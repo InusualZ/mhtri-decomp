@@ -16,6 +16,9 @@
  *   light_obj_is_enable, light_set_is_valid, light_setting_get_num_light_obj (`g3d/g3d_anmscn.cpp`'s kept copies of
  *   LightObj::Enable/Disable/IsEnable, LightSet::IsValid and LightSetting::GetNumLightObj).
  * RESIDUALS. The anmscn copies above are declared here until their owner names them (g3d-draw#7..#11).
+ * SHAPES. InitLightShininess divides by 2.0f (`* 0.5f` swaps the fmuls operands); the LightSetting constructor
+ *   stores its parameters through the cast `pSelf` before naming its locals (retail stores from the incoming
+ *   registers) and declares `white` before `amb` (the two 0xFFFFFFFF pool words are created in that order).
  */
 
 #include "types.h"
@@ -129,7 +132,7 @@ namespace g3d {
 #pragma fp_contract off
 /* 0x8007A768 (0x60): sets the specular shininess and makes the light specular. */
 void LightObj::InitLightShininess(f32 shininess) {
-    GXInitLightAttn(&mObj, 0.0f, 0.0f, 1.0f, shininess * 0.5f, 0.0f, 1.0f - shininess * 0.5f);
+    GXInitLightAttn(&mObj, 0.0f, 0.0f, 1.0f, shininess / 2.0f, 0.0f, 1.0f - shininess / 2.0f);
     mFlag = (mFlag & ~1) | 2;
 }
 #pragma fp_contract reset
@@ -195,16 +198,15 @@ extern "C" {
 void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 numLightObj, s32 pAmbLightObjBuf,
                          u32 numAmbLightObj) { /* untyped: opaque handle - the LightSetting record */
     using namespace nw4r::g3d;
+    ((LightSetting*)pSelf)->mNumLight = numLightObj;
+    ((LightSetting*)pSelf)->mNumLightSet = numAmbLightObj;
+    ((LightSetting*)pSelf)->mpLightObjArray = (LightObj*)pLightObjBuf;
+    ((LightSetting*)pSelf)->mpAmbLightObjArray = (AmbLightObj*)pLightAnmBuf;
+    ((LightSetting*)pSelf)->mpLightSetDataArray = (LightSetData*)pAmbLightObjBuf;
     LightSetting* pSetting = (LightSetting*)pSelf;
     LightObj* pLightObjArray = (LightObj*)pLightObjBuf;
     AmbLightObj* pAmbLightObjArray = (AmbLightObj*)pLightAnmBuf;
     LightSetData* pLightSetDataArray = (LightSetData*)pAmbLightObjBuf;
-
-    pSetting->mNumLight = numLightObj;
-    pSetting->mNumLightSet = numAmbLightObj;
-    pSetting->mpLightObjArray = pLightObjArray;
-    pSetting->mpAmbLightObjArray = pAmbLightObjArray;
-    pSetting->mpLightSetDataArray = pLightSetDataArray;
     bool countsFit = (u16)numLightObj <= 128 && (u16)numAmbLightObj <= 128;
     if (!countsFit) {
         nw4r::db::Panic("g3d_light.cpp", 0x134,
@@ -238,6 +240,7 @@ void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 nu
     pSetting->mpLightSetDataArray[0].idxLight[1] = 2;
     pSetting->mpLightSetDataArray[0].idxAmbLight = -1;
 
+    GXColor white = {0xFF, 0xFF, 0xFF, 0xFF};
     AmbLightObj amb = {0xFF, 0xFF, 0xFF, 0xFF};
     LightObj spotLight;
     LightObj pointLight;
@@ -252,7 +255,6 @@ void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 nu
     specLight.Clear();
     offLight.Clear();
 
-    GXColor white = {0xFF, 0xFF, 0xFF, 0xFF};
     spotLight.InitLightColor(white);
     fn_8007A5A8(&spotLight, 4000000.0f, 4000000.0f, 4000000.0f);
     fn_8007A5E4(&spotLight, 0.0f, -1.0f, 0.0f);

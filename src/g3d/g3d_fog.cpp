@@ -11,9 +11,10 @@
  * NAMES. Fog, FogData and the members are nw4r's.  fog_ctor, fog_init and fn_8007A1B8 keep C names because
  *   `g3d/g3d_scnroot.cpp` and `stage/stg_w.cpp` call them by those names (nw4r's Fog::Fog, Fog::Init and
  *   Fog::GetFogParam).  GUESS: fog_set_data (0x80079FE4, the handle's store).
- * RESIDUALS. CopyTo calls the record's assignment out of line (memberwise) where retail copies it inline as a block
- *   (`lfd`/`stfd`); the inline memberwise copy (without `dont_inline`) scores lower.
- *   mtx44_ptr (MTX44's conversion to the GX matrix) is g3d/g3d_camera.cpp's kept copy, declared here.
+ * SHAPES. CopyTo copies the record as six doublewords (FogDataBlock, retail's `lfd`/`stfd` pairs): a FogData
+ *   assignment is memberwise under this compiler (out of line under `dont_inline`), and its two handles are separate
+ *   temporaries (stack slots 0xC and 0x8).
+ * RESIDUALS. mtx44_ptr (MTX44's conversion to the GX matrix) is g3d/g3d_camera.cpp's kept copy, declared here.
  */
 
 #include "types.h"
@@ -84,11 +85,15 @@ void fog_init(s32 pSelf) {
 namespace nw4r {
 namespace g3d {
 
+/* The record seen as six doublewords, the unit CopyTo copies it in. size: 0x30 */
+struct FogDataBlock {
+    /* +0x00 */ f64 words[6];
+};
+
 /* 0x8007A0B4 (0xFC): copies the record to `pDst` and returns a handle on the copy (a null handle when there is
  * nothing to copy). */
 /* untyped: byte range - the copy's destination */
 Fog Fog::CopyTo(void* pDst) const {
-    Fog fog;
     if ((u32)pDst & 3) {
         nw4r::db::Panic("g3d_fog.cpp", 0x3D, "NW4R:Failed assertion !((u32)pDst & 0x3)");
     }
@@ -96,9 +101,14 @@ Fog Fog::CopyTo(void* pDst) const {
         nw4r::db::Panic("g3d_fog.cpp", 0x3E, "NW4R:Failed assertion IsValid()");
     }
     if (pDst != NULL && fog_is_valid(this)) {
-        *(FogData*)pDst = *ptr();
+        Fog fog;
+        const FogDataBlock* pSrc = (const FogDataBlock*)ptr();
+        for (int i = 0; i < 6; i++) {
+            ((FogDataBlock*)pDst)->words[i] = pSrc->words[i];
+        }
         return *(Fog*)fog_ctor((s32)&fog, pDst);
     }
+    Fog fog;
     return *(Fog*)fog_ctor((s32)&fog, NULL);
 }
 

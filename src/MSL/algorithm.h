@@ -136,7 +136,8 @@ void __sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
         if (++jitter >= 5) {
             jitter = -4;
         }
-        RandomAccessIterator m2 = first + 3 * n / 4 + jitter % 5;
+        long n34 = 3 * n / 4;
+        RandomAccessIterator m2 = first + (n34 + jitter % 5);
         if (++jitter >= 5) {
             jitter = -4;
         }
@@ -169,8 +170,7 @@ void __sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
         if (i == first) {
             swap(*i, *pivot);
             ++i;
-            j = last - 1;
-            if (!comp(*first, *j)) {
+            if (!comp(*first, *(j = last - 1))) {
                 while (i != last && !comp(*first, *i)) {
                     ++i;
                 }
@@ -221,7 +221,8 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
         if (++jitter >= 5) {
             jitter = -4;
         }
-        RandomAccessIterator m2 = first + 3 * n / 4 + jitter % 5;
+        long n34 = 3 * n / 4;
+        RandomAccessIterator m2 = first + (n34 + jitter % 5);
         if (++jitter >= 5) {
             jitter = -4;
         }
@@ -254,8 +255,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
         if (i == first) {
             swap(*i, *pivot);
             ++i;
-            j = last - 1;
-            if (!comp(*first, *j)) {
+            if (!comp(*first, *(j = last - 1))) {
                 while (i != last && !comp(*first, *i)) {
                     ++i;
                 }

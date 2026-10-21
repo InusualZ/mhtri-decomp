@@ -9,19 +9,24 @@
  *   `g3d/g3d_camera.cpp`'s 0x80795DD0).  SetupMaterial and the indirect-matrix operation's constructor are called
  *   only from Draw1Mat1ShpDirectly's chain, so the TU opens at 0x800761BC; `g3d/g3d_draw.cpp` opens on
  *   "g3d_draw.cpp" and a second pooled 1.0 at 0x800777B0.
- * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106) except SetupMaterial, which measures
- *   better with the pass on; `#pragma dont_inline on` (the accessors and the compiler-generated copies are called
- *   out of line, as retail does).
+ * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106); `#pragma dont_inline on` (the
+ *   accessors and the compiler-generated copies are called out of line, as retail does); `#pragma fp_contract off`
+ *   around Draw1Mat1ShpDirectly (retail keeps `fmuls` + `fadds` for the fur colour blends).
  * NAMES. nw4r's where the map, the asserts or the SDK carry them (Draw1Mat1ShpDirectly, Draw1Mat1ShpSwap's
  *   vtx*Table fields, GDWrite_u8/u16/u32, GDSetCullMode).  GUESS: SetupMaterial (0x800761BC),
  *   g3d_ind_mtx_op_ctor (0x8007663C), g3d_gd_set_chan_mat_color (XF 0x100C plus the channel), GDWriteXFCmd,
  *   ResVtxFurPos::GetNumLayer (0x800774A4), ResMatFurData's alphaPowExp/colorPowExp.
- * RESIDUALS. SetupMaterial: the parameters' register colouring and the ambient colour copy (retail copies it byte
- *   by byte) differ.  Draw1Mat1ShpDirectly: register colouring and stack slots.  The copy constructors of the swap's
- *   handles are this TU's own (retail calls other units' kept copies): relocation names only.  The indirect-matrix
+ * RESIDUALS. Draw1Mat1ShpDirectly: the parameters' registers (r22.. for retail's r26..) and the by-value
+ *   temporaries' stack slots (8 bytes lower): retail's fur position handle is a temporary copied by the copy
+ *   constructor (0x38), ours a named word from res_shp_get_vtx_fur_pos (a `const u32&` does not move it).
+ *   The copy constructors of the swap's handles are this TU's own (retail calls other units' kept copies): relocation names only.  The indirect-matrix
  *   callback and its operation are `g3d/g3d_state.cpp`'s types, declared here until that unit's header carries
  *   them (g3d-draw#3); STOPGAPs g3d-draw#4..#6.  Data: literals emitted, order and the inline copies' separate
  *   strings not yet retail's; flipcheck is not ready.
+ * SHAPES. SetupMaterial copies the loaded ambient colour member by member into a colour declared before it and
+ *   passes the channel's light flag as `(ctrl & 8) ? true : false` (evaluated first, as retail).
+ *   Draw1Mat1ShpDirectly nests the draw under `shp.IsValid() && shp.IsVisible()`, declares the fur pass's arrays and
+ *   colours before its handles (MWCC orders a frame by size, then declaration) and names the indirect stage id once.
  */
 
 #include "types.h"
@@ -62,7 +67,6 @@ void GDWrite_u8(u8 value);
 namespace nw4r {
 namespace g3d {
 
-#pragma peephole on
 /* 0x800761BC (0x480): loads the material's state (or the swap's replacements) unless the material is skipped, in
  * which case only the indirect matrices are offered to the callback. */
 static void SetupMaterial(ResMat mat, u32 ctrl, Draw1Mat1ShpSwap* pSwap, G3dIndMtxCallback* pIndMtxOp,
@@ -123,16 +127,20 @@ static void SetupMaterial(ResMat mat, u32 ctrl, Draw1Mat1ShpSwap* pSwap, G3dIndM
         u32 maskDiffAlpha;
         u32 maskSpecColor;
         u32 maskSpecAlpha;
+        GXColor amb;
         GXColor ambLoaded;
         g3d_state_load_light_set(misc.GetLightSetIdx(), &maskDiffColor, &maskDiffAlpha, &maskSpecColor,
                                  &maskSpecAlpha, &ambLoaded);
-        GXColor amb = ambLoaded;
+        amb.r = ambLoaded.r;
+        amb.g = ambLoaded.g;
+        amb.b = ambLoaded.b;
+        amb.a = ambLoaded.a;
         if (pSwap == NULL || !pSwap->chan.IsValid()) {
             g3d_state_load_mat_chan(mat.GetResMatChan(), maskDiffColor, maskDiffAlpha, maskSpecColor, maskSpecAlpha,
-                                    amb, (ctrl & 8) != 0);
+                                    amb, (ctrl & 8) ? true : false);
         } else {
             g3d_state_load_mat_chan(pSwap->chan, maskDiffColor, maskDiffAlpha, maskSpecColor, maskSpecAlpha, amb,
-                                    (ctrl & 8) != 0);
+                                    (ctrl & 8) ? true : false);
         }
         if (pSwap == NULL || !pSwap->texCoordGen.IsValid()) {
             g3d_state_load_tex_coord_gen(mat.GetResMatTexCoordGen());
@@ -155,7 +163,6 @@ static void SetupMaterial(ResMat mat, u32 ctrl, Draw1Mat1ShpSwap* pSwap, G3dIndM
         }
     }
 }
-#pragma peephole off
 
 }  // namespace g3d
 }  // namespace nw4r
@@ -281,6 +288,7 @@ nw4r::g3d::ResMatMisc::ResMatMisc(void* pData) : ResCommon<ResMatMiscData>(pData
 /* 0x800769EC (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatMiscData)
 
+#pragma fp_contract off
 /* 0x800769F4 (0x9A4): draws one shape with one material: the material state first, then either every fur layer
  * (each with its layer ratio's colours and indirect matrices) or the shape once, through the swap's vertex tables
  * when it has them. */
@@ -307,170 +315,170 @@ void nw4r::g3d::Draw1Mat1ShpDirectly(ResMat mat, ResShp shp, const math::MTX34* 
     }
     SetupMaterial(mat, ctrl, pSwap, pIndMtxOp, bIgnoreMaterial);
 
-    if (!shp.IsValid() || !shp.IsVisible()) {
-        return;
-    }
+    if (shp.IsValid() && shp.IsVisible()) {
+        if (bFur) {
+            f32 alphaPowExp = res_mat_fur_ref(&fur)->alphaPowExp;
+            f32 colorPowExp = res_mat_fur_ref(&fur)->colorPowExp;
+            math::MTX34 indMtx[3];
+            MTX34_ctor(&indMtx[0]);
+            MTX34_ctor(&indMtx[1]);
+            MTX34_ctor(&indMtx[2]);
+            u32 matSrc[4];
+            u32 attnFn[4];
+            /* The channel order the colour controls are read in: colour 0, alpha 0, colour 1, alpha 1. */
+            const u32 chanID[4] = {0, 2, 1, 3};
+            GXColor matColor[2];
+            GXColor kcolor0;
+            GXColor kcolor1;
+            GXColor kcolor2;
+            u8 furInd[3];
+            s8 indScaleExp[3];
 
-    if (bFur) {
-        f32 alphaPowExp = res_mat_fur_ref(&fur)->alphaPowExp;
-        f32 colorPowExp = res_mat_fur_ref(&fur)->colorPowExp;
-        math::MTX34 indMtx[3];
-        MTX34_ctor(&indMtx[0]);
-        MTX34_ctor(&indMtx[1]);
-        MTX34_ctor(&indMtx[2]);
-        /* The channel order the colour controls are read in: colour 0, alpha 0, colour 1, alpha 1. */
-        const u32 chanID[4] = {0, 2, 1, 3};
+            bool useMat = true;
+            bool noSwap = pSwap == NULL;
+            if (!noSwap && pSwap->tevColor.IsValid()) {
+                useMat = false;
+            }
+            ResMatTevColor tevColor(useMat ? mat.GetResMatTevColor() : pSwap->tevColor);
+            tevColor.GXGetTevKColor(GX_KCOLOR0, &kcolor0);
+            tevColor.GXGetTevKColor(GX_KCOLOR1, &kcolor1);
+            tevColor.GXGetTevKColor(GX_KCOLOR2, &kcolor2);
+            u8 kcolor2G = kcolor2.g;
 
-        bool noSwap = pSwap == NULL;
-        bool useMat = true;
-        if (!noSwap && pSwap->tevColor.IsValid()) {
             useMat = false;
-        }
-        ResMatTevColor tevColor(useMat ? mat.GetResMatTevColor() : pSwap->tevColor);
-        GXColor kcolor0;
-        GXColor kcolor1;
-        GXColor kcolor2;
-        tevColor.GXGetTevKColor(GX_KCOLOR0, &kcolor0);
-        tevColor.GXGetTevKColor(GX_KCOLOR1, &kcolor1);
-        tevColor.GXGetTevKColor(GX_KCOLOR2, &kcolor2);
-        u8 kcolor2G = kcolor2.g;
-
-        useMat = false;
-        if (noSwap || !pSwap->chan.IsValid()) {
-            useMat = true;
-        }
-        ResMatChan chan(useMat ? mat.GetResMatChan() : pSwap->chan);
-        GXColor matColor[2];
-        chan.GXGetChanMatColor(0, &matColor[0]);
-        chan.GXGetChanMatColor(1, &matColor[1]);
-        u32 matSrc[4];
-        u32 attnFn[4];
-        for (u8 i = 0; i < 4; i++) {
-            chan.GXGetChanCtrl(chanID[i], NULL, NULL, &matSrc[i], NULL, NULL, &attnFn[i]);
-        }
-
-        useMat = false;
-        if (noSwap || !pSwap->misc.IsValid()) {
-            useMat = true;
-        }
-        ResMatMisc misc(useMat ? mat.GetResMatMisc() : pSwap->misc);
-        useMat = false;
-        if (noSwap || !pSwap->indMtxAndScale.IsValid()) {
-            useMat = true;
-        }
-        ResMatIndMtxAndScale ind(useMat ? mat.GetResMatIndMtxAndScale() : pSwap->indMtxAndScale);
-
-        u8 furInd[3];
-        s8 indScaleExp[3];
-        for (u32 i = 0; i < 3; i++) {
-            ResMatMiscData::IndirectMethod method;
-            s8 normalMapRef;
-            misc.GetIndirectMethod((_GXIndTexMtxID)(i + 1), &method, &normalMapRef);
-            if (method == ResMatMiscData::FUR) {
-                furInd[i] = 1;
-                ind.GXGetIndTexMtx((_GXIndTexMtxID)(i + 1), &indMtx[i], &indScaleExp[i]);
-            } else {
-                furInd[i] = 0;
+            if (noSwap || !pSwap->chan.IsValid()) {
+                useMat = true;
             }
-        }
+            ResMatChan chan(useMat ? mat.GetResMatChan() : pSwap->chan);
+            chan.GXGetChanMatColor(0, &matColor[0]);
+            chan.GXGetChanMatColor(1, &matColor[1]);
+            for (u8 i = 0; i < 4; i++) {
+                chan.GXGetChanCtrl(chanID[i], NULL, NULL, &matSrc[i], NULL, NULL, &attnFn[i]);
+            }
 
-        g3d_state_load_shp_pre_prim(shp);
-        if (ctrl & 4) {
-            GDSetCullMode(GX_CULL_FRONT);
-            g3d_state_invalidate(0x10);
-        }
+            useMat = false;
+            if (noSwap || !pSwap->misc.IsValid()) {
+                useMat = true;
+            }
+            ResMatMisc misc(useMat ? mat.GetResMatMisc() : pSwap->misc);
+            useMat = false;
+            if (noSwap || !pSwap->indMtxAndScale.IsValid()) {
+                useMat = true;
+            }
+            ResMatIndMtxAndScale ind(useMat ? mat.GetResMatIndMtxAndScale() : pSwap->indMtxAndScale);
 
-        u32 furPosData = res_shp_get_vtx_fur_pos((ResHandle*)&shp);
-        ResVtxFurPos furPos(*(const ResVtxFurPos*)&furPosData);
-        u32 numLayer = furPos.GetNumLayer();
-        for (u16 layer = 0; layer < numLayer; layer++) {
-            f32 ratio = fur.GetLayerRatio(layer);
-            f32 invRatio = 1.0f - ratio;
-            f32 alphaRatio = math::FPow(ratio, alphaPowExp);
-            f32 colorRatio = math::FPow(ratio, colorPowExp);
-            f32 kRatio = math::FPow(ratio, 4.0f);
-            kcolor2.r = 255.0f * ratio;
-            kcolor2.g = kcolor2G * kRatio;
-            GXSetTevKColor(GX_KCOLOR2, kcolor2);
-
-            for (u8 i = 0; i < 3; i++) {
-                if (furInd[i]) {
-                    f32 m[2][3];
-                    m[0][0] = ratio * indMtx[i].m[0][0];
-                    m[0][1] = ratio * indMtx[i].m[0][1];
-                    m[0][2] = indMtx[i].m[0][2];
-                    m[1][0] = ratio * indMtx[i].m[1][0];
-                    m[1][1] = ratio * indMtx[i].m[1][1];
-                    m[1][2] = indMtx[i].m[1][2];
-                    GXSetIndTexMtx(i + 1, m, indScaleExp[i]);
+            for (u32 i = 0; i < 3; i++) {
+                ResMatMiscData::IndirectMethod method;
+                s8 normalMapRef;
+                _GXIndTexMtxID id = (_GXIndTexMtxID)(i + 1);
+                misc.GetIndirectMethod(id, &method, &normalMapRef);
+                if (method == ResMatMiscData::FUR) {
+                    furInd[i] = 1;
+                    ind.GXGetIndTexMtx(id, &indMtx[i], &indScaleExp[i]);
+                } else {
+                    furInd[i] = 0;
                 }
             }
 
-            u8 furR = kcolor0.r * invRatio + kcolor1.r * ratio;
-            u8 furG = kcolor0.g * invRatio + kcolor1.g * ratio;
-            u8 furB = kcolor0.b * invRatio + kcolor1.b * ratio;
-            u8 furA = kcolor0.a * (1.0f - alphaRatio) + kcolor1.a * alphaRatio;
-            for (u8 i = 0; i < 2; i++) {
-                u8 c = i * 2;
-                if (matSrc[c] == 0 || matSrc[c + 1] == 0) {
-                    GXColor color;
-                    if (attnFn[c] == 0) {
-                        color.r = colorRatio * matColor[i].r;
-                        color.g = colorRatio * matColor[i].g;
-                        color.b = colorRatio * matColor[i].b;
-                    } else {
-                        color.r = furR;
-                        color.g = furG;
-                        color.b = furB;
+            g3d_state_load_shp_pre_prim(shp);
+            if (ctrl & 4) {
+                GDSetCullMode(GX_CULL_FRONT);
+                g3d_state_invalidate(0x10);
+            }
+
+            u32 furPosData = res_shp_get_vtx_fur_pos((ResHandle*)&shp);
+            ResVtxFurPos furPos(*(const ResVtxFurPos*)&furPosData);
+            u32 numLayer = furPos.GetNumLayer();
+            for (u16 layer = 0; layer < numLayer; layer++) {
+                f32 ratio = fur.GetLayerRatio(layer);
+                f32 invRatio = 1.0f - ratio;
+                f32 alphaRatio = math::FPow(ratio, alphaPowExp);
+                f32 colorRatio = math::FPow(ratio, colorPowExp);
+                f32 kRatio = math::FPow(ratio, 4.0f);
+                kcolor2.r = 255.0f * ratio;
+                kcolor2.g = kcolor2G * kRatio;
+                GXSetTevKColor(GX_KCOLOR2, kcolor2);
+
+                for (u8 i = 0; i < 3; i++) {
+                    if (furInd[i]) {
+                        f32 m[2][3];
+                        m[0][0] = ratio * indMtx[i].m[0][0];
+                        m[0][1] = ratio * indMtx[i].m[0][1];
+                        m[0][2] = indMtx[i].m[0][2];
+                        m[1][0] = ratio * indMtx[i].m[1][0];
+                        m[1][1] = ratio * indMtx[i].m[1][1];
+                        m[1][2] = indMtx[i].m[1][2];
+                        GXSetIndTexMtx(i + 1, m, indScaleExp[i]);
                     }
-                    color.a = attnFn[c + 1] == 0 ? matColor[i].a : furA;
-                    g3d_gd_set_chan_mat_color(chanID[c], color);
+                }
+
+                u8 furR = kcolor0.r * invRatio + kcolor1.r * ratio;
+                u8 furG = kcolor0.g * invRatio + kcolor1.g * ratio;
+                u8 furB = kcolor0.b * invRatio + kcolor1.b * ratio;
+                u8 furA = kcolor0.a * (1.0f - alphaRatio) + kcolor1.a * alphaRatio;
+                for (u8 i = 0; i < 2; i++) {
+                    u8 c = i * 2;
+                    if (matSrc[c] == 0 || matSrc[c + 1] == 0) {
+                        GXColor color;
+                        if (attnFn[c] == 0) {
+                            color.r = colorRatio * matColor[i].r;
+                            color.g = colorRatio * matColor[i].g;
+                            color.b = colorRatio * matColor[i].b;
+                        } else {
+                            color.r = furR;
+                            color.g = furG;
+                            color.b = furB;
+                        }
+                        color.a = attnFn[c + 1] == 0 ? matColor[i].a : furA;
+                        g3d_gd_set_chan_mat_color(chanID[c], color);
+                    }
+                }
+
+                furPos.SetArray(layer);
+                g3d_state_load_shp_prim(shp, pViewPos, pViewNrm);
+            }
+        } else {
+            if (!(ctrl & 2)) {
+                g3d_state_load_shp_pre_prim(shp);
+                if (pSwap != NULL) {
+                    if (pSwap->vtxPosTable != NULL) {
+                        u32 shpPos = res_shp_get_vtx_pos((ResHandle*)&shp);
+                        if (((ResVtxPos*)&shpPos)->GetID() !=
+                            ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).GetID()) {
+                            nw4r::db::Panic("g3d_draw1mat1shp.cpp", 0x19D,
+                                            "NW4R:Failed assertion shp.GetResVtxPos().GetID() == "
+                                            "ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).GetID()");
+                        }
+                        ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).SetArray();
+                    }
+                    if (pSwap->vtxNrmTable != NULL) {
+                        s16 idx = shp.ref().idVtxNrm;
+                        if (idx >= 0) {
+                            ResVtxNrm(pSwap->vtxNrmTable[idx]).SetArray();
+                        }
+                    }
+                    if (pSwap->vtxClrTable != NULL) {
+                        s16 idx = shp.ref().idVtxClr[0];
+                        if (idx >= 0) {
+                            ResVtxClr(pSwap->vtxClrTable[idx]).SetArray(11);
+                        }
+                        idx = shp.ref().idVtxClr[1];
+                        if (idx >= 0) {
+                            ResVtxClr(pSwap->vtxClrTable[idx]).SetArray(12);
+                        }
+                    }
                 }
             }
-
-            furPos.SetArray(layer);
+            if (ctrl & 4) {
+                GDSetCullMode(GX_CULL_FRONT);
+                g3d_state_invalidate(0x10);
+            }
             g3d_state_load_shp_prim(shp, pViewPos, pViewNrm);
         }
-        return;
     }
-
-    if (!(ctrl & 2)) {
-        g3d_state_load_shp_pre_prim(shp);
-        if (pSwap != NULL) {
-            if (pSwap->vtxPosTable != NULL) {
-                u32 shpPos = res_shp_get_vtx_pos((ResHandle*)&shp);
-                if (((ResVtxPos*)&shpPos)->GetID() !=
-                    ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).GetID()) {
-                    nw4r::db::Panic("g3d_draw1mat1shp.cpp", 0x19D,
-                                    "NW4R:Failed assertion shp.GetResVtxPos().GetID() == "
-                                    "ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).GetID()");
-                }
-                ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).SetArray();
-            }
-            if (pSwap->vtxNrmTable != NULL) {
-                s16 idx = shp.ref().idVtxNrm;
-                if (idx >= 0) {
-                    ResVtxNrm(pSwap->vtxNrmTable[idx]).SetArray();
-                }
-            }
-            if (pSwap->vtxClrTable != NULL) {
-                s16 idx = shp.ref().idVtxClr[0];
-                if (idx >= 0) {
-                    ResVtxClr(pSwap->vtxClrTable[idx]).SetArray(11);
-                }
-                idx = shp.ref().idVtxClr[1];
-                if (idx >= 0) {
-                    ResVtxClr(pSwap->vtxClrTable[idx]).SetArray(12);
-                }
-            }
-        }
-    }
-    if (ctrl & 4) {
-        GDSetCullMode(GX_CULL_FRONT);
-        g3d_state_invalidate(0x10);
-    }
-    g3d_state_load_shp_prim(shp, pViewPos, pViewNrm);
 }
+
+#pragma fp_contract reset
 
 /* 0x80077398 (0x64): returns the shape block, panicking on a NULL handle. */
 nw4r::g3d::ResShpData& nw4r::g3d::ResShp::ref() {

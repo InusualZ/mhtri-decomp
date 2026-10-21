@@ -22,15 +22,16 @@
  *   fn_80077E64 and fn_80078904 (ResMdl's copy constructor and ResNode::IsVisible) keep their stems because
  *   `g3d/g3d_scnmdl.cpp` calls them by those names (g3d-draw#14).
  * RESIDUALS. PrepareIndMtxOp: the model-info word is a named local (retail: a temporary), so three stack slots
- *   shift.  The sort and __sort: registers of the outer copy differ and the second pivot's index is scaled twice
- *   (retail: once).  The handle assignments call this TU's own copies where retail calls other units' (res_node_assign,
+ *   shift (a `const u32&` temporary does not move them).  sort: the first/last/i registers differ (r27/r28/r29
+ *   for retail's r28/r29/r26); sort and __sort recompute the /12 reciprocal once more than retail (one `subi`).  The handle assignments call this TU's own copies where retail calls other units' (res_node_assign,
  *   res_mat_misc_copy_ctor): relocation names only.  The ResCommon<T>::operator= instances come out at the end of
  *   the object (retail: after each class's operator=).  Data: the literals are emitted but not yet in retail's
  *   order, and the inline copies' strings are merged; flipcheck is not ready.  STOPGAPs: g3d-draw#1, #3, #9.
  * SHAPES. `#pragma dont_inline on` reproduces retail's out-of-line accessors and compiler-generated assignments;
  *   the loop counters declared first (DrawMdlZ*, PrepareIndMtxOp) and the record pointer declared before the count
  *   (GatherMdlZ) give retail's register colouring; the specular half vector is written without a named scale and
- *   under `fp_contract off`.
+ *   under `fp_contract off`.  `MSL/algorithm.h`'s quicksort names the second pivot's `3 * n / 4` before adding the
+ *   jitter and tests `!comp(*first, *(j = last - 1))` in one expression (retail's scheduling of both).
  */
 
 #include "types.h"

@@ -37,8 +37,9 @@
  *   The two asm routines mtx34_axis_in_parent/mtx34_up_axis_in_parent open the range: their only callers are this
  *   unit's billboard builders and their constant calcview_det_epsilon_f32 (0x80795DB0) follows this unit's
  *   `.sdata2` pair, before g3d_calcvtx.cpp's.
- *   Partial: fn_8006F908 (98 %), mtx34_calc_billboard_y and mtx34_calc_billboard_y_persp (99.8 %: the parent node index
- *   takes r5 where retail keeps it in r0).
+ *   mtx34_calc_billboard_y and mtx34_calc_billboard_y_persp: the parent node index takes r5 where retail keeps it in
+ *   r0 (tried: s32, its declaration at every position of the function head, folding it into the call - worse or
+ *   equal).  fn_8006F908 declares the second square first (retail's f1/f2 colouring).
  *   flipcheck: `.text` short of the claim; `.rodata` byte-identical; `.data`/`.sdata`: the strings are literals,
  *   the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80); `.sdata2` (calcview_zero_f32/calcview_epsilon_f32/calcview_det_epsilon_f32) is declared, not emitted.
@@ -260,8 +261,9 @@ u32 res_node_get_child(ResHandle* pSelf)
 /* 0x8006F908 - the length of column `idx` of a 48-byte (12-float) matrix. */
 f32 fn_8006F908(const f32* pMtx, u32 idx) {
     const f32* p = (const f32*)((const u8*)pMtx + idx * 4);
+    f32 b;
     f32 a = p[8] * p[8];
-    f32 b = p[0] * p[0];
+    b = p[0] * p[0];
     f32 c = p[4] * p[4];
     return sqrt_f32(a + (b + c));
 }

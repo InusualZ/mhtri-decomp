@@ -11,13 +11,16 @@
  *   GUESS (the world-matrix attribute bit helpers), g3d_calc_world is a GUESS and g3d_calc_skinning is a GUESS (the
  *   node-tree and node-mix byte-code runners), res_mdl_get_info is a GUESS and res_mdl_info_num_view_mtx is a GUESS
  *   (the ResMdlInfo handle and its view-matrix count).
- * RESIDUALS. Partial: fn_800736F8, g3d_calc_world, fn_80073CE0, fn_80073D34, fn_80073F00, addVec3To.
+ * RESIDUALS. Partial: g3d_calc_world (register numbering and the byte-code switch's layout).
+ *   NodeMtxRec is a view of nw4r::g3d::ChrAnmResult (g3d/g3d_anmchr.h) kept for fn_80073FA0's memberwise copy.
  *   g3d_calc_skinning: its blend weight's stack slot (retail 20, ours 8); the paired-single accumulators are register
  *   variables used by inline `asm` blocks (retail's f31-f26).
  *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data`/`.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80);
  *   `.sdata2` byte-identical.
- * SHAPES. `#pragma peephole off` around fn_8007403C keeps retail's masked compare (playbook 32); file-scope
+ * SHAPES. fn_80073CE0/fn_80073D34/fn_80073F00 call ICalcWorldCallback's ExecCallbackC/B/A virtually (the canonical
+ *   `r12` dispatch) with the model handle by value; g3d_calc_world calls AnmObjChr::GetResult virtually.
+ *   `#pragma peephole off` around fn_8007403C keeps retail's masked compare (playbook 32); file-scope
  *   `#pragma fp_contract off`.
  *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
@@ -32,6 +35,7 @@
 #include "g3d/g3d_anmchr.h" /* res_node_ref_nonconst (rule 2) */
 #include "nw4r/fn_805012C4.h" /* nw4r::math::MTX34Scale (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC..mtx34_copy_ps (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ICalcWorldCallback, FuncObjCalcWorld (rule 1) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 #pragma pool_data off
@@ -59,7 +63,7 @@ struct ResNodeData;
 /* externs: the SDK and the neighbouring units this one calls (the map owns their names)            */
 /* ------------------------------------------------------------------------------------------------ */
 
-extern "C" void vec3_add_ps(void* pOut, const void* pIn);
+extern "C" void vec3_add_ps(void* pOut, const void* pA, const void* pB);
 extern "C" s32 res_node_is_valid(const void* p);
 extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
@@ -83,22 +87,19 @@ struct VtxAttrRef {
     /* +0x8 */ u32* mpFlags;
 }; /* size: 0xC */
 
-/* The polymorphic node-callback object `fn_80073CE0`/`fn_80073D34`/`fn_80073F00` dispatch through: a
- * vtable at +0x0, a flag byte at +0x4 and the node id at +0x6. */
-struct NodeCallback {
-    /* +0x0 */ void** mpVtbl;
-    /* +0x4 */ u8 mFlags;
-    /* +0x5 */ u8 mUnk05;
-    /* +0x6 */ u16 mNodeID;
-}; /* size: 0x8 */
+namespace nw4r {
+namespace g3d {
 
-/* The three-word record `fn_80073DC4` packs for the vtable's `+0x10` slot: the node's matrix, its
- * three-float offset and the matrix id slot. */
-struct MtxArg {
-    /* +0x0 */ void* mpMtx;
-    /* +0x4 */ void* mpVec;
-    /* +0x8 */ void* mpMtxID;
-}; /* size: 0xC */
+/* The node matrix, scale and attribute word a world callback's second slot may edit (fn_80073DC4 builds it and
+ * asserts each pointer).  size: 0xC */
+struct WorldMtxManip {
+    /* +0x0 */ math::MTX34* mpM;
+    /* +0x4 */ math::VEC3* mpS;
+    /* +0x8 */ u32* mpAttr;
+};
+
+}  // namespace g3d
+}  // namespace nw4r
 
 /* One node's matrix record (`fn_80073FA0` copies the whole 0x4C): a small header and the 0x30-byte
  * matrix at +0x1C.  Only the field boundaries the copy emits are named. */
@@ -130,15 +131,15 @@ u32 world_mtx_attr_not_scale_one(u32 value);
 u32 world_mtx_attr_scale_uniform(u32 value);
 u32 world_mtx_attr_scale_one(u32 value);
 void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, ResHandle* pMdl,
-                 NodeCallback* pNodeCallback, NodeCallback* pNodeCallback2, u32 flags);
-void fn_80073CE0(NodeCallback* pSelf, void* pMtx, s32* pMtxID);
+                 nw4r::g3d::AnmObjChr* pNodeCallback, nw4r::g3d::FuncObjCalcWorld* pNodeCallback2, u32 flags);
+void fn_80073CE0(nw4r::g3d::FuncObjCalcWorld* pSelf, void* pMtx, s32* pMtxID);
 void fn_80073D30(void);
-void fn_80073D34(NodeCallback* pSelf, u32 id, void* pMtx, void* pVec, s32* pMtxID, s32* pArg5);
+void fn_80073D34(nw4r::g3d::FuncObjCalcWorld* pSelf, u32 id, void* pMtx, void* pVec, s32* pMtxID, s32* pArg5);
 void fn_80073DC0(void);
-MtxArg* fn_80073DC4(MtxArg* pSelf, void* pM, void* pS, void* pAttr);
+nw4r::g3d::WorldMtxManip* fn_80073DC4(nw4r::g3d::WorldMtxManip* pSelf, void* pM, void* pS, void* pAttr);
 u32 fn_80073E80(u32 value, u32 low);
 u32 fn_80073E8C(void* pSelf);
-void fn_80073F00(NodeCallback* pSelf, u32 id, s32* pMtx, s32* pMtxID);
+void fn_80073F00(nw4r::g3d::FuncObjCalcWorld* pSelf, u32 id, s32* pMtx, s32* pMtxID);
 void fn_80073F64(void);
 nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 void fn_80073FA0(NodeMtxRec* pDst, const NodeMtxRec* pSrc);
@@ -166,8 +167,7 @@ void fn_800736F8(VtxAttrRef* pSelf, f32 x, f32 y, f32 z) {
             *pSelf->mpFlags = world_mtx_attr_scale_one(*pSelf->mpFlags);
             return;
         }
-        u32* pFlags = pSelf->mpFlags;
-        *pFlags = world_mtx_attr_scale_uniform(*pFlags);
+        *pSelf->mpFlags = world_mtx_attr_scale_uniform(*pSelf->mpFlags);
         *pSelf->mpFlags = world_mtx_attr_not_scale_one(*pSelf->mpFlags);
         return;
     }
@@ -197,7 +197,7 @@ u32 world_mtx_attr_scale_one(u32 value) {
 /* Walk a `ResByteCodeData` node tree: build each node's matrix record, compute its world matrix
  * (`fn_800D77B0` / `fn_800D7D24`), then scale the matrices the byte code marked. */
 void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, ResHandle* pMdl,
-                 NodeCallback* pNodeCallback, NodeCallback* pNodeCallback2, u32 flags) {
+                 nw4r::g3d::AnmObjChr* pNodeCallback, nw4r::g3d::FuncObjCalcWorld* pNodeCallback2, u32 flags) {
     s32 mayaDisable;
     u8 singleMtx;
     NodeMtxRec rec;
@@ -248,9 +248,8 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                 f32* pSrcScale = pScale + targetID * 3;
                 s32 prev = pMtxIDs[targetID];
                 if (pNodeCallback != NULL) {
-                    void* (*pGetRec)(void*, NodeMtxRec*, void*) =
-                        (void* (*)(void*, NodeMtxRec*, void*))pNodeCallback->mpVtbl[14];
-                    pRec = (NodeMtxRec*)pGetRec(pNodeCallback, &rec, (void*)res_node_get_id((const ResHandle*)&s1C));
+                    pRec = (NodeMtxRec*)pNodeCallback->GetResult((nw4r::g3d::ChrAnmResult*)&rec,
+                                                                 res_node_get_id((const ResHandle*)&s1C));
                 }
                 s32 reset;
                 if (pNodeCallback == NULL || pRec->mUnk00 == 0) {
@@ -339,11 +338,9 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
 }
 
 /* Notify the callback object's `+0x14` vtable slot that one node's matrix is ready. */
-void fn_80073CE0(NodeCallback* pSelf, void* pMtx, s32* pMtxID) {
-    if ((pSelf->mFlags & 4) != 0) {
-        s32 mtxID = *pMtxID;
-        void (*pNotify)(void*, void*, s32*, void*) = (void (*)(void*, void*, s32*, void*))pSelf->mpVtbl[5];
-        pNotify(pSelf->mpVtbl, pMtx, &mtxID, pSelf);
+void fn_80073CE0(nw4r::g3d::FuncObjCalcWorld* pSelf, void* pMtx, s32* pMtxID) {
+    if ((pSelf->mTiming & 4) != 0) {
+        pSelf->mpCallback->ExecCallbackC((nw4r::math::MTX34*)pMtx, *(nw4r::g3d::ResMdl*)pMtxID, pSelf);
     }
 }
 
@@ -351,23 +348,21 @@ void fn_80073D30(void) {
 }
 
 /* Notify the callback object's `+0x10` vtable slot for the matching node id. */
-void fn_80073D34(NodeCallback* pSelf, u32 id, void* pMtx, void* pVec, s32* pMtxID, s32* pArg5) {
-    if (id == pSelf->mNodeID && (pSelf->mFlags & 2) != 0) {
-        MtxArg arg;
+void fn_80073D34(nw4r::g3d::FuncObjCalcWorld* pSelf, u32 id, void* pMtx, void* pVec, s32* pMtxID, s32* pArg5) {
+    if (id == pSelf->mNodeID && (pSelf->mTiming & 2) != 0) {
+        nw4r::g3d::WorldMtxManip arg;
         fn_80073DC4(&arg, pMtx, pVec, pMtxID);
-        s32 mtxID = *pArg5;
-        void (*pNotify)(void*, void*, s32*, void*) = (void (*)(void*, void*, s32*, void*))pSelf->mpVtbl[4];
-        pNotify(pSelf->mpVtbl, &arg, &mtxID, pSelf);
+        pSelf->mpCallback->ExecCallbackB(&arg, *(nw4r::g3d::ResMdl*)pArg5, pSelf);
     }
 }
 
 void fn_80073DC0(void) {
 }
 
-MtxArg* fn_80073DC4(MtxArg* pSelf, void* pM, void* pS, void* pAttr) {
-    pSelf->mpMtx = pM;
-    pSelf->mpVec = pS;
-    pSelf->mpMtxID = pAttr;
+nw4r::g3d::WorldMtxManip* fn_80073DC4(nw4r::g3d::WorldMtxManip* pSelf, void* pM, void* pS, void* pAttr) {
+    pSelf->mpM = (nw4r::math::MTX34*)pM;
+    pSelf->mpS = (nw4r::math::VEC3*)pS;
+    pSelf->mpAttr = (u32*)pAttr;
     if (pM == NULL) {
         nw4r::db::Panic("g3d_calcworld.h", 46, "NW4R:Pointer must not be NULL (m)");
     }
@@ -395,11 +390,9 @@ u32 fn_80073E8C(void* pSelf) {
 }
 
 /* Notify the callback object's `+0xC` vtable slot for the matching node id. */
-void fn_80073F00(NodeCallback* pSelf, u32 id, s32* pMtx, s32* pMtxID) {
-    if (id == pSelf->mNodeID && (pSelf->mFlags & 1) != 0) {
-        s32 mtxID = *pMtxID;
-        void (*pNotify)(void*, void*, s32*, void*) = (void (*)(void*, void*, s32*, void*))pSelf->mpVtbl[3];
-        pNotify(pSelf->mpVtbl, pMtx, &mtxID, pSelf);
+void fn_80073F00(nw4r::g3d::FuncObjCalcWorld* pSelf, u32 id, s32* pMtx, s32* pMtxID) {
+    if (id == pSelf->mNodeID && (pSelf->mTiming & 1) != 0) {
+        pSelf->mpCallback->ExecCallbackA((nw4r::g3d::ChrAnmResult*)pMtx, *(nw4r::g3d::ResMdl*)pMtxID, pSelf);
     }
 }
 
@@ -407,7 +400,7 @@ void fn_80073F64(void) {
 }
 
 nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
-    vec3_add_ps(pOut, pIn);
+    vec3_add_ps(pOut, pOut, pIn);
     return pOut;
 }
 

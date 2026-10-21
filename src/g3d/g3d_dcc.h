@@ -19,8 +19,8 @@ struct TexSrt;
 /* Builds the texture matrix of one SRT record into `pMtx` (GUESS name: the DCC sibling of g3d_calc_tex_mtx_xsi). */
 /* 0x80075E9C - builds the texture matrix of one SRT record in the given texture-matrix mode. */
 extern "C" void g3d_calc_tex_mtx(nw4r::math::MTX34* pMtx, BOOL bSet, const nw4r::g3d::TexSrt* pSrt, u32 flag,
-                                 u32 mode);
-extern "C" void g3d_calc_tex_mtx_dcc(nw4r::math::MTX34* pMtx, bool bSet, const nw4r::g3d::TexSrt* pSrt, u32 flag);
+                                 int mode);
+extern "C" void g3d_calc_tex_mtx_dcc(nw4r::math::MTX34* pMtx, BOOL bSet, const nw4r::g3d::TexSrt* pSrt, u32 flag);
 #endif
 
 #endif

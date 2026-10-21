@@ -55,10 +55,19 @@ class AnmObjMatClr;
 class AnmObjTexPat;
 class AnmObjTexSrt;
 
+struct ChrAnmResult;
+struct WorldMtxManip;
+struct FuncObjCalcWorld;
+
 /* The world-matrix callback a model runs for one node (its interface is implemented by the game).  size: 0x4 */
 class ICalcWorldCallback {
 public:
     virtual ~ICalcWorldCallback();
+    /* +0x0C/+0x10/+0x14 of the table: before a node's matrix (its animation result), after it (its matrix, scale
+     * and attribute word), and after the whole tree; `g3d/g3d_calcworld.cpp` dispatches them. */
+    virtual void ExecCallbackA(ChrAnmResult* pResult, ResMdl mdl, FuncObjCalcWorld* pFuncObj);
+    virtual void ExecCallbackB(WorldMtxManip* pManip, ResMdl mdl, FuncObjCalcWorld* pFuncObj);
+    virtual void ExecCallbackC(math::MTX34* pMtxArray, ResMdl mdl, FuncObjCalcWorld* pFuncObj);
 };
 
 /* The callback, timing mask and node a world-matrix pass hands the calculator.  size: 0x8 */

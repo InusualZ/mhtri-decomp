@@ -13,8 +13,13 @@
  *   g3d_set_gqr7_s16_8 (0x8007A494) - named for the quantiser each writes.
  * RESIDUALS. g3d_state_set_render_mode (G3DState's render-mode setter, `g3d/g3d_state.cpp`) is declared here until its owner names
  *   it.  The `.sdata` claim is 8 bytes; the object emits the 4-byte pointer (the rest is link fill).
- * SHAPES. The GQR setters are SDK-style `static inline` functions with an `asm` block; MWCC inlines them behind a
- *   `b` to the next instruction.  OSInitFastCast is an `asm` function, so it stays out of line.
+ *   g3d_set_gqr6_s16_5/g3d_set_gqr7_s16_8: retail loads the arguments into r3/r4, branches `b +4` and runs the
+ *   shift/or body unfolded; ours (level 1) loads r4 first and has no `b`.  Measured: at -O3 the body folds,
+ *   an `inline asm` function is called and never inlined, `optimizewithasm off` and `opt_propagation off`
+ *   still fold.
+ * SHAPES. The GQR setters are `static inline` functions whose whole body is an `asm` block over the register
+ *   parameters, inlined under a scoped `#pragma optimization_level 1` (at -O3 the block's constants fold).
+ *   OSInitFastCast is an `asm` function, so it stays out of line.
  */
 
 #include "types.h"
@@ -42,14 +47,24 @@ const char* NW4R_G3D_Version_ = "<< NW4R    - G3D \tfinal   build: Jan 30 2010 1
 
 /* Writes GQR6 (both halves) from a type and a scale. */
 static inline void OSSetGQR6(register u32 type, register u32 scale) {
-    register u32 val = (((scale << 8) | type) << 16) | ((scale << 8) | type);
-    asm { mtspr 918, val }
+    asm {
+        slwi r0, scale, 8
+        or type, r0, type
+        slwi r0, type, 16
+        or r0, type, r0
+        mtspr 918, r0
+    }
 }
 
 /* Writes GQR7 (both halves) from a type and a scale. */
 static inline void OSSetGQR7(register u32 type, register u32 scale) {
-    register u32 val = (((scale << 8) | type) << 16) | ((scale << 8) | type);
-    asm { mtspr 919, val }
+    asm {
+        slwi r0, scale, 8
+        or type, r0, type
+        slwi r0, type, 16
+        or r0, type, r0
+        mtspr 919, r0
+    }
 }
 
 namespace nw4r { namespace g3d {
@@ -82,6 +97,7 @@ void g3d_init_fast_cast_gqrs(void) {
     g3d_set_gqr7_s16_8();
 }
 
+#pragma optimization_level 1
 /* 0x8007A494 (0x24): sets GQR7 to s16 with scale 8. */
 void g3d_set_gqr7_s16_8(void) {
     OSSetGQR7(7, 8);
@@ -91,6 +107,8 @@ void g3d_set_gqr7_s16_8(void) {
 void g3d_set_gqr6_s16_5(void) {
     OSSetGQR6(7, 5);
 }
+
+#pragma optimization_level reset
 
 /* 0x8007A4DC (0x34): sets GQR2..GQR5 to the u8/u16/s8/s16 fast-cast pairs. */
 asm void OSInitFastCast(void) {
