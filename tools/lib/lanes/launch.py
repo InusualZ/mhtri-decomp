@@ -57,10 +57,45 @@ def stage_task(main: str, key: str, task: str) -> str:
     return _fwd(path)
 
 
+def cwd_problem(main: str, cwd: str) -> str | None:
+    """Why a lane must not be launched in `cwd`, or None when it is a claimed lane's tree: a slot of `main`'s
+    pool that holds a claim (`pool.slot_claim_problem`, the rule `worktreehook arm --slot N` applies), or a
+    worktree a claim record names (a claim taken with the pool off). MAIN, a missing directory, an unclaimed slot
+    and any other directory are problems."""
+    from tools.lib.lanes import pool, registry
+    if not os.path.isdir(cwd):
+        return "cwd %s does not exist" % _fwd(cwd)
+    if registry.same_path(cwd, main):
+        return ("cwd is MAIN (%s) - a lane runs in its claimed slot, never the orchestrator's tree: "
+                "python tools/units/slots.py acquire <unit> --slot N --branch <branch> --worker <worker>"
+                % _fwd(main))
+    n = pool.slot_of_path(main, cwd)
+    if n is not None:
+        return pool.slot_claim_problem(main, n)
+    claims, ok = registry.read(main)
+    if ok and any(isinstance(rec, dict) and rec.get("worktree") and registry.same_path(rec["worktree"], cwd)
+                  for rec in claims.values()):
+        return None
+    return ("cwd %s is neither a slot of the pool nor a claim's worktree - launch a lane in the slot "
+            "`slots.py spawn` / `queue.py next` hands out" % _fwd(cwd))
+
+
 def lane_call(agent: str, cwd: str, task: str, name: str | None = None, session_id: str | None = None,
-              main: str | None = None, key: str | None = None, log_file: str | None = None) -> dict:
-    """The POSIX-shell launch command -> `{"call", "session_id", "task_file", "log_file"}`. The task is
-    single-quoted (`shlex.quote`); one over `INLINE_LIMIT` is staged under `main`/`key` (refused without them)."""
+              main: str | None = None, key: str | None = None, log_file: str | None = None,
+              cwd_check: str | None = None) -> dict:
+    """The POSIX-shell launch command -> `{"call", "session_id", "task_file", "log_file", "cwd_warning"}`. The task
+    is single-quoted (`shlex.quote`); one over `INLINE_LIMIT` is staged under `main`/`key` (refused without them).
+
+    `cwd_check` (needs `main`) runs `cwd_problem`: `"refuse"` raises SystemExit on a problem, `"warn"` returns it
+    as `cwd_warning` for the caller to print beside the line (the call stays one line); None (the default) builds
+    the line unchecked."""
+    warning = None
+    if cwd_check:
+        if cwd_check not in ("refuse", "warn") or not main:
+            raise SystemExit("lane_call: cwd_check is 'refuse' or 'warn' and needs main")
+        warning = cwd_problem(main, cwd)
+        if warning and cwd_check == "refuse":
+            raise SystemExit("REFUSED lane_call: %s" % warning)
     session_id = session_id or str(uuid.uuid4())
     parts = [os.environ.get(BIN_ENV) or "claude", "--agent", shlex.quote(agent)]
     if name:
@@ -80,7 +115,8 @@ def lane_call(agent: str, cwd: str, task: str, name: str | None = None, session_
     if log_file:
         parts += [">", shlex.quote(_fwd(log_file)), "2>&1"]
     call = "cd %s && %s" % (shlex.quote(_fwd(cwd)), " ".join(parts))
-    return {"call": call, "session_id": session_id, "task_file": task_file, "log_file": log_file}
+    return {"call": call, "session_id": session_id, "task_file": task_file, "log_file": log_file,
+            "cwd_warning": warning}
 
 
 def your_tree_lines(lines: list[str], b: dict) -> None:

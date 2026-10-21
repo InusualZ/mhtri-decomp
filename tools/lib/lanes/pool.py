@@ -181,7 +181,7 @@ def clear_lock(main: str, n: int) -> None:
 
 def slot_attached_branch(slot: str) -> str | None:
     p = subprocess.run(["git", "-C", slot, "symbolic-ref", "-q", "HEAD"], capture_output=True,
-                       text=True, encoding="utf-8", errors="replace")
+                       cwd=slot if os.path.isdir(slot) else None, text=True, encoding="utf-8", errors="replace")
     ref = (p.stdout or "").strip()
     if p.returncode == 0 and ref.startswith("refs/heads/"):
         return ref[len("refs/heads/"):]
@@ -293,6 +293,24 @@ def slot_of_path(main: str, path: str | None) -> int | None:
         if os.path.normcase(os.path.realpath(slot_dir(main, n))) == want:
             return n
     return None
+
+
+def claim_problem(n: int, branch: str | None, marked: bool) -> str | None:
+    """The one rule for "slot `n` holds a claimed lane": it is on a branch and carries its `.used` marker (what
+    `slots.py acquire` leaves). None when it does, else why not with the remedy. Pure: the caller reads the two
+    facts (`worktreehook` reads them through its swappable pool, `slot_claim_problem` through this module)."""
+    if branch and marked:
+        return None
+    return ("slot %d is not a claimed slot on a branch (branch=%r, `.used` marker %s) - claim it first: "
+            "python tools/units/slots.py acquire <unit> --slot %d --branch <branch> --worker <worker>"
+            % (n, branch, "present" if marked else "missing", n))
+
+
+def slot_claim_problem(main: str, n: int) -> str | None:
+    """`claim_problem` for slot `n` of `main`'s pool, its facts read from the slot directory."""
+    d = slot_dir(main, n)
+    exists = os.path.isdir(d)
+    return claim_problem(n, slot_attached_branch(d) if exists else None, marker_present(d) if exists else False)
 
 
 def lock_for_path(main: str, path: str | None) -> dict:

@@ -14,6 +14,7 @@ import subprocess
 import time
 
 from tools.lib.lanes import pool as slots  # the selftest swaps this name for a fake pool
+from tools.lib.lanes.pool import claim_problem  # the rule itself, never swapped
 from tools.lib.lanes import registry as lane_registry
 
 #: How long an arm token lives.  Long enough to launch a batch, short enough that a forgotten arm expires.
@@ -237,10 +238,10 @@ def create_bound(main: str, slot: int, data: dict) -> str:
     """
     d = slots.slot_dir(main, slot)
     branch = slots.slot_attached_branch(d) if os.path.isdir(d) else None
-    if not branch or not slots.marker_present(d):
+    why = claim_problem(slot, branch, os.path.isdir(d) and slots.marker_present(d))
+    if why:
         log(main, "create-bound-refused", slot=slot, branch=branch, input=data)
-        raise SystemExit("worktreehook: slot %d is not a claimed slot on a branch (branch=%r) - claim it first "
-                         "(queue.py next / slots.py acquire) and arm it again" % (slot, branch))
+        raise SystemExit("worktreehook: %s (or `queue.py next`), then arm it again" % why)
     log(main, "create-bound", slot=slot, branch=branch, path=d, input=data)
     return d
 

@@ -75,6 +75,7 @@ relative to `MAIN`; the contract of each tool is its spec.
 | `tools/units/claims.py` | **any lane starts**: claim a unit (`--pipeline` opts into the three-phase loop, §1) — the claim cuts a fresh branch off `main`'s tip and holds a slot for the whole loop; `release` returns the slot and **fails closed** (E2, §2.3). |
 | `tools/units/slots.py` | **you need a lane directory**: `init` builds the six-slot pool, `status`/`verify` read the pool and prove a kept tree current — *a stale build tree is a lie* (§7), so reach for `verify` the moment a measurement is suspect; the reset is fail-closed. |
 | `tools/units/queue.py` | **you are choosing the next item**: `next` picks a unit, takes a free slot and prints the paste-ready spawn line with the claim's own worktree as `cwd`; it refuses while all six slots are taken, and refuses a `cwd` that resolves to MAIN. |
+| `tools/units/lanecmd.py check <cwd>` | **you built a launch line by hand**: exit 0 only for a claimed slot (on a branch with its `.used` marker) or a claim's worktree; MAIN, an unclaimed slot or any other directory exits 1 with the `slots.py acquire` remedy. `slots.py spawn` applies the same check and refuses. |
 | `tools/units/brief.py` | **you are launching a lane**: it generates `tools/units/briefs/<unit>.md`, the one file the worker reads — unit, inventory, residuals, decided items, the task, and the rules copied verbatim from the plan. *If the brief does not say it, it is not a rule.* |
 
 ### The gate, the merge and the landing

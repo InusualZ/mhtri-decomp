@@ -354,7 +354,7 @@ def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None
         task_text = ("No task text was given (`--task-file` was not passed). Replace this placeholder with "
                      "the lane's task. " + tail)
     call = launch.lane_call(profile, path, task_text, name="%s-slot%d" % (profile, info["slot"]),
-                            main=main, key="slot%d" % info["slot"])
+                            main=main, key="slot%d" % info["slot"], cwd_check="refuse")
     if lock:
         lock["session_id"] = call["session_id"]
         write_lock(main, info["slot"], lock)

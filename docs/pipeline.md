@@ -1203,6 +1203,14 @@ Grouped by cause; each cost a lane ~30 min the first time.
 * In-session subagents in slots are a prototype: `.claude/settings.json` points `WorktreeCreate`/`WorktreeRemove` at
   `tools/units/worktreehook.py`; arm ONE slot, launch that lane, arm the next (2.5). Claude Code did not call the remove hook:
   the orchestrator runs `slots.py collect --path <worktreePath> --release` when a lane's result arrives.
+* **An in-session decompiler lane goes through the hook, never a hand-pointed cwd.** Claim the slot first
+  (`python tools/units/slots.py acquire <unit> --slot N --branch <branch> --worker <worker>`, or `queue.py next`), then
+  `python tools/units/worktreehook.py arm --slot N` and spawn the subagent with `isolation: worktree`: the hook hands over
+  exactly slot N and refuses an unclaimed one (on a branch and carrying its `.used` marker - `pool.claim_problem`, the one
+  rule). A launch line built by hand is checked with `python tools/units/lanecmd.py check <cwd>` (exit 1 names the reason
+  and the `acquire` remedy); `slots.py spawn` refuses an unclaimed cwd itself and `backlog.py` prints the warning beside
+  its suggested lane, whose cwd defaults to MAIN. Measured 2026-10-21: of slots 1, 4, 6, 8 and MAIN only slot 4 (claimed by
+  `queue.py`) passed; slot 1 held this tooling lane's branch with no marker - a lane launched by hand.
 * A lane cannot block on a question: it ends its turn with the request and is resumed.
 
 ### 13.3 Gotchas, with the incident behind each

@@ -1104,8 +1104,13 @@ def debt_task(main: str, item: Item, cwd: str | None = None, brief: str | None =
     task += ("Commit on your own branch; end your turn with your report - your final message is the result "
              "the orchestrator receives.")
     return {"agent": "fixer", "name": "fixer-debt-%s" % item.key[:32], "cwd": root, "task": task,
-            "call": lanecmd.lane_call("fixer", root, task, name="fixer-debt-%s" % item.key[:32],
-                                      main=main, key="debt-%s" % item.key[:32])["call"]}
+            **_call_fields(lanecmd.lane_call("fixer", root, task, name="fixer-debt-%s" % item.key[:32],
+                                             main=main, key="debt-%s" % item.key[:32], cwd_check="warn"))}
+
+
+def _call_fields(call: dict) -> dict:
+    """A lane's `call`, plus `cwd_warning` when its cwd is not a claimed slot (`launch.cwd_problem`)."""
+    return {"call": call["call"], **({"cwd_warning": call["cwd_warning"]} if call.get("cwd_warning") else {})}
 
 
 def lane_task(main: str, item: Item, cwd: str | None = None, brief: str | None = None) -> dict:
@@ -1133,8 +1138,8 @@ def lane_task(main: str, item: Item, cwd: str | None = None, brief: str | None =
         task += " Your brief is %s." % brief.replace("\\", "/")
     return {"agent": profile, "name": "%s-backlog-%s" % (profile, item.key[:32]),
             "cwd": root, "task": task,
-            "call": lanecmd.lane_call(profile, root, task, name="%s-backlog-%s" % (profile, item.key[:32]),
-                                      main=main, key="backlog-%s" % item.key[:32])["call"]}
+            **_call_fields(lanecmd.lane_call(profile, root, task, name="%s-backlog-%s" % (profile, item.key[:32]),
+                                             main=main, key="backlog-%s" % item.key[:32], cwd_check="warn"))}
 
 
 def refusal(main: str, top: int = 3, ratio: int = RATIO_DEFAULT, wants: int = 1, **kw) -> str | None:
@@ -1174,6 +1179,8 @@ def refusal(main: str, top: int = 3, ratio: int = RATIO_DEFAULT, wants: int = 1,
     lines.append("  task:  %s" % lane["task"])
     lines.append("")
     lines.append("  %s" % lane["call"])
+    if lane.get("cwd_warning"):
+        lines.append("  WARNING: %s" % lane["cwd_warning"])
     lines.append("")
     lines.append("remedy: resolve or park each item with `python tools/units/backlog.py --set-status <KEY> "
                  "done|parked`, then rerun; see `python tools/units/backlog.py --print`")

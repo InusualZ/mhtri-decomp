@@ -68,5 +68,58 @@ def test_long_task_and_resume(c):
         _restore(saved)
 
 
+def test_launch_cwd_check(c):
+    """`cwd_problem` accepts a claimed slot (on a branch, `.used` marker present) and a claim record's worktree, and
+    refuses MAIN, an unclaimed slot (detached, or on a branch with no marker) and any other directory; `lane_call`
+    refuses on `cwd_check="refuse"` and only reports on `"warn"`, its call staying one line.
+    Mutation: accepting a slot on a branch without its marker fails the "no marker" check."""
+    import json
+    from tools.lib.lanes import pool
+    with tempfile.TemporaryDirectory() as tmp:
+        fx = testing.GitFixture(os.path.join(tmp, "repo")).init()
+        fx.commit({"a.txt": "a\n"}, "base")
+        main = str(fx.root)
+        os.makedirs(os.path.join(main, ".pi", "slots"), exist_ok=True)
+        with open(os.path.join(main, ".pi", "slots", "pool.json"), "w", encoding="utf-8") as fh:
+            json.dump({"count": 3}, fh)
+        s1, s2, s3 = (pool.slot_dir(main, n) for n in (1, 2, 3))
+        fx.git("worktree", "add", "-q", "-b", "lane/a", s1)
+        fx.git("worktree", "add", "-q", "--detach", s2)
+        fx.git("worktree", "add", "-q", "-b", "lane/c", s3)
+        pool.mark_used(s1, "g3d/a", "lane/a", "lane/a")
+        other = os.path.join(tmp, "elsewhere")
+        claimed_wt = os.path.join(tmp, "claim-wt")
+        os.makedirs(other)
+        os.makedirs(claimed_wt)
+        with open(os.path.join(main, ".pi", "claims.json"), "w", encoding="utf-8") as fh:
+            json.dump({"g3d/b": {"worktree": claimed_wt, "branch": "worker/b"}}, fh)
+        c.check("a claimed slot is a launch cwd", lanecmd.cwd_problem(main, s1), None)
+        c.check("a claim record's worktree is a launch cwd", lanecmd.cwd_problem(main, claimed_wt), None)
+        c.contains("MAIN is refused", lanecmd.cwd_problem(main, main) or "", "cwd is MAIN")
+        c.contains("a detached slot is refused with the acquire remedy", lanecmd.cwd_problem(main, s2) or "",
+                   "slots.py acquire <unit> --slot 2")
+        c.contains("a slot on a branch with no marker is refused", lanecmd.cwd_problem(main, s3) or "",
+                   "`.used` marker missing")
+        c.contains("any other directory is refused", lanecmd.cwd_problem(main, other) or "",
+                   "neither a slot of the pool nor a claim's worktree")
+        c.contains("a missing directory is refused", lanecmd.cwd_problem(main, os.path.join(tmp, "nope")) or "",
+                   "does not exist")
+        c.raises("lane_call refuses an unclaimed cwd on cwd_check='refuse'", SystemExit, lanecmd.lane_call,
+                 "worker", s2, "x", main=main, cwd_check="refuse")
+        ok = lanecmd.lane_call("worker", s1, "x", main=main, cwd_check="refuse")
+        c.check("... and builds the line for a claimed one", (ok["cwd_warning"], ok["call"].startswith("cd ")),
+                (None, True))
+        warned = lanecmd.lane_call("worker", main, "x", main=main, cwd_check="warn")
+        c.check("'warn' reports the problem beside a one-line call",
+                ("cwd is MAIN" in (warned["cwd_warning"] or ""), "\n" in warned["call"]), (True, False))
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            codes = (lanecmd.main(["check", s2, "--main", main]), lanecmd.main(["check", s1, "--main", main]))
+        c.check("the CLI exits 1 on an unclaimed slot and 0 on a claimed one", codes, (1, 0))
+        for s in (s1, s2, s3):
+            fx.git("worktree", "remove", "--force", s)
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

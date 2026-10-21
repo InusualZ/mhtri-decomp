@@ -34,7 +34,9 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   `branch`, `debris`), `capacity_error`, `verify`/`claim_currency` (the build tree proven current, pending ninja
   steps run at handover; `NINJA_RUNNER` is the test seam), `release_blockers` (a live session, a dirty tree, commits
   no branch reaches), `lock_for_path(main, path)` (the lock of the slot a path is - a spawned lane's claim and unit
-  set), `acquire`/`preview`/`release`/`reclaim_verdict`/`reclaim_slot` (a slot on a branch whose tree
+  set), `claim_problem(n, branch, marked)` (the one rule for "slot n holds a claimed lane": on a branch with its `.used`
+  marker; pure, so `worktreehook`'s fake pool and `slot_claim_problem(main, n)` share it),
+  `acquire`/`preview`/`release`/`reclaim_verdict`/`reclaim_slot` (a slot on a branch whose tree
   `merge-tree` proves applied is reclaimed, rescue ref first), `unlanded_reason` (a slot) / `unlanded_reason_at` (any
   worktree directory: the one rule both read).
 * `seed`: `seed_worktree_build` (toolchain and build tree by copy, `orig/` by copy below 64 MB else junctioned, the
@@ -53,7 +55,9 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   then `git worktree remove --force`), `remove_worktree_checked` (also repairs a submodule and an untracked leftover);
   the `orig/` guard - `main_worktree`, `verify_orig`, `snapshot`.
 * `launch`: `KIND_PROFILE`, `PROFILES`, `profile_for_kind` (an unknown kind is refused with the list), `lane_call`
-  (`claude --agent ... -p`, cwd first, task single-quoted or staged under `.pi/lanes/` past `INLINE_LIMIT`),
+  (`claude --agent ... -p`, cwd first, task single-quoted or staged under `.pi/lanes/` past `INLINE_LIMIT`;
+  `cwd_check="refuse"|"warn"` runs `cwd_problem`), `cwd_problem(main, cwd)` (None for a claimed slot or a claim's
+  worktree; MAIN, an unclaimed slot or any other directory named with the `acquire` remedy - `spec/lanecmd.md`),
   `resume_call`, `task_units(task)` (the names a task's first `Units:` line lists, asides dropped) and
   `resolve_units(names, registered) -> (units, unresolved)` (a path as given, a bare stem only when one registered unit
   has it - `slots.py spawn`'s unit set), `your_tree_lines`/`teardown_lines`/`tree_block` (the block every lane gets, one copy for the brief and
