@@ -383,21 +383,60 @@ def leading_fill(section: str, ours_size: int, ours_align: int, claim_size: int,
 POSITIONED = (".bss", ".sbss", ".sbss2", ".sdata", ".sdata2")
 
 
-def data_symbol_gaps(ours: dict, theirs: dict, limit: int = 6) -> list[str]:
+def identity_symbols(m: dict) -> dict:
+    """The entries of a `section_symbols` map whose name carries an identity: anonymous `@`-names, dtk's `gap_` fill
+    labels, generated `lbl_`/`zz_` names (the target's spelling of compiler-pooled constants) and a function-local
+    static's `name$NNN` ordinal are dropped."""
+    return {n: v for n, v in m.items()
+            if not n.startswith(("@", "lbl_", "zz_")) and not is_fill_label(n) and not re.search(r"\$\d+$", n)}
+
+
+def data_symbol_gaps(ours: dict, theirs: dict, limit: int = 6, excused=frozenset()) -> list[str]:
     """Lines naming where our named symbols of one section sit at another offset than the target's, or a target
-    symbol with a real name that our object does not define. `ours`/`theirs` are `section_symbols` maps. Anonymous
-    `@`-names, dtk's `gap_` fill labels and generated `lbl_`/`zz_` names (the target's spelling of compiler-pooled
-    constants) and a function-local static's `name$NNN` ordinal carry no identity and are skipped; a size is not compared (the section size and the offsets are what
-    the link uses)."""
-    def named(m):
-        return {n: v for n, v in m.items()
-                if not n.startswith(("@", "lbl_", "zz_")) and not is_fill_label(n) and not re.search(r"\$\d+$", n)}
-    o, t = named(ours), named(theirs)
+    symbol with a real name that our object does not define. `ours`/`theirs` are `section_symbols` maps; names
+    without identity (`identity_symbols`) are skipped; a size is not compared (the section size and the offsets are
+    what the link uses). A target name in `excused` (an `unnamed_spellings` name the caller has proved no other link
+    input references) is not a missing definition."""
+    o, t = identity_symbols(ours), identity_symbols(theirs)
     lines = ["%s: the target defines it at +0x%X (0x%X bytes), our object does not" % (n, t[n][0], t[n][1])
-             for n in sorted(t, key=lambda n: t[n][0]) if n not in o]
+             for n in sorted(t, key=lambda n: t[n][0]) if n not in o and n not in excused]
     lines += ["%s: at +0x%X in our object, +0x%X in the target" % (n, o[n][0], t[n][0])
               for n in sorted(o, key=lambda n: o[n][0]) if n in t and o[n][0] != t[n][0]]
     return lines if len(lines) <= limit else lines[:limit] + ["... %d more" % (len(lines) - limit)]
+
+
+def section_symbol_rows(obj, name: str) -> list[tuple[str, int, int, bool]]:
+    """`[(symbol, offset, size, binds across objects)]` for every symbol defined in section `name`, unnamed ones
+    included (they still cover bytes); section and file symbols are skipped."""
+    elf = be32(obj)
+    if elf is None or elf.section(".symtab") is None:
+        return []
+    nsec = len(elf.sections)
+    return [(s.name, s.value, s.size, s.bind in (STB_GLOBAL, STB_WEAK)) for s in elf.symbols
+            if s.type not in (STT_SECTION, STT_FILE) and 0 < s.shndx < nsec and elf.sections[s.shndx].name == name]
+
+
+def unnamed_spellings(theirs: dict, ours_rows: list, mine: bytes | None, tgt: bytes | None) -> dict[str, tuple]:
+    """`{target name: (offset, size)}` for the identity-carrying target symbols (`identity_symbols`) that our object
+    does not define by name but emits as the same bytes at the same offset under no global name: the range lies inside
+    both sections' bytes and is equal there, and every symbol of ours that overlaps it is local (MWCC's `@NNN` pool
+    literal, a `static`) - the map's name for a word our compiler pools anonymously (`ef/ef_postfield`'s `ef_pf_*`
+    `.sdata2` rows). `theirs` is the target's `section_symbols` map, `ours_rows` our `section_symbol_rows` with the
+    offsets already shifted by any lead. A NOBITS section (no bytes), a zero-size row, a differing byte and a global
+    or weak symbol of ours over the range all leave the name a missing definition; whether another link input
+    references the name is the caller's check."""
+    if not mine or not tgt:
+        return {}
+    ours_names = {n for n, _o, _s, _g in ours_rows}
+    end = min(len(mine), len(tgt))
+    out = {}
+    for n, (off, size) in identity_symbols(theirs).items():
+        if n in ours_names or size <= 0 or off < 0 or off + size > end or mine[off:off + size] != tgt[off:off + size]:
+            continue
+        if any(g for _n, o, s, g in ours_rows if o < off + size and off < o + max(s, 1)):
+            continue
+        out[n] = (off, size)
+    return out
 
 
 def mislaid_layout(mine: bytes, tgt: bytes, ours: dict, theirs: dict):

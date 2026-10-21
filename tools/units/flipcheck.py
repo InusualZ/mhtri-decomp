@@ -246,18 +246,43 @@ def pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_path: s
                                    section_symbols(obj_path, name), start, next_aligns)
 
 
+def unreferenced_elsewhere(name: str, target_rel: str, link_ctx: dict) -> bool:
+    """Whether no link input other than the target object references `name` (the reverse-reference count)."""
+    self_refs = link_ctx["refs"].get(target_rel, set())
+    return link_ctx["ref_count"].get(name, 0) - (1 if name in self_refs else 0) <= 0
+
+
 def positioned_symbol_problems(claim: dict, ours: dict, src_path: str, obj_path: str,
-                               leads: dict[str, int] | None = None) -> list[str]:
+                               leads: dict[str, int] | None = None, link_ctx: dict | None = None,
+                               target_rel: str | None = None, notes: list[str] | None = None) -> list[str]:
     """Per positioned data section (`objcompare.POSITIONED`) the symbols whose offset, size or presence differs from
     the target's: equal sizes and bytes do not make the DOL hash hold when a spare global is dead-stripped or an
     object is 4 B instead of 8 B. `python tools/mwlink_debugger.py trace <unit>` names the cause. `leads` is `check`'s
-    section -> leading fill: our symbols sit that much later in the link."""
+    section -> leading fill: our symbols sit that much later in the link.
+
+    A target name our object emits unnamed (`objcompare.unnamed_spellings`: equal bytes at the same offset, only local
+    symbols of ours over them) is not missing when `link_ctx` shows no other link input references it - the map's
+    name for an anonymous pool word; it is listed in `notes`. Without `link_ctx` nothing is excused. Where our code
+    reaches those bytes is `relocation_place_problems`' check."""
     out = []
     leads = leads or {}
     for name in sorted(set(claim) & set(ours) & set(objcompare.POSITIONED)):
         lead = leads.get(name, 0)
         mine = {n: (off + lead, size) for n, (off, size) in section_symbols(src_path, name).items()}
-        gaps = objcompare.data_symbol_gaps(mine, section_symbols(obj_path, name))
+        theirs = section_symbols(obj_path, name)
+        excused: dict = {}
+        if link_ctx is not None and target_rel is not None:
+            data = raw_section(src_path, name)
+            rows = [(n, off + lead, size, g) for n, off, size, g in objcompare.section_symbol_rows(src_path, name)]
+            spelled = objcompare.unnamed_spellings(theirs, rows, bytes(lead) + data if data else data,
+                                                   raw_section(obj_path, name))
+            excused = {n: v for n, v in spelled.items() if unreferenced_elsewhere(n, target_rel, link_ctx)}
+        gaps = objcompare.data_symbol_gaps(mine, theirs, excused=excused)
+        if excused and notes is not None:
+            notes.append("%s: %d target name(s) our object emits unnamed - same bytes at the same offset, only local "
+                         "symbols of ours over them, no other link input references them: %s"
+                         % (name, len(excused), ", ".join("%s +0x%X" % (n, excused[n][0])
+                                                         for n in sorted(excused, key=lambda n: excused[n][0]))))
         if gaps:
             out.append("%s: symbol layout differs from the target (the link moves later data; `python "
                        "tools/mwlink_debugger.py trace <unit>` names the cause): %s" % (name, "; ".join(gaps)))
@@ -998,7 +1023,8 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
             problems += data_seam_problems(unit, name, src_path, obj_path)
 
     problems += pool_group_problems(unit, claim, ours, src_path, obj_path, padded=padded, leads=leads)
-    problems += positioned_symbol_problems(claim, ours, src_path, obj_path, leads=leads)
+    problems += positioned_symbol_problems(claim, ours, src_path, obj_path, leads=leads, link_ctx=link_ctx,
+                                           target_rel=target_rel, notes=notes)
     problems += relocation_place_problems(unit, claim, src_path, obj_path, leads=leads, moves=moves)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function

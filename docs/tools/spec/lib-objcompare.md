@@ -36,7 +36,11 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   (the fill the link puts before our section: the claim's start rounded up to our alignment, zero target bytes, no
   symbol but fill labels, the predecessor judged by the caller; never `LINKED_PAD_NEVER`). `is_fill_label(name)`: dtk's
   `gap_...` and `pad_<size>_<address>_<section>` labels (`data_symbol_gaps` skips both).
-  `data_symbol_gaps(ours, theirs) -> [line]` with `POSITIONED` (the data sections whose symbol offsets position later data).
+  `data_symbol_gaps(ours, theirs, excused=()) -> [line]` with `POSITIONED` (the data sections whose symbol offsets position
+  later data) and `identity_symbols(map)` (the names it compares). `section_symbol_rows(obj, section) -> [(name, offset,
+  size, global)]` (every symbol over the section, unnamed ones too) and `unnamed_spellings(theirs, ours_rows, mine, tgt) ->
+  {name: (offset, size)}`: the target names our object emits unnamed - equal bytes at the same offset, only local symbols of
+  ours over them, never NOBITS; the caller decides the link-reference half.
 * Symbols: `section_kind`, `wanted_kinds`, `defined_symbols(obj, kinds) -> {name: SymbolSize}`, `size_delta`,
   `symbols(target, ours, threshold, mode) -> [SymbolGap]`, `symbol_locations(obj)`, `symbol_rows(target, ours)` (a dtk-named row
   resolved by address).

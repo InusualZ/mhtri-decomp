@@ -45,6 +45,18 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   names, `gap_` labels, `lbl_`/`zz_` names (the target's spelling of pooled constants) and `name$NNN` function statics; a
   symbol's size is not compared (`MSL_C/errno` is 4 B ours, 8 B in the target and links). Measured on MAIN's 502 objects: the
   92 units READY before stay READY except `TRK/gdev_cc` (`.bss` buffers swapped: a real order defect).
+* **A map name over an anonymous pool word is not missing (2026-10-21).** dtk's map names words of a literal pool
+  (`ef/ef_postfield`'s 14 `.sdata2` rows `ef_pf_*`) that MWCC emits as local `@NNN` literals. A target name our object does
+  not define is satisfied when (a) the bytes at its offset are equal in both sections, (b) every symbol of ours over that
+  range is local or there is none (`lib.objcompare.unnamed_spellings`), and (c) no link input other than the target object
+  references the name (the reverse-reference count, docs/pipeline.md 15.3); the excused names are a note (`<section>: N
+  target name(s) our object emits unnamed ...`). Still refused: a NOBITS section (no bytes to prove), a differing word, a
+  global of ours under another name over it, a referenced name, a named symbol at another offset, and any check run
+  without the link context. Where our code loads those words stays `relocation_place_problems`' check (a load of the other
+  equal literal is refused there). Pinned by `tools/tests/units/test_flipcheck_poolnames.py` (10 checks; 6 fail against the
+  previous flipcheck; dropping the byte, binding or reference guard each fails 1). Measured on 651 objects at `ac489be6`:
+  READY 296 -> 298 (`ef/ef_postfield`, `NHTTP/NHTTP_os_RVL`'s `.sdata` string `NHTTPi_haltMessage`; each trial flip links
+  the exact DOL), the 301 Matching units' verdicts unchanged, 11 more units name fewer layout gaps and stay NOT READY.
 * **A short section before a flipped successor is link padding (2026-10-07).** A unit whose section ends short of its
   claim (`OS/OSLink` .text 0x18 of 0x20; the `.sdata`/`.sbss` 4-byte shortfalls) links correctly when the next unit in
   link order for that section is a linked object, because the link pads it up to the successor's alignment
