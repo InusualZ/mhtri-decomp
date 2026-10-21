@@ -11,6 +11,7 @@ import re
 
 from tools.elf.objalign import parse_splits, unit_key  # one splits grammar and one object -> unit rule
 from tools.lib.binary.elf import Elf, ElfEditor, ElfError
+from tools.lib.binary.extab import unwind_entries, weak_text_functions
 
 DEFAULT_SPLITS = os.path.join("config", "RMHE08", "splits.txt")
 
@@ -51,17 +52,57 @@ def ordinal_entries(elf: Elf) -> list[dict]:
     return entries
 
 
-def plan(entries: list[dict], starts: dict[str, int], verbose: bool) -> list[tuple[dict, str]]:
-    """(entry, map name) for every entry whose section has a claimed start in `starts`."""
+def target_object(path: str) -> str:
+    """The `dol split` object beside our candidate: `build/<v>/src/<unit>.o` -> `build/<v>/obj/<unit>.o`;
+    "" when the path has no `src` component."""
+    parts = os.path.normpath(path).split(os.sep)
+    for i in range(len(parts) - 1, -1, -1):
+        if parts[i] == "src":
+            return os.sep.join(parts[:i] + ["obj"] + parts[i + 1:])
+    return ""
+
+
+def dropped_entries(elf: Elf, target: str, verbose: bool = False) -> dict[str, dict[int, int]]:
+    """`{section: {offset: size}}` of the unwind entries the link drops with a weak `.text` copy.
+
+    MWCC emits an inline function out of line (weak) in every TU that uses it, each copy with its own `extab` and
+    `extabindex` entry; mwld keeps the first definition and drops a later copy *with* its unwind entries, as
+    retail's link did. A weak function the target object `target` does not define is such a copy: its entries have
+    no map address - they stay ordinal and local, because a global name on them makes mwld die with internal error
+    `ELF_linker.c` line 7133 - and every later entry of the section lands that much earlier. Empty when the object
+    has no weak function or `target` cannot be read."""
+    weak = weak_text_functions(elf)
+    if not weak or not target or not os.path.isfile(target):
+        return {}
+    try:
+        kept = Elf.read(target).require_be32().defined
+    except ElfError:
+        return {}
+    gone = weak - kept
+    if verbose:
+        for name in sorted(gone):
+            print(f"  {name}: weak copy the target does not define, its unwind entries stay local")
+    return unwind_entries(elf, gone) if gone else {}
+
+
+def plan(entries: list[dict], starts: dict[str, int], verbose: bool,
+         dropped: dict[str, dict[int, int]] | None = None) -> list[tuple[dict, str]]:
+    """(entry, map name) for every entry whose section has a claimed start in `starts`; the entries of a dropped weak
+    copy (`dropped_entries`) are left alone and every later one is named where it lands."""
     changes = []
     taken: set[str] = set()
+    dropped = dropped or {}
     for entry in entries:
         start = starts.get(entry["section"])
         if start is None:
             if verbose:
                 print(f"  {entry['name']}: {entry['section']} has no start in splits.txt, left alone")
             continue
-        name = map_name(entry["section"], start, entry["value"])
+        gone = dropped.get(entry["section"], {})
+        if entry["value"] in gone:
+            continue
+        shift = sum(size for offset, size in gone.items() if offset < entry["value"])
+        name = map_name(entry["section"], start, entry["value"] - shift)
         if name in taken:  # two symbols at one address would be a duplicate global definition
             if verbose:
                 print(f"  {entry['name']}: {name} is already used by an earlier entry, left alone")
@@ -89,13 +130,16 @@ def read_object(path: str) -> Elf:
         raise SystemExit(f"objextab: {exc}")
 
 
-def rename_object(path: str, starts: dict[str, int], verbose: bool, dry_run: bool) -> int:
-    """Rename the object's ordinal extab/extabindex symbols to the map's names; return the count."""
+def rename_object(path: str, starts: dict[str, int], verbose: bool, dry_run: bool,
+                  target: str | None = None) -> int:
+    """Rename the object's ordinal extab/extabindex symbols to the map's names; return the count. `target` is the
+    target object (default: `target_object(path)`), read for the weak copies the link drops."""
     elf = read_object(path)
     entries = ordinal_entries(elf)
     if not entries:
         return 0
-    candidates = plan(entries, starts, verbose)
+    dropped = dropped_entries(elf, target_object(path) if target is None else target, verbose)
+    candidates = plan(entries, starts, verbose, dropped)
     if not candidates:
         return 0
     for entry, name in candidates:

@@ -729,6 +729,8 @@ def generate_build_ninja(
     # enough); it writes only `.symtab`/`.strtab`, so the object's bytes - and the DOL - cannot move.
     # Evidence: tools/elf/objextab.py (selftest), .pi/notes/resfile-flip.md and docs/matching.md.
     objextab = Path("tools") / "elf" / "objextab.py"
+    # the unwind-record rule objextab names the entries after a dropped weak copy by
+    objextab_lib = Path("tools") / "lib" / "binary" / "extab.py"
     objextab_cmd = f" && $python {objextab} $out"
     mwcc_cmd += objextab_cmd
     mwcc_sjis_cmd += objextab_cmd
@@ -741,6 +743,7 @@ def generate_build_ninja(
         mwcc_sjis_extab_implicit,
     ):
         mwcc_implicit_list.append(objextab)
+        mwcc_implicit_list.append(objextab_lib)
 
     # MWLD
     mwld = compiler_path / "mwldeppc.exe"
@@ -1060,7 +1063,9 @@ def generate_build_ninja(
                 )
                 n.newline()
 
-        def c_build(obj: Object, src_path: Path) -> Optional[Path]:
+        def c_build(
+            obj: Object, src_path: Path, target_obj: Optional[Path] = None
+        ) -> Optional[Path]:
             # Avoid creating duplicate build rules
             if obj.src_obj_path is None or obj.src_obj_path in source_added:
                 return obj.src_obj_path
@@ -1112,6 +1117,12 @@ def generate_build_ninja(
                 variables["extab_padding"] = "".join(
                     f"{i:02x}" for i in obj.options["extab_padding"]
                 )
+            # The post-steps (objalign, objextab) read the unit's claim in splits.txt and the target
+            # object `dol split` wrote for it; the target object is the per-unit input that carries
+            # both, since `dol split` rewrites it only when its bytes change.
+            # See docs/tools/spec/objextab.md.
+            if target_obj is not None:
+                build_implcit = [*build_implcit, target_obj]
             n.comment(f"{obj.name}: {lib_name} (linked {obj.completed})")
             n.build(
                 outputs=obj.src_obj_path,
@@ -1203,7 +1214,9 @@ def generate_build_ninja(
                 check_path_case(obj.src_path)
                 if file_is_c_cpp(obj.src_path):
                     # Add C/C++ build rule
-                    built_obj_path = c_build(obj, obj.src_path)
+                    built_obj_path = c_build(
+                        obj, obj.src_path, Path(obj_path) if obj_path else None
+                    )
                 elif file_is_asm(obj.src_path):
                     # Add assembler build rule
                     built_obj_path = asm_build(obj, obj.src_path, obj.src_obj_path)

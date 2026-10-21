@@ -93,6 +93,12 @@ reload), and the link's order-only dep covers the case where the manifest was al
 
 If you see a link that started at ~0 s in the same run as a split, that dependency is missing.
 
+The same skipped-write property makes a unit's target object the **compile** edge's implicit input
+(`c_build(..., target_obj)`): the post-steps `objalign`/`objextab` read the unit's `splits.txt` claim and the target
+object, and a split rewrites exactly the target objects whose range (or bytes) changed - so a seam move recompiles
+the units it touched and nothing else, where `splits.txt` itself as an input would recompile every object (a full
+`ninja -k 0` recompile of the 651 compiled objects measured 57 s on 2026-10-21).
+
 ## Recipes
 
 ```sh

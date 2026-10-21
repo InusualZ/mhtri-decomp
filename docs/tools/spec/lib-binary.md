@@ -26,6 +26,11 @@ The tools listed under this concept in `docs/tools/README.md`. Delegating today 
 * `elf.ElfEditor(elf)`: `set_section_align`, `set_symbol_info`, `rename_symbols([(index, name)])` (appends to `.strtab`,
   splices it back, shifts later sections padded to their largest alignment), `to_bytes()`, `write(path)` - the
   `objalign`/`objextab` writer.
+* `extab`: MWCC's exception tables - `weak_text_functions(elf)` (the weak `.text` functions of size > 0, MWCC's
+  out-of-line inline copies) and `unwind_entries(elf, functions) -> {"extab": {offset: size}, "extabindex": {offset:
+  size}}` (the records covering those functions: an `extabindex` entry is 12 bytes, +0 relocates the function by name
+  or as `.text`+offset, +8 the `extab` record, whose size is its sized symbol's or the distance to the next record).
+  The one rule `objextab` names entries by and `flipcheck` drops entries by.
 * `dol.Dol.read(path|bytes)`: `segments` (non-empty `Segment(name, kind, index, address, size, offset)`, text first),
   `slots` (all eighteen), `bss_address`, `bss_size`, `entry`, `bytes_at(address, n)` (wholly inside one segment or
   None), `bytes_from(address, n)` (starts inside a segment, may run on), `word`, `words`, `cstr`, `section_of`,
@@ -66,6 +71,7 @@ The tools listed under this concept in `docs/tools/README.md`. Delegating today 
   `__setattr__` path (the same values, half the cost).
 * `elf.py` is an input of every MWCC compile (the `objalign`/`objextab` steps): `tools/project.py` lists it as an
   implicit dependency, so an edit to it rebuilds every object - keep it stable and cheap to import (no `typing`).
+  `extab.py` is the same (the `objextab` step imports it): it imports only `elf`.
 
 ## Test contract
 
