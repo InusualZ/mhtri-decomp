@@ -1,46 +1,50 @@
 /*
- * g3d/g3d_resanm.c - nw4r g3d float and colour animation-channel evaluators (fn_800898B0, fn_80089C6C), the Hermite
- *   step, the colour constructors and the byte-lerp and float-to-short helpers.
+ * g3d/g3d_resanm.cpp - nw4r g3d float and colour animation-channel evaluators (fn_800898B0, fn_80089C6C), the Hermite
+ *   step, the kept copies of nw4r::ut::Color's four-channel constructor and Set, and the byte-lerp and float-to-short
+ *   helpers.
  * RANGE. .text 0x800898B0-0x80089F94 (10 functions); extab, extabindex, .data 0x8058FDC8-0x8058FE90 (the evaluators
- *   pass "g3d_resanm.cpp"), .sdata2 0x80795E98-0x80795EC0.  The byte-lerp helpers fn_80089E9C..fn_80089F90 carry no
- *   data reference, so 0x80089E9C is an alternative right edge.
- * NAMES. Map stems.  The retail TU is C++; the source stays `.c` because it is C-idiom and does not compile as C++
- *   without casts, so the `Panic` mangling is spelled verbatim.
- * RESIDUALS. fn_80089C6C: retail destroys its `nw4r::ut::Color` temporary (`__dt__Q34nw4r2ut5ColorFv`) after the
- *   conversion - a C++ object this C source cannot express (the 0x14-byte tail is missing).  Compiled as C++ with a
- *   Color local declared after the early return, the row matches; its extab record then gains a cleanup range unless
- *   the colour is a real temporary of Color's 4-byte constructor (the map's fn_80089E9C) with operator u32
- *   (fn_800651BC) visible inline.
- *   flipcheck: `.data` and `.sdata2` byte-identical (the strings are literals under `#pragma pool_data off`).
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `dtor_8005B228`.
- * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`: retail has no record-form instruction and
- *   no fused multiply-add.  fn_80089F78 is the OS fast cast (`psq_st` through GQR5, then `lha`) in inline asm.
- *   fn_800898B0 passes the estimate bounds to Panic as doubles, compares `pKey->frame == frame` and
- *   `frame >= pKey->frame`, and computes the two Hermite intervals before the call.  fn_80089F90 is modf's
- *   argument order (frame first: retail sets f1 before r3), and fn_80089C6C's key index is an `int` (retail keeps
- *   the index and recomputes `(index + 1) * 4`; an `s32` is strength-reduced to one byte offset).
+ *   pass "g3d_resanm.cpp"), .sdata2 0x80795E98-0x80795EC0.
+ * FLAGS. cflags_g3d; file-scope `#pragma peephole off`, `#pragma fp_contract off` and `#pragma dont_inline on`, stated
+ *   ahead of the includes so `nw4r/ut_Color.h`'s inline members are compiled under them too.
+ * NAMES. Map stems for the evaluators and helpers.  0x80089E9C is Color's four-channel constructor (passes r3-r7 to
+ *   0x80089ECC and returns `this`) and 0x80089ECC is Color::Set (each channel narrowed with `clrlwi` before its
+ *   `stb`: `int` parameters); the constructor's `int` parameters are a GUESS (nw4r's spelling; its body only
+ *   forwards them).
+ * RESIDUALS. fn_80089C6C calls Color's `operator u32` under the map stem fn_800651BC (`g3d/g3d_anmscn.cpp` defines
+ *   it as a C function), so that relocation name differs.  Our object also carries the weak Color copies earlier
+ *   link inputs own (`__dt__Q34nw4r2ut5ColorFv`, `operator u32`, `ToU32ref`).  fn_80089C6C's extab record carries
+ *   a cleanup range for the Color temporary (0x1F0, length 0x10: action 0x82 destroying sp+8) that retail's 8-byte
+ *   record lacks; `throw()` on `operator u32` or on the destructor does not remove it.
+ * SHAPES. Retail has no record-form instruction and no fused multiply-add, and calls every inline member out of line.
+ *   fn_80089F78 is the OS fast cast (`psq_st` through GQR5, then `lha`) in inline asm.  fn_800898B0 passes the
+ *   estimate bounds to Panic as doubles, compares `pKey->frame == frame` and `frame >= pKey->frame`, and computes
+ *   the two Hermite intervals before the call.  fn_80089F90 is modf's argument order (frame first: retail sets f1
+ *   before r3), and fn_80089C6C's key index is an `int` (retail keeps the index and recomputes `(index + 1) * 4`; an
+ *   `s32` is strength-reduced to one byte offset).  fn_80089C6C returns a Color temporary of the four-channel
+ *   constructor, converted with `operator u32` and then destroyed (retail's `__dt__Q34nw4r2ut5ColorFv` call).
  */
 
+
+#pragma peephole off
+#pragma fp_contract off
+#pragma dont_inline on
 
 #include "types.h"
 #include "OS/OSFastCast.h" /* OS_FASTCAST_S16 (rule 1) */
 #include "nw4r/g3d/res_common.h"
-#include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
-#include "g3d/g3d_anmscn.h" /* fn_800651BC, owned by g3d/g3d_anmscn.cpp (rule 2) */
+#include "g3d/g3d_scnroot.h" /* math_f32_to_u16 (rule 2) */
+#include "nw4r/db_assert.h" /* nw4r::db::Panic (rule 2) */
+#include "nw4r/ut_Color.h" /* nw4r::ut::Color (rule 1) */
 
 #pragma pool_data off
 
-#pragma peephole off
-#pragma fp_contract off
-
-/* nw4r::db::Panic(const char*, int, const char*, ...) */
-extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
-
 /* The math/resource helpers this unit calls. */
+extern "C" {
 extern f32 anim_tick_angle(u16 value);
 extern f32 math_reciprocal(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);
 extern f32 modff(f32 *out, f32 frame);
+}
 
 /* A single animation key. */
 typedef struct {
@@ -66,16 +70,16 @@ typedef struct {
 } ResAnmClr; /* size: 0x4 */
 
 /* Forward declarations for the unit's own functions. */
+extern "C" {
 f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame);
 f32 fn_80089B88(f32 v0, f32 t0, f32 v1, f32 t1, f32 delta, f32 span);
 u32 fn_80089C6C(u32 *arg0, f32 frame);
-ResAnmClr *fn_80089E9C(ResAnmClr *self, u32 b0, u32 b1, u32 b2, u32 b3);
-void fn_80089ECC(ResAnmClr *self, u32 b0, u32 b1, u32 b2, u32 b3);
 u8 fn_80089EF0(s32 from, s32 to, s16 factor);
 s16 fn_80089F14(f32 value);
 void fn_80089F44(f32 *value, s16 *out);
 s16 fn_80089F78(f32 value);
 f32 fn_80089F90(f32 frame, f32 *out);
+}
 
 
 /* Evaluates one float channel at a frame and returns the interpolated value. */
@@ -89,7 +93,7 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
     u32 valid = IS_VALID_PTR(pData);
 
     if (!valid) {
-        Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 105,
+        nw4r::db::Panic("g3d_resanm.cpp", 105,
             "NW4R:Pointer Error\npData(=%p) is not valid pointer.", pData);
     }
     pLast = &pData->keys[pData->count - 1];
@@ -102,7 +106,7 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
     delta = frame - pData->keys[0].frame;
     pos = math_f32_to_u16(delta * anim_tick_angle(pData->count) * pData->rate);
     if (pos > pData->count - 1) {
-        Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 135,
+        nw4r::db::Panic("g3d_resanm.cpp", 135,
             "estimatePos is out of bounds(%f)\nestimatePos <= %f not satisfied.",
             (f64)pos, (f64)(pData->count - 1));
     }
@@ -124,7 +128,7 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
         u32 frameValid = frame >= pKey->frame && frame <= pKey[1].frame;
 
         if (!frameValid) {
-            Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 176,
+            nw4r::db::Panic("g3d_resanm.cpp", 176,
                 "frame is out of bounds(%f)\n%f <= frame <= %f not satisfied.", frame,
                 pKey->frame, pKey[1].frame);
         }
@@ -153,7 +157,6 @@ u32 fn_80089C6C(u32 *arg0, f32 frame)
     f32 sp14;
     u32 sp10;
     u32 spC;
-    ResAnmClr sp8;
     f32 value;
     int index;
     s16 factor;
@@ -161,7 +164,7 @@ u32 fn_80089C6C(u32 *arg0, f32 frame)
     u32 valid = IS_VALID_PTR(arg0);
 
     if (!valid) {
-        Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 206,
+        nw4r::db::Panic("g3d_resanm.cpp", 206,
             "NW4R:Pointer Error\npData(=%p) is not valid pointer.", arg0);
     }
     value = (f32)fn_80089F90(frame, &sp14);
@@ -172,28 +175,11 @@ u32 fn_80089C6C(u32 *arg0, f32 frame)
     fn_8005B1B4(&sp10, arg0[index]);
     fn_8005B1B4(&spC, arg0[index + 1]);
     factor = fn_80089F14(32768.0f * value);
-    fn_80089E9C(&sp8,
+    return nw4r::ut::Color(
         fn_80089EF0(((ResAnmClr *)&sp10)->b0, ((ResAnmClr *)&spC)->b0, factor),
         fn_80089EF0(((ResAnmClr *)&sp10)->b1, ((ResAnmClr *)&spC)->b1, factor),
         fn_80089EF0(((ResAnmClr *)&sp10)->b2, ((ResAnmClr *)&spC)->b2, factor),
         fn_80089EF0(((ResAnmClr *)&sp10)->b3, ((ResAnmClr *)&spC)->b3, factor));
-    return fn_800651BC(&sp8);
-}
-
-/* Constructs a 4-byte color from its four byte components. */
-ResAnmClr *fn_80089E9C(ResAnmClr *self, u32 b0, u32 b1, u32 b2, u32 b3)
-{
-    fn_80089ECC(self, b0, b1, b2, b3);
-    return self;
-}
-
-/* Stores a 4-byte color from its four byte components. */
-void fn_80089ECC(ResAnmClr *self, u32 b0, u32 b1, u32 b2, u32 b3)
-{
-    self->b0 = b0;
-    self->b1 = b1;
-    self->b2 = b2;
-    self->b3 = b3;
 }
 
 /* Linearly interpolates one byte between two values with a 15-bit factor. */

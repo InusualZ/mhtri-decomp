@@ -1,11 +1,13 @@
 /*
- * g3d/fn_800D77B0.cpp - the single-matrix node transform (by `pRec->flags`) and the matrix slot's sign-bit test.
+ * g3d/g3d_maya.cpp - the single-matrix node transform (by `pRec->flags`) and the matrix slot's sign-bit test.
  * RANGE. .text 0x800D77B0-0x800D79B4 (2 functions); extab, extabindex.  Between `g3d/g3d_xsi.cpp` and
  *   `g3d/g3d_basic.cpp`, with no `__FILE__` string of its own; fn_800D77B0 is the per-node world-matrix builder
  *   `g3d/g3d_calcworld.cpp`'s g3d_calc_world calls, and its multi-matrix sibling fn_800D7D24 is in `g3d/g3d_basic.cpp`.
- * NAMES. Map stems (no name evidence); `pRec` is a private view of `g3d/g3d_calcworld.cpp`'s `NodeMtxRec` (the
- *   three members this range reads, the MTX34 at +0x1C).
- * RESIDUALS. None in the code; the unit's file name is generated (unit rename request g3d-scn#2: g3d/g3d_maya.cpp).
+ * NAMES. The file name is a GUESS: the distinguishing test is node flag 0x20 (nw4r ResNodeData FLAG_SSC_APPLY, Maya
+ *   segment-scale compensation), and nw4r's DCC set is g3d_basic/g3d_maya/g3d_xsi/g3d_3dsmax.  Map stems (no name
+ *   evidence); `pRec` is a private view of `g3d/g3d_calcworld.cpp`'s `NodeMtxRec` (the three members this range
+ *   reads, the MTX34 at +0x1C).
+ * RESIDUALS. None.
  * SHAPES. File-scope `#pragma peephole off`: the five flag tests keep retail's `rlwinm` + `cmpwi`.
  * SHAPES. The returned id is a copy of `mtxId` made after the flag word is read (`u32 id = mtxId;`), and the
  *   sign-bit tests take `mtxId` itself: retail tests the argument register and keeps the copy in r31, the flag

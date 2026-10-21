@@ -3,7 +3,7 @@
  * RANGE. .text 0x800D6C00-0x800D77B0 (15 functions); extab, extabindex, .rodata 0x8056F830-0x8056F868 (the two
  *   seven-entry function tables), .data 0x80595790-0x80595840 ("g3d_xsi.cpp" and the three assert strings
  *   g3d_calc_tex_mtx_xsi reads), .sdata2 0x807963C8-0x807963D0 (0.0f, 1.0f).  The left edge is the end of
- *   fn_800D5F9C in `nw_resource.cpp`'s band; the right edge is `g3d/fn_800D77B0.cpp` (tudiscover at 0x800D74E8:
+ *   fn_800D5F9C in `nw_resource.cpp`'s band; the right edge is `g3d/g3d_maya.cpp` (tudiscover at 0x800D74E8:
  *   `.sdata2` 0x807963CC -> 0x807963D0).
  * NAMES. The TU name is the `__FILE__` string.  g3d_calc_tex_mtx_xsi is a GUESS (nw4r's CalcTexMtx for the XSI
  *   convention: the `TexSrt::FLAG_ANM_EXISTS` assert and the three-bit scale/rotate/translate selector);

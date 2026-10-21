@@ -369,7 +369,7 @@ g3d/g3d_resvtx.cpp:
 	.data       start:0x8058FCE8 end:0x8058FDC8
 	.sdata      start:0x80791258 end:0x80791268
 
-g3d/g3d_resanm.c:
+g3d/g3d_resanm.cpp:
 	extab       start:0x80008EB0 end:0x80008EE8
 	extabindex  start:0x800219E4 end:0x80021A38
 	.text       start:0x800898B0 end:0x80089F94 align:16
@@ -714,7 +714,7 @@ g3d/g3d_xsi.cpp:
 	.data       start:0x80595790 end:0x80595840
 	.sdata2     start:0x807963C8 end:0x807963D0
 
-g3d/fn_800D77B0.cpp:
+g3d/g3d_maya.cpp:
 	extab       start:0x8000AC54 end:0x8000AC5C
 	extabindex  start:0x800242C4 end:0x800242D0
 	.text       start:0x800D77B0 end:0x800D79B4 align:16

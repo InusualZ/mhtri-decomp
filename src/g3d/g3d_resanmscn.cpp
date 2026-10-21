@@ -36,7 +36,7 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* IS_VALID_PTR (rule 1) */
 #include "g3d/g3d_rescommon.h"     /* nw4r::g3d::ResName (rule 2) */
-#include "g3d/g3d_resanmtexsrt.h"  /* nw4r::g3d::ResFile (rule 2) */
+#include "g3d/g3d_resfile.h"  /* nw4r::g3d::ResFile (rule 2) */
 #include "g3d/g3d_resshp.h"       /* nw4r::g3d::ResTex / ResPltt (rule 2) */
 #include "nw4r/g3d/res_anm.h"    /* ResAnmAmbLightData, ResAnmFogData (rule 1) */
 #include "g3d/g3d_anmscn.h"      /* fn_8006584C, owner g3d/g3d_anmscn.cpp (rule 2) */
@@ -272,7 +272,7 @@ void *res_tex_copy_ctor(void *self, void *src); /* g3d/g3d_anmtexpat.cpp */
 u32 fn_800699B4(void *p);
 u32 fn_800699A8(void);
 
-/* The `ResFile` lookups (`g3d/g3d_resanmtexsrt.cpp`): resolve a name to a texture/palette handle. */
+/* The `ResFile` lookups (`g3d/g3d_resfile.cpp`): resolve a name to a texture/palette handle. */
 
 #pragma peephole off
 

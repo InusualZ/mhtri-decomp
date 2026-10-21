@@ -115,7 +115,7 @@ void scn_root_apply_anm_scn(nw4r::g3d::ScnRoot* pRoot); /* 0x8008311C - copies t
 void scn_root_calc_world(nw4r::g3d::ScnRoot* pRoot); /* 0x80083290 - applies the scene animation, then the world pass */
 void scn_root_calc_material(nw4r::g3d::ScnRoot* pRoot); /* 0x800832DC - the material pass */
 #endif
-u16 math_f32_to_u16(f32 value); /* 0x80082F18 - the frame-round helper (callers: g3d_resanm.c, g3d_resanmchr.cpp) */
+u16 math_f32_to_u16(f32 value); /* 0x80082F18 - the frame-round helper (callers: g3d_resanm.cpp, g3d_resanmchr.cpp) */
 s32 scn_root_get_current_camera(s32 model); /* 0x80082BCC - the camera handle lookup (callers: eft019.cpp, em_effect_ctrl.cpp) */
 
 #ifdef __cplusplus

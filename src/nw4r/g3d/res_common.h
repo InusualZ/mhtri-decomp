@@ -4,7 +4,7 @@
  * A type more than one unit uses is defined once and included where needed (docs/plan.md 6.5 rule 1).
  * This header mirrors nw4r's `g3d_rescommon.h`: the one-word `ResCommon<T>` handle is shared by
  * `g3d/g3d_calcvtx.cpp` (the `g3d_resvtx_ac.h` accessor copies) and `g3d/g3d_calcworld.cpp` (the
- * `ResMdl` node-table pass), and the `IS_VALID_PTR` resource-pointer check by `g3d/g3d_resanm.c` and
+ * `ResMdl` node-table pass), and the `IS_VALID_PTR` resource-pointer check by `g3d/g3d_resanm.cpp` and
  * `g3d/g3d_resanmamblight.c`, so both moved here out of the former `auto/` bulk-attribution units.
  * The resource-block types that only one of those units uses (`ResVtxNrmBlock`, `VtxEntry`,
  * `NodeCallback`, `ResAnmChrChannel`, ...) stay in the unit that owns them.
@@ -23,7 +23,7 @@ struct ResHandle {
 
 /*
  * The pointer-range check nw4r's resource macros expand to: a pointer is valid when it lies in one of
- * the Wii memory regions.  Shared by `g3d/g3d_resanm.c` and `g3d/g3d_resanmamblight.c`, so it lives
+ * the Wii memory regions.  Shared by `g3d/g3d_resanm.cpp` and `g3d/g3d_resanmamblight.c`, so it lives
  * here (rule 1).
  */
 #define IS_VALID_PTR(p) ( \

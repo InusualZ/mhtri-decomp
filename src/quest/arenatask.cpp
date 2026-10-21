@@ -135,7 +135,7 @@
 #include "menu/menu_infomation.h" /* `equip_list_page_count` (the owner's header, rule 2) */
 #include "nw_resource.h"      /* the resource loader entry points (the owner's header, rule 2) */
 #include "draw_shape.h"       /* `set_arena_idx`, the `ResFile` handle setters (the owner's header, rule 2) */
-#include "g3d/g3d_resanmtexsrt.h" /* `nw4r::g3d::ResFile` (the owner's header, rule 2) */
+#include "g3d/g3d_resfile.h" /* `nw4r::g3d::ResFile` (the owner's header, rule 2) */
 #include "g3d/g3d_resshp.h"     /* `nw4r::g3d::ResTex` (the owner's header, rule 2) */
 #include "quest/quest_entry.h"   /* `get_move_work_adrs`, `get_userdata`, `quest_init` (the owner's header, rule 2) */
 #include "Network/network_pat_control.h" /* the net control accessors (the owner's header, rule 2) */

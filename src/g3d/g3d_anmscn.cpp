@@ -18,7 +18,7 @@
  *   res_anm_light_get_id, res_anm_fog_get_id, res_anm_camera_get_id.  The weak accessor copies keep their map stems
  *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
  * RESIDUALS. The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`,
- *   the map's fn_800651BC); fn_800651BC stays defined as the C stem `g3d/g3d_resanm.c` calls.
+ *   the map's fn_800651BC); fn_800651BC stays defined as the C stem `g3d/g3d_resanm.cpp` calls.
  *   fn_8006522C: retail's ternary join branch.
  *   Data: the `.data` strings are not in `.text` order in retail (Construct's follow G3dProc's, GetLightSet's follow
  *   GetFog's); the `_ac.h` inline tail (0x8058C928-0x8058CC40, its "ref" copies in `.sdata`) is still extern; the

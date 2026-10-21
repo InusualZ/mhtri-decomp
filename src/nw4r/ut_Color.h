@@ -1,8 +1,8 @@
 /*
  * nw4r/ut_Color.h - nw4r::ut::Color, the SDK's GXColor with nw4r's constructors; header-only, its weak destructor is
- *   emitted by every object that needs it.  The members keep nw4r's call structure (the constructors assign through
- *   operator=(u32), which writes through ToU32ref): a unit that calls them out of line (`#pragma dont_inline on`)
- *   gets retail's weak copies (g3d/g3d_anmclr.cpp).
+ *   emitted by every object that needs it.  The members keep nw4r's call structure (the word constructors assign
+ *   through operator=(u32), which writes through ToU32ref; the four-channel constructor calls Set): a unit that calls
+ *   them out of line (`#pragma dont_inline on`) gets retail's weak copies (g3d/g3d_anmclr.cpp, g3d/g3d_resanm.cpp).
  */
 #ifndef NW4R_UT_COLOR_H
 #define NW4R_UT_COLOR_H
@@ -24,14 +24,19 @@ struct Color : public _GXColor {
         *this = rgba;
     }
 
-    Color(u8 red, u8 green, u8 blue, u8 alpha) {
+    Color(int red, int green, int blue, int alpha) {
+        Set(red, green, blue, alpha);
+    }
+
+    ~Color() {}
+
+    /* Sets the four channels. */
+    void Set(int red, int green, int blue, int alpha) {
         r = red;
         g = green;
         b = blue;
         a = alpha;
     }
-
-    ~Color() {}
 
     /* Sets the four channels from one RGBA word. */
     Color& operator=(u32 rgba) {

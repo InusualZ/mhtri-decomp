@@ -17,9 +17,8 @@
  *   g3d_scnproc.cpp (a ScnLeaf whose G3dProc runs every CheckCallback_* hook) is the candidate.
  *   type_obj_set_name_scnleaf and type_obj_set_name_scngroup are GUESSES (the type-name store copies the run-time type
  *   members call).  res_mdl_ctor_referencer is a GUESS (the dead-stripped caller that places the ResMdl constructor).
- *   fn_8007B4E4, fn_8007B540, fn_8007B5BC, fn_8007B93C and fn_8007B998 are IScnObjCallback's empty
- *   ExecCallback_CALC_VIEW/CALC_MAT/CALC_WORLD/DRAW_XLU/DRAW_OPA (the slots of `lobby/lb_npc.cpp`'s callback vtables
- *   0x805B8D80/0x805B8DA0).
+ *   IScnObjCallback's empty ExecCallback_CALC_VIEW/CALC_MAT/CALC_WORLD/DRAW_XLU/DRAW_OPA are the slots of
+ *   `lobby/lb_npc.cpp`'s callback vtables 0x805B8D80/0x805B8DA0.
  * RESIDUALS. fn_8007B864, fn_8007B878, fn_8007B8DC, fn_8007BA08 and fn_8007BA38 keep the map stems: the ResMdl handle
  *   constructor (fn_8007B878, asserting the `g3d_resmdl_ac.h` alignment) and two handle copies other units call by
  *   name.
@@ -57,16 +56,11 @@
 #pragma peephole off
 
 extern "C" {
-/* internal */ void fn_8007B4E4(void* a0);
-/* internal */ void fn_8007B540(void* a0);
-/* internal */ void fn_8007B5BC(void* a0);
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 /* internal */ struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ void fn_8007B864(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ u32 fn_8007B878(s32 pDst, s32 offset);
 /* internal */ void fn_8007B8DC(struct ResHandle* pSelf, s32 offset);
-/* internal */ void fn_8007B93C(void* a0);
-/* internal */ void fn_8007B998(void* a0);
 /* internal */ struct ResHandle* fn_8007BA08(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ void fn_8007BA38(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
@@ -93,12 +87,11 @@ void nw4r::g3d::ScnObj::CheckCallback_CALC_VIEW(Timing timing, u32 param, void* 
     }
 }
 
-extern "C" {
 /* 0x8007B4E4 (0x4): the callback's default CALC_VIEW hook does nothing. */
-void fn_8007B4E4(void* a0) {
-
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::IScnObjCallback::ExecCallback_CALC_VIEW(u32 timing, ScnObj* pObj, u32 param, void* pInfo)
+{
 }
-}   /* extern "C" */
 
 /* 0x8007B4E8 (0x58): runs the callback's CALC_MAT hook at `timing` when it is enabled for the pass and the timing. */
 /* untyped: caller-owned payload - the pass's info block */
@@ -109,12 +102,11 @@ void nw4r::g3d::ScnObj::CheckCallback_CALC_MAT(Timing timing, u32 param, void* p
     }
 }
 
-extern "C" {
 /* 0x8007B540 (0x4): the callback's default CALC_MAT hook does nothing. */
-void fn_8007B540(void* a0) {
-
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::IScnObjCallback::ExecCallback_CALC_MAT(u32 timing, ScnObj* pObj, u32 param, void* pInfo)
+{
 }
-}   /* extern "C" */
 
 /* 0x8007B544 (0x20): the matrix of `type`, or NULL for an unknown type. */
 nw4r::math::MTX34* nw4r::g3d::ScnObj::GetMtxPtr(ScnObjMtxType type)
@@ -134,12 +126,11 @@ void nw4r::g3d::ScnObj::CheckCallback_CALC_WORLD(Timing timing, u32 param, void*
     }
 }
 
-extern "C" {
 /* 0x8007B5BC (0x4): the callback's default CALC_WORLD hook does nothing. */
-void fn_8007B5BC(void* a0) {
-
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::IScnObjCallback::ExecCallback_CALC_WORLD(u32 timing, ScnObj* pObj, u32 param, void* pInfo)
+{
 }
-}   /* extern "C" */
 
 /* 0x8007B5C0 (0x34): whether the object's flags disable G3dProc pass `task`. */
 bool nw4r::g3d::ScnObj::IsG3dProcDisabled(u32 task) const
@@ -271,12 +262,11 @@ void nw4r::g3d::ScnObj::CheckCallback_DRAW_XLU(Timing timing, u32 param, void* p
     }
 }
 
-extern "C" {
 /* 0x8007B93C (0x4): the callback's default DRAW_XLU hook does nothing. */
-void fn_8007B93C(void* a0) {
-
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::IScnObjCallback::ExecCallback_DRAW_XLU(u32 timing, ScnObj* pObj, u32 param, void* pInfo)
+{
 }
-}   /* extern "C" */
 
 /* 0x8007B940 (0x58): runs the callback's DRAW_OPA hook at `timing` when it is enabled for the pass and the timing. */
 /* untyped: caller-owned payload - the pass's info block */
@@ -287,12 +277,11 @@ void nw4r::g3d::ScnObj::CheckCallback_DRAW_OPA(Timing timing, u32 param, void* p
     }
 }
 
-extern "C" {
 /* 0x8007B998 (0x4): the callback's default DRAW_OPA hook does nothing. */
-void fn_8007B998(void* a0) {
-
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::IScnObjCallback::ExecCallback_DRAW_OPA(u32 timing, ScnObj* pObj, u32 param, void* pInfo)
+{
 }
-}   /* extern "C" */
 
 /* 0x8007B99C: constructs the collector interface. */
 nw4r::g3d::IScnObjGather::IScnObjGather()

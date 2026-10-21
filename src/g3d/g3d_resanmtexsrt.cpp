@@ -21,7 +21,7 @@
  */
 
 #include "types.h"
-#include "g3d/g3d_resanmtexsrt.h" /* `nw4r::g3d::ResFile` and the detail BP helpers (this unit's own header) */
+#include "g3d/g3d_resanmtexsrt.h" /* the detail BP helpers (this unit's own header) */
 #include "g3d/g3d_rescommon.h"    /* `nw4r::g3d::ResName`/`ResDic` (rule 1) */
 #include "nw4r/g3d/res_common.h"   /* IS_VALID_PTR (rule 1) */
 #include "g3d/g3d_anmchr.h"        /* res_dic_is_valid/res_dic_ptr (rule 2, owner header) */

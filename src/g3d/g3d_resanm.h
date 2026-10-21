@@ -1,4 +1,4 @@
-/* g3d/g3d_resanm.h - the cross-unit declarations of the C unit `g3d/g3d_resanm.c` (C linkage). */
+/* g3d/g3d_resanm.h - the cross-unit declarations of `g3d/g3d_resanm.cpp` (C linkage). */
 #ifndef MHTRI_G3D_G3D_RESANM_H
 #define MHTRI_G3D_G3D_RESANM_H
 

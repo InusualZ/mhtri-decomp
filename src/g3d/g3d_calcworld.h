@@ -14,7 +14,7 @@ void addVec3To(void* dst, const void* src);
 void addVec3To(void* dst, const void* src);
 
 /* The world-matrix attribute helpers (0x800737AC..0x800737C4): clear the scale bits for a non-uniform or a
- * uniform-but-not-one scale, or set the uniform / one bits.  Consumers: `src/g3d/fn_800D77B0.cpp` (the per-node
+ * uniform-but-not-one scale, or set the uniform / one bits.  Consumers: `src/g3d/g3d_maya.cpp` (the per-node
  * transform) and `g3d/g3d_scnmdlsmpl.cpp`. */
 u32 world_mtx_attr_not_scale_uniform(u32 attrib);
 u32 world_mtx_attr_not_scale_one(u32 attrib);

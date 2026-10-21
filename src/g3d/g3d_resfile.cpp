@@ -26,7 +26,6 @@
 #include "types.h"
 #include "gx.h"                  /* GXWGFifo (rule 1) */
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
-#include "g3d/g3d_resanmtexsrt.h" /* the ten category accessors (rule 2) */
 #include "g3d/g3d_anmshp.h"      /* fn_800695EC (rule 2) */
 #include "g3d/g3d_anmtexpat.h"   /* fn_8006993C (rule 2) */
 #include "g3d/g3d_anmtexsrt.h"   /* fn_8006CDBC (rule 2) */
@@ -40,7 +39,7 @@
 #include "g3d/g3d_state.h"
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_cpu.h"
-#include "g3d/g3d_resfile.h"
+#include "g3d/g3d_resfile.h"     /* nw4r::g3d::ResFile and the ten category accessors (this unit's own header) */
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_rescommon.h"
 #include "g3d/g3d_resshp.h"
