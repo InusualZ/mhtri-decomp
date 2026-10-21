@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Score a whole unit in one compile and one `objdiff report generate` - the search-loop measurer.
 Spec: docs/tools/spec/measure.md. CLI: python tools/units/measure.py <unit> [symbol] [--diff] [--json] [-q] [--sort S]
-[--limit N] [--no-cache] [--baseline <report.json> | --against-main] [--save <path>] [--main <tree>]."""
+[--limit N] [--no-cache] [--baseline <report.json> | --against-main] [--save <path>] [--main <tree>] [--rename-map <file>]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 
+from tools.lib import pendingmap as _pendingmap
 from tools.lib import repo as _repo
 from tools.lib import report as _report
 from tools.lib import units as _units
@@ -193,12 +194,16 @@ def _save_scores(path: str, target: str, entries: dict) -> None:
 
 
 def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess.run,
-            use_cache: bool = True, baseline_path: str = None) -> dict:
+            use_cache: bool = True, baseline_path: str = None, rename_map: str = None) -> dict:
     """Compile once, score every symbol with one report, return the whole result (no printing).
 
     `baseline_path` (a project `report.json` or a `--save` file) replaces the tool's own cache as the
     delta's "before": every symbol then carries its delta against that saved build. A baseline that names
     a unit the file does not carry is refused loudly (see `load_baseline`).
+
+    `rename_map` (a `lib.pendingmap` file: `old new` and `split` lines) scores against a copy of the target with
+    those map edits applied (`build/tmp/measure/<unit>.pending.o`), so a unit whose map half has not landed reads
+    as it will once it has; the split object itself is never written.
     """
     unit = normalize_unit(unit, wt)
     unit_name = "main/" + os.path.splitext(unit)[0]
@@ -240,6 +245,17 @@ def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess
         result["flags_reread"] = flag_notes
     if kind == "missing":
         return result
+    if rename_map:
+        try:
+            ops = _pendingmap.load(rename_map)
+            pending = os.path.join(wt, STATE_DIR, _san(unit) + ".pending.o")
+            outcome = _pendingmap.apply_file(target, pending, ops)
+        except (OSError, ValueError) as exc:
+            result["score_error"] = "rename map %s: %s" % (rename_map, exc)
+            return result
+        result.update(rename_map=rename_map, pending=outcome.to_json(), pending_summary=outcome.summary(),
+                      scored_target=pending)
+        target = pending
 
     tmpdir = os.path.join(wt, STATE_DIR, _san(unit) + ".report")
     entries, measures, err = score_report(target, obj, unit_name, tmpdir,
@@ -328,6 +344,11 @@ def format_report(r: dict, sort: str = "score", limit: int = None, quiet: bool =
         out.append("baseline  %s  (before = this saved report)" % r["baseline"])
     if r.get("target_note"):
         out.append("          %s" % r["target_note"])
+    if r.get("rename_map"):
+        out.append("pending   %s: %s  (scored against %s)" % (r["rename_map"], r.get("pending_summary"),
+                                                              r.get("scored_target")))
+        for line, why in (r.get("pending") or {}).get("refused") or ():
+            out.append("          REFUSED line %s: %s" % (line, why))
     if r.get("symbol_map"):
         out.append("map       %s%s" % (r["symbol_map"],
                                       "  [%s]" % r["symbol_map_kind"] if r.get("symbol_map_kind")
@@ -428,6 +449,8 @@ def emit(r: dict, sort: str = "score", limit: int = None, quiet: bool = False,
     # a baseline that moved a row down is a regression: say so in the exit code so a sweep can gate on it
     if (r.get("moved") or {}).get("down"):
         return 1
+    if (r.get("pending") or {}).get("refused"):
+        return 1
     return 0
 
 
@@ -449,6 +472,9 @@ def main(argv=None) -> int:
     ap.add_argument("--against-main", action="store_true",
                     help="diff against MAIN's build/RMHE08/report.json (the last landed build)")
     ap.add_argument("--save", default=None, help="write this run's scores here, for a later --baseline")
+    ap.add_argument("--rename-map", default=None, metavar="FILE",
+                    help="score as if these pending map edits had landed: `old new` lines (symedit rename-batch) "
+                         "and `split <row> <offset> <new> [--scope S]` lines, applied to a copy of the target")
     args = ap.parse_args(argv)
 
     wt = worktree_root()
@@ -458,7 +484,7 @@ def main(argv=None) -> int:
         baseline = os.path.join(main_wt, "build", "RMHE08", "report.json")
     try:
         result = collect(args.unit, wt, main_wt, symbol=args.symbol, use_cache=not args.no_cache,
-                         baseline_path=baseline)
+                         baseline_path=baseline, rename_map=args.rename_map)
     except SystemExit as exc:
         print("measure: %s" % exc, file=sys.stderr)
         return 2

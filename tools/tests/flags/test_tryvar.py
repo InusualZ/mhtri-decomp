@@ -236,5 +236,125 @@ def test_permdecl(c):
             del os.environ["TRYVAR_TOOLS_ROOT"]
 
 
+def test_specs_multi_pair_and_exact(c):
+    """A variant is a list of exact replacements: a marker name repeated after a later `old` block adds a pair, a
+    JSON spec names its pairs, and an `old` that occurs twice is refused rather than applied at the first one."""
+    marker = ("//@@ old\nint a;\n//@@ variant both\nint z;\n//@@ variant only-a\nint y;\n"
+              "//@@ old\nint c;\n//@@ variant both\nint x;\n")
+    c.check("marker: a repeated name collects its pairs, in file order", tryvar.parse_marker_variants(marker),
+            [("both", [("int a;", "int z;"), ("int c;", "int x;")]), ("only-a", [("int a;", "int y;")])])
+    c.check("JSON spec: {name: [[old, new], ...]}",
+            tryvar.parse_json_variants({"swap": [["int a;", "int b;"], ["int c;", "int d;"]]}),
+            [("swap", [("int a;", "int b;"), ("int c;", "int d;")])])
+    c.check("JSON spec: [{name, replace}]", tryvar.parse_json_variants([{"name": "v", "replace": [["a", "b"]]}]),
+            [("v", [("a", "b")])])
+    c.raises("JSON spec: a pair that is not two strings is refused", SystemExit, tryvar.parse_json_variants,
+             {"bad": [["only-one"]]})
+    c.check("both pairs applied", tryvar.rewrite(SOURCE, [("int a;", "int z;"), ("int c;", "int x;")])[0],
+            SOURCE.replace("int a;", "int z;").replace("int c;", "int x;"))
+    c.check("an old that occurs twice is refused with its count",
+            tryvar.rewrite("int a;\nint a;\n", [("int a;", "int b;")]),
+            (None, "pattern occurs 2 times (want exactly one): 'int a;'"))
+    c.check("an absent old is refused", tryvar.rewrite(SOURCE, [("int q;", "x")])[0], None)
+
+
+HILL_SOURCE = "int g(void) {\n    int k = 1;\n    int a;\n    int b;\n    int c;\n    int d;\n    return k;\n}\n"
+#: the order the stub scorer calls retail: two moves away from the source's own
+HILL_RETAIL = ["d", "a", "c", "b"]
+
+
+def hill_score(obj, _target):
+    """`g` loses 10 % per pair of declarations out of retail's order (inversions): 100 % only for `HILL_RETAIL`."""
+    rank_ = [HILL_RETAIL.index(x) for x in decl_order(obj, "g")]
+    inversions = sum(1 for i in range(len(rank_)) for j in range(i + 1, len(rank_)) if rank_[i] > rank_[j])
+    return {"g": (100.0 - 10.0 * inversions, 16, 16)}
+
+
+def test_declperm_block_and_neighbours(c):
+    from tools.lib import declperm
+    run = declperm.block_run(HILL_SOURCE, "g", 3, 6)
+    c.check("--lines: the block is exactly those lines", [l.strip() for l in run.lines],
+            ["int a;", "int b;", "int c;", "int d;"])
+    c.check("... and its span holds them", HILL_SOURCE[run.start:run.end], run.block)
+    c.raises("a line that is not a declaration is refused", ValueError, declperm.block_run, HILL_SOURCE, "g", 6, 7)
+    c.raises("lines outside the function's body are refused", ValueError, declperm.block_run, HILL_SOURCE, "g", 1, 2)
+    c.raises("an absent function is refused", ValueError, declperm.block_run, HILL_SOURCE, "zz", 3, 6)
+    c.check("one move away: (n-1)^2 distinct orders for n=4", len(declperm.neighbours((0, 1, 2, 3))), 9)
+    c.check("neighbours keep dependencies", all(o.index(0) < o.index(2) for o in
+                                                declperm.neighbours((0, 1, 2), ((), (), (0,)))), True)
+
+
+def test_hill(c):
+    """The climb reaches the retail order through single moves, never writes the source and leaves no probe.
+    Mutation: accepting an equal-merit order (>= instead of >) or never restarting from the accepted order fails the
+    path checks."""
+    with testing.FixtureTree() as tree:
+        tree.add_unit("demo/unit.cpp", source=HILL_SOURCE, ranges={".text": (0x80004000, 0x80004010)})
+        tree.write("build/RMHE08/obj/demo/unit.o", b"\x7fELF")
+        stub = tree.write("stub_cc.py", STUB_CC)
+        unit = units.Unit.resolve("demo/unit", str(tree.root))
+        before = pathlib.Path(unit.source).read_bytes()
+        tokens = [sys.executable, str(stub), "-o", "unused", "-c", unit.source]
+        os.environ["TRYVAR_TOOLS_ROOT"] = str(testing.LIVE_ROOT)
+        try:
+            steps = []
+            rec = tryvar.hill_one(unit, tokens, "g", (3, 6), max_evals=200, score=hill_score,
+                                  diverge=lambda *_a: 0, out=steps.append)
+            c.check("it climbs to the retail order and stops at 100 %",
+                    (rec["status"], rec["stopped"], rec["path"][-1]["percent"]), ("ok", "100%", 100.0))
+            c.check("the best order is written as lines", rec["path"][-1]["lines"], ["int d;", "int a;", "int c;", "int b;"])
+            pcts = [p["percent"] for p in rec["path"]]
+            c.check("every accepted step is strictly better", all(b > a for a, b in zip(pcts, pcts[1:])), True)
+            c.check("the source's own order is the first step", rec["path"][0]["name"], tryvar.AS_IS)
+            c.check("one line per accepted step was reported", len(steps), len(rec["path"]))
+            capped = tryvar.hill_one(unit, tokens, "g", (3, 6), max_evals=2, score=hill_score, diverge=lambda *_a: 0)
+            c.check("--max-evals caps the probes", (capped["tried"] <= 2, capped["stopped"] in ("max-evals", "100%")),
+                    (True, True))
+            c.check("a block that is not declarations is refused, not tried",
+                    tryvar.hill_one(unit, tokens, "g", (6, 7), score=hill_score)["status"], "ambiguous")
+            c.check("the source is byte-identical after the climb", pathlib.Path(unit.source).read_bytes(), before)
+            c.check("no probe is left", sorted(os.listdir(os.path.dirname(unit.source))), ["unit.cpp"])
+            applied = tryvar.write_source(unit, lambda lf: tryvar.permdecl_apply(lf, [rec], 64), str(tree.root))
+            c.check("--apply writes the climbed order", ("    int d;\n    int a;\n    int c;\n    int b;\n" in
+                                                         pathlib.Path(unit.source).read_text(), bool(applied)), (True, True))
+        finally:
+            del os.environ["TRYVAR_TOOLS_ROOT"]
+
+
+def test_interrupt_and_apply_best(c):
+    """An interrupt mid-probe leaves the real source untouched and no probe behind; --apply-best keeps the source on
+    a tie and writes the winner (CRLF kept) when it is strictly better."""
+    with testing.FixtureTree() as tree:
+        tree.add_unit("demo/unit.cpp", source=SOURCE.replace("\n", "\r\n"), ranges={".text": (0x80004000, 0x80004010)})
+        tree.write("build/RMHE08/obj/demo/unit.o", b"\x7fELF")
+        stub = tree.write("stub_cc.py", STUB_CC)
+        unit = units.Unit.resolve("demo/unit", str(tree.root))
+        before = pathlib.Path(unit.source).read_bytes()
+        tokens = [sys.executable, str(stub), "-o", "unused", "-c", unit.source]
+        os.environ["TRYVAR_TOOLS_ROOT"] = str(testing.LIVE_ROOT)
+
+        def interrupt(_obj, _target):
+            raise KeyboardInterrupt
+
+        try:
+            c.raises("an interrupt propagates", KeyboardInterrupt, tryvar.try_variant, unit, tokens, "x",
+                     [("int a;", "int q;")], "f", interrupt, lambda *_a: 0)
+            c.check("... with the source byte-identical", pathlib.Path(unit.source).read_bytes(), before)
+            c.check("... and no probe left", sorted(os.listdir(os.path.dirname(unit.source))), ["unit.cpp"])
+            perms = tryvar.permutation_variants("//@@ item\nint a;\n//@@ item\nint b;\n//@@ item\nint c;\n")
+            results = tryvar.try_all(unit, tokens, perms, "f", score, diverge, as_is=True, out=None)
+            best = tryvar.best_to_apply(results, "f")
+            c.check("--apply-best picks the top of the ranking", best["name"], "order-2,0,1")
+            tie = [dict(r, symbol_percent=50.0, first_divergence=1, matched_bytes=8.0) for r in results]
+            c.check("... and nothing when the winner only ties the as-is source", tryvar.best_to_apply(tie, "f"), None)
+            import contextlib, io
+            with contextlib.redirect_stdout(io.StringIO()):
+                tryvar._apply_named(unit, best["name"], dict(perms)[best["name"]], str(tree.root))
+            after = pathlib.Path(unit.source).read_bytes()
+            c.check("the winner is written with the file's CRLF", after.startswith(b"int c;\r\nint a;\r\nint b;\r\n"), True)
+        finally:
+            del os.environ["TRYVAR_TOOLS_ROOT"]
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

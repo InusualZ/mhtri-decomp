@@ -8,7 +8,7 @@ match evidence for a function's leading locals.
 
 ## Users
 
-`tools/flags/tryvar.py --permdecl` (and `mt.py permdecl`, which forwards to it).
+`tools/flags/tryvar.py --permdecl` and `--hill` (and `mt.py permdecl` / `mt.py hill`, which forward to it).
 
 ## Public API
 
@@ -26,6 +26,13 @@ match evidence for a function's leading locals.
 * `reorder(text, run, order)` - the text with the run's lines in `order`, replaced **where the run was found**; `None`
   when the text no longer holds the run there.
 * `variants(run, orders)` - `[(name, callable)]` in `tryvar`'s variant shape; `name_of(order)` is `order-2,0,1`.
+* `block_run(text, function, first, last) -> Run` - lines `first`..`last` (1-based, inclusive) of the LF text as a run, so
+  any block can be permuted, not only the leading one (`tryvar --lines`). Every line must be a single-line declaration
+  (`declared`, read at any indent) and all share one indent; a range outside the function's body (its `{` to the matching
+  `}`, a plain brace count), an absent function or one defined twice raises `ValueError` with the reason.
+* `neighbours(order, deps=()) -> [order]` - the orders one move away (one line taken out and put back elsewhere) that keep
+  the dependencies, distinct and in a fixed order: the hill climb's step (`tryvar --hill`). `respects(order, deps)` is the
+  dependency test.
 
 ## Invariants and rules
 
@@ -38,10 +45,12 @@ match evidence for a function's leading locals.
 
 Tier: fixture, in `tools/tests/flags/test_tryvar.py` (`test_declperm_run_and_orders`, `test_declperm_initialised`).
 Replacing the first copy of the block instead of the found offset fails 4 checks; ignoring `deps` fails 4 (orders that
-put `c = a * 2` before `a`).
+put `c = a * 2` before `a`). `test_declperm_block_and_neighbours` pins `block_run`'s span and refusals and the
+`(n-1)^2` neighbours.
 
 ## Known gaps
 
 The function head must open on one line (`...name(args) {`); a head wrapped over lines is not found. A declaration over several
 lines, a `;` inside an initialiser string and a declarator list (`int a = 1, b = 2;`, only the first name is tracked) end or
-blur the run. Only the leading run is permuted - declarations after a statement are not.
+blur the run. `find_run` reads the leading run only; a later block needs `block_run`'s explicit lines, whose body end is a
+plain brace count (a brace inside a string or comment can misplace it).

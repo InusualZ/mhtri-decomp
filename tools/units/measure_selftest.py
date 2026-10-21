@@ -277,6 +277,48 @@ def collect_rows() -> int:
     return failures
 
 
+def rename_map_rows() -> int:
+    """`--rename-map`: the report scores a renamed copy of the target, never the split object itself; a bad map
+    is a score error, not a score."""
+    from tools.lib.binary.build import ElfBuilder
+    from tools.lib.binary.elf import Elf
+    failures = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        main = _fake_main(tmp)
+        target = os.path.join(main, "build", "RMHE08", "obj", "prop", "unit.o")
+        raw = (ElfBuilder().section(".text", b"\0" * 0x20)
+               .symbol("fn_80001000", ".text", 0, 0x20, type="func").build())
+        open(target, "wb").write(raw)
+        renames = os.path.join(tmp, "renames.txt")
+        open(renames, "w", encoding="utf-8").write("fn_80001000 f0\nfn_8000FFFF elsewhere\n")
+        calls, seen = [], []
+        functions = [{"name": "f0", "size": "32", "fuzzy_match_percent": 100.0}]
+        report = _report_runner(calls, functions)
+
+        def spy(argv, **kw):
+            if "generate" in argv:
+                proj = argv[argv.index("-p") + 1]
+                cfg = json.load(open(os.path.join(proj, "objdiff.json"), encoding="utf-8"))
+                seen.append(cfg["units"][0]["target_path"])
+            return report(argv, **kw)
+
+        combined = lambda argv, **kw: spy(argv, **kw) if argv[0] != "ninja" \
+            and not any("mwcceppc" in a for a in argv) else _compile_runner(calls, main)(argv, **kw)
+        result = ms.collect("prop/unit", main, main, runner=combined, use_cache=False, rename_map=renames)
+        scored = seen[0] if seen else ""
+        failures = _ok("the report scores the pending copy", scored.endswith(".pending.o"), True, failures)
+        failures = _ok("the pending copy carries the renamed row",
+                       sorted(s.name for s in Elf.read(scored).symbols if s.name) if scored else [], ["f0"], failures)
+        failures = _ok("the split object is untouched", open(target, "rb").read() == raw, True, failures)
+        failures = _ok("the summary counts the applied and the absent rename",
+                       result.get("pending_summary", "").startswith("1 rename(s) applied, 0 split(s), 1 name(s)"),
+                       True, failures)
+        open(renames, "w", encoding="utf-8").write("one-word-line\n")
+        bad = ms.collect("prop/unit", main, main, runner=combined, use_cache=False, rename_map=renames)
+        failures = _ok("a malformed map is a score error", "line 1" in (bad.get("score_error") or ""), True, failures)
+    return failures
+
+
 def format_rows() -> int:
     """The text a worker reads: official unit score, the table, and the focused symbol with a delta."""
     failures = 0
@@ -527,6 +569,7 @@ def main() -> int:
     failures += parse_rows()
     failures += collect_rows()
     failures += baseline_rows()
+    failures += rename_map_rows()
     failures += format_rows()
     failures += hostile_rows()
     failures += invocation_root_rows()

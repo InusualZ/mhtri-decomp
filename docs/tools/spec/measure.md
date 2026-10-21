@@ -14,8 +14,9 @@ the selftest runner (1); docs (28); imported by `verifyunit`
 
 ```
 python tools/units/measure.py <unit> [symbol] [--json] [-q]
+python tools/units/measure.py <unit> --rename-map pending.txt   # as if these map renames/splits had landed
 ```
-Flags: `--against-main`, `--baseline`, `--diff`, `--json`, `--limit`, `--main`, `--no-cache`, `--save`, `--sort`.
+Flags: `--against-main`, `--baseline`, `--diff`, `--json`, `--limit`, `--main`, `--no-cache`, `--rename-map`, `--save`, `--sort`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -29,12 +30,20 @@ Inputs -> outputs: unit source -> table/JSON, build/tmp/measure.
 * The compile command's flags are re-read from this tree's `configure.py` when the graph predates it
   (`lib.units.reconcile_flags`, the same call `recompile.py` makes); the report prints a `flags` line and `--json` carries
   `flags_reread`.
+* `--rename-map FILE` (2026-10-21, the lanes' `rscore.py`/`fcmp.py`): the report scores a copy of the target with the
+  pending map edits applied (`lib.pendingmap`: `old new` lines in the `symedit.py rename-batch` shape and `split <row>
+  <offset> <new> [--scope S]` lines), written to `build/tmp/measure/<unit>.pending.o`; `symbols.txt` and the split object
+  are never touched. The text prints a `pending` line (applied, split, absent and refused counts); a refused line exits 1, a
+  malformed file is a `score_error`. `--json` carries `rename_map`, `pending`, `pending_summary` and `scored_target`. A
+  baseline's rows keep their old names, so a renamed row reads as new against it. Measured: `g3d/g3d_state` with the
+  `g3d-state#4` renames reverted in the map read 73.05624; with `--rename-map` of the 29 renames, 99.30054 - the score after
+  the map half landed - in 0.95 s.
 * One compile, one report, N symbols: the cost of the search loop is the compiler, not N x the measurer. `recompile.py --measure` remains the tool for a single-symbol proof; this one is for the round.
 * The unit is the path from the repository root (`Pl/pl_act`, `Camellia/camellia`, `auto/8005AA28_fn_8005AA28`); the extension may be omitted and is inferred from the worktree's `src/`. Run it from the worktree you are editing, or from MAIN with `--main` left to `git worktree list`; the source, `-o` directory and `-i` order are always this tree's (that half is `recompile.py`'s, not this file's).
 
 ## Lib dependencies
 
-units, report, repo.
+units, report, repo, pendingmap (`spec/lib-pendingmap.md`).
 
 ## Test contract
 

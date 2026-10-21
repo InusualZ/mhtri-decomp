@@ -103,6 +103,74 @@ def find_run(text: str, function: str, max_lines: int = DEFAULT_MAX_LINES, initi
     return Run(function, start, pos, tuple(lines), dependencies(tuple(lines)) if initialised else ())
 
 
+def _body_end(text: str, brace: int) -> int:
+    """The offset just past the `}` that closes the `{` at `brace` (a plain count: braces in strings, characters or
+    comments are counted too); `len(text)` when it is never closed."""
+    depth = 0
+    for i in range(brace, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return len(text)
+
+
+def block_run(text: str, function: str, first: int, last: int) -> Run:
+    """The declaration lines `first`..`last` (1-based, inclusive, of the LF text) inside `function`'s body as a `Run`,
+    so any block - not only the leading one - can be permuted. Every line must be a single-line declaration
+    (`declared`, read at any indent) and the lines must share one indent (one scope); anything else, a range outside
+    the function's body, an absent function or one defined twice raises `ValueError` naming the reason."""
+    found = _definition(text, function)
+    if len(found) != 1:
+        raise ValueError("%s has %d definitions in the source" % (function, len(found)))
+    if not 1 <= first < last:
+        raise ValueError("--lines %d-%d: want two or more lines, first < last" % (first, last))
+    all_lines = text.split("\n")
+    if last >= len(all_lines):                   # the last element is what follows the final newline
+        raise ValueError("--lines %d-%d: the file has %d lines" % (first, last, len(all_lines) - 1))
+    start = sum(len(l) + 1 for l in all_lines[:first - 1])
+    lines = tuple(all_lines[first - 1:last])
+    end = start + sum(len(l) + 1 for l in lines)
+    body_start, body_end = found[0].end(), _body_end(text, found[0].end() - 2)
+    if start < body_start or end > body_end:
+        raise ValueError("--lines %d-%d are not inside %s's body" % (first, last, function))
+    indents = {len(l) - len(l.lstrip(" ")) for l in lines}
+    for number, line in enumerate(lines, first):
+        if declared("    " + line.lstrip(" ")) is None:
+            raise ValueError("line %d is not a single-line declaration: %r" % (number, line.strip()))
+    if len(indents) != 1:
+        raise ValueError("--lines %d-%d mix indents (scopes): %s" % (first, last, sorted(indents)))
+    norm = tuple("    " + l.lstrip(" ") for l in lines)
+    return Run(function, start, end, lines, dependencies(norm))
+
+
+def respects(order: tuple[int, ...], deps: tuple[tuple[int, ...], ...] = ()) -> bool:
+    """True when every line of `order` comes after the lines it depends on (`Run.deps`)."""
+    seen: set[int] = set()
+    for i in order:
+        if deps and any(d not in seen for d in deps[i]):
+            return False
+        seen.add(i)
+    return True
+
+
+def neighbours(order: tuple[int, ...], deps: tuple[tuple[int, ...], ...] = ()) -> list[tuple[int, ...]]:
+    """The orders one move away from `order` - one line taken out and put back at another position - that keep
+    every dependency, without repeats and without `order` itself, in a fixed order (the hill climb's step)."""
+    out: list[tuple[int, ...]] = []
+    seen = {order}
+    for i in range(len(order)):
+        rest = order[:i] + order[i + 1:]
+        for j in range(len(order)):
+            cand = rest[:j] + (order[i],) + rest[j:]
+            if cand not in seen and respects(cand, deps):
+                seen.add(cand)
+                out.append(cand)
+    return out
+
+
 def _topological(n: int, deps: tuple[tuple[int, ...], ...], limit: int) -> list[tuple[int, ...]]:
     """Up to `limit` orders of `range(n)` that keep every line after its dependencies, in lexicographic order."""
     out: list[tuple[int, ...]] = []

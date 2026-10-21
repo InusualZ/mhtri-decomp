@@ -32,5 +32,15 @@ def test_permdecl_argv(c):
     c.check("no function at all asks for --help", argv(["g3d/x"]), ["--help"])
 
 
+def test_hill_argv(c):
+    mt = load_mt()
+    hill = mt.ALIASES["hill"][1]
+    c.check("hill: the positional form builds --hill, --lines' value kept",
+            hill(["g3d/x", "f", "--lines", "61-68"]), ["-u", "g3d/x", "--hill", "f", "--lines", "61-68"])
+    c.check("hill: --hill spelled out is not added twice", hill(["-u", "g3d/x", "--hill", "f"]),
+            ["-u", "g3d/x", "--hill", "f"])
+    c.check("hill forwards to tryvar", mt.ALIASES["hill"][0], "variants")
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))
