@@ -824,7 +824,7 @@ config.libs = [
             Object(NonMatching, "ef/fn_800FD864_fx.cpp"),
             Object(NonMatching, "ef/eft004_fx.cpp"),
             Object(Matching, "ef/em_effect_ctrl.cpp"),
-            Object(NonMatching, "ef/eft007.cpp"),
+            Object(Matching, "ef/eft007.cpp"),
             Object(Matching, "ef/eft009.cpp"),
             Object(Matching, "ef/fn_80104BD0.c"),
             Object(NonMatching, "ef/fn_80105314.cpp"),
