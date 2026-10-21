@@ -11,24 +11,30 @@
  *   AABB_ctor (0x80080F44) is a GUESS in the `MTX34_ctor`/`VEC3_ctor` scheme: it runs the two corner records'
  *   constructors, the element constructor of ScnObj's bounding-box array.  scnmdlsmpl_align32 is a GUESS (the
  *   32-byte round-up the matrix-array sizes use), world_mtx_attr_ignore_anm_trans is a GUESS (bit 27 of a world-matrix
- *   attribute, set when the ignore-animation-translation option is on), CalcPosture, CalcSkinning,
+ *   attribute, set when the ignore-animation-translation option is on), EnableScnMdlCallbackTiming (sets the
+ *   +0x120 timing bits, nw4r's member by its shape) is a GUESS, CalcPosture, CalcSkinning,
  *   G3dProcGatherScnObj .. G3dProcUpdateFrame, GetDrawMode and the GetCalcWorld* getters are GUESSES (the per-pass
  *   helpers G3dProc dispatches to and the field readers), as are the callees' names in `g3d/g3d_calcworld.h`,
  *   `g3d/g3d_calcview.h`, `g3d/g3d_calcmaterial.h`, `g3d/g3d_anmvis.h`, `g3d/g3d_draw.h` and `g3d/g3d_scnmdl.h`
  *   (res_mdl_get_info, res_mdl_info_num_pos_nrm_mtx, res_mdl_info_num_view_mtx, res_mdl_info_ref, world_mtx_attr_*,
  *   g3d_calc_world, g3d_calc_skinning, g3d_calc_view*, g3d_lc_*, g3d_dc_invalidate_range, g3d_calc_material_directly,
  *   g3d_apply_vis_anm_result, g3d_draw_res_mdl_directly, type_obj_set_name_anmchr).
- * RESIDUALS. Unwritten: 0x80080B10-0x80080B5C (the callback-timing setter: foreign units call its stem) and
- *   0x800810DC-0x80081120 (ICalcWorldCallback's destructor: defining it would emit the interface's vtable here).
- *   Partial: SetAnmObj (retail's NOT_SPECIFIED case jumps into the per-type attach blocks, a goto shape rule 8
- *   forbids; the two-switch dispatch measures 88.2 and saves r25 through `_savegpr_25`/`_restgpr_25`, per-case
- *   inline attach helpers 34.3).  The constructor copies
- *   mResMdl inline where retail calls the out-of-line ResMdl copy constructor (fn_80077E34, 0x80077E34).
- *   flipcheck: `.rodata` (the "ScnMdlSimple" name record, declared not defined), `.data` and `.sdata` are claimed and
- *   not emitted.
- * SHAPES. The unit compiles with `#pragma peephole off` (retail keeps every `clrlwi` + `cmpwi` pair).
+ * RESIDUALS. SetAnmObj: retail's first switch jumps straight into the per-type attach blocks (the NOT_SPECIFIED
+ *   chain included), a goto shape rule 8 forbids; the two-switch form with one cast-result local keeps a second
+ *   dispatch and saves r28 (single local, NOT_SPECIFIED last: 89.5; five typed locals: 88.2; per-case inline
+ *   attach helpers: 34.3).  The constructor copies mResMdl inline (frame 0x50) where retail calls the out-of-line
+ *   ResMdl copy constructor (0x80077E34, `g3d/g3d_draw.cpp`'s stem) with a 0x60 frame.
+ *   EnableScnMdlCallbackTiming (0x80080B10) and ICalcWorldCallback's destructor (0x800810DC) are defined under
+ *   their manglings; the map rows and the game callers still spell fn_80080B10/fn_800810DC (rename requested), so
+ *   `g3d/g3d_scnmdlsmpl.h` keeps the two C declarations for those callers.
+ *   flipcheck: `.text` is 0x6C bytes longer (SetAnmObj) and in definition order; `.rodata`, `.data` and `.sdata`
+ *   are emitted at the target's sizes (the `.data` range shows an emission-order seam in 0x8058F388-0x8058F488).
+ * SHAPES. The unit compiles with `#pragma peephole off` (retail keeps every `clrlwi` + `cmpwi` pair), set above the
+ *   includes so the weak inline copies (ICalcWorldCallback's destructor keeps its `extsh` + `cmpwi`) compile under it.
  *   GetNumViewMtx and GetCalcWorldNodeID return u32: their callers use the `lhz` result unmasked.
  */
+
+#pragma peephole off
 
 #include "types.h"
 #include "g3d/g3d_scnmdlsmpl.h" /* this unit's own declarations (rule 1) */
@@ -58,7 +64,6 @@ extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox)
 #include "nw4r/db_assert.h"      /* nw4r::db::Panic / Warning (rule 2) */
 
 #pragma pool_data off
-#pragma peephole off
 
 using nw4r::g3d::ScnMdlSimple;
 
@@ -459,52 +464,48 @@ bool ScnMdlSimple::GetScnObjOption(u32 option, u32* pValue) const
  * already attached object, a type mismatch or an unbound animation. */
 bool ScnMdlSimple::SetAnmObj(AnmObj* pObj, AnmObjType type)
 {
-    AnmObjChr* pChr;
-    AnmObjVis* pVis;
-    AnmObjMatClr* pMatClr;
-    AnmObjTexPat* pTexPat;
-    AnmObjTexSrt* pTexSrt;
+    AnmObj* pAnm;
     if (pObj == NULL || pObj->GetParent() != NULL) {
         return false;
     }
     switch (type) {
-    case ANMOBJTYPE_NOT_SPECIFIED:
-        if ((pChr = DynamicCast<AnmObjChr>(pObj)) != NULL) {
-            type = ANMOBJTYPE_CHR;
-        } else if ((pVis = DynamicCast<AnmObjVis>(pObj)) != NULL) {
-            type = ANMOBJTYPE_VIS;
-        } else if ((pMatClr = DynamicCast<AnmObjMatClr>(pObj)) != NULL) {
-            type = ANMOBJTYPE_MATCLR;
-        } else if ((pTexPat = DynamicCast<AnmObjTexPat>(pObj)) != NULL) {
-            type = ANMOBJTYPE_TEXPAT;
-        } else if ((pTexSrt = DynamicCast<AnmObjTexSrt>(pObj)) != NULL) {
-            type = ANMOBJTYPE_TEXSRT;
-        } else {
-            return false;
-        }
-        break;
     case ANMOBJTYPE_CHR:
-        if ((pChr = DynamicCast<AnmObjChr>(pObj)) == NULL) {
+        if ((pAnm = DynamicCast<AnmObjChr>(pObj)) == NULL) {
             return false;
         }
         break;
     case ANMOBJTYPE_VIS:
-        if ((pVis = DynamicCast<AnmObjVis>(pObj)) == NULL) {
+        if ((pAnm = DynamicCast<AnmObjVis>(pObj)) == NULL) {
             return false;
         }
         break;
     case ANMOBJTYPE_MATCLR:
-        if ((pMatClr = DynamicCast<AnmObjMatClr>(pObj)) == NULL) {
+        if ((pAnm = DynamicCast<AnmObjMatClr>(pObj)) == NULL) {
             return false;
         }
         break;
     case ANMOBJTYPE_TEXPAT:
-        if ((pTexPat = DynamicCast<AnmObjTexPat>(pObj)) == NULL) {
+        if ((pAnm = DynamicCast<AnmObjTexPat>(pObj)) == NULL) {
             return false;
         }
         break;
     case ANMOBJTYPE_TEXSRT:
-        if ((pTexSrt = DynamicCast<AnmObjTexSrt>(pObj)) == NULL) {
+        if ((pAnm = DynamicCast<AnmObjTexSrt>(pObj)) == NULL) {
+            return false;
+        }
+        break;
+    case ANMOBJTYPE_NOT_SPECIFIED:
+        if ((pAnm = DynamicCast<AnmObjChr>(pObj)) != NULL) {
+            type = ANMOBJTYPE_CHR;
+        } else if ((pAnm = DynamicCast<AnmObjVis>(pObj)) != NULL) {
+            type = ANMOBJTYPE_VIS;
+        } else if ((pAnm = DynamicCast<AnmObjMatClr>(pObj)) != NULL) {
+            type = ANMOBJTYPE_MATCLR;
+        } else if ((pAnm = DynamicCast<AnmObjTexPat>(pObj)) != NULL) {
+            type = ANMOBJTYPE_TEXPAT;
+        } else if ((pAnm = DynamicCast<AnmObjTexSrt>(pObj)) != NULL) {
+            type = ANMOBJTYPE_TEXSRT;
+        } else {
             return false;
         }
         break;
@@ -513,7 +514,7 @@ bool ScnMdlSimple::SetAnmObj(AnmObj* pObj, AnmObjType type)
     }
     switch (type) {
     case ANMOBJTYPE_CHR:
-        if (!pChr->IsBound()) {
+        if (!pAnm->IsBound()) {
             nw4r::db::Warning("g3d_scnmdlsmpl.cpp", 0x246,
                               "ScnMdlSimple::SetAnmObj does not 'Bind' AnmObjChr now. Please 'Bind' before call "
                               "SetAnmObj.");
@@ -525,11 +526,11 @@ bool ScnMdlSimple::SetAnmObj(AnmObj* pObj, AnmObjType type)
         if (mpAnmObjChr != NULL) {
             nw4r::db::Panic("g3d_scnmdlsmpl.cpp", 0x24D, "NW4R:Failed assertion !mpAnmObjChr");
         }
-        mpAnmObjChr = pChr;
-        pChr->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
+        mpAnmObjChr = static_cast<AnmObjChr*>(pAnm);
+        pAnm->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
         return true;
     case ANMOBJTYPE_VIS:
-        if (!pVis->IsBound()) {
+        if (!pAnm->IsBound()) {
             nw4r::db::Warning("g3d_scnmdlsmpl.cpp", 0x259,
                               "ScnMdlSimple::SetAnmObj does not 'Bind' AnmObjVis now. Please 'Bind' before call "
                               "SetAnmObj.");
@@ -541,11 +542,11 @@ bool ScnMdlSimple::SetAnmObj(AnmObj* pObj, AnmObjType type)
         if (mpAnmObjVis != NULL) {
             nw4r::db::Panic("g3d_scnmdlsmpl.cpp", 0x260, "NW4R:Failed assertion !mpAnmObjVis");
         }
-        mpAnmObjVis = pVis;
-        pVis->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
+        mpAnmObjVis = static_cast<AnmObjVis*>(pAnm);
+        pAnm->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
         return true;
     case ANMOBJTYPE_MATCLR:
-        if (!pMatClr->IsBound()) {
+        if (!pAnm->IsBound()) {
             return false;
         }
         if (mpAnmObjMatClr != NULL) {
@@ -554,11 +555,11 @@ bool ScnMdlSimple::SetAnmObj(AnmObj* pObj, AnmObjType type)
         if (mpAnmObjMatClr != NULL) {
             nw4r::db::Panic("g3d_scnmdlsmpl.cpp", 0x26D, "NW4R:Failed assertion !mpAnmObjMatClr");
         }
-        mpAnmObjMatClr = pMatClr;
-        pMatClr->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
+        mpAnmObjMatClr = static_cast<AnmObjMatClr*>(pAnm);
+        pAnm->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
         return true;
     case ANMOBJTYPE_TEXPAT:
-        if (!pTexPat->IsBound()) {
+        if (!pAnm->IsBound()) {
             return false;
         }
         if (mpAnmObjTexPat != NULL) {
@@ -567,11 +568,11 @@ bool ScnMdlSimple::SetAnmObj(AnmObj* pObj, AnmObjType type)
         if (mpAnmObjTexPat != NULL) {
             nw4r::db::Panic("g3d_scnmdlsmpl.cpp", 0x27A, "NW4R:Failed assertion !mpAnmObjTexPat");
         }
-        mpAnmObjTexPat = pTexPat;
-        pTexPat->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
+        mpAnmObjTexPat = static_cast<AnmObjTexPat*>(pAnm);
+        pAnm->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
         return true;
     default:
-        if (!pTexSrt->IsBound()) {
+        if (!pAnm->IsBound()) {
             return false;
         }
         if (mpAnmObjTexSrt != NULL) {
@@ -580,8 +581,8 @@ bool ScnMdlSimple::SetAnmObj(AnmObj* pObj, AnmObjType type)
         if (mpAnmObjTexSrt != NULL) {
             nw4r::db::Panic("g3d_scnmdlsmpl.cpp", 0x287, "NW4R:Failed assertion !mpAnmObjTexSrt");
         }
-        mpAnmObjTexSrt = pTexSrt;
-        pTexSrt->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
+        mpAnmObjTexSrt = static_cast<AnmObjTexSrt*>(pAnm);
+        pAnm->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
         return true;
     }
 }
@@ -704,6 +705,20 @@ void ScnMdlSimple::UpdateFrame()
     }
     if (mpAnmObjTexSrt != NULL) {
         mpAnmObjTexSrt->UpdateFrame();
+    }
+}
+
+/* 0x80080B10 (0x4C): enables the world-matrix callback at each timing `timing` names. */
+void ScnMdlSimple::EnableScnMdlCallbackTiming(Timing timing)
+{
+    if (timing & CALLBACK_TIMING_A) {
+        mCalcWorldCallbackTiming |= CALLBACK_TIMING_A;
+    }
+    if (timing & CALLBACK_TIMING_B) {
+        mCalcWorldCallbackTiming |= CALLBACK_TIMING_B;
+    }
+    if (timing & CALLBACK_TIMING_C) {
+        mCalcWorldCallbackTiming |= CALLBACK_TIMING_C;
     }
 }
 
@@ -847,11 +862,16 @@ ScnMdlSimple::~ScnMdlSimple()
 }
 
 
+/* The ScnMdlSimple run-time type name GetTypeObj and GetTypeObjStatic point at. */
+extern "C" const nw4r::g3d::TypeNameData<sizeof("ScnMdlSimple")> scn_typename_ScnMdlSimple = {
+    sizeof("ScnMdlSimple"), "ScnMdlSimple"};
+
 /* 0x80081120 (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj ScnMdlSimple::GetTypeObj() const
 {
-    void* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, scn_typename_ScnMdlSimple));
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(
+        type_obj_set_name_anmchr(&pName, reinterpret_cast<const u8*>(&scn_typename_ScnMdlSimple)));
 }
 
 /* 0x80081150 (0x38): returns the type's name. */

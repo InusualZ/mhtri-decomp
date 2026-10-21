@@ -18,13 +18,14 @@
  *   are nw4r's (the asserts, the vtables); their map rows are fn_ stems until rename request g3d-anmtex#5 lands.
  *   texsrt_add_offset_to_ptr (0x8006D970, ut::AddOffsetToPtr), apply_tex_srt_anm_result_tex (0x8006E160, the
  *   texture-SRT half of ApplyTexSrtAnmResult) and tex_srt_assign (0x8006E244, TexSrt's copy assignment) are
- *   GUESSES.  ResAnmTexSrt::GetAnmResult is `g3d/g3d_resanmtexsrt.cpp`'s fn_800916FC.
- * RESIDUALS. Partial: fn_8006C650 (retail materialises `~(b - 1)` with an explicit `nor` where MWCC folds it into
- *   `andc`/`neg`; tried: a named mask, mask-first operands, signed casts).
- *   AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride, AnmObjTexSrtRes: the destructors' empty bodies are complete
+ *   GUESSES.  anmtexsrt_round_up (0x8006C650, the Construct functions' align-up: nw4r's ut::RoundUp shape) is a
+ *   GUESS.  ResAnmTexSrt::GetAnmResult is `g3d/g3d_resanmtexsrt.cpp`'s fn_800916FC.
+ * RESIDUALS. AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride, AnmObjTexSrtRes: the destructors' empty bodies are complete
  *   (the compiler emits the base calls and the deleting tail; `#pragma peephole off` keeps retail's `extsh`).
  *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata2` are claimed and not
  *   emitted.
+ * SHAPES. anmtexsrt_round_up takes `unsigned int align` (nw4r's ut::RoundUp signature): with a u32 alignment MWCC
+ *   folds `~(align - 1)` into `andc` where retail keeps `nor` + `and`.
  * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106) and
  *   `#pragma pool_data off`.  The unit includes `g3d/g3d_anmobj.h` rather than `g3d/g3d_anmscn.h`: the latter's
@@ -141,10 +142,10 @@ extern "C" f32 fn_8006E6A4(f32 x, f32 y)
     return x;
 }
 
-/* Rounds `a` up to the next multiple of `b`. */
-extern "C" u32 fn_8006C650(u32 a, u32 b)
+/* Rounds `offset` up to the next multiple of `align`. */
+extern "C" u32 anmtexsrt_round_up(u32 offset, unsigned int align)
 {
-    return (a + b - 1) & -b;
+    return (align + offset - 1) & ~(align - 1);
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -356,7 +357,7 @@ const char* nw4r::g3d::AnmObjTexSrt::GetTypeName() const
 /* 0x8006A3C4 (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrt::GetTypeObj() const
 {
-    void* pName;
+    const u8* pName;
     return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F5C0));
 }
 
@@ -654,9 +655,9 @@ nw4r::g3d::AnmObjTexSrtOverride* nw4r::g3d::AnmObjTexSrtOverride::Construct(MEMA
         return NULL;
     }
     int numMat = mdl.GetResMatNumEntries();
-    u32 bindingOffset = fn_8006C650(sizeof(AnmObjTexSrtOverride), 2);
-    u32 childrenOffset = fn_8006C650(bindingOffset + numMat * sizeof(u16), 4);
-    u32 size = fn_8006C650(childrenOffset + numChildren * sizeof(AnmObjTexSrtRes*), 4);
+    u32 bindingOffset = anmtexsrt_round_up(sizeof(AnmObjTexSrtOverride), 2);
+    u32 childrenOffset = anmtexsrt_round_up(bindingOffset + numMat * sizeof(u16), 4);
+    u32 size = anmtexsrt_round_up(childrenOffset + numChildren * sizeof(AnmObjTexSrtRes*), 4);
     if (pSize != NULL) {
         TEXSRT_POINTER_ASSERT(pSize, 0x1D0, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
         *pSize = size;
@@ -1025,7 +1026,7 @@ bool nw4r::g3d::AnmObjTexSrt::IsDerivedFrom(TypeObj type) const
 /* 0x8006E734 (0x30): returns the AnmObjTexSrt type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrt::GetTypeObjStatic()
 {
-    void* pName;
+    const u8* pName;
     return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F5C0));
 }
 

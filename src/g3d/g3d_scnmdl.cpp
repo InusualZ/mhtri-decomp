@@ -31,11 +31,15 @@
  *   0x8007BC2C-0x8007BE2C: the flag each marks, the handle each reads); scn_mdl_vis_access_ctor,
  *   scn_mdl_vis_access_set_visibility, scn_mdl_mark_vis_buffer_dirty and ScnMdlVisAccess are GUESSES (nw4r's
  *   CopiedVisAccess: the node check, the +0x148 visibility buffer and the +0x13C refresh bit).
- * RESIDUALS. Partial: RemoveAnmObj(AnmObj*) (the vertex-position loop's counter and destination swap r27/r28; its
- *   extab saved-register byte differs with it).
- *   flipcheck: `.rodata`, `.data` and `.sdata` byte-identical.  Order: AnmObj::IsBound comes after the
- *   DynamicCast<AnmObjShp> instance, retail has it before (an inline IsBound defined after SetAnmObj, or before it
- *   under `dont_inline`, and an implicit DynamicCast instance all keep the instance first).
+ * RESIDUALS. None: flipcheck READY (the object carries a weak G3dObj::GetParent copy the link drops for
+ *   `g3d/g3d_anmchr.cpp`'s).
+ * SHAPES. AnmObj::IsBound and the DynamicCast template are redeclared `inline` ahead of SetAnmObj, which compiles
+ *   under `#pragma dont_inline on`: the two weak copies then follow SetAnmObj in retail's order (IsBound first; an
+ *   implicitly instantiated non-inline template is emitted before every inline copy).
+ * SHAPES. G3dObj::GetParent is defined `inline` ahead of the destructor (under `dont_inline`): with the accessor's
+ *   body visible the destructor's unwind range starts after the assert, which is retail's extab record.
+ * SHAPES. RemoveAnmObj(AnmObj*) declares the vertex-position loop's destination before the loop (declared in the
+ *   body, it takes r27 and the counter r28, the reverse of retail).
  * SHAPES. The handle copies retail calls out of line (res_mat_copy_ctor, res_tex_obj_copy_ctor, ...) are explicit calls
  *   on `ResHandle` locals, declared in Construct/G3dProcCalcMat/InitBuffer order so the stack slots match; a
  *   by-value handle word the callee returns becomes a `HandleTemp` class temporary, whose address is then taken.
@@ -1234,6 +1238,20 @@ void ScnMdl::UpdateVisBuffer()
     mFlags &= ~1u;
 }
 
+/* AnmObj::IsBound and the AnmObjShp DynamicCast are inline here: their weak copies follow SetAnmObj, IsBound
+ * (0x8007EA08) first and the cast (0x8007EA10) second. */
+namespace nw4r { namespace g3d {
+template <typename TTo, typename TFrom>
+inline TTo* DynamicCast(TFrom* pObj);
+}}
+
+/* 0x8007EA08 (0x8): whether the animation is bound to a model. */
+inline bool nw4r::g3d::AnmObj::IsBound() const
+{
+    return TestAnmFlag(ANMFLAG_ISBOUND);
+}
+
+#pragma dont_inline on
 /* 0x8007E8B4 (0x154): attaches a bound shape animation (given or found) to its slot and marks the vertex tables for
  * refreshing; any other animation goes to ScnMdlSimple. */
 bool ScnMdl::SetAnmObj(AnmObj* pObj, AnmObjType type)
@@ -1267,15 +1285,7 @@ bool ScnMdl::SetAnmObj(AnmObj* pObj, AnmObjType type)
     return false;
 }
 
-/* 0x8007EA08 (0x8): whether the animation is bound to a model. */
-bool nw4r::g3d::AnmObj::IsBound() const
-{
-    return TestAnmFlag(ANMFLAG_ISBOUND);
-}
-
-/* 0x8007EA10 (0x7C): the checked cast to AnmObjShp. */
-template nw4r::g3d::AnmObjShp* nw4r::g3d::DynamicCast<nw4r::g3d::AnmObjShp, nw4r::g3d::AnmObj>(
-    nw4r::g3d::AnmObj* pObj);
+#pragma dont_inline reset
 
 /* 0x8007EA8C (0x24C): detaches the shape animation, refilling the replacement vertex tables from the resource (or
  * marking them for refreshing); any other animation goes to ScnMdlSimple. */
@@ -1293,9 +1303,10 @@ bool ScnMdl::RemoveAnmObj(AnmObj* pObj)
         }
         if (mReplacement.mpVtxPosTable != NULL) {
             u32 num = GetResMdl().GetResVtxPosNumEntries();
+            void* pDst;
             for (u32 i = 0; i < num; i++) {
                 nw4r::g3d::ResVtxPos pos(&GetResMdl().GetResVtxPos(i));
-                void* pDst = mReplacement.mpVtxPosTable[i];
+                pDst = mReplacement.mpVtxPosTable[i];
                 if ((void*)pos.ptr() != pDst) {
                     pos.CopyTo(pDst);
                 }
@@ -1372,6 +1383,14 @@ ScnMdl::ScnMdl(MEMAllocator* pHeap, ResMdl mdl, nw4r::math::MTX34* pWorldMtxArra
 {
 }
 
+/* G3dObj::GetParent is nw4r's inline accessor (its kept copy is `g3d/g3d_anmchr.cpp`'s 0x800600C0): with the body
+ * visible the destructor's unwind range starts after the assert, as retail's does. */
+inline nw4r::g3d::G3dObj* nw4r::g3d::G3dObj::GetParent() const
+{
+    return mpParent;
+}
+
+#pragma dont_inline on
 /* 0x8007EE68 (0xB4): asserts the model is detached and detaches its shape animation. */
 ScnMdl::~ScnMdl()
 {
@@ -1382,6 +1401,7 @@ ScnMdl::~ScnMdl()
         RemoveAnmObj(mpAnmObjShp);
     }
 }
+#pragma dont_inline reset
 
 /* The "ScnMdl" run-time type-name record: the name's size with its NUL, then the name (`TypeNameData`'s
  * layout, spelled as bytes because its consumers read it as `const u8*`). */

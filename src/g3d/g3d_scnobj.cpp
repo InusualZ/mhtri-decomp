@@ -20,19 +20,26 @@
  *   scn_obj_callback_dtor is a GUESS (0x8008147C: IScnObjCallback's deleting destructor, written as the C helper
  *   because defining the member would emit the interface's vtable here); aabb_copy is a GUESS (0x80081804: the
  *   AABB assignment retail calls out of line).
- * RESIDUALS. Partial: Remove(u32) (retail keeps `idx * 4` in a saved register across the detach call; tried a
- *   `while`/`idx` loop and optimization_level 1/2, strength-reduction, common-subs, scheduling, lifetimes,
- *   propagation and loop-invariant pragmas), Insert (one `subf` scheduled later), DefG3dProcScnGroup (retail keeps
- *   a dead `b` after the CALC_VIEW case).
+ * RESIDUALS. flipcheck: extab/extabindex carry the records of our weak std::find/std::distance copies (retail's
+ *   object lost them to `g3d/g3d_scninline.cpp`'s kept copies); a trial flip of this unit alone stops in the
+ *   linker's Optimizing phase (`internal linker error: File: 'ELF_linker.c' Line: 7133`, the weak copies against
+ *   the strong ones in scninline's split object), so it flips together with `g3d/g3d_scninline.cpp`.
+ *   The ScnObj constructor's extab range starts at the MTX34_ctor loop (+0x40) where retail's starts after the
+ *   first mtx34_identity (+0xA8): retail sees the bodies of the MTX34/AABB constructors and SetScnObjFlag (inline,
+ *   called out of line), this source calls MTX34_ctor/AABB_ctor as C functions.
+ * SHAPES. G3dObj::GetParent is defined `inline` here and its five callers compile under `#pragma dont_inline on`:
+ *   the destructors' extab ranges then start after their asserts (retail's records).
  *   IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the CheckCallback members sit in
  *   `g3d/g3d_scninline.cpp`'s range.
- *   flipcheck: `.text` (the three partial rows) only; the name records are emitted.
  * SHAPES. The ScnObj constructor builds its MTX34/AABB arrays with explicit do-while loops over MTX34_ctor and
  *   AABB_ctor (retail's member-array construction: the math types declare no constructors to let MWCC emit it).
  *   `(int)mCallbackDeleteOption == 1` and `(u32)type < MTX_TYPE_MAX` reproduce retail's signed and unsigned
  *   compares.  The unit compiles with `#pragma peephole off`: retail keeps the destructors' `extsh`, the `clrlwi` +
  *   `cmpwi` pairs, `addi r0` for a vtable store and `mr r3,rN` + `lwz r12,0(r3)` for a virtual call's table load
  *   (the pass folds them into one instruction each).
+ * SHAPES. The file compiles at `#pragma optimization_level 4`: at the lib's -O3, Remove(u32) recomputes `idx * 4`
+ *   after the detach call (retail keeps it in r31) and Insert schedules one `subf` later.  DefG3dProcScnGroup's
+ *   DRAW_OPA/DRAW_XLU cases `return` (retail's dead `b` after the CALC_VIEW case; a `break` there drops it).
  */
 
 #include "types.h"
@@ -49,6 +56,7 @@
 
 #pragma pool_data off
 #pragma peephole off
+#pragma optimization_level 4
 
 /* The frustum the gather pass culls against while it is set (`ScnRoot`'s camera); a NOTEST status clears it for the
  * subtree.  `.sbss` 0x807948E8, between g3d_scnmdlsmpl's and g3d_scnroot's words in link order. */
@@ -139,6 +147,15 @@ nw4r::g3d::ScnObj::ScnObj(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
 }
 
 
+/* G3dObj::GetParent is nw4r's inline accessor (its kept copy is `g3d/g3d_anmchr.cpp`'s 0x800600C0); the functions
+ * that call it compile under `dont_inline`, which keeps the call out of line while the visible body lets the
+ * destructors' unwind ranges start after their asserts, as retail's do. */
+inline nw4r::g3d::G3dObj* nw4r::g3d::G3dObj::GetParent() const
+{
+    return mpParent;
+}
+
+#pragma dont_inline on
 /* 0x800813B8 (0xC4): asserts the object is detached and deletes an owned callback. */
 nw4r::g3d::ScnObj::~ScnObj()
 {
@@ -149,6 +166,7 @@ nw4r::g3d::ScnObj::~ScnObj()
         delete mpFnCallback;
     }
 }
+#pragma dont_inline reset
 
 
 /* 0x8008147C (0x44): the callback interface's deleting destructor (frees only for a positive flag). */
@@ -377,6 +395,7 @@ nw4r::g3d::ScnLeaf::ScaleProperty nw4r::g3d::ScnLeaf::GetScaleProperty() const
     return NONUNIFORM_SCALED;
 }
 
+#pragma dont_inline on
 /* 0x80081A30 (0x158): a leaf's G3dProc work: the calc passes with their callbacks and the parent links. */
 /* untyped: caller-owned payload - the pass's info block */
 void nw4r::g3d::ScnLeaf::DefG3dProcScnLeaf(u32 task, u32 param, void* pInfo)
@@ -409,6 +428,7 @@ void nw4r::g3d::ScnLeaf::DefG3dProcScnLeaf(u32 task, u32 param, void* pInfo)
         break;
     }
 }
+#pragma dont_inline reset
 
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -508,6 +528,7 @@ void nw4r::g3d::ScnGroup::G3dProc(u32 task, u32 param, void* pInfo)
     DefG3dProcScnGroup(task, param, pInfo);
 }
 
+#pragma dont_inline on
 /* 0x8008209C (0x18C): a group's G3dProc work: its own passes, the parent links and the child list; any other task
  * goes to every child. */
 /* untyped: caller-owned payload - the pass's info block */
@@ -527,9 +548,8 @@ void nw4r::g3d::ScnGroup::DefG3dProcScnGroup(u32 task, u32 param, void* pInfo)
         G3dProcCalcView(param, static_cast<const math::MTX34*>(pInfo));
         break;
     case G3DPROC_DRAW_OPA:
-        break;
     case G3DPROC_DRAW_XLU:
-        break;
+        return;
     case G3DPROC_CHILD_DETACHED:
         Remove(static_cast<ScnObj*>(pInfo));
         break;
@@ -549,7 +569,9 @@ void nw4r::g3d::ScnGroup::DefG3dProcScnGroup(u32 task, u32 param, void* pInfo)
         break;
     }
 }
+#pragma dont_inline reset
 
+#pragma dont_inline on
 /* 0x80082228 (0x1AC): inserts a detached object at `idx` and attaches it; false when full or out of range. */
 bool nw4r::g3d::ScnGroup::Insert(u32 idx, ScnObj* pObj)
 {
@@ -564,6 +586,7 @@ bool nw4r::g3d::ScnGroup::Insert(u32 idx, ScnObj* pObj)
     }
     return false;
 }
+#pragma dont_inline reset
 
 /* 0x800823D4 (0xBC): detaches and removes the child at `idx` and returns it. */
 nw4r::g3d::ScnObj* nw4r::g3d::ScnGroup::Remove(u32 idx)
@@ -604,6 +627,7 @@ nw4r::g3d::ScnGroup::ScnGroup(MEMAllocator* pHeap, ScnObj** ppObjArray, u32 capa
 }
 
 
+#pragma dont_inline on
 /* 0x800825CC (0x9C): asserts the group is detached and removes every child. */
 nw4r::g3d::ScnGroup::~ScnGroup()
 {
@@ -612,6 +636,7 @@ nw4r::g3d::ScnGroup::~ScnGroup()
     }
     Clear();
 }
+#pragma dont_inline reset
 
 
 /* 0x80082668 (0x44): removes children until the group is empty. */

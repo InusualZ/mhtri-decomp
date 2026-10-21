@@ -58,13 +58,8 @@
  * RESIDUALS. GetAnmPlayPolicy (0x80061C70, the "g3d_anmobj.h" assert) reads its two-entry table
  *   anm_play_policy_table (.sdata 0x80790E70, map row lbl_80790E70, rename request g3d-anmtex#3), which sits inside
  *   `mh3_pad.cpp`'s `.sdata` claim (seam request g3d-anmtex#6); it is declared in `mh3_pad.h`.
- *   Partial: AnmObjChrBlend::GetResult (0x8D0: the loop's index and the result-flag word take r24/r23 swapped; every
- *   other instruction matches, with `#pragma fp_contract off` around it), AnmObjChrRes::Release(ResMdl, u32,
- *   BindOption) (the unrolled clear loop schedules its `subf` one slot early).
  *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/g3d_anmobj.cpp`'s claim, declared in the class only.
- *   Partial: g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it into `andc`;
- *   tried: a named mask local, swapped operands), and the members whose only difference is a relocation name (the
- *   strings).
+ *   Partial: the members whose only difference is a relocation name (the strings).
  *   G3dObj::operator delete, AnmObj, AnmObjChr, AnmObjChrBlend, AnmObjChrRes: the empty bodies are complete (retail's
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
  *   initialisers and the destructors' base calls).  The G3dObj vtable is emitted here (its first virtual,
@@ -75,6 +70,12 @@
  *   extabindex 0x4D4 of 0x4E0; `.rodata`, `.data` (0xA74 of 0xD08), `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
  *   Relocation names that differ from retail: the string literals (ours are `@NNN` pool names, the target's are the
  *   named `.data` rows) and the float pool constants.
+ * SHAPES. AnmObjChrBlend::GetResult declares the child's flag word before the blend loop (declared in the body it
+ *   takes r23 and the loop index r24, the reverse of retail) and compiles under `#pragma fp_contract off`.
+ * SHAPES. The file compiles at `#pragma optimization_level 4`: at the lib's -O3, AnmObjChrRes::Release(ResMdl, u32,
+ *   BindOption)'s unrolled clear loop schedules its `subf` one slot early.
+ * SHAPES. g3d_round_up takes `unsigned int align` (nw4r's ut::RoundUp signature): with a u32 alignment MWCC folds
+ *   `~(align - 1)` into `andc` where retail keeps `nor` + `and`.
  * SHAPES. The ResName constructor is complete: its work is the base initialiser.  The unit includes the leaf
  *   `g3d/g3d_anmobj.h` instead of `g3d/g3d_anmscn.h`: a visible global placement `operator delete` gives
  *   AnmObjChrBlend::Construct a landing pad (`__dl__FPvPv`) retail does not have.
@@ -104,6 +105,7 @@
 #include "MEM/MEMAllocFromAllocator.h" /* MEMAllocFromAllocator, owner MTX/mtx.c (rule 2) */
 
 #pragma peephole off
+#pragma optimization_level 4
 
 #pragma pool_data off
 
@@ -246,7 +248,7 @@ extern "C" void **fn_8005DC60(void **out, void *v)
     return out;
 }
 
-extern "C" void **type_obj_set_name_anmchr(void **out, void *v)
+extern "C" const u8 **type_obj_set_name_anmchr(const u8 **out, const u8 *v)
 {
     *out = v;
     return out;
@@ -479,7 +481,7 @@ extern "C" u8* res_dic_ofs_to_ptr(u8** p, s32 offset)
 }
 
 /* The align-up helper: (~(align - 1)) & (offset + align - 1). */
-extern "C" u32 g3d_round_up(u32 offset, u32 align)
+extern "C" u32 g3d_round_up(u32 offset, unsigned int align)
 {
     return (align + offset - 1) & ~(align - 1);
 }
@@ -643,7 +645,7 @@ extern "C" void **fn_80063C8C(void **out, void *v)
 
 #define ANMCHR_POINTER_ASSERT G3D_POINTER_ASSERT
 
-extern "C" u32 g3d_round_up(u32 offset, u32 align);
+extern "C" u32 g3d_round_up(u32 offset, unsigned int align);
 
 /* 0x80061948 (0x1B8): builds a resource-played character animation over `res`, with an optional result cache. */
 nw4r::g3d::AnmObjChrRes::AnmObjChrRes(MEMAllocator* pHeap, ResAnmChr res, u16* pBindingBuf, int numBinding,
@@ -1701,6 +1703,7 @@ const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrBlend::GetResult(ChrAnmResult
     pResult->s.y = 0.0f;
     pResult->s.z = 0.0f;
     nw4r::math::MTX34Zero(&pResult->rt);
+    u32 myFlags;
     for (int i = 0; i < mChildrenArraySize; i++) {
         ChrAnmResult childResult;
         chr_anm_result_init(&childResult);
@@ -1709,7 +1712,7 @@ const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrBlend::GetResult(ChrAnmResult
         if (pChild != NULL && weight != 0.0f && pChild->TestExistence(idx)) {
             const ChrAnmResult* pMy = pChild->GetResult(&childResult, idx);
             f32 w = weight * invSum;
-            u32 myFlags = pMy->flags;
+            myFlags = pMy->flags;
             if (!(myFlags & ChrAnmResult::FLAG_ANM_EXISTS)) {
                 nw4r::db::Panic("g3d_anmchr.cpp", 0x2EC,
                                 "NW4R:Failed assertion pMyResult->flags & ChrAnmResult::FLAG_ANM_EXISTS");
@@ -1927,7 +1930,7 @@ const char* nw4r::g3d::AnmObjChrRes::GetTypeName() const
 /* 0x8005DCA0 (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObj() const
 {
-    void* pName;
+    const u8* pName;
     return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F538));
 }
 
@@ -1948,6 +1951,6 @@ bool nw4r::g3d::AnmObjChrRes::IsDerivedFrom(TypeObj type) const
 /* 0x80063E30 (0x30): returns the AnmObjChrRes type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObjStatic()
 {
-    void* pName;
+    const u8* pName;
     return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F538));
 }

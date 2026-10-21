@@ -17,9 +17,12 @@
  *   g3d_scnproc.cpp (a ScnLeaf whose G3dProc runs every CheckCallback_* hook) is the candidate.
  *   type_obj_set_name_scnleaf and type_obj_set_name_scngroup are GUESSES (the type-name store copies the run-time type
  *   members call).
- * RESIDUALS. Unwritten (empty stubs): fn_8007B794, dtor_8007B7F0.  Partial: res_shp_copy_ctor, fn_8007B878,
- *   fn_8007B99C, fn_8007BA08.
- *   flipcheck: `.data` and `.sdata2` are claimed and not emitted (the vtable and the inline tail are declared).
+ * RESIDUALS. flipcheck: `.text` is a permutation (the layout follows the definition order, not retail's weak-copy
+ *   placement); `.data` and `.sdata2` are claimed and not emitted (the vtable and the inline tail are declared, and
+ *   the `.data` range shows an emission-order seam in 0x8058ED64-0x8058F028); extab carries 0x14 bytes more.
+ *   fn_8007B878, fn_8007B864, fn_8007B8DC, fn_8007BA08 and fn_8007BA38 keep the map stems: the ResMdl handle
+ *   constructor (fn_8007B878, asserting the `g3d_resmdl_ac.h` alignment) and two handle copies other units call by
+ *   name.
  */
 
 #include "types.h"
@@ -64,14 +67,14 @@ extern "C" {
 /* internal */ void fn_8007B540(void* a0);
 /* internal */ void fn_8007B5BC(void* a0);
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
-/* internal */ s32 res_shp_copy_ctor(s32 arg0);
-/* internal */ u32 fn_8007B864(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_8007B878(s32 arg0, s32 arg1);
-/* internal */ u32 fn_8007B8DC(s32 *arg0, s32 arg1);
+/* internal */ struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
+/* internal */ void fn_8007B864(struct ResHandle* pDst, const struct ResHandle* pSrc);
+/* internal */ u32 fn_8007B878(s32 pDst, s32 offset);
+/* internal */ void fn_8007B8DC(struct ResHandle* pSelf, s32 offset);
 /* internal */ void fn_8007B93C(void* a0);
 /* internal */ void fn_8007B998(void* a0);
-/* internal */ s32 fn_8007BA08(s32 arg0);
-/* internal */ u32 fn_8007BA38(s32 *arg0, s32 *arg1);
+/* internal */ struct ResHandle* fn_8007BA08(struct ResHandle* pDst, const struct ResHandle* pSrc);
+/* internal */ void fn_8007BA38(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
 } /* extern "C" */
 
@@ -206,8 +209,9 @@ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v)
 /* 0x8007B734 (0x30): returns the ScnMdlSimple type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnMdlSimple::GetTypeObjStatic()
 {
-    void* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, scn_typename_ScnMdlSimple));
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(
+        type_obj_set_name_anmchr(&pName, reinterpret_cast<const u8*>(&scn_typename_ScnMdlSimple)));
 }
 
 extern "C" {
@@ -234,13 +238,15 @@ nw4r::g3d::IScnObjGather::~IScnObjGather()
 
 extern "C" {
 
-s32 res_shp_copy_ctor(s32 arg0) {
-    fn_8007B864(0, 0);
-    return arg0;
+/* 0x8007B834 (0x30): copy-constructs a handle through its base-handle copy and returns the destination. */
+struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc) {
+    fn_8007B864(pDst, pSrc);
+    return pDst;
 }
 
-u32 fn_8007B864(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
+/* 0x8007B864 (0xC): copies the base handle's data pointer. */
+void fn_8007B864(struct ResHandle* pDst, const struct ResHandle* pSrc) {
+    pDst->mpData = pSrc->mpData;
 }
 
 }   /* extern "C": the placement `operator new` below has C++ linkage (`__nw__FUlPv`) */
@@ -253,16 +259,18 @@ void* operator new(unsigned long size, void* place) {
 
 extern "C" {
 
-s32 fn_8007B878(s32 arg0, s32 arg1) {
-    fn_8007B8DC(0, 0);
-    if ((s32) (arg1 & 0x1F) != 0) {
+/* 0x8007B878 (0x64): the ResMdl handle constructor: stores the block address, asserting its 32-byte alignment. */
+u32 fn_8007B878(s32 pDst, s32 offset) {
+    fn_8007B8DC((struct ResHandle*)pDst, offset);
+    if ((offset & 0x1F) != 0) {
         nw4r::db::Panic((const char*)&lbl_8058ED90, 0x78, (const char*)&lbl_8058ED64);
     }
-    return arg0;
+    return pDst;
 }
 
-u32 fn_8007B8DC(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
+/* 0x8007B8DC (0x8): stores the block address. */
+void fn_8007B8DC(struct ResHandle* pSelf, s32 offset) {
+    pSelf->mpData = (void*)offset;
 }
 
 void fn_8007B93C(void* a0) {
@@ -333,13 +341,15 @@ bool nw4r::g3d::IScnObjGather::IsUserSorted() const
 
 extern "C" {
 
-s32 fn_8007BA08(s32 arg0) {
-    fn_8007BA38(0, 0);
-    return arg0;
+/* 0x8007BA08 (0x30): copy-constructs a handle through its base-handle copy and returns the destination. */
+struct ResHandle* fn_8007BA08(struct ResHandle* pDst, const struct ResHandle* pSrc) {
+    fn_8007BA38(pDst, pSrc);
+    return pDst;
 }
 
-u32 fn_8007BA38(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
+/* 0x8007BA38 (0xC): copies the base handle's data pointer. */
+void fn_8007BA38(struct ResHandle* pDst, const struct ResHandle* pSrc) {
+    pDst->mpData = pSrc->mpData;
 }
 
 }   /* extern "C": the scene object members below have C++ linkage */

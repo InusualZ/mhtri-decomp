@@ -15,11 +15,8 @@
 extern "C" {
 #endif
 
-/* 0x8056F688 - the "ScnMdlSimple" type-name record (`.rodata`: a length word, then the NUL-terminated name) the
- * class's run-time type members read. */
-extern u8 scn_typename_ScnMdlSimple[];
-/* The callback-timing setter and the world-callback destructor the game's model users call (C linkage while
- * their consumers spell the stems). */
+/* ScnMdlSimple::EnableScnMdlCallbackTiming and ICalcWorldCallback's destructor as the game's model users still
+ * spell them (the map stems; the definitions are the members below, rename requested). */
 void fn_80080B10(void* arg0, u32 arg1);
 void fn_800810DC(void* arg0, s32 arg1);
 
@@ -28,6 +25,11 @@ void fn_800810DC(void* arg0, s32 arg1);
 
 #include "nw4r/fn_805012C4.h" /* nw4r::math::AABB, owner nw4r/fn_805012C4.cpp (rule 2) */
 #include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnLeaf, owner g3d/g3d_scnobj.cpp (rule 1) */
+#include "g3d/g3d_obj.h"      /* nw4r::g3d::TypeNameData (rule 1) */
+
+/* 0x8056F688 - the "ScnMdlSimple" type-name record (`.rodata`: a length word, then the NUL-terminated name) the
+ * class's run-time type members read. */
+extern "C" const nw4r::g3d::TypeNameData<sizeof("ScnMdlSimple")> scn_typename_ScnMdlSimple;
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMdl (rule 2) */
 
 /* 0x80080F44 - constructs an AABB's two corner records (two VEC3_ctor no-ops) and returns it: the element
@@ -62,7 +64,7 @@ struct FuncObjCalcWorld;
 /* The world-matrix callback a model runs for one node (its interface is implemented by the game).  size: 0x4 */
 class ICalcWorldCallback {
 public:
-    virtual ~ICalcWorldCallback();
+    virtual ~ICalcWorldCallback() {}
     /* +0x0C/+0x10/+0x14 of the table: before a node's matrix (its animation result), after it (its matrix, scale
      * and attribute word), and after the whole tree; `g3d/g3d_calcworld.cpp` dispatches them. */
     virtual void ExecCallbackA(ChrAnmResult* pResult, ResMdl mdl, FuncObjCalcWorld* pFuncObj);
@@ -135,6 +137,7 @@ public:
     AnmObjTexPat* GetAnmObjTexPat();
     AnmObjTexSrt* GetAnmObjTexSrt();
     void UpdateFrame();
+    void EnableScnMdlCallbackTiming(Timing timing);
     /* untyped: caller-owned payload - the pass's info block */
     void G3dProcUpdateFrame(u32 param, void* pInfo);
     void CalcPosture(u32 param, const math::MTX34* pParent);

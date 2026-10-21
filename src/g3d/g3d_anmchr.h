@@ -28,7 +28,7 @@ u8 *workmem_get_mdl_z_temporary(void);    /* 0x8005CEEC - the work-memory block 
 u8 *g3d_workmem_skinning_mtx(void);        /* 0x8005CEF8 - the work-memory block holding the skinning matrices */
 u8 *g3d_billboard_work_mtx(void);          /* 0x8005CF04 - the work-memory block holding the billboard parent matrices */
 void **fn_8005DC60(void **out, void *v);   /* 0x8005DC60 - stores `v` through `out`, returns `out` */
-void **type_obj_set_name_anmchr(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */
+const u8 **type_obj_set_name_anmchr(const u8 **out, const u8 *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */
 u32 res_dic_is_valid(void *self);               /* 0x800628B4 - `*(u32*)self != 0` */
 void *res_dic_ptr(void *self);             /* 0x800628A4 - loads the word at +0x0 of `self` */
 /* 0x80062D58 - `ResName`'s copy constructor: copies the handle word from `src`, returns `self`. */

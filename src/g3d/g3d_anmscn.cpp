@@ -9,26 +9,31 @@
  *   0x80068FC4; the previous TU's (`g3d_anmobj.cpp`, 0x8058C248) by PlayPolicy_Loop and the next TU's
  *   (`g3d_anmshp.cpp`, 0x8058CC40) from 0x8006946C on.
  * FLAGS. `cflags_g3d`'s `-O3` is measured on fn_800680A8 (docs/g3d.md, playbook 27).
- * NAMES. The AnmScn/AnmScnRes members are nw4r's (the vtables at 0x8058C808/0x8058C898 fix the slot order, the
+ * NAMES. anmscn_round_up (0x80065ED8, Construct's align-up: nw4r's ut::RoundUp shape) is a GUESS.
+ *   The AnmScn/AnmScnRes members are nw4r's (the vtables at 0x8058C808/0x8058C898 fix the slot order, the
  *   assert strings name Attach, Detach, GetParent, TestScnAnmFlag(FLAG_HAS_CACHE) and Construct's `pSize`/`pHeap`/
  *   `buf` checks).  GUESS: the count/limit slot names (GetNum*, Get*MaxRefNumber, from the ResAnmScn reader each
  *   forwards to), MakeSpecularLightObj (MakeDiffuseLightObj's specular twin), vec3_copy_construct,
  *   obj_delete_flagged (the LightSet view's destructor), fog_set_color, res_anm_light_config_test_flag8,
  *   res_anm_light_get_id, res_anm_fog_get_id, res_anm_camera_get_id.  The weak accessor copies keep their map stems
  *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
- * RESIDUALS. MakeDiffuseLightObj (point case), MakeSpecularLightObj, GetFog: retail computes the address of the
- *   by-value GXColor argument's copy before the copy (`addi r4` first); ours after.
- *   GetLightSetting: retail's ambient colour is a temporary below the diffuse block's counts (stack 0x8 vs 0x10) and
- *   its diffuse loops share one walking pointer (ours keeps two, one more register).
- *   fn_80065ED8: retail keeps `not` + `and`, ours fuses `andc`.  fn_8006522C: retail's ternary join branch.
+ * RESIDUALS. GetLightSetting: retail keeps the `numDiffuseLight != 0` load in r28 across the light-object calls
+ *   and adds it to the specular count; ours reloads the address-taken count after the virtual call.
+ *   The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`, the
+ *   map's fn_800651BC); fn_800651BC stays defined as the C stem `g3d/g3d_resanm.c` calls.
+ *   fn_8006522C: retail's ternary join branch.
  *   Data: the `.data` strings are not in `.text` order in retail (Construct's follow G3dProc's, GetLightSet's follow
  *   GetFog's); the `_ac.h` inline tail (0x8058C928-0x8058CC40, its "ref" copies in `.sdata`) is still extern; the
  *   weak `ut::Color` constructor/destructor copies MWCC emits here are retail's dead copies (linker-folded).
+ * SHAPES. The round-up helper takes `unsigned int align` (nw4r's ut::RoundUp signature): with a u32 alignment MWCC
+ *   folds `~(align - 1)` into `andc` where retail keeps `nor` + `and`.
  * SHAPES. `#pragma peephole off` (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`, `addi r0` vtable-store and
  *   `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106) and `#pragma pool_data off` (each string its
  *   own `lis`/`addi`).  GetLightSetting and GetAmbLightColor compile under `#pragma dont_inline on`, so the
- *   `ut::Color` constructor is called out of line; the explicit `color.~Color()` reproduces retail's out-of-line
- *   destructor call.  GetLightSet takes its LightSet by reference: retail passes a copy made by the out-of-line copy
+ *   `ut::Color` constructor, conversion and the temporary's destructor are called out of line.  The light results'
+ *   colours reach InitLightColor/fog_set_color as `static_cast<const ut::Color&>` (retail's fields are ut::Color:
+ *   the by-value GXColor slice takes its address before the copy); GetLightSetting's diffuse loops each declare
+ *   their own index and reach the light object through one reference.  GetLightSet takes its LightSet by reference: retail passes a copy made by the out-of-line copy
  *   constructor (fn_800651F0) and destroys it after the call (obj_delete_flagged), which GetLightSetting spells.
  *   The resolver words are passed to the handle copies by reference (retail's return temporaries sit below the
  *   handles); `perspFovy / 2.0f` keeps retail's load order of the ortho height.
@@ -126,7 +131,7 @@ u32 fn_8006591C(const ResHandle *p);
 u32 fn_80065948(const ResHandle *p);
 u32 fn_80065974(const ResHandle *p);
 u32 fn_800659A0(const ResHandle *p);
-u32 fn_80065ED8(u32 base, u32 size);
+u32 anmscn_round_up(u32 offset, unsigned int align);
 ResHandle *fn_80065FFC(ResHandle *dst, const ResHandle *src);
 void fn_8006602C(u32 *dst, const u32 *src);
 u32 fn_80066038(const ResHandle *p);
@@ -207,7 +212,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
     pObj->Clear();
     switch (type) {
     case 0:
-        pObj->InitLightColor(pResult->color);
+        pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
         fn_80064C14(pObj, &pResult->pos.x);
         pObj->InitLightSpot(0.0f, 0);
         pObj->InitLightDistAttn(pResult->refDistance, pResult->refBrightness, pResult->distFunc);
@@ -219,7 +224,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
 
         subVec3(&dir, &pResult->aim, &pResult->pos);
         vec3_scale(&pos, &dir, -1.0e10f);
-        pObj->InitLightColor(pResult->color);
+        pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
         fn_80064C14(pObj, &pos.x);
         pObj->InitLightAttnA(1.0f, 0.0f, 0.0f);
         pObj->InitLightAttnK(1.0f, 0.0f, 0.0f);
@@ -231,7 +236,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
 
         subVec3(&dir, &pResult->aim, &pResult->pos);
         vec3_normalize_into(&dir, &dir);
-        pObj->InitLightColor(pResult->color);
+        pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
         fn_80064C14(pObj, &pResult->pos.x);
         pObj->InitLightSpot(pResult->cutoff, pResult->spotFunc);
         pObj->InitLightDistAttn(pResult->refDistance, pResult->refBrightness, pResult->distFunc);
@@ -259,7 +264,7 @@ void MakeSpecularLightObj(LightObj *pObj, const LightAnmResult *pResult)
     subVec3(&dir, &pResult->aim, &pResult->pos);
     vec3_normalize_into(&dir, &dir);
     pObj->Clear();
-    pObj->InitLightColor(pResult->specColor);
+    pObj->InitLightColor(static_cast<const ut::Color&>(pResult->specColor));
     fn_80064CE0(pObj, &dir);
     pObj->InitLightShininess(pResult->shininess);
     if (!(pResult->flags & LightAnmResult::FLAG_COLOR_ENABLE)) {
@@ -345,9 +350,7 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
         u32 n = *g3d_min_u32(&numAmbLight, &numLightObj);
 
         for (u32 i = 0; i < n; i++) {
-            ut::Color color = GetAmbLightColor(i);
-            pAmbColor[i] = fn_800651BC(&color);
-            color.~Color();
+            pAmbColor[i] = GetAmbLightColor(i);
         }
     }
 
@@ -357,22 +360,22 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
         u32 numLight = numDiffuseLight + GetNumSpecularLight();
         u32 numDiffuse = *g3d_min_u32(&numDiffuseLight, &numLightObj);
         u32 numTotal = *g3d_min_u32(&numLight, &numLightObj);
-        u32 i;
 
-        for (i = 0; i < numDiffuse; i++) {
+        for (u32 i = 0; i < numDiffuse; i++) {
             light_obj_disable(&pLightObj[i]);
         }
-        for (i = 0; i < numDiffuse; i++) {
+        for (u32 i = 0; i < numDiffuse; i++) {
+            LightObj &rDiff = pLightObj[i];
             LightObj *pSpec = NULL;
 
-            if (!light_obj_is_enable(&pLightObj[i])) {
+            if (!light_obj_is_enable(&rDiff)) {
                 if (HasSpecularLight(i)) {
                     u32 specID = GetSpecularLightID(i);
                     if (specID < numTotal) {
                         pSpec = &pLightObj[specID];
                     }
                 }
-                GetLight(&pLightObj[i], pSpec, i);
+                GetLight(&rDiff, pSpec, i);
             }
         }
     }
@@ -667,11 +670,11 @@ AnmScnRes *AnmScnRes::Construct(MEMAllocator *pHeap, u32 *pSize, ResHandle resAn
     u32 fogSize = numFog * sizeof(FogAnmResult);
     u32 cameraSize = numCamera * sizeof(CameraAnmResult);
 
-    u32 ambLightOfs = fn_80065ED8(sizeof(AnmScnRes), 4);
-    u32 lightOfs = fn_80065ED8(ambLightOfs + ambLightSize, 4);
-    u32 fogOfs = fn_80065ED8(lightOfs + lightSize, 4);
-    u32 cameraOfs = fn_80065ED8(fogOfs + fogSize, 4);
-    u32 size = fn_80065ED8(cameraOfs + cameraSize, 4);
+    u32 ambLightOfs = anmscn_round_up(sizeof(AnmScnRes), 4);
+    u32 lightOfs = anmscn_round_up(ambLightOfs + ambLightSize, 4);
+    u32 fogOfs = anmscn_round_up(lightOfs + lightSize, 4);
+    u32 cameraOfs = anmscn_round_up(fogOfs + fogSize, 4);
+    u32 size = anmscn_round_up(cameraOfs + cameraSize, 4);
 
     if (pSize != NULL) {
         G3D_POINTER_ASSERT(ANMSCN_FILE, pSize, 1113, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
@@ -699,11 +702,10 @@ AnmScnRes *AnmScnRes::Construct(MEMAllocator *pHeap, u32 *pSize, ResHandle resAn
                                 cameraSize != 0 ? (CameraAnmResult *)(pBuf + cameraOfs) : NULL);
 }
 
-/* Rounds `base` up to a multiple of `size` (a power of two). */
-extern "C" u32 fn_80065ED8(u32 base, u32 size)
+/* Rounds `offset` up to a multiple of `align` (a power of two). */
+extern "C" u32 anmscn_round_up(u32 offset, unsigned int align)
 {
-    u32 mask = ~(size - 1);
-    return (size + base - 1) & mask;
+    return (align + offset - 1) & ~(align - 1);
 }
 
 /* 0x80065EF0 (0x10C): starts the frame control over the resource's frame count and play policy, keeps the
@@ -1142,7 +1144,7 @@ void AnmScnRes::GetFog(Fog fog, u32 refNumber)
     const FogAnmResult *pResult = GetFogResult(&result, refNumber);
     fn_80067AE4(&fog, pResult->type);
     fn_80067A5C(&fog, pResult->startz, pResult->endz);
-    fog_set_color(&fog, pResult->color);
+    fog_set_color(&fog, static_cast<const ut::Color&>(pResult->color));
 }
 
 /* 0x800679D4 (0x80): copies a colour into the fog record the handle names. */

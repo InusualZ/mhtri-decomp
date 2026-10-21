@@ -3,14 +3,11 @@
  * RANGE. .text 0x800D79B4-0x800D7F54 (4 functions); extab, extabindex, .data 0x80595840-0x805958F8 (opens on
  *   "g3d_basic.cpp", fn_800D79B4's assert file), .sdata2 0x807963D0-0x807963D8.
  * NAMES. Map stems.
- * RESIDUALS. fn_800D7D24: one prologue pair reordered - retail copies `pNode` to r29 and loads the flag word to r30
- *   before copying `handle` to r31, ours copies it to r30 first (tried: the local inlined or reordered, `tmpMtx`/
- *   `tmpVec` scoped into their branches; the `handleArg` -> `handle` alias is kept).
+ * RESIDUALS. fn_800D7D24: retail copies `handleArg` to r31 after loading the flag word and its three bit tests pass
+ *   r7 itself; ours copies it first and the tests pass r31 (the registers match: `handle` declared first, assigned
+ *   after the flag word, the tests on the argument; tried: `tmpMtx`/`tmpVec` scoped or first, `handle` initialised
+ *   in its declaration).
  *   flipcheck: `.data` and `.sdata2` byte-identical.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050133C`,
- *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`, `fn_80501390`,
- *     `MTX34Trans__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050133C`, `fn_80501390`.
  * SHAPES. File-scope `#pragma peephole off`: fn_800D7F40 keeps the unfolded `(x & 0x40000000) != 0`, and
  *   fn_800D7D24 and fn_800D79B4 lose rows without it.  `#pragma pool_data off` gives every string its own
  *   `lis`/`addi`.  The definitions are in retail's address order, which also orders the `.data` strings and the
@@ -22,6 +19,7 @@
 #include "g3d/g3d_camera.h" /* sin_cos_deg (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+#include "nw4r/math_types.h" /* nw4r::math::MTX34Scale / MTX34Trans, owner nw4r/math_types.cpp (rule 2) */
 
 #pragma pool_data off
 
@@ -46,8 +44,6 @@ u32 world_mtx_attr_not_scale_uniform(u32 handle);
 u32 world_mtx_attr_not_scale_one(u32 handle);
 u32 world_mtx_attr_scale_uniform(u32 handle);
 u32 world_mtx_attr_scale_one(u32 handle);
-void fn_8050133C(void* pOut, const void* pA, const void* pB);
-void fn_80501390(void* pOut, const void* pA, const void* pB);
 void PSMTXScaleApply(Mtx34* pDst, const Mtx34* pSrc, f32 xS, f32 yS, f32 zS);
 void PSMTXCopy(const Mtx34* pSrc, Mtx34* pDst);
 void PSMTXConcat(const Mtx34* pA, const Mtx34* pB, Mtx34* pDst);
@@ -156,33 +152,32 @@ int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
 /* The SRT dispatch: from the node's flag word pick a copy, a concatenation or a vector transform. */
 void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* pScale, u32 handleArg,
                  ResNode* pNode) {
+    u32 handle;
     u32 flag = pNode->flag;
-    /* arg5 aliased through a local: it is the register-colouring lever for the prologue (see the file
-     * header) - the flag word lands in the register retail gives it. */
-    u32 handle = handleArg;
+    handle = handleArg;
     Mtx34 tmpMtx;
     Vec3 tmpVec;
 
     if ((flag & 0x2) || (flag & 0x4)) {
-        if (fn_800D7F40(handle)) {
+        if (fn_800D7F40(handleArg)) {
             mtx34_copy_ps(pMtx, pSrcMtx);
         } else {
-            fn_8050133C(pMtx, pSrcMtx, pScale);
+            nw4r::math::MTX34Scale(pMtx, pSrcMtx, pScale);
         }
     } else if (flag & 0x20) {
-        if (fn_800D7F40(handle)) {
+        if (fn_800D7F40(handleArg)) {
             setVec3(&tmpVec, pNode->mtx.m[0][3], pNode->mtx.m[1][3], pNode->mtx.m[2][3]);
-            fn_80501390(pMtx, pSrcMtx, &tmpVec);
+            nw4r::math::MTX34Trans(pMtx, pSrcMtx, &tmpVec);
         } else {
             MTX34_ctor(&tmpMtx);
             fn_800D7ED0(&tmpMtx, pScale, &pNode->mtx);
             mtx34_concat(pMtx, pSrcMtx, &tmpMtx);
         }
     } else {
-        if (fn_800D7F40(handle)) {
+        if (fn_800D7F40(handleArg)) {
             mtx34_concat(pMtx, pSrcMtx, &pNode->mtx);
         } else {
-            fn_8050133C(pMtx, pSrcMtx, pScale);
+            nw4r::math::MTX34Scale(pMtx, pSrcMtx, pScale);
             mtx34_concat(pMtx, pMtx, &pNode->mtx);
         }
     }

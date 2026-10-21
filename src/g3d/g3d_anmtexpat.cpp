@@ -13,9 +13,9 @@
  *   animation's result).  AnmObjTexPat::GetTypeObjStatic is nw4r's member; the stems are defined `extern "C"`
  *   (playbook 48).  The cross-unit declarations are `g3d/g3d_anmtexpat.h`.  anm_tex_pat_res_data is a GUESS (the
  *   stripped reader below); anm_typename_AnmObjTexPat follows the `anm_typename_*` records (map row lbl_8056F5A8).
- * RESIDUALS. apply_tex_pat_anm_result: the palette loop's index takes r26 and the three palette values r27-r29
- *   where retail has r30 and r26-r28 (tried: a shared index, renamed index, a u16 count local); every other
- *   instruction matches.  `.data`, `.sdata` and `.rodata` are byte-identical to retail.
+ * RESIDUALS. None in the code (flipcheck READY).  apply_tex_pat_anm_result declares the palette loop's index `j`
+ *   first in the function and the palette values before that loop: retail's r30 and r26-r28 (declared in the loop,
+ *   the index takes r26 or r29).  `.data`, `.sdata` and `.rodata` are byte-identical to retail.
  *   anm_tex_pat_res_data is extra in the object (linker-stripped).
  * SHAPES. `#pragma peephole off` (playbook idea 106), `#pragma pool_data off` and `#pragma dont_inline on` over the
  *   accessors: the `_ac.h` accessors and the handle copies are `inline` (weak copies after their first referrer,
@@ -121,6 +121,7 @@ extern "C" u32 anm_tex_pat_res_data(ResHandle* pRes)
 extern "C" void apply_tex_pat_anm_result(struct ResHandle texObj, struct ResHandle tlutObj,
                                          const nw4r::g3d::TexPatAnmResult* pResult)
 {
+    u32 j;
     u32 texFlags = pResult->bTexExist;
     for (u32 i = 0; texFlags != 0; texFlags >>= 1, i++) {
         if (texFlags & 1) {
@@ -155,14 +156,17 @@ extern "C" void apply_tex_pat_anm_result(struct ResHandle texObj, struct ResHand
         }
     }
     u32 plttFlags = pResult->bPlttExist;
-    for (u32 i = 0; plttFlags != 0; plttFlags >>= 1, i++) {
+    void* pData;
+    u32 plttFmt;
+    u32 numEntries;
+    for (j = 0; plttFlags != 0; plttFlags >>= 1, j++) {
         if (plttFlags & 1) {
             ResHandle pltt;
-            res_pltt_copy_ctor(&pltt, (void*)&pResult->pltt[i]);
-            void* pData = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetPlttData();
-            u32 plttFmt = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetFmt();
-            u32 numEntries = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetNumEntries();
-            GXInitTlutObj(reinterpret_cast<nw4r::g3d::ResTlutObj*>(&tlutObj)->GetTlut((_GXTlut)i), pData, plttFmt,
+            res_pltt_copy_ctor(&pltt, (void*)&pResult->pltt[j]);
+            pData = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetPlttData();
+            plttFmt = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetFmt();
+            numEntries = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetNumEntries();
+            GXInitTlutObj(reinterpret_cast<nw4r::g3d::ResTlutObj*>(&tlutObj)->GetTlut((_GXTlut)j), pData, plttFmt,
                           numEntries);
         }
     }
@@ -173,6 +177,7 @@ extern "C" void apply_tex_pat_anm_result(struct ResHandle texObj, struct ResHand
 /* 0x80069C50 (0x30): returns the AnmObjTexPat type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexPat::GetTypeObjStatic()
 {
-    void* local;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&local, (void*)&anm_typename_AnmObjTexPat));
+    const u8* local;
+    return *reinterpret_cast<const TypeObj*>(
+        type_obj_set_name_anmchr(&local, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexPat)));
 }

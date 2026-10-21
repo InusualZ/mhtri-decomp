@@ -14,21 +14,32 @@
  *   type_obj_set_name_texsrt_node and type_obj_set_name_texsrt_override are GUESSES (the type-name store copies the
  *   texture-SRT GetTypeObj members call; the dump's GXInitTexObjUserData at those addresses is an identical-body
  *   fold, not evidence).  ResMat/ResMatChan's ref, ptr, GetClassName and IsValid are nw4r's members.  The cross-unit
- *   declarations are `g3d/g3d_anmclr.h`.  color_to_u32_ref (0x80064754, the identity the word readers pass a colour
- *   through, nw4r::ut::Color's ToU32ref shape) and color_ctor_white (0x80064834, stores 0xFFFFFFFF through the word
- *   setter, Color's default constructor shape) are GUESSES.
+ *   declarations are `g3d/g3d_anmclr.h`.  color_to_u32_ref (0x80064754, nw4r::ut::Color::ToU32ref const) and
+ *   color_ctor_white (0x80064834, Color's default constructor) are GUESSES kept as C stems: anmscn's result
+ *   constructors call them.  The ut::Color operators at 0x800646E8 (operator|), 0x80064730 (ToU32), 0x80064758
+ *   (operator&) and 0x800647A0 (operator=(const GXColor&)) are the compiler's weak copies (map renames requested).
  *   res_mat_get_id (0x8006405C, ResMat::GetID: the block's index word, read by AnmObjTexSrtRes::Bind) is a GUESS.
- * RESIDUALS. Unwritten (objdiff scores it zero): 0x80064128-0x800646E8 (apply_clr_anm_result).  It works through
- *   nw4r::ut::Color temporaries whose constructor, `operator=`, `operator&`, `operator|`, ToU32 and destructor
- *   retail calls out of line (0x80064834, 0x800647A0, 0x80064758, 0x800646E8, 0x80064730, 0x8005B228); this unit
- *   spells them as C stems and `nw4r/ut_Color.h` has no `operator&`/`operator|` and a constructor body that stores
- *   the word directly, so the function waits for that header's members (request g3d-anmtex#9).
- *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata` are claimed and not emitted
- *   (their order follows apply_clr_anm_result's inline references).
- * SHAPES. `#pragma pool_data off` (each assert string its own `lis`/`addi`).  The unit compiles with
- *   `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`,
- *   `extsh`, `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
+ * RESIDUALS. Color() and ToU32ref const are emitted twice (the C stems above and the weak copies apply_clr_anm_result
+ *   needs) until anmscn's result constructors become implicit constructors (math::VEC3 needs its constructor).
+ *   apply_clr_anm_result's calls to Color::operator=(u32), the GXColor copy and the destructor name the weak copies
+ *   (`__as__Q34nw4r2ut5ColorFUl`, `__as__8_GXColorFRC8_GXColor`) that the map holds as fn_8005B1E4 and
+ *   color_rgba_copy.
+ *   flipcheck: `.text` order, extab and extabindex differ; `.rodata`, `.data` and `.sdata` are claimed and not
+ *   emitted (the ResAnmClr/ResMatChan/ResMat `_ac.h` getters are C stems reading the strings by map label).
+ * SHAPES. `#pragma pool_data off` (each assert string its own `lis`/`addi`).  apply_clr_anm_result and the rest
+ *   of the file compile under `#pragma dont_inline on`: retail calls ResMatChan::ref and every ut::Color member out
+ *   of line, and the weak copies MWCC emits at the end of the file follow apply_clr_anm_result in retail order.
+ *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
+ *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).  The pragma sits
+ *   above the includes: a weak inline copy compiles under the pragma state of its definition in the header (with
+ *   peephole on, operator| and operator& move `this` to r3 before copying `rgba` to r31).
+ * SHAPES. apply_clr_anm_result reaches the channel block through the argument itself
+ *   (`reinterpret_cast<ResMatChan&>(chan).ref()` at each use) and one GXColor pointer local: a ResMatChan reference
+ *   local moves the argument copy after the other two (`mr r28,r3` last) and a GXColor reference per block swaps
+ *   r28/r29.
  */
+
+#pragma peephole off
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
@@ -37,8 +48,8 @@
 #include "g3d/g3d_anmchr.h"   /* type_obj_set_name_anmchr and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
-
-#pragma peephole off
+#include "g3d/g3d_resfile.h"   /* res_mat_tev_color_dc_store (rule 2) */
+#include "nw4r/ut_Color.h"       /* nw4r::ut::Color */
 
 #pragma pool_data off
 
@@ -73,18 +84,8 @@ extern "C" struct ResHandle *res_mat_copy_ctor(struct ResHandle *pDst, const str
     return pDst;
 }
 
-extern "C" u32 fn_80064730(void *self)
-{
-    return *color_to_u32_ref((u32 *)self);
-}
-
-/* The two `fn_8005B1E4` forwarders (0x800647A0 stores a word through it; 0x80064834 sets -1). */
+/* ut::Color::operator=(u32) (0x8005B1E4, the weak copy font/flfnt.cpp's range holds). */
 extern "C" void fn_8005B1E4(void *self, u32 value);
-
-extern "C" void fn_800647A0(void *self, u32 *p)
-{
-    fn_8005B1E4(self, *p);
-}
 
 extern "C" u32 *color_ctor_white(u32 *self)
 {
@@ -130,7 +131,7 @@ extern "C" u32 fn_8006480C(u32 *p)
 /* 0x80064868 (0x30): returns the AnmObjMatClr type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjMatClr::GetTypeObjStatic()
 {
-    void *local;
+    const u8 *local;
     return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&local, lbl_8056F550));
 }
 
@@ -206,15 +207,78 @@ nw4r::g3d::ResMatChanData& nw4r::g3d::ResMatChan::ref()
     return *(ResMatChanData *)fn_8006480C((u32 *)this);
 }
 
-/* The word-or/and forwarders (0x800646E8/0x80064758). */
-extern "C" void fn_8005B1B4(u32 *self, u32 value);
+#pragma dont_inline on
 
-extern "C" void fn_800646E8(void *self, void *p, u32 bits)
+/* 0x80064128 (0x5C0): applies a colour result to a material's channel and tev-colour blocks: each present colour is
+ * masked by its write mask and or-ed with the animated value. */
+extern "C" void apply_clr_anm_result(struct ResHandle chan, struct ResHandle tevColor,
+                                     const nw4r::g3d::ClrAnmResult* pResult)
 {
-    fn_8005B1B4((u32 *)self, bits | fn_80064730(p));
+    nw4r::g3d::ResMatTevColor& tev = reinterpret_cast<nw4r::g3d::ResMatTevColor&>(tevColor);
+    nw4r::ut::Color color;
+    GXColor* pColor;
+
+    if (pResult->bRgbaExist & 0xF) {
+        if (pResult->bRgbaExist & 0x1) {
+            pColor = &reinterpret_cast<nw4r::g3d::ResMatChan&>(chan).ref().chan[0].matColor;
+            color = *pColor;
+            *pColor = (color & pResult->rgbaMask[0]) | pResult->rgba[0];
+        }
+        if (pResult->bRgbaExist & 0x4) {
+            pColor = &reinterpret_cast<nw4r::g3d::ResMatChan&>(chan).ref().chan[0].ambColor;
+            color = *pColor;
+            *pColor = (color & pResult->rgbaMask[2]) | pResult->rgba[2];
+        }
+        if (pResult->bRgbaExist & 0x2) {
+            pColor = &reinterpret_cast<nw4r::g3d::ResMatChan&>(chan).ref().chan[1].matColor;
+            color = *pColor;
+            *pColor = (color & pResult->rgbaMask[1]) | pResult->rgba[1];
+        }
+        if (pResult->bRgbaExist & 0x8) {
+            pColor = &reinterpret_cast<nw4r::g3d::ResMatChan&>(chan).ref().chan[1].ambColor;
+            color = *pColor;
+            *pColor = (color & pResult->rgbaMask[3]) | pResult->rgba[3];
+        }
+    }
+
+    if (pResult->bRgbaExist & 0x7F0) {
+        if (pResult->bRgbaExist & 0x10) {
+            if (!tev.GXGetTevColor(GX_TEVREG0, &color))
+                color = 0xFF;
+            tev.GXSetTevColor(GX_TEVREG0, (color & pResult->rgbaMask[4]) | pResult->rgba[4]);
+        }
+        if (pResult->bRgbaExist & 0x20) {
+            if (!tev.GXGetTevColor(GX_TEVREG1, &color))
+                color = 0xFF;
+            tev.GXSetTevColor(GX_TEVREG1, (color & pResult->rgbaMask[5]) | pResult->rgba[5]);
+        }
+        if (pResult->bRgbaExist & 0x40) {
+            if (!tev.GXGetTevColor(GX_TEVREG2, &color))
+                color = 0xFF;
+            tev.GXSetTevColor(GX_TEVREG2, (color & pResult->rgbaMask[6]) | pResult->rgba[6]);
+        }
+        if (pResult->bRgbaExist & 0x80) {
+            if (!tev.GXGetTevKColor(GX_KCOLOR0, &color))
+                color = 0xFF;
+            tev.GXSetTevKColor(GX_KCOLOR0, (color & pResult->rgbaMask[7]) | pResult->rgba[7]);
+        }
+        if (pResult->bRgbaExist & 0x100) {
+            if (!tev.GXGetTevKColor(GX_KCOLOR1, &color))
+                color = 0xFF;
+            tev.GXSetTevKColor(GX_KCOLOR1, (color & pResult->rgbaMask[8]) | pResult->rgba[8]);
+        }
+        if (pResult->bRgbaExist & 0x200) {
+            if (!tev.GXGetTevKColor(GX_KCOLOR2, &color))
+                color = 0xFF;
+            tev.GXSetTevKColor(GX_KCOLOR2, (color & pResult->rgbaMask[9]) | pResult->rgba[9]);
+        }
+        if (pResult->bRgbaExist & 0x400) {
+            if (!tev.GXGetTevKColor(GX_KCOLOR3, &color))
+                color = 0xFF;
+            tev.GXSetTevKColor(GX_KCOLOR3, (color & pResult->rgbaMask[10]) | pResult->rgba[10]);
+        }
+        res_mat_tev_color_dc_store(&tevColor, 0);
+    }
 }
 
-extern "C" void fn_80064758(void *self, void *p, u32 bits)
-{
-    fn_8005B1B4((u32 *)self, bits & fn_80064730(p));
-}
+/* dont_inline stays on to the end of the file: the weak ut::Color copies are compiled here. */
