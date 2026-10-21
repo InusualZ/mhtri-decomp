@@ -11,9 +11,10 @@
  *   GUESS, xsi_set_st is a GUESS, xsi_set_srt is a GUESS, xsi_mul_s is a GUESS, xsi_mul_r is a GUESS, xsi_mul_t is
  *   a GUESS, xsi_mul_sr is a GUESS, xsi_mul_rt is a GUESS, xsi_mul_st is a GUESS, xsi_mul_srt is a GUESS (the
  *   table entries: which of scale, rotation and translation each one applies, writing or multiplying).
- * RESIDUALS. xsi_mul_sr, xsi_mul_srt: register choice only (retail keeps the four scale-rotation products in
- *   f0-f3, ours in f4-f7).  flipcheck: `.rodata`, `.data` and `.sdata2` are claimed and emitted by the source
- *   (the tables, the asserts' strings and the 0.0f/1.0f pool) and byte-identical to the target's (datagap).
+ * RESIDUALS. None: `.rodata`, `.data` and `.sdata2` are claimed and emitted by the source (the tables, the asserts'
+ *   strings and the 0.0f/1.0f pool) and byte-identical to the target's.
+ * SHAPES. xsi_mul_sr and xsi_mul_srt pass their four scale-rotation products to the inline xsi_mul_2x3: as the
+ *   inlined function's parameters they take f0-f3 (retail's colouring); computed in place they take f4-f7.
  * SHAPES. File-scope `#pragma fp_contract off` (retail keeps every `fmuls` + `fadds`/`fsubs`), `#pragma pool_data off`
  *   (each assert string gets its own `lis`/`addi`) and `#pragma peephole off` (the kept `clrlwi` + `cmpwi` of the
  *   flag test).  The two rows of a multiply are computed into temporaries before either is stored, and the
@@ -212,15 +213,8 @@ static void xsi_mul_t(Mtx34Xsi* pMtx, const TexSrtXsi& srt) {
     pMtx->m[1][3] += srt.Tv;
 }
 
-/* 0x800D7104 (0x114): scales and rotates the first two rows. */
-static void xsi_mul_sr(Mtx34Xsi* pMtx, const TexSrtXsi& srt) {
-    f32 s;
-    f32 c;
-    sin_cos_deg(&s, &c, srt.R);
-    f32 suC = srt.Su * c;
-    f32 suS = srt.Su * s;
-    f32 svC = srt.Sv * c;
-    f32 svS = srt.Sv * s;
+/* Multiplies the first three columns of the first two rows by the scale-rotation block (suC -suS; svS svC). */
+static inline void xsi_mul_2x3(Mtx34Xsi* pMtx, f32 suC, f32 suS, f32 svC, f32 svS) {
     f32 x0 = suC * pMtx->m[0][0] - suS * pMtx->m[1][0];
     f32 y0 = svS * pMtx->m[0][0] + svC * pMtx->m[1][0];
     pMtx->m[0][0] = x0;
@@ -233,6 +227,18 @@ static void xsi_mul_sr(Mtx34Xsi* pMtx, const TexSrtXsi& srt) {
     f32 y2 = svS * pMtx->m[0][2] + svC * pMtx->m[1][2];
     pMtx->m[0][2] = x2;
     pMtx->m[1][2] = y2;
+}
+
+/* 0x800D7104 (0x114): scales and rotates the first two rows. */
+static void xsi_mul_sr(Mtx34Xsi* pMtx, const TexSrtXsi& srt) {
+    f32 s;
+    f32 c;
+    sin_cos_deg(&s, &c, srt.R);
+    f32 suC = srt.Su * c;
+    f32 suS = srt.Su * s;
+    f32 svC = srt.Sv * c;
+    f32 svS = srt.Sv * s;
+    xsi_mul_2x3(pMtx, suC, suS, svC, svS);
     f32 x3 = suS + (suC * pMtx->m[0][3] - suS * pMtx->m[1][3]);
     f32 y3 = 1.0f + ((svS * pMtx->m[0][3] + svC * pMtx->m[1][3]) - svC);
     pMtx->m[0][3] = x3;
@@ -284,18 +290,7 @@ static void xsi_mul_srt(Mtx34Xsi* pMtx, const TexSrtXsi& srt) {
     f32 suS = srt.Su * s;
     f32 svC = srt.Sv * c;
     f32 svS = srt.Sv * s;
-    f32 x0 = suC * pMtx->m[0][0] - suS * pMtx->m[1][0];
-    f32 y0 = svS * pMtx->m[0][0] + svC * pMtx->m[1][0];
-    pMtx->m[0][0] = x0;
-    pMtx->m[1][0] = y0;
-    f32 x1 = suC * pMtx->m[0][1] - suS * pMtx->m[1][1];
-    f32 y1 = svS * pMtx->m[0][1] + svC * pMtx->m[1][1];
-    pMtx->m[0][1] = x1;
-    pMtx->m[1][1] = y1;
-    f32 x2 = suC * pMtx->m[0][2] - suS * pMtx->m[1][2];
-    f32 y2 = svS * pMtx->m[0][2] + svC * pMtx->m[1][2];
-    pMtx->m[0][2] = x2;
-    pMtx->m[1][2] = y2;
+    xsi_mul_2x3(pMtx, suC, suS, svC, svS);
     f32 a = pMtx->m[0][3] - srt.Tu;
     f32 x3 = suS + (suC * a - suS * (pMtx->m[1][3] + srt.Tv));
     f32 y3 = 1.0f + ((svS * a + svC * (pMtx->m[1][3] + srt.Tv)) - svC);

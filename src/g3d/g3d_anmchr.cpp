@@ -62,8 +62,8 @@
  *   Partial: the members whose only difference is a relocation name (the strings).
  *   G3dObj::operator delete, AnmObj, AnmObjChr, AnmObjChrBlend, AnmObjChrRes: the empty bodies are complete (retail's
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
- *   initialisers and the destructors' base calls).  The G3dObj vtable is emitted here (its first virtual,
- *   IsDerivedFrom, is defined here) while retail keeps it in `g3d/g3d_obj.cpp`'s `.data`.
+ *   initialisers and the destructors' base calls).  G3dObj::IsDerivedFrom is `inline` (`g3d/g3d_obj.h`), so its
+ *   copy here is weak and the G3dObj vtable is `g3d/g3d_obj.cpp`'s.
  *   The AnmObj type-name record (0x8056F568, read only by AnmObj::GetTypeObj and GetTypeObjStatic here) is
  *   `g3d/g3d_anmobj.cpp`'s `.rodata` claim (0x8056F568-0x8056F578).
  *   flipcheck: `.text` 0x6F18 of 0x6F90; extab 0x3EC of 0x3A4 (__dt__AnmObjChrNode's record is 108 B against 28 B);

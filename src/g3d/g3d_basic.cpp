@@ -3,11 +3,10 @@
  * RANGE. .text 0x800D79B4-0x800D7F54 (4 functions); extab, extabindex, .data 0x80595840-0x805958F8 (opens on
  *   "g3d_basic.cpp", fn_800D79B4's assert file), .sdata2 0x807963D0-0x807963D8.
  * NAMES. Map stems.
- * RESIDUALS. fn_800D7D24: retail copies `handleArg` to r31 after loading the flag word and its three bit tests pass
- *   r7 itself; ours copies it first and the tests pass r31 (the registers match: `handle` declared first, assigned
- *   after the flag word, the tests on the argument; tried: `tmpMtx`/`tmpVec` scoped or first, `handle` initialised
- *   in its declaration).
- *   flipcheck: `.data` and `.sdata2` byte-identical.
+ * RESIDUALS. None (flipcheck READY; `.data` and `.sdata2` byte-identical).
+ * SHAPES. fn_800D7D24's attribute copy is an `int` local assigned after the flag word: the conversion keeps the copy
+ *   (`mr r31,r7` after the flag load) and the three bit tests on the argument in r7; a `u32` copy is coalesced with
+ *   the argument and moved to the entry.
  * SHAPES. File-scope `#pragma peephole off`: fn_800D7F40 keeps the unfolded `(x & 0x40000000) != 0`, and
  *   fn_800D7D24 and fn_800D79B4 lose rows without it.  `#pragma pool_data off` gives every string its own
  *   `lis`/`addi`.  The definitions are in retail's address order, which also orders the `.data` strings and the
@@ -152,7 +151,7 @@ int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
 /* The SRT dispatch: from the node's flag word pick a copy, a concatenation or a vector transform. */
 void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* pScale, u32 handleArg,
                  ResNode* pNode) {
-    u32 handle;
+    int handle;
     u32 flag = pNode->flag;
     handle = handleArg;
     Mtx34 tmpMtx;

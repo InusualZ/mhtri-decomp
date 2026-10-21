@@ -81,7 +81,9 @@ public:
 
     G3dObj(MEMAllocator* pHeap, G3dObj* pParent);
 
-    virtual bool IsDerivedFrom(TypeObj type) const;
+    /* Inline (its kept copy is `g3d/g3d_anmchr.cpp`'s), so the destructor is the key function and
+     * `g3d/g3d_obj.cpp` emits the vtable. */
+    inline virtual bool IsDerivedFrom(TypeObj type) const;
     virtual void G3dProc(u32 task, u32 param, void* pInfo) = 0; /* untyped: caller-owned payload */
     virtual ~G3dObj();
     virtual const TypeObj GetTypeObj() const;

@@ -11,10 +11,8 @@
  * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` throughout (playbook idea 106).
  * NAMES. nw4r's (the map's manglings).  g3d_obj_dealloc_tail (0x8007B344) is a GUESS: the 4-byte forwarder
  *   Dealloc branches to (`b` to the next word), the shape of `g3d/g3d_anmchr.cpp`'s Alloc/g3d_obj_alloc_tail pair.
- * RESIDUALS. Dealloc's map row covers 8 bytes (0x8007B340-0x8007B348) and pairs with our 4-byte Dealloc until it
- *   is split at +4 into g3d_obj_dealloc_tail (request filed); the object's bytes are retail's.
- *   flipcheck: `.rodata` (the type-name record, declared not defined) and `.data` (the vtable) are claimed and not
- *   emitted.
+ * RESIDUALS. None: the vtable is emitted here because `g3d/g3d_obj.h` declares IsDerivedFrom `inline` (the
+ *   destructor is then the key function).
  * SHAPES. The destructor's body is the heap release; the compiler adds the vtable store and the deleting tail.
  */
 

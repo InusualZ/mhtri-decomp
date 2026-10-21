@@ -20,15 +20,13 @@
  *   scn_obj_callback_dtor is a GUESS (0x8008147C: IScnObjCallback's deleting destructor, written as the C helper
  *   because defining the member would emit the interface's vtable here); aabb_copy is a GUESS (0x80081804: the
  *   AABB assignment retail calls out of line).
- * RESIDUALS. flipcheck: extab/extabindex carry the records of our weak std::find/std::distance copies (retail's
- *   object lost them to `g3d/g3d_scninline.cpp`'s kept copies); a trial flip of this unit alone stops in the
- *   linker's Optimizing phase (`internal linker error: File: 'ELF_linker.c' Line: 7133`, the weak copies against
- *   the strong ones in scninline's split object), so it flips together with `g3d/g3d_scninline.cpp`.
- *   The ScnObj constructor's extab range starts at the MTX34_ctor loop (+0x40) where retail's starts after the
- *   first mtx34_identity (+0xA8): retail sees the bodies of the MTX34/AABB constructors and SetScnObjFlag (inline,
- *   called out of line), this source calls MTX34_ctor/AABB_ctor as C functions.
+ * RESIDUALS. None in the object: extab/extabindex carry the records of the weak std::find/std::distance copies,
+ *   which the link drops with the copies (`g3d/g3d_scninline.cpp` and the earlier units keep the first ones).
  * SHAPES. G3dObj::GetParent is defined `inline` here and its five callers compile under `#pragma dont_inline on`:
  *   the destructors' extab ranges then start after their asserts (retail's records).
+ * SHAPES. MTX34_ctor, VEC3_ctor, AABB_ctor and ScnObj::SetScnObjFlag are defined `inline` ahead of the constructor
+ *   and their callers compile under `dont_inline`: the visible bodies cannot throw, so the constructor's extab range
+ *   starts after the first mtx34_identity (+0xA8), retail's record; the weak copies are dropped by the link.
  *   IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the CheckCallback members sit in
  *   `g3d/g3d_scninline.cpp`'s range.
  * SHAPES. The ScnObj constructor builds its MTX34/AABB arrays with explicit do-while loops over MTX34_ctor and
@@ -107,6 +105,28 @@ void nw4r::g3d::ScnObj::CalcViewMtx(const math::MTX34* pCamera)
     mtx34_concat(&mMtxArray[MTX_VIEW], pCamera, &mMtxArray[MTX_WORLD]);
 }
 
+/* The math types' empty constructors and the box's element constructor, visible so the compiler knows they do not
+ * throw (their kept copies are 0x8005050C, 0x80043EA8 and `g3d/g3d_scnmdlsmpl.cpp`'s 0x80080F44). */
+extern "C" inline void MTX34_ctor(nw4r::math::MTX34* out) {}
+extern "C" inline void VEC3_ctor(nw4r::math::VEC3* out) {}
+extern "C" inline nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox)
+{
+    VEC3_ctor(&pBox->min);
+    VEC3_ctor(&pBox->max);
+    return pBox;
+}
+
+/* Sets or clears a flag (the kept copy is `g3d/g3d_scninline.cpp`'s). */
+inline void nw4r::g3d::ScnObj::SetScnObjFlag(ScnObjFlag flag, u32 on)
+{
+    if (on) {
+        mScnObjFlags |= flag;
+    } else {
+        mScnObjFlags &= ~flag;
+    }
+}
+
+#pragma dont_inline on
 /* 0x80081260 (0x158): constructs the object: identity matrices, empty boxes, the default draw priorities and no
  * callback. */
 nw4r::g3d::ScnObj::ScnObj(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
@@ -145,6 +165,7 @@ nw4r::g3d::ScnObj::ScnObj(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
     copyVec3(&mAABB[BOUNDINGVOLUME_AABB_WORLD].min, setVec3(&zero2, 0.0f, 0.0f, 0.0f));
     copyVec3(&mAABB[BOUNDINGVOLUME_AABB_WORLD].max, setVec3(&zero3, 0.0f, 0.0f, 0.0f));
 }
+#pragma dont_inline reset
 
 
 /* G3dObj::GetParent is nw4r's inline accessor (its kept copy is `g3d/g3d_anmchr.cpp`'s 0x800600C0); the functions
@@ -179,6 +200,7 @@ extern "C" void* scn_obj_callback_dtor(void* pSelf, s16 flag)
     return pSelf;
 }
 
+#pragma dont_inline on
 /* 0x800814C0 (0xB4): sets the flag an option id names; false for an unknown id. */
 bool nw4r::g3d::ScnObj::SetScnObjOption(u32 option, u32 value)
 {
@@ -312,6 +334,8 @@ bool nw4r::g3d::ScnObj::SetBoundingVolume(ScnObjBoundingVolumeType type, const m
     return SetScnObjOption(OPTION_ENABLE_CULLING, false);
 }
 
+#pragma dont_inline reset
+
 /* 0x80081804 (0x34): copies a bounding box (the box type's assignment, called out of line). */
 extern "C" void aabb_copy(nw4r::math::AABB* pDst, const nw4r::math::AABB* pSrc)
 {
@@ -342,6 +366,7 @@ nw4r::g3d::ScnObj::ForEachResult nw4r::g3d::ScnLeaf::ForEach(ForEachFunc pFunc, 
     return (ForEachResult)(pFunc(this, pInfo) == FOREACH_RESULT_RETURN);
 }
 
+#pragma dont_inline on
 /* 0x800818C8 (0x40): the draw-disable option sets both draw flags; the rest are the base's. */
 bool nw4r::g3d::ScnLeaf::SetScnObjOption(u32 option, u32 value)
 {
@@ -352,6 +377,7 @@ bool nw4r::g3d::ScnLeaf::SetScnObjOption(u32 option, u32 value)
     }
     return true;
 }
+#pragma dont_inline reset
 
 /* 0x80081908 (0x60): the draw-disable option reads both draw flags; the rest are the base's. */
 bool nw4r::g3d::ScnLeaf::GetScnObjOption(u32 option, u32* pValue) const
@@ -614,6 +640,7 @@ bool nw4r::g3d::ScnGroup::Remove(ScnObj* pObj)
     return false;
 }
 
+#pragma dont_inline on
 /* 0x80082524 (0xA8): constructs the group over a caller-owned child array; the group itself is not gathered for
  * drawing. */
 nw4r::g3d::ScnGroup::ScnGroup(MEMAllocator* pHeap, ScnObj** ppObjArray, u32 capacity)
@@ -625,6 +652,7 @@ nw4r::g3d::ScnGroup::ScnGroup(MEMAllocator* pHeap, ScnObj** ppObjArray, u32 capa
     SetScnObjFlag(SCNOBJFLAG_NOT_GATHER_DRAW_OPA, true);
     SetScnObjFlag(SCNOBJFLAG_NOT_GATHER_DRAW_XLU, true);
 }
+#pragma dont_inline reset
 
 
 #pragma dont_inline on

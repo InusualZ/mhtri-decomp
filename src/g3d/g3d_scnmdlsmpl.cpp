@@ -22,8 +22,9 @@
  * RESIDUALS. SetAnmObj: retail's first switch jumps straight into the per-type attach blocks (the NOT_SPECIFIED
  *   chain included), a goto shape rule 8 forbids; the two-switch form with one cast-result local keeps a second
  *   dispatch and saves r28 (single local, NOT_SPECIFIED last: 89.5; five typed locals: 88.2; per-case inline
- *   attach helpers: 34.3).  The constructor copies mResMdl inline (frame 0x50) where retail calls the out-of-line
- *   ResMdl copy constructor (0x80077E34, `g3d/g3d_draw.cpp`'s stem) with a 0x60 frame.
+ *   attach helpers: 34.3).  The constructor copies mResMdl inline where retail calls the out-of-line ResMdl copy
+ *   constructor (0x80077E34, `g3d/g3d_draw.cpp`'s stem; the shared handle base compiles the copy bitwise).  Calling
+ *   that stem inside the initialiser (and copying its result word) scores higher but names a generated symbol here.
  *   EnableScnMdlCallbackTiming (0x80080B10) and ICalcWorldCallback's destructor (0x800810DC) are defined under
  *   their manglings; the map rows and the game callers still spell fn_80080B10/fn_800810DC (rename requested), so
  *   `g3d/g3d_scnmdlsmpl.h` keeps the two C declarations for those callers.
@@ -32,6 +33,7 @@
  * SHAPES. The unit compiles with `#pragma peephole off` (retail keeps every `clrlwi` + `cmpwi` pair), set above the
  *   includes so the weak inline copies (ICalcWorldCallback's destructor keeps its `extsh` + `cmpwi`) compile under it.
  *   GetNumViewMtx and GetCalcWorldNodeID return u32: their callers use the `lhz` result unmasked.
+ *   The constructor keeps each ResMdlInfo handle the volume test reads in its own local (retail's three stack slots).
  */
 
 #pragma peephole off
@@ -812,10 +814,10 @@ ScnMdlSimple::ScnMdlSimple(MEMAllocator* pHeap, ResMdl mdl, math::MTX34* pWorldM
     }
     u32 info = res_mdl_get_info(&mdl);
     if (((const ScnMdlResMdlInfoData*)res_mdl_info_ref(&info))->isValidVolume) {
-        info = res_mdl_get_info(&mdl);
-        const ScnMdlResMdlInfoData* pMinInfo = (const ScnMdlResMdlInfoData*)res_mdl_info_ref(&info);
-        info = res_mdl_get_info(&mdl);
-        const ScnMdlResMdlInfoData* pMaxInfo = (const ScnMdlResMdlInfoData*)res_mdl_info_ref(&info);
+        u32 infoMin = res_mdl_get_info(&mdl);
+        const ScnMdlResMdlInfoData* pMinInfo = (const ScnMdlResMdlInfoData*)res_mdl_info_ref(&infoMin);
+        u32 infoMax = res_mdl_get_info(&mdl);
+        const ScnMdlResMdlInfoData* pMaxInfo = (const ScnMdlResMdlInfoData*)res_mdl_info_ref(&infoMax);
         math::AABB box;
         AABB_ctor(&box);
         box.min.x = pMinInfo->volumeMin.x;

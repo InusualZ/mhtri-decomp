@@ -17,14 +17,14 @@
  *   obj_delete_flagged (the LightSet view's destructor), fog_set_color, res_anm_light_config_test_flag8,
  *   res_anm_light_get_id, res_anm_fog_get_id, res_anm_camera_get_id.  The weak accessor copies keep their map stems
  *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
- * RESIDUALS. GetLightSetting: retail keeps the `numDiffuseLight != 0` load in r28 across the light-object calls
- *   and adds it to the specular count; ours reloads the address-taken count after the virtual call.
- *   The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`, the
- *   map's fn_800651BC); fn_800651BC stays defined as the C stem `g3d/g3d_resanm.c` calls.
+ * RESIDUALS. The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`,
+ *   the map's fn_800651BC); fn_800651BC stays defined as the C stem `g3d/g3d_resanm.c` calls.
  *   fn_8006522C: retail's ternary join branch.
  *   Data: the `.data` strings are not in `.text` order in retail (Construct's follow G3dProc's, GetLightSet's follow
  *   GetFog's); the `_ac.h` inline tail (0x8058C928-0x8058CC40, its "ref" copies in `.sdata`) is still extern; the
  *   weak `ut::Color` constructor/destructor copies MWCC emits here are retail's dead copies (linker-folded).
+ * SHAPES. GetLightSetting copies the diffuse count into a register local before the light-object calls: retail adds
+ *   that copy (r28) to the specular count; the address-taken count itself is reloaded after the virtual call.
  * SHAPES. The round-up helper takes `unsigned int align` (nw4r's ut::RoundUp signature): with a u32 alignment MWCC
  *   folds `~(align - 1)` into `andc` where retail keeps `nor` + `and`.
  * SHAPES. `#pragma peephole off` (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`, `addi r0` vtable-store and
@@ -355,9 +355,10 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
     }
 
     if (numDiffuseLight != 0) {
+        u32 diffuseCount = numDiffuseLight;
         LightObj *pLightObj = light_setting_get_light_obj_array(pSetting);
         u32 numLightObj = light_setting_get_num_light_obj(pSetting);
-        u32 numLight = numDiffuseLight + GetNumSpecularLight();
+        u32 numLight = diffuseCount + GetNumSpecularLight();
         u32 numDiffuse = *g3d_min_u32(&numDiffuseLight, &numLightObj);
         u32 numTotal = *g3d_min_u32(&numLight, &numLightObj);
 

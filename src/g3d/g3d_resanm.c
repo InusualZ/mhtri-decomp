@@ -6,15 +6,19 @@
  *   data reference, so 0x80089E9C is an alternative right edge.
  * NAMES. Map stems.  The retail TU is C++; the source stays `.c` because it is C-idiom and does not compile as C++
  *   without casts, so the `Panic` mangling is spelled verbatim.
- * RESIDUALS. fn_80089C6C: the key-index addressing (`slwi`/`lwzx`) is scheduled and allocated differently, and
- *   retail destroys its `nw4r::ut::Color` temporary (`__dt__Q34nw4r2ut5ColorFv`) - a C++ object this C source
- *   cannot express.
+ * RESIDUALS. fn_80089C6C: retail destroys its `nw4r::ut::Color` temporary (`__dt__Q34nw4r2ut5ColorFv`) after the
+ *   conversion - a C++ object this C source cannot express (the 0x14-byte tail is missing).  Compiled as C++ with a
+ *   Color local declared after the early return, the row matches; its extab record then gains a cleanup range unless
+ *   the colour is a real temporary of Color's 4-byte constructor (the map's fn_80089E9C) with operator u32
+ *   (fn_800651BC) visible inline.
  *   flipcheck: `.data` and `.sdata2` byte-identical (the strings are literals under `#pragma pool_data off`).
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `dtor_8005B228`.
  * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`: retail has no record-form instruction and
  *   no fused multiply-add.  fn_80089F78 is the OS fast cast (`psq_st` through GQR5, then `lha`) in inline asm.
  *   fn_800898B0 passes the estimate bounds to Panic as doubles, compares `pKey->frame == frame` and
- *   `frame >= pKey->frame`, and computes the two Hermite intervals before the call.
+ *   `frame >= pKey->frame`, and computes the two Hermite intervals before the call.  fn_80089F90 is modf's
+ *   argument order (frame first: retail sets f1 before r3), and fn_80089C6C's key index is an `int` (retail keeps
+ *   the index and recomputes `(index + 1) * 4`; an `s32` is strength-reduced to one byte offset).
  */
 
 
@@ -71,7 +75,7 @@ u8 fn_80089EF0(s32 from, s32 to, s16 factor);
 s16 fn_80089F14(f32 value);
 void fn_80089F44(f32 *value, s16 *out);
 s16 fn_80089F78(f32 value);
-f32 fn_80089F90(f32 *out, f32 frame);
+f32 fn_80089F90(f32 frame, f32 *out);
 
 
 /* Evaluates one float channel at a frame and returns the interpolated value. */
@@ -151,7 +155,7 @@ u32 fn_80089C6C(u32 *arg0, f32 frame)
     u32 spC;
     ResAnmClr sp8;
     f32 value;
-    s32 index;
+    int index;
     s16 factor;
 
     u32 valid = IS_VALID_PTR(arg0);
@@ -160,7 +164,7 @@ u32 fn_80089C6C(u32 *arg0, f32 frame)
         Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 206,
             "NW4R:Pointer Error\npData(=%p) is not valid pointer.", arg0);
     }
-    value = (f32)fn_80089F90(&sp14, frame);
+    value = (f32)fn_80089F90(frame, &sp14);
     index = (s32)sp14;
     if (value == 0.0f) {
         return arg0[index];
@@ -228,7 +232,7 @@ s16 fn_80089F78(register f32 value)
 }
 
 /* Tail call into the frame-index helper. */
-f32 fn_80089F90(f32 *out, f32 frame)
+f32 fn_80089F90(f32 frame, f32 *out)
 {
     return modff(out, frame);
 }
