@@ -788,12 +788,12 @@ config.libs = [
             Object(Matching, "ef/ef_postfield.cpp"),
             Object(NonMatching, "ef/ef_resource.cpp"),
             Object(NonMatching, "ef/ef_drawbillboardstrategy.cpp"),
-                        Object(NonMatching, "ef/ef_drawpointstrategy.cpp"),
-                        Object(NonMatching, "ef/ef_drawlinestrategy.cpp"),
+                        Object(Matching, "ef/ef_drawpointstrategy.cpp"),
+                        Object(Matching, "ef/ef_drawlinestrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
             # Flags: unit header of src/ef/ef_drawstrategyimpl.cpp (`-pool off`, playbook 43).
             Object(NonMatching, "ef/ef_drawstrategyimpl.cpp", extra_cflags=["-pool off"]),
-            Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
+            Object(Matching, "ef/ef_drawfreestrategy.cpp"),
             # Flags: unit header of src/ef/ef_torus.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(Matching, "ef/ef_torus.cpp", extra_cflags=["-pool off"]),
             # Flags: unit header of src/ef/ef_cube.cpp (`-pool off`: one `lis`/`addi` per string).
