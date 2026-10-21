@@ -13,12 +13,8 @@
  *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
  *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes; the `ResShpData` `id*` fields are
  *   spelled by res_shp_get_vtx_pos's assert (`ref().idVtxPosition >= 0`).
- * RESIDUALS. fn_80099C20: stack-slot order of the three `ResXxx` copies' destination handles and value temporaries.
- *   fn_8009A1E0: retail keeps `tev_display_list_size` in r31 across the `fn_800866FC` call (frame 0x20,
- *     r29-r31); ours rematerialises it after the call (frame 0x10, 8 bytes shorter); every spelling of the table
- *     read emits the same, a defined table included.
- *   res_tev_copy_to: the final `subf`'s destination register (r0 in retail, r4 here).
- *   flipcheck: `.text` 0x1340 of 0x1348; `.rodata` is the defined `tev_display_list_size` (a GUESS name for the
+ * RESIDUALS. res_tev_copy_to: the final `subf`'s destination register (r0 in retail, r4 here).
+ *   flipcheck: `.rodata` is the defined `tev_display_list_size` (a GUESS name for the
  *   map's lbl_8056F730); `.data`/
  *   `.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80).
@@ -26,7 +22,10 @@
  *   fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` + `cmpwi`).
  *   `#pragma pool_data off`; the strings are literals ("ref", 4 bytes, goes to `.sdata` and loads with
  *   `li r7, @sda21`).  fn_80099724 is compiled with `#pragma peephole on` (base word in r0); fn_800997E0 adds the
- *   record's index before its +0x32 offset.
+ *   record's index before its +0x32 offset.  ResTev::CallDisplayList indexes the size table with the stage count
+ *   read inline in the call's argument (a `prim` local lets MWCC defer the table address past `ref()`).
+ *   ResShp::Init builds each vertex resource's handle as a `ResHandleTemp` class temporary (retail's return-value
+ *   temporaries, allocated after the named locals).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -37,6 +36,7 @@
 #include "g3d/g3d_state.h"
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resshp.h"
+#include "g3d/g3d_rescommon.h" /* ResHandleTemp (rule 1) */
 
 #pragma pool_data off
 
@@ -446,12 +446,12 @@ void nw4r::g3d::ResShp::Init() {
     const void* pBaseVtx;
     u8 stride;
 
-    u32 vtxPos = res_shp_get_vtx_pos(reinterpret_cast<ResHandle*>(this));
-    reinterpret_cast<nw4r::g3d::ResVtxPos*>(&vtxPos)->GetArray(&pBaseVtx, &stride);
+    reinterpret_cast<nw4r::g3d::ResVtxPos*>(ResHandleTemp().set(res_shp_get_vtx_pos(reinterpret_cast<ResHandle*>(this))))
+        ->GetArray(&pBaseVtx, &stride);
     fn_800997E0(reinterpret_cast<ResHandle*>(this), 9, (u32)pBaseVtx, stride);
 
-    u32 vtxNrm = res_shp_get_vtx_nrm(reinterpret_cast<ResHandle*>(this));
-    nw4r::g3d::ResVtxNrm nrm(reinterpret_cast<const nw4r::g3d::ResVtxNrm*>(&vtxNrm));
+    nw4r::g3d::ResVtxNrm nrm(reinterpret_cast<const nw4r::g3d::ResVtxNrm*>(
+        ResHandleTemp().set(res_shp_get_vtx_nrm(reinterpret_cast<ResHandle*>(this)))));
 
     if (nrm.IsValid()) {
         nrm.GetArray(&pBaseVtx, &stride);
@@ -459,8 +459,8 @@ void nw4r::g3d::ResShp::Init() {
     }
 
     for (u32 i = 0; i < 2; i++) {
-        u32 vtxClr = res_shp_get_vtx_clr(reinterpret_cast<ResHandle*>(this), i);
-        nw4r::g3d::ResVtxClr clr(reinterpret_cast<const nw4r::g3d::ResVtxClr*>(&vtxClr));
+        nw4r::g3d::ResVtxClr clr(reinterpret_cast<const nw4r::g3d::ResVtxClr*>(
+            ResHandleTemp().set(res_shp_get_vtx_clr(reinterpret_cast<ResHandle*>(this), i))));
 
         if (clr.IsValid()) {
             clr.GetArray(&pBaseVtx, &stride);
@@ -469,9 +469,8 @@ void nw4r::g3d::ResShp::Init() {
     }
 
     for (u32 i = 0; i < 8; i++) {
-        u32 vtxTex = fn_80099B10(reinterpret_cast<ResHandle*>(this), i);
         ResHandle tex;
-        fn_80099E2C(&tex, (const ResHandle*)&vtxTex);
+        fn_80099E2C(&tex, reinterpret_cast<const ResHandle*>(ResHandleTemp().set(fn_80099B10(reinterpret_cast<ResHandle*>(this), i))));
 
         if (reinterpret_cast<nw4r::g3d::ResVtxTexCoord*>(&tex)->IsValid()) {
             reinterpret_cast<nw4r::g3d::ResVtxTexCoord*>(&tex)->GetArray(&pBaseVtx, &stride);
@@ -479,15 +478,13 @@ void nw4r::g3d::ResShp::Init() {
         }
     }
 
-    u32 prePrim = fn_800996AC(reinterpret_cast<ResHandle*>(this));
-    fn_8009A12C((ResHandle*)&prePrim, 0);
+    fn_8009A12C(reinterpret_cast<ResHandle*>(ResHandleTemp().set(fn_800996AC(reinterpret_cast<ResHandle*>(this)))), 0);
 
     /* Two copies of the shape's own display-list tag (the inlined accessor reached twice): the first
      * supplies the size, the second the address the tag resolves to. */
-    u32 tagSize = fn_80099DF8(reinterpret_cast<ResHandle*>(this));
-    u32 tagAddr = fn_80099DF8(reinterpret_cast<ResHandle*>(this));
-    u32 size = fn_80099DD4((ResHandle*)&tagSize);
-    nw4r::g3d::DC::StoreRangeNoSync((void*)fn_800996E8((ResHandle*)&tagAddr), size);
+    nw4r::g3d::DC::StoreRangeNoSync(
+        (void*)fn_800996E8(reinterpret_cast<ResHandle*>(ResHandleTemp().set(fn_80099DF8(reinterpret_cast<ResHandle*>(this))))),
+        fn_80099DD4(reinterpret_cast<ResHandle*>(ResHandleTemp().set(fn_80099DF8(reinterpret_cast<ResHandle*>(this))))));
 }
 
 /* 0x80099DD4 - the display-list tag's total size (`ResTagDL::ref` then its +0x00 word). */
@@ -639,9 +636,7 @@ void nw4r::g3d::ResTev::CallDisplayList(bool flag) const {
         PPCSync();
     }
 
-    u32 prim = (u8)fn_8009A254((ResHandle*)this) - 1;
-
-    GXCallDisplayList((void*)((u32)&ref() + 0x20), tev_display_list_size[prim]);
+    GXCallDisplayList((void*)((u32)&ref() + 0x20), tev_display_list_size[(u8)fn_8009A254((ResHandle*)this) - 1]);
 }
 
 /* 0x8009A254 - the block's primitive count (its +0x0C byte). */

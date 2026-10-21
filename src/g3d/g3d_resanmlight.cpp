@@ -5,12 +5,11 @@
  *   is "g3d_resanmlight.cpp" (.data 0x80590440); the right one is `g3d/g3d_resanmscn.cpp`'s: fn_8009001C onward
  *   read that TU's `ResName` records (0x80590660) and `_ac.h` strings, and extabindex 0x80021D8C opens it.
  * NAMES. Map stems, defined `extern "C"` (the dump answers `zz_` placeholders).
- * RESIDUALS. fn_8008F8E4: register colouring only - retail holds the resource in r30, the flags in r29, the light
- *   kind in r28 and the second-colour flag in r27; ours r29/r28/r27/r30 (declaration permutations reach no closer
- *   than one more instruction).
- *   flipcheck: `.text` is the one row above; `.data` byte-identical to the 0x208 bytes the object emits (the
- *   0x18-byte tail is fill before `g3d/g3d_resanmscn.cpp`'s 32-aligned name records).
- * SHAPES. fn_8008FE88/fn_8008FD04 are `inline` under `#pragma dont_inline on`, defined in that order: their asserts'
+ * RESIDUALS. flipcheck: `.data` byte-identical to the 0x208 bytes the object emits; the 0x18-byte tail of the claim
+ *   is fill before `g3d/g3d_resanmscn.cpp`'s 32-aligned name records, which the link reproduces only once that
+ *   unit's `.data` split carries `align:32` (request g3d-res2#6; trial flip with it: main.dol unchanged).
+ * SHAPES. fn_8008F8E4 types the second-colour flag `bool` (retail colours it r27).
+ *   fn_8008FE88/fn_8008FD04 are `inline` under `#pragma dont_inline on`, defined in that order: their asserts'
  *   strings are the inline tail (weak `@STRING@` copies, reversed), and their weak copies follow fn_8008F8E4.
  *   `base += offset` in fn_80090000 keeps the branch (a plain `if`/`return` if-converts to branchless code), and
  *   `#pragma peephole on` keeps its base word in r0.
@@ -26,7 +25,7 @@
 #include "g3d/g3d_anmshp.h" /* ResDic::GetNumData's owner (rule 2) */
 #include "g3d/g3d_resanmtexsrt.h" /* fn_80092330 (rule 2) */
 #include "MSL_C/alloc.h" /* floorf (rule 2) */
-#include "g3d/g3d_resanmcamera.h" /* fn_8008A644 (rule 2) */
+#include "g3d/g3d_resanmcamera.h" /* res_anm_data_get_result (rule 2) */
 
 #pragma pool_data off
 
@@ -112,7 +111,7 @@ extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pRes
     u32 flags;
     f32 clamped;
     s32 kind;
-    s32 second;
+    bool second;
     s32 useSecond;
     u32 valid = IS_VALID_PTR(pResult);
 
@@ -132,30 +131,30 @@ extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pRes
         kind = flags & 3;
         second = (flags & 0x8) != 0;
         useSecond = (kind != 0) || (second != 0);
-        pResult->nearChannel = fn_8008A644(&res->channel_0x24, frame, (flags & 0x00080000) != 0);
-        pResult->midChannel = fn_8008A644(&res->channel_0x28, frame, (flags & 0x00100000) != 0);
-        pResult->farChannel = fn_8008A644(&res->channel_0x2C, frame, (flags & 0x00200000) != 0);
+        pResult->nearChannel = res_anm_data_get_result(&res->channel_0x24, frame, (flags & 0x00080000) != 0);
+        pResult->midChannel = res_anm_data_get_result(&res->channel_0x28, frame, (flags & 0x00100000) != 0);
+        pResult->farChannel = res_anm_data_get_result(&res->channel_0x2C, frame, (flags & 0x00200000) != 0);
         fn_8005B1E4(&pResult->inlineColor,
             fn_8008A188(&res->channel_0x30, clamped, (flags & 0x00400000) != 0));
         if (useSecond) {
-            pResult->field_0x14 = fn_8008A644(&res->channel_0x34, frame, (flags & 0x01000000) != 0);
-            pResult->field_0x18 = fn_8008A644(&res->channel_0x38, frame, (flags & 0x02000000) != 0);
-            pResult->field_0x1C = fn_8008A644(&res->channel_0x3C, frame, (flags & 0x04000000) != 0);
+            pResult->field_0x14 = res_anm_data_get_result(&res->channel_0x34, frame, (flags & 0x01000000) != 0);
+            pResult->field_0x18 = res_anm_data_get_result(&res->channel_0x38, frame, (flags & 0x02000000) != 0);
+            pResult->field_0x1C = res_anm_data_get_result(&res->channel_0x3C, frame, (flags & 0x04000000) != 0);
         }
         switch (kind) {
         case 0:
             pResult->field_0x24 = res->field_0x40;
-            pResult->field_0x28 = fn_8008A644(&res->channel_0x44, frame, (flags & 0x10000000) != 0);
-            pResult->field_0x2C = fn_8008A644(&res->channel_0x48, frame, (flags & 0x20000000) != 0);
+            pResult->field_0x28 = res_anm_data_get_result(&res->channel_0x44, frame, (flags & 0x10000000) != 0);
+            pResult->field_0x2C = res_anm_data_get_result(&res->channel_0x48, frame, (flags & 0x20000000) != 0);
             break;
         case 1:
             break;
         case 2:
             pResult->field_0x24 = res->field_0x40;
             pResult->field_0x30 = res->field_0x4C;
-            pResult->field_0x34 = fn_8008A644(&res->channel_0x50, frame, (flags & 0x08000000) != 0);
-            pResult->field_0x28 = fn_8008A644(&res->channel_0x44, frame, (flags & 0x10000000) != 0);
-            pResult->field_0x2C = fn_8008A644(&res->channel_0x48, frame, (flags & 0x20000000) != 0);
+            pResult->field_0x34 = res_anm_data_get_result(&res->channel_0x50, frame, (flags & 0x08000000) != 0);
+            pResult->field_0x28 = res_anm_data_get_result(&res->channel_0x44, frame, (flags & 0x10000000) != 0);
+            pResult->field_0x2C = res_anm_data_get_result(&res->channel_0x48, frame, (flags & 0x20000000) != 0);
             break;
         default:
             nw4r::db::Panic("g3d_resanmlight.cpp", 0x8C, "NW4R Internal error\nUnknown light-type (=%d)", kind);
@@ -164,7 +163,7 @@ extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pRes
         if (second) {
             fn_8005B1E4(&pResult->inlineColor2,
                 fn_8008A188(&res->channel_0x54, clamped, (flags & 0x40000000) != 0));
-            pResult->field_0x3C = fn_8008A644(&res->channel_0x58, frame, (flags & 0x80000000) != 0);
+            pResult->field_0x3C = res_anm_data_get_result(&res->channel_0x58, frame, (flags & 0x80000000) != 0);
             pResult->typeWord = res->field_0x14;
         }
     }

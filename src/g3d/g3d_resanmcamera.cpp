@@ -9,7 +9,7 @@
  *   different, while the linked DOL is byte-identical.
  * SHAPES. fn_8008A220/fn_8008A284 are `g3d_resuser_ac.h` inline accessors: `inline`, referenced by the
  *   dead-stripped res_user_data_init at the head of the file, so MWCC emits their weak copies first and their
- *   strings after the out-of-line ones (the inline tail, playbook 80).  fn_8008A644 is defined after
+ *   strings after the out-of-line ones (the inline tail, playbook 80).  res_anm_data_get_result is defined after
  *   fn_8008A28C, in retail's order.
  */
 
@@ -88,7 +88,7 @@ extern "C" {
     void *fn_8008A220(void *self, u32 value);
     void fn_8008A284(u32 *self, u32 value);
     void res_anm_camera_get_anm_result(void *self, ResAnmCamAnmResult *pResult, f32 frame);
-    f32 fn_8008A644(ResAnmCamValue *self, f32 frame, u32 flag);
+    f32 res_anm_data_get_result(ResAnmCamValue *self, f32 frame, u32 flag);
 }
 
 /* Sets a sub-resource offset word through the `g3d_resuser_ac.h` constructor.  Nothing calls it, so the
@@ -135,24 +135,24 @@ extern "C" void res_anm_camera_get_anm_result(void *self, ResAnmCamAnmResult *pR
     pResult->field_0x00 = flags & 3;
     pResult->field_0x04 = res->projType;
 
-    pResult->field_0x08 = fn_8008A644(&res->field_0x20, frame, (flags & 0x20000) != 0);
-    pResult->field_0x0C = fn_8008A644(&res->field_0x24, frame, (flags & 0x40000) != 0);
-    pResult->field_0x10 = fn_8008A644(&res->field_0x28, frame, (flags & 0x80000) != 0);
-    pResult->field_0x14 = fn_8008A644(&res->field_0x2C, frame, (flags & 0x100000) != 0);
-    pResult->field_0x18 = fn_8008A644(&res->field_0x30, frame, (flags & 0x200000) != 0);
-    pResult->field_0x1C = fn_8008A644(&res->field_0x34, frame, (flags & 0x400000) != 0);
+    pResult->field_0x08 = res_anm_data_get_result(&res->field_0x20, frame, (flags & 0x20000) != 0);
+    pResult->field_0x0C = res_anm_data_get_result(&res->field_0x24, frame, (flags & 0x40000) != 0);
+    pResult->field_0x10 = res_anm_data_get_result(&res->field_0x28, frame, (flags & 0x80000) != 0);
+    pResult->field_0x14 = res_anm_data_get_result(&res->field_0x2C, frame, (flags & 0x100000) != 0);
+    pResult->field_0x18 = res_anm_data_get_result(&res->field_0x30, frame, (flags & 0x200000) != 0);
+    pResult->field_0x1C = res_anm_data_get_result(&res->field_0x34, frame, (flags & 0x400000) != 0);
 
     switch (camType) {
     case 0:
-        pResult->field_0x20 = fn_8008A644(&res->field_0x38, frame, (flags & 0x20000000) != 0);
-        pResult->field_0x24 = fn_8008A644(&res->field_0x3C, frame, (flags & 0x40000000) != 0);
-        pResult->field_0x28 = fn_8008A644(&res->field_0x40, frame, (flags & 0x80000000) != 0);
+        pResult->field_0x20 = res_anm_data_get_result(&res->field_0x38, frame, (flags & 0x20000000) != 0);
+        pResult->field_0x24 = res_anm_data_get_result(&res->field_0x3C, frame, (flags & 0x40000000) != 0);
+        pResult->field_0x28 = res_anm_data_get_result(&res->field_0x40, frame, (flags & 0x80000000) != 0);
         break;
     case 1:
-        pResult->field_0x20 = fn_8008A644(&res->field_0x44, frame, (flags & 0x02000000) != 0);
-        pResult->field_0x24 = fn_8008A644(&res->field_0x48, frame, (flags & 0x04000000) != 0);
-        pResult->field_0x28 = fn_8008A644(&res->field_0x4C, frame, (flags & 0x08000000) != 0);
-        pResult->field_0x2C = fn_8008A644(&res->field_0x50, frame, (flags & 0x10000000) != 0);
+        pResult->field_0x20 = res_anm_data_get_result(&res->field_0x44, frame, (flags & 0x02000000) != 0);
+        pResult->field_0x24 = res_anm_data_get_result(&res->field_0x48, frame, (flags & 0x04000000) != 0);
+        pResult->field_0x28 = res_anm_data_get_result(&res->field_0x4C, frame, (flags & 0x08000000) != 0);
+        pResult->field_0x2C = res_anm_data_get_result(&res->field_0x50, frame, (flags & 0x10000000) != 0);
         break;
     default:
         nw4r::db::Panic("g3d_resanmcamera.cpp", 99,
@@ -162,10 +162,10 @@ extern "C" void res_anm_camera_get_anm_result(void *self, ResAnmCamAnmResult *pR
 
     switch (res->projType) {
     case 0:
-        pResult->field_0x30 = fn_8008A644(&res->field_0x54, frame, (flags & 0x800000) != 0);
+        pResult->field_0x30 = res_anm_data_get_result(&res->field_0x54, frame, (flags & 0x800000) != 0);
         break;
     case 1:
-        pResult->field_0x30 = fn_8008A644(&res->field_0x58, frame, (flags & 0x1000000) != 0);
+        pResult->field_0x30 = res_anm_data_get_result(&res->field_0x58, frame, (flags & 0x1000000) != 0);
         break;
     default:
         nw4r::db::Panic("g3d_resanmcamera.cpp", 121,
@@ -175,7 +175,7 @@ extern "C" void res_anm_camera_get_anm_result(void *self, ResAnmCamAnmResult *pR
 }
 
 /* Evaluates one channel: the constant when its flag is set, else the interpolated key data. */
-extern "C" f32 fn_8008A644(ResAnmCamValue *self, f32 frame, u32 flag)
+extern "C" f32 res_anm_data_get_result(ResAnmCamValue *self, f32 frame, u32 flag)
 {
     if (flag) {
         return self->value;

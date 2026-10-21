@@ -19,6 +19,9 @@ u32 fn_8006CDBC(void* p);
 u32 fn_8006D9FC(void* self, u32 idx);
 /* 0x8006D9A4 - material `idx`'s animation record, from the resource's material dictionary. */
 u32 fn_8006D9A4(void* self, u32 idx);
+/* 0x8006CE20 - the unchecked `ResAnmTexSrt` block pointer (`ptr()`). */
+/* untyped: opaque handle - the `ResAnmTexSrt` handle, as the owner's definition spells it */
+u32 res_anm_tex_srt_ptr(void* p);
 
 #ifdef __cplusplus
 }
@@ -46,14 +49,18 @@ struct ResAnmTexSrtData {
     /* +0x14 */ u8 pad_0x14[0xC];
     /* +0x20 */ u16 numFrame;
     /* +0x22 */ u16 numMaterial;
-    /* +0x24 */ u8 pad_0x24[0x4];
+    /* +0x24 */ u32 texMtxMode;
     /* +0x28 */ u32 policy;
 };
 
 /* One animated material's record in a texture-SRT resource: the offset (from the record, plus 4) of its material
- * name first.  size: 0x4 (a lower bound: only this word is evidenced) */
+ * name, the animated-texture and animated-indirect-matrix bit sets, then one record offset per set bit.
+ * size: 0x10 (a lower bound: the offset array runs on) */
 struct ResAnmTexSrtMatData {
     /* +0x00 */ s32 toResName;
+    /* +0x04 */ u32 flags;
+    /* +0x08 */ u32 indFlags;
+    /* +0x0C */ s32 toResAnmTexSrtTexData[1];
 };
 
 /* The one-word handle on a texture-SRT animation resource.  size: 0x4 */

@@ -64,7 +64,7 @@ extern u8 lbl_8058D5F8[]; /* "ResTexSrt"     */
  * The word accessors (0x80068698-0x8006E6B4): read / test / copy the body word at +0x0.
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" u32 fn_8006CE20(void *p)
+extern "C" u32 res_anm_tex_srt_ptr(void *p)
 {
     return *(u32 *)p;
 }
@@ -227,7 +227,7 @@ extern "C" u32 fn_8006CDBC(void *p)
     if (fn_8006CE34(p) == 0)
         nw4r::db::Panic((const char *)lbl_8058D6A4, 38, (const char *)lbl_8058D688,
                         (const char *)fn_8006CE28(), "ref");
-    return fn_8006CE20(p);
+    return res_anm_tex_srt_ptr(p);
 }
 
 /* 0x8006E2AC (0x64): returns the texture-SRT block, panicking on a NULL handle. */

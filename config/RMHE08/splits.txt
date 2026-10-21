@@ -413,7 +413,7 @@ g3d/g3d_resanmscn.cpp:
 	extab       start:0x80009120 end:0x80009208
 	extabindex  start:0x80021D8C end:0x80021EE8
 	.text       start:0x8009001C end:0x800916FC
-	.data       start:0x80590660 end:0x80590928
+	.data       start:0x80590660 end:0x80590928 align:32
 	.sdata      start:0x80791268 end:0x80791270
 
 g3d/g3d_resanmtexsrt.cpp:

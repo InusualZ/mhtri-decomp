@@ -31,6 +31,9 @@ void **fn_8005DC60(void **out, void *v);   /* 0x8005DC60 - stores `v` through `o
 void **type_obj_set_name_anmchr(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */
 u32 res_dic_is_valid(void *self);               /* 0x800628B4 - `*(u32*)self != 0` */
 void *res_dic_ptr(void *self);             /* 0x800628A4 - loads the word at +0x0 of `self` */
+/* 0x80062D58 - `ResName`'s copy constructor: copies the handle word from `src`, returns `self`. */
+/* untyped: opaque handle - the destination handle, as the owner's definition spells it */
+void *res_name_copy_ctor(void *self, u32 *src);
 
 
 /* The animation type-name records (`.rodata`: a length word, then the NUL-terminated name) this unit's type-info
@@ -110,10 +113,12 @@ struct ResAnmChrData {
 };
 
 /* One animated node's record in a character-animation resource: the offset (from the record, plus 4) of its
- * node name, then the option/ScaleType flags.  size: 0x8 (a lower bound: only these two words are evidenced) */
+ * node name, the option/ScaleType flags, then the value cells the scale/rotate/translate readers walk.
+ * size: 0xC (a lower bound: the cell array runs on) */
 struct ResAnmChrNodeData {
     /* +0x00 */ s32 toResName;
     /* +0x04 */ u32 flags;
+    /* +0x08 */ f32 anms[1];
 };
 
 /* The one-word handle on a character-animation resource.  size: 0x4 */

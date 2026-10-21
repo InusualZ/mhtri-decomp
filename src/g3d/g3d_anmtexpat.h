@@ -11,6 +11,12 @@ extern "C" {
 
 /* 0x8006993C - the checked `ResAnmTexPat` resource resolver (a `ResFile` revision-check getter). */
 u32 fn_8006993C(void* p);
+/* 0x80069BD8 / 0x80069C14 - `ResPltt`'s and `ResTex`'s copy constructors: copy the handle word from `src` and return
+ * `self`. */
+/* untyped: opaque handle - the destination handle, as the owner's definition spells it */
+void* res_pltt_copy_ctor(void* self, void* src);
+/* untyped: opaque handle - the destination handle, as the owner's definition spells it */
+void* res_tex_copy_ctor(void* self, void* src);
 
 #ifdef __cplusplus
 }

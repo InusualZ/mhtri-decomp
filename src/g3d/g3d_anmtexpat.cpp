@@ -79,7 +79,7 @@ extern "C" inline void fn_80069C08(u32* dst, const u32* src)
 }
 
 /* 0x80069BD8 (0x30): copy-constructs a palette handle and returns the destination. */
-extern "C" inline void* fn_80069BD8(void* self, void* src)
+extern "C" inline void* res_pltt_copy_ctor(void* self, void* src)
 {
     fn_80069C08((u32*)self, (const u32*)src);
     return self;
@@ -92,7 +92,7 @@ extern "C" inline void fn_80069C44(u32* dst, const u32* src)
 }
 
 /* 0x80069C14 (0x30): copy-constructs a texture handle and returns the destination. */
-extern "C" inline void* fn_80069C14(void* self, void* src)
+extern "C" inline void* res_tex_copy_ctor(void* self, void* src)
 {
     fn_80069C44((u32*)self, (const u32*)src);
     return self;
@@ -125,7 +125,7 @@ extern "C" void apply_tex_pat_anm_result(struct ResHandle texObj, struct ResHand
     for (u32 i = 0; texFlags != 0; texFlags >>= 1, i++) {
         if (texFlags & 1) {
             ResHandle tex;
-            fn_80069C14(&tex, (void*)&pResult->tex[i]);
+            res_tex_copy_ctor(&tex, (void*)&pResult->tex[i]);
             GXTexObj* pObj = reinterpret_cast<nw4r::g3d::ResTexObj*>(&texObj)->GetTexObj((_GXTexMapID)i);
             u32 minFilt;
             u32 magFilt;
@@ -158,7 +158,7 @@ extern "C" void apply_tex_pat_anm_result(struct ResHandle texObj, struct ResHand
     for (u32 i = 0; plttFlags != 0; plttFlags >>= 1, i++) {
         if (plttFlags & 1) {
             ResHandle pltt;
-            fn_80069BD8(&pltt, (void*)&pResult->pltt[i]);
+            res_pltt_copy_ctor(&pltt, (void*)&pResult->pltt[i]);
             void* pData = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetPlttData();
             u32 plttFmt = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetFmt();
             u32 numEntries = reinterpret_cast<nw4r::g3d::ResPltt*>(&pltt)->GetNumEntries();

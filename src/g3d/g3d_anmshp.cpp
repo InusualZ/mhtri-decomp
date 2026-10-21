@@ -14,14 +14,15 @@
  *   anm_obj_shp_test_existence is AnmObjShp::TestExistence (the "int(vtxId)" assert), kept as a C function because
  *   `g3d/g3d_calcvtx.cpp` calls it that way.  anm_shp_res_reader is a GUESS (the
  *   stripped reader below).  anm_typename_AnmObjShp follows the `anm_typename_*` records (map row lbl_8056F598).
- * RESIDUALS. none in code.  .sdata: the two "ref" words are byte-identical but swapped - ResVtxPos::ref names the
- *   first and the `ResAnmShp` resolver the second in retail, ours the reverse (a trial flip links with exactly those
- *   two SDA21 low bytes different).  anm_shp_res_reader is extra in the object (linker-stripped, its extabindex
- *   record goes with it).
+ * RESIDUALS. none (flipcheck READY; a trial flip links main.dol unchanged).  anm_shp_res_reader is extra in the
+ *   object and the linker strips it.
  * SHAPES. `#pragma peephole off` (playbook idea 106) and `#pragma pool_data off`.  The data is the unit's own:
  *   literals, a defined `TypeNameData` record and the `_ac.h` accessors as `inline` functions under
  *   `#pragma dont_inline`, defined ResVtxPos first (their strings land last in the inline tail) and referenced by
  *   one stripped reader in reverse retail order (MWCC emits a function's inline references last-referenced first).
+ *   The reader sits under `#pragma exceptions off` (retail's stripped referencer leaves no extab record), and
+ *   ResVtxPos::ref passes `__FUNCTION__` (a `.sdata` static in definition order, so its "ref" precedes the
+ *   `ResAnmShp` resolver's literal, as retail's do).
  */
 
 #include "types.h"
@@ -58,7 +59,7 @@ inline u32 ResVtxPos::GetID() const {
 /* 0x800696E4 (0x64): returns the position block, panicking on a NULL handle. */
 inline const ResVtxPosData& ResVtxPos::ref() const {
     if (!IsValid()) {
-        nw4r::db::Panic("g3d_resvtx_ac.h", 39, "%s::%s: Object not valid.", GetClassName(), "ref");
+        nw4r::db::Panic("g3d_resvtx_ac.h", 39, "%s::%s: Object not valid.", GetClassName(), __FUNCTION__);
     }
     return *ptr();
 }
@@ -153,6 +154,7 @@ extern "C" bool anm_obj_shp_test_existence(const void* p, s32 idx) /* untyped: o
 
 /* The shape-result reader retail's linker strips: its references make MWCC emit the inline accessors after it, in
  * retail's order (the compiler emits the accessors a function references last-referenced first). */
+#pragma exceptions off
 extern "C" u32 anm_shp_res_reader(const nw4r::g3d::ResVtxPos* pPos, ResHandle* pRes, const nw4r::g3d::ResDic* pDic,
                                    const nw4r::g3d::ResVtxNrm* pNrm, const nw4r::g3d::ResVtxClr* pClr)
 {
@@ -166,6 +168,7 @@ extern "C" u32 anm_shp_res_reader(const nw4r::g3d::ResVtxPos* pPos, ResHandle* p
     sum += (u32)pClr->ptr();
     return sum;
 }
+#pragma exceptions reset
 
 #pragma dont_inline reset
 

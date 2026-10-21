@@ -108,6 +108,19 @@ public:
 }  // namespace g3d
 }  // namespace nw4r
 
+/* The storage of a one-word resource handle a lookup builds as a class temporary through the handle's out-of-line
+ * constructor (retail allocates such temporaries in creation order, after the named locals).  size: 0x4 */
+struct ResHandleTemp {
+    ResHandleTemp() {}
+    ResHandleTemp* self() { return this; }
+    ResHandleTemp* set(u32 value) {
+        word = value;
+        return this;
+    }
+
+    /* +0x0 */ u32 word;
+};
+
 /* Defines `ResCommon<D>`'s constructor (a single store) for the block type `D`. */
 #define NW4R_G3D_RESCOMMON_CTOR(D) \
     template <> nw4r::g3d::ResCommon<D>::ResCommon(void* pData) : mpData(static_cast<D*>(pData)) {}

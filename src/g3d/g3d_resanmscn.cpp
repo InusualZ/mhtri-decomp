@@ -12,20 +12,20 @@
  *   res_light_set_init, res_anm_amb_light_init, res_anm_light_init, res_anm_fog_init, res_anm_camera_init and
  *   res_anm_tex_pat_ref are GUESSES (dead-stripped referencers of the inline accessors; no symbols.txt row).
  *   res_name_light_set .. res_name_cameras are GUESSES for the map's lbl_80590660..lbl_805906E0.
- * RESIDUALS. fn_80090218/3EC/5C0/794: stack slots only - retail lays the fallback handle, the `ResDic` temporary,
- *   the element handle and the two `ResName` words at 0x8/0xC/0x10/0x14/0x18, ours at 0x14/0x8/0x18/0xC/0x10
- *   (moving the two handle declarations reaches no closer).
- *   fn_800913A0: register colouring only - the two `ResAnmTexPatInfoData` counts in r31/r30 (retail r30/r29), the
+ * RESIDUALS. fn_800913A0: register colouring only - the two `ResAnmTexPatInfoData` counts in r31/r30 (retail r30/r29), the
  *   texture-name array in r29 (retail r31), the palette counter on r24 (retail reuses r31), and the loop
  *   temporaries at 0x0C/0x1C/0x28/0x2C (retail 0x0C/0x14/0x1C/0x28).
  *   flipcheck: `.sdata` byte-identical; `.data` identical up to the texpat `ref()` format string, which retail
  *   places 4 bytes later (0x80590908 + 8-aligned, ours 4-aligned).  The six dead-stripped referencers are
  *   object-only.
  * SHAPES. The `_ac.h` accessors that carry strings (fn_800912F8, fn_80091280 and the five element constructors
- *   with their word stores) are `inline` under `#pragma dont_inline on`, defined in string-creation order (the
+ *   with their word stores) are `inline` and `__declspec(noinline)` under `#pragma dont_inline on`, defined in
+ *   string-creation order (the
  *   inline tail is reversed); each weak copy follows its first referencer - retail's dead-stripped ones are
  *   frameless one-call wrappers here.  The lookups and constructors are compiled with `#pragma peephole off`
  *   (the kept `clrlwi` + `cmpwi`); the getters keep the default, which holds the eight offset helpers' base in r0.
+ *   fn_80090218/3EC/5C0/794 build their element handles as `ResHandleTemp` class temporaries (g3d/g3d_rescommon.h)
+ *   under a scoped `#pragma dont_inline off`, so the temporaries take retail's stack slots.
  *   The dictionary lookups use the copy constructor's return value (fn_8009001C) as the dictionary and declare
  *   `obj` before `resolved`; the `ResName` records are 32-aligned (retail's 0x18 bytes of fill before them, and
  *   the lookups then hold the key copy's address in r31).
@@ -264,8 +264,8 @@ void *res_pltt_ctor(void *self, u32 value);                  /* construct a ResP
 
 /* The name/handle store helpers: store the source word at +0x0 of `self` and return `self`. */
 void *res_name_copy_ctor(void *self, void *src); /* g3d/g3d_anmchr.cpp */
-void *fn_80069BD8(void *self, void *src); /* g3d/g3d_anmtexpat.cpp */
-void *fn_80069C14(void *self, void *src); /* g3d/g3d_anmtexpat.cpp */
+void *res_pltt_copy_ctor(void *self, void *src); /* g3d/g3d_anmtexpat.cpp */
+void *res_tex_copy_ctor(void *self, void *src); /* g3d/g3d_anmtexpat.cpp */
 
 /* The `ResAnmTexPat` ref()-check helpers (g3d/g3d_anmtexpat.cpp): `fn_800699B4` is `*(u32*)p != 0` and
  * `fn_800699A8` returns the class-name string the message is built from. */
@@ -283,7 +283,7 @@ u32 fn_800699A8(void);
 
 /* `ResAnmTexPat::ref()`: the checked data pointer.  The message's class-name argument identifies the
  * class the `g3d_resanmtexpat_ac.h` inline belongs to. */
-inline u32 fn_800912F8(void *self)
+__declspec(noinline) inline u32 fn_800912F8(void *self)
 {
     if (fn_800699B4(self) == 0) {
         nw4r::db::Panic("g3d_resanmtexpat_ac.h", 92, "%s::%s: Object not valid.", (const char *)fn_800699A8(), "ref");
@@ -292,7 +292,7 @@ inline u32 fn_800912F8(void *self)
 }
 
 /* The checked data pointer of a one-word handle (`ResCommon<T>::ref()`); panics on a NULL `mpData`. */
-inline u32 *fn_80091280(void *self)
+__declspec(noinline) inline u32 *fn_80091280(void *self)
 {
     if (*(u32 **)self == NULL) {
         nw4r::db::Panic("g3d_rescommon_ac.h", 143, "NW4R:Pointer must not be NULL (mpData)");
@@ -301,7 +301,7 @@ inline u32 *fn_80091280(void *self)
 }
 
 /* Stores the resolved ambient-light pointer and asserts its 4-byte alignment. */
-inline void *fn_800901AC(void *self, const void *pData)
+__declspec(noinline) inline void *fn_800901AC(void *self, const void *pData)
 {
     u32 value = (u32)pData;
 
@@ -313,13 +313,13 @@ inline void *fn_800901AC(void *self, const void *pData)
 }
 
 /* Stores a word. */
-inline void fn_80090210(u32 *self, u32 value)
+__declspec(noinline) inline void fn_80090210(u32 *self, u32 value)
 {
     *self = value;
 }
 
 /* Stores the resolved light pointer and asserts its 4-byte alignment. */
-inline void *fn_80090380(void *self, const void *pData)
+__declspec(noinline) inline void *fn_80090380(void *self, const void *pData)
 {
     u32 value = (u32)pData;
 
@@ -331,13 +331,13 @@ inline void *fn_80090380(void *self, const void *pData)
 }
 
 /* Stores a word. */
-inline void fn_800903E4(u32 *self, u32 value)
+__declspec(noinline) inline void fn_800903E4(u32 *self, u32 value)
 {
     *self = value;
 }
 
 /* Stores the resolved light-set pointer and asserts its 4-byte alignment. */
-inline void *fn_800900A4(void *self, const void *pData)
+__declspec(noinline) inline void *fn_800900A4(void *self, const void *pData)
 {
     u32 value = (u32)pData;
 
@@ -349,13 +349,13 @@ inline void *fn_800900A4(void *self, const void *pData)
 }
 
 /* Stores a word. */
-inline void fn_80090108(u32 *self, u32 value)
+__declspec(noinline) inline void fn_80090108(u32 *self, u32 value)
 {
     *self = value;
 }
 
 /* Stores the resolved fog pointer and asserts its 4-byte alignment. */
-inline void *fn_80090554(void *self, const void *pData)
+__declspec(noinline) inline void *fn_80090554(void *self, const void *pData)
 {
     u32 value = (u32)pData;
 
@@ -367,13 +367,13 @@ inline void *fn_80090554(void *self, const void *pData)
 }
 
 /* Stores a word. */
-inline void fn_800905B8(u32 *self, u32 value)
+__declspec(noinline) inline void fn_800905B8(u32 *self, u32 value)
 {
     *self = value;
 }
 
 /* Stores the resolved camera pointer and asserts its 4-byte alignment. */
-inline void *fn_80090728(void *self, const void *pData)
+__declspec(noinline) inline void *fn_80090728(void *self, const void *pData)
 {
     u32 value = (u32)pData;
 
@@ -385,7 +385,7 @@ inline void *fn_80090728(void *self, const void *pData)
 }
 
 /* Stores a word. */
-inline void fn_8009078C(u32 *self, u32 value)
+__declspec(noinline) inline void fn_8009078C(u32 *self, u32 value)
 {
     *self = value;
 }
@@ -449,6 +449,7 @@ ResAnmAmbLight *res_anm_amb_light_init(ResAnmAmbLight *pHandle, const ResAnmAmbL
     return (ResAnmAmbLight *)fn_800901AC(pHandle, pData);
 }
 
+#pragma dont_inline off
 /* Resolves the "AmbLights(NW4R)" dictionary entry and reads the entry for `key`. */
 u32 fn_80090218(u32 *self, u32 key)
 {
@@ -460,12 +461,11 @@ u32 fn_80090218(u32 *self, u32 key)
                   fn_8009001C(&obj, &(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10)))))
                   [nw4r::g3d::ResName(&res_name_amb_lights)];
     if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_800901AC(&light, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
+        return *(u32 *)fn_800901AC(&ResHandleTemp().self()->word, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    u32 none;
-    return *(u32 *)fn_800901AC(&none, 0);
+    return *(u32 *)fn_800901AC(&ResHandleTemp().self()->word, 0);
 }
+#pragma dont_inline on
 
 /* Tail thunk to fn_80090218. */
 u32 res_anm_scn_get_res_anm_amb_light(u32 *self, u32 key)
@@ -495,6 +495,7 @@ ResAnmLight *res_anm_light_init(ResAnmLight *pHandle, const ResAnmLightData *pDa
     return (ResAnmLight *)fn_80090380(pHandle, pData);
 }
 
+#pragma dont_inline off
 /* Resolves the "Lights(NW4R)" dictionary entry and reads the entry for `key`. */
 u32 fn_800903EC(u32 *self, u32 key)
 {
@@ -506,12 +507,11 @@ u32 fn_800903EC(u32 *self, u32 key)
                   fn_8009001C(&obj, &(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10)))))
                   [nw4r::g3d::ResName(&res_name_lights)];
     if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_80090380(&light, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
+        return *(u32 *)fn_80090380(&ResHandleTemp().self()->word, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    u32 none;
-    return *(u32 *)fn_80090380(&none, 0);
+    return *(u32 *)fn_80090380(&ResHandleTemp().self()->word, 0);
 }
+#pragma dont_inline on
 
 /* Tail thunk to fn_800903EC. */
 u32 res_anm_scn_get_res_anm_light(u32 *self, u32 key)
@@ -541,6 +541,7 @@ ResAnmFog *res_anm_fog_init(ResAnmFog *pHandle, const ResAnmFogData *pData)
     return (ResAnmFog *)fn_80090554(pHandle, pData);
 }
 
+#pragma dont_inline off
 /* Resolves the "Fogs(NW4R)" dictionary entry and reads the entry for `key`. */
 u32 fn_800905C0(u32 *self, u32 key)
 {
@@ -552,12 +553,11 @@ u32 fn_800905C0(u32 *self, u32 key)
                   fn_8009001C(&obj, &(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10)))))
                   [nw4r::g3d::ResName(&res_name_fogs)];
     if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_80090554(&light, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
+        return *(u32 *)fn_80090554(&ResHandleTemp().self()->word, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    u32 none;
-    return *(u32 *)fn_80090554(&none, 0);
+    return *(u32 *)fn_80090554(&ResHandleTemp().self()->word, 0);
 }
+#pragma dont_inline on
 
 /* Tail thunk to fn_800905C0. */
 u32 res_anm_scn_get_res_anm_fog(u32 *self, u32 key)
@@ -587,6 +587,7 @@ ResAnmCamera *res_anm_camera_init(ResAnmCamera *pHandle, const ResAnmCameraData 
     return (ResAnmCamera *)fn_80090728(pHandle, pData);
 }
 
+#pragma dont_inline off
 /* Resolves the "Cameras(NW4R)" dictionary entry and reads the entry for `key`. */
 u32 fn_80090794(u32 *self, u32 key)
 {
@@ -598,12 +599,11 @@ u32 fn_80090794(u32 *self, u32 key)
                   fn_8009001C(&obj, &(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10)))))
                   [nw4r::g3d::ResName(&res_name_cameras)];
     if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_80090728(&light, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
+        return *(u32 *)fn_80090728(&ResHandleTemp().self()->word, (const void *)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    u32 none;
-    return *(u32 *)fn_80090728(&none, 0);
+    return *(u32 *)fn_80090728(&ResHandleTemp().self()->word, 0);
 }
+#pragma dont_inline on
 
 /* Tail thunk to fn_80090794. */
 u32 res_anm_scn_get_res_anm_camera(u32 *self, u32 key)
@@ -909,7 +909,7 @@ u32 fn_800913A0(void *self, void *file)
 
             res_name_copy_ctor(&name, &nameWord);
             handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResTex(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
-            fn_80069C14(&tex, &handle);
+            res_tex_copy_ctor(&tex, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResTex*>(&tex)->IsValid() != 0) {
                 res_tex_assign(pTexArray, &tex);
                 numBound++;
@@ -929,7 +929,7 @@ u32 fn_800913A0(void *self, void *file)
 
             res_name_copy_ctor(&name, &nameWord);
             handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResPltt(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
-            fn_80069BD8(&pltt, &handle);
+            res_pltt_copy_ctor(&pltt, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResPltt*>(&pltt)->IsValid() != 0) {
                 res_pltt_assign(pPlttArray, &pltt);
                 numBound++;

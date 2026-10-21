@@ -8,27 +8,29 @@
  *   stores).
  * RESIDUALS. the ResMdl accessors from 0x80097D40 are `g3d_resmdl.cpp`'s code (a seam candidate: their strings
  *   follow the material's and cite only `g3d_resvtx_ac.h`).
- *   ResTexPlttInfo::Bind: retail copy-constructs the two names and the found texture/palette out of line.
- *   ResTexPlttInfo::BindTex: retail's frame is 0x10 larger and lays the seven out-parameters in another order.
- *   ResMatIndMtxAndScale::GXSetIndTexMtx: the first command's word is ORed in a different order (one
- *   instruction); ResTexPlttInfo::BindPltt: register colouring (retail r29/r28/r30/r31, ours r31/r30/r29/r28).
+ *   ResTexPlttInfo::BindPltt: register colouring (retail keeps the record in r29 and the format in r31,
+ *   ours the reverse; every declaration order of the four locals and the record tried).
  *   relocdiff --callees: the asserts pass literal strings where retail names this unit's `.data` labels (the
  *   TLUT range assertion `resmat_tlut_id_range_assert_msg` in the five ResTlutObj accessors); ResMatMisc::
  *   GetIndirectMethod calls `ptr() const` where retail calls the non-const copy; ResMatTevColor::CallDisplayList
- *   reaches `ref()` through a different copy than retail;
- *   ResTexPlttInfo::Bind copy-constructs the names and the found handles inline (retail calls fn_80062D58,
- *   fn_80069C14 and fn_80069BD8; `res_name_copy_ctor` is the retail call at +0x38 and +0x120 that ours omits).
+ *   reaches `ref()` through a different copy than retail.  ResTexPlttInfo::Bind calls res_tex_copy_ctor and
+ *   res_pltt_copy_ctor.
  *   flipcheck: `.data` 0x4A8 of 0x508 and `.sdata2` 0x2C of 0x38 (the accessor copies' strings and pool sit
  *   elsewhere), `.sdata` 0x4 emitted and not claimed.
  * SHAPES. every accessor copy another unit keeps is called through its class (g3d/g3d_rescommon.h); the copies
  *   this TU keeps are defined here in retail's order.
+ *   ResTexPlttInfo::Bind copy-constructs its two names and the found texture/palette out of line into
+ *   `ResHandleTemp` locals, from the by-value results bound through res_temp_ref (retail's copies of the return
+ *   temporaries).
  *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except
  *   GetIndirectMethod and ResMatMiscData's assignment, which measure better with the pass on.
  *   The three ResMatIndMtxAndScale matrix accessors read `ref()` once before the id switch; GXGetIndTexMtx folds
  *   the scale with `s8` exponent loops that decrement before multiplying (`while (exp != 0) { exp--; ... }`).
  *   ResTexPlttInfo::BindPltt/Release materialise the range check as a bool set in an `if`; BindPltt truncates
  *   the entry count first.  The display-list words OR their fields right-nested in retail's evaluation order
- *   (GXSetBlendMode, GXSetAlphaCompare); a loop index, or the pointers a copy loop walks, are declared before the
+ *   (GXSetBlendMode, GXSetAlphaCompare, GXSetIndTexMtx's first command); BindTex keeps one format word per
+ *   path (the colour-indexed and the direct one) and declares the out-parameters image, LODs, formats, size,
+ *   mipmap flag; a loop index, or the pointers a copy loop walks, are declared before the
  *   values they are compared with (ResMdl::Bind, ResMat::Bind, the two CopyTo); the tev constant colour
  *   accessors add the colour's offset before the block's.
  */
@@ -42,6 +44,8 @@
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resnode.h"
 #include "g3d/g3d_resshp.h"
+#include "g3d/g3d_anmchr.h"  /* res_name_copy_ctor (rule 2) */
+#include "g3d/g3d_anmtexpat.h" /* res_tex_copy_ctor/res_pltt_copy_ctor (rule 2) */
 #include "g3d/g3d_resfile.h"
 #include "g3d/g3d_resanmtexsrt.h"
 #include "g3d/g3d_cpu.h"
@@ -772,9 +776,9 @@ void ResMatIndMtxAndScale::GXSetIndTexMtx(_GXIndTexMtxID id, const math::MTX34& 
         return;
     }
     scaleExp += 17;
-    detail::ResWriteBPCmd(pDL, (reg + 6) << 24 | (scaleExp & 3) << 22 |
-                                   (((s32)(1024.0f * mtx.m[0][0]) & 0x7ff) |
-                                    ((s32)(1024.0f * mtx.m[1][0]) & 0x7ff) << 11));
+    detail::ResWriteBPCmd(pDL, (reg + 6) << 24 | ((scaleExp & 3) << 22 |
+                                                  (((s32)(1024.0f * mtx.m[0][0]) & 0x7ff) |
+                                                   ((s32)(1024.0f * mtx.m[1][0]) & 0x7ff) << 11)));
     detail::ResWriteBPCmd(pDL + 5, (reg + 7) << 24 | ((scaleExp >> 2) & 3) << 22 |
                                        (((s32)(1024.0f * mtx.m[0][1]) & 0x7ff) |
                                         ((s32)(1024.0f * mtx.m[1][1]) & 0x7ff) << 11));
@@ -991,15 +995,16 @@ void ResTexPlttInfo::BindTex(ResTex tex, ResTexObj texObj) {
     }
     GXTexObj* pObj = texObj.GetTexObj(static_cast<_GXTexMapID>(r.mapID));
     void* pImage;
-    u16 width;
-    u16 height;
-    u32 format;
     f32 minLod;
     f32 maxLod;
+    u32 formatCI;
+    u32 format;
+    u16 width;
+    u16 height;
     u8 mipmap;
     if (IsCIFmt()) {
-        tex.GetTexObjCIParam(&pImage, &width, &height, &format, &minLod, &maxLod, &mipmap);
-        GXInitTexObjCI(pObj, pImage, width, height, format, r.wrap_s, r.wrap_t, mipmap, r.tlutID);
+        tex.GetTexObjCIParam(&pImage, &width, &height, &formatCI, &minLod, &maxLod, &mipmap);
+        GXInitTexObjCI(pObj, pImage, width, height, formatCI, r.wrap_s, r.wrap_t, mipmap, r.tlutID);
     } else {
         tex.GetTexObjParam(&pImage, &width, &height, &format, &minLod, &maxLod, &mipmap);
         GXInitTexObj(pObj, pImage, width, height, format, r.wrap_s, r.wrap_t, mipmap);
@@ -1023,9 +1028,13 @@ NW4R_G3D_RESOURCE_PTR(ResTexPlttInfo)
 
 /* 0x8009792C (0xD8): binds `pltt` to the record's TLUT, initialising its TLUT object. */
 void ResTexPlttInfo::BindPltt(ResPltt pltt, ResTlutObj tlutObj) {
+    u32 numEntries;
+    bool inRange;
+    u32 fmt;
+    GXTlutObj* pTlut;
     ResTexPlttInfoData& r = ref();
     r.pPlttData = const_cast<ResPlttData*>(&static_cast<const ResPltt&>(pltt).ref());
-    bool inRange = false;
+    inRange = false;
     if (r.mapID >= 0 && r.mapID <= 7) {
         inRange = true;
     }
@@ -1033,9 +1042,10 @@ void ResTexPlttInfo::BindPltt(ResPltt pltt, ResTlutObj tlutObj) {
         nw4r::db::Panic(RESMAT_FILE, 3028, "r.mapID is out of bounds(%d)\n%d <= r.mapID <= %d not satisfied.",
                         r.mapID, 0, 7);
     }
-    GXTlutObj* pTlut = tlutObj.GetTlut(static_cast<_GXTlut>(r.mapID));
-    u32 numEntries = (u16)pltt.GetNumEntries();
-    GXInitTlutObj(pTlut, static_cast<const ResPltt&>(pltt).GetPlttData(), pltt.GetFmt(), numEntries);
+    pTlut = tlutObj.GetTlut(static_cast<_GXTlut>(r.mapID));
+    numEntries = (u16)pltt.GetNumEntries();
+    fmt = pltt.GetFmt();
+    GXInitTlutObj(pTlut, static_cast<const ResPltt&>(pltt).GetPlttData(), fmt, numEntries);
     tlutObj.Validate(static_cast<_GXTlut>(r.mapID));
 }
 
@@ -1047,24 +1057,32 @@ void* ResPltt::GetPlttData() const {
 }
 
 /* 0x80097A3C (0x1AC): binds the record's texture and palette from `file`; false when one is missing. */
+/* The address of a by-value result: binds the temporary to a reference for the copy constructor. */
+template <typename T>
+inline const T& res_temp_ref(const T& r) { return r; }
+
 bool ResTexPlttInfo::Bind(ResFile file, ResTexObj texObj, ResTlutObj tlutObj) {
     bool success = true;
-    ResName texName = GetTexName();
-    RESMAT_ASSERT(texName.IsValid(), 3061, "texName.IsValid()");
+    ResHandleTemp texName;
+    res_name_copy_ctor(&texName, (u32*)&res_temp_ref(GetTexName()));
+    RESMAT_ASSERT(reinterpret_cast<ResName&>(texName).IsValid(), 3061, "texName.IsValid()");
     if (ref().pTexData == NULL) {
-        ResTex tex = file.GetResTex(texName);
-        if (tex.IsValid() && (!IsCIFmt() || tex.IsCIFmt())) {
-            BindTex(tex, texObj);
+        ResHandleTemp tex;
+        res_tex_copy_ctor(&tex, (void*)&res_temp_ref(file.GetResTex(reinterpret_cast<ResName&>(texName))));
+        if (reinterpret_cast<ResTex&>(tex).IsValid() && (!IsCIFmt() || reinterpret_cast<ResTex&>(tex).IsCIFmt())) {
+            BindTex(reinterpret_cast<ResTex&>(tex), texObj);
         } else {
             success = false;
         }
     }
     if (ref().pPlttData == NULL) {
-        ResName plttName = GetPlttName();
-        if (plttName.IsValid()) {
-            ResPltt pltt = file.GetResPltt(plttName);
-            if (pltt.IsValid()) {
-                BindPltt(pltt, tlutObj);
+        ResHandleTemp plttName;
+        res_name_copy_ctor(&plttName, (u32*)&res_temp_ref(GetPlttName()));
+        if (reinterpret_cast<ResName&>(plttName).IsValid()) {
+            ResHandleTemp pltt;
+            res_pltt_copy_ctor(&pltt, (void*)&res_temp_ref(file.GetResPltt(reinterpret_cast<ResName&>(plttName))));
+            if (reinterpret_cast<ResPltt&>(pltt).IsValid()) {
+                BindPltt(reinterpret_cast<ResPltt&>(pltt), tlutObj);
             } else {
                 success = false;
             }
