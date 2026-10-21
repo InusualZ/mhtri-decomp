@@ -58,6 +58,13 @@ def seams_in(seams: list[dict], start: int, end: int) -> list[dict]:
     return [s for s in seams if start < s["addr"] < end]
 
 
+def crossing(seams: list[dict], start: int, end: int) -> list[dict]:
+    """The seams that put a TU boundary inside a registered range `[start, end)` (`evidence.crosses`): a `V->S` gap
+    whose strings run on to the range's end - the vtables' own inline tail - is not one. `seams_in` stays the
+    cautious reading the claim tools cut an unclaimed run with."""
+    return [s for s in seams if ev.crosses(s, start, end)]
+
+
 def is_gap(seam: dict) -> bool:
     """A `V->S` row that carries its gap `[addr, latest)` (rows from `dataorder.seams`)."""
     return seam.get("kind") == "V->S" and seam.get("latest") is not None
@@ -192,13 +199,13 @@ def seam_note(unit: str, ours_path: str, target_path: str, section: str = ".data
     """What to say about a unit's differing `.data`, or None when the seams have nothing to add.
 
     `order-only` when the two objects hold the same symbols in a different sequence, else the multi-TU line -
-    both only when the unit's target range actually contains a strong seam. A unit whose range holds no seam,
-    or whose objects agree symbol for symbol, gets nothing: this is never a reason to refuse anything.
+    both only when a strong seam crosses the unit's target range (`crossing`). A unit whose range holds no
+    crossing seam, or whose objects agree symbol for symbol, gets nothing: this is never a reason to refuse anything.
     """
     rng = rng or unit_data_range(unit, section)
     if rng is None:
         return None
-    inside = seams_in(load_strong() if seams is None else seams, *rng)
+    inside = crossing(load_strong() if seams is None else seams, *rng)
     if not inside:
         return None
     ours, target = section_chunks(ours_path, section), section_chunks(target_path, section)
@@ -266,6 +273,37 @@ def selftest() -> int:
           ("no cut suggested" in only_wide, "suggested cuts:" in only_wide), (True, False))
     check("the multi-TU/order-only lines say 'a boundary in [a, b)' for a gap",
           "a boundary in [0x00001200, 0x00001800)" in multi_tu_message(".data", 0x1000, 0x2000, [wide]), True)
+    # g3d/g3d_state's .data tail [0x8058FAD0, 0x8058FCE8) as its target object (build/RMHE08/obj/g3d/g3d_state.o)
+    # holds it: two vtables, then the inline functions' header-name/message pairs (MWCC's weak @STRING@ literals)
+    # up to the unit's end, then the next unit's first string and the gap's later vtable (ef DrawOrder, retail).
+    tail_rows = [(0x8058FB00, 0x27, "NW4R:Pointer must not be NULL (mpData)"), (0x8058FB28, 0x13, "g3d_rescommon_ac.h"),
+                 (0x8058FB3C, 0x1A, "%s::%s: Object not valid."), (0x8058FB58, 0x10, "g3d_restev_ac.h"),
+                 (0x8058FB68, 0x1A, "%s::%s: Object not valid.")]
+    tail_rows += [(0x8058FB88, 0x10, "g3d_resmat_ac.h")]
+    tail_rows += [row for n in range(5) for row in ((0x8058FB98 + n * 0x30, 0x20, "NW4R:Failed assertion IsValid()"),
+                                                     (0x8058FBB8 + n * 0x30, 0x10, "g3d_resmat_ac.h"))]
+    tail_rows += [(0x8058FC88, 0x1A, "%s::%s: Object not valid."), (0x8058FCA8, 0x10, "g3d_resmat_ac.h"),
+                  (0x8058FCB8, 0x20, "NW4R:Failed assertion IsValid()"), (0x8058FCD8, 0x10, "g3d_resmat_ac.h"),
+                  (0x8058FCE8, 0x1A, "%s::%s: Object not valid."), (0x8058FD08, 0x10, "g3d_resvtx_ac.h")]
+    state = ([ev.Sym(0x8058FAD0, 0x18, "__vt__20G3dIndMtxCallbackStd", ev.VTABLE, 0x80088A48),
+              ev.Sym(0x8058FAE8, 0x18, "__vt__17G3dIndMtxCallback", ev.VTABLE, 0x80088004)]
+             + [ev.Sym(a, n, "lbl_%08X" % a, ev.STRING, None, t) for a, n, t in tail_rows]
+             + [ev.Sym(0x8059241C, 0x14, "__vt__Q34nw4r2ef9DrawOrder", ev.VTABLE, 0x800A3B20)])
+    st = ev.strong_seams(state)
+    check("g3d_state: the strings after its vtables are one V->S gap up to the next vtable",
+          [(x["kind"], x["addr"], x["latest"]) for x in st], [("V->S", 0x8058FB00, 0x8059241C)])
+    check("g3d_state: its inline tail runs past the unit's end", st[0]["cut"] >= 0x8058FCE8, True)
+    check("g3d_state: the gap is inside the range by address (the old reading)", len(seams_in(st, 0x8058F750, 0x8058FCE8)), 1)
+    check("g3d_state: but it does not cross the unit's range - the tail is the same TU",
+          crossing(st, 0x8058F750, 0x8058FCE8), [])
+    check("g3d_state: no multi-TU note for the unit (was 'spans at least 2 TUs')",
+          seam_note("g3d/g3d_state", "no.o", "no2.o", seams=st, rng=(0x8058F750, 0x8058FCE8)), None)
+    check("g3d_state: a range holding the later vtable too still crosses it",
+          ("spans at least 2 TUs" in (seam_note("u", "no.o", "no2.o", seams=st, rng=(0x8058F750, 0x80592440)) or ""),
+           len(crossing(st, 0x8058F750, 0x80592440))), (True, 1))
+    check("crossing: a zigzag strictly inside still crosses", crossing([zz], 0x1800, 0x2000), [zz])
+    check("crossing: a narrow gap whose later vtable is inside crosses", crossing([narrow], 0x1000, 0x1200), [narrow])
+    check("crossing: a gap ending exactly at the range's end does not", crossing([narrow], 0x1000, 0x1180), [])
     g = globals()
     saved = g["section_chunks"]
     try:
@@ -284,6 +322,9 @@ def selftest() -> int:
         check("real DOL: the four network_transport V->S seams are in the unit's run",
               [s["addr"] for s in real if s["kind"] == "V->S"], [0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40])
         check("real DOL: the load did not fail", load_error(), None)
+        check("real DOL: g3d_state's vtables-then-inline-tail gap is in its range by address, crosses it not",
+              ([s["addr"] for s in seams_in(load_strong(), 0x8058F750, 0x8058FCE8)],
+               crossing(load_strong(), 0x8058F750, 0x8058FCE8)), ([0x8058FB00], []))
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:

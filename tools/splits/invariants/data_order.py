@@ -46,11 +46,10 @@ def zigzag_interleaved(ctx, syms, by_addr, seam):
 def seams_inside(ctx, u, s, e, syms, found, by_addr, closure=None):
     """`(seams, instantiated)`: the strong `.data` seams that cut the range `[s, e)` of unit `u` - the rule `check_data_order` applies, one implementation.
 
-    A V->S row says a boundary lies in `[addr, latest)`: a range that ends inside that gap (`latest >= e`) can have it at its own end, so only one that
-    also holds the later vtable group crosses the seam; a zigzag cuts at `addr`.  Two classes whose member functions alternate in the text are one TU
+    Which rows cross the range is `evidence.crosses` (a V->S gap only when the range also holds its later vtable group, a zigzag at `addr`).  Two classes whose member functions alternate in the text are one TU
     (a zigzag between them is not an edge), and an instantiated vtable - a deferred constructor of this TU stores it (`closure`, the unit's `__sinit`
     closure) - is no TU edge: the later vtable of a V->S seam, the second of a zigzag pair, or the vtable before either."""
-    inside = [x for x in found if x["kind"] in _ev.STRONG_KINDS and s < x["addr"] < e and (x["kind"] != "V->S" or x["latest"] < e)]
+    inside = [x for x in found if x["kind"] in _ev.STRONG_KINDS and _ev.crosses(x, s, e)]
     inside = [x for x in inside if not (x["kind"] == "zigzag" and zigzag_interleaved(ctx, syms, by_addr, x))]
     kept, inst = [], []
     for x in inside:

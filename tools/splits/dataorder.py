@@ -63,18 +63,20 @@ def scan_dol() -> dict:
     syms = classify_all(rows, ev.Image(_paths()["DOL"]))
     ranges = unit_data_ranges()
     found = seams(syms)
-    inside, unclaimed, at_start = [], [], []
+    inside, unclaimed, at_start, to_end = [], [], [], []
     for s in found:
+        owner = unit_of(ranges, s["addr"])
         if s["addr"] in ranges:
             at_start.append(s)
-        elif unit_of(ranges, s["addr"]):
-            inside.append(dict(s, unit=unit_of(ranges, s["addr"])[0]))
+        elif owner:
+            # a V->S gap whose strings run on to the unit's end (its inline tail) is no boundary inside it
+            (inside if ev.crosses(s, owner[1], owner[2]) else to_end).append(dict(s, unit=owner[0]))
         else:
             unclaimed.append(s)
     return {"symbols": len(syms), "kinds": dict(collections.Counter(s.kind for s in syms)),
             "seams_by_kind": dict(collections.Counter(s["kind"] for s in found)),
             "zigzag_pairs": dict(zigzag_pairs(syms)),
-            "inside_registered_unit": inside, "at_registered_unit_start": at_start,
+            "inside_registered_unit": inside, "at_registered_unit_start": at_start, "open_to_unit_end": to_end,
             "in_unclaimed_data": len(unclaimed), "unclaimed": unclaimed}
 
 
@@ -89,6 +91,11 @@ def cmd_scan(args) -> int:
     print("inside a registered unit (candidate seams the unit hides): %d" % len(out["inside_registered_unit"]))
     for s in out["inside_registered_unit"]:
         print("  0x%08X  %-7s %s  (%s -> %s)" % (s["addr"], s["kind"], s["unit"], s["before"], s["after"]))
+    print("in a registered unit, but the V->S gap runs on to the unit's end (no boundary inside it): %d"
+          % len(out["open_to_unit_end"]))
+    for s in out["open_to_unit_end"]:
+        print("  0x%08X  %-7s %s  (gap to 0x%08X, %d of %d strings an inline tail)"
+              % (s["addr"], s["kind"], s["unit"], s["latest"], s["tail"], s["width"]))
     print("in unclaimed .data (candidate cuts for proposals): %d" % out["in_unclaimed_data"])
     return 0
 
@@ -108,14 +115,25 @@ def cmd_at(args) -> int:
     syms = classify_all(rows, ev.Image(_paths()["DOL"]))
     idx = min(range(len(syms)), key=lambda i: abs(syms[i].addr - addr))
     lo, hi = max(0, idx - args.window), min(len(syms), idx + args.window + 1)
-    cut = {s["addr"]: s["kind"] for s in seams(syms)}
+    cut = {s["addr"]: s for s in seams(syms)}
     ranges = unit_data_ranges()
     for s in syms[lo:hi]:
         u = unit_of(ranges, s.addr)
         print("%s0x%08X %5X %s %-40s %s%s" % (
             ">> " if s is syms[idx] else "   ", s.addr, s.size, s.kind, s.name[:40],
-            u[0] if u else "(unclaimed)", "   <-- %s seam" % cut[s.addr] if s.addr in cut else ""))
+            u[0] if u else "(unclaimed)", seam_marker(cut.get(s.addr), u)))
     return 0
+
+
+def seam_marker(row: dict | None, owner: tuple[str, int, int] | None) -> str:
+    """The `at` listing's marker for a seam row: its kind, and for a `V->S` gap that runs on to its unit's end the
+    note that it is no boundary inside that unit (`ev.crosses`)."""
+    if row is None:
+        return ""
+    text = "   <-- %s seam" % row["kind"]
+    if owner and row.get("latest") is not None and row["addr"] != owner[1] and not ev.crosses(row, owner[1], owner[2]):
+        text += " (gap to 0x%08X runs past the unit's end 0x%08X: no boundary inside it)" % (row["latest"], owner[2])
+    return text
 
 
 # --- selftest ------------------------------------------------------------------------------------
@@ -266,6 +284,13 @@ def selftest() -> int:
     check("a narrow gap is cut after its tail", [[s.name for s in f] for f in fragments(narrow_gap_run)],
           [["V0", "S1", "S2"], ["S3", "V4"]])
     check("fragments() reuses the seams threshold (dataseams cuts with it too)", narrow_gap(), 8)
+    # g3d/g3d_state's .data end (target object): the strings after its vtables run past the unit's end at 0x8058FCE8
+    gap = {"addr": 0x8058FB00, "kind": "V->S", "latest": 0x8059241C, "width": 279, "tail": 30}
+    check("at: a gap past the unit's end is marked as no boundary inside it",
+          "no boundary inside it" in seam_marker(gap, ("g3d/g3d_state.cpp", 0x8058F750, 0x8058FCE8)), True)
+    check("at: a gap whose later vtable is in the unit is a plain seam",
+          seam_marker(gap, ("u", 0x8058F750, 0x80592440)), "   <-- V->S seam")
+    check("at: no row, no marker", seam_marker(None, None), "")
 
     # the real DOL, when the repo has it: the network_transport seams the discovery came from
     if os.path.exists(_paths()["DOL"]) and os.path.exists(_paths()["SYMBOLS"]):
@@ -273,16 +298,22 @@ def selftest() -> int:
         check("real DOL: vtables were found", out["kinds"].get(VTABLE, 0) > 150, True)
         # inside the unit while it was one TU, at a registered unit's start since it was split (Network/NetworkPeerMcs
         # and its neighbours, docs/network.md): either way the scan must find all four
-        inside = {s["addr"] for s in out["inside_registered_unit"] + out["at_registered_unit_start"]}
+        inside = {s["addr"] for s in out["inside_registered_unit"] + out["at_registered_unit_start"]
+                  + out["open_to_unit_end"]}
         found_nt = [a for a in (0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40) if a in inside]
         check("real DOL: the four network_transport V->S seams are inside a unit or at a unit start",
               found_nt, [0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40])
         # the seams stay in the DOL whoever owns the data: once the splits program claimed the unowned runs the
         # "unclaimed" bucket empties, so count every bucket
         check("real DOL: .data holds candidate seams",
-              out["in_unclaimed_data"] + len(out["inside_registered_unit"]) + len(out["at_registered_unit_start"]) > 30, True)
+              out["in_unclaimed_data"] + len(out["inside_registered_unit"]) + len(out["at_registered_unit_start"])
+              + len(out["open_to_unit_end"]) > 30, True)
         rows_vs = [s for s in out["inside_registered_unit"] + out["unclaimed"] + out["at_registered_unit_start"]
-                   if s["kind"] == "V->S"]
+                   + out["open_to_unit_end"] if s["kind"] == "V->S"]
+        check("real DOL: g3d_state's vtables-then-inline-tail gap runs on to the unit's end, not inside it",
+              ([s["unit"] for s in out["open_to_unit_end"] if s["addr"] == 0x8058FB00],
+               [s["addr"] for s in out["inside_registered_unit"] if s["addr"] == 0x8058FB00]),
+              (["g3d/g3d_state.cpp"], []))
         check("real DOL: the g3d/ef inline tails are found (16 V->S rows measured 2026-09-29)",
               sum(1 for s in rows_vs if s["tail"]) >= 12, True)
         check("real DOL: the four network_transport gaps have no tail",

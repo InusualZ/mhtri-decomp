@@ -211,6 +211,22 @@ def strong_seams(syms: list[Sym]) -> list[dict]:
     return found
 
 
+def crosses(row: dict, start: int, end: int) -> bool:
+    """Whether the seam `row` puts a TU boundary strictly inside `[start, end)` - the one reading of "this range spans
+    several TUs" (the `data-order` invariant, dataseams' multi-TU note, dataorder's scan).
+
+    A zigzag (or a legacy row with no gap) crosses when its address is strictly inside. A `V->S` gap says a boundary
+    lies in `[addr, latest)`, and its first `tail` strings - the header-name/message pairs of inline functions, MWCC's
+    weak `@STRING@<function>` literals, emitted after the TU's vtables - are the vtables' own TU: a range that ends
+    inside that gap (`latest >= end`, which `cut >= end` implies) can have the boundary at its own end, so only a range
+    that also holds the later vtable group crosses it."""
+    if not start < row["addr"] < end:
+        return False
+    if row.get("kind") == "V->S" and row.get("latest") is not None:
+        return row["latest"] < end
+    return True
+
+
 def zigzag_pairs(syms: list[Sym]) -> collections.Counter:
     """How many adjacent vtable pairs go `up` (a seam), `down` (the same TU) or `tie` (equal owners: no evidence)."""
     c = collections.Counter()

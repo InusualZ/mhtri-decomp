@@ -36,7 +36,9 @@ Reads `config/RMHE08/symbols.txt` (`map_rows`, `map_tables`), `config/RMHE08/spl
   `size`/`kind`/`local`), `section_ranges(splits, section) -> {start: (unit, end)}`, `range_of(ranges, addr)`.
 * Data order: `Sym`, `VTABLE`/`STRING`/`DATA`, `classify(blob, tlo, thi)`, `classify_all(rows, reader)`, `text_range`,
   `data_symbols`, `seams(syms)`, `strong_seams(syms)` (strong rows with `cut`), `tail_cut(syms, at, row)` (the one cut
-  rule `strong_seams` and `fragments` share), `zigzag_pairs`, `fragments(syms, weak)`,
+  rule `strong_seams` and `fragments` share), `crosses(row, start, end)` (the one rule for "a TU boundary lies inside
+  this range": a `V->S` gap only when the range also holds its later vtable, so a range ending in its inline tail is
+  one TU - the `data-order` invariant, `dataseams.crossing`, `dataorder scan`), `zigzag_pairs`, `fragments(syms, weak)`,
   `inline_tail(gap)`, `is_header_name`, `is_source_name`, `retail_symbols(symbols, dol)`; `STRONG_KINDS`, `NARROW`,
   `PAD_MAX`, `TAIL_RUN_MAX`, `HEADER_NAME_RE`, `SOURCE_NAME_RE`.
 * The pool: `is_literal(section, size, kind, type_="object")`, `is_value_witness(...)`, `components(pairs)`;

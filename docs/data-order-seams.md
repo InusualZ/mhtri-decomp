@@ -196,6 +196,14 @@ yet; the 0x805F94E0 seam family of `network_transport` and the g3d gaps are the 
   slot is not its TU (a derived class starts with a base function), so the vtable owner is not used as ground truth.
 * `fragments()` now cuts a `V->S` gap of at most `dataseams.NARROW` symbols after its tail and leaves a wider gap
   uncut (it only had a cut at the first string before); it has no consumer outside `dataorder`'s own selftest.
+* **A gap that runs on to a unit's end does not cross it** (`seams.evidence.crosses`, one predicate for the
+  `data-order` invariant, `dataseams.seam_note` - so `datagap` and `flipcheck` - and `dataorder.py scan`/`at`): a
+  registered range is cut by a `V->S` gap only when it also holds the gap's later vtable; strings from the gap's start
+  to the range's end can be the range's own inline tail (header-name/message pairs, MWCC's weak `@STRING@<function>`
+  literals). Measured on the real DOL: g3d/g3d_state's `.data` [0x8058F750, 0x8058FCE8) no longer reads "spans at
+  least 2 TUs" for the gap [0x8058FB00, 0x8059241C) (its tail runs past the unit's end); registered `.data` ranges with a
+  seam note 45 -> 25, `scan` inside-a-unit rows 77 -> 54 (23 now `open_to_unit_end`). The claim tools' `seams_in`
+  (cutting an unclaimed run) is unchanged.
 
 ## Literal pools are the same kind of evidence (2026-09-30)
 

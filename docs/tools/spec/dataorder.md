@@ -28,6 +28,7 @@ Inputs -> outputs: DOL + symbols.txt -> seams.
 * **V->S** (strong) - two vtable groups with strings between them: the second group is another TU, and the boundary lies somewhere in the gap (after any inline tail). A vtable followed by strings and *no* later vtable is `V->tail` (weak): it may be an inline tail of the same TU, which is exactly what the g3d "contradictions" were. **A vtable followed by strings is not by itself a seam.**
 * **V->D** (weak) - a vtable followed by ordinary data (a jump table is `.data` too, its place is unmeasured);
 * **zigzag** - two *adjacent* vtables whose owners' first code slots go **up** in address are two TUs (inside one TU they descend).
+* **A gap that runs on to a unit's end is not inside it** (`seams.crosses`): `scan` lists a `V->S` row whose `latest` is at or past its unit's `.data` end under `open_to_unit_end`, not `inside_registered_unit` - the strings up to that end can be the unit's own inline tail - and `at` marks it "no boundary inside it". Measured: inside 77 -> 54, open to the unit's end 23 (g3d/g3d_state's 0x8058FB00 among them).
 * This module is the reusable core: classify the DOL's `.data` symbols, list the seams, cut a run into TU fragments. It reads only the DOL and `config/RMHE08/symbols.txt`. Nothing is written.
 * dataorder.py scan [--json] # every seam in the DOL, with the counts `docs/data-order-seams.md` quotes dataorder.py at <address|symbol> [--window N] # the symbols around one address, their kinds and the seams between dataorder.py --selftest
 
