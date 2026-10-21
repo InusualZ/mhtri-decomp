@@ -3,11 +3,11 @@
  *   context, and the TU's own copies of the stripe helpers: the quadratic B-spline ribbon and tube builders (each
  *   particle samples a ribbon edge pair or a tube ring, and every three neighbouring samples are blended into
  *   `curve steps` sub-segments), the GX writers and setup, the first-ahead and ahead-vector builders.
- * RANGE. .text 0x800BFFD4-0x800C5DB8 (49 functions); extab 0x8000A394-0x8000A49C, extabindex 0x80023904-0x80023A90,
+ * RANGE. .text 0x800BFF98-0x800C5DB8 (50 functions); extab 0x8000A38C-0x8000A49C, extabindex 0x800238F8-0x80023A90,
  *   .data 0x805944E0-0x80594840 (the `__FILE__` string "ef_drawsmoothstripestrategy.cpp" first), .bss
  *   0x806945B8-0x806945E8, .sbss 0x80794928-0x80794930, .sdata2 0x807961C0-0x807961E0.
- *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor]; this class's
- *   constructor (0x800BFF98) is the tail of `ef/ef_drawpointstrategy.cpp`'s range and is defined there.
+ *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor]; the range starts
+ *   at this class's constructor.
  * FLAGS. `cflags_main`; `#pragma peephole off`, `#pragma fp_contract off` and `#pragma pool_data off` before the
  *   includes (retail keeps the unfused `fmuls`/`fsubs`, and reaches each `.bss` static by its own `lis`/`addi`
  *   where the pooled form hoists one base: `Draw` 95.09 -> 97.78), `#pragma dont_inline on` at the end (the inline
@@ -149,6 +149,19 @@ void ef_smooth_ahead_type3(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* 
 void ef_smooth_ahead_type6(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
 void ef_smooth_ahead_type6_link1(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
 void ef_smooth_ahead_type6_link2(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
+
+}
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800BFF98 (0x3C): builds the strategy. */
+DrawSmoothStripeStrategy::DrawSmoothStripeStrategy() {}
+
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
 
 /* 0x800BFFD4 (0x3BC): one ribbon sample: the particle's frame times its rotation-and-scale matrix applied to the edge
  * offsets `a`/`b`, with texture coordinate `t`. */

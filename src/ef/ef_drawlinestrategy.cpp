@@ -1,14 +1,13 @@
 /*
  * ef/ef_drawlinestrategy.cpp - nw4r::ef DrawLineStrategy: `Draw` (walks the draw-order particle list and emits one GX
- *   line per eligible particle, width `(u8)(6.0f * min(t, 42.5f))`), its per-draw setup, the GX helpers, the class's
- *   destructor and the DrawPointStrategy constructor.
- * RANGE. .text 0x800BEF98-0x800BF818 (10 functions); extab 0x8000A344-0x8000A36C, extabindex 0x8002388C-0x800238C8,
+ *   line per eligible particle, width `(u8)(6.0f * min(t, 42.5f))`), its per-draw setup, the GX helpers and the class's
+ *   constructor and destructor.
+ * RANGE. .text 0x800BEF5C-0x800BF7DC (10 functions); extab 0x8000A33C-0x8000A364, extabindex 0x80023880-0x800238BC,
  *   .data 0x80594330-0x80594408 (the `__FILE__` string "ef_drawlinestrategy.cpp" first), .sdata
  *   0x80791348-0x80791350, .sdata2 0x807961A8-0x807961B8.
  *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor], and each constructor
- *   installs the vtable at the end of its own TU's `.data`; so this class's constructor is the tail of `ef/ef_drawfreestrategy.cpp`'s range
- *   (0x800BEF5C) and the DrawPointStrategy constructor at this range's tail (0x800BF7DC) is the next TU's; both are
- *   defined where their range is until the seam is re-drawn.
+ *   installs the vtable at the end of its own TU's `.data`; the range starts at this class's constructor and ends
+ *   at its inline destructor.
  * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma pool_data off` (each string address its own `lis`/`addi`)
  *   before the includes, `#pragma dont_inline on` at the end (the inline
  *   destructor calls its base out of line, see there).
@@ -20,18 +19,17 @@
  *   GUESS: `ef_line_setup_gx`.
  * RESIDUALS. Every row is written and every function is at 100 %.
  *   flipcheck: `.data` is emitted byte for byte (the four strings defined, then the vtable); `.text` carries the
- *   weak copies of the two base destructors (0x88) and emits the line destructor last, after the `DrawPointStrategy`
- *   constructor, where retail has it before (the range is one constructor off its TU: [0x800BEF5C, 0x800BF7DC)
- *   holds this class's constructor through its destructor, measured with a local re-split, every row unchanged).
- *   A trial flip ends in mwld's internal error (ELF_linker.c line 7133, phase Optimizing) whatever the seam; the
- *   trigger is the weak base-destructor copies, whose strong copies sit in `ef/ef_drawstripestrategy.cpp`'s range:
- *   with them suppressed (a scratch header declaring `~DrawStrategyImpl` out of line) the re-seamed flip links and
- *   `main.dol` hashes OK; weakening the stripe object's symbols or compiling both objects does not avoid it, and an
- *   out-of-line `~DrawStrategyImpl` costs `DrawStrategyBuilder::Create` (100 -> 55.9, its statics then register
- *   destructors); an out-of-line line destructor costs it 100 -> 92.1;
+ *   weak copies of the two base destructors after the constructor (0x88; retail's link keeps the copies in
+ *   `ef/ef_drawstripestrategy.cpp`'s range and drops these, with their unwind records), and is otherwise retail's.
+ *   Flip blocker (tooling, not source): `tools/elf/objextab.py` gives the weak copies' unwind entries global map
+ *   names, and mwld then dies dropping them (ELF_linker.c line 7133, phase Optimizing); with those entries left
+ *   local and the later ones named where they land, the flip of this unit and `ef/ef_drawpointstrategy.cpp` links
+ *   and `main.dol` hashes OK. flipcheck counts the dropped copies' entries (extab 0x38 of 0x28, extabindex 0x54
+ *   of 0x3C). An out-of-line `~DrawStrategyImpl` would avoid the copies but costs `DrawStrategyBuilder::Create`
+ *   (100 -> 55.9, its statics then register destructors); an out-of-line line destructor costs it 100 -> 92.1;
  *   `.sdata` (the width clamp) and `.sdata2` (the literals' pool) are emitted
  *   with their bytes equal, 0x4 short of the claim each (the trailing pad the next object's alignment adds).
- *   `DrawPointStrategy` (constructor): the empty body is the whole source - the compiler
+ *   `DrawLineStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  */
 
@@ -43,7 +41,6 @@
 #include "gx.h"
 #include "ef/fn_800AEE48.h"
 #include "ef/ef_drawlinestrategy.h"
-#include "ef/ef_drawpointstrategy.h" /* DrawPointStrategy, whose constructor closes this range */
 #include "ef/ef_particle.h"
 #include "ef/ef_particlemanager.h"
 #include "ef/ef_drawstripestrategy.h" /* ef_draw_info_view_mtx (rule 2) */
@@ -119,6 +116,9 @@ void ef_line_setup_gx(nw4r::ef::DrawLineStrategy* self, const EfDrawInfo* info, 
 
 namespace nw4r {
 namespace ef {
+
+/* 0x800BEF5C (0x3C): builds the strategy. */
+DrawLineStrategy::DrawLineStrategy() {}
 
 /* 0x800BEF98 (0x530): walks the draw-order particle list and emits one line per eligible particle. */
 void DrawLineStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
@@ -266,9 +266,6 @@ void ef_line_setup_gx(nw4r::ef::DrawLineStrategy* self, const EfDrawInfo* info, 
 
 namespace nw4r {
 namespace ef {
-
-/* 0x800BF7DC (0x3C): the DrawPointStrategy constructor (the next unit's class; see the unit header). */
-DrawPointStrategy::DrawPointStrategy() {}
 
 }  // namespace ef
 }  // namespace nw4r

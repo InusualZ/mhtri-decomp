@@ -35,9 +35,9 @@
  *   GUESS (from the body and its callers): `ef_particle_tex_offset_t`, `ef_particle_tex_offset_s`,
  *   GUESS: `ef_particle_tex_scale_t`, `ef_particle_tex_scale_s`, `ef_particle_wrap_t`, `ef_particle_wrap_s`.
  * RESIDUALS. 1 partial row:
- *  - `SetupGPTexture` (0x800C7CE0): the texture pointer lives in r30 (ours r23, r25 with `tex` declared first) and
- *    the loop's saved registers number one higher; retail also keeps the LOD 0.0f in f26 across the loop and loads
- *    its five constants in another order.
+ *  - `SetupGPTexture` (0x800C7CE0): the texture pointer (read through the inline `ef_particle_texture`) lives in r28
+ *    where retail has r30, after the file and texture-assert string bases (r28/r29 in retail), and the hoisted LOD
+ *    0.0f in f22 where retail has f26; the LOD's `max_lod`/`min_lod` locals give retail's constant load order.
  *   flipcheck: `.ctors` and `.data` claimed, not emitted (the strings are declared by their map names).
  *   `DrawStrategyImpl` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
@@ -1124,6 +1124,9 @@ bool DrawStrategyImpl::SetupGPColor(EfDrawParticle* pp, const EfEmitterDrawSetti
     return dirty;
 }
 
+/* Returns the particle's texture of one layer (inlined; its value is the loop's texture register). */
+inline EfTextureData* ef_particle_texture(EfDrawParticle* pp, int layer) { return pp->texture[layer]; }
+
 /* 0x800C7CE0 (0x994): loads each enabled layer's texture object when the texture or its wrap changed, and its
  * texture matrix (scale, rotation, translation, mirroring, and the projection for a projected layer) when the
  * transform changed. */
@@ -1141,7 +1144,7 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
             EfTextureData* tex;
 
             EF_VALID_PTR_ASSERT(ef_strategy_impl_file_str, 890, ef_strategy_impl_texture_assert_str, pp->texture[layer]);
-            tex = pp->texture[layer];
+            tex = ef_particle_texture(pp, layer);
             if (tex != NULL) {
                 s32 wrap_s = ef_particle_wrap_s(pp, layer);
                 s32 wrap_t = ef_particle_wrap_t(pp, layer);
@@ -1186,8 +1189,10 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
                         nw4r::db::Panic(ef_strategy_impl_file_str, 954, ef_strategy_impl_false_assert_str);
                         break;
                     }
-                    GXInitTexObjLOD(&tex_obj, tex->min_filter, tex->mag_filter, 0.0f,
-                                    -1.0f + tex->mipmap_count, tex->lod_bias, 0, 0, 0);
+                    f32 max_lod = -1.0f + tex->mipmap_count;
+                    f32 min_lod = 0.0f;
+                    GXInitTexObjLOD(&tex_obj, tex->min_filter, tex->mag_filter, min_lod,
+                                    max_lod, tex->lod_bias, 0, 0, 0);
                     GXLoadTexObj(&tex_obj, mTexmapMap[layer]);
                 }
 

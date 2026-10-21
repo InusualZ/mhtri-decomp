@@ -1,14 +1,13 @@
 /*
  * ef/ef_drawfreestrategy.cpp - nw4r::ef DrawFreeStrategy: the four-vertex quad emitter, the out-of-line GX FIFO
  *   writers, `Draw` (GX array state, then a camera-facing quad and an optional YZ quad per particle), the
- *   billboard and Euler/axis `MTX34` builders, the vertex-descriptor setup, the class's destructor and the
- *   DrawLineStrategy constructor.
- * RANGE. .text 0x800BE154-0x800BEF98 (11 functions); extab 0x8000A30C-0x8000A344, extabindex 0x80023838-0x8002388C,
+ *   billboard and Euler/axis `MTX34` builders, the vertex-descriptor setup and the class's constructor and destructor.
+ * RANGE. .text 0x800BE118-0x800BEF5C (11 functions); extab 0x8000A304-0x8000A33C, extabindex 0x8002382C-0x80023880,
  *   .rodata 0x8056F7D0-0x8056F830 (the XY and YZ quad corners), .data 0x805941F8-0x80594330 (the `__FILE__` string
  *   "ef_drawfreestrategy.cpp" first), .sdata 0x80791340-0x80791348, .sdata2 0x80796190-0x807961A8.
  *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor], and each constructor
- *   installs the vtable at the end of its own TU's `.data`; so this class's constructor is the tail of `ef/ef_drawbillboardstrategy.cpp`'s range
- *   (0x800BE118) and the DrawLineStrategy constructor at this range's tail (0x800BEF5C) is the next TU's.
+ *   installs the vtable at the end of its own TU's `.data`; the range starts at this class's constructor and ends
+ *   at its inline destructor.
  * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
  *   narrowing FIFO store and byte load), now before the includes; `#pragma pool_data off` (each string address its
  *   own `lis`/`addi`); `#pragma dont_inline on` at the end (the inline destructor calls its base out of line).
@@ -19,22 +18,21 @@
  *   GUESS (the billboard unit's scheme): `ef_free_write_quad`, `ef_free_gx_end`, `ef_free_gx_u8`, `ef_free_tex_flag`,
  *   GUESS: `ef_free_scale_mtx` (the source rows scaled by (u,v,u) with the s/t correction).
  *   The data names spell their strings (`ef_free_file_str`, `ef_free_*_assert_str` after the asserted expression).
- * RESIDUALS. 1 partial row:
- *  - `Draw` (0x800BE3C0): `addi r4, r1, 0x38` (the rotation matrix passed to `ef_free_scale_mtx`) is scheduled
- *    before the four `fmr`s where retail has it after them (a pointer local, a cast, a nested call and a block do
- *    not move it).
+ * RESIDUALS. Every row is written and every function is at 100 %.
  *   Relocation names that differ from retail (pool constants - the literals' own pool): `ef_free_hundred`,
  *     `ef_free_epsilon`, `ef_free_int_to_double`, `ef_free_one`, `ef_free_zero`.
  *   flipcheck: `.data` (the strings, then the vtable), `.rodata` (the quad tables) and `.sdata` (the texcoord
- *   table) are emitted; the range ends with the next class's constructor and the object emits this class's
- *   destructor last (see `ef/ef_drawlinestrategy.cpp`'s header), plus the weak base-destructor copies.
- *   `DrawLineStrategy` (constructor): the empty body is the whole source - the compiler
+ *   table) are emitted; `.text` adds the weak base-destructor copies, which the link drops with their unwind
+ *   entries (the flip blocker is `tools/elf/objextab.py` naming those entries, see `ef/ef_drawlinestrategy.cpp`).
+ *   `DrawFreeStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  * SHAPES. The GX setup's pointer assert is the NW4R expression form `(void)(ok || (Panic(...), 0))`: its value
  *   leaves retail's dead `li r0,0; cmpwi r0,0` after the call (playbook 103).
  * SHAPES. `Draw` declares `flag`, `next`, `first_pass`, `first`, `p`, `ed` in that order (retail's register
  *   colouring) and hands `ef_free_rotate_mtx` the particle itself; the full rotation computes `sx * sy` and
  *   `cx * sy` once, ahead of the matrix call.
+ * SHAPES. `ef_free_scale_mtx` takes the source matrix last, after the four floats (same registers, r4 and f1-f4):
+ *   the call then sets r4 after the four `fmr`s, as retail does.
  */
 
 #pragma peephole off
@@ -47,7 +45,6 @@
 #include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "ef/ef_drawfreestrategy.h"
 #include "nw4r/mtx34_mult_vec3.h" /* mtx34_mult_vec3 (rule 2) */
-#include "ef/ef_drawlinestrategy.h" /* DrawLineStrategy, whose constructor closes this range */
 #include "ef/ef_particle.h"
 #include "ef/ef_particlemanager.h"
 #include "ef/ef_drawstripestrategy.h" /* ef_draw_info_view_mtx/fn_800B54B4 (rule 2) */
@@ -146,9 +143,26 @@ void ef_free_gx_end(void);
 void ef_free_gx_u8(u8 value);
 int ef_free_tex_flag(u32 value);
 void ef_free_gx_position(const Vec3* v);
-void ef_free_scale_mtx(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v);
+void ef_free_scale_mtx(MTX34* dst, f32 s, f32 t, f32 u, f32 v, const MTX34* m);
 void ef_free_rotate_mtx(MTX34* dst, const EfDrawParticle* pp, u8 mode);
 void ef_free_setup_gx(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm);
+
+#ifdef __cplusplus
+}
+#endif
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800BE118 (0x3C): builds the strategy. */
+DrawFreeStrategy::DrawFreeStrategy() {}
+
+}  // namespace ef
+}  // namespace nw4r
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* --------------------------------------------------------------------------------------------- *
  * 0x800BE154 - the four-vertex emitter.
@@ -288,7 +302,7 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
         first_pass = false;
 
         ef_free_rotate_mtx(&mtx_rot, p, ed->drawer_mode);
-        ef_free_scale_mtx(&mtx_final, &mtx_rot, scale_a, scale_b, scale_x, scale_z);
+        ef_free_scale_mtx(&mtx_final, scale_a, scale_b, scale_x, scale_z, &mtx_rot);
 
         mtx_final.m[0][3] += ((EfDrawFreeParticle*)p)->offset_x;
         mtx_final.m[1][3] += ((EfDrawFreeParticle*)p)->offset_y;
@@ -314,7 +328,7 @@ extern "C" {
 
 /* Builds an `MTX34` through `mtx34_set` from the source rows scaled by (u,v,u), with an `s`/`t`
  * correction in the trailing column of rows 0 and 1. */
-void ef_free_scale_mtx(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v) {
+void ef_free_scale_mtx(MTX34* dst, f32 s, f32 t, f32 u, f32 v, const MTX34* m) {
     f32 us = u * s;
     f32 vt = v * t;
 
@@ -416,9 +430,6 @@ void ef_free_setup_gx(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, 
 
 namespace nw4r {
 namespace ef {
-
-/* 0x800BEF5C (0x3C): the DrawLineStrategy constructor (the next unit's class; see the unit header). */
-DrawLineStrategy::DrawLineStrategy() {}
 
 }  // namespace ef
 }  // namespace nw4r

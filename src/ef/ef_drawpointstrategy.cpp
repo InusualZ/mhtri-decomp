@@ -1,13 +1,13 @@
 /*
  * ef/ef_drawpointstrategy.cpp - nw4r::ef DrawPointStrategy: `Draw` (the point particle walker), the single point
- *   emitter (`GXBegin` POINTS, position, optional texcoord), the out-of-line GX FIFO writers, the point GX state, the
- *   class's destructor and the DrawSmoothStripeStrategy constructor.
- * RANGE. .text 0x800BF818-0x800BFFD4 (9 functions); extab 0x8000A36C-0x8000A394, extabindex 0x800238C8-0x80023904,
+ *   emitter (`GXBegin` POINTS, position, optional texcoord), the out-of-line GX FIFO writers, the point GX state and the
+ *   class's constructor and destructor.
+ * RANGE. .text 0x800BF7DC-0x800BFF98 (9 functions); extab 0x8000A364-0x8000A38C, extabindex 0x800238BC-0x800238F8,
  *   .data 0x80594408-0x805944E0 (the `__FILE__` string "ef_drawpointstrategy.cpp" and the three pointer-error
  *   messages first), .sdata 0x80791350-0x80791358, .sdata2 0x807961B8-0x807961C0.
  *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor], and each constructor
- *   installs the vtable at the end of its own TU's `.data`; so this class's constructor is the tail of `ef/ef_drawlinestrategy.cpp`'s range
- *   (0x800BF7DC) and the DrawSmoothStripeStrategy constructor at this range's tail (0x800BFF98) is the next TU's.
+ *   installs the vtable at the end of its own TU's `.data`; the range starts at this class's constructor and ends
+ *   at its inline destructor.
  * FLAGS. `cflags_main`; `#pragma peephole off` before the includes (the FIFO writers keep the unfused narrowing stores,
  *   playbook 39), `#pragma pool_data off` (each string address its own `lis`/`addi`), `#pragma dont_inline on` at
  *   the end (the inline destructor calls its base out of line).
@@ -18,10 +18,10 @@
  *   GUESS (from the bodies): `ef_point_write_point`, `ef_point_gx_end`, `ef_point_gx_texcoord`, `ef_point_tex_flag`.
  * RESIDUALS. Every row is written and every function is at 100 %.
  *   flipcheck: `.data` (the four strings, then the vtable) and `.sdata2` are emitted byte for byte; `.sdata` (the
- *   size clamp) is equal, 0x4 short of the claim (the trailing pad); `.text` emits this class's destructor after the
- *   DrawSmoothStripeStrategy constructor that closes the range (retail: before it) and carries the weak copies of
- *   the two base destructors (see `ef/ef_drawlinestrategy.cpp`'s header for the seam and the link).
- *   `DrawSmoothStripeStrategy` (constructor): the empty body is the whole source - the compiler
+ *   size clamp) is equal, 0x4 short of the claim (the trailing pad); `.text` carries the weak copies of the two
+ *   base destructors after the constructor, which the link drops with their unwind entries (the flip blocker is
+ *   `tools/elf/objextab.py` naming those entries, see `ef/ef_drawlinestrategy.cpp`'s header).
+ *   `DrawPointStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  * SHAPES. The `Panic` line numbers are literals (92/96/98 in `Draw`, 150 in the state setup), so the source's
  *   line count does not move them.
@@ -38,7 +38,6 @@
 #include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "ef/ef_drawpointstrategy.h"
 #include "ef/ef_drawstripestrategy.h" /* ef_draw_info_view_mtx (rule 2) */
-#include "ef/ef_drawsmoothstripestrategy.h" /* DrawSmoothStripeStrategy, whose constructor closes this range */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
@@ -100,6 +99,9 @@ void ef_point_setup_gx(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info
 
 namespace nw4r {
 namespace ef {
+
+/* 0x800BF7DC (0x3C): builds the strategy. */
+DrawPointStrategy::DrawPointStrategy() {}
 
 /* 0x800BF818 (0x4B4): draws each live particle of the manager as a GX point, resizing the point only when the size
  * changes. */
@@ -233,9 +235,6 @@ void ef_point_setup_gx(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info
 
 namespace nw4r {
 namespace ef {
-
-/* 0x800BFF98 (0x3C): the DrawSmoothStripeStrategy constructor (the next unit's class; see the unit header). */
-DrawSmoothStripeStrategy::DrawSmoothStripeStrategy() {}
 
 }  // namespace ef
 }  // namespace nw4r

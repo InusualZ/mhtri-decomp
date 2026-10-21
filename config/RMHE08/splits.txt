@@ -576,43 +576,43 @@ ef/ef_drawstripestrategy.cpp:
 	.sdata2     start:0x80796120 end:0x80796150
 
 ef/ef_drawbillboardstrategy.cpp:
-	extab       start:0x8000A23C end:0x8000A30C
-	extabindex  start:0x80023700 end:0x80023838
-	.text       start:0x800B9A44 end:0x800BE154
+	extab       start:0x8000A23C end:0x8000A304
+	extabindex  start:0x80023700 end:0x8002382C
+	.text       start:0x800B9A44 end:0x800BE118
 	.rodata     start:0x8056F770 end:0x8056F7D0
 	.data       start:0x80593E88 end:0x805941F8
 	.sdata      start:0x80791300 end:0x80791340
 	.sdata2     start:0x80796150 end:0x80796190
 
 ef/ef_drawfreestrategy.cpp:
-	extab       start:0x8000A30C end:0x8000A344
-	extabindex  start:0x80023838 end:0x8002388C
-	.text       start:0x800BE154 end:0x800BEF98
+	extab       start:0x8000A304 end:0x8000A33C
+	extabindex  start:0x8002382C end:0x80023880
+	.text       start:0x800BE118 end:0x800BEF5C
 	.rodata     start:0x8056F7D0 end:0x8056F830
 	.data       start:0x805941F8 end:0x80594330
 	.sdata      start:0x80791340 end:0x80791348
 	.sdata2     start:0x80796190 end:0x807961A8
 
 ef/ef_drawlinestrategy.cpp:
-	extab       start:0x8000A344 end:0x8000A36C
-	extabindex  start:0x8002388C end:0x800238C8
-	.text       start:0x800BEF98 end:0x800BF818
+	extab       start:0x8000A33C end:0x8000A364
+	extabindex  start:0x80023880 end:0x800238BC
+	.text       start:0x800BEF5C end:0x800BF7DC
 	.data       start:0x80594330 end:0x80594408
 	.sdata      start:0x80791348 end:0x80791350
 	.sdata2     start:0x807961A8 end:0x807961B8
 
 ef/ef_drawpointstrategy.cpp:
-	extab       start:0x8000A36C end:0x8000A394
-	extabindex  start:0x800238C8 end:0x80023904
-	.text       start:0x800BF818 end:0x800BFFD4
+	extab       start:0x8000A364 end:0x8000A38C
+	extabindex  start:0x800238BC end:0x800238F8
+	.text       start:0x800BF7DC end:0x800BFF98
 	.data       start:0x80594408 end:0x805944E0
 	.sdata      start:0x80791350 end:0x80791358
 	.sdata2     start:0x807961B8 end:0x807961C0
 
 ef/ef_drawsmoothstripestrategy.cpp:
-	extab       start:0x8000A394 end:0x8000A49C
-	extabindex  start:0x80023904 end:0x80023A90
-	.text       start:0x800BFFD4 end:0x800C5DB8
+	extab       start:0x8000A38C end:0x8000A49C
+	extabindex  start:0x800238F8 end:0x80023A90
+	.text       start:0x800BFF98 end:0x800C5DB8
 	.data       start:0x805944E0 end:0x80594840
 	.bss        start:0x806945B8 end:0x806945E8
 	.sbss       start:0x80794928 end:0x80794930

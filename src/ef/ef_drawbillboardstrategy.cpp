@@ -3,14 +3,14 @@
  *   constructors and inline destructors, the draw dispatch, the normal, Y and directional billboard walkers and their
  *   quad writers, the directional world- and view-space walkers with their rotation and local matrices, two copies
  *   of the out-of-line GX FIFO writers and four-vertex writers, the GX setup and the ahead-vector builders.
- * RANGE. .text 0x800B9A44-0x800BE154 (36 functions); extab 0x8000A23C-0x8000A30C, extabindex 0x80023700-0x80023838,
+ * RANGE. .text 0x800B9A44-0x800BE118 (35 functions); extab 0x8000A23C-0x8000A304, extabindex 0x80023700-0x8002382C,
  *   .rodata 0x8056F770-0x8056F7D0, .data 0x80593E88-0x805941F8, .sdata 0x80791300-0x80791340, .sdata2
  *   0x80796150-0x80796190.  The range holds two TUs by their `__FILE__` strings: "ef_drawbillboardstrategy.cpp"
  *   (0x80593E88) and "ef_drawdirectionalstrategy.cpp" (0x80594070, its bodies from 0x800BBDEC); the seam between
  *   them is open.  Left edge: the "ef_drawstripestrategy.cpp" strings belong to the code before 0x800B9A44.
  *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor], and each constructor
- *   installs the vtable at the end of its own TU's `.data`; so the DrawFreeStrategy constructor at this range's tail
- *   (0x800BE118) is the next TU's, and the directional class [0x800BBDEC, 0x800BE118) is a TU of its own.
+ *   installs the vtable at the end of its own TU's `.data`; so the directional class [0x800BBDEC, 0x800BE118) is a
+ *   TU of its own.
  * FLAGS. `cflags_main`; `#pragma peephole off` before the includes (the GX FIFO writers keep the unfused `clrlwi`/
  *   `extsh`/`extsb` in front of every narrowing store); `#pragma dont_inline on` at the end (the inline destructors
  *   call their base out of line).
@@ -56,8 +56,6 @@
  *     emits the base call and the vtable store.
  *   `DrawDirectionalStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
- *   `DrawFreeStrategy` (constructor): the empty body is the whole source - the compiler
- *     emits the base call and the vtable store.
  */
 
 #pragma peephole off
@@ -71,7 +69,6 @@
 #include "ef/fn_800AEE48.h" /* ef_vec3_normalize / ef_pm_next_alive / ef_pm_prev_alive, owned by ef_drawstripestrategy.cpp's range (rule 2) */
 #include "ef/ef_drawstripestrategy.h" /* the walker family ef_ahead_manager_axis_y..ef_ahead_move_dir (rule 2) */
 #include "ef/ef_drawbillboardstrategy.h"
-#include "ef/ef_drawfreestrategy.h" /* DrawFreeStrategy, whose constructor closes this range */
 #include "ef/ef_util.h"               /* ef_mtx34_column_length (rule 2) */
 #include "ef/ef_particle.h"           /* ef_particle_get_scale / ef_particle_get_scale_y (rule 2) */
 #include "ef/ef_particlemanager.h"    /* ef_pm_get_mtx (rule 2) */
@@ -1502,9 +1499,6 @@ DrawStrategyImpl::CalcAheadFunc DrawDirectionalStrategy::GetCalcAheadFunc(EfDraw
         return (CalcAheadFunc)ef_ahead_move_dir;
     }
 }
-
-/* 0x800BE118 (0x3C): the DrawFreeStrategy constructor (the next unit's class; see the unit header). */
-DrawFreeStrategy::DrawFreeStrategy() {}
 
 }  // namespace ef
 }  // namespace nw4r
