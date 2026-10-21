@@ -55,7 +55,8 @@ fresh-object proof, and finds the original object to score against.
   `config.libs` block (same `mw_version` and `cflags`) with only `-o` and `-lang` retargeted - never hand-rolled flags.
 * **The flags are the tree's configure.py's.** `build.ninja` is only as new as its last `python configure.py`, and a worktree
   compiles with MAIN's graph: `reconcile_flags` evaluates the invoking tree's `configure.py` (`lib.project.Configure`) and,
-  when the row's cflags or `mw_version` differ from the command's, replaces the flag slice (ninja's own `-lang=` kept) and the
+  when the row's cflags - its group, then its own `extra_cflags`, the order `tools/project.py` writes them - or
+  `mw_version` differ from the command's, replaces the flag slice (ninja's own `-lang=` kept) and the
   compiler directory, with a note naming the tokens removed and added. A row the evaluator cannot resolve, a missing file or an
   unregistered unit leaves the command as it is. Measured 2026-10-04: 354 of 354 registered units agree with MAIN's current
   graph (no false re-read); the network pilot measured `-O4,p` after its row had gone `-O3`.

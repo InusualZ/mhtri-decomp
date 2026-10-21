@@ -38,7 +38,9 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   accepts: template `<>,-`, `@LOCAL@`/`@GUARD@`, the `\` of `__sinit_\x_cpp`) and `name_pattern(name)` (a reference
   to the name in source, `\b`-free so `@...` and `...>` names are found).
 * `configure.py`: `Configure.load(path)` / `Configure.parse(text, args=None)`: `objects()` (`ObjectRow(path, flag, linked, lib,
-  mw_version, lib_cflags, cflags_name, cflags, options, line)`), `object(path)` (exact, else stem), `libs()` (`Lib(name,
+  mw_version, lib_cflags, cflags_name, cflags, options, line, extra_cflags)`; `extra_cflags` is the object's own
+  `extra_cflags=` resolved - `tools/project.py` lets an object's default `[]` override a lib-level value, so only the
+  object's count), `object(path)` (exact, else stem), `libs()` (`Lib(name,
   mw_version, cflags_name, cflags, progress_category, objects, line)`), `lib(name)`, `groups()`, `cflags(group or lib)`,
   `matching_units()`, `object_line(path)`, `object_line_text(path)`, `skipped` (lines the evaluator did not model);
   `object_calls(text) -> [ObjectCall(flag, path, line, closed)]` for a whole file or a fragment.

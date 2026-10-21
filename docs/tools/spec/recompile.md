@@ -31,7 +31,11 @@ Inputs -> outputs: MAIN build.ninja, src -> object, score.
 * puts the worktree's `-i` directories **first** and points every one of MAIN's at the worktree's copy of that directory, so a worker's edit to an existing shared header is the header that gets compiled (see `order_includes`; appending them - the old behaviour - left MAIN's copy first and silently measured the wrong source, which is what the `eft004` round had to work around with a scratch measurer);
 * re-reads the unit's flags and `mw_version` from **this tree's** `configure.py` when the graph's line disagrees
   (`lib.units.reconcile_flags`): a row switched after the last `python configure.py`, or in a worktree whose graph is MAIN's,
-  compiles at the row's level, and the CLI prints `[flags] ... -[old] +[new]` (`--json`: `flags_reread`);
+  compiles at the row's level, and the CLI prints `[flags] ... -[old] +[new]` (`--json`: `flags_reread`). The row's flags
+  are its cflags group **and** its `extra_cflags`: until 2026-10-21 the re-read dropped them, so `ef/ef_drawstrategyimpl`
+  (`extra_cflags=["-pool off"]`) printed `-[-pool] +[]` on a fresh graph and compiled without `-pool off` -
+  `Create__Q34nw4r2ef19DrawStrategyBuilderFUl` measured 80.80 % and `ef_strategy_init_basis` 83.67 % against 100 % from
+  ninja; both read 100 % now, with no `[flags]` line;
 * deletes the object first, then asserts the file exists and its mtime moved — a stale object is impossible;
 * prints the two object paths, the section sizes, and can measure a symbol **with the same objdiff code path the official report uses** (`report generate` on a one-unit project), so the number equals `build/RMHE08/report.json`'s `fuzzy_match_percent` for the same object.
 * A registered unit run from MAIN takes exactly the path it took before (MAIN's rule, MAIN's object). A unit run from a worktree that has its own copy - the filed double-take - takes **that** copy, and the CLI prints the resolved absolute path with its kind (`[worktree-split]`, `[registered]`, `[auto-fallback]`) **and the tree it came from**, so a measurement is never ambiguous about which tree it came from. The score is still `report generate`'s `fuzzy_match_percent`.

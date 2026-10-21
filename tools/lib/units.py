@@ -434,8 +434,9 @@ def unit_tokens(main: str, wt: str, spelling: str, runner: Callable = subprocess
 
 
 def configured_flags(tree: str, spelling: str) -> tuple[list[str], str | None] | None:
-    """(flag tokens, mw_version) `tree`'s configure.py gives the unit, evaluated now (`lib.project.Configure`),
-    or None when the file is missing, does not parse, or does not register the unit with resolved cflags.
+    """(flag tokens, mw_version) `tree`'s configure.py gives the unit - its cflags, then its `extra_cflags` -
+    evaluated now (`lib.project.Configure`), or None when the file is missing, does not parse, or does not register
+    the unit with resolved cflags.
 
     The tokens are the ones ninja's command carries: each cflags entry split the way the shell splits it, so
     `-pragma "cats off"` is `-pragma`, `cats off` (the shape `unquote` gives a ninja line)."""
@@ -451,7 +452,7 @@ def configured_flags(tree: str, spelling: str) -> tuple[list[str], str | None] |
     if row is None or not row.cflags:
         return None
     out: list[str] = []
-    for entry in row.cflags:
+    for entry in row.cflags + row.extra_cflags:  # project.py's order: cflags, then the object's extra_cflags
         out += shlex.split(entry)
     return out, row.mw_version
 

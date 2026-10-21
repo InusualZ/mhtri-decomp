@@ -48,6 +48,7 @@ class ObjectRow:
     cflags: tuple[str, ...]           # the effective flags, resolved
     options: tuple[tuple[str, str], ...]   # every keyword argument as (name, source text)
     line: int                         # 1-based line of the `Object(` call
+    extra_cflags: tuple[str, ...] = ()     # the object's own `extra_cflags=`, resolved (project.py appends them)
 
     @property
     def matching(self) -> bool:
@@ -499,7 +500,7 @@ class Configure:
                     cflags_name=entry["cflags_name"],
                     cflags=tuple(str(x) for x in entry["kwargs"]["cflags"])
                     if isinstance(entry["kwargs"].get("cflags"), (list, tuple)) else (),
-                    options=entry["options"], line=entry["line"]))
+                    options=entry["options"], line=entry["line"], extra_cflags=_extra(entry["kwargs"])))
                 continue
             if not isinstance(entry, dict) or not isinstance(entry.get("lib"), str):
                 continue
@@ -518,10 +519,17 @@ class Configure:
                     path=obj["path"], flag=obj["flag"].spelling, linked=obj["flag"].linked, lib=entry["lib"],
                     mw_version=text(kw.get("mw_version", entry.get("mw_version"))), lib_cflags=lib_group,
                     cflags_name=obj["cflags_name"] if "cflags" in kw else lib_group, cflags=flags,
-                    options=obj["options"], line=obj["line"]))
+                    options=obj["options"], line=obj["line"], extra_cflags=_extra(kw)))
             out.append(Lib(entry["lib"], text(entry.get("mw_version")), lib_group, lib_flags,
                            text(entry.get("progress_category")), tuple(rows), entry.get("__line__", 0)))
         return out
+
+
+def _extra(kwargs: dict[str, Any]) -> tuple[str, ...]:
+    """An `Object(...)`'s resolved `extra_cflags=`. Only the object's own count: `tools/project.py` lets the
+    object's default `[]` override a lib-level value, so a lib's `extra_cflags` never reaches the command."""
+    extra = kwargs.get("extra_cflags")
+    return tuple(str(x) for x in extra) if isinstance(extra, (list, tuple)) else ()
 
 
 def load(path: str | os.PathLike, **kw: Any) -> Configure:

@@ -252,5 +252,33 @@ def test_compile_result(c):
     c.check("a failure", dict(bad), {"object": "o.o", "compiled": False, "error": "boom"})
 
 
+def test_reconcile_keeps_extra_cflags(c):
+    """`recompile.py` re-reads the unit's flags from configure.py: a row's `extra_cflags` (ef/ef_drawstrategyimpl's
+    `-pool off`) is part of them, appended after the group as `tools/project.py` does. Mutation: before, the re-read
+    dropped `-pool off` and reported a stale graph (`-[-pool] +[]`), so `--measure` scored a different object."""
+    line = ("cmd /c build\\compilers\\Wii\\1.3\\mwcceppc.exe -nodefaults -O4,p -Cpp_exceptions off -lang=c++ "
+            "-pool off -MMD -c src\\ef\\a.cpp -o build\\RMHE08\\src\\ef")
+    tokens = units.unquote(line.split())
+    with tempfile.TemporaryDirectory() as tmp:
+        def write(extra):
+            Path(tmp, "configure.py").write_text(
+                'cflags_ef = ["-nodefaults", "-O4,p", "-Cpp_exceptions off"]\n'
+                'config.libs = [\n    {\n        "lib": "ef",\n        "mw_version": "Wii/1.3",\n'
+                '        "cflags": cflags_ef,\n        "objects": [\n'
+                '            Object(NonMatching, "ef/a.cpp"%s),\n        ],\n    },\n]\n' % extra, encoding="utf-8")
+
+        write(', extra_cflags=["-pool off"]')
+        c.check("configured_flags: the group, then the row's extra_cflags",
+                units.configured_flags(tmp, "ef/a.cpp"),
+                (["-nodefaults", "-O4,p", "-Cpp_exceptions", "off", "-pool", "off"], "Wii/1.3"))
+        c.check("a graph that carries the row's extra_cflags agrees with configure.py",
+                units.reconcile_flags(tokens, tmp, "ef/a.cpp"), (tokens, []))
+        write("")
+        out, notes = units.reconcile_flags(tokens, tmp, "ef/a.cpp")
+        c.check("a row that dropped them is still re-read (the graph is stale)",
+                (units.split_flags(out)[1], len(notes)),
+                (["-nodefaults", "-O4,p", "-Cpp_exceptions", "off", "-lang=c++"], 1))
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))
