@@ -78,7 +78,8 @@ def integrator_lines() -> list[str]:
              "### Integrator requests (a foreign symbol you need named, declared or moved)",
              "",
              "A change in a unit you do not own is not yours to make: file it, one JSON object per line, in "
-             "`MAIN/.pi/outbox/<slug>-requests.json`, and `python tools/units/integrate.py` applies the batch "
+             "`.pi/outbox/<slug>-requests.json` in your own worktree (`slots.py collect` copies it into MAIN), and "
+             "`python tools/units/integrate.py` applies the batch "
              "(renames with their sweep, owner-header declarations, the STOPGAP blocks it clears). "
              "`python tools/units/handoff.py --check-requests <file>` validates it. Fields: `id` (`<slug>#<n>`), "
              "`kind`, `symbol` or `address`, `section`, `proposed_name`, `confidence` (certain|evidence|guess), "
@@ -464,7 +465,9 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     _precommit_lines(lines)
     if b["handoff"]["claimed"]:
         lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch "
-                     "(`%s` minus `worker/`), so write it exactly here; do not invent a name."
+                     "(`%s` minus `worker/`), so use exactly this file name; do not invent one. Write it, and the "
+                     "notes below, under your own worktree's `.pi/` (`.pi/outbox/`, `.pi/notes/`): the orchestrator's "
+                     "`slots.py collect` copies them to these MAIN paths."
                      % (b["handoff"]["outbox"], b["handoff"]["branch"]))
         lines.append("* `%s`" % b["handoff"]["notes"])
         lines.append("* a ≤ 15-line digest in your reply")
@@ -606,8 +609,9 @@ def cluster_index(main: str, key: str, wt: str, units: list[str], briefs: dict, 
     lines.append("")
     if handoff.get("outbox"):
         lines.append("* `%s` - the one outbox `land.py`'s gate reads for this lane (named after the cluster's "
-                     "branch `%s` minus `worker/`); list every unit you touched in it." % (handoff["outbox"],
-                                                                                         handoff["branch"]))
+                     "branch `%s` minus `worker/`); list every unit you touched in it. Write it and the notes under "
+                     "your own worktree's `.pi/`; `slots.py collect` copies them to these MAIN paths."
+                     % (handoff["outbox"], handoff["branch"]))
         lines.append("* `%s`" % handoff["notes"])
     lines.append("* a ≤ 15-line digest in your reply - per unit, what moved and what is left")
     launch.teardown_lines(lines)

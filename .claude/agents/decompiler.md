@@ -28,11 +28,18 @@ residual written down is a landed win; a row you keep re-spelling is not.
 Your work belongs **only** inside your worktree - the `cwd` you were launched with. Every file you edit, every
 build, every `git` command, and every absolute path you construct stays inside it.
 
-**MAIN's tracked files are read-only to you** - its `src/`, `configure.py`, `splits.txt`, config and
-anything else under version control. The brief and the docs live there; read them, never write them. There is
-**one** exception, and it is not tracked: the campaign's evidence files, `MAIN/.pi/outbox/<slug>.json` and
-`MAIN/.pi/notes/<slug>.md` (the slug is your branch minus `worker/`). Those are the record a later session reads,
-so update them - they cannot corrupt the repo, because `.pi/` is gitignored.
+**MAIN is read-only to you** - its `src/`, `configure.py`, `splits.txt`, config, anything else under version
+control, and its `.pi/` too. The brief and the docs live there; read them, never write them. The campaign's
+evidence files are written **in your own worktree**, untracked: `.pi/outbox/<slug>.json`, `.pi/notes/<slug>.md`
+and `.pi/outbox/<slug>-requests.json` (the slug is your branch minus `worker/`; a brief that prints a
+`MAIN/.pi/...` path names where they end up, not where you write them). The orchestrator copies them into MAIN
+with `python tools/units/slots.py collect --path <your worktree>`, and a slot release or claim teardown copies
+any it has not collected before it cleans the tree. Those are the record a later session reads, so update them.
+A lane launched in-session with `isolation: worktree` cannot write MAIN at all - the harness refuses the path -
+and a headless lane writes the same place, so there is one rule (`docs/pipeline.md` 13.2). The same harness
+guard refuses any command it cannot prove stays in the worktree, read-only or not: run `git ...` plainly from your
+cwd (never `git -C <path>`, not even `git -C .`), and never a shell loop that hands `$f` to `objdump`/`python` -
+write the loop as a script file and run `python <file>` with literal paths.
 
 An uncommitted edit to MAIN's tracked files can be swept into another unit's commit and it makes the
 orchestrator's verification meaningless. If a build needs the original DOL and your worktree lacks
@@ -385,7 +392,7 @@ often an `owner_merge` artefact - verify it.
 ## Integrator requests and the STOPGAP marker
 
 A change you need in a unit another lane owns - a rename of its symbol, a declaration in its header, a field of its
-type, a seam - is **filed, not made**: one JSON object per line in `MAIN/.pi/outbox/<slug>-requests.json`, schema
+type, a seam - is **filed, not made**: one JSON object per line in your worktree's `.pi/outbox/<slug>-requests.json` (collected into MAIN), schema
 `tools/lib/requests.py` (`id` = `<slug>#<n>`, `kind` = rename | decl | decl-move | field | seam | unit-rename | config |
 info, `symbol` or `address`, `proposed_name`, `confidence` = certain | evidence | guess, `prototype` = the exact C line,
 `evidence`; a `decl` of an `fn_`/`lbl_` symbol must carry `proposed_name`). Validate it with `python
@@ -658,7 +665,7 @@ message:
    not until ruled.
 5. **The decision as one question.**
 
-Then **end your turn with that request as your final report** (and copy it to `MAIN/.pi/notes/<slug>.md`); the orchestrator resumes your session with the ruling. Apply exactly what is ruled and no more; if the ruling is narrower than your evidence supports say
+Then **end your turn with that request as your final report** (and copy it to your worktree's `.pi/notes/<slug>.md`); the orchestrator resumes your session with the ruling. Apply exactly what is ruled and no more; if the ruling is narrower than your evidence supports say
 so in your report rather than silently accepting it or silently widening it. Afterwards re-measure, report before/after per
 row, and state whether any score moved - a silent move is a refusal.
 

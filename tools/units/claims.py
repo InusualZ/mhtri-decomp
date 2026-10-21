@@ -333,7 +333,10 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, branch
     handoff = slug_of_branch(branch) or slug(unit)
     ack_file = ack_path(main, unit)
     outbox_file = os.path.join(main, ".pi", "outbox", handoff + ".json")
-    outbox = os.path.exists(outbox_file)
+    # a lane writes its outbox in its own tree (a worktree-isolated lane cannot write MAIN's `.pi/`); the teardown
+    # copies it into MAIN before the tree is cleaned or removed (`pool.copy_evidence`)
+    own_outbox = os.path.join(path, ".pi", "outbox", handoff + ".json") if path else None
+    outbox = os.path.exists(outbox_file) or bool(own_outbox and os.path.exists(own_outbox))
     branch_present = branch_exists(main, branch)
     merged = merged_into_main(main, branch) if branch_present else True
     result = {"unit": unit, "branch": branch, "worktree": path, "merged": merged, "outbox": outbox,
@@ -388,6 +391,10 @@ def release(unit: str, main: str, force: bool, dry_run: bool, probe=None, branch
         steps.append(teardown.skip("git branch -D %s" % branch, "the slot return deleted the branch"))
     else:
         if os.path.isdir(path):
+            def _save_evidence(p=path):
+                copied, _kept = pool.copy_evidence(main, p)
+                return "copied into MAIN/.pi: %s" % (", ".join(copied) or "nothing new")
+            steps.append(teardown.step("copy the worktree's .pi evidence into MAIN", _save_evidence))
             steps.append(teardown.step("git worktree remove --force %s" % path, lambda p=path: remove_worktree(main, p)))
         else:
             steps.append(teardown.skip("git worktree remove --force %s" % path, "worktree already gone"))
@@ -901,6 +908,29 @@ def selftest() -> int:
               (out["rescue_verdict"]["verdict"], out["rescue_verdict"]["pruned"], rescue_exists(main, "unl/unl"),
                "UNLANDED WORK" in step_of(out, "rescue ref audit")["why"], out["complete"]),
               ("unlanded", False, rescue_ref_name("unl/unl"), True, True))
+    with testing.temp_dir() as tmp:
+        # a worktree-isolated lane writes its outbox and notes in its own tree, never MAIN's `.pi/`
+        main = registered_main(tmp)
+        branch, wt = claim_shell(main, "own/own")
+        os.remove(os.path.join(main, ".pi", "outbox", slug("own/own") + ".json"))
+        apply_unit(wt, "own/own")
+        commit_in(wt, "the worker's work")
+        write(wt, ".pi/outbox/%s.json" % slug("own/own"), "{}")
+        write(wt, ".pi/notes/%s.md" % slug("own/own"), "notes")
+        out = release("own/own", main, force=False, dry_run=False, probe=no_session)
+        check("an outbox in the lane's own tree counts as the handoff (no refusal)",
+              (out["refused"], out["outbox"], out["complete"]), (None, True, True))
+        check("... and the teardown copies it and the notes into MAIN before removing the worktree",
+              (os.path.exists(os.path.join(main, ".pi", "outbox", slug("own/own") + ".json")),
+               os.path.exists(os.path.join(main, ".pi", "notes", slug("own/own") + ".md")), os.path.isdir(wt)),
+              (True, True, False))
+        branch2, wt2 = claim_shell(main, "none/none")
+        os.remove(os.path.join(main, ".pi", "outbox", slug("none/none") + ".json"))
+        apply_unit(wt2, "none/none")
+        commit_in(wt2, "the worker's work")
+        check("an unmerged claim with no outbox anywhere is still refused",
+              "neither merged into main nor has an outbox" in (release("none/none", main, force=False, dry_run=False,
+                                                                       probe=no_session)["refused"] or ""), True)
     with testing.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "clean/clean")

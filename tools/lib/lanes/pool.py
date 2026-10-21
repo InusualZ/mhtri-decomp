@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -601,8 +602,40 @@ def claim_currency(main: str, n: int, v: dict | None = None, complete: bool = Tr
 
 # --- reset ----------------------------------------------------------------------------------------------------------
 
-def clean_slot(slot: str) -> list[str]:
-    """`git clean -ffdx` keeping the warm trees (`SLOT_KEEP`) -> the paths removed."""
+#: The evidence a lane leaves under its own `.pi/` (`<sub>/*<ext>`): `slots.py collect` copies it into MAIN, and
+#: `clean_slot` copies it first, so a clean never discards a lane's uncollected outbox or notes.
+EVIDENCE = (("outbox", ".json"), ("notes", ".md"))
+
+
+def copy_evidence(main: str, tree: str) -> tuple[list[str], list[str]]:
+    """Copy `tree`'s `.pi/outbox/*.json` and `.pi/notes/*.md` into MAIN's `.pi/` -> `(copied, kept)` as `sub/name`;
+    MAIN's copy is kept when it is at least as new. A no-op when `tree` is MAIN itself."""
+    copied, kept = [], []
+    if os.path.normcase(os.path.realpath(tree)) == os.path.normcase(os.path.realpath(main)):
+        return copied, kept
+    for sub, ext in EVIDENCE:
+        src_dir = os.path.join(tree, ".pi", sub)
+        if not os.path.isdir(src_dir):
+            continue
+        for name in sorted(os.listdir(src_dir)):
+            src = os.path.join(src_dir, name)
+            if not name.endswith(ext) or not os.path.isfile(src):
+                continue
+            dst = os.path.join(main, ".pi", sub, name)
+            if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(src):
+                kept.append("%s/%s" % (sub, name))
+                continue
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+            copied.append("%s/%s" % (sub, name))
+    return copied, kept
+
+
+def clean_slot(slot: str, main: str | None = None) -> list[str]:
+    """`git clean -ffdx` keeping the warm trees (`SLOT_KEEP`) -> the paths removed. With `main`, the slot's
+    evidence (`copy_evidence`) is copied into MAIN first: the clean is what would otherwise lose it."""
+    if main:
+        copy_evidence(main, slot)
     args = ["clean", "-ffdx", "-q"]
     for keep in SLOT_KEEP:
         args += ["-e", keep]
@@ -617,7 +650,7 @@ def reset_slot(main: str, n: int) -> str:
     d = slot_dir(main, n)
     tip = git(["rev-parse", "HEAD"], main)
     git(["checkout", "-f", "-q", "--detach", tip], d)
-    clean_slot(d)
+    clean_slot(d, main)
     return tip
 
 
@@ -738,7 +771,7 @@ def reclaim_slot(main: str, n: int, branch: str | None = None, unit: str | None 
     if not verdict["reclaimable"]:
         return out
     if verdict["kind"] == "debris":
-        out["cleaned"] = clean_slot(d)
+        out["cleaned"] = clean_slot(d, main)
         out["marker_cleared"] = clear_marker(d)
         clear_lock(main, n)
         out["released"] = True
@@ -767,7 +800,7 @@ def reclaim_slot(main: str, n: int, branch: str | None = None, unit: str | None 
     git(["branch", "-D", attached], main)
     out["branch_deleted"] = True
     out["steps"].append({"step": "delete-branch", "branch": attached})
-    out["cleaned"] = clean_slot(d)
+    out["cleaned"] = clean_slot(d, main)
     if seed.main_build_is_current(main):
         out["refreshed"] = seed.seed_worktree_build(main, d, copy_orig=True, overwrite=True)
     out["marker_cleared"] = clear_marker(d)
@@ -995,7 +1028,7 @@ def release(main: str, slot: int | None = None, unit: str | None = None, branch:
         return result
     git(["checkout", "-f", "-q", "--detach", tip], d)
     result["detached"] = True
-    result["cleaned"] = clean_slot(d)
+    result["cleaned"] = clean_slot(d, main)
     branch_present = bool(branch and _branch_exists(main, branch))
     if delete_branch and branch_present:
         if rescue and not _merged(main, branch) and _ahead(main, branch):

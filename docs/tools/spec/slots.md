@@ -69,7 +69,8 @@ git submodule update --init tools/m2c
   in, the units on a `Units:` line (recorded on the lock like any unit set) and the no-write rule; a recon with no
   group is refused, and `--group` on any other kind is refused before a slot is taken.
 * **`collect`** copies a finished lane's `.pi/outbox/*.json` and `.pi/notes/*.md` into `MAIN/.pi/` (MAIN's copy kept
-  when at least as new), merges its data requests and reports its branch, the commits main lacks and the dirt
+  when at least as new; `lib.lanes.pool.copy_evidence`, which every slot clean - release, reclaim, the acquire reset -
+  also runs first, so a release never discards uncollected evidence), merges its data requests and reports its branch, the commits main lacks and the dirt
   (`lib.lanes.pool.unlanded_reason_at`). `--slot N` or `--path` naming a slot as before; `--path` may also name a
   **plain worktree** of the repository (`git worktree list`, MAIN excluded - an Agent-tool lane under
   `.claude/worktrees/`), which was refused ("no slot resolves") until 2026-10-05; `--release` is refused for it, its

@@ -193,8 +193,8 @@ def shadow(main: str, slot: int, dest: str, seed_build: bool = False, force: boo
 
 # --- collect ----------------------------------------------------------------------------------------------------
 
-#: The evidence a lane leaves under its own `.pi/` (copied out before a release `clean -ffdx`es it).
-EVIDENCE = (("outbox", ".json"), ("notes", ".md"))
+#: The evidence a lane leaves under its own `.pi/` (`pool.copy_evidence`; a release's clean copies it out first too).
+EVIDENCE = pool.EVIDENCE
 
 
 def _merge_data_requests(main: str, slot_root: str) -> int:
@@ -235,22 +235,7 @@ def collect(main: str, slot: int | None = None, path: str | None = None, release
         if not os.path.isdir(d):
             raise SystemExit("REFUSED collect: slot %d does not exist (%s)" % (n, d))
     branch = slot_attached_branch(d)
-    copied, kept = [], []
-    for sub, ext in EVIDENCE:
-        src_dir = os.path.join(d, ".pi", sub)
-        if not os.path.isdir(src_dir):
-            continue
-        for name in sorted(os.listdir(src_dir)):
-            src = os.path.join(src_dir, name)
-            if not name.endswith(ext) or not os.path.isfile(src):
-                continue
-            dst = os.path.join(main, ".pi", sub, name)
-            if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(src):
-                kept.append("%s/%s" % (sub, name))
-                continue
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copy2(src, dst)
-            copied.append("%s/%s" % (sub, name))
+    copied, kept = pool.copy_evidence(main, d)
     requests_merged = _merge_data_requests(main, d)
     commits = []
     if branch:
@@ -1547,7 +1532,21 @@ def selftest() -> int:
         check("... keeping MAIN's other rows",
               sorted(r["unit"] for r in _dq.load_requests(repo)), ["Lane/unit", "Other/unit"])
         check("... and a second collect adds nothing", collect(repo, slot=1)["requests_merged"], 0)
+        # (g1) a lane's evidence written in its own tree and never collected survives the release's clean
+        os.makedirs(os.path.join(cs2["dir"], ".pi", "outbox"), exist_ok=True)
+        os.makedirs(os.path.join(cs2["dir"], ".pi", "notes"), exist_ok=True)
+        with open(os.path.join(cs2["dir"], ".pi", "outbox", "collect-b.json"), "w") as fh:
+            fh.write("{}")
+        with open(os.path.join(cs2["dir"], ".pi", "notes", "collect-b.md"), "w") as fh:
+            fh.write("note")
+        check("uncollected evidence is not in MAIN before the release",
+              os.path.exists(os.path.join(repo, ".pi", "outbox", "collect-b.json")), False)
         release(repo, slot=1, unit="lane/collect-b", rescue=False)
+        check("a release copies the slot's uncollected outbox and notes into MAIN before cleaning",
+              (os.path.exists(os.path.join(repo, ".pi", "outbox", "collect-b.json")),
+               os.path.exists(os.path.join(repo, ".pi", "notes", "collect-b.md")),
+               os.path.exists(os.path.join(cs2["dir"], ".pi", "outbox", "collect-b.json"))), (True, True, False))
+        check("copy_evidence of MAIN into itself is a no-op", pool.copy_evidence(repo, repo), ([], []))
         check("an unknown path is refused", _raises(lambda: collect(repo, path=os.path.join(tmp, "nowhere"))), True)
         # (g2) a plain worktree (a lane launched in its own `git worktree`, not a slot) is collected too
         plain = os.path.join(tmp, "plain-lane")
