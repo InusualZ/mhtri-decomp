@@ -50,6 +50,9 @@ u32 ef_anim_rand_next(u32 seed);
  * division). */
 u32 ef_anim_name_hash(u16 a, u16 b, u16 c, u32 d);
 
+/* 0x800A2FA4 (0x64): empties a creation queue (the effect system's constructor builds its queue with it). */
+struct CreationQueue* ef_creation_queue_reset(struct CreationQueue* queue);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,13 +1,12 @@
 /*
- * ef/ef_draworder.cpp - the nw4r::ef draw-order list: the effect's list head accessor, `DrawOrder`'s three virtuals
- *   (`Add`: ordered insert by the manager's draw order at +0x89; `Remove`; `Draw`: the walk), the effect object's
- *   constructor, the `{two ut::Lists + counter}` sub-object constructors and the deleting destructor.
- * RANGE. .text 0x800A388C-0x800A40F4 (9 functions); extab 0x80009B60-0x80009BA0, extabindex 0x80022CEC-0x80022D4C,
+ * ef/ef_draworder.cpp - the nw4r::ef draw-order list: the effect's list head accessor and `DrawOrder`'s three
+ *   virtuals (`Add`: ordered insert by the manager's draw order at +0x89; `Remove`; `Draw`: the walk).
+ * RANGE. .text 0x800A388C-0x800A3F98 (4 functions); extab 0x80009B60-0x80009B80, extabindex 0x80022CEC-0x80022D1C,
  *   .data 0x805923A0-0x80592430 (the `__FILE__` string "ef_draworder.cpp", the two assert messages, then
- *   `DrawOrder`'s table, emitted here because `Add` is its key function).
+ *   `DrawOrder`'s table, emitted here because `Add` is its key function).  Right edge: `Effect::Effect`
+ *   (0x800A3F98) is `ef/ef_effect.cpp`'s.
  * FLAGS. `cflags_main` plus `-pool off` (configure.py: one `lis`/`addi` per string); file-wide `#pragma peephole
- *   off` (retail keeps `lis` + `addi r0` + `stw r0` for the table stores and `extsh` + `cmpwi` for the deleting
- *   destructor's flag test).
+ *   off`.
  * NAMES. `DrawOrder` and its members are nw4r's; the other functions keep `fn_` stems; the types and fields are
  *   GUESSes from the bodies.
  *   GUESS: `ef_draworder_file_name`, `ef_draworder_err_ef`, `ef_draworder_err_pm` (their text).
@@ -34,17 +33,6 @@ void Panic(const char* file, int line, const char* fmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The global `operator delete`; declaring the mangled `__dl__FPv` would be rule 9's violation. */
-void operator delete(void* ptr) throw();
-
-extern "C" {
-
-/* The two class tables of `ef/ef_effect.cpp`'s `.data`. */
-extern void* lbl_80592588[];      /* ef_effect's Effect table: 0, 0, then six method words   */
-extern void* lbl_805925A8[];      /* the root base's vtable: 0, 0, then two method words     */
-
-} /* extern "C" */
-
 /* The unit's `.data` strings, in retail order: the file name and one message per checked pointer (the
  * `DrawOrder` table follows them). */
 char ef_draworder_file_name[] = "ef_draworder.cpp";
@@ -64,8 +52,7 @@ typedef struct EfDrawOrderList {
     /* +0x0A */ u16 mOffset;
 } EfDrawOrderList; /* size: 0xC */
 
-/* The `{two lists + counter}` sub-object fn_800A3FFC constructs; every effect class embeds one
- * (ef/ef_emitter.cpp at +0xC0, ef/ef_particlemanager.cpp at +0x38, this unit at +0x24). */
+/* The `{two lists + counter}` activity list every effect class embeds (the effect's at +0x24). */
 typedef struct EfDrawOrderGroup {
     /* +0x00 */ EfDrawOrderList mListA;
     /* +0x0C */ EfDrawOrderList mListB;
@@ -120,11 +107,6 @@ extern "C" {
 /* Callees outside this unit: two particle-manager functions. */
 void fn_800AE628(void* pm);                                    /* particle manager: world matrix */
 void fn_800AE6A4(void* pm);                                    /* particle manager: tail (a `blr`) */
-
-/* This unit's own forward declarations (address order puts two bodies after their callers). */
-EfDrawOrderGroup* fn_800A3FFC(EfDrawOrderGroup* group, u32 offset);
-void fn_800A4030(EfDrawOrderGroup* group, u32 offset);
-void fn_800A4080(EfDrawOrderObject* self);
 
 } /* extern "C" */
 
@@ -181,50 +163,3 @@ void nw4r::ef::DrawOrder::Remove(Effect* effect, ParticleManager* pm) {
 
     nw4r::ut::List_Remove((nw4r::ut::List*)fn_800A388C((EfDrawOrderObject*)effect), pm);
 }
-
-extern "C" {
-
-/* 0x800A3F98 - the constructor: root base vtable, own vtable, group, matrix, vector, draw list. */
-EfDrawOrderObject* fn_800A3F98(EfDrawOrderObject* self) {
-    fn_800A4080(self);
-    self->mpVtbl = lbl_80592588;
-    fn_800A3FFC(&self->mGroup, 0x14);
-    MTX34_ctor(&self->mMat_0x58);
-    VEC3_ctor(&self->mVec_0x88);
-    nw4r::ut::List_Init((nw4r::ut::List*)&self->mDrawList, 0x30);
-    return self;
-}
-
-/* 0x800A3FFC - the group constructor: build the sub-object and hand it back. */
-EfDrawOrderGroup* fn_800A3FFC(EfDrawOrderGroup* group, u32 offset) {
-    fn_800A4030(group, (u16)offset);
-    return group;
-}
-
-/* 0x800A4030 - initialises both of the group's lists and clear its counter. */
-void fn_800A4030(EfDrawOrderGroup* group, u32 offset) {
-    nw4r::ut::List_Init((nw4r::ut::List*)&group->mListA, (u16)offset);
-    nw4r::ut::List_Init((nw4r::ut::List*)&group->mListB, (u16)offset);
-    group->mCount = 0;
-}
-
-/* 0x800A4080 - the root base's vtable setter, shared by every effect-class constructor
- * (ef/ef_emitter.cpp's fn_800A6258, ef/ef_particlemanager.cpp's fn_800AB664, ...). */
-void fn_800A4080(EfDrawOrderObject* self) {
-    self->mpVtbl = lbl_805925A8;
-}
-
-/* 0x800A4090 - the deleting destructor: reset the vtable, retire the effect's emitters and, for a
- * positive flag, free the object. */
-void* fn_800A4090(EfDrawOrderObject* self, s16 flag) {
-    if (self != NULL) {
-        self->mpVtbl = lbl_80592588;
-        ((nw4r::ef::Effect*)self)->RetireEmitterAll();
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
-} /* extern "C" */

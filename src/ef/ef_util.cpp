@@ -26,12 +26,11 @@
  *   `ef_util_f32_one`, `ef_util_f32_min_scale`, `ef_util_f32_minus_one`, `ef_util_f32_epsilon`, `ef_util_f32_flt_min`,
  *   `ef_util_f64_minus_one`, `ef_util_f32_half`, `ef_util_f32_three`, `ef_util_f32_65536`, `ef_util_f32_100000`,
  *   `ef_util_f32_min_scale_pair`, `ef_util_rsqrt_three_half`.
- * RESIDUALS. none in `.text` or `.data`.
- *   flipcheck: `.sdata2` claimed, not emitted - the pool constants are declared by their map names.  Retail's
- *   pool runs {65536, 65536}, 256/2pi, then 0, 1, 1e-5, -1, FLT_EPSILON, FLT_MIN, -1.0 (double), 0.5, 3, 65536,
- *   100000 and {1e-5, 0}; the literals' first uses in this source give 1, 1e-5, FLT_EPSILON, 0, FLT_MIN, -1, ...
- *   instead.  `sqrt_f32`/`vec3_len` are nw4r inlines (`FSqrt`'s 0.0 test) whose weak copies this TU emitted
- *   and the link dropped, which would create 0.0 first; not reproduced.
+ * RESIDUALS. none.
+ * SHAPES. The `.sdata2` pool is the named constants, declared `extern const` (sized) ahead of every reader and
+ *   defined at the end of the file in retail's order: a reader that sees no initializer loads the object instead of
+ *   pooling a literal copy, so the section is exactly the definitions.  A `[]` declaration sends its definition to
+ *   `.rodata`.
  * SHAPES. `fn_8009C040` keeps its three dot products in one local array (retail's frame and its stores of each
  *   product), declared first; the column vectors are declared and constructed in column order, and the sign flip
  *   multiplies by the named `-1.0` double.  `fn_8009CCAC`'s second and third reciprocals are conditional
@@ -89,7 +88,7 @@ void ef_mtx34_rotate_xyz(f32* mtx, f32 x, f32 y, f32 z);
 void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale);
 }
 
-/* This unit's pooled floats (its claimed `.sdata2`), declared, never defined. */
+/* This unit's pooled floats (its claimed `.sdata2`), defined at the end of the file. */
 
 extern const f32 ef_util_f32_65536_pair[2]; /* {65536.0f, 65536.0f} - the paired-single 65536 constant   .sdata2 */
 extern const f32 ef_util_f32_rad_to_fidx;   /* 40.743664f = 256 / (2 * pi) - radians to 8-bit fidx       .sdata2 */
@@ -104,7 +103,7 @@ extern const f32 ef_util_f32_half;   /* 0.5f                                    
 extern const f32 ef_util_f32_three;   /* 3.0f                                                     .sdata2 */
 extern const f32 ef_util_f32_65536;   /* 65536.0f - the quantized angle's ceiling                  .sdata2 */
 extern const f32 ef_util_f32_100000;   /* 100000.0f                                                .sdata2 */
-extern const f32 ef_util_f32_min_scale_pair[]; /* {1.0e-05f, 0.0f} - address taken                         .sdata2 */
+extern const f32 ef_util_f32_min_scale_pair[2]; /* {1.0e-05f, 0.0f} - address taken                         .sdata2 */
 
 /* The {3.0f, 0.5f} pair `ef_mtx34_column_length`'s reciprocal square root step loads with one `psq_l` (`.sdata`). */
 f32 ef_util_rsqrt_three_half[2] = {3.0f, 0.5f};
@@ -860,3 +859,19 @@ extern "C" asm f32 ef_mtx34_column_length(register const f32* mtx, register s32 
 }
 
 
+
+/* The unit's `.sdata2` pool, in retail's order; defined after every reader so each use loads the named object. */
+extern const f32 ef_util_f32_65536_pair[2] = {65536.0f, 65536.0f};
+extern const f32 ef_util_f32_rad_to_fidx = 40.743664f;
+extern const f32 ef_util_f32_zero = 0.0f;
+extern const f32 ef_util_f32_one = 1.0f;
+extern const f32 ef_util_f32_min_scale = 1.0e-05f;
+extern const f32 ef_util_f32_minus_one = -1.0f;
+extern const f32 ef_util_f32_epsilon = 1.19209290e-07f;
+extern const f32 ef_util_f32_flt_min = 1.17549435e-38f;
+extern const f64 ef_util_f64_minus_one = -1.0;
+extern const f32 ef_util_f32_half = 0.5f;
+extern const f32 ef_util_f32_three = 3.0f;
+extern const f32 ef_util_f32_65536 = 65536.0f;
+extern const f32 ef_util_f32_100000 = 100000.0f;
+extern const f32 ef_util_f32_min_scale_pair[2] = {1.0e-05f, 0.0f};

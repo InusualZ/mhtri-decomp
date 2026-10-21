@@ -1,7 +1,7 @@
 /*
  * ef/ef_effectsystem.h - the effect system singleton `EfSys` (nw4r's `EffectSystem`; `ef.h` still carries a stub
- *   under that name, so this layout keeps its own) and the group records it owns.  The system's constructor and
- *   destructor are `ef/ef_effect.cpp`'s, its instance and the rest of its members `ef/ef_effectsystem.cpp`'s.
+ *   under that name, so this layout keeps its own) and the group records it owns; `ef/ef_effectsystem.cpp` defines
+ *   them.
  */
 #ifndef MHTRI_EF_EF_EFFECTSYSTEM_H
 #define MHTRI_EF_EF_EFFECTSYSTEM_H
@@ -31,9 +31,11 @@ typedef struct EfSysActivityList {
 
 class EfSysEffect;
 class EfSysEmitter;
+struct ParticleManager;
 
 /* The allocator/pool object the system was handed (`fn_800D3D48` stores it into the system's +0x00): the
- * effect pool at table slots +0x10/+0x14, the emitter pool at +0x24/+0x28 and the byte allocator at +0x60; the slots between are declared only
+ * effect pool at table slots +0x10/+0x14, the emitter pool at +0x24/+0x28, the particle-manager pool at +0x38
+ * and the byte allocator at +0x60; the slots between are declared only
  * to place it.  Declared only, so no unit emits its table. */
 class EfSysMemoryManager {
 public:
@@ -50,7 +52,7 @@ public:
     virtual void slot_0x2C();
     virtual void slot_0x30();
     virtual void slot_0x34();
-    virtual void slot_0x38();
+    virtual ParticleManager* GetParticleManager();
     virtual void slot_0x3C();
     virtual void slot_0x40();
     virtual void slot_0x44();

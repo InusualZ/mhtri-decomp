@@ -1,21 +1,24 @@
 /*
- * ef/ef_emitter.cpp - the nw4r::ef emitter-side object layer: the resource object's constructor, sub-object
- *   constructor and deleting destructor, the particle-manager sweeps and retire paths, the emitter manager's
- *   destroy and set-params hooks (delegate slots at manager+0xA0), the initialiser, the random generator (`state *
- *   0x343FD + 0x269EC3`), the create-child/create-emitter slots, the frame's create and relocation passes, the
- *   distance fade and per-frame spawner, the track walkers, the transform chain and the accessors.
+ * ef/ef_emitter.cpp - nw4r::ef::Emitter: its constructor, sub-object constructor and deleting destructor, the
+ *   particle-manager sweeps and retire paths, the emitter manager's destroy and set-params hooks (delegate slots at
+ *   manager+0xA0), the initialiser, the random generator (`state * 0x343FD + 0x269EC3`), the eight virtuals
+ *   (`SendClosing`, `DestroyFunc`, `Initialize`, `CreateEmitter`, `CalcEmitter`, `CalcParticle`, `CalcEmission`,
+ *   `CalcBillboard`), the frame's create pass, the distance fade and per-frame spawner, the resource's track
+ *   walkers, the transform chain and the accessors.
  * RANGE. .text 0x800A6258-0x800A99B4 (52 functions); extab 0x80009CBC-0x80009DF4, extabindex 0x80022EC0-0x80023094,
- *   .data 0x80592850-0x80592CD0 (the `__FILE__` string "ef_emitter.cpp" first; the class table at 0x80592BB0 =
- *   fn_800A6414 destroy, fn_800A6420 retire, fn_800A6EC4 create child, fn_800A7378 create, fn_800A8A5C,
- *   fn_800A8D30, fn_800A8DF8, fn_800A8F18), .sbss 0x80794920-0x80794928, .sdata2 0x80796000-0x80796030.
+ *   .data 0x80592850-0x80592CD0 (the strings in first-use order, `Emitter`'s table at 0x80592BA8, then the four
+ *   header asserts' weak strings), .sbss 0x80794920-0x80794928 (`ef_pm_mtx_cache_id`), .sdata2
+ *   0x80796000-0x80796030 (100, 0, the two conversion doubles, -1, 1, 2, 65536, pi/2).
  * FLAGS. `cflags_main`; `#pragma peephole off` from the first definition (retail keeps the flag booleanisations
  *   `rlwinm; neg; or; srwi`, `clrlwi` + `slwi` index scaling and the `li r0,N; psq_lx` epilogues), back on for the
- *   last definition `fn_800A98D4` (retail folds its byte store's `clrlwi`).
- * NAMES. The map has only `fn_` stems for the range but four GUESS names from the bodies: `ef_store_word`,
- *   `ef_truncate_float`, `ef_random_float` and `ef_res_block_body`.  The object's containers are named by its
- *   asserts: its own particle-manager list at +0xC0 (`NW4R_EF_MAX_PARTICLEMANAGER`, 0x400) and the emitter
- *   manager's list at manager+0x24 (`NW4R_EF_MAX_EMITTER`, 0x200); `mManagerEF` is at +0xBC, the work record at
- *   +0xB8, the parent at +0xF4 and the object's MTX34 at +0x124.
+ *   last definition `fn_800A98D4` (retail folds its byte store's `clrlwi`); file-wide `#pragma pool_data off` (each
+ *   string its own `lis`/`addi`); `#pragma dont_inline` around the constructor (the base constructor stays a call).
+ * NAMES. The virtuals are nw4r's `Emitter` slots (GUESS: the parameter types and which Calc is which, read from the
+ *   table at 0x80592BA8 and the bodies).  The map has only `fn_` stems for the rest but GUESS names from the bodies:
+ *   `ef_store_word`, `ef_truncate_float`, `ef_random_float` and `ef_res_block_body`.  The object's containers are
+ *   named by its asserts: its own particle-manager list at +0xC0 (`NW4R_EF_MAX_PARTICLEMANAGER`, 0x400) and the
+ *   emitter manager's list at manager+0x24 (`NW4R_EF_MAX_EMITTER`, 0x200); `mManagerEF` is at +0xBC, the work record
+ *   at +0xB8, the parent at +0xF4 and the object's MTX34 at +0x124.
  *   GUESS (from the body and its callers): `ef_particle_get_move_dir`, `ef_emitter_tex_flags`,
  *   GUESS: `ef_emitter_get_mtx`.
  *   GUESS (the emitter resource's track blocks, from `ef/ef_resource.cpp`'s relocation): `ef_emres_num_emit_track`,
@@ -23,24 +26,28 @@
  *   GUESS: `ef_vec3_dist_sq` (0x800A8300): the squared distance of two positions.
  *   GUESS: `ef_random_u16` (0x800A6E70): steps the random block and returns its high half.
  *   GUESS: `ef_pm_set_mtx_dirty` (0x800A96C0): marks a particle manager's matrix for rebuilding.
+ *   GUESS: `ef_pm_mtx_cache_id` (0x80794920): the id of the manager whose matrix was built last.
  *   GUESS: `ef_mtx34_copy` (0x800A89A0): copies the twelve words of a 3x4 matrix and returns the destination.
  *   GUESS: `ef_calc_inherit_mtx` (0x800A90AC): builds the transform a child inherits (scale, rotation, a share of
  *   the translation) from its parent's matrix; the parent chain and the particle manager call it.
  *   GUESS: `EfManagerCallback::SetParams`/`Destroy` (the callback's first two virtuals, from the hooks that call them).
- * RESIDUALS. 2 partial rows:
- *  - `fn_800A7750`: every saved register is one lower than retail's (retail keeps the blended scale in r23 and the
- *    parameters in r24..r28; ours keeps `self` in r23);
- *  - `fn_800A6EC4` (and the same call in `fn_800A7750`): the memory manager's slot +0x38 and the particle manager's
- *    initialiser (table at +0x1C, slot +0x10) are called through function-pointer tables because their headers
- *    (`ef/ef_effectsystem.h`, `ef/ef_particlemanager.h`) declare no returning/argument-taking virtual there; the
- *    table loads go to r4/r6 where retail's virtual dispatch uses r12 (requests ef-emit#28/#29).
- *   flipcheck: `.data` (0x480) and `.sbss` (0x8) claimed, not emitted; `.sdata2` 0x10 of 0x30 (the pool is declared
- *   `extern`, so the conversion constants read our `@N` pool).
+ * RESIDUALS. `fn_800A7750`: the blended scale's registers - retail loads the emitter's scale step into r23 and
+ *   reuses r23 for the result, ours keeps the step in r28 (one extra `extsb`/`mr`); declaration order, an `else if`
+ *   chain with an empty branch, two temporaries and an `int` product do not move it.
+ * SHAPES. `Emitter` derives from `nw4r::ef::ReferencedObject` (`ef/ef_effect.h`), so the constructor calls the base's
+ *   implicit constructor (its weak copy is dropped for `ef/ef_effect.cpp`'s) and stores this unit's table; the
+ *   memory manager's particle-manager pool (`GetParticleManager`, slot +0x38) and the particle manager's
+ *   `Initialize` (slot +0x10) are virtual calls through r12.
+ * SHAPES. The header accessors (the resource's track walkers, the effect hooks `fn_800A66AC`/`fn_800A723C`, the life
+ *   setter `fn_800A66A4`, `ef_particle_get_move_dir`) are C-linkage `inline` functions marked
+ *   `__attribute__((never_inline))`, defined at the top in their headers' order (res_emitter.h, effect.h,
+ *   particle.h): their weak copies follow their first caller in reverse order of use, and their assert strings are
+ *   the `@STRING@` tail in reverse definition order, as retail's.
  * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_emitter.cpp", "particle.h" or "effect.h"); `#line` reproduces each assert's line.
  * SHAPES. The 0x1020/0x820 frames are `NW4R_EF_MAX_PARTICLEMANAGER`/`NW4R_EF_MAX_EMITTER`-wide stack arrays
- *   (`fn_800A6350`, `fn_800A6420`, `fn_800A6938`, `fn_800A8D30`); the list size is an `s32` local (retail narrows it
- *   straight into the argument register).
+ *   (`fn_800A6350`, `DestroyFunc`, `fn_800A6938`, `CalcParticle`); the list size is an `s32` local (retail narrows
+ *   it straight into the argument register).
  * SHAPES. The emitter manager's hooks call its callback object (`EfManagerCallback`, a class declared here) and the
  *   form is `nw4r::ef::EmitterForm` (`Emission` virtual) built by `nw4r::ef::EmitterFormBuilder::Create`.
  * SHAPES. The track walkers index the resource bytes (`&p[n * 8 + 4]`): a subscript puts the offset first in the
@@ -48,7 +55,8 @@
  * SHAPES. The spawner's countdown adds a `(u16)` float conversion (no narrowing mask); `ef_vec3_dist_sq` passes
  *   both conversions as arguments (evaluated right to left); `fn_800A7750` takes the blended scale from an inline
  *   product helper (its arguments evaluate right to left too).
- * SHAPES. The object type is `EfEmitterObj`; `ef/ef_point.cpp` carries a partial `EfEmitter` of the same class.
+ * SHAPES. The strings are literals and the `.sdata2` constants literal floats (the conversion doubles are the
+ *   compiler's), in retail's creation order.
  */
 
 #include "types.h"
@@ -63,69 +71,27 @@
 #include "ef/ef_emform.h" /* nw4r::ef::EmitterForm, the emitter's form (rule 1) */
 #include "nw4r/math_types.h" /* nw4r::math::MTX34Trans (rule 2) */
 #include "nw4r/ut_list.h" /* nw4r::ut::List_GetNext / List_GetNth (rule 2) */
+#include "ef/ef_effectsystem.h" /* EfSysMemoryManager, the pool the particle managers come from (rule 1) */
+#include "ef/ef_effect.h" /* nw4r::ef::ReferencedObject and the activity-list helpers (rule 1, rule 2) */
 
 extern "C" {
 
-/* The strings and constants of this unit's claimed `.data`, `.sdata2` and `.sbss`, declared, never
- * defined. */
-extern const char lbl_80592850[]; /* "ef_emitter.cpp"                                        */
-extern const char lbl_80592860[]; /* "NW4R:Failed assertion UtlistSize(&mActivityList..."
-                                     " < NW4R_EF_MAX_PARTICLEMANAGER"                        */
-extern const char lbl_805928BC[]; /* "NW4R:Failed assertion UtlistSize(&mManagerEF->..."
-                                     " < NW4R_EF_MAX_EMITTER"                                */
-extern const char lbl_8059291C[]; /* "NW4R:Pointer Error\ntarget(=%p) is not valid pointer." */
-extern const char lbl_80592954[]; /* "NW4R:Pointer Error\neh(=%p) is not valid pointer."     */
-extern const char lbl_80592988[]; /* "NW4R:Pointer Error\nef(=%p) is not valid pointer."     */
-extern const char lbl_805929C0[]; /* "NW4R:Pointer Error\naParentEF(=%p) is not valid..."    */
-extern const char lbl_805929F8[]; /* "NW4R:Failed assertion false"                           */
-extern const char lbl_80592A14[]; /* "incomplete relocation (emitter:%s)"                    */
-extern const char lbl_80592A38[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."     */
-extern const char lbl_80592A6C[]; /* "NW4R:Pointer Error\nmManagerEF(=%p) is not valid..."   */
-extern const char lbl_80592AA8[]; /* "NW4R:Pointer Error\nresult(=%p) is not valid..."       */
-extern const char lbl_80592AE0[]; /* "NW4R:Pointer Error\norig(=%p) is not valid pointer."   */
-extern const char lbl_80592B14[]; /* "NW4R:Failed assertion result != orig"                  */
-extern const char lbl_80592B3C[]; /* "NW4R:Failed assertion idx < GetNumParticleManager()"   */
-extern const char lbl_80592B70[]; /* "NW4R:Pointer Error\nptr(=%p) is not valid pointer."    */
-extern const char lbl_80592BD0[]; /* "NW4R:Pointer Error\nresult(=%p) is not valid..."       */
-extern const char lbl_80592C08[]; /* "particle.h"                                            */
-extern const char lbl_80592C14[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."     */
-extern const char lbl_80592C48[]; /* "effect.h"                                              */
-extern const char lbl_80592C54[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."     */
-extern const char lbl_80592C88[]; /* "effect.h"                                              */
-extern const char lbl_80592C94[]; /* "NW4R:Failed assertion num < NumEmitTrack()"            */
-extern const char lbl_80592CC0[]; /* "res_emitter.h"                                         */
-extern const f32 lbl_80796000;    /* 100.0f                                                  */
-extern const f32 lbl_80796004;    /* 0.0f                                                    */
-extern const f64 lbl_80796008;    /* 0x4330000000000000, the u32 -> f64 magic                */
-extern const f64 lbl_80796010;    /* 0x4330000080000000, the s32 -> f64 magic                */
-extern const f32 lbl_80796018;    /* -1.0f                                                   */
-extern const f32 lbl_8079601C;    /* 1.0f                                                    */
-extern const f32 lbl_80796020;    /* 2.0f                                                    */
-extern const f32 lbl_80796024;    /* 65536.0f                                                */
-extern const f32 lbl_80796028;    /* pi/2                                                    */
-extern s32 lbl_80794920;          /* the "current manager" cache slot                        */
 
 /* Callees outside this unit, declared locally with C linkage. */
 u16 fn_800A4AF0(void* list);                       /* UtlistSize */
 u16 fn_8009B374(void* list, void** buf, u16 size); /* UtlistGetArray */
 void* ef_list_get_first(void* list);                     /* GetFirst */
 s32 ef_get_life_status(void* node);
-void ef_activity_list_add(void* list, void* node);
 void fn_800A45DC(void* list, void* node);
 void fn_800A4A1C(void* list, void* node);
 void fn_800A49B8(void* node);
-void ef_activity_list_clear(void* list);
-void ef_ref_object_init(void* self);
 void fn_800A4474(void* manager, void* self);
-void* ef_system_memory_manager(void* self);
-void* ef_res_emitter_desc(void* p); /* walks to an object's chain head */
 void fn_800A486C(void* manager, void* emitter);
 u32 ef_emres_get_name(void* p);
 void* fn_800A4654(void* manager, void* em, u8 flag, s32 mode);
 void ef_ref_object_add_ref(void* p);
 void fn_800A3390(void* dst, const void* src);
 void fn_800A3800(void* p);
-void ef_effect_set_calc_flag(void* manager, s32 flag);
 void* fn_800A5484(void* p);
 void* fn_800A60C0(void* manager);
 void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
@@ -218,26 +184,10 @@ typedef struct EfEmitterParam {
     /* +0x05 */ u8 field_0x05;
     /* +0x06 */ u8 field_0x06;
     /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 pad_0x08[0x1C];
+    /* +0x08 */ u8 pad_0x08[0x04];
+    /* +0x0C */ nw4r::math::VEC3 vec_0x0C;
+    /* +0x18 */ nw4r::math::VEC3 vec_0x18;
 } EfEmitterParam; /* size: 0x24 (lower bound: the highest byte fn_800A3390 copies) */
-
-/* A function table reached as `*(void***)((u8*)obj + offset)`. */
-typedef struct EfVt {
-    /* +0x00 */ void* slots[16];
-} EfVt; /* size: 0x40 */
-
-/* The effect system's memory manager `ef_system_memory_manager` returns: its table is at +0x00, and slot 14
- * (+0x38) hands out a fresh particle manager (`ef/ef_effectsystem.h`'s `EfSysMemoryManager::slot_0x38`). */
-typedef struct EfMemoryManagerView {
-    /* +0x00 */ EfVt* vtable;
-} EfMemoryManagerView; /* size: 0x04 (lower bound) */
-
-/* A particle manager reached through its table: the pointer sits at +0x1C, slot 4 (+0x10) is its
- * initialiser. */
-typedef struct EfHost {
-    /* +0x00 */ u8 pad_0x00[0x1C];
-    /* +0x1C */ EfVt* vtable;
-} EfHost; /* size: 0x20 */
 
 /* The effect-side resource block the manager keeps at `managerEF + 0x20`.  Its random block is at
  * +0xC01C, the reference position at +0xC020, a matrix at +0xC02C and two range floats at
@@ -276,14 +226,39 @@ typedef struct EfEmitterManager {
     /* +0xA0 */ EfManagerCallback* delegate;
 } EfEmitterManager; /* size: 0xA4 (lower bound) */
 
-/* The object this unit works on: one `nw4r::ef` resource-backed object (the emitter and its
- * particle managers share this layout - it is the base both are reached through).  The table
- * pointer is installed by the sibling unit's constructor (`fn_800A6258`), so it stays padding. */
-typedef struct EfEmitterObj {
-    /* +0x000 */ void** vtable;
-    /* +0x004 */ u8 pad_0x004[0x08];
-    /* +0x00C */ s32 state; /* 0 = free, 1 = created, 2 = retiring */
-    /* +0x010 */ u8 pad_0x010[0x10];
+struct EfParticleRec;
+
+namespace nw4r {
+namespace ef {
+class Emitter;
+} // namespace ef
+} // namespace nw4r
+
+/* The bodies' spelling of the emitter. */
+typedef nw4r::ef::Emitter EfEmitterObj;
+
+namespace nw4r {
+namespace ef {
+
+/* The emitter: the reference-counted base (its life status at +0x0C, its table at +0x1C), the parameters copied
+ * from its resource, its particle-manager list at +0xC0, the parent chain and its matrix.  Its eight virtuals are
+ * this unit's; `SendClosing` is the key function, so the table is emitted here. */
+class Emitter : public ReferencedObject {
+public:
+    Emitter();
+
+    virtual void SendClosing();
+    virtual void DestroyFunc();
+    /* untyped: opaque handle - the emitter resource, passed through */
+    virtual s32 Initialize(EfEmitterManager* aParentEF, void* eh, u8 value);
+    /* untyped: opaque handle - the emitter resource and the host position, passed through */
+    virtual Emitter* CreateEmitter(void* em, const EfEmitterParam* params, EfParticleRec* pm, u16 life_bonus,
+                                   void* host);
+    virtual void CalcEmitter();
+    virtual void CalcParticle();
+    virtual void CalcEmission();
+    virtual void CalcBillboard();
+
     /* +0x020 */ u32 flags;
     /* +0x024 */ u32 flags2; /* a pointer to the emitter's parameter record */
     /* +0x028 */ union {
@@ -330,7 +305,10 @@ typedef struct EfEmitterObj {
     /* +0x0FC */ EfEmitterParam param;
     /* +0x120 */ u8 transform_dirty;
     /* +0x124 */ nw4r::math::MTX34 matrix;
-} EfEmitterObj; /* size: 0x154 (lower bound: +0x124 is the highest field any body touches) */
+}; /* size: 0x154 (lower bound: +0x124 is the highest field any body touches) */
+
+} // namespace ef
+} // namespace nw4r
 
 /* The particle-manager view of the same object: the extra fields the create/sweep paths use. */
 typedef struct EfPmView {
@@ -427,51 +405,27 @@ typedef struct EfSysResourceSub {
     /* +0x88 */ nw4r::math::VEC3 vec_0xA8;
 } EfSysResourceSub; /* size: 0x94 */
 
-/* The emitter-side object `fn_800A6258` builds: the constructor's view of `EfEmitterObj` (the same object; the
- * table sits at +0x1C here). size: 0x154 (lower bound: +0x124 is the highest field the constructor touches) */
-typedef struct EfSysResourceObj {
-    /* +0x000 */ u8 pad_0x000[0x01C];
-    /* +0x01C */ void* vtable; /* the root base's table fn_800A4080 sets, then this class's */
-    /* +0x020 */ EfSysResourceSub sub_0x020;
-    /* +0x0B4 */ u8 pad_0x0B4[0x00C];
-    /* +0x0C0 */ u8 particles[0x1C]; /* the activity-list record `fn_800A3FFC` initialises (EfEmitterObj's `particles`) */
-    /* +0x0DC */ u8 pad_0x0DC[0x02C];
-    /* +0x108 */ nw4r::math::VEC3 vec_0x108;
-    /* +0x114 */ nw4r::math::VEC3 vec_0x114;
-    /* +0x120 */ u8 pad_0x120[0x004];
-    /* +0x124 */ nw4r::math::MTX34 mtx_0x124;
-} EfSysResourceObj; /* size: 0x154 */
-
-extern void* lbl_80592BA8[]; /* the emitter-side object's table (this unit's eight virtuals) */
-
 extern "C" {
-EfSysResourceObj* fn_800A6258(EfSysResourceObj* self);
 EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self);
 void* fn_800A630C(void* self, s16 flag);
 void* fn_800A3FFC(void* list, u32 linkOffset);
-void fn_800A4080(void* self);
 }
 /* This unit's own symbols, in address order (the file defines them in that order). */
 extern "C" {
 u32 fn_800A6350(EfEmitterObj* self);
-void fn_800A6414(EfEmitterObj* self);
-void fn_800A6420(EfEmitterObj* self);
 s32 fn_800A6554(EfEmitterObj* self, EfEmitterObj* target);
-void fn_800A66A4(EfEmitterObj* self, u32 state);
-void fn_800A66AC(EfEmitterManager* self, void* eh);
+inline __attribute__((never_inline)) void fn_800A66A4(EfEmitterObj* self, u32 state);
+inline __attribute__((never_inline)) void fn_800A66AC(EfEmitterManager* self, void* eh);
 s32 fn_800A67E8(EfEmitterObj* self, EfParticleRec* target);
 u32 fn_800A6938(EfEmitterObj* self);
 s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef);
 u32 fn_800A6E64(EfEmitterWork* work);
 s32 ef_random_u16(void* random);
 void fn_800A6EA4(void* random);
-s32 fn_800A6EC4(EfEmitterObj* self, EfEmitterManager* aParentEF, void* eh, u8 value);
-void fn_800A723C(EfEmitterManager* self, void* pm);
-EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitterParam* params, EfParticleRec* pm,
-                       u16 life_bonus, void* host);
+inline __attribute__((never_inline)) void fn_800A723C(EfEmitterManager* self, void* pm);
 s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* params, EfParticleRec* pm,
                 u16 life_bonus, void* host);
-EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result);
+inline __attribute__((never_inline)) EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result);
 void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e);
 f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4);
 f32 ef_vec3_dist_sq(void* a, void* b);
@@ -483,17 +437,13 @@ void* ef_store_word(void* dst, s32 v);
 nw4r::math::MTX34* ef_mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 f32 ef_truncate_float(f32 x);
 f32 ef_random_float(u32* random);
-void fn_800A8A5C(EfEmitterObj* self);
-u16 ef_emres_num_emit_track(void* res);
-void* ef_emres_get_ptcl_track(void* res);
-void* ef_res_block_body(void* res);
-void* fn_800A8C34(void* res, u16 index);
-void* ef_emres_get_emit_track_tbl(void* res);
-u16 fn_800A8CE8(void* res);
-u32 fn_800A8D18(EfEmitterObj* self);
-void fn_800A8D30(EfEmitterObj* self);
-void fn_800A8DF8(EfEmitterObj* self);
-void fn_800A8F18(EfEmitterObj* self);
+inline __attribute__((never_inline)) u16 ef_emres_num_emit_track(void* res);
+inline __attribute__((never_inline)) void* ef_emres_get_ptcl_track(void* res);
+inline __attribute__((never_inline)) void* ef_res_block_body(void* res);
+inline __attribute__((never_inline)) void* fn_800A8C34(void* res, u16 index);
+inline __attribute__((never_inline)) void* ef_emres_get_emit_track_tbl(void* res);
+inline __attribute__((never_inline)) u16 fn_800A8CE8(void* res);
+inline __attribute__((never_inline)) u32 fn_800A8D18(EfEmitterObj* self);
 void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c, bool d);
 void* ef_emitter_get_mtx(EfEmitterObj* self, void* out);
 void fn_800A95D8(EfEmitterObj* self);
@@ -537,18 +487,108 @@ s32 fn_800A98D4(EfEmitterObj* self, void* cb, void* arg, s32 flag, s32 recurse);
  * ------------------------------------------------------------------------------------------------- */
 
 #pragma peephole off
+#pragma pool_data off
 
-/* 0x800A6258 - the emitter-side resource object's constructor (this unit owns its layout). */
-extern "C" EfSysResourceObj* fn_800A6258(EfSysResourceObj* self) {
-    fn_800A4080(self);
-    self->vtable = lbl_80592BA8;
-    fn_800A62C0(&self->sub_0x020);
-    fn_800A3FFC(&self->particles, 0x14);
-    VEC3_ctor(&self->vec_0x108);
-    VEC3_ctor(&self->vec_0x114);
-    MTX34_ctor(&self->mtx_0x124);
-    return self;
+extern "C" inline __attribute__((never_inline)) void* ef_res_block_body(void* res) {
+    EfResHeader* h = (EfResHeader*)res;
+    return &((u8*)h)[h->offset + sizeof(EfResHeader)];
 }
+
+extern "C" inline __attribute__((never_inline)) void* ef_emres_get_ptcl_track(void* res) {
+    EfChainHeader* h = (EfChainHeader*)ef_res_block_body(res);
+    return &((u8*)h)[h->offset + sizeof(EfChainHeader)];
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 0x800A8BC8 / 0x800A8BF8 / 0x800A8C24 / 0x800A8C34 / 0x800A8CB8 / 0x800A8CE8 - the
+ * emitter-resource track walkers.
+ * ------------------------------------------------------------------------------------------------- */
+
+extern "C" inline __attribute__((never_inline)) u16 ef_emres_num_emit_track(void* res) {
+    EfPtclTrackBlock* blk = (EfPtclTrackBlock*)ef_emres_get_ptcl_track(res);
+    return ((EfEmitTrackHead*)&((u8*)blk)[blk->num_ptcl * 8 + 4])->num;
+}
+
+extern "C" inline __attribute__((never_inline)) void* ef_emres_get_emit_track_tbl(void* res) {
+    EfPtclTrackBlock* blk = (EfPtclTrackBlock*)ef_emres_get_ptcl_track(res);
+    return ((EfEmitTrackHead*)&((u8*)blk)[blk->num_ptcl * 8 + 4])->table;
+}
+
+extern "C" inline __attribute__((never_inline)) void* fn_800A8C34(void* res, u16 index) {
+    void* array = ef_emres_get_emit_track_tbl(res);
+#line 736
+    if ((u32)index >= (u32)ef_emres_num_emit_track(res)) {
+        nw4r::db::Panic("res_emitter.h", __LINE__, "NW4R:Failed assertion num < NumEmitTrack()");
+    }
+    return *(void**)((u8*)array + (u32)index * 4);
+}
+
+extern "C" inline __attribute__((never_inline)) u16 fn_800A8CE8(void* res) {
+    EfPtclTrackBlock* blk = (EfPtclTrackBlock*)ef_emres_get_ptcl_track(res);
+    return ((EfEmitTrackHead*)&((u8*)blk)[blk->num_ptcl * 8 + 4])->first;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 0x800A8D18 - this object's "freed" flag.
+ * ------------------------------------------------------------------------------------------------- */
+
+extern "C" inline __attribute__((never_inline)) u32 fn_800A8D18(EfEmitterObj* self) {
+    return (self->flags & 0x200) != 0;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 0x800A66AC - the emitter manager's destroy hook (delegate slot 3).
+ * ------------------------------------------------------------------------------------------------- */
+
+extern "C" inline __attribute__((never_inline)) void fn_800A66AC(EfEmitterManager* self, void* eh) {
+#line 244
+    NW4R_POINTER_ASSERT("effect.h", eh, "NW4R:Pointer Error\npm(=%p) is not valid pointer.");
+    self->delegate->Destroy(self, eh);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 0x800A723C - the emitter manager's set-params hook (delegate slot 2).
+ * ------------------------------------------------------------------------------------------------- */
+
+extern "C" inline __attribute__((never_inline)) void fn_800A723C(EfEmitterManager* self, void* pm) {
+#line 237
+    NW4R_POINTER_ASSERT("effect.h", pm, "NW4R:Pointer Error\npm(=%p) is not valid pointer.");
+    self->delegate->SetParams(self, (EfPmView*)pm);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 0x800A66A4 - set an object's state word.
+ * ------------------------------------------------------------------------------------------------- */
+
+extern "C" inline __attribute__((never_inline)) void fn_800A66A4(EfEmitterObj* self, u32 state) {
+    self->mLifeStatus = state;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 0x800A7F00 - a particle's global position.
+ * ------------------------------------------------------------------------------------------------- */
+
+extern "C" inline __attribute__((never_inline)) EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result) {
+#line 300
+    NW4R_POINTER_ASSERT("particle.h", result, "NW4R:Pointer Error\nresult(=%p) is not valid pointer.");
+    {
+        EfVec v;
+        subVec3(&v, &self->offset, &self->position);
+        copyVec3(result, &v);
+    }
+    return result;
+}
+
+#pragma dont_inline on
+/* 0x800A6258 (0x68): builds the emitter: the base, its transform vectors, its particle-manager list and matrix. */
+nw4r::ef::Emitter::Emitter() {
+    fn_800A62C0((EfSysResourceSub*)&flags);
+    fn_800A3FFC(&particles, 0x14);
+    VEC3_ctor(&param.vec_0x0C);
+    VEC3_ctor(&param.vec_0x18);
+    MTX34_ctor(&matrix);
+}
+#pragma dont_inline reset
 
 /* 0x800A62C0 - the resource object's +0x20 sub-object: clear its four transform vectors. */
 extern "C" EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self) {
@@ -571,7 +611,7 @@ extern "C" void* fn_800A630C(void* self, s16 flag) {
 extern "C" u32 fn_800A6350(EfEmitterObj* self) {
     u32 total = 0;
 #line 53
-    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592850, __LINE__, lbl_80592860);
+    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, "ef_emitter.cpp", __LINE__, "NW4R:Failed assertion UtlistSize(&mActivityList.mActiveList) < NW4R_EF_MAX_PARTICLEMANAGER");
     s32 size = fn_800A4AF0(&self->particles);
     void* list[NW4R_EF_MAX_PARTICLEMANAGER];
     u16 num = fn_8009B374(&self->particles, list, size);
@@ -585,7 +625,8 @@ extern "C" u32 fn_800A6350(EfEmitterObj* self) {
  * 0x800A6414 - the table's destroy slot.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A6414(EfEmitterObj* self) {
+void nw4r::ef::Emitter::SendClosing() {
+    EfEmitterObj* self = this;
     fn_800A4474(self->managerEF, self);
 }
 
@@ -594,7 +635,8 @@ extern "C" void fn_800A6414(EfEmitterObj* self) {
  * list for this object's children.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A6420(EfEmitterObj* self) {
+void nw4r::ef::Emitter::DestroyFunc() {
+    EfEmitterObj* self = this;
     if (self->form != NULL) {
         self->form = NULL;
     }
@@ -604,7 +646,7 @@ extern "C" void fn_800A6420(EfEmitterObj* self) {
     fn_800A6938(self);
     if ((self->flags & 1) != 0) {
 #line 88
-        NW4R_ASSERT(fn_800A4AF0(&self->managerEF->emitters) < NW4R_EF_MAX_EMITTER, lbl_80592850, __LINE__, lbl_805928BC);
+        NW4R_ASSERT(fn_800A4AF0(&self->managerEF->emitters) < NW4R_EF_MAX_EMITTER, "ef_emitter.cpp", __LINE__, "NW4R:Failed assertion UtlistSize(&mManagerEF->mActivityList.mActiveList) < NW4R_EF_MAX_EMITTER");
         s32 size = fn_800A4AF0(&self->managerEF->emitters);
         void* list[NW4R_EF_MAX_EMITTER];
         u16 num = fn_8009B374(&self->managerEF->emitters, list, size);
@@ -614,7 +656,7 @@ extern "C" void fn_800A6420(EfEmitterObj* self) {
             while (p != NULL) {
                 if (p == self) {
                     fn_800A6350(eh);
-                    if (eh->state == 1) {
+                    if (eh->mLifeStatus == 1) {
                         fn_800A486C(self->managerEF, eh);
                     }
                     break;
@@ -631,7 +673,7 @@ extern "C" void fn_800A6420(EfEmitterObj* self) {
 
 extern "C" s32 fn_800A6554(EfEmitterObj* self, EfEmitterObj* target) {
 #line 118
-    NW4R_POINTER_ASSERT(lbl_80592850, target, lbl_8059291C);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", target, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.");
     fn_800A66AC(self->managerEF, target);
     fn_800A3800(((EfPmView*)target)->owner);
     fn_800A45DC(&self->particles, target);
@@ -639,23 +681,7 @@ extern "C" s32 fn_800A6554(EfEmitterObj* self, EfEmitterObj* target) {
     return 1;
 }
 
-/* -------------------------------------------------------------------------------------------------
- * 0x800A66A4 - set an object's state word.
- * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A66A4(EfEmitterObj* self, u32 state) {
-    self->state = state;
-}
-
-/* -------------------------------------------------------------------------------------------------
- * 0x800A66AC - the emitter manager's destroy hook (delegate slot 3).
- * ------------------------------------------------------------------------------------------------- */
-
-extern "C" void fn_800A66AC(EfEmitterManager* self, void* eh) {
-#line 244
-    NW4R_POINTER_ASSERT(lbl_80592C88, eh, lbl_80592C54);
-    self->delegate->Destroy(self, eh);
-}
 
 /* -------------------------------------------------------------------------------------------------
  * 0x800A67E8 - retire a manager if it is on the active list.
@@ -663,7 +689,7 @@ extern "C" void fn_800A66AC(EfEmitterManager* self, void* eh) {
 
 extern "C" s32 fn_800A67E8(EfEmitterObj* self, EfParticleRec* target) {
 #line 130
-    NW4R_POINTER_ASSERT(lbl_80592850, target, lbl_8059291C);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", target, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.");
     if (ef_get_life_status(target) != 1) {
         return 0;
     }
@@ -679,7 +705,7 @@ extern "C" s32 fn_800A67E8(EfEmitterObj* self, EfParticleRec* target) {
 extern "C" u32 fn_800A6938(EfEmitterObj* self) {
     u32 total = 0;
 #line 147
-    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592850, __LINE__, lbl_80592860);
+    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, "ef_emitter.cpp", __LINE__, "NW4R:Failed assertion UtlistSize(&mActivityList.mActiveList) < NW4R_EF_MAX_PARTICLEMANAGER");
     s32 size = fn_800A4AF0(&self->particles);
     void* list[NW4R_EF_MAX_PARTICLEMANAGER];
     u16 num = fn_8009B374(&self->particles, list, size);
@@ -698,12 +724,12 @@ extern "C" u32 fn_800A6938(EfEmitterObj* self) {
 
 extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
 #line 166
-    NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", eh, "NW4R:Pointer Error\neh(=%p) is not valid pointer.");
 #line 167
-    NW4R_POINTER_ASSERT(lbl_80592850, ef, lbl_80592988);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", ef, "NW4R:Pointer Error\nef(=%p) is not valid pointer.");
     EfEmitterWork* work;
     self->field_0x0E4 = 0;
-    self->state = 1;
+    self->mLifeStatus = 1;
     self->work = (EfEmitterWork*)eh;
     work = EfGetWork(eh);
     self->field_0x0B4 = 0;
@@ -713,15 +739,15 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
     self->life_max = work->life;
     self->field_0x0DE = work->field_0x14;
     self->field_0x0E0 = 0;
-    self->color_g = (f32)work->color_g / lbl_80796000;
-    self->color_r = (f32)work->color_r / lbl_80796000;
-    self->color_b = (f32)work->color_b / lbl_80796000;
+    self->color_g = (f32)work->color_g / 100.0f;
+    self->color_r = (f32)work->color_r / 100.0f;
+    self->color_b = (f32)work->color_b / 100.0f;
     self->scale_0x028.scale = work->scale;
-    self->scale_step = (f32)work->scale_range / lbl_80796000;
+    self->scale_step = (f32)work->scale_range / 100.0f;
     self->interval = work->interval;
     self->life_frames = work->field_0x34;
-    self->rate = (f32)work->rate / lbl_80796000;
-    self->life = lbl_80796004;
+    self->rate = (f32)work->rate / 100.0f;
+    self->life = 0.0f;
     self->field_0x0DC = 1;
     copyVec3(&self->position, &work->vec_0x78);
     copyVec3(&self->vec_0x9C, &work->vec_0x60);
@@ -787,25 +813,27 @@ extern "C" void fn_800A6EA4(void* random) {
  * 0x800A6EC4 - the table's create-child slot.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" s32 fn_800A6EC4(EfEmitterObj* self, EfEmitterManager* aParentEF, void* eh, u8 value) {
+/* untyped: opaque handle - the emitter resource, passed through */
+s32 nw4r::ef::Emitter::Initialize(EfEmitterManager* aParentEF, void* eh, u8 value) {
+    EfEmitterObj* self = this;
 #line 246
-    NW4R_POINTER_ASSERT(lbl_80592850, aParentEF, lbl_805929C0);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", aParentEF, "NW4R:Pointer Error\naParentEF(=%p) is not valid pointer.");
 #line 247
-    NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", eh, "NW4R:Pointer Error\neh(=%p) is not valid pointer.");
     ef_res_emitter_desc(eh);
     ef_ref_object_init(self);
     ef_activity_list_clear(&self->particles);
     fn_800A6A04(self, eh, aParentEF);
     self->managerEF = aParentEF;
     {
-        EfMemoryManagerView* mm = (EfMemoryManagerView*)ef_system_memory_manager(aParentEF->effect);
-        EfPmView* created = ((EfPmView* (*)(EfMemoryManagerView*))mm->vtable->slots[14])(mm);
+        EfSysMemoryManager* mm = (EfSysMemoryManager*)ef_system_memory_manager(aParentEF->effect);
+        EfPmView* created = (EfPmView*)mm->GetParticleManager();
         if (created == NULL) {
             return 0;
         }
-        if (((s32 (*)(EfPmView*, EfEmitterObj*, void*))((EfHost*)created)->vtable->slots[4])(created, self, eh) == 0) {
+        if (((ParticleManager*)created)->Initialize(self, eh) == 0) {
 #line 265
-            nw4r::db::Panic(lbl_80592850, __LINE__, lbl_805929F8);
+            nw4r::db::Panic("ef_emitter.cpp", __LINE__, "NW4R:Failed assertion false");
             return 0;
         }
         ef_ref_object_add_ref(self->managerEF);
@@ -828,26 +856,19 @@ extern "C" s32 fn_800A6EC4(EfEmitterObj* self, EfEmitterManager* aParentEF, void
     return 1;
 }
 
-/* -------------------------------------------------------------------------------------------------
- * 0x800A723C - the emitter manager's set-params hook (delegate slot 2).
- * ------------------------------------------------------------------------------------------------- */
-
-extern "C" void fn_800A723C(EfEmitterManager* self, void* pm) {
-#line 237
-    NW4R_POINTER_ASSERT(lbl_80592C48, pm, lbl_80592C14);
-    self->delegate->SetParams(self, (EfPmView*)pm);
-}
 
 /* -------------------------------------------------------------------------------------------------
  * 0x800A7378 - the table's create-emitter slot.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitterParam* params,
-                                  EfParticleRec* pm, u16 life_bonus, void* host) {
+/* untyped: opaque handle - the emitter resource and the host position, passed through */
+nw4r::ef::Emitter* nw4r::ef::Emitter::CreateEmitter(void* em, const EfEmitterParam* params, EfParticleRec* pm, u16 life_bonus,
+                                                     void* host) {
+    EfEmitterObj* self = this;
 #line 307
-    NW4R_POINTER_ASSERT(lbl_80592850, em, lbl_80592954);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", em, "NW4R:Pointer Error\neh(=%p) is not valid pointer.");
     if ((EfGetWork(em)->flags & 0x40000000) == 0) {
-        nw4r::db::Warning(lbl_80592850, 0x137, lbl_80592A14, ef_emres_get_name(em));
+        nw4r::db::Warning("ef_emitter.cpp", 0x137, "incomplete relocation (emitter:%s)", ef_emres_get_name(em));
         return NULL;
     }
     EfEmitterObj* e = (EfEmitterObj*)fn_800A4654(self->managerEF, em, params->field_0x05, 0);
@@ -872,9 +893,9 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         EfVec v;
         nw4r::math::MTX34 m1, m2;
         assignVec3((Vec*)&v, (Vec*)&e->position);
-        e->position.x = lbl_80796004;
-        e->position.y = lbl_80796004;
-        e->position.z = lbl_80796004;
+        e->position.x = 0.0f;
+        e->position.y = 0.0f;
+        e->position.z = 0.0f;
         fn_800A95D8(e);
         MTX34_ctor(&m1);
         MTX34_ctor(&m2);
@@ -924,9 +945,9 @@ static inline s8 ef_scale_product(s8 a, s8 b) {
 extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* params, EfParticleRec* pm,
                            u16 life_bonus, void* host) {
 #line 432
-    NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", eh, "NW4R:Pointer Error\neh(=%p) is not valid pointer.");
     if ((EfGetWork(eh)->flags & 0x40000000) == 0) {
-        nw4r::db::Warning(lbl_80592850, 0x1B4, lbl_80592A14, ef_emres_get_name(eh));
+        nw4r::db::Warning("ef_emitter.cpp", 0x1B4, "incomplete relocation (emitter:%s)", ef_emres_get_name(eh));
         return 0;
     }
     {
@@ -934,7 +955,6 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
         EfEmitterObj* ep;
         EfVec v;
 
-        fn_800A6258((EfSysResourceObj*)&e);
         ef_res_emitter_desc(eh);
         fn_800A6A04(&e, eh, self->managerEF);
         e.field_0x0E8 += life_bonus;
@@ -961,12 +981,12 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             MTX34_ctor(&m1);
             MTX34_ctor(&m2);
             ef_pm_get_mtx((void*)pm->manager, &m2);
-            m2.m[0][3] = m2.m[1][3] = m2.m[2][3] = lbl_80796004;
+            m2.m[0][3] = m2.m[1][3] = m2.m[2][3] = 0.0f;
             ef_particle_get_move_dir(pm, &v);
             mtx34_mult_vec3(&v, &m2, &v);
             if (ef_vec3_normalize_to(&v, &v) != 0) {
                 if (params->field_0x00 < 0) {
-                    vec3_scale_by(&v, &v, lbl_80796018);
+                    vec3_scale_by(&v, &v, -1.0f);
                 }
                 ef_mtx34_from_y_axis(m1.m[0], &v.x);
                 ef_mtx34_rotate_xyz(&m2, ep->rotation.x, ep->rotation.y, ep->rotation.z);
@@ -978,9 +998,9 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             EfVec pos;
             nw4r::math::MTX34 m1, m2;
             assignVec3((Vec*)&pos, (Vec*)&ep->position);
-            ep->position.x = lbl_80796004;
-            ep->position.y = lbl_80796004;
-            ep->position.z = lbl_80796004;
+            ep->position.x = 0.0f;
+            ep->position.y = 0.0f;
+            ep->position.z = 0.0f;
             fn_800A95D8(ep);
             MTX34_ctor(&m1);
             MTX34_ctor(&m2);
@@ -1010,8 +1030,8 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             ep->position.z = pos.z + m1.m[2][3];
             fn_800A95D8(ep);
         }
-        fn_800A8A5C(&e);
-        fn_800A8F18(&e);
+        e.CalcEmitter();
+        e.CalcBillboard();
         {
             s32 use_a;
             s32 use_b;
@@ -1046,15 +1066,14 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             created = (EfPmView*)fn_800A8040(self, eh, (u32)use_a, (u32)use_b, scale, (u32)use_c,
                                              params->field_0x05);
             if (created == NULL) {
-                EfMemoryManagerView* mm = (EfMemoryManagerView*)ef_system_memory_manager(self->managerEF->effect);
-                created = ((EfPmView* (*)(EfMemoryManagerView*))mm->vtable->slots[14])(mm);
+                EfSysMemoryManager* mm = (EfSysMemoryManager*)ef_system_memory_manager(self->managerEF->effect);
+                created = (EfPmView*)mm->GetParticleManager();
                 if (created == NULL) {
                     return 0;
                 }
-                if (((s32 (*)(EfPmView*, EfEmitterObj*, void*))((EfHost*)created)->vtable->slots[4])(created, self,
-                                                                                                      eh) == 0) {
+                if (((ParticleManager*)created)->Initialize(self, eh) == 0) {
 #line 623
-                    nw4r::db::Panic(lbl_80592850, __LINE__, lbl_805929F8);
+                    nw4r::db::Panic("ef_emitter.cpp", __LINE__, "NW4R:Failed assertion false");
                     return 0;
                 }
                 ef_activity_list_add(&self->particles, created);
@@ -1097,7 +1116,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
                 fn_800A3800(pm);
                 e.orig = NULL;
             }
-            if (self->state != 1 && ef_get_life_status(created) == 1) {
+            if (self->mLifeStatus != 1 && ef_get_life_status(created) == 1) {
                 fn_800A67E8(self, (EfParticleRec*)created);
             }
         }
@@ -1105,20 +1124,6 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
     return 1;
 }
 
-/* -------------------------------------------------------------------------------------------------
- * 0x800A7F00 - a particle's global position.
- * ------------------------------------------------------------------------------------------------- */
-
-extern "C" EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result) {
-#line 300
-    NW4R_POINTER_ASSERT(lbl_80592C08, result, lbl_80592BD0);
-    {
-        EfVec v;
-        subVec3(&v, &self->offset, &self->position);
-        copyVec3(result, &v);
-    }
-    return result;
-}
 
 /* -------------------------------------------------------------------------------------------------
  * 0x800A8040 - sweep this object's managers for the one matching a set of flag bytes.
@@ -1126,7 +1131,7 @@ extern "C" EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result) {
 
 extern "C" void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e) {
 #line 700
-    NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", eh, "NW4R:Pointer Error\neh(=%p) is not valid pointer.");
     void* node = ef_list_get_first(&self->particles);
     while (node != NULL) {
         EfPmView* pm = (EfPmView*)node;
@@ -1153,16 +1158,16 @@ extern "C" f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4) {
     f32 lo = range * p4;
     f32 hi = range * p3;
     if (lo > x) {
-        return lbl_8079601C;
+        return 1.0f;
     }
     if (hi < x) {
-        return lbl_80796004;
+        return 0.0f;
     }
     f32 span = hi - lo;
-    if (lbl_80796004 == span) {
-        return lbl_80796004;
+    if (0.0f == span) {
+        return 0.0f;
     }
-    return lbl_8079601C - (x - lo) / span;
+    return 1.0f - (x - lo) / span;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -1182,26 +1187,26 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
     EfEmitterWork* work;
 
 #line 768
-    NW4R_POINTER_ASSERT(lbl_80592850, pm, lbl_80592A38);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", pm, "NW4R:Pointer Error\npm(=%p) is not valid pointer.");
     if (self->field_0x0E0 != 0) {
         self->field_0x0E0--;
         return;
     }
     self->field_0x0E0 = self->interval;
-    if (lbl_80796004 != self->rate) {
-        self->field_0x0E0 += (u16)ef_truncate_float(((f32)self->interval * self->rate - lbl_8079601C) *
+    if (0.0f != self->rate) {
+        self->field_0x0E0 += (u16)ef_truncate_float(((f32)self->interval * self->rate - 1.0f) *
                                                     ef_random_float(&self->random.mState));
     }
     if ((self->flags2 & 0x20000) != 0) {
         self->life = (f32)self->life_frames;
     } else {
         f32 step;
-        if (lbl_80796004 == self->scale_step) {
+        if (0.0f == self->scale_step) {
             step = self->scale_0x028.scale;
         } else {
             step = self->scale_0x028.scale +
                    self->scale_0x028.scale * self->scale_step *
-                       (lbl_80796020 * ef_random_float(&self->random.mState) - lbl_8079601C);
+                       (2.0f * ef_random_float(&self->random.mState) - 1.0f);
         }
         if ((self->flags2 & 0x100) != 0) {
             EfEffectData* effect = self->managerEF->effect;
@@ -1209,22 +1214,22 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
             VEC3_ctor(&v);
             mtx34_mult_vec3(&v, ef_emitter_get_mtx(self, NULL), &self->position);
             step *= self->color_b +
-                    (lbl_8079601C - self->color_b) *
+                    (1.0f - self->color_b) *
                         fn_800A8220(&v, &effect->ref_pos, effect->range_a, effect->range_b,
                                     self->color_g, self->color_r);
         }
         self->life += step;
-        if (self->field_0x0DC != 0 && lbl_80796004 != self->scale_0x028.scale &&
-            self->life < lbl_8079601C) {
-            self->life = lbl_8079601C;
+        if (self->field_0x0DC != 0 && 0.0f != self->scale_0x028.scale &&
+            self->life < 1.0f) {
+            self->life = 1.0f;
         }
     }
-    if (self->life >= lbl_8079601C) {
+    if (self->life >= 1.0f) {
         ef_resource_instance();
         work = (EfEmitterWork*)ef_res_emitter_desc(self->work);
         if (self->form != NULL) {
 #line 835
-            NW4R_POINTER_ASSERT(lbl_80592850, self->managerEF, lbl_80592A6C);
+            NW4R_POINTER_ASSERT("ef_emitter.cpp", self->managerEF, "NW4R:Pointer Error\nmManagerEF(=%p) is not valid pointer.");
             if (self->managerEF->field_0x48 != NULL) {
                 s32 life_i = (s32)self->life;
                 u32 f2 = self->flags2;
@@ -1239,7 +1244,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
                 anim[4] = self->animate_0x58[1];
                 anim[5] = self->animate_0x58[2];
                 frames = work->field_0x0A;
-                scale = (f32)work->field_0x0C / lbl_80796000;
+                scale = (f32)work->field_0x0C / 100.0f;
                 ef_mtx34_copy(&mc, mtx);
                 ((void (*)(EfEmitterObj*, EfParticleRec*, s32*, u32*, f32*, u16*, f32*,
                            nw4r::math::MTX34*))self->managerEF->field_0x48)(self, pm, &life_i, &f2,
@@ -1247,7 +1252,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
                 self->form->Emission((EfWork*)self, (ParticleManager*)pm, life_i, f2, anim, frames, scale, &mc);
             } else {
                 self->form->Emission((EfWork*)self, (ParticleManager*)pm, (s32)self->life, self->flags2,
-                                     self->animate_0x4C, work->field_0x0A, (f32)work->field_0x0C / lbl_80796000, mtx);
+                                     self->animate_0x4C, work->field_0x0A, (f32)work->field_0x0C / 100.0f, mtx);
             }
             {
                 s32 a;
@@ -1314,18 +1319,19 @@ extern "C" f32 ef_truncate_float(f32 x) {
 
 extern "C" f32 ef_random_float(u32* random) {
     fn_800A6EA4(random);
-    return (f32)(*random >> 16) / lbl_80796024;
+    return (f32)(*random >> 16) / 65536.0f;
 }
 
 /* -------------------------------------------------------------------------------------------------
  * 0x800A8A5C - the frame's relocation pass over this object's particle managers.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A8A5C(EfEmitterObj* self) {
+void nw4r::ef::Emitter::CalcEmitter() {
+    EfEmitterObj* self = this;
     if (fn_800A8D18(self) != 0) {
         return;
     }
-    if (self->state != 1) {
+    if (self->mLifeStatus != 1) {
         return;
     }
     if (self->field_0x0B4 != 0) {
@@ -1373,63 +1379,24 @@ extern "C" void fn_800A8A5C(EfEmitterObj* self) {
     }
 }
 
-/* -------------------------------------------------------------------------------------------------
- * 0x800A8BC8 / 0x800A8BF8 / 0x800A8C24 / 0x800A8C34 / 0x800A8CB8 / 0x800A8CE8 - the
- * emitter-resource track walkers.
- * ------------------------------------------------------------------------------------------------- */
 
-extern "C" u16 ef_emres_num_emit_track(void* res) {
-    EfPtclTrackBlock* blk = (EfPtclTrackBlock*)ef_emres_get_ptcl_track(res);
-    return ((EfEmitTrackHead*)&((u8*)blk)[blk->num_ptcl * 8 + 4])->num;
-}
 
-extern "C" void* ef_emres_get_ptcl_track(void* res) {
-    EfChainHeader* h = (EfChainHeader*)ef_res_block_body(res);
-    return &((u8*)h)[h->offset + sizeof(EfChainHeader)];
-}
 
-extern "C" void* ef_res_block_body(void* res) {
-    EfResHeader* h = (EfResHeader*)res;
-    return &((u8*)h)[h->offset + sizeof(EfResHeader)];
-}
 
-extern "C" void* fn_800A8C34(void* res, u16 index) {
-    void* array = ef_emres_get_emit_track_tbl(res);
-#line 736
-    if ((u32)index >= (u32)ef_emres_num_emit_track(res)) {
-        nw4r::db::Panic(lbl_80592CC0, __LINE__, lbl_80592C94);
-    }
-    return *(void**)((u8*)array + (u32)index * 4);
-}
 
-extern "C" void* ef_emres_get_emit_track_tbl(void* res) {
-    EfPtclTrackBlock* blk = (EfPtclTrackBlock*)ef_emres_get_ptcl_track(res);
-    return ((EfEmitTrackHead*)&((u8*)blk)[blk->num_ptcl * 8 + 4])->table;
-}
 
-extern "C" u16 fn_800A8CE8(void* res) {
-    EfPtclTrackBlock* blk = (EfPtclTrackBlock*)ef_emres_get_ptcl_track(res);
-    return ((EfEmitTrackHead*)&((u8*)blk)[blk->num_ptcl * 8 + 4])->first;
-}
-
-/* -------------------------------------------------------------------------------------------------
- * 0x800A8D18 - this object's "freed" flag.
- * ------------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_800A8D18(EfEmitterObj* self) {
-    return (self->flags & 0x200) != 0;
-}
 
 /* -------------------------------------------------------------------------------------------------
  * 0x800A8D30 - the table's sweep slot: call slot 6 of every manager on the active list.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A8D30(EfEmitterObj* self) {
+void nw4r::ef::Emitter::CalcParticle() {
+    EfEmitterObj* self = this;
     if (fn_800A8D18(self) != 0) {
         return;
     }
 #line 973
-    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592850, __LINE__, lbl_80592860);
+    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, "ef_emitter.cpp", __LINE__, "NW4R:Failed assertion UtlistSize(&mActivityList.mActiveList) < NW4R_EF_MAX_PARTICLEMANAGER");
     s32 size = fn_800A4AF0(&self->particles);
     void* list[NW4R_EF_MAX_PARTICLEMANAGER];
     u16 num = fn_8009B374(&self->particles, list, size);
@@ -1442,7 +1409,8 @@ extern "C" void fn_800A8D30(EfEmitterObj* self) {
  * 0x800A8DF8 - the table's per-frame manager tick.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A8DF8(EfEmitterObj* self) {
+void nw4r::ef::Emitter::CalcEmission() {
+    EfEmitterObj* self = this;
     if (fn_800A8D18(self) != 0) {
         return;
     }
@@ -1453,7 +1421,7 @@ extern "C" void fn_800A8DF8(EfEmitterObj* self) {
     if (self->field_0x0E8 != 0) {
         ef_effect_set_calc_flag(self->managerEF, 1);
     }
-    if (self->state == 1) {
+    if (self->mLifeStatus == 1) {
         EfParticleRec* pm = (EfParticleRec*)ef_list_get_first(&self->particles);
         nw4r::math::MTX34 m1, m2;
         MTX34_ctor(&m1);
@@ -1481,8 +1449,9 @@ extern "C" void fn_800A8DF8(EfEmitterObj* self) {
  * 0x800A8F18 - the table's rotation-from-parent slot.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A8F18(EfEmitterObj* self) {
-    if (self->state != 1 && self->state != 2) {
+void nw4r::ef::Emitter::CalcBillboard() {
+    EfEmitterObj* self = this;
+    if (self->mLifeStatus != 1 && self->mLifeStatus != 2) {
         return;
     }
     if ((self->flags2 & 0x10000) == 0 && (self->flags2 & 0x8000) == 0) {
@@ -1491,24 +1460,24 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
     {
         nw4r::math::MTX34 m1, m2, m3, m4;
         MTX34_ctor(&m1);
-        self->rotation.x = self->rotation.y = self->rotation.z = lbl_80796004;
+        self->rotation.x = self->rotation.y = self->rotation.z = 0.0f;
         self->transform_dirty = 1;
         ef_emitter_get_mtx(self, &m1);
         MTX34_ctor(&m2);
         mtx34_concat(&m2, &self->managerEF->effect->ref_mtx, &m1);
         ef_mtx34_copy(&m3, &m2);
         m3.m[0][0] = ef_mtx34_column_length((const f32*)&m3, 0);
-        m3.m[2][0] = lbl_80796004;
-        m3.m[1][0] = lbl_80796004;
+        m3.m[2][0] = 0.0f;
+        m3.m[1][0] = 0.0f;
         m3.m[1][1] = ef_mtx34_column_length((const f32*)&m3, 1);
-        m3.m[2][1] = lbl_80796004;
-        m3.m[0][1] = lbl_80796004;
+        m3.m[2][1] = 0.0f;
+        m3.m[0][1] = 0.0f;
         m3.m[2][2] = ef_mtx34_column_length((const f32*)&m3, 2);
-        m3.m[1][2] = lbl_80796004;
-        m3.m[0][2] = lbl_80796004;
+        m3.m[1][2] = 0.0f;
+        m3.m[0][2] = 0.0f;
         if ((self->flags2 & 0x8000) != 0) {
             MTX34_ctor(&m4);
-            ef_mtx34_rotate_xyz(&m4, lbl_80796028, lbl_80796004, lbl_80796004);
+            ef_mtx34_rotate_xyz(&m4, 1.5707964f, 0.0f, 0.0f);
             mtx34_concat(&m3, &m3, &m4);
         }
         mtx34_inverse(&m2, &m2);
@@ -1526,11 +1495,11 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
 
 extern "C" void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c, bool d) {
 #line 1124
-    NW4R_POINTER_ASSERT(lbl_80592850, dst, lbl_80592AA8);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", dst, "NW4R:Pointer Error\nresult(=%p) is not valid pointer.");
 #line 1125
-    NW4R_POINTER_ASSERT(lbl_80592850, orig, lbl_80592AE0);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", orig, "NW4R:Pointer Error\norig(=%p) is not valid pointer.");
     if (dst == orig) {
-        nw4r::db::Panic(lbl_80592850, 0x466, lbl_80592B14);
+        nw4r::db::Panic("ef_emitter.cpp", 0x466, "NW4R:Failed assertion result != orig");
     }
     if (a != 0 && b != 0 && c == 100) {
         mtx34_copy((Mtx34*)dst, (Mtx34*)orig);
@@ -1550,7 +1519,7 @@ extern "C" void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c
         } else if (c != 0) {
             EfVec pt;
             VEC3_ctor(&pt);
-            vec3_scale_by(&pt, &offset, (f32)c / lbl_80796000);
+            vec3_scale_by(&pt, &offset, (f32)c / 100.0f);
             nw4r::math::MTX34Trans((nw4r::math::MTX34*)dst, (nw4r::math::MTX34*)dst, &pt);
         }
         if (b != 0 || a != 0) {
@@ -1572,7 +1541,7 @@ extern "C" void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c
             if (d != 0 && c != 100) {
                 EfVec pt;
                 VEC3_ctor(&pt);
-                vec3_scale_by(&pt, &offset, lbl_80796018);
+                vec3_scale_by(&pt, &offset, -1.0f);
                 nw4r::math::MTX34Trans((nw4r::math::MTX34*)dst, (nw4r::math::MTX34*)dst, &pt);
             }
         }
@@ -1645,14 +1614,17 @@ extern "C" void fn_800A95D8(EfEmitterObj* self) {
     }
 }
 
+/* The id of the particle manager whose matrix was last built; a manager marked dirty clears it (`.sbss`). */
+s32 ef_pm_mtx_cache_id;
+
 /* -------------------------------------------------------------------------------------------------
  * 0x800A96C0 - mark a manager's transform dirty.
  * ------------------------------------------------------------------------------------------------- */
 
 extern "C" void ef_pm_set_mtx_dirty(EfPmView* pm) {
     pm->dirty = 1;
-    if ((s32)fn_800A9700(pm) == lbl_80794920) {
-        lbl_80794920 = -1;
+    if ((s32)fn_800A9700(pm) == ef_pm_mtx_cache_id) {
+        ef_pm_mtx_cache_id = -1;
     }
 }
 
@@ -1671,7 +1643,7 @@ extern "C" u16 fn_800A970C(EfEmitterObj* self) {
 extern "C" void* fn_800A9714(EfEmitterObj* self, u16 index) {
 #line 1284
     if ((u32)index >= (u32)fn_800A970C(self)) {
-        nw4r::db::Panic(lbl_80592850, __LINE__, lbl_80592B3C);
+        nw4r::db::Panic("ef_emitter.cpp", __LINE__, "NW4R:Failed assertion idx < GetNumParticleManager()");
     }
     return nw4r::ut::List_GetNth((nw4r::ut::List*)&self->particles, index);
 }
@@ -1682,7 +1654,7 @@ extern "C" void fn_800A9784(EfEmitterObj* self, void* cb, void* arg, s32 flag) {
 
 extern "C" void fn_800A9790(EfEmitterObj* self, EfWalkCtx* arg) {
 #line 1305
-    NW4R_POINTER_ASSERT(lbl_80592850, self, lbl_80592B70);
+    NW4R_POINTER_ASSERT("ef_emitter.cpp", self, "NW4R:Pointer Error\nptr(=%p) is not valid pointer.");
     arg->count += fn_800A98D4(self, arg->cb, arg->arg, arg->flag, 0);
 }
 

@@ -23,6 +23,9 @@
  *   before the first virtual), so the virtual calls load the slot through r12 as retail does.  `Release` is an
  *   `inline` function defined after its only caller: `-inline noauto` keeps it out of line, and its strings are
  *   emitted after the unit's own.
+ * SHAPES. The last function (0x800A3888) is `ReferencedObject::SendClosing`'s weak copy (`ef/ef_effect.h`), the one
+ *   the link keeps: `ef_creation_queue_send_closing` calls it directly (`#pragma dont_inline`), so the copy follows
+ *   it, and the link strips the unreferenced reader as it stripped retail's.
  */
 
 #include "types.h"
@@ -31,6 +34,7 @@
 
 #include "ef/ef_creationqueue.h" /* the unit's own header */
 #include "ef/ef_emitter.h" /* fn_800A7750 (rule 2) */
+#include "ef/ef_effect.h" /* nw4r::ef::ReferencedObject (rule 1) */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic / Warning and NW4R_ASSERT (rule 2) */
 
 #pragma peephole off
@@ -203,6 +207,12 @@ extern "C" inline u32 fn_800A3800(EffectManager* manager) {
     return manager->mRefCount;
 }
 
-/* 0x800A3888 - an empty stub. */
-extern "C" void fn_800A3888(void) {
+#pragma dont_inline on
+
+/* Calls the base's `SendClosing` directly, so its weak copy (0x800A3888, the copy the link keeps) follows here; the
+ * link strips this reader. */
+void ef_creation_queue_send_closing(nw4r::ef::ReferencedObject* object) {
+    object->nw4r::ef::ReferencedObject::SendClosing();
 }
+
+#pragma dont_inline reset

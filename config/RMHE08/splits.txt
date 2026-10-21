@@ -498,26 +498,26 @@ ef/ef_creationqueue.cpp:
 	.data       start:0x805922C0 end:0x805923A0
 
 ef/ef_draworder.cpp:
-	extab       start:0x80009B60 end:0x80009BA0
-	extabindex  start:0x80022CEC end:0x80022D4C
-	.text       start:0x800A388C end:0x800A40F4
+	extab       start:0x80009B60 end:0x80009B80
+	extabindex  start:0x80022CEC end:0x80022D1C
+	.text       start:0x800A388C end:0x800A3F98
 	.data       start:0x805923A0 end:0x80592430
 
 ef/ef_effect.cpp:
-	extab       start:0x80009BA0 end:0x80009C38
-	extabindex  start:0x80022D4C end:0x80022E30
-	.text       start:0x800A40F4 end:0x800A56B0
-	.data       start:0x80592430 end:0x80592698
-	.sdata      start:0x807912E0 end:0x807912E8
+	extab       start:0x80009B80 end:0x80009C28
+	extabindex  start:0x80022D1C end:0x80022E18
+	.text       start:0x800A3F98 end:0x800A559C
+	.data       start:0x80592430 end:0x80592650
 	.sdata2     start:0x80795FF0 end:0x80795FF8
 
 ef/ef_effectsystem.cpp:
-	extab       start:0x80009C38 end:0x80009CBC
-	extabindex  start:0x80022E30 end:0x80022EC0
-	.text       start:0x800A56B0 end:0x800A6258 align:16
+	extab       start:0x80009C28 end:0x80009CBC
+	extabindex  start:0x80022E18 end:0x80022EC0
+	.text       start:0x800A559C end:0x800A6258
 	.ctors      start:0x8056F2D8 end:0x8056F2DC
-	.data       start:0x80592698 end:0x80592850
+	.data       start:0x80592650 end:0x80592850
 	.bss        start:0x80688420 end:0x80694538
+	.sdata      start:0x807912E0 end:0x807912E8
 	.sbss       start:0x80794910 end:0x80794920
 	.sdata2     start:0x80795FF8 end:0x80796000
 

@@ -1,15 +1,16 @@
 /*
  * ef/ef_effectsystem.cpp - the effect system (`EfSys`, nw4r's `EffectSystem`; the 0xC068-byte instance the game's
- *   effect manager holds, read by `fn_800D3C0C` at +0x29074): `Initialize` (the group table of 0x1C-byte
+ *   effect manager holds, read by `fn_800D3C0C` at +0x29074): its constructor (which registers the library version
+ *   once), destructor and instance accessor, `Initialize` (the group table of 0x1C-byte
  *   `mActivityList` records out of the system's allocator), its array helpers, the immediate retire, `CreateEffect`,
  *   `RetireEffect`, the three per-group sweeps (0x200-entry stack buffers), the reference-transform setter and two
  *   sub-object accessors; then the unit's statics - the draw-order object, the draw-strategy and emitter-form
  *   builders, the default draw info and the system instance - whose static initializer and implicit constructors
  *   the compiler emits after them.
- * RANGE. .text 0x800A56B0-0x800A6258 (20 functions); extab 0x80009C38-0x80009CBC, extabindex 0x80022E30-0x80022EC0,
- *   .ctors 0x8056F2D8-0x8056F2DC, .data 0x80592698-0x80592850 (the `__FILE__` string "ef_effectsystem.cpp" first,
- *   `DrawOrderBase`'s table last), .bss 0x80688420-0x80694538, .sbss 0x80794910-0x80794920, .sdata2
- *   0x80795FF8-0x80796000.
+ * RANGE. .text 0x800A559C-0x800A6258 (23 functions); extab 0x80009C28-0x80009CBC, extabindex 0x80022E18-0x80022EC0,
+ *   .ctors 0x8056F2D8-0x8056F2DC, .data 0x80592650-0x80592850 (the version string, then the `__FILE__` string
+ *   "ef_effectsystem.cpp", `DrawOrderBase`'s table last), .bss 0x80688420-0x80694538, .sdata 0x807912E0-0x807912E8
+ *   (`NW4R_EF_Version_`), .sbss 0x80794910-0x80794920, .sdata2 0x80795FF8-0x80796000.
  * FLAGS. `cflags_main` plus `-pool off` (configure.py: the static initializer addresses each static with its own
  *   `lis`/`addi`); `#pragma peephole off` from `Initialize` on (the table stores as `lis` + `addi r0` + `stw r0`, the
  *   sweeps' unfused `clrlwi` + `slwi`); `#pragma dont_inline on` over `Initialize` (retail calls its inline helpers)
@@ -53,6 +54,8 @@
 #include "ef/ef_effectsystem.h" /* EfSys, the unit's own header */
 #include "MSL/new.h" /* the placement array forms */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic / Warning and NW4R_ASSERT (rule 2) */
+#include "ef/ef_animcurve.h" /* ef_creation_queue_reset (rule 2) */
+#include "OS/OS.h" /* OSRegisterVersion (rule 2) */
 
 /* ===================================================================================================
  * Types.  The `EfSys` prefix keeps this unit's views apart from the sibling units' (`EfList`, ...).
@@ -105,6 +108,9 @@ typedef struct EfSysAccessObj {
 } EfSysAccessObj; /* size: 0x88 (lower bound: +0x58 is the highest field returned) */
 
 
+/* The library version string the effect system registers once (`.sdata`). */
+const char* NW4R_EF_Version_ = "<< NW4R    - EF \tfinal   build: Jan 30 2010 10:51:56 (0x4302_158) >>";
+
 /* This unit's `.data` strings, in retail order: the `__FILE__` string and the assert messages (`DrawOrderBase`'s
  * table follows them). */
 char ef_effectsystem_file_name[] = "ef_effectsystem.cpp";
@@ -130,6 +136,7 @@ EfSysEffect* fn_800A5A90(EfSys* self, void* emitter, u32 groupID, u16 flag);
 u32 fn_800A5D8C(EfSys* self, u32 groupID);
 u32 fn_800A5E6C(EfSys* self, u32 groupID);
 u32 fn_800A5F4C(EfSys* self, u32 groupID);
+EfSys* fn_800A56A4(void);
 void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src, f32 a, f32 b);
 void* ef_draw_info_projection(EfSysAccessObj* self);
 nw4r::math::MTX34* fn_800A60C0(EfSysAccessObj* self);
@@ -234,7 +241,7 @@ static DrawInfo sDrawInfo;
 /* Set once the library version has been registered. */
 u32 ef_system_version_registered;
 
-/* The system singleton (its constructor and destructor are `ef/ef_effect.cpp`'s). */
+/* The system singleton. */
 EfSys ef_system_instance;
 
 /* The system's allocator, reached through `ef_system_memory_manager` (the map's `GetMemoryManager__Q34nw4r2ef12EffectSystemCFv`
@@ -253,6 +260,33 @@ inline void nw4r::ef::Random::Srand(u32 seed) {
 /* Initialises the record's live list with a zero link offset. */
 inline EfSysActivityList::EfSysActivityList() {
     fn_800A4030(this, 0);
+}
+
+/* 0x800A559C (0x7C): builds the effect system: its creation queue, the reference position and matrix, and the
+ * library version, registered once. */
+EfSys::EfSys() {
+    ef_creation_queue_reset((CreationQueue*)mCreationQueue);
+    VEC3_ctor(&mRefPos);
+    MTX34_ctor(&mRefMtx);
+    if (ef_system_version_registered == 0) {
+        ef_system_version_registered = 1;
+        OSRegisterVersion(NW4R_EF_Version_);
+    }
+    mMemoryManager = NULL;
+    mMaxGroupID = 0;
+    mField_0xC064 = 0;
+}
+
+/* 0x800A5618 (0x8C): retires every group's effects. */
+EfSys::~EfSys() {
+    for (u32 i = 0; i < mMaxGroupID; i++) {
+        fn_800A5D8C(this, i);
+    }
+}
+
+/* 0x800A56A4 - the singleton accessor. */
+extern "C" EfSys* fn_800A56A4(void) {
+    return &ef_system_instance;
 }
 
 #pragma dont_inline on
