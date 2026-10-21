@@ -5,13 +5,16 @@
  *   +0x34); `fn_80119D9C` runs the type-2 start `fn_80119DEC` or the type handlers in `ef/eft029.cpp`.
  * NAMES. The map has only `fn_` stems for this range.  The file is C: the unit's own symbols are plain (a mangled
  *   callee is not evidence of a C++ unit); its extab/extabindex come from `cflags_main`'s `-Cpp_exceptions on`.
- * RESIDUALS. 2 partial rows:
- *  - `fn_80119C44`: the two handler stores use `r3` for the `addi` where retail uses `r0` (sizes and relocations
- *    agree); no spelling of the assignments moves it (docs/ef.md, "Handler stores through r0");
- *  - `fn_80119D9C`: retail places case 0's nested type switch after the function's exit block; MWCC puts it in
- *    case 0's slot for every spelling, so the source is the `case 0: break;` plus after-switch form, which keeps
- *    the target's size and order but leaves a dead `blr` (docs/ef.md, "The case-0 nested dispatch").
- *   flipcheck: `.sdata2` claimed, not emitted; `.text` differs in 26 bytes.
+ *   GUESS: `eft028_state0_dispatch` (0x80119DD8, the file-local state-0 function the map folds into `fn_80119D9C`'s
+ *   0x50 bytes; a split of that row at +0x3C is filed).
+ * FLAGS. `#pragma peephole off` around `fn_80119C44`: with the pass on, the two handler stores take `r3` for the
+ *   `addi` where retail uses `r0`.
+ * RESIDUALS. none in bytes once linked.  Until the map splits `fn_80119D9C` (0x50) into the dispatcher (0x3C) and
+ *   `eft028_state0_dispatch` (0x14), the target object carries case 0's `b` as a resolved in-function branch and ours
+ *   as a relocation to the static, so the report row reads short and flipcheck sees one byte.
+ * SHAPES. `fn_80119C44` takes `type`/`area` as `u8` (no mask before the `stb`s; the `area` compare keeps its
+ *   `clrlwi`).  Case 0 of `fn_80119D9C` calls a static function defined after it: MWCC tail-calls it with a `b`
+ *   to the next function, which is retail's `[chain][blr][b N][cases][blr][N: nested switch]` layout.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
@@ -67,8 +70,6 @@ extern void fn_8011AD00(struct _EFT_HEAP* self);
 
 extern void push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(void** effects, long count);
 
-extern f32 lbl_80796B2C; /* 1.0f */
-
 /* ---------------------------------------------------------------------------------------------------
  * body
  * ------------------------------------------------------------------------------------------------- */
@@ -77,9 +78,12 @@ void fn_80119D10(struct _EFT_HEAP* self);
 void fn_80119D24(struct _EFT_HEAP* self);
 void fn_80119D60(struct _EFT_HEAP* self);
 void fn_80119D9C(struct _EFT_HEAP* self);
+static void eft028_state0_dispatch(struct _EFT_HEAP* self);
+
+#pragma peephole off
 
 /* Creates the area's effect record and installs its two handlers. */
-struct _EFT_HEAP* fn_80119C44(u32 type, u32 area, u32 count)
+struct _EFT_HEAP* fn_80119C44(u8 type, u8 area, u32 count)
 {
     struct _EFT_HEAP* effect;
     struct _EFT_HEAP_WORK* work;
@@ -93,7 +97,7 @@ struct _EFT_HEAP* fn_80119C44(u32 type, u32 area, u32 count)
     }
     work = effect->work_0x38;
     work->count = (u8)count;
-    work->scale = lbl_80796B2C;
+    work->scale = 1.0f;
     effect->field_0x03 = 0x1C;
     effect->type_0x02 = type;
     effect->area_0x44 = area;
@@ -102,6 +106,8 @@ struct _EFT_HEAP* fn_80119C44(u32 type, u32 area, u32 count)
     effect->dispatch_0x34 = fn_80119D9C;
     return effect;
 }
+
+#pragma peephole reset
 
 /* Runs the release body the record's type asks for. */
 void fn_80119D10(struct _EFT_HEAP* self)
@@ -139,20 +145,24 @@ void fn_80119D9C(struct _EFT_HEAP* self)
 {
     switch (self->state_0x05) {
     case 0:
+        eft028_state0_dispatch(self);
         break;
     case 1:
         fn_8011A34C(self);
-        return;
+        break;
     case 2:
         fn_8011ACF0(self);
-        return;
+        break;
     case 3:
         fn_8011AD00(self);
-        return;
-    default:
-        return;
+        break;
     }
+}
 
+/* State 0: runs the type-2 start or the default start the record's type selects.  File-local, so the DOL map folds
+ * it into the dispatcher's extent. */
+static void eft028_state0_dispatch(struct _EFT_HEAP* self)
+{
     switch (self->type_0x02) {
     default:
         fn_80119DEC(self);

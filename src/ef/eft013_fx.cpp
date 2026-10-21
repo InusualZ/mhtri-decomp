@@ -36,7 +36,10 @@
  *    where retail calls `_savegpr_20`/`_restgpr_20`);
  *  - `fn_8010B71C`: the final store of the damage level keeps a `clrlwi` retail does not have (a `u8` level
  *    colours the registers differently and scores lower);
- *  - `fn_80107DDC`, `fn_8010AD00`: the case-0 nested dispatch (docs/ef.md, "The case-0 nested dispatch");
+ *  - `fn_80107DDC`, `fn_8010AD00`: instruction-identical; they read short until the map splits each at +0x3C into the
+ *    dispatcher and its file-local state-0 body (`eft013_state0_setup`, `eft014_state0_setup`, GUESS names; split
+ *    filed): case 0 tail-calls a static defined right after the dispatcher;
+ *  - function order: our definitions do not follow retail's address order (`eft013_set` is retail's first);
  *  - `fn_80107640`: retail reloads the stored type byte for its switch where ours narrows the argument with `clrlwi`,
  *    and keeps the hook addresses in r0 where ours uses the `lis` register.
  *  flipcheck: `.data`/`.sdata` claimed, not emitted (the tables above are declared `extern`, only the jump tables of
@@ -551,39 +554,44 @@ extern "C" void fn_8010AAD0(_EFT013* self) {
     }
 }
 
+static void eft014_state0_setup(_EFT013* self);
+
 /* 0x8010AD00 - the state_0x05 dispatcher; state 0 is the nested type dispatch. */
 extern "C" void fn_8010AD00(_EFT013* self) {
     switch (self->state_0x05) {
+    case 0:
+        eft014_state0_setup(self);
+        break;
     case 1:
         fn_8010B154(self);
-        return;
+        break;
     case 2:
         fn_8010BBCC(self);
-        return;
+        break;
     case 3:
         fn_8010BBDC(self);
-        return;
+        break;
+    }
+}
+
+/* State 0: runs the setup the type's kind selects.  File-local, so the DOL map folds it into the dispatcher's
+ * extent. */
+static void eft014_state0_setup(_EFT013* self) {
+    switch (lbl_80791808[self->type_0x02]) {
     case 0:
-        switch (lbl_80791808[self->type_0x02]) {
-        case 0:
-            fn_8010AD90(self);
-            return;
-        case 1:
-        case 4:
-            fn_8010AE0C(self);
-            return;
-        case 2:
-            fn_8010AF50(self);
-            return;
-        case 3:
-        case 5:
-            fn_8010B008(self);
-            return;
-        default:
-            return;
-        }
-    default:
-        return;
+        fn_8010AD90(self);
+        break;
+    case 1:
+    case 4:
+        fn_8010AE0C(self);
+        break;
+    case 2:
+        fn_8010AF50(self);
+        break;
+    case 3:
+    case 5:
+        fn_8010B008(self);
+        break;
     }
 }
 
@@ -1126,35 +1134,40 @@ extern "C" void eft013_set_pl_model(_EFT013_PL* self, u8 type) {
     eft_state_flags_set((_EFT*)e, 1, 0);
 }
 
-/* 0x80107DDC (0x80): the eft013 state dispatcher; state 0 picks the type's setup. */
+static void eft013_state0_setup(_EFT013* self);
+
+/* 0x80107DDC (0x3C): the eft013 state dispatcher; state 0 picks the type's setup. */
 extern "C" void fn_80107DDC(_EFT013* self) {
     switch (self->state_0x05) {
     case 0:
-        switch (lbl_8059EE1C[self->type_0x02]) {
-        case 0:
-        case 3:
-            eft013_setup_effect(self);
-            return;
-        case 1:
-            eft013_setup_uv_model(self);
-            return;
-        case 2:
-            fn_801089C0(self);
-            return;
-        default:
-            return;
-        }
+        eft013_state0_setup(self);
+        break;
     case 1:
         fn_80108A2C(self);
-        return;
+        break;
     case 2:
         eft013_retire_step(self);
-        return;
+        break;
     case 3:
         fn_8010A318(self);
-        return;
-    default:
-        return;
+        break;
+    }
+}
+
+/* State 0: runs the setup the type's kind selects.  File-local, so the DOL map folds it into the dispatcher's
+ * extent. */
+static void eft013_state0_setup(_EFT013* self) {
+    switch (lbl_8059EE1C[self->type_0x02]) {
+    case 0:
+    case 3:
+        eft013_setup_effect(self);
+        break;
+    case 1:
+        eft013_setup_uv_model(self);
+        break;
+    case 2:
+        fn_801089C0(self);
+        break;
     }
 }
 

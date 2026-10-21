@@ -7,16 +7,16 @@
  *   unfused `subi`/`clrlwi`/`extsb`/`rlwinm` + `cmpwi` forms; playbook 39) and `#pragma fp_contract off` for
  *   `fn_80101FA4` (retail keeps `fmuls` + `fsubs`; playbook 40).
  * NAMES. The unit name is a GUESS (the range holds the `em` controller); the map has only `fn_` stems, so the
- *   definitions are `extern "C"` in a C++ unit.
- * RESIDUALS. 2 partial rows:
- *  - `fn_80101FA4`: one `lfd` of the int-to-f64 magic names our pool entry where retail names `lbl_80796728`, and
- *    the registers are coloured differently;
- *  - `fn_801027D0`: retail's frame places `eye` at +0x08, the probe copy at +0x18, `seg` at +0x28, `cam` at +0x34 and
- *    the quad at +0x40; MWCC allocates the five locals in reverse order whatever the declaration order.
- *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x9E8 of 0x9F0) and `.sdata2` (0x10 of 0x50) short of the
- *   claim and differing; extabindex differs in 1 byte.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80796708`.
- * SHAPES. `EmEffectUnit::handles` is an array member and `fn_80101FA4` writes `unit->handles[i]->field` inline:
+ *   definitions are `extern "C"` in a C++ unit.  GUESS: `em_key_alpha_table` (map `lbl_80791790`, the
+ *   `eftGetKeyAlpha` table).
+ * RESIDUALS. none in bytes: every row, `.sdata` and `.sdata2` match (the `.sdata2` claim's last word is the 8-byte
+ *   fill before `ef/eft007.cpp`'s pool).  Pool relocations name `@NNN` where retail names the map's `lbl_` rows.
+ * SHAPES. `fn_80101FA4` scales by the dot product directly (`vec3_scale(&v64, &v100, vec3_dot(...))`) and by each
+ *   entry's own `intensity` byte; its scalar declarations run `f31, f29, intensity, alpha, part, i, unit` (the order
+ *   colours `unit` r25 and `i` r26).
+ *   `fn_801027D0`'s segment is one `EmEffectSegment` local (from/to at +0x28/+0x34), declared first; the probe loop
+ *   tests the literal (`scale > 0.0f`): a `zero` local schedules the `lfs f31` one slot early.
+ *   `EmEffectUnit::handles` is an array member and `fn_80101FA4` writes `unit->handles[i]->field` inline:
  *   retail reloads the handle and `unit->entries[i]` at every access.
  *   The screen-box test and its off-screen accumulator use the negated comparisons (`!(x <= lo)`, `!(x >= hi)`,
  *   `x >= 640.0f`, `x <= 0.0f`): only the `<=`/`>=` spellings give retail's `fcmpo` + `cror`.
@@ -180,24 +180,8 @@ extern "C" void move__6MHcharFUs(_EmHandle* self, u32 motion);
 extern "C" void setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(_EmHandle* self, u32 index, u32 id,
                                                                   _GXColor* color);
 
-/* --- the unit's own pool, declared, never defined (playbook 29) ---------------------------------- */
-extern f32 lbl_807966F0; /* 0.0001f  */
-extern f32 lbl_807966F4; /* 0.0f     */
-extern f32 lbl_807966F8; /* 50.0f    */
-extern f32 lbl_807966FC; /* -100.0f  */
-extern f32 lbl_80796700; /* 740.0f   */
-extern f32 lbl_80796704; /* 580.0f   */
-extern f32 lbl_80796708; /* 2.0f     */
-extern f32 lbl_8079670C; /* 640.0f   */
-extern f32 lbl_80796710; /* 480.0f   */
-extern f32 lbl_80796714; /* 1.0f     */
-extern f32 lbl_80796718; /* 0.01f    */
-extern f32 lbl_8079671C; /* 128.0f   */
-extern f32 lbl_80796720; /* 0.03125f */
-
-extern f32 lbl_80796738; /* 0.05f    */
-
-extern u8 lbl_80791790;  /* the key-alpha table `eftGetKeyAlpha` walks */
+/* The unit's `.sdata`: the key-alpha table `eftGetKeyAlpha` walks. */
+u8 em_key_alpha_table[8] = { 0x00, 0x00, 0x0A, 0x80, 0x34, 0x00, 0xFF, 0x00 };
 
 /* --- the functions, in address order ------------------------------------------------------------ */
 extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos);
@@ -237,13 +221,13 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     nw4r::math::VEC3 v10;  /* +0x010 */
     _GXColor color;        /* +0x00C */
     s32 model;             /* +0x008 */
-    EmEffectUnit* unit;
     f32 f31;
     f32 f29;
-    s32 alpha;
     s32 intensity;
+    s32 alpha;
     u8 part;
     u32 i;
+    EmEffectUnit* unit;
     f32 spread;
     f32 off_screen;
     f32 ease;
@@ -264,7 +248,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
         work->frame++;
         return;
     }
-    if (vec3_length_sq(&unit->world_pos) < lbl_807966F0) {
+    if (vec3_length_sq(&unit->world_pos) < 0.0001f) {
         return;
     }
     if (fn_802B45D4() == 1) {
@@ -273,7 +257,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     if (stage_water_enabled_ck() != 0) {
         get_camera_pos_c1(&cam);
         copyVec3(&vD0, &cam);
-        if (vD0.y < lbl_807966F4) {
+        if (vD0.y < 0.0f) {
             return;
         }
     }
@@ -289,46 +273,45 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     vec3_normalize_into(&vF4, &vF4);
     get_camera_pos_c1(&v94);
     copyVec3(&v124, &v94);
-    vec3_scale(&v88, &vF4, lbl_807966F8);
+    vec3_scale(&v88, &vF4, 50.0f);
     copyVec3(&vE8, &v88);
     addVec3To(&v124, &vE8);
-    if (!(v130.x <= lbl_807966FC) && !(v130.x >= lbl_80796700) && !(v130.y <= lbl_807966FC)
-        && !(v130.y >= lbl_80796704) && !(f29 < lbl_807966F4)) {
-        vec3_dot(&vE8, &v100);
-        vec3_scale(&v64, &v100, lbl_80796708);
+    if (!(v130.x <= -100.0f) && !(v130.x >= 740.0f) && !(v130.y <= -100.0f)
+        && !(v130.y >= 580.0f) && !(f29 < 0.0f)) {
+        vec3_scale(&v64, &v100, vec3_dot(&vE8, &v100));
         get_camera_pos_c1(&v70);
         addVec3(&v7C, &v70, &v64);
         copyVec3(&v10C, &v7C);
         subVec3(&v58, &v10C, &v124);
         copyVec3(&vE8, &v58);
-        vec3_scale_in_place(&vE8, lbl_80796708);
+        vec3_scale_in_place(&vE8, 2.0f);
         addVec3(&v4C, &v124, &vE8);
         copyVec3(&v118, &v4C);
         f31 = (f32)(s32)vec3_len(&vE8);
-        off_screen = lbl_807966F4;
-        if (v130.x >= lbl_8079670C) {
-            off_screen = v130.x - lbl_8079670C;
-        } else if (v130.x <= lbl_807966F4) {
+        off_screen = 0.0f;
+        if (v130.x >= 640.0f) {
+            off_screen = v130.x - 640.0f;
+        } else if (v130.x <= 0.0f) {
             off_screen = -v130.x;
         }
-        if (v130.y >= lbl_80796710) {
-            off_screen += v130.y - lbl_80796710;
-        } else if (v130.y <= lbl_807966F4) {
+        if (v130.y >= 480.0f) {
+            off_screen += v130.y - 480.0f;
+        } else if (v130.y <= 0.0f) {
             off_screen += -v130.y;
         }
-        ease = lbl_80796714 - (lbl_80796718 * off_screen);
-        if (ease < lbl_807966F4) {
-            ease = lbl_807966F4;
+        ease = 1.0f - (0.01f * off_screen);
+        if (ease < 0.0f) {
+            ease = 0.0f;
         }
-        intensity = (s32)(lbl_8079671C * ease);
-        spread = lbl_80796720;
+        intensity = (s32)(128.0f * ease);
+        spread = 0.03125f;
         vec3_normalize_into(&vDC, &vE8);
         fn_801027D0(work);
-        if (unit->scale_rate > lbl_80796718) {
+        if (unit->scale_rate > 0.01f) {
             for (i = 0; i < unit->emitter_count; i++) {
                 unit->handles[i]->offset_x = unit->entries[i].offset_x;
                 unit->handles[i]->offset_y = unit->entries[i].offset_y;
-                vec3_scale(&v28, &vE8, (f32)(u8)intensity);
+                vec3_scale(&v28, &vE8, (f32)unit->entries[i].intensity);
                 vec3_scale(&v34, &v28, spread);
                 addVec3(&v40, &v124, &v34);
                 copyVec3(&unit->handles[i]->pos, &v40);
@@ -409,7 +392,7 @@ extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos) 
         work->state++;
         /* fallthrough */
     case 2:
-        unit->color.a = eftGetKeyAlpha(&lbl_80791790, work->timer);
+        unit->color.a = eftGetKeyAlpha(em_key_alpha_table, work->timer);
         work->timer++;
         if (work->timer > 52) {
             work->state++;
@@ -442,30 +425,27 @@ extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos) 
 }
 
 extern "C" void fn_801027D0(EmEffectWork* work) {
-    nw4r::math::VEC3 eye;  /* +0x008 */
+    EmEffectSegment seg;   /* +0x028, from the effect to the camera */
     EmEffectProbe point;   /* +0x018, the probe entry copied locally before it is tested */
-    nw4r::math::VEC3 seg;  /* +0x028, the segment's two ends */
-    nw4r::math::VEC3 cam;  /* +0x034 */
+    nw4r::math::VEC3 eye;  /* +0x008 */
     EmEffectQuad quad;     /* +0x040 */
     EmEffectUnit* unit;
     u8 hit;
     u32 i;
-    f32 zero;
 
     unit = work->unit;
-    fn_800FA3E8((EmEffectSegment*)&seg);
+    fn_800FA3E8(&seg);
     fn_8010294C(&quad);
     fn_800FA420(&point.pos);
     if (unit->probes == 0) {
-        unit->scale_rate = lbl_80796714;
+        unit->scale_rate = 1.0f;
         return;
     }
-    copyVec3(&seg, &unit->world_pos);
+    copyVec3(&seg.from, &unit->world_pos);
     get_camera_pos_c1(&eye);
-    copyVec3(&cam, &eye);
+    copyVec3(&seg.to, &eye);
     pl_segment_box_set((const PlSegment*)&seg, (PlSegmentBox*)&quad);
-    zero = lbl_807966F4;
-    for (i = 0; unit->probes[i].scale > zero; i++) {
+    for (i = 0; unit->probes[i].scale > 0.0f; i++) {
         vec_to_mh_vec3(&point.pos, (Vec*)&unit->probes[i].pos);
         point.scale = unit->probes[i].scale;
         hit = fn_80290598(&quad, &point.pos, 0, 0);
@@ -475,19 +455,19 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
     }
     if (hit != 0) {
         unit->on_ground = 1;
-        if (unit->scale_rate > lbl_807966F4) {
-            unit->scale_rate -= lbl_80796738;
+        if (unit->scale_rate > 0.0f) {
+            unit->scale_rate -= 0.05f;
         }
-        if (unit->scale_rate < lbl_807966F4) {
-            unit->scale_rate = lbl_807966F4;
+        if (unit->scale_rate < 0.0f) {
+            unit->scale_rate = 0.0f;
         }
     } else {
         unit->on_ground = 0;
-        if (unit->scale_rate < lbl_80796714) {
-            unit->scale_rate += lbl_80796738;
+        if (unit->scale_rate < 1.0f) {
+            unit->scale_rate += 0.05f;
         }
-        if (unit->scale_rate > lbl_80796714) {
-            unit->scale_rate = lbl_80796714;
+        if (unit->scale_rate > 1.0f) {
+            unit->scale_rate = 1.0f;
         }
     }
 }

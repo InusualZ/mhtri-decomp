@@ -7,14 +7,22 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps the `li r0` + `psq_l` epilogue and the
  *   raw `clrlwi` chains; playbook 39).
  * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.
- * RESIDUALS. 1 partial row: `fn_80115100` is 28 bytes long, the `_GXColor` by-value temporary growing the frame.
- *   flipcheck: `.bss`/`.ctors`/`.data`/`.sdata2` claimed, not emitted; `.text` 0x5B8 against the claimed 0x59C and
- *   differing; extabindex differs in 1 byte.
- * SHAPES. `fn_80114E34` takes `u8` parameters with explicit `(u8)` casts, and its float guard is `scale <= 0.0f`
+ *   GUESS (the data, map `lbl_805A00B8`..`lbl_805A01E0`, `lbl_806A4538`): `eft020_effect_ids`,
+ *   `eft020_effect_counts`, `eft020_rgb_keys_aN`/`_bN`, `eft020_rgb_key_tables_a`/`_b`, `eft020_origin`,
+ *   `EftOriginVec3`.  The map's `fn_801153B8` is MWCC's `__sinit_\fn_80114E34_cpp` (rename filed; it follows the file
+ *   name).
+ * RESIDUALS. none in bytes: every row and section matches (`.bss` 0xC of the claimed 0x10, the tail the link's 8-byte
+ *   fill).  The `__sinit` row reads 0 in the report until the map names it.
+ * SHAPES. `fn_80115100` caches `source_0x30` in a typed local per case (`plw`, `enemy`; case 2 reloads it), tests
+ *   `(s32)self->type_0x02 != 9` (`cmpwi`), passes `work->color[i]` by value with no local copy, and declares
+ *   `i, dead, flags, work, plw, enemy` in that order.
+ *   The origin vector is a file-scope `EftOriginVec3` whose constructor calls `setVec3`: MWCC emits `__sinit` (a tail
+ *   call to `setVec3`), its `.ctors` word and the 0.0f/-5.0f pool.
+ *   `fn_80114E34` takes `u8` parameters with explicit `(u8)` casts, and its float guard is `scale <= 0.0f`
  *   (`fcmpo` + `cror`), not `==` (`fcmpu`).
  *   `fn_80114FAC` declares `MTX34 mtx; s32 i; u16 id; s32 n; _EFT_WORK_A* work;` in that order.
- *   `fn_80115100` selects the key with a ternary on the loaded value (`(i == 0) ? lbl_805A01B8[type] :
- *   lbl_805A01E0[type]`); selecting the table pointer first merges the two load arms.
+ *   `fn_80115100` selects the key with a ternary on the loaded value (`(i == 0) ? eft020_rgb_key_tables_a[type] :
+ *   eft020_rgb_key_tables_b[type]`); selecting the table pointer first merges the two load arms.
  */
 
 #include "types.h"
@@ -69,7 +77,6 @@ extern "C" void fn_80114FAC(_EFT*);
 extern "C" void fn_80115100(_EFT*);
 extern "C" void fn_801153A4(_EFT*);
 extern "C" void fn_801153B4(_EFT*);
-extern "C" void fn_801153B8(void);
 
 /* The library entry points, declared by their map spelling (a mangled callee is not evidence of a
  * C++ unit; only a mangled definition is). */
@@ -92,17 +99,122 @@ extern "C" void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 extern "C" void get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(void* chr, u32 joint,
                                                              nw4r::math::VEC3* out);
 
-/* The shared pool.  The `.data` tables are unsized arrays (large-data `lis`/`addi` addressing in the
- * target); the `.sdata`/`.sdata2` scalars stay scalars so their `@sda21` loads are unchanged. */
-extern "C" u16 lbl_805A00B8[];
-extern "C" u8 lbl_805A00CC[];
-extern "C" u8* lbl_805A01B8[];
-extern "C" u8* lbl_805A01E0[];
+/* The unit's `.data`: the effect id and effect count per type, the two RGB key runs (frame, r, g, b) the
+ * per-frame tint walks, and the per-type tables of those runs (one per effect). */
+extern "C" {
+u16 eft020_effect_ids[10] = {
+    0x01A4, 0x01F6, 0x01F7, 0x01A4, 0x01A4, 0x01A4, 0x01A4, 0x01A4, 0x01A4, 0x039A,
+};
+u8 eft020_effect_counts[10] = {
+    3, 1, 1, 3, 3, 3, 3, 3, 3, 1,
+};
+u8 eft020_rgb_keys_a0[16] = {
+    0, 0xDA, 0xFF, 0xD0,
+    9, 0xA2, 0xE0, 0xA9,
+    19, 0x64, 0xD6, 0x64,
+    255, 0x64, 0xD6, 0x64,
+};
+u8 eft020_rgb_keys_a1[16] = {
+    0, 0x3F, 0xBF, 0xFF,
+    9, 0x3F, 0xBF, 0xFF,
+    19, 0x3F, 0x9F, 0xFF,
+    255, 0x3F, 0x9F, 0xFF,
+};
+u8 eft020_rgb_keys_a2[16] = {
+    0, 0xBB, 0xBC, 0xFF,
+    9, 0xBB, 0xBC, 0xFF,
+    19, 0x70, 0x23, 0xFF,
+    255, 0x70, 0x23, 0xFF,
+};
+u8 eft020_rgb_keys_a3[16] = {
+    0, 0xFF, 0xAA, 0x50,
+    9, 0xFF, 0xAA, 0x50,
+    19, 0xFF, 0xEB, 0x96,
+    255, 0xFF, 0xEB, 0x96,
+};
+u8 eft020_rgb_keys_a4[16] = {
+    0, 0xDF, 0xFF, 0xFF,
+    9, 0xDF, 0xDF, 0xFF,
+    19, 0x7F, 0xFF, 0xFF,
+    255, 0x7F, 0xFF, 0xFF,
+};
+u8 eft020_rgb_keys_a5[16] = {
+    0, 0xFF, 0xDE, 0x5F,
+    9, 0xFF, 0x25, 0x10,
+    19, 0xFF, 0xAF, 0x5F,
+    255, 0xFF, 0xAF, 0x5F,
+};
+u8 eft020_rgb_keys_a6[16] = {
+    0, 0xFF, 0x16, 0x16,
+    9, 0xFF, 0x67, 0x4F,
+    19, 0xFF, 0xAF, 0x74,
+    255, 0xFF, 0xAF, 0x74,
+};
+u8 eft020_rgb_keys_b0[16] = {
+    0, 0x00, 0xB4, 0xB4,
+    15, 0xF0, 0xFF, 0xD6,
+    46, 0x5F, 0xFF, 0xBF,
+    255, 0x5F, 0xFF, 0xBF,
+};
+u8 eft020_rgb_keys_b1[16] = {
+    0, 0x9F, 0xBF, 0xFF,
+    15, 0xBF, 0xDF, 0xFF,
+    46, 0x5F, 0x9F, 0xFF,
+    255, 0x5F, 0x9F, 0xFF,
+};
+u8 eft020_rgb_keys_b2[16] = {
+    0, 0xFF, 0xFF, 0xFF,
+    15, 0xEF, 0xDF, 0xFF,
+    46, 0x9C, 0x7F, 0xFF,
+    255, 0x9C, 0x7F, 0xFF,
+};
+u8 eft020_rgb_keys_b3[16] = {
+    0, 0xFF, 0xEB, 0x64,
+    15, 0xFF, 0xEB, 0x64,
+    46, 0xFF, 0xC8, 0x82,
+    255, 0xFF, 0xC8, 0x82,
+};
+u8 eft020_rgb_keys_b4[16] = {
+    0, 0xDF, 0xFF, 0xFF,
+    15, 0x7F, 0xFF, 0xFF,
+    46, 0x7F, 0xFF, 0xFF,
+    255, 0x7F, 0xFF, 0xFF,
+};
+u8 eft020_rgb_keys_b5[16] = {
+    0, 0xFF, 0xC8, 0x7C,
+    15, 0xFF, 0x8F, 0x1F,
+    46, 0xFF, 0x30, 0x00,
+    255, 0xFF, 0x30, 0x00,
+};
+u8 eft020_rgb_keys_b6[16] = {
+    0, 0xFF, 0xC4, 0xA8,
+    15, 0xFF, 0x82, 0x5B,
+    46, 0xFF, 0x5F, 0x00,
+    255, 0xFF, 0x5F, 0x00,
+};
+u8* eft020_rgb_key_tables_a[10] = {
+    eft020_rgb_keys_a0, NULL, NULL, eft020_rgb_keys_a1,
+    eft020_rgb_keys_a2, eft020_rgb_keys_a3, eft020_rgb_keys_a4, eft020_rgb_keys_a5,
+    eft020_rgb_keys_a6, NULL,
+};
+u8* eft020_rgb_key_tables_b[10] = {
+    eft020_rgb_keys_b0, NULL, NULL, eft020_rgb_keys_b1,
+    eft020_rgb_keys_b2, eft020_rgb_keys_b3, eft020_rgb_keys_b4, eft020_rgb_keys_b5,
+    eft020_rgb_keys_b6, NULL,
+};
+}
 
-extern "C" nw4r::math::VEC3 lbl_806A4538;
+/* A vector built through `setVec3` (0x80041E8C), so a file-scope one is constructed by `__sinit`.  size: 0xC */
+struct EftOriginVec3 : public nw4r::math::VEC3 {
+    /* Builds (x, y, z). */
+    EftOriginVec3(f32 x, f32 y, f32 z)
+    {
+        setVec3(this, x, y, z);
+    }
+};
 
-extern "C" f32 lbl_80796A28;
-extern "C" f32 lbl_80796A2C;
+/* The effect origin, 5 units below the player's joint; MWCC's `__sinit` builds it. */
+static EftOriginVec3 eft020_origin(0.0f, -5.0f, 0.0f);
 
 #pragma peephole off
 
@@ -115,7 +227,7 @@ extern "C" _EFT* fn_80114E34(u8 type, u8 area, f32 scale)
     if ((u8)area != (u8)get_now_areano()) {
         return 0;
     }
-    if (scale <= lbl_80796A28) {
+    if (scale <= 0.0f) {
         return 0;
     }
     effect = eft_res_slot_get(0x20);
@@ -123,7 +235,7 @@ extern "C" _EFT* fn_80114E34(u8 type, u8 area, f32 scale)
         return 0;
     }
     work = (_EFT_WORK_A*)effect->work_0x38;
-    work->count = lbl_805A00CC[(u8)type];
+    work->count = eft020_effect_counts[(u8)type];
     work->scale = scale;
     effect->field_0x03 = 20;
     effect->timer_0x0C = 0;
@@ -176,11 +288,11 @@ extern "C" void fn_80114FAC(_EFT* self)
             id = 0x9FB;
             n = 3;
         } else {
-            id = lbl_805A00B8[self->type_0x02];
+            id = eft020_effect_ids[self->type_0x02];
             n = 9;
         }
     } else {
-        id = lbl_805A00B8[self->type_0x02];
+        id = eft020_effect_ids[self->type_0x02];
         n = 9;
     }
     for (i = 0; i < work->count; i++) {
@@ -214,11 +326,12 @@ extern "C" void fn_80115100(_EFT* self)
 {
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
-    s32 dead;
-    _EFT_WORK_A* work;
     s32 i;
+    s32 dead;
     s32 flags;
-    _GXColor color;
+    _EFT_WORK_A* work;
+    _PLW* plw;
+    _ENEMY_WORK* enemy;
 
     dead = 0;
     work = (_EFT_WORK_A*)self->work_0x38;
@@ -232,22 +345,22 @@ extern "C" void fn_80115100(_EFT* self)
             self->state_0x05++;
             return;
         }
-        copyVec3(&v, &lbl_806A4538);
-        get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(
-            &((_PLW*)self->source_0x30)->physics_0x13C->chr_0x04, 3, &self->pos_0x18);
+        plw = (_PLW*)self->source_0x30;
+        copyVec3(&v, &eft020_origin);
+        get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(&plw->physics_0x13C->chr_0x04, 3, &self->pos_0x18);
         addVec3To(&self->pos_0x18, &v);
-        if (Pl_master_ck((_PLW*)self->source_0x30) == 1) {
-            flags = eft_stage_spawn_flag((_PLW*)self->source_0x30) | 1;
+        if (Pl_master_ck(plw) == 1) {
+            flags = eft_stage_spawn_flag(plw) | 1;
         }
         break;
     case 1:
-        if (em_work_die_ck((_ENEMY_WORK*)self->source_0x30) != 0) {
+        enemy = (_ENEMY_WORK*)self->source_0x30;
+        if (em_work_die_ck(enemy) != 0) {
             self->flag_0x01 = 0;
             self->state_0x05++;
             return;
         }
-        get_joint_wpos_em((_ENEMY_WORK*)self->source_0x30,
-                                                                work->joint, &self->pos_0x18);
+        get_joint_wpos_em(enemy, work->joint, &self->pos_0x18);
         break;
     case 2:
         if (eft_res_spawn_gate_ck(self, 2) == 0) {
@@ -273,16 +386,14 @@ extern "C" void fn_80115100(_EFT* self)
         self->state_0x05++;
         return;
     }
-    if ((u32)(self->type_0x02 - 1) > 1U && self->type_0x02 != 9) {
+    if ((u32)(self->type_0x02 - 1) > 1U && (s32)self->type_0x02 != 9) {
         self->timer_0x0C++;
         for (i = 0; i < 2; i++) {
-            eftGetKeyRGB((i == 0) ? lbl_805A01B8[self->type_0x02]
-                                                  : lbl_805A01E0[self->type_0x02],
+            eftGetKeyRGB((i == 0) ? eft020_rgb_key_tables_a[self->type_0x02]
+                                  : eft020_rgb_key_tables_b[self->type_0x02],
                                          self->timer_0x0C, &work->color[i].r, &work->color[i].g,
                                          &work->color[i].b);
-            color = work->color[i];
-            change_color_eff(work->effects[i],
-                                                                             &self->pos_0x18, color);
+            change_color_eff(work->effects[i], &self->pos_0x18, work->color[i]);
         }
     }
     eft_res_models_spawn(self, &work->effects[0], flags, work->count, 0);
@@ -298,10 +409,4 @@ extern "C" void fn_801153A4(_EFT* self)
 extern "C" void fn_801153B4(_EFT* self)
 {
     eft_res_slot_release(self);
-}
-
-/* Zeroes the shared effect-origin vector. */
-extern "C" void fn_801153B8(void)
-{
-    setVec3(&lbl_806A4538, lbl_80796A28, lbl_80796A2C, lbl_80796A28);
 }

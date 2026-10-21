@@ -6,8 +6,9 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` from the first statement on (retail keeps `rlwinm` + `cmpwi` unfused,
  *   playbook 39).
  * NAMES. The map has only the `fn_` stem.  The file is C; mangled callees are declared by their map spelling.
- * RESIDUALS. none in code: the row matches.
- *   flipcheck: `.data`/`.sdata2` claimed, not emitted.
+ *   GUESS: `em_hit_eft_effect_ids`/`em_hit_eft_param_ids` (map `lbl_8059E430`/`lbl_8059E55C`, the
+ *   `res_eft_create` arguments indexed by the type).
+ * RESIDUALS. none: the row and the claimed sections match (`.data` the two tables, `.sdata2` the body's literals).
  * SHAPES. The two type switches enumerate every value of each non-default run (MWCC merges consecutive same-body
  *   cases into a run, so a missing value falls to `default` and changes the comparison tree).
  *   The colour bytes are extracted masked (`(color & 0xFF000000) >> 24`): `(u8)(color >> 24)` is three instructions
@@ -109,13 +110,33 @@ extern void change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(vo
                                                                                VEC3* scale);
 extern void setVector3__FPQ34nw4r4math4VEC3fff(VEC3* vec, f32 x, f32 y, f32 z);
 
-/* The type tables and the two scale constants, referenced but owned by another unit's pool (playbook
- * 29: declared, never defined). */
-extern u16 lbl_8059E430[];
-extern u16 lbl_8059E55C[];
-extern f32 lbl_80796778; /* 5.0f */
-extern f32 lbl_8079677C; /* 0.7f */
-extern f32 lbl_80796780; /* 0.5f */
+/* The unit's `.data`: the `res_eft_create` effect id and parameter id per hit-effect type (`self->type_0x02`,
+ * 150 types). */
+u16 em_hit_eft_effect_ids[150] = {
+    0x0016, 0x0017, 0x00F8, 0x011F, 0x0129, 0x012F, 0x012E, 0x0130, 0x0132, 0x0149, 0x011F, 0x0125, 0x014D, 0x014E, 0x014F,
+    0x0150, 0x0151, 0x0152, 0x0153, 0x0154, 0x0155, 0x0156, 0x00E1, 0x00E2, 0x0141, 0x0142, 0x01ED, 0x01E3, 0x01EB, 0x01EC,
+    0x01EE, 0x01EF, 0x01F0, 0x01F1, 0x01F2, 0x01F3, 0x0121, 0x0120, 0x014A, 0x02B1, 0x0346, 0x0361, 0x0362, 0x02B3, 0x0151,
+    0x0151, 0x01A3, 0x0416, 0x00E3, 0x04B9, 0x04CA, 0x00E1, 0x00E2, 0x0142, 0x0141, 0x04F1, 0x04F2, 0x04F3, 0x04F4, 0x04F5,
+    0x04F6, 0x04F7, 0x04F8, 0x04F9, 0x04FA, 0x04FB, 0x04FC, 0x04FD, 0x04FE, 0x04FF, 0x0500, 0x0501, 0x0502, 0x0503, 0x0503,
+    0x0504, 0x052C, 0x055B, 0x055D, 0x055E, 0x055F, 0x05DA, 0x05DE, 0x05E1, 0x05E2, 0x05E5, 0x05E6, 0x05E7, 0x0602, 0x0603,
+    0x0604, 0x0605, 0x0608, 0x060B, 0x060C, 0x0609, 0x060A, 0x0617, 0x0618, 0x0622, 0x0623, 0x0624, 0x05E8, 0x05E9, 0x05EA,
+    0x05EB, 0x063F, 0x0699, 0x069B, 0x069C, 0x069D, 0x06A0, 0x06C9, 0x06CA, 0x06CB, 0x06CC, 0x06CD, 0x06CE, 0x06CF, 0x06D0,
+    0x03ED, 0x0152, 0x06E3, 0x06E4, 0x06E5, 0x0734, 0x073C, 0x073D, 0x073F, 0x0790, 0x0990, 0x0991, 0x0992, 0x09E5, 0x09E6,
+    0x09E7, 0x09E8, 0x09E9, 0x09EA, 0x09EB, 0x09EC, 0x09ED, 0x09EE, 0x09EF, 0x09F0, 0x0A16, 0x000F, 0x0A4A, 0x0A4C, 0x0000,
+};
+
+u16 em_hit_eft_param_ids[150] = {
+    0x001F, 0x0004, 0x001F, 0x0000, 0x001F, 0x001F, 0x001F, 0x001F, 0x001F, 0x0000, 0x0000, 0x0000, 0x0028, 0x0028, 0x0028,
+    0x0028, 0x0028, 0x0028, 0x0028, 0x0028, 0x0028, 0x0028, 0x001A, 0x001A, 0x001A, 0x001A, 0x0033, 0x0033, 0x0033, 0x0033,
+    0x0033, 0x0033, 0x0033, 0x0033, 0x0033, 0x0033, 0x0000, 0x0000, 0x001A, 0x0042, 0x0042, 0x0032, 0x0032, 0x0042, 0x0028,
+    0x0028, 0x0028, 0x0022, 0x001A, 0x005E, 0x005B, 0x001A, 0x001A, 0x001A, 0x001A, 0x0042, 0x0042, 0x005E, 0x005E, 0x005E,
+    0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005E,
+    0x005E, 0x0062, 0x005B, 0x005B, 0x005B, 0x005B, 0x0042, 0x0042, 0x0042, 0x0042, 0x005A, 0x005A, 0x005A, 0x0071, 0x0071,
+    0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x005A, 0x005A, 0x005A,
+    0x005A, 0x0042, 0x0071, 0x0071, 0x0071, 0x0071, 0x0071, 0x005B, 0x005B, 0x005B, 0x005B, 0x005B, 0x005B, 0x005B, 0x005B,
+    0x0024, 0x0028, 0x005B, 0x005B, 0x005B, 0x005B, 0x0071, 0x0071, 0x0071, 0x005B, 0x005B, 0x005B, 0x005B, 0x00BD, 0x00BD,
+    0x00BD, 0x00BD, 0x00BD, 0x00BD, 0x00BD, 0x00BD, 0x00BD, 0x00BD, 0x00BD, 0x00BD, 0x0071, 0x0000, 0x00BD, 0x0042, 0x0000,
+};
 
 /* ---------------------------------------------------------------------------------------------------
  * body
@@ -193,8 +214,8 @@ void fn_80104BD0(_EM_EFT* self)
         break;
     }
 
-    work->effects[0] = res_eft_create__FUsUsUl(lbl_8059E430[self->type_0x02],
-                                               lbl_8059E55C[self->type_0x02], 0);
+    work->effects[0] = res_eft_create__FUsUsUl(em_hit_eft_effect_ids[self->type_0x02],
+                                               em_hit_eft_param_ids[self->type_0x02], 0);
     if (work->effects[0] == NULL) {
         fn_80105560(self);
         return;
@@ -205,7 +226,7 @@ void fn_80104BD0(_EM_EFT* self)
 
         switch (type) {
         case 0x33:
-            work->effects[1] = res_eft_create__FUsUsUl(0xE2, lbl_8059E55C[type], 0);
+            work->effects[1] = res_eft_create__FUsUsUl(0xE2, em_hit_eft_param_ids[type], 0);
             if (work->effects[1] == NULL) {
                 fn_80105560(self);
                 return;
@@ -213,7 +234,7 @@ void fn_80104BD0(_EM_EFT* self)
             work->count++;
             break;
         case 0x34:
-            work->effects[1] = res_eft_create__FUsUsUl(0x14A, lbl_8059E55C[type], 0);
+            work->effects[1] = res_eft_create__FUsUsUl(0x14A, em_hit_eft_param_ids[type], 0);
             if (work->effects[1] == NULL) {
                 fn_80105560(self);
                 return;
@@ -222,7 +243,7 @@ void fn_80104BD0(_EM_EFT* self)
             break;
         case 0x35:
         case 0x36:
-            work->effects[1] = res_eft_create__FUsUsUl(0xE3, lbl_8059E55C[type], 0);
+            work->effects[1] = res_eft_create__FUsUsUl(0xE3, em_hit_eft_param_ids[type], 0);
             if (work->effects[1] == NULL) {
                 fn_80105560(self);
                 return;
@@ -321,11 +342,11 @@ void fn_80104BD0(_EM_EFT* self)
         case 0x81:
         case 0x91:
         case 0x94:
-            self->pos_0x18.y = lbl_80796778 + enemy->field_0x20C;
+            self->pos_0x18.y = 5.0f + enemy->field_0x20C;
             color = get_stg_eft_col__FUcUc(self->area_0x44, 0);
             break;
         case 0x78:
-            self->pos_0x18.y = enemy->field_0x210 - lbl_80796778;
+            self->pos_0x18.y = enemy->field_0x210 - 5.0f;
             color = get_stg_eft_col__FUcUc(self->area_0x44, 1);
             break;
         case 0x03:
@@ -333,7 +354,7 @@ void fn_80104BD0(_EM_EFT* self)
         case 0x38:
         case 0x7C:
         default:
-            self->pos_0x18.y = lbl_80796778 + enemy->field_0x210;
+            self->pos_0x18.y = 5.0f + enemy->field_0x210;
             color = get_stg_eft_col__FUcUc(self->area_0x44, 1);
             break;
         }
@@ -454,7 +475,7 @@ void fn_80104BD0(_EM_EFT* self)
     work->color_a_0x13 = 0xFF;
 
     if ((s32)self->type_0x02 == 0x2E) {
-        setVector3__FPQ34nw4r4math4VEC3fff(&vec, lbl_8079677C, lbl_80796780, lbl_8079677C);
+        setVector3__FPQ34nw4r4math4VEC3fff(&vec, 0.7f, 0.5f, 0.7f);
         for (i = 0; i < work->count; i++) {
             change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(work->effects[i], &vec);
         }

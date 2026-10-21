@@ -8,11 +8,13 @@
  *   `fn_80103B60` (retail keeps the unfused compare forms; playbook 39).
  * NAMES. `eft007_set` and `eft007_set_vec` are the runtime dump's own names; `eft007_part_set` and
  *   `eft007_part_spawn` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
+ *   GUESS: `eft007_effect_ids`/`eft007_param_ids`/`eft007_colours` (map `lbl_8059DAA0`/`lbl_8059DAC8`/
+ *   `lbl_8059DAF0`: the `res_eft_create` arguments by type, the RGBA colours `colour_index_0x08` selects).
  * RESIDUALS. 1 partial row: `fn_80103518` is instruction-identical; only the callee-saved registers are coloured
- *   differently (playbook 22).  Ours names the three switch tables `@933`/`@1050`/`@1166` where retail names the
- *   `jumptable_8059DB00`/`DB50`/`DBA0` entries.
- *   flipcheck: `.sdata2` claimed, not emitted; `.data` (0xEC of 0x14C) short of the claim and differing; `.text`
- *   differs in 34 bytes.
+ *   differently (retail: `work` r31, `self` r30, the loop cursor r29; ours `self` r31, cursor r30, `work` r29;
+ *   `work` declared first, `work` assigned after the constructors and one function-scope `i` all measure lower).
+ *   Ours names the three switch tables `@NNN` where retail names the `jumptable_8059DB00`/`DB50`/`DBA0` entries.
+ *   `.data` and `.sdata2` are emitted byte-identical; flipcheck's only blocker is that row's 34 `.text` bytes.
  * SHAPES. The `eft007` setters take the part index as `u8` and the enemy wrappers as `u32`: the narrowing at the call
  *   is retail's `clrlwi`.
  *   `get_camera_pos`/`get_camera_direction` are called through the out-pointer view (`void (VEC3*)`): the owner's
@@ -63,8 +65,6 @@ struct _CP_VECTOR;
 #include "camera/camera.h" /* get_camera_pos (rule 2: the owner's header) */
 /* The call keeps the out-pointer view (`void (VEC3*)`) the target's frame needs: a cast call to the owner's by-value `get_camera_pos` is the same direct call to the map symbol. */
 #define get_camera_pos_c1 ((void (*)(nw4r::math::VEC3*))get_camera_pos)
-
-extern f32 lbl_80796740; /* 0.0f     */
 
 namespace nw4r {
 
@@ -174,13 +174,24 @@ extern "C" void fn_801036BC(_EFT007* self);
 extern "C" s32 fn_801036C0(_EFT007* self);
 extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx);
 
-/* --- the unit's own `.data`/`.sdata2` pool, referenced but never emitted here (playbook 29) --- */
-extern "C" u16 lbl_8059DAA0[];
-extern "C" u16 lbl_8059DAC8[];
-extern "C" u8 lbl_8059DAF0[];
-extern f32 lbl_80796744;
-extern f32 lbl_80796748;
-extern f32 lbl_8079674C;
+/* --- the unit's `.data`: the `res_eft_create` effect and parameter id per weapon type, and the four colours
+ * `colour_index_0x08` selects (RGBA) --- */
+extern "C" {
+u16 eft007_effect_ids[20] = {
+    0x063A, 0x063B, 0x063B, 0x0631, 0x0633, 0x0634, 0x0633, 0x0634, 0x063A, 0x06C6,
+    0x06C7, 0x063A, 0x063B, 0x072D, 0x072D, 0x072D, 0x080C, 0x080D, 0x0993, 0x0A15,
+};
+u16 eft007_param_ids[20] = {
+    0x0015, 0x0015, 0x0015, 0x0015, 0x0015, 0x0015, 0x0015, 0x0015, 0x0015, 0x0015,
+    0x0015, 0x0015, 0x0015, 0x0013, 0x0013, 0x0013, 0x0015, 0x0015, 0x0006, 0x001B,
+};
+u8 eft007_colours[16] = {
+    0xFF, 0x00, 0x00, 0xFF,
+    0x00, 0x64, 0x32, 0xFF,
+    0x8C, 0x96, 0x28, 0xFF,
+    0xFF, 0x00, 0x00, 0xFF,
+};
+}
 
 namespace nw4r {
 
@@ -280,7 +291,7 @@ void eft007_set(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math::VE
     if (vec != 0) {
         copyVec3(&work->pos_0x14, vec);
     } else {
-        setVector3(&work->pos_0x14, lbl_80796740, lbl_80796740, lbl_80796740);
+        setVector3(&work->pos_0x14, 0.0f, 0.0f, 0.0f);
     }
     u8 motion = fn_80331210(self);
     switch (type) {
@@ -336,7 +347,7 @@ void eft007_set_vec(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math
     if (vec != 0) {
         copyVec3(&work->pos_0x14, vec);
     } else {
-        setVector3(&work->pos_0x14, lbl_80796740, lbl_80796740, lbl_80796740);
+        setVector3(&work->pos_0x14, 0.0f, 0.0f, 0.0f);
     }
     u8 motion = fn_80331210(self);
     switch (type) {
@@ -415,7 +426,7 @@ extern "C" void fn_80102D48(_EFT007* self)
     VEC3_ctor(&pos);
     self->state_0x05++;
     work->effects[0] =
-        res_eft_create(lbl_8059DAA0[self->type_0x02], lbl_8059DAC8[self->type_0x02], 0);
+        res_eft_create(eft007_effect_ids[self->type_0x02], eft007_param_ids[self->type_0x02], 0);
     if (work->effects[0] == 0) {
         fn_801036BC(self);
         return;
@@ -477,7 +488,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         work->count++;
         if (fn_803311A0((MHchar*)model) >= 2) {
             self->timer_0x0C = 3;
-            work->paramscale *= lbl_80796744;
+            work->paramscale *= 0.7f;
         } else {
             self->timer_0x0C = 12;
         }
@@ -491,7 +502,7 @@ extern "C" void fn_80102D48(_EFT007* self)
     case 10:
         if (fn_803311A0((MHchar*)model) >= 2) {
             self->timer_0x0C = 3;
-            work->paramscale *= lbl_80796744;
+            work->paramscale *= 0.7f;
         } else {
             self->timer_0x0C = 12;
         }
@@ -630,19 +641,19 @@ extern "C" void fn_80103130(_EFT007* self)
     if ((u32)(self->type_0x02 - 13) > 2) {
         switch (self->type_0x02) {
         case 3:
-            color.r = lbl_8059DAF0[self->colour_index_0x08 * 4];
-            color.g = lbl_8059DAF0[self->colour_index_0x08 * 4 + 1];
-            color.b = lbl_8059DAF0[self->colour_index_0x08 * 4 + 2];
-            color.a = lbl_8059DAF0[self->colour_index_0x08 * 4 + 3];
+            color.r = eft007_colours[self->colour_index_0x08 * 4];
+            color.g = eft007_colours[self->colour_index_0x08 * 4 + 1];
+            color.b = eft007_colours[self->colour_index_0x08 * 4 + 2];
+            color.a = eft007_colours[self->colour_index_0x08 * 4 + 3];
             change_color_eff(work->effects[0], &self->pos_0x18, color);
             break;
         case 4:
         case 6:
         case 9:
-            color.r = lbl_8059DAF0[self->colour_index_0x08 * 4];
-            color.g = lbl_8059DAF0[self->colour_index_0x08 * 4 + 1];
-            color.b = lbl_8059DAF0[self->colour_index_0x08 * 4 + 2];
-            color.a = lbl_8059DAF0[self->colour_index_0x08 * 4 + 3];
+            color.r = eft007_colours[self->colour_index_0x08 * 4];
+            color.g = eft007_colours[self->colour_index_0x08 * 4 + 1];
+            color.b = eft007_colours[self->colour_index_0x08 * 4 + 2];
+            color.a = eft007_colours[self->colour_index_0x08 * 4 + 3];
             change_color_eff(work->effects[1], &self->pos_0x18, color);
             break;
         }
@@ -734,7 +745,7 @@ extern "C" s32 fn_801036C0(_EFT007* self)
         case 86:
         case 87:
         case 88:
-            return Pl_frame_check(model, 2, lbl_80796748, lbl_80796740) == 1;
+            return Pl_frame_check(model, 2, 108.0f, 0.0f) == 1;
         case 24:
         case 55:
             if (self->step_0x06 == 0) {
@@ -744,7 +755,7 @@ extern "C" s32 fn_801036C0(_EFT007* self)
             return 1;
         case 10:
         case 56:
-            if (Pl_frame_check(model, 2, lbl_8079674C, lbl_80796740) == 1) {
+            if (Pl_frame_check(model, 2, 10.0f, 0.0f) == 1) {
                 return 1;
             }
             if (self->step_0x06 == 1) {

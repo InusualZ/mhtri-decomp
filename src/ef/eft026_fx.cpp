@@ -8,24 +8,25 @@
  *   `subi`/`cmpwi` into `subic.` and compresses the frame; playbook 39).
  * NAMES. `eft026_set` and `eft028_set_koware` are the runtime dump's own names; the map has only `fn_` stems for the
  *   rest, so plain definitions are `extern "C"`.
- *   GUESS (from its body and its caller): eft028_set_scaled
- * RESIDUALS. 10 partial rows, including:
- *  - `fn_80118154`: retail's base+offset induction (`addi r30,r31,4; addi r31,r31,8`) for the four `slots[]` pushes;
- *    the pointer walk `p[0]`/`p--` here is the closest spelling;
- *  - `fn_80118214`: the placement tail's register pressure after the 12-way switch;
- *  - `fn_80118FF0`: ours addresses `lbl_80791940`/`lbl_80791948` with `lis`/`addi` where retail uses `@sda21`.
- *   The other 7 partial rows are scheduling or frame layout with no recorded cause (`symdiff.py -u ef/eft026_fx
- *   --all`).
- *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x1E78 of 0x1E9C), `.data` (0x30 of 0x268) and `.sdata2` (0x8 of
- *   0x6C) short of the claim; `.text`, `.data`, `.sdata2`, extab and extabindex differing.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_26`,
- *     `_savegpr_27`, `_restgpr_26`, `_restgpr_27`, `lbl_80796AF0`, `lbl_80796AF4`, `lbl_80796AFC`, `lbl_80796B00`,
- *     `lbl_80796AF8`, `lbl_80791948`, `lbl_80791940`, `_savegpr_25`, `_savegpr_24`, `_restgpr_25`, `_restgpr_24`.
- * SHAPES. `_EFT26_PHASE`'s colour is four plain `u8` fields, not a union (a union aligns to 4 and moves
- *   `_EFT26_WORK::slots` from +0x7C to +0x90); the two `fn_800964E4` sites read it as a word through
- *   `(u32*)&phase[i].color_r`.
- *   `lbl_805A04B0` is `s32[]`: the eft026 timer tests compile to retail's signed `cmpw` only with the signed view.
- *   `fn_80118B2C` calls `get_camera_direction()` mid-case, after the position accumulation.
+ *   GUESS (from its body and its caller): eft028_set_scaled; the data (map `lbl_805A0488`..`lbl_805A06B0`,
+ *   `lbl_80791940`..`lbl_80791968`): `eft026_effect_ids`, `eft026_handler_kinds`, `eft026_durations`,
+ *   `eft026_spin_rates`, `eft026_scale_keys_2`/`_9`/`_a`/`_b`, `eft026_alpha_keys_N`/`_kind2`,
+ *   `eft026_alpha_key_tables`, `eft026_model_counts`; `EftUvModelHooks` (`update`, `set_scalar`).
+ *   Also: `#pragma pool_data off` (each table its own `lis`/`addi`); `fn_80118B2C` at `optimization_level 4` (its
+ *   type switch's `subi`/`cmplwi` range test).
+ * RESIDUALS. 3 partial rows:
+ *  - `fn_80118214`: the placement tail's register pressure after the 12-way switch, frame 0x10 larger;
+ *  - `fn_8011870C`, `fn_80119450`: callee-saved register colouring only.
+ *   `.sdata2` is 0x68 of 0x6C: retail has a second, unreferenced 0.0f before 410.0f (0x80796B24) that one TU's
+ *   pool cannot hold twice; `.data` 0x264 of 0x268 (identical prefix).
+ *   Relocation names that differ from retail: pool constants (`@NNN`), the switch table (`jumptable_805A06BC`).
+ * SHAPES. `_EFT26_PHASE`'s colour is a `_GXColor` member (byte-aligned, so `slots` stays at +0x7C); the phase loops
+ *   index `work->phase[i]` (a `p` pointer adds an induction register) and count `done` in a `u8`.
+ *   `eft026_set` is defined first (retail's `.text` and pool order).  The handlers load `work`/`source` after the
+ *   constructors, extract colour bytes masked (`(col & 0xFF000000) >> 24`) and test loop floats against literals.
+ *   `fn_80119AA8` returns nothing; `fn_80117FF8`'s flag test re-reads the stored type; `_EFT26_WORK::slots` is
+ *   `[2][2]`; `fn_80118FF0` runs `move2` before the scale copy.
+ *   `eft026_durations` is `s32[]`: the eft026 timer tests compile to retail's signed `cmpw` only with the signed view.
  */
 
 #include "ef/eft_res_spawn_gate_ck.h" /* eft_res_spawn_gate_ck (rule 2: the owner's header) */
@@ -75,17 +76,14 @@ struct _g3d_work;
 typedef struct _EFT26_PHASE {
     /* +0x00 */ u8 state;      /* 0 = waiting on the timer, 1 = ramping, 2 = done */
     /* +0x01 */ u8 pad_0x01;
-    /* +0x02 */ u8 color_r;    /* read as a _GXColor by the material setters */
-    /* +0x03 */ u8 color_g;
-    /* +0x04 */ u8 color_b;
-    /* +0x05 */ u8 color_a;
+    /* +0x02 */ _GXColor color; /* the material colour the setters take by value (byte-aligned, so it stays at +0x02) */
     /* +0x06 */ u8 pad_0x06[2];
     /* +0x08 */ s32 frame;     /* the ramp position, walked against the per-type frame table */
 } _EFT26_PHASE;
 
 /* The eft026 work block `eft_res_slot_get(0x8C)` attaches. size: 0x8C */
 typedef struct _EFT26_WORK {
-    /* +0x00 */ s32 count;             /* pooled models; 1 or 2, from `lbl_805A06B0[type]` */
+    /* +0x00 */ s32 count;             /* pooled models; 1 or 2, from `eft026_model_counts[type]` */
     /* +0x04 */ MHchar* chara[2];      /* the pooled model chars */
     /* +0x0C */ void* models[2];       /* the `res_eft_UV_model_create` results */
     /* +0x14 */ _EFT26_PHASE phase[5]; /* five colour/fade slots */
@@ -97,7 +95,7 @@ typedef struct _EFT26_WORK {
     /* +0x72 */ u8 pad_0x72[2];
     /* +0x74 */ f32 field_0x74;        /* the enemy's height the placement remembers */
     /* +0x78 */ f32 field_0x78;        /* the ramp scale fn_80119450 reads */
-    /* +0x7C */ void* slots[4];        /* the g3d work handles res_eft_UV_model_create fills */
+    /* +0x7C */ _g3d_work* slots[2][2]; /* the g3d work handles res_eft_UV_model_create fills, two per model */
 } _EFT26_WORK; /* size: 0x8C */
 
 /* The enemy-side object `_EFT`'s source_0x30 points at for the eft026 family, seen through the offsets
@@ -157,6 +155,22 @@ typedef struct _EFT26_EFFECT_VTBL {
     /* +0x28 */ EffectVfn0x28 vfn_0x28; /* the one-float scalar hook */
 } _EFT26_EFFECT_VTBL; /* size: 0x2C */
 
+/* The pooled model's virtual interface as these handlers call it: the table slot +0x24 is the per-frame hook and
+ * +0x28 the one-float scalar hook; the slots before them are not called here.  Declared only, so this unit emits
+ * no table for it.  size: 0x04 */
+class EftUvModelHooks {
+public:
+    virtual void unused_0x08();
+    virtual void unused_0x0C();
+    virtual void unused_0x10();
+    virtual void unused_0x14();
+    virtual void unused_0x18();
+    virtual void unused_0x1C();
+    virtual void unused_0x20();
+    virtual void update();
+    virtual void set_scalar(f32 value);
+};
+
 typedef struct _EFT26_EFFECT {
     /* +0x00 */ _EFT26_EFFECT_VTBL* vtbl;
     /* +0x04 */ u8 pad_0x04[0x2C];
@@ -198,7 +212,7 @@ void fn_80119814(_EFT* self);
 void fn_80119818(MHchar* chr, u8 mode);
 void fn_801198F8(MHchar* chr, u8 index);
 void fn_80119970(u8 kind, u8 variant, u8 id);
-_EFT* fn_80119AA8(u8 area);
+void fn_80119AA8(u8 area);
 
 /* the plain callees with no reconstructed owner yet (declared here, never `extern`-spelled, so the
  * symbol is the target's plain name; the landing pass moves the ones a registered unit owns) */
@@ -222,47 +236,91 @@ void res_mat_tev_color_copy_ctor(_EFT26_MATOBJ* out, void* in);
 void res_mat_tev_color_end_edit(_EFT26_MATOBJ* obj);
 void fn_8011D7B0(s32 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 area, u8 team);
 
-/* the shared data the range reads (declared, never defined here) */
-extern u16 lbl_805A0488[];
-extern u8 lbl_805A04A0[];
-extern s32 lbl_805A04B0[];
-extern f32 lbl_805A04E0[];
-extern u8* lbl_805A05E0[];
-extern f32 lbl_805A0510[];
-extern f32 lbl_805A0560[];
-extern f32 lbl_805A0610[];
-extern f32 lbl_805A0680[];
-extern u8 lbl_805A06B0[];
+/* The unit's data.  `.sdata`: the six 8-byte alpha key runs ({frame, alpha} pairs, a 0xFF frame ends one).  `.data`:
+ * per type (12) the model's effect id, the handler kind, the duration, the spin rate in degrees per frame, the scale
+ * key runs ({frame, x, y, z}, a -1 frame ends one), the longer alpha key runs, the per-type alpha key run and the model
+ * count. */
+u8 eft026_alpha_keys_3[8] = {
+    0x00, 0x00, 0x06, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
+};
+u8 eft026_alpha_keys_kind2[8] = {
+    0x00, 0x00, 0x1E, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
+};
+u8 eft026_alpha_keys_5[8] = {
+    0x00, 0x00, 0x04, 0xFF, 0x0F, 0x00, 0xFF, 0x00,
+};
+u8 eft026_alpha_keys_7[8] = {
+    0x00, 0xFF, 0x04, 0xFF, 0x0C, 0x00, 0xFF, 0x00,
+};
+u8 eft026_alpha_keys_8[8] = {
+    0x00, 0x00, 0x0A, 0xBB, 0x14, 0x00, 0xFF, 0x00,
+};
+u8 eft026_alpha_keys_9[8] = {
+    0x00, 0xFF, 0x1E, 0xFF, 0x3C, 0x00, 0xFF, 0x00,
+};
 
-
-extern u8 lbl_80791940[];
-extern u8 lbl_80791948[];
-
-extern f32 lbl_80796AC0;
-extern f32 lbl_80796AC4;
-extern f32 lbl_80796AC8;
-extern f32 lbl_80796ACC;
-extern f32 lbl_80796AD0;
-extern f32 lbl_80796AD4;
-extern f32 lbl_80796AD8;
-extern f32 lbl_80796ADC;
-extern f32 lbl_80796AE0;
-extern f32 lbl_80796AE4;
-extern f32 lbl_80796AE8;
-extern f32 lbl_80796AEC;
-extern f32 lbl_80796AF0;
-extern f32 lbl_80796AF4;
-extern f32 lbl_80796AF8;
-extern f32 lbl_80796AFC;
-extern f32 lbl_80796B00;
-extern f32 lbl_80796B04;
-
-extern f32 lbl_80796B10;
-extern f32 lbl_80796B14;
-extern f32 lbl_80796B18;
-extern f32 lbl_80796B1C;
-extern f32 lbl_80796B20;
-extern f32 lbl_80796B28;
+u16 eft026_effect_ids[12] = {
+    0x001C, 0x002E, 0x002E, 0x004B, 0x001C, 0x001C, 0x001C, 0x001C, 0x00A3, 0x00A3, 0x001C, 0x001C,
+};
+u8 eft026_handler_kinds[16] = {
+    0x00, 0x01, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03, 0x01, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+s32 eft026_durations[12] = {
+    20, 20, 55, 255, 28, 15, 18, 12, 20, 60, 12, 18,
+};
+f32 eft026_spin_rates[12] = {
+    0.0f, 0.0f, 8.0f, 8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 8.0f, 0.0f, 0.0f,
+};
+f32 eft026_scale_keys_2[20] = {
+    0.0f, 0.5f, 0.5f, 0.5f,
+    5.0f, 1.4f, 1.4f, 0.7f,
+    11.0f, 1.3f, 1.3f, 1.0f,
+    55.0f, 0.6f, 0.6f, 1.0f,
+    -1.0f, 0.6f, 0.6f, 1.0f,
+};
+f32 eft026_scale_keys_9[16] = {
+    0.0f, 0.5f, 0.5f, 0.5f,
+    30.0f, 1.4f, 1.4f, 1.0f,
+    60.0f, 0.6f, 0.6f, 1.0f,
+    -1.0f, 0.6f, 0.6f, 1.0f,
+};
+u8 eft026_alpha_keys_0[12] = {
+    0x00, 0x00, 0x04, 0xFF, 0x0E, 0xFF, 0x14, 0x00, 0xFF, 0x00, 0x00, 0x00,
+};
+u8 eft026_alpha_keys_1[12] = {
+    0x00, 0x00, 0x05, 0xBB, 0x0A, 0xBB, 0x14, 0x00, 0xFF, 0x00, 0x00, 0x00,
+};
+u8 eft026_alpha_keys_2[12] = {
+    0x00, 0x00, 0x08, 0xFF, 0x19, 0xFF, 0x37, 0x00, 0xFF, 0x00, 0x00, 0x00,
+};
+u8 eft026_alpha_keys_4[12] = {
+    0x00, 0x00, 0x04, 0xFF, 0x12, 0xFF, 0x1C, 0x00, 0xFF, 0x00, 0x00, 0x00,
+};
+u8 eft026_alpha_keys_6[16] = {
+    0x00, 0x00, 0x04, 0xFF, 0x05, 0xFF, 0x12, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+u8* eft026_alpha_key_tables[12] = {
+    eft026_alpha_keys_0, eft026_alpha_keys_1, eft026_alpha_keys_2, eft026_alpha_keys_3,
+    eft026_alpha_keys_4, eft026_alpha_keys_5, eft026_alpha_keys_6, eft026_alpha_keys_7,
+    eft026_alpha_keys_8, eft026_alpha_keys_9, eft026_alpha_keys_7, eft026_alpha_keys_6,
+};
+f32 eft026_scale_keys_b[28] = {
+    0.0f, 0.1f, 0.1f, 0.4f,
+    8.0f, 1.82f, 1.82f, 0.4f,
+    10.0f, 1.8f, 1.8f, 1.0f,
+    11.0f, 1.75f, 1.75f, 1.0f,
+    14.0f, 1.55f, 1.55f, 1.0f,
+    20.0f, 1.0f, 1.0f, 1.0f,
+    -1.0f, 1.0f, 1.0f, 1.0f,
+};
+f32 eft026_scale_keys_a[12] = {
+    0.0f, 0.1f, 0.1f, 0.4f,
+    30.0f, 1.0f, 1.0f, 1.0f,
+    -1.0f, 1.0f, 1.0f, 1.0f,
+};
+u8 eft026_model_counts[12] = {
+    0x01, 0x01, 0x01, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+};
 }
 
 void rotMatrixY(u32 angle, nw4r::math::MTX34* mtx);
@@ -280,10 +338,31 @@ void push_g3d_wk(struct _g3d_work* work);
 void* res_eft_UV_model_create(MHchar* chr, u16 id, u32 a, long b, struct _g3d_work** list, long c, u8 d);
 
 #pragma peephole off
+#pragma pool_data off
 
 /* ---------------------------------------------------------------------------------------------------
  * the eft026 setters and its allocator/release/dispatcher
  * ------------------------------------------------------------------------------------------------- */
+
+/* The eft026 setter that arrives mangled in the map: the family's public spawn entry. */
+void eft026_set(_PLW* plw, u8 kind, u32 a, u32 b)
+{
+    _EFT* rec = fn_80117FF8(plw->area_0x16, kind);
+    _EFT26_WORK* work;
+
+    if (rec == 0) {
+        return;
+    }
+    rec->source_0x30 = plw;
+    rec->field_0x10 = 5;
+    rec->rot_0x24.x = plw->param_0x54 + a;
+    rec->rot_0x24.y = ((_EFT25_ACTOR*)plw)->angle_0x58;
+    work = (_EFT26_WORK*)rec->work_0x38;
+    work->joint = 0xff;
+    work->rot_c = (u16)b;
+    setVector3(&work->offset, 0.0f, 0.0f, 0.0f);
+    setVector3(&work->scale, 0.4f, 0.4f, 1.0f);
+}
 
 /* The player-side setter: seat the source player at the family allocator, copy its two angle words,
  * the packed vector, the joint and the scale. */
@@ -324,10 +403,10 @@ extern "C" void fn_80117EFC(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 
     work = (_EFT26_WORK*)rec->work_0x38;
     switch (rec->type_0x02) {
     case 7:
-        setVector3(&work->scale, lbl_80796ACC, lbl_80796ACC, lbl_80796AD0);
+        setVector3(&work->scale, 12.0f, 12.0f, 14.0f);
         break;
     case 10:
-        setVector3(&work->scale, lbl_80796AD4, lbl_80796AD4, lbl_80796AD4);
+        setVector3(&work->scale, 6.0f, 6.0f, 6.0f);
         break;
     default:
         eft_res_slot_release(rec);
@@ -355,7 +434,7 @@ extern "C" _EFT* fn_80117FF8(u8 area, u8 kind)
     rec->release_0x40 = fn_80118154;
     rec->dispatch_0x34 = fn_801181D8;
     work = (_EFT26_WORK*)rec->work_0x38;
-    work->count = lbl_805A06B0[kind];
+    work->count = eft026_model_counts[kind];
     memset(&work->slots[0], 0, 0x10);
     for (i = 0; i < work->count; i++) {
         work->chara[i] = (MHchar*)eft_res_model_get();
@@ -369,7 +448,7 @@ extern "C" _EFT* fn_80117FF8(u8 area, u8 kind)
     rec->timer_0x0C = 0;
     rec->field_0x10 = 0;
     rec->area_0x44 = area;
-    if ((u8)((u8)kind - 4) <= 3 || (u8)((u8)kind - 0xa) <= 1 || kind == 0) {
+    if ((u32)(rec->type_0x02 - 4) <= 3 || (u32)(rec->type_0x02 - 0xa) <= 1 || (s32)rec->type_0x02 == 0) {
         eft_state_flags_set(rec, 0, 0);
     } else {
         eft_state_flags_set(rec, 1, 0);
@@ -380,17 +459,15 @@ extern "C" _EFT* fn_80117FF8(u8 area, u8 kind)
 /* The family release: push the four g3d work slots, hand the model list back and clear the count. */
 extern "C" void fn_80118154(_EFT* self)
 {
-    _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;
     s32 i;
     s32 j;
+    _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;
 
     for (i = 0; i < 2; i++) {
-        _g3d_work** p = (_g3d_work**)&work->slots[i * 2 + 1];
         for (j = 1; j >= 0; j--) {
-            if (p[0] != 0) {
-                push_g3d_wk(p[0]);
+            if (work->slots[i][j] != 0) {
+                push_g3d_wk(work->slots[i][j]);
             }
-            p--;
         }
     }
     fn_800F8A44(&work->chara[0], work->count);
@@ -432,8 +509,8 @@ extern "C" void fn_80118214(_EFT* self)
     MTX34_ctor(&mtx);
     self->state_0x05++;
     for (i = 0; i < work->count; i++) {
-        work->models[i] = res_eft_UV_model_create(work->chara[i], lbl_805A0488[self->type_0x02], 0x118, 0,
-                                                  (struct _g3d_work**)&work->slots[0], 1, 0);
+        work->models[i] = res_eft_UV_model_create(work->chara[i], eft026_effect_ids[self->type_0x02], 0x118, 0,
+                                                  &work->slots[0][0], 1, 0);
         if (work->models[i] == 0) {
             fn_80119814(self);
             return;
@@ -442,7 +519,7 @@ extern "C" void fn_80118214(_EFT* self)
     self->flag_0x01 = 1;
     switch (self->type_0x02) {
     case 5:
-        work->offset.z = lbl_80796AD8;
+        work->offset.z = 50.0f;
         /* fall through */
     case 0:
     case 4:
@@ -452,10 +529,10 @@ extern "C" void fn_80118214(_EFT* self)
             u32 col;
             work->phase[i].frame = (u16)ran_suu(0) & 3;
             col = get_stg_eft_col(self->area_0x44, 1);
-            work->phase[i].color_r = (u8)(col >> 24);
-            work->phase[i].color_g = (u8)(col >> 16);
-            work->phase[i].color_b = (u8)(col >> 8);
-            work->phase[i].color_a = 0;
+            work->phase[i].color.r = (u8)(col >> 24);
+            work->phase[i].color.g = (u8)(col >> 16);
+            work->phase[i].color.b = (u8)(col >> 8);
+            work->phase[i].color.a = 0;
         }
         break;
     case 1:
@@ -485,8 +562,8 @@ extern "C" void fn_80118214(_EFT* self)
         rotLocalMatY(self->rot_0x24.y, &mtx);
         rotLocalMatX(self->rot_0x24.x, &mtx);
         rotLocalMatZ(self->rot_0x24.z, &mtx);
-        work->chara[0]->getTevKColor(0, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
-        work->phase[0].color_a = 0;
+        work->chara[0]->getTevKColor(0, GX_KCOLOR3, &work->phase[0].color);
+        work->phase[0].color.a = 0;
         mulVecMat(&vB, &mtx);
         addVec3To(&self->pos_0x18, &vB);
         work->field_0x74 = em->height_0x18C;
@@ -498,16 +575,16 @@ extern "C" void fn_80118214(_EFT* self)
             copyVec3(&vA, &cam);
             {
                 f32 dist = vec3_len((const f32*)&vA);
-                if (dist < lbl_80796ADC) {
+                if (dist < 600.0f) {
                     work->chara[0]->setVisibility(2, false);
                     work->chara[0]->setVisibility(4, false);
-                } else if (dist < lbl_80796AE0) {
+                } else if (dist < 1200.0f) {
                     work->chara[0]->setVisibility(4, false);
                 }
             }
             if (self->type_0x02 == 8) {
-                work->scale.y *= lbl_80796AE4;
-                work->scale.z *= lbl_80796AE8;
+                work->scale.y *= 0.7f;
+                work->scale.z *= 1.2f;
             }
         } else {
             fn_80119818(work->chara[0], 5);
@@ -528,8 +605,8 @@ extern "C" void fn_80118214(_EFT* self)
         }
         get_joint_wmat_em((struct _ENEMY_WORK*)em, work->joint, &mtx);
         mtx34_trans_get(&mtx, &self->pos_0x18);
-        work->chara[0]->getTevKColor(0, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
-        work->phase[0].color_a = 0;
+        work->chara[0]->getTevKColor(0, GX_KCOLOR3, &work->phase[0].color);
+        work->phase[0].color.a = 0;
         copyVec3(&vB, &work->offset);
         mulVecMat(&vB, &mtx);
         addVec3To(&self->pos_0x18, &vB);
@@ -541,12 +618,12 @@ extern "C" void fn_80118214(_EFT* self)
             u32 col;
             work->phase[i].frame = 0;
             col = get_stg_eft_col(self->area_0x44, 1);
-            work->phase[i].color_r = (u8)(col >> 24);
-            work->phase[i].color_g = (u8)(col >> 16);
-            work->phase[i].color_b = (u8)(col >> 8);
-            work->phase[i].color_a = 0;
+            work->phase[i].color.r = (u8)(col >> 24);
+            work->phase[i].color.g = (u8)(col >> 16);
+            work->phase[i].color.b = (u8)(col >> 8);
+            work->phase[i].color.a = 0;
         }
-        ((_EFT26_EFFECT*)work->models[0])->vtbl->vfn_0x28(work->models[0], lbl_80796AEC);
+        ((EftUvModelHooks*)work->models[0])->set_scalar(5.0f);
         break;
     }
     fn_801186C4(self);
@@ -555,7 +632,7 @@ extern "C" void fn_80118214(_EFT* self)
 /* State 1: dispatch on the per-type handler table. */
 extern "C" void fn_801186C4(_EFT* self)
 {
-    switch (lbl_805A04A0[self->type_0x02]) {
+    switch (eft026_handler_kinds[self->type_0x02]) {
     case 0:
         return fn_8011870C(self);
     case 1:
@@ -571,45 +648,46 @@ extern "C" void fn_801186C4(_EFT* self)
  * and seat the models from the enemy joint. */
 extern "C" void fn_8011870C(_EFT* self)
 {
-    _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;
-    _EFT26_EM* em = (_EFT26_EM*)self->source_0x30;
+    _EFT26_EM* em;
+    _EFT26_WORK* work;
     nw4r::math::VEC3 vA;
     nw4r::math::VEC3 vB;
     nw4r::math::MTX34 mtx;
-    u32 done = 0;
+    u8 done = 0;
     s32 i;
 
     VEC3_ctor(&vA);
     VEC3_ctor(&vB);
     MTX34_ctor(&mtx);
+    work = (_EFT26_WORK*)self->work_0x38;
+    em = (_EFT26_EM*)self->source_0x30;
 
     if (work->phase[0].state == 2) done = 1;
     if (work->phase[1].state == 2) done++;
     if (work->phase[2].state == 2) done++;
     if (work->phase[3].state == 2) done++;
     if (work->phase[4].state == 2) done++;
-    if (fn_800F92F4_c1(self, 0) == 0 || done != 5) {
+    if (fn_800F92F4_c1(self, 0) == 0 || done == 5) {
         self->flag_0x01 = 0;
         self->state_0x05++;
         return;
     }
 
     for (i = 0; i < 5; i++) {
-        _EFT26_PHASE* p = &work->phase[i];
-        switch (p->state) {
+        switch (work->phase[i].state) {
         case 0:
-            if (p->frame > 0) {
-                p->frame--;
+            if (work->phase[i].frame > 0) {
+                work->phase[i].frame--;
             } else {
-                p->frame = 0;
-                p->state++;
+                work->phase[i].frame = 0;
+                work->phase[i].state++;
             }
             break;
         case 1:
-            p->frame++;
-            p->color_a = eftGetKeyAlpha((u8*)lbl_805A05E0[self->type_0x02], p->frame);
-            if (p->frame >= lbl_805A04B0[self->type_0x02]) {
-                p->state++;
+            work->phase[i].frame++;
+            work->phase[i].color.a = eftGetKeyAlpha(eft026_alpha_key_tables[self->type_0x02], work->phase[i].frame);
+            if (work->phase[i].frame >= eft026_durations[self->type_0x02]) {
+                work->phase[i].state++;
             }
             break;
         }
@@ -622,7 +700,7 @@ extern "C" void fn_8011870C(_EFT* self)
                 u32 ignored;
                 res_mat_tev_color_copy_ctor(&obj, &handle);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXGetTevKColor(GX_KCOLOR3, (GXColor*)&ignored);
-                reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, *(GXColor*)&p->color_r);
+                reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, work->phase[i].color);
                 res_mat_tev_color_end_edit(&obj);
             }
         }
@@ -631,21 +709,21 @@ extern "C" void fn_8011870C(_EFT* self)
     self->field_0x10--;
     switch (self->field_0x06) {
     case 0:
-        work->scale.x += lbl_80796AF0;
-        work->scale.y += lbl_80796AF0;
+        work->scale.x += 0.12f;
+        work->scale.y += 0.12f;
         if (self->field_0x10 < 0) {
             self->field_0x06++;
             self->field_0x10 = 0xe;
         }
         break;
     case 1:
-        work->scale.x -= lbl_80796AF4;
-        work->scale.y -= lbl_80796AF4;
+        work->scale.x -= 0.01f;
+        work->scale.y -= 0.01f;
         if (self->field_0x10 < 0) {
             self->field_0x06++;
         }
-        if (self->type_0x02 != 5 && self->type_0x02 != 11 && self->field_0x10 == 0xa) {
-            if (em->field_0x40 < em->field_0x64 - lbl_80796AD8) {
+        if ((s32)self->type_0x02 != 5 && (s32)self->type_0x02 != 11 && self->field_0x10 == 0xa) {
+            if (em->field_0x40 < em->field_0x64 - 50.0f) {
                 eft013_set((_PLW*)em, 4);
             }
         }
@@ -672,16 +750,18 @@ extern "C" void fn_8011870C(_EFT* self)
         copyVec3(&work->chara[i]->pos_0x04, &self->pos_0x18);
         copyVec3(&work->chara[i]->scale_0x1C, &work->scale);
         work->chara[i]->move2(&mtx, 0);
-        ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
+        ((EftUvModelHooks*)work->models[i])->update();
         eft_res_models_spawn(self, (void**)&work->chara[i], 2, 1, 0);
     }
 }
 
 /* The kind-1 handler: run the five ramps with the offset placement and per-channel colour scale. */
+#pragma push
+#pragma optimization_level 4
 extern "C" void fn_80118B2C(_EFT* self)
 {
-    _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;
-    _EFT26_EM* em = (_EFT26_EM*)self->source_0x30;
+    _EFT26_WORK* work;
+    _EFT26_EM* em;
     nw4r::math::VEC3 v0;
     nw4r::math::VEC3 v1;
     nw4r::math::VEC3 v2;
@@ -696,6 +776,8 @@ extern "C" void fn_80118B2C(_EFT* self)
     VEC3_ctor(&v3);
     VEC3_ctor(&v4);
     MTX34_ctor(&mtx);
+    work = (_EFT26_WORK*)self->work_0x38;
+    em = (_EFT26_EM*)self->source_0x30;
 
     if (em_work_die_ck((struct _ENEMY_WORK*)em) != 0) {
         self->flag_0x01 = 0;
@@ -703,14 +785,14 @@ extern "C" void fn_80118B2C(_EFT* self)
         return;
     }
     self->timer_0x0C++;
-    if (self->timer_0x0C == lbl_805A04B0[self->type_0x02]) {
+    if (self->timer_0x0C == eft026_durations[self->type_0x02]) {
         self->flag_0x01 = 0;
         self->state_0x05++;
         return;
     }
-    work->phase[0].color_a = eftGetKeyAlpha((u8*)lbl_805A05E0[self->type_0x02], self->timer_0x0C);
+    work->phase[0].color.a = eftGetKeyAlpha(eft026_alpha_key_tables[self->type_0x02], self->timer_0x0C);
     self->area_0x44 = em->area_no_0x1E1;
-    self->rot_0x24.z += (u16)(s32)(lbl_80796AF8 + lbl_80796AFC * lbl_805A04E0[self->type_0x02] / lbl_80796B00);
+    self->rot_0x24.z += (u16)(s32)(0.5f + 65536.0f * eft026_spin_rates[self->type_0x02] / 360.0f);
 
     mtx34_identity(&mtx);
     rotLocalMatY(self->rot_0x24.y, &mtx);
@@ -739,24 +821,25 @@ extern "C" void fn_80118B2C(_EFT* self)
         mtx34_set_trans(&mtx, &self->pos_0x18);
         work->field_0x74 = em->height_0x18C;
         {
-            nw4r::math::VEC3 camDir = get_camera_direction();
+            const nw4r::math::VEC3& camDir = get_camera_direction();
+            nw4r::math::VEC3 sum;
             copyVec3(&v3, &camDir);
+            vec3_normalize_into(&v3, &v3);
+            vec3_scale_in_place(&v3, -200.0f);
+            addVec3(&sum, &self->pos_0x18, &v3);
+            copyVec3(&v2, &sum);
         }
-        vec3_normalize_into(&v3, &v3);
-        vec3_scale_in_place(&v3, lbl_80796B04);
-        addVec3(&v0, &self->pos_0x18, &v3);
-        copyVec3(&v2, &v0);
         self->field_0x10++;
         if (self->field_0x10 > 5) {
-            fn_8011D7B0(6, &self->pos_0x18, &self->rot_0x24, lbl_80796AC8, self->area_0x44, em->team);
+            fn_8011D7B0(6, &self->pos_0x18, &self->rot_0x24, 1.0f, self->area_0x44, em->team);
             self->field_0x10 = 0;
         }
         switch (self->type_0x02) {
         case 2:
-            getKeyData3(lbl_805A0510, (f32)self->timer_0x0C, &v4.x, &v4.y, &v4.z);
+            getKeyData3(eft026_scale_keys_2, (f32)self->timer_0x0C, &v4.x, &v4.y, &v4.z);
             break;
         case 9:
-            getKeyData3(lbl_805A0560, (f32)self->timer_0x0C, &v4.x, &v4.y, &v4.z);
+            getKeyData3(eft026_scale_keys_9, (f32)self->timer_0x0C, &v4.x, &v4.y, &v4.z);
             break;
         }
         v4.x *= work->scale.x;
@@ -768,38 +851,41 @@ extern "C" void fn_80118B2C(_EFT* self)
 
     {
         u32 col = get_stg_eft_col(self->area_0x44, 1);
-        work->phase[0].color_r = (u8)(col >> 24);
-        work->phase[0].color_g = (u8)(col >> 16);
-        work->phase[0].color_b = (u8)(col >> 8);
+        work->phase[0].color.r = (col & 0xFF000000) >> 24;
+        work->phase[0].color.g = (col & 0x00FF0000) >> 16;
+        work->phase[0].color.b = (col & 0x0000FF00) >> 8;
     }
-    if (self->type_0x02 == 1 || self->type_0x02 == 2) {
+    switch (self->type_0x02) {
+    case 1:
+    case 2:
         for (i = 0; i < 4; i++) {
-            work->chara[0]->setTevKColor(i, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
+            work->chara[0]->setTevKColor(i, GX_KCOLOR3, &work->phase[0].color);
         }
-    } else if (self->type_0x02 == 8 || self->type_0x02 == 9) {
+        break;
+    case 8:
+    case 9:
         for (i = 0; i < 5; i++) {
-            work->chara[0]->setTevKColor(i, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
+            work->chara[0]->setTevKColor(i, GX_KCOLOR3, &work->phase[0].color);
         }
+        break;
     }
 
-    {
-        f32 zero = lbl_80796AC0;
-        for (i = 0; i < work->count; i++) {
-            copyVec3(&work->chara[i]->scale_0x1C, &v4);
-            work->chara[i]->move2(&mtx, 0);
-            ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
-            if (get_camera_pos().y < zero) {
-                eft_res_models_spawn(self, (void**)&work->chara[i], 2, 1, &v2);
-            }
+    for (i = 0; i < work->count; i++) {
+        copyVec3(&work->chara[i]->scale_0x1C, &v4);
+        work->chara[i]->move2(&mtx, 0);
+        ((EftUvModelHooks*)work->models[i])->update();
+        if (get_camera_pos().y < 0.0f) {
+            eft_res_models_spawn(self, (void**)&work->chara[i], 2, 1, &v2);
         }
     }
 }
+#pragma pop
 
 /* The kind-2 handler: a two-stage timer with a wake-up step and the matrix placement. */
 extern "C" void fn_80118FF0(_EFT* self)
 {
-    _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;
-    _EFT26_EM* em = (_EFT26_EM*)self->source_0x30;
+    _EFT26_WORK* work;
+    _EFT26_EM* em;
     nw4r::math::VEC3 v0;
     nw4r::math::VEC3 v1;
     nw4r::math::VEC3 v2;
@@ -814,6 +900,8 @@ extern "C" void fn_80118FF0(_EFT* self)
     VEC3_ctor(&v3);
     MTX34_ctor(&mtxA);
     MTX34_ctor(&mtxB);
+    work = (_EFT26_WORK*)self->work_0x38;
+    em = (_EFT26_EM*)self->source_0x30;
 
     if (em_work_die_ck((struct _ENEMY_WORK*)em) != 0) {
         self->flag_0x01 = 0;
@@ -822,8 +910,8 @@ extern "C" void fn_80118FF0(_EFT* self)
     }
     {
         u16 mot = em_get_mot_no((struct _ENEMY_WORK*)em);
-        if ((u16)(mot - 0xd4) <= 3) {
-            if ((u16)(mot - 0xd4) <= 1 || mot == 0xd7) {
+        if ((u32)(mot - 0xd4) <= 3) {
+            if ((u32)(mot - 0xd4) <= 1 || mot == 0xd7) {
                 if (self->field_0x06 == 0) {
                     self->timer_0x0C++;
                 }
@@ -849,8 +937,8 @@ extern "C" void fn_80118FF0(_EFT* self)
     if (self->field_0x06 == 0) {
         self->field_0x10--;
         if (self->field_0x10 < 0) {
-            setVector3(&v1, lbl_80796AC0, lbl_80796B10, lbl_80796B14);
-            eft_em_spawn((struct _ENEMY_WORK*)em, 0x1e, 0xf, &v1, lbl_80796AC8);
+            setVector3(&v1, 0.0f, -80.0f, 120.0f);
+            eft_em_spawn((struct _ENEMY_WORK*)em, 0x1e, 0xf, &v1, 1.0f);
             self->field_0x10 = 3;
         }
     }
@@ -860,35 +948,35 @@ extern "C" void fn_80118FF0(_EFT* self)
     mulVecMat(&v1, &mtxA);
     mtx34_trans_add(&mtxA, &v1);
     mtx34_trans_get(&mtxA, &self->pos_0x18);
-    work->rot_a[0] += (u16)(s32)(lbl_80796AF8 + lbl_80796AFC * lbl_805A04E0[self->type_0x02] / lbl_80796B00);
-    work->rot_a[1] -= (u16)(s32)(lbl_80796AF8 + lbl_80796AFC * lbl_805A04E0[self->type_0x02] / lbl_80796B00);
+    work->rot_a[0] += (u16)(s32)(0.5f + 65536.0f * eft026_spin_rates[self->type_0x02] / 360.0f);
+    work->rot_a[1] -= (u16)(s32)(0.5f + 65536.0f * eft026_spin_rates[self->type_0x02] / 360.0f);
 
     if (self->field_0x06 != 0) {
-        getKeyData3(lbl_805A0680, (f32)self->timer_0x0C, &v3.x, &v3.y, &v3.z);
-        work->phase[0].color_a = eftGetKeyAlpha(lbl_80791948, self->timer_0x0C);
+        getKeyData3(eft026_scale_keys_a, (f32)self->timer_0x0C, &v3.x, &v3.y, &v3.z);
+        work->phase[0].color.a = eftGetKeyAlpha(eft026_alpha_keys_kind2, self->timer_0x0C);
     } else {
-        getKeyData3(lbl_805A0610, (f32)self->timer_0x0C, &v3.x, &v3.y, &v3.z);
-        work->phase[0].color_a = eftGetKeyAlpha(lbl_80791940, self->timer_0x0C);
+        getKeyData3(eft026_scale_keys_b, (f32)self->timer_0x0C, &v3.x, &v3.y, &v3.z);
+        work->phase[0].color.a = eftGetKeyAlpha(eft026_alpha_keys_3, self->timer_0x0C);
     }
     v3.x *= work->scale.x;
     v3.y *= work->scale.y;
     v3.z *= work->scale.z;
     {
         u32 col = get_stg_eft_col(self->area_0x44, 1);
-        work->phase[0].color_r = (u8)(col >> 24);
-        work->phase[0].color_g = (u8)(col >> 16);
-        work->phase[0].color_b = (u8)(col >> 8);
+        work->phase[0].color.r = (col & 0xFF000000) >> 24;
+        work->phase[0].color.g = (col & 0x00FF0000) >> 16;
+        work->phase[0].color.b = (col & 0x0000FF00) >> 8;
     }
     rotLocalMatX(0xe39, &mtxA);
 
     for (i = 0; i < work->count; i++) {
         mtx34_copy(&mtxB, &mtxA);
         rotLocalMatZ(work->rot_a[i], &mtxB);
-        copyVec3(&work->chara[i]->scale_0x1C, &v3);
         work->chara[i]->move2(&mtxB, 0);
-        ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
-        work->chara[i]->setTevKColor(0, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
-        if (get_camera_pos().y < lbl_80796AC0) {
+        copyVec3(&work->chara[i]->scale_0x1C, &v3);
+        ((EftUvModelHooks*)work->models[i])->update();
+        work->chara[i]->setTevKColor(0, GX_KCOLOR3, &work->phase[0].color);
+        if (get_camera_pos().y < 0.0f) {
             eft_res_models_spawn(self, (void**)&work->chara[i], 2, 1, 0);
         }
     }
@@ -897,33 +985,34 @@ extern "C" void fn_80118FF0(_EFT* self)
 /* The kind-3 handler: the same ramp/placement but with the vertical offset and the clamped step. */
 extern "C" void fn_80119450(_EFT* self)
 {
-    _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;
+    s32 i;
+    u8 done = 0;
     nw4r::math::VEC3 v0;
     nw4r::math::VEC3 v1;
     nw4r::math::VEC3 v2;
     nw4r::math::MTX34 mtx;
-    s32 i;
+    _EFT26_WORK* work;
 
     VEC3_ctor(&v0);
     VEC3_ctor(&v1);
     MTX34_ctor(&mtx);
+    work = (_EFT26_WORK*)self->work_0x38;
 
     for (i = 0; i < 5; i++) {
-        _EFT26_PHASE* p = &work->phase[i];
-        switch (p->state) {
+        switch (work->phase[i].state) {
         case 0:
-            if (p->frame > 0) {
-                p->frame--;
+            if (work->phase[i].frame > 0) {
+                work->phase[i].frame--;
             } else {
-                p->frame = 0;
-                p->state++;
+                work->phase[i].frame = 0;
+                work->phase[i].state++;
             }
             break;
         case 1:
-            p->frame++;
-            p->color_a = eftGetKeyAlpha((u8*)lbl_805A05E0[self->type_0x02], p->frame);
-            if (p->frame >= (s32)lbl_805A04B0[self->type_0x02]) {
-                p->state++;
+            work->phase[i].frame++;
+            work->phase[i].color.a = eftGetKeyAlpha(eft026_alpha_key_tables[self->type_0x02], work->phase[i].frame);
+            if (work->phase[i].frame >= (s32)eft026_durations[self->type_0x02]) {
+                work->phase[i].state++;
             }
             break;
         }
@@ -934,14 +1023,13 @@ extern "C" void fn_80119450(_EFT* self)
                 _EFT26_MATOBJ obj;
                 u32 handle = scn_mdl_mat_access_get_tev_color(&access, 0);
                 res_mat_tev_color_copy_ctor(&obj, &handle);
-                reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, *(GXColor*)&p->color_r);
+                reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, work->phase[i].color);
                 res_mat_tev_color_end_edit(&obj);
             }
         }
     }
 
     {
-        u32 done = 0;
         if (work->phase[0].state == 2) done = 1;
         if (work->phase[1].state == 2) done++;
         if (work->phase[2].state == 2) done++;
@@ -953,14 +1041,17 @@ extern "C" void fn_80119450(_EFT* self)
             return;
         }
     }
-    setVector3(&v0, lbl_80796AC0, lbl_80796AC0,
-               work->field_0x78 * ((f32)self->field_0x10 / (f32)lbl_805A04B0[self->type_0x02]));
-    if (self->type_0x02 == 7) {
-        v0.z -= lbl_80796B18;
-    } else if (self->type_0x02 == 10) {
-        v0.z -= lbl_80796B1C;
+    setVector3(&v0, 0.0f, 0.0f,
+               work->field_0x78 * ((f32)self->field_0x10 / (f32)eft026_durations[self->type_0x02]));
+    switch (self->type_0x02) {
+    case 7:
+        v0.z -= 5000.0f;
+        break;
+    case 10:
+        v0.z -= 500.0f;
+        break;
     }
-    vec3_scale_in_place(&v0, lbl_80796B20);
+    vec3_scale_in_place(&v0, -1.0f);
     self->field_0x10++;
     if (self->field_0x10 > 4) {
         self->field_0x10 = 4;
@@ -982,7 +1073,7 @@ extern "C" void fn_80119450(_EFT* self)
         copyVec3(&work->chara[i]->pos_0x04, &v1);
         copyVec3(&work->chara[i]->scale_0x1C, &work->scale);
         work->chara[i]->move2(&mtx, 0);
-        ((_EFT26_EFFECT*)work->models[i])->vtbl->vfn_0x24(work->models[i]);
+        ((EftUvModelHooks*)work->models[i])->update();
         eft_res_models_spawn(self, (void**)&work->chara[i], 2, 1, 0);
     }
 }
@@ -1000,7 +1091,7 @@ extern "C" void fn_80119814(_EFT* self)
 
 extern "C" void fn_80119818(MHchar* chr, u8 mode)
 {
-    u32 i;
+    s32 i;
 
     switch (mode) {
     case 1:
@@ -1015,7 +1106,7 @@ extern "C" void fn_80119818(MHchar* chr, u8 mode)
         for (i = mode; i <= 8; i++) {
             chr->setVisibility(i, true);
         }
-        for (i = 1; i < (u32)mode; i++) {
+        for (i = 1; i < mode; i++) {
             chr->setVisibility(i, false);
         }
         break;
@@ -1024,10 +1115,10 @@ extern "C" void fn_80119818(MHchar* chr, u8 mode)
 
 extern "C" void fn_801198F8(MHchar* chr, u8 index)
 {
-    u32 i;
+    s32 i;
 
     for (i = 1; i < 3; i++) {
-        if (i == (u32)index) {
+        if (i == index) {
             chr->setVisibility(i, true);
         } else {
             chr->setVisibility(i, false);
@@ -1038,26 +1129,6 @@ extern "C" void fn_801198F8(MHchar* chr, u8 index)
 /* ---------------------------------------------------------------------------------------------------
  * the eft028 (break/crumble) setters
  * ------------------------------------------------------------------------------------------------- */
-
-/* The two eft026 setters that arrive mangled in the map: they are the family's public spawn entries. */
-void eft026_set(_PLW* plw, u8 kind, u32 a, u32 b)
-{
-    _EFT* rec = fn_80117FF8(plw->area_0x16, kind);
-    _EFT26_WORK* work;
-
-    if (rec == 0) {
-        return;
-    }
-    rec->source_0x30 = plw;
-    rec->field_0x10 = 5;
-    rec->rot_0x24.x = plw->param_0x54 + a;
-    rec->rot_0x24.y = ((_EFT25_ACTOR*)plw)->angle_0x58;
-    work = (_EFT26_WORK*)rec->work_0x38;
-    work->joint = 0xff;
-    work->rot_c = (u16)b;
-    setVector3(&work->offset, lbl_80796AC0, lbl_80796AC0, lbl_80796AC0);
-    setVector3(&work->scale, lbl_80796AC4, lbl_80796AC4, lbl_80796AC8);
-}
 
 extern "C" void fn_80119970(u8 kind, u8 variant, u8 id)
 {
@@ -1102,7 +1173,7 @@ void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 variant, long timer)
     rec->timer_0x0C = timer;
 }
 
-extern "C" _EFT* fn_80119AA8(u8 area)
+extern "C" void fn_80119AA8(u8 area)
 {
     _EFT* rec;
     _EFT28_WORK* work;
@@ -1110,11 +1181,11 @@ extern "C" _EFT* fn_80119AA8(u8 area)
 
     fn_800FA3B8(&param);
     if (area != get_now_areano()) {
-        return 0;
+        return;
     }
     rec = (_EFT*)(void*)eft_res_slot_get(0x48);
     if (rec == 0) {
-        return 0;
+        return;
     }
     rec->field_0x03 = 28;
     rec->type_0x02 = 2;
@@ -1124,7 +1195,7 @@ extern "C" _EFT* fn_80119AA8(u8 area)
     work->mode = 1;
     copyVec3(&param.a, &lbl_806A4548[0]);
     copyVec3(&param.b, &lbl_806A4548[1]);
-    param.c = lbl_80796B28;
+    param.c = 410.0f;
     pl_capsule_box_set(&param, &work->param_0x0C[0]);
     work->col_r = 0xff;
     work->col_g = 0xff;
@@ -1134,7 +1205,6 @@ extern "C" _EFT* fn_80119AA8(u8 area)
     rec->timer_0x0C = 0;
     rec->release_0x40 = fn_80119D10;
     rec->dispatch_0x34 = fn_80119D9C;
-    return rec;
 }
 
 extern "C" void eft028_set_scaled(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 variant, long timer)

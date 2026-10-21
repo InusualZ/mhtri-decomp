@@ -5,14 +5,16 @@
  * RANGE. .text 0x801173AC-0x80117DA8 (10 functions); extab 0x8000C49C-0x8000C4D4, extabindex 0x800265D4-0x80026628,
  *   .sdata 0x80791938-0x80791940, .sdata2 0x80796A88-0x80796AC0.  The eft026/eft028 families from 0x80117DA8 are
  *   `ef/eft026_fx.cpp`.
- * FLAGS. `cflags_main`; `#pragma peephole off` over every body (playbook 39).
- * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.
- * RESIDUALS. 5 partial rows: `fn_801173AC`, `fn_80117688`, `fn_80117760` scheduling and frame layout; `fn_80117894`
- *   addresses `lbl_80791938` with `lis`/`addi` where retail uses `@sda21`; `fn_80117A1C` calls `event_demo_ck` by its
- *   plain name where retail calls `event_demo_ck__Fv`.
- *   flipcheck: `.sdata` claimed, not emitted; `.text` 0xA14 against the claimed 0x9FC, `.sdata2` 0x8 of 0x38, both
- *   differing; extabindex differs in 3 bytes; `event_demo_ck` has no map row.
- * SHAPES. `get_camera_pos`/`get_camera_direction` are declared with C++ linkage (their map names are `__Fv`).
+ * FLAGS. `cflags_main`; `#pragma peephole off` over every body (playbook 39); `#pragma fp_contract off` for
+ *   `fn_801173AC` (retail keeps `fmuls` + `fadds`; playbook 40).
+ * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.  GUESS:
+ *   `eft025_effect_ids` (map `lbl_80791938`, the `res_eft_create` id per type).
+ * RESIDUALS. none in bytes: every row, `.sdata` and `.sdata2` match.
+ * SHAPES. `fn_801173AC` accumulates the spins and angles with `+=` (an explicit `(s16)(a + b)` keeps an `extsh`/`clrlwi`
+ *   before each `sth`).  The setter `fn_80117688` and the allocator `fn_80117760` take the kind as `u32` (retail
+ *   narrows it only at the `stb`).  `fn_80117894` declares one `actor` after `work`/`vec`/`mtx`; `fn_80117A1C` loads
+ *   `work` after the constructors and stores the facing in `rot_0x24.y`; `_EFT25_WORK::motion` is `u32` (`cmplw`).
+ *   `get_camera_pos`/`get_camera_direction` are declared with C++ linkage (their map names are `__Fv`).
  *   The `MHchar`/`Effect` vtable slots are reached through function-pointer tables (retail's `lwz r12, off(r12)`
  *   shape; a `virtual` declaration would emit the class's vtable into this object).
  */
@@ -36,6 +38,7 @@
 #include "nw4r/g3d/scnmdl.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "lobby/lb_server_sel_trans.h" /* event_demo_ck (rule 2: the owner's header) */
 #include "ef/fn_801173AC_types.h"
 
 /* The eft024 job's kind-1 work view (`fn_80114E34.cpp`'s family-24 `job->work_0x38` block, 0x84 B).
@@ -64,16 +67,16 @@ typedef struct _EFT25_CHARA_SRC {
 typedef struct _EFT25_WORK {
     /* +0x00 */ s32 count;        /* pooled models, always 1 */
     /* +0x04 */ void* models[1];  /* the pooled `nw4r::ef::Effect` handles */
-    /* +0x08 */ s32 motion;       /* the source's motion number latched in state 0, type 2 */
+    /* +0x08 */ u32 motion;       /* the source's motion number latched in state 0, type 2 */
     /* +0x0C */ f32 scale;        /* the per-record scale fn_801176F0 carries */
 } _EFT25_WORK;
 
 extern "C" {
 /* this unit's own symbols (definitions below; the map's plain stems) */
 void fn_801173AC(_EFT* self);
-void fn_80117688(_PLW* plw, u8 kind);
+void fn_80117688(_PLW* plw, u32 kind);
 void fn_801176F0(_PLW* plw, f32 value);
-_EFT* fn_80117760(u8 kind, u8 area);
+_EFT* fn_80117760(u32 kind, u8 area);
 void fn_8011781C(_EFT* self);
 void fn_80117858(_EFT* self);
 void fn_80117894(_EFT* self);
@@ -85,22 +88,9 @@ void fn_80117DA4(_EFT* self);
  * `void*` copy collided with the owner's `u8*` definition once the header declared it. */
 s32 eft_res_spawn_gate_ck(_EFT* self, u32 flag);
 void mhchar_joint_mtx_get(void* mhchar, u32 joint, Mtx34* out);
-u32 event_demo_ck(void);
 
-extern u16 lbl_80791938[];
-
-extern f32 lbl_80796A88;
-extern f32 lbl_80796A8C;
-extern f32 lbl_80796A90;
-extern f32 lbl_80796A94;
-extern f32 lbl_80796A98;
-extern f32 lbl_80796A9C;
-extern f32 lbl_80796AA0;
-
-extern f32 lbl_80796AB0;
-extern f32 lbl_80796AB4;
-extern f32 lbl_80796AB8;
-extern f32 lbl_80796ABC;
+/* The unit's `.sdata`: the eft025 effect id per type. */
+u16 eft025_effect_ids[4] = { 0x00D7, 0x00D8, 0x00D9, 0x00D7 };
 }
 
 /* the mangled callees: declared at C++ scope so the call reaches the target's mangled name (rule 9) */
@@ -114,6 +104,7 @@ s32 ran_suu(s32 max);
 #pragma peephole off
 
 /* The eft024 kind-1 state-1 handler. */
+#pragma fp_contract off
 extern "C" void fn_801173AC(_EFT* self)
 {
     _EFT24_CHARA* work = (_EFT24_CHARA*)self->work_0x38;
@@ -123,27 +114,27 @@ extern "C" void fn_801173AC(_EFT* self)
     MTX34_ctor(&mtx);
     VEC3_ctor(&pos);
 
-    work->spin_x = (s16)((f32)work->spin_x * lbl_80796A88);
-    work->spin_y = (s16)((f32)work->spin_y * lbl_80796A8C);
-    work->spin_z = (s16)((f32)work->spin_z * lbl_80796A90);
-    work->spin_x = (s16)(work->spin_x + (s16)((((u16)ran_suu(1) & 0x1FF) - 0x1FF) >> 2));
-    work->spin_y = (s16)(work->spin_y + (s16)((((u16)ran_suu(1) & 0xFF) - 0xFF) >> 2));
-    work->spin_z = (s16)(work->spin_z + (s16)((((u16)ran_suu(1) & 0xFF) - 0xFF) >> 2));
-    work->rot_x = (u16)(work->rot_x + (u16)work->spin_x);
-    work->rot_y = (u16)(work->rot_y + (u16)work->spin_y);
-    work->rot_z = (u16)(work->rot_z + (u16)work->spin_z);
+    work->spin_x = (s16)((f32)work->spin_x * 0.9f);
+    work->spin_y = (s16)((f32)work->spin_y * 0.975f);
+    work->spin_z = (s16)((f32)work->spin_z * 0.95f);
+    work->spin_x += (s16)((((u16)ran_suu(1) & 0x1FF) - 0x1FF) >> 2);
+    work->spin_y += (s16)((((u16)ran_suu(1) & 0xFF) - 0xFF) >> 2);
+    work->spin_z += (s16)((((u16)ran_suu(1) & 0xFF) - 0xFF) >> 2);
+    work->rot_x += (u16)work->spin_x;
+    work->rot_y += (u16)work->spin_y;
+    work->rot_z += (u16)work->spin_z;
 
     mtx34_identity(&mtx);
     rotMatrixX(work->rot_x, &mtx);
     rotLocalMatY(work->rot_y, &mtx);
     rotLocalMatZ(work->rot_z, &mtx);
 
-    work->pos.x += lbl_80796A94 * mtx.m[1][0];
-    work->pos.y += lbl_80796A94 * mtx.m[1][1];
-    work->pos.z += lbl_80796A94 * mtx.m[1][2];
-    work->pos.x *= lbl_80796A98;
-    work->pos.y *= lbl_80796A98;
-    work->pos.z *= lbl_80796A9C;
+    work->pos.x += -5.0f * mtx.m[1][0];
+    work->pos.y += -5.0f * mtx.m[1][1];
+    work->pos.z += -5.0f * mtx.m[1][2];
+    work->pos.x *= 0.6f;
+    work->pos.y *= 0.6f;
+    work->pos.z *= 0.3f;
 
     copyVec3(&pos, &work->pos);
     mulVecMat(&pos, &mtx);
@@ -152,7 +143,7 @@ extern "C" void fn_801173AC(_EFT* self)
     work->chara[0]->field_0x2C = work->rot_y;
     work->chara[0]->field_0x30 = work->rot_z;
 
-    if (work->chara[0]->pos_0x04.y < lbl_80796AA0) {
+    if (work->chara[0]->pos_0x04.y < -50.0f) {
         self->state_0x05++;
     } else {
         s32 i;
@@ -162,6 +153,7 @@ extern "C" void fn_801173AC(_EFT* self)
         eft_res_models_spawn(self, (void**)&work->chara[0], 2, work->count, 0);
     }
 }
+#pragma fp_contract reset
 
 /* ---------------------------------------------------------------------------------------------------
  * the eft025 player family (0x80117688..0x80117DA4)
@@ -169,7 +161,7 @@ extern "C" void fn_801173AC(_EFT* self)
 
 /* The two spawn setters: they gate on the caller record's area and hand the family allocator the
  * kind, then remember the caller as the record's source. */
-extern "C" void fn_80117688(_PLW* plw, u8 kind)
+extern "C" void fn_80117688(_PLW* plw, u32 kind)
 {
     u8 area = plw->area_0x16;
     _EFT* rec;
@@ -200,7 +192,7 @@ extern "C" void fn_801176F0(_PLW* plw, f32 value)
 
 /* The family allocator: one 0x10-byte model slot, the family tag 25, one live handle, and the two
  * hooks that travel with the record. */
-extern "C" _EFT* fn_80117760(u8 kind, u8 area)
+extern "C" _EFT* fn_80117760(u32 kind, u8 area)
 {
     _EFT* rec;
 
@@ -252,11 +244,12 @@ extern "C" void fn_80117894(_EFT* self)
     _EFT25_WORK* work = (_EFT25_WORK*)self->work_0x38;
     nw4r::math::VEC3 vec;
     nw4r::math::MTX34 mtx;
+    _PLW* actor;
 
     VEC3_ctor(&vec);
     MTX34_ctor(&mtx);
     self->state_0x05++;
-    work->models[0] = res_eft_create(lbl_80791938[self->type_0x02], 0x16, 0);
+    work->models[0] = res_eft_create(eft025_effect_ids[self->type_0x02], 0x16, 0);
     if (work->models[0] == 0) {
         fn_80117DA4(self);
         return;
@@ -264,14 +257,14 @@ extern "C" void fn_80117894(_EFT* self)
     self->flag_0x01 = 1;
     switch (self->type_0x02) {
     case 1: {
-        _PLW* actor = (_PLW*)self->source_0x30;
+        actor = (_PLW*)self->source_0x30;
         if (eft_res_spawn_gate_ck(self, 0) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
             return;
         }
         mhchar_joint_mtx_get(&((_EFT25_PHYSICS*)actor->physics_0x13C)->chr_0x04, 0xb, &mtx);
-        setVector3(&vec, lbl_80796AB0, lbl_80796AB4, lbl_80796AB8);
+        setVector3(&vec, -20.0f, 0.0f, 55.0f);
         mulVecMat(&vec, &mtx);
         self->pos_0x18.x = mtx.m[0][3] + vec.x;
         self->pos_0x18.y = mtx.m[1][3] + vec.y;
@@ -279,7 +272,7 @@ extern "C" void fn_80117894(_EFT* self)
         break;
     }
     case 2: {
-        _PLW* actor = (_PLW*)self->source_0x30;
+        actor = (_PLW*)self->source_0x30;
         if (eft_res_spawn_gate_ck(self, 0) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
@@ -296,7 +289,7 @@ extern "C" void fn_80117894(_EFT* self)
  * advances to state 2 once they all die. */
 extern "C" void fn_80117A1C(_EFT* self)
 {
-    _EFT25_WORK* work = (_EFT25_WORK*)self->work_0x38;
+    _EFT25_WORK* work;
     nw4r::math::VEC3 vec;
     nw4r::math::VEC3 vel;
     nw4r::math::MTX34 mtxA;
@@ -307,6 +300,7 @@ extern "C" void fn_80117A1C(_EFT* self)
     VEC3_ctor(&vel);
     MTX34_ctor(&mtxA);
     MTX34_ctor(&mtxB);
+    work = (_EFT25_WORK*)self->work_0x38;
 
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
@@ -322,7 +316,7 @@ extern "C" void fn_80117A1C(_EFT* self)
     switch (self->type_0x02) {
     case 0:
         mhchar_joint_mtx_get(&((_EFT25_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 0xb, &mtxA);
-        setVector3(&vec, lbl_80796AB0, lbl_80796AB4, lbl_80796AB8);
+        setVector3(&vec, -20.0f, 0.0f, 55.0f);
         mulVecMat(&vec, &mtxA);
         self->pos_0x18.x = mtxA.m[0][3] + vec.x;
         self->pos_0x18.y = mtxA.m[1][3] + vec.y;
@@ -341,12 +335,12 @@ extern "C" void fn_80117A1C(_EFT* self)
             self->state_0x05++;
             return;
         }
-        self->field_0x10 = actor->angle_0x58 + 0x4000;
+        self->rot_0x24.y = actor->angle_0x58 + 0x4000;
         mhchar_joint_mtx_get(&actor->physics_0x13C->chr_0x04, 0xb, &mtxA);
-        setVector3(&vec, lbl_80796AB0, lbl_80796AB4, lbl_80796AB8);
+        setVector3(&vec, -20.0f, 0.0f, 55.0f);
         mulVecMat(&vec, &mtxA);
         mtx34_identity(&mtxB);
-        rotLocalMatY(self->field_0x10, &mtxB);
+        rotLocalMatY(self->rot_0x24.y, &mtxB);
         mtxB.m[0][3] = mtxA.m[0][3] + vec.x;
         self->pos_0x18.x = mtxA.m[0][3] + vec.x;
         mtxB.m[1][3] = mtxA.m[1][3] + vec.y;
@@ -360,7 +354,7 @@ extern "C" void fn_80117A1C(_EFT* self)
     }
     case 3:
         mhchar_joint_mtx_get(&((_EFT25_CHARA_SRC*)self->source_0x30)->chr_0x08, 0x10, &mtxA);
-        setVector3(&vec, lbl_80796AB4, lbl_80796AB8, lbl_80796ABC);
+        setVector3(&vec, 0.0f, 55.0f, 63.0f);
         mulVecMat(&vec, &mtxA);
         self->pos_0x18.x = mtxA.m[0][3] + vec.x;
         self->pos_0x18.y = mtxA.m[1][3] + vec.y;

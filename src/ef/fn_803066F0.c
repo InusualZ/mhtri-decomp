@@ -9,7 +9,8 @@
  * RESIDUALS. none in code: the row matches.
  *   flipcheck: our `.sdata` is 0x7 of the claimed 0x8 (the claim carries the alignment pad), and the 1.0f literal is
  *   an unclaimed 4-byte `.sdata2` (retail files it at 0x8079ADE0 with `ef/fn_8030681C.cpp`): a fold candidate with
- *   `ef/fn_8030681C.cpp` (one TU, one pool).
+ *   `ef/fn_8030681C.cpp` (one TU, one pool; that unit's pool holds the int-to-float magic at 0x8079AE08, so it is
+ *   8-aligned and cannot start at 0x8079ADE4 - seam request filed).
  * SHAPES. `created` is `void* volatile`: retail stores the call result and re-reads it (`stw r3,8(r28);
  *   lwz r0,8(r28)`), which no flag set reproduces.
  *   The declarations run `data; i; name;` (with `name` first the `name`/`i` registers swap; playbook 18).

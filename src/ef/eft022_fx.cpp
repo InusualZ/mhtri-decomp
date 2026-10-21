@@ -10,23 +10,28 @@
  *   `fn_80117120`.
  * NAMES. `eft022_set` is the runtime dump's own name; the map has only `fn_` stems for the rest, so plain definitions
  *   are `extern "C"`.
- * RESIDUALS. 17 partial rows, including:
+ *   GUESS: `eft024_job_start`/`eft024_job_step` (the file-local state-0/1 bodies at 0x80117018/0x80117050 the map
+ *   folds into `fn_80116FDC`; a split is filed), `EftModelObjRelease::destroy` (the model object's deleting
+ *   destructor slot, `fn_80115608` in the table at 0x805A0360).
+ * RESIDUALS. 6 partial rows plus one pending map split:
+ *  - `fn_80116FDC`: reads short until the map splits it (0x98 -> 0x3C + the two statics); instruction-identical;
  *  - `fn_80116080`: the pose-blend loop's float scheduling;
- *  - `fn_80116FDC`: block layout (the case bodies sit after the switch exit in retail);
- *  - `fn_80116B00`: the unsigned int-to-float conversion (`xoris`).
- *   The other 14 partial rows have no recorded cause (`symdiff.py -u ef/eft022_fx --all`).
- *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x1E2C of 0x1E5C) and `.sdata2` (0x10 of 0x50) short of
- *   the claim; `.text`, `.sdata2`, extab and extabindex differing.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050131C`,
- *     `MTX34Zero__Q24nw4r4mathFPQ34nw4r4math5MTX34`, `fn_80115FB0`, `_savegpr_15`, `_savegpr_16`, `_restgpr_15`,
- *     `_restgpr_16`, `_savegpr_21`, `_savegpr_22`, `_restgpr_21`, `_restgpr_22`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050131C`.
- * SHAPES. `fn_80116EEC` nests `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)` (retail's `mtctr`/`bdnz` and the
- *   `mr r3,r4` early returns; a flat `do`/`while` emits a decrement and compare).
- *   `fn_80117120` reaps one slot per iteration.
- *   `fn_80116FDC` uses the `case 0: break; case 1: break;` plus after-switch form (docs/ef.md, "The case-0 nested
- *   dispatch"); bodies inside the cases stay inline.
- *   `fn_80116B00` loads its seven float constants into named locals before the loop (inline globals reload per use).
+ *  - `fn_80116B00`: the int-to-float conversion is unsigned here (`xoris` magic `0x43300000 00000000`), signed in
+ *    retail;
+ *  - `fn_80115A80`, `fn_801156A0`: register colouring and pool-order differences;
+ *  - `fn_80116EEC`: retail unrolls the slot scan with the table base in r3; ours keeps a separate base;
+ *  - `fn_80117120`: retail keeps the dead loop counter's increment in both unrolled halves.
+ *   `.sdata2` cannot match one TU: retail holds 1.0f, -1.0f, 0.5f and the int-to-float magic twice (0x80796A30..0x80796A5C
+ *   for `fn_801156A0`..`fn_80116080`, 0x80796A60..0x80796A7C for `fn_801168D8`/`fn_80116B00`) - a TU seam near
+ *   0x80116770 (request filed).  `.data`/`.sdata` are still declared, not emitted.
+ *   Relocation names that differ from retail: pool constants, save helpers, `fn_8050131C`/`MTX34Zero`.
+ * SHAPES. Functions are defined in retail's address order.  `fn_80116FDC` tail-calls two static functions for states 0
+ *   and 1 (retail's `b` into the folded bodies after the exit `blr`).  u8 area stores take `get_now_areano()` uncast
+ *   (a `(u8)` cast keeps a `clrlwi` under peephole off); type tests that retail compares signed are `(s32)` casts.
+ *   `fn_8011661C` bumps its phase twice (`field_0x07++; field_0x07++;`: one `clrlwi` between the adds) and tests
+ *   `--timer <= 0` first.  `fn_801168D8` writes area 1/2 for map 6 as if/else and for map 17 as a ternary.
+ *   `fn_80116EEC` nests `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)`.
+ *   `fn_80116B00` loads its seven float constants into named locals before the loop.
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */
@@ -97,6 +102,14 @@ struct _EFT_MODEL_OBJ {
     /* +0x08 */ s32 index_0x08;
 };
 
+/* The model object's virtual interface as the release path sees it: the first slot (+0x08 in the table at
+ * 0x805A0360) is the deleting destructor `fn_80115608`.  Declared only, so this unit emits no table for it.
+ * size: 0x04 */
+class EftModelObjRelease {
+public:
+    virtual void destroy(s32 dealloc);
+};
+
 /* The eft021 work block. size: 0x25C */
 struct _EFT_WORK_B {
     /* +0x000 */ s32 count;
@@ -104,8 +117,8 @@ struct _EFT_WORK_B {
     /* +0x00C */ nw4r::math::MTX34 mtx[2][6];
     /* +0x24C */ void* objects[2];
     /* +0x254 */ s32 joint_num;
-    /* +0x258 */ s16 field_0x258;
-    /* +0x25A */ s16 field_0x25A;
+    /* +0x258 */ u16 field_0x258;
+    /* +0x25A */ u16 field_0x25A;
 };
 
 /* The eft022 work block. size: 0x08 */
@@ -153,7 +166,7 @@ extern "C" void fn_80115554(_EFT*);
 extern "C" s32 fn_80115608(void*, s16);
 extern "C" void fn_80115664(_EFT*);
 extern "C" void fn_801156A0(_EFT*);
-extern "C" void fn_80115A44(void**);
+extern "C" _EFT_MODEL_OBJ* fn_80115A44(void**);
 extern "C" void fn_80115A80(_EFT*);
 extern "C" void fn_80115FA0(_EFT*);
 extern "C" void fn_80115FB0(_EFT*);
@@ -175,7 +188,7 @@ extern "C" void fn_80116D90(_EFT*);
 extern "C" void fn_80116DA0(_EFT*);
 extern "C" void fn_80116DA4(void);
 extern "C" void* fn_80116E14(s16);
-extern "C" void fn_80116E1C(_EFT*, s16);
+extern "C" void fn_80116E1C(_EFT*, s16, s32);
 extern "C" s16 fn_80116EEC(_EFT*);
 extern "C" void fn_80116FCC(_EFT*);
 extern "C" void fn_80116FDC(_EFT*);
@@ -221,21 +234,7 @@ extern "C" _EFT_MAP_TABLE lbl_805A0428[];
 
 extern "C" char lbl_80791930[8];
 
-extern "C" f32 lbl_80796A30;
-extern "C" f32 lbl_80796A34;
-extern "C" f32 lbl_80796A38;
-extern "C" f32 lbl_80796A3C;
-extern "C" f32 lbl_80796A40;
-extern "C" f32 lbl_80796A44;
-extern "C" f32 lbl_80796A48;
 
-extern "C" f64 lbl_80796A58;
-extern "C" f32 lbl_80796A60;
-extern "C" f32 lbl_80796A64;
-extern "C" f32 lbl_80796A68;
-extern "C" f32 lbl_80796A6C;
-extern "C" f32 lbl_80796A70;
-extern "C" f32 lbl_80796A74;
 extern "C" f64 lbl_80796A78;
 
 #pragma peephole off
@@ -252,7 +251,7 @@ extern "C" void* fn_801153D0(void* source, s32 timer, u8 type)
     }
     work = (_EFT_WORK_B*)effect->work_0x38;
     work->field_0x258 = Get_motion_no((_PLW*)source);
-    work->field_0x25A = -1;
+    work->field_0x25A = 0xFFFF;
     effect->source_0x30 = source;
     effect->area_0x44 = ((_PLW*)source)->area_0x16;
     effect->timer_0x0C = timer;
@@ -295,9 +294,9 @@ extern "C" void* fn_80115460(u8 type)
 /* Releases the eft021 record's models and effect objects. */
 extern "C" void fn_80115554(_EFT* self)
 {
-    _EFT_WORK_B* work;
     s32 i;
     s32 j;
+    _EFT_WORK_B* work;
     _EFT_MODEL_OBJ* object;
 
     work = (_EFT_WORK_B*)self->work_0x38;
@@ -308,7 +307,7 @@ extern "C" void fn_80115554(_EFT* self)
         }
         object = (_EFT_MODEL_OBJ*)work->objects[i];
         if (object != 0) {
-            (*(void (*)(void*, s32))object->vtable[6])(object, 1);
+            ((EftModelObjRelease*)object)->destroy(1);
         }
     }
     work->count = 0;
@@ -346,508 +345,6 @@ extern "C" void fn_80115664(_EFT* self)
 /* ---------------------------------------------------------------------------------------------------
  * eft022 (fn_801164F0 release, fn_8011652C dispatch)
  * ------------------------------------------------------------------------------------------------- */
-
-/* Bumps the record's `state_0x05` state index. */
-extern "C" void fn_80115FA0(_EFT* self)
-{
-    self->state_0x05++;
-}
-
-/* Releases the eft021 record: the family-21 state-3 step. */
-extern "C" void fn_80115FB0(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
-
-/* Releases the eft021 model's texture handles. */
-extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
-{
-    nw4r::g3d::ResNode h((void*)0);
-    _EFT* effect = obj->owner_0x04;
-    _EFT_WORK_B* work = (_EFT_WORK_B*)effect->work_0x38;
-    s32 id;
-    s32 i;
-
-    for (i = 0; i < work->count; i++) {
-        s32 handle = work->models[i]->field_0x118;
-        fn_80080B10((void*)handle, 4);   /* the declaration takes void*, as its C sibling unit casts */
-        id = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&work->models[i]->field_0x114)->GetResNode((const char*)lbl_80791930).mpData;
-        res_node_assign(&h, &id);
-        if (res_node_is_valid(&h) == 1U) {
-            fn_800E3264((void*)handle, res_node_get_id(&h));
-        }
-    }
-}
-
-/* Creates the effect record the eft022 setter leaves behind. */
-extern "C" void fn_80115A44(void** out)
-{
-    fn_800E3B2C();
-    *out = lbl_805A0360;
-}
-
-/* Frees an eft022 record once the effect is gone. */
-extern "C" void fn_801164F0(_EFT* self)
-{
-    _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
-
-    push_eft_effect_heap_num(work->effects, work->count);
-    work->count = 0;
-}
-
-/* Runs the state handler the eft022 record's `state_0x05` selects. */
-extern "C" void fn_8011652C(_EFT* self)
-{
-    switch (self->state_0x05) {
-    case 0:
-        return fn_80116568(self);
-    case 1:
-        return fn_8011661C(self);
-    case 2:
-        return fn_8011675C(self);
-    case 3:
-        return fn_8011676C(self);
-    }
-}
-
-/* Spawns the record's effect and hands its position to the enemy it belongs to. */
-extern "C" void fn_80116568(_EFT* self)
-{
-    _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
-    _ENEMY_WORK* enemy;
-
-    self->state_0x05++;
-    work->effects[0] = res_eft_create(0x2D, 7, 0);
-    if (work->effects[0] == 0) {
-        fn_8011676C(self);
-        return;
-    }
-    SetRootMtxTrans(work->effects[0], &self->pos_0x18);
-    fn_8011661C(self);
-    if (self->type_0x02 != 1) {
-        fn_800DA864(&self->pos_0x18);
-        return;
-    }
-    enemy = (_ENEMY_WORK*)self->source_0x30;
-    if (em_work_die_ck(enemy) == 0) {
-        fn_800DCB18(enemy->field_0xB14, &self->pos_0x18);
-    }
-}
-
-/* Advances the eft022 record's timer through its four substates. */
-extern "C" void fn_8011661C(_EFT* self)
-{
-    _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
-
-    if (effect_move(work->effects[0]) == 1) {
-        fn_800F93D8_c1(self, &work->effects[0], 1, work->count, 0);
-    }
-    switch (self->field_0x07) {
-    case 0:
-        if (++self->timer_0x0C >= 0x18) {
-            self->timer_0x0C = 5;
-            fn_80059374(1);
-            self->field_0x07 = (u8)((u8)(self->field_0x07 + 1) + 1);
-        }
-        break;
-    case 1:
-        self->field_0x07 = (u8)(self->field_0x07 + 1);
-        break;
-    case 2:
-        if (--self->timer_0x0C > 0) {
-            fn_80059420();
-        } else {
-            self->timer_0x0C = 0x5A;
-            fn_80059374(2);
-            self->field_0x07 = (u8)(self->field_0x07 + 1);
-        }
-        break;
-    case 3:
-        if (--self->timer_0x0C > 0) {
-            fn_80059420();
-        } else {
-            self->flag_0x01 = 0;
-            self->state_0x05++;
-            self->field_0x06 = 0;
-            self->field_0x07 = 0;
-        }
-        break;
-    }
-}
-
-/* Bumps the eft022 record's `state_0x05` state index. */
-extern "C" void fn_8011675C(_EFT* self)
-{
-    self->state_0x05++;
-}
-
-/* Releases the eft022 record: the family-22 state-3 step. */
-extern "C" void fn_8011676C(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
-
-/* Creates the effect's eft022 record at the current area. */
-void eft022_set(nw4r::math::VEC3* pos, u8 area)
-{
-    _EFT* effect;
-    _EFT_WORK_C* work;
-
-    if ((u8)area != (u8)get_now_areano()) {
-        return;
-    }
-    effect = fn_800F8788_c1(8);
-    if (effect == 0) {
-        return;
-    }
-    work = (_EFT_WORK_C*)effect->work_0x38;
-    work->count = 1;
-    effect->release_0x40 = fn_801164F0;
-    effect->field_0x03 = 22;
-    effect->area_0x44 = area;
-    copyVec3(&effect->pos_0x18, pos);
-    effect->type_0x02 = 0;
-    effect->timer_0x0C = 0;
-    effect->flag_0x01 = 1;
-    fn_800F9DF4_c1(effect, 0, 0);
-    effect->dispatch_0x34 = fn_8011652C;
-}
-
-/* Creates the effect's eft022 record for an actor. */
-extern "C" void fn_80116430(void* source, nw4r::math::VEC3* pos, u8 area)
-{
-    _EFT* effect;
-    _EFT_WORK_C* work;
-
-    if ((u8)area != (u8)get_now_areano()) {
-        return;
-    }
-    effect = fn_800F8788_c1(8);
-    if (effect == 0) {
-        return;
-    }
-    work = (_EFT_WORK_C*)effect->work_0x38;
-    work->count = 1;
-    effect->release_0x40 = fn_801164F0;
-    effect->field_0x03 = 22;
-    effect->area_0x44 = area;
-    copyVec3(&effect->pos_0x18, pos);
-    effect->type_0x02 = 1;
-    effect->timer_0x0C = 0;
-    effect->flag_0x01 = 1;
-    effect->source_0x30 = source;
-    fn_800F9DF4_c1(effect, 0, 0);
-    effect->dispatch_0x34 = fn_8011652C;
-}
-
-/* ---------------------------------------------------------------------------------------------------
- * eft023 (fn_8011688C release, fn_8011689C dispatch)
- * --------------------------------------------------------------------------------------------------- */
-
-/* Creates the eft023 record and its per-area model set. */
-extern "C" void fn_80116770(void)
-{
-    _EFT* effect;
-    _EFT_JOB_WORK* work;
-    s32 i;
-    u8 map;
-    s32 id;
-
-    effect = fn_800F8788_c1(0x4C);
-    if (effect == 0) {
-        return;
-    }
-    effect->release_0x40 = fn_8011688C;
-    work = (_EFT_JOB_WORK*)effect->work_0x38;
-    work->count = 1;
-    effect->area_0x44 = (u8)get_now_areano();
-    map = get_now_mapno();
-    if (map == 6 || map == 0x11) {
-        if (effect->area_0x44 == 1) {
-            work->count = 5;
-        } else if (effect->area_0x44 == 2) {
-            work->count = 2;
-        }
-    }
-    for (i = 0; i < work->count; i++) {
-        work->models[i] = (MHchar*)eft_res_model_get_c1();
-        if (work->models[i] == 0) {
-            eft_res_slot_release(effect);
-            return;
-        }
-    }
-    effect->source_0x30 = 0;
-    effect->dispatch_0x34 = fn_8011689C;
-    effect->field_0x03 = 23;
-    fn_800F9DF4_c1(effect, 8, 0);
-}
-
-/* Releases the eft023 record's character handles. */
-extern "C" void fn_8011688C(_EFT* self)
-{
-    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
-
-    fn_800F8A44((void**)work->models, work->count);
-}
-
-/* Runs the state handler the eft023 record's `state_0x05` selects. */
-extern "C" void fn_8011689C(_EFT* self)
-{
-    switch (self->state_0x05) {
-    case 0:
-        return fn_801168D8(self);
-    case 1:
-        return fn_80116B00(self);
-    case 2:
-        return fn_80116D90(self);
-    case 3:
-        return fn_80116DA0(self);
-    }
-}
-
-/* Spawns the eft023 record's models for the current map and area. */
-extern "C" void fn_801168D8(_EFT* self)
-{
-    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
-    s32 i;
-    u8 map;
-    s32 id;
-
-    self->state_0x05++;
-    map = get_now_mapno();
-    switch (map) {
-    case 1:
-        id = 0x11;
-        break;
-    case 12:
-        id = 0x12;
-        break;
-    case 6:
-        id = (self->area_0x44 == 1) ? 0x13 : 0x15;
-        break;
-    case 17:
-        id = 0x16;
-        if (self->area_0x44 == 1) {
-            id = 0x14;
-        }
-        break;
-    }
-    for (i = 0; i < work->count; i++) {
-        switch (get_now_mapno()) {
-        case 1:
-        case 12:
-            if (self->area_0x44 == 1) {
-                work->tables[i] = &lbl_805A0380[i];
-            }
-            break;
-        case 6:
-        case 17:
-            if (self->area_0x44 == 1) {
-                work->tables[i] = &lbl_805A039C[i];
-            } else if (self->area_0x44 == 2) {
-                work->tables[i] = &lbl_805A0428[i];
-            }
-            break;
-        }
-        if (res_eft_model_create_light(work->models[i], id, 0x28, 2) == 0) {
-            fn_80116DA0(self);
-            return;
-        }
-    }
-    self->flag_0x01 = 1;
-    self->field_0x10 = 0;
-    for (i = 0; i < work->count; i++) {
-        vec_to_mh_vec3(&work->models[i]->pos_0x04, (Vec*)&work->tables[i]->pos_0x04);
-        setVector3(&work->models[i]->scale_0x1C, lbl_80796A60, lbl_80796A60,
-                                           lbl_80796A60);
-        work->models[i]->field_0x28 = 0;
-        work->models[i]->field_0x2C = work->tables[i]->field_0x12;
-        work->models[i]->field_0x28 = 0;
-        work->models[i]->ready_0x35 = 0;
-        work->field_0x18[i] = 0;
-        work->field_0x22[i] = (s16)(work->tables[i]->field_0x10 - 1);
-        work->field_0x2C[i] = 0;
-    }
-    fn_80116B00(self);
-}
-
-/* Bumps the eft023 record's `state_0x05` state index. */
-extern "C" void fn_80116D90(_EFT* self)
-{
-    self->state_0x05++;
-}
-
-/* Releases the eft023 record: the family-23 state-3 step. */
-extern "C" void fn_80116DA0(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
-
-/* ---------------------------------------------------------------------------------------------------
- * eft024 (fn_80116FCC release, fn_80116FDC dispatch)
- * --------------------------------------------------------------------------------------------------- */
-
-/* Creates the eft024 job record. */
-extern "C" void fn_80116DA4(void)
-{
-    _EFT* effect = fn_800F8788_c1(0x84);
-
-    if (effect != 0) {
-        effect->source_0x30 = 0;
-        effect->dispatch_0x34 = fn_80116FDC;
-        effect->field_0x03 = 24;
-        fn_800F9DF4_c1(effect, 8, 0);
-        effect->flag_0x01 = 1;
-        effect->area_0x44 = (u8)get_now_areano();
-    }
-}
-
-/* Allocates one eft024 character slot. */
-extern "C" void* fn_80116E14(s16 unused)
-{
-    return fn_800F8788_c1(0x20);
-}
-
-/* Adds one character to the eft024 job's free slot. */
-extern "C" void fn_80116E1C(_EFT* self, s16 type)
-{
-    _EFT_JOB2_WORK* work = (_EFT_JOB2_WORK*)self->work_0x38;
-    s16 slot;
-    _EFT* effect;
-
-    slot = fn_80116EEC(self);
-    if (slot == -1) {
-        return;
-    }
-    effect = (_EFT*)fn_80116E14(type);
-    if (effect == 0) {
-        return;
-    }
-    effect->field_0x03 = 24;
-    effect->type_0x02 = (u8)type;
-    effect->dispatch_0x34 = fn_80116FDC;
-    fn_800F9DF4_c1(effect, 8, 0);
-    effect->area_0x44 = (u8)get_now_areano();
-    work->slots[slot] = effect;
-    work->per_type[type - 1]++;
-    work->total++;
-}
-
-/* Finds the first free slot in the eft024 job's 32-slot table. */
-extern "C" s16 fn_80116EEC(_EFT* self)
-{
-    s16 i = 0;
-    _EFT** p = (_EFT**)self->work_0x38;
-    s32 j;
-    s32 k;
-
-    for (j = 0; j < 4; j++) {
-        for (k = 0; k < 8; k++) {
-            if (p[k] == 0) {
-                return i;
-            }
-            i++;
-        }
-        p += 8;
-    }
-    return -1;
-}
-
-/* Releases the eft024 job's character handles. */
-extern "C" void fn_80116FCC(_EFT* self)
-{
-    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
-
-    fn_800F8A44((void**)work->models, work->count);
-}
-
-/* Runs the state handler the eft024 job's `state_0x05` selects. */
-extern "C" void fn_80116FDC(_EFT* self)
-{
-    switch (self->state_0x05) {
-    case 0:
-        break;
-    case 1:
-        break;
-    case 2:
-        return fn_80117074(self);
-    case 3:
-        return fn_80117084(self);
-    default:
-        return;
-    }
-    switch (self->state_0x05) {
-    case 0:
-        self->state_0x05++;
-        self->flag_0x01 = 1;
-        switch (self->type_0x02) {
-        case 0:
-            return fn_80117088(self);
-        case 1:
-            return fn_8011722C(self);
-        }
-        return;
-    case 1:
-        switch (self->type_0x02) {
-        case 0:
-            return fn_80117120(self);
-        case 1:
-            return fn_801173AC(self);
-        }
-        return;
-    }
-}
-
-/* Bumps the eft024 job's `state_0x05` state index. */
-extern "C" void fn_80117074(_EFT* self)
-{
-    self->state_0x05++;
-}
-
-/* Releases the eft024 job: the family-24 state-3 step. */
-extern "C" void fn_80117084(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
-
-/* Zeroes the eft024 job's slot table and counters. */
-extern "C" void fn_80117088(_EFT* self)
-{
-    _EFT_JOB2_WORK* work = (_EFT_JOB2_WORK*)self->work_0x38;
-    s32 i;
-
-    self->timer_0x0C = 0;
-    for (i = 0; i < 32; i++) {
-        work->slots[i] = 0;
-    }
-    work->total = 0;
-    work->per_type[0] = 0;
-}
-
-#pragma unroll off
-
-/* Spawns a new character every second while the eft024 job's table has room, and reaps dead ones. */
-extern "C" void fn_80117120(_EFT* self)
-{
-    _EFT_JOB2_WORK* work = (_EFT_JOB2_WORK*)self->work_0x38;
-    _EFT* handle;
-    s32 i;
-
-    if (++self->timer_0x0C >= 0x3C && work->total < 0x20) {
-        fn_80116E1C(self, 1);
-        self->timer_0x0C = 0;
-    }
-    for (i = 0; i < 0x20; i++) {
-        handle = work->slots[i];
-        if (handle != 0 && handle->state_0x05 >= 2) {
-            work->per_type[handle->type_0x02 - 1]--;
-            work->slots[i] = 0;
-            work->total--;
-        }
-    }
-}
-
-#pragma unroll reset
 
 /* Moves the eft021 record's models and tints them from the shared key tables. */
 extern "C" void fn_801156A0(_EFT* self)
@@ -915,7 +412,7 @@ extern "C" void fn_801156A0(_EFT* self)
         work->joint_num = get_joint_num__6MHcharFv(work->models[i]);
         vec_to_mh_vec3(&v, (Vec*)&lbl_805A0208[self->type_0x02]);
         if (i == 1) {
-            v.x *= lbl_80796A30;
+            v.x *= -1.0f;
         }
         mulVecMat(&v, &work->mtx[i][0]);
         z = work->mtx[i][0].m[2][3];
@@ -944,57 +441,12 @@ extern "C" void fn_801156A0(_EFT* self)
     }
 }
 
-/* Advances the eft023 record's per-model joint visibility and rotation. */
-extern "C" void fn_80116B00(_EFT* self)
+/* Creates the effect record the eft022 setter leaves behind. */
+extern "C" _EFT_MODEL_OBJ* fn_80115A44(void** out)
 {
-    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
-    _EFT_MAP_TABLE* table;
-    s32 i;
-    u32 j;
-    u32 joint_num;
-    f32 f;
-    s16 t;
-    u8 base;
-    f32 f25 = lbl_80796A78;
-    f32 f26 = lbl_80796A64;
-    f32 f27 = lbl_80796A68;
-    f32 f28 = lbl_80796A60;
-    f32 f29 = lbl_80796A6C;
-    f32 f30 = lbl_80796A74;
-    f32 f31 = lbl_80796A70;
-
-    for (i = 0; i < work->count; i++) {
-        table = work->tables[i];
-        work->field_0x22[i] = (s16)(work->field_0x22[i] + 1);
-        base = table->field_0x10;
-        if (work->field_0x22[i] >= (s32)(base + table->field_0x11)) {
-            work->field_0x22[i] = base;
-        }
-        joint_num = get_joint_num__6MHcharFv(work->models[i]);
-        for (j = 0; j < joint_num; j++) {
-            if ((s32)j == work->field_0x22[i]) {
-                setVisibility__6MHcharFUlb(work->models[i], j, 1);
-            } else {
-                setVisibility__6MHcharFUlb(work->models[i], j, 0);
-            }
-        }
-        self->field_0x10++;
-        work->field_0x18[i] = (s16)(work->field_0x18[i] + 1);
-        t = work->field_0x18[i];
-        f = sinf(t, (f26 * (f32)(u16)(t << table->field_0x18)) / f27);
-        if ((f >= f28 || f <= f29) && table->field_0x1A > 0) {
-            work->field_0x2C[i] = (s16)(work->field_0x2C[i] + 1);
-            if (work->field_0x2C[i] > table->field_0x1A) {
-                work->field_0x2C[i] = 0;
-            } else {
-                work->field_0x18[i] = (s16)(work->field_0x18[i] - 1);
-            }
-        }
-        work->models[i]->field_0x2C =
-            (s32)(u16)(s32)(f31 + ((f27 * (f * table->field_0x14)) / f30)) + table->field_0x12;
-        move__6MHcharFUs(work->models[i], 0);
-        fn_800F93D8_c1(self, &work->models[i], 2, 1, 0);
-    }
+    fn_800E3B2C();
+    *out = lbl_805A0360;
+    return (_EFT_MODEL_OBJ*)out;
 }
 
 /* Moves the eft021 record's models through their pose animation. */
@@ -1013,12 +465,12 @@ extern "C" void fn_80115A80(_EFT* self)
     s8 r;
     f32 f0;
     f32 f1;
-    f32 f25 = lbl_80796A30;
-    f32 f27 = lbl_80796A38;
-    f32 f28 = lbl_80796A3C;
-    f32 f29 = lbl_80796A40;
-    f32 f30 = lbl_80796A44;
-    f32 f31 = lbl_80796A48;
+    f32 f25 = -1.0f;
+    f32 f27 = 60.0f;
+    f32 f28 = 1.0f;
+    f32 f29 = 204.0f;
+    f32 f30 = 20.0f;
+    f32 f31 = 255.0f;
 
     VEC3_ctor(&v);
     MTX34_ctor(&mtx);
@@ -1043,7 +495,7 @@ extern "C" void fn_80115A80(_EFT* self)
             if (r == 0) {
                 t = plw->field_0x384;
                 if (t < 0x3C) {
-                    f0 = lbl_80796A34;
+                    f0 = 0.0f;
                 } else {
                     f0 = (f32)(t - 0x3C) / f27;
                 }
@@ -1054,7 +506,7 @@ extern "C" void fn_80115A80(_EFT* self)
                 color.g = 0xFF - (s32)(f29 * f0);
                 color.b = 0xFF - (s32)(f29 * f0);
                 if (t < 0x14) {
-                    f1 = lbl_80796A34;
+                    f1 = 0.0f;
                 } else {
                     f1 = (f32)(t - 0x14) / f30;
                 }
@@ -1126,6 +578,38 @@ extern "C" void fn_80115A80(_EFT* self)
     }
 }
 
+/* Bumps the record's `state_0x05` state index. */
+extern "C" void fn_80115FA0(_EFT* self)
+{
+    self->state_0x05++;
+}
+
+/* Releases the eft021 record: the family-21 state-3 step. */
+extern "C" void fn_80115FB0(_EFT* self)
+{
+    eft_res_slot_release(self);
+}
+
+/* Releases the eft021 model's texture handles. */
+extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
+{
+    nw4r::g3d::ResNode h((void*)0);
+    _EFT* effect = obj->owner_0x04;
+    s32 id;
+    s32 i;
+    _EFT_WORK_B* work = (_EFT_WORK_B*)effect->work_0x38;
+
+    for (i = 0; i < work->count; i++) {
+        s32 handle = work->models[i]->field_0x118;
+        fn_80080B10((void*)handle, 4);   /* the declaration takes void*, as its C sibling unit casts */
+        id = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&work->models[i]->field_0x114)->GetResNode((const char*)lbl_80791930).mpData;
+        res_node_assign(&h, &id);
+        if (res_node_is_valid(&h) == 1U) {
+            fn_800E3264((void*)handle, res_node_get_id(&h));
+        }
+    }
+}
+
 /* Places one eft021 model's pose from the shared offset tables. */
 extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32 arg2)
 {
@@ -1142,7 +626,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
     s32 k;
     s32 group;
     s32 inner;
-    f32 f31 = lbl_80796A58;
+    f32 f31 = 0.5f;
     f32 f5;
     f32 f4;
     f32 f0;
@@ -1196,3 +680,536 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
         }
     }
 }
+
+/* Creates the effect's eft022 record at the current area. */
+void eft022_set(nw4r::math::VEC3* pos, u8 area)
+{
+    _EFT* effect;
+    _EFT_WORK_C* work;
+
+    if ((u8)area != (u8)get_now_areano()) {
+        return;
+    }
+    effect = fn_800F8788_c1(8);
+    if (effect == 0) {
+        return;
+    }
+    work = (_EFT_WORK_C*)effect->work_0x38;
+    work->count = 1;
+    effect->release_0x40 = fn_801164F0;
+    effect->field_0x03 = 22;
+    effect->area_0x44 = area;
+    copyVec3(&effect->pos_0x18, pos);
+    effect->type_0x02 = 0;
+    effect->timer_0x0C = 0;
+    effect->flag_0x01 = 1;
+    fn_800F9DF4_c1(effect, 0, 0);
+    effect->dispatch_0x34 = fn_8011652C;
+}
+
+/* Creates the effect's eft022 record for an actor. */
+extern "C" void fn_80116430(void* source, nw4r::math::VEC3* pos, u8 area)
+{
+    _EFT* effect;
+    _EFT_WORK_C* work;
+
+    if ((u8)area != (u8)get_now_areano()) {
+        return;
+    }
+    effect = fn_800F8788_c1(8);
+    if (effect == 0) {
+        return;
+    }
+    work = (_EFT_WORK_C*)effect->work_0x38;
+    work->count = 1;
+    effect->release_0x40 = fn_801164F0;
+    effect->field_0x03 = 22;
+    effect->area_0x44 = area;
+    copyVec3(&effect->pos_0x18, pos);
+    effect->type_0x02 = 1;
+    effect->timer_0x0C = 0;
+    effect->flag_0x01 = 1;
+    effect->source_0x30 = source;
+    fn_800F9DF4_c1(effect, 0, 0);
+    effect->dispatch_0x34 = fn_8011652C;
+}
+
+/* Frees an eft022 record once the effect is gone. */
+extern "C" void fn_801164F0(_EFT* self)
+{
+    _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
+
+    push_eft_effect_heap_num(work->effects, work->count);
+    work->count = 0;
+}
+
+/* Runs the state handler the eft022 record's `state_0x05` selects. */
+extern "C" void fn_8011652C(_EFT* self)
+{
+    switch (self->state_0x05) {
+    case 0:
+        return fn_80116568(self);
+    case 1:
+        return fn_8011661C(self);
+    case 2:
+        return fn_8011675C(self);
+    case 3:
+        return fn_8011676C(self);
+    }
+}
+
+/* Spawns the record's effect and hands its position to the enemy it belongs to. */
+extern "C" void fn_80116568(_EFT* self)
+{
+    _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
+    _ENEMY_WORK* enemy;
+
+    self->state_0x05++;
+    work->effects[0] = res_eft_create(0x2D, 7, 0);
+    if (work->effects[0] == 0) {
+        fn_8011676C(self);
+        return;
+    }
+    SetRootMtxTrans(work->effects[0], &self->pos_0x18);
+    fn_8011661C(self);
+    if ((s32)self->type_0x02 != 1) {
+        fn_800DA864(&self->pos_0x18);
+        return;
+    }
+    enemy = (_ENEMY_WORK*)self->source_0x30;
+    if (em_work_die_ck(enemy) == 0) {
+        fn_800DCB18(enemy->field_0xB14, &self->pos_0x18);
+    }
+}
+
+/* Advances the eft022 record's timer through its four substates. */
+extern "C" void fn_8011661C(_EFT* self)
+{
+    _EFT_WORK_C* work = (_EFT_WORK_C*)self->work_0x38;
+
+    if (effect_move(work->effects[0]) == 1) {
+        fn_800F93D8_c1(self, &work->effects[0], 1, work->count, 0);
+    }
+    switch (self->field_0x07) {
+    case 0:
+        if (++self->timer_0x0C >= 0x18) {
+            self->timer_0x0C = 5;
+            fn_80059374(1);
+            self->field_0x07++;
+            self->field_0x07++;
+        }
+        break;
+    case 1:
+        self->field_0x07++;
+        break;
+    case 2:
+        if (--self->timer_0x0C <= 0) {
+            self->timer_0x0C = 0x5A;
+            fn_80059374(2);
+            self->field_0x07++;
+        } else {
+            fn_80059420();
+        }
+        break;
+    case 3:
+        if (--self->timer_0x0C <= 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            self->field_0x06 = 0;
+            self->field_0x07 = 0;
+        } else {
+            fn_80059420();
+        }
+        break;
+    }
+}
+
+/* Bumps the eft022 record's `state_0x05` state index. */
+extern "C" void fn_8011675C(_EFT* self)
+{
+    self->state_0x05++;
+}
+
+/* Releases the eft022 record: the family-22 state-3 step. */
+extern "C" void fn_8011676C(_EFT* self)
+{
+    eft_res_slot_release(self);
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * eft023 (fn_8011688C release, fn_8011689C dispatch)
+ * --------------------------------------------------------------------------------------------------- */
+
+/* Creates the eft023 record and its per-area model set. */
+extern "C" void fn_80116770(void)
+{
+    _EFT* effect;
+    _EFT_JOB_WORK* work;
+    s32 i;
+    s32 map;
+    s32 id;
+
+    effect = fn_800F8788_c1(0x4C);
+    if (effect == 0) {
+        return;
+    }
+    effect->release_0x40 = fn_8011688C;
+    work = (_EFT_JOB_WORK*)effect->work_0x38;
+    work->count = 1;
+    effect->area_0x44 = get_now_areano();
+    map = get_now_mapno();
+    if (map == 6 || map == 0x11) {
+        if (effect->area_0x44 == 1) {
+            work->count = 5;
+        } else if (effect->area_0x44 == 2) {
+            work->count = 2;
+        }
+    }
+    for (i = 0; i < work->count; i++) {
+        work->models[i] = (MHchar*)eft_res_model_get_c1();
+        if (work->models[i] == 0) {
+            eft_res_slot_release(effect);
+            return;
+        }
+    }
+    effect->source_0x30 = 0;
+    effect->dispatch_0x34 = fn_8011689C;
+    effect->field_0x03 = 23;
+    fn_800F9DF4_c1(effect, 8, 0);
+}
+
+/* Releases the eft023 record's character handles. */
+extern "C" void fn_8011688C(_EFT* self)
+{
+    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
+
+    fn_800F8A44((void**)work->models, work->count);
+}
+
+/* Runs the state handler the eft023 record's `state_0x05` selects. */
+extern "C" void fn_8011689C(_EFT* self)
+{
+    switch (self->state_0x05) {
+    case 0:
+        return fn_801168D8(self);
+    case 1:
+        return fn_80116B00(self);
+    case 2:
+        return fn_80116D90(self);
+    case 3:
+        return fn_80116DA0(self);
+    }
+}
+
+/* Spawns the eft023 record's models for the current map and area. */
+extern "C" void fn_801168D8(_EFT* self)
+{
+    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
+    s32 i;
+    u8 map;
+    s32 id;
+
+    self->state_0x05++;
+    map = get_now_mapno();
+    switch (map) {
+    case 1:
+        id = 0x11;
+        break;
+    case 12:
+        id = 0x12;
+        break;
+    case 6:
+        if (self->area_0x44 == 1) {
+            id = 0x13;
+        } else {
+            id = 0x15;
+        }
+        break;
+    case 17:
+        id = (self->area_0x44 == 1) ? 0x14 : 0x16;
+        break;
+    }
+    for (i = 0; i < work->count; i++) {
+        switch (get_now_mapno()) {
+        case 1:
+        case 12:
+            if (self->area_0x44 == 1) {
+                work->tables[i] = &lbl_805A0380[i];
+            }
+            break;
+        case 6:
+        case 17:
+            if (self->area_0x44 == 1) {
+                work->tables[i] = &lbl_805A039C[i];
+            } else if (self->area_0x44 == 2) {
+                work->tables[i] = &lbl_805A0428[i];
+            }
+            break;
+        }
+        if (res_eft_model_create_light(work->models[i], id, 0x28, 2) == 0) {
+            fn_80116DA0(self);
+            return;
+        }
+    }
+    self->flag_0x01 = 1;
+    self->field_0x10 = 0;
+    for (i = 0; i < work->count; i++) {
+        vec_to_mh_vec3(&work->models[i]->pos_0x04, (Vec*)&work->tables[i]->pos_0x04);
+        setVector3(&work->models[i]->scale_0x1C, 1.0f, 1.0f,
+                                           1.0f);
+        work->models[i]->field_0x28 = 0;
+        work->models[i]->field_0x2C = work->tables[i]->field_0x12;
+        work->models[i]->field_0x28 = 0;
+        work->models[i]->ready_0x35 = 0;
+        work->field_0x18[i] = 0;
+        work->field_0x22[i] = (s16)(work->tables[i]->field_0x10 - 1);
+        work->field_0x2C[i] = 0;
+    }
+    fn_80116B00(self);
+}
+
+/* Advances the eft023 record's per-model joint visibility and rotation. */
+extern "C" void fn_80116B00(_EFT* self)
+{
+    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
+    _EFT_MAP_TABLE* table;
+    s32 i;
+    u32 j;
+    u32 joint_num;
+    f32 f;
+    s16 t;
+    u8 base;
+    f32 f25 = lbl_80796A78;
+    f32 f26 = 6.2831855f;
+    f32 f27 = 65536.0f;
+    f32 f28 = 1.0f;
+    f32 f29 = -1.0f;
+    f32 f30 = 360.0f;
+    f32 f31 = 0.5f;
+
+    for (i = 0; i < work->count; i++) {
+        table = work->tables[i];
+        work->field_0x22[i] = (s16)(work->field_0x22[i] + 1);
+        base = table->field_0x10;
+        if (work->field_0x22[i] >= (s32)(base + table->field_0x11)) {
+            work->field_0x22[i] = base;
+        }
+        joint_num = get_joint_num__6MHcharFv(work->models[i]);
+        for (j = 0; j < joint_num; j++) {
+            if ((s32)j == work->field_0x22[i]) {
+                setVisibility__6MHcharFUlb(work->models[i], j, 1);
+            } else {
+                setVisibility__6MHcharFUlb(work->models[i], j, 0);
+            }
+        }
+        self->field_0x10++;
+        work->field_0x18[i] = (s16)(work->field_0x18[i] + 1);
+        t = work->field_0x18[i];
+        f = sinf(t, (f26 * (f32)(u16)(t << table->field_0x18)) / f27);
+        if ((f >= f28 || f <= f29) && table->field_0x1A > 0) {
+            work->field_0x2C[i] = (s16)(work->field_0x2C[i] + 1);
+            if (work->field_0x2C[i] > table->field_0x1A) {
+                work->field_0x2C[i] = 0;
+            } else {
+                work->field_0x18[i] = (s16)(work->field_0x18[i] - 1);
+            }
+        }
+        work->models[i]->field_0x2C =
+            (s32)(u16)(s32)(f31 + ((f27 * (f * table->field_0x14)) / f30)) + table->field_0x12;
+        move__6MHcharFUs(work->models[i], 0);
+        fn_800F93D8_c1(self, &work->models[i], 2, 1, 0);
+    }
+}
+
+/* Bumps the eft023 record's `state_0x05` state index. */
+extern "C" void fn_80116D90(_EFT* self)
+{
+    self->state_0x05++;
+}
+
+/* Releases the eft023 record: the family-23 state-3 step. */
+extern "C" void fn_80116DA0(_EFT* self)
+{
+    eft_res_slot_release(self);
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * eft024 (fn_80116FCC release, fn_80116FDC dispatch)
+ * --------------------------------------------------------------------------------------------------- */
+
+/* Creates the eft024 job record. */
+extern "C" void fn_80116DA4(void)
+{
+    _EFT* effect = fn_800F8788_c1(0x84);
+
+    if (effect != 0) {
+        effect->source_0x30 = 0;
+        effect->dispatch_0x34 = fn_80116FDC;
+        effect->field_0x03 = 24;
+        fn_800F9DF4_c1(effect, 8, 0);
+        effect->flag_0x01 = 1;
+        effect->area_0x44 = get_now_areano();
+    }
+}
+
+/* Allocates one eft024 character slot. */
+extern "C" void* fn_80116E14(s16 unused)
+{
+    return fn_800F8788_c1(0x20);
+}
+
+/* Adds one character to the eft024 job's free slot. */
+extern "C" void fn_80116E1C(_EFT* self, s16 type, s32 unused_arg)
+{
+    _EFT_JOB2_WORK* work = (_EFT_JOB2_WORK*)self->work_0x38;
+    s16 slot;
+    _EFT* effect;
+
+    slot = fn_80116EEC(self);
+    if (slot == -1) {
+        return;
+    }
+    effect = (_EFT*)fn_80116E14(type);
+    if (effect == 0) {
+        return;
+    }
+    effect->field_0x03 = 24;
+    effect->type_0x02 = (u8)type;
+    effect->dispatch_0x34 = fn_80116FDC;
+    fn_800F9DF4_c1(effect, 8, 0);
+    effect->area_0x44 = get_now_areano();
+    work->slots[slot] = effect;
+    work->per_type[type - 1]++;
+    work->total++;
+}
+
+/* Finds the first free slot in the eft024 job's 32-slot table. */
+extern "C" s16 fn_80116EEC(_EFT* self)
+{
+    s16 i = 0;
+    _EFT** p = (_EFT**)self->work_0x38;
+    s32 j;
+    s32 k;
+
+    for (j = 0; j < 4; j++) {
+        for (k = 0; k < 8; k++) {
+            if (p[k] == 0) {
+                return i;
+            }
+            i++;
+        }
+        p += 8;
+    }
+    return -1;
+}
+
+/* Releases the eft024 job's character handles. */
+extern "C" void fn_80116FCC(_EFT* self)
+{
+    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
+
+    fn_800F8A44((void**)work->models, work->count);
+}
+
+static void eft024_job_start(_EFT* self);
+static void eft024_job_step(_EFT* self);
+
+/* Runs the state handler the eft024 job's `state_0x05` selects. */
+extern "C" void fn_80116FDC(_EFT* self)
+{
+    switch (self->state_0x05) {
+    case 0:
+        eft024_job_start(self);
+        break;
+    case 1:
+        eft024_job_step(self);
+        break;
+    case 2:
+        fn_80117074(self);
+        break;
+    case 3:
+        fn_80117084(self);
+        break;
+    }
+}
+
+/* State 0: advances the job and runs the kind's start.  File-local, so the DOL map folds it into the dispatcher's
+ * extent. */
+static void eft024_job_start(_EFT* self)
+{
+    self->state_0x05++;
+    self->flag_0x01 = 1;
+    switch (self->type_0x02) {
+    case 0:
+        fn_80117088(self);
+        break;
+    case 1:
+        fn_8011722C(self);
+        break;
+    }
+}
+
+/* State 1: runs the kind's per-frame step.  File-local, folded into the dispatcher's extent like the start. */
+static void eft024_job_step(_EFT* self)
+{
+    switch (self->type_0x02) {
+    case 0:
+        fn_80117120(self);
+        break;
+    case 1:
+        fn_801173AC(self);
+        break;
+    }
+}
+
+/* Bumps the eft024 job's `state_0x05` state index. */
+extern "C" void fn_80117074(_EFT* self)
+{
+    self->state_0x05++;
+}
+
+/* Releases the eft024 job: the family-24 state-3 step. */
+extern "C" void fn_80117084(_EFT* self)
+{
+    eft_res_slot_release(self);
+}
+
+/* Zeroes the eft024 job's slot table and counters. */
+extern "C" void fn_80117088(_EFT* self)
+{
+    _EFT_JOB2_WORK* work = (_EFT_JOB2_WORK*)self->work_0x38;
+    s32 i;
+
+    self->timer_0x0C = 0;
+    for (i = 0; i < 32; i++) {
+        work->slots[i] = 0;
+    }
+    work->total = 0;
+    work->per_type[0] = 0;
+}
+
+#pragma unroll off
+
+/* Spawns a new character every second while the eft024 job's table has room, and reaps dead ones. */
+extern "C" void fn_80117120(_EFT* self)
+{
+    _EFT_JOB2_WORK* work = (_EFT_JOB2_WORK*)self->work_0x38;
+    _EFT* handle;
+    s32 i;
+
+    if (++self->timer_0x0C >= 0x3C && work->total < 0x20) {
+        fn_80116E1C(self, 1, 0);
+        self->timer_0x0C = 0;
+    }
+    for (i = 0; i < 0x20; i++) {
+        handle = work->slots[i];
+        if (handle != 0 && handle->state_0x05 >= 2) {
+            work->per_type[handle->type_0x02 - 1]--;
+            work->slots[i] = 0;
+            work->total--;
+        }
+    }
+}
+
+#pragma unroll reset
+

@@ -6,10 +6,10 @@
  *   per-class offsets).
  * FLAGS. `cflags_main`; `#pragma peephole off` around the function: with the pass on, MWCC forwards
  *   `work->effect = res_eft_create(...)` into the test and drops retail's `lwz r0,4(work)` reload.
- * NAMES. The map has only the `fn_` stem.  The file is C: its own symbol is plain, the mangled callees are declared
- *   by their map spelling.
- * RESIDUALS. none in code: the row matches.
- *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted.
+ * NAMES. The map has only the `fn_` stem.  GUESS: `eft002_effect_ids`/`eft002_param_ids` (map `lbl_807916E0`/
+ *   `lbl_807916E4`, the `res_eft_create` arguments indexed by `type_0x02`).
+ *   The file is C: its own symbol is plain, the mangled callees are declared by their map spelling.
+ * RESIDUALS. none: the row and the claimed sections match (`.sdata` the two id tables, `.sdata2` the body's literals).
  * SHAPES. The pool-block store is its own statement (`if ((work->effect = ...) == 0)` does not reload even with the
  *   pragma).  `source` is declared before `work` (the other order swaps their callee-saved registers).
  *   `VEC3_ctor` and `MTX34_ctor` are one-instruction `blr` stubs in the DOL, so their calls stay written out.
@@ -58,23 +58,10 @@ extern void* res_eft_create__FUsUsUl(u16 id, u16 param, u32 idx);
 extern void mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(VEC3* out, MTX34* mtx);
 extern void SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(void* effect, VEC3* pos);
 
-/* The shared pool: the effect/parameter id tables, then the twelve per-class muzzle offsets.  The two
- * u16 tables are sized (2) on purpose: an unsized `extern` is too big for MWCC's small-data heuristic
- * and it emits a `lis`/`addi` pair where the target uses `lbl_...@sda21`. */
-extern u16 lbl_807916E0[2];
-extern u16 lbl_807916E4[2];
-extern f32 lbl_80796658; /* 10.0f   */
-extern f32 lbl_8079665C; /* -2.0f   */
-extern f32 lbl_80796660; /* 190.0f  */
-extern f32 lbl_80796664; /* -4.9f   */
-extern f32 lbl_80796668; /* -0.7f   */
-extern f32 lbl_8079666C; /* 90.0f   */
-extern f32 lbl_80796670; /* -7.8f   */
-extern f32 lbl_80796674; /* -10.0f  */
-extern f32 lbl_80796678; /* 195.0f  */
-extern f32 lbl_8079667C; /* -5.0f   */
-extern f32 lbl_80796680; /* -20.0f  */
-extern f32 lbl_80796684; /* 155.0f  */
+/* The unit's `.sdata`: the effect and parameter id per effect type (`self->type_0x02`); the twelve per-class
+ * muzzle offsets are the body's float literals (`.sdata2`, first-use order). */
+u16 eft002_effect_ids[2] = { 0x0297, 0x0398 };
+u16 eft002_param_ids[2] = { 0x003E, 0x0014 };
 
 /* ---------------------------------------------------------------------------------------------------
  * body
@@ -95,8 +82,8 @@ void fn_800FD520(struct _EFT* self)
     MTX34_ctor(&mtx);
 
     self->state_0x05++;
-    work->effect = res_eft_create__FUsUsUl(lbl_807916E0[self->type_0x02],
-                                           lbl_807916E4[self->type_0x02], 0);
+    work->effect = res_eft_create__FUsUsUl(eft002_effect_ids[self->type_0x02],
+                                           eft002_param_ids[self->type_0x02], 0);
     if (work->effect == 0) {
         fn_800FD860(self);
         return;
@@ -114,29 +101,29 @@ void fn_800FD520(struct _EFT* self)
             break;
         case 0:
         case 7:
-            v.x = lbl_80796658;
-            v.y = lbl_8079665C;
-            v.z = lbl_80796660;
+            v.x = 10.0f;
+            v.y = -2.0f;
+            v.z = 190.0f;
             break;
         case 1:
-            v.x = lbl_80796664;
-            v.y = lbl_80796668;
-            v.z = lbl_8079666C;
+            v.x = -4.9f;
+            v.y = -0.7f;
+            v.z = 90.0f;
             break;
         case 3:
-            v.x = lbl_80796670;
-            v.y = lbl_80796674;
-            v.z = lbl_80796678;
+            v.x = -7.8f;
+            v.y = -10.0f;
+            v.z = 195.0f;
             break;
         case 2:
-            v.x = lbl_8079667C;
-            v.y = lbl_80796680;
-            v.z = lbl_80796684;
+            v.x = -5.0f;
+            v.y = -20.0f;
+            v.z = 155.0f;
             break;
         case 8:
-            v.x = lbl_80796658;
-            v.y = lbl_8079665C;
-            v.z = lbl_80796660;
+            v.x = 10.0f;
+            v.y = -2.0f;
+            v.z = 190.0f;
             break;
         }
         mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&v, &mtx);

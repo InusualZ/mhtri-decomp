@@ -1,14 +1,15 @@
 /* ef/fn_8011722C.c - the kind-1 state-0 entry of the effect job machine (`ef/eft022_fx.cpp`'s `fn_80116FDC`
  *   dispatches on `state_0x05` and `kind_0x02`): it takes one effect character from the `eft_control` pool, creates
- *   its model, drops it at one of three random offsets (`lbl_805A0460`) and randomises its rotation; the kind-1
+ *   its model, drops it at one of three random offsets (`eft_job_spawn_offsets`) and randomises its rotation; the kind-1
  *   state-1 handler `fn_801173AC` then integrates the spin.
  * RANGE. .text 0x8011722C-0x801173AC (1 function); extab 0x8000C494-0x8000C49C, extabindex 0x800265C8-0x800265D4,
- *   .data 0x805A0460-0x805A0488 (three `Vec` offsets and a 0.0f word), .sdata2 0x80796A80-0x80796A88 (0.4f, 0.0f).
+ *   .data 0x805A0460-0x805A0488 (three `Vec` offsets), .sdata2 0x80796A80-0x80796A88 (0.4f, 0.0f).
  * FLAGS. `cflags_main`; `#pragma peephole off` around the function: with the pass on, MWCC forwards
  *   `work->chara[i] = eft_res_model_get()` into the loop test and drops retail's `lwz r0,4(r30)` reload.
  * NAMES. The map has only the `fn_` stem.  The file is C; the mangled nw4r callees are declared by their map spelling.
- * RESIDUALS. none in code: the row matches.
- *   flipcheck: `.data`/`.sdata2` claimed, not emitted.
+ *   GUESS: `eft_job_spawn_offsets` (map `lbl_805A0460`, the three offsets the random pick indexes).
+ * RESIDUALS. none: the row and the claimed sections match (`.data` the offsets, its last word the link's 8-byte
+ *   fill before `ef/eft026_fx.cpp`'s `.data`; `.sdata2` the body's literals).
  * SHAPES. The model id is the ternary `get_now_mapno() == 12 ? 24 : 23`: `(get_now_mapno() == 12) + 23` narrows to
  *   the `u16` parameter before `work->chara[0]` is loaded.
  *   `EftJob`/`EftCharaWork` are this unit's view of `job->work_0x38`; the kind-0 functions view the same block as 32
@@ -72,13 +73,12 @@ extern u8 get_now_mapno__Fv(void);
 extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec* out, f32 x, f32 y, f32 z);
 extern void vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(Vec* out, Vec* in);
 
-/* The shared pool.  `lbl_805A0460` is an unsized `Vec` array in `.data`, so MWCC keeps the target's
- * `lis`/`addi` addressing (a `.sdata2` scalar would fold into `@sda21`, and an unsized array is too
- * big for the small-data heuristic anyway).  The two floats stay scalars so their `@sda21` loads are
- * unchanged. */
-extern const Vec lbl_805A0460[]; /* the three spawn offsets, indexed by the random pick */
-extern const f32 lbl_80796A80;  /* 0.4f */
-extern const f32 lbl_80796A84;  /* 0.0f */
+/* The unit's `.data`: the three spawn offsets, indexed by the random pick. */
+Vec eft_job_spawn_offsets[3] = {
+    { -2100.0f, 3000.0f, -1000.0f },
+    { -1700.0f, 3000.0f, -1500.0f },
+    { -1300.0f, 3000.0f, -1700.0f },
+};
 
 /* ---------------------------------------------------------------------------------------------------
  * body
@@ -109,12 +109,12 @@ void fn_8011722C(EftJob* self)
     }
     work->chara[0]->ready = 0;
     vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec((Vec*)&work->chara[0]->pos_0x04,
-                                            (Vec*)&lbl_805A0460[ran_suu__Fl(1) % 3]);
-    setVector3__FPQ34nw4r4math4VEC3fff((Vec*)&work->chara[0]->scale_0x1C, lbl_80796A80, lbl_80796A80,
-                                       lbl_80796A80);
-    work->pos.x = lbl_80796A84;
-    work->pos.y = lbl_80796A84;
-    work->pos.z = lbl_80796A84;
+                                            &eft_job_spawn_offsets[ran_suu__Fl(1) % 3]);
+    setVector3__FPQ34nw4r4math4VEC3fff((Vec*)&work->chara[0]->scale_0x1C, 0.4f, 0.4f,
+                                       0.4f);
+    work->pos.x = 0.0f;
+    work->pos.y = 0.0f;
+    work->pos.z = 0.0f;
     work->rot_x = ran_suu__Fl(1);
     work->rot_y = ran_suu__Fl(1);
     work->rot_z = ran_suu__Fl(1);

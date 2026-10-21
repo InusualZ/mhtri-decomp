@@ -4,8 +4,7 @@
  *   .sdata2 0x80796688-0x80796690 (0.0f and 20.0f, the effect's offset above the shell).
  * NAMES. The map has only `fn_` stems for this range.  The file is C: the only C++ evidence is six mangled callees,
  *   which do not decide the caller's language (as in `ef/fn_800FD520.c`).
- * RESIDUALS. none in code: all three rows match.
- *   flipcheck: `.sdata2` claimed, not emitted.
+ * RESIDUALS. none: the rows and the claimed sections match (the `.sdata2` pair is the body's literals).
  * SHAPES. `type_0x02` is `s8` (retail `cmpwi`; a `u8` emits `cmplwi`).
  *   The area test is an early return (`if (area != get_now_areano()) return;`); as a block MWCC branches to the
  *   `effect_move` block where retail branches to the epilogue.
@@ -95,10 +94,6 @@ extern void rotVecZ__FPQ34nw4r4math4VEC3Ul(VEC3* v, u32 angle);
 extern void SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(void* effect, VEC3* pos);
 extern u32 effect_move__FPQ34nw4r2ef6Effect(void* effect);
 
-/* The shared pool: the effect's offset from the shell.  Referenced but not emitted (see the header). */
-extern f32 lbl_80796688; /* 0.0f  */
-extern f32 lbl_8079668C; /* 20.0f */
-
 /* ---------------------------------------------------------------------------------------------------
  * bodies
  * ------------------------------------------------------------------------------------------------- */
@@ -127,7 +122,7 @@ void fn_800FD718(struct _EFT_S8* self)
             return;
         }
         copyVec3(&self->pos_0x18, &source->pos_0x18);
-        setVector3__FPQ34nw4r4math4VEC3fff(&v, lbl_80796688, lbl_8079668C, lbl_80796688);
+        setVector3__FPQ34nw4r4math4VEC3fff(&v, 0.0f, 20.0f, 0.0f);
         rotVecX__FPQ34nw4r4math4VEC3Ul(&v, source->rot_x_0x24);
         rotVecZ__FPQ34nw4r4math4VEC3Ul(&v, source->rot_z_0x2C);
         addVec3To(&self->pos_0x18, &v);

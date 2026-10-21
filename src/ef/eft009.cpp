@@ -7,12 +7,14 @@
  *   truncations and byte masks retail keeps are fused away).
  * NAMES. `eft009_set_pos` is the runtime dump's own name; `eft009_spawn_at_joint` and `eft009_spawn_at_pos` are GUESSes from their bodies; the map
  *   has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
- * RESIDUALS. 2 partial rows: `fn_80103D28`, `fn_801041BC`: the loop-invariant `lbl_80796750` load (`lfs f31`) sits
- *   one slot early in ours (retail `li r26,0; mr r27,r31; lfs f31`); declaring `neg` in the loop, the `for`-init or a
- *   `while` preheader schedules it the same.  Ours names the three switch tables `@374`/`@550`/`@551` where retail
- *   names `jumptable_8059E160`/`jumptable_8059E268`/`jumptable_8059E328`.
- *   flipcheck: `.sdata2` claimed, not emitted; `.text` differs in 20 bytes.
- * SHAPES. `_EFT::work_0x38` is a union of two typed pointers: the move family (`fn_80103D28`/`fn_801041BC`) drives a
+ * RESIDUALS. none in bytes: every row, `.data` and `.sdata2` match (the `.sdata2` claim's last word is the 8-byte
+ *   fill before `ef/fn_80104BD0.c`'s pool).  Ours names the three switch tables `@NNN` where retail names
+ *   `jumptable_8059E160`/`jumptable_8059E268`/`jumptable_8059E328`.
+ *   The type tables at 0x8059DBF0-0x8059E160 (`lbl_8059DBF0`..`lbl_8059DE48`, read here and by `ef/eft007.cpp`'s
+ *   emitter) are unclaimed; they precede this unit's switch tables in `.data` order (claim request filed).
+ * SHAPES. The two mirrored-offset loops multiply by the literal (`vec.x *= -1.0f`): a hoisted `f32 neg` local
+ *   schedules the loop-invariant `lfs f31` one slot early.
+ *   `_EFT::work_0x38` is a union of two typed pointers: the move family (`fn_80103D28`/`fn_801041BC`) drives a
  *   joint matrix at +0x0C and an offset at +0x3C, the set family one pooled effect at +0x08 and an `f32` paramscale
  *   at +0x14.
  */
@@ -172,15 +174,6 @@ extern "C" _EFT* fn_80104A68(u32 id, u8 type, f32 scale, u8 area);
 /* The unit's shared pool, referenced but not emitted (see the header). */
 #include "unsplit/ef_tables.h" /* lbl_8059DBF0 / lbl_8059DC74 (rule 2: the band) */
 extern "C" u32 lbl_8059DCF8[]; /* joint id per type */
-extern "C" f32 lbl_80796750;
-extern "C" f32 lbl_80796754;
-extern "C" f32 lbl_80796758;
-extern "C" f32 lbl_8079675C;
-extern "C" f32 lbl_80796760;
-extern "C" f32 lbl_80796764;
-extern "C" f32 lbl_80796768;
-extern "C" f32 lbl_8079676C;
-extern "C" f32 lbl_80796770;
 
 /* ---------------------------------------------------------------------------------------------------
  * bodies
@@ -301,11 +294,10 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x12:
     case 0x21:
     case 0x23: {
-        f32 neg = lbl_80796750;
         for (i = 0; i < work->count; i++) {
             copyVec3(&vec, &work->offset_0x3C);
             if (i == 1) {
-                vec.x *= neg;
+                vec.x *= -1.0f;
             }
             mulVecMat(&vec, &work->mtx_0x0C);
             addVec3To(&self->pos_0x18, &vec);
@@ -421,11 +413,10 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x23: {
         get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
-        f32 neg = lbl_80796750;
         for (i = 0; i < work->count; i++) {
             copyVec3(&vec, &work->offset_0x3C);
             if (i == 1) {
-                vec.x *= neg;
+                vec.x *= -1.0f;
             }
             mulVecMat(&vec, &work->mtx_0x0C);
             addVec3To(&self->pos_0x18, &vec);
@@ -451,13 +442,13 @@ extern "C" void fn_801041BC(_EFT* self)
         }
         break;
     case 0x18:
-        change_paramscale_eff(work->items_0x04[0], lbl_80796754 * get_em_scale(enemy));
+        change_paramscale_eff(work->items_0x04[0], 2.2f * get_em_scale(enemy));
         break;
     case 0x19:
-        change_paramscale_eff(work->items_0x04[0], lbl_80796758 * get_em_scale(enemy));
+        change_paramscale_eff(work->items_0x04[0], 0.4f * get_em_scale(enemy));
         break;
     case 0x1D:
-        change_paramscale_eff(work->items_0x04[0], lbl_8079675C * get_em_scale(enemy));
+        change_paramscale_eff(work->items_0x04[0], 2.0f * get_em_scale(enemy));
         break;
     case 0x1B:
     case 0x1C:
@@ -474,19 +465,19 @@ extern "C" void fn_801041BC(_EFT* self)
         }
         break;
     case 0x1E:
-        change_paramscale_eff(work->items_0x04[0], lbl_80796760 * get_em_scale(enemy));
+        change_paramscale_eff(work->items_0x04[0], 0.5f * get_em_scale(enemy));
         break;
     case 0x1F:
-        change_paramscale_eff(work->items_0x04[0], lbl_80796764 * get_em_scale(enemy));
+        change_paramscale_eff(work->items_0x04[0], 0.7f * get_em_scale(enemy));
         break;
     case 0x38:
-        change_paramscale_eff(work->items_0x04[0], lbl_80796768 * get_em_scale(enemy));
+        change_paramscale_eff(work->items_0x04[0], 1.5f * get_em_scale(enemy));
         break;
     case 0x39:
-        change_paramscale_eff(work->items_0x04[0], lbl_8079676C * get_em_scale(enemy));
+        change_paramscale_eff(work->items_0x04[0], 0.8f * get_em_scale(enemy));
         break;
     case 0x3C:
-        change_paramscale_eff(work->items_0x04[0], lbl_80796770);
+        change_paramscale_eff(work->items_0x04[0], 1.3f);
         break;
     case 0x40:
         change_paramscale_eff(work->items_0x04[0], get_em_scale(enemy));
