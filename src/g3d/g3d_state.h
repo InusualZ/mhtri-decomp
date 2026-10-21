@@ -23,9 +23,6 @@ void g3d_state_invalidate(u32 flag);
 /* 0x800868A0 - the pipe-command writer (callers: gx/fn_8009AA78.c, gx/fn_8009ACE4.c). */
 void fn_800868A0(u32 value);
 
-/* 0x8079124C - the `.sdata` word the unit hands back the address of. */
-extern u32 lbl_8079124C;
-
 #ifdef __cplusplus
 }
 #endif

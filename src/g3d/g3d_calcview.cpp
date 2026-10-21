@@ -30,19 +30,28 @@
  *   g3d_calc_view_lc is a GUESS and g3d_calc_view_lc_dma is a GUESS (the three view-matrix calculators
  *   ScnMdlSimple's view pass picks between), g3d_lc_queue_wait is a GUESS, g3d_dc_invalidate_range is a GUESS and
  *   g3d_lc_base is a GUESS (the tail calls of LCQueueWait / DCInvalidateRange and the locked cache's address).
- * RESIDUALS. g3d_calc_view_lc and g3d_calc_view_lc_dma: retail keeps the attribute array and the matrix count in
- *   stack slots and recomputes `base + i` at each use; ours keeps one more register live (the global index after the
- *   billboard call), which renumbers r19-r30 and shifts the spill slots (tried: a separate index variable after the
- *   call - worse).  g3d_calc_view: the normal and texture matrix pointers of its second loop take r19/r20 swapped.
+ * RESIDUALS. g3d_calc_view_lc and g3d_calc_view_lc_dma: retail hoists a third assert string (the billboard-index
+ *   message, r14) and recomputes `base + i` after the billboard call, where ours keeps `base + i` live (r25) and
+ *   loads that string in place, which renumbers r25-r30 (tried: `i + base` at either use, a separate index variable
+ *   after the call - no better).
  *   The two asm routines mtx34_axis_in_parent/mtx34_up_axis_in_parent open the range: their only callers are this
  *   unit's billboard builders and their constant calcview_det_epsilon_f32 (0x80795DB0) follows this unit's
  *   `.sdata2` pair, before g3d_calcvtx.cpp's.
  *   mtx34_calc_billboard_y and mtx34_calc_billboard_y_persp: the parent node index takes r5 where retail keeps it in
  *   r0 (tried: s32, its declaration at every position of the function head, folding it into the call - worse or
  *   equal).  fn_8006F908 declares the second square first (retail's f1/f2 colouring).
- *   flipcheck: `.text` short of the claim; `.rodata` byte-identical; `.data`/`.sdata`: the strings are literals,
- *   the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
- *   instance, after the TU's own strings, playbook 80); `.sdata2` (calcview_zero_f32/calcview_epsilon_f32/calcview_det_epsilon_f32) is declared, not emitted.
+ *   flipcheck: `.text` (g3d_calc_view_lc/_dma above) only; `.rodata`, `.data`, `.sdata` and `.sdata2` byte-identical.
+ *   res_mdl_info_data is nw4r's ResMdlInfo::ref: it passes its `__FUNCTION__` as a local "ref" array until the map
+ *   names the row by the member (the C name's `__FUNCTION__` would spell the C name).
+ * SHAPES. Function order: the definitions follow retail's addresses; the `_ac.h` accessors and the helpers retail
+ *   emits as weak copies are defined first as `inline` (the whole function region is under `#pragma dont_inline
+ *   on`), so each copy lands right after its first caller; the asm routines and fn_8006F908 are plain and sit at
+ *   their addresses (an asm function is emitted where it is defined).  The weak strings come out in reverse
+ *   definition order (the node-of-matrix lookup, the info block, its class name, its constructor, ResMdl::ref, the
+ *   node's matrix id).  The `.sdata2` constants are defined at the end, after their uses, so every load names them.
+ *   The parent and node handle temporaries are named words copied by res_node_copy_ctor.  The view loops bind the
+ *   position and normal matrices of index `i` to references first (their pointer registers come out in retail's
+ *   order); the locked-cache loops set their base index before the output pointers.
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
@@ -76,7 +85,7 @@ void Warning(const char* pFile, int line, const char* pFmt, ...);
 
 /* The three `.sdata2` constants this unit reads (named map rows, not emitted yet). */
 extern const f32 calcview_epsilon_f32; /* 1.0e-18f */
-extern const f32 calcview_zero_f32; /* 0.0f: the unit's pooled constant (claimed, not emitted) */
+extern const f32 calcview_zero_f32; /* 0.0f (defined at the end of the file) */
 extern const f32 calcview_det_epsilon_f32; /* 1.0e-18f: the determinant threshold of the two paired-single routines */
 
 extern "C" {
@@ -108,6 +117,257 @@ void g3d_dc_invalidate_range(void* pBase, u32 size); /* untyped: byte range */
 void* g3d_lc_base(void); /* untyped: byte range - the locked cache */
 
 /* -------- reconstructed bodies -------- */
+
+} /* extern "C" */
+
+extern "C" {
+
+void word_swap_a(u32* pA, u32* pB);
+void word_swap_b(u32* pA, u32* pB);
+
+asm void mtx34_from_rot2d_scale3(register Mtx34* pOut, register const f32* pCosSin, register f32 sx, register f32 sy,
+                                 register f32 sz);
+asm void mtx34_from_rot2d_scale1(register Mtx34* pOut, register const f32* pCosSin, register f32 s);
+asm void mtx34_from_axes_scaled(register Mtx34* pOut, register const f32* pA, register const f32* pB,
+                                register const f32* pC, register f32 sa, register f32 sb, register f32 sc);
+void mtx34_calc_billboard_std(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
+                              const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
+void mtx34_calc_billboard_std_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
+                                    const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
+void mtx34_calc_billboard_y(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
+                            const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
+void mtx34_calc_billboard_y_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
+                                  const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
+void mtx34_calc_billboard_y_rot(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
+                                const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
+void mtx34_calc_billboard_y_rot_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
+                                      const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
+
+/* The billboard builders `g3d_calc_view` dispatches to by the attribute's billboard index (0: none). */
+typedef void (*BillboardFunc)(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
+                              const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
+
+const BillboardFunc g3d_billboard_func_tbl[8] = {
+    NULL,
+    mtx34_calc_billboard_std,
+    mtx34_calc_billboard_std_persp,
+    mtx34_calc_billboard_y,
+    mtx34_calc_billboard_y_persp,
+    mtx34_calc_billboard_y_rot,
+    mtx34_calc_billboard_y_rot_persp,
+    NULL,
+};
+
+}  // extern "C"
+
+#pragma push
+#pragma dont_inline on
+
+extern "C" {
+
+/* 0x8006FEC8 (0x58): the node id of position/normal matrix `mtxID`. */
+/* untyped: opaque handle - the ResMdlInfo handle */
+inline u32 res_mdl_info_get_node_of_pos_nrm_mtx(const void* pInfo, u32 mtxID)
+{
+    if (!(mtxID < res_mdl_info_num_pos_nrm_mtx(pInfo))) {
+        nw4r::db::Panic("g3d_resmdl_ac.h", 103, "NW4R:Failed assertion mtxID < GetNumPosNrmMtx()");
+    }
+    u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
+    const u32* pTable = (const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs + 4);
+    return pTable[mtxID];
+}
+
+/* 0x8006FF50 (0x34): the info block, asserting the handle is valid. */
+/* untyped: opaque handle - the ResMdlInfo handle */
+inline const ResMdlInfoData* res_mdl_info_data(const void* pInfo)
+{
+    /* nw4r's ResMdlInfo::ref passes `__FUNCTION__`; the C name spells it as the same local array. */
+    static char sFunction[] = "ref";
+    if (!res_mdl_info_is_valid((void*)pInfo)) {
+        nw4r::db::Panic("g3d_resmdl_ac.h", 57, "%s::%s: Object not valid.", res_mdl_info_get_class_name(), sFunction);
+    }
+    return (const ResMdlInfoData*)res_mdl_info_ptr((void*)pInfo);
+}
+
+/* 0x8006FFBC: returns the class name the info block asserts print. */
+inline const char* res_mdl_info_get_class_name(void) {
+    return "ResMdlInfo";
+}
+
+/* 0x80070054 - the 4-byte-aligned resource pointer constructor (g3d_resmdl_ac.h). */
+inline u32* fn_80070054(u32* pDst, u32 ptr) {
+    fn_800700B8(pDst, ptr);
+    if (ptr & 0x3) {
+        nw4r::db::Panic("g3d_resmdl_ac.h", 57, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return pDst;
+}
+
+} /* extern "C" */
+
+/* 0x800700C0 (0x64): returns the model block, panicking on a NULL handle. */
+inline const nw4r::g3d::ResMdlData& nw4r::g3d::ResMdl::ref() const {
+    if (!IsValid()) {
+        nw4r::db::Panic("g3d_resmdl_ac.h", 120, "%s::%s: Object not valid.", GetClassName(), __FUNCTION__);
+    }
+    return *ptr();
+}
+
+extern "C" {
+
+/* 0x8006FDCC - the model's node-list accessor. */
+inline u32 fn_8006FDCC(void* self) {
+    if (!res_node_is_valid(self)) {
+        nw4r::db::Panic("g3d_resnode_ac.h", 83, "NW4R:Failed assertion IsValid()");
+    }
+    if (res_node_is_valid(self)) {
+        return *(u32*)((u8*)res_node_ptr(self) + 16);
+    }
+    return 0;
+}
+
+/* 0x8006FE40 (0x3C): the parent node. */
+inline u32 res_node_get_parent_const(const ResHandle* pSelf)
+{
+    return fn_8006FE7C((void*)pSelf, res_node_ref(pSelf)->mToParentNode);
+}
+
+/* 0x8006FE7C - a checked resource pointer from a base handle and an offset (0 -> null). */
+inline u32 fn_8006FE7C(void* self, u32 off) {
+    u32 base = *(u32*)self;
+    if (off != 0) {
+        return (u32)nw4r::g3d::ResNode((void*)(base + off)).mpData;
+    }
+    return (u32)nw4r::g3d::ResNode((void*)0).mpData;
+}
+
+/* 0x8006FFB4 - dereference the handle. */
+inline u32 res_mdl_info_ptr(void* self) {
+    return *(u32*)self;
+}
+
+/* 0x8006FFC8 - is the handle non-null. */
+inline u32 res_mdl_info_is_valid(void* self) {
+    return *(u32*)self != 0;
+}
+
+/* 0x8006FFDC (0x44): the number of position/normal matrices. */
+/* untyped: opaque handle - the ResMdlInfo handle */
+inline u32 res_mdl_info_num_pos_nrm_mtx(const void* pInfo)
+{
+    u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
+    return *(const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs);
+}
+
+/* 0x80070020 - the checked pointer the model info lives at. */
+inline u32 res_mdl_info_handle(void* self) {
+    u8* p = (u8*)&reinterpret_cast<const nw4r::g3d::ResMdl*>(self)->ref();
+    u32 handle;
+    return *fn_80070054((u32*)&handle, (u32)(p + 76));
+}
+
+/* 0x800700B8 - store the 4-byte handle. */
+inline void fn_800700B8(u32* pDst, u32 value) {
+    *pDst = value;
+}
+
+} /* extern "C" */
+
+/* 0x80070124 (0x8): returns the model block. */
+inline const nw4r::g3d::ResMdlData* nw4r::g3d::ResMdl::ptr() const {
+    return mpData;
+}
+
+/* 0x8007012C (0x8): returns the class name. */
+inline const char* nw4r::g3d::ResMdl::GetClassName() {
+    return "ResMdl";
+}
+
+extern "C" {
+
+/* 0x80071008 (0x4): flushes the data-cache range without waiting. */
+inline void g3d_dc_flush_range_nosync(void* pBase, u32 size) { DCFlushRangeNoSync(pBase, size); }
+
+/* 0x8007100C (0x58): copies a 3x4 matrix. */
+inline Mtx34* mtx34_copy_ps(Mtx34* pDst, const Mtx34* pSrc)
+{
+    PSMTXCopy((const Mtx34*)mtx34_const_ptr((u32)pSrc), (Mtx34*)mtx34_get_ptr(pDst));
+    return pDst;
+}
+
+/* 0x80071064 (0x3C): the first child node. */
+inline u32 res_node_get_child(ResHandle* pSelf)
+{
+    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToChildNode);
+}
+
+/* 0x800710A0 (0x14): whether bit 29 of the flag word is set. */
+inline u32 test_flag_bit29(u32 flags) { return (flags & 0x20000000) != 0; }
+
+/* 0x800710B4 (0x8): the low byte. */
+inline u32 u8_cast(u32 value) { return (u8)value; }
+
+/* 0x800710BC (0x74): concatenates two 3x4 matrices into `pDst`. */
+inline Mtx34* mtx34_concat(Mtx34* pDst, const Mtx34* pA, const Mtx34* pB)
+{
+    PSMTXConcat((const Mtx34*)mtx34_const_ptr((u32)pA), (const Mtx34*)mtx34_const_ptr((u32)pB),
+                (Mtx34*)mtx34_get_ptr(pDst));
+    return pDst;
+}
+
+/* 0x80071130 (0x5C): concatenates `pA` with `count` matrices from `pSrc` into `pDst`. */
+inline Mtx34* mtx34_concat_array(Mtx34* pDst, const Mtx34* pA, const Mtx34* pSrc, u32 count)
+{
+    PSMTXConcatArray((const Mtx34*)mtx34_const_ptr((u32)pA), pSrc, pDst, count);
+    return pDst;
+}
+
+/* 0x8007118C (0xC): rounds `value` up to a multiple of 32. */
+inline u32 round_up_32(u32 value) { return (value + 31) & ~31; }
+
+/* 0x80071BD0 (0x4): hands the word reference back. */
+inline u32* word_forward_a(u32* pWord) { return pWord; }
+
+/* 0x80071B70 (0x60): swaps two words. */
+inline void word_swap_a(u32* pA, u32* pB)
+{
+    u32 tmp = *word_forward_a(pA);
+    *pA = *word_forward_a(pB);
+    *pB = *word_forward_a(&tmp);
+}
+
+/* 0x80071C34 (0x4): hands the word reference back. */
+inline u32* word_forward_b(u32* pWord) { return pWord; }
+
+/* 0x80071BD4 (0x60): swaps two words. */
+inline void word_swap_b(u32* pA, u32* pB)
+{
+    u32 tmp = *word_forward_b(pA);
+    *pA = *word_forward_b(pB);
+    *pB = *word_forward_b(&tmp);
+}
+
+/* 0x80071C38 (0x4): waits until the locked-cache queue holds at most `length` DMAs. */
+inline void g3d_lc_queue_wait(u32 length) { LCQueueWait(length); }
+
+/* 0x80071C3C (0x4): invalidates the data-cache range. */
+inline void g3d_dc_invalidate_range(void* pBase, u32 size) { DCInvalidateRange(pBase, size); }
+
+/* 0x80071C40 (0x8): the locked cache's address. */
+/* untyped: byte range - the locked cache */
+inline void* g3d_lc_base(void) { return (void*)0xE0000000; }
+
+/* 0x800726D0 (0x3C): yields until at most `length` locked-cache DMAs are queued. */
+inline void g3d_lc_queue_drain(u32 length)
+{
+    while (LCQueueLength() > length) {
+        OSYieldThread();
+    }
+}
+
+} /* extern "C" */
+
+extern "C" {
 
 /* 0x8006F5A0 (0xC0): the X and Y axes of `pMtx` expressed in `pParent`'s frame (the inverse of `pParent`'s 3x3
  * applied to them); zero when `pParent` is singular. */
@@ -226,134 +486,27 @@ asm void mtx34_up_axis_in_parent(register f32* pDst, register const f32* pMtx, r
     blr
 }
 
-/* 0x8006FDCC - the model's node-list accessor. */
-u32 fn_8006FDCC(void* self) {
-    if (!res_node_is_valid(self)) {
-        nw4r::db::Panic("g3d_resnode_ac.h", 83, "NW4R:Failed assertion IsValid()");
-    }
-    if (res_node_is_valid(self)) {
-        return *(u32*)((u8*)res_node_ptr(self) + 16);
-    }
-    return 0;
-}
-
-/* 0x8006FE7C - a checked resource pointer from a base handle and an offset (0 -> null). */
-u32 fn_8006FE7C(void* self, u32 off) {
-    u32 base = *(u32*)self;
-    if (off != 0) {
-        return (u32)nw4r::g3d::ResNode((void*)(base + off)).mpData;
-    }
-    return (u32)nw4r::g3d::ResNode((void*)0).mpData;
-}
-
-/* 0x8006FE40 (0x3C): the parent node. */
-u32 res_node_get_parent_const(const ResHandle* pSelf)
+/* 0x8006F738 (0x160): the matrix of a 'std' billboard: the Y axis of `pOut` (read as its column 1) normalised in the
+ * XY plane, rotated onto the node's world scale (uniform when `bUniformScale`). */
+void mtx34_calc_billboard_std(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera, const nw4r::g3d::ResMdl* pMdl,
+                              u32 mtxId)
 {
-    return fn_8006FE7C((void*)pSelf, res_node_ref(pSelf)->mToParentNode);
-}
-
-/* 0x80071064 (0x3C): the first child node. */
-u32 res_node_get_child(ResHandle* pSelf)
-{
-    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToChildNode);
-}
-
-/* 0x8006F908 - the length of column `idx` of a 48-byte (12-float) matrix. */
-f32 fn_8006F908(const f32* pMtx, u32 idx) {
-    const f32* p = (const f32*)((const u8*)pMtx + idx * 4);
-    f32 b;
-    f32 a = p[8] * p[8];
-    b = p[0] * p[0];
-    f32 c = p[4] * p[4];
-    return sqrt_f32(a + (b + c));
-}
-
-/* 0x8006FFB4 - dereference the handle. */
-u32 res_mdl_info_ptr(void* self) {
-    return *(u32*)self;
-}
-
-/* 0x8006FFBC - the "NodeTree" name string. */
-const char* res_mdl_info_get_class_name(void) {
-    return "ResMdlInfo";
-}
-
-/* 0x8006FFC8 - is the handle non-null. */
-u32 res_mdl_info_is_valid(void* self) {
-    return *(u32*)self != 0;
-}
-
-/* 0x800700B8 - store the 4-byte handle. */
-void fn_800700B8(u32* pDst, u32 value) {
-    *pDst = value;
-}
-
-/* 0x80070054 - the 4-byte-aligned resource pointer constructor (g3d_resmdl_ac.h). */
-u32* fn_80070054(u32* pDst, u32 ptr) {
-    fn_800700B8(pDst, ptr);
-    if (ptr & 0x3) {
-        nw4r::db::Panic("g3d_resmdl_ac.h", 57, "NW4R:Failed assertion !((u32)p & 0x3)");
+    nw4r::math::VEC3 axis;
+    setVec3(&axis, pOut->m[0][1], pOut->m[1][1], calcview_zero_f32);
+    if (abs_f32(axis.x) >= calcview_epsilon_f32 || abs_f32(axis.y) >= calcview_epsilon_f32) {
+        vec3_normalize_into(&axis, &axis);
+        if (bUniformScale) {
+            mtx34_from_rot2d_scale1(pOut, &axis.x, fn_8006F908((const f32*)&pWorldArray[mtxId], 0));
+        } else {
+            const Mtx34* pWorld = &pWorldArray[mtxId];
+            f32 sx = fn_8006F908((const f32*)pWorld, 0);
+            f32 sy = fn_8006F908((const f32*)pWorld, 1);
+            mtx34_from_rot2d_scale3(pOut, &axis.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
+        }
+    } else {
+        nw4r::db::Warning("g3d_calcview.cpp", 0x24B, "Y axis of a 'std' billboard is parallel to eye axis.");
+        nw4r::math::MTX34Zero(pOut);
     }
-    return pDst;
-}
-
-/* 0x80070020 - the checked pointer the model info lives at. */
-u32 res_mdl_info_handle(void* self) {
-    u8* p = (u8*)&reinterpret_cast<const nw4r::g3d::ResMdl*>(self)->ref();
-    u32 handle;
-    return *fn_80070054((u32*)&handle, (u32)(p + 76));
-}
-
-} /* extern "C" */
-
-/* 0x800700C0 (0x64): returns the model block, panicking on a NULL handle. */
-const nw4r::g3d::ResMdlData& nw4r::g3d::ResMdl::ref() const {
-    if (!IsValid()) {
-        nw4r::db::Panic("g3d_resmdl_ac.h", 120, "%s::%s: Object not valid.", GetClassName(), "ref");
-    }
-    return *ptr();
-}
-
-/* 0x80070124 (0x8): returns the model block. */
-const nw4r::g3d::ResMdlData* nw4r::g3d::ResMdl::ptr() const {
-    return mpData;
-}
-
-/* 0x8007012C (0x8): returns the class name. */
-const char* nw4r::g3d::ResMdl::GetClassName() {
-    return "ResMdl";
-}
-
-extern "C" {
-
-/* 0x8006FF50 (0x34): the info block, asserting the handle is valid. */
-/* untyped: opaque handle - the ResMdlInfo handle */
-const ResMdlInfoData* res_mdl_info_data(const void* pInfo)
-{
-    if (!res_mdl_info_is_valid((void*)pInfo)) {
-        nw4r::db::Panic("g3d_resmdl_ac.h", 57, "%s::%s: Object not valid.", res_mdl_info_get_class_name(), "ref");
-    }
-    return (const ResMdlInfoData*)res_mdl_info_ptr((void*)pInfo);
-}
-
-/* 0x8006FEC8 (0x58): the node id of position/normal matrix `mtxID`. */
-/* untyped: opaque handle - the ResMdlInfo handle */
-u32 res_mdl_info_get_node_of_pos_nrm_mtx(const void* pInfo, u32 mtxID)
-{
-    if (!(mtxID < res_mdl_info_num_pos_nrm_mtx(pInfo))) {
-        nw4r::db::Panic("g3d_resmdl_ac.h", 103, "NW4R:Failed assertion mtxID < GetNumPosNrmMtx()");
-    }
-    u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
-    const u32* pTable = (const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs + 4);
-    return pTable[mtxID];
-}
-
-/* 0x8006FFDC (0x44): the number of position/normal matrices. */
-/* untyped: opaque handle - the ResMdlInfo handle */
-u32 res_mdl_info_num_pos_nrm_mtx(const void* pInfo)
-{
-    u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
-    return *(const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs);
 }
 
 /* 0x8006F898 (0x3C): the matrix of a 2D rotation (cos, sin) with per-axis scales `sx`, `sy`, and `sz` on Z. */
@@ -397,57 +550,14 @@ asm void mtx34_from_rot2d_scale1(register Mtx34* pOut, register const f32* pCosS
     blr
 }
 
-/* 0x8006FB60 (0x5C): the matrix whose columns are the three vectors scaled by `sa`, `sb`, `sc`. */
-asm void mtx34_from_axes_scaled(register Mtx34* pOut, register const f32* pA, register const f32* pB,
-                                register const f32* pC, register f32 sa, register f32 sb, register f32 sc)
-{
-    nofralloc
-    psq_l f0, 0(pA), 0, 0
-    psq_l f4, 0(pB), 0, 0
-    ps_muls0 f0, f0, sa
-    ps_muls0 f4, f4, sb
-    ps_merge00 f5, f0, f4
-    ps_merge11 f0, f0, f4
-    psq_st f5, 0(pOut), 0, 0
-    psq_st f0, 16(pOut), 0, 0
-    psq_l f0, 0(pC), 0, 0
-    ps_muls0 f0, f0, sc
-    stfs f0, 8(pOut)
-    ps_merge11 f0, f0, f0
-    stfs f0, 24(pOut)
-    lfs f0, 8(pA)
-    fmuls f0, f0, sa
-    stfs f0, 32(pOut)
-    lfs f0, 8(pB)
-    fmuls f0, f0, sb
-    stfs f0, 36(pOut)
-    lfs f0, 8(pC)
-    fmuls f0, f0, sc
-    stfs f0, 40(pOut)
-    blr
-}
-
-/* 0x8006F738 (0x160): the matrix of a 'std' billboard: the Y axis of `pOut` (read as its column 1) normalised in the
- * XY plane, rotated onto the node's world scale (uniform when `bUniformScale`). */
-void mtx34_calc_billboard_std(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera, const nw4r::g3d::ResMdl* pMdl,
-                              u32 mtxId)
-{
-    nw4r::math::VEC3 axis;
-    setVec3(&axis, pOut->m[0][1], pOut->m[1][1], calcview_zero_f32);
-    if (abs_f32(axis.x) >= calcview_epsilon_f32 || abs_f32(axis.y) >= calcview_epsilon_f32) {
-        vec3_normalize_into(&axis, &axis);
-        if (bUniformScale) {
-            mtx34_from_rot2d_scale1(pOut, &axis.x, fn_8006F908((const f32*)&pWorldArray[mtxId], 0));
-        } else {
-            const Mtx34* pWorld = &pWorldArray[mtxId];
-            f32 sx = fn_8006F908((const f32*)pWorld, 0);
-            f32 sy = fn_8006F908((const f32*)pWorld, 1);
-            mtx34_from_rot2d_scale3(pOut, &axis.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
-        }
-    } else {
-        nw4r::db::Warning("g3d_calcview.cpp", 0x24B, "Y axis of a 'std' billboard is parallel to eye axis.");
-        nw4r::math::MTX34Zero(pOut);
-    }
+/* 0x8006F908 - the length of column `idx` of a 48-byte (12-float) matrix. */
+f32 fn_8006F908(const f32* pMtx, u32 idx) {
+    const f32* p = (const f32*)((const u8*)pMtx + idx * 4);
+    f32 b;
+    f32 a = p[8] * p[8];
+    b = p[0] * p[0];
+    f32 c = p[4] * p[4];
+    return sqrt_f32(a + (b + c));
 }
 
 /* 0x8006F934 (0x22C): the matrix of a 'std_persp' billboard: the node's up axis kept, the Z axis turned onto the eye
@@ -485,11 +595,35 @@ void mtx34_calc_billboard_std_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 b
     nw4r::math::MTX34Zero(pOut);
 }
 
-/* A node handle word wrapped in a temporary, so a copy helper gets its address. */
-struct CalcViewHandleWord {
-    CalcViewHandleWord(u32 word) { mWord = word; }
-    /* +0x00 */ u32 mWord;
-}; /* size: 0x4 */
+/* 0x8006FB60 (0x5C): the matrix whose columns are the three vectors scaled by `sa`, `sb`, `sc`. */
+asm void mtx34_from_axes_scaled(register Mtx34* pOut, register const f32* pA, register const f32* pB,
+                                register const f32* pC, register f32 sa, register f32 sb, register f32 sc)
+{
+    nofralloc
+    psq_l f0, 0(pA), 0, 0
+    psq_l f4, 0(pB), 0, 0
+    ps_muls0 f0, f0, sa
+    ps_muls0 f4, f4, sb
+    ps_merge00 f5, f0, f4
+    ps_merge11 f0, f0, f4
+    psq_st f5, 0(pOut), 0, 0
+    psq_st f0, 16(pOut), 0, 0
+    psq_l f0, 0(pC), 0, 0
+    ps_muls0 f0, f0, sc
+    stfs f0, 8(pOut)
+    ps_merge11 f0, f0, f0
+    stfs f0, 24(pOut)
+    lfs f0, 8(pA)
+    fmuls f0, f0, sa
+    stfs f0, 32(pOut)
+    lfs f0, 8(pB)
+    fmuls f0, f0, sb
+    stfs f0, 36(pOut)
+    lfs f0, 8(pC)
+    fmuls f0, f0, sc
+    stfs f0, 40(pOut)
+    blr
+}
 
 /* 0x8006FBBC (0x210): the matrix of a 'y' billboard: the node's axis expressed against its parent (the node's own
  * when it has none), normalised in the XY plane and applied with the node's world scale. */
@@ -504,8 +638,10 @@ void mtx34_calc_billboard_y(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformS
     const Mtx34* pWorld;
     int nodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&info, mtxId);
     if (nodeId >= 0) {
-        res_node_copy_ctor(&node, (u32*)&CalcViewHandleWord((u32)pMdl->GetResNode(nodeId).mpData).mWord);
-        res_node_copy_ctor(&parent, &CalcViewHandleWord(res_node_get_parent_const((const ResHandle*)&node)).mWord);
+        u32 nodeWord = (u32)pMdl->GetResNode(nodeId).mpData;
+        res_node_copy_ctor(&node, &nodeWord);
+        u32 parentWord = res_node_get_parent_const((const ResHandle*)&node);
+        res_node_copy_ctor(&parent, &parentWord);
         if (res_node_is_valid(&parent)) {
             u32 parentId = fn_8006FDCC(&parent);
             pWorld = &pWorldArray[mtxId];
@@ -554,8 +690,10 @@ void mtx34_calc_billboard_y_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUn
     const Mtx34* pWorld;
     int nodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&info, mtxId);
     if (nodeId >= 0) {
-        res_node_copy_ctor(&node, (u32*)&CalcViewHandleWord((u32)pMdl->GetResNode(nodeId).mpData).mWord);
-        res_node_copy_ctor(&parent, &CalcViewHandleWord(res_node_get_parent_const((const ResHandle*)&node)).mWord);
+        u32 nodeWord = (u32)pMdl->GetResNode(nodeId).mpData;
+        res_node_copy_ctor(&node, &nodeWord);
+        u32 parentWord = res_node_get_parent_const((const ResHandle*)&node);
+        res_node_copy_ctor(&parent, &parentWord);
         if (res_node_is_valid(&parent)) {
             u32 parentId = fn_8006FDCC(&parent);
             pWorld = &pWorldArray[mtxId];
@@ -661,99 +799,6 @@ void mtx34_calc_billboard_y_rot_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32
     nw4r::math::MTX34Zero(pOut);
 }
 
-/* 0x80071008 (0x4): flushes the data-cache range without waiting. */
-void g3d_dc_flush_range_nosync(void* pBase, u32 size) { DCFlushRangeNoSync(pBase, size); }
-
-/* 0x8007100C (0x58): copies a 3x4 matrix. */
-Mtx34* mtx34_copy_ps(Mtx34* pDst, const Mtx34* pSrc)
-{
-    PSMTXCopy((const Mtx34*)mtx34_const_ptr((u32)pSrc), (Mtx34*)mtx34_get_ptr(pDst));
-    return pDst;
-}
-
-/* 0x800710A0 (0x14): whether bit 29 of the flag word is set. */
-u32 test_flag_bit29(u32 flags) { return (flags & 0x20000000) != 0; }
-
-/* 0x800710B4 (0x8): the low byte. */
-u32 u8_cast(u32 value) { return (u8)value; }
-
-/* 0x800710BC (0x74): concatenates two 3x4 matrices into `pDst`. */
-Mtx34* mtx34_concat(Mtx34* pDst, const Mtx34* pA, const Mtx34* pB)
-{
-    PSMTXConcat((const Mtx34*)mtx34_const_ptr((u32)pA), (const Mtx34*)mtx34_const_ptr((u32)pB),
-                (Mtx34*)mtx34_get_ptr(pDst));
-    return pDst;
-}
-
-/* 0x80071130 (0x5C): concatenates `pA` with `count` matrices from `pSrc` into `pDst`. */
-Mtx34* mtx34_concat_array(Mtx34* pDst, const Mtx34* pA, const Mtx34* pSrc, u32 count)
-{
-    PSMTXConcatArray((const Mtx34*)mtx34_const_ptr((u32)pA), pSrc, pDst, count);
-    return pDst;
-}
-
-/* 0x8007118C (0xC): rounds `value` up to a multiple of 32. */
-u32 round_up_32(u32 value) { return (value + 31) & ~31; }
-
-void word_swap_a(u32* pA, u32* pB);
-void word_swap_b(u32* pA, u32* pB);
-
-
-/* 0x80071BD0 (0x4): hands the word reference back. */
-u32* word_forward_a(u32* pWord) { return pWord; }
-
-/* 0x80071B70 (0x60): swaps two words. */
-void word_swap_a(u32* pA, u32* pB)
-{
-    u32 tmp = *word_forward_a(pA);
-    *pA = *word_forward_a(pB);
-    *pB = *word_forward_a(&tmp);
-}
-
-/* 0x80071C34 (0x4): hands the word reference back. */
-u32* word_forward_b(u32* pWord) { return pWord; }
-
-/* 0x80071BD4 (0x60): swaps two words. */
-void word_swap_b(u32* pA, u32* pB)
-{
-    u32 tmp = *word_forward_b(pA);
-    *pA = *word_forward_b(pB);
-    *pB = *word_forward_b(&tmp);
-}
-
-/* 0x80071C38 (0x4): waits until the locked-cache queue holds at most `length` DMAs. */
-void g3d_lc_queue_wait(u32 length) { LCQueueWait(length); }
-
-/* 0x80071C3C (0x4): invalidates the data-cache range. */
-void g3d_dc_invalidate_range(void* pBase, u32 size) { DCInvalidateRange(pBase, size); }
-
-/* 0x80071C40 (0x8): the locked cache's address. */
-/* untyped: byte range - the locked cache */
-void* g3d_lc_base(void) { return (void*)0xE0000000; }
-
-/* 0x800726D0 (0x3C): yields until at most `length` locked-cache DMAs are queued. */
-void g3d_lc_queue_drain(u32 length)
-{
-    while (LCQueueLength() > length) {
-        OSYieldThread();
-    }
-}
-
-/* The billboard builders `g3d_calc_view` dispatches to by the attribute's billboard index (0: none). */
-typedef void (*BillboardFunc)(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera,
-                              const nw4r::g3d::ResMdl* pMdl, u32 mtxId);
-
-const BillboardFunc g3d_billboard_func_tbl[8] = {
-    NULL,
-    mtx34_calc_billboard_std,
-    mtx34_calc_billboard_std_persp,
-    mtx34_calc_billboard_y,
-    mtx34_calc_billboard_y_persp,
-    mtx34_calc_billboard_y_rot,
-    mtx34_calc_billboard_y_rot_persp,
-    NULL,
-};
-
 /* 0x80070820 (0x7E8): view matrices of a model in main memory: the camera times each world matrix, billboards
  * rebuilt in place, then the normal (and texture) matrices; the written ranges are flushed. */
 void g3d_calc_view(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pViewNrmMtxArray,
@@ -846,19 +891,21 @@ void g3d_calc_view(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pView
         }
         if (pViewNrmMtxArray != NULL) {
             for (u32 i = 0; i < numMtx; i++) {
+                nw4r::math::MTX34& pos = pViewPosMtxArray[i];
+                nw4r::math::MTX33& nrm = pViewNrmMtxArray[i];
                 if (test_flag_bit29(pWorldMtxAttribArray[i]) != 0) {
                     if (pViewTexMtxArray != NULL) {
-                        mtx34_copy_ps(&pViewTexMtxArray[i], &pViewPosMtxArray[i]);
+                        mtx34_copy_ps(&pViewTexMtxArray[i], &pos);
                         pViewTexMtxArray[i].m[2][3] = calcview_zero_f32;
                         pViewTexMtxArray[i].m[1][3] = calcview_zero_f32;
                         pViewTexMtxArray[i].m[0][3] = calcview_zero_f32;
                     }
-                    nw4r::math::MTX34ToMTX33(&pViewNrmMtxArray[i], &pViewPosMtxArray[i]);
+                    nw4r::math::MTX34ToMTX33(&nrm, &pos);
                 } else if (pViewTexMtxArray != NULL) {
-                    mtx34_inverse_transpose(&pViewTexMtxArray[i], &pViewPosMtxArray[i]);
-                    nw4r::math::MTX34ToMTX33(&pViewNrmMtxArray[i], &pViewTexMtxArray[i]);
+                    mtx34_inverse_transpose(&pViewTexMtxArray[i], &pos);
+                    nw4r::math::MTX34ToMTX33(&nrm, &pViewTexMtxArray[i]);
                 } else {
-                    mtx34_to_mtx33(&pViewNrmMtxArray[i], &pViewPosMtxArray[i]);
+                    mtx34_to_mtx33(&nrm, &pos);
                 }
             }
         }
@@ -910,10 +957,11 @@ void g3d_calc_view_lc(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pV
         }
         Mtx34* pWork = (Mtx34*)g3d_billboard_work_mtx();
         g3d_lc_queue_wait(0);
+        u32 base = 0;
         pWorld = pWorldMtxArray;
         pNrmOut = pViewNrmMtxArray;
         pTexOut = pViewTexMtxArray;
-        for (u32 base = 0; base < numMtx; base += 40) {
+        for (; base < numMtx; base += 40) {
             u32 num = numMtx - base;
             u32 posBlocks;
             u32 nrmBlocks;
@@ -1004,19 +1052,21 @@ void g3d_calc_view_lc(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pV
             nw4r::ut::LC::StoreBlocks(pViewPosMtxArray, pPosBuf, posBlocks);
             if (pViewNrmMtxArray != NULL) {
                 for (u32 i = 0; i < num; i++) {
+                    Mtx34& pos = pPosBuf[i];
+                    nw4r::math::MTX33& nrm = pNrmBuf[i];
                     if (test_flag_bit29(pWorldMtxAttribArray[base + i]) != 0) {
                         if (pViewTexMtxArray != NULL) {
-                            mtx34_copy_ps(&pTexBuf[i], &pPosBuf[i]);
+                            mtx34_copy_ps(&pTexBuf[i], &pos);
                             pTexBuf[i].m[2][3] = calcview_zero_f32;
                             pTexBuf[i].m[1][3] = calcview_zero_f32;
                             pTexBuf[i].m[0][3] = calcview_zero_f32;
                         }
-                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pPosBuf[i]);
+                        nw4r::math::MTX34ToMTX33(&nrm, &pos);
                     } else if (pViewTexMtxArray != NULL) {
-                        mtx34_inverse_transpose(&pTexBuf[i], &pPosBuf[i]);
-                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pTexBuf[i]);
+                        mtx34_inverse_transpose(&pTexBuf[i], &pos);
+                        nw4r::math::MTX34ToMTX33(&nrm, &pTexBuf[i]);
                     } else {
-                        mtx34_to_mtx33(&pNrmBuf[i], &pPosBuf[i]);
+                        mtx34_to_mtx33(&nrm, &pos);
                     }
                 }
             }
@@ -1083,9 +1133,10 @@ void g3d_calc_view_lc_dma(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33
         } else {
             g3d_lc_queue_wait(0);
         }
+        u32 base = 0;
         pNrmOut = pViewNrmMtxArray;
         pTexOut = pViewTexMtxArray;
-        for (u32 base = 0; base < numMtx; base += 40) {
+        for (; base < numMtx; base += 40) {
             u32 num = numMtx - base;
             u32 posBlocks;
             u32 nrmBlocks;
@@ -1182,19 +1233,21 @@ void g3d_calc_view_lc_dma(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33
             nw4r::ut::LC::StoreBlocks(pViewPosMtxArray, pPosBuf, posBlocks);
             if (pViewNrmMtxArray != NULL) {
                 for (u32 i = 0; i < num; i++) {
+                    Mtx34& pos = pPosBuf[i];
+                    nw4r::math::MTX33& nrm = pNrmBuf[i];
                     if (test_flag_bit29(pWorldMtxAttribArray[base + i]) != 0) {
                         if (pViewTexMtxArray != NULL) {
-                            mtx34_copy_ps(&pTexBuf[i], &pPosBuf[i]);
+                            mtx34_copy_ps(&pTexBuf[i], &pos);
                             pTexBuf[i].m[2][3] = calcview_zero_f32;
                             pTexBuf[i].m[1][3] = calcview_zero_f32;
                             pTexBuf[i].m[0][3] = calcview_zero_f32;
                         }
-                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pPosBuf[i]);
+                        nw4r::math::MTX34ToMTX33(&nrm, &pos);
                     } else if (pViewTexMtxArray != NULL) {
-                        mtx34_inverse_transpose(&pTexBuf[i], &pPosBuf[i]);
-                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pTexBuf[i]);
+                        mtx34_inverse_transpose(&pTexBuf[i], &pos);
+                        nw4r::math::MTX34ToMTX33(&nrm, &pTexBuf[i]);
                     } else {
-                        mtx34_to_mtx33(&pNrmBuf[i], &pPosBuf[i]);
+                        mtx34_to_mtx33(&nrm, &pos);
                     }
                 }
             }
@@ -1215,4 +1268,12 @@ void g3d_calc_view_lc_dma(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33
     }
 }
 
-}  // extern "C"
+} /* extern "C" */
+
+#pragma pop
+
+/* The billboard builders' constants (.sdata2), defined after their uses so the code and the asm routines load them
+ * by name. */
+const f32 calcview_zero_f32 = 0.0f;
+const f32 calcview_epsilon_f32 = 1.0e-18f;
+const f32 calcview_det_epsilon_f32 = 1.0e-18f;
