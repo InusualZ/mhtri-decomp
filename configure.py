@@ -1023,7 +1023,7 @@ config.libs = [
         "objects": [
             Object(NonMatching, "font/flfnt.cpp"),
             Object(NonMatching, "g3d/g3d_anmchr.cpp"),
-            Object(NonMatching, "g3d/g3d_anmshp.cpp"),
+            Object(Matching, "g3d/g3d_anmshp.cpp"),
             Object(NonMatching, "g3d/g3d_anmtexpat.cpp"),
             Object(NonMatching, "g3d/g3d_anmtexsrt.cpp"),
             Object(Matching, "g3d/g3d_calcmaterial.cpp"),
@@ -1044,7 +1044,7 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_resmat.cpp"),
             Object(Matching, "g3d/g3d_resnode.cpp"),
             Object(NonMatching, "g3d/g3d_resshp.cpp"),
-            Object(NonMatching, "g3d/g3d_resanmchr.cpp"),
+            Object(Matching, "g3d/g3d_resanmchr.cpp"),
             Object(NonMatching, "g3d/g3d_resanmtexsrt.cpp"),
             Object(NonMatching, "g3d/g3d_xsi.cpp"),
             Object(NonMatching, "g3d/fn_800D77B0.cpp"),
