@@ -31,9 +31,7 @@
  *   GUESS: `ef_calc_inherit_mtx` (0x800A90AC): builds the transform a child inherits (scale, rotation, a share of
  *   the translation) from its parent's matrix; the parent chain and the particle manager call it.
  *   GUESS: `EfManagerCallback::SetParams`/`Destroy` (the callback's first two virtuals, from the hooks that call them).
- * RESIDUALS. `fn_800A7750`: the blended scale's registers - retail loads the emitter's scale step into r23 and
- *   reuses r23 for the result, ours keeps the step in r28 (one extra `extsb`/`mr`); declaration order, an `else if`
- *   chain with an empty branch, two temporaries and an `int` product do not move it.
+ * RESIDUALS. none: every row and the data sections are byte-identical (flipcheck READY).
  * SHAPES. `Emitter` derives from `nw4r::ef::ReferencedObject` (`ef/ef_effect.h`), so the constructor calls the base's
  *   implicit constructor (its weak copy is dropped for `ef/ef_effect.cpp`'s) and stores this unit's table; the
  *   memory manager's particle-manager pool (`GetParticleManager`, slot +0x38) and the particle manager's
@@ -54,7 +52,8 @@
  *   `add`, a pointer sum puts the base first.
  * SHAPES. The spawner's countdown adds a `(u16)` float conversion (no narrowing mask); `ef_vec3_dist_sq` passes
  *   both conversions as arguments (evaluated right to left); `fn_800A7750` takes the blended scale from an inline
- *   product helper (its arguments evaluate right to left too).
+ *   product helper (its arguments evaluate right to left too), with the emitter's step an `s8` and the mode a `u8`
+ *   read through `(s8)` and the last two cases one conditional expression (the step's load then takes retail's r23).
  * SHAPES. The strings are literals and the `.sdata2` constants literal floats (the conversion doubles are the
  *   compiler's), in retail's creation order.
  */
@@ -1038,7 +1037,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             s32 use_c;
             s8 scale;
             s8 a;
-            s8 b;
+            u8 b;
             EfPmView* created;
             use_a = 0;
             if ((self->flags & 0x1000) != 0 && (EfGetWork(eh)->flags & 0x20) != 0) {
@@ -1054,14 +1053,12 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             }
             a = EfGetWork(self->work)->scale_step;
             b = EfGetWork(eh)->mode;
-            if (a == 0 || b == 0) {
+            if ((s8)a == 0 || (s8)b == 0) {
                 scale = 0;
-            } else if (a == 100) {
-                scale = b;
-            } else if (b == 100) {
-                scale = a;
+            } else if ((s8)a == 100) {
+                scale = (s8)b;
             } else {
-                scale = ef_scale_product(EfGetWork(self->work)->scale_step, (s8)EfGetWork(eh)->mode);
+                scale = ((s8)b == 100) ? (s8)a : ef_scale_product(EfGetWork(self->work)->scale_step, (s8)EfGetWork(eh)->mode);
             }
             created = (EfPmView*)fn_800A8040(self, eh, (u32)use_a, (u32)use_b, scale, (u32)use_c,
                                              params->field_0x05);

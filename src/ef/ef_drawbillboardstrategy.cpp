@@ -1,16 +1,13 @@
 /*
- * ef/ef_drawbillboardstrategy.cpp - nw4r::ef DrawBillboardStrategy and DrawDirectionalStrategy: their
- *   constructors and inline destructors, the draw dispatch, the normal, Y and directional billboard walkers and their
- *   quad writers, the directional world- and view-space walkers with their rotation and local matrices, two copies
- *   of the out-of-line GX FIFO writers and four-vertex writers, the GX setup and the ahead-vector builders.
- * RANGE. .text 0x800B9A44-0x800BE118 (35 functions); extab 0x8000A23C-0x8000A304, extabindex 0x80023700-0x8002382C,
- *   .rodata 0x8056F770-0x8056F7D0, .data 0x80593E88-0x805941F8, .sdata 0x80791300-0x80791340, .sdata2
- *   0x80796150-0x80796190.  The range holds two TUs by their `__FILE__` strings: "ef_drawbillboardstrategy.cpp"
- *   (0x80593E88) and "ef_drawdirectionalstrategy.cpp" (0x80594070, its bodies from 0x800BBDEC); the seam between
- *   them is open.  Left edge: the "ef_drawstripestrategy.cpp" strings belong to the code before 0x800B9A44.
- *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor], and each constructor
- *   installs the vtable at the end of its own TU's `.data`; so the directional class [0x800BBDEC, 0x800BE118) is a
- *   TU of its own.
+ * ef/ef_drawbillboardstrategy.cpp - nw4r::ef DrawBillboardStrategy: its constructor and inline destructor, the
+ *   draw dispatch, the normal, Y and directional billboard walkers and their quad writers, the out-of-line GX FIFO
+ *   writers and four-vertex writer, the GX setup and the ahead-vector builder with its two walkers.
+ * RANGE. .text 0x800B9A44-0x800BBDEC (20 functions); extab 0x8000A23C-0x8000A2AC, extabindex 0x80023700-0x800237A8,
+ *   .data 0x80593E88-0x80594070 (the `__FILE__` string "ef_drawbillboardstrategy.cpp" first, the class's table, then
+ *   the quad writers' weak strings), .sdata 0x80791300-0x80791320, .sdata2 0x80796150-0x80796170.  Left edge: the
+ *   "ef_drawstripestrategy.cpp" strings belong to the code before 0x800B9A44.  Right edge: the
+ *   "ef_drawdirectionalstrategy.cpp" TU (`ef/ef_drawdirectionalstrategy.cpp`) starts with its class's constructor at
+ *   0x800BBDEC (every strategy TU runs [constructor, ..., inline destructor], playbook 80).
  * FLAGS. `cflags_main`; `#pragma peephole off` before the includes (the GX FIFO writers keep the unfused `clrlwi`/
  *   `extsh`/`extsb` in front of every narrowing store); `#pragma dont_inline on` at the end (the inline destructors
  *   call their base out of line).
@@ -46,17 +43,13 @@
  *  - `ef_billboard_normal_quad` (0x800BA1E0): the `register` parameters the asm block needs keep the roll branch's
  *    temporaries out of f21-f31, so our frame saves f15-f20 too (0x1B0 against 0x150) and the roll branch's
  *    registers differ.
- *   Data: `.rodata` and `.sdata` are emitted and match; `.sdata2` is our own pool (the literals); `.data` holds only
- *   our two vtables - the strings stay `extern` because the range is two TUs (the three quad writers' strings, one
- *   "ef_drawbillboardstrategy.cpp" copy each, sit after the billboard vtable, and the directional TU's after them).
- *   flipcheck: `.text` 0x47F8 of 0x4710, extab 0xE0 of 0xD0, extabindex 0x150 of 0x138, `.data` 0x38 of 0x370,
- *   `.sdata2` 0x1C of 0x40.
+ *   Data: `.sdata` is emitted and matches; `.sdata2` is our own pool (the literals); `.data` holds only the vtable -
+ *   the strings stay `extern` (the three quad writers' strings, one "ef_drawbillboardstrategy.cpp" copy each, are the
+ *   weak tail after the vtable).
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_billboard_zero`.
  *   `DrawBillboardStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
- *   `DrawDirectionalStrategy` (constructor): the empty body is the whole source - the compiler
- *     emits the base call and the vtable store.
- */
+ * */
 
 #pragma peephole off
 
@@ -127,51 +120,13 @@ void ef_billboard_directional_quad(nw4r::ef::DrawBillboardStrategy* self, EfDraw
                                    f32 scale_y, f32 stretch, const EfVec2* pivot, u32 flags);
 
 
-/* The ahead-context argument block the walkers read: the particle handle and two cached positions. */
-typedef struct EfAheadArgs {
-    void* particle;    /* +0x00 */
-    u8 pad_0x04[0x94]; /* +0x04 */
-    VEC3 prev_pos;     /* +0x98  the previous resolved position */
-    Vec pos;           /* +0xA4  the fallback position */
-} EfAheadArgs; /* size: 0xB0 (lower bound, the record continues past what this unit reads) */
 
-/* The particle/emitter record each walker advances: its world position sits at +0xAC. */
-typedef struct EfWalkerObj {
-    u8 pad_0x00[0xAC]; /* +0x00 */
-    Vec world_pos;     /* +0xAC */
-} EfWalkerObj; /* size: 0xB8 (lower bound, the record continues past what this unit reads) */
-
-/* The particle's packed draw/rotate flag bytes (read by the flag accessor). */
-typedef struct EfParticleFlags {
-    u8 pad_0x00[0xB2]; /* +0x00 */
-    u8 flags_0xB2;     /* +0xB2  draw/rotate flag bits */
-} EfParticleFlags; /* size: 0xB3 (lower bound, the record continues past what this unit reads) */
-
-/* The walker family the shape selector returns (defined outside this range). */
-void ef_billboard_ahead_younger(Vec* out, EfAheadArgs* args, EfWalkerObj* em);
-void ef_billboard_ahead_neighbours(Vec* out, EfAheadArgs* args, EfWalkerObj* em);
-typedef void (*EfWalkerFn)(void);
-
-/* The large per-particle emitters this unit dispatches to (defined further down). */
-void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const EfDrawInfo* info,
-                               EfDrawParticleManager* pm);
-void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfDrawInfo* info,
-                              EfDrawParticleManager* pm);
-void ef_directional_write_quad_center(void* mtx, Vec* a, Vec* b, u32 flags);
-void ef_directional_local_mtx(MTX34* out, u8 pivot_mode, f32 pivot_x, f32 pivot_y, f32 scale_x, f32 scale_y,
-                              f32 stretch, const MTX34* rot);
-void ef_directional_rotate_mtx(MTX34* out, EfDrawParticle* p, u8 axis);
-void ef_directional_write_quad(void* mtx, Vec* src, u32 flags);
-void ef_directional_setup_gx(nw4r::ef::DrawStrategyImpl* self, const EfDrawInfo* info, EfDrawParticleManager* args);
-s32 ef_directional_draw_mode(void* unused, EfParticleFlags* self);
 
 /* SDK GX state setters and the matrix helpers, declared locally. */
 extern void GXLoadPosMtxImm(void* mtx, u32 id);
 extern void GXSetCurrentMtx(u32 id);
 /* The quads' texture coordinates, (s, t) byte pairs the GX_VA_TEX0 array reads (`.sdata`, 32-byte aligned). */
 __declspec(section ".sdata") static u8 ef_billboard_texcoords[32] __attribute__((aligned(32))) = {
-    0, 1, 0, 0, 1, 0, 1, 1};
-__declspec(section ".sdata") static u8 ef_directional_texcoords[32] __attribute__((aligned(32))) = {
     0, 1, 0, 0, 1, 0, 1, 1};
 
 /* The ahead-context walkers: the particle/emitter lookup helpers and the small vector helpers they
@@ -195,15 +150,6 @@ extern char ef_billboard_y_quad_file_str[];       /* "ef_drawbillboardstrategy.c
 extern char ef_billboard_quad_particle_str[];     /* "NW4R:Pointer Error
 particle(=%p) ..." .data 0x80594018 */
 extern char ef_billboard_quad_file_str[];         /* "ef_drawbillboardstrategy.cpp"          .data 0x80594050 */
-extern char ef_directional_file_str[]; /* "ef_drawdirectionalstrategy.cpp"                             .data 0x80594070 */
-extern char ef_directional_p_assert_str[]; /* "NW4R:Pointer Error\np(=%p) is not valid pointer."           .data 0x80594090 */
-extern char ef_directional_pm_assert_str[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."           .data 0x805940C0 */
-extern char ef_directional_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."     .data 0x805940F4 */
-extern char ef_directional_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."         .data 0x80594130 */
-extern char ef_directional_manager_em_assert_str[]; /* "NW4R:Pointer Error
-pm->mManagerEM(=%p) ..."  .data 0x80594164 */
-extern char ef_directional_pp_assert_str[];         /* "NW4R:Pointer Error
-pp(=%p) ..."             .data 0x805941A4 */
 
 /* --------------------------------------------------------------------------------------------------
  * The constructors and deleting destructors of this range.
@@ -807,36 +753,6 @@ void ef_billboard_vec2_set(f32* dst, f32 x, f32 y) {
     dst[1] = y;
 }
 
-/* Ends the current FIFO command (second copy). */
-void ef_directional_gx_end(void) {}
-
-/* Writes one u8 to the pipe (second copy). */
-void ef_directional_gx_u8(u8 value) {
-    GXWGFifo.u8 = value;
-}
-
-/* Tests the low bit of a status word (second copy). */
-int ef_directional_tex_flag(u32 value) {
-    return (value & 1) != 0;
-}
-
-static void ef_directional_gx_position3f(f32 x, f32 y, f32 z);
-
-/* Writes a vector to the pipe through the FIFO writer that follows it (second copy). */
-void ef_directional_gx_position(Vec* v) {
-    f32 x = v->x;
-    f32 y = v->y;
-    f32 z = v->z;
-    ef_directional_gx_position3f(x, y, z);
-}
-
-/* Writes three f32 to the pipe (second copy). */
-static void ef_directional_gx_position3f(f32 x, f32 y, f32 z) {
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-    GXWGFifo.f32 = z;
-}
-
 /* --------------------------------------------------------------------------------------------------
  * The indexed four-vertex stripe writers.  They expand a (matrix, two positions) pair into four
  * vertices through `subVec3`/`addVec3` and emit them to the pipe, tagging every other vertex
@@ -874,37 +790,6 @@ void ef_billboard_write_quad(void* unused, void* mtx, Vec* a, Vec* b, u32 flags)
         ef_billboard_gx_u8(3);
     }
     ef_billboard_gx_end();
-}
-
-/* The stripe writer (second copy): four vertices from the matrix and two positions. */
-void ef_directional_write_quad_center(void* mtx, Vec* a, Vec* b, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
-    GXBegin(0x80, 0, 4);
-    subVec3(&v0, mtx, a);
-    ef_directional_gx_position(&v0);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(0);
-    }
-    subVec3(&v1, mtx, b);
-    ef_directional_gx_position(&v1);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(1);
-    }
-    addVec3((VEC3*)&v2, (VEC3*)mtx, (VEC3*)a);
-    ef_directional_gx_position(&v2);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(2);
-    }
-    addVec3((VEC3*)&v3, (VEC3*)mtx, (VEC3*)b);
-    ef_directional_gx_position(&v3);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(3);
-    }
-    ef_directional_gx_end();
 }
 
 #ifdef __cplusplus
@@ -1012,504 +897,6 @@ void ef_billboard_setup_gx(nw4r::ef::DrawStrategyImpl* self, const EfDrawInfo* e
     mtx34_identity(&mtx);
     GXLoadPosMtxImm(mtx34_get_ptr(&mtx), 0);
     GXSetCurrentMtx(0);
-}
-
-/* Sets the directional stripe GX state (texcoord array and vertex format). */
-void ef_directional_setup_gx(nw4r::ef::DrawStrategyImpl* self, const EfDrawInfo* em, EfDrawParticleManager* args) {
-    (void)(IsValidPointer((u32)args) ||
-           (nw4r::db::Panic(ef_directional_file_str, 652, ef_directional_pm_assert_str, args), 0));
-    self->InitGraphics(args, *(EfEmitterDrawSetting*)ef_resource_draw_setting(args->resource), *em);
-    GXEnableTexOffsets(0, 1, 1);
-    GXSetArray(0xD, ef_directional_texcoords, 2);
-    GXClearVtxDesc();
-    GXSetVtxDesc(9, 1);
-    if (self->mNumTexmap != 0) {
-        GXSetVtxDesc(0xD, 2);
-    }
-    GXSetVtxAttrFmt(0, 9, 1, 4, 0);
-    GXSetVtxAttrFmt(0, 0xD, 1, 0, 0);
-    GXSetCurrentMtx(0);
-}
-
-#ifdef __cplusplus
-}
-#endif
-
-namespace nw4r {
-namespace ef {
-
-/* 0x800BBDEC (0x3C): builds the directional strategy. */
-DrawDirectionalStrategy::DrawDirectionalStrategy() {}
-
-/* 0x800BC1B4 (0x268): hands the draw to the point or tube path the particle flags select. */
-void DrawDirectionalStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
-
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_directional_file_str, 342, ef_directional_pm_assert_str, pm);
-    }
-    ef_directional_setup_gx(this, &info, pm);
-    EF_VALID_PTR_ASSERT(ef_directional_file_str, 346, ef_directional_resource_assert_str, pm->resource);
-    if (ef_directional_draw_mode(this, (EfParticleFlags*)ef_resource_draw_setting(pm->resource)) != 1) {
-        ef_directional_draw_world(this, &info, pm);
-        return;
-    }
-    ef_directional_draw_view(this, &info, pm);
-}
-
-}  // namespace ef
-}  // namespace nw4r
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* The unit quad in the XY plane and its crossing quad in the YZ plane (`.rodata`). */
-static const VEC3 ef_directional_quad_vtx[4] = {
-    {-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}};
-static const VEC3 ef_directional_cross_vtx[4] = {
-    {0.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, -1.0f}, {0.0f, -1.0f, -1.0f}};
-
-#pragma fp_contract off
-
-/* 0x800BC428 (0x8EC): draws every particle as a quad (two crossed quads for the cross type) in the manager's space,
- * each oriented by its rotation and by a frame built from its ahead vector. */
-void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const EfDrawInfo* info,
-                               EfDrawParticleManager* pm) {
-    MTX34 view;
-    EfEmitterDrawSetting* ed;
-    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
-    u32 use_tex;
-    VEC3 axis_y;
-    VEC3 axis_z;
-    VEC3 move;
-    VEC3 side;
-    VEC3 ahead;
-    VEC3 normal;
-    VEC3 pos;
-    EfDrawParticle* head;
-    f32 pivot_x;
-    f32 pivot_y;
-    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc get_first;
-    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc get_next;
-    bool first;
-    EfDrawParticle* p;
-
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_directional_file_str, 365, ef_directional_pm_assert_str, pm);
-    }
-    ef_directional_setup_gx(self, info, pm);
-    EF_VALID_PTR_ASSERT(ef_directional_file_str, 369, ef_directional_resource_assert_str, pm->resource);
-    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
-    if (!IsValidPointer((u32)ed)) {
-        nw4r::db::Panic(ef_directional_file_str, 371, ef_directional_ed_assert_str, ed);
-    }
-    MTX34_ctor(&view);
-    ef_draw_info_view_mtx(info, &view);
-    nw4r::ef::DrawStrategyImpl::AheadContext ctx(&view, pm);
-    calc_ahead = self->GetCalcAheadFunc(pm);
-    use_tex = self->mNumTexmap != 0;
-    VEC3_ctor(&axis_y);
-    VEC3_ctor(&axis_z);
-    if (ed->type_direction == 7) {
-        MTX34 mtx;
-        VEC3 col_y;
-        VEC3 col_z;
-
-        MTX34_ctor(&mtx);
-        mtx34_concat(&mtx, &view, &ctx.manager_mtx);
-        GXLoadPosMtxImm(mtx34_get_ptr(&mtx), 0);
-        copyVec3(&axis_y, setVec3(&col_y, ctx.manager_mtx_inv.m[0][1], ctx.manager_mtx_inv.m[1][1],
-                                  ctx.manager_mtx_inv.m[2][1]));
-        copyVec3(&axis_z, setVec3(&col_z, ctx.manager_mtx_inv.m[0][2], ctx.manager_mtx_inv.m[1][2],
-                                  ctx.manager_mtx_inv.m[2][2]));
-        ef_vec3_normalize(&axis_z);
-    } else {
-        MTX34 mtx;
-        MTX34 em_mtx;
-        VEC3 col_y;
-        VEC3 col_z;
-
-        MTX34_ctor(&mtx);
-        mtx34_concat(&mtx, &view, &ctx.manager_mtx);
-        GXLoadPosMtxImm(mtx34_get_ptr(&mtx), 0);
-        EF_VALID_PTR_ASSERT(ef_directional_file_str, 403, ef_directional_manager_em_assert_str, pm->emitter);
-        MTX34_ctor(&em_mtx);
-        ef_emitter_get_mtx(pm->emitter, &em_mtx);
-        mtx34_concat(&em_mtx, &ctx.manager_mtx_inv, &em_mtx);
-        copyVec3(&axis_y, setVec3(&col_y, em_mtx.m[0][1], em_mtx.m[1][1], em_mtx.m[2][1]));
-        copyVec3(&axis_z, setVec3(&col_z, em_mtx.m[0][2], em_mtx.m[1][2], em_mtx.m[2][2]));
-        ef_vec3_normalize(&axis_z);
-    }
-    for (head = (EfDrawParticle*)ef_pm_list_head((EfParticleState*)pm); head != NULL && head->ahead.x > 1.0f;
-         head = (EfDrawParticle*)ef_pm_list_next(pm, head)) {
-        copyVec3(&head->ahead, &axis_y);
-    }
-    pivot_x = ed->scale_a / 100.0f;
-    pivot_y = ed->scale_b / 100.0f;
-    get_first = self->GetGetFirstDrawParticleFunc(ed->flags & 0x800);
-    get_next = self->GetGetNextDrawParticleFunc(ed->flags & 0x800);
-    first = true;
-    for (p = get_first(pm); p != NULL; p = get_next(pm, p)) {
-        f32 scale_x;
-        f32 scale_y;
-        f32 stretch;
-        MTX34 rotate_mtx;
-        MTX34 local_mtx;
-        MTX34 frame_mtx;
-        MTX34 world_mtx;
-
-        scale_x = ef_particle_get_scale((EfParticle*)p);
-        if (scale_x < 1.1920929e-7f) {
-            continue;
-        }
-        scale_y = ef_particle_get_scale_y((EfParticle*)p);
-        if (scale_y < 1.1920929e-7f) {
-            continue;
-        }
-        stretch = 1.0f;
-        if (ed->type_option2 != 0) {
-            VEC3_ctor(&move);
-            ef_particle_get_move_dir(p, &move);
-            stretch += 0.5f * sqrt_f32(vec3_dot((const f32*)&move, (const f32*)&move)) / scale_y;
-        }
-        self->SetupGP(p, *ed, *info, first, false);
-        first = false;
-        ef_directional_rotate_mtx(&rotate_mtx, p, ed->type_axis);
-        ef_directional_local_mtx(&local_mtx, ed->type_option3, pivot_x, pivot_y, scale_x, scale_y, stretch,
-                                 &rotate_mtx);
-        VEC3_ctor(&side);
-        VEC3_ctor(&ahead);
-        VEC3_ctor(&normal);
-        calc_ahead(&ahead, &ctx, p);
-        vec3_cross((f32*)&normal, (const f32*)&p->ahead, (const f32*)&ahead);
-        if (ef_vec3_normalize(&normal) == 0) {
-            copyVec3(&normal, &axis_z);
-        }
-        vec3_cross((f32*)&side, (const f32*)&ahead, (const f32*)&normal);
-        copyVec3(&p->ahead, &side);
-        assignVec3((Vec*)&pos, (Vec*)&p->world_pos);
-        mtx34_set(&frame_mtx, side.x, ahead.x, normal.x, pos.x, side.y, ahead.y, normal.y, pos.y, side.z, ahead.z,
-                  normal.z, pos.z);
-        MTX34_ctor(&world_mtx);
-        mtx34_concat(&world_mtx, &frame_mtx, &local_mtx);
-        ef_directional_write_quad(&world_mtx, (Vec*)ef_directional_quad_vtx, use_tex);
-        if (ed->type_option == 1) {
-            ef_directional_write_quad(&world_mtx, (Vec*)ef_directional_cross_vtx, use_tex);
-        }
-    }
-}
-
-/* 0x800BCD14 (0x184): builds the quad's local matrix: the rotation scaled by the particle's size and stretch and
- * moved so the quad turns about its pivot (on the Y axis, or on the Z axis for pivot mode 1). */
-void ef_directional_local_mtx(MTX34* out, u8 pivot_mode, f32 pivot_x, f32 pivot_y, f32 scale_x, f32 scale_y,
-                              f32 stretch, const MTX34* rot) {
-    if (pivot_mode == 0) {
-        f32 tx = scale_x * pivot_x;
-        f32 sy = scale_y * stretch;
-        f32 ty = scale_y * ((pivot_y + stretch) - 1.0f);
-
-        mtx34_set(out, rot->m[0][0] * scale_x, rot->m[0][1] * sy, rot->m[0][2] * scale_x,
-                  pivot_x + (-rot->m[0][0] * tx - rot->m[0][1] * ty), rot->m[1][0] * scale_x, rot->m[1][1] * sy,
-                  rot->m[1][2] * scale_x, pivot_y + (-rot->m[1][0] * tx - rot->m[1][1] * ty), rot->m[2][0] * scale_x,
-                  rot->m[2][1] * sy, rot->m[2][2] * scale_x, -rot->m[2][0] * tx - rot->m[2][1] * ty);
-    } else {
-        f32 tx = scale_x * pivot_x;
-        f32 tz = scale_y * pivot_y;
-
-        mtx34_set(out, rot->m[0][0] * scale_x, rot->m[0][2] * scale_y, rot->m[0][1] * scale_x,
-                  pivot_x + (-rot->m[0][0] * tx - rot->m[0][2] * tz), rot->m[1][0] * scale_x, rot->m[1][2] * scale_y,
-                  rot->m[1][1] * scale_x, -rot->m[1][0] * tx - rot->m[1][2] * tz, rot->m[2][0] * scale_x,
-                  rot->m[2][2] * scale_y, rot->m[2][1] * scale_x, (-rot->m[2][0] * tx - rot->m[2][2] * tz) - pivot_y);
-    }
-}
-
-/* 0x800BCE98 (0x39C): builds the rotation matrix of a particle's rotation about the X, Y or Z axis, or all three. */
-void ef_directional_rotate_mtx(MTX34* out, EfDrawParticle* p, u8 axis) {
-    VEC3 rotate;
-    f32 sin_x;
-    f32 cos_x;
-    f32 sin_y;
-    f32 cos_y;
-    f32 sin_z;
-    f32 cos_z;
-
-    if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_directional_file_str, 239, ef_directional_pp_assert_str, p);
-    }
-    VEC3_ctor(&rotate);
-    ef_particle_get_rotate(p, (Vec3*)&rotate);
-    sin_x = 0.0f;
-    cos_x = 1.0f;
-    sin_y = 0.0f;
-    cos_y = 1.0f;
-    sin_z = 0.0f;
-    cos_z = 1.0f;
-    switch (axis) {
-    case 0:
-        if (0.0f != rotate.x) {
-            ef_sin_cos(&sin_x, &cos_x, -rotate.x);
-        }
-        mtx34_set(out, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, cos_x, -sin_x, 0.0f, 0.0f, sin_x, cos_x, 0.0f);
-        break;
-    case 1:
-        if (0.0f != rotate.y) {
-            ef_sin_cos(&sin_y, &cos_y, -rotate.y);
-        }
-        mtx34_set(out, cos_y, 0.0f, sin_y, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, -sin_y, 0.0f, cos_y, 0.0f);
-        break;
-    case 2:
-        if (0.0f != rotate.z) {
-            ef_sin_cos(&sin_z, &cos_z, -rotate.z);
-        }
-        mtx34_set(out, cos_z, -sin_z, 0.0f, 0.0f, sin_z, cos_z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-        break;
-    default: {
-        f32 sxsy;
-        f32 cxsy;
-
-        if (0.0f != rotate.x) {
-            ef_sin_cos(&sin_x, &cos_x, -rotate.x);
-        }
-        if (0.0f != rotate.y) {
-            ef_sin_cos(&sin_y, &cos_y, -rotate.y);
-        }
-        if (0.0f != rotate.z) {
-            ef_sin_cos(&sin_z, &cos_z, -rotate.z);
-        }
-        sxsy = sin_x * sin_y;
-        cxsy = cos_x * sin_y;
-        mtx34_set(out, cos_y * cos_z, sxsy * cos_z - cos_x * sin_z, cxsy * cos_z + sin_x * sin_z, 0.0f, cos_y * sin_z,
-                  sxsy * sin_z + cos_x * cos_z, cxsy * sin_z - sin_x * cos_z, 0.0f, -sin_y, cos_y * sin_x,
-                  cos_x * cos_y, 0.0f);
-        break;
-    }
-    }
-}
-
-/* 0x800BD234 (0x92C): draws every particle as a quad (two crossed quads for the cross type) in view space, each
- * oriented by its rotation and by a frame that keeps its ahead vector upright on screen. */
-void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfDrawInfo* info,
-                              EfDrawParticleManager* pm) {
-    MTX34 view;
-    EfEmitterDrawSetting* ed;
-    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
-    u32 use_tex;
-    MTX34 mtx;
-    MTX34 pm_mtx;
-    f32 axis_x;
-    f32 axis_y;
-    f32 axis_z;
-    EfDrawParticle* head;
-    f32 pivot_x;
-    f32 pivot_y;
-    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc get_first;
-    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc get_next;
-    bool first;
-    EfDrawParticle* p;
-    VEC3 move;
-    MTX34 rotate_mtx;
-    MTX34 local_mtx;
-    MTX34 frame_mtx;
-    MTX34 world_mtx;
-    VEC3 side;
-    VEC3 up;
-    VEC3 normal;
-    VEC3 ahead;
-    VEC3 pos;
-    VEC3 center;
-    VEC3 edge_a;
-    VEC3 edge_b;
-    VEC3 edge_c;
-    VEC3 edge_d;
-    VEC3 flat_side;
-    VEC3 flat_normal;
-
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_directional_file_str, 512, ef_directional_pm_assert_str, pm);
-    }
-    ef_directional_setup_gx(self, info, pm);
-    EF_VALID_PTR_ASSERT(ef_directional_file_str, 516, ef_directional_resource_assert_str, pm->resource);
-    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
-    if (!IsValidPointer((u32)ed)) {
-        nw4r::db::Panic(ef_directional_file_str, 518, ef_directional_ed_assert_str, ed);
-    }
-    MTX34_ctor(&view);
-    ef_draw_info_view_mtx(info, &view);
-    nw4r::ef::DrawStrategyImpl::AheadContext ctx(&view, pm);
-    calc_ahead = self->GetCalcAheadFunc(pm);
-    use_tex = self->mNumTexmap != 0;
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&pm_mtx);
-    ef_pm_get_mtx(pm, &pm_mtx);
-    mtx34_concat(&mtx, &view, &pm_mtx);
-    GXLoadPosMtxImm((void*)mtx34_const_ptr((u32)&ef_identity_mtx), 0);
-    axis_x = ef_mtx34_column_length((const f32*)&mtx, 0);
-    axis_y = ef_mtx34_column_length((const f32*)&mtx, 1);
-    axis_z = ef_mtx34_column_length((const f32*)&mtx, 2);
-    for (head = (EfDrawParticle*)ef_pm_list_head((EfParticleState*)pm); head != NULL && head->ahead.x > 1.0f;
-         head = (EfDrawParticle*)ef_pm_list_next(pm, head)) {
-        copyVec3(&head->ahead, &ef_zero_vec);
-    }
-    pivot_x = ed->scale_a / 100.0f;
-    pivot_y = ed->scale_b / 100.0f;
-    get_first = self->GetGetFirstDrawParticleFunc(ed->flags & 0x800);
-    get_next = self->GetGetNextDrawParticleFunc(ed->flags & 0x800);
-    first = true;
-    for (p = get_first(pm); p != NULL; p = get_next(pm, p)) {
-        f32 scale_x;
-        f32 scale_y;
-        f32 stretch;
-
-        scale_x = ef_particle_get_scale((EfParticle*)p);
-        if (scale_x < 1.1920929e-7f) {
-            continue;
-        }
-        scale_y = ef_particle_get_scale_y((EfParticle*)p);
-        if (scale_y < 1.1920929e-7f) {
-            continue;
-        }
-        stretch = 1.0f;
-        if (ed->type_option2 != 0) {
-            VEC3_ctor(&move);
-            ef_particle_get_move_dir(p, &move);
-            stretch += 0.5f * sqrt_f32(vec3_dot((const f32*)&move, (const f32*)&move)) / scale_y;
-        }
-        self->SetupGP(p, *ed, *info, first, false);
-        first = false;
-        ef_directional_rotate_mtx(&rotate_mtx, p, ed->type_axis);
-        ef_directional_local_mtx(&local_mtx, ed->type_option3, pivot_x, pivot_y, scale_x, scale_y, stretch,
-                                 &rotate_mtx);
-        VEC3_ctor(&side);
-        VEC3_ctor(&up);
-        VEC3_ctor(&normal);
-        VEC3_ctor(&ahead);
-        calc_ahead(&ahead, &ctx, p);
-        mtx34_rotate_vec3(&ahead, &mtx, &ahead);
-        copyVec3(&up, &ahead);
-        ef_vec3_normalize(&up);
-        copyVec3(&side, setVec3(&flat_side, ahead.y, -ahead.x, 0.0f));
-        if (ef_vec3_normalize(&side) != 0) {
-            copyVec3(&normal, setVec3(&flat_normal, -ahead.x * ahead.z, -ahead.y * ahead.z,
-                                      ahead.x * ahead.x + ahead.y * ahead.y));
-        } else {
-            vec3_cross((f32*)&side, (const f32*)&ahead, (const f32*)&p->ahead);
-            if (ef_vec3_normalize(&side) == 0) {
-                copyVec3(&side, &ef_unit_x_vec);
-            }
-            vec3_cross((f32*)&normal, (const f32*)&side, (const f32*)&ahead);
-        }
-        ef_vec3_normalize(&normal);
-        copyVec3(&p->ahead, &normal);
-        VEC3_ctor(&pos);
-        mtx34_mult_vec3(&pos, &mtx, (const VEC3*)&p->world_pos);
-        mtx34_set(&frame_mtx, axis_x * side.x, axis_y * up.x, axis_z * normal.x, pos.x, axis_x * side.y,
-                  axis_y * up.y, axis_z * normal.y, pos.y, axis_x * side.z, axis_y * up.z, axis_z * normal.z, pos.z);
-        MTX34_ctor(&world_mtx);
-        mtx34_concat(&world_mtx, &frame_mtx, &local_mtx);
-        setVec3(&center, world_mtx.m[0][3], world_mtx.m[1][3], world_mtx.m[2][3]);
-        setVec3(&edge_a, world_mtx.m[0][0] + world_mtx.m[0][1], world_mtx.m[1][0] + world_mtx.m[1][1],
-                world_mtx.m[2][0] + world_mtx.m[2][1]);
-        setVec3(&edge_b, world_mtx.m[0][0] - world_mtx.m[0][1], world_mtx.m[1][0] - world_mtx.m[1][1],
-                world_mtx.m[2][0] - world_mtx.m[2][1]);
-        ef_directional_write_quad_center(&center, (Vec*)&edge_a, (Vec*)&edge_b, use_tex);
-        if (ed->type_option == 1) {
-            setVec3(&edge_c, world_mtx.m[0][1] + world_mtx.m[0][2], world_mtx.m[1][1] + world_mtx.m[1][2],
-                    world_mtx.m[2][1] + world_mtx.m[2][2]);
-            setVec3(&edge_d, world_mtx.m[0][1] - world_mtx.m[0][2], world_mtx.m[1][1] - world_mtx.m[1][2],
-                    world_mtx.m[2][1] - world_mtx.m[2][2]);
-            ef_directional_write_quad_center(&center, (Vec*)&edge_c, (Vec*)&edge_d, use_tex);
-        }
-    }
-}
-
-#pragma fp_contract reset
-
-/* The four-vertex matrix writer: transforms four positions by a matrix and emits them. */
-void ef_directional_write_quad(void* mtx, Vec* src, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
-    if (!IsValidPointer((u32)src)) {
-        nw4r::db::Panic(ef_directional_file_str, 92, ef_directional_p_assert_str, src);
-    }
-    VEC3_ctor((VEC3*)&v0);
-    VEC3_ctor((VEC3*)&v1);
-    VEC3_ctor((VEC3*)&v2);
-    VEC3_ctor((VEC3*)&v3);
-    mtx34_mult_vec3((VEC3*)&v0, (const MTX34*)mtx, (const VEC3*)&src[0]);
-    mtx34_mult_vec3((VEC3*)&v1, (const MTX34*)mtx, (const VEC3*)&src[1]);
-    mtx34_mult_vec3((VEC3*)&v2, (const MTX34*)mtx, (const VEC3*)&src[2]);
-    mtx34_mult_vec3((VEC3*)&v3, (const MTX34*)mtx, (const VEC3*)&src[3]);
-    GXBegin(0x80, 0, 4);
-    ef_directional_gx_position(&v0);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(0);
-    }
-    ef_directional_gx_position(&v1);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(1);
-    }
-    ef_directional_gx_position(&v2);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(2);
-    }
-    ef_directional_gx_position(&v3);
-    if (ef_directional_tex_flag(flags) != 0) {
-        ef_directional_gx_u8(3);
-    }
-    ef_directional_gx_end();
-}
-
-#ifdef __cplusplus
-}
-#endif
-
-namespace nw4r {
-namespace ef {
-
-/* 0x800BDD34 (0x388): the ahead-vector builder the draw setting's direction type selects. */
-DrawStrategyImpl::CalcAheadFunc DrawDirectionalStrategy::GetCalcAheadFunc(EfDrawParticleManager* pm) {
-    EfEmitterShape* shape;
-
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_directional_file_str, 687, ef_directional_pm_assert_str, pm);
-    }
-    EF_VALID_PTR_ASSERT(ef_directional_file_str, 688, ef_directional_resource_assert_str, pm->resource);
-    shape = (EfEmitterShape*)ef_resource_draw_setting(pm->resource);
-    if (!IsValidPointer((u32)shape)) {
-        nw4r::db::Panic(ef_directional_file_str, 691, ef_directional_ed_assert_str, shape);
-    }
-    switch (shape->shape_0xAE) {
-    case 0:
-        return (CalcAheadFunc)ef_ahead_move_dir;
-    case 1:
-        return (CalcAheadFunc)ef_ahead_from_emitter;
-    case 2:
-        return (CalcAheadFunc)ef_ahead_emitter_axis_y;
-    case 3:
-        return (CalcAheadFunc)ef_billboard_ahead_younger;
-    case 5:
-    case 7:
-        return (CalcAheadFunc)ef_ahead_manager_axis_y;
-    case 6:
-        return (CalcAheadFunc)ef_billboard_ahead_neighbours;
-    default:
-        return (CalcAheadFunc)ef_ahead_move_dir;
-    }
-}
-
-}  // namespace ef
-}  // namespace nw4r
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* The first two draw/rotate flag bits of a particle. */
-s32 ef_directional_draw_mode(void* unused, EfParticleFlags* self) {
-    return self->flags_0xB2 & 3;
 }
 
 #ifdef __cplusplus

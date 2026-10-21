@@ -16,22 +16,19 @@
  *   `ef_cube_f32_percent`, `ef_cube_f64_int_bias`, `ef_cube_f32_min_size`, `ef_cube_f32_pi`, `ef_cube_f32_pi_epsilon`,
  *   `ef_cube_f32_minus_one`.
  * RESIDUALS.
- *  - `Emission`: the spiral's `dir = 0` is scheduled before the `n % 2` test where retail sets it after; the side
- *    faces' row counter takes r18 where retail's takes r23; and the `ef_random_u16(...) % 6` keeps a
- *    `clrlwi r4,r3,16` of the u16 return that retail does not (4 bytes longer).
- *   Relocation names that differ from retail (pool constants): `ef_cube_f64_int_bias` (the int-to-float bias reads
- *     our `@N` pool copy).
- *  - flipcheck: `.sdata2` 0x8 of 0x30 (the pool is declared, so the conversion constant reads our `@N`); `.text`
- *    0x1B7C of 0x1B78; extabindex differs in the cube row's size word.
+ *  - `Emission`: the spiral's `dir = 0` is scheduled before the `n % 2` test where retail sets it after (tried: a
+ *    ternary, if/else); the side faces' row counter takes r18 where retail's takes r23 (tried: reusing the spiral's
+ *    `i`, the counter declarations' orders by hill climb).
+ *  - flipcheck: `.text` only (`.data`, `.sdata2`, extab and extabindex are byte-identical).
  * SHAPES. The function is `nw4r::ef::EmitterFormCube::Emission` (declared in `ef/ef_emform.h`; this unit defines the key
  *   function, so the class's table is emitted here, after the strings).  The particle manager's spawn is its
  *   virtual `CreateParticle`, taking the position and velocity by value (copied velocity first, momentum
  *   evaluated before the life, dispatch through r3); the float argument precedes the space matrix.
  * SHAPES. The strings are global definitions in retail's order; `-pool off` (configure.py) gives each its own
  *   `lis`/`addi`.
- * SHAPES. The pool constants are declared `extern const`: retail hoists their loads out of every loop, which a
- *   non-`const` declaration prevents.  The three spiral/ring blocks declare their own counters in the order
- *   that reproduces retail's register assignment.
+ * SHAPES. The float constants are literals, pooled in creation order with the `(f32)int` bias after
+ *   `ef_cube_emit`'s; MWCC hoists them out of the loops as retail does.  The three spiral/ring blocks
+ *   declare their own counters in the order that reproduces retail's register assignment.
  */
 
 #include "types.h"
@@ -49,18 +46,6 @@ char ef_cube_file_name[] = "ef_cube.cpp";
 char ef_cube_err_em[] = "NW4R:Pointer Error\nem(=%p) is not valid pointer.";
 char ef_cube_err_pm[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
 char ef_cube_err_params[] = "NW4R:Pointer Error\nparams(=%p) is not valid pointer.";
-
-/* The unit's own `.sdata2` pool (claimed, declared, never defined). */
-extern const f32 ef_cube_f32_flt_min; /* 0x00800000, FLT_MIN */
-extern const f32 ef_cube_f32_two; /* 2.0f */
-extern const f32 ef_cube_f32_one; /* 1.0f */
-extern const f32 ef_cube_f32_zero; /* 0.0f */
-extern const f32 ef_cube_f32_percent; /* 0.01f */
-extern const f64 ef_cube_f64_int_bias; /* 0x4330000080000000, the u32 -> f64 magic */
-extern const f32 ef_cube_f32_min_size; /* 1e-5f: the smallest size, hollow ratio and direction component */
-extern const f32 ef_cube_f32_pi; /* pi */
-extern const f32 ef_cube_f32_pi_epsilon; /* the step a diffusion angle of pi is pulled back by */
-extern const f32 ef_cube_f32_minus_one; /* -1.0f */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */
@@ -119,17 +104,17 @@ void ef_cube_emit(nw4r::ef::EmitterFormCube* form, VEC3* b, VEC3* c, EfWork* em,
 
     ef_vec3_normalize_to(c, c);
     assignVec3((Vec*)&v1, (Vec*)b);
-    if (vec3_length_sq(&v1) <= ef_cube_f32_flt_min) {
-        v1.x = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
-        v1.y = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
-        v1.z = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
+    if (vec3_length_sq(&v1) <= 1.17549435e-38f) {
+        v1.x = ef_random_float(&em->progress) * 2.0f - 1.0f;
+        v1.y = ef_random_float(&em->progress) * 2.0f - 1.0f;
+        v1.z = ef_random_float(&em->progress) * 2.0f - 1.0f;
     }
     ef_vec3_normalize_to(&v1, &v1);
     assignVec3((Vec*)&v2, (Vec*)b);
-    v2.y = ef_cube_f32_zero;
-    if (vec3_length_sq(&v2) <= ef_cube_f32_flt_min) {
-        v2.x = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
-        v2.z = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
+    v2.y = 0.0f;
+    if (vec3_length_sq(&v2) <= 1.17549435e-38f) {
+        v2.x = ef_random_float(&em->progress) * 2.0f - 1.0f;
+        v2.z = ef_random_float(&em->progress) * 2.0f - 1.0f;
     }
     ef_vec3_normalize_to(&v2, &v2);
     /* This unit's `VEC3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
@@ -137,7 +122,7 @@ void ef_cube_emit(nw4r::ef::EmitterFormCube* form, VEC3* b, VEC3* c, EfWork* em,
     VEC3_ctor((nw4r::math::VEC3*)&v3);
     form->CalcVelocity((Vec*)&v3, em, (Vec*)b, (Vec*)c, (Vec*)&v1, (Vec*)&v2);
     pm->CreateParticle(form->CalcLife(d, f, em), *b, v3, e,
-                       ef_cube_f32_one + ef_cube_f32_percent * (f32)em->scale_rate * ef_random_float(&em->progress),
+                       1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress),
                        &em->spawn_data, em->spawn_extra, em->spawn_flag);
 }
 
@@ -145,7 +130,7 @@ void ef_cube_emit(nw4r::ef::EmitterFormCube* form, VEC3* b, VEC3* c, EfWork* em,
 #define EF_CUBE_MAX_ABS(a, b) (ef_fabsf(a) > ef_fabsf(b) ? ef_fabsf(a) : ef_fabsf(b))
 
 /* A uniform random value in [-1, 1). */
-#define EF_CUBE_RAND_SIGNED(em) (ef_cube_f32_two * ef_random_float(&(em)->progress) - ef_cube_f32_one)
+#define EF_CUBE_RAND_SIGNED(em) (2.0f * ef_random_float(&(em)->progress) - 1.0f)
 
 /* Emits `n` particles from the cube: on an even grid over the six faces (flag 0x20000), or at random inside the
  * shell the hollow ratio leaves; each direction leans out of its face by the emitter's diffusion angle. */
@@ -186,28 +171,28 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
         sizeY = cube->sizeY;
         sizeZ = cube->sizeZ;
     }
-    if (sizeX < ef_cube_f32_min_size) {
-        sizeX = ef_cube_f32_min_size;
+    if (sizeX < 1e-5f) {
+        sizeX = 1e-5f;
     }
-    if (sizeY < ef_cube_f32_min_size) {
-        sizeY = ef_cube_f32_min_size;
+    if (sizeY < 1e-5f) {
+        sizeY = 1e-5f;
     }
-    if (sizeZ < ef_cube_f32_min_size) {
-        sizeZ = ef_cube_f32_min_size;
+    if (sizeZ < 1e-5f) {
+        sizeZ = 1e-5f;
     }
-    if (ef_cube_f32_zero == cube->hollow) {
-        hollow = ef_cube_f32_min_size;
+    if (0.0f == cube->hollow) {
+        hollow = 1e-5f;
     } else {
-        hollow = ef_cube_f32_percent * cube->hollow;
+        hollow = 0.01f * cube->hollow;
     }
-    shell = ef_cube_f32_one - hollow;
+    shell = 1.0f - hollow;
     angle = em->spread;
-    if (ef_fabsf(angle - ef_cube_f32_pi) < ef_cube_f32_pi_epsilon) {
-        angle -= ef_cube_f32_pi_epsilon;
+    if (ef_fabsf(angle - 3.1415927f) < 3.74507039e-07f) {
+        angle -= 3.74507039e-07f;
     }
 
     if (flags & 0x20000) {
-        f32 step = ef_cube_f32_two / (f32)(int)(n + 1);
+        f32 step = 2.0f / (f32)(int)(n + 1);
         {
             int i;
             int col;
@@ -263,33 +248,33 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                         left = run;
                     }
                 }
-                u = (f32)col * step - ef_cube_f32_one;
-                v = (f32)row * step - ef_cube_f32_one;
+                u = (f32)col * step - 1.0f;
+                v = (f32)row * step - 1.0f;
                 px = u * sizeX;
                 pz = v * sizeZ;
-                spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
+                spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                 lean = EF_CUBE_MAX_ABS(u, v);
                 VEC3_ctor((nw4r::math::VEC3*)&pos);
                 VEC3_ctor((nw4r::math::VEC3*)&vel);
                 pos.x = px;
                 pos.y = -sizeY;
                 pos.z = pz;
-                if (ef_cube_f32_zero != shell) {
+                if (0.0f != shell) {
                     f32 depth;
                     if (flags & 0x01000000) {
                         f32 r = ef_random_float(&em->progress);
                         r *= r;
-                        depth = ef_cube_f32_one - spread * (r * shell);
+                        depth = 1.0f - spread * (r * shell);
                     } else {
-                        depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
+                        depth = 1.0f - spread * (shell * ef_random_float(&em->progress));
                     }
                     pos.y *= depth;
                 }
-                if (ef_cube_f32_zero == angle ||
-                    (fabsf(pos.x) < ef_cube_f32_min_size && fabsf(pos.z) < ef_cube_f32_min_size)) {
-                    vel.x = ef_cube_f32_zero;
-                    vel.y = ef_cube_f32_minus_one;
-                    vel.z = ef_cube_f32_zero;
+                if (0.0f == angle ||
+                    (fabsf(pos.x) < 1e-5f && fabsf(pos.z) < 1e-5f)) {
+                    vel.x = 0.0f;
+                    vel.y = -1.0f;
+                    vel.z = 0.0f;
                 } else {
                     f32 inv = math_reciprocal(tanf(lean * angle));
                     vel.x = pos.x;
@@ -306,13 +291,13 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
 
             /* The four side faces, one ring per row from the bottom up. */
             for (j = 1; j <= (int)n; j++) {
-                f32 v = (f32)j * step - ef_cube_f32_one;
+                f32 v = (f32)j * step - 1.0f;
                 f32 y = v * sizeY;
 
                 for (k = 1; k <= (int)n; k++) {
-                    f32 u = (f32)k * step - ef_cube_f32_one;
+                    f32 u = (f32)k * step - 1.0f;
                     f32 pu = u * sizeX;
-                    f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
+                    f32 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
                     VEC3 pos;
                     VEC3 vel;
@@ -322,22 +307,22 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     pos.x = pu;
                     pos.y = y;
                     pos.z = -sizeZ;
-                    if (ef_cube_f32_zero != shell) {
+                    if (0.0f != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
                             f32 r = ef_random_float(&em->progress);
                             r *= r;
-                            depth = ef_cube_f32_one - spread * (r * shell);
+                            depth = 1.0f - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
+                            depth = 1.0f - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.z *= depth;
                     }
-                    if (ef_cube_f32_zero == angle ||
-                        (fabsf(pos.x) < ef_cube_f32_min_size && fabsf(pos.y) < ef_cube_f32_min_size)) {
-                        vel.x = ef_cube_f32_zero;
-                        vel.y = ef_cube_f32_zero;
-                        vel.z = ef_cube_f32_minus_one;
+                    if (0.0f == angle ||
+                        (fabsf(pos.x) < 1e-5f && fabsf(pos.y) < 1e-5f)) {
+                        vel.x = 0.0f;
+                        vel.y = 0.0f;
+                        vel.z = -1.0f;
                     } else {
                         f32 inv = math_reciprocal(tanf(lean * angle));
                         vel.x = pos.x;
@@ -347,9 +332,9 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
                 }
                 for (k = 1; k <= (int)n; k++) {
-                    f32 u = (f32)k * step - ef_cube_f32_one;
+                    f32 u = (f32)k * step - 1.0f;
                     f32 pu = u * sizeZ;
-                    f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
+                    f32 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
                     VEC3 pos;
                     VEC3 vel;
@@ -359,22 +344,22 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     pos.x = sizeX;
                     pos.y = y;
                     pos.z = pu;
-                    if (ef_cube_f32_zero != shell) {
+                    if (0.0f != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
                             f32 r = ef_random_float(&em->progress);
                             r *= r;
-                            depth = ef_cube_f32_one - spread * (r * shell);
+                            depth = 1.0f - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
+                            depth = 1.0f - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.x *= depth;
                     }
-                    if (ef_cube_f32_zero == angle ||
-                        (fabsf(pos.y) < ef_cube_f32_min_size && fabsf(pos.z) < ef_cube_f32_min_size)) {
-                        vel.x = ef_cube_f32_one;
-                        vel.y = ef_cube_f32_zero;
-                        vel.z = ef_cube_f32_zero;
+                    if (0.0f == angle ||
+                        (fabsf(pos.y) < 1e-5f && fabsf(pos.z) < 1e-5f)) {
+                        vel.x = 1.0f;
+                        vel.y = 0.0f;
+                        vel.z = 0.0f;
                     } else {
                         f32 inv = math_reciprocal(tanf(lean * angle));
                         vel.x = inv * sqrt_f32(pos.y * pos.y + pos.z * pos.z);
@@ -384,9 +369,9 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
                 }
                 for (k = n; k >= 1; k--) {
-                    f32 u = (f32)k * step - ef_cube_f32_one;
+                    f32 u = (f32)k * step - 1.0f;
                     f32 pu = u * sizeX;
-                    f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
+                    f32 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
                     VEC3 pos;
                     VEC3 vel;
@@ -396,22 +381,22 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     pos.x = pu;
                     pos.y = y;
                     pos.z = sizeZ;
-                    if (ef_cube_f32_zero != shell) {
+                    if (0.0f != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
                             f32 r = ef_random_float(&em->progress);
                             r *= r;
-                            depth = ef_cube_f32_one - spread * (r * shell);
+                            depth = 1.0f - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
+                            depth = 1.0f - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.z *= depth;
                     }
-                    if (ef_cube_f32_zero == angle ||
-                        (fabsf(pos.x) < ef_cube_f32_min_size && fabsf(pos.y) < ef_cube_f32_min_size)) {
-                        vel.x = ef_cube_f32_zero;
-                        vel.y = ef_cube_f32_zero;
-                        vel.z = ef_cube_f32_one;
+                    if (0.0f == angle ||
+                        (fabsf(pos.x) < 1e-5f && fabsf(pos.y) < 1e-5f)) {
+                        vel.x = 0.0f;
+                        vel.y = 0.0f;
+                        vel.z = 1.0f;
                     } else {
                         f32 inv = math_reciprocal(tanf(lean * angle));
                         vel.x = pos.x;
@@ -421,9 +406,9 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
                 }
                 for (k = n; k >= 1; k--) {
-                    f32 u = (f32)k * step - ef_cube_f32_one;
+                    f32 u = (f32)k * step - 1.0f;
                     f32 pu = u * sizeZ;
-                    f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
+                    f32 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
                     VEC3 pos;
                     VEC3 vel;
@@ -433,22 +418,22 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     pos.x = -sizeX;
                     pos.y = y;
                     pos.z = pu;
-                    if (ef_cube_f32_zero != shell) {
+                    if (0.0f != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
                             f32 r = ef_random_float(&em->progress);
                             r *= r;
-                            depth = ef_cube_f32_one - spread * (r * shell);
+                            depth = 1.0f - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
+                            depth = 1.0f - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.x *= depth;
                     }
-                    if (ef_cube_f32_zero == angle ||
-                        (fabsf(pos.y) < ef_cube_f32_min_size && fabsf(pos.z) < ef_cube_f32_min_size)) {
-                        vel.x = ef_cube_f32_minus_one;
-                        vel.y = ef_cube_f32_zero;
-                        vel.z = ef_cube_f32_zero;
+                    if (0.0f == angle ||
+                        (fabsf(pos.y) < 1e-5f && fabsf(pos.z) < 1e-5f)) {
+                        vel.x = -1.0f;
+                        vel.y = 0.0f;
+                        vel.z = 0.0f;
                     } else {
                         f32 inv = math_reciprocal(tanf(lean * angle));
                         vel.x = inv * -sqrt_f32(pos.y * pos.y + pos.z * pos.z);
@@ -508,33 +493,33 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                         left = run;
                     }
                 }
-                u = (f32)col * step - ef_cube_f32_one;
-                v = (f32)row * step - ef_cube_f32_one;
+                u = (f32)col * step - 1.0f;
+                v = (f32)row * step - 1.0f;
                 px = u * sizeX;
                 pz = v * sizeZ;
-                spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
+                spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                 lean = EF_CUBE_MAX_ABS(u, v);
                 VEC3_ctor((nw4r::math::VEC3*)&pos);
                 VEC3_ctor((nw4r::math::VEC3*)&vel);
                 pos.x = px;
                 pos.y = sizeY;
                 pos.z = pz;
-                if (ef_cube_f32_zero != shell) {
+                if (0.0f != shell) {
                     f32 depth;
                     if (flags & 0x01000000) {
                         f32 r = ef_random_float(&em->progress);
                         r *= r;
-                        depth = ef_cube_f32_one - spread * (r * shell);
+                        depth = 1.0f - spread * (r * shell);
                     } else {
-                        depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
+                        depth = 1.0f - spread * (shell * ef_random_float(&em->progress));
                     }
                     pos.y *= depth;
                 }
-                if (ef_cube_f32_zero == angle ||
-                    (fabsf(pos.x) < ef_cube_f32_min_size && fabsf(pos.z) < ef_cube_f32_min_size)) {
-                    vel.x = ef_cube_f32_zero;
-                    vel.y = ef_cube_f32_one;
-                    vel.z = ef_cube_f32_zero;
+                if (0.0f == angle ||
+                    (fabsf(pos.x) < 1e-5f && fabsf(pos.z) < 1e-5f)) {
+                    vel.x = 0.0f;
+                    vel.y = 1.0f;
+                    vel.z = 0.0f;
                 } else {
                     f32 inv = math_reciprocal(tanf(lean * angle));
                     vel.x = pos.x;
@@ -554,41 +539,41 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
             VEC3 pos;
             VEC3 vel;
 
-            if (ef_cube_f32_zero == hollow) {
+            if (0.0f == hollow) {
                 /* A solid cube: anywhere inside. */
                 x = EF_CUBE_RAND_SIGNED(em);
                 y = EF_CUBE_RAND_SIGNED(em);
                 z = EF_CUBE_RAND_SIGNED(em);
-            } else if (ef_cube_f32_one == hollow) {
+            } else if (1.0f == hollow) {
                 /* A hollow cube: on one of the six faces. */
                 switch (ef_random_u16(&em->progress) % 6) {
                 case 0:
                     x = EF_CUBE_RAND_SIGNED(em);
                     y = EF_CUBE_RAND_SIGNED(em);
-                    z = ef_cube_f32_one;
+                    z = 1.0f;
                     break;
                 case 1:
                     x = EF_CUBE_RAND_SIGNED(em);
                     y = EF_CUBE_RAND_SIGNED(em);
-                    z = ef_cube_f32_minus_one;
+                    z = -1.0f;
                     break;
                 case 2:
                     x = EF_CUBE_RAND_SIGNED(em);
-                    y = ef_cube_f32_one;
+                    y = 1.0f;
                     z = EF_CUBE_RAND_SIGNED(em);
                     break;
                 case 3:
                     x = EF_CUBE_RAND_SIGNED(em);
-                    y = ef_cube_f32_minus_one;
+                    y = -1.0f;
                     z = EF_CUBE_RAND_SIGNED(em);
                     break;
                 case 4:
-                    x = ef_cube_f32_one;
+                    x = 1.0f;
                     y = EF_CUBE_RAND_SIGNED(em);
                     z = EF_CUBE_RAND_SIGNED(em);
                     break;
                 case 5:
-                    x = ef_cube_f32_minus_one;
+                    x = -1.0f;
                     y = EF_CUBE_RAND_SIGNED(em);
                     z = EF_CUBE_RAND_SIGNED(em);
                     break;
@@ -603,27 +588,27 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                 if (pick < slabY) {
                     x = EF_CUBE_RAND_SIGNED(em);
                     y = shell * EF_CUBE_RAND_SIGNED(em);
-                    if (y >= ef_cube_f32_zero) {
-                        y = ef_cube_f32_one - y;
+                    if (y >= 0.0f) {
+                        y = 1.0f - y;
                     } else {
-                        y = ef_cube_f32_minus_one - y;
+                        y = -1.0f - y;
                     }
                     z = EF_CUBE_RAND_SIGNED(em);
                 } else if (pick < slabY + slabZ) {
                     x = EF_CUBE_RAND_SIGNED(em);
                     y = hollow * EF_CUBE_RAND_SIGNED(em);
                     z = shell * EF_CUBE_RAND_SIGNED(em);
-                    if (z >= ef_cube_f32_zero) {
-                        z = ef_cube_f32_one - z;
+                    if (z >= 0.0f) {
+                        z = 1.0f - z;
                     } else {
-                        z = ef_cube_f32_minus_one - z;
+                        z = -1.0f - z;
                     }
                 } else {
                     x = shell * EF_CUBE_RAND_SIGNED(em);
-                    if (x >= ef_cube_f32_zero) {
-                        x = ef_cube_f32_one - x;
+                    if (x >= 0.0f) {
+                        x = 1.0f - x;
                     } else {
-                        x = ef_cube_f32_minus_one - x;
+                        x = -1.0f - x;
                     }
                     y = hollow * EF_CUBE_RAND_SIGNED(em);
                     z = hollow * EF_CUBE_RAND_SIGNED(em);
@@ -631,31 +616,31 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
             }
 
             VEC3_ctor((nw4r::math::VEC3*)&pos);
-            setVec3((nw4r::math::VEC3*)&vel, ef_cube_f32_zero, ef_cube_f32_zero, ef_cube_f32_zero);
-            if (y >= ef_cube_f32_zero && y >= ef_fabsf(x) && y >= ef_fabsf(z)) {
-                vel.y = ef_cube_f32_one;
-            } else if (y < ef_cube_f32_zero && -y >= ef_fabsf(x) && -y >= ef_fabsf(z)) {
-                vel.y = ef_cube_f32_minus_one;
-            } else if (x >= ef_cube_f32_zero && x >= ef_fabsf(y) && x >= ef_fabsf(z)) {
-                vel.x = ef_cube_f32_one;
-            } else if (x < ef_cube_f32_zero && -x >= ef_fabsf(y) && -x >= ef_fabsf(z)) {
-                vel.x = ef_cube_f32_minus_one;
-            } else if (z >= ef_cube_f32_zero) {
-                vel.z = ef_cube_f32_one;
+            setVec3((nw4r::math::VEC3*)&vel, 0.0f, 0.0f, 0.0f);
+            if (y >= 0.0f && y >= ef_fabsf(x) && y >= ef_fabsf(z)) {
+                vel.y = 1.0f;
+            } else if (y < 0.0f && -y >= ef_fabsf(x) && -y >= ef_fabsf(z)) {
+                vel.y = -1.0f;
+            } else if (x >= 0.0f && x >= ef_fabsf(y) && x >= ef_fabsf(z)) {
+                vel.x = 1.0f;
+            } else if (x < 0.0f && -x >= ef_fabsf(y) && -x >= ef_fabsf(z)) {
+                vel.x = -1.0f;
+            } else if (z >= 0.0f) {
+                vel.z = 1.0f;
             } else {
-                vel.z = ef_cube_f32_minus_one;
+                vel.z = -1.0f;
             }
             pos.x = x * sizeX;
             pos.y = y * sizeY;
             pos.z = z * sizeZ;
-            if (ef_cube_f32_zero != angle) {
-                if (ef_cube_f32_zero != vel.x) {
+            if (0.0f != angle) {
+                if (0.0f != vel.x) {
                     f32 lean = EF_CUBE_MAX_ABS(pos.y, pos.z);
                     f32 inv = math_reciprocal(tanf(lean * angle));
                     vel.x *= inv * sqrt_f32(pos.y * pos.y + pos.z * pos.z);
                     vel.y = pos.y;
                     vel.z = pos.z;
-                } else if (ef_cube_f32_zero != vel.y) {
+                } else if (0.0f != vel.y) {
                     f32 lean = EF_CUBE_MAX_ABS(pos.x, pos.z);
                     f32 inv = math_reciprocal(tanf(lean * angle));
                     vel.x = pos.x;

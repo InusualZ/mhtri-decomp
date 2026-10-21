@@ -32,15 +32,20 @@
  * SHAPES. The `.bss` edge offsets are function-local statics constructed through `setVec3` behind `.sbss` guards;
  *   the ribbon pair writer takes the scale before the flags (the caller loads f1 before r5); a spline weight's `t`
  *   is computed into a local before the call; the connection dispatches list `default` first.
+ * SHAPES. `ef_smooth_tube_curve`'s second side loop steps its counter before its table pointer.
+ * SHAPES. The ribbon and tube walkers declare their per-iteration state (the ahead and next-particle functions,
+ *   the ring indices, the particle) after the other locals; the order is a hill climb's (closer register colours).
  * RESIDUALS. Every row is written.  8 partial rows:
  *  - `Draw` (0x800C3D88): retail's `copyVec3(.., setVec3(&tmp, ..))` temporaries sit below the loop locals (the
  *    out-of-line VEC3 constructor's temporaries), ours above, and `ed`/`count` take r31/r29 where ours has r30/r31;
  *  - `ef_smooth_ribbon_open`/`_loop`/`_to_emitter`, `ef_smooth_tube_open`/`_loop`/`_to_emitter`: the register
- *    allocator gives the parameters r20-r25 and the loop state the high registers in retail, the reverse in ours;
+ *    allocator gives the parameters r20-r25 and the loop state the high registers in retail, the reverse in ours
+ *    (tried: `register`, the loop state in an inner block, copies of the parameters, hill climbs);
  *  - `ef_smooth_tube_curve`: the second side loop's counter and table pointer swap r20/r21.
  *   Data: `.bss` (the four statics) is emitted and matches; `.sbss` emits the four guards (0x4 of the claimed
- *   0x8); `.data` holds only our vtable - the strings stay `extern` because the range is two TUs by its
- *   emission order (`datagap.py`); the weak `DrawStrategyImpl`/`DrawStrategy` destructors add 0xA0 of `.text`.
+ *   0x8); `.data` holds only our vtable - the strings stay `extern` (the range is one TU: the strings after the
+ *   vtable are the inline accessors' weak tail, which `datagap.py` reads as a seam); the weak `DrawStrategyImpl`/
+ *   `DrawStrategy` destructors add 0xA0 of `.text`.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_smooth_zero`,
  *     `ef_smooth_one`, `ef_smooth_half`, `ef_smooth_minus_one`, `ef_smooth_hundredth`, `ef_smooth_full_circle`,
  *     `ef_smooth_axis_x`, `ef_smooth_axis_neg_x`, `ef_smooth_axis_z`, `ef_smooth_axis_neg_z`.
@@ -459,7 +464,7 @@ void ef_smooth_tube_curve(nw4r::ef::DrawSmoothStripeStrategy* self, s32 steps, s
                 }
             }
         } else {
-            for (j = 0, pair = trig; j <= divide; pair += 2, j++) {
+            for (j = 0, pair = trig; j <= divide; j++, pair += 2) {
                 f32 s = pair[1];
                 f32 co = pair[0];
                 VEC3 c_pos;
@@ -564,19 +569,19 @@ void ef_smooth_ribbon_open(nw4r::ef::DrawSmoothStripeStrategy* self,
                            nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags,
                            const VEC3* a, const VEC3* b) {
     EfDrawParticleManager* pm;
-    EfEmitterDrawSetting* ed;
-    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
     u32 order;
     nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
-    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
     s32 count;
     f32 width;
     f32 step;
-    s32 index;
-    s32 dir;
     EfRibbonParam samples[3];
     s32 prev;
+    EfEmitterDrawSetting* ed;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
     s32 cur;
+    s32 index;
+    s32 dir;
     EfDrawParticle* p;
 
     if (!IsValidPointer((u32)ctx)) {
@@ -654,9 +659,9 @@ u32 ef_smooth_draw_order(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitt
 void ef_smooth_ribbon_loop(nw4r::ef::DrawSmoothStripeStrategy* self,
                            nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags,
                            const VEC3* a, const VEC3* b) {
-    EfDrawParticleManager* pm;
     EfEmitterDrawSetting* ed;
     nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    EfDrawParticleManager* pm;
     u32 order;
     nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
     nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
@@ -741,18 +746,18 @@ void ef_smooth_ribbon_loop(nw4r::ef::DrawSmoothStripeStrategy* self,
 void ef_smooth_ribbon_to_emitter(nw4r::ef::DrawSmoothStripeStrategy* self,
                                  nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags,
                                  const VEC3* a, const VEC3* b) {
-    EfDrawParticleManager* pm;
-    EfEmitterDrawSetting* ed;
     nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    EfDrawParticleManager* pm;
     u32 order;
     nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
-    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
     f32 width;
     EfDrawParticle* youngest;
     VEC3 offset;
     s32 count;
+    EfEmitterDrawSetting* ed;
     f32 step;
     s32 index;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
     s32 dir;
     EfRibbonParam samples[3];
     VEC3 unused_a;
@@ -890,11 +895,11 @@ s32 ef_smooth_connect_type(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmi
  * neighbouring rings and the closing curve at the last one. */
 void ef_smooth_tube_open(nw4r::ef::DrawSmoothStripeStrategy* self,
                          nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags) {
-    EfDrawParticleManager* pm;
     EfEmitterDrawSetting* ed;
-    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
-    u32 order;
+    EfDrawParticleManager* pm;
     nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
     nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
     s32 count;
     f32 offset_x;
@@ -966,11 +971,11 @@ s32 ef_smooth_tube_divide(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmit
  * (sampled first, at half steps). */
 void ef_smooth_tube_loop(nw4r::ef::DrawSmoothStripeStrategy* self,
                          nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags) {
-    EfDrawParticleManager* pm;
     EfEmitterDrawSetting* ed;
-    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
-    u32 order;
+    EfDrawParticleManager* pm;
     nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
     nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
     s32 count;
     f32 offset_x;
@@ -1047,12 +1052,12 @@ void ef_smooth_tube_loop(nw4r::ef::DrawSmoothStripeStrategy* self,
  * moved by the youngest particle's offset from the emitter origin. */
 void ef_smooth_tube_to_emitter(nw4r::ef::DrawSmoothStripeStrategy* self,
                                nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags) {
-    EfDrawParticleManager* pm;
-    EfEmitterDrawSetting* ed;
     nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
     u32 order;
     nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
     nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
+    EfDrawParticleManager* pm;
+    EfEmitterDrawSetting* ed;
     f32 offset_x;
     f32 offset_y;
     EfDrawParticle* youngest;

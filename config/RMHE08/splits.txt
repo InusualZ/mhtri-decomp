@@ -540,18 +540,18 @@ ef/ef_emitterform.cpp:
 ef/ef_particle.cpp:
 	extab       start:0x80009E04 end:0x80009E6C
 	extabindex  start:0x800230AC end:0x80023148
-	.text       start:0x800AA18C end:0x800AB658
+	.text       start:0x800AA18C end:0x800AB664
 	.data       start:0x80592D50 end:0x80592F78
-	.sdata2     start:0x80796060 end:0x807960A0
+	.sdata2     start:0x80796060 end:0x807960A8
 
 ef/ef_particlemanager.cpp:
 	extab       start:0x80009E6C end:0x80009F74
 	extabindex  start:0x80023148 end:0x800232D4
-	.text       start:0x800AB658 end:0x800AEE48
+	.text       start:0x800AB664 end:0x800AEE48
 	.ctors      start:0x8056F2DC end:0x8056F2E0
 	.data       start:0x80592F78 end:0x80593580
 	.bss        start:0x80694538 end:0x80694598
-	.sdata2     start:0x807960A0 end:0x807960E8
+	.sdata2     start:0x807960A8 end:0x807960E8
 
 ef/ef_postfield.cpp:
 	extab       start:0x80009F74 end:0x8000A044
@@ -577,13 +577,21 @@ ef/ef_drawstripestrategy.cpp:
 	.sdata2     start:0x80796120 end:0x80796150
 
 ef/ef_drawbillboardstrategy.cpp:
-	extab       start:0x8000A23C end:0x8000A304
-	extabindex  start:0x80023700 end:0x8002382C
-	.text       start:0x800B9A44 end:0x800BE118
+	extab       start:0x8000A23C end:0x8000A2AC
+	extabindex  start:0x80023700 end:0x800237A8
+	.text       start:0x800B9A44 end:0x800BBDEC
+	.data       start:0x80593E88 end:0x80594070
+	.sdata      start:0x80791300 end:0x80791320
+	.sdata2     start:0x80796150 end:0x80796170
+
+ef/ef_drawdirectionalstrategy.cpp:
+	extab       start:0x8000A2AC end:0x8000A304
+	extabindex  start:0x800237A8 end:0x8002382C
+	.text       start:0x800BBDEC end:0x800BE118
 	.rodata     start:0x8056F770 end:0x8056F7D0
-	.data       start:0x80593E88 end:0x805941F8
-	.sdata      start:0x80791300 end:0x80791340
-	.sdata2     start:0x80796150 end:0x80796190
+	.data       start:0x80594070 end:0x805941F8
+	.sdata      start:0x80791320 end:0x80791340
+	.sdata2     start:0x80796170 end:0x80796190
 
 ef/ef_drawfreestrategy.cpp:
 	extab       start:0x8000A304 end:0x8000A33C

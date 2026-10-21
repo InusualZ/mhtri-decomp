@@ -18,12 +18,8 @@
  *   GUESS: `ef_particle_get_scale_y`, `ef_resource_draw_setting`, `ef_particle_get_scale`,
  *   GUESS: `ef_particle_flick_alpha`.
  *   GUESS (the particle parameters `ef/ef_resource.cpp` binds textures into): `ef_emres_get_ptcl_param`.
- * RESIDUALS. 2 partial rows:
- *  - `ef_particle_params_ctor`: the second 3-element loop's start and end pointers swap r30/r31 (retail's loops are the
- *    compiler's member-array construction; separate block-scoped loop variables in either order do not move it);
- *  - `ef_particle_flick_alpha`: case 1's falling ramp keeps the amplitude in r3 and the partial sum in r5 where
- *    retail has them the other way round.
- *   `lbl_807960A0` (2pi) is `ef/ef_particlemanager.cpp`'s pool, read by `ef_particle_flick_alpha`.
+ * RESIDUALS. none: every row and the data sections are byte-identical (flipcheck READY).
+ *   The `.sdata2` pool ends with flick_alpha's 2pi and the `SinRad` copy's 256/2pi (0x807960A0/A4).
  * SHAPES. `Particle` derives from `nw4r::ef::ReferencedObject` (`ef/ef_effect.h`); its members reach `EfParticle`'s
  *   fields through that view (the two definitions meet in `ef.h`'s layout).
  * SHAPES. The `particle.h` accessors are C-linkage `inline` functions marked `__attribute__((never_inline))`
@@ -38,7 +34,10 @@
  *   (`percent = inherit->color` inside the first product); each rotation is a `rotate +=` accumulation.
  * SHAPES. `ef_particle_get_color`/`ef_particle_get_alpha` take `int` indices: `layer >= 0 && layer < 2` on an
  *   `int` is retail's materialised `li 0; cmplwi 1; bgt; li 1` test.
- * SHAPES. `ef_particle_flick_alpha` computes `step * count` and case 1's falling ramp in their own statements.
+ * SHAPES. `ef_particle_flick_alpha` computes `step * count` and case 1's falling ramp (one sum, then `+ 128`) in
+ *   their own statements.
+ * SHAPES. `ef_particle_params_ctor`'s array loops compare against the array's end expression (no `end` variable):
+ *   the hoisted bound is a compiler temporary, coloured as retail's member-array construction.
  * SHAPES. `ef_random_u16` returns `s32` (`ef/ef_emitter.h`): retail narrows the result at each store and divides
  *   it signed (`% 254`).
  */
@@ -49,6 +48,7 @@
 #include "unsplit/ef.h"
 #include "ef/ef_emitter.h" /* ef_truncate_float/ef_res_block_body (rule 2) */
 #include "ef/ef_particlemanager.h" /* fn_800AB740 / fn_800AB658 (rule 2) */
+#include "nw4r/math_triangular.h" /* nw4r::math::SinFIdx (rule 2) */
 #include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
 #include "ef/ef_particle.h"
 #include "ef/ef_effect.h" /* ef_ref_object_init (rule 2) */
@@ -74,7 +74,6 @@ char ef_particle_err_manager_ef[] = "NW4R:Pointer Error\npm->mManagerEM->mManage
 char ef_particle_err_false[] = "NW4R:Failed assertion false";
 
 /* nw4r helpers, declared locally with C linkage. */
-extern f32 lbl_807960A0; /* 2pi  .sdata2 (ef/ef_particlemanager.cpp's pool) */
 
 /* nw4r::db::Panic.  The map already carries its real C++ mangling, and declaring the C++ spelling is
  * what reproduces the map's symbol exactly (tools/units/mangle.py). */
@@ -279,24 +278,21 @@ nw4r::ef::Particle::Particle()
 extern "C" EfParticleParams* ef_particle_params_ctor(EfParticleParams* self)
 {
     EfParticleNode* p;
-    EfParticleNode* end;
 
     VEC2_ctor(&self->scale_0x10);
     VEC2_ctor(&self->scale_0x18);
     VEC3_ctor(&self->field_0x20);
 
     p = &self->field_0x2C[0];
-    end = &self->field_0x2C[3];
     do {
         VEC2_ctor(p);
         p++;
-    } while (p < end);
+    } while (p < &self->field_0x2C[3]);
     p = &self->field_0x50[0];
-    end = &self->field_0x50[3];
     do {
         VEC2_ctor(p);
         p++;
-    } while (p < end);
+    } while (p < &self->field_0x50[3]);
 
     VEC3_ctor(&self->field_0x80);
     VEC3_ctor(&self->field_0x8C);
@@ -569,8 +565,7 @@ extern "C" u8 ef_particle_flick_alpha(EfParticle* self)
         if (rem * 2 <= count) {
             out = (s16)((128 - p->amplitude) + (p->amplitude * (rem * 4)) / count);
         } else {
-            s32 v = p->amplitude * 4 - p->amplitude;
-            v += -(p->amplitude * rem * 4) / count;
+            s32 v = p->amplitude * 4 - p->amplitude + -(p->amplitude * rem * 4) / count;
             out = (s16)(v + 128);
         }
         break;
@@ -588,7 +583,7 @@ extern "C" u8 ef_particle_flick_alpha(EfParticle* self)
         }
         break;
     case 5:
-        out = (s16)(128.0f + (f32)p->amplitude * fn_800AB658((lbl_807960A0 * (f32)rem) / (f32)count));
+        out = (s16)(128.0f + (f32)p->amplitude * fn_800AB658((6.2831855f * (f32)rem) / (f32)count));
         break;
     default:
         nw4r::db::Panic(ef_particle_file_name, 353, ef_particle_err_false);
@@ -602,4 +597,10 @@ extern "C" u8 ef_particle_flick_alpha(EfParticle* self)
         out = 255;
     }
     return (u8)out;
+}
+
+/* 0x800AB658 (0xC): the sine of an angle in radians (the angle scaled onto the 256-step index table); the weak
+ * copy of nw4r::math::SinRad, kept after its first user. */
+extern "C" inline __attribute__((never_inline)) f32 fn_800AB658(f32 x) {
+    return nw4r::math::SinFIdx(40.743664f * x);
 }

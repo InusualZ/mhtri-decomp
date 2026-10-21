@@ -788,6 +788,7 @@ config.libs = [
             Object(Matching, "ef/ef_postfield.cpp"),
             Object(NonMatching, "ef/ef_resource.cpp"),
             Object(NonMatching, "ef/ef_drawbillboardstrategy.cpp"),
+            Object(NonMatching, "ef/ef_drawdirectionalstrategy.cpp"),
                         Object(Matching, "ef/ef_drawpointstrategy.cpp"),
                         Object(Matching, "ef/ef_drawlinestrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),

@@ -31,7 +31,7 @@
  *   and the pattern ramp.
  *   GUESS: `ef_anim_rand_next` (0x8009EEDC): the random generator's LCG step.
  *   GUESS: `ef_anim_name_hash` (0x8009EEF4): hashes the seed, the curve's id, the key and the division.
- * RESIDUALS. 11 partial rows, every one written:
+ * RESIDUALS. 8 partial rows, every one written:
  *  - `ef_anim_latch_tex_type`: retail stores the masked byte, keeps it in a register and reloads `arg->mChannel`; at
  *    level 3 ours drops the first store, at the scoped level 1 it keeps the store but reloads the byte (a
  *    volatile store, a pointer local, a named intermediate and `opt_dead_assignments`/`opt_common_subs off`
@@ -39,9 +39,10 @@
  *  - `ef_anim_curve_rotate`, `ef_anim_curve_f32`, `ef_anim_curve_u8`: register colouring only (the mask, the two record strides and
  *    the key pointer take other callee-saved registers; retail reuses one pointer for the key data and the
  *    random range, flags read at -0xA);
- *  - `ef_anim_interp_u8`, `ef_anim_interp_f32`: float register colours of the cubic terms;
- *  - `ef_anim_find_bracket_keys`: the exact-key bool is narrowed (`clrlwi`) before its two stores;
- *  - `ef_anim_resolve_key_index`, `ef_anim_resolve_tick`, `ef_anim_curve_texture`, `ef_anim_tex_ramp`: register colours only;
+ *  - `ef_anim_interp_u8`: the cubic's `t` takes f7 and the 0x4 bit's constant f5, retail the other way round
+ *    (declaration placement of `t`/`c0`/`c1` does not move it);
+ *  - `ef_anim_resolve_key_index`, `ef_anim_resolve_tick`, `ef_anim_tex_ramp`: register colours only (widening the narrow
+ *    locals one at a time does not move them);
  *  - `ef_anim_curve_rotate` keeps the key record pointers beside their data pointers, one callee-saved register more than
  *    retail: `_savegpr_20`/`_restgpr_20` where retail calls `_savegpr_21`/`_restgpr_21`.
  *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` is 0x6280 of 0x6288 (the rows above), and the
@@ -53,8 +54,11 @@
  *   first-use order).  `ef_anim_find_bracket_keys` and `ef_anim_key_search` are `inline` under a file-wide
  *   `#pragma dont_inline on`: their weak copies stay in retail's place and their strings are the `@STRING@` tail
  *   (one "ef_animcurve.cpp" copy each).
- *   The kernels take the curve type last (retail evaluates it after the three floats). The key searches read
- *   their u16 keys `stride` bytes apart. `ef_creation_queue_reset` walks the queue entries with a bottom-tested loop.
+ *   The kernels take the curve type last (retail evaluates it after the three floats); their cubic branches are
+ *   one expression after the two constants (named products colour the floats differently). The key searches read
+ *   their u16 keys `stride` bytes apart; the exact-key flag is a `bool` stored through a `bool*` (no `clrlwi` before
+ *   its stores); a random record's u16 index is read into a `u32` local (the u16 one takes another register).
+ *   `ef_creation_queue_reset` walks the queue entries with a bottom-tested loop.
  */
 
 #include "types.h"
@@ -335,7 +339,7 @@ void ef_anim_advance_dividers(const EfAnimHeader* header, const EfAnimKeyRange* 
                  u32* divH);
 u32 ef_anim_rand_next(u32 seed);
 u32 ef_anim_name_hash(u16 a, u16 b, u16 c, u32 d);
-void ef_anim_find_bracket_keys(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
+void ef_anim_find_bracket_keys(u32* out, bool* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
                  const u16* ptrBase, u32 stride, s32 lo, s32 hi);
 void ef_anim_split_resource(const u8* pHead, const EfAnimHeader** header, const u8** key, const u8** random,
                  const u8** randomTable, const u8** nameTable);
@@ -580,7 +584,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
     u16 tick;
     u16 keyLo;
     u16 keyHi;
-    u8 exact;
+    bool exact;
 
     u8 end = ef_anim_table_hi(mask);
     u32 count = ef_anim_table_lo(mask);
@@ -809,17 +813,11 @@ u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type) {
     case 1: {
         f32 t = (f32)tick / 65536.0f;
         if (type == 1) {
-            f32 s0 = (f32)s;
-            f32 w = 3.0f - 2.0f * t;
-            return s0 + t * (t * (w * (f32)(int)(e - s)));
+            return (f32)s + t * (t * ((3.0f - 2.0f * t) * (f32)(int)(e - s)));
         } else {
             f32 c1 = ((type >> 2) & 1) == 0 ? 0.0f : 1.5f;
             f32 c0 = ((type >> 3) & 1) == 0 ? 0.0f : 1.5f;
-            f32 s0 = (f32)s;
-            f32 d = t * (f32)(int)(e - s);
-            f32 u = t * (t * (2.0f - (c0 + c1)));
-            f32 v = t * (3.0f + (-2.0f * c0 - c1));
-            f32 r = s0 + d * (c0 + (u + v));
+            f32 r = (f32)s + t * (f32)(int)(e - s) * (c0 + (t * (t * (c0 + c1 - 2.0f)) + t * (3.0f + (-2.0f * c0 - c1))));
             if (r < 0.0f) {
                 return 0;
             }
@@ -886,12 +884,12 @@ u32 ef_anim_name_hash(u16 a, u16 b, u16 c, u32 d) {
 
 /* 0x8009EF88 - binary-searches ef_anim_key_search's u16 key table for both bracketing keys (`outLo`/`outHi`);
  * `*flag` says whether `frac` lands exactly on the found key. */
-inline void ef_anim_find_bracket_keys(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
+inline void ef_anim_find_bracket_keys(u32* out, bool* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
                  const u16* ptrBase, u32 stride, s32 lo, s32 hi) {
     NW4R_POINTER_ASSERT(ptrBase, 0x1F1, "NW4R:Pointer Error\nptrBase(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     s32 mid = (lo + hi) / 2;
-    u8 atTarget = fabsf((f32)target - frac) < 1.1920929e-07f;
+    bool atTarget = fabsf((f32)target - frac) < 1.1920929e-07f;
 
     u16 keyLo = EF_ANIM_KEY_AT(ptrBase, stride, lo);
     *outLo = keyLo;
@@ -999,7 +997,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
     u16 tick;
     u16 keyLo;
     u16 keyHi;
-    u8 exact;
+    bool exact;
 
     ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
     ef_anim_resolve_tick(mode, header, step, &tick, &tickF32, &divL);
@@ -1030,7 +1028,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
             return;
         }
 
-        u16 r = *(const u16*)src;
+        u32 r = *(const u16*)src;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, divL);
         const EfAnimRandomRange* range;
         if ((rec->mFlags & 2) == 0) {
@@ -1195,10 +1193,7 @@ f32 ef_anim_interp_f32(f32 t, f32 a, f32 b, u8 type) {
         } else {
             f32 c0 = ((type >> 3) & 1) == 0 ? 0.0f : 1.5f;
             f32 c1 = ((type >> 2) & 1) == 0 ? 0.0f : 1.5f;
-            f32 s = t * (b - a);
-            f32 u = t * (t * (c0 + c1 - 2.0f));
-            f32 v = t * (3.0f + (-2.0f * c0 - c1));
-            return a + s * (c0 + (u + v));
+            return a + t * (b - a) * (c0 + (t * (t * (c0 + c1 - 2.0f)) + t * (3.0f + (-2.0f * c0 - c1))));
         }
     case 2:
         return a;
@@ -1227,7 +1222,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     u16 tick;
     u16 keyLo;
     u16 keyHi;
-    u8 exact;
+    bool exact;
 
     ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
     ef_anim_resolve_tick(mode, header, step, &tick, &tickF32, &divL);
@@ -1259,7 +1254,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
             return;
         }
 
-        u16 r = *(const u16*)src;
+        u32 r = *(const u16*)src;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, divL);
         const EfAnimRandomRange* range;
         if ((rec->mFlags & 2) == 0) {
@@ -1508,7 +1503,7 @@ void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16
     if (entry->mFlags == 0) {
         ef_anim_key_copy(&k, &entry->mValue.mKey);
     } else {
-        u16 r = entry->mValue.mRandomIndex;
+        u32 r = entry->mValue.mRandomIndex;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, resDiv);
         if ((entry->mFlags & 2) == 0) {
             const EfAnimRandomEntry* re = &((const EfAnimRandomBlock*)random)->mEntry[r];

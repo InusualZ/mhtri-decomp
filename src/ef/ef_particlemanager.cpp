@@ -472,11 +472,6 @@ extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p);
 extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src);
 extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin);
 
-/* Scale a normalised rate onto the sine table. */
-extern "C" f32 fn_800AB658(f32 x) {
-    return nw4r::math::SinFIdx(40.743664f * x);
-}
-
 /* ParticleManager constructor: base ctor, vtable, then the three sub-objects at +0x38/+0x58/+0x8C. */
 extern "C" EfPmManager* fn_800AB664(EfPmManager* self) {
     fn_800A4080(self);

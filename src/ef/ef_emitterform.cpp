@@ -11,11 +11,15 @@
  *   GUESS: `CalcVelocity` (0x800A99B4): nw4r's spawn-velocity helper, from what it builds.
  *   GUESS: `CalcLife` (0x800A9FB0): nw4r's per-instance life helper, from what it returns.
  * RESIDUALS. 1 partial row, `CalcVelocity`: the two `0.0f != weight` tests load the constant into f1 where retail
- *   loads it into f0 (the operands of `fcmpu` and the three stores of the zeroing branch follow).
- *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x10 of 0x30.
- * SHAPES. The five stages of `CalcVelocity` are in retail's evaluation order.  The pool constants are declared
- *   `extern const` (retail reads `0.0f` once per test), the second axis-angle matrix is a full `Mtx34` (retail's
- *   0x120 frame), and the spread's `z` term and the axis-angle adds keep retail's operand order.
+ *   loads it into f0 (the operands of `fcmpu` and the three stores of the zeroing branch follow); tried: either
+ *   operand order, `if (w)`, a chained or reversed zeroing, a `zero` local for one or both tests, an inverted test.
+ *   flipcheck: `.text` only (`.data` and `.sdata2` are byte-identical).
+ * NAMES. GUESS: `ef_emitterform_life_max` (0x80796058, map `lbl_80796058`): `CalcLife`'s upper clamp, 65535.0f.
+ * SHAPES. The five stages of `CalcVelocity` are in retail's evaluation order.  The second axis-angle matrix is a
+ *   full `Mtx34` (retail's 0x120 frame), and the spread's `z` term and the axis-angle adds keep retail's operand order.
+ * SHAPES. The strings and float constants are literals under `#pragma pool_data off` (each string its own
+ *   `lis`/`addi`), pooled in creation order; `ef_emitterform_life_max` is a named constant defined after `CalcLife`,
+ *   so it pools after the `(f32)u16` conversion constant as in retail.
  */
 
 #include "types.h"
@@ -23,20 +27,6 @@
 #include "ef/ef_emform.h" /* nw4r::ef::EmitterForm, the owner of these two members */
 #include "g3d/g3d_calcview.h" /* fn_800710BC (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
-
-/* This unit's own pooled data (still another unit's range in splits.txt - declared, never defined). */
-extern char lbl_80592CD0[]; /* "ef_emitterform.cpp"                                          .data */
-extern char lbl_80592CE4[]; /* "NW4R:Pointer Error\nresult(=%p) is not valid pointer."       .data */
-extern char lbl_80592D1C[]; /* "NW4R:Pointer Error\nem(=%p) is not valid pointer."           .data */
-
-/* This unit's own .sdata2 pool (unclaimed; the split owns no data section). */
-extern const f32 lbl_80796030; /* 0.0f                    .sdata2 */
-extern const f32 lbl_80796034; /* 2.0f                    .sdata2 */
-extern const f32 lbl_80796038; /* pi                      .sdata2 */
-extern const f32 lbl_8079603C; /* 1.0f                    .sdata2 */
-extern const f32 lbl_80796040; /* 0.01f                   .sdata2 */
-extern const f64 lbl_80796048; /* 0x4330000080000000, the int -> f64 magic  .sdata2 */
-extern const f32 lbl_80796058; /* 65535.0f                .sdata2 */
 
 /* nw4r::math helpers of `ef/ef_util.cpp` and `fn_8004CAD8.cpp`; retail's relocations carry their plain
  * map names, so they have C linkage. */
@@ -65,6 +55,10 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 
 #pragma peephole off
 #pragma fp_contract off
+#pragma pool_data off
+
+/* The life clamp's upper bound; defined after `CalcLife` so its pool entry follows the conversion constant. */
+extern const f32 ef_emitterform_life_max;
 
 /* Builds the particle spawn transform `out` from the emitter work record `em`, `dir` (base direction),
  * `offset` and the two rotated axes `rot`/`rot2`; each stage sits behind a non-zero weight in `em`. */
@@ -90,32 +84,32 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
 
     ok = IS_VALID_PTR(out);
     if (!ok) {
-        nw4r::db::Panic(lbl_80592CD0, 48, lbl_80592CE4, out);
+        nw4r::db::Panic("ef_emitterform.cpp", 48, "NW4R:Pointer Error\nresult(=%p) is not valid pointer.", out);
     }
     ok = IS_VALID_PTR(em);
     if (!ok) {
-        nw4r::db::Panic(lbl_80592CD0, 49, lbl_80592D1C, em);
+        nw4r::db::Panic("ef_emitterform.cpp", 49, "NW4R:Pointer Error\nem(=%p) is not valid pointer.", em);
     }
 
     VEC3_ctor(&tmp);
 
-    if (lbl_80796030 != em->dir_weight) {
+    if (0.0f != em->dir_weight) {
         vec3_scale_by(out, rot);
     } else {
-        out->x = lbl_80796030;
-        out->y = lbl_80796030;
-        out->z = lbl_80796030;
+        out->x = 0.0f;
+        out->y = 0.0f;
+        out->z = 0.0f;
     }
 
-    if (lbl_80796030 != em->rot_weight) {
+    if (0.0f != em->rot_weight) {
         vec3_scale_by(&tmp, rot2);
         vec3_add_ps(out, out, &tmp);
     }
 
-    if (lbl_80796030 != em->spread_scale) {
-        a1 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
-        a2 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
-        a3 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
+    if (0.0f != em->spread_scale) {
+        a1 = 2.0f * (3.1415927f * ef_random_float(&em->progress));
+        a2 = 2.0f * (3.1415927f * ef_random_float(&em->progress));
+        a3 = 2.0f * (3.1415927f * ef_random_float(&em->progress));
         ef_sin_cos(&s1, &c1, a1);
         ef_sin_cos(&s2, &c2, a2);
         ef_sin_cos(&s3, &c3, a3);
@@ -125,25 +119,25 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
         out->z += c2 * (em->spread_scale * c1);
     }
 
-    if (lbl_80796030 != em->offset_scale) {
+    if (0.0f != em->offset_scale) {
         out->x += offset->x * em->offset_scale;
         out->y += offset->y * em->offset_scale;
         out->z += offset->z * em->offset_scale;
     }
 
-    if (lbl_80796030 != em->axis_angle_scale) {
-        if (lbl_80796030 == em->axis_angle_y) {
+    if (0.0f != em->axis_angle_scale) {
+        if (0.0f == em->axis_angle_y) {
             MTX34_ctor(&mtx_a);
             ef_mtx34_rotate_xyz(&mtx_a, em->euler_x, em->euler_y, em->euler_z);
-            setVec3(&axis_a, lbl_80796030, lbl_8079603C, lbl_80796030);
+            setVec3(&axis_a, 0.0f, 1.0f, 0.0f);
             mtx34_mult_vec3(&axis_a, &mtx_a, &axis_a);
             out->x += em->axis_angle_scale * axis_a.x;
             out->y += em->axis_angle_scale * axis_a.y;
             out->z += em->axis_angle_scale * axis_a.z;
         } else {
             MTX34_ctor(&mtx_b);
-            ang = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
-            ef_mtx34_rotate_xyz(&mtx_b, em->axis_angle_y * ef_random_float(&em->progress), ang, lbl_80796030);
+            ang = 2.0f * (3.1415927f * ef_random_float(&em->progress));
+            ef_mtx34_rotate_xyz(&mtx_b, em->axis_angle_y * ef_random_float(&em->progress), ang, 0.0f);
             MTX34_ctor(&axis_b);
             ef_mtx34_rotate_xyz(&axis_b, em->euler_x, em->euler_y, em->euler_z);
             mtx34_concat(&mtx_b, &axis_b, &mtx_b);
@@ -154,9 +148,9 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
     }
 
     if (em->size_jitter != 0) {
-        jitter = lbl_8079603C -
-                  (lbl_80796040 * (f32)em->size_jitter) *
-                      (lbl_80796034 * ef_random_float(&em->progress) - lbl_8079603C);
+        jitter = 1.0f -
+                  (0.01f * (f32)em->size_jitter) *
+                      (2.0f * ef_random_float(&em->progress) - 1.0f);
         out->x *= jitter;
         out->y *= jitter;
         out->z *= jitter;
@@ -172,14 +166,14 @@ u16 nw4r::ef::EmitterForm::CalcLife(u16 id, f32 scale, EfWork* em)
 
     ok = IS_VALID_PTR(em);
     if (!ok) {
-        nw4r::db::Panic(lbl_80592CD0, 160, lbl_80592D1C, em);
+        nw4r::db::Panic("ef_emitterform.cpp", 160, "NW4R:Pointer Error\nem(=%p) is not valid pointer.", em);
     }
 
-    if (lbl_80796030 != scale) {
+    if (0.0f != scale) {
         v = scale * ((f32)(u16)id * ef_random_float(&em->progress));
-        if ((f32)(u16)id - v < lbl_8079603C) {
+        if ((f32)(u16)id - v < 1.0f) {
             id = 1;
-        } else if ((f32)(u16)id - v > lbl_80796058) {
+        } else if ((f32)(u16)id - v > ef_emitterform_life_max) {
             id = 65535;
         } else {
             id = (u16)(id - (s32)v);
@@ -187,3 +181,5 @@ u16 nw4r::ef::EmitterForm::CalcLife(u16 id, f32 scale, EfWork* em)
     }
     return id;
 }
+
+const f32 ef_emitterform_life_max = 65535.0f;
