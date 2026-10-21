@@ -143,7 +143,7 @@ u32 fn_8029F564(void* self, u32 flag);
 /* untyped: an opaque handle passed through (the pooled slot is only stored) */
 void* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(void* self);
-void fn_800F8A44(void* p, s32 mode);
+void eft_res_models_release(void* p, s32 mode);
 
 void eft_res_models_spawn(void* self, nw4r::ef::Effect** effects, s32 count, s32 mode, void* arg);
 u8 eft_water_state_ck(void* self);
@@ -317,7 +317,7 @@ extern "C" void fn_800FC3E0(_EFT* self)
 {
     _EFT001_EFFECT_WORK* work = (_EFT001_EFFECT_WORK*)self->work_0x38;
 
-    fn_800F8A44(&work->effect_0x08, 1);
+    eft_res_models_release(&work->effect_0x08, 1);
     push_eft_effect_heap_num((nw4r::ef::Effect**)&work->effect_0x04, work->count);
     work->count = 0;
 }

@@ -1133,7 +1133,7 @@ extern "C" void lb_quest_board_effect_push_models(_EFT* self) {
 extern "C" void lb_quest_board_effect_retire_list(_EFT* self) {
     LbQuestBoardEft* work = (LbQuestBoardEft*)self->work_0x38;
 
-    fn_800F8A44(&work->model, work->count);
+    eft_res_models_release(&work->model, work->count);
     work->count = 0;
 }
 

@@ -727,7 +727,7 @@ extern "C" void fn_8010BD3C(_EFT013* self) {
     s32 i;
     _EFT014_POOL_C* work = (_EFT014_POOL_C*)self->work_0x38;
     for (i = 0; i < work->count; i++) {
-        fn_800F8A44(&work->slots[i].model, 1);
+        eft_res_models_release(&work->slots[i].model, 1);
     }
     work->count = 0;
 }
@@ -827,14 +827,14 @@ extern "C" void fn_80107D20(_EFT013* self) {
             push_g3d_wk((struct _g3d_work*)work->models[i]);
         }
     }
-    fn_800F8A44(work->unused_0x08, 1);
+    eft_res_models_release(work->unused_0x08, 1);
     work->count = 0;
 }
 
 /* 0x80107DA0 - release the model pool (pointer at +0x04). */
 extern "C" void fn_80107DA0(_EFT013* self) {
     _EFT013_WORK_H* work = (_EFT013_WORK_H*)self->work_0x38;
-    fn_800F8A44(work->effects, work->count);
+    eft_res_models_release(work->effects, work->count);
     work->count = 0;
 }
 
@@ -1220,7 +1220,7 @@ extern "C" void fn_8010ABF4(_EFT013* self) {
             }
         }
         if (work->slots[k].models != NULL) {
-            fn_800F8A44(&work->slots[k], 1);
+            eft_res_models_release(&work->slots[k], 1);
         }
     }
     work->count = 0;

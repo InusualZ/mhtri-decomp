@@ -112,7 +112,7 @@ typedef struct CockpitRecord {
 } CockpitRecord;
 
 /* The `eft050` family's own work block (the 100-byte block `fn_8033FDA8` pools).
- * `models_0x00` is the handle list `fn_800F8A44` releases from and `count_0x04` its used length; both
+ * `models_0x00` is the handle list `eft_res_models_release` releases from and `count_0x04` its used length; both
  * spawners seed 1, so the list holds exactly the one pooled model. size: 0x64 */
 typedef struct Eft050Work {
     /* +0x00 */ MHchar* models_0x00[1]; /* the pooled handle list */
@@ -458,7 +458,7 @@ extern "C" s32 fn_8033FD78(void)
 extern "C" void fn_8033FEE8(_EFT* self)
 {
     Eft050Work* work = (Eft050Work*)self->work_0x38;
-    fn_800F8A44(work->models_0x00, work->count_0x04);
+    eft_res_models_release(work->models_0x00, work->count_0x04);
     work->count_0x04 = 0;
 }
 
@@ -631,7 +631,7 @@ extern "C" void fn_80342AC0(u32 kind, VEC3* pos, f32 scale)
 extern "C" void fn_80342C60(_EFT* self)
 {
     Eft051Work* work = (Eft051Work*)self->work_0x38;
-    fn_800F8A44(work->models_0x04, work->count_0x00);
+    eft_res_models_release(work->models_0x04, work->count_0x00);
 }
 
 /* The second family's state machine: 0 the model-create pass, 1 the alive body, 2 the state advance
@@ -681,14 +681,14 @@ extern "C" void fn_8034305C(_EFT* self)
 {
     Eft050SetWork* work = (Eft050SetWork*)self->work_0x38;
     for (s32 i = 0; i < work->count_0x00; i++) {
-        fn_800F8A44(&work->models_0x04[i], 1);
+        eft_res_models_release(&work->models_0x04[i], 1);
     }
     for (s32 i = 1; i >= 0; i--) {
         if (work->works_0x1C[i] != NULL) {
             push_g3d_wk(work->works_0x1C[i]);
         }
     }
-    fn_800F8A44(&work->extra_0x14, 1);
+    eft_res_models_release(&work->extra_0x14, 1);
 }
 
 /* Pools the `eft050` record: the effect, its work block, four pooled model handles, the extra record

@@ -11,8 +11,8 @@
  *   GUESS: `eft007_effect_ids`/`eft007_param_ids`/`eft007_colours` (map `lbl_8059DAA0`/`lbl_8059DAC8`/
  *   `lbl_8059DAF0`: the `res_eft_create` arguments by type, the RGBA colours `colour_index_0x08` selects).
  * RESIDUALS. none in bytes: every row, `.data` and `.sdata2` match.  Ours names the three switch tables `@NNN` where
- *   retail names the `jumptable_8059DB00`/`DB50`/`DBA0` entries.  The `.data` 0x8059DBF0-0x8059E160 eft007 reads
- *   (`lbl_8059DCF8`/`DE00`/`DE48`) is `ef/eft009.cpp`'s by `.data` order (seam request filed).
+ *   retail names the `jumptable_8059DB00`/`DB50`/`DBA0` entries.  The per-type tables it reads
+ *   (`eft009_joint_ids`, `eft009_part_effect_counts`, `eft009_part_joint_offsets`) are `ef/eft009.cpp`'s.
  * SHAPES. `fn_80103518` declares one function-scope `i` first (`s32 i;` before the locals): it colours `work` r31,
  *   `self` r30 and the loop cursor r29 as retail does; a per-loop `i` or `i` declared last swaps them.
  *   The `eft007` setters take the part index as `u8` and the enemy wrappers as `u32`: the narrowing at the call
@@ -223,7 +223,7 @@ typedef void (*EftEmitterHook)(_EFT_EMITTER* self);
 /* The work block at `_EFT_EMITTER::joint`: the joint's effect list plus the world matrix and the
  * offset the state machines transform through.  `get_joint_wmat_em` fills the matrix at `+0x0C` and
  * `vec_to_mh_vec3` the offset at `+0x3C`, which is what fixes the stride between them; the count is
- * `lbl_8059DE00[part]`, i.e. 1 or 2. */
+ * `eft009_part_effect_counts[part]`, i.e. 1 or 2. */
 struct _EFT_JOINT {
     /* +0x00 */ s32 count;
     /* +0x04 */ nw4r::ef::Effect* effects[2];
@@ -236,7 +236,7 @@ struct _EFT_JOINT {
 struct _EFT_EMITTER {
     /* +0x00 */ u8 in_use; /* set to 1 by the pool allocator */
     /* +0x01 */ u8 unused_0x01;
-    /* +0x02 */ u8 type; /* the joint/motion id, indexes lbl_8059DCF8 */
+    /* +0x02 */ u8 type; /* the joint/motion id, indexes eft009_joint_ids */
     /* +0x03 */ u8 eft_id; /* 8 for this family */
     /* +0x04 */ u8 unused_0x04;
     /* +0x05 */ u8 frame; /* the step fn_80103CEC dispatches on */
@@ -267,9 +267,6 @@ extern "C" _EFT_EMITTER* fn_80103B60(_ENEMY_WORK* enemy, u8 part);
 
 void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
 void get_joint_wmat_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::MTX34* mtx);
-
-/* The unit's own pool, declared, never defined (playbook 29). */
-#include "unsplit/ef_tables.h" /* lbl_8059DCF8 / lbl_8059DE00 / lbl_8059DE48 (rule 2: the band) */
 
 #pragma peephole off
 
@@ -851,8 +848,8 @@ extern "C" void eft007_part_spawn(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 po
         if (emitter != NULL) {
             _EFT_JOINT* joint = emitter->joint;
 
-            joint->count = lbl_8059DE00[part & 0xFF];
-            vec_to_mh_vec3(&joint->offset, &lbl_8059DE48[part & 0xFF]);
+            joint->count = eft009_part_effect_counts[part & 0xFF];
+            vec_to_mh_vec3(&joint->offset, &eft009_part_joint_offsets[part & 0xFF]);
             emitter->eft_id = 8;
             emitter->type = part;
 
@@ -892,7 +889,7 @@ extern "C" void eft007_part_spawn(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 po
             emitter->pos.z = 0;
 
             eft_state_flags_set(emitter, 0, 0);
-            get_joint_wmat_em(enemy, lbl_8059DCF8[emitter->type], &joint->mtx);
+            get_joint_wmat_em(enemy, eft009_joint_ids[emitter->type], &joint->mtx);
 
             emitter->retire = fn_80103CB0;
             emitter->advance = fn_80103CEC;
@@ -915,8 +912,8 @@ extern "C" _EFT_EMITTER* fn_80103B60(_ENEMY_WORK* enemy, u8 part)
     }
 
     joint = emitter->joint;
-    joint->count = lbl_8059DE00[part & 0xFF];
-    vec_to_mh_vec3(&joint->offset, &lbl_8059DE48[part & 0xFF]);
+    joint->count = eft009_part_effect_counts[part & 0xFF];
+    vec_to_mh_vec3(&joint->offset, &eft009_part_joint_offsets[part & 0xFF]);
     emitter->eft_id = 8;
     emitter->type = part;
     emitter->owner = enemy;
@@ -932,7 +929,7 @@ extern "C" _EFT_EMITTER* fn_80103B60(_ENEMY_WORK* enemy, u8 part)
     eft_rot_vec_copy_c1(&emitter->pos, &enemy->pos_0x1BC);
 
     eft_state_flags_set(emitter, 0, 0);
-    get_joint_wmat_em(enemy, lbl_8059DCF8[emitter->type], &joint->mtx);
+    get_joint_wmat_em(enemy, eft009_joint_ids[emitter->type], &joint->mtx);
 
     emitter->retire = fn_80103CB0;
     emitter->advance = fn_80103CEC;

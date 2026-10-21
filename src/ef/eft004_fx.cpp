@@ -32,7 +32,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
-#include "ef/fn_80101DF4.h"
+#include "ef/eft004_model_set_start.h"
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -69,7 +69,7 @@ struct Eft004Owner {
 };
 
 extern "C" void eft_res_slot_release(void* self);
-extern "C" void fn_800F8A44(void* block, s32 count);
+extern "C" void eft_res_models_release(void* block, s32 count);
 extern "C" void* eft_res_model_get();
 extern "C" Eft004* eft_res_slot_get(u32 pool_id);
 extern "C" Eft004* fn_801007BC(void* owner, u32 arg1, u32 arg2, u32 arg3, s32* arg4,
@@ -86,7 +86,7 @@ extern "C" void fn_801017B0(Eft004* self);
 extern "C" void fn_80101980(Eft004* self);
 extern "C" void fn_80101C60(Eft004* self);
 extern "C" void fn_80101C70(Eft004* self);
-/* fn_80101DF4 / fn_80101FA4 / fn_801025E8 / fn_801025F8 come from their owners' headers (rule 2). */
+/* eft004_model_set_start / fn_80101FA4 / fn_801025E8 / fn_801025F8 come from their owners' headers (rule 2). */
 u8 get_now_areano(); /* target references get_now_areano__Fv: C++ linkage (relocaudit) */
 
 /* `push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count)` - the map's mangled spelling. */
@@ -160,8 +160,8 @@ extern "C" void fn_80101D70(Eft004* self)
 {
     EftHeapPool* pool = (EftHeapPool*)self->work_0x38;
 
-    fn_800F8A44(pool->entries, pool->count);
-    fn_800F8A44(&pool->handle_0x40, 1);
+    eft_res_models_release(pool->entries, pool->count);
+    eft_res_models_release(&pool->handle_0x40, 1);
     pool->count = 0;
 }
 
@@ -208,7 +208,7 @@ extern "C" void fn_80101DB8(Eft004* self)
 {
     switch (self->state_0x05) {
     case 0:
-        fn_80101DF4(self);
+        eft004_model_set_start(self);
         return;
     case 1:
         fn_80101FA4(self);

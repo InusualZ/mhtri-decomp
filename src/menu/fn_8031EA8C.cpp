@@ -42,7 +42,7 @@ extern "C" {
 void* eft_res_slot_get(s32 size);
 void* eft_res_model_get(void);
 void  eft_res_slot_release(_EFT* self);
-void  fn_800F8A44(MHchar** models, s32 count);
+void  eft_res_models_release(MHchar** models, s32 count);
 f32   vec3_scale_in_place(VEC3* v, f32 s);
 u32   userdata_flag_ck(u32 value);
 s32   rand_lcg_step(u32 value);
@@ -140,7 +140,7 @@ extern "C" void fn_8031EADC(_EFT* self, u32 index) {
 extern "C" void fn_8031EC78(_EFT* self) {
     MenuFxWork* work = (MenuFxWork*)self->work_0x38;
 
-    fn_800F8A44(&work->models[0], work->count);
+    eft_res_models_release(&work->models[0], work->count);
     work->count = 0;
 }
 
@@ -209,7 +209,7 @@ extern "C" void fn_8031F304(void* arg) {
 extern "C" void fn_8031F3E4(_EFT* self) {
     MenuFxWork* work = (MenuFxWork*)self->work_0x38;
 
-    fn_800F8A44(&work->models[0], work->count);
+    eft_res_models_release(&work->models[0], work->count);
     work->count = 0;
 }
 

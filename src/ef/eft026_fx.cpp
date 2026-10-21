@@ -473,7 +473,7 @@ extern "C" void fn_80118154(_EFT* self)
             }
         }
     }
-    fn_800F8A44(&work->chara[0], work->count);
+    eft_res_models_release(&work->chara[0], work->count);
     work->count = 0;
 }
 

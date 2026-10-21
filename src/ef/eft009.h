@@ -8,6 +8,7 @@
 
 struct _ENEMY_WORK;
 struct _CP_VECTOR;
+struct Vec;
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +27,15 @@ void eft009_spawn_at_pos(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint_d
 void eft009_spawn_at_pos();
 #endif
 
+
+/* 0x8059DBF0-0x8059E160 - the per-type tables: the effect and resource ids this unit's spawners pass to
+ * `res_eft_create`, the enemy joint per type, and the effect count and joint offset (an engine `Vec`) per type that
+ * `ef/eft007.cpp`'s emitter reads. */
+extern u16 eft009_effect_ids[66];
+extern u16 eft009_resource_ids[66];
+extern u32 eft009_joint_ids[66];
+extern u8 eft009_part_effect_counts[72];
+extern struct Vec eft009_part_joint_offsets[66];
 
 /* The family's handlers and hooks. */
 void fn_80103D28(void* self);

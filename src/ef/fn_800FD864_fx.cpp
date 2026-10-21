@@ -42,7 +42,7 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
-#include "ef/fn_80101DF4.h"
+#include "ef/eft004_model_set_start.h"
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
 #include "ef/fn_800FD864_fx_types.h"

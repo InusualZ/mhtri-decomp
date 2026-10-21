@@ -75,14 +75,14 @@ extern "C" void fn_802F49D8(_EFT* self);
  * ------------------------------------------------------------------------------------------------- */
 
 /* One pooled model record of the type-0/1/3 family: the colour step the update walks (`state_0x00`
- * selects the colour), the model handle `eft_res_model_get` pools and `fn_800F8A44` releases, and the
+ * selects the colour), the model handle `eft_res_model_get` pools and `eft_res_models_release` releases, and the
  * model record `res_eft_UV_model_create` returned.  The release and the create both index this array
  * with a stride of 0x14 off work+0x08. size: 0x14 */
 struct Eft035Slot {
     /* +0x00 */ u8 state_0x00;       /* the colour step the update advances, 0..3 */
     /* +0x01 */ _GXColor color_0x01; /* the colour `state_0x00` selects */
     /* +0x05 */ u8 unused_0x05[0x07];
-    /* +0x0C */ MHchar* model_0x0C;  /* the pooled handle: `fn_800F8A44` releases this word */
+    /* +0x0C */ MHchar* model_0x0C;  /* the pooled handle: `eft_res_models_release` releases this word */
     /* +0x10 */ void* created_0x10;  /* what the create returned (the update virtual-calls it) */
 };
 
@@ -145,7 +145,7 @@ extern "C" void fn_802F250C(_EFT* self)
         }
     }
     for (i = 0; i < lbl_80792860[self->type_0x02]; i++) {
-        fn_800F8A44(&work->slots_0x08[i].model_0x0C, 1);
+        eft_res_models_release(&work->slots_0x08[i].model_0x0C, 1);
     }
     work->count_0x00 = 0;
 }
@@ -166,7 +166,7 @@ extern "C" void fn_802F25BC(_EFT* self)
             }
         }
     }
-    fn_800F8A44(&work->models_0x08[0], work->count_0x00);
+    eft_res_models_release(&work->models_0x08[0], work->count_0x00);
     work->count_0x00 = 0;
 }
 
@@ -381,7 +381,7 @@ extern "C" void fn_802F3AD0(_EFT* self)
 {
     Eft034Work* work = (Eft034Work*)self->work_0x38;
 
-    fn_800F8A44(&work->models_0x04[0], work->count_0x00);
+    eft_res_models_release(&work->models_0x04[0], work->count_0x00);
     work->count_0x00 = 0;
 }
 

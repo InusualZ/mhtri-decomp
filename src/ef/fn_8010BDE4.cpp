@@ -172,7 +172,7 @@ void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
 void* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(void* self);
 void* eft_res_model_get();
-void fn_800F8A44(void* p, s32 mode);
+void eft_res_models_release(void* p, s32 mode);
 u32 eft_res_models_spawn(void* self, void* list, s32 a, s32 b, void* c);
 u32 eft_water_state_ck(void* self);
 void mtx34_set_trans(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
@@ -236,7 +236,7 @@ extern "C" void fn_8010C710(_EFT* self)
     s32 i;
 
     for (i = 0; i < work->count_0x18; i++) {
-        fn_800F8A44(&work->models_0x1c[i], 1);
+        eft_res_models_release(&work->models_0x1c[i], 1);
     }
 
     work->count_0x18 = 0;

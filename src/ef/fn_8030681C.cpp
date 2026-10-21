@@ -484,7 +484,7 @@ extern "C" void fn_80306F40(_EFT* self)
             push_g3d_wk((struct _g3d_work*)wk);
         }
     }
-    fn_800F8A44(&work->models[0].model, work->count);
+    eft_res_models_release(&work->models[0].model, work->count);
     work->count = 0;
 }
 
@@ -493,7 +493,7 @@ extern "C" void fn_80306FB4(_EFT* self)
 {
     Eft042Work* work = (Eft042Work*)self->work_0x38;
 
-    fn_800F8A44(&work->models[0].model, work->count);
+    eft_res_models_release(&work->models[0].model, work->count);
     work->count = 0;
 }
 

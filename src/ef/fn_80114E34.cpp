@@ -3,7 +3,7 @@
  *   per-frame bodies.
  * RANGE. .text 0x80114E34-0x801153D0 (8 functions); extab 0x8000C3D4-0x8000C3F4, extabindex 0x800264A8-0x800264D8,
  *   .ctors 0x8056F310-0x8056F314, .data 0x805A00B8-0x805A0208, .bss 0x806A4538-0x806A4548, .sdata2
- *   0x80796A28-0x80796A30.  Families 21-24 from 0x801153D0 are `ef/eft022_fx.cpp`.
+ *   0x80796A28-0x80796A30.  Families 21-22 from 0x801153D0 are `ef/eft022_fx.cpp`, 23-24 `ef/eft023_fx.cpp`.
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps the `li r0` + `psq_l` epilogue and the
  *   raw `clrlwi` chains; playbook 39).
  * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.

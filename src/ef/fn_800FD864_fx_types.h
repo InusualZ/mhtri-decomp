@@ -5,7 +5,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
-#include "ef/fn_80101DF4.h"
+#include "ef/eft004_model_set_start.h"
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */

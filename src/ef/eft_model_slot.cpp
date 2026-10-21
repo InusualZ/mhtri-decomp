@@ -39,7 +39,7 @@ typedef struct EftModelOwner {
 } EftModelOwner; /* size: 0x3C */
 
 extern "C" {
-void fn_800F8A44(void* a, void* b);
+void eft_res_models_release(void* a, void* b);
 
 void* fn_800FBD68(s32 a);
 
@@ -87,7 +87,7 @@ extern "C" void fn_800FAD40(void* owner) {
 /* 0x800FAD90 - release the model held by the owner. */
 extern "C" void fn_800FAD90(EftModelOwner* self) {
     EftJointModel* model = self->model_0x38;
-    fn_800F8A44(&model->field_0x04, model->field_0x00);
+    eft_res_models_release(&model->field_0x04, model->field_0x00);
     model->field_0x00 = NULL;
 }
 

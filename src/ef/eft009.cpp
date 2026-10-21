@@ -1,17 +1,19 @@
 /* ef/eft009.cpp - the eft009 enemy-effect family: two per-frame handlers that place pooled effects on an enemy joint
  *   and recolour them, three setters, the allocator they funnel through and the record's hooks.
  * RANGE. .text 0x80103D28-0x80104BD0 (10 functions); extab 0x8000BF7C-0x8000BFB4, extabindex 0x80025E24-0x80025E78,
- *   .data 0x8059E160-0x8059E430 (the three switch tables), .sdata2 0x80796750-0x80796778.  `fn_80104A68` is the
- *   allocator (it installs `fn_80104B94` as the `state_0x05` dispatcher and `fn_80104B54` as the pool release).
- * FLAGS. `cflags_main`; `#pragma peephole off` around every body (playbook 39: with the pass on, the `u8` argument
- *   truncations and byte masks retail keeps are fused away).
- * NAMES. `eft009_set_pos` is the runtime dump's own name; `eft009_spawn_at_joint` and `eft009_spawn_at_pos` are GUESSes from their bodies; the map
+ *   .data 0x8059DBF0-0x8059E430 (the per-type tables, then the three switch tables), .sdata2 0x80796750-0x80796778.
+ *   `fn_80104A68` is the allocator (it installs `fn_80104B94` as the `state_0x05` dispatcher and `fn_80104B54` as the
+ *   pool release).  The tables follow `ef/eft007.cpp`'s `.data` (0x8059DBEC is zero fill).
+ * FLAGS. `cflags_main`; `#pragma pool_data off` from the per-type tables to the end of the file (retail addresses
+ *   each table with its own `lis`/`addi`, not from one shared base); `#pragma peephole off` around every body
+ *   (playbook 39: with the pass on, the `u8` argument truncations and byte masks retail keeps are fused away).
+ * NAMES. GUESS: the per-type tables `eft009_effect_ids`, `eft009_resource_ids`, `eft009_joint_ids`,
+ *   `eft009_part_effect_counts`, `eft009_part_joint_offsets` (named for what they hold and who reads them).
+ *   `eft009_set_pos` is the runtime dump's own name; `eft009_spawn_at_joint` and `eft009_spawn_at_pos` are GUESSes from their bodies; the map
  *   has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
  * RESIDUALS. none in bytes: every row, `.data` and `.sdata2` match (the `.sdata2` claim's last word is the 8-byte
  *   fill before `ef/fn_80104BD0.c`'s pool).  Ours names the three switch tables `@NNN` where retail names
  *   `jumptable_8059E160`/`jumptable_8059E268`/`jumptable_8059E328`.
- *   The type tables at 0x8059DBF0-0x8059E160 (`lbl_8059DBF0`..`lbl_8059DE48`, read here and by `ef/eft007.cpp`'s
- *   emitter) are unclaimed; they precede this unit's switch tables in `.data` order (claim request filed).
  * SHAPES. The two mirrored-offset loops multiply by the literal (`vec.x *= -1.0f`): a hoisted `f32 neg` local
  *   schedules the loop-invariant `lfs f31` one slot early.
  *   `_EFT::work_0x38` is a union of two typed pointers: the move family (`fn_80103D28`/`fn_801041BC`) drives a
@@ -171,9 +173,119 @@ extern "C" void eft009_spawn_at_pos(_ENEMY_WORK* self, u32 id, u32 type, s32 joi
                              nw4r::math::VEC3* pos);
 extern "C" _EFT* fn_80104A68(u32 id, u8 type, f32 scale, u8 area);
 
-/* The unit's shared pool, referenced but not emitted (see the header). */
-#include "unsplit/ef_tables.h" /* lbl_8059DBF0 / lbl_8059DC74 (rule 2: the band) */
-extern "C" u32 lbl_8059DCF8[]; /* joint id per type */
+#include "MTX/mtx.h" /* Vec (rule 1) */
+
+#pragma pool_data off
+
+/* The per-type tables (`.data` 0x8059DBF0-0x8059E160, ahead of the switch tables): this unit's spawners read the effect
+ * and resource ids and the joint id, `ef/eft007.cpp`'s emitter the joint id, the effect count and the joint offset. */
+
+/* The effect id per eft009 type (`res_eft_create`'s first argument). */
+u16 eft009_effect_ids[66] = {
+      21,   46,  260,  261,  264,  315,  314,  316,  313,  692,  694,  696,
+     700,  855,  857,  863,  868,  872,  873,  875,  876, 1041, 1042, 1064,
+    1066, 1066, 1169, 1207, 1208, 1230, 1066, 1066, 1296, 1297, 1298, 1300,
+    1314, 1317, 1316, 1315, 1319, 1321, 1320, 1517, 1530, 1528, 1531, 1532,
+    1534, 1549, 1550, 1552, 1555, 1556, 1563, 1562, 1066, 1066, 1683, 1694,
+    1568, 1554, 2182, 2181, 2586, 2613,
+};
+
+/* The resource id per eft009 type (`res_eft_create`'s second argument). */
+u16 eft009_resource_ids[66] = {
+      3,   3,   3,   3,   3,  38,  38,  38,  38,  50,  67,  67,  67,  76,  76,  76,
+     67,  76,  76,  76,  76,   3,   3,   3,  90,  90,  67,  94,  94,  90,  90,  90,
+     38,  38,  38,  76,  94,  94,  94,  94,  98,  98,  98, 111, 112, 112, 112, 112,
+    112, 113, 113, 113, 113, 113, 114, 114,  90,  90, 117, 113, 114, 113, 161, 161,
+     98, 113,
+};
+
+/* The enemy joint per type the effect is placed on (`get_joint_wmat_em`). */
+u32 eft009_joint_ids[66] = {
+    27, 30, 27, 30, 27, 26, 25, 25, 25, 26, 28, 28, 53, 22, 22, 23,
+    28, 23, 22, 23, 23, 27, 27, 27, 20,  7, 28, 22, 22,  7, 23, 24,
+    26, 25, 25, 22, 23, 23, 23, 23, 21, 21, 21, 18, 23, 23, 23, 23,
+    23, 25, 25, 25, 25, 25, 28, 28, 20, 20, 19, 25, 28, 25, 21, 21,
+    21, 25,
+};
+
+/* The number of effects per type `ef/eft007.cpp`'s emitter places; 66 entries and six zero bytes (size: 0x48). */
+u8 eft009_part_effect_counts[72] = {
+    1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+};
+
+/* The joint-space offset per type `ef/eft007.cpp`'s emitter adds. */
+Vec eft009_part_joint_offsets[66] = {
+    {0.0f, -20.0f, 30.0f},
+    {0.0f, 0.0f, 0.0f},
+    {0.0f, 0.0f, 0.0f},
+    {0.0f, 0.0f, 0.0f},
+    {0.0f, -20.0f, 30.0f},
+    {0.0f, -15.0f, 70.0f},
+    {0.0f, -35.0f, 100.0f},
+    {0.0f, -45.0f, 70.0f},
+    {0.0f, -50.0f, 100.0f},
+    {0.0f, -20.0f, 30.0f},
+    {0.0f, 0.0f, 50.0f},
+    {0.0f, 0.0f, 30.0f},
+    {0.0f, 0.0f, 0.0f},
+    {15.0f, 0.0f, 50.0f},
+    {0.0f, -30.0f, 20.0f},
+    {0.0f, -35.0f, 50.0f},
+    {0.0f, 0.0f, 50.0f},
+    {0.0f, -30.0f, 20.0f},
+    {5.0f, -15.0f, 50.0f},
+    {0.0f, -30.0f, 20.0f},
+    {0.0f, -30.0f, 20.0f},
+    {0.0f, 0.0f, 0.0f},
+    {0.0f, 0.0f, 0.0f},
+    {0.0f, -20.0f, 30.0f},
+    {0.0f, -50.0f, 90.0f},
+    {0.0f, -20.0f, 30.0f},
+    {0.0f, 0.0f, 50.0f},
+    {0.0f, -20.0f, 50.0f},
+    {0.0f, -20.0f, 50.0f},
+    {0.0f, -40.0f, 80.0f},
+    {0.0f, 10.0f, -85.0f},
+    {0.0f, -25.0f, -75.0f},
+    {0.0f, -15.0f, 70.0f},
+    {40.0f, -110.0f, 90.0f},
+    {0.0f, -55.0f, 120.0f},
+    {15.0f, 30.0f, 50.0f},
+    {0.0f, 100.0f, 60.0f},
+    {0.0f, 100.0f, 60.0f},
+    {0.0f, 100.0f, 60.0f},
+    {0.0f, 100.0f, 60.0f},
+    {0.0f, 0.0f, 100.0f},
+    {0.0f, 0.0f, 80.0f},
+    {0.0f, -30.0f, 100.0f},
+    {0.0f, 100.0f, 0.0f},
+    {0.0f, -50.0f, 50.0f},
+    {0.0f, -50.0f, 100.0f},
+    {0.0f, -50.0f, 50.0f},
+    {0.0f, -150.0f, 50.0f},
+    {0.0f, -80.0f, 50.0f},
+    {0.0f, -80.0f, 150.0f},
+    {0.0f, -80.0f, 150.0f},
+    {0.0f, -20.0f, 100.0f},
+    {0.0f, -20.0f, 200.0f},
+    {0.0f, -50.0f, 150.0f},
+    {0.0f, -20.0f, 50.0f},
+    {0.0f, -160.0f, 150.0f},
+    {0.0f, -40.0f, 80.0f},
+    {0.0f, 0.0f, 10.0f},
+    {0.0f, 0.0f, 0.0f},
+    {0.0f, -20.0f, 200.0f},
+    {0.0f, -20.0f, 50.0f},
+    {0.0f, -80.0f, 150.0f},
+    {0.0f, 0.0f, 100.0f},
+    {0.0f, 0.0f, 100.0f},
+    {0.0f, 0.0f, 200.0f},
+    {0.0f, -120.0f, 100.0f},
+};
+
+
 
 /* ---------------------------------------------------------------------------------------------------
  * bodies
@@ -194,8 +306,8 @@ extern "C" void fn_80103D28(_EFT* self)
     self->state_0x05++;
     if ((s32)self->type_0x02 == 0x23) {
         for (i = 0; i < work->count; i++) {
-            work->items_0x04[i] = res_eft_create(lbl_8059DBF0[self->type_0x02],
-                                                 lbl_8059DC74[self->type_0x02], 0);
+            work->items_0x04[i] = res_eft_create(eft009_effect_ids[self->type_0x02],
+                                                 eft009_resource_ids[self->type_0x02], 0);
             if (work->items_0x04[i] == NULL) {
                 fn_801048B0(self);
                 return;
@@ -203,8 +315,8 @@ extern "C" void fn_80103D28(_EFT* self)
         }
     } else {
         for (i = 0; i < work->count; i++) {
-            work->items_0x04[i] = res_eft_create((u16)(lbl_8059DBF0[self->type_0x02] + i),
-                                                 lbl_8059DC74[self->type_0x02], 0);
+            work->items_0x04[i] = res_eft_create((u16)(eft009_effect_ids[self->type_0x02] + i),
+                                                 eft009_resource_ids[self->type_0x02], 0);
             if (work->items_0x04[i] == NULL) {
                 fn_801048B0(self);
                 return;
@@ -323,7 +435,7 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x1F:
     case 0x38:
     case 0x39:
-        get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
+        get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
         copyVec3(&vec, &work->offset_0x3C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
         mulVecMat(&vec, &work->mtx_0x0C);
@@ -397,7 +509,7 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x35:
     case 0x36:
     case 0x41:
-        get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
+        get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
@@ -411,7 +523,7 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0xD:
     case 0x12:
     case 0x23: {
-        get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
+        get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             copyVec3(&vec, &work->offset_0x3C);
@@ -430,7 +542,7 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x7:
     case 0x2C:
     case 0x2D:
-        get_joint_wpos_em(enemy, lbl_8059DCF8[self->type_0x02], &self->pos_0x18);
+        get_joint_wpos_em(enemy, eft009_joint_ids[self->type_0x02], &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &work->mtx_0x0C);
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
@@ -452,7 +564,7 @@ extern "C" void fn_801041BC(_EFT* self)
         break;
     case 0x1B:
     case 0x1C:
-        get_joint_wmat_em(enemy, lbl_8059DCF8[self->type_0x02], &work->mtx_0x0C);
+        get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);

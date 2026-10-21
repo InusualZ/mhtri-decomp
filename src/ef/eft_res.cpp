@@ -5,7 +5,7 @@
  *   the range's last function drives the same `_EFT` state machine as `ef/effect.cpp`'s first.
  * NAMES. The unit name is a GUESS in the siblings' scheme (no `__FILE__` string is reachable; the runtime dump's
  *   `res_eft_*`, `get_eft_res_name` and `push_eft_effect_heap_num` name the `eft` resource layer).  The dump names
- *   seven functions; `eft_res_slot_get`, `eft_res_slot_release`, `eft_res_model_get`, `eft_res_spawn_gate_ck` and
+ *   seven functions; `eft_res_slot_get`, `eft_res_slot_release`, `eft_res_model_get`, `eft_res_spawn_gate_ck`, `eft_res_models_release` and
  *   `eft_res_models_spawn` are GUESSes from their bodies, `eft_stage_spawn_flag` (0x800F9380: stage size class to spawn
  *   flag) too; the map has only `fn_` stems for the rest.
  *   GUESS (from each body and its callers): eft_control_init
@@ -192,7 +192,7 @@ EftResSlot* eft_res_slot_get(u32);
 void eft_res_slot_release(void*);
 u8* eft_res_model_get(void);
 void fn_800F89A4(void*);
-void fn_800F8A44(void*, s32);
+void eft_res_models_release(void*, s32);
 void* fn_800F8B44(u32);
 void fn_800F8C78(void*, u32);
 u32 fn_800F8D80(u32);
@@ -626,7 +626,7 @@ extern "C" void fn_800F89A4(void* self_) {
 }
 
 /* 0x800F8A44 - release `count` model records off the front of a list. */
-extern "C" void fn_800F8A44(void* list, s32 count) {
+extern "C" void eft_res_models_release(void* list, s32 count) {
     void** items = (void**)list;
 
     for (s32 i = 0; i < count; i++) {

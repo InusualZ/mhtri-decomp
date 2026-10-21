@@ -1,4 +1,4 @@
-/* ef/fn_8011722C.c - the kind-1 state-0 entry of the effect job machine (`ef/eft022_fx.cpp`'s `fn_80116FDC`
+/* ef/fn_8011722C.c - the kind-1 state-0 entry of the effect job machine (`ef/eft023_fx.cpp`'s `fn_80116FDC`
  *   dispatches on `state_0x05` and `kind_0x02`): it takes one effect character from the `eft_control` pool, creates
  *   its model, drops it at one of three random offsets (`eft_job_spawn_offsets`) and randomises its rotation; the kind-1
  *   state-1 handler `fn_801173AC` then integrates the spin.

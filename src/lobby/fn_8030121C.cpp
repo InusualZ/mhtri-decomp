@@ -49,7 +49,7 @@ void* LbStr(u8 kind, u16 idx);
 
 /* The effect-41/42 spawners' pooled work block (`_EFT::work_0x38`) as this band views it.  The count
  * and the two parallel arrays the machines walk: the `effect` slots at +0x04 (stride 0x8, handed to
- * `push_eft_effect_heap_num` / `fn_800F8A44` as a block) and the four g3d part handles at +0x0C
+ * `push_eft_effect_heap_num` / `eft_res_models_release` as a block) and the four g3d part handles at +0x0C
  * (stride 0x10).  size: 0x20 (approximate: the pooled block is larger). */
 typedef struct Eft8030EffectSlot {
     /* +0x000 */ nw4r::ef::Effect* effect;
@@ -345,7 +345,7 @@ void fn_80306614(_EFT* self) {
             }
         }
         if (slots[i].effect != NULL) {
-            fn_800F8A44(&slots[i], 1);
+            eft_res_models_release(&slots[i], 1);
         }
     }
 }

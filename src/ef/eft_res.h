@@ -22,7 +22,7 @@ void eft_res_models_spawn(_EFT* self, void** models, s32 mode, s32 count, void* 
 /* Pools the slots `size` bytes' worth of effect records need and returns the first record. */
 EftResSlot* eft_res_slot_get(u32 size);
 /* Releases `count` handles from `list` back to the heap. */
-void fn_800F8A44(void* list, s32 count);
+void eft_res_models_release(void* list, s32 count);
 /* 0x800F92F4 - the per-mode alive check the effect state bodies make (`mode` 0 is the "may the record keep
  * stepping" test; `ef/fn_8030681C.cpp`'s kind-1 bodies branch on it).  The second parameter is `u32` because
  * `ef/fn_801173AC.cpp` includes this header beside its own `u32` declaration of the address (a second width is

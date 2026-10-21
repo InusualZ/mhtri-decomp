@@ -7,7 +7,7 @@ system core). The `nw4r::ef` library units (`ef_*.cpp`) keep their notes in thei
 
 The written `_EFT` state dispatchers that carry this residual - `ef/fn_80119C44.c`'s `fn_80119D9C`,
 `ef/eft002.cpp`'s `fn_800FC428`, `ef/fn_8030681C.cpp`'s `fn_80306FF0`, `ef/eft013_fx.cpp`'s `fn_8010AD00`,
-`ef/eft022_fx.cpp`'s `fn_80116FDC` and `ef/eft035.cpp`'s `fn_802F2640` - switch on `state_0x05`, and case 0 runs a
+`ef/eft023_fx.cpp`'s `fn_80116FDC` and `ef/eft035.cpp`'s `fn_802F2640` - switch on `state_0x05`, and case 0 runs a
 nested switch on the type. Retail lays the blocks out as
 `[compare chain][default blr][case0: b N][case1][case2][case3][exit blr][N: nested dispatch]`: case 0's block is a
 bare jump and the nested switch sits after the exit block, sharing its `break`.

@@ -2403,7 +2403,7 @@ void lb_scene_eft_release(_EFT* self) {
     LbSceneEftWork* work = (LbSceneEftWork*)self->work_0x38;
     for (i = 0; i < work->count; i++) {
         fn_800E26C4(work->models[i]);
-        fn_800F8A44((void*)&work->models[i], 1);
+        eft_res_models_release((void*)&work->models[i], 1);
     }
 }
 

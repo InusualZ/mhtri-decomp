@@ -229,7 +229,7 @@ extern f32 lbl_80796838; /* -1.0f, the day-key terminator */
 extern f64 lbl_80796840; /* the int-to-double magic */
 
 extern EftLight* eft_res_model_get(void);
-extern void fn_800F8A44(void* p, s32 n);
+extern void eft_res_models_release(void* p, s32 n);
 extern u8 GameMode_ck(void);
 extern Eft* fn_8010D70C(Plw* source, s32 arg1, s32 arg2, s32 arg3);
 extern void fn_8010D824(Eft* self);
@@ -564,7 +564,7 @@ void fn_8010D824(Eft* self)
     s32 i;
 
     work = self->work_0x38;
-    fn_800F8A44(&work->slots_0x10.items.items_0x10[0], work->count);
+    eft_res_models_release(&work->slots_0x10.items.items_0x10[0], work->count);
     for (i = 0; i < 5; i++) {
         if (work->slots_0x10.handles.handles_0x18[i] != 0) {
             push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(&work->slots_0x10.handles.handles_0x18[i], 1);

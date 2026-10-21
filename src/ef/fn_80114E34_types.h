@@ -1,4 +1,4 @@
-/* ef/fn_80114E34_types.h - the types and macros `ef/fn_80114E34.cpp` and `ef/eft022_fx.cpp` share. */
+/* ef/fn_80114E34_types.h - the types and macros `ef/fn_80114E34.cpp`, `ef/eft022_fx.cpp` and `ef/eft023_fx.cpp` share. */
 #ifndef MHTRI_EF_FN_80114E34_TYPES_H
 #define MHTRI_EF_FN_80114E34_TYPES_H
 
@@ -86,6 +86,12 @@ struct MHchar {
     /* +0x118 */ s32 field_0x118;
     /* +0x11C */ u8 unused_0x11C[0x13C - 0x11C];
     /* +0x13C */ u8* field_0x13C;
+
+    /* The engine character members the job machines call (`get_joint_num__6MHcharFv`, `setVisibility__6MHcharFUlb`,
+     * `move__6MHcharFUs`); a member adds no storage. */
+    u32 get_joint_num(void);
+    void setVisibility(u32 joint, bool visible);
+    void move(u16 flags);
 };
 
 /* size: 0x140 (lower bound) */
@@ -101,4 +107,8 @@ struct _ENEMY_WORK {
     /* +0x000 */ u8 unused_0x000[0xB14];
     /* +0xB14 */ s32 field_0xB14;
 };
+/* 0x800F8A44 - releases `count` model handles off the front of a list (`ef/eft_res.cpp`; its header pulls in `ef.h`,
+ * whose types collide with these). */
+extern "C" void eft_res_models_release(void** effects, s32 count); /* untyped: caller-owned payload - the handle list */
+
 #endif /* MHTRI_EF_FN_80114E34_TYPES_H */

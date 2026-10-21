@@ -44,7 +44,7 @@
 #include "ef/eft053.h"         /* this unit's header (the helpers whose owner header cannot carry them) */
 #include "unsplit/unknown.h"
 #include "enemy/em_pop.h"   /* the band's unnamed callees */
-#include "ef/eft_res.h"        /* eft_res_slot_get/eft_res_model_get/fn_800F8A44 (the effect pool) */
+#include "ef/eft_res.h"        /* eft_res_slot_get/eft_res_model_get/eft_res_models_release (the effect pool) */
 #include "ef/effect.h"         /* eft_state_flags_set (the effect's two state bytes) */
 #include "ef/eft019.h"         /* eft019_set_core (the family's shared placement entry) */
 #include "draw_shape.h"        /* fn_80056A84 (the shape request the state machine fires) */
@@ -138,7 +138,7 @@ extern "C" f32 lbl_8079B81C; /* -400.0f */
 typedef struct Eft053Work {
     /* +0x000 */ s32 count;      /* the slot count `eft053_model_list_get` writes */
     /* +0x004 */ MHchar* models[8]; /* one pooled model handle per slot; `models[0]` is what the
-                                     * release path (`fn_800F8A44`) is handed as its list base */
+                                     * release path (`eft_res_models_release`) is handed as its list base */
     /* +0x024 */ u8 kind_0x24;   /* the stage model-list kind `eft053_model_list_get` writes */
     /* +0x025 */ u8 pad_0x25[0x10];
     /* +0x035 */ u8 field_0x35[8]; /* per-slot placement index into the family's `Vec` table
@@ -766,7 +766,7 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
 extern "C" void eft053_release(_EFT* self)
 {
     Eft053Work* work = (Eft053Work*)self->work_0x38;
-    fn_800F8A44(&work->models[0], work->count);
+    eft_res_models_release(&work->models[0], work->count);
 }
 
 /* Dispatch on the effect's state byte into the family's per-state entry points. */

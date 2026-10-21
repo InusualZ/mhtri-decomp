@@ -122,7 +122,7 @@ extern "C" void eft052_release(_EFT* self)
 {
     EftPartWork* work = (EftPartWork*)self->work_0x38;
     for (s32 i = 0; i < work->count_0x00; i++)
-        fn_800F8A44(&work->slots_0x04[i], 1);
+        eft_res_models_release(&work->slots_0x04[i], 1);
 }
 
 /* 0x8035896C (0x3C): Dispatches `state_0x05` to its state handler (the dispatch hook). */

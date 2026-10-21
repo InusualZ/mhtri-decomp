@@ -1,25 +1,25 @@
 /* ef/em_effect_ctrl.cpp - the state handlers `ef/eft004_fx.cpp`'s `fn_80101DB8` dispatches on (state 0
- *   `fn_80101DF4` fills the state's `EftModelSet` from the per-type record runs and the per-map area tables; states
+ *   `eft004_model_set_start` fills the state's `EftModelSet` from the per-type record runs and the per-map area tables; states
  *   1-3 `fn_80101FA4`/`fn_801025E8`/`fn_801025F8`) and the enemy-effect (`em`) controller: `EmEffectWork`/
  *   `EmEffectUnit` and `fn_80101FA4`'s per-frame screen-box test.
  * RANGE. .text 0x80101DF4-0x80102994 (7 functions); extab 0x8000BEF4-0x8000BF1C, extabindex 0x80025D58-0x80025D94,
  *   .data 0x8059C8E8-0x8059DAA0, .sdata 0x80791790-0x807917A0, .sdata2 0x807966E8-0x80796740.  One TU: the
  *   area-table family `eft_map_area_spheres_0..9` is one definition list whose 8-byte member `_9` lands in `.sdata`
- *   after `em_key_alpha_table`, and only `fn_80101DF4` reads the `.data` tables.  The player-weapon controller from
- *   0x80102994 is `ef/eft007.cpp`.
- * FLAGS. `cflags_main`; `#pragma peephole off` for `fn_80101DF4`, `fn_80101FA4`, `fn_801025FC` and `fn_801027D0`
+ *   after `em_key_alpha_table`, and only `eft004_model_set_start` reads the `.data` tables.  The player-weapon
+ *   controller from 0x80102994 is `ef/eft007.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` for `eft004_model_set_start`, `fn_80101FA4`, `fn_801025FC` and `fn_801027D0`
  *   (retail keeps the unfused `clrlwi`+`slwi` index and `subi`/`clrlwi`/`extsb`/`rlwinm` + `cmpwi` forms; playbook
- *   39); `#pragma pool_data off` for the `fn_80101DF4` block (retail addresses each table with its own `lis`/`addi`);
+ *   39); `#pragma pool_data off` for the `eft004_model_set_start` block (retail addresses each table with its own `lis`/`addi`);
  *   `#pragma fp_contract off` for `fn_80101FA4` (retail keeps `fmuls` + `fsubs`; playbook 40).
- * NAMES. The unit name is a GUESS (the range holds the `em` controller); the map has only `fn_` stems, so the
- *   definitions are `extern "C"` in a C++ unit.  GUESS: `em_key_alpha_table` (map `lbl_80791790`, the
- *   `eftGetKeyAlpha` table); every `fn_80101DF4` table, named for what it holds (map `lbl_8059C8E8`..`lbl_8059DA48`
- *   and `lbl_80791798`, renames filed): `eft_model_records_typeN`, `eft_model_record_runs`, `eft_model_effect_ids`,
+ * NAMES. The unit name is a GUESS (the range holds the `em` controller); the map has no class names, so the
+ *   definitions are `extern "C"` in a C++ unit.  GUESS: `eft004_model_set_start` (the state-0 handler, from its
+ *   body); `em_key_alpha_table` (map `lbl_80791790`, the `eftGetKeyAlpha` table); every table that handler reads,
+ *   named for what it holds: `eft_model_records_typeN`, `eft_model_record_runs`, `eft_model_effect_ids`,
  *   `eft_area_spheres_NN`, `eft_map_area_spheres_N`, `eft_map_area_table`; `EftAreaSphere`, `EftModelSet::area_spheres`.
  * RESIDUALS. none in bytes: every row, `.data`, `.sdata` and `.sdata2` match (the `.sdata2` claim's last word is the
  *   fill before `ef/eft007.cpp`'s pool).  Pool relocations name `@NNN` where retail names the map's `lbl_` rows.
  * SHAPES. `em_key_alpha_table` is defined before the area tables: `.sdata` follows definition order.
- *   `fn_80101DF4`'s record cursor is the source's `i * sizeof(EftModelRecord)` index, which MWCC strength-reduces into
+ *   `eft004_model_set_start`'s record cursor is the source's `i * sizeof(EftModelRecord)` index, which MWCC strength-reduces into
  *   retail's separate byte-offset register (`addi r27,r27,20`); a byte-offset local swaps it with the `chars`
  *   pointer (playbook 19/20).
  *   `fn_80101FA4` scales by the dot product directly (`vec3_scale(&v64, &v100, vec3_dot(...))`) and by each
@@ -608,7 +608,7 @@ EftAreaSphere** eft_map_area_table[22] = {
 /* ------------------------------------------------------------------------------------------------ */
 
 /* The state-0 handler: sets up the effect-model set and advances the state to 1. */
-extern "C" void fn_80101DF4(EftState* self) {
+extern "C" void eft004_model_set_start(EftState* self) {
     s32 i;
     EftModelSet* set;
     nw4r::math::VEC3 vec;

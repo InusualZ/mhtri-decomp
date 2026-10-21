@@ -942,7 +942,7 @@ ef/eft009.cpp:
 	extab       start:0x8000BF7C end:0x8000BFB4
 	extabindex  start:0x80025E24 end:0x80025E78
 	.text       start:0x80103D28 end:0x80104BD0
-	.data       start:0x8059E160 end:0x8059E430
+	.data       start:0x8059DBF0 end:0x8059E430
 	.sdata2     start:0x80796750 end:0x80796778
 
 ef/fn_80104BD0.c:
@@ -1001,12 +1001,19 @@ ef/fn_80114E34.cpp:
 	.sdata2     start:0x80796A28 end:0x80796A30
 
 ef/eft022_fx.cpp:
-	extab       start:0x8000C3F4 end:0x8000C494
-	extabindex  start:0x800264D8 end:0x800265C8
-	.text       start:0x801153D0 end:0x8011722C align:16
-	.data       start:0x805A0208 end:0x805A0460
+	extab       start:0x8000C3F4 end:0x8000C464
+	extabindex  start:0x800264D8 end:0x80026580
+	.text       start:0x801153D0 end:0x80116770 align:16
+	.data       start:0x805A0208 end:0x805A0380
 	.sdata      start:0x80791930 end:0x80791938
-	.sdata2     start:0x80796A30 end:0x80796A80
+	.sdata2     start:0x80796A30 end:0x80796A60
+
+ef/eft023_fx.cpp:
+	extab       start:0x8000C464 end:0x8000C494
+	extabindex  start:0x80026580 end:0x800265C8
+	.text       start:0x80116770 end:0x8011722C
+	.data       start:0x805A0380 end:0x805A0460
+	.sdata2     start:0x80796A60 end:0x80796A80
 
 ef/fn_8011722C.c:
 	extab       start:0x8000C494 end:0x8000C49C

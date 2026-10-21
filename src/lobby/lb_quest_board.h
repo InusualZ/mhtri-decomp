@@ -117,7 +117,7 @@ extern LbQuestBoardLobby lobby_w;   /* .bss 0x806AAB44 */
 void userdata_hunter_rank_info_get(void* work, u32* out_a, u32* out_b);
 void sysSE_stop(u32 id);
 void eft_res_slot_release(void* work);
-void fn_800F8A44(void* list, s32 count);
+void eft_res_models_release(void* list, s32 count);
 void quest_board_flags_send(u8 a, u8 b);
 }
 
