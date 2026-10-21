@@ -12,6 +12,7 @@ from tools.lib import findings as _findings
 from tools.lib import objcompare
 from tools.lib import project as _project  # the splits / map readers
 from tools.lib.project import ownership as _ownership  # dtk's auto split objects
+from tools.lib.binary.extab import unwind_entries  # the unwind records a dropped function takes with it
 from tools.lib.lanes.naming import norm_unit  # the one unit spelling rule
 from tools.units import dataseams  # `.data` emission-order seams: order-only / multi-TU diagnosis
 from tools.units import poolseams  # literal pools as TU evidence: a pool difference a fold explains
@@ -828,6 +829,19 @@ def weak_duplicate_symbols(unit: str, src_path: str, obj_path: str, target_rel: 
     return dropped, notes
 
 
+def dropped_unwind_symbols(src_path: str, functions: set[str]) -> list:
+    """The `extab`/`extabindex` symbols of our object that cover the dropped weak `.text` copies `functions`
+    (`lib.binary.extab.unwind_entries`): mwld drops a function's unwind entries with it, so a weak copy an earlier
+    input defines takes its `extab` record and its 12-byte `extabindex` entry out of the link too - the same rule
+    `tools/elf/objextab.py` names the remaining entries by."""
+    elf = _elf(src_path) if functions else None
+    if elf is None:
+        return []
+    entries = unwind_entries(elf, functions)
+    return [s for s in elf.symbols if s.size > 0 and s.type != objcompare.STT_SECTION
+            and s.value in entries.get(s.section, {})]
+
+
 def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path: str, target_rel: str,
                     link_ctx: dict | None, map_rows: set[str] | None,
                     moves: dict | None = None) -> tuple[dict[str, bytes], list[str], list[str]]:
@@ -851,6 +865,7 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
         return {}, [], []
     weak, kept_copies = weak_duplicate_symbols(unit, src_path, obj_path, target_rel, link_ctx)
     weak_names = {s.name for s in weak}
+    unwind = dropped_unwind_symbols(src_path, {s.name for s in weak if s.section == STRIPPED_CODE})
     code, problems, weak_dead = [], [], []
     if STRIPPED_CODE in ours:
         dead = objcompare.dead_symbols(src_path, deadstrip_roots(unit, target_rel, link_ctx)) or []
@@ -872,22 +887,21 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
     # a kept weak copy's note ("the link keeps our copy") is wrong once the dead-strip takes the copy anyway
     gone = {s.name for s in code} | {s.name for s in weak_dead}
     notes = [text for name, text in kept_copies if name not in gone]
-    by_section: dict[str, tuple[list, list, list]] = {}
-    for s in code:
-        by_section.setdefault(s.section, ([], [], []))[0].append(s)
-    for s in weak:
-        by_section.setdefault(s.section, ([], [], []))[1].append(s)
-    for s in weak_dead:
-        by_section.setdefault(s.section, ([], [], []))[2].append(s)
+    by_section: dict[str, tuple[list, list, list, list]] = {}
+    for kind, symbols in enumerate((code, weak, weak_dead, unwind)):
+        for s in symbols:
+            by_section.setdefault(s.section, ([], [], [], []))[kind].append(s)
     kept: dict[str, bytes] = {}
-    for section, (stripped, copies, dead_data) in sorted(by_section.items()):
+    for section, (stripped, copies, dead_data, records) in sorted(by_section.items()):
         dead_txt = ("dead-stripped function(s) %s (no symbols.txt row, not in the target, nothing in the link "
                     "references them)" % ", ".join(s.name for s in stripped)) if stripped else ""
         weak_txt = ("weak copies %s that an earlier link input also defines (the link keeps the first definition)"
                     % ", ".join(s.name for s in copies)) if copies else ""
         data_txt = ("dead-stripped weak data %s (no symbols.txt row, not in the target, nothing the link keeps "
                     "references them)" % ", ".join(s.name for s in dead_data)) if dead_data else ""
-        laid = objcompare.strip_moves(src_path, section, stripped + copies + dead_data)
+        if records:
+            data_txt = "the unwind entries %s of the dropped weak copies (the link drops them with the function)"                 % ", ".join(s.name for s in records)
+        laid = objcompare.strip_moves(src_path, section, stripped + copies + dead_data + records)
         got = None if laid is None else objcompare.apply_moves(*laid)
         if got is None:
             if stripped and not copies:

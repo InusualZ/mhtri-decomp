@@ -131,6 +131,19 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   flfnt's, its `lyt::Window::Content` dtor is dead-stripped, and its weak `ut::Color` ctor has no other definer, so the
   link keeps it - its trial flip put the ctor at 0x8052E350 inside the unit and grew `main.dol` by 0x20 (the 0xC
   rounded to the DOL section alignment).
+* **A dropped weak `.text` copy takes its unwind entries with it (2026-10-21).** mwld drops a function's `extab`
+  record and `extabindex` entry together with the function, so for every `.text` copy `weak_duplicate_symbols` drops,
+  `dropped_unwind_symbols` removes the `extab`/`extabindex` symbols covering it (`lib.binary.extab.unwind_entries`,
+  the rule `tools/elf/objextab.py` names the kept entries by) through the same `strip_moves` layout, and the
+  relocation-place check maps the kept entries through those moves. The note reads `extab: 0xN of the object's 0xM
+  bytes are the unwind entries <names> of the dropped weak copies (the link drops them with the function); the 0xK
+  bytes the link keeps are compared`. A copy the link keeps (no earlier definer) keeps its entries counted, and an
+  entry the old `objextab` named at its own offset (two slots late) is refused on the relocations. Measured on all
+  651 registered units at `8b3cb635` with the patched `objextab`: READY 298 -> 301, the gains
+  ef/ef_drawlinestrategy, ef_drawpointstrategy and ef_drawfreestrategy (`extab` 0x38 vs claimed 0x28, `extabindex`
+  0x54 vs 0x3C before); no unit lost READY; their trial flip together hashes `main.dol: OK`. ef_drawfreestrategy's five
+  named `.sdata2` pool rows (`ef_free_hundred`, `_epsilon`, `_int_to_double`, `_one`, `_zero`) are excused by the
+  pool-name rule (`lib.objcompare.unnamed_spellings`) and read as a note.
 * **A leading alignment fill is not a size gap (2026-10-14).** dtk can start a claim at the previous object's end,
   before the unit's own aligned start (`DVD/dvd`'s `.sbss` claim 0x80795090 holds 0x10 bytes of fill, labelled
   `pad_10_80795090_sbss`, before its 32-aligned data). `lib.objcompare.leading_fill` accepts the lead when all of
