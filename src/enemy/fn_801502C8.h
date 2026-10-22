@@ -1,5 +1,5 @@
 /* Declarations `enemy/em001_prog.cpp` owns from its 0x801502C8-0x801545B8 block, in its definitions' spellings;
- * `fn_801545B8` keeps the C consumers' `void*` under `#ifndef __cplusplus` (the definition takes `EmSpawnRec`, a C
+ * `em001_spawn_rec_fill` keeps the C consumers' `void*` under `#ifndef __cplusplus` (the definition takes `EmSpawnRec`, a C
  * caller passes its own `ShellParams` view of the same 0x18 bytes).
  */
 #ifndef MHTRI_ENEMY_FN_801502C8_H
@@ -26,10 +26,10 @@ void fn_80154CA4(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 /* 0x801545B8 - fills the 0x18-byte spawn record and posts its effect. */
-void fn_801545B8(EmSpawnRec* rec, u8 arg1, s16 arg2, s16 arg3);
+void em001_spawn_rec_fill(EmSpawnRec* rec, u8 arg1, s16 arg2, s16 arg3);
 #else
 /* The C consumers' spelling (`enemy/em001_prog.cpp` passes its own `ShellParams` record). */
-void fn_801545B8(void* rec, u32 a, u32 b, u32 c);
+void em001_spawn_rec_fill(void* rec, u32 a, u32 b, u32 c);
 #endif
 
 #ifdef __cplusplus

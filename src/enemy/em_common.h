@@ -28,6 +28,9 @@ f32 get_em_base_scale(struct _ENEMY_WORK *self);
 
 f32 em_fall_height_get(struct _ENEMY_WORK* self);
 
+/* 0x80135AA0 - the enemy data kind byte (`EnemyData::kind_0x0C`) of the record. */
+u8 em_data_kind_get(struct _ENEMY_WORK* self);
+
 void em_move_mode_set(struct _ENEMY_WORK *self, u32 a);
 
 void em_fall_start(struct _ENEMY_WORK *self);

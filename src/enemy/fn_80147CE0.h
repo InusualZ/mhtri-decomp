@@ -9,12 +9,12 @@
 
 struct _ENEMY_WORK;
 
-/* The 0x18-byte spawn record the unit's `em_spawn_rec_init`/`fn_801545B8` fill and `fn_801493A8` builds on
+/* The 0x18-byte spawn record the unit's `em_spawn_rec_init`/`em001_spawn_rec_fill` fill and `em001_spawn_step` builds on
  * its stack.  Same layout as `enemy/em001_prog.cpp`'s private `ShellParams` (its +0x12/+0x14 u16 pair
  * is the one that unit reads back): one record, two definitions.
  * size: 0x18 */
 typedef struct EmSpawnRec {
-    /* +0x00 */ u32 id;           /* the effect type `fn_801545B8` stores (26) */
+    /* +0x00 */ u32 id;           /* the effect type `em001_spawn_rec_fill` stores (26) */
     /* +0x04 */ VEC3 pos;
     /* +0x10 */ u8 field_0x10;
     /* +0x12 */ u16 field_0x12;
@@ -27,23 +27,23 @@ extern "C" {
 
 #ifdef __cplusplus
 void fn_801481FC(struct _ENEMY_WORK* self);
-void fn_801493A8(struct _ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3);
+void em001_spawn_step(struct _ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3);
 EmSpawnRec* em_spawn_rec_init(EmSpawnRec* rec);
-void fn_801498C8(struct _ENEMY_WORK* self);
-void fn_80149A08(struct _ENEMY_WORK* self);
-void fn_80149AFC(struct _ENEMY_WORK* self);
-void fn_80149C54(struct _ENEMY_WORK* self);
-void fn_80149C58(struct _ENEMY_WORK* self);
+void em001_act3_0(struct _ENEMY_WORK* self);
+void em001_act3_1(struct _ENEMY_WORK* self);
+void em001_dive_step(struct _ENEMY_WORK* self);
+void em001_act3_3(struct _ENEMY_WORK* self);
+void em001_act3_4(struct _ENEMY_WORK* self);
 #else
 /* The consumers' old-style spellings (C only). */
 void fn_801481FC();
-void fn_801493A8();
+void em001_spawn_step();
 void em_spawn_rec_init();
-void fn_801498C8();
-void fn_80149A08();
-void fn_80149AFC();
-void fn_80149C54();
-void fn_80149C58();
+void em001_act3_0();
+void em001_act3_1();
+void em001_dive_step();
+void em001_act3_3();
+void em001_act3_4();
 #endif
 
 #ifdef __cplusplus

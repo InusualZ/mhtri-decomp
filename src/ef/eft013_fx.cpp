@@ -1054,7 +1054,7 @@ extern "C" void fn_80107860(_EFT013_PL* self, u32 a) {
 }
 
 /* 0x801078BC - arm the enemy setter (state 1) with the caller's id in the low byte. */
-extern "C" void fn_801078BC(_ENEMY_WORK* self, u32 id, u32 b) {
+extern "C" void eft013_spark_set_em(_ENEMY_WORK* self, u32 id, u32 b) {
     f32 scale;
     _EFT013* e = (_EFT013*)fn_80107A18(self, (u8)id, b, scale, self->act_id);
     if (e != NULL) {

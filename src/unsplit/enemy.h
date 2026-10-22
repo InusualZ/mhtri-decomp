@@ -368,10 +368,6 @@ extern const f32 lbl_8079B0FC;
 extern const f32 lbl_8079B100;
 extern const f32 lbl_8079AF60;   /* the low word of the 0.0 double at 0x8079AF60 */
 
-/* Two 0x40-byte `.rodata` effect tables `em_turn_seq_start`/`em_turn_seq_step` walk (no registered owner). */
-extern u8 lbl_80570740[];
-extern u8 lbl_80570780[];
-
 /* Added with `enemy/em_act_step.cpp`'s registration (rule 2): the `.sdata2` pool half
  * 0x8079B108..0x8079B210 that unit's 74 functions load their constants from.  No registered unit owns it (the
  * pool's bracketing units are the same unclaimed band), so this header is its home.  The pool labels are used as load

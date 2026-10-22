@@ -46,6 +46,24 @@ struct EmCmdRec {
     /* +0x4 */ s32 value;
 };
 
+/* The storage of one of the enemy's two attack hit records: a `_HIT_W` (`Pl/hit_w.h`) whose last 4 bytes overlap the
+ * next record, 0x5C apart (`em_hit_window_set`, `enemy/em_common.cpp`).
+ * size: 0x5C */
+struct EmHitSlot {
+    union {
+        /* +0x00 */ u8 bytes[0x5C];
+        /* the fields `enemy/em032_half_hp_ck.cpp`'s live-attack search reads */
+        struct {
+            /* +0x00 */ u8 unused_0x00[0x05];
+            /* +0x05 */ u8 active_0x05;    /* 1 while the attack record is live */
+            /* +0x06 */ u8 unused_0x06[0x38 - 0x06];
+            /* +0x38 */ f32 value_0x38;    /* tested against 0.0 for an enemy's own records */
+            /* +0x3C */ f32 power_0x3C;    /* tested above 0.0 */
+            /* +0x40 */ u8 unused_0x40[0x5C - 0x40];
+        };
+    };
+};
+
 /* The 0xB20-byte records `get_move_work_adrs(2)` hands back (`fn_8013FD98` steps a whole record at a
  * time and asks `pl_act_grabbed_ck` whether the candidate is the one it wants).  Only the bytes the search
  * and the distance test read are named; the rest is the record's own layout, not this unit's
@@ -63,7 +81,9 @@ struct EmAreaWork {
                                       * (`enemy/em034_prog.cpp`) and the one
                                       * `enemy/em030_prog.cpp`'s `fn_801B06D4` passes to
                                       * `vec3_dist_sq` as its `(void*, VEC3*)` second argument */
-    /* +0x048 */ u8 unused_0x048[0xB20 - 0x048];
+    /* +0x048 */ u8 unused_0x048[0x484 - 0x048];
+    /* +0x484 */ EmHitSlot hit_slots_0x484[2];  /* the record's two attack hit records */
+    /* +0x53C */ u8 unused_0x53C[0xB20 - 0x53C];
 };
 
 /* One 0x06-byte record of the eight-part table `_ENEMY_WORK::parts_0x838`: the damage level a part has
@@ -199,13 +219,6 @@ struct EmBreakPart {
     /* +0x68 */ nw4r::math::VEC3 accel;
     /* +0x74 */ _CP_VECTOR rot;
     /* +0x80 */ s32 effect;         /* the effect handle, -1 for none */
-};
-
-/* The storage of one of the enemy's two attack hit records: a `_HIT_W` (`Pl/hit_w.h`) whose last 4 bytes overlap the
- * next record, 0x5C apart (`em_hit_window_set`, `enemy/em_common.cpp`).
- * size: 0x5C */
-struct EmHitSlot {
-    /* +0x00 */ u8 bytes[0x5C];
 };
 
 struct EmPartState {
@@ -407,15 +420,15 @@ struct _ENEMY_WORK {
     /* +0x1F8 */ u8 field_0x1F8;
     /* +0x1F9 */ u8 field_0x1F9;        /* nonzero, `fn_801400BC`'s command is skipped */
     /* +0x1FA */ u8 field_0x1FA;
-    /* +0x1FB */ u8 field_0x1FB;        /* set by `fn_80147F48`'s case 9 */
+    /* +0x1FB */ u8 field_0x1FB;        /* set by `em001_event_notify`'s case 9 */
     /* +0x1FC */ u8 field_0x1FC;        /* the action-record / "special part" request flag: both
-                                        * `enemy/em001_prog.cpp`'s `fn_801542D0` and
+                                        * `enemy/em001_prog.cpp`'s `em001_action_select` and
                                         * `enemy/em007_act.cpp`'s `fn_801DF8EC` arm it with
                                         * +0x1FE/+0x1FF */
     /* +0x1FD */ u8 field_0x1FD;        /* nonzero, `fn_8013FC60`'s command is skipped */
-    /* +0x1FE */ u8 field_0x1FE;        /* the mode/timer byte `fn_801542D0` arms (0x0A/0x1E) and
+    /* +0x1FE */ u8 field_0x1FE;        /* the mode/timer byte `em001_action_select` arms (0x0A/0x1E) and
                                         * `fn_801DF8EC` writes (0x0A), beside +0x1FC/+0x1FF */
-    /* +0x1FF */ u8 field_0x1FF;        /* the id `fn_801542D0`/`fn_801DF8EC` arm beside
+    /* +0x1FF */ u8 field_0x1FF;        /* the id `em001_action_select`/`fn_801DF8EC` arm beside
                                         * +0x1FC/+0x1FE */
     /* +0x200 */ s16 field_0x200;
     /* +0x202 */ s16 field_0x202;
@@ -453,8 +466,8 @@ struct _ENEMY_WORK {
             /* +0x30E */ u8 no_ceiling_0x30E;  /* set, `em_height_limit_update` skips the ceiling clamp in move mode 1 */
             /* +0x30F */ u8 no_surface_0x30F;  /* set, `em_height_limit_update` skips the water-surface clamp in move mode 2 */
             /* +0x310 */ u8 unused_0x310[0x314 - 0x310];
-            /* +0x314 */ f32 field_0x314;  /* the effect scale `fn_80148BD0` writes */
-            /* +0x318 */ f32 field_0x318;  /* the effect radius `fn_801493A8` writes from `em_key_curve_eval` */
+            /* +0x314 */ f32 field_0x314;  /* the effect scale `em001_act1_5` writes */
+            /* +0x318 */ f32 field_0x318;  /* the effect radius `em001_spawn_step` writes from `em_key_curve_eval` */
         };
         /* the offset vector TWO units rotate and hand the position helpers: `enemy/em005_act.cpp`'s
          * `fn_801CC5DC` and `enemy/em030_prog.cpp`'s `fn_801B1F94`, the em030
@@ -470,7 +483,7 @@ struct _ENEMY_WORK {
             /* +0x320 */ f32 field_0x320;  /* the third effect scale `fn_80167770` seeds, and the one
                                             * `enemy/em030_prog.cpp`'s `fn_801B1F94` arms beside
                                             * the +0x310 triple */
-            /* +0x324 */ f32 field_0x324;  /* the effect scale `fn_801493A8` clamps */
+            /* +0x324 */ f32 field_0x324;  /* the effect scale `em001_spawn_step` clamps */
         };
         /* the second offset vector `enemy/em007_act.cpp`'s `fn_801D83C0` rotates (`rotVecY` on
          * +0x31C; `.y`/`.z` are the two floats above, so the two views share the bytes). */
@@ -531,17 +544,19 @@ struct _ENEMY_WORK {
             /* +0x350 */ s16 tev_0x350;
             /* +0x352 */ s16 tev_0x352;
         };
-        /* the float/rotation view `enemy/em001_prog.cpp`'s `fn_80154988` steps (the same bytes
+        /* the float/rotation view `enemy/em001_prog.cpp`'s `em001_part_rot_update` steps (the same bytes
          * as the flat s32 view above, read as the animation angles the effect rotates by). */
         struct {
             /* +0x328 */ u8 unused_0x328d[0x08];
-            /* +0x330 */ s32 field_0x330;
-            /* +0x334 */ u8 unused_0x334d[0x08];
-            /* +0x33C */ f32 field_0x33C;
+            /* +0x330 */ s32 field_0x330;     /* the rotation triple `em001_user_data_node_calc` hands to `cpSetRotMatrix` */
+            /* +0x334 */ s32 field_0x334;
+            /* +0x338 */ s32 field_0x338;
+            /* +0x33C */ f32 field_0x33C;     /* the translation `em001_user_data_node_calc` gives joint 18 */
             /* +0x340 */ f32 field_0x340;
-            /* +0x344 */ u8 unused_0x344d[0x04];
-            /* +0x348 */ f32 field_0x348;
+            /* +0x344 */ f32 field_0x344;
+            /* +0x348 */ f32 field_0x348;     /* the translation `em001_user_data_node_calc` gives joint 10 */
             /* +0x34C */ f32 field_0x34C;
+            /* +0x350 */ f32 field_0x350;
         } rot_0x328;
         /* the byte view `enemy/em003_prog.cpp`'s `em003_timers_clear` resets (the free-slot states of
          * the effect slot set). */
@@ -687,14 +702,16 @@ struct _ENEMY_WORK {
             /* +0x32D */ u8 kcolor_latch_0x32D;  /* set once the K-colour override has run */
             /* +0x32E */ u8 unused_0x32Efm[0x354 - 0x32E];
         };
-        /* the UV-model slot view `enemy/fn_802F5138.cpp` keeps: the slot index
-         * `fn_802F51C8` clears, the "armed" flag cleared beside it, and the "model created" flag
-         * `fn_802F5464` arms for the two idle modes and `fn_802F8B28` reads back by index.  A union
+        /* the UV-model slot view `enemy/em032_half_hp_ck.cpp` keeps: the slot index
+         * `em032_slots_clear` clears, the "armed" flag cleared beside it, and the "model created" flag
+         * `em032_event_notify` arms for the two idle modes and `em032_state_byte_get` reads back by index.  A union
          * member because the views above already own these bytes. */
         struct {
             /* +0x328 */ u8 slot_0x328;
             /* +0x329 */ u8 armed_0x329;
-            /* +0x32A */ u8 unused_0x32A[0x33E - 0x32A];
+            /* +0x32A */ u8 unused_0x32A[0x330 - 0x32A];
+            /* +0x330 */ nw4r::math::VEC3 pos_0x330;  /* the position the charge step measured from */
+            /* +0x33C */ u8 unused_0x33C[0x33E - 0x33C];
             /* +0x33E */ u8 created_0x33E;  /* the model has been placed for this slot */
             /* +0x33F */ u8 unused_0x33F[0x354 - 0x33F];
         } uv_model_0x328;
@@ -789,12 +806,12 @@ struct _ENEMY_WORK {
         } em040_0x328; /* size: 0x2C */
     };
     /* +0x354 */ union {
-        /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
+        /* the s16 view `em001_frame_update` counts and the byte view `em001_event_notify` flags - the same four
          * bytes, in the two spellings the reconstructed units use (rule 1: one home). */
         struct {
-            /* +0x0 */ s16 field_0x354;   /* the 50-frame action counter `fn_801481D8` ticks and wraps */
-            /* +0x2 */ u8 field_0x356;    /* the action's "hold" flag `fn_80147F48` arms/clears */
-            /* +0x3 */ u8 field_0x357;    /* the action's case-6 flag `fn_80147F48` sets */
+            /* +0x0 */ s16 field_0x354;   /* the 50-frame action counter `em001_frame_update` ticks and wraps */
+            /* +0x2 */ u8 field_0x356;    /* the action's "hold" flag `em001_event_notify` arms/clears */
+            /* +0x3 */ u8 field_0x357;    /* the action's case-6 flag `em001_event_notify` sets */
         };
         /* the 32-bit action bit set `enemy/em025_prog.cpp` clears (`fn_8019E948`), sets
          * (`fn_8019E960`) and tests (`fn_8019E9AC`): `slot = id / 8` clamped to 3,
@@ -809,7 +826,7 @@ struct _ENEMY_WORK {
     };
     /* +0x358 */ union {
         struct {
-            /* +0x358 */ u8 field_0x358;       /* the action's "run" flag `fn_80147F48` arms/clears */
+            /* +0x358 */ u8 field_0x358;       /* the action's "run" flag `em001_event_notify` arms/clears */
             /* +0x359 */ u8 field_0x359;       /* `enemy/em018_prog.cpp`'s `fn_801994F4` sets it with
                                                 * +0x35B at the two state-0/1 action starts. */
             /* +0x35A */ u8 unused_0x35A;
@@ -855,7 +872,7 @@ struct _ENEMY_WORK {
     /* +0x384 */ f32 field_0x384;       /* the record's +0x04 float, copied in with it */
     /* +0x388 */ u16 field_0x388;
     /* +0x38A */ u8 field_0x38A;
-    /* +0x38B */ u8 field_0x38B;       /* `fn_80147F48`'s per-step flag (cleared on entry) */
+    /* +0x38B */ u8 field_0x38B;       /* `em001_event_notify`'s per-step flag (cleared on entry) */
     /* +0x38C */ u8 field_0x38C;        /* bit 0 gates `fn_8012C870` */
     /* +0x38D */ u8 field_0x38D;        /* `fn_80137C9C`'s action-end block clears it */
     /* +0x38E */ u8 field_0x38E;        /* `fn_80137C9C`'s action-end block clears it */
@@ -897,7 +914,7 @@ struct _ENEMY_WORK {
     union {
         struct {
         /* +0x454 */ u8 unused_0x454[0x464 - 0x454];
-        /* +0x464 */ f32 field_0x464;      /* the motion parameter `fn_80149C58` hands to `em_mot_layer_blend_step` */
+        /* +0x464 */ f32 field_0x464;      /* the motion parameter `em001_act3_4` hands to `em_mot_layer_blend_step` */
         /* +0x468 */ u16 sync_flag_0x468;   /* cleared by every enemy net send and receive */
         /* +0x46A */ u8 freeze_0x46A;  /* set, `em_timers_update` runs only the motion and shake timers */
         /* +0x46B */ s8 event_slot_0x46B;  /* the enemy-control event target it was matched to, -1 = none */
