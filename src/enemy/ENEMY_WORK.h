@@ -660,6 +660,13 @@ struct _ENEMY_WORK {
             /* +0x340 */ nw4r::math::VEC3 tev_color2_0x340;  /* RGB written to TEV konst slots 2 and 3 (GUESS: the secondary glow) */
             /* +0x34C */ u8 unused_0x34Cem[0x354 - 0x34C];
         } em024_0x328;
+        /* the em017 program's alert pair (`enemy/em016_prog.cpp`): the flag its event hook latches for event kind 0xA
+         * and the "a ranked ally is near" flag its per-frame area scan sets (both GUESS names).  size: 0x2C */
+        struct {
+            /* +0x328 */ u8 alert_0x328;
+            /* +0x329 */ u8 ally_near_0x329;
+            /* +0x32A */ u8 unused_0x32Aem017[0x354 - 0x32A];
+        } em017_0x328; /* size: 0x2C */
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
@@ -700,7 +707,7 @@ struct _ENEMY_WORK {
             /* +0x35A */ s16 tev_0x35A;
             /* +0x35C */ s16 tev_0x35C;
             /* +0x35E */ u8 tev_0x35E;
-            /* +0x35F */ u8 unused_0x35F;
+            /* +0x35F */ u8 tev_0x35F;     /* cleared beside `tev_0x35E` by `enemy/em016_prog.cpp`'s init */
         };
     };
     /* +0x360 */ s16 field_0x360;      /* fn_8013FD98's "already in this mode" countdown */

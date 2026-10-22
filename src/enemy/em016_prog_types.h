@@ -85,7 +85,7 @@ struct EmMtxHolder {
  * array as `i * 0x90 + 0x590`); only the liveness byte and the position are read.  size: 0x90 */
 struct EmCluster {
     /* +0x00 */ u8 unused_0x00[0x03];
-    /* +0x03 */ u8 live_0x03;     /* `fn_80191E30` needs >= 1 */
+    /* +0x03 */ u8 live_0x03;     /* `em016_user_data_cluster_place` needs >= 1 */
     /* +0x04 */ u8 unused_0x04[0x20];
     /* +0x24 */ VEC3 pos_0x24;    /* the work's +0x5B4 */
     /* +0x30 */ u8 unused_0x30[0x60];
@@ -96,7 +96,7 @@ struct EmCluster {
 struct EmActWork {
     /* +0x000 */ u8 active;       /* `fn_80192448` skips an empty record */
     /* +0x001 */ u8 unused_0x001[0x003 - 0x001];
-    /* +0x003 */ u8 team;         /* the dispatch key of `fn_80191598` (16/17/21) and `fn_80192448`
+    /* +0x003 */ u8 team;         /* the dispatch key of `em016_action_select` (16/17/21) and `fn_80192448`
                                    * (0x12) */
     /* +0x004 */ u8 unused_0x004[0x00A - 0x004];
     /* +0x00A */ u8 field_0x00A;  /* 1 selects the second entry block of the dispatch */
