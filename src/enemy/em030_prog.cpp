@@ -12,7 +12,7 @@
  *    keeps the timer decrement as `subi` + `cmpwi`, ours fuses it into `subic.`;
  *  - `fn_801B0230`, `fn_801B0810`, `fn_801B0A28`, `fn_801B13A4`: retail keeps `clrlwi` + `cmpwi`, ours emits
  *    `clrlwi.`; `fn_801B055C` the same with `rlwinm.`;
- *  - `fn_801B0010`, `fn_801B096C`: the {1,2} / {10,11} case groups are two compares where retail uses the
+ *  - `em_area_engaged_ck`, `fn_801B096C`: the {1,2} / {10,11} case groups are two compares where retail uses the
  *    `(x - 1) <= 1` range test (the `(u32)(team - 1) <= 1` spelling has retail's size but reorders the blocks);
  *  - `fn_801B03E8`, `fn_801B0450`, `fn_801B0230`: retail reads the +0x328 halfword with `lhz`, ours with `lha`;
  *  - `fn_801B06D4`, `fn_801B42DC`: retail's frame is 0x30 against our 0x20 (retail spills f31 with `psq_st`);
@@ -131,7 +131,7 @@ extern "C" f32 lbl_80798B40; /* 2000.0f */
 
 /* 0x801B0010 (0xFC): whether any live kind-3 work record in `area` is engaged, asking the per-team checker
  * (cases 1/2 the shared one, 5 and 7 their own) for each 0xB18-byte record. */
-extern "C" u32 fn_801B0010(u32 area) {
+extern "C" u32 em_area_engaged_ck(u32 area) {
     u16 max = get_move_work_max(3);
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
     s32 i = 0;
@@ -552,8 +552,8 @@ extern "C" void fn_801B0A28(_ENEMY_WORK* work) {
     }
 
     if (work->field_0x00A != 1 && work->field_0x833 == 1) {
-        fn_8012C300(0x1E, work->area_no);
-        fn_8012C300(0x1F, work->area_no);
+        em_team_area_alert_set(0x1E, work->area_no);
+        em_team_area_alert_set(0x1F, work->area_no);
     }
     if (em_break_state_ck(work) == 1 && work->field_0x331 == 0) {
         work->field_0x331 = 1;

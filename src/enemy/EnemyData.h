@@ -10,6 +10,29 @@ typedef struct EmDataRecord EmDataRecord;   /* enemy/fn_80138074.c */
 typedef struct UserDataItem UserDataItem;   /* enemy/fn_80138074.c */
 typedef struct EnemyExtraData EnemyExtraData; /* enemy/em_common.cpp */
 
+/* One ailment effect record of the enemy data (`EnemyData::ailment_fx_0x9C`): the joint and the offset.
+ * size: 0x14 */
+struct EmAilmentFx {
+    /* +0x00 */ u32 joint;
+    /* +0x04 */ f32 x;
+    /* +0x08 */ f32 y;
+    /* +0x0C */ f32 z;
+    /* +0x10 */ f32 scale;
+};
+
+/* The enemy data's ailment effect block (`EnemyData::ailment_fx_0x9C`); `enemy/em_common.cpp` and
+ * `enemy/em027_prog.cpp` read it.
+ * size: 0x24 (lower bound) */
+struct EmAilmentFxBlock {
+    /* +0x00 */ f32 base_scale;        /* the effect scale `em_fx_scale_get` returns */
+    /* +0x04 */ f32 paralysis_scale;   /* the paralysis spark scale `em_paralysis_fx_scale_get` returns */
+    /* +0x08 */ struct EmAilmentFx* poison;
+    /* +0x0C */ struct EmAilmentFx* sleep;
+    /* +0x10 */ struct EmAilmentFx* stun;
+    /* +0x14 */ u8 unused_0x14[0x20 - 0x14];
+    /* +0x20 */ f32 hit_scale;         /* the hit effect scale `em_hit_fx_scale_get` returns */
+};
+
 /* The per-enemy data record `get_enemy_data` returns.  Union of `enemy/em_common.cpp` and
  * `enemy/fn_80138074.c`; the two views are compatible (a pointer table at +0x04, the value list at
  * +0x64, the user-data items at +0x94 and the extra block at +0xA0). size: 0xA4 */

@@ -26,7 +26,8 @@ typedef struct _ENEMY_DATA {
     /* +0x16 */ u8 highlight_0x16;   /* set while an enemy-control event highlights the entry (`emc_highlight_set`) */
     /* +0x17 */ u8 field_0x17;   /* `fn_801671AC` compares it against the work's +0x46C */
     /* +0x18 */ struct _ENEMY_WORK* work_0x18; /* the entry's live enemy work, or NULL */
-    /* +0x1C */ u8 pad_0x1C[0x08];
+    /* +0x1C */ u8 pad_0x1C[0x06];
+    /* +0x22 */ s16 field_0x22;  /* `enemy/em027_prog.cpp`'s frame update takes the hold when it is 1 */
     /* +0x24 */ nw4r::math::VEC3 vec_0x24; /* the entry's seat/aim vector */
     /* +0x30 */ f32 speed_0x30;  /* the target weave reach `em_target_pos_set` latches (`enemy/em_common.cpp`) */
     /* +0x34 */ u8 pad_0x34[0x36 - 0x34];

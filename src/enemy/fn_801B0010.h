@@ -1,4 +1,4 @@
-/* Declarations `enemy/em030_prog.cpp` owns that other units call (`fn_801B0010`, `fn_801B4348`/`fn_801B4398` in
+/* Declarations `enemy/em030_prog.cpp` owns that other units call (`em_area_engaged_ck`, `fn_801B4348`/`fn_801B4398` in
  * their definitions' signatures).
  */
 #ifndef MHTRI_ENEMY_FN_801B0010_H
@@ -14,7 +14,7 @@ extern "C" {
 
 /* 0x801B0010 - the area predicate: r3 the area (`u32`; the body narrows it itself) and the answer in r3, which the
  * caller compares against 1. */
-u32 fn_801B0010(u32 area);
+u32 em_area_engaged_ck(u32 area);
 /* 0x801B4348 - the seat/state reset `enemy/em034_prog.cpp` runs at its two teardown steps. */
 void fn_801B4348(struct _ENEMY_WORK* self);
 /* 0x801B4398 - the seat lookup that band walks: r3 the work record, r4 the kind set, r5 the `u32*`

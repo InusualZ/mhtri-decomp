@@ -65,7 +65,13 @@ struct _ENEMY_MINI_WORK {
         /* +0x30 */ struct _ENEMY_WORK* enemy_0x30;  /* the same word as `QuestBossSpawn::enemy_0x30` */
         /* +0x30 */ u32 spawn_0x30;                  /* the same word as `enemy/em003_prog.cpp`'s pick reads it */
     };
-    /* +0x34 */ u8 data_0x34[0x10];      /* the work's `data_0xB04` */
+    union {
+        /* +0x34 */ u8 data_0x34[0x10];      /* the work's `data_0xB04` */
+        struct {
+            /* +0x34 */ u8 resume_mode_0x34;  /* the work's `resume_mode_0xB04` (`enemy/em027_prog.cpp`'s mini step) */
+            /* +0x35 */ u8 seated_keep_0x35;  /* the work's `seated_keep_0xB05` */
+        }; /* size: 0x02 */
+    };
 };
 
 #endif /* MHTRI_ENEMY_ENEMY_MINI_WORK_H */

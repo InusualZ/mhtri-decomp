@@ -279,6 +279,15 @@ struct Em025Block {
 };
 
 /* size: 0xB18 */
+/* The saved position block em035's init (`enemy/em033_prog.cpp`) keeps at `_ENEMY_WORK::run_0xB04`.
+ * size: 0x10 */
+struct EmRunPos {
+    /* +0x00 */ nw4r::math::VEC3 pos;  /* the position saved and restored */
+    /* +0x0C */ u16 angle;             /* the heading saved with it */
+    /* +0x0E */ u8 flags;              /* bit 0: a saved position is present */
+    /* +0x0F */ u8 unused_0x0F;
+};
+
 struct _ENEMY_WORK {
     /* +0x000 */ u8 active;             /* nonzero while the record is in use */
     /* +0x001 */ u8 visible_0x001;          /* the quest marker shows the record only while this is set (`quest_target_color`) */
@@ -617,6 +626,31 @@ struct _ENEMY_WORK {
             /* +0x338 */ s8 point_0x338;      /* the area data point (6 or 7) the zone charge aims at */
             /* +0x339 */ u8 unused_0x339em22[0x354 - 0x339];
         } em022_0x328; /* size: 0x2C */
+        /* the seated flag `enemy/em027_prog.cpp` keeps (its state query kind 0 reports it; the init restores it
+         * from `seated_keep_0xB05`). */
+        struct {
+            /* +0x328 */ u8 seated_0x328;
+        } em027_0x328; /* size: 0x01 */
+        /* the em033 program's own block (`enemy/em033_prog.cpp`): the colour tween's step counter and its
+         * wind-down vector, the roster record it hunts and the hold kind that record reports, and the body
+         * colour/scale the tween writes. */
+        struct {
+            /* +0x328 */ s32 timer_0x328;          /* the colour tween's step (0..4) */
+            /* +0x32C */ nw4r::math::VEC3 vec_0x32C; /* the climb's remaining shift, spent over the timer */
+            /* +0x338 */ u8 color_step_0x338;
+            /* +0x339 */ u8 color_mode_0x339;
+            /* +0x33A */ u8 hold_kind_0x33A;       /* 1..4 from the record's +0x05 kind, 0 = none */
+            /* +0x33B */ u8 record_0x33B;          /* the roster record hunted (0xFF = none) */
+            /* +0x33C */ u8 unused_0x33C;
+            /* +0x33D */ u8 hit_prev_0x33D;        /* last frame's +0x43D hit flag */
+            /* +0x33E */ u8 attack_kind_0x33E;     /* the attack variant the state query reports */
+            /* +0x33F */ u8 phase_0x33F;           /* the hunt phase (0 idle, 1 locked, 2 tracking, 3 held) */
+            /* +0x340 */ u8 color_0x340[3];        /* the body K-colour the tween writes */
+            /* +0x343 */ u8 unused_0x343;
+            /* +0x344 */ u8 color_target_0x344[3]; /* the colour the tween starts from */
+            /* +0x347 */ u8 unused_0x347;
+            /* +0x348 */ nw4r::math::VEC3 scale_0x348; /* the body scale the tween grows */
+        } em033_0x328; /* size: 0x2C */
         /* the effect-seat view `enemy/em034_prog.cpp` keeps: the selected seat record index at
          * +0x328 (0xFF = none) and its armed flag at +0x329. */
         struct {
@@ -1142,7 +1176,14 @@ struct _ENEMY_WORK {
     /* +0xAEE */ u8 field_0xAEE;        /* `em_act_update`'s one-shot action-setup request */
     /* +0xAEF */ u8 unused_0xAEF[0xAF0 - 0xAEF];
     /* +0xAF0 */ EmDelayRec delays_0xAF0[1];  /* the delayed action `em_delay_act_set` queues */
-    /* +0xB04 */ u8 data_0xB04[0x10];  /* the 16 bytes the area entry keeps across a store (`em_area_entry_store`) */
+    union {
+        /* +0xB04 */ u8 data_0xB04[0x10];  /* the 16 bytes the area entry keeps across a store (`em_area_entry_store`) */
+        struct {
+            /* +0xB04 */ u8 resume_mode_0xB04;  /* the hold `enemy/em027_prog.cpp`'s frame update latches and its init re-arms */
+            /* +0xB05 */ u8 seated_keep_0xB05;  /* the seated flag that unit's init copies back into its +0x328 view */
+        }; /* size: 0x02 */
+        /* +0xB04 */ struct EmRunPos run_0xB04; /* the position em035's init saves and restores */
+    };
     /* +0xB14 */ struct _se_w* se_0xB14;  /* the sound-work handle `enemy/em006_prog.cpp`'s
                                            * `se_req_pos_ps`/`shell_se_req` calls take */
 };

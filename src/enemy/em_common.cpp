@@ -103,7 +103,7 @@
  *    forms `ainpc_w`'s address, which retail does not reference;
  *  - `fn_8012C3C8`, `fn_8012C4E8`: the distance test (`vec3_dist_sq`, `fmuls`) is laid out with the opposite branch
  *    polarity;
- *  - `fn_8012C300`, `fn_8012C600`, `fn_8012C6F4`, `fn_8012C870`, `fn_8012CDF4`, `fn_8012CF04`, `fn_8012D3E0`: the
+ *  - `em_team_area_alert_set`, `fn_8012C600`, `fn_8012C6F4`, `fn_8012C870`, `fn_8012CDF4`, `fn_8012CF04`, `fn_8012D3E0`: the
  *    `clrlwi` narrowing sits at a different point (at entry in one, at the use or store in the other);
  *  - `em_team_damage_under_ck`, `em_team_damage_over_ck`: retail keeps a dead loop counter (`li r4,0` +
  *    `addi r4,r4,1`) and loads `lbl_80796C68`/`lbl_80796C80` where ours names its own `.sdata2` magic;
@@ -4171,7 +4171,7 @@ extern "C" s32 em_team_member_claim(u32 team, u32 state_sub)
 
 /* Sets `flags_0xA04` bit 1 on every enemy-side record of `team` whose area matches `state_sub` and
  * returns 1 when at least one was marked. */
-extern "C" s32 fn_8012C300(u32 team, u32 state_sub)
+extern "C" s32 em_team_area_alert_set(u32 team, u32 state_sub)
 {
     _ENEMY_WORK* work;
     u16 max;
@@ -7297,27 +7297,7 @@ extern "C" void em_status_advance(_ENEMY_WORK* self)
     em_ailment_limit_raise(self, table, &self->field_0x91C, &self->poison_limit_0x922, &self->field_0x924);
 }
 
-/* One ailment effect record of the enemy data (`EnemyData::ailment_fx_0x9C`): the joint and the offset.
- * size: 0x14 */
-struct EmAilmentFx {
-    /* +0x00 */ u32 joint;
-    /* +0x04 */ f32 x;
-    /* +0x08 */ f32 y;
-    /* +0x0C */ f32 z;
-    /* +0x10 */ f32 scale;
-};
-
-/* The enemy data's ailment effect block (`EnemyData::ailment_fx_0x9C`).
- * size: 0x24 (lower bound) */
-struct EmAilmentFxBlock {
-    /* +0x00 */ f32 base_scale;        /* the effect scale `em_fx_scale_get` returns */
-    /* +0x04 */ f32 paralysis_scale;   /* the paralysis spark scale `em_paralysis_fx_scale_get` returns */
-    /* +0x08 */ EmAilmentFx* poison;
-    /* +0x0C */ EmAilmentFx* sleep;
-    /* +0x10 */ EmAilmentFx* stun;
-    /* +0x14 */ u8 unused_0x14[0x20 - 0x14];
-    /* +0x20 */ f32 hit_scale;         /* the hit effect scale `em_hit_fx_scale_get` returns */
-};
+/* `EmAilmentFx`/`EmAilmentFxBlock` (the enemy data's ailment effect block) are `enemy/EnemyData.h`'s. */
 
 /* 0x80132694 (0xD4): shows the poison bubbles at the enemy data's joint offset (default: joint 2, 100 up). */
 extern "C" void em_poison_fx_set(_ENEMY_WORK* self)
