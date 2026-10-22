@@ -151,7 +151,7 @@ extern "C" u32 fn_801B0010(u32 area) {
             }
             break;
         case 5:
-            if (fn_801D6694(work) == 1) {
+            if (em005_act13_early_ck(work) == 1) {
                 return 1;
             }
             break;
