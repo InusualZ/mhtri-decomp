@@ -242,7 +242,7 @@ extern EmFileEntry lbl_80582348[];
 extern f32 lbl_80796DBC;
 extern f32 lbl_80796DC0;
 extern f32 lbl_80796DC4;
-/* the row base `fn_80140CA0` indexes with `fn_800D4DD8`'s answer */
+/* the row base `fn_80140CA0` indexes with `res_mem_index_get`'s answer */
 /* the system work record `enemy_data_by_team_get` looks its extra table up in */
 extern u8 system_w[];
 
@@ -361,7 +361,7 @@ void res_file_assign(void* dst, void* src);
 void fn_8007BA08(void* a, void* b);
 s32 fn_800D56F4(char* name, u32 data);
 void* nw_res_entry_get(s32 handle);
-s32 fn_800D4DD8(char* name);
+s32 res_mem_index_get(char* name);
 void fn_800D5D60(void* work);
 void fn_800D5E30(void* work);
 void fn_800E38BC(void* a);
@@ -2431,7 +2431,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
         return;
     }
     rec = (u8*)nw_res_entry_get(work->handle_0x08);
-    fn_80140DAC(&row, (EmFileRow*)((u8*)nw_res_manager + fn_800D4DD8(name) * 0x4C + 0x3070));
+    fn_80140DAC(&row, (EmFileRow*)((u8*)nw_res_manager + res_mem_index_get(name) * 0x4C + 0x3070));
     if (rec == NULL) {
         return;
     }

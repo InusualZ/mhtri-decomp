@@ -142,11 +142,11 @@ struct EmActRec {
     /* +0x2 */ s16 value;
 };
 
-/* The file row `fn_80140DAC` copies (the 19 words of the table `fn_800D4DD8` indexes).  The unit
+/* The file row `fn_80140DAC` copies (the 19 words of the table `res_mem_index_get` indexes).  The unit
  * only copies the record - it reads none of its fields - so they stay `unused_0xNN`, at the offsets
  * the target's word-by-word copy names.
  * size: 0x4C */
-/* The 0x4C-byte file row `fn_80140DAC` copies (the table `fn_800D4DD8` indexes).  This unit only
+/* The 0x4C-byte file row `fn_80140DAC` copies (the table `res_mem_index_get` indexes).  This unit only
  * copies the record - it reads none of its fields - so they stay `unused_0xNN`, at the offsets the
  * target's own copy names.  The middle 0x40 bytes are 8-byte aligned on both sides, which is why the
  * target copies them two words at a time (measured: an `f64 unused_0x08[8]` member reproduces the
@@ -1032,7 +1032,9 @@ struct _ENEMY_WORK {
             /* +0x888 */ s32 field_0x888;       /* the effect handle `enemy/em034_prog.cpp`'s `fn_801B4E3C`
                                                 * releases through `fn_803B9994` and clears to -1; `fn_801B6C38`
                                                 * tests it against -1 */
-            /* +0x88C */ u8 unused_0x88C[0x89F - 0x88C];
+            /* +0x88C */ s32 drop_rec_0x88C[3];   /* the three drop records `em_drop_item_spawn` places (-1 free) */
+            /* +0x898 */ s16 drop_timer_0x898[3]; /* each drop's life, copied from the record's +0x1B8 */
+            /* +0x89E */ s8 drop_left_0x89E;      /* the drops the enemy may still spawn */
             /* +0x89F */ u8 field_0x89F;        /* the mode `em_motion_mode_set` latches */
         };
     };

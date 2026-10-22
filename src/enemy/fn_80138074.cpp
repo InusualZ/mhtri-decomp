@@ -931,12 +931,12 @@ void em_post_update(EnemyWork* self) {
         } else if ((self->flags_0x1C8 & 0x40000) != 0) {
             if (em_die_ck__FP11_ENEMY_WORK(self) == 1) {
                 u32 i;
-                for (i = 0; i < fn_800E28E4(EM_CHAR(self)); i++) {
+                for (i = 0; i < mhchar_mat_num_get(EM_CHAR(self)); i++) {
                     fn_800E30DC(EM_CHAR(self), i, 0x10);
                 }
             } else {
                 u32 i;
-                for (i = 0; i < fn_800E28E4(EM_CHAR(self)); i++) {
+                for (i = 0; i < mhchar_mat_num_get(EM_CHAR(self)); i++) {
                     fn_800E2EBC(EM_CHAR(self), i, 2);
                 }
             }

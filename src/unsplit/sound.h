@@ -18,7 +18,7 @@ extern "C" {
 
 void fn_800E0914(struct MHchar* ch);
 void fn_800E09D0(struct MHchar* ch, const Vec3* v, f32 arg2);
-u32 fn_800E28E4(struct MHchar* ch);
+u32 mhchar_mat_num_get(struct MHchar* ch);
 void fn_800E2EBC(struct MHchar* ch, u32 index, s32 arg2);
 void fn_800E30DC(struct MHchar* ch, u32 index, s32 arg2);
 void setScaleAll__6MHcharFf(struct MHchar* ch, f32 scale);

@@ -75,7 +75,7 @@ void fn_802910C0(VEC3* out, const VEC3* in, f32 scale);
 s32 fn_802919FC(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
 s32 fn_80291B08(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
 s32 fn_80291BBC(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind);
-void fn_80291C50(VEC3* pos, u8 flag, LandData* land, u32 kind);
+void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind);
 VEC3* fn_80292468(VEC3* pair);
 void vec3_scale_inv(VEC3* v, f32 divisor);
 VEC3* fn_8029573C(VEC3* v);
@@ -241,7 +241,7 @@ s32 fn_80291BBC(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind) {
 }
 
 /* 0x80291C50 - the kind-only query: no layer mask, no surface data. */
-void fn_80291C50(VEC3* pos, u8 flag, LandData* land, u32 kind) {
+void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind) {
     f32 out;
 
     fn_802977E4(land);

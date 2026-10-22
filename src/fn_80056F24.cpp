@@ -472,8 +472,8 @@ extern "C" void system_copy_filter_clear(void) {
  * The eased screen-fade alpha.
  * ------------------------------------------------------------------------------------------------- */
 
-/* `fn_800591AC`: the sine ease, `SinFIdx(0.7111111f * x)` (the owner namespace, rule 9). */
-extern "C" f32 fn_800591AC(f32 x) {
+/* `math_sin_deg`: the sine ease, `SinFIdx(0.7111111f * x)` (the owner namespace, rule 9). */
+extern "C" f32 math_sin_deg(f32 x) {
     return nw4r::math::SinFIdx(lbl_80795C80 * x);
 }
 
@@ -483,7 +483,7 @@ extern "C" void fn_8005913C(GameDrawState* s) {
         if (s->field_0x144 <= lbl_80795C74) {
             s->field_0x13C = 0;
         } else {
-            s->field_0x140 = (u8)(lbl_80795C7C * fn_800591AC(s->field_0x144));
+            s->field_0x140 = (u8)(lbl_80795C7C * math_sin_deg(s->field_0x144));
         }
     }
 }

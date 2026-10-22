@@ -352,7 +352,7 @@ extern "C" void fn_800DC878(nw4r::math::VEC3* pos) {
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DCA08(nw4r::math::VEC3* pos) {
+extern "C" void se_item_drop_req(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 167 : 67;
     se_slot_req_pos(0, id, pos);
 }

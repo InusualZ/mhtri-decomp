@@ -25,7 +25,7 @@
  * Result (measured against the target object with `recompile.py --measure`, official report metric):
  * 35 of 111 symbols at >= 80 %, 18 of them byte-identical (100.00).  The two tables (`resMem` at
  * +0x3070 and `resTable` at +0x16070), the five heap/allocator entry points, the name lookup / refcount
- * cluster (`pull_res_mem`, `push_res_mem`, `ckResourceName`, `fn_800D4CE4`/`fn_800D4DD8`, `nwDelResource`),
+ * cluster (`pull_res_mem`, `push_res_mem`, `ckResourceName`, `fn_800D4CE4`/`res_mem_index_get`, `nwDelResource`),
  * the retable reset pair (`fn_800D490C`/`fn_800D4A7C`) and the work entry points (`nwWorkInitialize`,
  * `nwMoveStart`, `nwMoveEnd`, `fn_800D5A04`/`fn_800D5A08`/`fn_800D5C4C`) are covered.
  *
@@ -148,7 +148,7 @@ void* fn_800D4C14(u32 size);
 void fn_800D4CA4(void* p);
 char* fn_800D4D9C(s32 index);
 s32 fn_800D4CE4(const char* path);
-s32 fn_800D4DD8(const char* path);
+s32 res_mem_index_get(const char* path);
 u32 nw_res_mem_size(s32 index);
 s32 fn_800D516C(void* data);
 void fn_800D5250(void);
@@ -316,7 +316,7 @@ s32 fn_800D4CE4(const char* path) {
 }
 
 /* 0x800D4DD8 - find a resource-memory slot by basename, without taking a reference. */
-s32 fn_800D4DD8(const char* path) {
+s32 res_mem_index_get(const char* path) {
     ResManager* m = nw_res_manager;
     s32 i;
     char* p = fn_80041404(path, 47);

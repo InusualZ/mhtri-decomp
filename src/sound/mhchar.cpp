@@ -200,7 +200,7 @@ extern "C" void mhchar_mat_blend_set(MHchar* self, u32 index, f32 value)
 }
 
 /* The model's +0x114 joint-list handle. */
-extern "C" u32 fn_800E28E4(MHchar* self)
+extern "C" u32 mhchar_mat_num_get(MHchar* self)
 {
     return reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResMatNumEntries();
 }

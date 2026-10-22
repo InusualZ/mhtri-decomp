@@ -52,7 +52,7 @@ struct _PL_ROOT {
     /* +0x0006 */ u8 unused_0x0006[0x00DC - 0x0006];
     /* +0x00DC */ u8* mode_work_0xDC;    /* `fn_8028F368` sets its +0x6A3E byte */
     /* +0x00E0 */ u8 unused_0x00E0[0x00E9 - 0x00E0];
-    /* +0x00E9 */ u8 area_no_0xE9;       /* `fn_8028F24C` hands it to `stage_map_kind_get` */
+    /* +0x00E9 */ u8 area_no_0xE9;       /* `pl_map_kind_get` hands it to `stage_map_kind_get` */
     /* +0x00EA */ u8 unused_0x00EA;
     /* +0x00EB */ u8 area_no_0xEB;       /* the area `quest_marker_draw_at` places the master's marker in */
     /* +0x00EC */ u8 unused_0x00EC;

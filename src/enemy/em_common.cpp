@@ -8951,17 +8951,6 @@ extern "C" u32 em_break_part_active_ck(_ENEMY_WORK* self, u8 any)
 }
 
 
-/* The enemy data's description of one breakable part (`EnemyData::table_0x98`): the lift it flies up by, the part
- * number `em_parts_break` takes and the three model materials it hides.
- * size: 0x20 (a lower bound: only these fields are reached) */
-struct EmBreakPartData {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ f32 lift;
-    /* +0x0C */ struct EmBreakPartCurves* curves;  /* the spin curves (`em_break_part_spin`) */
-    /* +0x10 */ u8 part;
-    /* +0x11 */ u8 pad_0x11[0x3];
-    /* +0x14 */ u32 mats[3];       /* 0xFFFFFFFF: none */
-};
 
 /* 0x80135C5C (0x1E8): breaks part `index` off (the part's pending hit kind 1/2 marks +0x836): picks its fall kind
  * from `flags` (4: none, 1: lifted) and, unless 4, breaks the model part, swaps its materials and places it above

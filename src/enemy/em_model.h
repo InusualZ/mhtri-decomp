@@ -21,7 +21,7 @@ extern EmPopWorkSlot em_pop_w;
 EmPopRec* em_roster_record_get(u32 index);
 /* 0x803B9588 - the per-slot effect/joint binding the range's entry points walk: r3 the work
  * record, r4 the slot index, r5 the slot pointer, r6/r7 two scalars. */
-void em_roster_slot_effect_set(struct _ENEMY_WORK* self, u16 index, s32* slot, s32 a, s32 b);
+s32 em_roster_slot_effect_set(struct _ENEMY_WORK* self, s32 index, s32* slot, s32 a, s32 b);
 s32 em_roster_record_slot_id_get(u32 index);
 u32 em_roster_record_alive_ck(u32 index);
 void em_roster_record_pos_set(s32 index, nw4r::math::VEC3* pos, u8 area);
@@ -32,12 +32,12 @@ EmPopRec* em_roster_record_clear(EmPopRec* rec);
 u32 em_roster_sub_record_clear(EmPopSubRec* rec);
 EmPopRec* em_roster_free_record_get(void);
 EmPopSubRec* em_roster_sub_free_get(void);
-void em_roster_record_copy(EmPopRec* dst, const EmPopRec* src);
-void em_roster_record_unlink(EmPopRec* rec);
-u32 em_roster_record_result_get(const EmPopRec* rec);
+struct EmPopSpare* em_roster_record_copy(struct EmPopSpare* dst, const struct EmPopSpare* src);
+void em_roster_record_unlink(struct EmPopObj* obj);
+u8 em_roster_record_result_get(const struct _ENEMY_WORK* enemy);
 
 /* 0x803BA69C - tests the local slot's move-work sub index.  GUESS name. */
-u32 quest_move_area_sub_ck(u8 sub);
+u8 quest_move_area_sub_ck(u8 sub);
 /* 0x803BAE80 - the weighted random pick over a 0xFFFF-terminated `EmWeightEntry` table.  GUESS name. */
 u16 em_weight_table_pick(const EmWeightEntry* table);
 
@@ -72,7 +72,39 @@ extern "C" {
 #endif
 /* 0x803B9FC8 - resets the enemy model pool (the system core's full reset). */
 void em_model_pool_reset(void);
+
+/* 0x803B9E90 - allocates and zeroes the population work, its record arrays and the model-handle table.
+ * GUESS name. */
+void em_pop_work_alloc(void);
+/* 0x803BAF44 / 0x803BB090 / 0x803BABB0 - the area point searches over the roster: the nearest point of `area`
+ * within `range` of `pos` (its id, or 0xFFFF; its kind, centre, word and radius go out through the pointers), and
+ * the use/gather takes of the point under `pos` whose word is `word` (0 when none).  GUESS names. */
+u16 em_roster_area_near_find(u8 area, nw4r::math::VEC3* pos, f32 range, s16* out_kind, nw4r::math::VEC3* out_pos,
+                             u32* out_word, f32* out_radius);
+s32 em_roster_area_use_take(u8 area, nw4r::math::VEC3* pos, u32 word);
+u8 em_roster_area_gather_take(u8 area, nw4r::math::VEC3* pos, u32 word);
+/* 0x803BD3C0 / 0x803BD798 - add a roster record from a pop-file entry, and from a spare record head.
+ * GUESS names. */
+struct EmPopEntry;
+EmPopRec* em_roster_pop_entry_add(const struct EmPopEntry* entry, u8 area);
+EmPopRec* em_roster_spare_entry_add(struct EmPopSpare* src, s32 area, s32 slot);
+/* 0x803BD9F8 / 0x803BDBDC / 0x803BDD28 - the spare-record pool: reset it, push one record into a list, and
+ * spawn the drawn spares.  GUESS names. */
+void em_pop_spare_init(void);
+void em_pop_spare_push(struct EmPopSpare* spare, u8 area, s32 slot);
+void em_pop_spare_spawn(void);
+/* 0x803BE128 - releases kind `kind`'s resources.  GUESS name. */
+void em_kind_res_release(u8 kind);
 #ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+namespace nw4r {
+namespace math {
+/* 0x803BB788 - the cosine of an angle in degrees (nw4r's inline `CosDeg`; this unit keeps the copy). */
+f32 CosDeg(f32 deg);
+}
 }
 #endif
 

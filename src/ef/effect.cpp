@@ -209,7 +209,7 @@ void fn_800A95D8(void* handle);
 s32 ef_resource_instance(void);
 void ef_resource_remove_all_effect_projects(void);
 void ef_resource_remove_all_texture_projects(s32 handle);
-s32 fn_800E28E4(void* chr);
+s32 mhchar_mat_num_get(void* chr);
 s32 copied_mat_access_valid_ck(void* access);
 
 void* scn_mdl_mat_access_get_tev_color(void* access, u32 idx);
@@ -555,7 +555,7 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
     }
     case 1: {
         MHchar* chr = (MHchar*)target;
-        fn_800E28E4(chr);
+        mhchar_mat_num_get(chr);
         v = (u32)((f32)owner->field_0x15 * ((f32)rgb[0] * (lbl_807965F8 * (f32)params->color_0x30[0])) * lbl_807965F8);
         if (v > 0xFF) v = 0xFF;
         out[0] = (u8)v;
@@ -727,7 +727,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
     eft_capsule_ctor((EftVectors*)&box);
     VEC3_ctor(&pos);
     eft_shape_init(&shape);
-    s32 count = fn_800E28E4(chr);
+    s32 count = mhchar_mat_num_get(chr);
     u8 flags = owner->flags_0x14;
     if ((flags & 1) != 0) {
         for (s32 i = 0; i < count; i++) {

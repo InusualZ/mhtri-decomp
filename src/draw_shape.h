@@ -67,6 +67,16 @@ void draw_shape_reset(void);
  * with (added with `menu/menu_infomation.cpp`'s sharpness bar). */
 void drawshape_set_color_array(const u32* colors);
 void drawshape_set_scale_ivec2(const s16* offset, const f32* scale);
+
+/* One map kind's population files: the place file and the free-hunt file.  size: 0x10 */
+typedef struct EmPopResFiles {
+    /* +0x00 */ u32 size_0x00;
+    /* +0x04 */ char* name_0x04;
+    /* +0x08 */ u32 size_0x08;
+    /* +0x0C */ char* name_0x0C;
+} EmPopResFiles;
+/* 0x8058AC20 (.data) - per map kind, the population files `enemy/em_model.cpp` loads and releases (GUESS name). */
+extern EmPopResFiles* stage_pop_res_tbl[12];
 #ifdef __cplusplus
 }
 #endif

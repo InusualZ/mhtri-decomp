@@ -1082,7 +1082,7 @@ u32 fn_8028F204(void) {
 }
 
 /* 0x8028F24C - the `+0xE9` area byte through `stage_map_kind_get`. */
-u32 fn_8028F24C(void) {
+u32 pl_map_kind_get(void) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     if (root == 0) {
         return 0;

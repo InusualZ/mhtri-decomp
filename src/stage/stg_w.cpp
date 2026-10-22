@@ -560,7 +560,7 @@ extern "C" u32 stage_cell_get(u8 i, u8 j)
 }
 
 /* Same lookup, but the area is an argument. */
-extern "C" u32 fn_802B0290(u8 i, u8 j, u8 area)
+extern "C" u32 stage_area_cell_get(u8 i, u8 j, u8 area)
 {
     StageArea* a = &SW->areas[(u8)area];
     StageAreaRow* r = &a->rows[(u8)i];

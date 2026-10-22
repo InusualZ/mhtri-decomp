@@ -33,7 +33,7 @@
 
 
 
-extern "C" SeSlot* fn_800DD504(nw4r::math::VEC3* pos)
+extern "C" SeSlot* se_pop_spring_req(nw4r::math::VEC3* pos)
 {
     return se_slot_req_pos(46, 64, pos);
 }

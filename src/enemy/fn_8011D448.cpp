@@ -3397,20 +3397,20 @@ extern "C" void em_roster_default_effect_set(_ENEMY_WORK* self)
 {
     switch (self->team) {
     case 20:
-        em_roster_slot_effect_set(self, em_roster_record_result_get((EmPopRec*)self), &self->roster_slot_0x888, 8, 0);
+        em_roster_slot_effect_set(self, em_roster_record_result_get(self), &self->roster_slot_0x888, 8, 0);
         break;
     case 24:
-        em_roster_slot_effect_set(self, em_roster_record_result_get((EmPopRec*)self), &self->roster_slot_0x888, 4, 0);
+        em_roster_slot_effect_set(self, em_roster_record_result_get(self), &self->roster_slot_0x888, 4, 0);
         break;
     case 25:
         em025_effect_slots_reset(self);
         break;
     default:
         if (((u32 (*)(_ENEMY_WORK*))em_water_check)(self) == 1) {
-            em_roster_slot_effect_set(self, em_roster_record_result_get((EmPopRec*)self), &self->roster_slot_0x888, 0,
+            em_roster_slot_effect_set(self, em_roster_record_result_get(self), &self->roster_slot_0x888, 0,
                                       0);
         } else {
-            em_roster_slot_effect_set(self, em_roster_record_result_get((EmPopRec*)self), &self->roster_slot_0x888, 1,
+            em_roster_slot_effect_set(self, em_roster_record_result_get(self), &self->roster_slot_0x888, 1,
                                       0);
         }
         break;
@@ -3679,7 +3679,7 @@ extern "C" u8 em_seq_exec(_ENEMY_WORK* self, EmSeqCmd* seq, u8 reverse)
                 roster = cmd->roster;
                 if (roster != NULL) {
                     ((void (*)(_ENEMY_WORK*, s32, s32*, s32, s32))em_roster_slot_effect_set)(
-                        self, roster->base + (u8)em_roster_record_result_get((EmPopRec*)self), &self->roster_slot_0x888,
+                        self, roster->base + (u8)em_roster_record_result_get(self), &self->roster_slot_0x888,
                         roster->kind, 0);
                 } else {
                     em_roster_default_effect_set(self);

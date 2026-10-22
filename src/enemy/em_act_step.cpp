@@ -54,7 +54,7 @@ extern "C" {
 #endif
 
 /* The out-of-range callees whose owner's header does not declare them; each spelling is the callee's own body. */
-void fn_80051B7C(void* out, const void* in, f32 scale, s32 a);
+void vec3_random_offset(void* out, const void* in, f32 scale, s32 a);
 void em_action_finish_fall(struct _ENEMY_WORK* self);
 void fn_8032DD04(struct _EM_CHARA_WORK* self);
 f32 calcVecDistXZ(const void* a, const void* b);
@@ -247,7 +247,7 @@ extern "C" void em_eff_ground_set(_EM_CHARA_WORK* self)
 
     em_ground_rec_clear(&rec);
     if (em_ground_rec_find(self->field_0x01A, &rec) != 0) {
-        fn_80051B7C(&self->pos, &rec.pos_0x08, lbl_8079B114, 0);
+        vec3_random_offset(&self->pos, &rec.pos_0x08, lbl_8079B114, 0);
         eft_rot_vec_copy(&self->rot, (_CP_VECTOR*)&rec.field_0x14);
     }
 }

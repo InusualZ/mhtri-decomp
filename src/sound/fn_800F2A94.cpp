@@ -178,7 +178,7 @@ u32 PlayMode_ck();
 s32 GetStreamStatus(u32 channel);
 u32 event_demo_ck();
 extern "C" u32 demo_play_ck();
-extern "C" u32 fn_8028F24C();
+extern "C" u32 pl_map_kind_get();
 u32 get_now_mapno();
 u32 get_now_areano();
 
@@ -509,7 +509,7 @@ extern "C" void bgm_track15_req() {
     if (work == NULL) {
         return;
     }
-    if ((u8)fn_8028F24C() == 6 && (u8)get_now_areano() != 1) {
+    if ((u8)pl_map_kind_get() == 6 && (u8)get_now_areano() != 1) {
         return;
     }
     fn_800F3054(1, 0x15);
