@@ -3712,13 +3712,13 @@ void fn_8025F088(_PLW* self) {
         break;
     case 3:
         if (self->vec_0x03C.y < pl_float_110 + self->ground_y_0x060) {
-            fn_800524C0(pl_float_0_6, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
+            vec3_move_damp(pl_float_0_6, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
                         &self->vec_0x03C);
         }
         break;
     default:
         if (self->field_0x01B == 0) {
-            fn_800524C0(pl_float_0_3, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
+            vec3_move_damp(pl_float_0_3, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
                         &self->vec_0x03C);
         }
         break;

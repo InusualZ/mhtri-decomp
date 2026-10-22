@@ -11,6 +11,8 @@
 #include "fn_8004CAD8/mtx.h" /* MTX34_ctor / set_slot_none - the two this unit's consumers share */
 #include "fn_8004CAD8/get_qResult_work.h" /* get_qResult_work (leaf header) */
 #include "vec3_scale.h" /* vec3_scale (leaf header) */
+#include "draw_rect.h" /* _DRAW_RECT_2D_TEX, DrawRect */
+#include "vs_user_data.h" /* _vs_user_data */
 
 #ifdef __cplusplus
 void wii_sysmsg_gen(long id, char* buf, long a);
@@ -24,25 +26,7 @@ void wii_sysmsg_gen(long id, char* buf, long a);
  * declaration reproduces it - `quest/quest_entry.cpp`'s relocations name `get_qResult_work__Fv`.  It is
  * declared in the leaf header `fn_8004CAD8/get_qResult_work.h`, included below the guard.) */
 
-/* The 0x100 B VS user block `get_vsUser_work` indexes (the two slots at 0x8066A620/0x8066A720).
- * The block's own name is the mangling's (`ck_mydata_vs__FP13_vs_user_dataP13_vs_user_data`), so a
- * caller that reaches a mangled consumer spells it `_vs_user_data`.  Only the fields this project's
- * functions touch are named; every other byte is filler.  size: 0x100 */
-struct _vs_user_data {
-    /* +0x00 */ u8 cfg_0x00[0x18];  /* the per-index option bytes `get_arena_cfg` reads (the
-                                     * `0x803BE30C` band's arena twin of `option_w`) */
-    /* +0x18 */ s32 point_0x18;      /* the credit `score_add_clamped` accumulates for the player */
-    /* +0x1C */ u8 pad_0x1C[0x2C - 0x1C];
-    /* +0x2C */ u32 item_0x2C[0x10]; /* the 16 four-byte item slots `item_count_find`/`item_take` walk */
-    /* +0x6C */ u32 slot_a_0x6C[10]; /* the first of the two per-slot flag runs `multi_box_phase_ck` counts (ten words: `arena_result_next` walks them all) */
-    /* +0x94 */ u32 slot_b_0x94[10]; /* its sibling; the two are read as a pair per slot */
-    /* +0xBC */ u16 ready_mask_0xBC; /* the per-player ready bits the phase gate tests against 0x380 */
-    /* +0xBE */ u8 pad_0xBE[0xCF - 0xBE];
-    /* +0xCF */ u8 player_0xCF;      /* the player's index into `system_w`'s per-player flag runs */
-    /* +0xD0 */ u8 option_0xD0[0x1F];  /* the player's copy of `option_w` (31 bytes), restored before a save */
-    /* +0xEF */ u8 pad_0xEF[0xFC - 0xEF];
-    /* +0xFC */ u32 checksum_0xFC;     /* the byte sum of +0x00..+0xFB (`vs_user_checksum_set`) */
-};
+/* `_vs_user_data` lives in `vs_user_data.h`, included above. */
 
 /* 0x8004D14C - one of the two 0x100 B VS user slots, or null when the index is out of range (the
  * owner defines it with the same `long` parameter, which is what its mangling `__Fl` asks for).
@@ -238,19 +222,7 @@ void drawshape_set_offset_ivec2(s16* pos);
 f32 anim_tick_cos(u16 t);
 f32 anim_tick_angle(u16 t);
 
-/* One 2D textured rectangle for `draw_rect_2d_tex_by_id` (the map's `_DRAW_RECT_2D_TEX`): the corner, the
- * opposite corner, the colour word and the two texture coordinate pairs.  size: 0x14 */
-typedef struct _DRAW_RECT_2D_TEX {
-    /* +0x00 */ s16 x;       /* the top-left corner */
-    /* +0x02 */ s16 y;
-    /* +0x04 */ s16 end_x;   /* the opposite corner (corner + size) */
-    /* +0x06 */ s16 end_y;
-    /* +0x08 */ u32 color;
-    /* +0x0C */ s16 u0;      /* the first texture coordinate pair */
-    /* +0x0E */ s16 v0;
-    /* +0x10 */ s16 u1;      /* the second pair */
-    /* +0x12 */ s16 v1;
-} _DRAW_RECT_2D_TEX;
+/* `_DRAW_RECT_2D_TEX` and `DrawRect` live in `draw_rect.h`, included above. */
 
 /* The draw-shape band's setters the cockpit quest HUD drives (0x80053xxx-0x80054xxx); names are guesses from
  * the callers (the owner's bodies are not written yet).  The vec2 arguments are two-float pairs. */
@@ -278,7 +250,7 @@ void place_rec_copy(void* dst, const void* src);
 /* 0x8004EA58 - the 8-row item table's insert: it fills the first empty row with the caller's 16-byte
  * record, and when every row is full shifts the table down one row and writes the record into the
  * last.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */
-void fn_8004EA58(const void* entry);
+void userdata_item_row_push(const void* entry);
 
 /* 0x8004F3B4 - stores the byte sum of VS user block `index`'s first 0xFC bytes in its `checksum_0xFC` (GUESS name). */
 void vs_user_checksum_set(u8 index);
@@ -378,14 +350,5 @@ void lobby_friend_row_copy(struct LobbyTimerRow* dst, const struct LobbyTimerRow
 }
 #endif
 
-/* The screen rectangle `draw_rect_set` (0x800525F0) fills and `draw_shape.cpp`'s `draw_rect_fill` (0x8005351C)
- * draws: two corners and the fill colour.  size: 0xC */
-typedef struct DrawRect {
-    /* +0x0 */ s16 x0;
-    /* +0x2 */ s16 y0;
-    /* +0x4 */ s16 x1;
-    /* +0x6 */ s16 y1;
-    /* +0x8 */ u32 color;
-} DrawRect;
 
 #endif /* MHTRI_FN_8004CAD8_H */

@@ -135,7 +135,7 @@ extern char ef_stripe_inline3_file_str[]; /* "ef_drawstripestrategy.cpp" (an inl
 extern char ef_stripe_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."       .data 0x80593C14 */
 
 /* Helpers owned by other units. */
-extern void* fn_800508AC(void* arg);
+extern void* vec3_to_const_vec(void* arg);
 extern void  PSMTXMultVec(const f32* mtx, const void* src, void* dst);
 extern void  ef_particle_get_move_dir(void* arg, Vec* v);
 
@@ -1162,7 +1162,7 @@ s32 ef_draw_setting_connect_type(void* ctx, EfParticleState* particle) {
 
 /* Transforms a vector by the matrix the helper pair builds, and returns `dst`. */
 VEC3* ef_vec3_transform(VEC3* dst, const MTX34* m, const VEC3* v) {
-    PSMTXMultVec((const f32*)mtx34_const_ptr((u32)m), fn_800508AC((void*)v), vec3_to_vec(dst));
+    PSMTXMultVec((const f32*)mtx34_const_ptr((u32)m), vec3_to_const_vec((void*)v), vec3_to_vec(dst));
     return dst;
 }
 

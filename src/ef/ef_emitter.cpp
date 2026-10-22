@@ -107,7 +107,7 @@ void ef_mtx34_scale_columns(void* out, void* mtx, void* in);
 void fn_8009CCAC(void* out, void* mtx, void* in);
 f32 sqrt_f32(f32 x);
 void subVec3(void* dst, void* a, void* b);
-void* fn_800508AC(void* vec);
+void* vec3_to_const_vec(void* vec);
 f32 PSVECSquareDistance(void* a, void* b);
 void mtx34_identity(void* mtx);
 void vec3_scale_by(void* dst, void* src, f32 scale);
@@ -1172,7 +1172,7 @@ extern "C" f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4) {
  * ------------------------------------------------------------------------------------------------- */
 
 extern "C" f32 ef_vec3_dist_sq(void* a, void* b) {
-    return PSVECSquareDistance(fn_800508AC(a), fn_800508AC(b));
+    return PSVECSquareDistance(vec3_to_const_vec(a), vec3_to_const_vec(b));
 }
 
 /* -------------------------------------------------------------------------------------------------

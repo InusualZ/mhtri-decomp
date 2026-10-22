@@ -3959,7 +3959,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
 
                     req->state_0x000++;
                     sysSE_stop(3);
-                    fn_8004D0D8(world, (u8)req->value_0x004);
+                    userdata_hunter_equip_set(world, (u8)req->value_0x004);
                     sub->flag_0x01C = world->count_0x009E;
                     memset(&arg, 0, sizeof(arg));
                     arg.kind_0x00 = 1;
@@ -3981,7 +3981,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                 if (world->count_0x0002 != req->value_0x004) {
                     req->state_0x000++;
                     sysSE_stop(0x28);
-                    fn_8004D0E0(world, (u8)req->value_0x004);
+                    userdata_hunter_hair_set(world, (u8)req->value_0x004);
                     pl_parts_color_set((struct _PLW*)sub, 5, world->count_0x0002);
                     fn_801EC7AC(self);
                 } else {

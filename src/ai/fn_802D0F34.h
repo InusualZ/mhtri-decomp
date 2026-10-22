@@ -56,7 +56,7 @@ void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void eft004_key_spawn(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
 void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b);
 void em_land_data_init(nw4r::math::VEC3* out);
-void fn_800524C0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
+void vec3_move_damp(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
                   nw4r::math::VEC3* c, f32 d);
 void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void g3d_root_model_bind(s32 a, u32 b);

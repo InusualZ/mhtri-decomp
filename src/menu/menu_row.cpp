@@ -94,7 +94,7 @@ extern "C" void note_slot_draw_row(u8 note_entry, s8 light, u16 word) {
 
 /* Finds the row whose kind and key words match `entry` in the 8-row item table. */
 extern "C" u32 menu_row_find(const MenuRowData* entry) {
-    MenuRowData* rows = fn_8004EA24();
+    MenuRowData* rows = userdata_item_rows_get();
     u32 found = 0;
 
     for (u32 i = 0; i < 8; i++) {
@@ -130,14 +130,14 @@ extern "C" u32 menu_row_find(const MenuRowData* entry) {
 
 /* Clears the row at `index` in the 8-row item table. */
 extern "C" void menu_row_clear(u16 index) {
-    MenuRowData* rows = fn_8004EA24();
+    MenuRowData* rows = userdata_item_rows_get();
 
     rows[index].kind = 0;
 }
 
 /* Counts the empty rows of the 8-row item table. */
 extern "C" u8 menu_row_empty_count(void) {
-    MenuRowData* rows = fn_8004EA24();
+    MenuRowData* rows = userdata_item_rows_get();
     u8 count = 0;
 
     for (u32 i = 0; i < 8; i++) {
@@ -156,7 +156,7 @@ extern "C" u32 menu_row_reserve(MenuRowData* entry) {
     if (menu_row_empty_count() != 0) {
         return 2;
     }
-    fn_8004EA58(entry);
+    userdata_item_row_push(entry);
     return 0;
 }
 

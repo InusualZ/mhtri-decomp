@@ -17,6 +17,9 @@ f32 cosf(f32 x);
 f32 sinf(f32 x);
 /* 0x80463EBC - `x` to the power `y`. */
 f32 powf(f32 x, f32 y);
+/* 0x80463E08 / 0x80463F74 - the single-precision arc tangent of `y / x` and square root. */
+f32 atan2f(f32 y, f32 x);
+f32 sqrtf(f32 x);
 
 #ifdef __cplusplus
 }

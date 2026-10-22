@@ -366,7 +366,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
         sprite_frame_apply((_SPR_DATA_*)&spr, 0x4D9, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x57), id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x58), id, &pos);
-        data = &fn_8004EA24()[slot->scroll.row];
+        data = &userdata_item_rows_get()[slot->scroll.row];
         switch (data->kind) {
         case 1:
         case 2:

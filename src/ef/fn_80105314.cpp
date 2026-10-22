@@ -97,7 +97,7 @@ struct _EFT013_WORK_A {
 /* ---------------------------------------------------------------------------------------------------
  * externs - mangled callees are declared through their real signature (rule 9)
  * ------------------------------------------------------------------------------------------------- */
-extern "C" void fn_80050708(void* mtx, nw4r::math::VEC3* v);
+extern "C" void mtx34_scale_in_place(void* mtx, nw4r::math::VEC3* v);
 
 /* ---------------------------------------------------------------------------------------------------
  * the unit's tables (.data), in address order
@@ -1258,7 +1258,7 @@ extern "C" void fn_80106F5C(_EFT013* self) {
         work->scale_0x04 *= work->scale_0x08;
     }
     setVector3(&v, work->scale_0x04, work->scale_0x04, work->scale_0x04);
-    fn_80050708(&mtx, &v);
+    mtx34_scale_in_place(&mtx, &v);
     for (i = 0; i < work->count; i++) {
         work->effects[i]->SetRootMtx(mtx);
         fn_800F975C(work->effects[i], &self->pos_0x18);

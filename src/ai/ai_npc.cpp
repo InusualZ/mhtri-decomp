@@ -9303,10 +9303,10 @@ void fn_802D1D90(struct _AINPC_W* self)
     copyVec3(&self->pos_0x178, &self->model.pos_0x04);
     if (self->variant != 1) {
         if (self->variant != 2) {
-            fn_800524C0(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, &self->pos_0x178,
+            vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, &self->pos_0x178,
                          lbl_8079A7B4);
         } else if (self->pos_0x184.y < lbl_8079A688 + self->field_0x19C) {
-            fn_800524C0(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, &self->pos_0x178,
+            vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, &self->pos_0x178,
                          lbl_8079A73C);
         }
     }

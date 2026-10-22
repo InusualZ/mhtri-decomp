@@ -100,7 +100,7 @@ u32 item_count_find(u16 id, void* a, s32 b);
 u32 userdata_item_count_total(u16 id, void* userdata);
 u32 item_slots_count_sum(u16 id, void* a, u16 b);
 u8 monster_size_crown_get(u8 a, u16 b);
-MenuRowData* fn_8004EA24(void);
+MenuRowData* userdata_item_rows_get(void);
 char* flfntStrChr(char* text, s32 c);   /* owner: `g3d/g3d_anmchr.cpp` */
 void monster_size_value_get(u8 a, u16 b, f32* out);
 u32 pl_item_page2_ck(s32 worker);

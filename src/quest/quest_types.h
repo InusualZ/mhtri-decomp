@@ -11,6 +11,7 @@
 #include "nw4r/math.h"                /* nw4r::math::VEC3 (Q_MoveWork) */
 #include "quest/quest_result_work.h"   /* Q_QuestStat, Q_ResultWork (shared with menu/ and lobby/) */
 #include "id_value.h"                 /* IdValue (Q_UserData's item box) */
+#include "Pl/plw.h"                   /* _EQUIP (Q_UserData's worn equipment and equipment box) */
 #include "enemy/ENEMY_MINI_WORK.h"     /* _ENEMY_MINI_WORK (QuestBossSpawn) */
 
 /* The player work record `quest_item_work_merge`'s first argument points at (defined in `pl.h`);
@@ -324,6 +325,68 @@ typedef struct LbShipBlock {
     /* +0x1D */ u8 pad_0x1D;
 } LbShipBlock;
 
+/* One saved equipment set of the save block: the equipment-box indices of the weapon, the two bowgun parts and
+ * the six armour pieces (0xFFFF for none, `Q_UserData::box_weapon_0x008C`'s layout) and a flag `my_set_store`
+ * clears.  size: 0x2A */
+struct Q_MySet {
+    /* +0x00 */ u16 weapon_0x00;
+    /* +0x02 */ u16 parts_0x02[2];
+    /* +0x06 */ u16 armour_0x06[6];
+    /* +0x12 */ u8 flag_0x12;
+    /* +0x13 */ u8 unused_0x13[0x2A - 0x13];
+};
+
+/* One saved bowgun set: the weapon's and the two parts' equipment-box indices and a flag.  size: 0x1E */
+struct Q_GunSet {
+    /* +0x00 */ u16 weapon_0x00;
+    /* +0x02 */ u16 parts_0x02[2];
+    /* +0x06 */ u8 flag_0x06;
+    /* +0x07 */ u8 unused_0x07[0x1E - 0x07];
+};
+
+/* One row record of the save block's item-menu log, as the save side reads it (the menu reads the same 16 bytes
+ * through `menu/menu_item_page.h`'s `MenuRowData`): the row kind (0 for an empty row) and the ids the kinds use -
+ * 3/4 an equipment id at +0x06, 1/2 an item id at +0x08, 6 an id at +0x0A.  size: 0x10 */
+struct Q_ItemRow {
+    /* +0x00 */ u32 kind_0x00;
+    /* +0x04 */ u16 equip_kind_0x04;
+    /* +0x06 */ u16 equip_id_0x06;
+    /* +0x08 */ u16 item_id_0x08;
+    /* +0x0A */ u16 id_0x0A;
+    /* +0x0C */ u16 value_0x0C;
+    /* +0x0E */ u8 unused_0x0E[0x10 - 0x0E];
+};
+
+/* The text fields of a saved friend, each its own type so a row copy goes field by field (as the retail copy does). */
+struct Q_FriendName {
+    /* +0x00 */ char text_0x00[0x14];
+};  /* size: 0x14 */
+struct Q_FriendId {
+    /* +0x00 */ char text_0x00[0xB];
+};  /* size: 0xB */
+struct Q_FriendProfile {
+    /* +0x00 */ u8 data_0x00[0x15];
+};  /* size: 0x15 */
+
+/* One saved friend: the name, the id text the lobby's friend rows are matched by, and profile bytes.  size: 0x34 */
+struct Q_FriendRow {
+    /* +0x00 */ Q_FriendName name_0x00;
+    /* +0x14 */ Q_FriendId id_0x14;
+    /* +0x1F */ Q_FriendProfile profile_0x1F;
+};
+
+/* The saved friend list: the count and up to 50 rows.  size: 0xA2C */
+struct Q_FriendBook {
+    /* +0x000 */ s32 count_0x000;
+    /* +0x004 */ Q_FriendRow rows_0x004[50];
+};
+
+/* One arena quest's saved row (the lobby keeps the first 0x1F bytes of each).  size: 0x25 */
+struct Q_ArenaRow {
+    /* +0x00 */ u8 data_0x00[0x1F];
+    /* +0x1F */ u8 unused_0x1F[0x25 - 0x1F];
+};
+
 struct Q_UserData {
     /* +0x0000 */ u8 hunter_sex_0x0000;     /* the character make's model (0 or 1) */
     /* +0x0001 */ u8 hunter_face_0x0001;
@@ -331,7 +394,13 @@ struct Q_UserData {
     /* +0x0003 */ char hunter_name_0x0003[0x11];
     /* +0x0014 */ u32 hair_color_0x0014;     /* the hair colour as an RGBA word */
     /* +0x0018 */ s32 zenny_0x18;  /* the player's money (`score_add_clamped` credits it) */
-    /* +0x001C */ u8 pad_0x001C[0x9E - 0x1C];
+    /* +0x001C */ u32 profile_0x001C;    /* a word the network profile exports carry beside the hunter rank */
+    /* +0x0020 */ _EQUIP weapon_0x0020;     /* the worn weapon */
+    /* +0x002C */ _EQUIP parts_0x002C[2];   /* the worn bowgun parts (kinds 12 and 13) */
+    /* +0x0044 */ _EQUIP armour_0x0044[6];  /* the worn armour, kinds 1..6 */
+    /* +0x008C */ u16 box_weapon_0x008C;    /* each worn record's index in `equip_box_0x0E00`, 0xFFFF for none */
+    /* +0x008E */ u16 box_parts_0x008E[2];
+    /* +0x0092 */ u16 box_armour_0x0092[6];
     /* +0x009E */ u8 hunter_equip_0x009E;   /* the character make's demo equipment set */
     /* +0x009F */ u8 hunter_voice_0x009F;
     /* +0x00A0 */ u8 pad_0x00A0[0x180 - 0xA0];
@@ -339,10 +408,16 @@ struct Q_UserData {
     /* +0x01E0 */ u8 pad_0x01E0[0x490 - 0x1E0];
     /* +0x0490 */ Q_CountSet set_c;
     /* +0x04E2 */ Q_CountSet set_d;
-    /* +0x0534 */ u8 pad_0x0534[0x39A0 - 0x534];
+    /* +0x0534 */ u8 pad_0x0534[0xE00 - 0x534];
+    /* +0x0E00 */ _EQUIP equip_box_0x0E00[800];   /* the equipment box `userdata_equip_box_add_new` fills */
+    /* +0x3380 */ Q_MySet my_set_0x3380[20];      /* the saved equipment sets (`my_set_*`) */
+    /* +0x36C8 */ Q_GunSet gun_set_0x36C8[20];    /* the saved bowgun sets (`gun_set_*`) */
+    /* +0x3920 */ u8 pad_0x3920[0x39A0 - 0x3920];
     /* +0x39A0 */ u8 face_type_0x39A0;
     /* +0x39A1 */ u8 face_eye_0x39A1;
-    /* +0x39A2 */ u8 pad_0x39A2[0x39BC - 0x39A2];
+    /* +0x39A2 */ u8 pad_0x39A2[0x39BA - 0x39A2];
+    /* +0x39BA */ u8 appearance_0x39BA;    /* an appearance byte the VS user block carries beside the face and makeup */
+    /* +0x39BB */ u8 pad_0x39BB;
     /* +0x39BC */ u32 inner_color_0x39BC;    /* the inner-wear colour as an RGBA word */
     /* +0x39C0 */ Q_CountSet set_a;
     /* +0x3A12 */ u8 pad_0x3A12[0x3AC0 - 0x3A12];
@@ -361,16 +436,25 @@ struct Q_UserData {
     /* +0x3F38 */ u8 pad_0x3F38[0x3F95 - 0x3F38];
     /* +0x3F95 */ u8 cat_name_0x3F95[3];   /* the name index of each of the three kitchen Felynes (NPC kinds 0x14..0x16) */
     /* +0x3F98 */ EmSetSave em_set_0x3F98;   /* the free hunt's monster records (`em_set_work_init`) */
-    /* +0x406E */ u8 pad_0x406E[0x42D0 - 0x406E];
+    /* +0x406E */ u8 pad_0x406E[0x4078 - 0x406E];
+    /* +0x4078 */ Q_ItemRow item_rows_0x4078[8];  /* the item menu's eight row records (`userdata_item_rows_get`) */
+    /* +0x40F8 */ u8 pad_0x40F8[0x4114 - 0x40F8];
+    /* +0x4114 */ Q_ArenaRow arena_rows_0x4114[12];  /* one row per arena quest (`userdata_arena_rows_export`) */
     /* +0x42D0 */ Q_ArenaRecord arena_0x42D0[12];  /* the arena quests' record holders, by arena quest */
     /* +0x4540 */ u8 pad_0x4540[0x4654 - 0x4540];
     /* +0x4654 */ LbShipBlock ship_0x4654;   /* the trade ship (`lobby/lb_equip_page.cpp`) */
-    /* +0x4672 */ u8 pad_0x4672[0x483A - 0x4672];
+    /* +0x4672 */ u8 pad_0x4672[0x47DA - 0x4672];
+    /* +0x47DA */ u16 progress_flags_0x47DA[0x30];  /* the progress flags, 16 per halfword (`userdata_progress_flag_*`; the
+                                                    * extent runs to the next named field) */
     /* +0x483A */ u8 pig_name_0x483A;   /* the Poogie's name index (`name_menu_step`) */
     /* +0x483B */ u8 pig_dress_0x483B;  /* the Poogie's costume (`pig_menu_step`) */
     /* +0x483C */ u8 pad_0x483C[0x484E - 0x483C];
     /* +0x484E */ u16 kitchen_seed_0x484E;    /* the kitchen's roll seed, re-drawn after every meal */
-    /* +0x4850 */ u8 pad_0x4850[0x516C - 0x4850];
+    /* +0x4850 */ u8 pad_0x4850[0x4AD8 - 0x4850];
+    /* +0x4AD8 */ u32 item_seen_0x4AD8[30];         /* one bit per item id (`userdata_item_seen_set` takes ids 0..746) */
+    /* +0x4B50 */ u8 equip_flags_0x4B50[1500];      /* per equipment item: bit flags (bit 2 the "new" mark), indexed by
+                                                    * the kind's base plus the item id */
+    /* +0x512C */ u32 event_flags_0x512C[0x10];     /* one bit per event in the event-id table (`userdata_flag_ck`) */
     /* +0x516C */ u8 kitchen_pairs_0x516C[0xF0];  /* the ingredient pairs tried offline, one bit per pair */
     /* +0x525C */ u8 kitchen_pairs_0x525C[0x14];  /* the pairs tried online (approximate: to the note timer) */
     /* +0x5270 */ NoteTimer note_timer_0x5270;   /* the note trade's voyage record (`note_timer_*`, `note_trade_*`) */
@@ -383,7 +467,8 @@ struct Q_UserData {
     /* +0x5364 */ u32 vs_items_0x5364[0x10];  /* the VS user block's 16 item slots (`item_0x2C`) */
     /* +0x53A4 */ s32 vs_point_0x53A4;       /* its `point_0x18` credit */
     /* +0x53A8 */ u32 seed_0x53A8;           /* the save slot in the top byte and a random value */
-    /* +0x53AC */ u8 pad_0x53AC[0x6000 - 0x53AC];
+    /* +0x53AC */ Q_FriendBook friends_0x53AC;   /* the saved friend list (`lobby_friend_list_sort` keeps it in step) */
+    /* +0x5DD8 */ u8 pad_0x5DD8[0x6000 - 0x5DD8];
 };  /* size: 0x6000 */
 
 struct QuestEntrySlot;

@@ -243,10 +243,10 @@ extern f32 vec3_distance(const Vec3* a, const Vec3* b);
 extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
 extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern void MTX33_ctor(Mtx34* mtx);
-extern void fn_80051894(Mtx34* out, const Mtx34* a, const Mtx34* b, s32 arg3, f32 t, f32 u);
+extern void mtx34_blend(Mtx34* out, const Mtx34* a, const Mtx34* b, s32 arg3, f32 t, f32 u);
 extern void vec3_scale(Vec3* out, const Vec3* v, f32 scale);
 extern f32 vec3_dot(const Vec3* a, const Vec3* b);
-extern void fn_800524C0(Vec3* out, const Vec3* a, const Vec3* b, const Vec3* c, f32 t);
+extern void vec3_move_damp(Vec3* out, const Vec3* a, const Vec3* b, const Vec3* c, f32 t);
 extern void mtx34_copy(Mtx34* out, const Mtx34* src);
 extern void res_node_assign(void* out, const void* src);
 extern s32 res_node_get_parent(void* arg0);
@@ -840,13 +840,13 @@ void fn_8013823C(EnemyWork* self) {
         switch (self->field_0x1E2) {
         case 0:
             if (was_special != 1) {
-                fn_800524C0(&self->field_0x194, &self->field_0x188, &self->field_0x230,
+                vec3_move_damp(&self->field_0x194, &self->field_0x188, &self->field_0x230,
                             &self->field_0x188, lbl_80796D68);
             }
             break;
         case 2:
             if (self->field_0x194.z < lbl_80796D58 + (self->field_0x20C + em_dive_depth_get(self))) {
-                fn_800524C0(&self->field_0x194, &self->field_0x188, &self->field_0x230,
+                vec3_move_damp(&self->field_0x194, &self->field_0x188, &self->field_0x230,
                             &self->field_0x188, lbl_80796D6C);
             }
             break;

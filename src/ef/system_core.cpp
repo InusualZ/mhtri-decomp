@@ -358,7 +358,7 @@ void monster_size_value_get(u32 a, u32 b) {
     ((ComDataFunc)com_data_func[0])((u8)a, (u16)b);
 }
 
-void fn_800CEE88(u32 a) {
+void monster_size_table_get(u32 a) {
     ((ComDataFunc1)com_data_func[1])((u8)a);
 }
 

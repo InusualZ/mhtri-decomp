@@ -76,7 +76,7 @@ u32 pl_act_kind_get(struct _PLW* self);
 
 /* ---- library callees (the owners' headers do not declare these) ---- */
 u32 calc_xz_angle(f32 a, f32 b, f32 c, f32 d);
-u32 fn_800524C0(f32 a, void* b, void* c, void* d, void* e);
+u32 vec3_move_damp(f32 a, void* b, void* c, void* d, void* e);
 u32 mhchar_model_mtx_update(void* p);
 u32 event_demo_running_ck(void);
 u32 se_slot_req(s32 value);
