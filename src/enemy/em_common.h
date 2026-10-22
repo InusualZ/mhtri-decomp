@@ -134,6 +134,10 @@ void em_move_sub_mode_set(struct _ENEMY_WORK* self, u8 sub);
 void em_stamina_regen(struct _ENEMY_WORK* self, f32 rate, s16 delta, s16 period);
 /* 0x80131E80 */
 void em_busy_timer_clear(struct _ENEMY_WORK* self);
+/* 0x80126BD4 */
+u32 em_area_entry_enter_ck(struct EmAreaEntry* entry, u8 map, u8 area);
+/* 0x80126E3C */
+u8 em_kind_area_next(u8 group, u8 team, u8 from, u8 to, u16 seed);
 
 /* The helpers `enemy/fn_8011D448.cpp` calls, as the owner defines them. */
 s32 em_part_slot_get(struct _ENEMY_WORK* self, u8 part);

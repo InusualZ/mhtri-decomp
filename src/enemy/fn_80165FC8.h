@@ -99,7 +99,7 @@ int fn_8006FDCC(const void* p);
 void res_node_assign(void* obj, const void* sub);
 void assignVec3(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void mtx34_concat_assign(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
-u32 fn_802B0998(u32 kind);
+u32 stg_area_flag_index_ck(u32 kind);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4): declared in their owner's header,
  * `ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them (rule 2). */
 void rotMatrixX(u32 angle, nw4r::math::MTX34* m);

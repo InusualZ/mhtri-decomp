@@ -114,7 +114,7 @@
  *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
  *    earlier;
- *  - `fn_8012B86C`, `em_team_member_claim`, `em_attack_start`, `fn_8012E968`: register allocation only.
+ *  - `fn_8012B86C`, `em_team_member_claim`, `em_attack_start`, `em_area_vacant_wait_ck`: register allocation only.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.rodata`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
  *   short of the claim (the unwritten rows above).
  * SHAPES. `#pragma peephole off` from the first body to the end (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi`
@@ -123,7 +123,7 @@
  *   parameter widths come from the codegen (retail masks them; a C++ declaration loses the `clrlwi`);
  *   `fn_80128590`/`fn_801285A0` take `u8`/`u16` so their stores stay unmasked; `fn_8012BA00`'s branch order, `u32`
  *   parameters, empty `else if (enemy->field_0x1E2 == 2)` arm and local order are load-bearing (docs/enemy.md);
- *   `fn_8012E968` reuses its `mode` argument as the table index; the callees the folded sources declared differently
+ *   `em_area_vacant_wait_ck` reuses its `mode` argument as the table index; the callees the folded sources declared differently
  *   are called through cast macros (`<name>_viewN`) and the disagreeing header declarations are renamed away around
  *   their `#include`; `em_part_hit_set`'s `switch` puts `default: return;` first (a trailing default costs two
  *   branches), and its material ids compare unsigned against 0xFFFFFFFF (retail's `addis` + `cmplwi 0xFFFF`).
@@ -593,7 +593,7 @@ extern "C" void em_attack_done_set(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E6A0(u32 kind, u16 id);
 extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy);
 extern "C" s32 em_mini_kill_kind_get(_ENEMY_WORK* enemy);
-extern "C" void fn_8012E8DC(_ENEMY_WORK* record);
+extern "C" void em_attack_finished_clear(_ENEMY_WORK* record);
 extern "C" s32 fn_8012E8F4(f32 seconds);
 
 extern "C" u8 stage_map_kind_get(u32 map_no);
@@ -5207,7 +5207,7 @@ extern "C" s32 em_mini_kill_kind_get(_ENEMY_WORK* enemy)
 }
 
 /* Clears the "attack finished" byte once it has been consumed. */
-extern "C" void fn_8012E8DC(_ENEMY_WORK* record)
+extern "C" void em_attack_finished_clear(_ENEMY_WORK* record)
 {
     if (record->field_0x008 == 5) {
         record->field_0x008 = 0;
@@ -5223,7 +5223,7 @@ extern "C" s32 fn_8012E8F4(f32 seconds)
 }
 
 /* The mode-dispatched predicate (see the file header). */
-extern "C" s32 fn_8012E968(_ENEMY_WORK* self, u8 mode)
+extern "C" s32 em_area_vacant_wait_ck(_ENEMY_WORK* self, u8 mode)
 {
     _ENEMY_WORK* work;
     EmAreaEntry* entry;

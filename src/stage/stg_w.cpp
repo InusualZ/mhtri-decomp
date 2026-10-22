@@ -434,7 +434,7 @@ extern "C" u32 stage_map_kind_get(u32 kind)
 }
 
 /* Tail-calls stg_area_flag_ck with the byte pair lbl_805CF038[2*index], [2*index+1]. */
-extern "C" u32 fn_802B0998(u8 index)
+extern "C" u32 stg_area_flag_index_ck(u8 index)
 {
     const u8* p = &lbl_805CF038[(u8)index * 2];
     return stg_area_flag_ck(p[0], p[1]);
@@ -679,11 +679,11 @@ extern "C" void fn_802B09B8(u8 id, u8 j)
 extern "C" u32 stage_gate_a_ck()
 {
     u8 count = 0;
-    if (fn_802B0998(3) == 1)
+    if (stg_area_flag_index_ck(3) == 1)
         count = 1;
-    if (fn_802B0998(11) == 1)
+    if (stg_area_flag_index_ck(11) == 1)
         count++;
-    if (fn_802B0998(4) == 1)
+    if (stg_area_flag_index_ck(4) == 1)
         count++;
     if (count >= 2)
         return 1;

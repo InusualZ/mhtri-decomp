@@ -5,7 +5,7 @@
 
 /* One entry of the area/group table `em_area_entry_tbl` (0x806A54E0..0x806A76E0, `enemy/enemy_control.cpp`'s `.bss`):
  * four of them per group, 32 groups.
- * Only the four bytes `fn_8012E968` tests are named.
+ * Only the four bytes `em_area_vacant_wait_ck` tests are named.
  * size: 0x44 */
 typedef struct EmAreaEntry {
     /* +0x00 */ u8 active;           /* nonzero while the entry is in use */

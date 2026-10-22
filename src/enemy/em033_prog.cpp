@@ -70,7 +70,7 @@ struct EmAimSource {
     /* +0x348 */ nw4r::math::VEC3 field_0x348;
 }; /* size: 0x354 */
 
-extern "C" u32 fn_802B0998(u8 index);
+extern "C" u32 stg_area_flag_index_ck(u8 index);
 
 /* 0x80295924 (`Pl/pl_coll.cpp`): the segment/line intersection test, declared at C++ scope (its map name is
  * this signature's mangling). */
@@ -159,7 +159,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         case 4:
             *out_a = 0xC;
             *out_b = 0;
-            if (fn_802B0998(3) == 1) {
+            if (stg_area_flag_index_ck(3) == 1) {
                 em_move_target_set(self, 1, 3, lbl_8079B70C);
             } else {
                 em_move_target_set(self, 0, 2, lbl_8079B70C);

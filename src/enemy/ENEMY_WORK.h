@@ -254,7 +254,7 @@ struct _ENEMY_WORK {
     /* +0x007 */ u8 state_0x007;        /* em015_act2_hit_chain's second sub-state */
     /* +0x008 */ u8 field_0x008;
     /* +0x009 */ u8 field_0x009;        /* `fn_80170610` gates the position seat on it */
-    /* +0x00A */ u8 field_0x00A;        /* the area `fn_8012E968` matches the work records'
+    /* +0x00A */ u8 field_0x00A;        /* the area `em_area_vacant_wait_ck` matches the work records'
                                         * `area_no` (+0x1E1) and the area table's entries against */
     /* +0x00B */ u8 field_0x00B;        /* the byte `em_mot_set_blend` hands the effect queue as its flag */
     /* +0x00C */ u8 field_0x00C;        /* the mode `fn_80166DF8` gates its case-0/case-3 blocks on

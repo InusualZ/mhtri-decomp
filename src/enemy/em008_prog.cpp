@@ -3850,9 +3850,9 @@ u32 em008_state_query(_ENEMY_WORK* self, u8 kind) {
         if (stage_map_kind_get(self->field_0x1E0) == 2) {
             switch (self->area_no) {
             case 4:
-                return (fn_802B0998(3) == 1) + 1;
+                return (stg_area_flag_index_ck(3) == 1) + 1;
             case 6:
-                return (fn_802B0998(4) == 1) + 1;
+                return (stg_area_flag_index_ck(4) == 1) + 1;
             }
         }
         break;
@@ -4001,7 +4001,7 @@ u32 em008_area_start_ck(_ENEMY_WORK* self, u32 arg1) {
     if (em_mot_finished_ck_view1(self) == 0 && self->value_0x452 >= 0x384) {
         u32 motion;
         if ((s32)self->area_no != 6) {
-            if (fn_802B0998(3) == 1) {
+            if (stg_area_flag_index_ck(3) == 1) {
                 motion = 6;
             } else {
                 motion = 4;

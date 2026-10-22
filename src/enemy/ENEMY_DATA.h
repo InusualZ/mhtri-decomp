@@ -19,7 +19,8 @@ typedef struct _ENEMY_DATA {
     /* +0x0C */ u8 pad_0x0C[0x0F - 0x0C];
     /* +0x0F */ u8 field_0x0F;   /* `enemy/em022_prog.cpp`: 3 picks the +0x10 area over the +0x14 one */
     /* +0x10 */ u8 field_0x10;   /* the alternate area `enemy/em022_prog.cpp` moves to (0xFF = none) */
-    /* +0x11 */ u8 pad_0x11[0x14 - 0x11];
+    /* +0x11 */ u8 pad_0x11[0x13 - 0x11];
+    /* +0x13 */ u8 map_0x13;     /* the map `enemy/em010_prog.cpp`'s mini step hands `em_area_entry_enter_ck` */
     /* +0x14 */ u8 field_0x14;   /* `fn_80166DF8` compares it against the work's +0x1E1 */
     /* +0x15 */ u8 field_0x15;   /* the second area byte `enemy/em022_prog.cpp` copies with +0x14 */
     /* +0x16 */ u8 pad_0x16;
