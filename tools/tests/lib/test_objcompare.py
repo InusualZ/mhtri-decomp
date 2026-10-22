@@ -144,6 +144,11 @@ def test_symbol_rows(c):
     bad = ElfBuilder().section(".init", b"\xAB" * 8).symbol("gTable", ".init", 0, 8).build()
     c.check("... and still refuses different bytes", oc.symbol_rows(target, bad)["pad_00_init"]["identical"], False)
     c.check("symbol_locations keeps bytes per symbol", oc.symbol_locations(ours)["gTable"], (".init", 0, 8, b"\xAA" * 8))
+    tl = ElfBuilder().section(".text", b"\0" * 4 + b"\xCC" * 8).symbol("__arraydtor$9000", ".text", 4, 8).build()
+    ol = ElfBuilder().section(".text", b"\xCC" * 8).symbol("__arraydtor$9394", ".text", 0, 8).build()
+    row = oc.symbol_rows(tl, ol)["__arraydtor$9000"]
+    c.check("a compiler-local `stem$N` resolves by STEM when the number and offset moved",
+            (row["resolved_by"], row["candidate_name"], row["identical"]), ("stem", "__arraydtor$9394", True))
 
 
 def _calls(rows, extra_syms=()):

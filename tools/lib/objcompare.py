@@ -44,6 +44,8 @@ MAX_RELOC_DIFFS = 6
 MAX_RELOC_OFFSETS = 8
 #: objdiff pairs by name but a pair whose sizes differ by more than this ratio reads as untouched.
 OBJDIFF_SIZE_GAP = 1.5
+#: MWCC's numbered compiler-local names (`__arraydtor$9000`, `@1234` is a different spelling and not matched).
+LOCAL_SUFFIX_RE = re.compile(r"\$\d+$")
 
 
 def legacy_reloc_name(rtype: int, fallback: str = "R_PPC_%d") -> str:
@@ -627,7 +629,9 @@ def symbol_rows(target, ours) -> dict[str, dict]:
 
     A name the candidate lacks is resolved by ADDRESS: the candidate symbol at the same section and offset (the
     equal-size one first; never a sizeless label) stands in with `resolved_by="address"` - dtk names a range it
-    cannot attribute (`pad_*`), and objdiff can never pair it. `identical` stays strict: equal sizes and bytes."""
+    cannot attribute (`pad_*`), and objdiff can never pair it. A compiler-local `stem$NNNN` neither name nor address finds
+    resolves by STEM (`resolved_by="stem"`) when exactly one unpaired candidate shares it. `identical` stays strict:
+    equal sizes and bytes."""
     t = symbol_locations(target)
     c = symbol_locations(ours)
     rows: dict[str, dict] = {}
@@ -642,6 +646,14 @@ def symbol_rows(target, ours) -> dict[str, dict]:
             if found:
                 candidate_name, cand_size, cand_data = found[0]
                 ce, resolved_by = (te[0], te[1], cand_size, cand_data), "address"
+            elif LOCAL_SUFFIX_RE.search(name):
+                # a compiler-local `stem$NNNN` (`__arraydtor$9000`): the number moves with every declaration the
+                # TU sees, and objdiff pairs it by stem - so does this, when exactly one unpaired candidate shares it.
+                stem = LOCAL_SUFFIX_RE.sub("", name)
+                same = [n for n, e in c.items() if n not in t and e[0] == te[0] and LOCAL_SUFFIX_RE.search(n)
+                        and LOCAL_SUFFIX_RE.sub("", n) == stem]
+                if len(same) == 1:
+                    candidate_name, ce, resolved_by = same[0], c[same[0]], "stem"
         rows[name] = {"target_size": te[2] if te else None, "candidate_size": ce[2] if ce else None,
                       "in_target": te is not None, "in_candidate": ce is not None,
                       "identical": bool(te and ce and te[2] == ce[2] and te[3] == ce[3]),
