@@ -683,12 +683,12 @@ extern "C" void fn_80147E68(_ENEMY_WORK* self, u8* in, u8* out) {
     }
 }
 
-/* The motion-selection tail: `fn_8012C220`/`fn_8012C4E8` with the area byte and the position. */
+/* The motion-selection tail: `em_team_member_claim`/`fn_8012C4E8` with the area byte and the position. */
 extern "C" void fn_80147F00(_ENEMY_WORK* self, u32 arg) {
     u32 id = self->team == 1 ? 2 : 1;
 
     if ((arg & 0xFF) == 0) {
-        fn_8012C220((u8)id, self->area_no);
+        em_team_member_claim((u8)id, self->area_no);
     } else {
         fn_8012C4E8((u8)id, self->area_no, 100, &self->pos, lbl_80796E30);
     }

@@ -174,7 +174,7 @@ extern "C" void fn_8030681C(_EFT* self);
 extern "C" void fn_80306A84(_EFT* self);
 extern "C" void fn_80306A94(_EFT* self);
 extern "C" void eft_spawn_type_at_area(_ENEMY_WORK* source, u8 type);
-extern "C" void fn_80306B10(_ENEMY_WORK* source, u8 type, s32 timer);
+extern "C" void eft_area_slot_bind(_ENEMY_WORK* source, u8 type, s32 timer);
 extern "C" _EFT* fn_80306BFC(u8 type, u8 area);
 extern "C" void fn_80306D14(MHchar* model, u8 type);
 extern "C" void fn_80306D6C(void* source, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale,
@@ -316,7 +316,7 @@ extern "C" void eft_spawn_type_at_area(_ENEMY_WORK* source, u8 type)
 }
 
 /* The same spawn, but with the step timer the caller picks (the state-0 body's own timer). */
-extern "C" void fn_80306B10(_ENEMY_WORK* source, u8 type, s32 timer)
+extern "C" void eft_area_slot_bind(_ENEMY_WORK* source, u8 type, s32 timer)
 {
     _EFT* eft = fn_80306BFC(type, source->area_no);
 

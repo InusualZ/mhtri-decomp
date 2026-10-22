@@ -77,7 +77,7 @@
  *  - `fn_8027885C`: retail's `mr r0,r3; mr r3,self; extsh r4,r0` says `fn_802753E4` returns `s16`; the declaration
  *    stays wider (`fn_802789EC`/`fn_80278D1C` depend on it) and each of the five `(s16)` call sites costs one row;
  *  - `fn_8027B0BC`: six `clrlwi r0,r0,24` before the `stb`s into `q + 0x5E1` (a peephole-level residual);
- *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `fn_8027D0D4`: retail gives the jump table r23 and the loop bound
+ *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
  *    r30, ours the mirror (playbook 22); `fn_8027C208`: the frame is 0x30 against retail's 0x40 (unused locals);
  *  - `fn_8027A340`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
  *    `Pl_bari_ck`: retail lays the first arm out of line and the second inline, the natural chain is the mirror;
@@ -156,7 +156,7 @@
  *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `fn_8027993C` casts its `u16` index to
  *    `s16` each iteration; `pl_impact_pos_get`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
  *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
- *  - `fn_8027D0D4`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
+ *  - `pl_area_buff_apply`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
  *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
  *    `fn_8027D050` declares its loop index before `v` (the r8/r9 order); `fn_80274B20` is `while (row[0] != 0)` with
  *    `id == row[0]` (the rotated loop); `fn_8027FFFC` opens with the `return 0` guard for non-gun kinds.
@@ -7815,7 +7815,7 @@ extern "C" void fn_8027D6C0(_MOVE_WORK*, s32, s32);
 
 /* 0x8027D0D4: applies one scripted action to every move-work record of type 2 whose kind byte matches
  * `arg0` - the per-action clamps and the state-helper calls of the attack/critical chain. */
-extern "C" void fn_8027D0D4(u8 arg0, u8 arg1)
+extern "C" void pl_area_buff_apply(u8 arg0, u8 arg1)
 {
     s32 i;
     u8* r29;

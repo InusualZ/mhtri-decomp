@@ -494,7 +494,7 @@ struct _ENEMY_WORK {
             /* +0x348 */ f32 field_0x348;
             /* +0x34C */ f32 field_0x34C;
         } rot_0x328;
-        /* the byte view `enemy/em003_prog.cpp`'s `fn_80154E40` resets (the free-slot states of
+        /* the byte view `enemy/em003_prog.cpp`'s `em003_timers_clear` resets (the free-slot states of
          * the effect slot set). */
         struct {
             /* +0x328 */ u8 slots_0x328[0x10];
@@ -503,6 +503,33 @@ struct _ENEMY_WORK {
                                            * `fn_8038729C` runs down */
             /* +0x33C */ s16 field_0x33C;
         } init_0x328;
+        /* the em003 program's own field view `enemy/em003_prog.cpp` reaches: the three TEV K-colours its colour
+         * update eases (`em003_color_update`, `em003_tev_color_update`), the reinforcement-call state its event
+         * hook and state query keep, and the hit id and distance ratio its attack steps latch.  A union member
+         * because the views above already own these bytes.  size: 0x1C */
+        struct {
+            /* +0x328 */ u8 kcolor1_r;       /* K-colour 1 red (`setTevKColor(0, 1)`) */
+            /* +0x329 */ u8 kcolor1_g;
+            /* +0x32A */ u8 kcolor1_b;
+            /* +0x32B */ u8 kcolor2_r;       /* K-colour 2 (`setTevKColor(0, 2)`) */
+            /* +0x32C */ u8 kcolor2_g;
+            /* +0x32D */ u8 kcolor2_b;
+            /* +0x32E */ u8 kcolor2_a;
+            /* +0x32F */ u8 kcolor3_a;       /* K-colour 3 alpha (`setTevKColor(1, 3)`) */
+            /* +0x330 */ u8 call_group;      /* the enemy group the call event summons (0 = none) */
+            /* +0x331 */ u8 call_done;       /* set once the call has gone out */
+            /* +0x332 */ u8 call_count;      /* calls made, capped at 0xFF */
+            /* +0x333 */ u8 rage;            /* set by the action-2 sub-state-6 event; state query kind 3 */
+            /* +0x334 */ u8 call_kind;       /* the summoned-kind id `em_spawn_request` is handed */
+            /* +0x335 */ u8 call_kind_done;  /* set once a kind-0x0A call went out (`em003_skip_ck`) */
+            /* +0x336 */ u8 flag_0x336;      /* set by event 0xD/1; `em003_area_start_ck`'s area-2 gate */
+            /* +0x337 */ u8 unused_0x337;
+            /* +0x338 */ s16 call_timer;     /* armed to 900 with `call_group`, counted down per tick */
+            /* +0x33A */ u16 hit_id;         /* the `get_hit_id` latched by the attack steps */
+            /* +0x33C */ u16 tick;           /* the 0..49 frame counter `em003_frame_update` cycles */
+            /* +0x33E */ u8 unused_0x33E[2];
+            /* +0x340 */ f32 dist_ratio;     /* the `em_target_dist_ratio_get` ratio action 7 scales by */
+        } em003_0x328; /* size: 0x1C */
         /* the action block `enemy/em007_act.cpp` clears (`fn_801D71C4`). */
         struct EmActionBlock action_0x328;
         /* the signed-short countdown view the action band `enemy/em008_prog.cpp` uses: the same
@@ -1046,7 +1073,10 @@ struct _ENEMY_WORK {
             /* +0xA17 */ u8 unused_0xA17[0xA34 - 0xA17];
             /* +0xA34 */ _PLW* plw_0xA34;     /* the player work `fn_801B203C` hands `fn_801B0230` */
             /* +0xA38 */ u8 field_0xA38;      /* the third gate `fn_801B203C` tests */
-            /* +0xA39 */ u8 unused_0xA39[0xA64 - 0xA39];
+            /* +0xA39 */ u8 unused_0xA39[0xA4C - 0xA39];
+            /* +0xA4C */ u8 hit_angle_0xA4C;  /* the first hit record's direction byte (the high byte of a
+                                               * 16-bit angle) `enemy/em003_prog.cpp`'s act-7 swipe steers */
+            /* +0xA4D */ u8 unused_0xA4D[0xA64 - 0xA4D];
             /* +0xA64 */ union {
                 /* +0xA64 */ u8 hit_0xA64[0x60];  /* the record's own `_HIT_W` (`Pl/hit_w.h`, size 0x60): `enemy/em029_prog.cpp`'s
                                                    * `em_action3_sub0` hands it to `hit_mask_ck`.  A byte view: `_HIT_W` has two

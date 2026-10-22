@@ -62,7 +62,7 @@ void em_busy_set(struct _ENEMY_WORK* self);
 /* 0x8012C220 / 0x8012C4E8 - the owner's own signatures (`s32 (u32 team, u32 state_sub)`; `void (u32 team,
  * u32 state_sub, s16 arg3, void* ref, f32 radius)`), which `enemy/em001_prog.cpp` calls them with. */
 #ifdef __cplusplus
-s32 fn_8012C220(u32 team, u32 state_sub);
+s32 em_team_member_claim(u32 team, u32 state_sub);
 void fn_8012C4E8(u32 team, u32 state_sub, s16 arg3, void* ref, f32 radius);
 #endif
 #ifdef __cplusplus

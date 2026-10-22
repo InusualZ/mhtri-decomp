@@ -114,7 +114,7 @@
  *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
  *    earlier;
- *  - `fn_8012B86C`, `fn_8012C220`, `em_attack_start`, `fn_8012E968`: register allocation only.
+ *  - `fn_8012B86C`, `em_team_member_claim`, `em_attack_start`, `fn_8012E968`: register allocation only.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.rodata`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
  *   short of the claim (the unwritten rows above).
  * SHAPES. `#pragma peephole off` from the first body to the end (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi`
@@ -4146,7 +4146,7 @@ extern "C" s32 fn_8012C20C(_ENEMY_WORK* enemy, u32 index)
 
 /* Claims the first enemy-side record of `team` that no other record's `state_sub` owns, marking it
  * with `flags_0xA04` bit 0 and returning 1; 0 when none is free. */
-extern "C" s32 fn_8012C220(u32 team, u32 state_sub)
+extern "C" s32 em_team_member_claim(u32 team, u32 state_sub)
 {
     _ENEMY_WORK* work;
     u16 max;
