@@ -6,7 +6,7 @@
  *   its static initializer (the `.ctors` words 0x8056F34C/350/354/358) and the `.sdata2` pool repeats a value at each
  *   change - em036 here, em040 `enemy/em040_ai.cpp`, em006 `enemy/em006_prog.cpp`, em004 `enemy/em004_act.cpp`, em005
  *   `enemy/em005_act.cpp`, em007 `enemy/em007_act.cpp`.  Right edge: `fn_801B985C` is this TU's static initializer and
- *   the 0.0 pool entry repeats at `lbl_80798DA4` from `fn_801B98C8` on; left edge: the 4-byte `fn_801B701C` sits in the
+ *   the 0.0 pool entry repeats at `lbl_80798DA4` from `fn_801B98C8` on; left edge: the 4-byte `em034_eft_ck` sits in the
  *   0.0 dedupe window 0x801B701C-0x801B70A4 and stays with `enemy/em034_prog.cpp` (unproven either way).
  * NAMES. The map stem; the dump answers `zz_01b7020_` for 0x801B7020 and nothing for the later rows, and no
  *   `__FILE__` string is referenced.  em036 is a GUESS from the prog table that opens the TU's data.
@@ -130,7 +130,7 @@ struct EmProgWork {
     /* +0x332 */ u8 unused_0x332[0x36C - 0x332];
     /* +0x36C */ nw4r::math::VEC3 target; /* the height the clamp measures against (+0x370) */
     /* +0x378 */ u8 unused_0x378[0x38B - 0x378];
-    /* +0x38B */ u8 field_0x38B;         /* cleared once `fn_801B701C` reports done */
+    /* +0x38B */ u8 field_0x38B;         /* cleared once `em034_eft_ck` reports done */
     /* +0x38C */ u8 unused_0x38C[0x43B - 0x38C];
     /* +0x43B */ u8 field_0x43B;         /* the action/mode byte `fn_8013072C` compares */
     /* +0x43C */ u8 unused_0x43C[0x440 - 0x43C];
@@ -291,7 +291,7 @@ extern "C" void fn_801B73EC(void) {
 /* The per-frame death/mode check: clear the "already reported" byte once the program reports done,
  * then shut the action down when the work is dead or its 150-frame timer has run out. */
 extern "C" void fn_801B73F0(EmProgWork* self) {
-    if (fn_801B701C((struct _ENEMY_WORK*)self) == 0 && self->field_0x38B == 1) {
+    if (em034_eft_ck((struct _ENEMY_WORK*)self) == 0 && self->field_0x38B == 1) {
         self->field_0x38B = 0;
     }
     if (em_die_ck((struct _ENEMY_WORK*)self)) {

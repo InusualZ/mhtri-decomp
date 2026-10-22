@@ -134,7 +134,7 @@ s32 fn_800D0724(void);
 s32 fn_802BE39C(void);
 s32 camera_work_ck(void);
 s32 my_player_no(void);
-void* fn_800A60C0(void* p);
+void* ef_effect_root_mtx(void* p);
 f32 vec3_dot(const VEC3* a, const VEC3* b);
 void fn_80049728(void* p, s32 n);
 void GXInvalidateVtxCache(void);
@@ -270,7 +270,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
                     f1 = p->pos.y;
                 } else if (p->kind > 1) {
                     if (p->kind == 2) {
-                        f1 = ((f32*)fn_800A60C0(p->handle))[7];
+                        f1 = ((f32*)ef_effect_root_mtx(p->handle))[7];
                     } else {
                         f1 = lbl_80796458;
                     }
@@ -314,7 +314,7 @@ extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
         f32* m = (f32*)reinterpret_cast<nw4r::g3d::ScnObj*>(self->handle)->GetMtxPtr(nw4r::g3d::ScnObj::MTX_VIEW);
         self->key = -m[0xB];
     } else if (self->kind == 2) {
-        f32* m = (f32*)fn_800A60C0(self->handle);
+        f32* m = (f32*)ef_effect_root_mtx(self->handle);
         setVector3(&v, m[3], m[7], m[11]);
         self->key = -(arg->f_0x2C + vec3_dot(&v, &arg->v_0x20));
     } else {

@@ -92,7 +92,7 @@ u32 fn_8019238C(EmActWork* self);
 u32 fn_801923CC(EmActWork* self);
 u32 fn_801923E0(EmActWork* self);
 u32 fn_80192410(EmActWork* self);
-f32 fn_80192440(EmActWork* self);
+f32 em018_glow_get(EmActWork* self);
 s32 fn_80192448(EmActWork* self);
 void fn_8019255C(EmActWork* self);
 void fn_80192630(EmActWork* self);
@@ -273,7 +273,7 @@ u32 fn_80192410(EmActWork* self) {
 }
 
 /* Reads the aim vector's z. */
-f32 fn_80192440(EmActWork* self) {
+f32 em018_glow_get(EmActWork* self) {
     return self->aim_0x328.vec_0x1C.z;
 }
 

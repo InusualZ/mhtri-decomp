@@ -13,7 +13,8 @@ extern "C" {
 #endif
 
 /* The per-frame handler of the enemy-effect controller (state 0 of `eft009`'s dispatcher). */
-void fn_80105314(void* self);
+/* untyped: a caller-owned payload (the effect record the eft009/fn_80104BD0 dispatchers pass under their own views) */
+void eft_em_effects_move(void* self);
 
 /* `state_0x05++` and the destroy hook of the same controller. */
 void fn_80105550(void* self);
@@ -27,7 +28,7 @@ void fn_8010A7D4(void* self, u32 a);
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale);
 /* 0x80106694 - the second spawner of the same band: r3 (`self`), r4 the `VEC3*`, r5 a byte kind and f1 the scale
  * (`enemy/em009_act.cpp` calls it). */
-void eft_spawn_type11(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 kind, f32 scale);
+void eft_spawn_type11(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 kind, f32 scale);
 
 #ifdef __cplusplus
 }

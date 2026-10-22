@@ -91,6 +91,9 @@ s32 em_mini_kill_kind_get(struct _ENEMY_WORK* enemy);
 /* 0x8013763C - sets the record's +0x43F latch the roar step arms (GUESS name). */
 void em_roar_latch_set(struct _ENEMY_WORK* self);
 
+/* 0x80136D38 */
+u32 em_eft_hide_ck(_ENEMY_WORK* enemy);
+
 #ifdef __cplusplus
 }
 #endif

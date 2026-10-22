@@ -264,7 +264,7 @@ u32 fn_80130134(EmWork* self, u32 value);
 void fn_8012A254(EmWork* self, u32 index);
 void fn_8012B380(EmWork* self, u32 a, u32 b, u8 c);
 void em_target_pos_set(EmWork* self, s32 mode);
-u32 fn_8012EC3C(EmWork* self);
+u32 em_eft_active_ck(EmWork* self);
 u8 fn_801408B4(EmWork* self);
 void fn_801409C8(EmWork* self);
 u8* fn_80130DF8(EmWork* self);
@@ -853,7 +853,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
                 }
                 continue;
             case 9:
-                if (fn_8012EC3C(self) == 1) {
+                if (em_eft_active_ck(self) == 1) {
                     fn_801409C8(self);
                 }
                 fn_8013AAC4(EM_ENEMY_WORK(self));

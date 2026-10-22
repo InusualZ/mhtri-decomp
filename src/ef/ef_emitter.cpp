@@ -92,7 +92,7 @@ void ef_ref_object_add_ref(void* p);
 void fn_800A3390(void* dst, const void* src);
 void fn_800A3800(void* p);
 void* fn_800A5484(void* p);
-void* fn_800A60C0(void* manager);
+void* ef_effect_root_mtx(void* manager);
 void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
 void ef_pm_handle(void* dst, const void* src);
 void fn_8035B998(void* p);
@@ -431,7 +431,7 @@ f32 ef_vec3_dist_sq(void* a, void* b);
 void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::math::MTX34* mtx);
 void* ef_emitter_tex_flags(void* self);
 void* fn_800A8968(EfEmitterObj* self);
-void* fn_800A898C(void* dst, const void* src);
+void* ef_word_copy(void* dst, const void* src);
 void* ef_store_word(void* dst, s32 v);
 nw4r::math::MTX34* ef_mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 f32 ef_truncate_float(f32 x);
@@ -448,8 +448,8 @@ void* ef_emitter_get_mtx(EfEmitterObj* self, void* out);
 void fn_800A95D8(EfEmitterObj* self);
 void ef_pm_set_mtx_dirty(EfPmView* pm);
 u16 fn_800A9700(EfPmView* pm);
-u16 fn_800A970C(EfEmitterObj* self);
-void* fn_800A9714(EfEmitterObj* self, u16 index);
+u16 ef_emitter_pm_count(EfEmitterObj* self);
+void* ef_emitter_pm_get(EfEmitterObj* self, u16 index);
 void fn_800A9784(EfEmitterObj* self, void* cb, void* arg, s32 flag);
 void fn_800A9790(EfEmitterObj* self, EfWalkCtx* arg);
 s32 fn_800A98D4(EfEmitterObj* self, void* cb, void* arg, s32 flag, s32 recurse);
@@ -1256,7 +1256,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
                 s32 b;
                 ef_store_word(&a, 0);
                 ef_pm_handle(&b, pm);
-                fn_800A898C(&a, &b);
+                ef_word_copy(&a, &b);
                 if ((*(u8*)((u8*)ef_emitter_tex_flags(&a) + 3) & 0x20) != 0) {
                     fn_8035B998(self->managerEF->field_0x44);
                 }
@@ -1287,7 +1287,7 @@ extern "C" void* fn_800A8968(EfEmitterObj* self) {
  * 0x800A898C / 0x800A8998 / 0x800A89A0 - small pooled-record helpers.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void* fn_800A898C(void* dst, const void* src) {
+extern "C" void* ef_word_copy(void* dst, const void* src) {
     *(u32*)dst = *(const u32*)src;
     return dst;
 }
@@ -1555,7 +1555,7 @@ extern "C" void* ef_emitter_get_mtx(EfEmitterObj* self, void* out) {
         nw4r::math::MTX34 m;
         MTX34_ctor(&m);
         if (self->parent == NULL) {
-            mtx34_copy_ps(&self->matrix, fn_800A60C0(self->managerEF));
+            mtx34_copy_ps(&self->matrix, ef_effect_root_mtx(self->managerEF));
         } else {
             nw4r::math::MTX34 p;
             MTX34_ctor(&p);
@@ -1633,13 +1633,13 @@ extern "C" u16 fn_800A9700(EfPmView* pm) {
     return (u16)pm->field_0x08;
 }
 
-extern "C" u16 fn_800A970C(EfEmitterObj* self) {
+extern "C" u16 ef_emitter_pm_count(EfEmitterObj* self) {
     return fn_800A4AF0(&self->particles);
 }
 
-extern "C" void* fn_800A9714(EfEmitterObj* self, u16 index) {
+extern "C" void* ef_emitter_pm_get(EfEmitterObj* self, u16 index) {
 #line 1284
-    if ((u32)index >= (u32)fn_800A970C(self)) {
+    if ((u32)index >= (u32)ef_emitter_pm_count(self)) {
         nw4r::db::Panic("ef_emitter.cpp", __LINE__, "NW4R:Failed assertion idx < GetNumParticleManager()");
     }
     return nw4r::ut::List_GetNth((nw4r::ut::List*)&self->particles, index);

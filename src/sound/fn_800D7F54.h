@@ -69,6 +69,10 @@ void se_req_pos_id54(nw4r::math::VEC3* pos);
 void se_req_pos_id84(nw4r::math::VEC3* pos);
 void se_req_pos_id83(nw4r::math::VEC3* pos);
 void se_req_pos_id49(nw4r::math::VEC3* pos);
+/* 0x800DCAAC / 0x800DC098 - the eft004 player-joint effect's start sounds at `pos` (SE 0x80000010; SE 23 through
+ * the demo request).  GUESS names. */
+void se_eft004_req(nw4r::math::VEC3* pos);
+void se_eft004_demo_req(nw4r::math::VEC3* pos);
 /* 0x800DA428 - the player's frame-set request; the owner defines it `extern "C"`.  Added with
  * `Pl/fn_80229ECC.cpp`, which calls it once per motion. */
 void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);

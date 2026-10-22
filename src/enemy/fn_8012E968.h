@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 /* 0x8012EC3C - whether the record's `field_0x89F` is 2 or 3. */
-u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 
 /* 0x8012EC60 - whether the record's latched mode is 1 (`em_alt_mode_set` latches it, 0/1).  The real
  * signature takes the record: the body loads `+0x8AA` straight out of r3 (`lbz r3,2218(r3)`), and

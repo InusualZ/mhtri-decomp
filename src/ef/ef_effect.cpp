@@ -160,8 +160,8 @@ u32 fn_800A5104(void* p);
 u32 fn_800A513C(EfEff* self);
 u32 fn_800A51B0(EfEff* self);
 void* fn_800A51C8(EfEff* self);
-u16 fn_800A51D0(EfEff* self);
-void* fn_800A51D8(EfEff* self, u16 idx);
+u16 ef_effect_emitter_count(EfEff* self);
+void* ef_effect_emitter_get(EfEff* self, u16 idx);
 s32 ef_get_life_status(void* p);
 void* ef_list_get_first(EfEffList* list);
 u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32 flag, EfEffEmitter* match);
@@ -649,14 +649,14 @@ extern "C" void* fn_800A51C8(EfEff* self) {
 }
 
 /* 0x800A51D0 - the number of live emitters. */
-extern "C" u16 fn_800A51D0(EfEff* self) {
+extern "C" u16 ef_effect_emitter_count(EfEff* self) {
     return fn_800A4AF0(&self->mEmitters.mActiveList);
 }
 
 /* 0x800A51D8 - the indexed live emitter. */
-extern "C" void* fn_800A51D8(EfEff* self, u16 idx) {
+extern "C" void* ef_effect_emitter_get(EfEff* self, u16 idx) {
 #line 422
-    if ((u16)idx >= (u16)fn_800A51D0(self)) {
+    if ((u16)idx >= (u16)ef_effect_emitter_count(self)) {
         nw4r::db::Panic("ef_effect.cpp", __LINE__, "NW4R:Failed assertion idx < GetNumEmitter()");
     }
     return nw4r::ut::List_GetNth((const nw4r::ut::List*)&self->mEmitters.mActiveList, idx);

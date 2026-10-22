@@ -19,8 +19,8 @@ struct _CP_VECTOR;
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 
 /* 0x800FC0F0 - the effect spawn the player's act frame step issues from the player's joint position
- * (`Pl/fn_80273B14.cpp`). */
-void fn_800FC0F0(nw4r::math::VEC3* pos, u32 type, u32 field_08, u32 area, _CP_VECTOR* rot,
+ * (`Pl/pl_act.cpp`). */
+void fn_800FC0F0(nw4r::math::VEC3* pos, u32 type, u8 field_08, u8 area, _CP_VECTOR* rot,
                  f32 scale);
 
 #ifdef __cplusplus

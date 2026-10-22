@@ -139,7 +139,7 @@ u32 fn_800A5F4C(EfSys* self, u32 groupID);
 EfSys* fn_800A56A4(void);
 void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src, f32 a, f32 b);
 void* ef_draw_info_projection(EfSysAccessObj* self);
-nw4r::math::MTX34* fn_800A60C0(EfSysAccessObj* self);
+nw4r::math::MTX34* ef_effect_root_mtx(EfSysAccessObj* self);
 
 /* the callees */
 void fn_800A4030(void* list, u16 linkOffset);
@@ -442,7 +442,7 @@ extern "C" void* ef_draw_info_projection(EfSysAccessObj* self) {
 }
 
 /* 0x800A60C0 - the +0x58 matrix accessor (callers include ef/effect.cpp, ef/fn_800FD864_fx.cpp, ef/ef_emitter.cpp). */
-extern "C" nw4r::math::MTX34* fn_800A60C0(EfSysAccessObj* self) {
+extern "C" nw4r::math::MTX34* ef_effect_root_mtx(EfSysAccessObj* self) {
     return &self->mtx_0x58;
 }
 

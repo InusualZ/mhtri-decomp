@@ -88,7 +88,7 @@ extern u16* lbl_805D8C10[12];
 /* The `.sdata` byte table at 0x80792A38 this range indexes by a work byte (`fn_802FF90C`). */
 extern u8 lbl_80792A38[];
 
-/* `fn_802FB5E4` (0x802FB5E4) is defined by this range and read by `fn_802FB97C` below. */
+/* `fn_802FB5E4` (0x802FB5E4) is defined by this range and read by `lb_event_state_ck` below. */
 u8 fn_802FB5E4(void);
 
 /* `fn_802FDB04`/`fn_802FDDCC` (0x802FDB04, 0x802FDDCC) are this range's own event steps, forwarded to
@@ -107,6 +107,9 @@ void fn_802FA9A0(struct _ENEMY_WORK* work);
 void fn_802FAB98(struct _ENEMY_WORK* work);
 void fn_802FAFB4(struct _ENEMY_WORK* work);
 void fn_802FAFC4(struct _ENEMY_WORK* work);
+
+/* 0x802FB97C */
+u32 lb_event_state_ck(void);
 
 #ifdef __cplusplus
 }

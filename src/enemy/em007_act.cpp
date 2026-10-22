@@ -205,7 +205,7 @@ u32 em_busy_ck(struct _ENEMY_WORK* self);
 u32 fn_8012D23C(struct _ENEMY_WORK* self, u32 a, u8 b);
 u8 fn_8012D3E0(struct _ENEMY_WORK* self, u32 a);
 
-u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
@@ -1339,7 +1339,7 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
             if (fn_801DA410(self, self->field_0x382) == 1) {
                 if (fn_8012D23C(self, 1, self->field_0x382) == 1) {
                     self->field_0x1E7 = 5;
-                    if (fn_8012EC3C(self) == 1) {
+                    if (em_eft_active_ck(self) == 1) {
                         em_state_set(self, 9, 3);
                         return;
                     }
@@ -1390,7 +1390,7 @@ extern "C" void fn_801DA7B4(struct _ENEMY_WORK* self) {
                     em_state_set(self, 9, 2);
                     return;
                 }
-                if (fn_8012EC3C(self) == 1) {
+                if (em_eft_active_ck(self) == 1) {
                     em_state_set(self, 9, 3);
                     return;
                 }
@@ -1848,7 +1848,7 @@ void em_busy_set(struct _ENEMY_WORK* self);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
 /* `fn_8012EC3C` and `em_alt_mode_ck` read the work record (+0x89F, +0x8AA). */
-u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 
 void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
@@ -2476,7 +2476,7 @@ extern "C" {
 
 /* The enemy-band callees, declared with the call sites' signatures (`enemy/em_common.cpp`'s first). */
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
-u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 
 void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 u32 fn_80129D3C(struct _ENEMY_WORK* self);
@@ -2839,7 +2839,7 @@ u32 fn_801DF810(struct _ENEMY_WORK* self, u8 part) {
             }
             break;
         case 4:
-            if (fn_8012EC3C(self) == 1) {
+            if (em_eft_active_ck(self) == 1) {
                 return 1;
             }
             if ((em_parts_damage_level_get(self, 4) & 1) == 0) {
@@ -2847,7 +2847,7 @@ u32 fn_801DF810(struct _ENEMY_WORK* self, u8 part) {
             }
             break;
         case 5:
-            if (fn_8012EC3C(self) == 1) {
+            if (em_eft_active_ck(self) == 1) {
                 return 1;
             }
             if ((em_parts_damage_level_get(self, 5) & 1) == 0) {

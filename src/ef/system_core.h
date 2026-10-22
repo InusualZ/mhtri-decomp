@@ -32,6 +32,13 @@ void system_stream_count_step(void);
 void system_scene_reset(void);
 void system_full_reset(void);
 
+/* 0x800CF698 */
+/* untyped: byte range - the loaded archive image */
+s32 pack_entry_count(void* data);
+/* 0x800CF6C8 */
+/* untyped: byte range - the loaded archive image and the member inside it */
+void* pack_entry_data(void* data, s32 index);
+
 #ifdef __cplusplus
 }
 #endif

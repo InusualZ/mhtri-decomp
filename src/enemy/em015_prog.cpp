@@ -447,13 +447,13 @@ extern "C" void fn_80176E8C(_ENEMY_WORK* self, u8* state, u8* sub) {
       case 7:
         switch (sub[0]) {
           case 6:
-            if (fn_8012EC3C(self) == 1) {
+            if (em_eft_active_ck(self) == 1) {
                 sub[0] = 0x17;
             }
             break;
           case 7:
           case 0xF:
-            if (fn_8012EC3C(self) == 1) {
+            if (em_eft_active_ck(self) == 1) {
                 sub[0] = 0x18;
             }
             break;
@@ -562,7 +562,7 @@ extern "C" void fn_8017708C(_ENEMY_WORK* self, u32 kind, u32 sub) {
 extern "C" void fn_80177258(_ENEMY_WORK* self) {
     fn_80182978(self);
     if (em_die_ck_view1(self) == 0) {
-        if (fn_8012EC3C(self) == 1) {
+        if (em_eft_active_ck(self) == 1) {
             if (self->field_0x1E2 == 0) {
                 self->field_0x32F = 1;
                 self->field_0x330 = 1;
@@ -2034,7 +2034,7 @@ void fn_80181E24(_ENEMY_WORK* self) {
     color.b = self->color_0x328.field_0x32E;
     ((MHchar*)self->char_0x024)->setTevKColor(3, GX_KCOLOR3, &color);
     ((MHchar*)self->char_0x024)->getTevKColor(5, GX_KCOLOR3, &color);
-    if (fn_8012EC3C(self) == 1) {
+    if (em_eft_active_ck(self) == 1) {
         color.a = 0;
     } else if (em_alt_mode_ck(self) == 1) {
         color.a = (u8)((s32)(lbl_80797BB0 * (lbl_80797B14 *
@@ -2102,7 +2102,7 @@ u32 fn_801820DC(_ENEMY_WORK* self, u32 arg) {
             return 1;
         }
         if (self->value_0x452 >= self->field_0x450 || self->field_0x43D != 1) {
-            if (fn_8012EC3C(self) == 1 && self->color_0x328.field_0x32F == 0) {
+            if (em_eft_active_ck(self) == 1 && self->color_0x328.field_0x32F == 0) {
                 if (mode == 1) {
                     if ((s32)self->area_no == 7) {
                         self->field_0x1FC = 1;

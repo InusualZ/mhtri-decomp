@@ -587,7 +587,7 @@ void fn_800E09D0(void* dst, void* src);
 u8 GameMode_ck(void);
 s8 my_player_no(void);
 u32 lobby_input_locked_ck(void);
-u16 fn_802BE038(void);
+u16 get_camera_rot_y(void);
 void* memset(void* dst, int value, u32 size);
 }
 
@@ -2206,7 +2206,7 @@ extern "C" u32 fn_8026FA6C(_PLW* self, u32 idx, u16 low, u16 high)
     u16 offset = 0;
 
     if (self->field_0x129 != 0) {
-        offset = (u16)(self->field_0x0A8 - fn_802BE038());
+        offset = (u16)(self->field_0x0A8 - get_camera_rot_y());
     }
     if (self->part_tbl_b_0xD4[idx] >= 50) {
         u16 value = (u16)(self->part_tbl_a_0xD0[idx] - offset);
@@ -7604,7 +7604,7 @@ struct _HIT_DATA {
 namespace s_80276B58 {
 
 
-extern "C" u8 fn_80331210(_PLW*);
+extern "C" u8 pl_frame_eft_color_get(_PLW*);
 extern "C" s16 fn_80273ED8(_PLW*, s32, s32);
 } /* namespace s_80276B58 */
 
@@ -7614,7 +7614,7 @@ s32 Pl_critical_get(_PLW*);
  * hit rate multipliers and the critical roll - from the attack flags and the actor's skills. */
 void Pl_attack_set_sub(_PLW* self, _HIT_DATA* hit, _HIT_W* data, u16 flags)
 {
-    using s_80276B58::fn_80273ED8; using s_80276B58::fn_802748C8; using s_80276B58::fn_80331210; using s_80276B58::lbl_8079A08C; using s_80276B58::lbl_8079A0A8; using s_80276B58::lbl_8079A0AC; using s_80276B58::lbl_8079A0B0; using s_80276B58::lbl_8079A0B4;
+    using s_80276B58::fn_80273ED8; using s_80276B58::fn_802748C8; using s_80276B58::pl_frame_eft_color_get; using s_80276B58::lbl_8079A08C; using s_80276B58::lbl_8079A0A8; using s_80276B58::lbl_8079A0AC; using s_80276B58::lbl_8079A0B0; using s_80276B58::lbl_8079A0B4;
     s32 f8;
     s32 f10;
     data->attack_flags_0x31 = 0xF;
@@ -7633,7 +7633,7 @@ void Pl_attack_set_sub(_PLW* self, _HIT_DATA* hit, _HIT_W* data, u16 flags)
         s32 sel;
         s16 t;
         f8 = flags & 8;
-        if (f8 != 0 && fn_80331210(self) == 1) {
+        if (f8 != 0 && pl_frame_eft_color_get(self) == 1) {
             sel = 1;
         } else {
             sel = 0;
@@ -7666,7 +7666,7 @@ void Pl_attack_set_sub(_PLW* self, _HIT_DATA* hit, _HIT_W* data, u16 flags)
             data->field_0x048 |= 0x200;
             data->field_0x04A = (u8)t;
         }
-        if (f8 != 0 && fn_80331210(self) == 3) {
+        if (f8 != 0 && pl_frame_eft_color_get(self) == 3) {
             data->field_0x048 = 0x80;
             t = fn_80273ED8(self, 0xF, 1);
             if (t <= 0) {
@@ -7691,7 +7691,7 @@ void Pl_attack_set_sub(_PLW* self, _HIT_DATA* hit, _HIT_W* data, u16 flags)
                 data->field_0x048 |= 1;
                 data->field_0x04A = (u8)t;
             }
-            if (f8 != 0 && fn_80331210(self) == 2) {
+            if (f8 != 0 && pl_frame_eft_color_get(self) == 2) {
                 data->field_0x048 = (u16)((data->field_0x048 & 0xFFFC) | 4);
                 t = fn_80273ED8(self, 0x10, 1);
                 if (t <= 0) {
@@ -7719,7 +7719,7 @@ void Pl_attack_set_sub(_PLW* self, _HIT_DATA* hit, _HIT_W* data, u16 flags)
         }
     }
     if ((flags & 8) != 0) {
-        switch ((u8)fn_80331210(self)) {
+        switch ((u8)pl_frame_eft_color_get(self)) {
         case 0:
             data->life_0x40 = (s16)(lbl_8079A0B4 * (f32)data->life_0x40);
             break;

@@ -9,9 +9,23 @@
 #include "types.h"
 #include "nw4r/math.h"
 
+/* One entry of the resource-file descriptor arrays the effect loaders walk: a byte size and the file name. */
+typedef struct EftResFile {
+    /* +0x00 */ u32 size_0x00;
+    /* +0x04 */ char* name_0x04;
+} EftResFile; /* size: 0x08 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x80582F10 / 0x80582F40 / 0x80588EE0 / 0x80589988 - the common resource-file descriptors (one `EftResFile` and a
+ * zero terminator each): the quest and lobby common `efm` files and the lobby and quest common `eft` files;
+ * `eft_common_load` hands them to the loader. */
+extern EftResFile q_comn_efm_file[2];
+extern EftResFile lobby_eft_mdl_file[2];
+extern EftResFile lb_comn_eft_file[2];
+extern EftResFile q_comn_eft_file[2];
 
 /* 0x80055E30 - selects the resource arena index the loaders draw from (and clears the switch byte);
  * `arena_resource_load` picks index 1 for the arena texture pack.  `res_file_ctor` (0x80054FE8) builds a

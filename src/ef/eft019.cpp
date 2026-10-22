@@ -84,7 +84,7 @@ void fn_80056A20(f32 a, f32 b);
 _EFT* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(_EFT* self);
 void fn_80306D6C(void* self, s32 a, void* b, void* c, u8 d, f32 e);
-u8 fn_80331210(void* self);
+u8 pl_frame_eft_color_get(void* self);
 void mhchar_joint_mtx_get(void* chr, u32 joint, nw4r::math::MTX34* out);
 
 #ifdef __cplusplus
@@ -111,9 +111,9 @@ void eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer);
  * `fn_800A970C`/`fn_800A9714`/`fn_800A67E8` `ef/ef_emitter.cpp`'s (a rule-2 residual). */
 extern "C" {
 void** ef_system_memory_manager(s32 id);
-void* fn_800A51D8(nw4r::ef::Effect* effect, u32 arg);
-u16 fn_800A970C(void);
-void* fn_800A9714(void* obj, u16 index);
+void* ef_effect_emitter_get(nw4r::ef::Effect* effect, u32 arg);
+u16 ef_emitter_pm_count(void);
+void* ef_emitter_pm_get(void* obj, u16 index);
 void fn_800A67E8(void* obj, void* value);
 }
 
@@ -589,7 +589,7 @@ void fn_80112B7C(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VE
         work->scale_b_0x48 = scale;
         work->scale_a_0x44 = scale;
         if ((s32)key == 102) {
-            u8 t = fn_80331210(source);
+            u8 t = pl_frame_eft_color_get(source);
             if ((u32)t > 2) {
                 if ((s32)t != 3) {
                     /* 4 and up keep the record's own id */
@@ -1058,8 +1058,8 @@ void fn_80112D58(_EFT* self)
     case 0x88:
         SetRootMtxTrans(work->effects[0], &self->pos_0x18);
         effect_retire(work->effects[0], 0);
-        obj = (_EFT019_SND_OBJ*)fn_800A51D8(work->effects[0], 0);
-        i = (s32)fn_800A9714(obj, (u16)(fn_800A970C() - 1));
+        obj = (_EFT019_SND_OBJ*)ef_effect_emitter_get(work->effects[0], 0);
+        i = (s32)ef_emitter_pm_get(obj, (u16)(ef_emitter_pm_count() - 1));
         fn_800AB9F4((struct EfPmManager*)i);
         fn_800A67E8(obj, (void*)i);
         obj = (_EFT019_SND_OBJ*)ef_system_memory_manager(snd);

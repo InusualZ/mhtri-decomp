@@ -299,7 +299,7 @@ typedef struct StageGroup {
 
 extern "C" void* fn_802AE564(u8 id);
 extern "C" u32 stage_map_kind_get(u32 kind);
-extern "C" bool fn_802B0B04(u8 index, u8 bit);
+extern "C" bool stg_area_flag_ck(u8 index, u8 bit);
 extern "C" u32 stage_map_area_count_get(u8 id);
 extern "C" void fn_802B0FF0(void* self, u8 index);
 extern "C" void fn_802B11A0(void* self, u8 index);
@@ -417,7 +417,7 @@ extern "C" bool fn_802AFF58()
 }
 
 /* Tests bit (4 + bit) of stage_w.bitmask[index]. */
-extern "C" bool fn_802B0B04(u8 index, u8 bit)
+extern "C" bool stg_area_flag_ck(u8 index, u8 bit)
 {
     return SW->bitmask[(u8)index] & (0x10 << (u8)bit);
 }
@@ -433,11 +433,11 @@ extern "C" u32 stage_map_kind_get(u32 kind)
     return mapped;
 }
 
-/* Tail-calls fn_802B0B04 with the byte pair lbl_805CF038[2*index], [2*index+1]. */
+/* Tail-calls stg_area_flag_ck with the byte pair lbl_805CF038[2*index], [2*index+1]. */
 extern "C" u32 fn_802B0998(u8 index)
 {
     const u8* p = &lbl_805CF038[(u8)index * 2];
-    return fn_802B0B04(p[0], p[1]);
+    return stg_area_flag_ck(p[0], p[1]);
 }
 
 /* Whether the float at `self`+8 is below the pooled constant. */
@@ -1031,7 +1031,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             lists = &local;
             local.hide = hide_buf;
             local.show = show_buf;
-            if (fn_802FB97C() == 1) {
+            if (lb_event_state_ck() == 1) {
                 src = lbl_80792460;
             } else {
                 src = lbl_80792464;

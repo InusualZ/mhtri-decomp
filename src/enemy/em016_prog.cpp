@@ -59,7 +59,7 @@
 #include "enemy/em_hit_window_set_default.h" /* em_hit_window_set_default (rule 2: the owner's header) */
 #include "enemy/em_busy_set.h" /* em_busy_set (rule 2: the owner's header) */
 #include "enemy/em_alt_mode_ck.h" /* em_alt_mode_ck (rule 2: the owner's header) */
-#include "enemy/fn_8012EC3C.h" /* fn_8012EC3C (rule 2: the owner's header) */
+#include "enemy/em_eft_active_ck.h" /* em_eft_active_ck (rule 2: the owner's header) */
 #include "enemy/em_mot_set_blend.h" /* em_mot_set_blend (rule 2: the owner's header) */
 #include "enemy/em_mot_set.h" /* em_mot_set (rule 2: the owner's header) */
 #include "enemy/em_mot_speed_set.h" /* em_mot_speed_set (rule 2: the owner's header) */
@@ -81,11 +81,11 @@
 #include "gx.h"
 #include "sound/mhchar.h"       /* MHchar, with the pointer-taking setTevKColor overload */
 #include "enemy/ENEMY_WORK.h"
-#define fn_8012EC3C fn_8012EC3C_hidden_fn_8012E968_h
+#define em_eft_active_ck fn_8012EC3C_hidden_fn_8012E968_h
 #define em_alt_mode_ck em_alt_mode_ck_hidden_fn_8012E968_h
 #include "unsplit/enemy.h"
 #undef em_alt_mode_ck
-#undef fn_8012EC3C
+#undef em_eft_active_ck
 #include "unsplit/unknown.h"   /* system_w */
 #include "enemy/fn_801251D0.h" /* fn_80126278/fn_80126324 + the 0x80129xxx helpers */
 #include "enemy/fn_8012EC74.h" /* fn_8013026C */
@@ -118,7 +118,7 @@
 #define fn_80117E58_c1 ((void (*)(_ENEMY_WORK*, u32, nw4r::math::VEC3*, u32, f32))fn_80117E58)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define em_alt_mode_ck_c1 ((u32 (*)(_ENEMY_WORK*))em_alt_mode_ck)
-#define fn_8012EC3C_c1 ((u32 (*)(_ENEMY_WORK*))fn_8012EC3C)
+#define fn_8012EC3C_c1 ((u32 (*)(_ENEMY_WORK*))em_eft_active_ck)
 #define fn_80129D3C_c1 ((u32 (*)(EmActWork*))fn_80129D3C)
 #define fn_80182D5C_noarg ((void (*)(void))fn_80182D5C)
 #define stage_map_kind_get_view3 ((u8 (*)(u8))stage_map_kind_get)
@@ -129,7 +129,7 @@
 #define fn_8013A654_view1 ((void (*)(EmUserData*, u32))fn_8013A654)
 #define fn_8013918C_view1 ((void (*)(void*, s16))fn_8013918C)
 #define fn_801321DC_view1 ((u32 (*)(EmActWork*))fn_801321DC)
-#define fn_8012EC3C_view1 ((u32 (*)(EmActWork*))fn_8012EC3C)
+#define fn_8012EC3C_view1 ((u32 (*)(EmActWork*))em_eft_active_ck)
 #define fn_8012A204_view1 ((s32 (*)(EmActWork*))fn_8012A204)
 #define fn_8012A014_view1 ((u32 (*)(EmActWork*, u32, u32, u16, u32, u8*))fn_8012A014)
 #define fn_80129DB8_view1 ((u8 (*)(EmActWork*))fn_80129DB8)

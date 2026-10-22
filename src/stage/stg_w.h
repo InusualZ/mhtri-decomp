@@ -55,6 +55,12 @@ void stage_area_start_get(u8 area, nw4r::math::VEC3* pos, s32* angle);
 /* 0x802AFD50 - the start position and facing of the stage the quest phase `phase` names.  GUESS name from
  * that use. */
 void stage_start_get(u8 phase, nw4r::math::VEC3* pos, s32* angle);
+/* 0x802B00AC - the current area's position (`out`); every caller passes an area byte the body does not read.
+ * GUESS name. */
+void get_now_area_pos(nw4r::math::VEC3* out, u8 area);
+/* 0x802B039C - the stage effect colour the area's records give for the position (-1 for area 255); the
+ * position-keyed sibling of `get_stg_eft_col`.  GUESS name. */
+u32 get_stg_eft_col_pos(u8 area, nw4r::math::VEC3* pos);
 #endif
 
 /* 0x802AEC00 - the stage pack reset `light/light.cpp`'s `fn_802C2314` calls; added with that
@@ -129,6 +135,9 @@ void stage_map_obj_load(u8 map);
 void stage_area_slot_release(s8 slot);
 /* 0x802AFB10 - the free stage area slot (0 or 1), -1 when both are taken (GUESS name). */
 s8 stage_area_free_slot_get(void);
+
+/* 0x802B0B04 */
+bool stg_area_flag_ck(u8 index, u8 bit);
 
 #ifdef __cplusplus
 }

@@ -57,6 +57,9 @@ extern "C" {
  * (GUESS names). */
 void eft_control_init(void);
 void eft_common_load(void);
+/* 0x800F6B6C - files entry `index` of the group/kind proID table under a free slot; the slot ordinal or 0xFF
+ * (GUESS name). */
+u8 eft_pro_slot_assign(u8 group, u8 kind, u8 set, u8 sub, u8 index);
 /* 0x800F6688 - releases every live effect slot (GUESS name). */
 void eft_res_release_all(void);
 

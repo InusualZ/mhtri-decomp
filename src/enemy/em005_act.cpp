@@ -196,7 +196,7 @@ void CancelFade(struct _ENEMY_WORK* self);
 void em_busy_set(struct _ENEMY_WORK* self);
 u32 em_busy_ck(struct _ENEMY_WORK* self);
 
-u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void fn_8012F7D4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
@@ -591,7 +591,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
                     struct _ENEMY_WORK* target;
                     self->state_0x006++;
                     target = 0;
-                    if (fn_8012EC3C(self) == 1 || self->field_0x8A2 >= 0xFA) {
+                    if (em_eft_active_ck(self) == 1 || self->field_0x8A2 >= 0xFA) {
                         target = fn_80131034(self, 0x1C, 0);
                     }
                     if (target != 0) {
@@ -2467,7 +2467,7 @@ void em_busy_set(struct _ENEMY_WORK* self);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
 /* `fn_8012EC3C` and `em_alt_mode_ck` read the work record (+0x89F, +0x8AA). */
-u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 
 void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
@@ -3537,7 +3537,7 @@ s32 fn_801D6C74(struct _ENEMY_WORK* self, u8 arg1) {
 }
 
 s32 fn_801D6CCC(struct _ENEMY_WORK* self, u8 arg1) {
-    if (arg1 == 0 && fn_8012EC3C(self) == 1 && self->field_0x1E2 == 0) {
+    if (arg1 == 0 && em_eft_active_ck(self) == 1 && self->field_0x1E2 == 0) {
         return 1;
     }
     return 0;

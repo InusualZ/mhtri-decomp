@@ -157,7 +157,7 @@ u8 fn_802FB948(void) {
 }
 
 /* The lobby's "new area reached" gate: id 0's boundary, or id 20's boundary with mode 4 selected. */
-u32 fn_802FB97C(void) {
+u32 lb_event_state_ck(void) {
     if (fn_802FB4F4(0) != 0) {
         return 1;
     }

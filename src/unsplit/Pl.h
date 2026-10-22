@@ -46,7 +46,7 @@ s32 fn_80276254(struct _PLW* self, s32 v);
 s32 pl_act_gauge_step_unlatched(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 s32 pl_act_gauge_step_signed(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 void pl_act_enter(struct _PLW* self, s32 a, u16 b, u16 c);
-s32 fn_8027D7EC(struct _PLW* self, u8 flag);
+s32 pl_act_no_eft_ck(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
 u32 pl_act_held_ck(struct _PLW* self, s32 v);
 /* 0x80260198 is NOT declared here: it sits inside the registered unit `Pl/fn_8025F088.cpp`

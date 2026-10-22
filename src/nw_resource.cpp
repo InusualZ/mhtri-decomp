@@ -148,7 +148,7 @@ void fn_800D4CA4(void* p);
 char* fn_800D4D9C(s32 index);
 s32 fn_800D4CE4(const char* path);
 s32 fn_800D4DD8(const char* path);
-u32 fn_800D5138(s32 index);
+u32 nw_res_mem_size(s32 index);
 s32 fn_800D516C(void* data);
 void fn_800D5250(void);
 s32 fn_800D5360(char* path);
@@ -264,7 +264,7 @@ void* getResMemAdrs(s32 index) {
 }
 
 /* 0x800D5138 - the size of a resource-memory slot, or 0. */
-u32 fn_800D5138(s32 index) {
+u32 nw_res_mem_size(s32 index) {
     if (index < 0) {
         return 0;
     }

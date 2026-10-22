@@ -192,6 +192,10 @@ struct EmSetEntry;
 struct _ENEMY_WORK* em_set_entry_spawn(struct EmSetEntry* entry, u16 order);
 s32 em_set_boss_spawn(struct EmSetEntry* entry, u16 order);
 
+/* 0x80147474 */
+/* untyped: byte range - the allocated block */
+void* em_kind_mem_alloc(u8 kind, u32 size);
+
 #ifdef __cplusplus
 }
 #endif

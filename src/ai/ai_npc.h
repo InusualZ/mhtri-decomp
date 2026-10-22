@@ -283,6 +283,9 @@ extern "C" {
  * unmangled). */
 s32 ai_npc_player_in_reach_ck(void);
 
+/* 0x802D2B78 */
+s32 ai_npc_flag_ck(struct _AINPC_W* self, s32 mask);
+
 #ifdef __cplusplus
 }
 #endif

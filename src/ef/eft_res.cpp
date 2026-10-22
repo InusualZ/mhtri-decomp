@@ -10,22 +10,31 @@
  *   flag) too; the map has only `fn_` stems for the rest.
  *   GUESS (from each body and its callers): eft_control_init
  *   GUESS (from each body and its callers): eft_res_release_all
+ *   GUESS (from each body and its callers): eft_pro_slot_assign (0x800F6B6C: files a table entry under a free proID
+ *   slot), eft_area_effects_set (0x800F6DB4: `stage_area_enter`'s per-map/area effect starts); the callees named
+ *   here are GUESSes filed with their owners: `pack_entry_count`/`pack_entry_data` (system_core), `em_kind_mem_alloc`
+ *   (enemy_control), `eft028_set`/`eft028_set_capsule` (eft026_fx), `nw_res_anm_work_num`/`nw_res_anm_create`
+ *   (nw_resource), and draw_shape's common file descriptors `q_comn_efm_file`, `lobby_eft_mdl_file`,
+ *   `lb_comn_eft_file`, `q_comn_eft_file`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps every `clrlwi`+`cmpwi` pair and the
+ *   narrowing `clrlwi` of the `u8`/`u16` parameters; with the pass on most rows score lower).
  * RESIDUALS. `fn_800F8634` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
  *   where retail's epilogue differs); `eft_res_models_spawn` calls `_savegpr_23`/`_restgpr_23` where retail calls
  *   `_savegpr_24`/`_restgpr_24`;
- *   `push_eft_effect_heap_num` lacks retail's call to `RetireParticleAll` (+0x40).  9 rows unwritten: 0x800F6710-0x800F6984 (`fn_800F6710`), 0x800F6B6C-0x800F7AA4 (`fn_800F6B6C`,
- *   `fn_800F6DB4`, `fn_800F7778`), 0x800F7F18-0x800F8634 (`fn_800F7F18`, `fn_800F8358`), 0x800F8E68-0x800F91A0
- *   (`res_eft_model_create_light`, `res_eft_UV_model_create`, `res_eft_UV_model_create_name`: they need the
- *   EftModel/g3d mesh chain `fn_8007B878`/`fn_8007BA08`/`fn_8005AB00`/`fn_800D3874`/`fn_800D38F8`).
- *   31 partial rows, including:
+ *   `push_eft_effect_heap_num` lacks retail's call to `RetireParticleAll` (+0x40).
+ *  - `eft_common_load`: retail carries the `eft` run's `j - 1` as its own induction register (three for the loop),
+ *    ours derives it with `addi` from `j`;
+ *  - `eft_area_effects_set`: retail keeps an unreachable `b` (the outer `break`) after each of its 20 inner switches;
+ *    `default: break;`, `return` in the inner or the outer cases all leave it out;
+ *  - `fn_800F7F18`: retail keeps `id * 0x18` and not `id` across the calls (one register fewer, `0` hoisted into
+ *    r14); `fn_800F8358`: retail hoists the 128-entry `mtctr` count into r18 (one saved register more);
+ *  - `fn_800F6A78`/`fn_800F7778`: the table base and the record pointer swap registers (r4/r5, r4/r31).
  *  - `res_eft_create`, `res_eft_model_create`, `get_eft_res_name`, `fn_800F6AC8`: retail narrows the `u16`/`u8`
  *    arguments (`clrlwi`) at entry, ours does not (or folds it into a `clrlslwi`);
  *  - `fn_800F6AC8`: retail unrolls the 0x18-byte record search three-wide (`li r0,0x33`), ours one-wide with `lbzu`;
  *  - `fn_800F8B44`: retail loads `eft_control`'s pool fields before the loop and walks the flag bytes with a
  *    pointer, ours re-indexes (`lbzx`) and runs a different loop shape.
- *   The other 26 partial rows have no recorded cause (`symdiff.py -u ef/eft_res --all`).
- *   flipcheck: `.data`/`.sbss`/`.sdata2` claimed, not emitted; `.text` (0x13E8 of 0x3084), extab (0xA8 of 0xF0) and
- *   extabindex (0xFC of 0x168) short of the claim and differing.
+ *   The other partial rows have no recorded cause (`symdiff.py -u ef/eft_res --all`).
  * SHAPES. `EftControl* ctrl = &eft_control;` opens every function that touches it, so the address lives in one
  *   callee-saved register (the unhoisted form loses the register on `eft_res_slot_release` and `fn_800F89A4`).
  *   The slot table is addressed two ways, both needed: `lbl_806A2D34 + i*0x18` with the fields at +0x04 (`fn_800F6A78`,
@@ -36,6 +45,8 @@
  */
 
 #include "types.h"
+
+#pragma peephole off
 #include "nw4r/math.h"
 #include "ef.h"
 #include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
@@ -50,6 +61,12 @@
 #include "sound/sound_job.h" /* split_screen_size_class (rule 2) */
 #include "ef/pRoot.h"
 #include "ef/fn_800D3C0C.h"
+#include "stage/get_now_mapno.h"
+#include "draw_shape.h" /* res_file_ctor / res_file_assign (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple::GetResMdl (rule 2) */
+#include "ef/system_core.h"   /* pack_entry_count, pack_entry_data */
+#include "enemy/enemy_control.h"   /* em_kind_mem_alloc */
+#include "ef/eft026_fx.h"   /* eft028_set, eft028_set_capsule */
 
 /* ---------------------------------------------------------------------------------------------------
  * the control block, the slot table and the model records
@@ -110,11 +127,18 @@ typedef struct EftProSlot {
     /* +0x14 */ s32 field_0x14;
 } EftProSlot; /* size: 0x18 */
 
-/* One entry of the resource-file descriptor array the loaders walk: a byte size and the file name. */
-typedef struct EftResFile {
-    /* +0x00 */ u32 size_0x00;
-    /* +0x04 */ char* name_0x04;
-} EftResFile; /* size: 0x08 */
+/* The whole slot table as one record: the header's four live counts (all records, then the `efm`, `eft` and `efx`
+ * records `fn_800F7D44`/`fn_800F8358` number), then the 256 records. */
+typedef struct EftProTable {
+    /* +0x0000 */ u8 used_0x00;
+    /* +0x0001 */ u8 models_0x01;
+    /* +0x0002 */ u8 effects_0x02;
+    /* +0x0003 */ u8 textures_0x03;
+    /* +0x0004 */ EftProSlot slots_0x04[0x100];
+} EftProTable; /* size: 0x1804 */
+
+/* `EftResFile` (the loaders' resource-file descriptor) comes from `draw_shape.h` and `EftResFileHandle` (the one-word
+ * file/model handle) from `nw_resource.h`, the owners of the data and the functions that use them (rule 1). */
 
 /* The pool record the 0x168-byte model arrays hold: a used byte, then the EftModel `eft_res_model_get`
  * hands out (the copy `res_eft_model_create_light` fills). */
@@ -139,6 +163,15 @@ typedef struct EftLoadCtx {
     /* +0x08 */ u32 unshared_0x08;
     /* +0x0C */ u32 param_0x0C;
 } EftLoadCtx; /* size: 0x10 */
+
+/* The context `fn_800F8634` hands the archive load and `fn_800F8358` reads back: the run's proID bytes, the slot
+ * ordinal the run starts at, the run's resource names and the load mode. */
+typedef struct EftFileLoadCtx {
+    /* +0x00 */ u8* proids_0x00;
+    /* +0x04 */ u32 first_0x04;
+    /* +0x08 */ char** names_0x08;
+    /* +0x0C */ s32 mode_0x0C;
+} EftFileLoadCtx; /* size: 0x10 */
 
 /* The same 0x18-byte record as the two functions that take the table's 4-byte header as part of the
  * record's address (fn_800F6A78's stores land on `+0x4..+0x18` of the header-based record). */
@@ -174,20 +207,23 @@ extern "C" {
 void fn_800F6520(void);
 void eft_control_init(void);
 void eft_res_release_all(void);
-void fn_800F6984(u32, u32, void*, void*);
-void fn_800F69A0(u32, void*, void*);
+void fn_800F6984(u8, u8, EftResFile*, u8*);
+void fn_800F69A0(u32, EftResFile*, u8*);
 void fn_800F69B8(void);
 void fn_800F6A24(void);
-void fn_800F6A78(u32);
+void fn_800F6A78(u8);
 EftProSlot* fn_800F6AC8(u32);
-void fn_800F7778(u8);
+u32 fn_800F7778(u8);
 EftProSlot* fn_800F7AA4(u32);
 void fn_800F7BF0(EftProSlot*);
 void fn_800F7C74(u32);
 void fn_800F7D44(u8*, void*, EftLoadCtx*, EftLoadCtx*);
-void fn_800F7F18(void*, u32, u32, void*);
-void fn_800F8358(void*, void*, void*, void*);
+void fn_800F7F18(EftResFile*, s32, u32, u8*);
+void fn_800F8358(char*, void*, u32, EftFileLoadCtx*);
 void fn_800F8634(EftResFile*, u32, void*, u8*, u32, u32);
+void eft_common_load(void);
+void eft_area_effects_set(void);
+u8 eft_pro_slot_assign(u8, u8, u8, u8, u8);
 EftResSlot* eft_res_slot_get(u32);
 void eft_res_slot_release(void*);
 u8* eft_res_model_get(void);
@@ -212,17 +248,41 @@ void fn_800FD864(void);
 void sound_job_request(s32, u8, s32, s32, s32, void*, s32);
 void mhchar_reset(void*);
 void fn_800E0BE8(void*, s32);
-void fn_800E2228(void*, void*, void*, s32);
-void res_file_ctor(void*, s32);
-void res_file_assign(void*, void*);
+void fn_800E2228(MHchar*, u32*, u32, s32);
 void fn_8007B878(void*, s32);
 void fn_8007BA08(void*, void*);
-extern s32 nwDelResource(s32);
 extern s32 ef_system_memory_manager(void*);
 extern void* fn_800A5484(void*);
 extern void* fn_800A5A90(void*, void*, void*, u32);
-extern void* res_model_name_ptr;
 
+#ifdef __cplusplus
+}
+#endif
+
+/* The resource tables the scene loaders install (`.sbss` 0x80794A40-0x80794A88): the per-group proID byte tables
+ * `eft_pro_slot_assign` resolves an effect through (0xFF ends each run), the model-name table `get_eft_res_name` reads, the
+ * area box table `ef/effect.cpp` reads, and the four common-file name tables `eft_common_load` hands the loader. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+u8** eft_em_proID_tbl_ptr;
+u8* efx_em_proID_tbl_ptr;
+u8** efm_em_proID_tbl_ptr;
+u8*** eft_map_proID_tbl_ptr;
+u8*** efm_map_proID_tbl_ptr;
+u8** efm_map_com_proID_tbl_ptr;
+u8** eft_map_com_proID_tbl_ptr;
+u8** eft_common_proID_tbl_ptr;
+u8** efx_map_com_proID_tbl_ptr;
+u8** efx_common_proID_tbl_ptr;
+u8** efm_common_proID_tbl_ptr;
+char** res_model_name_ptr;
+char** eft_name_tbl_ptr;
+void** eft_scnbox_data_ptr;
+char** q_comn_eft_name_ptr;
+char** lb_comn_eft_name_ptr;
+char** q_comn_efm_name_ptr;
+char** lobby_eft_mdl_name_ptr;
 #ifdef __cplusplus
 }
 #endif
@@ -241,7 +301,10 @@ void push_g3d_wk(struct _g3d_work* work);
 
 /* g3d's root node (the map spells it `pRoot`; ef/eft007.cpp declares the same) */
 
-void* res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light);
+u32 res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light);
+/* untyped: opaque handle - the UV animation record the caller stores */
+void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long light, struct _g3d_work** list, long count,
+                                   u8 flag);
 
 /* ---------------------------------------------------------------------------------------------------
  * the functions, in address order
@@ -303,15 +366,52 @@ extern "C" void eft_res_release_all(void) {
     }
 }
 
+/* 0x800F6710 (0x274): resolves the mode's common effect files (lobby or quest) into proID slots and requests their
+ * load: the `efm` run first, then the `eft` run, whose odd entries pair a plain and an alternate id. */
+extern "C" void eft_common_load(void) {
+    EftResFile* file;
+    u8 ids[0x50];
+    u32 i;
+
+    switch (GameMode_ck()) {
+    case 2:
+        file = lobby_eft_mdl_file;
+        for (i = 0; efm_common_proID_tbl_ptr[1][i] != 0xFF; i++) {
+            ids[i] = eft_pro_slot_assign(0, 3, 1, 0, i);
+        }
+        fn_800F8634(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[1], (u32)lobby_eft_mdl_name_ptr);
+        file = lb_comn_eft_file;
+        ids[0] = eft_pro_slot_assign(0, 2, 1, 0, 0);
+        for (i = 2; eft_common_proID_tbl_ptr[1][i - 1] != 0xFF; i += 2) {
+            ids[i - 1] = eft_pro_slot_assign(0, 1, 1, 0, i - 1);
+            ids[i] = eft_pro_slot_assign(0, 1, 1, 1, i);
+        }
+        fn_800F8634(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[1], (u32)lb_comn_eft_name_ptr);
+        break;
+    case 1:
+        file = q_comn_efm_file;
+        for (i = 0; efm_common_proID_tbl_ptr[0][i] != 0xFF; i++) {
+            ids[i] = eft_pro_slot_assign(0, 3, 0, 0, i);
+        }
+        fn_800F8634(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[0], (u32)q_comn_efm_name_ptr);
+        file = q_comn_eft_file;
+        ids[0] = eft_pro_slot_assign(0, 2, 0, 0, 0);
+        for (i = 2; eft_common_proID_tbl_ptr[0][i - 1] != 0xFF; i += 2) {
+            ids[i - 1] = eft_pro_slot_assign(0, 1, 0, 0, i - 1);
+            ids[i] = eft_pro_slot_assign(0, 1, 0, 1, i);
+        }
+        fn_800F8634(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[0], (u32)q_comn_eft_name_ptr);
+        break;
+    }
+}
+
 /* 0x800F6984 - load one resource set with the 0x20000 flag family. */
-extern "C" void fn_800F6984(u32 a, u32 b, void* desc, void* table) {
-    u32 tag = a & 0xFF;
-    tag = tag << 0x10;
-    fn_800F7F18(desc, (u8)b, tag | 2, table);
+extern "C" void fn_800F6984(u8 a, u8 b, EftResFile* desc, u8* table) {
+    fn_800F7F18(desc, b, (a << 16) | 2, table);
 }
 
 /* 0x800F69A0 - load one resource set with flag word 1. */
-extern "C" void fn_800F69A0(u32 a, void* desc, void* table) {
+extern "C" void fn_800F69A0(u32 a, EftResFile* desc, u8* table) {
     fn_800F7F18(desc, (u8)a, 1, table);
 }
 
@@ -338,8 +438,11 @@ extern "C" void fn_800F6A24(void) {
 }
 
 /* 0x800F6A78 - build one slot-table record (the id fn_800F6520 files it under). */
-extern "C" void fn_800F6A78(u32 id) {
-    EftProHdrSlot* slot = (EftProHdrSlot*)(lbl_806A2D34 + (id & 0xFF) * 0x18);
+extern "C" void fn_800F6A78(u8 id) {
+    u8* p = lbl_806A2D34;
+    EftProHdrSlot* slot;
+    p += id * 0x18;
+    slot = (EftProHdrSlot*)p;
 
     slot->kind_0x04 = 0;
     slot->field_0x05 = 0xFF;
@@ -365,6 +468,756 @@ extern "C" EftProSlot* fn_800F6AC8(u32 key) {
         slot++;
     }
     return NULL;
+}
+
+/* 0x800F6B6C (0x248): takes a free proID slot and files the effect `index` of the group/kind's table under it;
+ * returns the slot ordinal, or 0xFF when no slot is free or the table has no such effect. */
+extern "C" u8 eft_pro_slot_assign(u8 group, u8 kind, u8 set, u8 sub, u8 index) {
+    EftProSlot* slot;
+    u8* table;
+
+    slot = fn_800F6AC8(0);
+    if (slot != NULL) {
+        switch (group) {
+        case 0:
+            switch (kind) {
+            case 3:
+                if (set == 2) {
+                    table = efm_map_com_proID_tbl_ptr[sub];
+                } else {
+                    table = efm_common_proID_tbl_ptr[set];
+                }
+                break;
+            case 1:
+                if (set == 2) {
+                    table = eft_map_com_proID_tbl_ptr[sub];
+                } else if (set == 3) {
+                    table = eft_map_com_proID_tbl_ptr[sub];
+                    kind = 2;
+                } else {
+                    table = eft_common_proID_tbl_ptr[set];
+                    if (sub == 1) {
+                        kind = 2;
+                    }
+                }
+                break;
+            case 2:
+                if (set == 2) {
+                    table = efx_map_com_proID_tbl_ptr[sub];
+                } else {
+                    table = efx_common_proID_tbl_ptr[set];
+                }
+                break;
+            }
+            break;
+        case 2:
+            switch (kind) {
+            case 3:
+                table = efm_em_proID_tbl_ptr[set];
+                break;
+            case 1:
+                table = eft_em_proID_tbl_ptr[set];
+                break;
+            case 2:
+                table = efx_em_proID_tbl_ptr;
+                index = set;
+                break;
+            }
+            break;
+        case 1:
+            switch (kind) {
+            case 3:
+                table = efm_map_proID_tbl_ptr[set][sub];
+                break;
+            case 1:
+            case 2:
+                table = eft_map_proID_tbl_ptr[set][sub];
+                break;
+            }
+            break;
+        default:
+            return 0xFF;
+        }
+        if (table != NULL) {
+            slot->field_0x04 = table[index];
+            if (slot->field_0x04 != 0xFF) {
+                slot->kind_0x00 = 1;
+                slot->state_0x02 = group;
+                slot->field_0x01 = kind;
+                return slot->id_0x03;
+            }
+            return 0xFF;
+        }
+    }
+    return 0xFF;
+}
+/* 0x800F6DB4 (0x9C4): starts the current map area's resident effects on area entry: the eft004 area spawner and the
+ * eft028 break/crumble setters each map/area pair places. */
+extern "C" void eft_area_effects_set(void) {
+    u8 area;
+    u8 map;
+
+    area = get_now_areano();
+    map = get_now_mapno();
+    switch (map) {
+    case 1:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            eft028_set(0, 0, area);
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            eft028_set(0, 0, area);
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        case 10:
+            fn_800FD864();
+            break;
+        case 11:
+            fn_800FD864();
+            break;
+        case 12:
+            fn_800FD864();
+            eft028_set(0, 0, area);
+            break;
+        }
+        break;
+    case 2:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        case 10:
+            fn_800FD864();
+            break;
+        case 11:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 3:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            eft028_set(5, 1, area);
+            break;
+        case 2:
+            fn_800FD864();
+            eft028_set(3, 0, area);
+            eft028_set(5, 1, area);
+            break;
+        case 3:
+            eft028_set(3, 0, area);
+            eft028_set(5, 1, area);
+            break;
+        case 4:
+            fn_800FD864();
+            eft028_set(3, 0, area);
+            eft028_set(5, 1, area);
+            break;
+        case 5:
+            fn_800FD864();
+            eft028_set(5, 1, area);
+            break;
+        case 6:
+            fn_800FD864();
+            eft028_set(0, 0, area);
+            break;
+        case 7:
+            eft028_set(5, 1, area);
+            break;
+        case 8:
+            fn_800FD864();
+            eft028_set(3, 0, area);
+            break;
+        case 9:
+            fn_800FD864();
+            eft028_set(5, 1, area);
+            break;
+        }
+        break;
+    case 4:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 5:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        case 10:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 6:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 7:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            eft028_set(4, 1, area);
+            break;
+        case 2:
+            eft028_set(4, 1, area);
+            break;
+        case 3:
+            fn_800FD864();
+            eft028_set(4, 1, area);
+            break;
+        }
+        break;
+    case 8:
+        switch (area) {
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            eft028_set(0, 0, area);
+            break;
+        }
+        break;
+    case 9:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            eft028_set(0, 0, area);
+            break;
+        }
+        break;
+    case 10:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 11:
+        switch (area) {
+        case 1:
+            eft028_set(0, 0, area);
+            break;
+        }
+        break;
+    case 12:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            eft028_set(7, 0, area);
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            eft028_set(7, 0, area);
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        case 10:
+            fn_800FD864();
+            break;
+        case 11:
+            fn_800FD864();
+            break;
+        case 12:
+            fn_800FD864();
+            eft028_set(7, 0, area);
+            break;
+        }
+        break;
+    case 13:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        case 10:
+            fn_800FD864();
+            break;
+        case 11:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 14:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            eft028_set(3, 0, area);
+            break;
+        case 3:
+            fn_800FD864();
+            eft028_set(3, 0, area);
+            break;
+        case 4:
+            fn_800FD864();
+            eft028_set(3, 0, area);
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            eft028_set(7, 0, area);
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        case 8:
+            fn_800FD864();
+            eft028_set(3, 0, area);
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        case 10:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 15:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 16:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 4:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        case 8:
+            fn_800FD864();
+            break;
+        case 9:
+            fn_800FD864();
+            break;
+        case 10:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 17:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 18:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            eft028_set(4, 1, area);
+            break;
+        case 2:
+            eft028_set(4, 1, area);
+            break;
+        case 3:
+            fn_800FD864();
+            eft028_set(4, 1, area);
+            break;
+        }
+        break;
+    case 19:
+        switch (area) {
+        case 1:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 20:
+        switch (area) {
+        case 1:
+            eft028_set(7, 0, area);
+            break;
+        }
+        break;
+    case 21:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            eft028_set_capsule(area);
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        case 3:
+            fn_800FD864();
+            break;
+        case 5:
+            fn_800FD864();
+            break;
+        case 6:
+            fn_800FD864();
+            break;
+        case 7:
+            fn_800FD864();
+            break;
+        }
+        break;
+    case 22:
+        switch (area) {
+        case 0:
+            fn_800FD864();
+            break;
+        case 1:
+            fn_800FD864();
+            break;
+        case 2:
+            fn_800FD864();
+            break;
+        }
+        break;
+    }
+}
+
+/* 0x800F7778 (0x32C): releases one slot-table record - its registered project, its filed id and its resource
+ * memory - and rebuilds it empty; returns whether the resource itself was deleted. */
+extern "C" u32 fn_800F7778(u8 id) {
+    u8* p = lbl_806A2D34;
+    EftProHdrSlot* slot;
+    EftControl* ctrl;
+    u32 deleted;
+    EfResourceManager* resource;
+    u32 size;
+    u8 shared;
+
+    p += id * 0x18;
+    slot = (EftProHdrSlot*)p;
+    ctrl = &eft_control;
+    deleted = 0;
+    resource = ef_resource_instance();
+    if (slot->kind_0x04 == 0) {
+        return 0;
+    }
+    if (slot->kind_0x04 == 2) {
+        shared = slot->field_0x09 == 0xEE;
+        switch (slot->field_0x05) {
+        case 1:
+            if (slot->field_0x10 != -1 && nwDelResource(slot->field_0x10) == 0) {
+                if (slot->field_0x14 != 0) {
+                    ef_resource_remove_effect_project(resource, (void*)slot->field_0x14);
+                }
+                if (slot->field_0x09 != 0xFF && slot->field_0x10 == ctrl->id_a_0x3C[slot->field_0x09]) {
+                    ctrl->id_a_0x3C[slot->field_0x09] = -1;
+                    ctrl->loaded_a_0x30--;
+                }
+                deleted = 1;
+            }
+            if (shared == 0) {
+                if (slot->field_0x0C != -1) {
+                    size = nw_res_mem_size(slot->field_0x0C);
+                    if (push_res_mem(slot->field_0x0C) == 0) {
+                        ctrl->bytes_0xC3C -= size;
+                    }
+                }
+            } else {
+                ctrl->loaded_a_0x30--;
+            }
+            lbl_806A2D34[2]--;
+            break;
+        case 2:
+            if (slot->field_0x10 != -1 && nwDelResource(slot->field_0x10) == 0) {
+                if (slot->field_0x18 != 0) {
+                    ef_resource_remove_texture_project(resource, (void*)slot->field_0x18);
+                }
+                if (slot->field_0x09 != 0xFF && slot->field_0x10 == ctrl->id_b_0x43C[slot->field_0x09]) {
+                    ctrl->id_b_0x43C[slot->field_0x09] = -1;
+                    ctrl->loaded_b_0x34--;
+                }
+                deleted = 1;
+            }
+            if (shared == 0) {
+                if (slot->field_0x0C != -1) {
+                    size = nw_res_mem_size(slot->field_0x0C);
+                    if (push_res_mem(slot->field_0x0C) == 0) {
+                        ctrl->bytes_0xC3C -= size;
+                    }
+                }
+            } else {
+                ctrl->loaded_b_0x34--;
+            }
+            lbl_806A2D34[3]--;
+            break;
+        case 3:
+            if (slot->field_0x10 != -1) {
+                nw_res_entry_clear(slot->field_0x10);
+                if (slot->field_0x09 != 0xFF && slot->field_0x10 == ctrl->id_c_0x83C[slot->field_0x09]) {
+                    ctrl->id_c_0x83C[slot->field_0x09] = -1;
+                    ctrl->loaded_c_0x38--;
+                }
+                deleted = 1;
+            }
+            if (shared == 0) {
+                if (slot->field_0x0C != -1) {
+                    size = nw_res_mem_size(slot->field_0x0C);
+                    if (push_res_mem(slot->field_0x0C) == 0) {
+                        ctrl->bytes_0xC3C -= size;
+                    }
+                }
+            } else {
+                ctrl->loaded_c_0x38--;
+            }
+            lbl_806A2D34[1]--;
+            break;
+        }
+    }
+    slot->kind_0x04 = 0;
+    slot->field_0x05 = 0xFF;
+    slot->state_0x06 = 0xFF;
+    slot->id_0x07 = id;
+    slot->field_0x08 = 0xFF;
+    slot->field_0x09 = 0xFF;
+    slot->field_0x0A = -1;
+    slot->field_0x0C = -1;
+    slot->field_0x10 = -1;
+    slot->field_0x14 = 0;
+    slot->field_0x18 = 0;
+    lbl_806A2D34[0]--;
+    return deleted;
 }
 
 /* 0x800F7AA4 - find the handed-out record whose proID is `key`. */
@@ -473,6 +1326,252 @@ extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx
         break;
     }
     fn_800F7C74(1);
+}
+
+/* 0x800F7F18 (0x440): requests the load of every file of a descriptor run into the proID slots `ids` names: mode
+ * 3 the `efm` models, mode 1 the effect projects, mode 2 the texture projects (mode 0 both of the last two, one
+ * descriptor each); an area-tagged request (`flags` low half 2) loads into the area's enemy memory. */
+extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
+    EftControl* ctrl = &eft_control;
+    u32 count = 0;
+    EftProTable* table = (EftProTable*)lbl_806A2D34;
+    EftLoadCtx ctx;
+    s32 handle;
+    void* data;
+    u8 area;
+    u32 from_area;
+    u8 id;
+
+    if ((u16)flags == 2) {
+        area = (flags >> 16) & 0xFF;
+        from_area = 1;
+    } else {
+        from_area = 0;
+    }
+    for (;;) {
+        if (mode == 3) {
+            if (file->size_0x00 == 0) {
+                return;
+            }
+            if (file->name_0x04 != NULL && ids != NULL) {
+                id = ids[(u8)count];
+                if (id == 0xFF) {
+                    return;
+                }
+                table->slots_0x04[id].field_0x06 = -1;
+                do {
+                    if (from_area == 1) {
+                        data = em_kind_mem_alloc((u8)area, file->size_0x00);
+                        if (data == NULL) {
+                            break;
+                        }
+                        ctx.mode = 3;
+                        ctx.slot = &table->slots_0x04[id];
+                        ctx.unshared_0x08 = 1;
+                        load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)fn_800F7D44, 3, (u32*)&ctx);
+                        table->slots_0x04[id].field_0x05 = 0xEE;
+                        table->slots_0x04[id].kind_0x00 = 2;
+                        table->slots_0x04[id].field_0x01 = 3;
+                        table->slots_0x04[id].field_0x08 = flags;
+                    } else {
+                        handle = fn_800D4CE4(file->name_0x04);
+                        if (handle < 0) {
+                            handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
+                            if (handle < 0) {
+                                break;
+                            }
+                            ctx.mode = 3;
+                            ctx.slot = &table->slots_0x04[id];
+                            ctx.unshared_0x08 = 0;
+                            load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)fn_800F7D44,
+                                          3, (u32*)&ctx);
+                            ctrl->bytes_0xC3C += file->size_0x00;
+                        }
+                        table->slots_0x04[id].kind_0x00 = 2;
+                        table->slots_0x04[id].field_0x01 = 3;
+                        table->slots_0x04[id].field_0x08 = handle;
+                    }
+                    count++;
+                    table->used_0x00++;
+                } while (0);
+            }
+            file++;
+        } else {
+            if ((u32)mode <= 1) {
+                if (file->size_0x00 == 0) {
+                    return;
+                }
+                if (file->name_0x04 != NULL && ids != NULL) {
+                    id = ids[(u8)count];
+                    if (id == 0xFF) {
+                        return;
+                    }
+                    table->slots_0x04[id].field_0x06 = -1;
+                    do {
+                        if (from_area == 1) {
+                            data = em_kind_mem_alloc((u8)area, file->size_0x00);
+                            if (data == NULL) {
+                                break;
+                            }
+                            ctx.mode = 1;
+                            ctx.slot = &table->slots_0x04[id];
+                            ctx.unshared_0x08 = 1;
+                            load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)fn_800F7D44, 3, (u32*)&ctx);
+                            table->slots_0x04[id].field_0x05 = 0xEE;
+                            table->slots_0x04[id].kind_0x00 = 2;
+                            table->slots_0x04[id].field_0x01 = 1;
+                            table->slots_0x04[id].field_0x08 = flags;
+                        } else {
+                            handle = fn_800D4CE4(file->name_0x04);
+                            if (handle < 0) {
+                                handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
+                                if (handle < 0) {
+                                    break;
+                                }
+                                ctx.mode = 1;
+                                ctx.slot = &table->slots_0x04[id];
+                                ctx.unshared_0x08 = 0;
+                                load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)fn_800F7D44,
+                                              3, (u32*)&ctx);
+                                ctrl->bytes_0xC3C += file->size_0x00;
+                            }
+                            table->slots_0x04[id].kind_0x00 = 2;
+                            table->slots_0x04[id].field_0x01 = 1;
+                            table->slots_0x04[id].field_0x08 = handle;
+                        }
+                        count++;
+                        table->used_0x00++;
+                    } while (0);
+                }
+                file++;
+            }
+            if (mode == 0 || mode == 2) {
+                if (file->size_0x00 == 0) {
+                    return;
+                }
+                if (file->name_0x04 != NULL && ids != NULL) {
+                    id = ids[(u8)count];
+                    if (id == 0xFF) {
+                        return;
+                    }
+                    table->slots_0x04[id].field_0x06 = -1;
+                    do {
+                        if (from_area == 1) {
+                            data = em_kind_mem_alloc((u8)area, file->size_0x00);
+                            if (data == NULL) {
+                                break;
+                            }
+                            ctx.mode = 2;
+                            ctx.slot = &table->slots_0x04[id];
+                            ctx.unshared_0x08 = 1;
+                            load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)fn_800F7D44, 3, (u32*)&ctx);
+                            table->slots_0x04[id].field_0x05 = 0xEE;
+                            table->slots_0x04[id].kind_0x00 = 2;
+                            table->slots_0x04[id].field_0x01 = 2;
+                            table->slots_0x04[id].field_0x08 = flags;
+                        } else {
+                            handle = fn_800D4CE4(file->name_0x04);
+                            if (handle < 0) {
+                                handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
+                                if (handle < 0) {
+                                    break;
+                                }
+                                ctx.mode = 2;
+                                ctx.slot = &table->slots_0x04[id];
+                                ctx.unshared_0x08 = 0;
+                                load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)fn_800F7D44,
+                                              3, (u32*)&ctx);
+                                ctrl->bytes_0xC3C += file->size_0x00;
+                            }
+                            table->slots_0x04[id].kind_0x00 = 2;
+                            table->slots_0x04[id].field_0x01 = 2;
+                            table->slots_0x04[id].field_0x08 = handle;
+                        }
+                        count++;
+                        table->used_0x00++;
+                    } while (0);
+                }
+                file++;
+            }
+        }
+    }
+}
+
+/* 0x800F8358 (0x2DC): the archive-load callback: files every member of the loaded archive under the proID
+ * slot `eft_common_load`'s run reserved for it (searched from the run's first ordinal) and registers it. */
+extern "C" void fn_800F8358(char* path, void* data, u32 size, EftFileLoadCtx* ctx) {
+    EftControl* ctrl = &eft_control;
+    u8* table = lbl_806A2D34;
+    u8* proids = ctx->proids_0x00;
+    EfResourceManager* resource = ef_resource_instance();
+    char** names = ctx->names_0x08;
+    s32 count = pack_entry_count(data);
+    s32 mode = ctx->mode_0x0C;
+    EftProSlot* slot;
+    void* file;
+    s32 i;
+    s32 j;
+    u16 pos;
+    u32 index;
+
+    for (i = 0; i < count; i++) {
+        pos = (u16)ctx->first_0x04 + i;
+        if (pos > 0xFF) {
+            pos = 0;
+        }
+        for (j = 0; j < 0x100; pos++, j++) {
+            index = pos;
+            if (index > 0xFF) {
+                index = (u16)(index - 0x100);
+            }
+            slot = (EftProSlot*)(table + index * 0x18 + 4);
+            if (slot->field_0x04 == *proids && slot->kind_0x00 == 1) {
+                if (mode == 3) {
+                    if (mode == slot->field_0x01) {
+                        break;
+                    }
+                } else if (slot->field_0x01 != 3) {
+                    break;
+                }
+            }
+        }
+        if (j > 0xFF) {
+            return;
+        }
+        file = pack_entry_data(data, i);
+        slot->field_0x10 = 0;
+        slot->field_0x14 = 0;
+        switch (slot->field_0x01) {
+        case 3:
+            slot->field_0x06 = (s16)ctrl->loaded_c_0x38;
+            slot->field_0x0C = fn_800D56F4(*names, file);
+            ctrl->id_c_0x83C[ctrl->loaded_c_0x38] = slot->field_0x0C;
+            ctrl->loaded_c_0x38++;
+            slot->field_0x05 = table[1]++;
+            break;
+        case 1:
+            slot->field_0x06 = (s16)ctrl->loaded_a_0x30;
+            slot->field_0x0C = nwAddResource(*names, file);
+            ctrl->id_a_0x3C[ctrl->loaded_a_0x30] = slot->field_0x0C;
+            ctrl->loaded_a_0x30++;
+            slot->field_0x10 = ef_resource_add_effect_project(resource, file);
+            slot->field_0x05 = table[2]++;
+            break;
+        case 2:
+            slot->field_0x06 = (s16)ctrl->loaded_b_0x34;
+            slot->field_0x0C = nwAddResource(*names, file);
+            ctrl->id_b_0x43C[ctrl->loaded_b_0x34] = slot->field_0x0C;
+            ctrl->loaded_b_0x34++;
+            slot->field_0x14 = ef_resource_add_texture_project(resource, file);
+            slot->field_0x05 = table[3]++;
+            fn_800F7C74(1);
+            break;
+        }
+        slot->kind_0x00 = 2;
+        slot->field_0x08 = 0x7FFFFFFF;
+        names++;
+        proids++;
+    }
 }
 
 /* 0x800F8634 - the resource-file request: pull the file into memory and start the async load whose
@@ -734,14 +1833,108 @@ extern "C" void fn_800F8DA4(void) {
 
 /* 0x800F8E5C - create a model on an actor (no light argument). */
 void* res_eft_model_create(MHchar* model, u16 id, u32 arg) {
-    return res_eft_model_create_light(model, id, arg, 0);
+    return (void*)res_eft_model_create_light(model, id, arg, 0);
+}
+
+/* 0x800F8E68 (0xF4): binds the effect model resource `id` (the model-name table entry) to `model` with the light
+ * set `light`; returns 1, or 0 without a model, past the table's 0xAD names or when the file is not loaded. */
+u32 res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light) {
+    u32 res;
+    u32 file;
+    ResEntry* entry;
+
+    res_file_ctor(&res, 0);
+    if (model == NULL) {
+        return 0;
+    }
+    if (id >= 0xAD) {
+        return 0;
+    }
+    entry = ckResourceName(res_model_name_ptr[id]);
+    if (entry == NULL) {
+        return 0;
+    }
+    res_file_assign(&res, res_file_ctor(&file, (u32)entry->data));
+    mhchar_reset(model);
+    model->g3d_0x10C = NULL;
+    fn_800E0BE8(model, 1);
+    fn_800E2228(model, &res, arg, light);
+    model->ready = 1;
+    return 1;
+}
+
+/* 0x800F8F5C (0xAC): binds the UV-animated effect model resource `id` to `model` through
+ * `res_eft_UV_model_create_name`; NULL without a model or past the table's 0xAD names. */
+/* untyped: opaque handle - the UV animation record the caller stores */
+void* res_eft_UV_model_create(MHchar* model, u16 id, u32 arg, long light, struct _g3d_work** list, long count, u8 flag) {
+    u32 res;
+    u32 mdl;
+
+    res_file_ctor(&res, 0);
+    fn_8007B878(&mdl, 0);
+    if (model == NULL) {
+        return NULL;
+    }
+    if (id >= 0xAD) {
+        return NULL;
+    }
+    return res_eft_UV_model_create_name(model, res_model_name_ptr[id], arg, light, list, count, flag);
+}
+
+/* 0x800F9008 (0x198): binds the effect model file `name` to `model`, then builds its UV animation over the `count`
+ * g3d works of `list` (full strength for flag 1/2, half otherwise); returns the animation, or NULL after releasing
+ * the works when the file is not loaded or the works do not fit. */
+/* untyped: opaque handle - the UV animation record the caller stores */
+void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long light, struct _g3d_work** list, long count,
+                                   u8 flag) {
+    EftResFileHandle res;
+    EftResFileHandle mdl;
+    u32 file;
+    ResEntry* entry;
+    void* uv;
+    f32 strength;
+    s32 i;
+
+    res_file_ctor(&res.data_0x00, 0);
+    fn_8007B878(&mdl, 0);
+    entry = ckResourceName(name);
+    if (entry == NULL) {
+        return NULL;
+    }
+    res_file_assign(&res.data_0x00, res_file_ctor(&file, (u32)entry->data));
+    mhchar_reset(model);
+    model->g3d_0x10C = NULL;
+    fn_800E0BE8(model, 1);
+    fn_800E2228(model, &res.data_0x00, arg, light);
+    model->ready = 1;
+    nw4r::g3d::ResMdl scn_mdl = ((nw4r::g3d::ScnMdlSimple*)model->field_0x118)->GetResMdl();
+    fn_8007BA08(&mdl, &scn_mdl);
+    if (nw_res_anm_work_num(res, mdl, 5, list) <= count) {
+        if ((u32)(flag - 1) <= 1) {
+            strength = 1.0f;
+        } else {
+            strength = 0.5f;
+        }
+        uv = nw_res_anm_create(res, mdl, (nw4r::g3d::ScnMdlSimple*)model->field_0x118, 5, list[0], &list[1], strength);
+        if (uv != NULL) {
+            return uv;
+        }
+    }
+    for (i = 0; i < count; i++) {
+        if (*list != NULL) {
+            push_g3d_wk(*list);
+        }
+        *list = NULL;
+        list++;
+    }
+    return NULL;
 }
 
 /* 0x800F91A0 - the model-name table lookup. */
 char* get_eft_res_name(u16 id) {
     u32 index = id & 0xFFFF;
 
-    return ((char**)res_model_name_ptr)[index];
+    return res_model_name_ptr[index];
 }
 
 /* 0x800F91B4 - create a pooled effect from a proID pair and a resource ordinal. */

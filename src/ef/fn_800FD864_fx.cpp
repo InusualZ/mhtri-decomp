@@ -6,13 +6,15 @@
  *   `fn_800FE93C` (the four-state dispatcher: `fn_800FE978`, `fn_800FF8D4`, `fn_800FFC98`, `fn_800FFCA8`) and
  *   `fn_800FE8E8` (the release hook); `fn_800FE978` loads the family's effect file per map and area and seeds or
  *   drives the pre-placed slots.  The setters from 0x80100448 are `ef/eft004_fx.cpp`.
- * FLAGS. `cflags_main`; `#pragma peephole off` for `fn_800FD864`, `fn_800FE8E8`, `fn_800FE93C` and from `fn_800FFC98`
+ * FLAGS. `cflags_main`; `#pragma peephole off` for `fn_800FD864`, `fn_800FE8E8`, `fn_800FE93C` and from `fn_800FF8D4`
  *   to the end (retail keeps the hook address in `r0` and the unfused `rlwinm` + `cmpwi`; playbook 39).
  * NAMES. The map has only `fn_` stems here (the dump has placeholders), so the definitions are `extern "C"`; the
  *   unit is C++ because the mangled callees are called through their real signatures.
- * RESIDUALS. 3 rows unwritten: 0x800FF8D4-0x800FFC98 (`fn_800FF8D4`), 0x800FFCAC-0x800FFF08 (`fn_800FFCAC`),
- *   0x80100088-0x80100300 (`fn_80100088`).
- *   3 partial rows:
+ *   GUESS (from what they hold, their bodies and their callers): `eft004_spawn_ids_map*`, `eft004_flag_emitter_name`,
+ *   the callees `lb_event_state_ck`, `stg_area_flag_ck`, `ef_effect_emitter_*`, `ef_emitter_pm_*`, `ef_word_copy`
+ *   and the `ef_res_*` accessors.
+ * RESIDUALS. 5 partial rows:
+ *  - `fn_800FF8D4`, `fn_80100088`: the callee-saved registers are assigned in another order (structure identical);
  *  - `fn_800FE978`: retail's frame is 0x840 with the dynamic `stwux` prologue saving r22-r31, ours a static 0x8F0
  *    frame saving r21-r31, so `self` and every stack slot move; the `mapno` 21/22 area switches and the
  *    `fn_802FB8EC` sub-switches are compare chains in retail and local jump tables in ours;
@@ -20,14 +22,15 @@
  *  - `fn_80100330`: the `IsValidPointer` inline tests the value in `r4` where retail uses `r6`.
  *   Ours emits the eight `fn_800FD864` switch tables and three `fn_800FE978` tables locally (`@523`-`@533`, `@837`)
  *   where retail relocates against the `.data` run's `jumptable_` entries.
- *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted; `.text` (0x219C of 0x2BE4), extab (0x50 of 0x68), extabindex
- *   (0x78 of 0x9C) and `.data` (0x274 of 0xB80) short of the claim and differing.
+ *   flipcheck: `.sdata` claimed, not emitted; `.sdata2` (0x10 of 0x28), `.text` (0x2A6C of 0x2BE4) and `.data`
+ *   (0x2C4 of 0xB80) short of the claim and differing; extab and extabindex differ in 1 and 2 bytes.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_21`,
  *     `_savegpr_22`, `_restgpr_21`, `jumptable_8059C3E0`, `jumptable_8059C3C0`, `_restgpr_22`.
  * SHAPES. `fn_800FD864`'s `areano` is `u32` (the small area switches then compare `cmplwi`), assigned through a `(u8)`
  *   cast (retail's `clrlwi r3,24`); each case assigns its three parameters in retail's order (`a`, `b`, `c`; `b`, `a`,
  *   `c` for maps 21/22) and the tail stores them as `+0x00 = b`, `+0x0D0 = a`, `+0x0D4 = c`.
  *   `_EFT_MAP_WORK` is the 0x8F4-byte family block at `+0x38`.
+ *   `fn_800FF8D4` narrows `lb_event_state_ck()` (the owner's `u32`) with `(u8)`: retail's `clrlwi` after the call.
  */
 
 #include "types.h"
@@ -47,6 +50,16 @@
 #include "sound/fn_800D7F54.h"
 #include "ef/fn_800FD864_fx_types.h"
 #include "DVD/dvdfs.h" /* DVDFileInfo, DVDClose (rule 2) */
+#include "camera/camera.h" /* get_camera_pos (rule 2) */
+#include "lobby/lb_menu_pos_tbl.h" /* getItemListSelection (rule 2) */
+#include "ef/eft_res_models_spawn.h"
+#include "ef/ef_pm_modulate_color.h" /* ef_pm_handle (rule 2) */
+#include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
+#include "lobby/fn_802FA9A0.h"   /* lb_event_state_ck */
+#include "stage/stg_w.h"   /* stg_area_flag_ck */
+#include "ef/ef_effect_emitter_get.h" /* ef_effect_emitter_count, ef_effect_emitter_get (rule 2: a leaf header) */
+#include "ef/ef_emitter_pm_get.h" /* ef_emitter_pm_count, ef_emitter_pm_get, ef_word_copy (rule 2: a leaf header) */
+#include "ef/ef_res_emitterparam_vec.h" /* the ef_res_* accessors (rule 2: a leaf header) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the family work block `eft_res_slot_get(0x8F4)` attaches to the slot at `_EFT::work_0x38`
@@ -196,7 +209,7 @@ struct EftSpawnWorkSlot {
     /* +0x04 */ s32 value_a;
     /* +0x08 */ s32 value_b;
     /* +0x0C */ s32 value_c;
-    /* +0x10 */ u8 pad_0x10[0x04];
+    /* +0x10 */ s32 timer;          /* frames since the slot last spawned */
 }; /* size: 0x14 */
 
 /* The family's work block (`_EFT::work_0x38`).  The three sections are sized from the strides the
@@ -207,12 +220,12 @@ struct EftSpawnWork {
     /* +0x004 */ nw4r::ef::Effect* effects[30];
     /* +0x07C */ s32 count2;
     /* +0x080 */ nw4r::ef::Effect* effects2[20];
-    /* +0x0D0 */ u16 id_base;
-    /* +0x0D4 */ u16 kind;
+    /* +0x0D0 */ s32 id_base;
+    /* +0x0D4 */ s32 kind;
     /* +0x0D8 */ EftSpawnWorkSlot slots[30];
     /* +0x330 */ nw4r::math::MTX34 matrices[30];
     /* +0x8D0 */ s32 slot_count;
-    /* +0x8D4 */ u8 pad_0x8D4[0x01];
+    /* +0x8D4 */ u8 camera_gate_0x8D4; /* 1: hand the effects on only while the camera is above y 0 */
     /* +0x8D5 */ u8 types_0x8D5[30];
 }; /* size: 0x8F3 (lower bound: +0x8D5 is the highest offset any function of this unit reads) */
 
@@ -247,12 +260,40 @@ struct EftEmitter {
 
 extern "C" u32 fn_80100330(u32* p);
 extern "C" void* ef_emres_get_name(u32 color);
-extern "C" void* fn_800A60C0(void* self);
+extern "C" void* ef_effect_root_mtx(void* self);
 extern "C" void RetireParticleAll(nw4r::ef::Effect* effect);
 extern "C" nw4r::ef::EffectSystem* ef_system_memory_manager(nw4r::ef::EffectSystem* system);
 extern "C" EftEmitter* fn_800A51C8(void* self);
 
 extern "C" void fn_80100024(EftEmitter* self, nw4r::math::VEC3* out);
+extern "C" s32 fn_800FFF98(void* arg0, nw4r::math::VEC3* out);
+extern "C" void eft004_slot_spawn(_EFT* self, s32 idx);
+extern "C" void fn_800FFF08(Eft004* self, u32 idx);
+extern "C" void fn_80100300(u32* dst, const u32* src);
+extern "C" void* fn_8010030C(void* p);
+
+/* The 4-byte resource handle the nw4r emitter accessors fill and read: the address of the resource block
+ * (`ResEmitter`, its parameter block or its draw block). size: 0x04 */
+struct EftResHandle {
+    /* +0x00 */ u8* data;
+};
+
+
+/* The emitter name whose draw flag `fn_80100088` raises (`c00_p1`, `.sdata`). */
+extern char eft004_flag_emitter_name[8];
+
+/* The per-map spawn id tables `eft004_slot_spawn` picks by area: one `u16` id table per area. */
+extern u16* eft004_spawn_ids_map1[];
+extern u16* eft004_spawn_ids_map2[];
+extern u16* eft004_spawn_ids_map4[];
+extern u16* eft004_spawn_ids_map6[];
+extern u16* eft004_spawn_ids_map8[];
+extern u16* eft004_spawn_ids_map9[];
+extern u16* eft004_spawn_ids_map12[];
+extern u16* eft004_spawn_ids_map13[];
+extern u16* eft004_spawn_ids_map15[];
+extern u16* eft004_spawn_ids_map17[];
+extern u16* eft004_spawn_ids_map19[];
 
 /* The unit's own assert strings, referenced but not emitted (the pool lives in another unit). */
 extern "C" const char lbl_8059C4D0[]; /* "emitter.h"                                            .data */
@@ -1683,7 +1724,112 @@ extern "C" EftSpawnSlot* fn_800FF8A0(EftSpawnSlot* self)
     return self;
 }
 
+
 #pragma peephole off
+
+/* State 1: while the effect system is up and the area is current, re-spawns the timed slots whose effect has
+ * ended and retires the ones that stopped, then hands every live effect (or, on the map-22 event, the second run)
+ * to the model spawner at its emitter's position. */
+extern "C" void fn_800FF8D4(_EFT* self)
+{
+    nw4r::math::VEC3 pos;
+    nw4r::math::MTX34 mtx;
+    EftSpawnWork* work;
+    s32 i;
+    s32 count2;
+    s32 count;
+    s32 idx;
+
+    VEC3_ctor(&pos);
+    MTX34_ctor(&mtx);
+    work = (EftSpawnWork*)self->work_0x38;
+    if (eft_control.effect_system_0x04 == NULL) {
+        return;
+    }
+    if (self->area_0x44 != get_now_areano()) {
+        self->state_0x05++;
+        return;
+    }
+    if ((s32)self->field_0x07 != 1) {
+        for (i = 0; i < work->slot_count; i++) {
+            idx = work->slots[i].slot_index;
+            if (idx == 0xFF) {
+                continue;
+            }
+            if (work->effects[idx] == NULL) {
+                work->slots[i].timer++;
+                if (work->slots[i].timer > work->slots[i].value_a + work->slots[i].value_c) {
+                    eft004_slot_spawn(self, idx);
+                    work->slots[i].timer = 0;
+                    work->slots[i].value_c = ran_suu(0) % work->slots[i].value_b;
+                }
+            } else if (effect_emitter_alive_ck(work->effects[idx]) == 0) {
+                fn_800FFF08((Eft004*)self, idx);
+            }
+        }
+        if (work->camera_gate_0x8D4 == 1) {
+            if (get_camera_pos().y >= 0.0f) {
+                for (i = 0; i < work->count; i++) {
+                    if (work->effects[i] != NULL) {
+                        effect_retire(work->effects[i], 0);
+                        if (fn_800FFF98(work->effects[i], &pos) != 0) {
+                            eft_res_models_spawn(self, (void**)&work->effects[i], 1, 1, &pos);
+                        } else {
+                            eft_res_models_spawn(self, (void**)&work->effects[i], 1, 1, NULL);
+                        }
+                    }
+                }
+            }
+        } else {
+            for (i = 0; i < work->count; i++) {
+                if (work->effects[i] != NULL) {
+                    effect_retire(work->effects[i], 0);
+                    if (fn_800FFF98(work->effects[i], &pos) != 0) {
+                        eft_res_models_spawn(self, (void**)&work->effects[i], 1, 1, &pos);
+                    } else {
+                        eft_res_models_spawn(self, (void**)&work->effects[i], 1, 1, NULL);
+                    }
+                }
+            }
+        }
+    } else {
+        if (get_now_mapno() == 22) {
+            if ((u8)lb_event_state_ck() == 1) {
+                count = work->count - 3;
+                count2 = work->count2 - 3;
+            } else {
+                count = work->count;
+                count2 = work->count2;
+            }
+        } else {
+            count = work->count;
+            count2 = work->count2;
+        }
+        if (getItemListSelection() == 0) {
+            for (i = 0; i < count; i++) {
+                if (work->effects[i] != NULL) {
+                    effect_retire(work->effects[i], 0);
+                    if (fn_800FFF98(work->effects[i], &pos) != 0) {
+                        eft_res_models_spawn(self, (void**)&work->effects[i], 1, 1, &pos);
+                    } else {
+                        eft_res_models_spawn(self, (void**)&work->effects[i], 1, 1, NULL);
+                    }
+                }
+            }
+        } else {
+            for (i = 0; i < count2; i++) {
+                if (work->effects2[i] != NULL) {
+                    effect_retire(work->effects2[i], 0);
+                    if (fn_800FFF98(work->effects2[i], &pos) != 0) {
+                        eft_res_models_spawn(self, (void**)&work->effects2[i], 1, 1, &pos);
+                    } else {
+                        eft_res_models_spawn(self, (void**)&work->effects2[i], 1, 1, NULL);
+                    }
+                }
+            }
+        }
+    }
+}
 
 /* ---------------------------------------------------------------------------------------------------
  * bodies
@@ -1700,6 +1846,177 @@ extern "C" void fn_800FFC98(_EFT* effect)
 extern "C" void fn_800FFCA8(_EFT* effect)
 {
     eft_res_slot_release(effect);
+}
+
+/* Creates the effect of spawn slot `idx` from the current map's per-area id table (or from the family's id base
+ * when the map has none) and places it at the slot's matrix; two map-1 area-12 runs wait for their stage flags. */
+extern "C" void eft004_slot_spawn(_EFT* self, s32 idx)
+{
+    EftSpawnWork* work;
+    nw4r::ef::Effect** slot;
+    u16* ids;
+    u8 mapno;
+
+    work = (EftSpawnWork*)self->work_0x38;
+    mapno = get_now_mapno();
+    switch (mapno) {
+    case 1:
+        ids = eft004_spawn_ids_map1[self->area_0x44];
+        break;
+    case 2:
+        ids = eft004_spawn_ids_map2[self->area_0x44];
+        break;
+    case 4:
+        ids = eft004_spawn_ids_map4[self->area_0x44];
+        break;
+    case 6:
+        ids = eft004_spawn_ids_map6[self->area_0x44];
+        break;
+    case 8:
+        ids = eft004_spawn_ids_map8[self->area_0x44];
+        break;
+    case 9:
+        ids = eft004_spawn_ids_map9[self->area_0x44];
+        break;
+    case 12:
+        ids = eft004_spawn_ids_map12[self->area_0x44];
+        break;
+    case 13:
+        ids = eft004_spawn_ids_map13[self->area_0x44];
+        break;
+    case 15:
+        ids = eft004_spawn_ids_map15[self->area_0x44];
+        break;
+    case 17:
+        ids = eft004_spawn_ids_map17[self->area_0x44];
+        break;
+    case 19:
+        ids = eft004_spawn_ids_map19[self->area_0x44];
+        break;
+    default:
+        ids = NULL;
+        break;
+    }
+    if (mapno == 1 && (s32)get_now_areano() == 12) {
+        if ((u32)(idx - 13) <= 2 && stg_area_flag_ck(12, 1) == 1) {
+            return;
+        }
+        if ((u32)(idx - 16) <= 1 && stg_area_flag_ck(12, 0) == 1) {
+            return;
+        }
+    }
+    if (ids != NULL) {
+        slot = &work->effects[idx];
+        *slot = res_eft_create(ids[work->types_0x8D5[idx]], work->kind, 1);
+    } else {
+        slot = &work->effects[idx];
+        *slot = res_eft_create(idx + work->id_base, work->kind, 1);
+    }
+    if (*slot != NULL) {
+        (*slot)->SetRootMtx(work->matrices[idx]);
+    }
+}
+
+/* Retires one live effect: runs the nw4r teardown, releases it from the system and clears its slot. */
+extern "C" void fn_800FFF08(Eft004* self, u32 idx)
+{
+    EftEffectPool* pool = (EftEffectPool*)self->work_0x38;
+    nw4r::ef::EffectSystem* system = eft_control.effect_system_0x04;
+    nw4r::ef::Effect** slot = &pool->effects[idx];
+
+    if (*slot != NULL) {
+        ef_effect_root_mtx(*slot);
+        RetireParticleAll(*slot);
+        (*slot)->RetireEmitterAll();
+        system->RetireEffect(*slot);
+        ef_system_memory_manager(system)->virtual_0x0C();
+        *slot = NULL;
+    }
+}
+
+/* Copies the emitter's position out and, when the emitter is live, offsets it by the current view
+ * matrix's translation. Answers whether the offset was applied. */
+extern "C" s32 fn_800FFF98(void* arg0, nw4r::math::VEC3* out)
+{
+    EftEmitter* emitter = fn_800A51C8(arg0);
+
+    if (emitter != NULL) {
+        fn_80100024(emitter, out);
+        nw4r::math::MTX34* mtx = (nw4r::math::MTX34*)ef_effect_root_mtx(arg0);
+        out->x += mtx->m[0][3];
+        out->y += mtx->m[1][3];
+        out->z += mtx->m[2][3];
+        return 1;
+    }
+    return 0;
+}
+
+/* Asserts the destination vector, then copies the emitter's position into it. */
+extern "C" void fn_80100024(EftEmitter* self, nw4r::math::VEC3* out)
+{
+    if (out == NULL) {
+        nw4r::db::Panic(lbl_8059C4D0, 391, lbl_8059C4AC);
+    }
+    copyVec3(out, &self->pos_0x90);
+}
+
+/* Retires a pooled effect after shifting every particle manager's emitter 5 units along x and doubling its scale;
+ * with `flag` 1 the `c00_p1` emitter also gets its draw flag 0x400.  The effect then goes back to the heap. */
+/* untyped: an opaque handle passed through (the pooled effect, as ef/eft004.h declares it) */
+extern "C" void fn_80100088(void* effect, s32 flag)
+{
+    nw4r::math::VEC3 pos;
+    EftResHandle res;
+    EftResHandle param;
+    EftResHandle draw;
+    EftResHandle pm;
+    EftResHandle desc;
+    EftResHandle params;
+    u16 emitter_count;
+    u32 i;
+    u32 j;
+    const char* key;
+    EfEmitterObj* emitter;
+    u16 pm_count;
+    f32 scale;
+    const char* name;
+
+    VEC3_ctor(&pos);
+    ef_store_word(&res, 0);
+    ef_res_slot_set_emitter_desc(&param, NULL);
+    ef_res_slot_set_params(&draw, NULL);
+    effect_retire((nw4r::ef::Effect*)effect, 0);
+    emitter_count = ef_effect_emitter_count((EfEff*)effect);
+    key = eft004_flag_emitter_name;
+    for (i = 0; i < emitter_count; i++) {
+        emitter = ef_effect_emitter_get((EfEff*)effect, i);
+        pm_count = ef_emitter_pm_count(emitter);
+        for (j = 0; j < pm_count; j++) {
+            ef_pm_handle((EfDrawParticleManager**)&pm, ef_emitter_pm_get(emitter, j));
+            ef_word_copy(&res, &pm);
+            ef_res_slot_bind_emitter_desc(&desc, &res);
+            eft_word_copy((u32*)&param, (u32*)&desc);
+            scale = ef_res_emitterparam_scale(&param);
+            if (scale > 5e-05f) {
+                if ((u8)flag == 1) {
+                    name = (const char*)fn_8010030C(&res);
+                    if (name[0] == key[0] && name[1] == key[1] &&
+                        name[2] == key[2] && name[3] == key[3] &&
+                        name[4] == key[4] && name[5] == key[5]) {
+                        ef_res_slot_bind_params(&params, &res);
+                        fn_80100300((u32*)&draw, (u32*)&params);
+                        ef_res_drawparam_set_flag_0400(&draw, 1);
+                    }
+                }
+                copyVec3(&pos, ef_res_emitterparam_vec(&param));
+                pos.x += 5.0f;
+                scale *= 2.0f;
+                ef_res_emitterparam_set_vec(&param, &pos);
+                ef_res_emitterparam_set_scale(&param, scale);
+            }
+        }
+    }
+    push_eft_effect_heap_num((nw4r::ef::Effect**)&effect, 1);
 }
 
 /* Copies one 32-bit value. */
@@ -1721,47 +2038,4 @@ extern "C" u32 fn_80100330(u32* p)
         nw4r::db::Panic(lbl_8059C510, 102, lbl_8059C4DC);
     }
     return *p;
-}
-
-/* Copies the emitter's position out and, when the emitter is live, offsets it by the current view
- * matrix's translation. Answers whether the offset was applied. */
-extern "C" s32 fn_800FFF98(void* arg0, nw4r::math::VEC3* out)
-{
-    EftEmitter* emitter = fn_800A51C8(arg0);
-
-    if (emitter != NULL) {
-        fn_80100024(emitter, out);
-        nw4r::math::MTX34* mtx = (nw4r::math::MTX34*)fn_800A60C0(arg0);
-        out->x += mtx->m[0][3];
-        out->y += mtx->m[1][3];
-        out->z += mtx->m[2][3];
-        return 1;
-    }
-    return 0;
-}
-
-/* Asserts the destination vector, then copies the emitter's position into it. */
-extern "C" void fn_80100024(EftEmitter* self, nw4r::math::VEC3* out)
-{
-    if (out == NULL) {
-        nw4r::db::Panic(lbl_8059C4D0, 391, lbl_8059C4AC);
-    }
-    copyVec3(out, &self->pos_0x90);
-}
-
-/* Retires one live effect: runs the nw4r teardown, releases it from the system and clears its slot. */
-extern "C" void fn_800FFF08(Eft004* self, u32 idx)
-{
-    EftEffectPool* pool = (EftEffectPool*)self->work_0x38;
-    nw4r::ef::EffectSystem* system = eft_control.effect_system_0x04;
-    nw4r::ef::Effect** slot = &pool->effects[idx];
-
-    if (*slot != NULL) {
-        fn_800A60C0(*slot);
-        RetireParticleAll(*slot);
-        (*slot)->RetireEmitterAll();
-        system->RetireEffect(*slot);
-        ef_system_memory_manager(system)->virtual_0x0C();
-        *slot = NULL;
-    }
 }

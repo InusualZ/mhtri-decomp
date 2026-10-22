@@ -91,7 +91,7 @@ typedef struct _EM_EFT {
                   /* mtx = identity */
        /* vec = (0, 0, 0) */
 void mtx34_set_trans(MTX34* mtx, VEC3* pos);
-void fn_80105314(_EM_EFT* self);
+void eft_em_effects_move(_EM_EFT* self);
 void fn_80105560(_EM_EFT* self);               /* effect creation failed */
 void fn_80105564(_EM_EFT* self);
 
@@ -485,5 +485,5 @@ void fn_80104BD0(_EM_EFT* self)
         }
     }
 
-    fn_80105314(self);
+    eft_em_effects_move(self);
 }

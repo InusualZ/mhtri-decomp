@@ -6,13 +6,15 @@
  *   .data 0x8059F518-0x8059F530, .sdata 0x80791820-0x80791828, .sdata2 0x807967E8-0x80796838.
  * NAMES. The map has only `fn_` stems for this range, so the definitions are `extern "C"`; the unit is C++ because
  *   every callee it reaches is a C++ mangling (`MHchar` members, nw4r functions).
- * RESIDUALS. 11 partial rows, including:
+ * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps the unfused `clrlwi`/`cmpwi` pairs; six rows
+ *   rise and none falls with it).
+ * RESIDUALS. 10 partial rows, including:
  *  - `fn_8010C8F8`, `fn_8010CE80`: ours save the registers through `_savegpr_27` and a frame 0x10 larger where retail
  *    stores four registers inline, and invert the null/flag test before the state bump;
  *  - `fn_8010C0E0`: ours keeps the work pointer where retail reloads `+0x30`'s byte (`lbz r0,0(r3)`), and the
  *    registers are coloured one lower;
  *  - `fn_8010C7B8`: ours addresses `lbl_80791820` with `lis`/`addi` where retail uses `@sda21`.
- *   The other 7 partial rows have no recorded cause (`symdiff.py -u ef/fn_8010BDE4 --all`).
+ *   The other 6 partial rows have no recorded cause (`symdiff.py -u ef/fn_8010BDE4 --all`).
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x13A0 of 0x13C4) and `.sdata2` (0x10 of 0x50) short of
  *   the claim; `.text`, `.sdata2`, extab and extabindex differing.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_24`,
@@ -31,6 +33,8 @@
 #include "enemy/fn_80137648.h" /* fn_80137648 (rule 2: the owner's header) */
 #include "ef/lbl_8059F574.h" /* lbl_8059F574 (rule 2: the owner's header) */
 #include "types.h"
+
+#pragma peephole off
 #include "nw4r/math.h"
 #include "gx.h"
 #include "ef.h"

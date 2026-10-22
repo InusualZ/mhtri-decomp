@@ -78,7 +78,7 @@ s32 fn_801B6C38(struct _ENEMY_WORK* self, u8 flag);
 void fn_801B6C84(struct _ENEMY_WORK* self, s8* out_state, s8* out_flag);
 void fn_801B6EF4(struct _ENEMY_WORK* self, u8 kind);
 void fn_801B6FB0(void);
-u32 fn_801B701C(struct _ENEMY_WORK* self);
+u32 em034_eft_ck(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

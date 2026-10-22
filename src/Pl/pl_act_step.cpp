@@ -3374,7 +3374,7 @@ void fn_8025FA00(_PLW* self) {
                 fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
                 self->field_0x064 = value;
                 self->field_0x074 = 1;
-                if (self->vec_0x03C.y <= value && fn_8027D7EC(self, 0) == 0) {
+                if (self->vec_0x03C.y <= value && pl_act_no_eft_ck(self, 0) == 0) {
                     self->vec_0x03C.y = self->field_0x064;
                     self->kind_0x09 = 3;
                     if (Pl_master_ck(self) == 1 && self->field_0x370 <= 0) {
@@ -3788,7 +3788,7 @@ s32 fn_80264EE8(_PLW* self) {
 
 /* 0x80264F78 - the "rolled up into a ball" predicate. */
 s32 fn_80264F78(_PLW* self) {
-    if ((Pl_cat_skill_ck(self, 0x21) == 1 || Pl_cat_skill_ck(self, 0x22) == 1) && fn_8027D7EC(self, 0) == 1 &&
+    if ((Pl_cat_skill_ck(self, 0x21) == 1 || Pl_cat_skill_ck(self, 0x22) == 1) && pl_act_no_eft_ck(self, 0) == 1 &&
         self->field_0x370 > 0) {
         return 1;
     }

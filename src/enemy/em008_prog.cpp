@@ -334,7 +334,7 @@ extern "C" void fn_8015DAE4(_ENEMY_WORK* self, u8* state, u8* sub) {
         switch (*sub) {
           case 7:
           case 0xD:
-            if (fn_8012EC3C(self) == 1) {
+            if (em_eft_active_ck(self) == 1) {
                 *sub = 0x10;
             }
             break;
@@ -1007,7 +1007,7 @@ extern "C" s32 fn_80165C64(_ENEMY_WORK* self, u32 arg1) {
             return 1;
         }
     } else if ((u32) (temp_r4 - 3) <= 1U) {
-        if (fn_8012EC3C(self) == 1U) {
+        if (em_eft_active_ck(self) == 1U) {
             return 1;
         }
     }

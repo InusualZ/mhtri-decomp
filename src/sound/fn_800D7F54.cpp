@@ -285,7 +285,7 @@ extern "C" void fn_800DBC18(void) { fn_800DBB78(0, 31); }
 
 extern "C" void fn_800DBC24(void) { fn_800DBB78(0, 12); }
 
-extern "C" void fn_800DC098(nw4r::math::VEC3* pos) { fn_800DBE94(0, 23, pos); }
+extern "C" void se_eft004_demo_req(nw4r::math::VEC3* pos) { fn_800DBE94(0, 23, pos); }
 
 extern "C" void fn_800DC338(nw4r::math::VEC3* pos) { fn_800DA72C(0, 101, pos); }
 
@@ -1588,7 +1588,7 @@ extern "C" void fn_800DC6D8(nw4r::math::VEC3* pos, s32 kind) {
 /* --- 0x800DCAAC -------------------------------------------------------------------------------- */
 
 /* Requests the fixed system sound, preferring the streaming variant when the game mode allows it. */
-extern "C" void fn_800DCAAC(nw4r::math::VEC3* pos) {
+extern "C" void se_eft004_req(nw4r::math::VEC3* pos) {
     u32 id = 0x10;
     id |= 0x80000000;
 

@@ -148,7 +148,7 @@ extern "C" s32 eft_res_spawn_gate_ck(void* self, u32 arg);
 extern "C" void effect_retire(nw4r::ef::Effect* effect, u32 arg);
 extern "C" void mtx34_set_trans(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
 extern "C" u8 fn_803311A0(MHchar* model);
-extern "C" u8 fn_80331210(_PLW* self);
+extern "C" u8 pl_frame_eft_color_get(_PLW* self);
 
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
 void setVector3(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
@@ -290,7 +290,7 @@ void eft007_set(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math::VE
     } else {
         setVector3(&work->pos_0x14, 0.0f, 0.0f, 0.0f);
     }
-    u8 motion = fn_80331210(self);
+    u8 motion = pl_frame_eft_color_get(self);
     switch (type) {
     case 3:
     case 4:
@@ -346,7 +346,7 @@ void eft007_set_vec(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math
     } else {
         setVector3(&work->pos_0x14, 0.0f, 0.0f, 0.0f);
     }
-    u8 motion = fn_80331210(self);
+    u8 motion = pl_frame_eft_color_get(self);
     switch (type) {
     case 3:
     case 4:

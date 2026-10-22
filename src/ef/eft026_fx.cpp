@@ -1,6 +1,6 @@
 /* ef/eft026_fx.cpp - the eft026 enemy-fold family (`eft026_set` and two sibling setters, the allocator `fn_80117FF8`
  *   stamping tag 26, the release `fn_80118154` and its state machine) and the eft028 break/crumble family's setters
- *   (`fn_80119970`, `eft028_set_koware`, `fn_80119AA8`, `eft028_set_scaled`), which build their records through
+ *   (`eft028_set`, `eft028_set_koware`, `eft028_set_capsule`, `eft028_set_scaled`), which build their records through
  *   `ef/fn_80119C44.c`.
  * RANGE. .text 0x80117DA8-0x80119C44 (20 functions); extab 0x8000C4D4-0x8000C554, extabindex 0x80026628-0x800266E8,
  *   .data 0x805A0488-0x805A06F0, .sdata 0x80791940-0x80791970, .sdata2 0x80796AC0-0x80796B2C.
@@ -24,7 +24,7 @@
  *   index `work->phase[i]` (a `p` pointer adds an induction register) and count `done` in a `u8`.
  *   `eft026_set` is defined first (retail's `.text` and pool order).  The handlers load `work`/`source` after the
  *   constructors, extract colour bytes masked (`(col & 0xFF000000) >> 24`) and test loop floats against literals.
- *   `fn_80119AA8` returns nothing; `fn_80117FF8`'s flag test re-reads the stored type; `_EFT26_WORK::slots` is
+ *   `eft028_set_capsule` returns nothing; `fn_80117FF8`'s flag test re-reads the stored type; `_EFT26_WORK::slots` is
  *   `[2][2]`; `fn_80118FF0` runs `move2` before the scale copy.
  *   `fn_80118214`: the kind-1/2 vs 8/9 colours and the 1/8 vs 2/9 tail are `switch`es; the dead-enemy path stores
  *   state 3; the camera position is a `const VEC3&` bound after `fn_80119818`, with `cam` declared after it; the
@@ -135,13 +135,13 @@ typedef struct _EFT28_WORK {
     /* +0x0B */ u8 col_a;
     /* +0x0C */ u8 param_0x0C[0x10 - 0x0C]; /* pl_capsule_box_set's output */
     /* +0x10 */ f32 field_0x10;             /* eft028_set_scaled's scale */
-    /* +0x14 */ u8 key_0x14;                /* fn_80119970's colour keys */
+    /* +0x14 */ u8 key_0x14;                /* eft028_set's colour keys */
     /* +0x15 */ u8 key_0x15;
     /* +0x16 */ u8 key_0x16;
     /* +0x17 */ u8 key_0x17;
 } _EFT28_WORK;
 
-/* The 0x1C-byte parameter record `fn_800FA3B8` builds and `pl_capsule_box_set` reads in fn_80119AA8. */
+/* The 0x1C-byte parameter record `fn_800FA3B8` builds and `pl_capsule_box_set` reads in eft028_set_capsule. */
 typedef struct _EFT28_PARAM {
     /* +0x00 */ VEC3 a;
     /* +0x0C */ VEC3 b;
@@ -214,8 +214,8 @@ void fn_80119804(_EFT* self);
 void fn_80119814(_EFT* self);
 void fn_80119818(MHchar* chr, u8 mode);
 void fn_801198F8(MHchar* chr, u8 index);
-void fn_80119970(u8 kind, u8 variant, u8 id);
-void fn_80119AA8(u8 area);
+void eft028_set(u8 kind, u8 variant, u8 id);
+void eft028_set_capsule(u8 area);
 
 /* the plain callees with no reconstructed owner yet (declared here, never `extern`-spelled, so the
  * symbol is the target's plain name; the landing pass moves the ones a registered unit owns) */
@@ -1147,7 +1147,7 @@ extern "C" void fn_801198F8(MHchar* chr, u8 index)
  * the eft028 (break/crumble) setters
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_80119970(u8 kind, u8 variant, u8 id)
+extern "C" void eft028_set(u8 kind, u8 variant, u8 id)
 {
     u32 mode;
     _EFT* rec;
@@ -1190,7 +1190,7 @@ void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 variant, long timer)
     rec->timer_0x0C = timer;
 }
 
-extern "C" void fn_80119AA8(u8 area)
+extern "C" void eft028_set_capsule(u8 area)
 {
     _EFT* rec;
     _EFT28_WORK* work;

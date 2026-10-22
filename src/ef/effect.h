@@ -21,13 +21,16 @@ extern "C" {
 /* ORs the two flag bytes into the effect state's `flags_0x04` (the pool's per-effect state updater). */
 void eft_state_flags_set(struct _EFT* self, u8 a, u8 b);
 
+/* 0x800F96D4 - copies one word (the transform setters share it with the eft004 family). */
+void eft_word_copy(u32* dst, const u32* src);
+
 /* Calls vtable slot 6 of the pooled effect with `flag != 0` (its retire/flag hook). */
 void effect_retire(nw4r::ef::Effect* effect, u32 arg);
 
 /* Places/moves the pooled effect at a world position (the enemy/emitter state-0 handlers and
  * eft019's creation path), and reports whether the pooled effect is still alive. */
 void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
-s32 fn_800F9884(nw4r::ef::Effect* effect);
+s32 effect_emitter_alive_ck(nw4r::ef::Effect* effect);
 /* 0x800F9D80 - the effect's state/frame report the kind-1 state-0 body of `ef/fn_8030681C.cpp` switches on (it
  * compares it against 1). */
 s32 eft_water_state_ck(_EFT* self);
@@ -45,6 +48,8 @@ u32 effect_move(nw4r::ef::Effect* effect);
 void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
 /* 0x800F9AC0 - sets the pooled effect's parameter scale (`change_paramscale_eff__FPQ34nw4r2ef6Effectf`). */
 void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale);
+/* 0x800F9BA0 - sets the pooled effect's per-axis parameter scale (`change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3`). */
+void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* scale);
 #endif
 
 #endif /* MHTRI_EF_EFFECT_H */

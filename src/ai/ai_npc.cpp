@@ -172,7 +172,7 @@ u32 fn_802D2990(struct _AINPC_W* self, u32 flag, f32 low, f32 high);
 void fn_802D29F8(struct _AINPC_W* self, u32 variant);
 void fn_802D2ABC(struct _AINPC_W* self, u32 flag, u16 a, u16 se);
 void fn_802D2AD4(struct _AINPC_W* self, u32 state);
-u32 fn_802D2B78(struct _AINPC_W* self, u32 flag);
+u32 ai_npc_flag_ck(struct _AINPC_W* self, u32 flag);
 void fn_802D2B88(struct _AINPC_W* self, u32 flag);
 void fn_802D31FC(struct _AINPC_W* self);
 void fn_802D3210(struct _AINPC_W* self, u32* value);
@@ -348,7 +348,7 @@ extern "C" void fn_802C2F08(LightArm* self)
  * pass once `fn_802D2990` reports the arm window open. */
 extern "C" void fn_802C474C(struct _AINPC_W* self, u8 arg) {
     u8 state;
-    if (fn_802D2B78(self, 0x10) != 0) {
+    if (ai_npc_flag_ck(self, 0x10) != 0) {
         fn_802D3A2C(self, 2);
     }
     state = self->state;
@@ -1127,7 +1127,7 @@ extern "C" void fn_802C6318(struct _AINPC_W* self, u8 flag)
             setVec3(&back, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
             copyVec3(&vec, &back);
         }
-        if (fn_802D2B78(self, 2) != 0) {
+        if (ai_npc_flag_ck(self, 2) != 0) {
             break;
         }
         fn_802D2B88(self, 2);
@@ -2925,7 +2925,7 @@ void fn_802D1710(struct _AINPC_W* self)
 
     fn_8012A624(&base);
     self->field_0x3CE = 0;
-    if (self->field_0x3D0 <= 0 && fn_802D2B78(self, 2) == 0) {
+    if (self->field_0x3D0 <= 0 && ai_npc_flag_ck(self, 2) == 0) {
         if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &value, -6) == 1) {
             self->field_0x19C = value;
             if (self->variant == 0) {
@@ -3130,7 +3130,7 @@ void fn_802D1D90(struct _AINPC_W* self)
     if (self->field_0x174 != 0) {
         fn_802CB858(self);
     }
-    if (fn_802D2B78(self, 2) != 0 || self->area != ::get_now_areano()) {
+    if (ai_npc_flag_ck(self, 2) != 0 || self->area != ::get_now_areano()) {
         self->in_area = 0;
     } else {
         self->in_area = 1;
@@ -3573,7 +3573,7 @@ void fn_802D2B68(struct _AINPC_W* self)
 }
 
 /* 0x802D2B78 - tests the record's flag word. */
-s32 fn_802D2B78(struct _AINPC_W* self, s32 mask)
+s32 ai_npc_flag_ck(struct _AINPC_W* self, s32 mask)
 {
     return self->field_0x1EC & (u16)mask;
 }
@@ -3656,7 +3656,7 @@ void fn_802D2BB0(struct _AINPC_W* self, struct _HIT_W* hit)
     if (::ai_skill_ck((::_AINPC_W*)self, 0x0C) == 1) {
         hit->field_0x4E = (s8)(hit->field_0x4E * 0x78) / 100;
     }
-    if (fn_802D2B78(self, 4) != 0) {
+    if (ai_npc_flag_ck(self, 4) != 0) {
         hit->field_0x31 = 1;
         hit->field_0x40 = 0;
         if (self->field_0x34E == 1) {
@@ -5479,7 +5479,7 @@ u32 ai_torch_ck(struct _AINPC_W* self)
     if (self->field_0x420 != 1) {
         return 0;
     }
-    if (fn_802D2B78(self, 2) != 0) {
+    if (ai_npc_flag_ck(self, 2) != 0) {
         return 0;
     }
     return self->field_0x422 > 0;

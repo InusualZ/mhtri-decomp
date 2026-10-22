@@ -200,7 +200,7 @@ void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
  * 0x801502C8-0x801545B8 now, and its header `enemy/fn_801502C8.h` declares the symbol with
  * that same unsigned spelling (the call site reads the answer unsigned) - this band header includes
  * it (rule 2). */
-u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 void fn_80130F74(struct _ENEMY_WORK* self);
 void fn_801376B4(struct _ENEMY_WORK* self);
 /* Declarations moved here from `enemy/fn_801679B0.cpp` (docs/plan.md 6.5 rule 2): enemy-band
@@ -247,7 +247,7 @@ void fn_80198F14(struct _ENEMY_WORK* self);
  * own r3 argument, and every caller compares that return with 0 - `src/ef/eft001.cpp` declares it
  * `void`, which is wrong for those call sites (recorded in this unit's outbox).  The `u32` return
  * below is the form `enemy/fn_801B7020.cpp`'s `fn_801B73F0` needs. */
-u32 fn_801B701C(struct _ENEMY_WORK* self);
+u32 em034_eft_ck(struct _ENEMY_WORK* self);
 /* The enemy effect-slot cluster below `fn_801A4504`'s range (0x801A3xxx-0x801A9xxx): unowned (the
  * bracketing registered units are `lobby` above), so the declarations live in this band header.
  * `enemy/fn_8019ED34.cpp` calls all of them; the signatures are its call sites' registers.  The

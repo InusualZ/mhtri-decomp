@@ -142,7 +142,7 @@ extern "C" void ef_resource_effect_project_at(void* obj, u16 index);
 /* The state-3 handler, defined below. */
 extern "C" void fn_801025F8(void* self);
 /* Builds the current area's effect vector from the per-map table at 0x806C87C0. */
-extern "C" void fn_802B00AC(nw4r::math::VEC3* out, u8 area);
+extern "C" void get_now_area_pos(nw4r::math::VEC3* out, u8 area);
 
 /* Creates the `id` effect model on `chr`; NULL on failure. */
 void* res_eft_model_create(MHchar* chr, u16 id, u32 arg);
@@ -657,7 +657,7 @@ extern "C" void eft004_model_set_start(EftState* self) {
     }
 
     self->field_01 = 1;
-    fn_802B00AC(&vec, self->area);
+    get_now_area_pos(&vec, self->area);
     copyVec3(&set->vec, &vec);
 }
 

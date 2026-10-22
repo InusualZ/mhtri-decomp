@@ -348,7 +348,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode);
 extern "C" u8 fn_802FB8C4(void);
 extern "C" u8 fn_802FB8EC(s32 index);
 extern "C" u8 fn_802FB900(void);
-extern "C" u8 fn_802FB97C(void);
+extern "C" u8 lb_event_state_ck(void);
 extern "C" u32 fn_802FB9F8(void);
 extern "C" s32 fn_802B2978(u32 from, u32 to, f32 t);
 extern "C" s32 fn_802B46DC(u8 index);

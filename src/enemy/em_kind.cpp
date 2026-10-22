@@ -708,7 +708,7 @@ s16 fn_8013D9B8(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (fn_8012EC3C(self) == 0) {
+        if (em_eft_active_ck(self) == 0) {
             in += (u8)fn_801406E0_view1(36, in[0]);
             fn_8013BDE4(&in, 36, &result);
         }
@@ -975,7 +975,7 @@ s16 fn_8013EBC8(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (self->field_0x8A2 > in[1] * 10 && fn_8012EC3C(self) == 0) {
+        if (self->field_0x8A2 > in[1] * 10 && em_eft_active_ck(self) == 0) {
             in += (u8)fn_801406E0_view1(65, in[0]);
             fn_8013BDE4(&in, 65, &result);
         }
@@ -1110,7 +1110,7 @@ void fn_8013C458(_ENEMY_WORK *self, u8 *in) {
     if (value == 0 && sub == 255) {
         switch (self->field_0x1E2) {
         case 2:
-            if (fn_8012EC3C(self) == 1 && (self->field_0x1C8 & 0x40) != 0) {
+            if (em_eft_active_ck(self) == 1 && (self->field_0x1C8 & 0x40) != 0) {
                 sub = 5;
             } else {
                 sub = 4;
@@ -1136,7 +1136,7 @@ void fn_8013C458(_ENEMY_WORK *self, u8 *in) {
             sub = 7;
             break;
         default:
-            if (fn_8012EC3C(self) == 1 && (self->field_0x1C8 & 0x40) != 0) {
+            if (em_eft_active_ck(self) == 1 && (self->field_0x1C8 & 0x40) != 0) {
                 sub = 2;
             } else {
                 sub = (self->field_0x43D == 1);

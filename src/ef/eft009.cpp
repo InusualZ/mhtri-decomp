@@ -793,7 +793,7 @@ extern "C" void fn_80104B94(_EFT* self)
         fn_80104BD0(self);
         break;
     case 1:
-        fn_80105314(self);
+        eft_em_effects_move(self);
         break;
     case 2:
         fn_80105550(self);

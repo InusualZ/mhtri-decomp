@@ -461,8 +461,8 @@ void* get_enemy_data(_ENEMY_WORK* enemy);
 /* target references push_g3d_wk__FP9_g3d_work: C++ linkage with the _g3d_work* parameter */
 struct _g3d_work;
 void push_g3d_wk(struct _g3d_work* work);
-extern "C" u16 fn_800A51D0(void* obj);
-extern "C" void* fn_800A51D8(void* obj, u16 index);
+extern "C" u16 ef_effect_emitter_count(void* obj);
+extern "C" void* ef_effect_emitter_get(void* obj, u16 index);
 void getKeyData3(f32* keys, f32 frame, f32* out0, f32* out1, f32* out2);
 
 extern "C" void fn_80107CA0(_EFT013* self);
@@ -742,10 +742,10 @@ extern "C" void fn_8010A31C(_EFT013* self, nw4r::math::MTX34* mtx, nw4r::math::V
 
 /* 0x8010A6A0 - stamp the walker's +0xB4 field on every live model of the object. */
 extern "C" void fn_8010A6A0(void* self, void* obj) {
-    u16 n = fn_800A51D0(obj);
+    u16 n = ef_effect_emitter_count(obj);
     for (s32 i = 0; i < n; i++) {
-        if (i < (u16)fn_800A51D0(obj)) {
-            ((_EFT014_OBJ*)fn_800A51D8(obj, i))->field_0xB4 = 3;
+        if (i < (u16)ef_effect_emitter_count(obj)) {
+            ((_EFT014_OBJ*)ef_effect_emitter_get(obj, i))->field_0xB4 = 3;
         }
     }
 }

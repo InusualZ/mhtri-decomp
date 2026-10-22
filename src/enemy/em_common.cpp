@@ -72,9 +72,9 @@
 #include "enemy/EnemyData.h"
 #include "enemy/fn_801251D0.h"
 #define em_alt_mode_ck em_alt_mode_ck_hidden_fn_8012E968_h
-#define fn_8012EC3C fn_8012EC3C_hidden_enemy_h
+#define em_eft_active_ck fn_8012EC3C_hidden_enemy_h
 #include "unsplit/enemy.h"
-#undef fn_8012EC3C
+#undef em_eft_active_ck
 #undef em_alt_mode_ck
 #include "unsplit/enemy_pool.h" /* the enemy band's .data pool labels, declared in the band header */
 #include "Pl/Pl_master_ck.h"
@@ -124,9 +124,9 @@
 #define em_mot_finished_ck_view5 ((u32 (*)(void))em_mot_finished_ck)
 #define em_mot_finished_ck_view3 ((u32 (*)(void))em_mot_finished_ck)
 #define em_mot_finished_ck_view1 ((u32 (*)(void))em_mot_finished_ck)
-#define fn_8012EC3C_view7 ((u32 (*)(struct _ENEMY_WORK*))fn_8012EC3C)
-#define fn_8012EC3C_view4 ((u32 (*)(struct _ENEMY_WORK*))fn_8012EC3C)
-#define fn_8012EC3C_view1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012EC3C)
+#define fn_8012EC3C_view7 ((u32 (*)(struct _ENEMY_WORK*))em_eft_active_ck)
+#define fn_8012EC3C_view4 ((u32 (*)(struct _ENEMY_WORK*))em_eft_active_ck)
+#define fn_8012EC3C_view1 ((u32 (*)(struct _ENEMY_WORK*))em_eft_active_ck)
 #define fn_8012E5A8_view5 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
 #define fn_8012E5A8_view3 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
 #define fn_8012E5A8_view1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
@@ -211,7 +211,7 @@ extern "C" {
 
  /* vector copy */
                     /* v = (0, 0, 0) */
-extern s32 fn_802D2B78(_ENEMY_WORK* other, u16 mask); /* tests a bit of other's `+0x1EC` */
+extern s32 ai_npc_flag_ck(_ENEMY_WORK* other, u16 mask); /* tests a bit of other's `+0x1EC` */
 
 /* The pool constants the source reaches (0x80796C58..0x80796C90, this unit's `.sdata2`), declared and never
  * defined (playbook 29); the int-to-f64 magic at 0x80796C68 is the compiler's own entry. */
@@ -814,7 +814,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
         copyVec3(&vec, &other->pos_0x178);
         extra = motion->extra_frames;
         if (extra != 0) {
-            if (fn_802D2B78(other, 1) != 0) {
+            if (ai_npc_flag_ck(other, 1) != 0) {
                 result = extra[0];
             }
             if (other->flag_0x420 == 1 && other->count_0x422 > 0) {
@@ -1947,7 +1947,7 @@ extern "C" s32 fn_8012E968(_ENEMY_WORK* self, u8 mode)
 
 /* Whether `field_0x89F` is 2 or 3 (`enemy/em_kind.cpp`'s handlers gate on it), written as one unsigned range test:
  * retail's branch-free `subfic`/`orc`/`srwi`/`subf`/`srwi` run is how this compiler spells it. */
-extern "C" s32 fn_8012EC3C(_ENEMY_WORK* self)
+extern "C" s32 em_eft_active_ck(_ENEMY_WORK* self)
 {
     return (u32)(self->field_0x89F - 2) <= 1;
 }

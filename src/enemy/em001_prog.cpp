@@ -57,7 +57,7 @@
 #include "enemy/em_motion_param_set.h" /* em_motion_param_set (rule 2: the owner's header) */
 #include "enemy/lbl_805A1368.h" /* lbl_805A1368 (rule 2: the owner's header) */
 #include "enemy/em_busy_set.h" /* em_busy_set (rule 2: the owner's header) */
-#include "enemy/fn_8012EC3C.h" /* fn_8012EC3C (rule 2: the owner's header) */
+#include "enemy/em_eft_active_ck.h" /* em_eft_active_ck (rule 2: the owner's header) */
 #include "enemy/fn_80131BD4.h" /* fn_80131BD4 (rule 2: the owner's header) */
 #include "enemy/fn_801277F4.h" /* fn_801277F4 (rule 2: the owner's header) */
 #include "enemy/em_action_finish_fall.h" /* em_action_finish_fall (rule 2: the owner's header) */
@@ -93,11 +93,11 @@
 #include "ef/eft007.h"
 #include "ef/eft009.h"
 #include "sound/fn_800DD1F0.h"
-#define fn_8012EC3C fn_8012EC3C_hidden_fn_8012E968_h
+#define em_eft_active_ck fn_8012EC3C_hidden_fn_8012E968_h
 #define em_alt_mode_ck em_alt_mode_ck_hidden_fn_8012E968_h
 #include "unsplit/enemy.h"
 #undef em_alt_mode_ck
-#undef fn_8012EC3C
+#undef em_eft_active_ck
 #include "unsplit/unknown.h"
 #include "enemy/fn_80147CE0.h"
 #include "sys_mem.h"
@@ -120,7 +120,7 @@
 #define em_mot_finished_ck_c1 ((u32 (*)(void))em_mot_finished_ck)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define em_busy_set_c3 ((void (*)(_ENEMY_WORK*))em_busy_set)
-#define fn_8012EC3C_c1 ((u32 (*)(_ENEMY_WORK*))fn_8012EC3C)
+#define fn_8012EC3C_c1 ((u32 (*)(_ENEMY_WORK*))em_eft_active_ck)
 #define em_hit_window_set_default_c1 ((void (*)(_ENEMY_WORK *, u32, u32))em_hit_window_set_default)
 #define fn_80128A70_c1 ((void (*)(_ENEMY_WORK *, u32, u32))fn_80128A70)
 #define fn_8012E5A8_c1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)

@@ -383,7 +383,7 @@ typedef struct CamWork {
     /* +0x4D0 */ CamQuake quake_0x4D0;
     /* +0x4E4 */ u8 pad_0x4E4[0x8];
     /* +0x4EC */ u32 field_0x4EC;            /* fn_802BE060 returns its low half */
-    /* +0x4F0 */ u32 field_0x4F0;            /* fn_802BE038 returns its low half */
+    /* +0x4F0 */ u32 field_0x4F0;            /* get_camera_rot_y returns its low half */
     /* +0x4F4 */ u8 pad_0x4F4[0x3];
     /* +0x4F7 */ u8 field_0x4F7;             /* camera-slot bit flags (fn_802BC000/70/1CC) */
 } CamWork; /* size: 0x4F8 */
@@ -1113,7 +1113,7 @@ u32 fn_802BE060(void)
 /*
  * Returns the low half of the +0x4F0 word.
  */
-u32 fn_802BE038(void)
+u32 get_camera_rot_y(void)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 

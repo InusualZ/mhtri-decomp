@@ -16,6 +16,12 @@ struct ResEntry {
     /* +0x48 */ u32 flag;
 };
 
+/* The one-word file/model handle (`ResFile`/`ResMdl` shape: the resource's data address) the effect model creators
+ * build and hand to the animation helpers by value.  size: 0x04 */
+typedef struct EftResFileHandle {
+    /* +0x00 */ u32 data_0x00;
+} EftResFileHandle;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,13 +31,28 @@ s32 fn_800D4CE4(const char* path);
 /* the address of a resource's data, or a negative code. */
 s32 fn_800D4CE4_none(void);
 char* fn_800D4D9C(s32 index);
-u32 fn_800D5138(s32 index);
+u32 nw_res_mem_size(s32 index);
 s32 fn_800D56F4(void* arg, void* name);
 /* 0x800D58B0 - clears one resource-table entry outright. */
 void nw_res_entry_clear(s32 index);
 
 #ifdef __cplusplus
 }
+
+namespace nw4r { namespace g3d { class ScnMdlSimple; } }
+struct _g3d_work;
+
+extern "C" {
+/* 0x800D3874 - the number of g3d works the model's animation `kind` needs. */
+s32 nw_res_anm_work_num(EftResFileHandle res, EftResFileHandle mdl, s32 kind, struct _g3d_work** list);
+/* 0x800D38F8 - the animation built over those works (NULL on failure). */
+/* untyped: opaque handle - the animation record the caller hands on */
+void* nw_res_anm_create(EftResFileHandle res, EftResFileHandle mdl, nw4r::g3d::ScnMdlSimple* scn, s32 kind,
+                        struct _g3d_work* first, struct _g3d_work** rest, f32 strength);
+}
+
+/* 0x800D5864 - deletes a loaded resource's entry (0 when it was freed). */
+s32 nwDelResource(s32 index);
 
 /* The C++-linkage entry points: the map's `pull_res_mem__FPcUll` and friends are the compiler's spelling
  * of these (rule 9).  `pull_res_mem` reserves a resource-memory slot for `path` (a negative handle when

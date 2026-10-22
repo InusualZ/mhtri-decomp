@@ -3,7 +3,7 @@
  * RANGE. .text 0x800F95A4-0x800FACAC (36 functions); extab 0x8000BC5C-0x8000BD4C, extabindex 0x80025974-0x80025ADC,
  *   .ctors 0x8056F30C-0x8056F310, .data 0x8059B5D0-0x8059B5F8, .bss 0x806A1400-0x806A20F0, .sdata2
  *   0x807965D8-0x80796608.  The name is the range's own `__FILE__` string `effect.cpp` (0x8059B5D0, passed to
- *   `nw4r::db::Panic` by `fn_800F9884`).
+ *   `nw4r::db::Panic` by `effect_emitter_alive_ck`).
  * FLAGS. `cflags_main`; `#pragma fp_contract off` and `#pragma peephole off` for the whole file.
  * NAMES. `SetRootMtxTrans`, `effect_move`, `change_color_eff`, `change_paramscale_eff`, `change_paramscale_eff_vec3`,
  *   `eftGetKeyRGB` and `eftGetKeyAlpha` are the runtime dump's own names; the map has only `fn_` stems for the rest.
@@ -41,6 +41,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/effect_types.h"
+#include "ef/eft_res.h" /* eft_pro_slot_assign (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the range's records
@@ -184,7 +185,7 @@ void mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void fn_802BDE90(f32* out_a, f32* out_b);
 void VEC2_ctor(void* out);
 void* ef_emitter_tex_flags(void* self);
-void fn_800A898C(void* dst, const void* src);
+void ef_word_copy(void* dst, const void* src);
 void ef_pm_handle(void* dst, void* src);
 void ef_resource_find_emitter_handle(void* out, void* a, void* b, void* c);
 void fn_800A602C(void* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* mtx, f32 a, f32 b);
@@ -195,11 +196,11 @@ void fn_800A5F4C(void* effect, u32 idx);
 void fn_800A5E6C(void* effect, u32 idx);
 void fn_800A5D8C(void* effect, u32 idx);
 void* ef_system_memory_manager(void* effect);
-void* fn_800A60C0(void* effect);
-u16 fn_800A51D0(void* effect);
-void* fn_800A51D8(void* effect, u16 idx);
-u16 fn_800A970C(void* handle);
-void* fn_800A9714(void* handle, u32 idx);
+void* ef_effect_root_mtx(void* effect);
+u16 ef_effect_emitter_count(void* effect);
+void* ef_effect_emitter_get(void* effect, u16 idx);
+u16 ef_emitter_pm_count(void* handle);
+void* ef_emitter_pm_get(void* handle, u32 idx);
 void fn_800A95D8(void* handle);
 
 /* the resource / model helpers */
@@ -216,7 +217,6 @@ void res_mat_chan_copy_ctor(void* out, void* handle);
 
 /* the emitter data helpers */
 s32 fn_800F6984(u32 a, u32 b, void* table, void* names);
-s32 fn_800F6B6C(u32 a, u32 b, u8 idx, u32 c, u8 d);
 
 void* fn_802B0420(void);
 u32 stage_water_area_ck(void);
@@ -315,7 +315,7 @@ extern "C" void fn_800F9628(void) {
 }
 
 /* 0x800F96D4 - the 4-byte copy the transform setters share. */
-extern "C" void fn_800F96D4(u32* dst, const u32* src) {
+extern "C" void eft_word_copy(u32* dst, const u32* src) {
     *dst = *src;
 }
 
@@ -324,7 +324,7 @@ void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     nw4r::math::MTX34 mtx;
     MTX34_ctor(&mtx);
     if (effect != NULL) {
-        const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)fn_800A60C0(effect);
+        const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)ef_effect_root_mtx(effect);
         mtx34_copy(&mtx, src);
         mtx.m[0][3] = pos->x;
         mtx.m[1][3] = pos->y;
@@ -338,7 +338,7 @@ extern "C" void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     nw4r::math::MTX34 mtx;
     MTX34_ctor(&mtx);
     if (effect != NULL) {
-        const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)fn_800A60C0(effect);
+        const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)ef_effect_root_mtx(effect);
         mtx34_copy(&mtx, src);
         mtx.m[0][3] += pos->x;
         mtx.m[1][3] += pos->y;
@@ -357,20 +357,20 @@ extern "C" s32 fn_800F97F0(s32 idx, EftNameEntry* node, void* out) {
     }
     s32 frame;
     ef_resource_find_emitter_handle(&frame, (void*)ef_resource_instance(), lbl_8058A880[idx], node->field_0x10);
-    fn_800A898C(out, &frame);
+    ef_word_copy(out, &frame);
     return 1;
 }
 
 /* 0x800F9884 - whether every live emitter of the effect has a frame to move to. */
-extern "C" s32 fn_800F9884(void* effect) {
+extern "C" s32 effect_emitter_alive_ck(nw4r::ef::Effect* effect) {
     s32 total = 0;
-    u16 count = fn_800A51D0(effect);
+    u16 count = ef_effect_emitter_count(effect);
     for (s32 i = 0; i < (s32)count; i++) {
-        void* handle = fn_800A51D8(effect, (u16)i);
+        void* handle = ef_effect_emitter_get(effect, (u16)i);
         if (handle == NULL) {
             nw4r::db::Panic((const char*)lbl_8059B5D0, 2854, (const char*)lbl_8059B5E0);
         } else {
-            total += fn_800A970C(handle);
+            total += ef_emitter_pm_count(handle);
         }
     }
     return total > 0;
@@ -378,7 +378,7 @@ extern "C" s32 fn_800F9884(void* effect) {
 
 /* 0x800F9920 - move the effect and report whether it is still alive. */
 u32 effect_move(nw4r::ef::Effect* effect) {
-    if (fn_800F9884(effect) == 0) {
+    if (effect_emitter_alive_ck(effect) == 0) {
         return 0;
     }
     effect_retire((EftHandle*)(void*)effect, 0);
@@ -431,8 +431,8 @@ void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale) {
     VEC3_ctor(&v);
     VEC2_ctor(&v);
     if (scale >= lbl_807965DC) {
-        if (fn_800A51D0(effect) != 0) {
-            void* handle = fn_800A51D8(effect, 0);
+        if (ef_effect_emitter_count(effect) != 0) {
+            void* handle = ef_effect_emitter_get(effect, 0);
             if (handle != NULL) {
                 setVector3(&v, scale, scale, scale);
                 fn_800F9B68((EftHandle*)handle, &v);
@@ -452,8 +452,8 @@ void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* v) {
     nw4r::math::VEC3 tmp;
     VEC3_ctor(&tmp);
     if (vec3_length_sq(v) >= lbl_807965DC) {
-        if (fn_800A51D0(effect) != 0) {
-            void* handle = fn_800A51D8(effect, 0);
+        if (ef_effect_emitter_count(effect) != 0) {
+            void* handle = ef_effect_emitter_get(effect, 0);
             if (handle != NULL) {
                 fn_800F9B68((EftHandle*)handle, v);
             }
@@ -532,7 +532,7 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
     switch (mode) {
     case 0: {
         nw4r::ef::Effect* effect = (nw4r::ef::Effect*)target;
-        const nw4r::math::MTX34* root = (const nw4r::math::MTX34*)fn_800A60C0(effect);
+        const nw4r::math::MTX34* root = (const nw4r::math::MTX34*)ef_effect_root_mtx(effect);
         pos.x = root->m[0][3];
         pos.y = root->m[1][3];
         pos.z = root->m[2][3];
@@ -669,17 +669,17 @@ extern "C" void fn_800FA450(void* effect) {
     VEC3_ctor(&pos);
     fn_800FA378(&box2);
     ef_store_word(&mode, 0);
-    u16 count = fn_800A51D0(effect);
+    u16 count = ef_effect_emitter_count(effect);
     if (count == 0) {
         return;
     }
     u16 i;
     for (i = 0; i < count; i++) {
-        handle = fn_800A51D8(effect, i);
+        handle = ef_effect_emitter_get(effect, i);
         if (handle == NULL) {
             continue;
         }
-        if (fn_800A970C(handle) != 0) {
+        if (ef_emitter_pm_count(handle) != 0) {
             alive = 1;
             break;
         }
@@ -689,8 +689,8 @@ extern "C" void fn_800FA450(void* effect) {
         return;
     }
     u8 flags;
-    ef_pm_handle(&flags, fn_800A9714(handle, 0));
-    fn_800A898C(&mode, &flags);
+    ef_pm_handle(&flags, ef_emitter_pm_get(handle, 0));
+    ef_word_copy(&mode, &flags);
     u8 bits = *(u8*)((u8*)ef_emitter_tex_flags(&mode) + 3);
     u8 which;
     if ((bits & 0x80) != 0) {
@@ -700,7 +700,7 @@ extern "C" void fn_800FA450(void* effect) {
     } else {
         return;
     }
-    const nw4r::math::MTX34* root = (const nw4r::math::MTX34*)fn_800A60C0(effect);
+    const nw4r::math::MTX34* root = (const nw4r::math::MTX34*)ef_effect_root_mtx(effect);
     pos.x = root->m[0][3];
     pos.y = root->m[1][3];
     pos.z = root->m[2][3];
@@ -824,7 +824,7 @@ extern "C" void fn_800FA9B8(EftNameSet* out, u8 area) {
         }
         while (node->field_0x00 != 0) {
             if (node->field_0x04 != 0) {
-                s32 v = fn_800F6B6C(2, 1, area, 0, out->count_0x00);
+                s32 v = eft_pro_slot_assign(2, 1, area, 0, out->count_0x00);
                 names[n++] = (u8)v;
                 out->names_0x03[out->count_0x00] = (u8)v;
                 out->count_0x00++;
@@ -834,7 +834,7 @@ extern "C" void fn_800FA9B8(EftNameSet* out, u8 area) {
                     break;
                 }
                 if (node->field_0x04 != 0) {
-                    s32 v = fn_800F6B6C(2, 2, area, 0, m++);
+                    s32 v = eft_pro_slot_assign(2, 2, area, 0, m++);
                     names[n++] = (u8)v;
                     out->field_0x02 = (u8)v;
                 }
@@ -851,7 +851,7 @@ extern "C" void fn_800FA9B8(EftNameSet* out, u8 area) {
         }
         while (node->field_0x00 != 0) {
             if (node->field_0x04 != 0) {
-                s32 v = fn_800F6B6C(2, 3, area, 0, out->count_0x01);
+                s32 v = eft_pro_slot_assign(2, 3, area, 0, out->count_0x01);
                 names[out->count_0x01] = (u8)v;
                 out->names2_0x0C[out->count_0x01] = (u8)v;
                 out->count_0x01++;

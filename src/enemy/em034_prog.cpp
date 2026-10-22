@@ -1733,7 +1733,7 @@ extern "C" void fn_801B6FB0(void) {
 }
 
 /* 0x801B701C (0x4).  The tail-call slot the neighbouring unit's table keeps. */
-extern "C" u32 fn_801B701C(_ENEMY_WORK* self) {
+extern "C" u32 em034_eft_ck(_ENEMY_WORK* self) {
     return fn_80132184();
 }
 
