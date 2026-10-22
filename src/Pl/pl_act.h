@@ -90,9 +90,9 @@ u32 pl_area_spot_valid_ck(u8 a, nw4r::math::VEC3* v, u8 b);
 /* 0x8027D050 - the actor's stored carve value, scanned out of the item table.  The definition returns `u8`;
  * the retail consumer `Pl/fn_80229ECC.cpp` keeps the raw return in a register and masks
  * it per use (`clrlwi r0,r29,24` before each shift), which MWCC only emits when the declaration is
- * wider than a byte, so the consumer view declared here is 32-bit.  Unmangled (`fn_8027D050`), so the
+ * wider than a byte, so the consumer view declared here is 32-bit.  Unmangled (`pl_step_se_kind_get`), so the
  * wider return changes no link name. */
-u32 fn_8027D050(struct _PLW* self);
+u32 pl_step_se_kind_get(struct _PLW* self);
 
 /* 0x80277C48 (`pl_act_set_step_time`) / 0x80277C58 / 0x80278674 - the three unmangled motion helpers
  * `Pl/pl_act_step.cpp` drives. */

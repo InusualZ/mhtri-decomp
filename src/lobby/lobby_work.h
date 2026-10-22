@@ -72,6 +72,11 @@ typedef struct LbLobbyWork {
             /* +0x034 */ s16 slide_0x034;      /* the cursor slide `fn_8021261C` ramps inside +-0x3C */
             /* +0x036 */ s16 field_0x036[13];
         };
+        struct {   /* the day's random seeds the trade counter draws from (`lobby/lb_server_sel_trans.cpp`) */
+            /* +0x028 */ u8 pad_0x028[0x14];
+            /* +0x03C */ u16 trade_seed_0x03C;   /* seeds the trade pages' offers and rewards */
+            /* +0x03E */ u16 trade_seed_0x03E;   /* seeds the trade reward's roll */
+        };
     };
     /* +0x050 */ u16 field_0x050;   /* cleared with `page_0x052` when the party is dissolved (a halfword store) */
     /* +0x052 */ u8 page_0x052;
@@ -113,6 +118,8 @@ typedef struct LbLobbyWork {
         struct LbNoteTradeWork* note_trade_0x0AC; /* screen 0x17, the note trade (`lobby/lb_quest_screen.cpp`) */
         struct LbArmWrestleWork* arm_wrestle_0x0AC; /* screen 0x19, the arm wrestle (`lobby/lb_npc.cpp`) */
         struct LbShopWork* shop_0x0AC;            /* screen 0x02, the NPC shop (`lobby/lb_npc.cpp`) */
+        struct LbScreen26Work* screen26_0x0AC;    /* screen 0x1A, the combine/trade counter (`lobby/lb_server_sel_trans.cpp`) */
+        struct LbServerSelWork* server_sel_0x0AC; /* screen 0x1B, the server select (`lobby/lb_server_sel_trans.cpp`) */
     };
     /* +0x0B0 */ u8 field_0x0B0;
     /* +0x0B1 */ u8 sub_0x0B1;

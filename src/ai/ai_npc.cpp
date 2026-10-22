@@ -11633,7 +11633,7 @@ s32 fn_802D7CB0(struct _AINPC_W* self)
 
 /* 0x802D7CE4 - the "found the player" reaction: state 0x1A in a live area drops the AI NPC into
  * step 7. */
-void fn_802D7CE4(u8 state)
+void ainpc_demo_start(u8 state)
 {
     if (state != 0x1A) {
         return;
@@ -11648,7 +11648,7 @@ void fn_802D7CE4(u8 state)
 }
 
 /* 0x802D7D4C - the matching "lost the player" reaction for the +0x171 == 7 state. */
-void fn_802D7D4C(void)
+void ainpc_demo_end(void)
 {
     if (ainpc_w.active == 0) {
         return;

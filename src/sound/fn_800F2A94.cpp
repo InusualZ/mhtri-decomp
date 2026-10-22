@@ -45,12 +45,12 @@
  *     `snd_player_mask_clear` 87.92 -> 100 are byte-identical only with it, and it is the shared finding of both
  *     neighbouring `sound` units.  It costs `fn_800F51B8` (100 -> 90, still above the bar) and
  *     `fn_800F5A54` (100 -> 96); the scoped-pragma alternative is an outbox `flag` request.
- *   * Below 100 % but above the bar: `fn_800F2E38` 97.47, `fn_800F3218` 96.79, `fn_800F4644` 95.54,
+ *   * Below 100 % but above the bar: `demo_stream_stop_ck` 97.47, `fn_800F3218` 96.79, `fn_800F4644` 95.54,
  *     `fn_800F4350` 90.40 - each otherwise instruction-for-instruction equal to retail, differing in
  *     register colouring only.
  *   * 23 symbols are unwritten (0 %).  Biggest first: `snd_quest_frame_begin` (0x728), `bgm_ctrl_frame` (0x67C),
  *     `snd_quest_frame_end` (0x3B8), `fn_800F3C58` (0x340), `fn_800F3604` (0x320), `fn_800F3054` (0x1C4),
- *     `fn_800F2A94` (0x244), `fn_800F2CD8` (0x160), `fn_800F34EC`+`fn_800F3554` (0x118), `snd_quest_scene_set`
+ *     `fn_800F2A94` (0x244), `demo_stream_play` (0x160), `fn_800F34EC`+`fn_800F3554` (0x118), `snd_quest_scene_set`
  *     (0x138), `fn_800F48F4` (0x174).  The complete per-symbol table is the outbox's `symbols`.
  *   * `fn_800F2A94` (the 0x244-byte block initialiser) is *not* written: its store order interleaves
  *     three parallel 3-entry runs and no source shape tried so far reproduces the sequence.  It is the
@@ -189,7 +189,7 @@ u32 get_now_areano();
 /* 0x800F2E38 - 0x13C: "is the requested stream already up on both channels?"  The two bytes of
  * `lbl_8059B31C[id * 2]` say which channels the request wants; a request in the 0x2B/0x2C/0x2E/0x2F
  * group additionally forces channel 2 on when `demo_play_ck` says the demo is running. */
-extern "C" int fn_800F2E38(u8 id) {
+extern "C" int demo_stream_stop_ck(u8 id) {
     u8 ch2 = lbl_8059B31C[id * 2];
     u8 ch0 = lbl_8059B31C[id * 2 + 1];
     u8 up = 0;
@@ -227,7 +227,7 @@ extern "C" int fn_800F2E38(u8 id) {
 }
 
 /* 0x800F2F74 - 0xE0: stop the request's channels once they have run to their end (status 3). */
-extern "C" void fn_800F2F74(u8 id) {
+extern "C" void demo_stream_stop(u8 id) {
     u8 ch2 = lbl_8059B31C[id * 2];
     u8 ch0 = lbl_8059B31C[id * 2 + 1];
     if (demo_play_ck() == 1) {

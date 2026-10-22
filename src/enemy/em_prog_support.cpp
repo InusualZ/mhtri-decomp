@@ -246,7 +246,7 @@ extern "C" void em_prog_work_init(void) {
     for (u32 i = 0; i < 5; i++) {
         fn_8038526C(&lbl_806C4A88[i]);
     }
-    fn_803C7EAC();
+    npc_talk_init();
 }
 
 /* 0x803853C8 */
@@ -303,7 +303,7 @@ extern "C" void fn_8038575C(void) {
             fn_803857BC(&lbl_806C4A88[i]);
         }
     }
-    fn_803C7F88();
+    npc_talk_update();
 }
 
 /* 0x80385A54 */

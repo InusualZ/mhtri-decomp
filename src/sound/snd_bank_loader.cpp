@@ -377,8 +377,8 @@ extern "C" void fn_800F15B0(void);
 extern "C" void fn_800F1620(s32 arg0);
 extern "C" void se_slot_req(u8 arg0);
 extern "C" void fn_800F1700(u8 arg0, u8 arg1, u8 arg2);
-extern "C" s32 fn_800F1DE0(void);
-extern "C" void fn_800F1FCC(void);
+extern "C" s32 demo_bgm_ready_ck(void);
+extern "C" void stage_bgm_reload(void);
 extern "C" void fn_800F2114(void);
 extern "C" void lobby_bgm_load(void);
 extern "C" void fn_800F2328(u8 arg0, u8 arg1);
@@ -1423,7 +1423,7 @@ s32 demo_bgm_load(u8 index)
     return 0;
 }
 
-s32 fn_800F1DE0(void)
+s32 demo_bgm_ready_ck(void)
 {
     s32 ready = 0;
     s32 i = 0;
@@ -1477,7 +1477,7 @@ void quest_bgm_load(u8 arg0, u8 arg1)
 }
 
 /* The field BGM: the day/night stream plus the quest `srt`. */
-extern "C" void fn_800F1FCC(void)
+extern "C" void stage_bgm_reload(void)
 {
     u32 args[5];
     u8 mapno;

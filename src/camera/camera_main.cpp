@@ -624,7 +624,7 @@ void camera_quake_update(LightWork* self, u8 index);
 #include "ef/system_lobby_room_get.h"
 #include "enemy/em_kill_cut_target_get.h"
 #include "lobby/lb_screen_rect_get.h"
-#include "Pl/fn_8026FD94.h"
+#include "Pl/pl_now_area_ck.h"
 #include "Pl/pl_camera_reset_ck.h"
 #include "Pl/pl_target_lock_ck.h"
 #include "Pl/pl_camera_close_ck.h"
@@ -4777,7 +4777,7 @@ extern "C" void camera_pl_quake_req(_PLW* player, u8 kind)
 {
     CamQuake* slot = &((CamWork*)camera_work_get())->quake[0];
 
-    if (fn_8026FD94(player) != 0)
+    if (pl_now_area_ck(player) != 0)
         camera_quake_arm(slot, &player->vec_0x03C, kind, 0);
 }
 
@@ -4813,7 +4813,7 @@ extern "C" void camera_pl_quake2_req(_PLW* player, u8 kind)
 {
     CamQuake* slot = &((CamWork*)camera_work_get())->quake[1];
 
-    if (fn_8026FD94(player) != 0)
+    if (pl_now_area_ck(player) != 0)
         camera_quake_arm(slot, &player->vec_0x03C, kind, 0);
 }
 

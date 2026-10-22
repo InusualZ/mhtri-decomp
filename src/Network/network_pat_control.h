@@ -603,8 +603,11 @@ typedef struct NetMenuRow {
  * server-page view and the city-page view (each with its own cursor, count and page).  size: 0x76C */
 typedef struct NetListMenu {
     /* +0x000 */ u8 mode_0x000;
-    /* +0x001 */ u8 pad_0x001[0x5];
-    /* +0x006 */ s16 field_0x006;
+    /* +0x001 */ u8 step_0x001;      /* the server-select screen's sub-step (`lobby/lb_server_sel_trans.cpp`) */
+    /* +0x002 */ s8 result_0x002;    /* the request result the NetCtrlWk calls write (0 pending, < 0 failed) */
+    /* +0x003 */ u8 pad_0x003;
+    /* +0x004 */ u16 anim_0x004;     /* the screen's open animation counter (0..6) */
+    /* +0x006 */ u16 field_0x006;    /* the cursor steps' moved flags (the page arrows read them) */
     /* +0x008 */ s16 count_0x008;
     /* +0x00A */ s16 cursor_0x00A;
     /* +0x00C */ NetMenuRow rows_0x00C[8];

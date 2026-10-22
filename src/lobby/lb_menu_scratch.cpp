@@ -54,7 +54,7 @@ u32 fn_8021DF50(u32 idx, u32 limit);
 void fn_8021DDA8(LbMenuCandidate* candidate, LbMenuRow* row);
 f32 lb_fabsf(f32 v);
 s32 game_ready_ck(void);
-u8 fn_8004DD74(void);
+u8 userdata_rank_band_get(void);
 
 
 
@@ -184,7 +184,7 @@ s32 fn_8021E454(void)
 /* The page's availability gate: the item list must be open and its kind must match. */
 s32 fn_8021E484(s32 kind)
 {
-    if (fn_8004DD74() == 0) {
+    if (userdata_rank_band_get() == 0) {
         return 0;
     }
     switch ((u8)kind) {

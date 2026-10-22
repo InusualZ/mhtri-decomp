@@ -121,7 +121,7 @@
  * Sections: .text 0x802B2AA0-0x802B5C58; extab 0x80013D34-0x80013E3C (33 8-byte records - the
  * extabindex table has one entry per function that contains a `bl`); extabindex
  * 0x80031A4C-0x80031BD8 (33 x 12 B).  The six functions with no record (fn_802B2F3C, fn_802B3250,
- * fn_802B3260, fn_802B45BC, fn_802B45D4, stage_torch_unlit_ck) are exactly the ones with no call at all.
+ * fn_802B3260, stage_demo_flags_set, fn_802B45D4, stage_torch_unlit_ck) are exactly the ones with no call at all.
  *
  * Data.  `.data` 0x805CF56C-0x805CFBE8 (1660 B) is claimed: the 23-entry switch table MWCC emits for
  * fn_802B3270's `switch (st->mapno)` (0x805CF728, 92 B, arms read out of `main.elf`) sits inside it, and the
@@ -183,7 +183,7 @@
  * bar are 100 % on shape alone, and each one's shape is load-bearing:
  *   - fn_802B3270: new here; its call site (`stage_area_objects_refresh`, which must pass all three arguments) moved
  *     that row 95.69 -> 96.38.
- *   - fn_802B4824: the outer loop must be a `for` with `index` initialised outside it (`for (; index <
+ *   - stage_demo_start: the outer loop must be a `for` with `index` initialised outside it (`for (; index <
  *     4U; index++)`), not a `do`/`while` - only a for-counter gets the range analysis that drops the
  *     `clrlwi` off `index < 4U`; and the per-area body re-reads `st->area_char[index]` (retail loads
  *     the element address once per iteration and reloads the pointer after `frame_init`).  The
@@ -1647,7 +1647,7 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
 }
 
 /* Raises the stage block's one-shot flag byte. */
-extern "C" void fn_802B45BC(void)
+extern "C" void stage_demo_flags_set(void)
 {
     ((StageRuntime*)stage_w)->field_0x2F91 |= 0x81;
 }
@@ -1736,7 +1736,7 @@ extern "C" u32 stage_gate_b_ck(void)
 }
 
 /* Re-drives every live area actor's per-joint frame init for the palette the kind selects. */
-extern "C" void fn_802B4824(u8 kind)
+extern "C" void stage_demo_start(u8 kind)
 {
     f32 scale;
     f32 amount;

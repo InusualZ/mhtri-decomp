@@ -1,6 +1,6 @@
 /* The master-band declarations of `Pl/pl_act.cpp` that the player-record consumers include as one set.
  *
- * The C-linkage ones (`fn_8026FD94` ... `pl_act_set_flag`) live in `Pl/fn_8026FD94.h`, which this header
+ * The C-linkage ones (`pl_now_area_ck` ... `pl_act_set_flag`) live in `Pl/pl_now_area_ck.h`, which this header
  * includes; only the C++-linkage `Pl_master_ck`/`Pl_act_ck` are declared here.
  */
 #ifndef MHTRI_PL_PL_MASTER_CK_H
@@ -8,7 +8,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "Pl/fn_8026FD94.h"
+#include "Pl/pl_now_area_ck.h"
 
 struct _PLW;
 

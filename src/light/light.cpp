@@ -207,7 +207,7 @@ extern "C" LightVecAt4* fn_802C26CC(LightVecAt4* self)
 }
 
 /* Re-initialises the light work after the pad's motor callback. */
-extern "C" void fn_802C2314(void)
+extern "C" void light_demo_end(void)
 {
     fn_802AEC00();
     fn_802C0728();

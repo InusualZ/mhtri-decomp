@@ -17,7 +17,7 @@
 
 /* One entry of the per-chunk move-work table (`.bss` `pl_move_work`, 0x420 B of 24-byte entries,
  * 264 B - 11 entries - per `_PLW::chunk_ofs` chunk).  Only the fields the readers name are spelled;
- * `+0x14` is the byte `fn_8027D050` scans for (`Pl/pl_act.cpp`), and the rest is padding.
+ * `+0x14` is the byte `pl_step_se_kind_get` scans for (`Pl/pl_act.cpp`), and the rest is padding.
  * size: 0x18 */
 struct PlMoveEntry {
     /* +0x00 */ u16 kind;        /* non-zero marks a live entry; bit 1 is the "armed" flag */
@@ -25,7 +25,7 @@ struct PlMoveEntry {
     /* +0x08 */ f32 x_0x08;
     /* +0x0C */ u8 pad_0x0C[0x4];
     /* +0x10 */ f32 z_0x10;
-    /* +0x14 */ u8 carve_0x14;   /* `fn_8027D050` returns the first live entry's byte here */
+    /* +0x14 */ u8 carve_0x14;   /* `pl_step_se_kind_get` returns the first live entry's byte here */
     /* +0x15 */ u8 pad_0x15[0x3];
 };
 

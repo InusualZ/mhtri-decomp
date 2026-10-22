@@ -51,7 +51,7 @@
 #include "stage/get_now_mapno.h"          /* get_now_mapno (rule 2) */
 #include "ef/eft001.h"                    /* mtx34_set_trans (rule 2) */
 #include "ef/eft004_fx.h"                 /* fn_801006A0 (rule 2) */
-#include "Pl/fn_8026FD94.h"              /* fn_8026FE98 */
+#include "Pl/pl_now_area_ck.h"              /* fn_8026FE98 */
 #include "Pl/pl_skill.h"                 /* Pl_Skill_ck (rule 2) */
 #include "Pl/fn_802693C4.h"              /* Get_motion_no / Pl_frame_check (rule 2) */
 

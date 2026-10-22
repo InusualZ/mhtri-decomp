@@ -76,7 +76,7 @@
 #include "font/flfnt.h"
 #include "sound/fn_800D7F54.h"
 #include "fn_80056F24.h"
-#include "Pl/fn_8026FD94.h"
+#include "Pl/pl_now_area_ck.h"
 #include "fn_80047398.h"
 #include "fn_8004CAD8.h"
 #include "mh3_pad/Psw.h"

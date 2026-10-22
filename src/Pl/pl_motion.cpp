@@ -910,7 +910,7 @@ u32 fn_8028D574(void) {
 }
 
 /* 0x8028D5B8 - store the flag. */
-void fn_8028D5B8(s32 value) {
+void root_wait_frames_set(s32 value) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     if (root != 0) {
         root->flag_0x114 = value;

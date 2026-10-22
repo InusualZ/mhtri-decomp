@@ -158,7 +158,7 @@
  *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
  *  - `pl_area_buff_apply`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
  *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
- *    `fn_8027D050` declares its loop index before `v` (the r8/r9 order); `pl_item_icon_kind_get` is `while (row[0] != 0)` with
+ *    `pl_step_se_kind_get` declares its loop index before `v` (the r8/r9 order); `pl_item_icon_kind_get` is `while (row[0] != 0)` with
  *    `id == row[0]` (the rotated loop); `equip_gun_bonus_ck` opens with the `return 0` guard for non-gun kinds.
  */
 
@@ -2282,7 +2282,7 @@ extern "C" void pl_model_pos_sync(_PLW* self)
 }
 
 /* 0x8026FD94: true when the actor is in the area the player is currently in. */
-extern "C" u32 fn_8026FD94(_PLW* self)
+extern "C" u32 pl_now_area_ck(_PLW* self)
 {
     return get_now_areano() == self->area_0x16;
 }
@@ -6585,7 +6585,7 @@ extern "C" void fn_8027CFC0(_PLW* self)
 }
 
 /* 0x8027D050: the actor's stored carve value, scanned out of the item table. */
-extern "C" u8 fn_8027D050(_PLW* self)
+extern "C" u8 pl_step_se_kind_get(_PLW* self)
 {
     s32 i;
     u8 v = 0;

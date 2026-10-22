@@ -63,7 +63,7 @@ void get_now_area_pos(nw4r::math::VEC3* out, u8 area);
 u32 get_stg_eft_col_pos(u8 area, nw4r::math::VEC3* pos);
 #endif
 
-/* 0x802AEC00 - the stage pack reset `light/light.cpp`'s `fn_802C2314` calls; added with that
+/* 0x802AEC00 - the stage pack reset `light/light.cpp`'s `light_demo_end` calls; added with that
  * registration (rule 2: this range owns the address).  The owner's body does not exist yet, so the
  * signature is the call site's view: no arguments, no result. */
 void fn_802AEC00(void);

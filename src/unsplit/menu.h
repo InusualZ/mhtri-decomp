@@ -104,28 +104,8 @@ typedef struct PopEntry {
     /* +0x14E */ u8 pad_0x14E[0x56];
 } PopEntry; /* size: 0x1A4 */
 
-/* One 0x14-byte demo sub-record - the block at `demo_work` +0x14 the demo accessors test. size: 0x14 */
-typedef struct DemoEntry {
-    /* +0x00 */ u8 flag_0x00;
-    /* +0x01 */ u8 pad_0x01[0x7];
-    /* +0x08 */ u8 flag_0x08;
-    /* +0x09 */ u8 pad_0x09[0xB];
-} DemoEntry; /* size: 0x14 */
-
-/* The demo/event work `demo_work` (.bss 0x806D2B20, 0x28 B).  size: 0x28 */
-typedef struct DemoWork {
-    /* +0x00 */ u8 state_0x00;   /* 1 = running, 4 = the demo the game asks about */
-    /* +0x01 */ u8 pad_0x01;
-    /* +0x02 */ u8 demo_no_0x02; /* `get_demo_no`, 0xFF = none */
-    /* +0x03 */ u8 pad_0x03;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 pad_0x09[0x3];
-    /* +0x0C */ u8 field_0x0C;
-    /* +0x0D */ u8 field_0x0D;
-    /* +0x0E */ u8 pad_0x0E[0x6];
-    /* +0x14 */ DemoEntry entry_0x14;
-} DemoWork; /* size: 0x28 */
+/* `DemoWork` (the demo/event work `demo_work`, .bss 0x806D2B20) is `lobby/lb_server_sel_trans.cpp`'s type; its header,
+ * which `menu/get_pop_dat_ptr.h` includes below, defines it. */
 
 /* `pop_dat_ptrs` (.bss 0x806D2AF8) and `demo_work` (.bss 0x806D2B20) are defined by `menu/get_pop_dat_ptr.cpp` and
  * `lobby/lb_server_sel_trans.cpp`, which own those addresses since the phase 4 recut. */

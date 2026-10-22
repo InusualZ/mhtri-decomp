@@ -2788,7 +2788,7 @@ extern "C" void pl_rig_model_move(PlSeRig* rig)
     u32 v;
 
     if ((u8)GameMode_ck() == 1) {
-        if (fn_8026FD94(rig->plw) == 0) {
+        if (pl_now_area_ck(rig->plw) == 0) {
             flag = 0;
         }
         if ((u8)PlayMode_ck() == 3) {

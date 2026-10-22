@@ -340,7 +340,7 @@ void fn_802166B0(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f)
     lb_item_cell_draw_layout((u16)a, 0, b, c, d, e, 0, (u16)f, 8);
 }
 
-void fn_80216714(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
+void lb_item_cell_draw_layout11(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
     lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 11);
 }

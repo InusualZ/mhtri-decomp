@@ -280,11 +280,11 @@ extern "C" void fn_800DB964(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 97, pos)
 
 extern "C" void se_req_item_jingle(void) { se_bank_req(0, 36); }
 
-extern "C" void fn_800DBC0C(void) { se_bank_req(0, 37); }
+extern "C" void se_talk_bank_req(void) { se_bank_req(0, 37); }
 
 extern "C" void se_req_page_toggle(void) { se_bank_req(0, 31); }
 
-extern "C" void fn_800DBC24(void) { se_bank_req(0, 12); }
+extern "C" void se_talk_npc0_bank_req(void) { se_bank_req(0, 12); }
 
 extern "C" void se_eft004_demo_req(nw4r::math::VEC3* pos) { fn_800DBE94(0, 23, pos); }
 
@@ -837,7 +837,7 @@ void se_req_pos_ps(_se_w* work, s32 id, s32 param, nw4r::math::VEC3* pos) {
  * 0x800DA154  the "frame set" request for the player: only the `state == 2` work object takes it, and
  * only when the actor's range check passes.
  */
-extern "C" void fn_800DA428(_se_w* work, s32 a, u32 param, s32 d, s32 e) {
+extern "C" void se_req_frame_set_bank(_se_w* work, s32 a, u32 param, s32 d, s32 e) {
     if (work == NULL) {
         return;
     }
