@@ -536,7 +536,7 @@ void fn_801FD0F8(void);
 void fn_801FD174(_LB_NPC* self);
 void fn_801FD338(_LB_NPC* self, u8* data);
 u32 fn_802FB600(void);
-void fn_801E0298(u8 index);
+void em007_npc_model_eft_start(u8 index);
 void fn_800E26C4(u8* self);
 void res_file_ctor(void* out, s32 zero);
 void res_file_assign(void* a, void* b);
@@ -619,7 +619,7 @@ void lb_npc_map_setup(void)
     memset(lbl_806AA6F0, 0, 0x1C);
     if (get_now_mapno() == 0x16) {
         for (i = 0; i < 7; i++) {
-            fn_801E0298((u8)i);
+            em007_npc_model_eft_start((u8)i);
         }
     }
 }
