@@ -1393,21 +1393,23 @@ The 2026-10-21 game-module wave showed where landing time goes; this section is 
 
 ### 16.1 Own-row renames go in with the lane
 * A lane renames the `symbols.txt` rows **inside its own unit's claimed ranges** (`splits.txt` blocks of its manifest's units) with `tools/symbols/symedit.py rename/rename-batch` (no `--rewrite` into other units' files), and commits them on its branch with the code.
-* Its manifest lists `config/RMHE08/symbols.txt` under `own_rows` (not `owns`): the gate accepts a symbols.txt diff only when every changed row's address lies inside one of the batch units' claims, and refuses any other map change (status: gate check being built, see 16.5).
+* Its manifest lists `config/RMHE08/symbols.txt` under `own_rows` (not `owns`): the gate accepts a symbols.txt diff only when every changed row (renamed, resized, split, added, deleted) lies at an address one of the batch's units claims in that row's section, and refuses any other map change, naming each out-of-range row and its owner (`docs/tools/spec/lane-manifest.md`).
 * A row another unit's source spells by its old name: the lane updates that spelling only when it is a pure name swap in a declaration line; otherwise it files a request.
 
 ### 16.2 Foreign callees: the name registry
-* Before naming a symbol another unit owns, a lane looks it up in main's map and the registry; the first recorded proposal wins and later lanes reuse it.
-* The orchestrator lands registry names as small map-only batches (byte-identical, quick gate) so lanes cut after them see the names (status: tool being built, see 16.5).
+* Before naming a symbol another unit owns, a lane runs `python tools/symbols/names.py lookup <addr|name>` (main's map through the `main` ref, its own tree's map, and the registry); a name main already carries or the registry already holds is reused.
+* A new name is `names.py propose <addr> <name> --lane <slug> --evidence "..."`: the first recorded proposal wins (a refusal prints the winner). The registry is the tracked `config/RMHE08/name_registry.jsonl` (append-only, `merge=union`), so a lane's proposals travel on its branch; its manifest owns that file.
+* The orchestrator lands registry names as small map-only batches (byte-identical, quick gate): `names.py export -o <file>` writes the pending winners as `old new` lines for `symedit.py rename-batch`, so lanes cut after them see the names (`docs/tools/spec/names.md`).
 
 ### 16.3 Hub pre-pass before a module wave
 * Before parallel lanes start on a module, one short lane names the hub units' exported functions (for enemy: em_common, fn_8011D448, enemy_control) and lands first; the wave lanes reuse those names.
 
 ### 16.4 Landing
-* A branch with own-row renames and no foreign requests lands directly with `land.py land --branch ... --manifest ...` - no integrator.
+* A branch with own-row renames and no foreign requests lands directly with `land.py land --branch ... --manifest ...` - no integrator; a branch that registers nothing takes its units from the manifest's `units`.
 * Integrators remain for foreign declarations that need moving and for seams; several finished branches may be integrated together and landed in one batch.
 * Proven Matching flips are folded into the landing (section 11, 2026-10-13: proven flips may batch).
 * Never truncate `land.py` output in a pipeline (`| Select-Object -First N`, `| head`): it kills the process mid-apply and leaves MAIN dirty (incident 2026-10-21); redirect to a log file and read the tail.
 
 ### 16.5 Status of the tooling
-* Being built (2026-10-22): the `own_rows` gate check, the name registry tool, and the `integrate.py` fixes (C++-typed declarations into a leaf header; renaming a leaf `fn_X.h` with its symbol; detecting a request whose row main already renamed; float-argument-order mismatches). This list is updated as they land.
+* Built (branch `tools/landing-throughput`): the `own_rows` gate check with `land --branch` taking a manifest's `units` (16.1, 16.4); the name registry `tools/symbols/names.py` (16.2).
+* Being built (2026-10-22): the `integrate.py` fixes (C++-typed declarations into a leaf header; renaming a leaf `fn_X.h` with its symbol; detecting a request whose row main already renamed; float-argument-order mismatches; scratch inside the tree; `--gate-ref`). This list is updated as they land.

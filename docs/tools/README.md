@@ -45,7 +45,7 @@ Core gate: `land` (+ `lane-manifest`), `verifyunit`, `stylelint`, `vtableaudit`,
 `ledger`, `recompile`, `handoff`, `playbook`, `commitlint`, `guard`, `prepcommit`, `selftest`, `objalign`, `objextab`,
 `ideas` (+ `ideas_demo`), `sync_playbook_index`, `sync_profiles`.
 
-Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `dumpmap`, `phantom`, `mangle`, `methodize`,
+Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `names`, `dumpmap`, `phantom`, `mangle`, `methodize`,
 `symbolpreflight`, `tudiscover`, `dataorder`, `dataseams`, `poolseams` (+ `seams`), `splitcheck` (+ `invariants`), `dump_asm`,
 `dataclaim`, `dataqueue`,
 `sectiongap`, `pairgap`, `relocdiff`, `rawsame`, `unitscore`, `symdiff`, `fnasm`, `immreloc`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`, `gen_asm`,
@@ -107,6 +107,7 @@ relative to `MAIN`; the contract of each tool is its spec.
 | --- | --- |
 | `tools/units/symbolpreflight.py` | **before any source is written**: answer who owns an address and what a registration would touch — offline and bounded. |
 | `tools/symbols/symedit.py` | **you need a map row**: query and surgically edit `symbols.txt` (~65 700 lines) without loading it into context; the map row and the source change together. |
+| `tools/symbols/names.py` | **you are naming a symbol another unit owns**: look it up in main's map and the name registry, propose it (first proposal wins, the winner is printed), and export the pending winners as a map-only rename batch (§16.2). |
 | `tools/symbols/dumpmap.py` | **you want a rename candidate**: resolve `symbols.txt` names against the runtime dump's Dolphin map. |
 | `tools/splits/tudiscover.py` | **you need a TU boundary**: propose the translation-unit seam around an address, offline, from the data-section referrer runs. |
 | `tools/units/callees.py` | **you are about to write bodies**: name a unit's callees — every generated symbol its bodies reference, its owner, the call shape — before rule 7 bites. |

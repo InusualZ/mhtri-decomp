@@ -81,6 +81,14 @@ def test_manifest_paths(c):
             ["`own_rows` must be a list of non-empty strings"])
 
 
+def test_registry_is_batch_material(c):
+    from tools.units.landing.common import outside_batch
+    from tools.units.landing.rows.subject import land_subject
+    c.check("the name registry (tools/symbols/names.py) is batch material, landed under config/symbols",
+            (outside_batch(["config/RMHE08/name_registry.jsonl"]), land_subject(["config/RMHE08/name_registry.jsonl"])),
+            ([], "config/symbols: land config/RMHE08/name_registry.jsonl"))
+
+
 def _git(root, *args):
     p = subprocess.run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", "-c", "commit.gpgsign=false",
                         *args], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")

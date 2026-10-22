@@ -16,3 +16,7 @@
 
 # decomp-toolkit writes files with LF
 config/**/*.txt  text eol=lf
+
+# The name registry (tools/symbols/names.py) is append-only JSON lines: concurrent lanes' appends merge as a union
+# (`git merge` and `land.py`'s `git apply -3` both honour it), and the reader resolves duplicates first-proposal-wins.
+config/RMHE08/name_registry.jsonl  text eol=lf merge=union

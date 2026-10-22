@@ -31,7 +31,8 @@ def land_subject(units):
         cat = "config/flags"
     elif lo == "config":
         base = parts[-1]
-        cat = "config/" + {"symbols.txt": "symbols", "splits.txt": "splits", "configure.py": "flags"}.get(base, "config")
+        cat = "config/" + {"symbols.txt": "symbols", "name_registry.jsonl": "symbols", "splits.txt": "splits",
+                            "configure.py": "flags"}.get(base, "config")
     elif lo == ".claude":
         cat = "agents/" + (parts[2][:-3] if len(parts) > 2 and parts[2].endswith(".md") else "policy")
     elif lo in (".github", ".git"):
