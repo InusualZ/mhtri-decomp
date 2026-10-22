@@ -89,7 +89,7 @@ void em_res_user_data_flag_set(ResUserDataAc* self, u32 a);
 void em_user_data_reenter(struct _ENEMY_WORK* self);
 void em_res_user_data_dtor(void* self, s16 a);
 void fn_8016C674(struct _ENEMY_WORK* self, u8* a, u8* b);
-u32 fn_80176AA8(void* p);
+u32 em012_area_move_armed_ck(void* p);
 
 /* ---- library callees (their owners' headers do not declare these, or declare a different
  * signature; the shapes here are the call sites' - each is a leaf this unit never re-enters) ---- */

@@ -12,7 +12,9 @@ typedef struct EmAreaEntry {
     /* +0x01 */ u8 unused_0x01;
     /* +0x02 */ u8 group;            /* matched against `_ENEMY_WORK::group` */
     /* +0x03 */ u8 team_0x03;  /* the enemy kind (`em_area_entry_near_ck` hands it to `enemy_data_by_team_get`) */
-    /* +0x04 */ u8 unused_0x04[0x0A - 0x04];
+    /* +0x04 */ u8 unused_0x04[0x08 - 0x04];
+    /* +0x08 */ u8 kind_0x08;        /* `enemy/em012_prog.cpp`'s pack count counts kind 4 */
+    /* +0x09 */ u8 entry_0x09;       /* compared with `_ENEMY_WORK::field_0x46C` by the same count */
     /* +0x0A */ u8 area_no;          /* matched against `_ENEMY_WORK::field_0x00A` */
     /* +0x0B */ u8 unused_0x0B;
     /* +0x0C */ u8 field_0x0C;       /* must be 1 for the entry to count */

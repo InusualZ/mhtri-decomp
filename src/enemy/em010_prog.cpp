@@ -486,7 +486,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
         if (self->field_0x00C == 3) {
             _ENEMY_DATA* data =
                 (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
-            if (data != 0 && fn_80176AA8(data->work_0x18) == 1) {
+            if (data != 0 && em012_area_move_armed_ck(data->work_0x18) == 1) {
                 switch (map) {
                 case 1:
                     if (self->area_no == 2 && self->field_0x9F6 == 1) {

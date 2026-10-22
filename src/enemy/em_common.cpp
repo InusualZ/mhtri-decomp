@@ -664,7 +664,7 @@ extern "C" f32 lbl_80796CCC;   /* 0.05f */
 extern "C" f32 lbl_80796CD0;   /* 0.9f  */
 
 /* In-range helpers defined further down or unwritten, and the forward declaration of `fn_8012EC74`. */
-extern "C" f32 fn_8012EC74(_ENEMY_WORK* self);
+extern "C" f32 em_mot_window_base_get(_ENEMY_WORK* self);
 extern "C" u32 em_get_rank(_ENEMY_WORK* self);
 extern "C" void em_status_set(_ENEMY_WORK* self, u8 kind);
 extern "C" void em_alt_mode_set(_ENEMY_WORK* self, u8 value);
@@ -5296,13 +5296,13 @@ extern "C" s32 em_mot_finished_ck(_ENEMY_WORK* self)
 {
     f32 rate;
 
-    rate = fn_8012EC74(self);
+    rate = em_mot_window_base_get(self);
     return (f32)(s32)self->field_0x7A0 / (f32)(s32)self->field_0x7A4 <= rate;
 }
 
 /* The mode-selected base window: 0.3/0.2/0.18/0.15 s by the motion's sub-window count
  * `em_get_rank` returns.  The target re-reads the count in each arm, so the call is written per arm. */
-extern "C" f32 fn_8012EC74(_ENEMY_WORK* self)
+extern "C" f32 em_mot_window_base_get(_ENEMY_WORK* self)
 {
     if ((u8)em_get_rank(self) <= 1) return lbl_80796CB8;
     if ((u8)em_get_rank(self) <= 2) return lbl_80796CBC;
@@ -5417,7 +5417,7 @@ extern "C" s32 fn_8012F110(_ENEMY_WORK* self, u16 mode)
 extern "C" u32 em_motion_window_ck(_ENEMY_WORK* self)
 {
     if (self->field_0x938 > 0) {
-        f32 rate = fn_8012EC74(self);
+        f32 rate = em_mot_window_base_get(self);
         f32 limit;
 
         if ((u8)em_get_rank(self) <= 1) {

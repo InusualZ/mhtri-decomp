@@ -1,0 +1,1 @@
+{"address": "0x8012EC74", "section": ".text", "name": "em_mot_window_base_get", "old": "fn_8012EC74", "lane": "enemy-em012", "evidence": "enemy/em_common.cpp: returns one of four pooled window floats by em_get_rank (<=1,<=2,<=3,else); em_mot_finished_ck compares the motion ratio against it; em012_gauge_update steps the gauge to it minus 0.05", "at": "2026-10-21T23:27:43"}
