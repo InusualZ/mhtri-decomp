@@ -44,7 +44,7 @@ s32 lb_chacha_mask_name_get(u32 id);
 s32 lb_cat_name_get(u32 id);
 s32 lb_pig_name_get(u32 id);
 s16 weight_table_index(s16* table, s16 count, u32 value);
-s16 fn_80212724(u8* table, s16 count, u32 value);
+s16 weight_table_index_u8(u8* table, s16 count, u32 value);
 
 #ifdef __cplusplus
 }

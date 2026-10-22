@@ -72,7 +72,7 @@ void fn_802AEC00(void);
 void stage_area_colour_update(void);
 
 /* 0x802B4C5C - re-drives every live area object's own per-frame update (no arguments). */
-void fn_802B4C5C(void);
+void stage_area_objects_refresh(void);
 
 /* 0x802AFF38 / 0x802AFFF4 - the water tests for a shell's two area bits; each answers 1 while the point is under
  * water (no arguments, the answer in r3).  `stage_water_enabled_ck` is `s32` because `stage/fn_802B2AA0.h` declares it so. */

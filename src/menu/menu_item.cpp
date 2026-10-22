@@ -1346,7 +1346,7 @@ extern "C" u32 menu_item_input_ok(MenuSlot* slot)
     _PLW* worker = slot->worker;
 
     if (slot->field_0x00F == 1) {
-        if (quest_select_ready_ck() != 0 && (u8)fn_802FBA60() == 0) {
+        if (quest_select_ready_ck() != 0 && (u8)lb_unlock_cond5_on_ck() == 0) {
             return 0;
         }
         if (Pl_motion_input_ck(0) == 1) {

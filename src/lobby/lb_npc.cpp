@@ -295,7 +295,7 @@ s32 userdata_progress_flag_ck(s32);
 u32 userdata_flag_ck(s32);
 void lb_progress_unlock(u16);
 u16 lb_unlock_cond_top_get(s32);
-u8 fn_802FB948(void);
+u8 lb_progress_flag_b8_ck(void);
 void lb_ship_marks_set(void);
 void fn_801E9AA8(u8);
 s32 mhchar_motion_set(void* self, u8 kind, s32 a3, u16 id, s32 a5, s32 motion, s32 a7, f32 c, f32 k);
@@ -392,7 +392,7 @@ void fn_801FC268(void)
 {
     switch (lb_unlock_cond_top_get(0)) {
     case 0x1A:
-        if (fn_802FB948() == 0) {
+        if (lb_progress_flag_b8_ck() == 0) {
             lobby_world_block->field_0x3E01 = 9;
         } else {
             lobby_world_block->field_0x3E01 = 0xFF;
@@ -3394,7 +3394,7 @@ void ainpc_page_update(void);
 void fn_801FD0F8(void);
 void fn_801FD174(_LB_NPC* self);
 void fn_801FD338(_LB_NPC* self, LbNpcModel* data);
-u32 fn_802FB600(void);
+u32 lb_npc_appear_ck(void);
 void em007_npc_model_eft_start(u8 index);
 void mhchar_model_release(u8* self);
 void mhchar_res_bank_set(s32 a, u8* b, u32* res);
@@ -3466,7 +3466,7 @@ void lb_npc_map_setup(void)
         if (count >= 0x12) {
             break;
         }
-        if (fn_802FB600() == 1) {
+        if (lb_npc_appear_ck() == 1) {
             fn_801FD338(npc, (LbNpcModel*)data);
             npc++;
             count++;
@@ -3691,7 +3691,7 @@ u32 fn_801FE4B4(_LB_NPC* self);
 u32 fn_801FE55C(_LB_NPC* self);
 u32 fn_801FE8CC(_LB_NPC* self);
 u8 lb_world_mode_get(void);
-u8 fn_802FB948(void);
+u8 lb_progress_flag_b8_ck(void);
 u8 lb_world_upgrade_get(s32 idx);
 void camera_quake_req(s32 id);
 void fn_80201AA0(_LB_NPC* self, s32 flag);
@@ -4470,7 +4470,7 @@ void fn_80204148(_LB_NPC* self)
             self->field_0x006++;
             fn_801FDFE4(self, 1185, 4, 0);
             fn_801FE200(self, 25, 0);
-            if (fn_802FB948() == 0) {
+            if (lb_progress_flag_b8_ck() == 0) {
                 fn_801FE200(self, 24, 1);
             }
         } else if (lb_npc_motion_play(self, 0, lbl_807999C8, lbl_807999A0) != 0) {
@@ -6589,7 +6589,7 @@ u32 fn_80207EAC(_LB_NPC* self);
 u32 fn_802080C0(_LB_NPC* self);
 u8 lb_world_upgrade_get(s32 idx);
 u8 lb_world_mode_get(void);
-u8 fn_802FB948(void);
+u8 lb_progress_flag_b8_ck(void);
 extern LbPigRegion** village_pig_release;        /* .sbss: per area, the pig release regions */
 extern LbNpcMotionEntry*** move_cat_farm;        /* .sbss: per event state, the cat farm's tables by kind */
 extern LbNpcMotionEntry*** move_cat_farm_init;   /* .sbss: the same, entered from the slot setup */
@@ -6836,7 +6836,7 @@ void lb_npc_prop_sync(_LB_NPC* self)
             self->field_0x1E0 = 1;
             fn_801FE200(self, 22, 1);
         }
-    } else if (lb_npc_id_ck(self, 7) == 1 && fn_802FB948() == 1 && self->field_0x1E0 == 0) {
+    } else if (lb_npc_id_ck(self, 7) == 1 && lb_progress_flag_b8_ck() == 1 && self->field_0x1E0 == 0) {
         self->field_0x1E0 = 1;
         fn_801FE200(self, 24, 0);
     }
@@ -12105,7 +12105,7 @@ extern "C" void lb_item_db_toggle(void) {
             fn_801E9888();
         }
         fn_801E9C58();
-        fn_802FF2C0();
+        lb_kujira_day_step();
         lb_ship_voyage_tick();
     }
 }
@@ -12152,7 +12152,7 @@ extern "C" s16 weight_table_index(s16* table, s16 count, u32 value) {
 }
 
 /* The same walk over byte weights. */
-extern "C" s16 fn_80212724(u8* table, s16 count, u32 value) {
+extern "C" s16 weight_table_index_u8(u8* table, s16 count, u32 value) {
     s16 i;
     s16 sum;
 

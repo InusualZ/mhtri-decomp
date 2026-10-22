@@ -111,8 +111,8 @@ extern u8 eft052_item_box[];                 /* .bss 0x806BF310, 0x58 B */
 
 /* `src/lobby/fn_802FA9A0.cpp` owns these addresses (the band below); declared in its header once the
  * bodies land, so this file reaches them through that header. */
-void fn_802FF7F4(void* self);
-void fn_802FFE70(void* self);
+void lb_barter_refs_build(void* self);
+void lb_barter_reset(void* self);
 
 /* ------------------------------------------------------------------------------------------------
  * bodies, in address order
@@ -124,8 +124,8 @@ void fn_8030170C(void* self) {
     u8* p = (u8*)self;
     p[0x01] = 0;
     p[0x58] = 0;
-    fn_802FF7F4(self);
-    fn_802FFE70(self);
+    lb_barter_refs_build(self);
+    lb_barter_reset(self);
 }
 
 /* 0x80302228 - draws the selection-window frame after fetching the `0x23B6` sprite's position; the

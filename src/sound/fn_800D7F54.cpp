@@ -2,7 +2,7 @@
  *
  * Phase 4 fold: the old `sound/fn_800D7F54.cpp` (0x800D7F54..0x800DCFEC), `sound/fn_800DCFEC.cpp` (the map-dependent SE request, one function)
  * and the head of the old `sound/fn_800DD1F0.cpp` (0x800DD1F0..0x800DD40C: `fn_800DD38C`, `st_ice_se_req`, `st_ice_break_se_req`,
- * `fn_800DD3B8`) are one TU in the reconciled candidate.  The folded functions sit at the end of the file under
+ * `se_torch_slot_req`) are one TU in the reconciled candidate.  The folded functions sit at the end of the file under
  * `#pragma optimization_level reset`: the old units that held them were measured with the project's default level and `peephole off`
  * only (the `optimization_level 4` pragma below is the old `fn_800D7F54.cpp`'s, which the cflags of the three absorbed rows share).
  *
@@ -3580,7 +3580,7 @@ SeSlot* st_ice_break_se_req(nw4r::math::VEC3* pos)
 }
 
 /* Positional SE: bank 46, id `30 + (arg & 3)`, at the caller's position broadcast over all three axes. */
-extern "C" SeSlot* fn_800DD3B8(u32 arg)
+extern "C" SeSlot* se_torch_slot_req(u32 arg)
 {
     nw4r::math::VEC3 v;
     f32 c = lbl_807963E0;

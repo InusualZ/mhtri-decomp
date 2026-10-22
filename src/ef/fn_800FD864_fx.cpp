@@ -140,7 +140,7 @@ extern f32 lbl_807966A4;
 
 /* The nw4r::ef / engine helpers, reached through their real signatures (rule 9). */
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, u32 arg);
-extern "C" nw4r::ef::Effect* fn_800F91C4(u16 id, u16 kind, s32 a, s32 b);
+extern "C" nw4r::ef::Effect* res_eft_create_ex(u16 id, u16 kind, s32 a, s32 b);
 extern "C" void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 /* C++ callees: the target object references their manglings (cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34,
  * work_mem_alloc__FUl, work_mem_free__FPv, load_file__FPcUll, ran_suu__Fl), so no extern "C"
@@ -1525,14 +1525,14 @@ extern "C" void fn_800FE978(_EFT* self)
                     mtx34_copy(&work->matrices[i], &mtx);
 
                     if (set.slots_0x90[i].flags_0x03 & 2) {
-                        work->effects[i] = fn_800F91C4((u16)(work->id_base + work->types_0x8D5[i]),
+                        work->effects[i] = res_eft_create_ex((u16)(work->id_base + work->types_0x8D5[i]),
                                                        work->kind, 1, ran_suu(0) & 0x3F);
                         if (work->effects[i] != NULL) {
                             work->effects[i]->SetRootMtx(work->matrices[i]);
                             effect_retire(work->effects[i], 0);
                         }
                     } else if ((ran_suu(0) & 3) == 0) {
-                        work->effects[i] = fn_800F91C4((u16)(work->id_base + work->types_0x8D5[i]),
+                        work->effects[i] = res_eft_create_ex((u16)(work->id_base + work->types_0x8D5[i]),
                                                        work->kind, 1, ran_suu(0) & 0xF);
                         if (work->effects[i] != NULL) {
                             work->effects[i]->SetRootMtx(work->matrices[i]);
@@ -1557,7 +1557,7 @@ extern "C" void fn_800FE978(_EFT* self)
 
         i = 0;
         while (i < work->count) {
-            work->effects[i] = fn_800F91C4((u16)(work->id_base + i), work->kind, 1, 200);
+            work->effects[i] = res_eft_create_ex((u16)(work->id_base + i), work->kind, 1, 200);
             if (work->effects[i] == NULL) {
                 fn_800FFCA8(self);
                 return;
@@ -1598,19 +1598,19 @@ extern "C" void fn_800FE978(_EFT* self)
                     break;
                 case 2:
                     switch (lb_world_upgrade_get(3)) {
-                    case 1: work->effects[i] = fn_800F91C4(0x401, work->kind, 1, 200); i++; work->count++; break;
-                    case 2: work->effects[i] = fn_800F91C4(0x402, work->kind, 1, 200); i++; work->count++; break;
-                    case 3: work->effects[i] = fn_800F91C4(0x403, work->kind, 1, 200); i++; work->count++; break;
+                    case 1: work->effects[i] = res_eft_create_ex(0x401, work->kind, 1, 200); i++; work->count++; break;
+                    case 2: work->effects[i] = res_eft_create_ex(0x402, work->kind, 1, 200); i++; work->count++; break;
+                    case 3: work->effects[i] = res_eft_create_ex(0x403, work->kind, 1, 200); i++; work->count++; break;
                     }
                     switch (lb_world_upgrade_get(0)) {
-                    case 1: work->effects[i] = fn_800F91C4(0x404, work->kind, 1, 200); i++; work->count++; break;
-                    case 2: work->effects[i] = fn_800F91C4(0x405, work->kind, 1, 200); i++; work->count++; break;
-                    case 3: work->effects[i] = fn_800F91C4(0x406, work->kind, 1, 200); i++; work->count++; break;
+                    case 1: work->effects[i] = res_eft_create_ex(0x404, work->kind, 1, 200); i++; work->count++; break;
+                    case 2: work->effects[i] = res_eft_create_ex(0x405, work->kind, 1, 200); i++; work->count++; break;
+                    case 3: work->effects[i] = res_eft_create_ex(0x406, work->kind, 1, 200); i++; work->count++; break;
                     }
                     switch (lb_world_upgrade_get(2)) {
-                    case 1: work->effects[i] = fn_800F91C4(0x407, work->kind, 1, 200); work->count++; break;
-                    case 2: work->effects[i] = fn_800F91C4(0x408, work->kind, 1, 200); work->count++; break;
-                    case 3: work->effects[i] = fn_800F91C4(0x409, work->kind, 1, 200); work->count++; break;
+                    case 1: work->effects[i] = res_eft_create_ex(0x407, work->kind, 1, 200); work->count++; break;
+                    case 2: work->effects[i] = res_eft_create_ex(0x408, work->kind, 1, 200); work->count++; break;
+                    case 3: work->effects[i] = res_eft_create_ex(0x409, work->kind, 1, 200); work->count++; break;
                     }
                     count = 7;
                     base = 0x675;
@@ -1638,7 +1638,7 @@ extern "C" void fn_800FE978(_EFT* self)
             work->count2 = count;
             i = 0;
             while (i < work->count2) {
-                work->effects2[i] = fn_800F91C4((u16)(base + i), (u16)kind, 1, 200);
+                work->effects2[i] = res_eft_create_ex((u16)(base + i), (u16)kind, 1, 200);
                 if (work->effects2[i] == NULL) {
                     fn_800FFCA8(self);
                     return;
@@ -1649,19 +1649,19 @@ extern "C" void fn_800FE978(_EFT* self)
             if (mapno == 22) {
                 if (self->area_0x44 == 2) {
                     switch (lb_world_upgrade_get(3)) {
-                    case 1: work->effects2[i] = fn_800F91C4(0x67C, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 2: work->effects2[i] = fn_800F91C4(0x67D, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 3: work->effects2[i] = fn_800F91C4(0x67E, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 1: work->effects2[i] = res_eft_create_ex(0x67C, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 2: work->effects2[i] = res_eft_create_ex(0x67D, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 3: work->effects2[i] = res_eft_create_ex(0x67E, (u16)kind, 1, 200); i++; work->count2++; break;
                     }
                     switch (lb_world_upgrade_get(0)) {
-                    case 1: work->effects2[i] = fn_800F91C4(0x67F, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 2: work->effects2[i] = fn_800F91C4(0x680, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 3: work->effects2[i] = fn_800F91C4(0x681, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 1: work->effects2[i] = res_eft_create_ex(0x67F, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 2: work->effects2[i] = res_eft_create_ex(0x680, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 3: work->effects2[i] = res_eft_create_ex(0x681, (u16)kind, 1, 200); i++; work->count2++; break;
                     }
                     switch (lb_world_upgrade_get(2)) {
-                    case 1: work->effects2[i] = fn_800F91C4(0x682, (u16)kind, 1, 200); work->count2++; break;
-                    case 2: work->effects2[i] = fn_800F91C4(0x683, (u16)kind, 1, 200); work->count2++; break;
-                    case 3: work->effects2[i] = fn_800F91C4(0x684, (u16)kind, 1, 200); work->count2++; break;
+                    case 1: work->effects2[i] = res_eft_create_ex(0x682, (u16)kind, 1, 200); work->count2++; break;
+                    case 2: work->effects2[i] = res_eft_create_ex(0x683, (u16)kind, 1, 200); work->count2++; break;
+                    case 3: work->effects2[i] = res_eft_create_ex(0x684, (u16)kind, 1, 200); work->count2++; break;
                     }
                 }
             } else if (LbCheckKujiraEvent() == 1 && self->area_0x44 < 4) {
@@ -1672,7 +1672,7 @@ extern "C" void fn_800FE978(_EFT* self)
                 }
                 i = 0;
                 while (i < work->count) {
-                    work->effects[i] = fn_800F91C4((u16)(work->id_base + i), work->kind, 1, 200);
+                    work->effects[i] = res_eft_create_ex((u16)(work->id_base + i), work->kind, 1, 200);
                     if (work->effects[i] == NULL) {
                         fn_800FFCA8(self);
                         return;
@@ -1686,7 +1686,7 @@ extern "C" void fn_800FE978(_EFT* self)
                 }
                 i = 0;
                 while (i < work->count2) {
-                    work->effects2[i] = fn_800F91C4((u16)(base + i), (u16)kind, 1, 200);
+                    work->effects2[i] = res_eft_create_ex((u16)(base + i), (u16)kind, 1, 200);
                     if (work->effects2[i] == NULL) {
                         fn_800FFCA8(self);
                         return;

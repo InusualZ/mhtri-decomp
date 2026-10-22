@@ -234,7 +234,7 @@ void* fn_800F8B44(u32);
 void fn_800F8C78(void*, u32);
 u32 fn_800F8D80(u32);
 void fn_800F8DA4(void);
-void* fn_800F91C4(u16, u16, u32, u32);
+void* res_eft_create_ex(u16, u16, u32, u32);
 void* fn_800F9278(void*, void*, u32, u32);
 void* fn_800F92D4(void*, void*);
 u32 fn_800F92E0(void*);
@@ -1938,11 +1938,11 @@ char* get_eft_res_name(u16 id) {
 
 /* 0x800F91B4 - create a pooled effect from a proID pair and a resource ordinal. */
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, unsigned long arg) {
-    return (nw4r::ef::Effect*)fn_800F91C4((u16)id, (u16)kind, arg, 0);
+    return (nw4r::ef::Effect*)res_eft_create_ex((u16)id, (u16)kind, arg, 0);
 }
 
 /* 0x800F91C4 - resolve one resource and hand it to the effect spawner. */
-extern "C" void* fn_800F91C4(u16 id, u16 kind, u32 arg, u32 count) {
+extern "C" void* res_eft_create_ex(u16 id, u16 kind, u32 arg, u32 count) {
     u8 rec[8];
     u8 copy[4];
     void* system;

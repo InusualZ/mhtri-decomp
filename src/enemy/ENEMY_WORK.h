@@ -756,6 +756,20 @@ struct _ENEMY_WORK {
             /* +0x33B */ u8 kcolor_b_0x33B;
             /* +0x33C */ u8 unused_0x33Ckc[0x354 - 0x33C];
         } em020_kcolor_0x328;
+        /* the em023 program's state bytes (`lobby/fn_802FA9A0.cpp`): the rise flag event 5 latches, the route leg
+         * the action-12 walk is on, the enemy-data slot state, the sync and arrival flags, the two look headings
+         * and the action-11 timer.  size: 0x0C */
+        struct {
+            /* +0x328 */ u8 flag_0x328;        /* set by event 5 sub 19, cleared by sub 14 */
+            /* +0x329 */ s8 leg_0x329;         /* the route leg (`em023_route_step`) */
+            /* +0x32A */ u8 slot_state_0x32A;  /* 0 waiting, 1 latched, 2 standing in the slot's shape */
+            /* +0x32B */ u8 synced_0x32B;
+            /* +0x32C */ u8 arrived_0x32C;
+            /* +0x32D */ u8 pad_0x32D;
+            /* +0x32E */ u16 aim_x_0x32E;      /* the look heading `em023_move_look` turns to */
+            /* +0x330 */ u16 aim_y_0x330;      /* its pitch */
+            /* +0x332 */ s16 timer_0x332;      /* the action-11 frames the surface clamp eases in over */
+        } em023_0x328; /* size: 0x0C */
         /* the em029 program's hit pair (`enemy/em029_prog.cpp`): the flag the busy action holds this
          * frame and last frame's copy the per-frame slot shifts into it.  size: 0x2C */
         struct {

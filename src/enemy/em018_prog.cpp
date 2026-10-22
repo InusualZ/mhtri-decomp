@@ -5604,7 +5604,7 @@ u32 fn_8019E49C(struct _ENEMY_WORK* self, u32 flag) {
 }
 
 /* 0x8019E580 - "action 13 in its first five sub-states". */
-u32 fn_8019E580(struct _ENEMY_WORK* self) {
+u32 em018_act13_early_ck(struct _ENEMY_WORK* self) {
     if (self->action == 13 && self->state_sub <= 5) {
         return 1;
     }

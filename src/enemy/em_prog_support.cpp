@@ -142,7 +142,7 @@ extern "C" void fn_803831B0(void) {
 extern "C" void fn_803836EC(void) {
     lb_item_db_toggle();
     lb_item_list_select(lobby_world_block[15872]);
-    fn_802B4C5C();
+    stage_area_objects_refresh();
     fn_801FC2F0();
 }
 

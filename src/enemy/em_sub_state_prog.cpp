@@ -73,16 +73,16 @@ extern "C" void fn_802FA800(_ENEMY_WORK* work) {
 extern "C" void fn_802FA964(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
-        fn_802FA9A0(work);
+        eft036_model_create(work);
         break;
     case 1:
-        fn_802FAB98(work);
+        eft036_move(work);
         break;
     case 2:
-        fn_802FAFB4(work);
+        eft036_end(work);
         break;
     case 3:
-        fn_802FAFC4(work);
+        eft036_release(work);
         break;
     }
 }

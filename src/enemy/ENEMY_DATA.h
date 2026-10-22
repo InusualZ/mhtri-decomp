@@ -14,7 +14,8 @@ typedef struct _ENEMY_DATA {
     /* +0x00 */ u8 pad_0x00[0x08];
     /* +0x08 */ u8 field_0x08;   /* `fn_801671AC` latches the work's +0x46C to 0xFF when it is 0xFF;
                                   * `em_act_frame_ck` reads it as the "entry seated" state */
-    /* +0x09 */ u8 pad_0x09[0x02];
+    /* +0x09 */ u8 pad_0x09[0x01];
+    /* +0x0A */ u8 field_0x0A;   /* the em023 program leaves the slot state at 1 while it is 2 (`lobby/fn_802FA9A0.cpp`) */
     /* +0x0B */ u8 field_0x0B;   /* `em_act_frame_ck` asks for the leave transition when it is not 1 */
     /* +0x0C */ u8 pad_0x0C[0x0F - 0x0C];
     /* +0x0F */ u8 field_0x0F;   /* `enemy/em022_prog.cpp`: 3 picks the +0x10 area over the +0x14 one */

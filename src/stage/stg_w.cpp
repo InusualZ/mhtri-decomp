@@ -121,7 +121,7 @@
  * Sections: .text 0x802B2AA0-0x802B5C58; extab 0x80013D34-0x80013E3C (33 8-byte records - the
  * extabindex table has one entry per function that contains a `bl`); extabindex
  * 0x80031A4C-0x80031BD8 (33 x 12 B).  The six functions with no record (fn_802B2F3C, fn_802B3250,
- * fn_802B3260, fn_802B45BC, fn_802B45D4, fn_802B46DC) are exactly the ones with no call at all.
+ * fn_802B3260, fn_802B45BC, fn_802B45D4, stage_torch_unlit_ck) are exactly the ones with no call at all.
  *
  * Data.  `.data` 0x805CF56C-0x805CFBE8 (1660 B) is claimed: the 23-entry switch table MWCC emits for
  * fn_802B3270's `switch (st->mapno)` (0x805CF728, 92 B, arms read out of `main.elf`) sits inside it, and the
@@ -181,7 +181,7 @@
  *
  * `fn_802B2F60` and `fn_802B4ABC` keep their pre-existing source shapes.  Three rows that sat below the
  * bar are 100 % on shape alone, and each one's shape is load-bearing:
- *   - fn_802B3270: new here; its call site (`fn_802B4C5C`, which must pass all three arguments) moved
+ *   - fn_802B3270: new here; its call site (`stage_area_objects_refresh`, which must pass all three arguments) moved
  *     that row 95.69 -> 96.38.
  *   - fn_802B4824: the outer loop must be a `for` with `index` initialised outside it (`for (; index <
  *     4U; index++)`), not a `do`/`while` - only a for-counter gets the range analysis that drops the
@@ -1130,14 +1130,14 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                 show_i++;
                 break;
             }
-            if (fn_802FB8C4() == 0) {
+            if (lb_unlock_cond5_get() == 0) {
                 local.show[show_i] = 6;
                 show_i++;
             } else {
                 local.show[show_i] = 5;
                 show_i++;
             }
-            if (fn_802FB900() == 1) {
+            if (lb_unlock_cond22_flag_ck() == 1) {
                 local.show[show_i] = 0x10;
                 show_i++;
             }
@@ -1174,7 +1174,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 0x12;
                     show_i++;
                     local.show[show_i] = 0x13;
@@ -1195,7 +1195,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 0x10;
                     show_i++;
                     local.show[show_i] = 0x11;
@@ -1225,7 +1225,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 0x11;
                     show_i++;
                     local.show[show_i] = 0x12;
@@ -1246,7 +1246,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 0x0F;
                     show_i++;
                     local.show[show_i] = 0x10;
@@ -1276,14 +1276,14 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 4;
                     show_i++;
                     local.show[show_i] = 0x0C;
                     show_i++;
                     local.show[show_i] = 0x0D;
                     show_i++;
-                } else if (fn_802FB9F8() == 1) {
+                } else if (lb_event_gate2_ck() == 1) {
                     local.show[show_i] = 4;
                     show_i++;
                 }
@@ -1302,14 +1302,14 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 2;
                     show_i++;
                     local.show[show_i] = 0x0A;
                     show_i++;
                     local.show[show_i] = 0x0B;
                     show_i++;
-                } else if (fn_802FB9F8() == 1) {
+                } else if (lb_event_gate2_ck() == 1) {
                     local.show[show_i] = 2;
                     show_i++;
                 }
@@ -1337,7 +1337,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 7;
                     show_i++;
                     local.show[show_i] = 8;
@@ -1361,7 +1361,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 5;
                     show_i++;
                     local.show[show_i] = 6;
@@ -1406,7 +1406,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 0x19;
                     show_i++;
                     local.show[show_i] = 0x1D;
@@ -1416,7 +1416,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     local.show[show_i] = 0x23;
                     show_i++;
                 } else {
-                    if (fn_802FB9F8() == 1) {
+                    if (lb_event_gate2_ck() == 1) {
                         local.show[show_i] = 0x19;
                         show_i++;
                     }
@@ -1442,7 +1442,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     src++;
                     hide_i++;
                 }
-                if (::LbCheckKujiraEvent() == 0 && fn_802FB9F8() == 0) {
+                if (::LbCheckKujiraEvent() == 0 && lb_event_gate2_ck() == 0) {
                     local.show[show_i] = 5;
                     show_i++;
                     local.show[show_i] = 0x1B;
@@ -1452,7 +1452,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                     local.show[show_i] = 0x22;
                     show_i++;
                 } else {
-                    if (fn_802FB9F8() == 1) {
+                    if (lb_event_gate2_ck() == 1) {
                         local.show[show_i] = 5;
                         show_i++;
                     }
@@ -1667,14 +1667,14 @@ extern "C" void fn_802B45F4(u8 index)
 
     if ((st->field_0x2F92 & bit) == 0) {
         st->field_0x2F92 |= bit;
-        fn_802FBA94();
+        eft038_set();
     }
     now = quest_time_limit_get();
     st->field_0x2F94[index] = now - quest_time_elapsed_get();
 }
 
 /* Tests area bit `index` of the stage block's 16-bit mask and reports whether it is clear. */
-extern "C" s32 fn_802B46DC(u8 index)
+extern "C" s32 stage_torch_unlit_ck(u8 index)
 {
     return (((StageRuntime*)stage_w)->field_0x2F92 & (1 << index)) == 0;
 }
@@ -1707,7 +1707,7 @@ extern "C" void fn_802B4704(StageRuntime* st)
         return;
     }
     for (index = 0; index < 0x10U; index++) {
-        if (fn_802B46DC(index) == 0) {
+        if (stage_torch_unlit_ck(index) == 0) {
             if (span - (s32)st->field_0x2F94[index] >= 0x2A30) {
                 st->field_0x2F92 ^= 1 << index;
                 st->field_0x2F94[index] = 0;
@@ -1727,7 +1727,7 @@ extern "C" u32 stage_gate_b_ck(void)
     }
     index = 1;
     while (index < 5U) {
-        if (fn_802B46DC(index) == 1U) {
+        if (stage_torch_unlit_ck(index) == 1U) {
             return 0;
         }
         index++;
@@ -1888,7 +1888,7 @@ extern "C" void fn_802B4ABC(StageRuntime* st)
 }
 
 /* Re-drives every live area object's own per-frame update. */
-extern "C" void fn_802B4C5C(void)
+extern "C" void stage_area_objects_refresh(void)
 {
     StageRuntime* st = (StageRuntime*)stage_w;
     u8 index;
