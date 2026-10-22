@@ -1972,6 +1972,12 @@ def selftest() -> int:
                                   {"src/menu/fn_802A6624.cpp": "src/menu/menu_message.cpp"}),
                   {"rule": 2, "file": "x", "line": 1, "token": "new_row",
                    "detail": "`new_row` is owned by `src/menu/menu_message.cpp`"})
+            check("... and a row renamed inside a code-fragment token (rule 6) is the same finding",
+                  renamed_finding({"rule": 6, "file": "x", "line": 1, "token": "(char **)(old_row + 0x10",
+                                   "detail": "pointer arithmetic: (char **)(old_row + 0x10"},
+                                  {"old_row": "new_row"}),
+                  {"rule": 6, "file": "x", "line": 1, "token": "(char **)(new_row + 0x10",
+                   "detail": "pointer arithmetic: (char **)(new_row + 0x10"})
             # ... but a range the batch moved to another owner is NOT a rename: the boundaries differ
             moved_unit = Ownership({"new_row": [(".text", 0x80200030, "function")]},
                                    {".text": [(0x80200000, 0x80200008, "menu/menu_message.cpp")]})

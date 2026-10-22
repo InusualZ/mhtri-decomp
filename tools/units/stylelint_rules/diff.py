@@ -3,6 +3,7 @@ Spec: docs/tools/spec/stylelint_rules.md. CLI: none (the stylelint package; `sty
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 
 from tools.lib import findings as _findings
@@ -250,6 +251,22 @@ def owner_map(base: "Ownership | None", after: "Ownership | None", findings: lis
     return out
 
 
+_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def token_names(findings: list[dict]) -> set:
+    """The map names `rename_map` must resolve for `findings`: each token, and every identifier inside a token that is
+    a code fragment rather than one name (`renamed_finding` translates those word by word)."""
+    out = set()
+    for f in findings:
+        tok = f.get("token")
+        if tok:
+            out.add(tok)
+            if _IDENT.fullmatch(tok) is None:
+                out.update(_IDENT.findall(tok))
+    return out
+
+
 def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None, owners: "dict | None" = None) -> dict:
     """`f` with its token - and the owner path its detail spells - translated: the same token, renamed.
 
@@ -274,6 +291,12 @@ def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None, owners:
     if tok and tok in (symbols or {}):
         token2 = symbols[tok]
         detail = detail.replace("`%s`" % tok, "`%s`" % token2)
+    elif tok and symbols and _IDENT.search(tok) and _IDENT.fullmatch(tok) is None:
+        # a code-fragment token (a rule-6 cast `(char **)(lbl_X + 0x10`): a map row renamed inside it is the same
+        # finding, so each renamed identifier is translated in the token and the prose alike
+        swap = lambda m: symbols.get(m.group(0), m.group(0))  # noqa: E731
+        token2 = _IDENT.sub(swap, tok)
+        detail = detail.replace(tok, token2)
     for old, new in (files or {}).items():
         if old != new:
             detail = detail.replace(old, new)
@@ -546,8 +569,7 @@ def judge(before_findings: list[dict], after_findings: list[dict], touched: list
     # rename has strictly fewer of them; one credit costs one freed gap (`rename_credits`)
     freed = {src.rel: base_gaps.get(src.rel, set()) - unresolved_declarations(src, after_ownership)
              for src in after_sources}
-    symbol_rename = rename_map(base_ownership, after_ownership,
-                               {f.get("token") for f in before_findings if f.get("token")})
+    symbol_rename = rename_map(base_ownership, after_ownership, token_names(before_findings))
     owners = owner_map(base_ownership, after_ownership, before_findings, symbol_rename)
     with_owners = added_identities(before_findings, after_findings, symbol_rename, rename, owners)
     re_owned = []
