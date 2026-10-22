@@ -1,6 +1,6 @@
 /*
  * menu/menu_note.cpp - the note-list entry table: `get_note_item_slot` maps a note entry 0..9 to the item table's slot
- *   (0..3, `fn_8029F818`'s `lbl_806ACF28.array_0x758` run) and the index into it.
+ *   (0..3, `menu_row_limit_get`'s `lbl_806ACF28.array_0x758` run) and the index into it.
  * RANGE. .text 0x8034C0C4-0x8034C1D0 (1 function); .data 0x805E91F8-0x805E9248: `s_menu_note_cpp`, `s_nw4r_assert_failed`
  *   and the switch's 10-entry jump table.
  * FLAGS. `cflags_menu` (configure.py); no pragma.

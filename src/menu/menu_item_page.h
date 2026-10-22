@@ -30,7 +30,7 @@ typedef struct MenuRowData {
 /* The 4-byte row record the item list's data table (`menu_row_table_get()`) holds, indexed by
  * `MenuEntry::field_0x06`: the kind the row's damage/quality block switches on (+0) and the row id
  * `get_menu_lsp_tbl(0x55)` is indexed with (+1). */
-/* The item record `fn_8033ADD0` selects: the item id the panel's icon/name/exp lines take. */
+/* The item record `lb_page_row_pair_get` selects: the item id the panel's icon/name/exp lines take. */
 typedef struct ItemRec {
     /* +0x00 */ u16 field_0x00;
     /* +0x02 */ u16 id;
@@ -91,7 +91,7 @@ void sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out); /* 
 void fn_802E1A7C(u16 id, u16 part, u16 arg2, const _mh_ivec2_* pos);
 void draw_font_anim_idx(u32 id, u32 part, s8* text, u8 flag, const _mh_ivec2_* pos);
 u32 color_lerp(u32 value, u32 mask);
-void fn_802A9F48(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
+void menu_select_window_draw(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
 u8 GameMode_ck(void);
 u16 userdata_box_capacity(void* userdata);
 s32 userdata_pouch_size(u8 idx);
@@ -105,14 +105,14 @@ char* flfntStrChr(char* text, s32 c);   /* owner: `g3d/g3d_anmchr.cpp` */
 void monster_size_value_get(u8 a, u16 b, f32* out);
 u32 fn_8026FE44(s32 worker);
 s32 Pl_item_timer_get(s32 worker, u16 id);
-void fn_802D9EA8(void);
+void cockpit_blink_get(void);
 u32 fn_802DA20C(s32 a, u8 b);
-void fn_802DA2D4(s32 flag);
+void ainpc_entry_kill_kind(s32 flag);
 s32 hud_notice_spawn(s32 a, u8 b, s16 c, s16 d, s32 e, s32 f, s32 g);
 s8* fn_802DFB18(u8 idx);
-u16* fn_8033ADD0(u16 a, u16* b, u16* c, u16 d);
-s8 fn_8033AED0(void* a, u16 b);
-u32 fn_8033B67C(void* a, void* b);
+u16* lb_page_row_pair_get(u16 a, u16* b, u16* c, u16 d);
+s8 lb_combo_rate_get(void* a, u16 b);
+u32 lb_combo_rate_sprintf(void* a, void* b);
 void* get_userdata(void);
 
 /* The lobby item database `item_page_item_price` reads the price block out of: a 4-byte pointer at

@@ -75,7 +75,7 @@ typedef struct LbActReq {
     /* +0x10 */ u8 unused_0x10[0x4];
 } LbActReq; /* size: 0x14 */
 
-/* One 4-byte companion entry of `LbCompanionWork::pairs_0x5E2` (`pl_item_add`/`fn_802E5D68` are handed
+/* One 4-byte companion entry of `LbCompanionWork::pairs_0x5E2` (`pl_item_add`/`cockpit_pointer_target_set` are handed
  * its two halves).  size: 0x4 */
 typedef struct LbCompanionPair {
     /* +0x00 */ u16 id_0x00;
@@ -453,7 +453,7 @@ s32 fn_80343B44(void* entry);
 void menu_item_close(void);
 void snd_quest_start_bgm_set(void);
 void quest_slot_arm_all_a(s8 index);
-void fn_802E5D68(u16 id, s8 index);
+void cockpit_pointer_target_set(u16 id, s8 index);
 void em_ground_rec_clear(void* text);
 void fn_80142C58(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void fn_80146C00(s8 value, u8 index);
@@ -473,8 +473,8 @@ void userdata_progress_flag_set(u32 a);
 void fn_80046EE4(void);
 s32 event_demo_running_ck(void* psw);
 s32 fn_8028D574(void);
-u8* fn_8033AC78(u16 a, u16 b, s32 c);
-s8 fn_8033AED0(s16* out, s32 a, s32 b);
+u8* lb_combo_recipe_find(u16 a, u16 b, s32 c);
+s8 lb_combo_rate_get(s16* out, s32 a, s32 b);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */

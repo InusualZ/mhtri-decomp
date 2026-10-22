@@ -10,6 +10,12 @@
  * extabindex).
  * NAMES. GUESS (from its body and its callers): ainpc_page_hold_set
  *   GUESS (from each body and its callers): ainpc_page_mode2_set, ainpc_page_mark_b_draw, menu_money_draw
+ *   GUESS (from each body and its callers): `cockpit_blink_get`, `hud_screen_width_get`, `ainpc_entry_kind_get`,
+ *   `ainpc_entry_live_ck`, `ainpc_entry_kill_kind`, `ainpc_entry_update_all`, `ainpc_entry_draw_all`,
+ *   `draw_sprite_blink_idx`, `put_page_count`, `ainpc_page_reset`, `ainpc_page_idle`, `ainpc_page_update`,
+ *   `ainpc_page_hold_clear`, `cockpit_ticket_acquire`, `item_get_with_msg`, `put_button_guide`, `put_button_guide_b`,
+ *   `put_button_guide_c_idx`, `put_button_guide_c`, `cockpit_notice_init`, `cockpit_notice_update`,
+ *   `chara_icon_pos_get`.
  */
 /* ---- header inherited from src/ai/fn_802D44F4.cpp (written against its pre-phase-4 range) ---- */
 /*

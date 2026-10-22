@@ -16,6 +16,7 @@
  *   GUESS: `equip_detail_melee_draw`, `equip_detail_bowgun_draw`, `equip_detail_kind6_draw`,
  *   GUESS: `equip_detail_slots_draw`
  *   GUESS (from its reader `fn_80313E24`): `equip_panel_row_layout`
+ *   GUESS (from each body and its callers): `menu_equip_page_count`.
  * RESIDUALS. 59 rows unwritten (objdiff scores them zero): 0x80309098-0x8030A1D0, 0x8030A1DC-0x8030A30C,
  *   0x8030A328-0x8030B790, 0x8030B868-0x8030BACC, 0x8030BAF4-0x8030CA50, 0x8030CA68-0x8030D338,
  *   0x8030D798-0x8030D808, 0x8030D980-0x8030E784, 0x8030E79C-0x8030F374, 0x8030F38C-0x8030F7B0,
@@ -127,7 +128,7 @@ extern "C" {
 void equip_info_update(StatusScreenWork*);
 void put_equip_info_upper_page(StatusScreenWork*);
 void put_equip_info_piece_page(StatusScreenWork*);
-s32  fn_8030A1D0(_PLW*, s32);
+s32  menu_equip_page_count(_PLW*, s32);
 s32  fn_8030A1DC(_PLW*, s32, s32, s32);
 s32  equip_page_count_step(_PLW*, void*, u32, s8);
 s32  fn_8030A328(void*, void*, s32, s32, u16, s8);
@@ -229,12 +230,12 @@ void fn_8031A638(MenuSlot*);
 
 /* Callees other units own.  Most are declared in their owner's header and included above
  * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `Pl_Skill_slot_item_get`
- * and `pl_item_add` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
+ * and `pl_item_add` in `Pl/pl_skill.h`; `menu_slot_entry_b_select` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
  * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `unsplit/menu.h`).
- * The two below cannot: `fn_8031AE38`/`fn_8031BFEC` are owned by `menu/fn_8031A6C0.cpp`, whose header
+ * The two below cannot: `fn_8031AE38`/`menu_sel_cursor_init` are owned by `menu/fn_8031A6C0.cpp`, whose header
  * declares neither and `unsplit/menu.h` may not.  Declared here as this unit's view. */
 void fn_8031AE38(MenuSlot* self);
-void fn_8031BFEC(void* cursor, s32 kind, MenuSlot* owner);
+void menu_sel_cursor_init(void* cursor, s32 kind, MenuSlot* owner);
 
 extern u32 lbl_805DCD48[];          /* .data: the per-colour packed word table */
 extern const char lbl_80792BE4[3];  /* .sdata "%d" */
@@ -251,7 +252,7 @@ extern const char lbl_80792BEC[5];  /* .sdata "%d%s" */
  * --------------------------------------------------------------------------------------------------- */
 
 /* The equip page count with the default column arrangement. */
-s32 fn_8030A1D0(_PLW* equip, s32 mode)
+s32 menu_equip_page_count(_PLW* equip, s32 mode)
 {
     return fn_8030A1DC(equip, mode, 0, 0);
 }
@@ -1876,9 +1877,9 @@ void fn_8031A58C(MenuSlot* self) {
     s16 h = menu_page_count(size, 8);
     self->field_0x1A1 = (s8)h;
     self->field_0x1A2 = 0;
-    fn_8029FFFC(self, 0);
+    menu_slot_entry_b_select(self, 0);
     fn_8031AE38(self);
-    fn_8031BFEC(&self->field_0x1EC[0], 0, self);
+    menu_sel_cursor_init(&self->field_0x1EC[0], 0, self);
 }
 
 /* 0x8031A638 - when a menu slot is a ready bowgun/gunner panel, refresh both of its option rows. */

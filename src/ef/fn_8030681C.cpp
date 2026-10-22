@@ -4,7 +4,7 @@
  *   .data 0x805DC5E8-0x805DCC50, .sdata 0x80792B78-0x80792BB8, .sdata2 0x8079ADE0-0x8079AE30.  Right edge: the
  *   one-copy `"menu_infomation.cpp"` string (`lbl_805DCCDC`) is referenced only from 0x8030A328 up, so every body
  *   from 0x80308FB4 belongs to `menu/menu_infomation.cpp`; `fn_80308EC0`/`fn_80308F1C` read that unit's
- *   `StatusScreenWork` and call its `fn_8030A1D0`.
+ *   `StatusScreenWork` and call its `menu_equip_page_count`.
  * NAMES. `eft042_set2` is the runtime dump's own name (the family's spawner); `eft_spawn_type_at_area` is a GUESS
  *   (from its body); the map has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
  * RESIDUALS. 3 rows unwritten: 0x80307068-0x80307AE8 (`fn_80307068`, the kind-0 state-0 body over
@@ -60,7 +60,7 @@
 #include "menu/menu_infomation.h"
 
 /* The screen work record this range's tail reads (`fn_80308EC0`/`fn_80308F1C`) and the page count
- * they arm it from (`fn_8030A1D0`) live with their owner, `menu/menu_infomation.cpp`'s header: the
+ * they arm it from (`menu_equip_page_count`) live with their owner, `menu/menu_infomation.cpp`'s header: the
  * two screen bodies below the seam are all this unit needs from that unit.  The `EquipListWork`
  * record moved with `equip_list_page_count`, its only reader.
  */
@@ -579,7 +579,7 @@ extern "C" void fn_80308EC0(StatusScreenWork* self)
 {
     self->field_0x14 = 7;
     self->field_0x23A = 0;
-    self->field_0x1AF = (s8)(fn_8030A1D0(self->equip, 0) + 2);
+    self->field_0x1AF = (s8)(menu_equip_page_count(self->equip, 0) + 2);
     self->field_0x1AE = 0;
 }
 

@@ -57,8 +57,8 @@ u32 pl_act_held_ck(struct _PLW* self, s32 v);
 /* The 0x80229xxx motion/SE helper family `Pl/fn_80229ECC.cpp` dispatches into (all unregistered and
  * unmangled; the actor itself is the `_PLW` at their r3). */
 void fn_80229CB4(struct _PLW* self);
-void fn_80229E10(struct _se_w* work, s32 code, s32 val);
-void fn_80229EA8(struct _se_w* work, s32 a, s32 b, s32 c);
+void se_req_frame_set_parts3(struct _se_w* work, s32 code, s32 val);
+void se_req_frame_set_part4(struct _se_w* work, s32 a, s32 b, s32 c);
 
 /* 0x80244E88 - the per-motion effect dispatcher `Pl/fn_80229ECC.cpp` hands `&self->field_0xAF4`. */
 void fn_80244E88(void* p, u32 a, u32 b, u32 c);

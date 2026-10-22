@@ -238,7 +238,7 @@ extern "C" void item_page_draw_page_arrow(u16* table, u32 id, s32 flag, _mh_ivec
     part = id - 30;
     draw_sprite_anim_idx(table[0], part, pos);
     sprite_frame_apply((_SPR_DATA_*)&spr, table[1], part, NULL);
-    fn_802D9EA8();
+    cockpit_blink_get();
     spr.colour_0x1C = (spr.colour_0x1C & 0xFF) | (color_lerp(spr.colour_0x1C, 0xFFD246FF) & 0xFFFFFF00);
     draw_sprite(*(_SPR_DATA_*)&spr, pos);
 }
@@ -454,7 +454,7 @@ extern "C" void item_page_draw_column0(MenuSlot* slot)
         ofs = (_mh_ivec2_*)get_lsp_data(0x4DA, NULL);
         pos.x += ofs->x;
         pos.y += ofs->y;
-        fn_802A9F48(slot->field_0x01A, slot->entry_count_a, (s8*)fn_8029F7C4(12), &pos, 0);
+        menu_select_window_draw(slot->field_0x01A, slot->entry_count_a, (s8*)get_menu_msg_tbl(12), &pos, 0);
     }
 }
 
@@ -525,7 +525,7 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
             draw_font_anim_idx(0x493, id, (s8*)entry->field_0x08, 4, &pos);
             draw_font_anim_idx(0x4A9, id, fn_802DFB18(data->field_0x02), 0, &pos);
             fn_802E1A7C(0x48E, data->kind, id, &pos);
-            item_page_draw_wrapped_text(0x483, id, (s8*)fn_8029F7E0(0, entry->field_0x06), &pos);
+            item_page_draw_wrapped_text(0x483, id, (s8*)get_menu_msg(0, entry->field_0x06), &pos);
             switch (data->mode) {
             case 1:
                 if (limit_a > 0x3E7) {
@@ -615,16 +615,16 @@ extern "C" void item_page_draw_detail2(MenuSlot* slot)
         sprite_frame_apply((_SPR_DATA_*)&spr, 0x4B0, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x56), id, &pos);
         if (entry->field_0x02 != 0) {
-            item = (ItemRec*)fn_8033ADD0(entry->field_0x06, &item_a, &item_b, 0);
+            item = (ItemRec*)lb_page_row_pair_get(entry->field_0x06, &item_a, &item_b, 0);
             if (item != NULL) {
                 sprite_frame_apply((_SPR_DATA_*)&spr, 0x4C4, id, NULL);
                 draw_itemicon_item_id(*(_SPR_DATA_*)&spr, item->id, &pos);
                 draw_font_anim_idx(0x4C8, id, (s8*)ItemName(item->id), 4, &pos);
                 draw_font_anim_idx(0x4C9, id, (s8*)ItemName(item_a), 0, &pos);
                 draw_font_anim_idx(0x4CA, id, (s8*)ItemName(item_b), 0, &pos);
-                sprintf(text, "%d%", (s8)fn_8033AED0(item, 3));
+                sprintf(text, "%d%", (s8)lb_combo_rate_get(item, 3));
                 draw_font_anim_idx(0x4D4, id, text, 1, &pos);
-                fn_8033B67C(text, item);
+                lb_combo_rate_sprintf(text, item);
                 draw_font_anim_idx(0x4D5, id, text, 1, &pos);
                 sprite_frame_apply((_SPR_DATA_*)&spr, 0x4D7, id, NULL);
                 font_set_size(spr.width, spr.height);
@@ -752,11 +752,11 @@ extern "C" s8 item_page_option_row_index(u8 kind, u8 index, s8 light)
     case 2:
         if (index >= 0x0C && index < 0x1A) {
             row = index - 0x0C;
-            table = fn_8029F818(4);
+            table = menu_row_limit_get(4);
         }
         break;
     case 3:
-        table = fn_8029F818(5);
+        table = menu_row_limit_get(5);
         break;
     }
     if (table != 0) {
@@ -898,7 +898,7 @@ extern "C" u32 item_page_option_available(s8 index)
     if (fn_802DA20C(1, (u8)index) == 1) {
         return 0;
     }
-    fn_802DA2D4(1);
+    ainpc_entry_kill_kind(1);
     if (hud_notice_spawn(1, (u8)index, 0, 0, 1, 1, 0) != 0) {
         result = 1;
     }

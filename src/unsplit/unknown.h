@@ -62,8 +62,8 @@ void eft_em_spawn_param(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, 
  * (0x802B8DF8) left this group when `camera/fn_802B5C58.cpp` registered that range - its owner's
  * header carries it now (rule 2).  `ai_npc_item_give` (0x802D884C) is declared by its owner's leaf header,
  * `ai/ainpc_move.h`. */
-void fn_802DE578(struct _PLW* self, void* work);
-s32 fn_80331104(void);
+void cockpit_ticket_acquire(struct _PLW* self, void* work);
+s32 pl_mode8_free_ck(void);
 /* Added with `Pl/fn_80273B14.cpp`: 0x80335CE8 (hud below, enemy above) names different modules, so its
  * home is this file.  0x8029F73C moved to `menu/menu_item.h` (rule 2): `menu/menu_item.cpp`
  * registered the range 0x8029F3C8..0x802A6624, which owns that address. */

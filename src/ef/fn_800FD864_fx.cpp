@@ -17,7 +17,7 @@
  *  - `fn_800FF8D4`, `fn_80100088`: the callee-saved registers are assigned in another order (structure identical);
  *  - `fn_800FE978`: retail's frame is 0x840 with the dynamic `stwux` prologue saving r22-r31, ours a static 0x8F0
  *    frame saving r21-r31, so `self` and every stack slot move; the `mapno` 21/22 area switches and the
- *    `fn_802FB8EC` sub-switches are compare chains in retail and local jump tables in ours;
+ *    `lb_world_upgrade_get` sub-switches are compare chains in retail and local jump tables in ours;
  *  - `fn_800FFF08`: `self->work_0x38` and `&eft_control` swap `r3`/`r5`;
  *  - `fn_80100330`: the `IsValidPointer` inline tests the value in `r4` where retail uses `r6`.
  *   Ours emits the eight `fn_800FD864` switch tables and three `fn_800FE978` tables locally (`@523`-`@533`, `@837`)
@@ -144,7 +144,7 @@ extern "C" nw4r::ef::Effect* fn_800F91C4(u16 id, u16 kind, s32 a, s32 b);
 extern "C" void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 /* C++ callees: the target object references their manglings (cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34,
  * work_mem_alloc__FUl, work_mem_free__FPv, load_file__FPcUll, ran_suu__Fl), so no extern "C"
- * (relocaudit).  fn_802FB8EC is the reverse: its target spelling is plain, so it keeps C linkage. */
+ * (relocaudit).  lb_world_upgrade_get is the reverse: its target spelling is plain, so it keeps C linkage. */
 void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
 void setVector3(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 
@@ -154,7 +154,7 @@ void* work_mem_alloc(u32 size);
 void work_mem_free(void* ptr);
 u16 ran_suu(s32 index);
 
-extern "C" u8 fn_802FB8EC(u8 index);
+extern "C" u8 lb_world_upgrade_get(u8 index);
 u32 LbCheckKujiraEvent();
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -1597,17 +1597,17 @@ extern "C" void fn_800FE978(_EFT* self)
                     kind = 0x19;
                     break;
                 case 2:
-                    switch (fn_802FB8EC(3)) {
+                    switch (lb_world_upgrade_get(3)) {
                     case 1: work->effects[i] = fn_800F91C4(0x401, work->kind, 1, 200); i++; work->count++; break;
                     case 2: work->effects[i] = fn_800F91C4(0x402, work->kind, 1, 200); i++; work->count++; break;
                     case 3: work->effects[i] = fn_800F91C4(0x403, work->kind, 1, 200); i++; work->count++; break;
                     }
-                    switch (fn_802FB8EC(0)) {
+                    switch (lb_world_upgrade_get(0)) {
                     case 1: work->effects[i] = fn_800F91C4(0x404, work->kind, 1, 200); i++; work->count++; break;
                     case 2: work->effects[i] = fn_800F91C4(0x405, work->kind, 1, 200); i++; work->count++; break;
                     case 3: work->effects[i] = fn_800F91C4(0x406, work->kind, 1, 200); i++; work->count++; break;
                     }
-                    switch (fn_802FB8EC(2)) {
+                    switch (lb_world_upgrade_get(2)) {
                     case 1: work->effects[i] = fn_800F91C4(0x407, work->kind, 1, 200); work->count++; break;
                     case 2: work->effects[i] = fn_800F91C4(0x408, work->kind, 1, 200); work->count++; break;
                     case 3: work->effects[i] = fn_800F91C4(0x409, work->kind, 1, 200); work->count++; break;
@@ -1648,17 +1648,17 @@ extern "C" void fn_800FE978(_EFT* self)
 
             if (mapno == 22) {
                 if (self->area_0x44 == 2) {
-                    switch (fn_802FB8EC(3)) {
+                    switch (lb_world_upgrade_get(3)) {
                     case 1: work->effects2[i] = fn_800F91C4(0x67C, (u16)kind, 1, 200); i++; work->count2++; break;
                     case 2: work->effects2[i] = fn_800F91C4(0x67D, (u16)kind, 1, 200); i++; work->count2++; break;
                     case 3: work->effects2[i] = fn_800F91C4(0x67E, (u16)kind, 1, 200); i++; work->count2++; break;
                     }
-                    switch (fn_802FB8EC(0)) {
+                    switch (lb_world_upgrade_get(0)) {
                     case 1: work->effects2[i] = fn_800F91C4(0x67F, (u16)kind, 1, 200); i++; work->count2++; break;
                     case 2: work->effects2[i] = fn_800F91C4(0x680, (u16)kind, 1, 200); i++; work->count2++; break;
                     case 3: work->effects2[i] = fn_800F91C4(0x681, (u16)kind, 1, 200); i++; work->count2++; break;
                     }
-                    switch (fn_802FB8EC(2)) {
+                    switch (lb_world_upgrade_get(2)) {
                     case 1: work->effects2[i] = fn_800F91C4(0x682, (u16)kind, 1, 200); work->count2++; break;
                     case 2: work->effects2[i] = fn_800F91C4(0x683, (u16)kind, 1, 200); work->count2++; break;
                     case 3: work->effects2[i] = fn_800F91C4(0x684, (u16)kind, 1, 200); work->count2++; break;

@@ -13,14 +13,15 @@
  *   `hud/cockpit.cpp` units and no enemy unit, and the fillers' callers are `menu/menu_infomation`, `lobby/lb_companion_ui`
  *   and `lobby/lb_quest_ui`.  The file name (the dominant type `MenuRowData`) and every symbol name are GUESSes from the
  *   bodies, in the band's scheme (`get_note_item_slot`, `item_page_option_row_index`).
+ *   GUESS (from each body and its callers): `place_rec_alloc_spr`, `place_rec_alloc_idx`, `menu_row_rec_init`.
  * RESIDUALS. 13 rows unwritten (objdiff scores them zero): `menu_row_monster_index_get` (8 B), 0x8034CCBC-0x8034D2B0
- *   (`fn_8034CCBC`, `fn_8034CD6C`, `fn_8034CDDC` and the nine fillers).  `fn_8034CCBC`/`fn_8034CD6C` read
+ *   (`place_rec_alloc_spr`, `place_rec_alloc_idx`, `fn_8034CDDC` and the nine fillers).  `place_rec_alloc_spr`/`place_rec_alloc_idx` read
  *   `_SPR_DATA_`'s rectangle, and `hud/layout.h` (its owner) and `menu/menu_item_page.h` both define `_mh_ivec2_`, so the two
  *   headers collide in one TU.  The 10 partial rows include:
  *  - `menu_row_find`: retail duplicates the four-halfword compare block for the kinds 1/2 and 3/4/5 ranges; ours shares
  *    one body, one block shorter;
  *  - `place_list_overlap_find`: the loop's record pointer reloads each iteration where retail hoists it;
- *  - `note_slot_cursor_step`: the `fn_802DA2D4`/`return 0` tail's register allocation;
+ *  - `note_slot_cursor_step`: the `ainpc_entry_kill_kind`/`return 0` tail's register allocation;
  *  - `menu_row_clear`: retail keeps the scaled index and the zero in separate registers (`slwi r4,r0,4` + `li r0,0`).
  *   flipcheck: `.sdata2` (0x40) claimed but not emitted; short `.text` 0xAE0 of 0x10E0, extab 0x48 of 0x60,
  *   extabindex 0x6C of 0x90; the bytes of all three differ.
@@ -86,7 +87,7 @@ extern "C" s32 note_slot_cursor_step(u8 note_entry, u8* cursor, u16 flags, u16* 
         if ((s8)next < (s8)slot.count) {
             *cursor = next;
         } else {
-            fn_802DA2D4(1);
+            ainpc_entry_kill_kind(1);
             return 0;
         }
     }
@@ -186,16 +187,16 @@ extern "C" u32 note_slot_cursor_bounds(u8 kind, u8 index) {
     slot.raw = 0;
     switch (kind) {
     case 0:
-        table = (u16*)fn_8029F818(0);
+        table = (u16*)menu_row_limit_get(0);
         break;
     case 1:
-        table = (u16*)fn_8029F818(1);
+        table = (u16*)menu_row_limit_get(1);
         break;
     case 2:
-        table = (u16*)fn_8029F818(2);
+        table = (u16*)menu_row_limit_get(2);
         break;
     case 3:
-        table = (u16*)fn_8029F818(3);
+        table = (u16*)menu_row_limit_get(3);
         break;
     default:
         table = 0;

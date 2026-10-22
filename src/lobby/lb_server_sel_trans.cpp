@@ -10,6 +10,7 @@
  *   `__FILE__` string covers it.
  *   GUESS (from `menu/multi_result.cpp`'s NPC talk callers): npc_talk_start, npc_talk_active_ck, talk_msg_speaker_get
  *   GUESS (from the same callers): talk_msg_choice_ck, npc_talk_end, talk_msg_index_get, npc_talk_flag_set
+ *   GUESS (from each body and its callers): `demo_work_start`, `demo_work_update`, `demo_sound_update`.
  * RESIDUALS. 79 rows unwritten: 0x803C3A70-0x803C3DF8, 0x803C3E1C-0x803C4814, 0x803C482C-0x803C4840,
  *   0x803C48B0-0x803C4AA0, 0x803C4AB4-0x803C4B74 and 0x803C4BA0-0x803C987C.  Partial: `map_id_ck`,
  *   `demo_flag_ck`, `demo_work_init`.

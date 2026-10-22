@@ -2000,7 +2000,7 @@ extern "C" void fn_800D8404(SeSlot* slot);
 extern "C" s32 fn_8028F204(void);
 extern "C" u8* fn_800D8DDC(u8* base);
 extern "C" s32 fn_800F1398(_ENEMY_WORK* enemy, s32 index);
-extern "C" u32 fn_80331104(PlWorkView* plw);
+extern "C" u32 pl_mode8_free_ck(PlWorkView* plw);
 extern "C" u8* lbl_80597668[];
 extern "C" u8* lbl_805975D8[];
 extern "C" u8 lbl_8059768C[];
@@ -2355,7 +2355,7 @@ extern "C" void fn_800DC0A8(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView*
         s32 kind = plw->field_0x002;
         if (kind == 8) {
             u8** pair = (u8**)lbl_80597668[kind];
-            if (fn_80331104(plw) == 1) {
+            if (pl_mode8_free_ck(plw) == 1) {
                 table = (u8(*)[2])pair[0];
             } else {
                 table = (u8(*)[2])pair[1];
@@ -2393,7 +2393,7 @@ extern "C" void fn_800DC0A8(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView*
         s32 kind = plw->field_0x002;
         if (kind == 8) {
             u8** pair = (u8**)lbl_805975D8[kind];
-            if (fn_80331104(plw) == 1) {
+            if (pl_mode8_free_ck(plw) == 1) {
                 table = (u8(*)[2])pair[0];
             } else {
                 table = (u8(*)[2])pair[1];

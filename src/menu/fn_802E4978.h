@@ -215,11 +215,11 @@ extern "C" {
 
 u32 pad_hold_ck(void*);                /* 0x80046F0C mh3_pad.cpp */
 s32 fn_802D27E0(void);                  /* 0x802D27E0 ai/ai_npc.cpp */
-s32 fn_802E0B54(u16);                   /* 0x802E0B54 hud/layout.cpp */
+s32 sprite_anim_last_frame(u16);                   /* 0x802E0B54 hud/layout.cpp */
 u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
 /* 0x80050BC0 - `fn_8004CAD8.h` settles ONE float argument (from the callee's own body), and
  * that is the honest declaration; it cannot be used here yet: this unit's call site reproduces the
- * target's register allocation only with the 3-argument view, measured on `fn_802E5D68` at 95.675674
+ * target's register allocation only with the 3-argument view, measured on `cockpit_pointer_target_set` at 95.675674
  * against 95.47298 for the one-argument form (`sqrt_f32((f32)(sq + dy * dy))`, and the same with
  * `(f32)(dx * dx + dy * dy)`).  Both measurements are in the outbox. */
 f32 sqrt_f32(s32, s32, f32);

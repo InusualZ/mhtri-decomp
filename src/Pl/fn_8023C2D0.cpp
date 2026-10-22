@@ -44,7 +44,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         se_req_frame_set(seWorkMain, 0x18, 0x3, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         se_req_frame_set(seWorkMain, 0x3A, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0x34, ((part << 0x18) | 0x4), 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x36, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x36, 0x3);
         return;
 
     case 0x3EB:
@@ -54,7 +54,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         se_req_frame_set(seWorkMain, 0x16, 0x1, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         se_req_frame_set(seWorkMain, 0x38, 0x6, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         fn_800DA428(seWorkFrame, 0x52, ((part << 0x18) | 0x4), 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x54, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x54, 0x3);
         return;
 
     case 0x3EC:
@@ -62,8 +62,8 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         partHi = ((part << 0x18) | 0x2);
         fn_800DA428(seWorkFrame, 0x10, partHi, 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x2E, partHi, 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x12, 0x3);
-        fn_80229E10(seWorkPart, 0x32, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x12, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x32, 0x3);
         return;
 
     case 0x3F1:
@@ -76,7 +76,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x26, partHi, 0x11, 0x2);
         fn_800DA428(seWorkFrame, 0x4C, partHi, 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x62, (partHi | 0x1), 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x4E, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x4E, 0x3);
         return;
 
     case 0x3F4:
@@ -85,7 +85,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x1E, partHi, 0x14, 0x2);
         se_req_frame_set(seWorkPart, 0x6, 0x28, 0xC, 0x03000003);
         se_req_frame_set(seWorkMain, 0x16, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
-        fn_80229E10(seWorkPart, 0x22, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x22, 0x3);
         return;
 
     case 0x3F5:
@@ -94,15 +94,15 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x1E, partHi, 0x11, 0x2);
         se_req_frame_set(seWorkPart, 0x6, 0x28, 0xC, 0x03000003);
         se_req_frame_set(seWorkMain, 0x16, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
-        fn_80229E10(seWorkPart, 0x22, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x22, 0x3);
         return;
 
     case 0x400:
         partHi = (part << 0x18);
         fn_800DA428(seWorkFrame, 0x1A, partHi, 0x11, 0x2);
         fn_800DA428(seWorkFrame, 0x3E, partHi, 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x1C, 0x3);
-        fn_80229E10(seWorkPart, 0x40, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x1C, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x40, 0x3);
         return;
 
     case 0x41B:
@@ -185,8 +185,8 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x38, (partHi | 0x4), 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0xA8, (partHi | 0x1), 0x11, 0x2);
         se_req_frame_set(seWorkPart, 0x44, 0x11, 0x14, 0x03000003);
-        fn_80229EA8(seWorkPart, 0x52, 0x7, 0x3);
-        fn_80229E10(seWorkPart, 0xAA, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x52, 0x7, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0xAA, 0x3);
         return;
 
     case 0x44E:
@@ -197,8 +197,8 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         partHi = (part << 0x18);
         fn_800DA428(seWorkFrame, 0x1E, (partHi | 0x4), 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x72, (partHi | 0x1), 0x11, 0x2);
-        fn_80229EA8(seWorkPart, 0x44, 0x7, 0x3);
-        fn_80229E10(seWorkPart, 0x74, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x44, 0x7, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x74, 0x3);
         return;
 
     case 0x44F:
@@ -210,8 +210,8 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         se_req_frame_set(seWorkMain, 0x84, 0xB, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         se_req_frame_set(seWorkMain, 0x92, 0xC, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0x36, ((part << 0x18) | 0x4), 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x3A, 0x3);
-        fn_80229EA8(seWorkPart, 0x52, 0x7, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x3A, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x52, 0x7, 0x3);
         return;
 
     case 0x450:
@@ -222,9 +222,9 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x8, (part << 0x18) | 0x3, 0x11, 0x2);
         fn_800DA428(seWorkFrame, 0x1C, (part << 0x18) | 0x3, 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x72, (part << 0x18) | 0x1, 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x2A, 0x3);
-        fn_80229EA8(seWorkPart, 0x30, 0x7, 0x3);
-        fn_80229E10(seWorkPart, 0x74, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x2A, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x30, 0x7, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x74, 0x3);
         return;
 
     case 0x451:
@@ -235,24 +235,24 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         se_req_frame_set(seWorkPart, 0x8, 0x11, 0x14, 0x03000003);
         se_req_frame_set(seWorkMain, 0x3A, 0x9, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         se_req_frame_set(seWorkMain, 0x64, 0x9, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
-        fn_80229EA8(seWorkPart, 0x2C, 0x7, 0x3);
-        fn_80229EA8(seWorkPart, 0x5E, 0x7, 0x3);
-        fn_80229E10(seWorkPart, 0x3E, 0x3);
-        fn_80229E10(seWorkPart, 0x4A, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x2C, 0x7, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x5E, 0x7, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x3E, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x4A, 0x3);
         return;
 
     case 0x452:
         se_req_frame_set(seWorkMain, 0x8, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         se_req_frame_set(seWorkMain, 0x20, 0xA, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0x34, ((part << 0x18) | 0x1), 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x36, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x36, 0x3);
         return;
 
     case 0x453:
         se_req_frame_set(seWorkMain, 0x4, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         se_req_frame_set(seWorkMain, 0xA, 0xA, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0x1C, (part << 0x18), 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x26, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x26, 0x3);
         return;
 
     case 0x455:
@@ -268,7 +268,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         se_req_frame_set(seWorkMain, 0xA, 0xA, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         se_req_frame_set(seWorkMain, 0x20, 0x9, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0x1E, ((part << 0x18) | 0x4), 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x2C, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x2C, 0x3);
         return;
 
     case 0x457:
@@ -286,21 +286,21 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         se_req_frame_set(seWorkMain, 0x24, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         se_req_frame_set(seWorkMain, 0xA, 0xA, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0x1E, ((part << 0x18) | 0x4), 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x22, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x22, 0x3);
         return;
 
     case 0x459:
         se_req_frame_set(seWorkMain, 0x4, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         se_req_frame_set(seWorkMain, 0x26, 0x9, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0xA, ((part << 0x18) | 0x4), 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x18, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x18, 0x3);
         return;
 
     case 0x45A:
         se_req_frame_set(seWorkPart, 0x8, 0x1C, 0x14, 0x03000003);
         se_req_frame_set(seWorkMain, 0x36, 0x4, 0xB, 0x3);
         se_req_frame_set(seWorkMain, 0x54, 0x3, 0xB, 0x3);
-        fn_80229EA8(seWorkPart, 0x1E, 0x7, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x1E, 0x7, 0x3);
         return;
 
     case 0x460:
@@ -311,7 +311,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         partHi = (part << 0x18);
         fn_800DA428(seWorkFrame, 0x28, (partHi | 0x4), 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x6E, (partHi | 0x1), 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x42, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x42, 0x3);
         se_req_frame_set(seWorkPart, 0x4C, 0x11, 0x14, 0x03000003);
         return;
 
@@ -323,7 +323,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         partHi = (part << 0x18);
         fn_800DA428(seWorkFrame, 0x52, partHi, 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x70, (partHi | 0x1), 0x11, 0x2);
-        fn_80229E10(seWorkPart, 0x78, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x78, 0x3);
         return;
 
     case 0x462:
@@ -343,13 +343,13 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x18, partHi, 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x4C, partHi, 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0xAC, partHi, 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x1A, 0x3);
-        fn_80229E10(seWorkPart, 0x5C, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x1A, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x5C, 0x3);
         return;
 
     case 0x463:
         se_req_frame_set(seWorkMain, 0x4, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
-        fn_80229E10(seWorkPart, 0x78, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x78, 0x3);
         return;
 
     case 0x465:
@@ -390,8 +390,8 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         partHi = ((part << 0x18) | 0x4);
         fn_800DA428(seWorkFrame, 0x2A, partHi, 0x14, 0x2);
         fn_800DA428(seWorkFrame, 0x62, partHi, 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x2E, 0x3);
-        fn_80229E10(seWorkPart, 0x6E, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x2E, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x6E, 0x3);
         return;
 
     case 0x46A:
@@ -454,7 +454,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         se_req_frame_set(seWorkMain, 0x22, 0x5, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         se_req_frame_set(seWorkMain, 0x24, 0x9, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x4));
         fn_800DA428(seWorkFrame, 0x28, ((part << 0x18) | 0x4), 0x14, 0x2);
-        fn_80229E10(seWorkPart, 0x2C, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x2C, 0x3);
         return;
 
     case 0x47F:
@@ -729,7 +729,7 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x2A, ((part << 0x18) | 0x3), 0x11, 0x2);
         se_req_frame_set(seWorkMain, 0x26, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         se_req_frame_set(seWorkPart, 0x54, 0x1C, 0xE, 0x03000003);
-        fn_80229E10(seWorkPart, 0x1A, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x1A, 0x3);
         return;
 
     case 0x4C7:
@@ -738,9 +738,9 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x5E, (part << 0x18), 0x14, 0x2);
         se_req_frame_set(seWorkMain, 0x34, 0x2, 0xB, (((seWorkMain->field_0x0C + 1) << 0x18) | 0x3));
         se_req_frame_set(seWorkPart, 0x4A, 0x8, 0xE, 0x03000003);
-        fn_80229E10(seWorkPart, 0x24, 0x3);
-        fn_80229E10(seWorkPart, 0x60, 0x3);
-        fn_80229EA8(seWorkPart, 0x54, 0x7, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x24, 0x3);
+        se_req_frame_set_parts3(seWorkPart, 0x60, 0x3);
+        se_req_frame_set_part4(seWorkPart, 0x54, 0x7, 0x3);
         return;
 
     case 0x4E3:
@@ -779,19 +779,19 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 4, (part << 0x18) | 4, 0x14, 2);
         return;
     case 0x3EB:
-        fn_80229E10(seWorkPart, 4, 3);
+        se_req_frame_set_parts3(seWorkPart, 4, 3);
         se_req_frame_set(seWorkMain, 0xE, 2, 3, ((seWorkMain->field_0x0C + 1) << 0x18) | 4);
         se_req_frame_set(seWorkMain, 0x24, 4, 3, ((seWorkMain->field_0x0C + 1) << 0x18) | 4);
         se_req_frame_set(seWorkMain, 0x4E, 1, 3, ((seWorkMain->field_0x0C + 3) << 0x18) | 4);
         fn_800DA428(seWorkFrame, 0x66, part << 0x18, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x68, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x68, 3);
         return;
     case 0x3EC:
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 0x1E, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x3C, partHi, 0x11, 2);
-        fn_80229E10(seWorkPart, 8, 3);
-        fn_80229E10(seWorkPart, 0x24, 3);
+        se_req_frame_set_parts3(seWorkPart, 8, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x24, 3);
         return;
     case 0x3F1:
         se_req_frame_set(seWorkMain, 0xE, 2, 3, ((seWorkMain->field_0x0C + 1) << 0x18) | 4);
@@ -802,10 +802,10 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x30, partHi, 0x11, 2);
         fn_800DA428(seWorkFrame, 0x4A, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x66, partHi | 4, 0x11, 2);
-        fn_80229E10(seWorkPart, 6, 3);
-        fn_80229E10(seWorkPart, 0x20, 3);
-        fn_80229E10(seWorkPart, 0x40, 3);
-        fn_80229E10(seWorkPart, 0x5A, 3);
+        se_req_frame_set_parts3(seWorkPart, 6, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x20, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x40, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x5A, 3);
         return;
     case 0x3F3:
         se_req_frame_set(seWorkPart, 6, SE_Code_Make(0, 3, 1, 3), 0xC, 3);
@@ -814,41 +814,41 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 4, partHi | 3, 0x11, 2);
         fn_800DA428(seWorkFrame, 0x2E, partHi, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x14, 3);
-        fn_80229E10(seWorkPart, 0x34, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x14, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x34, 3);
         return;
     case 0x408:
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 0x1E, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x3C, partHi, 0x11, 2);
-        fn_80229E10(seWorkPart, 8, 3);
-        fn_80229E10(seWorkPart, 0x24, 3);
+        se_req_frame_set_parts3(seWorkPart, 8, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x24, 3);
         return;
     case 0x409:
         se_req_frame_set(seWorkPart, 0x2A, SE_Code_Make(7, 1, 8, 1), 0xC, 3);
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 0x14, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x2A, partHi, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x16, 3);
-        fn_80229E10(seWorkPart, 0x28, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x16, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x28, 3);
         return;
     case 0x40A:
         se_req_frame_set(seWorkPart, 0x2A, SE_Code_Make(7, 1, 8, 1), 0xC, 3);
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 0x16, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x2C, partHi, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x18, 3);
-        fn_80229E10(seWorkPart, 0x2C, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x18, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x2C, 3);
         return;
     case 0x40B:
         se_req_frame_set(seWorkMain, 2, 1, 3, ((seWorkMain->field_0x0C + 1) << 0x18) | 4);
         fn_800DA428(seWorkFrame, 0x14, (part << 0x18) | 4, 0x14, 2);
-        fn_80229E10(seWorkPart, 0x1C, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x1C, 3);
         return;
     case 0x40C:
         se_req_frame_set(seWorkMain, 4, 1, 3, ((seWorkMain->field_0x0C + 3) << 0x18) | 4);
         fn_800DA428(seWorkFrame, 0x38, part << 0x18, 0x14, 2);
-        fn_80229E10(seWorkPart, 0x3A, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x3A, 3);
         return;
     case 0x40D:
         se_req_frame_set(seWorkMain, 2, 1, 3, ((seWorkMain->field_0x0C + 3) << 0x18) | 4);
@@ -856,19 +856,19 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x10, partHi, 0x11, 2);
         fn_800DA428(seWorkFrame, 0x24, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x32, partHi | 4, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x14, 3);
-        fn_80229E10(seWorkPart, 0x34, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x14, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x34, 3);
         return;
     case 0x40E:
         se_req_frame_set(seWorkMain, 4, 1, 3, ((seWorkMain->field_0x0C + 3) << 0x18) | 4);
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 0x2A, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x3A, partHi | 4, 0x11, 2);
-        fn_80229EA8(seWorkPart, 0x26, 0xB, 3);
-        fn_80229E10(seWorkPart, 0x3C, 3);
+        se_req_frame_set_part4(seWorkPart, 0x26, 0xB, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x3C, 3);
         return;
     case 0x40F:
-        fn_80229E10(seWorkPart, 4, 3);
+        se_req_frame_set_parts3(seWorkPart, 4, 3);
         se_req_frame_set(seWorkMain, 4, 2, 3, ((seWorkMain->field_0x0C + 1) << 0x18) | 4);
         se_req_frame_set(seWorkMain, 0x14, 4, 3, ((seWorkMain->field_0x0C + 1) << 0x18) | 4);
         se_req_frame_set(seWorkMain, 0x36, 1, 3, ((seWorkMain->field_0x0C + 3) << 0x18) | 4);
@@ -877,23 +877,23 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x2A, partHi, 0x11, 2);
         fn_800DA428(seWorkFrame, 0x42, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x5A, partHi, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x10, 3);
-        fn_80229E10(seWorkPart, 0x2C, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x10, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x2C, 3);
         return;
     case 0x411:
         se_req_frame_set(seWorkPart, 0x18, SE_Code_Make(7, 1, 8, 1), 0xC, 3);
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 0x16, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x2E, partHi, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x18, 3);
-        fn_80229E10(seWorkPart, 0x30, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x18, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x30, 3);
         return;
     case 0x412:
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 2, partHi, 0x11, 2);
         fn_800DA428(seWorkFrame, 0x1A, partHi, 0x14, 2);
-        fn_80229E10(seWorkPart, 4, 3);
-        fn_80229E10(seWorkPart, 0x1C, 3);
+        se_req_frame_set_parts3(seWorkPart, 4, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x1C, 3);
         return;
     case 0x41B:
         se_req_frame_set(seWorkMain, 4, 0xB, 3, ((seWorkMain->field_0x0C + 1) << 0x18) | 4);
@@ -961,7 +961,7 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         partHi = part << 0x18;
         fn_800DA428(seWorkFrame, 0x5A, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x6C, partHi | 1, 0x11, 2);
-        fn_80229E10(seWorkPart, 0x60, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x60, 3);
         return;
     case 0x450:
         se_req_frame_set(seWorkMain, 0x20, 2, 7, ((seWorkMain->field_0x0C + 3) << 0x18) | 2);
@@ -972,8 +972,8 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         partHi = (part << 0x18) | 4;
         fn_800DA428(seWorkFrame, 0x18, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x78, partHi, 0x14, 2);
-        fn_80229E10(seWorkPart, 0x1A, 3);
-        fn_80229E10(seWorkPart, 0x7A, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x1A, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x7A, 3);
         return;
     case 0x451:
     case 0x452:
@@ -987,8 +987,8 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x3E, partHi | 4, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x60, partHi | 1, 0x11, 2);
         fn_800DA428(seWorkFrame, 0x7C, partHi, 0x14, 2);
-        fn_80229E10(seWorkPart, 0x46, 3);
-        fn_80229E10(seWorkPart, 0x7E, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x46, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x7E, 3);
         return;
     case 0x455:
     case 0x456:
@@ -997,7 +997,7 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x68, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x84, partHi | 1, 0x11, 2);
         se_req_frame_set(seWorkPart, 6, 0x10, 0x11, 0x03000003);
-        fn_80229E10(seWorkPart, 0x6C, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x6C, 3);
         return;
     case 0x458:
         se_req_frame_set(seWorkMain, 4, 1, 3, 4);
@@ -1008,7 +1008,7 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         fn_800DA428(seWorkFrame, 0x1A, partHi | 4, 0x11, 2);
         fn_800DA428(seWorkFrame, 0x42, partHi | 1, 0x14, 2);
         se_req_frame_set(seWorkPart, 0x14, 0x28, 0x14, 0x03000003);
-        fn_80229EA8(seWorkPart, 0x36, 7, 3);
+        se_req_frame_set_part4(seWorkPart, 0x36, 7, 3);
         return;
     case 0x45A:
     case 0x45B:
@@ -1020,8 +1020,8 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
         partHi = (part << 0x18) | 4;
         fn_800DA428(seWorkFrame, 0x18, partHi, 0x14, 2);
         fn_800DA428(seWorkFrame, 0x78, partHi, 0x14, 2);
-        fn_80229E10(seWorkPart, 4, 3);
-        fn_80229E10(seWorkPart, 0x7A, 3);
+        se_req_frame_set_parts3(seWorkPart, 4, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x7A, 3);
         return;
     case 0x45C:
     case 0x45D:
@@ -1038,7 +1038,7 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
     case 0x46B:
         se_req_frame_set(seWorkMain, 2, 2, 7, ((seWorkMain->field_0x0C + 1) << 0x18) | 2);
         fn_800DA428(seWorkFrame, 0x24, part << 0x18, 0x14, 2);
-        fn_80229E10(seWorkPart, 0x26, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x26, 3);
         return;
     case 0x47E:
     case 0x47F:
@@ -1112,12 +1112,12 @@ extern "C" void fn_8023FC20(_PLW* work, u8 part) {
     case 0x4BB:
         fn_800DA428(seWorkFrame, 0x3A, (part << 0x18) | 1, 0x14, 2);
         se_req_frame_set(seWorkPart, 2, 0x10, 0x11, 0x03000003);
-        fn_80229E10(seWorkPart, 0x3C, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x3C, 3);
         return;
     case 0x4BC:
         fn_800DA428(seWorkFrame, 0x72, (part << 0x18) | 1, 0x14, 2);
         se_req_frame_set(seWorkPart, 8, 0x10, 0x11, 0x03000003);
-        fn_80229E10(seWorkPart, 0x74, 3);
+        se_req_frame_set_parts3(seWorkPart, 0x74, 3);
         return;
     case 0x4E3:
         se_req_frame_set(seWorkPart, 4, SE_Code_Make(0x18, 1, 0x19, 1), 0xC, 3);

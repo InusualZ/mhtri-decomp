@@ -150,7 +150,7 @@
  * Shapes.  fn_802B3270's list writes are `field[i] = v; i++;` through the *struct field*, not
  * `buf[i++] = v` through the array: retail re-loads `local.show`/`local.hide` off the stack before
  * every store, which only the field spelling produces.  Its dispatches come in both lowerings - the
- * three on `fn_802FB8EC`'s result are `switch`es (one contiguous compare chain, cases merged into a
+ * three on `lb_world_upgrade_get`'s result are `switch`es (one contiguous compare chain, cases merged into a
  * `cmplwi/ble` range test where two share a body) while the `LbCheckKujiraEvent`/`fn_802FB9F8` tests
  * are `if`/`else if` (chain interleaved with the bodies); a rewrite to the other lowering costs
  * ~7 points.  `fn_802FB9F8` returns `u32`, not `u8` (retail compares `r3` raw, with no `clrlwi`).
@@ -1059,7 +1059,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             lists = &local;
             local.hide = hide_buf;
             local.show = show_buf;
-            switch (fn_802FB8EC(0)) {
+            switch (lb_world_upgrade_get(0)) {
             case 0:
             case 1:
                 local.show[0] = 3;
@@ -1077,7 +1077,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                 show_i = 2;
                 break;
             }
-            switch (fn_802FB8EC(2)) {
+            switch (lb_world_upgrade_get(2)) {
             case 0:
                 local.show[show_i] = 8;
                 show_i++;
@@ -1097,7 +1097,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                 show_i++;
                 break;
             }
-            switch (fn_802FB8EC(3)) {
+            switch (lb_world_upgrade_get(3)) {
             case 0:
                 local.show[show_i] = 11;
                 show_i++;
@@ -1117,7 +1117,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                 show_i++;
                 break;
             }
-            switch (fn_802FB8EC(1)) {
+            switch (lb_world_upgrade_get(1)) {
             case 0:
             case 1:
                 local.show[show_i] = 14;
@@ -1981,7 +1981,7 @@ extern "C" void fn_802B4E58(void)
     s16 i;
 
     count = fn_8021F218();
-    peak = fn_8021F228(count);
+    peak = lb_item_list_depth_get(count);
     table = fn_802B4CD0();
     step = lbl_8079A4C0 / (f32)count;
     low = 7;

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-/* The lobby item-database pointer (`lobby_world_block`, `.sbss` 0x80794880, 4 bytes).  `fn_802125C8`
+/* The lobby item-database pointer (`lobby_world_block`, `.sbss` 0x80794880, 4 bytes).  `lb_item_db_toggle`
  * toggles the byte 0x3E00 of the block it points at. */
 extern u8* lobby_world_block;
 

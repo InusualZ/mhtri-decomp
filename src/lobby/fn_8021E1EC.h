@@ -178,10 +178,10 @@ extern u32 frame_counter;             /* .sbss 0x80794868 - the page's tick coun
 s32 CalculateEvents();
 /* 0x80223E54 - `lobby/lb_equip_page.cpp`'s helper the Pl units call on the actor model (C linkage). */
 s32 fn_80223E54(s32 model);
-/* The page layer's model helpers the rig update (0x80224AC4-0x80229ECC) calls: `fn_80223258` reads `self->equipA`
+/* The page layer's model helpers the rig update (0x80224AC4-0x80229ECC) calls: `pl_equip_color_apply` reads `self->equipA`
  * (a `_PLW`), `fn_80223708`/`fn_80223830` take the actor's +0x25C/+0x258 blocks by pointer. */
 struct _PLW;
-void fn_80223258(struct _PLW* self, u32 slot);
+void pl_equip_color_apply(struct _PLW* self, u32 slot);
 void fn_80223708(void* rig, void* block_0x25C, u32 slot);
 void fn_8022375C(void* rig, u32 slot);
 void fn_80223830(void* rig, void* block_0x258);

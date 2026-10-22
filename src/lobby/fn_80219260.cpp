@@ -14,6 +14,9 @@
  *   GUESS: lb_menu_step
  *   GUESS: `userdata_award_bit_set`, `lb_talk_page_value_get`, `lb_talk_page_mode_set`,
  *   GUESS: `lb_talk_page_mode_reset`
+ *   GUESS (from each body and its callers): `lb_equip_compare_set`, `lb_equip_base_set`, `lb_equip_bg_draw`,
+ *   `lb_equip_page_draw`, `lb_equip_records_copy`, `lb_equip_kind_se_set`, `lb_equip_entry_apply`,
+ *   `stage_work_idle_ck`, `lb_menu_kind_pair_ck`, `lb_npc_talk_select`, `lb_npc_talk_mark_ck`.
  * RESIDUALS. 48 rows unwritten: 0x802196F0-0x8021AC24, 0x8021AD14-0x8021B5AC, 0x8021B690-0x8021B890,
  *   0x8021B94C-0x8021C900, 0x8021C938-0x8021CE0C, 0x8021CE70-0x8021D160, 0x8021D21C-0x8021D5A8, 0x8021D5D0-0x8021D704,
  *   0x8021D72C-0x8021D86C, 0x8021D884-0x8021D9E0, 0x8021D9F8-0x8021DED8, 0x8021DEFC-0x8021E1EC.
@@ -151,7 +154,7 @@ struct LbEquipWork {
 
 } /* extern "C" */
 
-/* The staged-record lookup `fn_80219530` calls; defined below so MWCC keeps the retail `bl`
+/* The staged-record lookup `lb_equip_compare_set` calls; defined below so MWCC keeps the retail `bl`
  * instead of inlining the whole switch into its caller. */
 extern "C" _EQUIP* fn_80219260(LbEquipWork* self, s32 kind);
 
@@ -223,7 +226,7 @@ extern "C" void fn_80219340(LbEquipWork* self, _EQUIP* src, s32 page) {
 
 /* Stages `src` on the page's second side and refreshes the page, resetting the index when it ran
  * past its maximum. */
-extern "C" void fn_80219530(LbEquipWork* self, _EQUIP* src) {
+extern "C" void lb_equip_compare_set(LbEquipWork* self, _EQUIP* src) {
     _EQUIP* equip = fn_80219260(self, src->kind);
 
     fn_80219340(self, equip, 1);
@@ -235,7 +238,7 @@ extern "C" void fn_80219530(LbEquipWork* self, _EQUIP* src) {
 
 /* Stages `src` on the page's first side and refreshes the page, resetting the index when it ran past
  * its maximum. */
-extern "C" void fn_80219590(LbEquipWork* self, _EQUIP* src) {
+extern "C" void lb_equip_base_set(LbEquipWork* self, _EQUIP* src) {
     fn_80219340(self, src, 0);
     fn_80218138(self);
     if (self->index_0x08 >= self->index_max_0x0A) {
@@ -320,7 +323,7 @@ extern "C" s32 fn_80219640(LbEquipWork* self, s32 page, s32 kind) {
 }
 
 /* Publishes the sound the given equipment kind wants. */
-extern "C" void fn_8021AC24(LbEquipWork* self) {
+extern "C" void lb_equip_kind_se_set(LbEquipWork* self) {
     u8 kind = self->kind_0x00;
 
     switch (kind) {
@@ -402,12 +405,12 @@ extern "C" void fn_8021B65C(LbEquipWork* self, s32 index) {
 }
 
 /* Whether the stage work block is idle. */
-extern "C" s32 fn_8021B890(void) {
+extern "C" s32 stage_work_idle_ck(void) {
     return lbl_806BAB44.busy_0x054 == 0;
 }
 
 /* Whether the two menu kinds belong together (kind 22 with 1, kind 21 with the decorations 5-7). */
-extern "C" s32 fn_8021B8A8(s32 type, s32 value) {
+extern "C" s32 lb_menu_kind_pair_ck(s32 type, s32 value) {
     switch ((u8)type) {
     case 22:
         if ((u8)value == 1) {

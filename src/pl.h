@@ -30,7 +30,7 @@ extern "C" {
  * `_CP_VECTOR` triple here (no consumer of the sound view reads it).  The record ends at +0x140:
  * `ai/ai_npc.h` embeds it at +0x008 with the next field at +0x148, and the sound band's
  * `pad_0x140`/`field_0x160` (+0x140..0x164, read by no source) belong to the 0x164-byte model record
- * `Pl/fn_80224AC4.h` builds around it.  size: 0x140 */
+ * `Pl/pl_se_rig.h` builds around it.  size: 0x140 */
 #ifdef __cplusplus
 /* The GX channel selector the `get/setTevKColor` and `get/setMatColor` members take; it is an enum
  * because MWCC mangles the enum's name into the symbol (`...12_GXChannelID...`).  `_GXTevKColorID`

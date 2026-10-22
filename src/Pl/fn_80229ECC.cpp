@@ -54,18 +54,18 @@ case 2:
     fn_800DA428(se_work_b, 20, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 56, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 90, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 22, 3);
-    fn_80229E10(se_work_a, 58, 3);
-    fn_80229E10(se_work_a, 92, 3);
+    se_req_frame_set_parts3(se_work_a, 22, 3);
+    se_req_frame_set_parts3(se_work_a, 58, 3);
+    se_req_frame_set_parts3(se_work_a, 92, 3);
     break;
 case 3:
     se_req_frame_set(se_work_a, 56, SE_Code_Make(7, 1, 8, 1), 12, 3);
     fn_800DA428(se_work_b, 8, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 30, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 54, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 10, 3);
-    fn_80229E10(se_work_a, 32, 3);
-    fn_80229E10(se_work_a, 56, 3);
+    se_req_frame_set_parts3(se_work_a, 10, 3);
+    se_req_frame_set_parts3(se_work_a, 32, 3);
+    se_req_frame_set_parts3(se_work_a, 56, 3);
     break;
 case 5:
     se_req_frame_set(se_work_a, 80, SE_Code_Make(9, 3, 9, 3), 12, 3);
@@ -73,75 +73,75 @@ case 5:
     fn_800DA428(se_work_b, 6, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 30, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 68, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 40, 3);
+    se_req_frame_set_parts3(se_work_a, 40, 3);
     break;
 case 6:
     fn_800DA428(se_work_b, 30, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 34, 3);
+    se_req_frame_set_parts3(se_work_a, 34, 3);
     break;
 case 7: case 9:
     se_req_frame_set(se_work_a, 4, 28, 14, 0x3000003);
-    fn_80229E10(se_work_a, 6, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
     break;
 case 10:
     se_req_frame_set(se_work_a, 38, 16, 16, 0x3000003);
     se_req_frame_set(se_work_a, 108, 16, 16, 0x3000003);
     fn_800DA428(se_work_b, 30, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 100, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229EA8(se_work_a, 84, 7, 3);
-    fn_80229EA8(se_work_a, 14, 7, 3);
+    se_req_frame_set_part4(se_work_a, 84, 7, 3);
+    se_req_frame_set_part4(se_work_a, 14, 7, 3);
     break;
 case 11:
-    fn_80229EA8(se_work_a, 4, 7, 3);
+    se_req_frame_set_part4(se_work_a, 4, 7, 3);
     break;
 case 12:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(0, 3, 1, 2), 12, 3);
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x3), 17, 2);
-    fn_80229E10(se_work_a, 6, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
     break;
 case 13:
     se_req_frame_set(se_work_a, 6, 13, 14, 0x3000002);
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x3), 17, 2);
-    fn_80229E10(se_work_a, 8, 3);
+    se_req_frame_set_parts3(se_work_a, 8, 3);
     break;
 case 15:
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x3), 20, 2);
-    fn_80229E10(se_work_a, 10, 3);
+    se_req_frame_set_parts3(se_work_a, 10, 3);
     break;
 case 16:
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x3), 17, 2);
-    fn_80229E10(se_work_a, 8, 3);
+    se_req_frame_set_parts3(se_work_a, 8, 3);
     break;
 case 17:
-    fn_80229EA8(se_work_a, 4, 7, 3);
+    se_req_frame_set_part4(se_work_a, 4, 7, 3);
     break;
 case 18:
     se_req_frame_set(se_work_a, 60, SE_Code_Make(3, 2, 3, 2), 12, 3);
     se_req_frame_set(se_work_a, 94, 17, 16, 0x3000002);
     fn_800DA428(se_work_b, 92, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 112, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 90, 3);
-    fn_80229EA8(se_work_a, 12, 11, 3);
-    fn_80229EA8(se_work_a, 44, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 90, 3);
+    se_req_frame_set_part4(se_work_a, 12, 11, 3);
+    se_req_frame_set_part4(se_work_a, 44, 7, 3);
     break;
 case 19:
     se_req_frame_set(se_work_a, 4, 10, 14, 0x3000002);
     fn_800DA428(se_work_b, 100, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 6, 3);
-    fn_80229E10(se_work_a, 100, 3);
-    fn_80229EA8(se_work_a, 74, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
+    se_req_frame_set_parts3(se_work_a, 100, 3);
+    se_req_frame_set_part4(se_work_a, 74, 11, 3);
     break;
 case 21:
     se_req_frame_set(se_work_a, 84, SE_Code_Make(9, 2, 9, 2), 12, 3);
     fn_800DA428(se_work_b, 34, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 74, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 40, 3);
-    fn_80229E10(se_work_a, 78, 3);
+    se_req_frame_set_parts3(se_work_a, 40, 3);
+    se_req_frame_set_parts3(se_work_a, 78, 3);
     break;
 case 22:
     fn_800DA428(se_work_b, 6, ((((u8)(v)) << 24) | 0x3), 17, 2);
     fn_800DA428(se_work_b, 14, ((((u8)(v)) << 24) | 0x3), 20, 2);
-    fn_80229E10(se_work_a, 14, 3);
+    se_req_frame_set_parts3(se_work_a, 14, 3);
     break;
 case 26:
     fn_800DA428(se_work_b, 10, ((((u8)(v)) << 24) | 0x1), 20, 2);
@@ -153,8 +153,8 @@ case 26:
     fn_800DA428(se_work_b, 174, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 200, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 212, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 82, 3);
-    fn_80229E10(se_work_a, 144, 3);
+    se_req_frame_set_parts3(se_work_a, 82, 3);
+    se_req_frame_set_parts3(se_work_a, 144, 3);
     break;
 case 28:
     se_req_frame_set(se_work_a, 6, SE_Code_Make(0, 3, 1, 1), 12, 3);
@@ -162,30 +162,30 @@ case 28:
     se_req_frame_set(se_work_a, 28, 11, 14, 0x3000002);
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x3), 17, 2);
     fn_800DA428(se_work_b, 46, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 20, 3);
-    fn_80229E10(se_work_a, 52, 3);
+    se_req_frame_set_parts3(se_work_a, 20, 3);
+    se_req_frame_set_parts3(se_work_a, 52, 3);
     break;
 case 30:
     fn_800DA428(se_work_b, 6, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 16, 3);
+    se_req_frame_set_parts3(se_work_a, 16, 3);
     break;
 case 34:
     fn_800DA428(se_work_b, 4, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 56, (((u8)(v)) << 24), 7, 2);
     fn_800DA428(se_work_b, 98, (((u8)(v)) << 24), 11, 2);
-    fn_80229E10(se_work_a, 18, 3);
-    fn_80229EA8(se_work_a, 56, 7, 3);
-    fn_80229EA8(se_work_a, 104, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 18, 3);
+    se_req_frame_set_part4(se_work_a, 56, 7, 3);
+    se_req_frame_set_part4(se_work_a, 104, 11, 3);
     break;
 case 35:
     fn_800DA428(se_work_b, 38, (((u8)(v)) << 24), 7, 2);
     fn_800DA428(se_work_b, 82, (((u8)(v)) << 24), 11, 2);
-    fn_80229E10(se_work_a, 46, 3);
-    fn_80229E10(se_work_a, 84, 3);
+    se_req_frame_set_parts3(se_work_a, 46, 3);
+    se_req_frame_set_parts3(se_work_a, 84, 3);
     break;
 case 36:
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x4), 17, 2);
-    fn_80229E10(se_work_a, 6, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
     break;
 case 37:
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x1), 20, 2);
@@ -195,8 +195,8 @@ case 38:
     se_req_frame_set(se_work_a, 16, SE_Code_Make(7, 3, 8, 2), 12, 3);
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 32, ((((u8)(v)) << 24) | 0x2), 20, 2);
-    fn_80229E10(se_work_a, 16, 3);
-    fn_80229E10(se_work_a, 32, 3);
+    se_req_frame_set_parts3(se_work_a, 16, 3);
+    se_req_frame_set_parts3(se_work_a, 32, 3);
     break;
 case 39:
     se_req_frame_set(se_work_a, 42, 9, 12, 3);
@@ -204,20 +204,20 @@ case 39:
     fn_800DA428(se_work_b, 48, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 72, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 100, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 24, 3);
-    fn_80229E10(se_work_a, 74, 3);
+    se_req_frame_set_parts3(se_work_a, 24, 3);
+    se_req_frame_set_parts3(se_work_a, 74, 3);
     break;
 case 41:
     fn_800DA428(se_work_b, 10, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229EA8(se_work_a, 4, 7, 3);
+    se_req_frame_set_part4(se_work_a, 4, 7, 3);
     break;
 case 42:
     fn_800DA428(se_work_b, 20, ((((u8)(v)) << 24) | 0x2), 20, 2);
-    fn_80229E10(se_work_a, 24, 3);
+    se_req_frame_set_parts3(se_work_a, 24, 3);
     break;
 case 46:
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 6, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
     break;
 case 48:
     se_req_frame_set(se_work_a, 4, 12, 14, 0x3000002);
@@ -225,8 +225,8 @@ case 48:
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x3), 14, 2);
     fn_800DA428(se_work_b, 80, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 100, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 82, 3);
-    fn_80229E10(se_work_a, 100, 3);
+    se_req_frame_set_parts3(se_work_a, 82, 3);
+    se_req_frame_set_parts3(se_work_a, 100, 3);
     se_req_frame_set(se_work_a, 8, 9, 14, 0x3000002);
     break;
 case 49:
@@ -237,20 +237,20 @@ case 50:
     se_req_frame_set(se_work_a, 20, SE_Code_Make(0, 2, 1, 2), 12, 3);
     se_req_frame_set(se_work_a, 18, 40, 20, 0x3000003);
     fn_800DA428(se_work_b, 20, ((((u8)(v)) << 24) | 0x3), 17, 2);
-    fn_80229E10(se_work_a, 32, 3);
+    se_req_frame_set_parts3(se_work_a, 32, 3);
     break;
 case 52:
     fn_800DA428(se_work_b, 18, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 48, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 20, 3);
-    fn_80229E10(se_work_a, 50, 3);
+    se_req_frame_set_parts3(se_work_a, 20, 3);
+    se_req_frame_set_parts3(se_work_a, 50, 3);
     break;
 case 53:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(7, 2, 8, 2), 12, 3);
     fn_800DA428(se_work_b, 20, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 42, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 22, 3);
-    fn_80229EA8(se_work_a, 40, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 22, 3);
+    se_req_frame_set_part4(se_work_a, 40, 7, 3);
     break;
 case 54:
     se_req_frame_set(se_work_a, 36, SE_Code_Make(3, 2, 3, 2), 12, 3);
@@ -258,56 +258,56 @@ case 54:
     fn_800DA428(se_work_b, 76, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 162, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 192, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 34, 3);
-    fn_80229E10(se_work_a, 194, 3);
+    se_req_frame_set_parts3(se_work_a, 34, 3);
+    se_req_frame_set_parts3(se_work_a, 194, 3);
     break;
 case 55:
     fn_800DA428(se_work_b, 16, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 32, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 18, 3);
-    fn_80229EA8(se_work_a, 34, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 18, 3);
+    se_req_frame_set_part4(se_work_a, 34, 7, 3);
     break;
 case 56:
     fn_800DA428(se_work_b, 2, ((((u8)(v)) << 24) | 0x3), 17, 2);
-    fn_80229E10(se_work_a, 6, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
     break;
 case 57:
     se_req_frame_set(se_work_a, 4, 10, 20, 0x3000003);
     fn_800DA428(se_work_b, 88, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 90, 3);
+    se_req_frame_set_parts3(se_work_a, 90, 3);
     break;
 case 58:
     fn_800DA428(se_work_b, 6, ((((u8)(v)) << 24) | 0x3), 17, 2);
     fn_800DA428(se_work_b, 10, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 12, 3);
+    se_req_frame_set_parts3(se_work_a, 12, 3);
     break;
 case 59:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(7, 2, 8, 2), 12, 3);
     fn_800DA428(se_work_b, 10, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 24, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 14, 3);
+    se_req_frame_set_parts3(se_work_a, 14, 3);
     break;
 case 60:
-    fn_80229EA8(se_work_a, 20, 11, 3);
+    se_req_frame_set_part4(se_work_a, 20, 11, 3);
     break;
 case 62:
     fn_800DA428(se_work_b, 4, ((((u8)(v)) << 24) | 0x3), 20, 2);
     fn_800DA428(se_work_b, 10, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 14, 3);
+    se_req_frame_set_parts3(se_work_a, 14, 3);
     break;
 case 63:
-    fn_80229E10(se_work_a, 4, 3);
+    se_req_frame_set_parts3(se_work_a, 4, 3);
     break;
 case 64:
     fn_800DA428(se_work_b, 26, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 60, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 28, 3);
-    fn_80229E10(se_work_a, 62, 3);
+    se_req_frame_set_parts3(se_work_a, 28, 3);
+    se_req_frame_set_parts3(se_work_a, 62, 3);
     break;
 case 66:
     fn_800DA428(se_work_b, 42, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 70, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 54, 3);
+    se_req_frame_set_parts3(se_work_a, 54, 3);
     break;
 case 100:
     se_req_frame_set(se_work_a, 140, 234, 3, 0x3000003);
@@ -457,19 +457,19 @@ case 142:
     break;
 case 201:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 2, 4, 2), 12, 3);
-    fn_80229E10(se_work_a, 6, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
     break;
 case 202:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 2, 5, 2), 12, 3);
     se_req_frame_set(se_work_a, 26, 10, 14, 0x3000003);
     fn_800DA428(se_work_b, 12, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 14, 3);
+    se_req_frame_set_parts3(se_work_a, 14, 3);
     break;
 case 204:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 2, 5, 2), 12, 3);
     se_req_frame_set(se_work_a, 14, 10, 14, 0x3000003);
     fn_800DA428(se_work_b, 26, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 26, 3);
+    se_req_frame_set_parts3(se_work_a, 26, 3);
     break;
 case 206: case 209:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(5, 2, 6, 6), 12, 3);
@@ -477,94 +477,94 @@ case 206: case 209:
     se_req_frame_set(se_work_a, 6, 12, 14, 0x3000003);
     se_req_frame_set(se_work_a, 32, 12, 14, 0x3000003);
     se_req_frame_set(se_work_a, 116, 13, 14, 0x3000003);
-    fn_80229E10(se_work_a, 56, 3);
-    fn_80229E10(se_work_a, 84, 3);
-    fn_80229E10(se_work_a, 116, 3);
-    fn_80229EA8(se_work_a, 118, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 56, 3);
+    se_req_frame_set_parts3(se_work_a, 84, 3);
+    se_req_frame_set_parts3(se_work_a, 116, 3);
+    se_req_frame_set_part4(se_work_a, 118, 7, 3);
     break;
 case 207:
     fn_800DA428(se_work_b, 30, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 74, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 10, 3);
+    se_req_frame_set_parts3(se_work_a, 10, 3);
     break;
 case 210:
     se_req_frame_set(se_work_a, 4, 9, 12, 3);
     se_req_frame_set(se_work_a, 66, 13, 19, 0x3000003);
     se_req_frame_set(se_work_a, 146, 46, 10, 0x3000003);
     se_req_frame_set(se_work_a, 152, 15, 14, 0x3000003);
-    fn_80229E10(se_work_a, 72, 3);
-    fn_80229EA8(se_work_a, 146, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 72, 3);
+    se_req_frame_set_part4(se_work_a, 146, 11, 3);
     break;
 case 211:
     se_req_frame_set(se_work_a, 16, 28, 14, 0x3000003);
     se_req_frame_set(se_work_a, 18, 46, 12, 0x3000003);
     fn_800DA428(se_work_b, 12, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 30, 3);
-    fn_80229EA8(se_work_a, 32, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 30, 3);
+    se_req_frame_set_part4(se_work_a, 32, 11, 3);
     break;
 case 212:
     fn_800DA428(se_work_b, 94, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 114, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 98, 3);
-    fn_80229EA8(se_work_a, 32, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 98, 3);
+    se_req_frame_set_part4(se_work_a, 32, 7, 3);
     break;
 case 214:
-    fn_80229E10(se_work_a, 16, 3);
-    fn_80229E10(se_work_a, 66, 3);
+    se_req_frame_set_parts3(se_work_a, 16, 3);
+    se_req_frame_set_parts3(se_work_a, 66, 3);
     break;
 case 215:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 2, 5, 2), 12, 3);
     se_req_frame_set(se_work_a, 4, 15, 12, 0x3000003);
     se_req_frame_set(se_work_a, 6, 12, 14, 0x3000003);
     se_req_frame_set(se_work_a, 106, 10, 14, 0x3000003);
-    fn_80229E10(se_work_a, 24, 3);
-    fn_80229EA8(se_work_a, 114, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 24, 3);
+    se_req_frame_set_part4(se_work_a, 114, 7, 3);
     break;
 case 216:
     se_req_frame_set(se_work_a, 14, 17, 14, 0x3000003);
     fn_800DA428(se_work_b, 44, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 64, ((((u8)(v)) << 24) | 0x3), 20, 2);
-    fn_80229E10(se_work_a, 74, 3);
-    fn_80229EA8(se_work_a, 4, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 74, 3);
+    se_req_frame_set_part4(se_work_a, 4, 7, 3);
     break;
 case 218:
     se_req_frame_set(se_work_a, 10, 28, 14, 0x3000003);
-    fn_80229EA8(se_work_a, 4, 7, 3);
+    se_req_frame_set_part4(se_work_a, 4, 7, 3);
     break;
 case 220:
-    fn_80229E10(se_work_a, 18, 3);
+    se_req_frame_set_parts3(se_work_a, 18, 3);
     break;
 case 221:
-    fn_80229E10(se_work_a, 22, 3);
-    fn_80229EA8(se_work_a, 56, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 22, 3);
+    se_req_frame_set_part4(se_work_a, 56, 7, 3);
     break;
 case 222:
     se_req_frame_set(se_work_a, 38, 12, 14, 0x3000003);
-    fn_80229E10(se_work_a, 46, 3);
+    se_req_frame_set_parts3(se_work_a, 46, 3);
     break;
 case 223:
-    fn_80229E10(se_work_a, 6, 3);
-    fn_80229EA8(se_work_a, 18, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 6, 3);
+    se_req_frame_set_part4(se_work_a, 18, 7, 3);
     break;
 case 224:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 4, 5, 4), 12, 3);
     se_req_frame_set(se_work_a, 64, 9, 12, 3);
     se_req_frame_set(se_work_a, 64, 14, 14, 0x3000003);
     fn_800DA428(se_work_b, 20, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 20, 3);
+    se_req_frame_set_parts3(se_work_a, 20, 3);
     break;
 case 225:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 4, 5, 4), 12, 3);
     se_req_frame_set(se_work_a, 64, 9, 12, 3);
     se_req_frame_set(se_work_a, 118, 14, 19, 0x3000003);
     se_req_frame_set(se_work_a, 170, 11, 14, 0x3000003);
-    fn_80229E10(se_work_a, 54, 3);
-    fn_80229EA8(se_work_a, 50, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 54, 3);
+    se_req_frame_set_part4(se_work_a, 50, 7, 3);
     break;
 case 226:
     fn_800DA428(se_work_b, 54, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 72, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 74, 3);
+    se_req_frame_set_parts3(se_work_a, 74, 3);
     break;
 case 227:
     se_req_frame_set(se_work_a, 22, SE_Code_Make(4, 3, 5, 3), 12, 3);
@@ -572,34 +572,34 @@ case 227:
     se_req_frame_set(se_work_a, 78, 11, 14, 0x3000003);
     se_req_frame_set(se_work_a, 128, 17, 14, 0x3000003);
     fn_800DA428(se_work_b, 52, ((((u8)(v)) << 24) | 0x3), 17, 2);
-    fn_80229E10(se_work_a, 58, 3);
-    fn_80229E10(se_work_a, 150, 3);
+    se_req_frame_set_parts3(se_work_a, 58, 3);
+    se_req_frame_set_parts3(se_work_a, 150, 3);
     break;
 case 228:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 2, 5, 2), 12, 3);
     se_req_frame_set(se_work_a, 8, 11, 14, 0x3000003);
     se_req_frame_set(se_work_a, 26, 9, 17, 0x3000003);
-    fn_80229E10(se_work_a, 10, 3);
+    se_req_frame_set_parts3(se_work_a, 10, 3);
     break;
 case 229:
     se_req_frame_set(se_work_a, 18, 46, 10, 0x3000003);
     fn_800DA428(se_work_b, 56, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 58, 3);
-    fn_80229EA8(se_work_a, 22, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 58, 3);
+    se_req_frame_set_part4(se_work_a, 22, 11, 3);
     break;
 case 230:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(4, 2, 5, 2), 12, 3);
     se_req_frame_set(se_work_a, 4, 15, 12, 0x3000003);
     se_req_frame_set(se_work_a, 6, 12, 14, 0x3000003);
     se_req_frame_set(se_work_a, 32, 9, 17, 0x3000003);
-    fn_80229E10(se_work_a, 34, 3);
-    fn_80229EA8(se_work_a, 44, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 34, 3);
+    se_req_frame_set_part4(se_work_a, 44, 11, 3);
     break;
 case 231:
     se_req_frame_set(se_work_a, 10, 17, 10, 0x3000003);
     se_req_frame_set(se_work_a, 74, 16, 10, 0x3000003);
     fn_800DA428(se_work_b, 52, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 54, 3);
+    se_req_frame_set_parts3(se_work_a, 54, 3);
     break;
 case 232:
     fn_800DA428(se_work_b, 10, ((((u8)(v)) << 24) | 0x2), 20, 2);
@@ -608,67 +608,67 @@ case 232:
     fn_800DA428(se_work_b, 54, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 66, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 84, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 12, 3);
-    fn_80229E10(se_work_a, 68, 3);
-    fn_80229EA8(se_work_a, 44, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 12, 3);
+    se_req_frame_set_parts3(se_work_a, 68, 3);
+    se_req_frame_set_part4(se_work_a, 44, 11, 3);
     break;
 case 240:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(5, 2, 6, 6), 12, 3);
     se_req_frame_set(se_work_a, 36, 12, 3, 0x3000003);
-    fn_80229E10(se_work_a, 56, 3);
+    se_req_frame_set_parts3(se_work_a, 56, 3);
     break;
 case 241:
     se_req_frame_set(se_work_a, 30, 17, 3, 0x3000003);
     se_req_frame_set(se_work_a, 104, 17, 3, 0x3000003);
     se_req_frame_set(se_work_a, 200, 17, 3, 0x3000003);
     se_req_frame_set(se_work_a, 294, 17, 3, 0x3000003);
-    fn_80229E10(se_work_a, 50, 3);
-    fn_80229E10(se_work_a, 112, 3);
-    fn_80229E10(se_work_a, 208, 3);
-    fn_80229E10(se_work_a, 374, 3);
-    fn_80229EA8(se_work_a, 72, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 50, 3);
+    se_req_frame_set_parts3(se_work_a, 112, 3);
+    se_req_frame_set_parts3(se_work_a, 208, 3);
+    se_req_frame_set_parts3(se_work_a, 374, 3);
+    se_req_frame_set_part4(se_work_a, 72, 11, 3);
     break;
 case 242:
     se_req_frame_set(se_work_a, 8, SE_Code_Make(4, 3, 5, 3), 12, 3);
     se_req_frame_set(se_work_a, 60, 13, 16, 0x3000003);
-    fn_80229E10(se_work_a, 12, 3);
-    fn_80229E10(se_work_a, 70, 3);
+    se_req_frame_set_parts3(se_work_a, 12, 3);
+    se_req_frame_set_parts3(se_work_a, 70, 3);
     break;
 case 243:
     se_req_frame_set(se_work_a, 36, SE_Code_Make(5, 2, 6, 2), 12, 3);
     se_req_frame_set(se_work_a, 36, 11, 3, 0x3000003);
     se_req_frame_set(se_work_a, 110, 13, 3, 0x3000003);
-    fn_80229E10(se_work_a, 112, 3);
+    se_req_frame_set_parts3(se_work_a, 112, 3);
     break;
 case 244:
     se_req_frame_set(se_work_a, 38, SE_Code_Make(4, 2, 5, 2), 12, 3);
     se_req_frame_set(se_work_a, 34, 13, 3, 0x3000003);
-    fn_80229E10(se_work_a, 70, 3);
-    fn_80229E10(se_work_a, 112, 3);
+    se_req_frame_set_parts3(se_work_a, 70, 3);
+    se_req_frame_set_parts3(se_work_a, 112, 3);
     break;
 case 245:
     se_req_frame_set(se_work_a, 34, SE_Code_Make(4, 4, 6, 4), 12, 3);
     se_req_frame_set(se_work_a, 226, 9, 12, 3);
     se_req_frame_set(se_work_a, 12, 18, 3, 0x3000003);
     se_req_frame_set(se_work_a, 254, 10, 3, 0x3000003);
-    fn_80229E10(se_work_a, 40, 3);
-    fn_80229E10(se_work_a, 260, 3);
-    fn_80229EA8(se_work_a, 60, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 40, 3);
+    se_req_frame_set_parts3(se_work_a, 260, 3);
+    se_req_frame_set_part4(se_work_a, 60, 11, 3);
     break;
 case 246:
     se_req_frame_set(se_work_a, 12, SE_Code_Make(2, 4, 2, 4), 12, 3);
     se_req_frame_set(se_work_a, 116, SE_Code_Make(3, 2, 3, 2), 12, 3);
     se_req_frame_set(se_work_a, 22, 17, 3, 0x3000003);
     se_req_frame_set(se_work_a, 12, 39, 11, 0x3000003);
-    fn_80229EA8(se_work_a, 16, 11, 3);
+    se_req_frame_set_part4(se_work_a, 16, 11, 3);
     break;
 case 248:
     se_req_frame_set(se_work_a, 68, 18, 3, 0x3000003);
     se_req_frame_set(se_work_a, 36, 46, 3, 0x3000003);
     fn_800DA428(se_work_b, 110, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 208, 3);
-    fn_80229EA8(se_work_a, 32, 11, 3);
-    fn_80229E10(se_work_a, 66, 3);
+    se_req_frame_set_parts3(se_work_a, 208, 3);
+    se_req_frame_set_part4(se_work_a, 32, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 66, 3);
     break;
 case 250:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(24, 2, 24, 2), 12, 3);
@@ -771,22 +771,22 @@ case 301:
     se_req_frame_set(se_work_a, 22, SE_Code_Make(0, 2, 1, 2), 12, 3);
     se_req_frame_set(se_work_a, 20, 39, 10, 0x3000003);
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x3), 17, 2);
-    fn_80229EA8(se_work_a, 24, 11, 3);
-    fn_80229E10(se_work_a, 40, 3);
+    se_req_frame_set_part4(se_work_a, 24, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 40, 3);
     break;
 case 302:
     se_req_frame_set(se_work_a, 122, 46, 3, 0x3000003);
     se_req_frame_set(se_work_a, 142, 46, 3, 0x3000003);
     fn_800DA428(se_work_b, 46, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229EA8(se_work_a, 48, 11, 3);
-    fn_80229EA8(se_work_a, 84, 11, 3);
-    fn_80229EA8(se_work_a, 142, 11, 3);
+    se_req_frame_set_part4(se_work_a, 48, 11, 3);
+    se_req_frame_set_part4(se_work_a, 84, 11, 3);
+    se_req_frame_set_part4(se_work_a, 142, 11, 3);
     break;
 case 303:
     se_req_frame_set(se_work_a, 28, SE_Code_Make(30, 3, 30, 3), 3, 0x3000003);
     se_req_frame_set(se_work_a, 226, SE_Code_Make(30, 3, 30, 3), 3, 0x3000003);
     fn_800DA428(se_work_b, 22, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 22, 3);
+    se_req_frame_set_parts3(se_work_a, 22, 3);
     break;
 case 305:
     se_req_frame_set(se_work_a, 70, 47, 11, 0x3000003);
@@ -796,19 +796,19 @@ case 305:
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 230, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 254, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229EA8(se_work_a, 40, 11, 3);
-    fn_80229EA8(se_work_a, 72, 11, 3);
-    fn_80229EA8(se_work_a, 120, 11, 3);
-    fn_80229EA8(se_work_a, 192, 11, 3);
-    fn_80229E10(se_work_a, 230, 3);
+    se_req_frame_set_part4(se_work_a, 40, 11, 3);
+    se_req_frame_set_part4(se_work_a, 72, 11, 3);
+    se_req_frame_set_part4(se_work_a, 120, 11, 3);
+    se_req_frame_set_part4(se_work_a, 192, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 230, 3);
     break;
 case 306:
     se_req_frame_set(se_work_a, 36, 45, 12, 0x3000003);
     break;
 case 307:
     se_req_frame_set(se_work_a, 38, 28, 10, 0x3000003);
-    fn_80229EA8(se_work_a, 52, 10, 3);
-    fn_80229E10(se_work_a, 50, 3);
+    se_req_frame_set_part4(se_work_a, 52, 10, 3);
+    se_req_frame_set_parts3(se_work_a, 50, 3);
     break;
 case 308:
     se_req_frame_set(se_work_a, 18, SE_Code_Make(10, 5, 11, 2), 12, 3);
@@ -818,7 +818,7 @@ case 308:
     break;
 case 309:
     se_req_frame_set(se_work_a, 20, 46, 11, 0x3000002);
-    fn_80229EA8(se_work_a, 10, 11, 3);
+    se_req_frame_set_part4(se_work_a, 10, 11, 3);
     break;
 case 310:
     se_req_frame_set(se_work_a, 42, 46, 11, 0x3000002);
@@ -838,8 +838,8 @@ case 314:
     fn_800DA428(se_work_b, 22, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 48, (((u8)(v)) << 24), 20, 2);
     se_req_frame_set(se_work_a, 62, 28, 10, 0x3000003);
-    fn_80229E10(se_work_a, 22, 3);
-    fn_80229EA8(se_work_a, 46, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 22, 3);
+    se_req_frame_set_part4(se_work_a, 46, 11, 3);
     break;
 case 315:
     se_req_frame_set(se_work_a, 8, 39, 11, 0x3000003);
@@ -850,9 +850,9 @@ case 315:
     fn_800DA428(se_work_b, 92, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 130, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 156, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 48, 3);
-    fn_80229E10(se_work_a, 94, 3);
-    fn_80229E10(se_work_a, 158, 3);
+    se_req_frame_set_parts3(se_work_a, 48, 3);
+    se_req_frame_set_parts3(se_work_a, 94, 3);
+    se_req_frame_set_parts3(se_work_a, 158, 3);
     break;
 case 316:
     se_req_frame_set(se_work_a, 4, 28, 3, 0x3000003);
@@ -873,16 +873,16 @@ case 317:
     se_req_frame_set(se_work_a, 12, 40, 11, 0x3000003);
     fn_800DA428(se_work_b, 12, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 70, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229EA8(se_work_a, 16, 11, 3);
-    fn_80229E10(se_work_a, 70, 3);
+    se_req_frame_set_part4(se_work_a, 16, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 70, 3);
     break;
 case 318:
     se_req_frame_set(se_work_a, 32, 43, 11, 0x3000003);
     fn_800DA428(se_work_b, 28, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 194, (((u8)(v)) << 24), 17, 2);
-    fn_80229EA8(se_work_a, 14, 11, 3);
-    fn_80229EA8(se_work_a, 104, 11, 3);
-    fn_80229E10(se_work_a, 194, 3);
+    se_req_frame_set_part4(se_work_a, 14, 11, 3);
+    se_req_frame_set_part4(se_work_a, 104, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 194, 3);
     break;
 case 319:
     se_req_frame_set(se_work_a, 30, 32, 7, 0x3000003);
@@ -896,46 +896,46 @@ case 319:
     fn_800DA428(se_work_b, 58, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 316, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 336, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 56, 3);
-    fn_80229E10(se_work_a, 318, 3);
+    se_req_frame_set_parts3(se_work_a, 56, 3);
+    se_req_frame_set_parts3(se_work_a, 318, 3);
     break;
 case 320:
     se_req_frame_set(se_work_a, 6, 28, 3, 0x3000003);
     se_req_frame_set(se_work_a, 70, 6, 13, 0x3000003);
-    fn_80229EA8(se_work_a, 118, 11, 3);
+    se_req_frame_set_part4(se_work_a, 118, 11, 3);
     fn_800DA428(se_work_b, 24, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 26, 3);
+    se_req_frame_set_parts3(se_work_a, 26, 3);
     break;
 case 321:
     fn_800DA428(se_work_b, 26, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 28, 3);
+    se_req_frame_set_parts3(se_work_a, 28, 3);
     break;
 case 322:
     se_req_frame_set(se_work_a, 28, 32, 7, 0x3000003);
     se_req_frame_set(se_work_a, 58, 33, 7, 0x3000003);
     fn_800DA428(se_work_b, 14, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 48, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 18, 3);
-    fn_80229E10(se_work_a, 50, 3);
+    se_req_frame_set_parts3(se_work_a, 18, 3);
+    se_req_frame_set_parts3(se_work_a, 50, 3);
     break;
 case 323:
     fn_800DA428(se_work_b, 18, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 30, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 20, 3);
-    fn_80229E10(se_work_a, 32, 3);
+    se_req_frame_set_parts3(se_work_a, 20, 3);
+    se_req_frame_set_parts3(se_work_a, 32, 3);
     break;
 case 324:
     se_req_frame_set(se_work_a, 10, 28, 13, 0x3000003);
     se_req_frame_set(se_work_a, 72, 7, 13, 0x3000003);
-    fn_80229EA8(se_work_a, 30, 11, 3);
+    se_req_frame_set_part4(se_work_a, 30, 11, 3);
     fn_800DA428(se_work_b, 24, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 26, 3);
+    se_req_frame_set_parts3(se_work_a, 26, 3);
     break;
 case 325:
     fn_800DA428(se_work_b, 48, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 78, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 50, 3);
-    fn_80229E10(se_work_a, 80, 3);
+    se_req_frame_set_parts3(se_work_a, 50, 3);
+    se_req_frame_set_parts3(se_work_a, 80, 3);
     break;
 case 326:
     se_req_frame_set(se_work_a, 168, 39, 3, 0x3000003);
@@ -945,12 +945,12 @@ case 326:
     fn_800DA428(se_work_b, 74, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 166, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 172, ((((u8)(v)) << 24) | 0x2), 20, 2);
-    fn_80229E10(se_work_a, 210, 3);
-    fn_80229E10(se_work_a, 234, 3);
-    fn_80229EA8(se_work_a, 332, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 210, 3);
+    se_req_frame_set_parts3(se_work_a, 234, 3);
+    se_req_frame_set_part4(se_work_a, 332, 11, 3);
     break;
 case 328:
-    fn_80229EA8(se_work_a, 30, 7, 3);
+    se_req_frame_set_part4(se_work_a, 30, 7, 3);
     break;
 case 329:
     se_req_frame_set(se_work_a, 30, 16, 14, 0x3000003);
@@ -959,17 +959,17 @@ case 329:
     se_req_frame_set(se_work_a, 305, 17, 14, 0x3000003);
     fn_800DA428(se_work_b, 350, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 414, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 244, 3);
-    fn_80229E10(se_work_a, 306, 3);
-    fn_80229E10(se_work_a, 352, 3);
-    fn_80229E10(se_work_a, 416, 3);
-    fn_80229EA8(se_work_a, 56, 7, 3);
-    fn_80229EA8(se_work_a, 122, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 244, 3);
+    se_req_frame_set_parts3(se_work_a, 306, 3);
+    se_req_frame_set_parts3(se_work_a, 352, 3);
+    se_req_frame_set_parts3(se_work_a, 416, 3);
+    se_req_frame_set_part4(se_work_a, 56, 7, 3);
+    se_req_frame_set_part4(se_work_a, 122, 7, 3);
     break;
 case 331:
     fn_800DA428(se_work_b, 26, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229EA8(se_work_a, 70, 7, 3);
-    fn_80229E10(se_work_a, 30, 3);
+    se_req_frame_set_part4(se_work_a, 70, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 30, 3);
     se_req_frame_set(se_work_a, 132, SE_Code_Make(7, 3, 8, 1), 12, 3);
     se_req_frame_set(se_work_a, 242, SE_Code_Make(7, 1, 8, 3), 12, 3);
     break;
@@ -977,26 +977,26 @@ case 332:
     se_req_frame_set(se_work_a, 30, 3, 12, 3);
     fn_800DA428(se_work_b, 8, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 106, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 8, 3);
-    fn_80229EA8(se_work_a, 46, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 8, 3);
+    se_req_frame_set_part4(se_work_a, 46, 7, 3);
     break;
 case 333:
     se_req_frame_set(se_work_a, 12, 28, 11, 0x3000003);
     se_req_frame_set(se_work_a, 24, 13, 11, 0x3000002);
     se_req_frame_set(se_work_a, 68, 13, 14, 0x3000002);
     fn_800DA428(se_work_b, 54, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 54, 3);
+    se_req_frame_set_parts3(se_work_a, 54, 3);
     break;
 case 334:
     se_req_frame_set(se_work_a, 4, 28, 3, 0x3000003);
     fn_800DA428(se_work_b, 18, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 20, 3);
+    se_req_frame_set_parts3(se_work_a, 20, 3);
     break;
 case 335:
     se_req_frame_set(se_work_a, 4, 28, 6, 0x3000003);
     se_req_frame_set(se_work_a, 56, 9, 12, 3);
     fn_800DA428(se_work_b, 118, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 118, 3);
+    se_req_frame_set_parts3(se_work_a, 118, 3);
     break;
 case 336:
     se_req_frame_set(se_work_a, 4, 26, 6, 0x3000002);
@@ -1006,8 +1006,8 @@ case 338:
     fn_800DA428(se_work_b, 60, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 94, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 142, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 94, 3);
-    fn_80229EA8(se_work_a, 106, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 94, 3);
+    se_req_frame_set_part4(se_work_a, 106, 11, 3);
     break;
 case 340:
     se_req_frame_set(se_work_a, 44, 46, 6, 0x3000002);
@@ -1018,11 +1018,11 @@ case 340:
     fn_800DA428(se_work_b, 32, ((((u8)(v)) << 24) | 0x4), 17, 2);
     fn_800DA428(se_work_b, 52, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 84, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 34, 3);
-    fn_80229E10(se_work_a, 54, 3);
-    fn_80229E10(se_work_a, 94, 3);
-    fn_80229E10(se_work_a, 220, 3);
-    fn_80229EA8(se_work_a, 34, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 34, 3);
+    se_req_frame_set_parts3(se_work_a, 54, 3);
+    se_req_frame_set_parts3(se_work_a, 94, 3);
+    se_req_frame_set_parts3(se_work_a, 220, 3);
+    se_req_frame_set_part4(se_work_a, 34, 7, 3);
     break;
 case 341:
     se_req_frame_set(se_work_a, 16, 3, 12, 3);
@@ -1033,14 +1033,14 @@ case 341:
     fn_800DA428(se_work_b, 76, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 100, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 222, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 24, 3);
+    se_req_frame_set_parts3(se_work_a, 24, 3);
     break;
 case 342:
     se_req_frame_set(se_work_a, 28, 2, 6, 0x3000002);
     fn_800DA428(se_work_b, 66, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 94, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 212, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 94, 3);
+    se_req_frame_set_parts3(se_work_a, 94, 3);
     break;
 case 343:
     se_req_frame_set(se_work_a, 18, SE_Code_Make(6, 4, 6, 4), 12, 3);
@@ -1048,35 +1048,35 @@ case 343:
     se_req_frame_set(se_work_a, 4, 3, 6, 0x3000002);
     se_req_frame_set(se_work_a, 10, 2, 6, 0x3000002);
     fn_800DA428(se_work_b, 176, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 126, 3);
+    se_req_frame_set_parts3(se_work_a, 126, 3);
     break;
 case 344:
     se_req_frame_set(se_work_a, 60, SE_Code_Make(1, 4, 1, 4), 12, 3);
     se_req_frame_set(se_work_a, 24, 46, 14, 0x3000002);
-    fn_80229EA8(se_work_a, 26, 7, 3);
+    se_req_frame_set_part4(se_work_a, 26, 7, 3);
     fn_800DA428(se_work_b, 128, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 130, 3);
+    se_req_frame_set_parts3(se_work_a, 130, 3);
     break;
 case 345:
     se_req_frame_set(se_work_a, 100, 9, 12, 3);
     se_req_frame_set(se_work_a, 32, 46, 14, 0x3000002);
-    fn_80229EA8(se_work_a, 68, 7, 3);
+    se_req_frame_set_part4(se_work_a, 68, 7, 3);
     fn_800DA428(se_work_b, 164, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 164, 3);
+    se_req_frame_set_parts3(se_work_a, 164, 3);
     break;
 case 346:
     se_req_frame_set(se_work_a, 8, SE_Code_Make(0, 4, 1, 4), 12, 3);
     se_req_frame_set(se_work_a, 4, 28, 11, 0x3000002);
-    fn_80229EA8(se_work_a, 12, 11, 3);
+    se_req_frame_set_part4(se_work_a, 12, 11, 3);
     break;
 case 347:
     se_req_frame_set(se_work_a, 8, SE_Code_Make(0, 4, 1, 4), 12, 3);
     se_req_frame_set(se_work_a, 4, 28, 7, 0x3000002);
-    fn_80229EA8(se_work_a, 12, 7, 3);
+    se_req_frame_set_part4(se_work_a, 12, 7, 3);
     break;
 case 348:
     se_req_frame_set(se_work_a, 52, SE_Code_Make(7, 4, 8, 4), 12, 3);
-    fn_80229EA8(se_work_a, 12, 11, 3);
+    se_req_frame_set_part4(se_work_a, 12, 11, 3);
     break;
 case 349:
     se_req_frame_set(se_work_a, 4, 26, 7, 0x3000002);
@@ -1167,50 +1167,50 @@ case 401:
     se_req_frame_set(se_work_a, 26, 65, 11, 0x3000003);
     se_req_frame_set(se_work_a, 70, 64, 11, 0x3000003);
     fn_800DA428(se_work_b, 68, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 70, 3);
+    se_req_frame_set_parts3(se_work_a, 70, 3);
     break;
 case 402:
     se_req_frame_set(se_work_a, 6, 60, 11, 0x3000003);
     se_req_frame_set(se_work_a, 20, 63, 11, 0x3000003);
     se_req_frame_set(se_work_a, 48, 28, 11, 0x3000003);
     fn_800DA428(se_work_b, 64, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 66, 3);
+    se_req_frame_set_parts3(se_work_a, 66, 3);
     break;
 case 403:
     se_req_frame_set(se_work_a, 20, SE_Code_Make(0, 1, 1, 1), 12, 3);
     se_req_frame_set(se_work_a, 18, 61, 11, 0x3000003);
     fn_800DA428(se_work_b, 14, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 26, 3);
+    se_req_frame_set_parts3(se_work_a, 26, 3);
     break;
 case 404:
     se_req_frame_set(se_work_a, 14, 60, 11, 0x3000003);
-    fn_80229EA8(se_work_a, 18, 11, 3);
+    se_req_frame_set_part4(se_work_a, 18, 11, 3);
     break;
 case 406:
     se_req_frame_set(se_work_a, 14, 64, 11, 0x3000003);
     fn_800DA428(se_work_b, 24, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 26, 3);
+    se_req_frame_set_parts3(se_work_a, 26, 3);
     break;
 case 407:
     se_req_frame_set(se_work_a, 10, 64, 11, 0x3000003);
     fn_800DA428(se_work_b, 28, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 18, 3);
+    se_req_frame_set_parts3(se_work_a, 18, 3);
     break;
 case 408:
     se_req_frame_set(se_work_a, 20, SE_Code_Make(0, 1, 1, 1), 12, 3);
     se_req_frame_set(se_work_a, 18, 61, 11, 0x3000003);
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 34, 3);
+    se_req_frame_set_parts3(se_work_a, 34, 3);
     break;
 case 409:
     se_req_frame_set(se_work_a, 14, 60, 11, 0x3000003);
     fn_800DA428(se_work_b, 12, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229EA8(se_work_a, 18, 11, 3);
+    se_req_frame_set_part4(se_work_a, 18, 11, 3);
     break;
 case 411:
     se_req_frame_set(se_work_a, 14, 64, 11, 0x3000003);
     fn_800DA428(se_work_b, 30, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 32, 3);
+    se_req_frame_set_parts3(se_work_a, 32, 3);
     break;
 case 412:
     se_req_frame_set(se_work_a, 10, 64, 11, 0x3000003);
@@ -1223,14 +1223,14 @@ case 413:
     fn_800DA428(se_work_b, 26, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 50, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 74, ((((u8)(v)) << 24) | 0x2), 17, 2);
-    fn_80229E10(se_work_a, 52, 3);
-    fn_80229E10(se_work_a, 76, 3);
+    se_req_frame_set_parts3(se_work_a, 52, 3);
+    se_req_frame_set_parts3(se_work_a, 76, 3);
     break;
 case 414:
     se_req_frame_set(se_work_a, 6, 64, 11, 0x3000003);
     fn_800DA428(se_work_b, 8, ((((u8)(v)) << 24) | 0x3), 20, 2);
     fn_800DA428(se_work_b, 20, (((u8)(v)) << 24), 17, 2);
-    fn_80229E10(se_work_a, 12, 3);
+    se_req_frame_set_parts3(se_work_a, 12, 3);
     break;
 case 420:
     se_req_frame_set(se_work_a, 22, 13, 3, 0x3000003);
@@ -1242,10 +1242,10 @@ case 420:
     se_req_frame_set(se_work_a, 172, 14, 3, 0x3000003);
     se_req_frame_set(se_work_a, 188, 9, 3, 0x3000003);
     se_req_frame_set(se_work_a, 204, 10, 3, 0x3000003);
-    fn_80229E10(se_work_a, 64, 3);
-    fn_80229E10(se_work_a, 152, 3);
-    fn_80229E10(se_work_a, 210, 3);
-    fn_80229E10(se_work_a, 260, 3);
+    se_req_frame_set_parts3(se_work_a, 64, 3);
+    se_req_frame_set_parts3(se_work_a, 152, 3);
+    se_req_frame_set_parts3(se_work_a, 210, 3);
+    se_req_frame_set_parts3(se_work_a, 260, 3);
     break;
 case 421:
     se_req_frame_set(se_work_a, 34, 10, 3, 0x3000003);
@@ -1257,10 +1257,10 @@ case 421:
     se_req_frame_set(se_work_a, 120, 9, 3, 0x3000003);
     se_req_frame_set(se_work_a, 148, 8, 16, 0x3000003);
     se_req_frame_set(se_work_a, 186, 9, 19, 0x3000003);
-    fn_80229E10(se_work_a, 24, 3);
-    fn_80229E10(se_work_a, 90, 3);
-    fn_80229E10(se_work_a, 140, 3);
-    fn_80229E10(se_work_a, 224, 3);
+    se_req_frame_set_parts3(se_work_a, 24, 3);
+    se_req_frame_set_parts3(se_work_a, 90, 3);
+    se_req_frame_set_parts3(se_work_a, 140, 3);
+    se_req_frame_set_parts3(se_work_a, 224, 3);
     break;
 case 422:
     se_req_frame_set(se_work_a, 44, SE_Code_Make(3, 1, 3, 1), 12, 3);
@@ -1268,8 +1268,8 @@ case 422:
     se_req_frame_set(se_work_a, 42, 28, 11, 0x3000003);
     se_req_frame_set(se_work_a, 38, 8, 16, 0x3000003);
     se_req_frame_set(se_work_a, 4, 8, 16, 0x3000003);
-    fn_80229E10(se_work_a, 8, 3);
-    fn_80229E10(se_work_a, 48, 3);
+    se_req_frame_set_parts3(se_work_a, 8, 3);
+    se_req_frame_set_parts3(se_work_a, 48, 3);
     break;
 case 423:
     se_req_frame_set(se_work_a, 112, SE_Code_Make(3, 2, 3, 2), 12, 3);
@@ -1279,21 +1279,21 @@ case 423:
     se_req_frame_set(se_work_a, 130, 18, 16, 0x3000003);
     fn_800DA428(se_work_b, 126, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 144, (((u8)(v)) << 24), 17, 2);
-    fn_80229EA8(se_work_a, 24, 7, 3);
-    fn_80229EA8(se_work_a, 94, 7, 3);
-    fn_80229E10(se_work_a, 128, 3);
-    fn_80229E10(se_work_a, 146, 3);
+    se_req_frame_set_part4(se_work_a, 24, 7, 3);
+    se_req_frame_set_part4(se_work_a, 94, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 128, 3);
+    se_req_frame_set_parts3(se_work_a, 146, 3);
     break;
 case 500:
     fn_800DA428(se_work_b, 16, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 42, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 42, 3);
-    fn_80229EA8(se_work_a, 62, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 42, 3);
+    se_req_frame_set_part4(se_work_a, 62, 7, 3);
     break;
 case 501:
     fn_800DA428(se_work_b, 114, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 52, 3);
-    fn_80229EA8(se_work_a, 46, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 52, 3);
+    se_req_frame_set_part4(se_work_a, 46, 7, 3);
     se_req_frame_set(se_work_a, 10, 17, 20, 0x3000003);
     break;
 case 502:
@@ -1301,16 +1301,16 @@ case 502:
     fn_800DA428(se_work_b, 22, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 142, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 100, ((((u8)(v)) << 24) | 0x3), 20, 2);
-    fn_80229EA8(se_work_a, 34, 7, 3);
-    fn_80229E10(se_work_a, 24, 3);
-    fn_80229E10(se_work_a, 70, 3);
+    se_req_frame_set_part4(se_work_a, 34, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 24, 3);
+    se_req_frame_set_parts3(se_work_a, 70, 3);
     se_req_frame_set(se_work_a, 80, 39, 7, 0x3000003);
     break;
 case 503:
     se_req_frame_set(se_work_a, 48, 9, 12, 3);
     fn_800DA428(se_work_b, 26, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 28, 3);
-    fn_80229EA8(se_work_a, 82, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 28, 3);
+    se_req_frame_set_part4(se_work_a, 82, 7, 3);
     se_req_frame_set(se_work_a, 64, 13, 7, 0x3000003);
     se_req_frame_set(se_work_a, 80, 10, 20, 0x3000003);
     break;
@@ -1323,11 +1323,11 @@ case 505:
     fn_800DA428(se_work_b, 56, ((((u8)(v)) << 24) | 0x1), 20, 2);
     se_req_frame_set(se_work_a, 28, 13, 20, 0x3000003);
     se_req_frame_set(se_work_a, 56, 13, 20, 0x3000003);
-    fn_80229E10(se_work_a, 32, 3);
-    fn_80229E10(se_work_a, 58, 3);
+    se_req_frame_set_parts3(se_work_a, 32, 3);
+    se_req_frame_set_parts3(se_work_a, 58, 3);
     break;
 case 506:
-    fn_80229E10(se_work_a, 18, 3);
+    se_req_frame_set_parts3(se_work_a, 18, 3);
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 32, ((((u8)(v)) << 24) | 0x1), 20, 2);
     se_req_frame_set(se_work_a, 30, 80, 7, 0x3000003);
@@ -1337,17 +1337,17 @@ case 507:
     fn_800DA428(se_work_b, 20, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 44, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 174, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 12, 3);
-    fn_80229E10(se_work_a, 46, 3);
-    fn_80229E10(se_work_a, 176, 3);
-    fn_80229E10(se_work_a, 292, 3);
-    fn_80229EA8(se_work_a, 40, 11, 3);
-    fn_80229EA8(se_work_a, 70, 7, 3);
-    fn_80229EA8(se_work_a, 176, 11, 3);
-    fn_80229EA8(se_work_a, 114, 11, 3);
-    fn_80229EA8(se_work_a, 168, 7, 3);
-    fn_80229EA8(se_work_a, 230, 11, 3);
-    fn_80229EA8(se_work_a, 246, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 12, 3);
+    se_req_frame_set_parts3(se_work_a, 46, 3);
+    se_req_frame_set_parts3(se_work_a, 176, 3);
+    se_req_frame_set_parts3(se_work_a, 292, 3);
+    se_req_frame_set_part4(se_work_a, 40, 11, 3);
+    se_req_frame_set_part4(se_work_a, 70, 7, 3);
+    se_req_frame_set_part4(se_work_a, 176, 11, 3);
+    se_req_frame_set_part4(se_work_a, 114, 11, 3);
+    se_req_frame_set_part4(se_work_a, 168, 7, 3);
+    se_req_frame_set_part4(se_work_a, 230, 11, 3);
+    se_req_frame_set_part4(se_work_a, 246, 7, 3);
     se_req_frame_set(se_work_a, 38, 39, 11, 0x3000003);
     se_req_frame_set(se_work_a, 54, 39, 7, 0x3000003);
     se_req_frame_set(se_work_a, 176, 39, 7, 0x3000003);
@@ -1362,55 +1362,55 @@ case 508:
     fn_800DA428(se_work_b, 246, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 272, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 312, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 86, 3);
-    fn_80229E10(se_work_a, 150, 3);
-    fn_80229E10(se_work_a, 216, 3);
-    fn_80229E10(se_work_a, 266, 3);
-    fn_80229EA8(se_work_a, 138, 11, 3);
-    fn_80229EA8(se_work_a, 204, 7, 3);
-    fn_80229EA8(se_work_a, 248, 11, 3);
-    fn_80229EA8(se_work_a, 312, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 86, 3);
+    se_req_frame_set_parts3(se_work_a, 150, 3);
+    se_req_frame_set_parts3(se_work_a, 216, 3);
+    se_req_frame_set_parts3(se_work_a, 266, 3);
+    se_req_frame_set_part4(se_work_a, 138, 11, 3);
+    se_req_frame_set_part4(se_work_a, 204, 7, 3);
+    se_req_frame_set_part4(se_work_a, 248, 11, 3);
+    se_req_frame_set_part4(se_work_a, 312, 7, 3);
     break;
 case 509:
     fn_800DA428(se_work_b, 36, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 194, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 38, 3);
-    fn_80229E10(se_work_a, 196, 3);
+    se_req_frame_set_parts3(se_work_a, 38, 3);
+    se_req_frame_set_parts3(se_work_a, 196, 3);
     break;
 case 510:
     fn_800DA428(se_work_b, 32, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 34, 3);
-    fn_80229EA8(se_work_a, 46, 7, 3);
-    fn_80229EA8(se_work_a, 70, 7, 3);
-    fn_80229EA8(se_work_a, 118, 7, 3);
-    fn_80229EA8(se_work_a, 134, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 34, 3);
+    se_req_frame_set_part4(se_work_a, 46, 7, 3);
+    se_req_frame_set_part4(se_work_a, 70, 7, 3);
+    se_req_frame_set_part4(se_work_a, 118, 7, 3);
+    se_req_frame_set_part4(se_work_a, 134, 7, 3);
     break;
 case 511:
     fn_800DA428(se_work_b, 26, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 140, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 28, 3);
-    fn_80229E10(se_work_a, 142, 3);
+    se_req_frame_set_parts3(se_work_a, 28, 3);
+    se_req_frame_set_parts3(se_work_a, 142, 3);
     se_req_frame_set(se_work_a, 62, 16, 20, 0x3000003);
-    fn_80229EA8(se_work_a, 80, 7, 3);
-    fn_80229EA8(se_work_a, 154, 7, 3);
+    se_req_frame_set_part4(se_work_a, 80, 7, 3);
+    se_req_frame_set_part4(se_work_a, 154, 7, 3);
     se_req_frame_set(se_work_a, 78, 39, 7, 0x3000003);
     break;
 case 512:
     fn_800DA428(se_work_b, 12, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229EA8(se_work_a, 22, 7, 3);
+    se_req_frame_set_part4(se_work_a, 22, 7, 3);
     break;
 case 513:
     se_req_frame_set(se_work_a, 34, 9, 12, 3);
-    fn_80229EA8(se_work_a, 22, 7, 3);
+    se_req_frame_set_part4(se_work_a, 22, 7, 3);
     se_req_frame_set(se_work_a, 54, 10, 14, 0x3000003);
     se_req_frame_set(se_work_a, 104, 13, 20, 0x3000003);
-    fn_80229E10(se_work_a, 118, 3);
-    fn_80229E10(se_work_a, 182, 3);
-    fn_80229E10(se_work_a, 224, 3);
-    fn_80229E10(se_work_a, 270, 3);
-    fn_80229E10(se_work_a, 322, 3);
-    fn_80229E10(se_work_a, 366, 3);
-    fn_80229E10(se_work_a, 406, 3);
+    se_req_frame_set_parts3(se_work_a, 118, 3);
+    se_req_frame_set_parts3(se_work_a, 182, 3);
+    se_req_frame_set_parts3(se_work_a, 224, 3);
+    se_req_frame_set_parts3(se_work_a, 270, 3);
+    se_req_frame_set_parts3(se_work_a, 322, 3);
+    se_req_frame_set_parts3(se_work_a, 366, 3);
+    se_req_frame_set_parts3(se_work_a, 406, 3);
     break;
 case 514:
     fn_800DA428(se_work_b, 32, ((((u8)(v)) << 24) | 0x1), 20, 2);
@@ -1418,9 +1418,9 @@ case 514:
     fn_800DA428(se_work_b, 114, (((u8)(v)) << 24), 17, 2);
     se_req_frame_set(se_work_a, 52, 17, 14, 0x3000003);
     se_req_frame_set(se_work_a, 82, 28, 14, 0x3000003);
-    fn_80229E10(se_work_a, 46, 3);
-    fn_80229E10(se_work_a, 116, 3);
-    fn_80229EA8(se_work_a, 56, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 46, 3);
+    se_req_frame_set_parts3(se_work_a, 116, 3);
+    se_req_frame_set_part4(se_work_a, 56, 7, 3);
     break;
 case 515:
     se_req_frame_set(se_work_a, 32, 80, 7, 0x3000003);
@@ -1437,14 +1437,14 @@ case 515:
     fn_800DA428(se_work_b, 132, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 282, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 306, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 24, 3);
-    fn_80229E10(se_work_a, 120, 3);
-    fn_80229E10(se_work_a, 130, 3);
-    fn_80229E10(se_work_a, 176, 3);
-    fn_80229E10(se_work_a, 228, 3);
-    fn_80229EA8(se_work_a, 362, 7, 3);
-    fn_80229EA8(se_work_a, 386, 7, 3);
-    fn_80229EA8(se_work_a, 436, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 24, 3);
+    se_req_frame_set_parts3(se_work_a, 120, 3);
+    se_req_frame_set_parts3(se_work_a, 130, 3);
+    se_req_frame_set_parts3(se_work_a, 176, 3);
+    se_req_frame_set_parts3(se_work_a, 228, 3);
+    se_req_frame_set_part4(se_work_a, 362, 7, 3);
+    se_req_frame_set_part4(se_work_a, 386, 7, 3);
+    se_req_frame_set_part4(se_work_a, 436, 7, 3);
     break;
 case 516:
     fn_800DA428(se_work_b, 18, ((((u8)(v)) << 24) | 0x1), 20, 2);
@@ -1452,15 +1452,15 @@ case 516:
     fn_800DA428(se_work_b, 190, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 462, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 514, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229EA8(se_work_a, 146, 7, 3);
-    fn_80229EA8(se_work_a, 210, 7, 3);
-    fn_80229EA8(se_work_a, 296, 7, 3);
-    fn_80229EA8(se_work_a, 396, 7, 3);
-    fn_80229E10(se_work_a, 22, 3);
-    fn_80229E10(se_work_a, 108, 3);
-    fn_80229E10(se_work_a, 194, 3);
-    fn_80229E10(se_work_a, 464, 3);
-    fn_80229E10(se_work_a, 514, 3);
+    se_req_frame_set_part4(se_work_a, 146, 7, 3);
+    se_req_frame_set_part4(se_work_a, 210, 7, 3);
+    se_req_frame_set_part4(se_work_a, 296, 7, 3);
+    se_req_frame_set_part4(se_work_a, 396, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 22, 3);
+    se_req_frame_set_parts3(se_work_a, 108, 3);
+    se_req_frame_set_parts3(se_work_a, 194, 3);
+    se_req_frame_set_parts3(se_work_a, 464, 3);
+    se_req_frame_set_parts3(se_work_a, 514, 3);
     break;
 case 517:
     fn_800DA428(se_work_b, 30, ((((u8)(v)) << 24) | 0x1), 20, 2);
@@ -1469,16 +1469,16 @@ case 517:
     fn_800DA428(se_work_b, 120, ((((u8)(v)) << 24) | 0x1), 17, 2);
     fn_800DA428(se_work_b, 148, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 176, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229EA8(se_work_a, 46, 7, 3);
-    fn_80229EA8(se_work_a, 146, 7, 3);
-    fn_80229E10(se_work_a, 32, 3);
-    fn_80229E10(se_work_a, 94, 3);
-    fn_80229E10(se_work_a, 150, 3);
+    se_req_frame_set_part4(se_work_a, 46, 7, 3);
+    se_req_frame_set_part4(se_work_a, 146, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 32, 3);
+    se_req_frame_set_parts3(se_work_a, 94, 3);
+    se_req_frame_set_parts3(se_work_a, 150, 3);
     break;
 case 518:
     se_req_frame_set(se_work_a, 16, 18, 14, 0x3000003);
     fn_800DA428(se_work_b, 26, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 28, 3);
+    se_req_frame_set_parts3(se_work_a, 28, 3);
     break;
 case 520:
     se_req_frame_set(se_work_a, 26, 237, 7, 0x3000003);
@@ -1558,10 +1558,10 @@ case 600:
     fn_800DA428(se_work_b, 98, ((((u8)(v)) << 24) | 0x1), 20, 2);
     fn_800DA428(se_work_b, 144, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 178, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 16, 3);
-    fn_80229E10(se_work_a, 46, 3);
-    fn_80229E10(se_work_a, 144, 3);
-    fn_80229E10(se_work_a, 178, 3);
+    se_req_frame_set_parts3(se_work_a, 16, 3);
+    se_req_frame_set_parts3(se_work_a, 46, 3);
+    se_req_frame_set_parts3(se_work_a, 144, 3);
+    se_req_frame_set_parts3(se_work_a, 178, 3);
     break;
 case 603:
     fn_800DA428(se_work_b, 16, ((((u8)(v)) << 24) | 0x1), 17, 2);
@@ -1569,20 +1569,20 @@ case 603:
     se_req_frame_set(se_work_a, 34, 80, 7, 0x3000003);
     se_req_frame_set(se_work_a, 48, 80, 7, 0x3000003);
     se_req_frame_set(se_work_a, 62, 80, 7, 0x3000003);
-    fn_80229E10(se_work_a, 120, 3);
+    se_req_frame_set_parts3(se_work_a, 120, 3);
     break;
 case 604:
     se_req_frame_set(se_work_a, 12, 17, 17, 0x3000003);
     break;
 case 614:
     se_req_frame_set(se_work_a, 38, 16, 12, 0x3000003);
-    fn_80229EA8(se_work_a, 62, 7, 3);
+    se_req_frame_set_part4(se_work_a, 62, 7, 3);
     break;
 case 615:
     se_req_frame_set(se_work_a, 42, 46, 12, 0x3000003);
-    fn_80229EA8(se_work_a, 70, 11, 3);
-    fn_80229EA8(se_work_a, 154, 11, 3);
-    fn_80229EA8(se_work_a, 220, 11, 3);
+    se_req_frame_set_part4(se_work_a, 70, 11, 3);
+    se_req_frame_set_part4(se_work_a, 154, 11, 3);
+    se_req_frame_set_part4(se_work_a, 220, 11, 3);
     break;
 case 617:
     se_req_frame_set(se_work_a, 46, 16, 14, 0x3000003);
@@ -1590,21 +1590,21 @@ case 617:
     fn_800DA428(se_work_b, 102, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 140, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 176, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 104, 3);
-    fn_80229E10(se_work_a, 142, 3);
-    fn_80229E10(se_work_a, 176, 3);
+    se_req_frame_set_parts3(se_work_a, 104, 3);
+    se_req_frame_set_parts3(se_work_a, 142, 3);
+    se_req_frame_set_parts3(se_work_a, 176, 3);
     break;
 case 619:
     fn_800DA428(se_work_b, 40, (((u8)(v)) << 24), 17, 2);
     fn_800DA428(se_work_b, 54, ((((u8)(v)) << 24) | 0x1), 20, 2);
-    fn_80229E10(se_work_a, 40, 3);
+    se_req_frame_set_parts3(se_work_a, 40, 3);
     break;
 case 620:
-    fn_80229EA8(se_work_a, 24, 11, 3);
+    se_req_frame_set_part4(se_work_a, 24, 11, 3);
     break;
 case 621:
-    fn_80229EA8(se_work_a, 28, 11, 3);
-    fn_80229EA8(se_work_a, 82, 11, 3);
+    se_req_frame_set_part4(se_work_a, 28, 11, 3);
+    se_req_frame_set_part4(se_work_a, 82, 11, 3);
     break;
 case 623:
     se_req_frame_set(se_work_a, 26, SE_Code_Make(5, 4, 6, 4), 12, 3);
@@ -1618,14 +1618,14 @@ case 623:
     fn_800DA428(se_work_b, 90, ((((u8)(v)) << 24) | 0x2), 17, 2);
     fn_800DA428(se_work_b, 100, ((((u8)(v)) << 24) | 0x2), 20, 2);
     fn_800DA428(se_work_b, 126, ((((u8)(v)) << 24) | 0x4), 17, 2);
-    fn_80229E10(se_work_a, 26, 3);
-    fn_80229E10(se_work_a, 56, 3);
-    fn_80229E10(se_work_a, 68, 3);
-    fn_80229E10(se_work_a, 80, 3);
-    fn_80229E10(se_work_a, 90, 3);
-    fn_80229E10(se_work_a, 100, 3);
-    fn_80229E10(se_work_a, 110, 3);
-    fn_80229E10(se_work_a, 126, 3);
+    se_req_frame_set_parts3(se_work_a, 26, 3);
+    se_req_frame_set_parts3(se_work_a, 56, 3);
+    se_req_frame_set_parts3(se_work_a, 68, 3);
+    se_req_frame_set_parts3(se_work_a, 80, 3);
+    se_req_frame_set_parts3(se_work_a, 90, 3);
+    se_req_frame_set_parts3(se_work_a, 100, 3);
+    se_req_frame_set_parts3(se_work_a, 110, 3);
+    se_req_frame_set_parts3(se_work_a, 126, 3);
     break;
 case 627:
     se_req_frame_set(se_work_a, 70, 46, 11, 0x3000003);
@@ -1634,19 +1634,19 @@ case 627:
     se_req_frame_set(se_work_a, 120, 13, 20, 0x3000003);
     se_req_frame_set(se_work_a, 318, 17, 20, 0x3000003);
     fn_800DA428(se_work_b, 26, (((u8)(v)) << 24), 20, 2);
-    fn_80229E10(se_work_a, 28, 3);
-    fn_80229E10(se_work_a, 86, 3);
-    fn_80229E10(se_work_a, 116, 3);
-    fn_80229E10(se_work_a, 346, 3);
-    fn_80229E10(se_work_a, 476, 3);
-    fn_80229EA8(se_work_a, 108, 7, 3);
-    fn_80229EA8(se_work_a, 596, 7, 3);
+    se_req_frame_set_parts3(se_work_a, 28, 3);
+    se_req_frame_set_parts3(se_work_a, 86, 3);
+    se_req_frame_set_parts3(se_work_a, 116, 3);
+    se_req_frame_set_parts3(se_work_a, 346, 3);
+    se_req_frame_set_parts3(se_work_a, 476, 3);
+    se_req_frame_set_part4(se_work_a, 108, 7, 3);
+    se_req_frame_set_part4(se_work_a, 596, 7, 3);
     break;
 case 628:
     se_req_frame_set(se_work_a, 38, 18, 14, 0x3000003);
     fn_800DA428(se_work_b, 12, (((u8)(v)) << 24), 20, 2);
     fn_800DA428(se_work_b, 40, ((((u8)(v)) << 24) | 0x1), 17, 2);
-    fn_80229E10(se_work_a, 34, 3);
+    se_req_frame_set_parts3(se_work_a, 34, 3);
     break;
 case 634:
     se_req_frame_set(se_work_a, 4, SE_Code_Make(6, 4, 5, 4), 12, 3);
@@ -1657,9 +1657,9 @@ case 634:
     se_req_frame_set(se_work_a, 270, 16, 11, 0x3000003);
     se_req_frame_set(se_work_a, 306, 13, 11, 0x3000003);
     se_req_frame_set(se_work_a, 340, 13, 11, 0x3000003);
-    fn_80229E10(se_work_a, 78, 3);
-    fn_80229E10(se_work_a, 270, 3);
-    fn_80229EA8(se_work_a, 308, 11, 3);
-    fn_80229EA8(se_work_a, 344, 11, 3);
+    se_req_frame_set_parts3(se_work_a, 78, 3);
+    se_req_frame_set_parts3(se_work_a, 270, 3);
+    se_req_frame_set_part4(se_work_a, 308, 11, 3);
+    se_req_frame_set_part4(se_work_a, 344, 11, 3);
     }
 }

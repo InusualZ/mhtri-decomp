@@ -9,6 +9,8 @@
  * FLAGS. `cflags_menu` (configure.py; unmeasured).
  * NAMES. Module `menu` and the file from the `__FILE__` string "movie.cpp".
  *   GUESS (from each body and its callers): `movie_drive_wait`.
+ *   GUESS (from each body and its callers): `movie_change_request`, `menu_friend_list_init`, `menu_friend_list_step`,
+ *   `menu_friend_list_draw`.
  * RESIDUALS. every body (112 rows score zero) and the internal seams: the run holds at least three TUs (movie,
  *   `menu_friendlist.cpp` at 0x8043F398, the character make code).  The symbols are in the map
  *   (`python tools/units/ledger.py unit menu/movie.cpp`).

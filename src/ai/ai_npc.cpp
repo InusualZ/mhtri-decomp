@@ -5579,7 +5579,7 @@ struct AinpcEntry {
     /* +0x00 */ u8 pad_0x00[0x20];
 }; /* size: 0x20 */
 
-/* The page state `fn_802DB2F0` and its helpers keep at `ainpc_page_state`: +0x00 and +0x26 are cleared per
+/* The page state `ainpc_page_update` and its helpers keep at `ainpc_page_state`: +0x00 and +0x26 are cleared per
  * page, +0x01 is saved across the clear. */
 struct AinpcPageState {
     /* +0x00 */ u8 active_0x00;

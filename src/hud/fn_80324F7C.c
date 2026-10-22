@@ -1,5 +1,5 @@
 /*
- * Naming note: the one callee this file still spells by its map stem (`fn_8021B890`) is a bare .text
+ * Naming note: the one callee this file still spells by its map stem (`stage_work_idle_ck`) is a bare .text
  * entry in config/RMHE08/symbols.txt with `zz_` in the runtime dump, and its address is not this
  * unit's own row.
  * One player's move-indicator draw: `move_indicator_draw`, `.text` 0x80324F7C-0x803250B0 (0x134 B).
@@ -7,7 +7,7 @@
  * It samples a HUD anchor with `get_lsp_data(0x20D3, …)`, derives two more anchors from it with the
  * 2D-vector copy `uv_pair_copy`, and blits sprite-id runs at each with `draw_sprite_ary`.  The second
  * variant of the layout (the extra sprite plus the two ±10 y offsets) is selected by the caller's move
- * record: when its flag byte is clear and the lobby is up (`fn_8021B890`) the plain layout is drawn,
+ * record: when its flag byte is clear and the lobby is up (`stage_work_idle_ck`) the plain layout is drawn,
  * otherwise the expanded one.  `get_option_cfg(7)` picks between two further sprite runs.
  *
  * The argument is one element of the per-player "move work" array `get_move_work_adrs` indexes at stride
@@ -57,7 +57,7 @@ typedef struct _mh_move_work_ {
 /* These callees are still unsplit, so their declarations live here (the owning TUs have no source yet);
  * the spellings are the map's mangled names, which is what the target object relocates against. */
 void uv_pair_copy(_mh_ivec2_* dst, const _mh_ivec2_* src);
-u32 fn_8021B890(void);
+u32 stage_work_idle_ck(void);
 void draw_sprite_ary__FPCUsPC10_mh_ivec2_(const u16* sprite_ids, const _mh_ivec2_* pos);
 u8 get_option_cfg__FUc(u8 id);
 
@@ -90,7 +90,7 @@ void move_indicator_draw(_mh_move_work_* self)
     uv_pair_copy(&left, &anchor);
     uv_pair_copy(&right, &anchor);
 
-    if (self->flags == 0 && fn_8021B890() == 1) {
+    if (self->flags == 0 && stage_work_idle_ck() == 1) {
         expanded = 0;
     } else {
         expanded = 1;

@@ -48,7 +48,7 @@ u32   userdata_flag_ck(u32 value);
 s32   rand_lcg_step(u32 value);
 s32   lb_panel_close(void);
 void  setCockpitTransferMode(u8 index, s32 value);
-void  fn_802DFCD4(void);
+void  cockpit_notice_init(void);
 void* memset(void* dst, int value, u32 size);
 void  sysSE_stop(s32 value);
 char* quest_result_field_text_get(MenuQuestWork* self, s32 index);
@@ -326,7 +326,7 @@ extern "C" void fn_8032422C(void) {
     for (i = 0; i < 10; i++) {
         setCockpitTransferMode((u8)i, 0);
     }
-    fn_802DFCD4();
+    cockpit_notice_init();
     ai_slots_clear();
 }
 

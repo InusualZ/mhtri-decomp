@@ -62,7 +62,7 @@ struct ItemDataRecord {
                                        * `quest_item_slot_add` compares a slot's own count against it
                                        * as a signed byte, and clamps both on overflow and on a negative
                                        * merge) */
-    /* +0x004 */ u8 tex_idx_0x004;    /* the texture index `draw_itemicon_item_id`/`fn_802E1190`
+    /* +0x004 */ u8 tex_idx_0x004;    /* the texture index `draw_itemicon_item_id`/`draw_itemicon_item_id_idx`
                                        * (both in `hud/layout.cpp`) hand to `fn_80055C5C`, and the
                                        * byte `fn_802E1024`'s callers read next to `kind`.  Spliced
                                        * out of the `unused_0x003[2]` filler this record carried, one
@@ -168,7 +168,7 @@ struct MenuSlot {
     /* +0x014 */ s8 field_0x014;      /* the value `fn_802A04EC`/`fn_802A0464` compare */
     /* +0x015 */ u8 field_0x015;
     /* +0x016 */ u8 entry_count_a;    /* `entries_a`'s count (`fn_8029FFB8`) */
-    /* +0x017 */ u8 entry_count_b;    /* `entries_b`'s count (`fn_8029FFFC`, `fn_802A3190`) */
+    /* +0x017 */ u8 entry_count_b;    /* `entries_b`'s count (`menu_slot_entry_b_select`, `fn_802A3190`) */
     /* +0x018 */ u8 entry_count_c;    /* `entries_c`'s count (`fn_8029FB00`, `fn_802A0040`) */
     /* +0x019 */ u8 field_0x019;
     /* +0x01A */ u8 field_0x01A;
@@ -178,7 +178,7 @@ struct MenuSlot {
     /* +0x01E */ u8 field_0x01E;      /* kind 2's */
     /* +0x01F */ u8 field_0x01F;      /* kind 3's */
     /* +0x020 */ u8 unused_0x020[0x021 - 0x020];
-    /* +0x021 */ u8 field_0x021;      /* the byte `fn_802A053C`/`fn_802A054C` set */
+    /* +0x021 */ u8 field_0x021;      /* the byte `menu_slot0_lock_set`/`menu_slot_lock_set` set */
     /* +0x022 */ u8 unused_0x022[0x024 - 0x022];
     /* +0x024 */ MenuEntry entries_a[3];
     /* +0x06C */ MenuEntry entries_b[8];
@@ -265,8 +265,8 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *     call sites'; `mh3_pad.h` cannot be included here because it and `ef.h` (which `pl.h` pulls in) collide.
  *   * `GameMode_ck` keeps its owner's (`ef/fn_800CDB2C.h`) `u8` spelling: a `u32` view is `(10505) illegal
  *     overloading` beside the owner's header.
- *   * the rest (`fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
- *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) are declared in their call
+ *   * the rest (`fn_802FBA60`, `fn_8031A638`, `ainpc_entry_kill_kind`, `fn_802DB26C`,
+ *     `ainpc_page_hold_clear`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) are declared in their call
  *     sites' shapes; their owners' headers do not declare them yet.
  *
  * The `fn_*` declarations keep C linkage: the map's names for them are placeholders, not manglings.
@@ -309,18 +309,18 @@ u32 fn_8029F5E4(_HIT_W* hit);
 u32 fn_8029F5F8(_HIT_W* hit);
 u32 fn_8029F60C(void);
 void fn_8029F680(u16 id);
-ItemSpeciesRecord* fn_8029F6B4(u16 id);
+ItemSpeciesRecord* get_item_species_data(u16 id);
 u32 fn_8029F704(u16 id);
 s32 item_category_ck(u16 id, s32 index);
 u32 fn_8029F774(u16 id);
 u32 fn_8029F788(u16 kind);
-u32 fn_8029F7C4(u16 idx);
-u32 fn_8029F7E0(u16 idx, u16 sub);
+u32 get_menu_msg_tbl(u16 idx);
+u32 get_menu_msg(u16 idx, u16 sub);
 u32 menu_row_table_get(void);
-u32 fn_8029F818(u16 idx);
+u32 menu_row_limit_get(u16 idx);
 void fn_8029FCFC(void);
 void fn_8029FFB8(MenuSlot* slot, s32 index);
-void fn_8029FFFC(MenuSlot* slot, s32 index);
+void menu_slot_entry_b_select(MenuSlot* slot, s32 index);
 void fn_802A0040(s32 index);
 u32 fn_802A008C(MenuSlot* slot);
 u32 fn_802A0148(void);
@@ -332,8 +332,8 @@ u32 fn_802A0404(MenuFrameWork* self);
 u32 fn_802A0464(void);
 u32 fn_802A04B0(void);
 u32 fn_802A04EC(s8 value, u8 idx);
-void fn_802A053C(u8 value);
-void fn_802A054C(u8 idx, u8 value);
+void menu_slot0_lock_set(u8 value);
+void menu_slot_lock_set(u8 idx, u8 value);
 void fn_802A16F8(MenuEntryState* state);
 void fn_802A2550(MenuEntryState* dst, const MenuEntryState* src);
 void fn_802A2C98(u8 idx);
@@ -358,19 +358,19 @@ u32 move_work_state_ck(void);
 u32 game_ready_ck(void);
 u32 fn_802FBA60(void);
 void fn_8031A638(MenuSlot* slot);
-void fn_802DA2D4(s32 flag);
+void ainpc_entry_kill_kind(s32 flag);
 void fn_802DB26C(void);
-void fn_802DE238(void);
+void ainpc_page_hold_clear(void);
 u32 fn_802DE670(u8 idx);
 void fn_80384380(void);
 void fn_804273EC(s32 a, s32 b, s32 c);
 
 /* 0x802A2620 / 0x802A26F4 - the two menu-band entries `hud/cockpit_quest.cpp`'s cockpit band
  * (0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses).
- * `fn_802A2620(0)` redraws the menu frame; `menu_slot_panel_draw` is registered with `subTransSetPrio` by
+ * `menu_slot_anim_update(0)` redraws the menu frame; `menu_slot_panel_draw` is registered with `subTransSetPrio` by
  * address, so it is declared as the function it is.  Both signatures are that consumer's call sites
  * (neither body is written yet). */
-void fn_802A2620(s32 a);
+void menu_slot_anim_update(s32 a);
 void menu_slot_panel_draw(void);
 
 #ifdef __cplusplus

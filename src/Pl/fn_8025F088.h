@@ -58,7 +58,7 @@ u32 hit_attack_list_push(void* p);
 /* ---- callees another registered unit owns whose header does not declare them ---- */
 u32 em_land_data_init(void* out);
 u32 em_player_spotted_set(u8 index);
-u32 fn_80224AC4(void* physics);
+u32 pl_rig_model_move(void* physics);
 u32 fn_80262940(struct _PLW* self);
 u32 fn_802657F8(struct _PLW* self);
 u32 fn_8026F7B4(void);
@@ -80,7 +80,7 @@ u32 fn_800524C0(f32 a, void* b, void* c, void* d, void* e);
 u32 fn_800E0914(void* p);
 u32 event_demo_running_ck(void);
 u32 se_slot_req(s32 value);
-u32 fn_8033112C(void* p);
+u32 pl_mode8_alive_ck(void* p);
 
 /* ---- mangled callees at C++ scope, so the front-end reproduces the map's spelling (rule 9) ---- */
 #ifdef __cplusplus

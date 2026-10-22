@@ -1,6 +1,6 @@
 /*
  * menu/menu_infomation.h - the records and entry points `menu/menu_infomation.cpp` owns.  `StatusScreenWork` is the
- *   status screen's work record as `fn_8030BACC`/`equip_list_page_count`/`fn_8030A1D0` and `ef/fn_8030681C.cpp`'s
+ *   status screen's work record as `fn_8030BACC`/`equip_list_page_count`/`menu_equip_page_count` and `ef/fn_8030681C.cpp`'s
  *   `fn_80308EC0`/`fn_80308F1C` (below the 0x80308FB4 edge) read it: a partial view, not the complete layout.
  */
 #ifndef MHTRI_MENU_MENU_INFOMATION_H
@@ -12,7 +12,7 @@ struct _PLW;
 struct _EQUIP;
 
 /* The status screen's own work record (`fn_80308EC0`/`fn_80308F1C` below the seam, `fn_8030BACC`/
- * `equip_list_page_count`/`fn_8030A1D0` above it).  Only the fields those bodies reach are named, so the size
+ * `equip_list_page_count`/`menu_equip_page_count` above it).  Only the fields those bodies reach are named, so the size
  * is the extent they prove, not the record's own.
  * size: 0x23C (the extent these bodies prove) */
 typedef struct StatusScreenWork {
@@ -25,7 +25,7 @@ typedef struct StatusScreenWork {
     u8    pad_0x015[0x1C - 0x15];  /* +0x015 */
     u8    field_0x1C;              /* +0x01C  the cursor row `fn_8030BACC` clears */
     u8    pad_0x01D[0x190 - 0x1D]; /* +0x01D */
-    struct _PLW* equip;            /* +0x190  the player work `fn_8030A1D0` walks */
+    struct _PLW* equip;            /* +0x190  the player work `menu_equip_page_count` walks */
     u8    pad_0x194[0x19E - 0x194];/* +0x194 */
     u16   field_0x19E;             /* +0x19E  the page count `equip_list_page_count` counts into */
     u8    field_0x1A0;             /* +0x1A0  one visible-row flag per row */
@@ -57,7 +57,7 @@ extern "C" {
 
 /* 0x8030A1D0 - the equip page count with the default column arrangement (the owner defines it).  The
  * owner's `fn_80308EC0` (the screen's entry, below the seam) arms the screen's page bytes from it. */
-s32 fn_8030A1D0(struct _PLW* equip, s32 mode);
+s32 menu_equip_page_count(struct _PLW* equip, s32 mode);
 
 /* 0x8030B790 - the number of six-row pages the equip list record fills (never below one). */
 s32 equip_list_page_count(EquipListWork* list);

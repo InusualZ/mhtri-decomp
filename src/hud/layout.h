@@ -85,18 +85,18 @@ void spr_data_copy(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, 
 const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */
 
 /* This unit's own bodies, in address order. */
-void fn_802E08E8(u16 id, u32 color, const _mh_ivec2_* pos);
+void draw_sprite_idx_color(u16 id, u32 color, const _mh_ivec2_* pos);
 u32 fn_802E099C(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame);
 u32 fn_802E0A24(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* out);
 u32 sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out);
-u16 fn_802E0B54(u16 id);
+u16 sprite_anim_last_frame(u16 id);
 u16 sprite_ary_last_frame(const u16* ids);
 u32 fn_802E0CE4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 part, const _mh_ivec2_* pos);
 u32 spr_anim_draw(_SPR_DATA_* rec, u16 part, const _mh_ivec2_* pos);
 void fn_802E0F78(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx);
 void fn_802E1024(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
-void fn_802E1134(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
-void fn_802E1190(u16 id, u16 item_id, const _mh_ivec2_* pos);
+void draw_tex_icon_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
+void draw_itemicon_item_id_idx(u16 id, u16 item_id, const _mh_ivec2_* pos);
 void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 u32 fn_802E12A0(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_itemicon_anim_idx(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos);
@@ -112,7 +112,7 @@ void draw_font_anim_idx(u16 id, u16 part, s8* str, u32 flags, const _mh_ivec2_* 
 void draw_window_frame(s16 x, s16 y, u16 width, u16 height, u32 color);
 void draw_window_frame_style(s16 x, s16 y, u16 width, u16 height, u8 style);
 void fn_802E16E0(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
-void fn_802E1794(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
+void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void fn_802E1834(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void fn_802E18D4(u16 id, u8 tex_idx, const _mh_ivec2_* pos);
 s8 fn_802E1978(u8 index);

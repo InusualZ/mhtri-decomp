@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 void fn_80220114(void);
-void fn_80223258(struct _PLW* self, u8 value);
+void pl_equip_color_apply(struct _PLW* self, u8 value);
 /* 0x80224884 - whether the player's effects are drawn (0 while the player is hidden, inactive or not yet ready).
  * GUESS name. */
 u8 pl_eft_draw_ck(struct _PLW* plw);

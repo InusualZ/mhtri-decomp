@@ -59,8 +59,8 @@
 extern "C" {
 /* The lobby helpers the band calls (`lobby/fn_80212810.cpp`, `lobby/lb_npc.cpp`, `lobby/lb_menu_pos_tbl.cpp`). */
 void lb_panel_close(void);
-void fn_802125C8(void);
-void fn_8021F248(u8 a);
+void lb_item_db_toggle(void);
+void lb_item_list_select(u8 a);
 void fn_801FC2F0(void);
 
 struct _QNPC_W;
@@ -140,8 +140,8 @@ extern "C" void fn_803831B0(void) {
 /* 0x803836EC - the note band's per-frame step: refresh, then rebuild the note pane from the block
  * `lobby_world_block` points at. */
 extern "C" void fn_803836EC(void) {
-    fn_802125C8();
-    fn_8021F248(lobby_world_block[15872]);
+    lb_item_db_toggle();
+    lb_item_list_select(lobby_world_block[15872]);
     fn_802B4C5C();
     fn_801FC2F0();
 }

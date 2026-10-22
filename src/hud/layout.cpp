@@ -1,18 +1,22 @@
 /* hud/layout.cpp - the HUD's 2D element library (the 88-function `layout.cpp` translation unit,
  * `.text` 0x802E0740..0x802E4978 / 0x4238 B).
  * NAMES. GUESS (from each body and its callers): spr_anim_draw, draw_font_anim_idx, draw_window_frame_style
+ *   GUESS (from each body and its callers): `draw_sprite_idx_color`, `sprite_anim_last_frame`, `draw_tex_icon_idx`,
+ *   `draw_itemicon_item_id_idx`, `draw_tex_icon_square`, `draw_font_align_at`, `draw_font_align`,
+ *   `draw_font_align_idx`, `knj_msg_str_build`, `str_tbl_utf16_build`, `draw_layout_window_style`, `draw_title_window`,
+ *   `draw_window_box`, `draw_layout_window`, `draw_help_window`, `draw_window_frame_preset`, `draw_spin_icon`.
  *
  * Naming note: the symbol map had only fn_XXXXXXXX for most of this range; this run named every row it
  * wrote and the rows they call inside the unit (see "Renames" below).  The rows still carrying a
  * `fn_` stem are the ones with no body yet, plus the pre-existing debt (`fn_802E1978`,
- * `fn_802E198C`, `fn_802E0A24`, `fn_802E0B54`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
- * `fn_802E08E8`, `fn_802E099C`, `sprite_frame_apply`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
+ * `fn_802E198C`, `fn_802E0A24`, `sprite_anim_last_frame`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
+ * `draw_sprite_idx_color`, `fn_802E099C`, `sprite_frame_apply`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
  * `fn_802E1D30`, `fn_802E0714`) - filed as a naming sweep, not fixed here because each needs its
  * own evidence and the two that are called from outside this unit are cross-unit sweeps.
  *
  * Home, name and seam, from evidence (docs/plan.md 12, brief section 2):
  *   - class 1, a `__FILE__` string.  `.data` 0x805D5800, 0xB = "layout.cpp", is referenced by
- *     `fn_802E2440` (0x802E2464: `lis`/`addi` of the string) and `fn_802E2524` (0x802E2564), both
+ *     `knj_msg_str_build` (0x802E2464: `lis`/`addi` of the string) and `str_tbl_utf16_build` (0x802E2564), both
  *     in this range, and by nobody else; the dump's local symbol for it is
  *     `s_layout.cpp_805d5800`.  So the file is `layout.cpp` (the `.cpp` suffix is the string's).
  *   - the seam.  `tudiscover.py at 0x802E0740` must-links this range (0x802E0740..0x802E4978, 88
@@ -85,10 +89,10 @@
  *
  * Two corrections the target's own extractions forced, both measured:
  *   - `_SPR_ANIM_` is **not** a bitfield pair.  The step kind is the low 12 bits of the halfword
- *     (`fn_802E099C`/`fn_802E0B54` both read it as `clrlwi r0,r0,20`) and the "wrap the frame at the
+ *     (`fn_802E099C`/`sprite_anim_last_frame` both read it as `clrlwi r0,r0,20`) and the "wrap the frame at the
  *     table's last key" flag is bit 15 (`rlwinm r0,r0,0,16,16`) - MSB-first bitfields gave
  *     `extrwi 12,16` / `extrwi 1,28`, which is a *different* field.  As a plain `u16 flags` with the
- *     two masks: `fn_802E099C` 98.12 -> 99.88 %, `fn_802E0B54` 61.49 -> 62.29 %.
+ *     two masks: `fn_802E099C` 98.12 -> 99.88 %, `sprite_anim_last_frame` 61.49 -> 62.29 %.
  *   - the unit needs `#pragma fp_contract off` (scoped to this file): retail keeps every `a*b + c` as
  *     its own `fmuls` + `fadds`, and with the default `-fp_contract on` `anim_step_uv` measured
  *     85.38 % and `color_lerp` 87.17 % against 98.91 % / 95.99 % with it off.
@@ -110,13 +114,13 @@
  * `fn_802E2D84` calls `fn_802A2550` (`menu/menu_item.cpp`, 3 referrer lines); the two font-order
  * entries call `menu_text_center_x`/`menu_text_center_x_by_gaps`/`menu_text_block_center_x`
  * (`menu/menu_message.cpp`, already renamed there; 11 call sites) and
- * `fn_802E21C0` also `fn_8005C8F0` (`font/flfnt.cpp`, 4 call sites); `draw_font_anim_idx` calls
- * `sprite_frame_apply` (this unit's own row, but 44 referrer lines across 8 files).  `fn_802E2440`,
- * `fn_802E2524`, `draw_window_frame_style`/`fn_802E4828`, the four 0x802E33B4-family layout entries and
- * `fn_802E4850` are blocked on **data** (the `lbl_805D58xx`/`lbl_805D5Axx` tables and the `__FILE__`
+ * `draw_font_align_at` also `fn_8005C8F0` (`font/flfnt.cpp`, 4 call sites); `draw_font_anim_idx` calls
+ * `sprite_frame_apply` (this unit's own row, but 44 referrer lines across 8 files).  `knj_msg_str_build`,
+ * `str_tbl_utf16_build`, `draw_window_frame_style`/`draw_window_frame_preset`, the four 0x802E33B4-family layout entries and
+ * `draw_spin_icon` are blocked on **data** (the `lbl_805D58xx`/`lbl_805D5Axx` tables and the `__FILE__`
  * and panic strings), i.e. on the `.data`/`.sdata` claim below.
  *
- * Residuals of the rows that are written: `fn_802E0B54` 62.3 % (the kind switch's arm order),
+ * Residuals of the rows that are written: `sprite_anim_last_frame` 62.3 % (the kind switch's arm order),
  * `note_box_size` 91.67 %, `color_lerp` 95.99 % (the four channel extractions' declaration order and
  * the pack's OR order), `color_scale` 97.04 % (the pack's OR order), `anim_step_tex_id` 97.37 %
  * (`cur`/`prev` land in the opposite register pair), `anim_step_uv` 98.91 %, `anim_step_color`
@@ -220,7 +224,7 @@ void draw_sprite_idx(u16 id, const _mh_ivec2_* pos)
 }
 
 /* 0x802E08E8 (0x5C) - the same, with the record's colour word replaced by `color`. */
-void fn_802E08E8(u16 id, u32 color, const _mh_ivec2_* pos)
+void draw_sprite_idx_color(u16 id, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ rec;
 
@@ -296,7 +300,7 @@ u32 sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out)
  * is absent, which is the smallest a caller can use).  Each step's frame count indexes its own
  * table, whose stride depends on the step's kind: 2 halfwords for kinds 0/2/4, 3 for kind 1 and 6
  * for kind 3. */
-u16 fn_802E0B54(u16 id)
+u16 sprite_anim_last_frame(u16 id)
 {
     const _SPR_ANIM_* anim = (const _SPR_ANIM_*)fn_802E0714(id);
     u16 highest = 1;
@@ -340,7 +344,7 @@ u16 sprite_ary_last_frame(const u16* ids)
     u16 highest = 1;
 
     for (; *ids != 0xFFFF; ids++) {
-        u16 value = fn_802E0B54(*ids);
+        u16 value = sprite_anim_last_frame(*ids);
 
         if (value > highest) {
             highest = value;
@@ -455,17 +459,17 @@ void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos)
 }
 
 /* 0x802E1134 (0x5C) - the same from the sprite id. */
-void fn_802E1134(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
+void draw_tex_icon_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
     fn_802E1024(get_lsp_data(id, 0), tex_idx, color, pos);
 }
 
 /* 0x802E1190 (0x64) - the item icon drawn with an arbitrary sprite id. */
-void fn_802E1190(u16 id, u16 item_id, const _mh_ivec2_* pos)
+void draw_itemicon_item_id_idx(u16 id, u16 item_id, const _mh_ivec2_* pos)
 {
     ItemDataRecord* item = GetItemData(item_id);
 
-    fn_802E1134(id, item->tex_idx_0x004, lbl_805CDE78[item->kind], pos);
+    draw_tex_icon_idx(id, item->tex_idx_0x004, lbl_805CDE78[item->kind], pos);
 }
 
 /* 0x802E11F4 (0x94) - a square filled with texture `tex_idx` of the item uv table. */
@@ -576,7 +580,7 @@ void fn_802E16E0(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 }
 
 /* 0x802E1794 (0xA0) - a square of `_SPR_DATA_` uv pairs from the `fn_80055D20` table at flag 1. */
-void fn_802E1794(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
+void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
 {
     _mh_tex_uv_ uv0;
     _mh_tex_uv_ uv1;

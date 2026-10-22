@@ -147,7 +147,7 @@ struct _EFT007 { /* size: 0x48 */
 extern "C" s32 eft_res_spawn_gate_ck(void* self, u32 arg);
 extern "C" void effect_retire(nw4r::ef::Effect* effect, u32 arg);
 extern "C" void mtx34_set_trans(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
-extern "C" u8 fn_803311A0(MHchar* model);
+extern "C" u8 pl_gauge_level_get(MHchar* model);
 extern "C" u8 pl_frame_eft_color_get(_PLW* self);
 
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
@@ -483,7 +483,7 @@ extern "C" void fn_80102D48(_EFT007* self)
             return;
         }
         work->count++;
-        if (fn_803311A0((MHchar*)model) >= 2) {
+        if (pl_gauge_level_get((MHchar*)model) >= 2) {
             self->timer_0x0C = 3;
             work->paramscale *= 0.7f;
         } else {
@@ -497,7 +497,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         fn_800DD7E0((MHchar*)model, &self->pos_0x18, 0);
         break;
     case 10:
-        if (fn_803311A0((MHchar*)model) >= 2) {
+        if (pl_gauge_level_get((MHchar*)model) >= 2) {
             self->timer_0x0C = 3;
             work->paramscale *= 0.7f;
         } else {

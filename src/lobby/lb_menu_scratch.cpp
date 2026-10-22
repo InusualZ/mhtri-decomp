@@ -9,6 +9,7 @@
  *   `fn_8021E304`, whose retail body has none to keep (docs/lobby.md).
  * NAMES. `lb_menu_scratch` is the `.bss` block the unit constructs (`fn_8021EFC8`); the map and the dump give only
  *   placeholders for the functions.
+ *   GUESS (from each body and its callers): `lb_fabsf`.
  * RESIDUALS. Unwritten: `fn_8021E538` (0x8021E538-0x8021EBF0), `fn_8021EC98` (0x8021EC98-0x8021EFBC).  `fn_8021EFBC`,
  *   which the `.ctors` word points at, is written as a plain function, so the object emits no `.ctors`.
  *  - `fn_8021E1EC`: retail copies the fourth integer argument (`mr r30,r6`) after the float one (`fmr f31,f1`), ours
@@ -51,7 +52,7 @@ f32 fabsf(f32 v);
 
 u32 fn_8021DF50(u32 idx, u32 limit);
 void fn_8021DDA8(LbMenuCandidate* candidate, LbMenuRow* row);
-f32 fn_8021E300(f32 v);
+f32 lb_fabsf(f32 v);
 s32 game_ready_ck(void);
 u8 fn_8004DD74(void);
 
@@ -86,7 +87,7 @@ s32 fn_8021E1EC(LbMenuActor* self, LbMenuActor* rec, LbMenuFallback* work, u32 l
     } else {
         copyVec3(&pos, &work->pos_0x10);
     }
-    if (fn_8021E300(pos.y - self->pos_0x03C.y) < lbl_80799C60) {
+    if (lb_fabsf(pos.y - self->pos_0x03C.y) < lbl_80799C60) {
         idx = fn_8021E1B4(self, &pos);
         dist_sq = calcDistanceSqXZ(&self->pos_0x03C, &pos);
         if ((idx < limit || idx > (u32)(-1 - (s32)limit)) && dist_sq < radius) {
@@ -102,7 +103,7 @@ s32 fn_8021E1EC(LbMenuActor* self, LbMenuActor* rec, LbMenuFallback* work, u32 l
 }
 
 /* The y-window filter's absolute value helper (retail: `b <fabsf>`). */
-f32 fn_8021E300(f32 v)
+f32 lb_fabsf(f32 v)
 {
     return fabsf(v);
 }

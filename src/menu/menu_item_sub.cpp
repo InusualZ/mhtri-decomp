@@ -1,5 +1,5 @@
 /*
- * menu/menu_item_sub.cpp - a menu helper band that `menu/menu_item.cpp`'s `fn_802A07A0` calls (0x8036A828).  No bodies
+ * menu/menu_item_sub.cpp - a menu helper band that `menu/menu_item.cpp`'s `menu_work_update` calls (0x8036A828).  No bodies
  *   yet.
  * RANGE. .text 0x8036A828-0x8036CF64 (23 functions); extab 0x80017844-0x800178E4, extabindex 0x800372CC-0x800373BC,
  *   .data 0x805EE078-0x805EE098, .bss 0x806BF440-0x806BF530.  The left edge is `ef/eft053.cpp`'s end.

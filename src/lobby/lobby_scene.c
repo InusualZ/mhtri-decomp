@@ -6,13 +6,14 @@
  * NAMES. Module `lobby` is a GUESS from the data, not a symbol: `lbl_80794B28` sits in the `.sbss` run of lobby/effect
  *   resource pointers (`lobby_eft_mdl_name_ptr`, `lb_pig_name`, `pl_eft_func`, `set_demo_equip_data_func`), and the
  *   code around it references `lobby_w` and `sysSE_req__Fl`.
+ *   GUESS (from each body and its callers): `lb_page_record_empty_ck`.
  * RESIDUALS. none.
  */
 
 extern char *lbl_80794B28;
 extern void fn_80269394(char *entry);
 
-void fn_801EC9E0(unsigned char *obj)
+void lb_page_record_empty_ck(unsigned char *obj)
 {
     char *table = *(char **)(lbl_80794B28 + 0x10);
 

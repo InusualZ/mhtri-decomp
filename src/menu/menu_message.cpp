@@ -15,10 +15,13 @@
  *   `menu_text_*center_x*`, `menu_item_pick_seek`, `item_pair*`/`item_pages_*`, `menu_slot_*`, `get_group2_name_str`,
  *   `menu_item_row_sprite_ids`, the `.data` tables marked in place, and the cursor page move's 0x04/0x08 bits as
  *   "first"/"last".
+ *   GUESS (from each body and its callers): `put_frame_dialog_title`, `put_frame_header`, `put_frame_label`,
+ *   `put_frame_separator`, `put_frame_cursor_bar`, `put_message_window`, `menu_select_window_draw`,
+ *   `menu_choice_window_draw`, `menu_pad_map_set`.
  * RESIDUALS. 22 rows unwritten (objdiff scores them zero): 0x802A6F64-0x802A736C, 0x802A7524-0x802A7978,
  *   0x802A79B8-0x802A7B80, 0x802A7C44-0x802A8D74, 0x802A907C-0x802A91AC, 0x802A9BCC-0x802A9CD8,
  *   0x802A9F48-0x802AA3EC, 0x802AA4F4-0x802AA59C, 0x802AA68C-0x802AA6A8.  They need the `.sdata2` 120.0f (sole referrer
- *   `fn_802AA4F4`) or callees no header declares with a usable signature (`fn_802E3D18`, `fn_802D9EA8`, `draw_itemicon_anim_idx`,
+ *   `fn_802AA4F4`) or callees no header declares with a usable signature (`draw_window_box`, `cockpit_blink_get`, `draw_itemicon_anim_idx`,
  *   `get_rare_color`, `draw_number_idx`, `fn_8027993C`/`fn_80279B84`, and `font_print`, `char*` in `unsplit/menu.h` where
  *   the map's variadic `font_print__FPSce` sets `crclr`).  The 6 partial rows:
  *  - `menu_page_count`: retail `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B; five shapes measured);

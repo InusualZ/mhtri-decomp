@@ -167,7 +167,7 @@
 #include "types.h"
 #include "pl.h"
 #include "Pl/fn_802693C4.h"
-#include "Pl/fn_80224AC4.h"
+#include "Pl/pl_se_rig.h"
 #include "Pl/pl_skill.h"
 #include "sound/fn_800DD1F0.h"
 #include "Pl/pl_act_step_data.h"
@@ -583,7 +583,7 @@ u32 pl_id_bit_ck(_PLW* self, u32 id);
 u32 fn_8026B99C(_PLW* self);
 u32 fn_8026B934(_PLW* self);
 u32 fn_8026BA04(_PLW* self);
-u32 fn_803BECC8(u8 value, u32 low, u32 high);
+u32 option_cfg_eq_ck(u8 value, u32 low, u32 high);
 void fn_8026AF08(_PLW* self, u32 value);
 void fn_800E09D0(void* dst, void* src);
 u8 GameMode_ck(void);
@@ -873,7 +873,7 @@ extern "C" void fn_8026BF98(_PLW* self)
         if (st->flagsB8 & 0x80) {
             fn_8026A618(self, 17);
         }
-        if (fn_803BECC8(self->chunk_ofs, 10, 1) == 1) {
+        if (option_cfg_eq_ck(self->chunk_ofs, 10, 1) == 1) {
             if (st->flagsB8 & 4) {
                 fn_8026A618(self, 43);
             } else if (st->flagsB8 & 0x10) {
@@ -931,7 +931,7 @@ extern "C" void fn_8026BF98(_PLW* self)
         }
         break;
     case 1:
-        if (fn_803BECC8(self->chunk_ofs, 10, 1) == 1) {
+        if (option_cfg_eq_ck(self->chunk_ofs, 10, 1) == 1) {
             if (st->flagsB8 & 0x2000) {
                 fn_8026A618(self, 43);
             } else if (st->flagsB8 & 0x1000) {
@@ -2444,7 +2444,7 @@ u32 fn_80363A2C(void);
 int fn_80274AB8(int);
 u32 fn_8027E29C(u8);
 int Pl_item_timer_get(_PLW*, u16);
-u32 fn_8029F6B4(u16);
+u32 get_item_species_data(u16);
 u32 fn_8027E290(u8);
 void fn_8027E98C(u8*);
 s32 fn_8027EBA8(_PLW*, u8*);
@@ -2470,7 +2470,7 @@ u32 fn_80269394(void*);
 u32 fn_802693C4(u8, int, s32);
 u32 fn_80269474(u8, int, s32);
 void fn_802695A4(u8, void*, void*);
-void fn_80223258(_PLW*, u8);
+void pl_equip_color_apply(_PLW*, u8);
 void fn_80272B10(_PLW*, s32);
 s8 fn_8027234C(u8*, u8);
 void fn_802736A0(_PLW*);
@@ -3090,7 +3090,7 @@ extern "C" u32 fn_80271A18(_PLW* plw, u16 skill) {
 
 /* The skill level an equipment record contributes for `skill`, or 0. */
 extern "C" s8 fn_80271AD8(u16 item, u8 skill) {
-    _SKILLITEM* rec = (_SKILLITEM*)fn_8029F6B4(item);
+    _SKILLITEM* rec = (_SKILLITEM*)get_item_species_data(item);
     s8 lvl = 0;
 
     if (rec != 0) {
@@ -3106,7 +3106,7 @@ extern "C" s8 fn_80271AD8(u16 item, u8 skill) {
 
 /* Whether an equipment record provides `skill` at a non-zero level. */
 extern "C" u32 fn_80271B4C(u16 item, u8 skill) {
-    _SKILLITEM* rec = (_SKILLITEM*)fn_8029F6B4(item);
+    _SKILLITEM* rec = (_SKILLITEM*)get_item_species_data(item);
     u32 ok = 0;
 
     if (rec != 0) {
@@ -3526,7 +3526,7 @@ extern "C" void pl_parts_refresh(_PLW* plw, s32 arg) {
             plw->set_valid &= (u16)~mask;
             if (id != 0xFF) {
                 fn_8027373C(plw, id);
-                fn_80223258(plw, id);
+                pl_equip_color_apply(plw, id);
             }
         }
     }
@@ -5202,7 +5202,7 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
             if (plw->field_0x585 != 0) {
                 if (plw->field_0x018 == 1) {
                     if (plw->field_0x002 == 8) {
-                        if (fn_80331104() == 1U) {
+                        if (pl_mode8_free_ck() == 1U) {
                             fn_80275C18(plw, 0x3E9, a, b, d);
                         } else {
                             fn_80275C18(plw, 0x3FC, a, b, d);
@@ -5218,7 +5218,7 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
             }
             if (plw->field_0x018 == 1) {
                 if (plw->field_0x002 == 8) {
-                    if (fn_80331104() == 1U) {
+                    if (pl_mode8_free_ck() == 1U) {
                         fn_80275C18(plw, 0x3E9, a, b, d);
                     } else {
                         fn_80275C18(plw, 0x3FC, a, b, d);
@@ -5287,7 +5287,7 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
                 fn_80275C18(plw, 0x64, a, b, d);
             }
         } else if (plw->field_0x002 == 8) {
-            if (fn_80331104() == 1U) {
+            if (pl_mode8_free_ck() == 1U) {
                 fn_80275C18(plw, 0x41A, a, b, d);
             } else {
                 fn_80275C18(plw, 0x438, a, b, d);
@@ -5636,7 +5636,7 @@ extern "C" u32 Pl_act_state_ck(_PLW*);
 extern "C" void fn_80276868(_PLW*, s16);
 extern "C" void fn_80276CE8(_PLW*, s16);
 extern "C" u8 pl_act_kind_get(u8);
-extern "C" s32 fn_80331104(void);
+extern "C" s32 pl_mode8_free_ck(void);
 extern "C" void fn_8010D688(_PLW*);
 extern "C" u32 fn_8026FE44(_PLW*);
 extern "C" void mhchar_motion_speed_set(u8*, f32);
@@ -5688,7 +5688,7 @@ extern "C" {
 void lb_entry_handover_send(s32, u8, u8);
 }
 extern "C" void pl_item_add(_PLW*, u16, s16);
-extern "C" void fn_802E5D68(u16);
+extern "C" void cockpit_pointer_target_set(u16);
 
 extern "C" s32 pl_part_flag_ck(_PLW*, s32);
 extern "C" u8 pl_stagger_level_get(_PLW*);
@@ -5889,13 +5889,13 @@ extern "C" void Pl_act_set_step_table(_PLW* self, u32 table, s32 arg2)
 extern "C" void fn_802771A0(_PLW* self, s32 arg1)
 {
     if (self->kind_0x09 != 3) {
-        if (self->field_0x002 == 8 && fn_80331104() == 0) {
+        if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
             Pl_act_set_step_table(self, (u32)lbl_805E2248, (s16)arg1);
         } else {
             Pl_act_set_step_table(self, lbl_805BF448[self->field_0x002], (s16)arg1);
         }
     } else {
-        if (self->field_0x002 == 8 && fn_80331104() == 0) {
+        if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
             Pl_act_set_step_table(self, (u32)lbl_805E25D0, (s16)arg1);
         } else {
             Pl_act_set_step_table(self, lbl_805BF46C[self->field_0x002], (s16)arg1);
@@ -7081,7 +7081,7 @@ extern "C" void fn_8027AF88(_PLW* self)
     pl_item_add(self, *(u16*)(q + 1506 + *(s8*)(q + 1505) * 4),
                 *(s16*)(q + 1508 + *(s8*)(q + 1505) * 4));
     *(u32*)(q + 1668 + (*(s8*)(q + 1505) >> 5) * 4) |= 1 << (*(s8*)(q + 1505) & 31);
-    fn_802E5D68(*(u16*)(q + 1506 + *(s8*)(q + 1505) * 4));
+    cockpit_pointer_target_set(*(u16*)(q + 1506 + *(s8*)(q + 1505) * 4));
     *(s16*)(q + 1506 + *(s8*)(q + 1505) * 4) = 0;
     *(s16*)(q + 1508 + *(s8*)(q + 1505) * 4) = 0;
 }
@@ -8427,7 +8427,7 @@ extern "C" u32 fn_802D7804(s32, f32);
 extern "C" void mtx34_identity(void*);
 extern "C" void fn_8008C484(void*, f32, f32, f32);
 extern "C" void mtx34_concat_assign(void*, void*);
-extern "C" u8 fn_80224E28(_PLW*, u8);
+extern "C" u8 pl_slot_motion_allow_get(_PLW*, u8);
 extern "C" void fn_8026A394(_PLW*, s32, void*);
 extern "C" void pl_chr_set_motion_default(_PLW*, s32, u16, s32, s32);
 extern "C" void pl_model_set_value(_PLW*, s32, f32);
@@ -9036,7 +9036,7 @@ extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
     MTX34_ctor(&m);
     MTX34_ctor(&m2);
     VEC3_ctor(&v);
-    u8 t = fn_80224E28(self, lbl_805BAA90[self->field_0x002]);
+    u8 t = pl_slot_motion_allow_get(self, lbl_805BAA90[self->field_0x002]);
     out->x = lbl_8079A084;
     out->y = lbl_8079A084;
     setVector3(&v, lbl_8079A084, lbl_8079A084, lbl_8079A084);
@@ -9772,7 +9772,7 @@ extern "C" u32 skill_name_get(u16 id) {
 
 /* 0x8027F0F4 (0x28): the first byte of the species record `id` selects. */
 extern "C" u8 item_species_class_get(u16 id) {
-    return fn_8029F6B4(id)->slot_size;
+    return get_item_species_data(id)->slot_size;
 }
 
 /* 0x8027FFFC (0x54): whether a gun slot (kind 11 or 12) resolves to a weapon record with its +0x15 flag set. */

@@ -18,9 +18,12 @@
  *   0x8033C4D8/0x8033C570 is not adopted: both are 0x24-byte refresh wrappers without an argument.  The game-root
  *   dispatcher at 0x80432154 calls `lb_act_dispatch`/`lb_act_dispatch_ex` as `(u8 index, LbActReq* req)`.  Module
  *   `lobby`: `lobby_w`, `lb_param_w`, `lb_deli_data`, 11 `LbStr` calls.
+ *   GUESS (from each body and its callers): `lb_combo_item_known_ck`, `lb_combo_recipe_find`, `lb_page_row_pair_get`,
+ *   `lb_combo_rate_get`, `lb_combo_recipe_known_ck`, `lb_combo_exec`, `lb_combo_rate_sprintf`, `lb_deli_list_build`,
+ *   `lb_deli_menu_step`, `lb_deli_menu_draw`.
  * RESIDUALS. 55 rows unwritten or scoring zero: 0x80339F10-0x8033A0BC (`lb_act_dispatch_ex`), 0x8033A160-0x8033A850,
  *   0x8033A868-0x8033A9F4, 0x8033AAFC-0x8033ADAC, 0x8033ADD0-0x8033AE58, 0x8033AED0-0x8033B298, 0x8033B2C8-0x8033B7D0
- *   (`fn_8033B67C` among the `sprintf` users that need the `.sdata` format operand), 0x8033B808-0x8033C36C,
+ *   (`lb_combo_rate_sprintf` among the `sprintf` users that need the `.sdata` format operand), 0x8033B808-0x8033C36C,
  *   0x8033C4FC-0x8033C570, 0x8033C594-0x8033CEC0, 0x8033CF18-0x8033E050 (with the written `lb_byte_list_has`, which
  *   scores zero), 0x8033E088-0x8033F270.
  *  - `lb_page_entry_bit_set`: retail forms `lobby_world_block + (index >> 3)` in a register and keeps the bit-field
@@ -486,7 +489,7 @@ void lb_act_handover(u8 unused, LbActReq* req) {
                     if (req->sel_0x04.bytes_0x00.d_0x03 != 0xFF) {
                         pair = &companion->pairs_0x5E2[req->sel_0x04.bytes_0x00.d_0x03];
                         pl_item_add((_PLW*)&moves[index], pair->id_0x00, pair->value_0x02);
-                        fn_802E5D68(pair->id_0x00, (s8)req->sel_0x04.bytes_0x00.d_0x03);
+                        cockpit_pointer_target_set(pair->id_0x00, (s8)req->sel_0x04.bytes_0x00.d_0x03);
                     }
                 }
                 companion->bits_0x684[0] = companion->bits_0x684[0] | req->mask_0x08.word_0x00;
@@ -1061,9 +1064,9 @@ u16* lb_page_id_find(u16 id) {
     return NULL;
 }
 
-/* Forwards the two halfwords of the page table row `lbl_806043E8[index]` to the row writer `fn_8033AC78`. */
+/* Forwards the two halfwords of the page table row `lbl_806043E8[index]` to the row writer `lb_combo_recipe_find`. */
 void lb_page_row_apply(u16 index, s32 value) {
-    fn_8033AC78(lbl_806043E8[index].first_0x00, lbl_806043E8[index].second_0x02, value);
+    lb_combo_recipe_find(lbl_806043E8[index].first_0x00, lbl_806043E8[index].second_0x02, value);
 }
 
 /* Act 26: whether the request's fourth byte has bit 0 (the "already handled" bit) clear. */
@@ -1074,12 +1077,12 @@ u32 lb_act_handled_bit_ck(u8 unused, LbActReq* req) {
     return 0;
 }
 
-/* `fn_8033AC78`'s row lookup: -1 when the row is not in the page table, else the row goes to `fn_8033AED0`. */
+/* `lb_combo_recipe_find`'s row lookup: -1 when the row is not in the page table, else the row goes to `lb_combo_rate_get`. */
 s8 lb_page_row_ck(u16 id, u16 value, s16* out) {
-    if (fn_8033AC78(id, value, 0) == NULL) {
+    if (lb_combo_recipe_find(id, value, 0) == NULL) {
         return -1;
     }
-    return fn_8033AED0(out, 0, 0);
+    return lb_combo_rate_get(out, 0, 0);
 }
 
 /* Sets the bit for `index` in the page block's per-entry bit field `lobby_world_block->bits_0x3960`. */

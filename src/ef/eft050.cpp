@@ -94,7 +94,7 @@ typedef struct CockpitItemBlock {
 
 /* The two-line panel `fn_8033F270`/`fn_8033F40C`/`fn_8033F560` draw; `fn_8033F638` addresses the one
  * at +0x9C of its record.  The field names come from the sprite id each value is drawn at (the
- * `fn_802152A4(sprite, value, mode, pos)` calls). size: 0x1A */
+ * `draw_font_idx_num(sprite, value, mode, pos)` calls). size: 0x1A */
 typedef struct CockpitPanel {
     /* +0x00 */ u8 value_0x00;  /* drawn at sprite 0x201C */
     /* +0x01 */ u8 value_0x01;  /* 0x201D */
@@ -248,7 +248,7 @@ typedef struct HoldOwner {
 extern "C" {
 #endif
 
-void fn_802152A4(u16 id, s32 value, u32 mode, const _mh_ivec2_* pos);
+void draw_font_idx_num(u16 id, s32 value, u32 mode, const _mh_ivec2_* pos);
 void addVec3To(VEC3* dst, const VEC3* src);
 u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
 const u8* fn_802D773C(u8 index);
@@ -399,20 +399,20 @@ extern "C" void fn_8033F270(CockpitPanel* self, const _mh_ivec2_* pos)
     if (self->icon_0x0A != 0) {
         u8 icon = lbl_805E7180[self->icon_0x0A];
         if (icon != 0xFF) {
-            fn_802E1794((s16)(pos->x + 0x3A), (s16)(pos->y + 0x6E), 0x12, 0xFFFFFFFF, icon);
+            draw_tex_icon_square((s16)(pos->x + 0x3A), (s16)(pos->y + 0x6E), 0x12, 0xFFFFFFFF, icon);
         }
         if (self->gauge_0x0C + self->gauge_delta_0x0E >= 0x64) {
             anchor.x = (s16)(anchor.x + 6);
         }
-        fn_802152A4(0x2020, self->gauge_0x0C + self->gauge_delta_0x0E, 2, &anchor);
+        draw_font_idx_num(0x2020, self->gauge_0x0C + self->gauge_delta_0x0E, 2, &anchor);
     } else {
         draw_font_idx(0x2021, LbStr(0, 0x1B8), 2, pos);
     }
-    fn_802152A4(0x201C, self->value_0x00, 2, pos);
-    fn_802152A4(0x201D, self->value_0x01, 2, pos);
-    fn_802152A4(0x201E, self->count_0x02 + self->count_delta_0x04, 2, pos);
-    fn_802152A4(0x201F, self->count_0x06 + self->count_delta_0x08, 2, pos);
-    fn_802152A4(0x2022, self->timer_0x10 + self->timer_delta_0x12, 2, pos);
+    draw_font_idx_num(0x201C, self->value_0x00, 2, pos);
+    draw_font_idx_num(0x201D, self->value_0x01, 2, pos);
+    draw_font_idx_num(0x201E, self->count_0x02 + self->count_delta_0x04, 2, pos);
+    draw_font_idx_num(0x201F, self->count_0x06 + self->count_delta_0x08, 2, pos);
+    draw_font_idx_num(0x2022, self->timer_0x10 + self->timer_delta_0x12, 2, pos);
 }
 
 /* Draws the hold slot list the selected player carries: one row of three sprites and the entry's name
@@ -424,7 +424,7 @@ extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
     const u8* rows = fn_802D773C(sel);
     const u8* slots = lb_entry_id_get(sel);
     draw_font_idx(0x2043, get_player_name_str(sel), 1, pos);
-    fn_802152A4(0x2044, self->mode_0x14, 1, pos);
+    draw_font_idx_num(0x2044, self->mode_0x14, 1, pos);
     if (rows[slots[0] + 4] == 0) {
         draw_font_idx(0x2046, LbStr(0, 0x1C1), 1, pos);
     } else {
@@ -441,7 +441,7 @@ extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
 extern "C" void fn_8033F560(CockpitPanel* self, const _mh_ivec2_* pos)
 {
     draw_sprite_ary(lbl_805E7464, pos);
-    fn_802152A4(0x205F, self->value_0x16 + self->value_delta_0x18, 1, pos);
+    draw_font_idx_num(0x205F, self->value_0x16 + self->value_delta_0x18, 1, pos);
     draw_font_idx(0x2060, LbStr(0, (u16)(self->label_0x1A + 0x1C2)), 1, pos);
     u16 digits[4];
     fn_802D7754(lobby_world_block->clock_hour_0x51A4, lobby_world_block->clock_minute_0x51A5, digits);

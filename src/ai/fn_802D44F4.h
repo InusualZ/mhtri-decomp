@@ -1,7 +1,7 @@
 /*
  * ai/fn_802D44F4.h - declarations of the 0x802D44F4-0x802DDC04 band, now `ai/ai_npc.cpp` (to 0x802D9EA4) and
  *   `hud/cockpit.cpp` (from there): the notice-pool and slot helpers the cockpit calls, `ai_slots_clear`, `PutPageArrow`
- *   and the `ai_npc` entries other units call.  `fn_802DA3CC` is declared as the function whose address
+ *   and the `ai_npc` entries other units call.  `ainpc_entry_draw_all` is declared as the function whose address
  *   `subTransSetPrio` registers.
  */
 #ifndef MHTRI_AI_FN_802D44F4_H
@@ -27,7 +27,7 @@ void hud_notice_set_flag_ptr(HudNotice* notice, u8* flag);
 /* 0x802DA1B0 - clears the sixteen 0x20-byte AI slot records at 0x806BD808 (each body is a byte store); the
  * function reads no argument.  Renamed with `quest/quest_entry.cpp`; GUESS name from that loop. */
 void ai_slots_clear(void);
-void fn_802DA344(void);                  /* 0x802DA344 */
+void ainpc_entry_update_all(void);                  /* 0x802DA344 */
 /* 0x802DA454 - claims a free slot of the notice pool and fills it from the arguments (kind, id, the
  * position and three mode bytes); returns the slot. */
 HudNotice* hud_notice_spawn(s32 kind, s32 id, s16 x, s16 y, s32 a, s32 b, s32 c);
@@ -43,7 +43,7 @@ u32 player_color_get(u8 player);
 void ai_npc_hold_item_arm(void);                  /* 0x802D6534, called by hud/cockpit_quest.cpp's
                                           * `quest_slot_arm_a` (its body is written in this unit) */
 
-void fn_802DA3CC(void);                  /* 0x802DA3CC, registered by address */
+void ainpc_entry_draw_all(void);                  /* 0x802DA3CC, registered by address */
 
 /* 0x802D94C4 - the area-mode setter `enemy/em020_prog.cpp`'s `em020_area_model_set` calls for
  * the em020 area models: once the screen-state query `quest_move_state_valid_ck` is true it arms

@@ -4,6 +4,7 @@
  * NAMES. The map and the dump give only placeholders for the range, so the file keeps the map's stem.  Module `lobby`:
  *   the callees are the lobby UI API (`lobby_w`, `LbStr`, `lb_param_w`, `get_lsp_data`, `GetMenuFontColor`,
  *   `set_blendmode`, `draw_font_idx`, `draw_sprite_ary`).
+ *   GUESS (from each body and its callers): `lb_world_submode_get`.
  * RESIDUALS. 43 rows unwritten: 0x801E9010-0x801E92B0, 0x801E938C-0x801E9600, 0x801E9640-0x801E9AA8,
  *   0x801E9B68-0x801E9FC8, 0x801E9FF0-0x801EAC30, 0x801EAC84-0x801EB0B8, 0x801EB1B8-0x801EB524, 0x801EB560-0x801EB6F4,
  *   0x801EB7A4-0x801EC194, 0x801EC19C-0x801EC7AC, 0x801EC85C-0x801EC9E0.
@@ -284,7 +285,7 @@ void fn_801E79E4(void)
             if (lb_unlock_cond_ck(6U) == 0) {
                 flags |= 1;
             }
-            if (fn_8033B6C0(self->data_0x1C, self->data_0x20) > 0 && fn_802FB4F4(4) == 0) {
+            if (lb_deli_list_build(self->data_0x1C, self->data_0x20) > 0 && lb_unlock_cond_last_ck(4) == 0) {
                 lb_choice_init(self->str_0x24, lbl_805B7CB0 + 20, flags, 0x10);
             } else {
                 lb_choice_init(self->str_0x24, lbl_805B7CB0, flags, 0);
@@ -352,7 +353,7 @@ void fn_801E79E4(void)
                 break;
             case 4:
                 self->state_0x00 = 6U;
-                fn_8033B6C0(self->data_0x1C, self->data_0x20);
+                lb_deli_list_build(self->data_0x1C, self->data_0x20);
                 sysSE_req(0x1B);
                 break;
             }
@@ -373,7 +374,7 @@ void fn_801E79E4(void)
         return;
     case 6:
         ainpc_page_hold_set();
-        switch (fn_8033B990()) {
+        switch (lb_deli_menu_step()) {
         case 1:
             break;
         case 2:
@@ -802,7 +803,7 @@ void fn_801E8D5C(LbMenuWork* self)
             get_lsp_data(idp[0], &pos);
             pos.x += anchor.x;
             pos.y += anchor.y;
-            fn_80216560(id, base[(u16)i * 3 + 1], (s16*)&pos, 1, selected, 1, 0x10);
+            lb_item_cell_draw_layout1(id, base[(u16)i * 3 + 1], (s16*)&pos, 1, selected, 1, 0x10);
             idp += 2;
         }
         return;

@@ -12,7 +12,7 @@ struct _QNPC_W;
 struct _g3d_work;
 
 /* The +0x110 pointer the pane's scene-model teardown reads: it lives over the `MHchar`'s padding
- * (`MHchar` is 0x140 bytes, `Pl/fn_80224AC4.h`'s model record 0x164: this view spans the 0x164),
+ * (`MHchar` is 0x140 bytes, `Pl/pl_se_rig.h`'s model record 0x164: this view spans the 0x164),
  * so it is the model view's own field.
  * size: 0x164 */
 struct NoteModelView {

@@ -136,22 +136,22 @@ extern u16 lbl_805B8914[];         /* .data 0x805B8914 */
 /* The unsplit plain-C callees.  Their map names are bare `fn_XXXXXXXX` stems, so they take C linkage
  * (a C++ declaration would mangle the name objdiff pairs on); each is declared with the argument count
  * and widths the target's call site shows. */
-u32 fn_801EC9E0(LbPage* page);
+u32 lb_page_record_empty_ck(LbPage* page);
 void fn_801EC828(LbPageOwner* owner);
 void fn_801EC7AC(LbPageOwner* owner);
 u32 userdata_flag_ck(s32 id);
-void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
+void put_page_count(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u8 flag, s32 arg);
 void equip_record_copy(LbIconRec* dst, const LbIconRec* src);
 void fn_801F8318(LbPage* self, s16 x, s16 y);
-void fn_801F6DBC(void* dst, s16 x, s16 y, u8* ptr);
+void lb_pane_draw(void* dst, s16 x, s16 y, u8* ptr);
 void fn_801F353C(const s16* table, s16* out_max, s16* out_count);
 void fn_801F6168(u8* slots, u8* rows, u32 row, u8 kind, s16 value, u8* extra, LbPage* page);
 void sysSE_stop(s32 id);
 void fn_8004D0D8(LbWorldBlock* world, u8 id);
 void fn_8004D0E0(LbWorldBlock* world, u8 id);
 void fn_8004C038(LbPage* page, LbWorldBlock* world);
-void fn_802DF7CC(s32 kind, const _mh_ivec2_* pos);
+void put_button_guide(s32 kind, const _mh_ivec2_* pos);
 
 #ifdef __cplusplus
 }

@@ -13,20 +13,26 @@
  *   GUESS: `lb_item_cell_draw_wide`, `lb_item_cell_draw`, `lb_panel_close`, `lb_panel_msg_draw`
  *   GUESS (from each body and its callers): `lb_count_window_draw`, `lb_help_text_put`, `lb_help_num_put`,
  *   `lb_item_row_draw`.
+ *   GUESS (from each body and its callers): `lb_equip_kind_ck`, `lb_kakou_icon_build`, `draw_font_idx_num`,
+ *   `lb_font_print`, `lb_text_center_print`, `lb_cursor_prompt_draw`, `lb_button_prompt_draw`, `lb_page_arrow_put`,
+ *   `lb_item_cell_draw_layout`, `lb_item_cell_draw_layout1`, `lb_equip_cell_draw_layout`, `lb_equip_cell_draw_layout3`,
+ *   `lb_equip_cell_draw_layout5`, `lb_item_detail_panel_draw`, `lb_item_info_draw`, `lb_equip_cell_draw`,
+ *   `lb_item_flags_ck`, `lb_equip_flags_ck`, `lb_equip_state_get`, `lb_row_init`, `lb_anim_mark_draw`,
+ *   `lb_speaker_name_get`, `lb_scroll_init`, `lb_scroll_flag_set`, `lb_scroll_tables_set`, `lb_scroll_kind_set`.
  * RESIDUALS. 68 rows unwritten: 0x80212B1C-0x80214EF0, 0x80214F30-0x80215A74, 0x80215AE4-0x80215E6C,
  *   0x80215E84-0x802164F0, 0x8021677C-0x80216A08, 0x80216A68-0x80217934, 0x802179D4-0x80217B04, 0x80217C68-0x80217DA0,
  *   0x80217DD8-0x80217F4C, 0x80217FA0-0x802180D8, 0x80218138-0x80219080.  `lb_choice_draw` among them: `unsplit/lobby.h`
  *   declares five parameters where retail reads a sixth (`clrlwi r8,r8,24`), so its real definition would clash.
- *  - `fn_802128A8`: retail zero-extends `kind` (`clrlwi r3,r3,24`) before the switch; a `u8` parameter drops the mask,
+ *  - `lb_equip_kind_ck`: retail zero-extends `kind` (`clrlwi r3,r3,24`) before the switch; a `u8` parameter drops the mask,
  *    `s32` + `switch ((u8)kind)` gives a signed tree, `kind = (u8)kind` moves the copy to r31; the `u8` form is kept;
  *  - `fn_80215E6C`: retail keeps `clrlwi r0,r3,24; slwi r0,r0,2`, ours fuses them into one `rlwinm` (the unit does not
  *    set the `#pragma peephole off` its siblings use);
  *  - `fn_80212A2C`: ours fuses `clrlwi.` where retail keeps `clrlwi` + `cmpwi` (the same missing pragma);
- *  - `fn_80216560`, `fn_80216678`, `fn_80217B04`: retail narrows the `u8`/`u16` values (`clrlwi`) where ours passes
- *    them through; `fn_80217944`, `fn_80217988`: the narrowed copy lands in r4 where ours uses r3;
- *  - `fn_80215A74`: `li r0,1` is scheduled earlier in retail; `fn_80217BE4`: its two counters swap r28/r29;
+ *  - `lb_item_cell_draw_layout1`, `fn_80216678`, `fn_80217B04`: retail narrows the `u8`/`u16` values (`clrlwi`) where ours passes
+ *    them through; `lb_item_flags_ck`, `lb_equip_flags_ck`: the narrowed copy lands in r4 where ours uses r3;
+ *  - `lb_page_arrow_put`: `li r0,1` is scheduled earlier in retail; `fn_80217BE4`: its two counters swap r28/r29;
  *  - `fn_802180D8`: the compare tree is laid out differently (ours 16 B longer);
- *  - `fn_802190FC`: `addi r3` and `li r5` swap (the copy's argument setup order).
+ *  - `lb_scroll_tables_set`: `addi r3` and `li r5` swap (the copy's argument setup order).
  *   flipcheck: `.data` 0x38 against 0x620; `.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of
  *   the claim; `GetItemData`, `LbPutAnaPageArrow` and `PutPageArrow` are referenced unmangled where the map spells
  *   `GetItemData__FUs`, `LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` and `PutPageArrow__FPUsssUsPC10_mh_ivec2_Uc`.
@@ -38,7 +44,7 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
-/* The 0xFFFF-masked byte/word table `fn_80212810` and `fn_802128A8` index by the item kind. */
+/* The 0xFFFF-masked byte/word table `fn_80212810` and `lb_equip_kind_ck` index by the item kind. */
 extern const u8 lbl_805B97F4[];
 
 /* The pointer run `fn_80215E6C` indexes by a byte id (the `.data` run the discovery surfaced). */
@@ -72,8 +78,8 @@ typedef struct LbItemFlags {
 } LbItemFlags; /* size: 0x7 */
 
 /* The 0x80-byte scroll-list work block the tail of this range operates on: a byte kind/mode pair,
- * two 16-bit cursors, four copied tables and the owner id.  Layout read off `fn_80219080`'s memset
- * (0x80) and the memcpy lengths in `fn_802190FC`. */
+ * two 16-bit cursors, four copied tables and the owner id.  Layout read off `lb_scroll_init`'s memset
+ * (0x80) and the memcpy lengths in `lb_scroll_tables_set`. */
 typedef struct LbScrollWork {
     /* +0x00 */ u8 kind_0x00;
     /* +0x01 */ u8 flag_0x01;
@@ -148,7 +154,7 @@ s32 fn_80212810(s32 id)
     return (s32)LbStr(0, (u16)value);
 }
 
-s32 fn_802128A8(u8 kind, s32 arg, s32 sel)
+s32 lb_equip_kind_ck(u8 kind, s32 arg, s32 sel)
 {
     LbEquipCheck* equip;
     LbItemFlags* flags;
@@ -271,10 +277,10 @@ void LbPutAnaPageArrow(u16 a, u16 b, s16 c, s16 d, u16 e, _mh_ivec2_* pos, bool 
 
 /* The 9-argument page drawer the small wrappers below forward to; the 9th argument travels on the
  * stack and selects which item table the page uses (0..11). */
-void fn_80215F8C(u16 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, u16 h, u8 kind);
+void lb_item_cell_draw_layout(u16 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, u16 h, u8 kind);
 
 /* The 9-argument variant the `fn_80216Axx` wrappers forward to. */
-void fn_8021677C(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, u8 g, s32 h, u8 kind);
+void lb_equip_cell_draw_layout(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, u8 g, s32 h, u8 kind);
 
 /* Forwarders around LbPutAnaPageArrow that fix one of the trailing flags. */
 void fn_80215AC8(s32 a, s32 b, s32 c, s32 d, s32 e, _mh_ivec2_* pos, bool side)
@@ -291,67 +297,67 @@ void* fn_80215E6C(u8 id)
 /* The page drawers, one per table kind. */
 void lb_item_cell_draw_wide(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 7);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 7);
 }
 
 void lb_item_cell_draw(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 0);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 0);
 }
 
-s32 fn_80216560(u16 a, u16 b, s16* c, s32 d, s32 e, s32 f, s32 g)
+s32 lb_item_cell_draw_layout1(u16 a, u16 b, s16* c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C(a, b, (s32)c, d, e, f, 0, (u16)g, 1);
+    lb_item_cell_draw_layout(a, b, (s32)c, d, e, f, 0, (u16)g, 1);
 }
 
 void fn_80216598(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 2);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 2);
 }
 
 void fn_802165D0(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 3);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 3);
 }
 
 void fn_80216608(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 5);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 5);
 }
 
 void lb_window_draw(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 6);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 6);
 }
 
 s32 fn_80216678(u16 a, s32 b, s16* c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C(a, b, (s32)c, d, e, f, 0, (u16)g, 10);
+    lb_item_cell_draw_layout(a, b, (s32)c, d, e, f, 0, (u16)g, 10);
 }
 
 void fn_802166B0(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f)
 {
-    fn_80215F8C((u16)a, 0, b, c, d, e, 0, (u16)f, 8);
+    lb_item_cell_draw_layout((u16)a, 0, b, c, d, e, 0, (u16)f, 8);
 }
 
 void fn_80216714(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 11);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 11);
 }
 
 void lb_item_row_draw(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
 {
-    fn_80215F8C((u16)a, b, c, d, e, f, g, (u16)h, 1);
+    lb_item_cell_draw_layout((u16)a, b, c, d, e, f, g, (u16)h, 1);
 }
 
-void fn_80216A08(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
+void lb_equip_cell_draw_layout3(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
 {
-    fn_8021677C(a, b, c, d, e, f, (u8)g, 3, (u8)h);
+    lb_equip_cell_draw_layout(a, b, c, d, e, f, (u8)g, 3, (u8)h);
 }
 
-void fn_80216A38(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
+void lb_equip_cell_draw_layout5(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
 {
-    fn_8021677C(a, b, c, d, e, f, (u8)g, 5, (u8)h);
+    lb_equip_cell_draw_layout(a, b, c, d, e, f, (u8)g, 5, (u8)h);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -380,12 +386,12 @@ s32 fn_80217DAC(s32 a, s32 b)
     return fn_80217B04((u8)a, (u16)b) * 2;
 }
 
-s32 fn_80217944(s32 a, s32 bits)
+s32 lb_item_flags_ck(s32 a, s32 bits)
 {
     return (((LbItemFlags*)fn_8027E344(a))->flags_0x06 & (u8)bits) == (u8)bits;
 }
 
-s32 fn_80217988(s32 a, s32 b, s32 bits)
+s32 lb_equip_flags_ck(s32 a, s32 b, s32 bits)
 {
     return (((LbItemFlags*)fn_8027E2A8((u8)a, (u16)b))->flags_0x06 & (u8)bits) == (u8)bits;
 }
@@ -402,7 +408,7 @@ extern u16 lbl_805B9924[];
 
 void PutPageArrow(u16* table, s16 c, s16 d, u16 e, const _mh_ivec2_* pos, u8 flags);
 
-void fn_80219080(s32 owner, LbScrollWork* self, u8 kind, u8 mode)
+void lb_scroll_init(s32 owner, LbScrollWork* self, u8 kind, u8 mode)
 {
     memset(self, 0, 0x80);
     self->owner_0x34 = owner;
@@ -414,7 +420,7 @@ void fn_80219080(s32 owner, LbScrollWork* self, u8 kind, u8 mode)
 
 void fn_80218138(LbScrollWork* self);
 
-void fn_802190FC(LbScrollWork* self, void* a, void* b, void* c, void* d)
+void lb_scroll_tables_set(LbScrollWork* self, void* a, void* b, void* c, void* d)
 {
     if (a != NULL) {
         memcpy(self->table1_0x38, a, 12);
@@ -434,7 +440,7 @@ void fn_802190FC(LbScrollWork* self, void* a, void* b, void* c, void* d)
     }
 }
 
-void fn_802191C4(LbScrollWork* self, u8 kind)
+void lb_scroll_kind_set(LbScrollWork* self, u8 kind)
 {
     self->kind_0x00 = kind;
     fn_80218138(self);
@@ -452,7 +458,7 @@ void fn_8021920C(LbScrollWork* self, u16 value)
     }
 }
 
-void fn_802190F4(LbScrollWork* self, u8 flag)
+void lb_scroll_flag_set(LbScrollWork* self, u8 flag)
 {
     self->flag_0x01 = flag;
 }
@@ -463,10 +469,10 @@ void fn_80219254(LbScrollWork* self, s32 value, u16 index)
     self->value_0x0C = index;
 }
 
-void* fn_8029F6B4(u16 id);
+void* get_item_species_data(u16 id);
 void* GetItemData(u16 id);
 
-/* A 12-byte row `fn_80217F4C` clears and fills. size: 0xC. */
+/* A 12-byte row `lb_row_init` clears and fills. size: 0xC. */
 typedef struct LbRow12 {
     /* +0x00 */ u8 kind_0x00;
     /* +0x01 */ u8 unused_0x01;
@@ -474,7 +480,7 @@ typedef struct LbRow12 {
     /* +0x04 */ u8 unused_0x04[8];
 } LbRow12; /* size: 0xC */
 
-void fn_80217F4C(LbRow12* row, u8 kind, u16 value)
+void lb_row_init(LbRow12* row, u8 kind, u16 value)
 {
     memset(row, 0, 0xC);
     row->kind_0x00 = kind;
@@ -489,7 +495,7 @@ s32 fn_80217BE4(u16* list, s32 count)
     sum = 0;
     for (i = 0; i < (u8)count; i++) {
         if (list[i + 3] != 0) {
-            u16* entry = (u16*)fn_8029F6B4(list[i + 3]);
+            u16* entry = (u16*)get_item_species_data(list[i + 3]);
             u32* item = (u32*)GetItemData(entry[1]);
             sum += (s32)item[4];
         }
@@ -581,7 +587,7 @@ s32 fn_80217B04(u8 kind, u16 sel)
     return result;
 }
 
-void fn_80215A74(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f)
+void lb_page_arrow_put(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f)
 {
     _mh_ivec2_ pos;
     u8 flags;

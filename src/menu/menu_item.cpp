@@ -17,6 +17,9 @@
  *   GUESS (from each body and its callers): hit_mask_ck
  *   GUESS: `menu_row_table_get`
  *   GUESS (from each body and its callers): `menu_item_close`.
+ *   GUESS (from each body and its callers): `hit_lists_init`, `hit_registry_clear`, `hit_registry_update`,
+ *   `get_item_species_data`, `get_menu_msg_tbl`, `get_menu_msg`, `menu_row_limit_get`, `menu_slot_entry_b_select`,
+ *   `menu_slot0_lock_set`, `menu_slot_lock_set`, `menu_work_update`, `menu_slot_anim_update`.
  * RESIDUALS. 96 rows unwritten (objdiff scores them zero): 0x80297E34-0x80299ED8, 0x80299EF8-0x8029A140,
  *   0x8029A19C-0x8029B8F4, 0x8029B918-0x8029D6FC, 0x8029D744-0x8029EFDC, 0x8029F204-0x8029F3C8 (`hit_data_apply`),
  *   0x8029F834-0x8029FA74, 0x8029FCFC-0x8029FFB8, 0x802A0568-0x802A16F8, 0x802A1714-0x802A2550,
@@ -24,7 +27,7 @@
  *   0x802A4430-0x802A47F4, 0x802A4810-0x802A5444.  Blocked so far: `hit_data_apply`'s owner kinds 1 and 2 land on
  *   offsets `pl.h` does not name (+0x1E1 inside an `_EQUIP`, +0x08); the `fn_802996B4`..`fn_802997E4` family stores a
  *   float triple at the owner's +0x470, an `s16` in `pl.h`; every jump table of the Pl tail is zero-filled in the DOL,
- *   so a sparse switch's case mapping (`fn_80299EF8`, `fn_8029A358`, `fn_8029B918`, `fn_8029E35C`) is not recoverable.
+ *   so a sparse switch's case mapping (`fn_80299EF8`, `hit_registry_update`, `fn_8029B918`, `fn_8029E35C`) is not recoverable.
  *   The 11 partial rows:
  *  - `fn_8029A140`: the branch sense of one `fcmpo`, and its tail block laid out in the other order;
  *  - `fn_8029F084`: retail keeps an unused accumulator (`li r5,0`, `+9` per outer iteration) MWCC deletes;
@@ -43,8 +46,8 @@
  * SHAPES. Two views of the menu slot at `.bss` 0x806AC8C8 meet here: `MenuSlot` (`menu/menu_item.h`) and `MENU_ITEM_W`
  *   (below, the option/action lists' view); where one symbol has one declaration the `MenuSlot` one wins and the list
  *   call site carries the difference:
- *  - `fn_8029FFFC(MenuSlot*, s32)` is called with `(s8)self->grid_row`: retail sign-extends there (`extsb r4,r4`);
- *  - `fn_802A4D98(MenuSlot*)` takes a pointer cast; `fn_8029F7C4`/`fn_8029F7E0`/`get_menu_lsp_tbl` return `u32`/`u32*` and
+ *  - `menu_slot_entry_b_select(MenuSlot*, s32)` is called with `(s8)self->grid_row`: retail sign-extends there (`extsb r4,r4`);
+ *  - `fn_802A4D98(MenuSlot*)` takes a pointer cast; `get_menu_msg_tbl`/`get_menu_msg`/`get_menu_lsp_tbl` return `u32`/`u32*` and
  *    the call sites cast to the pointer they hand on;
  *  - `ItemDataRecord`'s +0x000 is a union of both views (`kind_0x00`/`level_0x01` beside one `u16`).
  */
@@ -103,7 +106,7 @@ extern "C" void fn_8029F1D4(u16* ids, u8* count, u16 id)
  * ------------------------------------------------------------------------------------------------ */
 
 /* Clears the registry: both list heads, both counts, the id counter and the trailing word. */
-extern "C" void fn_80299ED8(void)
+extern "C" void hit_registry_clear(void)
 {
     lbl_806AC8A8.head_0x00 = 0;
     lbl_806AC8A8.head_0x04 = 0;
@@ -243,7 +246,7 @@ void Panic(const char* file, int line, const char* fmt, ...);
 extern "C" const char lbl_805CDFC8[];
 extern "C" const char lbl_805CDFD8[];
 
-/* The cursor-arrow sprite rows `fn_802A6414` hands `fn_802DB140` (`.data` 0x805CDFF0). */
+/* The cursor-arrow sprite rows `fn_802A6414` hands `put_page_count` (`.data` 0x805CDFF0). */
 extern "C" u16 lbl_805CDFF0[];
 
 /* One 0x130-byte record of the option table `lobby_hunter_cards` (`.bss`): +0x00 says the row is filled,
@@ -268,7 +271,7 @@ typedef struct MENU_MOVE_WORK {
  * +0x00 byte says the row is filled, +0x03 the label and +0x0D its value text.  `.bss` 0x806BE340. */
 extern u8 lobby_hunter_cards[];
 
-/* The block `fn_802AA0DC` draws for the panel (`self` +0x24).  Only ever passed by pointer, so the
+/* The block `menu_choice_window_draw` draws for the panel (`self` +0x24).  Only ever passed by pointer, so the
  * run is opaque here. size: 0x48 */
 typedef struct MENU_ITEM_PANEL {
     /* +0x00 */ u8 unused_0x00[0x48];
@@ -315,7 +318,7 @@ typedef struct MENU_ITEM_W {
     /* +0x01B */ u8 pad_0x01B[0x09];
     /* +0x024 */ MENU_ITEM_PANEL panel_0x024;
     /* +0x06C */ MENU_ITEM_SLOT slots_0x06C[12]; /* the run to +0x18C (12 x 0x18) */
-    /* +0x18C */ u32 field_0x18C;  /* the pick-state word `toggle_word_step_dpad` advances (its low byte is the state `fn_802A9F48` draws) */
+    /* +0x18C */ u32 field_0x18C;  /* the pick-state word `toggle_word_step_dpad` advances (its low byte is the state `menu_select_window_draw` draws) */
     /* +0x190 */ _PLW* plw;         /* the player work record the item list acts on */
     /* +0x194 */ IdValue* page_0x194; /* the first page's entries */
     /* +0x198 */ IdValue* page_0x198; /* the second page's entries (see `two_page`) */
@@ -349,8 +352,8 @@ typedef struct MENU_ITEM_W {
 
 /* The folded half's callees (map stems, so C linkage - the front-end emits the map's
  * plain names) plus the two it hands a *pointer* view of the record to.  This unit's own
- * symbols among them - `fn_802A04EC`, `fn_8029FFFC`, `fn_802A4D98`, `fn_8029F7C4`,
- * `fn_8029F7E0`, `get_menu_lsp_tbl`, `GetItemData` - are declared once, in
+ * symbols among them - `fn_802A04EC`, `menu_slot_entry_b_select`, `fn_802A4D98`, `get_menu_msg_tbl`,
+ * `get_menu_msg`, `get_menu_lsp_tbl`, `GetItemData` - are declared once, in
  * `menu/menu_item.h`, and the call sites below follow those declarations (see
  * VIEWS in the file header for the two that cross the two views of the record). */
 extern "C" {
@@ -369,11 +372,11 @@ void fn_802A9BCC(_PLW* plw, void* page_a, void* page_b);
 u8 menu_slot_index_is_page_b(MENU_ITEM_W* self, s16 index);
 u32 menu_item_slot_accepts(MENU_ITEM_W* self, u16 item_id, s16 index);
 IdValue* menu_slot_get(MENU_ITEM_W* self, s16 index);
-void fn_802A9F48(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
-void fn_802AA0DC(void* panel, s32 index, const _mh_ivec2_* pos);
-void fn_802E2358(_SPR_DATA_* spr, s8* text, u32 length, const _mh_ivec2_* pos);
-void fn_802E4828(s16 x, s16 y, s32 flag);
-void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
+void menu_select_window_draw(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
+void menu_choice_window_draw(void* panel, s32 index, const _mh_ivec2_* pos);
+void draw_font_align(_SPR_DATA_* spr, s8* text, u32 length, const _mh_ivec2_* pos);
+void draw_window_frame_preset(s16 x, s16 y, s32 flag);
+void put_page_count(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 s16 fn_802D72EC(u16 item_id);
 char* strcpy(char* dst, const char* src);
 s32 fn_802A6434(_PLW* plw);
@@ -651,7 +654,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
                 self->flag_0x1B1 = self->flag_0x1B1 ^ 1;
             }
         }
-        fn_8029FFFC((MenuSlot*)self, (s8)self->grid_row);
+        menu_slot_entry_b_select((MenuSlot*)self, (s8)self->grid_row);
         break;
 
     case 1:
@@ -889,15 +892,15 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
     if (line_kind != 0 && (u8)span != 0xFF) {
         if (line_kind == 2) {
             get_lsp_data(732, &pos);
-            fn_802E4828(pos.x, pos.y, 0);
+            draw_window_frame_preset(pos.x, pos.y, 0);
             font_set_size(16, 16);
-            font_print_ex((s16)(pos.x + 24), (s16)(pos.y + 16), 0, (s8*)fn_8029F7E0(37, (u8)span));
+            font_print_ex((s16)(pos.x + 24), (s16)(pos.y + 16), 0, (s8*)get_menu_msg(37, (u8)span));
         } else if (line_kind == 3) {
             get_lsp_data(732, &pos);
-            fn_802E4828(pos.x, pos.y, 0);
+            draw_window_frame_preset(pos.x, pos.y, 0);
             font_set_size(16, 16);
-            font_print_ex((s16)(pos.x + 24), (s16)(pos.y + 16), 0, (s8*)fn_8029F7E0(37, (u8)span));
-            font_print_ex((s16)(pos.x + 24), (s16)(pos.y + 32), 2, (s8*)fn_8029F7E0(37, 8));
+            font_print_ex((s16)(pos.x + 24), (s16)(pos.y + 16), 0, (s8*)get_menu_msg(37, (u8)span));
+            font_print_ex((s16)(pos.x + 24), (s16)(pos.y + 32), 2, (s8*)get_menu_msg(37, 8));
         }
     }
     font_flush();
@@ -927,14 +930,14 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
             if (self->menu_kind == 2) {
                 MENU_OPTION_REC* option = &((MENU_OPTION_REC*)lobby_hunter_cards)[(s8)item];
                 if (get_option_cfg(12) == 0) {
-                    fn_802E2358(&spr, option->value_0x0D, length, &pos);
+                    draw_font_align(&spr, option->value_0x0D, length, &pos);
                 } else {
                     draw_font(spr, option->label_0x03, length, &pos);
                 }
             } else {
                 MENU_MOVE_WORK* work = &move_work[(s8)item];
                 if (get_option_cfg(12) == 0) {
-                    fn_802E2358(&spr, work->name_0x5CA, length, &pos);
+                    draw_font_align(&spr, work->name_0x5CA, length, &pos);
                 } else {
                     draw_font(spr, work->value_0x5DB, length, &pos);
                 }
@@ -945,18 +948,18 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
 
     if (draw_ok != 0) {
         get_lsp_data(741, &pos);
-        fn_802A9F48((u8)self->field_0x18C, 2, (s8*)fn_8029F7C4(13), &pos, 0);
+        menu_select_window_draw((u8)self->field_0x18C, 2, (s8*)get_menu_msg_tbl(13), &pos, 0);
     }
 
     if (draw_panel != 0) {
         get_lsp_data(742, &pos);
-        fn_802AA0DC(&self->panel_0x024, self->field_0x016, &pos);
+        menu_choice_window_draw(&self->panel_0x024, self->field_0x016, &pos);
     }
 }
 
 /* The cursor arrow: hands the player work record's cursor state to the arrow-table drawer. */
 extern "C" void fn_802A6414(MENU_ITEM_W* self, const _mh_ivec2_* pos) {
-    fn_802DB140(lbl_805CDFF0, self->cursor, self->cursor_max, self->move_result_0x238, pos);
+    put_page_count(lbl_805CDFF0, self->cursor, self->cursor_max, self->move_result_0x238, pos);
 }
 
 /* The player work record's item-list test, through the Pl unit's own entry point. */
@@ -1177,11 +1180,11 @@ u32 ItemExp(u16 id)
 /* 0x8029F680: reports an item's species kind to the caller, through the species table's +0x08 byte. */
 extern "C" void fn_8029F680(u16 id)
 {
-    item_kind_name_get(fn_8029F6B4(GetItemData(id)->species)->kind);
+    item_kind_name_get(get_item_species_data(GetItemData(id)->species)->kind);
 }
 
 /* 0x8029F6B4: the species record an item's +0x00A id selects; entry 0 when out of the 132-entry table. */
-ItemSpeciesRecord* fn_8029F6B4(u16 id)
+ItemSpeciesRecord* get_item_species_data(u16 id)
 {
     if (id >= 132) {
         id = 0;
@@ -1236,13 +1239,13 @@ u32* get_menu_lsp_tbl(u16 idx)
 }
 
 /* 0x8029F7C4: the second table's entry for a menu index. */
-extern "C" u32 fn_8029F7C4(u16 idx)
+extern "C" u32 get_menu_msg_tbl(u16 idx)
 {
     return (u32)lbl_806ACF28.tab_0x66C[idx];
 }
 
 /* 0x8029F7E0: an entry of the table the second run's entry points at. */
-extern "C" u32 fn_8029F7E0(u16 idx, u16 sub)
+extern "C" u32 get_menu_msg(u16 idx, u16 sub)
 {
     return (u32)lbl_806ACF28.tab_0x66C[idx][sub];
 }
@@ -1254,7 +1257,7 @@ extern "C" u32 menu_row_table_get(void)
 }
 
 /* 0x8029F818: the menu table's +0x758 run, indexed. */
-extern "C" u32 fn_8029F818(u16 idx)
+extern "C" u32 menu_row_limit_get(u16 idx)
 {
     return lbl_806ACF28.array_0x758[idx];
 }
@@ -1276,7 +1279,7 @@ extern "C" void fn_8029FFB8(MenuSlot* slot, s32 index)
 }
 
 /* 0x8029FFFC: the same selection over the second entry array. */
-extern "C" void fn_8029FFFC(MenuSlot* slot, s32 index)
+extern "C" void menu_slot_entry_b_select(MenuSlot* slot, s32 index)
 {
     s32 i;
 
@@ -1437,13 +1440,13 @@ extern "C" u32 fn_802A04EC(s8 value, u8 idx)
 }
 
 /* 0x802A053C: stores the first slot's +0x021 byte. */
-extern "C" void fn_802A053C(u8 value)
+extern "C" void menu_slot0_lock_set(u8 value)
 {
     menu_work.slot[0].field_0x021 = value;
 }
 
 /* 0x802A054C: the same store for the slot the caller names. */
-extern "C" void fn_802A054C(u8 idx, u8 value)
+extern "C" void menu_slot_lock_set(u8 idx, u8 value)
 {
     menu_work.slot[idx].field_0x021 = value;
 }
@@ -1463,7 +1466,7 @@ extern "C" void fn_8029FA74(MenuSlot* slot)
     slot->entries_a[0].field_0x02 = 1;
     slot->entries_a[1].field_0x02 = 1;
     fn_8029FFB8(slot, (s8)slot->field_0x019);
-    fn_8029FFFC(slot, (s8)slot->field_0x01B);
+    menu_slot_entry_b_select(slot, (s8)slot->field_0x01B);
 }
 
 /* 0x8029FB00: builds a slot's third entry array from the menu table the slot's state selects. */
@@ -1479,7 +1482,7 @@ extern "C" void fn_8029FB00(MenuSlot* slot)
             break;
         }
         slot->entry_count_c = 3;
-        table = (u32*)fn_8029F7C4(7);
+        table = (u32*)get_menu_msg_tbl(7);
         slot->entries_c[0].field_0x02 = 1;
         slot->entries_c[0].field_0x00 = 6;
         slot->entries_c[1].field_0x02 = 1;
@@ -1491,7 +1494,7 @@ extern "C" void fn_8029FB00(MenuSlot* slot)
         switch ((s8)slot->field_0x01B) {
         case 2:
             slot->entry_count_c = 3;
-            table = (u32*)fn_8029F7C4(8);
+            table = (u32*)get_menu_msg_tbl(8);
             slot->entries_c[0].field_0x02 = 1;
             slot->entries_c[0].field_0x00 = 22;
             slot->entries_c[1].field_0x02 = 1;
@@ -1501,7 +1504,7 @@ extern "C" void fn_8029FB00(MenuSlot* slot)
             break;
         case 4:
             slot->entry_count_c = 3;
-            table = (u32*)fn_8029F7C4(9);
+            table = (u32*)get_menu_msg_tbl(9);
             slot->entries_c[0].field_0x02 = 1;
             slot->entries_c[0].field_0x00 = 19;
             slot->entries_c[1].field_0x02 = 1;
@@ -1511,7 +1514,7 @@ extern "C" void fn_8029FB00(MenuSlot* slot)
             break;
         case 5:
             slot->entry_count_c = 4;
-            table = (u32*)fn_8029F7C4(10);
+            table = (u32*)get_menu_msg_tbl(10);
             if (slot->field_0x00F == 2) {
                 slot->entries_c[0].field_0x02 = 1;
                 slot->entries_c[1].field_0x02 = 1;
@@ -1551,7 +1554,7 @@ extern "C" void menu_item_close(void)
     MenuSlot* slot;
     s32 i;
 
-    fn_802DA2D4(1);
+    ainpc_entry_kill_kind(1);
     for (i = 0, slot = &menu_work.slot[0]; i < 2; slot++, i++) {
         if (slot->active != 0) {
             fn_8031A638(slot);
@@ -1579,9 +1582,9 @@ extern "C" u32 fn_802A025C(void)
 {
     u32 released = 0;
 
-    fn_802DA2D4(1);
+    ainpc_entry_kill_kind(1);
     fn_80384380();
-    fn_802DE238();
+    ainpc_page_hold_clear();
     if (game_ready_ck() == 1 && menu_work.slot[0].field_0x31E == 1) {
         fn_804273EC(4, 0, 0);
         released = 1;

@@ -14,6 +14,7 @@
  * NAMES. Module `menu` from the callees (`get_menu_lsp_tbl`, `GetMenuFontColor`, `GetItemData`, `ItemName`, `draw_font`)
  *   and the bracketing menu units; no `__FILE__` string covers the range (`menu_infomation.cpp`'s is the neighbour's) and
  *   the dump answers `zz_`, so the file keeps the map's stem.
+ *   GUESS (from each body and its callers): `menu_sel_cursor_init`, `menu_item_cell_draw`.
  * RESIDUALS. 23 rows unwritten (objdiff scores them zero): `fn_8031A6C0`, 0x8031AE38-0x8031B2D0, `fn_8031B39C`,
  *   `fn_8031B4C4`, 0x8031B624-0x8031BD50, `fn_8031BD7C`, `fn_8031C0B8`, `fn_8031C5FC`, `fn_8031C934`,
  *   0x8031CAC4-0x8031DA50, `fn_8031DA54` (the state machines, the draw passes, the cursor's record machine and the
@@ -22,8 +23,8 @@
  *  - indexed-access fold: retail `add r3,r3,r0` + `lhz`/`sth 0x39a2(r3)`, ours `lhzx`/`sthx` (`fn_8031B2D0`,
  *    `fn_8031B2FC`, `fn_8031B31C`);
  *  - an extra narrowing (`clrlwi`/`extsh`) ours applies to a value retail stores or compares raw (`fn_8031AD30`,
- *    `fn_8031AD9C`, `fn_8031B2FC`, `fn_8031BFEC`, `fn_8031C01C`, `fn_8031C028`, `fn_8031C390`, `fn_8031CA3C`);
- *  - 0xFFFF built as `lis r6,1; subi r0,r6,1` in retail, `li r0,-1` in ours (`fn_8031BFEC`, `fn_8031C028`);
+ *    `fn_8031AD9C`, `fn_8031B2FC`, `menu_sel_cursor_init`, `fn_8031C01C`, `fn_8031C028`, `fn_8031C390`, `fn_8031CA3C`);
+ *  - 0xFFFF built as `lis r6,1; subi r0,r6,1` in retail, `li r0,-1` in ours (`menu_sel_cursor_init`, `fn_8031C028`);
  *  - a signed byte test (`extsb` + `cmpwi`) where ours emits `cmplwi` (`fn_8031C338`, `fn_8031C8EC`), and `lhz`
  *    where ours loads `lha` (`fn_8031C514`);
  *  - ours repeats a `li r3,0; blr` tail where retail branches to a shared one (`fn_8031C338`, `fn_8031C390`,
@@ -41,16 +42,16 @@
 #include "menu/menu_message.h"
 #include "sound/fn_800D7F54.h"
 
-/* Callees other units own (`menu_slot_get` `menu/menu_message.cpp`, `fn_80274570` `Pl/pl_act.cpp`, `fn_8033AAFC`
+/* Callees other units own (`menu_slot_get` `menu/menu_message.cpp`, `fn_80274570` `Pl/pl_act.cpp`, `lb_combo_item_known_ck`
  * `lobby/lb_companion_ui.cpp`, ...); their owners' headers do not declare them yet. */
 
 extern "C" {
 
 u16* menu_slot_get(MenuSel* self, s16 index);
 s32  fn_80274570(void* a);
-s32  fn_8033AAFC(u16 a);
-s32  fn_8033AC78(u16 a, u16 b, s32 c);
-s16  fn_8033B380(void* self, u16 a, u16 b, s32 kind, s16 c, s16 d);
+s32  lb_combo_item_known_ck(u16 a);
+s32  lb_combo_recipe_find(u16 a, u16 b, s32 c);
+s16  lb_combo_exec(void* self, u16 a, u16 b, s32 kind, s16 c, s16 d);
 u16  item_count_find(u16 a, s32 b, s32 c);
 s32  fn_8004B3A0(u16 a, s32 b, s32 c);
 void fn_800DCFC0(void);
@@ -70,7 +71,7 @@ extern "C" s32 fn_8031AC0C(MenuSel* self, u16 a, u16 b) {
     u16* rec = menu_slot_get(self, (s16)a);
     if ((s16)rec[1] == 0) return 0;
     if (rec[0] != b) return 0;
-    return fn_8033AAFC(b);
+    return lb_combo_item_known_ck(b);
 }
 
 /* 0x8031AC80 - resolve the pair `(a, b)` into the cursor's record */
@@ -80,7 +81,7 @@ extern "C" s32 fn_8031AC80(MenuSel* self, u16 a, u16 b) {
     u16* rec = menu_slot_get(self, (s16)a);
     if ((s16)rec[1] == 0) return 0;
     u16* rec2 = menu_slot_get(self, (s16)b);
-    s32 r = fn_8033AC78(rec2[0], rec[0], 0);
+    s32 r = lb_combo_recipe_find(rec2[0], rec[0], 0);
     self->cursor_0x1EC.record_0x00 = (void*)r;
     return r != 0;
 }
@@ -161,7 +162,7 @@ extern "C" void fn_8031BD50(u16* dst, u16* src) {
 /* ============================================================================================== */
 /* 0x8031BFEC..0x8031CA3C - the cursor's own machine                                               */
 /* ============================================================================================== */
-extern "C" void fn_8031BFEC(MenuSelCursor* cur, s8 kind, MenuSel* owner) {
+extern "C" void menu_sel_cursor_init(MenuSelCursor* cur, s8 kind, MenuSel* owner) {
     cur->item_b_0x06 = 0;
     cur->item_a_0x04 = 0;
     cur->slot_b_0x0A = -1;
@@ -181,7 +182,7 @@ extern "C" s32 fn_8031C028(MenuSelCursor* cur, u16 a, u16 b) {
     cur->slot_b_0x0A = (s16)a;
     cur->item_b_0x06 = b;
     if (a == 0xFFFF) cur->record_0x00 = NULL;
-    else cur->record_0x00 = (void*)fn_8033AC78(cur->item_a_0x04, b, 0);
+    else cur->record_0x00 = (void*)lb_combo_recipe_find(cur->item_a_0x04, b, 0);
     cur->mode_0x16 = 0;
     cur->state_0x18 = 0;
     if (cur->record_0x00 == NULL) {
@@ -262,11 +263,11 @@ extern "C" void fn_8031C514(MenuSelCursor* cur, u8 which) {
     u8 t = cur->kind_0x0E;
     if (t > 1) {
         if (t == 2) {
-            cur->value_0x0C = fn_8033B380(&cur->anim_0x15, cur->item_a_0x04, cur->item_b_0x06, 2,
+            cur->value_0x0C = lb_combo_exec(&cur->anim_0x15, cur->item_a_0x04, cur->item_b_0x06, 2,
                                           cur->slot_a_0x08, cur->slot_b_0x0A);
         }
     } else {
-        cur->value_0x0C = fn_8033B380(&cur->anim_0x15, cur->item_a_0x04, cur->item_b_0x06, 0,
+        cur->value_0x0C = lb_combo_exec(&cur->anim_0x15, cur->item_a_0x04, cur->item_b_0x06, 0,
                                       cur->slot_a_0x08, cur->slot_b_0x0A);
     }
     cur->mode_0x16 = 1;

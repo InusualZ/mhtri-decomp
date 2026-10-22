@@ -8,6 +8,8 @@
  *   the file keeps the map's stem.  Module `lobby`: the predicates read `lobby_w` +0x003/+0x15F/+0x161 and
  *   `lobby_world_block`, and the callees are the lobby UI API plus the `ef`/`enemy` helpers the screens drive.
  *   GUESS: `lb_unlock_cond_ck`, `kujira_event_over_ck`
+ *   GUESS (from each body and its callers): `lb_progress_unlock`, `lb_unlock_cond_last_ck`, `lb_unlock_cond_top_get`,
+ *   `lb_world_mode_get`, `lb_unlock_rank_get`, `lb_world_upgrade_get`.
  * RESIDUALS. 93 rows unwritten: 0x802FA9A0-0x802FB3B0, 0x802FB600-0x802FB8C4, 0x802FBA14-0x802FBA60,
  *   0x802FBA94-0x802FBE40, 0x802FBE60-0x802FDB90, 0x802FDBA4-0x802FDF9C, 0x802FDFB0-0x802FEE4C, 0x802FEE54-0x802FF0A4,
  *   0x802FF0A8-0x802FF234, 0x802FF2C0-0x802FF478, 0x802FF4AC-0x802FF90C, 0x802FF928-0x8030121C.
@@ -90,7 +92,7 @@ u32 lb_unlock_cond_ck(u32 raw) {
 
 /* Whether `id` and `id + 1` together form the run boundary the caller is looking for: `id` accepted
  * and the next id rejected. */
-u32 fn_802FB4F4(u32 id) {
+u32 lb_unlock_cond_last_ck(u32 id) {
     if (lb_unlock_cond_ck((u16)id) == 1 && lb_unlock_cond_ck((u16)(id + 1)) == 0) {
         return 1;
     }
@@ -99,7 +101,7 @@ u32 fn_802FB4F4(u32 id) {
 
 /* Returns the first id of the requested table that `lb_unlock_cond_ck` accepts: ids 27 downwards for kind 0
  * and 39 down to 28 for kind 1; any other kind answers 0. */
-u16 fn_802FB54C(u32 raw) {
+u16 lb_unlock_cond_top_get(u32 raw) {
     u16 id;
 
     switch ((u8)raw) {
@@ -124,7 +126,7 @@ u16 fn_802FB54C(u32 raw) {
 }
 
 /* The mode byte of the block `lobby_world_block` points at, +0x3E01. */
-u8 fn_802FB5E4(void) {
+u8 lb_world_mode_get(void) {
     return lobby_world_block->mode_0x3E01;
 }
 
@@ -139,7 +141,7 @@ u8 fn_802FB8C4(void) {
 }
 
 /* A per-kind state byte of the block `lobby_world_block` points at, +0x4654. */
-u8 fn_802FB8EC(u32 raw) {
+u8 lb_world_upgrade_get(u32 raw) {
     return lobby_world_block->states_0x4654[(u8)raw];
 }
 
@@ -158,11 +160,11 @@ u8 fn_802FB948(void) {
 
 /* The lobby's "new area reached" gate: id 0's boundary, or id 20's boundary with mode 4 selected. */
 u32 lb_event_state_ck(void) {
-    if (fn_802FB4F4(0) != 0) {
+    if (lb_unlock_cond_last_ck(0) != 0) {
         return 1;
     }
-    if (fn_802FB4F4(20) != 0) {
-        if ((u8)fn_802FB5E4() == 4) {
+    if (lb_unlock_cond_last_ck(20) != 0) {
+        if ((u8)lb_world_mode_get() == 4) {
             return 1;
         }
     }

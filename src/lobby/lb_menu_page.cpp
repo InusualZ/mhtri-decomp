@@ -43,10 +43,10 @@ typedef struct LbPageSubWork {
 
 /* One 0x18-byte record of the page's record table at +0x264. size: 0x18 */
 typedef struct LbPageRecord {
-    /* +0x00 */ u8 kind_0x00;      /* the row kind `fn_80217F4C` is handed (12/13 mean "use kind 11") */
+    /* +0x00 */ u8 kind_0x00;      /* the row kind `lb_row_init` is handed (12/13 mean "use kind 11") */
     /* +0x01 */ u8 unused_0x01;
     /* +0x02 */ u16 flags_0x02;    /* bits 1/2/3 select the text ids (0x2/0x4/0x8) */
-    /* +0x04 */ u16 value_0x04;    /* `fn_80217F4C`'s value for the row */
+    /* +0x04 */ u16 value_0x04;    /* `lb_row_init`'s value for the row */
     /* +0x06 */ u8 unused_0x06[0x2];
     /* +0x08 */ void* data_0x08;   /* `lb_help_num_put`'s third argument */
     /* +0x0C */ u8 unused_0x0C[0xC];
@@ -95,7 +95,7 @@ typedef struct LbMenuPage {
     /* +0x324 */ u8 unused_0x324[0x4];
     /* +0x328 */ LbPageEntry entries_0x328[7];
     /* +0x398 */ u8 unused_0x398[0xC];
-    /* +0x3A4 */ u8 work_0x3A4[0x1E];  /* the sub-work `fn_801F0834`/`fn_801EF73C` run on */
+    /* +0x3A4 */ u8 work_0x3A4[0x1E];  /* the sub-work `fn_801F0834`/`lb_digit_pane_value` run on */
     /* +0x3C2 */ s16 icon_index_0x3C2; /* the shared icon table's index (guess) */
     /* +0x3C4 */ u8 tail_0x3C4[];
 } LbMenuPage; /* size: 0x3C4+ */
@@ -105,21 +105,21 @@ extern "C" {
 void fn_801E66A8(s32 a, s32 b);                  /* 0x801E66A8 - resets the band's work group */
 void fn_801E677C(void* work, u8 kind, u8 flag);  /* 0x801E677C - initialises one sub-work record */
 void fn_801E68B4(void* work, u8 flag);           /* 0x801E68B4 - ditto, one argument */
-s16 fn_801EF73C(void* work);                     /* 0x801EF73C - the icon index of the sub-work (s16) */
+s16 lb_digit_pane_value(void* work);                     /* 0x801EF73C - the icon index of the sub-work (s16) */
 s32 fn_801F0834(void* work);                     /* 0x801F0834 - non-zero while the sub-work is live */
-s32 fn_802142D8(LbIconRec* icon, s32 flag, void* table_a, void* table_b);
+s32 lb_kakou_icon_build(LbIconRec* icon, s32 flag, void* table_a, void* table_b);
 s32 lb_panel_msg_draw(s32 page, s16 id);               /* the 0x1877 panel's primary text */
 s32 lb_help_num_put(s32 page, s32 id, void* data);   /* the same panel's row text plus its data */
 s32 lb_panel_line_draw(s32 page, s16 id, s32 a, s32 b); /* its secondary text */
 s32 lb_panel_yes_no_draw(s32 page, s32 data);             /* its value */
-s32 fn_802179D4(LbIconRec* icon);                /* non-zero while the record is already held */
-s32 fn_80217F4C(LbIconRec* icon, u8 kind, u16 value); /* fills a record from a kind and a value */
-s32 fn_8021A5FC(void);                           /* 0x8021A5FC - the banner/message step */
+s32 lb_equip_state_get(LbIconRec* icon);                /* non-zero while the record is already held */
+s32 lb_row_init(LbIconRec* icon, u8 kind, u16 value); /* fills a record from a kind and a value */
+s32 lb_equip_bg_draw(void);                           /* 0x8021A5FC - the banner/message step */
 s32 equip_kind_table_class(u8 kind);                        /* the equipment kind's row-table class (Pl) */
 s32 fn_8027F1B8(LbIconRec* icon);                /* the record's stack count (Pl) */
 s32 fn_8027F21C(LbIconRec* icon);                /* the record's "held" test (Pl) */
 s32 menu_money_draw(s32 id);                         /* 0x802DF6E4 - the HUD/2D element release */
-s32 fn_8033C1AC(void);                           /* 0x8033C1AC - the companion-page step */
+s32 lb_deli_menu_draw(void);                           /* 0x8033C1AC - the companion-page step */
 void fn_803642B8(LbMenuPage* self);              /* 0x803642B8 - the band's per-state draw arms */
 void fn_803645C4(LbMenuPage* self);
 void fn_80364BD8(LbMenuPage* self);
@@ -180,12 +180,12 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                 LbPageRecord* rec = &self->records_0x264[self->list_mode_0x0C];
 
                 if ((u32)(rec->kind_0x00 - 12) <= 1) {
-                    fn_80217F4C(&icon, 11, 1);
+                    lb_row_init(&icon, 11, 1);
                 } else {
-                    fn_80217F4C(&icon, rec->kind_0x00, rec->value_0x04);
+                    lb_row_init(&icon, rec->kind_0x00, rec->value_0x04);
                 }
             }
-            if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
+            if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && lb_equip_state_get(&icon) == 0) {
                 msg_b = 78;
             }
             break;
@@ -223,11 +223,11 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                 msg_a = 97;
                 icon_flag = 1;
             }
-            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[lb_digit_pane_value(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
-            if ((u16)fn_802142D8(&icon, icon_flag, self->icons_0x20C, self->values_0x23C) == 0) {
+            if ((u16)lb_kakou_icon_build(&icon, icon_flag, self->icons_0x20C, self->values_0x23C) == 0) {
                 break;
             }
             msg_b = 98;
@@ -273,7 +273,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
         case 3:
             msg_a = 77;
             equip_record_copy(&icon, &self->icons_0x20C[self->index_0x128]);
-            if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
+            if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && lb_equip_state_get(&icon) == 0) {
                 msg_b = 78;
             }
             lb_panel_yes_no_draw(6265, self->data_0x200);
@@ -330,7 +330,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             page = 6264;
             msg_a = 104;
-            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[lb_digit_pane_value(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
@@ -374,7 +374,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             page = 6264;
             msg_a = 111;
-            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[lb_digit_pane_value(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
@@ -466,33 +466,33 @@ extern "C" void lb_menu_page_step(void) {
         break;
     case 5:
         if (self->mode_0x01 != 2 && self->mode_0x01 != 3) {
-            fn_8021A5FC();
+            lb_equip_bg_draw();
             menu_money_draw(6360);
         }
         fn_803642B8(self);
         break;
     case 10:
-        fn_8021A5FC();
+        lb_equip_bg_draw();
         menu_money_draw(6360);
         fn_803659E8(self);
         break;
     case 6:
-        fn_8021A5FC();
+        lb_equip_bg_draw();
         menu_money_draw(6360);
         fn_80364BD8(self);
         break;
     case 7:
-        fn_8021A5FC();
+        lb_equip_bg_draw();
         menu_money_draw(6360);
         fn_80364EE8(self);
         break;
     case 8:
-        fn_8021A5FC();
+        lb_equip_bg_draw();
         menu_money_draw(6360);
         fn_803653A0(self);
         break;
     case 9:
-        fn_8033C1AC();
+        lb_deli_menu_draw();
         break;
     }
 

@@ -35,7 +35,7 @@ typedef struct LbKujiraWork {
 } LbKujiraWork; /* size: 0x0C */
 
 /* The block the `.sbss` pointer `lobby_world_block` (0x80794880) points at, as this range sees it: the
- * mode byte at +0x3E01 (`fn_802FB5E4`), the per-kind state bytes at +0x4654 (`fn_802FB8EC`) and the
+ * mode byte at +0x3E01 (`lb_world_mode_get`), the per-kind state bytes at +0x4654 (`lb_world_upgrade_get`) and the
  * flag bytes at +0x4832..+0x4834 (`fn_802FF248`/`kujira_event_over_ck`/`fn_802FF29C`).  Everything between them
  * is filler.  size: 0x6010 (the neighbour view's extent - `lobby/fn_8021E1EC.h`; this range
  * reads nothing above +0x4834) */
@@ -88,8 +88,8 @@ extern u16* lbl_805D8C10[12];
 /* The `.sdata` byte table at 0x80792A38 this range indexes by a work byte (`fn_802FF90C`). */
 extern u8 lbl_80792A38[];
 
-/* `fn_802FB5E4` (0x802FB5E4) is defined by this range and read by `lb_event_state_ck` below. */
-u8 fn_802FB5E4(void);
+/* `lb_world_mode_get` (0x802FB5E4) is defined by this range and read by `lb_event_state_ck` below. */
+u8 lb_world_mode_get(void);
 
 /* `fn_802FDB04`/`fn_802FDDCC` (0x802FDB04, 0x802FDDCC) are this range's own event steps, forwarded to
  * by `fn_802FDB90`/`fn_802FDF9C`. */

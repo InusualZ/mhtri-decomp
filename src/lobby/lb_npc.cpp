@@ -27,6 +27,7 @@
  *   GUESS: lb_npc_motion_restart, lb_npc_act_set, lb_player_act_latch, lb_player_angle_to
  *   GUESS: `lb_cmd_pressed_ck`, `lb_cmd_held_ck`, `lb_cmd_repeat_ck`, `lb_cmd_repeat_get`, `lb_yes_no_step`
  *   GUESS: `lb_npc_motion_play`
+ *   GUESS (from each body and its callers): `lb_npc_id_ck`, `lb_item_db_toggle`, `weight_table_index`.
  * RESIDUALS. 238 rows unwritten: 0x801FC318-0x801FC6A0, 0x801FCBC8-0x801FD0F8, 0x801FD338-0x801FDD9C,
  *   0x801FE200-0x802029B4, 0x80204DA8-0x8020505C, 0x8020623C-0x80206824, 0x80206AD0-0x80206CB4, 0x80207284-0x80207698,
  *   0x80207B3C-0x80207E9C, 0x80207EEC-0x802080C0, 0x80208100-0x80208928, 0x80208AFC-0x8020A5D4, 0x8020A714-0x8020AD14,
@@ -107,8 +108,8 @@ extern "C" LbResId lbl_80582A68[];
 extern "C" {
 s32 userdata_progress_flag_ck(s32);
 u32 userdata_flag_ck(s32);
-void fn_802FAFC8(u16);
-u16 fn_802FB54C(s32);
+void lb_progress_unlock(u16);
+u16 lb_unlock_cond_top_get(s32);
 u8 fn_802FB948(void);
 void fn_80220078(void);
 void fn_801E9AA8(u8);
@@ -138,63 +139,63 @@ namespace s_801FBF78 {
 extern "C" {
 
 /* 0x801FBF78 - the lobby "world update" state dispatcher: each state runs its own quest-flag gate.
- * `fn_802FB54C(1)` returns the current mode; the switch's 10 arms are states 0x1D..0x26. */
+ * `lb_unlock_cond_top_get(1)` returns the current mode; the switch's 10 arms are states 0x1D..0x26. */
 void fn_801FBF78(void)
 {
-    switch (fn_802FB54C(1)) {
+    switch (lb_unlock_cond_top_get(1)) {
     case 0x1D:
         if (userdata_progress_flag_ck(0x3C) == 0 && userdata_flag_ck(0x2711) == 1 && userdata_flag_ck(0x2714) == 1 &&
             userdata_flag_ck(0x2715) == 1 && userdata_flag_ck(0x2718) == 1 && userdata_flag_ck(0x271D) == 1) {
-            fn_802FAFC8(0x3C);
+            lb_progress_unlock(0x3C);
         }
         break;
     case 0x1E:
         if (userdata_flag_ck(0x36B0) == 1) {
-            fn_802FAFC8(0x3D);
+            lb_progress_unlock(0x3D);
         }
         break;
     case 0x1F:
         if (userdata_progress_flag_ck(0x3E) == 0 && userdata_flag_ck(0x2743) == 1 && userdata_flag_ck(0x274A) == 1 &&
             userdata_flag_ck(0x274B) == 1 && userdata_flag_ck(0x274D) == 1 && userdata_flag_ck(0x2750) == 1) {
-            fn_802FAFC8(0x3E);
+            lb_progress_unlock(0x3E);
         }
         break;
     case 0x20:
         if (userdata_flag_ck(0x36B1) == 1) {
-            fn_802FAFC8(0x3F);
+            lb_progress_unlock(0x3F);
         }
         break;
     case 0x21:
         if (userdata_progress_flag_ck(0x40) == 0 && userdata_flag_ck(0x2774) == 1 && userdata_flag_ck(0x2775) == 1 &&
             userdata_flag_ck(0x277A) == 1 && userdata_flag_ck(0x277C) == 1 && userdata_flag_ck(0x2780) == 1) {
-            fn_802FAFC8(0x40);
+            lb_progress_unlock(0x40);
         }
         break;
     case 0x22:
         if (userdata_flag_ck(0x36B2) == 1) {
-            fn_802FAFC8(0x41);
+            lb_progress_unlock(0x41);
         }
         break;
     case 0x23:
         if (userdata_progress_flag_ck(0x42) == 0 && userdata_flag_ck(0x3A9B) == 1 && userdata_flag_ck(0x3A9E) == 1 &&
             userdata_flag_ck(0x3A9F) == 1 && userdata_flag_ck(0x3AA1) == 1 && userdata_flag_ck(0x3AA6) == 1) {
-            fn_802FAFC8(0x42);
+            lb_progress_unlock(0x42);
         }
         break;
     case 0x24:
         if (userdata_flag_ck(0x4A38) == 1) {
-            fn_802FAFC8(0x43);
+            lb_progress_unlock(0x43);
         }
         break;
     case 0x25:
         if (userdata_progress_flag_ck(0x44) == 0 && userdata_flag_ck(0x3ACB) == 1 && userdata_flag_ck(0x3ACD) == 1 &&
             userdata_flag_ck(0x3AD0) == 1 && userdata_flag_ck(0x3AD4) == 1 && userdata_flag_ck(0x3AD6) == 1) {
-            fn_802FAFC8(0x44);
+            lb_progress_unlock(0x44);
         }
         break;
     case 0x26:
         if (userdata_flag_ck(0x4A39) == 1) {
-            fn_802FAFC8(0x45);
+            lb_progress_unlock(0x45);
         }
         break;
     }
@@ -204,7 +205,7 @@ void fn_801FBF78(void)
 #pragma peephole off
 void fn_801FC268(void)
 {
-    switch (fn_802FB54C(0)) {
+    switch (lb_unlock_cond_top_get(0)) {
     case 0x1A:
         if (fn_802FB948() == 0) {
             lobby_world_block->field_0x3E01 = 9;
@@ -516,9 +517,9 @@ namespace s_801FBF78 {
 extern "C" {
 void fn_80212370(void);
 void fn_8021261C(void);
-void fn_803C3F6C(void);
+void demo_sound_update(void);
 void lobby_net_update(void);
-void fn_802DB2B8(void);
+void ainpc_page_reset(void);
 void fn_80211E68(void);
 void fn_802680C4(void);
 void fn_802B58D4(void);
@@ -526,11 +527,11 @@ void fn_802ADB98(void);
 void fn_800F8DA4(void);
 void hud_msg_frame(void);
 void ai_npc_reaction_forward(void);
-void fn_802DB2EC(void);
-void fn_802A07A0(void);
+void ainpc_page_idle(void);
+void menu_work_update(void);
 void fn_8021DC24(void);
 void fn_80324274(void);
-void fn_802DB2F0(void);
+void ainpc_page_update(void);
 void fn_801FD0F8(void);
 void fn_801FD174(_LB_NPC* self);
 void fn_801FD338(_LB_NPC* self, u8* data);
@@ -553,7 +554,7 @@ void lobby_frame_update(void)
     prim_init_all();
     fn_80212370();
     fn_8021261C();
-    fn_803C3F6C();
+    demo_sound_update();
     lobby_w.field_0x027 = lobby_w.field_0x000;
     if (isNetCityMode() == 1) {
         lobby_net_update();
@@ -565,7 +566,7 @@ void lobby_frame_update(void)
         lobby_w.field_0x12C = 1;
         lobby_w.field_0x172 = 10;
     } else {
-        fn_802DB2B8();
+        ainpc_page_reset();
         fn_801FD0F8();
         fn_80211E68();
         fn_802680C4();
@@ -575,14 +576,14 @@ void lobby_frame_update(void)
         fn_800F8DA4();
         hud_msg_frame();
         ai_npc_reaction_forward();
-        fn_802DB2EC();
+        ainpc_page_idle();
         system_w.field_0x8C0 = 0;
         if (lobby_w.field_0x12C != 1 && (lobby_w.field_0x000 == 0 || lobby_w.field_0x000 == 0x24)) {
-            fn_802A07A0();
+            menu_work_update();
         }
         fn_8021DC24();
         fn_80324274();
-        fn_802DB2F0();
+        ainpc_page_update();
     }
 }
 
@@ -822,7 +823,7 @@ u32 fn_801FE1DC(_LB_NPC* self, u16 id, f32 a, f32 b);
 u32 fn_801FE1EC(_LB_NPC* self);
 void fn_801FE200(_LB_NPC* self, u8 visible, bool flag);
 void fn_801FE128(_LB_NPC* self, u8 value);
-u32 fn_801FE32C(_LB_NPC* self, u8 kind);
+u32 lb_npc_id_ck(_LB_NPC* self, u8 kind);
 u32 fn_801FE348(_LB_NPC* self);
 u32 fn_801FE39C(_LB_NPC* self);
 u32 fn_801FE400(_LB_NPC* self);
@@ -831,9 +832,9 @@ u32 fn_801FE4A0(_LB_NPC* self);
 u32 fn_801FE4B4(_LB_NPC* self);
 u32 fn_801FE55C(_LB_NPC* self);
 u32 fn_801FE8CC(_LB_NPC* self);
-u8 fn_802FB5E4(void);
+u8 lb_world_mode_get(void);
 u8 fn_802FB948(void);
-u8 fn_802FB8EC(s32 idx);
+u8 lb_world_upgrade_get(s32 idx);
 void fn_802BE4FC(s32 id);
 void fn_80201AA0(_LB_NPC* self, s32 flag);
 void fn_80201BE4(_LB_NPC* self);
@@ -1097,28 +1098,28 @@ void fn_80203114(_LB_NPC* self)
 {
     fn_801FDFC0(self, 1);
 
-    if (fn_801FE32C(self, 1) == 1) {
+    if (lb_npc_id_ck(self, 1) == 1) {
         fn_80201AA0(self, 1);
-    } else if (fn_801FE32C(self, 14) == 1) {
+    } else if (lb_npc_id_ck(self, 14) == 1) {
         fn_80201BE4(self);
-    } else if (fn_801FE32C(self, 11) == 1) {
+    } else if (lb_npc_id_ck(self, 11) == 1) {
         fn_80201C80(self);
-    } else if (fn_801FE32C(self, 2) == 1) {
+    } else if (lb_npc_id_ck(self, 2) == 1) {
         fn_80201F60(self);
-    } else if (fn_801FE32C(self, 13) == 1) {
+    } else if (lb_npc_id_ck(self, 13) == 1) {
         fn_802020FC(self);
     } else if (fn_801FE348(self) == 1) {
         fn_80202394(self);
     } else if (fn_801FE39C(self) == 1) {
         fn_802024C4(self);
-    } else if (fn_801FE32C(self, 3) == 1) {
+    } else if (lb_npc_id_ck(self, 3) == 1) {
         if (LbCheckKujiraEvent() == 1) {
             fn_80202728(self);
         } else {
             fn_80202570(self);
         }
-    } else if (fn_801FE32C(self, 7) == 1) {
-        if (fn_802FB5E4() == 9) {
+    } else if (lb_npc_id_ck(self, 7) == 1) {
+        if (lb_world_mode_get() == 9) {
             fn_802027CC(self, 1);
         } else if (((u16)ran_suu(1) & 1) != 0) {
             fn_802027CC(self, 0);
@@ -1127,9 +1128,9 @@ void fn_80203114(_LB_NPC* self)
         }
     } else if (fn_801FE400(self) == 1) {
         fn_802029B4(self);
-    } else if (fn_801FE32C(self, 12) == 1) {
+    } else if (lb_npc_id_ck(self, 12) == 1) {
         fn_80202AC4(self);
-    } else if (fn_801FE32C(self, 5) == 1) {
+    } else if (lb_npc_id_ck(self, 5) == 1) {
         fn_80202B88(self);
     } else if (fn_801FE4A0(self) == 1) {
         fn_80202E6C(self);
@@ -1139,34 +1140,34 @@ void fn_80203114(_LB_NPC* self)
         fn_80202DD0(self);
     } else if (fn_801FE55C(self) == 1) {
         fn_80202D24(self);
-    } else if (fn_801FE32C(self, 19) == 1 || fn_801FE32C(self, 20) == 1) {
+    } else if (lb_npc_id_ck(self, 19) == 1 || lb_npc_id_ck(self, 20) == 1) {
         fn_80202C24(self);
     } else {
         switch (self->field_0x006) {
         case 0:
-            if (fn_801FE32C(self, 10) == 1 || fn_801FE32C(self, 9) == 1) {
+            if (lb_npc_id_ck(self, 10) == 1 || lb_npc_id_ck(self, 9) == 1) {
                 fn_801FE0AC(self, 1047, 16, 0);
-            } else if (fn_801FE32C(self, 8) == 1) {
+            } else if (lb_npc_id_ck(self, 8) == 1) {
                 if (lb_npc_Get_motion_no(self) == 52 || lb_npc_Get_motion_no(self) == 51) {
                     fn_801FE0AC(self, 51, 4, 0);
                 } else {
                     fn_801FE0AC(self, 1136, 4, 0);
                 }
-            } else if (fn_801FE32C(self, 17) == 1) {
+            } else if (lb_npc_id_ck(self, 17) == 1) {
                 fn_801FE0AC(self, 1136, 4, 0);
             } else if (fn_801FE450(self) == 1) {
                 fn_801FE0AC(self, 1144, 4, 0);
-            } else if (fn_801FE32C(self, 16) == 1) {
+            } else if (lb_npc_id_ck(self, 16) == 1) {
                 if (lb_npc_Get_motion_no(self) == 1137 || lb_npc_Get_motion_no(self) == 1138) {
                     fn_801FE0AC(self, 1139, 4, 0);
                 } else {
                     fn_801FE0AC(self, 1136, 4, 0);
                 }
-            } else if (fn_801FE32C(self, 6) == 1) {
+            } else if (lb_npc_id_ck(self, 6) == 1) {
                 fn_801FE0AC(self, 1111, 4, 0);
-            } else if (fn_801FE32C(self, 4) == 1) {
+            } else if (lb_npc_id_ck(self, 4) == 1) {
                 fn_801FE0AC(self, 1071, 4, 0);
-            } else if (fn_801FE32C(self, 18) == 1) {
+            } else if (lb_npc_id_ck(self, 18) == 1) {
                 fn_801FE0AC(self, 1098, 4, 0);
             } else {
                 lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
@@ -2704,12 +2705,12 @@ void fn_802050AC(_LB_NPC* self)
                 if ((u8)get_now_mapno() == 22 && self->field_0x004 == 2) {
                     switch ((u32)kind) {
                     case 1:
-                        if (fn_802FB8EC(2) == 0) {
+                        if (lb_world_upgrade_get(2) == 0) {
                             skip = 1;
                         }
                         break;
                     case 5:
-                        if (fn_802FB8EC(3) == 0) {
+                        if (lb_world_upgrade_get(3) == 0) {
                             skip = 1;
                         }
                         break;
@@ -2796,14 +2797,14 @@ void fn_80207698(_LB_NPC* self);
 /* The Pl-band helpers, and this group's own neighbours. */
 u32 Pl_motion_end_ck(_PLW* self);
 u32 game_ready_ck(void);
-u32 fn_8021B8A8(u8 a, u8 b);
+u32 lb_menu_kind_pair_ck(u8 a, u8 b);
 u32 fn_8021B8F4(u8 a, u8 b);
 void fn_801FDEE4(_LB_NPC* self, u32 motion);
 u32 fn_801FDFD0(_LB_NPC* self);
 void fn_801FE0AC(_LB_NPC* self, u16 motion_id, s32 a, s32 b);
 void lb_npc_motion_restart(_LB_NPC* self, u16 motion_id);
 u32 fn_801FE1EC(_LB_NPC* self);
-u32 fn_801FE32C(_LB_NPC* self, u16 id);
+u32 lb_npc_id_ck(_LB_NPC* self, u16 id);
 void fn_801FE200(_LB_NPC* self, u16 a, u16 b);
 s32 fn_801FDE3C(_LB_NPC* self, VEC3* target);
 }
@@ -3028,7 +3029,7 @@ u32 fn_80208928(_PLW* self)
     if (fn_8021B8F4(self->kind_0x015, self->area_0x16) == 1) {
         return 0;
     }
-    if (fn_8021B8A8(self->kind_0x015, self->area_0x16) != 1) {
+    if (lb_menu_kind_pair_ck(self->kind_0x015, self->area_0x16) != 1) {
         return 1;
     }
     work = (u8*)get_move_work_adrs(2);
@@ -3371,7 +3372,7 @@ extern "C" s32 lobby_cmd_toggle_step_raw(void* self) {
 }
 
 /* Toggles the item database's display byte and redraws the lobby when the pad loop is idle. */
-extern "C" void fn_802125C8(void) {
+extern "C" void lb_item_db_toggle(void) {
     if (game_ready_ck() == 0) {
         lobby_world_block[0x3E00] ^= 1;
         if (getItemListSelection() == 1) {
@@ -3407,7 +3408,7 @@ extern "C" void fn_8021261C(void) {
 }
 
 /* The index of the first `count` entries whose running total reaches `value`, over s16 weights. */
-extern "C" s16 fn_802126E8(s16* table, s16 count, u32 value) {
+extern "C" s16 weight_table_index(s16* table, s16 count, u32 value) {
     s16 i;
     s16 sum;
 

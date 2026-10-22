@@ -20,6 +20,7 @@
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
  * extabindex).
  * NAMES. GUESS (from each body and its callers): cockpit_quest_init
+ *   GUESS (from each body and its callers): `cockpit_pointer_target_set`.
  */
 /* ---- header inherited from src/menu/fn_802E4978.cpp (written against its pre-phase-4 range) ---- */
 /*
@@ -55,7 +56,7 @@
  *     `fn_802E646C`, `fn_802E6AAC` (VMX/paired-single bodies, `m2c` flags them);
  *     `fn_802E6EB4` is partial (39.8 %) - the `drawshape` colour/rect tail does not reproduce.
  *   * `fn_802E4AD4` 80.3 %, `fn_802E555C` 81.3 %, `fn_802E5220` 87.2 %, `fn_802E5284` 88.9 %,
- *     `fn_802E53C4` 89.3 %, `fn_802E4978` 93.3 %, `fn_802E5A14` 95.6 %, `fn_802E5D68` 95.7 %,
+ *     `fn_802E53C4` 89.3 %, `fn_802E4978` 93.3 %, `fn_802E5A14` 95.6 %, `cockpit_pointer_target_set` 95.7 %,
  *     `fn_802E5C3C` 95.8 % - register-allocation/argument-width residuals (first divergence is an
  *     ARG row, the instruction set is equal; several already sit at the 100 %-minus-a-few-points
  *     level from the `{lval}` casts the compiler had to insert).
@@ -385,7 +386,7 @@ void fn_802E5A14(void);
 void fn_802E5BB4(void);
 void fn_802E5C3C(_mh_ivec2_*, s8);
 void fn_802E5CFC(s8);
-void fn_802E5D68(s16, u8);
+void cockpit_pointer_target_set(s16, u8);
 void fn_802E5E90(void);
 void fn_802E646C(void);
 void fn_802E6AAC(void);
@@ -477,7 +478,7 @@ void cockpit_quest_init(void) {
     st->field_0x074 = 0;
     idx = (s8)my_player_no();
     fn_802E4978(&cockpit_work[0], &move[idx]);
-    fn_802DFCD4();
+    cockpit_notice_init();
     ai_slots_clear();
 }
 
@@ -521,8 +522,8 @@ void fn_802E5220(CockpitWork* self) {
 
 void fn_802E53C4(void) {
     screen_split_mode_ck();
-    fn_802DA344();
-    subTransSetPrio(6, (u32)&fn_802DA3CC, 0, NULL);
+    ainpc_entry_update_all();
+    subTransSetPrio(6, (u32)&ainpc_entry_draw_all, 0, NULL);
 }
 
 void fn_802E5400(void) {
@@ -702,12 +703,12 @@ void fn_802E5A14(void) {
             self->field_0x176 = 0;
         }
         self->field_0x17B++;
-        if (fn_802E0B54(0xE53) < (s32)self->field_0x17B) {
+        if (sprite_anim_last_frame(0xE53) < (s32)self->field_0x17B) {
             self->field_0x17B = 0;
         }
         if (self->field_0x17C != 0) {
             self->field_0x17C++;
-            if (fn_802E0B54(0xE33) < (s32)self->field_0x17C) {
+            if (sprite_anim_last_frame(0xE33) < (s32)self->field_0x17C) {
                 self->field_0x17C = 0;
             }
         }
@@ -766,7 +767,7 @@ void fn_802E5284(void) {
         cockpit_work[0].field_0x0D1 = 0;
         fn_802E4C24();
         fn_803839EC();
-        fn_802DFD38();
+        cockpit_notice_update();
         quest_gauge_update(&cockpit_work[0], 0xFF);
         fn_802E4C5C(move, &cockpit_work[0].text);
         if (m0->field_0x0EF != 0) {
@@ -778,17 +779,17 @@ void fn_802E5284(void) {
         fn_802E5A14();
         fn_802E5BB4();
         fn_802ED88C();
-        fn_802A2620(0);
+        menu_slot_anim_update(0);
         if (move_work_state_ck() != 0) {
             fn_802EF230();
         }
         fn_802EF6B0();
-        fn_802DA344();
+        ainpc_entry_update_all();
     }
     if (event_demo_ck() != 1) {
         subTransSet((u32)(void*)fn_802E555C, 0, NULL);
         if (lb_quest_work_active_ck() == 0) {
-            subTransSetPrio(6, (u32)(void*)&fn_802DA3CC, 0, NULL);
+            subTransSetPrio(6, (u32)(void*)&ainpc_entry_draw_all, 0, NULL);
         }
         subTransSetPrio(6, (u32)(void*)&menu_slot_panel_draw, 0, NULL);
     }
@@ -861,7 +862,7 @@ void fn_802E4C5C(CockpitMove* self, CockpitText* text) {
 void fn_802E5764(void* arg0, u8 arg1) {
 }
 
-void fn_802E5D68(s16 arg0, u8 arg1) {
+void cockpit_pointer_target_set(s16 arg0, u8 arg1) {
     CockpitWork* self;
     _mh_ivec2_ pos;
     _mh_ivec2_ anchor;
@@ -3141,11 +3142,11 @@ namespace nw4r = ::nw4r;  /* the view headers below reopen it */
 
 #include "hud/cockpit_quest_marker.h"
 
-/* 0x802EC6C4 (0x3C).  A one-bit predicate over `fn_803311A0`'s byte: the branch-free
+/* 0x802EC6C4 (0x3C).  A one-bit predicate over `pl_gauge_level_get`'s byte: the branch-free
  * `subfic`/`orc`/`subf` sequence is the target's own shape. */
 u32 fn_802EC6C4(void)
 {
-    u32 v = fn_803311A0();
+    u32 v = pl_gauge_level_get();
     return ((~v | 1) - ((1 - v) >> 1)) >> 31;
 }
 

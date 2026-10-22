@@ -9,6 +9,7 @@
  *   they are), so the file keeps the map's stem.  Module `lobby`: every foreign call is the lobby/HUD API (`LbStr`,
  *   `GetMenuFontColor`, `get_lsp_data`, `draw_sprite_*`, `ItemName`) or one of 23 calls into `lobby/fn_80212810.cpp`.
  *   GUESS (from each body and its callers): `item_price_get`.
+ *   GUESS (from each body and its callers): `lb_title_frame_draw`.
  * RESIDUALS. 56 rows unwritten: 0x801E0ADC-0x801E1A2C, 0x801E1B68-0x801E3EDC, 0x801E3EF8-0x801E403C,
  *   0x801E41D0-0x801E448C, 0x801E451C-0x801E4E38, 0x801E4ED0-0x801E4F78, 0x801E5000-0x801E6850, 0x801E68B4-0x801E6DCC,
  *   0x801E6E04-0x801E6EA8, 0x801E6F80-0x801E72F4, 0x801E732C-0x801E7530.  Partial: `fn_801E1A40`, `fn_801E4E44`.
@@ -27,16 +28,16 @@ void userdata_zenny_add(s32 size);
 void fn_8004C038(void* a, void* b);
 s32 game_ready_ck(void);
 u32 fn_800D0734(s32 a);
-s32 fn_80217F4C(void*, u8, u16);
-void fn_802190FC(void*, s32, s32, void*, void*);
-void fn_80219530(void*, void*);
+s32 lb_row_init(void*, u8, u16);
+void lb_scroll_tables_set(void*, s32, s32, void*, void*);
+void lb_equip_compare_set(void*, void*);
 s32 fn_802754B4(void*);
 s32 fn_8027E354(u8, u16);
 s32 lb_unlock_cond_ck(u16);
 u32 lobby_net_busy_ck(void);
 u32 chk_pointer(void);
 void eft_res_slot_release(void* obj);
-void fn_8021AA78(void*, u32, void*, void*, void*);
+void lb_equip_records_copy(void*, u32, void*, void*, void*);
 s32 lb_panel_close(void);
 }
 
@@ -170,16 +171,16 @@ void userdata_zenny_add(s32 size);
 void fn_8004C038(void* a, void* b);
 s32 game_ready_ck(void);
 u32 fn_800D0734(s32 a);
-s32 fn_80217F4C(void*, u8, u16);
-void fn_802190FC(void*, s32, s32, void*, void*);
-void fn_80219530(void*, void*);
+s32 lb_row_init(void*, u8, u16);
+void lb_scroll_tables_set(void*, s32, s32, void*, void*);
+void lb_equip_compare_set(void*, void*);
 s32 fn_802754B4(void*);
 s32 fn_8027E354(u8, u16);
 s32 lb_unlock_cond_ck(u16);
 u32 lobby_net_busy_ck(void);
 u32 chk_pointer(void);
 void eft_res_slot_release(void* obj);
-void fn_8021AA78(void*, u32, void*, void*, void*);
+void lb_equip_records_copy(void*, u32, void*, void*, void*);
 s32 lb_panel_close(void);
 }
 
@@ -259,7 +260,7 @@ void fn_801E3EDC(void* obj)
 /* Forwards one record plus its three sub-records to the page handler. */
 void fn_801E3EE0(void* a, u8* rec, u8 kind)
 {
-    fn_8021AA78(a, kind, rec + 0x454, rec + 0x49C, rec + 0x4A8);
+    lb_equip_records_copy(a, kind, rec + 0x454, rec + 0x49C, rec + 0x4A8);
 }
 
 /* Clears the work block's 16-bit timer at +0x32. */
@@ -403,14 +404,14 @@ void fn_801E413C(LbEftWork* self)
 {
     s16 sel = self->sel_0x0EC;
 
-    fn_80217F4C(&self->info_0x430, self->recs_0x134[sel].kind_0x01,
+    lb_row_init(&self->info_0x430, self->recs_0x134[sel].kind_0x01,
                 self->recs_0x134[sel].id_0x02);
     if (fn_801E448C(self) == 1) {
-        fn_802190FC(&self->field_0x3A8, 0, 0, &self->info_0x430, &self->sub_0x43C);
+        lb_scroll_tables_set(&self->field_0x3A8, 0, 0, &self->info_0x430, &self->sub_0x43C);
     } else {
-        fn_802190FC(&self->field_0x3A8, 0, 0, &self->info_0x430, 0);
+        lb_scroll_tables_set(&self->field_0x3A8, 0, 0, &self->info_0x430, 0);
     }
-    fn_80219530(&self->field_0x3A8, &self->info_0x430);
+    lb_equip_compare_set(&self->field_0x3A8, &self->info_0x430);
 }
 
 /* Returns whether the info record's id is in the page table, filling the two sub-records when it is. */
@@ -422,8 +423,8 @@ u32 fn_801E448C(LbEftWork* self)
         row = lbl_805ED210;
         while (row->id_0x00 != 0) {
             if (row->id_0x00 == self->info_0x430.id_0x02) {
-                fn_80217F4C(&self->sub_0x43C, 0xC, row->value_0x02);
-                fn_80217F4C(&self->sub_0x448, 0xD, row->sub_0x04);
+                lb_row_init(&self->sub_0x43C, 0xC, row->value_0x02);
+                lb_row_init(&self->sub_0x448, 0xD, row->sub_0x04);
                 return 1;
             }
             row++;

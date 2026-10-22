@@ -11,6 +11,7 @@
  *   the terms object's constructor publishes itself there.
  *   GUESS (from each body and its callers): game_data_file_create_start, game_system_file_create_start
  *   GUESS: game_system_file_create_wait
+ *   GUESS (from each body and its callers): `plsearch_work_init`, `plsearch_step`, `plsearch_draw`.
  * RESIDUALS. every body (118 rows score zero) and the internal seams: at least three TUs (`menu_plsearch.cpp`,
  *   `menu_message.cpp` at 0x8044E340, the save-data code).  The symbols are in the map
  *   (`python tools/units/ledger.py unit menu/menu_plsearch.cpp`).

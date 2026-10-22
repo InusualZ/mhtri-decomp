@@ -11,6 +11,7 @@
  * GUESS (rule 7): the stem joins the two old names, the player frame checks (em_pl_frame) and the net character sync.
  * NAMES. GUESS: `mtx34_to_mtx33` (0x80330E14: returns the 3x3 of a 3x4 matrix written into its first argument; unwritten).
  *
+ *   GUESS (from each body and its callers): `pl_mode8_free_ck`, `pl_mode8_alive_ck`, `pl_gauge_level_get`.
  * Sections: the unit's block in config/RMHE08/splits.txt (.data, .sdata, .sdata2, .text, extab, extabindex).
  */
 /* ---- header inherited from src/enemy/em_pl_frame.cpp (written against its pre-phase-4 range) ---- */

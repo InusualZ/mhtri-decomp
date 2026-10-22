@@ -4,13 +4,15 @@
  *   .sdata2 0x80799CD8-0x80799E00, extab, extabindex.  Two halves of one TU (one `.sdata2`/`.data` pool run): the page
  *   layer 0x80220038-0x80224AC4 and the rig update 0x80224AC4-0x80229ECC, whose actor parameters are all `_PLW*` (its
  *   SE work is `_PLW.field_0xAF4`).  The extabindex run ends with `fn_80224A28` / begins the rig half with
- *   `fn_80224AC4`.
+ *   `pl_rig_model_move`.
  * FLAGS. `cflags_lobby` and `#pragma peephole off` (retail keeps the narrowing `clrlwi`s), back on around
  *   `fn_802216B4`; the rig half was `cflags_pl` (`Wii/1.0`, `-opt nopeephole`), which this reproduces byte for byte
  *   (docs/lobby.md).
  * NAMES. `lb_equip_page` is a GUESS from the item/equipment page the first half draws; the map and the dump give only
  *   placeholders for the functions.
  *   GUESS (from each body and its callers): lb_item_box_count_draw
+ *   GUESS (from each body and its callers): `pl_equip_color_apply`, `res_mat_name_get`, `pl_rig_model_move`,
+ *   `pl_slot_motion_allow_get`, `se_req_frame_set_parts3`, `se_req_frame_set_part4`.
  * RESIDUALS. 85 rows unwritten: 0x80220078-0x80220114, 0x8022015C-0x80220818, 0x8022081C-0x802208A8,
  *   0x80220994-0x80220AF0, 0x80220B84-0x802216B4, 0x802216E8-0x80221864, 0x80221890-0x80221BBC, 0x80221C28-0x80222238,
  *   0x802222C0-0x802227BC, 0x80222848-0x802230C8, 0x802230F8-0x802235A4, 0x802235FC-0x80223A18, 0x80223A70-0x80224AC4,
@@ -25,7 +27,7 @@
  *    ours passes the parameter through and emits `lis`/`addi`;
  *  - `fn_802235E0`: one scheduling delta left after `*base` is hoisted above the `offset == 0` test;
  *  - `fn_80223A18`/`fn_80223A44`: the leading `clrlwi`/`slwi` pair is scheduled differently;
- *  - `fn_80224AC4`: the allocator's colouring - retail keeps its loop bases in r23/r24 (`_savegpr_23`), ours saves
+ *  - `pl_rig_model_move`: the allocator's colouring - retail keeps its loop bases in r23/r24 (`_savegpr_23`), ours saves
  *    r25-r31, and the third loop's element pointer is addressed off `rig` (+284) where ours uses `rig+4` (+280);
  *  - `fn_80220114`: retail forms `lobby_world_block + 0x465C` once and addresses +0x8/+0x10 off it, ours folds the
  *    offset into each access and reloads the pointer; `fn_802208D4`: the same for +0x4654, and retail stores +0x46 with
@@ -76,7 +78,7 @@ s32 game_ready_ck(void);
 s32 lb_panel_close(void);
 u8* fn_80223A18(u8 table, s32 index);
 u8* fn_80223A44(u8 table, s32 index);
-void fn_802FAFC8(s32 id);
+void lb_progress_unlock(s32 id);
 void fn_80221C28(LbMenuItem* item, s32 open);
 s32 fn_802205D8(u16 id);
 void fn_80221E04(LbMenuItem* item);
@@ -229,7 +231,7 @@ void fn_80220038(void)
 {
     LbMenuBigBlock* block = lb_menu_block();
 
-    fn_802FAFC8(0x19);
+    lb_progress_unlock(0x19);
     block->rows_0x4654[0].open_0x00 = 1;
     block->rows_0x4654[0].ready_0x01 = 1;
     block->count_0x4670 = 1;
@@ -299,7 +301,7 @@ s16 fn_80220AF0(u8* state, u16* id)
 }
 
 /* The base-relative accessor `fn_80064080`'s block wants. */
-void fn_802235A4(u32* base)
+void res_mat_name_get(u32* base)
 {
     fn_802235E0(base, ((const LbGlobalBlock*)&reinterpret_cast<const nw4r::g3d::ResMat*>(base)->ref())->field_0x08);
 }
@@ -331,7 +333,7 @@ void fn_802235A4(u32* base)
 #include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
 #include "unsplit/unknown.h"
 #include "sys_mem.h"
-#include "Pl/fn_80224AC4.h"
+#include "Pl/pl_se_rig.h"
 #include "Pl/fn_802693C4.h"
 
 /* One 4-byte row of the table `fn_80229868` scans. size: 0x4 */
@@ -343,7 +345,7 @@ typedef struct PlSeRow {
 /* This unit's own functions, declared in address order so an earlier body can call a later one.  All
  * of them are `extern "C"` because the map spells them unmangled (playbook 42). */
 extern "C" {
-u32 fn_80224E28(_PLW* self, u32 slot);
+u32 pl_slot_motion_allow_get(_PLW* self, u32 slot);
 f32 fn_802250E4(void);
 f32 fn_80225434(PlSeRig* rig, s32 index, u8 id);
 u32 fn_80225734(_PLW* self, u16 motion);
@@ -362,7 +364,7 @@ void fn_80226D90(PlSeRig* rig, PlSeAttach* attach, u8 id);
 
 /* Clears the actor's live flag when any gate says the model must not move, then drives every model
  * record the rig carries: gate byte, model helper, placement and the model's own `move`. */
-extern "C" void fn_80224AC4(PlSeRig* rig)
+extern "C" void pl_rig_model_move(PlSeRig* rig)
 {
     u32 flag = rig->plw->field_0x001;
     u32 i;
@@ -418,7 +420,7 @@ extern "C" void fn_80224AC4(PlSeRig* rig)
         if (flag != 0) {
             m->model.field_0x34 = rig->field_0x9C0[i];
         }
-        fn_80223258(rig->plw, i);
+        pl_equip_color_apply(rig->plw, i);
         if (m->model.field_0x34 != 0) {
             fn_80223708(rig, rig->plw->field_0x25C, i);
             if (i == 5) {
@@ -477,7 +479,7 @@ extern "C" void fn_80224AC4(PlSeRig* rig)
 
 /* Maps one of the actor's motion slots onto the per-slot decision table, then lets the motion number
  * override it: 0 = blocked, 1 = allowed, 2 = the model's own answer. */
-extern "C" u32 fn_80224E28(_PLW* self, u32 slot)
+extern "C" u32 pl_slot_motion_allow_get(_PLW* self, u32 slot)
 {
     u16 motion = Get_motion_no(self);
     u32 flag = 2;
@@ -765,7 +767,7 @@ extern "C" void fn_80229CB4(_PLW* self)
 /* 0x80229E10 */
 
 /* Arms one SE frame request for each of the actor's three frame codes. */
-extern "C" void fn_80229E10(_se_w* work, s32 code, s32 val)
+extern "C" void se_req_frame_set_parts3(_se_w* work, s32 code, s32 val)
 {
     if (work->field_0x0A3D != 0) {
         se_req_frame_set(work, code, work->field_0x0A3D, 2, val | 0x1000000);
@@ -782,7 +784,7 @@ extern "C" void fn_80229E10(_se_w* work, s32 code, s32 val)
 /* 0x80229EA8 */
 
 /* Arms the actor's fourth SE frame request. */
-extern "C" void fn_80229EA8(_se_w* work, s32 code, s32 x, s32 y)
+extern "C" void se_req_frame_set_part4(_se_w* work, s32 code, s32 x, s32 y)
 {
     u32 v = work->field_0x0A40;
 

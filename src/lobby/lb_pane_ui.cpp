@@ -14,13 +14,15 @@
  * NAMES. `lb_pane_ui` is a GUESS from what the three bands draw; no `__FILE__` string or dump name covers the range,
  *   and the map gives only placeholders for the functions.
  *   GUESS (from each body and its callers): lobby_scene_setup_step
+ *   GUESS (from each body and its callers): `lb_digit_pane_value`, `lb_list_pane_init`, `lb_list_pane_pos_set`,
+ *   `lb_page_walk_head`, `lb_pane_draw`.
  * RESIDUALS. 69 rows unwritten: 0x801EE988-0x801EEDC4, 0x801EF3B0-0x801EF73C, 0x801EF760-0x801F3294,
  *   0x801F35B0-0x801F37C8, 0x801F3828-0x801F3998, 0x801F39E8-0x801F3DEC, 0x801F3FDC-0x801F4444, 0x801F44CC-0x801F54C4,
  *   0x801F55B4-0x801F5FB0, 0x801F6168-0x801F6A9C, 0x801F6AEC-0x801F865C, 0x801F87B0-0x801F8ABC, 0x801F8B3C-0x801FA0DC,
  *   0x801FA2C8-0x801FB1D8, 0x801FB80C-0x801FBAE4, 0x801FBB64-0x801FBF78.
  *  - the panes' `fn_801ECB2C`, `fn_801ECEF0`, `fn_801ECF74`, `fn_801ED048`, `fn_801ED184`, `fn_801ED200`,
  *    `fn_801ED464`, `fn_801ED56C`, `fn_801ED9E4`, `fn_801EDA34`, `fn_801EDA9C`, `fn_801EDB34`, `fn_801EDC4C`,
- *    `fn_801EE1E4`, `fn_801EF244`, `fn_801EF73C`: allocator/scheduling deltas, no structural gap;
+ *    `fn_801EE1E4`, `fn_801EF244`, `lb_digit_pane_value`: allocator/scheduling deltas, no structural gap;
  *  - `fn_801ED688`, `fn_801EEDC4`: register colouring (ours saves r28 in `fn_801EEDC4`, 20 B shorter in `fn_801ED688`);
  *    `fn_801EE900`, `fn_801EE940`: retail narrows into the same register, ours into r0; `fn_801EEFA0`: retail loads
  *    `lobby_world_block` two instructions later;
@@ -136,7 +138,7 @@ typedef struct LbEquipPane {
     /* +0x04 */ u16 ids_0x04[3];        /* the three equipped item ids (0xFFFF = empty) */
     /* +0x0A */ u8 unused_0x0A[2];
     /* +0x0C */ s32 stepper_0x0C;       /* the 4-byte stepper state `toggle_word_step` walks */
-    /* +0x10 */ u8 icon_0x10[6];        /* the icon run `fn_80219080` fills */
+    /* +0x10 */ u8 icon_0x10[6];        /* the icon run `lb_scroll_init` fills */
     /* +0x16 */ s16 move_0x16;          /* the 4-step state `menu_cursor_step_fixed_tail`'s base is at */
     /* +0x18 */ s16 move_max_0x18;
     /* +0x1A */ s16 cursor_0x1A;
@@ -224,9 +226,9 @@ s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list);
 s32 fn_801EF1D0(LbEquipPane* self);
 void fn_801EF244(LbEquipPane* self, s16 a, u16 b, u16 c, u16 d, u8 e, s32 f);
 s32 fn_801EF3B0(LbListPane* self, LbListPane* other, LbDigitPane* pane);
-u16 fn_801EF73C(LbDigitPane* self);
+u16 lb_digit_pane_value(LbDigitPane* self);
 void fn_801EFD74(LbListPane* self, s16 a, u8 b);
-void fn_801EFFD0(LbListPane* self, s16 a, s16 b, s16 c);
+void lb_list_pane_pos_set(LbListPane* self, s16 a, s16 b, s16 c);
 s32 fn_801F1710(LbListPane* self, LbListPane* other, LbListPane* pane);
 }
 
@@ -274,7 +276,7 @@ void fn_801EC804(void* p);
 s32 fn_801EC828(LbMenuPanel* self);
 s32 fn_801EC85C(LbMenuPanel* self);
 void fn_801EC95C(LbMenuPanel* self);
-s32 fn_801EC9E0(void);
+s32 lb_page_record_empty_ck(void);
 s32 lb_cmd_pressed_ck(u32 mask);
 s32 lb_cmd_repeat_ck(u32 mask);
 u16 lb_cmd_repeat_get(void);
@@ -285,16 +287,16 @@ s32 lb_yes_no_step(void* p);
 s16 fn_80213374(u8 a, s16 b, void* c, u16 d, s32 e, s32 f, u8 g);
 s32 lb_list_init(void* p, s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g);
 s32 lb_choice_step(void* p);
-s32 fn_80219080(s32 a, void* p, s32 b, s32 c);
-void fn_802190F4(void* p);
-void fn_802190FC(void* p, void* a, void* b, void* c, void* d);
-s32 fn_80219530(void* p);
-void fn_80219590(void* p, void* a);
-s32 fn_8021B7EC(s32 a);
+s32 lb_scroll_init(s32 a, void* p, s32 b, s32 c);
+void lb_scroll_flag_set(void* p);
+void lb_scroll_tables_set(void* p, void* a, void* b, void* c, void* d);
+s32 lb_equip_compare_set(void* p);
+void lb_equip_base_set(void* p, void* a);
+s32 lb_equip_entry_apply(s32 a);
 s32 pl_equip_model_set(s32 a);
 s32 equip_kind_table_class(u8 kind);
 s32 fn_802BBAC4(s32 a);
-s32 fn_8031BFEC(void* p, s32 a, s32 b);
+s32 menu_sel_cursor_init(void* p, s32 a, s32 b);
 s32 fn_8031C028(void* p, u16 a);
 s32 fn_8031C0B8(void* p);
 s32 fn_8031C408(void* p, void* q, u16 a, u16 b, u16 c);
@@ -302,8 +304,8 @@ s32 fn_8031C514(void* p, s32 a);
 s32 fn_8031C5FC(void* p, u16 a, u16 b);
 void fn_8031C8EC(void* p);
 s32 fn_8031C934(void* p, u16 a, u16 b);
-s32 fn_8033AAFC(void);
-s32 fn_8033AC78(u16 a, s32 b);
+s32 lb_combo_item_known_ck(void);
+s32 lb_combo_recipe_find(u16 a, s32 b);
 s32 eft052_item_value_get(u16 id);
 s32 hud_item_msg_push(s32 a, s32 b, s32 c);
 u32 lobby_net_busy_ck(void);
@@ -1160,7 +1162,7 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
 /* Whether the entry's item is one the shop can hand over. */
 extern "C" u32 fn_801EE900(u16 item_id)
 {
-    if (item_id != 0 && fn_8033AAFC() == 1U) {
+    if (item_id != 0 && lb_combo_item_known_ck() == 1U) {
         return 1;
     }
     return 0;
@@ -1169,7 +1171,7 @@ extern "C" u32 fn_801EE900(u16 item_id)
 /* Whether the entry's item is one the shop can accept. */
 extern "C" s32 fn_801EE940(u16 index, u16 item_id)
 {
-    if (item_id != 0 && fn_8033AC78(index, 0) != 0) {
+    if (item_id != 0 && lb_combo_recipe_find(index, 0) != 0) {
         return 1;
     }
     return 0;
@@ -1367,16 +1369,16 @@ extern "C" void fn_801EF244(LbEquipPane* self, s16 index, u16 a, u16 b, u16 c, u
     self->side_0x01 = side;
     self->icon_index_0x90 = icon_index;
     if (side == 0) {
-        fn_80219080(icon_index, &self->icon_0x10[0], 5, 7);
+        lb_scroll_init(icon_index, &self->icon_0x10[0], 5, 7);
     } else {
-        fn_80219080(icon_index, &self->icon_0x10[0], 5, 6);
+        lb_scroll_init(icon_index, &self->icon_0x10[0], 5, 6);
     }
     self->move_max_0x18 = 4;
     self->flags_0x20 |= 1;
 }
 
 /* The digit entry's number, as the id lookup takes it. */
-extern "C" u16 fn_801EF73C(LbDigitPane* self)
+extern "C" u16 lb_digit_pane_value(LbDigitPane* self)
 {
     return (u16)(s16)((self->digit_ones_0x0A + self->digit_hundreds_0x02 * 100)
                       + self->digit_tens_0x0C * 10);
@@ -1418,7 +1420,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
     case 0:
         if (req->done_0x001 == 1) {
             req->state_0x000 = 2;
-            if (fn_801EC9E0(sub) == 1) {
+            if (lb_page_record_empty_ck(sub) == 1) {
                 ret = 2;
             }
             break;
@@ -1428,7 +1430,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
             break;
         }
         if (lb_cmd_pressed_ck(0x10) == 1) {
-            if (fn_801EC9E0(sub) != 1) {
+            if (lb_page_record_empty_ck(sub) != 1) {
                 break;
             }
             switch (req->mode_0x002) {
@@ -1479,13 +1481,13 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
         }
         break;
     case 1:
-        if (fn_801EC9E0(sub) == 1 && lb_cmd_pressed_ck(0x30) == 1) {
+        if (lb_page_record_empty_ck(sub) == 1 && lb_cmd_pressed_ck(0x30) == 1) {
             req->state_0x000 = 0;
             sysSE_req(0);
         }
         break;
     case 2:
-        if (fn_801EC9E0(sub) == 1) {
+        if (lb_page_record_empty_ck(sub) == 1) {
             ret = 2;
         }
         break;
@@ -1645,7 +1647,7 @@ void fn_801F3F78(LbPage* self, u8 value)
         u8 slot = fn_802738B8((u8)i);
 
         if (slot != 0xFF) {
-            fn_80223258((::_PLW*)self->next_0x028, slot);
+            pl_equip_color_apply((::_PLW*)self->next_0x028, slot);
         }
     }
 }
@@ -1688,9 +1690,9 @@ void fn_801F54C4(void)
     get_lsp_data(6833, &pos);
     pos.y += 30;
     if (get_option_cfg(7) == 0) {
-        fn_802DF7CC(5, &pos);
+        put_button_guide(5, &pos);
     } else {
-        fn_802DF7CC(15, &pos);
+        put_button_guide(15, &pos);
     }
 }
 
@@ -1720,7 +1722,7 @@ void fn_801F5FB0(s16 a, s16 b, u16 c, u8 kind)
     } else {
         get_lsp_data(6862, &pos);
     }
-    fn_802DB140(lbl_805B88D4, a, b, c, &pos);
+    put_page_count(lbl_805B88D4, a, b, c, &pos);
 }
 
 /* 0x801F6034 - draws one entry's icon with the item icons' add-blend, and the cursor under it on request (kept out of
@@ -1759,7 +1761,7 @@ void fn_801F6A9C(LbPageOwner* self, u32 row, u32 flags)
 }
 
 /* 0x801F6AC8 - run the page's entry walk from its head, in the "no page" state. */
-void fn_801F6AC8(u32 id, s16 row)
+void lb_page_walk_head(u32 id, s16 row)
 {
     fn_801F6168(NULL, NULL, id, 5, row, NULL, NULL);
 }
@@ -1778,7 +1780,7 @@ void fn_801F865C(LbPage* self, u32 id_a, void* page_b, u32 id_c, u8* ptr_f)
         break;
     case 1:
         get_lsp_data((u16)id_c, &pos);
-        fn_801F6DBC(page_b, pos.x, pos.y, ptr_f);
+        lb_pane_draw(page_b, pos.x, pos.y, ptr_f);
         break;
     }
 }
@@ -1893,7 +1895,7 @@ typedef struct LbChgFileReq {
  * Declarations.  `fn_*`/`ckResourceName` are plain C symbols; the lobby UI helpers come from
  * `unsplit/lobby.h`; the mangled C++ callees are declared with the signatures that reproduce their map
  * names (rule 9).  Some belong to other units whose headers do not declare them (`fn_801FCA80`, `fn_801FCADC`,
- * `fn_803C3F60`, ...).
+ * `demo_work_update`, ...).
  * ------------------------------------------------------------------------------------------------- */
 extern "C" {
 s32 score_add_clamped(s32 delta, s32* value);
@@ -1940,8 +1942,8 @@ void sprite_frame_apply(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
 void fn_8032422C(void);
 void hud_msg_init(void);
 void lobby_res_slots_init(void);
-void fn_803C3A70(void);
-void fn_803C3F60(void);
+void demo_work_start(void);
+void demo_work_update(void);
 s32 game_data_file_create_start(void);
 s32 game_system_file_create_start(void);
 s32 game_system_file_create_wait(void);
@@ -2025,7 +2027,7 @@ void fn_801FA0DC(LbChgColorWork* self)
             lb_chg::lb_list_row_draw((s32)LbStr(0, 0x231), (u8)active, (s16*)&pos, color, 8);
             break;
         case -2:
-            fn_8021565C((u8)(selected | 0x80), (s16*)&pos);
+            lb_cursor_prompt_draw((u8)(selected | 0x80), (s16*)&pos);
             break;
         default:
             get_lsp_data(lbl_805B8A04[(u8)i], &pos);
@@ -2118,7 +2120,7 @@ void fn_801FB438(void)
     menu_item_work_init();
     fn_8032422C();
     hud_msg_init();
-    fn_803C3A70();
+    demo_work_start();
 }
 
 /* 0x801FB478 - load the ten `07/dcm%03d.bin` archives the editor streams, one work allocation each. */
@@ -2252,7 +2254,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
         break;
     case 6:
         stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
-        fn_803C3F60();
+        demo_work_update();
         lb_npc_map_setup();
         fn_802BB0EC();
         self->step_0x0A++;

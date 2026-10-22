@@ -96,7 +96,7 @@ struct _PLW {
         };
     };
     /* +0x018 */ union { /* the actor mode byte; three spellings of one byte, one member per offset */
-        /* +0x018 */ u8 field_0x18;   /* `fn_80224AC4` reads the actor mode here, and
+        /* +0x018 */ u8 field_0x18;   /* `pl_rig_model_move` reads the actor mode here, and
                                        * `Pl/pl_act.cpp`'s own view of the record calls it `unk18` */
         /* +0x018 */ u8 field_0x018;  /* the two-way variant the act handlers branch on - cleared on
                                        * entry, and `1` selects the alternate motion/effect set
@@ -105,7 +105,7 @@ struct _PLW {
                                        * consumers (rule 5) */
     };
     /* +0x019 */ union {
-        /* +0x019 */ s8 field_0x19;    /* `fn_80224AC4` clears the actor's live flag when > 0 */
+        /* +0x019 */ s8 field_0x19;    /* `pl_rig_model_move` clears the actor's live flag when > 0 */
         /* +0x019 */ u8 pad_0x19[0x1]; /* a padding spelling of the same byte; no consumer
                                        * reads it */
     };
@@ -123,7 +123,7 @@ struct _PLW {
                                           * slot the game's user-data block fills at its +158);
                                           * GUESS - derived from that body's store, see the unit header */
     /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
-    /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `fn_80224AC4` */
+    /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `pl_rig_model_move` */
     /* +0x01F */ union {   /* one byte, two spellings (rule 5) */
         /* +0x01F */ u8 field_0x01F;   /* the act's follow-up stage latch: `pl_act_stage_latch_set` arms it,
                                        * `fn_80274794` tests it and `pl_act_stage_get` reads it */
@@ -339,8 +339,8 @@ struct _PLW {
         /* +0x256 */ u8 pad_0x256[0x2];
         /* +0x256 */ s16 field_0x256;  /* the 450-frame timer the "2" act entry presets */
     };
-    /* +0x258 */ u8 field_0x258[0x4];  /* passed to `fn_80223830` by `fn_80224AC4` */
-    /* +0x25C */ u8 field_0x25C[0x8];  /* passed to `fn_80223708` by `fn_80224AC4` */
+    /* +0x258 */ u8 field_0x258[0x4];  /* passed to `fn_80223830` by `pl_rig_model_move` */
+    /* +0x25C */ u8 field_0x25C[0x8];  /* passed to `fn_80223708` by `pl_rig_model_move` */
     /* +0x264 */ union {
         /* +0x264 */ s16 unk264;
         /* +0x264 */ s16 field_0x264;  /* cleared by the act entry (`pl_act_enter_raw`) */
@@ -978,7 +978,7 @@ struct _PLW {
             /* +0x586 */ u8 pad_0x586[0x12];
         };
     };
-    /* +0x598 */ u16 field_0x598;   /* the three act fields `fn_802DE578` is handed the address of
+    /* +0x598 */ u16 field_0x598;   /* the three act fields `cockpit_ticket_acquire` is handed the address of
                                     * (`Pl/pl_act_step.cpp` reads it) */
     /* +0x59A */ union {   /* one u16, two spellings */
         /* +0x59A */ u8 pad_0x59A[0x2];
@@ -1157,7 +1157,7 @@ struct _PLW {
     /* +0xB01 */ u8 field_0xB01;
     /* +0xB02 */ u8 field_0xB02;
     /* +0xB03 */ u8 field_0xB03;
-    /* +0xB04 */ u8 field_0xB04;   /* `fn_80224AC4`: non-zero suppresses the up-swing gate;
+    /* +0xB04 */ u8 field_0xB04;   /* `pl_rig_model_move`: non-zero suppresses the up-swing gate;
                                     * the lobby's latch block runs to this byte as well (+0xB00..+0xB04) */
     /* +0xB05 */ u8 name_0xB05[10];  /* the hunter name the lobby compares with the move work */
     /* +0xB0F */ char partner_0xB0F[0xA];  /* the trade partner's name the lobby packets carry (GUESS) */

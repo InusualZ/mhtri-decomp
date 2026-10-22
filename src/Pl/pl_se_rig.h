@@ -1,10 +1,10 @@
 /*
- * The player's SE/motion rig, the object `_PLW.physics_0x13C` points at: `fn_80224AC4` (`lobby/lb_equip_page.cpp`'s
+ * The player's SE/motion rig, the object `_PLW.physics_0x13C` points at: `pl_rig_model_move` (`lobby/lb_equip_page.cpp`'s
  * range) walks it and `Pl/pl_act.cpp`'s part accessors read the same records (rule 1).  The rig's constructor
  * `fn_80269DD8` fixes the 0x1560-byte extent (`__construct_array` of 7 x 0x90 at +0xE40 and 3 x 0x110 at +0x1230).
  */
-#ifndef MHTRI_PL_FN_80224AC4_H
-#define MHTRI_PL_FN_80224AC4_H
+#ifndef MHTRI_PL_PL_SE_RIG_H
+#define MHTRI_PL_PL_SE_RIG_H
 
 #include "types.h"
 #include "pl.h"
@@ -36,7 +36,7 @@ typedef struct PlSeAttach {
 
 /* The actor's SE/motion rig: the `_PLW*` at +0, seven model records, the per-model gate bytes, three
  * sub-model records, the seven 0x90-byte slot records and the three attachment records - the offsets
- * `fn_80224AC4` walks and the ones the rig's constructor `fn_80269DD8` lays out (`__construct_array`
+ * `pl_rig_model_move` walks and the ones the rig's constructor `fn_80269DD8` lays out (`__construct_array`
  * of 7 x 0x90 at +0xE40 and 3 x 0x110 at +0x1230, ending exactly at 0x1560).
  * size: 0x1560 */
 typedef struct PlSeRig {
@@ -50,4 +50,4 @@ typedef struct PlSeRig {
     /* +0x1230 */ PlSeAttach attachments_0x1230[3];
 } PlSeRig; /* size: 0x1560 */
 
-#endif /* MHTRI_PL_FN_80224AC4_H */
+#endif /* MHTRI_PL_PL_SE_RIG_H */
