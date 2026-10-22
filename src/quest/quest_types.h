@@ -375,7 +375,12 @@ typedef struct QuestSpawnRec {
  * bytes are cleared but never read.  The literal decides - it is what the allocator reserved and what
  * `max` multiplies - so the tail stays filler. */
 struct Q_MoveWork {
-    /* +0x0000 */ u8 pad_0x0000[0xDC];
+    /* +0x0000 */ u8 demo_state_0x0000;   /* the gallery demo task's step (0 start, 1 load, 2 run, 3 fade out) */
+    /* +0x0001 */ u8 demo_sub_0x0001;     /* the step's sub-state */
+    /* +0x0002 */ u8 pad_0x0002;
+    /* +0x0003 */ u8 demo_scene_0x0003;   /* the demo's scene state (2 once it plays) */
+    /* +0x0004 */ s16 demo_timer_0x0004;  /* the fade-out countdown (90 frames) */
+    /* +0x0006 */ u8 pad_0x0006[0xDC - 0x6];
     /* +0x00DC */ Q_ItemWork* item_work;   /* the item work `move_work_item_work_get` returns */
     /* +0x00E0 */ s32 area_slots_0xE0[2];     /* the stage area slot (`stage_area_slot_get`) per index */
     /* +0x00E8 */ u8 area_slot_index_0xE8;
@@ -431,8 +436,9 @@ struct Q_MoveWork {
     /* +0x22DC */ u8 flag_0x22DC;          /* `LbParamWork::hunt_option_0x0A` at the free-hunt start */
     /* +0x22DD */ u8 pad_0x22DD[0x22E2 - 0x22DD];
     /* +0x22E2 */ u8 player_count_0x22E2;  /* the players the quest ran with */
-    /* +0x22E3 */ u8 pad_0x22E3[0x22E8 - 0x22E3];  /* cleared, never read: the lobby's own view names
-                                                   * +0x22E3, this one reads up to +0x22DC */
+    /* +0x22E3 */ u8 pad_0x22E3;          /* the lobby's own view names it (`flag_0x22E3`) */
+    /* +0x22E4 */ u8 demo_play_0x22E4;     /* set while a gallery demo plays (`demo_play_ck`) */
+    /* +0x22E5 */ u8 pad_0x22E5[0x22E8 - 0x22E5];
 };  /* size: 0x22E8 */
 
 /* One 3-byte entry of the reward-group table `quest_part_reward_roll` indexes by a group count (clamped to the

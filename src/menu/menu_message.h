@@ -146,6 +146,9 @@ s32 GetMenuIconColor(bool a, bool b, bool c, bool d);
 void put_message_sys_ok_button(void);
 /* 0x802A8020 - a framed dialog box (`put_frame_dialog__FssssUlUl`, C++ linkage - rule 9). */
 void put_frame_dialog(s16 x, s16 y, s16 width, s16 height, u32 color, u32 frame_color);
+/* 0x802A88EC - the centred message line `msg` at height `y` in `color` (`put_message__FPScsUl`, C++ linkage - rule 9;
+ * added with `menu/menu_plsearch.cpp`). */
+void put_message(s8* msg, s16 y, u32 color);
 #endif
 
 #endif /* MHTRI_MENU_MENU_MESSAGE_H */

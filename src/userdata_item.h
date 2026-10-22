@@ -70,4 +70,10 @@ void userdata_frame_reset(void);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x800491DC - queues the draw callback `func` (a code address) on the sub-transfer list (`subTransSet__FUllPUl`, a C++
+ * free function - rule 9); added with `menu/menu_plsearch.cpp` (rule 2). */
+void subTransSet(u32 func, s32 prio, u32* handle);
+#endif
+
 #endif /* MHTRI_USERDATA_ITEM_H */

@@ -6163,10 +6163,10 @@ void NetCtrlWk::requestCommand17(s8* result, s32 value)
 /*
  * Queue command 0x18 with the caller's argument list.
  */
-void NetCtrlWk::requestCommand18(const s32* args, s8* result)
+s32 NetCtrlWk::requestCommand18(const s32* args, s8* result)
 {
     *result = 0;
-    queueNetCommand(0x18, result, 0, 1, args);
+    return queueNetCommand(0x18, result, 0, 1, args);
 }
 
 /*
@@ -7004,7 +7004,7 @@ void NetCtrlWk::copyFriendList(NetFriendListView* out, u8 use_own)
         if (entry->session_38.state_00 != 0) {
             row->status_0x20 = entry->session_38.status_08 >> 24;
             row->area_0x1E = entry->session_38.area_10 >> 16;
-            row->pad_0x21 = 0;
+            row->rare_0x21 = 0;
         }
     }
 }

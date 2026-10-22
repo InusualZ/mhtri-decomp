@@ -31,6 +31,28 @@ BOOL isMoviePlaying(void);
 struct DVDFileInfo;
 void movie_drive_wait(struct DVDFileInfo* info);
 
+/* The friend picker (its `menu_friendlist.cpp` run from 0x8043F314), called by `menu/menu_plsearch.cpp`'s message
+ * menu.  GUESS names, from the bodies and their one caller. */
+struct LobbyTimerRow;
+/* The picker's work: its step bytes, its mode, the list it shows and the row the player picked.
+ * size: 0x10D0 (the clear `friend_pick_init` runs) */
+typedef struct FriendPickWork {
+    /* +0x000 */ u8 step_0x000;
+    /* +0x001 */ u8 sub_0x001;
+    /* +0x002 */ u8 pad_0x002;
+    /* +0x003 */ u8 mode_0x003;
+    /* +0x004 */ u8 pad_0x004[0x14];
+    /* +0x018 */ struct LobbyTimerRow* picked_0x018;   /* the friend row the player chose */
+    /* +0x01C */ u8 pad_0x01C[0x10B4];
+} FriendPickWork; /* size: 0x10D0 */
+
+/* 0x8043F314 (0x78): clears `work`, stores `mode` and points it at the lobby's friend list. */
+void friend_pick_init(FriendPickWork* work, u8 mode);
+/* 0x8043F398 (0x6CC): steps the picker: 1 next, 2 back, 3 or 4 done. */
+s32 friend_pick_step(FriendPickWork* work);
+/* 0x8043FA70 (0x9C): draws the picker. */
+void friend_pick_draw(FriendPickWork* work);
+
 #ifdef __cplusplus
 }
 #endif

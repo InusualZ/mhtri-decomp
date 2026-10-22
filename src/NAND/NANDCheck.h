@@ -10,8 +10,19 @@
 extern "C" {
 #endif
 
-/* The save banner record `NANDInitBanner` fills (0xF0A0 bytes: its clear); its layout stays with NAND/NANDCheck.c. */
-typedef struct NANDBanner NANDBanner;
+#define NAND_BANNER_COMMENT_LENGTH 32
+
+/* size: 0xF0A0 - the save banner a title writes as banner.bin: its signature, flags, two comment lines and the
+ * banner and icon textures (the clear `NANDInitBanner` runs is 0xF0A0 bytes; `menu/menu_plsearch.cpp` builds one). */
+typedef struct NANDBanner {
+    /* +0x0000 */ u32 signature;
+    /* +0x0004 */ u32 flags;
+    /* +0x0008 */ u16 iconSpeed;
+    /* +0x000A */ u8 pad_0xA[0x16];
+    /* +0x0020 */ u16 comment[2][NAND_BANNER_COMMENT_LENGTH];
+    /* +0x00A0 */ u8 bannerTexture[0x6000];
+    /* +0x60A0 */ u8 iconTexture[8][0x1200];
+} NANDBanner; /* size: 0xF0A0 */
 
 /* 0x804C9480 - clears `banner`, stamps its signature and `flags`, and copies `title` and `comment` (an empty string
  * becomes a single space). */

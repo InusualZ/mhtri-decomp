@@ -129,9 +129,14 @@ typedef struct SystemWork {
     /* +0x7E0 */ u8 field_0x7e0[4];
     /* +0x7E4 */ u8 field_0x7e4[4];
     /* +0x7E8 */ u8 vs_load_player_0x7e8;  /* GUESS name: the VS player whose save `multi_box_phase_input` starts loading */
-    /* +0x7E9 */ u8 pad_0x7e9[0x67];
+    /* +0x7E9 */ u8 pad_0x7e9[0x1];
+    /* +0x7EA */ char save_name_0x7ea[6][0x11];   /* GUESS name: each save file's player name (the save code copies it in and out of the data file's +0x08) */
     /* +0x850 */ u8 vs_player_pending_0x850[4];   /* GUESS name: per-player flag `arena_result_next` raises through the player's Vs block */
-    /* +0x854 */ u8 pad_0x854[0xF];
+    /* +0x854 */ u8 pad_0x854[0x2];
+    /* +0x856 */ u8 sys_file_valid_0x856;   /* GUESS name: non-zero once the system file was read; the system file write then keeps +0x888/+0x910 */
+    /* +0x857 */ u8 pad_0x857[0x2];
+    /* +0x859 */ u8 save_used_0x859[6];     /* GUESS name: each save file's in-use word (the data file's +0x00), copied by the save read */
+    /* +0x85F */ u8 pad_0x85f[0x4];
     /* +0x863 */ u8 unk2147;
     /* +0x864 */ u8 unk2148;
     /* +0x865 */ u8 field_0x865;
@@ -195,8 +200,8 @@ typedef struct SystemWork {
     /* +0x90C */ u8 pad_0x90C[0x3];
     /* +0x90F */ u8 net_session_0x90f;   /* GUESS name: non-zero while the arena runs as a network session */
     /* +0x910 */ u8 save_keep_0x910[2];  /* GUESS name: two bytes `multi_box_phase_input` keeps across a box save */
-    /* +0x912 */ u8 pad_0x912[0x1F];
-    /* +0x931 */ u8 unk2353;
+    /* +0x912 */ u8 option_copy_0x912[0x1F];   /* GUESS name: the copy of `option_w` the data file write keeps */
+    /* +0x931 */ u8 nand_corrupt_0x931;   /* GUESS name: the save code's NAND wrappers raise it on NAND_RESULT_CORRUPT; the main loop idles while it is set */
     /* +0x932 */ u8 pad_0x932[0xE];
     /* +0x940 */ u32 layout_0x940;     /* the system core's memory layout: the user data block */
     /* +0x944 */ u32 layout_0x944;     /* the font buffer */

@@ -59,6 +59,18 @@ s32 game_data_file_create_start(void);
 s32 game_system_file_create_start(void);
 s32 game_system_file_create_wait(void);
 
+/* 0x8044BDD0 / 0x8044BDD8 / 0x8044BDE0 - the blocks and inodes the save files need, and the data files a player can
+ * choose (GUESS names). */
+u32 save_check_blocks(void);
+u32 save_check_inodes(void);
+s32 save_data_slot_max(void);
+/* 0x8044A848 / 0x8044AA08 - arm and step the account file write; 0x8044B9DC / 0x8044BAAC - arm and step its read
+ * (GUESS names). */
+s32 account_file_create_init(void);
+s32 account_file_create(void);
+s32 account_file_read_init(void);
+s32 account_file_read(void);
+
 #ifdef __cplusplus
 }
 #endif
@@ -66,14 +78,19 @@ s32 game_system_file_create_wait(void);
 #ifdef __cplusplus
 /* 0x80449878 - waits for the game save (C++ scope: `game_save_wait__Fv`). */
 s32 game_save_wait(void);
+/* 0x80449368 / 0x8044954C - arm and step the system file creation (C++ scope, `__Fv`). */
+s32 createSystemFile_init(void);
+s32 createSystemFile(void);
 /* 0x80449970 - starts creating the save file of player `player` in slot `slot` (C++ scope, `__Flll`); 1 when started. */
 u32 createDataFile_init(long player, long slot, long mode);
-/* 0x8044ACB8 - starts reading player `player`'s save file (`__Fll`). */
-void readDataFile_init(long player, long mode);
+/* 0x80449CAC - steps the data file write; `check_only` stops after reading the old file back (`__FUc`). */
+s32 createDataFile(u8 check_only);
+/* 0x8044ACB8 - starts reading player `player`'s save file (`__Fll`); 1 when started. */
+s32 readDataFile_init(long player, long mode);
 /* 0x8044AFDC - steps the save-file read; nonzero once it has finished. */
 s32 readDataFile(void);
 /* 0x8044B268 - copies save slot `slot`'s player data into the user data. */
-void setPlayerSave2Userdata(u8 slot);
+s32 setPlayerSave2Userdata(u8 slot);
 /* 0x8044BD44 - the message id for the last NAND error. */
 s32 chg_nand_err2msgcode(void);
 #endif

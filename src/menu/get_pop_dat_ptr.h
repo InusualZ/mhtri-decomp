@@ -15,6 +15,11 @@ u8 get_option_cfg(u8 index);
 u8 ck_option_cfg(u8 index);
 /* 0x803BEBF0 - one option out of the arena profile of the VS user work. */
 u8 get_arena_cfg(u8 index, u8 value);
+/* 0x803BE838 (0x80): applies the option table's modes (`set_option_mode__Fv`; the save read calls it after restoring
+ * `option_w`). */
+void set_option_mode(void);
+/* 0x803BEB50: stores option `index` (`set_option_cfg__FUcUc`). */
+void set_option_cfg(u8 index, u8 value);
 /* `event_demo_ck` (0x803C4814) is `lobby/lb_server_sel_trans.cpp`'s; its header is included for the consumers of this
  * one. */
 #include "lobby/lb_server_sel_trans.h"
@@ -28,6 +33,10 @@ u8 get_cfg(u8 index, u8 value);
 
 /* 0x803BEE04 - option 21 out of the option table or the arena profile. */
 u8 get_option_21(void);
+
+/* 0x803BEDA4 (0x60): copies the default option table (0x1F bytes) into `options` and stores each entry through
+ * `set_option_cfg`. */
+void option_cfg_load(u8* options);
 
 /* 0x803BE8B8 - applies the player's arena profile: the SE/BGM volumes and the screen brightness the
  * Vs user block of `player` stores (nothing when the Vs mode byte is clear or the block is absent).

@@ -111,6 +111,16 @@ void draw_font_anim_idx(u16 id, u16 part, s8* str, u32 flags, const _mh_ivec2_* 
  * the frame-style table (blend mode 4/5/1).  GUESS names; added with `menu/menu_result.cpp` (rule 2). */
 void draw_window_frame(s16 x, s16 y, u16 width, u16 height, u32 color);
 void draw_window_frame_style(s16 x, s16 y, u16 width, u16 height, u8 style);
+/* 0x802E4828 - the preset window frame at (`x`, `y`).  Added with `menu/menu_plsearch.cpp` (rule 2; the signature
+ * is its call sites'). */
+void draw_window_frame_preset(s16 x, s16 y, s32 flag);
+/* 0x802E2374 - `draw_font` over layout `id`, aligned by `flags`; 0x802E2440 - lays the kanji message `src` out into
+ * `dst`, `columns` wide and at most `lines` lines.  Added with `menu/menu_plsearch.cpp` (rule 2). */
+void draw_font_align_idx(u16 id, s8* str, u32 flags, const _mh_ivec2_* pos);
+void knj_msg_str_build(s8* src, s8* dst, s32 columns, s32 lines);
+/* 0x802E2524 - the first `count` characters of the string table text `src` as UTF-16 into `dst`.  Added with
+ * `menu/menu_plsearch.cpp` (rule 2). */
+void str_tbl_utf16_build(s8* src, s8* dst, s32 count);
 void fn_802E16E0(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void draw_tex_icon_square_arena(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);

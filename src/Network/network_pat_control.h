@@ -417,7 +417,7 @@ typedef struct NetFriendView {
     /* +0x14 */ char id_text_0x14[0xA];
     /* +0x1E */ u16 area_0x1E;
     /* +0x20 */ u8 status_0x20;
-    /* +0x21 */ u8 pad_0x21;
+    /* +0x21 */ u8 rare_0x21;    /* the colour index the player search tints a friend's status icon with (`get_rare_color`) */
 } NetFriendView; /* size: 0x22 */
 
 /* The friend-list copy: the count and the rows (the caller sizes the run).  size: 0x4+ */
@@ -544,7 +544,7 @@ typedef struct PatSettings {
 /* The network save record `exportNetworkSave`/`importNetworkSave` move to and from the work record.
  * size: 0x88 (approximate: the highest byte written) */
 typedef struct NetSaveRecord {
-    /* +0x00 */ u8 pad_0x00[0x4];
+    /* +0x00 */ u32 checksum_0x00;   /* the byte sum of the account file's bytes 4..0x3FFF (`menu/menu_plsearch.cpp`) */
     /* +0x04 */ s32 terms_version_0x04;
     /* +0x08 */ PatSettings settings_0x08;
     /* +0x48 */ char support_code_0x48[0x20];
@@ -954,7 +954,7 @@ typedef struct NetCtrlWk {
     static void requestCommand0E(s8* result, s32 value);
     static void requestCommand0F(s8* result, s32 value);
     static void requestCommand17(s8* result, s32 value);
-    static void requestCommand18(const s32* args, s8* result);
+    static s32 requestCommand18(const s32* args, s8* result);
     static void requestSettingsCommand(s8* result, s32 value, const NetSettingsWords* settings);
     static void requestCommand12(s8* result, s32 value);
     static s32 copyPeerList(NetPeerList* list);

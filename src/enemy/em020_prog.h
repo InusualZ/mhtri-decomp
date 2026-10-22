@@ -12,6 +12,17 @@ extern "C" {
 void sendMemberJoinNotice(const char* id_text);
 /* 0x80378B70 - drops lobby mail `index`, moving the later ones up; 1 when dropped (GUESS name). */
 u8 dropLobbyMail(s32 index);
+/* 0x80378D1C / 0x80378D40 - whether the friend list is full (50 rows), and whether it holds `who`; 0x80378920 /
+ * 0x803789AC - sends a friend request to `who` (0 sent, 1..3 refused) and adds `who` to the recent players;
+ * 0x80375BE0 / 0x80375C3C - the notice text for network result `code` (NULL for none) and whether the lobby is left
+ * after `choice`.  Added with `menu/menu_plsearch.cpp` (rule 2). */
+struct LobbyRecentRow;
+u32 lobby_friend_list_full(void);
+u32 lobby_friend_has_row(const struct LobbyRecentRow* who);
+s32 lobby_friend_request_send(const struct LobbyRecentRow* who);
+void lobby_recent_add(const struct LobbyRecentRow* who);
+char* lobby_net_jump_msg_get(s8 code);
+u32 lobby_net_leave_select(s8 choice);
 /* 0x80378D48 - adds a friend notice row (id text, name) to the lobby's notice list (GUESS name). */
 void addFriendNotice(const char* id_text, const char* name);
 /* 0x80377110 - releases the parts and model of remote player slots 1..9 whose lobby slot record still points at

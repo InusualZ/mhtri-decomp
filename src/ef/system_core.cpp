@@ -43,7 +43,7 @@
  *  - `set_move_work_max`, `GameMode_set`, `PlayMode_set`, `get_move_work_adrs`, `get_move_work_max`: retail narrows
  *    the argument (`clrlwi`) at entry, ours folds it into the store or the `clrlslwi`;
  *  - `fn_800D20B4`: retail `extsh`s both GX-FIFO halfwords before the `sth`;
- *  - `fn_800D0568`, `fn_800D05A4`, `fn_800D05DC`: retail hoists `lis`/`addi system_w` above the `index < 0x20`
+ *  - `fn_800D0568`, `fn_800D05A4`, `sys_tex_image_get`: retail hoists `lis`/`addi system_w` above the `index < 0x20`
  *    check, ours materialises the base after the branch;
  *  - `fn_800CFD20`: the branch sense around the `fn_800CFC64` call is inverted;
  *  - `tex_palette_bind`, `fn_800D02C0`, `tex_palette_bind_point`: retail reloads the slot's image fields for `GXInitTexObj`, ours
@@ -854,7 +854,7 @@ SysTask* fn_800D05A4(s32 index) {
 }
 
 /* 0x800D05DC - the task's +0x24 word, or NULL. */
-u32 fn_800D05DC(s32 index) {
+u32 sys_tex_image_get(s32 index) {
     if (index >= 0x20) {
         return 0;
     }

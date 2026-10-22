@@ -437,7 +437,7 @@ int main(void)
         if (system_w.field_0x865 != 0) {
             continue;
         }
-        if (system_w.unk2353 != 0) {
+        if (system_w.nand_corrupt_0x931 != 0) {
             continue;
         }
         if (lbl_807947A6 != 1 && lbl_807947A5 != 1) {

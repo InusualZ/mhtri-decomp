@@ -255,15 +255,16 @@ struct MenuSlot {
     /* +0x23D */ u8 unused_0x23D[0x2ED - 0x23D];
     /* +0x2ED */ u8 kind_row_base[8]; /* `kind_row_base[kind * 2]`: the first row the item kind shows */
     /* +0x2F5 */ u8 field_0x2F5;     /* the item kind (0..3) the page is showing */
-    /* +0x2F6 */ u8 unused_0x2F6[0x31E - 0x2F6];
+    /* +0x2F6 */ char text_0x2F6[0x28]; /* the player-search keyboard text (cleared by `plsearch_menu_init`) */
     /* +0x31E */ u8 field_0x31E;
     /* +0x31F */ u8 field_0x31F;
-    /* +0x320 */ u8 unused_0x320[0x4];
+    /* +0x320 */ s8 net_result_0x320;  /* the player-search network request's result (0 pending, 1 done, else failed) */
+    /* +0x321 */ u8 unused_0x321[0x3];
     /* +0x324 */ MenuPlaceRec* place_entries; /* the 0x24-byte placement list `menu/menu_row.cpp` walks */
     /* +0x328 */ s32 place_count;
-    /* +0x32C */ u8 unused_0x32C[0x1];
+    /* +0x32C */ u8 field_0x32C;      /* the mailbox list's row offset, counted up by `mailbox_row_offset_inc` */
     /* +0x32D */ u8 field_0x32D;      /* the flag `menu_item_close` clears after `kbd_close_call` */
-    /* +0x32E */ u8 unused_0x32E[0x330 - 0x32E];
+    /* +0x32E */ s16 wait_0x32E;      /* the player-search menu's message wait (15 frames) */
 };
 
 /* The menu work area itself: the two slots, `.bss` 0x806AC8C8..0x806ACF28 (0x660 B - exactly two

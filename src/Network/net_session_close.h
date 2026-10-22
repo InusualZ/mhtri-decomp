@@ -57,7 +57,7 @@ typedef struct NetPeerCard {
     /* +0x020 */ u8 level_0x020;
     /* +0x021 */ u8 rank_0x021;
     /* +0x022 */ u8 equip_0x022[9][0xC];  /* `_EQUIP` records */
-    /* +0x08E */ u8 pad_0x08E[0x10];
+    /* +0x08E */ u16 equip_ids_0x08E[8];  /* the shown equipment ids (`card_equip_ids_build`) */
     /* +0x09E */ char comment_0x09E[0xAC];
     /* +0x14A */ char names_0x14A[3][0x40];
     /* +0x20A */ u8 server_0x20A;
