@@ -41,8 +41,8 @@ void fn_8025E448(struct _PLW* self);
 void fn_8025EC58(struct _PLW* self);
 void fn_8025ED00(struct _PLW* self);
 void fn_802642D0(struct _PLW* self);
-u32 fn_8024676C(void);
-u32 fn_8025DE38(struct _PLW* self);
+void fn_8024676C(struct _PLW* self);
+void fn_8025DE38(struct _PLW* self);
 u32 fn_8025E298(struct _PLW* self, s32 a, s32 b);
 
 /* ---- Pl-band callees with no registered owner (`unsplit/Pl.h`'s home) ---- */
@@ -53,7 +53,6 @@ u32 fn_802872E4(struct _PLW* self);
 s32 pl_ground_check(struct _PLW* self, void* a, void* b, f32* out, s32 slot);
 u32 pl_coll_shape_set(struct _PLW* self, u8 mode, u16 flags);
 u32 fn_8027DCA8(struct _PLW* self);
-u32 hit_attack_list_push(void* p);
 
 /* ---- callees another registered unit owns whose header does not declare them ---- */
 u32 em_land_data_init(void* out);
@@ -72,7 +71,6 @@ u32 fn_80278D1C(struct _PLW* self);
 u32 fn_80279C20(struct _PLW* self);
 u32 fn_8027AF34(struct _PLW* self);
 s32 pl_item_room_get(struct _PLW* self, u16 item_id, s16 value);
-u32 pl_act_kind_get(struct _PLW* self);
 
 /* ---- library callees (the owners' headers do not declare these) ---- */
 u32 calc_xz_angle(f32 a, f32 b, f32 c, f32 d);

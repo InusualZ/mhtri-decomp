@@ -71,4 +71,12 @@ s32 chk_pointer(void);
 void PutPageArrow(u16* table, s16 page, s16 count, u16 flags, const struct _mh_ivec2_* pos, u8 mode);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+s16 item_get_with_msg(struct _PLW* plw, u16 item, u16 ticket, u8 flags, s16 count);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_HUD_COCKPIT_H */

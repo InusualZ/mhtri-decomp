@@ -87,7 +87,7 @@ void draw_shape_stage_load(u8 idx);
 void se_handle_clear(void* handle);
 void eft_common_load(void);
 
-u32 fn_8027CB1C(void* self);
+u32 pl_hit_result_best_get(void* self);
 u32 stage_map_kind_get(u8 idx);
 void camera_pl_quake_req(void* self, u32 sub);
 void em_pop_res_load(u8 idx);
@@ -151,7 +151,7 @@ void pl_act_class7_handler_23(_PLW* self, s32 kind);
 extern "C" {
 
 /* 0x80288CEC - the player's primary-act update: `act_no` selects the primary-act flag through a jump table,
- * `fn_8027CB1C` latches `+0x565` and `Pl_frame_check` arms `+0x566` and hands the player to `fn_802BE568` once. */
+ * `pl_hit_result_best_get` latches `+0x565` and `Pl_frame_check` arms `+0x566` and hands the player to `fn_802BE568` once. */
 void fn_80288CEC(_PLW* self, u32 sub, f32 dt) {
     u32 primary = 0;
     s32 result;
@@ -181,7 +181,7 @@ void fn_80288CEC(_PLW* self, u32 sub, f32 dt) {
             break;
         }
 
-        result = (u8)fn_8027CB1C(self);
+        result = (u8)pl_hit_result_best_get(self);
         switch (result) {
         case 2:
             self->field_0x565 = 1;
@@ -1116,7 +1116,7 @@ void pl_quest_end_request(u32 arg) {
 }
 
 /* 0x8028F368 - hand the mode work over to the network move system; 1 on success. */
-u32 fn_8028F368(void) {
+u32 pl_net_move_handover(void) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     u8* mode;
 

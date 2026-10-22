@@ -564,7 +564,7 @@ extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind);
 extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot);
 extern "C" void* em_kill_cut_target_get(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 pl_torch_ck(void* arg);
-extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag);
+extern "C" s32 em_search_record_ck(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 em_act_trap_ck(_ENEMY_WORK* enemy);
 extern "C" u32 ana_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(_ENEMY_WORK* enemy, u32 area, nw4r::math::VEC3* pos, u32 flag, f32 radius);
 extern "C" void* ana_em_ck__FUcPQ34nw4r4math4VEC3fUc(u32 area, nw4r::math::VEC3* pos, u32 flag, f32 radius);
@@ -4721,7 +4721,7 @@ extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind)
 }
 
 /* Whether the search helper finds any record. */
-extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag)
+extern "C" s32 em_search_record_ck(u32 selector, _PLW* work, s8* out_flag)
 {
     return em_kill_cut_target_get((u8)selector, work, out_flag) != NULL;
 }

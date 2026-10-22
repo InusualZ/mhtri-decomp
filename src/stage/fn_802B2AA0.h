@@ -353,7 +353,7 @@ extern "C" u32 lb_event_gate2_ck(void);
 extern "C" s32 fn_802B2978(u32 from, u32 to, f32 t);
 extern "C" s32 stage_torch_unlit_ck(u8 index);
 extern "C" s32 camera_angle_y_get(void);
-extern "C" void fn_802B4680(void* plw, u8 index);
+extern "C" void stage_area_event_dispatch(void* plw, u8 index);
 extern "C" f32 fn_802B4D24(s16 index, f32 span);
 extern "C" u32 fn_802B53CC(u32 base);
 extern "C" u32 fn_802B5488(u32 block);

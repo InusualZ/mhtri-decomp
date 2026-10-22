@@ -50,7 +50,7 @@ struct _PL_ROOT {
     /* +0x0003 */ u8 unused_0x0003[0x0004 - 0x0003];
     /* +0x0004 */ s16 timer_0x04;
     /* +0x0006 */ u8 unused_0x0006[0x00DC - 0x0006];
-    /* +0x00DC */ u8* mode_work_0xDC;    /* `fn_8028F368` sets its +0x6A3E byte */
+    /* +0x00DC */ u8* mode_work_0xDC;    /* `pl_net_move_handover` sets its +0x6A3E byte */
     /* +0x00E0 */ u8 unused_0x00E0[0x00E9 - 0x00E0];
     /* +0x00E9 */ u8 area_no_0xE9;       /* `pl_map_kind_get` hands it to `stage_map_kind_get` */
     /* +0x00EA */ u8 unused_0x00EA;
@@ -61,7 +61,7 @@ struct _PL_ROOT {
     /* +0x00EF */ u8 npc_present_0xEF;   /* the AI NPC's marker is drawn while this is set (`quest_npc_marker_draw`) */
     /* +0x00F0 */ u8 unused_0x00F0[0x00FB - 0x00F0];
     /* +0x00FB */ u8 seq_0xFB;           /* `pl_quest_end_request` stores 4 or 6 */
-    /* +0x00FC */ u8 seq_0xFC;           /* `fn_8028F368` stores 4 */
+    /* +0x00FC */ u8 seq_0xFC;           /* `pl_net_move_handover` stores 4 */
     /* +0x00FD */ u8 unused_0x00FD[0x0114 - 0x00FD];
     /* +0x0114 */ s32 flag_0x114;       /* `fn_8028D574` tests `<= 0`; `root_wait_frames_set` stores */
     /* +0x0118 */ u8 unused_0x0118[0x0128 - 0x0118];

@@ -18,6 +18,7 @@ void fn_8010C0E0(_EFT* self);
 void fn_8010C454(_EFT* self);
 void fn_8010C464(_EFT* self);
 
+void eft_pl_hit_light_spawn(struct _PLW* source);
 #ifdef __cplusplus
 }
 #endif

@@ -12,7 +12,7 @@ struct _PLW;
 extern "C" {
 #endif
 
-/* The per-act handlers `fn_802840DC` tail-calls out of its `act_no` switch (cases 0-34; the two
+/* The per-act handlers `pl_weapon1_act_dispatch` tail-calls out of its `act_no` switch (cases 0-34; the two
  * families are the ones carrying an index argument and the ones that take only the actor).  The
  * call site's own register width is all there is to go on: the index is `li`-materialised (0-4) and
  * the actor is the same `_PLW` every other Pl entry takes. */
@@ -56,6 +56,16 @@ void pl_act_motion_row_apply(struct _PLW* self, u8 mode, const PlMotionRow* row,
 /* 0x80284474 - the player's charge stage for the second weapon class (`ef/eft029_fx.cpp` reads it). */
 u8 pl_charge_stage2_get(struct _PLW* plw);
 
+/* 0x805CAD48: the step table the guard-break act hands Pl_act_set_step_table for weapon kind 2 */
+extern u32 pl_flinch_steps_kind2[];
+void pl_weapon1_act_dispatch(struct _PLW* self);
+/* 0x80286DF8: the class-2 weapon act dispatcher */
+void pl_weapon2_act_dispatch(struct _PLW* self);
+/* 0x80288848: the class-4-6 weapon act dispatcher */
+void pl_weapon456_act_dispatch(struct _PLW* self);
+/* 0x805CB894 / 0x805CBA64: the two scan-row tables (`_PLW`+0x318) during which weapon kinds 4-6 guard any hit */
+extern u8 pl_scan_rows_guard_a[];
+extern u8 pl_scan_rows_guard_b[];
 #ifdef __cplusplus
 }
 #endif

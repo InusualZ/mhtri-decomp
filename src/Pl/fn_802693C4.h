@@ -41,10 +41,10 @@ u32 fn_8026A364(struct _PLW* self);
 void pl_joint_mtx_get(struct _PLW* self, s32 joint, nw4r::math::MTX34* out);
 u8 fn_8026A3A0(struct _PLW* self);
 void pl_act_set_cam_ang(struct _PLW* self);
-void fn_8026A4E4(struct _PLW* self);
-void fn_8026A518(struct _PLW* self);
-void fn_8026A570(struct _PLW* self);
-void fn_8026A590(struct _PLW* self);
+void pl_motion_integrate_stop(struct _PLW* self);
+void pl_motion_integrate(struct _PLW* self);
+void pl_motion_clear(struct _PLW* self);
+void pl_motion_acc_clear(struct _PLW* self);
 void fn_8026A618(struct _PLW* self, s32 id);
 /* The id-flag tests return `u32`: `Pl/pl_act_step.cpp` compares `pl_part_flag_ck(...) == 1` and retail performs a
  * `cmplwi r3,1` there (`cmpwi` is the signed form). */

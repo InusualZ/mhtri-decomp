@@ -1,6 +1,6 @@
 /*
  * Pl/fn_80230FBC.cpp - the player work's motion-kind dispatch and four of its nine kind banks.
- * RANGE. .text 0x80230FBC-0x802373AC (4 functions): `fn_80230FBC`, the 9-way dispatcher on the kind byte `_PLW`+0x002,
+ * RANGE. .text 0x80230FBC-0x802373AC (4 functions): `pl_se_kind_dispatch`, the 9-way dispatcher on the kind byte `_PLW`+0x002,
  *   then the banks for kinds 0-3, each a switch on `Get_motion_no` over the motions 1002-1271; .data
  *   0x805C1F94-0x805C2C60 (the jump tables, 9 + 270 + 270 + 270 entries), extab, extabindex.  The `.data` claim starts
  *   at the 4-mod-8 0x805C1F94: `tools/elf/objalign.py` lowers the object's section alignment so it links in place
@@ -34,7 +34,7 @@ extern "C" void fn_80234E9C(_PLW* work, u8 part);
 
 /* Dispatches on the player's motion-kind byte to the nine per-kind banks; does nothing during an event demo,
  * outside play mode 3 (unless the master action runs) or for a kind past the last bank. */
-extern "C" void fn_80230FBC(_PLW* self)
+extern "C" void pl_se_kind_dispatch(_PLW* self)
 {
     u8 part;
 

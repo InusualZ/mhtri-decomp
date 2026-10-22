@@ -13,6 +13,8 @@ extern "C" {
  * is no root work (GUESS name). */
 u8 quest_move_sub_flag_get(void);
 
+u32 pl_net_move_handover(void);
+void pl_act_class7_dispatch(struct _PLW* self);
 #ifdef __cplusplus
 }
 #endif

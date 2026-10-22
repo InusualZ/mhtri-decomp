@@ -166,9 +166,16 @@ struct _PLW {
         };
         struct {   /* the act unit's own view: the stagger value `pl_act_name_row_get` branches on.  Retail
                     * loads that pair with `lha`, so the field really is a signed 16-bit one */
-            /* +0x030 */ u8 pad_0x30_pair[0x6];
+            /* +0x030 */ u8 pad_0x30_pair[0x4];
+            /* +0x034 */ s16 count_0x034;   /* the fishing act's bite countdown */
             /* +0x036 */ s16 field_0x036;
-            /* +0x038 */ u8 pad_0x38[0x4];
+            /* +0x038 */ union {   /* one run, two spellings (rule 5) */
+                /* +0x038 */ u8 pad_0x38[0x4];
+                struct {
+                    /* +0x038 */ u16 field_0x038;   /* the aim act's saved facing */
+                    /* +0x03A */ u8 pad_0x03A[0x2];
+                };
+            };
         };
     };
     /* +0x03C */ union { /* the original and later names of the same 12 bytes (rule 5) */
@@ -176,8 +183,8 @@ struct _PLW {
             /* +0x03C */ union {   /* one f32, three spellings: `unk03C`/`field_0x03C` and
                                     * `motion_pos_0x3C` - the three floats the 0x8026A4E4-family integrators
                                     * move are the position at +0x3C, the velocity at +0x78 and the
-                                    * acceleration at +0x84 (fn_8026A4E4 adds the velocity into the position,
-                                    * fn_8026A518 the acceleration into the velocity) */
+                                    * acceleration at +0x84 (pl_motion_integrate_stop adds the velocity into the position,
+                                    * pl_motion_integrate the acceleration into the velocity) */
                 /* +0x03C */ f32 unk03C;
                 /* +0x03C */ f32 field_0x03C;
                 /* +0x03C */ f32 motion_pos_0x3C;
@@ -244,7 +251,13 @@ struct _PLW {
                 };
                 struct {   /* a split of the same bytes (the part/motion section) */
                     /* +0x074 */ u8 pad_0x74[0x1];
-                    /* +0x075 */ u8 pad_0x75[0x3];
+                    /* +0x075 */ union {   /* one run, two spellings (rule 5) */
+                        /* +0x075 */ u8 pad_0x75[0x3];
+                        struct {
+                            /* +0x075 */ u8 pad_0x75_head[0x2];
+                            /* +0x077 */ u8 field_0x077;   /* cleared on the first frame */
+                        };
+                    };
                     /* +0x078 */ f32 motion_vel_0x78;
                     /* +0x07C */ f32 motion_vel_0x7C;
                     /* +0x080 */ f32 motion_vel_0x80;
@@ -295,8 +308,15 @@ struct _PLW {
     /* +0x0BA */ u16 unkBA;
     /* +0x0BC */ u16 unkBC;
     /* +0x0BE */ u16 unkBE;
-    /* +0x0C0 */ u8 pad_0xC0[0xC];
-    /* +0x0CC */ u16 unkCC;
+    /* +0x0C0 */ union {   /* one run, two spellings (rule 5) */
+        /* +0x0C0 */ u8 pad_0xC0[0xC];
+        struct {
+            /* +0x0C0 */ u8 pad_0xC0_head[0x8];
+            /* +0x0C8 */ u16 field_0x0C8;   /* the input bits the step-up act tests for 0x2000 */
+            /* +0x0CA */ u8 pad_0x0CA[0x2];
+        };
+    };
+    /* +0x0CC */ u16 field_0x0CC;   /* the input bits it tests for 0x1000 */
     /* +0x0CE */ u16 unkCE;
     /* +0x0D0 */ union {   /* 0x0D0-0x10F: the id bit sets as u32 words, and the master band's two per-part u16 tables over the same bytes */
         struct {
@@ -312,8 +332,21 @@ struct _PLW {
             /* +0x0D4 */ u16 part_tbl_b_0xD4[0x1E];   /* per-part table B (the `lhz/lha 212(this + idx*2)` reads) */
         };
     };
-    /* +0x110 */ f32 unk110;
-    /* +0x114 */ u8 pad_0x114[0x14];
+    /* +0x110 */ f32 field_0x110;   /* the height the action prompt compares with -70 */
+    /* +0x114 */ union {   /* one run, two spellings (rule 5) */
+        /* +0x114 */ u8 pad_0x114[0x14];
+        struct {
+            /* +0x114 */ u8 pad_0x114_head[0xC];
+            /* +0x120 */ u8 field_0x120;   /* cleared with the skill state on an act reset */
+            /* +0x121 */ u8 field_0x121;
+            /* +0x122 */ u8 field_0x122;
+            /* +0x123 */ u8 field_0x123;
+            /* +0x124 */ u8 field_0x124;
+            /* +0x125 */ u8 field_0x125;
+            /* +0x126 */ u8 field_0x126;
+            /* +0x127 */ u8 field_0x127;
+        };
+    };
     /* +0x128 */ union {   /* one u8, two spellings (rule 5) */
         /* +0x128 */ u8 unk128;
         /* +0x128 */ u8 field_0x128;
@@ -370,7 +403,7 @@ struct _PLW {
     };
     /* +0x26A */ u8 ammo_capacity_0x26A;   /* the loaded magazine's capacity (`hud/cockpit_quest.cpp`'s ammo gauge) */
     /* +0x26B */ u8 unk26B;
-    /* +0x26C */ u8 held_item_kind_0x26C;   /* the held item's kind `fn_80279B84` derives from its item id (GUESS) */
+    /* +0x26C */ u8 held_item_kind_0x26C;   /* the held item's kind `pl_held_item_refresh` derives from its item id (GUESS) */
     /* +0x26D */ u8 ammo_icon_kind_0x26D;  /* the loaded ammo's icon kind (`pl_item_icon_kind_get`) */
     /* +0x26E */ u16 item_slot_sel;   /* the selected item slot; 0x80 marks the second page (`menu/menu_item.cpp`) */
     /* +0x270 */ s16 magazine_0x270;      /* non-zero while a magazine is loaded (`hud/cockpit_quest.cpp`'s ammo gauge) */
@@ -433,8 +466,8 @@ struct _PLW {
             };
         };
     };
-    /* +0x30C */ u8 unk30C;
-    /* +0x30D */ u8 unk30D;
+    /* +0x30C */ u8 field_0x30C;
+    /* +0x30D */ u8 field_0x30D;
     /* +0x30E */ union {   /* 0x30E-0x317: one 10-byte run with two views - the byte view
                             * (`flag_0x30E` and its runs, with the `unk30F_start` split inside
                             * them) and the act entry's own 16-bit `field_0x310` alongside it.  The
@@ -457,11 +490,13 @@ struct _PLW {
                 /* +0x314 */ u8 unk314;
                 /* +0x314 */ u8 field_0x314;  /* > 0 suppresses the scan (`fn_8025E298`) */
             };
-            /* +0x315 */ u8 unk315[0x318 - 0x315];
+            /* +0x315 */ u8 field_0x315;
+            /* +0x316 */ u8 pad_0x316[0x2];
         };
         struct {   /* the act entry's own view; the halfword and the byte each carry
                     * both spellings as union members, one member per offset */
-            /* +0x30E */ u8 pad_0x30E_pair[0x2];
+            /* +0x30E */ u8 pad_0x30E_pair[0x1];
+            /* +0x30F */ u8 field_0x30F;
             /* +0x310 */ union {   /* one halfword, two spellings (rule 5) */
                 /* +0x310 */ u16 field_0x310;         /* the halfword the act entry clears
                                                        * (`fn_80275C34`); `fn_80280678` clears
@@ -557,22 +592,22 @@ struct _PLW {
     /* +0x36C */ s16 field_0x36C;
     /* +0x36E */ u8 unk36E[0x370 - 0x36E];
     /* +0x370 */ union { /* the health pair: current and cap, both signed 16-bit (`pl_act_add_hold_gauge`
-                         * adds a signed delta to the current, `fn_80276690` moves the cap and clamps
+                         * adds a signed delta to the current, `pl_gauge_ceiling_grow` moves the cap and clamps
                          * the current to it, and the reset sets current = cap) */
         /* +0x370 */ s16 health;      /* current health; clamped to [0, cap], and to >= 1 by the act
                                        * path that takes `-0xA` damage through `pl_act_add_hold_gauge` */
         /* +0x370 */ s16 field_0x370; /* the spelling `Pl/pl_act_step.cpp` reads; the
-                                       * act's current hold gauge (`fn_80276690`) */
+                                       * act's current hold gauge (`pl_gauge_ceiling_grow`) */
     };
     /* +0x372 */ union {
-        /* +0x372 */ s16 health_max; /* the cap: `fn_80276690` clamps it to [1, 150] and clamps
+        /* +0x372 */ s16 health_max; /* the cap: `pl_gauge_ceiling_grow` clamps it to [1, 150] and clamps
                                       * `health`/`unk376` down to it */
         /* +0x372 */ s16 unk372;     /* an older spelling of the same word */
-        /* +0x372 */ s16 field_0x372;  /* the hold gauge's ceiling (`fn_80276690` grows it) */
+        /* +0x372 */ s16 field_0x372;  /* the hold gauge's ceiling (`pl_gauge_ceiling_grow` grows it) */
     };
     /* +0x374 */ union {
         /* +0x374 */ u8 pad_0x374[0x2];
-        /* +0x374 */ s16 field_0x374;  /* the soft gauge cap `fn_80276690` grows when `a == 0` */
+        /* +0x374 */ s16 field_0x374;  /* the soft gauge cap `pl_gauge_ceiling_grow` grows when `a == 0` */
     };
     /* +0x376 */ union {
         /* +0x376 */ s16 unk376;
@@ -601,7 +636,7 @@ struct _PLW {
     };
     /* +0x382 */ union {
         /* +0x382 */ u8 pad_0x382[0x2];
-        /* +0x382 */ s16 field_0x382;  /* the re-arm flag `fn_80276778`/`pl_act_add_stagger` clear */
+        /* +0x382 */ s16 field_0x382;  /* the re-arm flag `pl_stagger_budget_add`/`pl_act_add_stagger` clear */
     };
     /* +0x384 */ s16 field_0x384;
     /* +0x386 */ union {
@@ -612,7 +647,7 @@ struct _PLW {
         /* +0x388 */ u8 unk388;
         /* +0x388 */ u8 field_0x388;   /* cleared by the act entry */
     };
-    /* +0x389 */ u8 unk389[0x38A - 0x389];
+    /* +0x389 */ u8 field_0x389;   /* cleared on an area entry */
     /* +0x38A */ s16 field_0x38A;   /* cleared by the lobby player's first frame */
     /* +0x38C */ s16 unk38C;
     /* +0x38E */ s16 unk38E;
@@ -628,7 +663,8 @@ struct _PLW {
     /* +0x39A */ u8 unk39A[0x39C - 0x39A];
     /* +0x39C */ u16 field_0x39C;         /* shell/element charge gauge (`fn_80265748`) */
     /* +0x39E */ u8 unk39E;
-    /* +0x39F */ u8 unk39F[0x3A1 - 0x39F];
+    /* +0x39F */ u8 field_0x39F;         /* 27..31 refuse the guard (`pl_guard_ck`) */
+    /* +0x3A0 */ u8 field_0x3A0;         /* bit 0x20 asks for skill 37, bit 0x40 lifts the guard's facing test */
     /* +0x3A1 */ u8 field_0x3A1;
     /* +0x3A2 */ union {
         /* +0x3A2 */ s8 unk3A2;
@@ -699,7 +735,7 @@ struct _PLW {
         /* +0x3DC */ u32 unk3DC;
         /* +0x3DC */ u32 field_0x3DC;
     };
-    /* +0x3E0 */ u32 unk3E0;
+    /* +0x3E0 */ u32 dm_condition_prev_0x3E0;   /* the last frame's +0x3DC damage-condition word */
     /* +0x3E4 */ union {   /* the 6-byte run, with a named split inside it */
         /* +0x3E4 */ u8 unk3E4[0x3EA - 0x3E4];
         struct {
@@ -712,15 +748,15 @@ struct _PLW {
         };
     };
     /* +0x3EA */ s16 field_0x3EA;         /* hit-stop / stagger timer `fn_80264274` feeds */
-    /* +0x3EC */ s16 unk3EC;
+    /* +0x3EC */ s16 field_0x3EC;   /* the pending stagger amount `pl_status_pending_apply` hands `fn_80264274` */
     /* +0x3EE */ union {   /* the 4-byte run, with a named split inside it */
         /* +0x3EE */ u8 unk3EE[0x3F2 - 0x3EE];
         struct {
-            /* +0x3EE */ u8 pad_0x3EE[0x2];
+            /* +0x3EE */ s16 field_0x3EE;   /* the 30-frame hold armed with the +0x3EC stagger (`pl_status_pending_apply`) */
             /* +0x3F0 */ s16 field_0x3F0;  /* the act's first timer (`fn_80259310`) */
         };
     };
-    /* +0x3F2 */ s16 unk3F2;
+    /* +0x3F2 */ s16 field_0x3F2;   /* the pending stun build-up added to +0x3F0 and +0x3F4 */
     /* +0x3F4 */ union {   /* the 4-byte run, split two ways (same byte total) */
         /* +0x3F4 */ u8 unk3F4[0x3F8 - 0x3F4];
         struct {
@@ -734,10 +770,10 @@ struct _PLW {
             };
         };
     };
-    /* +0x3F8 */ s16 unk3F8;
-    /* +0x3FA */ u8 unk3FA[0x3FC - 0x3FA];
-    /* +0x3FC */ s16 field_0x3FC;         /* stamina/guard timer (`fn_80264EA4`, `fn_80265374`) */
-    /* +0x3FE */ s16 unk3FE;
+    /* +0x3F8 */ s16 field_0x3F8;   /* the pending build-up added to +0x3F6 */
+    /* +0x3FA */ s16 field_0x3FA;   /* the paralysis act's remaining frames */
+    /* +0x3FC */ s16 field_0x3FC;         /* stamina/guard timer (`fn_80264EA4`, `pl_status_pending_apply`) */
+    /* +0x3FE */ s16 field_0x3FE;   /* the pending build-up added to the +0x3FC stamina timer */
     /* +0x400 */ union {   /* one u16 pair, also spelled as the single `unk400` run */
         /* +0x400 */ u8 unk400[0x404 - 0x400];
         struct {
@@ -763,7 +799,7 @@ struct _PLW {
             /* +0x40C */ u16 field_0x40C;
         };
     };
-    /* +0x40E */ s16 unk40E;
+    /* +0x40E */ s16 field_0x40E;   /* > 0 re-arms the +0x410 timer at 5400 frames */
     /* +0x410 */ union {   /* the 4-byte run 0x410-0x413, with the act's re-arm word inside */
         /* +0x410 */ u8 unk410[0x414 - 0x410];
         /* +0x410 */ u16 field_0x410;  /* the second timer pair's first word (`Pl/pl_act_step.cpp`) */
@@ -778,27 +814,47 @@ struct _PLW {
     /* +0x41A */ s16 unk41A;
     /* +0x41C */ s16 field_0x41C;
     /* +0x41E */ s16 field_0x41E;         /* second shell timer, cleared by `fn_802656EC` */
-    /* +0x420 */ s16 unk420;
+    /* +0x420 */ s16 field_0x420;   /* > 0 re-arms the +0x422 timer */
     /* +0x422 */ union {
         /* +0x422 */ s16 unk422;
         /* +0x422 */ u16 field_0x422;  /* one of the timer pair the act-84 entry clears */
     };
-    /* +0x424 */ s16 unk424;
-    /* +0x426 */ s16 unk426;
-    /* +0x428 */ s16 unk428;
-    /* +0x42A */ s16 unk42A;
-    /* +0x42C */ s16 unk42C;
+    /* +0x424 */ union {   /* five s16, also indexed as one run (rule 5) */
+        struct {
+            /* +0x424 */ s16 unk424;
+            /* +0x426 */ s16 unk426;
+            /* +0x428 */ s16 unk428;
+            /* +0x42A */ s16 unk42A;
+            /* +0x42C */ s16 unk42C;
+        };
+        /* +0x424 */ s16 status_pending_0x424[5];  /* > 0 re-arms the matching `status_timer_0x42E` slot
+                                                   * (`pl_status_pending_apply`) */
+    };
     /* +0x42E */ union {   /* the 0x16-byte run 0x42E-0x443, with the act-end word inside it */
         /* +0x42E */ u8 pad_0x42E[0x16];
         struct {
-            /* +0x42E */ u16 field_0x42E;   /* the five-word timer run the act-84 entry clears; the
-                                            * access is a raw `sth` and nothing reads them else-
-                                            * where, so the width is taken from the store */
-            /* +0x430 */ u16 field_0x430;
-            /* +0x432 */ u16 field_0x432;
-            /* +0x434 */ u16 field_0x434;
-            /* +0x436 */ u16 field_0x436;
-            /* +0x438 */ u8 pad_0x438[0xA];
+            /* +0x42E */ union {   /* five u16, also indexed as one run (rule 5) */
+                struct {
+                    /* +0x42E */ u16 field_0x42E;   /* the five-word timer run the act-84 entry clears; the
+                                                    * access is a raw `sth`, so the width is taken from
+                                                    * the store */
+                    /* +0x430 */ u16 field_0x430;
+                    /* +0x432 */ u16 field_0x432;
+                    /* +0x434 */ u16 field_0x434;
+                    /* +0x436 */ u16 field_0x436;
+                };
+                /* +0x42E */ u16 status_timer_0x42E[5];  /* 3600 frames (1800 with cat skill 46) */
+            };
+            /* +0x438 */ union {   /* one run, two spellings (rule 5) */
+                /* +0x438 */ u8 pad_0x438[0xA];
+                struct {
+                    /* +0x438 */ s16 field_0x438;   /* the resistance item 0x187's timer */
+                    /* +0x43A */ s16 field_0x43A;   /* the resistance item 0x188's timer */
+                    /* +0x43C */ s16 field_0x43C;   /* the resistance item 0x18A's timer */
+                    /* +0x43E */ s16 field_0x43E;   /* the resistance item 0x189's timer */
+                    /* +0x440 */ s16 field_0x440;   /* the resistance item 0x170's timer */
+                };
+            };
             /* +0x442 */ u16 field_0x442;  /* cleared by the act-state re-entry (`pl_act_reenter`) */
         };
     };
@@ -818,18 +874,18 @@ struct _PLW {
         /* +0x447 */ u8 field_0x447;  /* the act's one-shot cat-skill latch (`fn_8027633C`) */
     };
     /* +0x448 */ s8 unk448;
-    /* +0x449 */ s8 unk449;
-    /* +0x44A */ u8 unk44A[0x44C - 0x44A];
+    /* +0x449 */ s8 field_0x449;   /* the 0x16C party item's level */
+    /* +0x44A */ s16 field_0x44A;   /* the item buff timer the 0x14/0x86 items arm */
     /* +0x44C */ s8 unk44C;
     /* +0x44D */ s8 unk44D;
     /* +0x44E */ union {   /* the 12-byte run, split (same byte total) */
         /* +0x44E */ u8 unk44E[0x45A - 0x44E];
         struct {
-            /* +0x44E */ u8 unk44E_start[0x450 - 0x44E];
+            /* +0x44E */ s16 field_0x44E;   /* the item buff timer the 0x17/0x87 items arm */
             /* +0x450 */ u8 field_0x450;   /* set by `fn_8027D6A4`, with the s16 at +0x454 */
             /* +0x451 */ u8 field_0x451;   /* set by `fn_8027D6C0`, with the s16 at +0x456 */
             /* +0x452 */ s8 field_0x452;   /* set by `fn_8027D698`, with the s16 at +0x458 */
-            /* +0x453 */ u8 pad_0x453[0x1];
+            /* +0x453 */ u8 field_0x453;
             /* +0x454 */ s16 field_0x454;  /* raised to the argument, never lowered (`fn_8027D6A4`) */
             /* +0x456 */ s16 field_0x456;  /* raised to the argument, never lowered (`fn_8027D6C0`) */
             /* +0x458 */ s16 field_0x458;  /* stored raw by `fn_8027D698` */
@@ -840,7 +896,7 @@ struct _PLW {
     /* +0x45E */ union {   /* the 8-byte run, with a named split inside it */
         /* +0x45E */ u8 pad_0x45E[0x466 - 0x45E];
         struct {
-            /* +0x45E */ u8 pad_0x45E_start[0x460 - 0x45E];
+            /* +0x45E */ s16 field_0x45E;   /* the 0x14E item's timer */
             /* +0x460 */ s16 field_0x460;  /* > 0 is the whole of `Pl_timer_0x460_ck` */
             /* +0x462 */ u8 pad_0x462[0x464 - 0x462];
             /* +0x464 */ s16 field_0x464;  /* the cockpit-quest bar's recompute gate:
@@ -887,10 +943,21 @@ struct _PLW {
         };
     };
     /* +0x46F */ u8 field_0x46F;
-    /* +0x470 */ s16 unk470;
-    /* +0x472 */ u8 unk472[0x47B - 0x472];
+    /* +0x470 */ s16 field_0x470;
+    /* +0x472 */ u8 unk472[0x2];
+    /* +0x474 */ u32 field_0x474;
+    /* +0x478 */ u16 field_0x478;   /* the gathering point's kind (0x10 hands out the fixed item 0x2B) */
+    /* +0x47A */ u8 field_0x47A;   /* the emote id the gesture act hands stage_area_event_dispatch */
     /* +0x47B */ u8 field_0x47B;         /* per-player type index `fn_80267C84` reads */
-    /* +0x47C */ u8 pad_0x47C[0x480 - 0x47C];
+    /* +0x47C */ union {   /* one run, two spellings (rule 5) */
+        /* +0x47C */ u8 pad_0x47C[0x4];
+        struct {
+            /* +0x47C */ u8 field_0x47C;   /* the first frame clears 0x47C-0x483 byte by byte */
+            /* +0x47D */ u8 field_0x47D;
+            /* +0x47E */ u8 field_0x47E;
+            /* +0x47F */ u8 field_0x47F;
+        };
+    };
     /* +0x480 */ union { /* the original and later names of the same 96 bytes (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
             /* +0x480 */ union {   /* the 0x480..0x4DF run: the field spellings kept whole, with the
@@ -917,9 +984,12 @@ struct _PLW {
                     /* +0x4C0 */ f32 hold_time_0x4C0;  /* positive while the hold lasts */
                 };
                 struct {   /* the shell band's view: the actor's own attack entry, the record
-                            * `Pl/pl_act.cpp` spells `_HIT_W` and `fn_80277974` fills in.  Only its address is
+                            * `Pl/pl_act.cpp` spells `_HIT_W` and `pl_hit_attack_build` fills in.  Only its address is
                             * named - the entry runs on into the fields of the view above */
-                    /* +0x480 */ u8 pad_0x480_head[0x484 - 0x480];
+                    /* +0x480 */ u8 field_0x480;
+                    /* +0x481 */ u8 field_0x481;
+                    /* +0x482 */ u8 field_0x482;
+                    /* +0x483 */ u8 field_0x483;
                     /* +0x484 */ u8 hit_0x484[0x5C];
                 };
             };
@@ -944,7 +1014,9 @@ struct _PLW {
     /* +0x4EE */ u8 unk4EE;
     /* +0x4EF */ u8 unk4EF[0x538 - 0x4EF];
     /* +0x538 */ u8 unk538;
-    /* +0x539 */ u8 unk539[0x565 - 0x539];
+    /* +0x539 */ u8 unk539[0x3];
+    /* +0x53C */ u16 hit_ids_0x53C[20];   /* the hit ids already taken this attack (`hit_id_list_clear`) */
+    /* +0x564 */ u8 hit_id_count_0x564;   /* how many of them are set */
     /* +0x565 */ u8 field_0x565;  /* the primary-act latch `Pl/pl_motion.cpp` sets */
     /* +0x566 */ union {   /* 0x566-0x57F: the `field_0x566` byte and its `unk567`/`unk568`
                             * filler runs, with the act's armed-weapon fields inside the same bytes and
@@ -972,16 +1044,17 @@ struct _PLW {
             /* +0x566 */ u8 pad_0x566;    /* `field_0x566` is declared in the member above */
             /* +0x567 */ u8 pad_0x567;    /* `atk_act_flag`/`field_0x567` are declared above */
             /* +0x568 */ u8 pad_0x568[0x2];
-            /* +0x56A */ u8 field_0x56A;   /* the weapon record's level byte (`fn_802740F4`) */
+            /* +0x56A */ u8 field_0x56A;   /* the weapon record's level byte (`pl_weapon_record_read`) */
             /* +0x56B */ u8 field_0x56B;   /* the armed weapon class the act-kind deltas index */
-            /* +0x56C */ u8 pad_0x56C[0x2];
+            /* +0x56C */ s16 field_0x56C;   /* the working copy of the armed attack value */
             /* +0x56E */ s16 field_0x56E;  /* the armed attack value */
             /* +0x570 */ s8 field_0x570;   /* the ranged attack value `Pl_critical_get` reads */
-            /* +0x571 */ u8 pad_0x571[0xF];
+            /* +0x571 */ u8 pad_0x571[0x3];
+            /* +0x574 */ u8 drift_vel_0x574[12];   /* (a VEC3, byte-declared: the run sits in a 2-aligned struct) the per-frame drift added to the position while +0x582 is set (`pl_frame_post_step`) */
         };
     };
     /* +0x580 */ s16 field_0x580;   /* cleared by the lobby player's first frame; `Pl/pl_act.cpp` stores its argument */
-    /* +0x582 */ u8 unk582;
+    /* +0x582 */ u8 drift_on_0x582;   /* nonzero applies the +0x574 drift each frame */
     /* +0x583 */ union {
         u8 shell_ang_0x583; /* the player's shell-frame angle: `ef/eft053.cpp`'s shell
                              * projection reads it as a signed per-frame step (its sign
@@ -1049,9 +1122,11 @@ struct _PLW {
                                   * `unk5BC` - both are one byte, so no offset moves) */
     /* +0x5BD */ u8 quest_menu_open_0x5BD;  /* the cockpit's quest menu is open (`hud/cockpit_quest.cpp`) */
     /* +0x5BE */ u8 take_menu_open_0x5BE;   /* the cockpit's take-item menu is open */
-    /* +0x5BF */ u8 cockpit_menu_row_0x5BF; /* the cockpit's quest-menu row (`hud/cockpit_quest.cpp`) */
+    /* +0x5BF */ u8 cockpit_menu_row_0x5BF; /* the cockpit's quest-menu row (`hud/cockpit_quest.cpp`); the rest act's
+                                          * spot search step */
     /* +0x5C0 */ u8 cockpit_menu_0x5C0;     /* the cockpit's quest-menu state: 1 rows, 2 count, 3 confirm (`hud/cockpit_quest.cpp`) */
-    /* +0x5C1 */ u8 pad_0x5C1[0x5C4 - 0x5C1];
+    /* +0x5C1 */ u8 pad_0x5C1[0x1];
+    /* +0x5C2 */ s16 field_0x5C2;   /* the rest act's 30-frame timer */
     /* +0x5C4 */ union { /* the original and later names of the same 36 bytes (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
             /* +0x5C4 */ union {
@@ -1071,10 +1146,10 @@ struct _PLW {
                         };
                     };
                     /* +0x5C8 */ u8 field_0x5C8;   /* the armed weapon class `fn_802745DC` reads; non-zero
-                                                    * also lets `fn_8027D6DC` send its motion
+                                                    * also lets `pl_motion_request_latch` send its motion
                                                     * request */
                     /* +0x5C9 */ u8 field_0x5C9;   /* set once the armed value table has been read; the latch
-                                                    * `fn_8027D6DC` sets on every call */
+                                                    * `pl_motion_request_latch` sets on every call */
                     /* +0x5CA */ union {   /* the 0x1B-byte tail, two spellings (rule 5) */
                         /* +0x5CA */ u8 pad_0x5CA[0x1B];
                         /* +0x5CA */ struct {   /* the lobby's view: the hunter name and id text a peer card loads.  size: 0x1B */
@@ -1168,7 +1243,8 @@ struct _PLW {
                 /* +0x65F */ u8 unk65F[0x662 - 0x65F];
                 struct {
                     /* +0x65F */ u8 field_0x65F;
-                    /* +0x660 */ u8 pad_0x660[0x2];
+                    /* +0x660 */ u8 field_0x660;   /* cleared on the first frame */
+                    /* +0x661 */ u8 pad_0x661[0x1];
                 };
             };
             /* +0x662 */ s16 field_0x662;
@@ -1179,10 +1255,14 @@ struct _PLW {
                                 /* +0x656 */ u8 field_0x656;
                                 /* +0x657 */ u8 field_0x657;
                                 /* +0x658 */ u8 field_0x658;   /* the 90-frame lockout `fn_80262688` sets */
-        /* +0x659 */ u8 pad_merge_0x659[0x3];
+        /* +0x659 */ u8 field_0x659;
+        /* +0x65A */ u8 field_0x65A;
+        /* +0x65B */ u8 pad_0x65B[0x1];
                                 /* +0x65C */ u8 field_0x65C;
                                 /* +0x65D */ u8 field_0x65D;
-        /* +0x65E */ u8 pad_merge_0x65E[0x6];
+        /* +0x65E */ u8 pad_merge_0x65E[0x2];
+        /* +0x660 */ s16 wide_area_hold_0x660;   /* the 60-frame hold between two wide-area item effects (`pl_wide_area_effect_step`) */
+        /* +0x662 */ u8 pad_0x662[0x2];
         };
     };
     /* +0x664 */ union {
@@ -1192,7 +1272,8 @@ struct _PLW {
     /* +0x666 */ u16 field_0x666;
     /* +0x668 */ u8 talk_wait_0x668;    /* re-armed to 5 each frame a lobby NPC talk runs; 0 ends the talk */
     /* +0x669 */ u8 talk_left_0x669;    /* the talks the NPC still has (3 once the progress flag is set); swaps open at 6 or less */
-    /* +0x66A */ u8 pad_0x66A[0x2];
+    /* +0x66A */ u8 field_0x66A;
+    /* +0x66B */ u8 pad_0x66B[0x1];
     /* +0x66C */ u16 trade_want_0x66C;   /* the item the quest NPC asks for (`npc_trade_pick`) */
     /* +0x66E */ s16 trade_count_0x66E;  /* -1 once the trade is settled, else the count */
     /* +0x670 */ u16 trade_give_0x670;   /* the item the NPC gives for it */

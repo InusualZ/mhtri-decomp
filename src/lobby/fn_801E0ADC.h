@@ -18,4 +18,12 @@ u16 item_price_get(u16 id);
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+void eft033_set_gun(struct _PLW* plw);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_LOBBY_FN_801E0ADC_H */

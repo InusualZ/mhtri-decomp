@@ -2792,7 +2792,7 @@ extern "C" void pl_rig_model_move(PlSeRig* rig)
             flag = 0;
         }
         if ((u8)PlayMode_ck() == 3) {
-            if (fn_8025EFF4(rig->plw) == 1) {
+            if (pl_camera_near_head_ck(rig->plw) == 1) {
                 flag = 0;
             }
         }

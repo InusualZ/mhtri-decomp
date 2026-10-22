@@ -33,7 +33,7 @@ extern "C" {
 
 /* The actor's current shell act (`_PLW::act_no`, 0-34) dispatched to its per-act handler; an act
  * number outside the table does nothing. */
-void fn_802840DC(_PLW* self)
+void pl_weapon1_act_dispatch(_PLW* self)
 {
     switch (self->act_no) {
     case 0:
@@ -159,10 +159,10 @@ void fn_80284204(_PLW* self, s16 value, u8 flag)
         flags = (Pl_atk_act_flag_ck(self, 1) == 1) ? 16 : 0;
     }
     if (flag != 0) {
-        fn_80277974(self, &self->hit_0x484, lbl_805C9608, magnitude, lbl_80792188,
+        pl_hit_attack_build(self, &self->hit_0x484, lbl_805C9608, magnitude, lbl_80792188,
                     (u16)(flags | 4));
     } else {
-        fn_80277974(self, &self->hit_0x484, lbl_805C9608, magnitude, lbl_80792188,
+        pl_hit_attack_build(self, &self->hit_0x484, lbl_805C9608, magnitude, lbl_80792188,
                     (u16)(flags | 7));
     }
 }
@@ -339,9 +339,9 @@ u32 fn_8028732C(_PLW* self)
 void fn_8028738C(_PLW* self, s16 value, u8 kind)
 {
     if (kind != 0) {
-        fn_80277974(self, &self->hit_0x484, lbl_805CB0B0, (u16)value, lbl_80792190, 4);
+        pl_hit_attack_build(self, &self->hit_0x484, lbl_805CB0B0, (u16)value, lbl_80792190, 4);
     } else {
-        fn_80277974(self, &self->hit_0x484, lbl_805CB0B0, (u16)value, lbl_80792190, 7);
+        pl_hit_attack_build(self, &self->hit_0x484, lbl_805CB0B0, (u16)value, lbl_80792190, 7);
     }
 }
 
@@ -413,13 +413,13 @@ void pl_act_attack_set(_PLW* self, s16 value, u8 kind)
     }
     switch (kind) {
     case 0:
-        fn_80277974(self, &self->hit_0x484, lbl_805CBC80, index, lbl_807921A8, (u16)(flags | 7));
+        pl_hit_attack_build(self, &self->hit_0x484, lbl_805CBC80, index, lbl_807921A8, (u16)(flags | 7));
         break;
     case 1:
-        fn_80277974(self, &self->hit_0x484, lbl_805CBC80, index, lbl_807921A8, (u16)(flags | 4));
+        pl_hit_attack_build(self, &self->hit_0x484, lbl_805CBC80, index, lbl_807921A8, (u16)(flags | 4));
         break;
     case 2:
-        fn_80277974(self, &self->hit_0x484, lbl_805CBC80, index, lbl_807921A8, (u16)(flags | 263));
+        pl_hit_attack_build(self, &self->hit_0x484, lbl_805CBC80, index, lbl_807921A8, (u16)(flags | 263));
         break;
     }
 }

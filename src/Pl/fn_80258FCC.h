@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* 0x8025EFF4 - the act's motion/act hand-off the rig updater `pl_rig_model_move` tests. */
-u32 fn_8025EFF4(struct _PLW* self);
+u32 pl_camera_near_head_ck(struct _PLW* self);
 
 #ifdef __cplusplus
 }

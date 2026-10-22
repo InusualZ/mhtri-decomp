@@ -15,11 +15,11 @@ struct _PLW;
  * hands to the 2061-sprite putter.  size: 0x18 (the row stride) */
 typedef struct PlSkillRec {
     /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ u8 level_a;          /* scaled by 0x32 and biased by 0x96 into `+0x56E` (`fn_802740F4`) */
+    /* +0x08 */ u8 level_a;          /* scaled by 0x32 and biased by 0x96 into `+0x56E` (`pl_weapon_record_read`) */
     /* +0x09 */ u8 level_b;          /* the sibling level the same function scales */
     /* +0x0A */ u8 pad_0x0A[0x2];
     /* +0x0C */ u8 slot_count;       /* non-zero for the pieces `weapon_slot_count_get` reports */
-    /* +0x0D */ s8 value;            /* the value `fn_802744A0` stores into `+0x570` */
+    /* +0x0D */ s8 value;            /* the value `pl_weapon_class_refresh` stores into `+0x570` */
     /* +0x0E */ u8 element_a_type;   /* 0 = none */
     /* +0x0F */ s8 element_a_value;  /* negative = hidden */
     /* +0x10 */ u8 element_b_type;   /* 0 = none */
@@ -40,7 +40,7 @@ typedef struct PlWeaponRec {
     /* +0x0C */ u8 pad_0x0C[0x4];
     /* +0x10 */ u8 recoil_kind;   /* the row of the info screen's recoil tables (a frame's rating and icon, a stock's) */
     /* +0x11 */ u8 pad_0x11[0x1];
-    /* +0x12 */ s8 bonus_0x12;   /* the points `pl_weapon_affinity_get`/`fn_802744A0` add up */
+    /* +0x12 */ s8 bonus_0x12;   /* the points `pl_weapon_affinity_get`/`pl_weapon_class_refresh` add up */
     /* +0x13 */ u8 pad_0x13[0x2];
     /* +0x15 */ u8 bonus_flag_0x15; /* non-zero: a gun slot's bonus applies (`equip_gun_bonus_ck`) */
     /* +0x16 */ u8 pad_0x16[0xE];

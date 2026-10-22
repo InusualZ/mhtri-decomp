@@ -14,7 +14,7 @@
  * FLAGS. `cflags_pl` (docs/pl.md).  The skill section is under `#pragma optimization_level 4` (docs/pl.md: level 3
  *   rematerialises `pl_parts_refresh`'s base); the file is under `#pragma peephole off` from the act-entry section on.  The
  *   master section's `#pragma peephole off` runs from `fn_8026BE94` through `fn_8026CBE4` (including `fn_8026BF98`),
- *   and `off`/`reset` pairs scope `pl_input_active_ck`, `fn_8026F9A4` and `Pl_act_ck`..`fn_8026FEF0`: recorded as
+ *   and `off`/`reset` pairs scope `pl_input_active_ck`, `fn_8026F9A4` and `Pl_act_ck`..`pl_cond_flags_clear`: recorded as
  *   load-bearing in six places (they turn the fused record form back into retail's `clrlwi`/`rlwinm`/`and` + `cmpwi`
  *   pair and keep the byte/short truncations), measured with a flag set without `-opt nopeephole` and not re-measured
  *   under the lib flag.
@@ -85,14 +85,14 @@
  *    `fn_8027DE88`/`fn_8027DF38` (retail lays the id-scan loop head after the body), `fn_8027DFE4` (the `case 12`
  *    equality if-converts to the branchless bool form), `pl_act_range2_ck` (written as the negated/nested if-chain; retail
  *    compares the id signed against 0x41/0x9A where ours is unsigned, and its arm order differs by one `b`);
- *  - `fn_8027CB1C`: retail re-tests the second byte's range (`li r0,0xff; cmplwi; beq; cmplw; bge`) where ours
+ *  - `pl_hit_result_best_get`: retail re-tests the second byte's range (`li r0,0xff; cmplwi; beq; cmplw; bge`) where ours
  *    folds it (20 B short); `fn_8027D40C`: the 32-bit scan's two induction variables sit in r5/r6 swapped;
- *  - `fn_8027CFC0`: two extra `extsh` before its clamp stores (+8 B);
+ *  - `pl_stun_tick`: two extra `extsh` before its clamp stores (+8 B);
  *  - `fn_80277FF8`: the `t`-vs-`arg1` test polarity - about a dozen rows around an inlined `li r3,0; blr` (+12 B);
  *  - the other 54 partial rows have no recorded cause.
  *  - `fn_8026CC7C` is byte-identical; its switch table relocation goes through MWCC's local `@NNNN` where the target
  *    names `jumptable_805C5FA0` (same address).  The extab record names agree (`@etb_800126CC` is in both objects).
- *  - the action and equipment sections are not in `.text` order (`Pl_attack_set_sub` and `fn_80277974`.. sit after
+ *  - the action and equipment sections are not in `.text` order (`Pl_attack_set_sub` and `pl_hit_attack_build`.. sit after
  *    `fn_8027B0BC`); the object's function order is source order, so the file has to
  *    be sorted before the unit can link.
  *  - `.data`: retail has a zero word at 0x805C60A4 between the act-entry section's second switch table and its pick
@@ -114,7 +114,7 @@
  *    register); `fn_8026BF98`'s `Vec3` loop is `do { } while (p < &vec[16])` (a `for`/`while` adds a guard), it reads
  *    `st->unk7D` through a `switch` with `default:` first (`cmpwi`, fall-through layout), and it tests the inner
  *    request bits through `self->unkBC` but the enclosing ones through `st->flagsBC` (the base register shows);
- *  - `fn_8026CC7C` is the m2c reconstruction: its `1U`/`s32` spellings and `st->flagsB8`/`self->unkCC` base choices
+ *  - `fn_8026CC7C` is the m2c reconstruction: its `1U`/`s32` spellings and `st->flagsB8`/`self->field_0x0CC` base choices
  *    are load-bearing; `fn_8026CBE4` keeps two unused trailing parameters (its callers pass four);
  *  - `equip_skill_points_get`/`equip_skill_tree_has_ck` dispatch with `switch ((u32)kind)`: cases 1-5, case 6, then 7-15 as `default`, which
  *    lays the bodies out in retail's B, C, A order;
@@ -134,7 +134,7 @@
  *  - `Pl_net_send` is called through its two-parameter view `PlNetSend2`: retail's call sites pass two arguments to
  *    the owner's three-parameter function, and a third argument would emit `li r5,X`;
  *  - an `s16`/`s8` parameter with a compound assignment stores the raw sum and sign-extends only at the compare
- *    (`fn_80279154`, `fn_80279194`, `fn_8027C89C`, `fn_8027A044`, `fn_80276CE8`, `fn_8027CA48`, `fn_80276E08`,
+ *    (`pl_attack_up_set`, `pl_defense_up_set`, `fn_8027C89C`, `fn_8027A044`, `fn_80276CE8`, `fn_8027CA48`, `fn_80276E08`,
  *    `fn_80278674`, `fn_8027D5A4`; playbook 38); `field = field + value` and a temporary extend at the store, and
  *    `field--` stores raw where `field = field - 1` extends (`fn_8027B0BC`);
  *  - a 32-bit accumulator that retail sign-extends only at each compare is an `s32` with `b = (s16)(b + N)` on the
@@ -153,7 +153,7 @@
  *  - `fn_8027AF34` keeps the pre-decrement value in an `s16` local and an unreachable `if (v < 0) return;` after the
  *    store, which reproduces retail's `blelr ... sth ... bltlr`;
  *  - `pl_pos_blend_start` writes `(f32)(s16)arg1` inline at each division (retail recomputes the conversion);
- *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `pl_item_slot_next_get` casts its `u16` index to
+ *  - `pl_attack_range_tier_get` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `pl_item_slot_next_get` casts its `u16` index to
  *    `s16` each iteration; `pl_impact_pos_get`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
  *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
  *  - `pl_area_buff_apply`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
@@ -454,14 +454,14 @@ u8 fn_8026A3A0(_PLW* self)
 }
 
 /* The three motion integrators: position += velocity, velocity += acceleration, and both zeroed. */
-void fn_8026A4E4(_PLW* self)
+void pl_motion_integrate_stop(_PLW* self)
 {
     self->motion_pos_0x3C += self->motion_vel_0x78;
     self->motion_pos_0x40 += self->motion_vel_0x7C;
     self->motion_pos_0x44 += self->motion_vel_0x80;
 }
 
-void fn_8026A518(_PLW* self)
+void pl_motion_integrate(_PLW* self)
 {
     self->motion_vel_0x78 = self->motion_vel_0x78 + self->motion_acc_0x84;
     self->motion_vel_0x7C = self->motion_vel_0x7C + self->motion_acc_0x88;
@@ -471,7 +471,7 @@ void fn_8026A518(_PLW* self)
     self->motion_pos_0x44 += self->motion_vel_0x80;
 }
 
-void fn_8026A570(_PLW* self)
+void pl_motion_clear(_PLW* self)
 {
     self->motion_acc_0x8C = lbl_8079A000;
     self->motion_acc_0x88 = lbl_8079A000;
@@ -481,7 +481,7 @@ void fn_8026A570(_PLW* self)
     self->motion_vel_0x78 = lbl_8079A000;
 }
 
-void fn_8026A590(_PLW* self)
+void pl_motion_acc_clear(_PLW* self)
 {
     self->motion_acc_0x8C = lbl_8079A000;
     self->motion_acc_0x88 = lbl_8079A000;
@@ -554,10 +554,10 @@ typedef struct ActState {
     u8 pad06[0x0A];      /* 0x06 */
     u16 unk10;           /* 0x10 - the word fn_8026BE94 tests 0x2000/0x1000/0x800/0x400 against */
     u16 unk12;           /* 0x12 */
-    u16 flagsCC;         /* 0x14 - self->unkCC: per-part behaviour bits */
+    u16 flagsCC;         /* 0x14 - self->field_0x0CC: per-part behaviour bits */
     u8 pad16[0x3E];      /* 0x16 */
     f32 unk54;           /* 0x54 - self->unk10C: the charge/axis value fn_8026CC7C bands */
-    f32 unk58;           /* 0x58 - self->unk110: the weapon/model axis length */
+    f32 unk58;           /* 0x58 - self->field_0x110: the weapon/model axis length */
     u8 pad5C[0xC];       /* 0x5C */
     u8 part[8];          /* 0x68 - per-part selector table (fn_8026BE94 indexes it, the dispatchers read part[1]) */
     u8 mode;             /* 0x70 - self->unk128: the dispatchers' switch value */
@@ -648,7 +648,7 @@ extern "C" void fn_8026BA1C(_PLW* self)
         }
     } else {
         if (self->part_tbl_b_0xD4[0] < 50 && self->unk128 == 1) {
-            if (self->unk110 <= lbl_8079A020) {
+            if (self->field_0x110 <= lbl_8079A020) {
                 fn_8026A618(self, 64);
             } else {
                 fn_8026A618(self, 65);
@@ -1143,7 +1143,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 6);
                     fn_8026A678(self, 0x13);
                 }
-                if ((s32) (self->unkCC & 0x3C) != 0) {
+                if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                     fn_8026A678(self, 4);
                 }
                 if (fn_8026FC40(self, 1, 0xA000, 0x2000) == 1U) {
@@ -1271,7 +1271,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 6);
                     return;
                 }
-                if (((s32) self->field_0x308 == 0) && ((s32) (self->unkCC & 0x10) != 0)) {
+                if (((s32) self->field_0x308 == 0) && ((s32) (self->field_0x0CC & 0x10) != 0)) {
                     fn_8026A678(self, 5);
                     fn_8026A618(self, 0xC);
                     fn_8026A618(self, 0x18);
@@ -1415,7 +1415,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0x13);
                     fn_8026A678(self, 0x14);
                 }
-                if ((s32) (self->unkCC & 0x3C) != 0) {
+                if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                     fn_8026A678(self, 9);
                     return;
                 }
@@ -1579,7 +1579,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 if ((s32) (st->flagsBC & 0x100) != 0) {
                     fn_8026A678(self, 2);
                 }
-                if ((s32) (self->unkCC & 0x3C) != 0) {
+                if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                     fn_8026A678(self, 8);
                     return;
                 }
@@ -1691,7 +1691,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 1);
                     fn_8026A678(self, 3);
                 }
-                if ((s32) (self->unkCC & 0x3C) != 0) {
+                if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                     fn_8026A678(self, 6);
                     fn_8026A678(self, 5);
                     return;
@@ -1806,7 +1806,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0xE);
                     fn_8026A678(self, 5);
                 }
-                if ((s32) (self->unkCC & 0x3C) != 0) {
+                if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                     fn_8026A678(self, 7);
                     return;
                 }
@@ -1986,14 +1986,14 @@ extern "C" void fn_8026CC7C(_PLW* self)
                             fn_8026A678(self, 8);
                         }
                     }
-                    if ((s32) (self->unkCC & 0x3C) != 0) {
+                    if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                         fn_8026A678(self, 7);
                         if (fn_8026FB20(self, 0x1000) == 1U) {
                             fn_8026A678(self, 8);
                         }
                     }
                 }
-                if ((s32) (self->unkCC & 0x3C) != 0) {
+                if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                     fn_8026A678(self, 0xD);
                     fn_8026A678(self, 0x1F);
                     return;
@@ -2133,7 +2133,7 @@ extern "C" u32 pl_input_active_ck(_PLW* self)
     if ((self->unkBC & 0x3FF) != 0) {
         return 1;
     }
-    if ((self->unkCC & 0x3C3C) != 0) {
+    if ((self->field_0x0CC & 0x3C3C) != 0) {
         return 1;
     }
     return (self->unk134 & 3) != 0;
@@ -2183,7 +2183,7 @@ extern "C" u8 pl_act_param_tier_ck(_PLW* self, u32 idx)
 /* 0x8026F9A4: an attack-level gate plus the part's angle window. */
 extern "C" u32 fn_8026F9A4(_PLW* self, u32 idx, u16 low, u16 high)
 {
-    u16 flags = self->unkCC;
+    u16 flags = self->field_0x0CC;
 
     if (idx == 0) {
         if ((flags & 0x3C00) == 0) {
@@ -2345,7 +2345,7 @@ extern "C" void pl_act_set_flag(_PLW* self, u32 mask)
 }
 
 /* 0x8026FEF0 */
-extern "C" void fn_8026FEF0(_PLW* self, u32 mask)
+extern "C" void pl_cond_flags_clear(_PLW* self, u32 mask)
 {
     if ((mask & 0x80000000) == 0) {
         self->field_0x35C &= ~mask;
@@ -2441,7 +2441,7 @@ extern u32 lbl_805C5FC8[];
 extern u32 lbl_805C5FE0[];
 u8 GameMode_ck(void);
 u32 lb_smith_deco_page_ck(void);
-int fn_80274AB8(int);
+int pl_weapon_guard_ck(int);
 u32 weapon_class_index(u8);
 int Pl_item_timer_get(_PLW*, u16);
 u32 get_item_species_data(u16);
@@ -2453,7 +2453,7 @@ void equip_columns_skills_get(_EQUIP*, u16*, s8*, u8*);
 void* memset(void*, int, u32);
 u8 Get_pl_type__FP6_EQUIPP6_EQUIP(_EQUIP*, _EQUIP*);
 u16 pl_item_slot_next_get(_PLW*, u16, int);
-void fn_80279B84(_PLW*);
+void pl_held_item_refresh(_PLW*);
 u8* GetItemData__FUs(u16);
 u16 pl_item_slot_find(_PLW*, u16);
 s32 fn_8004BD30(s16*);
@@ -2531,7 +2531,7 @@ extern "C" u16 fn_80270018(_PLW* plw, u32 param, u8* out) {
             *out = 1;
         }
         value += plw->unk448;
-        value += plw->unk449;
+        value += plw->field_0x449;
         if (Pl_Skill_ck(plw, 74) == 1) {
             value += 10;
             *out = 1;
@@ -2927,7 +2927,7 @@ extern "C" u32 pl_skill_valid_ck(_PLW* plw, u8 kind) {
     case 15:
     case 16:
     case 17:
-        return (u32)(fn_80274AB8((int)plw) == 1);
+        return (u32)(pl_weapon_guard_ck((int)plw) == 1);
     case 74: {
         int type = plw->field_0x002;
 
@@ -3279,7 +3279,7 @@ extern "C" void fn_80272D5C(_PLW* plw) {
 }
 
 /* The weapon-type slot count for one equipment slot, 2 for the empty slot. */
-extern "C" s32 fn_80272DB4(_PLW* plw, u16 slot) {
+extern "C" s32 pl_equip_slot_count_get(_PLW* plw, u16 slot) {
     u16 id = pl_item_slot_find(plw, slot);
 
     if (id != 0xFFFF) {
@@ -3369,7 +3369,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
     }
     if (slot == plw->item_slot_sel) {
         plw->item_slot_sel = pl_item_slot_next_get(plw, (u16)slot, 2);
-        fn_80279B84(plw);
+        pl_held_item_refresh(plw);
         plw->unk272 = plw->magazine_0x270;
         plw->unk275 = plw->ammo_capacity_0x26A;
         plw->unk274 = 0;
@@ -3380,7 +3380,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
 
         if (cur == 0xFF) {
             plw->item_slot_sel = pl_item_slot_next_get(plw, 0, 2);
-            fn_80279B84(plw);
+            pl_held_item_refresh(plw);
             return;
         }
         u8* item;
@@ -3392,7 +3392,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
         }
         if (item[0] != 1) {
             plw->item_slot_sel = pl_item_slot_next_get(plw, plw->item_slot_sel, 0);
-            fn_80279B84(plw);
+            pl_held_item_refresh(plw);
         }
     }
 }
@@ -4174,7 +4174,7 @@ extern "C" u8 item_bonus_class_get(u16 kind)
 }
 
 /* Maps the player's act-state byte to the act kind `pl_weapon_stat_get` selects its delta column by. */
-extern "C" s32 fn_8027408C(struct _PLW* plw)
+extern "C" s32 pl_act_kind_column_get(struct _PLW* plw)
 {
     switch (plw->field_0x002) {
     case 6:
@@ -4197,7 +4197,7 @@ extern "C" void pl_weapon_alt_form_ck(struct _PLW* plw)
 }
 
 /* Re-reads the player's armed weapon record into the level/attack bytes at +0x56A/+0x56E. */
-extern "C" void fn_802740F4(struct _PLW* plw, struct _EQUIP* equip)
+extern "C" void pl_weapon_record_read(struct _PLW* plw, struct _EQUIP* equip)
 {
     PlSkillRec* rec = equip_blade_rec_get(equip);
 
@@ -4315,7 +4315,7 @@ extern "C" s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, s
 }
 
 /* Refreshes the player's armed weapon class and ranged attack value out of the melee slot. */
-extern "C" void fn_802744A0(struct _PLW* plw)
+extern "C" void pl_weapon_class_refresh(struct _PLW* plw)
 {
     switch (plw->equipB.kind) {
     case 7:
@@ -4478,7 +4478,7 @@ extern "C" struct _PLW* my_player_work_get(void)
 }
 
 /* The first move work record whose slot byte differs from this player's. */
-extern "C" void* fn_80274850(struct _PLW* plw)
+extern "C" void* pl_partner_work_get(struct _PLW* plw)
 {
     u8* work = (u8*)get_move_work_adrs(2);
     u16 count = (u16)get_move_work_max(2);
@@ -4568,7 +4568,7 @@ extern "C" s32 fn_80274A04(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind
 }
 
 /* True when the player's act kind is one the melee/ranged family owns. */
-extern "C" s32 fn_80274AB8(struct _PLW* plw)
+extern "C" s32 pl_weapon_guard_ck(struct _PLW* plw)
 {
     if ((u32)(plw->field_0x002 - 4) > 2U) {
         if (plw->field_0x002 <= 1U || plw->field_0x002 == 3) {
@@ -5070,7 +5070,7 @@ extern "C" void pl_act_enter_raw(struct _PLW* plw, u8 kind, u16 no, u16 mask)
     }
     pl_model_hide(plw);
     pl_model_aux_flag_clear(plw);
-    fn_8027AC2C(plw, 0xFF, 0xFF);
+    pl_shell_ids_set(plw, 0xFF, 0xFF);
     plw->field_0x662 = 0;
     plw->field_0x3A3 = 0;
     plw->field_0x3A2 = 0;
@@ -5104,7 +5104,7 @@ extern "C" void fn_80275ADC(struct _PLW* plw, s32 a, u16 b, u16 c)
 }
 
 /* Writes the player's act kind byte. */
-extern "C" void fn_80275AFC(struct _PLW* plw, s8 value)
+extern "C" void pl_act_kind_set(struct _PLW* plw, s8 value)
 {
     plw->kind_0x09 = value;
 }
@@ -5114,30 +5114,30 @@ extern "C" void Pl_act_set_motion(struct _PLW* plw, u16 a, u32 b, u32 c)
 {
     switch ((u8)a) {
     case 1:
-        fn_80275AFC(plw, 1);
+        pl_act_kind_set(plw, 1);
         break;
     case 2:
-        fn_80275AFC(plw, 2);
+        pl_act_kind_set(plw, 2);
         break;
     case 3:
-        fn_80275AFC(plw, 3);
+        pl_act_kind_set(plw, 3);
         break;
     default:
-        fn_80275AFC(plw, 0);
+        pl_act_kind_set(plw, 0);
         break;
     }
     if ((a & 0x8000) != 0) {
-        fn_8026FEF0(plw, 1);
+        pl_cond_flags_clear(plw, 1);
     } else {
         pl_act_set_flag(plw, 1);
     }
     if (b == 0) {
-        fn_8026FEF0(plw, 2);
+        pl_cond_flags_clear(plw, 2);
     } else {
         pl_act_set_flag(plw, 2);
     }
     if (c == 0) {
-        fn_8026FEF0(plw, 4);
+        pl_cond_flags_clear(plw, 4);
         return;
     }
     pl_act_set_flag(plw, 4);
@@ -5279,12 +5279,12 @@ extern "C" void Pl_act_set_motion_slot(struct _PLW* self, u32 a, u32 b, u32 c)
     fn_80275C34(self, a, b, c, 0, 0);
 }
 
-extern "C" void fn_802761C4(struct _PLW* self, u32 a, u32 b, u32 c)
+extern "C" void pl_act_reset_idle(struct _PLW* self, u32 a, u32 b, u32 c)
 {
     fn_80275C34(self, a, b, c, 12, 1);
 }
 
-extern "C" void fn_802761D0(struct _PLW* self, u32 a, u32 b, u32 c)
+extern "C" void pl_act_reset_down(struct _PLW* self, u32 a, u32 b, u32 c)
 {
     fn_80275C34(self, a, b, c, 2, 1);
 }
@@ -5304,13 +5304,13 @@ extern "C" void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c)
 }
 
 /* True when the given motion value fits inside the act's stagger budget. */
-extern "C" s32 fn_80276254(struct _PLW* self, s32 value)
+extern "C" s32 pl_stagger_budget_ck(struct _PLW* self, s32 value)
 {
     return (s16)value <= self->field_0x378;
 }
 
 /* True when the given motion value fits inside the act's hold gauge. */
-extern "C" s32 fn_80276270(struct _PLW* plw, s32 value)
+extern "C" s32 pl_hold_gauge_ck(struct _PLW* plw, s32 value)
 {
     return (s16)value <= plw->field_0x370;
 }
@@ -5407,7 +5407,7 @@ extern "C" s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out)
 }
 
 /* Applies the skill-tier damage bonus and steps the hold gauge. */
-extern "C" void fn_802765B4(struct _PLW* plw, s16 amount)
+extern "C" void pl_health_recover(struct _PLW* plw, s16 amount)
 {
     s16 value = amount;
 
@@ -5425,7 +5425,7 @@ extern "C" void fn_802765B4(struct _PLW* plw, s16 amount)
 }
 
 /* Grows the act's gauge ceilings (and, when `a` is 0, the soft cap) by `amount`. */
-extern "C" void fn_80276690(struct _PLW* plw, s32 amount, u8 a)
+extern "C" void pl_gauge_ceiling_grow(struct _PLW* plw, s32 amount, u8 a)
 {
     if (Pl_master_ck(plw) != 0) {
         s16 value;
@@ -5457,7 +5457,7 @@ extern "C" void fn_80276690(struct _PLW* plw, s32 amount, u8 a)
 }
 
 /* Adds to the act's stagger budget up to its 150-point ceiling. */
-extern "C" void fn_80276778(struct _PLW* plw, s16 amount)
+extern "C" void pl_stagger_budget_add(struct _PLW* plw, s16 amount)
 {
     if (amount > 0) {
         plw->field_0x382 = 0;
@@ -5546,7 +5546,7 @@ extern "C" void pl_act_gauge_gate(struct _PLW* plw, s16 amount)
 }
 
 /* The act's guard-break entry: picks the stagger step from the defence skills and applies it. */
-extern "C" void fn_80276A3C(struct _PLW* plw)
+extern "C" void pl_guard_break_apply(struct _PLW* plw)
 {
     s16 step = -1;
     s32 mask = 0;
@@ -5599,11 +5599,11 @@ extern "C" void fn_80276868(_PLW*, s16);
 extern "C" void fn_80276CE8(_PLW*, s16);
 extern "C" u8 pl_act_kind_get(u8);
 extern "C" s32 pl_mode8_free_ck(void);
-extern "C" void fn_8010D688(_PLW*);
+extern "C" void eft_pl_weapon_follow_spawn(_PLW*);
 extern "C" u32 pl_item_page2_ck(_PLW*);
 extern "C" void mhchar_motion_speed_set(u8*, f32);
 extern "C" u32 stage_pos_z_low_ck(void*);
-extern "C" void fn_8026FEF0(_PLW*, s32);
+extern "C" void pl_cond_flags_clear(_PLW*, s32);
 extern "C" void pl_act_enter(_PLW*, s32, u16, u16);
 
 /* In-unit callees that the appended bodies reference before their own definition. */
@@ -5611,7 +5611,7 @@ extern "C" void pl_skill_update2(_PLW*, s32);
 extern "C" void fn_8027A17C(_PLW*);
 extern "C" u32 fn_80278144(u8, u8*, u8);
 extern "C" u32 pl_area_spot_valid_ck(u8, u8*, u8);
-extern "C" void fn_80278B58(_PLW*, s32, s32);
+extern "C" void pl_dodge_motion_start(_PLW*, s32, s32);
 } /* namespace s_80276B58 */
 
 
@@ -5755,7 +5755,7 @@ extern "C" void fn_80276CE8(_PLW* self, s16 arg1)
 }
 
 /* 0x80276D94: applies the stamina bonus the two armour skills grant, then the signed amount. */
-extern "C" void fn_80276D94(_PLW* self, s32 arg1)
+extern "C" void pl_stamina_add(_PLW* self, s32 arg1)
 {
     if ((s16)arg1 > 0 && (Pl_Skill_ck(self, 0x48) == 1 || Pl_Skill_ck(self, 0x49) == 1)) {
         arg1 += 150;
@@ -5827,7 +5827,7 @@ extern "C" void fn_80276E08(_PLW* self)
 }
 
 /* 0x802770E0 */
-extern "C" s32 fn_802770E0(void)
+extern "C" s32 pl_act_dash_input_ck(void)
 {
     return 0;
 }
@@ -5903,13 +5903,13 @@ extern "C" s32 fn_80277FE0(_PLW* self)
 /* 0x80277FE8 */
 extern "C" u32 fn_80277FE8(_PLW* self)
 {
-    return (u32)(self->unk30C - 1) >> 31;
+    return (u32)(self->field_0x30C - 1) >> 31;
 }
 
 /* 0x802784A8 */
 extern "C" s32 fn_802784A8(_PLW* self)
 {
-    return (u32)(self->unk30D - 3) >> 31;
+    return (u32)(self->field_0x30D - 3) >> 31;
 }
 
 /* 0x80278564 */
@@ -5954,21 +5954,21 @@ namespace s_80276B58 {
 
 
 /* 0x802790E4 */
-extern "C" u32 fn_802790E4(_PLW* self, u32 mask)
+extern "C" u32 pl_dm_condition_ex_ck(_PLW* self, u32 mask)
 {
-    return (self->unk3E0 & mask) != 0;
+    return (self->dm_condition_prev_0x3E0 & mask) != 0;
 }
 
 /* 0x80279154 */
-extern "C" void fn_80279154(_PLW* self, s32 arg1, s8 arg2)
+extern "C" void pl_attack_up_set(_PLW* self, s32 arg1, s8 arg2)
 {
     if (arg1 == 0) {
         if (self->unk448 < arg2) {
             self->unk448 = arg2;
         }
     } else {
-        if (self->unk449 < arg2) {
-            self->unk449 = arg2;
+        if (self->field_0x449 < arg2) {
+            self->field_0x449 = arg2;
         }
     }
 }
@@ -6164,7 +6164,7 @@ extern "C" s32 fn_8027D4FC(_PLW* self)
 }
 
 /* 0x8027D510 */
-extern "C" void fn_8027D510(_PLW* self)
+extern "C" void pl_guard_latch_set(_PLW* self)
 {
     self->unk3B5 = 1;
 }
@@ -6263,18 +6263,18 @@ extern "C" s32 fn_80278450(_PLW* self)
 }
 
 /* 0x80278994: clears the actor's stored per-motion scratch values. */
-extern "C" void fn_80278994(_PLW* self)
+extern "C" void pl_motion_scratch_clear(_PLW* self)
 {
     self->unk39E = 0;
     self->field_0x38A = 0;
-    self->unk3EC = 0;
-    self->unk3F8 = 0;
-    self->unk3FE = 0;
-    self->unk3F2 = 0;
-    self->unk40E = 0;
+    self->field_0x3EC = 0;
+    self->field_0x3F8 = 0;
+    self->field_0x3FE = 0;
+    self->field_0x3F2 = 0;
+    self->field_0x40E = 0;
     self->unk414 = 0;
     self->unk41A = 0;
-    self->unk420 = 0;
+    self->field_0x420 = 0;
     self->unk38C = 0;
     self->unk424 = 0;
     self->unk38E = 0;
@@ -6288,10 +6288,10 @@ extern "C" void fn_80278994(_PLW* self)
 }
 
 /* 0x80278B58: starts the actor's dodge/step motion. */
-extern "C" void fn_80278B58(_PLW* self, s32 arg1, s32 arg2)
+extern "C" void pl_dodge_motion_start(_PLW* self, s32 arg1, s32 arg2)
 {
-    fn_8026FEF0(self, 4);
-    fn_8026FEF0(self, 16);
+    pl_cond_flags_clear(self, 4);
+    pl_cond_flags_clear(self, 16);
     self->health = 0;
     self->unk376 = 0;
     pl_skill_update2(self, 1);
@@ -6305,16 +6305,16 @@ extern "C" void pl_ride_down_set(_PLW* self)
     if (self->field_0x00A == 8) {
         return;
     }
-    fn_8026FEF0(self, 4);
-    fn_8026FEF0(self, 16);
+    pl_cond_flags_clear(self, 4);
+    pl_cond_flags_clear(self, 16);
     self->health = 0;
     self->unk376 = 0;
     pl_skill_update2(self, 1);
     fn_8027A17C(self);
     if (self->kind_0x09 == 3) {
-        fn_80278B58(self, 1, 0);
+        pl_dodge_motion_start(self, 1, 0);
     } else {
-        fn_80278B58(self, 0, 0);
+        pl_dodge_motion_start(self, 0, 0);
     }
 }
 
@@ -6353,8 +6353,8 @@ extern "C" s32 fn_802790FC(_PLW* self)
 {
     if (self->unk46C == 1 && self->unk46C != self->unk46D && self->unk46E == 0) {
         self->unk46E = 1;
-        if (self->unk470 == 0) {
-            self->unk470 = 1800;
+        if (self->field_0x470 == 0) {
+            self->field_0x470 = 1800;
             return 1;
         }
         return 0;
@@ -6363,7 +6363,7 @@ extern "C" s32 fn_802790FC(_PLW* self)
 }
 
 /* 0x80279194 */
-extern "C" s32 fn_80279194(_PLW* self, s32 arg1, s8 arg2)
+extern "C" s32 pl_defense_up_set(_PLW* self, s32 arg1, s8 arg2)
 {
     if (arg1 == 0) {
         self->unk422 = 0;
@@ -6408,7 +6408,7 @@ extern "C" void pl_act_clear_mode5c4(_PLW* self)
 {
     if ((self->unk5C4 & 0xF) != 0) {
         self->unk5C4 &= 0xF0;
-        fn_8010D688(self);
+        eft_pl_weapon_follow_spawn(self);
     }
 }
 
@@ -6419,7 +6419,7 @@ extern "C" s32 pl_item_menu_open_ck(_PLW* self)
 }
 
 /* 0x8027BDD4 */
-extern "C" s32 fn_8027BDD4(_PLW* self)
+extern "C" s32 pl_carry_light_ck(_PLW* self)
 {
     if (Pl_Skill_ck(self, 93) == 1) {
         return 1;
@@ -6503,7 +6503,7 @@ extern "C" u8* gun_ammo_entry_find(u8* self, u8 arg1)
 }
 
 /* 0x80279B84: refreshes the actor's held-item state from its item id. */
-extern "C" void fn_80279B84(_PLW* self)
+extern "C" void pl_held_item_refresh(_PLW* self)
 {
     if (pl_item_page2_ck(self) != 0 && self->item_slot_sel != 255) {
         (void)GetItemData((u16)pl_item_slot_item_get(self, (u8)self->item_slot_sel));
@@ -6569,7 +6569,7 @@ extern "C" s32 Pl_motion_input_ck(s32 arg1)
 }
 
 /* 0x8027CFC0: ticks down the actor's stun timer and clears the stun condition at zero. */
-extern "C" void fn_8027CFC0(_PLW* self)
+extern "C" void pl_stun_tick(_PLW* self)
 {
     if (Pl_master_ck(self) != 0 && self->unk404 > 0) {
         if (Pl_dm_condition_ck(self, 2) == 1) {
@@ -6693,7 +6693,7 @@ extern "C" void fn_8027CA48(_PLW* self, s16 arg1)
 }
 
 /* 0x8027CB1C: the carve slot to select, sentinel 255 meaning "none". */
-extern "C" u8 fn_8027CB1C(_PLW* self)
+extern "C" u8 pl_hit_result_best_get(_PLW* self)
 {
     u8 v = 255;
     if (self->unk489 != 0 && self->unk492 != 255 && (v == 255 || v < self->unk492)) {
@@ -6873,7 +6873,7 @@ extern "C" s32 fn_802784B8(_PLW* self)
 }
 
 /* 0x80278590: the actor's attack-range tier for the current weapon class. */
-extern "C" s32 fn_80278590(_PLW* self)
+extern "C" s32 pl_attack_range_tier_get(_PLW* self)
 {
     if (pl_item_page2_ck(self) == 1) {
         return 0;
@@ -6902,7 +6902,7 @@ extern "C" s32 fn_80278590(_PLW* self)
 /* 0x802789EC: resets the actor's whole action state and re-applies the armour skill values. */
 extern "C" void pl_skill_update2(_PLW* self, s32 arg1)
 {
-    fn_80278994(self);
+    pl_motion_scratch_clear(self);
     *(u32*)((u8*)self + 988) = 0;
     *(s16*)((u8*)self + 1042) = 0;
     *(s16*)((u8*)self + 1002) = 0;
@@ -7057,7 +7057,7 @@ extern "C" void fn_80278D1C(_PLW* self)
         if (*(s16*)((u8*)self + 1002) != 0) {
             bits |= 1;
         }
-        if (self->unk448 + self->unk449 > 0) {
+        if (self->unk448 + self->field_0x449 > 0) {
             bits |= 0x10;
         }
         if (*(s16*)((u8*)self + 900) >= 100) {
@@ -7793,12 +7793,12 @@ extern "C" void pl_area_buff_apply(u8 arg0, u8 arg1)
                 ef_inst_spawn((_PLW*)p, 0);
                 break;
             case 1:
-                fn_80279154((_PLW*)p, 1, 0xA);
+                pl_attack_up_set((_PLW*)p, 1, 0xA);
                 p->unk44A = 0x1518;
                 ef_inst_spawn((_PLW*)p, 1);
                 break;
             case 2:
-                if ((u32)fn_80279194((_PLW*)p, 1, 0x14) == 1) {
+                if ((u32)pl_defense_up_set((_PLW*)p, 1, 0x14) == 1) {
                     p->unk44E = 0x1518;
                 }
                 ef_inst_spawn((_PLW*)p, 2);
@@ -7815,9 +7815,9 @@ extern "C" void pl_area_buff_apply(u8 arg0, u8 arg1)
             case 4:
             case 7:
                 if (arg1 == 4) {
-                    fn_80279154((_PLW*)p, 1, 3);
+                    pl_attack_up_set((_PLW*)p, 1, 3);
                 } else {
-                    fn_80279154((_PLW*)p, 1, 5);
+                    pl_attack_up_set((_PLW*)p, 1, 5);
                 }
                 p->unk44A = 0x1518;
                 ef_inst_spawn((_PLW*)p, 1);
@@ -7825,10 +7825,10 @@ extern "C" void pl_area_buff_apply(u8 arg0, u8 arg1)
             case 5:
             case 8:
                 if (arg1 == 5) {
-                    if ((u32)fn_80279194((_PLW*)p, 1, 0xA) == 1) {
+                    if ((u32)pl_defense_up_set((_PLW*)p, 1, 0xA) == 1) {
                         p->unk44E = 0x1518;
                     }
-                } else if ((u32)fn_80279194((_PLW*)p, 1, 0x14) == 1) {
+                } else if ((u32)pl_defense_up_set((_PLW*)p, 1, 0x14) == 1) {
                     p->unk44E = 0x1518;
                 }
                 ef_inst_spawn((_PLW*)p, 2);
@@ -7976,8 +7976,8 @@ extern "C" void fn_8027BE4C(_PLW* self)
     }
 }
 
-extern "C" void fn_80276690(_PLW*, s16, s32);
-extern "C" void fn_80276778(_PLW*, s16);
+extern "C" void pl_gauge_ceiling_grow(_PLW*, s16, s32);
+extern "C" void pl_stagger_budget_add(_PLW*, s16);
 extern "C" s16 fn_8026FF20(_PLW*);
 
 /* 0x8027885C: resets the actor's shell/ammo timers and, when the relevant skill is on, reseeds the
@@ -7988,11 +7988,11 @@ extern "C" void pl_skill_update(_PLW* self, s32 arg1, s32 arg2)
     *(s16*)((u8*)self + 0x372) = 0x64;
     *(s16*)((u8*)self + 0x380) = 0x64;
     if ((u32)Pl_master_ck(self) == 1 && (arg1 == 0 || Pl_cat_skill_ck(self, 0x27) == 1)) {
-        fn_80276690(self, (s16)fn_802753E4(self, 1), 0);
+        pl_gauge_ceiling_grow(self, (s16)fn_802753E4(self, 1), 0);
         fn_80276CE8(self, (s16)fn_802753E4(self, 2));
-        fn_80276778(self, (s16)fn_802753E4(self, 3));
+        pl_stagger_budget_add(self, (s16)fn_802753E4(self, 3));
     }
-    fn_80276690(self, fn_8026FF20(self), 0);
+    pl_gauge_ceiling_grow(self, fn_8026FF20(self), 0);
     *(s16*)((u8*)self + 0x36C) = 0x32;
     *(s16*)((u8*)self + 0x36E) = 0x96;
     if (arg2 == 0) {
@@ -8593,7 +8593,7 @@ extern "C" u32 pl_area_spot_valid_ck(u8 arg0, u8* arg1, u8 arg2)
 }
 
 /* 0x80277974: builds the attack entry an incoming hit produces and runs the shared attack set-up. */
-extern "C" void fn_80277974(_PLW* self, _HIT_W* hit, u8* base, u16 idx, s32* ids, u16 flags)
+extern "C" void pl_hit_attack_build(_PLW* self, _HIT_W* hit, u8* base, u16 idx, s32* ids, u16 flags)
 {
     u8* p = (u8*)((u8*)self->physics_0x13C);
     u8* d = base + idx * 0x1A;
@@ -8671,7 +8671,7 @@ extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
             *(s16*)((u8*)self + 0x56C) = lim;
             changed = 1;
         }
-        s32 m = fn_80278590(self);
+        s32 m = pl_attack_range_tier_get(self);
         u8 old = *(u8*)((u8*)self + 0x56B);
         if ((u8)m != old) {
             if (old > (u8)m) {
@@ -8816,7 +8816,7 @@ extern "C" void fn_80279C20(_PLW* self)
             } else {
                 self->item_slot_sel = pl_item_slot_next_get(self, 1, 0);
             }
-            fn_80279B84(self);
+            pl_held_item_refresh(self);
             if (self->item_slot_sel != 0xFF) {
                 *(u8*)((u8*)self + 0x309) = (u8)(*(u8*)((u8*)self + 0x309) | 8);
                 sysSE_req(6);
@@ -8827,7 +8827,7 @@ extern "C" void fn_80279C20(_PLW* self)
             } else {
                 self->item_slot_sel = pl_item_slot_next_get(self, 0, 0);
             }
-            fn_80279B84(self);
+            pl_held_item_refresh(self);
             if (self->item_slot_sel != 0xFF) {
                 *(u8*)((u8*)self + 0x309) = (u8)(*(u8*)((u8*)self + 0x309) | 0x10);
                 sysSE_req(6);
@@ -8836,7 +8836,7 @@ extern "C" void fn_80279C20(_PLW* self)
     } else if (self->unk26B != 0) {
         self->unk26B = 0;
         if (self->ammo_icon_kind_0x26D != self->held_item_kind_0x26C) {
-            fn_80279B84(self);
+            pl_held_item_refresh(self);
         } else {
             *(s16*)((u8*)self + 0x270) = *(s16*)((u8*)self + 0x272);
             *(u8*)((u8*)self + 0x26A) = *(u8*)((u8*)self + 0x275);
@@ -8953,7 +8953,7 @@ extern "C" s32 pl_target_lock_ck(_PLW* self)
 
 /* 0x8027AC2C: sets the two stored shell ids (or their per-weapon-class defaults) and scales them by
  * the actor's ammo skill. */
-extern "C" void fn_8027AC2C(_PLW* self, u8 arg1, u8 arg2)
+extern "C" void pl_shell_ids_set(_PLW* self, u8 arg1, u8 arg2)
 {
     if (arg1 == 0xFF) {
         u8 t = self->field_0x002;
@@ -9347,7 +9347,7 @@ extern "C" void fn_8027D6C0(_PLW* self, u8 arg1, s16 arg2) {
 }
 
 /* Latches the motion-request byte, then sends the motion through the +0x5C8 gate. */
-extern "C" void fn_8027D6DC(_PLW* self, s16 value) {
+extern "C" void pl_motion_request_latch(_PLW* self, s16 value) {
     self->field_0x5C9 = 1;
     if (self->field_0x5C8 != 0) {
         u32 motion = fn_802745DC(self, value);

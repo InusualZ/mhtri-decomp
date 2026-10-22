@@ -36,15 +36,15 @@ void fn_80275C18(struct _PLW* plw, u32 motion, u32 a, u32 b, u32 c);
 /* 0x80275C34 and the three no-argument entries that drive it. */
 void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32 d);
 void Pl_act_set_motion_slot(struct _PLW* self, u32 a, u32 b, u32 c);
-void fn_802761C4(struct _PLW* self, u32 a, u32 b, u32 c);
-void fn_802761D0(struct _PLW* self, u32 a, u32 b, u32 c);
+void pl_act_reset_idle(struct _PLW* self, u32 a, u32 b, u32 c);
+void pl_act_reset_down(struct _PLW* self, u32 a, u32 b, u32 c);
 
 /* 0x80276238 - clears the act's hold latch and re-enters the act state. */
 void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
 
 /* 0x80276254 / 0x80276270 - the two gauge-budget predicates. */
-s32 fn_80276254(struct _PLW* self, s32 value);
-s32 fn_80276270(struct _PLW* plw, s32 value);
+s32 pl_stagger_budget_ck(struct _PLW* self, s32 value);
+s32 pl_hold_gauge_ck(struct _PLW* plw, s32 value);
 
 /* 0x8027628C - adds `delta` to the act's hold gauge, clamped to 0..`+0x372`. */
 void pl_act_add_hold_gauge(struct _PLW* plw, s16 delta);
@@ -55,9 +55,9 @@ s32 pl_act_gauge_step_unlatched(struct _PLW* plw, s16 delta, s8* out);
 s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out);
 
 /* 0x802765B4 / 0x80276690 / 0x80276778 / 0x802767B4 - the gauge and stagger setters. */
-void fn_802765B4(struct _PLW* plw, s16 amount);
-void fn_80276690(struct _PLW* plw, s32 amount, u8 a);
-void fn_80276778(struct _PLW* plw, s16 amount);
+void pl_health_recover(struct _PLW* plw, s16 amount);
+void pl_gauge_ceiling_grow(struct _PLW* plw, s32 amount, u8 a);
+void pl_stagger_budget_add(struct _PLW* plw, s16 amount);
 void pl_act_add_stagger(struct _PLW* plw, s16 amount);
 
 /* 0x80276800 / 0x8027681C - the two act-state predicates. */
@@ -67,14 +67,14 @@ u32 Pl_act_state_ck(struct _PLW* plw);
 /* 0x80276868 / 0x802768F8 / 0x80276A3C - the stagger-budget setters. */
 void fn_80276868(struct _PLW* plw, s16 amount);
 void pl_act_gauge_gate(struct _PLW* plw, s16 amount);
-void fn_80276A3C(struct _PLW* plw);
+void pl_guard_break_apply(struct _PLW* plw);
 
 /* 0x802745DC / 0x802748C8 / 0x80274AB8 / 0x80274AEC - the armed-slot and act-kind predicates.
- * `fn_802745DC` returns `u32`: its own body is byte-identical either way, and its caller `fn_8027D6DC` reproduces
+ * `fn_802745DC` returns `u32`: its own body is byte-identical either way, and its caller `pl_motion_request_latch` reproduces
  * retail's `mr r0,r3` result copy only with the wider return.  The `s16` parameter is narrowed by retail's `extsh`. */
 u32 fn_802745DC(struct _PLW* plw, s16 kind);
 s32 pl_stagger_level_get(void* self);
-s32 fn_80274AB8(struct _PLW* plw);
+s32 pl_weapon_guard_ck(struct _PLW* plw);
 s32 fn_80274AEC(u8 kind);
 
 /* The equipment-slot resolvers of `Pl/pl_act.cpp`'s equipment section (0x8027D684-0x802840DC), with their
@@ -105,19 +105,19 @@ void pl_info_text_set(struct _PLW* plw, const char* src);
 s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag);
 
 /* 0x802740F4 / 0x802744A0 / 0x80274748 / 0x80274794 - the armed-value and follow-up stage helpers. */
-void fn_802740F4(struct _PLW* plw, struct _EQUIP* equip);
-void fn_802744A0(struct _PLW* plw);
+void pl_weapon_record_read(struct _PLW* plw, struct _EQUIP* equip);
+void pl_weapon_class_refresh(struct _PLW* plw);
 s32 fn_80274794(struct _PLW* plw);
 
 /* 0x80274808 / 0x80275AFC - the follow-up stage byte and the act kind byte. */
 u8 pl_act_stage_get(struct _PLW* plw);
-void fn_80275AFC(struct _PLW* plw, s8 value);
+void pl_act_kind_set(struct _PLW* plw, s8 value);
 
 /* 0x802761DC - the motion-parameter act-state entry. */
 void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c);
 
 /* 0x80274810 / 0x80274850 - the player's own move work record and its sibling scan. */
-void* fn_80274850(struct _PLW* plw);
+void* pl_partner_work_get(struct _PLW* plw);
 
 /* 0x80274918 - the act-name table row picker. */
 u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index);
@@ -137,7 +137,7 @@ s32 pl_act_menu_lock_ck(struct _PLW* plw);
 /* 0x8027403C / 0x8027408C / 0x802740EC / 0x80274174 / 0x80274370 / 0x80274570 / 0x80274584 /
  * 0x80274624 / 0x80274904 / 0x80274988 / 0x80274A04 / 0x80274B5C - the section's other entry points. */
 u8 item_bonus_class_get(u16 kind);
-s32 fn_8027408C(struct _PLW* plw);
+s32 pl_act_kind_column_get(struct _PLW* plw);
 void pl_weapon_alt_form_ck(struct _PLW* plw);
 s16 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out);
 s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,

@@ -39,6 +39,9 @@ void pl_se_req_charge_tip(struct _PLW* plw, nw4r::math::VEC3* pos);
 #endif
 
 #ifdef __cplusplus
+/* 0x800DDCB8 - requests the map SE `id` at `pos` (`map_se_req__FUcPQ34nw4r4math4VEC3`, C++ linkage: the map name
+ * is the mangling, so it is declared outside the `extern "C"` block). */
+void map_se_req(u8 id, nw4r::math::VEC3* pos);
 /* 0x800DE014 - the capsule-seated shell-SE request (`shell_se_req2__FP5_se_wPQ34nw4r4math7CAPSULEUcUl`, C++
  * linkage: the map name is the mangling, rule 9). */
 void shell_se_req2(struct _se_w* work, nw4r::math::CAPSULE* capsule, u8 id, u32 arg);

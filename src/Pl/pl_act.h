@@ -47,7 +47,7 @@ void fn_8027AC00(struct _PLW* self);
 void pl_act_add_charge(struct _PLW* self, s32 delta);
 void pl_act_clear_flag5bb(struct _PLW* self);
 void fn_8027D4F0(struct _PLW* self);
-void fn_8027D510(struct _PLW* self);
+void pl_guard_latch_set(struct _PLW* self);
 s32 fn_80277DAC(struct _PLW* self, s32 a, f32 b, f32 c);
 /* 0x80277B44 - arms the actor's `+0x396` gauge/hold word (the field's own `s16`; the sibling
  * `pl_act_set_gauge_arm_skilled` at 0x80277B4C scales it by the cat-skill arms 28/29); `Pl/pl_act_step.cpp`'s
@@ -63,7 +63,7 @@ s32 pl_ground_probe_ahead(struct _PLW* self, nw4r::math::VEC3* out, f32 arg2, f3
 /* 0x8027D968 - the stage weapon whose reach covers the actor: its kind word, or 0; the position, id and second word
  * of the record go out through the three pointers. */
 s32 pl_stg_weapon_near_find(struct _PLW* self, nw4r::math::VEC3* out_pos, s32* out_id, s32* out_word);
-u32 fn_802790E4(struct _PLW* self, u32 mask);
+u32 pl_dm_condition_ex_ck(struct _PLW* self, u32 mask);
 u32 pl_carry_item_get(struct _PLW* self);
 /* 0x802731B4 - how many of item `id` the actor carries (pouch and box run). */
 int Pl_item_timer_get(struct _PLW* self, u16 id);
@@ -102,12 +102,12 @@ void fn_80278674(struct _PLW* self, s16 motion, u8 a);
 
 /* The act entry and frame step call these: 0x8027AC2C is the act's status-block store, 0x80278BE4 the act tail
  * the frame step falls into. */
-void fn_8027AC2C(struct _PLW* self, u32 a, u32 b);
+void pl_shell_ids_set(struct _PLW* self, u32 a, u32 b);
 void pl_ride_down_set(struct _PLW* self);
 
 /* 0x80277974 - the shared attack set-up the shell band's `fn_80284204` fills its attack entry with
  * (`hit` is this unit's `_HIT_W`, spelled `void*` here so the consumer needs no type of its own). */
-void fn_80277974(struct _PLW* self, void* hit, u8* base, u16 idx, s32* ids, u16 flags);
+void pl_hit_attack_build(struct _PLW* self, void* hit, u8* base, u16 idx, s32* ids, u16 flags);
 
 /* 0x8027B0BC / 0x8027B358 / 0x8027B918 - the three per-frame act entries the cockpit band (`menu/fn_802E4978.cpp`)
  * drives, with the definitions' `_PLW*` parameter. */
@@ -186,6 +186,27 @@ u8 pl_charge_stage_get(struct _PLW* plw);
 s16 pl_act_frame_get(struct _PLW* plw, s32 a, s32 b);
 void pl_impact_pos_get(struct _PLW* plw, nw4r::math::VEC3* out);
 
+s32 pl_attack_range_tier_get(struct _PLW* self);
+void pl_motion_scratch_clear(struct _PLW* self);
+void pl_held_item_refresh(struct _PLW* self);
+s32 pl_act_dash_input_ck(void);
+void pl_stun_tick(struct _PLW* self);
+void pl_attack_up_set(struct _PLW* self, s32 arg1, s8 arg2);
+s32 pl_defense_up_set(struct _PLW* self, s32 arg1, s8 arg2);
+void pl_stamina_add(struct _PLW* self, s32 arg1);
+void pl_jump_gravity_set(struct _PLW* self, s32 arg);
+void pl_camera_heading_update(struct _PLW* self);
+/* 0x805C7A0C: the guard act's step table for weapon kind 0 */
+extern u32 pl_steps_guard_kind0[];
+/* 0x805C7A38: the guard-walk act's step table for weapon kind 0 */
+extern u32 pl_steps_guard_walk_kind0[];
+void pl_act_set_gauge_arm_skilled(struct _PLW* self, s16 arg1);
+void pl_dodge_motion_start(struct _PLW* self, s32 arg1, s32 arg2);
+void pl_motion_request_latch(struct _PLW* self, s16 value);
+s32 pl_carry_light_ck(struct _PLW* self);
+s32 pl_equip_slot_count_get(struct _PLW* plw, u16 slot);
+/* 0x802829B4: the class-0 weapon act dispatcher */
+void pl_weapon0_act_dispatch(struct _PLW* self);
 #ifdef __cplusplus
 }
 #endif

@@ -25,11 +25,9 @@
  *  - `eft053_work_act_ck`: ours keeps an extra saved register where retail branches to its two constant tails;
  *  - `eft053_set`: retail reloads the count (`lwz r0,4(r31)`) before the loop test, ours reuses `r3`;
  *  - `eft053_slot_rot_step`, `eft053_slot_move_step`: the slot-address arithmetic (`slwi`/`add`/`lwz`) sits at
- *    each use in ours and the registers are coloured differently; `eft053_slot_rot_step` calls `map_se_req` by its
- *    plain name where retail calls `map_se_req__FUcPQ34nw4r4math4VEC3`.
+ *    each use in ours and the registers are coloured differently.
  *   flipcheck: `.rodata` claimed, not emitted; `.text` (0x12A4 of 0x4210), extab (0x40 of 0x70), extabindex (0x60 of
- *   0xA8), `.data` (0x78 of 0x598) and `.sdata2` (0x10 of 0xE0) short of the claim and differing; `map_se_req` has
- *   no map row.
+ *   0xA8), `.data` (0x78 of 0x598) and `.sdata2` (0x10 of 0xE0) short of the claim and differing.
  * SHAPES. `eft053_shell_pos_project` keeps both arms of the angle test: with one shared arm MWCC if-converts them.
  */
 #include "types.h"
@@ -48,7 +46,8 @@
 #include "ef/effect.h"         /* eft_state_flags_set (the effect's two state bytes) */
 #include "ef/eft019.h"         /* eft019_set_core (the family's shared placement entry) */
 #include "draw_shape.h"        /* fn_80056A84 (the shape request the state machine fires) */
-#include "sound/fn_800DD1F0.h" /* map_se_req (the map SE the same state fires) */
+#include "sound/fn_800DD1F0.h"
+#include "sound/se_req.h" /* map_se_req (the map SE the same state fires) */
 #include "unsplit/Pl.h"        /* PlSlotGate lbl_806BB7A0 (the family's timing block) */
 #include "ef/fn_800CDB2C.h"    /* ran_suu (the family's frame randomiser) */
 #include "ef/eft001.h"         /* eft_rot_vec_copy (the rotation copy) */

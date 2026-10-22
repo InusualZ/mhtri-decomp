@@ -195,7 +195,7 @@ void fn_8010C0E0(_EFT* self);
 void fn_8010C454(_EFT* self);
 void fn_8010C464(_EFT* self);
 _EFT* fn_8010C468(u32 count);
-void fn_8010C554(_PLW* source);
+void eft_pl_hit_light_spawn(_PLW* source);
 void eft_stun_set(void* source, u32 id, nw4r::math::VEC3* vec, f32 scale, u8 type);
 void eft_npc_aura_create(void* source);
 void fn_8010C710(_EFT* self);
@@ -280,7 +280,7 @@ extern "C" _EFT* fn_8010C468(u32 count)
 }
 
 /* The five-light player hit effect: no offset, a full second of life. */
-extern "C" void fn_8010C554(_PLW* source)
+extern "C" void eft_pl_hit_light_spawn(_PLW* source)
 {
     _EFT* eft = fn_8010C468(5);
     _EFT_LIGHT_WORK* work;

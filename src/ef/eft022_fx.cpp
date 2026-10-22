@@ -118,7 +118,7 @@ struct _EFT_WORK_C {
 
 /* size: 0x148 (lower bound) */
 
-extern "C" void* fn_801153D0(void*, s32, u8);
+extern "C" void* eft021_pl_create(void*, s32, u8);
 extern "C" void* fn_80115460(u8);
 extern "C" void fn_80115554(_EFT*);
 extern "C" void fn_80115664(_EFT*);
@@ -168,7 +168,7 @@ extern "C" char lbl_80791930[8];
 #pragma peephole off
 
 /* Creates the actor's eft021 record and seeds its work block. */
-extern "C" void* fn_801153D0(void* source, s32 timer, u8 type)
+extern "C" void* eft021_pl_create(void* source, s32 timer, u8 type)
 {
     _EFT* effect;
     _EFT_WORK_B* work;

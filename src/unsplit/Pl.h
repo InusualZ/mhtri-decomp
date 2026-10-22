@@ -30,8 +30,8 @@ s32 pl_stagger_level_get(void* a);
  * result with `mr r0,r3` before the caller's `(u16)` cast, which only a `u32` return produces.  The
  * `s16` parameter is the owner's too (retail's callee narrows it with `extsh`). */
 u32 fn_802745DC(struct _PLW* self, s16 kind);
-s32 fn_80274AB8(struct _PLW* self);  /* the owner's own definition (fn_80273B14.cpp) */
-s32 fn_80276254(struct _PLW* self, s32 v);
+s32 pl_weapon_guard_ck(struct _PLW* self);  /* the owner's own definition (fn_80273B14.cpp) */
+s32 pl_stagger_budget_ck(struct _PLW* self, s32 v);
 s32 pl_act_gauge_step_unlatched(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 s32 pl_act_gauge_step_signed(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 void pl_act_enter(struct _PLW* self, s32 a, u16 b, u16 c);
@@ -49,8 +49,6 @@ void fn_80229CB4(struct _PLW* self);
 void se_req_frame_set_parts3(struct _se_w* work, s32 code, s32 val);
 void se_req_frame_set_part4(struct _se_w* work, s32 a, s32 b, s32 c);
 
-/* 0x80244E88 - the per-motion effect dispatcher `Pl/fn_80229ECC.cpp` hands `&self->field_0xAF4`. */
-void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 
 /* The Pl helpers `Pl/fn_802489D4.cpp` (0x802489D4-0x8024F200) and `Pl/pl_act_step.cpp`
  * (0x8024F200-0x80258FCC) call that sit in the band's unclaimed runs (0x802430E8-0x80258FCC and
@@ -71,6 +69,9 @@ u32 fn_80276800(struct _PLW* self, s32 v);
  * them, so - like the band's code - this header is their rule-2 home). */
 extern u32 lbl_805BE824[]; /* 0x805BE824 - the per-act SE/motion table `Pl_act_set_step_table` is handed */
 extern u32 lbl_805BE5B8[]; /* 0x805BE5B8 - the sibling table `fn_8024A640` is handed */
+extern u32 pl_flinch_steps_kind1[]; /* 0x805C87F8 - the flinch act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` is its only referrer) */
+extern u32 pl_steps_guard_kind1[]; /* 0x805C887C - the guard act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` reads it) */
+extern u32 pl_steps_guard_walk_kind1[]; /* 0x805C8918 - the guard-walk act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` reads it) */
 extern u16 lbl_805C4A54[]; /* 0x805C4A54 - 3 rows of {u16 motion, u16 param} `fn_8024A8EC` reads */
 extern u16 lbl_805C4A60[]; /* 0x805C4A60 - the sibling motion row table `fn_8024B35C` indexes */
 extern u16 lbl_805C4A6C[]; /* 0x805C4A6C - the sibling motion row table `fn_8024B46C` indexes */
@@ -239,7 +240,7 @@ extern u8 lbl_805C4F5C[];
  * `illegal function overloading` class, and this band must not declare one. */
 
 /* The band's own tables, all unclaimed: `lbl_805C9608` is the 0x1A-byte-row attack table
- * `Pl/pl_act.cpp`'s `fn_80277974` walks (its `base` argument), and the `ShellAtkRow` arrays below are
+ * `Pl/pl_act.cpp`'s `pl_hit_attack_build` walks (its `base` argument), and the `ShellAtkRow` arrays below are
  * the per-shell-kind attack rows `fn_802842D4` is handed (`&row[kind]`, 0x12 bytes per row).  The
  * second run of labels are the `u32` tables `fn_802842D4` passes on to `Pl_act_set_step_table`.  Declared,
  * never defined (invariant 8.4). */

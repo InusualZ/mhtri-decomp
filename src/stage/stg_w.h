@@ -100,6 +100,12 @@ extern "C" {
 
 extern u8 stage_w[]; /* the block itself, viewed as `StageMapView` by a cast (the band's own idiom) */
 
+/* 0x802ADD78: places the actor's barrel bomb (the place act's variant 0) */
+void stg_barrel_bomb_place(struct _PLW* self);
+/* 0x802ADE0C: places the actor's trap (the place act's variant 1) */
+void stg_trap_place(struct _PLW* self);
+/* 0x802ADE8C: fires the slinger's special shell (item 0x180) */
+void stg_slinger_special_fire(struct _PLW* self);
 #ifdef __cplusplus
 }
 #endif

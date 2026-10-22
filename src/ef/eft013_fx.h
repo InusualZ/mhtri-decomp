@@ -14,4 +14,13 @@ void eft013_set(struct _PLW* plw, u8 type);
 
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+void eft013_set_pl_model(struct _EFT013_PL* self, u8 type);
+void eft013_spark_spawn(struct _EFT013_PL* self);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_EF_EFT013_FX_H */

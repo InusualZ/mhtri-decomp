@@ -28,6 +28,9 @@ void camera_flag_0x145_set(void);
 /* 0x802B9574 */
 void camera_target_slot_clear(u8 reset);
 
+void camera_pl_quake_req(struct _PLW* player, u8 kind);
+void camera_mode2_req(void);
+void camera_mode3_req(void);
 #ifdef __cplusplus
 }
 #endif

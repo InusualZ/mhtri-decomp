@@ -22,7 +22,7 @@
  *   0x802A79B8-0x802A7B80, 0x802A7C44-0x802A8D74, 0x802A907C-0x802A91AC, 0x802A9BCC-0x802A9CD8,
  *   0x802A9F48-0x802AA3EC, 0x802AA4F4-0x802AA59C, 0x802AA68C-0x802AA6A8.  They need the `.sdata2` 120.0f (sole referrer
  *   `fn_802AA4F4`) or callees no header declares with a usable signature (`draw_window_box`, `cockpit_blink_get`, `draw_itemicon_anim_idx`,
- *   `get_rare_color`, `draw_number_idx`, `pl_item_slot_next_get`/`fn_80279B84`, and `font_print`, `char*` in `unsplit/menu.h` where
+ *   `get_rare_color`, `draw_number_idx`, `pl_item_slot_next_get`/`pl_held_item_refresh`, and `font_print`, `char*` in `unsplit/menu.h` where
  *   the map's variadic `font_print__FPSce` sets `crclr`).  The 6 partial rows:
  *  - `menu_page_count`: retail `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B; five shapes measured);
  *  - `menu_list_fill`: `self` and the record pointer in r29/r30 swapped, each `id` extension before the record test;

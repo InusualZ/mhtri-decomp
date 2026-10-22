@@ -131,8 +131,14 @@ SeSlot* se_req_pos_ps(_se_w* work, long id, long param, nw4r::math::VEC3* pos);
 
 
 /* 0x800DB2DC - the no-argument SE mix update `Pl/fn_80262940.cpp` drives after the action settles; the
- * owner defines it `extern "C" void fn_800DB2DC(void)` (fn_800D7F54.cpp:1328). */
+ * owner defines it `extern "C" void fn_800DB2DC(void)` (fn_800D7F54.cpp:1328), so it is declared with C linkage. */
+#ifdef __cplusplus
+extern "C" {
+#endif
 void fn_800DB2DC(void);
+#ifdef __cplusplus
+}
+#endif
 
 /* 0x800DBB78 - the non-positional SE request (`sysSE_req__Fl`); the owner defines it at C++ scope
  * (fn_800D7F54.cpp:144), so it is declared here at C++ scope, outside the `extern "C"` block
@@ -177,6 +183,19 @@ void se_req_eft019_tick(nw4r::math::VEC3* pos);
 void se_req_item_jingle(void);
 /* 0x800DD1F0 - requests the splash sound `id` at `pos` (`ef/eft029.cpp`, `ef/eft052.cpp`). */
 void se_req_splash(u8 id, nw4r::math::VEC3* pos);
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void se_step_pos_set(nw4r::math::VEC3* pos);
+void se_fishing_cast(s32 unused, u32 mode);
+void se_fishing_bite_big(void);
+void se_fishing_bite_small(void);
+void se_fishing_result(u8 kind, u32 unused, u8 sub);
+void se_item_pickup_play(u16 code);
+#ifdef __cplusplus
 }
 #endif
 

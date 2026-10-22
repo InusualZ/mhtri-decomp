@@ -13,7 +13,7 @@
 
 /* size: 0x98 (approximation: evidenced to +0x94) */
 struct ShellSetFuncs {
-    /* +0x00 */ u8 pad_0x00[0x04];
+    /* +0x00 */ void (*method_0x00)(struct _PLW* self, u32 kind, u32 mode, ShellSetFuncs* table);  /* the item-use shell (`Pl/pl_act_step.cpp`) */
     /* +0x04 */ void (*method_0x04)(struct _AINPC_W* self, u32 kind, u32 a, u32 b, u32 c, ShellSetFuncs* table);
     /* +0x08 */ void (*method_0x08)(nw4r::math::VEC3* pos, u32 kind, u32 area, u32 a);
     /* +0x0C */ u8 pad_0x0C[0x10 - 0x0C];
@@ -52,7 +52,8 @@ struct ShellSetFuncs {
     /* +0x70 */ void (*method_0x70)(struct _ENEMY_WORK* self, ShellSetFuncs* table);
     /* +0x74 */ void (*method_0x74)(struct _ENEMY_WORK* self, u32 kind, u32 joint, nw4r::math::VEC3* pos, f32 scale,
                                     u32 a, u16 b, ShellSetFuncs* table);
-    /* +0x78 */ u8 pad_0x78[0x80 - 0x78];
+    /* +0x78 */ void (*method_0x78)(struct _PLW* self, u32 kind, ShellSetFuncs* table);  /* the slinger shell (`Pl/pl_act_step.cpp`) */
+    /* +0x7C */ u8 pad_0x7C[0x80 - 0x7C];
     /* +0x80 */ void (*method_0x80)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* table);
     /* +0x84 */ void (*method_0x84)(struct _ENEMY_WORK* self, u32 kind, nw4r::math::VEC3* pos, f32 scale, u32 id,
                                     ShellSetFuncs* table);

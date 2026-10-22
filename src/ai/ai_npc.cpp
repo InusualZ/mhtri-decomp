@@ -11507,7 +11507,7 @@ s32 fn_802D77DC(u8 slot)
 
 /* 0x802D7A50 - raises the player-side AI NPC's "release" flag when the record is live, then
  * forwards to the shared dispatcher. */
-void fn_802D7A50(void)
+void ainpc_call_request(void)
 {
     if (ainpc_w.active == 0) {
         return;

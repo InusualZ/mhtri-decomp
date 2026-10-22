@@ -165,6 +165,8 @@ u32 em_exhaust_add(struct _ENEMY_WORK* self, s16 amount);
 u32 em_ailment8_add(struct _ENEMY_WORK* self, s16 amount);
 void em_action_finish_swim(struct _ENEMY_WORK* self);
 
+u32 em_player_watched_ck(u8 player);
+s32 em_search_record_ck(u32 selector, struct _PLW* work, s8* out_flag);
 #ifdef __cplusplus
 }
 #endif
@@ -211,6 +213,11 @@ u32 em_data_word_get(struct _ENEMY_WORK* self);
 u8 em_joint_points_get(struct _ENEMY_WORK* self, struct EmJointPoints* set, nw4r::math::VEC3* out);
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* 0x80135938 - the world position of the enemy's joint `joint`; C++ linkage (the map row is the mangling). */
+void get_joint_wpos_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::VEC3* out);
 #endif
 
 #endif /* MHTRI_ENEMY_EM_COMMON_H */

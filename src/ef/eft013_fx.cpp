@@ -1021,7 +1021,7 @@ extern "C" void fn_801075AC(_EFT013_PL* self, nw4r::math::VEC3* pos, u32 a, f32 
 }
 
 /* 0x801077C4 - clear the setter state of the pooled type-9 effect. */
-extern "C" void fn_801077C4(_EFT013_PL* self) {
+extern "C" void eft013_spark_spawn(_EFT013_PL* self) {
     f32 scale;
     _EFT013* e = (_EFT013*)fn_80107A18(self, 9, 3, scale, self->area_0x16);
     if (e != NULL) {

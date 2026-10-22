@@ -27,7 +27,7 @@
  * Build: `cflags_main` plus a file-scope `#pragma peephole off` and a file-scope
  * `#pragma optimization_level 4`. The retail object keeps `clrlwi`+`cmpwi`
  * unfused and uses non-record forms in `sysSE_req`, `sysSE_stop`, `se_req_orb`, `fn_800DC53C` and
- * `fn_800DAADC`; `-opt nopeephole` reproduces all of them and changes none of the other functions, so the
+ * `se_item_pickup_play`; `-opt nopeephole` reproduces all of them and changes none of the other functions, so the
  * pragma is a stand-in for the per-unit cflags group the outbox requests (playbook 33). The level-4
  * pragma is measured too: it moves `fn_800D9B6C` 96.667 -> 99.483 (retail's contiguous-case dispatch is
  * the fused `addi r,r,-9; cmplwi r,1` form) and changes no other symbol in the unit; the whole-unit
@@ -38,13 +38,13 @@
  * residual write-up are in the outbox; the short version:
  *   - every symbol below 100 % is instruction-for-instruction equal to retail - the differences are
  *     register colouring, one range-test encoding, or a pool name, never a missing operation.
- *   - `fn_800DB044` (73.3 %): the two-voice crossfade. Every operation is present, but the callee-saved
+ *   - `se_fishing_cast` (73.3 %): the two-voice crossfade. Every operation is present, but the callee-saved
  *     colouring puts `work` in r31 where retail has r30 (~10 declaration orders and source shapes tried).
  *   - `fn_800D8404` (81.9 %): the switch's 3/4 range test is two compares where retail uses
  *     `addi r,r,-3; cmplwi r,1`.
  *   - `fn_800D87B8` (89.6 %): retail reaches the stop body by a direct jump from case 4; the `goto`-free
  *     shape (a `stop` flag with the body written twice) costs 15 instructions.
- *   - The int->float magic in `se_item_get_play`/`snd_item_fail_play`/`fn_800DB044` is the compiler's own `.sdata2`
+ *   - The int->float magic in `se_item_get_play`/`snd_item_fail_play`/`se_fishing_cast` is the compiler's own `.sdata2`
  *     pool entry: the target names it `lbl_80796400`, ours emits an anonymous `@NN` (playbook 29).
  *
  * Data runs in this range are recorded in `splits.txt` as comments and not claimed (playbook 23,
@@ -312,7 +312,7 @@ extern "C" void se_req_pos_id72(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 72, 
 
 extern "C" void se_req_pos_id73(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 73, pos); }
 
-extern "C" void fn_800DC4E4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 46, pos); }
+extern "C" void se_step_pos_set(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 46, pos); }
 
 extern "C" void se_req_pos_id74(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 74 : 174;
@@ -1273,7 +1273,7 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  *   a reference, a separate assignment, a const pointer, nested-scope assignment. All give r31 = base.
  *
  * fn_800F2680 must return u32 here: with u8 the u8->f32 narrowing loses its `mr r0,r3` copy and both
- *   fn_800DB36C and pl_charge_se_play drop off 100 % (96.37 / 93.07).
+ *   se_fishing_result and pl_charge_se_play drop off 100 % (96.37 / 93.07).
  *
  * `se_req_pos_ps` is declared as a C++ function on purpose - the map's symbol is the mangled
  *   `se_req_pos_ps__FP5_se_wllPQ34nw4r4math4VEC3`, and `extern "C"` emits an unmangled reloc instead.
@@ -1352,7 +1352,7 @@ extern "C" void fn_800DB2DC(void) {
 /* --- 0x800DB36C -------------------------------------------------------------------------------- */
 
 /* Maps a trap kind and its sub-kind onto a handle slot, then applies a volume. */
-extern "C" void fn_800DB36C(u8 kind, u32 unused, u8 sub) {
+extern "C" void se_fishing_result(u8 kind, u32 unused, u8 sub) {
     if (fn_800D843C() == 1) {
         return;
     }
@@ -1704,7 +1704,7 @@ extern "C" u32 fn_800DAE48(void) {
 }
 
 /* Resets the manager's effect state and starts the effect `kind` 15 on the current id. */
-extern "C" void fn_800DAE9C(void) {
+extern "C" void se_fishing_bite_small(void) {
     SeMgrState* mgr = (SeMgrState*)lbl_80794978;
     mgr->field_0x295E4 = 0;
     mgr->field_0x295E8 = 0;
@@ -1722,8 +1722,8 @@ extern "C" void fn_800DAE9C(void) {
     }
 }
 
-/* Same as fn_800DAE9C for effect `kind` 10. */
-extern "C" void fn_800DAF70(void) {
+/* Same as se_fishing_bite_small for effect `kind` 10. */
+extern "C" void se_fishing_bite_big(void) {
     SeMgrState* mgr = (SeMgrState*)lbl_80794978;
     mgr->field_0x295E4 = 0;
     mgr->field_0x295E8 = 0;
@@ -3192,7 +3192,7 @@ extern "C" u32 item_se_ck(void);
 
 /* Switches on the caller's sound code: a few codes are silent, two bump the global SE level, and the
  * rest open a per-frame voice whose rate is scaled like `se_item_get_play`'s. */
-extern "C" void fn_800DAADC(u16 code) {
+extern "C" void se_item_pickup_play(u16 code) {
     SeWork* work = get_move_work_adrs__FUc(0);
     if (work == NULL) {
         return;
@@ -3232,7 +3232,7 @@ extern "C" u32 fn_800DAE48(void);
 
 /* Opens a per-frame voice for the caller's mode, files it in one of the two rotating voice slots and
  * starts the other one (or retunes it) so the two crossfade. */
-extern "C" void fn_800DB044(s32 unused, u32 mode) {
+extern "C" void se_fishing_cast(s32 unused, u32 mode) {
     s32 id;
     _se_w* work = lbl_80794978;
     u8 handle;

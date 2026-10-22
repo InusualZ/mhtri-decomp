@@ -1680,7 +1680,7 @@ extern "C" s32 stage_torch_unlit_ck(u8 index)
 }
 
 /* Dispatches an area-index event to either the local stage or the caller's own handler. */
-extern "C" void fn_802B4680(void* plw, u8 index)
+extern "C" void stage_area_event_dispatch(void* plw, u8 index)
 {
     if (index >= 0x10U) {
         return;
@@ -1749,7 +1749,7 @@ extern "C" void stage_demo_start(u8 kind)
         amount = lbl_8079A4B8;
         break;
     case 33:
-        fn_802B4680(NULL, 0);
+        stage_area_event_dispatch(NULL, 0);
         return;
     case 47:
         amount = lbl_8079A4BC;

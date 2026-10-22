@@ -20,6 +20,7 @@
 #include "sound/fn_800D7F54.h"
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
+#include "Pl/pl_act_step.h"
 
 extern "C" void pl_se_frame_callback(_PLW* self)
 {
@@ -832,7 +833,7 @@ case 312:
     se_req_frame_set(se_work_a, 16, 16, 17, 0x3000003);
     break;
 case 313:
-    fn_80244E88((&self->field_0xAF4), ((u8)(v)), motion, self->field_0x002);
+    pl_se_long_motion_frames((&self->field_0xAF4), ((u8)(v)), motion, self->field_0x002);
     break;
 case 314:
     se_req_frame_set_bank(se_work_b, 22, (((u8)(v)) << 24), 17, 2);
@@ -1112,7 +1113,7 @@ case 355:
     se_req_frame_set(se_work_a, 80, 234, 3, 0x3000003);
     break;
 case 356:
-    fn_80244E88((&self->field_0xAF4), ((u8)(v)), motion, self->field_0x002);
+    pl_se_long_motion_frames((&self->field_0xAF4), ((u8)(v)), motion, self->field_0x002);
     break;
 case 357:
     se_req_frame_set(se_work_a, 6, 234, 3, 0x3000003);

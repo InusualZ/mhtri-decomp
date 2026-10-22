@@ -13,6 +13,7 @@ extern "C" {
  * so `u8` here; the owner's C body spells them `s8`), r6 a scalar and f1 the scale. */
 void eft_spawn_pos_in_area(void* self, u8 a, u8 b, s32 c, f32 scale);
 
+void eft_pl_weapon_follow_spawn(struct Plw* self);
 #ifdef __cplusplus
 }
 #endif
