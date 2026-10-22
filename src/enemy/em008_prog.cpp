@@ -62,8 +62,8 @@
 #define em_fall_height_get em_fall_height_get_hidden_fn_80165FC8_h
 #define em_frame_flag_set em_frame_flag_set_hidden_fn_80165FC8_h
 #define em_mot_set em_mot_set_hidden_fn_80165FC8_h
-#define fn_8013918C fn_8013918C_hidden_fn_80165FC8_h
-#define fn_8013A654 fn_8013A654_hidden_fn_80165FC8_h
+#define em_res_user_data_dtor fn_8013918C_hidden_fn_80165FC8_h
+#define em_res_user_data_flag_set fn_8013A654_hidden_fn_80165FC8_h
 #define fn_8015D934 fn_8015D934_hidden_fn_80165FC8_h
 #define rotMatrixX rotMatrixX_hidden_fn_80165FC8_h
 #define rotMatrixZ rotMatrixZ_hidden_fn_80165FC8_h
@@ -71,8 +71,8 @@
 #undef rotMatrixZ
 #undef rotMatrixX
 #undef fn_8015D934
-#undef fn_8013A654
-#undef fn_8013918C
+#undef em_res_user_data_flag_set
+#undef em_res_user_data_dtor
 #undef em_mot_set
 #undef em_frame_flag_set
 #undef em_fall_height_get
@@ -84,8 +84,8 @@
 #define rotMatrixZ_view1 ((void (*)(u32, nw4r::math::MTX34*))rotMatrixZ)
 #define rotMatrixX_view1 ((void (*)(u32, nw4r::math::MTX34*))rotMatrixX)
 #define fn_8015D934_view1 ((u8 (*)(struct _ENEMY_WORK*))fn_8015D934)
-#define fn_8013A654_view1 ((void (*)(ResUserDataAc*, u32))fn_8013A654)
-#define fn_8013918C_view1 ((void (*)(void*, s16))fn_8013918C)
+#define fn_8013A654_view1 ((void (*)(ResUserDataAc*, u32))em_res_user_data_flag_set)
+#define fn_8013918C_view1 ((void (*)(void*, s16))em_res_user_data_dtor)
 #define em_motion_param_set_view1 ((void (*)(struct _ENEMY_WORK*, u32, f32))em_motion_param_set)
 #define em_mot_finished_ck_view1 ((u32 (*)(struct _ENEMY_WORK*))em_mot_finished_ck)
 #define em_parts_damage_level_get_view1 ((u8 (*)(_ENEMY_WORK*, u8))em_parts_damage_level_get)
@@ -315,7 +315,7 @@ extern "C" void fn_8015D9C8(_ENEMY_WORK* self, u32 arg) {
     }
     if (self->field_0x009 == 0) {
         setVector3(&v, lbl_80797330, lbl_80797334, lbl_80797338);
-        fn_801057A4(self, 0x14, &v, lbl_8079733C, 0);
+        eft_em_attach_set(self, 0x14, &v, lbl_8079733C, 0);
     }
 }
 
@@ -422,15 +422,15 @@ extern "C" void fn_8015DD6C(_ENEMY_WORK* self) {
 /* 0x8015DDB8 - the state-0 step: motion 0, then motion set (7, 0x12). */
 extern "C" void fn_8015DDB8(_ENEMY_WORK* self) {
     em_move_mode_set(self, 0);
-    fn_80128AAC(self, 7, 0x12);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 7, 0x12);
+    em_finish_flag_set(self);
 }
 
 /* 0x8015DE00 - the state-0 step: motion 4, then motion set (6, 0xC). */
 extern "C" void fn_8015DE00(_ENEMY_WORK* self) {
     em_move_mode_set(self, 4);
-    fn_80128AAC(self, 6, 0xC);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 6, 0xC);
+    em_finish_flag_set(self);
 }
 
 /* 0x8015DE48 - the two-step state: start motion set (1, 0xA) on entry, finish on the wait. */
@@ -482,7 +482,7 @@ extern "C" void fn_8015DF40(_ENEMY_WORK* self) {
 }
 
 /* 0x8015DFBC - the two-step state that also refreshes the scene: motion set (1, 0, 0) and the
- * height pair on entry, `fn_801280F4` on the wait. */
+ * height pair on entry, `em_action_finish_stand` on the wait. */
 extern "C" void fn_8015DFBC(_ENEMY_WORK* self) {
     em_busy_timer_reset(self);
     em_shake_req_set(self);
@@ -495,7 +495,7 @@ extern "C" void fn_8015DFBC(_ENEMY_WORK* self) {
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -1179,7 +1179,7 @@ extern "C" void fn_8015F2D8(_ENEMY_WORK* self) {
             em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -1205,7 +1205,7 @@ extern "C" void fn_8015F39C(_ENEMY_WORK* self) {
         temp_r0 = self->timer_0x020 - 1;
         self->timer_0x020 = temp_r0;
         if (temp_r0 == 0) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -1228,7 +1228,7 @@ extern "C" void fn_8015F450(_ENEMY_WORK* self) {
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1U) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -1257,7 +1257,7 @@ extern "C" void fn_8015F510(_ENEMY_WORK* self, u8 arg1) {
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1U) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -1279,7 +1279,7 @@ extern "C" void fn_8015F60C(_ENEMY_WORK* self) {
         return;
     case 1:
         if (em_turn_seq_step(self, lbl_8056FB50) == 1U) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }

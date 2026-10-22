@@ -54,7 +54,7 @@
  *    signatures or cannot be included beside it).
  * SHAPES. Loop counters are declared before the work pointers (retail's register colours); the type tests that
  *   retail compares `cmpwi` are `switch`es; the small-data tables are declared with their sizes (`@sda21`); empty
- *   switch arms that retail compares explicitly `return` while the default `break`s (`fn_8010A7D4`); a flag retail
+ *   switch arms that retail compares explicitly `return` while the default `break`s (`eft013_em_set`); a flag retail
  *   compares against the zero it just stored is written as a compare with that field (`fn_80109A84`).
  */
 
@@ -666,7 +666,7 @@ extern "C" void fn_8010A394(_EFT013* self) {
 
 /* 0x8010A7D4 - spawn the enemy effect the type selects (the 212-slot variant at area 0/7, the 72-slot
  * one at type 1) and hand it to fn_8010AA24. */
-extern "C" void fn_8010A7D4(void* self, u32 type) {
+extern "C" void eft013_em_set(void* self, u32 type) {
     switch ((u8)type) {
     case 0:
     case 7: {

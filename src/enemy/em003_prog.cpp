@@ -254,7 +254,7 @@ extern "C" void fn_80154E90(_ENEMY_WORK* self, u8 arg1) {
     }
     if (self->state_0x009 == 0) {
         setVector3(&pos, lbl_807970C0, lbl_807970C8, lbl_807970CC);
-        fn_801057A4(self, 0x1A, &pos, lbl_807970C4, 0x1C72);
+        eft_em_attach_set(self, 0x1A, &pos, lbl_807970C4, 0x1C72);
     }
     self->flags_0x836 = (u16)(self->flags_0x836 | 0x8000);
 }
@@ -340,8 +340,8 @@ extern "C" void fn_80155664(_ENEMY_WORK* self) {
 extern "C" void fn_8015569C(_ENEMY_WORK* self) {
     em_fall_height_get(self);
     em_fall_start(self);
-    fn_80128AAC(self, 3, 0xB);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 3, 0xB);
+    em_finish_flag_set(self);
 }
 
 extern "C" void fn_801556E8(_ENEMY_WORK* self) {
@@ -2084,7 +2084,7 @@ extern "C" s32 fn_8015D1F0(_ENEMY_WORK* self) {
 }
 
 extern "C" void fn_8015D200(_ENEMY_WORK* self) {
-    fn_8013A654(self, 3);
+    em_res_user_data_flag_set(self, 3);
 }
 
 /* The unit's `.bss`: the three two-vector records `fn_8015D764` seeds.  Names are GUESSes (each record is a

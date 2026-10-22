@@ -38,7 +38,7 @@ s32 fn_801260E0(struct _ENEMY_WORK* work);
 s32 fn_80126104(struct _ENEMY_WORK* work);
 /* 0x80126278 - three arguments, from the call sites (`enemy/em018_prog.cpp`'s `fn_8019D9BC` sets all three):
  * r3 the `_ENEMY_WORK`, r4 the 16-bit id, r5 the `VEC3*` fill target. */
-void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
+void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 void (*fn_801264BC(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);
 u16 em_hit_mask_get(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
@@ -62,7 +62,7 @@ void em_action_finish_walk(struct _ENEMY_WORK* self);
 /* 0x80128A70 / 0x80128AAC - r3 (`self`) and two u8 arguments (`clrlwi r4,r4,24` /
  * `clrlwi r5,r5,24`); 0x80128AAC supplies the constant third argument itself. */
 void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80128AAC(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_act_arm_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 fn_80128204(struct _ENEMY_WORK* work);
 void fn_80128308(struct _ENEMY_WORK* work);
 void em_target_pos_set(struct _ENEMY_WORK* work, VEC3* pos);
@@ -116,7 +116,7 @@ void fn_8012A9E8(struct _ENEMY_WORK* self, u8* a, u8* b, u8* c);
 u8* fn_80126044(struct _ENEMY_WORK* self);
 void* fn_80126704(struct _ENEMY_WORK* self);
 void fn_80126898(struct _ENEMY_WORK* self);
-void fn_801280F4(struct _ENEMY_WORK* self);
+void em_action_finish_stand(struct _ENEMY_WORK* self);
 /* 0x80128030 - one `self` argument, no return; the state machines of `enemy/em015_prog.cpp`, `enemy/em016_prog.cpp`,
  * `enemy/em018_prog.cpp` and `enemy/em020_prog.cpp` call it after `em_mot_end_ck` reports done. */
 void fn_80128030(struct _ENEMY_WORK* self);

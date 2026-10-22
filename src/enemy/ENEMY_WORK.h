@@ -244,7 +244,9 @@ struct _ENEMY_WORK {
     union {
         struct {
             /* +0x194 */ Vec3 prev_pos;
-            /* +0x1A0 */ u8 unused_0x1A0[12];
+            /* +0x1A0 */ u8 unused_0x1A0[4];
+            /* +0x1A4 */ f32 fall_speed_0x1A4; /* the fall speed `enemy/em019_ai.cpp`'s dive clears */
+            /* +0x1A8 */ u8 unused_0x1A8[4];
         };
         /* +0x194 */ nw4r::math::VEC3 vec_0x194;  /* the second target position the 0x803253BC band
                                         * measures its aim angle against (`em_act_aim` passes it
@@ -303,7 +305,8 @@ struct _ENEMY_WORK {
                                         * +0x1FC/+0x1FE */
     /* +0x200 */ s16 field_0x200;
     /* +0x202 */ s16 field_0x202;
-    /* +0x204 */ u8 unused_0x204[8];
+    /* +0x204 */ u32 joint_0x204;      /* the joint `enemy/em019_ai.cpp`'s jump and dive drop from */
+    /* +0x208 */ u8 unused_0x208[4];
     /* +0x20C */ f32 field_0x20C;        /* one height, three readers: the effect spawn height
                                          * `fn_801D4DD8`/`fn_801D428C` add to the work record's y,
                                          * the height `fn_801A4504` compares its joint samples

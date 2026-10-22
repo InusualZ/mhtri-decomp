@@ -4,7 +4,7 @@
  * RANGE. .text 0x80383148-0x80385EE0 (75 functions); .ctors 0x8056F3AC-0x8056F3B0 (`fn_80385E7C`),
  *   .data 0x805EF8C0-0x805EF990, .bss 0x806C2418-0x806C5528, .sdata 0x807933C0-0x807933D8, .sbss 0x80794C00-0x80794C08,
  *   .sdata2 0x8079BF60-0x8079BF90, extab, extabindex.
- * SEAM. The left edge closes `enemy/em019_ai.cpp`, whose static initializer `fn_8038309C` ends there.  This unit's
+ * SEAM. The left edge closes `enemy/em019_ai.cpp`, whose static initializer `em019_se_shift_init` ends there.  This unit's
  *   own initializer `fn_80385E7C` constructs the `lbl_806C4A88` array with `fn_80385E9C`, emitted after it; the pool
  *   repeats 41c00000 at `lbl_8079BFAC` (first read by `fn_803865B4`), so the next TU starts in
  *   0x80385E7C-0x80386028 and the right edge 0x80385EE0 is a GUESS.

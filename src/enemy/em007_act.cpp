@@ -193,7 +193,7 @@ void em_part_rec_reset(struct _ENEMY_WORK* self, u32 a);
 void em_part_rec_alt_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 em_hit_mask_get(struct _ENEMY_WORK* self, f32 a);
 void em_action_finish(struct _ENEMY_WORK* self);
-void fn_801280F4(struct _ENEMY_WORK* self);
+void em_action_finish_stand(struct _ENEMY_WORK* self);
 void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_target_pos_set(struct _ENEMY_WORK* self, void* p);
 void em_hit_window_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
@@ -545,7 +545,7 @@ extern "C" void fn_801D89F4(struct _ENEMY_WORK* self) {
         }
         if (em_mot_end_ck(self) == 1) {
             fn_801303EC(self, fn_8013032C(self));
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -570,7 +570,7 @@ extern "C" void fn_801D8AC4(struct _ENEMY_WORK* self) {
         temp_r0 = self->timer_0x020 - 1;
         self->timer_0x020 = temp_r0;
         if (temp_r0 == 0) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -593,7 +593,7 @@ extern "C" void fn_801D8B70(struct _ENEMY_WORK* self) {
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -614,7 +614,7 @@ extern "C" void fn_801D8C34(struct _ENEMY_WORK* self) {
         return;
     case 1:
         if (em_turn_seq_step(self, lbl_80570500) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -1832,9 +1832,9 @@ void em_demo_key_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c, u32 d,
 void em_demo_enable(struct _ENEMY_WORK* self);
 
 /* `enemy/em_common.cpp` */
-void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
+void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 void em_action_finish(struct _ENEMY_WORK* self);
-void fn_801280F4(struct _ENEMY_WORK* self);
+void em_action_finish_stand(struct _ENEMY_WORK* self);
 void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_act_arm_unless_down(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_hit_window_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
@@ -1845,7 +1845,7 @@ u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, vo
 s32 em_area_leave_ck(struct _ENEMY_WORK* self);
 
 void em_busy_set(struct _ENEMY_WORK* self);
-u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+u32 em_act11_wait_ck(struct _ENEMY_WORK* self);
 
 /* `fn_8012EC3C` and `em_alt_mode_ck` read the work record (+0x89F, +0x8AA). */
 u32 em_eft_active_ck(struct _ENEMY_WORK* self);
@@ -1868,7 +1868,7 @@ f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
 void fn_801369A0(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
 void em_bait_react(struct _ENEMY_WORK* self);
-struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
+struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void em_gauge_tick(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
 void em_tint_hold_start(struct _ENEMY_WORK* self);
 void em_tint_hold_end(struct _ENEMY_WORK* self);
@@ -1879,7 +1879,7 @@ void em_act_flag1_set(struct _ENEMY_WORK* self);
 
 /* `enemy/fn_80138074.c` */
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* helper);
-void fn_8013918C(void* helper, s16 flag);
+void em_res_user_data_dtor(void* helper, s16 flag);
 s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 
 /* `enemy/em001_prog.cpp` */
@@ -1962,61 +1962,61 @@ void fn_801D71C4(struct _ENEMY_WORK* self, u8 arg1) {
         case 1:
             switch (self->area_no) {
             case 4:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 7), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 7), &self->pos);
                 break;
             case 5:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 5), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 5), &self->pos);
                 break;
             }
             break;
         case 2:
             switch (self->area_no) {
             case 4:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 6), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 6), &self->pos);
                 break;
             case 6:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 7), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 7), &self->pos);
                 break;
             }
             break;
         case 3:
             switch (self->area_no) {
             case 1:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 1), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 1), &self->pos);
                 break;
             case 3:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 4), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 4), &self->pos);
                 break;
             }
             break;
         case 4:
             switch (self->area_no) {
             case 3:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 7), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 7), &self->pos);
                 break;
             case 6:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 5), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 5), &self->pos);
                 break;
             }
             break;
         case 5:
             switch (self->area_no) {
             case 4:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 1), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 1), &self->pos);
                 break;
             case 6:
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | 4), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | 4), &self->pos);
                 break;
             }
             break;
         case 8:
             if (self->area_no == 1) {
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
             }
             break;
         case 9:
             if (self->area_no == 0) {
-                fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
+                em_data_point_get(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
             }
             break;
         }
@@ -2148,7 +2148,7 @@ void fn_801D7890(struct _ENEMY_WORK* self) {
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -2478,25 +2478,25 @@ extern "C" {
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 
-void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
+void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 u32 fn_80129D3C(struct _ENEMY_WORK* self);
 u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
 u8 em_area_break_ck(struct _ENEMY_WORK* self);
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 s32 em_area_leave_ck(struct _ENEMY_WORK* self);
 
-u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+u32 em_act11_wait_ck(struct _ENEMY_WORK* self);
 
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
-struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
+struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 u32 fn_8013023C(struct _ENEMY_WORK* self);
 u8* em_move_work_pick(u8 index);
 void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 em_flags836_ck(struct _ENEMY_WORK* self, u32 a);
-void fn_8013A654(struct _ENEMY_WORK* self, u32 a);
+void em_res_user_data_flag_set(struct _ENEMY_WORK* self, u32 a);
 
 /* `enemy/fn_80138074.c` */
-void fn_8013918C(void* helper, s16 flag);
+void em_res_user_data_dtor(void* helper, s16 flag);
 
 /* The part-manager record `fn_801E0538` dispatches on (only the step byte is named).  size: 0x6 */
 struct EmEftPartsMan {
@@ -2748,7 +2748,7 @@ u32 fn_801DF540(struct _ENEMY_WORK* self, u8 a) {
     return 0;
 }
 
-/* 0x801DF568 (0x2A4) - arms the part's motion (`em_move_mode_set`) and picks the `fn_80126278` effect id
+/* 0x801DF568 (0x2A4) - arms the part's motion (`em_move_mode_set`) and picks the `em_data_point_get` effect id
  * from the work record's map kind (`stage_map_kind_get`) and `area_no`. */
 void fn_801DF568(struct _ENEMY_WORK* self, u8* outA, u8* outB) {
     u32 kind;
@@ -2760,64 +2760,64 @@ void fn_801DF568(struct _ENEMY_WORK* self, u8* outA, u8* outB) {
     case 1:
         switch (self->area_no) {
         case 4:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 7), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 7), &self->pos);
             break;
         case 5:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 5), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 5), &self->pos);
             break;
         }
         break;
     case 2:
         switch (self->area_no) {
         case 4:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 6), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 6), &self->pos);
             break;
         case 6:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 7), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 7), &self->pos);
             break;
         }
         break;
     case 3:
         switch (self->area_no) {
         case 1:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 1), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 1), &self->pos);
             break;
         case 3:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 4), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 4), &self->pos);
             break;
         }
         break;
     case 4:
         switch (self->area_no) {
         case 3:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 7), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 7), &self->pos);
             break;
         case 6:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 5), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 5), &self->pos);
             break;
         }
         break;
     case 5:
         switch (self->area_no) {
         case 4:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 1), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 1), &self->pos);
             break;
         case 6:
-            fn_80126278(self, (u16)(((self->area_no & 0xf) << 8) | 4), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xf) << 8) | 4), &self->pos);
             break;
         }
         break;
     case 8:
         switch (self->area_no) {
         case 1:
-            fn_80126278(self, (u16)((self->area_no & 0xf) << 8), &self->pos);
+            em_data_point_get(self, (u16)((self->area_no & 0xf) << 8), &self->pos);
             break;
         }
         break;
     case 9:
         switch (self->area_no) {
         case 0:
-            fn_80126278(self, (u16)((self->area_no & 0xf) << 8), &self->pos);
+            em_data_point_get(self, (u16)((self->area_no & 0xf) << 8), &self->pos);
             break;
         }
         break;
@@ -3050,7 +3050,7 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
 /* 0x801DFEAC (0x40) - clears the helper and sets part 7. */
 void fn_801DFEAC(struct _ENEMY_WORK* self) {
     nw4r::g3d::ResNode tmp((void*)0);
-    fn_8013A654(self, 7);
+    em_res_user_data_flag_set(self, 7);
 }
 
 /* 0x801E0058 (0x164) - "is either part 0x1B or 0x1C within (scale * lbl_80799780)^2 of me". */
@@ -3058,9 +3058,9 @@ u32 fn_801E0058(struct _ENEMY_WORK* self, u8 a) {
     struct _ENEMY_WORK* p;
     f32 d;
     f32 lim;
-    p = fn_80131034(self, 0x1b, 0);
+    p = em_ally_find(self, 0x1b, 0);
     if (p != NULL) {
-        if (fn_8012E5A8(p) == 1) {
+        if (em_act11_wait_ck(p) == 1) {
             if (a == 0) {
                 return 1;
             }
@@ -3072,9 +3072,9 @@ u32 fn_801E0058(struct _ENEMY_WORK* self, u8 a) {
             }
         }
     }
-    p = fn_80131034(self, 0x1c, 0);
+    p = em_ally_find(self, 0x1c, 0);
     if (p != NULL) {
-        if (fn_8012E5A8(p) == 1) {
+        if (em_act11_wait_ck(p) == 1) {
             if (a == 0) {
                 return 1;
             }
@@ -3100,7 +3100,7 @@ u32 fn_801E01BC(struct _ENEMY_WORK* self) {
 /* 0x801E01E4 (0x5C) - the deleting destructor of the +0x4 helper. */
 void* fn_801E01E4(void* self, s16 flag) {
     if (self != NULL) {
-        fn_8013918C(self, 0);
+        em_res_user_data_dtor(self, 0);
         if (flag > 0) {
             operator delete(self);
         }

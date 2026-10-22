@@ -91,7 +91,7 @@
 #include "enemy/fn_8012EC74.h" /* fn_8013026C */
 #include "enemy/fn_8012BDF4.h" /* fn_8012E5A8 */
 #include "ef.h"
-#include "enemy/fn_80138074.h" /* fn_8013A654/fn_8013918C + the EmUserData record */
+#include "enemy/fn_80138074.h" /* em_res_user_data_flag_set/em_res_user_data_dtor + the EmUserData record */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "fn_8004CAD8.h"       /* fn_8005024C/fn_80051378/rotVecY/calcDistanceSqXZ */
 #include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
@@ -126,8 +126,8 @@
 #define fn_80192080_view1 ((void (*)(_ENEMY_WORK*))fn_80192080)
 #define fn_80191EF8_view1 ((void (*)(_ENEMY_WORK*))fn_80191EF8)
 #define fn_80182D5C_view1 ((void (*)(void))fn_80182D5C)
-#define fn_8013A654_view1 ((void (*)(EmUserData*, u32))fn_8013A654)
-#define fn_8013918C_view1 ((void (*)(void*, s16))fn_8013918C)
+#define fn_8013A654_view1 ((void (*)(EmUserData*, u32))em_res_user_data_flag_set)
+#define fn_8013918C_view1 ((void (*)(void*, s16))em_res_user_data_dtor)
 #define fn_801321DC_view1 ((u32 (*)(EmActWork*))fn_801321DC)
 #define fn_8012EC3C_view1 ((u32 (*)(EmActWork*))em_eft_active_ck)
 #define fn_8012A204_view1 ((s32 (*)(EmActWork*))em_area_leave_ck)
@@ -688,8 +688,8 @@ extern "C" u32 fn_80182F60(_ENEMY_WORK* self) {
 /* Arms the motion that this map/area pair starts with. */
 extern "C" void fn_80182FF8(_ENEMY_WORK* self) {
     em_move_mode_set(self, 4);
-    fn_80128AAC(self, 6, 5);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 6, 5);
+    em_finish_flag_set(self);
 }
 
 /* The 0xC-byte helper's second constructor: base first, then this class's vtable. */
@@ -809,7 +809,7 @@ extern "C" void fn_80183D44(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }

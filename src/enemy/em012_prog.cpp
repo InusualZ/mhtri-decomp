@@ -116,7 +116,7 @@ void fn_80170610(_ENEMY_WORK *self, u8 a) {
     }
     if (self->field_0x009 == 0) {
         setVector3(&v, 0.0f, 0.0f, 45.0f);
-        fn_801057A4(self, 0x14, &v, 0.7f, 0x1C72);
+        eft_em_attach_set(self, 0x14, &v, 0.7f, 0x1C72);
     }
 }
 

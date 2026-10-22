@@ -521,18 +521,18 @@ void fn_8019ECD4(struct _ENEMY_WORK* self) {
 void fn_8019EF40(void) {}
 
 /* 0x8019F12C - the band's motion arming tail shared by several states: arm mode 4, set the
- * `fn_80128AAC` window (6, 9) and refresh through `fn_80133BB4`. */
+ * `em_act_arm_unless_act11` window (6, 9) and refresh through `em_finish_flag_set`. */
 void fn_8019F12C(struct _ENEMY_WORK* self) {
     em_move_mode_set(self, 4);
-    fn_80128AAC(self, 6, 9);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 6, 9);
+    em_finish_flag_set(self);
 }
 
-/* 0x8019F174 - the same tail arming mode 0 with the `fn_80128AAC` window (1, 0). */
+/* 0x8019F174 - the same tail arming mode 0 with the `em_act_arm_unless_act11` window (1, 0). */
 void fn_8019F174(struct _ENEMY_WORK* self) {
     em_move_mode_set(self, 0);
-    fn_80128AAC(self, 1, 0);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 1, 0);
+    em_finish_flag_set(self);
 }
 
 /* 0x8019F1BC - the two-state motion step: state 0 arms `em_mot_set_ck(self, 13, 30, 0)` plus the
@@ -554,7 +554,7 @@ void fn_8019F1BC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x8019F244 - the same shape arming `em_mot_set_ck(self, 1, 30, 0)` and completing through
- * `fn_801280F4`. */
+ * `em_action_finish_stand`. */
 void fn_8019F244(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -564,7 +564,7 @@ void fn_8019F244(struct _ENEMY_WORK* self) {
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -941,7 +941,7 @@ void fn_801A05B4(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801A05E0 - action 6's first motion: arm `fn_8012F5C4(self, 1, 30, 0, 1)`, then wait on
- * `em_approach_step(self, 0, 0)` and complete through `fn_801280F4`. */
+ * `em_approach_step(self, 0, 0)` and complete through `em_action_finish_stand`. */
 void fn_801A05E0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -953,7 +953,7 @@ void fn_801A05E0(struct _ENEMY_WORK* self) {
         break;
     case 1:
         if (em_approach_step(self, 0, 0) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -1198,7 +1198,7 @@ void fn_801A0FEC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801A12C8 - action 6's sub-state 14: arm mode 8 and the scaled `field_0x318`, then step the move offset
- * and complete through `fn_801280F4`. */
+ * and complete through `em_action_finish_stand`. */
 void fn_801A12C8(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1213,14 +1213,14 @@ void fn_801A12C8(struct _ENEMY_WORK* self) {
     case 1:
         em_move_offset_step(self, &self->field_0x1BC);
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
 }
 
 /* 0x801A1384 - action 6's sub-state 15/23: state 0 arms mode 1 and seeds `timer_0x020` from the
- * (mode) selector (240/150), state 1 runs the timer down and completes through `fn_801280F4`. */
+ * (mode) selector (240/150), state 1 runs the timer down and completes through `em_action_finish_stand`. */
 void fn_801A1384(struct _ENEMY_WORK* self, u32 mode) {
     switch (self->state) {
     case 0:
@@ -1243,7 +1243,7 @@ void fn_801A1384(struct _ENEMY_WORK* self, u32 mode) {
     case 1:
         self->timer_0x020--;
         if (self->timer_0x020 <= 0) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -1300,7 +1300,7 @@ void fn_801A14FC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801A1624 - action 6's sub-state 19: state 0 arms mode 1, state 1 waits for the 64-bit
- * `em_turn_to_target` predicate and advances, state 2 completes through `fn_801280F4`. */
+ * `em_turn_to_target` predicate and advances, state 2 completes through `em_action_finish_stand`. */
 void fn_801A1624(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1316,14 +1316,14 @@ void fn_801A1624(struct _ENEMY_WORK* self) {
         break;
     case 2:
         if (fn_8012F948(self) == 0) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
 }
 
 /* 0x801A16D4 - action 6's sub-state 20/21: drive the `field_0x1AC` height against the mode's blend window,
- * then `fn_8019F12C` (mode 0) or `fn_801280F4`. */
+ * then `fn_8019F12C` (mode 0) or `em_action_finish_stand`. */
 void fn_801A16D4(struct _ENEMY_WORK* self, u32 mode) {
     switch (self->state) {
     case 0:
@@ -1343,7 +1343,7 @@ void fn_801A16D4(struct _ENEMY_WORK* self, u32 mode) {
             em_height_add(self, lbl_807985F0);
             if (self->field_0x1AC >= lbl_807985A4) {
                 fn_801303EC(self, fn_8013032C(self));
-                fn_801280F4(self);
+                em_action_finish_stand(self);
             }
         }
         break;
@@ -2733,7 +2733,7 @@ void fn_801A9724(struct _ENEMY_WORK* self) {
  * 3-byte area-table entry. */
 void fn_801A9C6C(struct _ENEMY_WORK* self) {
     nw4r::g3d::ResNode sp8((void*)0);
-    fn_8013A654(self, 3);
+    em_res_user_data_flag_set(self, 3);
 }
 
 /* r3 the work record; releases the joint-effect slots and re-arms the two it owns. */
@@ -2751,7 +2751,7 @@ void fn_801A9DF4(struct _ENEMY_WORK* self) {
  * flag is positive.  Returns r3 (the record). */
 s32 fn_801AA0F8(s32 record, s16 free_it) {
     if (record != 0) {
-        fn_8013918C((struct _ENEMY_WORK*)record, 0);
+        em_res_user_data_dtor((struct _ENEMY_WORK*)record, 0);
         if (free_it > 0) {
             operator delete((void*)record);
         }

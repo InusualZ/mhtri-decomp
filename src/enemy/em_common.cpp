@@ -89,9 +89,9 @@
 #define fn_8012D8D0 fn_8012D8D0_hidden_fn_8012BDF4_h
 #define fn_8012DB3C fn_8012DB3C_hidden_fn_8012BDF4_h
 #define fn_8012E21C fn_8012E21C_hidden_fn_8012BDF4_h
-#define fn_8012E5A8 fn_8012E5A8_hidden_fn_8012BDF4_h
+#define em_act11_wait_ck fn_8012E5A8_hidden_fn_8012BDF4_h
 #include "enemy/fn_8012BDF4.h"
-#undef fn_8012E5A8
+#undef em_act11_wait_ck
 #undef fn_8012E21C
 #undef fn_8012DB3C
 #undef fn_8012D8D0
@@ -127,9 +127,9 @@
 #define fn_8012EC3C_view7 ((u32 (*)(struct _ENEMY_WORK*))em_eft_active_ck)
 #define fn_8012EC3C_view4 ((u32 (*)(struct _ENEMY_WORK*))em_eft_active_ck)
 #define fn_8012EC3C_view1 ((u32 (*)(struct _ENEMY_WORK*))em_eft_active_ck)
-#define fn_8012E5A8_view5 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
-#define fn_8012E5A8_view3 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
-#define fn_8012E5A8_view1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
+#define fn_8012E5A8_view5 ((u32 (*)(struct _ENEMY_WORK*))em_act11_wait_ck)
+#define fn_8012E5A8_view3 ((u32 (*)(struct _ENEMY_WORK*))em_act11_wait_ck)
+#define fn_8012E5A8_view1 ((u32 (*)(struct _ENEMY_WORK*))em_act11_wait_ck)
 #define fn_8012E21C_view5 ((u32 (*)(u32, u32))fn_8012E21C)
 #define fn_8012E21C_view3 ((u32 (*)(u32, u32))fn_8012E21C)
 #define fn_8012E21C_view1 ((u32 (*)(u32, u32))fn_8012E21C)
@@ -305,7 +305,7 @@ extern "C" s32 fn_8012E2D4(u32 state, u32 action);
 extern "C" s32 fn_8012E35C(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E464(_ENEMY_WORK* enemy, u32 flag);
 extern "C" s32 fn_8012E548(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012E5A8(_ENEMY_WORK* enemy);
+extern "C" s32 em_act11_wait_ck(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E5D4(u32 actor, u32 flags);
 extern "C" s32 em_record_hit_ck(_ENEMY_WORK* record);
 extern "C" s32 em_mini_hit_ck(_ENEMY_WORK* record);
@@ -649,7 +649,7 @@ extern "C" void em_act_arm_unless_down(struct _ENEMY_WORK* self, u8 a, u8 b)
     em_act_step_arm(self, a, b, 1);
 }
 
-extern "C" void fn_80128AAC(struct _ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void em_act_arm_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
     if (self->action == 11) {
         return;
@@ -1220,7 +1220,7 @@ extern "C" void fn_8012CDF4(_ENEMY_WORK* enemy, u32 state, u32 sub)
     enemy->field_0x95D = sub;
     enemy->field_0x958 = enemy->field_0x954[(u8)state][(u8)sub];
     enemy->field_0x79A = 1;
-    fn_80133BB4(enemy);
+    em_finish_flag_set(enemy);
 }
 
 
@@ -1784,7 +1784,7 @@ extern "C" s32 fn_8012E548(_ENEMY_WORK* enemy)
 }
 
 /* Whether the enemy is in the four-state part of the second action state. */
-extern "C" s32 fn_8012E5A8(_ENEMY_WORK* enemy)
+extern "C" s32 em_act11_wait_ck(_ENEMY_WORK* enemy)
 {
     if (enemy->action == 0x0B && (u32)(enemy->state_sub - 0x10) <= 3) {
         return 1;

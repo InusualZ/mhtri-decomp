@@ -190,7 +190,7 @@ extern "C" void fn_8038743C(_ENEMY_WORK* self) {
         fn_801303EC(self, fn_8013032C(self));
     } else if (v == 1) {
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
     }
 }
@@ -754,7 +754,7 @@ extern "C" void fn_80388C38(_ENEMY_WORK* self)
         if (em_mot_end_ck(self) == 1) {
             fn_8013032C(self);
             fn_801303EC(self, lbl_8079BFF8);
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -776,7 +776,7 @@ extern "C" void fn_80388D1C(_ENEMY_WORK* self)
         return;
     case 1:
         if (--self->timer_0x020 == 0) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -799,7 +799,7 @@ extern "C" void fn_80388DC8(_ENEMY_WORK* self)
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -828,7 +828,7 @@ extern "C" void fn_80388E88(_ENEMY_WORK* self, u8 a)
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }
@@ -849,7 +849,7 @@ extern "C" void fn_80388F88(_ENEMY_WORK* self)
         return;
     case 1:
         if (em_turn_seq_step(self, lbl_80570B20) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }

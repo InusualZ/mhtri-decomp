@@ -92,7 +92,7 @@ extern "C" void fn_801BD6C0(_ENEMY_WORK* self, u8 arg1)
             s32 limit = arg1 == 1 ? 0x50 : 0x2D;
 
             if (++self->timer_0x020 >= limit) {
-                fn_801280F4(self);
+                em_action_finish_stand(self);
             }
         }
         break;
@@ -129,7 +129,7 @@ extern "C" void fn_801BD838(_ENEMY_WORK* self)
             self->state_0x006 = 1;
         }
         if (--self->timer_0x020 <= 0 && self->state_0x006 == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }

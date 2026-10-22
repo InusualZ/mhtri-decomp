@@ -29,7 +29,7 @@
  *  - `fn_80181E24`: the peephole fuses `clrlwi.` and `clrlslwi` and drops two `clrlwi` re-masks retail keeps;
  *  - `fn_801820DC`: retail shares one tail between the action-start chains (a `goto`, rule 8); the nested `if`
  *    with two `switch` selects is the conformant shape, the rest is `cmpwi`/`cmplwi` and re-mask colouring;
- *  - `fn_80182978`: retail builds each `fn_80126278` argument as `clrlwi r0,r0,28; slwi r0,r0,8; clrlwi r4,r0,16`,
+ *  - `fn_80182978`: retail builds each `em_data_point_get` argument as `clrlwi r0,r0,28; slwi r0,r0,8; clrlwi r4,r0,16`,
  *    MWCC folds every spelling tried into `rlwinm r4,r0,8,20,23`;
  *  - `fn_80176C58`: one compare is `cmplwi r3,4` where retail has `cmpwi`.
  *   The other 9 partial rows have no recorded cause.  `fn_80182B94` calls `copyVec3` where retail calls
@@ -86,7 +86,7 @@
 #include "enemy/fn_801251D0.h" /* fn_80126278/fn_80126324 + the 0x80129xxx helpers */
 #include "enemy/fn_8012EC74.h" /* fn_8013026C */
 #include "enemy/fn_8012BDF4.h" /* fn_8012E5A8 */
-#include "enemy/fn_80138074.h" /* fn_8013A654/fn_8013918C + the EmUserData record */
+#include "enemy/fn_80138074.h" /* em_res_user_data_flag_set/em_res_user_data_dtor + the EmUserData record */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "fn_8004CAD8.h"       /* fn_8005024C/fn_80051378/rotVecY/calcDistanceSqXZ */
 #include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
@@ -377,8 +377,8 @@ extern "C" void fn_80176C58(_ENEMY_WORK* self, u32 arg) {
     }
     if (self->field_0x009 == 0) {
         setVector3(&v, 0.0f, -80.0f, 90.0f);
-        fn_801057A4(self, 0x1A, &v, 1.5f, 0x18E4);
-        fn_8010A7D4(self, 1);
+        eft_em_attach_set(self, 0x1A, &v, 1.5f, 0x18E4);
+        eft013_em_set(self, 1);
     }
 }
 
@@ -2167,7 +2167,7 @@ void fn_801823A0(_ENEMY_WORK* self, u32 value) {
 
 /* Resets the work's part state after the user-data teardown. */
 void fn_801823C0(EmUserData* self) {
-    fn_8013A654((_ENEMY_WORK*)self, 5);
+    em_res_user_data_flag_set((_ENEMY_WORK*)self, 5);
     self->work_0x04->part_0x740.field_0x740 = 1;
     self->work_0x04->part_0x740.field_0x742 = 0;
     self->work_0x04->part_0x740.field_0x744 = 0;
@@ -2186,11 +2186,11 @@ u32 fn_80182430(_ENEMY_WORK* self, u32 arg) {
     VEC3 probe;
     VEC3_ctor(&a);
     VEC3_ctor(&b);
-    _ENEMY_WORK* target = fn_80131034(self, 23, 0);
+    _ENEMY_WORK* target = em_ally_find(self, 23, 0);
     if (target == 0) {
         return 0;
     }
-    if (fn_8012E5A8(target) != 1) {
+    if (em_act11_wait_ck(target) != 1) {
         return 0;
     }
     if ((arg & 0xFF) == 0) {
@@ -2241,9 +2241,9 @@ u32 fn_801825A4(_ENEMY_WORK* self, u32 kind) {
     case 2:
         return self->color_0x328.field_0x32F;
     case 3: {
-        _ENEMY_WORK* target = fn_80131034(self, 23, 0);
+        _ENEMY_WORK* target = em_ally_find(self, 23, 0);
         if (target != 0) {
-            return fn_8012E5A8(target) == 1;
+            return em_act11_wait_ck(target) == 1;
         }
         return 0;
     }
@@ -2340,16 +2340,16 @@ void fn_80182978(_ENEMY_WORK* self) {
     switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         if ((s32)self->area_no == 7 || (s32)self->area_no == 12) {
-            fn_80126278(self, (u16)((self->area_no & 0xF) * 256), &self->aim);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) * 256), &self->aim);
         }
         break;
     case 3:
         if ((s32)self->area_no == 3 || (s32)self->area_no == 6) {
-            fn_80126278(self, (u16)((self->area_no & 0xF) * 256 + 8), &self->aim);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) * 256 + 8), &self->aim);
         } else if ((s32)self->area_no == 4) {
-            fn_80126278(self, (u16)((self->area_no & 0xF) * 256 + 3), &self->aim);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) * 256 + 3), &self->aim);
         } else if ((s32)self->area_no == 8) {
-            fn_80126278(self, (u16)((self->area_no & 0xF) * 256 + 4), &self->aim);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) * 256 + 4), &self->aim);
         }
         break;
     case 9:
@@ -2381,7 +2381,7 @@ void fn_80182AB8(struct EmWorkItem* out, u32 a, s16 b, s16 c) {
  * can chain. */
 void* fn_80182B38(void* p, s16 arg) {
     if (p != 0) {
-        fn_8013918C((_ENEMY_WORK*)p, 0);
+        em_res_user_data_dtor((_ENEMY_WORK*)p, 0);
         if (arg > 0) {
             operator delete(p);
         }

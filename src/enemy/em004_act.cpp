@@ -113,15 +113,15 @@ void fn_801CA4CC(_ENEMY_WORK* self, u8* out_mode, u8* out_flag) {
     switch (stage_map_kind_get(self->field_0x1E0)) {
     case 4:
         if ((s32)(u8)self->area_no == 4)
-            fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
         break;
     case 8:
         if ((s32)(u8)self->area_no == 1)
-            fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
         break;
     case 9:
         if ((s32)(u8)self->area_no == 0)
-            fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
         break;
     }
     self->pos.y = self->pos.y + lbl_8079900C;

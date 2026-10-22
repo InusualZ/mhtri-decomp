@@ -85,9 +85,9 @@ void em_state_refresh(struct _ENEMY_WORK* self);
 void em_move_vec2_clr(struct _ENEMY_WORK* self);
 void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
 void em_wave_amp(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale, u32 mode, u16 angle);
-void fn_8013A654(ResUserDataAc* self, u32 a);
+void em_res_user_data_flag_set(ResUserDataAc* self, u32 a);
 void em_user_data_reenter(struct _ENEMY_WORK* self);
-void fn_8013918C(void* self, s16 a);
+void em_res_user_data_dtor(void* self, s16 a);
 void fn_8016C674(struct _ENEMY_WORK* self, u8* a, u8* b);
 u32 fn_80176AA8(void* p);
 

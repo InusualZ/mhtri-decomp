@@ -143,10 +143,10 @@ extern "C" void em035_arm_mot1s4_angle_wait90(_ENEMY_WORK* work)
         em_fall_start(work);
         em_mot_set_ck(work, 1, 4, 0);
         work->timer_0x020 = 90;
-        fn_80136DF4(work);
+        em_ground_snap(work);
         break;
     case 1:
-        fn_80136DF4(work);
+        em_ground_snap(work);
         if (--work->timer_0x020 <= 0)
             em_action_finish_fall(work);
         break;
@@ -228,10 +228,10 @@ extern "C" void em035_arm_mot2_angle_exit(_ENEMY_WORK* work)
         em_fall_height_get(work);
         em_fall_start(work);
         em_mot_set(work, 2, 0, 0);
-        fn_80136DF4(work);
+        em_ground_snap(work);
         break;
     case 1:
-        fn_80136DF4(work);
+        em_ground_snap(work);
         if (em_mot_end_ck(work) == 1)
             em_action_finish_fall(work);
         break;
@@ -249,10 +249,10 @@ extern "C" void em035_arm_mot1s0_angle_wait90(_ENEMY_WORK* work)
         em_fall_start(work);
         em_mot_set_ck(work, 1, 0, 0);
         work->timer_0x020 = 90;
-        fn_80136DF4(work);
+        em_ground_snap(work);
         break;
     case 1:
-        fn_80136DF4(work);
+        em_ground_snap(work);
         if (--work->timer_0x020 <= 0)
             em_action_finish_fall(work);
         break;

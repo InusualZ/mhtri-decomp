@@ -213,8 +213,8 @@ void em_act_frame_ck(_ENEMY_WORK* self, u8 motion, u8 state) {
 /* Arms the band's fifth action: motion 6 sub-state 7. */
 void em_act_arm_m06s07(_ENEMY_WORK* self) {
     em_move_mode_set(self, 4);
-    fn_80128AAC(self, 6, 7);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 6, 7);
+    em_finish_flag_set(self);
 }
 
 /* The band's 50-frame hold: steps its own state byte and hands the follow-up motion to the move
@@ -251,7 +251,7 @@ void em_act_follow(_ENEMY_WORK* self) {
     case 1:
         em_act_move_step(NULL, 0, lbl_8079AF58);
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         return;
     }

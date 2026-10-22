@@ -71,7 +71,7 @@
 #include "enemy/em_mot_end_ck.h" /* em_mot_end_ck (rule 2: the owner's header) */
 #include "enemy/em_fall_start.h" /* em_fall_start (rule 2: the owner's header) */
 #include "enemy/fn_801369A0.h" /* fn_801369A0 (rule 2: the owner's header) */
-#include "enemy/fn_8012E5A8.h" /* fn_8012E5A8 (rule 2: the owner's header) */
+#include "enemy/em_act11_wait_ck.h" /* em_act11_wait_ck (rule 2: the owner's header) */
 #include "enemy/em_alt_mode_ck.h" /* em_alt_mode_ck (rule 2: the owner's header) */
 #include "enemy/em_area_roam_pick.h" /* em_area_roam_pick (rule 2: the owner's header) */
 #include "enemy/fn_80129D3C.h" /* fn_80129D3C (rule 2: the owner's header) */
@@ -83,9 +83,9 @@
 #define em_hit_window_set em_hit_window_set_hidden_fn_801251D0_h
 #include "enemy/fn_801251D0.h"
 #undef em_hit_window_set
-#define fn_8012E5A8 fn_8012E5A8_hidden_fn_8012BDF4_h
+#define em_act11_wait_ck fn_8012E5A8_hidden_fn_8012BDF4_h
 #include "enemy/fn_8012BDF4.h"
-#undef fn_8012E5A8
+#undef em_act11_wait_ck
 #include "ef/get_move_work_adrs.h"
 #include "enemy/fn_80138074.h"
 #include "ef.h"
@@ -123,7 +123,7 @@
 #define fn_8012EC3C_c1 ((u32 (*)(_ENEMY_WORK*))em_eft_active_ck)
 #define em_hit_window_set_default_c1 ((void (*)(_ENEMY_WORK *, u32, u32))em_hit_window_set_default)
 #define fn_80128A70_c1 ((void (*)(_ENEMY_WORK *, u32, u32))fn_80128A70)
-#define fn_8012E5A8_c1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
+#define fn_8012E5A8_c1 ((u32 (*)(struct _ENEMY_WORK*))em_act11_wait_ck)
 #define em_alt_mode_ck_c1 ((u32 (*)(struct _ENEMY_WORK*))em_alt_mode_ck)
 #define em_fall_height_get_f32 ((f32 (*)(struct _ENEMY_WORK*))em_fall_height_get)
 /* Unprototyped call shapes: each call keeps its argument shape through a cast (the same direct call). */
@@ -157,8 +157,8 @@
 #define fn_800AD9C0_c1 ((void (*)(void*, void*, f32))fn_800AD9C0)
 #define fn_80131EC0_c2 ((void (*)(_ENEMY_WORK*))fn_80131EC0)
 #define mhchar_mat_tev_set_view1 ((void (*)(void*, s32, s32, u8, s32, s32, u8, f32))mhchar_mat_tev_set)
-#define fn_8013918C_view1 ((void (*)(void*, s32))fn_8013918C)
-#define fn_80131034_view1 ((struct _ENEMY_WORK* (*)(struct _ENEMY_WORK*, s32, s32))fn_80131034)
+#define fn_8013918C_view1 ((void (*)(void*, s32))em_res_user_data_dtor)
+#define fn_80131034_view1 ((struct _ENEMY_WORK* (*)(struct _ENEMY_WORK*, s32, s32))em_ally_find)
 #define fn_80130CDC_view1 ((void (*)(s32))fn_80130CDC)
 #define fn_801303FC_view1 ((void (*)(f32))em_height_add)
 #define fn_8012B380_view1 ((void (*)(_ENEMY_WORK*, u8, u8, u8))fn_8012B380)
@@ -638,7 +638,7 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
     }
     if (self->field_0x009 == 0) {
         setVector3(&v, lbl_80796E1C, lbl_80796E24, lbl_80796E28);
-        fn_801057A4(self, 27, &v, lbl_80796E2C, 7282);
+        eft_em_attach_set(self, 27, &v, lbl_80796E2C, 7282);
     }
 }
 
@@ -805,8 +805,8 @@ extern "C" void fn_801481D8(_ENEMY_WORK* self) {
 extern "C" void fn_801481FC(_ENEMY_WORK* self) {
     em_fall_height_get(self);
     em_fall_start(self);
-    fn_80128AAC(self, 3, 11);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 3, 11);
+    em_finish_flag_set(self);
 }
 
 /* The action's first step: arm the motion `em_mot_set_ck(self, 1, 10, 0)` with a 150-frame timer and
@@ -1644,7 +1644,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                 }
                 self->state_0x006++;
                 if (fn_8012EC3C_c1(self) == 1 || self->field_0x8A2 < 500) {
-                    v = fn_80131034(self, 27, 0);
+                    v = em_ally_find(self, 27, 0);
                     if (v != 0 && fn_8012E5A8_c1(v) == 1) {
                         v = 0;
                     }
@@ -1664,7 +1664,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
             case 1:
                 switch (self->state_0x007) {
                 case 1: {
-                    _ENEMY_WORK* v = fn_80131034(self, 27, 1);
+                    _ENEMY_WORK* v = em_ally_find(self, 27, 1);
 
                     if (v != 0 && fn_8012E5A8_c1(v) == 1) {
                         v = 0;
@@ -2352,7 +2352,7 @@ void fn_8014B1F8(_ENEMY_WORK *self, s32 arg1) {
         }
         em_move_vec_clr(self);
         self->field_0x37C = self->field_0x1C0;
-        self->float_0x328 = fn_801356A8(self, lbl_80796E20, lbl_80796F20, lbl_80796F24);
+        self->float_0x328 = em_target_dist_ratio_get(self, lbl_80796E20, lbl_80796F20, lbl_80796F24);
         break;
     case 1:
         if (arg1 == 0) {
@@ -3115,7 +3115,7 @@ void fn_8014D504(_ENEMY_WORK *self) {
         em_mot_set(self, 0xC8, 6, 0);
         em_hit_window_set_default_c1(self, 0, 0x17);
         em_move_vec2_clr(self);
-        self->float_0x328 = fn_801356A8(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
+        self->float_0x328 = em_target_dist_ratio_get(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
         return;
     case 1:
         em_key_curve_eval(self, &lbl_805A1DD8);
@@ -3608,7 +3608,7 @@ void fn_8014FA34(_ENEMY_WORK *self) {
         em_hit_window_set_default_c1(self, 0, 0xB);
         em_move_vec2_clr(self);
         fn_801303EC(self, lbl_80796E1C);
-        self->float_0x328 = fn_801356A8(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
+        self->float_0x328 = em_target_dist_ratio_get(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
         return;
     case 1:
         em_key_curve_eval(self, &lbl_805A1DD8);

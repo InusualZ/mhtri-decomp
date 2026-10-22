@@ -33,7 +33,7 @@ s32 em_pl_slot_leaving_ck(u8 arg0);
 u32 fn_8012D23C();
 u8 fn_8012D3E0();
 u32 pl_torch_ck(struct _ENEMY_WORK* other);
-u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+u32 em_act11_wait_ck(struct _ENEMY_WORK* self);
 /* 0x8012E664 - one `self` argument, no return (clears the work record; `enemy/em016_prog.cpp`'s teardown step). */
 void em_attack_start(struct _ENEMY_WORK* self);
 /* 0x8012E694 - one `self` argument, no return (the finish step `enemy/em016_prog.cpp` runs once

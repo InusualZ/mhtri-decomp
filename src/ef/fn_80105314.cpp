@@ -389,7 +389,7 @@ extern "C" void eft_spawn_type10(_ENEMY_WORK* self, u8 type, u32 a, nw4r::math::
 }
 
 /* 0x801057A4 - setter: spawn type 2 and store the trailing id at +0x24. */
-extern "C" void fn_801057A4(void* self, u32 a, void* v, f32 scale, u32 id) {
+extern "C" void eft_em_attach_set(void* self, u32 a, void* v, f32 scale, u32 id) {
     _EFT013* e = fn_80105888((_ENEMY_WORK*)self, 2, a, (nw4r::math::VEC3*)v, scale);
     if (e != NULL) {
         e->rot_0x24.x = id;

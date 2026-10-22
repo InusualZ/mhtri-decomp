@@ -220,9 +220,9 @@ extern "C" u8 eft052_part_damage_ck(_ENEMY_WORK* self, u32 part)
             return 1;
         break;
     case 5:
-        fn_80126278(self, (u16)((self->area_no & 0xF) * 256), &v);
+        em_data_point_get(self, (u16)((self->area_no & 0xF) * 256), &v);
         near_dist = calcDistanceSqXZ(&self->pos, &v);
-        fn_80126278(self, (u16)(((self->area_no & 0xF) * 256) | 1), &v);
+        em_data_point_get(self, (u16)(((self->area_no & 0xF) * 256) | 1), &v);
         far_dist = calcDistanceSqXZ(&self->pos, &v);
         if (near_dist > far_dist)
             return 1;

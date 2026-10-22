@@ -488,12 +488,12 @@ void em018_init(struct _ENEMY_WORK* self, u8 mode) {
         if (stage_map_kind_get(self->field_0x1E0) == 3) {
             switch (self->area_no) {
             case 3:
-                fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | 6), &self->pos);
+                em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | 6), &self->pos);
                 em_move_mode_set(self, 4);
                 em_act_arm_unless_down(self, 6, 5);
                 break;
             case 8:
-                fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | 9), &self->pos);
+                em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | 9), &self->pos);
                 em_move_mode_set(self, 4);
                 em_act_arm_unless_down(self, 6, 5);
                 break;
@@ -698,7 +698,7 @@ void fn_80192E04(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80192E84 - the flag-arming step: sets the two action-start flags, arms mode 4 with motion 0xCE
- * and the fresh-scale pair, then waits on `fn_801280F4`. */
+ * and the fresh-scale pair, then waits on `em_action_finish_stand`. */
 void fn_80192E84(struct _ENEMY_WORK* self) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
@@ -712,7 +712,7 @@ void fn_80192E84(struct _ENEMY_WORK* self) {
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -1542,7 +1542,7 @@ void fn_80195214(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80195504 (0x134): motion 0xCB, then the flag-armed motion 0xD9 that raises aim bit 0x04 and the dim flag
- * on its frames, completing with `fn_801280F4`.  The dispatcher's argument is unused. */
+ * on its frames, completing with `em_action_finish_stand`.  The dispatcher's argument is unused. */
 void fn_80195504(struct _ENEMY_WORK* self, u32 a) {
     switch (self->state) {
     case 0:
@@ -1569,14 +1569,14 @@ void fn_80195504(struct _ENEMY_WORK* self, u32 a) {
             self->field_0x359 = 1;
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
 }
 
 /* 0x80195720 (0x140): the flag-armed approach: motion 0xD1 at the `speed` pick (0.8 for 1 and 2, 1.2 for 0),
- * the `dist` pick of the approach target, completing with `fn_801280F4`. */
+ * the `dist` pick of the approach target, completing with `em_action_finish_stand`. */
 void fn_80195720(struct _ENEMY_WORK* self, u32 speed, u32 dist) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
@@ -1615,7 +1615,7 @@ void fn_80195720(struct _ENEMY_WORK* self, u32 speed, u32 dist) {
         break;
     case 1:
         if (em_approach_step(self, 0, 0x80) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -1744,7 +1744,7 @@ void fn_80195CA4(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80195D80 (0x154): the flag-armed hold: motion 0xCC, then 0xCF for 1800 frames with the tint pulse, then
- * motion 0xCD, completing with `fn_801280F4`. */
+ * motion 0xCD, completing with `em_action_finish_stand`. */
 void fn_80195D80(struct _ENEMY_WORK* self) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
@@ -1776,7 +1776,7 @@ void fn_80195D80(struct _ENEMY_WORK* self) {
         break;
     case 3:
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -1909,7 +1909,7 @@ void fn_801953BC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80196278 (0x130): motion 0xCB, then the flag-armed motion 0xD9 sinking 2 per frame, raising aim bit 0x04
- * and the dim flag on its frames and completing with `fn_801280F4`. */
+ * and the dim flag on its frames and completing with `em_action_finish_stand`. */
 void fn_80196278(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1935,7 +1935,7 @@ void fn_80196278(struct _ENEMY_WORK* self) {
             self->field_0x359 = 1;
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -2525,7 +2525,7 @@ void fn_801976B8(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80197D50 (0x1B4): the flag-armed motion 0xD2: on its frames the jaw effect ahead of joint 0x1A and the aim
- * effect, then the dim flag, completing with `fn_801280F4`. */
+ * effect, then the dim flag, completing with `em_action_finish_stand`. */
 void fn_80197D50(struct _ENEMY_WORK* self) {
     VEC3 pos;
     VEC3 ofs;
@@ -2556,7 +2556,7 @@ void fn_80197D50(struct _ENEMY_WORK* self) {
             self->field_0x359 = 1;
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -3131,7 +3131,7 @@ void fn_80194CC8(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80195BCC - the flag-arming release step: arms motion 0xCD, refreshes the scale, then either
- * the `em_state_set(self, 6, 1)` completion (`a == 1`) or `fn_801280F4`. */
+ * the `em_state_set(self, 6, 1)` completion (`a == 1`) or `em_action_finish_stand`. */
 void fn_80195BCC(struct _ENEMY_WORK* self, u8 a) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
@@ -3149,7 +3149,7 @@ void fn_80195BCC(struct _ENEMY_WORK* self, u8 a) {
             if (a == 1) {
                 em_state_set(self, 6, 1);
             } else {
-                fn_801280F4(self);
+                em_action_finish_stand(self);
             }
         }
         break;
@@ -3563,7 +3563,7 @@ void fn_80197BC0(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801961C8 - the flag-armed step: arms motion 0xCE, refreshes the scale and completes through
- * `fn_801280F4`.  `a` only selects the two-state release at entry. */
+ * `em_action_finish_stand`.  `a` only selects the two-state release at entry. */
 void fn_801961C8(struct _ENEMY_WORK* self, u8 a) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
@@ -3579,7 +3579,7 @@ void fn_801961C8(struct _ENEMY_WORK* self, u8 a) {
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -3602,7 +3602,7 @@ void fn_8019610C(struct _ENEMY_WORK* self, u8 a) {
         break;
     case 1:
         if (em_turn_to_target(self, 0x300) == 1) {
-            fn_801280F4(self);
+            em_action_finish_stand(self);
         }
         break;
     }
@@ -5231,7 +5231,7 @@ u32 fn_8019D8B8(struct _ENEMY_WORK* self, u8 mode) {
 }
 
 /* 0x8019D9BC - the "load the action's joint position" init: arm mode 4, publish the two record
- * bytes and ask `fn_80126278` for the area's joint, then run the band's common tail. */
+ * bytes and ask `em_data_point_get` for the area's joint, then run the band's common tail. */
 void fn_8019D9BC(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
     em_move_mode_set(self, 4);
     *out_a = 12;
@@ -5240,17 +5240,17 @@ void fn_8019D9BC(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
     case 3:
         switch (self->area_no) {
         case 3:
-            fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | 6), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | 6), &self->pos);
             break;
         case 8:
-            fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | 9), &self->pos);
+            em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | 9), &self->pos);
             break;
         }
         break;
     case 9:
     case 11:
         if (self->area_no == 1) {
-            fn_80126278(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
+            em_data_point_get(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
         }
         break;
     }
@@ -5461,9 +5461,9 @@ void em018_user_data_node_calc(EmUserData* self, EmMtxHolder* holder, u32 a2, u3
     }
 }
 
-/* 0x8019DE90 - the one-line tail call the band's teardown uses: `fn_8013A654(self, 1)`. */
+/* 0x8019DE90 - the one-line tail call the band's teardown uses: `em_res_user_data_flag_set(self, 1)`. */
 void fn_8019DE90(struct _ENEMY_WORK* self) {
-    fn_8013A654(self, 1);
+    em_res_user_data_flag_set(self, 1);
 }
 
 
@@ -5567,8 +5567,8 @@ void fn_8019E398(struct _ENEMY_WORK* self) {
 /* 0x8019E49C - "is the record we are hunting within reach": true when the paired record exists and
  * the xz distance is inside the scaled radius (or when the caller asked for the trivial answer). */
 u32 fn_8019E49C(struct _ENEMY_WORK* self, u32 flag) {
-    struct _ENEMY_WORK* other = fn_80131034(self, 23, 0);
-    if (other != 0 && fn_8012E5A8(other) == 1) {
+    struct _ENEMY_WORK* other = em_ally_find(self, 23, 0);
+    if (other != 0 && em_act11_wait_ck(other) == 1) {
         if ((u8)flag == 0) {
             return 1;
         }
@@ -5589,11 +5589,11 @@ u32 fn_8019E580(struct _ENEMY_WORK* self) {
     return 0;
 }
 
-/* 0x8019E5A8 - the record's deleting destructor: reset through `fn_8013918C`, `operator delete` on a
+/* 0x8019E5A8 - the record's deleting destructor: reset through `em_res_user_data_dtor`, `operator delete` on a
  * positive flag, and return the argument. */
 void* fn_8019E5A8(void* p, s16 flags) {
     if (p != 0) {
-        fn_8013918C((struct _ENEMY_WORK*)p, 0);
+        em_res_user_data_dtor((struct _ENEMY_WORK*)p, 0);
         if (flags > 0) {
             operator delete(p);
         }

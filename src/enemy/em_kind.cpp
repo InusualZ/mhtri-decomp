@@ -39,7 +39,7 @@
 #include "enemy/fn_80131BD4.h" /* fn_80131BD4 (rule 2: the owner's header) */
 #include "enemy/fn_80125FF0.h" /* fn_80125FF0 (rule 2: the owner's header) */
 #include "enemy/em_act_step_arm.h" /* em_act_step_arm (rule 2: the owner's header) */
-#include "enemy/fn_80126278.h" /* fn_80126278 (rule 2: the owner's header) */
+#include "enemy/em_data_point_get.h" /* em_data_point_get (rule 2: the owner's header) */
 #include "enemy/fn_8012B380.h" /* fn_8012B380 (rule 2: the owner's header) */
 #include "enemy/em_target_pos_set.h" /* em_target_pos_set (rule 2: the owner's header) */
 #include "enemy/fn_80126DAC.h" /* fn_80126DAC (rule 2: the owner's header) */
@@ -1304,7 +1304,7 @@ void fn_8013D8C8(_ENEMY_WORK *self, u8 *in, u32 param) {
 
 /* Moves the converted target position into the record's position and remembers the old one. */
 void fn_8013DE80(_ENEMY_WORK *self, u8 *in) {
-    fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &self->pos);
+    em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &self->pos);
     copyVec3(&self->prev_pos, &self->pos);
 }
 
@@ -1313,7 +1313,7 @@ void fn_8013DEFC(_ENEMY_WORK *self, u8 *in) {
     Vec3 v;
 
     VEC3_ctor(&v);
-    fn_80126278(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &v);
+    em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &v);
     self->field_0x1BC = 0;
     self->field_0x1C0 = calcVecAng2(&self->pos, &v);
     self->field_0x1C4 = 0;

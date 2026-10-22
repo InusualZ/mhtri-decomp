@@ -101,6 +101,15 @@ s32 em_surface_reach_ck(struct _ENEMY_WORK* self, f32 depth);
 /* 0x80135468 */
 u32 em_move_offset_fall_update(struct _ENEMY_WORK* self, f32 limit);
 
+/* 0x8012FEB4 */
+u32 em_ground_snap_offset_ck(struct _ENEMY_WORK* self, f32 offset);
+/* 0x801303A0 */
+void em_fall_speed_set(struct _ENEMY_WORK* self, f32 speed);
+/* 0x8013063C */
+void em_joint_drop_start(struct _ENEMY_WORK* self, u32 joint);
+/* 0x80131D90 */
+void em_hide_set(struct _ENEMY_WORK* self);
+
 #ifdef __cplusplus
 }
 #endif

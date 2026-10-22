@@ -37,7 +37,7 @@ void em_state_refresh(struct _ENEMY_WORK* work);
 u32 em_team_damage_under_ck(u8 team, u8 kind);
 u32 em_team_damage_over_ck(u8 team, u8 kind);
 /* 0x80133BB4 - r3 the work record; the hit-part refresh the action band calls. */
-void fn_80133BB4(struct _ENEMY_WORK* enemy);
+void em_finish_flag_set(struct _ENEMY_WORK* enemy);
 /* r3 (`self`) and f1; its callers `fadds` the return into a value they build. */
 f32 em_float_depth_get(struct _ENEMY_WORK* self);
 /* r3 (`self`), f1; no return (`enemy/em016_prog.cpp`'s `fn_801850F8` passes the sum it just built). */
@@ -121,7 +121,7 @@ void fn_8013581C(VEC3* out, VEC3* a, VEC3* b, u32 c, u16 d, f32 e);
 
 /* 0x80136DF4 - r3 the work record; the per-frame refresh `enemy/em035_prog.cpp`'s angle-reset steps call once at the
  * sub-state entry and once per wait frame (none reads a result). */
-void fn_80136DF4(struct _ENEMY_WORK* self);
+void em_ground_snap(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }
@@ -132,7 +132,7 @@ void fn_80136DF4(struct _ENEMY_WORK* self);
  * map name. */
 f32 em_water_check(struct _ENEMY_WORK* self);
 f32 get_em_chg_scale(struct _ENEMY_WORK* self);
-/* `fn_80131034` is deliberately NOT declared here: its map name is the plain `fn_80131034`, so its
+/* `em_ally_find` is deliberately NOT declared here: its map name is the plain `em_ally_find`, so its
  * consumers reach the `extern "C"` form `unsplit/enemy.h` already carries.  A C++-linkage
  * copy here is an MWCC 10505 "illegal overloading" against that one. */
 /* 0x80135940 - the model scale, declared at C++ scope for `get_em_scale__FP11_ENEMY_WORK`. */

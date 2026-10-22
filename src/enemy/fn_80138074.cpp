@@ -16,7 +16,7 @@
  *    `em_userdata_record_find_back`: retail keeps `rlwinm`/`clrlwi`/`extsh` + `cmpwi`, ours emits the record form;
  *  - `fn_8013823C`, `fn_8013A830`, `fn_8013A884`, `fn_8013A8B4`, `fn_8013A900`, `fn_8013AB74`: retail keeps `clrlwi`
  *    + `slwi`, ours fuses them into `clrlslwi`;
- *  - `fn_801394C0` (the `clrlwi r0,r4,16` before the `sth`), `fn_8013918C`, `fn_80139858`, `fn_8013A954`,
+ *  - `fn_801394C0` (the `clrlwi r0,r4,16` before the `sth`), `em_res_user_data_dtor`, `fn_80139858`, `fn_8013A954`,
  *    `fn_8013AA1C`, `em_userdata_state_exit`: retail narrows the value, ours elides the mask;
  *  - `fn_801391FC`, `fn_80139620`: ours converts int to float through the object's own `.sdata2` magic where retail
  *    references `lbl_80796D78`/`lbl_80796D80`, and `fn_801391FC` lacks retail's `__cvt_fp2unsigned` call; `fn_801391FC` and `fn_80138F3C` also differ in the `psq_st` f31 spill;
@@ -44,7 +44,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "enemy/get_enemy_data__FP11_ENEMY_WORK.h" /* get_enemy_data__FP11_ENEMY_WORK (rule 2: the owner's header) */
 #include "enemy/fn_801252DC.h" /* fn_801252DC (rule 2: the owner's header) */
 #include "enemy/fn_80126098.h" /* fn_80126098 (rule 2: the owner's header) */
-#include "enemy/fn_80126278.h" /* fn_80126278 (rule 2: the owner's header) */
+#include "enemy/em_data_point_get.h" /* em_data_point_get (rule 2: the owner's header) */
 #include "enemy/fn_801264BC.h" /* fn_801264BC (rule 2: the owner's header) */
 #include "enemy/em_hit_mask_get.h" /* em_hit_mask_get (rule 2: the owner's header) */
 #include "enemy/fn_801281EC.h" /* fn_801281EC (rule 2: the owner's header) */
@@ -155,7 +155,7 @@ typedef struct UserDataCursor UserDataCursor;
 typedef struct MtxHolder MtxHolder;
 typedef struct MHchar MHchar;
 typedef struct EmCharBase EmCharBase;
-#define fn_80126278_c1 ((void (*)(u16, Vec3*))fn_80126278)
+#define fn_80126278_c1 ((void (*)(u16, Vec3*))em_data_point_get)
 #define EM_CHAR(self) ((MHchar*)&(self)->char_0x024)
 typedef struct WorkSlot WorkSlot;
 typedef struct EffectArea EffectArea;
@@ -175,7 +175,7 @@ void fn_80138EC8(EnemyWork* self, u32 arg1);
 void fn_80138F3C(EnemyWork* self);
 void fn_80139024(EnemyWork* self);
 void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1);
-void fn_8013918C(void* arg0, s16 arg1);
+void em_res_user_data_dtor(void* arg0, s16 arg1);
 s32 em_res_user_data_ck(EnemyWork* self);
 void fn_801391FC(EnemyWork* self);
 void fn_801394B8(ResUserDataAc* self);
@@ -217,7 +217,7 @@ void fn_8013A5D8(ResUserData* dst, ResUserData* src);
 ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data);
 void fn_8013A648(ResUserData* self, ResUserDataItemData* data);
 void fn_8013A650(void);
-void fn_8013A654(ResUserDataAc* self, u32 arg1);
+void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1);
 UserDataItem* fn_8013A6C0(EnemyWork* work);
 s32 fn_8013A6F4(EnemyWork* work);
 void fn_8013A770(UserDataCursor* cursor, EnemyWork* work);
@@ -705,7 +705,7 @@ void fn_8013823C(EnemyWork* self) {
                     self->field_0x9A4->records->field_0x04) {
                     fn_801381F4(self);
                     em_userdata_motion_head_load(self);
-                    fn_80133BB4(self);
+                    em_finish_flag_set(self);
                 }
             }
         } else if (self->field_0x1FA == 1 && self->field_0x1FB == 1) {
@@ -1107,7 +1107,7 @@ void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1) {
 }
 
 /* Releases a heap block the work allocated, then hands the pointer back. */
-void fn_8013918C(void* arg0, s16 arg1) {
+void em_res_user_data_dtor(void* arg0, s16 arg1) {
     if (arg0 != 0) {
         fn_800810DC(arg0, 0);
         if (arg1 > 0) {
@@ -1195,7 +1195,7 @@ void fn_801391FC(EnemyWork* self) {
 
 /* Re-enters the accessor's default flag state. */
 void fn_801394B8(ResUserDataAc* self) {
-    fn_8013A654(self, 1);
+    em_res_user_data_flag_set(self, 1);
 }
 
 /* Stores the cursor's item index. */
@@ -1567,7 +1567,7 @@ void fn_8013A650(void) {
 }
 
 /* Refreshes the accessor's flag word from the work's user-data list. */
-void fn_8013A654(ResUserDataAc* self, u32 arg1) {
+void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1) {
     EnemyWork* work = self->work;
     u32 handle = work->field_0x13C;
 

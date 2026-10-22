@@ -9,8 +9,8 @@
 
 struct _ENEMY_WORK;
 
-/* The `ResUserDataAc` record `fn_8013A654` runs on (the owner spells the type `ResUserDataAc`): a
- * work pointer at +0x04 and a flag word at +0x08 (settled from `fn_8013A654`'s own body, which does
+/* The `ResUserDataAc` record `em_res_user_data_flag_set` runs on (the owner spells the type `ResUserDataAc`): a
+ * work pointer at +0x04 and a flag word at +0x08 (settled from `em_res_user_data_flag_set`'s own body, which does
  * `lwz r31,4(r3)` and reads r31's +0x110/+0x13C).  `enemy/fn_801823C0` clears the work's part state
  * through it.  size: 0x0C */
 struct EmUserData {
@@ -45,10 +45,10 @@ u8 em_userdata_record_find_back(struct _ENEMY_WORK* self, u8 index, u8 key);
 s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* arg1);
 /* 0x8013A654 - r3 `self` (the owner spells it `ResUserDataAc*`) and r4, stored at +0x8 of the record at +0x4. */
-void fn_8013A654(struct _ENEMY_WORK* self, u32 a);
+void em_res_user_data_flag_set(struct _ENEMY_WORK* self, u32 a);
 /* 0x8013918C - r3 `self` and r4, the flag `enemy/em018_prog.cpp`'s `fn_8019E5A8` passes as 0 before it decides
  * whether to `operator delete` the record. */
-void fn_8013918C(struct _ENEMY_WORK* self, u32 a);
+void em_res_user_data_dtor(struct _ENEMY_WORK* self, u32 a);
 
 #ifdef __cplusplus
 }

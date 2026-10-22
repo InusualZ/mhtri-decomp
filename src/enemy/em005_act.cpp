@@ -216,7 +216,7 @@ void em_height_add(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
 void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
-struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
+struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void fn_80131BD4(struct _ENEMY_WORK* self);
 void em_frame_flag_set(struct _ENEMY_WORK* self);
 void fn_80131D9C(struct _ENEMY_WORK* self);
@@ -244,7 +244,7 @@ void fn_80135584(struct _ENEMY_WORK* self, void* p);
 void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
 u32 em_move_offset_step_update(struct _ENEMY_WORK* self, void* p);
 f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
-f32 fn_801356A8(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+f32 em_target_dist_ratio_get(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 void em_shake_req_set(struct _ENEMY_WORK* self);
 
 /* `enemy/fn_80138074.c` */
@@ -564,7 +564,7 @@ void fn_801CD2EC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801CD400 - the target search and approach action: state 1 runs two sub-steps and picks its target
- * group through `fn_80131034`; early finishes `return` to the shared epilogue. */
+ * group through `em_ally_find`; early finishes `return` to the shared epilogue. */
 void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_set(self);
     fn_80131D9C(self);
@@ -592,7 +592,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
                     self->state_0x006++;
                     target = 0;
                     if (em_eft_active_ck(self) == 1 || self->field_0x8A2 >= 0xFA) {
-                        target = fn_80131034(self, 0x1C, 0);
+                        target = em_ally_find(self, 0x1C, 0);
                     }
                     if (target != 0) {
                         self->state_0x007 = 1;
@@ -606,7 +606,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
             case 1:
                 switch (self->state_0x007) {
                 case 1: {
-                    struct _ENEMY_WORK* target = fn_80131034(self, 0x1C, 1);
+                    struct _ENEMY_WORK* target = em_ally_find(self, 0x1C, 1);
                     if (target != 0) {
                         fn_8012B380(self, 3, 2, target->group);
                         em_state_set(self, 0x0D, 0);
@@ -1434,7 +1434,7 @@ void fn_801CEF44(struct _ENEMY_WORK* self, u8 mode) {
         em_move_vec2_clr(self);
         self->field_0x37C = self->field_0x1C0;
         self->timer_0x328.field_0x328 =
-            fn_801356A8(self, lbl_80799240, lbl_8079932C, lbl_80799330);
+            em_target_dist_ratio_get(self, lbl_80799240, lbl_8079932C, lbl_80799330);
         fn_80130CDC(self, (u32)-0x0A);
         break;
     case 1: {
@@ -1799,7 +1799,7 @@ void fn_801D08A8(struct _ENEMY_WORK* self) {
         em_move_vec2_clr(self);
         self->field_0x318 = lbl_80799364 * get_em_base_scale(self);
         self->field_0x318 =
-            self->field_0x318 * fn_801356A8(self, lbl_80799368, lbl_8079932C, lbl_8079926C);
+            self->field_0x318 * em_target_dist_ratio_get(self, lbl_80799368, lbl_8079932C, lbl_8079926C);
         diff = (u16)(calcVecAng2(&self->pos, &self->vec_0x36C) - self->field_0x1C0);
         if (diff >= 0x8000) {
             diff = 0x10000 - diff;
@@ -2017,30 +2017,30 @@ u16 fn_801CA8DC(_ENEMY_WORK* self, u8 a) {
 void fn_801CAF70(_ENEMY_WORK* self) {
     em_fall_height_get(self);
     em_fall_start(self);
-    fn_80128AAC(self, 3, 0x0B);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 3, 0x0B);
+    em_finish_flag_set(self);
 }
 
 /* 0x801CAFBC - enters the 0x14 motion. */
 void fn_801CAFBC(_ENEMY_WORK* self) {
     em_fall_height_get(self);
     em_fall_start(self);
-    fn_80128AAC(self, 3, 0x14);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 3, 0x14);
+    em_finish_flag_set(self);
 }
 
 /* 0x801CB008 - arms motion 7/5. */
 void fn_801CB008(_ENEMY_WORK* self) {
     em_move_mode_set(self, 0);
-    fn_80128AAC(self, 7, 5);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 7, 5);
+    em_finish_flag_set(self);
 }
 
 /* 0x801CB050 - arms motion 7/6. */
 void fn_801CB050(_ENEMY_WORK* self) {
     em_move_mode_set(self, 0);
-    fn_80128AAC(self, 7, 6);
-    fn_80133BB4(self);
+    em_act_arm_unless_act11(self, 7, 6);
+    em_finish_flag_set(self);
 }
 
 /* 0x801CB098 - state 0 arms motion 1/0x0A, state 1 closes on the motion end. */
@@ -2454,9 +2454,9 @@ void em_demo_key_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c, u32 d,
 void em_demo_enable(struct _ENEMY_WORK* self);
 
 /* `enemy/em_common.cpp` */
-void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
+void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 void em_action_finish(struct _ENEMY_WORK* self);
-void fn_801280F4(struct _ENEMY_WORK* self);
+void em_action_finish_stand(struct _ENEMY_WORK* self);
 void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
@@ -2464,7 +2464,7 @@ u8 em_area_break_ck(struct _ENEMY_WORK* self);
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 
 void em_busy_set(struct _ENEMY_WORK* self);
-u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+u32 em_act11_wait_ck(struct _ENEMY_WORK* self);
 
 /* `fn_8012EC3C` and `em_alt_mode_ck` read the work record (+0x89F, +0x8AA). */
 u32 em_eft_active_ck(struct _ENEMY_WORK* self);
@@ -2488,7 +2488,7 @@ f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
 void fn_801369A0(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
 void em_bait_react(struct _ENEMY_WORK* self);
-struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
+struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void em_gauge_tick(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
 void em_tint_hold_start(struct _ENEMY_WORK* self);
 void em_tint_hold_end(struct _ENEMY_WORK* self);
@@ -2499,7 +2499,7 @@ void em_act_flag1_set(struct _ENEMY_WORK* self);
 
 /* `enemy/fn_80138074.c` */
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* helper);
-void fn_8013918C(void* helper, s16 flag);
+void em_res_user_data_dtor(void* helper, s16 flag);
 s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 
 /* `enemy/em001_prog.cpp` */
@@ -3347,8 +3347,8 @@ s32 fn_801D6548(struct _ENEMY_WORK* self, u8 arg1) {
 
     VEC3_ctor(&a);
     VEC3_ctor(&b);
-    other = fn_80131034(self, 0x1C, 0);
-    if (other != NULL && fn_8012E5A8(other) == 1) {
+    other = em_ally_find(self, 0x1C, 0);
+    if (other != NULL && em_act11_wait_ck(other) == 1) {
         if (arg1 == 0) {
             return 1;
         }
@@ -3414,7 +3414,7 @@ u8 fn_801D67D8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, nw4r::math::VEC3* tar
     id = arg1;
     best = arg2;
     for (i = 0; i < (s32)arg2; i++) {
-        fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | id), &pos);
+        em_data_point_get(self, (u16)((self->area_no & 0xF) << 8 | id), &pos);
         if (i == 0) {
             dist = calcDistanceSqXZ(target, &pos);
             best = (u8)i;
@@ -3467,7 +3467,7 @@ u32 fn_801D68A8(struct _ENEMY_WORK* self, u32 arg1) {
         }
         return 0xFF;
     case 1:
-        return fn_80131034(self, 0x1C, 1) != NULL;
+        return em_ally_find(self, 0x1C, 1) != NULL;
     case 2:
         return self->action_0x328.armed_0x328.field_0x330;
     case 3:
@@ -3607,7 +3607,7 @@ void fn_801D6EDC(EmSpawnRec801CCBC4* rec, u8 a1, u16 a2, u16 a3) {
 
 void* fn_801D6F5C(void* self, s16 arg1) {
     if (self != NULL) {
-        fn_8013918C(self, 0);
+        em_res_user_data_dtor(self, 0);
         if (arg1 > 0) {
             operator delete(self);
         }

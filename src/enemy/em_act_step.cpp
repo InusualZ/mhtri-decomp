@@ -58,7 +58,7 @@ void em_action_finish_fall(struct _ENEMY_WORK* self);
 void fn_8032DD04(struct _EM_CHARA_WORK* self);
 f32 calcVecDistXZ(const void* a, const void* b);
 void em_attack_done_set(struct _ENEMY_WORK* self);
-void fn_80136DF4(struct _ENEMY_WORK* self);
+void em_ground_snap(struct _ENEMY_WORK* self);
 void eft_rot_vec_copy(_CP_VECTOR* dst, const _CP_VECTOR* src);
 u32 quest_sub_state_end_ck(u32 a);
 void fn_80130350(struct _ENEMY_WORK* self, void* vec);
@@ -320,10 +320,10 @@ extern "C" void em_act_arm_mot201(_EM_CHARA_WORK* self)
         em_fall_height_get((_ENEMY_WORK*)self);
         em_fall_start((_ENEMY_WORK*)self);
         em_mot_set_ck((_ENEMY_WORK*)self, 201, 6, 0);
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         break;
     case 1:
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             em_action_finish_fall((_ENEMY_WORK*)self);
         }
@@ -671,10 +671,10 @@ extern "C" void em_act_arm_mot202(_EM_CHARA_WORK* self)
         em_fall_height_get((_ENEMY_WORK*)self);
         em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 202, 6, 0);
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         break;
     case 1:
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             em_action_finish_fall((_ENEMY_WORK*)self);
         }
@@ -692,7 +692,7 @@ extern "C" void em_act_arm_mot201_hit7_2(_EM_CHARA_WORK* self)
         em_fall_height_get((_ENEMY_WORK*)self);
         em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 201, 0, 0);
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         self->field_0x20 = 0;
         break;
     case 1: {
@@ -700,7 +700,7 @@ extern "C" void em_act_arm_mot201_hit7_2(_EM_CHARA_WORK* self)
         _PLW* work;
         u8 i;
 
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         if ((self->field_0x20 & 0xF) == 0) {
             max = get_move_work_max(2);
             work = (_PLW*)get_move_work_adrs(2);
@@ -736,10 +736,10 @@ extern "C" void em_act_arm_mot203_204(_EM_CHARA_WORK* self, u32 action)
         em_fall_height_get((_ENEMY_WORK*)self);
         em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, (u16)(203 + ((action & 0xFF) == 1)), 0, 0);
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         break;
     case 1:
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             em_action_finish_fall((_ENEMY_WORK*)self);
         }
@@ -758,10 +758,10 @@ extern "C" void em_act_arm_mot205(_EM_CHARA_WORK* self)
         em_mot_set((_ENEMY_WORK*)self, 205, 4, 0);
         em_approach_start((_ENEMY_WORK*)self, lbl_8079B124, 0);
         self->field_0x20 = 120;
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         break;
     case 1:
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         if (em_approach_step((_ENEMY_WORK*)self, 0, 64) == 1 || --self->field_0x20 <= 0) {
             em_action_finish_fall((_ENEMY_WORK*)self);
         }
@@ -778,10 +778,10 @@ extern "C" void em_act_arm_mot207(_EM_CHARA_WORK* self)
         em_fall_height_get((_ENEMY_WORK*)self);
         em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 207, 4, 0);
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         break;
     case 1:
-        fn_80136DF4((_ENEMY_WORK*)self);
+        em_ground_snap((_ENEMY_WORK*)self);
         if (em_turn_to_target((_ENEMY_WORK*)self, 1024) == 1) {
             em_action_finish_fall((_ENEMY_WORK*)self);
         }

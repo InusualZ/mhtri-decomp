@@ -516,10 +516,10 @@ void em020_hit_info_get(struct _ENEMY_WORK* self, struct Em020HitInfo* out)
     }
 }
 
-/* 0x803754EC: hands the area's third resource record to the `fn_8013A654` installer. */
+/* 0x803754EC: hands the area's third resource record to the `em_res_user_data_flag_set` installer. */
 void em020_res_user_data_apply(struct _ENEMY_WORK* self)
 {
-    fn_8013A654(self, 3);
+    em_res_user_data_flag_set(self, 3);
 }
 
 /* The em020 aim-target predicate: whether the `+0x836` bit 15 "aim target found" flag is set.
@@ -567,7 +567,7 @@ u32 em020_area2_action20_ck(struct _ENEMY_WORK* self)
 void* em020_work_free(struct _ENEMY_WORK* self, s16 size)
 {
     if (self != NULL) {
-        fn_8013918C(self, 0);
+        em_res_user_data_dtor(self, 0);
         if (size > 0) {
             operator delete(self);
         }

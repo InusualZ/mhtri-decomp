@@ -21,8 +21,8 @@ void fn_80105550(void* self);
 void fn_80105560(void* self);
 
 /* The enemy effect setter (position, scale, trailing id) and the id-only setter. */
-void fn_801057A4(void* self, u32 a, void* v, f32 scale, u32 id);
-void fn_8010A7D4(void* self, u32 a);
+void eft_em_attach_set(void* self, u32 a, void* v, f32 scale, u32 id);
+void eft013_em_set(void* self, u32 a);
 /* 0x8010562C - this unit's joint-effect spawner: r3 (`self`), r4/r5 two scalars, r6 the `VEC3*` and f1 the scale
  * (`enemy/em009_act.cpp` calls it). */
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale);

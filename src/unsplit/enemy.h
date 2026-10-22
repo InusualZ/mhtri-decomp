@@ -92,7 +92,7 @@ void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
  * 0x80130B6C; `enemy/fn_8014A1BC.c` calls it with two arguments, so the prototype is safe for C. */
 void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
 u32 fn_80130DF8(void);
-struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
+struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void fn_80131150(struct _ENEMY_WORK* work);
 void fn_80131D9C(struct _ENEMY_WORK* work);
 void em_motion_timer_arm(struct _ENEMY_WORK* work);
@@ -108,7 +108,7 @@ u32 fn_80132184(void);
 void fn_801324E0(struct _ENEMY_WORK* work);
 void fn_801333E0(struct _ENEMY_WORK* work);
 void fn_80133B5C(struct _ENEMY_WORK* work);
-void fn_80133BB4(struct _ENEMY_WORK* enemy);
+void em_finish_flag_set(struct _ENEMY_WORK* enemy);
 void fn_80133C30(struct _ENEMY_WORK* work);
 void em_hit_arm_set(struct _ENEMY_WORK *self);
 void fn_80133CC8(struct _ENEMY_WORK *self, u32 a, u32 b);
@@ -139,7 +139,7 @@ void em_move_offset_step_update(struct _ENEMY_WORK* self, void* p);
 u32 em_move_offset_step_update();
 #endif
 f32 em_key_curve_eval(struct _ENEMY_WORK *self, void *tbl);
-f32 fn_801356A8(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
+f32 em_target_dist_ratio_get(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
 u32 fn_80135BC4(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801363F8(struct _ENEMY_WORK* work);
 /* Declarations for the action band 0x80178378.. (`enemy/fn_80178378.cpp`): the arming helpers its 64
@@ -210,8 +210,8 @@ void em_act_flag1_set(struct _ENEMY_WORK* self);
 #ifdef __cplusplus
 void fn_80167404(struct _ENEMY_WORK* self);
 void fn_80167968(struct _ENEMY_WORK* self);
-void fn_801321C4(struct _ENEMY_WORK* self);
-void fn_801321D0(struct _ENEMY_WORK* self);
+void em_guard_set(struct _ENEMY_WORK* self);
+void em_guard_clr(struct _ENEMY_WORK* self);
 #endif
 void em_gauge_tick(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
 void em_tint_hold_start(struct _ENEMY_WORK* self);

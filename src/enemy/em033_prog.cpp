@@ -168,7 +168,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         case 6:
             *out_a = 0xC;
             *out_b = 2;
-            fn_80126278(self, (u16)((self->act_id & 0xF) << 8), &self->pos);
+            em_data_point_get(self, (u16)((self->act_id & 0xF) << 8), &self->pos);
             self->pos_0x1BC.y = 0x6C00;
             break;
         case 9:
@@ -455,19 +455,19 @@ extern "C" void fn_8035ECD8(_ENEMY_WORK* self)
     switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         if ((u8)(self->act_id - 1) <= 3) {
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
         }
         break;
     case 2:
         switch (self->act_id) {
         case 4:
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
             break;
         case 6:
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
             break;
         case 9:
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
             break;
         default:
             break;
@@ -475,12 +475,12 @@ extern "C" void fn_8035ECD8(_ENEMY_WORK* self)
         break;
     case 3:
         if ((u8)(self->act_id - 5) <= 1 || self->act_id == 9) {
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
         }
         break;
     case 5:
         if (self->act_id == 2) {
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 2), &self->aim);
         }
         break;
     default:
@@ -494,17 +494,17 @@ extern "C" void fn_8035EE40(_ENEMY_WORK* self, u8 a, VEC3* out)
     switch (a) {
     case 0:
         if ((u8)stage_map_kind_get(self->field_0x1E0) == 3 && self->act_id == 6) {
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 7), out);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 7), out);
         }
         break;
     case 1:
         if ((u8)stage_map_kind_get(self->field_0x1E0) == 3 && self->act_id == 6) {
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 8), out);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 8), out);
         }
         break;
     case 2:
         if ((u8)stage_map_kind_get(self->field_0x1E0) == 3 && self->act_id == 6) {
-            fn_80126278(self, (u16)(((self->act_id & 0xF) << 8) | 5), out);
+            em_data_point_get(self, (u16)(((self->act_id & 0xF) << 8) | 5), out);
         }
         break;
     default:
@@ -515,7 +515,7 @@ extern "C" void fn_8035EE40(_ENEMY_WORK* self, u8 a, VEC3* out)
 /* 0x8035EF50 (0x8): a one-line forwarder. */
 extern "C" void fn_8035EF50(_ENEMY_WORK* self)
 {
-    fn_8013A654(self, 1);
+    em_res_user_data_flag_set(self, 1);
 }
 
 /* 0x8035EF58 (0xAC): the effect/target aim writer. */
@@ -542,7 +542,7 @@ extern "C" void fn_8035EF58(void* a, void* b, void* c, void* d, u32 e, u8* f)
 extern "C" _ENEMY_WORK* fn_8035F004(_ENEMY_WORK* p, u16 a)
 {
     if (p != 0) {
-        fn_8013918C(p, 0);
+        em_res_user_data_dtor(p, 0);
         if ((s16)a > 0) {
             operator delete(p);
         }
