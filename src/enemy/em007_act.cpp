@@ -22,8 +22,9 @@
  *   em007_act<action>_<first sub-state>, em007_act<action>_dispatch, em007_act10_se_play, em007_act11_se_play.
  *   GUESS (from the bodies): em007_partner_front_ck, em007_alt_parts_update, em007_alt_mode_effect,
  *   em007_effect_spawn, em007_alt_scale_step, em007_aim_point_get, em007_ally_wait_near_ck, em007_act13_early_ck,
- *   em007_user_data_ctor/_dtor/_flag_hook/_scale_hook/_mtx_hook, em007_model_eft_start/_alloc/_release/_step/_create,
- *   em007_npc_model_eft_start, em007_model_copy_ctor/_dtor/_bind_nodes, em007_res_node_name, em007_res_name_at.
+ *   `Em007UserData` (Attach/CalcAnmItemEx/CalcWorldEnd), `Em007ModelCopy`, em007_model_eft_start/_alloc/_release/
+ *   _step/_create, em007_npc_model_eft_start, em007_model_copy_ctor/_bind_nodes, em007_res_node_name,
+ *   em007_res_name_at.
  *   GUESS (data): em007_turn_seq_0..6, em007_pick_tbl_0/1, em007_se_seq_<sub-state>, em007_se_alt_seq_<sub-state>
  *   and their em007_se_rec/pos records; the types Em007ProgTbl, Em007UserData, Em007EftWork, Em007ModelCopy,
  *   EmUserDataItemView.
@@ -37,13 +38,12 @@
  *   answer in r4), `em007_act2_10`/`em007_act7_1` (the scale product's `fmuls` operands swap), `em007_act2_14`/
  *   `em007_act7_6` (the motion-choice sum lands in r0, retail r4), `em007_act7_10` (the `fn_8012D3E0` answer is
  *   narrowed into r0, retail r6), `em007_act7_11`.
- *   Data: `.data` stops at 0xBDC: the user-data class table (0x805B75B8, 0x30) and the word before it are not
- *   emitted - `em007_user_data_ctor` stores it by hand and its slots name `enemy/fn_80138074.cpp`'s C-linkage
- *   overrides (rule 10: needs that unit's user-data class).  `.sdata2` stops at 0x28C: the trailing alignment word
- *   is the link's.
+ *   Data: `Em007UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table
+ *   (0x805B75B8); it is built with placement `new` over `operator new` (a new-expression adds a landing pad).
+ *   `.sdata2` stops at 0x28C: the trailing alignment word is the link's.
  *   flipcheck: `.text`/extab/extabindex short of the claim (the four rows above), `em007_res_node_name` undefined.
  * SHAPES. A one-case test retail compares signed (`cmpwi`) is a `switch` with `default:` first (`em007_init`,
- *   `em007_event_notify`, `em007_act1_4`, `em007_user_data_scale_hook`); a two-value area test is a nested `switch`
+ *   `em007_event_notify`, `em007_act1_4`, `Em007UserData::CalcAnmItemEx`); a two-value area test is a nested `switch`
  *   with shared cases (`em007_tev_color_update`).  The hit-window id choices are `cond ? a : b` arguments, the step
  *   counters `self->state++`.  The shell-table slots +0x14/+0x2C/+0x54 are called without the table argument
  *   (`Em007ShellPosJobFn`, `Em007ShellSpawnFn`, `Em007ShellPointFn`).  `em_act_ck` is read unsigned through
@@ -76,6 +76,7 @@
 #include "ef/effect.h"
 #include "lobby/lb_npc.h"
 #include "enemy/fn_80138074.h"
+#include "MSL/new.h" /* the placement `operator new` */
 #include "draw_shape/mtx34_copy.h"
 #include "enemy/fn_80147CE0.h"
 #include "enemy/em_hit_mask_get.h"
@@ -313,8 +314,6 @@ void em_drop_item_spawn(struct _ENEMY_WORK* self, void* pos, u32 a);
 }
 #endif
 
-extern u8 lbl_805B75B8[];
-
 /* The C++-mangled callees, declared with the signature each mangling encodes (rule 9). */
 
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
@@ -384,9 +383,6 @@ void em_act_flag1_set(struct _ENEMY_WORK* self);
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* helper);
 s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 
-/* `enemy/em001_prog.cpp` */
-void* em_res_user_data_ctor(void* self);
-
 /* ef module */
 void eft009_spawn_at_pos(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale,
                  nw4r::math::VEC3* pos);
@@ -402,20 +398,23 @@ void stg_ground_impact_set(void* pos, u8 a, u16 b);
  * the records this unit needs locally
  * -------------------------------------------------------------------------------------------------- */
 
-/* The 12-byte helper `em007_init` allocates; its constructor `em007_user_data_ctor` chains `em_res_user_data_ctor`
- * and stores `lbl_805B75B8` at +0x00.  size: 0x0C (`operator new(0xC)`) */
-struct Em007UserData {
-    /* +0x00 */ void* vtbl;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
+/* The user-data accessor `em007_init` installs: the base accessor with its own destructor, attach hook, animation
+ * item hook and end-of-tree hook (its table is `.data` 0x805B75B8).  size: 0xC (`operator new(0xC)`) */
+class Em007UserData : public ResUserDataAc {
+public:
+    Em007UserData();
+    virtual ~Em007UserData();
+    virtual void Attach();
+    virtual void CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+    virtual void CalcWorldEnd(nw4r::math::MTX34* pMtxArray, nw4r::g3d::ResMdl mdl,
+                              nw4r::g3d::FuncObjCalcWorld* pFuncObj);
 };
 
 /* ====================================================================================================
  * bodies
  * ================================================================================================== */
 
-/* this range's own functions that a later body calls before its definition */
-void* em007_user_data_ctor(Em007UserData* self);
 
 void em007_init(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 pos;
@@ -430,10 +429,8 @@ void em007_init(struct _ENEMY_WORK* self, u8 arg1) {
     blk->field_0x344 = 0;
     blk->field_0x345 = 0;
     if (em_res_user_data_ck(self) == 0) {
-        helper = (Em007UserData*)operator new(0xC);
-        if (helper != NULL) {
-            em007_user_data_ctor(helper);
-        }
+        helper = (Em007UserData*)operator new(sizeof(Em007UserData));
+        new (helper) Em007UserData;
         em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
@@ -516,10 +513,8 @@ void em007_init(struct _ENEMY_WORK* self, u8 arg1) {
     }
 }
 
-void* em007_user_data_ctor(Em007UserData* self) {
-    em_res_user_data_ctor(self);
-    self->vtbl = lbl_805B75B8;
-    return self;
+/* 0x801D752C (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em007UserData::Em007UserData() {
 }
 
 void em007_noop(void) {
@@ -2573,19 +2568,15 @@ void get_joint_wpos_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::VEC3* ou
 void* operator new(unsigned long size);
 void operator delete(void* ptr) throw();
 
-/* The user-data item `em007_user_data_scale_hook` receives (the record `enemy/fn_80138074.cpp` walks as `UserDataItem`); only its
- * kind byte is read here.  size: 0x18 */
-struct EmUserDataItemView {
-    /* +0x00 */ u32 id_0x00;
-    /* +0x04 */ u8 kind_0x04;
-    /* +0x05 */ u8 pad_0x05[0x18 - 0x05];
-};
 
-/* The model copy the effect clones its model into: deleted through its virtual destructor (table slot +0x08,
- * `em007_model_copy_dtor`); its table and constructor are `lobby/fn_801E0ADC.cpp`'s data and `em007_model_copy_ctor`.  Declared
- * only.  size: 0x54 */
-class Em007ModelCopy {
+/* The model copy the effect clones its model into: a world-matrix callback (its table, `.data` 0x805B76B8, and its
+ * constructor `em007_model_copy_ctor` are `lobby/fn_801E0ADC.cpp`'s) deleted through its virtual destructor.
+ * ExecCallbackB (0x801E28F4, that unit's) is declared first so the table is emitted with it, not with the
+ * destructor here.  size: 0x54 */
+class Em007ModelCopy : public nw4r::g3d::ICalcWorldCallback {
 public:
+    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
     virtual ~Em007ModelCopy();
 };
 
@@ -2650,7 +2641,6 @@ void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 /* Runtime helpers. */
 f32 vec3_distance(void* a, void* b);
 void res_node_assign(void* out, void* src);
-void fn_800810DC(void* self, u32 a);
 
 /* `stage_map_kind_get` and `get_now_areano` come from `stage/stg_w.h`, `get_now_mapno` from
  * `unsplit/unknown.h`. */
@@ -3988,39 +3978,39 @@ void em007_aim_point_get(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* a
     }
 }
 
-/* 0x801DFEAC (0x40): clears the helper and sets part 7. */
-void em007_user_data_flag_hook(struct _ENEMY_WORK* self) {
+/* 0x801DFEAC (0x40): Sets the accessor's flag word to 7 once it is installed. */
+void Em007UserData::Attach() {
     nw4r::g3d::ResNode tmp((void*)0);
-    em_res_user_data_flag_set(self, 7);
+    em_res_user_data_flag_set((struct _ENEMY_WORK*)this, 7);
 }
 
-/* 0x801DFEEC (0x94): the user-data animation hook: joint 0x1B takes its result scale from the work's
- * +0x328 vector and joint 0x1A from +0x334, for an item whose kind byte is 0xFF. */
-void em007_user_data_scale_hook(struct EmUserData* self, struct ResAnmChrObj* anm, s32 frame, s32 node, u32 joint,
-                 struct EmUserDataItemView* item) {
+/* 0x801DFEEC (0x94): For an item of kind 0xFF, node 0x1B takes its result scale from the work's +0x328 vector and
+ * node 0x1A from +0x334. */
+void Em007UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                                  nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 joint, UserDataItem* item) {
     nw4r::math::VEC3 unused;
     nw4r::math::VEC3* scale;
 
     VEC3_ctor(&unused);
-    scale = &self->work_0x04->action_0x328.vec_0x328;
-    switch (item->kind_0x04) {
+    scale = &this->work->action_0x328.vec_0x328;
+    switch (item->field_0x04) {
     default:
         break;
     case 0xFF:
         switch (joint) {
         case 0x1B:
-            anm_chr_result_scale_set(anm, &scale->x);
+            anm_chr_result_scale_set((struct ResAnmChrObj*)pResult, &scale->x);
             break;
         case 0x1A:
-            anm_chr_result_scale_set(anm, &scale[1].x);
+            anm_chr_result_scale_set((struct ResAnmChrObj*)pResult, &scale[1].x);
             break;
         }
     }
 }
 
-/* 0x801DFF80 (0xD8): the user-data matrix hook: tilts node 0x11's world matrix by the work's X/Z rotation
- * words (+0x608/+0x610), keeping its translation. */
-void em007_user_data_mtx_hook(struct EmUserData* self, nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl) {
+/* 0x801DFF80 (0xD8): Tilts node 0x11's world matrix by the work's X/Z rotation words (+0x608/+0x610), keeping its
+ * translation. */
+void Em007UserData::CalcWorldEnd(nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
     nw4r::g3d::ResNode node((void*)0);
     nw4r::math::MTX34 rot;
     nw4r::math::MTX34 world;
@@ -4031,7 +4021,7 @@ void em007_user_data_mtx_hook(struct EmUserData* self, nw4r::math::MTX34* mtx, n
     MTX34_ctor(&world);
     data = (s32)mdl.GetResNode(0x11).mpData;
     res_node_assign(&node, &data);
-    work = self->work_0x04;
+    work = this->work;
     mtx34_copy(&world, &mtx[fn_8006FDCC(&node)]);
     mtx34_identity(&rot);
     rotMatrixX(work->field_0x608, &rot);
@@ -4084,15 +4074,8 @@ u32 em007_act13_early_ck(struct _ENEMY_WORK* self) {
     return 0;
 }
 
-/* 0x801E01E4 (0x5C): the deleting destructor of the +0x4 helper. */
-void* em007_user_data_dtor(void* self, s16 flag) {
-    if (self != NULL) {
-        em_res_user_data_dtor((struct _ENEMY_WORK*)self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* 0x801E01E4 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em007UserData::~Em007UserData() {
 }
 
 /* 0x801E0240 (0x58): starts the model effect for an enemy: mode 0, the enemy's +0x420 kind, and arms it. */
@@ -4179,16 +4162,11 @@ void em007_model_eft_release(_EFT* eft) {
     delete work->copy_0x24;
 }
 
-/* 0x801E04DC (0x5C): the deleting destructor of the res-object helper. */
-void* em007_model_copy_dtor(void* self, s16 flag) {
-    if (self != NULL) {
-        fn_800810DC(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* 0x801E04DC (0x5C): Destroys the model copy through the world-callback base (called out of line). */
+#pragma dont_inline on
+Em007ModelCopy::~Em007ModelCopy() {
 }
+#pragma dont_inline reset
 
 /* 0x801E0538 (0x3C): the part-manager state dispatcher (index at +0x5). */
 void em007_model_eft_step(_EFT* self) {

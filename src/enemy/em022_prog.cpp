@@ -13,17 +13,18 @@
  *   GUESS: every `em022_*` function, table and field name, from its body, its program-table slot, the action id
  *   `em022_action_run` dispatches on (`em022_act<N>_*`) or the sub-state that plays a sound table
  *   (`em022_se_tbl_<sub>`, `_b_` for the mode-1 set; records are named after the first table that points at
- *   them).  The pre-existing `em_*` row names are kept.
+ *   them).  The pre-existing `em_*` row names are kept; `Em022UserData` is the accessor class.
  * RESIDUALS. All 85 rows written.
  *  - `em022_act6_wander`: retail converts the spread width 20 to float at run time (`li r0,20; xoris; lfd; fsubs`)
  *    after the modulo part; every source spelling folds it (literal, inline, macro) or hoists it (local `s32`).
  *  - `.sdata2`: the claim starts at 0x8079AF48 (2.0f), which only menu/fn_8031EA8C's `draw_lsp_anim_ary` loads;
  *    our pool starts at the 1300.0f word, so the double 0.0 lands 4 bytes later than retail's (seam request).
- *  - `.data`: the user-data class table 0x805DFC00 (0x30, last object) is not emitted: `em_act_rec_init` stores
- *    it by hand, which needs the `ResUserDataAc` base modelled as a C++ class (rule 10).
  *  - `.sbss`: ours is 5 bytes (the 4-byte sound parameter and the 1-byte static-init object), retail's claim 8.
- *   flipcheck: the sdata2 seam, the missing class table, and `lbl_8079AF48` (referenced from fn_8031EA8C.o).
- * SHAPES. A `u8` compared through `(s32)` gives retail's `cmpwi`; `switch (self->state) { case 0: self->state++;`
+ *   flipcheck: the sdata2 seam and `lbl_8079AF48` (referenced from fn_8031EA8C.o).
+ * SHAPES. `Em022UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   A `u8` compared through `(s32)` gives retail's `cmpwi`; `switch (self->state) { case 0: self->state++;`
  *   reuses the loaded byte.  Float arguments are evaluated in parameter order, so `em_wave_segment` and
  *   `capsule_box_from_points` are called through `_v` views that list the radius before the trailing integer/pointer
  *   arguments (their owners' prototypes list it last).  `em_fall_start` is called with
@@ -40,6 +41,8 @@
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_8012EC74.h"
 #include "enemy/fn_80138074.h"
+#include "MSL/new.h" /* the placement `operator new` */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "enemy/fn_80147CE0.h"
 #include "enemy/enemy_control.h"
 #include "fn_8004CAD8.h"
@@ -82,12 +85,22 @@
 /* `em_approach_step` with the 16-bit angle and rate its body reads (the shared declaration says `s32`). */
 /* the user-data flag setter and destructor over this unit's `EmUserData` view. */
 #define em_res_user_data_flag_set_c1 ((void (*)(EmUserData*, u32))em_res_user_data_flag_set)
-#define em_res_user_data_dtor_c1 ((void (*)(EmUserData*, s16))em_res_user_data_dtor)
 #define em_approach_step_c1 ((u32 (*)(struct _ENEMY_WORK*, u16, u16))em_approach_step)
 
 /* The +0x3C `ShellSetFuncs` slot spelled without its trailing table argument (the table load is then emitted
  * last, in r6, as retail has it). */
 typedef void (*ShellRecJobFn)(struct _ENEMY_WORK* self, EmSpawnRec* rec, u32 mode);
+
+/* The user-data accessor `em022_init` installs: the base accessor with its own destructor, attach hook and
+ * animation item hook (its table is `.data` 0x805DFC00).  size: 0xC (`operator new(0xC)`) */
+class Em022UserData : public ResUserDataAc {
+public:
+    Em022UserData();
+    virtual ~Em022UserData();
+    virtual void Attach();
+    virtual void CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+};
 
 extern "C" {
 
@@ -190,14 +203,13 @@ Em022Zone em022_nest_zone = {1, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, 400.0f};
 #define eft_slot_marks_set_sync_v ((void (*)(_ENEMY_DATA*, u8, u8))eft_slot_marks_set_sync)
 #define em_wave_segment_v \
     ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32, u32, u16))em_wave_segment)
-#define anm_chr_result_rot_mul_v ((void (*)(EmMtxHolder*, nw4r::math::MTX33*))anm_chr_result_rot_mul)
+#define anm_chr_result_rot_mul_v ((void (*)(nw4r::g3d::ChrAnmResult*, nw4r::math::MTX33*))anm_chr_result_rot_mul)
 #define capsule_box_from_points_v \
     ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, f32, PlCapsuleBox*))capsule_box_from_points)
 #define eft_shape_init_v ((PlCapsuleBox* (*)(PlCapsuleBox*))eft_shape_init)
 
 /* The unit's own entry points: the original file's definition order is not the address order, so the
  * callers below need these prototypes. */
-void* em_act_rec_init(void* self);
 void em_act_move_step(_ENEMY_WORK* self, u8 mode, f32 step);
 void em_act_hold(_ENEMY_WORK* self);
 void em_act_follow(_ENEMY_WORK* self);
@@ -290,20 +302,19 @@ void em_act_entry_start(_ENEMY_WORK* self, u8 mode) {
     }
     self->field_0x835 = 1;
     if (em_res_user_data_ck(self) == 0) {
-        void* record = operator new(0xC);
-        if (record != NULL) {
-            em_act_rec_init(record);
-        }
+        Em022UserData* record = (Em022UserData*)operator new(sizeof(Em022UserData));
+        new (record) Em022UserData;
         em_res_user_data_set(self, record);
     }
 }
 
-/* Initialises the 0xC-byte action record's shared vtable word. */
-void* em_act_rec_init(void* self) {
-    em_res_user_data_ctor(self);
-    *(void**)self = (void*)&lbl_805DFC00;
-    return self;
+} /* extern "C" */
+
+/* 0x8032564C (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em022UserData::Em022UserData() {
 }
+
+extern "C" {
 
 /* The program table's empty motion-next slot. */
 void em_act_noop(void) {
@@ -4412,20 +4423,23 @@ u32 em022_area_change_ck(_ENEMY_WORK* self) {
     return 0;
 }
 
-/* The user-data helper's flag hook: raises flag 1. */
-void em022_user_data_flag_set(EmUserData* data) {
-    em_res_user_data_flag_set_c1(data, 1);
+} /* extern "C" */
+
+/* 0x8032C1FC (0x8): Sets the accessor's flag word to 1 once it is installed. */
+void Em022UserData::Attach() {
+    em_res_user_data_flag_set_c1((EmUserData*)this, 1);
 }
 
-/* The user-data node hook: for an admitted item of kind 9 it turns the jaw joint by the jaw angle about X. */
-void em022_user_data_node_calc(EmUserData* data, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind, EmUserItem* item) {
-    _ENEMY_WORK* work = data->work_0x04;
+/* 0x8032C204 (0xA8): For an admitted item of node 9, turns the jaw joint by the jaw angle about X. */
+void Em022UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* holder, nw4r::g3d::ResMdl mdl,
+                                  nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 kind, UserDataItem* item) {
+    _ENEMY_WORK* work = this->work;
     nw4r::math::MTX34 mtx;
     nw4r::math::MTX33 rot;
 
     MTX34_ctor(&mtx);
     MTX33_ctor(&rot);
-    if ((s32)item->type_0x04 == 0xFF && kind == 9) {
+    if ((s32)item->field_0x04 == 0xFF && kind == 9) {
         u32 angles[3];
         angles[0] = work->em022_0x328.jaw_angle_0x32E;
         angles[2] = 0;
@@ -4435,6 +4449,8 @@ void em022_user_data_node_calc(EmUserData* data, EmMtxHolder* holder, u32 a2, u3
         anm_chr_result_rot_mul_v(holder, &rot);
     }
 }
+
+extern "C" {
 
 /* Steps the jaw angle: the fast pulse (action 7's bite) and the slow pulse (motion 6) swing it between the open
  * limits once the motion has started, otherwise it eases open while the target is in sight and shut after;
@@ -4541,16 +4557,13 @@ void em022_mini_step(_ENEMY_MINI_WORK* mini) {
     }
 }
 
-/* The user-data helper's destructor: runs the base destructor and frees the helper when asked to. */
-EmUserData* em022_user_data_dtor(EmUserData* data, s32 flags) {
-    if (data != NULL) {
-        em_res_user_data_dtor_c1(data, 0);
-        if ((s16)flags > 0) {
-            operator delete(data);
-        }
-    }
-    return data;
+} /* extern "C" */
+
+/* 0x8032C600 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em022UserData::~Em022UserData() {
 }
+
+extern "C" {
 
 
 

@@ -11,30 +11,41 @@
  *   (0x8013AACC); em_userdata_state_reenter_alt is a GUESS (0x8013AB6C); em_userdata_roll is a GUESS (0x8013AC00);
  *   em_userdata_record_find_back is a GUESS (0x8013AC08); em_res_user_data_ck is a GUESS (0x801391E8);
  *   joint_mtx_store is a GUESS (0x80139A64); joint_mtx_load is a GUESS (0x80139A7C).
- * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`fn_80139B6C`, the per-item matrix builder).
- *  - `fn_80138074`, `fn_8013823C`, `em_post_update`, `fn_801391FC`, `fn_801394D4`, `em_userdata_record_find_back`,
- *    `em_userdata_state_kind_get`, `em_res_user_data_dtor`, `fn_80139858`: register colouring, a narrowing mask or a fused compare still
+ *   `ResUserDataAc` (`enemy/res_user_data_ac.h`) is the owner's spelling; it derives from nw4r's
+ *   `ICalcWorldCallback` (the base constructor stores that class's table first) and overrides ExecCallbackA/B/C.
+ *   Its six hooks are GUESS names from the dispatch: Attach (+0x18, run by `em_res_user_data_set`), CalcAnmItem /
+ *   CalcAnmItemEx (+0x1C/+0x20, ExecCallbackA's items), CalcMtxItem / CalcMtxItemEx (+0x24/+0x28, ExecCallbackB's),
+ *   CalcWorldEnd (+0x2C, run at the end of ExecCallbackC).
+ * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`ResUserDataAc::ExecCallbackC`, the per-item matrix
+ *   builder).
+ *  - `fn_80138074`, `fn_8013823C`, `em_post_update`, `fn_801391FC`, `ExecCallbackA`, `em_userdata_record_find_back`,
+ *    `em_userdata_state_kind_get`, `ExecCallbackB`: register colouring, a narrowing mask or a fused compare still
  *    differs with the scoped `#pragma peephole off` (see SHAPES);
- *  - `fn_801391FC`, `fn_80139620`: ours converts int to float through the object's own `.sdata2` magic where retail
+ *  - `fn_801391FC`, `CalcAnmItem`: ours converts int to float through the object's own `.sdata2` magic where retail
  *    references `lbl_80796D78`/`lbl_80796D80`, and `fn_801391FC` lacks retail's `__cvt_fp2unsigned` call; `fn_801391FC` and `fn_80138F3C` also differ in the `psq_st` f31 spill;
  *  - `fn_8013A29C`, `fn_8013A338`, `fn_8013A4E8`: ours forms the `lbl_807919F0`/`F4`/`F8` addresses with `lis` +
  *    `addi`, retail with one instruction;
  *  - `fn_8013A494`, `fn_8013A560`: ours passes a stack temporary (`addi r3,r1,0x8`); `fn_8013A43C`: ours passes the
  *    record where retail passes its +0x4;
- *  - `fn_80139024`, `fn_80139954`, `fn_8013A6F4`, `fn_8013A770`, `em_res_user_data_set`: the branch layout differs
+ *  - `fn_80139024`, `CalcMtxItem`, `fn_8013A6F4`, `fn_8013A770`: the branch layout differs
  *    (an extra or a missing `b`/`beq`);
- *  - `fn_8013823C`, `fn_801394D4`, `fn_80139620`: the frame differs (0x100/0x40/0xC0 against our 0xE0/0x30/0xD0);
+ *  - `fn_8013823C`, `ExecCallbackA`, `CalcAnmItem`: the frame differs (0x100/0x40/0xC0 against our 0xE0/0x30/0xD0);
  *    `em_userdata_motion_head_load`: ours saves r30.
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `__cvt_fp2unsigned`,
  *     `fn_805012E8`, `MTX34ToMTX33__Q24nw4r4mathFPQ34nw4r4math5MTX33PCQ34nw4r4math5MTX34`, `lbl_807919F4`,
  *     `lbl_807919F0`, `lbl_807919F8`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_805012E8`.
+ *  - The class table `__vt__13ResUserDataAc` is emitted at `.data` +0x0; retail's sits at +0x10 (0x805A1368).
+ *  - The destructor calls ICalcWorldCallback's destructor out of line (`g3d/g3d_scnmdlsmpl`'s kept copy), so the
+ *    object carries that inline destructor's weak copy, which retail's link folded into the g3d unit's.
  * SHAPES. `#pragma peephole off` is scoped to the 18 bodies whose retail keeps the unfused `clrlwi`/`rlwinm` +
  *   `cmpwi`, `clrlwi` + `slwi` and narrowing masks (a per-function sweep, no row lower).  `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
  *   `fn_801391FC`'s `total` are 32-bit accumulators narrowed at the use (`u16` locals re-mask every iteration);
  *   `em_userdata_state_kind_get` is a `switch` inside `for (;;)`, not three `if`s.  The unit's own symbols are plain C names, so its
  *   definitions and its callees' map spellings sit in one `extern "C"` block; the nw4r members are called as C++.
+ *   `ResUserDataAc`'s members sit between closes of that block.  The destructor is compiled under `#pragma
+ *   dont_inline on`: retail calls the base destructor out of line (`li r4,0; bl`), `-inline noauto` inlines it away.
  */
 
 struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */
@@ -71,7 +82,8 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "sound/mhchar.h" /* MHchar::move (rule 2) */
 #include "enemy/fn_8013ACC4.h" /* em_userdata_script_run (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8006FDCC/mtx34_copy_ps (rule 2) */
-#include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* ScnMdlSimple, FuncObjCalcWorld (rule 2) */
+#include "enemy/res_user_data_ac.h" /* ResUserDataAc, UserDataItem (rule 1) */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 #include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
@@ -143,13 +155,9 @@ typedef struct CPVector { /* size: 0x0C */
 typedef struct _ENEMY_WORK EnemyWork;
 typedef struct EnemyData EnemyData;
 typedef struct EmDataRecord EmDataRecord;
-typedef struct UserDataItem UserDataItem;
 typedef struct KeyFrameSet KeyFrameSet;
-typedef struct ResUserDataAc ResUserDataAc;
-typedef struct ResUserDataAcVtbl ResUserDataAcVtbl;
 typedef struct ResUserData ResUserData;
 typedef struct ResUserDataItemData ResUserDataItemData;
-typedef struct UserDataCursor UserDataCursor;
 typedef struct MtxHolder MtxHolder;
 typedef struct MHchar MHchar;
 typedef struct EmCharBase EmCharBase;
@@ -173,23 +181,12 @@ void fn_80138EC8(EnemyWork* self, u32 arg1);
 void fn_80138F3C(EnemyWork* self);
 void fn_80139024(EnemyWork* self);
 void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1);
-void em_res_user_data_dtor(void* arg0, s16 arg1);
 s32 em_res_user_data_ck(EnemyWork* self);
 void fn_801391FC(EnemyWork* self);
-void fn_801394B8(ResUserDataAc* self);
-void fn_801394C0(UserDataCursor* self, u32 arg1);
-u32 fn_801394CC(UserDataCursor* self);
-void fn_801394D4(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3);
-void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4, UserDataItem* arg5);
-void fn_80139854(void);
-void fn_80139858(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3);
-void fn_80139954(ResUserDataAc* self, MtxHolder* arg1, s32 arg2, s32 arg3, s32 arg4, UserDataItem* arg5);
 void joint_mtx_store(MtxHolder* dst, void* src);
 void joint_mtx_load(MtxHolder* holder, void* mtx);
 void fn_80139A98(MtxHolder* holder, void* src);
-void fn_80139AA0(void);
 void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2);
-void fn_80139B6C(ResUserDataAc* self, Mtx34* arg1, s32* arg2, s32 arg3);
 ResUserDataItemData* fn_8013A218(ResUserData* self);
 void* fn_8013A280(ResUserData* self, s32 arg1);
 ResUserDataItemData* fn_8013A29C(ResUserData* self);
@@ -214,11 +211,10 @@ ResUserData* fn_8013A5A8(ResUserData* self, ResUserData* src);
 void fn_8013A5D8(ResUserData* dst, ResUserData* src);
 ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data);
 void fn_8013A648(ResUserData* self, ResUserDataItemData* data);
-void fn_8013A650(void);
 void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1);
 UserDataItem* fn_8013A6C0(EnemyWork* work);
 s32 fn_8013A6F4(EnemyWork* work);
-void fn_8013A770(UserDataCursor* cursor, EnemyWork* work);
+void fn_8013A770(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work);
 s32 em_break_part_data_get(EnemyWork* work, u8 arg1);
 u32 fn_8013A884(EnemyWork* work, u8 arg1);
 s32 fn_8013A8B4(EnemyWork* work, u8 arg1, u8 arg2);
@@ -313,18 +309,6 @@ struct EmDataRecord { /* size: 0x0C */
     /* +0x0B */ u8 field_0x0B;
 };
 
-/* One 0x18-byte entry of `EnemyData::items` (the user-data list). */
-struct UserDataItem { /* size: 0x18 */
-    /* +0x00 */ u32 field_0x00;      /* -1 terminates the list */
-    /* +0x04 */ u8 field_0x04;       /* item type */
-    /* +0x05 */ u8 pad_0x05[0x03];
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u32 field_0x0C;
-    /* +0x10 */ u8 field_0x10;
-    /* +0x11 */ u8 pad_0x11[0x03];
-    /* +0x14 */ KeyFrameSet* frames;
-};
-
 /* The keyframe block a `UserDataItem` may point at (+0x14). */
 struct KeyFrameSet { /* size: 0x18 */
     /* +0x00 */ u32 field_0x00;
@@ -386,35 +370,6 @@ struct MoveWork { /* size: 0xB20 */
     /* +0x009 */ u8 pad_0x009[0x33];
     /* +0x03C */ Vec3 field_0x3C;
     /* +0x048 */ u8 pad_0x048[0xAD8];
-};
-
-/* The `ResUserDataAc` virtual table.  Slots 0x1C/0x20/0x24/0x28/0x2C are the per-item dispatch
- * entries the accessor calls; everything before them is out of this unit. */
-struct ResUserDataAcVtbl { /* size: 0x30 */
-    /* +0x00 */ void (*fn_0x00)(void);
-    /* +0x04 */ void (*fn_0x04)(void);
-    /* +0x08 */ void (*fn_0x08)(ResUserDataAc*, s32);
-    /* +0x0C */ void (*fn_0x0C)(void);
-    /* +0x10 */ void (*fn_0x10)(void);
-    /* +0x14 */ void (*fn_0x14)(void);
-    /* +0x18 */ void (*fn_0x18)(ResUserDataAc*);
-    /* +0x1C */ void (*fn_0x1C)(ResUserDataAc*, s32, s32*, UserDataCursor*, u16, UserDataItem*);
-    /* +0x20 */ void (*fn_0x20)(ResUserDataAc*, s32, s32*, UserDataCursor*, u16, UserDataItem*);
-    /* +0x24 */ void (*fn_0x24)(ResUserDataAc*, s32, s32*, UserDataCursor*, u16, UserDataItem*);
-    /* +0x28 */ void (*fn_0x28)(ResUserDataAc*, s32, s32*, UserDataCursor*, u16, UserDataItem*);
-    /* +0x2C */ void (*fn_0x2C)(ResUserDataAc*, Mtx34*, s32*, s32);
-};
-
-struct ResUserDataAc { /* size: 0x0C */
-    /* +0x00 */ ResUserDataAcVtbl* vtable;
-    /* +0x04 */ EnemyWork* work;
-    /* +0x08 */ u32 flags;
-};
-
-/* The little index object `fn_8013A770` maintains (its `u16` at +6). */
-struct UserDataCursor { /* size: 0x08 */
-    /* +0x00 */ u8 pad_0x00[0x06];
-    /* +0x06 */ u16 field_0x06;
 };
 
 /* A struct holding one matrix pointer (the `joint_mtx_store`/`joint_mtx_load` argument). */
@@ -1099,27 +1054,27 @@ void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1) {
     ResUserDataAc* old = self->field_0x484;
 
     if (old != NULL) {
-        old->vtable->fn_0x08(old, 1);
+        delete old;
     }
     self->field_0x484 = arg1;
     if (arg1 != NULL) {
         arg1->work = self;
-        fn_800E25B0((void*)self->field_0x13C, self->field_0x484);
-        self->field_0x484->vtable->fn_0x18(self->field_0x484);
+        ((nw4r::g3d::ScnMdlSimple*)self->field_0x13C)->SetCalcWorldCallback(self->field_0x484);
+        self->field_0x484->Attach();
         self->field_0x064 = 0;
     }
 }
 
 #pragma peephole off
-/* Releases a heap block the work allocated, then hands the pointer back. */
-void em_res_user_data_dtor(void* arg0, s16 arg1) {
-    if (arg0 != 0) {
-        fn_800810DC(arg0, 0);
-        if (arg1 > 0) {
-            __dl__FPv(arg0);
-        }
-    }
+} /* extern "C" */
+
+/* Destroys the accessor through the world-callback base. */
+#pragma dont_inline on
+ResUserDataAc::~ResUserDataAc() {
 }
+#pragma dont_inline reset
+
+extern "C" {
 
 #pragma peephole on
 /* Reports whether the work has a user-data accessor installed. */
@@ -1201,59 +1156,63 @@ void fn_801391FC(EnemyWork* self) {
 /* --------------------------------------------------------------------------------------------- */
 
 #pragma peephole on
+} /* extern "C" */
+
 /* Re-enters the accessor's default flag state. */
-void fn_801394B8(ResUserDataAc* self) {
-    em_res_user_data_flag_set(self, 1);
+void ResUserDataAc::Attach() {
+    em_res_user_data_flag_set(this, 1);
 }
 
 #pragma peephole off
-/* Stores the cursor's item index. */
-void fn_801394C0(UserDataCursor* self, u32 arg1) {
-    self->field_0x06 = (u16)(arg1 & 0xFFFF);
+/* 0x801394C0 (0xC): Stores the node the next callback runs at (nw4r's inline accessor, kept here). */
+void nw4r::g3d::FuncObjCalcWorld::SetCallbackNodeID(u32 nodeID) {
+    mNodeID = (u16)(nodeID & 0xFFFF);
 }
 
 #pragma peephole on
-/* Reads the cursor's item index. */
-u32 fn_801394CC(UserDataCursor* self) {
-    return self->field_0x06;
+/* 0x801394CC (0x8): Returns the node the next callback runs at. */
+u32 nw4r::g3d::FuncObjCalcWorld::GetCallbackNodeID() const {
+    return mNodeID;
 }
 
 #pragma peephole off
+
 /* Dispatches every user-data item of the cursor's index to the accessor's virtuals. */
-void fn_801394D4(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3) {
-    u32 index = fn_801394CC(arg3);
+void ResUserDataAc::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
+    u32 index = pFuncObj->GetCallbackNodeID();
     UserDataItem* item;
 
-    if (index == self->work->field_0x110) {
+    if (index == work->field_0x110) {
         Vec3 pos;
         VEC3_ctor(&pos);
         pos.x = lbl_80796D40;
         pos.y = lbl_80796D40;
         pos.z = lbl_80796D40;
-        anm_chr_result_trans_set((void*)arg1, &pos);
+        anm_chr_result_trans_set(pResult, &pos);
     }
-    item = fn_8013A6C0(self->work);
+    item = fn_8013A6C0(work);
     while (item != NULL && item->field_0x00 != (u32)-1) {
         if (item->field_0x00 == index) {
-            s32 value;
             if (item->field_0x04 == 0 || (u32)(item->field_0x04 - 3) <= 1) {
-                value = *arg2;
-                self->vtable->fn_0x1C(self, arg1, &value, arg3, index, item);
+                CalcAnmItem(pResult, mdl, pFuncObj, index, item);
             } else {
-                value = *arg2;
-                self->vtable->fn_0x20(self, arg1, &value, arg3, index, item);
+                CalcAnmItemEx(pResult, mdl, pFuncObj, index, item);
             }
         }
         item++;
     }
-    if ((self->flags & 2) == 0) {
-        fn_8013A770(arg3, self->work);
+    if ((flags & 2) == 0) {
+        fn_8013A770(pFuncObj, work);
     }
 }
 
+extern "C" {
+
 #pragma peephole on
+} /* extern "C" */
+
 /* Builds the effect transform for one user-data item and applies it to the EmCharBase. */
-void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4, UserDataItem* arg5) {
+void ResUserDataAc::CalcAnmItem(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
     Vec3 angles;
     Mtx34 mtx;
     Mtx34 dst;
@@ -1262,14 +1221,14 @@ void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4
     VEC3_ctor(&angles);
     MTX34_ctor(&mtx);
     MTX33_ctor(&dst);
-    switch (arg5->field_0x04) {
+    switch (item->field_0x04) {
     case 0:
     case 3: {
-        u8 area = arg5->field_0x10;
+        u8 area = item->field_0x10;
         if (area != (u8)-1) {
-            EffectArea* rec = &self->work->field_0x488[area];
+            EffectArea* rec = &work->field_0x488[area];
             if (rec->field_0x00 >= 2) {
-                frames = arg5->frames;
+                frames = item->frames;
                 if (frames != NULL) {
                     s32 x = 0;
                     s32 y = 0;
@@ -1299,77 +1258,76 @@ void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4
                         cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(&cp, &mtx);
                     }
                     fn_805012E8(&dst, &mtx);
-                    anm_chr_result_rot_mul(arg1, &dst);
+                    anm_chr_result_rot_mul(pResult, &dst);
                 }
             }
         }
         return;
     }
     case 4:
-        fn_8008DF8C(arg1, &dst);
-        self->work->field_0x76C.x = dst.m[1][0];
-        self->work->field_0x76C.y = dst.m[1][1];
-        self->work->field_0x76C.z = dst.m[1][2];
+        fn_8008DF8C(pResult, &dst);
+        work->field_0x76C.x = dst.m[1][0];
+        work->field_0x76C.y = dst.m[1][1];
+        work->field_0x76C.z = dst.m[1][2];
         break;
     }
 }
 
 /* Placeholder the retail object keeps as an empty body. */
-void fn_80139854(void) {
+void ResUserDataAc::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
 }
 
 /* Dispatches every user-data item of the cursor's index to the accessor's second virtual pair. */
-void fn_80139858(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3) {
-    u32 index = fn_801394CC(arg3);
-    UserDataItem* item = fn_8013A6C0(self->work);
+void ResUserDataAc::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
+    u32 index = pFuncObj->GetCallbackNodeID();
+    UserDataItem* item = fn_8013A6C0(work);
 
     while (item != NULL && item->field_0x00 != (u32)-1) {
         if (item->field_0x00 == index) {
-            s32 value;
             if (item->field_0x04 <= 3) {
-                value = *arg2;
-                self->vtable->fn_0x24(self, arg1, &value, arg3, index, item);
+                CalcMtxItem(pManip, mdl, pFuncObj, index, item);
             } else {
-                value = *arg2;
-                self->vtable->fn_0x28(self, arg1, &value, arg3, index, item);
+                CalcMtxItemEx(pManip, mdl, pFuncObj, index, item);
             }
         }
         item++;
     }
-    fn_8013A770(arg3, self->work);
+    fn_8013A770(pFuncObj, work);
 }
 
 /* Applies one user-data item's transform to the caller's matrix. */
-void fn_80139954(ResUserDataAc* self, MtxHolder* arg1, s32 arg2, s32 arg3, s32 arg4, UserDataItem* arg5) {
+void ResUserDataAc::CalcMtxItem(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
     Mtx34 mtx;
 
     MTX34_ctor(&mtx);
-    switch (arg5->field_0x04) {
+    switch (item->field_0x04) {
     case 0:
     case 3: {
-        u8 area = arg5->field_0x10;
+        u8 area = item->field_0x10;
         if (area < 2) {
-            EffectArea* rec = &self->work->field_0x488[area];
-            if (arg5->field_0x08 == 0 && rec->field_0x00 >= 2) {
-                fn_80139A98(arg1, &rec->matrix);
+            EffectArea* rec = &work->field_0x488[area];
+            if (item->field_0x08 == 0 && rec->field_0x00 >= 2) {
+                fn_80139A98((MtxHolder*)pManip, &rec->matrix);
                 return;
             }
         }
         return;
     }
     case 1:
-        if (arg5->field_0x08 < 6) {
-            joint_mtx_load(arg1, &mtx);
-            rotMatrixY__FUlPQ34nw4r4math5MTX34(self->work->field_0x742[arg5->field_0x08], &mtx);
-            joint_mtx_store(arg1, &mtx);
+        if (item->field_0x08 < 6) {
+            joint_mtx_load((MtxHolder*)pManip, &mtx);
+            rotMatrixY__FUlPQ34nw4r4math5MTX34(work->field_0x742[item->field_0x08], &mtx);
+            joint_mtx_store((MtxHolder*)pManip, &mtx);
             return;
         }
         break;
     case 2:
-        yure_joint_apply((struct YureRec*)&self->work->field_0x590[arg5->field_0x08], (struct MtxHolder*)arg1);
+        yure_joint_apply((struct YureRec*)&work->field_0x590[item->field_0x08], (struct MtxHolder*)pManip);
         break;
     }
 }
+
+extern "C" {
 
 /* Copies a matrix into the holder, or resets it when no source is given. */
 void joint_mtx_store(MtxHolder* dst, void* src) {
@@ -1393,9 +1351,13 @@ void fn_80139A98(MtxHolder* holder, void* src) {
     mtx34_copy_ps((Mtx34*)holder->mtx, (const Mtx34*)src);
 }
 
+} /* extern "C" */
+
 /* Placeholder the retail object keeps as an empty body. */
-void fn_80139AA0(void) {
+void ResUserDataAc::CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
 }
+
+extern "C" {
 
 /* Builds one bone matrix from a keyframed scale/rotation/translation triple. */
 void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
@@ -1576,9 +1538,13 @@ void fn_8013A648(ResUserData* self, ResUserDataItemData* data) {
     self->data = data;
 }
 
+} /* extern "C" */
+
 /* Placeholder the retail object keeps as an empty body. */
-void fn_8013A650(void) {
+void ResUserDataAc::CalcWorldEnd(nw4r::math::MTX34* pMtxArray, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
 }
+
+extern "C" {
 
 /* Refreshes the accessor's flag word from the work's user-data list. */
 void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1) {
@@ -1587,8 +1553,8 @@ void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1) {
 
     self->flags = arg1;
     self->flags = self->flags | (u32)fn_8013A6F4(work);
-    fn_80080B10((void*)handle, self->flags);
-    fn_800E3264((void*)handle, work->field_0x110);
+    ((nw4r::g3d::ScnMdlSimple*)handle)->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)self->flags);
+    ((nw4r::g3d::ScnMdlSimple*)handle)->SetCalcWorldNodeID(work->field_0x110);
 }
 
 /* Returns the work's user-data item list. */
@@ -1621,8 +1587,8 @@ s32 fn_8013A6F4(EnemyWork* work) {
 }
 
 /* Advances the cursor to the next user-data index the work can still reach. */
-void fn_8013A770(UserDataCursor* cursor, EnemyWork* work) {
-    u32 current = fn_801394CC(cursor);
+void fn_8013A770(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work) {
+    u32 current = cursor->GetCallbackNodeID();
     u32 best = current;
     UserDataItem* item = fn_8013A6C0(work);
 
@@ -1639,7 +1605,7 @@ void fn_8013A770(UserDataCursor* cursor, EnemyWork* work) {
         }
     }
     if (best > current && best != (u32)-1) {
-        fn_801394C0(cursor, best);
+        cursor->SetCallbackNodeID(best);
     }
 }
 

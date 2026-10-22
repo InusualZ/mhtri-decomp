@@ -26,8 +26,7 @@
  *   constructor (0x80077E34, `g3d/g3d_draw.cpp`'s stem; the shared handle base compiles the copy bitwise).  Calling
  *   that stem inside the initialiser (and copying its result word) scores higher but names a generated symbol here.
  *   EnableScnMdlCallbackTiming (0x80080B10) and ICalcWorldCallback's destructor (0x800810DC) are defined under
- *   their manglings; the map rows and the game callers still spell fn_80080B10/fn_800810DC (rename requested), so
- *   `g3d/g3d_scnmdlsmpl.h` keeps the two C declarations for those callers.
+ *   their manglings.
  *   flipcheck: `.text` is 0x6C bytes longer (SetAnmObj) and in definition order; `.rodata`, `.data` and `.sdata`
  *   are emitted at the target's sizes (the `.data` range shows an emission-order seam in 0x8058F388-0x8058F488).
  * SHAPES. The unit compiles with `#pragma peephole off` (retail keeps every `clrlwi` + `cmpwi` pair), set above the

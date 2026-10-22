@@ -22,8 +22,6 @@ struct EmUserData {
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* 0x801394C0 - the track-selection helper `lobby/lb_equip_page.cpp` tail-calls (rule 2). */
-void fn_801394C0(void* arg, u32 index);
 
 /* 0x8013A9F4 - r3 `self`; the joint-effect release `enemy/em025_prog.cpp`'s `fn_801A9540` calls before it walks
  * the slots. */
@@ -46,12 +44,11 @@ s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* arg1);
 /* 0x8013A654 - r3 `self` (the owner spells it `ResUserDataAc*`) and r4, stored at +0x8 of the record at +0x4. */
 void em_res_user_data_flag_set(struct _ENEMY_WORK* self, u32 a);
-/* 0x8013918C - r3 `self` and r4, the flag `enemy/em018_prog.cpp`'s `fn_8019E5A8` passes as 0 before it decides
- * whether to `operator delete` the record. */
-void em_res_user_data_dtor(struct _ENEMY_WORK* self, u32 a);
 
 #ifdef __cplusplus
 }
+
+#include "enemy/res_user_data_ac.h" /* ResUserDataAc, UserDataItem */
 #endif
 
 #endif /* MHTRI_ENEMY_FN_80138074_H */

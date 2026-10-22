@@ -217,9 +217,9 @@ extern "C" __declspec(noinline) inline u32 fn_800924B8(u32* p) {
 extern "C" u32 fn_800924CC(void* self, u32 arg) {
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_mdl)];
     if (entry != 0) {
-        return *(u32*)fn_8007B878((s32)&ResHandleTemp().self()->word, (s32)(u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+        return *(u32*)&nw4r::g3d::ResMdl(nw4r::g3d::ResDic((void*)entry)[(int)arg]);
     }
-    return *(u32*)fn_8007B878((s32)&ResHandleTemp().self()->word, 0);
+    return *(u32*)&nw4r::g3d::ResMdl((void*)0);
 }
 
 /* `ResFile::GetResMdl(u32)`, forwarding to the `int` overload. */
@@ -893,11 +893,9 @@ extern "C" u32 fn_800940D0(ResHandle* pSelf, u32 offset) {
     u32 data = (u32)pSelf->mpData;
 
     if (offset != 0) {
-        u32 found;
-        return *(u32*)fn_8007B878((s32)&found, (s32)(data + offset));
+        return *(u32*)&nw4r::g3d::ResMdl((void*)(data + offset));
     } else {
-        u32 zero;
-        return *(u32*)fn_8007B878((s32)&zero, 0);
+        return *(u32*)&nw4r::g3d::ResMdl((void*)0);
     }
 }
 

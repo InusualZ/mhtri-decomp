@@ -6,14 +6,12 @@
 #include "types.h"
 
 struct _ENEMY_WORK;
-struct Em009UserData;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 void em009_work_clear(struct _ENEMY_WORK* self);
 void em009_init(struct _ENEMY_WORK* self, u8 mode);
-struct Em009UserData* em009_user_data_ctor(struct Em009UserData* self);
 void em009_motion_next(struct _ENEMY_WORK* self, u8* state, u8* sub);
 void em009_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub);
 void em009_frame_update(struct _ENEMY_WORK* self);
@@ -74,7 +72,6 @@ void em009_death_action_get(struct _ENEMY_WORK* self, u8* action, u8* sub);
 void em009_cooldown_clear(struct _ENEMY_WORK* self);
 int em009_part_broken_ck(struct _ENEMY_WORK* self);
 u32 em009_action_select(struct _ENEMY_WORK* self, u32 arg);
-struct Em009UserData* em009_user_data_dtor(struct Em009UserData* self, s32 flags);
 #ifdef __cplusplus
 }
 #endif

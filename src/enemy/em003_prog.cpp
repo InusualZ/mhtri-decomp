@@ -22,13 +22,12 @@
  *   GUESS (dispatcher slot): em003_act<action>_<first sub-state that runs it>, em003_act<N>_dispatch,
  *   em003_act2_slide, em003_act10_se_play, em003_act11_se_play; GUESS (from the bodies): em003_finish_act3,
  *   em003_skip_ck, em003_alt_mode_fx, em003_ground_impact_fx, em003_effect_spawn, em003_color_approach,
- *   em003_color_update, em003_spawn_rec_set, em003_call_group_pick, em003_call_kind_pick,
- *   em003_user_data_ctor/_flag_set/_dtor.
+ *   em003_color_update, em003_spawn_rec_set, em003_call_group_pick, em003_call_kind_pick.
  *   GUESS (data): the key curves (em003_lift_keys ... em003_swipe_aim_keys, em003_glow_keys_<motion>,
  *   em003_demo_pos_keys/_rot_keys), em003_call_group_tbl/_kind_tbl, em003_area_pick_tbl,
  *   em003_turn_seq_left/_right/_fly, em003_fly_tbl_a/_b, em003_se_seq_<sub-state>/em003_se_alt_seq_<sub-state> with
  *   their em003_se_rec/_loop/_ofs records, em003_se_shift_a/_b/_c; the `Em003ProgTbl` slot names, `Em003VecPair`, the
- *   `em003_0x328` view's field names and `Em003UserData`.
+ *   `em003_0x328` view's field names, `Em003UserData` and its `Attach` hook.
  *   The foreign callees em_team_member_claim, em_area_buff_apply, pl_area_buff_apply, eft_area_slot_bind,
  *   em003_call_se_reset and em003_call_se_step are this unit's registry proposals for 0x8012C220, 0x8012D618,
  *   0x8027D0D4, 0x80306B10, 0x8043B410 and 0x8043B424 (declared in their owners' leaf headers).
@@ -42,10 +41,11 @@
  *   Register allocation only: `em003_call_group_pick`, `em003_call_kind_pick`, `em003_color_update`,
  *   `em003_event_notify`, `em003_area_start_ck`, `em003_motion_events` (one argument load), `em003_act7_3` (the
  *   step rate's `clrlwi`).
- *   `em003_user_data_ctor` stores the class table `lbl_805A5D18` by hand (rule 10): the user-data class hierarchy
- *   (`enemy/fn_80138074.cpp`'s record) is not modelled, so `.data` stops 0x34 short of the claim (the table).
- *   flipcheck: the class table, the rows above.
- * SHAPES. A one-case compare retail emits as `cmpwi` on a u8 is a `switch` (its other path as `default:`, written
+ *   flipcheck: the rows above.
+ * SHAPES. `Em003UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   A one-case compare retail emits as `cmpwi` on a u8 is a `switch` (its other path as `default:`, written
  *   first when retail lays it out first); a case-level `return` that retail lays out as a `break` costs a branch, so
  *   the state switches use `break`.  The swipe hit index is assigned after its last frame test (`else hit = -1`).
  *   The unsigned shift of the swipe angle byte goes through `(u32)(u16)`; the area-table loops count to 128 over
@@ -70,6 +70,7 @@
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_80138074.h"
 #include "enemy/fn_80147CE0.h"
+#include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/EnemyData.h"
 #include "fn_8004CAD8.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -119,7 +120,6 @@
 /* the fall start takes the height `em_fall_height_get` leaves in f1 */
 /* the user-data record methods are called on the record (the owners spell the parameter as the work record) */
 #define em_res_user_data_flag_set_view1 ((void (*)(Em003UserData*, u32))em_res_user_data_flag_set)
-#define em_res_user_data_dtor_view1 ((void (*)(Em003UserData*, s16))em_res_user_data_dtor)
 /* the action test and the death test answer through `cmplwi` (u32) */
 #define em_act_ck_view1 ((u32 (*)(_ENEMY_WORK*, u8, u8))em_act_ck)
 #define em_die_ck_view1 ((u32 (*)(_ENEMY_WORK*))em_die_ck)
@@ -137,22 +137,18 @@ struct Em003CallPair {
     /* +0x1 */ u8 team;
 };
 
-/* The 12-byte user-data record `em003_init` allocates and `em003_user_data_ctor` constructs: the class table
- * `lbl_805A5D18` at +0x00, then the base record's two words.  size: 0xC (`operator new(0xC)`) */
-typedef struct Em003UserData {
-    /* +0x0 */ void* vtbl;
-    /* +0x4 */ u32 unused_0x4;
-    /* +0x8 */ u32 unused_0x8;
-} Em003UserData;
-
-/* The record's class table, at the end of this unit's `.data`; no class emits it yet (see the unit header). */
-extern "C" u8 lbl_805A5D18[];
+/* The user-data accessor `em003_init` installs: the base accessor with its own destructor and attach hook (its
+ * table is `.data` 0x805A5D18).  size: 0xC (`operator new(0xC)`) */
+class Em003UserData : public ResUserDataAc {
+public:
+    Em003UserData();
+    virtual ~Em003UserData();
+    virtual void Attach();
+};
 
 extern "C" {
 void em003_timers_clear(_ENEMY_WORK *self);
 void em003_init(_ENEMY_WORK *self, u8 arg1);
-/* untyped: opaque handle - the 0x0C-byte user-data record (the constructor returns its `this`) */
-void** em003_user_data_ctor(void** self);
 void em003_motion_next(_ENEMY_WORK* self, u8* state, u8* sub);
 void em003_event_notify(_ENEMY_WORK *self, u8 arg1, u8 arg2);
 void em003_frame_update(_ENEMY_WORK *self);
@@ -248,11 +244,9 @@ void em003_death_action_get(_ENEMY_WORK* self, u8* action, u8* sub);
 void em003_call_state_clear(_ENEMY_WORK *self);
 s32 em003_guard_ck(_ENEMY_WORK *self, u8 arg1);
 s32 em003_idle_ck(_ENEMY_WORK *self);
-void em003_user_data_flag_set(Em003UserData* self);
 void em003_spawn_rec_set(EmSpawnRec* out, u8 kind, u16 angle_a, u16 angle_b);
 u8 em003_call_group_pick(_ENEMY_WORK* self);
 u8 em003_call_kind_pick(_ENEMY_WORK* self);
-Em003UserData* em003_user_data_dtor(Em003UserData* self, s16 flags);
 }
 u8 em003_call_act_type_ck(_ENEMY_WORK* self);
 u32 em003_atama_koware_act_ck(_ENEMY_WORK *self);
@@ -501,10 +495,8 @@ void em003_init(_ENEMY_WORK* self, u8 arg1) {
         em_motion_param_set(self, 1.0f, 0xA);
     }
     if (em_res_user_data_ck(self) == 0) {
-        helper = (Em003UserData*)operator new(0xC);
-        if (helper != 0) {
-            em003_user_data_ctor((void**)helper);
-        }
+        helper = (Em003UserData*)operator new(sizeof(Em003UserData));
+        new (helper) Em003UserData;
         em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
@@ -514,11 +506,8 @@ void em003_init(_ENEMY_WORK* self, u8 arg1) {
     self->flags_0x836 = (u16)(self->flags_0x836 | 0x8000);
 }
 
-/* untyped: opaque handle - the 0x0C-byte user-data record (the constructor returns its `this`) */
-void** em003_user_data_ctor(void** self) {
-    em_res_user_data_ctor(self);
-    *self = (void*)lbl_805A5D18;
-    return self;
+/* 0x80154F70 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em003UserData::Em003UserData() {
 }
 
 /* 0x80154FAC (0x150): the motion hand-over: in action 1 the call sub-states move to their follow-up once the
@@ -4853,9 +4842,9 @@ s32 em003_idle_ck(_ENEMY_WORK* self) {
     return self->field_0x1E2 == 0;
 }
 
-/* 0x8015D200 (0x8): the user-data hook: sets flag 3. */
-void em003_user_data_flag_set(Em003UserData* self) {
-    em_res_user_data_flag_set_view1(self, 3);
+/* 0x8015D200 (0x8): Sets the accessor's flag word to 3 once it is installed. */
+void Em003UserData::Attach() {
+    em_res_user_data_flag_set_view1(this, 3);
 }
 
 /* 0x8015D208 (0x80): fills a spawn record: effect type 26 at (0, -20, 30), the kind and the two angles. */
@@ -5012,15 +5001,8 @@ s32 em003_yobi_boss_em_ck(u8 group) {
     return 0;
 }
 
-/* 0x8015D708 (0x5C): the user-data destructor: unregisters, then frees when `flags` is positive. */
-Em003UserData* em003_user_data_dtor(Em003UserData* self, s16 flags) {
-    if (self != 0) {
-        em_res_user_data_dtor_view1(self, 0);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* 0x8015D708 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em003UserData::~Em003UserData() {
 }
 
 /* The unit's `.bss`: the three vector pairs MWCC's `__sinit` seeds (GUESS names). */

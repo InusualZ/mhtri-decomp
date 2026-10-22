@@ -43,6 +43,7 @@
 #include "enemy/fn_8012EC74.h"
 #include "enemy/fn_80138074.h"
 #include "enemy/fn_80147CE0.h"
+#include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/fn_8011D448.h"
 #include "fn_8004CAD8.h"
 #include "unsplit/enemy.h"
@@ -362,10 +363,8 @@ void em006_init(struct _ENEMY_WORK* self, u8 mode)
         break;
     }
     if (em_res_user_data_ck(self) == 0) {
-        void* data = operator new(0xC);
-        if (data != 0) {
-            em_res_user_data_ctor(data);
-        }
+        ResUserDataAc* data = (ResUserDataAc*)operator new(sizeof(ResUserDataAc));
+        new (data) ResUserDataAc;
         em_res_user_data_set(self, data);
     }
     if (self->field_0x009 == 0) {

@@ -17,8 +17,7 @@
  *   data that points at it (the dump answers `zz_` or a linker-folded duplicate's name); `em019_act<N>_*` steps
  *   are named by the action id `em_act_run` dispatches on.  Where a callee's owner header declares another
  *   signature than retail's call, the call goes through a cast view (`_c1`/`_c2`).
- * RESIDUALS. Unwritten: 0x80379210 (0x3C, the user-data constructor: it stores the vtable 0x805EF890 by hand,
- *   which needs the `ResUserDataAc` base as a C++ class to emit).  Partial rows:
+ * RESIDUALS. Partial rows:
  *  - `em019_motion_next`: retail tests the 31..32 cases as `subi` + `cmplwi 1`; ours as `cmpwi 31`/`blt` +
  *    `cmpwi 32`/`ble` (every case order measured);
  *  - `em019_act7_rush`: retail keeps the side-step angle in r31 and multiplies `ratio * scale` as (f0, f31); ours
@@ -27,11 +26,14 @@
  *  - `em019_spawn_point_pick`: retail narrows `first` before the loop and colours i/first r28/r30, ours r30/r28
  *    (every declaration order measured);
  *  - `em019_area_change_ck`: retail re-narrows the second `map == 5 ? 9 : 0xFF` with `clrlwi`, ours does not.
- *   Data: the vtable 0x805EF890 (0x30) and its 4-byte gap are not emitted (constructor above); `.ctors` is not
+ *   Data: `.ctors` is not
  *   emitted (`em019_se_shift_init` is a plain function: `setVec3`/`assignVec3` are C-linkage helpers, not a
  *   constructor pair); the map splits `em019_se_shift` at 0x806C2400 and `em019_se_ofs_mot28` at 0x805EE810 (one
  *   object each in retail, requests filed); `.sdata2` is 0x2D4 of the claimed 0x2D8 (a trailing pad word).
- * SHAPES. The `ShellSetFuncs` +0x2C/+0x3C/+0x74 calls go through spellings without the trailing table argument:
+ * SHAPES. `Em019UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   The `ShellSetFuncs` +0x2C/+0x3C/+0x74 calls go through spellings without the trailing table argument:
  *   the shared slot types hoist the table load.  The turn angles are `u32` with `-0x6000`/`-0x2000` constants
  *   (retail's `li`), a `u8` compared through `(s32)` gives retail's `cmpwi`, the colour pulses add a `(u8)`
  *   conversion and read the meter through an `f32*`.
@@ -56,6 +58,7 @@
 #include "sound/mhchar.h"
 #include "enemy/fn_8012E968.h"
 #include "enemy/fn_80138074.h"
+#include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/fn_80147CE0.h"
 #include "enemy/note_work.h" /* NoteWork and the pane/slot/layout types (rule 1) */
 #include "lobby/lb_quest_screen.h" /* note_pane_get_motion (rule 2: the owner's header) */
@@ -140,14 +143,21 @@ Vec em019_se_shift[4];
 #define em_area_leave_ck_c1 ((s32 (*)(struct _ENEMY_WORK*))em_area_leave_ck)
 /* the user-data flag setter and destructor over this unit's `EmUserData` view. */
 #define em_res_user_data_flag_set_c1 ((void (*)(EmUserData*, u32))em_res_user_data_flag_set)
-#define em_res_user_data_dtor_c1 ((void (*)(EmUserData*, s16))em_res_user_data_dtor)
+
+/* The user-data accessor `em019_init` installs: the base accessor with its own destructor and attach hook (its
+ * table is `.data` 0x805EF890).  size: 0xC (`operator new(0xC)`) */
+class Em019UserData : public ResUserDataAc {
+public:
+    Em019UserData();
+    virtual ~Em019UserData();
+    virtual void Attach();
+};
 
 extern "C" {
 
 /* This unit's own functions, in address order (the unwritten ones declared only). */
 void em019_part_state_set(_ENEMY_WORK* self, u8 mask);
 u8 em019_part_state_get(_ENEMY_WORK* self, u8 part);
-EmUserData* em019_user_data_ctor(EmUserData* self);
 void em019_act2_dispatch(_ENEMY_WORK* self);
 void em019_act7_dispatch(_ENEMY_WORK* self);
 void em019_act10_se_play(_ENEMY_WORK* self);
@@ -312,10 +322,9 @@ void em019_init(_ENEMY_WORK* self, u8 mode)
         em_state_refresh(self);
     }
     if (em_res_user_data_ck(self) == 0) {
-        void* rec = operator new(0xC);
+        Em019UserData* rec = (Em019UserData*)operator new(sizeof(Em019UserData));
 
-        if (rec != NULL)
-            em019_user_data_ctor((EmUserData*)rec);
+        new (rec) Em019UserData;
         em_res_user_data_set(self, rec);
     }
     self->field_0x1E4 = 0;
@@ -325,6 +334,15 @@ void em019_init(_ENEMY_WORK* self, u8 mode)
         eft013_em_set(self, 1);
     }
 }
+
+} /* extern "C" */
+
+/* 0x80379210 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em019UserData::Em019UserData()
+{
+}
+
+extern "C" {
 
 /* Picks the follow-up motion of a finished motion pair: the stand-ups after motion 2, and the part-break
  * reactions after motion 7. */
@@ -4360,18 +4378,22 @@ void em019_part_flag_set(_ENEMY_WORK* self, u32 flag)
     }
 }
 
-/* The user-data helper's part reset: flags the owner's part state and clears its six counters. */
-void em019_user_data_part_reset(EmUserData* data)
+} /* extern "C" */
+
+/* 0x80382DD8 (0x70): Sets the accessor's flag word to 5 and resets the owner's part state once it is installed. */
+void Em019UserData::Attach()
 {
-    em_res_user_data_flag_set_c1(data, 5);
-    data->work_0x04->part_0x740.field_0x740 = 1;
-    data->work_0x04->part_0x740.field_0x742 = 0;
-    data->work_0x04->part_0x740.field_0x744 = 0;
-    data->work_0x04->part_0x740.field_0x746 = 0;
-    data->work_0x04->part_0x740.field_0x748 = 0;
-    data->work_0x04->part_0x740.field_0x74A = 0;
-    data->work_0x04->part_0x740.field_0x74C = 0;
+    em_res_user_data_flag_set_c1((EmUserData*)this, 5);
+    work->part_0x740.field_0x740 = 1;
+    work->part_0x740.field_0x742 = 0;
+    work->part_0x740.field_0x744 = 0;
+    work->part_0x740.field_0x746 = 0;
+    work->part_0x740.field_0x748 = 0;
+    work->part_0x740.field_0x74A = 0;
+    work->part_0x740.field_0x74C = 0;
 }
+
+extern "C" {
 
 /* Answers whether the waiting ally (enemy 29 in action 11) is there and, when `near` is set, within
  * 400 units of the point 900 units ahead of this work. */
@@ -4426,16 +4448,14 @@ void em019_spawn_rec_set(EmSpawnRec* rec, u8 mode, u16 a, u16 angle)
     rec->field_0x14 = angle;
 }
 
-/* The user-data helper's destructor: runs the base destructor and frees the helper when asked to. */
-EmUserData* em019_user_data_dtor(EmUserData* data, s32 flags)
+} /* extern "C" */
+
+/* 0x80383040 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em019UserData::~Em019UserData()
 {
-    if (data != NULL) {
-        em_res_user_data_dtor_c1(data, 0);
-        if ((s16)flags > 0)
-            operator delete(data);
-    }
-    return data;
 }
+
+extern "C" {
 
 /* Seeds the two sound-offset vector pairs the sound tables point at. */
 void em019_se_shift_init(void)

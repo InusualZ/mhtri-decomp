@@ -33,8 +33,8 @@
  *    offset into each access and reloads the pointer; `fn_802208D4`: the same for +0x4654, and retail stores +0x46 with
  *    `sth` where ours uses `stb` (a field width).
  *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim.  The rig
- *   half's `.data` holds two class tables, `lbl_805BAB58` and `lbl_805BAB74` (0x1C each), the source does not emit
- *   (rule 10).
+ *   half's `.data` holds the two class tables `__vt__21LbEquipModelCallbackA`/`B` (0x1C each); the classes are
+ *   declared here and emit them, but `.data` is otherwise not emitted, so they sit at the start of ours.
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -330,7 +330,34 @@ void res_mat_name_get(u32* base)
 #include "Pl/fn_80258FCC.h"
 #include "lobby/fn_8021E1EC.h"
 #include "unsplit/g3d.h"
-#include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* ScnMdlSimple, FuncObjCalcWorld, ICalcWorldCallback (rule 2) */
+
+/* The world-matrix callback class whose table is `.data` 0x805BAB74 (declared before `LbEquipModelCallbackA`:
+ * MWCC emits the tables in reverse order): overrides ExecCallbackA/B (0x802294A4/0x80229698, unwritten) and adds a
+ * timing hook at +0x18.  The class names and `ApplyTiming` are GUESSes from the tables and the hook bodies.
+ * size: 0x4 (the table pointer only; an approximation) */
+class LbEquipModelCallbackB : public nw4r::g3d::ICalcWorldCallback {
+public:
+    virtual ~LbEquipModelCallbackB();
+    virtual void ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg);
+};
+
+/* The class whose table is `.data` 0x805BAB58: ExecCallbackA/B at 0x802298AC/0x80229A20 (unwritten), the same
+ * timing hook.  size: 0x4 (approximation) */
+class LbEquipModelCallbackA : public nw4r::g3d::ICalcWorldCallback {
+public:
+    virtual ~LbEquipModelCallbackA();
+    virtual void ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg);
+};
+
 #include "unsplit/unknown.h"
 #include "sys_mem.h"
 #include "Pl/pl_se_rig.h"
@@ -655,18 +682,17 @@ extern "C" void fn_80229358(_PLW* self, f32* a, f32* b, f32* c, f32* d)
 /* ------------------------------------------------------------------------------------------------ */
 /* 0x802293BC */
 
-/* Dispatches one track update by its mode: 1 and 2 also run the second-stage update, 4 only the
- * first. */
-extern "C" void fn_802293BC(void* self, MHchar* track, s32 mode, u32 arg)
+/* Enables the model's world callback at `timing`; timings 1 and 2 also set the node it runs at. */
+void LbEquipModelCallbackB::ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg)
 {
     switch (mode) {
     case 1:
     case 2:
-        fn_80080B10(track, mode);
-        fn_800E3264(track, arg);
+        track->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)mode);
+        track->SetCalcWorldNodeID(arg);
         break;
     case 4:
-        fn_80080B10(track, mode);
+        track->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)mode);
         break;
     default:
         break;
@@ -676,17 +702,17 @@ extern "C" void fn_802293BC(void* self, MHchar* track, s32 mode, u32 arg)
 /* ------------------------------------------------------------------------------------------------ */
 /* 0x80229430 */
 
-/* 0x802293BC's twin: the same dispatch for the second track family. */
-extern "C" void fn_80229430(void* self, MHchar* track, s32 mode, u32 arg)
+/* The same timing hook for the other callback class. */
+void LbEquipModelCallbackA::ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg)
 {
     switch (mode) {
     case 1:
     case 2:
-        fn_80080B10(track, mode);
-        fn_800E3264(track, arg);
+        track->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)mode);
+        track->SetCalcWorldNodeID(arg);
         break;
     case 4:
-        fn_80080B10(track, mode);
+        track->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)mode);
         break;
     default:
         break;
@@ -698,13 +724,13 @@ extern "C" void fn_80229430(void* self, MHchar* track, s32 mode, u32 arg)
 
 /* Finds the first entry of `rows` after `index` whose gate byte is set and hands it to the track
  * update; stops at the table's seventh entry. */
-extern "C" void fn_80229868(u32 index, PlSeRow* rows, void* arg)
+extern "C" void fn_80229868(u32 index, PlSeRow* rows, nw4r::g3d::FuncObjCalcWorld* arg)
 {
     u32 i;
 
     for (i = index + 1; i < 7; i++) {
         if (rows[i].field_0x00 != 0) {
-            fn_801394C0(arg, i);
+            arg->SetCallbackNodeID(i);
             return;
         }
     }
@@ -797,27 +823,15 @@ extern "C" void se_req_frame_set_part4(_se_w* work, s32 code, s32 x, s32 y)
 /* ------------------------------------------------------------------------------------------------ */
 /* 0x80229BFC / 0x80229C58 */
 
-/* The first base class's deleting destructor; `mode` > 0 asks for the storage back. */
-extern "C" void* dtor_80229BFC(void* self, s16 mode)
+/* 0x80229BFC (0x5C): Destroys the callback through the world-callback base (called out of line). */
+#pragma dont_inline on
+LbEquipModelCallbackA::~LbEquipModelCallbackA()
 {
-    if (self != NULL) {
-        fn_800810DC(self, 0);
-        if (mode > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
-/* The second base class's deleting destructor. */
-extern "C" void* dtor_80229C58(void* self, s16 mode)
+/* 0x80229C58 (0x5C): Destroys the other callback class the same way. */
+LbEquipModelCallbackB::~LbEquipModelCallbackB()
 {
-    if (self != NULL) {
-        fn_800810DC(self, 0);
-        if (mode > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
+#pragma dont_inline reset
 #pragma peephole reset

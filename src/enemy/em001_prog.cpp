@@ -6,22 +6,23 @@
  *   0x800285B4-0x80028A64, .ctors 0x8056F320-0x8056F324 (`fn_80154D44`), .rodata 0x8056F8E0-0x8056FA38, .data
  *   0x805A1C58-0x805A44A8, .bss 0x806A77D8-0x806A7820 (three 0x18-byte vector records), .sdata 0x80791A20-0x80791A38,
  *   .sdata2 0x80796E08-0x807970C0.  The left edge 0x80147C94 is where `enemy/enemy_control.cpp`'s `.text` and
- *   extabindex runs end; nothing else proves it (the base helper table `lbl_805A1368` is `enemy/fn_80138074.c`'s
- *   data, not a link to `enemy_control`).  The right edge is the TU end: `fn_80154D44` is the `.ctors` entry and
+ *   extabindex runs end; nothing else proves it (the base helper table `__vt__13ResUserDataAc` is
+ *   `enemy/fn_80138074.cpp`'s data, not a link to `enemy_control`).  The right edge is the TU end: `fn_80154D44` is the `.ctors` entry and
  *   MWCC places a TU's static initializer last.
  * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_80147CE0` to `fn_80149D6C` and from `fn_80151074` to the
  *   end except `fn_801545B8` (retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs, playbook 39); the band
  *   `fn_8014A1BC`..`fn_80150FCC` and `fn_801545B8` compile with it on.
- * NAMES. The file name follows the runtime dump's `em001_prog_tbl`, which opens `.data`.  `em_res_user_data_ctor`
- *   (the resource user-data helper's base constructor) and `em_spawn_rec_init` (the spawn record's position
- *   reset) are GUESSes from their bodies; the dump answers `zz_` for both.  The map has only `fn_` stems for the
+ * NAMES. The file name follows the runtime dump's `em001_prog_tbl`, which opens `.data`.  `em_spawn_rec_init` (the
+ *   spawn record's position reset) is a GUESS from its body.  `ResUserDataAc::ResUserDataAc` (the base accessor's
+ *   constructor, kept here as its first user) and `Em001UserData` (the accessor `fn_80147CE0` installs, table
+ *   0x805A4478) follow `enemy/res_user_data_ac.h`.  The map has only `fn_` stems for the
  *   other rows.  Callees whose call sites disagree with the owner's header are called
  *   through `<name>_viewN`/`<name>_cN` cast macros (the same direct call), and `#define <name>
  *   <name>_hidden_<header>` hides the disagreeing declaration around its `#include`.  The `.bss` record names
  *   (`vec_pair_801502C8_*`) are GUESSes.  `_ENEMY_WORK` is 0xB18 bytes: `create_move_work` (`ef/system_core.cpp`)
  *   strides kind 3 with `mulli r30,r3,2840` at 0x800CFA0C.
  * RESIDUALS. 3 rows unwritten: 0x80147C94-0x80147CE0; 0x801514BC-0x80154184 (`fn_801514BC`, the case table over
- *   `jumptable_805A4104`); 0x801544F0-0x801545B8 (`fn_801544F0` reads a 32-bit pointer at `_ENEMY_WORK` +0x04,
+ *   `jumptable_805A4104`); 0x801544F0-0x801545B8 (`Em001UserData::CalcAnmItemEx` reads a 32-bit pointer at `_ENEMY_WORK` +0x04,
  *   which `enemy/ENEMY_WORK.h` types as the byte `field_0x004`).
  *   61 partial rows, including:
  *  - `fn_80147CE0`: retail re-masks the argument at each use (`clrlwi r0,r31,24`) where ours keeps it in r31
@@ -55,7 +56,8 @@
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
 #include "enemy/em_motion_param_set.h" /* em_motion_param_set (rule 2: the owner's header) */
-#include "enemy/lbl_805A1368.h" /* lbl_805A1368 (rule 2: the owner's header) */
+#include "MSL/new.h" /* the placement `operator new` */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "enemy/em_busy_set.h" /* em_busy_set (rule 2: the owner's header) */
 #include "enemy/em_eft_active_ck.h" /* em_eft_active_ck (rule 2: the owner's header) */
 #include "enemy/em_any_player_seen_ck.h" /* em_any_player_seen_ck (rule 2: the owner's header) */
@@ -112,7 +114,7 @@
 #include "enemy/fn_8012EC74.h" /* fn_80136D4C (its owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "unsplit/enemy_pool.h" /* this unit's own `.data` symbols, declared in the band header (rule 2 inverted) */
-#include "enemy/fn_80147CE0.h" /* EmSpawnRec + em_res_user_data_ctor (the owner's header) */
+#include "enemy/fn_80147CE0.h" /* EmSpawnRec (the owner's header) */
 #include "enemy/fn_801502C8.h" /* this unit's own declarations (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -157,7 +159,6 @@
 #define fn_800AD9C0_c1 ((void (*)(void*, void*, f32))vec3_div)
 #define fn_80131EC0_c2 ((void (*)(_ENEMY_WORK*))em_timer_0x81C_arm)
 #define mhchar_mat_tev_set_view1 ((void (*)(void*, s32, s32, u8, s32, s32, u8, f32))mhchar_mat_tev_set)
-#define fn_8013918C_view1 ((void (*)(void*, s32))em_res_user_data_dtor)
 #define fn_80131034_view1 ((struct _ENEMY_WORK* (*)(struct _ENEMY_WORK*, s32, s32))em_ally_find)
 #define fn_80130CDC_view1 ((void (*)(s32))em_stamina_add)
 #define fn_801303FC_view1 ((void (*)(f32))em_height_add)
@@ -182,16 +183,15 @@
 #define assignVec3_view1 ((void (*)(void*, s32))assignVec3)
 #define addVec3_view2 ((void (*)(void*, const void*, const void*))addVec3)
 
-/* The 12-byte helper `fn_80147CE0` allocates and `fn_80147DF0` constructs; +0x00 holds a `.data` table
- * address.  `enemy/em015_prog.cpp`'s `Helper_80176E50` is the same record.  size: 0xC (`operator new(0xC)`) */
-typedef struct Helper_80147CE0 {
-    /* +0x0 */ void* tbl;
-    /* +0x4 */ u32 unused_0x4;
-    /* +0x8 */ u32 unused_0x8;
-} Helper_80147CE0;
-
-/* The derived table `fn_80147DF0` installs over the base `lbl_805A1368` (both 0x30 bytes). */
-extern "C" u8 lbl_805A4478[];
+/* The user-data accessor `fn_80147CE0` installs: the base accessor with its own destructor and animation item
+ * hook (its table is `.data` 0x805A4478).  size: 0xC (`operator new(0xC)`) */
+class Em001UserData : public ResUserDataAc {
+public:
+    Em001UserData();
+    virtual ~Em001UserData();
+    virtual void CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+};
 
 /* Callees whose owners' headers do not declare them: `camera/camera_main.cpp`'s `camera_target_slot_clear` and
  * `enemy/em_model.cpp`'s `em_drop_item_spawn`. */
@@ -259,7 +259,6 @@ extern "C" u8 lbl_805A1F70[];
 /* ------------------------------------------------------------------------------------------------ *
  * this unit's own forward declarations
  * ------------------------------------------------------------------------------------------------ */
-extern "C" Helper_80147CE0* fn_80147DF0(Helper_80147CE0* self);
 extern "C" void fn_80147F00(_ENEMY_WORK* self, u32 arg);
 
 f32 calcDistanceSqXZ(nw4r::math::VEC3*, nw4r::math::VEC3*);
@@ -602,7 +601,6 @@ extern VEC3 vec_pair_801502C8_2[2];
 
 #pragma peephole off
 
-extern "C" void* em_res_user_data_ctor(void* self);
 extern "C" void fn_801493A8(_ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3);
 extern "C" void fn_801545B8(EmSpawnRec* rec, u8 arg1, s16 arg2, s16 arg3);
 extern "C" s32 fn_80154638(struct _ENEMY_WORK* self, u8 arg1);
@@ -616,7 +614,7 @@ extern "C" void fn_80154B04(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16
  * timer for the "hit" step, arm the two frame counters and spawn the 0x1C72 effect. */
 extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
     VEC3 v;
-    Helper_80147CE0* helper;
+    Em001UserData* helper;
 
     VEC3_ctor(&v);
     if ((arg & 0xFF) == 2) {
@@ -630,10 +628,8 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
         em_motion_param_set(self, lbl_80796E20, 10);
     }
     if (em_res_user_data_ck(self) == 0) {
-        helper = (Helper_80147CE0*)operator new(0xC);
-        if (helper != 0) {
-            fn_80147DF0(helper);
-        }
+        helper = (Em001UserData*)operator new(sizeof(Em001UserData));
+        new (helper) Em001UserData;
         em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
@@ -642,21 +638,13 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
     }
 }
 
-/* The derived helper's constructor: run the base and override the table with its own. */
-extern "C" Helper_80147CE0* fn_80147DF0(Helper_80147CE0* self) {
-    em_res_user_data_ctor(self);
-    self->tbl = lbl_805A4478;
-    return self;
+/* 0x80147DF0 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em001UserData::Em001UserData() {
 }
 
-/* The helper's base constructor: install the engine's joint table, then the base table, and return
- * `self`. */
-extern "C" void* em_res_user_data_ctor(void* self) {
-    Helper_80147CE0* helper = (Helper_80147CE0*)self;
-
-    fn_800E3B2C((MHchar*)self);
-    helper->tbl = lbl_805A1368;
-    return helper;
+/* 0x80147E2C (0x3C): Constructs the base accessor: the world-callback base, then the accessor's table (the kept
+ * copy of the shared constructor). */
+ResUserDataAc::ResUserDataAc() {
 }
 
 /* One action-cancel/transition step: on a `2` command byte, map the state byte through the three
@@ -5489,15 +5477,8 @@ void fn_80154CA4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80154CE8 (0x5C) - releases the 0x0C-byte helper when the action closes. */
-s32 fn_80154CE8(s32 self, s16 flag) {
-    if (self != 0) {
-        fn_8013918C_view1(0, 0);
-        if (flag > 0) {
-            operator delete((void*)self);
-        }
-    }
-    return self;
+/* 0x80154CE8 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em001UserData::~Em001UserData() {
 }
 
 /* 0x80154D44 (0xFC) - seeds the six 0xC-byte animation vectors of the three global records. */

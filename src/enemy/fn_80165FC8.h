@@ -87,7 +87,6 @@ void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
 void em_wave_amp(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale, u32 mode, u16 angle);
 void em_res_user_data_flag_set(ResUserDataAc* self, u32 a);
 void em_user_data_reenter(struct _ENEMY_WORK* self);
-void em_res_user_data_dtor(void* self, s16 a);
 void fn_8016C674(struct _ENEMY_WORK* self, u8* a, u8* b);
 u32 em012_area_move_armed_ck(void* p);
 

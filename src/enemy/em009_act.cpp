@@ -6,7 +6,7 @@
  * RANGE. .text 0x803868DC-0x8038EC44 (64 functions); extab 0x8001803C-0x800181C4, extabindex
  *   0x80037EC0-0x8003810C, .rodata 0x80570B20-0x80570BA0, .data 0x805EF990-0x805F0CB8 (`em009_prog_tbl` first),
  *   .sdata2 0x8079BFF8-0x8079C298.  Left edge: the 0.0 pool entry repeats at 0x8079BFF8, first read by
- *   `em009_init`; right edge: `em009_user_data_dtor` closes the TU (the class table at 0x805F0C88 names it).
+ *   `em009_init`; right edge: `Em009UserData::~Em009UserData` closes the TU (the class table at 0x805F0C88 names it).
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi`+`cmpwi` forms),
  *   `#pragma pool_data off` and `#pragma fp_contract off` (no fused multiply-add in the target).
  * NAMES. The file name follows the runtime dump's `em009_prog_tbl`, which opens the TU's `.data`.
@@ -15,16 +15,18 @@
  *   em009_state_query, em009_death_action_get, em009_cooldown_clear, em009_part_broken_ck, em009_action_select.
  *   GUESS (dispatcher slot): em009_act<action>_<first sub-state> and em009_act<action>_dispatch,
  *   em009_act10_se_play, em009_act11_se_play; GUESS (from the bodies): em009_alt_mode_effect, em009_effect_spawn,
- *   em009_user_data_ctor/_dtor, `Em009UserData`.
+ *   `Em009UserData` (the class whose table is 0x805F0C88).
  *   GUESS (data): em009_slide_curve, em009_pick_tbl, em009_route_points, em009_turn_seq_0/1,
  *   em009_demo_keys3/_a/_a_time/_b, em009_se_seq_<sub-state> (the sub-state that first plays each table) with their
  *   em009_se_rec/pos records, the `Em009ProgTbl` slot names.
- * RESIDUALS. `em009_user_data_ctor` stores the class table 0x805F0C88 by hand (rule 10): the user-data class
- *   hierarchy is not modelled, so `.data` stops 0x30 short of the claim (the table).  `em009_act2_11`: retail
- *   computes the motion select into r4 (`addi r4,r4,0x1f; clrlwi r4,r4,16`), ours into r0 (a u16 callee view, a
- *   local, unsigned constants and the inverted test all leave it).  `.sdata2` is 0x29C against the claim's 0x2A0
- *   (the trailing word is the section's 8-byte alignment pad).  flipcheck: the class table and `em009_act2_11`.
- * SHAPES. A case-level `return` that retail lays out as a `break` is written `break`; one-case signed compares are
+ * RESIDUALS. `em009_act2_11`: retail computes the motion select into r4 (`addi r4,r4,0x1f;
+ *   clrlwi r4,r4,16`), ours into r0 (a u16 callee view, a local, unsigned constants and the inverted test all leave
+ *   it).  `.sdata2` is 0x29C against the claim's 0x2A0 (the trailing word is the section's 8-byte alignment pad).
+ *   flipcheck: `em009_act2_11`.
+ * SHAPES. `Em009UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv` landing pad,
+ *   0x10 of extab, retail does not have).  A case-level `return` that retail lays out as a `break` is written
+ *   `break`; one-case signed compares are
  *   `switch`es; range tests retail compiles as a compare tree are `switch`es with case lists (`em009_effect_spawn`,
  *   `em009_act7_5`'s slide limit, `em009_act6_10`'s reaction).  A product of calls is one expression with the calls
  *   in place (`0.45f * (chg * (curve * base))`); the shell-set slots are called through typed slot pointers without
@@ -52,7 +54,7 @@
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
 #include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
-#include "enemy/fn_80147CE0.h" /* em_res_user_data_ctor (rule 2: the owner's header) */
+#include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "enemy/fn_80138074.h"
 #include "enemy/em_se_record.h"
@@ -73,7 +75,6 @@
 #define em_pack_area_pick_c1 ((u32 (*)(struct _ENEMY_WORK*, u32, u8, u16, u8*, u32*))em_pack_area_pick)
 #define em_roll_cooldown_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u16, u16, s16*))em_roll_cooldown_ck)
 #define get_move_work_max_c1 ((u16 (*)(u8))get_move_work_max)
-#define em_res_user_data_dtor_c1 ((void (*)(Em009UserData*, s16))em_res_user_data_dtor)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
 #define em_pl_target_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u8*))em_pl_target_ck)
 
@@ -83,12 +84,12 @@ typedef void (*EmShellPosAngleFn)(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32*
                                   u16 flags);
 typedef void (*EmShellJobFn)(_ENEMY_WORK* self, u32 kind, u32 count, nw4r::math::VEC3* pos, f32 scale, u16 id);
 
-/* The 12-byte user-data record `em009_init` allocates and `em009_user_data_ctor` constructs (+0x00: the class
- * table 0x805F0C88).  size: 0xC (`operator new(0xC)`) */
-struct Em009UserData {
-    /* +0x0 */ void* vtbl;
-    /* +0x4 */ u32 unused_0x4;
-    /* +0x8 */ u32 unused_0x8;
+/* The user-data accessor `em009_init` installs: the base accessor with a destructor of its own only (its table,
+ * 0x805F0C88, keeps every hook of `ResUserDataAc`).  size: 0xC (`operator new(0xC)`) */
+class Em009UserData : public ResUserDataAc {
+public:
+    Em009UserData();
+    virtual ~Em009UserData();
 };
 
 /* The em009 program table (`em009_prog_tbl`): the entry points the shared enemy program driver calls (slot names
@@ -179,9 +180,6 @@ extern "C" const u32 em009_turn_seq_1[16] = {
     0x000C0000, 0x00000002, 0x00000000, 0x00000000,
 };
 
-/* The helper's class table (0x805F0C88, the last 0x30 bytes of `.data`), not emitted: see RESIDUALS. */
-extern u8 lbl_805F0C88[];
-
 extern "C" {
 
 /* 0x803868DC (0x14): Clears the joint-effect handle and the two +0x338/+0x33A counters. */
@@ -206,10 +204,8 @@ void em009_init(_ENEMY_WORK* self, u8 mode) {
         break;
     }
     if (em_res_user_data_ck(self) == 0) {
-        helper = (Em009UserData*)operator new(0xC);
-        if (helper != 0) {
-            em009_user_data_ctor(helper);
-        }
+        helper = (Em009UserData*)operator new(sizeof(Em009UserData));
+        new (helper) Em009UserData;
         em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
@@ -218,12 +214,13 @@ void em009_init(_ENEMY_WORK* self, u8 mode) {
     }
 }
 
-/* 0x803869C8 (0x3C): The helper's constructor: base first, then this class's table. */
-Em009UserData* em009_user_data_ctor(Em009UserData* self) {
-    em_res_user_data_ctor(self);
-    *(void**)self = (void*)lbl_805F0C88;
-    return self;
+} /* extern "C" */
+
+/* 0x803869C8 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em009UserData::Em009UserData() {
 }
+
+extern "C" {
 
 /* 0x80386A04 (0x298): In state 7, moves the sub-state on to its follow-up once the effect runs (sub-state 1/0x27 to
  * 0x43 while part flag bit 0 is set). */
@@ -3624,16 +3621,9 @@ u32 em009_action_select(_ENEMY_WORK* self, u32 arg) {
     return (em_area_leave_ck(self) - 1) == 0;
 }
 
-/* 0x8038EBE8 (0x5C): The helper's release: unregisters, then frees when `flags` is positive. */
-Em009UserData* em009_user_data_dtor(Em009UserData* self, s32 flags) {
-    if (self != 0) {
-        em_res_user_data_dtor_c1(self, 0);
-        if ((s16)flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
 
 } /* extern "C" */
+
+/* 0x8038EBE8 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em009UserData::~Em009UserData() {
+}

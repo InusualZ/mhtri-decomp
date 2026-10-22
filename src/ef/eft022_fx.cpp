@@ -8,14 +8,15 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (playbook 39).
  * NAMES. `eft022_set` is the runtime dump's own name; the map has only `fn_` stems for the rest, so plain definitions
  *   are `extern "C"`.
- *   GUESS: `EftModelObjRelease::destroy` (the model object's deleting destructor slot, `fn_80115608` in the table at
- *   0x805A0360).
+ *   GUESS: `EftModelCallback` and its `Attach` hook (the model object, an ICalcWorldCallback whose table is
+ *   0x805A0360; the +0x18 slot runs right after the object is installed on the model).
  * RESIDUALS.
- *  - `fn_80116080`: the pose-blend loop's float scheduling;
+ *  - `EftModelCallback::ExecCallbackC`: the pose-blend loop's float scheduling;
  *  - `fn_80115A80`, `fn_801156A0`: register colouring and pool-order differences.
  *   `.data`/`.sdata` are still declared, not emitted.
  *   Relocation names that differ from retail: pool constants, save helpers, `fn_8050131C`/`MTX34Zero`.
- * SHAPES. Functions are defined in retail's address order.  u8 area stores take `get_now_areano()` uncast (a `(u8)`
+ * SHAPES. The model object is built with placement `new` over `operator new` (no landing pad, as retail), and its
+ *   later stores go through `work->objects[i]` (retail reloads it).  Functions are defined in retail's address order.  u8 area stores take `get_now_areano()` uncast (a `(u8)`
  *   cast keeps a `clrlwi` under peephole off); type tests that retail compares signed are `(s32)` casts.
  *   `fn_8011661C` bumps its phase twice (`field_0x07++; field_0x07++;`: one `clrlwi` between the adds) and tests
  *   `--timer <= 0` first.
@@ -38,7 +39,8 @@
 #include "Pl/Pl_master_ck.h"
 #include "Pl/fn_802693C4.h"
 #include "ef/fn_8011722C.h"
-#include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* ScnMdlSimple, ICalcWorldCallback (rule 2) */
+#include "MSL/new.h" /* the placement `operator new` */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
@@ -82,19 +84,19 @@ enum _GXChannelID {
     GX_ALPHAZERO
 };
 
-/* A model object the eft021 record owns: its vtable, its owner and its slot index. size: 0x0C */
-struct _EFT_MODEL_OBJ {
-    /* +0x00 */ void** vtable;
+/* A model object the eft021 record owns: the world-matrix callback each model runs (its table is `.data`
+ * 0x805A0360), its owner and its slot index.  It overrides ExecCallbackC and adds an attach hook at +0x18; the
+ * class name and `Attach` are GUESSes.  size: 0x0C (`operator new(0xC)`) */
+class EftModelCallback : public nw4r::g3d::ICalcWorldCallback {
+public:
+    EftModelCallback();
+    virtual ~EftModelCallback();
+    virtual void ExecCallbackC(nw4r::math::MTX34* pMtxArray, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void Attach();
+
     /* +0x04 */ _EFT* owner_0x04;
     /* +0x08 */ s32 index_0x08;
-};
-
-/* The model object's virtual interface as the release path sees it: the first slot (+0x08 in the table at
- * 0x805A0360) is the deleting destructor `fn_80115608`.  Declared only, so this unit emits no table for it.
- * size: 0x04 */
-class EftModelObjRelease {
-public:
-    virtual void destroy(s32 dealloc);
 };
 
 /* The eft021 work block. size: 0x25C */
@@ -119,15 +121,11 @@ struct _EFT_WORK_C {
 extern "C" void* fn_801153D0(void*, s32, u8);
 extern "C" void* fn_80115460(u8);
 extern "C" void fn_80115554(_EFT*);
-extern "C" s32 fn_80115608(void*, s16);
 extern "C" void fn_80115664(_EFT*);
 extern "C" void fn_801156A0(_EFT*);
-extern "C" _EFT_MODEL_OBJ* fn_80115A44(void**);
 extern "C" void fn_80115A80(_EFT*);
 extern "C" void fn_80115FA0(_EFT*);
 extern "C" void fn_80115FB0(_EFT*);
-extern "C" void fn_80115FB4(_EFT_MODEL_OBJ*);
-extern "C" void fn_80116080(_EFT_MODEL_OBJ*, nw4r::math::MTX34*, s32);
 extern "C" void eft022_spawn(void*, nw4r::math::VEC3*, u8);
 extern "C" void fn_801164F0(_EFT*);
 extern "C" void fn_8011652C(_EFT*);
@@ -163,7 +161,6 @@ extern "C" _GXColor lbl_805A0258[];
 extern "C" _GXColor lbl_805A026C[];
 extern "C" nw4r::math::VEC3* lbl_805A0300[];
 extern "C" nw4r::math::VEC3* lbl_805A0330[];
-extern "C" u8 lbl_805A0360[];
 
 extern "C" char lbl_80791930[8];
 
@@ -228,7 +225,7 @@ extern "C" void fn_80115554(_EFT* self)
     s32 i;
     s32 j;
     _EFT_WORK_B* work;
-    _EFT_MODEL_OBJ* object;
+    EftModelCallback* object;
 
     work = (_EFT_WORK_B*)self->work_0x38;
     eft_res_models_release((void**)work->models, work->count);
@@ -236,27 +233,20 @@ extern "C" void fn_80115554(_EFT* self)
         for (j = 0; j < 6; j++) {
             fn_8050131C(&work->mtx[i][j]);
         }
-        object = (_EFT_MODEL_OBJ*)work->objects[i];
-        if (object != 0) {
-            ((EftModelObjRelease*)object)->destroy(1);
-        }
+        object = (EftModelCallback*)work->objects[i];
+        delete object;
     }
     work->count = 0;
     work->field_0x258 = 0;
     work->field_0x25A = 0;
 }
 
-/* Frees an eft021 work block once the record is gone. */
-extern "C" s32 fn_80115608(void* p, s16 flag)
+/* 0x80115608 (0x5C): Destroys the model callback through the world-callback base (called out of line). */
+#pragma dont_inline on
+EftModelCallback::~EftModelCallback()
 {
-    if (p != 0) {
-        fn_800810DC(p, 0);
-        if (flag > 0) {
-            operator delete(p);
-        }
-    }
-    return (s32)p;
 }
+#pragma dont_inline reset
 
 /* Runs the state handler the eft021 record's `state_0x05` selects. */
 extern "C" void fn_80115664(_EFT* self)
@@ -284,7 +274,7 @@ extern "C" void fn_801156A0(_EFT* self)
     nw4r::math::MTX34 mtx;
     _EFT_WORK_B* work;
     _PLW* plw;
-    _EFT_MODEL_OBJ* obj;
+    EftModelCallback* obj;
     _GXColor color;
     s32 i;
     s32 j;
@@ -326,19 +316,18 @@ extern "C" void fn_801156A0(_EFT* self)
         return;
     }
     for (i = 0; i < work->count; i++) {
-        obj = (_EFT_MODEL_OBJ*)operator new(0xC);
-        if (obj != 0) {
-            fn_80115A44((void**)&obj);
-        }
+        obj = (EftModelCallback*)operator new(sizeof(EftModelCallback));
+        new (obj) EftModelCallback;
         if (obj == 0) {
             fn_80115FB0(self);
             return;
         }
         work->objects[i] = obj;
-        obj->owner_0x04 = self;
-        obj->index_0x08 = i;
-        fn_800E25B0((void*)work->models[i]->field_0x118, obj);
-        (*(void (*)(void*))obj->vtable[6])(obj);
+        ((EftModelCallback*)work->objects[i])->owner_0x04 = self;
+        ((EftModelCallback*)work->objects[i])->index_0x08 = i;
+        ((nw4r::g3d::ScnMdlSimple*)work->models[i]->field_0x118)->SetCalcWorldCallback(
+            (EftModelCallback*)work->objects[i]);
+        ((EftModelCallback*)work->objects[i])->Attach();
         work->models[i]->field_0x40 = 0;
         work->joint_num = get_joint_num__6MHcharFv(work->models[i]);
         vec_to_mh_vec3(&v, (Vec*)&lbl_805A0208[self->type_0x02]);
@@ -372,12 +361,9 @@ extern "C" void fn_801156A0(_EFT* self)
     }
 }
 
-/* Creates the effect record the eft022 setter leaves behind. */
-extern "C" _EFT_MODEL_OBJ* fn_80115A44(void** out)
+/* 0x80115A44 (0x3C): Constructs the model callback: the world-callback base, then this class's table. */
+EftModelCallback::EftModelCallback()
 {
-    fn_800E3B2C();
-    *out = lbl_805A0360;
-    return (_EFT_MODEL_OBJ*)out;
 }
 
 /* Moves the eft021 record's models through their pose animation. */
@@ -522,8 +508,9 @@ extern "C" void fn_80115FB0(_EFT* self)
 }
 
 /* Releases the eft021 model's texture handles. */
-extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
+void EftModelCallback::Attach()
 {
+    EftModelCallback* obj = this;
     nw4r::g3d::ResNode h((void*)0);
     _EFT* effect = obj->owner_0x04;
     s32 id;
@@ -532,18 +519,20 @@ extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
 
     for (i = 0; i < work->count; i++) {
         s32 handle = work->models[i]->field_0x118;
-        fn_80080B10((void*)handle, 4);   /* the declaration takes void*, as its C sibling unit casts */
+        ((nw4r::g3d::ScnMdlSimple*)handle)->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)4);
         id = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&work->models[i]->field_0x114)->GetResNode((const char*)lbl_80791930).mpData;
         res_node_assign(&h, &id);
         if (res_node_is_valid(&h) == 1U) {
-            fn_800E3264((void*)handle, res_node_get_id(&h));
+            ((nw4r::g3d::ScnMdlSimple*)handle)->SetCalcWorldNodeID(res_node_get_id(&h));
         }
     }
 }
 
 /* Places one eft021 model's pose from the shared offset tables. */
-extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32 arg2)
+void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResMdl mdl,
+                                     nw4r::g3d::FuncObjCalcWorld* pFuncObj)
 {
+    EftModelCallback* obj = this;
     nw4r::math::MTX34 out;
     nw4r::math::MTX34 ma;
     nw4r::math::MTX34 mb;
@@ -576,7 +565,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
     s32 id0;
     s32 id1;
     src = &work->mtx[obj->index_0x08][0];
-    id0 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(arg2)->GetResNode((u32)3).mpData;
+    id0 = (s32)mdl.GetResNode((u32)3).mpData;
     res_node_assign(&h0, &id0);
     copyMat33(&mtx_arr[fn_8006FDCC(&h0)], src);
     k = 4;
@@ -587,7 +576,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
         for (inner = 0; inner < 6; inner++) {
             a = lbl_805A0330[inner];
             b = lbl_805A0300[inner];
-            id1 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(arg2)->GetResNode((u32)k).mpData;
+            id1 = (s32)mdl.GetResNode((u32)k).mpData;
             res_node_assign(&h1, &id1);
             dst = &mtx_arr[fn_8006FDCC(&h1)];
             fn_80051894(&out, &ma, &mb, 1, a->x, a->y);

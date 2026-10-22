@@ -12,17 +12,6 @@
 #include "types.h"
 
 #ifdef __cplusplus
-extern "C" {
-#endif
-
-/* ScnMdlSimple::EnableScnMdlCallbackTiming and ICalcWorldCallback's destructor as the game's model users still
- * spell them (the map stems; the definitions are the members below, rename requested). */
-void fn_80080B10(void* arg0, u32 arg1);
-void fn_800810DC(void* arg0, s32 arg1);
-
-#ifdef __cplusplus
-}
-
 #include "nw4r/fn_805012C4.h" /* nw4r::math::AABB, owner nw4r/fn_805012C4.cpp (rule 2) */
 #include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnLeaf, owner g3d/g3d_scnobj.cpp (rule 1) */
 #include "g3d/g3d_obj.h"      /* nw4r::g3d::TypeNameData (rule 1) */
@@ -31,6 +20,7 @@ void fn_800810DC(void* arg0, s32 arg1);
  * class's run-time type members read. */
 extern "C" const nw4r::g3d::TypeNameData<sizeof("ScnMdlSimple")> scn_typename_ScnMdlSimple;
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMdl (rule 2) */
+#include "g3d/g3d_calcworld_callback.h" /* nw4r::g3d::ICalcWorldCallback (rule 1) */
 
 /* 0x80080F44 - constructs an AABB's two corner records (two VEC3_ctor no-ops) and returns it: the element
  * constructor ScnObj's bounding-box array is built with. */
@@ -61,20 +51,12 @@ struct ChrAnmResult;
 struct WorldMtxManip;
 struct FuncObjCalcWorld;
 
-/* The world-matrix callback a model runs for one node (its interface is implemented by the game).  size: 0x4 */
-class ICalcWorldCallback {
-public:
-    virtual ~ICalcWorldCallback() {}
-    /* +0x0C/+0x10/+0x14 of the table: before a node's matrix (its animation result), after it (its matrix, scale
-     * and attribute word), and after the whole tree; `g3d/g3d_calcworld.cpp` dispatches them. */
-    virtual void ExecCallbackA(ChrAnmResult* pResult, ResMdl mdl, FuncObjCalcWorld* pFuncObj);
-    virtual void ExecCallbackB(WorldMtxManip* pManip, ResMdl mdl, FuncObjCalcWorld* pFuncObj);
-    virtual void ExecCallbackC(math::MTX34* pMtxArray, ResMdl mdl, FuncObjCalcWorld* pFuncObj);
-};
-
 /* The callback, timing mask and node a world-matrix pass hands the calculator.  size: 0x8 */
 struct FuncObjCalcWorld {
     FuncObjCalcWorld(ICalcWorldCallback* pCallback, u32 timing, u32 nodeID);
+    /* The node the next callback runs at (nw4r's inline accessors; the kept copies are 0x801394CC/0x801394C0). */
+    u32 GetCallbackNodeID() const;
+    void SetCallbackNodeID(u32 nodeID);
 
     /* +0x0 */ ICalcWorldCallback* mpCallback;
     /* +0x4 */ u8 mTiming;
@@ -129,6 +111,9 @@ public:
     const u8* GetByteCodeDrawXlu();
     u32 GetDrawMode() const;
     ICalcWorldCallback* GetCalcWorldCallback();
+    /* The world-matrix callback and its node (nw4r's inline setters; the kept copies are 0x800E25B0/0x800E3264). */
+    void SetCalcWorldCallback(ICalcWorldCallback* pCallback);
+    void SetCalcWorldNodeID(u32 nodeID);
     u8 GetCalcWorldCallbackTiming();
     u32 GetCalcWorldNodeID();
     AnmObjChr* GetAnmObjChr();

@@ -93,7 +93,6 @@ struct ResTexBlock {
 
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
-void* fn_8007B878(void* pOut, u32 value);                /* owner: src/g3d/g3d_scninline.cpp */
 }
 
 /* The unit's own functions, in address order (the forward declarations keep the source order free).
@@ -135,11 +134,9 @@ u32 fn_80099400(ResHandle* pSelf) {
 u32 fn_8009943C(ResHandle* pSelf, u32 ofs) {
     u32 base = (u32)pSelf->mpData;
     if (ofs != 0) {
-        u32 present;
-        return *(u32*)fn_8007B878(&present, base + ofs);
+        return *(u32*)&nw4r::g3d::ResMdl((void*)(base + ofs));
     }
-    u32 absent;
-    return *(u32*)fn_8007B878(&absent, 0);
+    return *(u32*)&nw4r::g3d::ResMdl((void*)0);
 }
 
 /* The class-name string the `%s::%s: Object not valid.` assert passes for ResShpPrePrim. */

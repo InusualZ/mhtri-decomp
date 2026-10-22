@@ -5,6 +5,14 @@
 #ifndef MHTRI_MSL_NEW_H
 #define MHTRI_MSL_NEW_H
 
+/* Returns the caller's block unchanged (the scalar form; a new-expression through it keeps its null test and, with
+ * no placement `operator delete` declared, no landing pad). */
+/* untyped: placement allocation hands back the caller-owned byte range */
+inline void* operator new(unsigned long size, void* block) {
+    (void)size;
+    return block;
+}
+
 /* Returns the caller's block unchanged. */
 /* untyped: placement allocation hands back the caller-owned byte range */
 inline void* operator new[](unsigned long size, void* block) {

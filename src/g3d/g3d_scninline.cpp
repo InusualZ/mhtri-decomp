@@ -19,9 +19,9 @@
  *   members call).  res_mdl_ctor_referencer is a GUESS (the dead-stripped caller that places the ResMdl constructor).
  *   IScnObjCallback's empty ExecCallback_CALC_VIEW/CALC_MAT/CALC_WORLD/DRAW_XLU/DRAW_OPA are the slots of
  *   `lobby/lb_npc.cpp`'s callback vtables 0x805B8D80/0x805B8DA0.
- * RESIDUALS. fn_8007B864, fn_8007B878, fn_8007B8DC, fn_8007BA08 and fn_8007BA38 keep the map stems: the ResMdl handle
- *   constructor (fn_8007B878, asserting the `g3d_resmdl_ac.h` alignment) and two handle copies other units call by
- *   name.
+ * RESIDUALS. fn_8007B864, fn_8007BA08 and fn_8007BA38 keep the map stems: two handle copies other units call by
+ *   name.  `res_mdl_ctor_referencer` (dead-stripped) is 0x28 bytes with no unwind record where the C spelling was a
+ *   4-byte tail call, so the object's `.text` is longer while the image is unchanged.
  * SHAPES. Definitions follow retail's address order.  The ResMdl constructor is `inline` and placed by a 4-byte
  *   referencer the link dead-strips, so its two strings are the weak inline tail after the vtable (retail's `.data`).
  *   setVec3 is defined `inline` ahead of the ScnLeaf constructor (called out of line under `dont_inline`): the visible
@@ -59,8 +59,6 @@ extern "C" {
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 /* internal */ struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ void fn_8007B864(struct ResHandle* pDst, const struct ResHandle* pSrc);
-/* internal */ u32 fn_8007B878(s32 pDst, s32 offset);
-/* internal */ void fn_8007B8DC(struct ResHandle* pSelf, s32 offset);
 /* internal */ struct ResHandle* fn_8007BA08(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ void fn_8007BA38(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
@@ -228,30 +226,31 @@ void* operator new(unsigned long size, void* place) {
     return place;
 }
 
-extern "C" {
-
-/* 0x8007B878 (0x64): the ResMdl handle constructor: stores the block address, asserting its 32-byte alignment. */
-inline u32 fn_8007B878(s32 pDst, s32 offset) {
-    fn_8007B8DC((struct ResHandle*)pDst, offset);
-    if ((offset & 0x1F) != 0) {
+/* 0x8007B878 (0x64): Constructs a ResMdl handle on `pData`, asserting its 32-byte alignment. */
+/* untyped: opaque handle - the model block's address */
+inline nw4r::g3d::ResMdl::ResMdl(void* pData) : nw4r::g3d::ResCommon<nw4r::g3d::ResMdlData>(pData) {
+    if (((u32)pData & 0x1F) != 0) {
         nw4r::db::Panic("g3d_resmdl_ac.h", 0x78, "NW4R:Failed assertion !((u32)p & 0x1f)");
     }
-    return pDst;
 }
+
+extern "C" {
 
 #pragma dont_inline on
-/* Calls the ResMdl handle constructor (the link dead-strips it; it places the constructor's kept copy). */
-u32 res_mdl_ctor_referencer(s32 pDst, s32 offset) {
-    return fn_8007B878(pDst, offset);
+#pragma exceptions off
+/* Builds a ResMdl handle (the link dead-strips it; it places the constructor's kept copy).  No unwind record: the
+ * function is not in the image. */
+/* untyped: opaque handle - the model block's address */
+u32 res_mdl_ctor_referencer(void* pData) {
+    return *(u32*)&nw4r::g3d::ResMdl(pData);
 }
+#pragma exceptions reset
 #pragma dont_inline reset
 
-/* 0x8007B8DC (0x8): stores the block address. */
-void fn_8007B8DC(struct ResHandle* pSelf, s32 offset) {
-    pSelf->mpData = (void*)offset;
-}
-
 }   /* extern "C" */
+
+/* 0x8007B8DC (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMdlData)
 
 /* 0x8007B8E4 (0x58): runs the callback's DRAW_XLU hook at `timing` when it is enabled for the pass and the timing. */
 /* untyped: caller-owned payload - the pass's info block */

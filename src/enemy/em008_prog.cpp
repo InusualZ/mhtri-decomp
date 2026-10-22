@@ -19,17 +19,18 @@
  *   em008_act2_approach, em008_act10_se_play, em008_act11_se_play; GUESS (from the bodies): em008_part_flags_seed,
  *   em008_part_flag_clear_ck, em008_part_pair_ck, em008_part_flags_count, em008_finish_act6/_act7 (the action they
  *   arm), em008_spawn_rec_set, em008_part_rec_update, em008_alt_mode_fx, em008_effect_spawn, em008_flag491_update,
- *   em008_user_data_ctor/_attach/_node_calc/_dtor, em008_static_init.
+ *   em008_static_init.
  *   GUESS (data): em008_turn_seq_wait/_back/_side, em008_area_pick_tbl, em008_se_seq_<sub-state> and
  *   em008_se_alt_seq_<sub-state> (the sub-state that first plays each table) with their em008_se_rec/pos records,
  *   em008_se_shift_a/_b, em008_ctor; the `Em008ProgTbl` slot names; `Em008UserData`.
  *   `em_flag_0x8AD_ck` is called through the `_c1` view: its owner's header declares it `void`.
  * RESIDUALS. `em008_area_start_ck`: retail colours self/arg/seat/entry r28/r29/r30/r31, ours r31/r28/r29/r30 (the
  *   declaration order, an if/else or switch select, a u16 argument and dead call results all leave it).
- *   `em008_user_data_ctor` stores the class table 0x805A6D28 by hand (rule 10): the user-data class hierarchy
- *   (`enemy/fn_80138074.cpp`'s record) is not modelled, so `.data` stops 0x30 short of the claim (the table).
- *   flipcheck: the class table and the `em008_area_start_ck` registers.
- * SHAPES. A call written in place as the right operand of `*` is evaluated first (`x * base * get_em_chg_scale`).
+ *   flipcheck: the `em008_area_start_ck` registers.
+ * SHAPES. `Em008UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   A call written in place as the right operand of `*` is evaluated first (`x * base * get_em_chg_scale`).
  *   The degree-to-angle turn is one expression (`(u16)(s32)(0.5f + (65536.0f * (deg * scale)) / 360.0f)`); split
  *   into temporaries it moves the `mr r3`.  A `u8` predicate result that retail truncates is written `(u8)(...) &
  *   0xFF` in a `u32` function (`em008_state_query` case 4).  A case-level `return` that retail lays out as a `break`
@@ -53,6 +54,7 @@
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_80138074.h"
 #include "enemy/fn_80147CE0.h"
+#include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/EnemyData.h"
 #include "fn_8004CAD8.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -64,15 +66,15 @@
 #define em_fall_height_get em_fall_height_get_hidden_fn_80165FC8_h
 #define em_frame_flag_set em_frame_flag_set_hidden_fn_80165FC8_h
 #define em_mot_set em_mot_set_hidden_fn_80165FC8_h
-#define em_res_user_data_dtor fn_8013918C_hidden_fn_80165FC8_h
 #define em_res_user_data_flag_set fn_8013A654_hidden_fn_80165FC8_h
 #define rotMatrixX rotMatrixX_hidden_fn_80165FC8_h
 #define rotMatrixZ rotMatrixZ_hidden_fn_80165FC8_h
+#define ResUserDataAc ResUserDataAcBandView
 #include "enemy/fn_80165FC8.h"
+#undef ResUserDataAc
 #undef rotMatrixZ
 #undef rotMatrixX
 #undef em_res_user_data_flag_set
-#undef em_res_user_data_dtor
 #undef em_mot_set
 #undef em_frame_flag_set
 #undef em_fall_height_get
@@ -95,22 +97,21 @@
 #define rotMatrixZ_view1 ((void (*)(u32, nw4r::math::MTX34*))rotMatrixZ)
 #define rotMatrixX_view1 ((void (*)(u32, nw4r::math::MTX34*))rotMatrixX)
 #define fn_8013A654_view1 ((void (*)(ResUserDataAc*, u32))em_res_user_data_flag_set)
-#define fn_8013918C_view1 ((void (*)(void*, s16))em_res_user_data_dtor)
 #define em_mot_finished_ck_view1 ((u32 (*)(struct _ENEMY_WORK*))em_mot_finished_ck)
 #define em_parts_damage_level_get_view1 ((u8 (*)(_ENEMY_WORK*, u8))em_parts_damage_level_get)
 #define em_ground_ck_f ((u32 (*)(_ENEMY_WORK*, f32))em_ground_ck)
 #define assignVec3_view1 ((void (*)(nw4r::math::VEC3*, const nw4r::math::VEC3*))assignVec3)
 
-/* The 12-byte user-data record `em008_init` allocates and `em008_user_data_ctor` constructs (+0x00: the class table
- * `lbl_805A6D28`); the same record as `enemy/em001_prog.cpp`'s.  size: 0xC (`operator new(0xC)`) */
-typedef struct Em008UserData {
-    /* +0x0 */ void* vtbl;
-    /* +0x4 */ u32 unused_0x4;
-    /* +0x8 */ u32 unused_0x8;
-} Em008UserData;
-
-/* The record's class table, in this unit's `.data`; no class emits it yet (see the unit header). */
-extern "C" u8 lbl_805A6D28[];
+/* The user-data accessor `em008_init` installs: the base accessor with its own destructor, attach hook and
+ * end-of-tree hook (its table is `.data` 0x805A6D28).  size: 0xC (`operator new(0xC)`) */
+class Em008UserData : public ResUserDataAc {
+public:
+    Em008UserData();
+    virtual ~Em008UserData();
+    virtual void Attach();
+    virtual void CalcWorldEnd(nw4r::math::MTX34* pMtxArray, nw4r::g3d::ResMdl mdl,
+                              nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+};
 
 /* The slot +0x3C job spelled without its trailing table argument (the call sites pass none). */
 typedef void (*ShellRecJobFn)(struct _ENEMY_WORK* self, EmSpawnRec* rec, u32 mode);
@@ -143,7 +144,6 @@ u32 em008_part_pair_ck(_ENEMY_WORK* self);
 u8 em008_part_flags_count(_ENEMY_WORK* self);
 void em008_timers_clear(_ENEMY_WORK* self);
 void em008_init(_ENEMY_WORK* self, u32 arg);
-Em008UserData* em008_user_data_ctor(Em008UserData* self);
 void em008_motion_next(_ENEMY_WORK* self, u8* state, u8* sub);
 void em008_event_notify(_ENEMY_WORK* self, u8 arg, u8 sub);
 void em008_frame_update(_ENEMY_WORK* self);
@@ -221,9 +221,6 @@ s32 em008_alt_part_ck(_ENEMY_WORK* self, u8 arg1);
 s32 em008_part_break_ck(_ENEMY_WORK* self, u8 part);
 void em008_part_break_set(_ENEMY_WORK* self, u8 part);
 u32 em008_area_start_ck(_ENEMY_WORK* self, u32 arg1);
-void em008_user_data_attach(ResUserDataAc* self);
-void em008_user_data_node_calc(ResUserDataAc* self, MTX34* mtx, void* cursor, s32 arg3);
-ResUserDataAc* em008_user_data_dtor(ResUserDataAc* self, s32 flags);
 void em008_static_init(void);
 }
 
@@ -389,10 +386,8 @@ void em008_init(_ENEMY_WORK* self, u32 arg) {
     }
     em008_part_flags_seed(self);
     if (em_res_user_data_ck(self) == 0) {
-        helper = (Em008UserData*)operator new(0xC);
-        if (helper != 0) {
-            em008_user_data_ctor(helper);
-        }
+        helper = (Em008UserData*)operator new(sizeof(Em008UserData));
+        new (helper) Em008UserData;
         em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
@@ -401,11 +396,8 @@ void em008_init(_ENEMY_WORK* self, u32 arg) {
     }
 }
 
-/* 0x8015DAA8 - the helper's constructor: base first, then this class's table. */
-Em008UserData* em008_user_data_ctor(Em008UserData* self) {
-    em_res_user_data_ctor(self);
-    self->vtbl = lbl_805A6D28;
-    return self;
+/* 0x8015DAA8 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em008UserData::Em008UserData() {
 }
 
 /* 0x8015DAE4 - one action pair's (state, sub-state) transitions: in state 7, sub-state 7/0xD goes to 0x10
@@ -4026,26 +4018,26 @@ u32 em008_area_start_ck(_ENEMY_WORK* self, u32 arg1) {
     return em_area_leave_ck(self) == 1;
 }
 
-/* 0x801661BC (0x40): the user-data hook: sets flag 7. */
-void em008_user_data_attach(ResUserDataAc* self) {
+/* 0x801661BC (0x40): Sets the accessor's flag word to 7 once it is installed. */
+void Em008UserData::Attach() {
     nw4r::g3d::ResNode pad((void*)0);
-    fn_8013A654_view1(self, 7);
+    fn_8013A654_view1(this, 7);
 }
 
-/* 0x801661FC (0xD8): rotates node 0x18 of the model by the +0x608/+0x610 angles. */
-void em008_user_data_node_calc(ResUserDataAc* self, MTX34* mtx, void* cursor, s32 arg3) {
+/* 0x801661FC (0xD8): Rotates node 0x18 of the model by the work's +0x608/+0x610 angles. */
+void Em008UserData::CalcWorldEnd(nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
     nw4r::g3d::ResNode head((void*)0);
     s32 idx;
     MTX34 out;
     MTX34 local;
 
-    (void)arg3;
+    (void)pFuncObj;
     MTX34_ctor(&out);
     MTX34_ctor(&local);
-    idx = (s32)(u32)reinterpret_cast<const nw4r::g3d::ResMdl*>(cursor)->GetResNode(0x18).mpData;
+    idx = (s32)(u32)mdl.GetResNode(0x18).mpData;
     res_node_assign(&head, &idx);
     {
-        _ENEMY_WORK* work = self->work;
+        _ENEMY_WORK* work = this->work;
         mtx34_copy(&local, &mtx[fn_8006FDCC(&head)]);
         mtx34_identity(&out);
         rotMatrixX_view1(work->field_0x608, &out);
@@ -4055,15 +4047,8 @@ void em008_user_data_node_calc(ResUserDataAc* self, MTX34* mtx, void* cursor, s3
     }
 }
 
-/* 0x801662D4 (0x5C): the record release: unregisters, then frees when `flags` is positive. */
-ResUserDataAc* em008_user_data_dtor(ResUserDataAc* self, s32 flags) {
-    if (self != 0) {
-        fn_8013918C_view1(self, 0);
-        if ((s16)flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* 0x801662D4 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em008UserData::~Em008UserData() {
 }
 
 /* 0x80166330 (0xB4): the static initialiser: seeds the two sound shift records. */

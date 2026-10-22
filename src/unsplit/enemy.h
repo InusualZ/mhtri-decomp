@@ -368,18 +368,13 @@ extern const f32 lbl_8079B0FC;
 extern const f32 lbl_8079B100;
 extern const f32 lbl_8079AF60;   /* the low word of the 0.0 double at 0x8079AF60 */
 
-/* The word the 0xC-byte action record's first field is set to (the shared vtable of that
- * record's class; the table itself is outside this unit's ranges - rule 10). */
-extern u32 lbl_805DFC00[];
-
 /* Two 0x40-byte `.rodata` effect tables `em_turn_seq_start`/`em_turn_seq_step` walk (no registered owner). */
 extern u8 lbl_80570740[];
 extern u8 lbl_80570780[];
 
 /* Added with `enemy/em_act_step.cpp`'s registration (rule 2): the `.sdata2` pool half
- * 0x8079B108..0x8079B210 that unit's 74 functions load their constants from, and the class vtable
- * `lbl_805E04E0` its constructor installs.  No registered unit owns either (the pool's bracketing
- * units are the same unclaimed band), so this header is their home.  The pool labels are used as load
+ * 0x8079B108..0x8079B210 that unit's 74 functions load their constants from.  No registered unit owns it (the
+ * pool's bracketing units are the same unclaimed band), so this header is its home.  The pool labels are used as load
  * operands and never defined (playbook 29: defining one would rebuild the section and move every later
  * constant); the comment after each is the value the DOL holds at that address.
  *

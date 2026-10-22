@@ -16,7 +16,10 @@
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: `.sdata2` claimed, not emitted.
  * NAMES. GUESS: `mhchar_joint_mtx_get`, `mhchar_node_count`
- *   GUESS (from each body and its callers): `copied_mat_access_valid_ck`.
+ *   GUESS (from each body and its callers): `copied_mat_access_valid_ck`, `MHcharWorldCallback` and its
+ *   `ApplyTiming` hook (the world callback whose table is 0x80597CA0; the hook enables the model's callback timing).
+ *   The nw4r inline setters `ScnMdlSimple::SetCalcWorldCallback`/`SetCalcWorldNodeID` and the ICalcWorldCallback
+ *   constructor keep their copies here.
  */
 
 #include "types.h"
@@ -26,6 +29,7 @@
 #include "sound/se.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* ScnMdlSimple, ICalcWorldCallback (rule 2) */
 #include "sys_mem.h"
 
 #pragma peephole off
@@ -36,21 +40,26 @@ s32 fn_800E0A8C(MHchar* self);
 void fn_800E2640(u32* dst, u32* src);
 void fn_800E2EB0(u32* dst, u32* src);
 void fn_800E301C(u32* dst, u32* src);
-void fn_800E3264(MHchar* self, u32 value);
-void fn_800E3B2C(MHchar* self);
 }
 
-/* Release `self` through its +0x?? teardown when `flag` is positive. */
-extern "C" void* fn_800E0504(void* self, s16 flag)
+/* The world-matrix callback the model installs (its table is `.data` 0x80597CA0): overrides ExecCallbackA
+ * (0x800E3270, unwritten) and adds a timing hook at +0x18.  The class name and `ApplyTiming` are GUESSes (the
+ * hook has the same body as `lobby/lb_equip_page.cpp`'s).  size: 0x4 (the table pointer only; an approximation) */
+class MHcharWorldCallback : public nw4r::g3d::ICalcWorldCallback {
+public:
+    MHcharWorldCallback();
+    virtual ~MHcharWorldCallback();
+    virtual void ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ApplyTiming(nw4r::g3d::ScnMdlSimple* scn, s32 kind, u32 value);
+};
+
+/* 0x800E0504 (0x5C): Destroys the callback through the world-callback base (called out of line). */
+#pragma dont_inline on
+MHcharWorldCallback::~MHcharWorldCallback()
 {
-    if (self) {
-        fn_800810DC(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
+#pragma dont_inline reset
 
 /* Copy `src` into the model's +0xDC vector (the second element of the +0xD4 float block). */
 extern "C" void fn_800E0808(MHchar* self, nw4r::math::VEC3* src)
@@ -142,10 +151,10 @@ extern "C" u32 mhchar_motion_flag_ck(MHchar* self, u32 mask)
     return (self->field_0x4C & mask) != 0;
 }
 
-/* Store the model's +0x11C word. */
-extern "C" void fn_800E25B0(MHchar* self, s32 value)
+/* 0x800E25B0 (0x8): Stores the world-matrix callback (nw4r's inline setter, kept here). */
+void nw4r::g3d::ScnMdlSimple::SetCalcWorldCallback(ICalcWorldCallback* pCallback)
 {
-    self->field_0x11C = value;
+    mpCalcWorldCallback = pCallback;
 }
 
 /* The model's +0x00 base plus `offset`, or 0 when `offset` is 0. */
@@ -249,25 +258,25 @@ extern "C" int mhchar_node_count(MHchar* self)
     return reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNodeNumEntries();
 }
 
-/* Apply `value` to the +0x122 halfword for the motion kinds that carry it. */
-extern "C" void fn_800E31F0(void* unused, MHchar* self, s32 kind, u32 value)
+/* 0x800E31F0 (0x74): Enables the model's world callback at `kind`; kinds 1 and 2 also set the node it runs at. */
+void MHcharWorldCallback::ApplyTiming(nw4r::g3d::ScnMdlSimple* self, s32 kind, u32 value)
 {
     switch (kind) {
     case 1:
     case 2:
-        fn_80080B10(self, kind);
-        fn_800E3264(self, value);
+        self->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)kind);
+        self->SetCalcWorldNodeID(value);
         break;
     case 4:
-        fn_80080B10(self, kind);
+        self->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)kind);
         break;
     }
 }
 
-/* Store the model's +0x122 halfword (the low 16 bits of `value`). */
-extern "C" void fn_800E3264(MHchar* self, u32 value)
+/* 0x800E3264 (0xC): Stores the node the world callback runs at (nw4r's inline setter, kept here). */
+void nw4r::g3d::ScnMdlSimple::SetCalcWorldNodeID(u32 nodeID)
 {
-    self->field_0x122 = (u16)value;
+    mCalcWorldNodeID = (u16)nodeID;
 }
 
 /* Reset the model through its +0x?? state. */
@@ -276,16 +285,12 @@ extern "C" void fn_800E3AE8(void* self)
     res_file_ctor((u32*)self, 0);
 }
 
-/* Point the model's +0x00 word at the +0xCA0 joint table, after the base reset. */
-extern "C" MHchar* fn_800E3AF0(MHchar* self)
+/* 0x800E3AF0 (0x3C): Constructs the callback: the world-callback base, then this class's table. */
+MHcharWorldCallback::MHcharWorldCallback()
 {
-    fn_800E3B2C(self);
-    self->field_0x00 = (u32)&lbl_80597CA0;
-    return self;
 }
 
-/* Point the model's +0x00 word at the initial joint table. */
-extern "C" void fn_800E3B2C(MHchar* self)
+/* 0x800E3B2C (0x10): Constructs the world-callback base: stores its table (nw4r's inline constructor, kept here). */
+nw4r::g3d::ICalcWorldCallback::ICalcWorldCallback()
 {
-    self->field_0x00 = (u32)&lbl_80597CC0;
 }

@@ -125,8 +125,6 @@ void CleanUpTracks(void* obj);
 void res_node_assign(void* obj, void* sub);
 int fn_8006FDCC(void* sub);
 void mtx34_copy(void* dst, void* src);
-void fn_80080B10(void* obj, s32 kind);
-void fn_800810DC(void* obj, s32 flag);
 SeSlot* fn_800D8E58(_se_w* work, s32 id);
 /* 0x80047058 is `mh3_pad.cpp`'s: the retail body takes NO argument (it loads `Screen_w` itself), so
  * the `void* obj` this header carried was the call site's guess and collided with the owner. */
@@ -135,9 +133,6 @@ s32 screen_split_mode_ck(void);
 /* this unit's read-only pool constants (referenced, not defined here - playbook 29) */
 extern const f32 lbl_807963E0;
 extern const f32 lbl_80796438;
-/* the model's initial joint/motion table this unit points `MHchar::field_0x00` at */
-extern u32 lbl_80597CC0[];
-extern u32 lbl_80597CA0[];
 extern const f32 lbl_80796450;
 extern const f32 lbl_80796454;
 

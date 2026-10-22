@@ -84,6 +84,7 @@
 #include "unsplit/em_snd_proc_tbl.h" /* em_snd_proc_tbl (rule 2: the band) */
 #include "enemy/em_pop.h" /* quest_flag_100000_ck, quest_flag_10_ck (rule 2: their owner) */
 #include "ef/nw_res_manager.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 /* the call sites use the argument-less view: a cast call is the same direct call. */
 #define em_mot_finished_ck_c1 ((u32 (*)(void))em_mot_finished_ck)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -357,7 +358,6 @@ void fn_800FA9B8(u8* rec, u8 id);
 /* the shared layers the range's helpers call */
 void* res_file_ctor(void* out, u32 a);
 void res_file_assign(void* dst, void* src);
-void fn_8007B878(void* out, u32 a);
 void fn_8007BA08(void* a, void* b);
 s32 fn_800D56F4(char* name, u32 data);
 void* nw_res_entry_get(s32 handle);
@@ -2417,14 +2417,14 @@ u32 enemy_data_by_team_get(u8 id, u8 kind) {
 void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     EmcWork* work = (EmcWork*)&emc_work[*ctx * 0x18];
     u32 h1;
-    u32 h2;
+
+    res_file_ctor(&h1, 0);
+    nw4r::g3d::ResMdl h2((void*)0);
     u32 tmp;
     u32 res;
     EmFileRow row;
     u8* rec;
 
-    res_file_ctor(&h1, 0);
-    fn_8007B878(&h2, 0);
     get_move_work_adrs(0);
     work->handle_0x08 = fn_800D56F4(name, data);
     if (work->handle_0x08 == -1) {

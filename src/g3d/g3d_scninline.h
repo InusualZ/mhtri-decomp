@@ -14,10 +14,6 @@ extern "C" {
 const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
 const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 
-/* 0x8007B878 - the alignment-asserting offset helper (the ResMdl handle constructor); `g3d/g3d_resanmtexsrt.cpp`
- * casts at its two call sites. */
-u32 fn_8007B878(s32 pDst, s32 offset);
-
 /* 0x8007B834 (0x30): copy-constructs a shape handle and returns the destination. */
 struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
 

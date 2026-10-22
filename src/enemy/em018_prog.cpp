@@ -15,13 +15,11 @@
  *   GUESS (the program-table slot each fills, `Em024ProgTbl`'s scheme): em018_init, em018_frame_update,
  *   em018_event_notify, em018_motion_events, em018_tev_color_update, em018_action_select, em018_static_init.
  *   GUESS (from the bodies and callers): em018_effect_spawn, em018_drip_effect, em018_glow_fade,
- *   em018_user_data_ctor, em018_user_data_node_calc; data em018_se_seq_<sub-state>, em018_se_alt_seq_<sub-state>,
+ *   `Em018UserData`; data em018_se_seq_<sub-state>, em018_se_alt_seq_<sub-state>,
  *   em018_demo_keys, em018_pick_a, em018_pick_b; the `EmFadeRec` field names.
  *   The callee names this unit asked for (`enemy-em018#N`) are GUESS except where the owner's comment names the
  *   behaviour.  The `.bss` record names (`vec_pair_801926EC_0`) are GUESSes.
- * RESIDUALS. 1 row unwritten: 0x8019287C-0x801928BC (`em018_user_data_ctor`, 60 B): it stores the class table
- *   0x805AE720 at +0x00, which needs the user-data class hierarchy modelled (rule 10), not a hand store.
- *   Partial rows:
+ * RESIDUALS. Partial rows:
  *  - `em018_motion_events`: retail shares the motion 0x55/0x56 water tail (case 0x56 branches into case 0x55's
  *    tail); the source repeats it (160 B long), the only shape without a `goto`;
  *  - `em018_drip_effect`: retail recomputes `angle + 0x8000` at each test, ours keeps it in a register;
@@ -35,7 +33,10 @@
  *   differences while those map rows keep their generated names.
  *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` and `.sdata2` not emitted in retail
  *   order (the SE tables, demo keys and pick records are `extern`).
- * SHAPES. `u8 >= 2` in `fn_8019238C` compiles to the borrow sequence (`li r3,2; orc; addi; srwi; subf; srwi`):
+ * SHAPES. `Em018UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   `u8 >= 2` in `fn_8019238C` compiles to the borrow sequence (`li r3,2; orc; addi; srwi; subf; srwi`):
  *   the source keeps the comparison.  `fn_80192448` declares its locals `max`, `i`, `work`, which gives retail's
  *   r31/r30/r29.  A one-case parameter test that retail compares signed (`cmpwi`) is a `switch` with `default:`
  *   first (`fn_80196E10`); a `cmplwi` range test with the in-range body last is `if ((u32)(x - 1) > 1) {...} else`
@@ -58,7 +59,9 @@
 #include "enemy/fn_801251D0.h" /* fn_801280F4, fn_80128030 */
 #include "enemy/fn_8012BDF4.h" /* em_busy_set */
 #include "enemy/fn_8012EC74.h" /* em_camera_req */
-#include "enemy/fn_80138074.h"  /* em_res_user_data_set, em_res_user_data_ck, fn_8013A654, fn_8013918C */
+#include "enemy/fn_80138074.h"  /* em_res_user_data_set, em_res_user_data_ck, ResUserDataAc */
+#include "MSL/new.h" /* the placement `operator new` */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "enemy/fn_80191598.h" /* fn_80192370, fn_80192618 */
 #include "fn_8004CAD8.h"       /* calcDistanceSqXZ */
 #include "unsplit/enemy.h"     /* the plain enemy-band callees (rule 2 band header) */
@@ -110,10 +113,10 @@
 #define em_move_offset_step_update_c1 ((u32 (*)(struct _ENEMY_WORK*, u32*, f32))em_move_offset_step_update)
 #define em_area_break_ck_c2 ((u8 (*)(struct _ENEMY_WORK*, u8))em_area_break_ck)
 #define em_roll_cooldown_ck_c1 ((s32 (*)(struct _ENEMY_WORK*, u16, u16, s16*))em_roll_cooldown_ck)
-#define anm_chr_result_scale_get_c1 ((void (*)(EmMtxHolder*, VEC3*))anm_chr_result_scale_get)
-#define anm_chr_result_trans_get_c1 ((void (*)(EmMtxHolder*, VEC3*))anm_chr_result_trans_get)
-#define anm_chr_result_scale_set_c1 ((void (*)(EmMtxHolder*, VEC3*))anm_chr_result_scale_set)
-#define anm_chr_result_trans_set_c1 ((void (*)(EmMtxHolder*, VEC3*))anm_chr_result_trans_set)
+#define anm_chr_result_scale_get_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_scale_get)
+#define anm_chr_result_trans_get_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_trans_get)
+#define anm_chr_result_scale_set_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_scale_set)
+#define anm_chr_result_trans_set_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_trans_set)
 #define camera_mode12_set_c1 ((void (*)(struct _ENEMY_WORK*))camera_mode12_set)
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -333,8 +336,18 @@ void fn_80198F10(struct _ENEMY_WORK* self);
 void fn_80198F14(struct _ENEMY_WORK* self);
 void em018_glow_fade(struct _ENEMY_WORK* self);
 u32 fn_8019E49C(struct _ENEMY_WORK* self, u32 flag);
-EmUserData* em018_user_data_ctor(EmUserData* self);
 }
+
+/* The user-data accessor `em018_init` installs: the base accessor with its own destructor, attach hook and
+ * animation item hook (its table is `.data` 0x805AE720).  size: 0xC (`operator new(0xC)`) */
+class Em018UserData : public ResUserDataAc {
+public:
+    Em018UserData();
+    virtual ~Em018UserData();
+    virtual void Attach();
+    virtual void CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+};
 
 
 extern "C" {
@@ -472,10 +485,8 @@ void em018_init(struct _ENEMY_WORK* self, u8 mode) {
 
     VEC3_ctor(&vec);
     if (em_res_user_data_ck(self) == 0) {
-        EmUserData* data = (EmUserData*)operator new(0xC);
-        if (data != 0) {
-            em018_user_data_ctor(data);
-        }
+        Em018UserData* data = (Em018UserData*)operator new(sizeof(Em018UserData));
+        new (data) Em018UserData;
         em_res_user_data_set(self, data);
     }
     if (self->field_0x009 == 0) {
@@ -502,6 +513,14 @@ void em018_init(struct _ENEMY_WORK* self, u8 mode) {
         em_state_refresh(self);
     }
 }
+
+} /* extern "C" */
+
+/* 0x8019287C (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em018UserData::Em018UserData() {
+}
+
+extern "C" {
 
 /* 0x801928BC (0x298): the program's event hook: releases the roster binding, then reacts to the (kind, sub)
  * event: the hit reactions, the 900/2700-frame cooldowns, the arena key, the gauge drain and the bound-player
@@ -5394,18 +5413,25 @@ u32 em018_action_select(struct _ENEMY_WORK* self, u32 arg) {
     return (em_area_leave_ck(self) - 1) == 0;
 }
 
-/* 0x8019DE98 (0x22C): the user-data node hook: for an admitted item it scales the joint node's glow (kinds 27/28,
- * clamped), lifts its translation by 25 while aim bit 0x01 is set (kind 24) and rescales the height by the two
- * fades (kinds 24/26). */
-void em018_user_data_node_calc(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind, EmUserItem* item) {
+} /* extern "C" */
+
+/* 0x8019DE90 (0x8): Sets the accessor's flag word to 1 once it is installed. */
+void Em018UserData::Attach() {
+    em_res_user_data_flag_set((struct _ENEMY_WORK*)this, 1);
+}
+
+/* 0x8019DE98 (0x22C): For an admitted item, scales the joint node's glow (kinds 27/28, clamped), lifts its
+ * translation by 25 while aim bit 0x01 is set (kind 24) and rescales the height by the two fades (kinds 24/26). */
+void Em018UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* holder, nw4r::g3d::ResMdl mdl,
+                                  nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 kind, UserDataItem* item) {
     VEC3 vec;
     struct _ENEMY_WORK* work;
     EmFadeRec* rec;
 
     VEC3_ctor(&vec);
-    work = self->work_0x04;
+    work = this->work;
     rec = &((EmActWork*)work)->fade_0x328;
-    switch (item->type_0x04) {
+    switch (item->field_0x04) {
     case 0xFF:
         switch (kind) {
         case 27:
@@ -5461,11 +5487,7 @@ void em018_user_data_node_calc(EmUserData* self, EmMtxHolder* holder, u32 a2, u3
     }
 }
 
-/* 0x8019DE90 - the one-line tail call the band's teardown uses: `em_res_user_data_flag_set(self, 1)`. */
-void fn_8019DE90(struct _ENEMY_WORK* self) {
-    em_res_user_data_flag_set(self, 1);
-}
-
+extern "C" {
 
 /* 0x8019E0C4 (0x2D4): steps the two glow triples by the fade state and fades the dim pair in or out. */
 void em018_glow_fade(struct _ENEMY_WORK* self) {
@@ -5589,17 +5611,10 @@ u32 fn_8019E580(struct _ENEMY_WORK* self) {
     return 0;
 }
 
-/* 0x8019E5A8 - the record's deleting destructor: reset through `em_res_user_data_dtor`, `operator delete` on a
- * positive flag, and return the argument. */
-void* fn_8019E5A8(void* p, s16 flags) {
-    if (p != 0) {
-        em_res_user_data_dtor((struct _ENEMY_WORK*)p, 0);
-        if (flags > 0) {
-            operator delete(p);
-        }
-    }
-    return p;
 }
+
+/* 0x8019E5A8 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em018UserData::~Em018UserData() {
 }
 
 /* The unit's `.bss`: the two-vector record `em018_static_init` seeds.  The name is a GUESS (a pair of model-space

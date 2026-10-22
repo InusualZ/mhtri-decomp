@@ -15,7 +15,7 @@
  *   dont_inline on/off` around the three packet constructors so MWCC emits them out of line after their first user.
  * NAMES. The file name follows the runtime dump's `em020_prog_tbl`, which opens the TU's `.data`; `getInstance_`
  *   is the dump's name.  GUESS (from each body, its callers and what it stores):
- *   em020_reset, em020_init, em020_user_data_ctor, em020_event_notify, em020_turn_back, em020_circle_charge,
+ *   em020_reset, em020_init, `Em020UserData`, em020_event_notify, em020_turn_back, em020_circle_charge,
  *   em020_blast, em020_walk_approach, em020_action5_dispatch, em020_slam, em020_leap, em020_dash, em020_tail_sweep,
  *   em020_spin, em020_burrow_attack_a, em020_burrow_attack_b, em020_pose_cb, em020_pose_cc, em020_pose_cd, em020_hop,
  *   em020_action7_dispatch, em020_action10_dispatch, em020_action11_play, em020_demo_intro, em020_demo_hold,
@@ -42,9 +42,7 @@
  *   Map rows already named (GUESS, from their bodies): the `em020_*` handlers the map carries, lobby_net_err_draw,
  *   em020_profile_send, releaseRemotePlayerParts, sendMemberJoinNotice, handleLobbyNetMessage, dropLobbyMail,
  *   addFriendNotice.  Foreign callees named by this unit are GUESS names too.
- * RESIDUALS. Unwritten: `em020_user_data_ctor` 0x8036E534 (0x40) - it stores the user-data table 0x805EE3F8 at
- *   +0x00, so it needs a real class whose MWCC-emitted vtable is that table (rule 10); the table (0x30) is not
- *   emitted either, so `.data` is 0x30 short and everything after 0x805EE3F8 sits 0x30 low.
+ * RESIDUALS.
  *  - `lobby_net_update`: 3240 B vs 3008 B; retail shares the error-window tails between cases (a tail merge no
  *    goto-free shape reproduced).
  *  - `em020_hp_ratio_ck`, `lobby_net_state_request_recv`, `em020_light_update`: retail exits through a `bne L; b end`
@@ -61,6 +59,9 @@
  *  - Signature casts: `em_get_part_limit`, `pl_parts_refresh`, `requestListRefreshAlias`, `userdata_item_slot_count`,
  *    `quest_grade_get` and `calcVecAngX` are called through a function-pointer cast where the owner's declaration
  *    differs from the retail call (decl requests filed).
+ * SHAPES. `Em020UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
  */
 
 #include "types.h"
@@ -75,7 +76,8 @@
 
 #include "gx.h"
 #include "enemy/fn_8012BDF4.h" /* em_act_ck (the C++ declaration, which mangles to the map's name) */
-#include "enemy/fn_80138074.h" /* fn_8013A9F4, the owner's own declaration */
+#include "enemy/fn_80138074.h" /* fn_8013A9F4, ResUserDataAc */
+#include "MSL/new.h" /* the placement `operator new` */
 #include "sound/mhchar.h"
 #include "nw4r/g3d/scnmdl.h"     /* ScnMdl::CopiedMatAccess */
 #include "g3d/g3d_resmat.h" /* ResTexSrt */
@@ -178,16 +180,18 @@
 #define em_eft_fx_spawn_anchor_c1 ((void (*)(struct _ENEMY_WORK*, u32, u32, f32))em_eft_fx_spawn_anchor)
 #define mhchar_mat_blend_set_c1 ((void (*)(struct MHchar*, u32, f32))mhchar_mat_blend_set)
 
-/* The em020 user-data helper `em020_init` installs: the 12-byte `ResUserDataAc` record (its table pointer, the work
- * record and a flag word) with em020's own table (`.data` 0x805EE3F8).  size: 0xC */
-struct Em020UserData {
-    /* +0x00 */ u8 record_0x00[0xC];
+/* The user-data accessor `em020_init` installs: the base accessor with its own destructor and attach hook (its
+ * table is `.data` 0x805EE3F8).  size: 0xC (`operator new(0xC)`) */
+class Em020UserData : public ResUserDataAc {
+public:
+    Em020UserData();
+    virtual ~Em020UserData();
+    virtual void Attach();
 };
 
 /* This unit's own forward declarations. */
 extern "C" {
 void em020_reset(_ENEMY_WORK* self);
-Em020UserData* em020_user_data_ctor(Em020UserData* self);
 void em020_angle_step_to_zero(_ENEMY_WORK* self);
 void em020_glow_color_get(_ENEMY_WORK* self, u8* r, u8* g, u8* b);
 u8* em020_quest_page_ptr(void);
@@ -710,10 +714,9 @@ void em020_init(_ENEMY_WORK* self)
     s32 hp;
 
     if (em_res_user_data_ck(self) == 0) {
-        Em020UserData* rec = (Em020UserData*)operator new(0xC);
+        Em020UserData* rec = (Em020UserData*)operator new(sizeof(Em020UserData));
 
-        if (rec != NULL)
-            em020_user_data_ctor(rec);
+        new (rec) Em020UserData;
         em_res_user_data_set(self, rec);
     }
     em_move_mode_set(self, 2);
@@ -753,6 +756,15 @@ void em020_init(_ENEMY_WORK* self)
         fn_802D94C4(1);
     }
 }
+
+} /* extern "C" */
+
+/* 0x8036E534 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em020UserData::Em020UserData()
+{
+}
+
+extern "C" {
 
 /* One handler slot of `em020_prog_tbl` that does nothing - the table's index 4. */
 void em020_nop(_ENEMY_WORK* self)
@@ -3115,11 +3127,15 @@ void em020_map_area_action_set(struct _ENEMY_WORK* self)
     }
 }
 
-/* 0x803754EC: hands the area's third resource record to the `em_res_user_data_flag_set` installer. */
-void em020_res_user_data_apply(struct _ENEMY_WORK* self)
+} /* extern "C" */
+
+/* 0x803754EC (0x8): Sets the accessor's flag word to 3 once it is installed. */
+void Em020UserData::Attach()
 {
-    em_res_user_data_flag_set(self, 3);
+    em_res_user_data_flag_set((struct _ENEMY_WORK*)this, 3);
 }
+
+extern "C" {
 
 /* The em020 aim-target predicate: whether the `+0x836` bit 15 "aim target found" flag is set.
  * 0x803754F4 */
@@ -3195,17 +3211,14 @@ u8 em020_status_flags_get(_ENEMY_WORK* self)
     return flags;
 }
 
-/* 0x803757E0: releases the sub-record through the shared teardown, freeing the block on a positive size. */
-void* em020_work_free(struct _ENEMY_WORK* self, s16 size)
+} /* extern "C" */
+
+/* 0x803757E0 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em020UserData::~Em020UserData()
 {
-    if (self != NULL) {
-        em_res_user_data_dtor(self, 0);
-        if (size > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
+
+extern "C" {
 
 /* The lobby's profile-part packets (`sendUserProfilePart` kind 0) all open with this 0x24-byte head: the packet kind,
  * a valid byte, the sender's id text and, for the addressed kinds, the receiver's id text.  size: 0x24 */

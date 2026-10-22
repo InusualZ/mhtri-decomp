@@ -25,10 +25,6 @@ typedef struct EmSpawnRec {
 extern "C" {
 #endif
 
-/* The helper's base constructor (the same 12-byte record `enemy/em015_prog.cpp` names
- * `Helper_80176E50`; the parameter stays `void*` until that type moves to a shared header). */
-void* em_res_user_data_ctor(void* self);
-
 #ifdef __cplusplus
 void fn_801481FC(struct _ENEMY_WORK* self);
 void fn_801493A8(struct _ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3);

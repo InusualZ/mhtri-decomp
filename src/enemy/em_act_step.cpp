@@ -1,9 +1,10 @@
 /* enemy/em_act_step.cpp - the enemy work record's action-step band: the step function of each of the record's first
- *   four action ids, the motion each of their phases arms, and the record's own class (constructor, vtable, destructor
- *   halves) with the effect-offset and seat-aim helpers.
+ *   four action ids, the motion each of their phases arms, the user-data accessor class `EmActStepUserData`
+ *   (`enemy/em_act_step.h`; constructor, table and destructor) and the effect-offset and seat-aim helpers.
  * RANGE. .text 0x8032C920-0x80330194 (70 functions); .ctors 0x8056F3A0-0x8056F3A4 (`fn_80330128`),
- *   .data 0x805DFC30-0x805E0510 (from `em026_prog_tbl`; the jump tables, the per-function tables and the class vtable
- *   `lbl_805E04E0` last), .bss 0x806BE328-0x806BE340, .sdata 0x80792D18-0x80792D28, .sdata2 0x8079B108-0x8079B210,
+ *   .data 0x805DFC30-0x805E0510 (from `em026_prog_tbl`; the jump tables, the per-function tables and the class table
+ *   `__vt__17EmActStepUserData` last), .bss 0x806BE328-0x806BE340, .sdata 0x80792D18-0x80792D28,
+ *   .sdata2 0x8079B108-0x8079B210,
  *   extab, extabindex.  The band's last four functions are `enemy/em_act_step_tail.cpp`.
  * SEAM. The band's end 0x8033041C (against `hud/pl_frame_sync.cpp`) is settled: extabindex entry 57 (0x800357A8)
  *   is `eft_frame_state_init`; the `.sdata2` run cuts at 0x8079B20C | 0x8079B210 with no label shared and MWCC's u32->f32
@@ -64,7 +65,6 @@ u32 quest_sub_state_end_ck(u32 a);
 void em_move_vec_set(struct _ENEMY_WORK* self, void* vec);
 void fn_8027D3F0(struct _PLW* self, u8 a);
 void em_attack_start(struct _ENEMY_WORK* self);
-void* em_res_user_data_ctor(void* self);
 u32 em_ground_rec_find(u16 id, EmGroundRec* rec);
 void em_ground_rec_clear(EmGroundRec* rec);
 
@@ -89,11 +89,11 @@ struct EmHandleBlock {
 
 /* The record every function in this range takes in r3 (size from the largest access, +0xB14, and from
  * `enemy/ENEMY_WORK.h`'s 0xB18; every field named from its use, ascending except `field_0x834`, see RESIDUALS).  Offset +0x000 is the class vtable the constructor
- * `em_work_ctor` stores, so the class's object *is* this record.
+ * `EmActStepUserData::EmActStepUserData` stores, so the class's object *is* this record.
  * size: 0xB18 */
 struct _EM_CHARA_WORK {
     /* +0x000 */ union {                /* the object's first four bytes carry both readings: the class
-                                         * vtable `em_work_ctor` stores here, and the header's own
+                                         * vtable `EmActStepUserData::EmActStepUserData` stores here, and the header's own
                                          * `active`/`group`/`team` bytes are the same four bytes. */
         void** vtable;
         struct {                       /* size: 0x04 */
@@ -252,15 +252,12 @@ extern "C" void em_eff_ground_set(_EM_CHARA_WORK* self)
     }
 }
 
-/* The class constructor: runs the base constructor, then installs this unit's vtable. */
-extern "C" _EM_CHARA_WORK* em_work_ctor(_EM_CHARA_WORK* self)
+/* 0x8032CEA8 (0x3C): Constructs the accessor: the base first, then this class's table. */
+EmActStepUserData::EmActStepUserData()
 {
-    em_res_user_data_ctor((_ENEMY_WORK*)self);
-    self->vtable = (void**)lbl_805E04E0;
-    return self;
 }
 
-/* The class destructor's deleting half, called from the vtable's slot 2 by `fn_803300CC`. */
+/* An empty body the target keeps after the accessor's constructor. */
 extern "C" void em_work_dtor_del(void)
 {
 }
@@ -915,5 +912,10 @@ extern "C" s32 em_seat_aim_ck(_EM_CHARA_WORK* self)
         return -1;
     }
     return 0;
+}
+
+/* 0x803300CC (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+EmActStepUserData::~EmActStepUserData()
+{
 }
 

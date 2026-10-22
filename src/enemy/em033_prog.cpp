@@ -21,13 +21,10 @@
  *   GUESS (dispatcher slot): em033_act<action>_<first sub-state> and em033_act<action>_dispatch, em033_act10_se_play,
  *   em033_act11_se_play; GUESS (from the bodies): em033_hold_kind_get, em033_color_update, em033_roster_pick,
  *   em033_area_roster_ck, em033_record_area_ck, em033_target_lock, em033_target_track, em033_aim_sync,
- *   em033_point_get; GUESS (the user-data class table's slots): em033_user_data_ctor, em033_user_data_flag_set,
- *   em033_user_data_calc, em033_user_data_dtor.
+ *   em033_point_get; `Em033UserData` (the accessor whose table is 0x805ED808) follows `enemy/res_user_data_ac.h`.
  *   GUESS (data): em033_turn_seq, em033_turn_rate_a/_b, em033_se_tbl_mot<N> / em033_se_rec_mot<N>_<x>,
  *   em033_se_tbl_/_rec_/_branch_act11_<n>; `_ENEMY_WORK::em033_0x328` (`hold_kind_0x33A`, `record_0x33B`, ...).
- * RESIDUALS. 1 row unwritten: `em033_user_data_ctor` (0x8035BBE8, 0x3C) - it stores the class table at
- *   0x805ED808 into the helper's +0x00, which is a hand-wired vtable (rule 10) until the user-data helper is a class;
- *   the table (0x30 B at the end of `.data`) stays unemitted with it, and so do the constructor's extab records.
+ * RESIDUALS.
  *   5 rows short: `em033_event_notify` - retail tests hold kinds 1..3 as one range (`subi`/`cmplwi 2`), ours
  *   compares 1 and 3 (a switch with and without `default`, and three `if` shapes measured lower);
  *   `em033_roster_pick`, `em033_area_roster_ck` - the loop's pointer, record and count registers colour
@@ -61,6 +58,8 @@
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_8012EC74.h"
 #include "enemy/fn_80138074.h"
+#include "MSL/new.h" /* the placement `operator new` */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "enemy/fn_80147CE0.h"
 #include "enemy/em_model.h"
 #include "enemy/em_pop.h"
@@ -95,12 +94,18 @@
 /* The +0x3C shell-table slot spelled without its trailing table argument: the call site passes none. */
 typedef void (*ShellRecJobFn)(struct _ENEMY_WORK* self, EmSpawnRec* rec, u32 mode);
 
-/* The object the aim writer's first argument points at, and the source block its +0x4 member names
- * (`em033_user_data_calc`).  Only the two fields the body touches are named. */
-struct EmAimOwner {
-    /* +0x000 */ u8 pad_0x000[0x4];
-    /* +0x004 */ u8* field_0x004;
-}; /* size: 0x8 */
+/* The user-data accessor `em033_init` installs: the base accessor with its own destructor, attach hook and
+ * animation item hook (its table is `.data` 0x805ED808).  size: 0xC (`operator new(0xC)`) */
+class Em033UserData : public ResUserDataAc {
+public:
+    Em033UserData();
+    virtual ~Em033UserData();
+    virtual void Attach();
+    virtual void CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+};
+
+/* The work block the aim writer reads.  Only the two fields the body touches are named. */
 struct EmAimSource {
     /* +0x000 */ u8 pad_0x000[0xA];
     /* +0x00A */ u8 field_0x00A;
@@ -178,15 +183,9 @@ void em033_target_lock(_ENEMY_WORK* self, u8 a);
 void em033_target_track(_ENEMY_WORK* self);
 void em033_aim_sync(_ENEMY_WORK* self);
 void em033_point_get(_ENEMY_WORK* self, u8 a, VEC3* out);
-void em033_user_data_flag_set(_ENEMY_WORK* self);
-void em033_user_data_calc(void* a, void* b, void* c, void* d, u32 e, u8* f);
-_ENEMY_WORK* em033_user_data_dtor(_ENEMY_WORK* p, u16 a);
 void em035_init(_ENEMY_WORK* self, u8 a);
 void em035_noop(void);
 void em035_event_notify(_ENEMY_WORK* self, u8 a, u8 b);
-
-/* untyped: opaque handle - the 0x0C-byte user-data record the constructor builds in place */
-void* em033_user_data_ctor(void* self);
 
 extern EmSeEntry em033_se_tbl_mot0[];
 extern EmSeEntry em033_se_tbl_mot122[];
@@ -248,7 +247,7 @@ void em033_reset(struct _ENEMY_WORK* self) {
 }
 
 void em033_init(struct _ENEMY_WORK* self, u8 mode) {
-    void* data;
+    Em033UserData* data;
 
     if ((s32)self->field_0x00A == 1) {
         self->field_0x1CC = 1.25f;
@@ -261,13 +260,19 @@ void em033_init(struct _ENEMY_WORK* self, u8 mode) {
         em_state_refresh(self);
     }
     if (em_res_user_data_ck(self) == 0) {
-        data = operator new(0xC);
-        if (data != 0) {
-            em033_user_data_ctor(data);
-        }
+        data = (Em033UserData*)operator new(sizeof(Em033UserData));
+        new (data) Em033UserData;
         em_res_user_data_set(self, data);
     }
 }
+
+} /* extern "C" */
+
+/* 0x8035BBE8 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em033UserData::Em033UserData() {
+}
+
+extern "C" {
 
 void em033_noop(void) {
 }
@@ -1989,25 +1994,29 @@ void em033_point_get(_ENEMY_WORK* self, u8 a, VEC3* out) {
     }
 }
 
-/* 0x8035EF50 (0x8): a one-line forwarder. */
-void em033_user_data_flag_set(_ENEMY_WORK* self) {
-    em_res_user_data_flag_set(self, 1);
+} /* extern "C" */
+
+/* 0x8035EF50 (0x8): Sets the accessor's flag word to 1 once it is installed. */
+void Em033UserData::Attach() {
+    em_res_user_data_flag_set((_ENEMY_WORK*)this, 1);
 }
 
-/* 0x8035EF58 (0xAC): the effect/target aim writer. */
-void em033_user_data_calc(void* a, void* b, void* c, void* d, u32 e, u8* f) {
+/* 0x8035EF58 (0xAC): For an item of kind 0xFF, sets node 0x17's scale from the work's +0x348 vector and scales
+ * nodes 5/6 by 1.5 while the work's +0x00A flag is set. */
+void Em033UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* b, nw4r::g3d::ResMdl mdl,
+                                  nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 e, UserDataItem* item) {
     VEC3 v;
-    struct EmAimSource* p = (struct EmAimSource*)((struct EmAimOwner*)a)->field_0x004;
+    struct EmAimSource* p = (struct EmAimSource*)this->work;
 
     VEC3_ctor(&v);
-    if ((s32)f[4] == 0xFF) {
+    if ((s32)item->field_0x04 == 0xFF) {
         switch (e) {
         case 0x17:
             anm_chr_result_scale_set((struct ResAnmChrObj*)b, (f32*)&p->field_0x348);
             break;
         case 5:
         case 6:
-            if (((struct EmAimSource*)((struct EmAimOwner*)a)->field_0x004)->field_0x00A == 1) {
+            if (((struct EmAimSource*)this->work)->field_0x00A == 1) {
                 anm_chr_result_scale_get((struct ResAnmChrObj*)b, (f32*)&v);
                 vec3_scale_in_place(&v, 1.5f);
                 anm_chr_result_scale_set((struct ResAnmChrObj*)b, (f32*)&v);
@@ -2017,16 +2026,11 @@ void em033_user_data_calc(void* a, void* b, void* c, void* d, u32 e, u8* f) {
     }
 }
 
-/* 0x8035F004 (0x5C): the em033 record's release hook. */
-_ENEMY_WORK* em033_user_data_dtor(_ENEMY_WORK* p, u16 a) {
-    if (p != 0) {
-        em_res_user_data_dtor(p, 0);
-        if ((s16)a > 0) {
-            operator delete(p);
-        }
-    }
-    return p;
+/* 0x8035F004 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em033UserData::~Em033UserData() {
 }
+
+extern "C" {
 
 /* 0x8035F060 (0x114): the em035 run-state constructor. */
 void em035_init(_ENEMY_WORK* self, u8 a) {

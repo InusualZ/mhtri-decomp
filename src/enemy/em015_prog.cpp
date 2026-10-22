@@ -21,19 +21,19 @@
  *   em015_back_step, em015_thunder_ball, em015_thunder_ball_aimed, em015_rolling_charge, em015_turn_slam,
  *   em015_thunder_burst, em015_thunder_burst_great, em015_reposition, em015_demo_dive_in, em015_demo_wake,
  *   em015_demo_arena, em015_mouth_sparks, em015_color_step, em015_step_toward, em015_part_flag_set,
- *   em015_ally_front_ck, em015_damage_level, em015_aim_set, em015_spawn_rec_set, em015_user_data_ctor/_dtor/
- *   _node_calc, em015_static_init.
+ *   em015_ally_front_ck, em015_damage_level, em015_aim_set, em015_spawn_rec_set, `Em015UserData`,
+ *   em015_static_init.
  *   GUESS (data): em015_turn_seq_*, em015_area_follow_tbl, em015_area_point_tbl, em015_se_seq_<sub-state> and
  *   em015_se_alt_seq_<sub-state> (the sub-state that first plays each table) with their em015_se_rec/pos/ofs records,
  *   em015_demo_keys, em015_se_shift; the `Em015ProgTbl` slot names.
  * RESIDUALS. `em015_rest`: retail colours `self` r31 and `kind`/`limit` r30, ours the other way round (the local's
  *   declaration place, an `if`/`else` select and a `u8`/`s32` parameter all leave it).
- *   `em015_user_data_ctor` stores the class table 0x805AA900 by hand (rule 10): the user-data class hierarchy
- *   (`enemy/fn_80138074.cpp`'s record) is not modelled, so `.data` stops at +0x145C - the 4-byte pad and the
- *   0x30-byte table are not emitted.
  *   `.sdata2` is 0x374 against the 0x378 claim: the last word is the alignment pad before the next unit's pool.
- *   flipcheck: the class table blocks a flip.
- * SHAPES. A `u8` selector parameter switched on directly (`switch (kind)`) gives retail's `subi`+`cmplwi` range
+ *   flipcheck: the `em015_rest` registers.
+ * SHAPES. `Em015UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   A `u8` selector parameter switched on directly (`switch (kind)`) gives retail's `subi`+`cmplwi` range
  *   lowering (`em015_back_step`, `em015_event_notify`); `switch ((u8)kind)` on a `u32` gives `cmpwi`/`blt` pairs.
  *   A masked selector compared `(s32)(u8)kind == N` gives retail's `cmpwi`.  A call written as the right operand of
  *   `*` is evaluated first: `x * get_em_chg_scale(self)` in place gives retail's operand order where a `scale` local
@@ -84,7 +84,8 @@
 #include "enemy/fn_801251D0.h" /* em_data_point_get/fn_80126324 + the 0x80129xxx helpers */
 #include "enemy/fn_8012EC74.h" /* em_float_depth_get */
 #include "enemy/fn_8012BDF4.h" /* em_act11_wait_ck */
-#include "enemy/fn_80138074.h" /* em_res_user_data_flag_set/em_res_user_data_dtor + the EmUserData record */
+#include "enemy/fn_80138074.h" /* em_res_user_data_flag_set, ResUserDataAc */
+#include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "fn_8004CAD8.h"       /* sin_idx_get/fn_80051378/rotVecY/calcDistanceSqXZ */
 #include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
@@ -162,16 +163,14 @@ void em015_swim_in(_ENEMY_WORK* self, u32 kind, u32 motion);
 void em015_act5_dispatch(_ENEMY_WORK* self);
 }
 
-/* The 12-byte helper `em015_init` allocates and `em015_user_data_ctor` constructs (+0x00: `lbl_805AA900`).
- * size: 0xC (`operator new(0xC)`) */
-typedef struct Em015UserData {
-    /* +0x0 */ void* vtbl;
-    /* +0x4 */ u32 unused_0x4;
-    /* +0x8 */ u32 unused_0x8;
-} Em015UserData;
-
-/* The helper's table, in this unit's `.data`. */
-extern "C" u8 lbl_805AA900[];
+/* The user-data accessor `em015_init` installs: the base accessor with its own destructor and attach hook (its
+ * table is `.data` 0x805AA900).  size: 0xC (`operator new(0xC)`) */
+class Em015UserData : public ResUserDataAc {
+public:
+    Em015UserData();
+    virtual ~Em015UserData();
+    virtual void Attach();
+};
 
 /* --------------------------------------------------------------------------------------------- */
 /* callees                                                                                        */
@@ -182,9 +181,6 @@ extern "C" u8 stage_map_kind_get(u8 id);
 extern "C" void em015_aim_set(_ENEMY_WORK* self);
 extern "C" u32 quest_id_get(void);
 extern "C" void em015_part_flag_set(_ENEMY_WORK* self, u32 a);
-
-/* This unit's own forward declaration (em015_init calls it before its definition). */
-extern "C" Em015UserData* em015_user_data_ctor(Em015UserData* self);
 
 /* The two mangled free functions, declared by their real signatures (rule 9: never the mangled
  * spelling - the front-end produces `em_die_ck__FP11_ENEMY_WORK` from this declaration). */
@@ -263,7 +259,6 @@ void em015_part_clamp(_ENEMY_WORK* self, u32 part);
 u32 em015_area_start_ck(_ENEMY_WORK* self, u32 arg);
 void em015_area_follow(_ENEMY_WORK* self);
 void em015_part_flag_set(_ENEMY_WORK* self, u32 value);
-void em015_user_data_node_calc(EmUserData* self);
 u32 em015_ally_front_ck(_ENEMY_WORK* self, u32 arg);
 u32 em015_act13_early_ck(_ENEMY_WORK* self);
 u8 em015_state_query(_ENEMY_WORK* self, u32 kind);
@@ -272,7 +267,6 @@ void em015_aim_reset(_ENEMY_WORK* self);
 u8 em015_damage_level(_ENEMY_WORK* self);
 void em015_aim_set(_ENEMY_WORK* self);
 void em015_spawn_rec_set(EmSpawnRec* out, u8 a, u16 b, u16 c);
-Em015UserData* em015_user_data_dtor(Em015UserData* self, s16 arg);
 void em015_static_init(void);
 
 /* The four 0xC-byte vectors `em015_static_init` seeds. */
@@ -415,10 +409,8 @@ extern "C" void em015_init(_ENEMY_WORK* self, u32 arg) {
 
     VEC3_ctor(&v);
     if (em_res_user_data_ck(self) == 0) {
-        helper = (Em015UserData*)operator new(0xC);
-        if (helper != 0) {
-            em015_user_data_ctor(helper);
-        }
+        helper = (Em015UserData*)operator new(sizeof(Em015UserData));
+        new (helper) Em015UserData;
         em_res_user_data_set(self, helper);
     }
     em015_aim_set(self);
@@ -466,10 +458,8 @@ extern "C" void em015_init(_ENEMY_WORK* self, u32 arg) {
     }
 }
 
-extern "C" Em015UserData* em015_user_data_ctor(Em015UserData* self) {
-    em_res_user_data_ctor(self);
-    self->vtbl = lbl_805AA900;
-    return self;
+/* 0x80176E50 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em015UserData::Em015UserData() {
 }
 
 extern "C" void em015_motion_next(_ENEMY_WORK* self, u8* state, u8* sub) {
@@ -5574,16 +5564,16 @@ void em015_part_flag_set(_ENEMY_WORK* self, u32 value) {
     }
 }
 
-/* Resets the work's part state after the user-data teardown. */
-void em015_user_data_node_calc(EmUserData* self) {
-    em_res_user_data_flag_set((_ENEMY_WORK*)self, 5);
-    self->work_0x04->part_0x740.field_0x740 = 1;
-    self->work_0x04->part_0x740.field_0x742 = 0;
-    self->work_0x04->part_0x740.field_0x744 = 0;
-    self->work_0x04->part_0x740.field_0x746 = 0;
-    self->work_0x04->part_0x740.field_0x748 = 0;
-    self->work_0x04->part_0x740.field_0x74A = 0;
-    self->work_0x04->part_0x740.field_0x74C = 0;
+/* 0x801823C0 (0x70): Sets the accessor's flag word to 5 and resets the work's part state once it is installed. */
+void Em015UserData::Attach() {
+    em_res_user_data_flag_set((_ENEMY_WORK*)this, 5);
+    work->part_0x740.field_0x740 = 1;
+    work->part_0x740.field_0x742 = 0;
+    work->part_0x740.field_0x744 = 0;
+    work->part_0x740.field_0x746 = 0;
+    work->part_0x740.field_0x748 = 0;
+    work->part_0x740.field_0x74A = 0;
+    work->part_0x740.field_0x74C = 0;
 }
 
 /* Is the work within the aimed target's attack range: compare the squared XZ distance to the rotated
@@ -5793,16 +5783,8 @@ void em015_spawn_rec_set(EmSpawnRec* out, u8 a, u16 b, u16 c) {
     out->field_0x14 = c;
 }
 
-/* The record's release step: unregister, then free when the caller asks (arg > 0); returns the record so a caller
- * can chain. */
-Em015UserData* em015_user_data_dtor(Em015UserData* self, s16 arg) {
-    if (self != 0) {
-        em_res_user_data_dtor((_ENEMY_WORK*)self, 0);
-        if (arg > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* 0x80182B38 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em015UserData::~Em015UserData() {
 }
 
 /* 0x80182B94 (0xAC): the static initialiser: seeds the four sound-offset vectors. */

@@ -7,7 +7,7 @@
  *   .rodata 0x80570150-0x805701A0 (`em025_turn_seq`, then the head tracking's limit initializer), .data
  *   0x805AE750-0x805B06D0 (`em025_prog_tbl` first, the user-data class table last), .sdata 0x80791A80-0x80791A88,
  *   .sdata2 0x80798518-0x80798910.  Left edge: `em018_static_init` (`enemy/em018_prog.cpp`) ends there and the 0.0
- *   pool entry repeats from here.  Right edge: `em025_user_data_dtor`, a deleting destructor like `em018_prog.cpp`'s,
+ *   pool entry repeats from here.  Right edge: `Em025UserData::~Em025UserData`, a deleting destructor like `em018_prog.cpp`'s,
  *   closes the TU (the 0.0 entry repeats again at `lbl_8079893C`, first read by `fn_801AA154`).
  * FLAGS. `cflags_main`; `#pragma peephole off` file-wide (retail keeps `clrlwi` + `cmpwi` pairs), `#pragma pool_data
  *   off`.
@@ -19,17 +19,16 @@
  *   em025_act<action>_dispatch, em025_act10_se_play, em025_act11_se_play.  GUESS (from the bodies and callers): the
  *   other em025_* functions, `Em025Block` and its fields, `Em025HitRec` and its fields, the em025_*_tbl capsule
  *   tables, the em025_*_curve key curves, em025_sway_keys, em025_swim_speeds, em025_turn_seq, the em025_se_*
- *   records, em025_se_height, em025_se_next_act.  Foreign GUESS names proposed in the registry (lane enemy-em025)
- *   and declared in leaf headers: em_busy_net_notify, world_mtx_attr_scale_set, camera_quake_pos_req,
- *   camera_mode_req, eft_em_model_pair_attach, bgm_event_flag_set, bgm_track15_req, anim_key_curve_eval.
- * RESIDUALS. `em025_user_data_ctor` (0x8019EF04, 0x3C) unwritten: it stores the user-data class table (.data
- *   0x805B06A0, 0x30 B: `em025_user_data_dtor`/`em025_user_data_attach`/`em025_user_data_node_calc` over the
- *   `ResUserDataAc` base slots) at +0x00, which needs that base as a C++ class (rule 10); the table is not emitted
- *   either.  `em025_head_track` - the block pointer's induction register is set up before the joint/limit table
+ *   records, em025_se_height, em025_se_next_act, `Em025UserData`.
+ *   Foreign GUESS names proposed in the registry (lane enemy-em025) and declared in leaf headers:
+ *   em_busy_net_notify, world_mtx_attr_scale_set, camera_quake_pos_req, camera_mode_req, eft_em_model_pair_attach, bgm_event_flag_set, bgm_track15_req, anim_key_curve_eval.
+ * RESIDUALS. `em025_head_track` - the block pointer's induction register is set up before the joint/limit table
  *   pointers, and the turn angle lands in r4 with the `i == 0` compare scheduled after the subtraction.
- *   flipcheck: `.text` 0x3C and extab/extabindex one record short (the unwritten constructor), `.data` 0x1F4C of
- *   0x1F80 (the class table), and the 8 foreign names above are registry proposals, not map names yet.
- * SHAPES. A `subi`/`cmplwi`/`ble` range test on a `u8` is the explicit `(u32)((u8)x - lo) <= n` (a `switch` or an `||`
+ *   flipcheck: the 8 foreign names above are registry proposals, not map names yet.
+ * SHAPES. `Em025UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   A `subi`/`cmplwi`/`ble` range test on a `u8` is the explicit `(u32)((u8)x - lo) <= n` (a `switch` or an `||`
  *   chain gives the `cmpwi` tree); a `(s32)` cast gives retail's signed `cmpwi` on a `u8`/`u16` value; a one-case
  *   test compared signed is a `switch` with the other path as `default:`; the shell-table slots are called without
  *   their trailing table argument; `em_ground_ck_c1`/`curve_key_eval_c1` keep the float argument where retail
@@ -76,6 +75,8 @@
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "sys_mem.h"
 #include "enemy/fn_80138074.h"
+#include "MSL/new.h" /* the placement `operator new` */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "Pl/plw.h"
 #include "enemy/em_se_record.h"
 #include "stage/shell_set_func_ptr.h"
@@ -95,23 +96,18 @@
 #include "enemy/joint_mtx_store.h"
 #include "calcMtxAng3.h"
 
+/* The user-data accessor `em025_init` installs: the base accessor with its own destructor, attach hook and matrix
+ * item hook (its table is `.data` 0x805B06A0).  size: 0xC (`operator new(0xC)`) */
+class Em025UserData : public ResUserDataAc {
+public:
+    Em025UserData();
+    virtual ~Em025UserData();
+    virtual void Attach();
+    virtual void CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+};
+
 extern "C" {
-/* The em025 user-data helper the init attaches: the 12-byte `ResUserDataAc` record (its table pointer, the
- * work record and a flag word) with em025's own table.  size: 0xC */
-struct Em025UserData {
-    /* +0x00 */ u8 record_0x00[0xC];
-};
-Em025UserData* em025_user_data_ctor(Em025UserData* self);
-
-struct UserDataCursor;
-
-/* The model node record the joint callback receives: only its parent byte is read.  size: 0x08 (approximate -
- * only +0x04 is observed) */
-struct Em025NodeItem {
-    /* +0x00 */ u8 pad_0x00[4];
-    /* +0x04 */ u8 parent_0x04;    /* 0xFF for a joint with no parent override */
-    /* +0x05 */ u8 pad_0x05[3];
-};
 
 /* `enemy/fn_8011D448.cpp`'s status-bit helpers (`bits_0x824`), declared with these call sites' spelling. */
 void em_status_bits_init(struct _ENEMY_WORK* self);
@@ -756,13 +752,19 @@ void em025_init(struct _ENEMY_WORK* self, u8 mode) {
     }
     eft_em_model_pair_attach(self);
     if (em_res_user_data_ck(self) == 0) {
-        data = (Em025UserData*)operator new(0xC);
-        if (data != NULL) {
-            em025_user_data_ctor(data);
-        }
+        data = (Em025UserData*)operator new(sizeof(Em025UserData));
+        new (data) Em025UserData;
         em_res_user_data_set(self, data);
     }
 }
+
+} /* extern "C" */
+
+/* 0x8019EF04 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em025UserData::Em025UserData() {
+}
+
+extern "C" {
 
 /* 0x8019EF40 - an empty virtual body (the class's no-op slot). */
 void em025_noop(void) {
@@ -4584,47 +4586,51 @@ void em025_head_track(struct _ENEMY_WORK* self) {
     }
 }
 
-/* r3 the work record; the kind-3 request: clears its slot word, arms the aim motion and takes the
- * 3-byte area-table entry. */
-void em025_user_data_attach(struct _ENEMY_WORK* self) {
+} /* extern "C" */
+
+/* 0x801A9C6C (0x40): Sets the accessor's flag word to 3 once it is installed. */
+void Em025UserData::Attach() {
     nw4r::g3d::ResNode sp8((void*)0);
-    em_res_user_data_flag_set(self, 3);
+    em_res_user_data_flag_set((struct _ENEMY_WORK*)this, 3);
 }
 
-/* 0x801A9CAC (0x148): the user data's joint callback: the head tracking's Y rotations on joints 23/24, the sway
- * scale and X rotation on joints 28/29, for the joints with no parent override. */
-void em025_user_data_node_calc(EmUserData* self, struct MtxHolder* node, s32* unused, struct UserDataCursor* cursor, u32 joint, Em025NodeItem* item) {
-    struct _ENEMY_WORK* work = self->work_0x04;
+/* 0x801A9CAC (0x148): The head tracking's Y rotations on nodes 23/24 and the sway scale and X rotation on nodes
+ * 28/29, for an item of kind 0xFF. */
+void Em025UserData::CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                                  nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 joint, UserDataItem* item) {
+    struct _ENEMY_WORK* work = this->work;
     nw4r::math::MTX34 mtx;
 
     MTX34_ctor(&mtx);
-    if ((s32)item->parent_0x04 == 0xFF) {
+    if ((s32)item->field_0x04 == 0xFF) {
         switch (joint) {
         case 23:
-            joint_mtx_load(node, &mtx);
+            joint_mtx_load((struct MtxHolder*)pManip, &mtx);
             rotMatrixY(work->em025_0x328.rot_y_0x33C[0], &mtx);
-            joint_mtx_store(node, &mtx);
+            joint_mtx_store((struct MtxHolder*)pManip, &mtx);
             break;
         case 24:
-            joint_mtx_load(node, &mtx);
+            joint_mtx_load((struct MtxHolder*)pManip, &mtx);
             rotMatrixY(work->em025_0x328.rot_y_0x33C[1], &mtx);
-            joint_mtx_store(node, &mtx);
+            joint_mtx_store((struct MtxHolder*)pManip, &mtx);
             break;
         case 28:
-            world_mtx_attr_scale_set((struct VtxAttrRef*)node, 1.0f, work->em025_0x328.scale_0x348, 1.0f);
-            joint_mtx_load(node, &mtx);
+            world_mtx_attr_scale_set((struct VtxAttrRef*)pManip, 1.0f, work->em025_0x328.scale_0x348, 1.0f);
+            joint_mtx_load((struct MtxHolder*)pManip, &mtx);
             rotMatrixX(work->em025_0x328.rot_x_0x344, &mtx);
-            joint_mtx_store(node, &mtx);
+            joint_mtx_store((struct MtxHolder*)pManip, &mtx);
             break;
         case 29:
-            world_mtx_attr_scale_set((struct VtxAttrRef*)node, 1.0f, work->em025_0x328.scale_0x348, 1.0f);
-            joint_mtx_load(node, &mtx);
+            world_mtx_attr_scale_set((struct VtxAttrRef*)pManip, 1.0f, work->em025_0x328.scale_0x348, 1.0f);
+            joint_mtx_load((struct MtxHolder*)pManip, &mtx);
             rotMatrixX(work->em025_0x328.rot_x_0x344, &mtx);
-            joint_mtx_store(node, &mtx);
+            joint_mtx_store((struct MtxHolder*)pManip, &mtx);
             break;
         }
     }
 }
+
+extern "C" {
 
 /* r3 the work record; releases the joint-effect slots and re-arms the two it owns. */
 void em025_effect_slots_reset(struct _ENEMY_WORK* self) {
@@ -4680,15 +4686,8 @@ u32 em025_shore_target_ck(struct _ENEMY_WORK* self) {
     return 0;
 }
 
-/* r3 the record, r4 the sign-extended flag; releases the record's user data and frees it when the
- * flag is positive.  Returns r3 (the record). */
-s32 em025_user_data_dtor(s32 record, s16 free_it) {
-    if (record != 0) {
-        em_res_user_data_dtor((struct _ENEMY_WORK*)record, 0);
-        if (free_it > 0) {
-            operator delete((void*)record);
-        }
-    }
-    return record;
 }
+
+/* 0x801AA0F8 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em025UserData::~Em025UserData() {
 }

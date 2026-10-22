@@ -42,6 +42,7 @@
 #include "mh3_pad.h"
 #include "fn_8004CAD8.h"
 #include "enemy/fn_80147CE0.h"
+#include "MSL/new.h" /* the placement `operator new` */
 #include "ef/eft004.h"
 #include "ef/fn_80105314.h"
 #include "ef/fn_800CDB2C.h"
@@ -263,10 +264,9 @@ extern "C" void em024_init(_ENEMY_WORK* self, u8 arg)
     self->em024_0x328.tev_color2_0x340 = self->em024_0x328.tev_color_0x334;
     self->field_0x1E4 = 0;
     if (em_res_user_data_ck(self) == 0) {
-        void* rec = operator new(0xC);
+        ResUserDataAc* rec = (ResUserDataAc*)operator new(sizeof(ResUserDataAc));
 
-        if (rec != NULL)
-            em_res_user_data_ctor(rec);
+        new (rec) ResUserDataAc;
         em_res_user_data_set(self, rec);
     }
     if (arg == 0 && self->field_0x010 == 1) {

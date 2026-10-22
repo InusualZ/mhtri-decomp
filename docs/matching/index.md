@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (154)
+## Ideas that work (155)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -163,6 +163,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 172 | [Quantised fast-cast loads and stores are inline asm psq_l/psq_st with a GQR index](172-fast-cast-inline-asm.md) | works | source-shape | Retail converts a quantised `s16`/`u8` with one `psq_l fD,0(rA),1,N` (or stores with `psq_st ...,1,N`) where ours, written as a C cast, emits `lha`/`lbz` plus the int-to-float magic sequence. |
 | 173 | [An inline asm block inside a C loop is unrolled with its displacements rebased](173-asm-block-loop-unrolled.md) | works | source-shape | Retail has a long straight run of paired-single stores or loads (`psq_st f0,0..248(r30)`, a 4x `psq_l`/`ps_madd` key loop) that no C loop produces and an asm function reproduces only by writing every copy out. |
 | 174 | [A unit's claimed data is its own literals, type-name records, statics and inline tail: write them as source](174-data-written-as-source.md) | works | data, sections, source-shape | A unit whose code rows are all 100 % emits none of its claimed `.data`/`.sdata`/`.rodata`/`.bss`, so flipcheck refuses it - the source declares every string, type-name record and constant `extern`. |
+| 175 | [A real constructor call with no unwind record is placement new over operator new](175-real-constructor-call-with.md) | works | source-shape, sections, vtable | The allocating function's `.text` is 100 % once the class is real, but its `extab` record grows by 0x10 with a `__dl__FPv` relocation the target does not have. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

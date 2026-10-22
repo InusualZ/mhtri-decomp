@@ -250,7 +250,6 @@ void sound_job_request(s32, u8, s32, s32, s32, void*, s32);
 void mhchar_reset(void*);
 void mhchar_draw_mode_set(void*, s32);
 void mhchar_model_create(MHchar*, u32*, u32, s32);
-void fn_8007B878(void*, s32);
 void fn_8007BA08(void*, void*);
 extern s32 ef_system_memory_manager(void*);
 extern void* fn_800A5484(void*);
@@ -1869,10 +1868,9 @@ u32 res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light) {
 /* untyped: opaque handle - the UV animation record the caller stores */
 void* res_eft_UV_model_create(MHchar* model, u16 id, u32 arg, long light, struct _g3d_work** list, long count, u8 flag) {
     u32 res;
-    u32 mdl;
 
     res_file_ctor(&res, 0);
-    fn_8007B878(&mdl, 0);
+    nw4r::g3d::ResMdl mdl((void*)0);
     if (model == NULL) {
         return NULL;
     }
@@ -1889,15 +1887,15 @@ void* res_eft_UV_model_create(MHchar* model, u16 id, u32 arg, long light, struct
 void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long light, struct _g3d_work** list, long count,
                                    u8 flag) {
     EftResFileHandle res;
-    EftResFileHandle mdl;
-    u32 file;
     ResEntry* entry;
     void* uv;
     f32 strength;
     s32 i;
 
     res_file_ctor(&res.data_0x00, 0);
-    fn_8007B878(&mdl, 0);
+    nw4r::g3d::ResMdl mdl((void*)0);
+    u32 file;
+
     entry = ckResourceName(name);
     if (entry == NULL) {
         return NULL;
@@ -1910,13 +1908,13 @@ void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long ligh
     model->ready = 1;
     nw4r::g3d::ResMdl scn_mdl = ((nw4r::g3d::ScnMdlSimple*)model->field_0x118)->GetResMdl();
     fn_8007BA08(&mdl, &scn_mdl);
-    if (nw_res_anm_work_num(res, mdl, 5, list) <= count) {
+    if (nw_res_anm_work_num(res, *(EftResFileHandle*)&mdl, 5, list) <= count) {
         if ((u32)(flag - 1) <= 1) {
             strength = 1.0f;
         } else {
             strength = 0.5f;
         }
-        uv = nw_res_anm_create(res, mdl, (nw4r::g3d::ScnMdlSimple*)model->field_0x118, 5, list[0], &list[1], strength);
+        uv = nw_res_anm_create(res, *(EftResFileHandle*)&mdl, (nw4r::g3d::ScnMdlSimple*)model->field_0x118, 5, list[0], &list[1], strength);
         if (uv != NULL) {
             return uv;
         }

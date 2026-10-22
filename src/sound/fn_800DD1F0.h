@@ -24,18 +24,6 @@ void mhchar_mat_tev_set(MHchar* self, s32 mat, s32 mode, u8 a, s32 b, s32 c, u8 
 
 
 
-/* The model's base initialiser: stores the initial joint table's address at +0x00 of `self`
- * (`src/sound/fn_800DD1F0.cpp` defines it as `void fn_800E3B2C(MHchar* self)`; the parameter is
- * `MHchar*` because its own call sites pass the actor's model, and the body only writes +0x00, so the
- * enemy band's 12-byte helper constructor `enemy/fn_80147CE0.cpp`'s `em_res_user_data_ctor` calls it with its
- * own record).  Declared here on landing that consumer (rule 2: the owner's header); the older
- * `unsplit/sound.h` no-argument view stays for the C-side consumer that uses it. */
-void fn_800E3B2C(MHchar* self);
-
-/* 0x800E3264 - the per-track value setter (defined here at src/sound/fn_800DD1F0.cpp:300).
- * The older `(void*, void*)` view in `unsplit/sound.h` stays for that band's other consumers. */
-void fn_800E3264(MHchar* track, u32 arg);
-
 /* 0x800E1640 / 0x800E16DC / 0x800E2198 - the model-block setters the Pl part accessors tail-call.
  * The addresses sit inside this unit's range (0x800DD1F0-0x800E3CBC), so the declarations belong to
  * this header (rule 2); `Pl/fn_802693c4.cpp` and `Pl/pl_act.cpp` are the call sites.  The value

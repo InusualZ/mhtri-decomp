@@ -28,12 +28,12 @@
  *    spelling tried (u16/u32 local, ternary, if, u16 parameter view, cast) folds it away;
  *  - `em016_atk_volley_charge`, `em016_atk_volley_run`: `(kind == 1) + 0xC9` computed into r0 where retail uses r4;
  *  - `em016_action_allow_ck`, `em016_swim_rest`: one scratch register coloured differently.
- *  Data: `.data` is byte-identical through +0x2A0C; the user-data class table `em016_user_data_class_tbl`
- *  (0x805AD340, 0x30) and the 4-byte pad before it are not emitted - the table is the vtable of the user-data class
- *  `em016_user_data_ctor` stores by hand (rule 10: needs the ResUserData hierarchy of `enemy/fn_80138074.cpp`).
  *  `.ctors` is not emitted: `em016_static_init` is a plain function (a real `__sinit` needs the vector pair
  *  constructors). flipcheck also names `fn_805012E8` (no map row in this tree).
- * SHAPES. A one-case test retail compares signed (`cmpwi`) is a `switch`; a trailing `default:` retail lays out
+ * SHAPES. `Em016UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
+ *   landing pad retail does not have).
+ *   A one-case test retail compares signed (`cmpwi`) is a `switch`; a trailing `default:` retail lays out
  *   first is written first.  The float argument of the effect spawners is evaluated first, so they are called
  *   through float-first views (`em_eft_fx_spawn_ff`, `eft_em_spawn_joint`'s owner order).  The shell slots +0x2C,
  *   +0x30 and +0x3C are called without the table argument the header spells (r6/r8 there is only the table base),
@@ -79,7 +79,9 @@
 #include "enemy/fn_8012EC74.h" /* fn_8013026C */
 #include "enemy/fn_8012BDF4.h" /* fn_8012E5A8 */
 #include "ef.h"
-#include "enemy/fn_80138074.h" /* em_res_user_data_flag_set/em_res_user_data_dtor + the EmUserData record */
+#include "enemy/fn_80138074.h" /* em_res_user_data_flag_set, ResUserDataAc */
+#include "MSL/new.h" /* the placement `operator new` */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "fn_8004CAD8.h"       /* fn_8005024C/fn_80051378/rotVecY/calcDistanceSqXZ */
 #include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
@@ -199,7 +201,6 @@ typedef void (*EmShellShotFn)(_ENEMY_WORK* self, EmSpawnRec* req, u32 mode);
 #define fn_80191EF8_view1 ((void (*)(_ENEMY_WORK*))em016_aim_step)
 #define fn_80182D5C_view1 ((void (*)(void))em016_area_route_set)
 #define fn_8013A654_view1 ((void (*)(EmUserData*, u32))em_res_user_data_flag_set)
-#define fn_8013918C_view1 ((void (*)(void*, s16))em_res_user_data_dtor)
 #define fn_801321DC_view1 ((u32 (*)(EmActWork*))em_flag_0x8AE_ck)
 #define fn_8012EC3C_view1 ((u32 (*)(EmActWork*))em_eft_active_ck)
 #define fn_8012A204_view1 ((s32 (*)(EmActWork*))em_area_leave_ck)
@@ -226,7 +227,6 @@ u32 stage_map_kind_get(u32 kind);
 /* ------------------------------------------------------------------------------------------------
  * This unit's own functions: declared up front so the dispatchers can tail-call them.
  * ------------------------------------------------------------------------------------------------ */
-void* em016_user_data_ctor(void* self);
 void em016_frame_em016(_ENEMY_WORK* self);
 void em016_frame_em017(_ENEMY_WORK* self);
 void em016_look_roar(_ENEMY_WORK* self);
@@ -245,10 +245,20 @@ void em016_walk_dispatch_em017(_ENEMY_WORK* self);
 void em016_walk_dispatch_em021(_ENEMY_WORK* self);
 void em016_look_dispatch_em017(_ENEMY_WORK* self);
 void em016_look_dispatch_em021(_ENEMY_WORK* self);
-
-/* The table the 0xC-byte helper's constructors install at +0x00, in this unit's `.data`. */
-extern u32 em016_user_data_class_tbl[];
 }
+
+/* The user-data accessor `em016_init` installs for enemy 016: the base accessor with its own destructor, attach
+ * hook and two item hooks (its table is `.data` 0x805AD340).  size: 0xC (`operator new(0xC)`) */
+class Em016UserData : public ResUserDataAc {
+public:
+    Em016UserData();
+    virtual ~Em016UserData();
+    virtual void Attach();
+    virtual void CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+    virtual void CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item);
+};
 
 /* The mangled callees, outside `extern "C"` with the widths each mangling encodes (rule 9). */
 u16 calcVecAngX(nw4r::math::VEC3* v);
@@ -328,7 +338,7 @@ f32 sin_idx_get(u16 a);
  * where these call sites read r3. */
 struct _CP_VECTOR;
 
-/* The 3x3 matrix `fn_805012E8` fills (nine floats; `em016_user_data_aim_apply`'s frame is sized for it).
+/* The 3x3 matrix `fn_805012E8` fills (nine floats; `Em016UserData::CalcAnmItemEx`'s frame is sized for it).
  * size: 0x24 */
 struct EmMtx33 {
     /* +0x00 */ f32 m[3][3];
@@ -384,13 +394,9 @@ u32 em016_ready_ck(EmActWork* self);
 u32 em016_state_clear_ck(EmActWork* self);
 void em016_part_drop(EmActWork* self, u32 kind);
 s32 em016_action_allow_ck(EmActWork* self, u32 arg);
-void em016_user_data_reenter(EmUserData* self);
-void em016_user_data_aim_apply(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind, EmUserItem* item);
-void em016_user_data_cluster_place(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind, EmUserItem* item);
 void em016_aim_step(EmActWork* self);
 void em016_aim_fade(EmActWork* self);
 void em016_shot_req_init(EmSpawnRec* out, u8 a, u16 b, u16 c);
-void* em016_user_data_dtor(void* p, u32 flag);
 void em016_static_init(void);
 }
 
@@ -699,10 +705,8 @@ extern "C" void em016_init(_ENEMY_WORK* self, u8 mode) {
     VEC3_ctor(&offset);
     if (self->team == 0x10) {
         if (em_res_user_data_ck(self) == 0) {
-            void* helper = operator new(0xC);
-            if (helper != 0) {
-                em016_user_data_ctor(helper);
-            }
+            Em016UserData* helper = (Em016UserData*)operator new(sizeof(Em016UserData));
+            new (helper) Em016UserData;
             em_res_user_data_set(self, helper);
         }
         EmActWork* work = (EmActWork*)self;
@@ -821,11 +825,8 @@ extern "C" void em016_init(_ENEMY_WORK* self, u8 mode) {
     }
 }
 
-/* The 0xC-byte helper's second constructor: base first, then this class's vtable. */
-extern "C" void* em016_user_data_ctor(void* self) {
-    em_res_user_data_ctor(self);
-    *(void**)self = em016_user_data_class_tbl;
-    return self;
+/* 0x80183440 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em016UserData::Em016UserData() {
 }
 
 /* 0x8018347C (0x29C): Reacts to a program event `(kind, value)`: enemy 016 raises its flags, calls for help or
@@ -7844,22 +7845,23 @@ s32 em016_action_allow_ck(EmActWork* self, u32 arg) {
     return (fn_8012A204_view1(self) - 1) == 0;
 }
 
-/* Re-enters the user-data accessor's third flag state. */
-void em016_user_data_reenter(EmUserData* self) {
-    fn_8013A654_view1(self, 3);
+/* 0x80191CDC (0x8): Sets the accessor's flag word to 3 once it is installed. */
+void Em016UserData::Attach() {
+    fn_8013A654_view1((EmUserData*)this, 3);
 }
 
-/* Applies one user-data item's aim transform to the caller's matrix holder. */
-void em016_user_data_aim_apply(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind, EmUserItem* item) {
+/* 0x80191CE4 (0x14C): Applies the aim block's scale or rotation to the animation result of nodes 16..26. */
+void Em016UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* holder, nw4r::g3d::ResMdl mdl,
+                                  nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 kind, UserDataItem* item) {
     MTX34 mtx;
     EmMtx33 dst;
     EmRotVec rot;
     EmActWork* work;
 
-    work = (EmActWork*)self->work_0x04;
+    work = (EmActWork*)this->work;
     MTX34_ctor(&mtx);
     MTX33_ctor(&dst);
-    switch (item->type_0x04) {
+    switch (item->field_0x04) {
     case 0xFF:
         switch (kind) {
         case 16:
@@ -7892,15 +7894,16 @@ void em016_user_data_aim_apply(EmUserData* self, EmMtxHolder* holder, u32 a2, u3
     }
 }
 
-/* Places the aimed cluster the item's index selects. */
-void em016_user_data_cluster_place(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind, EmUserItem* item) {
+/* 0x80191E30 (0xC8): Moves the matrix of node 16/18/20 onto its live cluster's position. */
+void Em016UserData::CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                                  nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 kind, UserDataItem* item) {
     MTX34 mtx;
     u32 index;
     EmActWork* work;
 
-    work = (EmActWork*)self->work_0x04;
+    work = (EmActWork*)this->work;
     MTX34_ctor(&mtx);
-    switch (item->type_0x04) {
+    switch (item->field_0x04) {
     case 0xFF:
         switch (kind) {
         default:
@@ -7917,9 +7920,9 @@ void em016_user_data_cluster_place(EmUserData* self, EmMtxHolder* holder, u32 a2
         }
         EmCluster* cluster = &work->clusters_0x590[index];
         if (cluster->live_0x03 >= 1) {
-            joint_mtx_load(holder, &mtx);
+            joint_mtx_load((EmMtxHolder*)pManip, &mtx);
             mtx34_set_trans(&mtx, &cluster->pos_0x24);
-            joint_mtx_store(holder, &mtx);
+            joint_mtx_store((EmMtxHolder*)pManip, &mtx);
         }
         break;
     }
@@ -8024,15 +8027,8 @@ void em016_shot_req_init(EmSpawnRec* out, u8 a, u16 b, u16 c) {
     out->field_0x14 = c;
 }
 
-/* Releases a heap block when the flag asks for it, then hands the pointer back. */
-void* em016_user_data_dtor(void* p, u32 flag) {
-    if (p != 0) {
-        fn_8013918C_view1(p, 0);
-        if ((s16)flag > 0) {
-            operator delete(p);
-        }
-    }
-    return p;
+/* 0x801921A8 (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em016UserData::~Em016UserData() {
 }
 
 /* Builds the five static vectors the effect requests start from. */

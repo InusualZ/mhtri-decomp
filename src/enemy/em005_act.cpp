@@ -27,9 +27,8 @@
  *    constructor pair (`setVec3` returning `this`, then `assignVec3` from that result: `mr r4,r3`) and places those
  *    temporaries below the vector pairs'; the inline pair written here copies from the temporary's address
  *    (`addi r4,r1,N`) and orders the slots the other way.
- *   Data: the user-data helper's class table `em005_user_data_class_tbl` (0x805B69A8, 0x30 B, at the end of `.data`)
- *   is not emitted (it needs the `ResUserDataAc` class hierarchy, rule 10), so `.data` is 0x34 B short and the unit
- *   cannot flip; the helper's constructor stores the table address by hand.
+ *   Data: `Em005UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table
+ *   (0x805B69A8); it is built with placement `new` over `operator new` (a new-expression adds a landing pad).
  * SHAPES. A `u8` compared with `==` gives `cmplwi`; retail's `cmpwi` comes from a `(s32)` cast or a one-case `switch`,
  *   and a masked byte compared unsigned is `(u8)(x & m) == n`.  The aim angles are `u32` locals holding
  *   `(u16)(calcVecAng2(...) - field_0x1C0)`; the random side offset is written `angle + 0x4000 + bits % 0x2000`.
@@ -57,6 +56,7 @@
 #include "enemy/fn_8012EC74.h"
 #include "enemy/fn_80138074.h"
 #include "enemy/fn_80147CE0.h"
+#include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/fn_8011D448.h"
 #include "enemy/enemy_control.h"
 #include "unsplit/enemy.h"
@@ -101,7 +101,6 @@
 #define em_pack_area_pick_v ((u32 (*)(struct _ENEMY_WORK*, u8, u8, u16, u8*, u8*))em_pack_area_pick)
 #define em_area_leave_ck_v ((s32 (*)(struct _ENEMY_WORK*))em_area_leave_ck)
 #define capsule_box_from_points_v ((void (*)(void*, void*, f32, void*))capsule_box_from_points)
-#define em_res_user_data_dtor_v ((void (*)(void*, s16))em_res_user_data_dtor)
 #define em_move_offset_step_update_v ((u32 (*)(struct _ENEMY_WORK*, void*))em_move_offset_step_update)
 
 /* The `ShellSetFuncs` slot spelled without its trailing table argument: the shared slot type hoists the table
@@ -148,12 +147,12 @@ struct Em005Capsule {
     /* +0x18 */ f32 radius;
 };
 
-/* The user-data helper `em005_init` allocates (0xC B, `operator new(0xC)`): the class table its constructor stores,
- * then the base record's work pointer and flag word (`enemy/fn_80138074.h`'s `EmUserData`).  size: 0x0C */
-struct Em005UserData {
-    /* +0x00 */ u32* class_tbl_0x00;
-    /* +0x04 */ struct _ENEMY_WORK* work_0x04;
-    /* +0x08 */ u32 flags_0x08;
+/* The user-data accessor `em005_init` installs: the base accessor with a destructor of its own only (its table is
+ * `.data` 0x805B69A8).  size: 0xC (`operator new(0xC)`) */
+class Em005UserData : public ResUserDataAc {
+public:
+    Em005UserData();
+    virtual ~Em005UserData();
 };
 
 /* The three-word rotation record `em_move_offset_rot_apply` takes.  size: 0x0C */
@@ -169,8 +168,6 @@ extern Em005VecPair em005_vec_pair_1;
 extern Em005VecPair em005_vec_pair_2;
 extern Em005VecPair em005_vec_pair_3;
 extern Em005Capsule em005_capsule_tbl[3];
-/* The user-data helper class table (`.data`, not emitted: see RESIDUALS). */
-extern u32 em005_user_data_class_tbl[];
 
 
 extern "C" {
@@ -178,7 +175,6 @@ s32 em005_slot_angle_avg(struct _ENEMY_WORK* self, u32 kind);
 u32 em005_slot_turn_step(struct _ENEMY_WORK* self, u16 step, u8 kind);
 void em005_work_clear(_ENEMY_WORK* self);
 void em005_init(struct _ENEMY_WORK* self, u8 mode);
-Em005UserData* em005_user_data_ctor(Em005UserData* self);
 void em005_motion_next(struct _ENEMY_WORK* self, u8 *arg1, u8 *arg2);
 void em005_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub);
 void em005_frame_update(struct _ENEMY_WORK* self);
@@ -288,7 +284,6 @@ s32 em005_part_ck(struct _ENEMY_WORK* self, u8 arg1);
 void em005_part_arm(struct _ENEMY_WORK* self);
 s32 em005_area_change_ck(struct _ENEMY_WORK* self, u16 timer);
 void em005_spawn_rec_fill(EmSpawnRec* rec, u8 a1, u16 a2, u16 a3);
-Em005UserData* em005_user_data_dtor(Em005UserData* self, s16 flag);
 }
 
 /* The em005 program table (`em005_prog_tbl`): the entry points the shared enemy program driver calls.  Slot
@@ -529,10 +524,8 @@ void em005_init(struct _ENEMY_WORK* self, u8 mode) {
         em_state_refresh(self);
     }
     if (em_res_user_data_ck(self) == 0) {
-        Em005UserData* helper = (Em005UserData*)operator new(0xC);
-        if (helper != 0) {
-            em005_user_data_ctor(helper);
-        }
+        Em005UserData* helper = (Em005UserData*)operator new(sizeof(Em005UserData));
+        new (helper) Em005UserData;
         em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
@@ -541,11 +534,8 @@ void em005_init(struct _ENEMY_WORK* self, u8 mode) {
     }
 }
 
-/* The 0xC-byte user-data helper's constructor: the base record first, then this class's table. */
-Em005UserData* em005_user_data_ctor(Em005UserData* self) {
-    em_res_user_data_ctor(self);
-    self->class_tbl_0x00 = em005_user_data_class_tbl;
-    return self;
+/* 0x801CABC8 (0x3C): Constructs the accessor: the base first, then this class's table. */
+Em005UserData::Em005UserData() {
 }
 
 void em005_motion_next(struct _ENEMY_WORK* self, u8 *arg1, u8 *arg2) {
@@ -5845,15 +5835,8 @@ void em005_spawn_rec_fill(EmSpawnRec* rec, u8 a1, u16 a2, u16 a3) {
     rec->field_0x14 = a3;
 }
 
-/* The user-data helper's destructor: the base record's, then the storage when `flag` is positive. */
-Em005UserData* em005_user_data_dtor(Em005UserData* self, s16 flag) {
-    if (self != NULL) {
-        em_res_user_data_dtor_v(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* 0x801D6F5C (0x5C): Destroys the accessor through the base destructor (the class table is emitted with it). */
+Em005UserData::~Em005UserData() {
 }
 
 
