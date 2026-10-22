@@ -27,7 +27,7 @@
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
-#include "enemy/fn_8012E2D4.h" /* fn_8012E2D4 (rule 2: the owner's header) */
+#include "enemy/em_act_leap_ck.h" /* fn_8012E2D4 (rule 2: the owner's header) */
 #include "enemy/em_status_ck.h" /* em_status_ck (rule 2: the owner's header) */
 #include "enemy/fn_80137614.h" /* fn_80137614 (rule 2: the owner's header) */
 #include "enemy/fn_80137648.h" /* fn_80137648 (rule 2: the owner's header) */
@@ -463,7 +463,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
         switch (self->type_0x02) {
         case 0:
             if (((em_status_ck((_ENEMY_WORK*)self->source_0x30, 0x10) == 1 &&
-                  fn_8012E2D4(em->field_0x1e5, em->field_0x1e6) == 1 && em->field_0x950 > 0) ||
+                  em_act_leap_ck(em->field_0x1e5, em->field_0x1e6) == 1 && em->field_0x950 > 0) ||
                  fn_80137614((_ENEMY_WORK*)self->source_0x30) == 1 ||
                  fn_80137648((_ENEMY_WORK*)self->source_0x30) == 1)) {
                 break;
@@ -480,7 +480,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
             return;
         case 2:
             if (((em_status_ck((_ENEMY_WORK*)self->source_0x30, 0x10) == 1 &&
-                  fn_8012E2D4(em->field_0x1e5, em->field_0x1e6) == 1 && em->field_0x950 > 0) ||
+                  em_act_leap_ck(em->field_0x1e5, em->field_0x1e6) == 1 && em->field_0x950 > 0) ||
                  fn_80137614((_ENEMY_WORK*)self->source_0x30) == 1 ||
                  fn_80137648((_ENEMY_WORK*)self->source_0x30) == 1)) {
                 break;

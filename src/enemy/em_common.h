@@ -135,6 +135,25 @@ void em_stamina_regen(struct _ENEMY_WORK* self, f32 rate, s16 delta, s16 period)
 /* 0x80131E80 */
 void em_busy_timer_clear(struct _ENEMY_WORK* self);
 
+/* The helpers `enemy/fn_8011D448.cpp` calls, as the owner defines them. */
+s32 em_part_slot_get(struct _ENEMY_WORK* self, u8 part);
+s16 em_frames_get(struct _ENEMY_WORK* self);
+void em_act_request(struct _ENEMY_WORK* self, u8 a, u8 b);
+void em_hate_add(struct _ENEMY_WORK* self, u8 player, s32 amount);
+s32 em_spawn_rec_live_ck(struct _ENEMY_WORK* self);
+u32 em_mot_no_ck(struct _ENEMY_WORK* self, u32 motion);
+u32 em_in_water_ck(struct _ENEMY_WORK* self, u32 flag);
+void em_sight_player_set(struct _ENEMY_WORK* self, u8 player);
+u32 em_ailment_mask_ck(struct _ENEMY_WORK* self, u8 bits);
+void em_ailment_mask_set(struct _ENEMY_WORK* self, u8 bits);
+u32 em_poison_add(struct _ENEMY_WORK* self, s16 amount);
+u32 em_sleep_add(struct _ENEMY_WORK* self, s16 amount);
+u32 em_paralysis_add(struct _ENEMY_WORK* self, s16 amount);
+u32 em_stun_add(struct _ENEMY_WORK* self, s16 amount);
+u32 em_exhaust_add(struct _ENEMY_WORK* self, s16 amount);
+u32 em_ailment8_add(struct _ENEMY_WORK* self, s16 amount);
+void em_action_finish_swim(struct _ENEMY_WORK* self);
+
 #ifdef __cplusplus
 }
 #endif

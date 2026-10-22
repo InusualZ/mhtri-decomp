@@ -37,7 +37,7 @@ typedef struct EnemyData {
     /* +0x028 */ u32* words_0x28;        /* the per-index words `em_data_word_get` reads (`em_common.cpp`) */
     /* +0x02C */ u8 pad_0x2C[0x4];
     /* +0x030 */ u32 bits_0x30;     /* copied into `_ENEMY_WORK::bits_0x824` by em_status_bits_init */
-    /* +0x034 */ u8 pad_0x034[0x038 - 0x034];
+    /* +0x034 */ u8* hit_dirs_0x34;  /* per reaction kind, the hit-direction mode and turn mode (`em_hit_dir_get`) */
     /* +0x038 */ struct EmMapEntry* area_maps_0x38;  /* per map, the area reach table (`em_map_table_get`; `em_common.cpp`) */
     /* +0x03C */ struct EmMapEntry* allowed_areas_0x3C;  /* per map, the areas the kind may enter (`em_data_area_allowed_ck`) */
     /* +0x040 */ u8* water_exclude_0x40;  /* `{map kind, area, water area}` triples, closed by 0xFF, that `em_in_water_ck` ignores */
@@ -58,7 +58,7 @@ typedef struct EnemyData {
     /* +0x07C */ f32 ceiling_depth_0x7C;  /* `em_ceiling_depth_get` */
     /* +0x080 */ f32 model_height_0x80;  /* `em_model_height_get` (`fn_8012F39C` scales it by 0.9) */
     /* +0x084 */ s16** motion_frames;      /* per hundred motion numbers, a table of s16 frame values (`em_common.cpp`) */
-    /* +0x088 */ u8 pad_0x88[0x4];
+    /* +0x088 */ struct EmPartBreakRec* part_breaks_0x88;  /* the part-break records `em_parts_refresh` walks */
     /* +0x08C */ struct EmMotionAttr* motion_attrs;  /* `{motion, value}` pairs, closed by motion 0xFFFFFFFF */
     /* +0x090 */ struct EmMotionCond* motion_conds;  /* `{motion, kind, mode, arg, level}` gates, closed the same way */
     /* +0x094 */ UserDataItem* items;

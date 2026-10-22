@@ -12,6 +12,8 @@ extern "C" {
 
 /* 0x8019E70C - the shore action's sub-phase of enemy record `self` (255 when it is not that action). */
 u32 em025_shore_phase_get(struct _ENEMY_WORK* self);
+/* 0x801A9DF4 - releases the joint-effect slots and re-arms the two the record owns. */
+void em025_effect_slots_reset(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

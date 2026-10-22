@@ -26,6 +26,8 @@ s32 em_roster_record_slot_id_get(u32 index);
 u32 em_roster_record_alive_ck(u32 index);
 void em_roster_record_pos_set(s32 index, nw4r::math::VEC3* pos, u8 area);
 void em_roster_record_release(u32 index);
+/* 0x803B99C0 - releases the record's roster entries (+0x888 and the two carried ones), setting them to -1. */
+void em_roster_records_release(struct _ENEMY_WORK* self);
 EmPopRec* em_roster_record_clear(EmPopRec* rec);
 u32 em_roster_sub_record_clear(EmPopSubRec* rec);
 EmPopRec* em_roster_free_record_get(void);

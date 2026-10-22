@@ -94,7 +94,7 @@
  *    index), `em_motion_param_set` (an extra `frsp`), `em_height_limit_update` (the range switch lowers to
  *    compares), the `u16` fields retail reads as `s16` (+0x812/+0x814/+0x94A/+0x94C),
  *    `em_break_part_active_ck` (retail adds the 0x488 base before the loop);
- *  - `fn_8012E040`, `fn_8012E5D4`: dense-case dispatch trees; retail shares one tail per constant return and lowers
+ *  - `em_act_sleep_side_get`, `fn_8012E5D4`: dense-case dispatch trees; retail shares one tail per constant return and lowers
  *    the quartet 0x24..0x27 with `subi`/`cmplwi`, every shape tried emits inline returns or a two-compare range test
  *    (docs/enemy.md);
  *  - `ana_em_ck`, `shibire_em_ck`: retail re-materialises the two `(u8)` argument masks at each call in the loop,
@@ -110,7 +110,7 @@
  *    `em_motion_window_ck`: the same magic, and ours materialises the final test branch-free (`mfcr` + `extrwi`);
  *  - `em_sleep_ck`: retail shares one `return 0` through both `bne` arms, ours a `li r3,0` per arm;
  *    `fn_8012F39C`: the constant is loaded before the field (f0/f1 against retail's f2/f0);
- *  - `em_pl_target_ck`, `fn_8012E2A8`: ours compares unsigned where retail uses `cmpwi` (`em_pl_target_ck` also an extra
+ *  - `em_pl_target_ck`, `em_act_kind6_ck`: ours compares unsigned where retail uses `cmpwi` (`em_pl_target_ck` also an extra
  *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
  *    earlier;
@@ -232,15 +232,15 @@
 #define em_team_mate_state_ck fn_8012D23C_hidden_fn_8012BDF4_h
 #define fn_8012D3E0 fn_8012D3E0_hidden_fn_8012BDF4_h
 #define pl_torch_ck fn_8012D7FC_hidden_fn_8012BDF4_h
-#define fn_8012D8D0 fn_8012D8D0_hidden_fn_8012BDF4_h
-#define fn_8012DB3C fn_8012DB3C_hidden_fn_8012BDF4_h
+#define em_act_trap_ck fn_8012D8D0_hidden_fn_8012BDF4_h
+#define em_act_paralysis_ck fn_8012DB3C_hidden_fn_8012BDF4_h
 #define fn_8012E21C fn_8012E21C_hidden_fn_8012BDF4_h
 #define em_act11_wait_ck fn_8012E5A8_hidden_fn_8012BDF4_h
 #include "enemy/fn_8012BDF4.h"
 #undef em_act11_wait_ck
 #undef fn_8012E21C
-#undef fn_8012DB3C
-#undef fn_8012D8D0
+#undef em_act_paralysis_ck
+#undef em_act_trap_ck
 #undef pl_torch_ck
 #undef fn_8012D3E0
 #undef em_team_mate_state_ck
@@ -357,12 +357,12 @@
 #define fn_8012E21C_view5 ((u32 (*)(u32, u32))fn_8012E21C)
 #define fn_8012E21C_view3 ((u32 (*)(u32, u32))fn_8012E21C)
 #define fn_8012E21C_view1 ((u32 (*)(u32, u32))fn_8012E21C)
-#define fn_8012DB3C_view5 ((u32 (*)(struct _ENEMY_WORK*))fn_8012DB3C)
-#define fn_8012DB3C_view3 ((u32 (*)(struct _ENEMY_WORK*))fn_8012DB3C)
-#define fn_8012DB3C_view1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012DB3C)
-#define fn_8012D8D0_view5 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D8D0)
-#define fn_8012D8D0_view3 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D8D0)
-#define fn_8012D8D0_view1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D8D0)
+#define fn_8012DB3C_view5 ((u32 (*)(struct _ENEMY_WORK*))em_act_paralysis_ck)
+#define fn_8012DB3C_view3 ((u32 (*)(struct _ENEMY_WORK*))em_act_paralysis_ck)
+#define fn_8012DB3C_view1 ((u32 (*)(struct _ENEMY_WORK*))em_act_paralysis_ck)
+#define fn_8012D8D0_view5 ((u32 (*)(struct _ENEMY_WORK*))em_act_trap_ck)
+#define fn_8012D8D0_view3 ((u32 (*)(struct _ENEMY_WORK*))em_act_trap_ck)
+#define fn_8012D8D0_view1 ((u32 (*)(struct _ENEMY_WORK*))em_act_trap_ck)
 #define fn_8012D7FC_view5 ((u32 (*)(struct _ENEMY_WORK*))pl_torch_ck)
 #define fn_8012D7FC_view3 ((u32 (*)(struct _ENEMY_WORK*))pl_torch_ck)
 #define fn_8012D7FC_view1 ((u32 (*)(struct _ENEMY_WORK*))pl_torch_ck)
@@ -380,8 +380,8 @@
 #define fn_8012D0B4_view3 ((s32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
 #define fn_8012D0B4_view1 ((s32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
 #define fn_8012BA00_view1 ((s32 (*)(struct _ENEMY_WORK*, struct EnemyActionTable*, void*, s32, u16))fn_8012BA00)
-#define fn_8012B9BC_view1 ((void (*)(_ENEMY_WORK*, u8, s32))fn_8012B9BC)
-#define fn_8012B944_view1 ((s32 (*)(_ENEMY_WORK*, u8, s32))fn_8012B944)
+#define fn_8012B9BC_view1 ((void (*)(_ENEMY_WORK*, u8, s32))em_hate_em_add)
+#define fn_8012B944_view1 ((s32 (*)(_ENEMY_WORK*, u8, s32))em_hate_pl_add)
 #define vec3_distance_view1 ((f32 (*)(const VEC3*, const VEC3*))vec3_distance)
 #define em_status_ck_view1 ((u32 (*)(_ENEMY_WORK*, u32))em_status_ck)
 #define em_area_ck_view5 ((u32 (*)(struct _ENEMY_WORK*))em_area_ck)
@@ -519,7 +519,7 @@ struct EnemyExtraData {
     /* +0x054 */ struct _HIT_DATA* attacks;        /* the 0x1A-byte attack records `em_hit_window_set` arms */
 };
 
-/* One 0x1C-byte rank record `fn_80126044` returns: the health scale and the two shell rates.
+/* One 0x1C-byte rank record `em_rank_rec_get` returns: the health scale and the two shell rates.
  * size: 0x1C */
 struct EmRankRecord {
     /* +0x00 */ f32 hp_scale;
@@ -565,25 +565,25 @@ extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot);
 extern "C" void* fn_8012D498(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 pl_torch_ck(void* arg);
 extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag);
-extern "C" s32 fn_8012D8D0(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_trap_ck(_ENEMY_WORK* enemy);
 extern "C" u32 ana_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(_ENEMY_WORK* enemy, u32 area, nw4r::math::VEC3* pos, u32 flag, f32 radius);
 extern "C" void* ana_em_ck__FUcPQ34nw4r4math4VEC3fUc(u32 area, nw4r::math::VEC3* pos, u32 flag, f32 radius);
 extern "C" u32 shibire_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(_ENEMY_WORK* enemy, u32 area, nw4r::math::VEC3* pos, u32 flag, f32 radius);
 extern "C" void* shibire_em_ck__FUcPQ34nw4r4math4VEC3fUc(u32 area, nw4r::math::VEC3* pos, u32 flag, f32 radius);
-extern "C" s32 fn_8012DB3C(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012DD58(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012DE78(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012DED8(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012DF68(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012E040(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_paralysis_ck(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_sleep_ck(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_kind23_ck(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_wake_ck(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_stun_ck(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_sleep_side_get(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E0D8(u32 state, u32 action);
 extern "C" s32 fn_8012E158(u32 state, u32 action);
 extern "C" s32 fn_8012E21C(u32 state, u32 action);
-extern "C" s32 fn_8012E2A8(u32 state, u32 sub);
-extern "C" s32 fn_8012E2D4(u32 state, u32 action);
-extern "C" s32 fn_8012E35C(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012E464(_ENEMY_WORK* enemy, u32 flag);
-extern "C" s32 fn_8012E548(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_kind6_ck(u32 state, u32 sub);
+extern "C" s32 em_act_leap_ck(u32 state, u32 action);
+extern "C" s32 em_act_roar_ck(_ENEMY_WORK* enemy);
+extern "C" s32 em_act_ball_ck(_ENEMY_WORK* enemy, u32 flag);
+extern "C" s32 em_act_kind18_ck(_ENEMY_WORK* enemy);
 extern "C" s32 em_act11_wait_ck(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E5D4(u32 actor, u32 flags);
 extern "C" s32 em_record_hit_ck(_ENEMY_WORK* record);
@@ -599,7 +599,7 @@ extern "C" s32 fn_8012E8F4(f32 seconds);
 extern "C" u8 stage_map_kind_get(u32 map_no);
 extern "C" u32 fn_802B0688(void* pos);
 extern "C" u8 Pl_area_flag_get(u32 value);
-extern "C" void fn_8012B988(_ENEMY_WORK* enemy, s32 value);
+extern "C" void em_hate_misc_add(_ENEMY_WORK* enemy, s32 value);
 extern "C" void fn_8012CE8C(_ENEMY_WORK* enemy, u16 flag);
 extern "C" void fn_8012CE9C(_ENEMY_WORK* enemy, u32 flag);
 extern "C" void fn_8012CDF4(_ENEMY_WORK* enemy, u32 state, u32 sub);
@@ -624,7 +624,7 @@ extern "C" s32 em_pl_slot_leaving_ck(u32 index);
 extern "C" s32 fn_8012D188(_ENEMY_WORK* enemy, _PLW* work);
 extern "C" u32 em_busy_ck(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012CF2C(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012CF90(_ENEMY_WORK* enemy, u32 value);
+extern "C" s32 em_ally_kind_ck(_ENEMY_WORK* enemy, u32 value);
 extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2);
 extern "C" u32 em_act_ck__FP11_ENEMY_WORKUcUc(_ENEMY_WORK* enemy, u32 state, u32 sub);
 extern "C" u32 fn_8012C870(_ENEMY_WORK* enemy, u32 mask);
@@ -652,7 +652,7 @@ extern "C" f32 lbl_80796CB4;   /* 35.0f - mode 5 */
 
 
 
-extern "C" f32 lbl_80796C58;   /* 0.0f  - `fn_8012EFDC`'s `team == 0xf` threshold */
+extern "C" f32 lbl_80796C58;   /* 0.0f  - `em_damage_area_ok_ck`'s `team == 0xf` threshold */
 extern "C" f32 lbl_80796C5C;   /* 100.0f - the frame-window denominator */
 
 extern "C" f32 lbl_80796CB8;   /* 0.3f  */
@@ -853,7 +853,7 @@ extern "C" u32 fn_80125FF0(u32 a, u32 b)
     return (u8)stage_map_kind_get_view1((u8)a) == (u8)b;
 }
 
-extern "C" u8* fn_80126044(struct _ENEMY_WORK* self)
+extern "C" u8* em_rank_rec_get(struct _ENEMY_WORK* self)
 {
     EnemyData* data = get_enemy_data(self);
     u8* result = fn_8014260C(data->field_0x0E);
@@ -1836,7 +1836,7 @@ extern "C" u16 fn_80127568(void* unused, struct _EM_REC4* table, u32 idx)
     return table[(u8)idx].field_0x2;
 }
 
-extern "C" u32 fn_80127CB0(struct _ENEMY_WORK* self, u32 idx)
+extern "C" u32 em_attacker_rec_get(struct _ENEMY_WORK* self, u32 idx)
 {
     return self->values_0x868[(u8)idx];
 }
@@ -2285,10 +2285,10 @@ extern "C" void em_act_step_arm(_ENEMY_WORK* self, u8 act, u8 sub, u32 mode)
         if (fn_8012E158(a, b) == 0 && em_status_ck(self, 1) != 0) {
             em_sleep_end(self);
         }
-        if (fn_8012E2A8(a, b) == 0 && em_status_ck(self, 8) != 0) {
+        if (em_act_kind6_ck(a, b) == 0 && em_status_ck(self, 8) != 0) {
             em_ailment8_end(self);
         }
-        if (fn_8012E2D4(a, b) == 0 && em_status_ck(self, 0x10) != 0) {
+        if (em_act_leap_ck(a, b) == 0 && em_status_ck(self, 0x10) != 0) {
             em_stun_end(self);
         }
         if ((u8)mode == 4) {
@@ -2725,7 +2725,7 @@ extern "C" void em_hit_buff_apply(_ENEMY_WORK* self, _HIT_W* hit)
     u8 cur;
 
     if (buff != NULL && buff->off == 0) {
-        add = ((EmRankRecord*)fn_80126044(self))->hit_buff;
+        add = ((EmRankRecord*)em_rank_rec_get(self))->hit_buff;
         if (add > 0) {
             cur = hit->field_0x05A;
             if (cur != 0 && (hit->mask_0x46 & buff->mask)) {
@@ -3299,7 +3299,7 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
                 if ((self->field_0x1C8 & 1) && (work->field_0x1C8 & 1) == 0) {
                     continue;
                 }
-                if ((u32)fn_8012CF90(self, work->team) == 1 || work->action == 0xB || work->action == 0xC) {
+                if ((u32)em_ally_kind_ck(self, work->team) == 1 || work->action == 0xB || work->action == 0xC) {
                     continue;
                 }
                 if (hidden == 1 && em_break_state_ck(work) == 0) {
@@ -3540,7 +3540,7 @@ extern "C" void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b)
     em_act_request(self, (u8)a, (u8)b);
 }
 
-extern "C" void fn_80128A30(struct _ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void em_act_request_now(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
     em_act_step_arm(self, (u8)a, (u8)b, 1);
     fn_801281EC(self);
@@ -3551,7 +3551,7 @@ extern "C" void em_act_set_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b)
     if (self->action == 11) {
         return;
     }
-    fn_80128A30(self, (u8)a, (u8)b);
+    em_act_request_now(self, (u8)a, (u8)b);
 }
 
 extern "C" void em_act_arm_unless_down(struct _ENEMY_WORK* self, u8 a, u8 b)
@@ -3570,7 +3570,7 @@ extern "C" void em_act_arm_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b)
     em_act_step_arm(self, (u8)a, (u8)b, 2);
 }
 
-extern "C" void fn_80128ACC(struct _ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void em_act_request_react(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
     if (self->action == 11) {
         return;
@@ -3652,7 +3652,7 @@ extern "C" u32 em_area_roam_pick(_ENEMY_WORK* self, u16 seed)
         rank = em_get_rank(self);
         for (i = 0; i < max; i++, work++) {
             if (self->group != i && work->active != 0 && work->area_no == self->area_no && work->action != 0xB &&
-                work->action != 0xC && (u32)fn_8012CF90(self, work->team) != 1) {
+                work->action != 0xC && (u32)em_ally_kind_ck(self, work->team) != 1) {
                 if ((u8)em_get_rank(work) > (u8)rank) {
                     rival = 2;
                     break;
@@ -3876,7 +3876,7 @@ extern "C" void fn_8012B8F8(struct _ENEMY_WORK* self)
     }
 }
 
-extern "C" void fn_8012B944(struct _ENEMY_WORK* self, u32 a, s32 b)
+extern "C" void em_hate_pl_add(struct _ENEMY_WORK* self, u32 a, s32 b)
 {
     s32 v;
     self->values_0x390[(u8)a] += b;
@@ -3890,7 +3890,7 @@ extern "C" void fn_8012B944(struct _ENEMY_WORK* self, u32 a, s32 b)
     }
 }
 
-extern "C" void fn_8012B988(struct _ENEMY_WORK* self, s32 b)
+extern "C" void em_hate_misc_add(struct _ENEMY_WORK* self, s32 b)
 {
     s32 v = self->values_0x390[4] + b;
     self->values_0x390[4] = v;
@@ -3903,7 +3903,7 @@ extern "C" void fn_8012B988(struct _ENEMY_WORK* self, s32 b)
     }
 }
 
-extern "C" void fn_8012B9BC(struct _ENEMY_WORK* self, u32 a, s32 b)
+extern "C" void em_hate_em_add(struct _ENEMY_WORK* self, u32 a, s32 b)
 {
     s32 v;
     self->values_0x3A4[(u8)a] += b;
@@ -4035,7 +4035,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
 
 
 /* Scores every player-side work record against its action table and hands the result to
- * `fn_8012B944`; then, when the global state allows it, picks the enemy's target for `fn_8012B9BC`. */
+ * `em_hate_pl_add`; then, when the global state allows it, picks the enemy's target for `em_hate_em_add`. */
 extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
 {
     EnemyActionSet* set;
@@ -4080,7 +4080,7 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
         } else {
             value = -5;
         }
-        fn_8012B988(enemy, value);
+        em_hate_misc_add(enemy, value);
     }
     if (set == NULL || (table = set->table_0x008) == NULL) {
         table = lbl_805A106C[0];
@@ -4089,7 +4089,7 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
     target = (_ENEMY_WORK*)get_move_work_adrs(3);
     for (j = 0; j < enemy_max; j++, target++) {
         if (enemy->group == j || target->active == 0 || enemy->team == target->team ||
-            fn_8012CF90(enemy, target->team) == 1 || (u8)(target->action - 0x0B) <= 1) {
+            em_ally_kind_ck(enemy, target->team) == 1 || (u8)(target->action - 0x0B) <= 1) {
             enemy->values_0x3A4[j] = 0;
         } else {
             fn_8012B9BC_view1(enemy, (u8)j, fn_8012BA00_view1(enemy, table, target, 3, j));
@@ -4274,7 +4274,7 @@ extern "C" void fn_8012C600(_ENEMY_WORK* enemy)
 
 
 /* Latches the "hit by" byte unless the enemy is already in the state that consumes it. */
-extern "C" void fn_8012C6DC(_ENEMY_WORK* enemy)
+extern "C" void em_hit_latch_set(_ENEMY_WORK* enemy)
 {
     if (enemy->field_0x43D != 1) {
         enemy->field_0x43A = 1;
@@ -4541,7 +4541,7 @@ extern "C" s32 fn_8012CF2C(_ENEMY_WORK* enemy)
 
 
 /* Whether the enemy's own value list contains `value` (0x28 is always a hit). */
-extern "C" s32 fn_8012CF90(_ENEMY_WORK* enemy, u32 value)
+extern "C" s32 em_ally_kind_ck(_ENEMY_WORK* enemy, u32 value)
 {
     u8* list = get_enemy_data(enemy)->values;
 
@@ -4737,7 +4737,7 @@ extern "C" s32 pl_torch_ck(void* arg)
 }
 
 /* Whether the enemy is in the low part of its action state. */
-extern "C" s32 fn_8012D850(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_flinch_light_ck(_ENEMY_WORK* enemy)
 {
     if (enemy->action == 0x0A && enemy->state_sub <= 0x12) {
         return 1;
@@ -4755,7 +4755,7 @@ extern "C" s32 em_action_mid_ck(_ENEMY_WORK* enemy)
 }
 
 /* Whether the enemy is in the high part of its action state. */
-extern "C" s32 fn_8012D8A4(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_part_flinch_ck(_ENEMY_WORK* enemy)
 {
     if (enemy->action == 0x0A && (u32)(enemy->state_sub - 0xC3) <= 0x0F) {
         return 1;
@@ -4764,7 +4764,7 @@ extern "C" s32 fn_8012D8A4(_ENEMY_WORK* enemy)
 }
 
 /* The "analysable" action-state list `ana_em_ck` accepts. */
-extern "C" s32 fn_8012D8D0(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_trap_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xB6) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xB7) == 1 ||
@@ -4781,7 +4781,7 @@ extern "C" s32 fn_8012D8D0(_ENEMY_WORK* enemy)
 }
 
 /* The "paralysed" action-state list. */
-extern "C" s32 fn_8012DB3C(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_paralysis_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xBF) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xC0) == 1) {
@@ -4805,7 +4805,7 @@ extern "C" u32 ana_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(
     if ((u8)flag == 0 && enemy->action == 0x0B) {
         return 0;
     }
-    if (fn_8012D8D0(enemy) == 0) {
+    if (em_act_trap_ck(enemy) == 0) {
         return 0;
     }
     return calcVecDistXZ(pos, &enemy->pos) <= radius;
@@ -4840,7 +4840,7 @@ extern "C" u32 shibire_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(
     if (enemy->area_no != (u8)area) {
         return 0;
     }
-    if (fn_8012DB3C(enemy) == 0 &&
+    if (em_act_paralysis_ck(enemy) == 0 &&
         ((u8)flag == 0 || (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xB, 0x1A) == 0 &&
                            em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xB, 0x1B) == 0))) {
         return 0;
@@ -4877,7 +4877,7 @@ extern "C" void* shibire_em_ck__FUcPQ34nw4r4math4VEC3fUc(
 /* The action-state list predicates. */
 
 /* The "sleeping" action-state list. */
-extern "C" s32 fn_8012DD58(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_sleep_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xE4) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xE8) == 1 ||
@@ -4895,7 +4895,7 @@ extern "C" s32 fn_8012DD58(_ENEMY_WORK* enemy)
 }
 
 /* Whether the enemy is in action state 0xF1 or 0xF2 (an `em_act_ck` list). */
-extern "C" s32 fn_8012DE78(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_kind23_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xF1) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xF2) == 1) {
@@ -4905,7 +4905,7 @@ extern "C" s32 fn_8012DE78(_ENEMY_WORK* enemy)
 }
 
 /* The "waking up" action-state list. */
-extern "C" s32 fn_8012DED8(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_wake_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xF4) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xF3) == 1 ||
@@ -4917,7 +4917,7 @@ extern "C" s32 fn_8012DED8(_ENEMY_WORK* enemy)
 }
 
 /* The "stunned" action-state list. */
-extern "C" s32 fn_8012DF68(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_stun_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xAF) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xB0) == 1 ||
@@ -4932,7 +4932,7 @@ extern "C" s32 fn_8012DF68(_ENEMY_WORK* enemy)
 }
 
 /* Three-way action-state query: 0/1 for the two states it knows, 0xFF otherwise. */
-extern "C" s32 fn_8012E040(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_sleep_side_get(_ENEMY_WORK* enemy)
 {
     switch (enemy->action) {
     case 0x0A:
@@ -5031,7 +5031,7 @@ extern "C" s32 fn_8012E21C(u32 state, u32 action)
 }
 
 /* Whether the enemy is in the three-state part of the second action state. */
-extern "C" s32 fn_8012E2A8(u32 state, u32 sub)
+extern "C" s32 em_act_kind6_ck(u32 state, u32 sub)
 {
     if ((u8)state == 0xB && (u32)((u8)sub - 0x1A) <= 2) {
         return 1;
@@ -5040,7 +5040,7 @@ extern "C" s32 fn_8012E2A8(u32 state, u32 sub)
 }
 
 /* Whether the action id is one of the "leap" attacks. */
-extern "C" s32 fn_8012E2D4(u32 state, u32 action)
+extern "C" s32 em_act_leap_ck(u32 state, u32 action)
 {
     if ((u8)state == 0xA) {
         switch ((u8)action) {
@@ -5061,7 +5061,7 @@ extern "C" s32 fn_8012E2D4(u32 state, u32 action)
 }
 
 /* Whether the action id is one of the "roar" attacks. */
-extern "C" s32 fn_8012E35C(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_roar_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0x84) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0x85) == 1 ||
@@ -5078,7 +5078,7 @@ extern "C" s32 fn_8012E35C(_ENEMY_WORK* enemy)
 }
 
 /* Whether the action id is one of the "ball" attacks of the given flavour. */
-extern "C" s32 fn_8012E464(_ENEMY_WORK* enemy, u32 flag)
+extern "C" s32 em_act_ball_ck(_ENEMY_WORK* enemy, u32 flag)
 {
     if ((u8)flag == 0) {
         if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xD6) == 1 ||
@@ -5095,7 +5095,7 @@ extern "C" s32 fn_8012E464(_ENEMY_WORK* enemy, u32 flag)
 }
 
 /* The two-state action list around the "poison" attacks. */
-extern "C" s32 fn_8012E548(_ENEMY_WORK* enemy)
+extern "C" s32 em_act_kind18_ck(_ENEMY_WORK* enemy)
 {
     if (em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xBD) == 1 ||
         em_act_ck__FP11_ENEMY_WORKUcUc(enemy, 0xA, 0xBE) == 1) {
@@ -5197,7 +5197,7 @@ extern "C" s32 em_spawn_rec_live_ck2(_ENEMY_WORK* self)
 /* Whether the enemy is in the "charge" state pair. */
 extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy)
 {
-    return (u8)((fn_8012E2A8(enemy->action, enemy->state_sub) - 1) == 0);
+    return (u8)((em_act_kind6_ck(enemy->action, enemy->state_sub) - 1) == 0);
 }
 
 /* The two-state mask the record's mode byte selects. */
@@ -5357,7 +5357,7 @@ extern "C" u32 em_team_damage_over_ck(u8 team, u8 kind)
 }
 
 /* "The record's team id is a live map id and the map's frame gate is the first frame". */
-extern "C" s32 fn_8012EF98(_ENEMY_WORK* self)
+extern "C" s32 em_quest_entry_live_ck(_ENEMY_WORK* self)
 {
     if (quest_element_state_find(self->team) != 0) {
         if (quest_entry_active_ck() == 1) return 1;
@@ -5367,7 +5367,7 @@ extern "C" s32 fn_8012EF98(_ENEMY_WORK* self)
 
 /* The area/status gate that guards the per-motion block: the `field_0x1C8` bit-0 request, the area and
  * magma tests, then the team-specific height/map tests. */
-extern "C" s32 fn_8012EFDC(_ENEMY_WORK* self)
+extern "C" s32 em_damage_area_ok_ck(_ENEMY_WORK* self)
 {
     if (self->field_0x1C8 & 1) {
         if (em_area_ck_view5(self) == 0) return 0;
@@ -5432,7 +5432,7 @@ extern "C" u32 em_motion_window_ck(_ENEMY_WORK* self)
 
 /* The window test behind the two landed cross-unit gates: either of the two "in this motion" tests,
  * then the padded window test. */
-extern "C" s32 fn_8012F2A4(_ENEMY_WORK* self)
+extern "C" s32 em_ailment8_window_ck(_ENEMY_WORK* self)
 {
     if (fn_8012D8D0_view5(self) == 1 || fn_8012DB3C_view5(self) == 1) {
         if (em_motion_window_ck(self) == 1) return 1;
@@ -6983,7 +6983,7 @@ extern "C" void em_status_bit_tick(_ENEMY_WORK* self)
  * flags). */
 extern "C" void em_max_hp_set(_ENEMY_WORK* self, s32 hp)
 {
-    f32 scale = ((EmRankRecord*)fn_80126044(self))->hp_scale;
+    f32 scale = ((EmRankRecord*)em_rank_rec_get(self))->hp_scale;
 
     self->field_0x7A4 = (s32)(hp * scale);
     if (quest_flag_100000_ck(NULL) == 1 || quest_flag_10_ck(NULL) == 1) {
@@ -7005,7 +7005,7 @@ extern "C" void em_shell_rate_init(_ENEMY_WORK* self)
 {
     EmAngerTable* table = NULL;
     EnemyData* data = get_enemy_data(self);
-    EmRankRecord* rank = (EmRankRecord*)fn_80126044(self);
+    EmRankRecord* rank = (EmRankRecord*)em_rank_rec_get(self);
 
     self->shell_rate_0x7B4 = rank->shell_rate;
     self->field_0x7B8 = rank->rate_0x08;
@@ -7424,7 +7424,7 @@ extern "C" void em_sleep_fx_update(_ENEMY_WORK* self)
     EmAilmentFx* fx;
 
     VEC3_ctor(&offset);
-    if ((em_sleep_ck(self, 1) == 1 || (u32)fn_8012E2A8(self->action, self->state_sub) == 1) &&
+    if ((em_sleep_ck(self, 1) == 1 || (u32)em_act_kind6_ck(self->action, self->state_sub) == 1) &&
         (system_w.field_0x0c & 0x1F) == 0x10) {
         fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
         if (fx != NULL) {
@@ -7514,7 +7514,7 @@ extern "C" void em_paralysis_fx_update(_ENEMY_WORK* self)
 /* 0x80132D54 (0xA4): resets the stun buildup; its limit is scaled by the rank. */
 extern "C" void em_stun_init(_ENEMY_WORK* self)
 {
-    EmRankRecord* rank = (EmRankRecord*)fn_80126044(self);
+    EmRankRecord* rank = (EmRankRecord*)em_rank_rec_get(self);
     EnemyData* data = get_enemy_data(self);
     EmAilmentTable* table;
 
@@ -7562,7 +7562,7 @@ extern "C" void em_stun_start(_ENEMY_WORK* self)
 extern "C" void em_stun_end(_ENEMY_WORK* self)
 {
     EmAilmentTable* table = get_enemy_data(self)->extra->stun;
-    EmRankRecord* rank = (EmRankRecord*)fn_80126044(self);
+    EmRankRecord* rank = (EmRankRecord*)em_rank_rec_get(self);
 
     em_ailment_reset(self, 0x10);
     em_ailment_limit_raise(self, table, &self->stun_count_0x91F, &self->stun_limit_0x940, &self->field_0x93E);
@@ -7591,7 +7591,7 @@ extern "C" void em_stun_fx_set(_ENEMY_WORK* self)
 /* 0x80133068 (0xA4): resets the exhaust buildup; its limit is scaled by the rank. */
 extern "C" void em_exhaust_init(_ENEMY_WORK* self)
 {
-    EmRankRecord* rank = (EmRankRecord*)fn_80126044(self);
+    EmRankRecord* rank = (EmRankRecord*)em_rank_rec_get(self);
     EnemyData* data = get_enemy_data(self);
     EmAilmentTable* table;
 
@@ -7627,7 +7627,7 @@ extern "C" void shuffle5(_ENEMY_WORK* self)
 extern "C" void em_exhaust_end(_ENEMY_WORK* self)
 {
     EnemyData* data = get_enemy_data(self);
-    EmRankRecord* rank = (EmRankRecord*)fn_80126044(self);
+    EmRankRecord* rank = (EmRankRecord*)em_rank_rec_get(self);
 
     self->field_0x944 = 0;
     em_ailment_limit_raise(self, data->extra->exhaust, &self->exhaust_count_0x920, &self->exhaust_limit_0x946,

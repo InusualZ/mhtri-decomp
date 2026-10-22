@@ -15,7 +15,7 @@
 #include "enemy/em_frames2_get.h" /* em_frames2_get (rule 2: the owner's header) */
 #include "enemy/em_part_rec_reset_all.h" /* em_part_rec_reset_all (rule 2: the owner's header) */
 #include "enemy/em_act_queued_arm.h" /* em_act_queued_arm (rule 2: the owner's header) */
-#include "enemy/fn_80128A30.h" /* fn_80128A30 (rule 2: the owner's header) */
+#include "enemy/em_act_request_now.h" /* fn_80128A30 (rule 2: the owner's header) */
 #include "enemy/em_act_end.h" /* em_act_end (rule 2: the owner's header) */
 #include "enemy/em_status_set.h" /* em_status_set (rule 2: the owner's header) */
 #include "enemy/em_anger_clear.h" /* em_anger_clear (rule 2: the owner's header) */
@@ -238,7 +238,7 @@ extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
             self->field_0x011 = 0;
             self->field_0x1E7 = 1;
             self->field_0x018 = em_frames2_get(self);
-            fn_80128A30(self, 12, 255);
+            em_act_request_now(self, 12, 255);
             em_state_refresh(self);
             return 1;
         }

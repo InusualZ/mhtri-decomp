@@ -113,7 +113,7 @@ u32 fn_80125FF0(u32 a, u32 b);
 /* 0x8012A9E8 - r3 the `_ENEMY_WORK`, r4/r5/r6 three byte pointers the effect spawner (`ef/eft_slot.cpp`) hands
  * over. */
 void em_target_select(struct _ENEMY_WORK* self, u8* a, u8* b, u8* c);
-u8* fn_80126044(struct _ENEMY_WORK* self);
+u8* em_rank_rec_get(struct _ENEMY_WORK* self);
 void* fn_80126704(struct _ENEMY_WORK* self);
 void fn_80126898(struct _ENEMY_WORK* self);
 void em_action_finish_stand(struct _ENEMY_WORK* self);

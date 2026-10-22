@@ -41,8 +41,8 @@ void em_attack_start(struct _ENEMY_WORK* self);
 void em_attack_done_set(struct _ENEMY_WORK* self);
 /* 0x8012D8D0 / 0x8012DB3C / 0x8012E21C - in the signatures their call sites set (r3 the work record / the two
  * byte-derived values). */
-u32 fn_8012D8D0(struct _ENEMY_WORK* work);
-u32 fn_8012DB3C(struct _ENEMY_WORK* work);
+u32 em_act_trap_ck(struct _ENEMY_WORK* work);
+u32 em_act_paralysis_ck(struct _ENEMY_WORK* work);
 u32 fn_8012E21C(u32 state, u32 action);
 /* 0x8012C300 / 0x8012C3C8 - the owner's own signatures: `(u32 team, u32 state_sub)` and
  * `(u32 team, u32 state_sub, void* ref, f32 radius)`. */

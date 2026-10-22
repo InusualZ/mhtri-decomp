@@ -2738,7 +2738,7 @@ void fn_801A9C6C(struct _ENEMY_WORK* self) {
 }
 
 /* r3 the work record; releases the joint-effect slots and re-arms the two it owns. */
-void fn_801A9DF4(struct _ENEMY_WORK* self) {
+void em025_effect_slots_reset(struct _ENEMY_WORK* self) {
     s32* slot = self->handles_0x328;
     u16 i;
 

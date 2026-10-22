@@ -859,7 +859,7 @@ struct _ENEMY_WORK {
     /* +0x7A4 */ u32 field_0x7A4;       /* its denominator */
     /* +0x7A8 */ u8 unused_0x7A8[0x7AC - 0x7A8];
     /* +0x7AC */ u32 field_0x7AC;       /* the second frame counter `em_team_damage_over_ck` measures against `field_0x7A0` */
-    /* +0x7B0 */ f32 field_0x7B0;       /* the `team == 0xf` threshold `fn_8012EFDC` tests against 0.0 */
+    /* +0x7B0 */ f32 field_0x7B0;       /* the `team == 0xf` threshold `em_damage_area_ok_ck` tests against 0.0 */
     /* +0x7B4 */ f32 shell_rate_0x7B4;  /* the factor `shell_attack_set` scales a shell's hit life by */
     /* +0x7B8 */ f32 field_0x7B8;  /* the second rank rate `em_shell_rate_init` sets */
     /* +0x7BC */ f32 field_0x7BC;       /* the effect radius `em_motion_blend_scale_get` scales */

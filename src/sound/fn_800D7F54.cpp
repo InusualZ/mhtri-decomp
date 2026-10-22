@@ -506,7 +506,7 @@ extern "C" void fn_800DCFC8(u8 which) {
 struct _se_w;
 void se_req_pos_ps(_se_w* self, s32 id, s32 param, nw4r::math::VEC3* pos);
 
-extern "C" void fn_800DCA98(_se_w* self, nw4r::math::VEC3* pos, u8 id) {
+extern "C" void se_em_snore_req(_se_w* self, nw4r::math::VEC3* pos, u8 id) {
     se_req_pos_ps(self, id + 137, 2, pos);
 }
 

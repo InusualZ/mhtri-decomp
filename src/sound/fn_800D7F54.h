@@ -145,6 +145,8 @@ void titleSE_req(s32 id);
 
 /* 0x800DC9A4 - the positional landing SE request; the owner defines it `extern "C"`. */
 extern "C" void se_req_pos_landing(struct _se_w* work, VEC3* pos);
+/* 0x800DCA98 - the enemy's sleep sound (`id` 0/1 picks the breath), at `pos`. */
+extern "C" void se_em_snore_req(struct _se_w* work, VEC3* pos, u8 id);
 
 /* 0x800D9804 - takes a free SE entry for `kind` on `enemy` with `callback` as its sound source and returns it (GUESS
  * name). */

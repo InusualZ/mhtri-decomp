@@ -507,7 +507,7 @@ extern "C" bool fn_802B0BC0(u8 id, u8 j)
 }
 
 /* Returns the j-th word of the group's inline table, or NULL for the unmapped id. */
-extern "C" u32* fn_802AFE5C(u8 id, u8 j)
+extern "C" u32* stage_group_word_get(u8 id, u8 j)
 {
     StageGroup* g;
     if ((u8)id == 0xFF)

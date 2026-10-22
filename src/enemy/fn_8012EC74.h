@@ -145,6 +145,8 @@ void get_joint_wmat_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::MTX34* o
 /* 0x8013011C - `em_magma_check__FP11_ENEMY_WORK`: 1 when the work sits on lava (`enemy/em009_act.cpp` branches on
  * it before spawning an effect). */
 u32 em_magma_check(struct _ENEMY_WORK* self);
+/* 0x8012F304 - `em_sleep_ck__FP11_ENEMY_WORKUc`: whether the enemy sleeps (`kind` 1: the reaction test). */
+u32 em_sleep_ck(struct _ENEMY_WORK* self, u8 kind);
 #endif
 
 #endif
