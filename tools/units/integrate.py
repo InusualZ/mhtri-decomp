@@ -54,6 +54,26 @@ def rel(root: str, path: str) -> str:
     return os.path.relpath(path, root).replace("\\", "/")
 
 
+#: The temp variables `scratch_dir` honours when they point inside the tree (a lane sets them to its slot's scratch).
+TEMP_VARS = ("TMPDIR", "TEMP", "TMP")
+
+
+def scratch_dir(root: str) -> str:
+    """Where this run's scratch goes, always inside `root`: the first of TMPDIR/TEMP/TMP that resolves inside it (a lane
+    points them at the slot's `.pi/tmp/<slug>`), else `<root>/build/tmp/integrate` (`lib.repo.scratch`). A variable
+    pointing outside the tree is ignored: the system temp directory is shared by every lane and outside the checkout."""
+    top = os.path.normcase(os.path.abspath(root))
+    for var in TEMP_VARS:
+        value = os.environ.get(var)
+        if not value:
+            continue
+        path = os.path.normcase(os.path.abspath(value))
+        if path == top or path.startswith(top.rstrip(os.sep) + os.sep):
+            os.makedirs(value, exist_ok=True)
+            return os.path.abspath(value)
+    return str(librepo.scratch("integrate", root))
+
+
 def run_tool(script: str, *args: str, cwd: str, timeout: float | None = None):
     """Another tool, by subprocess (the layering rule: a tool never imports a tool it is not allowed to)."""
     return proc.run([sys.executable, os.path.join(TOOLS_TREE, script), *args], cwd=cwd, timeout=timeout)
@@ -268,7 +288,7 @@ def plan(requests: list[R.Request], ownership: Ownership, decisions: dict, live:
         if owner_live:
             it.state, it.why = "deferred", "owner %s has a live lane (claims)" % owner_live
             continue
-        problems, news = [], []
+        problems, news, main_named = [], [], set()
         for r in it.resolved:
             news.append(None)
             if r.current is None:
@@ -285,6 +305,13 @@ def plan(requests: list[R.Request], ownership: Ownership, decisions: dict, live:
             want = decided or r.target.proposed_name
             if want and want in (r.current, R.source_name(r.current)):
                 continue                                   # the map already carries the name
+            if r.stale and not decided and not libnames.is_generated(r.current, "map"):
+                # the lane filed the row by its generated name and main has named it since: main's name stands (renaming
+                # a landed name is not this request's to do), and the lane's spellings follow it
+                it.notes.append("main already named it %s (%s, the request asked %s): using %s"
+                                % (r.current, r.target.symbol, want or "no name", R.source_name(r.current)))
+                main_named.add(id(r))
+                continue
             if not (req.kind == "rename" or libnames.is_generated(r.current, "map")):
                 continue                                   # a plain declaration: no rename asked
             if not want:
@@ -309,6 +336,10 @@ def plan(requests: list[R.Request], ownership: Ownership, decisions: dict, live:
             spelled = r.target.symbol
             if spelled != final and _ident(spelled) and spelled != r.current and R.source_name(r.current) != spelled:
                 it.rewrites.append((spelled, final))
+            proposed = r.target.proposed_name
+            if (id(r) in main_named and proposed and _ident(proposed) and proposed not in (spelled, final)
+                    and proposed not in ownership.symbols):
+                it.rewrites.append((proposed, final))      # the lane's source already spelled its own proposal
             hint = r.target.prototype
             # the prototype spells the filed name or the lane's proposed one; a --names decision may have chosen a
             # third (L2 round 2: `isCircleListBusy` filed, `testAndSet611b` decided - the declaration named the wrong
@@ -437,6 +468,44 @@ def needed_types(proto: str, name: str) -> list[str]:
             if i not in BUILTIN_TYPES and i not in out and i not in ("struct", "class", "union", "enum"):
                 out.append(i)
     return out
+
+
+#: The scalar float types a parameter is passed in an FPR for (a pointer or reference to one is a GPR).
+FLOAT_TYPES = frozenset({"f32", "f64", "float", "double"})
+
+
+def param_kinds(proto: str, name: str) -> list[str] | None:
+    """`["g", "f", ...]` per parameter of `name`'s prototype - `f` for a by-value float (an FPR argument), `g` for any
+    other - or None when `proto` holds no parameter list for `name`."""
+    m = re.search(r"\b%s\s*\((.*)\)" % re.escape(name), proto or "", re.S)
+    if not m:
+        return None
+    inner = cscan.remove_comments(m.group(1)).strip()
+    if inner in ("", "void"):
+        return []
+    out = []
+    for part in cscan._split_top(inner.replace(",", ";")):
+        part = part.strip()
+        if not part or part == "...":
+            continue
+        indirect = any(ch in part for ch in "*&[(")
+        ids = set(re.findall(r"[A-Za-z_]\w*", part))
+        out.append("f" if not indirect and ids & FLOAT_TYPES else "g")
+    return out
+
+
+def float_order_mismatch(proto: str, reference: str, name: str) -> str | None:
+    """Why `proto` places its float parameters elsewhere than `reference` (the owner's prototype) does, or None. MWCC
+    loads arguments in parameter order, so a float moved between integer arguments changes the call's schedule even
+    when the registers agree (docs/matching: the em004/em015 float-order findings) - a report, never a refusal."""
+    a, b = param_kinds(proto, name), param_kinds(reference, name)
+    if a is None or b is None:
+        return None
+    fa, fb = [i + 1 for i, k in enumerate(a) if k == "f"], [i + 1 for i, k in enumerate(b) if k == "f"]
+    if fa == fb:
+        return None
+    return ("%s: float parameter(s) at position %s in `%s`, at %s in the owner's `%s`"
+            % (name, fa or "none", " ".join(proto.split()), fb or "none", " ".join(reference.split())))
 
 
 def visible_names(files: Files, header: str) -> set[str]:
@@ -710,6 +779,52 @@ def adopt_leaf(files: Files, op: "DeclOp") -> None:
         op.full_header, op.header, op.leaf = op.header, lp, True
 
 
+_QUALIFIER_RE = re.compile(r"([A-Za-z_]\w*)\s*::")
+
+
+def defining_header(files: Files, name: str, namespaces: list[str] = ()) -> str | None:
+    """The header that defines type `name` - a `class`/`struct`/`union`/`enum` with a body (a base clause allowed) or a
+    typedef - preferring one that opens the prototype's first namespace (`nw4r::math::VEC3` -> a header with
+    `namespace nw4r`), then the shortest path. None when no header defines it."""
+    body = re.compile(r"\b(?:class|struct|union|enum)\s+%s\b[^;{}()]*\{" % re.escape(name))
+    hits = []
+    for r in files.all():
+        if not r.endswith(HEADER_SUFFIXES) or r.startswith(".."):
+            continue
+        text = files.get(r)
+        if name not in text:
+            continue
+        clean = cscan.strip_comments(text)
+        if body.search(clean) or any(d.name == name for d in cscan.declared_names(clean)):
+            in_ns = bool(namespaces) and re.search(r"\bnamespace\s+%s\b" % re.escape(namespaces[0]), clean) is not None
+            hits.append((not in_ns, len(r), r))
+    return min(hits)[2] if hits else None
+
+
+def leaf_plan(files: Files, op: "DeclOp", proto: str) -> tuple[list[str], list[str]]:
+    """-> (headers the leaf header must include, problems): for a prototype whose types the owner header cannot see (a
+    `nw4r::` type, a C++ class, a typedef a C header does not reach), every type `types.h` does not already give gets
+    the header that defines it (`defining_header`; namespace qualifiers are not types). A problem: a type no header
+    defines, a type only the clashing full header defines, or a C++ type for a C owner."""
+    namespaces = list(dict.fromkeys(_QUALIFIER_RE.findall(proto)))
+    types_h = "%s/types.h" % librepo.header_root(files.root)
+    base = visible_names(files, types_h) if files.exists(types_h) else set()
+    includes, problems = [], []
+    for n in needed_types(proto, op.name):
+        if n in namespaces or n in base:
+            continue
+        h = defining_header(files, n, namespaces)
+        if h is None:
+            problems.append("%s: no header defines %s" % (op.name, n))
+        elif h in (op.header, op.full_header) and op.leaf:
+            problems.append("%s: %s is defined only in the clashing full header %s" % (op.name, n, h))
+        elif (op.owner or "").endswith(".c") and (namespaces or type_keyword(files, n) == "class"):
+            problems.append("%s: the C owner %s cannot declare the C++ type %s" % (op.name, op.owner, n))
+        elif h not in includes:
+            includes.append(h)
+    return includes, problems
+
+
 def decl_sites(files: Files, op: "DeclOp", scope_files: set[str]) -> list[tuple]:
     """Every prototype/`extern` of `op.name` outside its header: `(file, start, end, statement, in_scope)`, where
     `in_scope` says the integrator may remove it (the lane's files, a lane-owned symbol, a decl-move's band)."""
@@ -816,6 +931,12 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
         if not proto:
             refuse(op, "%s: no prototype (the request, the owner and the lane spell none)" % op.name)
             continue
+        if source == "the owner's definition":
+            # (d) report only: a float that sits elsewhere in the request's or the lane's prototype than in the owner's
+            others = [op.hint] + ([" ".join(cscan.remove_comments(lane_site[3]).split())] if lane_site else [])
+            found = [w for w in (float_order_mismatch(x, proto, op.name) for x in others if x) if w]
+            if found:
+                op.result["float_order"] = list(dict.fromkeys(found))
         if op.data and not proto.startswith("extern"):
             proto = "extern " + proto
         if "void*" in proto.replace(" *", "*") and not marker and owner_src and files.exists(owner_src):
@@ -840,12 +961,23 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
                     why = ("not a type the tree defines" if not kw else "a by-value use" if not ptr_use else
                            "a C-consumable header cannot forward-declare it without changing the prototype")
                     bad.append("%s: the prototype names %s, which %s cannot see (%s)" % (op.name, n, op.header, why))
-            for why in bad:
-                refuse(op, why)
             if bad:
-                continue
-            op.result["forward"] = fwd
-            by_header.setdefault(op.header, []).append(op)
+                # (a) a type the owner header cannot see goes with the declaration into its leaf header, which includes
+                # the headers that define those types: the owner header and its C consumers stay as they are
+                includes, problems = leaf_plan(files, op, proto)
+                if problems:
+                    for why in bad + problems:
+                        refuse(op, why)
+                    continue
+                if not op.leaf:
+                    op.full_header, op.header, op.leaf = op.header, leaf_header(op), True
+                op.result.update({"leaf_includes": includes, "leaf_because": bad})
+                fwd = []
+                if files.exists(op.header) and op.name in files.declared(op.header):
+                    op.result["already_declared"] = True
+            if not op.result.get("already_declared"):
+                op.result["forward"] = fwd
+                by_header.setdefault(op.header, []).append(op)
         op.result["sites_removed"] = []
         for r, s, e, _stmt, in_scope in sorted(sites, key=lambda x: (x[0], -x[1])):
             if in_scope:
@@ -866,6 +998,12 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
                                    decl_block(c_ops, nl) if c_ops else "")
         if fwd:
             text = _insert_forward(text, fwd, nl)
+        leaf_incs: dict[str, list[str]] = {}
+        for o in hops:
+            for h in o.result.get("leaf_includes", []):
+                leaf_incs.setdefault(librepo.include_spelling(h), []).append(o.name)
+        if leaf_incs:
+            text = add_includes(text, leaf_incs)
         files.set(header, text)
         if mangle_check:
             for o in cpp_ops:
@@ -1059,7 +1197,7 @@ def snapshot_objects(root: str) -> str | None:
     src = os.path.join(root, BUILD, "src")
     if not os.path.isdir(src):
         return None
-    dst_root = tempfile.mkdtemp(prefix="integrate-objs-")
+    dst_root = tempfile.mkdtemp(prefix="integrate-objs-", dir=scratch_dir(root))
     for base, _dirs, files in os.walk(src):
         for f in files:
             if f.endswith(".o"):
@@ -1174,7 +1312,8 @@ def apply_plan(root: str, items: list[Item], lane_scope: set[str], comments: boo
     if stage in ("renames", "all"):
         pairs = list(dict.fromkeys((o, n) for it in todo for o, n in it.renames))
         if pairs:
-            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as fh:
+            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8",
+                                             dir=scratch_dir(root)) as fh:
                 fh.write("".join("%s %s\n" % p for p in pairs))
                 path = fh.name
             args = ["rename-batch", path, "--rewrite", "--no-refs"] + (["--comments"] if comments else [])
@@ -1183,18 +1322,26 @@ def apply_plan(root: str, items: list[Item], lane_scope: set[str], comments: boo
             if p.returncode != 0:
                 raise SystemExit("integrate: symedit rename-batch refused:\n%s" % (p.stdout + p.stderr)[-2000:])
             result["rename_log"] = (p.stdout or "").strip().splitlines()[-1:]
+            moved, notes = rename_leaf_headers(root, pairs)
+            result["header_renames"], result["header_notes"] = moved, notes
+            result["files"] += [new for _old, new in moved]
     if stage in ("rest", "all"):
         # a lane's stale spelling of a name the map already changed: source only, so the renames stage is the map
         # and its sweep alone (the first commit)
         stale = list(dict.fromkeys((o, n) for it in todo for o, n in it.rewrites))
         if stale:
-            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as fh:
+            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8",
+                                             dir=scratch_dir(root)) as fh:
                 fh.write("".join("%s %s\n" % p for p in stale))
                 path = fh.name
             p = run_tool("tools/symbols/symedit.py", "rewrite-batch", path, *(["--comments"] if comments else []),
                          cwd=root, timeout=600)
             os.unlink(path)
             result["rewrite_log"] = (p.stdout or "").strip().splitlines()[-1:]
+            moved, notes = rename_leaf_headers(root, stale)
+            result.setdefault("header_renames", []).extend(moved)
+            result.setdefault("header_notes", []).extend(notes)
+            result["files"] += [new for _old, new in moved]
     if stage in ("rest", "all"):
         files = Files(root)
         scope = set(lane_scope)
@@ -1210,8 +1357,61 @@ def apply_plan(root: str, items: list[Item], lane_scope: set[str], comments: boo
             if it.config:
                 cfg = os.path.join(root, "config", "RMHE08", "config.yml")
                 result["failures"].update(apply_config(cfg, it))
-        result["files"] = files.flush()
+        result["files"] = result["files"] + [f for f in files.flush() if f not in result["files"]]
     return result
+
+
+_INCLUDE_SPELLING_RE = re.compile(r'(#[ \t]*include[ \t]*")([^"]+)(")')
+
+
+def rename_leaf_headers(root: str, pairs: list[tuple[str, str]]) -> tuple[list[tuple[str, str]], list[str]]:
+    """(b) A leaf header named after a symbol's old stem (`<dir>/fn_X.h`, `<dir>/lbl_X.h`) follows the symbol's rename:
+    the file becomes `<dir>/<new source name>.h`, its include guard follows, and every `#include` that resolves to it is
+    respelled. -> ([(old path, new path)], notes). Never for a unit's own header (`<dir>/fn_X.c*` exists: renaming a
+    unit's file is a registration move), a mangled member name, or a new path that already exists."""
+    files = Files(root)
+    moved, notes = [], []
+    for old, new in pairs:
+        stem = R.source_name(new)
+        if not libnames.is_generated(old, "map") or not _ident(stem):
+            continue
+        for r in [x for x in files.all() if x.endswith(HEADER_SUFFIXES) and os.path.splitext(os.path.basename(x))[0] == old]:
+            base, ext = os.path.splitext(r)
+            if any(os.path.isfile(os.path.join(root, base + s)) for s in (".c", ".cpp", ".cp", ".cc")):
+                notes.append("%s is unit %s's own header: renaming it is a registration move" % (r, base[len("src/"):]))
+                continue
+            target = "%s/%s%s" % (os.path.dirname(r), stem, ext)
+            if files.exists(target):
+                notes.append("%s not renamed: %s already exists" % (r, target))
+                continue
+            text = files.get(r)
+            old_guard, new_guard = guard_name(r), guard_name(target)
+            text = re.sub(r"\b%s\b" % re.escape(old_guard), new_guard, text)
+            text = re.sub(r"(?m)^([ \t]*#[ \t]*(?:ifndef|define|endif)\b.*?)%s" % re.escape(old.upper()),
+                          lambda m: m.group(1) + stem.upper(), text)
+            spelled_to = os.path.normcase(os.path.abspath(os.path.join(root, r)))
+            for f in files.all():
+                t = files.get(f)
+                if os.path.basename(r) not in t:
+                    continue
+
+                def respell(m, f=f):
+                    inc = m.group(2)
+                    if os.path.basename(inc) != os.path.basename(r):
+                        return m.group(0)
+                    hit = files.resolve(inc, os.path.join(root, f))
+                    if hit is None or os.path.normcase(os.path.abspath(hit)) != spelled_to:
+                        return m.group(0)
+                    return m.group(1) + inc[:len(inc) - len(os.path.basename(inc))] + stem + ext + m.group(3)
+                new_t = _INCLUDE_SPELLING_RE.sub(respell, t)
+                if new_t != t:
+                    files.set(f, new_t)
+            files.set(target, text)
+            moved.append((r, target))
+    files.flush()
+    for old_path, _new_path in moved:
+        os.remove(os.path.join(root, old_path))
+    return moved, notes
 
 
 def dedupe_ops(ops: list[DeclOp]) -> list[DeclOp]:
@@ -1369,9 +1569,9 @@ def object_source(root: str, obj: str) -> str | None:
     return None
 
 
-def error_command(tokens: list[str], scratch_dir: str) -> list[str] | None:
+def error_command(tokens: list[str], out_dir: str) -> list[str] | None:
     """The build's compile command for one object, with every error reported (`-maxerrors 0`: the project's
-    `-maxerrors 1` stops MWCC at the first error of an object) and the object written to `scratch_dir` - the build's
+    `-maxerrors 1` stops MWCC at the first error of an object) and the object written to `out_dir` - the build's
     own object and flags are untouched. None when the command has no `-o`."""
     toks = list(tokens)
     if "&&" in toks:
@@ -1383,7 +1583,7 @@ def error_command(tokens: list[str], scratch_dir: str) -> list[str] | None:
     else:
         toks.insert(toks.index("-o"), "0")
         toks.insert(toks.index("0"), "-maxerrors")
-    toks[toks.index("-o") + 1] = scratch_dir
+    toks[toks.index("-o") + 1] = out_dir
     return toks
 
 
@@ -1401,7 +1601,7 @@ def object_errors(root: str, failed: list[str], runner=None) -> tuple[list[dict]
         except SystemExit as exc:
             notes.append("%s: no compile command (%s)" % (obj, str(exc).splitlines()[0]))
             continue
-        tmp = tempfile.mkdtemp(prefix="integrate-errors-")
+        tmp = tempfile.mkdtemp(prefix="integrate-errors-", dir=scratch_dir(root))
         try:
             cmd = error_command(tokens, tmp)
             if cmd is None:
@@ -1690,6 +1890,8 @@ def run(args, root: str | None = None) -> int:
     summary = {"tree": root, "requests": len(requests), "files": [os.path.basename(p) for p in paths],
                "classes": {c: sum(1 for i in items if i.cls == c) for c in R.CLASSES}}
     summary["already_applied"] = mark_applied(root, items, scope_files(root, lane_scope), ownership)
+    summary["main_named"] = ["%s: %s" % (it.req.id, n) for it in items for n in it.notes
+                             if n.startswith("main already named")]
     if args.dry_run:
         return emit(args, items, summary, log, t_start)
     prev_branch = g.current_branch()
@@ -1716,7 +1918,7 @@ def run(args, root: str | None = None) -> int:
     report_path = os.path.join(root, BUILD, "report.json")
     before_report = None
     if os.path.exists(report_path):
-        before_report = os.path.join(tempfile.gettempdir(), "integrate-report-before-%d.json" % os.getpid())
+        before_report = os.path.join(scratch_dir(root), "integrate-report-before-%d.json" % os.getpid())
         with open(report_path, "rb") as src, open(before_report, "wb") as dst:
             dst.write(src.read())
         if args.no_build:
@@ -1739,6 +1941,9 @@ def run(args, root: str | None = None) -> int:
                 restore(root, base_head, created)        # each round starts from the base; the last one is kept
             res = apply_plan(root, items, lane_scope, not args.no_comments, not args.no_mangle_check)
             created = [f for f in res["files"] if g.run("ls-files", "--error-unmatch", f).returncode != 0]
+            if res.get("header_renames") or res.get("header_notes"):
+                summary["header_renames"] = {"moved": [" -> ".join(m) for m in res.get("header_renames", [])],
+                                             "notes": res.get("header_notes", [])}
             fail_now = res["failures"]
             if fail_now:
                 for it in items:
@@ -1806,7 +2011,10 @@ def run(args, root: str | None = None) -> int:
     if not args.no_build:
         summary["objects"] = objects_same(before_objects, root)
     if not args.no_gate and not args.no_build:
-        summary["gate"] = gate_prerun(root, base_head, units)
+        # `--gate-ref main` judges the add-only rows against main's tip, as `land.py` will, not the cut point
+        gate_ref = args.gate_ref or base_head
+        summary["gate"] = gate_prerun(root, gate_ref, units)
+        summary["gate"]["ref"] = gate_ref
     # (h) the relocation-analysis change is a separate patch, never part of the unit commits
     patch = write_config_patch(root, base_head, branch)
     if patch:
@@ -1890,8 +2098,13 @@ def emit(args, items: list[Item], summary: dict, log: list[str], t_start: float)
                 for d in it.live_decls():
                     for why in d.result.get("not_moved", [])[:1]:
                         print("    kept in the lane: %s" % why[:200])
-    for key in ("base_build", "rounds", "final", "build_seconds", "drift", "report", "objects", "gate",
-                "stopgap_mentions", "units", "config_patch", "config_apply", "renames_commit", "commits",
+                    for why in d.result.get("float_order", []):
+                        print("    float order (report only): %s" % why[:300])
+            for note in it.notes:
+                print("    note: %s" % note[:300])
+    for key in ("main_named", "base_build", "rounds", "final", "build_seconds", "drift", "report", "objects", "gate",
+                "stopgap_mentions", "header_renames", "units", "config_patch", "config_apply", "renames_commit",
+                "commits",
                 "commits_verified", "left_in_tree", "land"):
         if key in summary:
             print("\n%s: %s" % (key, json.dumps(summary[key]) if not isinstance(summary[key], str) else summary[key]))
@@ -1912,6 +2125,9 @@ def main(argv: list[str] | None = None, root: str | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="classify, resolve and plan; write nothing")
     ap.add_argument("--no-build", action="store_true", help="skip the builds (and so never commit)")
     ap.add_argument("--no-gate", action="store_true", help="skip the stylelint/undefrefs/vtableaudit pre-run")
+    ap.add_argument("--gate-ref", default=None, metavar="REF",
+                    help="the ref the gate pre-run diffs against (default: the integrate branch's base; `main` judges "
+                         "the batch as land.py will)")
     ap.add_argument("--no-claims", action="store_true", help="do not ask claims.py for live lanes")
     ap.add_argument("--no-comments", action="store_true", help="the sweep leaves comment mentions alone")
     ap.add_argument("--no-mangle-check", action="store_true", help="skip mangle.py on C++ declarations")

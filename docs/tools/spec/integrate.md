@@ -16,7 +16,7 @@ it; a lane under the trial rule runs `--dry-run` to prove names-only drift.
 
 ```
 python tools/units/integrate.py [--requests FILE..] [--lane SLUG..] [--outbox DIR] [--only ID..] [--names FILE]
-    [--lane-units UNIT..] [--base BRANCH] [--branch NAME] [--dry-run] [--no-build] [--no-gate] [--no-claims]
+    [--lane-units UNIT..] [--base BRANCH] [--branch NAME] [--dry-run] [--no-build] [--no-gate] [--gate-ref REF] [--no-claims]
     [--no-comments] [--no-mangle-check] [--retries N] [--no-commit] [--write-status] [--json]
 python tools/units/land.py integrate ARGS...        # the same, forwarded unchanged
 ```
@@ -36,10 +36,14 @@ python tools/units/land.py integrate ARGS...        # the same, forwarded unchan
   tree already satisfies is recorded `applied`.
 * exit 0 when the batch went green (the verdicts are in the report); **1 on a refusal**: a dirty tree, a base that does
   not compile, a build that never went green (nothing is committed); 2 when it could not run.
-* `--json`: `{summary: {requests, classes, already_applied, branch, base, base_build, rounds, build_seconds,
-  drift {names_only, content}, report, objects, gate {stylelint, undefrefs, vtableaudit}, stopgap_mentions, units,
-  config_patch, config_apply, commits, commits_verified, left_in_tree, final, land}, items: [...]}`; each round carries
-  its `errors` (every error of every failed object) and `narrowed {excluded, leaf, forced, reverted}`.
+* `--gate-ref REF`: the ref the gate pre-run (`stylelint --diff`, `undefrefs --base`, `vtableaudit --diff`) judges
+  against; the default is the integrate branch's base (the cut point), `--gate-ref main` judges the batch as `land.py`
+  will once main has moved. The ref used is `summary.gate.ref`.
+* `--json`: `{summary: {requests, classes, already_applied, main_named, branch, base, base_build, rounds, build_seconds,
+  drift {names_only, content}, report, objects, gate {ref, stylelint, undefrefs, vtableaudit}, stopgap_mentions,
+  header_renames {moved, notes}, units, config_patch, config_apply, commits, commits_verified, left_in_tree, final,
+  land}, items: [...]}`; each round carries its `errors` (every error of every failed object) and `narrowed {excluded,
+  leaf, forced, reverted}`; a declaration's `float_order` and an item's `notes` are in `items`.
 
 ## Inputs and outputs
 
@@ -48,7 +52,10 @@ map/splits/sources, `claims.py list --json` (live lanes: every unmerged row's `u
 or a spawned lane's unit set, `units_of_rows`). Writes only in the invocation tree: `config/RMHE08/symbols.txt`
 (through `symedit.py rename-batch --rewrite --comments`), `src/`, `config/RMHE08/config.yml` (relocation keys
 only, during the build rounds - the change leaves as a patch file under `build/tmp/integrate/`, never in a unit
-commit), the branch, and with `--write-status` the sidecars.
+commit), the branch, and with `--write-status` the sidecars. Scratch (the rename-pair files, the base objects'
+snapshot, the diagnostic compiles, the before report) goes to `scratch_dir`: the first of TMPDIR/TEMP/TMP that points
+inside the tree (a lane sets them to its slot's `.pi/tmp/<slug>`), else `build/tmp/integrate/` - never the system temp
+directory, which every lane shares and which lies outside the checkout.
 
 ## Invariants and rules
 
@@ -76,6 +83,25 @@ commit), the branch, and with `--write-status` the sidecars.
   reason. A legacy multi-target request still excludes one declaration at a time.
 * **A prototype names the decided symbol:** the request's prototype is rewritten from the filed spelling, the lane's
   proposed name and the map's current name to the final one (L2: `isCircleListBusy` filed, `testAndSet611b` decided).
+* **C++-typed declarations go to the leaf header:** a prototype naming a type the owner header cannot see (a `nw4r::`
+  type, a C++ class by value, a typedef a C-read header does not reach) is no longer refused: `leaf_plan` finds the
+  header that defines each type (`defining_header`: a body or a typedef, the prototype's namespace preferred; namespace
+  qualifiers are not types) and the declaration goes to `src/<module>/<symbol>.h`, which includes those headers; the
+  owner header is untouched. Still refused: a type no header defines, a type only the clashing full header defines, a
+  C++ type (or `&`/`::`) for a `.c` owner.
+* **A leaf header follows its symbol's rename** (`rename_leaf_headers`): after the map renames (and after a stale
+  spelling's rewrite), a header named after the old generated stem (`<dir>/fn_X.h`, `lbl_X.h`) becomes
+  `<dir>/<new source name>.h`, its include guard follows, and every `#include` that resolves to it is respelled (the
+  same directory's short spelling too; another directory's namesake never). A unit's own header (`<dir>/fn_X.c*`
+  exists) is left with a note - renaming a unit's file is a registration move. Reported as `header_renames`.
+* **Main already named it:** a request filed by a generated name (or address) whose row main has renamed since
+  renames nothing - main's name stands - unless a `--names` decision says otherwise; the item carries the note `main
+  already named it N (...): using N`, listed under `main_named`, and the lane's spellings (the filed one, and its own
+  proposed name when the map does not use it) are rewritten to N.
+* **Float order (report only):** when the owner's definition is the prototype's authority, the request's prototype and
+  the lane's local declaration are compared with it: a by-value float parameter at another position (MWCC loads
+  arguments in parameter order, so the schedule differs) is reported as the declaration's `float_order`, never refused;
+  the owner's prototype is what is declared.
 * **Leaf headers:** when a consumer cannot include the owner's full header (a redefinition error in it after this batch
   declared into or included it), the declaration moves to `src/<module>/<symbol>.h` (section 6.5 rule 2's leaf
   header, created from the template) in the next round; a rerun finds an existing leaf header and declares nothing in
@@ -125,13 +151,21 @@ commit), the branch, and with `--write-status` the sidecars.
 Tier fixture: `tools/tests/units/test_integrate.py` - planning on a fixture map (rename, GUESS deferred, member
 judgement, stale rewrite, live owner, sidecar), the declaration edits on a fixture tree (legacy stopgap block and its
 comment removed, a STOPGAP-BEGIN block removed, the include placed, out-of-scope declarations kept, idempotence, a new
-header from the template, a C header refusing an unseen type), the build-log reader (an error block, never a warning),
+header from the template, a C header's unseen type moved to the leaf header with its defining include, a type no
+header defines still refused), the build-log reader (an error block, never a warning),
 blame and exclusion; the 2026-10-04 gaps - a STOPGAP block keeps its typedef, a rename's declaration comes from its
 removed STOPGAP block, a `--names` decision rewrites the prototype, already-applied detection (owner header, leaf
 header, a STOPGAP block still present), `narrow` (forced, excluded, reverted, leaf), the diagnostic compile command,
 the config edit, and `run()` on a fixture repository with the build faked: a never-green build exits 1 with nothing
 committed and the attempt left in the tree, a broken base is refused before anything is applied, a green build is
-committed with a non-empty land line. Every one of those has a mutation that fails it. Acceptance (measured, not in
+committed with a non-empty land line. Every one of those has a mutation that fails it.
+`tools/tests/units/test_integrate_gaps.py` (the 2026-10-22 gaps, 22 checks, all failing against the tool before them): a
+`nw4r::` prototype into its leaf header (the include, C++ linkage, the owner header untouched, the lane's include,
+idempotence) and a C owner still refusing it; a leaf `fn_X.h` renamed with its symbol (guard, both include spellings,
+another directory's namesake, a unit's own header left with a note); a request whose row main named (no rename, the
+note, both spellings rewritten) beside one main did not; `param_kinds`/`float_order_mismatch` and the report on a real
+declaration; `scratch_dir` (TEMP inside the tree honoured, outside ignored); `run()` judging the gate pre-run against
+the cut point by default and against `main` with `--gate-ref main`. Acceptance (measured, not in
 the suite): the L3/L4 replays and the L2 round-2 replay in `docs/pipeline.md` 10.10.
 
 ## Known gaps
@@ -143,3 +177,6 @@ the suite): the L3/L4 replays and the L2 round-2 replay in `docs/pipeline.md` 10
 * Type changes at call sites (`net_exp_heap` retyped, a cast, `&array` -> `array`) are never made: they come back as
   judgement with the compiler's message.
 * The declaration comment is the address only; the evidence stays in the request.
+* `--dry-run` does not list the leaf-header renames a run would make (they are found after the map rename); the float
+  order is compared only against the owner's definition, never against another caller's declaration; a type defined
+  in two headers takes the namespace match, then the shortest path - the leaf may include a wider header than needed.

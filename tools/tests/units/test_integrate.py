@@ -149,10 +149,24 @@ def test_new_header_and_refusals(c):
         c.check("... with its guard and the C++-linkage declaration outside any extern \"C\"",
                 ("#ifndef MHTRI_EF_CORE_H" in core, "void* work_alloc(unsigned long size);" in core,
                  "extern \"C\"" in core), (True, True, False))
-        c.check("a C header cannot be handed a type it does not see", fails.get("a#2", [""])[0].startswith(
-            "cinit: the prototype names Param, which src/C/clib.h cannot see"), True)
-        c.check("... and the refused declaration stays in the lane", "s32 cinit(Param* p);" in read(tmp, "src/Lane/lane.cpp"),
-                True)
+        c.check("a C header that cannot see a type leaves it alone: the declaration goes to its leaf header",
+                (fails.get("a#2"), ops[1].header, ops[1].full_header, ops[1].result.get("leaf_includes")),
+                (None, "src/C/cinit.h", "src/C/clib.h", ["src/Net/param.h"]))
+        leaf = read(tmp, "src/C/cinit.h")
+        c.check("... which includes the header defining the type and declares it with C linkage",
+                ('#include "Net/param.h"' in leaf, "s32 cinit(Param* p);" in leaf, 'extern "C"' in leaf,
+                 "cinit" in read(tmp, "src/C/clib.h")), (True, True, True, False))
+        c.check("... and the lane includes the leaf header in place of its local declaration",
+                ('#include "C/cinit.h"' in read(tmp, "src/Lane/lane.cpp"),
+                 "s32 cinit(Param* p);" in read(tmp, "src/Lane/lane.cpp")), (True, False))
+        write(tmp, "src/Lane/lane2.cpp", '#include "types.h"\ns32 cmyst(Mystery* p);\nvoid g() { cmyst(0); }\n')
+        files = ig.Files(tmp)
+        op = ig.DeclOp("a#3", "cmyst", "cmyst", 0x80001100, ".text", "C/clib.c", "src/C/clib.h", cpp=False)
+        fails = ig.apply_decls(files, [op], {"src/Lane/lane2.cpp"}, set())
+        files.flush()
+        c.check("a type no header defines is still refused, and the declaration stays in the lane",
+                (fails.get("a#3", [""])[-1], "s32 cmyst(Mystery* p);" in read(tmp, "src/Lane/lane2.cpp")),
+                ("cmyst: no header defines Mystery", True))
 
 
 def test_text_helpers(c):
