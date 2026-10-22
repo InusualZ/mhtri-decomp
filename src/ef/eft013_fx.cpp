@@ -1042,7 +1042,7 @@ extern "C" void eft013_spark_set(_ENEMY_WORK* self, u32 a) {
 }
 
 /* 0x80107860 - the player variant of eft013_spark_set (state 2, player record's key/state bytes). */
-extern "C" void fn_80107860(_EFT013_PL* self, u32 a) {
+extern "C" void eft013_npc_motion_spawn(_EFT013_PL* self, u32 a) {
     f32 scale;
     _EFT013* e = (_EFT013*)fn_80107A18(self, 9, a, scale, self->field_0x1A4);
     if (e != NULL) {

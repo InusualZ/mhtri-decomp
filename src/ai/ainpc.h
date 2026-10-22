@@ -75,7 +75,7 @@ struct _AINPC_W {
     /* +0x1D1 */ u8 unused_0x1D1[0x1D4 - 0x1D1];
     /* +0x1D4 */ f32 field_0x1D4;
     /* +0x1D8 */ u8 unused_0x1D8[0x1DC - 0x1D8];
-    /* +0x1DC */ f32 field_0x1DC;       /* the effect's hold timer `fn_802D2904` arms */
+    /* +0x1DC */ f32 field_0x1DC;       /* the effect's hold timer `ai_npc_motion_set` arms */
     /* +0x1E0 */ u8 unused_0x1E0[0x1E1 - 0x1E0];
     /* +0x1E1 */ u8 field_0x1E1;
     /* +0x1E2 */ u8 unused_0x1E2[0x1E5 - 0x1E2];
@@ -106,9 +106,9 @@ struct _AINPC_W {
     /* +0x327 */ u8 unused_0x327[0x33A - 0x327];
     /* +0x33A */ u8 field_0x33A;        /* the per-record index into the 0x805D5354/5360/5378/5390 tables */
     /* +0x33B */ u8 unused_0x33B[0x344 - 0x33B];
-    /* +0x344 */ u16 hunt_bonus;        /* the hunt-rank bonus `fn_802D9C84` adds up to 100;
+    /* +0x344 */ u16 hunt_bonus;        /* the hunt-rank bonus `ai_npc_bonus_add` adds up to 100;
                                         * `result_hunt_rank_get` reads it */
-    /* +0x346 */ u16 time_bonus;        /* the time-rank bonus `fn_802D9C84` adds up to 10;
+    /* +0x346 */ u16 time_bonus;        /* the time-rank bonus `ai_npc_bonus_add` adds up to 10;
                                         * `result_time_rank_get` adds it to the rank */
     /* +0x348 */ u8 unused_0x348;
     /* +0x349 */ u8 field_0x349;
@@ -220,7 +220,7 @@ struct _AINPC_W {
     /* +0x46D */ u8 unused_0x46D[0x47C - 0x46D];
     /* +0x47C */ s16 field_0x47C;       /* the torch gauge `fn_802D84D0` sets */
     /* +0x47E */ u8 unused_0x47E[0x482 - 0x47E];
-    /* +0x482 */ u8 field_0x482;        /* read sign-extended at every `fn_802D9D30` call site */
+    /* +0x482 */ u8 field_0x482;        /* read sign-extended at every `ai_npc_talk` call site */
     /* +0x483 */ u8 field_0x483;        /* the item page the AI NPC is on (1..4) */
     /* +0x484 */ u8 field_0x484;
     /* +0x485 */ u8 field_0x485;

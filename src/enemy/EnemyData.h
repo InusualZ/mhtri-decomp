@@ -33,6 +33,13 @@ struct EmAilmentFxBlock {
     /* +0x20 */ f32 hit_scale;         /* the hit effect scale `em_hit_fx_scale_get` returns */
 };
 
+/* The enemy kind's body size record `EnemyData::size_0x54` points at; `ai/ai_npc.cpp` scales its +0x24 with
+ * `get_em_chg_scale`.  size: 0x28 (approximation: evidenced to +0x24) */
+struct EmSizeParams {
+    /* +0x00 */ u8 unused_0x00[0x24];
+    /* +0x24 */ f32 radius_0x24;   /* the reach the companion keeps from the enemy */
+};
+
 /* The per-enemy data record `get_enemy_data` returns.  Union of `enemy/em_common.cpp` and
  * `enemy/fn_80138074.c`; the two views are compatible (a pointer table at +0x04, the value list at
  * +0x64, the user-data items at +0x94 and the extra block at +0xA0). size: 0xA4 */
@@ -76,7 +83,7 @@ typedef struct EnemyData {
     /* +0x048 */ struct EmRouteMap* routes_0x48;  /* the per-map area routes `em_route_find` walks (`em_common.cpp`) */
     /* +0x04C */ struct EmSpecialPartBlock* special_parts_0x4C;  /* the special-part sets (`em_special_part_map_get`) */
     /* +0x050 */ f32* move_params_0x50;  /* three VEC3 move-mode parameters `em_move_mode_set` copies, plus the dive one at +0x18 */
-    /* +0x054 */ u8 pad_0x054[0x058 - 0x054];
+    /* +0x054 */ struct EmSizeParams* size_0x54;  /* the body size record (`ai/ai_npc.cpp` reads its reach) */
     /* +0x058 */ struct EmStatusLimits* status_limits_0x58;  /* the +0x43D status frame limits `em_status_update` reads */
     /* +0x05C */ s32 frames_bias_0x5C;  /* the bias `em_data_frames_get` adds (`em_common.cpp`) */
     /* +0x060 */ u8 pad_0x060[0x064 - 0x060];

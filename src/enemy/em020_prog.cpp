@@ -87,7 +87,7 @@
 #include "unsplit/unknown.h"     /* SystemWork / system_w */
 #include "enemy/em020_ai.h"      /* em020_aim_target_ck (this unit's) */
 #include "stage/stg_w.h"         /* fn_802B0A98, stage_map_kind_get (the owner is stage/stg_w.cpp) */
-#include "ai/fn_802D44F4.h"      /* fn_802D94C4 (the owner is ai/ai_npc.cpp) */
+#include "ai/fn_802D44F4.h"      /* ainpc_element_report_set (the owner is ai/ai_npc.cpp) */
 #include "Pl/fn_8027D684.h"      /* fn_8027DC64 (the owner is Pl/pl_act.cpp) */
 
 #include "enemy/em020_ai.h"
@@ -753,7 +753,7 @@ void em020_init(_ENEMY_WORK* self)
         fn_802B0A98(7, 0);
         fn_802B0A98(9, 0);
         fn_802B0A98(10, 0);
-        fn_802D94C4(1);
+        ainpc_element_report_set(1);
     }
 }
 
@@ -3091,11 +3091,11 @@ extern "C" void em020_area_model_set(_ENEMY_WORK* self) {
         switch (self->area_no) {
         case 2:
             fn_802B0A98(9, 1);
-            fn_802D94C4(0);
+            ainpc_element_report_set(0);
             break;
         case 3:
             fn_802B0A98(10, 1);
-            fn_802D94C4(1);
+            ainpc_element_report_set(1);
             break;
         }
     }

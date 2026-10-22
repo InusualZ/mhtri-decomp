@@ -2,7 +2,7 @@
  *   its update hook, and the per-variant bodies that create the nw4r effects, lights and colours.
  * RANGE. .text 0x8010D1A8-0x801121DC (37 functions); extab 0x8000C25C-0x8000C32C, extabindex 0x80026274-0x800263AC,
  *   .data 0x8059F530-0x8059F670, .sdata 0x80791828-0x80791840, .sdata2 0x80796838-0x807969D8.  The spawn helpers
- *   (`eft_spawn_pos_in_area`, `ef_pl_effects_init`, `fn_8010D678`, `fn_8010D688`) build the record through
+ *   (`eft_spawn_pos_in_area`, `ef_pl_effects_init`, `eft_npc_model_set_create`, `fn_8010D688`) build the record through
  *   `eft_res_slot_get`/`fn_8010D70C` and install `fn_8010D3C4`/`fn_8010D8B0`; `fn_8010D1A8` scales the effect over
  *   the day-cycle keyframes `lbl_8059F530`.
  * FLAGS. `cflags_main`; `#pragma peephole off` around `fn_8010D400` (the pool-block store keeps retail's reload).
@@ -445,7 +445,7 @@ void ef_pl_effects_init(Plw* source)
 }
 
 /* Spawns the third sub-effect variant. */
-void fn_8010D678(Plw* source)
+void eft_npc_model_set_create(Plw* source)
 {
     fn_8010D70C(source, 3, 2, 1);
 }

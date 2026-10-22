@@ -14,11 +14,67 @@
 #include "nw4r/math.h"
 #include "pl.h"
 
-/* The 0x10-byte formation record `+0x41C` points at - the AI skirmish line's member spacing, read
- * as a 0-100 percentage by `fn_802D4020`.  size: 0x14 (the band reads +0x10; 4-aligned) */
+/* One tuning row of a formation: what it adjusts (0 attack, 1 defence, 2 speed, 3 gauge) and the amount per
+ * companion level.  size: 0xE */
+struct AINPCTuning {
+    /* +0x00 */ u8 kind;
+    /* +0x01 */ u8 pad_0x01;
+    /* +0x02 */ s16 values[6];
+};
+
+/* The formation record `+0x41C` points at: its two tuning rows and the attack rate `fn_802D4020` rolls
+ * against.  size: 0x14 (the band reads +0x10; 4-aligned) */
 struct AINPCFormation {
-    /* +0x00 */ u8 unused_0x00[0x10];
+    /* +0x00 */ struct AINPCTuning* tuning_0x00;  /* two rows, applied by `ai_npc_behaviour_apply` */
+    /* +0x04 */ u8 unused_0x04[0x10 - 0x04];
     /* +0x10 */ u8 attack_rate;        /* the percentage `fn_802D4020` rolls against */
+};
+
+/* A companion setup the lobby previews: the formation, the three skills and the three tuning parameters.
+ * size: 0xA */
+struct AINPCSetup {
+    /* +0x0 */ u8 behaviour;
+    /* +0x1 */ u8 skills[3];
+    /* +0x4 */ u16 attack_level;
+    /* +0x6 */ u16 gauge_level;
+    /* +0x8 */ u16 level;
+};
+
+/* The status preview `ai_npc_status_preview` fills from a setup.  size: 0x1C */
+struct AINPCStatus {
+    /* +0x00 */ u8 attack_rank;
+    /* +0x01 */ u8 gauge_rank;
+    /* +0x02 */ s16 rate;            /* always 100 */
+    /* +0x04 */ s16 gauge_bonus;     /* the formation's gauge adjustment */
+    /* +0x06 */ s16 attack;
+    /* +0x08 */ s16 attack_bonus;
+    /* +0x0A */ u8 status_kind;      /* the status attack the skills give (0 none) */
+    /* +0x0B */ u8 pad_0x0B;
+    /* +0x0C */ s16 status_attack;
+    /* +0x0E */ s16 status_bonus;
+    /* +0x10 */ s16 defense;
+    /* +0x12 */ s16 defense_bonus;
+    /* +0x14 */ u8 level;
+    /* +0x15 */ u8 pad_0x15;
+    /* +0x16 */ s16 gauge;
+    /* +0x18 */ s16 gauge_add;
+    /* +0x1A */ u8 speed_rank;
+    /* +0x1B */ u8 pad_0x1B;
+};
+
+/* One weak point of an enemy's list (`_ENEMY_WORK::field_0x8C8`, ended by joint -1): the joint it sits on (1000 for a
+ * fixed position), its kind, flags (0x002 hidden, 0x010 disabled, 0x100 broken), the part `em_flags836_ck` tests,
+ * the radius the companion keeps and the offset on the joint.  size: 0x2C */
+struct EmWeakPoint {
+    /* +0x00 */ s16 joint;
+    /* +0x02 */ u8 unused_0x02[0x08 - 0x02];
+    /* +0x08 */ u16 kind;
+    /* +0x0A */ u16 flags;
+    /* +0x0C */ u16 part;
+    /* +0x0E */ u8 unused_0x0E[0x10 - 0x0E];
+    /* +0x10 */ f32 radius;
+    /* +0x14 */ nw4r::math::VEC3 offset;
+    /* +0x20 */ u8 unused_0x20[0x2C - 0x20];
 };
 
 /* One attack entry of the two the AI NPC carries at +0x240 (stride 0x5C).  `hit_flag_set` /
@@ -60,7 +116,7 @@ struct _HIT_W {
 };
 
 /* The AI-NPC work record.  `self + 8` is the actor model; the band's own state starts after it.
- * size: 0x49C (lower bound - the highest offset the band touches is +0x498) */
+ * size: 0x4A8 (the map's size of the `ainpc_w` object) */
 /* One slot of the +0x390 ring and of the +0x3B0 pending block: the attack id and its count.
  * size: 0x4 */
 struct HitSlot {
@@ -72,9 +128,11 @@ struct _AINPC_W {
     /* +0x000 */ u8 active;            /* non-zero while the record is in use */
     /* +0x001 */ u8 in_area;           /* set from `area_0x1A4 == get_now_areano()` */
     /* +0x002 */ u8 field_0x002;       /* set to 1 by the state setter; zero suppresses +0x3C */
-    /* +0x003 */ u8 unused_0x003[0x004 - 0x003];
-    /* +0x004 */ u8 field_0x004;       /* the three bytes the motion setter clears */
-    /* +0x005 */ u8 field_0x005;
+    /* +0x003 */ u8 phase;             /* 0 until `ainpc_start` has set the record up (it bumps it to 1);
+                                        * `ainpc_frame` switches on it */
+    /* +0x004 */ u8 state;             /* the motion's own sub-state every arm handler switches on (the setter clears
+                                        * it with +0x005/+0x006) */
+    /* +0x005 */ u8 sub_step;          /* the sub-state's counter (repeats left) */
     /* +0x006 */ u8 field_0x006;
     /* +0x007 */ u8 unused_0x007;
     /* +0x008 */ MHchar model;         /* size 0x140; the actor's joint/model block */
@@ -95,7 +153,8 @@ struct _AINPC_W {
     /* +0x19C */ f32 field_0x19C;      /* added to +0x188 before the move blend is applied */
     /* +0x1A0 */ f32 field_0x1A0;      /* the effect height offset */
     /* +0x1A4 */ u8 area;              /* the area the NPC lives in */
-    /* +0x1A5 */ u8 unused_0x1A5[0x1B0 - 0x1A5];
+    /* +0x1A5 */ u8 unused_0x1A5[0x1AC - 0x1A5];
+    /* +0x1AC */ s32 timer_0x1AC;            /* the motion countdown the arm handlers seed with a random 5..20 */
     /* +0x1B0 */ nw4r::math::VEC3 pos_0x1B0;  /* the last accepted move target */
     /* +0x1BC */ f32 field_0x1BC;
     /* +0x1C0 */ f32 field_0x1C0;
@@ -116,15 +175,20 @@ struct _AINPC_W {
     /* +0x1F0 */ s32 gauge_0x1F0;      /* the motion gauge the drivers drain and refill */
     /* +0x1F4 */ s32 gauge_max_0x1F4;
     /* +0x1F8 */ s16 gauge_refill_0x1F8;
-    /* +0x1FA */ u8 unused_0x1FA[0x1FE - 0x1FA];
+    /* +0x1FA */ u16 field_0x1FA;                 /* the attack `ai_npc_attack_update` derives */
+    /* +0x1FC */ u16 field_0x1FC;                 /* the defence `ai_npc_defense_update` derives */
     /* +0x1FE */ u16 field_0x1FE;
     /* +0x200 */ u16 field_0x200;
-    /* +0x202 */ u8 unused_0x202[0x210 - 0x202];
+    /* +0x202 */ u8 unused_0x202[0x204 - 0x202];
+    /* +0x204 */ f32 field_0x204;
+    /* +0x208 */ f32 field_0x208;
+    /* +0x20C */ u32 behaviour_flags;        /* the behaviour flag word `fn_802D6888` assembles */
     /* +0x210 */ u16 field_0x210;      /* the attack id stamped into every hit entry */
     /* +0x212 */ u16 field_0x212;      /* the counter-attack window `fn_802D2264` drains */
     /* +0x214 */ s16 field_0x214;      /* a countdown set by `fn_802D3A2C` */
     /* +0x216 */ u8 field_0x216;       /* the gate at the top of `fn_802D2264` */
-    /* +0x217 */ u8 unused_0x217[0x21A - 0x217];
+    /* +0x217 */ u8 unused_0x217;
+    /* +0x218 */ u16 field_0x218;
     /* +0x21A */ u8 field_0x21A;       /* the attack selector the dispatcher switches on */
     /* +0x21B */ u8 unused_0x21B;
     /* +0x21C */ s16 field_0x21C;
@@ -149,17 +213,26 @@ struct _AINPC_W {
     /* +0x23D */ u8 unused_0x23D;
     /* +0x23E */ s16 field_0x23E;      /* the countdown that clears +0x23C */
     /* +0x240 */ struct _HIT_W hit[2]; /* the two attack entries `fn_802D2F7C` fills and
-                                        * `fn_802D29F8`'s dispatcher reads back */
-    /* +0x2F8 */ u8 unused_0x2F8[0x321 - 0x2F8];
+                                        * `ai_npc_variant_set`'s dispatcher reads back */
+    /* +0x2F8 */ u16 hit_ids[0x14];          /* the hit-id list `hit_id_list_clear` empties */
+    /* +0x320 */ u8 hit_id_count;
     /* +0x321 */ u8 field_0x321;       /* `fn_802D3E4C` sets it, `fn_802D3F08` reads it */
     /* +0x322 */ u8 unused_0x322[0x324 - 0x322];
     /* +0x324 */ u16 field_0x324;      /* the damage-type flag word `fn_802D4248` tests */
-    /* +0x326 */ u8 unused_0x326[0x32C - 0x326];
+    /* +0x326 */ u8 field_0x326;
+    /* +0x327 */ u8 unused_0x327[0x32C - 0x327];
     /* +0x32C */ nw4r::math::VEC3 pos_0x32C;
-    /* +0x338 */ u8 unused_0x338;
+    /* +0x338 */ u8 field_0x338;
     /* +0x339 */ u8 field_0x339;       /* the 0..0x14 progress `fn_802D3984`/`fn_802D3F70`
                                         * interpolate with */
-    /* +0x33A */ u8 unused_0x33A[0x348 - 0x33A];
+    /* +0x33A */ u8 field_0x33A;
+    /* +0x33B */ u8 unused_0x33B;
+    /* +0x33C */ u16 field_0x33C;
+    /* +0x33E */ u16 field_0x33E;
+    /* +0x340 */ u16 field_0x340;
+    /* +0x342 */ u16 field_0x342;
+    /* +0x344 */ u16 hunt_bonus;             /* the hunt-rank bonus `ai_npc_bonus_add` adds up to 100 */
+    /* +0x346 */ u16 time_bonus;             /* the time-rank bonus `ai_npc_bonus_add` adds up to 10 */
     /* +0x348 */ u8 field_0x348;
     /* +0x349 */ u8 field_0x349;
     /* +0x34A */ u8 field_0x34A;       /* the countdown `fn_802D36B8` runs down */
@@ -172,23 +245,31 @@ struct _AINPC_W {
     /* +0x350 */ s16 field_0x350;
     /* +0x352 */ s16 field_0x352;      /* the countdown that arms +0x354 */
     /* +0x354 */ u8 field_0x354;
-    /* +0x355 */ u8 unused_0x355[0x358 - 0x355];
+    /* +0x355 */ u8 unused_0x355;
+    /* +0x356 */ u16 field_0x356;
     /* +0x358 */ u8 field_0x358;
     /* +0x359 */ u8 unused_0x359;
     /* +0x35A */ s16 field_0x35A;
     /* +0x35C */ u8 field_0x35C;
     /* +0x35D */ u8 unused_0x35D;
     /* +0x35E */ s16 field_0x35E;
-    /* +0x360 */ u8 unused_0x360[0x374 - 0x360];
+    /* +0x360 */ u8 unused_0x360[0x362 - 0x360];
+    /* +0x362 */ u8 field_0x362;
+    /* +0x364 */ u32 field_0x364;
+    /* +0x368 */ nw4r::math::VEC3 pos_0x368;
     /* +0x374 */ s16 field_0x374;
     /* +0x376 */ u8 field_0x376;       /* cleared with +0x378 by `fn_802D4238` */
-    /* +0x377 */ u8 unused_0x377;
+    /* +0x377 */ u8 field_0x377;
     /* +0x378 */ u8 field_0x378;
-    /* +0x379 */ u8 unused_0x379[0x382 - 0x379];
+    /* +0x379 */ u8 unused_0x379[0x37C - 0x379];
+    /* +0x37C */ f32 field_0x37C;
+    /* +0x380 */ u16 field_0x380;
     /* +0x382 */ u8 field_0x382;       /* cleared with +0x34B by `fn_802D3B24` */
     /* +0x383 */ u8 field_0x383;       /* set when the hit entry was filled */
     /* +0x384 */ u8 field_0x384;
-    /* +0x385 */ u8 unused_0x385[0x389 - 0x385];
+    /* +0x385 */ u8 unused_0x385;
+    /* +0x386 */ s16 field_0x386;
+    /* +0x388 */ u8 unused_0x388;
     /* +0x389 */ u8 field_0x389;
     /* +0x38A */ s16 field_0x38A;
     /* +0x38C */ s16 field_0x38C;      /* the aim-build timer `fn_802D1C90` runs up */
@@ -198,7 +279,7 @@ struct _AINPC_W {
                                              * 8-11 the four deferred slots `fn_802D40EC` fills; the
                                              * target indexes all twelve from the one base */
     /* +0x3C0 */ u16 entry_index;      /* the ring cursor, wrapping at 8 */
-    /* +0x3C2 */ u8 unused_0x3C2[0x3C4 - 0x3C2];
+    /* +0x3C2 */ u16 field_0x3C2;
     /* +0x3C4 */ u8 field_0x3C4;
     /* +0x3C5 */ u8 unused_0x3C5;
     /* +0x3C6 */ s16 field_0x3C6;      /* the three timers `fn_802D3B34` advances */
@@ -209,20 +290,34 @@ struct _AINPC_W {
     /* +0x3CE */ s8 field_0x3CE;       /* non-zero arms +0x3CC */
     /* +0x3CF */ u8 unused_0x3CF;
     /* +0x3D0 */ s16 field_0x3D0;
-    /* +0x3D2 */ u8 unused_0x3D2[0x3D4 - 0x3D2];
+    /* +0x3D2 */ u8 field_0x3D2;
+    /* +0x3D3 */ u8 unused_0x3D3;
     /* +0x3D4 */ s16 field_0x3D4;
     /* +0x3D6 */ s16 field_0x3D6;
-    /* +0x3D8 */ u8 unused_0x3D8[0x3DC - 0x3D8];
+    /* +0x3D8 */ u8 unused_0x3D8[0x3DA - 0x3D8];
+    /* +0x3DA */ s16 field_0x3DA;
     /* +0x3DC */ s16 field_0x3DC;      /* the countdown that calls `fn_802D6B2C` */
     /* +0x3DE */ u8 field_0x3DE;       /* cleared by `fn_802D3D84` */
-    /* +0x3DF */ u8 unused_0x3DF[0x408 - 0x3DF];
+    /* +0x3DF */ u8 unused_0x3DF;
+    /* +0x3E0 */ nw4r::math::VEC3 pos_0x3E0;
+    /* +0x3EC */ u16 field_0x3EC;
+    /* +0x3EE */ u16 field_0x3EE;
+    /* +0x3F0 */ u8 field_0x3F0;
+    /* +0x3F1 */ u8 unused_0x3F1;
+    /* +0x3F2 */ u16 field_0x3F2;
+    /* +0x3F4 */ u16 field_0x3F4;
+    /* +0x3F6 */ u8 field_0x3F6;
+    /* +0x3F7 */ u8 field_0x3F7;
+    /* +0x3F8 */ u8 field_0x3F8[4];
+    /* +0x3FC */ u8 field_0x3FC[4];
+    /* +0x400 */ u16 field_0x400[4];
     /* +0x408 */ s16 field_0x408;      /* the block of countdowns `fn_802D36B8` decrements */
     /* +0x40A */ s16 field_0x40A;
     /* +0x40C */ s16 field_0x40C;
     /* +0x40E */ s16 field_0x40E;
     /* +0x410 */ s16 field_0x410;
     /* +0x412 */ s16 field_0x412;
-    /* +0x414 */ u8 unused_0x414[0x416 - 0x414];
+    /* +0x414 */ s16 field_0x414;
     /* +0x416 */ u8 field_0x416;       /* the distance band `fn_802D1C90` latches */
     /* +0x417 */ u8 field_0x417;
     /* +0x418 */ u8 field_0x418;
@@ -235,21 +330,26 @@ struct _AINPC_W {
     /* +0x426 */ u8 field_0x426;       /* the weak-point index `fn_802D1AFC` rolls */
     /* +0x427 */ u8 weak_point_0x427[5];  /* the five weak-point rates it bumps */
     /* +0x42C */ u16 field_0x42C;
-    /* +0x42E */ u8 unused_0x42E[0x43C - 0x42E];
+    /* +0x42E */ u8 skill_0x42E[3];          /* the three skill slots `ai_skill_ck` compares against */
+    /* +0x431 */ u8 field_0x431;
+    /* +0x432 */ u8 unused_0x432[0x434 - 0x432];
+    /* +0x434 */ s32 field_0x434;
+    /* +0x438 */ s32 field_0x438;
     /* +0x43C */ u8 field_0x43C;       /* the count `fn_802D348C` bumps below 7 */
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ s16 field_0x43E;      /* a countdown `fn_802D36B8` runs down */
     /* +0x440 */ u8 field_0x440;
     /* +0x441 */ u8 unused_0x441[0x445 - 0x441];
     /* +0x445 */ u8 field_0x445;
-    /* +0x446 */ u8 unused_0x446;
+    /* +0x446 */ u8 field_0x446;
     /* +0x447 */ u8 field_0x447;       /* the roll `fn_802D1710` stores */
     /* +0x448 */ u8 field_0x448;
     /* +0x449 */ u8 unused_0x449[0x44C - 0x449];
     /* +0x44C */ f32 field_0x44C;
     /* +0x450 */ u8 field_0x450;
     /* +0x451 */ u8 field_0x451;
-    /* +0x452 */ u8 unused_0x452[0x460 - 0x452];
+    /* +0x452 */ u8 unused_0x452[0x454 - 0x452];
+    /* +0x454 */ nw4r::math::VEC3 pos_0x454;
     /* +0x460 */ u8 field_0x460;
     /* +0x461 */ u8 field_0x461;
     /* +0x462 */ u16 field_0x462;
@@ -266,13 +366,17 @@ struct _AINPC_W {
     /* +0x47F */ u8 unused_0x47F;
     /* +0x480 */ s16 field_0x480;
     /* +0x482 */ u8 field_0x482;
-    /* +0x483 */ u8 unused_0x483[0x485 - 0x483];
+    /* +0x483 */ u8 field_0x483;
+    /* +0x484 */ u8 field_0x484;
     /* +0x485 */ u8 field_0x485;
     /* +0x486 */ s16 field_0x486;
-    /* +0x488 */ u8 unused_0x488[0x492 - 0x488];
-    /* +0x492 */ u8 field_0x492;
-    /* +0x493 */ u8 unused_0x493[0x498 - 0x493];
+    /* +0x488 */ u32 field_0x488;
+    /* +0x48C */ u32 field_0x48C;
+    /* +0x490 */ u32 field_0x490;
+    /* +0x494 */ u32 field_0x494;
     /* +0x498 */ u32 sound_handle_0x498;  /* the sound handler the attack drivers take */
+    /* +0x49C */ u32 sound_handle_0x49C;  /* the second SE entry `se_entry_request(0xB, ...)` returns */
+    /* +0x4A0 */ u8 unused_0x4A0[0x4A8 - 0x4A0];
 };
 
 #ifdef __cplusplus

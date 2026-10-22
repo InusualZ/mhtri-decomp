@@ -910,6 +910,12 @@ struct _PLW {
                     /* +0x4DC */ u8 unk4DC;
                     /* +0x4DD */ u8 unk4DD[0x4E0 - 0x4DD];
                 };
+                struct {   /* `ai/ai_npc.cpp`'s view: the hold that pins the player down */
+                    /* +0x480 */ u8 pad_0x480_hold[0x492 - 0x480];
+                    /* +0x492 */ u8 hold_kind_0x492;   /* 0xFF while nothing holds the player */
+                    /* +0x493 */ u8 pad_0x493_hold[0x4C0 - 0x493];
+                    /* +0x4C0 */ f32 hold_time_0x4C0;  /* positive while the hold lasts */
+                };
                 struct {   /* the shell band's view: the actor's own attack entry, the record
                             * `Pl/pl_act.cpp` spells `_HIT_W` and `fn_80277974` fills in.  Only its address is
                             * named - the entry runs on into the fields of the view above */

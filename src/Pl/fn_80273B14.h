@@ -144,7 +144,7 @@ s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUI
                 struct _EQUIP* equip2, s8* out);
 s32 fn_80274570(struct _PLW* plw);
 void fn_80274584(s8 value);
-s32 fn_80274624(struct _PLW* plw);
+s32 pl_act_class_get(struct _PLW* plw);
 s32 fn_80274904(struct _PLW* plw);
 s32 fn_80274988(struct _PLW* plw);
 s32 fn_80274A04(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind);

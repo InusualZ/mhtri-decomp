@@ -17,33 +17,33 @@ extern "C" {
 #endif
 
 /* ---- `ai/ai_npc.cpp`'s own rows below the view (0x802CC794..0x802D0F34) ---- */
-void fn_802CD770(struct _AINPC_W* self);
-void fn_802CDA1C(struct _AINPC_W* self);
-void fn_802CDB10(struct _AINPC_W* self);
-void fn_802D0C9C(struct _AINPC_W* self);
+void ai_npc_player_watch(struct _AINPC_W* self);
+void ai_npc_target_refresh(struct _AINPC_W* self);
+void ai_npc_plan_decide(struct _AINPC_W* self);
+void ai_npc_plan_dispatch(struct _AINPC_W* self);
 void fn_802D0DCC(struct _AINPC_W* self);
 
 /* ---- `ai/ai_npc.cpp`'s own rows above the view (0x802D44F4..) ---- */
 void fn_802D6888(struct _AINPC_W* self);
-void fn_802D6B2C(struct _AINPC_W* self, s32 a);
-void fn_802D6D4C(struct _AINPC_W* self);
-void fn_802D6DF4(struct _AINPC_W* self);
-void fn_802D8478(struct _AINPC_W* self);
+void fn_802D6B2C(struct _AINPC_W* self, s16 delta);
+void ai_npc_attack_update(struct _AINPC_W* self);
+void ai_npc_defense_update(struct _AINPC_W* self);
+void ai_npc_player_idle_count(struct _AINPC_W* self);
 u32 fn_802D8550(struct _AINPC_W* self);
 u32 fn_802D86D4(struct _AINPC_W* self, u16* id, s16* count);
 u16 fn_802D89D4(struct _AINPC_W* self, u16 motion);
 void fn_802D92F8(struct _AINPC_W* self);
-void fn_802D93B8(struct _AINPC_W* self);
+void ai_npc_element_frame(struct _AINPC_W* self);
 u32 fn_802D948C(struct _AINPC_W* self);
 u32 fn_802D94A0(struct _AINPC_W* self);
 void fn_802D9A40(struct _AINPC_W* self);
-s16 fn_802D9D14(struct _AINPC_W* self);
-void fn_802D9D30(struct _AINPC_W* self, s32 a, u32 b, u32 c, u32 d);
+s16 ai_npc_counter_window_get(struct _AINPC_W* self);
+u32 ai_npc_talk(struct _AINPC_W* self, s32 npc, u32 msg, u32 arg, u32 kind);
 u32 fn_802D7B24(struct _AINPC_W* self);
 
 /* ---- the band below (`camera`/`light`/`stage`..) ---- */
-void fn_802CB858(struct _AINPC_W* self);
-s32 fn_802CB900(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 limit);
+void ai_npc_motion_run(struct _AINPC_W* self);
+u8 ai_npc_in_range_ck(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 limit);
 u32 Pl_motion_input_ck(s32 a);
 s32 fn_80291B08(struct _AINPC_W* self, nw4r::math::VEC3* pos, void* angle, f32* out,
                s32 mode);
@@ -54,7 +54,7 @@ void hit_data_apply(struct _HIT_W* hit, void* owner, f32 value);
 void hit_flags_clear(struct _HIT_W* hit);
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void eft004_key_spawn(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
-void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, s32 a, s32 b, f32 c);
+void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b);
 void em_land_data_init(nw4r::math::VEC3* out);
 void fn_800524C0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
                   nw4r::math::VEC3* c, f32 d);
@@ -73,11 +73,11 @@ s32 abs(s16 value);
 
 /* ---- the model (`sound/mhchar.cpp`'s range) ---- */
 void mhchar_model_mtx_update(struct MHchar* chr);
-void mhchar_joint_mtx_get(struct MHchar* chr);
+void mhchar_joint_mtx_get(struct MHchar* chr, u32 joint, nw4r::math::MTX34* out);
 void mhchar_motion_set(struct MHchar* chr, u32 a, u32 b, u16 motion, s32 c, s32 d, s32 e, f32 f,
                  f32 g);
 void mhchar_motion_speed_set(struct MHchar* chr, f32 value);
-u32 mhchar_frame_check(struct MHchar* chr, u32 motion, s32 flag);
+u32 mhchar_frame_check(struct MHchar* chr, u16 layer, s32 flag, f32 low, f32 high);
 u32 mhchar_motion_end_ck(struct MHchar* chr, s32 flag);
 
 /* ---- the sound bridge ---- */
@@ -139,29 +139,29 @@ extern "C" {
 
 u8* fn_802D27E0(void);
 s32 fn_802D282C(s32 index);
-void fn_802D287C(struct _AINPC_W* self, s32 motion, s32 a, s32 b, s32 c);
-void fn_802D2904(struct _AINPC_W* self, s32 motion, s32 a, s32 b);
-void fn_802D2910(struct _AINPC_W* self, s32 motion, s32 a, s32 b);
-void fn_802D2984(struct _AINPC_W* self);
-void fn_802D2990(struct _AINPC_W* self, s32 motion);
-void fn_802D29A0(struct _AINPC_W* self, s32 motion);
+void ai_npc_motion_play(struct _AINPC_W* self, s32 motion, s32 a, s32 b, s32 c);
+void ai_npc_motion_set(struct _AINPC_W* self, u32 motion, s32 a, s32 b);
+void ai_npc_motion_change(struct _AINPC_W* self, s32 motion, s32 a, s32 b);
+u32 ai_npc_motion_end_ck(struct _AINPC_W* self);
+u32 ai_npc_frame_ck(struct _AINPC_W* self, u32 flag, f32 low, f32 high);
+u32 fn_802D29A0(struct _AINPC_W* self, u32 layer, f32 low, f32 high);
 void fn_802D29B8(struct _AINPC_W* self, s8 value);
 void fn_802D29C0(struct _AINPC_W* self);
 void fn_802D29CC(struct _AINPC_W* self, f32 scale);
 void fn_802D29E4(struct _AINPC_W* self, s8 value);
 void fn_802D29EC(struct _AINPC_W* self);
-void fn_802D29F8(struct _AINPC_W* self, s8 variant);
+void ai_npc_variant_set(struct _AINPC_W* self, u8 variant);
 void fn_802D2A00(struct _AINPC_W* self, u8 motion, u16 step, s16 gauge);
 void fn_802D2ABC(struct _AINPC_W* self, s32 motion, s32 step, s32 gauge);
-void fn_802D2AD4(struct _AINPC_W* self, u8 variant);
+void ai_npc_base_state_set(struct _AINPC_W* self, u32 variant);
 u32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step);
-void fn_802D2B68(struct _AINPC_W* self);
+void fn_802D2B68(struct _AINPC_W* self, u32 joint, nw4r::math::MTX34* out);
 s32 ai_npc_flag_ck(struct _AINPC_W* self, s32 mask);
 void fn_802D2B88(struct _AINPC_W* self, u16 flags);
 void fn_802D2B98(struct _AINPC_W* self, u16 flags);
 void fn_802D2BB0(struct _AINPC_W* self, struct _HIT_W* hit);
 void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row);
-u16 fn_802D30F8(u16 angle, s32 target, u16 limit);
+u16 fn_802D30F8(u16 angle, u16 target, u16 limit);
 s32 fn_802D3184(struct _AINPC_W* self, u32 limit);
 void fn_802D31FC(struct _AINPC_W* self);
 void fn_802D3210(struct _AINPC_W* self, u32* angles);
@@ -184,7 +184,7 @@ void fn_802D3AD8(struct _AINPC_W* self);
 void fn_802D3AF8(struct _AINPC_W* self);
 void fn_802D3B10(struct _AINPC_W* self);
 void fn_802D3B24(struct _AINPC_W* self);
-s32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy);
+u32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy);
 void fn_802D3CB8(struct _AINPC_W* self);
 void fn_802D3CCC(struct _AINPC_W* self, s16 value);
 void fn_802D3CD4(struct _AINPC_W* self, s16 value);
@@ -192,13 +192,13 @@ void fn_802D3CDC(struct _AINPC_W* self);
 void fn_802D3CEC(struct _AINPC_W* self);
 void fn_802D3CFC(struct _AINPC_W* self, u8 full);
 void fn_802D3D84(struct _AINPC_W* self);
-s32 fn_802D3DE8(struct _AINPC_W* self);
+u32 fn_802D3DE8(struct _AINPC_W* self);
 s32 fn_802D3E4C(struct _AINPC_W* self);
 u32 fn_802D3F08(struct _AINPC_W* self);
 u8 fn_802D3F1C(struct _AINPC_W* self);
 s32 fn_802D3F70(struct _AINPC_W* self, u8 high, u8 low);
-s32 fn_802D4020(struct _AINPC_W* self);
-void fn_802D40A4(struct _AINPC_W* self, s16 id);
+u32 fn_802D4020(struct _AINPC_W* self);
+void fn_802D40A4(struct _AINPC_W* self, u16 id);
 void fn_802D40EC(struct _AINPC_W* self, s32 id, s32 delta);
 void fn_802D41C8(struct _AINPC_W* self);
 void fn_802D41D4(struct _AINPC_W* self);
@@ -213,7 +213,7 @@ void fn_802D1D90(struct _AINPC_W* self);
 void fn_802D1FFC(struct _AINPC_W* self);
 u32 fn_802D2024(struct _AINPC_W* self);
 void fn_802D214C(struct _AINPC_W* self);
-s32 fn_802D21F8(u8 value);
+u8 fn_802D21F8(u8 value);
 void fn_802D2238(struct _AINPC_W* self);
 s32 fn_802D2264(struct _AINPC_W* self);
 void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f32 scale);

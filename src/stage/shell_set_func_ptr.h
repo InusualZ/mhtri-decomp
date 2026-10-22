@@ -11,11 +11,14 @@
 #include "types.h"
 #include "nw4r/math.h"
 
-/* size: 0x90 */
+/* size: 0x98 (approximation: evidenced to +0x94) */
 struct ShellSetFuncs {
-    /* +0x00 */ u8 pad_0x00[0x08];
+    /* +0x00 */ u8 pad_0x00[0x04];
+    /* +0x04 */ void (*method_0x04)(struct _AINPC_W* self, u32 kind, u32 a, u32 b, u32 c, ShellSetFuncs* table);
     /* +0x08 */ void (*method_0x08)(nw4r::math::VEC3* pos, u32 kind, u32 area, u32 a);
-    /* +0x0C */ u8 pad_0x0C[0x14 - 0x0C];
+    /* +0x0C */ u8 pad_0x0C[0x10 - 0x0C];
+    /* +0x10 */ void (*method_0x10)(struct _AINPC_W* self, nw4r::math::VEC3* pos, u32 kind, u32 area,
+                                    ShellSetFuncs* table);
     /* +0x14 */ void (*method_0x14)(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a, u32 b, u16 c,
                                     ShellSetFuncs* table);
     /* +0x18 */ void (*method_0x18)(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32* angle, u32 a, u32 b,
@@ -40,7 +43,8 @@ struct ShellSetFuncs {
     /* +0x54 */ void (*method_0x54)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos,
                                     ShellSetFuncs* table);
     /* +0x58 */ void (*method_0x58)(struct _ENEMY_WORK* self, u32 id);
-    /* +0x5C */ u8 pad_0x5C[0x64 - 0x5C];
+    /* +0x5C */ void (*method_0x5C)(struct _AINPC_W* self, u32 id, ShellSetFuncs* table);
+    /* +0x60 */ u8 pad_0x60[0x64 - 0x60];
     /* +0x64 */ void (*method_0x64)(struct _ENEMY_WORK* self, u32 kind, u32 joint, f32 scale, u16 id,
                                     ShellSetFuncs* table);
     /* +0x68 */ void (*method_0x68)(struct _ENEMY_WORK* self, u32 kind, u32 id, f32 scale, nw4r::math::VEC3* pos);
@@ -55,6 +59,9 @@ struct ShellSetFuncs {
     /* +0x88 */ void (*method_0x88)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* table);
     /* +0x8C */ void (*method_0x8C)(struct _ENEMY_WORK* self, u32 kind, nw4r::math::VEC3* pos, f32 scale, u32 id,
                                     ShellSetFuncs* table);
+    /* +0x90 */ void (*method_0x90)(struct _AINPC_W* self, u32 kind, u8 count, u16 spin, u16 angle,
+                                    ShellSetFuncs* table);
+    /* +0x94 */ void (*method_0x94)(struct _AINPC_W* self, u32 kind, nw4r::math::VEC3* target, ShellSetFuncs* table);
 };
 
 extern ShellSetFuncs* shell_set_func_ptr;

@@ -7658,8 +7658,8 @@ s32 score_add_clamped(s32 delta, s32* value);
 void stage_map_set(u8 mode);
 s32 res_file_assign(void* dst, void* src);
 void* res_file_ctor(void* out, u32 value);
-void fn_800D5CAC(void* rec);
-void fn_800E3358(u32 kind, u8 arg, void* str);
+void nw_res_list_load(void* rec);
+void mhchar_res_bank_set(u32 kind, u8 arg, void* str);
 void eft_res_pool_reset(void);
 void eft_control_init(void);
 void eft_common_load(void);
@@ -8260,8 +8260,8 @@ void fn_801FB2A8(u8 a, u8 b, u8 c)
     lobby_res_slots_init();
     fn_802AFA40();
     player_init_data_load();
-    fn_800D5CAC((void*)npc_model_res_ids);
-    fn_800D5CAC((void*)lbl_8058AA98);
+    nw_res_list_load((void*)npc_model_res_ids);
+    nw_res_list_load((void*)ainpc_anim_res_ids);
     fn_801FCA80(a);
     eft_res_pool_reset();
     eft_common_load();
@@ -8289,7 +8289,7 @@ void fn_801FB364(u8 index)
             u32 tmp;
 
             res_file_assign(&dst, res_file_ctor(&tmp, (u32)res->payload_0x44));
-            fn_800E3358(0, 0, &dst);
+            mhchar_res_bank_set(0, 0, &dst);
         }
     }
     {
@@ -8299,7 +8299,7 @@ void fn_801FB364(u8 index)
             u32 tmp;
 
             res_file_assign(&dst, res_file_ctor(&tmp, (u32)res->payload_0x44));
-            fn_800E3358(3, 0, &dst);
+            mhchar_res_bank_set(3, 0, &dst);
         }
     }
     fn_801FCADC(NULL, index);

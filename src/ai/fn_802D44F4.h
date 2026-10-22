@@ -80,7 +80,7 @@ void ainpc_entry_draw_all(void);                  /* 0x802DA3CC, registered by a
  * `ainpc_w`'s +0x484 mode byte and its 90-frame +0x486 timer (1 for 0, 2 otherwise) and clears
  * +0x485.  Added with that registration (rule 2: this range owns the address; the signature is the
  * callee's own body, which narrows r3 with `clrlwi r3,24` before the `cmpwi r3,0`). */
-void fn_802D94C4(u8 mode);
+void ainpc_element_report_set(u8 mode);
 
 /* 0x802D9EA4 - forwards to the reaction dispatcher (its consumers call it with no argument: the AI work
  * pointer is the caller's `r3`).  Added with `quest/arenatask.cpp` (rule 2: this range owns it). */

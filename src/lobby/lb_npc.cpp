@@ -3397,8 +3397,8 @@ void fn_801FD338(_LB_NPC* self, LbNpcModel* data);
 u32 fn_802FB600(void);
 void em007_npc_model_eft_start(u8 index);
 void mhchar_model_release(u8* self);
-void fn_800E3358(s32 a, u8* b, u32* res);
-void fn_800D5CAC(void* rec);
+void mhchar_res_bank_set(s32 a, u8* b, u32* res);
+void nw_res_list_load(void* rec);
 void* memset(void* dst, s32 c, u32 n);
 }
 
@@ -3508,7 +3508,7 @@ void fn_801FCA80(u32 index)
 
     fn_801FCAC8((u32*)&rec, (const u32*)&lbl_80582A68[index]);
     rec.c_0x08 = 0;
-    fn_800D5CAC(&rec);
+    nw_res_list_load(&rec);
 }
 
 /* 0x801FCADC - load the `index`-th resource table entry and hand it to effect id 4. */
@@ -3523,7 +3523,7 @@ void fn_801FCADC(u8* self, u32 index)
         u32 src;
 
         res_file_assign(&dst, res_file_ctor(&src, (u32)res->payload_0x44));
-        fn_800E3358(4, self, &dst);
+        mhchar_res_bank_set(4, self, &dst);
     }
 }
 

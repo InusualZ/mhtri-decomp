@@ -1100,7 +1100,7 @@ u8 fn_8028F288(void) {
 }
 
 /* 0x8028F2F8 - arm the mode sequence: 6 for the "no argument" call, 4 otherwise. */
-void fn_8028F2F8(u32 arg) {
+void pl_quest_end_request(u32 arg) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     if (root == 0) {
         return;

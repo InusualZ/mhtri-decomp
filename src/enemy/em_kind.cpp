@@ -263,7 +263,7 @@ void load_file_req(char* name, u32 data, s32 size, u32 callback, s32 flag, u32* 
 /* the two records this unit's own call sites name */
 /* the 0x18-byte per-enemy file slot of `emc_work` (`fn_80140E48`/`fn_80140EE8`/the load callback) */
 struct EmcWork {
-    /* +0x00 */ u8 field_0x00;   /* the id `fn_800E3358` gets back */
+    /* +0x00 */ u8 field_0x00;   /* the id `mhchar_res_bank_set` gets back */
     /* +0x01 */ u8 unused_0x01;
     /* +0x02 */ u8 index_0x02;   /* `em_res_buffer_alloc`'s file-table index */
     /* +0x03 */ u8 flags_0x03;   /* bit 0 = the sound proc was requested, bit 1 = the other file */
@@ -365,7 +365,7 @@ s32 res_mem_index_get(char* name);
 void fn_800D5D60(void* work);
 void fn_800D5E30(void* work);
 void mhchar_mdl_prepare(void* a);
-void fn_800E3358(u32 a, u8 b, void* c);
+void mhchar_res_bank_set(u32 a, u8 b, void* c);
 s32 fn_800924CC(void* a, u32 b);
 
 extern "C" void fn_801409C8(_ENEMY_WORK* self);
@@ -2475,7 +2475,7 @@ void fn_80140EE8(char* name, u32 size, u32 a, u32 b, u32 c, u32* ctx) {
         if (rec != NULL) {
             res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
             em_res_file_setup(&h1);
-            fn_800E3358(2, work->field_0x00, &h1);
+            mhchar_res_bank_set(2, work->field_0x00, &h1);
             fn_800D5E30(work);
         }
     }

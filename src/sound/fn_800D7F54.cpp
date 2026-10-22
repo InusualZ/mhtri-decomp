@@ -361,9 +361,9 @@ extern "C" void se_req_pos_id83(nw4r::math::VEC3* pos) {
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DCC0C(void) { se_bank_req(28, 27); }
+extern "C" void se_npc_faint_play(void) { se_bank_req(28, 27); }
 
-extern "C" void fn_800DCC18(void) { se_bank_req(28, 35); }
+extern "C" void se_npc_revive_play(void) { se_bank_req(28, 35); }
 
 extern "C" void fn_800DCFC0(void) { se_slot_req(0); }
 

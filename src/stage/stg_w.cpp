@@ -574,7 +574,7 @@ extern "C" void fn_802B02C4(void* out, u8 i, u8 k)
 }
 
 /* Classifies the current map number into a load category. */
-extern "C" u32 fn_802B0608()
+extern "C" u32 stage_climate_kind_get()
 {
     s32 m = SW->mapno;
     switch (m) {

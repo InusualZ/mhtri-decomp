@@ -8,7 +8,9 @@
 /* The quest move work (`get_move_work_adrs(0)`), as far as the system core and the item menu read it.
  * size: 0x114 (lower bound, an approximation) */
 typedef struct SysQuestMove {
-    /* +0x000 */ u8 unused_0x000[0xFA];
+    /* +0x000 */ u8 unused_0x000[0xDC];
+    /* +0x0DC */ struct QuestWork* quest_0x0DC;  /* the running quest's work (`ai/ai_npc.cpp` asks its element picks) */
+    /* +0x0E0 */ u8 unused_0x0E0[0xFA - 0xE0];
     /* +0x0FA */ u8 result_0x0FA;    /* 7 ends the quest with its result */
     /* +0x0FB */ u8 unused_0x0FB[0x112 - 0x0FB];
     /* +0x112 */ u8 menu_lock_0x112; /* 1 keeps the item menu from opening (`menu/menu_item.cpp`'s frame) */

@@ -197,7 +197,7 @@ void fn_8010C464(_EFT* self);
 _EFT* fn_8010C468(u32 count);
 void fn_8010C554(_PLW* source);
 void eft_stun_set(void* source, u32 id, nw4r::math::VEC3* vec, f32 scale, u8 type);
-void fn_8010C680(void* source);
+void eft_npc_aura_create(void* source);
 void fn_8010C710(_EFT* self);
 void fn_8010C77C(_EFT* self);
 void fn_8010C7B8(_EFT* self);
@@ -326,7 +326,7 @@ extern "C" void eft_stun_set(void* source, u32 id, nw4r::math::VEC3* vec, f32 sc
 }
 
 /* The five-light player effect with a raised offset. */
-extern "C" void fn_8010C680(void* source)
+extern "C" void eft_npc_aura_create(void* source)
 {
     _EFT* eft = fn_8010C468(5);
     _EFT_LIGHT_WORK* work;

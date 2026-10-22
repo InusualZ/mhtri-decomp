@@ -159,7 +159,7 @@ void fn_800D58DC(void);
 s32 fn_800D5A04(char* name, void* data);
 void* fn_800D5A08(char* path, u32 size);
 void fn_800D5C4C(char* path, u32* entry);
-s32 fn_800D5CAC(void* table);
+s32 nw_res_list_load(void* table);
 void fn_800D5F00(void);
 void fn_800D5F10(void);
 void fn_800D5F20(void);
@@ -549,7 +549,7 @@ void fn_800D5C4C(char* path, u32* entry) {
 }
 
 /* 0x800D5CAC - pull every entry of a (name, size) request table. */
-s32 fn_800D5CAC(void* table) {
+s32 nw_res_list_load(void* table) {
     u32* e = (u32*)table;
     s32 count = 0;
     while (e[0] != 0) {

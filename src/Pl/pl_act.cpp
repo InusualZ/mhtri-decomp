@@ -70,7 +70,7 @@
  *  - `pl_parts_refresh`: the three call-spanning values are coloured base/`pend`/mask in r24/r25/r26 by retail, mask/base/
  *    `pend` by ours;
  *  - `pl_gun_deviation_get`: retail saves `f31` through a `psq_st`/`vmrghb` pair (the compiler's own float-save form);
- *  - `fn_80278144`/`fn_80278310`: the early `(u32)((u8)m - 6) <= 1` exit inlines `li r3,0; b epilogue` (+8 B each)
+ *  - `fn_80278144`/`pl_area_spot_valid_ck`: the early `(u32)((u8)m - 6) <= 1` exit inlines `li r3,0; b epilogue` (+8 B each)
  *    where retail shares one block through a label (rule 8; docs/pl.md);
  *  - `Pl_motion_input_ck`: the case-3/5 failures return inline where retail branches to a shared `return 0`;
  *  - `fn_8027A57C`: the conformant if/else-if dispatch interleaves the case tests retail lays out `switch`-shaped;
@@ -83,7 +83,7 @@
  *    `Pl_bari_ck`: retail lays the first arm out of line and the second inline, the natural chain is the mirror;
  *  - `fn_8027DCA8` (`return a || b` shares the `li r3,1` tail), `fn_8027DCE0` (retail merges every `return 0`),
  *    `fn_8027DE88`/`fn_8027DF38` (retail lays the id-scan loop head after the body), `fn_8027DFE4` (the `case 12`
- *    equality if-converts to the branchless bool form), `fn_8027DDC4` (written as the negated/nested if-chain; retail
+ *    equality if-converts to the branchless bool form), `pl_act_range2_ck` (written as the negated/nested if-chain; retail
  *    compares the id signed against 0x41/0x9A where ours is unsigned, and its arm order differs by one `b`);
  *  - `fn_8027CB1C`: retail re-tests the second byte's range (`li r0,0xff; cmplwi; beq; cmplw; bge`) where ours
  *    folds it (20 B short); `fn_8027D40C`: the 32-bit scan's two induction variables sit in r5/r6 swapped;
@@ -4360,7 +4360,7 @@ extern "C" void fn_80274584(s8 value)
 } /* namespace s_80273B14 */
 
 
-/* The act-number lists `fn_802745DC` (by armed slot) and `fn_80274624` (by act number) walk: the
+/* The act-number lists `fn_802745DC` (by armed slot) and `pl_act_class_get` (by act number) walk: the
  * melee family, then the ranged family; slot 0 is unused and 0xFFFF ends a list.  size: 0x1C each */
 u16 pl_act_no_tbl_melee[14] = {0x0000, 0x000A, 0x0004, 0x0003, 0x0008, 0x0000, 0x0002,
                                0x0001, 0x0009, 0x0005, 0x0006, 0x000B, 0x0007, 0xFFFF};
@@ -4384,7 +4384,7 @@ extern "C" u32 fn_802745DC(struct _PLW* plw, s16 kind)
 }
 
 /* Finds the index the player's act number occupies in one of the two act tables. */
-extern "C" s32 fn_80274624(struct _PLW* plw)
+extern "C" s32 pl_act_class_get(struct _PLW* plw)
 {
     const u16* row;
     s32 index;
@@ -5610,7 +5610,7 @@ extern "C" void pl_act_enter(_PLW*, s32, u16, u16);
 extern "C" void pl_skill_update2(_PLW*, s32);
 extern "C" void fn_8027A17C(_PLW*);
 extern "C" u32 fn_80278144(u8, u8*, u8);
-extern "C" u32 fn_80278310(u8, u8*, u8);
+extern "C" u32 pl_area_spot_valid_ck(u8, u8*, u8);
 extern "C" void fn_80278B58(_PLW*, s32, s32);
 } /* namespace s_80276B58 */
 
@@ -6256,7 +6256,7 @@ extern "C" s32 fn_802782B8(_PLW* self)
 /* 0x80278450 */
 extern "C" s32 fn_80278450(_PLW* self)
 {
-    if (fn_80277FE8(self) == 1 && fn_80278310(self->area_0x16, (u8*)self + 60, self->water_area_0x5A6) == 1) {
+    if (fn_80277FE8(self) == 1 && pl_area_spot_valid_ck(self->area_0x16, (u8*)self + 60, self->water_area_0x5A6) == 1) {
         return 1;
     }
     return 0;
@@ -8545,7 +8545,7 @@ extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
 }
 
 /* 0x80278310: the same map/move-work gate as 80278144, for the smaller action set. */
-extern "C" u32 fn_80278310(u8 arg0, u8* arg1, u8 arg2)
+extern "C" u32 pl_area_spot_valid_ck(u8 arg0, u8* arg1, u8 arg2)
 {
     u32 m = stage_map_kind_get(get_now_mapno());
     if (fn_80277FF8((u8)m, arg0, arg2) == 0) {
@@ -9381,7 +9381,7 @@ extern "C" void fn_8027D76C(_PLW* self) {
 }
 
 /* The act range 0x54-0x56 of the idle kind. */
-extern "C" s32 fn_8027D874(_PLW* self) {
+extern "C" s32 pl_act_84_86_ck(_PLW* self) {
     if (self->field_0x00A == 0 && (u32)(self->act_no - 0x54) <= 2U) {
         return 1;
     }
@@ -9460,7 +9460,7 @@ extern "C" u32 fn_8027DCE0(_PLW* self, u8 arg1) {
 }
 
 /* The second act-number gate of the same handler family. */
-extern "C" u32 fn_8027DDC4(_PLW* self, u8 arg1) {
+extern "C" u32 pl_act_range2_ck(_PLW* self, u8 arg1) {
     if (Pl_master_ck(self) == 0) {
         return 0;
     }

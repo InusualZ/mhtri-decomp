@@ -60,7 +60,7 @@ struct _PL_ROOT {
     /* +0x00EE */ u8 unused_0x00EE;
     /* +0x00EF */ u8 npc_present_0xEF;   /* the AI NPC's marker is drawn while this is set (`quest_npc_marker_draw`) */
     /* +0x00F0 */ u8 unused_0x00F0[0x00FB - 0x00F0];
-    /* +0x00FB */ u8 seq_0xFB;           /* `fn_8028F2F8` stores 4 or 6 */
+    /* +0x00FB */ u8 seq_0xFB;           /* `pl_quest_end_request` stores 4 or 6 */
     /* +0x00FC */ u8 seq_0xFC;           /* `fn_8028F368` stores 4 */
     /* +0x00FD */ u8 unused_0x00FD[0x0114 - 0x00FD];
     /* +0x0114 */ s32 flag_0x114;       /* `fn_8028D574` tests `<= 0`; `fn_8028D5B8` stores */

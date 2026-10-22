@@ -413,7 +413,7 @@ void menu_choice_window_draw(void* panel, s32 index, const _mh_ivec2_* pos);
 void draw_font_align(_SPR_DATA_* spr, s8* text, u32 length, const _mh_ivec2_* pos);
 void draw_window_frame_preset(s16 x, s16 y, s32 flag);
 void put_page_count(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
-s16 fn_802D72EC(u16 item_id);
+s16 ai_npc_item_stock_get(u16 item_id);
 char* strcpy(char* dst, const char* src);
 s32 menu_item_worker_ck(_PLW* plw);
 u32 menu_item_move_target_set(MenuSlot* self, s16 index);
@@ -727,7 +727,7 @@ extern "C" s32 menu_item_page_step(MenuSlot* self) {
                     self->count_0x1B6 = 1;
                     self->count_max_0x1B8 = entry->value;
                     if (mode == 2) {
-                        s16 value = fn_802D72EC(entry->id);
+                        s16 value = ai_npc_item_stock_get(entry->id);
                         if (value < self->count_max_0x1B8) {
                             self->count_max_0x1B8 = value;
                         }
@@ -1053,7 +1053,7 @@ extern "C" u32 menu_item_use_ck(MenuSlot* self) {
         if (quest_move_state_valid_ck() == 0) {
             return 0;
         }
-        if ((s16)fn_802D72EC(item_id) == 0) {
+        if ((s16)ai_npc_item_stock_get(item_id) == 0) {
             return 0;
         }
         break;

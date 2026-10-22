@@ -85,7 +85,7 @@ void fn_80276CE8(struct _PLW* self, s16 value);
 
 /* 0x80278310 - the three-argument target-check helper `ai/fn_802CC794.cpp` and the enemy units call; C linkage
  * (the map row is unmangled). */
-u32 fn_80278310(u8 a, nw4r::math::VEC3* v, u8 b);
+u32 pl_area_spot_valid_ck(u8 a, nw4r::math::VEC3* v, u8 b);
 
 /* 0x8027D050 - the actor's stored carve value, scanned out of the item table.  The definition returns `u8`;
  * the retail consumer `Pl/fn_80229ECC.cpp` keeps the raw return in a register and masks
