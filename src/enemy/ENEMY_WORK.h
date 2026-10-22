@@ -242,6 +242,23 @@ struct EmActionBlock {
     /* +0x01E (+0x346) */ u8 unused_0x346[0x2C - 0x1E];
 };
 
+/* The em025 program's own block at +0x328 (`enemy/em025_prog.cpp`): the four roster slot handles and the
+ * area-table states beside them, the three joint angles and the scale its joint callback applies, and the
+ * blend ratio, hold timer and mode its sway step drives.  The same bytes the views above spell field by field.
+ * size: 0x2C */
+struct Em025Block {
+    /* +0x000 (+0x328) */ s32 handles_0x328[4];  /* the roster slot handles, -1 = empty */
+    /* +0x010 (+0x338) */ u8 states_0x338[4];    /* the area-table index each slot holds, 0xFF = free */
+    /* +0x014 (+0x33C) */ u32 rot_y_0x33C[2];    /* the Y rotations the joint callback gives joints 23/24, eased
+                                                 * toward the nearest player by the head tracking */
+    /* +0x01C (+0x344) */ u32 rot_x_0x344;       /* the X rotation of joints 28/29, from the sway curve */
+    /* +0x020 (+0x348) */ f32 scale_0x348;       /* the joints' 28/29 Y scale, the curve's key cursor */
+    /* +0x024 (+0x34C) */ f32 blend_0x34C;       /* the sway curve position the blend mode steps */
+    /* +0x028 (+0x350) */ s16 hold_0x350;        /* the frames blend mode 1 has held */
+    /* +0x02A (+0x352) */ u8 blend_mode_0x352;   /* 0 = ease out, 1 = hold near 0.5, 2 = ease in */
+    /* +0x02B (+0x353) */ u8 flag_0x353;         /* the flag the kind-1 state query reports */
+};
+
 /* size: 0xB18 */
 struct _ENEMY_WORK {
     /* +0x000 */ u8 active;             /* nonzero while the record is in use */
@@ -694,6 +711,8 @@ struct _ENEMY_WORK {
             /* +0x329 */ u8 ally_near_0x329;
             /* +0x32A */ u8 unused_0x32Aem017[0x354 - 0x32A];
         } em017_0x328; /* size: 0x2C */
+        /* the em025 program's block (`enemy/em025_prog.cpp`). */
+        struct Em025Block em025_0x328;
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four

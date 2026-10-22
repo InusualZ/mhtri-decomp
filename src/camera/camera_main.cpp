@@ -465,7 +465,7 @@ extern "C" {
 /* Defined later in this file. */
 void fn_802BB870(u32 mode, u32 a, u32 b, u8 c);
 void camera_area_reset(void);
-void fn_802BC4AC(u32 kind, u32 arg);
+void camera_mode_req(u32 kind, u32 arg);
 void fn_802BB118(CamWork* self);
 void fn_802BBEE0(void);
 }
@@ -1291,7 +1291,7 @@ void fn_802BC65C(void)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
-    fn_802BC4AC(2, 0);
+    camera_mode_req(2, 0);
     self->field_0x285 = 40;
 }
 
@@ -1302,7 +1302,7 @@ void fn_802BC69C(void)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
-    fn_802BC4AC(3, 0);
+    camera_mode_req(3, 0);
     self->field_0x285 = 8;
 }
 
@@ -1311,7 +1311,7 @@ void fn_802BC69C(void)
  */
 void camera_mode12_set(u32 arg)
 {
-    fn_802BC4AC(12, arg);
+    camera_mode_req(12, arg);
 }
 
 /*
@@ -1319,7 +1319,7 @@ void camera_mode12_set(u32 arg)
  */
 void fn_802BC7BC(void)
 {
-    fn_802BC4AC(17, 0);
+    camera_mode_req(17, 0);
 }
 
 /*
@@ -1327,7 +1327,7 @@ void fn_802BC7BC(void)
  */
 void fn_802BC820(u32 base, u32 arg)
 {
-    fn_802BC4AC((u8)(base + 17), arg);
+    camera_mode_req((u8)(base + 17), arg);
 }
 
 /*
@@ -1337,7 +1337,7 @@ void camera_demo_event_set(u8 mode, u32 arg)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
-    fn_802BC4AC(mode, arg);
+    camera_mode_req(mode, arg);
     self->field_0x285 = 8;
 }
 
@@ -1348,7 +1348,7 @@ void camera_event_set(u8 mode, u32 arg)
 {
     if (camera_work_ck()) {
         camera_talk_reset();
-        fn_802BC4AC(mode, arg);
+        camera_mode_req(mode, arg);
     }
 }
 }

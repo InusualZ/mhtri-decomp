@@ -64,19 +64,6 @@ extern "C" {
 
 /* 0x80339E04 (`lobby/lb_companion_ui.cpp`): two arguments at the call site, of which the callee reads only r3. */
 void lb_area_change_send(u8 a, s32 b);
-/* r3 the work record, r4 the slot id; arms one action slot. */
-void fn_8019E960(struct _ENEMY_WORK* self, s32 slot);
-/* r3 the work record; returns the slot word the caller compares against 0. */
-s32 fn_8019E9AC(struct _ENEMY_WORK* self, s32 slot);
-/* r3 the work record: the callees at 0x801A9748 and 0x801A98F8 the band's state machines call. */
-void fn_801A9748(struct _ENEMY_WORK* self);
-void fn_801A98F8(struct _ENEMY_WORK* self);
-/* r3 the work record; the per-joint slot release `fn_801A94C0` tail-calls. */
-void fn_8019EA04(struct _ENEMY_WORK* self);
-/* 0x8019E840 - r3 the work record; returns the 1/0 flag `fn_8019F07C` tests. */
-u32 fn_8019E840(struct _ENEMY_WORK* self);
-/* r3 the work record and three scalars. */
-void fn_8019EC38(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
 
 #ifdef __cplusplus
 }

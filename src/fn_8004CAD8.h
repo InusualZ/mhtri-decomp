@@ -215,7 +215,7 @@ void addVec3(VEC3* out, VEC3* a, VEC3* b);
 void* vec3_normalize_into(void* dst, const void* src);
 /* 0x80052370 - the animation key-frame reader the C++ pair below sits beside (plain `fn_` map name,
  * so it stays at C linkage).  Added with `Pl/fn_80224AC4.cpp`. */
-f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
+f32 anim_key_curve_eval(f32* a, f32* b, f32* c, f32 frame);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
  * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `vec3_add_ps(out, a, b)`
  * is the paired-single add `out = a + b`, `vec3_copy(out, src)` the field-by-field three-float copy,

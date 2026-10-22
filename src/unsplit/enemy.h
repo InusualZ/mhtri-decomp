@@ -248,18 +248,6 @@ void fn_80198F14(struct _ENEMY_WORK* self);
  * `void`, which is wrong for those call sites (recorded in this unit's outbox).  The `u32` return
  * below is the form `enemy/fn_801B7020.cpp`'s `fn_801B73F0` needs. */
 u32 em034_eft_ck(struct _ENEMY_WORK* self);
-/* The enemy effect-slot cluster below `fn_801A4504`'s range (0x801A3xxx-0x801A9xxx): unowned (the
- * bracketing registered units are `lobby` above), so the declarations live in this band header.
- * `enemy/fn_8019ED34.cpp` calls all of them; the signatures are its call sites' registers.  The
- * 0x8019E9xx members are NOT here - they are inside `enemy/fn_801926EC.cpp`'s range, so its owner
- * header carries them. */
-void fn_801A3E90(struct _ENEMY_WORK* self);
-void fn_801A3FD8(struct _ENEMY_WORK* self);
-void fn_801A4218(struct _ENEMY_WORK* self);
-/* r3 the work record, r4 a joint id, r5/r6 two `VEC3*` (the target's call sites set all three). */
-void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* a, Vec3* b);
-/* r3 the work record, r4/r5/r6/r7 four scalars and f1 (the target's call sites set all five). */
-void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
 /* 0x80346268 - the two-argument request `enemy/em022_prog.cpp`'s entry action's case 11 makes when
  * the enemy data entry is latched.  `ef/eft_slot.cpp` registered the band that owns the address, so
  * the declaration moved to that unit's header, `ef/eft_slot.h` (rule 2). */

@@ -35,9 +35,11 @@ typedef struct EmPopRec {
     /* +0x1D0 */ nw4r::math::VEC3 aim_0x1D0;   /* the aim position (same vector as `pos_0x014`) */
     /* +0x1DC */ u8 pad_0x1DC[0x14];
     /* +0x1F0 */ f32 radius_0x1F0;
-    /* +0x1F4 */ u8 pad_0x1F4[6];
+    /* +0x1F4 */ u8 pad_0x1F4[4];
+    /* +0x1F8 */ s16 state_0x1F8;    /* set to 3 by `enemy/em025_prog.cpp`'s init for each slot it fills (GUESS) */
     /* +0x1FA */ u16 slot_id_0x1FA;   /* the id `em_roster_record_slot_id_get` reports (-1 when unset) */
-    /* +0x1FC */ u8 pad_0x1FC[0x28];
+    /* +0x1FC */ s16 state_0x1FC;    /* set to 3 beside `state_0x1F8` (GUESS) */
+    /* +0x1FE */ u8 pad_0x1FE[0x26];
 } EmPopRec; /* size: 0x224 */
 
 /* The sub-record array the manager allocates alongside the roster (stride 0x20C).  Only the two

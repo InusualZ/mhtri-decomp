@@ -504,7 +504,7 @@ extern "C" void fn_800F6338() {
 }
 
 /* 0x800F6420 - 0x54: in the final area, request id 0x15 on channel 1. */
-extern "C" void fn_800F6420() {
+extern "C" void bgm_track15_req() {
     BgmCtrl* work = lbl_80791690;
     if (work == NULL) {
         return;

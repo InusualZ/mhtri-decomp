@@ -9324,7 +9324,7 @@ extern "C" u32 fn_80137648(_ENEMY_WORK* self)
 }
 
 /* Kicks `lb_sub0e_send` for the record when `em_busy_ck` says the action is armed. */
-extern "C" void fn_8013765C(_ENEMY_WORK* self, u32 arg1)
+extern "C" void em_busy_net_notify(_ENEMY_WORK* self, u32 arg1)
 {
     if (em_busy_ck(self) == 1) {
         lb_sub0e_send(my_player_no(), arg1, 1, self->field_0x01A);

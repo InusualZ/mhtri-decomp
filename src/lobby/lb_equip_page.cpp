@@ -640,7 +640,7 @@ extern "C" f32 fn_802292D0(_PLW* self, f32* out)
 /* Reads three key-frame channels at the motion layer's current frame. */
 extern "C" f32 fn_80229304(_PLW* self, f32* a, f32* b, f32* c)
 {
-    return fn_80052370(a, b, c, pl_rig_get_motion_frame(self));
+    return anim_key_curve_eval(a, b, c, pl_rig_get_motion_frame(self));
 }
 
 /* ------------------------------------------------------------------------------------------------ */

@@ -89,7 +89,7 @@ extern "C" s32 fn_800D7D24(void* pA, void* pB, void* pC, void* pD, s32 e, void* 
 /* types                                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The three-word accessor `fn_800736F8` fills in: the value (three floats) and the flag word. */
+/* The three-word accessor `world_mtx_attr_scale_set` fills in: the value (three floats) and the flag word. */
 struct VtxAttrRef {
     /* +0x0 */ u32 mUnused00;
     /* +0x4 */ f32* mpValue;
@@ -134,7 +134,7 @@ extern "C" {
 /* forward declarations (one per function this unit defines; keeps the source order free)             */
 /* ------------------------------------------------------------------------------------------------ */
 
-void fn_800736F8(VtxAttrRef* pSelf, f32 x, f32 y, f32 z);
+void world_mtx_attr_scale_set(VtxAttrRef* pSelf, f32 x, f32 y, f32 z);
 u32 world_mtx_attr_not_scale_uniform(u32 value);
 u32 world_mtx_attr_not_scale_one(u32 value);
 u32 world_mtx_attr_scale_uniform(u32 value);
@@ -161,7 +161,7 @@ ResHandle* camera_ctor(ResHandle* pSelf, u32 value);
 
 /* Store the three scale values and pick the scale-mode flag word: 0x40000000 when all three are 1.0f,
  * 0x10000000 then 0x3FFFFFFF when they are equal but not 1.0f, otherwise just clear the mode bits. */
-void fn_800736F8(VtxAttrRef* pSelf, f32 x, f32 y, f32 z) {
+void world_mtx_attr_scale_set(VtxAttrRef* pSelf, f32 x, f32 y, f32 z) {
     pSelf->mpValue[0] = x;
     pSelf->mpValue[1] = y;
     pSelf->mpValue[2] = z;
