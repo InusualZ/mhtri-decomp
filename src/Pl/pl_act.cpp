@@ -2440,7 +2440,7 @@ void pl_skill_update2(_PLW*, int);
 extern u32 lbl_805C5FC8[];
 extern u32 lbl_805C5FE0[];
 u8 GameMode_ck(void);
-u32 fn_80363A2C(void);
+u32 lb_smith_deco_page_ck(void);
 int fn_80274AB8(int);
 u32 weapon_class_index(u8);
 int Pl_item_timer_get(_PLW*, u16);
@@ -2857,14 +2857,14 @@ extern "C" void pl_status_sheet_get(_PLW* plw, _EQUIP* equip, u8* out) {
 
 /* Whether the player's active skill set contains `skill`. */
 u32 Pl_Skill_ck(_PLW* plw, u16 skill) {
-    using s_80270018::GameMode_ck; using s_80270018::fn_80363A2C; 
+    using s_80270018::GameMode_ck; using s_80270018::lb_smith_deco_page_ck; 
     bool ok = false;
     int i;
 
     if (GameMode_ck() == 2) {
         if (lobby_w.state_0x000 == 6) {
             ok = true;
-        } else if (lobby_w.state_0x000 == 15 && fn_80363A2C() == 1) {
+        } else if (lobby_w.state_0x000 == 15 && lb_smith_deco_page_ck() == 1) {
             ok = true;
         }
     }
@@ -4894,7 +4894,7 @@ extern "C" s16 fn_802753E4(struct _PLW* plw, u16 id)
 }
 
 /* Marks the player as gone. */
-extern "C" void fn_802754B4(struct _PLW* plw)
+extern "C" void pl_model_refresh_req(struct _PLW* plw)
 {
     plw->field_0x19 = 1;
 }

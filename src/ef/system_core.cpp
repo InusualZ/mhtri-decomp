@@ -582,7 +582,7 @@ u8 system_lobby_flag_get(void) {
     return system_w.field_0x877;
 }
 
-void fn_800D0734(u8 value) {
+void system_lobby_flag_set(u8 value) {
     system_w.field_0x877 = value;
 }
 

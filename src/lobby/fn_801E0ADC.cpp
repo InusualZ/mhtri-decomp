@@ -89,13 +89,13 @@
 /* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
 void userdata_zenny_add(s32 size);
-void fn_8004C038(void* a, void* b);
-u32 fn_800D0734(s32 a);
+void userdata_pl_look_apply(void* a, void* b);
+u32 system_lobby_flag_set(s32 a);
 s32 lb_row_init(void*, u8, u16);
 void lb_scroll_tables_set(void*, s32, s32, void*, void*);
 void lb_equip_compare_set(void*, void*);
 s32 lb_unlock_cond_ck(u16);
-s32 fn_802754B4(void*);
+s32 pl_model_refresh_req(void*);
 s32 fn_8027E354(u8, u16);
 void eft_res_slot_release(void* obj);
 void lb_equip_records_copy(void*, u32, void*, void*, void*);
@@ -1523,8 +1523,8 @@ void lb_eqshop_close(void)
 {
     LbEquipShopWork* self = (LbEquipShopWork*)lobby_w.menu_0xAC;
 
-    fn_800D0734(0);
-    fn_8004C038(self->plw_0x12C, lobby_world_block);
+    system_lobby_flag_set(0);
+    userdata_pl_look_apply(self->plw_0x12C, lobby_world_block);
     if (lobby_w.param_0x12D != 0) {
         lobby_w.param_0x12D = 0;
         ((s32 (*)(LbEftFlagBlock*))lobby_net_profile_part1_send)(lobby_world_block);
@@ -1717,7 +1717,7 @@ void lb_eqshop_bought_equip(LbEquipShopWork* self)
     if (self->box_0x128 != 0xFFFF) {
         lb_equip_entry_apply(self->box_0x128);
     }
-    fn_8004C038(self->plw_0x12C, lobby_world_block);
+    userdata_pl_look_apply(self->plw_0x12C, lobby_world_block);
     lb_eqshop_pl_equip_set(self->plw_0x12C, self, 2);
 }
 
@@ -1981,17 +1981,17 @@ void lb_eqshop_preview_step(LbEquipShopWork* self)
 {
     if (self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00] == 3) {
         if ((u8)(lobby_w.field_0x0B0 + 0xFF) <= 1) {
-            fn_800D0734(0);
-            fn_802754B4(self->plw_0x12C);
+            system_lobby_flag_set(0);
+            pl_model_refresh_req(self->plw_0x12C);
             return;
         }
         switch (self->type_list_0x024.cursor_0x00) {
         case 0:
-            fn_800D0734(2);
+            system_lobby_flag_set(2);
             lb_pl_model_turn_step(self->plw_0x12C);
             break;
         case 1:
-            fn_800D0734(1);
+            system_lobby_flag_set(1);
             lb_pl_model_turn_step(self->plw_0x12C);
             break;
         }
@@ -2001,11 +2001,11 @@ void lb_eqshop_preview_step(LbEquipShopWork* self)
 /* Puts the player's equipment back and resets its pose when the model tab or the flag asks for it. */
 void lb_eqshop_preview_end(LbEquipShopWork* self)
 {
-    fn_8004C038(self->plw_0x12C, lobby_world_block);
+    userdata_pl_look_apply(self->plw_0x12C, lobby_world_block);
     if (self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00] == 3) {
-        fn_802754B4(self->plw_0x12C);
+        pl_model_refresh_req(self->plw_0x12C);
     } else if (self->flag_0x101 != 0) {
-        fn_802754B4(self->plw_0x12C);
+        pl_model_refresh_req(self->plw_0x12C);
     }
 }
 
@@ -2054,7 +2054,7 @@ s32 lb_eqshop_weapon_step(LbEquipShopWork* self)
                                    self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00]);
                 if (prev != self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00] &&
                     self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00] == 3) {
-                    fn_802754B4(self->plw_0x12C);
+                    pl_model_refresh_req(self->plw_0x12C);
                 }
             }
         } else {
@@ -2110,7 +2110,7 @@ s32 lb_eqshop_weapon_step(LbEquipShopWork* self)
         }
         if (system_lobby_flag_get() != 0) {
             if (self->count_0x0F8 == 0) {
-                fn_802754B4(self->plw_0x12C);
+                pl_model_refresh_req(self->plw_0x12C);
                 break;
             }
             lb_row_init(&row, self->goods_0x134[self->cursor_0x0EC].kind_0x01,
@@ -2184,7 +2184,7 @@ s32 lb_eqshop_weapon_step(LbEquipShopWork* self)
                 self->tab_list_0x104.cursor_0x00 = 0;
                 lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x3A8, self->tab_kinds_0x428[0]);
                 lb_eqshop_preview_end(self);
-                fn_802754B4(self->plw_0x12C);
+                pl_model_refresh_req(self->plw_0x12C);
             }
             break;
         case 2:
@@ -2203,7 +2203,7 @@ s32 lb_eqshop_weapon_step(LbEquipShopWork* self)
             self->tab_list_0x104.cursor_0x00 = 0;
             lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x3A8, self->tab_kinds_0x428[0]);
             lb_eqshop_preview_end(self);
-            fn_802754B4(self->plw_0x12C);
+            pl_model_refresh_req(self->plw_0x12C);
             break;
         case 2:
             self->step_0x001 = 5;
@@ -2213,7 +2213,7 @@ s32 lb_eqshop_weapon_step(LbEquipShopWork* self)
             self->tab_list_0x104.cursor_0x00 = 0;
             lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x3A8, self->tab_kinds_0x428[0]);
             lb_eqshop_preview_end(self);
-            fn_802754B4(self->plw_0x12C);
+            pl_model_refresh_req(self->plw_0x12C);
             break;
         }
         break;
@@ -2274,7 +2274,7 @@ s32 lb_eqshop_armor_step(LbEquipShopWork* self)
                                    self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00]);
                 if (prev != self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00] &&
                     self->tab_kinds_0x428[self->tab_list_0x104.cursor_0x00] == 3) {
-                    fn_802754B4(self->plw_0x12C);
+                    pl_model_refresh_req(self->plw_0x12C);
                 }
             }
         } else {
@@ -2321,7 +2321,7 @@ s32 lb_eqshop_armor_step(LbEquipShopWork* self)
         lb_eqshop_preview_step(self);
         if (system_lobby_flag_get() != 0) {
             if (self->count_0x0F8 == 0) {
-                fn_802754B4(self->plw_0x12C);
+                pl_model_refresh_req(self->plw_0x12C);
                 break;
             }
             lb_row_init(&row, self->goods_0x134[self->cursor_0x0EC].kind_0x01,
@@ -2391,7 +2391,7 @@ s32 lb_eqshop_armor_step(LbEquipShopWork* self)
             self->tab_list_0x104.cursor_0x00 = 0;
             lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x3A8, self->tab_kinds_0x428[0]);
             lb_eqshop_preview_end(self);
-            fn_802754B4(self->plw_0x12C);
+            pl_model_refresh_req(self->plw_0x12C);
             break;
         case 2:
             self->step_0x001 = 5;
@@ -2402,7 +2402,7 @@ s32 lb_eqshop_armor_step(LbEquipShopWork* self)
             self->tab_list_0x104.cursor_0x00 = 0;
             lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x3A8, self->tab_kinds_0x428[0]);
             lb_eqshop_preview_end(self);
-            fn_802754B4(self->plw_0x12C);
+            pl_model_refresh_req(self->plw_0x12C);
             break;
         }
         break;
@@ -2425,7 +2425,7 @@ void lb_screen03_step(void)
 
     self->page_moved_0x0FA = 0;
     self->scroll_0x3A8.moved_0x06 = 0;
-    fn_800D0734(0);
+    system_lobby_flag_set(0);
     switch (self->state_0x000) {
     case 0:
         if ((u32)(lb_talk_page_mode_reset() - 1) <= 1) {

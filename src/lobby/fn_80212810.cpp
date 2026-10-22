@@ -27,11 +27,11 @@
  *    `s32` + `switch ((u8)kind)` gives a signed tree, `kind = (u8)kind` moves the copy to r31; the `u8` form is kept;
  *  - `fn_80215E6C`: retail keeps `clrlwi r0,r3,24; slwi r0,r0,2`, ours fuses them into one `rlwinm` (the unit does not
  *    set the `#pragma peephole off` its siblings use);
- *  - `fn_80212A2C`: ours fuses `clrlwi.` where retail keeps `clrlwi` + `cmpwi` (the same missing pragma);
+ *  - `lb_deco_class_ck`: ours fuses `clrlwi.` where retail keeps `clrlwi` + `cmpwi` (the same missing pragma);
  *  - `lb_item_cell_draw_layout1`, `fn_80216678`, `fn_80217B04`: retail narrows the `u8`/`u16` values (`clrlwi`) where ours passes
  *    them through; `lb_item_flags_ck`, `lb_equip_flags_ck`: the narrowed copy lands in r4 where ours uses r3;
  *  - `lb_page_arrow_put`: `li r0,1` is scheduled earlier in retail; `fn_80217BE4`: its two counters swap r28/r29;
- *  - `fn_802180D8`: the compare tree is laid out differently (ours 16 B longer);
+ *  - `lb_equip_kind_group_get`: the compare tree is laid out differently (ours 16 B longer);
  *  - `lb_scroll_tables_set`: `addi r3` and `li r5` swap (the copy's argument setup order).
  *   flipcheck: `.data` 0x38 against 0x620; `.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of
  *   the claim; `GetItemData`, `LbPutAnaPageArrow` and `PutPageArrow` are referenced unmangled where the map spells
@@ -44,7 +44,7 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
-/* The 0xFFFF-masked byte/word table `fn_80212810` and `lb_equip_kind_ck` index by the item kind. */
+/* The 0xFFFF-masked byte/word table `lb_sort_filter_name_get` and `lb_equip_kind_ck` index by the item kind. */
 extern const u8 lbl_805B97F4[];
 
 /* The pointer run `fn_80215E6C` indexes by a byte id (the `.data` run the discovery surfaced). */
@@ -102,7 +102,7 @@ typedef struct LbScrollWork {
 
 extern "C" {
 
-s32 fn_80212810(s32 id)
+s32 lb_sort_filter_name_get(s32 id)
 {
     s32 value;
 
@@ -214,7 +214,7 @@ s32 lb_equip_kind_ck(u8 kind, s32 arg, s32 sel)
     return 0;
 }
 
-s32 fn_80212A2C(s32 kind, s32 arg)
+s32 lb_deco_class_ck(s32 kind, s32 arg)
 {
     switch ((u8)kind) {
     case 0:
@@ -320,7 +320,7 @@ void fn_802165D0(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
     lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 3);
 }
 
-void fn_80216608(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
+void lb_item_cell_draw_layout5(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
     lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 5);
 }
@@ -376,7 +376,7 @@ s32 lb_scene_npc_refresh_all(void)
     return lb_scene_npc_refresh(1);
 }
 
-s32 fn_80217DA0(s32 a, s32 b)
+s32 lb_seisan_price_get(s32 a, s32 b)
 {
     return fn_80217B04((u8)a, (u16)b);
 }
@@ -449,7 +449,7 @@ void lb_scroll_kind_set(LbScrollWork* self, u8 kind)
     }
 }
 
-void fn_8021920C(LbScrollWork* self, u16 value)
+void lb_scroll_item_set(LbScrollWork* self, u16 value)
 {
     self->value_0x0E = value;
     fn_80218138(self);
@@ -463,7 +463,7 @@ void lb_scroll_flag_set(LbScrollWork* self, u8 flag)
     self->flag_0x01 = flag;
 }
 
-void fn_80219254(LbScrollWork* self, s32 value, u16 index)
+void lb_scroll_materials_set(LbScrollWork* self, s32 value, u16 index)
 {
     self->value_0x30 = value;
     self->value_0x0C = index;
@@ -503,7 +503,7 @@ s32 fn_80217BE4(u16* list, s32 count)
     return sum;
 }
 
-s32 fn_802180D8(s32 kind)
+s32 lb_equip_kind_group_get(s32 kind)
 {
     s32 k;
 

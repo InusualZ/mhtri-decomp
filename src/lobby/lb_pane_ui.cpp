@@ -42,7 +42,7 @@
  *    `mr` source), `lb_gun_set_detail_draw` (plus retail's two dead branches after `Gunner_opt_ok_ck`);
  *  - `lb_entry_pane_list_reset`: register colouring of the cursor/delta pair;
  *  - the panes' `fn_801ECEF0`/`lb_entry_pane_blink_tick`, `fn_801ECF74`, `fn_801ED184`, `fn_801ED200`, `fn_801ED464`,
- *    `fn_801ED9E4`, `fn_801EDA34`, `fn_801EDA9C`, `fn_801EDB34`, `fn_801EDC4C`, `fn_801EE1E4`, `fn_801EF244`: allocator
+ *    `fn_801ED9E4`, `fn_801EDA34`, `fn_801EDA9C`, `fn_801EDB34`, `fn_801EDC4C`, `fn_801EE1E4`, `lb_equip_set_pane_init`: allocator
  *    and narrowing deltas; `fn_801ED688`, `fn_801EEDC4`: register colouring; `fn_801F5534`: `(u16)count <= 1` needs a
  *    bare `cmplwi r5,1`; `fn_801F86FC`: retail keeps the `flags` pointer in r30, ours in r31; `fn_801FB364`: frame 0x30
  *    against 0x20 with the same local offsets.
@@ -249,7 +249,7 @@ typedef struct LbPaneScroll {
     /* +0x30 */ u8 unused_0x30[0x50];
 } LbPaneScroll; /* size: 0x80 */
 
-/* The set pane `fn_801EF1D0`/`fn_801EF244`/`lb_equip_set_pane_step` drive: the slot the cursor is on, the set's
+/* The set pane `fn_801EF1D0`/`lb_equip_set_pane_init`/`lb_equip_set_pane_step` drive: the slot the cursor is on, the set's
  * three record ids, the confirm stepper and the scroll list of the set. */
 typedef struct LbEquipPane {
     /* +0x00 */ u8 phase_0x00;
@@ -376,7 +376,7 @@ typedef struct LbEntryPane {
 } LbEntryPane; /* size: 0x234 */
 
 /* The equipment-box screen work (`lobby_w.menu_0xAC` while the box is open): the done flag, the page record
- * `fn_8004C038` refreshes, the entry pane and the set pane. */
+ * `userdata_pl_look_apply` refreshes, the entry pane and the set pane. */
 typedef struct LbEquipBoxWork {
     /* +0x000 */ u8 unused_0x000[4];
     /* +0x004 */ u8 changed_0x004;     /* set once the worn equipment changed */
@@ -403,7 +403,7 @@ typedef struct LbMySetPane {
     /* +0x0C */ s16 blink_0x0C;        /* the move step's blink timer (0..19) */
     /* +0x0E */ u8 unused_0x0E[2];
     /* +0x10 */ s32 stepper_0x10;      /* the confirm stepper `toggle_word_step`/`lb_yes_no_step` walk */
-    /* +0x14 */ struct LbPage* page_0x14; /* the page record `fn_8004C038` refreshes */
+    /* +0x14 */ struct LbPage* page_0x14; /* the page record `userdata_pl_look_apply` refreshes */
 } LbMySetPane; /* size: 0x18 */
 
 /* The model pane `lb_model_pane_init` seeds: the step, the mode, the part kind it starts on and the player work whose
@@ -458,7 +458,7 @@ s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbListPane* list)
 s32 fn_801EEDC4(LbDigitPane* self, LbListPane* list);
 s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list);
 s32 fn_801EF1D0(LbEquipPane* self);
-void fn_801EF244(LbEquipPane* self, s16 index, u16 a, u16 b, u16 c, u8 side, struct LbPage* page);
+void lb_equip_set_pane_init(LbEquipPane* self, s16 index, u16 a, u16 b, u16 c, u8 side, struct LbPage* page);
 s32 lb_equip_set_pane_step(LbEquipPane* self, LbEntryPane* entry, LbEquipBoxWork* owner);
 s16 lb_digit_pane_value(LbEntryPane* self);
 void lb_entry_pane_scroll_refresh(LbEntryPane* self);
@@ -537,8 +537,8 @@ s32 fn_8004B870(IdValue* slots, u16 index, s16 delta);
 s32 item_box_store(u16 id, s32 a, s16* out);
 s32 fn_8004BF28(void* dst, u16 count);
 u16 item_slots_free_count(void* slots, u16 count);
-void fn_8004C038(struct LbPage* page, LbItemDb* db);
-u32 fn_8004C7BC(LbItemDb* db, u16 id);
+void userdata_pl_look_apply(struct LbPage* page, LbItemDb* db);
+u32 userdata_equip_box_worn_ck(LbItemDb* db, u16 id);
 s32 score_add_clamped(s32 a, void* p);
 s32 userdata_progress_flag_ck(s32 a);
 s32 userdata_flag_ck(s32 a);
@@ -1745,7 +1745,7 @@ extern "C" s32 fn_801EF1D0(LbEquipPane* self)
 }
 
 /* Seeds the equipment pane with the three ids and the icon run. */
-extern "C" void fn_801EF244(LbEquipPane* self, s16 index, u16 a, u16 b, u16 c, u8 side, struct LbPage* page)
+extern "C" void lb_equip_set_pane_init(LbEquipPane* self, s16 index, u16 a, u16 b, u16 c, u8 side, struct LbPage* page)
 {
     u16 id_a;
     u16 id_b;
@@ -2041,7 +2041,7 @@ extern "C" void lb_entry_pane_scroll_refresh(LbEntryPane* self)
                 lb_equip_compare_set(&self->scroll_0x04C, rec);
                 kind = self->scroll_0x04C.kind_0x00;
                 if ((kind == 2 || kind == 6) && (u8)equip_kind_table_class(rec->kind_0x00) == 0
-                    && fn_8004C7BC(db, id) == 1U) {
+                    && userdata_equip_box_worn_ck(db, id) == 1U) {
                     memset(&set[0], 0, sizeof(LbEquipRec));
                     set[0].kind_0x00 = rec->kind_0x00;
                     lb_equip_base_set(&self->scroll_0x04C, &set[0]);
@@ -2054,7 +2054,7 @@ extern "C" void lb_entry_pane_scroll_refresh(LbEntryPane* self)
             lb_equip_compare_set(&self->scroll_0x04C, rec);
             kind = self->scroll_0x04C.kind_0x00;
             if ((kind == 2 || kind == 6) && (u8)equip_kind_table_class(rec->kind_0x00) == 0
-                && fn_8004C7BC(db, id) == 1U) {
+                && userdata_equip_box_worn_ck(db, id) == 1U) {
                 memset(&set[0], 0, sizeof(LbEquipRec));
                 set[0].kind_0x00 = rec->kind_0x00;
                 lb_equip_base_set(&self->scroll_0x04C, &set[0]);
@@ -2867,8 +2867,8 @@ extern "C" void lb_equip_record_swap(u16 id_a, u16 id_b, LbEquipPane* set)
 
     db = lobby_world_block;
     class_change = 0;
-    worn_a = fn_8004C7BC(db, id_a) == 1;
-    worn_b = fn_8004C7BC(db, id_b) == 1;
+    worn_a = userdata_equip_box_worn_ck(db, id_a) == 1;
+    worn_b = userdata_equip_box_worn_ck(db, id_b) == 1;
     equip_record_copy(&tmp, &lobby_world_block->equip_0x0E00[id_a]);
     equip_record_copy(&lobby_world_block->equip_0x0E00[id_a], &lobby_world_block->equip_0x0E00[id_b]);
     equip_record_copy(&lobby_world_block->equip_0x0E00[id_b], &tmp);
@@ -2976,26 +2976,26 @@ extern "C" s32 lb_equip_box_wear_step(LbEquipBoxWork* self)
             case 11:
                 entry->phase_0x000++;
                 sysSE_stop(0x2B);
-                fn_801EF244(&self->set_0x2A8, 0, id, 0xFFFF, 0xFFFF, 0, entry->page_0x028);
+                lb_equip_set_pane_init(&self->set_0x2A8, 0, id, 0xFFFF, 0xFFFF, 0, entry->page_0x028);
                 break;
             case 12:
                 entry->phase_0x000++;
                 sysSE_stop(0x2B);
-                fn_801EF244(&self->set_0x2A8, 1, 0xFFFF, id, 0xFFFF, 0, entry->page_0x028);
+                lb_equip_set_pane_init(&self->set_0x2A8, 1, 0xFFFF, id, 0xFFFF, 0, entry->page_0x028);
                 break;
             case 13:
                 entry->phase_0x000++;
                 sysSE_stop(0x2B);
-                fn_801EF244(&self->set_0x2A8, 2, 0xFFFF, 0xFFFF, id, 0, entry->page_0x028);
+                lb_equip_set_pane_init(&self->set_0x2A8, 2, 0xFFFF, 0xFFFF, id, 0, entry->page_0x028);
                 break;
             default:
                 switch ((u8)equip_kind_table_class(rec->kind_0x00)) {
                 case 1:
-                    if (fn_8004C7BC(lobby_world_block, id) == 0) {
+                    if (userdata_equip_box_worn_ck(lobby_world_block, id) == 0) {
                         entry->phase_0x000 = 2;
                         sysSE_stop(3);
                         lb_equip_entry_apply(id);
-                        fn_8004C038(self->page_0x010, lobby_world_block);
+                        userdata_pl_look_apply(self->page_0x010, lobby_world_block);
                         fn_801EC7AC((LbMenuPanel*)self);
                         lb_entry_pane_list_reset(entry, self);
                         self->changed_0x004 = 1;
@@ -3007,12 +3007,12 @@ extern "C" s32 lb_equip_box_wear_step(LbEquipBoxWork* self)
                     if (equip_wearable_ck(lobby_world_block, (_EQUIP*)rec) == 1U) {
                         entry->phase_0x000 = 2;
                         sysSE_stop(3);
-                        if (fn_8004C7BC(lobby_world_block, id) == 1U) {
+                        if (userdata_equip_box_worn_ck(lobby_world_block, id) == 1U) {
                             set_slot_none(lobby_world_block, rec->kind_0x00);
                         } else {
                             lb_equip_entry_apply(id);
                         }
-                        fn_8004C038(self->page_0x010, lobby_world_block);
+                        userdata_pl_look_apply(self->page_0x010, lobby_world_block);
                         fn_801EC7AC((LbMenuPanel*)self);
                         lb_entry_pane_list_reset(entry, self);
                     } else {
@@ -3045,7 +3045,7 @@ extern "C" s32 lb_equip_box_wear_step(LbEquipBoxWork* self)
                     lb_equip_entry_apply(self->set_0x2A8.ids_0x04[i]);
                 }
             }
-            fn_8004C038(self->page_0x010, lobby_world_block);
+            userdata_pl_look_apply(self->page_0x010, lobby_world_block);
             fn_801EC7AC((LbMenuPanel*)self);
             lb_entry_pane_list_reset(entry, self);
             self->changed_0x004 = 1;
@@ -3130,7 +3130,7 @@ extern "C" s32 lb_entry_pane_sell_step(LbEntryPane* self, LbEquipBoxWork* owner)
             if (lb_cmd_pressed_ck(0x10) == 1U) {
                 self->mark_0x01E = lb_digit_pane_value(self);
                 if ((u8)equip_kind_table_class(lobby_world_block->equip_0x0E00[self->mark_0x01E].kind_0x00) != 0xFF
-                    && fn_8004C7BC(lobby_world_block, self->mark_0x01E) == 0) {
+                    && userdata_equip_box_worn_ck(lobby_world_block, self->mark_0x01E) == 0) {
                     self->phase_0x000++;
                     self->stepper_0x004 = 0;
                     sysSE_req(0);
@@ -3504,7 +3504,7 @@ extern "C" s32 lb_gun_set_load_step(LbEquipBoxWork* owner, LbMySetPane* self)
                     lb_equip_entry_apply(set->opts_0x02.ids[i]);
                 }
             }
-            fn_8004C038(self->page_0x14, lobby_world_block);
+            userdata_pl_look_apply(self->page_0x14, lobby_world_block);
             fn_801EC7AC((LbMenuPanel*)owner);
             owner->changed_0x004 = 1;
             sysSE_stop(3);
@@ -3848,7 +3848,7 @@ u8 lb_entry_pane_scroll_kind_get(::LbEntryPane* self);
 u8* lb_entry_pane_kind_tbl_get(::LbEntryPane* self);
 s16 lb_digit_pane_value(::LbEntryPane* self);
 void lb_entry_pane_scroll_refresh(::LbEntryPane* self);
-u32 fn_8004C7BC(::LbItemDb* db, u16 id);
+u32 userdata_equip_box_worn_ck(::LbItemDb* db, u16 id);
 s16 fn_801ED160(::LbDigitPane* self);
 s16 fn_801ED9E4(s16 index);
 s32 userdata_item_slot_count(::LbItemDb* db);
@@ -3991,7 +3991,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
             }
         } else {
             if (lb_cmd_pressed_ck(0x20) == 1) {
-                fn_8004C038(sub, world);
+                userdata_pl_look_apply(sub, world);
                 req->done_0x001 = 1;
                 sysSE_req(1);
             } else if (lb_cmd_repeat_ck(3) != 0) {
@@ -4231,7 +4231,7 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
                     world->inner_color_0x39BC = self->picked_0x18;
                     break;
                 }
-                fn_8004C038(page, world);
+                userdata_pl_look_apply(page, world);
                 fn_801EC7AC(owner);
                 sysSE_req(0);
                 self->done_0x01 = 2;
@@ -4259,7 +4259,7 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
                     world->inner_color_0x39BC = self->original_0x1C;
                     break;
                 }
-                fn_8004C038(page, world);
+                userdata_pl_look_apply(page, world);
                 self->done_0x01 = 1;
             } else {
                 self->phase_0x00++;
@@ -4298,7 +4298,7 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
                 world->inner_color_0x39BC = self->original_0x1C;
                 break;
             }
-            fn_8004C038(page, world);
+            userdata_pl_look_apply(page, world);
             sysSE_req(0);
             self->done_0x01 = 1;
             break;
@@ -6072,7 +6072,7 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                     index = self->sorted_ids_0x16C[slot + c];
                 }
                 rec = &((::LbItemDb*)lobby_world_block)->equip_0x0E00[index];
-                worn = fn_8004C7BC((::LbItemDb*)lobby_world_block, index) == 1;
+                worn = userdata_equip_box_worn_ck((::LbItemDb*)lobby_world_block, index) == 1;
                 if (sorting == 0) {
                     switch (self->slot_kind_0x016) {
                     case 0:
@@ -6536,14 +6536,14 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                     } else {
                         switch ((u8)equip_kind_table_class(rec->kind_0x00)) {
                         case 0:
-                            if (fn_8004C7BC((::LbItemDb*)lobby_world_block, picked) == 1) {
+                            if (userdata_equip_box_worn_ck((::LbItemDb*)lobby_world_block, picked) == 1) {
                                 reason = 0xE3;
                             } else if (equip_wearable_ck(lobby_world_block, (::_EQUIP*)rec) == 0) {
                                 reason = 0xE9;
                             }
                             break;
                         case 1:
-                            if (fn_8004C7BC((::LbItemDb*)lobby_world_block, picked) == 1) {
+                            if (userdata_equip_box_worn_ck((::LbItemDb*)lobby_world_block, picked) == 1) {
                                 reason = 0xE0;
                             } else if (userdata_gunner_ck(lobby_world_block) == 1) {
                                 reason = 0xE1;
@@ -6589,7 +6589,7 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                 switch (self->phase_0x000) {
                 case 0:
                     help = 0xDC;
-                    if (fn_8004C7BC((::LbItemDb*)lobby_world_block, picked) == 1) {
+                    if (userdata_equip_box_worn_ck((::LbItemDb*)lobby_world_block, picked) == 1) {
                         reason = 0xE6;
                     } else if (my_set_record_used_ck(lobby_world_block, picked) == 1
                                || gun_set_record_used_ck(lobby_world_block, picked) == 1) {
@@ -6804,7 +6804,7 @@ void lb_set_pane_draw(::LbEquipPane* self, s16 x, s16 y)
 
 /* 0x801F865C - run the state's own draw call: the entry list for states 0 and 2, the icon strip for
  * state 1. */
-void fn_801F865C(::LbEquipPane* self, u32 id_a, void* page_b, u32 id_c, u8* ptr_f)
+void lb_equip_set_pane_draw(::LbEquipPane* self, u32 id_a, void* page_b, u32 id_c, u8* ptr_f)
 {
     _mh_ivec2_ pos;
 
@@ -8184,7 +8184,7 @@ void lb_box_menu_draw(void)
             lb_pane_draw(entry, pos.x, pos.y, self);
             break;
         case 1:
-            fn_801F865C(set, 0x1BD6, entry, 0x1AE1, (u8*)self);
+            lb_equip_set_pane_draw(set, 0x1BD6, entry, 0x1AE1, (u8*)self);
             break;
         case 2:
             lb_panel_msg_draw(0x1877, 0xDD);

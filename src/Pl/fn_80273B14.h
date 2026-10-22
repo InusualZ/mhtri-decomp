@@ -97,7 +97,7 @@ s32 pl_item_pouch_ok_ck(struct _PLW* plw, u16 id);
 
 /* 0x802753E4 / 0x802754B4 / 0x802754C0 / 0x8027552C - the per-act bonus and the mode entries. */
 s16 fn_802753E4(struct _PLW* plw, u16 id);
-void fn_802754B4(struct _PLW* plw);
+void pl_model_refresh_req(struct _PLW* plw);
 void pl_act_hold_notify(struct _PLW* plw, u8 flag);
 void pl_info_text_set(struct _PLW* plw, const char* src);
 

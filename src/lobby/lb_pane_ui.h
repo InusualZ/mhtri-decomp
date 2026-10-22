@@ -211,7 +211,7 @@ void fn_801F353C(const s16* table, s16* out_max, s16* out_count);
 void sysSE_stop(s32 id);
 void fn_8004D0D8(LbWorldBlock* world, u8 id);
 void fn_8004D0E0(LbWorldBlock* world, u8 id);
-void fn_8004C038(LbPage* page, LbWorldBlock* world);
+void userdata_pl_look_apply(LbPage* page, LbWorldBlock* world);
 void put_button_guide(s32 kind, const _mh_ivec2_* pos);
 
 #ifdef __cplusplus

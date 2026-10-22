@@ -120,12 +120,12 @@ s32 equip_deco_count(LbIconRec* icon);                /* the record's stack coun
 s32 equip_deco_slots_free(LbIconRec* icon);                /* the record's "held" test (Pl) */
 s32 menu_money_draw(s32 id);                         /* 0x802DF6E4 - the HUD/2D element release */
 s32 lb_deli_menu_draw(void);                           /* 0x8033C1AC - the companion-page step */
-void fn_803642B8(LbMenuPage* self);              /* 0x803642B8 - the band's per-state draw arms */
-void fn_803645C4(LbMenuPage* self);
-void fn_80364BD8(LbMenuPage* self);
-void fn_80364EE8(LbMenuPage* self);
-void fn_803653A0(LbMenuPage* self);
-void fn_803659E8(LbMenuPage* self);
+void lb_smith_make_draw(LbMenuPage* self);              /* 0x803642B8 - the band's per-state draw arms */
+void lb_smith_part_list_draw(LbMenuPage* self);
+void lb_smith_deco_draw(LbMenuPage* self);
+void lb_smith_attach_draw(LbMenuPage* self);
+void lb_smith_detach_draw(LbMenuPage* self);
+void lb_smith_kakou_draw(LbMenuPage* self);
 }
 
 /* `set_zmode__FbUcb`'s owner (`sound/fn_800E3CBC.cpp`) publishes no header; the mangling is
@@ -447,7 +447,7 @@ extern "C" void lb_menu_page_step(void) {
         lb_eqshop_bg_draw(1, 1);
         if (self->state_0x00 == 4) {
             lb_eqshop_menu_draw(&self->work_0xE0, (u8)self->work_0xA0.kind_0x00, 1);
-            fn_803645C4(self);
+            lb_smith_part_list_draw(self);
         } else {
             lb_eqshop_menu_draw(&self->work_0xE0, (u8)self->work_0xA0.kind_0x00, 0);
         }
@@ -469,27 +469,27 @@ extern "C" void lb_menu_page_step(void) {
             lb_equip_bg_draw();
             menu_money_draw(6360);
         }
-        fn_803642B8(self);
+        lb_smith_make_draw(self);
         break;
     case 10:
         lb_equip_bg_draw();
         menu_money_draw(6360);
-        fn_803659E8(self);
+        lb_smith_kakou_draw(self);
         break;
     case 6:
         lb_equip_bg_draw();
         menu_money_draw(6360);
-        fn_80364BD8(self);
+        lb_smith_deco_draw(self);
         break;
     case 7:
         lb_equip_bg_draw();
         menu_money_draw(6360);
-        fn_80364EE8(self);
+        lb_smith_attach_draw(self);
         break;
     case 8:
         lb_equip_bg_draw();
         menu_money_draw(6360);
-        fn_803653A0(self);
+        lb_smith_detach_draw(self);
         break;
     case 9:
         lb_deli_menu_draw();

@@ -24,7 +24,7 @@ u32 Pl_motion_input_ck(s32 arg);
 u8 fn_802738B8(u8 idx);
 void pl_equip_model_set(struct _PLW* plw, u8* rec);
 void pl_parts_color_set(struct _PLW* plw, u8 idx, s32 val);
-void fn_802754B4(struct _PLW* plw);
+void pl_model_refresh_req(struct _PLW* plw);
 /* 0x8027EB18 (0x18): the string-table name of item kind `kind` (kind 85 and up read as 0). */
 u32 item_kind_name_get(u8 kind);
 /* 0x8027EB30 (0x18): the system string table's name of active skill `id`. */

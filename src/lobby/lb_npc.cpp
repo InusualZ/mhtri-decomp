@@ -6412,7 +6412,7 @@ void fn_80207A44(_LB_NPC* self)
 }
 
 /* 0x80207AA4 - arm the lobby sub-scene latch block for a scene id. */
-void fn_80207AA4(u8 scene)
+void lb_npc_scene_start(u8 scene)
 {
     memset(&lb_npc_scene_work, 0, 28);
     lb_npc_scene_work.scene_0x10 = scene;
@@ -6420,7 +6420,7 @@ void fn_80207AA4(u8 scene)
 }
 
 /* 0x80207AF8 - whether the latch block is armed and its +3 byte is set. */
-u32 fn_80207AF8(void)
+u32 lb_npc_scene_done_ck(void)
 {
     if (lb_npc_scene_work.active_0x02 == 0) {
         return 1;
@@ -12169,7 +12169,7 @@ extern "C" s16 fn_80212724(u8* table, s16 count, u32 value) {
 }
 
 /* Maps a lobby part kind to its string id and returns the string. */
-extern "C" void fn_80212760(u32 kind) {
+extern "C" void lb_sort_order_name_get(u32 kind) {
     u16 str_id;
 
     switch ((u8)kind) {
