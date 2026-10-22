@@ -4938,13 +4938,13 @@ void hbmPanelRelayout(HbmPanelView* self)
 }
 
 /* Store the incoming word into the panel's +0x1988 field. */
-void fn_8054CDBC(HbmTextPanel* self, s32 value)
+void hbmPanelSetInputEnabled(HbmTextPanel* self, s32 value)
 {
     self->field_0x1988 = value;
 }
 
 /* Forward the +0x19C4 record to 0x80526D00 (a tail call in retail). */
-void fn_8054CDC4(HbmTextPanel* self)
+void hbmPanelClearKanaQueue(HbmTextPanel* self)
 {
     KPRClearQueue((KPRQueue*)&self->field_0x19C4);
 }

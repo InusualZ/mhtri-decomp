@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): a symbol `menu/menu_sysmsg.cpp` defines, for a consumer that cannot include
+/* Leaf header (docs/plan.md 6.5 rule 2): a symbol `menu/sysmsg_text.cpp` defines, for a consumer that cannot include
  * the owner's full header.  C linkage (the map row is a plain name). */
 #ifndef MHTRI_MENU_NPC_TALK_NAME_TBL_H
 #define MHTRI_MENU_NPC_TALK_NAME_TBL_H

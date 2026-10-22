@@ -10,7 +10,7 @@
  * wrote and the rows they call inside the unit (see "Renames" below).  The rows still carrying a
  * `fn_` stem are the ones with no body yet, plus the pre-existing debt (`fn_802E1978`,
  * `fn_802E198C`, `spr_anim_frame_set`, `sprite_anim_last_frame`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
- * `draw_sprite_idx_color`, `fn_802E099C`, `sprite_frame_apply`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
+ * `draw_sprite_idx_color`, `fn_802E099C`, `sprite_frame_apply`, `draw_uv_rect`, `fn_802E1AEC`, `fn_802E1C74`,
  * `fn_802E1D30`, `fn_802E0714`) - filed as a naming sweep, not fixed here because each needs its
  * own evidence and the two that are called from outside this unit are cross-unit sweeps.
  *
@@ -124,7 +124,7 @@
  * `note_box_size` 91.67 %, `color_lerp` 95.99 % (the four channel extractions' declaration order and
  * the pack's OR order), `color_scale` 97.04 % (the pack's OR order), `anim_step_tex_id` 97.37 %
  * (`cur`/`prev` land in the opposite register pair), `anim_step_uv` 98.91 %, `anim_step_color`
- * 98.96 %, plus the pre-existing `fn_802E1978` 79.0 %, `fn_802E198C` 89.98 %, `fn_802E0F78` 91.05 %,
+ * 98.96 %, plus the pre-existing `fn_802E1978` 79.0 %, `fn_802E198C` 89.98 %, `draw_uv_rect` 91.05 %,
  * `spr_anim_frame_set` 93.86 %, `fn_802E1D30` 97.39 %, `put_button_icon_tex` 97.9 %,
  * `fn_802E099C` 99.88 % (the switch's arm order), `sprite_ary_last_frame` 99.4 % and `draw_sprite` 99.96 %
  * (retail materialises the 0x4330 conversion high word twice; MWCC CSEs ours, 4 bytes short).
@@ -423,7 +423,7 @@ void put_button_icon(s16 x, s16 y, s16 size, u32 color, u8 tex_idx, u8 wide_idx)
 }
 
 /* 0x802E0F78 (0xAC) - a rectangle filled with the fixed `.sdata` uv pair at scale 8. */
-void fn_802E0F78(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx)
+void draw_uv_rect(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx)
 {
     _mh_tex_uv_ uv0;
     _mh_tex_uv_ uv1;

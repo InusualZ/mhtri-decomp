@@ -679,6 +679,7 @@ config.libs = [
             Object(NonMatching, "menu/menu_placeinfo.cpp"),
             Object(NonMatching, "menu/movie.cpp"),
             Object(NonMatching, "menu/menu_plsearch.cpp"),
+            Object(Matching, "menu/sysmsg_text.cpp"),
             Object(NonMatching, "menu/menu_sysmsg.cpp"),
         ],
     },

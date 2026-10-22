@@ -4348,7 +4348,7 @@ extern "C" s32 fn_80274570(struct _PLW* plw)
 }
 
 /* Writes the armed byte of the player's own move work record. */
-extern "C" void fn_80274584(s8 value)
+extern "C" void pl_gesture_req(s8 value)
 {
     struct _PLW* work = (struct _PLW*)get_move_work_adrs(2);
 

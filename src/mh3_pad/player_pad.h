@@ -50,7 +50,7 @@ typedef struct PlayerPad {
     /* +0x0D6 */ u16 control_0x0D6;  /* the second control word's low pair (masked with 0x88) */
     /* +0x0D8 */ u8 pad_0x0d8[0x2];
     /* +0x0DA */ u16 field_0xda;
-    /* +0x0DC */ u8 pad_0x0dc[0x2];
+    /* +0x0DC */ u16 cc_word2_0x0DC;  /* the third control word of the Classic Controller set (the software keyboard reads it) */
     /* +0x0DE */ u16 control_0x0DE;
     /* +0x0E0 */ u8 pad_0x0e0[0x8];
     /* +0x0E8 */ u16 field_0xe8;     /* the fourth control word the camera keeps (`camera/camera_main.cpp`) */
@@ -62,7 +62,7 @@ typedef struct PlayerPad {
     /* +0x0FC */ u16 control_0x0FC;  /* the held-button word */
     /* +0x0FE */ u8 pad_0x0fe[0x2];
     /* +0x100 */ u16 field_0x100;
-    /* +0x102 */ u8 pad_0x102[0x2];
+    /* +0x102 */ u16 wpad_word2_0x102; /* the third control word of the Wii Remote set (the software keyboard reads it) */
     /* +0x104 */ u16 control_0x104;  /* the pressed-button word */
     /* +0x106 */ u8 pad_0x106[0x18];
     /* +0x11E */ u16 field_0x11e;

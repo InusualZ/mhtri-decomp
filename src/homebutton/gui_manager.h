@@ -108,7 +108,7 @@ struct VisNode {
     /* +0xBB */ u8       flags_0xBB;
 }; /* size: 0xBC */
 
-/* The intrusive node fn_8056BBD0 links (`prev` at +4, `next` at +8). */
+/* The intrusive node hkbNodeAppend links (`prev` at +4, `next` at +8). */
 struct CNode {
     /* +0x00 */ u32    field_0x00;
     /* +0x04 */ CNode* prev_0x04;

@@ -88,7 +88,7 @@ typedef struct GlyphMetric {
     /* +0x00 */ u16 width;
     /* +0x02 */ u16 advance;
 } GlyphMetric; /* size: 0x04 */
-extern GlyphMetric lbl_80580058[];
+extern GlyphMetric sys_font_code_table[];
 
 /* The UTF-8 decoder walker and the glyph resolvers (`fn_8005BD3C`/`fn_8005BF20` are unwritten). */
 extern "C" s32 fn_8005BD3C(char**);
@@ -243,7 +243,7 @@ extern "C" u16 fn_8005BFAC(u32 index)
     if (index >= lbl_807948D8->glyph_count) {
         return 1;
     }
-    return lbl_80580058[index].advance;
+    return sys_font_code_table[index].advance;
 }
 
 /* The 8-word (0x20 B) matrix block copy. */

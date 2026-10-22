@@ -51,7 +51,7 @@
  *   * fn_8005A648 (56.01 %, ours 0x24C vs 0x298): retail keeps `id` in r29 and the horizontal position
  *     `x` in r31; MWCC gives this source `id`->r31 and `x`->r29, which recolours most of the body's
  *     compares/argument moves.  The instruction sequence is otherwise the same shape (the two duplicated
- *     `lbl_8060B1A8[sw9][id]` call sites are written separately, matching retail's two copies; merging
+ *     `sysmsg_save_text[sw9][id]` call sites are written separately, matching retail's two copies; merging
  *     them scores 53.7).  Declaration/usage order permutations (x before y, id as unsigned) were tried and
  *     are worse (47.6-53.7).
  *   * fn_800595E4 (0xD88) is NOT written: it is the per-frame callback's 8-state switch (`system_w`,
@@ -78,6 +78,7 @@
 #include "fn_8004CAD8.h"      /* wii_sysmsg_gen (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat (rule 2) */
 #include "ef/fn_800CDB2C.h"   /* fn_800D0568 (rule 2) */
+#include "menu/sysmsg_text.h"  /* sysmsg_save_text, sysmsg_yes_text, sysmsg_manager_text (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * The range's pooled data.
@@ -95,10 +96,6 @@ extern s16 lbl_8058B2B0[]; /* 8 s16: {0x1E0,0xF8, 0x1E0,0x82, 0xF0,0x50, 0xF0,0x
 extern s16 lbl_8058B290[]; /* 16 s16 RGBA colour pairs                                          0x8058B290 */
 extern s16 lbl_8058B2C0[]; /* 6 s16: {0x7,0xA4, 0xE5,0xA4, 0x76,0xA4}                         0x8058B2C0 */
 
-/* `fn_8005A648`'s message-string tables, indexed by `system_w.field_0x09`. */
-extern char** lbl_8060B1A8[]; /* [6] string tables indexed by system_w.field_0x09      0x8060B1A8 */
-extern char** lbl_8060B200[]; /* [6] string tables indexed by system_w.field_0x09      0x8060B200 */
-extern char** lbl_8060B2F0[]; /* [6] string tables indexed by system_w.field_0x09      0x8060B2F0 */
 extern s16 lbl_8058B2CC[];  /* 14 s16                                                  0x8058B2CC */
 
 /* The SDATA scratch/constants the range touches. */
@@ -170,18 +167,18 @@ void fn_8005A648(u32 a, s32* idPtr) {
     font_set_size(lbl_80791114 + 2, lbl_80791114 + 2);
 
     if ((id >= 2 && id <= 7) || id == 1) {
-        font_print_ex(x, 144, 0, (signed char*)lbl_80791118, lbl_8060B1A8[system_w.field_0x09][id]);
+        font_print_ex(x, 144, 0, (signed char*)lbl_80791118, sysmsg_save_text[system_w.field_0x09][id]);
     } else if (id == 16 || id == 17 || id == 19) {
         wii_sysmsg_gen(id, buf, 0);
         font_print_ex(x, 134, 0, (signed char*)lbl_80791118, buf);
     } else if (id == -200) {
-        font_print_ex(x, 144, 0, (signed char*)lbl_80791118, lbl_8060B1A8[system_w.field_0x09][0]);
+        font_print_ex(x, 144, 0, (signed char*)lbl_80791118, sysmsg_save_text[system_w.field_0x09][0]);
     }
 
     if (id == 1) {
-        font_print_ex(x, (s16)(y + lbl_8058B2CC[13]), 5, (signed char*)lbl_80791118, lbl_8060B200[system_w.field_0x09][0]);
+        font_print_ex(x, (s16)(y + lbl_8058B2CC[13]), 5, (signed char*)lbl_80791118, sysmsg_yes_text[system_w.field_0x09][0]);
     } else if (id == 16 || id == 17) {
-        font_print_ex(x, (s16)(y + lbl_8058B2CC[9]), 5, (signed char*)lbl_80791118, lbl_8060B2F0[system_w.field_0x09][0]);
+        font_print_ex(x, (s16)(y + lbl_8058B2CC[9]), 5, (signed char*)lbl_80791118, sysmsg_manager_text[system_w.field_0x09][0]);
     }
 }
 

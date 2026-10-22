@@ -304,6 +304,12 @@ public:
     u16 getChar(u16 index);
     u16 findChar(const char* paneName);
 
+    /* Returns whether the half-width set is shown. */
+    s32 isHalfWidth() { return mbFullWidth == 0; }
+
+    /* Returns the kana sub-mode (the low nibble of the kana flags). */
+    u32 getKanaMode() { return mKanaFlags & 0xF; }
+
     /* Returns the column of the kana key table the kana sub-mode selects. */
     inline s32 getKanaColumn();
 
@@ -462,6 +468,9 @@ public:
     /* slot +0x08C */ virtual void updateEnterKey();
 
     void selectCursor(u32 position);
+
+    /* Returns the key state's kana sub-mode. */
+    u32 getKanaMode() { return mKeyState.getKanaMode(); }
 
     /* +0x14 */ s32 mInputStyle;
     /* +0x18 */ s32 mPanelStyle;

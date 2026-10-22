@@ -327,7 +327,7 @@ typedef struct Panel805482CC_Sub118 {
 } Panel805482CC_Sub118; /* size: 0x24 - a lower bound */
 
 /* The embedded record at +0x19C4 (`fn_80526CA0` constructs it, `fn_80526D20` configures it, and
- * `fn_8054CDC4`/`hbmPanelCloseCandidates` dispatch through it). */
+ * `hbmPanelClearKanaQueue`/`hbmPanelCloseCandidates` dispatch through it). */
 typedef struct Panel805482CC_Sub19C4 {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u8 pad_0x04[0x18];

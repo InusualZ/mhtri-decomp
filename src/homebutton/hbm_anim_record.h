@@ -127,7 +127,7 @@ public:
 }; /* size: 0x50 */
 
 /* The sign panel's own part: its page state and the page table, its allocator and the object holding the text panel;
- * slots 0x34..0x4C are its own (its table is not this unit's: slot 0x40 is kept at 0x80454970).  size: 0x24 */
+ * slots 0x34..0x4C are its own (its table is not this unit's: slot 0x40's inline copy is menu/menu_sysmsg's, at 0x80454970).  size: 0x24 */
 class HbmAnimPanelBase : public HkbLayoutInputWidget {
 public:
     /* slot +0x034 */ virtual void v_0x034() {}
@@ -139,7 +139,7 @@ public:
         }
         mPage = 0;
     }
-    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x040 */ virtual u8 getPage();
     /* slot +0x044 */ virtual void prevPage();
     /* slot +0x048 */ virtual void nextPage();
     /* slot +0x04C */ virtual void close();

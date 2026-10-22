@@ -93,7 +93,7 @@ u16 sprite_anim_last_frame(u16 id);
 u16 sprite_ary_last_frame(const u16* ids);
 u32 fn_802E0CE4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 part, const _mh_ivec2_* pos);
 u32 spr_anim_draw(_SPR_DATA_* rec, u16 part, const _mh_ivec2_* pos);
-void fn_802E0F78(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx);
+void draw_uv_rect(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx);
 void draw_tex_icon(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_tex_icon_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_itemicon_item_id_idx(u16 id, u16 item_id, const _mh_ivec2_* pos);

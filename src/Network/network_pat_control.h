@@ -1034,6 +1034,8 @@ char* get_server_type_desc(s32 index);
 u16 get_server_big_data_timeout_element(s32 index);
 s32 CalculateEvents(void);
 /* The band's functions other units call by name (each still carries its own local declaration). */
+/* 0x80426D10 - zeroes the work record's idle-frame counter (the software keyboard calls it on every key). */
+void resetIdleFrames(void);
 u32 isServerSelectState(void);
 u32 isReadyCountOne(void);
 /* untyped: byte range - the command record the session manager sends to the players */

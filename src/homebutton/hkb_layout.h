@@ -275,6 +275,9 @@ public:
     /* untyped: byte range - the pane block the builder reads */
     static Pane* BuildPaneObj(s32 kind, const void* dataPtr, const ResBlockSet& resBlockSet);
 
+    /* Sets the allocator the layouts allocate from. */
+    static void SetAllocator(MEMAllocator* pAllocator) { mspAllocator = pAllocator; }
+
     /* Allocates `size` bytes from the layout allocator. */
     /* untyped: byte range - the raw block */
     static void* AllocMemory(u32 size) { return MEMAllocFromAllocator(mspAllocator, size); }

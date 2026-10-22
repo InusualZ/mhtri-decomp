@@ -56,6 +56,12 @@ u16 hkbKeyIterGetChar(HkbKeyIter* it);
 u16 hkbKeyIterGetCharForUsage(HkbKeyIter* it, u8 usage);
 /* Returns the key code of the key the cursor stands on. */
 u16 hkbKeyIterGetCode(HkbKeyIter* it);
+/* Starts the manager on `workArea` once; 3 when it already runs. */
+s32 hkbManagerInit(HkbManager* self, u8* workArea);
+/* Stops the manager. */
+void hkbManagerShutdown(HkbManager* self);
+/* Polls the keyboard channels and rebuilds the key words. */
+void hkbManagerUpdate(HkbManager* self);
 /* Selects the key map of the manager's channel and re-sends its LEDs. */
 void hkbManagerSetMap(HkbManager* self, s32 mapIndex);
 /* Returns channel 0's modifier word with the masked bits replaced. */

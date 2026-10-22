@@ -179,7 +179,9 @@ typedef struct SystemWork {
                                     * user work's profile instead of `option_w` (0x803BE30C band) */
     /* +0x8B1 */ u8 field_0x8b1;
     /* +0x8B2 */ u8 field_0x8b2;   /* set by the quest result fill when element 0 is monster 25 and was armed */
-    /* +0x8B3 */ u8 pad_0x8b3[0xD];
+    /* +0x8B3 */ u8 pad_0x8b3[0x1];
+    /* +0x8B4 */ u8 kbd_hooks_set_0x8b4;   /* 1 once the software keyboard driver stored its hooks below */
+    /* +0x8B5 */ u8 pad_0x8b5[0xB];
     /* +0x8C0 */ u8 menu_closed_0x8c0;   /* 1 while the item menu is closed (`menu/menu_item.cpp`'s frame) */
     /* +0x8C1 */ u8 net_result_wait_0x8c1;   /* GUESS name: `arena_task` step 4 skips its network-result wait unless this is 1 */
     /* +0x8C2 */ u8 pad_0x8c2[0x2];

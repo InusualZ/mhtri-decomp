@@ -935,7 +935,7 @@ extern "C" void frame_swap_wait(void)
 }
 
 /* The framebuffer the next frame will draw into. */
-extern "C" void* fn_8004026C(void)
+extern "C" void* vi_next_frame_buffer(void)
 {
     return lbl_80794778;
 }

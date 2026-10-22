@@ -9,7 +9,7 @@
  * FLAGS.     GC/3.0a5.2 + cflags_hkb (see src/homebutton/hbm_kb_event.cpp); no extab/extabindex in the target, so
  *            `#pragma exceptions off`; `#pragma auto_inline on` around hkbGuiPaneManagerCreateLayoutScene/WalkInChildren
  *            (retail inlines the recursive walk three levels deep).
- * NAMES.     File name from the `__FILE__` string "tiHKBManager.cpp" (lbl_80658408) that fn_8056BBF0's OSPanic cites.
+ * NAMES.     File name from the `__FILE__` string "tiHKBManager.cpp" (lbl_80658408) that hkbNodeRemove's OSPanic cites.
  * NAMES.     GUESS view classes HkbGuiComponent, HkbGuiManagerView, HkbGuiEventTarget and HkbListener (slots named by
  *            offset where no body names them) and the types HkbManager, HkbChannel, HkbNode, HkbRecord, HkbArg,
  *            HkbSlotMsg, HkbKeyIter, HkbStageEventArgs: named from the bodies that use them.
@@ -926,7 +926,7 @@ extern "C" void fn_8056BBC0(Manager* self, u32 v) { self->field_0x04 = v; }
 extern "C" u32 fn_8056BBC8(void) { return 0; }
 
 /* --- 0x8056BBD0: append `node` at the tail of the +8/+4 chain rooted at `head`. --- */
-extern "C" void fn_8056BBD0(CNode* head, CNode* node) {
+extern "C" void hkbNodeAppend(CNode* head, CNode* node) {
     CNode* p = head;
     while (p->next_0x08 != 0) {
         p = p->next_0x08;
@@ -940,7 +940,7 @@ extern "C" void fn_8056BBD0(CNode* head, CNode* node) {
 extern "C" {
 
 /* 0x8056BBF0: unlink `node` from `list`, panicking if it is not on the list. */
-void fn_8056BBF0(HkbNode* list, HkbNode* node)
+void hkbNodeRemove(HkbNode* list, HkbNode* node)
 {
     HkbNode* p = list->next;
     while (p != 0) {

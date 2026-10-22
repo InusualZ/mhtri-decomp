@@ -143,7 +143,7 @@ s16 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out);
 s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 s32 fn_80274570(struct _PLW* plw);
-void fn_80274584(s8 value);
+void pl_gesture_req(s8 value);
 s32 pl_act_class_get(struct _PLW* plw);
 s32 fn_80274904(struct _PLW* plw);
 s32 fn_80274988(struct _PLW* plw);
