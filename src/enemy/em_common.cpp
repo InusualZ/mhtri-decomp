@@ -400,8 +400,8 @@ u32 em_sleep_ck(_ENEMY_WORK* enemy, u8 kind);
 
 /* Callees outside this unit. */
 
-/* `fn_80124C5C` (0x574 B), which `enemy/fn_8011D448.cpp` defines and whose header does not declare it. */
-extern "C" void fn_80124C5C(u32 a, u32 b, u8 c);
+/* `em_seq_run` (0x574 B), which `enemy/fn_8011D448.cpp` defines and whose header does not declare it. */
+extern "C" void em_seq_run(u32 a, u32 b, u8 c);
 
 /* The unit's own next symbols, defined in this TU. */
 extern "C" void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
@@ -679,7 +679,7 @@ extern "C" u32 fn_80132270(_ENEMY_WORK* self);
 u32 em_magma_check(_ENEMY_WORK* self);
 
 /* Other units' C-linkage callees. */
-extern "C" s32 fn_8011E640(_ENEMY_WORK* self, u32 mask);
+extern "C" s32 em_status_bits_ck(_ENEMY_WORK* self, u32 mask);
 
 extern "C" u32 quest_entry_active_ck(void);
 
@@ -722,12 +722,12 @@ void lb_sub0e_send(u8 a, u16 b, u8 c, u16 d);
 /* The written bodies, in address order. */
 extern "C" void em_se_tbl_play(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b)
 {
-    fn_80124C5C((u32)self, (u32)tbl, (u8)a);
+    em_seq_run((u32)self, (u32)tbl, (u8)a);
 }
 
 extern "C" void em_se_tbl_play_alt(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b)
 {
-    fn_80124C5C((u32)self, (u32)tbl, (u8)a);
+    em_seq_run((u32)self, (u32)tbl, (u8)a);
 }
 
 /* Binds the enemy to a player slot: the local player, or with bit 3 of +0x1C8 the first live player
@@ -5396,14 +5396,14 @@ extern "C" s32 fn_8012F110(_ENEMY_WORK* self, u16 mode)
     if (self->field_0x818 > 0) return 0;
     switch (mode) {
     case 0xa:
-        if (fn_8011E640(self, 0x20) != 0) {
+        if (em_status_bits_ck(self, 0x20) != 0) {
             if (self->field_0x1E2 == 0) {
                 if ((u32)em_die_ck(self) != 1) break;
             }
         }
         return 0;
     case 0xb:
-        if (fn_8011E640(self, 0x40) != 0) {
+        if (em_status_bits_ck(self, 0x40) != 0) {
             if (self->field_0x1E2 == 0 || self->field_0x1E2 == 2) {
                 if ((u32)em_die_ck(self) != 1) break;
             }
@@ -6588,7 +6588,7 @@ extern "C" void em_sight_update(_ENEMY_WORK* self)
             }
         }
     }
-    if (fn_8011E640(self, 4) != 0 && em_busy_ck(self) != 0 && (fn_8011E640(self, 8) != 0 || self->field_0x1E2 != 4) &&
+    if (em_status_bits_ck(self, 4) != 0 && em_busy_ck(self) != 0 && (em_status_bits_ck(self, 8) != 0 || self->field_0x1E2 != 4) &&
         (self->field_0x38C & 2)) {
         senko = emc_work.senko_0x090;
         em_sight_copy(&local, sight);

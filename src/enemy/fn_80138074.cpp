@@ -272,8 +272,8 @@ extern u8 get_now_areano__Fv(void);
 extern s32 event_demo_ck__Fv(void);
 extern s32 ran_suu__Fl(s32 n);
 
-extern void fn_8011F5C0(EnemyWork* work);
-extern u32 fn_8011F654(EnemyWork* work);
+extern void em_damage_reenter_ck(EnemyWork* work);
+extern u32 em_damage_eval(EnemyWork* work);
 extern void fn_80295578(EnemyWork* work, u8 arg1, u16 arg2);
 extern void hit_attack_list_push(void* arg0);
 extern void hit_knock_set(void* arg0, s32 arg1);
@@ -784,8 +784,8 @@ void fn_8013823C(EnemyWork* self) {
     }
     em_shell_rate_init(self);
     if (event_demo_ck__Fv() == 0 && self->field_0x46A == 0) {
-        fn_8011F5C0(self);
-        flag = fn_8011F654(self);
+        em_damage_reenter_ck(self);
+        flag = em_damage_eval(self);
     }
     {
         void (*cb)(EnemyWork*) = em_hook_get(self, 2);

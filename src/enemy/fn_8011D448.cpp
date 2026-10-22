@@ -10,20 +10,29 @@
  *   0x8011F230 is a library-signature match on a 16-byte body, not evidence.  `em_parts_damage_add`, the other
  *   `em_parts_*` and the `em_event_settle*` names are GUESSES from their bodies.
  *   GUESS (from each body and its callers): em_status_bits_set
+ *   GUESS, the effect family (the `eft029_*` create/release/dispatch/start/move/state_next/free scheme):
+ *   `em_eft_fx_*` - `_release_groups`/`_flat` and `_start_`/`_move_`/`_fade_` are the family-0/family-1 bodies the
+ *   `lbl_805A0CB8` tag selects; `em_eft_fx_place_at_joint` places one effect at `ids_0x90[part]`.
+ *   GUESS, the damage settle (`em_damage_eval` is `fn_8013823C`'s per-frame call): `em_damage_*` accumulate into
+ *   +0x7CA..+0x80E, `em_status_buildup_*` read +0x802[n-9], `em_hit_dir_*` turn +0x1C0 against +0x816; the reaction
+ *   kind at +0x82C picks a handler in `em_event_settle_dispatch` and each is `em_event_settle_kindN` after its case
+ *   (kind 1/27 keep `em_event_settle`); `_kindN_ck` are the callback gates (slots 0xF/0x10/0x12/0x13) those kinds test.
+ *   GUESS, the action script (`em_se_tbl_play` hands it an 8-byte {cmd, arg} table): `em_seq_*`.
+ *   `em_kill_sub_kind_ck` is the name `enemy/em_common.cpp`'s lane proposed.
  * RESIDUALS. 75 rows unwritten: 0x8011DA24-0x8011DE2C, 0x8011DE5C-0x8011E378, 0x8011E3A8-0x8011E51C,
  *   0x8011E7F4-0x8011E9DC, 0x8011E9F0-0x8011F230, 0x8011F240-0x801251D0.
  *  - `em_eft_fx_spawn_anchor`, `em_eft_fx_spawn_free`: ours stores the scale and the id word at +0x8C/+0x90 where retail stores +0xC/
  *    +0x10; `em_eft_fx_spawn_anchor` also stores one word more and `em_eft_fx_spawn_free` moves r6/r7 earlier;
- *  - `fn_8011D8F0`: retail hoists `&work[i].slots` out of the outer loop and advances both pointers by 0x44, ours
+ *  - `em_eft_fx_release_groups`: retail hoists `&work[i].slots` out of the outer loop and advances both pointers by 0x44, ours
  *    re-forms `+8` in the body (132 B against 140 B);
- *  - `fn_8011D9B8`: retail tests `state_0x05 == 0` and lays its body after the four stage tail calls, ours lets the
+ *  - `em_eft_fx_dispatch`: retail tests `state_0x05 == 0` and lays its body after the four stage tail calls, ours lets the
  *    state-0 body fall through first (92 B against 108 B);
- *  - `fn_8011E658`: retail loads `amount_0x7A0` a second time for the `+=`.
+ *  - `em_gauge_add`: retail loads `amount_0x7A0` a second time for the `+=`.
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim; ours
  *   emits a 4-byte `.sbss` the unit does not claim.
- * SHAPES. `#pragma peephole off` over the bodies (with the pass on `fn_8011E530` fuses `clrlwi` + `slwi` into
- *   `clrlslwi` and `fn_8011D558` loses the `clrlwi` before its stores); the creators take `u32` type/timer arguments
- *   (retail masks at the store) and `fn_8011D558` ends `(f32 scale, u8 timer)` (its prologue's `fmr f31,f1` comes
+ * SHAPES. `#pragma peephole off` over the bodies (with the pass on `em_eft_fx_place_at_joint` fuses `clrlwi` + `slwi` into
+ *   `clrlslwi` and `em_eft_fx_create` loses the `clrlwi` before its stores); the creators take `u32` type/timer arguments
+ *   (retail masks at the store) and `em_eft_fx_create` ends `(f32 scale, u8 timer)` (its prologue's `fmr f31,f1` comes
  *   before `mr r29,r7`); `event_demo_ck`/`get_em_scale` are declared at C++ scope for their mangled relocations; the
  *   creators' common skeleton for the unwritten rows is in docs/enemy.md.
  */
@@ -46,7 +55,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* Retail keeps the unfused `clrlwi` + `slwi` and `clrlwi` + `stb`/`stw` pairs the peephole pass folds
- * (`fn_8011E530`'s part index, `fn_8011D558`'s type/timer narrowing; playbook 39). */
+ * (`em_eft_fx_place_at_joint`'s part index, `em_eft_fx_create`'s type/timer narrowing; playbook 39). */
 #pragma peephole off
 
 /* This unit's own `.data` (0x805A0C10-0x805A0FB0) and `.sdata` (0x807919C8-0x807919D0), declared and never defined
@@ -68,21 +77,21 @@ f32 lbl_80796C08;   /* 0.0f */
 /* This unit's own members the dispatchers tail-call, and `em_get_mot_no` (`enemy/em_common.cpp`) and
  * `get_camera_pos` (`camera/camera_main.cpp`). */
 extern "C" {
-void fn_8011DA24(_EFT* self);
-void fn_8011DB74(_EFT* self);
-void fn_8011DE2C(_EFT* self);
-void fn_8011DE5C(_EFT* self);
-void fn_8011E138(_EFT* self);
-void fn_8011E378(_EFT* self);
-void fn_8011E3A8(_EFT* self);
-void fn_8011E51C(_EFT* self);
-void fn_8011E52C(_EFT* self);
-void fn_8011E658(_ENEMY_WORK* self, s32 step, s32 limit);
-void fn_8011D8F0(_EFT* self);
-void fn_8011D97C(_EFT* self);
-void fn_8011D8C0(_EFT* self);
-void fn_8011D9B8(_EFT* self);
-_EFT* fn_8011D558(_ENEMY_WORK* self, u32 kind, u32 id0, u32 id1, f32 scale, u8 timer);
+void em_eft_fx_start_groups(_EFT* self);
+void em_eft_fx_start_flat(_EFT* self);
+void em_eft_fx_move(_EFT* self);
+void em_eft_fx_move_groups(_EFT* self);
+void em_eft_fx_move_flat(_EFT* self);
+void em_eft_fx_fade(_EFT* self);
+void em_eft_fx_fade_groups(_EFT* self);
+void em_eft_fx_state_next(_EFT* self);
+void em_eft_fx_free(_EFT* self);
+void em_gauge_add(_ENEMY_WORK* self, s32 step, s32 limit);
+void em_eft_fx_release_groups(_EFT* self);
+void em_eft_fx_release_flat(_EFT* self);
+void em_eft_fx_release(_EFT* self);
+void em_eft_fx_dispatch(_EFT* self);
+_EFT* em_eft_fx_create(_ENEMY_WORK* self, u32 kind, u32 id0, u32 id1, f32 scale, u8 timer);
 s32 em_get_mot_no(_ENEMY_WORK* enemy);
 void get_camera_pos(nw4r::math::VEC3* out);
 
@@ -115,7 +124,7 @@ struct _EFT_FX_POOL {
 };
 
 /* The `0xA8` pool's work block.  `state_0x00` is the family tag the creator writes, `ids_0x90` the
- * two id words the same creator passes and `fn_8011E530` indexes by the spawner's part number.
+ * two id words the same creator passes and `em_eft_fx_place_at_joint` indexes by the spawner's part number.
  * size: 0xA4 (lower bound: +0x98 is the highest offset the written functions read) */
 struct _EFT_FX_FULL {
     /* +0x00 */ u32 state_0x00;
@@ -127,11 +136,11 @@ struct _EFT_FX_FULL {
 
 /* Bodies. */
 
-/* 0x8011D448 - spawns one pooled effect through fn_8011D558 and points its target vector along the
+/* 0x8011D448 - spawns one pooled effect through em_eft_fx_create and points its target vector along the
  * type table's z.  The z component comes from `lbl_805A0C88[type]`; x and y stay at 0.0f. */
 extern "C" void em_eft_fx_spawn(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, f32 scale)
 {
-    _EFT* effect = fn_8011D558(self, type, id, id, scale, timer);
+    _EFT* effect = em_eft_fx_create(self, type, id, id, scale, timer);
     _EFT_FX_FULL* work;
 
     if (effect != NULL) {
@@ -145,7 +154,7 @@ extern "C" void em_eft_fx_spawn(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, 
 extern "C" void em_eft_fx_spawn_at(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, const nw4r::math::VEC3* pos,
                                    f32 scale)
 {
-    _EFT* effect = fn_8011D558(self, type, id, id, scale, timer);
+    _EFT* effect = em_eft_fx_create(self, type, id, id, scale, timer);
     _EFT_FX_FULL* work;
 
     if (effect != NULL) {
@@ -158,7 +167,7 @@ extern "C" void em_eft_fx_spawn_at(_ENEMY_WORK* self, u32 type, u32 id, u32 time
  * because the id pair is taken from the caller's two words. */
 extern "C" void em_eft_fx_spawn_pair(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, u32 timer, f32 scale)
 {
-    _EFT* effect = fn_8011D558(self, type, id0, id1, scale, timer);
+    _EFT* effect = em_eft_fx_create(self, type, id0, id1, scale, timer);
     _EFT_FX_FULL* work;
 
     if (effect != NULL) {
@@ -169,7 +178,7 @@ extern "C" void em_eft_fx_spawn_pair(_ENEMY_WORK* self, u32 type, u32 id0, u32 i
 
 /* 0x8011D558 - the `0xA8`-pool creator: within the enemy's own area, fills the work block and stamps the record
  * (tag 0x1f, type, timer, owner, area, rotation), installs the release/dispatch pair, marks demo ownership. */
-extern "C" _EFT* fn_8011D558(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, f32 scale, u8 timer)
+extern "C" _EFT* em_eft_fx_create(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, f32 scale, u8 timer)
 {
     _EFT* effect;
     _EFT_FX_FULL* work;
@@ -197,8 +206,8 @@ extern "C" _EFT* fn_8011D558(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, f32 
     effect->rot_0x24 = self->pos_0x1BC;
     eft_state_flags_set(effect, 0, 0);
     effect->demo_flag_0x08 = self->team;
-    effect->release_0x40 = fn_8011D8C0;
-    effect->dispatch_0x34 = fn_8011D9B8;
+    effect->release_0x40 = em_eft_fx_release;
+    effect->dispatch_0x34 = em_eft_fx_dispatch;
     if (event_demo_ck() == 1) {
         effect->field_0x07 = 1;
     }
@@ -238,8 +247,8 @@ extern "C" void em_eft_fx_spawn_anchor(_ENEMY_WORK* self, u32 type, u32 id, f32 
     if (event_demo_ck() == 1) {
         effect->field_0x07 = 1;
     }
-    effect->release_0x40 = fn_8011D8C0;
-    effect->dispatch_0x34 = fn_8011D9B8;
+    effect->release_0x40 = em_eft_fx_release;
+    effect->dispatch_0x34 = em_eft_fx_dispatch;
 }
 
 /* 0x8011D7B0 - the `0x20`-pool creator that belongs to nobody: the caller passes the type, position, rotation
@@ -275,26 +284,26 @@ extern "C" void em_eft_fx_spawn_free(u32 type, const nw4r::math::VEC3* pos, cons
     if (event_demo_ck() == 1) {
         effect->field_0x07 = 1;
     }
-    effect->release_0x40 = fn_8011D8C0;
-    effect->dispatch_0x34 = fn_8011D9B8;
+    effect->release_0x40 = em_eft_fx_release;
+    effect->dispatch_0x34 = em_eft_fx_dispatch;
 }
 
 /* 0x8011D8C0 - the pooled family's `.release` callback: hand the type's slot run back. */
-extern "C" void fn_8011D8C0(_EFT* self)
+extern "C" void em_eft_fx_release(_EFT* self)
 {
     switch (lbl_805A0CB8[self->type_0x02]) {
     case 0:
-        fn_8011D8F0(self);
+        em_eft_fx_release_groups(self);
         break;
     case 1:
-        fn_8011D97C(self);
+        em_eft_fx_release_flat(self);
         break;
     }
 }
 
 /* 0x8011D8F0 - the grouped release: every slot of every 0x44-stride group, one call each, then the
  * group count is cleared. */
-extern "C" void fn_8011D8F0(_EFT* self)
+extern "C" void em_eft_fx_release_groups(_EFT* self)
 {
     _EFT_FX_GROUP* work = (_EFT_FX_GROUP*)self->work_0x38;
     s32 i;
@@ -309,7 +318,7 @@ extern "C" void fn_8011D8F0(_EFT* self)
 }
 
 /* 0x8011D97C - the flat release: the whole run in one call, then the count is cleared. */
-extern "C" void fn_8011D97C(_EFT* self)
+extern "C" void em_eft_fx_release_flat(_EFT* self)
 {
     _EFT_FX_POOL* work = (_EFT_FX_POOL*)self->work_0x38;
 
@@ -319,72 +328,72 @@ extern "C" void fn_8011D97C(_EFT* self)
 
 /* 0x8011D9B8 - the family's `.dispatch` callback: `state_0x05` selects the stage, and stage 0 posts on to the
  * type table's first/second handler. */
-extern "C" void fn_8011D9B8(_EFT* self)
+extern "C" void em_eft_fx_dispatch(_EFT* self)
 {
     switch (self->state_0x05) {
     case 0:
         break;
     case 1:
-        fn_8011DE2C(self);
+        em_eft_fx_move(self);
         return;
     case 2:
-        fn_8011E378(self);
+        em_eft_fx_fade(self);
         return;
     case 3:
-        fn_8011E52C(self);
+        em_eft_fx_free(self);
         return;
     }
     switch (lbl_805A0CB8[self->type_0x02]) {
     case 0:
-        fn_8011DA24(self);
+        em_eft_fx_start_groups(self);
         break;
     case 1:
-        fn_8011DB74(self);
+        em_eft_fx_start_flat(self);
         break;
     }
 }
 
 /* 0x8011DE2C - the second family's release dispatcher. */
-extern "C" void fn_8011DE2C(_EFT* self)
+extern "C" void em_eft_fx_move(_EFT* self)
 {
     switch (lbl_805A0CB8[self->type_0x02]) {
     case 0:
-        fn_8011DE5C(self);
+        em_eft_fx_move_groups(self);
         break;
     case 1:
-        fn_8011E138(self);
+        em_eft_fx_move_flat(self);
         break;
     }
 }
 
 /* 0x8011E378 - the third family's per-frame dispatcher. */
-extern "C" void fn_8011E378(_EFT* self)
+extern "C" void em_eft_fx_fade(_EFT* self)
 {
     switch (lbl_805A0CB8[self->type_0x02]) {
     case 0:
-        fn_8011E3A8(self);
+        em_eft_fx_fade_groups(self);
         break;
     case 1:
-        fn_8011E51C(self);
+        em_eft_fx_state_next(self);
         break;
     }
 }
 
 /* 0x8011E51C - the terminal stage of the shared state machine. */
-extern "C" void fn_8011E51C(_EFT* self)
+extern "C" void em_eft_fx_state_next(_EFT* self)
 {
     self->state_0x05++;
 }
 
 /* 0x8011E52C - the terminal release: hand the whole pooled record back. */
-extern "C" void fn_8011E52C(_EFT* self)
+extern "C" void em_eft_fx_free(_EFT* self)
 {
     eft_res_slot_release(self);
 }
 
 /* 0x8011E530 - places `effect` at the enemy's `part` joint: the record's rotation carries the work's target
  * vector, the joint's world position is added, and the result goes into the pooled effect. */
-extern "C" void fn_8011E530(_EFT* self, nw4r::ef::Effect* effect, u8 part)
+extern "C" void em_eft_fx_place_at_joint(_EFT* self, nw4r::ef::Effect* effect, u8 part)
 {
     nw4r::math::VEC3 joint;
     nw4r::math::VEC3 target;
@@ -409,7 +418,7 @@ extern "C" void fn_8011E530(_EFT* self, nw4r::ef::Effect* effect, u8 part)
 }
 
 /* 0x8011E5EC - seeds the enemy's status bits from its static data record. */
-extern "C" void fn_8011E5EC(_ENEMY_WORK* self)
+extern "C" void em_status_bits_init(_ENEMY_WORK* self)
 {
     self->bits_0x824 = get_enemy_data(self)->bits_0x30;
 }
@@ -421,21 +430,21 @@ extern "C" void em_status_bits_set(_ENEMY_WORK* self, u32 mask)
 }
 
 /* 0x8011E630 - clears status bits. */
-extern "C" void fn_8011E630(_ENEMY_WORK* self, u32 mask)
+extern "C" void em_status_bits_clr(_ENEMY_WORK* self, u32 mask)
 {
     self->bits_0x824 &= ~mask;
 }
 
 /* 0x8011E640 - are all of `mask`'s bits set?  (retail emits the `cntlzw` of
  * `(bits & mask) - mask`, which is this comparison and nothing else.) */
-extern "C" u32 fn_8011E640(_ENEMY_WORK* self, u32 mask)
+extern "C" u32 em_status_bits_ck(_ENEMY_WORK* self, u32 mask)
 {
     return (self->bits_0x824 & mask) == mask;
 }
 
 /* 0x8011E658 - steps the gauge and clamps it to [0, ceiling], never below the data record's per-model ratio
  * (`field_0x7a4 * field_0x7B0`). */
-extern "C" void fn_8011E658(_ENEMY_WORK* self, s32 step, s32 ceiling)
+extern "C" void em_gauge_add(_ENEMY_WORK* self, s32 step, s32 ceiling)
 {
     s32 value;
     s32 low;
@@ -459,7 +468,7 @@ extern "C" void fn_8011E658(_ENEMY_WORK* self, s32 step, s32 ceiling)
 /* 0x8011E6E4 - steps the gauge by `step` with the data record's ratio as the ceiling. */
 extern "C" void em_gauge_step(_ENEMY_WORK* self, s32 step)
 {
-    fn_8011E658(self, step, self->field_0x7a4);
+    em_gauge_add(self, step, self->field_0x7a4);
 }
 
 /* 0x8011E6EC - steps the gauge on every `period`-th system tick (an unsigned `divwu` modulo: a `u32` counter
@@ -467,11 +476,11 @@ extern "C" void em_gauge_step(_ENEMY_WORK* self, s32 step)
 extern "C" void em_gauge_period_step(_ENEMY_WORK* self, s32 step, s16 period, f32 scale)
 {
     if (system_w.field_0x0c % period == 0) {
-        fn_8011E658(self, step, (s32)((f32)(s32)self->field_0x7a4 * scale));
+        em_gauge_add(self, step, (s32)((f32)(s32)self->field_0x7a4 * scale));
     }
 }
 
-/* 0x8011E760 - forces the gauge to `value`, clamped the same way `fn_8011E658` clamps it. */
+/* 0x8011E760 - forces the gauge to `value`, clamped the same way `em_gauge_add` clamps it. */
 extern "C" void em_gauge_set(_ENEMY_WORK* self, s32 value)
 {
     s32 ceiling;
@@ -508,7 +517,7 @@ u8 em_parts_damage_level_get(_ENEMY_WORK* self, u8 part)
 }
 
 /* 0x8011F230 - OR a mask into the record's own u16 mask. */
-extern "C" void fn_8011F230(_ENEMY_WORK* self, u16 mask)
+extern "C" void em_damage_flags_set(_ENEMY_WORK* self, u16 mask)
 {
     self->mask_0x80E |= mask;
 }

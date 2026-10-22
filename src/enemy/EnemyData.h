@@ -36,7 +36,7 @@ typedef struct EnemyData {
     /* +0x024 */ u32 field_0x24;
     /* +0x028 */ u32* words_0x28;        /* the per-index words `em_data_word_get` reads (`em_common.cpp`) */
     /* +0x02C */ u8 pad_0x2C[0x4];
-    /* +0x030 */ u32 bits_0x30;     /* copied into `_ENEMY_WORK::bits_0x824` by fn_8011E5EC */
+    /* +0x030 */ u32 bits_0x30;     /* copied into `_ENEMY_WORK::bits_0x824` by em_status_bits_init */
     /* +0x034 */ u8 pad_0x034[0x038 - 0x034];
     /* +0x038 */ struct EmMapEntry* area_maps_0x38;  /* per map, the area reach table (`em_map_table_get`; `em_common.cpp`) */
     /* +0x03C */ struct EmMapEntry* allowed_areas_0x3C;  /* per map, the areas the kind may enter (`em_data_area_allowed_ck`) */

@@ -114,9 +114,9 @@ extern u8 lbl_805B0478[];
 extern u8 lbl_80570150[];
 
 /* `enemy/fn_8011D448.cpp`'s status-bit helpers (`bits_0x824`), declared with these call sites' spelling. */
-void fn_8011E5EC(struct _ENEMY_WORK* self);
+void em_status_bits_init(struct _ENEMY_WORK* self);
 void em_status_bits_set(struct _ENEMY_WORK* self, u32 mask);
-void fn_8011E630(struct _ENEMY_WORK* self, u32 mask);
+void em_status_bits_clr(struct _ENEMY_WORK* self, u32 mask);
 
 /* `stage/stg_w.cpp`'s blend helper: r3 is the `_ENEMY_WORK` (set by the caller), f1 the scalar. */
 void fn_802B08DC(f32 a);
@@ -1352,22 +1352,22 @@ void fn_801A16D4(struct _ENEMY_WORK* self, u32 mode) {
 }
 
 /* 0x801A4218 - action 7's status-bit pass: the (7,6) and (7,7) windows re-arm bits 0x40000/0x80000,
- * otherwise `fn_8011E5EC` seeds and area 1 clears 0x40000. */
+ * otherwise `em_status_bits_init` seeds and area 1 clears 0x40000. */
 void fn_801A4218(struct _ENEMY_WORK* self) {
     if (em_act_ck(self, 7, 6) == 1) {
-        fn_8011E630(self, -1);
+        em_status_bits_clr(self, -1);
         if ((u16)em_get_mot_no(self) == 7) {
             if (em_after_frame_check(self, 2, lbl_807987B4, lbl_80798538) == 1) {
                 em_status_bits_set(self, 0x40000);
             }
         }
     } else if (em_act_ck(self, 7, 7) == 1) {
-        fn_8011E630(self, -1);
+        em_status_bits_clr(self, -1);
         em_status_bits_set(self, 0x80000);
     } else {
-        fn_8011E5EC(self);
+        em_status_bits_init(self);
         if (self->area_no == 1) {
-            fn_8011E630(self, 0x40000);
+            em_status_bits_clr(self, 0x40000);
         }
     }
 }

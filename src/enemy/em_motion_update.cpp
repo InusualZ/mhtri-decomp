@@ -73,8 +73,8 @@ void g3d_root_model_bind(s32 root, u32 id);
 void fn_800E0914(struct MHchar* model);
 
 /* `enemy/fn_8011D448.cpp`'s and `enemy/enemy_control.cpp`'s helpers */
-void fn_8011E5EC(_ENEMY_WORK* self);
-void fn_8011E960(_ENEMY_WORK* self);
+void em_status_bits_init(_ENEMY_WORK* self);
+void em_parts_init(_ENEMY_WORK* self);
 u8 fn_8014278C(u16 a, u16 b);
 f32 fn_80142958(u16 a, u16 b);
 void emc_kill_report(_ENEMY_WORK* self, s32 mode);
@@ -199,10 +199,10 @@ extern "C" void fn_80137C20(_ENEMY_WORK* self)
     self->field_0x1C8 = *(u32*)get_enemy_data(self);
     self->field_0x8C8 = fn_801260BC_c1(self);
     self->field_0x8CC = fn_801260E0_c1(self);
-    fn_8011E5EC(self);
+    em_status_bits_init(self);
     em_part_rec_reset_all(self);
     em_max_hp_init(self);
-    fn_8011E960(self);
+    em_parts_init(self);
     fn_8013A978(self);
 }
 
