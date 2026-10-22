@@ -156,19 +156,7 @@ typedef struct CockpitBlink {
     /* +0x04 */ f32 value;
 } CockpitBlink;
 
-/* A float point passed by value to the textured-rectangle helper.  size: 0xC */
-struct HudPos3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-    HudPos3(f32 px, f32 py, f32 pz) : x(px), y(py), z(pz) {}
-};
-/* A float extent passed by value to the textured-rectangle helper.  size: 0x8 */
-struct HudSize2 {
-    /* +0x00 */ f32 w;
-    /* +0x04 */ f32 h;
-    HudSize2(f32 pw, f32 ph) : w(pw), h(ph) {}
-};
+/* `HudPos3`/`HudSize2` (the textured-rectangle helper's by-value arguments) live in `hud/cockpit.h`. */
 
 /* One row of the kind-0 notice table: its sprite id run and two mode bytes.  size: 0x8 */
 typedef struct HudNoticeAnimRow {

@@ -68,7 +68,7 @@ struct ItemDataRecord {
                                        * byte `fn_802E1024`'s callers read next to `kind`.  Spliced
                                        * out of the `unused_0x003[2]` filler this record carried, one
                                        * byte at +0x004, so no member's offset moved (playbook 56). */
-    /* +0x005 */ u8 kind;             /* indexes the .data colour table `lbl_805CDE78` */
+    /* +0x005 */ u8 kind;             /* indexes the .data colour table `item_kind_color_tbl` */
     /* +0x006 */ u16 sort_order_0x006; /* the high half of the key `item_pair_sort_key` orders a list by */
     /* +0x008 */ u8 unused_0x008[0x00A - 0x008];
     /* +0x00A */ u16 species;        /* indexes the .data record table `lbl_805DBFB8` */
@@ -270,7 +270,7 @@ extern HitRegistry lbl_806AC8A8;
 extern ItemDataHead lbl_806AC8B8;
 extern MenuWork menu_work;
 extern MenuTables lbl_806ACF28;
-extern u32 lbl_805CDE78[];              /* .data:0x805CDE78 - 0x30 B, indexed by `ItemDataRecord::kind` */
+extern u32 item_kind_color_tbl[];              /* .data:0x805CDE78 - 0x30 B, indexed by `ItemDataRecord::kind` */
 extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
 
 /* This unit's own entry points, in address order, and the callees its written bodies call.

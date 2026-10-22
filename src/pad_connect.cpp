@@ -45,7 +45,7 @@ extern "C" s32 screen_split_mode_ck(void)
     return Screen_w.split_mode != 0;
 }
 
-extern "C" s8 fn_800470B4(void)
+extern "C" s8 screen_split_view_get(void)
 {
     if (Screen_w.split_mode != 0) {
         return (s8)Screen_w.split_view_no;
@@ -55,7 +55,7 @@ extern "C" s8 fn_800470B4(void)
 
 extern "C" u8 player_pad_channel_get(s32 arg0)
 {
-    return (u8)(fn_800470B4() * 2 + arg0);
+    return (u8)(screen_split_view_get() * 2 + arg0);
 }
 
 extern "C" void fn_80046E98(void)

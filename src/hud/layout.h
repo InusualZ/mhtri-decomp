@@ -70,9 +70,9 @@ extern "C" {
 #endif
 
 /* The `fn_8005xxxx` helpers of the draw-shape band (`src/fn_8004CAD8.cpp` and `src/draw_shape.cpp`
- * own these addresses; rule 2 debt above).  `fn_800526E4`/`uv_pair_copy` are the two-halfword copy,
+ * own these addresses; rule 2 debt above).  `tex_uv_copy`/`uv_pair_copy` are the two-halfword copy,
  * the rest are the pipeline steps the `draw_*` family drives. */
-void fn_800526E4(void* dst, const void* src);                  /* 0x800526E4 */
+void tex_uv_copy(_mh_tex_uv_* dst, const _mh_tex_uv_* src);  /* 0x800526E4 */
 void uv_pair_copy(void* dst, const void* src);                  /* 0x800526F8 */
 void fn_80053E78(const f32* scale, const f32* offset, u16 id); /* 0x80053E78 */
 void atlas_digit_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055C5C */
@@ -98,7 +98,7 @@ void fn_802E1024(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_tex_icon_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_itemicon_item_id_idx(u16 id, u16 item_id, const _mh_ivec2_* pos);
 void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
-u32 fn_802E12A0(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
+u32 draw_itemicon_frame_idx(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_itemicon_anim_idx(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos);
 void draw_equipicon_rare(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, u8 rare);
 void draw_equipicon_idx(u16 id, _EQUIP* equip, const _mh_ivec2_* pos);
@@ -121,7 +121,7 @@ void knj_msg_str_build(s8* src, s8* dst, s32 columns, s32 lines);
 /* 0x802E2524 - the first `count` characters of the string table text `src` as UTF-16 into `dst`.  Added with
  * `menu/menu_plsearch.cpp` (rule 2). */
 void str_tbl_utf16_build(s8* src, s8* dst, s32 count);
-void fn_802E16E0(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
+void draw_sprite_cell_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void draw_tex_icon_square_arena(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void draw_award_icon_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos);

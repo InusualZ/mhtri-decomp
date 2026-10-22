@@ -197,8 +197,8 @@ void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos)
     f32 posf[2];
 
     uv_pair_copy(&anchor, &spr.pos);
-    fn_800526E4(&uv0, &spr.uv0);
-    fn_800526E4(&uv1, &spr.uv1);
+    tex_uv_copy(&uv0, &spr.uv0);
+    tex_uv_copy(&uv1, &spr.uv1);
     if (pos != 0) {
         anchor.x += pos->x;
         anchor.y += pos->y;
@@ -407,8 +407,8 @@ void put_button_icon_tex(s16 x, s16 y, s16 size, u32 color, u8 tex_idx, u8 wide_
 
     x += get_wide_offset(wide_idx);
     index = (u32)tex_idx * 2;
-    fn_800526E4(&uv0, &lbl_805D5798[index]);
-    fn_800526E4(&uv1, &lbl_805D5798[index + 1]);
+    tex_uv_copy(&uv0, &lbl_805D5798[index]);
+    tex_uv_copy(&uv1, &lbl_805D5798[index + 1]);
     drawshape_init(3, 0xFFFF);
     drawshape_set_vertex_rect(x, y, size, size);
     drawshape_set_flat_color(color);
@@ -429,8 +429,8 @@ void fn_802E0F78(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx)
     _mh_tex_uv_ uv1;
 
     x += get_wide_offset(wide_idx);
-    fn_800526E4(&uv0, &lbl_807927B0[0]);
-    fn_800526E4(&uv1, &lbl_807927B0[1]);
+    tex_uv_copy(&uv0, &lbl_807927B0[0]);
+    tex_uv_copy(&uv1, &lbl_807927B0[1]);
     drawshape_init(3, 0xFFFF);
     drawshape_set_vertex_rect(x, y, w, h);
     drawshape_set_flat_color(color);
@@ -455,7 +455,7 @@ void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos)
 {
     ItemDataRecord* item = GetItemData(id);
 
-    fn_802E1024((_SPR_DATA_*)&spr, item->tex_idx_0x004, lbl_805CDE78[item->kind], pos);
+    fn_802E1024((_SPR_DATA_*)&spr, item->tex_idx_0x004, item_kind_color_tbl[item->kind], pos);
 }
 
 /* 0x802E1134 (0x5C) - the same from the sprite id. */
@@ -469,7 +469,7 @@ void draw_itemicon_item_id_idx(u16 id, u16 item_id, const _mh_ivec2_* pos)
 {
     ItemDataRecord* item = GetItemData(item_id);
 
-    draw_tex_icon_idx(id, item->tex_idx_0x004, lbl_805CDE78[item->kind], pos);
+    draw_tex_icon_idx(id, item->tex_idx_0x004, item_kind_color_tbl[item->kind], pos);
 }
 
 /* 0x802E11F4 (0x94) - a square filled with texture `tex_idx` of the item uv table. */
@@ -494,7 +494,7 @@ void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
 
 /* 0x802E12A0 (0x80) - the animation-step blit with a texture override: the record is built by
  * `sprite_frame_apply`, then handed to the copy-and-recolour helper. */
-u32 fn_802E12A0(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
+u32 draw_itemicon_frame_idx(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work;
     u32 drawn = sprite_frame_apply(&work, id, part, 0);
@@ -508,7 +508,7 @@ void draw_itemicon_anim_idx(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos
 {
     ItemDataRecord* item = GetItemData(item_id);
 
-    fn_802E12A0(id, part, item->tex_idx_0x004, lbl_805CDE78[item->kind], pos);
+    draw_itemicon_frame_idx(id, part, item->tex_idx_0x004, item_kind_color_tbl[item->kind], pos);
 }
 
 /* 0x802E1394 (0x6C) - the equipment icon: nothing is drawn for an empty slot. */
@@ -570,7 +570,7 @@ void draw_sprite_uv_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
 }
 
 /* 0x802E16E0 (0xB4) - the same with it. */
-void fn_802E16E0(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
+void draw_sprite_cell_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 

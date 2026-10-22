@@ -3586,7 +3586,7 @@ s32 fn_80262688(_PLW* self) {
             ((PlItemData*)GetItemData(work->field_0x650))->field_0x01 < 3) {
             self->field_0x658 = 90;
             if (pl_item_room_get(self, work->field_0x650, work->field_0x652) < work->field_0x652) {
-                if ((u16)fn_80273044(self, work->field_0x650) == 0xFFFF) {
+                if ((u16)pl_item_slot_find(self, work->field_0x650) == 0xFFFF) {
                     pl_model_state_set(self, 1, 0, 0);
                 } else {
                     pl_model_state_set(self, 2, 30, work->field_0x650);
@@ -3691,7 +3691,7 @@ void fn_8025F088(_PLW* self) {
     fn_8025E448(self);
     if (self->field_0x30A == 0xFF) {
         self->field_0x30A = 0;
-    } else if (fn_8027AC18(self) == 0 &&
+    } else if (pl_item_menu_open_ck(self) == 0 &&
                (fn_8025E298_view3(self, 128, 255) == 1 || fn_8025E298_view3(self, 137, 248) == 1 ||
                 fn_8025E298_view3(self, 137, 247) == 1) &&
                self->field_0x00A != 7 && self->field_0x00A != 12) {

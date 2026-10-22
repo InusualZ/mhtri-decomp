@@ -232,7 +232,7 @@ void vec3_scale_in_place(VEC3* v, f32 scale);
  * 0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses; the signatures are that
  * consumer's call sites, neither body being written yet).  0x80053960 sets a four-word colour run on
  * the draw-shape state, 0x80054178 takes the 2D vertex pair it rewrites. */
-void fn_80053960(u32, s32, s32, u32);
+void drawshape_set_corner_colors(u32, s32, s32, u32);
 void drawshape_set_offset_ivec2(s16* pos);
 /* 0x800501B4 / 0x800501E4 - the animation clock's cosine and its angle: `t` is a tick count (16-bit wrapped). */
 f32 anim_tick_cos(u16 t);

@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (158)
+## Ideas that work (159)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -167,6 +167,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 176 | [A C++ accessor that builds its returned vector in the return slot: return a copy-constructible view of the type](176-nrvo-copy-ctor-return.md) | works | source-shape | A function returning a POD vector/matrix by value keeps a local and copies it out (bigger frame, extra lwz/stw), where retail works on the sret pointer directly |
 | 177 | [An out-pointer vector helper whose result lands in a temporary: call it through a view that returns the vector](177-sret-helper-view.md) | works | source-shape, allocator | The stack slots of the helper results (subVec3/addVec3 outputs copied with copyVec3) are ordered differently from retail, shifting every addi rN,r1,X |
 | 178 | [A float argument loaded early among the integer argument setup: move the float parameter forward in the callee's declaration](178-float-param-position.md) | works | source-shape | The lfs f1 of a float argument sits before (or after) the li/addi of the integer arguments in retail, and the whole argument block is misaligned in the diff |
+| 179 | [A stack copy whose address is passed is a by-value struct parameter](179-stack-copy-whose-address.md) | works | source-shape, allocator | The caller copies a local struct word by word (lwz/stw) to a fresh stack slot and passes that slot's address |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

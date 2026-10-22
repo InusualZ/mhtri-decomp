@@ -3071,7 +3071,7 @@ extern "C" u8 em020_condition_ck(_ENEMY_WORK* self, u32 mode) {
     case 1:
         return em020_aim_target_ck(self) == 1;
     case 2:
-        if (self->em020_0x328.timer_0x334 <= 0 && fn_8027DC64() == 1) {
+        if (self->em020_0x328.timer_0x334 <= 0 && pl_work_flag0_clear_ck() == 1) {
             return 1;
         }
         return 0;

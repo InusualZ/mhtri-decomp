@@ -368,12 +368,12 @@ struct _PLW {
             /* +0x269 */ u8 field_0x269;   /* nonzero picks the kind-4 attachment's second key tables (`lobby/lb_equip_page.cpp`) */
         };
     };
-    /* +0x26A */ u8 unk26A;
+    /* +0x26A */ u8 ammo_capacity_0x26A;   /* the loaded magazine's capacity (`hud/cockpit_quest.cpp`'s ammo gauge) */
     /* +0x26B */ u8 unk26B;
     /* +0x26C */ u8 held_item_kind_0x26C;   /* the held item's kind `fn_80279B84` derives from its item id (GUESS) */
-    /* +0x26D */ u8 unk26D;
+    /* +0x26D */ u8 ammo_icon_kind_0x26D;  /* the loaded ammo's icon kind (`pl_item_icon_kind_get`) */
     /* +0x26E */ u16 item_slot_sel;   /* the selected item slot; 0x80 marks the second page (`menu/menu_item.cpp`) */
-    /* +0x270 */ s16 unk270;
+    /* +0x270 */ s16 magazine_0x270;      /* non-zero while a magazine is loaded (`hud/cockpit_quest.cpp`'s ammo gauge) */
     /* +0x272 */ s16 unk272;
     /* +0x274 */ union { /* the original and later names of the same byte (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
@@ -860,7 +860,7 @@ struct _PLW {
             /* +0x466 */ s16 field_0x466;
         };
     };
-    /* +0x468 */ s16 unk468;
+    /* +0x468 */ s16 daze_timer_0x468;   /* > 0 while the stagger gauge pulses white (GUESS) */
     /* +0x46A */ s16 unk46A;
     /* +0x46C */ union { /* the original and later names of the same byte (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
@@ -1047,7 +1047,11 @@ struct _PLW {
     /* +0x5BC */ u8 field_0x5BC;   /* `hud/cockpit_quest.cpp`'s `quest_mark_visible_ck` gates the quest
                                   * mark on this byte being 0; meaning not yet derived (GUESS, was
                                   * `unk5BC` - both are one byte, so no offset moves) */
-    /* +0x5BD */ u8 pad_0x5BD[0x5C4 - 0x5BD];
+    /* +0x5BD */ u8 quest_menu_open_0x5BD;  /* the cockpit's quest menu is open (`hud/cockpit_quest.cpp`) */
+    /* +0x5BE */ u8 take_menu_open_0x5BE;   /* the cockpit's take-item menu is open */
+    /* +0x5BF */ u8 cockpit_menu_row_0x5BF; /* the cockpit's quest-menu row (`hud/cockpit_quest.cpp`) */
+    /* +0x5C0 */ u8 cockpit_menu_0x5C0;     /* the cockpit's quest-menu state: 1 rows, 2 count, 3 confirm (`hud/cockpit_quest.cpp`) */
+    /* +0x5C1 */ u8 pad_0x5C1[0x5C4 - 0x5C1];
     /* +0x5C4 */ union { /* the original and later names of the same 36 bytes (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
             /* +0x5C4 */ union {

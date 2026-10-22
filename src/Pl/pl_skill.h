@@ -41,7 +41,7 @@ u8 Pl_Skill_slot_item_get(struct _PLW* plw, u32 slot);
  * `int`, like the definition. */
 int Pl_item_timer_get(struct _PLW* plw, u16 item);
 /* 0x80273044 - the item-id -> slot lookup `fn_8027DE88` walks its id tables with; `u16`, like the definition. */
-u16 fn_80273044(struct _PLW* plw, u16 item);
+u16 pl_item_slot_find(struct _PLW* plw, u16 item);
 #ifdef __cplusplus
 }
 #endif

@@ -4733,7 +4733,7 @@ extern "C" s32 pl_torch_ck(void* arg)
     if (Pl_Skill_ck((_PLW*)arg, 0xCD) == 1) {
         return 1;
     }
-    return (fn_8027AC18(arg) - 1) == 0;
+    return (pl_item_menu_open_ck((_PLW*)arg) - 1) == 0;
 }
 
 /* Whether the enemy is in the low part of its action state. */

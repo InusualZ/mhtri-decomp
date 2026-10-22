@@ -13,7 +13,7 @@ typedef struct _mh_ivec2_ {
 } _mh_ivec2_;
 
 /* One texture coordinate pair (`_mh_tex_uv_` in the map's mangling: the two halfwords
- * `fn_800526E4` copies and `drawshape_set_texture_rect` takes by pointer).
+ * `tex_uv_copy` copies and `drawshape_set_texture_rect` takes by pointer).
  * size: 0x4 */
 typedef struct _mh_tex_uv_ {
     /* +0x00 */ s16 u;

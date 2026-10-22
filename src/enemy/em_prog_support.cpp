@@ -147,7 +147,7 @@ extern "C" void fn_803836EC(void) {
 }
 
 /* 0x8038392C */
-extern "C" u32 fn_8038392C(void) {
+extern "C" u32 em_prog_flag_ck(void) {
     return lbl_806C2418.cursor_x_0x00 != 0;
 }
 

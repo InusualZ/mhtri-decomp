@@ -78,7 +78,7 @@
  *    stays wider (`pl_skill_update2`/`fn_80278D1C` depend on it) and each of the five `(s16)` call sites costs one row;
  *  - `fn_8027B0BC`: six `clrlwi r0,r0,24` before the `stb`s into `q + 0x5E1` (a peephole-level residual);
  *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
- *    r30, ours the mirror (playbook 22); `fn_8027C208`: the frame is 0x30 against retail's 0x40 (unused locals);
+ *    r30, ours the mirror (playbook 22); `pl_item_now_usable_ck`: the frame is 0x30 against retail's 0x40 (unused locals);
  *  - `pl_target_lock_ck`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
  *    `Pl_bari_ck`: retail lays the first arm out of line and the second inline, the natural chain is the mirror;
  *  - `fn_8027DCA8` (`return a || b` shares the `li r3,1` tail), `fn_8027DCE0` (retail merges every `return 0`),
@@ -118,7 +118,7 @@
  *    are load-bearing; `fn_8026CBE4` keeps two unused trailing parameters (its callers pass four);
  *  - `equip_skill_points_get`/`equip_skill_tree_has_ck` dispatch with `switch ((u32)kind)`: cases 1-5, case 6, then 7-15 as `default`, which
  *    lays the bodies out in retail's B, C, A order;
- *  - the record walks index the typed arrays (`rec->skill_id[i]`); `fn_80273044`/`pl_item_room_get` scan `plw->slot_id`
+ *  - the record walks index the typed arrays (`rec->skill_id[i]`); `pl_item_slot_find`/`pl_item_room_get` scan `plw->slot_id`
  *    with a flat `for (i = 0; i < 24; i++)` (unrolled eight-wide under `mtctr 3`), and `pl_item_room_get`'s spare-slot scan
  *    is a `u16*` walk (`p[i * 2]`); `Pl_cat_skill_ck` is a two-iteration loop over a `u16*` walk (`p += 2`);
  *  - the valid-bit updates in `pl_parts_color_set`/`fn_8027373C`/`pl_equip_model_set` are compound (`plw->set_valid &= (u16)~mask`);
@@ -147,18 +147,18 @@
  *  - `extern u8 lbl_80792150;` taken by address gives retail's `@sda21` form where an unsized array gives `lis/addi`;
  *  - `fn_802784B8`'s first case falls through into a `default:` written between the cases; `fn_8027A57C`'s shared
  *    tail is the `switch`'s `default:` after the last case; `pl_impact_pos_get` writes its `default:` first;
- *  - `fn_8027C208` ends in `return 0` with an explicit `default: return 1`, and every refused path is
+ *  - `pl_item_now_usable_ck` ends in `return 0` with an explicit `default: return 1`, and every refused path is
  *    `if (!c) return 1; break;` (the `if (c) return 0; return 1;` form if-converts; playbook 34);
  *  - `pl_target_lock_ck` writes its cases in body address order (0, 4, 2) with the range guard negated and its arms swapped;
  *  - `fn_8027AF34` keeps the pre-decrement value in an `s16` local and an unreachable `if (v < 0) return;` after the
  *    store, which reproduces retail's `blelr ... sth ... bltlr`;
  *  - `pl_pos_blend_start` writes `(f32)(s16)arg1` inline at each division (retail recomputes the conversion);
- *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `fn_8027993C` casts its `u16` index to
+ *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `pl_item_slot_next_get` casts its `u16` index to
  *    `s16` each iteration; `pl_impact_pos_get`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
  *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
  *  - `pl_area_buff_apply`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
  *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
- *    `fn_8027D050` declares its loop index before `v` (the r8/r9 order); `fn_80274B20` is `while (row[0] != 0)` with
+ *    `fn_8027D050` declares its loop index before `v` (the r8/r9 order); `pl_item_icon_kind_get` is `while (row[0] != 0)` with
  *    `id == row[0]` (the rotated loop); `equip_gun_bonus_ck` opens with the `return 0` guard for non-gun kinds.
  */
 
@@ -2448,14 +2448,14 @@ u32 get_item_species_data(u16);
 u32 fn_8027E290(u8);
 void fn_8027E98C(u8*);
 s32 pl_equip_model_id_get(_PLW*, u8*);
-u32 fn_80274B20(u16);
+u32 pl_item_icon_kind_get(u16);
 void equip_columns_skills_get(_EQUIP*, u16*, s8*, u8*);
 void* memset(void*, int, u32);
 u8 Get_pl_type__FP6_EQUIPP6_EQUIP(_EQUIP*, _EQUIP*);
-u16 fn_8027993C(_PLW*, u16, int);
+u16 pl_item_slot_next_get(_PLW*, u16, int);
 void fn_80279B84(_PLW*);
 u8* GetItemData__FUs(u16);
-u16 fn_80273044(_PLW*, u16);
+u16 pl_item_slot_find(_PLW*, u16);
 s32 fn_8004BD30(s16*);
 
 void pl_parts_refresh(_PLW*, s32);
@@ -3242,7 +3242,7 @@ namespace s_80270018 {
 
 
 /* The item id in one equipment slot, or 0 for the empty slot. */
-extern "C" u16 fn_80272C80(_PLW* plw, u8 slot) {
+extern "C" u16 pl_item_slot_item_get(_PLW* plw, u8 slot) {
     if (slot == 0xFF) {
         return 0;
     }
@@ -3253,11 +3253,11 @@ extern "C" u16 fn_80272C80(_PLW* plw, u8 slot) {
 }
 
 /* The signed skill value of one equipment slot, or 20 for the fixed-value item. */
-extern "C" s16 fn_80272CC8(_PLW* plw, u8 slot) {
+extern "C" s16 pl_item_slot_count_get(_PLW* plw, u8 slot) {
     if (slot == 0xFF) {
         return 0;
     }
-    if (fn_80272C80(plw, slot) == 0x35) {
+    if (pl_item_slot_item_get(plw, slot) == 0x35) {
         return 20;
     }
     if (slot & 0x80) {
@@ -3268,9 +3268,9 @@ extern "C" s16 fn_80272CC8(_PLW* plw, u8 slot) {
 
 /* Recomputes the current slot's skill value and lowers the running minimum. */
 extern "C" void fn_80272D5C(_PLW* plw) {
-    s16 v = fn_80272CC8(plw, (u8)plw->item_slot_sel);
+    s16 v = pl_item_slot_count_get(plw, (u8)plw->item_slot_sel);
 
-    plw->unk270 = v;
+    plw->magazine_0x270 = v;
     plw->unk272 = (s16)v;
     if ((s16)v < plw->unk269) {
         plw->unk269 = (u8)(s16)v;
@@ -3280,7 +3280,7 @@ extern "C" void fn_80272D5C(_PLW* plw) {
 
 /* The weapon-type slot count for one equipment slot, 2 for the empty slot. */
 extern "C" s32 fn_80272DB4(_PLW* plw, u16 slot) {
-    u16 id = fn_80273044(plw, slot);
+    u16 id = pl_item_slot_find(plw, slot);
 
     if (id != 0xFFFF) {
         if (id & 0x80) {
@@ -3360,7 +3360,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
     } else {
         ent = (u16*)((u8*)plw + slot * 4 + 0x278);
     }
-    v = fn_80274B20(*ent);
+    v = pl_item_icon_kind_get(*ent);
     if (slot != plw->item_slot_sel) {
         if (plw->held_item_kind_0x26C != (u8)v) {
             return;
@@ -3368,10 +3368,10 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
         plw->item_slot_sel = (u16)slot;
     }
     if (slot == plw->item_slot_sel) {
-        plw->item_slot_sel = fn_8027993C(plw, (u16)slot, 2);
+        plw->item_slot_sel = pl_item_slot_next_get(plw, (u16)slot, 2);
         fn_80279B84(plw);
-        plw->unk272 = plw->unk270;
-        plw->unk275 = plw->unk26A;
+        plw->unk272 = plw->magazine_0x270;
+        plw->unk275 = plw->ammo_capacity_0x26A;
         plw->unk274 = 0;
         return;
     }
@@ -3379,7 +3379,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
         u16 cur = plw->item_slot_sel;
 
         if (cur == 0xFF) {
-            plw->item_slot_sel = fn_8027993C(plw, 0, 2);
+            plw->item_slot_sel = pl_item_slot_next_get(plw, 0, 2);
             fn_80279B84(plw);
             return;
         }
@@ -3391,7 +3391,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
             item = GetItemData__FUs(plw->slot_id[cur].item_id);
         }
         if (item[0] != 1) {
-            plw->item_slot_sel = fn_8027993C(plw, plw->item_slot_sel, 0);
+            plw->item_slot_sel = pl_item_slot_next_get(plw, plw->item_slot_sel, 0);
             fn_80279B84(plw);
         }
     }
@@ -3400,20 +3400,20 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
 /* Resolves the equipment slot for a changed slot and re-selects the skill to display. */
 extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
     u8* data = GetItemData__FUs(item);
-    u16 cur = fn_80273044(plw, item);
+    u16 cur = pl_item_slot_find(plw, item);
     s16 v;
     u16 slot;
 
     for (;;) {
         if (data[0] == 1 && pl_item_page2_ck(plw) == 1 && (cur == 0xFFFF || (cur & 0x80) != 0)) {
             v = item_take(item, value, plw->spare_slot_id, 8, 1, 0);
-            slot = fn_80273044(plw, item);
+            slot = pl_item_slot_find(plw, item);
             if ((u32)v <= 4) {
                 break;
             }
         }
         v = item_take(item, value, plw->slot_id, 24, 1, 0);
-        slot = fn_80273044(plw, item);
+        slot = pl_item_slot_find(plw, item);
         break;
     }
     switch (v) {
@@ -3436,14 +3436,14 @@ extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
         break;
     case 4:
         if (data[0] == 1) {
-            if (fn_8027993C(plw, plw->item_slot_sel, 1) == 0xFF) {
+            if (pl_item_slot_next_get(plw, plw->item_slot_sel, 1) == 0xFF) {
                 plw->item_slot_sel = 0xFF;
-                plw->unk270 = 0;
-                plw->unk26A = 0;
+                plw->magazine_0x270 = 0;
+                plw->ammo_capacity_0x26A = 0;
                 plw->unk269 = 0;
             } else if (plw->item_slot_sel == cur) {
-                plw->unk270 = 0;
-                plw->unk26A = 0;
+                plw->magazine_0x270 = 0;
+                plw->ammo_capacity_0x26A = 0;
                 plw->unk269 = 0;
             }
             if (plw->item_slot_sel == cur) {
@@ -3457,7 +3457,7 @@ extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
 
 /* The value one equipment slot contributes to `value`, clamped to the item's own limit. */
 extern "C" s32 pl_item_room_get(_PLW* plw, u16 item, s16 value) {
-    u16 slot = fn_80273044(plw, item);
+    u16 slot = pl_item_slot_find(plw, item);
     u8* data = GetItemData__FUs(item);
     s16 ent;
 
@@ -3822,7 +3822,7 @@ extern "C" void pl_skill_tree_points_get(_PLW* plw, u8 skill) {
 
 /* The signed skill value of the equipment slot `slot`, or 0 for the empty slot. */
 extern "C" int Pl_item_timer_get(_PLW* plw, u16 slot) {
-    u16 id = fn_80273044(plw, slot);
+    u16 id = pl_item_slot_find(plw, slot);
 
     if (id != 0xFFFF) {
         if (id & 0x80) {
@@ -3898,7 +3898,7 @@ extern "C" void pl_equip_models_set(_PLW* plw, u8* a2, u8* a3, u8* a4) {
 }
 
 /* Maps a slot's item id to the display slot number, the spare-slot half being marked with 0x80. */
-extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
+extern "C" u16 pl_item_slot_find(_PLW* plw, u16 slot) {
     int i;
 
     if (GetItemData__FUs(slot)[0] == 1 && pl_item_page2_ck(plw) == 1) {
@@ -4592,7 +4592,7 @@ extern "C" s32 fn_80274AEC(u8 kind)
 }
 
 /* Looks an id up in the 4-byte-stride id/value table at 0x805BF490. */
-extern "C" u8 fn_80274B20(u16 id)
+extern "C" u8 pl_item_icon_kind_get(u16 id)
 {
     const u16* row = lbl_805BF490;
     while (row[0] != 0) {
@@ -4712,7 +4712,7 @@ extern "C" s32 pl_item_pouch_ok_ck(struct _PLW* plw, u16 id)
     if (pl_item_page2_ck(plw) == 0) {
         return 1;
     }
-    cls = fn_80274B20(id);
+    cls = pl_item_icon_kind_get(id);
     if (cls == 0xFF) {
         return 1;
     }
@@ -5191,7 +5191,7 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
                 pl_act_enter(plw, 0, 0, (u16)c);
                 return;
             }
-            if (fn_8027AC18(plw) == 1U) {
+            if (pl_item_menu_open_ck(plw) == 1U) {
                 fn_80275C18(plw, 0x190, a, b, d);
                 pl_act_enter(plw, 0xA, 0, (u16)c);
                 return;
@@ -5266,7 +5266,7 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
         return;
     }
     fn_80275C18(plw, 8, a, b, d);
-    if (fn_8027AC18(plw) == 1U) {
+    if (pl_item_menu_open_ck(plw) == 1U) {
         pl_act_enter(plw, 0xA, 0xE, (u16)c);
         return;
     }
@@ -5641,7 +5641,7 @@ void rotVecY(nw4r::math::VEC3*, u32);
 namespace s_80276B58 {
 
 
-extern "C" s32 fn_802E5CFC(s32);
+extern "C" s32 cockpit_supply_notice_spawn(s32);
 extern "C" u32 isServerSelectState(s32);
 /* 0x80338E04 - `lobby/lb_companion_ui.cpp`'s.  Its header declares `Pl_cat_skill_ck` returning `void` against this
  * file's `u32` (`(10505) illegal overloading`), so the declaration is this unit's view in a linkage block; the
@@ -5656,9 +5656,9 @@ extern "C" s32 pl_part_flag_ck(_PLW*, s32);
 extern "C" u8 pl_stagger_level_get(_PLW*);
 
 extern "C" u32 pl_carry_item_get(_PLW*);
-extern "C" s32 fn_80272C80(_PLW*, u8);
-extern "C" u8 fn_80274B20(u16);
-extern "C" s16 fn_80272CC8(_PLW*, u8);
+extern "C" s32 pl_item_slot_item_get(_PLW*, u8);
+extern "C" u8 pl_item_icon_kind_get(u16);
+extern "C" s16 pl_item_slot_count_get(_PLW*, u8);
 extern "C" u8 fn_80274D98(_PLW*, u8);
 extern "C" u32 fn_8028732C(_PLW*);
 extern "C" u8* equip_weapon_rec_get(void*);
@@ -5976,8 +5976,8 @@ extern "C" void fn_80279154(_PLW* self, s32 arg1, s8 arg2)
 /* 0x802798FC */
 extern "C" s32 fn_802798FC(_PLW* self)
 {
-    if ((self->unk269 == 0 || (self->unk269 < self->unk26A && self->unk269 < self->unk270))
-        && self->unk270 > 0) {
+    if ((self->unk269 == 0 || (self->unk269 < self->ammo_capacity_0x26A && self->unk269 < self->magazine_0x270))
+        && self->magazine_0x270 > 0) {
         return 1;
     }
     return 0;
@@ -6094,8 +6094,8 @@ extern "C" s32 fn_8027C030(_PLW* self)
 /* 0x8027C89C: raises the actor's stored action id to the given one. */
 extern "C" void fn_8027C89C(_PLW* self, s16 arg1)
 {
-    if (self->unk468 < arg1) {
-        self->unk468 = arg1;
+    if (self->daze_timer_0x468 < arg1) {
+        self->daze_timer_0x468 = arg1;
     }
 }
 
@@ -6105,7 +6105,7 @@ extern "C" s32 fn_8027CA04(_PLW* self, s32 arg1)
     if (self->field_0x002 != 7) {
         return 0;
     }
-    if (self->unk468 > 0) {
+    if (self->daze_timer_0x468 > 0) {
         return 1;
     }
     return self->field_0x384 >= (s16)arg1;
@@ -6118,7 +6118,7 @@ extern "C" u32 pl_camera_close_ck(_PLW* self)
 }
 
 /* 0x8027CF24 */
-extern "C" s32 fn_8027CF24(_PLW* self)
+extern "C" s32 pl_gauge_icon_ck(_PLW* self)
 {
     if (pl_item_page2_ck(self) == 1 && self->unk276 != 0) {
         return 1;
@@ -6413,7 +6413,7 @@ extern "C" void pl_act_clear_mode5c4(_PLW* self)
 }
 
 /* 0x8027AC18 */
-extern "C" s32 fn_8027AC18(_PLW* self)
+extern "C" s32 pl_item_menu_open_ck(_PLW* self)
 {
     return self->unk5BB != 0;
 }
@@ -6454,7 +6454,7 @@ extern "C" s32 pl_act_grabbed_ck(_PLW* self)
 }
 
 /* 0x8027A4EC */
-extern "C" s32 fn_8027A4EC(_PLW* self)
+extern "C" s32 pl_aim_act_ck(_PLW* self)
 {
     s32 v = 0;
     if (self->field_0x00A == 4) {
@@ -6506,10 +6506,10 @@ extern "C" u8* gun_ammo_entry_find(u8* self, u8 arg1)
 extern "C" void fn_80279B84(_PLW* self)
 {
     if (pl_item_page2_ck(self) != 0 && self->item_slot_sel != 255) {
-        (void)GetItemData((u16)fn_80272C80(self, (u8)self->item_slot_sel));
-        self->held_item_kind_0x26C = fn_80274B20((u16)fn_80272C80(self, (u8)self->item_slot_sel));
-        self->unk270 = fn_80272CC8(self, (u8)self->item_slot_sel);
-        self->unk26A = fn_80274D98(self, self->held_item_kind_0x26C);
+        (void)GetItemData((u16)pl_item_slot_item_get(self, (u8)self->item_slot_sel));
+        self->held_item_kind_0x26C = pl_item_icon_kind_get((u16)pl_item_slot_item_get(self, (u8)self->item_slot_sel));
+        self->magazine_0x270 = pl_item_slot_count_get(self, (u8)self->item_slot_sel);
+        self->ammo_capacity_0x26A = fn_80274D98(self, self->held_item_kind_0x26C);
         self->unk269 = 0;
     }
 }
@@ -6640,7 +6640,7 @@ namespace s_80276B58 {
 
 
 /* 0x8027CE74: whether the actor's current motion is one of the gunner charge motions. */
-extern "C" s32 fn_8027CE74(_PLW* self)
+extern "C" s32 pl_reload_motion_ck(_PLW* self)
 {
     if (pl_item_page2_ck(self) == 1) {
     switch ((u16)Get_motion_no(self)) {
@@ -6790,7 +6790,7 @@ extern "C" void pl_act_add_class7_gauge(_PLW* self, s32 arg1)
     if (self->field_0x002 != 7) {
         return;
     }
-    if ((s16)arg1 < 0 && self->unk468 > 0) {
+    if ((s16)arg1 < 0 && self->daze_timer_0x468 > 0) {
         return;
     }
     f32 f = (f32)(s16)arg1;
@@ -6805,7 +6805,7 @@ extern "C" void pl_act_add_class7_gauge(_PLW* self, s32 arg1)
     if (f >= lbl_8079A084) {
         if (self->field_0x384 >= 100) {
             self->field_0x384 = 100;
-            if ((u32)Pl_master_ck(self) == 1 && self->unk468 == 0) {
+            if ((u32)Pl_master_ck(self) == 1 && self->daze_timer_0x468 == 0) {
                 ef_inst_spawn(self, 1);
             }
             fn_8027C89C(self, 900);
@@ -7032,7 +7032,7 @@ extern "C" void fn_8027AF88(_PLW* self)
     if (q == 0) {
         return;
     }
-    if (isServerSelectState(fn_802E5CFC(*(s8*)(q + 1505))) == 1) {
+    if (isServerSelectState(cockpit_supply_notice_spawn(*(s8*)(q + 1505))) == 1) {
         *(s16*)((u8*)self + 1626) = 900;
         *((u8*)self + 1625) = 1;
         lb_entry_handover_send(1, (u8)my_player_no(), *(u8*)(q + 1505));
@@ -8689,7 +8689,7 @@ extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
 }
 
 /* 0x8027993C: the first item slot the actor may use, scanned round the 33-entry shell ring. */
-extern "C" u16 fn_8027993C(_PLW* self, u16 arg1, u8 arg2)
+extern "C" u16 pl_item_slot_next_get(_PLW* self, u16 arg1, u8 arg2)
 {
     u16 slot;
     s32 i;
@@ -8724,7 +8724,7 @@ extern "C" u16 fn_8027993C(_PLW* self, u16 arg1, u8 arg2)
         if (*(u16*)(e + 0) != 0 && *(s16*)(e + 2) > 0) {
             u8* it = (u8*)GetItemData(*(u16*)(e + 0));
             if ((it[2] & 8) != 0 && it[0] == 1 &&
-                fn_80274DCC(self, (u8)fn_80274B20(*(u16*)(e + 0))) == 1U) {
+                fn_80274DCC(self, (u8)pl_item_icon_kind_get(*(u16*)(e + 0))) == 1U) {
                 if ((u32)slot >= 0x18U) {
                     slot = (u16)((slot - 0x18) | 0x80);
                 }
@@ -8812,9 +8812,9 @@ extern "C" void fn_80279C20(_PLW* self)
     if (pl_id_bit_ck(self, 0xB) == 1U) {
         if (pl_id_bit_ck(self, 0xD) == 1U) {
             if (self->item_slot_sel == 0xFF) {
-                self->item_slot_sel = fn_8027993C(self, 0, 3);
+                self->item_slot_sel = pl_item_slot_next_get(self, 0, 3);
             } else {
-                self->item_slot_sel = fn_8027993C(self, 1, 0);
+                self->item_slot_sel = pl_item_slot_next_get(self, 1, 0);
             }
             fn_80279B84(self);
             if (self->item_slot_sel != 0xFF) {
@@ -8823,9 +8823,9 @@ extern "C" void fn_80279C20(_PLW* self)
             }
         } else if (pl_id_bit_ck(self, 0xC) == 1U) {
             if (self->item_slot_sel == 0xFF) {
-                self->item_slot_sel = fn_8027993C(self, 0, 2);
+                self->item_slot_sel = pl_item_slot_next_get(self, 0, 2);
             } else {
-                self->item_slot_sel = fn_8027993C(self, 0, 0);
+                self->item_slot_sel = pl_item_slot_next_get(self, 0, 0);
             }
             fn_80279B84(self);
             if (self->item_slot_sel != 0xFF) {
@@ -8835,7 +8835,7 @@ extern "C" void fn_80279C20(_PLW* self)
         }
     } else if (self->unk26B != 0) {
         self->unk26B = 0;
-        if (self->unk26D != self->held_item_kind_0x26C) {
+        if (self->ammo_icon_kind_0x26D != self->held_item_kind_0x26C) {
             fn_80279B84(self);
         } else {
             *(s16*)((u8*)self + 0x270) = *(s16*)((u8*)self + 0x272);
@@ -8843,7 +8843,7 @@ extern "C" void fn_80279C20(_PLW* self)
             self->unk269 = *(u8*)((u8*)self + 0x274);
         }
     }
-    if (self->unk26D == self->held_item_kind_0x26C) {
+    if (self->ammo_icon_kind_0x26D == self->held_item_kind_0x26C) {
         *(s16*)((u8*)self + 0x270) = *(s16*)((u8*)self + 0x272);
         *(u8*)((u8*)self + 0x26A) = *(u8*)((u8*)self + 0x275);
         self->unk269 = *(u8*)((u8*)self + 0x274);
@@ -9029,7 +9029,7 @@ extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
 }
 
 /* 0x8027C208: the action-class gate - whether the actor may start the given action id. */
-extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
+extern "C" s32 pl_item_now_usable_ck(_PLW* self, u16 arg1)
 {
     nw4r::math::VEC3 sp24;
     s32 sp18;
@@ -9389,12 +9389,12 @@ extern "C" s32 pl_act_84_86_ck(_PLW* self) {
 }
 
 /* Reports the first of the three per-slot gate bytes at 0x806BB7A0 as empty. */
-extern "C" s32 fn_8027DC64(void) {
+extern "C" s32 pl_work_flag0_clear_ck(void) {
     return lbl_806BB7A0[0].flag_0x00 == 0;
 }
 
 /* Reports the second gate byte as empty. */
-extern "C" s32 fn_8027DC78(void) {
+extern "C" s32 pl_work_flag8_clear_ck(void) {
     return lbl_806BB7A0[1].flag_0x00 == 0;
 }
 
@@ -9487,13 +9487,13 @@ extern "C" u16 fn_8027DE88(_PLW* self, s32 arg1) {
     u16* table;
     switch (arg1) {
     case 0:
-        table = lbl_80792030;
+        table = pl_act_kind2_item_ids;
         break;
     case 1:
-        table = lbl_80792038;
+        table = pl_act_kind3_item_ids;
         break;
     case 2:
-        table = lbl_805BFFE0;
+        table = pl_act_kind4_item_ids;
         break;
     default:
         return 0xFFFF;
@@ -9503,7 +9503,7 @@ extern "C" u16 fn_8027DE88(_PLW* self, s32 arg1) {
         if (id == 0xFFFF) {
             return 0xFFFF;
         }
-        u16 result = fn_80273044(self, id);
+        u16 result = pl_item_slot_find(self, id);
         if (result != 0xFFFF) {
             return result;
         }
@@ -9516,13 +9516,13 @@ extern "C" u16 fn_8027DF38(_PLW* self, s32 arg1) {
     u16* table;
     switch (arg1) {
     case 0:
-        table = lbl_80792030;
+        table = pl_act_kind2_item_ids;
         break;
     case 1:
-        table = lbl_80792038;
+        table = pl_act_kind3_item_ids;
         break;
     case 2:
-        table = lbl_805BFFE0;
+        table = pl_act_kind4_item_ids;
         break;
     default:
         return 0xFFFF;

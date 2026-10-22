@@ -1238,7 +1238,7 @@ ItemDataRecord* GetItemData(u16 id)
 /* 0x8029F704: the colour the item's +0x05 kind selects. */
 extern "C" u32 item_rare_color_get(u16 id)
 {
-    return lbl_805CDE78[GetItemData(id)->kind];
+    return item_kind_color_tbl[GetItemData(id)->kind];
 }
 
 /* 0x8029F73C: the item record's +0x02 byte masked by the caller's value. */
@@ -1256,7 +1256,7 @@ extern "C" u32 item_is_53_ck(u16 id)
 /* 0x8029F788: the colour an item kind selects, without an item record. */
 extern "C" u32 item_kind_color_by_kind(u16 kind)
 {
-    return lbl_805CDE78[kind];
+    return item_kind_color_tbl[kind];
 }
 
 /* 0x8029F7A0: the menu table set the three accessors below index. */

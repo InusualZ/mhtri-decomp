@@ -1,243 +1,59 @@
-/*
- * hud/cockpit_quest.cpp - unit, `.text` 0x802E4978..0x802F2238 (158 functions, 55488 bytes).
- *
- * Four bands: the cockpit band (0x802E4978), the cockpit quest band (0x802E7408), the quest-window band (0x802EBED8)
- * and the cockpit head of the eft035 range (0x802F140C).  The functions below are in address order; every other
- * function of the range keeps its original bytes.  107 of 158 functions have a body here.
- *
- * FLAGS.  `cflags_hud` + `-pool off` (this unit's own row).  The cockpit band was measured under `cflags_menu`
- * (equal to `cflags_hud`) and the quest-window band under the hud group without `-pool off`; no function of either
- * scored lower under the merged flags (measured).
- *
- * RESIDUAL (record views).  The absorbed sources were written as separate units and each carries its own header view
- * of the records they share; where two views disagree on a record layout or a prototype of one extern "C" symbol they
- * are kept apart in a namespace (extern "C" names stay unmangled, so the symbols are unchanged) instead of being
- * unified by guess.  Unifying them (one record header, one prototype per symbol) is the open work and removes the
- * namespace.  Here: `view_fn_802E4978` (menu/fn_802E4978.h, unsplit/lobby.h) and `view_fn_802EBED8`
- * (hud/cockpit_quest_marker.h) keep the two incompatible views of the cockpit work arrays (`cockpit_work`, `cockpit_state`)
- * away from the `hud/cockpit_quest.h` view of this file.
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
- * extabindex).
- * NAMES. GUESS (from each body and its callers): cockpit_quest_init
- *   GUESS (from each body and its callers): `cockpit_pointer_target_set`.
- */
-/* ---- header inherited from src/menu/fn_802E4978.cpp (written against its pre-phase-4 range) ---- */
-/*
- * menu/fn_802E4978.cpp - the 0x802E4978-0x802E7408 cockpit/HUD band (29 functions, 10896 B).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/symedit.py find/at + the Dolphin dump map at $MHTRI_DUMP_SYMBOLS (DumpSymbols.zip): every
- * defined name in the range is a bare `fn_`/`zz_` entry, and the only `__FILE__` strings in the
- * neighbourhood are `cockpit.cpp` (emitted at 0x802DBC48, below this range) and `cockpit_quest.cpp`
- * (emitted at 0x802E74E0, above it), neither of which this range references).
- *
- * Home and type, from evidence: the band's entry points are the menu/UI library's - it calls
- * `get_menu_lsp_tbl`, `put_menu_cursor`, `GetMenuFontColor`, `ItemName`, `GetItemData` and the
- * `draw_sprite`/`draw_font`/`drawshape_*` family - and the registered sibling `menu/menu_message.cpp`
- * owns `GetMenuFontColor`, so the module is `menu`.  The file keeps the map's stem (brief section 2,
- * class 4: nothing in the object names the original source file).  Its own data is the two
- * 0x194-byte per-player cockpit work records at `cockpit_work` (2 entries) and the sub-screen state
- * at `cockpit_state`.
- *
- * Sections: .text 0x802E4978..0x802E7408, extab 0x80014FFC..0x800150C4 and extabindex
- * 0x80033660..0x8003378C (dtk derived both from the range's own prologues).  The range's `.data`
- * jump table `jumptable_805D5B48` (0x4C = 19 entries, the `fn_802E4C5C` switch) is declared
- * `extern` and used, never defined (playbook 29); claiming it as a range is a config_request.
- *
- * Flags: `cflags_menu` (the registered sibling's lib flags), -O3 -inline noauto with the peephole
- * pass off.
- *
- * Work: 23 of the 29 functions are at or above the 80 % bar (7 byte-identical).  Residuals, by
- * function, measured with the report metric (`tools/units/recompile.py menu/fn_802E4978 --measure
- * <symbol>`, target = the split object of the range):
- *   * NOT RECONSTRUCTED (empty body, 0 %): `fn_802E4C5C` (the 0x5C4 switch, needs its `.data` jump
- *     table `jumptable_805D5B48` claimed - playbook 53/56); `fn_802E5764`, `fn_802E5E90`,
- *     `fn_802E646C`, `fn_802E6AAC` (VMX/paired-single bodies, `m2c` flags them);
- *     `fn_802E6EB4` is partial (39.8 %) - the `drawshape` colour/rect tail does not reproduce.
- *   * `fn_802E4AD4` 80.3 %, `fn_802E555C` 81.3 %, `fn_802E5220` 87.2 %, `fn_802E5284` 88.9 %,
- *     `fn_802E53C4` 89.3 %, `fn_802E4978` 93.3 %, `fn_802E5A14` 95.6 %, `cockpit_pointer_target_set` 95.7 %,
- *     `fn_802E5C3C` 95.8 % - register-allocation/argument-width residuals (first divergence is an
- *     ARG row, the instruction set is equal; several already sit at the 100 %-minus-a-few-points
- *     level from the `{lval}` casts the compiler had to insert).
- *   * a 0-byte-identical tail: none of the residuals is a flag problem - all 23 matched functions
- *     are compiled with the sibling `menu` lib's own `cflags_menu` command line.
- *
- * Rule 2 (an extern lives with the TU that owns it).  `stylelint --diff main` reports 0 sites: the 54
- * declarations this band used to carry in `unsplit/menu.h` are re-homed - 16 to their owners'
- * headers, which this file now includes (`fn_8004CAD8.h`, `ef/fn_800CDB2C.h`,
- * `Runtime.PPCEABI.H/memset.h`, `Pl/pl_act.h`, `menu/menu_item.h`, the new `ai/fn_802D44F4.h` and
- * `enemy/fn_80382310.h`), 14 dropped (nothing in this file referenced them) and 24 left as this
- * unit's own view in `menu/fn_802E4978.h` because the owner's header cannot be included from
- * here (the clash that blocks each is named there; every one is a `shared-file` config_request).  The
- * band header now declares only symbols no registered unit owns.
- *
- * `.data` request: the range's own jump table is `jumptable_805D5B48` (0x4C = 19 entries, the
- * `fn_802E4C5C` switch); it is declared `extern` here and never defined (playbook 29), and a `range`
- * config_request asks for 0x805D5B48..0x805D5B94 so the switch can be read from `main.elf`.
- * Functions reconstructed in address order.
- */
-/* ---- header inherited from src/hud/cockpit_quest.cpp (written against its pre-phase-4 range) ---- */
-/*
- * hud/cockpit_quest.cpp - the quest cockpit HUD band: `.text` 0x802E7408..0x802EBED8 (64 functions), extab
- * 0x800150C4..0x8001529C, extabindex 0x8003378C..0x80033A50, and the claimed `.data` 0x805D5C74..0x805D6310.
- *
- * Home and name: `.data` 0x805D5D08 is the bare source name "cockpit_quest.cpp" and only `quest_bar_a_next_id` /
- * `quest_bar_b_next_id` (the `nw4r::db::Panic` asserts) reference it.
- *
- * Seam (unproven): `tudiscover` offers 0x802E932C as the strong boundary, and the `.sdata2` run 0x8079A8E0..0x8079A944 is
- * shared with the band below (`menu/fn_802E4978.cpp`), so the true TU is probably 0x802E4978..0x802EBBD0.  That is why
- * the object's `.data` starts 4 bytes late (the first 8-aligned table lands 4 B after the target's) - the claimed run
- * itself matches the target byte for byte - and why the pooled literals below are compiler-made (`.sdata2`, unclaimed).
- * The same sharing makes the owner of the icon tables (`hud/cockpit_icon_data.cpp`) an open question, together with
- * the quest-window band and `ef/eft035.cpp`: whether one TU spans all four (and so owns the pools) is not decided here.
- *
- * Flags: `cflags_hud` plus a per-object `-pool off` (configure.py, with the four-row evidence table): with the unit's
- * own tables defined, MWCC shares one base register across 3+ `.data` objects per function where retail loads each with
- * its own `lis`/`addi`.  `-opt nopeephole` keeps retail's unfused `clrlwi`+`cmp` pairs.
- *
- * Source shapes that are load-bearing: locals are declared in the reverse of their target stack-offset order; `switch`
- * where retail compares with `cmpwi`; `while (count > 0) { ...; count--; p++; }` loops and `for (;;) { if (*p == 0xFFFF)
- * break; ... }` for the list walks; list counts kept `u32` and narrowed in the loop condition (`i < (u8)count`);
- * `-pool off`-dependent tables defined before their first use; `SprRecordWords` for the word-wise record copy; casts to
- * `u32` where retail compares with `cmplwi`; `#pragma fp_contract off` around the nine functions that keep retail's
- * unfused `fmul`+`fadd` (nine pairs, between the screen projection and `quest_pit_trap_marker_draw`); the results of
- * `get_worldworld_pos` (it returns the VEC3 by value) are bound to a `const VEC3&`, because a declared local copies the
- * hidden result temporary, and `quest_npc_marker_draw` passes the temporary to a `static inline` helper so the
- * reference does not pin a callee-saved register.
- *
- * Names: GUESSes throughout - no map name here comes from the runtime dump (`zz_`); they are read off call sites and
- * callee bodies (prefixes `quest_gauge_`, `quest_marker_`, `quest_pit_`, `quest_map_`, the callees renamed for this
- * unit, `Pl_*` helpers such as `Pl_motion_input_ck`, and the table names in `hud/cockpit_icon_data.h`).  The inventory is
- * `ledger.py unit hud/cockpit_quest.cpp` and the map.
- *
- * Residuals (per row; the report has the percentages):
- *  - `quest_targets_update_a`/`_b`, `quest_gauge_update`: one `li` in a scratch register after the call where MWCC
- *    keeps the byte in a callee-saved one (playbook 22; `if/else`, ternary and declaration-order spellings measured).
- *  - `quest_gauge_draw`: the `pos.x` narrowing pair (`extsh` placement) and scheduling of the stack reloads.
- *  - `quest_marker_ring_draw`, `quest_marker_icon_draw`, `quest_marker_draw_at`, `quest_marker_draw_faded`: the order
- *    the callee-saved float/int registers are assigned (r27/r28, f30/f31) and where the argument `fmr`/`frsp` sit.
- *  - `quest_mark_fade_value`: retail returns through one exit (`b end`), ours through `mr r3,r4; b`.
- *  - `quest_bar_b_next_id`: one argument register in the tail call; `quest_bar_a_next_id` and `quest_bar_b_next_id`
- *    also reference our compiler-local panic strings (`@NNNN`) where the target references `quest_source_file_name` /
- *    `quest_assert_fail_msg` (symbol identity, bytes equal).
- *  - `quest_gauge_bar_draw`, `quest_marker_pie_draw`, `quest_icon_rect_draw` (99.6-99.8 %): scheduling and the pooled
- *    `.sdata2` literal names.
- *  - `quest_npc_marker_draw`: one `fmr` position and one `fmuls` pair (the helper split, 98.5 %); the map icon draws
- *    `quest_map_icon_sprites_draw` and the others read `.sdata2`/list symbols whose names differ from the target's.
- *  - Others at 95-99 %: instruction scheduling only (`quest_player_marker_draw`, `quest_marker_draw_with_master`,
- *    `quest_marker_draw_all_non_master`, `quest_target_marker_draw`, `quest_mark_draw`).
- *
- * Data: `.data` is claimed and emitted (24 objects + the jump table the `quest_target_icon_get` switch emits).  The map
- * icon tables and the flash id list are `hud/cockpit_icon_data.cpp`'s.  Left out, with the census class: `.sdata`
- * `quest_gauge_shake_scale`/`quest_view_hold_ids*` (isolated-run, defined here, unclaimed) and `.sdata2` 0x8079A928..0x8079A984
- * (pool-synth: the compiler emits the literals).
- */
-/* The quest-window band, `.text` 0x802EBED8..0x802F140C (54 functions):
- *  - names: the map has `fn_` stems for the range except `quest_marker_draw`, the dump answers `zz_`, and no
- *    `__FILE__` load reaches it; module `hud` from its `_PLW` act fields and the quest-window record it shares with
- *    the cockpit bands.
- *  - sections: its extab 0x8001529C..0x80015424 and extabindex 0x80033A50..0x80033C9C hold 49 records, one per framed
- *    function (`fn_802ED588`, `fn_802ED6F4`, `fn_802EDAF0`, `fn_802EDB0C` and `fn_802EF400` are unframed); the tables
- *    it reads are declared, never defined (playbook 29).
- *  - seam: unproven; `tudiscover.py` offers left cuts at 0x802EBBD0, 0x802EBE2C and 0x802EBED8 on the `.sdata2` jump
- *    `lbl_8079A980 -> lbl_8079A988`.
- *  - residuals: `fn_802EC6C4` (retail folds `1 | ~v` into `orc`, ours emits `not` + `ori`; playbook 22),
- *    `fn_802ED588` (register allocation, playbook 22), and `fn_802ED834`, `fn_802EF0A0`, `fn_802EEC24`, `fn_802ED6F4`
- *    one or two register or instruction choices off.
- */
-/* ---- header inherited from src/ef/eft035.cpp (written against its pre-phase-4 range) ---- */
-/* ef/eft035.cpp - the `eft035` effect family, `.text` 0x802F140C..0x802F5138 (39 functions).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump resolves only the two
- * `eft035_*` names - `eft035_set` at 0x802F2238 and `eft035_set2` at 0x802F2394 - and every other
- * address in the range is the dump's placeholder `zz_XXXXXXXX_`).
- *
- * Registration (docs/plan.md 12).  Class 2 evidence named it: the runtime dump's own name at
- * 0x802F2238 is `eft035_set`, so the module is `ef` and the file is `eft035.cpp` - the scheme of its
- * neighbours `ef/eft001.cpp` ... `ef/eft029.cpp`.  Language: both dumped names are C++ manglings
- * (`eft035_set__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3P10_CP_VECTORUcf`), so the file is `.cpp` and
- * every definition whose map name is plain (`fn_XXXXXXXX`) is `extern "C"` so its emitted name stays
- * the map's stem and objdiff can pair it (playbook row 42).  Sections: `extab`
- * 0x80015424..0x80015514 and `extabindex` 0x80033C9C..0x80033E04 (30 records each - exactly the
- * bytes the bracketing units leave unclaimed: the quest-window band ends at 0x80015424/0x80033C9C
- * and the next unclaimed run starts at 0x80015514/0x80033E04).  No data section belongs to the unit
- * (the target object carries none); its `.data`/`.sdata`/`.sdata2` pool is `extern` here and never
- * defined (playbook 29).  One `.ctors` word belongs to the range, at 0x8056F38C - the address of the
- * file-scope static initialiser `fn_802F20D8`, read out of the DOL's `.ctors`; it is not claimed,
- * because dtk's auto split gave the range no `.ctors` unit.
- *
- * Seam (unproven).  This is one maximal unclaimed run, registered whole.  Two clusters share it and
- * there is no call edge between them: 0x802F140C..0x802F2238 (11 functions) drives the cockpit HUD
- * records (`cockpit_work`/`cockpit_state`, the `draw_sprite`/`drawshape` helpers) and carries the
- * file-scope static initialiser `fn_802F20D8`, while 0x802F2238..0x802F5138 (28 functions) is the
- * `eft035` family proper.  A *second* effect family (tag 34; `fn_802F39DC` seeds `field_0x03 = 34`
- * where `eft035_set` seeds 35) sits in the same half, so the range may hold more than one original
- * TU.  The extent settles as the functions match; the seam did not have to be cut to register, so it
- * was not.
- *
- * What it is.  `eft035_set`/`eft035_set2` are the spawn entry points of enemy effect 35: each
- * rejects a foreign area, takes a 64-byte (resp. 56-byte) work block from `eft_res_slot_get`, stamps
- * `field_0x03 = 35`, `type_0x02`, the source `_ENEMY_WORK` at +0x30, the position, the two copied
- * rotation words and the area, then installs the two hooks that travel with the record -
- * `fn_802F24E0` (`release_0x40`, the pool release) and `fn_802F2640` (`dispatch_0x34`, the
- * `state_0x05` machine).  The two setters differ in their work block: the type-0/1/3 family pools
- * 20-byte model records at work+0x08 (`memset` of the 16-byte handle list at work+0x30), the
- * type-4..7 family pools 4-byte model handles at work+0x08 (`memset` of the 24-byte list at
- * work+0x20).  Both block sizes are pinned by the allocation (`eft_res_slot_get(64)` / `eft_res_slot_get(56)`
- * against the 0x40 / 0x38 the two layouts need).
- *
- * The state machine is `fn_802F2640`: `state_0x05` 0 -> the type switch
- * (`fn_802F26B4`/`fn_802F288C`/`fn_802F2988`), 1 -> `fn_802F2C78`, 2 -> `fn_802F3940`,
- * 3 -> `fn_802F3950`.  `fn_802F2C78` is the alive-state body of the same family
- * (`fn_802F2CB0`/`fn_802F31F0`/`fn_802F3358`), and `fn_802F3B0C` is the machine of the tag-34 family
- * (`fn_802F3B48`/`fn_802F3D94`/`fn_802F49C8`/`fn_802F49D8`).
- *
- * Data.  The `.data` tables, the `.sdata` property tables (`lbl_80792860`, `lbl_80792868`,
- * `eft035_alpha_keys_2`, `eft035_color_keys_7`) and the `.sdata2` constants are `extern`-declared by their map
- * names and never defined (playbook 29).
- *
- * Residuals.  17 of the range's 39 functions are reconstructed; 11 of them are byte-identical and
- * every one but `eft035_set` is at or above the 80 % bar (`python tools/units/recompile.py
- * ef/eft035.cpp --main . --measure <symbol>`, against this worktree's own split target object):
- *
- *   byte-identical  fn_802F288C, fn_802F250C, fn_802F25BC, fn_802F2C78, fn_802F3940, fn_802F3950,
- *                   fn_802F3954, fn_802F3AD0, fn_802F3B0C, fn_802F49C8, fn_802F49D8
- *   fn_802F26B4     99.11  ours 468 B against the target's 472 B: retail keeps one more instruction
- *                          in the type-1 arm (the `em015_denki_eft_se_req` + `fn_802F3954` +
- *                          `eft019_set_core` argument setup)
- *   fn_802F39DC     99.18  the register colouring of the two-model seeding loop
- *   eft035_set2     98.73  ours 328 B against 332 B: we hoist `lbl_80792860[type]` where retail
- *                          re-reads it with `lbzx` inside the loop
- *   fn_802F24E0     94.55  the `== 2` arm: retail is `cmpwi` where our `u32` operand makes MWCC emit
- *                          `cmplwi` (the `<= 1` arm above it needs the unsigned form, so one operand
- *                          type cannot spell both tests)
- *   fn_802F2640     92.97  the outer switch: case 0 written first gives retail's chain order
- *                          (`cmpwi 0,1,2,3`) but its nested block then lands before the three
- *                          tail-call bodies (71.90); case 0 written last gives the bodies retail's
- *                          order and the chain 1,2,3,0 (92.97).  Retail has chain 0,1,2,3 *and*
- *                          bodies 1,2,3,0 - its case-0 body is a `b` to a block emitted after the
- *                          whole switch, which no source order we tried reproduces.
- *   eft035_set      73.85  the seeding loop's colouring: retail holds the narrowed type in r25 and
- *                          the table base in r26 and iterates with r23/r24 (`_savegpr_23`), we
- *                          hoist `lbl_80792860[type]` into r26 and save one register fewer
- *                          (`_savegpr_24`); our object is exactly the target's 348 B.  Tried: the
- *                          bound through a `u8` local (73.85), through a local table pointer (73.22
- *                          - worse), `memset(..., sizeof(work->works_0x30))` and reloading the work
- *                          pointer for the final scale store (71.32 -> 73.85).
- *
- * The 22 functions still to write, in address order (size): fn_802F140C (0x2B4), fn_802F16C0 (0x284),
- * fn_802F1944 (0x1D8), fn_802F1B1C (0x1DC), fn_802F1CF8 (0x23C), fn_802F1F34 (0x1A4),
- * fn_802F20D8 (0x48), fn_802F2120 (0x58), fn_802F2178 (0x30), fn_802F21A8 (0x60), fn_802F2208 (0x30),
- * fn_802F2988 (0x2F0), fn_802F2CB0 (0x540), fn_802F31F0 (0x168), fn_802F3358 (0x5E8),
- * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), eft035_ray_flicker (0x17C), eft035_ray_origin_get (0x2F0),
- * eft035_throw_start (0x270), eft035_orb_move (0x44), eft035_throw_act_ck (0x3C).  What they need beyond this pass: the
- * 11 HUD functions drive `cockpit_work`/`cockpit_state` (their types live in `hud/cockpit_quest.h` and
- * `hud/cockpit_quest_marker.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
- * `__construct_array` runtime helper (whose only declaration today sits in `sound/sound_work.h`);
- * the two tag-34 bodies (`fn_802F3B48`, `fn_802F3D94`) read the `_ENEMY_WORK` motion/sound block and
- * `eft035_throw_act_ck` reads a `u16` at `_ENEMY_WORK`+0x306 that the shared header does not name yet.
+/* hud/cockpit_quest - the in-game cockpit HUD: the per-player cockpit work records and their frame update, the
+ *   quest gauges, the quest marker ring with its target/player/pit-trap markers, the party plates, the weapon HUD
+ *   (aim view, ammo, stagger and charge gauges), the item ring/list/tag, the hunt log, the supply box and the quest
+ *   menus, in the single view and the two-player split view.
+ * RANGE. .text 0x802E4978-0x802F2238 (158 functions, all written); extab 0x80014FFC-0x8001547C, extabindex
+ *   0x80033660-0x80033D20, .ctors 0x8056F38C-0x8056F390, .data 0x805D5B48-0x805D69A8, .bss 0x806BDCC8-0x806BE078,
+ *   .sdata 0x807927C0-0x80792860, .sdata2 0x8079A8E0-0x8079A9C8 (the unit's block in config/RMHE08/splits.txt).
+ * FLAGS. `cflags_hud` (cflags_main + `-opt nopeephole`) plus this object's `-pool off` (configure.py); `#pragma
+ *   fp_contract off` around the functions that keep retail's unfused `fmuls`+`fadds`.
+ * VIEWS. `cockpit_work_init`, `cockpit_quest_init`, `cockpit_split_init`, `cockpit_frame_tick`,
+ *   `cockpit_npc_entries_update`, `cockpit_notice_hold`, `cockpit_event_notice_spawn`, `cockpit_hud_hidden_self_ck`,
+ *   `cockpit_hud_hidden_ck`, `cockpit_party_elements_draw`, `cockpit_take_menu_update`, `cockpit_supply_cell_pos_get`,
+ *   `cockpit_supply_notice_spawn`, `cockpit_pointer_target_set`, `cockpit_free_play_ck`, `quest_bar_id_keep` and the
+ *   timer rows `cockpit_timer_hand_draw`/`cockpit_timer_ring_draw` still compile in the namespace `view_fn_802E4978`
+ *   against `menu/fn_802E4978.h`'s older record view (`CockpitWork` with `CockpitMove`/`CockpitText`); everything
+ *   else uses `hud/cockpit_quest.h` and `hud/cockpit_work_types.h`.  Folding that view removes the namespace.
+ * NAMES. GUESS (each read off its body and its callers): every `cockpit_*` and `quest_*` function of the unit,
+ *   `pit_trap_construct`, the record types `CockpitItemTag`, `HuntLogEntry`, `CockpitSlotPair`, `CockpitWeaponIds`,
+ *   `CockpitStaggerIds` and their fields, the `.data`/`.sdata` table names (`cockpit_act_mask_*`, `cockpit_split_*`,
+ *   `cockpit_timer_ring_*`, ...), the `QuestWork` supply/take fields, `SysQuestMove::area_0x0EB/pos_0x128/
+ *   npc_plate_0x0EF` and the `_PLW` fields `ammo_capacity_0x26A`, `ammo_icon_kind_0x26D`, `magazine_0x270`,
+ *   `daze_timer_0x468`, `quest_menu_open_0x5BD`, `take_menu_open_0x5BE`, `cockpit_menu_row_0x5BF`,
+ *   `cockpit_menu_0x5C0`, and `_AINPC_W::digit_state_0x3C4`.  The registry names this unit proposed for
+ *   foreign rows are GUESS too (the `pl_item_*`, `pl_*_ck`, `ai_npc_*_ck`, `draw_*`, `cockpit_*_ids` rows in
+ *   config/RMHE08/name_registry.jsonl under lane hud-cockpit-quest).
+ * RESIDUALS. register colouring or scheduling only (same instructions): `quest_marker_ring_draw`,
+ *   `quest_marker_draw_at`, `quest_marker_icon_draw`, `quest_marker_draw_faded`, `quest_marker_draw_with_master`,
+ *   `quest_marker_draw_all_non_master`, `quest_player_marker_draw`, `quest_target_marker_draw`, `quest_mark_draw`,
+ *   `quest_gauge_draw`, `cockpit_split_gauge_draw`, `cockpit_icon_cursors_update`, `cockpit_party_list_draw` (the
+ *   loop's `max`/`plw` pair), `cockpit_ammo_gauge_draw`/`cockpit_split_ammo_gauge_draw` (`icons` against `step`),
+ *   `cockpit_supply_box_draw`, `cockpit_name_tags_draw`, `cockpit_item_list_entry_draw`, `cockpit_item_tag_update`
+ *   (the second search loop's counters), `cockpit_split_item_ring_draw`, `cockpit_weapon_frame_draw`,
+ *   `cockpit_hunt_log_draw`, `cockpit_prompt_draw`.
+ *   `quest_marker_draw`, `quest_marker_draw_sub`: the window record's colour word is loaded before the two `fmr`s
+ *   where retail loads it after.
+ *   `cockpit_party_plate_draw`: retail compares the transfer-mode byte with `cmpwi`, ours with `cmplwi`.
+ *   `cockpit_take_menu_draw`: the `li r3,0xE7B` of the count-label id is scheduled before the compare.
+ *   `cockpit_npc_digit_draw`: the z reload of the projected point is scheduled earlier than retail.
+ *   `quest_targets_update_a`/`_b`, `quest_gauge_update`: one `li` in a scratch register after the call where MWCC
+ *   keeps the byte in a callee-saved one.
+ *   `quest_mark_fade_value`: retail returns through one exit, ours through `mr r3,r4; b`.
+ *   `quest_bar_a_next_id`/`quest_bar_b_next_id`: they reference compiler-local panic strings where the target
+ *   references `quest_source_file_name`/`quest_assert_fail_msg`; `quest_bar_b_next_id` one argument register.
+ *   `cockpit_work_init`: retail keeps the -1 store value in a callee-saved register (one more saved register).
+ *   `cockpit_pointer_target_set`: the u8 `slot` is stored without retail's `clrlwi` (retail's parameter is wider).
+ *   Data: `.data`/`.sdata` objects are defined where their first user is, not yet in the target's order (the
+ *   view namespace still declares `cockpit_timer_ring_*` and the `jumptable_805D5B48` the `cockpit_item_tag_update`
+ *   switch now emits itself); the `.sdata2` pool is compiler-made.
+ *   `cockpit_static_init`..`cockpit_item_tag_construct` are plain functions: the target's are MWCC's `__sinit` and
+ *   the record constructors (its `.ctors` word 0x8056F38C), which need `CockpitWork`/`CockpitState`/`PitTrap`/
+ *   `CockpitItemTag` constructors and `cockpit_work`/`cockpit_state` defined in this view.
+ * SHAPES. Locals are declared in the reverse of their target stack offsets; a value passed by value to a callee
+ *   (`quest_marker_draw(_faded)`'s window spot, `cockpit_aim_marker_draw`'s `VEC3`) is a by-value parameter, not a
+ *   pointer to a copy; `bool` locals for `GetMenuFontColor` arguments; `switch` where retail compares a byte with
+ *   `cmpwi`; `id = A; if (c) id = B;` where retail branches over a second `li` (a ternary turns branchless);
+ *   `(u8)(x + 166) <= 9` range checks; `for (;;) { if (*p == 0) break; ... }` for the 0-terminated mask walks.
  */
 
 #include "types.h"
@@ -262,7 +78,11 @@
 #include "fn_8004CAD8.h"
 #include "enemy/ENEMY_WORK.h"
 #include "copyVec2.h"
-#include "hud/quest_marker_draw.h"
+#include "hud/pl_gauge_level_get.h"
+#include "hud/pl_mode8_alive_ck.h"
+#include "ef/eft053_shell_pos_project.h"
+#include "camera/camera_main.h"
+#include "ef/sys_quest_move.h"
 #include "camera/fn_802B5C58.h"
 #include "stage/stg_w.h"
 #include "Pl/fn_80288CEC.h"
@@ -287,6 +107,44 @@ extern "C" {
 
 #include "MSL_C/alloc.h" /* sprintf (owner: MSL_C/alloc.cpp, rule 2) */
 }
+
+#include "Pl/pl_item_slot_item_get.h"
+#include "Pl/pl_act_kind4_item_ids.h"
+#include "ai/ai_npc_wait_ck.h"
+#include "hud/draw_itemicon_frame_idx.h"
+#include "tex_uv_copy.h"
+#include "drawshape_set_corner_colors.h"
+#include "screen_split_view_get.h"
+#include "sound/pl_charge_se_play.h"
+#include "enemy/em_prog_flag_ck.h"
+#include "menu/item_kind_color_tbl.h"
+#include "camera/camera_mode1_ck_player.h"
+#include "enemy/em_sight_player_ck2.h"
+#include "lobby/cockpit_item_ring_frame_ids.h"
+#include "Pl/pl_item_page2_ck.h"
+#include "Pl/pl_act_step.h"
+#include "Pl/pl_target_lock_ck.h"
+#include "Pl/pl_camera_reset_ck.h"
+#include "camera/camera.h"
+#include "hud/hud_screen_width_get.h"
+#include "hud/chara_icon_pos_get.h"
+#include "g3d/scn_root_get_current_camera.h"
+#include "g3d/camera_world_to_screen.h"
+#include "ef/pRoot.h"
+#include "Pl/pl_eye_mtx_get.h"
+#include "enemy/em_pl_target_ck.h"
+#include "g3d/g3d_scnroot.h"
+#include "hud/cockpit_quest_init.h"
+#include "pad_hold_ck.h"
+#include "ef/math_sin_rad.h"
+#include "Runtime.PPCEABI.H/CPlusLibPPC.h"
+#include "quest/quest_types.h"
+#include "hud/draw_window_box.h"
+#include "hud/put_page_count.h"
+#include "lobby/lb_server_sel_trans.h"
+#include "lobby/lb_quest_work_active_ck.h"
+#include "font/flfnt.h"
+#include "mh3_pad/system_w.h"
 
 /* nw4r's debug panic - the map's mangling is `Panic__Q24nw4r2dbFPCciPCce` (rule 9: the owner is
  * `nw4r::db`, so the declaration is the real one and the front-end reproduces the map name). */
@@ -364,42 +222,41 @@ extern f32 lbl_8079A90C;
 extern f32 lbl_8079A918;
 extern f32 lbl_8079A91C;
 extern f32 lbl_8079A920;
-extern u16 lbl_805D5B98[];
-extern u8 lbl_805D5BD8[];
-extern u8 lbl_805D5C68[];
-u32 math_sin_rad(u8, f32);
-void fn_802E4978(CockpitWork*, CockpitMove*);
+extern u16 cockpit_timer_ring_verts[];
+extern u8 cockpit_timer_ring_uvs[];
+extern u8 cockpit_timer_ring_cells[];
+f32 math_sin_rad(f32);
+void cockpit_work_init(CockpitWork*, CockpitMove*);
 void cockpit_quest_init(void);
-void fn_802E4B8C(void);
-void fn_802E4C24(void);
-void fn_802E5220(CockpitWork*);
-void fn_802E5284(void);
-void fn_802E53C4(void);
-void fn_802E5400(void);
-void fn_802E5414(u8);
-u32 fn_802E54A8(CockpitMove*);
+void cockpit_split_init(void);
+void cockpit_frame_tick(void);
+void cockpit_npc_digit_update(CockpitWork*);
+void cockpit_frame_update(void);
+void cockpit_npc_entries_update(void);
+void cockpit_notice_hold(void);
+void cockpit_event_notice_spawn(u8);
+u32 cockpit_hud_hidden_self_ck(CockpitMove*);
 u32 cockpit_hud_hidden_ck(CockpitMove*, u8);
-void fn_802E555C(void);
-void fn_802E56B4(void);
-void fn_802E5764(void*, u8);
-void fn_802E5A14(void);
-void fn_802E5BB4(void);
-void fn_802E5C3C(_mh_ivec2_*, s8);
-void fn_802E5CFC(s8);
+void cockpit_draw(void);
+void cockpit_party_elements_draw(void);
+void cockpit_supply_box_update(void);
+void cockpit_take_menu_update(void);
+void cockpit_supply_cell_pos_get(_mh_ivec2_*, s8);
+void cockpit_supply_notice_spawn(s8);
 void cockpit_pointer_target_set(s16, u8);
-void fn_802E5E90(void);
-void fn_802E646C(void);
-void fn_802E6AAC(void);
-void fn_802E6EB4(void);
-void fn_802E704C(u16, s32, _mh_ivec2_*);
-void fn_802E70F0(s32, _mh_ivec2_*);
-void fn_802E71C4(void);
-u32 fn_802E73B4(void);
+void cockpit_supply_box_draw(void);
+void cockpit_take_menu_draw(void);
+void cockpit_quest_menu_draw(void);
+void cockpit_flash_gauge_draw(void);
+void cockpit_timer_hand_draw(u16, s32, _mh_ivec2_*);
+void cockpit_timer_ring_draw(s32, _mh_ivec2_*);
+void cockpit_timer_draw(void);
+u32 cockpit_free_play_ck(void);
 s32 quest_bar_id_keep(s32, s32);
-void fn_802E4C5C(CockpitMove*, CockpitText*);
+void cockpit_item_tag_update(CockpitMove*, CockpitText*);
 }
 
-void fn_802E4978(CockpitWork* self, CockpitMove* move) {
+void cockpit_work_init(CockpitWork* self, CockpitMove* move) {
     s32 r;
     s32 i;
 
@@ -422,8 +279,8 @@ void fn_802E4978(CockpitWork* self, CockpitMove* move) {
     self->field_0x139 = 0;
     self->text.field_0x014 = 0;
     self->text.field_0x00C = 0;
-    fn_802EDAF0(move, &self->field_0x16B, &self->field_0x16F);
-    r = fn_802EC6C4(move);
+    cockpit_item_ring_reset(move, &self->field_0x16B, &self->field_0x16F);
+    r = cockpit_gauge_low_ck(move);
     self->field_0x16A = (s8)(((s32)(-r | r) >> 31) & 5);
     self->field_0x168 = move->field_0x36C;
     self->field_0x164 = 0xFF;
@@ -461,8 +318,8 @@ void cockpit_quest_init(void) {
     CockpitState* st;
     s8 idx;
 
-    st = &cockpit_state;
     move = (CockpitMove*)::get_move_work_adrs(2);
+    st = &cockpit_state;
     st->field_0x000 = 1;
     st->field_0x059 = 0;
     st->field_0x058 = 0;
@@ -477,61 +334,46 @@ void cockpit_quest_init(void) {
     }
     st->field_0x074 = 0;
     idx = (s8)my_player_no();
-    fn_802E4978(&cockpit_work[0], &move[idx]);
+    move = &move[idx];
+    cockpit_work_init(&cockpit_work[0], move);
     cockpit_notice_init();
     ai_slots_clear();
 }
 
-void fn_802E4B8C(void) {
+void cockpit_split_init(void) {
     CockpitMove* move;
 
     move = (CockpitMove*)::get_move_work_adrs(2);
     cockpit_state.field_0x000 = 2;
     cockpit_state.field_0x059 = 0;
     cockpit_state.field_0x058 = 0;
-    fn_802E4978(&cockpit_work[0], &move[0]);
-    fn_802E4978(&cockpit_work[1], &move[1]);
+    cockpit_work_init(&cockpit_work[0], &move[0]);
+    cockpit_work_init(&cockpit_work[1], &move[1]);
     cockpit_state.field_0x078 = 0;
     cockpit_state.field_0x002 = 100;
     cockpit_state.field_0x004 = 0;
     ai_slots_clear();
 }
 
-void fn_802E4C24(void) {
+void cockpit_frame_tick(void) {
     cockpit_state.field_0x078++;
     cockpit_work[0].field_0x190++;
     cockpit_work[1].field_0x190++;
 }
 
-void fn_802E5220(CockpitWork* self) {
-    switch (self->field_0x048->field_0x3C4) {
-    case 0:
-        self->field_0x04C = 0;
-        self->field_0x050 = 0;
-        break;
-    case 1:
-        self->field_0x04C = 0x22;
-        self->field_0x050 = 0x00FF00FF;
-        break;
-    case 2:
-        self->field_0x04C = 2;
-        self->field_0x050 = 0xFF0000FF;
-        break;
-    }
-}
 
-void fn_802E53C4(void) {
+void cockpit_npc_entries_update(void) {
     screen_split_mode_ck();
     ainpc_entry_update_all();
     subTransSetPrio(6, (u32)&ainpc_entry_draw_all, 0, NULL);
 }
 
-void fn_802E5400(void) {
+void cockpit_notice_hold(void) {
     cockpit_work[0].field_0x0CF = 1;
     ai_slots_clear();
 }
 
-void fn_802E5414(u8 arg0) {
+void cockpit_event_notice_spawn(u8 arg0) {
     _mh_ivec2_ pos;
     u16 lsp;
     s32 idx;
@@ -556,7 +398,7 @@ void fn_802E5414(u8 arg0) {
     hud_notice_spawn(2, idx, pos.x, pos.y, 1, 1, 0);
 }
 
-u32 fn_802E54A8(CockpitMove* move) {
+u32 cockpit_hud_hidden_self_ck(CockpitMove* move) {
     u32 r;
 
     r = get_cfg((u8)move->field_0x008, 0xD) == 0;
@@ -570,7 +412,7 @@ u32 cockpit_hud_hidden_ck(CockpitMove* move, u8 id) {
     u32 r;
 
     if (id == 0xFF) {
-        return fn_802E54A8(move);
+        return cockpit_hud_hidden_self_ck(move);
     }
     r = get_arena_cfg(id, 0xD) == 0;
     if (move->field_0x308 == 1) {
@@ -579,7 +421,7 @@ u32 cockpit_hud_hidden_ck(CockpitMove* move, u8 id) {
     return r;
 }
 
-void fn_802E56B4(void) {
+void cockpit_party_elements_draw(void) {
     CockpitMove* move;
     u16 max;
     s32 i;
@@ -595,7 +437,7 @@ void fn_802E56B4(void) {
     }
 }
 
-void fn_802E5BB4(void) {
+void cockpit_take_menu_update(void) {
     CockpitWork* self;
     CockpitMove* move;
 
@@ -615,134 +457,35 @@ void fn_802E5BB4(void) {
     self->field_0x17E = 0;
 }
 
-void fn_802E5C3C(_mh_ivec2_* pos, s8 idx) {
+void cockpit_supply_cell_pos_get(_mh_ivec2_* pos, s8 idx) {
     _mh_ivec2_* src;
 
     ::get_lsp_data(0xE15, (::_mh_ivec2_*)pos);
     src = (_mh_ivec2_*)::get_lsp_data(cockpit_slot_row_sprite_ids[idx >> 3], NULL);
     pos->x += src->x;
-    pos->y = (s16)(pos->y + src->y);
+    pos->y += src->y;
     src = (_mh_ivec2_*)::get_lsp_data(cockpit_slot_column_sprite_ids[idx & 7], NULL);
     pos->x += src->x;
-    pos->y = (s16)(pos->y + src->y);
+    pos->y += src->y;
 }
 
-void fn_802E5CFC(s8 idx) {
+void cockpit_supply_notice_spawn(s8 idx) {
     _mh_ivec2_ pos;
     CockpitWork* self;
 
     self = &cockpit_work[0];
-    fn_802E5C3C(&pos, idx);
+    cockpit_supply_cell_pos_get(&pos, idx);
     HudNotice* notice = hud_notice_spawn(0, 6, pos.x, pos.y, 1, 1, 0);
     if (notice != 0) {
         hud_notice_set_flag_ptr(notice, &self->field_0x17A);
     }
 }
 
-u32 fn_802E54A8(CockpitMove* move);
+u32 cockpit_hud_hidden_self_ck(CockpitMove* move);
 
-void fn_802E555C(void) {
-    CockpitMove0* m0;
-    CockpitMove* move;
 
-    m0 = (CockpitMove0*)::get_move_work_adrs(0);
-    move = cockpit_work[0].move;
-    if (::get_now_areano() != 0xFF) {
-        set_zmode(false, 0, false);
-        cockpit_work[0].field_0x0CD = 0;
-        fn_802E56B4();
-        draw_lsp_parts();
-        fn_802EC700();
-        if (fn_802E54A8(move) == 1) {
-            fn_802E71C4();
-            quest_gauge_draw();
-            fn_802ED480();
-        }
-        fn_802EE82C(&cockpit_work[0]);
-        if (m0->field_0x0EF != 0) {
-            fn_802EF0FC(&cockpit_work[0]);
-        }
-        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
-            if (move->field_0x5BC != 0) {
-            } else if (move->field_0x5BE != 0) {
-            } else if (move->field_0x5BD != 0) {
-                quest_marker_arm();
-                if (fn_802E54A8(move) == 1) {
-                    fn_802EE65C(move, &cockpit_work[0].field_0x16F);
-                    fn_802EDCE4(move, &cockpit_work[0].field_0x16B);
-                }
-            }
-        }
-        quest_marks_flush(&cockpit_work[0]);
-        fn_802E6EB4();
-        note_box_draw();
-        if (move_work_state_ck() != 0) {
-            fn_802EF424();
-        }
-        fn_802EF730();
-    }
-}
 
-void fn_802E5A14(void) {
-    CockpitWork* self;
-    CockpitMove* move;
-    u8 v;
-
-    self = &cockpit_work[0];
-    move = self->move;
-    if (self->field_0x176 != 0) {
-        fn_8027B0BC((struct _PLW*)move);
-    }
-    if (self->field_0x17D == 1) {
-        fn_8027B358((struct _PLW*)move);
-    }
-    if (move->field_0x5BC != 0) {
-        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
-            self->field_0x176 = 1;
-        } else {
-            self->field_0x176 = 0;
-        }
-        self->field_0x17B++;
-        if (sprite_anim_last_frame(0xE53) < (s32)self->field_0x17B) {
-            self->field_0x17B = 0;
-        }
-        if (self->field_0x17C != 0) {
-            self->field_0x17C++;
-            if (sprite_anim_last_frame(0xE33) < (s32)self->field_0x17C) {
-                self->field_0x17C = 0;
-            }
-        }
-        if (self->field_0x178 != 0) {
-            v = self->field_0x179 - 1;
-            self->field_0x179 = v;
-            if (v == 0) {
-                self->field_0x178 = 0;
-                self->field_0x17C = 1;
-            }
-        }
-        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
-            self->field_0x17A = 0;
-        } else {
-            self->field_0x17A = 1;
-        }
-    } else {
-        self->field_0x176 = 0;
-        self->field_0x17A = 1;
-        self->field_0x178 = 0;
-        self->field_0x17C = 0;
-    }
-    if (move->field_0x5BE != 0) {
-        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
-            self->field_0x17D = 1;
-            return;
-        }
-        self->field_0x17D = 0;
-        return;
-    }
-    self->field_0x17D = 0;
-}
-
-u32 fn_802E73B4(void) {
+u32 cockpit_free_play_ck(void) {
     return move_work_state_ck();
 }
 
@@ -757,43 +500,6 @@ s32 quest_bar_id_keep(s32 arg0, s32 arg1) {
     return mask & v;
 }
 
-void fn_802E5284(void) {
-    CockpitMove0* m0;
-    CockpitMove* move;
-
-    m0 = (CockpitMove0*)::get_move_work_adrs(0);
-    move = cockpit_work[0].move;
-    if (pad_hold_ck(&cockpit_work[0]) != 1) {
-        cockpit_work[0].field_0x0D1 = 0;
-        fn_802E4C24();
-        fn_803839EC();
-        cockpit_notice_update();
-        quest_gauge_update(&cockpit_work[0], 0xFF);
-        fn_802E4C5C(move, &cockpit_work[0].text);
-        if (m0->field_0x0EF != 0) {
-            fn_802E5220(&cockpit_work[0]);
-        }
-        fn_802EDB0C(move, &cockpit_work[0].field_0x16B, &cockpit_work[0].field_0x16F);
-        quest_targets_update_b(&cockpit_work[0]);
-        fn_802EC4F0(&cockpit_work[0]);
-        fn_802E5A14();
-        fn_802E5BB4();
-        fn_802ED88C();
-        menu_slot_anim_update(0);
-        if (move_work_state_ck() != 0) {
-            fn_802EF230();
-        }
-        fn_802EF6B0();
-        ainpc_entry_update_all();
-    }
-    if (event_demo_ck() != 1) {
-        subTransSet((u32)(void*)fn_802E555C, 0, NULL);
-        if (lb_quest_work_active_ck() == 0) {
-            subTransSetPrio(6, (u32)(void*)&ainpc_entry_draw_all, 0, NULL);
-        }
-        subTransSetPrio(6, (u32)(void*)&menu_slot_panel_draw, 0, NULL);
-    }
-}
 
 struct SprView {
     /* +0x000 */ u8 unused_0x000[0x010];
@@ -801,7 +507,7 @@ struct SprView {
     /* +0x012 */ u8 unused_0x012[0x020 - 0x012];
 }; /* size: 0x20 */
 
-void fn_802E704C(u16 arg0, s32 arg1, _mh_ivec2_* pos) {
+void cockpit_timer_hand_draw(u16 arg0, s32 arg1, _mh_ivec2_* pos) {
     SprView spr;
     f32 f;
 
@@ -811,7 +517,7 @@ void fn_802E704C(u16 arg0, s32 arg1, _mh_ivec2_* pos) {
     ::draw_sprite(*(const ::_SPR_DATA_*)&spr, (const ::_mh_ivec2_*)pos);
 }
 
-void fn_802E70F0(s32 arg0, _mh_ivec2_* pos) {
+void cockpit_timer_ring_draw(s32 arg0, _mh_ivec2_* pos) {
     s32 n;
     u8 tex;
 
@@ -822,44 +528,13 @@ void fn_802E70F0(s32 arg0, _mh_ivec2_* pos) {
     if (n < 0) {
         n = 0;
     }
-    tex = lbl_805D5C68[n / 5];
+    tex = cockpit_timer_ring_cells[n / 5];
     drawshape_init(3, (u16)(((0x4A - n) / 15) * 4));
-    drawshape_set_vertex_array((::_mh_ivec2_*)lbl_805D5B98);
+    drawshape_set_vertex_array((::_mh_ivec2_*)cockpit_timer_ring_verts);
     drawshape_set_flat_color(0xFFFFFFFF);
-    ::drawshape_set_texture_array(0xD, (const ::_mh_tex_uv_*)(lbl_805D5BD8 + tex * 4));
+    ::drawshape_set_texture_array(0xD, (const ::_mh_tex_uv_*)(cockpit_timer_ring_uvs + tex * 4));
     drawshape_set_offset_ivec2((s16*)pos);
     drawshape_exec();
-}
-
-void fn_802E6EB4(void) {
-    CockpitMove* move;
-    _mh_ivec2_ pos;
-    _mh_ivec2_* p;
-
-    move = cockpit_work[0].move;
-    if (move->field_0x00A == 7 && move->field_0x3A4 != 0) {
-        set_blendmode(4, 5, 1);
-        ::get_lsp_data(0xBCE, (::_mh_ivec2_*)&pos);
-        ::draw_sprite_anim_ary(cockpit_flash_anim_ids, cockpit_work[0].half_0x180, (const ::_mh_ivec2_*)&pos);
-        p = (_mh_ivec2_*)::get_lsp_data(0xBD2, NULL);
-        {
-            u8 lo = move->field_0x3A5;
-            u8 hi = move->field_0x3A4;
-            f32 f2 = (f32)p->x * (f32)hi;
-            s32 col = color_lerp(0xC50A83FF, 0xD813BEFF, lo, (f32)hi * (lbl_8079A8FC / (f32)lo), f2);
-            drawshape_init(3, 0xFFFF);
-            drawshape_set_vertex_rect((s16)(p->x + pos.x), (s16)(p->y + pos.y), (s16)(f2 / (f32)lo), p->y);
-            fn_80053960(0xC50A83FF, col, col, 0xC50A83FF);
-            drawshape_exec();
-        }
-    }
-}
-
-/* ---- not yet reconstructed (residual) ---- */
-void fn_802E4C5C(CockpitMove* self, CockpitText* text) {
-}
-
-void fn_802E5764(void* arg0, u8 arg1) {
 }
 
 void cockpit_pointer_target_set(s16 arg0, u8 arg1) {
@@ -875,7 +550,7 @@ void cockpit_pointer_target_set(s16 arg0, u8 arg1) {
     self = &cockpit_work[0];
     self->field_0x174 = arg0;
     self->field_0x177 = arg1;
-    fn_802E5C3C(&pos, (s8)arg1);
+    cockpit_supply_cell_pos_get(&pos, (s8)arg1);
     p = (_mh_ivec2_*)::get_lsp_data(0xE56, NULL);
     pos.x += p->x;
     pos.y += p->y;
@@ -894,15 +569,6 @@ void cockpit_pointer_target_set(s16 arg0, u8 arg1) {
     self->field_0x179 = self->field_0x178;
 }
 
-void fn_802E5E90(void) {
-}
-
-void fn_802E646C(void) {
-}
-
-void fn_802E6AAC(void) {
-}
-
 /* `Screen_w` and its `ScreenGeomView` view come from `unsplit/menu.h` (rule 1: this unit
  * was the first user, `quest/quest_entry.cpp` the second). */
 
@@ -911,57 +577,851 @@ struct SprDataView {
     /* +0x01C */ u32 colour_0x01C;
 }; /* size: 0x20 */
 
-void fn_802E71C4(void) {
+}  /* namespace view_fn_802E4978 */
+
+/* 0x802E71C4 (0x1F0): Draws the quest timer panel: blinking red in the last five minutes, then the minute ring and the
+ * minutes left of the limit (or the idle face with no limit); the elapsed time is the base time once the sub-state
+ * has ended. */
+void cockpit_timer_draw(void) {
     _mh_ivec2_ pos;
-    SprDataView spr;
-    s32 colour;
+    _SPR_DATA_ spr;
+    CockpitWork* work = cockpit_work;
+    u32 color;
+    s32 minute;
+    s32 elapsed;
+    s32 left;
     s32 limit;
-    s32 frame;
-    s32 value;
-    s32 total;
-    s32 bars;
+    f32 t;
 
     set_blendmode(4, 5, 1);
-    ::get_lsp_data(0xB90, (::_mh_ivec2_*)&pos);
-    colour = 0x6DAAA3FF;
-    if (fn_802E73B4() != 0) {
-        frame = 0;
-        bars = 0;
+    get_lsp_data(0xB90, &pos);
+    color = 0x6DAAA3FF;
+    if (cockpit_free_play_ck() != 0) {
+        elapsed = 0;
+        limit = 0;
     } else {
-        f32 f;
-        limit = (s32)(lbl_8079A91C * Screen_w.frame_scale);
+        minute = 60.0f * Screen_w.frame_scale;
         if (quest_sub_state_end_ck(1) == 0) {
-            total = quest_time_elapsed_get();
+            elapsed = quest_time_elapsed_get();
         } else {
-            total = quest_time_base_get();
+            elapsed = quest_time_base_get();
         }
-        if (total <= limit * 5) {
-            if (total > limit) {
-                f = (f32)((cockpit_work[0].field_0x190 & 0x1F) << 0xB);
+        if (elapsed <= minute * 5) {
+            if (elapsed > minute) {
+                t = (work->frame_0x190 & 0x1F) << 11;
             } else {
-                f = (f32)((cockpit_work[0].field_0x190 & 0xF) << 0xC);
+                t = (work->frame_0x190 & 0xF) << 12;
             }
-            colour = color_lerp(0xF50C23FF, 0xFF8C9BFF, (u8)math_sin_rad(0, lbl_8079A920 * f),
-                                 lbl_8079A8FC + 0.0f, 0.0f);
+            color = color_lerp(0xF50C23FF, 0xFF8C9BFF, 0.5f * (1.0f + math_sin_rad(9.58738019e-05f * t)));
         }
-        value = quest_time_limit_get();
-        frame = (value - total) / limit;
-        bars = value / limit;
+        left = quest_time_limit_get();
+        elapsed = (left - elapsed) / minute;
+        limit = left / minute;
     }
-    spr_data_copy((s16*)&spr, ::get_lsp_data(0xB91, NULL));
-    spr.colour_0x01C = colour;
-    ::draw_sprite(*(const ::_SPR_DATA_*)&spr, (const ::_mh_ivec2_*)&pos);
-    ::draw_sprite_idx(0xB92, (const ::_mh_ivec2_*)&pos);
-    if (bars != 0) {
-        fn_802E70F0(bars, &pos);
-        fn_802E704C(0xB93, bars, &pos);
-        fn_802E704C(0xB94, frame, &pos);
+    spr_data_copy(&spr, get_lsp_data(0xB91, NULL));
+    spr.color = color;
+    draw_sprite(spr, &pos);
+    draw_sprite_idx(0xB92, &pos);
+    if (limit != 0) {
+        cockpit_timer_ring_draw(limit, &pos);
+        cockpit_timer_hand_draw(0xB93, limit, &pos);
+        cockpit_timer_hand_draw(0xB94, elapsed, &pos);
+    } else {
+        cockpit_timer_ring_draw(0, &pos);
+        draw_sprite_idx(0xB95, &pos);
+    }
+}
+
+/* 0x802E4C5C (0x5C4): Updates the player's item tag from the act kind: the open, bob and flash frames, then the icon,
+ * colour, count and usability - for the item-using kinds the first listed item the player holds (selected slot
+ * first). */
+void cockpit_item_tag_update(_PLW* plw, CockpitItemTag* tag) {
+    u16 ids[10];
+    u16* dst;
+    const u16* src;
+    ItemDataRecord* data;
+    s32 i;
+    s32 j;
+    _SLOTENT* slot;
+
+    tag->tex_idx_0x15 = 0;
+    tag->count_0x19 = 0;
+    tag->unusable_0x16 = 0;
+    tag->open_0x17 = 0;
+    tag->flag_0x18 = 0;
+    tag->ofs_y_0x0F = 0;
+    ids[0] = 0;
+    ids[1] = 0;
+    ids[2] = 0;
+    ids[3] = 0;
+    ids[4] = 0;
+    ids[5] = 0;
+    ids[6] = 0;
+    ids[7] = 0;
+    ids[8] = 0;
+    ids[9] = 0;
+    if (plw->field_0x3E9 != 0) {
+        tag->open_0x17 = 1;
+    }
+    if (tag->kind_prev_0x14 != plw->field_0x3E4) {
+        tag->kind_prev_0x14 = plw->field_0x3E4;
+        tag->open_frame_0x0E = 0;
+        tag->bob_frame_0x0D = 0;
+        tag->frame_0x0C = 0;
+    } else {
+        tag->frame_0x0C++;
+        if (tag->frame_0x0C >= 190) {
+            tag->frame_0x0C = 40;
+        } else if ((u8)(tag->frame_0x0C + 166) <= 9) {
+            tag->frame_0x0C = 40;
+        }
+        if ((plw->field_0x309 & 0x20) != 0) {
+            tag->frame_0x0C = 100;
+        }
+        tag->bob_frame_0x0D++;
+        if (tag->bob_frame_0x0D > 90) {
+            if (tag->bob_frame_0x0D >= 138) {
+                tag->bob_frame_0x0D = 90;
+            }
+            tag->ofs_y_0x0F = 6.0f * math_sin_rad(0.0174532924f * (tag->bob_frame_0x0D - 90));
+        }
+        tag->open_frame_0x0E++;
+        if (tag->open_frame_0x0E >= 50) {
+            tag->open_frame_0x0E = 30;
+        }
+    }
+    switch (plw->field_0x3E4) {
+    default:
+    case 0:
+    case 14:
+        return;
+    case 16:
+        tag->tex_idx_0x15 = 0x22;
+        tag->color_0x10 = 0xFF6347FF;
+        return;
+    case 1:
+    case 10:
+        tag->tex_idx_0x15 = 0x22;
+        tag->color_0x10 = 0xFFFFFFFF;
+        return;
+    case 2:
+        src = pl_act_kind2_item_ids;
+        dst = ids;
+        while (*src != 0xFFFF) {
+            *dst++ = *src++;
+        }
+        break;
+    case 3:
+        src = pl_act_kind3_item_ids;
+        dst = ids;
+        while (*src != 0xFFFF) {
+            *dst++ = *src++;
+        }
+        break;
+    case 4:
+        src = pl_act_kind4_item_ids;
+        dst = ids;
+        while (*src != 0xFFFF) {
+            *dst++ = *src++;
+        }
+        break;
+    case 5:
+        tag->tex_idx_0x15 = 0x73;
+        tag->color_0x10 = 0x43ABDEFF;
+        return;
+    case 9:
+        tag->tex_idx_0x15 = 0x73;
+        tag->color_0x10 = 0xCA2F59FF;
+        return;
+    case 8:
+        tag->tex_idx_0x15 = 0x6E;
+        tag->color_0x10 = 0xA6A0E6FF;
+        return;
+    case 11:
+        tag->tex_idx_0x15 = 0x30;
+        tag->color_0x10 = item_kind_color_tbl[1];
+        return;
+    case 12:
+        tag->tex_idx_0x15 = 0x30;
+        tag->color_0x10 = 0xF01010FF;
+        if (Pl_item_timer_get(plw, 43) <= 0) {
+            tag->unusable_0x16 = 1;
+        }
+        return;
+    case 13:
+        tag->tex_idx_0x15 = 0x22;
+        tag->color_0x10 = 0xF0F010FF;
+        return;
+    case 6:
+        tag->tex_idx_0x15 = 0x70;
+        tag->color_0x10 = 0xD01C27FF;
+        return;
+    case 7:
+        if (cockpit_item_slot_live_ck(plw, plw->field_0x304) != 0 && plw->slot_id[plw->field_0x304].item_id != 0xDF) {
+            data = GetItemData(plw->slot_id[plw->field_0x304].item_id);
+            tag->count_0x19 = data->max_num_0x003 != 1 ? plw->slot_id[plw->field_0x304].value : 0;
+            tag->tex_idx_0x15 = data->tex_idx_0x004;
+            tag->color_0x10 = item_kind_color_tbl[data->kind];
+            if (pl_item_now_usable_ck(plw, plw->slot_id[plw->field_0x304].item_id) == 0) {
+                tag->unusable_0x16 = 1;
+            }
+        }
+        return;
+    case 15:
+        tag->tex_idx_0x15 = 0x23;
+        tag->color_0x10 = 0xFFFFFFFF;
+        if (pl_work_flag0_clear_ck() == 0) {
+            tag->unusable_0x16 = 1;
+        }
+        return;
+    case 17:
+        tag->tex_idx_0x15 = 0x23;
+        tag->color_0x10 = 0xFFFFFFFF;
+        if (pl_work_flag8_clear_ck() == 0) {
+            tag->unusable_0x16 = 1;
+        }
+        return;
+    case 18:
+        tag->tex_idx_0x15 = 0x23;
+        tag->color_0x10 = 0xF06060FF;
         return;
     }
-    fn_802E70F0(0, &pos);
-    ::draw_sprite_idx(0xB95, (const ::_mh_ivec2_*)&pos);
+    for (i = 0; i < 11; i++) {
+        if (ids[i] == 0) {
+            break;
+        }
+        slot = &plw->slot_id[plw->field_0x304];
+        if (slot->item_id == ids[i] && slot->value > 0) {
+            data = GetItemData(ids[i]);
+            tag->tex_idx_0x15 = data->tex_idx_0x004;
+            tag->count_0x19 = plw->slot_id[plw->field_0x304].value;
+            tag->color_0x10 = item_kind_color_tbl[data->kind];
+            return;
+        }
+    }
+    for (i = 0; i < 11; i++) {
+        if (ids[i] == 0) {
+            break;
+        }
+        for (j = 0; j < 24; j++) {
+            if (plw->slot_id[j].item_id == ids[i]) {
+                data = GetItemData(ids[i]);
+                tag->tex_idx_0x15 = data->tex_idx_0x004;
+                tag->count_0x19 = plw->slot_id[j].value;
+                tag->color_0x10 = item_kind_color_tbl[data->kind];
+                return;
+            }
+        }
+    }
+    if (tag->count_0x19 == 0) {
+        data = GetItemData(ids[0]);
+        tag->tex_idx_0x15 = data->tex_idx_0x004;
+        tag->color_0x10 = item_kind_color_tbl[data->kind];
+        tag->unusable_0x16 = 1;
+    }
 }
-}  /* namespace view_fn_802E4978 */
+
+/* 0x802E5220 (0x64): Sets the digit over the AI NPC from its digit state: none, a green 0x22 or a red 2. */
+void cockpit_npc_digit_update(CockpitWork* work) {
+    switch (work->ai_npc_0x048->digit_state_0x3C4) {
+    case 0:
+        work->npc_digit_0x04C = 0;
+        work->npc_digit_color_0x050 = 0;
+        break;
+    case 1:
+        work->npc_digit_0x04C = 0x22;
+        work->npc_digit_color_0x050 = 0x00FF00FF;
+        break;
+    case 2:
+        work->npc_digit_0x04C = 2;
+        work->npc_digit_color_0x050 = 0xFF0000FF;
+        break;
+    }
+}
+
+/* 0x802E5284 (0x140): The single-view cockpit's per-frame update (unless the pad is held): the clocks, notices,
+ * gauges, item tag, NPC digit, item ring, target masks, icon animations, the supply box and take menu, the cursors,
+ * the hunt log and the prompt; then queues the draw tasks unless an event demo runs. */
+void cockpit_frame_update(void) {
+    SysQuestMove* move = (SysQuestMove*)get_move_work_adrs(0);
+    CockpitWork* work = cockpit_work;
+    _PLW* plw = work->plw;
+
+    if (pad_hold_ck() != 1) {
+        work->field_0x0D1 = 0;
+        cockpit_frame_tick();
+        fn_803839EC();
+        cockpit_notice_update();
+        quest_gauge_update(work, 0xFF);
+        cockpit_item_tag_update(plw, &work->item_tag_0x02C);
+        if (move->npc_plate_0x0EF != 0) {
+            cockpit_npc_digit_update(work);
+        }
+        cockpit_item_ring_update(plw, work->item_ring_anim_0x16B, work->item_list_anim_0x16F);
+        quest_targets_update_b(work);
+        cockpit_gauge_icons_update(work);
+        cockpit_supply_box_update();
+        cockpit_take_menu_update();
+        cockpit_icon_cursors_update();
+        menu_slot_anim_update(0);
+        if (move_work_state_ck() != 0) {
+            cockpit_hunt_log_update();
+        }
+        cockpit_prompt_update();
+        ainpc_entry_update_all();
+    }
+    if (event_demo_ck() != 1) {
+        subTransSet((u32)cockpit_draw, 0, 0);
+        if (lb_quest_work_active_ck() == 0) {
+            subTransSetPrio(6, (u32)ainpc_entry_draw_all, 0, 0);
+        }
+        subTransSetPrio(6, (u32)menu_slot_panel_draw, 0, 0);
+    }
+}
+
+/* 0x802E555C (0x158): The single-view cockpit draw task: the party elements, the weapon HUD, the gauges and party
+ * list, the item tag and NPC digit, then the open menu (supply box, take menu or quest menu) or the marker window with
+ * the item list and ring, the marks, the flash gauge, the note box, the hunt log and the prompt. */
+void cockpit_draw(void) {
+    SysQuestMove* move = (SysQuestMove*)get_move_work_adrs(0);
+    CockpitWork* work = cockpit_work;
+    _PLW* plw = work->plw;
+
+    if (get_now_areano() != 0xFF) {
+        set_zmode(false, 0, false);
+        work->mark_count_0x0CD = 0;
+        cockpit_party_elements_draw(work);
+        draw_lsp_parts();
+        cockpit_weapon_hud_draw();
+        if (cockpit_hud_hidden_self_ck(plw) == 1) {
+            cockpit_timer_draw();
+            quest_gauge_draw();
+            cockpit_party_list_draw();
+        }
+        cockpit_item_tag_draw(work);
+        if (move->npc_plate_0x0EF != 0) {
+            cockpit_npc_digit_draw(work);
+        }
+        if (menu_item_frame_update((MenuFrameWork*)plw) == 0) {
+            if (plw->field_0x5BC != 0) {
+                cockpit_supply_box_draw();
+            } else if (plw->take_menu_open_0x5BE != 0) {
+                cockpit_take_menu_draw();
+            } else if (plw->quest_menu_open_0x5BD != 0) {
+                cockpit_quest_menu_draw();
+            } else {
+                quest_marker_arm();
+                if (cockpit_hud_hidden_self_ck(plw) == 1) {
+                    cockpit_item_list_draw(plw, work->item_list_anim_0x16F);
+                    cockpit_item_ring_draw(plw, work->item_ring_anim_0x16B);
+                }
+            }
+        }
+        quest_marks_flush(work);
+        cockpit_flash_gauge_draw();
+        note_box_draw();
+        if (move_work_state_ck() != 0) {
+            cockpit_hunt_log_draw();
+        }
+        cockpit_prompt_draw();
+    }
+}
+
+/* 0x802E5764 (0x2B0): Draws the name tags of the other live players in the same area over their heads, through
+ * player `player`'s camera and clamped to that player's half of the screen: a black shadow, then the name in the
+ * player's colour. */
+void cockpit_name_tags_draw(CockpitWork* work, u8 player) {
+    VEC3 screen;
+    u32 camera;
+    s32 handle;
+    _PLW* plw;
+    u16 max;
+    s32 i;
+    f32 top;
+    f32 bottom;
+    s16 x;
+    s16 y;
+    u32 area;
+    char* name;
+
+    handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(Screen_w.camera_view.player_camera_0x50[player]);
+    word_copy_return_dst(&camera, &handle);
+    VEC3_ctor(&screen);
+    top = 18.0f;
+    bottom = 480.0f;
+    plw = (_PLW*)get_move_work_adrs(2);
+    max = get_move_work_max(2);
+    for (i = 0; i < max; i++, plw++) {
+        if (plw->slot_active != 0 && plw->chunk_ofs != player && plw->field_0x001 != 0) {
+            area = Pl_area_flag_get(work->plw->chunk_ofs);
+            if (area == Pl_area_flag_get(plw->chunk_ofs)) {
+                chara_icon_pos_get(plw, 0, &work->name_pos_0x054[plw->chunk_ofs]);
+                camera_world_to_screen(&camera, &screen, &work->name_pos_0x054[plw->chunk_ofs]);
+                if (screen.z < 0.0f || screen.z > 1.0f) {
+                    continue;
+                }
+                if (player == 0) {
+                    bottom = 240.0f;
+                }
+                if (player != 0) {
+                    top = 258.0f;
+                }
+                screen.x *= hud_screen_width_get();
+                screen.y *= 1.07142854f;
+                if (screen.y < top || screen.y > bottom) {
+                    continue;
+                }
+                x = screen.x;
+                y = screen.y;
+                if (get_arena_cfg(player, 12) == 0 || isServerSelectState() == 0) {
+                    name = plw->hunter_0x5CA.name_0x5CA;
+                } else {
+                    name = plw->hunter_0x5CA.id_0x5DB;
+                }
+                x = menu_text_center_x(name, x, 18);
+                y -= 18;
+                font_set_size(18, 18);
+                flfntSetColor(0xFF);
+                font_locate(x + 2, y + 1);
+                font_print((s8*)name);
+                flfntSetColor(player_color_get(plw->chunk_ofs));
+                font_locate(x, y);
+                font_print((s8*)name);
+            }
+        }
+    }
+    font_flush();
+}
+
+/* 0x802E5A14 (0x1A0): Steps the supply box and take menu of the first cockpit: the pending take and supply actions,
+ * the cursor and frame animations, the item flight to the pointer, and the menus' busy flags. */
+void cockpit_supply_box_update(void) {
+    CockpitWork* work = cockpit_work;
+    _PLW* plw = work->plw;
+
+    if (work->supply_busy_0x176 != 0) {
+        fn_8027B0BC(plw);
+    }
+    if (work->take_busy_0x17D == 1) {
+        fn_8027B358(plw);
+    }
+    if (plw->field_0x5BC != 0) {
+        if (menu_item_frame_update((MenuFrameWork*)plw) == 0) {
+            work->supply_busy_0x176 = 1;
+        } else {
+            work->supply_busy_0x176 = 0;
+        }
+        work->cursor_frame_0x17B++;
+        if (sprite_anim_last_frame(0xE53) < work->cursor_frame_0x17B) {
+            work->cursor_frame_0x17B = 0;
+        }
+        if (work->box_frame_0x17C != 0) {
+            work->box_frame_0x17C++;
+            if (sprite_anim_last_frame(0xE33) < work->box_frame_0x17C) {
+                work->box_frame_0x17C = 0;
+            }
+        }
+        if (work->pointer_time_0x178 != 0) {
+            if (--work->pointer_left_0x179 == 0) {
+                work->pointer_time_0x178 = 0;
+                work->box_frame_0x17C = 1;
+            }
+        }
+        if (menu_item_frame_update((MenuFrameWork*)plw) == 0) {
+            work->supply_notice_0x17A = 0;
+        } else {
+            work->supply_notice_0x17A = 1;
+        }
+    } else {
+        work->supply_busy_0x176 = 0;
+        work->supply_notice_0x17A = 1;
+        work->pointer_time_0x178 = 0;
+        work->box_frame_0x17C = 0;
+    }
+    if (plw->take_menu_open_0x5BE != 0) {
+        if (menu_item_frame_update((MenuFrameWork*)plw) == 0) {
+            work->take_busy_0x17D = 1;
+            return;
+        }
+        work->take_busy_0x17D = 0;
+        return;
+    }
+    work->take_busy_0x17D = 0;
+}
+
+/* 0x802E5E90 (0x5DC): Draws the supply box: the 5x8 grid of the quest's supply items (taken cells empty) with the
+ * cursor, the item flying to the pointer, the selected item's name, count, rarity and room warning, and the help. */
+void cockpit_supply_box_draw(void) {
+    _SPR_DATA_ spr;
+    _mh_ivec2_ base;
+    _mh_ivec2_ row_pos;
+    _mh_ivec2_ cell_pos;
+    char text[4];
+    SysQuestMove* move;
+    const u16* row;
+    CockpitWork* work;
+    const u16* col;
+    QuestWork* quest;
+    const _SPR_DATA_* rec;
+    const Q_ItemPair* pair;
+    ItemDataRecord* data;
+    u8** help;
+    s32 r;
+    s32 c;
+    s32 first;
+    s32 idx;
+    s32 warn;
+    u32 color;
+    s32 frame;
+    f32 t;
+    f32 inv;
+
+    move = (SysQuestMove*)get_move_work_adrs(0);
+    if (move != NULL) {
+        quest = move->quest_0x0DC;
+        if (quest != NULL) {
+            work = cockpit_work;
+            set_blendmode(4, 5, 1);
+            get_lsp_data(0xE15, &base);
+            draw_sprite_ary(cockpit_supply_box_frame_ids, &base);
+            r = 0;
+            row = cockpit_slot_row_sprite_ids;
+            first = 0;
+            do {
+                rec = get_lsp_data(*row, NULL);
+                row_pos.x = base.x + rec->pos.x;
+                row_pos.y = base.y + rec->pos.y;
+                draw_sprite_ary(cockpit_slot_column_sprite_ids, &row_pos);
+                c = 0;
+                col = cockpit_slot_column_sprite_ids;
+                do {
+                    idx = first + c;
+                    rec = get_lsp_data(*col, NULL);
+                    if (quest->supply_cursor_0x5E1 == idx) {
+                        set_blendmode(4, 1, 1);
+                        cell_pos.x = row_pos.x + rec->pos.x;
+                        cell_pos.y = row_pos.y + rec->pos.y;
+                        draw_sprite_anim_idx(0xE53, work->cursor_frame_0x17B, &cell_pos);
+                        set_blendmode(4, 5, 1);
+                    }
+                    if (((1 << (idx & 0x1F)) & quest->supply_taken_0x684[idx >> 5]) == 0 &&
+                        quest->supply_0x5E2[idx].id != 0) {
+                        rec = get_lsp_data(*col, NULL);
+                        cell_pos.x = row_pos.x + rec->pos.x;
+                        cell_pos.y = row_pos.y + rec->pos.y;
+                        draw_itemicon_item_id_idx(0xE56, quest->supply_0x5E2[idx].id, &cell_pos);
+                    }
+                    col++;
+                    c++;
+                } while (c < 8);
+                row++;
+                first += 8;
+                r++;
+            } while (r < 5);
+            draw_sprite_anim_idx(0xE33, work->box_frame_0x17C, &base);
+            if (work->pointer_time_0x178 != 0) {
+                t = (f32)work->pointer_left_0x179 / (f32)work->pointer_time_0x178;
+                inv = 1.0f - t;
+                frame = inv * sprite_anim_last_frame(0xE56);
+                cockpit_supply_cell_pos_get(&row_pos, work->pointer_cell_0x177);
+                rec = get_lsp_data(0xE56, NULL);
+                row_pos.x += rec->pos.x;
+                row_pos.y += rec->pos.y;
+                rec = get_lsp_data(0xE33, NULL);
+                cell_pos.x = rec->pos.x + base.x;
+                cell_pos.y = rec->pos.y + base.y;
+                sprite_frame_apply(&spr, 0xE56, frame, NULL);
+                spr.pos.x = row_pos.x * t + cell_pos.x * inv;
+                spr.pos.y = row_pos.y * t + cell_pos.y * inv;
+                draw_itemicon_item_id(spr, work->pointer_item_0x174, NULL);
+            }
+            pair = NULL;
+            if (((1 << (quest->supply_cursor_0x5E1 & 0x1F)) & quest->supply_taken_0x684[quest->supply_cursor_0x5E1 >> 5]) == 0) {
+                pair = &quest->supply_0x5E2[quest->supply_cursor_0x5E1];
+                if (pair->id == 0) {
+                    pair = NULL;
+                }
+            }
+            warn = 0;
+            if (pair != NULL) {
+                _PLW* plw = work->plw;
+                if (pl_item_room_get(plw, pair->id, (s16)pair->num) < (s16)pair->num) {
+                    if (pl_item_slot_find(plw, pair->id) == 0xFFFF) {
+                        draw_sprite_idx(0xE47, &base);
+                        warn = 1;
+                    } else {
+                        draw_sprite_idx(0xE48, &base);
+                        warn = 2;
+                    }
+                }
+                draw_itemicon_item_id_idx(0xE26, pair->id, &base);
+                draw_font_idx(0xE2B, (s8*)ItemName(pair->id), 1, &base);
+                sprintf(text, "%d", (s16)pair->num);
+                draw_font_idx(0xE2C, (s8*)text, 1, &base);
+                data = GetItemData(pair->id);
+                color = get_rare_color(data->level_0x01);
+                spr_data_copy(&spr, get_lsp_data(0xE28, NULL));
+                spr.color = color;
+                draw_sprite(spr, &base);
+                draw_number_idx(0xE29, data->level_0x01 + 1, color, &base);
+            }
+            menu_item_row_draw_by_lsp(0xE14, (u16*)pair);
+            if (em_prog_flag_ck() == 0) {
+                get_lsp_data(0xE13, &row_pos);
+                draw_window_frame_preset(row_pos.x, row_pos.y, 2);
+                help = get_str_tbl(0x58);
+                font_set_size(18, 18);
+                font_print_ex(row_pos.x + 24, row_pos.y + 16, 0, (s8*)help[1]);
+                if (warn != 0) {
+                    font_print_ex(row_pos.x + 24, row_pos.y + 52, 2, (s8*)help[2]);
+                }
+            }
+            font_flush();
+        }
+    }
+}
+
+/* 0x802E646C (0x640): Draws the take-item menu: the three item rows (name and count, or the empty/none text) with
+ * the row cursor, then by the menu state the count page, the yes/no confirmation and the empty-row notice. */
+void cockpit_take_menu_draw(void) {
+    _SPR_DATA_ spr;
+    char text[8];
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    CockpitSlotPair pair;
+    CockpitWork* work = cockpit_work;
+    SysQuestMove* move;
+    u16 id;
+    QuestWork* quest;
+    _PLW* plw;
+    u8** strs;
+    s32 row;
+    bool rows_state;
+    u32 count;
+    s16 x;
+
+    move = (SysQuestMove*)get_move_work_adrs(0);
+    if (move != NULL) {
+        quest = move->quest_0x0DC;
+        if (quest != NULL) {
+            plw = work->plw;
+            if (plw != NULL) {
+                set_blendmode(4, 5, 1);
+                get_lsp_data(0xE57, &base);
+                draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x109), &base);
+                get_lsp_data(0xE57, &base);
+                row = 0;
+                do {
+                    get_lsp_data(((const u16*)get_menu_lsp_tbl(0x10A))[row], &pos);
+                    pos.x += base.x;
+                    pos.y += base.y;
+                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x10B), &pos);
+                    if (row == quest->take_row_0x68C && plw->cockpit_menu_0x5C0 == 1) {
+                        put_menu_cursor((u16*)get_menu_lsp_tbl(0x10D), 0, &pos);
+                    }
+                    draw_sprite_idx(((const u16*)get_menu_lsp_tbl(0x10C))[row], &pos);
+                    rows_state = plw->cockpit_menu_0x5C0 == 1;
+                    em_work_slot_pair_get(row, (s16*)&pair);
+                    if (pair.id == 0) {
+                        spr_data_copy(&spr, get_lsp_data(0xE79, NULL));
+                        spr.color = GetMenuFontColor(0, row == quest->take_row_0x68C, rows_state, 0);
+                        draw_font(spr, (s8*)get_str_tbl(28)[0], 0, &pos);
+                    } else if (pair.count != 0) {
+                        spr_data_copy(&spr, get_lsp_data(0xE79, NULL));
+                        spr.color = GetMenuFontColor(1, row == quest->take_row_0x68C, rows_state, 0);
+                        draw_font(spr, (s8*)ItemName(pair.id), 0, &pos);
+                        sprintf(text, "%d", pair.count);
+                        id = 0xE7B;
+                        if (pair.count < 10) {
+                            id = 0xE7A;
+                        }
+                        spr_data_copy(&spr, get_lsp_data(id, NULL));
+                        spr.color = GetMenuFontColor(1, row == quest->take_row_0x68C, rows_state, 0);
+                        x = menu_text_center_x(text, (s16)(pos.x + spr.pos.x), spr.width);
+                        font_set_size(spr.width, spr.height);
+                        font_print_ex(x, (s16)(pos.y + spr.pos.y), (s16)spr.color, (s8*)"%s", text);
+                    } else {
+                        spr_data_copy(&spr, get_lsp_data(0xE79, NULL));
+                        spr.color = GetMenuFontColor(0, row == quest->take_row_0x68C, rows_state, 0);
+                        draw_font(spr, (s8*)get_str_tbl(28)[1], 0, &pos);
+                    }
+                    row++;
+                } while (row < 3);
+                if (plw->cockpit_menu_0x5C0 >= 2) {
+                    get_lsp_data(0xE8C, &base);
+                    em_work_slot_pair_get(quest->take_row_0x68C, (s16*)&pair);
+                    count = Pl_item_timer_get(plw, pair.id);
+                    if ((u32)pair.count < count) {
+                        count = pair.count;
+                    }
+                    put_page_count((u16*)get_menu_lsp_tbl(0x10F), quest->take_count_0x68E, count, quest->take_flags_0x696,
+                                   &base);
+                    if (plw->cockpit_menu_0x5C0 == 2) {
+                        get_lsp_data(0xE9A, &pos);
+                        pos.x += base.x;
+                        pos.y += base.y;
+                        put_menu_cursor((u16*)get_menu_lsp_tbl(0x110), 0, &pos);
+                    }
+                }
+                if (plw->cockpit_menu_0x5C0 == 3) {
+                    spr_data_copy(&spr, get_lsp_data(0xE9B, &base));
+                    draw_window_box(base.x, base.y, spr.width, spr.height, 0x82574FFF, 0);
+                    get_lsp_data(0xE9C, &base);
+                    get_lsp_data(((const u16*)get_menu_lsp_tbl(0x111))[quest->take_confirm_0x68D], &pos);
+                    pos.x += base.x;
+                    pos.y += base.y;
+                    put_menu_cursor((u16*)get_menu_lsp_tbl(0x110), 0, &pos);
+                    get_lsp_data(0xE9C, &base);
+                    spr_data_copy(&spr, get_lsp_data(0x6E, NULL));
+                    strs = get_str_tbl(29);
+                    get_lsp_data(0xE9D, &pos);
+                    pos.x += base.x;
+                    pos.y += base.y;
+                    spr.color = GetMenuFontColor(1, quest->take_confirm_0x68D == 0, 1, 0);
+                    draw_font(spr, (s8*)strs[0], 1, &pos);
+                    get_lsp_data(0xE9E, &pos);
+                    pos.x += base.x;
+                    pos.y += base.y;
+                    spr.color = GetMenuFontColor(1, quest->take_confirm_0x68D == 1, 1, 0);
+                    draw_font(spr, (s8*)strs[1], 1, &pos);
+                }
+                if (plw->cockpit_menu_0x5C0 == 3 && quest->take_row_0x68C == 0) {
+                    spr_data_copy(&spr, get_lsp_data(0xE85, &base));
+                    draw_window_frame_style(base.x, base.y, spr.width, spr.height, 0);
+                    get_lsp_data(0xE86, &base);
+                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x10E), &base);
+                    spr_data_copy(&spr, get_lsp_data(0xE87, &pos));
+                    draw_font(spr, (s8*)get_str_tbl(27)[0], 0, &base);
+                }
+            }
+        }
+    }
+}
+
+/* 0x802E6AAC (0x408): Draws the quest menu: its two rows (the second only when an item notice is pending) with the
+ * row frame, then by the menu state the row's help window or the yes/no confirmation. */
+void cockpit_quest_menu_draw(void) {
+    _SPR_DATA_ spr;
+    union {
+        _mh_ivec2_ pos;
+        s32 word;
+    } base;
+    _mh_ivec2_ pos;
+    s32 anchor;
+    const u16* ids;
+    CockpitWork* work = cockpit_work;
+    SysQuestMove* move;
+    QuestWork* quest;
+    _PLW* plw;
+    u8** strs;
+    s32 row;
+    bool enabled;
+    bool active;
+
+    move = (SysQuestMove*)get_move_work_adrs(0);
+    if (move != NULL) {
+        quest = move->quest_0x0DC;
+        if (quest != NULL) {
+            plw = work->plw;
+            if (plw != NULL) {
+                get_lsp_data(0xEA0, &base.pos);
+                draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x112), &base.pos);
+                row = 0;
+                do {
+                    ids = (const u16*)get_menu_lsp_tbl(0x113);
+                    anchor = base.word;
+                    put_lsp_anchor_offset(ids[row], &pos, &anchor);
+                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x114), &pos);
+                    enabled = 0;
+                    if (row == 1) {
+                        if (Pl_motion_input_ck(0) != 1 && quest_flag_80_ck(NULL) == 1 &&
+                            (quest_item_work_notify(1) == 1 || quest_item_work_notify(2) == 1)) {
+                            enabled = 1;
+                        }
+                    } else {
+                        enabled = 1;
+                    }
+                    active = 0;
+                    if (plw->cockpit_menu_0x5C0 > 1 && plw->cockpit_menu_row_0x5BF == row) {
+                        active = 1;
+                    }
+                    strs = get_str_tbl(66);
+                    spr_data_copy(&spr, get_lsp_data(0xEB8, NULL));
+                    spr.color = GetMenuFontColor(enabled, plw->cockpit_menu_0x5C0 == row, 1, active);
+                    draw_font(spr, (s8*)strs[row], 0, &pos);
+                    if (plw->cockpit_menu_row_0x5BF == row) {
+                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x115), &pos);
+                    }
+                    row++;
+                } while (row < 2);
+                strs = get_str_tbl(65);
+                switch (plw->cockpit_menu_0x5C0) {
+                case 1:
+                    spr_data_copy(&spr, get_lsp_data(0xEBD, &base.pos));
+                    draw_window_frame_style(base.pos.x, base.pos.y, spr.width, spr.height, 0);
+                    get_lsp_data(0xEBE, &base.pos);
+                    spr_data_copy(&spr, get_lsp_data(0xEBF, NULL));
+                    draw_font(spr, (s8*)strs[plw->cockpit_menu_row_0x5BF], 0, &base.pos);
+                    break;
+                case 2:
+                    if (plw->cockpit_menu_row_0x5BF == 1) {
+                        spr_data_copy(&spr, get_lsp_data(0xEC0, &base.pos));
+                        draw_window_frame_style(base.pos.x, base.pos.y, spr.width, spr.height, 0);
+                        get_lsp_data(0xEC1, &base.pos);
+                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x116), &base.pos);
+                        spr_data_copy(&spr, get_lsp_data(0xEC6, &pos));
+                        draw_font(spr, (s8*)strs[2], 0, &base.pos);
+                    }
+                    break;
+                }
+                if (plw->cockpit_menu_0x5C0 == 2) {
+                    spr_data_copy(&spr, get_lsp_data(0xEC7, &base.pos));
+                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xA), &base.pos);
+                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xB), &base.pos);
+                    if (quest->take_confirm_0x68D == 0) {
+                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xD), &base.pos);
+                    }
+                    if (quest->take_confirm_0x68D == 1) {
+                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xC), &base.pos);
+                    }
+                    strs = get_str_tbl(67);
+                    spr_data_copy(&spr, get_lsp_data(0x1AE, NULL));
+                    spr.color = GetMenuFontColor(1, quest->take_confirm_0x68D == 0, 1, 0);
+                    draw_font(spr, (s8*)strs[0], 1, &base.pos);
+                    spr_data_copy(&spr, get_lsp_data(0x1B6, NULL));
+                    spr.color = GetMenuFontColor(1, quest->take_confirm_0x68D == 1, 1, 0);
+                    draw_font(spr, (s8*)strs[1], 1, &base.pos);
+                }
+            }
+        }
+    }
+}
+
+/* 0x802E6EB4 (0x198): Draws the first player's flash gauge while act kind 7 charges: the frame animation and the
+ * bar, filled and coloured by the charge over its limit. */
+void cockpit_flash_gauge_draw(void) {
+    _mh_ivec2_ pos;
+    CockpitWork* work = cockpit_work;
+    _PLW* plw = work->plw;
+    const _SPR_DATA_* rec;
+    u32 color;
+    s16 width;
+    f32 t;
+
+    if (plw->field_0x00A == 7 && plw->field_0x3A4 != 0) {
+        set_blendmode(4, 5, 1);
+        get_lsp_data(0xBCE, &pos);
+        draw_sprite_anim_ary(cockpit_flash_anim_ids, work->flash_frame_0x180, &pos);
+        rec = get_lsp_data(0xBD2, NULL);
+        t = plw->field_0x3A4 * (1.0f / plw->field_0x3A5);
+        width = (rec->width * (f32)plw->field_0x3A4) / plw->field_0x3A5;
+        color = color_lerp(0xC50A83FF, 0xD813BEFF, t);
+        drawshape_init(3, 0xFFFF);
+        drawshape_set_vertex_rect((s16)(rec->pos.x + pos.x), (s16)(rec->pos.y + pos.y), width, rec->height);
+        drawshape_set_corner_colors(0xC50A83FF, color, color, 0xC50A83FF);
+        drawshape_exec();
+    }
+}
 
 /* 0x802E7408 (0x140).  The first bar's blend parameter: the player's slot 45 state picks a row of
  * the 2x5 `u16` table at 0x805D5C74 and the argument picks the column pair, and a zero result means
@@ -1788,10 +2248,7 @@ void quest_marker_arm(void) {
     pos.y = 0;
     if (work->mark_gate_0x0CE == 0) {
         work->draw_id_0x0BA = 0xBE5;
-        {
-            _mh_ivec2_ mark = pos;
-            quest_marker_draw(work, 0xBE4, 0, &mark);
-        }
+        quest_marker_draw(work, 0xBE4, 0, pos);
     } else {
         pos.x += 0x20C;
         pos.y = 0xC6;
@@ -1799,10 +2256,7 @@ void quest_marker_arm(void) {
         work->ring_extent_x_0x0A4 = 0.110815607f;
         work->ring_extent_y_0x0A8 = 0.166223407f;
         work->draw_id_0x0BA = 0xBE5;
-        {
-            _mh_ivec2_ mark = pos;
-            quest_marker_draw_faded(work, 0xBE4, 0, &mark);
-        }
+        quest_marker_draw_faded(work, 0xBE4, 0, pos);
     }
 }
 
@@ -3047,7 +3501,7 @@ void PitTrapSet(const VEC3* pos, u8 kind) {
 
 /* 0x802EBBD0.  Draws the quest cockpit's marker ring and everything on it: the ring's pie at the window spot (rotated
  * by the camera when the option is on), then the map icons, the quest targets, the players and the pit traps. */
-void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, const _mh_ivec2_* pos) {
+void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos) {
     _PLW* plw = work->plw;
     u32 angle_on;
     u16 angle;
@@ -3057,8 +3511,8 @@ void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, const _mh_ivec
     f32 scale;
     u32 prev_player;
 
-    work->window_x_0x084 = pos->x;
-    work->window_y_0x086 = pos->y;
+    work->window_x_0x084 = pos.x;
+    work->window_y_0x086 = pos.y;
     angle_on = 0;
     if (get_cfg(plw->chunk_ofs, 0xF) == 1) {
         angle_on = 1;
@@ -3119,7 +3573,7 @@ void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, const _mh_ivec
 
 /* 0x802EBE2C.  Whether the quest marker may show for the player: never on map kind 6, always while the move work
  * state holds or skill 0x86 is on, never with skill 0x87, else by the item timer of id 0x2A. */
-s32 quest_mark_allowed_ck(_PLW* plw) {
+u32 quest_mark_allowed_ck(_PLW* plw) {
     if (stage_map_kind_get(get_now_mapno()) == 6) {
         return 0;
     }
@@ -3135,24 +3589,2417 @@ s32 quest_mark_allowed_ck(_PLW* plw) {
     return Pl_item_timer_get(plw, 0x2A) != 0;
 }
 
+/* 0x802EBED8 (0x328): Draws the quest cockpit's marker window unfaded: the window record at `pos`, the map icons, and -
+ * when the marker may not show - the ring around the player's projected position, then the targets, players and traps. */
+#pragma fp_contract off
 
-namespace view_fn_802EBED8 {
+void quest_marker_draw(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos) {
+    union {
+        SprRecordWords words;
+        _SPR_DATA_ spr;
+    } rec;
+    VEC3 local;
+    f32 spot[2];
+    f32 proj[2];
+    _PLW* plw = work->plw;
+    f32 tex_scale;
+    f32 scale;
+    f32 inv;
 
-namespace nw4r = ::nw4r;  /* the view headers below reopen it */
+    rec.words = *(const SprRecordWords*)get_lsp_data(id, NULL);
+    rec.spr.pos.x += pos.x;
+    rec.spr.pos.y += pos.y;
+    work->window_x_0x084 = rec.spr.pos.x;
+    work->window_y_0x086 = rec.spr.pos.y;
+    work->window_scale_0x088 = (f32)rec.spr.width;
+    work->window_icon_scale_0x08C = 1.0f;
+    if (mode == 0) {
+        quest_target_icons_anim_draw();
+    }
+    if (quest_mark_allowed_ck(plw) == 1) {
+        draw_sprite(rec.spr, NULL);
+        if (mode == 0) {
+            quest_map_icon_marks_draw(work, 0x12, 0);
+        } else {
+            quest_pit_area_icon_marks_draw(work, 0x12, 0);
+        }
+    } else {
+        VEC3_ctor(&local);
+        quest_player_marker_pos(plw, &local);
+        const VEC3& world = get_worldworld_pos(&local, plw->area_0x16);
+        quest_screen_project(proj, &world.x);
+        spot[0] = (f32)work->window_x_0x084 + work->window_scale_0x088 * proj[0];
+        spot[1] = (f32)work->window_y_0x086 + work->window_scale_0x088 * proj[1];
+        if (stage_map_kind_get(get_now_mapno()) == 6) {
+            if (get_now_areano() == 1) {
+                tex_scale = 0.219999999f;
+            } else {
+                tex_scale = 0.119999997f;
+            }
+        } else {
+            tex_scale = 0.219999999f;
+        }
+        scale = 0.00260416674f * work->window_scale_0x088;
+        quest_marker_ring_draw(spot, proj, rec.spr.color, scale, tex_scale);
+        work->marker_ofs_x_0x090 = spot[0];
+        work->marker_ofs_y_0x094 = spot[1];
+        drawshape_copy_vec2(&work->marker_ref_x_0x098, proj);
+        work->ring_scale_0x0A0 = scale;
+        work->ring_extent_x_0x0A4 = tex_scale;
+        work->ring_extent_y_0x0A8 = tex_scale;
+        inv = 1.0f / tex_scale;
+        work->ring_inv_x_0x0AC = inv;
+        work->ring_inv_y_0x0B0 = inv;
+        work->ring_angle_0x0B8 = 0;
+        work->ring_radius_0x0B4 = 0.75f;
+        if (mode == 0) {
+            quest_map_icon_marks_draw(work, 0x12, 1);
+        } else {
+            quest_pit_area_icon_marks_draw(work, 0x12, 1);
+        }
+    }
+    quest_target_markers_draw(work, 0);
+    if (mode == 0) {
+        quest_npc_marker_draw(0);
+    }
+    if (mode == 0) {
+        quest_marker_draw_all_non_master(work, 0);
+    } else {
+        quest_marker_draw_others_then_self(work, 0);
+    }
+    quest_pit_traps_draw(work, 0);
+}
 
-#include "hud/cockpit_quest_marker.h"
+/* 0x802EC200 (0x2F0): Draws the quest-window variant of the marker window for the first cockpit: the window frame,
+ * the map icon sprites (the ring around the quest move's position when the marker may not show), the live targets,
+ * the players and the pit traps, then raises the loading display. */
+void quest_marker_draw_sub(void) {
+    union {
+        SprRecordWords words;
+        _SPR_DATA_ spr;
+    } rec;
+    f32 spot[2];
+    f32 proj[2];
+    _mh_ivec2_ base;
+    CockpitWork* work = cockpit_work;
+    _PLW* plw = work->plw;
+    SysQuestMove* quest;
+    f32 tex_scale;
+    f32 scale;
+    f32 inv;
+
+    set_blendmode(4, 5, 1);
+    get_lsp_data(0x11D3, &base);
+    draw_sprite_idx(0x11D4, &base);
+    get_lsp_data(0x11D0, &base);
+    spr_data_copy(&rec.spr, get_lsp_data(0x11D1, NULL));
+    work->window_x_0x084 = rec.spr.pos.x + base.x;
+    work->window_y_0x086 = rec.spr.pos.y + base.y;
+    work->window_scale_0x088 = (f32)rec.spr.width;
+    work->window_icon_scale_0x08C = 1.48181820f;
+    work->draw_id_0x0BA = 0xBE5;
+    quest_target_icons_anim_draw();
+    if (quest_mark_allowed_ck(plw) == 1) {
+        draw_sprite(rec.spr, &base);
+        quest_map_icon_sprites_draw(work, 0x1A, work->frame_0x190 % 14, 0);
+    } else {
+        quest = (SysQuestMove*)get_move_work_adrs(0);
+        const VEC3& world = get_worldworld_pos(&quest->pos_0x128, quest->area_0x0EB);
+        quest_screen_project(proj, &world.x);
+        spot[0] = (f32)work->window_x_0x084 + work->window_scale_0x088 * proj[0];
+        spot[1] = (f32)work->window_y_0x086 + work->window_scale_0x088 * proj[1];
+        if (stage_map_kind_get(get_now_mapno()) == 6) {
+            tex_scale = 0.119999997f;
+        } else {
+            tex_scale = 0.219999999f;
+        }
+        scale = 0.00260416674f * work->window_scale_0x088;
+        quest_marker_ring_draw(spot, proj, rec.spr.color, scale, tex_scale);
+        work->marker_ofs_x_0x090 = spot[0];
+        work->marker_ofs_y_0x094 = spot[1];
+        drawshape_copy_vec2(&work->marker_ref_x_0x098, proj);
+        work->ring_scale_0x0A0 = scale;
+        work->ring_extent_x_0x0A4 = tex_scale;
+        work->ring_extent_y_0x0A8 = tex_scale;
+        inv = 1.0f / tex_scale;
+        work->ring_inv_x_0x0AC = inv;
+        work->ring_inv_y_0x0B0 = inv;
+        work->ring_angle_0x0B8 = 0;
+        work->ring_radius_0x0B4 = 0.75f;
+        quest_map_icon_sprites_draw(work, 0x1A, work->frame_0x190 % 14, 1);
+    }
+    quest_target_markers_draw_live(work);
+    quest_npc_marker_draw(0);
+    quest_marker_draw_with_master(work, work->plw);
+    quest_pit_traps_draw(work, 0);
+    loading_disp_set(1, 6);
+}
+#pragma fp_contract on
+
+/* 0x802EC4F0 (0x1D4): Steps the cockpit's item and gauge icon animations from the player work: the gauge value and
+ * level on the first item page, the item icon frame and the gauge icon frame (with its sound cue) on the second. */
+void cockpit_gauge_icons_update(CockpitWork* work) {
+    _PLW* plw = work->plw;
+    u32 cam;
+    u8 icon;
+
+    if (cockpit_state.field_0x000 == 2) {
+        cam = camera_mode1_ck_player(plw->chunk_ofs);
+    } else {
+        cam = camera_mode1_ck();
+    }
+    if (pl_item_page2_ck(plw) == 0) {
+        switch (plw->field_0x002) {
+        case 8:
+            if (work->gauge_value_0x168 >= plw->field_0x36C) {
+                work->gauge_value_0x168 = plw->field_0x36C;
+            } else {
+                work->gauge_value_0x168++;
+            }
+            if (cockpit_gauge_low_ck(plw) != 0) {
+                if (work->gauge_level_0x16A < 5) {
+                    work->gauge_level_0x16A++;
+                }
+            } else if (work->gauge_level_0x16A != 0) {
+                work->gauge_level_0x16A--;
+            }
+            break;
+        }
+    } else {
+        icon = pl_item_icon_kind_get(pl_item_slot_item_get(plw, plw->item_slot_sel));
+        if (work->item_icon_0x164 != icon) {
+            work->item_icon_0x164 = icon;
+            work->item_frame_0x166 = 0;
+        } else if (work->item_frame_0x166 != 0) {
+            if (sprite_ary_last_frame(cockpit_ammo_fire_ids) <= work->item_frame_0x166) {
+                work->item_frame_0x166 = 0;
+            } else {
+                work->item_frame_0x166++;
+            }
+        } else if (work->item_count_prev_0x165 > plw->field_0x269) {
+            work->item_frame_0x166++;
+        }
+        work->item_count_prev_0x165 = plw->field_0x269;
+        if (pl_gauge_icon_ck(plw) != 0) {
+            if (sprite_ary_last_frame(cockpit_scope_anim_ids) > work->gauge_frame_0x167) {
+                work->gauge_frame_0x167++;
+                if (cam != 0 && work->gauge_frame_0x167 == 7) {
+                    pl_charge_se_play(plw);
+                }
+            }
+        } else {
+            work->gauge_frame_0x167 = 0;
+        }
+    }
+}
+
+/* 0x802EC700 (0x1AC): Draws the first cockpit's weapon HUD: the aim view, the lock-on and camera markers and the
+ * gauge icons on the second item page; the aim view, the camera marker and the weapon gauge on the first. */
+void cockpit_weapon_hud_draw(void) {
+    _mh_ivec2_ pos;
+    CockpitWork* work = cockpit_work;
+    _PLW* plw = work->plw;
+
+    set_blendmode(4, 5, 1);
+    if (pl_item_page2_ck(plw) == 1) {
+        if (camera_mode1_ck() == 1) {
+            cockpit_aim_view_draw();
+            return;
+        }
+        if (camera_work_ck() == 0) {
+            if ((u32)pl_target_lock_ck(plw) == 1 && pl_aim_act_ck(plw) == 1) {
+                cockpit_eye_marker_draw(plw);
+            }
+            if (pl_camera_reset_ck(plw, 1) == 1) {
+                cockpit_shell_marker_draw(plw);
+            }
+        }
+        if (cockpit_hud_hidden_self_ck(plw) == 1) {
+            get_lsp_data(ck_WideMode() != 0 ? 0xCC7 : 0xC75, &pos);
+            cockpit_ammo_gauge_draw(plw, pos.x, pos.y, 0);
+        }
+    } else {
+        if (camera_mode1_ck() == 1) {
+            cockpit_aim_view_draw();
+        }
+        if (camera_work_ck() == 0 && pl_camera_reset_ck(plw, 1) == 1) {
+            cockpit_shell_marker_draw(plw);
+        }
+        if (cockpit_hud_hidden_self_ck(plw) == 1) {
+            get_lsp_data(0xBA6, &pos);
+            cockpit_weapon_frame_draw(work, &pos, 0);
+            switch (plw->field_0x002) {
+            case 7:
+                cockpit_stagger_gauge_draw(work, 0, 0);
+                break;
+            case 8:
+                get_lsp_data(0xC13, &pos);
+                cockpit_charge_gauge_draw(work, &pos, 0);
+                break;
+            }
+        }
+    }
+}
+
+/* 0x802EC8AC (0x174): Draws the aim view: the scope frame and its gauge animation while the camera aims, the barrier
+ * gauge when no barrier holds, and the zoom ring scaled by the zoom ratio. */
+void cockpit_aim_view_draw(void) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ gauge;
+    f32 zoom;
+    u8 aiming;
+    u8 zooming;
+    CockpitWork* work = cockpit_work;
+    _PLW* plw = work->plw;
+    s32 wide = ck_WideMode();
+
+    camera_aim_zoom_get(plw, &aiming, &zooming, &zoom);
+    get_lsp_data(wide != 0 ? 0xCA1 : 0xC48, &pos);
+    if (aiming != 0) {
+        draw_sprite_ary(wide != 0 ? cockpit_scope_frame_ids_wide : cockpit_scope_frame_ids, &pos);
+        draw_sprite_anim_ary(wide != 0 ? cockpit_scope_anim_ids_wide : cockpit_scope_anim_ids, work->gauge_frame_0x167, &pos);
+        if (Pl_bari_ck(plw, 1) == 0) {
+            get_lsp_data(wide != 0 ? 0xCC6 : 0xC6E, &gauge);
+            cockpit_ammo_gauge_draw(plw, gauge.x, gauge.y, 1);
+        }
+    }
+    if (zooming != 0) {
+        zoom *= (f32)sprite_anim_last_frame(0xC5C);
+        draw_sprite_anim_ary(wide != 0 ? cockpit_zoom_ring_ids_wide : cockpit_zoom_ring_ids, (u16)zoom, &pos);
+    }
+}
+
+/* The status icon cells per cursor index (players' two rows), the act-field mask tables the player cursors walk
+ * (kind 0 and 1, the +0x3D8 and +0x3DC words), and the AI NPC's two mask tables - 0-terminated. */
+u8 cockpit_act_icon_cells[20] = {
+    0x04, 0x05, 0x3C, 0x02, 0x03, 0x3D, 0x0E, 0x0F, 0x10, 0x32,
+    0x33, 0x34, 0x35, 0x36, 0x0C, 0x41, 0x42, 0x43, 0x44, 0x00,
+};
+u8 cockpit_skill_icon_cells[20] = {
+    0x07, 0x06, 0x09, 0x08, 0x0B, 0x37, 0x38, 0x3B, 0x11, 0x12,
+    0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x00, 0x00,
+};
+u32 cockpit_act_mask_a0[10] = {
+    0x00000010, 0x00000020, 0x00010000, 0x00000040, 0x00000080,
+    0x00002000, 0x00000800, 0x00000400, 0x00004000, 0x00000000,
+};
+u32 cockpit_act_mask_b0[11] = {
+    0x00008000, 0x00010000, 0x00040000, 0x00020000, 0x00080000, 0x00000400,
+    0x00000800, 0x00002000, 0x00001000, 0x00004000, 0x00000000,
+};
+u32 cockpit_act_mask_a1[9] = {
+    0x00000008, 0x00000004, 0x00000002, 0x00000001, 0x00000100,
+    0x00000200, 0x00020000, 0x00040000, 0x00000000,
+};
+u32 cockpit_act_mask_b1[12] = {
+    0x00000001, 0x00000002, 0x00000004, 0x00000008, 0x00000040, 0x00000080,
+    0x00000010, 0x00000020, 0x00000100, 0x00000200, 0x00000000, 0x00000000,
+};
+u32 cockpit_npc_mask0[4] = {
+    0x00000010, 0x00000040, 0x00002000, 0x00000000,
+};
+u32 cockpit_npc_mask1[5] = {
+    0x00000008, 0x00000004, 0x00000002, 0x00000001, 0x00000000,
+};
+
+/* The ammo gauge's three state icons (empty, reloading, idle) for the plain and the aim view. */
+u16 cockpit_ammo_icons[3] = { 0x0C76, 0x0C77, 0x0C78 };
+u16 cockpit_ammo_icons_aim[3] = { 0x0C71, 0x0C72, 0x0C73 };
+
+/* 0x802ECA20 (0x208): Draws the ammo gauge at (`x`, `y`): one cell per loaded round (the firing cell animated), the
+ * condition marker, then the gauge's state icon; with no magazine only the empty icon while the weapon is out. */
+void cockpit_ammo_gauge_draw(_PLW* plw, s16 x, s16 y, u8 aim) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ start;
+    const u16* icons;
+    s16 step;
+    CockpitWork* work = cockpit_work;
+    u8 capacity;
+    u8 loaded;
+    s32 i;
+
+    icons = aim == 0 ? cockpit_ammo_icons : cockpit_ammo_icons_aim;
+    pos.x = x;
+    pos.y = y;
+    if (plw->magazine_0x270 == 0) {
+        if (plw->field_0x018 == 1 && pl_item_slot_next_get(plw, plw->item_slot_sel, 1) != 0xFF) {
+            draw_sprite_anim_idx(icons[2], work->frame_0x190, &pos);
+        }
+    } else {
+        capacity = plw->ammo_capacity_0x26A;
+        loaded = plw->field_0x269;
+        step = get_lsp_data(0xC6F, NULL)->width;
+        if (aim != 0) {
+            pos.x = (s32)(320.0f * hud_screen_width_get()) - (capacity * step) / 2;
+        }
+        uv_pair_copy(&start, &pos);
+        for (i = 0; i < capacity; i++) {
+            if (work->item_frame_0x166 != 0 && i == loaded) {
+                draw_sprite_anim_ary(cockpit_ammo_fire_ids, work->item_frame_0x166, &pos);
+            } else if (i < loaded) {
+                draw_sprite_anim_idx(0xC6F, 0, &pos);
+            } else {
+                draw_sprite_anim_idx(0xC70, 100, &pos);
+            }
+            pos.x += step;
+        }
+        if (Pl_dm_condition_ck(plw, 0x300) != 0) {
+            draw_sprite_anim_idx(0xC74, work->frame_0x190, &start);
+        }
+        pos.x = x;
+        pos.y = y;
+        if (pl_reload_motion_ck(plw) != 0) {
+            draw_sprite_anim_idx(icons[1], work->frame_0x190, &pos);
+        } else if (loaded == 0 && plw->field_0x018 == 1) {
+            draw_sprite_anim_idx(icons[0], work->frame_0x190, &pos);
+        }
+    }
+}
+
+/* 0x802ECC28 (0x200): Draws one player's name plate at `base`: the plate in the player's colour, the class icon
+ * (blinking the warning icon while `cockpit_lockon_level_get` reports one), the hunter name and the plate's status icons. */
+void cockpit_split_plate_draw(_PLW* plw, const _mh_ivec2_* base) {
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    CockpitWork* work = &cockpit_work[plw->chunk_ofs];
+    const _SPR_DATA_* rec;
+    u32 color;
+    u8 warn;
+
+    rec = get_lsp_data(0xD00, NULL);
+    pos.x = rec->pos.x + base->x;
+    pos.y = rec->pos.y + base->y;
+    rec = get_lsp_data(0xBB6, NULL);
+    color = player_color_get(plw->chunk_ofs);
+    drawshape_init(3, 0xFFFF);
+    drawshape_set_vertex_rect((s16)(rec->pos.x + pos.x), (s16)(rec->pos.y + pos.y), rec->width, rec->height);
+    drawshape_set_corner_colors(-1, color, color, -1);
+    drawshape_set_texture_rect(rec->tex_flag, &rec->uv0, &rec->uv1);
+    drawshape_exec();
+    spr_data_copy(&spr, get_lsp_data(0xBB7, NULL));
+    spr.color = color;
+    draw_sprite(spr, &pos);
+    warn = cockpit_lockon_level_get(plw);
+    if (warn != 0 && ((work->frame_0x190 / 20) & 1) != 0) {
+        draw_sprite_uv_idx(0xBBB, warn == 2 ? 0 : 1, &pos);
+    } else {
+        draw_sprite_uv_color_idx(0xBB8, plw->field_0x002, color, &pos);
+    }
+    rec = get_lsp_data(0xBB9, NULL);
+    font_set_size(rec->width, rec->height);
+    font_print_ex((s16)(pos.x + rec->pos.x), (s16)(pos.y + rec->pos.y), 0, (s8*)"%s", plw->hunter_0x5CA.name_0x5CA);
+    cockpit_plate_icons_draw(&pos, plw);
+}
+
+/* 0x802ECE28 (0x3E4): Draws one player's plate in the cockpit's party list: the master's own plate on top, the
+ * others stacked by `index`; the plate, class icon, mark-table entry, name (or id), transfer icon, status icons and
+ * the health bar of a non-master. */
+void cockpit_party_plate_draw(_PLW* plw, u16 index) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ mark;
+    _SPR_DATA_ spr;
+    CockpitWork* work = cockpit_work;
+    const _SPR_DATA_* rec;
+    u32 color;
+    u16 text_id;
+    u8 warn;
+    s16 width;
+
+    if (Pl_master_ck(plw) == 1) {
+        get_lsp_data(0xBB5, &pos);
+        rec = get_lsp_data(0xBB6, NULL);
+        text_id = 0xBB9;
+    } else {
+        get_lsp_data(0xBBE, &pos);
+        pos.y += (s16)(index * 25);
+        rec = get_lsp_data(0xBC0, NULL);
+        text_id = 0xBC2;
+    }
+    color = player_color_get(plw->chunk_ofs);
+    drawshape_init(3, 0xFFFF);
+    drawshape_set_vertex_rect((s16)(rec->pos.x + pos.x), (s16)(rec->pos.y + pos.y), rec->width, rec->height);
+    drawshape_set_corner_colors(-1, color, color, -1);
+    drawshape_set_texture_rect(rec->tex_flag, &rec->uv0, &rec->uv1);
+    drawshape_exec();
+    spr_data_copy(&spr, get_lsp_data(0xBB7, NULL));
+    spr.color = color;
+    draw_sprite(spr, &pos);
+    warn = cockpit_lockon_level_get(plw);
+    if (warn != 0 && ((work->frame_0x190 / 20) & 1) != 0) {
+        draw_sprite_uv_idx(0xBBB, warn == 2 ? 0 : 1, &pos);
+    } else {
+        draw_sprite_uv_color_idx(0xBB8, plw->field_0x002, color, &pos);
+    }
+    if ((work->slot_flags_0x0C8 & (1 << plw->chunk_ofs)) != 0) {
+        rec = get_lsp_data(0xBBD, NULL);
+        mark.x = rec->pos.x + pos.x;
+        mark.y = rec->pos.y + pos.y;
+        quest_mark_append(work, &mark, 0, work->slot_state_0x0C9[plw->chunk_ofs] == 0 ? color : 0xF0F0F0FF,
+                          work->slot_timer_0x0C0[plw->chunk_ofs]);
+    }
+    rec = get_lsp_data(text_id, NULL);
+    font_set_size(rec->width, rec->height);
+    if (isServerSelectState() == 0 || get_option_cfg(12) == 0) {
+        font_print_ex((s16)(pos.x + rec->pos.x), (s16)(pos.y + rec->pos.y), 0, (s8*)"%s", plw->hunter_0x5CA.name_0x5CA);
+    } else {
+        font_print_ex((s16)(pos.x + rec->pos.x), (s16)(pos.y + rec->pos.y), 0, (s8*)"%s", plw->hunter_0x5CA.id_0x5DB);
+    }
+    if (game_ready_ck() == 1 && (u8)cockpit_state.transfer_mode_0x07C[plw->chunk_ofs] == 3 && (system_w.field_0x0c & 0x10) == 0) {
+        draw_tex_icon_square((s16)(pos.x + rec->pos.x + 46), (s16)(pos.y + rec->pos.y), rec->width, -1, 34);
+    }
+    cockpit_plate_icons_draw(&pos, plw);
+    if (Pl_master_ck(plw) == 0) {
+        rec = get_lsp_data(0xBC1, NULL);
+        width = rec->width * plw->health / plw->health_max;
+        drawshape_init(3, 0xFFFF);
+        drawshape_set_vertex_rect((s16)(pos.x + rec->pos.x), (s16)(pos.y + rec->pos.y), width, rec->height);
+        drawshape_set_flat_color(0x57CC33FF);
+        drawshape_exec();
+    }
+}
+
+/* 0x802ED20C (0x274): Draws the AI NPC's plate in the party list: the plate and icon in the NPC colour, its name
+ * line, its health bar, its status icons and its mark-table entry while its view timer runs. */
+void cockpit_npc_plate_draw(void) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ mark;
+    _SPR_DATA_ spr;
+    CockpitWork* work = cockpit_work;
+    _AINPC_W* npc = work->ai_npc_0x048;
+    const _SPR_DATA_* rec;
+    u8** names;
+    s32 single;
+    s16 width;
+
+    get_lsp_data(0xBBE, &pos);
+    rec = get_lsp_data(0xBC0, NULL);
+    drawshape_init(3, 0xFFFF);
+    drawshape_set_vertex_rect((s16)(rec->pos.x + pos.x), (s16)(rec->pos.y + pos.y), rec->width, rec->height);
+    drawshape_set_corner_colors(-1, 0xC8E52EFF, 0xC8E52EFF, -1);
+    drawshape_set_texture_rect(rec->tex_flag, &rec->uv0, &rec->uv1);
+    drawshape_exec();
+    spr_data_copy(&spr, get_lsp_data(0xBBF, NULL));
+    spr.color = 0xC8E52EFF;
+    draw_sprite(spr, &pos);
+    draw_sprite_cell_color_idx(0xBC5, 0x3A, 0xC8E52EFF, &pos);
+    names = get_str_tbl(0x55);
+    single = ai_npc_mode1_ck(npc) == 1;
+    rec = get_lsp_data(0xBC2, NULL);
+    font_set_size(rec->width, rec->height);
+    font_print_ex((s16)(pos.x + rec->pos.x), (s16)(pos.y + rec->pos.y), 0, (s8*)names[(u8)single]);
+    rec = get_lsp_data(0xBC1, NULL);
+    width = rec->width * npc->field_0x1F0 / npc->field_0x1F4;
+    drawshape_init(3, 0xFFFF);
+    drawshape_set_vertex_rect((s16)(pos.x + rec->pos.x), (s16)(pos.y + rec->pos.y), width, rec->height);
+    drawshape_set_flat_color(0x57CC33FF);
+    drawshape_exec();
+    cockpit_npc_plate_icons_draw(&pos);
+    if (ai_npc_call_ck(npc) == 1 && work->view_timer_0x0BE < 0) {
+        work->view_timer_0x0BE = 0;
+    }
+    if (work->view_timer_0x0BE >= 0) {
+        rec = get_lsp_data(0xBC7, NULL);
+        mark.x = rec->pos.x + pos.x;
+        mark.y = rec->pos.y + pos.y;
+        quest_mark_append(work, &mark, 0, 0xC8E52EFF, work->view_timer_0x0BE);
+    }
+}
+
+/* 0x802ED480 (0x108): Draws the cockpit's party list: the local player's plate, then every other live non-master
+ * player's plate once the game is ready - before that, the AI NPC's plate while the quest move shows one. */
+void cockpit_party_list_draw(void) {
+    _PLW* plw;
+    u16 max;
+    u16 index;
+    s32 i;
+
+    set_blendmode(4, 5, 1);
+    plw = (_PLW*)get_move_work_adrs(2);
+    cockpit_party_plate_draw(&plw[(s8)my_player_no()], 0);
+    if (game_ready_ck() == 1) {
+        plw = (_PLW*)get_move_work_adrs(2);
+        max = get_move_work_max(2);
+        index = 0;
+        for (i = 0; i < max; i++, plw++) {
+            if (plw->slot_active != 0 && Pl_master_ck(plw) == 0) {
+                cockpit_party_plate_draw(plw, index);
+                index++;
+            }
+        }
+    } else if (((SysQuestMove*)get_move_work_adrs(0))->npc_plate_0x0EF != 0 && quest_move_state_valid_ck() == 1) {
+        cockpit_npc_plate_draw();
+    }
+    font_flush();
+}
+
+/* 0x802ED620 (0xD4): The AI NPC's status icon bits: one bit per set mask word of the kind's table, then (kind 0) the
+ * NPC's follow, wait or arrived state as bit 3, 4 or 5. */
+s32 cockpit_npc_icon_mask_get(_AINPC_W* npc, u8 kind) {
+    s32 result = 0;
+    s32 bit = 1;
+    const u32* mask;
+    u32 flags;
+
+    mask = kind == 0 ? cockpit_npc_mask0 : cockpit_npc_mask1;
+    flags = npc->field_0x20C;
+    for (;;) {
+        if (*mask == 0) {
+            break;
+        }
+        if ((flags & *mask) != 0) {
+            result |= bit;
+        }
+        bit <<= 1;
+        mask++;
+    }
+    if (kind == 0) {
+        if (ai_npc_wait_ck(npc) == 1) {
+            result |= 8;
+        } else if (ai_npc_motion5_ck(npc) == 1) {
+            result |= 0x10;
+        } else if ((u32)ai_npc_arrived_ck(npc) == 1) {
+            result |= 0x20;
+        }
+    }
+    return result;
+}
+
+/* 0x802ED88C (0xE4): Steps the status-icon cursors: both of every live player's, then the AI NPC's two. */
+void cockpit_icon_cursors_update(void) {
+    _PLW* plw;
+    CockpitWork* work = cockpit_work;
+    u16 max;
+    s32 i;
+    _AINPC_W* npc;
+
+    plw = (_PLW*)get_move_work_adrs(2);
+    if (plw != NULL) {
+        max = get_move_work_max(2);
+        for (i = 0; i < max; i++, plw++) {
+            if (plw->slot_active != 0) {
+                cockpit_act_cursor_step(plw, &work->act_cursor_0x018[plw->chunk_ofs], 0);
+                cockpit_act_cursor_step(plw, &work->skill_cursor_0x020[plw->chunk_ofs], 1);
+            }
+        }
+        npc = work->ai_npc_0x048;
+        cockpit_npc_cursor_step(npc, &work->npc_cursor_0x028[0], 0);
+        cockpit_npc_cursor_step(npc, &work->npc_cursor_0x028[1], 1);
+    }
+}
+
+/* 0x802ED970 (0xB4): Draws the player's two status icons on the plate at `pos`, each while its cursor is armed. */
+void cockpit_plate_icons_draw(const _mh_ivec2_* pos, _PLW* plw) {
+    CockpitWork* work = cockpit_work;
+    Cursor2* cur;
+
+    cur = &work->act_cursor_0x018[plw->chunk_ofs];
+    if (cur->timer >= 0) {
+        draw_sprite_uv_idx(0xBBA, cockpit_act_icon_cells[cur->index], pos);
+    }
+    cur = &work->skill_cursor_0x020[plw->chunk_ofs];
+    if (cur->timer >= 0) {
+        draw_sprite_uv_idx(0xBBC, cockpit_skill_icon_cells[cur->index], pos);
+    }
+}
+
+/* The AI NPC's two status icon tables (sprite cells of 0xBC4 and 0xBC6), indexed by its cursors. */
+u8 cockpit_npc_act_cells[8] = { 0x04, 0x02, 0x3D, 0x40, 0x39, 0x3A, 0x00, 0x00 };
+u8 cockpit_npc_skill_cells[4] = { 0x07, 0x06, 0x09, 0x08 };
+
+/* 0x802EDA24 (0xCC): Draws the AI NPC's two status icons on its plate at `pos`; icons 0x40 and 0x3A get their own
+ * colours. */
+void cockpit_npc_plate_icons_draw(const _mh_ivec2_* pos) {
+    CockpitWork* work = cockpit_work;
+
+    u8 icon;
+
+    if (work->npc_cursor_0x028[0].timer >= 0) {
+        icon = cockpit_npc_act_cells[work->npc_cursor_0x028[0].index];
+        switch (icon) {
+        case 0x40:
+            draw_sprite_cell_color_idx(0xBC4, icon, 0xFCE45EFF, pos);
+            break;
+        case 0x3A:
+            draw_sprite_cell_color_idx(0xBC4, icon, 0xF1A86DFF, pos);
+            break;
+        default:
+            draw_sprite_uv_idx(0xBC4, icon, pos);
+            break;
+        }
+    }
+    if (work->npc_cursor_0x028[1].timer >= 0) {
+        draw_sprite_uv_idx(0xBC6, cockpit_npc_skill_cells[work->npc_cursor_0x028[1].index], pos);
+    }
+}
+
+/* 0x802EDB0C (0x1D8): Steps the special-shell icon state while the selected slot holds shell 0xDF: the hold and
+ * blink counters and the level while the weapon is charged, the fade alpha up or down; latches the shell flag. */
+void cockpit_item_ring_update(_PLW* plw, u8* anim, u8* fade) {
+    u8 on = plw->slot_id[plw->field_0x304].item_id == 0xDF;
+
+    if (plw->field_0x308 == 0) {
+        if (anim[1] != 0) {
+            anim[1]--;
+        }
+        anim[2] = 0;
+        if (on != anim[0]) {
+            anim[3] = on != 0 ? 16 : 0;
+        } else if (on == 0) {
+            if (anim[3] != 0) {
+                anim[3]--;
+            }
+            if (anim[3] > 3) {
+                anim[3] = 3;
+            }
+        } else {
+            if (anim[3] < 16) {
+                anim[3]++;
+            }
+            if (anim[3] > 16) {
+                anim[3] = 16;
+            }
+        }
+        if (fade[1] > 16) {
+            fade[1] -= 16;
+        } else {
+            fade[1] = 0;
+        }
+    } else {
+        if (anim[1] < 10) {
+            anim[1]++;
+        }
+        anim[2]++;
+        if (anim[2] >= 190) {
+            anim[2] = 40;
+        } else if ((u8)(anim[2] + 166) <= 9) {
+            anim[2] = 40;
+        }
+        if ((plw->field_0x309 & 0x20) != 0) {
+            anim[2] = 100;
+        }
+        if (on == 0) {
+            if (anim[3] != 0) {
+                anim[3]--;
+            }
+            if (anim[3] > 3) {
+                anim[3] = 3;
+            }
+        } else {
+            if (anim[3] < 3) {
+                anim[3]++;
+            }
+            if (anim[3] > 3) {
+                anim[3]--;
+            }
+        }
+        fade[1] += 10;
+        if (fade[1] > 150) {
+            fade[1] = 150;
+        }
+    }
+    anim[0] = on;
+}
+
+/* 0x802EDCE4 (0x5A4): Draws the item-slot ring: the frame, the selected item and up to four neighbours (the shell
+ * slot's frame cells swapped in), the act icons, the selected item's name and count, and the use prompt. */
+void cockpit_item_ring_draw(_PLW* plw, u8* anim) {
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    u16 next2;
+    u16 prev2;
+    u16 prev;
+    u16 next;
+    u16 cur;
+    s16 count;
+    u32 dead;
+    const u16* alt;
+    const u16* ids;
+    const _SPR_DATA_* rec;
+    u16 item;
+    s16 num;
+
+    set_blendmode(4, 5, 1);
+    get_lsp_data(0xC20, &pos);
+    draw_sprite_anim_ary(cockpit_item_ring_open_ids, anim[1], &pos);
+    draw_sprite_anim_ary(cockpit_item_ring_level_ids, anim[3], &pos);
+    if (anim[1] != 0) {
+        next2 = 0xFF;
+        prev2 = 0xFF;
+        prev = 0xFF;
+        next = 0xFF;
+        cur = 0xFF;
+        count = cockpit_item_slot_live_count(plw);
+        dead = cockpit_item_slot_live_ck(plw, plw->field_0x304) == 0;
+        if (dead != 0) {
+            count++;
+        }
+        if (dead == 0) {
+            cur = plw->field_0x304;
+        }
+        switch (count) {
+        case 0:
+        case 1:
+            break;
+        default:
+            next = pl_item_slot_cycle(plw, plw->field_0x304, 1);
+            prev = pl_item_slot_cycle(plw, plw->field_0x304, 0);
+            prev2 = pl_item_slot_cycle(plw, next, 1);
+            next2 = pl_item_slot_cycle(plw, prev, 0);
+            break;
+        case 4:
+            next = pl_item_slot_cycle(plw, plw->field_0x304, 1);
+            prev = pl_item_slot_cycle(plw, plw->field_0x304, 0);
+            prev2 = pl_item_slot_cycle(plw, next, 1);
+            break;
+        case 3:
+            prev = pl_item_slot_cycle(plw, plw->field_0x304, 0);
+        case 2:
+            next = pl_item_slot_cycle(plw, plw->field_0x304, 1);
+            break;
+        }
+        alt = NULL;
+        if (plw->slot_id[next].item_id == 0xDF) {
+            alt = cockpit_item_ring_shell_next_ids;
+        } else if (plw->slot_id[prev].item_id == 0xDF) {
+            alt = cockpit_item_ring_shell_prev_ids;
+        } else if (plw->slot_id[prev2].item_id == 0xDF) {
+            alt = cockpit_item_ring_shell_prev2_ids;
+        } else if (plw->slot_id[next2].item_id == 0xDF) {
+            alt = cockpit_item_ring_shell_next2_ids;
+        }
+        if (alt == NULL) {
+            draw_sprite_anim_ary(cockpit_item_ring_frame_ids, anim[1], &pos);
+        } else {
+            for (ids = cockpit_item_ring_frame_ids; *ids != 0xFFFF; ids++, alt++) {
+                sprite_frame_apply(&spr, *ids, anim[1], NULL);
+                if (*ids != *alt) {
+                    rec = get_lsp_data(*alt, NULL);
+                    tex_uv_copy(&spr.uv0, &rec->uv0);
+                    tex_uv_copy(&spr.uv1, &rec->uv1);
+                }
+                draw_sprite(spr, &pos);
+            }
+        }
+        cockpit_item_slot_icon_draw(plw, 0xC23, anim[1], cur, &pos);
+        cockpit_item_slot_icon_draw(plw, 0xC2D, anim[1], next, &pos);
+        cockpit_item_slot_icon_draw(plw, 0xC2E, anim[1], prev, &pos);
+        cockpit_item_slot_icon_draw(plw, 0xC2F, anim[1], prev2, &pos);
+        cockpit_item_slot_icon_draw(plw, 0xC30, anim[1], next2, &pos);
+    } else {
+        cockpit_item_slot_icon_draw(plw, 0xC23, anim[1], plw->field_0x304, &pos);
+    }
+    cockpit_act_icon_draw(plw, 0xC3F, anim[3], 4, &pos);
+    cockpit_act_icon_draw(plw, 0xC40, anim[3], 2, &pos);
+    draw_sprite_anim_ary(cockpit_item_ring_act_ids, anim[3], &pos);
+    item = plw->slot_id[plw->field_0x304].item_id;
+    if (item != 0 && (item != 0xDF || anim[3] == 3)) {
+        draw_font_idx(0xC2C, item == 0xDF ? (s8*)get_str_tbl(0x58)[3] : (s8*)ItemName(item), 5, &pos);
+        if (GetItemData(item)->max_num_0x003 != 1) {
+            draw_sprite_anim_idx(0xC24, anim[1], &pos);
+            num = plw->slot_id[plw->field_0x304].value;
+            if (num == GetItemData(item)->max_num_0x003) {
+                draw_number_2digit_anim_ary(cockpit_item_ring_digit_ids, anim[1], num, 0xF53737FF, &pos);
+            } else {
+                draw_number_2digit_anim_ary(cockpit_item_ring_digit_ids, anim[1], num, 0, &pos);
+            }
+        }
+    }
+    if (get_cfg(plw->chunk_ofs, 7) == 0) {
+        draw_sprite_anim_idx(0xC37, anim[1], &pos);
+    } else {
+        draw_sprite_anim_idx(0xC38, anim[1], &pos);
+    }
+    if (plw->field_0x3E4 == 7 && plw->field_0x3E8 == 0 && item != 0 && item != 0xDF && get_cfg(plw->chunk_ofs, 7) == 0) {
+        draw_sprite_anim_idx(0xC39, anim[2], &pos);
+        draw_sprite_anim_idx(0xC36, anim[2], &pos);
+        if (pl_item_now_usable_ck(plw, item) != 0) {
+            set_blendmode(4, 1, 1);
+            draw_sprite_anim_idx(0xC35, anim[2], &pos);
+            set_blendmode(4, 5, 1);
+        }
+    }
+}
+
+/* The item list's name colours: selected/other slot, matching/other kind. */
+u32 cockpit_item_list_colors[4] = { 0xF3D73EFF, 0xD1BA3FFF, 0xF5F5F5FF, 0xB4B4B4FF };
+
+/* 0x802EE3AC (0x2B0): Draws one entry of the item list at `id` offset by (`x`, `y`): the item name and its count
+ * (or the stack text), shadowed for the selected slot and coloured by slot and kind, then the item icon. */
+void cockpit_item_list_entry_draw(_PLW* plw, u16 id, s16 x, s16 y, u8 slot) {
+    char text[12];
+    _mh_ivec2_ pos;
+    const _SPR_DATA_* rec;
+    const _SPR_DATA_* line;
+    u16 item;
+    u32 selected;
+    s16 name_x;
+    s16 name_y;
+    s16 idx;
+    u32 color;
+    s16 text_x;
+    u8 kind;
+    u16 num_id;
+
+    if (slot != 0xFF && pl_item_slot_count_get(plw, slot) != 0) {
+        item = pl_item_slot_item_get(plw, slot);
+        if (GetItemData(item)->kind_0x00 == 1) {
+            selected = slot == plw->item_slot_sel;
+            rec = get_lsp_data(id, NULL);
+            x += rec->pos.x;
+            y += rec->pos.y;
+            line = get_lsp_data(0xC9E, NULL);
+            name_x = x + line->pos.x;
+            name_y = y + line->pos.y;
+            kind = pl_item_icon_kind_get(item);
+            idx = 0;
+            if (kind != plw->ammo_icon_kind_0x26D) {
+                idx = 2;
+            }
+            if (plw->item_slot_sel != slot) {
+                idx++;
+            }
+            color = cockpit_item_list_colors[idx];
+            font_set_size(line->width, line->height);
+            name_x = menu_text_center_x((char*)ItemName(item), name_x, 16);
+            if (selected != 0) {
+                font_print_ex(name_x + 2, name_y + 1, 1, (s8*)"%s", ItemName(item));
+            }
+            font_locate(name_x, name_y);
+            flfntSetColor(color);
+            font_print((s8*)"%s", ItemName(item));
+            if (item_is_53_ck(item) == 1) {
+                sprintf(text, (const char*)get_str_tbl(31)[2]);
+                num_id = 0xC9F;
+            } else {
+                sprintf(text, "%d", pl_item_slot_count_get(plw, slot));
+                num_id = 0xCA0;
+                if (pl_item_slot_count_get(plw, slot) < 10) {
+                    num_id = 0xC9F;
+                }
+            }
+            rec = get_lsp_data(num_id, NULL);
+            text_x = menu_text_center_x(text, (s16)(x + rec->pos.x), rec->width);
+            if (selected != 0) {
+                font_print_ex(text_x + 2, name_y + 1, 1, (s8*)text);
+            }
+            font_locate(text_x, name_y);
+            font_set_size(rec->width, rec->height);
+            flfntSetColor(color);
+            font_print((s8*)text);
+            pos.x = x;
+            pos.y = y;
+            draw_itemicon_item_id_idx(0xC9D, item, &pos);
+        }
+    }
+}
+
+/* The item list frame's opening animation and its second-page overlay (sprite ids, 0xFFFF-terminated). */
+u16 cockpit_item_list_frame_ids[16] = {
+    0x0C94, 0x0C88, 0x0C89, 0x0C8A, 0x0C8B, 0x0C8C, 0x0C8D, 0x0C8E,
+    0x0C8F, 0x0C90, 0x0C91, 0x0C92, 0x0C93, 0x0C9A, 0xFFFF, 0x0000,
+};
+u16 cockpit_item_list_page2_ids[18] = {
+    0x0C7A, 0x0C7B, 0x0C7C, 0x0C7D, 0x0C7E, 0x0C7F, 0x0C80, 0x0C81, 0x0C82,
+    0x0C83, 0x0C84, 0x0C85, 0x0C98, 0x0C99, 0x0C95, 0x0C96, 0x0C97, 0xFFFF,
+};
+
+/* 0x802EE65C (0x1D0): Draws the item list of the second item page: the frame (opening with the hold frame), the act
+ * icons, then the selected item and - as the frame opens - its two neighbours. */
+void cockpit_item_list_draw(_PLW* plw, u8* anim) {
+    _mh_ivec2_ pos;
+    u16 next;
+    u16 prev;
+    u8 frame;
+
+    if (pl_item_page2_ck(plw) != 0) {
+        set_blendmode(4, 5, 1);
+        frame = anim[1] / 10;
+        get_lsp_data(0xC79, &pos);
+        draw_sprite_anim_ary(cockpit_item_list_frame_ids, frame, &pos);
+        if (frame != 0) {
+            draw_sprite_anim_ary(cockpit_item_list_page2_ids, frame, &pos);
+            cockpit_act_icon_draw(plw, 0xC86, frame, 0x10, &pos);
+            cockpit_act_icon_draw(plw, 0xC87, frame, 8, &pos);
+        }
+        if (frame <= 3) {
+            cockpit_item_list_entry_draw(plw, 0xC9A, pos.x, pos.y, plw->item_slot_sel);
+        } else {
+            cockpit_item_list_entry_draw(plw, 0xC99, pos.x, pos.y, plw->item_slot_sel);
+            next = pl_item_slot_next_get(plw, plw->item_slot_sel, 1);
+            if (next != 0xFF && next != plw->item_slot_sel) {
+                cockpit_item_list_entry_draw(plw, 0xC9A, pos.x, pos.y, next);
+            }
+            if (frame > 7) {
+                prev = pl_item_slot_next_get(plw, plw->item_slot_sel, 0);
+                if (prev != 0xFF && prev != plw->item_slot_sel && next != prev) {
+                    cockpit_item_list_entry_draw(plw, 0xC98, pos.x, pos.y, prev);
+                }
+            }
+        }
+        font_flush();
+    }
+}
+
+/* 0x802EE82C (0x150): Draws the cockpit's floating item tag over the player: projected through the current camera,
+ * kept below the screen top, offset by the tag's own y. */
+void cockpit_item_tag_draw(CockpitWork* work) {
+    VEC3 screen;
+    u32 camera;
+    _mh_ivec2_ pos;
+    s32 handle;
+    _PLW* plw = work->plw;
+    CockpitItemTag* tag;
+
+    if (plw->field_0x3E4 != 0) {
+        tag = &work->item_tag_0x02C;
+        if (tag->tex_idx_0x15 != 0) {
+            set_blendmode(4, 5, 1);
+            VEC3_ctor(&screen);
+            chara_icon_pos_get(plw, 1, &tag->pos);
+            handle = scn_root_get_current_camera(pRoot);
+            word_copy_return_dst(&camera, &handle);
+            camera_world_to_screen(&camera, &screen, &tag->pos);
+            if (screen.z < 0.0f || screen.z > 1.0f) {
+                return;
+            }
+            screen.x *= hud_screen_width_get();
+            screen.y *= 1.07142854f;
+            if (screen.y < 100.0f) {
+                screen.y = 100.0f;
+            }
+            pos.x = screen.x;
+            pos.y = screen.y + tag->ofs_y_0x0F;
+            cockpit_item_tag_draw_at(plw, tag, &pos, 0xFF);
+        }
+    }
+}
+
+/* The item tag's opening animation (sprite ids, 0xFFFF-terminated). */
+u16 cockpit_item_tag_open_ids[4] = { 0x0BDD, 0x0BDE, 0xFFFF, 0x0000 };
+
+/* 0x802EE97C (0x2A8): Draws one item tag at `pos`: the frame, the icon (crossed out when unusable) and its count; on
+ * the second item page with the prompt on, the use prompt; with the menu open, the opening animation. */
+void cockpit_item_tag_draw_at(_PLW* plw, const CockpitItemTag* tag, const _mh_ivec2_* pos, u8 alpha) {
+    u32 prompt;
+    u16 id;
+    u8 frame;
+
+    set_blendmode(4, 5, 1);
+    prompt = 0;
+    if (get_cfg(plw->chunk_ofs, 7) == 0) {
+        prompt = 1;
+    }
+    if (pl_item_menu_open_ck(plw) == 0 || plw->field_0x3E4 == 7) {
+        if (plw->field_0x3E8 == 0 && prompt == 1) {
+            id = 0xBD6;
+        } else {
+            id = 0xBD7;
+        }
+        draw_sprite_anim_idx(id, tag->frame_0x0C, pos);
+        draw_itemicon_frame_idx(0xBDC, tag->frame_0x0C, tag->tex_idx_0x15, tag->color_0x10, pos);
+        if (tag->unusable_0x16 != 0) {
+            draw_itemicon_frame_idx(0xBDC, tag->frame_0x0C, 0x71, 0xFF0000FF, pos);
+        }
+        if (tag->count_0x19 != 0) {
+            draw_number_2digit_anim_ary(cockpit_item_tag_digit_ids, tag->frame_0x0C, tag->count_0x19, 0, pos);
+        }
+        if (plw->field_0x3E8 == 0 && prompt == 1) {
+            draw_sprite_anim_idx(0xBDA, tag->frame_0x0C, pos);
+            draw_sprite_anim_idx(0xBD9, tag->frame_0x0C, pos);
+            if (tag->open_0x17 != 0 && tag->unusable_0x16 == 0) {
+                draw_sprite_anim_idx(0xBDB, tag->frame_0x0C, pos);
+            }
+            if (tag->unusable_0x16 == 0) {
+                set_blendmode(4, 1, 1);
+                draw_sprite_anim_idx(0xBD8, tag->frame_0x0C, pos);
+            }
+        }
+    } else {
+        draw_sprite_anim_idx(0xBD7, tag->frame_0x0C, pos);
+        frame = tag->open_frame_0x0E;
+        if (frame > 30) {
+            frame = 30;
+        }
+        if (tag->unusable_0x16 == 0) {
+            if (prompt == 1) {
+                draw_sprite_anim_ary(cockpit_item_tag_open_ids, tag->open_frame_0x0E, pos);
+            } else {
+                draw_itemicon_frame_idx(0xBDC, tag->frame_0x0C, tag->tex_idx_0x15, tag->color_0x10, pos);
+            }
+        } else if (prompt == 1) {
+            draw_sprite_anim_idx(0xBDD, frame, pos);
+            draw_sprite_anim_idx(0xBDF, frame, pos);
+        } else {
+            draw_itemicon_frame_idx(0xBDC, tag->frame_0x0C, tag->tex_idx_0x15, tag->color_0x10, pos);
+            draw_itemicon_frame_idx(0xBDC, tag->frame_0x0C, 0x71, 0xFF0000FF, pos);
+        }
+    }
+}
+
+/* 0x802EED0C (0xD8): The player's lock-on warning level: 1 when a live, alert quest target that sees the player
+ * targets it with state 1, else 2 for state 2, else 0. */
+u8 cockpit_lockon_level_get(_PLW* plw) {
+    s32 level = 0;
+    u16 max = get_move_work_max(3);
+    _ENEMY_WORK* enemy = (_ENEMY_WORK*)get_move_work_adrs(3);
+    u16 i;
+
+    for (i = 0; i < max; i++, enemy++) {
+        if (enemy->active != 0 && (enemy->field_0x1C8 & 1) != 0 && em_sight_player_ck2(enemy, plw->chunk_ofs) == 1 &&
+            em_pl_target_ck(enemy, plw) != 0) {
+            if (enemy->field_0x43D == 1) {
+                level = 1;
+            }
+            if (enemy->field_0x43D == 2 && level == 0) {
+                level = 2;
+            }
+        }
+    }
+    return level;
+}
+
+/* 0x802EEDE4 (0xBC): Draws the aim marker at the world position `pos`, projected through the current camera. */
+void cockpit_aim_marker_draw(VEC3 pos) {
+    VEC3 screen;
+    u32 camera;
+    _mh_ivec2_ spot;
+    s32 handle;
+
+    VEC3_ctor(&screen);
+    handle = scn_root_get_current_camera(pRoot);
+    word_copy_return_dst(&camera, &handle);
+    camera_world_to_screen(&camera, &screen, &pos);
+    if (screen.z < 0.0f || screen.z > 1.0f) {
+        return;
+    }
+    spot.x = screen.x * hud_screen_width_get();
+    spot.y = 1.07142854f * screen.y;
+    draw_sprite_idx(0xC6D, &spot);
+}
+
+/* 0x802EEEA0 (0xDC): `cockpit_aim_marker_draw` through player `player`'s own scene camera. */
+void cockpit_aim_marker_draw_split(VEC3 pos, u8 player) {
+    VEC3 screen;
+    u32 camera;
+    _mh_ivec2_ spot;
+    s32 handle;
+
+    VEC3_ctor(&screen);
+    handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(Screen_w.camera_view.player_camera_0x50[player]);
+    word_copy_return_dst(&camera, &handle);
+    camera_world_to_screen(&camera, &screen, &pos);
+    if (screen.z < 0.0f || screen.z > 1.0f) {
+        return;
+    }
+    spot.x = screen.x * hud_screen_width_get();
+    spot.y = 1.07142854f * screen.y;
+    draw_sprite_idx(0xC6D, &spot);
+}
+
+/* 0x802EEF7C (0x90): Draws the aim marker 1000 units ahead of the player's eye. */
+void cockpit_eye_marker_draw(_PLW* plw) {
+    MTX34 eye;
+    VEC3 pos;
+    VEC3 ofs;
+
+    VEC3_ctor(&pos);
+    MTX34_ctor(&eye);
+    pl_eye_mtx_get(plw, &eye);
+    copyVec3(&pos, setVec3(&ofs, 0.0f, 0.0f, 1000.0f));
+    mulVecMatAddTrans(&pos, &eye);
+    cockpit_aim_marker_draw(pos);
+}
+
+/* 0x802EF00C (0x94): `cockpit_eye_marker_draw` through the player's own scene camera. */
+void cockpit_eye_marker_draw_split(_PLW* plw) {
+    MTX34 eye;
+    VEC3 pos;
+    VEC3 ofs;
+
+    VEC3_ctor(&pos);
+    MTX34_ctor(&eye);
+    pl_eye_mtx_get(plw, &eye);
+    copyVec3(&pos, setVec3(&ofs, 0.0f, 0.0f, 1000.0f));
+    mulVecMatAddTrans(&pos, &eye);
+    cockpit_aim_marker_draw_split(pos, plw->chunk_ofs);
+}
+
+/* 0x802EF0FC (0x134): Draws the digit over the AI NPC's head (when it carries one), projected through the current
+ * camera. */
+#pragma fp_contract off
+void cockpit_npc_digit_draw(CockpitWork* work) {
+    VEC3 screen;
+    VEC3 world;
+    u32 camera;
+    s32 handle;
+    _AINPC_W* npc = work->ai_npc_0x048;
+
+    VEC3_ctor(&screen);
+    assignVec3((Vec*)&world, (Vec*)&npc->vec_0x178);
+    handle = scn_root_get_current_camera(pRoot);
+    word_copy_return_dst(&camera, &handle);
+    if (work->npc_digit_0x04C != 0) {
+        world.y += 150.0f;
+        camera_world_to_screen(&camera, &screen, &world);
+        if (screen.z < 0.0f || screen.z > 1.0f) {
+            return;
+        }
+        screen.x *= hud_screen_width_get();
+        screen.y *= 1.07142854f;
+        HudSize2 size(32.0f, 32.0f);
+        HudPos3 pos(screen.x - 0.5f * size.w, screen.y, screen.z);
+        draw_digit_rect(pos, size, work->npc_digit_0x04C, work->npc_digit_color_0x050);
+    }
+}
+#pragma fp_contract on
+
+/* 0x802EF230 (0x110): Ticks the hunt log: counts its timer down (clearing the log at 0), steps the lines' and the
+ * total's flash frames, and flashes the total when the hunt count grows. */
+void cockpit_hunt_log_update(void) {
+    CockpitState* state = &cockpit_state;
+    HuntLogEntry* entry;
+    s32 i;
+    u32 total;
+
+    if (state->hunt_log_timer_0x05C != 0) {
+        if (--state->hunt_log_timer_0x05C == 0) {
+            state->hunt_log_count_0x05A = 0;
+            return;
+        }
+        entry = state->hunt_log_0x05E;
+        for (i = 0; i < state->hunt_log_count_0x05A; i++, entry++) {
+            if (entry->frame != 0) {
+                entry->frame++;
+                if (entry->frame > 6) {
+                    entry->frame = 0;
+                }
+            }
+        }
+        if (state->hunt_total_frame_0x05B != 0) {
+            if (++state->hunt_total_frame_0x05B > 6) {
+                state->hunt_total_frame_0x05B = 0;
+            }
+        }
+        if (move_work_state_ck() != 0) {
+            total = em_set_work_state_get();
+            if (state->hunt_total_0x070 < total) {
+                state->hunt_total_0x070 = total;
+                state->hunt_total_frame_0x05B = 1;
+            }
+        } else {
+            total = quest_work_state_get();
+            if (state->hunt_total_0x070 < total) {
+                state->hunt_total_0x070 = total;
+                state->hunt_total_frame_0x05B = 1;
+            }
+        }
+    }
+}
+
+/* 0x802EF340 (0xC0): Pushes a hunted monster onto the hunt log (the oldest of three drops off) and shows the log for
+ * five seconds. */
+void cockpit_hunt_log_push(s32 name_id, s32 count, s32 crown) {
+    CockpitState* state = &cockpit_state;
+
+    cockpit_hunt_log_entry_copy(&state->hunt_log_0x05E[2], &state->hunt_log_0x05E[1]);
+    cockpit_hunt_log_entry_copy(&state->hunt_log_0x05E[1], &state->hunt_log_0x05E[0]);
+    if (state->hunt_log_count_0x05A < 3) {
+        state->hunt_log_count_0x05A++;
+    }
+    state->hunt_log_0x05E[0].name_id = name_id;
+    state->hunt_log_0x05E[0].count = count;
+    state->hunt_log_0x05E[0].crown = crown;
+    state->hunt_log_0x05E[0].frame = 1;
+    state->hunt_log_timer_0x05C = 5.0f * Screen_w.frame_scale;
+}
+
+/* The hunt log's frame, its row count, its line anchors and the crown animation (sprite ids). */
+u16 cockpit_hunt_log_frame_ids[12] = {
+    0x0BF8, 0x0BF9, 0x0BFA, 0x0BFB, 0x0BFC, 0x0BF5, 0x0BF6, 0x0BF7, 0xFFFF, 0x0000, 0x0000, 0x0000,
+};
+u16 cockpit_hunt_log_row_ids[4] = { 0x0BFD, 0x0BFE, 0x0BFF, 0xFFFF };
+u16 cockpit_hunt_log_line_ids[4] = { 0x0C01, 0x0C02, 0x0C03, 0x0000 };
+u16 cockpit_hunt_log_crown_ids[4] = { 0x0C06, 0x0C07, 0x0C05, 0xFFFF };
+
+/* 0x802EF424 (0x208): Draws the hunt log: the frame, the total (red at 999999), then one line per entry - the
+ * monster's name, its count (red at 99) and its crown. */
+void cockpit_hunt_log_draw(void) {
+    char text[8];
+    _mh_ivec2_ base;
+    _SPR_DATA_ spr;
+    _mh_ivec2_ pos;
+    CockpitState* state = &cockpit_state;
+    HuntLogEntry* entry;
+    s32 i;
+    const _SPR_DATA_* rec;
+    u16 id;
+
+    set_blendmode(4, 5, 1);
+    if (state->hunt_log_timer_0x05C != 0 && state->hunt_log_count_0x05A != 0) {
+        get_lsp_data(0xBF4, &base);
+        draw_sprite_ary(cockpit_hunt_log_frame_ids, &base);
+        sprite_frame_apply(&spr, 0xC00, state->hunt_total_frame_0x05B, NULL);
+        if (state->hunt_total_0x070 >= 999999) {
+            spr.color = 0xF53737FF;
+        }
+        sprintf(text, "%d", state->hunt_total_0x070);
+        draw_font(spr, (s8*)text, 2, &base);
+        draw_sprite_anim_ary(cockpit_hunt_log_row_ids, state->hunt_log_count_0x05A - 1, &base);
+        entry = state->hunt_log_0x05E;
+        for (i = 0; i < state->hunt_log_count_0x05A; i++, entry++) {
+            rec = get_lsp_data(cockpit_hunt_log_line_ids[state->hunt_log_count_0x05A - 1 - i], NULL);
+            pos.x = base.x + rec->pos.x;
+            pos.y = base.y + rec->pos.y;
+            draw_font_idx(0xC09, str_tbl_33_get(entry->name_id), 0, &pos);
+            draw_sprite_idx(0xC08, &pos);
+            sprintf(text, "%d", entry->count);
+            id = 0xC0B;
+            if (entry->count > 99) {
+                id = 0xC0A;
+            }
+            sprite_frame_apply(&spr, id, entry->frame, NULL);
+            if (entry->count >= 99) {
+                spr.color = 0xF53737FF;
+            }
+            draw_font(spr, (s8*)text, 2, &pos);
+            if (entry->crown != 0) {
+                draw_sprite_anim_ary(cockpit_hunt_log_crown_ids, entry->crown - 1, &pos);
+            }
+        }
+        font_flush();
+    }
+}
+
+/* 0x802EF730 (0x14C): Draws the quest HUD's move prompt while its blink runs: the frame, the button (by the control
+ * option), the prompt line (the second when the latched flag is 2) and, in act state 0xE, the flashing arrow. */
+void cockpit_prompt_draw(void) {
+    _mh_ivec2_ pos;
+    CockpitState* state = &cockpit_state;
+    CockpitWork* work;
+    u32 second;
+    const _SPR_DATA_* rec;
+
+    if (state->blink_timer_0x074 != 0) {
+        set_blendmode(4, 5, 1);
+        work = cockpit_work;
+        rec = get_lsp_data(0xC0C, &pos);
+        draw_prompt_frame(pos.x, pos.y, rec->width, 0, 3);
+        get_lsp_data(0xC0D, &pos);
+        if (get_option_cfg(7) == 0) {
+            draw_sprite_idx(0xC0E, &pos);
+        } else {
+            draw_sprite_idx(0xC0F, &pos);
+        }
+        second = state->blink_flag_0x075 == 2;
+        draw_font_idx(0xC10, (s8*)get_str_tbl(42)[second], 0, &pos);
+        if (work->plw->field_0x3E4 == 0xE) {
+            set_blendmode(4, 1, 1);
+            draw_sprite_anim_idx(0xC11, state->field_0x078, &pos);
+            set_blendmode(4, 5, 1);
+        } else {
+            draw_sprite_idx(0xC12, &pos);
+        }
+    }
+}
+
+/* 0x802EF87C (0x1B4): The quest cockpit's per-frame update (unless the pad is held): the quest timer notice, both
+ * gauges, item tags, shell icons and target masks, the pit-trap latch, the icon animations and the AI NPC entries;
+ * then queues the draw tasks. */
+void cockpit_split_frame_update(void) {
+    CockpitState* state;
+    CockpitWork* work;
+    CockpitWork* work2;
+    _PLW* plw;
+    s32 limit;
+    s32 elapsed;
+
+    if (pad_hold_ck() != 1) {
+        state = &cockpit_state;
+        work = cockpit_work;
+        work2 = &cockpit_work[1];
+        work->field_0x0D1 = 0;
+        cockpit_frame_tick();
+        if (state->quest_notice_timer_0x004 != 0) {
+            state->quest_notice_timer_0x004--;
+        }
+        limit = 5.0f * (60.0f * Screen_w.frame_scale);
+        elapsed = quest_time_elapsed_get();
+        if (elapsed <= limit) {
+            state->quest_notice_timer_0x004 = 0x7FFF;
+        } else if (elapsed < limit * state->quest_notice_step_0x002) {
+            state->quest_notice_timer_0x004 = 10.0f * Screen_w.frame_scale;
+            state->quest_notice_step_0x002 = elapsed / limit;
+        }
+        quest_gauge_update(work, 0);
+        quest_gauge_update(work2, 1);
+        plw = (_PLW*)get_move_work_adrs(2);
+        cockpit_item_tag_update(plw, &work->item_tag_0x02C);
+        cockpit_item_tag_update(&plw[1], &work2->item_tag_0x02C);
+        cockpit_item_ring_update(work->plw, work->item_ring_anim_0x16B, work->item_list_anim_0x16F);
+        cockpit_item_ring_update(work2->plw, work2->item_ring_anim_0x16B, work2->item_list_anim_0x16F);
+        quest_targets_update_a(work);
+        quest_targets_update_a(work2);
+        state->pit_trap_shown_0x059 = state->pit_trap_count_0x058;
+        state->pit_trap_count_0x058 = 0;
+        cockpit_gauge_icons_update(work);
+        cockpit_gauge_icons_update(work2);
+        cockpit_supply_box_update();
+        cockpit_icon_cursors_update();
+        menu_slot_anim_update(0);
+        menu_slot_anim_update(1);
+        ainpc_entry_update_all();
+    }
+    subTransSet((u32)cockpit_split_draw, 0, 0);
+    subTransSetPrio(6, (u32)ainpc_entry_draw_all, 0, 0);
+}
+
+/* The two players' marker window anchors (layout ids). */
+u16 cockpit_split_marker_anchors[4] = { 0x0CD2, 0x0CD3, 0x0000, 0x0000 };
+
+/* 0x802EFA30 (0x150): Draws player `player`'s split-screen marker window: plain at its anchor, or - with the view
+ * gate set - the faded ring with the split view's scale trio. */
+void cockpit_split_marker_draw(u8 player) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ base;
+    CockpitWork* work;
+    const _SPR_DATA_* rec;
+
+    if (get_arena_cfg(player, 14) != 1) {
+        work = &cockpit_work[player];
+        set_blendmode(4, 5, 1);
+        get_lsp_data(cockpit_split_marker_anchors[player], &base);
+        rec = get_lsp_data(0xCD2, NULL);
+        base.x -= rec->pos.x;
+        base.y -= rec->pos.y;
+        if (work->mark_gate_0x0CE == 0) {
+            work->draw_id_0x0BA = 0xD08;
+            quest_marker_draw(work, 0xD06, 1, base);
+            return;
+        }
+        work->ring_scale_0x0A0 = 2.0f;
+        work->ring_extent_x_0x0A4 = 0.0651041642f;
+        work->ring_extent_y_0x0A8 = 0.0651041642f;
+        work->draw_id_0x0BA = 0xD08;
+        rec = get_lsp_data(0xD07, NULL);
+        pos.x = rec->pos.x + base.x;
+        pos.y = rec->pos.y + base.y;
+        quest_marker_draw_faded(work, 0xD07, 1, pos);
+    }
+}
+
+/* 0x802EFB80 (0x218): The split-screen cockpit draw task: per player the gauge, the target ring, the hidden-HUD
+ * panels (plate, weapon and ammo), the marker window and the mark table, the quick panel; then the quest timer and
+ * both item tags. */
+void cockpit_split_draw(void) {
+    _mh_ivec2_ pos;
+    CockpitState* state = &cockpit_state;
+    CockpitWork* work = cockpit_work;
+    CockpitWork* work2 = &cockpit_work[1];
+    _PLW* plw = work->plw;
+    _PLW* plw2 = work2->plw;
+
+    work->mark_count_0x0CD = 0;
+    work2->mark_count_0x0CD = 0;
+    set_zmode(false, 0, false);
+    set_blendmode(4, 5, 1);
+    if (screen_split_view_get() == 0) {
+        cockpit_name_tags_draw(work, 0);
+        cockpit_split_weapon_hud_draw(work, 0);
+        if (cockpit_hud_hidden_ck(plw, 0) == 1) {
+            cockpit_split_gauge_draw(work, 0);
+            get_lsp_data(0xCCA, &pos);
+            cockpit_split_plate_draw(plw, &pos);
+        }
+        if (menu_slot_busy_ck(0) == 0) {
+            cockpit_split_marker_draw(0);
+            if (cockpit_hud_hidden_ck(plw, 0) == 1) {
+                cockpit_split_item_list_draw(plw, work->item_list_anim_0x16F, 0);
+                cockpit_split_item_ring_draw(plw, work->item_ring_anim_0x16B, 0);
+            }
+        }
+        quest_marks_flush(work);
+        cockpit_split_flash_gauge_draw(work, 0);
+        menu_split_panel_draw(0);
+        cockpit_name_tags_draw(work2, 1);
+        cockpit_split_weapon_hud_draw(work2, 1);
+        if (cockpit_hud_hidden_ck(plw2, 1) == 1) {
+            cockpit_split_gauge_draw(work2, 1);
+            get_lsp_data(0xCCB, &pos);
+            cockpit_split_plate_draw(plw2, &pos);
+        }
+        if (menu_slot_busy_ck(1) == 0) {
+            cockpit_split_marker_draw(1);
+            if (cockpit_hud_hidden_ck(plw2, 1) == 1) {
+                cockpit_split_item_list_draw(plw2, work2->item_list_anim_0x16F, 1);
+                cockpit_split_item_ring_draw(plw2, work2->item_ring_anim_0x16B, 1);
+            }
+        }
+        quest_marks_flush(work2);
+        cockpit_split_flash_gauge_draw(work2, 1);
+        menu_split_panel_draw(1);
+    }
+    if (state->quest_notice_timer_0x004 != 0) {
+        cockpit_split_timer_draw(1);
+    }
+    cockpit_split_item_tag_draw(work);
+    cockpit_split_item_tag_draw(work2);
+}
+
+/* The quest timer's ring: its 16 vertices, the 36 cell texture corners and the cell index per 5-second step. */
+_mh_ivec2_ cockpit_split_timer_ring_verts[16] = {
+    { 0, 0 }, { -17, 0 }, { -17, -17 }, { 0, -17 }, { 0, 0 }, { 0, 17 }, { -17, 17 }, { -17, 0 },
+    { 0, 0 }, { 17, 0 }, { 17, 17 }, { 0, 17 }, { 0, 0 }, { 0, -17 }, { 17, -17 }, { 17, 0 },
+};
+_mh_tex_uv_ cockpit_split_timer_ring_uvs[36] = {
+    { 0x154, 0xA0 }, { 0x154, 0x8F }, { 0x165, 0x8F }, { 0x165, 0xA0 }, { 0x154, 0xA0 }, { 0x154, 0x8F },
+    { 0x165, 0x8F }, { 0x165, 0xA0 }, { 0x154, 0xA0 }, { 0x154, 0x8F }, { 0x165, 0x8F }, { 0x165, 0xA0 },
+    { 0x154, 0xA0 }, { 0x154, 0x8F }, { 0x165, 0x8F }, { 0x165, 0xA0 }, { 0x178, 0xA0 }, { 0x178, 0x8F },
+    { 0x189, 0x8F }, { 0x189, 0xA0 }, { 0x154, 0xA0 }, { 0x154, 0x8F }, { 0x165, 0x8F }, { 0x165, 0xA0 },
+    { 0x154, 0xA0 }, { 0x154, 0x8F }, { 0x165, 0x8F }, { 0x165, 0xA0 }, { 0x154, 0xA0 }, { 0x154, 0x8F },
+    { 0x165, 0x8F }, { 0x165, 0xA0 }, { 0x166, 0xA0 }, { 0x166, 0x8F }, { 0x177, 0x8F }, { 0x177, 0xA0 },
+};
+u8 cockpit_split_timer_ring_cells[16] = {
+    0x00, 0x14, 0x04, 0x04, 0x18, 0x08, 0x08, 0x1C, 0x0C, 0x0C, 0x20, 0x10, 0x00, 0x00, 0x00, 0x00,
+};
+
+/* 0x802EFD98 (0x188): Draws the quest timer's ring at layout `id` for `seconds` (0..55): the ring fills in 15-second
+ * quarters and its cell art steps every 5 seconds. */
+void cockpit_timer_ring_draw_at(u16 id, s32 seconds, const _mh_ivec2_* pos) {
+    f32 ofs[2];
+    f32 scale[2];
+    const _SPR_DATA_* rec;
+    u8 cell;
+
+    if (seconds <= 55) {
+        if (seconds < 0) {
+            seconds = 0;
+        }
+        cell = cockpit_split_timer_ring_cells[seconds / 5];
+        rec = get_lsp_data(id, NULL);
+        ofs[0] = rec->pos.x + pos->x;
+        ofs[1] = rec->pos.y + pos->y;
+        scale[0] = rec->u_scale / 100.0f;
+        scale[1] = rec->v_scale / 100.0f;
+        drawshape_init(3, ((74 - seconds) / 15) * 4);
+        drawshape_set_vertex_array(cockpit_split_timer_ring_verts);
+        drawshape_set_flat_color(rec->color);
+        drawshape_set_texture_array(rec->tex_flag, &cockpit_split_timer_ring_uvs[cell]);
+        drawshape_set_offset_f32(scale, ofs);
+        drawshape_exec();
+    }
+}
+
+/* 0x802EFF20 (0x204): Draws the quest timer panel at the anchor `kind` picks: blinking red in the last five minutes,
+ * then the minute ring and the minutes left of the limit (or the idle face with no limit). */
+void cockpit_split_timer_draw(u8 kind) {
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    CockpitWork* work = cockpit_work;
+    u32 color;
+    s32 minute;
+    s32 elapsed;
+    s32 left;
+    s32 limit;
+    u16 id;
+    f32 t;
+
+    set_blendmode(4, 5, 1);
+    switch (kind) {
+    default:
+        id = 0xB90;
+        break;
+    case 1:
+        id = 0xCC8;
+        break;
+    case 2:
+        id = 0xCC9;
+        break;
+    }
+    get_lsp_data(id, &pos);
+    color = 0x6DAAA3FF;
+    if (cockpit_free_play_ck() != 0) {
+        elapsed = 0;
+        limit = 0;
+    } else {
+        minute = 60.0f * Screen_w.frame_scale;
+        elapsed = quest_time_elapsed_get();
+        if (elapsed <= minute * 5) {
+            if (elapsed > minute) {
+                t = (work->frame_0x190 & 0x1F) << 11;
+            } else {
+                t = (work->frame_0x190 & 0xF) << 12;
+            }
+            color = color_lerp(0xF50C23FF, 0xFF8C9BFF, 0.5f * (1.0f + math_sin_rad(9.58738019e-05f * t)));
+        }
+        left = quest_time_limit_get();
+        elapsed = (left - elapsed) / minute;
+        limit = left / minute;
+    }
+    spr_data_copy(&spr, get_lsp_data(0xCDB, NULL));
+    spr.color = color;
+    draw_sprite(spr, &pos);
+    draw_sprite_idx(0xCDC, &pos);
+    if (limit != 0) {
+        cockpit_timer_ring_draw_at(0xCE0, limit, &pos);
+        cockpit_timer_hand_draw(0xCDD, limit, &pos);
+        cockpit_timer_hand_draw(0xCDE, elapsed, &pos);
+    } else {
+        cockpit_timer_ring_draw_at(0xCE0, 0, &pos);
+        draw_sprite_idx(0xCDF, &pos);
+    }
+}
+
+/* 0x802F0124 (0x1C8): Draws the work record's item tag over its player in the split view, through that player's own
+ * camera and clamped to the player's half of the screen. */
+void cockpit_split_item_tag_draw(CockpitWork* work) {
+    VEC3 screen;
+    u32 camera;
+    _mh_ivec2_ pos;
+    s32 handle;
+    _PLW* plw = work->plw;
+    CockpitItemTag* tag;
+    f32 top;
+    f32 bottom;
+
+    if (plw->field_0x3E4 != 0) {
+        tag = &work->item_tag_0x02C;
+        if (tag->tex_idx_0x15 != 0) {
+            VEC3_ctor(&screen);
+            top = 64.0f;
+            bottom = 480.0f;
+            handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(Screen_w.camera_view.player_camera_0x50[plw->chunk_ofs]);
+            word_copy_return_dst(&camera, &handle);
+            chara_icon_pos_get(plw, 1, &tag->pos);
+            camera_world_to_screen(&camera, &screen, &tag->pos);
+            if (screen.z < 0.0f || screen.z > 1.0f) {
+                return;
+            }
+            if (plw->chunk_ofs == 0) {
+                if (screen_split_view_get() == 0) {
+                    bottom = 240.0f;
+                }
+            } else if (screen_split_view_get() == 0) {
+                top = 304.0f;
+            }
+            screen.x *= hud_screen_width_get();
+            screen.y *= 1.07142854f;
+            if (screen.y < top) {
+                screen.y = top;
+            }
+            if (screen.y > bottom) {
+                screen.y = bottom;
+            }
+            pos.x = screen.x;
+            pos.y = screen.y + tag->ofs_y_0x0F;
+            cockpit_item_tag_draw_at(plw, tag, &pos, plw->chunk_ofs);
+        }
+    }
+}
+
+/* The two players' item list anchors (layout ids). */
+u16 cockpit_split_item_list_anchors[4] = { 0x0DDC, 0x0DE1, 0x0D82, 0x0D86 };
+
+/* The two players' item ring anchors (layout ids). */
+u16 cockpit_split_item_ring_anchors[4] = { 0x0CCE, 0x0CCF, 0x0CD0, 0x0CD1 };
+
+/* 0x802F02EC (0x4F8): `cockpit_item_ring_draw` for player `player`'s split view: the item ring at the player's anchor with the
+ * selected item and its two neighbours, the act icons, the name and count, and the use prompt. */
+void cockpit_split_item_ring_draw(_PLW* plw, u8* anim, u8 player) {
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    u16 prev;
+    u16 next;
+    u16 cur;
+    s16 count;
+    u32 dead;
+    const u16* alt;
+    const u16* ids;
+    const _SPR_DATA_* rec;
+    u16 item;
+    s16 num;
+
+    set_blendmode(4, 5, 1);
+    get_lsp_data(cockpit_split_item_ring_anchors[player], &pos);
+    draw_sprite_anim_ary(cockpit_split_item_ring_open_ids, anim[1], &pos);
+    draw_sprite_anim_ary(cockpit_split_item_ring_level_ids, anim[3], &pos);
+    if (anim[1] != 0) {
+        prev = 0xFF;
+        next = 0xFF;
+        cur = 0xFF;
+        count = cockpit_item_slot_live_count(plw);
+        dead = cockpit_item_slot_live_ck(plw, plw->field_0x304) == 0;
+        if (dead != 0) {
+            count++;
+        }
+        if (dead == 0) {
+            cur = plw->field_0x304;
+        }
+        switch (count) {
+        case 0:
+        case 1:
+            break;
+        default:
+            next = pl_item_slot_cycle(plw, plw->field_0x304, 1);
+            prev = pl_item_slot_cycle(plw, plw->field_0x304, 0);
+            break;
+        case 4:
+            next = pl_item_slot_cycle(plw, plw->field_0x304, 1);
+            prev = pl_item_slot_cycle(plw, plw->field_0x304, 0);
+            break;
+        case 3:
+            prev = pl_item_slot_cycle(plw, plw->field_0x304, 0);
+        case 2:
+            next = pl_item_slot_cycle(plw, plw->field_0x304, 1);
+            break;
+        }
+        alt = NULL;
+        if (plw->slot_id[next].item_id == 0xDF) {
+            alt = cockpit_split_item_ring_shell_next_ids;
+        } else if (plw->slot_id[prev].item_id == 0xDF) {
+            alt = cockpit_split_item_ring_shell_prev_ids;
+        }
+        if (alt == NULL) {
+            draw_sprite_anim_ary(cockpit_split_item_ring_frame_ids, anim[1], &pos);
+        } else {
+            for (ids = cockpit_split_item_ring_frame_ids; *ids != 0xFFFF; ids++, alt++) {
+                sprite_frame_apply(&spr, *ids, anim[1], NULL);
+                if (*ids != *alt) {
+                    rec = get_lsp_data(*alt, NULL);
+                    tex_uv_copy(&spr.uv0, &rec->uv0);
+                    tex_uv_copy(&spr.uv1, &rec->uv1);
+                }
+                draw_sprite(spr, &pos);
+            }
+        }
+        cockpit_item_slot_icon_draw(plw, 0xD3C, anim[1], cur, &pos);
+        cockpit_item_slot_icon_draw(plw, 0xD44, anim[1], next, &pos);
+        cockpit_item_slot_icon_draw(plw, 0xD45, anim[1], prev, &pos);
+    } else {
+        cockpit_item_slot_icon_draw(plw, 0xD3C, anim[1], plw->field_0x304, &pos);
+    }
+    cockpit_act_icon_draw(plw, 0xD52, anim[3], 4, &pos);
+    cockpit_act_icon_draw(plw, 0xD53, anim[3], 2, &pos);
+    draw_sprite_anim_ary(cockpit_split_item_ring_act_ids, anim[3], &pos);
+    item = plw->slot_id[plw->field_0x304].item_id;
+    if (item != 0 && (item != 0xDF || anim[3] == 3)) {
+        draw_font_idx(0xD43, item == 0xDF ? (s8*)get_str_tbl(0x58)[3] : (s8*)ItemName(item), 5, &pos);
+        if (GetItemData(item)->max_num_0x003 != 1) {
+            draw_sprite_anim_idx(0xD3D, anim[1], &pos);
+            num = plw->slot_id[plw->field_0x304].value;
+            if (num == GetItemData(item)->max_num_0x003) {
+                draw_number_2digit_anim_ary(cockpit_split_item_ring_digit_ids, anim[1], num, 0xF53737FF, &pos);
+            } else {
+                draw_number_2digit_anim_ary(cockpit_split_item_ring_digit_ids, anim[1], num, 0, &pos);
+            }
+        }
+    }
+    if (get_arena_cfg(player, 7) == 0) {
+        draw_sprite_anim_idx(0xC37, anim[1], &pos);
+    } else {
+        draw_sprite_anim_idx(0xC38, anim[1], &pos);
+    }
+    if (plw->field_0x3E4 == 7 && plw->field_0x3E8 == 0 && item != 0 && item != 0xDF && get_arena_cfg(player, 7) == 0) {
+        draw_sprite_anim_idx(0xC39, anim[2], &pos);
+        draw_sprite_anim_idx(0xC36, anim[2], &pos);
+        if (pl_item_now_usable_ck(plw, item) != 0) {
+            set_blendmode(4, 1, 1);
+            draw_sprite_anim_idx(0xC35, anim[2], &pos);
+            set_blendmode(4, 5, 1);
+        }
+    }
+}
+
+/* 0x802F07E4 (0x1E0): `cockpit_item_list_draw` for player `player`'s split view: the item list at the player's anchor. */
+void cockpit_split_item_list_draw(_PLW* plw, u8* anim, u8 player) {
+    _mh_ivec2_ pos;
+    u16 next;
+    u16 prev;
+    u8 frame;
+
+    if (pl_item_page2_ck(plw) != 0) {
+        set_blendmode(4, 5, 1);
+        frame = anim[1] / 10;
+        get_lsp_data(cockpit_split_item_list_anchors[player], &pos);
+        draw_sprite_anim_ary(cockpit_item_list_frame_ids, frame, &pos);
+        if (frame != 0) {
+            draw_sprite_anim_ary(cockpit_item_list_page2_ids, frame, &pos);
+            cockpit_act_icon_draw(plw, 0xC86, frame, 0x10, &pos);
+            cockpit_act_icon_draw(plw, 0xC87, frame, 8, &pos);
+        }
+        if (frame <= 3) {
+            cockpit_item_list_entry_draw(plw, 0xC9A, pos.x, pos.y, plw->item_slot_sel);
+        } else {
+            cockpit_item_list_entry_draw(plw, 0xC99, pos.x, pos.y, plw->item_slot_sel);
+            next = pl_item_slot_next_get(plw, plw->item_slot_sel, 1);
+            if (next != 0xFF && next != plw->item_slot_sel) {
+                cockpit_item_list_entry_draw(plw, 0xC9A, pos.x, pos.y, next);
+            }
+            if (frame > 7) {
+                prev = pl_item_slot_next_get(plw, plw->item_slot_sel, 0);
+                if (prev != 0xFF && prev != plw->item_slot_sel && next != prev) {
+                    cockpit_item_list_entry_draw(plw, 0xC98, pos.x, pos.y, prev);
+                }
+            }
+        }
+        font_flush();
+    }
+}
+
+/* The split view's gauge tables: the health shake, the health tick quads (plain and wide) and their texture corners,
+ * the stagger flicker offsets; the gauge anchors and the shake scale. */
+u16 cockpit_split_gauge_anchors[4] = { 0x0CCA, 0x0CCB, 0x0CCC, 0x0CCD };
+s16 cockpit_split_shake_scale = 2;
+s16 cockpit_split_shake_table[12] = {
+    0, 1, 0, 2, 0, 3, 0, 3, 0, 3, 0, 3,
+};
+_mh_ivec2_ cockpit_split_health_tick_verts[64] = {
+    { 26, 9 }, { 26, 31 }, { 41, 31 }, { 41, 9 },
+    { 41, 9 }, { 41, 31 }, { 75, 31 }, { 75, 9 },
+    { 75, 9 }, { 75, 31 }, { 109, 31 }, { 109, 9 },
+    { 109, 9 }, { 109, 31 }, { 143, 31 }, { 143, 9 },
+    { 143, 9 }, { 143, 31 }, { 177, 31 }, { 177, 9 },
+    { 177, 9 }, { 177, 31 }, { 211, 31 }, { 211, 9 },
+    { 211, 9 }, { 211, 31 }, { 245, 31 }, { 245, 9 },
+    { 245, 9 }, { 245, 31 }, { 279, 31 }, { 279, 9 },
+    { 279, 9 }, { 279, 31 }, { 313, 31 }, { 313, 9 },
+    { 313, 9 }, { 313, 31 }, { 347, 31 }, { 347, 9 },
+    { 347, 9 }, { 347, 31 }, { 381, 31 }, { 381, 9 },
+    { 381, 9 }, { 381, 31 }, { 415, 31 }, { 415, 9 },
+    { 415, 9 }, { 415, 31 }, { 449, 31 }, { 449, 9 },
+    { 449, 9 }, { 449, 31 }, { 483, 31 }, { 483, 9 },
+    { 483, 9 }, { 483, 31 }, { 517, 31 }, { 517, 9 },
+    { 517, 9 }, { 517, 31 }, { 551, 31 }, { 551, 9 },
+};
+_mh_ivec2_ cockpit_split_health_tick_verts_wide[64] = {
+    { 26, 9 }, { 26, 31 }, { 41, 31 }, { 41, 9 },
+    { 41, 9 }, { 41, 31 }, { 85, 31 }, { 85, 9 },
+    { 85, 9 }, { 85, 31 }, { 129, 31 }, { 129, 9 },
+    { 129, 9 }, { 129, 31 }, { 173, 31 }, { 173, 9 },
+    { 173, 9 }, { 173, 31 }, { 217, 31 }, { 217, 9 },
+    { 217, 9 }, { 217, 31 }, { 261, 31 }, { 261, 9 },
+    { 261, 9 }, { 261, 31 }, { 305, 31 }, { 305, 9 },
+    { 305, 9 }, { 305, 31 }, { 349, 31 }, { 349, 9 },
+    { 349, 9 }, { 349, 31 }, { 393, 31 }, { 393, 9 },
+    { 393, 9 }, { 393, 31 }, { 437, 31 }, { 437, 9 },
+    { 437, 9 }, { 437, 31 }, { 481, 31 }, { 481, 9 },
+    { 481, 9 }, { 481, 31 }, { 525, 31 }, { 525, 9 },
+    { 525, 9 }, { 525, 31 }, { 569, 31 }, { 569, 9 },
+    { 569, 9 }, { 569, 31 }, { 613, 31 }, { 613, 9 },
+    { 613, 9 }, { 613, 31 }, { 657, 31 }, { 657, 9 },
+    { 657, 9 }, { 657, 31 }, { 701, 31 }, { 701, 9 },
+};
+_mh_tex_uv_ cockpit_split_health_tick_uvs[64] = {
+    { 84, 1 }, { 84, 23 }, { 99, 23 }, { 99, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+    { 100, 1 }, { 100, 23 }, { 134, 23 }, { 134, 1 },
+};
+s16 cockpit_split_flicker_ofs_hit[52] = {
+    0, 2, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+s16 cockpit_split_flicker_ofs_idle[26] = {
+    0, 2, -2, 1, -1, 1, -1, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+/* 0x802F09C4 (0x8E0): `quest_gauge_draw` for player `player`'s split view: the stamina, health and stagger gauges
+ * at the player's anchor, with the split view's own tick and flicker tables. */
+void cockpit_split_gauge_draw(CockpitWork* work, u8 player) {
+    _PLW* plw = work->plw;
+    s32 wide = ck_WideMode();
+    _DRAW_RECT_2D_TEX rect;
+    _mh_ivec2_ quad[6];
+    _mh_tex_uv_ uvs[6];
+    u32 colors[6];
+    _mh_ivec2_ spot;
+    _mh_ivec2_ flash_pos;
+    _mh_ivec2_ corner;
+    _mh_ivec2_ pos;
+    s32 copy;
+    _mh_tex_uv_ uv_a;
+    s32 anchor_a;
+    s32 anchor_b;
+    _SPR_DATA_* rec;
+    _mh_ivec2_* ticks;
+    s16 cell;
+    u32 cells;
+    u32 tick_count;
+    s32 tick_end;
+    u16 scaled_max;
+    u16 shown;
+    u16 top;
+    s16 shake;
+    f32 fill;
+    u16 count;
+
+    set_blendmode(4, 5, 1);
+    get_lsp_data(cockpit_split_gauge_anchors[player], &spot);
+    draw_sprite_idx(0xCEC, &spot);
+    pos.y = 0;
+    pos.x = 0;
+    rec = get_lsp_data(0xCE9, NULL);
+    if (wide == 0) {
+        cell = rec->width;
+    } else {
+        cell = 0x6E;
+    }
+    cells = plw->field_0x37A / 150;
+    corner.x = rec->pos.x + spot.x;
+    corner.y = rec->pos.y + spot.y;
+    draw_rect_2d_tex_init(&rect, &corner.x, (u16)(cell * cells), rec->height, rec->color, &rec->uv0.u, &rec->uv1.u);
+    draw_rect_2d_tex_by_id(&rect, rec->tex_flag);
+    pos.x = (s16)(cell * (cells - 1)) + spot.x;
+    pos.y += spot.y;
+    if ((u32)wide == 1) {
+        pos.x += 0x19;
+    }
+    draw_sprite_idx(0xCEA, &pos);
+    uv_pair_copy(&copy, &pos);
+    if (wide == 0) {
+        quest_gauge_bar_draw(0xCEB, plw->field_0x378, 0, plw->field_0x37A, 0x384, &work->bar_b_0x154, &spot, 0);
+    } else {
+        quest_gauge_bar_draw(0xCEB, plw->field_0x378, 0, plw->field_0x37A, 0x384, &work->bar_b_0x154, &spot,
+                             0x294);
+    }
+    if (plw->field_0x37A >= 0x384) {
+        if (work->sparkle_b_frame_0x18E < 0x60) {
+            work->sparkle_b_frame_0x18E++;
+            anchor_a = copy;
+            put_lsp_anchor_offset(0xCEF, &spot, &anchor_a);
+            draw_sprite_anim_idx(0xCF0, work->sparkle_b_frame_0x18E, &spot);
+        }
+    } else {
+        work->sparkle_b_frame_0x18E = 0;
+    }
+    pos.y = 0;
+    pos.x = 0;
+    if (work->health_hit_clock_0x13A != 0) {
+        pos.y = cockpit_split_shake_scale * cockpit_split_shake_table[work->health_hit_clock_0x13A];
+    }
+    pos.x += spot.x;
+    pos.y += spot.y;
+    tick_count = plw->health_max / 10;
+    if ((s32)tick_count > 0xF) {
+        tick_count = 0xF;
+    }
+    tick_end = tick_count * 4;
+    drawshape_init(3, (u16)(tick_end + 4));
+    ticks = cockpit_split_health_tick_verts;
+    if (wide != 0) {
+        ticks = cockpit_split_health_tick_verts_wide;
+    }
+    drawshape_set_vertex_array(ticks);
+    drawshape_set_flat_color(-1);
+    drawshape_set_texture_array(0xD, cockpit_split_health_tick_uvs);
+    drawshape_set_offset_ivec2(&pos.x);
+    drawshape_exec();
+    if (wide == 0) {
+        pos.x += (s16)(cockpit_split_health_tick_verts[tick_end].x - cockpit_split_health_tick_verts[4].x);
+    } else {
+        pos.x = (s16)(pos.x + (s16)(cockpit_split_health_tick_verts_wide[tick_end].x - cockpit_split_health_tick_verts_wide[4].x)) + 0xA;
+    }
+    draw_sprite_idx(0xCE6, &pos);
+    uv_pair_copy(&copy, &pos);
+    pos = spot;
+    if (wide == 0) {
+        quest_gauge_bar_draw(0xCE7, plw->health, plw->field_0x376, plw->health_max, 0x96, &work->bar_a_0x144,
+                             &pos, 0);
+    } else {
+        quest_gauge_bar_draw(0xCE7, plw->health, plw->field_0x376, plw->health_max, 0x96, &work->bar_a_0x144,
+                             &pos, 0x294);
+    }
+    if (plw->health_max >= 0x96) {
+        if (work->sparkle_a_frame_0x18C < 0x60) {
+            work->sparkle_a_frame_0x18C++;
+            anchor_b = copy;
+            put_lsp_anchor_offset(0xCED, &spot, &anchor_b);
+            draw_sprite_anim_idx(0xCEE, work->sparkle_a_frame_0x18C, &spot);
+        }
+    } else {
+        work->sparkle_a_frame_0x18C = 0;
+    }
+    rec = get_lsp_data(0xCF7, NULL);
+    spot.x += rec->pos.x;
+    spot.y += rec->pos.y;
+    scaled_max = (plw->field_0x380 * 0x84) / 150;
+    shown = (work->stagger_shown_0x134 * 0x84) / 150;
+    top = scaled_max - 0x11;
+    if (plw->kind_0x09 != 3) {
+        draw_sprite_idx(0xCFB, &spot);
+        rec = get_lsp_data(0xCFC, NULL);
+        corner.x = rec->pos.x + spot.x;
+        corner.y = rec->pos.y + spot.y;
+        draw_rect_2d_tex_init(&rect, &corner.x, rec->width, top, rec->color, &rec->uv0.u, &rec->uv1.u);
+        draw_rect_2d_tex_by_id(&rect, rec->tex_flag);
+        pos.x = spot.x;
+        pos.y = spot.y + (top - rec->height);
+        draw_sprite_idx(0xCFD, &pos);
+    } else {
+        if (plw->field_0x37E != 0) {
+            shake = cockpit_split_flicker_ofs_hit[work->stagger_shake_idx_0x137];
+        } else {
+            shake = cockpit_split_flicker_ofs_idle[work->stagger_shake_idx_0x137];
+        }
+        pos.x = shake + spot.x;
+        pos.y = spot.y;
+        draw_sprite_idx(0xCF8, &pos);
+        rec = get_lsp_data(0xCFA, NULL);
+        corner.x = rec->pos.x + pos.x;
+        corner.y = rec->pos.y + pos.y;
+        draw_rect_2d_tex_init(&rect, &corner.x, rec->width, rec->height, rec->color, &rec->uv0.u, &rec->uv1.u);
+        rec = get_lsp_data(0xCF9, NULL);
+        rect.y = rec->pos.y + pos.y;
+        rect.end_y += (s16)(top - rec->height);
+        rect.v0 -= top;
+        draw_rect_2d_tex_by_id(&rect, rec->tex_flag);
+    }
+    if (work->stagger_flash_0x136 != 0) {
+        rec = get_lsp_data(0xCFE, NULL);
+        flash_pos.x = rec->pos.x;
+        flash_pos.y = (rec->pos.y + scaled_max) - shown;
+        uv_a.u = rec->uv0.u;
+        uv_a.v = rec->uv1.v - shown;
+        if (work->stagger_shake_idx_0x137 != 0) {
+            flash_pos.x += spot.x;
+            flash_pos.y += spot.y;
+            draw_rect_2d_tex_init(&rect, &flash_pos.x, rec->width, shown,
+                                  work->stagger_flash_0x136 | 0xC1183600, &uv_a.u, &rec->uv1.u);
+            draw_rect_2d_tex_by_id(&rect, rec->tex_flag);
+            return;
+        }
+        flash_pos.x += spot.x;
+        flash_pos.y += spot.y;
+        fill = (2.0f * (f32)work->stagger_shown_0x134) / (f32)plw->field_0x380;
+        quad[0].x = quad[2].x = flash_pos.x;
+        quad[1].x = quad[3].x = flash_pos.x + rec->width;
+        quad[0].y = quad[1].y = flash_pos.y;
+        quad[2].y = quad[3].y = flash_pos.y + shown;
+        uvs[0].u = uvs[2].u = rec->uv0.u;
+        uvs[1].u = uvs[3].u = rec->uv1.u;
+        uvs[0].v = uvs[1].v = uv_a.v;
+        if (fill <= 1.0f) {
+            colors[0] = colors[1] = work->stagger_flash_0x136 | color_lerp(0x93DDF500, 0x16D9D000, fill);
+            colors[2] = colors[3] = work->stagger_flash_0x136 | 0x93DDF500;
+            uvs[2].v = uvs[3].v = rec->uv1.v;
+            count = 4;
+        } else {
+            s16 half;
+            quad[4].x = flash_pos.x;
+            quad[5].x = quad[1].x;
+            quad[4].y = quad[5].y = quad[3].y;
+            half = (plw->field_0x380 * 0x84) / 300;
+            quad[2].y = quad[3].y = quad[3].y - half;
+            colors[0] = colors[1] = work->stagger_flash_0x136 | color_lerp(0x16D9D000, 0xB79200, fill - 1.0f);
+            colors[2] = colors[3] = work->stagger_flash_0x136 | 0x16D9D000;
+            colors[4] = colors[5] = work->stagger_flash_0x136 | 0x93DDF500;
+            uvs[4].u = uvs[0].u;
+            uvs[5].u = uvs[1].u;
+            uvs[2].v = uvs[3].v = rec->uv1.v - half;
+            uvs[4].v = uvs[5].v = rec->uv1.v;
+            count = 6;
+        }
+        drawshape_init(5, count);
+        drawshape_set_vertex_array(quad);
+        drawshape_set_color_array(colors);
+        drawshape_set_texture_array(rec->tex_flag, uvs);
+        drawshape_exec();
+    }
+}
+
+/* The weapon-class frame per player and class, the class glow colours, and per player the glow and condition ids. */
+u16 cockpit_weapon_frame_ids[2][7] = {
+    { 0x0BA9, 0x0BA8, 0x0BA7, 0x0BA7, 0x0BA7, 0x0BA7, 0x0BA7 },
+    { 0x0CF4, 0x0CF3, 0x0CF2, 0x0CF2, 0x0CF2, 0x0CF2, 0x0CF2 },
+};
+u32 cockpit_weapon_glow_colors[8] = {
+    0xFF0000FF, 0x00000000, 0x00000000, 0x5ED300FF, 0x3068EEFF, 0xF0F0F0FF, 0xF000F0FF, 0x00000000,
+};
+CockpitWeaponIds cockpit_weapon_ids[2] = {
+    { 0x0BAA, 0x0BAB },
+    { 0x0CF5, 0x0CF6 },
+};
+
+/* 0x802F12A4 (0x168): Draws the weapon-class frame at `pos`: the class's frame, its pulsing glow and the condition
+ * marker. */
+void cockpit_weapon_frame_draw(CockpitWork* work, const _mh_ivec2_* pos, u8 player) {
+    _SPR_DATA_ spr;
+    _PLW* plw = work->plw;
+    u8 kind = plw->field_0x56B;
+    u32 glow;
+    u32 alpha;
+
+    draw_sprite_idx(cockpit_weapon_frame_ids[player][kind], pos);
+    glow = cockpit_weapon_glow_colors[kind];
+    if (glow != 0) {
+        set_blendmode(4, 1, 1);
+        alpha = (s8)(96.0f * math_sin_rad(9.58738019e-05f * (u16)((work->frame_0x190 & 0x7F) << 9))) + glow + 159;
+        spr_data_copy(&spr, get_lsp_data(cockpit_weapon_ids[player].glow_id, NULL));
+        spr.color = alpha;
+        draw_sprite(spr, pos);
+        set_blendmode(4, 5, 1);
+    }
+    if (Pl_dm_condition_ck(plw, 0x300) != 0) {
+        draw_sprite_anim_idx(cockpit_weapon_ids[player].cond_id, work->frame_0x190, pos);
+    }
+}
+
+/* Per player the stagger gauge's flash animation, frame and bar ids; the flash colour per stagger level. */
+CockpitStaggerIds cockpit_stagger_ids[2] = {
+    { 0x0BCC, 0x0BCB, 0x0BCD },
+    { 0x0D03, 0x0D02, 0x0D04 },
+};
+u32 cockpit_stagger_flash_colors[4] = { 0x00000000, 0xFAFAFA00, 0xF5F59100, 0xF596CD00 };
+
+/* 0x802F140C (0x2B4): Draws the stagger gauge (at its own anchor for the first view, else offset from `pos`): the
+ * level's flash, the frame and the bar, filled to the stagger value and pulsing white while the player is dazed. */
+void cockpit_stagger_gauge_draw(CockpitWork* work, const _mh_ivec2_* pos, u8 player) {
+    _mh_ivec2_ at;
+    _SPR_DATA_ spr;
+    CockpitState* state = &cockpit_state;
+    _PLW* plw = work->plw;
+    const _SPR_DATA_* rec;
+    u32 flash;
+    u32 near_color;
+    u32 far_color;
+    u32 color;
+    u16 width;
+    f32 t;
+
+    if (player == 0) {
+        get_lsp_data(0xBCA, &at);
+    } else {
+        rec = get_lsp_data(0xD01, NULL);
+        at.x = pos->x + rec->pos.x;
+        at.y = pos->y + rec->pos.y;
+    }
+    flash = cockpit_stagger_flash_colors[(u8)pl_stagger_level_get(plw)];
+    if (flash != 0) {
+        sprite_frame_apply(&spr, cockpit_stagger_ids[player].flash_id,
+                           state->field_0x078 % (sprite_anim_last_frame(cockpit_stagger_ids[player].flash_id) + 1), NULL);
+        spr.color = (u8)spr.color + flash;
+        draw_sprite(spr, &at);
+    }
+    draw_sprite_idx(cockpit_stagger_ids[player].frame_id, &at);
+    near_color = 0xE92412FF;
+    far_color = 0xEB7416FF;
+    if (plw->daze_timer_0x468 > 0) {
+        t = 0.5f * (1.0f + math_sin_rad(9.58738019e-05f * (u16)((state->field_0x078 & 0x7F) << 9)));
+        near_color = color_lerp(0xF4F4F4FF, 0xE92412FF, t);
+        far_color = color_lerp(0xF4F4F4FF, 0xEB7416FF, t);
+    }
+    rec = get_lsp_data(cockpit_stagger_ids[player].bar_id, NULL);
+    t = 0.00999999978f * plw->field_0x384;
+    width = (rec->width * plw->field_0x384) / 100;
+    color = color_lerp(near_color, far_color, t);
+    drawshape_init(3, 0xFFFF);
+    drawshape_set_vertex_rect((s16)(rec->pos.x + at.x), (s16)(rec->pos.y + at.y), (s16)width, rec->height);
+    drawshape_set_corner_colors(near_color, color, color, near_color);
+    drawshape_exec();
+}
+
+/* The charge gauge's frame animation for the first and the second view (sprite ids, 0xFFFF-terminated). */
+u16 cockpit_charge_frame_ids[12] = {
+    0x0C16, 0x0C17, 0x0C14, 0x0C15, 0x0C1E, 0x0C18, 0x0C19, 0x0C1A, 0x0C1B, 0x0C1C, 0xFFFF, 0x0000,
+};
+u16 cockpit_charge_frame_ids_split[12] = {
+    0x0D2F, 0x0D30, 0x0D2D, 0x0D2E, 0x0D37, 0x0D31, 0x0D32, 0x0D33, 0x0D34, 0x0D35, 0xFFFF, 0x0000,
+};
+
+/* 0x802F16C0 (0x284): Draws the charge gauge at `pos`: the frame at the gauge level, the bar filled to the shown
+ * value (gold while the level is low, red otherwise), and the flashing cap while the gauge is nearly full. */
+#pragma fp_contract off
+void cockpit_charge_gauge_draw(CockpitWork* work, const _mh_ivec2_* pos, u8 player) {
+    _mh_ivec2_ at;
+    _PLW* plw = work->plw;
+    const _SPR_DATA_* rec;
+    u32 color;
+    u32 dark;
+    u32 light;
+    u16 width;
+    u16 frame;
+    u16 count;
+    f32 t;
+
+    at.x = pos->x;
+    at.y = pos->y;
+    draw_sprite_anim_ary(player != 0 ? cockpit_charge_frame_ids_split : cockpit_charge_frame_ids, work->gauge_level_0x16A, &at);
+    rec = get_lsp_data(player != 0 ? 0xD36 : 0xC1D, NULL);
+    t = 0.00999999978f * work->gauge_value_0x168;
+    width = (rec->width * work->gauge_value_0x168) / 100;
+    if (cockpit_gauge_low_ck(plw) != 0) {
+        dark = 0xF1C516FF;
+        light = 0xFAE632FF;
+    } else {
+        dark = 0xCF3169FF;
+        light = 0xEC3E7CFF;
+    }
+    color = color_lerp(dark, light, t);
+    drawshape_init(3, 0xFFFF);
+    drawshape_set_vertex_rect((s16)(rec->pos.x + at.x), (s16)(rec->pos.y + at.y), (s16)width, rec->height);
+    drawshape_set_corner_colors(dark, color, color, dark);
+    drawshape_exec();
+    if (pl_mode8_alive_ck(plw) != 0 && plw->field_0x36C < 100) {
+        count = sprite_anim_last_frame(player != 0 ? 0xD38 : 0xC1F) + 1;
+        frame = work->frame_0x190 % count;
+        t = 1.0f + 0.699999988f * (0.5f * (1.0f + math_sin_rad(6.28318548f * ((f32)frame / (f32)count))));
+        color_scale(dark, t, 1.0f);
+        color_scale(light, t, 1.0f);
+        if (pl_charge_flash_ck(plw) != 0) {
+            draw_sprite_anim_idx(player != 0 ? 0xD38 : 0xC1F, frame, &at);
+        }
+    }
+}
+#pragma fp_contract on
+
+/* The two players' weapon frame anchors (layout ids). */
+u16 cockpit_split_weapon_anchors[4] = { 0x0CCA, 0x0CCB, 0x0CCC, 0x0CCD };
+
+/* 0x802F1944 (0x1D8): `cockpit_weapon_hud_draw` for player `player`'s split view: the aim view, the lock-on marker and the ammo
+ * gauge on the second item page; the weapon frame and its stagger or charge gauge on the first. */
+void cockpit_split_weapon_hud_draw(CockpitWork* work, u8 player) {
+    _mh_ivec2_ frame_pos;
+    _mh_ivec2_ aim_pos;
+    _mh_ivec2_ gauge;
+    _PLW* plw;
+    const _SPR_DATA_* rec;
+
+    set_blendmode(4, 5, 1);
+    plw = work->plw;
+    if (pl_item_page2_ck(plw) == 1) {
+        if (camera_mode1_ck_player(player) == 1) {
+            cockpit_split_aim_view_draw(work, player);
+            return;
+        }
+        if (camera_work_ck_player(player) == 0 && (u32)pl_target_lock_ck(plw) == 1 && pl_aim_act_ck(plw) == 1) {
+            cockpit_eye_marker_draw_split(plw);
+        }
+        if (cockpit_hud_hidden_ck(plw, player) == 1) {
+            if (player == 0) {
+                get_lsp_data(ck_WideMode() != 0 ? 0xE11 : 0xDE2, &aim_pos);
+            } else {
+                get_lsp_data(ck_WideMode() != 0 ? 0xE12 : 0xDE3, &aim_pos);
+            }
+            cockpit_split_ammo_gauge_draw(plw, aim_pos.x, aim_pos.y, 0);
+        }
+    } else if (cockpit_hud_hidden_ck(plw, player) != 0) {
+        get_lsp_data(cockpit_split_weapon_anchors[player], &frame_pos);
+        cockpit_weapon_frame_draw(work, &frame_pos, 1);
+        switch (plw->field_0x002) {
+        case 7:
+            cockpit_stagger_gauge_draw(work, &frame_pos, 1);
+            break;
+        case 8:
+            rec = get_lsp_data(0xD2C, NULL);
+            gauge.x = rec->pos.x + frame_pos.x;
+            gauge.y = rec->pos.y + frame_pos.y;
+            cockpit_charge_gauge_draw(work, &gauge, 1);
+            break;
+        }
+    }
+}
+
+/* 0x802F1B1C (0x1DC): `cockpit_aim_view_draw` for player `player`'s split view: the scope frame and its animation with the
+ * ammo gauge while aiming, and the zoom ring. */
+void cockpit_split_aim_view_draw(CockpitWork* work, u8 player) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ gauge;
+    f32 zoom;
+    u8 aiming;
+    u8 zooming;
+    _PLW* plw = work->plw;
+    s32 wide = ck_WideMode();
+
+    camera_aim_zoom_get_player(plw, &aiming, &zooming, &zoom, player);
+    if (player == 0) {
+        get_lsp_data(wide != 0 ? 0xDE4 : 0xDB1, &pos);
+    } else {
+        get_lsp_data(wide != 0 ? 0xE0F : 0xDDE, &pos);
+    }
+    if (aiming != 0) {
+        draw_sprite_ary(wide != 0 ? cockpit_split_scope_frame_ids_wide : cockpit_split_scope_frame_ids, &pos);
+        draw_sprite_anim_ary(wide != 0 ? cockpit_split_scope_anim_ids_wide : cockpit_split_scope_anim_ids, work->gauge_frame_0x167, &pos);
+        if (player == 0) {
+            get_lsp_data(wide != 0 ? 0xE09 : 0xDD6, &gauge);
+            cockpit_split_ammo_gauge_draw(plw, gauge.x, gauge.y, 1);
+        } else {
+            get_lsp_data(wide != 0 ? 0xE10 : 0xDDF, &gauge);
+            cockpit_split_ammo_gauge_draw(plw, gauge.x, gauge.y, 1);
+        }
+    }
+    if (zooming != 0) {
+        zoom *= (f32)sprite_anim_last_frame(wide != 0 ? 0xDF8 : 0xDC5);
+        draw_sprite_anim_ary(wide != 0 ? cockpit_split_zoom_ring_ids_wide : cockpit_split_zoom_ring_ids, (u16)zoom, &pos);
+    }
+}
+
+/* The split view's ammo gauge state icons (empty, reloading, idle), plain and wide. */
+u16 cockpit_split_ammo_icons[3] = { 0x0DD9, 0x0DDA, 0x0DDB };
+u16 cockpit_split_ammo_icons_wide[3] = { 0x0E0C, 0x0E0D, 0x0E0E };
+
+/* 0x802F1CF8 (0x23C): `cockpit_ammo_gauge_draw` for the split view: the ammo gauge of the player's own cockpit record, with the
+ * wide layout's cells. */
+void cockpit_split_ammo_gauge_draw(_PLW* plw, s16 x, s16 y, u8 aim) {
+    _mh_ivec2_ pos;
+    _mh_ivec2_ start;
+    s16 step;
+    const u16* icons;
+    s32 wide;
+    CockpitWork* work = &cockpit_work[plw->chunk_ofs];
+    u8 capacity;
+    u8 loaded;
+    s32 i;
+
+    wide = ck_WideMode();
+    icons = wide != 0 ? cockpit_split_ammo_icons_wide : cockpit_split_ammo_icons;
+    pos.x = x;
+    pos.y = y;
+    if (plw->magazine_0x270 == 0) {
+        if (plw->field_0x018 == 1 && pl_item_slot_next_get(plw, plw->item_slot_sel, 1) != 0xFF) {
+            draw_sprite_anim_idx(icons[2], work->frame_0x190, &pos);
+        }
+    } else {
+        capacity = plw->ammo_capacity_0x26A;
+        loaded = plw->field_0x269;
+        step = get_lsp_data(wide != 0 ? 0xE0A : 0xDD7, NULL)->width;
+        if (aim != 0) {
+            pos.x = (s32)(320.0f * hud_screen_width_get()) - (capacity * step) / 2;
+        }
+        uv_pair_copy(&start, &pos);
+        for (i = 0; i < capacity; i++) {
+            if (work->item_frame_0x166 != 0 && i == loaded) {
+                draw_sprite_anim_ary(cockpit_ammo_fire_ids, work->item_frame_0x166, &pos);
+            } else if (i < loaded) {
+                draw_sprite_anim_idx(wide != 0 ? 0xE0A : 0xDD7, 0, &pos);
+            } else {
+                draw_sprite_anim_idx(wide != 0 ? 0xE0B : 0xDD8, 100, &pos);
+            }
+            pos.x += step;
+        }
+        if (Pl_dm_condition_ck(plw, 0x300) != 0) {
+            draw_sprite_anim_idx(0xC74, work->frame_0x190, &start);
+        }
+        pos.x = x;
+        pos.y = y;
+        if (pl_reload_motion_ck(plw) != 0) {
+            draw_sprite_anim_idx(icons[1], work->frame_0x190, &pos);
+        } else if (loaded == 0 && plw->field_0x018 == 1) {
+            draw_sprite_anim_idx(icons[0], work->frame_0x190, &pos);
+        }
+    }
+}
+
+/* The two players' flash gauge anchors (layout ids). */
+u16 cockpit_split_flash_anchors[4] = { 0x0CD6, 0x0CD7, 0x0CD8, 0x0CD9 };
+
+/* 0x802F1F34 (0x1A4): Draws player `player`'s flash gauge while act kind 7 charges: the frame animation and the bar,
+ * filled and coloured by the charge over its limit. */
+void cockpit_split_flash_gauge_draw(CockpitWork* work, u8 player) {
+    _mh_ivec2_ pos;
+    _PLW* plw = work->plw;
+    const _SPR_DATA_* rec;
+    u32 color;
+    s16 width;
+    f32 t;
+
+    if (plw->field_0x00A == 7 && plw->field_0x3A4 != 0) {
+        set_blendmode(4, 5, 1);
+        get_lsp_data(cockpit_split_flash_anchors[player], &pos);
+        draw_sprite_anim_ary(cockpit_flash_anim_ids, work->flash_frame_0x180, &pos);
+        rec = get_lsp_data(0xBD2, NULL);
+        t = plw->field_0x3A4 * (1.0f / plw->field_0x3A5);
+        width = (rec->width * (f32)plw->field_0x3A4) / plw->field_0x3A5;
+        color = color_lerp(0xC50A83FF, 0xD813BEFF, t);
+        drawshape_init(3, 0xFFFF);
+        drawshape_set_vertex_rect((s16)(rec->pos.x + pos.x), (s16)(rec->pos.y + pos.y), width, rec->height);
+        drawshape_set_corner_colors(0xC50A83FF, color, color, 0xC50A83FF);
+        drawshape_exec();
+    }
+}
+
+/* 0x802F20D8 (0x48): The unit's static initialiser: constructs both cockpit work records and the cockpit state. */
+void cockpit_static_init(void) {
+    __construct_array(cockpit_work, (void*)cockpit_work_construct, NULL, sizeof(CockpitWork), 2);
+    cockpit_state_construct(&cockpit_state);
+}
+
+/* 0x802F2120 (0x58): Constructs the cockpit state: the positions of its four pit traps. */
+CockpitState* cockpit_state_construct(CockpitState* state) {
+    PitTrap* trap = state->pit_traps_0x018;
+
+    do {
+        pit_trap_construct(trap);
+        trap++;
+    } while (trap < &state->pit_traps_0x018[4]);
+    return state;
+}
+
+/* 0x802F2178 (0x30): Constructs one pit trap record (its position). */
+PitTrap* pit_trap_construct(PitTrap* trap) {
+    VEC3_ctor(&trap->pos);
+    return trap;
+}
+
+/* 0x802F21A8 (0x60): Constructs one cockpit work record: its item tag and its four marker positions. */
+CockpitWork* cockpit_work_construct(CockpitWork* work) {
+    VEC3* pos;
+
+    cockpit_item_tag_construct(&work->item_tag_0x02C);
+    pos = work->name_pos_0x054;
+    do {
+        VEC3_ctor(pos);
+        pos++;
+    } while (pos < &work->name_pos_0x054[4]);
+    return work;
+}
+
+/* 0x802F2208 (0x30): Constructs one item tag (its world position). */
+CockpitItemTag* cockpit_item_tag_construct(CockpitItemTag* tag) {
+    VEC3_ctor(&tag->pos);
+    return tag;
+}
+
+/* 0x802EE288 (0xA8): Draws the item icon of slot `slot` (none for 0xFF, an empty or a 0xDF slot), crossed out in red
+ * when `pl_item_now_usable_ck` says the item cannot be used. */
+void cockpit_item_slot_icon_draw(_PLW* plw, u16 id, u8 part, u16 slot, const _mh_ivec2_* pos) {
+    u16 item;
+
+    if (slot != 0xFF) {
+        item = plw->slot_id[slot].item_id;
+        if (item != 0 && item != 0xDF) {
+            draw_itemicon_anim_idx(id, part, item, pos);
+            if (pl_item_now_usable_ck(plw, item) == 0) {
+                draw_itemicon_frame_idx(id, part, 0x71, 0xFF0000FF, pos);
+            }
+        }
+    }
+}
+
 
 /* 0x802EC6C4 (0x3C).  A one-bit predicate over `pl_gauge_level_get`'s byte: the branch-free
  * `subfic`/`orc`/`subf` sequence is the target's own shape. */
-u32 fn_802EC6C4(void)
+u32 cockpit_gauge_low_ck(_PLW* plw)
 {
-    u32 v = pl_gauge_level_get();
-    return ((~v | 1) - ((1 - v) >> 1)) >> 31;
+    return pl_gauge_level_get(plw) <= 1;
 }
 
 /* 0x802EDAF0 (0x1C).  Zero a 4-byte run and the second byte of a following flag record - the
- * caller (`fn_802E4978`) hands the two pointers into its 0x194 record. */
-void fn_802EDAF0(_PLW* plw, u8* a, u8* b)
+ * caller (`cockpit_work_init`) hands the two pointers into its 0x194 record. */
+void cockpit_item_ring_reset(_PLW* plw, u8* a, u8* b)
 {
     (void)plw;
     a[0] = 0;
@@ -3165,29 +6012,40 @@ void fn_802EDAF0(_PLW* plw, u8* a, u8* b)
 /* 0x802ED588 (0x98).  Fold the two 0x3D8/0x3DC act bitfields through the two 4-byte mask tables
  * (the `kind` selects the table pair) into one bitmask: bit `n` is raised when the n-th non-zero
  * mask word is set in the field. */
-s32 fn_802ED588(_PLW* plw, u8 kind)
+s32 cockpit_act_icon_mask_get(_PLW* plw, u8 kind)
 {
-    s32 bit = 1;
-    s32 result = 0;
+    s32 bit;
+    s32 result;
     const u32* a;
     const u32* b;
+    u32 flags;
 
+    result = 0;
+    bit = 1;
     if (kind == 0) {
-        a = lbl_805D6338;
-        b = lbl_805D6360;
+        a = cockpit_act_mask_a0;
+        b = cockpit_act_mask_b0;
     } else {
-        a = lbl_805D638C;
-        b = lbl_805D63B0;
+        a = cockpit_act_mask_a1;
+        b = cockpit_act_mask_b1;
     }
-    while (*a != 0) {
-        if ((plw->field_0x3D8 & *a) != 0) {
+    flags = plw->field_0x3D8;
+    for (;;) {
+        if (*a == 0) {
+            break;
+        }
+        if ((flags & *a) != 0) {
             result |= bit;
         }
         bit <<= 1;
         a++;
     }
-    while (*b != 0) {
-        if ((plw->field_0x3DC & *b) != 0) {
+    flags = plw->field_0x3DC;
+    for (;;) {
+        if (*b == 0) {
+            break;
+        }
+        if ((flags & *b) != 0) {
             result |= bit;
         }
         bit <<= 1;
@@ -3199,7 +6057,7 @@ s32 fn_802ED588(_PLW* plw, u8 kind)
 /* 0x802ED6F4 (0xF0).  Advance the two-byte cursor over the caller's bit table: while `timer` is
  * negative, arm on the lowest set bit; while it is non-negative, keep counting down on the same
  * bit and, once it runs out, arm on the next set bit (wrapping at `count`). */
-void fn_802ED6F4(u32 mask, s32 count, Cursor2* cur)
+void cockpit_cursor_step(u32 mask, s32 count, Cursor2* cur)
 {
     if (mask == 0) {
         cur->timer = -1;
@@ -3234,30 +6092,26 @@ void fn_802ED6F4(u32 mask, s32 count, Cursor2* cur)
 
 /* 0x802ED7E4 (0x50).  The 18/19-entry cursor's `kind == 0` lumping: mask the act fields, then arm
  * the cursor with the count the kind selects. */
-void fn_802ED7E4(_PLW* plw, Cursor2* cur, u8 kind)
+void cockpit_act_cursor_step(_PLW* plw, Cursor2* cur, u8 kind)
 {
     u8 k = kind;
     s32 count = (k == 0) ? 19 : 18;
-    fn_802ED6F4((u32)fn_802ED588(plw, k), count, cur);
+    cockpit_cursor_step((u32)cockpit_act_icon_mask_get(plw, k), count, cur);
 }
 
 /* 0x802ED834 (0x58).  The second selector's 4/6-entry cursor. */
-void fn_802ED834(_PLW* plw, Cursor2* cur, u8 kind)
+void cockpit_npc_cursor_step(_AINPC_W* npc, Cursor2* cur, u8 kind)
 {
-    s32 count = 4;
-    if (kind == 0) {
-        count = 6;
-    }
-    fn_802ED6F4((u32)fn_802ED620(plw, kind), count, cur);
+    cockpit_cursor_step((u32)cockpit_npc_icon_mask_get(npc, kind), kind == 0 ? 6 : 4, cur);
 }
 
-/* 0x802EECA0 (0x6C).  Count the live equipment slots (0..25) `fn_802EEC24` accepts. */
-s16 fn_802EECA0(_PLW* plw)
+/* 0x802EECA0 (0x6C).  Count the live equipment slots (0..25) `cockpit_item_slot_live_ck` accepts. */
+s16 cockpit_item_slot_live_count(_PLW* plw)
 {
     s16 count = 0;
     u32 i = 0;
     do {
-        if (fn_802EEC24(plw, i) != 0) {
+        if (cockpit_item_slot_live_ck(plw, i) != 0) {
             count = count + 1;
         }
         i = i + 1;
@@ -3267,13 +6121,16 @@ s16 fn_802EECA0(_PLW* plw)
 
 /* 0x802EEC24 (0x7C).  A slot is "live" when its value is positive, it holds an item, the item
  * passes `item_category_ck`'s flag test and its record's first byte is not 1. */
-s32 fn_802EEC24(_PLW* plw, u16 idx)
+s32 cockpit_item_slot_live_ck(_PLW* plw, u16 idx)
 {
     _SLOTENT* slot = &plw->slot_id[idx];
+    u16 item;
+
     if (slot->value > 0) {
-        if (slot->item_id != 0) {
-            if (item_category_ck(slot->item_id, 8) != 0) {
-                if (GetItemData(slot->item_id)->kind_0x00 != 1) {
+        item = slot->item_id;
+        if (item != 0) {
+            if (item_category_ck(item, 8) != 0) {
+                if (GetItemData(item)->kind_0x00 != 1) {
                     return 1;
                 }
             }
@@ -3285,35 +6142,32 @@ s32 fn_802EEC24(_PLW* plw, u16 idx)
 /* 0x802EE330 (0x7C).  One cockpit icon: when the act's status byte overlaps the caller's mask,
  * draw the position record through the 2D library in the fixed 0xFFE300FF colour, else play the
  * icon's animation. */
-void fn_802EE330(_PLW* plw, u16 id, u8 anim, u8 mask, const _mh_ivec2_* pos)
+void cockpit_act_icon_draw(_PLW* plw, u16 id, u8 anim, u8 mask, const _mh_ivec2_* pos)
 {
     if ((plw->field_0x309 & mask) != 0) {
         _SPR_DATA_ spr;
         sprite_frame_apply(&spr, id, anim, 0);
         spr.color = 0xFFE300FF;
-        ::draw_sprite(*(const ::_SPR_DATA_*)&(spr), (const ::_mh_ivec2_*)pos);
+        draw_sprite(spr, pos);
     } else {
         draw_sprite_anim_idx(id, anim, pos);
     }
 }
 
 /* 0x802EF0A0 (0x5C).  Project the caller's position through `eft053_shell_pos_project` and hand the
- * 12-byte result to the same-file `fn_802EEDE4` (the three word copies are the target's own shape). */
-void fn_802EF0A0(_PLW* plw, void* out)
+ * 12-byte result to the same-file `cockpit_aim_marker_draw` (the three word copies are the target's own shape). */
+void cockpit_shell_marker_draw(_PLW* plw)
 {
-    Pos12 scratch;
-    Pos12 pos;
+    VEC3 pos;
 
-    (void)out;
-    VEC3_ctor((VEC3*)&scratch);
-    eft053_shell_pos_project(plw, &scratch);
-    pos = scratch;
-    fn_802EEDE4(&pos);
+    VEC3_ctor(&pos);
+    eft053_shell_pos_project(plw, &pos);
+    cockpit_aim_marker_draw(pos);
 }
 
 /* 0x802EF62C (0x84).  The quest HUD's gate: off while `menu_item_frame_update(0)` or `camera_mode1_ck()` hold,
  * on only in area 1 with the act's state byte at 0 or 0xE. */
-s32 fn_802EF62C(_PLW* plw)
+s32 cockpit_prompt_ck(_PLW* plw)
 {
     if (menu_item_frame_update(0) != 0) {
         return 0;
@@ -3322,43 +6176,47 @@ s32 fn_802EF62C(_PLW* plw)
         return 0;
     }
 
-    u8 kind = plw->field_0x3E4;
-    if ((kind == 0 || kind == 0xE) && ::get_now_areano() == 1) {
-        return 1;
+    switch (plw->field_0x3E4) {
+    case 0:
+    case 0xE:
+        if (get_now_areano() == 1) {
+            return 1;
+        }
+        break;
     }
     return 0;
 }
 
 /* 0x802EF6B0 (0x80).  Arm/decay the blink record after the two quest work records: zero it when
- * the quest gate `fn_802EF62C` is closed, else reload a 10-frame countdown from `quest_move_sub_flag_get` and
+ * the quest gate `cockpit_prompt_ck` is closed, else reload a 10-frame countdown from `quest_move_sub_flag_get` and
  * tick it down. */
-void fn_802EF6B0(void)
+void cockpit_prompt_update(void)
 {
-    QuestBlink* blink = &cockpit_state;
+    CockpitState* blink = &cockpit_state;
 
-    if (fn_802EF62C(cockpit_work[0]) == 0) {
-        blink->timer = 0;
+    if (cockpit_prompt_ck(cockpit_work[0].plw) == 0) {
+        blink->blink_timer_0x074 = 0;
         return;
     }
 
     u8 v = quest_move_sub_flag_get();
     if (v != 0) {
-        blink->timer = 10;
-        blink->flag = v;
+        blink->blink_timer_0x074 = 10;
+        blink->blink_flag_0x075 = v;
         return;
     }
-    if (blink->timer != 0) {
-        blink->timer -= 1;
+    if (blink->blink_timer_0x074 != 0) {
+        blink->blink_timer_0x074 -= 1;
     }
 }
 
 /* 0x802EF400 (0x24).  Copy one 5-byte selection record field by field (the widths are the target's
  * `lbz`/`lbz`/`lhz`/`lbz`). */
-void fn_802EF400(QuestSel* dst, const QuestSel* src)
+void cockpit_hunt_log_entry_copy(HuntLogEntry* dst, const HuntLogEntry* src)
 {
-    dst->field_0x0 = src->field_0x0;
-    dst->field_0x1 = src->field_0x1;
-    dst->field_0x2 = src->field_0x2;
-    dst->field_0x4 = src->field_0x4;
+    dst->name_id = src->name_id;
+    dst->crown = src->crown;
+    dst->count = src->count;
+    dst->frame = src->frame;
 }
-}  /* namespace view_fn_802EBED8 */
+

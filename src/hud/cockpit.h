@@ -6,7 +6,24 @@
 
 #include "types.h"
 
+/* A float point passed by value to the textured-rectangle helper `draw_digit_rect`.  size: 0xC */
+struct HudPos3 {
+    /* +0x00 */ f32 x;
+    /* +0x04 */ f32 y;
+    /* +0x08 */ f32 z;
+    HudPos3(f32 px, f32 py, f32 pz) : x(px), y(py), z(pz) {}
+};
+/* A float extent passed by value to the textured-rectangle helper `draw_digit_rect`.  size: 0x8 */
+struct HudSize2 {
+    /* +0x00 */ f32 w;
+    /* +0x04 */ f32 h;
+    HudSize2(f32 pw, f32 ph) : w(pw), h(ph) {}
+};
+
 extern "C" {
+
+/* 0x802D9FB4 - draws digit `digit` of the number sheet as a textured rectangle at `pos`, `size` big. */
+void draw_digit_rect(HudPos3 pos, HudSize2 size, u8 digit, u32 color);
 
 /* 0x802DFC6C - hides the quest notice (the note band's pane code calls it). */
 void cockpit_notice_quest_clear(void);

@@ -90,7 +90,7 @@ s32 equip_gun_clip_get(struct _EQUIP* equip, u8 kind);
 u32 equip_gun_bonus_ck(struct _EQUIP* equip);
 
 /* 0x80274B20 / 0x80274D98 / 0x80274DCC / 0x80274E00 - the act-id and bonus-sum helpers. */
-u8 fn_80274B20(u16 id);
+u8 pl_item_icon_kind_get(u16 id);
 u8 fn_80274D98(struct _PLW* plw, u8 kind);
 u8 fn_80274DCC(struct _PLW* plw, u8 kind);
 s32 pl_item_pouch_ok_ck(struct _PLW* plw, u16 id);

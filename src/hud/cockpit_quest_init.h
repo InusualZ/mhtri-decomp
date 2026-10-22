@@ -12,7 +12,7 @@ extern "C" {
 /* 0x802E4AD4 / 0x802EF340 - set the cockpit up for a hunt, and push a kill onto its hunt log (monster, its
  * count, kill/capture kind).  GUESS names. */
 void cockpit_quest_init(void);
-void cockpit_hunt_log_push(u8 monster, u16 count, u8 kind);
+void cockpit_hunt_log_push(s32 monster, s32 count, s32 kind);
 
 #ifdef __cplusplus
 }

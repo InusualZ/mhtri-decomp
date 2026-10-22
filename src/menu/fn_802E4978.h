@@ -1,7 +1,7 @@
 /*
  * menu/fn_802E4978.h - the records and outbound declarations of `hud/cockpit_quest.cpp`'s 0x802E4978 band, the
- *   in-game cockpit: `fn_802E4978` builds one player's cockpit work in `cockpit_work` (2 entries, stride 0x194),
- *   `fn_802E4AD4`/`fn_802E4B8C` pick the viewer, the rest drive the item bar, the quest text and the action prompt.  The
+ *   in-game cockpit: `cockpit_work_init` builds one player's cockpit work in `cockpit_work` (2 entries, stride 0x194),
+ *   `fn_802E4AD4`/`cockpit_split_init` pick the viewer, the rest drive the item bar, the quest text and the action prompt.  The
  *   records are the band's views (`pl.h`'s `_PLW` has the fuller layout); the outbound block names the callees whose
  *   owner header cannot be included here, with the clash for each.
  */
@@ -59,7 +59,7 @@ typedef struct CockpitMove0 {
     /* +0x0F0 */ u8 pad_0x0F0[0xB20 - 0x0F0];
 } CockpitMove0; /* size: 0xB20 */
 
-/* The text/colour block inside one cockpit work record, at +0x2C (both `fn_802E4C5C` and the
+/* The text/colour block inside one cockpit work record, at +0x2C (both `cockpit_item_tag_update` and the
  * frame counters index it by this base). size: 0x1A (to the record's next named member) */
 typedef struct CockpitText {
     /* +0x000 */ u8 unused_0x000[0x00C];
@@ -223,28 +223,28 @@ u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
  * against 95.47298 for the one-argument form (`sqrt_f32((f32)(sq + dy * dy))`, and the same with
  * `(f32)(dx * dx + dy * dy)`).  Both measurements are in the outbox. */
 f32 sqrt_f32(s32, s32, f32);
-void fn_80053960(u32, s32, s32, u32);   /* 0x80053960 fn_8004CAD8.cpp */
+void drawshape_set_corner_colors(u32, s32, s32, u32);   /* 0x80053960 fn_8004CAD8.cpp */
 void drawshape_set_offset_ivec2(s16*);                  /* 0x80054178 fn_8004CAD8.cpp */
 void quest_gauge_update(void*, s32);           /* 0x802E796C hud/cockpit_quest.cpp */
 void quest_gauge_draw(void);                 /* 0x802E7FA0 hud/cockpit_quest.cpp */
 void quest_targets_update_b(void*);                /* 0x802E8C8C hud/cockpit_quest.cpp */
 void quest_marker_arm(void);                 /* 0x802E8E64 hud/cockpit_quest.cpp */
 void quest_marks_flush(void*);                /* 0x802EA33C hud/cockpit_quest.cpp */
-void fn_802EC4F0(void*);                /* 0x802EC4F0 hud/cockpit_quest.cpp */
-s32 fn_802EC6C4(void*);                 /* 0x802EC6C4 hud/cockpit_quest.cpp */
-void fn_802EC700(void);                 /* 0x802EC700 hud/cockpit_quest.cpp */
-void fn_802ED480(void);                 /* 0x802ED480 hud/cockpit_quest.cpp */
-void fn_802ED88C(void);                 /* 0x802ED88C hud/cockpit_quest.cpp */
-void fn_802EDAF0(void*, void*, void*);  /* 0x802EDAF0 hud/cockpit_quest.cpp */
-void fn_802EDB0C(void*, void*, void*);  /* 0x802EDB0C hud/cockpit_quest.cpp */
-void fn_802EDCE4(void*, void*);         /* 0x802EDCE4 hud/cockpit_quest.cpp */
-void fn_802EE65C(void*, void*);         /* 0x802EE65C hud/cockpit_quest.cpp */
-void fn_802EE82C(void*);                /* 0x802EE82C hud/cockpit_quest.cpp */
-void fn_802EF0FC(void*);                /* 0x802EF0FC hud/cockpit_quest.cpp */
-void fn_802EF230(void);                 /* 0x802EF230 hud/cockpit_quest.cpp */
-void fn_802EF424(void);                 /* 0x802EF424 hud/cockpit_quest.cpp */
-void fn_802EF6B0(void);                 /* 0x802EF6B0 hud/cockpit_quest.cpp */
-void fn_802EF730(void);                 /* 0x802EF730 hud/cockpit_quest.cpp */
+void cockpit_gauge_icons_update(void*);                /* 0x802EC4F0 hud/cockpit_quest.cpp */
+s32 cockpit_gauge_low_ck(void*);                 /* 0x802EC6C4 hud/cockpit_quest.cpp */
+void cockpit_weapon_hud_draw(void);                 /* 0x802EC700 hud/cockpit_quest.cpp */
+void cockpit_party_list_draw(void);                 /* 0x802ED480 hud/cockpit_quest.cpp */
+void cockpit_icon_cursors_update(void);                 /* 0x802ED88C hud/cockpit_quest.cpp */
+void cockpit_item_ring_reset(void*, void*, void*);  /* 0x802EDAF0 hud/cockpit_quest.cpp */
+void cockpit_item_ring_update(void*, void*, void*);  /* 0x802EDB0C hud/cockpit_quest.cpp */
+void cockpit_item_ring_draw(void*, void*);         /* 0x802EDCE4 hud/cockpit_quest.cpp */
+void cockpit_item_list_draw(void*, void*);         /* 0x802EE65C hud/cockpit_quest.cpp */
+void cockpit_item_tag_draw(void*);                /* 0x802EE82C hud/cockpit_quest.cpp */
+void cockpit_npc_digit_draw(void*);                /* 0x802EF0FC hud/cockpit_quest.cpp */
+void cockpit_hunt_log_update(void);                 /* 0x802EF230 hud/cockpit_quest.cpp */
+void cockpit_hunt_log_draw(void);                 /* 0x802EF424 hud/cockpit_quest.cpp */
+void cockpit_prompt_update(void);                 /* 0x802EF6B0 hud/cockpit_quest.cpp */
+void cockpit_prompt_draw(void);                 /* 0x802EF730 hud/cockpit_quest.cpp */
 /* 0x8033A850 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The owner's header cannot be included
  * here: it redefines `_mh_ivec2_` against `unsplit/lobby.h`, which this unit needs (measured - `(10296) class
  * '_mh_ivec2_' redefined`).  The zero-argument signature is this unit's call site. */

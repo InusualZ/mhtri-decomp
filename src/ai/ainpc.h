@@ -149,7 +149,8 @@ struct _AINPC_W {
                                         * copies all twelve */
     /* +0x3C0 */ u8 unused_0x3C0[0x3C2 - 0x3C0];
     /* +0x3C2 */ u16 field_0x3C2;       /* the motion the finish-out branch leaves the target in */
-    /* +0x3C4 */ u8 unused_0x3C4[0x3C6 - 0x3C4];
+    /* +0x3C4 */ u8 digit_state_0x3C4;      /* the cockpit's digit over the NPC: 0 none, 1 green, 2 red (`hud/cockpit_quest.cpp`) */
+    /* +0x3C5 */ u8 unused_0x3C5;
     /* +0x3C6 */ u16 field_0x3C6;       /* cleared when the aim's second stage starts */
     /* +0x3C8 */ u8 unused_0x3C8[0x3D2 - 0x3C8];
     /* +0x3D2 */ u8 field_0x3D2;

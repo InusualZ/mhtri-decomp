@@ -1273,7 +1273,7 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  *   a reference, a separate assignment, a const pointer, nested-scope assignment. All give r31 = base.
  *
  * fn_800F2680 must return u32 here: with u8 the u8->f32 narrowing loses its `mr r0,r3` copy and both
- *   fn_800DB36C and fn_800DB86C drop off 100 % (96.37 / 93.07).
+ *   fn_800DB36C and pl_charge_se_play drop off 100 % (96.37 / 93.07).
  *
  * `se_req_pos_ps` is declared as a C++ function on purpose - the map's symbol is the mangled
  *   `se_req_pos_ps__FP5_se_wllPQ34nw4r4math4VEC3`, and `extern "C"` emits an unmangled reloc instead.
@@ -1449,7 +1449,7 @@ extern "C" void fn_800DB7C8(_PLW* plw, nw4r::math::VEC3* pos) {
 /* --- 0x800DB86C -------------------------------------------------------------------------------- */
 
 /* Plays the weapon-hit sound of the player's currently equipped motion at a fixed volume. */
-extern "C" void fn_800DB86C(_PLW* plw) {
+extern "C" void pl_charge_se_play(_PLW* plw) {
     _se_w* se = plw->field_0xAFC;
 
     if (se == NULL) {
@@ -1985,7 +1985,7 @@ extern "C" {
 s32 my_player_no(void);
 }
 extern "C" void my_player_no_set(s32 value);
-extern "C" u8 fn_802EED0C(SeMoveWork* work);
+extern "C" u8 cockpit_lockon_level_get(SeMoveWork* work);
 /* The target object references this callee by its C++ mangling
  * (em_act_ck__FP11_ENEMY_WORKUcUc), so it is C++ - the extern "C" here was the
  * defect (relocaudit). */
@@ -2032,7 +2032,7 @@ extern "C" void se_frame_step(void) {
     if (work != NULL) {
         work += (s8)my_player_no();
         if (GameMode_ck() == 1) {
-            self->field_0x2927D = fn_802EED0C(work);
+            self->field_0x2927D = cockpit_lockon_level_get(work);
         }
     }
 

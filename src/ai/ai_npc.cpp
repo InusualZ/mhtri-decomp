@@ -5405,7 +5405,7 @@ s32 ai_npc_buff_item_pick(_AINPC_W* self)
     u16 pick = 0;
     u16 levels;
 
-    if (fn_802D948C(self) == 1) {
+    if (ai_npc_mode1_ck(self) == 1) {
         return 0;
     }
     if (::ran_suu(1) % 100 > 15) {
@@ -6176,7 +6176,7 @@ void ai_npc_player_watch(_AINPC_W* self)
  * the carry spot; only while +0x389 allows and the record is near the player. */
 void ai_npc_target_refresh(_AINPC_W* self)
 {
-    if (self->field_0x389 != 0 && (fn_802D948C(self) != 1 || self->area == self->plw_0x16C->area_0x16)) {
+    if (self->field_0x389 != 0 && (ai_npc_mode1_ck(self) != 1 || self->area == self->plw_0x16C->area_0x16)) {
         switch (self->field_0x1CC) {
         case 0:
             ai_npc_target_player_set(self);
@@ -8862,7 +8862,7 @@ void fn_802D0F34(struct _AINPC_W* self)
     u8* enemy_work = (u8*)::get_move_work_adrs(3);
 
     if (self->motion != 7 &&
-        (fn_802D948C(self) != 1 || self->area == self->plw_0x16C->area_0x16 ||
+        (ai_npc_mode1_ck(self) != 1 || self->area == self->plw_0x16C->area_0x16 ||
          self->field_0x485 == 1)) {
         if (self->field_0x1D1 != 0) {
             self->field_0x35C = 0;
@@ -9143,7 +9143,7 @@ void fn_802D1954(struct _AINPC_W* self)
     nw4r::math::VEC3 position;
 
     VEC3_ctor(&offset);
-    if (fn_802D948C(self) != 1) {
+    if (ai_npc_mode1_ck(self) != 1) {
         if (fn_802D94A0(self) == 1 && plw->area_0x16 == 0) {
             self->field_0x486 = 0x5A;
         }
@@ -9271,7 +9271,7 @@ void fn_802D1D90(struct _AINPC_W* self)
     if (fn_802D94A0(self) == 1) {
         fn_802D9A40(self);
     }
-    if (fn_802D948C(self) == 1) {
+    if (ai_npc_mode1_ck(self) == 1) {
         ai_npc_element_frame(self);
     } else {
         ai_npc_plan_decide(self);
@@ -9998,7 +9998,7 @@ void fn_802D348C(struct _AINPC_W* self)
         fn_802D3D84(self);
         fn_802D4200(self);
         self->field_0x389 = 1;
-        if (fn_802D948C(self) == 1) {
+        if (ai_npc_mode1_ck(self) == 1) {
             fn_802D3474(self, 9, 0);
             return;
         }
@@ -10038,7 +10038,7 @@ u32 fn_802D35EC(struct _AINPC_W* self, s32 delta)
         delta = 0;
     }
     fn_802D35B4(self, delta);
-    if (fn_802D948C(self) == 1) {
+    if (ai_npc_mode1_ck(self) == 1) {
         fn_802D92F8(self);
     }
     if (self->gauge_0x1F0 <= 0 && self->variant != 1) {
@@ -11681,7 +11681,7 @@ void fn_802D7DF0(struct _AINPC_W* self, s16 value)
 }
 
 /* 0x802D7DF8 - whether the +0x374 gauge is running. */
-s32 fn_802D7DF8(struct _AINPC_W* self)
+s32 ai_npc_wait_ck(struct _AINPC_W* self)
 {
     if (self->active == 0) {
         return 0;
@@ -11699,7 +11699,7 @@ s32 ai_npc_arrived_ck(struct _AINPC_W* self)
 }
 
 /* 0x802D7E68 - the same arrival test for the other motion slot. */
-s32 fn_802D7E68(struct _AINPC_W* self)
+s32 ai_npc_motion5_ck(struct _AINPC_W* self)
 {
     if (self->active == 0) {
         return 0;
@@ -11727,7 +11727,7 @@ void fn_802D84D0(struct _AINPC_W* self, s16 value)
 }
 
 /* 0x802D948C - whether the item page at +0x483 is the first one. */
-u32 fn_802D948C(struct _AINPC_W* self)
+u32 ai_npc_mode1_ck(struct _AINPC_W* self)
 {
     return self->field_0x483 == 1;
 }
@@ -11754,7 +11754,7 @@ void fn_802D9A44(struct _AINPC_W* self)
 }
 
 /* 0x802D9A50 - whether the acknowledgement has already happened. */
-s32 fn_802D9A50(struct _AINPC_W* self)
+s32 ai_npc_call_ck(struct _AINPC_W* self)
 {
     if (self->active == 0) {
         return 0;
@@ -11966,7 +11966,7 @@ s16 result_hunt_rank_get(struct Q_CountSet* counts_c, struct Q_CountSet* counts_
     if (quest_move_state_valid_ck() == 0) {
         return 0;
     }
-    if (fn_802D948C(self) == 1) {
+    if (ai_npc_mode1_ck(self) == 1) {
         return 0;
     }
     for (i = 0; i < 0x29; i++) {
@@ -11987,7 +11987,7 @@ u16 result_time_rank_get(u16 minutes)
     if (quest_move_state_valid_ck() == 0) {
         return 0;
     }
-    if (fn_802D948C(self) == 1) {
+    if (ai_npc_mode1_ck(self) == 1) {
         return 0;
     }
     for (; result_time_rank_tbl[i] >= 0; i += 2) {
@@ -12016,7 +12016,7 @@ void result_rank_rows_fill(struct IdValue* rows)
     if (quest_move_state_valid_ck() == 0) {
         locked = 1;
     }
-    if (fn_802D948C(self) == 1) {
+    if (ai_npc_mode1_ck(self) == 1) {
         locked = 1;
     }
     for (i = 0; i < 12; i++, rows++) {
@@ -12040,7 +12040,7 @@ u32 result_rank_points_get(struct Q_CountSet* counts_c, struct Q_CountSet* count
     if (quest_move_state_valid_ck() == 0) {
         return 0;
     }
-    if (fn_802D948C(self) == 1) {
+    if (ai_npc_mode1_ck(self) == 1) {
         return 0;
     }
     for (entry = result_rank_points_tbl; entry->count_index != 0xFF; entry++) {

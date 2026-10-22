@@ -38,7 +38,13 @@ typedef struct ScreenWork {
     /* +0x3C */ u16 visible_width;
     /* +0x3E */ u16 visible_height;
     /* +0x40 */ u8 pad_0x40[8];
-    /* +0x48 */ f32 player_aspect[3];
+    /* +0x48 */ union {
+        /* +0x48 */ f32 player_aspect[3];
+        struct {   /* size: 0xC */
+            /* +0x48 */ u8 pad_0x48[8];
+            /* +0x50 */ u8 player_camera_0x50[4]; /* each player's scene camera index (`hud/cockpit_quest.cpp`) */
+        } camera_view;
+    };
 } ScreenWork; /* size: 0x54 */
 
 

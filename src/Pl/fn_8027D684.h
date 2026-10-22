@@ -117,8 +117,8 @@ u32 equip_gun_bonus_ck(struct _EQUIP* equip);
 
 /* 0x8027DC64 - the player's slot-occupied flag (the first byte of the record at 0x806BB7A0), read as a boolean;
  * `enemy/em020_handlers.cpp`'s `em020_condition_ck` mode 2 compares it against 1.  `u32`, not the definition's
- * `s32`: the caller compares the result unsigned (`bl fn_8027DC64; cmplwi r3,0x1`). */
-u32 fn_8027DC64(void);
+ * `s32`: the caller compares the result unsigned (`bl pl_work_flag0_clear_ck; cmplwi r3,0x1`). */
+u32 pl_work_flag0_clear_ck(void);
 
 /* 0x8027E72C - the colour table's `index`-th 3-byte row as an opaque-alpha RGBA word; 0x8027E7BC - the
  * colour-table index the `_EQUIP` record's kind-row stores at +0x05 (0 when the row is absent);

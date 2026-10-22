@@ -188,7 +188,7 @@ u32 fn_8027D8A0(struct _PLW* self, s32 a);
  * consumer) - the band must not declare a symbol a registered unit owns. */
 
 /* The `.data` tables the same unit reads. */
-extern const u16 lbl_805BF490[];  /* 4-byte {u16 id, u16 value} rows, `fn_80274B20` looks ids up */
+extern const u16 lbl_805BF490[];  /* 4-byte {u16 id, u16 value} rows, `pl_item_icon_kind_get` looks ids up */
 extern u8 lbl_805C5F30[];         /* the melee act-name table rows `pl_act_name_row_get` picks */
 extern u8 lbl_805C5F50[];
 extern u8 lbl_805C5F70[];
@@ -202,7 +202,7 @@ extern const f32 lbl_8079A084;
 /* The per-slot gate table at 0x806BB7A0 (`.bss`, 0x18 B = three 8-byte entries, the map's size).
  * size: 0x8 */
 typedef struct PlSlotGate {
-    /* +0x00 */ u8 flag_0x00;   /* non-zero means the slot is occupied (`fn_8027DC64`/`78`/`90`) */
+    /* +0x00 */ u8 flag_0x00;   /* non-zero means the slot is occupied (`pl_work_flag0_clear_ck`/`78`/`90`) */
     /* +0x01 */ u8 pad_0x01[0x3];
     /* +0x04 */ s32 length_0x04; /* the effect family's loop length in frames; `ef/eft053.cpp`'
                                   * state machine reloads entry 1's copy after its last state */
@@ -218,9 +218,13 @@ extern u32 lbl_805706D8[];  /* the sibling counts `fn_8027E918` reads for kinds 
 
 /* The three per-kind item-id tables `fn_8027DE88`/`fn_8027DF38` walk until the 0xFFFF sentinel
  * (`.sdata` 0x80792030/0x80792038 at 0x8 B each, `.data` 0x805BFFE0 at 0x18 B - the map's sizes). */
-extern u16 lbl_80792030[];
-extern u16 lbl_80792038[];
-extern u16 lbl_805BFFE0[];
+extern u16 pl_act_kind2_item_ids[];
+extern u16 pl_act_kind3_item_ids[];
+extern u16 pl_act_kind4_item_ids[];
+/* The same two `.sdata` tables under the registry names `hud/cockpit_quest.cpp` spells (one declaration each
+ * once the registry names land). */
+extern u16 pl_act_kind2_item_ids[];
+extern u16 pl_act_kind3_item_ids[];
 
 /* The per-act `.data` record `Pl_act_set_step_table` installs (the `.data` run is unclaimed, so this
  * band header is its rule-2 home).  The `.sdata2` words that used to sit beside it are owned by

@@ -719,9 +719,16 @@ typedef struct QuestWork {
     /* +0x04E2 */ u16 capture_counts_0x4E2[41];  /* per monster key, the captures `quest_capture_reward_roll` pays */
     /* +0x0534 */ u8 result_block_0x534[0x0A4];  /* the run the result fill copies into the result's +0xA4 block */
     /* +0x05D8 */ u16 field_0x5D8;              /* the run's point score */
-    /* +0x05DA */ u8 unused_0x05DA[0x008];
-    /* +0x05E2 */ Q_ItemPair supply_0x5E2[0x18];  /* the supply pairs each drop adds a row of */
-    /* +0x0642 */ u8 unused_0x0642[0x056];
+    /* +0x05DA */ u8 unused_0x05DA[0x007];
+    /* +0x05E1 */ s8 supply_cursor_0x5E1;      /* the supply box cell the cockpit's cursor is on (`hud/cockpit_quest.cpp`) */
+    /* +0x05E2 */ Q_ItemPair supply_0x5E2[0x28];  /* the supply box, 5 rows of 8 pairs; each drop adds a row */
+    /* +0x0682 */ u8 unused_0x0682[0x002];
+    /* +0x0684 */ u32 supply_taken_0x684[2];   /* one bit per supply box cell already taken */
+    /* +0x068C */ s8 take_row_0x68C;          /* the cockpit's take-item menu row (`hud/cockpit_quest.cpp`) */
+    /* +0x068D */ s8 take_confirm_0x68D;      /* the take-item confirmation's yes/no cursor */
+    /* +0x068E */ s8 take_count_0x68E;        /* the count the take-item page shows */
+    /* +0x068F */ u8 unused_0x068F[0x007];
+    /* +0x0696 */ u16 take_flags_0x696;       /* the take-item page counter's flags */
     /* +0x0698 */ Q_UserData userdata_0x698;    /* the save block mirror `quest_init` copies in */
     /* +0x6698 */ u16* slot_values_0x6698[8];   /* the eight u16 stacks `quest_slot_items_get` copies */
     /* +0x66B8 */ s32 slot_counts_0x66B8[8];

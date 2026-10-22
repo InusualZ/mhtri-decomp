@@ -34,7 +34,7 @@ u32 fn_802D86D4(struct _AINPC_W* self, u16* id, s16* count);
 u16 fn_802D89D4(struct _AINPC_W* self, u16 motion);
 void fn_802D92F8(struct _AINPC_W* self);
 void ai_npc_element_frame(struct _AINPC_W* self);
-u32 fn_802D948C(struct _AINPC_W* self);
+u32 ai_npc_mode1_ck(struct _AINPC_W* self);
 u32 fn_802D94A0(struct _AINPC_W* self);
 void fn_802D9A40(struct _AINPC_W* self);
 s16 ai_npc_counter_window_get(struct _AINPC_W* self);
