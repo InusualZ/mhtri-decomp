@@ -46,8 +46,10 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 3. every changed path belongs to the batch (tool scratch `d<digits>.json`/`t<digits>.json` is tolerated and named), and none
    is added or changed under the retired `include/` root (a deletion or a rename out of it is fine: `common.retired_paths`); no batch file carries a conflict marker (GATE).
    With `--manifest PATH|SLUG` only: the batch touches only the lane's manifest - every changed path is inside its
-   `owns` globs and outside its `read_only` ones (GATE); an unreadable or malformed manifest is BOOKKEEPING; no row
-   without the flag (`rows/manifest.py`, `lane-manifest.md`).
+   `owns` globs and outside its `read_only` ones, and a map under its `own_rows` changes only rows at addresses the
+   batch's units claim (GATE, the out-of-range rows named); an unreadable or malformed manifest is BOOKKEEPING; no row
+   without the flag (`rows/manifest.py`, `lane-manifest.md`). `land --branch` with no `--units` takes the units from
+   the branch's registration diff, else from the manifest's `units` (a lane on a registered unit registers nothing).
 4. every unit's branch carries its work as commits (BOOKKEEPING refusal - the gate's only "the work exists" test); batch units named (or `--no-outbox` for an orchestrator-only batch) (BOOKKEEPING); every unit's outbox validates (`handoff.validate`) - a **WARNING** since 2026-10-05 (`every unit's outbox validates (warning)`, always PASS: each problem is printed as `WARNING: ...`, written as a `warning:` line in the commit body and into the landing log's `warnings`); it is skipped with a printed note for `--branch` naming a branch that is not `worker/<slug>` (only a claim's lane writes an outbox).
 5. style lint (section 6.5) adds no violation (`stylelint --diff <base>`, add-only, with rename/move credits; rule 15's advisory classes never count) (GATE).
 6. all tool selftests pass except the parked list (`tools/selftest.py`, ~30 s); `--no-selftests` skips (GATE).

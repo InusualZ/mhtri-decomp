@@ -41,8 +41,9 @@ prints the `land.band_ownership_warnings` command beside `stylelint.py --diff ma
   branch commits), `rules.py` (style lint with rule 12's allowance, rule 2's band boundary, rule 10), `selftests.py` (the suite row), `subject.py` (commitlint), `build.py` (command rows, the compile gate, the
   `ok` stamp), `objects.py` (`verifyunit`, `undefrefs`, `flipcheck`: registration, references, drift, re-measure),
   `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`, then `lib.report.seam_exempt` over the base-to-tree `splits.txt` diff: a unit-average row of a unit a `.text` move names is lifted when every function paired by address scores at least what it did, every function that changed unit lies inside a move between those two units, the touched units' matched code and the whole-report fuzzy did not fall, and the unit lost or gained a function; the PASS row reads `seam move: A -> B, N functions, none worse`, `Batch.seam_moves` and the landing log's `seam_moves` carry it; a snapshot recorded without addresses credits nothing - re-record the base), `manifest.py` (pre-build, after the conflict
-  markers: with `--manifest` every changed path must sit inside the lane's `owns` and outside its `read_only` -
-  `lane-manifest.md`; no row without the flag); `objects.new_unit_name_row` (pre-build, rule 7: a unit newly registered under a generated name refuses); `knowledge.py` (7.10) was deleted
+  markers: with `--manifest` every changed path must sit inside the lane's `owns` and outside its `read_only`, and a
+  map under its `own_rows` may change only rows at addresses the batch's units claim - `lane-manifest.md`; no row
+  without the flag; `flow.manifest_units` hands `land --branch` the manifest's `units` when the branch registers none); `objects.new_unit_name_row` (pre-build, rule 7: a unit newly registered under a generated name refuses); `knowledge.py` (7.10) was deleted
   2026-10-05 with its row.
 * `gate.py` - `verify`: `PRE_BUILD` rows in order, then the build and the rows that read it, the message body.
 * `flow.py` - `land` and `land_branch` (gate -> stage -> commit -> release, one answer line). A stage or commit step

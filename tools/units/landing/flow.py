@@ -14,6 +14,7 @@ from tools.lib.lanes import registry
 from tools.units.landing import gate
 from tools.units.landing import release
 from tools.units.landing import state
+from tools.units.landing.rows import manifest as manifest_row
 from tools.units.landing.base import base_dirty_paths, ledger_line, ledger_numbers, record_base, summary
 from tools.units.landing.branch import (_sweep_resolve_helpers, apply_branch, claim_unit_for_branch,
     resolve_helper_state, undo_apply, units_from_branch)
@@ -111,7 +112,8 @@ def land_branch(main: str, branch: str, units: list[str] | None = None, base: st
     Idempotent and loud: every refusal prints one `REFUSED <branch> | <reason>` line (stdout) and leaves
     MAIN exactly as it was found - the apply is undone whenever the landing did not reach a commit, so a
     refused landing is never a half-landing.  The registered unit(s) come from the branch's registration
-    diff when `--units` is not given, so a unit renamed at registration is landed under its real name.
+    diff when `--units` is not given, so a unit renamed at registration is landed under its real name; a branch that
+    registers nothing (an own-row lane on a registered unit) takes its `--manifest`'s `units`.
     Every attempt appends one line to the landing log.
     """
     t0, rec = time.time(), _attempt(state.allowances(allow_regression, check_outbox, no_selftests))
@@ -120,6 +122,15 @@ def land_branch(main: str, branch: str, units: list[str] | None = None, base: st
                             release_claims, subject, no_selftests)
     finally:
         _log(main, branch, rec, t0)
+
+
+def manifest_units(main: str) -> list[str]:
+    """The `units` of this invocation's `--manifest` (`state.MANIFEST`), normalised; [] without one or when it cannot
+    be read (the manifest row then refuses with the reason)."""
+    if not state.MANIFEST:
+        return []
+    data, _why = manifest_row.load(main, state.MANIFEST)
+    return [naming.norm_unit(u.strip().strip("/")) for u in (data or {}).get("units") or [] if u.strip()]
 
 
 def _land_branch(main, branch, rec, units, base, no_build, allow_regression, check_outbox, release_claims,
@@ -146,9 +157,13 @@ def _land_branch(main, branch, rec, units, base, no_build, allow_regression, che
         norm = units_from_branch(main, branch, merge_base)
         rec["units"] = norm
     if not norm:
+        # a lane working an already-registered unit changes no registration: its manifest's `units` name them
+        norm = manifest_units(main)
+        rec["units"] = norm
+    if not norm:
         clear_land_message(main)
-        return _refused(rec, "REFUSED %s | could not read the branch's registered unit(s) from its configure.py/"
-                             "splits.txt diff; pass --units explicitly" % branch, "units from the branch")
+        return _refused(rec, "REFUSED %s | could not read the branch's unit(s) from its configure.py/splits.txt diff "
+                             "or a --manifest's `units`; pass --units explicitly" % branch, "units from the branch")
     # Read the resolve-helper state now, while `branch` still exists: the landing below may release and
     # delete it, and the containment proof is against `branch`'s pre-land tip.
     helper_redundant, helper_refused = resolve_helper_state(main, branch)

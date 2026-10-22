@@ -30,14 +30,23 @@ The manifest, read-only:
 
 ```json
 {"manifest": {"lane": "net-l2", "base": "65b341058",
-              "owns": ["src/Network/NetworkSession*", "src/unsplit/network.h", "configure.py", "config/RMHE08/*.txt"],
+              "owns": ["src/Network/NetworkSession*", "src/unsplit/network.h", "configure.py", "config/RMHE08/splits.txt"],
+              "own_rows": ["config/RMHE08/symbols.txt"],
               "read_only": ["src/types.h", "src/nw4r/", "src/Network/network_state.h"],
               "units": ["Network/NetworkSessionManager", "Network/NetworkSessionStable"]}}
 ```
 
 * `lane` (required): the lane's name, printed by the row. `base`: the commit the lane was cut from (recorded, not
-  compared). `units`: the units the lane works (recorded). `owns` (required, non-empty) and `read_only`: lists of
-  repo-relative entries.
+  compared). `units`: the units the lane works; `land --branch` lands them when the branch registers nothing (no
+  `--units`, no registration diff). `owns` (required, non-empty), `read_only` and `own_rows`: lists of repo-relative
+  entries.
+* `own_rows` (docs/pipeline.md 16.1): a map the lane may change **row by row** - every changed row (renamed, resized,
+  split, added, deleted: the removed and added lines of a multiset line diff, HEAD against the working tree) must sit
+  at an address one of the batch's units claims in the row's own section of the `splits.txt` beside the map (the
+  working tree's, so a unit registered in the same batch counts). A changed line that is no map row, or a row at an
+  address another unit or nobody claims, refuses with the row, its address and its owner named. An `own_rows` match
+  wins over an `owns` match (listing the map in both still narrows it); `read_only` wins over both. The batch's units
+  are `--units`, else the branch's registration, else the manifest's `units`.
 * An entry with `*`, `?` or `[` is an `fnmatch` glob (`*` crosses `/`); any other entry is a directory (everything
   below it, trailing `/` optional) or the exact path.
 * Output: one row in the gate table; the landing log line's `manifest` key (`lib.lanes.landlog.Attempt.manifest`); a
@@ -46,6 +55,7 @@ The manifest, read-only:
 ## Invariants and rules
 
 * A path inside a `read_only` entry refuses even when an `owns` entry also matches it: read-only wins.
+* A path an `own_rows` entry matches is judged by its rows (`rows/manifest.py` `out_of_claim_rows`), never by `owns`.
 * A path no `owns` entry matches refuses. The paths judged are the gate's changed paths (both sides of a rename),
   minus the tolerated scratch; gitignored paths (`.pi/`, `build/`) are never in a batch.
 * The out-of-manifest refusal is GATE: the batch edits a file its lane does not own. The remedy is to move the edit
@@ -68,6 +78,11 @@ refuses, naming the header and the remedy) in the golden table; `test_manifest_d
 matching, read-only over owns, an unowned path, the shape problems, slug/outbox/bare-file loading, a missing file);
 `test_landlog_hook.py::test_manifest_reaches_the_log_and_the_body`. Mutation-checked (2026-10-06): deleting the row
 from `PRE_BUILD` fails 6 checks, ignoring `read_only` fails 5, ignoring `owns` fails 1.
+`tools/tests/units/landing/test_own_rows.py`: `out_of_claim_rows` (an own rename/split/deletion passes, a foreign rename,
+an unclaimed addition, a row in another section and a non-row line refuse; order and line endings are no change), the
+path decision (`own_rows` beside `owns`/`read_only`), and `land --branch` on a fixture branch that registers nothing:
+it lands with the manifest's `units` and the real row, and a branch that also renames another unit's row is refused
+with the rows named and main unchanged (19 checks; all three test functions fail against the tree before `own_rows`).
 
 ## Known gaps
 
