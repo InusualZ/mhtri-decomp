@@ -890,7 +890,7 @@ void fn_801EC7AC(void)
 void fn_801EC828(u8* self)
 {
     self[3] = 1;
-    fn_802BBAC4(1);
+    camera_lobby_manual_set(1);
     sysSE_req(1);
 }
 

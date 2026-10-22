@@ -568,7 +568,7 @@ void pl_equip_model_set(struct _PLW* plw, u8* rec);
 void lb_list_init(LbList* list, s16 count, u8 kind, u16 str_base, s16 help_str, u16 off_mask, s32 se_ok, u32 flags,
                   u16 blink_mask);
 s32 lb_choice_step(void* list);
-s32 fn_802BBAC4(s32 a);
+s32 camera_lobby_manual_set(s32 a);
 void menu_sel_cursor_init(MenuSelCursor* cur, s8 kind, MenuSel* owner);
 s32 fn_8031C028(MenuSelCursor* cur, u16 slot, u16 item_id);
 u32 fn_8031C0B8(MenuSelCursor* cur);
@@ -2470,7 +2470,7 @@ extern "C" s32 lb_entry_pane_menu_step(LbEntryPane* self, LbEquipBoxWork* owner,
     case 0:
         if (lb_cmd_held_ck(0x80) == 1U) {
             if (self->held_0x020 == 0) {
-                fn_802BBAC4(0);
+                camera_lobby_manual_set(0);
                 self->held_0x020 = 1;
                 sysSE_req(5);
                 lb_digit_pane_value(self);
@@ -2486,7 +2486,7 @@ extern "C" s32 lb_entry_pane_menu_step(LbEntryPane* self, LbEquipBoxWork* owner,
             self->held_0x020 = 0;
             sysSE_req(1);
             if (lb_entry_pane_scroll_kind_get(self) == 7) {
-                fn_802BBAC4(1);
+                camera_lobby_manual_set(1);
             }
             return 1;
         }
@@ -7691,7 +7691,7 @@ void fn_802AFA40(void);
 s32 stage_area_slot_get(u8 a, u8 b);
 void stage_map_obj_load(u8 mode);
 void camera_work_init(void);
-void fn_802BB0EC(void);
+void camera_area_default_set(void);
 void stage_dcm_path_get(char* buf, u8 index);
 void sprite_frame_apply(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
 void fn_8032422C(void);
@@ -8427,7 +8427,7 @@ s32 lobby_scene_setup_step(LbChgSeqWork* self)
     case 6:
         stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
         lb_npc_map_setup();
-        fn_802BB0EC();
+        camera_area_default_set();
         self->step_0x0A++;
         self->state_0x0B = 0;
         NetCtrlWk::setFetchMode(1);
@@ -8726,7 +8726,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
         stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
         demo_work_update();
         lb_npc_map_setup();
-        fn_802BB0EC();
+        camera_area_default_set();
         self->step_0x0A++;
         self->state_0x0B = 0;
         setSoftresetFlag(1);

@@ -5,7 +5,7 @@
  * sprite-transform helpers, `.bss` 0x806699B8 on).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range - no `__FILE__` string, no assert, no runtime-dump name (class 1/2
- * fail), so the file keeps the map's `fn_80047398` stem (evidence class 3, the same outcome as `src/fn_80040598.cpp`) in the
+ * fail), so the file keeps the map's `scene_current_camera_get` stem (evidence class 3, the same outcome as `src/fn_80040598.cpp`) in the
  * game-root `main` lib band (`cflags_main`), next to `mh3_pad.cpp` which ends where this unit begins.  The mangled names the range
  * carries (`drawSpr2TF__FUcP9fltSpr2TFUc`, `subTransSetPrio__FUcUllPUl`, ...) are in `userdata_item.cpp`'s half and are never
  * spelled as callable identifiers (rule 9).
@@ -19,7 +19,7 @@
  * Status: partial.  Written, in address order: the accessors and the face animation helpers up to `fn_80047D38` and the GX pipe
  * writers `fn_80048764..userdata_size_get`; the biggest unwritten are `fn_80047D6C` (0x9F8), `face_tex_bind` (0x200), `face_tex_load` (0x170).
  *
- * Residual: the four functions that read `Screen_w` (fn_80047398, fn_800473F4, face_tex_bind, fn_80047D6C) are NOT written:
+ * Residual: the four functions that read `Screen_w` (scene_current_camera_get, scene_current_camera_set, face_tex_bind, fn_80047D6C) are NOT written:
  * `ScreenWork` is defined inside `main.cpp`, and reaching its fields from a second unit needs that type moved to `include/` first
  * (rule 1).  fn_80047634/fn_80047780 are declared and called by fn_80047884/fn_80047CAC but their load_file_req/load_file bodies
  * are unwritten (their real signatures come from the map's `load_file_req__FPcUllUllPUl` / `load_file__FPcUll`, which rule 9

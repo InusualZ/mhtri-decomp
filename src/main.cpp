@@ -75,7 +75,7 @@
  *     int->float conversion temps in `fn_8003FEBC`/`frame_copy_display` away, so those two run with it off - each is
  *     then the target's own 220 B/428 B (98.00 -> 99.82 %, 99.02 -> 99.95 %).
  *   * a pragma region is **not local**: moving that `reset` down from before `fn_8003FEBC` to before
- *     `frame_swap_wait` also flipped `fn_8004029C`/`fn_80040360` from our coalesced `lis r31` to retail's
+ *     `frame_swap_wait` also flipped `screen_aspect_get`/`fn_80040360` from our coalesced `lis r31` to retail's
  *     scratch `lis r3` (99.52/99.47 -> 100 %) without touching any other function. Adding anything earlier
  *     in this file can move a later function's register tie-break, so re-measure the whole unit.
  *   * the reset can also sit *inside* a function: `fn_8003F9E4`'s head needs the truncation kept (peephole
@@ -146,7 +146,7 @@
  *     top-of-function `GXRenderModeObj* mode = (GXRenderModeObj*)_f_bss;` local (worse - 81.80 %, the base
  *     is hoisted and a third callee-saved register appears) and a `void*` parameter (no change).
  *   * `fn_8003FC64` 99.58 % - one `lis r4` vs `lis r3` scratch-register choice on the warning-counter base -
- *     the same tie-break the pragma-region move flipped in `fn_8004029C`/`fn_80040360`, but an off/reset
+ *     the same tie-break the pragma-region move flipped in `screen_aspect_get`/`fn_80040360`, but an off/reset
  *     pair placed at this function does not reach it (97.50 % with the pragma over its own body).
  */
 
@@ -960,7 +960,7 @@ extern "C" u16* fn_8004028C(void)
 
 /* The aspect ratio the current draw should use: the per-player one while the screen is split, the
  * plain screen aspect otherwise. */
-extern "C" f32 fn_8004029C(void)
+extern "C" f32 screen_aspect_get(void)
 {
     if (Screen_w.split_mode != 0) {
         return Screen_w.player_aspect[(s8)my_player_no()];

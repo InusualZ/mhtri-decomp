@@ -1071,10 +1071,19 @@ struct _PLW {
         struct {   /* the later names, padded to the same byte total */
         /* +0x5C4 */ u8 pad_merge_0x5C4[0x3];
                                 /* +0x5C7 */ u8 field_0x5C7;
-        /* +0x5C8 */ u8 pad_merge_0x5C8[0x20];
+        /* +0x5C8 */ u8 pad_merge_0x5C8[0x1D];
+        /* +0x5E5 */ u8 camera_lock_0x5E5;   /* non-zero keeps the follow camera off the player's input (`camera/camera_main.cpp`) */
+        /* +0x5E6 */ u8 pad_merge_0x5E6[0x2];
         };
     };
-    /* +0x5E8 */ s16 unk5E8;
+    /* +0x5E8 */ union {   /* the original and later names of the same 2 bytes (rule 5) */
+        struct {   /* the original layout */
+            /* +0x5E8 */ s16 unk5E8;
+        };
+        struct {   /* the later names */
+            /* +0x5E8 */ s16 aim_pitch_0x5E8;   /* the scope's pitch the aim camera turns by (`camera/camera_main.cpp`) */
+        };
+    };
     /* +0x5EA */ u8 pad_0x5EA[0x8];
     /* +0x5F2 */ u16 active_skill_id[8];    /* the hunter's active skills (0 = none); GUESS name, from the info screen */
     /* +0x602 */ u8 active_skill_tree[8];    /* the skill tree each one comes from */

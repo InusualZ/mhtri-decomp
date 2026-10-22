@@ -89,7 +89,7 @@ void eft_common_load(void);
 
 u32 fn_8027CB1C(void* self);
 u32 stage_map_kind_get(u8 idx);
-void fn_802BE568(void* self, u32 sub);
+void camera_pl_quake_req(void* self, u32 sub);
 void em_pop_res_load(u8 idx);
 
 }
@@ -208,7 +208,7 @@ void fn_80288CEC(_PLW* self, u32 sub, f32 dt) {
     if (self->field_0x566 == 0 && self->field_0x565 == 0 && dt > pl_motion_f32_zero &&
         Pl_frame_check(self, 0, dt, pl_motion_f32_zero) == 1) {
         self->field_0x566 = 1;
-        fn_802BE568(self, 0);
+        camera_pl_quake_req(self, 0);
     }
 }
 

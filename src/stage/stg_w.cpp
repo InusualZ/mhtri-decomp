@@ -441,7 +441,7 @@ extern "C" u32 stg_area_flag_index_ck(u8 index)
 }
 
 /* Whether the float at `self`+8 is below the pooled constant. */
-extern "C" u32 fn_802B0688(void* self)
+extern "C" u32 stage_pos_z_low_ck(void* self)
 {
     return ((f32*)self)[2] < lbl_8079A480;
 }
@@ -803,7 +803,7 @@ extern "C" void fn_802B2AA0(StageBlendRec* rec, void* obj, u8 store)
 }
 
 /* Copies the current area's staged colour record out of the stage block and drives it. */
-extern "C" void fn_802B2E2C(void)
+extern "C" void stage_area_colour_update(void)
 {
     StageRuntime* st = (StageRuntime*)stage_w;
     StageColourRec rec;
@@ -825,7 +825,7 @@ extern "C" void fn_802B2E2C(void)
     if (stage_water_enabled_ck() == 0) {
         return;
     }
-    if (fn_802BE088() == 1U) {
+    if (camera_underwater_ck() == 1U) {
         fn_802B2F3C(&rec, &st->area[st->areano].colour_b);
     } else {
         fn_802B2F3C(&rec, &st->area[st->areano].colour_a);
@@ -896,7 +896,7 @@ extern "C" void fn_802B2F60(StageRuntime* st, u8 kind)
     if (group == 1U && kind == 0) {
         copyVec3(&poly, &::get_camera_pos());
         group = my_player_no();
-        if (fn_802B0688(&poly) == 1U) {
+        if (stage_pos_z_low_ck(&poly) == 1U) {
             keep = list->show;
             drop = list->hide;
             found = 1;
@@ -1572,7 +1572,7 @@ extern "C" void fn_802B428C(StageRuntime* st)
         if ((s32)(system_w.field_0x0c % 160) == 0) {
             setVector3(&pos, lbl_8079A4AC, lbl_8079A4B0, lbl_8079A4B4);
             ::eft028_set_koware(6, &pos, st->areano, 0);
-            fn_802BE4FC(0x43);
+            camera_quake_req(0x43);
             fn_800DD38C();
         }
         break;

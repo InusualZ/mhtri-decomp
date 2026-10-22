@@ -52,7 +52,11 @@ typedef struct PlayerPad {
     /* +0x0DA */ u16 field_0xda;
     /* +0x0DC */ u8 pad_0x0dc[0x2];
     /* +0x0DE */ u16 control_0x0DE;
-    /* +0x0E0 */ u8 pad_0x0e0[0x18];
+    /* +0x0E0 */ u8 pad_0x0e0[0x8];
+    /* +0x0E8 */ u16 field_0xe8;     /* the fourth control word the camera keeps (`camera/camera_main.cpp`) */
+    /* +0x0EA */ u8 pad_0x0ea[0x2];
+    /* +0x0EC */ u16 field_0xec;     /* the fifth control word the camera keeps */
+    /* +0x0EE */ u8 pad_0x0ee[0xA];
     /* +0x0F8 */ u16 field_0xf8;
     /* +0x0FA */ u8 pad_0x0fa[0x2];
     /* +0x0FC */ u16 control_0x0FC;  /* the held-button word */

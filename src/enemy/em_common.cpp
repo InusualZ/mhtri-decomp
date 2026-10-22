@@ -562,7 +562,7 @@ extern "C" s32 quest_time_elapsed_get(void);
 
 extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind);
 extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot);
-extern "C" void* fn_8012D498(u32 selector, _PLW* work, s8* out_flag);
+extern "C" void* em_kill_cut_target_get(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 pl_torch_ck(void* arg);
 extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 em_act_trap_ck(_ENEMY_WORK* enemy);
@@ -597,7 +597,7 @@ extern "C" void em_attack_finished_clear(_ENEMY_WORK* record);
 extern "C" s32 fn_8012E8F4(f32 seconds);
 
 extern "C" u8 stage_map_kind_get(u32 map_no);
-extern "C" u32 fn_802B0688(void* pos);
+extern "C" u32 stage_pos_z_low_ck(void* pos);
 extern "C" u8 Pl_area_flag_get(u32 value);
 extern "C" void em_hate_misc_add(_ENEMY_WORK* enemy, s32 value);
 extern "C" void fn_8012CE8C(_ENEMY_WORK* enemy, u16 flag);
@@ -4634,10 +4634,10 @@ extern "C" s32 em_pl_target_ck(_ENEMY_WORK* enemy, _PLW* work)
     if (enemy->area_no == work->area_0x16) {
         if (stage_map_kind_get(enemy->field_0x1E0) == 9) {
             if (Pl_area_flag_get(work->chunk_ofs) == 0) {
-                if (fn_802B0688(&enemy->pos) == 1) {
+                if (stage_pos_z_low_ck(&enemy->pos) == 1) {
                     return 1;
                 }
-            } else if (fn_802B0688(&enemy->pos) == 0) {
+            } else if (stage_pos_z_low_ck(&enemy->pos) == 0) {
                 return 1;
             }
             return 0;
@@ -4723,7 +4723,7 @@ extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind)
 /* Whether the search helper finds any record. */
 extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag)
 {
-    return fn_8012D498((u8)selector, work, out_flag) != NULL;
+    return em_kill_cut_target_get((u8)selector, work, out_flag) != NULL;
 }
 
 

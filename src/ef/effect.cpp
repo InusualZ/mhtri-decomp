@@ -184,7 +184,7 @@ extern "C" {
 /* the engine vector/matrix helpers */
 void color_rgba_copy(void* dst, void* src);
 void mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
-void fn_802BDE90(f32* out_a, f32* out_b);
+void camera_proj_params_get(f32* out_a, f32* out_b);
 void VEC2_ctor(void* out);
 void* ef_emitter_tex_flags(void* self);
 void ef_word_copy(void* dst, const void* src);
@@ -294,7 +294,7 @@ extern "C" void fn_800F95A4(void* self) {
     VEC3_ctor(&pos);
     copyVec3(&pos, &get_camera_pos());
     mtx34_copy(&world, &get_current_view_mtx());
-    fn_802BDE90(&fov, &aspect);
+    camera_proj_params_get(&fov, &aspect);
     fn_800A602C(self, &pos, &world, fov, aspect);
 }
 

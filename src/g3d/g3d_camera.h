@@ -45,7 +45,7 @@ void camera_get_projection_tex_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::M
 void camera_get_environment_tex_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX34* pOut);
 
 /* The camera-position copy `camera/fn_802B5C58.cpp`'s `get_camera_pos` reads through. */
-void fn_800749C8(const void* src, void* dst); /* 0x800749C8 - copies the camera's +0x74 vector out */
+void camera_get_position(const void* src, void* dst); /* 0x800749C8 - copies the camera's +0x74 vector out */
 
 #ifdef __cplusplus
 }

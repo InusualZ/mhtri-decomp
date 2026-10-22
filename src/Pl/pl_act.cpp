@@ -79,7 +79,7 @@
  *  - `fn_8027B0BC`: six `clrlwi r0,r0,24` before the `stb`s into `q + 0x5E1` (a peephole-level residual);
  *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
  *    r30, ours the mirror (playbook 22); `fn_8027C208`: the frame is 0x30 against retail's 0x40 (unused locals);
- *  - `fn_8027A340`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
+ *  - `pl_target_lock_ck`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
  *    `Pl_bari_ck`: retail lays the first arm out of line and the second inline, the natural chain is the mirror;
  *  - `fn_8027DCA8` (`return a || b` shares the `li r3,1` tail), `fn_8027DCE0` (retail merges every `return 0`),
  *    `fn_8027DE88`/`fn_8027DF38` (retail lays the id-scan loop head after the body), `fn_8027DFE4` (the `case 12`
@@ -149,7 +149,7 @@
  *    tail is the `switch`'s `default:` after the last case; `pl_impact_pos_get` writes its `default:` first;
  *  - `fn_8027C208` ends in `return 0` with an explicit `default: return 1`, and every refused path is
  *    `if (!c) return 1; break;` (the `if (c) return 0; return 1;` form if-converts; playbook 34);
- *  - `fn_8027A340` writes its cases in body address order (0, 4, 2) with the range guard negated and its arms swapped;
+ *  - `pl_target_lock_ck` writes its cases in body address order (0, 4, 2) with the range guard negated and its arms swapped;
  *  - `fn_8027AF34` keeps the pre-decrement value in an `s16` local and an unreachable `if (v < 0) return;` after the
  *    store, which reproduces retail's `blelr ... sth ... bltlr`;
  *  - `pl_pos_blend_start` writes `(f32)(s16)arg1` inline at each division (retail recomputes the conversion);
@@ -5602,7 +5602,7 @@ extern "C" s32 pl_mode8_free_ck(void);
 extern "C" void fn_8010D688(_PLW*);
 extern "C" u32 pl_item_page2_ck(_PLW*);
 extern "C" void mhchar_motion_speed_set(u8*, f32);
-extern "C" u32 fn_802B0688(void*);
+extern "C" u32 stage_pos_z_low_ck(void*);
 extern "C" void fn_8026FEF0(_PLW*, s32);
 extern "C" void pl_act_enter(_PLW*, s32, u16, u16);
 
@@ -6112,7 +6112,7 @@ extern "C" s32 fn_8027CA04(_PLW* self, s32 arg1)
 }
 
 /* 0x8027CC2C */
-extern "C" u32 fn_8027CC2C(_PLW* self)
+extern "C" u32 pl_camera_close_ck(_PLW* self)
 {
     return (self->field_0x5A4 & 0x40) != 0;
 }
@@ -6237,7 +6237,7 @@ extern "C" s32 fn_80277F54(_PLW* self)
             return 0;
         }
     } else {
-        if (fn_802B0688((u8*)self + 60) == 1) {
+        if (stage_pos_z_low_ck((u8*)self + 60) == 1) {
             return 0;
         }
     }
@@ -6516,7 +6516,7 @@ extern "C" void fn_80279B84(_PLW* self)
 
 /* 0x8027A2A0: whether the actor may still act - master/rage state, the bari timer, the stun flag
  * and the held-item lock all have to agree. */
-extern "C" s32 fn_8027A2A0(_PLW* self, s32 arg1)
+extern "C" s32 pl_camera_reset_ck(_PLW* self, s32 arg1)
 {
     s32 v = 1;
     if (Pl_master_ck(self) == 0) {
@@ -6721,7 +6721,7 @@ extern "C" s32 fn_8027D40C(_PLW* self)
 }
 
 /* 0x8027CD0C: builds the gunner's aim matrix from its rotation and gun position. */
-extern "C" void fn_8027CD0C(_PLW* self, nw4r::math::MTX34* mtx)
+extern "C" void pl_eye_mtx_get(_PLW* self, nw4r::math::MTX34* mtx)
 {
     _CP_VECTOR pos;
     nw4r::math::VEC3 v;
@@ -6864,7 +6864,7 @@ extern "C" s32 fn_802784B8(_PLW* self)
         break;
     }
     case 9:
-        if (fn_802B0688((u8*)self + 60) == 1) {
+        if (stage_pos_z_low_ck((u8*)self + 60) == 1) {
             return 0;
         }
         break;
@@ -8147,9 +8147,9 @@ extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
 
 extern "C" s32 pl_part_flag2_ck(_PLW*, s32);
 extern "C" void fn_80279EBC(_PLW*, u16, u16);
-extern "C" s32 fn_8027A340(_PLW*);
+extern "C" s32 pl_target_lock_ck(_PLW*);
 extern "C" u32 fn_80287244(_PLW*, s32);
-extern "C" void fn_802B9740(_PLW*, u8*, u8*, f32*);
+extern "C" void camera_aim_zoom_get(_PLW*, u8*, u8*, f32*);
 extern "C" u8 get_cfg(u8, s32);
 extern "C" { extern u8 lbl_805C6118[]; }
 extern "C" { extern const f32 lbl_8079A080; }
@@ -8192,7 +8192,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                 break;
             }
             if (arg2 == 0) {
-                if (!(self->field_0x00A == 4 || fn_8027A340(self) != 0)) {
+                if (!(self->field_0x00A == 4 || pl_target_lock_ck(self) != 0)) {
                     break;
                 }
             } else if (arg2 == 2) {
@@ -8203,7 +8203,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
         }
         switch (arg2) {
         case 0:
-            if (fn_8027A340(self) != 0 ||
+            if (pl_target_lock_ck(self) != 0 ||
                 ((s32)self->unk5E6 == 0 && (u32)fn_80287244(self, 0) == 1)) {
                 u8 c;
                 u8 r;
@@ -8298,7 +8298,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                         f26 = c;
                     }
                     spC = lbl_8079A080;
-                    fn_802B9740(self, &sp9, &sp8, &spC);
+                    camera_aim_zoom_get(self, &sp9, &sp8, &spC);
                     mag = 1;
                     step = 0x4C;
                     t = (s32*)lbl_805C6118;
@@ -8536,7 +8536,7 @@ extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
         break;
     }
     case 9:
-        if (fn_802B0688(arg1) == 1U) {
+        if (stage_pos_z_low_ck(arg1) == 1U) {
             return 0;
         }
         break;
@@ -8584,7 +8584,7 @@ extern "C" u32 fn_80278310(u8 arg0, u8* arg1, u8 arg2)
         break;
     }
     case 9:
-        if (fn_802B0688(arg1) == 1U) {
+        if (stage_pos_z_low_ck(arg1) == 1U) {
             return 0;
         }
         break;
@@ -8886,7 +8886,7 @@ extern "C" void fn_80279EBC(_PLW* self, u16 arg1, u16 arg2)
 
 /* 0x8027A340: whether the actor may act at all this frame - master/bari state, the stun flag and the
  * per-action-class exceptions. */
-extern "C" s32 fn_8027A340(_PLW* self)
+extern "C" s32 pl_target_lock_ck(_PLW* self)
 {
     s32 ok = 1;
     if (Pl_master_ck(self) == 0) {
@@ -9162,7 +9162,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (*(u8*)((u8*)self + 0x585) != 0) {
             return 0;
         }
-        if (fn_8027CC2C(self) == 1U) {
+        if (pl_camera_close_ck(self) == 1U) {
             return 0;
         }
         if (Pl_item_timer_get(self, 0x1D) > 0 && self->kind_0x09 != 3) {
@@ -9173,7 +9173,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (self->kind_0x09 == 3) {
             return 0;
         }
-        if (fn_8027CC2C(self) == 1U) {
+        if (pl_camera_close_ck(self) == 1U) {
             return 0;
         }
         if (Pl_item_timer_get(self, 0x1D) > 0 && fn_802D7804(4, lbl_8079A0F8) == 1U) {

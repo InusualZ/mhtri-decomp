@@ -2580,7 +2580,7 @@ u32 em_area_ck(_ENEMY_WORK* enemy);
 extern "C" u32 stage_water_area_ck(void);
 extern "C" u8 GameMode_ck(void);
 extern "C" u32 fn_800F26B8(s32 handle, u32 id, s32 which);
-extern "C" u32 fn_802BE088(void);
+extern "C" u32 camera_underwater_ck(void);
 extern "C" void fn_800F2714(s32 handle, u32 id, s32 which, u32 value);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 extern "C" void fn_800F2540(s32 handle, u32 id, u16* out);
@@ -2835,7 +2835,7 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
 
         scale = lbl_807963D8;
         if (stage_water_area_ck() == 1) {
-            if (fn_802BE088() == 1) {
+            if (camera_underwater_ck() == 1) {
                 a = 0;
                 if (s->pos.y >= lbl_807963E0) {
                     b = (s32)(lbl_807963E8 * (f32)(u8)b);

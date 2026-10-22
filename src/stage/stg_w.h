@@ -37,8 +37,8 @@ void stage_area_point_get(u8 area, u8 idx, nw4r::math::VEC3* pos, u32* extra);
 
 /* 0x802B0688 - the stage resource query the light unit's `camera_kill_cut_start_split` hands a block to; added with
  * the `light/light.cpp` registration (rule 2: this range owns the address).  The owner defines it
- * `extern "C" u32 fn_802B0688(void* self)` at `stage/stg_w.cpp:275`. */
-u32 fn_802B0688(void* self);
+ * `extern "C" u32 stage_pos_z_low_ck(void* self)` at `stage/stg_w.cpp:275`. */
+u32 stage_pos_z_low_ck(void* self);
 
 /* 0x802B0A98 - the stage table selector `enemy/em020_handlers.cpp`'s `em020_area_model_set` calls
  * for the two em020 area models: `idx` indexes the two-byte records at 0x805DEF38, whose bytes are
@@ -69,7 +69,7 @@ u32 get_stg_eft_col_pos(u8 area, nw4r::math::VEC3* pos);
 void fn_802AEC00(void);
 
 /* 0x802B2E2C - copies the current area's staged colour record out of the stage block and drives it (no arguments). */
-void fn_802B2E2C(void);
+void stage_area_colour_update(void);
 
 /* 0x802B4C5C - re-drives every live area object's own per-frame update (no arguments). */
 void fn_802B4C5C(void);

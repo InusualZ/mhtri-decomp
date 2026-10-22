@@ -108,7 +108,7 @@ extern ReverbMgr snd_reverb_mgr;      /* the global reverb manager (fn_800E5398)
 
 extern "C" {
 void fn_80075390(Mtx44* mtx);
-void fn_802BDC90(Mtx44* mtx);
+void camera_proj_mtx_get(Mtx44* mtx);
 void* fn_80075E98(Mtx44* mtx);
 void GXSetProjection(void* mtx, u32 type);
 u32 OSDisableInterrupts(void);
@@ -203,7 +203,7 @@ extern "C" void fn_800E4754(void)
     Mtx44 src;
 
     fn_80075390(&mtx);
-    fn_802BDC90(&src);
+    camera_proj_mtx_get(&src);
     fn_800E479C(&mtx, &src);
     GXSetProjection(fn_80075E98(&mtx), 0);
 }

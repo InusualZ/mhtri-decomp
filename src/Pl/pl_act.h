@@ -75,7 +75,7 @@ s32 fn_8027D40C(struct _PLW* self);
 /* The helpers `Pl/pl_act_step.cpp`'s action/handler cluster calls, with their definitions' signatures;
  * `pl_act_set_frame_timer` is declared in the block below. */
 void fn_802771A0(struct _PLW* self, s32 value);
-s32 fn_8027A340(struct _PLW* self);
+s32 pl_target_lock_ck(struct _PLW* self);
 void fn_8027A57C(struct _PLW* self, u16 a, u8 b);
 void pl_act_clear_mode5c4(struct _PLW* self);
 void fn_80277BC4(struct _PLW* self, u8 flag);

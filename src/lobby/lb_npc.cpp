@@ -3381,7 +3381,7 @@ void lobby_net_update(void);
 void ainpc_page_reset(void);
 void fn_80211E68(void);
 void fn_802680C4(void);
-void fn_802B58D4(void);
+void camera_update(void);
 void fn_802ADB98(void);
 void fn_800F8DA4(void);
 void hud_msg_frame(void);
@@ -3427,7 +3427,7 @@ void lobby_frame_update(void)
         fn_801FD0F8();
         fn_80211E68();
         fn_802680C4();
-        fn_802B58D4();
+        camera_update();
         fn_802ADB98();
         light_move();
         fn_800F8DA4();
@@ -3693,7 +3693,7 @@ u32 fn_801FE8CC(_LB_NPC* self);
 u8 lb_world_mode_get(void);
 u8 fn_802FB948(void);
 u8 lb_world_upgrade_get(s32 idx);
-void fn_802BE4FC(s32 id);
+void camera_quake_req(s32 id);
 void fn_80201AA0(_LB_NPC* self, s32 flag);
 void fn_80201BE4(_LB_NPC* self);
 void fn_80201C80(_LB_NPC* self);
@@ -4477,7 +4477,7 @@ void fn_80204148(_LB_NPC* self)
             fn_801FE200(self, 24, 0);
             fn_801FE200(self, 25, 1);
         } else if (lb_npc_motion_play(self, 0, lbl_807999E0, lbl_807999A0) != 0) {
-            fn_802BE4FC(8);
+            camera_quake_req(8);
         }
         break;
     case 3:

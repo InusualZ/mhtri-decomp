@@ -24,7 +24,7 @@ struct LightWork;
 extern "C" {
 #endif
 
-struct LightWork* fn_802BECD0(void);
+struct LightWork* camera_work_get(void);
 
 #ifdef __cplusplus
 }

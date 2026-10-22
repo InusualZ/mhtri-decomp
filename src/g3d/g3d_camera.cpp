@@ -132,12 +132,12 @@ CameraData* camera_ref(nw4r::g3d::Camera* pSelf);
 CameraData* camera_ref_const(const nw4r::g3d::Camera* pSelf);
 void camera_init(nw4r::g3d::Camera* pSelf);
 void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a5, u16 a6);
-void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut);
+void camera_get_position(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut);
 void fn_80074AA8(nw4r::g3d::Camera* pSelf, f32* pX, f32* pY, f32* pZ);
 s32 fn_80074D38(const f32* pA, const f32* pB);
 void camera_posture_get(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut);
 void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h);
-void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
+void camera_set_viewport(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void camera_get_viewport(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
 void camera_world_to_screen(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
 void MTX44_ctor(nw4r::math::MTX44* pMtx);
@@ -210,7 +210,7 @@ void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a
     pData->mUnkA4 = 0.0f;
     pData->mProjType = 0;
     pData->mProjA = 60.0f;
-    pData->mProjB = fn_8004029C();
+    pData->mProjB = screen_aspect_get();
     pData->mProjC = 0.1f;
     pData->mProjD = 1000.0f;
     pData->mUnkBC = 0.0f;
@@ -246,7 +246,7 @@ void nw4r::g3d::Camera::SetPosition(const math::VEC3& rPos) {
     }
 }
 
-void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut) {
+void camera_get_position(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut) {
     if (!fn_80067EE8(pSelf)) {
         nw4r::db::Panic("g3d_camera.cpp", 195, "NW4R:Failed assertion IsValid()");
     }
@@ -399,7 +399,7 @@ void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h) {
     }
 }
 
-void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d) {
+void camera_set_viewport(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d) {
     if (!fn_80067EE8(pSelf)) {
         nw4r::db::Panic("g3d_camera.cpp", 463, "NW4R:Failed assertion IsValid()");
     }

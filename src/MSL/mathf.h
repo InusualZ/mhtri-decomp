@@ -15,6 +15,8 @@ f32 ldexpf(f32 x, s32 exp);
 /* 0x80463E50 / 0x80463EE0 - the single-precision cosine and sine. */
 f32 cosf(f32 x);
 f32 sinf(f32 x);
+/* 0x80463EBC - `x` to the power `y`. */
+f32 powf(f32 x, f32 y);
 
 #ifdef __cplusplus
 }

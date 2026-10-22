@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (155)
+## Ideas that work (158)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -164,6 +164,9 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 173 | [An inline asm block inside a C loop is unrolled with its displacements rebased](173-asm-block-loop-unrolled.md) | works | source-shape | Retail has a long straight run of paired-single stores or loads (`psq_st f0,0..248(r30)`, a 4x `psq_l`/`ps_madd` key loop) that no C loop produces and an asm function reproduces only by writing every copy out. |
 | 174 | [A unit's claimed data is its own literals, type-name records, statics and inline tail: write them as source](174-data-written-as-source.md) | works | data, sections, source-shape | A unit whose code rows are all 100 % emits none of its claimed `.data`/`.sdata`/`.rodata`/`.bss`, so flipcheck refuses it - the source declares every string, type-name record and constant `extern`. |
 | 175 | [A real constructor call with no unwind record is placement new over operator new](175-real-constructor-call-with.md) | works | source-shape, sections, vtable | The allocating function's `.text` is 100 % once the class is real, but its `extab` record grows by 0x10 with a `__dl__FPv` relocation the target does not have. |
+| 176 | [A C++ accessor that builds its returned vector in the return slot: return a copy-constructible view of the type](176-nrvo-copy-ctor-return.md) | works | source-shape | A function returning a POD vector/matrix by value keeps a local and copies it out (bigger frame, extra lwz/stw), where retail works on the sret pointer directly |
+| 177 | [An out-pointer vector helper whose result lands in a temporary: call it through a view that returns the vector](177-sret-helper-view.md) | works | source-shape, allocator | The stack slots of the helper results (subVec3/addVec3 outputs copied with copyVec3) are ordered differently from retail, shifting every addi rN,r1,X |
+| 178 | [A float argument loaded early among the integer argument setup: move the float parameter forward in the callee's declaration](178-float-param-position.md) | works | source-shape | The lfs f1 of a float argument sits before (or after) the li/addi of the integer arguments in retail, and the whole argument block is misaligned in the diff |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

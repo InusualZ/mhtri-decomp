@@ -586,7 +586,7 @@ void fn_800D0734(u8 value) {
     system_w.field_0x877 = value;
 }
 
-u8 fn_800D0744(void) {
+u8 system_lobby_room_get(void) {
     return system_w.field_0x886;
 }
 

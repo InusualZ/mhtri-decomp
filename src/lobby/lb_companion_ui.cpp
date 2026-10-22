@@ -948,7 +948,7 @@ void lb_sub1a_send(u8 index, s8 value) {
 
 /* Act 24: hands the pad index and the request's byte to the page handler `fn_802BC000`. */
 void lb_act_page_apply(u8 index, LbActReq* req) {
-    fn_802BC000((u8)index, req->sel_0x04.bytes_0x00.a_0x00);
+    camera_slot_bit_set((u8)index, req->sel_0x04.bytes_0x00.a_0x00);
 }
 
 /* Sends the header-only sub-0x1B command, or sets `work->flag_0x22E3` locally when the link is down. */

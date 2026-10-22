@@ -74,7 +74,7 @@ f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out);
 void fn_802910C0(VEC3* out, const VEC3* in, f32 scale);
 s32 pl_ground_check(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
 s32 fn_80291B08(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
-s32 fn_80291BBC(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind);
+s32 stage_water_surface_get(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind);
 void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind);
 VEC3* fn_80292468(VEC3* pair);
 void vec3_scale_inv(VEC3* v, f32 divisor);
@@ -228,7 +228,7 @@ s32 fn_80291B08(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
 
 /* 0x80291BBC - the single-layer probe: builds a scratch `LandData` for the query and reports both
  * the query's verdict and the layer it hit. */
-s32 fn_80291BBC(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind) {
+s32 stage_water_surface_get(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind) {
     LandData land;
     s32 found;
 

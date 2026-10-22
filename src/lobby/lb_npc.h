@@ -426,6 +426,8 @@ void lb_act_latch_set(struct _PLW* self, u8 value);
 void lb_player_act_latch(struct _PLW* self);
 /* 0x8020E778 - the heading from the player towards `target` (GUESS name). */
 u32 lb_player_angle_to(struct _PLW* self, VEC3* target);
+/* 0x801FE32C - true when the NPC's placement record has model kind `kind`. */
+u32 lb_npc_id_ck(struct _LB_NPC* self, u32 kind);
 
 #ifdef __cplusplus
 }

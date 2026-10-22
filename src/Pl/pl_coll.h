@@ -88,7 +88,7 @@ extern nw4r::math::VEC3 pl_coll_closest_0[0x78 / 0xC]; /* 0x806ABED0: 10 x VEC3,
 extern nw4r::math::VEC3 pl_coll_closest_1[0x78 / 0xC]; /* 0x806ABF48: 10 x VEC3, `VEC3_ctor` */
 extern nw4r::math::VEC3 pl_coll_closest_2[0x78 / 0xC]; /* 0x806ABFC0: 10 x VEC3, `VEC3_ctor` */
 extern f32 pl_coll_slot_dist[0x28 / 4];          /* 0x806AC038: 10 per-slot distances; cleared with the
-                                                  * two flag arrays by `fn_80293A88`/`findInterSection3`,
+                                                  * two flag arrays by `coll_line_check`/`findInterSection3`,
                                                   * read one slot at a time by `fn_80294EFC` */
 extern u8 pl_coll_slot_hit[0x0C];                /* 0x806AC060: 12 per-slot hit flags, cleared beside
                                                   * `pl_coll_slot_dist` (`findInterSection3`) */

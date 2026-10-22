@@ -29,7 +29,7 @@ extern const f32 lbl_8079A56C; /* 0x8079A56C - fn_802B7980's timer threshold */
 
 /* The eight 16-bit quake durations `fn_802BE44C` indexes by `kind & 7`.  In the unit's own `.data`
  * run (0x805CFBE8..0x805D39A0), which is not claimed yet, so it is declared rather than defined. */
-extern const s16 lbl_805D1E7C[];
+extern const s16 camera_quake_frames[];
 
 #ifdef __cplusplus
 }

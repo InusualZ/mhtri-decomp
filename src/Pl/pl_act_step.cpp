@@ -998,7 +998,7 @@ void fn_802498E0(_PLW* self) {
         fn_802771A0(self, 0);
         return;
     case 1:
-        if (self->field_0x28 > 0 || fn_8027A340(self) == 0) {
+        if (self->field_0x28 > 0 || pl_target_lock_ck(self) == 0) {
             timer = self->field_0x28 - 1;
             self->field_0x28 = timer;
             if (timer <= 0) {
@@ -1147,7 +1147,7 @@ void fn_8024A8EC(_PLW* self, s32 arg1) {
         if (arg1 == 0) {
             self->field_0x5B8 = 0;
             self->field_0x5BA = 0;
-            fn_802B8DF8(self);
+            camera_follow_master_turn(self);
         }
         return;
     case 1:

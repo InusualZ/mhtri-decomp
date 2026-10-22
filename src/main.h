@@ -17,7 +17,7 @@ extern "C" {
 /* The screen scissor geometry `fn_8004028C` points at (only the two u16 dims are read). `main.cpp`
  * defines the accessor with a `u16*` return; the type stays opaque to the consumers. */
 u16* fn_8004028C(void);
-f32 fn_8004029C(void);
+f32 screen_aspect_get(void);
 
 /* The game allocator pair `sys_mem.cpp` wraps around the exp heap. */
 void* fn_80040420(u32 size);

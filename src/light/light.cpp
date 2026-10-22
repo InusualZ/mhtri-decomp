@@ -180,7 +180,7 @@ extern "C" s32 fn_802C2510(s32 value, s32 low, s32 high)
 }
 
 /* Rebuilds the light the given slot's record holds. */
-extern "C" void fn_802C20A4(void* arg)
+extern "C" void light_dir_set(void* arg)
 {
     fn_802C1E14(fn_802C1D68(0), arg);
 }

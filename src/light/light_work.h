@@ -21,7 +21,7 @@ typedef struct LightChannel {
     /* +0x11 */ u8 pad_0x11[3];
 } LightChannel; /* size: 0x14 */
 
-/* The map resource the light work points at.  Only the block fn_802B0688 is handed is traced, so the
+/* The map resource the light work points at.  Only the block stage_pos_z_low_ck is handed is traced, so the
  * extent past +0x3C is an approximation. */
 typedef struct LightResource {
     /* +0x00 */ u8 unused_0x00[0x3C];
@@ -116,7 +116,7 @@ typedef struct LightWrap2 {
     /* +0x08 */ u32 block;
 } LightWrap2; /* size: 0x0C traced (the block is larger; approximation) */
 
-/* The light work record.  `resource` is the map resource whose +0x3C block fn_802B0688 queries; every
+/* The light work record.  `resource` is the map resource whose +0x3C block stage_pos_z_low_ck queries; every
  * other element is a sub-record a constructor builds, an untraced gap, or a channel. */
 typedef struct LightWork {
     /* +0x000 */ LightRoot root;

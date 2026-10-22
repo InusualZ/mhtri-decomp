@@ -13,6 +13,8 @@ typedef struct SysQuestMove {
     /* +0x0FB */ u8 unused_0x0FB[0x112 - 0x0FB];
     /* +0x112 */ u8 menu_lock_0x112; /* 1 keeps the item menu from opening (`menu/menu_item.cpp`'s frame) */
     /* +0x113 */ u8 state_0x113;     /* 1 while the quest's sub-state machine runs */
+    /* +0x114 */ u8 unused_0x114[0x22DD - 0x114];
+    /* +0x22DD */ u8 slot_state_0x22DD[4]; /* the four server slots' states; 4 is the idle one (`camera/camera_main.cpp`) */
 } SysQuestMove;
 
 #endif /* MHTRI_EF_SYS_QUEST_MOVE_H */
