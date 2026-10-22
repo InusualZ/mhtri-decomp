@@ -67,7 +67,7 @@ extern "C" void fn_801BD6C0(_ENEMY_WORK* self, u8 arg1)
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         self->timer_0x020 = 0;
         break;
     case 1:
@@ -117,7 +117,7 @@ extern "C" void fn_801BD838(_ENEMY_WORK* self)
         em_mot_speed_set(self, lbl_80798E90);
         em_hit_window_set(self, 0, 0x21, 2);
         em_approach_start(self, lbl_80798EA8, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         self->timer_0x020 = 0x14;
         break;
     case 1:
@@ -204,7 +204,7 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
         em_move_mode_set(self, 4);
         em_mot_set(self, 0xCE, 0, 0);
         em_hit_window_set_default(self, 0, 0x16);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         em_stamina_add(self, -0xA);
         em_busy_set(self);
         em_busy_timer_reset(self);

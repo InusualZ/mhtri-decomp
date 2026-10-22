@@ -57,7 +57,7 @@ void em_mot_speed_set();
 f32 em_mot_frame_get(struct _ENEMY_WORK *self);
 f32 fn_8012F8F4(struct _ENEMY_WORK *self);
 u32 em_mot_end_ck(struct _ENEMY_WORK *self);
-u32 fn_8012F948(struct _ENEMY_WORK *self);
+u32 em_mot_frame_started_ck(struct _ENEMY_WORK *self);
 void fn_8012FC60(struct _ENEMY_WORK* work);
 void fn_8012FCE4(struct _ENEMY_WORK* work);
 void fn_8012FF38(struct _ENEMY_WORK* work);
@@ -99,10 +99,10 @@ void em_motion_timer_arm(struct _ENEMY_WORK* work);
 void em_fx_flag_set(struct _ENEMY_WORK* work);
 void fn_80131E0C(struct _ENEMY_WORK* work);
 void fn_80131E00(struct _ENEMY_WORK* work);
-f32 fn_8013032C(struct _ENEMY_WORK* work);
+f32 em_height_base_get(struct _ENEMY_WORK* work);
 u32 fn_80132198(struct _ENEMY_WORK* work);
 void fn_801321B0(struct _ENEMY_WORK* work);
-void em_timer_0x81C_arm();
+void em_timer_0x81C_arm(struct _ENEMY_WORK* self);
 void fn_801320A4(struct _ENEMY_WORK* work);
 u32 fn_80132184(void);
 void fn_801324E0(struct _ENEMY_WORK* work);
@@ -146,7 +146,7 @@ void fn_801363F8(struct _ENEMY_WORK* work);
  * action functions call and no registered unit owns.  Signatures are the call sites' - the argument
  * counts are what the callers set in r4..r6/f1..f3 and the functions are in this band. */
 void em015_part_flag_set(struct _ENEMY_WORK* self, u32 a);
-/* fn_8012F948(self) is declared above with the rest of the 0x8012F band - the sibling landing
+/* em_mot_frame_started_ck(self) is declared above with the rest of the 0x8012F band - the sibling landing
  * `enemy/fn_8015E854.cpp` had added it there first, so this branch's copy was dropped by hand
  * instead of leaving two identical prototypes. */
 u32 em015_ally_front_ck(struct _ENEMY_WORK* self, u32 a);
@@ -194,7 +194,7 @@ void fn_80170DF0(struct _ENEMY_WORK* self);
 void fn_80170E78(struct _ENEMY_WORK* self);
 void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
-void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
+void em_mot_set_blend_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 /* `fn_80154784` (0x80154784) was declared here (from `enemy/fn_801B0010.cpp`'s call site) as
  * `u32 (struct _ENEMY_WORK*)` while the band had no registered unit.  `enemy/fn_801502C8.cpp` owns
  * 0x801502C8-0x801545B8 now, and its header `enemy/fn_801502C8.h` declares the symbol with
@@ -260,7 +260,7 @@ void fn_801A4218(struct _ENEMY_WORK* self);
 void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* a, Vec3* b);
 /* r3 the work record, r4/r5/r6/r7 four scalars and f1 (the target's call sites set all five). */
 void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
-/* 0x80346268 - the two-argument request `enemy/em_action.cpp`'s entry action's case 11 makes when
+/* 0x80346268 - the two-argument request `enemy/em022_prog.cpp`'s entry action's case 11 makes when
  * the enemy data entry is latched.  `ef/eft_slot.cpp` registered the band that owns the address, so
  * the declaration moved to that unit's header, `ef/eft_slot.h` (rule 2). */
 

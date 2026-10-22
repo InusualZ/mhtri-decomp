@@ -87,7 +87,7 @@ void fn_80130350(struct _ENEMY_WORK* self, void* vec);
 /* 0x8013072C - r3 (`self`), r4 (narrowed with `clrlwi r4,r4,24`) and r5; the action-mode/latch setter
  * the enemy program functions call.  Names of the two scalars are this unit's call sites' (2/0 and
  * 0/0); the body compares r4 against `self->+0x43B`. */
-void fn_8013072C(struct _ENEMY_WORK* self, u32 mode, u32 value);
+void em_motion_kind_set(struct _ENEMY_WORK* self, u32 mode, u32 value);
 /* 0x80131FA0 - r3 (`self`) and r4 (the scalar the motion modes pass: 80). */
 void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
 /* The effect-slot step band the per-action state machines drive the motion through; the signatures are the call
@@ -114,10 +114,10 @@ void em_frame_flag_set(struct _ENEMY_WORK* self);
 /* r3 the work record; plays the armed motion's end reaction. */
 void fn_80132160(struct _ENEMY_WORK* self);
 
-/* Called by `enemy/em_action.cpp`. */
-void fn_801354AC(struct _ENEMY_WORK* self);
-void fn_801354B4(struct _ENEMY_WORK* self);
-void fn_8013581C(VEC3* out, VEC3* a, VEC3* b, u32 c, u16 d, f32 e);
+/* Called by `enemy/em022_prog.cpp`. */
+void em_height_move_apply(struct _ENEMY_WORK* self);
+void em_height_move_step(struct _ENEMY_WORK* self);
+void em_wave_segment(VEC3* out, VEC3* a, VEC3* b, u32 c, u16 d, f32 e);
 
 /* 0x80136DF4 - r3 the work record; the per-frame refresh `enemy/em035_prog.cpp`'s angle-reset steps call once at the
  * sub-state entry and once per wait frame (none reads a result). */

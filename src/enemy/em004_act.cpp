@@ -123,7 +123,6 @@ typedef void (*ShellEftJobFn)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math
 #define em_move_rot_ground_step_v ((void (*)(struct _ENEMY_WORK*, u32*, f32))em_move_rot_ground_step)
 #define em_motion_slot_angle_avg_v ((s32 (*)(struct _ENEMY_WORK*, u32))em_motion_slot_angle_avg)
 #define em_turn_away_step_v ((void (*)(struct _ENEMY_WORK*, u32, u32))em_turn_away_step)
-#define em_timer_0x81C_arm_v ((void (*)(struct _ENEMY_WORK*))em_timer_0x81C_arm)
 #define em_team_mate_state_ck_v ((u32 (*)(struct _ENEMY_WORK*, u8, u8))em_team_mate_state_ck)
 
 
@@ -2618,7 +2617,7 @@ void em004_act8_call(struct _ENEMY_WORK* self) {
         break;
     case 1:
         if (em_frame_check(self, 1, 50.0f, 0.0f) == 1) {
-            em_timer_0x81C_arm_v(self);
+            em_timer_0x81C_arm(self);
         }
         if (em_frame_check(self, 0, 44.0f, 0.0f) == 1) {
             em_camera_req(self, 0x1C, 1);
@@ -2630,7 +2629,7 @@ void em004_act8_call(struct _ENEMY_WORK* self) {
         break;
     case 2:
         if (em_frame_check(self, 1, 50.0f, 0.0f) == 1) {
-            em_timer_0x81C_arm_v(self);
+            em_timer_0x81C_arm(self);
         }
         if (self->timer_0x020 > 0) {
             self->timer_0x020--;
@@ -2701,7 +2700,7 @@ u32 em004_team_answer_ck(struct _ENEMY_WORK* self) {
 
 /* 0x801C7868 (0x114): the call loop: while the team mates answer, counts the calls down (action 9 sub 2/1). */
 void em004_act9_call_loop(struct _ENEMY_WORK* self) {
-    em_timer_0x81C_arm_v(self);
+    em_timer_0x81C_arm(self);
     em004_hover_height_step(self);
     self->flags_0x836 &= 0x7FFF;
     switch (self->state) {
@@ -2733,7 +2732,7 @@ void em004_act9_call_loop(struct _ENEMY_WORK* self) {
 /* 0x801C797C (0x1AC): the call heal: at frame 32 regains health and stamina, then loops while the team mates
  * answer. */
 void em004_act9_call_heal(struct _ENEMY_WORK* self) {
-    em_timer_0x81C_arm_v(self);
+    em_timer_0x81C_arm(self);
     em004_hover_height_step(self);
     self->flags_0x836 &= 0x7FFF;
     switch (self->state) {
@@ -2785,13 +2784,13 @@ void em004_act9_call_end(struct _ENEMY_WORK* self) {
         em_mot_set_blend(self, 0x43, 8, 0, 1);
         em_hit_window_set_default(self, 0, 0x12);
         em_guard_set(self);
-        em_timer_0x81C_arm_v(self);
+        em_timer_0x81C_arm(self);
         camera_flag_0x145_set();
         em004_hover_height_step(self);
         break;
     case 1:
         if (em_frame_check(self, 2, 198.0f, 0.0f) == 1) {
-            em_timer_0x81C_arm_v(self);
+            em_timer_0x81C_arm(self);
             em004_hover_height_step(self);
         }
         if (em_frame_check(self, 0, 260.0f, 0.0f) == 1) {

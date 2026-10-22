@@ -255,7 +255,7 @@ extern void mtx34_copy(Mtx34* out, const Mtx34* src);
 extern void res_node_assign(void* out, const void* src);
 extern s32 res_node_get_parent(void* arg0);
 extern void fn_8008DF8C(void* arg0, Mtx34* out);
-extern void fn_8008EE68(void* arg0, Mtx34* mtx);
+extern void anm_chr_result_rot_mul(void* arg0, Mtx34* mtx);
 extern void anm_chr_result_trans_set(void* arg0, const Vec3* v);
 extern f32 getKeyData__FPff(s32 key, f32 t);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPVector* angles, Mtx34* mtx);
@@ -1299,7 +1299,7 @@ void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4
                         cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(&cp, &mtx);
                     }
                     fn_805012E8(&dst, &mtx);
-                    fn_8008EE68(arg1, &dst);
+                    anm_chr_result_rot_mul(arg1, &dst);
                 }
             }
         }

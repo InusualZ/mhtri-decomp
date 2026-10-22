@@ -187,7 +187,7 @@ extern "C" void fn_8038743C(_ENEMY_WORK* self) {
         self->state = v + 1;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
     } else if (v == 1) {
         if (em_mot_end_ck(self) == 1) {
             em_action_finish_stand(self);
@@ -368,7 +368,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
             self->state++;
             em_move_mode_set(self, 4);
             em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
-            fn_8013032C(self);
+            em_height_base_get(self);
             em_height_set(self, lbl_8079BFF8);
         }
         return;
@@ -378,7 +378,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
             em_move_mode_set(self, 4);
             em_mot_set(self, 0xA, 0, 0);
             em_approach_start(self, lbl_8079BFF8, 0);
-            fn_8013032C(self);
+            em_height_base_get(self);
             em_height_set(self, lbl_8079BFF8);
         }
         return;
@@ -406,7 +406,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
         }
         return;
     case 7:
-        if (fn_8012F948(self) == 1) {
+        if (em_mot_frame_started_ck(self) == 1) {
             em_reaction_req(self, 0, 0, 0);
             em_state_set(self, 1, 7);
         }
@@ -489,7 +489,7 @@ extern "C" void fn_80388190(_ENEMY_WORK* self, u8 a, u8 b)
         }
         return;
     case 1:
-        if (em_approach_step(self, 0, 0x80) == 1 && fn_8012F948(self) == 0) {
+        if (em_approach_step(self, 0, 0x80) == 1 && em_mot_frame_started_ck(self) == 0) {
             switch (b) {
             case 0:
                 self->state++;
@@ -752,7 +752,7 @@ extern "C" void fn_80388C38(_ENEMY_WORK* self)
             em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_8013032C(self);
+            em_height_base_get(self);
             em_height_set(self, lbl_8079BFF8);
             em_action_finish_stand(self);
         }
@@ -770,7 +770,7 @@ extern "C" void fn_80388D1C(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        fn_8013032C(self);
+        em_height_base_get(self);
         em_height_set(self, lbl_8079BFF8);
         self->timer_0x020 = 0x5A;
         return;
@@ -794,7 +794,7 @@ extern "C" void fn_80388DC8(_ENEMY_WORK* self)
         em_move_mode_set(self, 4);
         em_mot_set(self, 6, 0, 0);
         em_approach_start(self, lbl_8079C0C8, 0);
-        fn_8013032C(self);
+        em_height_base_get(self);
         em_height_set(self, lbl_8079BFF8);
         return;
     case 1:
@@ -823,7 +823,7 @@ extern "C" void fn_80388E88(_ENEMY_WORK* self, u8 a)
             end = lbl_8079C0D0;
         }
         em_approach_start(self, end, 0);
-        fn_8013032C(self);
+        em_height_base_get(self);
         em_height_set(self, lbl_8079BFF8);
         return;
     case 1:
@@ -844,7 +844,7 @@ extern "C" void fn_80388F88(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 4);
         em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
-        fn_8013032C(self);
+        em_height_base_get(self);
         em_height_set(self, lbl_8079BFF8);
         return;
     case 1:
@@ -914,7 +914,7 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
             em_target_pos_set(self, 0);
             em_move_mode_set(self, 4);
             em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
-            fn_8013032C(self);
+            em_height_base_get(self);
             em_height_set(self, lbl_8079BFF8);
         }
         return;
@@ -924,7 +924,7 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
             em_mot_set(self, 0xA, 0, 0);
             em_mot_speed_set(self, lbl_8079C0CC);
             em_approach_start(self, lbl_8079BFF8, 0);
-            fn_8013032C(self);
+            em_height_base_get(self);
             em_height_set(self, lbl_8079BFF8);
             em_frame_flag_set(self);
         }
@@ -938,7 +938,7 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
                     em_reaction_req(self, 5, 8, 2);
                     em_target_pos_set(self, 0);
                     em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
-                    fn_8013032C(self);
+                    em_height_base_get(self);
                     em_height_set(self, lbl_8079BFF8);
                     return;
                 }

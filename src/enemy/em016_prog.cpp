@@ -534,7 +534,7 @@ void em_drop_item_spawn(EmActWork* self, VEC3* pos, s32 value);
 void joint_mtx_store(EmMtxHolder* holder, void* src);
 void joint_mtx_load(EmMtxHolder* holder, void* mtx);
 void anm_chr_result_scale_set(void* holder, void* vec);
-void fn_8008EE68(void* holder, void* mtx);
+void anm_chr_result_rot_mul(void* holder, void* mtx);
 void mtx34_set_trans(MTX34* mtx, VEC3* vec);
 void eft_rot_vec_copy(void* dst, void* src);
 void fn_805012E8(EmMtx33* dst, const MTX34* src);
@@ -769,7 +769,7 @@ extern "C" void fn_80183C44(_ENEMY_WORK* self) {
         u8 state = self->state;
         self->state = state + 1;
         em_move_mode_set(self, 2);
-        fn_8012F5C4(self, 0x28, 0x14, 0, 3);
+        em_mot_set_blend_ck(self, 0x28, 0x14, 0, 3);
         break;
     }
     case 1:
@@ -786,7 +786,7 @@ extern "C" void fn_80183CC4(_ENEMY_WORK* self) {
         u8 state = self->state;
         self->state = state + 1;
         em_move_mode_set(self, 2);
-        fn_8012F5C4(self, 0x36, 0x14, 0, 3);
+        em_mot_set_blend_ck(self, 0x36, 0x14, 0, 3);
         break;
     }
     case 1:
@@ -1541,7 +1541,7 @@ extern "C" void fn_801858B8(_ENEMY_WORK* self) {
         u8 state = self->state;
         self->state = state + 1;
         em_move_mode_set(self, 2);
-        fn_8012F5C4(self, 0x28, 0x14, 0, 3);
+        em_mot_set_blend_ck(self, 0x28, 0x14, 0, 3);
         break;
     }
     case 1:
@@ -4088,19 +4088,19 @@ void fn_80191CE4(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind
             rot.z = 0;
             cpSetRotMatrix((struct _CP_VECTOR*)&rot, &mtx);
             fn_805012E8(&dst, &mtx);
-            fn_8008EE68(holder, &dst);
+            anm_chr_result_rot_mul(holder, &dst);
             break;
         case 25:
             eft_rot_vec_copy(&rot, &work->aim_0x328.rot_0x04);
             cpSetRotMatrix((struct _CP_VECTOR*)&rot, &mtx);
             fn_805012E8(&dst, &mtx);
-            fn_8008EE68(holder, &dst);
+            anm_chr_result_rot_mul(holder, &dst);
             break;
         case 26:
             eft_rot_vec_copy(&rot, &work->aim_0x328.rot_0x10);
             cpSetRotMatrix((struct _CP_VECTOR*)&rot, &mtx);
             fn_805012E8(&dst, &mtx);
-            fn_8008EE68(holder, &dst);
+            anm_chr_result_rot_mul(holder, &dst);
             break;
         }
         break;

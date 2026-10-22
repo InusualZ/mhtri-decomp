@@ -28,10 +28,10 @@ u8 enemy_data_grp(u8 kind, u8 variant);
  * The record is passed as this unit's `EftSlot` view - a caller holding an `_ENEMY_DATA*` casts. */
 u8 eft_slot_effect_key(struct EftSlot* slot);
 
-/* 0x80346268 - the two-argument request `enemy/em_action.cpp`'s entry action's case 11 makes when
+/* 0x80346268 - the two-argument request `enemy/em022_prog.cpp`'s entry action's case 11 makes when
  * the enemy data entry is latched.  The address is in this unit's range and its body is still
  * unwritten, so the declaration keeps the caller's view (`r3`/`r4`, no result). */
-void fn_80346268(u32 a, u32 b);
+void eft_slot_marks_set_sync(u32 a, u32 b);
 
 
 struct _ENEMY_WORK;

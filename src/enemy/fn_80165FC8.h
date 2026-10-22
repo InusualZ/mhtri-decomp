@@ -76,7 +76,7 @@ u32 em_mot_end_ck(struct _ENEMY_WORK* self);
 void em_fall_height_get(struct _ENEMY_WORK* self);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
-void fn_8013072C(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_motion_kind_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_frame_flag_set(void);
 void em_fx_flag_set(struct _ENEMY_WORK* self);
 void em_busy_timer_reset(struct _ENEMY_WORK* self);

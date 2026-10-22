@@ -10,7 +10,7 @@
  *   address order.
  * FLAGS. `cflags_main`; `#pragma peephole off` over the third block.
  * NAMES. `em007` is the runtime dump's `em007_prog_tbl`, which opens the TU's `.data`; the `_act` suffix is a
- *   GUESS.  The map has only `fn_` stems for the functions.  `fn_8013032C` returns `f32` and `em_height_set` takes
+ *   GUESS.  The map has only `fn_` stems for the functions.  `em_height_base_get` returns `f32` and `em_height_set` takes
  *   it; the one argument-less call is a cast call.
  * RESIDUALS. 11 rows unwritten: 0x801DBE0C-0x801DF2F8, 0x801DFEEC-0x801E0058, 0x801E0240-0x801E04DC,
  *   0x801E0574-0x801E0AC0.
@@ -18,7 +18,7 @@
  *   Relocations (`relocdiff --by-owner`): `fn_801D83C0` and `fn_801D8E9C` call `CancelFade__FP11_ENEMY_WORK` where
  *   retail calls the C-linkage `CancelFade`; `fn_801D944C` and `fn_801D9584` call
  *   `calcVecAngXY__FPQ34nw4r4math4VEC3PUlPl` where retail's last parameter is `u32*` (`...PUlPUl`); `fn_801D7890`
- *   calls `fn_8013032C` once where retail does not.
+ *   calls `em_height_base_get` once where retail does not.
  *   flipcheck: `.rodata` claimed, not emitted; `.data` 0x1F4 against 0xC10, `.sdata2` 0x10 against 0x290 (a
  *   partial pool: candidate fold with `lobby/fn_801E0ADC.cpp`); `.text` (0x59BC of 0x9918), extab (0x218 of 0x270)
  *   and extabindex (0x324 of 0x3A8) short of the claim and differing; the two spellings above have no map row
@@ -214,7 +214,7 @@ f32 get_em_base_scale(struct _ENEMY_WORK* self);
 f32 fn_8012F8F4(struct _ENEMY_WORK* self);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
-f32 fn_8013032C(struct _ENEMY_WORK* self);
+f32 em_height_base_get(struct _ENEMY_WORK* self);
 void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
@@ -544,7 +544,7 @@ extern "C" void fn_801D89F4(struct _ENEMY_WORK* self) {
             em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
-            em_height_set(self, fn_8013032C(self));
+            em_height_set(self, em_height_base_get(self));
             em_action_finish_stand(self);
         }
         return;
@@ -563,7 +563,7 @@ extern "C" void fn_801D8AC4(struct _ENEMY_WORK* self) {
         self->state = temp_r3 + 1;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         self->timer_0x020 = 0x5A;
         return;
     case 1:
@@ -589,7 +589,7 @@ extern "C" void fn_801D8B70(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0xA, 4, 0);
         em_mot_speed_set(self, lbl_80799520);
         em_approach_start(self, lbl_807994FC, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1) {
@@ -610,7 +610,7 @@ extern "C" void fn_801D8C34(struct _ENEMY_WORK* self) {
         self->state = temp_r3 + 1;
         em_move_mode_set(self, 4);
         em_turn_seq_start(self, lbl_80570500, 0, 0, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         return;
     case 1:
         if (em_turn_seq_step(self, lbl_80570500) == 1) {
@@ -1855,7 +1855,7 @@ void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
-s32 fn_8012F948(struct _ENEMY_WORK* self);
+s32 em_mot_frame_started_ck(struct _ENEMY_WORK* self);
 void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 void em_fall_height_get(struct _ENEMY_WORK* self);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
@@ -2143,8 +2143,8 @@ void fn_801D7890(struct _ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        fn_8013032C(self);
-        em_height_set(self, fn_8013032C(self));
+        em_height_base_get(self);
+        em_height_set(self, em_height_base_get(self));
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {

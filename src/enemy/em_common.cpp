@@ -389,7 +389,7 @@ extern "C" f32 lbl_80796CD0;   /* 0.9f  */
 extern "C" f32 fn_8012EC74(_ENEMY_WORK* self);
 extern "C" u32 em_get_rank(_ENEMY_WORK* self);
 extern "C" u32 fn_80130134(_ENEMY_WORK* self, u32 flag);
-extern "C" f32 fn_8013032C(_ENEMY_WORK* self);
+extern "C" f32 em_height_base_get(_ENEMY_WORK* self);
 extern "C" u32 fn_80132270(_ENEMY_WORK* self);
 
 /* The other in-range mangled entry point, at C++ scope for its mangling. */
@@ -2122,11 +2122,11 @@ u32 em_sleep_ck(_ENEMY_WORK* self, u8 kind)
     return 0;
 }
 
-/* "The record's kind is 4 and its height is above 0.9 * the model scale `fn_8013032C` returns". */
+/* "The record's kind is 4 and its height is above 0.9 * the model scale `em_height_base_get` returns". */
 extern "C" s32 fn_8012F39C(_ENEMY_WORK* self)
 {
     if (self->field_0x1E2 == 4) {
-        if (self->field_0x1AC > lbl_80796CD0 * fn_8013032C(self)) return 1;
+        if (self->field_0x1AC > lbl_80796CD0 * em_height_base_get(self)) return 1;
     }
     return 0;
 }

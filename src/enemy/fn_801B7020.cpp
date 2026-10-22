@@ -132,7 +132,7 @@ struct EmProgWork {
     /* +0x378 */ u8 unused_0x378[0x38B - 0x378];
     /* +0x38B */ u8 field_0x38B;         /* cleared once `em034_eft_ck` reports done */
     /* +0x38C */ u8 unused_0x38C[0x43B - 0x38C];
-    /* +0x43B */ u8 field_0x43B;         /* the action/mode byte `fn_8013072C` compares */
+    /* +0x43B */ u8 field_0x43B;         /* the action/mode byte `em_motion_kind_set` compares */
     /* +0x43C */ u8 unused_0x43C[0x440 - 0x43C];
     /* +0x440 */ s16 field_0x440;        /* the 150-frame timer `fn_801B73F0` tests */
     /* +0x442 */ u8 unused_0x442[0x834 - 0x442];
@@ -298,10 +298,10 @@ extern "C" void fn_801B73F0(EmProgWork* self) {
         return;
     }
     if (self->field_0x834 == 1) {
-        fn_8013072C((struct _ENEMY_WORK*)self, 2, 0);
+        em_motion_kind_set((struct _ENEMY_WORK*)self, 2, 0);
     }
     if (self->field_0x43B == 2 && self->field_0x440 > 150) {
-        fn_8013072C((struct _ENEMY_WORK*)self, 0, 0);
+        em_motion_kind_set((struct _ENEMY_WORK*)self, 0, 0);
         self->field_0x834 = 0;
     }
 }

@@ -676,7 +676,7 @@ extern "C" void em015_act0_00(_ENEMY_WORK* self) {
       case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F5C4(self, 1, 0x14, 0, 1);
+        em_mot_set_blend_ck(self, 1, 0x14, 0, 1);
         break;
       case 1:
         em_target_pos_set_view1(self, 0);
@@ -692,7 +692,7 @@ extern "C" void em015_act0_01(_ENEMY_WORK* self) {
       case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F5C4(self, 0x14, 0x14, 0, 1);
+        em_mot_set_blend_ck(self, 0x14, 0x14, 0, 1);
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -707,7 +707,7 @@ extern "C" void em015_act0_02(_ENEMY_WORK* self) {
       case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F5C4(self, 0x1D, 0x14, 0, 1);
+        em_mot_set_blend_ck(self, 0x1D, 0x14, 0, 1);
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -723,7 +723,7 @@ extern "C" void em015_act0_04(_ENEMY_WORK* self) {
       case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        fn_8012F5C4(self, 0x28, 0x28, 0, 3);
+        em_mot_set_blend_ck(self, 0x28, 0x28, 0, 3);
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -738,7 +738,7 @@ extern "C" void em015_act0_05(_ENEMY_WORK* self) {
       case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        fn_8012F5C4(self, 0x36, 0x1E, 0, 3);
+        em_mot_set_blend_ck(self, 0x36, 0x1E, 0, 3);
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -1323,7 +1323,7 @@ extern "C" void em015_swim_in(_ENEMY_WORK* self, u32 kind, u32 motion) {
             done = em_approach_step(self, 0, 0x80);
             break;
         }
-        if (done == 1 && fn_8012F948(self) == 0) {
+        if (done == 1 && em_mot_frame_started_ck(self) == 0) {
             self->state++;
             em_mot_set_blend(self, 0x2F, 0x28, 0, 1);
         }
@@ -4063,7 +4063,7 @@ extern "C" void em015_act13_swim_turn(_ENEMY_WORK* self) {
     }
 }
 
-/* Three-phase: 0x37/0x14, then 0x2F/0x28 once `em_approach_step` and `fn_8012F948` agree. */
+/* Three-phase: 0x37/0x14, then 0x2F/0x28 once `em_approach_step` and `em_mot_frame_started_ck` agree. */
 extern "C" void em015_act13_swim_in(_ENEMY_WORK* self) {
     em015_part_flag_set(self, 1);
     switch (self->state) {
@@ -4079,7 +4079,7 @@ extern "C" void em015_act13_swim_in(_ENEMY_WORK* self) {
 
         em_mot_speed_set(self, 1.3f);
         fn_80136D4C(self, 2.0f);
-        if (done == 1 && fn_8012F948(self) == 0) {
+        if (done == 1 && em_mot_frame_started_ck(self) == 0) {
             self->state++;
             em_mot_set_blend(self, 0x2F, 0x28, 0, 1);
         }

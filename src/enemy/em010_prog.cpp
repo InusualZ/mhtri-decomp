@@ -550,7 +550,7 @@ void fn_801671AC(_ENEMY_WORK* self) {
     if (em_die_ck(self) == 0) {
         if (self->field_0x834 == 1 || em_hit_timer_ck(self) == 1) {
             em_attack_start(self);
-            fn_8013072C(self, 1, 0);
+            em_motion_kind_set(self, 1, 0);
         }
         {
             _ENEMY_DATA* data =

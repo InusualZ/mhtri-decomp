@@ -27,7 +27,7 @@
  *    trailing `clrlwi`s) and tests the float with `fcmpo` + `cror`; ours folds them and uses `fcmpu`.
  *   The other 15 partial rows have no recorded cause.  Relocations (`relocdiff --by-owner`): `fn_8019EA04` and
  *   `fn_801A4504` save from r27 (`_savegpr_27`/`_restgpr_27`) where retail saves from r26, and `fn_801A16D4`
- *   calls `fn_8013032C` once where retail does not.
+ *   calls `em_height_base_get` once where retail does not.
  *   flipcheck: `.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.data` 0x2AC against 0x1F80; `.text` (0x71F0
  *   of 0xBAE4), extab (0x138 of 0x250) and extabindex (0x1D4 of 0x378) short of the claim and differing.
  */
@@ -941,14 +941,14 @@ void fn_801A05B4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801A05E0 - action 6's first motion: arm `fn_8012F5C4(self, 1, 30, 0, 1)`, then wait on
+/* 0x801A05E0 - action 6's first motion: arm `em_mot_set_blend_ck(self, 1, 30, 0, 1)`, then wait on
  * `em_approach_step(self, 0, 0)` and complete through `em_action_finish_stand`. */
 void fn_801A05E0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 4);
-        fn_8012F5C4(self, 1, 30, 0, 1);
+        em_mot_set_blend_ck(self, 1, 30, 0, 1);
         em_height_set(self, lbl_807985A4);
         em_approach_start(self, lbl_80798538, 0);
         break;
@@ -1187,11 +1187,11 @@ void fn_801A0FEC(struct _ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 4);
         em_turn_seq_start(self, lbl_80570150, 0, 16, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         break;
     case 1:
         if (em_turn_seq_step(self, lbl_80570150) == 1) {
-            em_height_set(self, fn_8013032C(self));
+            em_height_set(self, em_height_base_get(self));
             fn_8019F12C(self);
         }
         break;
@@ -1258,13 +1258,13 @@ void fn_801A1454(struct _ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 30, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         self->timer_0x020 = 150;
         break;
     case 1:
         self->timer_0x020--;
         if (self->timer_0x020 <= 0) {
-            em_height_set(self, fn_8013032C(self));
+            em_height_set(self, em_height_base_get(self));
             fn_8019F12C(self);
         }
         break;
@@ -1293,7 +1293,7 @@ void fn_801A14FC(struct _ENEMY_WORK* self) {
             em_move_offset_rot_apply(self, &self->field_0x1BC);
         }
         if (em_mot_end_ck(self) == 1) {
-            em_height_set(self, fn_8013032C(self));
+            em_height_set(self, em_height_base_get(self));
             fn_8019F12C(self);
         }
         break;
@@ -1316,7 +1316,7 @@ void fn_801A1624(struct _ENEMY_WORK* self) {
         }
         break;
     case 2:
-        if (fn_8012F948(self) == 0) {
+        if (em_mot_frame_started_ck(self) == 0) {
             em_action_finish_stand(self);
         }
         break;
@@ -1330,20 +1330,20 @@ void fn_801A16D4(struct _ENEMY_WORK* self, u32 mode) {
     case 0:
         self->state++;
         em_move_mode_set(self, 4);
-        fn_8012F5C4(self, 1, 30, 0, 0);
+        em_mot_set_blend_ck(self, 1, 30, 0, 0);
         em_move_vec2_clr(self);
         break;
     case 1:
         if ((u8)mode == 0) {
             em_height_add(self, lbl_807985E8);
             if (self->field_0x1AC <= lbl_807985EC) {
-                em_height_set(self, fn_8013032C(self));
+                em_height_set(self, em_height_base_get(self));
                 fn_8019F12C(self);
             }
         } else {
             em_height_add(self, lbl_807985F0);
             if (self->field_0x1AC >= lbl_807985A4) {
-                em_height_set(self, fn_8013032C(self));
+                em_height_set(self, em_height_base_get(self));
                 em_action_finish_stand(self);
             }
         }

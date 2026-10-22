@@ -40,8 +40,8 @@
  *   `eft_slot_link_marks_get`, `eft_slot_linked_step`, `eft_slot_linked_state_change`, `eft_slot_shape_block0_set`,
  *   `eft_slot_roam_step`, `eft_slot_arena_state_change`, `eft_slot_shape_block11_set`, `eft_slot_arena_step`,
  *   `eft_slot_roam_tables`.
- * RESIDUALS. 5 rows unwritten: `fn_803432B4` (0x490, the eft050 seam above), `fn_80346268` (0x4C: retail calls it
- *   `(entry, 2, area)` from `enemy/em_action.cpp`, whose source and `ef/eft_slot.h` spell two arguments - a filed
+ * RESIDUALS. 5 rows unwritten: `fn_803432B4` (0x490, the eft050 seam above), `eft_slot_marks_set_sync` (0x4C: retail calls it
+ *   `(entry, 2, area)` from `enemy/em022_prog.cpp`, whose source and `ef/eft_slot.h` spell two arguments - a filed
  *   request), and the compiler-emitted `fn_803489F0`/`fn_803489F4`/`fn_80348A14` (the pool's `__sinit`, which needs
  *   `EftSlot` to be a class with a constructed `VEC3`).
  *   Partial rows (`measure.py ef/eft_slot` lists them), including:

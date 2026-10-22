@@ -202,7 +202,7 @@ void fn_8008DF8C(ResAnmChrObj* self, f32* out);
 void anm_chr_result_trans_get(ResAnmChrObj* self, f32* out);
 void fn_8008E698(ResAnmChrObj* self, f32* out);
 void fn_8008EB68(ResAnmChrObj* self, const f32* out);
-void fn_8008EE68(ResAnmChrObj* self, const f32* out);
+void anm_chr_result_rot_mul(ResAnmChrObj* self, const f32* out);
 void anm_chr_result_trans_set(ResAnmChrObj* self, const f32* out);
 void fn_8008F3DC(ResAnmChrObj* self, const void* src);
 
@@ -1666,7 +1666,7 @@ void fn_8008EB68(ResAnmChrObj* self, const f32* out)
     self->flags |= 0x80000000;
 }
 
-void fn_8008EE68(ResAnmChrObj* self, const f32* out)
+void anm_chr_result_rot_mul(ResAnmChrObj* self, const f32* out)
 {
     u32 valid;
     u32 flags;

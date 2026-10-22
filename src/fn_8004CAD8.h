@@ -261,9 +261,9 @@ void drawshape_set_offset_uniform(const f32* offset, f32 scale);           /* 0x
 void drawshape_set_offset_f32(const f32* scale, const f32* offset);        /* 0x8005420C */
 void drawshape_set_tex_offset_uniform(const f32* offset, f32 scale);       /* 0x8005442C */
 void drawshape_set_tex_offset_f32(const f32* scale, u16 tex_no, const f32* offset); /* 0x8005445C */
-/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
+/* Added by `enemy/em022_prog.cpp` (rule 2: the declaration belongs with the owner TU, which
  * had not declared it yet). */
-s32 fn_80050C40(void* a, void* b);
+s32 calcVecAngX2(void* a, void* b);
 void capsule_box_from_points(void* a, void* b, void* c, f32 d);
 void MTX33_ctor(void* out);
 /* 0x8004EAF4 - the 16-byte struct copy MWCC emits for a four-word assignment (`dst[0..3] = src[0..3]`)

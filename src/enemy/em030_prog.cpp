@@ -457,12 +457,12 @@ extern "C" void fn_801B096C(_ENEMY_WORK* work, u32 state, u32 kind) {
         switch ((u8)kind) {
         case 0x13:
             if (work->field_0x43B == 2 && work->field_0x43C == 1) {
-                fn_8013072C(work, 4, 0);
+                em_motion_kind_set(work, 4, 0);
             }
             break;
         case 0x10:
             if (work->field_0x43B == 3) {
-                fn_8013072C(work, 0, 0);
+                em_motion_kind_set(work, 0, 0);
             }
             break;
         }
@@ -488,7 +488,7 @@ extern "C" void fn_801B0A28(_ENEMY_WORK* work) {
         if (work->field_0x334 == 0) {
             if (fn_801B0810(work) == 1) {
                 if (work->field_0x43B != 1) {
-                    fn_8013072C(work, 3, 0);
+                    em_motion_kind_set(work, 3, 0);
                 }
                 work->field_0x334 = 1;
             }
@@ -499,7 +499,7 @@ extern "C" void fn_801B0A28(_ENEMY_WORK* work) {
         }
         if (work->field_0xA07 == 1) {
             if (work->field_0x43B == 2 && work->field_0x43C == 0) {
-                fn_8013072C(work, 2, 1);
+                em_motion_kind_set(work, 2, 1);
             }
             work->field_0xA07 = 0;
         }
@@ -508,7 +508,7 @@ extern "C" void fn_801B0A28(_ENEMY_WORK* work) {
     switch (work->field_0x43B) {
     case 0:
         if (work->action != 0x0A && em_die_ck(work) == 0 && fn_801B06D4(work) == 1) {
-            fn_8013072C(work, 2, 0);
+            em_motion_kind_set(work, 2, 0);
         }
         break;
     case 2:
@@ -517,16 +517,16 @@ extern "C" void fn_801B0A28(_ENEMY_WORK* work) {
             if (work->field_0x833 == 1) {
                 fn_8012C3C8(0x1E, work->area_no, &work->pos, lbl_80798B40);
                 fn_8012C3C8(0x1F, work->area_no, &work->pos, lbl_80798B40);
-                fn_8013072C(work, 2, 1);
+                em_motion_kind_set(work, 2, 1);
             } else {
                 if (fn_801B06D4(work) == 0) {
-                    fn_8013072C(work, 0, 0);
+                    em_motion_kind_set(work, 0, 0);
                 }
             }
             break;
         case 1:
             if (em_die_ck(work) == 0 && work->field_0x440 > 300) {
-                fn_8013072C(work, 4, 0);
+                em_motion_kind_set(work, 4, 0);
             }
             break;
         }
@@ -534,18 +534,18 @@ extern "C" void fn_801B0A28(_ENEMY_WORK* work) {
     case 3:
         if (em_die_ck(work) == 0) {
             if (work->field_0x440 > 1800) {
-                fn_8013072C(work, 0, 0);
+                em_motion_kind_set(work, 0, 0);
             } else if (work->field_0x00A == 1) {
-                fn_8013072C(work, 0, 0);
+                em_motion_kind_set(work, 0, 0);
             }
         }
         break;
     case 4:
         if (em_die_ck(work) == 0) {
             if (work->field_0x440 > 1800) {
-                fn_8013072C(work, 0, 0);
+                em_motion_kind_set(work, 0, 0);
             } else if (work->field_0x00A == 1) {
-                fn_8013072C(work, 0, 0);
+                em_motion_kind_set(work, 0, 0);
             }
         }
         break;
@@ -1301,7 +1301,7 @@ extern "C" void fn_801B203C(_ENEMY_WORK* work, u32 kind) {
         if ((u8)kind == 2 && work->state_0x006 == 0 && work->field_0xA16 != 0xFF && work->field_0xA16 != 5
             && work->field_0xA38 == 0) {
             if (fn_801B0230(work, work->plw_0xA34) == 1) {
-                fn_8013072C(work, 1, 0);
+                em_motion_kind_set(work, 1, 0);
             }
             em_hit_window_clear(work, 0);
             work->state_0x006 = 1;

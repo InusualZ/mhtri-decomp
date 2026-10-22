@@ -25,7 +25,7 @@
  */
 
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
-#include "enemy/fn_8013072C.h" /* fn_8013072C (rule 2: the owner's header) */
+#include "enemy/em_motion_kind_set.h" /* em_motion_kind_set (rule 2: the owner's header) */
 #include "enemy/em_se_tbl_play.h" /* em_se_tbl_play (rule 2: the owner's header) */
 #include "enemy/em_se_tbl_play_alt.h" /* em_se_tbl_play_alt (rule 2: the owner's header) */
 #include "enemy/em_ground_rec_clear.h" /* fn_80125F54 (rule 2: the owner's header) */
@@ -33,7 +33,7 @@
 #include "enemy/em_hit_window_set_default.h" /* em_hit_window_set_default (rule 2: the owner's header) */
 #include "enemy/em_pl_target_ck.h" /* em_pl_target_ck (rule 2: the owner's header) */
 #include "enemy/em_pl_slot_leaving_ck.h" /* em_pl_slot_leaving_ck (rule 2: the owner's header) */
-#include "enemy/fn_8013581C.h" /* fn_8013581C (rule 2: the owner's header) */
+#include "enemy/em_wave_segment.h" /* em_wave_segment (rule 2: the owner's header) */
 #include "enemy/em_wave_amp.h" /* em_wave_amp (rule 2: the owner's header) */
 #include "enemy/em_turn_in_window.h" /* em_turn_in_window (rule 2: the owner's header) */
 #include "enemy/em_approach_start.h" /* em_approach_start (rule 2: the owner's header) */
@@ -350,7 +350,7 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
 }
 
 #pragma peephole off
-/* 0x801B4694 (0x110): moves the aim to seat `index` - a segment (`fn_8013581C`) for a two-point seat, the point
+/* 0x801B4694 (0x110): moves the aim to seat `index` - a segment (`em_wave_segment`) for a two-point seat, the point
  * itself (`em_wave_amp`) otherwise, each with the seat's own float and a random u16 phase. */
 extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
     nw4r::math::VEC3 a;
@@ -370,7 +370,7 @@ extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
         if (list[i].code == 1) {
             vec_to_mh_vec3(&a, (Vec*)list[i].vec_0x04);
             vec_to_mh_vec3(&b, (Vec*)list[i].vec_0x10);
-            fn_8013581C(&self->aim, &a, &b, 0, phase, list[i].value_0x1C);
+            em_wave_segment(&self->aim, &a, &b, 0, phase, list[i].value_0x1C);
         } else {
             vec_to_mh_vec3(&a, (Vec*)list[i].vec_0x04);
             em_wave_amp(&self->aim, &a, list[i].value_0x1C, 0, phase);
@@ -379,7 +379,7 @@ extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
 }
 
 /* 0x801B47A4 (0x4B0): the per-tick seat update; marks which of the up-to-10 seats the kind-3 work and kind-2 area
- * records occupy, re-picks the current seat (`fn_801B4458`) and arms the seat action (`fn_8013072C`). */
+ * records occupy, re-picks the current seat (`fn_801B4458`) and arms the seat action (`em_motion_kind_set`). */
 extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
     u8 flags[0x0A];
     EmSeatRec* list;
@@ -399,7 +399,7 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
     list = NULL;
     if (self->field_0x43B == 1) {
         if (self->field_0x440 > 0x1C2) {
-            fn_8013072C(self, 0, 0);
+            em_motion_kind_set(self, 0, 0);
             return;
         }
     } else if ((u8)(self->field_0x43B + 0xFE) <= 1) {
@@ -451,12 +451,12 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
             }
         }
         if (seated || (self->flag_0x329 == 1 && self->field_0x833 != 0)) {
-            fn_8013072C(self, 2, 0);
+            em_motion_kind_set(self, 2, 0);
             self->flag_0x329 = 0;
             em_hit_by_set(self, (s16)(ran_suu(0) & 0x1F), 0);
         }
         if (any == 0) {
-            fn_8013072C(self, 0, 0);
+            em_motion_kind_set(self, 0, 0);
             fn_801B4348(self);
         } else if (self->field_0x43B == 2 && self->field_0x440 > 0x1C2) {
             k = 0;
@@ -477,7 +477,7 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
                 }
                 self->slot_0x328 = k;
             }
-            fn_8013072C(self, 3, k);
+            em_motion_kind_set(self, 3, k);
             fn_801B4694(self, k);
         }
         if (self->field_0x43B == 3 && self->flag_0x329 == 0 &&
@@ -486,7 +486,7 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
         }
     } else {
         if (self->field_0x43B == 0 && (self->field_0x833 == 1 || (self->field_0x00A & 2) != 0)) {
-            fn_8013072C(self, 4, 0);
+            em_motion_kind_set(self, 4, 0);
         }
         max = get_move_work_max(3);
         work = (_ENEMY_WORK*)get_move_work_adrs(3);
@@ -496,10 +496,10 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
                 u8 seat = fn_801B4458(self, self->area_no);
                 self->slot_0x328 = seat;
                 if (seat == 0xFF) {
-                    fn_8013072C(self, 3, 0);
+                    em_motion_kind_set(self, 3, 0);
                     return;
                 }
-                fn_8013072C(self, 3, seat);
+                em_motion_kind_set(self, 3, seat);
                 fn_801B4694(self, self->slot_0x328);
                 return;
             }
@@ -586,7 +586,7 @@ extern "C" void fn_801B4E3C(_ENEMY_WORK* self) {
 extern "C" void fn_801B4EA8(_ENEMY_WORK* self) {
     if (em_die_ck(self) == 0) {
         if (self->field_0x834 == 1) {
-            fn_8013072C(self, 1, 0);
+            em_motion_kind_set(self, 1, 0);
             self->field_0x834 = 0;
         }
         fn_801B47A4(self);

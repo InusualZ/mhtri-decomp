@@ -491,7 +491,7 @@ extern "C" void fn_8015DFBC(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -826,7 +826,7 @@ extern "C" void fn_8015E854(_ENEMY_WORK* self, u8 arg1, u8 arg2) {
         return;
     case 1:
         if (em_approach_step(self, 0, 0x80) == 1U) {
-            if (fn_8012F948(self) == 0) {
+            if (em_mot_frame_started_ck(self) == 0) {
                 temp_a2 = arg2;
                 switch ((s32) temp_a2) {
                 case 0:
@@ -1068,7 +1068,7 @@ extern "C" void fn_8015EFAC(_ENEMY_WORK* self) {
         return;
     case 1:
         if (em_approach_step(self, 0, 0x80) == 1U) {
-            if (fn_8012F948(self) == 0) {
+            if (em_mot_frame_started_ck(self) == 0) {
                 self->state = self->state + 1;
                 em_mot_set(self, 0xB, 4, 0);
                 em_approach_start(self, lbl_80797330, 0);
@@ -1198,7 +1198,7 @@ extern "C" void fn_8015F39C(_ENEMY_WORK* self) {
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         self->timer_0x020 = 0x5A;
         return;
     case 1:
@@ -1224,7 +1224,7 @@ extern "C" void fn_8015F450(_ENEMY_WORK* self) {
         em_move_mode_set(self, 4);
         em_mot_set(self, 6, 0, 0);
         em_approach_start(self, lbl_80797380, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1U) {
@@ -1253,7 +1253,7 @@ extern "C" void fn_8015F510(_ENEMY_WORK* self, u8 arg1) {
             f31 = lbl_807973B8;
         }
         em_approach_start(self, f31, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1U) {
@@ -1275,7 +1275,7 @@ extern "C" void fn_8015F60C(_ENEMY_WORK* self) {
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 4);
         em_turn_seq_start(self, lbl_8056FB50, 0, 0, 0);
-        em_height_set(self, fn_8013032C(self));
+        em_height_set(self, em_height_base_get(self));
         return;
     case 1:
         if (em_turn_seq_step(self, lbl_8056FB50) == 1U) {

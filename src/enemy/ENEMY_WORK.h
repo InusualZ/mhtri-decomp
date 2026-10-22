@@ -251,7 +251,7 @@ struct _ENEMY_WORK {
         };
         /* +0x194 */ nw4r::math::VEC3 vec_0x194;  /* the second target position the 0x803253BC band
                                         * measures its aim angle against (`em_act_aim` passes it
-                                        * with `pos` to `fn_80050C40`) */
+                                        * with `pos` to `calcVecAngX2`) */
     };
     /* +0x1AC */ f32 field_0x1AC;       /* the height `fn_8012F39C` compares against 0.9 * the model scale */
     /* +0x1B0 */ nw4r::math::VEC3 aim;   /* one position, two readers: the second position
@@ -462,18 +462,23 @@ struct _ENEMY_WORK {
             /* +0x334 */ s16 timer_0x334;
             /* +0x336 */ u8 unused_0x336e4[0x354 - 0x336];
         } em004_0x328; /* size: 0x2C */
-        /* the four `s16` action slots `enemy/em_action.cpp`'s `em_act_slots_clr` clears and its state
-         * machine reads back (`em_act_frame_ck` arms +0x32A/+0x32C, `fn_803257C4` counts +0x334 down and
-         * clamps +0x336).  A union member because the countdown view above already owns +0x32A. */
+        /* the em022 program's own field view `enemy/em022_prog.cpp` reaches: the jaw pulse steps and the jaw
+         * angle `em022_jaw_update` steps (the joint callback applies it as an X rotation), the turn angle,
+         * the sighting counter and its alert timer.  A union member because the views above already own
+         * these bytes.  size: 0x2C */
         struct {
-            /* +0x328 */ u8 unused_0x328fn[0x32A - 0x328];
-            /* +0x32A */ s16 arm_0x32A;   /* the action's own halfword timer */
-            /* +0x32C */ s16 arm_0x32C;   /* the second one, armed by `em_act_frame_ck`'s case 6 */
-            /* +0x32E */ u8 unused_0x32E[0x334 - 0x32E];
-            /* +0x334 */ s16 count_0x334;   /* counted down by `fn_803257C4`, clamped at 0x5A */
-            /* +0x336 */ s16 limit_0x336;   /* clamped to the count above */
-            /* +0x338 */ u8 unused_0x338fn[0x354 - 0x338];
-        } band_0x328;
+            /* +0x328 */ u8 jaw_open_0x328;    /* set while the target is in sight: the jaw eases open */
+            /* +0x329 */ u8 unused_0x329em22;
+            /* +0x32A */ u16 pulse_a_0x32A;    /* the fast jaw pulse step (1..4), 0 = off */
+            /* +0x32C */ u16 pulse_b_0x32C;    /* the slow jaw pulse step (1..10), 0 = off */
+            /* +0x32E */ u16 jaw_angle_0x32E;  /* the jaw joint's X rotation */
+            /* +0x330 */ u16 turn_0x330;       /* the turn angle the side-step and circling motions aim at */
+            /* +0x332 */ s16 leg_0x332;        /* the frames the strafe has spent on its current leg */
+            /* +0x334 */ s16 sight_0x334;      /* frames the target has been in sight, capped at 90 */
+            /* +0x336 */ s16 alert_0x336;      /* the alert timer: 90 once sighted, counted down after */
+            /* +0x338 */ s8 point_0x338;      /* the area data point (6 or 7) the zone charge aims at */
+            /* +0x339 */ u8 unused_0x339em22[0x354 - 0x339];
+        } em022_0x328; /* size: 0x2C */
         /* the effect-seat view `enemy/em034_prog.cpp` keeps: the selected seat record index at
          * +0x328 (0xFF = none) and its armed flag at +0x329. */
         struct {

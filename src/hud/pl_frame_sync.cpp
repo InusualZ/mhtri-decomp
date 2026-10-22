@@ -65,7 +65,7 @@
  * MODULE AND NAME - the pass that writes the bodies decides, and this is the hint it starts from.  No
  * `__FILE__` string is reachable and `tools/symbols/dumpmap.py lookup` answers `zz_XXXXXXXX_` for every
  * address of the range, so the map has no name for the file either.  Module `enemy` is the link
- * band's: 0x803250B0..0x80334568 is the enemy band (`enemy/em_action.cpp` and
+ * band's: 0x803250B0..0x80334568 is the enemy band (`enemy/em022_prog.cpp` and
  * `enemy/em_act_step.cpp` bracket it) and the neighbouring files are `enemy/`.  The honest caveat, of
  * the same kind `hud/net_char_sync.cpp` records for its band: the content is the *player* work.  This
  * half drives the player work record (`_PLW` reached with `get_move_work_adrs(2)`, then

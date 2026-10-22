@@ -1787,7 +1787,7 @@ void em015_denkiball_se_req(_se_w* work, s32 a, s32 b, nw4r::math::VEC3* pos) {
 }
 
 /* Requests a coin-flip SE, id 9 or 13 by the low bit of the random draw. */
-extern "C" void fn_800DC9A4(_se_w* work, nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_landing(_se_w* work, nw4r::math::VEC3* pos) {
     s32 id;
     if ((u16)ran_suu(0) & 1) {
         id = 9;

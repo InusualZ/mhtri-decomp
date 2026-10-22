@@ -143,9 +143,8 @@ void sysSE_req(s32 id);
  * Added with `quest/arenatask.cpp` (rule 2: this TU owns the address). */
 void titleSE_req(s32 id);
 
-/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
- * had not declared it yet). */
-void fn_800DC9A4(struct _se_w* work, VEC3* pos);
+/* 0x800DC9A4 - the positional landing SE request; the owner defines it `extern "C"`. */
+extern "C" void se_req_pos_landing(struct _se_w* work, VEC3* pos);
 
 /* 0x800D9804 - takes a free SE entry for `kind` on `enemy` with `callback` as its sound source and returns it (GUESS
  * name). */

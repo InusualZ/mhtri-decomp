@@ -1,6 +1,6 @@
 /* The small per-enemy work record `em_get_unique_work` hands back through its third parameter (`_ENEMY_MINI_WORK` in
  * that symbol's mangling); only the bytes the net sync and the quest kill bookkeeping read are named.
- * size: 0x1E (measured minimum: the highest byte any reader names is +0x1D; the true extent is unmeasured) */
+ * size: 0x24 (measured minimum: the highest byte any reader names is +0x22; the true extent is unmeasured) */
 #ifndef MHTRI_ENEMY_ENEMY_MINI_WORK_H
 #define MHTRI_ENEMY_ENEMY_MINI_WORK_H
 
@@ -12,7 +12,10 @@ struct _ENEMY_MINI_WORK {
     /* +0x03 */ u8 team_0x03;
     /* +0x04 */ u8 unused_0x04[0x08 - 0x04];
     /* +0x08 */ u8 state_0x08;           /* the mode the net events compare against (1, 3 or 4) */
-    /* +0x09 */ u8 unused_0x09[0x0D - 0x09];
+    /* +0x09 */ u8 entry_0x09;           /* the enemy data entry `enemy/em022_prog.cpp`'s mini hooks look up */
+    /* +0x0A */ u8 area_0x0A;            /* the area the mini work stands in (`enemy/em022_prog.cpp`) */
+    /* +0x0B */ u8 area_prev_0x0B;       /* the area it stood in before the last move */
+    /* +0x0C */ u8 unused_0x0C;
     /* +0x0D */ u8 element_0x0D;         /* the quest element it belongs to (above 2: none) */
     /* +0x0E */ u8 unused_0x0E[0x12 - 0x0E];
     /* +0x12 */ u8 step_0x12;            /* the step counter the net events raise */
@@ -23,6 +26,8 @@ struct _ENEMY_MINI_WORK {
     /* +0x18 */ u8 unused_0x18[0x1C - 0x18];
     /* +0x1C */ u8 phase_0x1C;           /* the phase counter the net events compare against */
     /* +0x1D */ u8 area_slot_0x1D;       /* the area list its spawn record was filed under */
+    /* +0x1E */ u8 unused_0x1E[0x22 - 0x1E];
+    /* +0x22 */ s16 move_timer_0x22;     /* the frames until the next area move (`enemy/em022_prog.cpp`), -1 = unarmed */
 };
 
 #endif /* MHTRI_ENEMY_ENEMY_MINI_WORK_H */

@@ -404,14 +404,14 @@ extern "C" void fn_8035EAA0(_ENEMY_WORK* self, u8 a)
         self->field_0x33B = id;
         copyVec3(&self->target, em_roster_kind_aim_pos_get(id, self->act_id));
         em_reaction_req(self, 6, 0xFF, 0);
-        fn_8013072C(self, 5, 1);
+        em_motion_kind_set(self, 5, 1);
     } else {
         self->field_0x33B = 0xFF;
         if (a == 1) {
             fn_8012CEB4_c1(self, (s16)(ran_suu(0) & 0xF), 0);
-            fn_8013072C(self, 0, 0);
+            em_motion_kind_set(self, 0, 0);
         } else {
-            fn_8013072C(self, 5, 0);
+            em_motion_kind_set(self, 5, 0);
         }
     }
 }
@@ -445,7 +445,7 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
         self->field_0x33B = 0xFF;
         fn_8012CEB4_c1(self, (s16)(ran_suu(0) & 0xF), 0);
         self->field_0x33F = 0;
-        fn_8013072C(self, 0, 0);
+        em_motion_kind_set(self, 0, 0);
     }
 }
 

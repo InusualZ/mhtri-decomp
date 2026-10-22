@@ -207,10 +207,10 @@ void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 f32 get_em_base_scale(struct _ENEMY_WORK* self);
 f32 em_mot_frame_get(struct _ENEMY_WORK* self);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
-s32 fn_8012F948(struct _ENEMY_WORK* self);
+s32 em_mot_frame_started_ck(struct _ENEMY_WORK* self);
 u32 em_ground_ck(struct _ENEMY_WORK* self, f32 a);
 f32 em_fall_height_get(struct _ENEMY_WORK* self);
-f32 fn_8013032C(struct _ENEMY_WORK* self);
+f32 em_height_base_get(struct _ENEMY_WORK* self);
 void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_height_add(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
@@ -493,7 +493,7 @@ void fn_801CD068(struct _ENEMY_WORK* self, u8 mode) {
         }
         break;
     case 2:
-        if (fn_8012F948(self) == 0) {
+        if (em_mot_frame_started_ck(self) == 0) {
             em_move_offset_rot_apply(self, &self->field_0x1BC);
         }
         {
@@ -1359,7 +1359,7 @@ void fn_801CEC44(struct _ENEMY_WORK* self) {
         }
         break;
     case 2:
-        if (fn_8012F948(self) == 0) {
+        if (em_mot_frame_started_ck(self) == 0) {
             em_move_offset_rot_apply(self, &self->field_0x1BC);
         }
         {
@@ -2474,11 +2474,11 @@ void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
-s32 fn_8012F948(struct _ENEMY_WORK* self);
+s32 em_mot_frame_started_ck(struct _ENEMY_WORK* self);
 void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 u32 em_phase_get(struct _ENEMY_WORK* self);
-f32 fn_8013032C(struct _ENEMY_WORK* self);
+f32 em_height_base_get(struct _ENEMY_WORK* self);
 void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
@@ -3097,7 +3097,7 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
             em_demo_rot_set(self, lbl_80799220, lbl_8079941C, lbl_80799220);
             em_demo_key3_apply(self, em_demo_frame_get(), lbl_805B63E8, 0);
             em_height_set(self, self->pos.y - self->field_0x20C);
-        } else if (fn_8012F948(self) == 0) {
+        } else if (em_mot_frame_started_ck(self) == 0) {
             self->field_0x318 = em_key_curve_eval(self, lbl_805B52D8);
             em_move_offset_rot_apply(self, &self->field_0x1BC);
         }

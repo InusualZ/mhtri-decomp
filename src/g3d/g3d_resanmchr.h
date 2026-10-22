@@ -13,7 +13,7 @@ extern "C" {
 
 /* 0x8008EE68 - the caller's matrix times the joint's world matrix (`enemy/fn_80138074.c` spells the
  * second argument `Mtx34*`; only the pointer width is load-bearing). */
-void fn_8008EE68(void* arg0, MTX34* mtx);
+void anm_chr_result_rot_mul(void* arg0, MTX34* mtx);
 
 #ifdef __cplusplus
 }

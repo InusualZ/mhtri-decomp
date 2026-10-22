@@ -30,7 +30,7 @@ u32 em_busy_ck(struct _ENEMY_WORK* work);
 /* 0x8012E728 - ends the running action; `mode` is the caller's 0. */
 void em_act_end(struct _ENEMY_WORK* work, s32 mode);
 s32 em_pl_slot_leaving_ck(u8 arg0);
-u32 em_team_mate_state_ck();
+u32 em_team_mate_state_ck(struct _ENEMY_WORK* enemy, u32 kind, u32 slot);
 u8 fn_8012D3E0();
 u32 pl_torch_ck(struct _ENEMY_WORK* other);
 u32 em_act11_wait_ck(struct _ENEMY_WORK* self);
