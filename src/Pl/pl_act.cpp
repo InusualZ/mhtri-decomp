@@ -4943,7 +4943,7 @@ void Pl_decide_mot_get(u16* motion, u16* param)
     s32 i;
 
     for (i = 0; i < 11; i++) {
-        switch (get_ControlType(0)) {
+        switch ((u8)get_ControlType(0)) {
         case 1:
             if (i < 4) {
                 if ((Psw[0].control_0x104 & row[i].control_a) != 0) {
