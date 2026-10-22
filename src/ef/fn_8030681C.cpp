@@ -2,7 +2,7 @@
  *   below `menu/menu_infomation.cpp`.
  * RANGE. .text 0x8030681C-0x80308FB4 (26 functions); extab 0x80015AB4-0x80015B54, extabindex 0x80034674-0x80034764,
  *   .data 0x805DC5E8-0x805DCC50, .sdata 0x80792B78-0x80792BB8, .sdata2 0x8079ADE0-0x8079AE30.  Right edge: the
- *   one-copy `"menu_infomation.cpp"` string (`lbl_805DCCDC`) is referenced only from 0x8030A328 up, so every body
+ *   one-copy `"menu_infomation.cpp"` string (`str_menu_infomation_cpp`) is referenced only from 0x8030A328 up, so every body
  *   from 0x80308FB4 belongs to `menu/menu_infomation.cpp`; `fn_80308EC0`/`fn_80308F1C` read that unit's
  *   `StatusScreenWork` and call its `menu_equip_page_count`.
  * NAMES. `eft042_set2` is the runtime dump's own name (the family's spawner); `eft_spawn_type_at_area` is a GUESS
@@ -577,7 +577,7 @@ extern "C" void fn_80308E38(_EFT* self, u32 visible, u8 from, u8 to)
  * (the returned count picks the last-page byte) and the page index. */
 extern "C" void fn_80308EC0(StatusScreenWork* self)
 {
-    self->field_0x14 = 7;
+    self->screen_mode = 7;
     self->field_0x23A = 0;
     self->field_0x1AF = (s8)(menu_equip_page_count(self->equip, 0) + 2);
     self->field_0x1AE = 0;
@@ -588,7 +588,7 @@ extern "C" void fn_80308EC0(StatusScreenWork* self)
 extern "C" s32 fn_80308F1C(StatusScreenWork* self)
 {
     s32 result = 0;
-    u16 flags = (u16)(self->field_0x04 | (self->field_0x08 & 0xF));
+    u16 flags = (u16)(self->pad_trig | (self->pad_repeat & 0xF));
 
     if ((flags & 0x20) != 0) {
         result = 2;

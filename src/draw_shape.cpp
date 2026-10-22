@@ -16,7 +16,7 @@
  * `gpframe_tex_load`, `menu_tex_load`, `village_tex_load`, `set_arena_idx_switch`).
  *
  * Results (objdiff, source compiled with the unit's real `cflags_main` command line, measured as the old `draw_shape.cpp` range):
- * 100 %: fn_80054C64, res_file_assign, fn_80054FDC, fn_8005504C, set_arena_idx, set_arena_idx_switch, fn_80055E48, fn_80055E50,
+ * 100 %: fn_80054C64, res_file_assign, fn_80054FDC, fn_8005504C, set_arena_idx, set_arena_idx_switch, arena_idx_get, fn_80055E50,
  *        fn_80055E58, fn_80055E64.
  * 90-100 %: res_file_ctor 95.80, fn_80055D8C 93.00.  80-90 %: fn_80055D20 87.22, fn_80055C5C 86.73, fn_80055DC8 86.73,
  *        fn_80054C74 82.45, fn_80055CC4 81.96.
@@ -138,7 +138,7 @@ extern "C" u32* res_file_ctor(u32* dst, u32 value) {
     return dst;
 }
 
-extern "C" u8 fn_80055E48(void) {
+extern "C" u8 arena_idx_get(void) {
     return lbl_807948A0;
 }
 

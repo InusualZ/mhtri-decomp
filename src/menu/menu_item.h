@@ -102,10 +102,13 @@ struct MenuTables {
  * `fn_8029F680` passes on. */
 struct ItemSpeciesRecord {
     /* +0x000 */ u8 slot_size;        /* GUESS: the decoration slots the item takes; the readers compare it to 1/2/3 */
-    /* +0x001 */ u8 unused_0x001[3];
+    /* +0x001 */ u8 unused_0x001;
+    /* +0x002 */ u16 item_id;        /* the item the record is for (`menu/menu_infomation.cpp` looks up its class) */
     /* +0x004 */ u32 unused_0x004;
     /* +0x008 */ u8 kind;
-    /* +0x009 */ u8 unused_0x009[0x00C - 0x009];
+    /* +0x009 */ u8 kind_points;     /* the points the decoration adds to skill `kind` (signed, read as `s8`) */
+    /* +0x00A */ u8 kind2;           /* its second skill (0 = none) */
+    /* +0x00B */ u8 kind2_points;    /* the points it adds to `kind2` (signed, read as `s8`) */
 };
 
 /* One 0x18-byte menu entry: the three entry arrays inside a `MenuSlot` are made of these, and the
@@ -310,7 +313,7 @@ u32 fn_8029F5F8(_HIT_W* hit);
 u32 fn_8029F60C(void);
 void fn_8029F680(u16 id);
 ItemSpeciesRecord* get_item_species_data(u16 id);
-u32 fn_8029F704(u16 id);
+u32 item_rare_color_get(u16 id);
 s32 item_category_ck(u16 id, s32 index);
 u32 fn_8029F774(u16 id);
 u32 fn_8029F788(u16 kind);

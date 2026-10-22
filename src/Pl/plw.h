@@ -1069,12 +1069,12 @@ struct _PLW {
     };
     /* +0x5E8 */ s16 unk5E8;
     /* +0x5EA */ u8 pad_0x5EA[0x8];
-    /* +0x5F2 */ u16 unk5F2[8];
-    /* +0x602 */ u8 unk602[8];
+    /* +0x5F2 */ u16 active_skill_id[8];    /* the hunter's active skills (0 = none); GUESS name, from the info screen */
+    /* +0x602 */ u8 active_skill_tree[8];    /* the skill tree each one comes from */
     /* +0x60A */ u8 unk60A[0x612 - 0x60A];
     /* +0x612 */ u16 deco_skill_id[4];
-    /* +0x61A */ u16 unk61A[8];
-    /* +0x62A */ u8 unk62A[8];
+    /* +0x61A */ u16 shown_skill_id[8];     /* a copy of the active skills the info screen clears; GUESS name */
+    /* +0x62A */ u8 shown_skill_tree[8];
     /* +0x632 */ u8 unk632[0x634 - 0x632];
     /* +0x634 */ u32 unk634;
     /* +0x638 */ u32 unk638;

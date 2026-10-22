@@ -9,23 +9,82 @@
 
 struct _PLW;
 
-/* The blademaster weapon row `fn_8027ECAC` hands back (the 0x18-byte stride `fn_8027EC50` indexes kinds 7-11/14-15
- * with).  The element pairs are read by `menu/menu_infomation.cpp` (`fn_8031622C`, `fn_803164D0`): the type is
- * shown as `type + 6`, a negative value only under skill 201.  `slot_count` is a GUESS: the byte `fn_80316978`
+/* The blademaster weapon row `equip_blade_rec_get` hands back (the 0x18-byte stride `fn_8027EC50` indexes kinds 7-11/14-15
+ * with).  The element pairs are read by `menu/menu_infomation.cpp` (`weapon_element_compare`, `weapon_status_compare`): the type is
+ * shown as `type + 6`, a negative value only under skill 201.  `slot_count` is a GUESS: the byte `weapon_slot_count_get`
  * hands to the 2061-sprite putter.  size: 0x18 (the row stride) */
 typedef struct PlSkillRec {
     /* +0x00 */ u8 pad_0x00[0x8];
     /* +0x08 */ u8 level_a;          /* scaled by 0x32 and biased by 0x96 into `+0x56E` (`fn_802740F4`) */
     /* +0x09 */ u8 level_b;          /* the sibling level the same function scales */
     /* +0x0A */ u8 pad_0x0A[0x2];
-    /* +0x0C */ u8 slot_count;       /* non-zero for the pieces `fn_80316978` reports */
+    /* +0x0C */ u8 slot_count;       /* non-zero for the pieces `weapon_slot_count_get` reports */
     /* +0x0D */ s8 value;            /* the value `fn_802744A0` stores into `+0x570` */
     /* +0x0E */ u8 element_a_type;   /* 0 = none */
     /* +0x0F */ s8 element_a_value;  /* negative = hidden */
     /* +0x10 */ u8 element_b_type;   /* 0 = none */
     /* +0x11 */ s8 element_b_value;  /* negative = hidden */
-    /* +0x12 */ u8 pad_0x12[0x6];
+    /* +0x12 */ u8 pad_0x12[0x1];
+    /* +0x13 */ u8 phial_type;       /* a switch axe's phial (string table 0x2F's row); GUESS, from the info screen */
+    /* +0x14 */ u8 pad_0x14[0x4];
 } PlSkillRec; /* size: 0x18 */
+
+/* The weapon/skill record an equipment slot resolves to (the 0x24-byte sibling table). size: 0x24 */
+typedef struct PlWeaponRec {
+    /* +0x00 */ u8 pad_0x00[0x6];
+    /* +0x06 */ u8 bonus_0x06;   /* the mode-0 points `pl_weapon_stat_get` reads through `fn_8027E708` */
+    /* +0x07 */ s8 bonus_0x07;   /* the points `pl_gun_recoil_get` accumulates */
+    /* +0x08 */ u8 defense_bonus; /* the defence a weapon adds (the info screen sums a bowgun's three parts) */
+    /* +0x09 */ s8 bonus_0x09;   /* the points `pl_gun_reload_get` accumulates */
+    /* +0x0A */ s16 bonus_0x0A;  /* the bonus `pl_gun_deviation_get` scales by 1/100 */
+    /* +0x0C */ u8 pad_0x0C[0x4];
+    /* +0x10 */ u8 recoil_kind;   /* the row of the info screen's recoil tables (a frame's rating and icon, a stock's) */
+    /* +0x11 */ u8 pad_0x11[0x1];
+    /* +0x12 */ s8 bonus_0x12;   /* the points `pl_weapon_affinity_get`/`fn_802744A0` add up */
+    /* +0x13 */ u8 pad_0x13[0x2];
+    /* +0x15 */ u8 bonus_flag_0x15; /* non-zero: a gun slot's bonus applies (`equip_gun_bonus_ck`) */
+    /* +0x16 */ u8 pad_0x16[0xE];
+} PlWeaponRec; /* size: 0x24 */
+
+/* The per-slot record `equip_slot_rec_get` hands back (the 0x18-byte row `fn_8027E2A8` indexes); `fn_80273ED8` sums one
+ * signed byte per act kind out of it. size: 0x18 (the row stride) */
+typedef struct PlSlotRec {
+    /* +0x00 */ u8 pad_0x00[0x4];
+    /* +0x04 */ u8 dye_mode;      /* 2: the piece can always be recoloured (`EnableChangeColor`) */
+    /* +0x05 */ u8 color_index;   /* the colour-table row `equip_color_index_get` hands back */
+    /* +0x06 */ u8 wear_flags;    /* bit 2: a blademaster can wear it, bit 3: a gunner (the info screen's wear check) */
+    /* +0x07 */ u8 pad_0x07[0x1];
+    /* +0x08 */ s8 value_0x08;
+    /* +0x09 */ s8 value_0x09;
+    /* +0x0A */ s8 value_0x0A;
+    /* +0x0B */ s8 value_0x0B;
+    /* +0x0C */ s8 value_0x0C;
+    /* +0x0D */ u8 pad_0x0D[0xB];
+} PlSlotRec; /* size: 0x18 */
+
+/* An RGBA colour built byte by byte (red first, alpha last) and handed back as one register word (the colour getters build it; `menu/menu_infomation.cpp` reads it back by channel). size: 0x4 */
+typedef union PlRgba {
+    /* +0x0 */ u8 channel[4];
+    /* +0x0 */ u32 word;
+} PlRgba; /* size: 0x4 */
+
+/* The hunter's status sheet `pl_status_sheet_get` (0x80270F50) fills from the player work (+0x372..+0x3D4) after
+ * applying a column array of equipment: what the equipment-information screen's status blocks print.
+ * size: 0x22 */
+typedef struct PlStatusSheet {
+    /* +0x00 */ s16 health;
+    /* +0x02 */ s16 stamina;        /* in sixths: the screen prints it divided by 6 */
+    /* +0x04 */ s16 affinity;       /* GUESS, from the row the screen prints it in */
+    /* +0x06 */ u16 attack;         /* the raw value; the screen scales it by the weapon class */
+    /* +0x08 */ u16 defense;
+    /* +0x0A */ u8 element_type;    /* 1.. (0 = none) */
+    /* +0x0B */ u8 status_type;     /* 12.. (0 = none) */
+    /* +0x0C */ s16 element_value;
+    /* +0x0E */ s16 status_value;
+    /* +0x10 */ s16 resist[5];      /* fire, water, ice, thunder, dragon (the screen's row order is 0, 1, 3, 2, 4) */
+    /* +0x1A */ u8 cleared_0x1A[7]; /* zeroed by the getter, read by nobody here */
+    /* +0x21 */ u8 pad_0x21;
+} PlStatusSheet; /* size: 0x22 */
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,18 +101,19 @@ s32 Pl_timer_0x460_ck(struct _PLW* self);
 /* 0x8027D76C - the action-complete hook the AI band calls once a motion resolves. */
 void fn_8027D76C(struct _PLW* self);
 
-/* 0x8027FF88 - classify one packed equipment word (`_EQUIP_INDEX` +0x00) and return the number of
- * colour/variant forms it has (0 = none); read by the equipment-information screen (`menu/menu_infomation.cpp`). */
-u8 fn_8027FF88(u32 equip);
-
-/* 0x8027F11C - the equipment "category weight" of one piece: `lbz` of its first byte, then a
- * 0/1/6/0xB..0xF switch (`NULL` maps to 0).  `fn_8027ECAC` / `fn_8027FFFC` are the two sub-record
- * accessors the same screen reads to classify a piece: the `_EQUIP` sub-record (NULL when absent)
- * and, for a kind-11/12 gun piece, the +0x15 flag of the weapon record it resolves to (1 when set). */
 struct _EQUIP;
-u8 fn_8027F11C(void* equip);
-PlSkillRec* fn_8027ECAC(struct _EQUIP* equip);
-u32 fn_8027FFFC(struct _EQUIP* equip);
+
+/* 0x8027FF88 - a blade's colour tier: the number of colour forms its row (+0x16, in steps of five) gives, 0 for
+ * none; read by the equipment-information screen (`menu/menu_infomation.cpp`) on the shown piece. */
+u8 equip_color_tier_get(struct _EQUIP* equip);
+
+/* 0x8027F11C - a piece's decoration slot count: `lbz` of its first byte, then a 0/1/6/0xB..0xF switch (`NULL`
+ * maps to 0).  `equip_blade_rec_get` / `equip_gun_bonus_ck` are the two sub-record accessors the same screen
+ * reads to classify a piece: the `_EQUIP` sub-record (NULL when absent) and, for a kind-11/12 gun piece, the
+ * +0x15 flag of the weapon record it resolves to (1 when set). */
+u8 equip_deco_slots_get(struct _EQUIP* equip);
+PlSkillRec* equip_blade_rec_get(struct _EQUIP* equip);
+u32 equip_gun_bonus_ck(struct _EQUIP* equip);
 
 /* 0x8027DC64 - the player's slot-occupied flag (the first byte of the record at 0x806BB7A0), read as a boolean;
  * `enemy/em020_handlers.cpp`'s `em020_condition_ck` mode 2 compares it against 1.  `u32`, not the definition's

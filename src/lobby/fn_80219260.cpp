@@ -52,7 +52,7 @@ void fn_80218138(void* self);
 /* Pl-band helpers with no registered owner (the bracketing Pl units make `unsplit/Pl.h`
  * their rule-2 home). */
 u8 fn_8027E290(u8 kind);
-u8 fn_8027E29C(u8 kind);
+u8 weapon_class_index(u8 kind);
 u32 fn_8026FE44(struct _PLW* plw);
 s32 Gunner_opt_ok_ck(_EQUIP* equip);
 
@@ -333,7 +333,7 @@ extern "C" void lb_equip_kind_se_set(LbEquipWork* self) {
     case 10:
     case 14:
     case 15:
-        fn_800D0754(fn_8027E29C(kind));
+        fn_800D0754(weapon_class_index(kind));
         break;
     case 11:
     case 12:

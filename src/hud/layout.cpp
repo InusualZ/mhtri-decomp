@@ -515,13 +515,13 @@ void draw_itemicon_anim_idx(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos
 void draw_equipicon(const _SPR_DATA_& spr, _EQUIP* equip, const _mh_ivec2_* pos)
 {
     if (equip->kind != 0) {
-        fn_802E1400((_SPR_DATA_*)&spr, equip, pos, Get_equip_rare(equip));
+        draw_equipicon_rare((_SPR_DATA_*)&spr, equip, pos, Get_equip_rare(equip));
     }
 }
 
 /* 0x802E1400 (0xCC) - the equipment icon with the rarity colour: a gunner-only slot the player
  * cannot use falls back to the weapon-icon path, everything else uses the kind's texture. */
-void fn_802E1400(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, u8 rare)
+void draw_equipicon_rare(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, u8 rare)
 {
     if (equip->kind != 0) {
         if (equip->kind == 0xB && !Gunner_opt_ok_ck(equip)) {
@@ -594,7 +594,7 @@ void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
 }
 
 /* 0x802E1834 (0xA0) - the same at texture flag 0x1E. */
-void fn_802E1834(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
+void draw_tex_icon_square_arena(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
 {
     _mh_tex_uv_ uv0;
     _mh_tex_uv_ uv1;

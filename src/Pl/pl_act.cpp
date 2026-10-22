@@ -30,7 +30,7 @@
  *   pl_act_true_ck, pl_act_no_68_71_ck, pl_chr_set_motion_default, pl_model_set_value, pl_rig_get_motion_frame,
  *   pl_act_gauge_step_unlatched, pl_act_gauge_step_signed, pl_act_held_ck, pl_ground_probe_ahead,
  *   pl_stg_weapon_near_find
- *   GUESS (field, from its menu reader `fn_80316978`): `PlSkillRec::slot_count` (`Pl/fn_8027D684.h`)
+ *   GUESS (field, from its menu reader `weapon_slot_count_get`): `PlSkillRec::slot_count` (`Pl/fn_8027D684.h`)
  *   GUESS (from each body and its menu/lobby callers): equip_color_rgba_get and equip_color_index_get (the
  *   equipment colour table's RGBA row and the kind row's +0x05 index), item_kind_name_get, skill_name_get (the
  *   system string table's +0x94/+0x90 lists), item_species_class_get, armor_color_rgba_get and armor_color_table (the 3-byte
@@ -38,7 +38,7 @@
  *   word at +0x04), equip_level_max_ck, pl_act_set_motion_gate (+0x45A), pl_act_add_class7_gauge (+0x384, class 7
  *   only), pl_act_timer_step (+0x445)
  *   GUESS (fields, from their readers): `PlWeaponRec::bonus_0x06` (`fn_8027E708`), `PlWeaponRec::bonus_flag_0x15`
- *   (`fn_8027FFFC`), `PlSlotRec::dye_mode` (`EnableChangeColor` tests 2), `PlSlotRec::color_index`
+ *   (`equip_gun_bonus_ck`), `PlSlotRec::dye_mode` (`EnableChangeColor` tests 2), `PlSlotRec::color_index`
  *   (`equip_color_index_get`); `PlRgba` (the stack word the colour getters assemble)
  *   GUESS (from each body and its callers): `pl_status_bit_ck`, `pl_stagger_level_get`,
  *   `pl_impact_pos_get`, `pl_charge_stage_get`, `pl_act_frame_get`.
@@ -62,14 +62,14 @@
  *    `b`; the nested if, the else-if chain and a `switch` all lay the blocks out differently;
  *  - `fn_802693C4`/`fn_80269508`: retail adds the record offset into the base register (`add r4,r4,r0` /
  *    `add r5,r5,r0`), ours into a fresh one; `fn_8027AF88`: one `extsb` target register (r4 against r0);
- *  - `fn_80270F50`: the implicit int->float conversion constant rows (compiler-synthesised, playbook 29);
- *  - `fn_80271BD4`/`fn_80271E0C`: MWCC's `switch` decision tree against retail's three linear `subi`/`cmplwi` range
- *    tests, and in `fn_80271E0C` the `deco_count` bound retail re-masks from r0; the label-chain shape that rule 8
+ *  - `pl_status_sheet_get`: the implicit int->float conversion constant rows (compiler-synthesised, playbook 29);
+ *  - `equip_skill_points_get`/`equip_skill_tree_has_ck`: MWCC's `switch` decision tree against retail's three linear `subi`/`cmplwi` range
+ *    tests, and in `equip_skill_tree_has_ck` the `deco_count` bound retail re-masks from r0; the label-chain shape that rule 8
  *    removed reproduced more rows (docs/pl.md);
  *  - `Pl_cat_skill_ck`: MWCC reassociates `(plw + 4) + 0x612` into `plw + 0x616` for every walk tried;
  *  - `pl_parts_refresh`: the three call-spanning values are coloured base/`pend`/mask in r24/r25/r26 by retail, mask/base/
  *    `pend` by ours;
- *  - `fn_802751B4`: retail saves `f31` through a `psq_st`/`vmrghb` pair (the compiler's own float-save form);
+ *  - `pl_gun_deviation_get`: retail saves `f31` through a `psq_st`/`vmrghb` pair (the compiler's own float-save form);
  *  - `fn_80278144`/`fn_80278310`: the early `(u32)((u8)m - 6) <= 1` exit inlines `li r3,0; b epilogue` (+8 B each)
  *    where retail shares one block through a label (rule 8; docs/pl.md);
  *  - `Pl_motion_input_ck`: the case-3/5 failures return inline where retail branches to a shared `return 0`;
@@ -104,7 +104,7 @@
  *  - `equip_color_table`/`armor_color_table` (0x805C6238/0x805C6278) are this unit's `.data`, read through `extern`
  *    declarations until the section is emitted.
  * SHAPES. A `switch` on an unsigned value puts the case blocks out of line with a forward `b` to the default
- *   (`fn_8027176C`, `fn_80271674`, `fn_80271A18`); `switch (u8)` promotes to a signed `cmpwi` chain.
+ *   (`pl_equip_skill_valid_ck`, `pl_skill_valid_ck`, `pl_bonus_skill_valid_ck`); `switch (u8)` promotes to a signed `cmpwi` chain.
  *  - the pool floats are `extern` declarations used as load operands, never definitions (playbook 29), and a multiply
  *    is written `lbl * value`, the target's `fmuls` operand order;
  *  - `pl_act_param_tier_ck`: the dead copy chain `classCopy0..2` of `self->field_0x002` plus a separate `weaponClass`
@@ -116,7 +116,7 @@
  *    request bits through `self->unkBC` but the enclosing ones through `st->flagsBC` (the base register shows);
  *  - `fn_8026CC7C` is the m2c reconstruction: its `1U`/`s32` spellings and `st->flagsB8`/`self->unkCC` base choices
  *    are load-bearing; `fn_8026CBE4` keeps two unused trailing parameters (its callers pass four);
- *  - `fn_80271BD4`/`fn_80271E0C` dispatch with `switch ((u32)kind)`: cases 1-5, case 6, then 7-15 as `default`, which
+ *  - `equip_skill_points_get`/`equip_skill_tree_has_ck` dispatch with `switch ((u32)kind)`: cases 1-5, case 6, then 7-15 as `default`, which
  *    lays the bodies out in retail's B, C, A order;
  *  - the record walks index the typed arrays (`rec->skill_id[i]`); `fn_80273044`/`pl_item_room_get` scan `plw->slot_id`
  *    with a flat `for (i = 0; i < 24; i++)` (unrolled eight-wide under `mtctr 3`), and `pl_item_room_get`'s spare-slot scan
@@ -124,13 +124,13 @@
  *  - the valid-bit updates in `pl_parts_color_set`/`fn_8027373C`/`pl_equip_model_set` are compound (`plw->set_valid &= (u16)~mask`);
  *    the plain assignment adds a `clrlwi` before the `sth`;
  *  - narrow returns decide where MWCC re-converts: `item_take` and `pl_item_add` return `s16`, `fn_802736A0`'s
- *    `Get_pl_type__FP6_EQUIPP6_EQUIP` returns `u8`, `fn_802724E8`/`fn_8027252C` take signed-byte `s8*`/`s8` levels;
+ *    `Get_pl_type__FP6_EQUIPP6_EQUIP` returns `u8`, `fn_802724E8`/`equip_columns_skills_get` take signed-byte `s8*`/`s8` levels;
  *    `fn_80272D5C` restates `(s16)v` at its second store and compare;
- *  - `fn_8027252C` declares `tv, tb, ta` in that order (stack slots 0x20/0x18/0x10 and the register order), nests the
+ *  - `equip_columns_skills_get` declares `tv, tb, ta` in that order (stack slots 0x20/0x18/0x10 and the register order), nests the
  *    value test `if (v != 0) { if (v > 0) ... } else { zeros }` and swaps tv/tb before ta; `fn_80272B10` indexes
  *    `plw->slot_id` with `?:` and calls `GetItemData` in each arm; `pl_item_add` skips its second lookup through a
  *    single-iteration `for (;;)` with `break`, and its `case 4` compares `plw->unk26E` against the first lookup;
- *  - `fn_80273B14` and `fn_80274B5C` write their case bodies in the order their jump tables point at, not case order;
+ *  - `pl_weapon_stat_get` and `pl_gun_clip_get` write their case bodies in the order their jump tables point at, not case order;
  *  - `Pl_net_send` is called through its two-parameter view `PlNetSend2`: retail's call sites pass two arguments to
  *    the owner's three-parameter function, and a third argument would emit `li r5,X`;
  *  - an `s16`/`s8` parameter with a compound assignment stores the raw sum and sign-extends only at the compare
@@ -159,7 +159,7 @@
  *  - `pl_area_buff_apply`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
  *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
  *    `fn_8027D050` declares its loop index before `v` (the r8/r9 order); `fn_80274B20` is `while (row[0] != 0)` with
- *    `id == row[0]` (the rotated loop); `fn_8027FFFC` opens with the `return 0` guard for non-gun kinds.
+ *    `id == row[0]` (the rotated loop); `equip_gun_bonus_ck` opens with the `return 0` guard for non-gun kinds.
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
@@ -2442,14 +2442,14 @@ extern u32 lbl_805C5FE0[];
 u8 GameMode_ck(void);
 u32 fn_80363A2C(void);
 int fn_80274AB8(int);
-u32 fn_8027E29C(u8);
+u32 weapon_class_index(u8);
 int Pl_item_timer_get(_PLW*, u16);
 u32 get_item_species_data(u16);
 u32 fn_8027E290(u8);
 void fn_8027E98C(u8*);
 s32 fn_8027EBA8(_PLW*, u8*);
 u32 fn_80274B20(u16);
-void fn_8027252C(_EQUIP*, u16*, s8*, u8*);
+void equip_columns_skills_get(_EQUIP*, u16*, s8*, u8*);
 void* memset(void*, int, u32);
 u8 Get_pl_type__FP6_EQUIPP6_EQUIP(_EQUIP*, _EQUIP*);
 u16 fn_8027993C(_PLW*, u16, int);
@@ -2461,7 +2461,7 @@ s32 fn_8004BD30(s16*);
 void pl_parts_refresh(_PLW*, s32);
 
 
-void* fn_8027E344(void);
+void* equip_slot_rec_get(void);
 
 u32 fn_80274AEC(u8*, u32, u8);
 
@@ -2472,7 +2472,7 @@ u32 fn_80269474(u8, int, s32);
 void fn_802695A4(u8, void*, void*);
 void pl_equip_color_apply(_PLW*, u8);
 void fn_80272B10(_PLW*, s32);
-s8 fn_8027234C(u8*, u8);
+s8 equip_columns_tree_points_get(u8*, u8);
 void fn_802736A0(_PLW*);
 
 
@@ -2763,7 +2763,7 @@ extern "C" void fn_80270CA4(_PLW* plw) {
 
 /* Swaps the player's nine equipment slots for another set, re-derives every skill field and fills the status
  * screen's skill summary; a null equipment set only fills the summary. */
-extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
+extern "C" void pl_status_sheet_get(_PLW* plw, _EQUIP* equip, u8* out) {
     _EQUIP saved[9];
     int i;
 
@@ -2788,7 +2788,7 @@ extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
         equip_record_copy(&plw->equipD, &equip[8]);
         fn_80272A08(plw);
         for (int i = 0; i < 8; i++) {
-            plw->unk61A[i] = plw->unk5F2[i];
+            plw->shown_skill_id[i] = plw->active_skill_id[i];
         }
         fn_8027885C(plw, 0, 0);
         fn_802789EC(plw, 0);
@@ -2843,7 +2843,7 @@ extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
         equip_record_copy(&plw->equipD, &saved[8]);
         fn_80272A08(plw);
         for (int i = 0; i < 8; i++) {
-            plw->unk61A[i] = 0;
+            plw->shown_skill_id[i] = 0;
         }
         fn_8027885C(plw, 0, 0);
         fn_802789EC(plw, 0);
@@ -2870,13 +2870,13 @@ u32 Pl_Skill_ck(_PLW* plw, u16 skill) {
     }
     if (ok == 1) {
         for (int i = 0; i < 8; i++) {
-            if (skill == plw->unk61A[i]) {
+            if (skill == plw->shown_skill_id[i]) {
                 return true;
             }
         }
     } else {
         for (int i = 0; i < 8; i++) {
-            if (skill == plw->unk5F2[i]) {
+            if (skill == plw->active_skill_id[i]) {
                 return true;
             }
         }
@@ -2891,7 +2891,7 @@ extern "C" u32 fn_802714F0(_PLW* plw, u16 skill) {
     int i;
 
     for (i = 0; i < 8; i++) {
-        if (skill == plw->unk5F2[i]) {
+        if (skill == plw->active_skill_id[i]) {
             return 1;
         }
     }
@@ -2904,14 +2904,14 @@ extern "C" u32 Pl_Skill_slot_item_get(_PLW* plw, u32 slot) {
 
     if (GameMode_ck() == 2 && lobby_w.state_0x000 == 6) {
         for (int i = 0; i < 8; i++) {
-            if ((u8)slot == plw->unk62A[i]) {
-                return (u8)plw->unk61A[i];
+            if ((u8)slot == plw->shown_skill_tree[i]) {
+                return (u8)plw->shown_skill_id[i];
             }
         }
     } else {
         for (int i = 0; i < 8; i++) {
-            if ((u8)slot == plw->unk602[i]) {
-                return (u8)plw->unk5F2[i];
+            if ((u8)slot == plw->active_skill_tree[i]) {
+                return (u8)plw->active_skill_id[i];
             }
         }
     }
@@ -2920,7 +2920,7 @@ extern "C" u32 Pl_Skill_slot_item_get(_PLW* plw, u32 slot) {
 
 /* Whether the player currently provides `kind` of skill: kind 15-17 ask the equipment, 74 the player
  * type, and anything else the two skill-id tables. */
-extern "C" u32 fn_80271674(_PLW* plw, u8 kind) {
+extern "C" u32 pl_skill_valid_ck(_PLW* plw, u8 kind) {
     u16 mode = (fn_8026FE44(plw) == 1);
 
     switch (kind) {
@@ -2956,7 +2956,7 @@ extern "C" u32 fn_80271674(_PLW* plw, u8 kind) {
 
 /* Whether the player's active skill set satisfies one skill query: the equipment-provided kinds
  * 7-10/14-15, the level query kinds 11-13, and the 74 player-type special case. */
-extern "C" u32 fn_8027176C(_PLW* plw, u8* p, u32 a, u8 kind) {
+extern "C" u32 pl_equip_skill_valid_ck(_PLW* plw, u8* p, u32 a, u8 kind) {
     u32 lvl;
     u32 mode;
 
@@ -2973,7 +2973,7 @@ extern "C" u32 fn_8027176C(_PLW* plw, u8* p, u32 a, u8 kind) {
         case 10:
         case 14:
         case 15:
-            lvl = fn_8027E29C(v);
+            lvl = weapon_class_index(v);
             mode = 0;
             break;
         case 11:
@@ -2983,7 +2983,7 @@ extern "C" u32 fn_8027176C(_PLW* plw, u8* p, u32 a, u8 kind) {
             mode = 1;
             break;
         default:
-            return fn_80271674(plw, kind);
+            return pl_skill_valid_ck(plw, kind);
         }
     }
     switch (kind) {
@@ -3048,19 +3048,19 @@ extern "C" u8 fn_802718C8(u16 skill) {
     return 0;
 }
 
-/* The one-argument form of fn_80271674: the skill is resolved through the id table first. */
-extern "C" void fn_80271978(_PLW* plw, u16 skill) {
-    fn_80271674(plw, fn_802718C8(skill));
+/* The one-argument form of pl_skill_valid_ck: the skill is resolved through the id table first. */
+extern "C" void pl_skill_id_valid_ck(_PLW* plw, u16 skill) {
+    pl_skill_valid_ck(plw, fn_802718C8(skill));
 }
 
-/* The three-argument form of fn_8027176C: the skill is resolved through the id table first. */
-extern "C" void fn_802719B8(_PLW* plw, u8* p, u32 a, u16 skill) {
-    fn_8027176C(plw, p, a, fn_802718C8(skill));
+/* The three-argument form of pl_equip_skill_valid_ck: the skill is resolved through the id table first. */
+extern "C" void pl_equip_skill_id_valid_ck(_PLW* plw, u8* p, u32 a, u16 skill) {
+    pl_equip_skill_valid_ck(plw, p, a, fn_802718C8(skill));
 }
 
 /* Whether a skill is available in the current quest context: three kinds are gated on the
  * quest mode, one on the player type, everything else is always available. */
-extern "C" u32 fn_80271A18(_PLW* plw, u16 skill) {
+extern "C" u32 pl_bonus_skill_valid_ck(_PLW* plw, u16 skill) {
     u16 mode = (fn_8026FE44(plw) == 1);
 
     switch (skill) {
@@ -3143,7 +3143,7 @@ extern "C" void fn_802724E8(u16* table, s8* a, u8* b, u8* count, u16 v, u8 bval,
 
 /* The saved-skill set behind fn_80272A08: looks each skill id up in the 16-byte record table, keeps the
  * rank the player's equipment reaches, converts it to a display value and sorts the eight entries. */
-extern "C" void fn_8027252C(_EQUIP* equips, u16* table, s8* a, u8* b) {
+extern "C" void equip_columns_skills_get(_EQUIP* equips, u16* table, s8* a, u8* b) {
     _SKILLREC* rec = (_SKILLREC*)lbl_805C01C8;
     s16 tv[8];
     u8 tb[8];
@@ -3159,7 +3159,7 @@ extern "C" void fn_8027252C(_EQUIP* equips, u16* table, s8* a, u8* b) {
         a[i] = 0;
     }
     while (rec->id != 0xFFFF) {
-        level = fn_8027234C((u8*)equips, (u8)rec->id);
+        level = equip_columns_tree_points_get((u8*)equips, (u8)rec->id);
         if (level <= (s8)rec->unk2) {
             fn_802724E8(table, a, b, &count, (u16)rec->unk3, (u8)rec->id, level);
         } else if (level <= (s8)rec->unk4) {
@@ -3346,7 +3346,7 @@ extern "C" void fn_80272A08(_PLW* plw) {
     equip_record_copy(&saved[6], &plw->equipB);
     equip_record_copy(&saved[7], &plw->equipC);
     equip_record_copy(&saved[8], &plw->equipD);
-    fn_8027252C(&saved[0], plw->unk5F2, (s8*)plw->unk60A, plw->unk602);
+    equip_columns_skills_get(&saved[0], plw->active_skill_id, (s8*)plw->unk60A, plw->active_skill_tree);
 }
 
 /* Re-selects the skill slot: keeps the current one when it still holds the same skill id, otherwise
@@ -3565,7 +3565,7 @@ extern "C" void fn_802736A0(_PLW* plw) {
 
 /* The skill level one player equipment record contributes for `skill`: a per-kind record layout,
  * with the per-decoration levels summed for the kinds that carry them. */
-extern "C" s8 fn_80271BD4(u8* raw, u8 skill) {
+extern "C" s8 equip_skill_points_get(u8* raw, u8 skill) {
     _EQUIP* rec = (_EQUIP*)raw;
     s8 v = 0;
     int i;
@@ -3583,7 +3583,7 @@ extern "C" s8 fn_80271BD4(u8* raw, u8 skill) {
         case 4:
         case 5:
             {
-                u8* r = (u8*)fn_8027E344();
+                u8* r = (u8*)equip_slot_rec_get();
 
                 if (r[14] == skill) {
                     v = (s8)r[15];
@@ -3638,37 +3638,37 @@ extern "C" s8 fn_80271BD4(u8* raw, u8 skill) {
 }
 
 /* Scales the skill level of one record by how many of the nine player records carry it. */
-extern "C" s8 fn_80272084(u8* rec, u8 skill) {
-    s8 v = fn_80271BD4(rec, skill);
+extern "C" s8 equip_columns_torso_points_get(u8* rec, u8 skill) {
+    s8 v = equip_skill_points_get(rec, skill);
 
     if (v != 0) {
         s8 n = 1;
 
-        if (fn_80271BD4(rec + 0x30, 1)) {
+        if (equip_skill_points_get(rec + 0x30, 1)) {
             n = 2;
         }
-        if (fn_80271BD4(rec + 0x00, 1)) {
+        if (equip_skill_points_get(rec + 0x00, 1)) {
             n++;
         }
-        if (fn_80271BD4(rec + 0x0C, 1)) {
+        if (equip_skill_points_get(rec + 0x0C, 1)) {
             n++;
         }
-        if (fn_80271BD4(rec + 0x18, 1)) {
+        if (equip_skill_points_get(rec + 0x18, 1)) {
             n++;
         }
-        if (fn_80271BD4(rec + 0x24, 1)) {
+        if (equip_skill_points_get(rec + 0x24, 1)) {
             n++;
         }
-        if (fn_80271BD4(rec + 0x3C, 1)) {
+        if (equip_skill_points_get(rec + 0x3C, 1)) {
             n++;
         }
-        if (fn_80271BD4(rec + 0x48, 1)) {
+        if (equip_skill_points_get(rec + 0x48, 1)) {
             n++;
         }
-        if (rec[0x54] == 12 && fn_80271BD4(rec + 0x54, 1)) {
+        if (rec[0x54] == 12 && equip_skill_points_get(rec + 0x54, 1)) {
             n++;
         }
-        if (rec[0x60] == 13 && fn_80271BD4(rec + 0x60, 1)) {
+        if (rec[0x60] == 13 && equip_skill_points_get(rec + 0x60, 1)) {
             n++;
         }
         v = v * n;
@@ -3677,7 +3677,7 @@ extern "C" s8 fn_80272084(u8* rec, u8 skill) {
 }
 
 /* Whether one player equipment record provides `skill` at a non-zero level. */
-extern "C" u32 fn_80271E0C(u8* raw, u8 skill) {
+extern "C" u32 equip_skill_tree_has_ck(u8* raw, u8 skill) {
     _EQUIP* rec = (_EQUIP*)raw;
     u32 ok = 0;
     int i;
@@ -3695,7 +3695,7 @@ extern "C" u32 fn_80271E0C(u8* raw, u8 skill) {
         case 4:
         case 5:
             {
-                u8* r = (u8*)fn_8027E344();
+                u8* r = (u8*)equip_slot_rec_get();
 
                 if (r[14] == skill && (s8)r[15] != 0) {
                     ok = 1;
@@ -3752,60 +3752,60 @@ extern "C" u32 fn_80271E0C(u8* raw, u8 skill) {
 }
 
 /* Whether any of the nine player records provides `skill`. */
-extern "C" u32 fn_80272218(u8* rec, u8 skill) {
+extern "C" u32 equip_columns_tree_has_ck(u8* rec, u8 skill) {
     u32 ok = 0;
 
-    if (fn_80271E0C(rec + 0x30, skill) == 1) {
+    if (equip_skill_tree_has_ck(rec + 0x30, skill) == 1) {
         ok = 1;
     }
-    if (fn_80271E0C(rec + 0x0C, skill) == 1) {
+    if (equip_skill_tree_has_ck(rec + 0x0C, skill) == 1) {
         ok = 1;
     }
-    if (fn_80271E0C(rec + 0x18, skill) == 1) {
+    if (equip_skill_tree_has_ck(rec + 0x18, skill) == 1) {
         ok = 1;
     }
-    if (fn_80271E0C(rec + 0x24, skill) == 1) {
+    if (equip_skill_tree_has_ck(rec + 0x24, skill) == 1) {
         ok = 1;
     }
-    if (fn_80271E0C(rec + 0x3C, skill) == 1) {
+    if (equip_skill_tree_has_ck(rec + 0x3C, skill) == 1) {
         ok = 1;
     }
-    if (fn_80271E0C(rec + 0x48, skill) == 1) {
+    if (equip_skill_tree_has_ck(rec + 0x48, skill) == 1) {
         ok = 1;
     }
-    if (rec[0x54] == 12 && fn_80271E0C(rec + 0x54, skill) == 1) {
+    if (rec[0x54] == 12 && equip_skill_tree_has_ck(rec + 0x54, skill) == 1) {
         ok = 1;
     }
-    if (rec[0x60] == 13 && fn_80271E0C(rec + 0x60, skill) == 1) {
+    if (rec[0x60] == 13 && equip_skill_tree_has_ck(rec + 0x60, skill) == 1) {
         ok = 1;
     }
-    if (fn_80271E0C(rec, skill) == 1) {
+    if (equip_skill_tree_has_ck(rec, skill) == 1) {
         ok = 1;
     }
     return ok;
 }
 
 /* Sums the skill level of all nine player records, the main record scaled by its carrier count. */
-extern "C" s8 fn_8027234C(u8* rec, u8 skill) {
-    s8 v = fn_80271BD4(rec + 0x30, skill);
+extern "C" s8 equip_columns_tree_points_get(u8* rec, u8 skill) {
+    s8 v = equip_skill_points_get(rec + 0x30, skill);
 
-    v += fn_80271BD4(rec + 0x0C, skill);
-    v += fn_80271BD4(rec + 0x18, skill);
-    v += fn_80271BD4(rec + 0x24, skill);
-    v += fn_80271BD4(rec + 0x3C, skill);
-    v += fn_80271BD4(rec + 0x48, skill);
+    v += equip_skill_points_get(rec + 0x0C, skill);
+    v += equip_skill_points_get(rec + 0x18, skill);
+    v += equip_skill_points_get(rec + 0x24, skill);
+    v += equip_skill_points_get(rec + 0x3C, skill);
+    v += equip_skill_points_get(rec + 0x48, skill);
     if (rec[0x54] == 12) {
-        v += fn_80271BD4(rec + 0x54, skill);
+        v += equip_skill_points_get(rec + 0x54, skill);
     }
     if (rec[0x60] == 13) {
-        v += fn_80271BD4(rec + 0x60, skill);
+        v += equip_skill_points_get(rec + 0x60, skill);
     }
-    v += fn_80272084(rec, skill);
+    v += equip_columns_torso_points_get(rec, skill);
     return v;
 }
 
 /* Sums the skill level of the nine saved equipment slots. */
-extern "C" void fn_8027243C(_PLW* plw, u8 skill) {
+extern "C" void pl_skill_tree_points_get(_PLW* plw, u8 skill) {
     _EQUIP saved[9];
 
     equip_record_copy(&saved[0], &plw->equipA[0]);
@@ -3817,7 +3817,7 @@ extern "C" void fn_8027243C(_PLW* plw, u8 skill) {
     equip_record_copy(&saved[6], &plw->equipB);
     equip_record_copy(&saved[7], &plw->equipC);
     equip_record_copy(&saved[8], &plw->equipD);
-    fn_8027234C((u8*)&saved[0], skill);
+    equip_columns_tree_points_get((u8*)&saved[0], skill);
 }
 
 /* The signed skill value of the equipment slot `slot`, or 0 for the empty slot. */
@@ -3954,28 +3954,11 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
  * li r4, X; bl`), so they call it through this two-parameter view. */
 typedef void (*PlNetSend2)(struct _PLW* plw, s32 kind);
 
-/* The two equipment-slot records `fn_8027ED18`/`fn_8027E344` hand back.  Only this unit reads them, so they live
- * here (rule 1); each offset/width is the one its readers narrow to.  The `fn_8027ECAC` row, `PlSkillRec`, is
- * shared with `menu/menu_infomation.cpp` and lives in `Pl/fn_8027D684.h`.
- */
+/* The `equip_weapon_rec_get`/`equip_slot_rec_get` records (`PlWeaponRec`, `PlSlotRec`) and the `equip_blade_rec_get` row (`PlSkillRec`) are
+ * shared with `menu/menu_infomation.cpp` and live in `Pl/fn_8027D684.h`. */
 
-/* The weapon/skill record an equipment slot resolves to (the 0x24-byte sibling table). size: 0x24 */
-typedef struct PlWeaponRec {
-    /* +0x00 */ u8 pad_0x00[0x6];
-    /* +0x06 */ u8 bonus_0x06;   /* the mode-0 points `fn_80273B14` reads through `fn_8027E708` */
-    /* +0x07 */ s8 bonus_0x07;   /* the points `fn_80274E6C` accumulates */
-    /* +0x08 */ u8 pad_0x08[0x1];
-    /* +0x09 */ s8 bonus_0x09;   /* the points `fn_80275014` accumulates */
-    /* +0x0A */ s16 bonus_0x0A;  /* the bonus `fn_802751B4` scales by 1/100 */
-    /* +0x0C */ u8 pad_0x0C[0x6];
-    /* +0x12 */ s8 bonus_0x12;   /* the points `fn_80274370`/`fn_802744A0` add up */
-    /* +0x13 */ u8 pad_0x13[0x2];
-    /* +0x15 */ u8 bonus_flag_0x15; /* non-zero: a gun slot's bonus applies (`fn_8027FFFC`) */
-    /* +0x16 */ u8 pad_0x16[0xE];
-} PlWeaponRec; /* size: 0x24 */
-
-/* The per-slot record `fn_8027EE08` hands back through its second argument; `fn_80273B14` reads one
- * act-kind delta per slot out of it.  It is a different table from the `fn_8027E344` record below
+/* The per-slot record `fn_8027EE08` hands back through its second argument; `pl_weapon_stat_get` reads one
+ * act-kind delta per slot out of it.  It is a different table from the `equip_slot_rec_get` record (`PlSlotRec`)
  * (its +0x0A is a 2-byte value where that one's is a signed byte). size: 0x14 */
 typedef struct PlEquipSlot {
     /* +0x00 */ u8 pad_0x00[0xA];
@@ -3988,27 +3971,6 @@ typedef struct PlEquipSlot {
     /* +0x11 */ s8 value_0x11;
     /* +0x12 */ u8 pad_0x12[0x2];
 } PlEquipSlot; /* size: 0x14 */
-
-/* The per-slot record `fn_8027E344` hands back; `fn_80273ED8` sums one signed byte per act kind out
- * of it. size: 0x10 */
-typedef struct PlSlotRec {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u8 dye_mode;      /* 2: the piece can always be recoloured (`EnableChangeColor`) */
-    /* +0x05 */ u8 color_index;   /* the colour-table row `equip_color_index_get` hands back */
-    /* +0x06 */ u8 pad_0x06[0x2];
-    /* +0x08 */ s8 value_0x08;
-    /* +0x09 */ s8 value_0x09;
-    /* +0x0A */ s8 value_0x0A;
-    /* +0x0B */ s8 value_0x0B;
-    /* +0x0C */ s8 value_0x0C;
-    /* +0x0D */ u8 pad_0x0D[0x3];
-} PlSlotRec; /* size: 0x10 */
-
-/* An RGBA colour built byte by byte (red first, alpha last) and handed back as one register word. size: 0x4 */
-typedef union PlRgba {
-    /* +0x0 */ u8 channel[4];
-    /* +0x0 */ u32 word;
-} PlRgba; /* size: 0x4 */
 
 /* One 8-byte row of the act/motion pick table `Pl_decide_mot_get` walks (0x805C60A8, 11 rows: the
  * motion, its parameter and the two control words the row is gated on). size: 0x8 */
@@ -4029,7 +3991,7 @@ using ::_EQUIP;
 
 /* Sums the act-kind deltas of the three equipment slots; `mode` selects the delta column (0/6 and the 7..16 skill
  * tiers), `flag` the melee/ranged variant (`fn_80273ED8`/`fn_80274D98` wrap it). */
-extern "C" s32 fn_80273B14(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* equip0, struct _EQUIP* equip1,
+extern "C" s32 pl_weapon_stat_get(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out)
 {
     s16 value = 0;
@@ -4144,7 +4106,7 @@ extern "C" s32 fn_80273B14(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* e
     return value;
 }
 
-/* The single-slot wrapper of `fn_80273B14`: it hands the player's own melee/ranged slots on. */
+/* The single-slot wrapper of `pl_weapon_stat_get`: it hands the player's own melee/ranged slots on. */
 extern "C" s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag)
 {
     s32 value = 0;
@@ -4154,18 +4116,18 @@ extern "C" s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag)
             if (kind != 0) {
                 return 0;
             }
-            value = fn_80273B14(plw, kind, (u8)flag, &plw->equipB, &plw->equipC, &plw->equipD,
+            value = pl_weapon_stat_get(plw, kind, (u8)flag, &plw->equipB, &plw->equipC, &plw->equipD,
                                 (s8*)&plw->field_0x00E);
         } else {
             s32 n = 0;
             struct _EQUIP* slot = plw->equipA;
 
             do {
-                PlSlotRec* rec = (PlSlotRec*)fn_8027E344(slot);
+                PlSlotRec* rec = (PlSlotRec*)equip_slot_rec_get(slot);
 
                 switch (kind) {
                 case 0:
-                    value += fn_8027E510(slot);
+                    value += equip_defense_get(slot);
                     break;
                 case 1:
                     value += rec->value_0x08;
@@ -4188,7 +4150,7 @@ extern "C" s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag)
             } while (n < 6);
         }
     } else {
-        value = fn_80273B14(plw, kind, (u8)flag, &plw->equipB, &plw->equipC, &plw->equipD,
+        value = pl_weapon_stat_get(plw, kind, (u8)flag, &plw->equipB, &plw->equipC, &plw->equipD,
                             (s8*)&plw->field_0x00E);
     }
     return value;
@@ -4211,7 +4173,7 @@ extern "C" u8 fn_8027403C(u16 kind)
     }
 }
 
-/* Maps the player's act-state byte to the act kind `fn_80273B14` selects its delta column by. */
+/* Maps the player's act-state byte to the act kind `pl_weapon_stat_get` selects its delta column by. */
 extern "C" s32 fn_8027408C(struct _PLW* plw)
 {
     switch (plw->field_0x002) {
@@ -4237,7 +4199,7 @@ extern "C" void fn_802740EC(struct _PLW* plw)
 /* Re-reads the player's armed weapon record into the level/attack bytes at +0x56A/+0x56E. */
 extern "C" void fn_802740F4(struct _PLW* plw, struct _EQUIP* equip)
 {
-    PlSkillRec* rec = fn_8027ECAC(equip);
+    PlSkillRec* rec = equip_blade_rec_get(equip);
 
     plw->field_0x56A = rec->level_a;
     plw->field_0x56E = (s16)(rec->level_b * 0x32 + 0x96);
@@ -4315,7 +4277,7 @@ namespace s_80273B14 {
 
 /* Sums the points of the two weapon records the act is holding, then folds in the act-kind and
  * skill-tier deltas. */
-extern "C" s32 fn_80274370(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,
+extern "C" s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out)
 {
     s32 value;
@@ -4328,19 +4290,19 @@ extern "C" s32 fn_80274370(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUI
     case 10:
     case 14:
     case 15:
-        value = fn_8027ECAC(equip0)->value;
+        value = equip_blade_rec_get(equip0)->value;
         break;
     case 12:
     case 13:
-        value = ((PlWeaponRec*)fn_8027ED18(equip0))->bonus_0x12;
+        value = ((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x12;
         break;
     case 11:
-        value = ((PlWeaponRec*)fn_8027ED18(equip0))->bonus_0x12;
+        value = ((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x12;
         if (equip1 != NULL && equip1->kind == 12) {
-            value += ((PlWeaponRec*)fn_8027ED18(equip1))->bonus_0x12;
+            value += ((PlWeaponRec*)equip_weapon_rec_get(equip1))->bonus_0x12;
         }
         if (equip2 != NULL && equip2->kind == 13) {
-            value += ((PlWeaponRec*)fn_8027ED18(equip2))->bonus_0x12;
+            value += ((PlWeaponRec*)equip_weapon_rec_get(equip2))->bonus_0x12;
         }
         break;
     default:
@@ -4362,15 +4324,15 @@ extern "C" void fn_802744A0(struct _PLW* plw)
     case 10:
     case 14:
     case 15:
-        plw->field_0x570 = fn_8027ECAC(&plw->equipB)->value;
+        plw->field_0x570 = equip_blade_rec_get(&plw->equipB)->value;
         break;
     case 11:
-        plw->field_0x570 = ((PlWeaponRec*)fn_8027ED18(&plw->equipB))->bonus_0x12;
+        plw->field_0x570 = ((PlWeaponRec*)equip_weapon_rec_get(&plw->equipB))->bonus_0x12;
         if (plw->equipD.kind == 13) {
-            plw->field_0x570 += ((PlWeaponRec*)fn_8027ED18(&plw->equipD))->bonus_0x12;
+            plw->field_0x570 += ((PlWeaponRec*)equip_weapon_rec_get(&plw->equipD))->bonus_0x12;
         }
         if (plw->equipC.kind == 12) {
-            plw->field_0x570 += ((PlWeaponRec*)fn_8027ED18(&plw->equipC))->bonus_0x12;
+            plw->field_0x570 += ((PlWeaponRec*)equip_weapon_rec_get(&plw->equipC))->bonus_0x12;
         }
         break;
     default:
@@ -4575,10 +4537,10 @@ extern "C" s32 fn_80274988(struct _PLW* plw)
     if (fn_8026FE44(plw) == 0) {
         return 0;
     }
-    if (fn_8027FFFC(&plw->equipB) == 1U) {
+    if (equip_gun_bonus_ck(&plw->equipB) == 1U) {
         return 1;
     }
-    if (plw->equipC.kind == 12 && fn_8027FFFC(&plw->equipC) == 1U) {
+    if (plw->equipC.kind == 12 && equip_gun_bonus_ck(&plw->equipC) == 1U) {
         return 1;
     }
     return 0;
@@ -4592,13 +4554,13 @@ extern "C" s32 fn_80274A04(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind
     }
     if (equip0 != NULL) {
         if (equip0->kind == 11) {
-            if (fn_8027FFFC(equip0) == 1U) {
+            if (equip_gun_bonus_ck(equip0) == 1U) {
                 return 1;
             }
-            if (equip1 != NULL && equip1->kind == 12 && fn_8027FFFC(equip1) == 1U) {
+            if (equip1 != NULL && equip1->kind == 12 && equip_gun_bonus_ck(equip1) == 1U) {
                 return 1;
             }
-        } else if (equip0->kind == 12 && fn_8027FFFC(equip0) == 1U) {
+        } else if (equip0->kind == 12 && equip_gun_bonus_ck(equip0) == 1U) {
             return 1;
         }
     }
@@ -4643,18 +4605,18 @@ extern "C" u8 fn_80274B20(u16 id)
 }
 
 /* Sums the weapon/skill bonus records of the player's three weapon slots for the given act kind. */
-extern "C" s32 fn_80274B5C(struct _PLW* plw, u8 kind, struct _EQUIP* equip0, struct _EQUIP* equip1,
+extern "C" s32 pl_gun_clip_get(struct _PLW* plw, u8 kind, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out)
 {
     u8 value;
 
     *out = 0;
-    value = (u8)fn_8027F008(equip0, kind);
+    value = (u8)equip_gun_clip_get(equip0, kind);
     if (equip1 != NULL && equip1->kind == 12) {
-        value = (u8)(value + (u8)fn_8027F008(equip1, kind));
+        value = (u8)(value + (u8)equip_gun_clip_get(equip1, kind));
     }
     if (equip2 != NULL && equip2->kind == 13) {
-        value = (u8)(value + (u8)fn_8027F008(equip2, kind));
+        value = (u8)(value + (u8)equip_gun_clip_get(equip2, kind));
     }
     switch (kind) {
     case 0:
@@ -4729,10 +4691,10 @@ extern "C" s32 fn_80274B5C(struct _PLW* plw, u8 kind, struct _EQUIP* equip0, str
     return value;
 }
 
-/* The player-bound wrapper of `fn_80274B5C`. */
+/* The player-bound wrapper of `pl_gun_clip_get`. */
 extern "C" u8 fn_80274D98(struct _PLW* plw, u8 kind)
 {
-    return (u8)fn_80274B5C(plw, kind, &plw->equipB, &plw->equipC, &plw->equipD,
+    return (u8)pl_gun_clip_get(plw, kind, &plw->equipB, &plw->equipC, &plw->equipD,
                             (s8*)&plw->field_0x00E);
 }
 
@@ -4758,19 +4720,19 @@ extern "C" s32 fn_80274E00(struct _PLW* plw, u16 id)
 }
 
 /* Sums the weapon records' `bonus_0x07` column and folds the skill tiers in, clamped to 0..6. */
-extern "C" u8 fn_80274E6C(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
+extern "C" u8 pl_gun_recoil_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
 {
     s32 value = 0;
 
     *out = 0;
     if (equip0 != NULL && equip0->kind == 11) {
-        value = ((PlWeaponRec*)fn_8027ED18(equip0))->bonus_0x07;
+        value = ((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x07;
         if (value == 0) {
             value = 1;
         }
     }
     if (equip1 != NULL && equip1->kind == 13) {
-        value += ((PlWeaponRec*)fn_8027ED18(equip1))->bonus_0x07;
+        value += ((PlWeaponRec*)equip_weapon_rec_get(equip1))->bonus_0x07;
     }
     if (plw != NULL) {
         if (Pl_Skill_ck(plw, 0x2D) == 1U) {
@@ -4804,16 +4766,16 @@ extern "C" u8 fn_80274E6C(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP
 }
 
 /* Sums the weapon records' `bonus_0x09` column plus a fixed 3, clamped to 0..9. */
-extern "C" u8 fn_80275014(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
+extern "C" u8 pl_gun_reload_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
 {
     s32 value = 0;
 
     *out = 0;
     if (equip0 != NULL && equip0->kind == 11) {
-        value = ((PlWeaponRec*)fn_8027ED18(equip0))->bonus_0x09;
+        value = ((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x09;
     }
     if (equip1 != NULL && equip1->kind == 13) {
-        value += ((PlWeaponRec*)fn_8027ED18(equip1))->bonus_0x09;
+        value += ((PlWeaponRec*)equip_weapon_rec_get(equip1))->bonus_0x09;
     }
     if (plw != NULL) {
         if (Pl_Skill_ck(plw, 0x27) == 1U) {
@@ -4848,20 +4810,20 @@ extern "C" u8 fn_80275014(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP
 }
 
 /* The two weapon records' elemental bonus product, scaled by 1/100. */
-extern "C" f32 fn_802751B4(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
+extern "C" f32 pl_gun_deviation_get(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
 {
     f32 value = lbl_8079A000;
 
     *out = 0;
     if (equip0 != NULL) {
         if (equip0->kind == 11) {
-            value = (f32)((PlWeaponRec*)fn_8027ED18(equip0))->bonus_0x0A;
+            value = (f32)((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x0A;
         }
         if (equip1 != NULL && equip1->kind == 12) {
-            value = value * (f32)((PlWeaponRec*)fn_8027ED18(equip1))->bonus_0x0A / lbl_8079A044;
+            value = value * (f32)((PlWeaponRec*)equip_weapon_rec_get(equip1))->bonus_0x0A / lbl_8079A044;
         }
     } else if (equip1 != NULL && equip1->kind == 12) {
-        value = (f32)((PlWeaponRec*)fn_8027ED18(equip1))->bonus_0x0A;
+        value = (f32)((PlWeaponRec*)equip_weapon_rec_get(equip1))->bonus_0x0A;
     }
     return value / lbl_8079A044;
 }
@@ -5699,8 +5661,8 @@ extern "C" u8 fn_80274B20(u16);
 extern "C" s16 fn_80272CC8(_PLW*, u8);
 extern "C" u8 fn_80274D98(_PLW*, u8);
 extern "C" u32 fn_8028732C(_PLW*);
-extern "C" u8* fn_8027ED18(void*);
-extern "C" u8* fn_80279360(u8*, u8);
+extern "C" u8* equip_weapon_rec_get(void*);
+extern "C" u8* gun_ammo_entry_find(u8*, u8);
 
 extern "C" { extern const f32 lbl_8079A088; }
 extern "C" { extern const f32 lbl_8079A08C; }
@@ -6510,13 +6472,13 @@ extern "C" s32 fn_8027A4EC(_PLW* self)
 /* 0x80279414: looks the given id up in the actor's two reaction tables. */
 extern "C" u8* fn_80279414(_PLW* self, u8 arg1)
 {
-    u8* p = fn_80279360(fn_8027ED18((u8*)self + 464), arg1);
+    u8* p = gun_ammo_entry_find(equip_weapon_rec_get((u8*)self + 464), arg1);
     if (p != 0) {
         return p;
     }
     u8 n = ((u8*)&self->equipC)[0];
     if (n == 12) {
-        u8* q = fn_80279360(fn_8027ED18((&self->equipC)), arg1);
+        u8* q = gun_ammo_entry_find(equip_weapon_rec_get((&self->equipC)), arg1);
         if (q != 0) {
             return q;
         }
@@ -6525,7 +6487,7 @@ extern "C" u8* fn_80279414(_PLW* self, u8 arg1)
 }
 
 /* 0x80279360: finds the reaction-table entry the given motion id maps to. */
-extern "C" u8* fn_80279360(u8* self, u8 arg1)
+extern "C" u8* gun_ammo_entry_find(u8* self, u8 arg1)
 {
     for (s32 i = 0; i < 4; i++) {
         u8 idx = self[0x18 + i];
@@ -6916,7 +6878,7 @@ extern "C" s32 fn_80278590(_PLW* self)
     if (fn_8026FE44(self) == 1) {
         return 0;
     }
-    s16* t = (s16*)(lbl_805BFFA8[self->field_0x002]
+    s16* t = (s16*)(pl_sharpness_tbl[self->field_0x002]
                     + ((*((u8*)self + 0x56A) * 7) << 1));
     s16 v = *((s16*)self + 0x2B6);
     if (v <= t[0]) {
@@ -7022,11 +6984,11 @@ extern "C" u32 pl_carry_item_get(_PLW* self)
 /* 0x80279670: the shell multiplier adjustment the two shell tables give. */
 f32 Get_Shell_rate_adj(_PLW* self, u8 arg1)
 {
-    using s_80276B58::fn_8027ED18; using s_80276B58::lbl_8079A0D0;
-    s16 raw = ((PlWeaponRec*)fn_8027ED18(&self->equipB))->bonus_0x0A;
+    using s_80276B58::equip_weapon_rec_get; using s_80276B58::lbl_8079A0D0;
+    s16 raw = ((PlWeaponRec*)equip_weapon_rec_get(&self->equipB))->bonus_0x0A;
     f32 v = (f32)raw;
     if (((u8*)&self->equipC)[0] == 12) {
-        raw = ((PlWeaponRec*)fn_8027ED18(&self->equipC))->bonus_0x0A;
+        raw = ((PlWeaponRec*)equip_weapon_rec_get(&self->equipC))->bonus_0x0A;
         v = v * (f32)raw / lbl_8079A0D0;
     }
     return v / lbl_8079A0D0;
@@ -8054,9 +8016,9 @@ extern "C" s32 fn_802791FC(_PLW* self, u8 arg1)
         return 1;
     }
     s32 a = *(u8*)(lbl_805BF538 + 1 + arg1 * 4);
-    s32 b = *(u8*)(fn_8027ED18(&self->equipB) + 9);
+    s32 b = *(u8*)(equip_weapon_rec_get(&self->equipB) + 9);
     if (((u8*)&self->equipD)[0] == 0xD) {
-        b += *(u8*)(fn_8027ED18(&self->equipD) + 9);
+        b += *(u8*)(equip_weapon_rec_get(&self->equipD) + 9);
     }
     if (Pl_Skill_ck(self, 0x27) == 1) {
         b = (s16)(b + 2);
@@ -8091,13 +8053,13 @@ extern "C" { extern u8 lbl_80792150; }
 /* 0x80279720: the shell "bure" type (0/1/2) the actor's equipped shell and its skills resolve to. */
 u32 Get_Shell_bure_type(_PLW* self, u8 arg1)
 {
-    using s_80276B58::fn_8027ED18; using s_80276B58::lbl_805C6100; using s_80276B58::lbl_80792150;
-    u8* t31 = lbl_805BFCD8 + *(u8*)(fn_8027ED18(&self->equipB) + 0x10) * 2;
+    using s_80276B58::equip_weapon_rec_get; using s_80276B58::lbl_805C6100; using s_80276B58::lbl_80792150;
+    u8* t31 = lbl_805BFCD8 + *(u8*)(equip_weapon_rec_get(&self->equipB) + 0x10) * 2;
     s32 v29 = t31[1];
     v29 += *(s8*)(lbl_805BF538 + 3 + arg1 * 4);
     s32 r29;
     if (((u8*)&self->equipC)[0] == 0xC) {
-        v29 -= (&lbl_80792150)[*(u8*)(fn_8027ED18(&self->equipC) + 0x10)];
+        v29 -= (&lbl_80792150)[*(u8*)(equip_weapon_rec_get(&self->equipC) + 0x10)];
     }
     if ((s8)v29 <= 5) {
         r29 = 0;
@@ -8145,9 +8107,9 @@ extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
     }
     s32 b = 0;
     if (fn_80279414(self, arg1) == 0) {
-        b = *(u8*)(fn_8027ED18(&self->equipB) + 7);
+        b = *(u8*)(equip_weapon_rec_get(&self->equipB) + 7);
         if (((u8*)&self->equipD)[0] == 0xD) {
-            b += *(u8*)(fn_8027ED18(&self->equipD) + 7);
+            b += *(u8*)(equip_weapon_rec_get(&self->equipD) + 7);
         }
         if (Pl_Skill_ck(self, 0x2D) == 1) {
             b += 2;
@@ -9308,7 +9270,7 @@ namespace s_8027D684 {
 
 extern "C" s32 equip_kind_table_class(u8 kind);
 extern "C" u8 fn_8027E290(u8 kind);
-extern "C" u8 fn_8027E29C(s32 kind);
+extern "C" u8 weapon_class_index(s32 kind);
 
 /* The 1-based kind's 0x18-byte equipment row (the row stride is the `mulli r0,r0,24` in retail). */
 extern "C" void* fn_8027E2A8(u8 kind, u16 index) {
@@ -9339,13 +9301,13 @@ extern "C" void* fn_8027E354(u8 kind, u16 index) {
 /* The 7-based kind's 0x18-byte row of the fifth table (no kind guard, unlike the 1-based pair). */
 extern "C" void* fn_8027EC50(u8 kind, u16 index) {
     u8** base = lbl_806AB810[4];
-    return base[fn_8027E29C(kind)] + index * 0x18;
+    return base[weapon_class_index(kind)] + index * 0x18;
 }
 
 /* The sibling 0x24-byte row of the same table. */
 extern "C" void* fn_8027ECBC(u8 kind, u16 index) {
     u8** base = lbl_806AB810[4];
-    return base[fn_8027E29C(kind)] + index * 0x24;
+    return base[weapon_class_index(kind)] + index * 0x24;
 }
 
 /* In-unit callees referenced before their own definition (this TU is their owner). */
@@ -9664,12 +9626,12 @@ extern "C" u8 fn_8027E290(u8 kind) {
 }
 
 /* The same one-based kind, for the seven-kind table. */
-extern "C" u8 fn_8027E29C(s32 kind) {
+extern "C" u8 weapon_class_index(s32 kind) {
     return kind - 7;
 }
 
 /* Looks up the 0x18-byte equipment row an `_EQUIP` record names. */
-extern "C" void* fn_8027E344(_EQUIP* equip) {
+extern "C" void* equip_slot_rec_get(_EQUIP* equip) {
     return fn_8027E2A8(equip->kind, equip->item_id);
 }
 
@@ -9679,34 +9641,34 @@ extern "C" void* fn_8027E3F4(_EQUIP* equip) {
 }
 
 /* The `_EQUIP` -> data-row lookup the table helper and the sound unit share. */
-extern "C" PlSkillRec* fn_8027ECAC(_EQUIP* equip) {
+extern "C" PlSkillRec* equip_blade_rec_get(_EQUIP* equip) {
     return (PlSkillRec*)fn_8027EC50(equip->kind, equip->item_id);
 }
 
 /* The `_EQUIP` -> item lookup the four Pl consumers share. */
-extern "C" void* fn_8027ED18(void* equip) {
+extern "C" void* equip_weapon_rec_get(void* equip) {
     _EQUIP* e = (_EQUIP*)equip;
     return fn_8027ECBC(e->kind, e->item_id);
 }
 
-/* The three-argument sibling of `fn_8027ED18`. */
+/* The three-argument sibling of `equip_weapon_rec_get`. */
 extern "C" void* fn_8027EE08(_EQUIP* equip, u32 arg2, u32 arg3) {
     return fn_8027ED6C(equip->kind, equip->item_id, arg2, arg3);
 }
 
 /* The `_EQUIP` -> row lookup that also passes the decoration count. */
-extern "C" void* fn_8027FC70(_EQUIP* equip) {
+extern "C" void* equip_level_cap_get(_EQUIP* equip) {
     return fn_8027FB84(equip->kind, equip->item_id, equip->deco_count);
 }
 
 /* The last `_EQUIP` -> row lookup of the family. */
-extern "C" void* fn_8027FF20(_EQUIP* equip) {
+extern "C" void* gun_frame_level_cap_get(_EQUIP* equip) {
     return fn_8027FE50(equip->kind, equip->item_id);
 }
 
 /* 0x8027E708 (0x24): the +0x06 bonus byte of the weapon record the slot resolves to. */
 extern "C" s32 fn_8027E708(_EQUIP* equip) {
-    return ((PlWeaponRec*)fn_8027ED18(equip))->bonus_0x06;
+    return ((PlWeaponRec*)equip_weapon_rec_get(equip))->bonus_0x06;
 }
 
 /* 0x8027E72C (0x48): the `index`-th 3-byte row of the equipment colour table as an opaque RGBA word. */
@@ -9733,7 +9695,7 @@ extern "C" s32 armor_color_rgba_get(u8 index) {
 
 /* 0x8027E7BC (0x34): the colour-table index the slot's kind row stores (0 when the row is absent). */
 extern "C" u8 equip_color_index_get(_EQUIP* equip) {
-    PlSlotRec* rec = (PlSlotRec*)fn_8027E344(equip);
+    PlSlotRec* rec = (PlSlotRec*)equip_slot_rec_get(equip);
 
     if (rec != NULL) {
         return rec->color_index;
@@ -9776,11 +9738,11 @@ extern "C" u8 item_species_class_get(u16 id) {
 }
 
 /* 0x8027FFFC (0x54): whether a gun slot (kind 11 or 12) resolves to a weapon record with its +0x15 flag set. */
-extern "C" u32 fn_8027FFFC(_EQUIP* equip) {
+extern "C" u32 equip_gun_bonus_ck(_EQUIP* equip) {
     if (equip->kind != 11 && equip->kind != 12) {
         return 0;
     }
-    if (((PlWeaponRec*)fn_8027ED18(equip))->bonus_flag_0x15 != 0) {
+    if (((PlWeaponRec*)equip_weapon_rec_get(equip))->bonus_flag_0x15 != 0) {
         return 1;
     }
     return 0;
@@ -9821,7 +9783,7 @@ extern "C" s32 fn_8027E918(u8 kind) {
             count = lbl_805706C0[fn_8027E290(kind)];
         }
     } else {
-        count = lbl_805706D8[fn_8027E29C(kind)];
+        count = lbl_805706D8[weapon_class_index(kind)];
     }
     return count;
 }
@@ -9829,7 +9791,7 @@ extern "C" s32 fn_8027E918(u8 kind) {
 
 /* 0x8027E7F0 (0x50): whether the piece may be recoloured - its kind row's dye mode 2, otherwise the level-cap test. */
 u32 EnableChangeColor(_EQUIP* equip) {
-    PlSlotRec* rec = (PlSlotRec*)s_8027D684::fn_8027E344(equip);
+    PlSlotRec* rec = (PlSlotRec*)s_8027D684::equip_slot_rec_get(equip);
 
     if (rec != NULL && rec->dye_mode == 2) {
         return 1;

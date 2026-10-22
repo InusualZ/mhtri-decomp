@@ -79,15 +79,15 @@ s32 fn_80274AEC(u8 kind);
 
 /* The equipment-slot resolvers of `Pl/pl_act.cpp`'s equipment section (0x8027D684-0x802840DC), with their
  * definitions' signatures. */
-void* fn_8027E344(struct _EQUIP* equip);
-s32 fn_8027E510(void* slot);
+void* equip_slot_rec_get(struct _EQUIP* equip);
+s32 equip_defense_get(void* slot);
 s16 fn_8027E5E4(struct _EQUIP* equip);
 s32 fn_8027E708(struct _EQUIP* equip);
-void* fn_8027ED18(void* equip);
+void* equip_weapon_rec_get(void* equip);
 void fn_8027ED28(struct _EQUIP* equip);
 void* fn_8027EE08(struct _EQUIP* equip, u32 arg2, u32 arg3);
-s32 fn_8027F008(struct _EQUIP* equip, u8 kind);
-u32 fn_8027FFFC(struct _EQUIP* equip);
+s32 equip_gun_clip_get(struct _EQUIP* equip, u8 kind);
+u32 equip_gun_bonus_ck(struct _EQUIP* equip);
 
 /* 0x80274B20 / 0x80274D98 / 0x80274DCC / 0x80274E00 - the act-id and bonus-sum helpers. */
 u8 fn_80274B20(u16 id);
@@ -123,9 +123,9 @@ void* fn_80274850(struct _PLW* plw);
 u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index);
 
 /* 0x80274E6C / 0x80275014 / 0x802751B4 - the three weapon-record bonus sums. */
-u8 fn_80274E6C(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
-u8 fn_80275014(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
-f32 fn_802751B4(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
+u8 pl_gun_recoil_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
+u8 pl_gun_reload_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
+f32 pl_gun_deviation_get(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
 
 /* 0x802752C8 / 0x80275394 - the act-id and act-state pair predicates.  `Pl_item_id_usable_ck`'s second
  * argument is never read by its body, but every retail call site passes it (0 in `quest/quest_entry.cpp`, 1 in
@@ -140,7 +140,7 @@ u8 fn_8027403C(u16 kind);
 s32 fn_8027408C(struct _PLW* plw);
 void fn_802740EC(struct _PLW* plw);
 s16 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out);
-s32 fn_80274370(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,
+s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 s32 fn_80274570(struct _PLW* plw);
 void fn_80274584(s8 value);
@@ -148,11 +148,11 @@ s32 fn_80274624(struct _PLW* plw);
 s32 fn_80274904(struct _PLW* plw);
 s32 fn_80274988(struct _PLW* plw);
 s32 fn_80274A04(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind);
-s32 fn_80274B5C(struct _PLW* plw, u8 kind, struct _EQUIP* equip0, struct _EQUIP* equip1,
+s32 pl_gun_clip_get(struct _PLW* plw, u8 kind, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 
 /* 0x80273B14 - the act-kind delta sum. */
-s32 fn_80273B14(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* equip0, struct _EQUIP* equip1,
+s32 pl_weapon_stat_get(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 #ifdef __cplusplus
 }

@@ -7,7 +7,7 @@
  *   (0x80297E34-0x8029F3C8) is the tail of the old Pl hit/land band, whose head is `Pl/pl_coll.cpp`.
  * FLAGS. `cflags_menu` (configure.py: the lib's `-opt nopeephole`, which makes the old `#pragma peephole off`
  *   redundant).  The Pl tail's functions compile instruction-identical under Wii/1.0 and Wii/1.3; the menu half needs 1.3.
- *   The range keeps `bl`s to its tiny same-file helpers (`GetItemData` from `fn_8029F704`/`item_category_ck`,
+ *   The range keeps `bl`s to its tiny same-file helpers (`GetItemData` from `item_rare_color_get`/`item_category_ck`,
  *   `hit_flag_set` from `hit_motion_set`): `cflags_main`'s `-inline noauto`.
  * NAMES. Module and file from the `__FILE__` string `lbl_805CDFC8` = "menu_item.cpp", passed by every
  *   `nw4r::db::Panic` of the range (the dump's `_802a22a4s_menu_item.cpp_805cdfc8`, emitted by 0x802A22A4).  The runtime
@@ -1203,7 +1203,7 @@ ItemDataRecord* GetItemData(u16 id)
 }
 
 /* 0x8029F704: the colour the item's +0x05 kind selects. */
-extern "C" u32 fn_8029F704(u16 id)
+extern "C" u32 item_rare_color_get(u16 id)
 {
     return lbl_805CDE78[GetItemData(id)->kind];
 }

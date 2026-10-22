@@ -56,7 +56,7 @@ extern "C" {
 u8 equip_kind_table_class(u8 id);
 void* fn_8027EC50(u8 id, u16 sel);
 void* fn_8027E2A8(u8 id, u16 sel);
-void* fn_8027E344(u8 id);
+void* equip_slot_rec_get(u8 id);
 u8 item_species_class_get(u16 id);
 }
 
@@ -388,7 +388,7 @@ s32 fn_80217DAC(s32 a, s32 b)
 
 s32 lb_item_flags_ck(s32 a, s32 bits)
 {
-    return (((LbItemFlags*)fn_8027E344(a))->flags_0x06 & (u8)bits) == (u8)bits;
+    return (((LbItemFlags*)equip_slot_rec_get(a))->flags_0x06 & (u8)bits) == (u8)bits;
 }
 
 s32 lb_equip_flags_ck(s32 a, s32 b, s32 bits)

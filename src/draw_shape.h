@@ -59,10 +59,25 @@ void menu_tex_load(void);
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* 0x80055E48 - the resource arena index `set_arena_idx` selected (0 the common packs).  GUESS name. */
+u8 arena_idx_get(void);
 /* 0x80052760 - resets the shape draw queue (the system core's full reset). */
 void draw_shape_reset(void);
+/* 0x80053994 / 0x80053FF4 - the shape's per-vertex colour array, and the offset and scale its vertices are drawn
+ * with (added with `menu/menu_infomation.cpp`'s sharpness bar). */
+void drawshape_set_color_array(const u32* colors);
+void drawshape_set_scale_ivec2(const s16* offset, const f32* scale);
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+struct _mh_ivec2_;
+struct _mh_tex_uv_;
+/* 0x80053860 / 0x80053ACC - the shape's vertex array and its texture with one uv per vertex (C++ scope: the map
+ * rows are `drawshape_set_vertex_array__FPC10_mh_ivec2_` and `drawshape_set_texture_array__FUsPC11_mh_tex_uv_`). */
+void drawshape_set_vertex_array(const _mh_ivec2_* verts);
+void drawshape_set_texture_array(u16 tex_id, const _mh_tex_uv_* uvs);
 #endif
 
 #endif /* MHTRI_DRAW_SHAPE_H */

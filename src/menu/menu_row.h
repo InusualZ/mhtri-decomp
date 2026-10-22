@@ -26,11 +26,20 @@ extern "C" {
  * monster has none: an 8-byte forward to the HUD layout's 0x802E1978.  GUESS name. */
 s8 menu_row_monster_index_get(u8 monster);
 
+/* 0x8034CD6C - files a help record `src` for the box of layout sprite `id` at `pos` (`place_rec_alloc_spr`).  Added with
+ * `menu/menu_infomation.cpp`'s skill rows. */
+void place_rec_alloc_idx(const PlaceRec* src, u16 id, const struct _mh_ivec2_* pos, s16 a, s16 b);
+
 /* 0x8034CC2C - files a help record `src` for the screen rectangle (`x`, `y`, `width`, `height`). */
 u8 place_rec_alloc(const PlaceRec* src, s16 x, s16 y, s16 width, s16 height, s16 a, s16 b);
 /* 0x8034D200 / 0x8034D284 - fill a help record of kind 6 (a trade) / kind 9 (a course).  GUESS names. */
 s32 place_rec_trade_set(PlaceRec* rec, u16 source, u16 item, u16 count, u16 cost, u16 cost_count);
 s32 place_rec_course_set(PlaceRec* rec, u16 course);
+/* 0x8034D258 - fill a help record of kind 8 (a skill; added with `menu/menu_infomation.cpp`'s skill panels).  GUESS
+ * name. */
+s32 place_rec_skill_set(PlaceRec* rec, u16 skill);
+/* 0x8034D22C - fill a help record of kind 7 (a skill tree; added with `menu/menu_infomation.cpp`'s skill rows). */
+s32 menu_row_rec_init(PlaceRec* rec, u16 tree);
 
 #ifdef __cplusplus
 }

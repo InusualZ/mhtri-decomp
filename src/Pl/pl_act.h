@@ -10,6 +10,7 @@
 #include "nw4r/math.h"
 
 struct _PLW;
+struct _EQUIP;
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +27,10 @@ void pl_parts_color_set(struct _PLW* plw, u8 idx, s32 val);
 void fn_802754B4(struct _PLW* plw);
 /* 0x8027EB18 (0x18): the string-table name of item kind `kind` (kind 85 and up read as 0). */
 u32 item_kind_name_get(u8 kind);
+/* 0x8027EB30 (0x18): the system string table's name of active skill `id`. */
+u32 skill_name_get(u16 id);
+/* 0x8027E840 (0x4C): a dyeable piece's own colour (its RGB565 word at +0x04) as an opaque RGBA word. */
+s32 equip_custom_color_rgba_get(struct _EQUIP* equip);
 /* 0x8027F0F4 (0x28): the class byte (+0x00) of the species record `id` selects. */
 u8 item_species_class_get(u16 id);
 u32 fn_8027E120(struct _PLW* worker);

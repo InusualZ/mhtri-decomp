@@ -25,7 +25,7 @@ extern MealSkill meal_skill_tbl[52];
 extern u16 lbl_805C0198[];
 extern u16 lbl_805C01B8[];
 extern u8 lbl_805C01C8[];
-extern u8* lbl_805BFFA8[];
+extern u8* pl_sharpness_tbl[];
 extern u32 lbl_805BF448[];
 extern u32 lbl_805BF46C[];
 extern u8 lbl_805BF5E0[];
