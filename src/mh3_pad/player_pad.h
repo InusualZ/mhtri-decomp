@@ -29,7 +29,11 @@ typedef struct PadButtons {
     /* +0x0C */ u16 trigger_0x0C;    /* GUESS name: the shoulder-trigger word `menu_cursor_step_fixed_tail` pages with */
     /* +0x0E */ u8 pad_0x0E[0x6];
     /* +0x14 */ u16 held_0x14;       /* the auto-repeat word, ORed with `pressed_0x04` for cursor steps */
-    /* +0x16 */ u8 pad_0x16[0x5E];
+    /* +0x16 */ u8 pad_0x16[0x7];
+    /* +0x1D */ u8 edge_0x1D;        /* GUESS name: a button-edge byte the menu pad copy masks with `edge_off_0x1E` */
+    /* +0x1E */ u8 edge_off_0x1E;    /* GUESS name: the bits cleared from `edge_0x1D` */
+    /* +0x1F */ u8 edge_on_0x1F;     /* GUESS name: the bits ORed in (`menu/menu_item.cpp`'s pad copy) */
+    /* +0x20 */ u8 pad_0x20[0x54];
 } PadButtons; /* size: 0x74 (approximate: even, so the struct's 2-byte alignment leaves PlayerPad's +0x335 in place) */
 
 typedef struct PlayerPad {

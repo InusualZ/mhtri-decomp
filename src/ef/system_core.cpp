@@ -67,6 +67,7 @@
 #include "OS/OSCache.h" /* DCFlushRange */
 #include "MSL_C/string.h" /* strcpy */
 #include "MSL/strlen.h" /* strlen */
+#include "ef/sys_quest_move.h" /* SysQuestMove */
 #include "menu/movie.h" /* fn_8043F088 */
 #include "sound/fn_800E3CBC.h" /* prim_init_all, fn_800E3DE0 */
 #include "ef/eft_res.h" /* eft_res_release_all, fn_800F6520 */
@@ -311,14 +312,6 @@ u8 PlayMode_ck(void);
 void all_reset(void);
 void system_w_clr(void);
 
-/* The quest move work (`get_move_work_adrs(0)`), as far as the system core reads it.  size: 0x114 (lower bound,
- * an approximation) */
-typedef struct SysQuestMove {
-    /* +0x000 */ u8 unused_0x000[0xFA];
-    /* +0x0FA */ u8 result_0x0FA;    /* 7 ends the quest with its result */
-    /* +0x0FB */ u8 unused_0x0FB[0x113 - 0x0FB];
-    /* +0x113 */ u8 state_0x113;     /* 1 while the quest's sub-state machine runs */
-} SysQuestMove;
 extern "C" void fn_800CFC64(void);
 
 extern "C" s32 fn_800D02C0(TPLPalette* pal, SysTask* slot);

@@ -53,7 +53,7 @@ void fn_80218138(void* self);
  * their rule-2 home). */
 u8 fn_8027E290(u8 kind);
 u8 weapon_class_index(u8 kind);
-u32 fn_8026FE44(struct _PLW* plw);
+u32 pl_item_page2_ck(struct _PLW* plw);
 s32 Gunner_opt_ok_ck(_EQUIP* equip);
 
 /* Unsplittable callees whose bracketing registered units name different modules (rule 2's named gap:
@@ -187,7 +187,7 @@ extern "C" void fn_80219340(LbEquipWork* self, _EQUIP* src, s32 page) {
         memcpy(a, src, 12);
         break;
     default:
-        if (fn_8026FE44(plw) == 1) {
+        if (pl_item_page2_ck(plw) == 1) {
             switch (src->kind) {
             case 11:
                 memcpy(a, src, 12);
@@ -259,12 +259,12 @@ extern "C" _EQUIP* fn_80219260(LbEquipWork* self, s32 kind) {
     case 15:
         return &self->plw_0x34->equipB;
     case 12:
-        if (fn_8026FE44(self->plw_0x34) == 1) {
+        if (pl_item_page2_ck(self->plw_0x34) == 1) {
             return &self->plw_0x34->equipC;
         }
         return &self->plw_0x34->equipB;
     case 13:
-        if (fn_8026FE44(self->plw_0x34) == 1) {
+        if (pl_item_page2_ck(self->plw_0x34) == 1) {
             return &self->plw_0x34->equipD;
         }
         return &self->plw_0x34->equipB;

@@ -132,7 +132,7 @@ f32 pl_gun_deviation_get(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
  * `enemy/em_pop.cpp`, 2 in `ai/fn_802D44F4.cpp`), so the declaration carries it.  The parameter's NAME is a GUESS:
  * the sites' 0/1/2 are the only evidence for it, and the body's own masks are 1/2/0x10. */
 u32 Pl_item_id_usable_ck(u16 id, s32 mode);
-s32 fn_80275394(struct _PLW* plw);
+s32 pl_act_menu_lock_ck(struct _PLW* plw);
 
 /* 0x8027403C / 0x8027408C / 0x802740EC / 0x80274174 / 0x80274370 / 0x80274570 / 0x80274584 /
  * 0x80274624 / 0x80274904 / 0x80274988 / 0x80274A04 / 0x80274B5C - the section's other entry points. */

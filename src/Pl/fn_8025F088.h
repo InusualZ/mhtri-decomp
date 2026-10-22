@@ -62,7 +62,7 @@ u32 pl_rig_model_move(void* physics);
 u32 fn_80262940(struct _PLW* self);
 u32 fn_802657F8(struct _PLW* self);
 u32 fn_8026F7B4(void);
-u32 fn_8026FE44(struct _PLW* self);
+u32 pl_item_page2_ck(struct _PLW* self);
 u32 fn_8027035C(struct _PLW* self);
 u32 fn_80270728(struct _PLW* self);
 u32 fn_80270CA4(struct _PLW* self);

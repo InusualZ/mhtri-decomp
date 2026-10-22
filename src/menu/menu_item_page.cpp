@@ -26,7 +26,7 @@
  *   link input.
  * SHAPES. The `MenuRowData` record declares `kind` `s32`: retail's `switch (data->kind)` is a signed binary search; `u32`
  *   gives an unsigned linear chain.
- *  - `item_page_item_price`, `userdata_item_count_total`, `item_count_find`, `item_slots_count_sum` and `fn_8026FE44` are `u32` in this unit's
+ *  - `item_page_item_price`, `userdata_item_count_total`, `item_count_find`, `item_slots_count_sum` and `pl_item_page2_ck` are `u32` in this unit's
  *    view (retail masks none of those results), and the price is two statements (`base = Pl_item_timer_get(worker, id);
  *    base += item_slots_count_sum(...);`) so the worker call comes first.
  */
@@ -345,7 +345,7 @@ extern "C" u32 item_page_item_price(MenuSlot* slot, u16 id)
     }
     base = Pl_item_timer_get(worker, id);
     base += item_slots_count_sum(id, (void*)&lobby_world_block->field_0x0180, userdata_box_capacity((void*)lobby_world_block));
-    if (fn_8026FE44(worker) == 1) {
+    if (pl_item_page2_ck(worker) == 1) {
         return base + item_count_find(id, userdata_pouch_get((void*)lobby_world_block, 0), userdata_pouch_size(0));
     }
     return base + item_count_find(id, userdata_pouch_get((void*)lobby_world_block, 1), userdata_pouch_size(1));

@@ -358,7 +358,7 @@ struct _PLW {
     /* +0x26B */ u8 unk26B;
     /* +0x26C */ u8 held_item_kind_0x26C;   /* the held item's kind `fn_80279B84` derives from its item id (GUESS) */
     /* +0x26D */ u8 unk26D;
-    /* +0x26E */ u16 unk26E;
+    /* +0x26E */ u16 item_slot_sel;   /* the selected item slot; 0x80 marks the second page (`menu/menu_item.cpp`) */
     /* +0x270 */ s16 unk270;
     /* +0x272 */ s16 unk272;
     /* +0x274 */ u8 unk274;

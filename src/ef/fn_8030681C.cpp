@@ -3,7 +3,7 @@
  * RANGE. .text 0x8030681C-0x80308FB4 (26 functions); extab 0x80015AB4-0x80015B54, extabindex 0x80034674-0x80034764,
  *   .data 0x805DC5E8-0x805DCC50, .sdata 0x80792B78-0x80792BB8, .sdata2 0x8079ADE0-0x8079AE30.  Right edge: the
  *   one-copy `"menu_infomation.cpp"` string (`str_menu_infomation_cpp`) is referenced only from 0x8030A328 up, so every body
- *   from 0x80308FB4 belongs to `menu/menu_infomation.cpp`; `fn_80308EC0`/`fn_80308F1C` read that unit's
+ *   from 0x80308FB4 belongs to `menu/menu_infomation.cpp`; `menu_status_page_open`/`menu_status_page_step` read that unit's
  *   `StatusScreenWork` and call its `menu_equip_page_count`.
  * NAMES. `eft042_set2` is the runtime dump's own name (the family's spawner); `eft_spawn_type_at_area` is a GUESS
  *   (from its body); the map has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
@@ -11,7 +11,7 @@
  *   `jumptable_805DCB68`), 0x80307E44-0x803088FC (`fn_80307E44`, kind-0 state-1), 0x80308A30-0x80308D00
  *   (`fn_80308A30`, kind-2 state-1; it needs the `nw4r::g3d::ScnMdl::CopiedMatAccess` class views).
  *   18 partial rows, including:
- *  - `fn_8030681C`, `fn_803088FC`, `fn_80308F1C`: ours call `get_now_mapno`, `eft004_set`, `rotLocalMatX`,
+ *  - `fn_8030681C`, `fn_803088FC`, `menu_status_page_step`: ours call `get_now_mapno`, `eft004_set`, `rotLocalMatX`,
  *    `rotLocalMatY` and `sysSE_req` by their plain names where retail calls the manglings (`get_now_mapno__Fv`,
  *    `eft004_set__FUcPQ34nw4r4math4VEC3fUlUc`, `rotLocalMatX__FUlPQ34nw4r4math5MTX34`, `sysSE_req__Fl`, ...);
  *    `fn_8030681C` also has a 0x50 frame against retail's 0x60 (retail keeps `f31` live for `lbl_8079ADE8`);
@@ -59,7 +59,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "menu/menu_infomation.h"
 
-/* The screen work record this range's tail reads (`fn_80308EC0`/`fn_80308F1C`) and the page count
+/* The screen work record this range's tail reads (`menu_status_page_open`/`menu_status_page_step`) and the page count
  * they arm it from (`menu_equip_page_count`) live with their owner, `menu/menu_infomation.cpp`'s header: the
  * two screen bodies below the seam are all this unit needs from that unit.  The `EquipListWork`
  * record moved with `equip_list_page_count`, its only reader.
@@ -194,8 +194,8 @@ extern "C" void fn_80308A30(_EFT* self);
 extern "C" void fn_80308D00(_EFT* self);
 extern "C" void fn_80308E34(_EFT* self);
 extern "C" void fn_80308E38(_EFT* self, u32 visible, u8 from, u8 to);
-extern "C" void fn_80308EC0(StatusScreenWork* self);
-extern "C" s32  fn_80308F1C(StatusScreenWork* self);
+extern "C" void menu_status_page_open(StatusScreenWork* self);
+extern "C" s32  menu_status_page_step(StatusScreenWork* self);
 
 /* Neighbours of this range the map leaves plain; the ones an owner unit already has a header for are
  * declared there and included above (rule 2), the rest sit here until their owner writes one. */
@@ -575,7 +575,7 @@ extern "C" void fn_80308E38(_EFT* self, u32 visible, u8 from, u8 to)
 
 /* Arms the screen: the mode byte, the cursor reset, the equipment page the `+0x190` record hands out
  * (the returned count picks the last-page byte) and the page index. */
-extern "C" void fn_80308EC0(StatusScreenWork* self)
+extern "C" void menu_status_page_open(StatusScreenWork* self)
 {
     self->screen_mode = 7;
     self->field_0x23A = 0;
@@ -585,7 +585,7 @@ extern "C" void fn_80308EC0(StatusScreenWork* self)
 
 /* Folds the screen's flag words into one mask: the SE bit plays the confirm SE (returns 2), the scroll bits step the
  * page through `menu_cursor_step` (returns 0). */
-extern "C" s32 fn_80308F1C(StatusScreenWork* self)
+extern "C" s32 menu_status_page_step(StatusScreenWork* self)
 {
     s32 result = 0;
     u16 flags = (u16)(self->pad_trig | (self->pad_repeat & 0xF));

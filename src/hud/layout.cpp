@@ -114,7 +114,7 @@
  * `fn_802E2D84` calls `fn_802A2550` (`menu/menu_item.cpp`, 3 referrer lines); the two font-order
  * entries call `menu_text_center_x`/`menu_text_center_x_by_gaps`/`menu_text_block_center_x`
  * (`menu/menu_message.cpp`, already renamed there; 11 call sites) and
- * `draw_font_align_at` also `fn_8005C8F0` (`font/flfnt.cpp`, 4 call sites); `draw_font_anim_idx` calls
+ * `draw_font_align_at` also `font_print_plain` (`font/flfnt.cpp`, 4 call sites); `draw_font_anim_idx` calls
  * `sprite_frame_apply` (this unit's own row, but 44 referrer lines across 8 files).  `knj_msg_str_build`,
  * `str_tbl_utf16_build`, `draw_window_frame_style`/`draw_window_frame_preset`, the four 0x802E33B4-family layout entries and
  * `draw_spin_icon` are blocked on **data** (the `lbl_805D58xx`/`lbl_805D5Axx` tables and the `__FILE__`

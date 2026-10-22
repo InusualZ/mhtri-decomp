@@ -1,7 +1,7 @@
 /*
  * menu/menu_infomation.h - the records and entry points `menu/menu_infomation.cpp` owns.  `StatusScreenWork` is the
  *   status screen's work record as `equip_detail_screen_reset`/`equip_list_page_count`/`menu_equip_page_count` and `ef/fn_8030681C.cpp`'s
- *   `fn_80308EC0`/`fn_80308F1C` (below the 0x80308FB4 edge) read it: a partial view, not the complete layout.
+ *   `menu_status_page_open`/`menu_status_page_step` (below the 0x80308FB4 edge) read it: a partial view, not the complete layout.
  */
 #ifndef MHTRI_MENU_MENU_INFOMATION_H
 #define MHTRI_MENU_MENU_INFOMATION_H
@@ -11,17 +11,17 @@
 struct _PLW;
 struct _EQUIP;
 
-/* The status screen's own work record (`fn_80308EC0`/`fn_80308F1C` below the seam, `equip_detail_screen_reset`/
+/* The status screen's own work record (`menu_status_page_open`/`menu_status_page_step` below the seam, `equip_detail_screen_reset`/
  * `equip_list_page_count`/`menu_equip_page_count` above it).  Only the fields those bodies reach are named, so the size
  * is the extent they prove, not the record's own.
  * size: 0x23C (the extent these bodies prove) */
 typedef struct StatusScreenWork {
     u8    pad_0x000[0x4];          /* +0x000 */
-    u16   pad_trig;                /* +0x004  the pad's triggered buttons (`fn_80308F1C` folds them) */
+    u16   pad_trig;                /* +0x004  the pad's triggered buttons (`menu_status_page_step` folds them) */
     u8    pad_0x006[0x2];          /* +0x006 */
     u16   pad_repeat;              /* +0x008  the pad's repeat buttons (the low four, the d-pad, step the cursors) */
     u8    pad_0x00A[0x14 - 0x0A];  /* +0x00A */
-    u8    screen_mode;             /* +0x014  the screen mode `fn_80308EC0`/`equip_detail_screen_reset` set */
+    u8    screen_mode;             /* +0x014  the screen mode `menu_status_page_open`/`equip_detail_screen_reset` set */
     u8    pad_0x015[0x1C - 0x15];  /* +0x015 */
     s8    piece_cursor;            /* +0x01C  the equipment row the detail page shows (0 the weapon, 1..6 armour) */
     u8    pad_0x01D[0x190 - 0x1D]; /* +0x01D */
@@ -36,7 +36,7 @@ typedef struct StatusScreenWork {
     s8    field_0x1AE;             /* +0x1AE  the page index `menu_cursor_step` advances */
     s8    field_0x1AF;             /* +0x1AF  the last-page index (one past the count) */
     u8    pad_0x1B0[0x23A - 0x1B0];/* +0x1B0 */
-    u8    field_0x23A;             /* +0x23A  the `fn_80308EC0` reset byte */
+    u8    field_0x23A;             /* +0x23A  the `menu_status_page_open` reset byte */
     u8    pad_0x23B[1];            /* +0x23B */
 } StatusScreenWork;
 
@@ -56,7 +56,7 @@ extern "C" {
 #endif
 
 /* 0x8030A1D0 - the equip page count with the default column arrangement (the owner defines it).  The
- * owner's `fn_80308EC0` (the screen's entry, below the seam) arms the screen's page bytes from it. */
+ * owner's `menu_status_page_open` (the screen's entry, below the seam) arms the screen's page bytes from it. */
 s32 menu_equip_page_count(struct _PLW* equip, struct _EQUIP* frame);
 
 /* 0x8030B790 - the number of six-row pages the equip list record fills (never below one). */

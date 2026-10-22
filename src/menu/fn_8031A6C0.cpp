@@ -2,8 +2,8 @@
  * menu/fn_8031A6C0.cpp - the item/equipment selection screen.  `MenuSel` (this unit's view of the 0x330-byte working
  *   record `menu/menu_item.h` names `MenuSlot`) is the screen state: the input bits at +0x4/+0x8, the cursor at +0x1EC,
  *   the 3+8 0x18-byte entry arrays at +0x24/+0x6C, the resolved slot pairs at +0x210, the item data at +0x1F0;
- *   `self[1]` is the work area's second slot.  `fn_8031A6C0` is the per-frame state step and `fn_8031B774` the state
- *   dispatch (both switch on `state_0x001`); `fn_8031AE38`/`fn_8031B080`/`fn_8031BD7C` are the three draw passes.
+ *   `self[1]` is the work area's second slot.  `menu_equip_panel_step` is the per-frame state step and `menu_page02_step` the state
+ *   dispatch (both switch on `state_0x001`); `fn_8031AE38`/`menu_equip_panel_draw`/`menu_page02_draw` are the three draw passes.
  *   C++: the callees are mangled free functions (`GetItemData__FUs`, `get_lsp_data__FUsP10_mh_ivec2_`), the bodies
  *   `extern "C"`.
  * RANGE. .text 0x8031A6C0-0x8031DAA8 (45 functions); extab, extabindex, .ctors 0x8056F398, .data 0x805DCE98-0x805DCF38,
@@ -15,8 +15,8 @@
  *   and the bracketing menu units; no `__FILE__` string covers the range (`menu_infomation.cpp`'s is the neighbour's) and
  *   the dump answers `zz_`, so the file keeps the map's stem.
  *   GUESS (from each body and its callers): `menu_sel_cursor_init`, `menu_item_cell_draw`.
- * RESIDUALS. 23 rows unwritten (objdiff scores them zero): `fn_8031A6C0`, 0x8031AE38-0x8031B2D0, `fn_8031B39C`,
- *   `fn_8031B4C4`, 0x8031B624-0x8031BD50, `fn_8031BD7C`, `fn_8031C0B8`, `fn_8031C5FC`, `fn_8031C934`,
+ * RESIDUALS. 23 rows unwritten (objdiff scores them zero): `menu_equip_panel_step`, 0x8031AE38-0x8031B2D0, `fn_8031B39C`,
+ *   `fn_8031B4C4`, 0x8031B624-0x8031BD50, `menu_page02_draw`, `fn_8031C0B8`, `fn_8031C5FC`, `fn_8031C934`,
  *   0x8031CAC4-0x8031DA50, `fn_8031DA54` (the state machines, the draw passes, the cursor's record machine and the
  *   effect-model tail).  The 15 partial rows (0x8031AD30-0x8031AE38, 0x8031B2D0-0x8031B39C, 0x8031BFEC-0x8031C0B8,
  *   0x8031C338-0x8031C5FC, `fn_8031C8EC`, `menu_sel_cursor_blend_tick`), by cause:
@@ -61,7 +61,7 @@ extern MenuSharedSlots* lobby_world_block;
 /* ============================================================================================== */
 /* 0x8031AC04 - hand the display worker to its update routine                                     */
 /* ============================================================================================== */
-extern "C" void fn_8031AC04(MenuSel* self) {
+extern "C" void menu_slot_worker_busy_ck(MenuSel* self) {
     fn_80274570(self->worker_0x190);
 }
 

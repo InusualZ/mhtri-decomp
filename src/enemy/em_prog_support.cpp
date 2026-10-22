@@ -27,7 +27,7 @@
  *  - `fn_80384F48`, `qnpc_load_ck`, `fn_80384FF8`, `fn_803853C8`, `fn_8038541C`, `fn_80385538`, `fn_80385B28`,
  *    `note_pane_motion_start`, `note_pane_anim_pair_ck`, `note_pane_motion_set`: retail narrows the argument with `clrlwi`, ours
  *    drops it;
- *  - `fn_80384004`, `fn_80384B34`: retail keeps `extsh`/`extsb` + `cmpwi`, ours the record form; `fn_803843D8`:
+ *  - `fn_80384004`, `fn_80384B34`: retail keeps `extsh`/`extsb` + `cmpwi`, ours the record form; `note_page_open`:
  *    retail sign-extends twice more;
  *  - `fn_803852B8`, `em_prog_support_reset`, `fn_8038575C`: the loop's index setup is ordered differently; `fn_803857BC`: ours
  *    compares the narrowed value unsigned where retail compares signed.
@@ -66,7 +66,7 @@ void fn_801FC2F0(void);
 struct _QNPC_W;
 struct _g3d_work;
 
-/* The enemy record's note pane (the fields `fn_803843D8` seeds): `+0x14` is `_ENEMY_WORK::field_0x14`
+/* The enemy record's note pane (the fields `note_page_open` seeds): `+0x14` is `_ENEMY_WORK::field_0x14`
  * and the two bytes it clears/arms are the pane's own.
  * size: 0x1A0 */
 struct NotePane {
@@ -177,7 +177,7 @@ extern "C" void fn_80384304(void) {
 }
 
 /* 0x80384324 - the note pen: seed the layout state from the screen frame scale, then rebuild. */
-extern "C" void fn_80384324(void) {
+extern "C" void note_pen_seed(void) {
     lbl_806C2418.field_0x008 = 4;
     lbl_806C2418.cursor_x_0x00 = (u16)(lbl_8079BF60 * Screen_w.frame_scale);
     lbl_806C2418.field_0x003 = 0;
@@ -185,7 +185,7 @@ extern "C" void fn_80384324(void) {
 }
 
 /* 0x80384380 */
-extern "C" void fn_80384380(void) {
+extern "C" void note_pane_reset(void) {
     lbl_806C2418.field_0x009 = 0;
     lbl_806C2418.field_0x007 = 0;
     lbl_806C2418.field_0x008 = 4;
@@ -203,7 +203,7 @@ extern "C" u32 fn_803843A8(void) {
 }
 
 /* 0x803843D8 - the pane reset `fn_80384304` seeds. */
-extern "C" void fn_803843D8(NotePane* self, u8 a) {
+extern "C" void note_page_open(NotePane* self, u8 a) {
     self->field_0x014 = a;
     self->field_0x19E = 0;
     self->field_0x01C = 0;

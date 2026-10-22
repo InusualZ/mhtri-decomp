@@ -172,7 +172,8 @@ typedef struct SystemWork {
                                     * user work's profile instead of `option_w` (0x803BE30C band) */
     /* +0x8B1 */ u8 field_0x8b1;
     /* +0x8B2 */ u8 field_0x8b2;   /* set by the quest result fill when element 0 is monster 25 and was armed */
-    /* +0x8B3 */ u8 pad_0x8b3[0xE];
+    /* +0x8B3 */ u8 pad_0x8b3[0xD];
+    /* +0x8C0 */ u8 menu_closed_0x8c0;   /* 1 while the item menu is closed (`menu/menu_item.cpp`'s frame) */
     /* +0x8C1 */ u8 net_result_wait_0x8c1;   /* GUESS name: `arena_task` step 4 skips its network-result wait unless this is 1 */
     /* +0x8C2 */ u8 pad_0x8c2[0x2];
     /* +0x8C4 */ void (*reset_func_0x8c4)(void);   /* GUESS name: the hook `game_mode_flow_task` runs when the lobby is left for the title */

@@ -1005,7 +1005,7 @@ void fn_802498E0(_PLW* self) {
                 self->field_0x0AC = 0;
             }
         }
-        if (Pl_master_ck(self) == 1 && fn_8026FE44(self) == 1 && self->field_0x018 == 1) {
+        if (Pl_master_ck(self) == 1 && pl_item_page2_ck(self) == 1 && self->field_0x018 == 1) {
             fn_8027A57C(self, 0x41A, 0);
         }
         if (self->field_0x018 != 1) {
@@ -3665,7 +3665,7 @@ void fn_8025F088(_PLW* self) {
         self->field_0x5C7 = 0;
     }
     fn_8025EC58(self);
-    if (fn_8026FE44(self) == 1) {
+    if (pl_item_page2_ck(self) == 1) {
         fn_802872E4(self);
     }
     self->field_0x3B4 = 0;

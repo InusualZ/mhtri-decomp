@@ -11,7 +11,7 @@
  * game's free-memory pool tops (`lbl_807947B8`/`C0`/`C4`, selected by the mode argument it is passed)
  * at the end of the module's BSS.  The rest of the range is a nine-slot keyboard interface over the
  * `system_w` interface block (+0x8E8..+0x90C): the named `kbd_*` entry points are tail-call dispatchers
- * into `system_w`.  `kbd_reset_call`/`kbd_close_call`/`fn_80040874` dispatch its three slots the name source
+ * into `system_w`.  `kbd_reset_call`/`kbd_close_call`/`system_menu_callback_call` dispatch its three slots the name source
  * left unnamed (+0x8FC/+0x900/+0x908); the registration at 0x804561AC shows those slots run 0x80451E3C
  * (clears the input state bytes -> `kbd_reset`), 0x80455A48 (ends the session and teardown -> `kbd_close`)
  * and 0x80456150 (processes the pending key -> `kbd_input`).
@@ -27,10 +27,10 @@
  * map's sizes.  Evidence: the 2021 Dolphin name dump has no symbol at any of those five addresses while
  * it does carry `zz_` placeholders for genuinely unnamed functions - including 0x80040598, 0x8004080C,
  * 0x8004082C and 0x80040874 inside this very range; and `kbd_move__Fv`, `get_kbd_setup_type__Fv`,
- * `kbd_close_call` and `fn_80040874` are byte-identical to the target's bytes for *their own symbol plus
+ * `kbd_close_call` and `system_menu_callback_call` are byte-identical to the target's bytes for *their own symbol plus
  * the following artifact* (checked with `objdump -s`, 40/40, 40/40, 40/40 and 44/44 bytes).  Merging
  * each artifact into the symbol before it (map: `kbd_move__Fv` 0x24 -> 0x28, `kbd_open__FUc`
- * 0x28 -> 0x2C, `get_kbd_setup_type__Fv` 0x24 -> 0x28, `kbd_close_call` 0x24 -> 0x28, `fn_80040874`
+ * 0x28 -> 0x2C, `get_kbd_setup_type__Fv` 0x24 -> 0x28, `kbd_close_call` 0x24 -> 0x28, `system_menu_callback_call`
  * 0x28 -> 0x2C, and `fn_80040794`/`fn_800407C0`/`fn_80040808`/`fn_80040850`/`fn_8004089C` deleted)
  * is applied and closed four of the five dispatchers outright - `kbd_open` still carries its masking
  * residual below.  Declaring five empty bodies instead would score those five
@@ -236,7 +236,7 @@ void kbd_exit(void)
     }
 }
 
-extern "C" int fn_80040874(void)
+extern "C" int system_menu_callback_call(void)
 {
     if (system_w.kbd_close == NULL) {
         return 0;

@@ -53,7 +53,7 @@ extern "C" s8 fn_800470B4(void)
     return -1;
 }
 
-extern "C" u8 fn_800472DC(s32 arg0)
+extern "C" u8 player_pad_channel_get(s32 arg0)
 {
     return (u8)(fn_800470B4() * 2 + arg0);
 }

@@ -103,7 +103,7 @@ u8 monster_size_crown_get(u8 a, u16 b);
 MenuRowData* fn_8004EA24(void);
 char* flfntStrChr(char* text, s32 c);   /* owner: `g3d/g3d_anmchr.cpp` */
 void monster_size_value_get(u8 a, u16 b, f32* out);
-u32 fn_8026FE44(s32 worker);
+u32 pl_item_page2_ck(s32 worker);
 s32 Pl_item_timer_get(s32 worker, u16 id);
 void cockpit_blink_get(void);
 u32 fn_802DA20C(s32 a, u8 b);

@@ -22,7 +22,7 @@
  *   GUESS (from each body and its callers): `font_buffer_size_get`, `font_color_set`.
  * RESIDUALS. Unwritten (objdiff scores them zero): flfntStackReset, flKnjMsgNumPtr, flKnjMsgNum, flfntPrintf,
  *   fn_8005B278, fn_8005BA68-fn_8005BD3C, utf82unicode2, fn_8005BF20, getGlyphWidth, fn_8005BFDC, flfntFlush,
- *   fn_8005C4CC-fn_8005C500, font_print, fn_8005C618, font_print_ex, fn_8005C8F0, fn_8005C9B8, fn_8005CA64,
+ *   fn_8005C4CC-fn_8005C500, font_print, fn_8005C618, font_print_ex, font_print_plain, fn_8005C9B8, fn_8005CA64,
  *   disp_beta_tex, dbg_drawgraph_init, dtor_8005B228.  Partial: fn_8005AED4, fn_8005B7D8, font_color_set.
  *   flipcheck: `.text` 0x384 of 0x22F8; `.data`, `.bss`, `.sdata`, `.sbss` and `.sdata2` are claimed and not emitted.
  */

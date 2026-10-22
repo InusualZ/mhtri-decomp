@@ -115,7 +115,7 @@ struct NoteLayout {
 };
 
 /* `Screen_w` (0x8065903C, .bss, unsplit): only the frame scale at +0x14, the field this band's
- * `fn_80384324` multiplies its string width by (the same field `enemy/em_common.cpp` names).
+ * `note_pen_seed` multiplies its string width by (the same field `enemy/em_common.cpp` names).
  * size: 0x54 */
 struct NoteScreenScale {
     /* +0x00 */ u8 pad_0x00[0x14];

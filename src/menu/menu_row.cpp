@@ -50,23 +50,6 @@ typedef union MenuNoteSlot {
     };
 } MenuNoteSlot; /* size: 0x2 */
 
-/* One 0x24-byte record of the placement list `MenuWork::slot[0].place_entries` holds: the record's
- * rectangle, the four halves its creator stores, and the 16-byte body copied in at +0x14.  Its only
- * consumer is this unit, so the definition lives here and `menu/menu_item.h` forward-declares it.
- * size: 0x24 */
-typedef struct MenuPlaceRec {
-    /* +0x00 */ u8 active;
-    /* +0x01 */ u8 index;          /* the byte `place_rec_alloc` hands back to its caller */
-    /* +0x02 */ u8 pad_0x02[0x6];
-    /* +0x08 */ s16 pos_x;          /* the rectangle `place_list_overlap_find`'s overlap test reads */
-    /* +0x0A */ s16 pos_y;
-    /* +0x0C */ s16 width;
-    /* +0x0E */ s16 height;
-    /* +0x10 */ s16 field_0x10;
-    /* +0x12 */ s16 field_0x12;
-    /* +0x14 */ u32 key;            /* the id `place_list_key_count` counts and `place_rec_key_ptr` hands out */
-    /* +0x18 */ u8 body[0x0C];      /* the 16-byte body `fn_8004EAF4` copies over +0x14 */
-} MenuPlaceRec; /* size: 0x24 */
 
 extern "C" u32 note_slot_cursor_bounds(u8 kind, u8 index);
 

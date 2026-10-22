@@ -129,7 +129,7 @@
  *  - `equip_columns_skills_get` declares `tv, tb, ta` in that order (stack slots 0x20/0x18/0x10 and the register order), nests the
  *    value test `if (v != 0) { if (v > 0) ... } else { zeros }` and swaps tv/tb before ta; `fn_80272B10` indexes
  *    `plw->slot_id` with `?:` and calls `GetItemData` in each arm; `pl_item_add` skips its second lookup through a
- *    single-iteration `for (;;)` with `break`, and its `case 4` compares `plw->unk26E` against the first lookup;
+ *    single-iteration `for (;;)` with `break`, and its `case 4` compares `plw->item_slot_sel` against the first lookup;
  *  - `pl_weapon_stat_get` and `pl_gun_clip_get` write their case bodies in the order their jump tables point at, not case order;
  *  - `Pl_net_send` is called through its two-parameter view `PlNetSend2`: retail's call sites pass two arguments to
  *    the owner's three-parameter function, and a third argument would emit `li r5,X`;
@@ -2305,7 +2305,7 @@ namespace s_8026BA1C {
 
 
 /* 0x8026FE44: true for the "gun" weapon classes. */
-extern "C" u32 fn_8026FE44(_PLW* self)
+extern "C" u32 pl_item_page2_ck(_PLW* self)
 {
     return (u32)(self->field_0x002 - 4) <= 2;
 }
@@ -2434,7 +2434,7 @@ u32 fn_80273ED8(_PLW*, int, s8);
 
 int fn_802753E4(_PLW*, u16);
 void fn_80272A08(_PLW*);
-u32 fn_8026FE44(_PLW*);
+u32 pl_item_page2_ck(_PLW*);
 void fn_8027885C(_PLW*, int, int);
 void fn_802789EC(_PLW*, int);
 extern u32 lbl_805C5FC8[];
@@ -2921,7 +2921,7 @@ extern "C" u32 Pl_Skill_slot_item_get(_PLW* plw, u32 slot) {
 /* Whether the player currently provides `kind` of skill: kind 15-17 ask the equipment, 74 the player
  * type, and anything else the two skill-id tables. */
 extern "C" u32 pl_skill_valid_ck(_PLW* plw, u8 kind) {
-    u16 mode = (fn_8026FE44(plw) == 1);
+    u16 mode = (pl_item_page2_ck(plw) == 1);
 
     switch (kind) {
     case 15:
@@ -3061,7 +3061,7 @@ extern "C" void pl_equip_skill_id_valid_ck(_PLW* plw, u8* p, u32 a, u16 skill) {
 /* Whether a skill is available in the current quest context: three kinds are gated on the
  * quest mode, one on the player type, everything else is always available. */
 extern "C" u32 pl_bonus_skill_valid_ck(_PLW* plw, u16 skill) {
-    u16 mode = (fn_8026FE44(plw) == 1);
+    u16 mode = (pl_item_page2_ck(plw) == 1);
 
     switch (skill) {
     case 15:
@@ -3268,7 +3268,7 @@ extern "C" s16 fn_80272CC8(_PLW* plw, u8 slot) {
 
 /* Recomputes the current slot's skill value and lowers the running minimum. */
 extern "C" void fn_80272D5C(_PLW* plw) {
-    s16 v = fn_80272CC8(plw, (u8)plw->unk26E);
+    s16 v = fn_80272CC8(plw, (u8)plw->item_slot_sel);
 
     plw->unk270 = v;
     plw->unk272 = (s16)v;
@@ -3361,25 +3361,25 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
         ent = (u16*)((u8*)plw + slot * 4 + 0x278);
     }
     v = fn_80274B20(*ent);
-    if (slot != plw->unk26E) {
+    if (slot != plw->item_slot_sel) {
         if (plw->held_item_kind_0x26C != (u8)v) {
             return;
         }
-        plw->unk26E = (u16)slot;
+        plw->item_slot_sel = (u16)slot;
     }
-    if (slot == plw->unk26E) {
-        plw->unk26E = fn_8027993C(plw, (u16)slot, 2);
+    if (slot == plw->item_slot_sel) {
+        plw->item_slot_sel = fn_8027993C(plw, (u16)slot, 2);
         fn_80279B84(plw);
         plw->unk272 = plw->unk270;
         plw->unk275 = plw->unk26A;
         plw->unk274 = 0;
         return;
     }
-    if (fn_8026FE44(plw) != 0) {
-        u16 cur = plw->unk26E;
+    if (pl_item_page2_ck(plw) != 0) {
+        u16 cur = plw->item_slot_sel;
 
         if (cur == 0xFF) {
-            plw->unk26E = fn_8027993C(plw, 0, 2);
+            plw->item_slot_sel = fn_8027993C(plw, 0, 2);
             fn_80279B84(plw);
             return;
         }
@@ -3391,7 +3391,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
             item = GetItemData__FUs(plw->slot_id[cur].item_id);
         }
         if (item[0] != 1) {
-            plw->unk26E = fn_8027993C(plw, plw->unk26E, 0);
+            plw->item_slot_sel = fn_8027993C(plw, plw->item_slot_sel, 0);
             fn_80279B84(plw);
         }
     }
@@ -3405,7 +3405,7 @@ extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
     u16 slot;
 
     for (;;) {
-        if (data[0] == 1 && fn_8026FE44(plw) == 1 && (cur == 0xFFFF || (cur & 0x80) != 0)) {
+        if (data[0] == 1 && pl_item_page2_ck(plw) == 1 && (cur == 0xFFFF || (cur & 0x80) != 0)) {
             v = item_take(item, value, plw->spare_slot_id, 8, 1, 0);
             slot = fn_80273044(plw, item);
             if ((u32)v <= 4) {
@@ -3430,23 +3430,23 @@ extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
     case 1:
     case 2:
     case 3:
-        if (data[0] == 1 && plw->unk26E == slot) {
+        if (data[0] == 1 && plw->item_slot_sel == slot) {
             fn_80272D5C(plw);
         }
         break;
     case 4:
         if (data[0] == 1) {
-            if (fn_8027993C(plw, plw->unk26E, 1) == 0xFF) {
-                plw->unk26E = 0xFF;
+            if (fn_8027993C(plw, plw->item_slot_sel, 1) == 0xFF) {
+                plw->item_slot_sel = 0xFF;
                 plw->unk270 = 0;
                 plw->unk26A = 0;
                 plw->unk269 = 0;
-            } else if (plw->unk26E == cur) {
+            } else if (plw->item_slot_sel == cur) {
                 plw->unk270 = 0;
                 plw->unk26A = 0;
                 plw->unk269 = 0;
             }
-            if (plw->unk26E == cur) {
+            if (plw->item_slot_sel == cur) {
                 fn_80272D5C(plw);
             }
         }
@@ -3475,7 +3475,7 @@ extern "C" s32 pl_item_room_get(_PLW* plw, u16 item, s16 value) {
         }
         return value;
     }
-    if (data[0] == 1 && fn_8026FE44(plw) == 1) {
+    if (data[0] == 1 && pl_item_page2_ck(plw) == 1) {
         u16* p = (u16*)plw->spare_slot_id;
 
         for (int i = 0; i < 8; i++) {
@@ -3901,7 +3901,7 @@ extern "C" void pl_equip_models_set(_PLW* plw, u8* a2, u8* a3, u8* a4) {
 extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
     int i;
 
-    if (GetItemData__FUs(slot)[0] == 1 && fn_8026FE44(plw) == 1) {
+    if (GetItemData__FUs(slot)[0] == 1 && pl_item_page2_ck(plw) == 1) {
         for (i = 0; i < 8; i++) {
             if (slot == plw->spare_slot_id[i].item_id) {
                 return (u16)(i | 0x80);
@@ -4216,7 +4216,7 @@ extern "C" s16 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out)
 {
     s16 value = base;
 
-    if (base > 0 && ranged == 0 && fn_8026FE44(plw) == 0) {
+    if (base > 0 && ranged == 0 && pl_item_page2_ck(plw) == 0) {
         switch (plw->field_0x56B) {
         case 4:
             value += 5;
@@ -4534,7 +4534,7 @@ extern "C" u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index)
 /* True when either of the player's weapon slots resolves to a bonus. */
 extern "C" s32 fn_80274988(struct _PLW* plw)
 {
-    if (fn_8026FE44(plw) == 0) {
+    if (pl_item_page2_ck(plw) == 0) {
         return 0;
     }
     if (equip_gun_bonus_ck(&plw->equipB) == 1U) {
@@ -4709,7 +4709,7 @@ extern "C" s32 pl_item_pouch_ok_ck(struct _PLW* plw, u16 id)
 {
     u8 cls;
 
-    if (fn_8026FE44(plw) == 0) {
+    if (pl_item_page2_ck(plw) == 0) {
         return 1;
     }
     cls = fn_80274B20(id);
@@ -4851,7 +4851,7 @@ extern "C" u32 Pl_item_id_usable_ck(u16 id, s32 mode)
 }
 
 /* True when the player's act/act-state pair is one of the two held combinations. */
-extern "C" s32 fn_80275394(struct _PLW* plw)
+extern "C" s32 pl_act_menu_lock_ck(struct _PLW* plw)
 {
     switch (plw->field_0x00A) {
     case 0:
@@ -5600,7 +5600,7 @@ extern "C" void fn_80276CE8(_PLW*, s16);
 extern "C" u8 pl_act_kind_get(u8);
 extern "C" s32 pl_mode8_free_ck(void);
 extern "C" void fn_8010D688(_PLW*);
-extern "C" u32 fn_8026FE44(_PLW*);
+extern "C" u32 pl_item_page2_ck(_PLW*);
 extern "C" void mhchar_motion_speed_set(u8*, f32);
 extern "C" u32 fn_802B0688(void*);
 extern "C" void fn_8026FEF0(_PLW*, s32);
@@ -6120,7 +6120,7 @@ extern "C" u32 fn_8027CC2C(_PLW* self)
 /* 0x8027CF24 */
 extern "C" s32 fn_8027CF24(_PLW* self)
 {
-    if (fn_8026FE44(self) == 1 && self->unk276 != 0) {
+    if (pl_item_page2_ck(self) == 1 && self->unk276 != 0) {
         return 1;
     }
     return 0;
@@ -6505,10 +6505,10 @@ extern "C" u8* gun_ammo_entry_find(u8* self, u8 arg1)
 /* 0x80279B84: refreshes the actor's held-item state from its item id. */
 extern "C" void fn_80279B84(_PLW* self)
 {
-    if (fn_8026FE44(self) != 0 && self->unk26E != 255) {
-        (void)GetItemData((u16)fn_80272C80(self, (u8)self->unk26E));
-        self->held_item_kind_0x26C = fn_80274B20((u16)fn_80272C80(self, (u8)self->unk26E));
-        self->unk270 = fn_80272CC8(self, (u8)self->unk26E);
+    if (pl_item_page2_ck(self) != 0 && self->item_slot_sel != 255) {
+        (void)GetItemData((u16)fn_80272C80(self, (u8)self->item_slot_sel));
+        self->held_item_kind_0x26C = fn_80274B20((u16)fn_80272C80(self, (u8)self->item_slot_sel));
+        self->unk270 = fn_80272CC8(self, (u8)self->item_slot_sel);
         self->unk26A = fn_80274D98(self, self->held_item_kind_0x26C);
         self->unk269 = 0;
     }
@@ -6642,7 +6642,7 @@ namespace s_80276B58 {
 /* 0x8027CE74: whether the actor's current motion is one of the gunner charge motions. */
 extern "C" s32 fn_8027CE74(_PLW* self)
 {
-    if (fn_8026FE44(self) == 1) {
+    if (pl_item_page2_ck(self) == 1) {
     switch ((u16)Get_motion_no(self)) {
     case 1104:
     case 1114:
@@ -6875,7 +6875,7 @@ extern "C" s32 fn_802784B8(_PLW* self)
 /* 0x80278590: the actor's attack-range tier for the current weapon class. */
 extern "C" s32 fn_80278590(_PLW* self)
 {
-    if (fn_8026FE44(self) == 1) {
+    if (pl_item_page2_ck(self) == 1) {
         return 0;
     }
     s16* t = (s16*)(pl_sharpness_tbl[self->field_0x002]
@@ -8012,7 +8012,7 @@ extern "C" void fn_8027885C(_PLW* self, s32 arg1, s32 arg2)
  * are applied. */
 extern "C" s32 fn_802791FC(_PLW* self, u8 arg1)
 {
-    if ((s32)fn_8026FE44(self) == 0) {
+    if ((s32)pl_item_page2_ck(self) == 0) {
         return 1;
     }
     s32 a = *(u8*)(lbl_805BF538 + 1 + arg1 * 4);
@@ -8097,7 +8097,7 @@ namespace s_80276B58 {
  * mapped onto the 0-3 capacity class the caller uses. */
 extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
 {
-    if ((s32)fn_8026FE44(self) == 0) {
+    if ((s32)pl_item_page2_ck(self) == 0) {
         return 2;
     }
     s32 a = *(u8*)(lbl_805BF538 + arg1 * 4);
@@ -8648,7 +8648,7 @@ extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
 {
     s16 v = arg1;
     s32 changed = 0;
-    if (Pl_master_ck(self) != 0 && fn_8026FE44(self) != 1U) {
+    if (Pl_master_ck(self) != 0 && pl_item_page2_ck(self) != 1U) {
         if (v < 0 && arg2 == 0) {
             if (Pl_Skill_ck(self, 0x15) == 1U) {
                 if (v == -1 && (ran_suu__Fl(1) & 1) != 0) {
@@ -8693,7 +8693,7 @@ extern "C" u16 fn_8027993C(_PLW* self, u16 arg1, u8 arg2)
 {
     u16 slot;
     s32 i;
-    if (fn_8026FE44(self) == 0) {
+    if (pl_item_page2_ck(self) == 0) {
         return 0xFF;
     }
     u8 ring[33 * 4];
@@ -8752,7 +8752,7 @@ extern "C" void fn_80279C20(_PLW* self)
     if (Pl_master_ck(self) == 0) {
         return;
     }
-    if (fn_8026FE44(self) == 0) {
+    if (pl_item_page2_ck(self) == 0) {
         return;
     }
     if (Pl_motion_input_ck(1) == 1U) {
@@ -8811,24 +8811,24 @@ extern "C" void fn_80279C20(_PLW* self)
     }
     if (pl_id_bit_ck(self, 0xB) == 1U) {
         if (pl_id_bit_ck(self, 0xD) == 1U) {
-            if (self->unk26E == 0xFF) {
-                self->unk26E = fn_8027993C(self, 0, 3);
+            if (self->item_slot_sel == 0xFF) {
+                self->item_slot_sel = fn_8027993C(self, 0, 3);
             } else {
-                self->unk26E = fn_8027993C(self, 1, 0);
+                self->item_slot_sel = fn_8027993C(self, 1, 0);
             }
             fn_80279B84(self);
-            if (self->unk26E != 0xFF) {
+            if (self->item_slot_sel != 0xFF) {
                 *(u8*)((u8*)self + 0x309) = (u8)(*(u8*)((u8*)self + 0x309) | 8);
                 sysSE_req(6);
             }
         } else if (pl_id_bit_ck(self, 0xC) == 1U) {
-            if (self->unk26E == 0xFF) {
-                self->unk26E = fn_8027993C(self, 0, 2);
+            if (self->item_slot_sel == 0xFF) {
+                self->item_slot_sel = fn_8027993C(self, 0, 2);
             } else {
-                self->unk26E = fn_8027993C(self, 0, 0);
+                self->item_slot_sel = fn_8027993C(self, 0, 0);
             }
             fn_80279B84(self);
-            if (self->unk26E != 0xFF) {
+            if (self->item_slot_sel != 0xFF) {
                 *(u8*)((u8*)self + 0x309) = (u8)(*(u8*)((u8*)self + 0x309) | 0x10);
                 sysSE_req(6);
             }
@@ -8892,7 +8892,7 @@ extern "C" s32 fn_8027A340(_PLW* self)
     if (Pl_master_ck(self) == 0) {
         ok = 0;
     }
-    if (fn_8026FE44(self) == 0) {
+    if (pl_item_page2_ck(self) == 0) {
         ok = 0;
     }
     if (self->unk5E6 != 0) {
@@ -9221,7 +9221,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
     case 0x30:
     case 0x62:
     case 0xCF:
-        if (fn_8026FE44(self) == 0) {
+        if (pl_item_page2_ck(self) == 0) {
             return 1;
         }
         break;
