@@ -699,7 +699,7 @@ config.libs = [
             Object(NonMatching, "enemy/em001_prog.cpp"),
             Object(NonMatching, "enemy/em003_prog.cpp"),
             Object(NonMatching, "enemy/em008_prog.cpp"),
-            Object(NonMatching, "enemy/em010_prog.cpp"),
+            Object(Matching, "enemy/em010_prog.cpp"),
             Object(NonMatching, "enemy/em011_prog.cpp"),
             Object(NonMatching, "enemy/em015_prog.cpp"),
             Object(NonMatching, "enemy/em016_prog.cpp"),
