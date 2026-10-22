@@ -41,7 +41,7 @@ struct MenuSelCursor {
     /* +0x13 */ u8    flag_0x13;
     /* +0x14 */ s8    applied_0x14;  /* the applied amount */
     /* +0x15 */ u8    anim_0x15;     /* draw-animation selector */
-    /* +0x16 */ u8    mode_0x16;     /* the draw state `fn_8031CE08` switches on */
+    /* +0x16 */ u8    mode_0x16;     /* the draw state `menu_sel_cursor_result_draw` switches on */
     /* +0x17 */ u8    timer_0x17;
     /* +0x18 */ u8    state_0x18;    /* the sub state `fn_8031C338` advances */
     /* +0x19 */ u8    pad_0x19[0x03];

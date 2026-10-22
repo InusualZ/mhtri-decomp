@@ -39,14 +39,18 @@ typedef struct LbIconRec {
 typedef struct LbWorldBlock {
     /* +0x0000 */ u8 unused_0x0000[2];
     /* +0x0002 */ u8 count_0x0002;    /* the per-page entry count `fn_801F3294` compares an item id against */
-    /* +0x0003 */ u8 unused_0x0003[0x9B];
+    /* +0x0003 */ u8 unused_0x0003[0x11];
+    /* +0x0014 */ u32 hair_color_0x0014; /* the hair colour word the colour pane edits (mode 1) */
+    /* +0x0018 */ u8 unused_0x0018[0x86];
     /* +0x009E */ u8 count_0x009E;    /* the same byte for the page the range scrolls */
     /* +0x009F */ u8 unused_0x009F[0xD61];
     /* +0x0E00 */ LbIconRec entries_0x0E00[1]; /* the icon table `fn_801F86FC` indexes by entry id */
     /* +0x0E0C */ u8 unused_0x0E0C[0x2BAE];
     /* +0x39BA */ u8 field_0x39BA;     /* the byte `fn_801F3DEC` copies into the page's mode */
-    /* +0x39BB */ u8 tail_0x39BB[];
-} LbWorldBlock; /* size: 0x39BB+ */
+    /* +0x39BB */ u8 unused_0x39BB;
+    /* +0x39BC */ u32 inner_color_0x39BC; /* the inner-wear colour word the colour pane edits (mode 0) */
+    /* +0x39C0 */ u8 tail_0x39C0[];
+} LbWorldBlock; /* size: 0x39C0+ */
 
 /* The per-page record this unit's page functions work on (the object `fn_801F3DEC` initialises and
  * `fn_801F3294` drives as its request).  Every offset below is one the disassembly reads or writes; the
@@ -57,25 +61,42 @@ typedef struct LbPage {
     /* +0x001 */ u8 done_0x001;            /* set when the page has finished, read at the step change */
     /* +0x002 */ u8 mode_0x002;            /* 0 = the scrolling page, 1 = the fixed one */
     /* +0x003 */ u8 kind_0x003;            /* the entry kind, 0..2 */
-    /* +0x004 */ s16 value_0x004;          /* the cursor `fn_801F3294` advances */
+    /* +0x004 */ union {
+        /* +0x004 */ s16 value_0x004;      /* the cursor `fn_801F3294` advances */
+        /* +0x004 */ u16 part_0x004;       /* the dye pane's armour piece (0 = all) */
+    };
     /* +0x006 */ s16 count_0x006;          /* its bound */
     /* +0x008 */ s16 field_0x008;          /* zeroed by the initialiser */
     /* +0x00A */ s16 max_0x00A;            /* `fn_801F353C`'s out_max, read signed by `fn_801F5534` */
     /* +0x00C */ u16 num_0x00C;            /* its out_count, and `fn_801F3EDC`'s answer for kind 0 */
-    /* +0x00E */ u16 field_0x00E;
-    /* +0x010 */ u16 field_0x010;
-    /* +0x012 */ u16 field_0x012;
-    /* +0x014 */ union {
-        /* +0x014 */ u32 id_0x014;         /* read 32-bit by `fn_801F37C8` for its "current" row */
-        /* +0x014 */ s16 sel_id_0x014;     /* ... and 16-bit by `fn_801F4444` (narrow load) */
+    /* +0x00E */ union {
+        /* +0x00E */ u16 field_0x00E;
+        /* +0x00E */ s16 anim_0x00E;       /* the value `fn_801EC804` animates */
     };
-    /* +0x018 */ u32 slot_0x018;           /* `fn_801F37C8` packs the selected row's bytes into it */
-    /* +0x01C */ u8 flag_0x01C;            /* mirrored from the world block by `fn_801F3294` */
-    /* +0x01D */ u8 unused_0x01D[3];
+    /* +0x010 */ union {
+        /* +0x010 */ u16 field_0x010;
+        /* +0x010 */ s16 cursor_x_0x010;   /* the free colour cursor */
+    };
+    /* +0x012 */ union {
+        /* +0x012 */ u16 field_0x012;
+        /* +0x012 */ s16 cursor_y_0x012;
+    };
+    /* +0x014 */ union {
+        struct {
+            /* +0x014 */ u32 id_0x014;
+            /* +0x018 */ u32 slot_0x018;
+            /* +0x01C */ u8 flag_0x01C;    /* mirrored from the world block by `fn_801F3294` */
+            /* +0x01D */ u8 unused_0x01D[3];
+        }; /* size: 0xC */
+        struct {
+            /* +0x014 */ s16 sel_id_0x014; /* the colour `fn_801F4444` takes for its "current" row */
+            /* +0x016 */ u16 part_colors_0x016[5]; /* the five armour pieces' loaded dye colours */
+        }; /* size: 0xC */
+    };
     /* +0x020 */ u16 sel_0x020;            /* `fn_801F4444`'s decoded selection */
     /* +0x022 */ u8 sel_flag_0x022;        /* set while the selection is the open one */
     /* +0x023 */ u8 field_0x023;           /* cleared by the initialiser */
-    /* +0x024 */ u8 unused_0x024[4];
+    /* +0x024 */ s32 stepper_0x024;       /* the confirm stepper */
     /* +0x028 */ struct LbPage* next_0x028; /* the panel `fn_801F3F78` forwards its byte to */
     /* +0x02C */ u8 unused_0x02C[0x22C];
     /* +0x258 */ u8 rgb_a_0x258[3];        /* the three colour bytes `fn_801F3998` writes (which 1) */
@@ -89,13 +110,13 @@ typedef struct LbPage {
 } LbPage; /* size: 0x263+ (approximate) */
 
 /* The owner object `fn_801F3294`/`fn_801F6A9C` take: it holds the page pointer at +0x10 and the two
- * runs `fn_801F6168` is handed.  Only the offsets those two functions reach are named.
+ * runs `lb_box_grid_draw` is handed.  Only the offsets those two functions reach are named.
  * size: 0x3B8+ (approximate: 0x3B8 is the highest offset an argument points at) */
 typedef struct LbPageOwner {
     /* +0x000 */ u8 unused_0x000[0x10];
     /* +0x010 */ LbPage* page_0x010;       /* the per-page record this unit's other functions work on */
     /* +0x014 */ u8 unused_0x014[0x1C];
-    /* +0x030 */ u8 rows_0x030[0x24];      /* the row run `fn_801F6168` reads (second argument) */
+    /* +0x030 */ u8 rows_0x030[0x24];      /* the row run `lb_box_grid_draw` reads (second argument) */
     /* +0x054 */ u8 slots_0x054[0x364];    /* the run it fills (first argument) */
     /* +0x3B8 */ u8 tail_0x3B8[];          /* the run it reads (sixth argument) */
 } LbPageOwner; /* size: 0x3B8+ (approximate) */
@@ -103,12 +124,13 @@ typedef struct LbPageOwner {
 /* One 0xA-byte entry of the lobby selection table at `lbl_805B8674`: the three packed bytes are read as
  * bitfields by `fn_801F4444`/`fn_801F37C8`.  size: 0xA */
 typedef struct LbSelRec {
-    /* +0x00 */ u8 unused_0x00[2];
+    /* +0x00 */ u16 name_id_0x00; /* the colour's name string */
     /* +0x02 */ u8 match_0x02;   /* the kind byte `fn_801F3F14` matches */
     /* +0x03 */ u8 bits_0x03;    /* the top nibble is a field of the packed value */
     /* +0x04 */ u8 bits_0x04;
     /* +0x05 */ u8 bits_0x05;
-    /* +0x06 */ u8 unused_0x06[4];
+    /* +0x06 */ s16 cursor_x_0x06; /* the free colour cursor's spot for the entry */
+    /* +0x08 */ s16 cursor_y_0x08;
 } LbSelRec; /* size: 0xA */
 
 /* The 0xC-byte per-step argument `fn_801F3294` fills for `pl_equip_model_set`: the first byte is the kind and
@@ -128,6 +150,48 @@ extern LbSelRec lbl_805B8674[];    /* .data 0x805B8674, 0xA-byte stride selectio
 extern const s16 lbl_805B875C[];   /* .data 0x805B875C, `-2`-terminated index table */
 extern const s16 lbl_805B8768[];   /* .data 0x805B8768, `-1`-terminated value table */
 extern const s16 lbl_805B8798[];   /* .data 0x805B8798, idem for the other kind */
+extern const s16 lb_dye_grid_cells_a[16]; /* .data 0x805B8778, the dye grid's cells (kind 1) */
+extern const s16 lb_dye_grid_cells_b[16]; /* .data 0x805B87A8, the dye grid's cells (kind 2) */
+extern const s16 lb_color_grid_widths[8]; /* .data 0x805B87C8, the colour grid's row widths */
+extern const s16 lb_box_sub_str_bases[8];  /* .data 0x805B85E8, each category's first sub-row string */
+extern const u16 lb_box_sub_frame_kinds[8]; /* .data 0x805B8608, the sub frame's animation frame per row count */
+extern const u16 lb_box_top_frame[18];     /* .data 0x805B8824, the top list's frame sprites */
+extern const u16 lb_box_top_frame_alt[16]; /* .data 0x805B8848, idem off the first page */
+extern const u16 lb_box_top_row_panels[8]; /* .data 0x805B8868, the category rows' panels */
+extern const u16 lb_box_sub_frame[14];     /* .data 0x805B8878, the sub list's frame sprites */
+extern const u16 lb_box_sub_row_panels[8]; /* .data 0x805B8894, the sub rows' panels */
+extern const u16 lb_box_guide_frame[24];   /* .data 0x805B88A4, the guide frame's sprites */
+extern const u16 lb_box_pouch_tabs[10];    /* .data 0x805B88F0, the pouch tabs' sprites */
+extern const u16 lb_count_box_frame[8];    /* .data 0x805B8978, the count box's sprites */
+extern const u16 lb_combine_result_rows[8]; /* .data 0x805B8988, the combine result row's sprites */
+extern const u16 lb_model_pane_frame[16];  /* .data 0x805B8998, the model pane's frame sprites */
+extern const u16 lb_model_pane_rows[12];   /* .data 0x805B89B8, the model pane rows' layout sprites */
+extern u16 lb_color_slot_cursor_inner[6];  /* .data 0x805B89F8, the inner colour slot's cursor sprites */
+extern const u16 lb_color_pane_cell_lsp[14]; /* .data 0x805B8A80, the colour grid cells' layout sprites */
+extern const u16 lb_color_pane_grid_frame[8]; /* .data 0x805B8A9C, the colour grid's frame */
+extern const u16 lb_color_pane_free_frame[12]; /* .data 0x805B8AAC, the free colour cell's frame */
+extern const u16 lb_color_pane_grid_mark[6]; /* .data 0x805B8AC4, the colour grid's mark */
+extern const u16 lb_color_pane_frame[20];  /* .data 0x805B8AD0, the colour pane's frame */
+extern const u16 lb_dye_pane_frame[18];    /* .data 0x805B8A10, the dye pane's frame */
+extern const u16 lb_dye_part_lsp[10];      /* .data 0x805B8A34, the armour piece rows' layout sprites */
+extern const u16 lb_dye_grid_frame[20];    /* .data 0x805B8A48, the dye grid's frame */
+extern const u16 lb_dye_part_icon[8];      /* .data 0x805B8A70, the armour piece icons */
+extern const u16 lb_my_set_detail_frame[8]; /* .data 0x805B8AF8, the saved set detail's frame */
+extern const u16 lb_my_set_status_frame[8]; /* .data 0x805B8B08, the saved set status page's frame */
+extern const u16 lb_gun_set_frame[6];      /* .data 0x805B8B18, the gunner set pane's frame */
+extern const u16 lb_gun_set_panel[24];     /* .data 0x805B8B24, the gunner set pane's panel */
+extern const u16 lb_gun_set_title[10];     /* .data 0x805B8B54, the gunner set pane's title */
+extern const u16 lb_box_grid_frame[18];    /* .data 0x805B8904, the item box grid's frame */
+extern const u16 lb_box_grid_overlay[16];  /* .data 0x805B8928, the grid's overlay */
+extern const u16 lb_box_grid_rows[12];     /* .data 0x805B8948, the grid rows' layout sprites */
+extern const u16 lb_box_grid_cols[12];     /* .data 0x805B8960, the grid columns' layout sprites (+8: the cell) */
+extern u16 lb_sort_blade_classes[8];       /* .data 0x805B8618, the blade sort menu's row -> weapon class table */
+extern const u16 lb_sort_blade_titles[8];  /* .data 0x805B8628, the blade class sort's titles */
+extern u16 lb_sort_blade_classes_late[6];  /* .data 0x805B8638, the same once the late weapon classes are unlocked */
+extern const u16 lb_sort_blade_titles_late[6]; /* .data 0x805B8644, idem once the late classes are unlocked */
+extern const u16 lb_sort_order_titles[6];  /* .data 0x805B8650, the order sort's titles */
+extern const u16 lb_sort_gun_titles[6];    /* .data 0x805B865C, the bowgun sort's titles */
+extern const u16 lb_sort_gun_order_titles[6]; /* .data 0x805B8668, the bowgun order sort's titles */
 extern u16 lbl_805B8810[];         /* .data 0x805B8810, `PutPageArrow`'s sprite rows */
 extern const s16 lbl_805B85F8[];   /* .data 0x805B85F8 */
 extern u16 lbl_805B88D4[];         /* .data 0x805B88D4, the arrow's sprite rows */
@@ -141,12 +205,9 @@ void fn_801EC828(LbPageOwner* owner);
 void fn_801EC7AC(LbPageOwner* owner);
 u32 userdata_flag_ck(s32 id);
 void put_page_count(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
-void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u8 flag, s32 arg);
+void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u32 frame, _mh_ivec2_* pos);
 void equip_record_copy(LbIconRec* dst, const LbIconRec* src);
-void fn_801F8318(LbPage* self, s16 x, s16 y);
-void lb_pane_draw(void* dst, s16 x, s16 y, u8* ptr);
 void fn_801F353C(const s16* table, s16* out_max, s16* out_count);
-void fn_801F6168(u8* slots, u8* rows, u32 row, u8 kind, s16 value, u8* extra, LbPage* page);
 void sysSE_stop(s32 id);
 void fn_8004D0D8(LbWorldBlock* world, u8 id);
 void fn_8004D0E0(LbWorldBlock* world, u8 id);

@@ -970,7 +970,7 @@ void fn_802BBAC4(u8 value)
 /*
  * Arms the camera work with mode 0.
  */
-void fn_802BBAB8(void)
+void camera_lobby_menu_enter(void)
 {
     fn_802BBA2C(0);
 }

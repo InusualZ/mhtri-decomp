@@ -19,11 +19,11 @@
  *   `fn_8031B4C4`, 0x8031B624-0x8031BD50, `fn_8031BD7C`, `fn_8031C0B8`, `fn_8031C5FC`, `fn_8031C934`,
  *   0x8031CAC4-0x8031DA50, `fn_8031DA54` (the state machines, the draw passes, the cursor's record machine and the
  *   effect-model tail).  The 15 partial rows (0x8031AD30-0x8031AE38, 0x8031B2D0-0x8031B39C, 0x8031BFEC-0x8031C0B8,
- *   0x8031C338-0x8031C5FC, `fn_8031C8EC`, `fn_8031CA3C`), by cause:
+ *   0x8031C338-0x8031C5FC, `fn_8031C8EC`, `menu_sel_cursor_blend_tick`), by cause:
  *  - indexed-access fold: retail `add r3,r3,r0` + `lhz`/`sth 0x39a2(r3)`, ours `lhzx`/`sthx` (`fn_8031B2D0`,
  *    `fn_8031B2FC`, `fn_8031B31C`);
  *  - an extra narrowing (`clrlwi`/`extsh`) ours applies to a value retail stores or compares raw (`fn_8031AD30`,
- *    `fn_8031AD9C`, `fn_8031B2FC`, `menu_sel_cursor_init`, `fn_8031C01C`, `fn_8031C028`, `fn_8031C390`, `fn_8031CA3C`);
+ *    `fn_8031AD9C`, `fn_8031B2FC`, `menu_sel_cursor_init`, `menu_sel_cursor_first_set`, `fn_8031C028`, `fn_8031C390`, `menu_sel_cursor_blend_tick`);
  *  - 0xFFFF built as `lis r6,1; subi r0,r6,1` in retail, `li r0,-1` in ours (`menu_sel_cursor_init`, `fn_8031C028`);
  *  - a signed byte test (`extsb` + `cmpwi`) where ours emits `cmplwi` (`fn_8031C338`, `fn_8031C8EC`), and `lhz`
  *    where ours loads `lha` (`fn_8031C514`);
@@ -173,7 +173,7 @@ extern "C" void menu_sel_cursor_init(MenuSelCursor* cur, s8 kind, MenuSel* owner
     cur->owner_0x1C = owner;
 }
 
-extern "C" void fn_8031C01C(MenuSelCursor* cur, u16 a, u16 b) {
+extern "C" void menu_sel_cursor_first_set(MenuSelCursor* cur, u16 a, u16 b) {
     cur->slot_a_0x08 = a;
     cur->item_a_0x04 = b;
 }
@@ -286,7 +286,7 @@ extern "C" void fn_8031C8EC(MenuSelCursor* cur) {
 }
 
 /* 0x8031CA3C - the per-frame blend counters */
-extern "C" void fn_8031CA3C(MenuSelCursor* cur) {
+extern "C" void menu_sel_cursor_blend_tick(MenuSelCursor* cur) {
     if (cur->record_0x00 == NULL) {
         u8 t = cur->blend_0x20;
         if (t != 0) cur->blend_0x20 = (u8)(t - 1);

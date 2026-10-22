@@ -283,7 +283,7 @@ void lb_item_cell_draw_layout(u16 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, u
 void lb_equip_cell_draw_layout(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, u8 g, s32 h, u8 kind);
 
 /* Forwarders around LbPutAnaPageArrow that fix one of the trailing flags. */
-void fn_80215AC8(s32 a, s32 b, s32 c, s32 d, s32 e, _mh_ivec2_* pos, bool side)
+void lb_ana_page_arrow_put(s32 a, s32 b, s32 c, s32 d, s32 e, _mh_ivec2_* pos, bool side)
 {
     LbPutAnaPageArrow((u16)a, (u16)b, (s16)c, (s16)d, (u16)e, pos, side, true);
 }

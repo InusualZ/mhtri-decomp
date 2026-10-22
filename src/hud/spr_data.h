@@ -8,10 +8,18 @@
 
 #include "types.h"
 
-/* size: 0x20 (approximate: the frame `fn_801F60D4` reserves for it) */
+struct _SPR_ANIM_;
+
+/* size: 0x24 */
 typedef struct _SPR_DATA_ {
-    /* +0x00 */ u8 unused_0x00[0x1C];
+    /* +0x00 */ s16 pos_x;          /* the record's own anchor (`hud/layout_types.h`'s `pos`) */
+    /* +0x02 */ s16 pos_y;
+    /* +0x04 */ u8 unused_0x04[4];
+    /* +0x08 */ s16 width;          /* the sprite's rectangle (`hud/layout_types.h` names them alike) */
+    /* +0x0A */ s16 height;
+    /* +0x0C */ u8 unused_0x0C[0x10];
     /* +0x1C */ u32 color_0x1C;
+    /* +0x20 */ const struct _SPR_ANIM_* anim_0x20; /* the animation table the frame setters walk */
 } _SPR_DATA_;
 
 #endif /* MHTRI_HUD_SPR_DATA_H */

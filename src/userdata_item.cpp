@@ -171,7 +171,7 @@ struct BgTexDispHook {
 /* This unit's own `.bss` (`splits.txt` `.bss 0x806699B8..0x80669F68`) and `.sbss` (`0x80794878..0x80794884`), in
  * address order.  Defined at the foot of the file, after every use.  `lobby_world_block` is the cache
  * `get_userdata()` (0x8004D120) and the user-data init `fn_800497B4`/`fn_800498EC` store the 0x6000-byte
- * user-data block in; the block belongs to the user-data subsystem this band and `fn_8004C9A0`/`fn_8004CAD8` share. */
+ * user-data block in; the block belongs to the user-data subsystem this band and `equip_record_wear`/`fn_8004CAD8` share. */
 u8 sub_trans_buf[0x580];               /* +0x806699B8: the sub-transform buffer `subTransSetPrio` fills (GUESS name) */
 u8 sub_trans_state[0x30];              /* +0x80669F38: the sub-transform stack state (GUESS name) */
 BgTexDispHook bg_tex_disp_func;        /* +0x80794878 */

@@ -1,0 +1,19 @@
+/* `gun_set_record_used_ck`, defined by `src/fn_8004CAD8.cpp` (leaf header, rule 2). */
+#ifndef MHTRI_GUN_SET_RECORD_USED_CK_H
+#define MHTRI_GUN_SET_RECORD_USED_CK_H
+
+#include "types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Whether box record `id` is named by a saved gunner set. */
+/* untyped: the save block, seen by each caller through its own record view */
+u32 gun_set_record_used_ck(void* userdata, u16 id);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_GUN_SET_RECORD_USED_CK_H */

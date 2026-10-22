@@ -9,7 +9,7 @@
  * Naming note: the symbol map had only fn_XXXXXXXX for most of this range; this run named every row it
  * wrote and the rows they call inside the unit (see "Renames" below).  The rows still carrying a
  * `fn_` stem are the ones with no body yet, plus the pre-existing debt (`fn_802E1978`,
- * `fn_802E198C`, `fn_802E0A24`, `sprite_anim_last_frame`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
+ * `fn_802E198C`, `spr_anim_frame_set`, `sprite_anim_last_frame`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
  * `draw_sprite_idx_color`, `fn_802E099C`, `sprite_frame_apply`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
  * `fn_802E1D30`, `fn_802E0714`) - filed as a naming sweep, not fixed here because each needs its
  * own evidence and the two that are called from outside this unit are cross-unit sweeps.
@@ -125,7 +125,7 @@
  * the pack's OR order), `color_scale` 97.04 % (the pack's OR order), `anim_step_tex_id` 97.37 %
  * (`cur`/`prev` land in the opposite register pair), `anim_step_uv` 98.91 %, `anim_step_color`
  * 98.96 %, plus the pre-existing `fn_802E1978` 79.0 %, `fn_802E198C` 89.98 %, `fn_802E0F78` 91.05 %,
- * `fn_802E0A24` 93.86 %, `fn_802E1D30` 97.39 %, `put_button_icon_tex` 97.9 %,
+ * `spr_anim_frame_set` 93.86 %, `fn_802E1D30` 97.39 %, `put_button_icon_tex` 97.9 %,
  * `fn_802E099C` 99.88 % (the switch's arm order), `sprite_ary_last_frame` 99.4 % and `draw_sprite` 99.96 %
  * (retail materialises the 0x4330 conversion high word twice; MWCC CSEs ours, 4 bytes short).
  *
@@ -265,7 +265,7 @@ u32 fn_802E099C(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame)
 /* 0x802E0A24 (0xB0) - walk up to five animation steps of `anim`, stopping at the first whose frame
  * count has run out, and report whether any step drew.  `out` (optional) receives the record's
  * anchor, widened by `get_wide_offset(rec->wide_idx)`. */
-u32 fn_802E0A24(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* out)
+u32 spr_anim_frame_set(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* out)
 {
     u32 drawn = 0;
     s32 i;
@@ -293,7 +293,7 @@ u32 fn_802E0A24(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* 
 u32 sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out)
 {
     spr_data_copy(rec, get_lsp_data(id, 0));
-    return fn_802E0A24(rec, fn_802E0714(id), part, out);
+    return spr_anim_frame_set(rec, fn_802E0714(id), part, out);
 }
 
 /* 0x802E0B54 (0x12C) - the highest frame value the id's animation table reaches (1 when the table
@@ -360,7 +360,7 @@ u32 fn_802E0CE4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 part, const _mh_ive
     _SPR_DATA_ work = *rec;
     u32 drawn;
 
-    drawn = fn_802E0A24(&work, anim, part, 0);
+    drawn = spr_anim_frame_set(&work, anim, part, 0);
     if ((work.color & 0xFF) != 0 && work.u_scale != 0 && work.v_scale != 0) {
         draw_sprite(work, pos);
     }

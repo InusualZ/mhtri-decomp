@@ -11,7 +11,7 @@
  *   Class 1 fails: the range's `.data` run is the switch jump table `jumptable_80581544` only (no bare
  *     source-file name; the function calls no OSPanic/Panic, so no assert string exists).
  *   Class 2 fails: `tools/symbols/dumpmap.py lookup 0x8004C9A0` answers `zz_004c9a0_` (a placeholder).
- *   Class 3/4 decide it: nothing supports a descriptive name, so the map's `fn_8004C9A0` stem is kept,
+ *   Class 3/4 decide it: nothing supports a descriptive name, so the map's `equip_record_wear` stem is kept,
  *     and the unit is registered in the game-root `main` lib at `src/` - the link band whose
  *     neighbours are `main.cpp`, `sys_mem.cpp`, `fn_80040598.cpp`, `mh3_pad.cpp`, `fn_80047398.cpp`
  *     and `nw_resource.cpp`.  Its physical neighbours `set_slot_none` (0x8004CAD8) and `get_userdata`
@@ -52,7 +52,7 @@ int Gunner_opt_ok_ck(_EQUIP* equip);
 /* Selects `index` into the slot the record's kind belongs to.  Returns 0 when the kind selects
  * nothing (0 or > 15), 1 otherwise; `*out` reports the transition the caller reacts to (1 = a kind-0xB
  * record left the gunner slot, 2 = a kind-0xB record entered it). */
-extern "C" int fn_8004C9A0(UserData* self, u32 index, u8* out) {
+extern "C" int equip_record_wear(UserData* self, u32 index, u8* out) {
     *out = 0;
     _EQUIP* equip = &self->equip[(u16)index];
 

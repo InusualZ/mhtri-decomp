@@ -4705,7 +4705,7 @@ extern "C" u8 fn_80274DCC(struct _PLW* plw, u8 kind)
 }
 
 /* Gates the act's bonus sum on the act id being a live one. */
-extern "C" s32 fn_80274E00(struct _PLW* plw, u16 id)
+extern "C" s32 pl_item_pouch_ok_ck(struct _PLW* plw, u16 id)
 {
     u8 cls;
 

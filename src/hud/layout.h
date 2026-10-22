@@ -87,7 +87,7 @@ const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */
 /* This unit's own bodies, in address order. */
 void draw_sprite_idx_color(u16 id, u32 color, const _mh_ivec2_* pos);
 u32 fn_802E099C(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame);
-u32 fn_802E0A24(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* out);
+u32 spr_anim_frame_set(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* out);
 u32 sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out);
 u16 sprite_anim_last_frame(u16 id);
 u16 sprite_ary_last_frame(const u16* ids);

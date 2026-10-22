@@ -106,7 +106,7 @@ void fn_801E66A8(s32 a, s32 b);                  /* 0x801E66A8 - resets the band
 void fn_801E677C(void* work, u8 kind, u8 flag);  /* 0x801E677C - initialises one sub-work record */
 void fn_801E68B4(void* work, u8 flag);           /* 0x801E68B4 - ditto, one argument */
 s16 lb_digit_pane_value(void* work);                     /* 0x801EF73C - the icon index of the sub-work (s16) */
-s32 fn_801F0834(void* work);                     /* 0x801F0834 - non-zero while the sub-work is live */
+s32 lb_entry_pane_busy_ck(void* work);                     /* 0x801F0834 - non-zero while the sub-work is live */
 s32 lb_kakou_icon_build(LbIconRec* icon, s32 flag, void* table_a, void* table_b);
 s32 lb_panel_msg_draw(s32 page, s16 id);               /* the 0x1877 panel's primary text */
 s32 lb_help_num_put(s32 page, s32 id, void* data);   /* the same panel's row text plus its data */
@@ -116,8 +116,8 @@ s32 lb_equip_state_get(LbIconRec* icon);                /* non-zero while the re
 s32 lb_row_init(LbIconRec* icon, u8 kind, u16 value); /* fills a record from a kind and a value */
 s32 lb_equip_bg_draw(void);                           /* 0x8021A5FC - the banner/message step */
 s32 equip_kind_table_class(u8 kind);                        /* the equipment kind's row-table class (Pl) */
-s32 fn_8027F1B8(LbIconRec* icon);                /* the record's stack count (Pl) */
-s32 fn_8027F21C(LbIconRec* icon);                /* the record's "held" test (Pl) */
+s32 equip_deco_count(LbIconRec* icon);                /* the record's stack count (Pl) */
+s32 equip_deco_slots_free(LbIconRec* icon);                /* the record's "held" test (Pl) */
 s32 menu_money_draw(s32 id);                         /* 0x802DF6E4 - the HUD/2D element release */
 s32 lb_deli_menu_draw(void);                           /* 0x8033C1AC - the companion-page step */
 void fn_803642B8(LbMenuPage* self);              /* 0x803642B8 - the band's per-state draw arms */
@@ -212,7 +212,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
     case 10:
         switch (self->mode_0x01) {
         case 0:
-            if (fn_801F0834(&self->work_0x3A4) != 0) {
+            if (lb_entry_pane_busy_ck(&self->work_0x3A4) != 0) {
                 break;
             }
             page = 6264;
@@ -257,7 +257,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                     if ((u8)equip_kind_table_class(rec->kind_0x00) == 1 && rec->kind_0x00 != 11) {
                         if ((flags & 0x100) != 0) {
                             msg_b = 123;
-                        } else if (fn_8027F1B8(rec) > 0) {
+                        } else if (equip_deco_count(rec) > 0) {
                             msg_b = 122;
                             arg_c = 5;
                         }
@@ -325,7 +325,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
     case 7:
         switch (self->mode_0x01) {
         case 0:
-            if (fn_801F0834(&self->work_0x3A4) != 0) {
+            if (lb_entry_pane_busy_ck(&self->work_0x3A4) != 0) {
                 break;
             }
             page = 6264;
@@ -334,7 +334,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             if (icon.kind_0x00 == 0) {
                 break;
             }
-            if (fn_8027F21C(&icon) != 0) {
+            if (equip_deco_slots_free(&icon) != 0) {
                 break;
             }
             msg_b = 105;
@@ -369,7 +369,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
     case 8:
         switch (self->mode_0x01) {
         case 0:
-            if (fn_801F0834(&self->work_0x3A4) != 0) {
+            if (lb_entry_pane_busy_ck(&self->work_0x3A4) != 0) {
                 break;
             }
             page = 6264;
@@ -378,7 +378,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             if (icon.kind_0x00 == 0) {
                 break;
             }
-            if (fn_8027F1B8(&icon) != 0) {
+            if (equip_deco_count(&icon) != 0) {
                 break;
             }
             msg_b = 112;
