@@ -114,6 +114,8 @@ u32 em_ground_snap_offset_ck(struct _ENEMY_WORK* self, f32 offset);
 void em_fall_speed_set(struct _ENEMY_WORK* self, f32 speed);
 /* 0x8013063C */
 void em_joint_drop_start(struct _ENEMY_WORK* self, u32 joint);
+/* 0x80133BA4 - sets the +0x762 latch with the timer `frames`. */
+void em_latch_0x762_set(struct _ENEMY_WORK* self, s16 frames);
 /* 0x80131EF0 - arms the +0x81E timer for 2 frames. */
 void em_timer_0x81E_arm(struct _ENEMY_WORK* self);
 /* 0x80131D90 */

@@ -285,7 +285,7 @@ struct EmRunPos {
     /* +0x00 */ nw4r::math::VEC3 pos;  /* the position saved and restored */
     /* +0x0C */ u16 angle;             /* the heading saved with it */
     /* +0x0E */ u8 flags;              /* bit 0: a saved position is present */
-    /* +0x0F */ u8 unused_0x0F;
+    /* +0x0F */ u8 valid_0x0F;          /* set once the block holds a position (`enemy/em040_ai.cpp`) */
 };
 
 struct _ENEMY_WORK {
@@ -438,7 +438,9 @@ struct _ENEMY_WORK {
     /* +0x228 */ u16 field_0x228;      /* `enemy/em018_prog.cpp`'s `fn_8019D8B8` case 4: the low
                                         * two bits are the "blocked" gate (`lhz` + `clrlwi ...,30`). */
     /* +0x22A */ u8 water_area_0x22A;  /* bit 7: lava; bits 0-6: the water area `em_phase_get` returns */
-    /* +0x22B */ u8 unused_0x22B[0x23C - 0x22B];
+    /* +0x22B */ u8 unused_0x22B[0x22F - 0x22B];
+    /* +0x22F */ u8 cell_0x22F;        /* the stage cell colour index `enemy/em040_ai.cpp`'s tint reads */
+    /* +0x230 */ u8 unused_0x230[0x23C - 0x230];
     /* +0x23C */ u8 field_0x23C;       /* the action-ready byte `enemy/em004_act.cpp`'s
                                         * `em004_state_query` case 0 reports */
     /* +0x23D */ u8 unused_0x23D[0x240 - 0x23D];
@@ -664,7 +666,8 @@ struct _ENEMY_WORK {
          * (`plw_0x32C` is the +0x328 move that unit latched); a union member because the views above already own these
          * bytes. */
         struct {
-            /* +0x328 */ u8 unused_0x328em[0x32C - 0x328];
+            /* +0x328 */ u16 item_0x328;    /* the item `enemy/em030_prog.cpp`'s steal latched (0 = none) */
+            /* +0x32A */ u8 unused_0x32Aem[0x32C - 0x32A];
             /* +0x32C */ _PLW* plw_0x32C;  /* the player work `fn_801B0230` latched the +0x328 move
                                             * on (NULL when nothing is latched) */
             /* +0x330 */ u8 field_0x330;   /* the value the em030 condition hook
@@ -768,6 +771,22 @@ struct _ENEMY_WORK {
         } em017_0x328; /* size: 0x2C */
         /* the em025 program's block (`enemy/em025_prog.cpp`). */
         struct Em025Block em025_0x328;
+        /* the em040 program's own fields (`enemy/em040_ai.cpp`): the tint latch, the escape flag, the call timers,
+         * the leader it follows and the leap's landing and peak points.  The leap's drift vector starts at +0x34C
+         * and runs on into the +0x354 word, so the view keeps its first two floats and the unit reads it as a
+         * vector there.  A union member because the views above already own these bytes.  size: 0x2C */
+        struct {
+            /* +0x328 */ u8 tint_done_0x328;      /* set once the water tint has been applied */
+            /* +0x329 */ u8 escape_0x329;         /* the landing point is out of reach: leave through action 11 */
+            /* +0x32A */ s16 call_timer_0x32A;    /* the frames left to wait for the leader's call (1800) */
+            /* +0x32C */ s16 call_delay_0x32C;    /* the staggered delay before answering, -1 = not yet ranked */
+            /* +0x32E */ u8 call_state_0x32E;     /* 0 waiting, 1 called, 2 answered */
+            /* +0x32F */ u8 se_alt_0x32F;         /* picks the second landing sound */
+            /* +0x330 */ struct _ENEMY_WORK* leader_0x330;  /* the live kind-9 work found at init */
+            /* +0x334 */ nw4r::math::VEC3 land_0x334;   /* where the leap ends */
+            /* +0x340 */ nw4r::math::VEC3 peak_0x340;   /* the leap's top point */
+            /* +0x34C */ f32 drift_0x34C[2];            /* the body's offset from the landing point (x, y; z is +0x354) */
+        } em040_0x328; /* size: 0x2C */
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four

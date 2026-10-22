@@ -14,7 +14,7 @@
  * header (rule 2: a declaration belongs with its owner's TU). */
 #include "enemy/fn_8012E968.h"
 /* The same for the enemy range `enemy/fn_801502C8.cpp` owns (0x801502C8-0x801545B8):
- * `fn_80154784`/`fn_80154CA4`/`fn_801545B8` were declared in this band header, and this re-exports
+ * `em001_act13_early_ck`/`fn_80154CA4`/`fn_801545B8` were declared in this band header, and this re-exports
  * the owner's header so the consumers that include this one keep them (rule 2). */
 #include "enemy/fn_801502C8.h"
 #include "enemy/em_common.h"
@@ -195,7 +195,7 @@ void fn_80170E78(struct _ENEMY_WORK* self);
 void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
 void em_mot_set_blend_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
-/* `fn_80154784` (0x80154784) was declared here (from `enemy/fn_801B0010.cpp`'s call site) as
+/* `em001_act13_early_ck` (0x80154784) was declared here (from `enemy/fn_801B0010.cpp`'s call site) as
  * `u32 (struct _ENEMY_WORK*)` while the band had no registered unit.  `enemy/fn_801502C8.cpp` owns
  * 0x801502C8-0x801545B8 now, and its header `enemy/fn_801502C8.h` declares the symbol with
  * that same unsigned spelling (the call site reads the answer unsigned) - this band header includes

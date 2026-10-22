@@ -24,6 +24,10 @@ void eft019_set_vec(nw4r::math::VEC3* pos, struct _CP_VECTOR* rot, u8 area, u8 t
 /* 0x801127A4 - spawns a landing record that keeps only the rotation's yaw, with a scale. */
 void eft019_set_tyakudan(nw4r::math::VEC3* pos, struct _CP_VECTOR* rot, u8 area, u8 type, f32 scale);
 
+/* 0x80112994 - spawns a record of a subtype with its rotation, timer and scale (`eft019_set_subtype__FUcUcPQ34nw4r4math4VEC3UcP10_CP_VECTORlf`).
+ * `enemy/em040_ai.cpp` calls it. */
+void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, struct _CP_VECTOR* rot, s32 timer, f32 scale);
+
 /* 0x80114C20 - spawns the eft020 record keyed `key` on an actor, in the actor's area; C linkage (the map row is
  * unmangled).  `Pl/pl_act.cpp` and `Pl/pl_act_step.cpp` pass the player work. */
 extern "C" {

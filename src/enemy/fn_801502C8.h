@@ -19,7 +19,7 @@ extern "C" {
 
 /* 0x80154784 - whether the work record's action is armed (its answer is compared against 1 -
  * `enemy/em030_prog.cpp`'s call site reads it unsigned, so the definition returns `u32`). */
-u32 fn_80154784(struct _ENEMY_WORK* self);
+u32 em001_act13_early_ck(struct _ENEMY_WORK* self);
 
 /* 0x80154CA4 - clamps the record's +0x1AC counter after `em_height_add`. */
 void fn_80154CA4(struct _ENEMY_WORK* self);

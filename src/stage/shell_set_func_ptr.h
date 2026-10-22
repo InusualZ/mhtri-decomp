@@ -13,7 +13,9 @@
 
 /* size: 0x90 */
 struct ShellSetFuncs {
-    /* +0x00 */ u8 pad_0x00[0x14];
+    /* +0x00 */ u8 pad_0x00[0x08];
+    /* +0x08 */ void (*method_0x08)(nw4r::math::VEC3* pos, u32 kind, u32 area, u32 a);
+    /* +0x0C */ u8 pad_0x0C[0x14 - 0x0C];
     /* +0x14 */ void (*method_0x14)(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a, u32 b, u16 c,
                                     ShellSetFuncs* table);
     /* +0x18 */ void (*method_0x18)(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32* angle, u32 a, u32 b,

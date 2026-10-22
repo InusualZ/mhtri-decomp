@@ -47,7 +47,7 @@ u32 fn_8012E21C(u32 state, u32 action);
 /* 0x8012C300 / 0x8012C3C8 - the owner's own signatures: `(u32 team, u32 state_sub)` and
  * `(u32 team, u32 state_sub, void* ref, f32 radius)`. */
 s32 em_team_area_alert_set(u32 team, u32 state_sub);
-s32 fn_8012C3C8(u32 team, u32 state_sub, void* ref, f32 radius);
+s32 em_team_area_alert_set_near(u32 team, u32 state_sub, void* ref, f32 radius);
 
 /* Whether more than `seconds` have passed since the last frame stamp. */
 s32 fn_8012E8F4(f32 seconds);

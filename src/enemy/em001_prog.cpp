@@ -5288,7 +5288,7 @@ s32 fn_80154638(struct _ENEMY_WORK* self, u8 arg1) {
 
 /* 0x80154784 (0x28) - is the action one of the glide steps?  `u32`: `enemy/em030_prog.cpp`'s call
  * site compares it against 1 unsigned. */
-u32 fn_80154784(struct _ENEMY_WORK* self) {
+u32 em001_act13_early_ck(struct _ENEMY_WORK* self) {
     if (self->action == 0xD && self->state_sub <= 4) {
         return 1;
     }

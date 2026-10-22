@@ -123,4 +123,7 @@ void pl_coll_table_clear(void);
 /* 0x80291664 - the ground height under `pos`; `hit` receives the hit flag (C++ linkage: the map's mangling). */
 f32 GetGroundHit2(nw4r::math::VEC3* pos, u32 ground, u8 flag, u8* hit);
 
+/* 0x8029163C - the ground height under `pos` without the hit flag (C++ linkage: the map's mangling). */
+f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag);
+
 #endif /* MHTRI_PL_PL_COLL_H */
