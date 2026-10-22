@@ -135,7 +135,7 @@ typedef struct SndSeSlot {
 typedef struct SndWork {
     /* +0x0000 */ u8   pad_0000[0x04];
     /* +0x0004 */ u32  total_size;      /* the running file offset both bank walkers leave behind */
-    /* +0x0008 */ u32  bank_base_2;     /* cursor `fn_800F0D88` walks from */
+    /* +0x0008 */ u32  bank_base_2;     /* cursor `snd_em_bank_level_load` walks from */
     /* +0x000C */ u32  bank_base_1;     /* cursor `snd_bank_layout` walks from */
     /* +0x0010 */ u32  whd_ofs[0x31];   /* per chunk: the `whd` half's offset */
     /* +0x00D4 */ u32  whd_size[0x31];  /*               ... and its size */
@@ -152,7 +152,7 @@ typedef struct SndWork {
     /* +0x970A */ u8   se_slot_num[6];  /* its refcount */
     /* +0x9710 */ u8   se_slot_bank[6]; /* get_em_se_bank returns it */
     /* +0x9716 */ u8   se_slot_idx[6];  /* the request id fn_800F0F9C loads for it */
-    /* +0x971C */ u8   se_auto[2];      /* fn_800F0D88's {start, count} */
+    /* +0x971C */ u8   se_auto[2];      /* snd_em_bank_level_load's {start, count} */
     /* +0x971E */ u8   chunk_handle[0x31]; /* snd_bank_layout clears it to 0xFF; nothing reads it here */
     /* +0x974F */ u8   pad_974F[0x25];
     /* +0x9774 */ u8   chunk_ready[0x31]; /* both halves are in */
@@ -366,7 +366,7 @@ extern "C" void fn_800F08E8(u8 arg0);
 extern "C" void fn_800F0AD0(u8 arg0);
 extern "C" s8 fn_800F0C14(s32 chunk);
 extern "C" u8 fn_800F0C74(u8 id);
-extern "C" void fn_800F0D88(u8 kind);
+extern "C" void snd_em_bank_level_load(u8 kind);
 extern "C" void fn_800F0EA0(void);
 extern "C" void snd_em_se_slot_release(u8 id);
 extern "C" void fn_800F0F9C(u8 id);
@@ -1001,7 +1001,7 @@ extern "C" u8 fn_800F0C74(u8 id)
 }
 
 /* Lays the per-kind bank table out and records which stream slots it may use. */
-extern "C" void fn_800F0D88(u8 kind)
+extern "C" void snd_em_bank_level_load(u8 kind)
 {
     SndChunkRec* rec;
     u32 cur;

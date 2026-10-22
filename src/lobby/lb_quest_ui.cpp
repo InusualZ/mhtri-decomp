@@ -2402,7 +2402,7 @@ void lb_scene_eft_release(_EFT* self) {
     s32 i;
     LbSceneEftWork* work = (LbSceneEftWork*)self->work_0x38;
     for (i = 0; i < work->count; i++) {
-        fn_800E26C4(work->models[i]);
+        mhchar_model_release(work->models[i]);
         eft_res_models_release((void*)&work->models[i], 1);
     }
 }

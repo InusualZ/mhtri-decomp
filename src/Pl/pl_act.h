@@ -98,7 +98,7 @@ void fn_80278674(struct _PLW* self, s16 motion, u8 a);
 /* The act entry and frame step call these: 0x8027AC2C is the act's status-block store, 0x80278BE4 the act tail
  * the frame step falls into. */
 void fn_8027AC2C(struct _PLW* self, u32 a, u32 b);
-void fn_80278BE4(struct _PLW* self);
+void pl_ride_down_set(struct _PLW* self);
 
 /* 0x80277974 - the shared attack set-up the shell band's `fn_80284204` fills its attack entry with
  * (`hit` is this unit's `_HIT_W`, spelled `void*` here so the consumer needs no type of its own). */

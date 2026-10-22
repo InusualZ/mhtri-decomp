@@ -125,7 +125,7 @@ int MHchar::get_joint_num(void)
 }
 
 /* Store the model's +0x38 word. */
-extern "C" void fn_800E0BE8(MHchar* self, s32 value)
+extern "C" void mhchar_draw_mode_set(MHchar* self, s32 value)
 {
     self->field_0x38 = value;
 }

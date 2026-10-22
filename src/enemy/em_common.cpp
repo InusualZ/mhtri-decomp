@@ -840,7 +840,7 @@ extern "C" void fn_8012554C(struct _ENEMY_WORK* self)
 
 extern "C" u8 fn_80125F88(u32 idx)
 {
-    return lbl_805A1ADC[(u8)idx];
+    return em_kind_index_tbl[(u8)idx];
 }
 
 extern "C" u32 enemy_kind_same_ck(u32 a, u32 b)
@@ -856,7 +856,7 @@ extern "C" u32 fn_80125FF0(u32 a, u32 b)
 extern "C" u8* em_rank_rec_get(struct _ENEMY_WORK* self)
 {
     EnemyData* data = get_enemy_data(self);
-    u8* result = fn_8014260C(data->field_0x0E);
+    u8* result = em_stat_tbl_get(data->field_0x0E);
     if (result != NULL) {
         return result + self->field_0x7C8 * 0x1C;
     }
@@ -5189,7 +5189,7 @@ extern "C" s32 em_spawn_rec_live_ck(_ENEMY_WORK* self)
 }
 
 /* 0x8012E718 (0x10): the same test for the halfword id at +0x16 (the two counter bytes read as one). */
-extern "C" s32 em_spawn_rec_live_ck2(_ENEMY_WORK* self)
+extern "C" u32 em_spawn_rec_live_ck2(_ENEMY_WORK* self)
 {
     return fn_8012E6A0(self->field_0x00C, *(u16*)&self->field_0x016);
 }
@@ -6619,7 +6619,7 @@ extern "C" void em_sight_copy(EmSight* dst, EmSight* src)
 extern "C" u32 em_sight_player_ck(_ENEMY_WORK* self, EmSight* sight, nw4r::math::VEC3* eye, nw4r::math::VEC3* target,
                                   u32 angle, f32 dist)
 {
-    SenkoRec* smoke = emc_work.marker_0x130;
+    KemuriRec* smoke = emc_work.marker_0x130;
     s32 i;
     PlSegment seg;
     PlSegmentBox box;
@@ -9196,15 +9196,6 @@ extern "C" u32 em_data_word_get(_ENEMY_WORK* self)
     }
     return 0;
 }
-
-/* A joint point set: the joint, the point count and the joint-local points.
- * size: 0xC */
-struct EmJointPoints {
-    /* +0x0 */ u32 joint;
-    /* +0x4 */ u8 count;
-    /* +0x5 */ u8 pad_0x5[3];
-    /* +0x8 */ nw4r::math::VEC3* points;
-};
 
 /* 0x80136C20 (0xF4): transforms a joint point set into world space into `out`; returns the point count. */
 extern "C" u8 em_joint_points_get(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VEC3* out)

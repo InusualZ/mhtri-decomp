@@ -566,13 +566,13 @@ void lb_act_row_apply(u8 unused, LbActReq* req) {
     }
 }
 
-/* Act 15: sends the 0x2C-byte sub-0x0F text packet built from the caller's block; with the link down, `fn_80142C58`. */
+/* Act 15: sends the 0x2C-byte sub-0x0F text packet built from the caller's block; with the link down, `em_small_spawn_stat`. */
 void lb_sub0f_send(u8 index, u8 value, void* text, u16 id, u8 flag, f32 scale) {
     LbCmdSub0F cmd;
 
     lb_sub0f_init(&cmd);
     if (isServerSelectState() == 0) {
-        fn_80142C58(value, text, id, flag, scale);
+        em_small_spawn_stat(value, text, id, flag, scale);
         return;
     }
     ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0xF);
@@ -603,19 +603,19 @@ LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd) {
     return cmd;
 }
 
-/* The link-down half of act 15: hands the packet's own fields straight to the text writer `fn_80142C58`. */
+/* The link-down half of act 15: hands the packet's own fields straight to the text writer `em_small_spawn_stat`. */
 void lb_text_apply(u8 unused, LbCmdSub0F* cmd) {
     void* text = cmd->text_0x0C.bytes_0x00;
 
-    fn_80142C58(cmd->value_0x04, text, cmd->id_0x06, cmd->flag_0x05, cmd->scale_0x08);
+    em_small_spawn_stat(cmd->value_0x04, text, cmd->id_0x06, cmd->flag_0x05, cmd->scale_0x08);
 }
 
-/* Sends the sub-0x10 command with one signed byte, or hands it to `fn_80146C00` when the link is down. */
+/* Sends the sub-0x10 command with one signed byte, or hands it to `em_res_peer_count_inc` when the link is down. */
 void lb_sub10_send(u8 index, s8 value) {
     LbCmdSub10 cmd;
 
     if (isServerSelectState() == 0) {
-        fn_80146C00(value, index);
+        em_res_peer_count_inc(value, index);
         return;
     }
     ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0x10);
@@ -623,9 +623,9 @@ void lb_sub10_send(u8 index, s8 value) {
     broadcastSessionCommand(&cmd, 5);
 }
 
-/* Act 16: hands the request's byte and the pad index to `fn_80146C00`. */
+/* Act 16: hands the request's byte and the pad index to `em_res_peer_count_inc`. */
 void lb_act_byte_apply(u8 unused, LbActReq* req) {
-    fn_80146C00((s8)req->sel_0x04.bytes_0x00.a_0x00, req->index_0x01);
+    em_res_peer_count_inc((s8)req->sel_0x04.bytes_0x00.a_0x00, req->index_0x01);
 }
 
 /* Sends the sub-0x11 command with two signed bytes.  GUESS name: caller unwritten. */

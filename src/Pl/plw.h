@@ -977,6 +977,13 @@ struct _PLW {
                                             * `fn_80247EF0` clears when it enters the chase */
             /* +0x586 */ u8 pad_0x586[0x12];
         };
+        struct {   /* the enemy-ride view `enemy/enemy_control.cpp`'s `pl_ride_move` keeps */
+            /* +0x584 */ u8 ride_pad_0x584[0x4];
+            /* +0x588 */ VEC3 ride_ofs_0x588;   /* the last frame's push off the ridden enemy */
+            /* +0x594 */ u8 ride_joint_0x594;   /* the ridden enemy's joint */
+            /* +0x595 */ u8 ride_enemy_0x595;   /* the ridden enemy's work index */
+            /* +0x596 */ u8 ride_pad_0x596[0x2];
+        };
     };
     /* +0x598 */ u16 field_0x598;   /* the three act fields `cockpit_ticket_acquire` is handed the address of
                                     * (`Pl/pl_act_step.cpp` reads it) */

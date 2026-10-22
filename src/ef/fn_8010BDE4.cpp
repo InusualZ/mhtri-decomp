@@ -171,7 +171,7 @@ void mtx34_inverse(nw4r::math::MTX34* out, nw4r::math::MTX34* src);
 s32 fn_8006FDCC(void* handle);
 void fn_800DAA4C(nw4r::math::VEC3* pos);
 s32 fn_800E0A8C(MHchar* model);
-void fn_800E0BE8(MHchar* model, s32 value);
+void mhchar_draw_mode_set(MHchar* model, s32 value);
 void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
 void* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(void* self);
@@ -517,7 +517,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
 
     if (self->type_0x02 >= 2) {
         MHchar* model = work->models_0x1c[0];
-        fn_800E0BE8(model, 1);
+        mhchar_draw_mode_set(model, 1);
         model->move(0);
         fn_8010CD68(self, work->models_0x1c, work->count_0x18);
     } else {
@@ -528,7 +528,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
             fn_8010D12C(&mtxB, &mtxB);
             s = fn_8010D1A8(self, i, f31);
             setVector3(&model->scale_0x1C, s, s, s);
-            fn_800E0BE8(model, 1);
+            mhchar_draw_mode_set(model, 1);
             model->move2(&mtxB, 0);
         }
     }

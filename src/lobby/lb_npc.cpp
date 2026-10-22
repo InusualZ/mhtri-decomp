@@ -537,7 +537,7 @@ void fn_801FD174(_LB_NPC* self);
 void fn_801FD338(_LB_NPC* self, u8* data);
 u32 fn_802FB600(void);
 void em007_npc_model_eft_start(u8 index);
-void fn_800E26C4(u8* self);
+void mhchar_model_release(u8* self);
 void res_file_ctor(void* out, s32 zero);
 void res_file_assign(void* a, void* b);
 void fn_800E3358(s32 a, u8* b, void* c);
@@ -637,7 +637,7 @@ void lb_npc_model_release_all(void)
                 npc->field_0x164 = 0;
                 npc->field_0x170 = 0;
             }
-            fn_800E26C4(npc->body_0x058);
+            mhchar_model_release(npc->body_0x058);
         }
         npc++;
     }

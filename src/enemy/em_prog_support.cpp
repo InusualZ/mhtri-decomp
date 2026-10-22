@@ -124,7 +124,7 @@ void push_g3d_wk(_g3d_work* wk);
 extern "C" {
 void res_file_ctor(void* obj, s32 flag);
 void se_handle_clear(s32 handle);
-void fn_800E26C4(void* chr);
+void mhchar_model_release(void* chr);
 void g3d_root_model_bind(s32 root, u32 id);
 void fn_80385828(NoteWork* self);
 void fn_803858F8(NoteWork* self);
@@ -501,7 +501,7 @@ extern "C" NoteWork* fn_803851D4(void) {
 /* 0x80385478 - tears one seat record down. */
 extern "C" void fn_80385478(NoteWork* self) {
     if (self->field_0x000 != 0) {
-        fn_800E26C4(&self->model);
+        mhchar_model_release(&self->model);
         if (self->view.g3d_0x110 != 0) {
             push_g3d_wk(self->view.g3d_0x110);
             self->view.g3d_0x110 = 0;

@@ -1,5 +1,5 @@
 /* enemy/fn_80138074.cpp - the enemy "user data" driver and its accessors, two clusters of one TU: the `_ENEMY_WORK`
- *   per-frame driver (0x80138074-0x801391E8: `fn_8013823C` the per-tick update, `fn_80138B60` the sleep/death half
+ *   per-frame driver (0x80138074-0x801391E8: `fn_8013823C` the per-tick update, `em_post_update` the sleep/death half
  *   and their helpers) and the `ResUserDataAc` accessor with the per-entity user-data state machine
  *   (0x801394B8-0x8013AC08).
  * RANGE. .text 0x80138074-0x8013ACC4 (73 functions); .data 0x805A1358-0x805A1530, .sdata 0x807919F0-0x80791A20,
@@ -12,7 +12,7 @@
  *   em_userdata_record_find_back is a GUESS (0x8013AC08); em_res_user_data_ck is a GUESS (0x801391E8);
  *   joint_mtx_store is a GUESS (0x80139A64); joint_mtx_load is a GUESS (0x80139A7C).
  * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`fn_80139B6C`, the per-item matrix builder).
- *  - `fn_80138074`, `fn_8013823C`, `fn_80138B60`, `fn_801391FC`, `fn_801394D4`, `em_userdata_record_find_back`,
+ *  - `fn_80138074`, `fn_8013823C`, `em_post_update`, `fn_801391FC`, `fn_801394D4`, `em_userdata_record_find_back`,
  *    `em_userdata_state_kind_get`, `em_res_user_data_dtor`, `fn_80139858`: register colouring, a narrowing mask or a fused compare still
  *    differs with the scoped `#pragma peephole off` (see SHAPES);
  *  - `fn_801391FC`, `fn_80139620`: ours converts int to float through the object's own `.sdata2` magic where retail
@@ -165,7 +165,7 @@ void fn_80138074(EnemyWork* self, u8 arg1);
 void em_userdata_motion_head_load(EnemyWork* self);
 void fn_801381F4(EnemyWork* self);
 void fn_8013823C(EnemyWork* self);
-void fn_80138B60(EnemyWork* self);
+void em_post_update(EnemyWork* self);
 void fn_80138E18(EnemyWork* self);
 void fn_80138E28(EnemyWork* self);
 void fn_80138E64(EnemyWork* self);
@@ -915,7 +915,7 @@ void fn_8013823C(EnemyWork* self) {
 
 #pragma peephole on
 /* The sleep/death half of the per-frame update. */
-void fn_80138B60(EnemyWork* self) {
+void em_post_update(EnemyWork* self) {
     s32 found;
 
     if (self->field_0x1DE != 0) {

@@ -511,7 +511,7 @@ extern u8 lbl_805E1ED0[];
 
 /* The enemy module's id lookup; the mangling is
  * `em_get_unique_work__FUsPP11_ENEMY_WORKPP16_ENEMY_MINI_WORK`. */
-u32 em_get_unique_work(u16 id, _ENEMY_WORK** out, struct _ENEMY_MINI_WORK** mini);
+u8 em_get_unique_work(u16 id, _ENEMY_WORK** out, struct _ENEMY_MINI_WORK** mini);
 
 #endif
 

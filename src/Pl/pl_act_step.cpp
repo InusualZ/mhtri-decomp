@@ -3340,7 +3340,7 @@ void fn_8025FA00(_PLW* self) {
                 }
                 if (self->field_0x00A != 8) {
                     if (Pl_master_ck(self) == 1 && self->field_0x370 <= 0) {
-                        fn_80278BE4(self);
+                        pl_ride_down_set(self);
                         return;
                     }
                     pl_act_enter(self, 6, 52, 0);
@@ -3378,7 +3378,7 @@ void fn_8025FA00(_PLW* self) {
                     self->vec_0x03C.y = self->field_0x064;
                     self->kind_0x09 = 3;
                     if (Pl_master_ck(self) == 1 && self->field_0x370 <= 0) {
-                        fn_80278BE4(self);
+                        pl_ride_down_set(self);
                     } else {
                         pl_act_enter(self, 0, 151, 12);
                     }

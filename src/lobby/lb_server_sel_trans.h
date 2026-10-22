@@ -18,6 +18,9 @@ u8 get_demo_no(void);
 extern "C" {
 #endif
 
+/* 0x803C4840 - the word the demo work holds at +0x04 (its frame). */
+u32 get_demo_data(void);
+
 /* The demo work's per-frame pass (0x803C4BA0..; unwritten). */
 void demo_work_process(struct DemoWork* work);
 

@@ -11,6 +11,7 @@
 #include "nw4r/math.h"                /* nw4r::math::VEC3 (Q_MoveWork) */
 #include "quest/quest_result_work.h"   /* Q_QuestStat, Q_ResultWork (shared with menu/ and lobby/) */
 #include "id_value.h"                 /* IdValue (Q_UserData's item box) */
+#include "enemy/ENEMY_MINI_WORK.h"     /* _ENEMY_MINI_WORK (QuestBossSpawn) */
 
 /* The player work record `quest_item_work_merge`'s first argument points at (defined in `pl.h`);
  * nothing here reads it, so the forward declaration is all this header needs. */
@@ -351,12 +352,9 @@ struct Q_UserData {
 };  /* size: 0x6000 */
 
 struct QuestEntrySlot;
-/* What a large monster's spawn hands back: a record whose +0x30 is the enemy work.  Only that word is read
- * here. size: 0x34 (approximate: the highest offset this band reads + 4) */
-typedef struct QuestBossSpawn {
-    /* +0x00 */ u8 unused_0x00[0x30];
-    /* +0x30 */ struct _ENEMY_WORK* enemy_0x30;
-} QuestBossSpawn;
+/* What a large monster's spawn hands back: the area record `em_large_spawn` files the monster under (its +0x30 is
+ * the linked enemy work); the layout is `enemy/ENEMY_MINI_WORK.h`'s. */
+typedef struct _ENEMY_MINI_WORK QuestBossSpawn;
 /* One 0x10-byte spawn record of the move work: the spawn order, the slot's count and monster, the slot it
  * came from and the large-monster record (NULL for a small one). size: 0x10 */
 typedef struct QuestSpawnRec {

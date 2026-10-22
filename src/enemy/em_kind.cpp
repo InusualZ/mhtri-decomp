@@ -3,7 +3,7 @@
  *   file loader that `load_file_req` drives (`em_kind_release`).
  * RANGE. .text 0x8013BE60-0x801411B8 (123 functions); .data 0x805A19D0-0x805A1A80, .sdata2 0x80796D90-0x80796DC8,
  *   extab, extabindex.  The interpreter walks `prog_0xA00` (3-byte `EmProgTbl` entries) through the `emNNN_prog_tbl`
- *   array `lbl_805A1B34` and the 0x6D-byte command-length table `lbl_805A1530`.
+ *   array `em_prog_tbl_list` and the 0x6D-byte command-length table `lbl_805A1530`.
  * NAMES. `em_kind_release` (0x80141050, the dump answers only `zz_`) and the static `em_prog_trace2` are GUESSES from
  *   their bodies, and the file name `em_kind` is a GUESS from `em_kind_release`; the other rows keep the map's `fn_`
  *   stems.
@@ -264,7 +264,7 @@ void load_file_req(char* name, u32 data, s32 size, u32 callback, s32 flag, u32* 
 struct EmcWork {
     /* +0x00 */ u8 field_0x00;   /* the id `fn_800E3358` gets back */
     /* +0x01 */ u8 unused_0x01;
-    /* +0x02 */ u8 index_0x02;   /* `fn_80146F10`'s file-table index */
+    /* +0x02 */ u8 index_0x02;   /* `em_res_buffer_alloc`'s file-table index */
     /* +0x03 */ u8 flags_0x03;   /* bit 0 = the sound proc was requested, bit 1 = the other file */
     /* +0x04 */ u8 unused_0x04[4];
     /* +0x08 */ s32 handle_0x08; /* the first file's handle */
@@ -311,7 +311,7 @@ struct SystemWorkTables {
     /* +0x898 */ u32** tables_0x898;
 };
 
-/* the handle record `fn_800D5418` returns, as `fn_80140CA0`/`fn_80140EE8` read it (its +0x44 word
+/* the handle record `nw_res_entry_get` returns, as `fn_80140CA0`/`fn_80140EE8` read it (its +0x44 word
  * is handed to `res_file_assign`) */
 struct EmHandleRec {
     /* +0x00 */ u8 unused_0x00[0x44];
@@ -342,16 +342,16 @@ void fn_8013C244(_ENEMY_WORK* self, u8* in, u32 id);
 void fn_8013AA00(_ENEMY_WORK* self);
 u32 pl_act_grabbed_ck(EmAreaWork* rec);
 u32 stg_area_flag_index_ck(u8 id);
-char* fn_80146F10(u8 id);
-void fn_80146B98(s32 id);
-u32 fn_80146DF4(u8 id);
-u8 fn_80141470(u8 id);
+char* em_res_buffer_alloc(u8 id);
+void em_res_peer_count_dec(s32 id);
+u32 em_res_buffer_claim(u8 id);
+u8 em_kind_slot_claim(u8 id);
 u8 em_kind_slot_find(u8 id);
-void fn_801414C8(void* work);
-void fn_80147160(u8 id);
-u8 fn_80147550(u8 id);
-s32 fn_80147684(u8 id, s32 a);
-void fn_801411B8(void* str);   /* owner: `enemy/enemy_control.cpp`'s range, the next proposal */
+void em_kind_slot_ready_set(void* work);
+void em_sub_buffer_claim(u8 id);
+u8 em_sub_buffer_refs_get(u8 id);
+s32 em_sub_buffer_index_get(u8 id, s32 a);
+void em_res_file_setup(void* str);   /* owner: `enemy/enemy_control.cpp`'s range, the next proposal */
 void fn_800FA9B8(u8* rec, u8 id);
 
 /* the shared layers the range's helpers call */
@@ -360,7 +360,7 @@ void res_file_assign(void* dst, void* src);
 void fn_8007B878(void* out, u32 a);
 void fn_8007BA08(void* a, void* b);
 s32 fn_800D56F4(char* name, u32 data);
-void* fn_800D5418(s32 handle);
+void* nw_res_entry_get(s32 handle);
 s32 fn_800D4DD8(char* name);
 void fn_800D5D60(void* work);
 void fn_800D5E30(void* work);
@@ -2364,7 +2364,7 @@ void fn_801409C8(_ENEMY_WORK* self) {
 }
 
 void fn_80140B20(void) {
-    u32* src = lbl_805A1B34;
+    u32* src = em_prog_tbl_list;
     u32* dst = (u32*)0x90348000;
 
     while (*src != 0) {
@@ -2430,13 +2430,13 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     if (work->handle_0x08 == -1) {
         return;
     }
-    rec = (u8*)fn_800D5418(work->handle_0x08);
+    rec = (u8*)nw_res_entry_get(work->handle_0x08);
     fn_80140DAC(&row, (EmFileRow*)((u8*)nw_res_manager + fn_800D4DD8(name) * 0x4C + 0x3070));
     if (rec == NULL) {
         return;
     }
     res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
-    fn_801411B8(&h1);
+    em_res_file_setup(&h1);
     res = fn_800924CC(&h1, 0);
     fn_8007BA08(&h2, &res);
     fn_800E38BC(&h2);
@@ -2455,7 +2455,7 @@ s32 fn_80140E48(char* name, u32 size, u8 flag) {
 
     work->flags_0x03 |= 1;
     ctx = flag;
-    file = fn_80146F10(work->index_0x02);
+    file = em_res_buffer_alloc(work->index_0x02);
     if (file == NULL) {
         return 0;
     }
@@ -2471,15 +2471,15 @@ void fn_80140EE8(char* name, u32 size, u32 a, u32 b, u32 c, u32* ctx) {
     res_file_ctor(&h1, 0);
     work->handle_0x10 = fn_800D56F4(name, size);
     if (work->handle_0x10 != -1) {
-        u8* rec = (u8*)fn_800D5418(work->handle_0x10);
+        u8* rec = (u8*)nw_res_entry_get(work->handle_0x10);
         if (rec != NULL) {
             res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
-            fn_801411B8(&h1);
+            em_res_file_setup(&h1);
             fn_800E3358(2, work->field_0x00, &h1);
             fn_800D5E30(work);
         }
     }
-    fn_801414C8(work);
+    em_kind_slot_ready_set(work);
 }
 
 s32 fn_80140FB0(char* name, u32 size, u8 flag) {
@@ -2489,7 +2489,7 @@ s32 fn_80140FB0(char* name, u32 size, u8 flag) {
 
     work->flags_0x03 |= 2;
     ctx = flag;
-    file = fn_80146F10(work->index_0x02);
+    file = em_res_buffer_alloc(work->index_0x02);
     if (file == NULL) {
         return 0;
     }
@@ -2501,18 +2501,18 @@ s32 em_kind_release(u8 id) {
     s32 loaded = 0;
 
     if (em_kind_slot_find(id) != 0xFF) {
-        s8 v = lbl_805A1B08[id];
+        s8 v = em_res_class_tbl[id];
         if (v > 0) {
-            fn_80146B98(v);
+            em_res_peer_count_dec(v);
         }
         return 0;
     }
     {
-        u8 sub = fn_80141470(id);
+        u8 sub = em_kind_slot_claim(id);
         if (sub == 0xFF) {
             return -1;
         }
-        if (fn_80146DF4(id) == 0) {
+        if (em_res_buffer_claim(id) == 0) {
             return -1;
         }
         if (lbl_80581E20[id].key_0x00 != 0) {
@@ -2524,9 +2524,9 @@ s32 em_kind_release(u8 id) {
             loaded++;
         }
     }
-    fn_80147160(id);
-    if (fn_80147550(id) == 1) {
-        s32 idx = fn_80147684(id, 0);
+    em_sub_buffer_claim(id);
+    if (em_sub_buffer_refs_get(id) == 1) {
+        s32 idx = em_sub_buffer_index_get(id, 0);
         if (idx >= 0) {
             fn_800FA9B8(&emc_work[0xEA0 + idx * 0x17], id);
         }

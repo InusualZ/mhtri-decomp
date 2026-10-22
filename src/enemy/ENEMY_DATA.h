@@ -23,7 +23,7 @@ typedef struct _ENEMY_DATA {
     /* +0x13 */ u8 map_0x13;     /* the map `enemy/em010_prog.cpp`'s mini step hands `em_area_entry_enter_ck` */
     /* +0x14 */ u8 field_0x14;   /* `fn_80166DF8` compares it against the work's +0x1E1 */
     /* +0x15 */ u8 field_0x15;   /* the second area byte `enemy/em022_prog.cpp` copies with +0x14 */
-    /* +0x16 */ u8 pad_0x16;
+    /* +0x16 */ u8 highlight_0x16;   /* set while an enemy-control event highlights the entry (`emc_highlight_set`) */
     /* +0x17 */ u8 field_0x17;   /* `fn_801671AC` compares it against the work's +0x46C */
     /* +0x18 */ struct _ENEMY_WORK* work_0x18; /* the entry's live enemy work, or NULL */
     /* +0x1C */ u8 pad_0x1C[0x08];

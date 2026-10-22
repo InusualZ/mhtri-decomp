@@ -5405,7 +5405,7 @@ extern "C" s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out)
         }
         plw->field_0x376 = 0;
         if (plw->kind_0x09 != 2) {
-            fn_80278BE4(plw);
+            pl_ride_down_set(plw);
             return 1;
         }
         if (plw->field_0x00A != 6 && Pl_act_ck(plw, 2, 1) == 0) {
@@ -6338,7 +6338,7 @@ extern "C" void fn_80278B58(_PLW* self, s32 arg1, s32 arg2)
 }
 
 /* 0x80278BE4 */
-extern "C" void fn_80278BE4(_PLW* self)
+extern "C" void pl_ride_down_set(_PLW* self)
 {
     if (self->field_0x00A == 8) {
         return;

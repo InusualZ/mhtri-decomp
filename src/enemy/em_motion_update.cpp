@@ -1,4 +1,4 @@
-/* enemy/em_motion_update.cpp - an enemy's per-frame motion/action driver: `fn_8013791C` (an outer phase switch around
+/* enemy/em_motion_update.cpp - an enemy's per-frame motion/action driver: `em_act_update` (an outer phase switch around
  *   an inner action switch) with its init, action callbacks and angle helpers.
  * RANGE. .text 0x8013791C-0x80138074 (7 functions); extab, extabindex.
  * NAMES. `em_motion_update` is a GUESS from what the driver does; the map has only `fn_` stems for the range.
@@ -75,8 +75,8 @@ void fn_800E0914(struct MHchar* model);
 /* `enemy/fn_8011D448.cpp`'s and `enemy/enemy_control.cpp`'s helpers */
 void em_status_bits_init(_ENEMY_WORK* self);
 void em_parts_init(_ENEMY_WORK* self);
-u8 fn_8014278C(u16 a, u16 b);
-f32 fn_80142958(u16 a, u16 b);
+u8 em_stat_level_roll(u16 a, u16 b);
+f32 em_size_scale_roll(u16 a, u16 b);
 void emc_kill_report(_ENEMY_WORK* self, s32 mode);
 }
 
@@ -85,7 +85,7 @@ void emc_kill_report(_ENEMY_WORK* self, s32 mode);
 /* The per-frame driver and its callbacks. */
 
 /* One frame of the record's action state machine. */
-extern "C" void fn_8013791C(_ENEMY_WORK* self)
+extern "C" void em_act_update(_ENEMY_WORK* self)
 {
     self->field_0x1DE = 0;
     switch (self->field_0x004) {
@@ -124,9 +124,9 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
                 u32 rnd;
 
                 rnd = ran_suu(1);
-                self->field_0x7C8 = fn_8014278C(self->field_0x01A, rnd);
+                self->field_0x7C8 = em_stat_level_roll(self->field_0x01A, rnd);
                 rnd = ran_suu(1);
-                self->field_0x1D0 = fn_80142958(self->field_0x01A, rnd);
+                self->field_0x1D0 = em_size_scale_roll(self->field_0x01A, rnd);
                 em_net_send(self, 4, 0);
             } else {
                 emc_kill_report(self, 2);
@@ -141,9 +141,9 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
 
                 self->field_0x012++;
                 rnd = ran_suu(1);
-                self->field_0x7C8 = fn_8014278C(self->field_0x01A, rnd);
+                self->field_0x7C8 = em_stat_level_roll(self->field_0x01A, rnd);
                 rnd = ran_suu(1);
-                self->field_0x1D0 = fn_80142958(self->field_0x01A, rnd);
+                self->field_0x1D0 = em_size_scale_roll(self->field_0x01A, rnd);
                 em_net_send(self, 4, 0);
                 em_act_advance(self, 1);
                 refresh = 1;
@@ -159,9 +159,9 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
                 u32 rnd;
 
                 rnd = ran_suu(1);
-                self->field_0x7C8 = fn_8014278C(self->field_0x01A, rnd);
+                self->field_0x7C8 = em_stat_level_roll(self->field_0x01A, rnd);
             rnd = ran_suu(1);
-                self->field_0x1D0 = fn_80142958(self->field_0x01A, rnd);
+                self->field_0x1D0 = em_size_scale_roll(self->field_0x01A, rnd);
             }
             em_net_send(self, 4, 1);
             em_act_end(self, 0);
@@ -193,8 +193,8 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
     }
 }
 
-/* Latches the record's static data and reseats the helpers `fn_8013791C` drives. */
-extern "C" void fn_80137C20(_ENEMY_WORK* self)
+/* Latches the record's static data and reseats the helpers `em_act_update` drives. */
+extern "C" void em_static_data_latch(_ENEMY_WORK* self)
 {
     self->field_0x1C8 = *(u32*)get_enemy_data(self);
     self->field_0x8C8 = fn_801260BC_c1(self);
@@ -212,7 +212,7 @@ extern "C" void fn_80137C94(_ENEMY_WORK* self)
     em_act_advance(self, self->field_0x00E);
 }
 
-/* The action callback `fn_8013791C` runs each frame: the `fn_80139024` step, or the caller's own
+/* The action callback `em_act_update` runs each frame: the `fn_80139024` step, or the caller's own
  * callback while `em_act_ck` has not armed the action. */
 extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
 {

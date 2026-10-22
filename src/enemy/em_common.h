@@ -86,7 +86,7 @@ s32 em_record_hit_ck(struct _ENEMY_WORK* record);
 s32 em_mini_hit_ck(struct _ENEMY_WORK* record);
 u8 em_captured_ck(struct _ENEMY_WORK* enemy);
 /* 0x80126AD0 - whether area entry `entry` lies in area `sub` or one area `index` reaches from it (GUESS name). */
-s32 em_area_entry_near_ck(struct EmAreaEntry* entry, u8 index, u8 sub);
+s32 em_area_entry_near_ck(struct _ENEMY_MINI_WORK* entry, u8 index, u8 sub);
 s32 em_mini_kill_kind_get(struct _ENEMY_WORK* enemy);
 /* 0x8013763C - sets the record's +0x43F latch the roar step arms (GUESS name). */
 void em_roar_latch_set(struct _ENEMY_WORK* self);
@@ -137,7 +137,7 @@ void em_stamina_regen(struct _ENEMY_WORK* self, f32 rate, s16 delta, s16 period)
 /* 0x80131E80 */
 void em_busy_timer_clear(struct _ENEMY_WORK* self);
 /* 0x80126BD4 */
-u32 em_area_entry_enter_ck(struct EmAreaEntry* entry, u8 map, u8 area);
+u32 em_area_entry_enter_ck(struct _ENEMY_MINI_WORK* entry, u8 map, u8 area);
 /* 0x80126E3C */
 u8 em_kind_area_next(u8 group, u8 team, u8 from, u8 to, u16 seed);
 
@@ -169,6 +169,42 @@ void em_action_finish_swim(struct _ENEMY_WORK* self);
 extern "C" {
 /* 0x80131DA8 */
 void em_water_surface_latch(struct _ENEMY_WORK* self);
+}
+#endif
+
+/* A joint point set: the joint, the point count and the joint-local points (a list ended by joint 0xFFFFFFFF).
+ * size: 0xC */
+struct EmJointPoints {
+    /* +0x0 */ u32 joint;
+    /* +0x4 */ u8 count;
+    /* +0x5 */ u8 pad_0x5[3];
+    /* +0x8 */ nw4r::math::VEC3* points;
+};
+
+/* Declarations `enemy/enemy_control.cpp` calls. */
+struct _ENEMY_MINI_WORK;
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* One marker callback of an enemy kind; `enemy/enemy_control.cpp` calls it with the area entry. */
+typedef void (*EmEntryProc)(struct _ENEMY_MINI_WORK* entry);
+/* 0x801265F8 */
+EmEntryProc em_entry_proc_get(struct _ENEMY_MINI_WORK* entry, u8 marker);
+/* 0x801267DC */
+s16 em_kind_frames_get(struct _ENEMY_WORK* self);
+/* 0x80126868 */
+s16 em_kind_frames2_get(struct _ENEMY_WORK* self);
+/* 0x80126B5C */
+u32 em_area_enter_ck(struct _ENEMY_WORK* self, u8 map, u8 area);
+/* 0x8012E718 */
+u32 em_spawn_rec_live_ck2(struct _ENEMY_WORK* self);
+/* 0x80135AE8 */
+void em_break_parts_reset(struct _ENEMY_WORK* self);
+/* 0x80136BD4 */
+u32 em_data_word_get(struct _ENEMY_WORK* self);
+/* 0x80136C20 */
+u8 em_joint_points_get(struct _ENEMY_WORK* self, struct EmJointPoints* set, nw4r::math::VEC3* out);
+#ifdef __cplusplus
 }
 #endif
 

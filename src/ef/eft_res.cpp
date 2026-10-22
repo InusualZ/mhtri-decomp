@@ -29,7 +29,7 @@
  *    `default: break;`, `return` in the inner or the outer cases all leave it out;
  *  - `fn_800F7F18`: retail keeps `id * 0x18` and not `id` across the calls (one register fewer, `0` hoisted into
  *    r14); `fn_800F8358`: retail hoists the 128-entry `mtctr` count into r18 (one saved register more);
- *  - `fn_800F6A78`/`fn_800F7778`: the table base and the record pointer swap registers (r4/r5, r4/r31).
+ *  - `fn_800F6A78`/`eft_res_release`: the table base and the record pointer swap registers (r4/r5, r4/r31).
  *  - `res_eft_create`, `res_eft_model_create`, `get_eft_res_name`, `fn_800F6AC8`: retail narrows the `u16`/`u8`
  *    arguments (`clrlwi`) at entry, ours does not (or folds it into a `clrlslwi`);
  *  - `fn_800F6AC8`: retail unrolls the 0x18-byte record search three-wide (`li r0,0x33`), ours one-wide with `lbzu`;
@@ -110,12 +110,12 @@ typedef struct EftSpawnRecord {
 } EftSpawnRecord; /* size: 0x34 (lower bound: only +0x30 is read by this unit) */
 
 /* The 256-entry slot table that follows `eft_control` in `.bss`: a 4-byte header, then 0x18-byte records
- * whose proID byte `fn_800F6AC8` looks up (`fn_800F6A78` builds one, `fn_800F7778` releases it).
+ * whose proID byte `fn_800F6AC8` looks up (`fn_800F6A78` builds one, `eft_res_release` releases it).
  * Every function reaches it through the map's own absolute label, never as an offset of `eft_control`. */
 #include "unsplit/ef_tables.h" /* lbl_806A2D34 (rule 2: the band) */
 
 typedef struct EftProSlot {
-    /* +0x00 */ u8 kind_0x00;    /* fn_800F6AC8's key; 2 = a registered effect (fn_800F7778) */
+    /* +0x00 */ u8 kind_0x00;    /* fn_800F6AC8's key; 2 = a registered effect (eft_res_release) */
     /* +0x01 */ u8 field_0x01;   /* 0xff; the "handed out" flag fn_800F7AA4 tests for 1 */
     /* +0x02 */ u8 state_0x02;   /* 0xff; 1 while the resource is live */
     /* +0x03 */ u8 id_0x03;      /* the slot ordinal the effect's resources are filed under */
@@ -192,7 +192,7 @@ typedef struct EftProHdrSlot {
 } EftProHdrSlot; /* size: 0x1C (the last field is the next record's +0x00) */
 
 /* The records start 4 bytes into the table (its 4-byte header is zeroed by eft_res_pool_reset and counted down
- * by fn_800F7778). */
+ * by eft_res_release). */
 inline EftProSlot* eft_pro_slots(void) {
     return (EftProSlot*)(lbl_806A2D34 + 4);
 }
@@ -214,7 +214,7 @@ void fn_800F69B8(void);
 void fn_800F6A24(void);
 void fn_800F6A78(u8);
 EftProSlot* fn_800F6AC8(u32);
-u32 fn_800F7778(u8);
+u32 eft_res_release(u8);
 EftProSlot* fn_800F7AA4(u32);
 void fn_800F7BF0(EftProSlot*);
 void fn_800F7C74(u32);
@@ -248,8 +248,8 @@ void fn_800FA5D4(_EFT*);
 void fn_800FD864(void);
 void sound_job_request(s32, u8, s32, s32, s32, void*, s32);
 void mhchar_reset(void*);
-void fn_800E0BE8(void*, s32);
-void fn_800E2228(MHchar*, u32*, u32, s32);
+void mhchar_draw_mode_set(void*, s32);
+void mhchar_model_create(MHchar*, u32*, u32, s32);
 void fn_8007B878(void*, s32);
 void fn_8007BA08(void*, void*);
 extern s32 ef_system_memory_manager(void*);
@@ -422,7 +422,7 @@ extern "C" void fn_800F69B8(void) {
 
     for (s32 i = 0xFF; i >= 0; i--) {
         if (slot->kind_0x00 == 2 && slot->state_0x02 == 1) {
-            fn_800F7778(slot->id_0x03);
+            eft_res_release(slot->id_0x03);
         }
         slot--;
     }
@@ -433,7 +433,7 @@ extern "C" void fn_800F6A24(void) {
     EftProSlot* slot = &eft_pro_slots()[0x100 - 1];
 
     for (s32 i = 0xFF; i >= 0; i--) {
-        fn_800F7778(slot->id_0x03);
+        eft_res_release(slot->id_0x03);
         slot--;
     }
 }
@@ -1117,7 +1117,7 @@ extern "C" void eft_area_effects_set(void) {
 
 /* 0x800F7778 (0x32C): releases one slot-table record - its registered project, its filed id and its resource
  * memory - and rebuilds it empty; returns whether the resource itself was deleted. */
-extern "C" u32 fn_800F7778(u8 id) {
+extern "C" u32 eft_res_release(u8 id) {
     u8* p = lbl_806A2D34;
     EftProHdrSlot* slot;
     EftControl* ctrl;
@@ -1858,8 +1858,8 @@ u32 res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light) {
     res_file_assign(&res, res_file_ctor(&file, (u32)entry->data));
     mhchar_reset(model);
     model->g3d_0x10C = NULL;
-    fn_800E0BE8(model, 1);
-    fn_800E2228(model, &res, arg, light);
+    mhchar_draw_mode_set(model, 1);
+    mhchar_model_create(model, &res, arg, light);
     model->ready = 1;
     return 1;
 }
@@ -1905,8 +1905,8 @@ void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long ligh
     res_file_assign(&res.data_0x00, res_file_ctor(&file, (u32)entry->data));
     mhchar_reset(model);
     model->g3d_0x10C = NULL;
-    fn_800E0BE8(model, 1);
-    fn_800E2228(model, &res.data_0x00, arg, light);
+    mhchar_draw_mode_set(model, 1);
+    mhchar_model_create(model, &res.data_0x00, arg, light);
     model->ready = 1;
     nw4r::g3d::ResMdl scn_mdl = ((nw4r::g3d::ScnMdlSimple*)model->field_0x118)->GetResMdl();
     fn_8007BA08(&mdl, &scn_mdl);

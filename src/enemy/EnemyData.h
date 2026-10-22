@@ -14,9 +14,17 @@ typedef struct EnemyExtraData EnemyExtraData; /* enemy/em_common.cpp */
  * `enemy/fn_80138074.c`; the two views are compatible (a pointer table at +0x04, the value list at
  * +0x64, the user-data items at +0x94 and the extra block at +0xA0). size: 0xA4 */
 typedef struct EnemyData {
-    /* +0x000 */ u8 field_0x00;
-    /* +0x001 */ u8 pad_0x1[0x3];
-    /* +0x004 */ EmDataRecord* records;
+    union {
+        struct { /* size: 0x4 */
+            /* +0x000 */ u8 field_0x00;
+            /* +0x001 */ u8 pad_0x1[0x3];
+        };
+        /* +0x000 */ u32 flags_0x00;   /* bit 0 a large monster, copied into `_ENEMY_WORK::field_0x1C8` */
+    };
+    union {
+        /* +0x004 */ EmDataRecord* records;
+        /* +0x004 */ u32 model_flags_0x04;  /* the model flags `enemy_work_setup` hands `mhchar_model_create` */
+    };
     union {
         struct { /* size: 0x4 */
             /* +0x008 */ u16 field_0x08;

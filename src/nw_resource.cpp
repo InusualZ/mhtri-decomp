@@ -153,7 +153,7 @@ u32 nw_res_mem_size(s32 index);
 s32 fn_800D516C(void* data);
 void fn_800D5250(void);
 s32 fn_800D5360(char* path);
-ResEntry* fn_800D5418(s32 index);
+ResEntry* nw_res_entry_get(s32 index);
 void nw_res_entry_clear(s32 index);
 void fn_800D58DC(void);
 s32 fn_800D5A04(char* name, void* data);
@@ -366,7 +366,7 @@ s32 fn_800D5360(char* path) {
 }
 
 /* 0x800D5418 - the resource-table entry whose index equals `index`, or NULL. */
-ResEntry* fn_800D5418(s32 index) {
+ResEntry* nw_res_entry_get(s32 index) {
     ResManager* m = nw_res_manager;
     ResEntry* e = m->resTable;
     s32 i;

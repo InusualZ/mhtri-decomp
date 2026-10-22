@@ -46,6 +46,13 @@ u32 eft_slot_marks_set(struct EftSlot* slot, u8 a, u8 b);
  * it.  It is `menu/menu_effect_slot.cpp`'s, declared here until that unit has a header. */
 void fn_80349914(u16* dst, const u16* src);
 
+/* 0x80343780 - clears the ten effect slots (`enemy/enemy_control.cpp`'s `enemy_work_reset`). */
+void eft_slot_pool_clear(void);
+/* 0x80343CE4 - one spawn per live enemy work record and per live target record. */
+void eft_slot_spawn_targets(void);
+/* 0x80345124 - the effect slot pool's per-frame pass. */
+void eft_slot_pool_frame(void);
+
 #ifdef __cplusplus
 }
 #endif
