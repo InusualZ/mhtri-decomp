@@ -1037,6 +1037,7 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-14 | **Nothing outside the checkout is ever deleted, moved or overwritten** (owner: "Hard rule from now on"). A path outside the repo checkout (or a lane's slot) is listed and reported, never removed - even when it looks like scratch. Scratch resolves to a Windows-native folder inside the checkout, `<checkout>\.pi\tmp\<slug>\`, never `/c/Users/...`, `/tmp` or `$TEMP` from Python. Every agent profile (`.claude/agents/`) and every brief (`docs/pair-briefs.md`, the orchestrator's prompts) carries it. Incident: a worker wrote to `/c/Users/...` from Windows Python, which resolved to `C:\c\Users\...`, then `rm -rf`'d `C:\c` unlisted (§12). |
 | 2026-10-14 | **Ghidra is a hint, never the source of truth** (owner). Names, field names, struct layouts, types and symbols in the shared Ghidra project come from the owner's own reverse engineering; a lane uses them as leads and proves each fact from the retail bytes, the SDK or a measurement (`docs/memory-dump.md`). |
 | 2026-10-14 | **Land recut work, flip later** (owner: "Rather than parking the WPAD branch, just land the work on main and then flip when the work that needs to be done also lands"). A recut or pre-pass that is green except for a finding that resolves only when later work lands (first case: the WPAD recut's jump-table run at `.data:8062C278`, offset-shifted by unwritten WPAD.c data) lands on main with the finding allowed and recorded; its units stay `NonMatching` and flip when that work lands. |
+| 2026-10-22 | **Lanes rename their own unit's map rows; landing throughput plan** (owner: "Go", answering the landing-slowdown analysis; "keep the pipeline procedure document updated with the improvements"). Measured on 2026-10-21: 37 land attempts, 34 landed, gate mean 4.2 min - the gate was not the bottleneck; integration was (20-45 min per branch, re-cuts when main moved): lanes could not touch `config/RMHE08/symbols.txt`, so each filed 150-300 rename requests and read ~0 % until integrated; `--rewrite` sweeps through callers collided with concurrent lanes; lanes named the same foreign callees differently. Adopted: **(A)** a lane may edit the `symbols.txt` rows inside its own unit's claimed address ranges (its own functions and data) and commits them with its code; the gate refuses any other map change in the batch (section 16). **(B)** foreign-callee names go through a shared registry (first proposal wins) and land as small map-only batches. **(C)** before a module wave, a short hub pre-pass names the hub units' exported functions and lands first. **(D)** `integrate.py` gaps are closed by a tooling lane. Section 16 is the procedure. |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---
@@ -1385,3 +1386,28 @@ commit (owner ruling 2026-10-13, §11). Function-count 100 % is not flip-readine
 `report.json` goes stale after an object rebuild (every lane deleted it by hand); lanes start with their cwd in MAIN,
 not the slot; a `fieldcheck` for struct offsets with no named field; `symbols.txt` row-range ownership in manifests;
 `deps`/`prepass` lane kinds and the standard briefs in `slots.py spawn`.
+
+## 16. Landing throughput: own-row renames, the name registry, hub pre-pass (owner, 2026-10-22)
+
+The 2026-10-21 game-module wave showed where landing time goes; this section is the procedure that replaces "lane files every rename, an integrator applies them".
+
+### 16.1 Own-row renames go in with the lane
+* A lane renames the `symbols.txt` rows **inside its own unit's claimed ranges** (`splits.txt` blocks of its manifest's units) with `tools/symbols/symedit.py rename/rename-batch` (no `--rewrite` into other units' files), and commits them on its branch with the code.
+* Its manifest lists `config/RMHE08/symbols.txt` under `own_rows` (not `owns`): the gate accepts a symbols.txt diff only when every changed row's address lies inside one of the batch units' claims, and refuses any other map change (status: gate check being built, see 16.5).
+* A row another unit's source spells by its old name: the lane updates that spelling only when it is a pure name swap in a declaration line; otherwise it files a request.
+
+### 16.2 Foreign callees: the name registry
+* Before naming a symbol another unit owns, a lane looks it up in main's map and the registry; the first recorded proposal wins and later lanes reuse it.
+* The orchestrator lands registry names as small map-only batches (byte-identical, quick gate) so lanes cut after them see the names (status: tool being built, see 16.5).
+
+### 16.3 Hub pre-pass before a module wave
+* Before parallel lanes start on a module, one short lane names the hub units' exported functions (for enemy: em_common, fn_8011D448, enemy_control) and lands first; the wave lanes reuse those names.
+
+### 16.4 Landing
+* A branch with own-row renames and no foreign requests lands directly with `land.py land --branch ... --manifest ...` - no integrator.
+* Integrators remain for foreign declarations that need moving and for seams; several finished branches may be integrated together and landed in one batch.
+* Proven Matching flips are folded into the landing (section 11, 2026-10-13: proven flips may batch).
+* Never truncate `land.py` output in a pipeline (`| Select-Object -First N`, `| head`): it kills the process mid-apply and leaves MAIN dirty (incident 2026-10-21); redirect to a log file and read the tail.
+
+### 16.5 Status of the tooling
+* Being built (2026-10-22): the `own_rows` gate check, the name registry tool, and the `integrate.py` fixes (C++-typed declarations into a leaf header; renaming a leaf `fn_X.h` with its symbol; detecting a request whose row main already renamed; float-argument-order mismatches). This list is updated as they land.
