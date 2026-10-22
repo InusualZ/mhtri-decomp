@@ -8,7 +8,7 @@
  * RESIDUALS. 43 rows unwritten: 0x801E9010-0x801E92B0, 0x801E938C-0x801E9600, 0x801E9640-0x801E9AA8,
  *   0x801E9B68-0x801E9FC8, 0x801E9FF0-0x801EAC30, 0x801EAC84-0x801EB0B8, 0x801EB1B8-0x801EB524, 0x801EB560-0x801EB6F4,
  *   0x801EB7A4-0x801EC194, 0x801EC19C-0x801EC7AC, 0x801EC85C-0x801EC9E0.
- *  - `fn_801E7530`: retail loads the `lbl_805BA6D4`/`lbl_805BA718` table bases into saved registers up front and is 132
+ *  - `fn_801E7530`: retail loads the `lb_trade_flag_rows`/`lb_trade_pair_rows` table bases into saved registers up front and is 132
  *    B shorter than ours (the body's structure differs);
  *  - `fn_801E8994`: it calls `lb_choice_draw` with the five arguments `unsplit/lobby.h` declares, so every argument sits
  *    one register early against retail's six;
@@ -100,7 +100,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
     self->list_mode_0x0C = list_mode;
     self->count_0x10 = 0;
     count = 0;
-    row = lbl_805BA6D4;
+    row = lb_trade_flag_rows;
     for (;;) {
         if (row[0] == 0) {
             break;
@@ -120,7 +120,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
     if ((u32)self->list_mode_0x0C > 2U) {
         switch (self->list_mode_0x0C) {
         case 3:
-            row = lbl_805BA6D4;
+            row = lb_trade_flag_rows;
             for (;;) {
                 if (row[0] == 0) {
                     break;
@@ -142,7 +142,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
             break;
         case 4:
             if (self->stage_0x0E != 3 || lb_unlock_cond_ck(0xA) != 1U) {
-                row = lbl_805BA6D4 + 18;
+                row = lb_trade_flag_rows + 18;
                 for (;;) {
                     if (row[0] == 0) {
                         break;
@@ -162,7 +162,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
                     row += 3;
                 }
             } else {
-                row = lbl_805BA718;
+                row = lb_trade_pair_rows;
                 for (;;) {
                     if (row[0] == 0) {
                         break;
@@ -184,7 +184,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
             }
             break;
         case 5:
-            row = lbl_805BA718;
+            row = lb_trade_pair_rows;
             for (;;) {
                 if (row[0] == 0) {
                     break;
@@ -206,7 +206,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
             break;
         }
     } else {
-        const u16* p = lbl_805BA660 + (u16)self->list_mode_0x0C * 18;
+        const u16* p = lb_trade_price_rows + (u16)self->list_mode_0x0C * 18;
 
         for (;;) {
             if (p[0] == 0) {
@@ -218,7 +218,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
             }
             p += 3;
         }
-        fn_801E74B0(self, self->list_mode_0x0C);
+        lb_goods_price_group_get(self, self->list_mode_0x0C);
     }
     if (self->count_0x10 <= self->selected_0x08) {
         self->selected_0x08 = self->count_0x10 - 1;
@@ -277,7 +277,7 @@ void lb_deli_screen_step(void)
     case 0:
         if ((u32)(lb_talk_page_mode_reset() - 1) <= 1U) {
             self->state_0x00 = 1U;
-            fn_801E6F80(self);
+            lb_goods_sale_list_build(self);
             flags = 0;
             if (lb_unlock_cond_ck(5U) == 0 && fn_802089F4(self->data_0x1C) == 0xFFFFFFFFU) {
                 flags = 4;
@@ -324,7 +324,7 @@ void lb_deli_screen_step(void)
                 break;
             case 1:
                 self->state_0x00 = 3U;
-                fn_801E6F80(self);
+                lb_goods_sale_list_build(self);
                 sysSE_req(0x1B);
                 break;
             case 2:
@@ -337,7 +337,7 @@ void lb_deli_screen_step(void)
                     param.id_0x06 = -1;
                     param.limit_0x08 = 0xC;
                     param.max_0x0A = 0xF;
-                    param.cur_0x0C = fn_801E74B0(self, 0);
+                    param.cur_0x0C = lb_goods_price_group_get(self, 0);
                     param.time_0x10 = 0x13E6;
                     param.count_0x12 = 0;
                     param.data_0x14 = self->str_0x24;
@@ -400,7 +400,7 @@ void lb_deli_screen_step(void)
         return;
     case 3:
         ainpc_page_hold_set();
-        switch (fn_801E7178(self)) {
+        switch (lb_goods_sale_step(self)) {
         case 1:
             self->state_0x00 = 5U;
             eft052_item_get_open(lobby_world_block + 0x4860, lb_item_get_data + 0x20);
@@ -412,7 +412,7 @@ void lb_deli_screen_step(void)
         return;
     case 4:
         ainpc_page_hold_set();
-        if ((u32)(fn_801E73A4(self) - 1) <= 1U) {
+        if ((u32)(lb_goods_hold_step(self) - 1) <= 1U) {
             self->state_0x00 = 1U;
         }
         return;
@@ -424,7 +424,7 @@ void lb_deli_screen_step(void)
         return;
     case 8:
         if ((u32)(lb_talk_page_mode_reset() - 1) <= 1U) {
-            fn_801E6DCC();
+            lb_goods_sale_close();
         }
         return;
     }
@@ -437,11 +437,11 @@ void fn_801E7EA8(u16 id, const _mh_ivec2_* pos)
     u16 b;
     u8 buf[8];
 
-    data = (LbItemData*)fn_801E6F10(id);
+    data = (LbItemData*)lb_goods_pair_row_get(id);
     draw_sprite_ary(&lbl_805B7D18[0], pos);
     draw_font_idx(0x1DD9U, (s8*)str_tbl_33_get((u8)id), 4, pos);
-    a = fn_801E6EA8(id, 0);
-    b = fn_801E6EA8(id, 1);
+    a = lb_goods_count_get(id, 0);
+    b = lb_goods_count_get(id, 1);
     sprintf((char*)buf, (char*)lbl_80791B88, a);
     draw_font_idx(0x1DDAU, (s8*)buf, 2, pos);
     sprintf((char*)buf, (char*)lbl_80791B88, b);
@@ -458,10 +458,10 @@ void fn_801E7FEC(u16 id, const _mh_ivec2_* pos)
     u16 a;
     u8 buf[8];
 
-    data = (LbItemData*)fn_801E6F48(id);
+    data = (LbItemData*)lb_goods_flag_row_get(id);
     draw_sprite_ary(&lbl_805B7D38[0], pos);
     draw_font_idx(0x1DEFU, (s8*)str_tbl_33_get((u8)id), 4, pos);
-    a = fn_801E6EA8(id, 0);
+    a = lb_goods_count_get(id, 0);
     sprintf((char*)buf, (char*)lbl_80791B88, a);
     draw_font_idx(0x1DF0U, (s8*)buf, 2, pos);
     sprintf((char*)buf, (char*)lbl_80791B88, data->rate_0x02 * a);
@@ -786,7 +786,7 @@ void fn_801E8D5C(LbMenuWork* self)
     draw_sprite_ary((const u16*)lbl_80791BB8, &anchor);
     lb_page_arrow_draw(0x1E6D, self->list_mode_0x0C, self->stage_0x0E, self->item_id_0x12, 1U);
     if ((u32)self->list_mode_0x0C <= 2U) {
-        base = lbl_805BA660 + self->list_mode_0x0C * 18;
+        base = lb_trade_price_rows + self->list_mode_0x0C * 18;
         draw_font_idx(0x1E59U, (s8*)LbStr(0, 0x139U), 1, &anchor);
         i = 0;
         idp = &lbl_805B7EF4[0];

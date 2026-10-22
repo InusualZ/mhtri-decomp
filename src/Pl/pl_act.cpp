@@ -414,7 +414,7 @@ void pl_model_aux_flag_clear(_PLW* self)
 }
 
 /* The same frame check as `Pl_frame_check`, with the model layer's second flag set. */
-u32 fn_8026A328(_PLW* self, u16 frame, f32 a, f32 b)
+u32 Pl_frame_check_alt(_PLW* self, u16 frame, f32 a, f32 b)
 {
     return mhchar_frame_check(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, frame, 1);
 }

@@ -102,9 +102,9 @@ typedef struct LbMenuPage {
 
 /* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
-void fn_801E66A8(s32 a, s32 b);                  /* 0x801E66A8 - resets the band's work group */
-void fn_801E677C(void* work, u8 kind, u8 flag);  /* 0x801E677C - initialises one sub-work record */
-void fn_801E68B4(void* work, u8 flag);           /* 0x801E68B4 - ditto, one argument */
+void lb_eqshop_bg_draw(s32 a, s32 b);                  /* 0x801E66A8 - resets the band's work group */
+void lb_eqshop_menu_draw(void* work, u8 kind, u8 flag);  /* 0x801E677C - initialises one sub-work record */
+void lb_eqshop_menu_draw_plain(void* work, u8 flag);           /* 0x801E68B4 - ditto, one argument */
 s16 lb_digit_pane_value(void* work);                     /* 0x801EF73C - the icon index of the sub-work (s16) */
 s32 lb_entry_pane_busy_ck(void* work);                     /* 0x801F0834 - non-zero while the sub-work is live */
 s32 lb_kakou_icon_build(LbIconRec* icon, s32 flag, void* table_a, void* table_b);
@@ -431,25 +431,25 @@ extern "C" void lb_menu_page_step(void) {
 
     switch (self->state_0x00) {
     case 1:
-        fn_801E66A8(1, 1);
-        fn_801E68B4(&self->work_0xA0, 0);
+        lb_eqshop_bg_draw(1, 1);
+        lb_eqshop_menu_draw_plain(&self->work_0xA0, 0);
         break;
     case 2:
-        fn_801E66A8(1, 1);
+        lb_eqshop_bg_draw(1, 1);
         if (self->work_0xA0.kind_0x00 == 2) {
-            fn_801E677C(&self->work_0xC0, 4, 0);
+            lb_eqshop_menu_draw(&self->work_0xC0, 4, 0);
         } else {
-            fn_801E677C(&self->work_0xC0, (u8)(self->work_0xA0.kind_0x00 + 2), 0);
+            lb_eqshop_menu_draw(&self->work_0xC0, (u8)(self->work_0xA0.kind_0x00 + 2), 0);
         }
         break;
     case 3:
     case 4:
-        fn_801E66A8(1, 1);
+        lb_eqshop_bg_draw(1, 1);
         if (self->state_0x00 == 4) {
-            fn_801E677C(&self->work_0xE0, (u8)self->work_0xA0.kind_0x00, 1);
+            lb_eqshop_menu_draw(&self->work_0xE0, (u8)self->work_0xA0.kind_0x00, 1);
             fn_803645C4(self);
         } else {
-            fn_801E677C(&self->work_0xE0, (u8)self->work_0xA0.kind_0x00, 0);
+            lb_eqshop_menu_draw(&self->work_0xE0, (u8)self->work_0xA0.kind_0x00, 0);
         }
         switch (self->work_0xA0.kind_0x00) {
         case 0:

@@ -2629,9 +2629,9 @@ void em007_model_eft_create(_EFT* self);
 void em007_model_eft_step(_EFT* self);
 void em007_model_eft_release(_EFT* eft);
 _EFT* em007_model_eft_alloc(void);
-void fn_801E0D38(_EFT* self);
-void fn_801E1A2C(_EFT* self);
-void fn_801E1A3C(_EFT* self);
+void em007_model_eft_update(_EFT* self);
+void em007_model_eft_next(_EFT* self);
+void em007_model_eft_retire(_EFT* self);
 
 /* The effect clusters. */
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
@@ -4175,13 +4175,13 @@ void em007_model_eft_step(_EFT* self) {
         em007_model_eft_create(self);
         break;
     case 1:
-        fn_801E0D38(self);
+        em007_model_eft_update(self);
         break;
     case 2:
-        fn_801E1A2C(self);
+        em007_model_eft_next(self);
         break;
     case 3:
-        fn_801E1A3C(self);
+        em007_model_eft_retire(self);
         break;
     }
 }

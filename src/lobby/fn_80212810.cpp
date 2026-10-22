@@ -381,7 +381,7 @@ s32 fn_80217DA0(s32 a, s32 b)
     return fn_80217B04((u8)a, (u16)b);
 }
 
-s32 fn_80217DAC(s32 a, s32 b)
+s32 lb_equip_price_get(s32 a, s32 b)
 {
     return fn_80217B04((u8)a, (u16)b) * 2;
 }

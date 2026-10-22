@@ -86,7 +86,7 @@ extern u32 lbl_805E2048[]; /* 0x805E2048 - the sibling table for the third actor
 extern f32 lbl_805C4898[];
 
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
- * The 0x8026A3xx trio (`fn_8026A328`/`pl_rig_get_motion_frame`/`fn_8026A3A0`) sits inside the range
+ * The 0x8026A3xx trio (`Pl_frame_check_alt`/`pl_rig_get_motion_frame`/`fn_8026A3A0`) sits inside the range
  * `Pl/fn_802693C4.cpp` now owns (`.text` 0x802693C4-0x8026BA1C), so it is declared in
  * `Pl/fn_802693C4.h`; 0x8025EFF4 is owned by `Pl/fn_80258FCC.cpp` and is declared in
  * `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the runs the header above already

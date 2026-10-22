@@ -854,7 +854,7 @@ extern "C" void fn_800DA428(_se_w* work, s32 a, u32 param, s32 d, s32 e) {
     }
     param &= 0xFFFFFF;
     work->field_0x0C = bank;
-    if (fn_8026A328(((SeWorkObj*)work)->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
+    if (Pl_frame_check_alt(((SeWorkObj*)work)->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
         return;
     }
     if ((u16)param == 0xFFFF) {
@@ -933,7 +933,7 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
     switch (w->field_0x008) {
     case 1:
     case 3:
-        if (fn_8026A328(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
+        if (Pl_frame_check_alt(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
             return;
         }
         if ((u16)param == 0xFFFF) {
@@ -1007,7 +1007,7 @@ void se_req_frame_set_sp(_se_w* work, s32 a, s32 param, s32 d, s32 e, s32 f) {
     switch (w->field_0x008) {
     case 1:
     case 3:
-        if (fn_8026A328(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
+        if (Pl_frame_check_alt(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
             return;
         }
         if ((u16)param == 0xFFFF) {
@@ -1843,7 +1843,7 @@ extern "C" void fn_800DCE10(_se_w* work, nw4r::math::VEC3* pos) {
     se_req_pos_ps(work, 16, (bank << 24) | 2, pos);
 }
 
-extern "C" void fn_800DCE64(_se_w* work, nw4r::math::VEC3* pos) {
+extern "C" void chacha_mask_se13_req(_se_w* work, nw4r::math::VEC3* pos) {
     s32 bank = get_chacha_kamen_bank();
     se_req_pos_ps(work, 13, (bank << 24) | 2, pos);
 }

@@ -1,6 +1,6 @@
 /*
  * ef/eft052.cpp - the eft052 effect family (`_EFT` tag 52, two parts flying the area's paths), the cockpit item-page
- *   band (the page counters, the hold strip at `lbl_806BF368`, the item hand-over box `eft052_item_box`), the enemy
+ *   band (the page counters, the hold strip at `cockpit_hold_block`, the item hand-over box `eft052_item_box`), the enemy
  *   part report, and the HUD message queue (`hud_msg_*`, its work at `hud_msg_work`).
  * RANGE. .text 0x80358624-0x8035BAB4 (53 functions); extab 0x8001736C-0x80017494, extabindex 0x80036B88-0x80036D44,
  *   .data 0x805ED0C0-0x805ED370, .bss 0x806BF310-0x806BF3C0, .sdata 0x80793338-0x80793340, .sbss
@@ -455,7 +455,7 @@ struct CockpitHoldBlock {
     /* +0x54 */ u8 pad_0x54[0x4];
 }; /* size: 0x58 */
 
-extern CockpitHoldBlock lbl_806BF368;
+extern CockpitHoldBlock cockpit_hold_block;
 
 /* This unit's own out-of-order definitions. */
 extern "C" s32 eft052_page_count_ck(u16 id, u8 use_rows);
@@ -670,7 +670,7 @@ extern "C" void eft052_hold_row_set(CockpitHoldBlock* block, s16 page)
 /* 0x803594C8 (0x68): Re-points the hold block at its clamped cursor row and clears its dirty byte. */
 extern "C" void eft052_hold_cursor_step()
 {
-    CockpitHoldBlock* block = &lbl_806BF368;
+    CockpitHoldBlock* block = &cockpit_hold_block;
 
     eft052_hold_row_set(block, block->page_0x02);
     if (block->page_0x02 >= block->pages_0x04)
@@ -682,7 +682,7 @@ extern "C" void eft052_hold_cursor_step()
 /* 0x80359530 (0x38): Returns the cursor row's table value and the block's +0x0A word through optional pointers. */
 extern "C" void eft052_hold_row_get(u16* out_row, s32* out_value)
 {
-    CockpitHoldBlock* block = &lbl_806BF368;
+    CockpitHoldBlock* block = &cockpit_hold_block;
 
     if (out_row != NULL)
         *out_row = block->rows_0x10[block->row_0x01].id_0x00;
@@ -694,9 +694,9 @@ extern "C" void eft052_hold_row_get(u16* out_row, s32* out_value)
 extern "C" void eft052_hold_entry_set(CockpitHoldEntry* entry, u8 flag)
 {
     entry->quiet_0x19 = flag;
-    memset(&lbl_806BF368, 0, 0x54);
-    eft052_hold_entry_copy(&lbl_806BF368.entry_0x38, entry);
-    eft052_hold_row_set(&lbl_806BF368, 0);
+    memset(&cockpit_hold_block, 0, 0x54);
+    eft052_hold_entry_copy(&cockpit_hold_block.entry_0x38, entry);
+    eft052_hold_row_set(&cockpit_hold_block, 0);
 }
 
 /* 0x803595CC (0x5C): Copies one hold entry field by field. */
@@ -719,7 +719,7 @@ extern "C" void eft052_hold_entry_copy(CockpitHoldEntry* dst, CockpitHoldEntry* 
  * the row and page cursors, or cancels; 1 once an entry is taken, 2 when cancelled. */
 extern "C" s32 eft052_hold_step(void)
 {
-    CockpitHoldBlock* block = &lbl_806BF368;
+    CockpitHoldBlock* block = &cockpit_hold_block;
     s32 result = 0;
     s32 have;
     s16 room;
@@ -786,7 +786,7 @@ extern "C" s32 eft052_hold_step(void)
  * page (or the entry's empty line). */
 extern "C" void eft052_hold_list_draw(void)
 {
-    CockpitHoldBlock* block = &lbl_806BF368;
+    CockpitHoldBlock* block = &cockpit_hold_block;
     s32 active;
     u16 flags;
     u8 arrow_mode;
@@ -854,7 +854,7 @@ extern "C" void eft052_hold_list_draw(void)
 /* 0x80359B00 (0xE0): Draws the hold strip and the help lines of its mode (the count step's line only while idle). */
 extern "C" void eft052_hold_draw(s32 busy)
 {
-    CockpitHoldBlock* block = &lbl_806BF368;
+    CockpitHoldBlock* block = &cockpit_hold_block;
 
     switch (block->mode_0x00) {
     case 0:

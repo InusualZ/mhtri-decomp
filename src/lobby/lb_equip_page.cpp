@@ -2959,9 +2959,9 @@ extern "C" u8 pl_slot_motion_allow_get(_PLW* self, u32 slot)
         break;
     case 313:
     case 356:
-        if (fn_8026A328(self, 1, lbl_80799CE0, lbl_80799CDC) == 1) {
+        if (Pl_frame_check_alt(self, 1, lbl_80799CE0, lbl_80799CDC) == 1) {
             flag = 2;
-        } else if (fn_8026A328(self, 1, lbl_80799CE4, lbl_80799CDC) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, lbl_80799CE4, lbl_80799CDC) == 1) {
             flag = 1;
         } else {
             flag = 2;
@@ -3040,7 +3040,7 @@ extern "C" f32 pl_rig_key_lerp(_PLW* plw, PlRigKey* keys, PlSeVecPair* out)
             out->z_0x14 = keys->rot_0x04.z;
             return keys->frame_0x00;
         }
-        if (fn_8026A328(plw, 5, keys->frame_0x00, keys[1].frame_0x00) != 0) {
+        if (Pl_frame_check_alt(plw, 5, keys->frame_0x00, keys[1].frame_0x00) != 0) {
             f32 t = (pl_rig_get_motion_frame(plw) - keys->frame_0x00) / (keys[1].frame_0x00 - keys->frame_0x00);
 
             out->x_0x00 = keys->pos_0x10.x + t * (keys[1].pos_0x10.x - keys->pos_0x10.x);
@@ -3240,19 +3240,19 @@ extern "C" u8 pl_rig_kind0_allow_get(_PLW* self, u16 motion)
 
     switch (motion) {
     case 0x3EA:
-        if (fn_8026A328(self, 1, 14.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 14.0f, 0.0f) == 1) {
             allow = 0;
         }
         break;
     case 0x3EB:
-        if (fn_8026A328(self, 1, 36.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 36.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 0;
         }
         break;
     case 0x3F1:
-        if (fn_8026A328(self, 1, 42.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 42.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 0;
@@ -3264,18 +3264,18 @@ extern "C" u8 pl_rig_kind0_allow_get(_PLW* self, u16 motion)
     case 0x46B:
         if (leaning != 0) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 18.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 18.0f, 0.0f) == 1) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 4.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 4.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 2;
         }
         break;
     case 0x41B:
-        if (fn_8026A328(self, 1, 26.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 26.0f, 0.0f) == 1) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 4.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 4.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 2;
@@ -3284,16 +3284,16 @@ extern "C" u8 pl_rig_kind0_allow_get(_PLW* self, u16 motion)
     case 0x41C:
         if (leaning != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 62.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 62.0f, 0.0f) == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 2.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 1;
         }
         break;
     case 0x482:
-        if (fn_8026A328(self, 6, 4.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 6, 4.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 2;
@@ -3302,9 +3302,9 @@ extern "C" u8 pl_rig_kind0_allow_get(_PLW* self, u16 motion)
     case 0x421:
         if (leaning != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 48.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 48.0f, 0.0f) == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 8.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 8.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 1;
@@ -3313,9 +3313,9 @@ extern "C" u8 pl_rig_kind0_allow_get(_PLW* self, u16 motion)
     case 0x48F:
         if (leaning != 0) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 10.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 10.0f, 0.0f) == 1) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 2.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 2;
@@ -3333,21 +3333,21 @@ extern "C" u8 pl_rig_kind0_allow_get(_PLW* self, u16 motion)
         allow = 0;
         break;
     case 0x41E:
-        if (leaning != 0 || fn_8026A328(self, 2, 2.0f, 0.0f) == 1) {
+        if (leaning != 0 || Pl_frame_check_alt(self, 2, 2.0f, 0.0f) == 1) {
             allow = 1;
         } else {
             allow = 0;
         }
         break;
     case 0x420:
-        if (leaning != 0 || fn_8026A328(self, 2, 16.0f, 0.0f) == 1) {
+        if (leaning != 0 || Pl_frame_check_alt(self, 2, 16.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 1;
         }
         break;
     case 0x4EE:
-        if (leaning != 0 || fn_8026A328(self, 2, 70.0f, 0.0f) == 1) {
+        if (leaning != 0 || Pl_frame_check_alt(self, 2, 70.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 1;
@@ -3373,7 +3373,7 @@ extern "C" u8 pl_rig_kind2_allow_get(_PLW* self, u16 motion)
 
     switch (motion) {
     case 0x3EA:
-        if (fn_8026A328(self, 1, 4.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 4.0f, 0.0f) != 0) {
             allow = 1;
         }
         if (leaning == 1) {
@@ -3381,14 +3381,14 @@ extern "C" u8 pl_rig_kind2_allow_get(_PLW* self, u16 motion)
         }
         break;
     case 0x3EB:
-        if (fn_8026A328(self, 1, 46.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 46.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 1;
         }
         break;
     case 0x3F1:
-        if (fn_8026A328(self, 1, 48.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 48.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 1;
@@ -3404,7 +3404,7 @@ extern "C" u8 pl_rig_kind2_allow_get(_PLW* self, u16 motion)
     case 0x41B:
         if (leaning != 0) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 2.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) == 1) {
             allow = 1;
         } else {
             allow = 2;
@@ -3413,7 +3413,7 @@ extern "C" u8 pl_rig_kind2_allow_get(_PLW* self, u16 motion)
     case 0x41C:
         if (leaning != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 50.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 50.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
@@ -3422,7 +3422,7 @@ extern "C" u8 pl_rig_kind2_allow_get(_PLW* self, u16 motion)
     case 0x421:
         if (leaning != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 54.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 54.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
@@ -3431,7 +3431,7 @@ extern "C" u8 pl_rig_kind2_allow_get(_PLW* self, u16 motion)
     case 0x49A:
         if (leaning != 0) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 2.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) == 1) {
             allow = 1;
         } else {
             allow = 2;
@@ -3466,28 +3466,28 @@ extern "C" u8 pl_rig_kind1_allow_get(_PLW* self, u16 motion)
         }
         break;
     case 0x3EB:
-        if (fn_8026A328(self, 1, 32.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 32.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
         }
         break;
     case 0x3F1:
-        if (fn_8026A328(self, 1, 30.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 30.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
         }
         break;
     case 0x3F8:
-        if (fn_8026A328(self, 1, 14.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 14.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 2;
         }
         break;
     case 0x3F9:
-        if (fn_8026A328(self, 1, 44.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 44.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 0;
@@ -3501,14 +3501,14 @@ extern "C" u8 pl_rig_kind1_allow_get(_PLW* self, u16 motion)
         }
         break;
     case 0x41C:
-        if (fn_8026A328(self, 1, 18.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 18.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
         }
         break;
     case 0x421:
-        if (fn_8026A328(self, 1, 26.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 26.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
@@ -3545,14 +3545,14 @@ extern "C" u8 pl_rig_kind3_allow_get(_PLW* self, u16 motion)
         }
         break;
     case 0x3EB:
-        if (fn_8026A328(self, 1, 62.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 62.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
         }
         break;
     case 0x41C:
-        if (fn_8026A328(self, 1, 66.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 66.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
@@ -3560,7 +3560,7 @@ extern "C" u8 pl_rig_kind3_allow_get(_PLW* self, u16 motion)
         break;
     case 0x421:
     case 0x3F1:
-        if (fn_8026A328(self, 1, 68.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 68.0f, 0.0f) == 1) {
             allow = 2;
         } else {
             allow = 1;
@@ -3569,14 +3569,14 @@ extern "C" u8 pl_rig_kind3_allow_get(_PLW* self, u16 motion)
     case 0x46A:
     case 0x42E:
     case 0x3FA:
-        if (fn_8026A328(self, 1, 2.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) == 1) {
             allow = 1;
         } else {
             allow = 2;
         }
         break;
     case 0x49C:
-        if (fn_8026A328(self, 1, 4.0f, 0.0f) == 1) {
+        if (Pl_frame_check_alt(self, 1, 4.0f, 0.0f) == 1) {
             allow = 1;
         } else {
             allow = 2;
@@ -3603,7 +3603,7 @@ extern "C" u8 pl_rig_kind4_allow_get(_PLW* self, u16 motion)
     case 0x46A:
     case 0x41B:
     case 0x3EA:
-        if (fn_8026A328(self, 1, 2.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) != 0) {
             allow = 1;
         } else {
             allow = 2;
@@ -3612,14 +3612,14 @@ extern "C" u8 pl_rig_kind4_allow_get(_PLW* self, u16 motion)
     case 0x421:
     case 0x41C:
     case 0x3EB:
-        if (fn_8026A328(self, 1, 110.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 110.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 1;
         }
         break;
     case 0x3F1:
-        if (fn_8026A328(self, 1, 90.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 90.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 1;
@@ -3627,7 +3627,7 @@ extern "C" u8 pl_rig_kind4_allow_get(_PLW* self, u16 motion)
         break;
     case 0x46C:
     case 0x410:
-        if (fn_8026A328(self, 1, 22.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 22.0f, 0.0f) != 0) {
             allow = 1;
         } else {
             allow = 2;
@@ -3639,7 +3639,7 @@ extern "C" u8 pl_rig_kind4_allow_get(_PLW* self, u16 motion)
     case 0x43D:
     case 0x43A:
     case 0x40B:
-        if (fn_8026A328(self, 1, 26.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 26.0f, 0.0f) != 0) {
             allow = 1;
         } else {
             allow = 2;
@@ -3656,14 +3656,14 @@ extern "C" u8 pl_rig_kind4_allow_get(_PLW* self, u16 motion)
         break;
     case 0x43B:
     case 0x43C:
-        if (fn_8026A328(self, 1, 2.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 1;
         }
         break;
     case 0x40F:
-        if (fn_8026A328(self, 1, 82.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 82.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 1;
@@ -3693,21 +3693,21 @@ extern "C" u8 pl_rig_kind7_allow_get(_PLW* self, u16 motion)
     case 0x3EA:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 54.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 54.0f, 0.0f) != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 14.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 14.0f, 0.0f) != 0) {
             allow = 0;
         }
         break;
     case 0x3EB:
-        if (fn_8026A328(self, 1, 50.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 50.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 0;
         }
         break;
     case 0x3F1:
-        if (fn_8026A328(self, 1, 44.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 44.0f, 0.0f) != 0) {
             allow = 2;
         } else {
             allow = 0;
@@ -3716,18 +3716,18 @@ extern "C" u8 pl_rig_kind7_allow_get(_PLW* self, u16 motion)
     case 0x41B:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 54.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 54.0f, 0.0f) != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 14.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 14.0f, 0.0f) != 0) {
             allow = 0;
         }
         break;
     case 0x41C:
         if (leaning != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 50.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 50.0f, 0.0f) == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 0.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 0.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 1;
@@ -3736,9 +3736,9 @@ extern "C" u8 pl_rig_kind7_allow_get(_PLW* self, u16 motion)
     case 0x421:
         if (leaning != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 48.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 48.0f, 0.0f) == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 0.0f, 0.0f) == 1) {
+        } else if (Pl_frame_check_alt(self, 1, 0.0f, 0.0f) == 1) {
             allow = 0;
         } else {
             allow = 1;
@@ -3747,9 +3747,9 @@ extern "C" u8 pl_rig_kind7_allow_get(_PLW* self, u16 motion)
     case 0x45B:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 26.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 26.0f, 0.0f) != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 6.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 6.0f, 0.0f) != 0) {
             allow = 0;
         } else {
             allow = 2;
@@ -3758,16 +3758,16 @@ extern "C" u8 pl_rig_kind7_allow_get(_PLW* self, u16 motion)
     case 0x466:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 2.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) != 0) {
             allow = 0;
         }
         break;
     case 0x495:
     case 0x467:
-        if (fn_8026A328(self, 1, 128.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 128.0f, 0.0f) != 0) {
             allow = 2;
         } else {
-            allow = fn_8026A328(self, 1, 58.0f, 0.0f) == 0;
+            allow = Pl_frame_check_alt(self, 1, 58.0f, 0.0f) == 0;
         }
         if (leaning == 1) {
             allow = 1;
@@ -3776,9 +3776,9 @@ extern "C" u8 pl_rig_kind7_allow_get(_PLW* self, u16 motion)
     case 0x489:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 28.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 28.0f, 0.0f) != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 6.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 6.0f, 0.0f) != 0) {
             allow = 0;
         } else {
             allow = 2;
@@ -3787,7 +3787,7 @@ extern "C" u8 pl_rig_kind7_allow_get(_PLW* self, u16 motion)
     case 0x494:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 2.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) != 0) {
             allow = 0;
         }
         break;
@@ -3814,9 +3814,9 @@ extern "C" u8 pl_rig_kind8_allow_get(_PLW* self, u16 motion)
     case 0x3EA:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 56.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 56.0f, 0.0f) != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 4.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 4.0f, 0.0f) != 0) {
             allow = 0;
         }
         break;
@@ -3824,9 +3824,9 @@ extern "C" u8 pl_rig_kind8_allow_get(_PLW* self, u16 motion)
     case 0x41C:
     case 0x3F1:
     case 0x3EB:
-        if (fn_8026A328(self, 1, 90.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 90.0f, 0.0f) != 0) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 32.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 32.0f, 0.0f) != 0) {
             allow = 0;
         } else {
             allow = 1;
@@ -3836,17 +3836,17 @@ extern "C" u8 pl_rig_kind8_allow_get(_PLW* self, u16 motion)
     case 0x458:
         if (leaning == 1) {
             allow = 2;
-        } else if (fn_8026A328(self, 1, 30.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 30.0f, 0.0f) != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 1, 2.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 1, 2.0f, 0.0f) != 0) {
             allow = 0;
         }
         break;
     case 0x494:
     case 0x462:
-        if (fn_8026A328(self, 6, 110.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 6, 110.0f, 0.0f) != 0) {
             allow = 1;
-        } else if (fn_8026A328(self, 6, 34.0f, 0.0f) != 0) {
+        } else if (Pl_frame_check_alt(self, 6, 34.0f, 0.0f) != 0) {
             allow = 0;
         } else {
             allow = 1;
@@ -3858,21 +3858,21 @@ extern "C" u8 pl_rig_kind8_allow_get(_PLW* self, u16 motion)
         break;
     case 0x496:
     case 0x464:
-        if (fn_8026A328(self, 1, 36.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 36.0f, 0.0f) != 0) {
             allow = 1;
         } else {
             allow = 0;
         }
         break;
     case 0x465:
-        if (fn_8026A328(self, 1, 50.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 50.0f, 0.0f) != 0) {
             allow = 1;
         } else {
             allow = 0;
         }
         break;
     case 0x497:
-        if (fn_8026A328(self, 1, 52.0f, 0.0f) != 0) {
+        if (Pl_frame_check_alt(self, 1, 52.0f, 0.0f) != 0) {
             allow = 1;
         } else {
             allow = 0;
@@ -4341,22 +4341,22 @@ extern "C" void pl_rig_kind0_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
             }
             break;
         case 0x468:
-            if (leaning != 0 || fn_8026A328(plw, 2, 50.0f, 0.0f) == 1) {
+            if (leaning != 0 || Pl_frame_check_alt(plw, 2, 50.0f, 0.0f) == 1) {
                 charge = 1;
             }
             break;
         case 0x46F:
-            if (leaning != 0 || fn_8026A328(plw, 2, 56.0f, 0.0f) == 1) {
+            if (leaning != 0 || Pl_frame_check_alt(plw, 2, 56.0f, 0.0f) == 1) {
                 charge = 1;
             }
             break;
         case 0x48E:
-            if (leaning != 0 || fn_8026A328(plw, 2, 54.0f, 0.0f) == 1) {
+            if (leaning != 0 || Pl_frame_check_alt(plw, 2, 54.0f, 0.0f) == 1) {
                 charge = 1;
             }
             break;
         case 0x494:
-            if (leaning != 0 || fn_8026A328(plw, 2, 70.0f, 0.0f) == 1) {
+            if (leaning != 0 || Pl_frame_check_alt(plw, 2, 70.0f, 0.0f) == 1) {
                 charge = 1;
             }
             break;
@@ -4687,7 +4687,7 @@ extern "C" void pl_rig_key_scale_lerp(_PLW* plw, PlRigScaleKey* keys, PlSeJointA
             adj->trans_0x0C.z = keys->tilt_z_0x10;
             break;
         }
-        if (fn_8026A328(plw, 5, keys->frame_0x00, keys[1].frame_0x00) != 0) {
+        if (Pl_frame_check_alt(plw, 5, keys->frame_0x00, keys[1].frame_0x00) != 0) {
             f32 t = (pl_rig_get_motion_frame(plw) - keys->frame_0x00) / (keys[1].frame_0x00 - keys->frame_0x00);
 
             adj->scale_0x00.x = keys->scale_0x04 + t * (keys[1].scale_0x04 - keys->scale_0x04);
@@ -4713,7 +4713,7 @@ extern "C" void pl_rig_key_tilt_lerp(_PLW* plw, PlRigTiltKey* keys, PlSeJointAdj
             adj->trans_0x0C.z = keys->tilt_z_0x0C;
             return;
         }
-        if (fn_8026A328(plw, 5, keys->frame_0x00, keys[1].frame_0x00) != 0) {
+        if (Pl_frame_check_alt(plw, 5, keys->frame_0x00, keys[1].frame_0x00) != 0) {
             f32 t = (pl_rig_get_motion_frame(plw) - keys->frame_0x00) / (keys[1].frame_0x00 - keys->frame_0x00);
 
             adj->rot_0x18.y = keys->lift_0x04 + t * (keys[1].lift_0x04 - keys->lift_0x04);
@@ -4984,11 +4984,11 @@ extern "C" void pl_rig_kind3_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
             return;
         case 0x48A:
         case 0x458:
-            if (fn_8026A328(plw, 2, 50.0f, 0.0f) == 1) {
+            if (Pl_frame_check_alt(plw, 2, 50.0f, 0.0f) == 1) {
                 attach->adj_0x014[3].rot_0x18.z = 360.0f * (f32)(s32)((plw->frame_0x020 & 7) << 13) / 65536.0f;
                 return;
             }
-            if (fn_8026A328(plw, 2, 90.0f, 0.0f) == 1) {
+            if (Pl_frame_check_alt(plw, 2, 90.0f, 0.0f) == 1) {
                 attach->adj_0x014[3].rot_0x18.z =
                     360.0f * (f32)(s32)((plw->frame_0x020 & 0x1F) << 11) / 65536.0f;
                 return;

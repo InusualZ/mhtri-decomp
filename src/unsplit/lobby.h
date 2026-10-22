@@ -38,7 +38,7 @@ typedef struct _mh_ivec2_ {
  * incomplete type is enough here. */
 struct _SPR_DATA_;
 
-/* One 6-byte row of the lobby selection tables (`lbl_805BA660`, `lbl_805BA6D4`, `lbl_805BA718`): a
+/* One 6-byte row of the lobby selection tables (`lb_trade_price_rows`, `lb_trade_flag_rows`, `lb_trade_pair_rows`): a
  * u16 id, a u16 payload and a u16 gate flag. */
 typedef struct LbTableRow {
     /* +0x00 */ u16 id_0x00;
@@ -299,9 +299,9 @@ extern const u16 lb_color_pane_head_hair[4];
 extern const u16 lb_color_pane_head_inner[4];
 extern const f64 lbl_80799878;
 
-extern u16 lbl_805BA660[58];
-extern u16 lbl_805BA6D4[34];
-extern u16 lbl_805BA718[28];
+extern u16 lb_trade_price_rows[58];
+extern u16 lb_trade_flag_rows[34];
+extern u16 lb_trade_pair_rows[28];
 extern const u16 lb_ship_box_frames[10];
 extern u8 eft052_item_box[88];
 extern u16 lbl_80791B70[4];
@@ -409,16 +409,16 @@ extern LbNpcMoveSpot lbl_805B8F60[2];
 extern LbNpcMoveSpot lbl_805B8F70[3];
 
 /* The unsplit plain-C callees. */
-void* fn_801E6F10(u16 id);
-void* fn_801E6F48(u16 id);
+void* lb_goods_pair_row_get(u16 id);
+void* lb_goods_flag_row_get(u16 id);
 s32 spr_data_copy(s16 *, void *);
-s32 fn_801E6DCC(void);
-u16 fn_801E6EA8(u16, s32);
-s32 fn_801E6F80(void *);
-s32 fn_801E7178(void *);
+s32 lb_goods_sale_close(void);
+u16 lb_goods_count_get(u16, s32);
+s32 lb_goods_sale_list_build(void *);
+s32 lb_goods_sale_step(void *);
 u16 item_price_get(u16);
-s32 fn_801E73A4(void *);
-s16 fn_801E74B0(void *, s16);
+s32 lb_goods_hold_step(void *);
+s16 lb_goods_price_group_get(void *, s16);
 u16 fn_802089F4(s32);
 s32 lb_cmd_pressed_ck(s32, s16);
 s32 lb_cmd_repeat_ck(s32);

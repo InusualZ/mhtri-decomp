@@ -33,7 +33,7 @@ void pl_model_visible_set(struct _PLW* self, u8 value);
 void pl_model_hide(struct _PLW* self);
 void pl_model_set_state(struct _PLW* self, u8 value);
 void pl_model_aux_flag_clear(struct _PLW* self);
-u32 fn_8026A328(struct _PLW* self, u16 frame, f32 a, f32 b);
+u32 Pl_frame_check_alt(struct _PLW* self, u16 frame, f32 a, f32 b);
 u32 Pl_motion_end_ck(struct _PLW* self);
 f32 pl_rig_get_motion_frame(struct _PLW* self);
 f32 pl_rig_get_float_a4(struct _PLW* self);
@@ -64,7 +64,7 @@ void fn_8026AF08(struct _PLW* self, u32 value);
 }
 
 /* The mangled half (rule 9).  `Pl_chr_set_attr` takes the fifth `u32` argument `Pl_chr_set_attr_default` fills in
- * with 0; `Pl_frame_check`/`fn_8026A328` ignore their two floats and pass a constant flag instead. */
+ * with 0; `Pl_frame_check`/`Pl_frame_check_alt` ignore their two floats and pass a constant flag instead. */
 void set_com_motion_type(u8 type);
 u16 Get_motion_no(struct _PLW* self);
 u32 Pl_frame_check(struct _PLW* self, u32 mask, f32 a, f32 b);

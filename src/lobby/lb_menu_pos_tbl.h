@@ -32,4 +32,19 @@ void lobby_player_place_ex(u8 mode, nw4r::math::VEC3* pos, u16 angle, s32 kind);
 }
 #endif
 
+/* The lobby trade tables (.data 0x805BA660-0x805BA750), rows of halfwords that `lobby/fn_801E0ADC.cpp`'s
+ * trade-goods sale reads. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* .data 0x805BA660 (0x74) - item id -> price rows (three halfwords each), in groups of six rows. */
+extern u16 lb_trade_price_rows[58];
+/* .data 0x805BA6D4 (0x44) - the single trade goods and their prices (three halfwords each). */
+extern u16 lb_trade_flag_rows[34];
+/* .data 0x805BA718 (0x38) - the paired trade goods and their two prices (four halfwords each). */
+extern u16 lb_trade_pair_rows[28];
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_LOBBY_LB_MENU_POS_TBL_H */

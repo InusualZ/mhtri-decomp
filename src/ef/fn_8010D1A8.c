@@ -249,7 +249,7 @@ extern s32 res_eft_model_create_light__FP6MHcharUsUll(EftLight* light, u16 id, u
 extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec3* v, f32 x, f32 y, f32 z);
 extern s16 light_id_next(void);
 extern void fn_80111870(void);
-extern s32 fn_8026A328(s32 a, f32 b, f32 c);
+extern s32 Pl_frame_check_alt(s32 a, f32 b, f32 c);
 extern u16 Get_motion_no__FP4_PLW(Plw* plw);
 extern s32 Pl_frame_check__FP4_PLWUlff(Plw* plw, u32 a, f32 b, f32 c);
 extern Rgb3 lbl_8059F5B0[];
@@ -833,7 +833,7 @@ void fn_80111BC0(Eft* self, EftModel* model, u16 arg2)
     void* p;
 
     work = self->work_0x38;
-    if ((arg2 - 0x15D) <= 1 || (arg2 == 0x150 && fn_8026A328(1, lbl_80796884, lbl_80796884) != 0)) {
+    if ((arg2 - 0x15D) <= 1 || (arg2 == 0x150 && Pl_frame_check_alt(1, lbl_80796884, lbl_80796884) != 0)) {
         if (self->areano_0x44 != get_now_areano__Fv() || self->flag_0x01 == 0) {
             g3d_root_model_bind(pRoot, model->field_0x118);
             return;
