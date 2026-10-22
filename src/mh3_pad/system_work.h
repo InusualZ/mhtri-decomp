@@ -129,7 +129,7 @@ typedef struct SystemWork {
     /* +0x7E0 */ u8 field_0x7e0[4];
     /* +0x7E4 */ u8 field_0x7e4[4];
     /* +0x7E8 */ u8 vs_load_player_0x7e8;  /* GUESS name: the VS player whose save `multi_box_phase_input` starts loading */
-    /* +0x7E9 */ u8 pad_0x7e9[0x1];
+    /* +0x7E9 */ u8 vs_load_slot_0x7e9;  /* GUESS name: the save slot the character make seeds a new user data with */
     /* +0x7EA */ char save_name_0x7ea[6][0x11];   /* GUESS name: each save file's player name (the save code copies it in and out of the data file's +0x08) */
     /* +0x850 */ u8 vs_player_pending_0x850[4];   /* GUESS name: per-player flag `arena_result_next` raises through the player's Vs block */
     /* +0x854 */ u8 pad_0x854[0x2];
@@ -151,8 +151,10 @@ typedef struct SystemWork {
     /* +0x86E */ u8 unk2158;
     /* +0x86F */ u8 unk2159;
     /* +0x870 */ u8 hbm_disabled;     /* hbm_disable sets 1; hbm_enable follows +0x86B */
-    /* +0x871 */ u8 unk2161;
-    /* +0x872 */ u8 pad_0x872[0x5];
+    /* +0x871 */ u8 system_halt_0x871; /* set on a fatal drive error or a handled reset: the main loop stops polling */
+    /* +0x872 */ u8 pad_0x872[0x1];
+    /* +0x873 */ u8 field_0x873;      /* non-zero: the disc-error screen stays off */
+    /* +0x874 */ u8 pad_0x874[0x3];
     /* +0x877 */ u8 field_0x877;
     /* +0x878 */ u32 field_0x878;
     /* +0x87C */ u32 field_0x87c;

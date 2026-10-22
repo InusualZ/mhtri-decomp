@@ -18,9 +18,9 @@ extern "C" {
 #endif
 
 u32 fn_802693C4(s32 player, u8 part, s32 value);
-u32 fn_80269474(s32 player, u8 part, s32 value);
+u32 pl_parts_set(s32 player, u8 part, s32 value);
 s32 fn_80269508(struct _PLW* self, s32 part);
-s32 fn_8026954C(s32 player, u8 part, s32 value);
+s32 pl_parts_set_ck(s32 player, u8 part, s32 value);
 void fn_802695A4(u8 player, void* equipA, void* equipB);
 u8 fn_802699AC(void);
 s16 fn_8026A00C(u16 id);

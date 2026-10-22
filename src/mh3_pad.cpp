@@ -415,7 +415,7 @@ extern "C" char* fn_80041404(char* s, int c)
     return strrchr(s, c);
 }
 
-extern "C" void fn_80041408(void)
+extern "C" void pmic_stop(void)
 {
     PMICStop();
 }

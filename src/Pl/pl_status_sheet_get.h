@@ -29,7 +29,7 @@ u32 pl_skill_valid_ck(struct _PLW* plw, u8 skill);
  * piece's kind).  GUESS name. */
 u32 pl_equip_skill_valid_ck(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* barrel, u8 skill);
 
-/* 0x802719B8 - `pl_equip_skill_valid_ck` for an active skill id (mapped to its tree by `fn_802718C8`).  GUESS name. */
+/* 0x802719B8 - `pl_equip_skill_valid_ck` for an active skill id (mapped to its tree by `pl_skill_tree_get`).  GUESS name. */
 u32 pl_equip_skill_id_valid_ck(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* barrel, u16 skill_id);
 
 /* 0x80271E0C - whether a piece adds points to a skill tree (its row or a decoration).  GUESS name. */

@@ -94,15 +94,15 @@ void fn_800E7D34(void);
 void fn_800E7DE4(u32 idx, RelocDesc* desc);
 void fn_800E7EE0(u32 idx, RelocDesc* desc);
 void* fn_800E7FC4(u32 idx, u32 key);
-u32 fn_800E802C(u32 key);
+u32 snd_stream_reloc_busy_ck(u32 key);
 void fn_800E8080(u32 key, u16 pitch);
 void* fn_800E80DC(u32 a, u32 b, u32 c);
 void* fn_800E8150(u32 a, u32 b, u32 c, u32 d);
 void* fn_800E81BC(u32 a, u32 b, u32 c, u32 d);
-void fn_800E8228(u32 owner);
+void snd_stream_reloc_stop(u32 owner);
 void fn_800E8294(void);
-void fn_800E82D4(void);
-void fn_800E8314(void);
+void snd_stream_reloc_pause(void);
+void snd_stream_reloc_resume(void);
 void fn_800E8354(u32 owner, s16 arg);
 void fn_800E83CC(u32 owner, s16 arg);
 s16 fn_800E8444(u32 key);
@@ -115,7 +115,7 @@ void fn_800E93E0(ReverbLine* line);
 
 void fn_800E8634(u32 idx, u32 entry_idx);
 void fn_800E8698(void);
-void fn_800E86E8(u32 id);
+void snd_master_volume_set(u32 id);
 void pushReverbSamples(s16* src, s32 count);
 void fn_800E8DA4(void);
 void* fn_800E8DE0(void* obj, s32 flags);
@@ -392,7 +392,7 @@ extern "C" void* fn_800E7FC4(u32 idx, u32 key)
 }
 
 /* How many voices one owner holds, with interrupts off. */
-extern "C" u32 fn_800E802C(u32 key)
+extern "C" u32 snd_stream_reloc_busy_ck(u32 key)
 {
     u32 level = OSDisableInterrupts();
     u32 count = fn_800E7700(fn_800E5714(), key);
@@ -441,7 +441,7 @@ extern "C" void* fn_800E81BC(u32 a, u32 b, u32 c, u32 d)
 }
 
 /* Registers one slot-list entry with no extra data, with interrupts off. */
-extern "C" void fn_800E8228(u32 owner)
+extern "C" void snd_stream_reloc_stop(u32 owner)
 {
     u32 level = OSDisableInterrupts();
 
@@ -459,7 +459,7 @@ extern "C" void fn_800E8294(void)
 }
 
 /* Marks sound bank 2 pending, with interrupts off. */
-extern "C" void fn_800E82D4(void)
+extern "C" void snd_stream_reloc_pause(void)
 {
     u32 level = OSDisableInterrupts();
 
@@ -468,7 +468,7 @@ extern "C" void fn_800E82D4(void)
 }
 
 /* Marks sound bank 4 pending, with interrupts off. */
-extern "C" void fn_800E8314(void)
+extern "C" void snd_stream_reloc_resume(void)
 {
     u32 level = OSDisableInterrupts();
 
@@ -552,7 +552,7 @@ extern "C" void fn_800E8698(void)
 }
 
 /* Sets the global voice count with interrupts off. */
-extern "C" void fn_800E86E8(u32 id)
+extern "C" void snd_master_volume_set(u32 id)
 {
     u32 level = OSDisableInterrupts();
 

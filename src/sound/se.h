@@ -110,7 +110,7 @@ extern "C" {
 void fn_800D9CC8(_se_w* work, s32 a, s32 b, s32 c);
 u32 fn_800D8D8C(nw4r::math::VEC3* pos);
 SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos);
-s32 fn_800DBB78(s32 bank, s32 id);
+s32 se_bank_req(s32 bank, s32 id);
 
 /* C-linkage helpers the model methods call (their owners are elsewhere in the game).
  * 0x80041E40 is owned by `src/mh3_pad.cpp`; this copy is normalised to that owner's body

@@ -348,7 +348,7 @@ extern const char lbl_8059B150[]; /* "16/srt/bgm/MH3BGM_LOBBY.srt" */
 extern "C" void snd_bank_layout(u8 mode);
 extern "C" void scene_se_bank_load(u8 a, u8 b);
 extern "C" void snd_player_banks_load(u8 arg0);
-extern "C" void fn_800EFC68(_PLW* work);
+extern "C" void pl_voice_bank_load(_PLW* work);
 extern "C" s32 fn_800EFD88(u8 id, u32 kind);
 extern "C" void fn_800EFDD8(_PLW* work);
 extern "C" void fn_800F0230(void* unused_0, void* unused_1, void* unused_2, u32* args);
@@ -669,7 +669,7 @@ extern "C" void snd_player_banks_load(u8 arg0)
 }
 
 /* The same for one already-selected slot. */
-extern "C" void fn_800EFC68(_PLW* work)
+extern "C" void pl_voice_bank_load(_PLW* work)
 {
     char name[0x88];
     u32 args[3];

@@ -254,7 +254,7 @@ struct Q_ItemWork {
 
 /* The game's save/user block, seen only as the four count blocks this unit reads.  It is the arena
  * buffer `get_userdata` hands out (`*(void**)(&system_w + 0x95C)`, set by `ef/system_core.cpp`'s
- * `memory_layout_init`), and 0x6000 is the whole extent `fn_80047398.cpp`'s `fn_800497B4`/`fn_800498EC`
+ * `memory_layout_init`), and 0x6000 is the whole extent `fn_80047398.cpp`'s `fn_800497B4`/`userdata_clear`
  * clear with `memset(get_userdata(), 0, 0x6000)`.  Nothing reads at or past it: of the 344 functions
  * that reach the block the furthest is `menu/get_pop_dat_ptr.cpp`'s `fn_803C0F3C`, at `+0x5364` for
  * sixteen 2-byte entries, so the run past the count sets stays unnamed filler. */
@@ -306,14 +306,25 @@ struct Q_ArenaRecord {
 };
 
 struct Q_UserData {
-    /* +0x0000 */ u8 pad_0x0000[0x18];
+    /* +0x0000 */ u8 hunter_sex_0x0000;     /* the character make's model (0 or 1) */
+    /* +0x0001 */ u8 hunter_face_0x0001;
+    /* +0x0002 */ u8 hunter_hair_0x0002;
+    /* +0x0003 */ char hunter_name_0x0003[0x11];
+    /* +0x0014 */ u32 hair_color_0x0014;     /* the hair colour as an RGBA word */
     /* +0x0018 */ s32 zenny_0x18;  /* the player's money (`score_add_clamped` credits it) */
-    /* +0x001C */ u8 pad_0x001C[0x180 - 0x1C];
+    /* +0x001C */ u8 pad_0x001C[0x9E - 0x1C];
+    /* +0x009E */ u8 hunter_equip_0x009E;   /* the character make's demo equipment set */
+    /* +0x009F */ u8 hunter_voice_0x009F;
+    /* +0x00A0 */ u8 pad_0x00A0[0x180 - 0xA0];
     /* +0x0180 */ IdValue box_0x180[0x18];  /* the item box's first page */
     /* +0x01E0 */ u8 pad_0x01E0[0x490 - 0x1E0];
     /* +0x0490 */ Q_CountSet set_c;
     /* +0x04E2 */ Q_CountSet set_d;
-    /* +0x0534 */ u8 pad_0x0534[0x39C0 - 0x534];
+    /* +0x0534 */ u8 pad_0x0534[0x39A0 - 0x534];
+    /* +0x39A0 */ u8 face_type_0x39A0;
+    /* +0x39A1 */ u8 face_eye_0x39A1;
+    /* +0x39A2 */ u8 pad_0x39A2[0x39BC - 0x39A2];
+    /* +0x39BC */ u32 inner_color_0x39BC;    /* the inner-wear colour as an RGBA word */
     /* +0x39C0 */ Q_CountSet set_a;
     /* +0x3A12 */ u8 pad_0x3A12[0x3AC0 - 0x3A12];
     /* +0x3AC0 */ Q_CountSet set_b;
@@ -322,7 +333,9 @@ struct Q_UserData {
     /* +0x3C64 */ u8 pad_0x3C64[0x3DE0 - 0x3C64];
     /* +0x3DE0 */ s32 hunter_points_0x3DE0;  /* the hunter points total */
     /* +0x3DE4 */ u16 hunter_rank_0x3DE4;    /* the hunter rank */
-    /* +0x3DE6 */ u8 pad_0x3DE6[0x3F04 - 0x3DE6];
+    /* +0x3DE6 */ u8 makeup_0x3DE6;
+    /* +0x3DE7 */ u8 makeup_color_0x3DE7;
+    /* +0x3DE8 */ u8 pad_0x3DE8[0x3F04 - 0x3DE8];
     /* +0x3F04 */ s32 points_0x3F04;          /* the resource points (`userdata_zenny_add` credits them) */
     /* +0x3F08 */ u8 pad_0x3F08[0x3F28 - 0x3F08];
     /* +0x3F28 */ Q_QuestStat quest_stat;  /* the stat `quest_init` copies into the work block's own */
@@ -348,7 +361,8 @@ struct Q_UserData {
     /* +0x5334 */ u32 arena_best_0x5334[12];  /* the arena quests' best times in frames, 0 when unset */
     /* +0x5364 */ u32 vs_items_0x5364[0x10];  /* the VS user block's 16 item slots (`item_0x2C`) */
     /* +0x53A4 */ s32 vs_point_0x53A4;       /* its `point_0x18` credit */
-    /* +0x53A8 */ u8 pad_0x53A8[0x6000 - 0x53A8];
+    /* +0x53A8 */ u32 seed_0x53A8;           /* the save slot in the top byte and a random value */
+    /* +0x53AC */ u8 pad_0x53AC[0x6000 - 0x53AC];
 };  /* size: 0x6000 */
 
 struct QuestEntrySlot;

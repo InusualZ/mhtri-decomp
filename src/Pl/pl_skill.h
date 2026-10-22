@@ -46,8 +46,8 @@ u16 fn_80273044(struct _PLW* plw, u16 item);
 }
 #endif
 
-/* One 0x14C-byte player-object record (`lbl_80794B28->table`, one per player).  The first 11 bytes are
- * the record's 11 state slots (`fn_80269394`/`fn_802693C4`/`player_move_start_ck` walk them); the rest
+/* One 0x14C-byte player-object record (`pl_global->table`, one per player).  The first 11 bytes are
+ * the record's 11 state slots (`pl_obj_ready_ck`/`fn_802693C4`/`player_move_start_ck` walk them); the rest
  * is 7 groups of 11 resource words each (`parts_mdl_release_all`/`fn_802688B0` step `group[k][part]`).
  * size: 0x14C */
 struct _PLOBJ {
@@ -57,14 +57,14 @@ struct _PLOBJ {
         /* +0x00B */ u8 unk00B[0xD];
         struct {
             /* +0x00B */ u8 part_flag_0x0B[11];  /* the per-part armed/consumed flag `fn_802693C4`
-                                                  * clears and `fn_80269474` sets */
+                                                  * clears and `pl_parts_set` sets */
             /* +0x016 */ u8 pad_0x16[0x2];
         };
     };
     /* +0x018 */ s32 group[7][11];
 };
 
-/* One 0xB20-byte player work record (`lbl_80794B28->objects`, `get_move_work_adrs(2)`).
+/* One 0xB20-byte player work record (`pl_global->objects`, `get_move_work_adrs(2)`).
  * size: 0xB20 */
 struct _PLWORK {
     /* +0x000 */ u8 active;
@@ -75,7 +75,7 @@ struct _PLWORK {
     /* +0x268 */ u8 unk268[0xB20 - 0x268];
 };
 
-/* The 0x47C-byte player-global record `lbl_80794B28` (`Pl/player_control.cpp`'s `.sbss`) points at - the allocation
+/* The 0x47C-byte player-global record `pl_global` (`Pl/player_control.cpp`'s `.sbss`) points at - the allocation
  * size `player_work_array_get` requests.  The middle fields are named from the player-control code's uses.
  * size: 0x47C */
 struct _PLGLOBAL {
@@ -84,7 +84,7 @@ struct _PLGLOBAL {
     /* +0x004 */ s32 count;              /* number of player records (`player_move_start__Fl`) */
     /* +0x008 */ s32 ready;              /* how many players finished `fn_80267AA0`'s start-up */
     /* +0x00C */ struct _PLWORK* objects;  /* `count` records */
-    /* +0x010 */ struct _PLOBJ* table;    /* one record per player, `fn_80269394`/`pl_skill` walk it */
+    /* +0x010 */ struct _PLOBJ* table;    /* one record per player, `pl_obj_ready_ck`/`pl_skill` walk it */
     /* +0x014 */ u8 unk014[0x8];
     /* +0x01C */ s32 res_0x1C[0x79];      /* the per-player resource word table */
     /* +0x200 */ union {   /* two views: `loaded[7]` plus the four gate words, and
@@ -114,7 +114,7 @@ struct _PLGLOBAL {
                                             * `fn_802699AC` returns */
     };
 };
-extern struct _PLGLOBAL* lbl_80794B28;
+extern struct _PLGLOBAL* pl_global;
 
 extern u8 lbl_80794B2C[4];
 

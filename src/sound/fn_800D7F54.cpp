@@ -13,7 +13,7 @@
  * position, lands in a free slot of the `_se_w` work object, and the per-frame drivers (`fn_800D84E8` /
  * `fn_800D85B0` / `fn_800D8678` / `fn_800D8730`) walk the slots and turn each live one into playback
  * calls (`fn_800F0C14` bank lookup, `fn_800F2890`/`fn_800F27C4` id resolve, `fn_800E80DC`/`fn_800E81BC`
- * open, `fn_800E8354` volume, `fn_800E83CC` pitch, `fn_800E802C`/`fn_800E8228` stop).
+ * open, `fn_800E8354` volume, `fn_800E83CC` pitch, `snd_stream_reloc_busy_ck`/`snd_stream_reloc_stop` stop).
  *
  * The core shapes, all read off the disassembly:
  *   - `_se_w` is the work object; `fn_800D843C()` is the "SE disabled" predicate (1 = skip), and
@@ -22,7 +22,7 @@
  *   - `se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos)` is the common "start a positional sound"
  *     helper. The dozens of 16-byte `fn_*` wrappers are `se_slot_req_pos(0, id, pos)` with a fixed id; the
  *     72-byte ones pick the id from `fn_800D8D8C(pos)` first.
- *   - `fn_800DBB78(s32 bank, s32 id)` is the non-positional (`sysSE_req`/`titleSE_req`) path.
+ *   - `se_bank_req(s32 bank, s32 id)` is the non-positional (`sysSE_req`/`titleSE_req`) path.
  *
  * Build: `cflags_main` plus a file-scope `#pragma peephole off` and a file-scope
  * `#pragma optimization_level 4`. The retail object keeps `clrlwi`+`cmpwi`
@@ -49,7 +49,7 @@
  *
  * Data runs in this range are recorded in `splits.txt` as comments and not claimed (playbook 23,
  * docs/plan.md 8.4); the `extab`/`extabindex` fragments travel with the code unit.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_800E8228`,
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `snd_stream_reloc_stop`,
  *     `lbl_807963E0`, `lbl_80794978`, `lbl_807963F8`, `fn_800F2680`.
  *   flipcheck: `.data` size gap.
  *   flipcheck: `.sdata` claimed, not emitted.
@@ -67,8 +67,7 @@
 #pragma peephole off
 #include "sound/fn_800E80DC.h" /* fn_800E80DC (rule 2: the owner's header) */
 #include "enemy/em_after_frame_check__FP11_ENEMY_WORKUsff.h" /* em_after_frame_check__FP11_ENEMY_WORKUsff (rule 2: the owner's header) */
-#include "sound/fn_800E802C.h" /* fn_800E802C (rule 2: the owner's header) */
-#include "sound/fn_800E8228.h" /* fn_800E8228 (rule 2: the owner's header) */
+#include "sound/snd_stream_reloc_busy_ck.h" /* snd_stream_reloc_busy_ck / snd_stream_reloc_stop (rule 2) */
 #include "sound/fn_800E8354.h" /* fn_800E8354 (rule 2: the owner's header) */
 #include "sound/fn_800EF56C.h" /* fn_800EF56C (rule 2: the owner's header) */
 #include "sound/fn_800E8498.h" /* fn_800E8498 (rule 2: the owner's header) */
@@ -91,8 +90,8 @@
 #include "lobby/lb_npc_func.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define fn_800E80DC_c1 ((s32 (*)(s32, s32, s32))fn_800E80DC)
-#define fn_800E802C_c1 ((s32 (*)(s32))fn_800E802C)
-#define fn_800E8228_c1 ((void (*)(s32))fn_800E8228)
+#define fn_800E802C_c1 ((s32 (*)(s32))snd_stream_reloc_busy_ck)
+#define fn_800E8228_c1 ((void (*)(s32))snd_stream_reloc_stop)
 #define fn_800E8354_c1 ((void (*)(s32, s16))fn_800E8354)
 #define fn_800E8498_c1 ((void (*)(Mtx34*, s32))fn_800E8498)
 #define fn_800E81BC_c1 ((s32 (*)(s32, s32, nw4r::math::VEC3*, s32))fn_800E81BC)
@@ -169,7 +168,7 @@ extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800DBFAC(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800D8E58(_se_w* work, s32 id);
 extern "C" u32 fn_800D8D8C(nw4r::math::VEC3* pos);
-extern "C" s32 fn_800DBB78(s32 bank, s32 id);
+extern "C" s32 se_bank_req(s32 bank, s32 id);
 extern "C" s32 se_slot_req(s32 value);
 extern "C" SeWork* get_move_work_adrs__FUc(u8 kind);
 
@@ -279,13 +278,13 @@ extern "C" void se_req_pos_id84(nw4r::math::VEC3* pos) {
 
 extern "C" void fn_800DB964(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 97, pos); }
 
-extern "C" void se_req_item_jingle(void) { fn_800DBB78(0, 36); }
+extern "C" void se_req_item_jingle(void) { se_bank_req(0, 36); }
 
-extern "C" void fn_800DBC0C(void) { fn_800DBB78(0, 37); }
+extern "C" void fn_800DBC0C(void) { se_bank_req(0, 37); }
 
-extern "C" void se_req_page_toggle(void) { fn_800DBB78(0, 31); }
+extern "C" void se_req_page_toggle(void) { se_bank_req(0, 31); }
 
-extern "C" void fn_800DBC24(void) { fn_800DBB78(0, 12); }
+extern "C" void fn_800DBC24(void) { se_bank_req(0, 12); }
 
 extern "C" void se_eft004_demo_req(nw4r::math::VEC3* pos) { fn_800DBE94(0, 23, pos); }
 
@@ -362,9 +361,9 @@ extern "C" void se_req_pos_id83(nw4r::math::VEC3* pos) {
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DCC0C(void) { fn_800DBB78(28, 27); }
+extern "C" void fn_800DCC0C(void) { se_bank_req(28, 27); }
 
-extern "C" void fn_800DCC18(void) { fn_800DBB78(28, 35); }
+extern "C" void fn_800DCC18(void) { se_bank_req(28, 35); }
 
 extern "C" void fn_800DCFC0(void) { se_slot_req(0); }
 
@@ -373,7 +372,7 @@ extern "C" void fn_800DCFE4(void) { sysSE_req(12); }
 
 /* --- hand-reconstructed functions ---------------------------------------------------------------- */
 
-/* --- the non-positional path: `fn_800DBB78` plus its `sysSE_req`/`titleSE_req` family ------------- */
+/* --- the non-positional path: `se_bank_req` plus its `sysSE_req`/`titleSE_req` family ------------- */
 
 extern "C" s32 fn_800F0C14(s32 bank);
 extern "C" s32 fn_800F04FC(s32 id);
@@ -384,7 +383,7 @@ extern "C" u8 lbl_80597A20[];
 
 /* Resolves the bank to a sound handle and hands it to the playback helper; `-1` and the disabled
  * states short-circuit to 0. */
-extern "C" s32 fn_800DBB78(s32 bank, s32 id) {
+extern "C" s32 se_bank_req(s32 bank, s32 id) {
     s32 handle = fn_800F0C14(bank);
     if (handle == -1) {
         return 0;
@@ -400,19 +399,19 @@ extern "C" s32 fn_800DBB78(s32 bank, s32 id) {
 /* The `sysSE_req` family: bank 0, gated on the `event_demo_running_ck` predicate and the id being playable. */
 void sysSE_req(s32 id) {
     if (event_demo_running_ck() == 0 && fn_800F04FC(0) != 0) {
-        fn_800DBB78(0, id);
+        se_bank_req(0, id);
     }
 }
 
 extern "C" void sysSE_stop(s32 id) {
     if (event_demo_running_ck() == 0 && fn_800F04FC(30) != 0) {
-        fn_800DBB78(30, id);
+        se_bank_req(30, id);
     }
 }
 
 extern "C" void sysSE_bank32_req(s32 id) {
     if (fn_800F04FC(32) != 0) {
-        fn_800DBB78(32, id);
+        se_bank_req(32, id);
     }
 }
 
@@ -425,31 +424,31 @@ extern "C" void fn_800DBD1C(u32 row, u32 column) {
         return;
     }
     if (fn_800F04FC(21) != 0) {
-        fn_800DBB78(21, lbl_80597A20[row * 5 + column]);
+        se_bank_req(21, lbl_80597A20[row * 5 + column]);
     }
 }
 
 extern "C" void sysSE_bank20_req(s32 id) {
     if (fn_800F04FC(20) != 0) {
-        fn_800DBB78(20, id);
+        se_bank_req(20, id);
     }
 }
 
 extern "C" void sysSE_bank24_req(void) {
     if (fn_800F04FC(24) != 0) {
-        fn_800DBB78(24, 0);
+        se_bank_req(24, 0);
     }
 }
 
 extern "C" void se_ch2_req(s32 id) {
     if (fn_800F04FC(2) != 0) {
-        fn_800DBB78(2, id);
+        se_bank_req(2, id);
     }
 }
 
 void titleSE_req(s32 id) {
     if (fn_800F04FC(46) != 0) {
-        fn_800DBB78(46, id);
+        se_bank_req(46, id);
     }
 }
 
@@ -3567,7 +3566,7 @@ extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
 /* Non-positional SE: bank 46, id 15. */
 extern "C" s32 fn_800DD38C(void)
 {
-    return fn_800DBB78(46, 15);
+    return se_bank_req(46, 15);
 }
 
 SeSlot* st_ice_se_req(nw4r::math::VEC3* pos)

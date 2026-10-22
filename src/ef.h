@@ -24,11 +24,13 @@ extern "C" {
  * engine's vector library works on this one and `vec_to_mh_vec3` converts it to nw4r's
  * (`vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src)`), so a `Vec*` and a `Vec3*` are NOT
  * interchangeable. size: 0x0C */
+#ifndef MHTRI_MTX_MTX_H /* `MTX/mtx.h` defines the same record when a unit includes it first */
 typedef struct Vec {
     /* +0x00 */ f32 x;
     /* +0x04 */ f32 y;
     /* +0x08 */ f32 z;
 } Vec; /* size: 0x0C */
+#endif
 
 /* The emission parameter block.  Its interpretation is per-shape; the disc reads the two radii, the
  * sweep rate and the start/end angle. */

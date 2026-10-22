@@ -364,7 +364,7 @@ extern "C" void snd_bank_pending_set(void* work, u32 mask)
 }
 
 /* Marks bank 2 pending, with interrupts off. */
-extern "C" void fn_800E4ACC(void)
+extern "C" void snd_track_pause(void)
 {
     u32 level = OSDisableInterrupts();
     snd_bank_pending_set(fn_800E4A18(), 2);
@@ -372,7 +372,7 @@ extern "C" void fn_800E4ACC(void)
 }
 
 /* Marks bank 4 pending, with interrupts off. */
-extern "C" void fn_800E4B0C(void)
+extern "C" void snd_track_resume(void)
 {
     u32 level = OSDisableInterrupts();
     snd_bank_pending_set(fn_800E4A18(), 4);

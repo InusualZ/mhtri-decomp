@@ -378,4 +378,14 @@ void lobby_friend_row_copy(struct LobbyTimerRow* dst, const struct LobbyTimerRow
 }
 #endif
 
+/* The screen rectangle `draw_rect_set` (0x800525F0) fills and `draw_shape.cpp`'s `draw_rect_fill` (0x8005351C)
+ * draws: two corners and the fill colour.  size: 0xC */
+typedef struct DrawRect {
+    /* +0x0 */ s16 x0;
+    /* +0x2 */ s16 y0;
+    /* +0x4 */ s16 x1;
+    /* +0x6 */ s16 y1;
+    /* +0x8 */ u32 color;
+} DrawRect;
+
 #endif /* MHTRI_FN_8004CAD8_H */

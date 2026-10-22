@@ -9,7 +9,7 @@
  *   declared with different signatures); `extern "C"` names stay unmangled, and the C++-linkage callees and the types
  *   the manglings name stay at global scope.  Uniting the declarations is open work.
  *   The left seam is unproven by extabindex: 0x8002F6DC -> 0x8026910C is `Pl/player_control.cpp`'s last record and
- *   0x8002F6E8 -> 0x802695A4 this unit's first; `fn_80269394` and `fn_802693C4`..`fn_80269508` are frameless, so
+ *   0x8002F6E8 -> 0x802695A4 this unit's first; `pl_obj_ready_ck` and `fn_802693C4`..`fn_80269508` are frameless, so
  *   extab cannot place the 0x802693C4 seam.
  * FLAGS. `cflags_pl` (docs/pl.md).  The skill section is under `#pragma optimization_level 4` (docs/pl.md: level 3
  *   rematerialises `pl_parts_refresh`'s base); the file is under `#pragma peephole off` from the act-entry section on.  The
@@ -188,8 +188,8 @@ typedef struct PlJointHolder {
 
 void set_com_motion_type(u8 type)
 {
-    if (lbl_80794B28 != NULL) {
-        lbl_80794B28->com_motion_type = type;
+    if (pl_global != NULL) {
+        pl_global->com_motion_type = type;
     }
 }
 
@@ -218,13 +218,13 @@ extern "C" {
  * was consumed (> 1), 1 after the state moves to 2 and the part's gate is cleared. */
 u32 fn_802693C4(s32 player, u8 part, s32 value)
 {
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return 0;
     }
     _PLOBJ* obj;
     _PLWORK* work;
 
-    obj = &lbl_80794B28->table[player];
+    obj = &pl_global->table[player];
     if (obj->state[part] > 1) {
         return 0;
     }
@@ -235,7 +235,7 @@ u32 fn_802693C4(s32 player, u8 part, s32 value)
     obj->part_flag_0x0B[part] = 0;
     obj->group[0][part] = value;
     obj->state[part] = 2;
-    work = &lbl_80794B28->objects[player];
+    work = &pl_global->objects[player];
     if (part < 7) {
         ((PlSeRig*)work->model_0x13C)->field_0x9C0[part] = 0;
     } else {
@@ -246,9 +246,9 @@ u32 fn_802693C4(s32 player, u8 part, s32 value)
 
 /* Consumes one part: 0 when the part already carries this value, 1 after the flag is set, the value
  * stored and the state moved to 2; a consumed part (> 1) is reported as 0. */
-u32 fn_80269474(s32 player, u8 part, s32 value)
+u32 pl_parts_set(s32 player, u8 part, s32 value)
 {
-    _PLGLOBAL* g = lbl_80794B28;
+    _PLGLOBAL* g = pl_global;
     _PLOBJ* obj;
 
     if (g == NULL) {
@@ -264,7 +264,7 @@ u32 fn_80269474(s32 player, u8 part, s32 value)
     obj->part_flag_0x0B[part] = 1;
     obj->group[0][part] = value;
     obj->state[part] = 2;
-    ((PlSeRig*)lbl_80794B28->objects[player].model_0x13C)->field_0x9C0[part] = 0;
+    ((PlSeRig*)pl_global->objects[player].model_0x13C)->field_0x9C0[part] = 0;
     return 1;
 }
 
@@ -275,19 +275,19 @@ s32 fn_80269508(_PLW* self, s32 part)
     if (self == NULL) {
         return -1;
     }
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return -1;
     }
-    return lbl_80794B28->table[self->chunk_ofs].group[3][part];
+    return pl_global->table[self->chunk_ofs].group[3][part];
 }
 
 /* 0 when the part already carries this value, 1 while it is still free, -1 once it is consumed. */
-s32 fn_8026954C(s32 player, u8 part, s32 value)
+s32 pl_parts_set_ck(s32 player, u8 part, s32 value)
 {
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return -1;
     }
-    _PLOBJ* obj = &lbl_80794B28->table[player];
+    _PLOBJ* obj = &pl_global->table[player];
     if (obj->group[3][part] == value) {
         return 0;
     }
@@ -300,17 +300,17 @@ s32 fn_8026954C(s32 player, u8 part, s32 value)
 /* Returns 0 with no global, otherwise the global's common motion type. */
 u8 fn_802699AC(void)
 {
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return 0;
     }
-    return lbl_80794B28->com_motion_type;
+    return pl_global->com_motion_type;
 }
 
 /* Clears one player's object record: a part mid-load (state 4 or 5) drops its load request, then the state and
  * the six value words go to -1 and the player's slot byte to 0. */
 void fn_802699C8(u8 player)
 {
-    _PLGLOBAL* g = lbl_80794B28;
+    _PLGLOBAL* g = pl_global;
     _PLOBJ* obj;
     s32 i;
 
@@ -2447,7 +2447,7 @@ int Pl_item_timer_get(_PLW*, u16);
 u32 get_item_species_data(u16);
 u32 fn_8027E290(u8);
 void fn_8027E98C(u8*);
-s32 fn_8027EBA8(_PLW*, u8*);
+s32 pl_equip_model_id_get(_PLW*, u8*);
 u32 fn_80274B20(u16);
 void equip_columns_skills_get(_EQUIP*, u16*, s8*, u8*);
 void* memset(void*, int, u32);
@@ -2466,9 +2466,9 @@ void* equip_slot_rec_get(void);
 u32 fn_80274AEC(u8*, u32, u8);
 
 s16 item_take(u16, s16, void*, int, int, int);
-u32 fn_80269394(void*);
+u32 pl_obj_ready_ck(void*);
 u32 fn_802693C4(u8, int, s32);
-u32 fn_80269474(u8, int, s32);
+u32 pl_parts_set(u8, int, s32);
 void fn_802695A4(u8, void*, void*);
 void pl_equip_color_apply(_PLW*, u8);
 void fn_80272B10(_PLW*, s32);
@@ -3018,7 +3018,7 @@ extern "C" u32 pl_equip_skill_valid_ck(_PLW* plw, u8* p, u32 a, u8 kind) {
 }
 
 /* Maps a display skill id to its internal id through the 16-byte record table, or 0 when absent. */
-extern "C" u8 fn_802718C8(u16 skill) {
+extern "C" u8 pl_skill_tree_get(u16 skill) {
     _SKILLREC* rec = (_SKILLREC*)lbl_805C01C8;
 
     if (skill == 0) {
@@ -3050,12 +3050,12 @@ extern "C" u8 fn_802718C8(u16 skill) {
 
 /* The one-argument form of pl_skill_valid_ck: the skill is resolved through the id table first. */
 extern "C" void pl_skill_id_valid_ck(_PLW* plw, u16 skill) {
-    pl_skill_valid_ck(plw, fn_802718C8(skill));
+    pl_skill_valid_ck(plw, pl_skill_tree_get(skill));
 }
 
 /* The three-argument form of pl_equip_skill_valid_ck: the skill is resolved through the id table first. */
 extern "C" void pl_equip_skill_id_valid_ck(_PLW* plw, u8* p, u32 a, u16 skill) {
-    pl_equip_skill_valid_ck(plw, p, a, fn_802718C8(skill));
+    pl_equip_skill_valid_ck(plw, p, a, pl_skill_tree_get(skill));
 }
 
 /* Whether a skill is available in the current quest context: three kinds are gated on the
@@ -3503,7 +3503,7 @@ extern "C" void pl_parts_refresh(_PLW* plw, s32 arg) {
     if (!(plw->set_valid != 0 || plw->equip_valid != 0 || plw->deco_dirty != 0)) {
         return;
     }
-    ok = fn_80269394(lbl_80794B28->table + plw->chunk_ofs);
+    ok = pl_obj_ready_ck(pl_global->table + plw->chunk_ofs);
     for (i = 0; i < 7; i++) {
         id = fn_802738B8(i);
         mask = 1 << i;
@@ -3512,7 +3512,7 @@ extern "C" void pl_parts_refresh(_PLW* plw, s32 arg) {
                 if (*(u32*)((u8*)plw->physics_0x13C + i * 0x164 + 0x11C) == 0) {
                     val = fn_802693C4(plw->chunk_ofs, i, plw->set_pending[i]);
                 } else {
-                    val = fn_80269474(plw->chunk_ofs, i, plw->set_pending[i]);
+                    val = pl_parts_set(plw->chunk_ofs, i, plw->set_pending[i]);
                 }
                 if (val == 1) {
                     plw->set_valid &= (u16)~mask;
@@ -3842,7 +3842,7 @@ extern "C" void pl_equip_model_set(_PLW* plw, u8* rec) {
     plw->equip_valid |= (u16)(1 << idx);
     idx = fn_802738D8(idx);
     if (idx != 0xFF) {
-        pl_parts_color_set(plw, idx, fn_8027EBA8(plw, rec));
+        pl_parts_color_set(plw, idx, pl_equip_model_id_get(plw, rec));
     }
 }
 

@@ -743,10 +743,10 @@ extern "C" void fn_80229868(u32 index, PlSeRow* rows, nw4r::g3d::FuncObjCalcWorl
  * actor's SE work, collapsing duplicates to zero. */
 extern "C" void fn_80229CB4(_PLW* self)
 {
-    s32 n0 = fn_8027EBA8(self, &self->equipA[3]);
-    s32 n1 = fn_8027EBA8(self, &self->equipA[2]);
-    s32 n2 = fn_8027EBA8(self, &self->equipA[0]);
-    s32 n3 = fn_8027EBA8(self, &self->equipA[1]);
+    s32 n0 = pl_equip_model_id_get(self, &self->equipA[3]);
+    s32 n1 = pl_equip_model_id_get(self, &self->equipA[2]);
+    s32 n2 = pl_equip_model_id_get(self, &self->equipA[0]);
+    s32 n3 = pl_equip_model_id_get(self, &self->equipA[1]);
     u8 v0;
     u8 v1;
     u8 v2;

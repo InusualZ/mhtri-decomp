@@ -82,7 +82,7 @@ void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);
  * `ai/fn_802C474C.cpp` (docs/plan.md 6.5 rule 2). */
 void fn_800DCC24(struct _se_w* work, s32 kind, u8 c);
 /* 0x800DBDD4 - the fixed-SE request the quest-result band's swap timer arms (`li r3,0x18` then
- * `fn_800F04FC`/`fn_800DBB78(0x18,0)`), so it takes no argument and is declared at C linkage like
+ * `fn_800F04FC`/`se_bank_req(0x18,0)`), so it takes no argument and is declared at C linkage like
  * its `fn_` siblings here (the map name is the plain `sysSE_bank24_req`).  Added with
  * `menu/menu_result.cpp` (rule 2: this TU owns the address). */
 void sysSE_bank24_req(void);

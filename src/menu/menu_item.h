@@ -127,32 +127,7 @@ struct MenuEntry {
     /* +0x14 */ u32 colour_0x14;     /* the marked row's text colour */
 };
 
-/* The 0x0C-byte list-scroll work record embedded in a `MenuSlot` at +0x1A4: the two cursors (`row`,
- * `col`) the menu band's scroller (`menu_scroll_step`) moves by a button word, clamped against the row
- * and column counts, plus the `move_flags` word it sets for the frame and the two option-card
- * colours.  `menu/menu_item_page.cpp` is the record's own reader (`item_page_fill_rows` reads the counts and
- * the cursor pair); the fields it does not touch keep their offsets.
- * size: 0x0C (its own byte run: `MenuSlot`'s +0x1A4 pad and this record's +0x0C end agree) */
-struct MenuScroll {
-    /* +0x000 */ u16 index;          /* the flat entry index: `row + rows_per_page * col` */
-    /* +0x002 */ u8 rows_per_page;    /* the row count `menu_scroll_step` clamps `row` against */
-    /* +0x003 */ u8 row;             /* the row cursor */
-    /* +0x004 */ u8 col;             /* the column cursor */
-    /* +0x005 */ u8 row_limit;       /* the row count the cursor is bounded by */
-    /* +0x006 */ u8 col_count;       /* the column count `col` wraps at */
-    /* +0x007 */ u8 field_0x007;     /* `menu_scroll_step` copies it into `row_limit` at the last column */
-    /* +0x008 */ u16 move_flags;     /* the move bits `menu_scroll_step` ORs in (1/2/4/8) */
-    /* +0x00A */ union {               /* the option card's two colours, or the equipment page's cursor pair */
-        struct {
-            /* +0x00A */ s8 light_colour;    /* the option card's light colour */
-            /* +0x00B */ s8 dark_colour;     /* its dark colour */
-        };
-        struct {
-            /* +0x00A */ s8 equip_page;      /* the equipment page the status page shows */
-            /* +0x00B */ s8 equip_page_count; /* its page count (`equip_list_page_count` + 2) */
-        };
-    };
-};
+#include "menu/menu_scroll.h" /* `MenuScroll` (shared with `menu/movie.h`) */
 
 struct _mh_ivec2_;
 
@@ -247,7 +222,10 @@ struct MenuSlot {
     /* +0x1EC */ u8 field_0x1EC[0x1F0 - 0x1EC];  /* the embedded selection cursor */
     /* +0x1F0 */ u16 field_0x1F0;    /* the cursor's two item ids */
     /* +0x1F2 */ u16 field_0x1F2;
-    /* +0x1F4 */ u8 unused_0x1F4[0x238 - 0x1F4];
+    /* +0x1F4 */ u8 unused_0x1F4[0x234 - 0x1F4];
+    /* +0x234 */ u8 option_value_0x234;  /* the option pages' value before the change (restored on cancel) */
+    /* +0x235 */ u8 unused_0x235;
+    /* +0x236 */ s16 option_move_0x236;  /* the arrow (4/8) that changed the option value this frame */
     /* +0x238 */ u16 move_result_0x238; /* which button last moved the cursor (`menu_cursor_page_move`) */
     /* +0x23A */ u8 field_0x23A;     /* the sprite id every draw of the item page takes */
     /* +0x23B */ u8 field_0x23B;     /* 0 = the page draws no detail panel */

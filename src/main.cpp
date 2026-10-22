@@ -37,7 +37,7 @@
  * this file only *declares* the pool labels; the constants MWCC synthesises for the int->float conversions
  * still live in our object's own pool under `@NN` names, so each `lfd` that retail points at
  * `lbl_80795AC0`/`lbl_80795AD0` is one ARG row (playbook 23; four sites: `main`, `fn_8003FEBC`,
- * `fn_8003FF98`, `fn_8004030C`).
+ * `frame_copy_display`, `fn_8004030C`).
  *
  * Flags - measured this batch against `build/RMHE08/obj/main.o`, all of it per-library for `main` (never
  * `cflags_base`):
@@ -72,10 +72,10 @@
  *     `fn_8003FE30`, the `clrlwi r0,r3,24` retail keeps in front of `stb` in `fn_8003F730`, and `main`'s
  *     redundant `clrlwi`s in front of the two `sth r0,0x3e(r4)` (with the whole-unit `-opt nopeephole` those
  *     two appear and `main` drops to 94.49 %). It also fuses the *second* `lis r0,0x4330` of the two
- *     int->float conversion temps in `fn_8003FEBC`/`fn_8003FF98` away, so those two run with it off - each is
+ *     int->float conversion temps in `fn_8003FEBC`/`frame_copy_display` away, so those two run with it off - each is
  *     then the target's own 220 B/428 B (98.00 -> 99.82 %, 99.02 -> 99.95 %).
  *   * a pragma region is **not local**: moving that `reset` down from before `fn_8003FEBC` to before
- *     `fn_80040144` also flipped `fn_8004029C`/`fn_80040360` from our coalesced `lis r31` to retail's
+ *     `frame_swap_wait` also flipped `fn_8004029C`/`fn_80040360` from our coalesced `lis r31` to retail's
  *     scratch `lis r3` (99.52/99.47 -> 100 %) without touching any other function. Adding anything earlier
  *     in this file can move a later function's register tie-break, so re-measure the whole unit.
  *   * the reset can also sit *inside* a function: `fn_8003F9E4`'s head needs the truncation kept (peephole
@@ -92,14 +92,14 @@
  *     (signed) idiom, not the `0x4330000000000000` (unsigned) one - MWCC emits them the opposite way round
  *     from the obvious guess, so `u32` there costs 2 instructions and `lfd`s the wrong constant. The same
  *     holds for `lbl_807947A0` and for `fn_8003F524`'s return: the two frame-wait loops compare with `cmpw`
- *     (signed), and declaring them `u32` costs `cmplw` + a REPLACE row (`fn_80040144` 92.97 -> 100.00 %).
+ *     (signed), and declaring them `u32` costs `cmplw` + a REPLACE row (`frame_swap_wait` 92.97 -> 100.00 %).
  *   * the TV-standard chains in `fn_8003F730`/`fn_8003F9E4` are `switch`es, not `if`/`else if` chains: MWCC
  *     lays a switch out as all the tests first (`beq` off to each case block) and the blocks after them,
  *     while an `if`/`else if` chain inlines the first block right after its test. That one shape is worth
  *     `fn_8003F730` 89.36 -> 96.25 % and `fn_8003F9E4` 85.70 -> 92.75 %.
  *   * a value that has to survive a call lives in a *named* local, because the compiler then cannot
  *     rematerialise it into a volatile register: `GXRenderModeObj* mode = Rmode;` in `fn_8003FEBC`
- *     (92.00 -> 98.00 %) and `u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;` inside `fn_80040144`'s wait loops
+ *     (92.00 -> 98.00 %) and `u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;` inside `frame_swap_wait`'s wait loops
  *     (argument-setup order: retail computes the tick count before the `li r3,0`).
  *   * the `Screen_w` block reads and writes a *local* base pointer (`ScreenWork* sw = &Screen_w;`) in both
  *     `main` and `fn_8003F9E4`: one live range across the `if`/`else` merge keeps the base in retail's r4 for
@@ -127,7 +127,7 @@
  *
  * Residual (all measured with the committed `cflags_main`, i.e. `-O3 -inline noauto`; the five functions
  * whose `.text` sizes were wrong now match the target's size exactly):
- *   * the pool `lfd` ARG rows - `main` 99.91 %, `fn_8003FEBC` 99.82 %, `fn_8003FF98` 99.95 %,
+ *   * the pool `lfd` ARG rows - `main` 99.91 %, `fn_8003FEBC` 99.82 %, `frame_copy_display` 99.95 %,
  *     `fn_8003FCCC` 99.94 %, `fn_8004030C` 99.76 %: the int->float conversions `lfd` the target's
  *     `lbl_80795AC0`/`lbl_80795AD0` (the signed/unsigned 2^52 doubles) where our object loads its own
  *     synthesised pool entry (`@91`/`@302`). Our `.sdata2` is 0x10 B - those two f64s - against the target's
@@ -160,6 +160,7 @@
 #include "unsplit/unknown.h"     /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "sound/fn_800D7F54.h"   /* owned by sound/fn_800D7F54.cpp (rule 2) */
+#include "menu/movie.h"           /* system_shutdown_prepare (rule 2) */
 
 /* The retail `.sbss`/`.bss`/`.sdata2` labels this unit references; they live in the unclaimed scaffolding
  * until the data ranges are split, so these are declarations only and objdiff pairs the relocations by the
@@ -169,8 +170,8 @@ extern u8 lbl_80794781;
 extern u8 lbl_80794782;
 extern u8 lbl_80794784;
 extern s32 lbl_8079479C;
-extern u8 lbl_807947A5;
-extern u8 lbl_807947A6;
+extern u8 reset_request;
+extern u8 shutdown_request;
 
 extern const f32 lbl_80795AA0;
 extern const f32 lbl_80795AA4;
@@ -333,8 +334,8 @@ extern "C" void fn_8003FCCC(void);
 extern "C" void fn_8003FE24(void);
 extern "C" void fn_8003FE30(void);
 extern "C" void fn_8003FEBC(void);
-extern "C" void fn_8003FF98(void);
-extern "C" void fn_80040144(void);
+extern "C" void frame_copy_display(void);
+extern "C" void frame_swap_wait(void);
 extern "C" void fn_800408A8(void);
 extern "C" void fn_80040FDC(void);
 extern "C" void fn_80041304(void);
@@ -345,7 +346,6 @@ extern "C" int fn_804ED620(void);
 extern "C" void VIInit(void);
 extern "C" void OSSetResetCallback(void* arg);
 extern "C" void OSSetPowerCallback(void* arg);
-extern "C" void fn_8043F290(void);
 
 /* C++ symbols: declared by their real (unmangled) source names so the compiler emits the map's mangled
  * forms, exactly as the retail callers do. */
@@ -355,13 +355,13 @@ extern void bgm_stop_all(void);
 /* Raises the video-mode-change latch the game loop polls. */
 extern "C" void fn_8003F200(void)
 {
-    lbl_807947A5 = 1;
+    reset_request = 1;
 }
 
 /* Raises the restart-requested latch the game loop polls. */
 extern "C" void fn_8003F20C(void)
 {
-    lbl_807947A6 = 1;
+    shutdown_request = 1;
 }
 
 int main(void)
@@ -408,8 +408,8 @@ int main(void)
 
     OSSetResetCallback(_f_text);
     OSSetPowerCallback((void*)fn_8003F20C);
-    lbl_807947A5 = 0;
-    lbl_807947A6 = 0;
+    reset_request = 0;
+    shutdown_request = 0;
     NANDInit();
     memset(&system_w, 0, 2652);
     system_w.unk2147 = 0xFF;
@@ -429,9 +429,9 @@ int main(void)
     while (1) {
         fn_8003FEBC();
         fn_80046D34();
-        fn_8003FF98();
-        fn_80040144();
-        if (system_w.unk2161 != 0) {
+        frame_copy_display();
+        frame_swap_wait();
+        if (system_w.system_halt_0x871 != 0) {
             continue;
         }
         if (system_w.field_0x865 != 0) {
@@ -440,29 +440,29 @@ int main(void)
         if (system_w.nand_corrupt_0x931 != 0) {
             continue;
         }
-        if (lbl_807947A6 != 1 && lbl_807947A5 != 1) {
+        if (shutdown_request != 1 && reset_request != 1) {
             continue;
         }
-        if (lbl_807947A5 != 0) {
+        if (reset_request != 0) {
             if (system_w.unk2264() == 1) {
                 system_w.unk2272();
-                system_w.unk2161 = 1;
+                system_w.system_halt_0x871 = 1;
                 continue;
             }
         }
         if (fn_804ED620() == 3) {
             pad_motor_stop_all();
         }
-        if (lbl_807947A5 != 0 && system_w.unk2158 != 0) {
+        if (reset_request != 0 && system_w.unk2158 != 0) {
             system_w.unk2276();
         }
         sound_frame_entry();
         bgm_stop_all();
-        fn_8043F290();
-        if (lbl_807947A5 != 0) {
+        system_shutdown_prepare();
+        if (reset_request != 0) {
             OSRestart(restart);
         }
-        if (lbl_807947A6 != 0) {
+        if (shutdown_request != 0) {
             OSShutdownSystem();
         }
     }
@@ -470,7 +470,7 @@ int main(void)
 
 /* ---- 0x8003F4D8-0x8003F564: GQR/VI counters and the periodic wide-mode request ---- */
 
-extern u32 lbl_80794798;
+extern u32 dvd_drive_status;
 extern s32 lbl_807947A0;
 
 extern "C" u32 DVDGetDriveStatus(void);
@@ -512,7 +512,7 @@ extern "C" void fn_8003F554(void);
 extern "C" void fn_8003F52C(void)
 {
     fn_8003F554();
-    lbl_80794798 = DVDGetDriveStatus();
+    dvd_drive_status = DVDGetDriveStatus();
 }
 
 /* Bumps the periodic request counter. */
@@ -525,7 +525,7 @@ extern "C" void fn_8003F554(void)
 extern "C" void fn_8003F564(void)
 {
     fn_8003F554();
-    lbl_80794798 = DVDGetDriveStatus();
+    dvd_drive_status = DVDGetDriveStatus();
 }
 
 /* ---- 0x8003F58C-0x8003F730: the periodic alarm and the memory arenas ---- */
@@ -883,7 +883,7 @@ extern "C" void fn_8003FEBC(void)
 
 /* Per-frame GX setup: depth/alpha/colour state, then the copy filter rebuilt from the current
  * brightness scale and the render-mode V filter, and finally the other framebuffer. */
-extern "C" void fn_8003FF98(void)
+extern "C" void frame_copy_display(void)
 {
     GXSetZMode(1, 3, 1);
     GXSetAlphaUpdate(1);
@@ -905,7 +905,7 @@ extern "C" void fn_8003FF98(void)
 
 /* Waits for the pending VI requests, presents the frame, applies a queued video-mode change and then
  * waits out the second half of the frame before flipping the framebuffer. */
-extern "C" void fn_80040144(void)
+extern "C" void frame_swap_wait(void)
 {
     while (lbl_807947A0 < fn_8003F524() - 1) {
         u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;

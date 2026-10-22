@@ -135,7 +135,7 @@ void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a
 void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut);
 void fn_80074AA8(nw4r::g3d::Camera* pSelf, f32* pX, f32* pY, f32* pZ);
 s32 fn_80074D38(const f32* pA, const f32* pB);
-void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut);
+void camera_posture_get(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut);
 void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h);
 void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void camera_get_viewport(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
@@ -328,7 +328,7 @@ s32 fn_80074D38(const f32* pA, const f32* pB) {
     return result;
 }
 
-void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut) {
+void camera_posture_get(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut) {
     if (!fn_80067EE8(pSelf)) {
         nw4r::db::Panic("g3d_camera.cpp", 282, "NW4R:Failed assertion IsValid()");
     }

@@ -33,7 +33,7 @@ void fn_802673D4(u8 index);
 u32 fn_80267A78(u8 index);
 u8 fn_80267C84(struct _PLW* self);
 u32 pl_net_slot_ready_ck(struct _PLW* self);
-s32 fn_80269394(struct _PLOBJ* obj);
+s32 pl_obj_ready_ck(struct _PLOBJ* obj);
 
 void fn_80268E38(struct _PLW* self, u8* slots, u8 index);
 void fn_80268E48(struct _PLW* self, u32 unused, s32 mode, u8** stream);
@@ -45,18 +45,18 @@ void set_max_player(s32 value);
 
 /* 0x802673A4 - stores the maximum player count. */
 void set_max_player(s32 value) {
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return;
     }
-    lbl_80794B28->count = value;
+    pl_global->count = value;
 }
 
 /* 0x802673B8 - reads the maximum player count back. */
 s32 fn_802673B8(void) {
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return 0;
     }
-    return lbl_80794B28->count;
+    return pl_global->count;
 }
 
 /* 0x802673D4 - marks one player slot as ready. */
@@ -66,15 +66,15 @@ void fn_802673D4(u8 index) {
 
 /* 0x802681D4 - arms the player data load. */
 void player_init_data_load(void) {
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return;
     }
-    lbl_80794B28->state = 1;
+    pl_global->state = 1;
 }
 
 /* 0x802681EC - every live player's 11 state slots have left the "not yet started" value. */
 u32 player_move_start_ck(void) {
-    _PLGLOBAL* global = lbl_80794B28;
+    _PLGLOBAL* global = pl_global;
     _PLWORK* work = global->objects;
     _PLOBJ* obj = global->table;
     s32 pending = 0;
@@ -96,10 +96,10 @@ u32 player_move_start_ck(void) {
 
 /* 0x80267A78 - one player's per-player work word. */
 u32 fn_80267A78(u8 index) {
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return 0;
     }
-    return lbl_80794B28->players_0x44C[index];
+    return pl_global->players_0x44C[index];
 }
 
 /* 0x80268E38 - marks one record's slot as "loaded". */
@@ -146,16 +146,16 @@ u32 pl_net_slot_ready_ck(_PLW* self) {
     s32 i;
     u8 index;
 
-    if (lbl_80794B28 == NULL) {
+    if (pl_global == NULL) {
         return 0;
     }
     index = self->chunk_ofs;
-    if (lbl_80794B28->slot_state[index] != 2) {
+    if (pl_global->slot_state[index] != 2) {
         return 0;
     }
     any = 0;
     for (i = 0; i < 11; i++) {
-        if (lbl_80794B28->table[index].state[i] != 1) {
+        if (pl_global->table[index].state[i] != 1) {
             any = 1;
         }
     }
@@ -164,7 +164,7 @@ u32 pl_net_slot_ready_ck(_PLW* self) {
 
 /* 0x80268260 - starts the move for one player (`-1` = every live player). */
 void player_move_start(s32 index) {
-    _PLGLOBAL* global = lbl_80794B28;
+    _PLGLOBAL* global = pl_global;
     s32 i;
 
     if (global == NULL) {
@@ -183,7 +183,7 @@ void player_move_start(s32 index) {
 }
 
 /* 0x80269394 - no slot of this record has advanced past "empty". */
-s32 fn_80269394(_PLOBJ* obj) {
+s32 pl_obj_ready_ck(_PLOBJ* obj) {
     s32 count = 0;
     s32 i;
 

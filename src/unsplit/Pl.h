@@ -103,7 +103,7 @@ extern f32 lbl_805C4898[];
  * `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the runs the header above already
  * documents. */
 s32 fn_8027EE24(void);
-s32 fn_8027EBA8(struct _PLW* self, void* equip);
+s32 pl_equip_model_id_get(struct _PLW* self, void* equip);
 
 /* The range's private pooled constants (playbook 29: declared, never defined).  `.sdata2`
  * 0x80799CD8-0x80799Dxx is the run `Pl/fn_80224AC4.cpp` and the lobby unit next door share; `.sdata`
