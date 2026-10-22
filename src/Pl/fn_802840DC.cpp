@@ -219,7 +219,7 @@ void fn_802843CC(_PLW* self)
 
 /* The charge rate in frames per level the actor's gun skills buy: 30 frames, or the 1.25x / 0.83x
  * skill-adjusted rate. */
-s32 fn_802843F0(_PLW* self)
+s32 pl_charge_cycle_get(_PLW* self)
 {
     f32 rate = lbl_8079A1D8;
 
@@ -235,7 +235,7 @@ s32 fn_802843F0(_PLW* self)
  * charge callers write at +0x312 and clamp. */
 u8 pl_charge_stage2_get(_PLW* self)
 {
-    return (u8)(self->charge_gauge_0x310 / (s16)fn_802843F0(self));
+    return (u8)(self->charge_gauge_0x310 / (s16)pl_charge_cycle_get(self));
 }
 
 /* The band's motion gate and scan helper used by the act machines below (`fn_802845F0` and

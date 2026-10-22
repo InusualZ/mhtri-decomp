@@ -654,7 +654,7 @@ extern "C" void fn_80045164(f32* dst, f32* src)
     dst[1] = src[1];
 }
 
-extern "C" void fn_80045330(f32* dst, f32* src)
+extern "C" void vec3_float_copy(f32* dst, f32* src)
 {
     dst[0] = src[0];
     dst[1] = src[1];

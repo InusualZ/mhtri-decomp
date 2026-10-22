@@ -79,6 +79,9 @@ extern "C" void yure_player_init(YurePlayerWork* plw);
 extern "C" void yure_player_init_kind(YurePlayerWork* plw, u8 kind);
 extern "C" void yure_player_clear_flags(YurePlayerWork* plw);
 extern "C" void yure_player_move(YurePlayerWork* plw);
+/* 0x802AD7CC - computes the sway record's pitch and roll words for the joint matrix `mtx` (`index` picks its chain
+ * point). */
+extern "C" void yure_angles_calc(YureRec* rec, nw4r::math::MTX34* mtx, u32* pitch, u32* roll, u32 index);
 extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureEnemyWork or a YurePlayerWork, by `is_enemy` */, u8 is_player, s32 index, s32 kind);
 void yure_move(void);
 

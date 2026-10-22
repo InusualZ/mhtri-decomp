@@ -166,7 +166,7 @@ static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) 
         if (!nrmMtxReady) {
             nrmMtxReady = true;
             if (shp.ptr()->curMtxIdx >= 0) {
-                if (shp.ptr()->curMtxIdx == fn_8006FDCC(&node)) {
+                if (shp.ptr()->curMtxIdx == res_node_mtx_id_get(&node)) {
                     const Mat33* pNrm = g3d_state_get_nrm_mtx(shp.ptr()->curMtxIdx);
                     nrmMtx.m[0][0] = pNrm->m[0][0];
                     nrmMtx.m[0][1] = pNrm->m[0][1];
@@ -696,7 +696,7 @@ static MdlZ* GatherMdlZ(u32* pNumMdlZ, ResMdl mdl, const math::MTX34* pViewPosMt
             pMdlZ->nodeID = nodeID;
             pMdlZ->matID = (pByteCode[1] << 8) | pByteCode[2];
             pMdlZ->shpID = (pByteCode[3] << 8) | pByteCode[4];
-            u32 mtxID = fn_8006FDCC(&node);
+            u32 mtxID = res_node_mtx_id_get(&node);
             if (mtxID < numViewMtx) {
                 pMdlZ->Z = pViewPosMtxArray[mtxID].m[2][3];
             } else {

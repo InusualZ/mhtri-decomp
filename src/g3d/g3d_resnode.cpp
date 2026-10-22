@@ -40,7 +40,7 @@ void* res_handle_ptr(const ResHandle* pSelf);                   /* owner: src/g3
 ResNodeData* res_node_ptr(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 ResNodeData* res_node_ref_nonconst(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 VEC3* vec3_copy_construct(VEC3* pOut, const VEC3* pIn);              /* owner: src/g3d/g3d_anmscn.cpp */
-void fn_8008C484(f32* pOut, f32 x, f32 y, f32 z);            /* owner: src/g3d/g3d_resanmchr.cpp */
+void mtx34_rot_xyz_deg(f32* pOut, f32 x, f32 y, f32 z);            /* owner: src/g3d/g3d_resanmchr.cpp */
 void* fn_8008A220(void* pOut, u32 value);                    /* owner: src/g3d/g3d_resanmcamera.cpp */
 }
 
@@ -94,7 +94,7 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
                 mtx34_identity((MTX34*)pResult->mtx);
                 flags |= 0x20;
             } else {
-                fn_8008C484(pResult->mtx, pData->mRotate[0], pData->mRotate[1], pData->mRotate[2]);
+                mtx34_rot_xyz_deg(pResult->mtx, pData->mRotate[0], pData->mRotate[1], pData->mRotate[2]);
                 flags &= ~0x26;
             }
             pResult->mtx[3] = translate.x;
@@ -154,7 +154,7 @@ void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult) {
         } else {
             VEC3 rotate;
             copyVec3((VEC3*)pResult->rotate, vec3_copy_construct(&rotate, (const VEC3*)pData->mRotate));
-            fn_8008C484(pResult->mtx, pData->mRotate[0], pData->mRotate[1], pData->mRotate[2]);
+            mtx34_rot_xyz_deg(pResult->mtx, pData->mRotate[0], pData->mRotate[1], pData->mRotate[2]);
         }
         if ((pData->mFlags & 0x2) != 0) {
             flags |= 0x40;

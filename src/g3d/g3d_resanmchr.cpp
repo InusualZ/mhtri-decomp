@@ -176,7 +176,7 @@ u32* fn_8008CF2C(f32* out, ResAnmChrNodeData* self, f32* p, f32 frame);
 f32 fn_8008CB98(u32 self, u32* p, u16 index, f32 frame, s32 isConst);
 f32 fn_8008C800(u32 self, u32* p, u16 index, f32 frame, s32 isConst);
 f32 fn_8008C498(u32 self, u32* p, u16 index, f32 frame, s32 isConst);
-void fn_8008C484(f32* out, f32 x, f32 y, f32 z);
+void mtx34_rot_xyz_deg(f32* out, f32 x, f32 y, f32 z);
 ResAnmChrNodeData* fn_8008D9B8(u32 self, u32 idx);
 void fn_8008D1AC(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeData, f32 frame);
 void fn_8008D2CC(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeData, f32 frame);
@@ -197,14 +197,14 @@ void fn_8008D528(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeDat
 
 f32 fn_8008B75C(u32 addr);
 void anm_chr_result_scale_get(ResAnmChrObj* self, f32* out);
-s32 fn_8008DC4C(ResAnmChrObj* self, f32* out);
+s32 anm_chr_result_rot_get(ResAnmChrObj* self, f32* out);
 void fn_8008DF8C(ResAnmChrObj* self, f32* out);
 void anm_chr_result_trans_get(ResAnmChrObj* self, f32* out);
-void fn_8008E698(ResAnmChrObj* self, f32* out);
-void fn_8008EB68(ResAnmChrObj* self, const f32* out);
+void anm_chr_result_mtx_get(ResAnmChrObj* self, f32* out);
+void anm_chr_result_rot_set(ResAnmChrObj* self, const f32* out);
 void anm_chr_result_rot_mul(ResAnmChrObj* self, const f32* out);
 void anm_chr_result_trans_set(ResAnmChrObj* self, const f32* out);
-void fn_8008F3DC(ResAnmChrObj* self, const void* src);
+void anm_chr_result_mtx_set(ResAnmChrObj* self, const void* src);
 
 f32 fn_8008A938(u32* self, u32* p, f32 frame, s32 isConst);
 f32 fn_8008AED0(f32 v0, f32 t0, f32 v1, f32 t1, f32 rate, f32 span);
@@ -1060,7 +1060,7 @@ u32* fn_8008C038(f32* mtx, f32* rawRot, const u16* info, ResAnmChrNodeData* self
         v2 = v0;
         break;
     }
-    fn_8008C484(mtx, v0, v1, v2);
+    mtx34_rot_xyz_deg(mtx, v0, v1, v2);
     rawRot[0] = v0;
     rawRot[1] = v1;
     rawRot[2] = v2;
@@ -1068,7 +1068,7 @@ u32* fn_8008C038(f32* mtx, f32* rawRot, const u16* info, ResAnmChrNodeData* self
 }
 
 /* Scales a 3-float record by a constant and forwards it. */
-void fn_8008C484(f32* out, f32 x, f32 y, f32 z)
+void mtx34_rot_xyz_deg(f32* out, f32 x, f32 y, f32 z)
 {
     nw4r::math::MTX34RotXYZFIdx(reinterpret_cast<nw4r::math::MTX34*>(out), 0.7111111f * x, 0.7111111f * y, 0.7111111f * z);
 }
@@ -1455,7 +1455,7 @@ void anm_chr_result_scale_get(ResAnmChrObj* self, f32* out)
     }
 }
 
-s32 fn_8008DC4C(ResAnmChrObj* self, f32* out)
+s32 anm_chr_result_rot_get(ResAnmChrObj* self, f32* out)
 {
     u32 valid;
     f32 r;
@@ -1572,7 +1572,7 @@ void fn_8008E408(ResAnmChrObj* self, f32* out)
     }
 }
 
-void fn_8008E698(ResAnmChrObj* self, f32* out)
+void anm_chr_result_mtx_get(ResAnmChrObj* self, f32* out)
 {
     u32 valid;
 
@@ -1619,7 +1619,7 @@ void anm_chr_result_scale_set(ResAnmChrObj* self, const f32* out)
     copyVec3((nw4r::math::VEC3*)self->scale, (const nw4r::math::VEC3*)out);
 }
 
-void fn_8008EB68(ResAnmChrObj* self, const f32* out)
+void anm_chr_result_rot_set(ResAnmChrObj* self, const f32* out)
 {
     u32 valid;
     u32 flags;
@@ -1656,7 +1656,7 @@ void fn_8008EB68(ResAnmChrObj* self, const f32* out)
         nw4r::math::VEC3 rec;
 
         setVec3(&rec, self->mat[3], self->mat[7], self->mat[11]);
-        fn_8008C484(self->mat, out[0], out[1], out[2]);
+        mtx34_rot_xyz_deg(self->mat, out[0], out[1], out[2]);
         self->mat[3] = rec.x;
         self->mat[7] = rec.y;
         self->mat[11] = rec.z;
@@ -1729,7 +1729,7 @@ void anm_chr_result_trans_set(ResAnmChrObj* self, const f32* out)
     self->mat[11] = out[2];
 }
 
-void fn_8008F3DC(ResAnmChrObj* self, const void* src)
+void anm_chr_result_mtx_set(ResAnmChrObj* self, const void* src)
 {
     u32 valid;
     nw4r::math::VEC3 rec;

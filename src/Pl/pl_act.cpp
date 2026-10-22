@@ -4180,10 +4180,10 @@ extern "C" s32 fn_8027408C(struct _PLW* plw)
     case 6:
         return 1;
     case 5:
-        fn_802740EC(plw);
+        pl_weapon_alt_form_ck(plw);
         return 2;
     case 4:
-        fn_802740EC(plw);
+        pl_weapon_alt_form_ck(plw);
         return 0;
     default:
         return 0;
@@ -4191,7 +4191,7 @@ extern "C" s32 fn_8027408C(struct _PLW* plw)
 }
 
 /* Clears the player's short-range equipment slot record. */
-extern "C" void fn_802740EC(struct _PLW* plw)
+extern "C" void pl_weapon_alt_form_ck(struct _PLW* plw)
 {
     fn_8027ED28(&plw->equipB);
 }
@@ -8387,7 +8387,7 @@ extern "C" u32 fn_80274DCC(_PLW*, u8);
 extern "C" s32 fn_8027DC90(void);
 extern "C" u32 fn_802D7804(s32, f32);
 extern "C" void mtx34_identity(void*);
-extern "C" void fn_8008C484(void*, f32, f32, f32);
+extern "C" void mtx34_rot_xyz_deg(void*, f32, f32, f32);
 extern "C" void mtx34_concat_assign(void*, void*);
 extern "C" u8 pl_slot_motion_allow_get(_PLW*, u8);
 extern "C" void pl_joint_mtx_get(_PLW*, s32, void*);
@@ -8998,7 +8998,7 @@ extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
     MTX34_ctor(&m);
     MTX34_ctor(&m2);
     VEC3_ctor(&v);
-    u8 t = pl_slot_motion_allow_get(self, lbl_805BAA90[self->field_0x002]);
+    u8 t = pl_slot_motion_allow_get(self, pl_rig_attach_kind_tbl[self->field_0x002]);
     out->x = lbl_8079A084;
     out->y = lbl_8079A084;
     setVector3(&v, lbl_8079A084, lbl_8079A084, lbl_8079A084);
@@ -9009,7 +9009,7 @@ extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
         break;
     case 1:
         if (self->field_0x002 == 3) {
-            copyVec3(&v, (const nw4r::math::VEC3*)em_vec3_copy(buf, lbl_805BAC98 + self->field_0x002 * 0x18 + 0xC,
+            copyVec3(&v, (const nw4r::math::VEC3*)em_vec3_copy(buf, pl_rig_pose_drawn + self->field_0x002 * 0x18 + 0xC,
                                                               self->field_0x002 * 0x18));
         }
         /* fall through */
@@ -9020,7 +9020,7 @@ extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
     }
     pl_joint_mtx_get(self, part, &m);
     mtx34_identity(&m2);
-    fn_8008C484(&m2, v.x, v.y, v.z);
+    mtx34_rot_xyz_deg(&m2, v.x, v.y, v.z);
     mtx34_concat_assign(&m, &m2);
     mulVecMat(out, &m);
     out->x = out->x + m.m[0][3];

@@ -348,7 +348,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
             u32 targetID = (pCode[3] << 8) + pCode[4];
             s14 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResNode(nodeID).mpData;
             res_node_copy_ctor(&s1C, (u32*)&s14);
-            u32 mtxID = fn_8006FDCC(&s1C);
+            u32 mtxID = res_node_mtx_id_get(&s1C);
             if (numMtx >= 0x800) {
                 nw4r::db::Panic("g3d_calcworld.cpp", 137, "NW4R:Failed assertion numMtxID < detail::workmem::WORKMEM_NUMMTXID");
             }

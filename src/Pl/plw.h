@@ -360,7 +360,14 @@ struct _PLW {
             /* +0x268 */ u8 field_0x268;  /* the byte `fn_8027D738` reports as a boolean */
         };
     };
-    /* +0x269 */ u8 unk269;
+    /* +0x269 */ union { /* the original and later names of the same byte (rule 5) */
+        struct {   /* the original layout: every member keeps its own offset */
+            /* +0x269 */ u8 unk269;
+        };
+        struct {   /* the later names, padded to the same byte total */
+            /* +0x269 */ u8 field_0x269;   /* nonzero picks the kind-4 attachment's second key tables (`lobby/lb_equip_page.cpp`) */
+        };
+    };
     /* +0x26A */ u8 unk26A;
     /* +0x26B */ u8 unk26B;
     /* +0x26C */ u8 held_item_kind_0x26C;   /* the held item's kind `fn_80279B84` derives from its item id (GUESS) */
@@ -368,7 +375,14 @@ struct _PLW {
     /* +0x26E */ u16 item_slot_sel;   /* the selected item slot; 0x80 marks the second page (`menu/menu_item.cpp`) */
     /* +0x270 */ s16 unk270;
     /* +0x272 */ s16 unk272;
-    /* +0x274 */ u8 unk274;
+    /* +0x274 */ union { /* the original and later names of the same byte (rule 5) */
+        struct {   /* the original layout: every member keeps its own offset */
+            /* +0x274 */ u8 unk274;
+        };
+        struct {   /* the later names, padded to the same byte total */
+            /* +0x274 */ u8 field_0x274;   /* nonzero picks the kind-4 attachment's raised pose (`lobby/lb_equip_page.cpp`) */
+        };
+    };
     /* +0x275 */ u8 unk275;
     /* +0x276 */ union { /* the original and later names of the same byte (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */

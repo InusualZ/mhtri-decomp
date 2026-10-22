@@ -1,6 +1,6 @@
 /*
  * g3d/g3d_calcview.cpp - nw4r g3d view/billboard-matrix calculator: the per-billboard matrix builders
- *   (fn_8006F738, fn_8006F934, fn_8006FBBC) and the material/model accessor chain they drive (fn_8006FDCC ..
+ *   (fn_8006F738, fn_8006F934, fn_8006FBBC) and the material/model accessor chain they drive (res_node_mtx_id_get ..
  *   fn_80070134).
  * RANGE. .text 0x8006F5A0-0x8007270C (46 functions); extab, extabindex, .rodata 0x8056F638-0x8056F658, .data
  *   0x8058D938-0x8058DD68 (opens on "g3d_calcview.cpp", then the billboard warning strings), .sdata
@@ -98,7 +98,7 @@ void fn_80069CF4(void* p0, void* p1);
 
 /* -------- this unit's own bodies -------- */
 f32 fn_8006F908(const f32* pMtx, u32 idx);
-u32 fn_8006FDCC(void* self);
+u32 res_node_mtx_id_get(void* self);
 u32 res_node_get_parent_const(const ResHandle* pSelf);
 const ResMdlInfoData* res_mdl_info_data(const void* pInfo);
 u32 res_mdl_info_get_node_of_pos_nrm_mtx(const void* pInfo, u32 mtxID);
@@ -216,7 +216,7 @@ inline const nw4r::g3d::ResMdlData& nw4r::g3d::ResMdl::ref() const {
 extern "C" {
 
 /* 0x8006FDCC - the model's node-list accessor. */
-inline u32 fn_8006FDCC(void* self) {
+inline u32 res_node_mtx_id_get(void* self) {
     if (!res_node_is_valid(self)) {
         nw4r::db::Panic("g3d_resnode_ac.h", 83, "NW4R:Failed assertion IsValid()");
     }
@@ -643,7 +643,7 @@ void mtx34_calc_billboard_y(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformS
         u32 parentWord = res_node_get_parent_const((const ResHandle*)&node);
         res_node_copy_ctor(&parent, &parentWord);
         if (res_node_is_valid(&parent)) {
-            u32 parentId = fn_8006FDCC(&parent);
+            u32 parentId = res_node_mtx_id_get(&parent);
             pWorld = &pWorldArray[mtxId];
             mtx34_axis_in_parent(&axis.x, (const f32*)pWorld, (const f32*)&pWorldArray[parentId]);
         } else {
@@ -695,7 +695,7 @@ void mtx34_calc_billboard_y_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUn
         u32 parentWord = res_node_get_parent_const((const ResHandle*)&node);
         res_node_copy_ctor(&parent, &parentWord);
         if (res_node_is_valid(&parent)) {
-            u32 parentId = fn_8006FDCC(&parent);
+            u32 parentId = res_node_mtx_id_get(&parent);
             pWorld = &pWorldArray[mtxId];
             mtx34_up_axis_in_parent(&up.x, (const f32*)pWorld, (const f32*)&pWorldArray[parentId]);
         } else {
@@ -880,7 +880,7 @@ void g3d_calc_view(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pView
                     res_node_copy_ctor(&parentNode, &parentTmp);
                     if (res_node_is_valid(&parentNode) && (res_node_ref_nonconst((ResHandle*)&parentNode)->mFlags & 0x400)) {
                         parent = (u32)pMdl->GetResNode((u32)res_node_ref_nonconst((ResHandle*)&parentNode)->mBillboardRefNodeID).mpData;
-                        u32 parentId = fn_8006FDCC(&parent);
+                        u32 parentId = res_node_mtx_id_get(&parent);
                         if (!(parentId < i)) {
                             nw4r::db::Panic("g3d_calcview.cpp", 0x47F, "The billboard matrix hasn't be calculated yet.");
                         }
@@ -1039,7 +1039,7 @@ void g3d_calc_view_lc(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pV
                             (res_node_ref_nonconst((ResHandle*)&parentNode)->mFlags & 0x400)) {
                             parent = (u32)pMdl->GetResNode(
                                 (u32)res_node_ref_nonconst((ResHandle*)&parentNode)->mBillboardRefNodeID).mpData;
-                            u32 parentId = fn_8006FDCC(&parent);
+                            u32 parentId = res_node_mtx_id_get(&parent);
                             if (!(parentId < base + i)) {
                                 nw4r::db::Panic("g3d_calcview.cpp", 0x575,
                                                 "The billboard matrix hasn't be calculated yet.");
@@ -1220,7 +1220,7 @@ void g3d_calc_view_lc_dma(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33
                             (res_node_ref_nonconst((ResHandle*)&parentNode)->mFlags & 0x400)) {
                             parent = (u32)pMdl->GetResNode(
                                 (u32)res_node_ref_nonconst((ResHandle*)&parentNode)->mBillboardRefNodeID).mpData;
-                            u32 parentId = fn_8006FDCC(&parent);
+                            u32 parentId = res_node_mtx_id_get(&parent);
                             if (!(parentId < base + i)) {
                                 nw4r::db::Panic("g3d_calcview.cpp", 0x692,
                                                 "The billboard matrix hasn't be calculated yet.");

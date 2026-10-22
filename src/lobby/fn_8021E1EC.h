@@ -161,32 +161,30 @@ extern VEC3 lb_menu_pos_tbl[4];      /* .bss 0x806AAB08 */
 extern VEC3 lb_menu_pos_extra;       /* .bss 0x806AAB38 */
 extern LbLobbyWork* lobby_wp;    /* .sbss 0x80794B18 - points at `lobby_w` (`lobby_flow_init`) */
 extern const f32 lbl_80799C60;       /* .sdata2 0x80799C60 - the y-window this range tests against */
-extern u8* lbl_807922B0[];           /* .sdata 0x807922B0 - the 8-byte row tables `fn_80223A18` indexes */
-extern u8* lbl_807922B8[];           /* .sdata 0x807922B8 - the 2-byte row tables `fn_80223A44` indexes */
-extern const u16 lbl_80791F30[];     /* .sdata 0x80791F30 */
-extern const u16 lbl_805BA820[];     /* .data 0x805BA820 - the item page's sprite rows */
-extern const u16 lbl_805BA968[];
-extern const u16 lbl_805BA974[];
-extern const u16 lbl_805BA980[];
-extern const u16 lbl_805BA9E4[];
-extern const u16 lbl_805BAA08[];
-extern const u16 lbl_805BAA14[];
+extern const u16 lb_ship_header_sprites[];     /* .sdata 0x80791F30 */
+extern const u16 lb_ship_header_frame[];     /* .data 0x805BA820 - the item page's sprite rows */
+extern const u16 lb_ship_panel_frame[];
+extern const u16 lb_ship_panel_closed[];
+extern const u16 lb_ship_panel_open[];
+extern const u16 lb_ship_backdrop[];
+extern const u16 lb_ship_backdrop_4x3[];
+extern const u16 lb_ship_backdrop_wide[];
 extern const f32 lbl_80799CD8;       /* .sdata2 0x80799CD8 */
 extern const f32 lbl_80799C78;       /* .sdata2 0x80799C78 - the per-row step scale */
 extern const f32 lbl_80799C7C;       /* .sdata2 0x80799C7C - the "scrolled to the end" mark */
 extern u32 frame_counter;             /* .sbss 0x80794868 - the page's tick counter */
 s32 CalculateEvents();
 /* 0x80223E54 - `lobby/lb_equip_page.cpp`'s helper the Pl units call on the actor model (C linkage). */
-s32 fn_80223E54(s32 model);
+s32 pl_rig_weapon_kind_set(s32 model);
 /* The page layer's model helpers the rig update (0x80224AC4-0x80229ECC) calls: `pl_equip_color_apply` reads `self->equipA`
  * (a `_PLW`), `fn_80223708`/`fn_80223830` take the actor's +0x25C/+0x258 blocks by pointer. */
 struct _PLW;
 void pl_equip_color_apply(struct _PLW* self, u32 slot);
-void fn_80223708(void* rig, void* block_0x25C, u32 slot);
-void fn_8022375C(void* rig, u32 slot);
-void fn_80223830(void* rig, void* block_0x258);
-void fn_80224820(u32 unused, void* model, struct _PLW* plw, f32 scale);
-u32 fn_80224944(struct _PLW* self);
+void pl_rig_model_skin_color_set(void* rig, void* block_0x25C, u32 slot);
+void pl_rig_sub_color_apply(void* rig, u32 slot);
+void pl_rig_hair_color_set(void* rig, void* block_0x258);
+void pl_rig_model_place(u32 unused, void* model, struct _PLW* plw, f32 scale);
+u32 pl_rig_screen_ok_ck(struct _PLW* self);
 extern const f32 lbl_80799CDC;       /* .sdata2 0x80799CDC */
 }
 

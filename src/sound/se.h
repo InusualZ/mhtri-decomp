@@ -123,7 +123,7 @@ void fn_800E2680(void* sub);
 void fn_80093AA0(void* obj);
 void CleanUpTracks(void* obj);
 void res_node_assign(void* obj, void* sub);
-int fn_8006FDCC(void* sub);
+int res_node_mtx_id_get(void* sub);
 void mtx34_copy(void* dst, void* src);
 SeSlot* fn_800D8E58(_se_w* work, s32 id);
 /* 0x80047058 is `mh3_pad.cpp`'s: the retail body takes NO argument (it loads `Screen_w` itself), so

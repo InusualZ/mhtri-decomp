@@ -4038,12 +4038,12 @@ void Em008UserData::CalcWorldEnd(nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl, 
     res_node_assign(&head, &idx);
     {
         _ENEMY_WORK* work = this->work;
-        mtx34_copy(&local, &mtx[fn_8006FDCC(&head)]);
+        mtx34_copy(&local, &mtx[res_node_mtx_id_get(&head)]);
         mtx34_identity(&out);
         rotMatrixX_view1(work->field_0x608, &out);
         rotMatrixZ_view1(work->field_0x610, &out);
         mtx34_concat_assign(&local, &out);
-        copyMat33(&mtx[fn_8006FDCC(&head)], &local);
+        copyMat33(&mtx[res_node_mtx_id_get(&head)], &local);
     }
 }
 

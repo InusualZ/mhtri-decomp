@@ -94,7 +94,7 @@ u32 em012_area_move_armed_ck(void* p);
  * signature; the shapes here are the call sites' - each is a leaf this unit never re-enters) ---- */
 void mtx34_identity(void* out);
 void mtx34_copy(void* dst, const void* src);
-int fn_8006FDCC(const void* p);
+int res_node_mtx_id_get(const void* p);
 void res_node_assign(void* obj, const void* sub);
 void assignVec3(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void mtx34_concat_assign(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);

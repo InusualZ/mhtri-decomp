@@ -1370,10 +1370,10 @@ void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
     MTX34_ctor(&m1);
     MTX34_ctor(&m2);
     MTX34_ctor(&m3);
-    mtx34_copy(&m1, &arg2[fn_8006FDCC(arg1)]);
+    mtx34_copy(&m1, &arg2[res_node_mtx_id_get(arg1)]);
     idx = res_node_get_parent(arg1);
     res_node_assign(&key, &idx);
-    mtx34_copy(&m2, &arg2[fn_8006FDCC(&key)]);
+    mtx34_copy(&m2, &arg2[res_node_mtx_id_get(&key)]);
     mtx34_inverse(&m3, &m2);
     mtx34_concat(out, &m3, &m1);
 }

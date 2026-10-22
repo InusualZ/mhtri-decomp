@@ -698,13 +698,13 @@ void fn_801E89B4(LbMenuWork* self)
     s32 off;
 
     get_lsp_data(0x1E16U, &pos);
-    draw_sprite_ary((const u16*)lbl_805BAA20, &pos);
+    draw_sprite_ary((const u16*)lb_ship_box_frames, &pos);
     found = 0;
     spr_data_copy((s16*)&p0, (s16*)get_lsp_data(0x1307U, NULL));
     uv_pair_copy(&a, &p0);
     off = 0;
     for (i = 0; i < 0x1E; i++) {
-        fn_80222848(i, (s16*)&m);
+        lb_ship_cell_pos_get(i, (s16*)&m);
         spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x12F9U, NULL));
         uv_pair_copy(&p2, &m);
         p0.x = m.x + a.x;

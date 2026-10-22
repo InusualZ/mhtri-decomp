@@ -36,7 +36,7 @@
 
 /* This unit's own functions used before their definition (the file is in address order). */
 extern "C" {
-s32 fn_800E0A8C(MHchar* self);
+s32 mhchar_wld_mtx_array_get(MHchar* self);
 void fn_800E2640(u32* dst, u32* src);
 void fn_800E2EB0(u32* dst, u32* src);
 void fn_800E301C(u32* dst, u32* src);
@@ -109,13 +109,13 @@ extern "C" void mhchar_joint_mtx_get(MHchar* self, void* arg, void* dst)
         return;
     }
     void* entry = reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNode((u32)arg).mpData;
-    int offset = fn_8006FDCC(&entry) * 48;
+    int offset = res_node_mtx_id_get(&entry) * 48;
     MHchar* handle = (MHchar*)self->field_0x118;
-    mtx34_copy(dst, (void*)(fn_800E0A8C(handle) + offset));
+    mtx34_copy(dst, (void*)(mhchar_wld_mtx_array_get(handle) + offset));
 }
 
 /* Read the model's +0xEC word. */
-extern "C" s32 fn_800E0A8C(MHchar* self)
+extern "C" s32 mhchar_wld_mtx_array_get(MHchar* self)
 {
     return self->field_0xEC;
 }

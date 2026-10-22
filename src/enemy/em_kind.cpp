@@ -364,7 +364,7 @@ void* nw_res_entry_get(s32 handle);
 s32 res_mem_index_get(char* name);
 void fn_800D5D60(void* work);
 void fn_800D5E30(void* work);
-void fn_800E38BC(void* a);
+void mhchar_mdl_prepare(void* a);
 void fn_800E3358(u32 a, u8 b, void* c);
 s32 fn_800924CC(void* a, u32 b);
 
@@ -2439,7 +2439,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     em_res_file_setup(&h1);
     res = fn_800924CC(&h1, 0);
     fn_8007BA08(&h2, &res);
-    fn_800E38BC(&h2);
+    mhchar_mdl_prepare(&h2);
     fn_800D5D60(work);
 }
 

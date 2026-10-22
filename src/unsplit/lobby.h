@@ -302,7 +302,7 @@ extern const f64 lbl_80799878;
 extern u16 lbl_805BA660[58];
 extern u16 lbl_805BA6D4[34];
 extern u16 lbl_805BA718[28];
-extern const u16 lbl_805BAA20[10];
+extern const u16 lb_ship_box_frames[10];
 extern u8 eft052_item_box[88];
 extern u16 lbl_80791B70[4];
 extern u16 lbl_80791B78[4];
@@ -445,7 +445,7 @@ s32 lb_panel_close(void);
 s32 lb_talk_page_open(s32);
 s32 lb_talk_page_mode_reset(void);
 s32 getItemListSelection(void);
-s32 fn_80222848(s32, s16 *);
+s32 lb_ship_cell_pos_get(s32, s16 *);
 s32 lb_item_box_count_draw(void*, s32, u8);
 /* `menu_hold_row_draw_by_lsp`/`menu_cursor_step_fixed_tail`/`menu_cursor_step_open_last`/`menu_cursor_step`/`toggle_word_step` (0x802A7C04-0x802A8F50) were
  * declared here while the menu band had no registered unit.  `menu/menu_message.cpp` owns that range

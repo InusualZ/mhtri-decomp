@@ -11,17 +11,6 @@ struct _se_w;
 struct _PLW;
 struct _se_w;
 
-/* One 24-byte vector pair of the motion layer's placement tables; `Pl/fn_80224AC4.cpp` hands these to
- * the model layer. size: 0x18 */
-typedef struct PlSeVecPair {
-    /* +0x00 */ f32 x_0x00;
-    /* +0x04 */ f32 y_0x04;
-    /* +0x08 */ f32 z_0x08;
-    /* +0x0C */ f32 x_0x0C;
-    /* +0x10 */ f32 y_0x10;
-    /* +0x14 */ f32 z_0x14;
-} PlSeVecPair; /* size: 0x18 */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -102,7 +91,6 @@ extern f32 lbl_805C4898[];
  * `Pl/fn_802693C4.h`; 0x8025EFF4 is owned by `Pl/fn_80258FCC.cpp` and is declared in
  * `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the runs the header above already
  * documents. */
-s32 fn_8027EE24(void);
 s32 pl_equip_model_id_get(struct _PLW* self, void* equip);
 
 /* The range's private pooled constants (playbook 29: declared, never defined).  `.sdata2`
@@ -158,8 +146,6 @@ extern u8* lbl_807913C0[];
 extern u8* lbl_807913C8[];
 extern u8* lbl_807913D0[];
 extern u8* lbl_807913D8[];
-extern const f32 lbl_80792010[2];
-extern u8 lbl_805BAAD4[];
 /* The 0x8079A000 `.sdata2` run the Pl band's part/motion accessors load (0.0f and 1.0f; the eight
  * bytes at +0x08 are the 2^52 double MWCC's u32->f32 conversion uses, which overlaps the -0.0f at
  * +0x0C).  No registered unit claims the run, so this band header is its rule-2 home - declared, never
@@ -172,9 +158,6 @@ extern const f32 lbl_8079A004; /* 1.0f */
  * the actor's `_PLW`+0x002 byte.  Both are unclaimed. */
 extern s16* lbl_805C0C98[];
 extern s16** lbl_805C1584[];
-
-extern PlSeVecPair lbl_805BB028[];
-extern PlSeVecPair lbl_805BB130[];
 
 /* The four sibling motion banks `Pl/fn_80230FBC.cpp`'s kind byte dispatches to (kinds 3 and 7), and
 the motion bank that unit's range stops at.  All are unregistered, so this band header is their
@@ -302,7 +285,7 @@ extern u8 lbl_805CB0B0[];
 extern u8 lbl_805CBC80[];
 
 /* The band's private `.sdata2` pool, 0x8079A1D8-0x8079A268 - declared as loads, never defined
- * (playbook 29).  The 30.0f/1.25f/0.83f trio is the charge-rate chain `fn_802843F0` applies. */
+ * (playbook 29).  The 30.0f/1.25f/0.83f trio is the charge-rate chain `pl_charge_cycle_get` applies. */
 extern const f32 lbl_8079A1D8; /* 30.0f  - the base charge rate */
 extern const f32 lbl_8079A1DC; /* 1.25f  - the skill-191 rate divisor */
 extern const f32 lbl_8079A1E0; /* 0.83f  - the skill-192 rate divisor */

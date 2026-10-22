@@ -235,7 +235,7 @@ u32 *fn_80091280(void *self);
 u32 fn_800912D4(void *self);
 u32 fn_800912F8(void *self);
 u32 fn_8009135C(void *self);
-void *fn_80091364(void *self, const void *src);
+void *res_file_handle_copy(void *self, const void *src);
 void fn_80091394(void *dst, const void *src);
 u32 fn_800913A0(void *self, void *file);
 u32 fn_80091584(void *self, u32 idx);
@@ -858,7 +858,7 @@ u32 fn_8009135C(void *self)
 }
 
 /* The store-and-return wrapper of `fn_80091394`. */
-void *fn_80091364(void *self, const void *src)
+void *res_file_handle_copy(void *self, const void *src)
 {
     fn_80091394(self, src);
     return self;

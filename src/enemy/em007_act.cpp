@@ -4022,12 +4022,12 @@ void Em007UserData::CalcWorldEnd(nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl, 
     data = (s32)mdl.GetResNode(0x11).mpData;
     res_node_assign(&node, &data);
     work = this->work;
-    mtx34_copy(&world, &mtx[fn_8006FDCC(&node)]);
+    mtx34_copy(&world, &mtx[res_node_mtx_id_get(&node)]);
     mtx34_identity(&rot);
     rotMatrixX(work->field_0x608, &rot);
     rotMatrixZ(work->field_0x610, &rot);
     mtx34_concat_assign(&world, &rot);
-    copyMat33(&mtx[fn_8006FDCC(&node)], &world);
+    copyMat33(&mtx[res_node_mtx_id_get(&node)], &world);
 }
 
 /* 0x801E0058 (0x164): "is either part 0x1B or 0x1C within (scale * 1000.0f)^2 of me". */

@@ -168,9 +168,9 @@ void mtx34_concat(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34*
 void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 void g3d_root_model_bind(s32 root, u32 id);
 void mtx34_inverse(nw4r::math::MTX34* out, nw4r::math::MTX34* src);
-s32 fn_8006FDCC(void* handle);
+s32 res_node_mtx_id_get(void* handle);
 void fn_800DAA4C(nw4r::math::VEC3* pos);
-s32 fn_800E0A8C(MHchar* model);
+s32 mhchar_wld_mtx_array_get(MHchar* model);
 void mhchar_draw_mode_set(MHchar* model, s32 value);
 void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
 void* eft_res_slot_get(u32 pool);
@@ -583,9 +583,9 @@ extern "C" void fn_8010CE80(void* arg)
         s = fn_8010D1A8(self, i, f31);
         setVec3(&scale, s, s, s);
         scaleMat34W(&mtxB, &scale);
-        base = fn_800E0A8C((MHchar*)((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x118);
+        base = mhchar_wld_mtx_array_get((MHchar*)((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x118);
         handle = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x114)->GetResNode(i + 1).mpData;
-        idx = fn_8006FDCC(&handle);
+        idx = res_node_mtx_id_get(&handle);
         mtx34_copy_ps(&((nw4r::math::MTX34*)base)[idx], &mtxB);
     }
 }

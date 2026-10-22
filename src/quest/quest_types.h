@@ -305,6 +305,25 @@ struct Q_ArenaRecord {
     /* +0x14 */ char name_b[0x20];
 };
 
+/* One trade-ship order in the save block (`lobby/lb_equip_page.cpp`): the goods ordered, the bonus item asked for, the
+ * voyages left, the voyage count when the hold was last emptied and the order's own random seed.  size: 0x8 */
+typedef struct LbShipOrder {
+    /* +0x00 */ u16 item_0x00;
+    /* +0x02 */ u16 bonus_0x02;
+    /* +0x04 */ u8 voyages_0x04;
+    /* +0x05 */ u8 voyages_seen_0x05;
+    /* +0x06 */ u16 seed_0x06;
+} LbShipOrder;
+
+/* The trade ship's save record: the grade of each of the four goods tables (0 locked), the three ships' orders and
+ * how many ships sail.  size: 0x1E (the u16 orders align it) */
+typedef struct LbShipBlock {
+    /* +0x00 */ u8 grade_0x00[4];
+    /* +0x04 */ LbShipOrder orders_0x04[3];
+    /* +0x1C */ u8 ships_0x1C;
+    /* +0x1D */ u8 pad_0x1D;
+} LbShipBlock;
+
 struct Q_UserData {
     /* +0x0000 */ u8 hunter_sex_0x0000;     /* the character make's model (0 or 1) */
     /* +0x0001 */ u8 hunter_face_0x0001;
@@ -344,7 +363,9 @@ struct Q_UserData {
     /* +0x3F98 */ EmSetSave em_set_0x3F98;   /* the free hunt's monster records (`em_set_work_init`) */
     /* +0x406E */ u8 pad_0x406E[0x42D0 - 0x406E];
     /* +0x42D0 */ Q_ArenaRecord arena_0x42D0[12];  /* the arena quests' record holders, by arena quest */
-    /* +0x4540 */ u8 pad_0x4540[0x483A - 0x4540];
+    /* +0x4540 */ u8 pad_0x4540[0x4654 - 0x4540];
+    /* +0x4654 */ LbShipBlock ship_0x4654;   /* the trade ship (`lobby/lb_equip_page.cpp`) */
+    /* +0x4672 */ u8 pad_0x4672[0x483A - 0x4672];
     /* +0x483A */ u8 pig_name_0x483A;   /* the Poogie's name index (`name_menu_step`) */
     /* +0x483B */ u8 pig_dress_0x483B;  /* the Poogie's costume (`pig_menu_step`) */
     /* +0x483C */ u8 pad_0x483C[0x484E - 0x483C];

@@ -92,7 +92,7 @@
  * ## Shared types and shared files
  *
  * The record both per-actor paths walk is `pl.h`'s `_PLW`: its `equipB` / `equipB2` /
- * `equipC` / `equipD` are exactly the four `_EQUIP` records `Get_pl_type` and `fn_8027EE24` take at
+ * `equipC` / `equipD` are exactly the four `_EQUIP` records `Get_pl_type` and `equip_variant_get` take at
  * +0x1D0 / +0x1DC / +0x1E8 / +0x1F4, and the enemy list walks it at its 0xB20 stride.  So this unit
  * includes that header rather than carrying a copy of either type.  Four of that record's fields had
  * no name (`unk000`, `unk08`, `unk00E[6]`, `pad_0x1C[1]`); they are named from this unit's evidence,
@@ -236,7 +236,7 @@ typedef struct SndFlag3 {
  * it copies out of the 6th, which is why each call site declares `u32 args[n]` of that size. */
 void load_file_req(char* path, u32 dma, s32 size, u32 cb, s32 words, u32* args);
 
-extern "C" u8  fn_8027EE24(void* equip);
+extern "C" u8  equip_variant_get(void* equip);
 u8  Get_pl_type(_EQUIP* a, _EQUIP* b);
 void cnvt_eur_fname(char* dst, char* src);
 extern "C" u8 fn_8028F288(void);
@@ -729,7 +729,7 @@ extern "C" void fn_800EFDD8(_PLW* work)
         if ((s32)type > 8) {
             return;
         }
-        variant = fn_8027EE24(eq);
+        variant = equip_variant_get(eq);
     }
     chunk = lbl_8079160C[work->chunk_ofs];
     sizes = &lbl_80598A48[type];
@@ -769,7 +769,7 @@ extern "C" void fn_800EFDD8(_PLW* work)
             u8 var = variant;
             u32 idx;
             if (i != 0) {
-                var = fn_8027EE24(&eq[1 + i]);
+                var = equip_variant_get(&eq[1 + i]);
             }
             args[1] = chunk + 1 + i;
             args[2] = chunk + 1 + i;

@@ -567,7 +567,7 @@ void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResM
     src = &work->mtx[obj->index_0x08][0];
     id0 = (s32)mdl.GetResNode((u32)3).mpData;
     res_node_assign(&h0, &id0);
-    copyMat33(&mtx_arr[fn_8006FDCC(&h0)], src);
+    copyMat33(&mtx_arr[res_node_mtx_id_get(&h0)], src);
     k = 4;
     for (group = 0; group < 4; group++) {
         mtx34_copy(&ma, &src[group]);
@@ -578,7 +578,7 @@ void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResM
             b = lbl_805A0300[inner];
             id1 = (s32)mdl.GetResNode((u32)k).mpData;
             res_node_assign(&h1, &id1);
-            dst = &mtx_arr[fn_8006FDCC(&h1)];
+            dst = &mtx_arr[res_node_mtx_id_get(&h1)];
             fn_80051894(&out, &ma, &mb, 1, a->x, a->y);
             out.m[0][3] *= lbl_805A0244[effect->type_0x02];
             out.m[1][3] *= lbl_805A0244[effect->type_0x02];

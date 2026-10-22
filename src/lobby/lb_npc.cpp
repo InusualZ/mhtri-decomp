@@ -296,7 +296,7 @@ u32 userdata_flag_ck(s32);
 void lb_progress_unlock(u16);
 u16 lb_unlock_cond_top_get(s32);
 u8 fn_802FB948(void);
-void fn_80220078(void);
+void lb_ship_marks_set(void);
 void fn_801E9AA8(u8);
 s32 mhchar_motion_set(void* self, u8 kind, s32 a3, u16 id, s32 a5, s32 motion, s32 a7, f32 c, f32 k);
 u32 mhchar_frame_check(void* self, u16 a, s32 b, f32 frame, f32 speed);
@@ -411,7 +411,7 @@ void fn_801FC268(void)
 /* 0x801FC2F0 - reset the menu layer and leave the menu. */
 void fn_801FC2F0(void)
 {
-    fn_80220078();
+    lb_ship_marks_set();
     fn_801E9AA8(0);
 }
 
@@ -12106,7 +12106,7 @@ extern "C" void lb_item_db_toggle(void) {
         }
         fn_801E9C58();
         fn_802FF2C0();
-        fn_80220114();
+        lb_ship_voyage_tick();
     }
 }
 

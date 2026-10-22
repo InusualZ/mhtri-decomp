@@ -20,8 +20,8 @@ u32 res_mdl_info_is_valid(void* pSelf);       /* 0x8006FFC8 - the `ResMdlInfo` h
 void mtx34_concat(Mtx34* out, const Mtx34* a, const Mtx34* b);
 
 /* 0x8006FDCC..0x8007100C - the `g3d_calcworld` node/resource helpers (callers: g3d_calcworld.cpp and the
- * matrix users).  `fn_8006FDCC`'s callers use the word as a matrix id or an array index. */
-u32 fn_8006FDCC(const void* p);
+ * matrix users).  `res_node_mtx_id_get`'s callers use the word as a matrix id or an array index. */
+u32 res_node_mtx_id_get(const void* p);
 /* untyped: opaque handle - the ResMdlInfo handle */
 const struct ResMdlInfoData* res_mdl_info_data(const void* pInfo); /* 0x8006FF50 - the info block, asserting the handle is valid */
 /* 0x8006FEC8 - the node id of position/normal matrix `mtxID` */

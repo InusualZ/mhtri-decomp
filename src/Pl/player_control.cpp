@@ -173,11 +173,11 @@ void player_move_start(s32 index) {
     if (index == -1) {
         for (i = 0; i < global->count; i++) {
             if (global->objects[i].active != 0) {
-                fn_80223E54((s32)global->objects[i].model_0x13C);
+                pl_rig_weapon_kind_set((s32)global->objects[i].model_0x13C);
             }
         }
     } else if (global->objects[index].active != 0) {
-        fn_80223E54((s32)global->objects[index].model_0x13C);
+        pl_rig_weapon_kind_set((s32)global->objects[index].model_0x13C);
     }
     global->state = 4;
 }
