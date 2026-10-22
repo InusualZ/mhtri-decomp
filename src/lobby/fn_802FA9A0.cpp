@@ -131,7 +131,7 @@ u8 lb_world_mode_get(void) {
 }
 
 /* The lobby work block's scene byte at +0x003. */
-u8 fn_802FB5F0(void) {
+u8 lb_event_kind_get(void) {
     return lobby_w.field_0x003;
 }
 

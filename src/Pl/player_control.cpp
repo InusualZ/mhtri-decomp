@@ -8,7 +8,7 @@
  *   GUESS (from each body and its callers): `player_work_array_get`.
  * RESIDUALS. 16 functions unwritten (objdiff scores them 0) in 5 runs: 0x802673E8-0x80267A78, 0x80267AA0-0x80267C84,
  *   0x80267D00-0x802681D4, 0x8026837C-0x80268E38, 0x80268E70-0x80269394.  4 partial, none with
- *   a recorded cause: `player_move_start_ck`..`fn_80268308` (0x802681EC-0x8026837C) and `fn_80268E48`.
+ *   a recorded cause: `player_move_start_ck`..`pl_net_slot_ready_ck` (0x802681EC-0x8026837C) and `fn_80268E48`.
  *  - flipcheck: the object emits no `.bss` (0x400 claimed), `.data` (0xD8), `.sbss` (0x8) or `.sdata` (0xD8); `.text`
  *    0x2FC, extab 0x10 and extabindex 0x18 against the claims 0x2020, 0x90 and 0xD8; every compared section differs.
  */
@@ -32,7 +32,7 @@ s32 fn_802673B8(void);
 void fn_802673D4(u8 index);
 u32 fn_80267A78(u8 index);
 u8 fn_80267C84(struct _PLW* self);
-u32 fn_80268308(struct _PLW* self);
+u32 pl_net_slot_ready_ck(struct _PLW* self);
 s32 fn_80269394(struct _PLOBJ* obj);
 
 void fn_80268E38(struct _PLW* self, u8* slots, u8 index);
@@ -140,7 +140,7 @@ u8 fn_80267C84(_PLW* self) {
 }
 
 /* 0x80268308 - the player record is loaded and every one of its 11 slots has left "empty". */
-u32 fn_80268308(_PLW* self) {
+u32 pl_net_slot_ready_ck(_PLW* self) {
     s32 global;
     s32 any;
     s32 i;

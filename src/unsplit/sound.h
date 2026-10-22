@@ -16,7 +16,7 @@ struct MHchar;
 extern "C" {
 #endif
 
-void fn_800E0914(struct MHchar* ch);
+void mhchar_model_mtx_update(struct MHchar* ch);
 void fn_800E09D0(struct MHchar* ch, const Vec3* v, f32 arg2);
 u32 mhchar_mat_num_get(struct MHchar* ch);
 void fn_800E2EBC(struct MHchar* ch, u32 index, s32 arg2);

@@ -5,6 +5,8 @@
 #define MHTRI_LOBBY_LOBBY_WORK_H
 
 #include "types.h"
+#include "nw4r/math.h"
+#include "ef/cp_vector.h"
 
 struct LbMenuWork;
 struct LbMenuPanel;
@@ -38,6 +40,11 @@ typedef struct LbLobbyWork {
     /* +0x003 */ union {
         u8 unused_0x003[3];
         u8 field_0x003;   /* the NPC band resets it to 0xFF */
+        struct {
+            /* +0x003 */ u8 pad_0x003[1];
+            /* +0x004 */ u8 field_0x004;   /* the HUD toggle the idle screen flips on the 0x80 command */
+            /* +0x005 */ u8 field_0x005;   /* toggled by the bench act's 0x80 command (`lobby/lb_npc.cpp`) */
+        };
     };
     /* +0x006 */ u8 field_0x006;
     /* +0x007 */ u8 field_0x007;   /* cleared with +0x006 when the game-mode flow enters the lobby */
@@ -66,16 +73,21 @@ typedef struct LbLobbyWork {
             /* +0x036 */ s16 field_0x036[13];
         };
     };
-    /* +0x050 */ u8 unused_0x050[0x2];
+    /* +0x050 */ u16 field_0x050;   /* cleared with `page_0x052` when the party is dissolved (a halfword store) */
     /* +0x052 */ u8 page_0x052;
     /* +0x053 */ u8 unused_0x053;
     /* +0x054 */ u8 kitchen_busy_0x054;   /* set while the kitchen serves a meal; cleared by `lobby_flow_init` */
-    /* +0x055 */ u8 unused_0x055[0x21];
+    /* +0x055 */ s8 talk_area_0x055;   /* the area NPC 0x17 was last talked to in (`lobby/lb_npc.cpp`) */
+    /* +0x056 */ u8 unused_0x056[0x2];
+    /* +0x058 */ nw4r::math::VEC3 npc_pos_0x058;   /* NPC 0x17's position, rotation and motion table, recorded */
+    /* +0x064 */ _CP_VECTOR npc_rot_0x064;          /* each frame by `lobby/lb_npc.cpp` */
+    /* +0x070 */ struct LbNpcMotionEntry* npc_motion_0x070;
+    /* +0x074 */ s16 npc_motion_index_0x074;
     /* +0x076 */ u8 field_0x076;
     /* +0x077 */ u8 field_0x077;
     /* +0x078 */ u8 pig_dress_0x078;   /* the Poogie costume the lobby shows (`lobby_pig_dress_view_set`) */
     /* +0x079 */ s8 field_0x079;
-    /* +0x07A */ u8 unused_0x07A[0x2];
+    /* +0x07A */ u8 npc_event_0x07A[0x2];   /* the event state of the NPCs `lobby/lb_npc.cpp` keys by kind */
     /* +0x07C */ union {   /* 0x07C-0x0AB: the slot run and the NPC/page units' views of it (the union is anchored
                             * at the aligned +0x07C so its u16 members keep their offsets) */
         struct {
@@ -88,10 +100,9 @@ typedef struct LbLobbyWork {
             /* +0x081 */ u8 pad_0x081[0x3];
             /* +0x084 */ union {
                 u16 count_0x084;            /* the item count `menu_cursor_page_move` takes as its pad argument */
-                u16 cmd_mask_0x084[2][5];   /* per-player UI command/availability words, rebuilt from the pad
+                u16 cmd_mask_0x084[4][5];   /* per-player UI command/availability words, rebuilt from the pad
                                              * record by `fn_80212370` */
             };
-            /* +0x098 */ u8 pad_0x098[0x14];
         };
     };
     /* +0x0AC */ union {
@@ -100,6 +111,8 @@ typedef struct LbLobbyWork {
         struct LbPigMenuWork* pig_menu_0x0AC;     /* screen 0x15, the Poogie menu (`menu/multi_result.cpp`) */
         struct LbNameMenuWork* name_menu_0x0AC;   /* screen 0x16, the name menu (`menu/multi_result.cpp`) */
         struct LbNoteTradeWork* note_trade_0x0AC; /* screen 0x17, the note trade (`lobby/lb_quest_screen.cpp`) */
+        struct LbArmWrestleWork* arm_wrestle_0x0AC; /* screen 0x19, the arm wrestle (`lobby/lb_npc.cpp`) */
+        struct LbShopWork* shop_0x0AC;            /* screen 0x02, the NPC shop (`lobby/lb_npc.cpp`) */
     };
     /* +0x0B0 */ u8 field_0x0B0;
     /* +0x0B1 */ u8 sub_0x0B1;
@@ -124,9 +137,17 @@ typedef struct LbLobbyWork {
     };
     /* +0x12C */ u8 field_0x12C;   /* 1 puts the lobby act layer on hold */
     /* +0x12D */ u8 param_0x12D;
-    /* +0x12E */ u8 unused_0x12E[0x1];
+    /* +0x12E */ s8 invite_0x12E;   /* the first invite's answer: 1 accepted, < 0 refused (`lobby/lb_npc.cpp`) */
     /* +0x12F */ u8 param_0x12F;
-    /* +0x130 */ u8 unused_0x130[0x19];
+    /* +0x130 */ s8 invite_0x130;   /* the second invite's answer, read the same way */
+    /* +0x131 */ u8 param_0x131;
+    /* +0x132 */ s8 invite_0x132;   /* the arm wrestle's rematch answer */
+    /* +0x133 */ s8 invite_0x133;   /* the opponent's copy of it */
+    /* +0x134 */ u8 unused_0x134[0x11];
+    /* +0x145 */ u8 field_0x145;
+    /* +0x146 */ u8 field_0x146;
+    /* +0x147 */ u8 field_0x147;
+    /* +0x148 */ u8 field_0x148;
     /* +0x149 */ u8 meal_area_0x149;      /* the online meal's area code (the cook's +0xB6 byte / 4) */
     /* +0x14A */ u8 meal_received_0x14A;  /* nonzero once the host's meal has arrived */
     /* +0x14B */ u8 meal_skill_0x14B[3];  /* the received meal's skill ids */

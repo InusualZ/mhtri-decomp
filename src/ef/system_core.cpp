@@ -578,7 +578,7 @@ u8 fn_800D06E0(void) {
 }
 
 /* 0x800D0724/0x800D0734/0x800D0744/0x800D0754 - the texture-load flags. */
-u8 fn_800D0724(void) {
+u8 system_lobby_flag_get(void) {
     return system_w.field_0x877;
 }
 

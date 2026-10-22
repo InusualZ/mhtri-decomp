@@ -90,7 +90,9 @@ typedef struct LbMenuWork {
 /* The lobby's NPC move table block (`lb_npc_move_data`, .bss): +0x0C is the `LbNpcMotionEntry` array
  * `_LB_NPC::field_0x204` is pointed at.  Only the pointer is read here. size: 0x10 */
 typedef struct LbNpcMoveData {
-    /* +0x00 */ u8 unused_0x00[0x0C];
+    /* +0x00 */ LbNpcMotionEntry* cat_farm_0x00;   /* the cat-farm NPC's tables by event state 4, 3 and 2 */
+    /* +0x04 */ LbNpcMotionEntry* cat_farm_0x04;
+    /* +0x08 */ LbNpcMotionEntry* cat_farm_0x08;
     /* +0x0C */ LbNpcMotionEntry* table_0x0C;
     /* +0x10 */ LbNpcMotionEntry* table_0x10;
     /* +0x14 */ LbNpcMotionEntry* table_0x14;
@@ -100,7 +102,9 @@ typedef struct LbNpcMoveData {
     /* +0x24 */ LbNpcMotionEntry** list_0x24;
     /* +0x28 */ LbNpcMotionEntry** list_0x28;
     /* +0x2C */ LbNpcMotionEntry** list_0x2C;
-} LbNpcMoveData; /* size: 0x30+ */
+    /* +0x30 */ LbNpcMotionEntry** model12_0x30;   /* model 12's tables by its talk id */
+    /* +0x34 */ LbNpcMotionEntry* model12_mode1_0x34;
+} LbNpcMoveData; /* size: 0x38 */
 
 /* One entry of the map's NPC spot tables (`lbl_805B8EF0`, `lbl_805B8F28`, ...): an x and a z the
  * `_LB_NPC`'s position is tested against; each table ends with the 10000.0f / 0.0f terminator the
@@ -168,7 +172,7 @@ typedef struct LbParam {
     /* +0x0B */ u8 mode_0x0B;
 } LbParam; /* size: 0xC */
 
-/* The 0x1C-byte parameter block `eft052_hold_entry_set` reads (the `fn_801E79E4` menu action). */
+/* The 0x1C-byte parameter block `eft052_hold_entry_set` reads (the `lb_deli_screen_step` menu action). */
 typedef struct LbSeParam {
     /* +0x00 */ s32 value_0x00;
     /* +0x04 */ s16 mode_0x04;
@@ -256,7 +260,6 @@ extern u8 lbl_805B85B8[32];
 /* The `.data`/`.sdata` tables the character-edit (hair/inner colour) screen unit
  * (`src/lobby/fn_801F9CD4.cpp`) addresses; no registered unit owns them yet, so they are declared
  * here rather than in that unit's source (rule 2). */
-extern u32 lbl_80582988[44];
 extern u8 lbl_80582B30[40];
 extern u32 lbl_8058AA98[4];
 /* The 0xA-byte colour record the character-edit screen's `lbl_805B8674` table holds, and the two
@@ -388,6 +391,15 @@ extern f32 lbl_80799AD4;
 extern f32 lbl_80799AD8;
 extern f32 lbl_80799ADC;
 extern LbNpcMoveData lb_npc_move_data;
+/* The NPC shops' stock lists (`lobby/lb_npc.cpp`'s buy list pages through them; no registered unit claims the
+ * run 0x805DD298..0x805DD598): (item, unlock condition) u16 pairs, 0-terminated.  GUESS names (registry). */
+extern u16 lb_shop_items_npc5[];       /* .data 0x805DD298 */
+extern u16 lb_shop_items_npc39[];      /* .data 0x805DD380 */
+extern u16 lb_shop_items_npc39_net[];  /* .data 0x805DD3D8: the online extra stock */
+extern u16 lb_shop_items_npc41[];      /* .data 0x805DD408 */
+extern u16 lb_shop_items_npc41_net[];  /* .data 0x805DD460 */
+extern u16 lb_shop_items_npc50[];      /* .data 0x805DD4A0 */
+extern u16 lb_shop_halfprice_skip[];   /* .data 0x805DD580: the items the half-price event leaves alone */
 extern LbNpcMotionEntry lbl_805B8EC8;
 extern LbNpcMoveSpot lbl_805B8EF0[7];
 extern LbNpcMoveSpot lbl_805B8F28[2];
@@ -462,7 +474,6 @@ owner's header and are included here. */
 
 /* The lobby band's unclaimed `.bss` / `.sdata2` objects this unit and its neighbours read.  An
  * `extern` for an unsplit symbol belongs in this band header (docs/plan.md 6.5 rule 2). */
-extern u8 lbl_806AA6F0[0x20];   /* .bss 0x806AA6F0 - the lobby sub-scene latch block */
 extern f32 lbl_80799B18;
 extern f32 lbl_80799B1C;
 extern f32 lbl_80799B20;

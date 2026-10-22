@@ -5,7 +5,7 @@
 #include "nw4r/math.h"
 
 /* ef/eft004.h - the eft004 family's declarations its consumers call (docs/plan.md 6.5 rule 2): the matrix helpers
- * and `fn_80101594` are `ef/eft004_fx.cpp`'s, the per-frame handlers `ef/fn_800FD864_fx.cpp`'s.  Plain C linkage.
+ * and `eft004_hold_item_spawn` are `ef/eft004_fx.cpp`'s, the per-frame handlers `ef/fn_800FD864_fx.cpp`'s.  Plain C linkage.
  * `mtx34_trans_get`'s two-argument form is the owner's; `ef/fn_80114E34.cpp` passes three and keeps its own
  * declaration, so the two arities coexist. */
 #ifdef __cplusplus
@@ -26,7 +26,7 @@ void fn_800FFCA8(struct _EFT* self);
 void fn_80100088(void* effect, s32 flag);
 /* 0x80101594 - the player actor's effect-anchor refresh `Pl/fn_802489D4.cpp` calls after it arms a motion; it takes
  * the caller's `_PLW*` as an opaque pointer. */
-void fn_80101594(void* self);
+void eft004_hold_item_spawn(void* self);
 #ifdef __cplusplus
 }
 

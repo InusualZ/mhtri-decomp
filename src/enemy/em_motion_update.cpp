@@ -53,7 +53,7 @@ void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
 /* `ran_suu__Fl` (`ef/system_core.cpp`). */
 s32 ran_suu(s32 range);
 
-/* `fn_800E0914`'s parameter is a model base, not a `_ENEMY_WORK`; the record embeds one at +0x24. */
+/* `mhchar_model_mtx_update`'s parameter is a model base, not a `_ENEMY_WORK`; the record embeds one at +0x24. */
 struct MHchar;
 
 extern "C" {
@@ -70,7 +70,7 @@ void fn_8013A978(_ENEMY_WORK* self);
 void g3d_root_model_bind(s32 root, u32 id);
 
 /* `sound/mhchar.cpp`: refreshes the model base at `_ENEMY_WORK::char_0x024`. */
-void fn_800E0914(struct MHchar* model);
+void mhchar_model_mtx_update(struct MHchar* model);
 
 /* `enemy/fn_8011D448.cpp`'s and `enemy/enemy_control.cpp`'s helpers */
 void em_status_bits_init(_ENEMY_WORK* self);
@@ -94,7 +94,7 @@ extern "C" void em_act_update(_ENEMY_WORK* self)
         fn_80137C94(self);
         em_motion_timer_arm(self);
         em_fx_flag_set(self);
-        fn_800E0914((struct MHchar*)&self->char_0x024);
+        mhchar_model_mtx_update((struct MHchar*)&self->char_0x024);
         break;
 
     case 1:
@@ -175,7 +175,7 @@ extern "C" void em_act_update(_ENEMY_WORK* self)
         if (refresh == 1) {
             em_motion_timer_arm(self);
             em_fx_flag_set(self);
-            fn_800E0914((struct MHchar*)&self->char_0x024);
+            mhchar_model_mtx_update((struct MHchar*)&self->char_0x024);
         }
         if (self->model_flag_0x058 != 0) {
             g3d_root_model_bind(pRoot, self->field_0x13C);

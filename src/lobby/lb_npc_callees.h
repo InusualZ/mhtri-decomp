@@ -4,16 +4,17 @@
 #define MHTRI_LOBBY_LB_NPC_CALLEES_H
 
 #include "types.h"
+#include "lobby/lb_npc.h"   /* LbNpcUserData */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* The lobby item-database pointer (`lobby_world_block`, `.sbss` 0x80794880, 4 bytes).  `lb_item_db_toggle`
- * toggles the byte 0x3E00 of the block it points at. */
-extern u8* lobby_world_block;
+/* The lobby user-data block pointer (`lobby_world_block`, `.sbss` 0x80794880, 4 bytes).  `lb_item_db_toggle`
+ * toggles the block's byte 0x3E00. */
+extern LbNpcUserData* lobby_world_block;
 
-s32 game_ready_ck(void);
+u32 game_ready_ck(void);
 void fn_801E9888(void);
 void fn_801E9C58(void);
 void fn_802FF2C0(void);

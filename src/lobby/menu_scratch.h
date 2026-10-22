@@ -10,8 +10,8 @@
  * 0x10-byte run at +0x0C (`index_0x14C` selects one of its rows), and the tail from +0x160 is the
  * 8 x 0xC vector run `fn_8021EFC8` clears. */
 typedef struct LbMenuRow {
-    /* +0x00 */ u32 table_0x00;    /* the row's table pointer `fn_8021EC20` hands out */
-    /* +0x04 */ u32 model_0x04;    /* the row's model pointer `fn_8021EBF0` hands out */
+    /* +0x00 */ u32 table_0x00;    /* the row's table pointer `lb_plsearch_target_get` hands out */
+    /* +0x04 */ u32 model_0x04;    /* the row's model pointer `lb_target_npc_get` hands out */
     /* +0x08 */ u8 unused_0x08[8];
 } LbMenuRow; /* size: 0x10 */
 

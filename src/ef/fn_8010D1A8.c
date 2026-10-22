@@ -2,7 +2,7 @@
  *   its update hook, and the per-variant bodies that create the nw4r effects, lights and colours.
  * RANGE. .text 0x8010D1A8-0x801121DC (37 functions); extab 0x8000C25C-0x8000C32C, extabindex 0x80026274-0x800263AC,
  *   .data 0x8059F530-0x8059F670, .sdata 0x80791828-0x80791840, .sdata2 0x80796838-0x807969D8.  The spawn helpers
- *   (`eft_spawn_pos_in_area`, `fn_8010D608`, `fn_8010D678`, `fn_8010D688`) build the record through
+ *   (`eft_spawn_pos_in_area`, `ef_pl_effects_init`, `fn_8010D678`, `fn_8010D688`) build the record through
  *   `eft_res_slot_get`/`fn_8010D70C` and install `fn_8010D3C4`/`fn_8010D8B0`; `fn_8010D1A8` scales the effect over
  *   the day-cycle keyframes `lbl_8059F530`.
  * FLAGS. `cflags_main`; `#pragma peephole off` around `fn_8010D400` (the pool-block store keeps retail's reload).
@@ -17,7 +17,7 @@
  *  - `fn_8010D8B0`: case 0 is written last; ours still compares 1, 2, 3, 0 against retail's 0, 1, 2, 3;
  *  - `fn_80111BC0`: retail reloads `+0x30` and narrows the `u16` id (`clrlwi`) before the range test, ours reorders
  *    the two tests;
- *  - `fn_8010D608`: ours drops two `cmpwi`/`bne` null tests retail keeps;
+ *  - `ef_pl_effects_init`: ours drops two `cmpwi`/`bne` null tests retail keeps;
  *  - `fn_8010D928`: ours addresses `lbl_80791838` with `lis`/`addi` where retail uses `@sda21`.
  *   The other 8 partial rows have no recorded cause (`symdiff.py -u ef/fn_8010D1A8 --all`).
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x10FC of 0x5034), extab (0x90 of 0xD0), extabindex
@@ -433,7 +433,7 @@ void fn_8010D50C(Eft* self)
 }
 
 /* Spawns the sub-effect whose variant depends on the current game mode. */
-void fn_8010D608(Plw* source)
+void ef_pl_effects_init(Plw* source)
 {
     if (GameMode_ck() == 2) {
         if (fn_8010D70C(source, 4, 0, 1) == 0) {

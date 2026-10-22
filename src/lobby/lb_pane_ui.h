@@ -192,7 +192,7 @@ extern const u16 lb_sort_blade_titles_late[6]; /* .data 0x805B8644, idem once th
 extern const u16 lb_sort_order_titles[6];  /* .data 0x805B8650, the order sort's titles */
 extern const u16 lb_sort_gun_titles[6];    /* .data 0x805B865C, the bowgun sort's titles */
 extern const u16 lb_sort_gun_order_titles[6]; /* .data 0x805B8668, the bowgun order sort's titles */
-extern u16 lbl_805B8810[];         /* .data 0x805B8810, `PutPageArrow`'s sprite rows */
+extern u16 lb_page_arrow_ids[];         /* .data 0x805B8810, `PutPageArrow`'s sprite rows */
 extern const s16 lbl_805B85F8[];   /* .data 0x805B85F8 */
 extern u16 lbl_805B88D4[];         /* .data 0x805B88D4, the arrow's sprite rows */
 extern u16 lbl_805B8914[];         /* .data 0x805B8914 */

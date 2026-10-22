@@ -858,7 +858,7 @@ void fn_8013823C(EnemyWork* self) {
         em_height_limit_update(self);
         fn_80137DD0(self);
         fn_80138E64(self);
-        fn_800E0914(EM_CHAR(self));
+        mhchar_model_mtx_update(EM_CHAR(self));
         {
             u8 slot;
             for (slot = 0; slot < 2; slot++) {
@@ -889,7 +889,7 @@ void em_post_update(EnemyWork* self) {
         }
         if (self->field_0x8C0 != 0 || found != -1) {
             fn_80138E64(self);
-            fn_800E0914(EM_CHAR(self));
+            mhchar_model_mtx_update(EM_CHAR(self));
         }
         fn_8012A414(self);
         if (self->field_0x766 == 0) {

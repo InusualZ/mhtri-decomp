@@ -2,7 +2,7 @@
  *   `Put_equip_dtl_*` / `Put_status_equip_*` page and edits that player's equipment set.
  * RANGE. .text 0x80219260-0x8021E1EC (76 functions); .data 0x805B9DDC-0x805BA0C0, .bss 0x806AA790-0x806AA8C8, .sdata
  *   0x80791EB0-0x80791EE0, .sdata2 0x80799C40-0x80799C60, extab, extabindex.
- * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off`: retail keeps `extsb` + `cmpwi` (`fn_8021CE0C`) and
+ * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off`: retail keeps `extsb` + `cmpwi` (`lb_screen07_step`) and
  *   `clrlwi` + `cmpwi` (`fn_80219640`) unfused, and the pragma took `fn_802195E0`, `fn_8021AC8C`, `fn_8021D1D4` to
  *   byte-identical.
  * NAMES. No `__FILE__` string covers the range (the band's `enemy_control.cpp` at 0x805A1BB8 is never addressed from
@@ -23,7 +23,7 @@
  *  - `fn_80219340`, `fn_80219640`: the two guard pairs and the `kind` byte are read from `self` in another order;
  *  - `fn_8021C900`: retail addresses the id table at 0x805C9F50 as its own base, the map's only symbol there is
  *    `lbl_805C9F40`, so ours needs one more `addi`; `fn_8021B5AC`: the same at 0x805C968C plus one `extsh`;
- *  - `fn_8021CE0C`: the base and byte registers swap (r4/r3). `fn_80218138` (owned by `lobby/fn_80212810.cpp`, which
+ *  - `lb_screen07_step`: the base and byte registers swap (r4/r3). `fn_80218138` (owned by `lobby/fn_80212810.cpp`, which
  *    has no header) is declared here; `lb_talk_page_open` and `lb_talk_page_mode_reset`, this unit's own, are also declared in
  *    `unsplit/lobby.h`.
  *   flipcheck: `.data`/`.bss`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim;
@@ -40,7 +40,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 
 /* The retail object keeps the unfused compare forms the peephole pass folds (`extsb` + `cmpwi`
- * in `fn_8021CE0C`, `clrlwi` + `cmpwi` in `fn_80219640`), so the unit is built with the pass off. */
+ * in `lb_screen07_step`, `clrlwi` + `cmpwi` in `fn_80219640`), so the unit is built with the pass off. */
 #pragma peephole off
 
 extern "C" {
@@ -112,7 +112,7 @@ struct LbRangeTable {
 }; /* size: 0x390 */
 extern LbRangeTable lbl_805C9608;
 
-/* A menu slot record (`fn_8021D188`'s argument and `fn_8021D704`'s only one). */
+/* A menu slot record (`fn_8021D188`'s argument and `lb_npc_talk_flag_ck`'s only one). */
 struct LbMenuSlot {
     /* +0x000 */ u8 unused_0x000[2];
     /* +0x002 */ u8 type_0x002;    /* 9 / 15 select the id-table entries below */
@@ -516,7 +516,7 @@ extern "C" s32 lb_talk_page_mode_reset(void) {
 }
 
 /* Whether the selection record is filled. */
-extern "C" s32 fn_8021D704(LbMenuSlot* slot) {
+extern "C" s32 lb_npc_talk_flag_ck(LbMenuSlot* slot) {
     u8 filled;
 
     if (slot == 0) {
@@ -546,7 +546,7 @@ extern "C" void fn_8021DED8(LbRow16* dst, const LbRow16* src) {
 
 /* Runs the page's tick state: the first tick starts the sound update, the second rebuilds the page
  * once the menu-mode switch has settled. */
-extern "C" void fn_8021CE0C(void) {
+extern "C" void lb_screen07_step(void) {
     s8 state = lbl_806AA790.state_0x008;
 
     switch (state) {

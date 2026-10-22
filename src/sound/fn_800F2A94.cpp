@@ -473,7 +473,7 @@ extern "C" void fn_800F5AA4() {
 }
 
 /* 0x800F5AC8 - 0x48: start id 0x49 on channel 2. */
-extern "C" void fn_800F5AC8() {
+extern "C" void bgm_lobby_return_req() {
     BgmCtrl* work = lbl_80791690;
     if (work == NULL) {
         return;

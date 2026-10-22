@@ -362,7 +362,7 @@ typedef struct CamWork {
     /* +0x389 */ u8 pad_0x389[0x3F];
     /* +0x3C8 */ u8 field_0x3C8;             /* raised by fn_802B8B8C */
     /* +0x3C9 */ u8 pad_0x3C9[0x97];
-    /* +0x460 */ u8 field_0x460;             /* returned by fn_802BBA94 */
+    /* +0x460 */ u8 field_0x460;             /* returned by camera_mode_cur_get */
     /* +0x461 */ u8 pad_0x461[0x19];
     /* +0x47A */ u8 field_0x47A;             /* fn_802BBA3C clears it */
     /* +0x47B */ u8 pad_0x47B[0x3];
@@ -946,7 +946,7 @@ void camera_talk_lock_set(u8 value)
 /*
  * Reads the +0x460 byte of the current camera work.
  */
-u8 fn_802BBA94(void)
+u8 camera_mode_cur_get(void)
 {
     return ((CamWork*)fn_802BECD0())->field_0x460;
 }
@@ -1317,7 +1317,7 @@ void camera_mode12_set(u32 arg)
 /*
  * Puts the camera into mode 17 with a zero argument.
  */
-void fn_802BC7BC(void)
+void camera_lobby_mode_req(void)
 {
     camera_mode_req(17, 0);
 }

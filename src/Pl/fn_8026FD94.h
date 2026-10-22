@@ -17,9 +17,9 @@ u32 fn_8026FD94(struct _PLW* self);
 u32 pl_item_page2_ck(struct _PLW* self);
 u8 pl_act_param_tier_ck(struct _PLW* self, u32 idx);
 void pl_act_set_flag(struct _PLW* self, u32 bits);
-u32 fn_8026FD0C(struct _PLW* self);
+u32 pl_model_pos_sync(struct _PLW* self);
 void fn_8026FEF0(struct _PLW* self, s32 v);
-u32 fn_8026F888(struct _PLW* self);
+u32 pl_input_active_ck(struct _PLW* self);
 u32 fn_8026FB20(struct _PLW* self, u32 mask);
 
 #ifdef __cplusplus

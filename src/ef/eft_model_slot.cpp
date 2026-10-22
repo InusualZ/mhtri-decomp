@@ -56,7 +56,7 @@ void fn_800FADCC(EftFrameState* self);
 #pragma peephole off
 
 /* 0x800FACAC - register the area owner on pool slot 0. */
-extern "C" void fn_800FACAC(void* owner) {
+extern "C" void eft_pl_model_slot_bind(void* owner) {
     EftPoolSlot* slot = (EftPoolSlot*)fn_800FBD68(0);
     if (slot != NULL) {
         slot->state_0x03 = 0;

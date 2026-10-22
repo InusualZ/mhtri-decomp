@@ -816,7 +816,7 @@ extern "C" void fn_80101470(Eft004* self)
 }
 
 /* Creates a player-owned effect with a 1-effect pool, seeding its area and key byte. */
-extern "C" void fn_80101594(_PLW* self)
+extern "C" void eft004_hold_item_spawn(_PLW* self)
 {
     Eft004* effect = eft_res_slot_get(12);
 

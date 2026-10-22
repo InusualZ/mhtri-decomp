@@ -210,7 +210,7 @@ s32 fn_8021E484(s32 kind)
 }
 
 /* The current row's model pointer, or 0 when there is none. */
-s32 fn_8021EBF0(void)
+s32 lb_target_npc_get(void)
 {
     if (lb_menu_scratch.index_0x14C >= 0 && lb_menu_scratch.rows_0x00C[lb_menu_scratch.index_0x14C].model_0x04 != 0) {
         return lb_menu_scratch.rows_0x00C[lb_menu_scratch.index_0x14C].model_0x04;
@@ -219,7 +219,7 @@ s32 fn_8021EBF0(void)
 }
 
 /* The current row's table pointer, or 0 when there is none. */
-s32 fn_8021EC20(void)
+s32 lb_plsearch_target_get(void)
 {
     if (lb_menu_scratch.index_0x14C >= 0 && lb_menu_scratch.rows_0x00C[lb_menu_scratch.index_0x14C].table_0x00 != 0) {
         return lb_menu_scratch.rows_0x00C[lb_menu_scratch.index_0x14C].table_0x00;
@@ -228,7 +228,7 @@ s32 fn_8021EC20(void)
 }
 
 /* The special (fixed) entry's two pointers, one per accessor; only valid in the -2 mode. */
-s16* fn_8021EC50(void)
+s16* lb_spot_cur_get(void)
 {
     if (lb_menu_scratch.index_0x14C == -2) {
         return lb_menu_scratch.fixed_a_0x004;
@@ -236,7 +236,7 @@ s16* fn_8021EC50(void)
     return 0;
 }
 
-u8* fn_8021EC74(void)
+u8* lb_place_rec_get(void)
 {
     if (lb_menu_scratch.index_0x14C == -2) {
         return lb_menu_scratch.fixed_b_0x008;

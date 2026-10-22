@@ -15,7 +15,7 @@
  *   0x80291664-0x802919FC, 0x80291A70-0x80291B08, 0x80291B48-0x80291BBC, 0x80291CD0-0x80292468, 0x802924C0-0x80293A7C,
  *   0x80293A88-0x8029573C, 0x8029576C-0x80295924, 0x80295998-0x802961F8, 0x80296260-0x80296368, 0x80296448-0x802969A8,
  *   0x802969F8-0x8029708C, 0x802970A0-0x802977E4, 0x80297814-0x80297BE4, 0x80297C30-0x80297D9C.  Known blockers:
- *   `pl_ground_probe`/`fn_80291B48` read `_PLW` bytes with no field (+0x1E1 inside `equipB2.deco_level`, +0x004 inside
+ *   `pl_ground_probe`/`npc_ground_check` read `_PLW` bytes with no field (+0x1E1 inside `equipB2.deco_level`, +0x004 inside
  *   `unk003`), and `pl_ground_probe` needs `_HIT_TENJO_DATA`'s layout (still a forward declaration); `GetGroundHit2`,
  *   `hit_ground_comon` and `findInterSection3` walk `pl_land_data` (0x88 stride) and `pl_hit_id_list` with a 0x40-byte
  *   hit record that is not `LandData` and needs naming first; the query half `fn_8028FA20`-`fn_80290D08` takes a record
@@ -72,7 +72,7 @@ f32 fn_8028F84C(f32 value, f32 low, f32 high);
 f32 pl_box_point_dist_sq(PlBox* box, const VEC3* point, f32* param);
 f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out);
 void fn_802910C0(VEC3* out, const VEC3* in, f32 scale);
-s32 fn_802919FC(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
+s32 pl_ground_check(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
 s32 fn_80291B08(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
 s32 fn_80291BBC(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind);
 void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind);
@@ -204,7 +204,7 @@ void fn_802910C0(VEC3* out, const VEC3* in, f32 scale) {
 
 /* 0x802919FC - the 2-layer ground query: resets the caller's `LandData` and asks for the region
  * byte's layers. */
-s32 fn_802919FC(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
+s32 pl_ground_check(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
     fn_802977E4(land);
     return hit_ground_comon(pos, self->area_0x16, land, out, kind, 2, 0, 0, 0);
 }

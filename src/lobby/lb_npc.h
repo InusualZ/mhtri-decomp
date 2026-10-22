@@ -14,7 +14,11 @@
 /* The block `lobby_world_block` points at (a 4-byte pointer in .sbss).  Only the fields this unit touches
  * are named; the rest is padding and carries its offset. */
 typedef struct LbNpcUserData {
-    /* +0x0000 */ u8 pad_0x0000[0x3E00];
+    /* +0x0000 */ u8 pad_0x0000[0x18];
+    /* +0x0018 */ s32 money_0x18;          /* the zenny the shop charges and credits */
+    /* +0x001C */ u8 pad_0x001C[0x144];
+    /* +0x0160 */ _SLOTENT supplies_0x160[8];   /* the carried supplies the sell list's last page shows */
+    /* +0x0180 */ _SLOTENT box_0x180[0xF20];    /* the item box */
     /* +0x3E00 */ u8 field_0x3E00;
     /* +0x3E01 */ u8 field_0x3E01;
     /* +0x3E02 */ u8 pad_0x3E02;
@@ -23,23 +27,208 @@ typedef struct LbNpcUserData {
     /* +0x4068 */ u8 name_0x4068[0x10];
     /* +0x4078 */ u8 pad_0x4078[0x7C3];
     /* +0x483B */ u8 field_0x483B;
-    /* +0x483C */ u8 pad_0x483C[0x960];
-    /* +0x519C */ u32 field_0x519C;
-    /* +0x51A0 */ u8 parts_0x51A0[0x3C];
-    /* +0x51DC */ u8 pad_0x51DC[0x8];
+    /* +0x483C */ u8 place_0x483C[0x960];   /* the place info `place_info_set` shows */
+    /* +0x519C */ u32 field_0x519C;          /* the rank point bits the quest results OR in */
+    /* +0x51A0 */ u16 hunt_rank_0x51A0;      /* the last quest's hunt rank */
+    /* +0x51A2 */ u16 time_rank_0x51A2;      /* its time rank */
+    /* +0x51A4 */ u8 pad_0x51A4[2];
+    /* +0x51A6 */ u16 cat_rank_0x51A6[7];    /* the felyne companion's rank by companion kind */
+    /* +0x51B4 */ _SLOTENT rank_items_0x51B4[12];   /* the result's rank reward items */
     /* +0x51E4 */ u8 tail_0x51E4[];
 } LbNpcUserData; /* size: 0x51E4+ */
 
-/* The g3d model handle an NPC owns through `field_0x050`; only its flag byte is read here. */
+/* One 8-byte NPC placement record of the map's NPC table (`npc_data_town`/`npc_data_village` rows, stride 8, a zero
+ * first byte ends the table); an NPC keeps a pointer to its record in `field_0x050`.  size: 0x8 */
 typedef struct LbNpcModel {
-    /* +0x000 */ u8 pad_0x000[6];
+    /* +0x000 */ u8 npc_id_0x000;    /* copied to `_LB_NPC::field_0x002` */
+    /* +0x001 */ u8 field_0x001;
+    /* +0x002 */ s16 model_0x002;    /* the model kind `lb_npc_id_ck` compares */
+    /* +0x004 */ u8 variant_0x004;   /* the model variant (0xFF: none) */
+    /* +0x005 */ u8 flags_0x005;     /* 0x08: always shown, 0x10: kept updating off screen, 0x20: dropped to the floor */
     /* +0x006 */ u8 flag_0x006;
-} LbNpcModel; /* size: 0x7+ */
+    /* +0x007 */ u8 pad_0x007;
+} LbNpcModel;
+
+/* The ground probe record `em_land_data_init` constructs and the ground query fills: the ground attribute and the
+ * surface normal.  size: 0x14 */
+typedef struct LbNpcGround {
+    /* +0x00 */ u16 attr_0x00;
+    /* +0x02 */ u8 pad_0x02[6];
+    /* +0x08 */ VEC3 normal_0x08;
+} LbNpcGround;
+
+/* One 8-byte model-dressing op of an `npc_sub_data` list (an op of 0xFF ends the list): 0 hides node `node_0x1`,
+ * 2 shows it, 1 sets its material colour to the RGB in `color_0x4`.  size: 0x8 */
+typedef struct LbNpcSubOp {
+    /* +0x0 */ u8 op_0x0;
+    /* +0x1 */ u8 node_0x1;
+    /* +0x2 */ u8 pad_0x2[2];
+    /* +0x4 */ u32 color_0x4;
+} LbNpcSubOp;
+
+/* One NPC motion-table override of an event set (an NPC id of 0xFF ends the set).  size: 0x8 */
+typedef struct LbNpcEventSet {
+    /* +0x0 */ u8 npc_0x0;
+    /* +0x1 */ u8 pad_0x1[3];
+    /* +0x4 */ struct LbNpcMotionEntry* table_0x4;
+} LbNpcEventSet;
+
+/* `npc_event_set_data` (.sbss): the override sets by world mode and by running event.  size: 0x8 */
+typedef struct LbNpcEventSets {
+    /* +0x0 */ LbNpcEventSet** by_mode_0x0;
+    /* +0x4 */ LbNpcEventSet** by_event_0x4;
+} LbNpcEventSets;
+
+/* `move_npc_tbl_ptr` (.bss): the NPC motion tables `lb_npc_motion_table_select` picks from.  Names are GUESSes from the NPC
+ * each list serves.  size: 0x38 */
+typedef struct LbNpcMoveTables {
+    /* +0x00 */ struct LbNpcMotionEntry** by_npc_0x00;      /* by NPC id */
+    /* +0x04 */ struct LbNpcMotionEntry** by_area_0x04;     /* NPC 1, by area */
+    /* +0x08 */ struct LbNpcMotionEntry** npc2_0x08;        /* by lobby layout */
+    /* +0x0C */ struct LbNpcMotionEntry** npc9_0x0C;
+    /* +0x10 */ struct LbNpcMotionEntry** npc14_0x10;
+    /* +0x14 */ struct LbNpcMotionEntry** npc15_0x14;
+    /* +0x18 */ struct LbNpcMotionEntry** npc23_0x18;       /* by talk area */
+    /* +0x1C */ struct LbNpcMotionEntry** npc48_0x1C;       /* [the kujira event is on] */
+    /* +0x20 */ struct LbNpcMotionEntry** npc71_0x20;       /* by area 5..7 */
+    /* +0x24 */ struct LbNpcMotionEntry** npc73_0x24;       /* by area 5..7 */
+    /* +0x28 */ struct LbNpcMotionEntry** model12_0x28;
+    /* +0x2C */ struct LbNpcMotionEntry** npc4_kujira_0x2C;
+    /* +0x30 */ struct LbNpcMotionEntry** npc2_talk_0x30;
+    /* +0x34 */ struct LbNpcMotionEntry** npc14_talk_0x34;
+} LbNpcMoveTables;
+
+/* One 0x18-byte lobby spot (a zero kind ends an area's list): the spot kind and id, its position and the facing
+ * the player takes there.  size: 0x18 */
+typedef struct LbSpot {
+    /* +0x00 */ s16 kind_0x00;
+    /* +0x02 */ s16 id_0x02;
+    /* +0x04 */ VEC3 pos_0x04;
+    /* +0x10 */ u32 angle_0x10;
+    /* +0x14 */ u8 pad_0x14[4];
+} LbSpot;
+
+/* An area entry the player is placed at (`lb_player_area_enter`): the area, the position and the facing.  size: 0x34 */
+typedef struct LbPlaceRec {
+    /* +0x00 */ u8 area_0x00;
+    /* +0x01 */ u8 pad_0x01[0x23];
+    /* +0x24 */ f32 x_0x24;
+    /* +0x28 */ f32 y_0x28;
+    /* +0x2C */ f32 z_0x2C;
+    /* +0x30 */ u32 angle_0x30;
+} LbPlaceRec;
+
+/* The three `Pl_chr_set_attr_default` arguments of an item act: the motion, the blend frames and the start
+ * frame.  size: 0x6 */
+typedef struct LbMotionArgs {
+    /* +0x0 */ u16 motion_0x0;
+    /* +0x2 */ s16 blend_0x2;
+    /* +0x4 */ s16 start_0x4;
+} LbMotionArgs;
+
+/* The arm-wrestle screen's work block (`LbLobbyWork::arm_wrestle_0x0AC`, cleared 0x2000 bytes at a time): the
+ * step, its timers and the two players.  Names are GUESSes from the screen's state machine.  size: 0x2000 */
+typedef struct LbArmWrestleWork {
+    /* +0x00 */ s8 step_0x00;
+    /* +0x01 */ u8 pad_0x01[3];
+    /* +0x04 */ s16 wait_0x04;
+    /* +0x06 */ s16 count_0x06;
+    /* +0x08 */ s16 tick_0x08;
+    /* +0x0A */ s16 cooldown_0x0A;
+    /* +0x0C */ s16 power_0x0C;
+    /* +0x0E */ u8 pad_0x0E[2];
+    /* +0x10 */ struct _PLW* self_0x10;
+    /* +0x14 */ struct _PLW* opponent_0x14;
+    /* +0x18 */ u8 pad_0x18[0x1FE8];
+} LbArmWrestleWork;
+
+/* One row of the shop list: the item, its discount mark, the price and the row's state bits.  size: 0xC */
+typedef struct LbShopRow {
+    /* +0x0 */ u16 item_0x0;
+    /* +0x2 */ u8 discount_0x2;    /* set when the price is halved (`lb_shop_price_get`) */
+    /* +0x3 */ u8 pad_0x3;
+    /* +0x4 */ s32 price_0x4;
+    /* +0x8 */ u16 flags_0x8;      /* 0x80: not for sale (0x02: box full), 0x04: sold out */
+    /* +0xA */ u8 pad_0xA[2];
+} LbShopRow;
+
+/* One cell of the item box preview the sell list shows.  size: 0x18 */
+typedef struct LbBoxCell {
+    /* +0x00 */ u8 pad_0x00[2];
+    /* +0x02 */ u8 selected_0x02;
+    /* +0x03 */ u8 pad_0x03[3];
+    /* +0x06 */ s16 index_0x06;
+    /* +0x08 */ u8 pad_0x08[0x10];
+} LbBoxCell;
+
+/* One row the shop list draws: the item and its price, handed to `menu_item_row_draw_by_lsp` by address.  size: 0x4 */
+typedef struct LbShopCell {
+    /* +0x0 */ u16 item_0x0;
+    /* +0x2 */ s16 price_0x2;
+} LbShopCell;
+
+/* The NPC shop screen's work block (`LbLobbyWork::shop_0x0AC`, screen 2): the step, the list cursor and pages,
+ * the buy/sell count dialog, the shop's player and NPC, the stocked items and the eight shown rows.  Names are
+ * GUESSes from the shop screens.  size: 0x2000 */
+typedef struct LbShopWork {
+    /* +0x000 */ u8 step_0x000;
+    /* +0x001 */ u8 sub_0x001;
+    /* +0x002 */ u8 pad_0x002[2];
+    /* +0x004 */ s16 blink_0x004;
+    /* +0x006 */ s16 cursor_0x006;
+    /* +0x008 */ s16 page_0x008;
+    /* +0x00A */ s16 pages_0x00A;
+    /* +0x00C */ u16 count_0x00C;
+    /* +0x00E */ u16 item_0x00E;
+    /* +0x010 */ s16 count_max_0x010;
+    /* +0x012 */ s16 rows_0x012;
+    /* +0x014 */ s32 yes_no_0x014;
+    /* +0x018 */ u16 slot_0x018;
+    /* +0x01A */ u8 pad_0x01A[2];
+    /* +0x01C */ union {
+        s16 kind_0x01C;            /* the chosen shop list: 0 buy, 1 sell, 2 buy into the box */
+        u8 choice_0x01C[0x20];     /* the buy/sell choice window `lb_list_init` builds */
+    };
+    /* +0x03C */ struct _PLW* plw_0x03C;
+    /* +0x040 */ struct _LB_NPC* npc_0x040;
+    /* +0x044 */ u16 items_0x044[0x80];
+    /* +0x144 */ LbShopRow rows_0x144[8];
+    /* +0x1A4 */ LbBoxCell box_0x1A4[8];
+    /* +0x264 */ s16 box_page_0x264;
+    /* +0x266 */ s16 box_mode_0x266;
+    /* +0x268 */ u8 pad_0x268[0x1D98];
+} LbShopWork;
+
+/* `lb_npc_scene_work` (.bss): the lobby sub-scene latch block the scripted NPC scenes run on: the scene step, the
+ * armed and finished flags, a delay and the scene's frame timer, the scene id and the once-a-frame tick latch.
+ * size: 0x20 */
+typedef struct LbNpcSceneWork {
+    /* +0x00 */ u8 step_0x00;
+    /* +0x01 */ u8 pad_0x01;
+    /* +0x02 */ u8 active_0x02;
+    /* +0x03 */ u8 done_0x03;
+    /* +0x04 */ s16 delay_0x04;
+    /* +0x06 */ s16 timer_0x06;
+    /* +0x08 */ u8 pad_0x08[8];
+    /* +0x10 */ u8 scene_0x10;
+    /* +0x11 */ u8 ticked_0x11;
+    /* +0x12 */ u8 pad_0x12[0xE];
+} LbNpcSceneWork;
 
 /* The system work block's tail byte `lobby_frame_update` clears (a partial view; the full block belongs to the
  * ef/system units). */
 typedef struct LbNpcSystemWork {
-    /* +0x000 */ u8 pad_0x000[0x8C0];
+    /* +0x000 */ u8 pad_0x000[0xC];
+    /* +0x00C */ u32 frame_0x00C;   /* the frame counter the NPC effects gate on (`& 0x3F`, `& 7`) */
+    /* +0x010 */ u8 pad_0x010[0x1D];
+    /* +0x02D */ u8 field_0x02D;
+    /* +0x02E */ u8 pad_0x02E[0x7A0];
+    /* +0x7CE */ u8 field_0x7CE;    /* the online lobby kind NPC 1's return spot depends on */
+    /* +0x7CF */ u8 pad_0x7CF[0x4];
+    /* +0x7D3 */ u8 field_0x7D3;    /* with +0x86A, the arena return that spawns the player at the arena gate */
+    /* +0x7D4 */ u8 pad_0x7D4[0x96];
+    /* +0x86A */ u8 field_0x86A;
+    /* +0x86B */ u8 pad_0x86B[0x55];
     /* +0x8C0 */ u8 field_0x8C0;
 } LbNpcSystemWork; /* size: 0x8C1 */
 
@@ -67,17 +256,15 @@ typedef struct LbResRec {
  * it to `lb_npc_motion_restart`, which restarts that motion).  Only the id is read here; size from the two
  * `mulli ..., 20` sites. size: 0x14 */
 typedef struct LbNpcMotionEntry {
-    /* +0x00 */ u8 pad_0x00[0x0C];
-    /* +0x0C */ u16 motion_0x0C;
+    /* +0x00 */ VEC3 pos_0x00;       /* the point the NPC walks to (y <= -10000: none); a turn entry keeps its angle in x */
+    /* +0x0C */ u16 motion_0x0C;     /* 0xFFFF ends the table */
     /* +0x0E */ u8 pad_0x0E[2];
-    /* +0x10 */ struct LbNpcMotionEntry* field_0x10;
+    /* +0x10 */ union {
+        s32 count_0x10;                       /* the entry's frame count; -1 holds, -2 runs until the motion ends */
+        struct LbNpcMotionEntry* branch_0x10; /* a branch entry's next table */
+    };
 } LbNpcMotionEntry;
 
-/* The motion record an NPC points at through `field_0x214`; only its trailing VEC3 is used here. */
-typedef struct LbNpcMotion {
-    /* +0x00 */ u8 pad_0x00[0x3C];
-    /* +0x3C */ VEC3 vec_0x3C;
-} LbNpcMotion; /* size: 0x48+ */
 
 /* One `_LB_NPC` record - the type `lb_npc_Get_motion_no__FP7_LB_NPC` / `lb_npc_area_ck__FP7_LB_NPCUc`
  * take and the 0x12-element `lb_npc` array's element (stride 0x268).  The class name is the map's own
@@ -144,7 +331,7 @@ typedef struct _LB_NPC {
     /* +0x20C */ f32 field_0x20C;
     /* +0x210 */ u8 field_0x210;
     /* +0x211 */ u8 pad_0x211[3];
-    /* +0x214 */ LbNpcMotion* field_0x214;
+    /* +0x214 */ struct _PLW* field_0x214;   /* the player the NPC talks to (`lb_npc_talk_partner_set`) */
     /* +0x218 */ s32 field_0x218;
     /* +0x21C */ s16 field_0x21C;
     /* +0x21E */ s16 field_0x21E;
@@ -163,9 +350,16 @@ typedef struct _LB_NPC {
     /* +0x22D */ u8 field_0x22D;
     /* +0x22E */ u8 field_0x22E;
     /* +0x22F */ u8 pad_0x22F;
-    /* +0x230 */ s16 field_0x230;
+    /* +0x230 */ u16 field_0x230;   /* the ground attribute bits under the NPC */
     /* +0x232 */ u8 pad_0x232[2];
-    /* +0x234 */ u8 field_0x234[0x20];
+    /* +0x234 */ union {   /* size: 0x20 */
+        /* +0x234 */ u8 field_0x234[0x20];   /* the NPC's event scratch: byte 0 the event state, byte 1 its argument */
+        struct {   /* size: 0x10 */
+            /* +0x234 */ VEC3 event_pos_0x234;     /* the scripted spin's centre */
+            /* +0x240 */ u16 event_angle_0x240;    /* its angle */
+            /* +0x242 */ u16 event_spin_0x242;     /* the spin added to the heading */
+        };
+    };
     /* +0x254 */ u8 field_0x254;
     /* +0x255 */ u8 field_0x255;
     /* +0x256 */ u8 field_0x256;
@@ -202,6 +396,7 @@ extern "C" {
 #endif
 
 extern u8* lb_item_get_data;
+extern LbNpcSceneWork lb_npc_scene_work;
 
 /* 0x802087D4 - resets the lobby party state when the party is dissolved (GUESS name, from the body). */
 void lb_party_state_reset(void);

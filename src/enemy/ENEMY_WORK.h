@@ -335,7 +335,7 @@ struct _ENEMY_WORK {
     /* +0x01E */ u8 net_seq_0x01E;   /* the message counter every enemy net sender post-increments (the step `em_net_ident_set` stores) */
     /* +0x01F */ u8 unused_0x01F[1];
     /* +0x020 */ s32 timer_0x020;       /* em015_act1_wait runs this down */
-    /* +0x024 */ u8 char_0x024[0x34];   /* the embedded `MHchar` base `fn_800E0914` takes (0x40 bytes
+    /* +0x024 */ u8 char_0x024[0x34];   /* the embedded `MHchar` base `mhchar_model_mtx_update` takes (0x40 bytes
                                         * in this band's view; its +0x34 byte is named below) */
     /* +0x058 */ u8 model_flag_0x058;   /* set, the tail of `em_act_update` refreshes the scene model */
     /* +0x059 */ u8 unused_0x059[7];

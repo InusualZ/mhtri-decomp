@@ -1,4 +1,4 @@
-/* g3d/g3d_camera.h - the declarations `g3d/g3d_camera.cpp` owns: fn_80075258 projects the world position `pVec`
+/* g3d/g3d_camera.h - the declarations `g3d/g3d_camera.cpp` owns: camera_world_to_screen projects the world position `pVec`
  *   through the camera handle `pSelf` (what fn_80082BCC returns) into the screen-space `pOut`; `extern "C"` keeps the
  *   map's stem. */
 #ifndef MHTRI_G3D_G3D_CAMERA_H
@@ -17,7 +17,7 @@ struct Camera;
 extern "C" {
 #endif
 
-void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
+void camera_world_to_screen(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
 
 /* 0x80075DCC (0xC): the sine and cosine of `angle` degrees through the 256-step table. */
 void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);

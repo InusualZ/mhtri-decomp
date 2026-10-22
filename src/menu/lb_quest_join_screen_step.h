@@ -1,0 +1,19 @@
+/* Leaf header (docs/plan.md 6.5 rule 2): `menu/fn_8031EA8C.cpp`'s `lb_quest_join_screen_step`, the one declaration `lobby/lb_npc.cpp` needs.
+ * C linkage (the map row is a plain name).  GUESS name. */
+#ifndef MHTRI_MENU_LB_QUEST_JOIN_SCREEN_STEP_H
+#define MHTRI_MENU_LB_QUEST_JOIN_SCREEN_STEP_H
+
+#include "types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x803208C8 - the quest session-join screen step (requestSessionJoin), screen 29 */
+void lb_quest_join_screen_step(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_MENU_LB_QUEST_JOIN_SCREEN_STEP_H */

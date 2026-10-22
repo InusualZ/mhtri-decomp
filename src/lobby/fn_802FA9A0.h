@@ -8,7 +8,7 @@
 /* The lobby work block (`lobby_w`, .bss 0x806AAB44, 0x17C B in the map) as THIS range sees it: the
  * three flag bytes below are the only fields it touches - the rest of the block is filler because the
  * range never reaches into it (rule 5's padding exception).  The offsets come from the range's own
- * code (`fn_802FB5F0` reads +0x003, `LbCheckKujiraEvent` +0x15F, `fn_802FB9F8` +0x161).
+ * code (`lb_event_kind_get` reads +0x003, `LbCheckKujiraEvent` +0x15F, `fn_802FB9F8` +0x161).
  * size: 0x17C */
 typedef struct LbLobbyView {
     /* +0x000 */ u8 unused_0x000[0x3];

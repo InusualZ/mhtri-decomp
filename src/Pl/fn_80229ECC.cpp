@@ -21,7 +21,7 @@
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
 
-extern "C" void fn_80229ECC(_PLW* self)
+extern "C" void pl_se_frame_callback(_PLW* self)
 {
     _se_w* se_work_a;
     _se_w* se_work_b;

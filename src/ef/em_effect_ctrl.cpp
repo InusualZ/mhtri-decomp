@@ -779,7 +779,7 @@ extern "C" void vec3_scale(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f3
 extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
 extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
-extern "C" void fn_80075258(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
+extern "C" void camera_world_to_screen(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
 extern "C" void pl_segment_init(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
 extern "C" void eft_vec_ctor(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" u8 pl_segment_sphere_hit(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
@@ -890,7 +890,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     subVec3(&vAC, &unit->world_pos, &vA0);
     copyVec3(&vF4, &vAC);
     model = scn_root_get_current_camera(pRoot);
-    fn_80075258(&model, &v130, &unit->world_pos);
+    camera_world_to_screen(&model, &v130, &unit->world_pos);
     f29 = vec3_dot(&v100, &vF4);
     vec3_normalize_into(&v100, &v100);
     vec3_normalize_into(&vF4, &vF4);

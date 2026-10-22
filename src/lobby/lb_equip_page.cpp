@@ -3,7 +3,7 @@
  * RANGE. .text 0x80220038-0x80229ECC (118 functions); .data 0x805BA750-0x805BDC48, .sdata 0x80791EF0-0x80792030,
  *   .sdata2 0x80799CD8-0x80799E00, extab, extabindex.  Two halves of one TU (one `.sdata2`/`.data` pool run): the page
  *   layer 0x80220038-0x80224AC4 and the rig update 0x80224AC4-0x80229ECC, whose actor parameters are all `_PLW*` (its
- *   SE work is `_PLW.field_0xAF4`).  The extabindex run ends with `fn_80224A28` / begins the rig half with
+ *   SE work is `_PLW.field_0xAF4`).  The extabindex run ends with `pl_rig_draw_mode_end` / begins the rig half with
  *   `pl_rig_model_move`.
  * FLAGS. `cflags_lobby` and `#pragma peephole off` (retail keeps the narrowing `clrlwi`s), back on around
  *   `fn_802216B4`; the rig half was `cflags_pl` (`Wii/1.0`, `-opt nopeephole`), which this reproduces byte for byte

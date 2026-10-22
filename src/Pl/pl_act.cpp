@@ -14,7 +14,7 @@
  * FLAGS. `cflags_pl` (docs/pl.md).  The skill section is under `#pragma optimization_level 4` (docs/pl.md: level 3
  *   rematerialises `pl_parts_refresh`'s base); the file is under `#pragma peephole off` from the act-entry section on.  The
  *   master section's `#pragma peephole off` runs from `fn_8026BE94` through `fn_8026CBE4` (including `fn_8026BF98`),
- *   and `off`/`reset` pairs scope `fn_8026F888`, `fn_8026F9A4` and `Pl_act_ck`..`fn_8026FEF0`: recorded as
+ *   and `off`/`reset` pairs scope `pl_input_active_ck`, `fn_8026F9A4` and `Pl_act_ck`..`fn_8026FEF0`: recorded as
  *   load-bearing in six places (they turn the fused record form back into retail's `clrlwi`/`rlwinm`/`and` + `cmpwi`
  *   pair and keep the byte/short truncations), measured with a flag set without `-opt nopeephole` and not re-measured
  *   under the lib flag.
@@ -74,8 +74,8 @@
  *    where retail shares one block through a label (rule 8; docs/pl.md);
  *  - `Pl_motion_input_ck`: the case-3/5 failures return inline where retail branches to a shared `return 0`;
  *  - `fn_8027A57C`: the conformant if/else-if dispatch interleaves the case tests retail lays out `switch`-shaped;
- *  - `fn_8027885C`: retail's `mr r0,r3; mr r3,self; extsh r4,r0` says `fn_802753E4` returns `s16`; the declaration
- *    stays wider (`fn_802789EC`/`fn_80278D1C` depend on it) and each of the five `(s16)` call sites costs one row;
+ *  - `pl_skill_update`: retail's `mr r0,r3; mr r3,self; extsh r4,r0` says `fn_802753E4` returns `s16`; the declaration
+ *    stays wider (`pl_skill_update2`/`fn_80278D1C` depend on it) and each of the five `(s16)` call sites costs one row;
  *  - `fn_8027B0BC`: six `clrlwi r0,r0,24` before the `stb`s into `q + 0x5E1` (a peephole-level residual);
  *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
  *    r30, ours the mirror (playbook 22); `fn_8027C208`: the frame is 0x30 against retail's 0x40 (unused locals);
@@ -140,7 +140,7 @@
  *  - a 32-bit accumulator that retail sign-extends only at each compare is an `s32` with `b = (s16)(b + N)` on the
  *    arms that convert and `a -= b` for the difference (`fn_80279490`, `fn_802791FC`, `pl_carry_item_get`);
  *  - equality on a `u16`/`u8` value pairs as `cmpwi` through a signed local or cast (`s32 id = self->act_no`,
- *    `(s32)(u8)x`, `(s32)arg0 == N`) and `(u32)` on an `s32` helper gives `cmplwi` (`pl_act_add_class7_gauge`, `fn_802789EC`);
+ *    `(s32)(u8)x`, `(s32)arg0 == N`) and `(u32)` on an `s32` helper gives `cmplwi` (`pl_act_add_class7_gauge`, `pl_skill_update2`);
  *  - `x <= N ? 1 : 2` gives retail's `xoris/subfic/addc/subfe/addi` and `x == N ? a : b` its `addi/subfic/nor/srawi`
  *    (`Get_Shell_bure_type`, `fn_802791FC`, `fn_80279490`); a constant before the index (`lbl + k + idx * 4`) makes
  *    MWCC form the base first;
@@ -388,17 +388,17 @@ void pl_model_set_value(_PLW* self, s32 index, f32 value)
 }
 
 /* Hands the model layer the scale the work record carries. */
-void fn_8026A2BC(_PLW* self)
+void pl_motion_speed_apply(_PLW* self)
 {
     mhchar_motion_speed_set(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, self->field_0x354);
 }
 
-void fn_8026A2D0(_PLW* self, u8 value)
+void pl_model_visible_set(_PLW* self, u8 value)
 {
     ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0xF1 = value;
 }
 
-void fn_8026A2DC(_PLW* self)
+void pl_model_hide(_PLW* self)
 {
     ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0xF1 = 0;
 }
@@ -408,7 +408,7 @@ void pl_model_set_state(_PLW* self, u8 value)
     ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0xF2 = value;
 }
 
-void fn_8026A2F8(_PLW* self)
+void pl_model_aux_flag_clear(_PLW* self)
 {
     ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0xF2 = 0;
 }
@@ -442,7 +442,7 @@ u32 fn_8026A364(_PLW* self)
 }
 
 /* The named joint's world position, through the model. */
-void fn_8026A394(_PLW* self, s32 joint, nw4r::math::MTX34* out)
+void pl_joint_mtx_get(_PLW* self, s32 joint, nw4r::math::MTX34* out)
 {
     mhchar_joint_mtx_get(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, joint, out);
 }
@@ -543,7 +543,7 @@ u32 fn_8026BA04(_PLW* self)
 
 typedef nw4r::math::VEC3 Vec3;
 
-/* The actor's 132-byte action-state block, `self + 0xB8`: `fn_8026F7B4`/`fn_8026F828` clear it, the two
+/* The actor's 132-byte action-state block, `self + 0xB8`: `fn_8026F7B4`/`pl_input_clear` clear it, the two
  * big dispatchers (`fn_8026BF98`, `fn_8026CC7C`) drive it, and `fn_8026BE94` reads the request word and the
  * per-part selector out of it, so one type has to carry both views. Retail materialises the base pointer
  * once and keeps it in a callee-saved register - hence the local `st` in the dispatchers below. */
@@ -2113,7 +2113,7 @@ extern "C" void fn_8026F7B4(_PLW* self)
 }
 
 /* 0x8026F828 */
-extern "C" void fn_8026F828(_PLW* self)
+extern "C" void pl_input_clear(_PLW* self)
 {
     if (Pl_master_ck(self) == 0 || lobby_input_locked_ck() == 1) {
         memset((u8*)self + 184, 0, 132);
@@ -2125,7 +2125,7 @@ extern "C" void fn_8026F828(_PLW* self)
 #pragma peephole off
 
 /* 0x8026F888: true while the actor has an action-state flag set. */
-extern "C" u32 fn_8026F888(_PLW* self)
+extern "C" u32 pl_input_active_ck(_PLW* self)
 {
     if (Pl_master_ck(self) == 0) {
         return 0;
@@ -2264,7 +2264,7 @@ extern "C" u32 fn_8026FCCC(_PLW* self, u32 idx, u16 low, u16 high)
 }
 
 /* 0x8026FD0C: hands the actor's transform to its physics sub-object. */
-extern "C" void fn_8026FD0C(_PLW* self)
+extern "C" void pl_model_pos_sync(_PLW* self)
 {
     Vec3 vec;
     u32* p;
@@ -2433,10 +2433,10 @@ u32 fn_8026FFBC(_PLW*);
 u32 fn_80273ED8(_PLW*, int, s8);
 
 int fn_802753E4(_PLW*, u16);
-void fn_80272A08(_PLW*);
+void pl_equip_refresh(_PLW*);
 u32 pl_item_page2_ck(_PLW*);
-void fn_8027885C(_PLW*, int, int);
-void fn_802789EC(_PLW*, int);
+void pl_skill_update(_PLW*, int, int);
+void pl_skill_update2(_PLW*, int);
 extern u32 lbl_805C5FC8[];
 extern u32 lbl_805C5FE0[];
 u8 GameMode_ck(void);
@@ -2586,7 +2586,7 @@ extern "C" u16 fn_80270018(_PLW* plw, u32 param, u8* out) {
 }
 
 /* Recomputes the player's skill point total and the fraction of its 700 point cap. */
-extern "C" void fn_8027035C(_PLW* plw) {
+extern "C" void pl_gauge_step_a(_PLW* plw) {
     if (Pl_master_ck(plw) == 1) {
         u8 flag;
         int v = fn_80273ED8(plw, 6, 0);
@@ -2667,7 +2667,7 @@ extern "C" u16 fn_802703F4(_PLW* plw, u32 param, u8* out) {
 }
 
 /* Recomputes the second skill set's point meter, clamped to a minimum of ten points. */
-extern "C" void fn_80270728(_PLW* plw) {
+extern "C" void pl_gauge_step_b(_PLW* plw) {
     if (Pl_master_ck(plw) == 1) {
         u8 flag;
         int v = fn_80273ED8(plw, 0, 0) + 1;
@@ -2743,7 +2743,7 @@ extern "C" f32 fn_80270C64(s16* table, s16 slot) {
 }
 
 /* Rebuilds the five attack-bonus fields from the player's armour skills and the weapon's own bonuses. */
-extern "C" void fn_80270CA4(_PLW* plw) {
+extern "C" void pl_condition_step(_PLW* plw) {
     plw->unk3C4 = (f32)(s16)fn_80273ED8(plw, 1, 0) + fn_80270C64((s16*)plw, 0);
     plw->unk3C8 = (f32)(s16)fn_80273ED8(plw, 2, 0) + fn_80270C64((s16*)plw, 1);
     plw->unk3CC = (f32)(s16)fn_80273ED8(plw, 3, 0) + fn_80270C64((s16*)plw, 2);
@@ -2786,15 +2786,15 @@ extern "C" void pl_status_sheet_get(_PLW* plw, _EQUIP* equip, u8* out) {
         equip_record_copy(&plw->equipB, &equip[6]);
         equip_record_copy(&plw->equipC, &equip[7]);
         equip_record_copy(&plw->equipD, &equip[8]);
-        fn_80272A08(plw);
+        pl_equip_refresh(plw);
         for (int i = 0; i < 8; i++) {
             plw->shown_skill_id[i] = plw->active_skill_id[i];
         }
-        fn_8027885C(plw, 0, 0);
-        fn_802789EC(plw, 0);
-        fn_8027035C(plw);
-        fn_80270728(plw);
-        fn_80270CA4(plw);
+        pl_skill_update(plw, 0, 0);
+        pl_skill_update2(plw, 0);
+        pl_gauge_step_a(plw);
+        pl_gauge_step_b(plw);
+        pl_condition_step(plw);
     }
     out[10] = 0;
     *(u16*)(out + 12) = 0;
@@ -2841,15 +2841,15 @@ extern "C" void pl_status_sheet_get(_PLW* plw, _EQUIP* equip, u8* out) {
         equip_record_copy(&plw->equipB, &saved[6]);
         equip_record_copy(&plw->equipC, &saved[7]);
         equip_record_copy(&plw->equipD, &saved[8]);
-        fn_80272A08(plw);
+        pl_equip_refresh(plw);
         for (int i = 0; i < 8; i++) {
             plw->shown_skill_id[i] = 0;
         }
-        fn_8027885C(plw, 0, 0);
-        fn_802789EC(plw, 0);
-        fn_8027035C(plw);
-        fn_80270728(plw);
-        fn_80270CA4(plw);
+        pl_skill_update(plw, 0, 0);
+        pl_skill_update2(plw, 0);
+        pl_gauge_step_a(plw);
+        pl_gauge_step_b(plw);
+        pl_condition_step(plw);
     }
 }
 } /* namespace s_80270018 */
@@ -3141,7 +3141,7 @@ extern "C" void fn_802724E8(u16* table, s8* a, u8* b, u8* count, u16 v, u8 bval,
     *count += 1;
 }
 
-/* The saved-skill set behind fn_80272A08: looks each skill id up in the 16-byte record table, keeps the
+/* The saved-skill set behind pl_equip_refresh: looks each skill id up in the 16-byte record table, keeps the
  * rank the player's equipment reaches, converts it to a display value and sorts the eight entries. */
 extern "C" void equip_columns_skills_get(_EQUIP* equips, u16* table, s8* a, u8* b) {
     _SKILLREC* rec = (_SKILLREC*)lbl_805C01C8;
@@ -3292,7 +3292,7 @@ extern "C" s32 fn_80272DB4(_PLW* plw, u16 slot) {
 }
 
 /* Clears the four per-set skill summary words. */
-extern "C" void fn_8027346C(_PLW* plw) {
+extern "C" void pl_push_clear(_PLW* plw) {
     plw->unk634 = 0;
     plw->unk638 = 0;
     plw->unk63C = 0;
@@ -3334,7 +3334,7 @@ extern "C" void pl_parts_color_set(_PLW* plw, u8 idx, s32 val) {
 }
 
 /* Copies the player's nine equipment slots into a local save area and rebuilds the skill set from it. */
-extern "C" void fn_80272A08(_PLW* plw) {
+extern "C" void pl_equip_refresh(_PLW* plw) {
     _EQUIP saved[9];
 
     equip_record_copy(&saved[0], &plw->equipA[0]);
@@ -3932,7 +3932,7 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 #include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
 #include "Pl/fn_802693C4.h"   /* the part/motion section's `Pl_chr_set_attr_default`/`fn_8026A2DC`/
-                          * `fn_8026A2F8`/`Pl_chr_setX` (rule 2) */
+                          * `pl_model_aux_flag_clear`/`Pl_chr_setX` (rule 2) */
 #include "ef/fn_800CDB2C.h"
 #include "unsplit/unknown.h"
 #include "unsplit/Pl.h"
@@ -3945,7 +3945,7 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 #include "enemy/em_model.h" /* em_roster_area_hit_find (the owner header, rule 2) */
 #include "quest/quest_entry.h"   /* quest_element_supply_state_get, quest_element_item_use (rule 2) */
 
-/* 0x8045F554 - the runtime string copy `fn_8027552C` uses to arm a hunter name (owner: `MSL_C/alloc.cpp`, rule 2). */
+/* 0x8045F554 - the runtime string copy `pl_info_text_set` uses to arm a hunter name (owner: `MSL_C/alloc.cpp`, rule 2). */
 #include "MSL_C/alloc.h"
 #include "Pl/fn_8027D684.h" /* PlSkillRec, fn_8027ECAC (this unit's equipment-section header) */
 
@@ -4913,7 +4913,7 @@ extern "C" void pl_act_hold_notify(struct _PLW* plw, u8 flag)
 }
 
 /* Copies (or clears) the player's hunter name in the move work record. */
-extern "C" void fn_8027552C(struct _PLW* plw, const char* src)
+extern "C" void pl_info_text_set(struct _PLW* plw, const char* src)
 {
     if (src == NULL) {
         memset(plw->name_0xB05, 0, 10);
@@ -5068,8 +5068,8 @@ extern "C" void pl_act_enter_raw(struct _PLW* plw, u8 kind, u16 no, u16 mask)
         plw->field_0x06C = lbl_8079A084;
         plw->field_0x070 = lbl_8079A084;
     }
-    fn_8026A2DC(plw);
-    fn_8026A2F8(plw);
+    pl_model_hide(plw);
+    pl_model_aux_flag_clear(plw);
     fn_8027AC2C(plw, 0xFF, 0xFF);
     plw->field_0x662 = 0;
     plw->field_0x3A3 = 0;
@@ -5607,7 +5607,7 @@ extern "C" void fn_8026FEF0(_PLW*, s32);
 extern "C" void pl_act_enter(_PLW*, s32, u16, u16);
 
 /* In-unit callees that the appended bodies reference before their own definition. */
-extern "C" void fn_802789EC(_PLW*, s32);
+extern "C" void pl_skill_update2(_PLW*, s32);
 extern "C" void fn_8027A17C(_PLW*);
 extern "C" u32 fn_80278144(u8, u8*, u8);
 extern "C" u32 fn_80278310(u8, u8*, u8);
@@ -5885,7 +5885,7 @@ extern "C" void pl_act_set_gauge_arm_skilled(_PLW* self, s16 arg1)
 /* 0x80277C48 */
 extern "C" void pl_act_set_step_time(_PLW* self, s16 arg1)
 {
-    self->unk580 = arg1;
+    self->field_0x580 = arg1;
 }
 
 /* 0x80277C50 */
@@ -6060,16 +6060,16 @@ extern "C" void pl_act_clear_flag5bb(_PLW* self)
 /* 0x8027AF34: ticks the actor's residual-velocity timer and integrates its position deltas. */
 extern "C" void fn_8027AF34(_PLW* self)
 {
-    s16 v = self->unk0B4;
+    s16 v = self->blend_frames_0x0B4;
     if (v > 0) {
-        self->unk0B4--;
+        self->blend_frames_0x0B4--;
         /* unreachable - it makes the compiler reuse the first test's condition register */
         if (v < 0) {
             return;
         }
-        self->motion_pos_0x3C += self->unk09C;
-        self->motion_pos_0x40 += self->unk0A0;
-        self->motion_pos_0x44 += self->unk0A4;
+        self->motion_pos_0x3C += self->blend_step_x_0x09C;
+        self->motion_pos_0x40 += self->blend_step_y_0x0A0;
+        self->motion_pos_0x44 += self->blend_step_z_0x0A4;
     }
 }
 
@@ -6266,7 +6266,7 @@ extern "C" s32 fn_80278450(_PLW* self)
 extern "C" void fn_80278994(_PLW* self)
 {
     self->unk39E = 0;
-    self->unk38A = 0;
+    self->field_0x38A = 0;
     self->unk3EC = 0;
     self->unk3F8 = 0;
     self->unk3FE = 0;
@@ -6294,7 +6294,7 @@ extern "C" void fn_80278B58(_PLW* self, s32 arg1, s32 arg2)
     fn_8026FEF0(self, 16);
     self->health = 0;
     self->unk376 = 0;
-    fn_802789EC(self, 1);
+    pl_skill_update2(self, 1);
     fn_8027A17C(self);
     pl_act_enter(self, 8, (u16)arg1, (u16)(arg2 | 32));
 }
@@ -6309,7 +6309,7 @@ extern "C" void pl_ride_down_set(_PLW* self)
     fn_8026FEF0(self, 16);
     self->health = 0;
     self->unk376 = 0;
-    fn_802789EC(self, 1);
+    pl_skill_update2(self, 1);
     fn_8027A17C(self);
     if (self->kind_0x09 == 3) {
         fn_80278B58(self, 1, 0);
@@ -6768,18 +6768,18 @@ namespace s_80276B58 {
 extern "C" void pl_pos_blend_start(_PLW* self, s32 arg1)
 {
     if (vec3_distance((u8*)self + 60, (u8*)self + 144) >= lbl_8079A0F4 || (s16)arg1 == 0) {
-        self->unk0B4 = 0;
+        self->blend_frames_0x0B4 = 0;
         self->motion_pos_0x3C = self->target_pos_0x090.x;
         self->motion_pos_0x40 = self->target_pos_0x090.y;
         self->motion_pos_0x44 = self->target_pos_0x090.z;
-        self->unk09C = lbl_8079A084;
-        self->unk0A0 = lbl_8079A084;
-        self->unk0A4 = lbl_8079A084;
+        self->blend_step_x_0x09C = lbl_8079A084;
+        self->blend_step_y_0x0A0 = lbl_8079A084;
+        self->blend_step_z_0x0A4 = lbl_8079A084;
     } else {
-        self->unk0B4 = arg1;
-        self->unk09C = (self->target_pos_0x090.x - self->motion_pos_0x3C) / (f32)(s16)arg1;
-        self->unk0A0 = (self->target_pos_0x090.y - self->motion_pos_0x40) / (f32)(s16)arg1;
-        self->unk0A4 = (self->target_pos_0x090.z - self->motion_pos_0x44) / (f32)(s16)arg1;
+        self->blend_frames_0x0B4 = arg1;
+        self->blend_step_x_0x09C = (self->target_pos_0x090.x - self->motion_pos_0x3C) / (f32)(s16)arg1;
+        self->blend_step_y_0x0A0 = (self->target_pos_0x090.y - self->motion_pos_0x40) / (f32)(s16)arg1;
+        self->blend_step_z_0x0A4 = (self->target_pos_0x090.z - self->motion_pos_0x44) / (f32)(s16)arg1;
     }
 }
 
@@ -6900,7 +6900,7 @@ extern "C" s32 fn_80278590(_PLW* self)
 }
 
 /* 0x802789EC: resets the actor's whole action state and re-applies the armour skill values. */
-extern "C" void fn_802789EC(_PLW* self, s32 arg1)
+extern "C" void pl_skill_update2(_PLW* self, s32 arg1)
 {
     fn_80278994(self);
     *(u32*)((u8*)self + 988) = 0;
@@ -7982,7 +7982,7 @@ extern "C" s16 fn_8026FF20(_PLW*);
 
 /* 0x8027885C: resets the actor's shell/ammo timers and, when the relevant skill is on, reseeds the
  * three shell tables from the actor's current state. */
-extern "C" void fn_8027885C(_PLW* self, s32 arg1, s32 arg2)
+extern "C" void pl_skill_update(_PLW* self, s32 arg1, s32 arg2)
 {
     *(s16*)((u8*)self + 0x37A) = 0x258;
     *(s16*)((u8*)self + 0x372) = 0x64;
@@ -8390,7 +8390,7 @@ extern "C" void mtx34_identity(void*);
 extern "C" void fn_8008C484(void*, f32, f32, f32);
 extern "C" void mtx34_concat_assign(void*, void*);
 extern "C" u8 pl_slot_motion_allow_get(_PLW*, u8);
-extern "C" void fn_8026A394(_PLW*, s32, void*);
+extern "C" void pl_joint_mtx_get(_PLW*, s32, void*);
 extern "C" void pl_chr_set_motion_default(_PLW*, s32, u16, s32, s32);
 extern "C" void pl_model_set_value(_PLW*, s32, f32);
 extern "C" f32 pl_rig_get_motion_frame(_PLW*);
@@ -9018,7 +9018,7 @@ extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
         out->z = *(f32*)(lbl_805C61D4 + self->field_0x002 * 4);
         break;
     }
-    fn_8026A394(self, part, &m);
+    pl_joint_mtx_get(self, part, &m);
     mtx34_identity(&m2);
     fn_8008C484(&m2, v.x, v.y, v.z);
     mtx34_concat_assign(&m, &m2);

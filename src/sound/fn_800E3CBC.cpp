@@ -131,7 +131,7 @@ void* fn_80047234(void* a);
 s32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
 s32 fn_802AFF58(void);
-s32 fn_800D0724(void);
+s32 system_lobby_flag_get(void);
 s32 camera_mode1_ck(void);
 s32 camera_work_ck(void);
 s32 my_player_no(void);
@@ -221,7 +221,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
         PrimRec* p = (PrimRec*)prim_rec_pool[i];
         for (u32 j = 0; j < prim_rec_count[i]; j++, p++) {
             if (!(p->flags & 0x200)) {
-                if (fn_800D0724()) {
+                if (system_lobby_flag_get()) {
                     continue;
                 }
             }

@@ -139,7 +139,7 @@ void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut)
 void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h);
 void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void camera_get_viewport(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
-void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
+void camera_world_to_screen(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
 void MTX44_ctor(nw4r::math::MTX44* pMtx);
 void camera_get_projection_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX44* pOut);
 void camera_get_projection_tex_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX34* pOut);
@@ -440,7 +440,7 @@ void camera_get_viewport(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f3
     }
 }
 
-void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec) {
+void camera_world_to_screen(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec) {
     if (pOut == NULL) {
         return;
     }

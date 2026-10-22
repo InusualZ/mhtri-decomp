@@ -101,6 +101,7 @@ struct LbChgColorWork;
 #include "mh3_pad/Screen_w.h"
 #include "RVLGX/GXMisc.h"
 #include "menu/Put_equip_dtl_syo_item1.h"
+#include "npc_model_res_ids.h"
 #include "menu/Put_status_equip_status_block.h"
 #include "menu/equip_list_draw.h"
 #include "menu/column_skills_page_draw.h"
@@ -315,7 +316,7 @@ typedef struct LbGunSet {
 } LbGunSet;
 
 /* The lobby item database `lobby_world_block` (a 4-byte pointer in `.sbss`) points at: the item slot table
- * at +0x180 (`fn_8004AFC8`/`userdata_pouch_get`/`userdata_equip_item_slots_get` index it), the 0xC-byte equipment records at
+ * at +0x180 (`userdata_equip_item_id_get`/`userdata_pouch_get`/`userdata_equip_item_slots_get` index it), the 0xC-byte equipment records at
  * +0xE00, and the current-equipment kind at +0x8C. */
 typedef struct LbItemDb {
     /* +0x0000 */ u8 unused_0x0000[0x18];
@@ -522,10 +523,10 @@ s16 userdata_pouch_size(u8 side);
 s32 userdata_item_slot_count(LbItemDb* db);
 IdValue* userdata_pouch_get(LbItemDb* db, u8 side);
 IdValue* userdata_equip_item_slots_get(LbItemDb* db);
-u16 fn_8004AFC8(LbItemDb* db, s16 index);
+u16 userdata_equip_item_id_get(LbItemDb* db, s16 index);
 s16 fn_8004AFFC(LbItemDb* db, s16 index);
 s32 fn_8004B460(LbItemDb* db, u8 side);
-s16 fn_8004B624(LbItemDb* db, u16 id);
+s16 userdata_item_total_count(LbItemDb* db, u16 id);
 s32 item_slots_room_get(u16 id, void* slots, s32 count);
 s32 item_pair_index_find(u16 id, IdValue* base, s32 count);
 s32 item_take(u16 id, s16 a, void* p, s32 b, s32 c, s32 d);
@@ -845,7 +846,7 @@ extern "C" s32 fn_801ED184(s16 index)
     }
     db = lobby_world_block;
     count = userdata_box_capacity(db);
-    return item_slots_room_get(fn_8004AFC8(db, index), &db->slots_0x180[0], (u16)count);
+    return item_slots_room_get(userdata_equip_item_id_get(db, index), &db->slots_0x180[0], (u16)count);
 }
 
 /* Whether the slot holds an item at all (and which side it came from). */
@@ -854,7 +855,7 @@ extern "C" s16 fn_801ED200(s16 index, u8 side)
     if (index >= userdata_item_slot_count(lobby_world_block)) {
         return 0;
     }
-    if (fn_8004AFC8(lobby_world_block, index) == 0) {
+    if (userdata_equip_item_id_get(lobby_world_block, index) == 0) {
         return 0;
     }
     return fn_8004B460(lobby_world_block, side == 0);
@@ -893,8 +894,8 @@ extern "C" void fn_801ED3E8(LbListPane* self)
 {
     s16 out;
 
-    item_box_store(fn_8004AFC8(lobby_world_block, self->entry_max_0x022), self->entry_0x020, &out);
-    fn_8004BBEC(lobby_world_block, fn_8004AFC8(lobby_world_block, self->entry_max_0x022), -self->entry_0x020,
+    item_box_store(userdata_equip_item_id_get(lobby_world_block, self->entry_max_0x022), self->entry_0x020, &out);
+    fn_8004BBEC(lobby_world_block, userdata_equip_item_id_get(lobby_world_block, self->entry_max_0x022), -self->entry_0x020,
                 self->side_0x005, 1);
     self->entry_max_0x022 = out;
 }
@@ -908,7 +909,7 @@ extern "C" void fn_801ED464(LbListPane* self)
     s16 v;
 
     side = self->side_0x005 == 0;
-    id = fn_8004AFC8(lobby_world_block, self->entry_max_0x022);
+    id = userdata_equip_item_id_get(lobby_world_block, self->entry_max_0x022);
     fn_8004BBEC(lobby_world_block, id, self->entry_0x020, side, 1);
     fn_8004BBEC(lobby_world_block, id, -self->entry_0x020, self->side_0x005, 1);
     limit = userdata_pouch_size(side);
@@ -1074,7 +1075,7 @@ extern "C" s16 fn_801ED9E4(s16 index)
     s16 value;
 
     slot = &lobby_world_block->slots_0x180[index];
-    limit = fn_8004B624(lobby_world_block, slot->id);
+    limit = userdata_item_total_count(lobby_world_block, slot->id);
     value = slot->value;
     if (limit < value) {
         value = limit;
@@ -1090,7 +1091,7 @@ extern "C" s16 fn_801EDA34(u16 index, u8 side)
     s16 value;
 
     slot = &userdata_pouch_get(lobby_world_block, side == 0)[index];
-    limit = fn_8004B624(lobby_world_block, slot->id);
+    limit = userdata_item_total_count(lobby_world_block, slot->id);
     value = slot->value;
     if (limit < value) {
         return limit;
@@ -1105,7 +1106,7 @@ extern "C" u8 fn_801EDA9C(u16 index, u16 item_id)
         return 1;
     }
     if (item_slots_free_count(&lobby_world_block->slots_0x180[0], userdata_box_capacity(lobby_world_block)) == 0
-        && fn_8004AFC8(lobby_world_block, index) != 0) {
+        && userdata_equip_item_id_get(lobby_world_block, index) != 0) {
         return 2;
     }
     return 0;
@@ -1124,7 +1125,7 @@ extern "C" u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id)
     if (index >= 0x18U && *data != 1) {
         return 1;
     }
-    slot_id = fn_8004AFC8(lobby_world_block, index);
+    slot_id = userdata_equip_item_id_get(lobby_world_block, index);
     if (slot_id != 0) {
         data = GetItemData(slot_id);
         limit = userdata_pouch_size(side);
@@ -1353,7 +1354,7 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
             id = fn_801ED53C(self);
             if (fn_801EDB34(self, id, self->item_id_0x024) == 0) {
                 side = self->side_0x005 == 0;
-                if (fn_8004AFC8(lobby_world_block, id) != 0
+                if (userdata_equip_item_id_get(lobby_world_block, id) != 0
                     && fn_8004B460(lobby_world_block, side) <= 0) {
                     self->phase_0x001 = 3;
                     item_pair_copy(&tmp2, &userdata_equip_item_slots_get(lobby_world_block)[id]);
@@ -3838,7 +3839,7 @@ s16 fn_801ED200(s16 index, u8 side);
 u8 fn_801EDA9C(u16 index, u16 item_id);
 s16 fn_801EDA34(u16 index, u8 side);
 u8 fn_801EDB34(::LbListPane* self, u16 index, u16 item_id);
-u16 fn_8004AFC8(::LbItemDb* db, s16 index);
+u16 userdata_equip_item_id_get(::LbItemDb* db, s16 index);
 s16 userdata_pouch_size(u8 side);
 s32 item_pair_index_find(u16 id, ::IdValue* base, s32 count);
 ::IdValue* userdata_pouch_get(::LbItemDb* db, u8 side);
@@ -6920,7 +6921,7 @@ void fn_801F8ABC(u32 id, u8 a, u8 b, u32 c, s32 room)
     if (room == 0) {
         flags |= 0x80;
     }
-    PutPageArrow(lbl_805B8810, (s16)a, (s16)b, (u16)c, &pos, flags);
+    PutPageArrow(lb_page_arrow_ids, (s16)a, (s16)b, (u16)c, &pos, flags);
 }
 
 
@@ -7673,7 +7674,7 @@ void fn_801FB364(u8 index);
 void fn_801FB438(void);
 void fn_801FB478(void);
 void fn_801FBAE4(void);
-void fn_801FC318(void);
+void lb_quest_return_apply(void);
 void fn_801FC6A0(u32 unused, s32* value);
 void fn_801FC810(void);
 void fn_801FC874(void);
@@ -8014,7 +8015,7 @@ void lb_box_menu_draw(void)
             if (lb_box_lists_draw((::LbListPane*)self, 0x84) == 0) {
                 lb_panel_msg_draw(0x1877, 0xB3);
                 index = fn_801ED53C((::LbListPane*)self);
-                if (fn_8004AFC8((::LbItemDb*)lobby_world_block, index) != 0 && fn_801ED184(index) <= 0) {
+                if (userdata_equip_item_id_get((::LbItemDb*)lobby_world_block, index) != 0 && fn_801ED184(index) <= 0) {
                     lb_panel_str_print(0x1877, 0xCC, 2);
                 }
             }
@@ -8038,8 +8039,8 @@ void lb_box_menu_draw(void)
             if (lb_box_lists_draw((::LbListPane*)self, 0x104) == 0) {
                 lb_panel_msg_draw(0x1877, 0xB3);
                 index = fn_801ED53C((::LbListPane*)self);
-                if (fn_8004AFC8((::LbItemDb*)lobby_world_block, index) != 0 && fn_801ED200(index, self->side_0x005) <= 0) {
-                    id = fn_8004AFC8((::LbItemDb*)lobby_world_block, index);
+                if (userdata_equip_item_id_get((::LbItemDb*)lobby_world_block, index) != 0 && fn_801ED200(index, self->side_0x005) <= 0) {
+                    id = userdata_equip_item_id_get((::LbItemDb*)lobby_world_block, index);
                     if (self->side_0x005 == 0) {
                         count = userdata_pouch_size(1);
                         if (item_pair_index_find(id, userdata_pouch_get((::LbItemDb*)lobby_world_block, 1), count) >= 0) {
@@ -8259,7 +8260,7 @@ void fn_801FB2A8(u8 a, u8 b, u8 c)
     lobby_res_slots_init();
     fn_802AFA40();
     player_init_data_load();
-    fn_800D5CAC((void*)lbl_80582988);
+    fn_800D5CAC((void*)npc_model_res_ids);
     fn_800D5CAC((void*)lbl_8058AA98);
     fn_801FCA80(a);
     eft_res_pool_reset();
@@ -8364,7 +8365,7 @@ s32 lobby_scene_setup_step(LbChgSeqWork* self)
         }
         PlayMode_set(4);
         create_move_work(1);
-        fn_801FC318();
+        lb_quest_return_apply();
         q = get_qResult_work();
         if (q != NULL && system_w.field_0x2d == 0 && (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
             if (game_data_file_create_start() != 0) {
@@ -8657,7 +8658,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
         if (system_w.field_0x7ce == 2) {
             lobby_w.field_0x002 = 2;
         }
-        fn_801FC318();
+        lb_quest_return_apply();
         fn_801FC874();
         fn_801FC8C8();
         fn_801E92B0();

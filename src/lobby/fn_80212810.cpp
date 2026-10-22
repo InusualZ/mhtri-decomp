@@ -310,7 +310,7 @@ s32 lb_item_cell_draw_layout1(u16 a, u16 b, s16* c, s32 d, s32 e, s32 f, s32 g)
     lb_item_cell_draw_layout(a, b, (s32)c, d, e, f, 0, (u16)g, 1);
 }
 
-void fn_80216598(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
+void lb_price_cell_draw(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
     lb_item_cell_draw_layout((u16)a, b, c, d, e, f, 0, (u16)g, 2);
 }
@@ -371,7 +371,7 @@ s32 lb_panel_close(void)
     return lb_scene_npc_refresh(0);
 }
 
-s32 fn_8021793C(void)
+s32 lb_scene_npc_refresh_all(void)
 {
     return lb_scene_npc_refresh(1);
 }

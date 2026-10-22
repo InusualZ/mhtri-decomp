@@ -47,7 +47,7 @@ s32 fn_802CB900(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 limit);
 u32 Pl_motion_input_ck(s32 a);
 s32 fn_80291B08(struct _AINPC_W* self, nw4r::math::VEC3* pos, void* angle, f32* out,
                s32 mode);
-s32 fn_8029208C(nw4r::math::VEC3* probe, nw4r::math::VEC3* current, nw4r::math::VEC3* pos,
+s32 coll_wall_slide(nw4r::math::VEC3* probe, nw4r::math::VEC3* current, nw4r::math::VEC3* pos,
                u16 mask, u16 flags, s32 a, u8 area, f32 offset);
 void hit_attack_list_push(struct _HIT_W* hit);
 void hit_data_apply(struct _HIT_W* hit, void* owner, f32 value);
@@ -72,7 +72,7 @@ s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 s32 abs(s16 value);
 
 /* ---- the model (`sound/mhchar.cpp`'s range) ---- */
-void fn_800E0914(struct MHchar* chr);
+void mhchar_model_mtx_update(struct MHchar* chr);
 void mhchar_joint_mtx_get(struct MHchar* chr);
 void mhchar_motion_set(struct MHchar* chr, u32 a, u32 b, u16 motion, s32 c, s32 d, s32 e, f32 f,
                  f32 g);

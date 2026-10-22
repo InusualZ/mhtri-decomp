@@ -180,7 +180,7 @@ void eft_res_models_release(void* p, s32 mode);
 u32 eft_res_models_spawn(void* self, void* list, s32 a, s32 b, void* c);
 u32 eft_water_state_ck(void* self);
 void mtx34_set_trans(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
-void fn_8026A394(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
+void pl_joint_mtx_get(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
 u32 ai_npc_motion_step_ck(_ENEMY_WORK* enemy, u8 a, u16 b);
 void fn_802D2B68(_ENEMY_WORK* enemy, u32 id, nw4r::math::MTX34* mtx);
 void fn_8010D29C(void* self);
@@ -449,7 +449,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
             self->flag_0x01 = 0;
             return;
         }
-        fn_8026A394((_PLW*)self->source_0x30, work->id_0x34, &mtxA);
+        pl_joint_mtx_get((_PLW*)self->source_0x30, work->id_0x34, &mtxA);
         f31 = lbl_80796814;
         work->count2_0x30 = plw->field_0x07;
         self->area_0x44 = plw->area_0x16;

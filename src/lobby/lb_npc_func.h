@@ -5,6 +5,7 @@
 #define MHTRI_LOBBY_LB_NPC_FUNC_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 struct _ENEMY_WORK;
 
@@ -13,7 +14,8 @@ struct LbNpcFunc {
     /* +0x00 */ void (*se_func_0x00)(struct _ENEMY_WORK* work, s32 event);   /* the NPC sound source the game-mode flow
                                                                             * hands to `se_entry_request` */
     /* +0x04 */ void (*field_0x04)(void);
-    /* +0x08 */ u8 pad_0x08[8];
+    /* +0x08 */ void (*talk_0x08)(u16 npc, nw4r::math::VEC3* pos);   /* fired when the player starts an NPC talk */
+    /* +0x0C */ u8 pad_0x0C[4];
 };
 
 #ifdef __cplusplus

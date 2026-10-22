@@ -864,7 +864,7 @@ void fn_80249424(_PLW* self, s32 arg1) {
             Pl_chr_set_attr_default(self, 0x87, 4, 0);
         }
         self->act_end_request = 0;
-        fn_80101594(self);
+        eft004_hold_item_spawn(self);
         return;
     case 1:
         if (Pl_master_ck(self) != 0 && (pl_part_flag_ck(self, 4) == 1 || self->act_end_request != 0)) {
@@ -2475,7 +2475,7 @@ extern "C" void fn_80258FCC(_PLW* self, s16 a2, s16 a3, u8 a4)
     }
     if (a4 == 0) {
         if ((s8)self->field_0x444 == 0) {
-            if (fn_8026F888(self) == 1) {
+            if (pl_input_active_ck(self) == 1) {
                 if (*timer > 0) {
                     *timer -= (s16)10;
                     if (*timer < 0) {
@@ -2763,7 +2763,7 @@ extern "C" void fn_8025A7FC(_PLW* self)
         if (self->field_0x378 <= 0) {
             return;
         }
-        if (fn_8026F888(self) != 1) {
+        if (pl_input_active_ck(self) != 1) {
             return;
         }
         if ((s8)self->field_0x3A7 != 0) {
@@ -3014,15 +3014,15 @@ void fn_8025F478(_PLW* self) {
     f32 value;
 
     em_land_data_init(&work);
-    if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
+    if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         self->ground_y_0x060 = value;
         self->kind_0x09 = 0;
         return;
     }
-    if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, 1) == 1) {
+    if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, 1) == 1) {
         self->ground_y_0x060 = value;
         self->kind_0x09 = 3;
-        if (fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
+        if (pl_ground_check(self, &self->vec_0x03C, &work, &value, 4) == 1) {
             self->field_0x064 = value;
             self->field_0x074 = 1;
             if (self->vec_0x03C.y >= value - pl_frame_window_30) {
@@ -3207,7 +3207,7 @@ s32 fn_8025FF0C(_PLW* self, u8 mode) {
          (u32)(self->act_no - 102) <= 3)) {
         flags &= 0xFEFF;
     }
-    fn_802950D8(self, mode, flags);
+    pl_coll_shape_set(self, mode, flags);
 
     self->field_0x369 = 0;
     if (self->field_0x364 != 0) {
@@ -3314,7 +3314,7 @@ void fn_8025FA00(_PLW* self) {
     f32 value;
 
     em_land_data_init(&work);
-    if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
+    if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         self->ground_y_0x060 = value;
         switch (self->kind_0x09) {
         case 2:
@@ -3366,12 +3366,12 @@ void fn_8025FA00(_PLW* self) {
             }
             break;
         }
-    } else if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, 1) == 1) {
+    } else if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, 1) == 1) {
         self->ground_y_0x060 = value;
         switch (self->kind_0x09) {
         case 2:
             if (Pl_master_ck(self) != 0 &&
-                fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
+                pl_ground_check(self, &self->vec_0x03C, &work, &value, 4) == 1) {
                 self->field_0x064 = value;
                 self->field_0x074 = 1;
                 if (self->vec_0x03C.y <= value && pl_act_no_eft_ck(self, 0) == 0) {
@@ -3397,7 +3397,7 @@ void fn_8025FA00(_PLW* self) {
             break;
         default:
             if (Pl_master_ck(self) != 0 &&
-                fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
+                pl_ground_check(self, &self->vec_0x03C, &work, &value, 4) == 1) {
                 self->field_0x064 = value;
                 self->field_0x074 = 1;
                 if (self->vec_0x03C.y <= value) {
@@ -3417,7 +3417,7 @@ void fn_8025FA00(_PLW* self) {
             break;
         }
     }
-    if (fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
+    if (pl_ground_check(self, &self->vec_0x03C, &work, &value, 4) == 1) {
         self->field_0x064 = value;
         if (self->kind_0x09 == 3) {
             self->field_0x074 = 1;
@@ -3452,7 +3452,7 @@ s32 fn_8025F588(_PLW* self) {
     f32 value;
 
     em_land_data_init(&work);
-    if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
+    if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         self->ground_y_0x060 = value;
         switch (self->kind_0x09) {
         case 2:
@@ -3501,11 +3501,11 @@ s32 fn_8025F588(_PLW* self) {
             }
             break;
         }
-    } else if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, 1) == 1) {
+    } else if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, 1) == 1) {
         self->ground_y_0x060 = value;
         switch (self->kind_0x09) {
         case 2:
-            if (fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
+            if (pl_ground_check(self, &self->vec_0x03C, &work, &value, 4) == 1) {
                 if (self->vec_0x03C.y <= value) {
                     self->kind_0x09 = 3;
                 } else {
@@ -3533,7 +3533,7 @@ s32 fn_8025F588(_PLW* self) {
         }
     }
     if ((u8)(self->kind_0x09 - 2) <= 1 &&
-        fn_802919FC(self, &self->vec_0x03C, &work, &value, 4) == 1) {
+        pl_ground_check(self, &self->vec_0x03C, &work, &value, 4) == 1) {
         self->field_0x064 = value;
         self->field_0x074 = 1;
         if (self->vec_0x03C.y >= pl_frame_window_200 + value) {
@@ -3639,7 +3639,7 @@ void fn_8025F088(_PLW* self) {
     self->field_0x276 = 0;
     self->field_0x3DC &= ~0x100000;
 
-    fn_80260B38(self);
+    pl_act_status_step(self);
     self->field_0x309 = 0;
     self->field_0x657 = 0;
     self->field_0x30A = 0;
@@ -3674,9 +3674,9 @@ void fn_8025F088(_PLW* self) {
     if (fn_802657F8(self) == 0) {
         fn_80262940(self);
     }
-    fn_8027035C(self);
-    fn_80270728(self);
-    fn_80270CA4(self);
+    pl_gauge_step_a(self);
+    pl_gauge_step_b(self);
+    pl_condition_step(self);
     fn_802642D0(self);
     self->field_0x3B0 = self->field_0x3AC;
     self->field_0x3AC = 0;
@@ -3703,7 +3703,7 @@ void fn_8025F088(_PLW* self) {
     fn_802602A0(self);
     fn_8027AF34(self);
     fn_802607C4(self);
-    fn_8026FD0C(self);
+    pl_model_pos_sync(self);
     fn_8025ED00(self);
     pl_rig_model_move(self->physics_0x13C);
     copyVec3(&self->vec_0x03C, &chr->pos_0x04);
@@ -3728,8 +3728,8 @@ void fn_8025F088(_PLW* self) {
     if (Pl_act_ck(self, 0, 20) == 1 || Pl_act_ck(self, 0, 158) == 1) {
         self->field_0x268 = 1;
     }
-    fn_8026FD0C(self);
-    fn_800E0914(chr);
+    pl_model_pos_sync(self);
+    mhchar_model_mtx_update(chr);
     if (fn_8026FD94(self) == 0) {
         fn_8027D4F0(self);
     }

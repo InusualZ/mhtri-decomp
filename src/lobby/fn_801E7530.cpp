@@ -15,7 +15,7 @@
  *  - `fn_801E7EA8`, `fn_801E88E8`, `fn_801E8CDC`, `fn_801EB744`, `fn_801E936C`: retail narrows `u8`/`u16` values with
  *    `clrlwi` at the use where ours passes them through (`fn_801E936C` narrows the sum and returns with `blelr`);
  *    `fn_801EB138`: retail sign-extends (`extsh`) twice more;
- *  - `fn_801E79E4`: ours emits its own switch table (`@1070`) where retail uses `jumptable_805B7CD8`, plus register
+ *  - `lb_deli_screen_step`: ours emits its own switch table (`@1070`) where retail uses `jumptable_805B7CD8`, plus register
  *    drift;
  *  - `fn_801E790C`: ours materialises zero three more times and addresses +0x24 where retail uses +0x12;
  *  - `fn_801E80FC`: register colouring and a `lwz` of +0x100 where ours uses `lhz` (a field width);
@@ -254,7 +254,7 @@ s32 fn_801E790C(LbMenuWork* self)
     return result;
 }
 
-void fn_801E79E4(void)
+void lb_deli_screen_step(void)
 {
     LbMenuWork* self;
     u16 flags;
@@ -875,7 +875,7 @@ void fn_801EC804(s16* value)
     }
 }
 
-s32 fn_801EC7E4(void)
+s32 lb_screen_work_busy_ck(void)
 {
     return lobby_w.menu_0xAC->active_0x04 != 0;
 }

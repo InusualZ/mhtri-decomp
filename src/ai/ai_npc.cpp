@@ -2912,7 +2912,7 @@ void fn_802D15DC(struct _AINPC_W* self)
     probe.y = probe.y + lbl_8079A7A8;
     copyVec3(&current, &self->pos_0x178);
     current.y = current.y + lbl_8079A7A8;
-    self->field_0x3C8 = (s8)fn_8029208C(&probe, &current, &self->pos_0x178, 0xFFFF, flags, 1,
+    self->field_0x3C8 = (s8)coll_wall_slide(&probe, &current, &self->pos_0x178, 0xFFFF, flags, 1,
                                         self->area, lbl_8079A7A8);
 }
 
@@ -3026,7 +3026,7 @@ void fn_802D1954(struct _AINPC_W* self)
         self->model.scale_0x1C.y = lbl_8079A674;
         self->model.scale_0x1C.z = lbl_8079A674;
         fn_802D1FFC(self);
-        fn_800E0914(&self->model);
+        mhchar_model_mtx_update(&self->model);
     }
 }
 
@@ -3156,7 +3156,7 @@ void fn_802D1D90(struct _AINPC_W* self)
     fn_802D15DC(self);
     fn_802D1710(self);
     fn_802D1FFC(self);
-    fn_800E0914(&self->model);
+    mhchar_model_mtx_update(&self->model);
     for (i = 0; i < 2; i++) {
         hit_attack_list_push(&self->hit[i]);
     }
@@ -5513,7 +5513,7 @@ void ainpc_move(void)
         fn_802D15DC(self);
         fn_802D1710(self);
         fn_802D1FFC(self);
-        fn_800E0914(&self->model);
+        mhchar_model_mtx_update(&self->model);
     }
     ::ai_npc_motion_dispatch((::_AINPC_W*)self);
 }

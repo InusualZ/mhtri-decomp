@@ -114,7 +114,10 @@ struct _PLW {
             /* +0x01A */ u16 field_0x01A;
         };
         struct {   /* the later names, padded to the same byte total */
-        /* +0x01A */ u8 pad_merge_0x01A[0x1];
+        /* +0x01A */ union {
+            /* +0x01A */ u8 pad_merge_0x01A[0x1];
+            /* +0x01A */ u8 drawn_0x01A;   /* set once the lobby frame ran this frame; the lobby draw skips the actor while 0 */
+        };
                                 /* +0x01B */ u8 field_0x01B;   /* the "no surface contact" byte `Pl/pl_act_step.cpp` clears */
         };
     };
@@ -158,7 +161,8 @@ struct _PLW {
         };
         struct {   /* the act unit's own view: the act word the act entry clears (`pl_act_enter_raw`) */
             /* +0x030 */ s16 field_0x030;
-            /* +0x032 */ u8 pad_0x32[0xA];
+            /* +0x032 */ u16 field_0x032;   /* the camera yaw the lobby draw hands the local player's model */
+            /* +0x034 */ u8 pad_0x34_tail[0x8];
         };
         struct {   /* the act unit's own view: the stagger value `pl_act_name_row_get` branches on.  Retail
                     * loads that pair with `lha`, so the field really is a signed 16-bit one */
@@ -258,9 +262,9 @@ struct _PLW {
         };
     };
     /* +0x090 */ VEC3 target_pos_0x090;   /* the position the blend walks the actor to (`pl_pos_blend_start` divides the gap to it by its frame count); the net receivers write it */
-    /* +0x09C */ f32 unk09C;
-    /* +0x0A0 */ f32 unk0A0;
-    /* +0x0A4 */ f32 unk0A4;
+    /* +0x09C */ f32 blend_step_x_0x09C;   /* the per-frame step the lobby walk blend adds to the position */
+    /* +0x0A0 */ f32 blend_step_y_0x0A0;
+    /* +0x0A4 */ f32 blend_step_z_0x0A4;
     /* +0x0A8 */ u32 field_0x0A8;          /* the second counter `fn_80264940` feeds (Pl/pl_act_step.cpp) */
     /* +0x0AC */ union { /* the original and later names of the same 8 bytes (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
@@ -268,7 +272,10 @@ struct _PLW {
                 /* +0x0AC */ u8 unk0AC[0xB4 - 0xAC];
                 struct {
                     /* +0x0AC */ u32 field_0x0AC;  /* mirrors the damage/param word at +0x054 (`fn_802498E0`) */
-                    /* +0x0B0 */ u8 pad_0x0B0[0x4];
+                    /* +0x0B0 */ union {
+                        /* +0x0B0 */ u8 pad_0x0B0[0x4];
+                        /* +0x0B0 */ u16 field_0x0B0;   /* the body lean `lobby/lb_npc.cpp` eases into a turn */
+                    };
                 };
             };
         };
@@ -277,7 +284,7 @@ struct _PLW {
                                 /* +0x0B2 */ u16 field_0x0B2;
         };
     };
-    /* +0x0B4 */ s16 unk0B4;
+    /* +0x0B4 */ s16 blend_frames_0x0B4;   /* the frames left in the walk blend (`lobby/lb_npc.cpp`, `Pl/pl_act.cpp`) */
     /* +0x0B6 */ u16 field_0x0B6;  /* a bit field: bit 0 and bit 15 are tested and the low decimal
                                    * pair feeds the +0x354 scale (`Pl/pl_act_step.cpp`); the low 3
                                    * bits are the cat-skill level `Pl/pl_act_step.cpp` reads */
@@ -349,7 +356,7 @@ struct _PLW {
         /* +0x266 */ u8 unk266[0x269 - 0x266];
         struct {
             /* +0x266 */ s8 field_0x266;  /* non-zero holds off the act switch (`fn_80258FCC`) */
-            /* +0x267 */ u8 unk267[0x268 - 0x267];
+            /* +0x267 */ u8 field_0x267;   /* set by the lobby player's first frame (`lobby/lb_npc.cpp`) */
             /* +0x268 */ u8 field_0x268;  /* the byte `fn_8027D738` reports as a boolean */
         };
     };
@@ -495,7 +502,7 @@ struct _PLW {
         };
     };
     /* +0x354 */ union {   /* one f32, two spellings: `field_0x354` is
-                            * the scale `fn_8026A2BC` hands the model layer */
+                            * the scale `pl_motion_speed_apply` hands the model layer */
         /* +0x354 */ f32 unk354;
         /* +0x354 */ f32 field_0x354;
     };
@@ -592,7 +599,7 @@ struct _PLW {
         /* +0x388 */ u8 field_0x388;   /* cleared by the act entry */
     };
     /* +0x389 */ u8 unk389[0x38A - 0x389];
-    /* +0x38A */ s16 unk38A;
+    /* +0x38A */ s16 field_0x38A;   /* cleared by the lobby player's first frame */
     /* +0x38C */ s16 unk38C;
     /* +0x38E */ s16 unk38E;
     /* +0x390 */ s16 unk390;
@@ -953,7 +960,7 @@ struct _PLW {
             /* +0x571 */ u8 pad_0x571[0xF];
         };
     };
-    /* +0x580 */ s16 unk580;
+    /* +0x580 */ s16 field_0x580;   /* cleared by the lobby player's first frame; `Pl/pl_act.cpp` stores its argument */
     /* +0x582 */ u8 unk582;
     /* +0x583 */ union {
         u8 shell_ang_0x583; /* the player's shell-frame angle: `ef/eft053.cpp`'s shell
@@ -1169,8 +1176,7 @@ struct _PLW {
     /* +0xB05 */ u8 name_0xB05[10];  /* the hunter name the lobby compares with the move work */
     /* +0xB0F */ char partner_0xB0F[0xA];  /* the trade partner's name the lobby packets carry (GUESS) */
     /* +0xB19 */ u8 pad_0xB19;
-    /* +0xB1A */ u8 field_0xB1A;
-    /* +0xB1B */ u8 pad_0xB1B[0x1];
+    /* +0xB1A */ s16 field_0xB1A;   /* the lobby's frames until the area-return message (`lobby/lb_npc.cpp`) */
     /* +0xB1C */ u8 user_profile_0xB1C[0x4];  /* the four profile bytes `arena_eqdata_from_vsuser`
                                                * serialises into the arena user-data record's bytes
                                                * 9/10/12/13; GUESS - derived from that body's four

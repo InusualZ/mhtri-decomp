@@ -616,7 +616,7 @@ extern "C" void eft052_page_put(u16 id, s16 count, u8 flag)
 extern "C" s32 eft052_page_count_ck(u16 id, u8 use_rows)
 {
     if (use_rows == 0)
-        return fn_8004B624(lobby_world_block, id);
+        return userdata_item_total_count(lobby_world_block, id);
     return item_slots_room_get(id, &lobby_world_block->field_0x0180, userdata_box_capacity(lobby_world_block));
 }
 
@@ -1053,7 +1053,7 @@ extern "C" s32 eft052_item_get_step(void)
     case 1:
         if (lb_cmd_pressed_ck(0x10)) {
             cell = box->column_0x01 + box->row_0x12 * box->grid_0x38.columns_0x00;
-            room = fn_8004B624(lobby_world_block, box->cells_0x24[cell].item_0x00);
+            room = userdata_item_total_count(lobby_world_block, box->cells_0x24[cell].item_0x00);
             if (room > 0 && box->cells_0x24[cell].count_0x02 != 0) {
                 if (room < box->cells_0x24[cell].count_0x02) {
                     userdata_item_give(lobby_world_block, box->cells_0x24[cell].item_0x00, room, 1);

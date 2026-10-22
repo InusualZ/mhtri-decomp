@@ -107,8 +107,8 @@ typedef struct MHchar {
     /* +0x0D4 */ f32 field_0xD4[6];
     /* +0x0EC */ s32 field_0xEC;
     /* +0x0F0 */ u8 pad_0xF0[0x1];
-    /* +0x0F1 */ u8 field_0xF1;     /* the model visibility flag `fn_8026A2D0`/`fn_8026A2DC` set */
-    /* +0x0F2 */ u8 field_0xF2;     /* the second flag, `pl_model_set_state`/`fn_8026A2F8` */
+    /* +0x0F1 */ u8 field_0xF1;     /* the model visibility flag `pl_model_visible_set`/`pl_model_hide` set */
+    /* +0x0F2 */ u8 field_0xF2;     /* the second flag, `pl_model_set_state`/`pl_model_aux_flag_clear` */
     /* +0x0F3 */ u8 pad_0xF3[0x19];
     /* +0x10C */ struct _g3d_work* g3d_0x10C;   /* the pooled g3d work `push_shell_chara_heap` releases */
     /* +0x110 */ s32 field_0x110;
