@@ -1389,7 +1389,7 @@ lobby/lb_menu_pos_tbl.cpp:
 	extabindex  start:0x8002E464 end:0x8002E4F4
 	.text       start:0x8021F020 end:0x80220038 align:16
 	.ctors      start:0x8056F364 end:0x8056F368
-	.data       start:0x805BA650 end:0x805BA660
+	.data       start:0x805BA650 end:0x805BA750
 	.bss        start:0x806AAA88 end:0x806AACC0
 	.sdata2     start:0x80799C78 end:0x80799CD8
 
