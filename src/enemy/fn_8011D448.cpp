@@ -129,7 +129,7 @@ struct _EFT_FX_FULL {
 
 /* 0x8011D448 - spawns one pooled effect through fn_8011D558 and points its target vector along the
  * type table's z.  The z component comes from `lbl_805A0C88[type]`; x and y stay at 0.0f. */
-extern "C" void fn_8011D448(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, f32 scale)
+extern "C" void em_eft_fx_spawn(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, f32 scale)
 {
     _EFT* effect = fn_8011D558(self, type, id, id, scale, timer);
     _EFT_FX_FULL* work;
@@ -156,7 +156,7 @@ extern "C" void fn_8011D4AC(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, cons
 
 /* 0x8011D4FC - the same spawn, target vector from the type table only.  Distinct from 0x8011D448
  * because the id pair is taken from the caller's two words. */
-extern "C" void fn_8011D4FC(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, u32 timer, f32 scale)
+extern "C" void em_eft_fx_spawn_pair(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, u32 timer, f32 scale)
 {
     _EFT* effect = fn_8011D558(self, type, id0, id1, scale, timer);
     _EFT_FX_FULL* work;
@@ -457,7 +457,7 @@ extern "C" void fn_8011E658(_ENEMY_WORK* self, s32 step, s32 ceiling)
 }
 
 /* 0x8011E6E4 - steps the gauge by `step` with the data record's ratio as the ceiling. */
-extern "C" void fn_8011E6E4(_ENEMY_WORK* self, s32 step)
+extern "C" void em_gauge_step(_ENEMY_WORK* self, s32 step)
 {
     fn_8011E658(self, step, self->field_0x7a4);
 }
@@ -472,7 +472,7 @@ extern "C" void fn_8011E6EC(_ENEMY_WORK* self, s32 step, s16 period, f32 scale)
 }
 
 /* 0x8011E760 - forces the gauge to `value`, clamped the same way `fn_8011E658` clamps it. */
-extern "C" void fn_8011E760(_ENEMY_WORK* self, s32 value)
+extern "C" void em_gauge_set(_ENEMY_WORK* self, s32 value)
 {
     s32 ceiling;
     s32 low;

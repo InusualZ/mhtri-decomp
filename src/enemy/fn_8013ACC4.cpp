@@ -378,7 +378,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
     for (;;) {
         frames++;
         if ((s16)frames > 0x3e8) {
-            fn_8013AAC4(EM_ENEMY_WORK(self));
+            em_user_data_reenter(EM_ENEMY_WORK(self));
         }
 
         if (self->stream_0x958 == (u8*)self->field_0x954[0][0]) {
@@ -397,7 +397,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
 
         len = fn_80140768(self->stream_0x958);
         if ((u8)len == 0xff && self->stream_0x958[0] != 0xff) {
-            fn_8013AAC4(EM_ENEMY_WORK(self));
+            em_user_data_reenter(EM_ENEMY_WORK(self));
             continue;
         }
 
@@ -448,7 +448,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
             self->stream_0x958 += (s16)fn_8013CCA8(self, self->stream_0x958);
             break;
         case 0x0D:
-            fn_8013AAC4(EM_ENEMY_WORK(self));
+            em_user_data_reenter(EM_ENEMY_WORK(self));
             break;
         case 0x0E:
             self->stream_0x958 += (s16)fn_8013CCD0(self, self->stream_0x958);
@@ -759,7 +759,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
         case 0xFF:
             switch (self->field_0x95C) {
             default:
-                fn_8013AAC4(EM_ENEMY_WORK(self));
+                em_user_data_reenter(EM_ENEMY_WORK(self));
                 continue;
             case 0:
                 if (self->stack_0x961[1] == 0) {
@@ -838,7 +838,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
                         finished = 1;
                     }
                 } else {
-                    fn_8013AAC4(EM_ENEMY_WORK(self));
+                    em_user_data_reenter(EM_ENEMY_WORK(self));
                 }
                 continue;
             case 1:
@@ -849,14 +849,14 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
                     self->field_0x95D = 1;
                     fn_8013AB74(EM_ENEMY_WORK(self), self->field_0x95C, 1);
                 } else {
-                    fn_8013AAC4(EM_ENEMY_WORK(self));
+                    em_user_data_reenter(EM_ENEMY_WORK(self));
                 }
                 continue;
             case 9:
                 if (em_eft_active_ck(self) == 1) {
                     fn_801409C8(self);
                 }
-                fn_8013AAC4(EM_ENEMY_WORK(self));
+                em_user_data_reenter(EM_ENEMY_WORK(self));
                 continue;
             case 10:
                 switch (self->field_0x95D) {

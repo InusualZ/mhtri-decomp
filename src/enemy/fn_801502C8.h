@@ -21,7 +21,7 @@ extern "C" {
  * `enemy/em030_prog.cpp`'s call site reads it unsigned, so the definition returns `u32`). */
 u32 fn_80154784(struct _ENEMY_WORK* self);
 
-/* 0x80154CA4 - clamps the record's +0x1AC counter after `fn_801303FC`. */
+/* 0x80154CA4 - clamps the record's +0x1AC counter after `em_height_add`. */
 void fn_80154CA4(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus

@@ -398,7 +398,7 @@ extern "C" void fn_801057A4(void* self, u32 a, void* v, f32 scale, u32 id) {
 }
 
 /* 0x801057FC - setter: spawn the type in the low byte of `type` and store the trailing id at +0x24. */
-extern "C" void fn_801057FC(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale, u32 id) {
+extern "C" void eft013_spawn_id(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale, u32 id) {
     _EFT013* e = fn_80105888(self, (u8)type, a, b, scale);
     if (e != NULL) {
         e->rot_0x24.x = id;
@@ -407,7 +407,7 @@ extern "C" void fn_801057FC(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3
 }
 
 /* 0x80105844 - setter: spawn type in the low byte with a scale of 1.0 and zero the id. */
-extern "C" void fn_80105844(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b) {
+extern "C" void eft013_spawn(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b) {
     _EFT013* e = fn_80105888(self, (u8)type, a, b, 1.0f);
     if (e != NULL) {
         e->rot_0x24.x = 0;

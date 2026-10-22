@@ -116,7 +116,7 @@ extern "C" f32 lbl_8079BE88;   /* -20.0 */
  * the call site consumes the result). */
 typedef nw4r::math::VEC3* (*Fn80041E8C)(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 
-/* This unit's own functions the program steps call, and `enemy/em_model.cpp`'s `fn_803B9BA0`. */
+/* This unit's own functions the program steps call, and `enemy/em_model.cpp`'s `em_drop_item_spawn`. */
 
 extern "C" {
 u8 fn_80378F9C(struct _ENEMY_WORK* self, u32 a);
@@ -132,7 +132,7 @@ void fn_8037DFF0(struct _ENEMY_WORK* self);
 void em019_action_start_if_idle(struct _ENEMY_WORK* self);
 void fn_8037E0E8(struct _ENEMY_WORK* self);
 u32 fn_80382E48(struct _ENEMY_WORK* self, u32 a);
-void fn_803B9BA0(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a);
+void em_drop_item_spawn(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a);
 }
 #include "types.h"
 #include "gx.h"
@@ -548,7 +548,7 @@ extern "C" void em_act_prog_6(_ENEMY_WORK* self) {
     }
 }
 
-/* Program channel 7: phase 0 arms motion 6/10, a 300-frame countdown and the `fn_803B9BA0` job, phase 1
+/* Program channel 7: phase 0 arms motion 6/10, a 300-frame countdown and the `em_drop_item_spawn` job, phase 1
  * lands +0x1E4 on part 13/8 when the countdown ends. */
 extern "C" void em_act_prog_7(_ENEMY_WORK* self) {
     switch (self->state) {
@@ -557,7 +557,7 @@ extern "C" void em_act_prog_7(_ENEMY_WORK* self) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 6, 10, 0);
         self->timer_0x020 = 300;
-        fn_803B9BA0(self, &self->pos, 60);
+        em_drop_item_spawn(self, &self->pos, 60);
         break;
     case 1:
         if (--self->timer_0x020 <= 0)

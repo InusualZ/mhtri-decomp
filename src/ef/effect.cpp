@@ -168,14 +168,14 @@ u32 hit_point_sphr(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 r);
 /* The unit's own symbols other units call. */
 extern "C" void eft_state_flags_set(EftFrameState* self, u8 a, u8 b);
 extern "C" EftVectors* fn_800FA3E8(EftVectors* self);
-extern "C" nw4r::math::VEC3* fn_800FA420(nw4r::math::VEC3* self);
+extern "C" nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self);
 
 /* the unit's own helpers, used before their definitions below */
 extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec);
 extern "C" void fn_800FA318(EftBox* dst, const EftBox* src);
 extern "C" void fn_800FA354(EftSphere* dst, const EftSphere* src);
 extern "C" EftShape* fn_800FA378(EftShape* self);
-extern "C" EftVectors* fn_800FA3B8(EftVectors* self);
+extern "C" EftVectors* eft_capsule_ctor(EftVectors* self);
 extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColorParams* params, u8 flag);
 
 extern "C" {
@@ -590,8 +590,8 @@ extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec) {
     EftBox box;
     EftShape box2;
     u32 result = 0;
-    fn_800FA420((nw4r::math::VEC3*)&sphere);
-    fn_800FA3B8((EftVectors*)&box);
+    eft_vec_ctor((nw4r::math::VEC3*)&sphere);
+    eft_capsule_ctor((EftVectors*)&box);
     fn_800FA378(&box2);
     switch (rec->mode_0x00) {
     case 0:
@@ -630,14 +630,14 @@ extern "C" void fn_800FA354(EftSphere* dst, const EftSphere* src) {
 
 /* 0x800FA378 - construct the box record and its two vectors. */
 extern "C" EftShape* fn_800FA378(EftShape* self) {
-    fn_800FA3B8((EftVectors*)&self->box_0x00);
+    eft_capsule_ctor((EftVectors*)&self->box_0x00);
     VEC3_ctor(&self->a_0x1C);
     VEC3_ctor(&self->b_0x28);
     return self;
 }
 
 /* 0x800FA3B8 - construct the sphere record. */
-extern "C" EftVectors* fn_800FA3B8(EftVectors* self) {
+extern "C" EftVectors* eft_capsule_ctor(EftVectors* self) {
     fn_800FA3E8(self);
     return self;
 }
@@ -650,7 +650,7 @@ extern "C" EftVectors* fn_800FA3E8(EftVectors* self) {
 }
 
 /* 0x800FA420 - zero one vector. */
-extern "C" nw4r::math::VEC3* fn_800FA420(nw4r::math::VEC3* self) {
+extern "C" nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self) {
     VEC3_ctor(self);
     return self;
 }
@@ -664,8 +664,8 @@ extern "C" void fn_800FA450(void* effect) {
     u8 mode;
     void* handle = NULL;
     s32 alive = 0;
-    fn_800FA420((nw4r::math::VEC3*)&sphere);
-    fn_800FA3B8((EftVectors*)&box);
+    eft_vec_ctor((nw4r::math::VEC3*)&sphere);
+    eft_capsule_ctor((EftVectors*)&box);
     VEC3_ctor(&pos);
     fn_800FA378(&box2);
     ef_store_word(&mode, 0);
@@ -720,9 +720,9 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
     EftSphere sphere2;
     EftBox box;
     EftShape shape;
-    fn_800FA420((nw4r::math::VEC3*)&sphere);
-    fn_800FA420((nw4r::math::VEC3*)&sphere2);
-    fn_800FA3B8((EftVectors*)&box);
+    eft_vec_ctor((nw4r::math::VEC3*)&sphere);
+    eft_vec_ctor((nw4r::math::VEC3*)&sphere2);
+    eft_capsule_ctor((EftVectors*)&box);
     VEC3_ctor(&pos);
     fn_800FA378(&shape);
     s32 count = fn_800E28E4(chr);
@@ -865,11 +865,11 @@ extern "C" void fn_800FA9B8(EftNameSet* out, u8 area) {
 /* 0x800FAC1C - construct the two static effect-name arrays. */
 extern "C" void fn_800FAC1C(void) {
     __construct_array(lbl_806A1400, (void*)fn_800FAC78, 0, 0x20, 0x64);
-    __construct_array(lbl_806A2080, (void*)fn_800FA3B8, 0, 0x1C, 4);
+    __construct_array(lbl_806A2080, (void*)eft_capsule_ctor, 0, 0x1C, 4);
 }
 
 /* 0x800FAC78 - construct one 0x20-byte name-array element. */
 extern "C" EftNameArrayElem* fn_800FAC78(EftNameArrayElem* self) {
-    fn_800FA3B8(&self->vectors_0x04);
+    eft_capsule_ctor(&self->vectors_0x04);
     return self;
 }

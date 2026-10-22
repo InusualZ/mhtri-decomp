@@ -85,11 +85,11 @@ void fn_80173D04(_ENEMY_WORK* self);
 void fn_80173FF4(_ENEMY_WORK* self);
 void fn_801740A0(_ENEMY_WORK* self);
 
-/* This unit's `action_0x1E5` handlers `fn_80170A00`/`fn_80171130`, and `enemy/em_model.cpp`'s `fn_803B9BA0`,
+/* This unit's `action_0x1E5` handlers `fn_80170A00`/`fn_80171130`, and `enemy/em_model.cpp`'s `em_drop_item_spawn`,
  * declared with the call sites' widths. */
 void fn_80170A00(_ENEMY_WORK* self);
 void fn_80171130(_ENEMY_WORK* self);
-void fn_803B9BA0(_ENEMY_WORK* self, VEC3* pos, s32 value);
+void em_drop_item_spawn(_ENEMY_WORK* self, VEC3* pos, s32 value);
 }
 
 #pragma peephole off
@@ -134,7 +134,7 @@ void fn_80170758(_ENEMY_WORK *self, u8 a, u8 b) {
     if ((a & 0xFF) == 1) {
         switch (b) {
         case 5:
-            fn_80130F74(self);
+            em_bait_react(self);
             break;
         case 0xA:
             self->field_0x32A = 0;
@@ -150,7 +150,7 @@ void fn_80170758(_ENEMY_WORK *self, u8 a, u8 b) {
             }
             break;
         case 0xE:
-            fn_801376B4(self);
+            em_act_flag1_set(self);
             break;
         }
     }
@@ -165,7 +165,7 @@ void fn_80170804(_ENEMY_WORK *self) {
         ENEMY_ENTRY *entry = (ENEMY_ENTRY *)enemy_data_find(v, self->field_0x46C);
         if (entry != 0 && entry->field_0x08 == 0xFF) {
             self->field_0x46C = 0xFF;
-            fn_8013AAC4(self);
+            em_user_data_reenter(self);
         }
     }
 }
@@ -280,16 +280,16 @@ void fn_80170B4C(_ENEMY_WORK *self) {
             self->state++;
             em_mot_set(self, 0x6E, 4, 0);
             self->timer_0x020 = 0x708;
-            fn_80132224(self);
+            em_tint_hold_start(self);
         }
         break;
     case 2: {
         f32 t = 0.4f;
-        fn_8013221C(self, t, 1, 0xF);
+        em_gauge_tick(self, t, 1, 0xF);
         if (--self->timer_0x020 <= 0) {
             self->state++;
             em_mot_set(self, 0x71, 4, 0);
-            fn_80132264(self);
+            em_tint_hold_end(self);
         }
     }
         break;
@@ -572,7 +572,7 @@ int fn_80176328(_ENEMY_WORK* self, u32 arg) {
 
 void fn_80176374(_ENEMY_WORK* self, u32 arg) {
     if ((u8)arg == 0 && self->team == 14 && em_parts_damage_level_get(self, 0) == 1) {
-        fn_803B9BA0(self, &self->pos, 100);
+        em_drop_item_spawn(self, &self->pos, 100);
     }
 }
 }

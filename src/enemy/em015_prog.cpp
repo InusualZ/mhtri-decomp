@@ -41,7 +41,7 @@
  * SHAPES. The armed-state step is `case 0: { u8 state = self->state; self->state = state + 1; ... }`: the copy
  *   gives retail's load/add/store, `self->state += 1` does not.  The countdown is `self->timer_0x020 -= 1;
  *   if ((s32)self->timer_0x020 < 1)`, the one spelling that does not fuse into `subic.`.  `fn_801797F8` keeps
- *   `(u8)((s32)angle >> 8)` and `fn_80182978` its `(s32)` compares (`cmpwi`).  `fn_803B9BA0` is declared here
+ *   `(u8)((s32)angle >> 8)` and `fn_80182978` its `(s32)` compares (`cmpwi`).  `em_drop_item_spawn` is declared here
  *   with the `(_ENEMY_WORK*, u32, u32)` spelling its call sites were measured with.
  */
 
@@ -50,12 +50,12 @@
 #include "enemy/fn_8012999C.h" /* fn_8012999C (rule 2: the owner's header) */
 #include "enemy/em_action_finish.h" /* em_action_finish (rule 2: the owner's header) */
 #include "enemy/fn_80128030.h" /* fn_80128030 (rule 2: the owner's header) */
-#include "enemy/fn_8013221C.h" /* fn_8013221C (rule 2: the owner's header) */
-#include "enemy/fn_80132224.h" /* fn_80132224 (rule 2: the owner's header) */
-#include "enemy/fn_80132264.h" /* fn_80132264 (rule 2: the owner's header) */
+#include "enemy/em_gauge_tick.h" /* em_gauge_tick (rule 2: the owner's header) */
+#include "enemy/em_tint_hold_start.h" /* em_tint_hold_start (rule 2: the owner's header) */
+#include "enemy/em_tint_hold_end.h" /* em_tint_hold_end (rule 2: the owner's header) */
 #include "enemy/em_move_mode_set.h" /* em_move_mode_set (rule 2: the owner's header) */
 #include "enemy/em_mot_set.h" /* em_mot_set (rule 2: the owner's header) */
-#include "enemy/fn_8012F810.h" /* fn_8012F810 (rule 2: the owner's header) */
+#include "enemy/em_mat_blend_reset.h" /* em_mat_blend_reset (rule 2: the owner's header) */
 #include "enemy/em_mot_end_ck.h" /* em_mot_end_ck (rule 2: the owner's header) */
 #include "enemy/em_approach_step.h" /* em_approach_step (rule 2: the owner's header) */
 #include "enemy/em_turn_seq_start.h" /* em_turn_seq_start (rule 2: the owner's header) */
@@ -199,7 +199,7 @@ extern f32 lbl_80797B64;
 
 /* `enemy/em_model.cpp`'s pose request `fn_8017E178` posts (`self`, the pose vector, the request id); its
  * callers spell it two ways, so each declares its own. */
-void fn_803B9BA0(_ENEMY_WORK* self, u32 v, u32 a);
+void em_drop_item_spawn(_ENEMY_WORK* self, u32 v, u32 a);
 /* This unit's unwritten table writers, which the written ones call. */
 void fn_801784D0(_ENEMY_WORK* self, u32 a, u32 b);
 void fn_80179E98(_ENEMY_WORK* self);
@@ -310,7 +310,7 @@ extern f32 lbl_80797E78;
 extern f32 lbl_80797E7C;
 extern f32 lbl_80797E80;
 
-/* The two argument records `fn_8012A014` takes (the unit's `.data`). */
+/* The two argument records `em_pack_area_pick` takes (the unit's `.data`). */
 extern u32 lbl_805A950C[];
 extern u32 lbl_805A9518[];
 /* The four 0xC-byte vectors `fn_80182B94` seeds. */
@@ -476,10 +476,10 @@ extern "C" void fn_8017708C(_ENEMY_WORK* self, u32 kind, u32 sub) {
       case 1:
         switch ((u8)sub) {
           case 6:
-            fn_80130F74(self);
+            em_bait_react(self);
             break;
           case 7:
-            fn_801376B4(self);
+            em_act_flag1_set(self);
             break;
         }
         break;
@@ -492,10 +492,10 @@ extern "C" void fn_8017708C(_ENEMY_WORK* self, u32 kind, u32 sub) {
             fn_8012A354(self);
             break;
           case 0x1D:
-            fn_80130F74(self);
+            em_bait_react(self);
             break;
           case 0x26:
-            fn_801376B4(self);
+            em_act_flag1_set(self);
             break;
         }
         break;
@@ -730,16 +730,16 @@ extern "C" void fn_80177774(_ENEMY_WORK* self) {
             self->state++;
             em_mot_set(self, 4, 0, 0);
             self->timer_0x020 = 0x708;
-            fn_80132224(self);
+            em_tint_hold_start(self);
         }
         break;
     case 2:
-        fn_8013221C(self, lbl_80797B44, 1, 0xF);
+        em_gauge_tick(self, lbl_80797B44, 1, 0xF);
         self->timer_0x020 = self->timer_0x020 - 1;
         if ((s32)self->timer_0x020 <= 0) {
             self->state++;
             em_mot_set(self, 5, 4, 0);
-            fn_80132264(self);
+            em_tint_hold_end(self);
         }
         break;
     case 3:
@@ -892,7 +892,7 @@ void fn_80177BEC(_ENEMY_WORK* self, s32 arg) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F810(self);
+        em_mat_blend_reset(self);
         em_mot_set_blend_view1(self, 0x15, 0x28, 0, 1);
         switch ((u8)arg) {
         default:
@@ -1505,7 +1505,7 @@ extern "C" void fn_8017C918(_ENEMY_WORK* self) {
             fn_80133CC8(self, 0x180, 0x280);
         }
         if (em_frame_check(self, 2, lbl_80797CC0, lbl_80797B18) == 1) {
-            fn_80133C3C(self);
+            em_hit_arm_set(self);
         }
         em_turn_in_window(self, lbl_80797BF8, lbl_80797BFC, 0x8000);
         if (em_mot_end_ck(self) == 1) {
@@ -1668,7 +1668,7 @@ extern "C" void fn_8017DE8C(_ENEMY_WORK* self) {
     }
 }
 
-/* Three-phase: 0x31/0x14 plus the `fn_803B9BA0` pose request, then 0x21/0. */
+/* Three-phase: 0x31/0x14 plus the `em_drop_item_spawn` pose request, then 0x21/0. */
 extern "C" void fn_8017E178(_ENEMY_WORK* self) {
     switch (self->state) {
     case 0: {
@@ -1676,7 +1676,7 @@ extern "C" void fn_8017E178(_ENEMY_WORK* self) {
         self->state = state + 1;
         em_move_mode_set(self, 2);
         em_mot_set_blend(self, 0x31, 0x14, 0, 1);
-        fn_803B9BA0(self, (u32)&self->pos, 0x32);
+        em_drop_item_spawn(self, (u32)&self->pos, 0x32);
         break;
     }
     case 1:
@@ -2038,10 +2038,10 @@ void fn_80181E24(_ENEMY_WORK* self) {
         color.a = 0;
     } else if (em_alt_mode_ck(self) == 1) {
         color.a = (u8)((s32)(lbl_80797BB0 * (lbl_80797B14 *
-                    (lbl_80797B34 + fn_8005024C((u16)(system_w.field_0x0c << 13))))) + 225);
+                    (lbl_80797B34 + sin_idx_get((u16)(system_w.field_0x0c << 13))))) + 225);
     } else {
         color.a = (u8)((s32)(lbl_80797BB0 * (lbl_80797B14 *
-                    (lbl_80797B34 + fn_8005024C((u16)(system_w.field_0x0c << 13))))) + 135);
+                    (lbl_80797B34 + sin_idx_get((u16)(system_w.field_0x0c << 13))))) + 135);
     }
     ((MHchar*)self->char_0x024)->setTevKColor(5, GX_KCOLOR3, &color);
 }
@@ -2086,7 +2086,7 @@ u32 fn_801820DC(_ENEMY_WORK* self, u32 arg) {
         break;
     }
     if (probe != 0xFF) {
-        u8 state = (u8)fn_80129DB8(self);
+        u8 state = (u8)em_area_break_ck(self);
         switch (state) {
         case 1:
             armed = 1;
@@ -2131,16 +2131,16 @@ u32 fn_801820DC(_ENEMY_WORK* self, u32 arg) {
                     sel = 0xFF;
                     break;
                 }
-                if (fn_8012A014(self, 23, sel, (u16)arg, lbl_805A950C, lbl_805A9518) == 1) {
+                if (em_pack_area_pick(self, 23, sel, (u16)arg, lbl_805A950C, lbl_805A9518) == 1) {
                     return 1;
                 }
             }
         }
     }
-    if (fn_80129A70(self, (u16)arg) == 1) {
+    if (em_area_roam_pick(self, (u16)arg) == 1) {
         return 1;
     }
-    return fn_8012A204(self) == 1;
+    return em_area_leave_ck(self) == 1;
 }
 
 /* The area's follow-up arming: when the action has run out (not action 10, 0x81A <= 0) pick the two motion ids
@@ -2252,7 +2252,7 @@ u32 fn_801825A4(_ENEMY_WORK* self, u32 kind) {
     case 5: {
         f32 scale = get_em_chg_scale(self);
         f32 limit = self->field_0x210 -
-                    (lbl_80797B9C + fn_8013026C(self)) * scale;
+                    (lbl_80797B9C + em_float_depth_get(self)) * scale;
         return self->pos.y < limit;
     }
     case 6:

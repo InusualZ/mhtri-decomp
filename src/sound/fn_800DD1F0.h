@@ -44,7 +44,7 @@ void fn_800E3264(MHchar* track, u32 arg);
 void fn_800E1640(MHchar* chr, f32 value);
 u32 fn_800E16DC(MHchar* chr, u16 motion, s32 flag);
 u32 fn_800E2198(MHchar* chr, s32 flag);
-void fn_800E26B4(MHchar* chr, u32 index, f32 value);
+void mhchar_mat_blend_set(MHchar* chr, u32 index, f32 value);
 /* 0x800E0A14 - the joint's world position through the model; the same signature `unsplit/sound.h`
  * carries, so a TU that includes both headers sees one declaration, not an overload. */
 void mhchar_joint_mtx_get(void* chr, u32 joint, Mtx34* out);

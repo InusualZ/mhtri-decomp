@@ -141,7 +141,7 @@ typedef struct _EFT28_WORK {
     /* +0x17 */ u8 key_0x17;
 } _EFT28_WORK;
 
-/* The 0x1C-byte parameter record `fn_800FA3B8` builds and `pl_capsule_box_set` reads in eft028_set_capsule. */
+/* The 0x1C-byte parameter record `eft_capsule_ctor` builds and `pl_capsule_box_set` reads in eft028_set_capsule. */
 typedef struct _EFT28_PARAM {
     /* +0x00 */ VEC3 a;
     /* +0x0C */ VEC3 b;
@@ -199,7 +199,7 @@ typedef struct _EFT26_RECCOL {
 } _EFT26_RECCOL; /* size: 0x18 (lower bound) */
 
 extern "C" {
-void fn_80117E58(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u32 joint, f32 scale);
+void eft026_pl_spawn(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u32 joint, f32 scale);
 void fn_80117EFC(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, f32 scale);
 _EFT* fn_80117FF8(u8 area, u8 kind);
 void fn_80118154(_EFT* self);
@@ -233,7 +233,7 @@ void mtx34_copy(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 
 void eft_em_spawn(struct _ENEMY_WORK* em, s32 a, s32 b, nw4r::math::VEC3* v, f32 c);
 void pl_capsule_box_set(_EFT28_PARAM* param, void* out);
-void fn_800FA3B8(_EFT28_PARAM* param);
+void eft_capsule_ctor(_EFT28_PARAM* param);
 u32 scn_mdl_mat_access_get_tev_color(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
 void res_mat_tev_color_copy_ctor(_EFT26_MATOBJ* out, void* in);
 void res_mat_tev_color_end_edit(_EFT26_MATOBJ* obj);
@@ -369,7 +369,7 @@ void eft026_set(_PLW* plw, u8 kind, u32 a, u32 b)
 
 /* The player-side setter: seat the source player at the family allocator, copy its two angle words,
  * the packed vector, the joint and the scale. */
-extern "C" void fn_80117E58(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u32 joint, f32 scale)
+extern "C" void eft026_pl_spawn(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u32 joint, f32 scale)
 {
     _EFT* rec = fn_80117FF8(em->area_no_0x1E1, kind);
 
@@ -1196,7 +1196,7 @@ extern "C" void eft028_set_capsule(u8 area)
     _EFT28_WORK* work;
     _EFT28_PARAM param;
 
-    fn_800FA3B8(&param);
+    eft_capsule_ctor(&param);
     if (area != get_now_areano()) {
         return;
     }

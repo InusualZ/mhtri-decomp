@@ -249,11 +249,11 @@ extern "C" void fn_80387844(_ENEMY_WORK* self)
             self->state++;
             em_mot_set(self, 0x6E, 4, 0);
             self->timer_0x020 = 0x708;
-            fn_80132224(self);
+            em_tint_hold_start(self);
         }
         return;
     case 2:
-        fn_8013221C(self, lbl_8079C024, 1, 0xF);
+        em_gauge_tick(self, lbl_8079C024, 1, 0xF);
         if (--self->timer_0x020 <= 0) {
             found = 1;
         } else if (em_busy_ck(self) == 1) {
@@ -261,7 +261,7 @@ extern "C" void fn_80387844(_ENEMY_WORK* self)
             move = (u8*)get_move_work_adrs(2);
             found = 0;
             for (i = 0; i < count; i++) {
-                if (move[0] != 0 && fn_8012D1A8(move[8]) == 0 && fn_8012D0B4(self, move) == 1) {
+                if (move[0] != 0 && em_pl_slot_leaving_ck(move[8]) == 0 && em_pl_target_ck(self, move) == 1) {
                     found = 1;
                 }
                 move += 0xB20;
@@ -343,14 +343,14 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
         self->state++;
         em_mot_set_ck(self, 0x6E, 0, 0);
         self->timer_0x020 = 0x96;
-        fn_80132224(self);
+        em_tint_hold_start(self);
         return;
     case 1:
-        fn_8013221C(self, lbl_8079C024, 1, 3);
+        em_gauge_tick(self, lbl_8079C024, 1, 3);
         if (--self->timer_0x020 <= 0) {
             self->state++;
             em_mot_set(self, 0x70, 4, 0);
-            fn_80132264(self);
+            em_tint_hold_end(self);
         }
         return;
     case 2:

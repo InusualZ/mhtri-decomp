@@ -19,7 +19,7 @@
  *  - `fn_8035ECD8`: retail keeps `act_id & 0xF` (`clrlwi r0,r4,28`) in every case body, ours folds the mask under
  *    the `(u8)(act_id - 1) <= 3` guard (360 B against 320 B);
  *  - `fn_8035EF58`: the prologue's callee-saved set and the `p = *(a + 4)` local colour differently, and ours calls
- *    `fn_8008E8D0` at a later point;
+ *    `anm_chr_result_scale_set` at a later point;
  *  - `fn_8035E81C`, `fn_8035E984`: ours calls `get_now_areano` a second time where retail reuses the narrowed
  *    result, and compares unsigned where retail uses `cmpwi`;
  *  - `fn_8035ECD8`, `fn_8035EE40`, `fn_8035F178`: retail keeps `clrlwi` + `slwi`, ours fuses them into `clrlslwi`;
@@ -53,8 +53,8 @@
 /* Callees outside this unit. */
 
 /* The vector helpers `g3d/g3d_resanmchr.cpp` (the first two) and `fn_8004CAD8.cpp` define. */
-extern "C" void fn_8008E8D0(void* a, void* b);
-extern "C" void fn_8008DA10(void* a, void* b);
+extern "C" void anm_chr_result_scale_set(void* a, void* b);
+extern "C" void anm_chr_result_scale_get(void* a, void* b);
 void vec3_scale_in_place(VEC3* v, f32 s);
 
 /* The object the aim writer's first argument points at, and the source block its +0x4 member names
@@ -528,12 +528,12 @@ extern "C" void fn_8035EF58(void* a, void* b, void* c, void* d, u32 e, u8* f)
     if (f[4] == 0xFF) {
         if (e - 5 <= 1) {
             if (p->field_0x00A == 1) {
-                fn_8008DA10(b, &v);
+                anm_chr_result_scale_get(b, &v);
                 vec3_scale_in_place(&v, lbl_8079B710);
-                fn_8008E8D0(b, &v);
+                anm_chr_result_scale_set(b, &v);
             }
         } else if (e == 0x17) {
-            fn_8008E8D0(b, &p->field_0x348);
+            anm_chr_result_scale_set(b, &p->field_0x348);
         }
     }
 }

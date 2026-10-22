@@ -125,7 +125,7 @@ void em020_angle_step_to_zero(_ENEMY_WORK* self)
         self->field_0x1BC = ang + 0x40;
     }
 
-    fn_80133C3C(self);
+    em_hit_arm_set(self);
 }
 
 /* Ticks the +0x334 countdown, and +0x33E in area 2 at stack depth 6; +0x338 latches "map 7, area 3"
@@ -150,7 +150,7 @@ void em020_timers_tick(_ENEMY_WORK* self)
  * release the record. */
 void em020_arm_mot1_wait20(_ENEMY_WORK* self)
 {
-    fn_80133C3C(self);
+    em_hit_arm_set(self);
     em020_angle_step_to_zero(self);
 
     switch (self->state) {
@@ -402,7 +402,7 @@ extern "C" void em020_model_refresh(_ENEMY_WORK* self) {
             res_tex_srt_copy_ctor(&srt_a, access_a.GetResTexSrt(false));
             res_tex_srt_copy_ctor(&srt_b, access_b.GetResTexSrt(false));
             srt_a.GetEffectMtx(1, &mtx);
-            mtx.m[0][3] = lbl_8079B8CC * fn_8005024C((u16) (system_w.field_0x0c << 7));
+            mtx.m[0][3] = lbl_8079B8CC * sin_idx_get((u16) (system_w.field_0x0c << 7));
             mtx.m[1][3] += lbl_8079BC64;
             if (mtx.m[1][3] > lbl_8079B848) {
                 mtx.m[1][3] -= lbl_8079B848;

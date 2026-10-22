@@ -39,9 +39,9 @@ u32 em_team_damage_over_ck(u8 team, u8 kind);
 /* 0x80133BB4 - r3 the work record; the hit-part refresh the action band calls. */
 void fn_80133BB4(struct _ENEMY_WORK* enemy);
 /* r3 (`self`) and f1; its callers `fadds` the return into a value they build. */
-f32 fn_8013026C(struct _ENEMY_WORK* self);
+f32 em_float_depth_get(struct _ENEMY_WORK* self);
 /* r3 (`self`), f1; no return (`enemy/em016_prog.cpp`'s `fn_801850F8` passes the sum it just built). */
-void fn_8012FE3C(struct _ENEMY_WORK* self, f32 a);
+void em_surface_clamp(struct _ENEMY_WORK* self, f32 a);
 /* r3 (`self`); returns a word compared against 1 (`cmplwi`) - the teardown step of
  * `enemy/em016_prog.cpp` runs `em_attack_start` only when it answers 1. */
 u32 em_hit_timer_ck(struct _ENEMY_WORK* self);
@@ -79,7 +79,7 @@ void fn_80132154(struct _ENEMY_WORK* self);
 u32 em_break_state_ck(struct _ENEMY_WORK* self);
 /* 0x80133DB0 - the angle stepper: three `u16` arguments (`enemy/em001_prog.cpp` passes three `(u16)` casts) and a
  * 16-bit angle back. */
-u16 fn_80133DB0(u16 a, u16 b, u16 c);
+u16 em_angle_approach(u16 a, u16 b, u16 c);
 
 /* 0x80130350 - r3 `self` and r4 (the `VEC3*` the caller builds); the body writes through r4 only, so no caller
  * reads a return value. */
@@ -95,7 +95,7 @@ void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
 /* `em_mot_speed_set` is deliberately NOT declared here: it is one of the 0x8012F symbols whose C
  * consumer (`enemy/em001_prog.cpp`) calls it with `self` only and relies on the old-style
  * declaration, so `unsplit/enemy.h` carries its `#ifdef __cplusplus` / `#else void
- * em_mot_speed_set();` split form - the shape `em_ground_ck`, `fn_801303FC`, `fn_80133F4C` and
+ * em_mot_speed_set();` split form - the shape `em_ground_ck`, `em_height_add`, `fn_80133F4C` and
  * `em_move_offset_step_update` keep there too, and the form the C++ consumers that do not include this header
  * (`enemy/em003_prog.cpp`, `enemy/em008_prog.cpp`) reach it through.  A prototype here is an
  * MWCC 10563 redeclaration against that declaration as soon as a C consumer includes both
@@ -108,7 +108,7 @@ void em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c)
 /* r3 the work record, r4 the effect table; returns 1 once the effect has finished. */
 u32 em_turn_seq_step(struct _ENEMY_WORK* self, void* tbl);
 /* r3 the work record; the normalized motion-frame ratio. */
-f32 fn_8012F8EC(struct _ENEMY_WORK* self);
+f32 em_mot_frame_get(struct _ENEMY_WORK* self);
 /* r3 the work record; the per-frame motion tick the escaping actions run at their head. */
 void em_frame_flag_set(struct _ENEMY_WORK* self);
 /* r3 the work record; plays the armed motion's end reaction. */

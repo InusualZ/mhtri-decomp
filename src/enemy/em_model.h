@@ -57,6 +57,10 @@ struct _CP_VECTOR;
 u16 em_roster_area_hit_find(u8 player, u8 area, nw4r::math::VEC3* pos, s16* out_kind, nw4r::math::VEC3* out_pos,
                             struct _CP_VECTOR* out_rot, s32* out_word);
 
+/* 0x803B9BA0 - rolls `percent` against the random draw and spawns the enemy's drop item at `pos` in a free drop
+ * slot (GUESS name). */
+s32 em_drop_item_spawn(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 percent);
+
 #ifdef __cplusplus
 }
 #endif

@@ -387,7 +387,7 @@ extern "C" void eft_slot_work_bind(EftSlot* slot) {
         s8 i;
 
         for (i = 0; i < (s8)count; i++, work += 0xB20) {
-            if (work[0] != 0 && fn_8012D1A8(work[8]) == 0) {
+            if (work[0] != 0 && em_pl_slot_leaving_ck(work[8]) == 0) {
                 slot->work_0x03 = i;
                 break;
             }
@@ -421,11 +421,11 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
             u32 found = 0;
 
             if (work[(s8)slot->work_0x03].active == 0 ||
-                fn_8012D1A8(slot->work_0x03) != 0) {
+                em_pl_slot_leaving_ck(slot->work_0x03) != 0) {
                 u16 i;
 
                 for (i = 0; i < count; i++) {
-                    if (work[i].active != 0 && fn_8012D1A8((u8)i) == 0) {
+                    if (work[i].active != 0 && em_pl_slot_leaving_ck((u8)i) == 0) {
                         slot->work_0x03 = (s8)i;
                         found = 1;
                         break;
@@ -473,7 +473,7 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
                         next = 0;
                     }
                     record = (_ENEMY_WORK*)((u8*)work + next * 0xB20);
-                    if (record->active != 0 && fn_8012D1A8(next) == 0 &&
+                    if (record->active != 0 && em_pl_slot_leaving_ck(next) == 0 &&
                         slot->field_0x14 == record->field_0x016) {
                         slot->work_0x03 = (s8)next;
                         slot->armed_0x02 = 0;

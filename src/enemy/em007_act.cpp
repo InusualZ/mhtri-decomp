@@ -260,7 +260,7 @@ void fn_802B43A8(void* pos, u8 a, u16 b);
 void fn_802B954C(void);
 void fn_802B9574(u32 a);
 void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, void* pos, f32 c);
-void fn_803B9BA0(struct _ENEMY_WORK* self, void* pos, u32 a);
+void em_drop_item_spawn(struct _ENEMY_WORK* self, void* pos, u32 a);
 
 #ifdef __cplusplus
 }
@@ -900,7 +900,7 @@ extern "C" void fn_801D9584(struct _ENEMY_WORK* self, u8 arg1) {
     case 1:
         em_turn_in_window(self, lbl_807995A8, lbl_807995AC, -(self->state_0x006 << 8));
         if ((arg1 == 1) && (em_frame_check(self, 0, lbl_80799504, lbl_807994FC) == 1)) {
-            fn_803B9BA0(self, &self->pos, 0x64);
+            em_drop_item_spawn(self, &self->pos, 0x64);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1479,7 +1479,7 @@ extern "C" void fn_801DAAC8(struct _ENEMY_WORK* self) {
             fn_80131EC0(self);
         }
         if (em_frame_check(self, 0, lbl_8079951C, lbl_807994FC) == 1) {
-            fn_803B9BA0(self, &self->pos, 0x64);
+            em_drop_item_spawn(self, &self->pos, 0x64);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1702,7 +1702,7 @@ extern "C" void fn_801DB594(struct _ENEMY_WORK* self) {
         self->state_0x006 = 0;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x32, 4, 0);
-        fn_803B9BA0(self, &self->pos, 0x64);
+        em_drop_item_spawn(self, &self->pos, 0x64);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -1839,10 +1839,10 @@ void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_act_arm_unless_down(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_hit_window_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
-u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
-u8 fn_80129DB8(struct _ENEMY_WORK* self);
-u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
-s32 fn_8012A204(struct _ENEMY_WORK* self);
+u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
+u8 em_area_break_ck(struct _ENEMY_WORK* self);
+u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
+s32 em_area_leave_ck(struct _ENEMY_WORK* self);
 
 void em_busy_set(struct _ENEMY_WORK* self);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
@@ -1862,20 +1862,20 @@ void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 u32 fn_8013023C(struct _ENEMY_WORK* self);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
-void fn_80133C3C(struct _ENEMY_WORK* self);
+void em_hit_arm_set(struct _ENEMY_WORK* self);
 void em_move_offset_rot_apply(struct _ENEMY_WORK* self, void* p);
 f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
 void fn_801369A0(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
-void fn_80130F74(struct _ENEMY_WORK* self);
+void em_bait_react(struct _ENEMY_WORK* self);
 struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
-void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
-void fn_80132224(struct _ENEMY_WORK* self);
-void fn_80132264(struct _ENEMY_WORK* self);
+void em_gauge_tick(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
+void em_tint_hold_start(struct _ENEMY_WORK* self);
+void em_tint_hold_end(struct _ENEMY_WORK* self);
 u8* em_move_work_pick(u8 index);
 void em_part_hit_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_801376B4(struct _ENEMY_WORK* self);
+void em_act_flag1_set(struct _ENEMY_WORK* self);
 
 /* `enemy/fn_80138074.c` */
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* helper);
@@ -1889,11 +1889,11 @@ void* em_res_user_data_ctor(void* self);
 void eft009_spawn_at_pos(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale,
                  nw4r::math::VEC3* pos);
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
-void fn_801057FC(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, s32 d);
+void eft013_spawn_id(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, s32 d);
 void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 void fn_800FA378(void* out);
-void fn_800FA3B8(void* out);
+void eft_capsule_ctor(void* out);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
 
@@ -1955,7 +1955,7 @@ void fn_801D71C4(struct _ENEMY_WORK* self, u8 arg1) {
     }
     if (self->field_0x009 == 0) {
         setVector3(&pos, lbl_807994FC, lbl_807994FC, lbl_80799500);
-        fn_801057FC(self, 0x14, 0x18, &pos, lbl_807994F8, 0);
+        eft013_spawn_id(self, 0x14, 0x18, &pos, lbl_807994F8, 0);
     }
     if (arg1 == 2) {
         switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
@@ -2039,12 +2039,12 @@ void fn_801D756C(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
     case 1:
         switch (arg2) {
         case 0:
-            fn_801376B4(self);
+            em_act_flag1_set(self);
             break;
         case 5:
         case 9:
         case 12:
-            fn_80130F74(self);
+            em_bait_react(self);
             break;
         }
         break;
@@ -2254,16 +2254,16 @@ void fn_801D7BF8(struct _ENEMY_WORK* self) {
             self->state++;
             em_mot_set(self, 0x6E, 4, 0);
             self->timer_0x020 = 0x708;
-            fn_80132224(self);
+            em_tint_hold_start(self);
         }
         break;
     case 2:
-        fn_8013221C(self, lbl_80799518, 1, 5);
+        em_gauge_tick(self, lbl_80799518, 1, 5);
         self->timer_0x020 = self->timer_0x020 - 1;
         if (self->timer_0x020 <= 0) {
             self->state++;
             em_mot_set(self, 0x70, 4, 0);
-            fn_80132264(self);
+            em_tint_hold_end(self);
         }
         break;
     case 3:
@@ -2480,10 +2480,10 @@ u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 
 void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 u32 fn_80129D3C(struct _ENEMY_WORK* self);
-u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
-u8 fn_80129DB8(struct _ENEMY_WORK* self);
-u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
-s32 fn_8012A204(struct _ENEMY_WORK* self);
+u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
+u8 em_area_break_ck(struct _ENEMY_WORK* self);
+u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
+s32 em_area_leave_ck(struct _ENEMY_WORK* self);
 
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
@@ -2859,8 +2859,8 @@ u32 fn_801DF810(struct _ENEMY_WORK* self, u8 part) {
     return 0;
 }
 
-/* 0x801DF8EC (0x31C) - the part-state step: gate on map kind 1..5, test the state (`fn_80129DB8`), request
- * a special part (`fn_8012A014`) and arm +0x1FC/+0x1FE/+0x1FF. */
+/* 0x801DF8EC (0x31C) - the part-state step: gate on map kind 1..5, test the state (`em_area_break_ck`), request
+ * a special part (`em_pack_area_pick`) and arm +0x1FC/+0x1FE/+0x1FF. */
 u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
     u32 kind;
     u32 found;
@@ -2894,7 +2894,7 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
         break;
     }
     if (id != 0xff) {
-        u8 s = fn_80129DB8(self);
+        u8 s = em_area_break_ck(self);
         if (s == 1) {
             found = 1;
         } else if (s == 2) {
@@ -2931,12 +2931,12 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
             break;
         }
         if (r4 != 0 || r5 != 0xff) {
-            if (fn_8012A014(self, r4, r5, a, lbl_805B6A44, lbl_805B6A50) == 1) {
+            if (em_pack_area_pick(self, r4, r5, a, lbl_805B6A44, lbl_805B6A50) == 1) {
                 return 1;
             }
         }
     }
-    if (fn_80129A70(self, a) == 1) {
+    if (em_area_roam_pick(self, a) == 1) {
         return 1;
     }
     if (!(self->value_0x452 < self->field_0x450 && self->field_0x43D == 1)) {
@@ -2971,7 +2971,7 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
             }
         }
     }
-    return fn_8012A204(self) == 1;
+    return em_area_leave_ck(self) == 1;
 }
 
 /* 0x801DFC08 (0x134) - steps the four action-block floats toward their clamps (up when `em_alt_mode_ck`

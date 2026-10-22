@@ -171,6 +171,11 @@ u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index);
 struct _EQUIP;
 void equip_from_item_id(u16 item_id, struct _EQUIP* out);
 
+/* 0x8027D530 */
+s32 pl_act_grabbed_ck(_PLW* self);
+/* 0x8027D584 */
+void pl_act_hold_motion_set(_PLW* self, u8* arg1);
+
 #ifdef __cplusplus
 }
 #endif

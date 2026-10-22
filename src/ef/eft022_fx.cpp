@@ -128,7 +128,7 @@ extern "C" void fn_80115FA0(_EFT*);
 extern "C" void fn_80115FB0(_EFT*);
 extern "C" void fn_80115FB4(_EFT_MODEL_OBJ*);
 extern "C" void fn_80116080(_EFT_MODEL_OBJ*, nw4r::math::MTX34*, s32);
-extern "C" void fn_80116430(void*, nw4r::math::VEC3*, u8);
+extern "C" void eft022_spawn(void*, nw4r::math::VEC3*, u8);
 extern "C" void fn_801164F0(_EFT*);
 extern "C" void fn_8011652C(_EFT*);
 extern "C" void fn_80116568(_EFT*);
@@ -639,7 +639,7 @@ void eft022_set(nw4r::math::VEC3* pos, u8 area)
 }
 
 /* Creates the effect's eft022 record for an actor. */
-extern "C" void fn_80116430(void* source, nw4r::math::VEC3* pos, u8 area)
+extern "C" void eft022_spawn(void* source, nw4r::math::VEC3* pos, u8 area)
 {
     _EFT* effect;
     _EFT_WORK_C* work;

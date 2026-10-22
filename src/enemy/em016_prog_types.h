@@ -30,7 +30,7 @@ struct EmAimRec {
     /* +0x00 */ u32 angle_0x00;    /* the lead angle: +-0x222 per frame */
     /* +0x04 */ EmRotVec rot_0x04; /* step +-0x1C7; z is armed to -1 by the initialiser */
     /* +0x10 */ EmRotVec rot_0x10; /* step +-0x1C7 */
-    /* +0x1C */ VEC3 vec_0x1C;     /* the vector `fn_8008E8D0` is handed */
+    /* +0x1C */ VEC3 vec_0x1C;     /* the vector `anm_chr_result_scale_set` is handed */
     /* +0x28 */ f32 value_0x28;    /* armed with `value_0x2C` before bit 0 of `flags_0x35` */
     /* +0x2C */ f32 value_0x2C;
     /* +0x30 */ u8 flag_0x30;
@@ -42,6 +42,43 @@ struct EmAimRec {
     /* +0x36 */ s16 value_0x36;
     /* +0x38 */ s16 value_0x38;
     /* +0x3A */ s16 value_0x3A;
+};
+
+/* `enemy/em018_prog.cpp`'s reading of the same 0x3C bytes: its initialiser `fn_80192630` seeds two float
+ * triples where enemy 016 keeps angles, and its per-frame fade `em018_glow_fade` steps them.  The triple and fade
+ * names are a GUESS (glow scales the model tint reads).
+ * size: 0x3C */
+struct EmFadeRec {
+    /* +0x00 */ VEC3 glow_0x00;    /* stepped toward (2.0, 17.0, 1.0) while `state_0x30` is 1 or 2 */
+    /* +0x0C */ s32 roster_0x0C;   /* the roster record handle, -1 for none (armed by the initialiser) */
+    /* +0x10 */ VEC3 glow_0x10;    /* stepped toward (2.3, 1.4, 2.8) in state 2 */
+    /* +0x1C */ f32 glint_0x1C;    /* the K-colour alpha `em018_tev_color_update` ramps 0..255 by 8.5 while aim flag 0x33 is set */
+    /* +0x20 */ f32 ambient_0x20;  /* the ambient level `em018_tev_color_update` ramps between 127 and the map's ceiling */
+    /* +0x24 */ f32 pulse_0x24;    /* the K-colour 1 grey level `em018_tev_color_update` swings up and down */
+    /* +0x28 */ f32 fade_0x28;     /* falls to 0.0001 while `dim_0x31` is set, then aim bit 0x01 is raised */
+    /* +0x2C */ f32 fade_0x2C;     /* falls to 0.5 while `dim_0x31` is set, rises to 1.0 otherwise */
+    /* +0x30 */ u8 state_0x30;     /* 0 fades both triples back to 1.0, 1 and 2 raise them */
+    /* +0x31 */ u8 dim_0x31;
+    /* +0x32 */ s8 pulse_up_0x32;  /* 1 while `pulse_0x24` rises, 0 while it falls */
+    /* +0x33 */ u8 flag_0x33;
+    /* +0x34 */ u8 flag_0x34;
+    /* +0x35 */ u8 flags_0x35;
+    /* +0x36 */ s16 value_0x36;
+    /* +0x38 */ s16 value_0x38;
+    /* +0x3A */ s16 value_0x3A;
+};
+
+/* The user-data item the user-data class methods of `enemy/em016_prog.cpp` and `enemy/em018_prog.cpp` take (`enemy/fn_80138074.c`'s `UserDataItem`; only +0x04 is read).
+ * size: 0x18 */
+struct EmUserItem {
+    /* +0x00 */ u32 key_0x00;
+    /* +0x04 */ u8 type_0x04;   /* 0xFF admits the call */
+    /* +0x05 */ u8 unused_0x05[0x13];
+};
+
+/* The matrix-pointer holder `joint_mtx_store`/`joint_mtx_load` take (the owner's `MtxHolder`).  size: 0x04 */
+struct EmMtxHolder {
+    /* +0x00 */ MTX34* mtx_0x00;
 };
 
 /* One of the three per-area clusters at `EmActWork::clusters_0x590` (`enemy/fn_80138074.c` addresses the same
@@ -70,7 +107,10 @@ struct EmActWork {
     /* +0x1E1 */ u8 act_id;       /* the action id every dispatch in this range switches on */
     /* +0x1E2 */ u8 state_0x1E2;
     /* +0x1E3 */ u8 unused_0x1E3[0x328 - 0x1E3];
-    /* +0x328 */ EmAimRec aim_0x328;
+    union {
+        /* +0x328 */ EmAimRec aim_0x328;
+        /* +0x328 */ EmFadeRec fade_0x328; /* `enemy/em018_prog.cpp`'s view of the same record */
+    };
     /* +0x364 */ u8 unused_0x364[0x590 - 0x364];
     /* +0x590 */ EmCluster clusters_0x590[3];
     /* +0x740 */ u8 unused_0x740[0x9F6 - 0x740];

@@ -137,10 +137,10 @@ extern "C" void fn_8015E6E8(_ENEMY_WORK* self);
 extern "C" void fn_8015E788(_ENEMY_WORK* self);
 
 /* Callees whose owners' headers do not declare them: `lobby/fn_8030121C.cpp`'s effect spawns `fn_80305924`
- * and `eft_em_spawn`, and `enemy/em_model.cpp`'s `fn_803B9BA0`. */
+ * and `eft_em_spawn`, and `enemy/em_model.cpp`'s `em_drop_item_spawn`. */
 extern "C" void fn_80305924(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, s32 id);
 extern "C" void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s);
-extern "C" void fn_803B9BA0(_ENEMY_WORK* self, void* pos, s32 value);
+extern "C" void em_drop_item_spawn(_ENEMY_WORK* self, void* pos, s32 value);
 
 /* The unit's `.sdata2` pool, declared, not defined: the source does not emit it yet (values from the DOL). */
 extern f32 lbl_80797330; /* 0.0 */
@@ -349,7 +349,7 @@ extern "C" void fn_8015DAE4(_ENEMY_WORK* self, u8* state, u8* sub) {
 }
 
 /* 0x8015DB68 - the second transition table: action 1 arms the +0x32A countdown, the joint effect and the
- * `fn_801376B4` hand-over; action 0xA arms flag bits 0/5 and +0x491, each with an effect. */
+ * `em_act_flag1_set` hand-over; action 0xA arms flag bits 0/5 and +0x491, each with an effect. */
 extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
     VEC3 v1;
     VEC3 v2;
@@ -370,7 +370,7 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
             }
             break;
           case 9:
-            fn_801376B4(self);
+            em_act_flag1_set(self);
             break;
         }
         break;
@@ -382,7 +382,7 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
                 self->field_0x1E4 |= 1;
                 setVector3(&v1, lbl_80797330, lbl_80797340, lbl_80797344);
                 fn_80305924(self, 1, 0x14, &v1, lbl_8079733C, -1);
-                fn_803B9BA0(self, &self->pos, 0x1E);
+                em_drop_item_spawn(self, &self->pos, 0x1E);
             }
             break;
           case 0xC8:
@@ -392,7 +392,7 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
                 self->field_0x1E4 |= 0x20;
                 setVector3(&v1, lbl_80797330, lbl_80797330, lbl_80797330);
                 fn_80305924(self, 1, 0x2D, &v1, lbl_8079733C, -1);
-                fn_803B9BA0(self, &self->pos, 0x1E);
+                em_drop_item_spawn(self, &self->pos, 0x1E);
             }
             break;
         }
@@ -612,15 +612,15 @@ extern "C" void fn_8015E338(_ENEMY_WORK* self) {
             self->state++;
             em_mot_set(self, 0x6E, 4, 0);
             self->timer_0x020 = 0x708;
-            fn_80132224(self);
+            em_tint_hold_start(self);
         }
         break;
       case 2:
-        fn_8013221C(self, lbl_80797358, 1, 0xA);
+        em_gauge_tick(self, lbl_80797358, 1, 0xA);
         if (--self->timer_0x020 <= 0) {
             self->state++;
             em_mot_set(self, 0x70, 4, 0);
-            fn_80132264(self);
+            em_tint_hold_end(self);
         }
         break;
       case 3:
@@ -1314,7 +1314,7 @@ extern "C" void fn_8015F6C4(_ENEMY_WORK* self, u8 arg1) {
             if (self->field_0x1AC >= lbl_80797330) {
                 fn_801303EC(self, lbl_80797330);
             } else {
-                fn_801303FC(self, lbl_80797340);
+                em_height_add(self, lbl_80797340);
             }
         }
         if (em_mot_end_ck(self) == 1U) {
@@ -1533,7 +1533,7 @@ u32 fn_80165FC8(_ENEMY_WORK* self, u32 arg1) {
     if ((s32)entry == 2) {
         sel = 3;
     }
-    if (sel != 0xFF && (s32)fn_80129DB8(self) == 2) {
+    if (sel != 0xFF && (s32)em_area_break_ck(self) == 2) {
         return 1;
     }
     if (em_mot_finished_ck_view1(self) == 0 && self->value_0x452 >= 0x384) {
@@ -1547,21 +1547,21 @@ u32 fn_80165FC8(_ENEMY_WORK* self, u32 arg1) {
         } else {
             motion = 6;
         }
-        if (fn_8012A014(self, 0, motion, (u16)arg1, 0, lbl_805A5DB4) == 1) {
+        if (em_pack_area_pick(self, 0, motion, (u16)arg1, 0, lbl_805A5DB4) == 1) {
             return 1;
         }
     }
     if (em_mot_finished_ck_view1(self) == 0 && self->value_0x452 >= 0x384 && fn_8015D934_view1(self) <= 2 && (s32)entry == 2
-        && self->area_no != 3 && fn_80129A1C(self, (u16)arg1, 0x1E, seat) == 1) {
+        && self->area_no != 3 && em_roll_cooldown_ck(self, (u16)arg1, 0x1E, seat) == 1) {
         self->field_0x1FC = 1;
         self->field_0x1FE = 0xA;
         self->field_0x1FF = 3;
         return 1;
     }
-    if (fn_80129A70(self, (u16)arg1) == 1) {
+    if (em_area_roam_pick(self, (u16)arg1) == 1) {
         return 1;
     }
-    return fn_8012A204(self) == 1;
+    return em_area_leave_ck(self) == 1;
 }
 
 void fn_801661BC(ResUserDataAc* self) {

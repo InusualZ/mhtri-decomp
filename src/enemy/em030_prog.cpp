@@ -115,7 +115,7 @@ extern "C" f32 lbl_80798C60; /* -50.0f - its z */
 /* The two three-float records the unit's static constructor fills (0x18 bytes of `.bss`). */
 extern "C" VEC3 vec_pair_801B0010_0[2];
 /* 0x803B9BA0 (`enemy/em_model.cpp`): r3 the work record, r4 the position, r5 the id. */
-extern "C" void fn_803B9BA0(_ENEMY_WORK* work, nw4r::math::VEC3* pos, u32 id);
+extern "C" void em_drop_item_spawn(_ENEMY_WORK* work, nw4r::math::VEC3* pos, u32 id);
 extern "C" f32 lbl_80798B40; /* 2000.0f */
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -188,7 +188,7 @@ extern "C" u32 fn_801B0168(_ENEMY_WORK* work) {
         if (work->field_0x382 != 0xFF) {
             _ENEMY_WORK* target = (_ENEMY_WORK*)em_move_work_pick(work->state_0x381, work->field_0x382);
             if (target->active) {
-                if (fn_8012D0B4(work, target) == 1) {
+                if (em_pl_target_ck(work, target) == 1) {
                     return 0;
                 }
             }
@@ -380,7 +380,7 @@ extern "C" u32 fn_801B06D4(_ENEMY_WORK* work) {
         if (!area->active) {
             continue;
         }
-        if (fn_8012D0B4(work, area) == 0) {
+        if (em_pl_target_ck(work, area) == 0) {
             continue;
         }
         if (pl_torch_ck((_ENEMY_WORK*)area) == 0) {
@@ -822,7 +822,7 @@ extern "C" void fn_801B13A4(_ENEMY_WORK* work, u32 kind) {
             case 1:
                 work->state = work->state + 1;
                 em_mot_set(work, 0x26, 0, 0);
-                fn_803B9BA0(work, &work->pos, 0x64);
+                em_drop_item_spawn(work, &work->pos, 0x64);
                 break;
             case 2:
                 work->field_0x331 = 0;
@@ -1050,7 +1050,7 @@ extern "C" void fn_801B1958(_ENEMY_WORK* work) {
 }
 
 /* 0x801B1A40 (0xF0): the motion-0x06 turn; the 4-bit `bits_0x1EC` field is latched into `state_0x006` as the
- * turn step, and the second angle steps through `fn_80133DB0` while the 0x78-frame countdown runs. */
+ * turn step, and the second angle steps through `em_angle_approach` while the 0x78-frame countdown runs. */
 extern "C" void fn_801B1A40(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
@@ -1066,7 +1066,7 @@ extern "C" void fn_801B1A40(_ENEMY_WORK* work) {
             work->state = work->state + 1;
             em_mot_set(work, 0x19, 4, 0);
         } else {
-            work->field_0x1C0 = fn_80133DB0((u16)(work->state_0x006 << 12), (u16)work->field_0x1C0, 0x800);
+            work->field_0x1C0 = em_angle_approach((u16)(work->state_0x006 << 12), (u16)work->field_0x1C0, 0x800);
         }
         break;
     case 2:
@@ -1135,7 +1135,7 @@ extern "C" void fn_801B1C60(_ENEMY_WORK* work) {
 }
 
 /* 0x801B1CF4 (0x194): the motion-0x06 turn-to-target; the angle to the +0x36C target point becomes a per-frame
- * step (clamped at 0) through `fn_80133DB0`, and the 0x78-frame countdown picks the 0x19 tail. */
+ * step (clamped at 0) through `em_angle_approach`, and the 0x78-frame countdown picks the 0x19 tail. */
 extern "C" void fn_801B1CF4(_ENEMY_WORK* work, u32 kind) {
     VEC3 vec;
     VEC3 diff;
@@ -1169,7 +1169,7 @@ extern "C" void fn_801B1CF4(_ENEMY_WORK* work, u32 kind) {
             if ((u8)kind == 1) {
                 step = -step;
             }
-            work->field_0x1C0 = fn_80133DB0((u16)(angB + step), (u16)work->field_0x1C0, 0x800);
+            work->field_0x1C0 = em_angle_approach((u16)(angB + step), (u16)work->field_0x1C0, 0x800);
             work->timer_0x020--;
             if (work->timer_0x020 <= 0) {
                 work->state = work->state + 1;
@@ -1340,7 +1340,7 @@ extern "C" void fn_801B203C(_ENEMY_WORK* work, u32 kind) {
 }
 
 /* 0x801B2298 (0x27C): the kinded turn action; state 0 latches the target angle (`calcVecAngXY`), state 1 waits
- * or steps the second angle through `fn_80133DB0`, and the team/kind gates pick the follow-up. */
+ * or steps the second angle through `em_angle_approach`, and the team/kind gates pick the follow-up. */
 extern "C" void fn_801B2298(_ENEMY_WORK* work, u32 kind) {
     VEC3 vec;
     VEC3 diff;
@@ -1383,7 +1383,7 @@ extern "C" void fn_801B2298(_ENEMY_WORK* work, u32 kind) {
         } else if ((u8)kind == 1) {
             em_turn_to_target(work, 0x800);
         } else {
-            work->field_0x1C0 = fn_80133DB0((u16)work->field_0x37C, (u16)work->field_0x1C0, 0x800);
+            work->field_0x1C0 = em_angle_approach((u16)work->field_0x37C, (u16)work->field_0x1C0, 0x800);
         }
         if (work->timer_0x020 > 0x0F) {
             if (fn_801B0168(work) == 1) {

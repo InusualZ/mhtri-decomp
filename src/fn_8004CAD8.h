@@ -72,6 +72,10 @@ s32 calcVecAng2(VEC3* a, VEC3* b);
  * locally in their own sources. */
 void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
+/* 0x80050AA4 / 0x80050B48 - the vector's yaw and pitch (`calcVecAng3__FPQ34nw4r4math4VEC3`,
+ * `calcVecAngX__FPQ34nw4r4math4VEC3`): 16-bit angles, masked by their callers (`clrlwi r3,r3,16`). */
+s32 calcVecAng3(nw4r::math::VEC3* v);
+u16 calcVecAngX(nw4r::math::VEC3* v);
 #endif
 
 /* C linkage: the target symbol is the unmangled `mtx34_const_ptr` (.text 0x80051570, a 4-byte `blr`).
@@ -136,7 +140,7 @@ f32 sqrt_f32(f32 x);
  * its argument to u16 (`clrlwi r3,r3,16`), scales the `anim_tick_angle` result and returns
  * `nw4r::math::SinFIdx`, so the signature is `(u16) -> f32` (settled from the callee's own body,
  * docs/plan.md 6.5 rule 6).  Added with proposal/80181C88. */
-f32 fn_8005024C(u16 idx);
+f32 sin_idx_get(u16 idx);
 /* 0x80050CF4 - the SDK vector subtract (`ps_sub` on two paired loads): `dst = a - b`. */
 void PSVECSubtract(f32* dst, const f32* a, const f32* b);
 /* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved

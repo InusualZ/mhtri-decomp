@@ -43,7 +43,7 @@
  *    `em_motion_window_ck`: the same magic, and ours materialises the final test branch-free (`mfcr` + `extrwi`);
  *  - `em_sleep_ck`: retail shares one `return 0` through both `bne` arms, ours a `li r3,0` per arm;
  *    `fn_8012F39C`: the constant is loaded before the field (f0/f1 against retail's f2/f0);
- *  - `fn_8012D0B4`, `fn_8012E2A8`: ours compares unsigned where retail uses `cmpwi` (`fn_8012D0B4` also an extra
+ *  - `em_pl_target_ck`, `fn_8012E2A8`: ours compares unsigned where retail uses `cmpwi` (`em_pl_target_ck` also an extra
  *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
  *    earlier;
@@ -80,9 +80,9 @@
 #include "Pl/Pl_master_ck.h"
 #define em_act_ck__FP11_ENEMY_WORKUcUc em_act_ck__FP11_ENEMY_WORKUcUc_hidden_fn_8012BDF4_h
 #define em_area_ck em_area_ck_hidden_fn_8012BDF4_h
-#define fn_8012D0B4 fn_8012D0B4_hidden_fn_8012BDF4_h
+#define em_pl_target_ck fn_8012D0B4_hidden_fn_8012BDF4_h
 #define fn_8012D188 fn_8012D188_hidden_fn_8012BDF4_h
-#define fn_8012D1A8 fn_8012D1A8_hidden_fn_8012BDF4_h
+#define em_pl_slot_leaving_ck fn_8012D1A8_hidden_fn_8012BDF4_h
 #define fn_8012D23C fn_8012D23C_hidden_fn_8012BDF4_h
 #define fn_8012D3E0 fn_8012D3E0_hidden_fn_8012BDF4_h
 #define pl_torch_ck fn_8012D7FC_hidden_fn_8012BDF4_h
@@ -98,9 +98,9 @@
 #undef pl_torch_ck
 #undef fn_8012D3E0
 #undef fn_8012D23C
-#undef fn_8012D1A8
+#undef em_pl_slot_leaving_ck
 #undef fn_8012D188
-#undef fn_8012D0B4
+#undef em_pl_target_ck
 #undef em_area_ck
 #undef em_act_ck__FP11_ENEMY_WORKUcUc
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -146,15 +146,15 @@
 #define fn_8012D3E0_view2 ((u8 (*)())fn_8012D3E0)
 #define fn_8012D23C_view4 ((u32 (*)())fn_8012D23C)
 #define fn_8012D23C_view2 ((u32 (*)())fn_8012D23C)
-#define fn_8012D1A8_view5 ((s32 (*)(u8))fn_8012D1A8)
-#define fn_8012D1A8_view3 ((s32 (*)(u8))fn_8012D1A8)
-#define fn_8012D1A8_view1 ((s32 (*)(u8))fn_8012D1A8)
+#define fn_8012D1A8_view5 ((s32 (*)(u8))em_pl_slot_leaving_ck)
+#define fn_8012D1A8_view3 ((s32 (*)(u8))em_pl_slot_leaving_ck)
+#define fn_8012D1A8_view1 ((s32 (*)(u8))em_pl_slot_leaving_ck)
 #define fn_8012D188_view5 ((s32 (*)(struct _ENEMY_WORK*, struct _ENEMY_WORK*))fn_8012D188)
 #define fn_8012D188_view3 ((s32 (*)(struct _ENEMY_WORK*, struct _ENEMY_WORK*))fn_8012D188)
 #define fn_8012D188_view1 ((s32 (*)(struct _ENEMY_WORK*, struct _ENEMY_WORK*))fn_8012D188)
-#define fn_8012D0B4_view5 ((s32 (*)(struct _ENEMY_WORK*, void*))fn_8012D0B4)
-#define fn_8012D0B4_view3 ((s32 (*)(struct _ENEMY_WORK*, void*))fn_8012D0B4)
-#define fn_8012D0B4_view1 ((s32 (*)(struct _ENEMY_WORK*, void*))fn_8012D0B4)
+#define fn_8012D0B4_view5 ((s32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
+#define fn_8012D0B4_view3 ((s32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
+#define fn_8012D0B4_view1 ((s32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
 #define fn_8012BA00_view1 ((s32 (*)(struct _ENEMY_WORK*, struct EnemyActionTable*, void*, s32, u16))fn_8012BA00)
 #define fn_8012B9BC_view1 ((void (*)(_ENEMY_WORK*, u8, s32))fn_8012B9BC)
 #define fn_8012B944_view1 ((s32 (*)(_ENEMY_WORK*, u8, s32))fn_8012B944)
@@ -224,7 +224,7 @@ extern f32 lbl_80796C8C; /* 0.7f */
 
 /* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
 /* The root object `get_move_work_adrs(0)` returns - the per-player status bytes that
- * `fn_8012D1A8` reads.  It is not the 0xB20 record array; the index is a byte offset into this one
+ * `em_pl_slot_leaving_ck` reads.  It is not the 0xB20 record array; the index is a byte offset into this one
  * object.
  * size: 0x22FD (lower bound; the per-player array bound is approximate) */
 struct _PLAYER_ROOT {
@@ -340,8 +340,8 @@ extern "C" f32 lbl_80796C58;
 extern "C" f32 lbl_80796C90;
 extern "C" f32 lbl_80796C94;
 
-extern "C" s32 fn_8012D0B4(_ENEMY_WORK* enemy, _PLW* work);
-extern "C" s32 fn_8012D1A8(u32 index);
+extern "C" s32 em_pl_target_ck(_ENEMY_WORK* enemy, _PLW* work);
+extern "C" s32 em_pl_slot_leaving_ck(u32 index);
 extern "C" s32 fn_8012D188(_ENEMY_WORK* enemy, _PLW* work);
 extern "C" u32 em_busy_ck(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012CF2C(_ENEMY_WORK* enemy);
@@ -417,7 +417,7 @@ extern "C" {
  * (playbook 42); their owners' headers do not declare them. */
 
 /* this unit's own entry points, used before their definitions below */
-void fn_801376B4(_ENEMY_WORK* self);
+void em_act_flag1_set(_ENEMY_WORK* self);
 void fn_801376BC(_ENEMY_WORK* self, u8 flag);
 void fn_801376DC(_ENEMY_WORK* self, u8 flag);
 
@@ -446,7 +446,7 @@ extern "C" void em_se_tbl_play_alt(struct _ENEMY_WORK* self, void* tbl, u32 a, u
     fn_80124C5C((u32)self, (u32)tbl, (u8)a);
 }
 
-extern "C" void fn_801252C0(struct _ENEMY_WORK* self, u8 a)
+extern "C" void em_owner_slot_set(struct _ENEMY_WORK* self, u8 a)
 {
     self->owner_slot_0x1F6 = (s8)a;
     self->field_0x1F5 = 0;
@@ -683,7 +683,7 @@ extern "C" void fn_801299D8(struct _ENEMY_WORK* self)
     }
 }
 
-extern "C" u32 fn_80129A1C(void* unused, u32 a, u32 b, s16* timer)
+extern "C" u32 em_roll_cooldown_ck(void* unused, u32 a, u32 b, s16* timer)
 {
     if (*timer <= 0) {
         if ((u16)a % 100 < (u16)b) {
@@ -694,7 +694,7 @@ extern "C" u32 fn_80129A1C(void* unused, u32 a, u32 b, s16* timer)
     return 0;
 }
 
-extern "C" u32 fn_8012A204(struct _ENEMY_WORK* self)
+extern "C" u32 em_area_leave_ck(struct _ENEMY_WORK* self)
 {
     if (self->value_0x44C <= 0
         || (self->field_0x43D != 1 && self->value_0x452 > self->value_0x44E)) {
@@ -905,7 +905,7 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
     max = get_move_work_max(2);
     work = get_move_work_adrs(2);
     for (i = 0; i < max; i++) {
-        if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0) {
+        if (work->slot_active != 0 && em_pl_slot_leaving_ck(work->chunk_ofs) == 0) {
             value = fn_8012BA00_view1(enemy, table, work, 1, i);
             if (value > 0) {
                 if (Pl_Skill_ck(work, 0xC) == 1) {
@@ -965,7 +965,7 @@ extern "C" s32 fn_8012C0EC(_ENEMY_WORK* enemy, u32 index)
         table = lbl_805A0FF8[0];
     }
     work += (u8)index;
-    if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0 && fn_8012D0B4(enemy, work) == 1) {
+    if (work->slot_active != 0 && em_pl_slot_leaving_ck(work->chunk_ofs) == 0 && em_pl_target_ck(enemy, work) == 1) {
         entry = table->entry;
         if (entry->condition_0x00C != 0 && Pl_condition_ck(work, entry->condition_0x00C) == 1) {
             value += entry->value_0x010;
@@ -1153,8 +1153,8 @@ extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2)
         enemy->field_0x798 = 0xFF;
         if ((u8)mask != 0xFF) {
             for (i = 0; i < max; i++, work++) {
-                if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0 &&
-                    ((u8)mask & (1 << i)) != 0 && fn_8012D0B4(enemy, work) != 0) {
+                if (work->slot_active != 0 && em_pl_slot_leaving_ck(work->chunk_ofs) == 0 &&
+                    ((u8)mask & (1 << i)) != 0 && em_pl_target_ck(enemy, work) != 0) {
                     enemy->field_0x798 = i;
                     break;
                 }
@@ -1196,8 +1196,8 @@ extern "C" u32 fn_8012C870(_ENEMY_WORK* enemy, u32 mask)
         work = get_move_work_adrs(2);
         enemy->field_0x798 = 0xFF;
         for (i = 0; i < max; i++, work++) {
-            if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0 &&
-                ((u8)mask & (1 << i)) != 0 && fn_8012D0B4(enemy, work) != 0) {
+            if (work->slot_active != 0 && em_pl_slot_leaving_ck(work->chunk_ofs) == 0 &&
+                ((u8)mask & (1 << i)) != 0 && em_pl_target_ck(enemy, work) != 0) {
                 enemy->field_0x798 = i;
                 break;
             }
@@ -1332,7 +1332,7 @@ extern "C" u32 em_busy_ck(_ENEMY_WORK* enemy)
 }
 
 /* Whether the given player slot is in the "out of action" state; only player 0 is looked at. */
-extern "C" s32 fn_8012D1A8(u32 index)
+extern "C" s32 em_pl_slot_leaving_ck(u32 index)
 {
     _PLAYER_ROOT* root;
 
@@ -1357,9 +1357,9 @@ extern "C" u32 em_act_ck__FP11_ENEMY_WORKUcUc(_ENEMY_WORK* enemy, u32 state, u32
 
 /* Whether the enemy may attack the given work record: same area, not already out, and past the
  * map-specific position gate. */
-extern "C" s32 fn_8012D0B4(_ENEMY_WORK* enemy, _PLW* work)
+extern "C" s32 em_pl_target_ck(_ENEMY_WORK* enemy, _PLW* work)
 {
-    if (fn_8012D1A8(work->chunk_ofs) == 1) {
+    if (em_pl_slot_leaving_ck(work->chunk_ofs) == 1) {
         return 0;
     }
     if (work->field_0x00A == 8) {
@@ -2174,7 +2174,7 @@ extern "C" void fn_8013765C(_ENEMY_WORK* self, u32 arg1)
 }
 
 /* Sets the `flags_0x8B3` bit 1. */
-extern "C" void fn_801376B4(_ENEMY_WORK* self)
+extern "C" void em_act_flag1_set(_ENEMY_WORK* self)
 {
     fn_801376DC(self, 1);
 }
@@ -2223,7 +2223,7 @@ extern "C" void em_motion_mode_set(_ENEMY_WORK* self, u8 mode)
         break;
     }
     case 0:
-        fn_801376B4(self);
+        em_act_flag1_set(self);
         break;
     }
 }

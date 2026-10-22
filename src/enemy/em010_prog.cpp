@@ -569,7 +569,7 @@ void fn_801671AC(_ENEMY_WORK* self) {
                 }
                 if (data->field_0x08 == 0xFF) {
                     self->field_0x46C = 0xFF;
-                    fn_8013AAC4(self);
+                    em_user_data_reenter(self);
                     fn_8012B380(self, 6, 0xFF, 0);
                 }
             }

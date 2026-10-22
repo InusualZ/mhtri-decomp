@@ -1309,7 +1309,7 @@ void fn_802BC69C(void)
 /*
  * Puts the camera into mode 12 with the caller's argument.
  */
-void fn_802BC7B0(u32 arg)
+void camera_mode12_set(u32 arg)
 {
     fn_802BC4AC(12, arg);
 }

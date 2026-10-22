@@ -46,14 +46,14 @@ struct EmCmdRec {
 };
 
 /* The 0xB20-byte records `get_move_work_adrs(2)` hands back (`fn_8013FD98` steps a whole record at a
- * time and asks `fn_8027D530` whether the candidate is the one it wants).  Only the bytes the search
+ * time and asks `pl_act_grabbed_ck` whether the candidate is the one it wants).  Only the bytes the search
  * and the distance test read are named; the rest is the record's own layout, not this unit's
  * business.
  * size: 0xB20 */
 struct EmAreaWork {
     /* +0x000 */ u8 active;
     /* +0x001 */ u8 unused_0x001[0x008 - 0x001];
-    /* +0x008 */ u8 field_0x008;      /* the kind `fn_8012D1A8` classifies */
+    /* +0x008 */ u8 field_0x008;      /* the kind `em_pl_slot_leaving_ck` classifies */
     /* +0x009 */ u8 unused_0x009[0x016 - 0x009];
     /* +0x016 */ u8 area_no;
     /* +0x017 */ u8 unused_0x017[0x03C - 0x017];
@@ -256,7 +256,7 @@ struct _ENEMY_WORK {
                                          * record's `pos` into, and the aim point `fn_801D75D0`
                                          * copies the target record's position into (`enemy/em007_act.cpp`) */
     /* +0x1BC */ u32 field_0x1BC;       /* a rotation angle (wraps at 0x10000) */
-    /* +0x1C0 */ u32 field_0x1C0;       /* the second rotation angle `fn_80133DB0` steps */
+    /* +0x1C0 */ u32 field_0x1C0;       /* the second rotation angle `em_angle_approach` steps */
     /* +0x1C4 */ u32 field_0x1C4;       /* the third rotation angle */
     /* +0x1C8 */ u32 field_0x1C8;       /* bit 0x80 suppresses `fn_8012C6F4` */
     /* +0x1CC */ f32 field_0x1CC;       /* the seat-preference weight `enemy/em034_prog.cpp`'s
@@ -621,7 +621,7 @@ struct _ENEMY_WORK {
     /* +0x37C */ u32 field_0x37C;       /* the rotation word `fn_801CEF44` latches from `field_0x1C0`
                                         * and hands `em_move_offset_rot_apply` (`enemy/em005_act.cpp`), and the
                                         * angle `enemy/em030_prog.cpp`'s `fn_801B2298` computes with
-                                        * `calcVecAngXY` and steps through `fn_80133DB0` */
+                                        * `calcVecAngXY` and steps through `em_angle_approach` */
     /* +0x380 */ u8 field_0x380;        /* the "special part armed" selector `fn_801D6758` matches
                                          * against 1 (`enemy/em005_act.cpp`), and the em030
                                          * homing/action state `enemy/em030_prog.cpp` keeps here */
@@ -886,7 +886,8 @@ struct _ENEMY_WORK {
     /* +0x0A05 */ u8 field_0xA05;
     /* +0x0A06 */ u8 field_0xA06;
     /* +0x0A07 */ u8 field_0xA07;
-    /* +0x0A08 */ u8 unused_0xA08[0xA0D - 0xA08];
+    /* +0x0A08 */ u8 hit_0xA08[0xA0D - 0xA08];  /* the hit reference `enemy/em018_prog.cpp`'s `fn_80198150` hands
+                                        * `hit_list_capsule_ck` with its capsule */
     /* +0x0A0D */ u8 field_0xA0D;       /* fn_80177D54's per-frame gate */
     /* +0x0A0E */ u8 unused_0xA0E[0xA16 - 0xA0E];
     /* +0xA16 */ u8 field_0xA16;      /* the byte `enemy/em030_prog.cpp`'s `fn_801B203C` tests against

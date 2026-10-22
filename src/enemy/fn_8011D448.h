@@ -29,6 +29,15 @@ void em_event_settle_kind21(struct _ENEMY_WORK* self);
 void em_status_bits_set(struct _ENEMY_WORK* self, u32 mask);
 
 #ifdef __cplusplus
+
+/* 0x8011D448 */
+void em_eft_fx_spawn(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, f32 scale);
+/* 0x8011D4FC */
+void em_eft_fx_spawn_pair(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, u32 timer, f32 scale);
+/* 0x8011E6E4 */
+void em_gauge_step(_ENEMY_WORK* self, s32 step);
+/* 0x8011E760 */
+void em_gauge_set(_ENEMY_WORK* self, s32 value);
 }
 
 /* r3 the work record, r4 the part index; returns that part's damage level (a byte). */

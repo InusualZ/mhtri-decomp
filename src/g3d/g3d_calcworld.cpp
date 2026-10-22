@@ -78,8 +78,8 @@ extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
 extern "C" ResNodeData* res_node_ptr(const void* p);
 extern "C" void chr_anm_result_init(void* pOut);
-extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
-extern "C" void fn_8008F148(void* pOut, const void* pIn);
+extern "C" void* anm_chr_result_trans_get(void* pOut, const void* pIn);
+extern "C" void anm_chr_result_trans_set(void* pOut, const void* pIn);
 extern "C" void fn_80098D5C(void* pA, const void* pB);
 extern "C" void fn_80098F6C(void* pA, void* pOut);
 extern "C" s32 fn_800D77B0(void* pA, void* pB, void* pC, void* pD, s32 e, void* pF);
@@ -377,12 +377,12 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                     rec = *pRec;
                     pRec = &rec;
                 }
-                fn_8008E1C0(&rec, &vA);
+                anm_chr_result_trans_get(&rec, &vA);
                 rec.mUnk00 |= 0x200;
                 fn_80098D5C(&s1C, &rec);
-                fn_8008E1C0(&rec, &vB);
+                anm_chr_result_trans_get(&rec, &vB);
                 addVec3To(&vB, &vA);
-                fn_8008F148(&rec, &vB);
+                anm_chr_result_trans_set(&rec, &vB);
             }
             if (pNodeCallback2 != NULL) {
                 if (pRec != &rec) {

@@ -136,6 +136,8 @@ typedef struct MHchar {
     u32 getMatColor(u32 index, _GXChannelID channel, _GXColor* out);               /* ef/effect.cpp */
     void setMatColor(u32 index, _GXChannelID channel, _GXColor color, bool keep);  /* ef/effect.cpp */
     void setAmbColor(u32 index, _GXChannelID channel, _GXColor color, bool keep);  /* sound/mhchar.cpp */
+    u32 getAmbColor(u32 index, _GXChannelID channel, _GXColor* out);               /* enemy/em018_prog.cpp */
+    void setNumTevStages(u32 index, u8 count);                                     /* enemy/em018_prog.cpp */
     void setScaleAll(f32 scale);                                                   /* sound/mhchar.cpp */
     void frame_init(long a, u16 b, f32 c, u32 d, f32 e);                           /* sound/mhchar.cpp */
     void setTevKColor(u32 index, _GXTevKColorID id, _GXColor color);               /* by-value overload, enemy/em004_act.cpp */

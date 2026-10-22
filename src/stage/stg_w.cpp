@@ -2100,9 +2100,9 @@ extern "C" u32 fn_802B5488(u32 block)
     u32 p;
 
     p = block + 4;
-    fn_800FA420((Vec3*)p);
+    eft_vec_ctor((Vec3*)p);
     p = block + 0x14;
-    fn_800FA3B8((Vec3*)p);
+    eft_capsule_ctor((Vec3*)p);
     return block;
 }
 

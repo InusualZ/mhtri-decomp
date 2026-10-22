@@ -55,16 +55,16 @@ u32 fn_80127308(struct _ENEMY_WORK* self, const void* src, nw4r::math::VEC3* dst
 void em_move_target_set(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void em_action_finish(struct _ENEMY_WORK* self);
 void em_act_arm_unless_down(struct _ENEMY_WORK* self, u8 a, u8 b);
-u32 fn_80129A1C(struct _ENEMY_WORK* self, u16 a, u32 b, s16* timer);
-u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
+u32 em_roll_cooldown_ck(struct _ENEMY_WORK* self, u16 a, u32 b, s16* timer);
+u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
 u32 fn_80129D3C(struct _ENEMY_WORK* self);
-u8 fn_80129DB8(struct _ENEMY_WORK* self);
+u8 em_area_break_ck(struct _ENEMY_WORK* self);
 /* 0x8012A014 - owned by `enemy/fn_801251D0.h`; the spelling here is the owner's (its body
  * forwards r7/r8 to `fn_80129F5C` as the pair of table pointers it walks, `cmpwi r4,0`).  The older
  * `u32 d, const void* e` copy was the second declaration that stopped this header and the owner's
  * being included together (same class as `em_act_arm_unless_down`). */
-u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
-u32 fn_8012A204(struct _ENEMY_WORK* self);
+u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
+u32 em_area_leave_ck(struct _ENEMY_WORK* self);
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_hit_by_set(struct _ENEMY_WORK* self, s16 timer, u8 index);
 u8 fn_8015D934(struct _ENEMY_WORK* self);
@@ -86,7 +86,7 @@ void em_move_vec2_clr(struct _ENEMY_WORK* self);
 void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
 void em_wave_amp(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale, u32 mode, u16 angle);
 void fn_8013A654(ResUserDataAc* self, u32 a);
-void fn_8013AAC4(struct _ENEMY_WORK* self);
+void em_user_data_reenter(struct _ENEMY_WORK* self);
 void fn_8013918C(void* self, s16 a);
 void fn_8016C674(struct _ENEMY_WORK* self, u8* a, u8* b);
 u32 fn_80176AA8(void* p);

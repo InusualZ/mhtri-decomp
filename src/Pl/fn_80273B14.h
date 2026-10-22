@@ -98,7 +98,7 @@ s32 fn_80274E00(struct _PLW* plw, u16 id);
 /* 0x802753E4 / 0x802754B4 / 0x802754C0 / 0x8027552C - the per-act bonus and the mode entries. */
 s16 fn_802753E4(struct _PLW* plw, u16 id);
 void fn_802754B4(struct _PLW* plw);
-void fn_802754C0(struct _PLW* plw, u8 flag);
+void pl_act_hold_notify(struct _PLW* plw, u8 flag);
 void fn_8027552C(struct _PLW* plw, const char* src);
 
 /* 0x80273ED8 - the single-slot wrapper of the act-kind sum the action and skill sections call. */

@@ -38,8 +38,8 @@
 #include "enemy/em_ground_rec_clear.h" /* fn_80125F54 (rule 2: the owner's header) */
 #include "enemy/em_move_target_set.h" /* fn_80126324 (rule 2: the owner's header) */
 #include "enemy/em_hit_window_set_default.h" /* em_hit_window_set_default (rule 2: the owner's header) */
-#include "enemy/fn_8012D0B4.h" /* fn_8012D0B4 (rule 2: the owner's header) */
-#include "enemy/fn_8012D1A8.h" /* fn_8012D1A8 (rule 2: the owner's header) */
+#include "enemy/em_pl_target_ck.h" /* em_pl_target_ck (rule 2: the owner's header) */
+#include "enemy/em_pl_slot_leaving_ck.h" /* em_pl_slot_leaving_ck (rule 2: the owner's header) */
 #include "enemy/fn_8013581C.h" /* fn_8013581C (rule 2: the owner's header) */
 #include "enemy/em_wave_amp.h" /* em_wave_amp (rule 2: the owner's header) */
 #include "enemy/em_turn_in_window.h" /* em_turn_in_window (rule 2: the owner's header) */
@@ -62,11 +62,11 @@
 #include "enemy/fn_801B0010.h"
 #include "enemy/em005_act.h"
 #include "enemy/em007_act.h"
-#define fn_8012D0B4 fn_8012D0B4_hidden_fn_8012BDF4_h
-#define fn_8012D1A8 fn_8012D1A8_hidden_fn_8012BDF4_h
+#define em_pl_target_ck fn_8012D0B4_hidden_fn_8012BDF4_h
+#define em_pl_slot_leaving_ck fn_8012D1A8_hidden_fn_8012BDF4_h
 #include "enemy/fn_8012BDF4.h"
-#undef fn_8012D1A8
-#undef fn_8012D0B4
+#undef em_pl_slot_leaving_ck
+#undef em_pl_target_ck
 #define em_hit_window_set_default em_hit_window_set_default_hidden_fn_801251D0_h
 #define em_se_tbl_play em_se_tbl_play_hidden_fn_801251D0_h
 #define em_se_tbl_play_alt em_se_tbl_play_alt_hidden_fn_801251D0_h
@@ -110,15 +110,15 @@
 #define em_se_tbl_play_c1 ((void (*)(void*, u32, u32))em_se_tbl_play)
 #define em_se_tbl_play_alt_c1 ((void (*)(void*, u32, u32))em_se_tbl_play_alt)
 #define em_hit_window_set_default_c1 ((u32 (*)(struct _ENEMY_WORK*, u32, u32))em_hit_window_set_default)
-#define fn_8012D0B4_c1 ((u32 (*)(struct _ENEMY_WORK*, void*))fn_8012D0B4)
-#define fn_8012D1A8_c1 ((u32 (*)(u8))fn_8012D1A8)
+#define fn_8012D0B4_c1 ((u32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
+#define fn_8012D1A8_c1 ((u32 (*)(u8))em_pl_slot_leaving_ck)
 #define em_approach_start_c1 ((void (*)(struct _ENEMY_WORK*, f32, u32))em_approach_start)
 #define em_turn_seq_start_c1 ((u32 (*)(struct _ENEMY_WORK*, void*, s32, s32, s32))em_turn_seq_start)
 /* Callees the folded sources declared with different parameters: each call keeps its own view through a cast
  * (the same direct call). */
 #define ran_suu_view1 ((u16 (*)(s32))ran_suu)
-#define fn_8012D1A8_view1 ((s32 (*)(u8))fn_8012D1A8)
-#define fn_8012D0B4_view1 ((s32 (*)(struct _ENEMY_WORK*, void*))fn_8012D0B4)
+#define fn_8012D1A8_view1 ((s32 (*)(u8))em_pl_slot_leaving_ck)
+#define fn_8012D0B4_view1 ((s32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
 #define fn_80126324_view1 ((void (*)(struct _ENEMY_WORK*, u32, u32, f32))em_move_target_set)
 #define em_turn_seq_start_view1 ((void (*)(struct _ENEMY_WORK*, void*, s32, s32, s32))em_turn_seq_start)
 #define em_se_tbl_play_alt_view1 ((void (*)(struct _ENEMY_WORK*, void*, u32, u32))em_se_tbl_play_alt)

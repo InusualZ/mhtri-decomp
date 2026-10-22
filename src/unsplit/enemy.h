@@ -41,7 +41,7 @@ u32 em_sleep_ck__FP11_ENEMY_WORKUc(struct _ENEMY_WORK* enemy, u8 kind);
  * call to 0x8012F758), so the four scalar arguments and the float are in the call sites' order. */
 void fn_8012F7D4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
 /* 0x8012F810 - one `self` argument, no return (restores the motion state). */
-void fn_8012F810(struct _ENEMY_WORK* self);
+void em_mat_blend_reset(struct _ENEMY_WORK* self);
 /* 0x8012F860 - reads f1 and f2 (`fcmpo cr0,f1,f0` then `fadds f0,f0,f2`), so it takes two floats;
  * `enemy/fn_80156EA4` sets f1 (the computed ratio) and f2 (`lbl_80797150`) before the call. */
 void fn_8012F860(struct _ENEMY_WORK* self, f32 a, f32 b);
@@ -54,7 +54,7 @@ void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 #else
 void em_mot_speed_set();
 #endif
-f32 fn_8012F8EC(struct _ENEMY_WORK *self);
+f32 em_mot_frame_get(struct _ENEMY_WORK *self);
 f32 fn_8012F8F4(struct _ENEMY_WORK *self);
 u32 em_mot_end_ck(struct _ENEMY_WORK *self);
 u32 fn_8012F948(struct _ENEMY_WORK *self);
@@ -71,7 +71,7 @@ u32 em_ground_ck(struct _ENEMY_WORK* self);
 u32 em_ground_ck();
 #endif
 u8 fn_8013023C(struct _ENEMY_WORK* work);
-f32 fn_801302E4(struct _ENEMY_WORK* work);
+f32 em_dive_depth_get(struct _ENEMY_WORK* work);
 /* 0x801303EC - r3 (`self`) and f1 (stored at +0x1ac); 0x801303FC tail-calls it with `f0 + f1`.
  * `enemy/fn_8014A1BC.c` calls both with two arguments, so a real two-argument prototype is safe for
  * C too. */
@@ -82,9 +82,9 @@ void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
  * with one argument (leaving f1 as the tail of its preceding call), so C keeps the old-style
  * declaration. */
 #ifdef __cplusplus
-void fn_801303FC(struct _ENEMY_WORK* self, f32 a);
+void em_height_add(struct _ENEMY_WORK* self, f32 a);
 #else
-void fn_801303FC();
+void em_height_add();
 #endif
 void fn_80130438(struct _ENEMY_WORK* work);
 void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
@@ -110,7 +110,7 @@ void fn_801333E0(struct _ENEMY_WORK* work);
 void fn_80133B5C(struct _ENEMY_WORK* work);
 void fn_80133BB4(struct _ENEMY_WORK* enemy);
 void fn_80133C30(struct _ENEMY_WORK* work);
-void fn_80133C3C(struct _ENEMY_WORK *self);
+void em_hit_arm_set(struct _ENEMY_WORK *self);
 void fn_80133CC8(struct _ENEMY_WORK *self, u32 a, u32 b);
 /* 0x80133F4C - r3 (`self`), f1, f2 and r4 (the callee's body does `fmr f30,f1` / `fmr f31,f2` /
  * `mr r31,r4`), so the real signature is four-argument; `enemy/fn_8014BDF8` (C) leaves r4 as the
@@ -201,8 +201,8 @@ void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
  * that same unsigned spelling (the call site reads the answer unsigned) - this band header includes
  * it (rule 2). */
 u32 em_eft_active_ck(struct _ENEMY_WORK* self);
-void fn_80130F74(struct _ENEMY_WORK* self);
-void fn_801376B4(struct _ENEMY_WORK* self);
+void em_bait_react(struct _ENEMY_WORK* self);
+void em_act_flag1_set(struct _ENEMY_WORK* self);
 /* Declarations moved here from `enemy/fn_801679B0.cpp` (docs/plan.md 6.5 rule 2): enemy-band
  * symbols no registered unit owns.  Guarded for C++ because the C consumers carry their own
  * ABI-equivalent spellings of `em_approach_start` (`f32,u16` in `enemy/fn_80149D6C.c`, `u32,f32` in
@@ -213,9 +213,9 @@ void fn_80167968(struct _ENEMY_WORK* self);
 void fn_801321C4(struct _ENEMY_WORK* self);
 void fn_801321D0(struct _ENEMY_WORK* self);
 #endif
-void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
-void fn_80132224(struct _ENEMY_WORK* self);
-void fn_80132264(struct _ENEMY_WORK* self);
+void em_gauge_tick(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
+void em_tint_hold_start(struct _ENEMY_WORK* self);
+void em_tint_hold_end(struct _ENEMY_WORK* self);
 /* `fn_80154CA4`/`fn_801545B8` (0x80154CA4/0x801545B8) were declared here (moved from
  * `enemy/fn_80147CE0.cpp`'s call sites) while the band 0x801545B8..0x80154CA4 had no registered
  * unit.  `enemy/fn_801502C8.cpp` owns 0x801502C8-0x801545B8 now, so `enemy/fn_801502C8.h`

@@ -156,10 +156,6 @@ void eft_state_flags_set(void* self, u8 a, u8 b);
 #pragma peephole off
 #pragma fp_contract off
 
-/* STOPGAP-BEGIN(ef-game3#8) */
-s32 calcVecAng3(nw4r::math::VEC3* v);
-/* STOPGAP-END(ef-game3#8) */
-
 /* The glow's offset from the enemy's joint (y, z); `.sdata` words, not pooled constants. */
 f32 eft001_glow_offset_y = 50.0f;
 f32 eft001_glow_offset_z = 40.0f;

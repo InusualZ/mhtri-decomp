@@ -59,6 +59,14 @@ struct MTX44 {
     /* +0x00 */ f32 m[4][4];
 };
 
+/* A capsule: the two end points and the radius (`shell_se_req2__FP5_se_wPQ34nw4r4math7CAPSULEUcUl` mangles
+ * the type under this namespace; the same layout as `Pl/pl_hit_sphere.h`'s `PlCapsule`). size: 0x1C */
+struct CAPSULE {
+    /* +0x00 */ VEC3 start;
+    /* +0x0C */ VEC3 end;
+    /* +0x18 */ f32 radius;
+};
+
 }  // namespace math
 }  // namespace nw4r
 

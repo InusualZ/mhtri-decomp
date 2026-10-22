@@ -26,4 +26,10 @@ void se_point_req(u8 kind, nw4r::math::VEC3* pos);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x800DE014 - the capsule-seated shell-SE request (`shell_se_req2__FP5_se_wPQ34nw4r4math7CAPSULEUcUl`, C++
+ * linkage: the map name is the mangling, rule 9). */
+void shell_se_req2(struct _se_w* work, nw4r::math::CAPSULE* capsule, u8 id, u32 arg);
+#endif
+
 #endif /* MHTRI_SOUND_SE_REQ_H */

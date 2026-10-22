@@ -3,7 +3,7 @@
  *   effect passes, the per-area and quest tests, and the closing deleting destructor `fn_801AA0F8`.
  * RANGE. .text 0x8019E670-0x801AA154 (93 functions); extab 0x8000F124-0x8000F374, extabindex
  *   0x8002A8A0-0x8002AC18, .rodata 0x80570150-0x805701A0, .data 0x805AE750-0x805B06D0 (`em025_prog_tbl` first),
- *   .sdata 0x80791A80-0x80791A88, .sdata2 0x80798518-0x80798910.  Left edge: `fn_8019E604`,
+ *   .sdata 0x80791A80-0x80791A88, .sdata2 0x80798518-0x80798910.  Left edge: `em018_static_init`,
  *   `enemy/em018_prog.cpp`'s static initializer, ends there and the 0.0 pool entry repeats at `lbl_80798538` from
  *   here.  The right edge is a GUESS inside the pool window 0x801AA0F8-0x801AA154 (the 0.0 entry repeats at
  *   `lbl_8079893C`, first read by `fn_801AA154`): `fn_801AA0F8` is a deleting destructor like `fn_8019E5A8`, which
@@ -1286,7 +1286,7 @@ void fn_801A14FC(struct _ENEMY_WORK* self) {
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_807985E0, lbl_80798538) == 1) {
-            fn_801303FC(self, lbl_807985E4 * get_em_base_scale(self));
+            em_height_add(self, lbl_807985E4 * get_em_base_scale(self));
         }
         if (em_frame_check(self, 1, lbl_807985A8, lbl_80798538) == 1) {
             em_move_offset_rot_apply(self, &self->field_0x1BC);
@@ -1334,13 +1334,13 @@ void fn_801A16D4(struct _ENEMY_WORK* self, u32 mode) {
         break;
     case 1:
         if ((u8)mode == 0) {
-            fn_801303FC(self, lbl_807985E8);
+            em_height_add(self, lbl_807985E8);
             if (self->field_0x1AC <= lbl_807985EC) {
                 fn_801303EC(self, fn_8013032C(self));
                 fn_8019F12C(self);
             }
         } else {
-            fn_801303FC(self, lbl_807985F0);
+            em_height_add(self, lbl_807985F0);
             if (self->field_0x1AC >= lbl_807985A4) {
                 fn_801303EC(self, fn_8013032C(self));
                 fn_801280F4(self);

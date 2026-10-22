@@ -29,6 +29,10 @@ void eft_spawn_type10(struct _ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC
 /* 0x80106694 - the second spawner of the same band: r3 (`self`), r4 the `VEC3*`, r5 a byte kind and f1 the scale
  * (`enemy/em009_act.cpp` calls it). */
 void eft_spawn_type11(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 kind, f32 scale);
+/* 0x801057FC / 0x80105844 - spawns the effect type in the low byte of `type` at joint `joint` and `pos`: with a
+ * scale and the trailing id stored at +0x24, and with a scale of 1.0 and a zero id. */
+void eft013_spawn_id(struct _ENEMY_WORK* self, u32 type, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 id);
+void eft013_spawn(struct _ENEMY_WORK* self, u32 type, u32 joint, nw4r::math::VEC3* pos);
 
 #ifdef __cplusplus
 }

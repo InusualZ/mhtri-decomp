@@ -196,14 +196,14 @@ void fn_8008D30C(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeDat
 void fn_8008D528(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeData, f32 frame);
 
 f32 fn_8008B75C(u32 addr);
-void fn_8008DA10(ResAnmChrObj* self, f32* out);
+void anm_chr_result_scale_get(ResAnmChrObj* self, f32* out);
 s32 fn_8008DC4C(ResAnmChrObj* self, f32* out);
 void fn_8008DF8C(ResAnmChrObj* self, f32* out);
-void fn_8008E1C0(ResAnmChrObj* self, f32* out);
+void anm_chr_result_trans_get(ResAnmChrObj* self, f32* out);
 void fn_8008E698(ResAnmChrObj* self, f32* out);
 void fn_8008EB68(ResAnmChrObj* self, const f32* out);
 void fn_8008EE68(ResAnmChrObj* self, const f32* out);
-void fn_8008F148(ResAnmChrObj* self, const f32* out);
+void anm_chr_result_trans_set(ResAnmChrObj* self, const f32* out);
 void fn_8008F3DC(ResAnmChrObj* self, const void* src);
 
 f32 fn_8008A938(u32* self, u32* p, f32 frame, s32 isConst);
@@ -248,7 +248,7 @@ f32 fn_8008C7F0(u32 self, u16 index);
 f32 fn_8008CB58(const ResAnmChrU16Channel* p, u16 index);
 f32 fn_8008CEF0(const ResAnmChrU8Channel* p, u16 index);
 void fn_8008E408(ResAnmChrObj* self, f32* out);
-void fn_8008E8D0(ResAnmChrObj* self, const f32* out);
+void anm_chr_result_scale_set(ResAnmChrObj* self, const f32* out);
 
 extern const ResAnmChrGetResultFunc res_anm_chr_get_result_table[8];
 
@@ -1434,7 +1434,7 @@ ResAnmChrNodeData* fn_8008D9B8(u32 self, u32 idx)
     return static_cast<ResAnmChrNodeData*>((*reinterpret_cast<nw4r::g3d::ResDic*>(&tmp))[(int)idx]);
 }
 
-void fn_8008DA10(ResAnmChrObj* self, f32* out)
+void anm_chr_result_scale_get(ResAnmChrObj* self, f32* out)
 {
     u32 valid;
 
@@ -1516,7 +1516,7 @@ void fn_8008DF8C(ResAnmChrObj* self, f32* out)
     }
 }
 
-void fn_8008E1C0(ResAnmChrObj* self, f32* out)
+void anm_chr_result_trans_get(ResAnmChrObj* self, f32* out)
 {
     u32 valid;
 
@@ -1590,7 +1590,7 @@ void fn_8008E698(ResAnmChrObj* self, f32* out)
     }
 }
 
-void fn_8008E8D0(ResAnmChrObj* self, const f32* out)
+void anm_chr_result_scale_set(ResAnmChrObj* self, const f32* out)
 {
     u32 valid;
     u32 t;
@@ -1699,7 +1699,7 @@ void fn_8008EE68(ResAnmChrObj* self, const f32* out)
     self->flags &= 0x7FFFFFFF;
 }
 
-void fn_8008F148(ResAnmChrObj* self, const f32* out)
+void anm_chr_result_trans_set(ResAnmChrObj* self, const f32* out)
 {
     u32 valid;
     u32 mask;
@@ -1744,7 +1744,7 @@ void fn_8008F3DC(ResAnmChrObj* self, const void* src)
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x672, "NW4R:Pointer Error\npMtx(=%p) is not valid pointer.", src);
     }
     setVec3(&rec, fn_8008F6C4((u32)src, 0), fn_8008F6C4((u32)src, 1), fn_8008F6C4((u32)src, 2));
-    fn_8008E8D0(self, (const f32*)&rec);
+    anm_chr_result_scale_set(self, (const f32*)&rec);
     if (self->flags & 8) {
         mtx34_copy_ps((Mtx34*)self->mat, (const Mtx34*)src);
     } else {

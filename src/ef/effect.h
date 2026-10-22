@@ -34,6 +34,8 @@ s32 effect_emitter_alive_ck(nw4r::ef::Effect* effect);
 /* 0x800F9D80 - the effect's state/frame report the kind-1 state-0 body of `ef/fn_8030681C.cpp` switches on (it
  * compares it against 1). */
 s32 eft_water_state_ck(_EFT* self);
+/* 0x800FA420 - zeroes one vector and returns it. */
+nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self);
 
 #ifdef __cplusplus
 }

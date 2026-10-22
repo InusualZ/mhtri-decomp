@@ -230,7 +230,7 @@ void fn_8013A978(EnemyWork* work);
 void fn_8013A9F4(EnemyWork* work);
 void fn_8013AA00(EnemyWork* work);
 void fn_8013AA1C(EnemyWork* work, u8 arg1);
-void fn_8013AAC4(EnemyWork* work);
+void em_user_data_reenter(EnemyWork* work);
 void em_userdata_state_exit(EnemyWork* work, u8 arg1);
 void em_userdata_state_reenter_alt(EnemyWork* work);
 s32 fn_8013AB74(EnemyWork* work, u8 arg1, u8 arg2);
@@ -258,7 +258,7 @@ extern void res_node_assign(void* out, const void* src);
 extern s32 res_node_get_parent(void* arg0);
 extern void fn_8008DF8C(void* arg0, Mtx34* out);
 extern void fn_8008EE68(void* arg0, Mtx34* mtx);
-extern void fn_8008F148(void* arg0, const Vec3* v);
+extern void anm_chr_result_trans_set(void* arg0, const Vec3* v);
 extern f32 getKeyData__FPff(s32 key, f32 t);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPVector* angles, Mtx34* mtx);
 extern void rotMatrixX__FUlPQ34nw4r4math5MTX34(u16 angle, Mtx34* mtx);
@@ -889,7 +889,7 @@ void fn_8013823C(EnemyWork* self) {
             }
             break;
         case 2:
-            if (self->field_0x194.z < lbl_80796D58 + (self->field_0x20C + fn_801302E4(self))) {
+            if (self->field_0x194.z < lbl_80796D58 + (self->field_0x20C + em_dive_depth_get(self))) {
                 fn_800524C0(&self->field_0x194, &self->field_0x188, &self->field_0x230,
                             &self->field_0x188, lbl_80796D6C);
             }
@@ -1040,8 +1040,8 @@ void fn_80138F3C(EnemyWork* self) {
     f32 sentinel = lbl_80796D70;
 
     for (i = 0; i < (s32)max; i++) {
-        if (move[i].field_0x00 != 0 && fn_8012D1A8(move[i].field_0x08) == 0) {
-            if (fn_8012D0B4(self, &move[i]) == 0) {
+        if (move[i].field_0x00 != 0 && em_pl_slot_leaving_ck(move[i].field_0x08) == 0) {
+            if (em_pl_target_ck(self, &move[i]) == 0) {
                 self->field_0x454[i] = sentinel;
             } else {
                 self->field_0x454[i] = vec3_distance(&self->field_0x188, &move[i].field_0x3C);
@@ -1219,7 +1219,7 @@ void fn_801394D4(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3)
         pos.x = lbl_80796D40;
         pos.y = lbl_80796D40;
         pos.z = lbl_80796D40;
-        fn_8008F148((void*)arg1, &pos);
+        anm_chr_result_trans_set((void*)arg1, &pos);
     }
     item = fn_8013A6C0(self->work);
     while (item != NULL && item->field_0x00 != (u32)-1) {
@@ -1738,7 +1738,7 @@ void fn_8013AA1C(EnemyWork* work, u8 arg1) {
 }
 
 /* Re-enters the work's user-data state in the default mode. */
-void fn_8013AAC4(EnemyWork* work) {
+void em_user_data_reenter(EnemyWork* work) {
     fn_8013AA1C(work, 1);
 }
 

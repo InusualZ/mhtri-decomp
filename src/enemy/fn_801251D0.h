@@ -79,10 +79,10 @@ void em_se_tbl_play(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
 #else
 void em_se_tbl_play(u32 a, u32 b, u32 c);
 #endif
-u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
-u8 fn_80129DB8(struct _ENEMY_WORK* self);
-u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
-u32 fn_8012A204(struct _ENEMY_WORK* self);
+u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
+u8 em_area_break_ck(struct _ENEMY_WORK* self);
+u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
+u32 em_area_leave_ck(struct _ENEMY_WORK* self);
 void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80128B80(struct _ENEMY_WORK* self);
 
@@ -105,7 +105,7 @@ void em_part_rec_alt_set(struct _ENEMY_WORK* self, u32 slot, u32 sel);
 /* 0x80129744 - r3 `self` only; the action band's release hook (`enemy/em009_act.cpp`'s `fn_80389E1C` calls it when
  * its sub-state count reaches 4). */
 void fn_80129744(struct _ENEMY_WORK* self);
-void fn_801252C0(struct _ENEMY_WORK* self, u8 a);
+void em_owner_slot_set(struct _ENEMY_WORK* self, u8 a);
 void fn_8012554C(struct _ENEMY_WORK* self);
 u8 fn_80125F88(u32 idx);
 u32 enemy_kind_same_ck(u32 a, u32 b);

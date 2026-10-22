@@ -184,7 +184,7 @@ extern "C" void fn_800E2680(void* sub)
 }
 
 /* Write the model's +0xD4 float block at `index`. */
-extern "C" void fn_800E26B4(MHchar* self, u32 index, f32 value)
+extern "C" void mhchar_mat_blend_set(MHchar* self, u32 index, f32 value)
 {
     self->field_0xD4[index] = value;
 }

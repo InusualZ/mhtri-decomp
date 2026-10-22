@@ -27,7 +27,7 @@
 #include "enemy/fn_801322B4.h" /* fn_801322B4 (rule 2: the owner's header) */
 #include "enemy/em_state_refresh.h" /* em_state_refresh (rule 2: the owner's header) */
 #include "enemy/fn_80133C48.h" /* fn_80133C48 (rule 2: the owner's header) */
-#include "enemy/fn_80133DB0.h" /* fn_80133DB0 (rule 2: the owner's header) */
+#include "enemy/em_angle_approach.h" /* em_angle_approach (rule 2: the owner's header) */
 #include "types.h"
 #include "hud/em_net_send.h" /* the owner's leaf header (rule 2) */
 #include "nw4r/math.h"
@@ -352,8 +352,8 @@ extern "C" s32 fn_80137EE0(_ENEMY_WORK* self, u32 kind)
     }
 }
 
-/* Steps the record's second angle field through `fn_80133DB0`. */
+/* Steps the record's second angle field through `em_angle_approach`. */
 extern "C" void fn_80138024(_ENEMY_WORK* self, u32 a, u32 b)
 {
-    self->field_0x1C0 = fn_80133DB0((u16)(b + 0x8000), (u16)self->field_0x1C0, (u16)a);
+    self->field_0x1C0 = em_angle_approach((u16)(b + 0x8000), (u16)self->field_0x1C0, (u16)a);
 }

@@ -338,7 +338,7 @@ void fn_8013C244(_ENEMY_WORK* self, u8* in, u32 id);
 
 /* the enemy band's other units */
 void fn_8013AA00(_ENEMY_WORK* self);
-u32 fn_8027D530(EmAreaWork* rec);
+u32 pl_act_grabbed_ck(EmAreaWork* rec);
 u32 fn_802B0998(u8 id);
 char* fn_80146F10(u8 id);
 void fn_80146B98(s32 id);
@@ -1913,7 +1913,7 @@ s16 fn_8013FD98(_ENEMY_WORK* self, u8* in) {                    /* 0x59 */
             u16 count = get_move_work_max(2);
             EmAreaWork* rec = (EmAreaWork*)get_move_work_adrs(2);
             for (u16 i = 0; i < count; i++) {
-                if (rec->active != 0 && rec->area_no == self->area_no && fn_8027D530(rec) != 0) {
+                if (rec->active != 0 && rec->area_no == self->area_no && pl_act_grabbed_ck(rec) != 0) {
                     found = 1;
                     break;
                 }

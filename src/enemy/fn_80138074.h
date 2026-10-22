@@ -31,7 +31,7 @@ void fn_8013A9F4(struct _ENEMY_WORK* self);
 u32 fn_8013A884(struct _ENEMY_WORK* self, s32 value);
 u32 fn_8013A8B4(struct _ENEMY_WORK* enemy, s32 a, s32 b);
 u8 fn_8013A900(struct _ENEMY_WORK* enemy);
-void fn_8013AAC4(struct _ENEMY_WORK* enemy);
+void em_user_data_reenter(struct _ENEMY_WORK* enemy);
 u32 fn_8013AB74(struct _ENEMY_WORK *self, u32 a, u32 b);
 
 /* The user-data accessors `enemy/fn_8013ACC4.cpp`'s interpreter drives (its call sites' arity). */

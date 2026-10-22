@@ -781,7 +781,7 @@ extern "C" void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
 extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" void fn_80075258(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
 extern "C" void fn_800FA3E8(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
-extern "C" void fn_800FA420(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
+extern "C" void eft_vec_ctor(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" u8 fn_80290598(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
 extern "C" s32 stage_water_enabled_ck(void);
 extern "C" u32 fn_802B45D4(void);
@@ -1059,7 +1059,7 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
     unit = work->unit;
     fn_800FA3E8(&seg);
     fn_8010294C(&quad);
-    fn_800FA420(&point.pos);
+    eft_vec_ctor(&point.pos);
     if (unit->probes == 0) {
         unit->scale_rate = 1.0f;
         return;

@@ -94,6 +94,13 @@ void em_roar_latch_set(struct _ENEMY_WORK* self);
 /* 0x80136D38 */
 u32 em_eft_hide_ck(_ENEMY_WORK* enemy);
 
+/* 0x8012F74C */
+void em_mot_layer_set(struct _ENEMY_WORK* self, u32 layer, u16 motion, u32 a, u32 b);
+/* 0x80130088 */
+s32 em_surface_reach_ck(struct _ENEMY_WORK* self, f32 depth);
+/* 0x80135468 */
+u32 em_move_offset_fall_update(struct _ENEMY_WORK* self, f32 limit);
+
 #ifdef __cplusplus
 }
 #endif

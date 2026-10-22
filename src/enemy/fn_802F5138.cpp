@@ -179,7 +179,7 @@ extern "C" void fn_802F5B98(_ENEMY_WORK* work) {
 /* Second step of the "idle" action: the same shape as the first, with the second motion set and the
  * band's own retire helper. */
 extern "C" void fn_802F5C58(_ENEMY_WORK* work) {
-    fn_80133C3C(work);
+    em_hit_arm_set(work);
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
@@ -400,7 +400,7 @@ extern "C" void fn_802F92E8(_ENEMY_WORK* work) {
 
 /* First step of the "roar" action: starts the second motion set and seeds the three effect sizes. */
 extern "C" void fn_802F930C(_ENEMY_WORK* work) {
-    fn_80133C3C(work);
+    em_hit_arm_set(work);
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
@@ -422,7 +422,7 @@ extern "C" void fn_802F930C(_ENEMY_WORK* work) {
 
 /* First step of the "stance" action. */
 extern "C" void fn_802F943C(_ENEMY_WORK* work) {
-    fn_80133C3C(work);
+    em_hit_arm_set(work);
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
@@ -441,7 +441,7 @@ extern "C" void fn_802F943C(_ENEMY_WORK* work) {
 
 /* First step of the "movement" action. */
 extern "C" void fn_802F94EC(_ENEMY_WORK* work) {
-    fn_80133C3C(work);
+    em_hit_arm_set(work);
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
@@ -458,7 +458,7 @@ extern "C" void fn_802F94EC(_ENEMY_WORK* work) {
 
 /* First step of the "crouch" action. */
 extern "C" void fn_802F95C8(_ENEMY_WORK* work) {
-    fn_80133C3C(work);
+    em_hit_arm_set(work);
     switch (work->state) {
     case 0:
         work->state = work->state + 1;

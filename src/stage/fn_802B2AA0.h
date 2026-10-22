@@ -328,8 +328,8 @@ extern "C" void my_player_no_set(s8 value);  /* s8 is the owner's spelling (the 
  * narrows with `extsb` in retail); `ef/fn_800CDB2C.h` declares it the same way. */
 extern "C" void fn_800DD38C(void);
 extern "C" u32 fn_800E16DC(void* chr, s32 a, s32 b, f32 c, f32 d);
-extern "C" void fn_800FA3B8(nw4r::math::VEC3* out);
-extern "C" void fn_800FA420(nw4r::math::VEC3* out);
+extern "C" void eft_capsule_ctor(nw4r::math::VEC3* out);
+extern "C" void eft_vec_ctor(nw4r::math::VEC3* out);
 extern "C" void mhchar_construct(void* out);
 extern "C" u32 fn_8021F218(void);
 extern "C" f32 fn_8021F228(u32 index);

@@ -382,7 +382,7 @@ void pl_chr_set_motion_default(_PLW* self, s32 a, u16 motion, s32 b, s32 c)
 /* The model block's per-index value setter. */
 void pl_model_set_value(_PLW* self, s32 index, f32 value)
 {
-    fn_800E26B4(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, index, value);
+    mhchar_mat_blend_set(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, index, value);
 }
 
 /* Hands the model layer the scale the work record carries. */
@@ -4936,7 +4936,7 @@ extern "C" void fn_802754B4(struct _PLW* plw)
 }
 
 /* Starts the mode's act for the player's current state. */
-extern "C" void fn_802754C0(struct _PLW* plw, u8 flag)
+extern "C" void pl_act_hold_notify(struct _PLW* plw, u8 flag)
 {
     u8 kind = 0;
 
@@ -6212,7 +6212,7 @@ extern "C" s32 fn_8027D51C(_PLW* self)
 }
 
 /* 0x8027D584 */
-extern "C" void fn_8027D584(_PLW* self, u8* arg1)
+extern "C" void pl_act_hold_motion_set(_PLW* self, u8* arg1)
 {
     self->unk59C = arg1[3] | 0x8000;
     self->unk59E = 0;
@@ -6481,7 +6481,7 @@ extern "C" u8 fn_8027CBC8(_PLW* self)
 }
 
 /* 0x8027D530 */
-extern "C" s32 fn_8027D530(_PLW* self)
+extern "C" s32 pl_act_grabbed_ck(_PLW* self)
 {
     if (Pl_act_ck(self, 0, 64) == 1 && self->unk306 == 206) {
         return 1;
