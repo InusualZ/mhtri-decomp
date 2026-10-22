@@ -72,7 +72,7 @@ u32 item_slots_count_sum(u16 id, void* a, u16 b);
 void fn_8004B200(void* userdata, u16 id, s16 delta);
 s32 userdata_item_total_count(void* userdata, u16 id);
 s32 item_slots_room_get(u16 id, void* a, u16 b);
-void userdata_item_give(void* userdata, u16 id, s16 count, s32 flag);
+s16 userdata_item_give(void* userdata, u16 id, s16 count, s32 flag);
 void item_box_store(u16 id, s16 count, void* out);
 
 /* 0x8004A430 - decodes the packed 0x100-byte character record `blob` into the player card `card`

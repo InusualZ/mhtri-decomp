@@ -76,7 +76,7 @@ typedef struct WorkBuf {
     /* 0x2C */ f32 f_0x2C;
 };
 
-/* The object `fn_80047234` returns.  Only +0xB4 / +0xB8 are read.  size: 0xBC (approximate) */
+/* The object `word_read` returns.  Only +0xB4 / +0xB8 are read.  size: 0xBC (approximate) */
 typedef struct DrawCtx {
     /* 0x00 */ u8 pad_0x00[0xB4];
     /* 0xB4 */ f32 f_0xB4;
@@ -127,7 +127,7 @@ extern f32 lbl_80796460;
 extern f32 lbl_80796464;
 extern f32 lbl_80796468;
 extern f64 lbl_80796470;
-void* fn_80047234(void* a);
+void* word_read(void* a);
 s32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
 s32 fn_802AFF58(void);
@@ -210,7 +210,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
     MTX34_ctor((MTX34*)&b10);
     GXInvalidateVtxCache();
     ((nw4r::g3d::Camera*)a)->GetCameraMtx((MTX34*)&b40);
-    DrawCtx* ctx = (DrawCtx*)fn_80047234(a);
+    DrawCtx* ctx = (DrawCtx*)word_read(a);
     s32 sel = stage_water_enabled_ck();
     if (sel == 1) {
         f31 = lbl_80796458;

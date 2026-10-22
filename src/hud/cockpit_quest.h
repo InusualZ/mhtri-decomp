@@ -34,35 +34,6 @@ typedef struct QuestScreen {
 
 
 
-/* One pit trap: its world position and kind byte (`PitTrapSet`).  size: 0x10 */
-typedef struct PitTrap {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ u8 kind_0x0C;      /* 0 is drawn in the first colour, anything else in the second */
-    /* +0x0D */ u8 unused_0x0D[0x10 - 0x0D];
-} PitTrap;
-
-/* The one-player cockpit state at `cockpit_state` (the sub-screen selector).  Its owner is
- * `src/menu/fn_802E4978.cpp` (`menu/fn_802E4978.h`, which cannot be included here - it
- * redefines `CockpitWork` - so this is the same one-record-two-views debt as above, filed).  This
- * band reads the player count and the flag pair `quest_targets_update_b` shifts.  size: 0x88 */
-typedef struct CockpitState {
-    /* +0x000 */ u8 field_0x000;   /* the number of live players `quest_slot_arm_all_a` loops over */
-    /* +0x001 */ u8 unused_0x001;
-    /* +0x002 */ s16 field_0x002;
-    /* +0x004 */ s16 field_0x004;
-    /* +0x006 */ u8 unused_0x006[0x018 - 0x006];
-    /* +0x018 */ PitTrap pit_traps_0x018[4]; /* the pit traps `PitTrapSet` registers this frame */
-    /* +0x058 */ u8 pit_trap_count_0x058;   /* how many `PitTrapSet` has filled (`quest_targets_update_b` latches it into +0x059) */
-    /* +0x059 */ u8 pit_trap_shown_0x059;   /* the count the markers draw */
-    /* +0x05A */ u8 field_0x05A;
-    /* +0x05B */ u8 unused_0x05B;
-    /* +0x05C */ s16 field_0x05C;
-    /* +0x05E */ u8 unused_0x05E[0x070 - 0x05E];
-    /* +0x070 */ u32 field_0x070;
-    /* +0x074 */ u8 field_0x074;
-    /* +0x075 */ u8 unused_0x075[0x078 - 0x075];
-    /* +0x078 */ u32 field_0x078;
-} CockpitState;
 
 
 /* The one-player cockpit state (`.bss` 0x806BDFF0, 0x88 B; see the type's comment). */

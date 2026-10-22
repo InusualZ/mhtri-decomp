@@ -44,7 +44,7 @@
  *     `addi r,r,-3; cmplwi r,1`.
  *   - `fn_800D87B8` (89.6 %): retail reaches the stop body by a direct jump from case 4; the `goto`-free
  *     shape (a `stop` flag with the body written twice) costs 15 instructions.
- *   - The int->float magic in `fn_800DABF0`/`snd_item_fail_play`/`fn_800DB044` is the compiler's own `.sdata2`
+ *   - The int->float magic in `se_item_get_play`/`snd_item_fail_play`/`fn_800DB044` is the compiler's own `.sdata2`
  *     pool entry: the target names it `lbl_80796400`, ours emits an anonymous `@NN` (playbook 29).
  *
  * Data runs in this range are recorded in `splits.txt` as comments and not claimed (playbook 23,
@@ -283,7 +283,7 @@ extern "C" void se_req_item_jingle(void) { fn_800DBB78(0, 36); }
 
 extern "C" void fn_800DBC0C(void) { fn_800DBB78(0, 37); }
 
-extern "C" void fn_800DBC18(void) { fn_800DBB78(0, 31); }
+extern "C" void se_req_page_toggle(void) { fn_800DBB78(0, 31); }
 
 extern "C" void fn_800DBC24(void) { fn_800DBB78(0, 12); }
 
@@ -1997,7 +1997,7 @@ extern "C" void fn_800D8730(_se_w* work);
 extern "C" void fn_800D85B0(_se_w* work, s32 mode);
 extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot);
 extern "C" void fn_800D8404(SeSlot* slot);
-extern "C" s32 fn_8028F204(void);
+extern "C" s32 pl_root_lock_ck(void);
 extern "C" u8* fn_800D8DDC(u8* base);
 extern "C" s32 fn_800F1398(_ENEMY_WORK* enemy, s32 index);
 extern "C" u32 pl_mode8_free_ck(PlWorkView* plw);
@@ -2118,7 +2118,7 @@ extern "C" void se_frame_step(void) {
             fn_800D92E4(NULL, slot);
             fn_800D8404(slot);
         }
-        if (fn_8028F204() == 0) {
+        if (pl_root_lock_ck() == 0) {
             fn_800DFDCC(self, 0);
         }
     }
@@ -3118,7 +3118,7 @@ extern "C" s32 fn_800F0C14(s32 owner);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 
 /* Looks the per-frame bank up, opens a handle and scales its rate by the `lbl_807963E4` factor. */
-extern "C" void fn_800DABF0(void) {
+extern "C" void se_item_get_play(void) {
     SeWork* work = get_move_work_adrs__FUc(0);
     if (work == NULL) {
         return;
@@ -3192,7 +3192,7 @@ extern "C" void se_work_init(void) {
 extern "C" u32 item_se_ck(void);
 
 /* Switches on the caller's sound code: a few codes are silent, two bump the global SE level, and the
- * rest open a per-frame voice whose rate is scaled like `fn_800DABF0`'s. */
+ * rest open a per-frame voice whose rate is scaled like `se_item_get_play`'s. */
 extern "C" void fn_800DAADC(u16 code) {
     SeWork* work = get_move_work_adrs__FUc(0);
     if (work == NULL) {

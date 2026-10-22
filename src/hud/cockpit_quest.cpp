@@ -367,7 +367,7 @@ extern f32 lbl_8079A920;
 extern u16 lbl_805D5B98[];
 extern u8 lbl_805D5BD8[];
 extern u8 lbl_805D5C68[];
-u32 fn_800AB658(u8, f32);
+u32 math_sin_rad(u8, f32);
 void fn_802E4978(CockpitWork*, CockpitMove*);
 void cockpit_quest_init(void);
 void fn_802E4B8C(void);
@@ -941,7 +941,7 @@ void fn_802E71C4(void) {
             } else {
                 f = (f32)((cockpit_work[0].field_0x190 & 0xF) << 0xC);
             }
-            colour = color_lerp(0xF50C23FF, 0xFF8C9BFF, (u8)fn_800AB658(0, lbl_8079A920 * f),
+            colour = color_lerp(0xF50C23FF, 0xFF8C9BFF, (u8)math_sin_rad(0, lbl_8079A920 * f),
                                  lbl_8079A8FC + 0.0f, 0.0f);
         }
         value = quest_time_limit_get();

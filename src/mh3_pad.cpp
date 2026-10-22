@@ -878,12 +878,12 @@ PadChanState pad_chan_state[4];        /* +0x8065ADD0: per-channel state records
 u16 pad_btn_table_0[16];               /* +0x8065AE30: copy of the .data button table 0x80580E90 (GUESS name) */
 u16 pad_btn_table_1[16];               /* +0x8065AE50: copy of the .data button table 0x80580EB0 (GUESS name) */
 u16 pad_btn_table_2[16];               /* +0x8065AE70: copy of the .data button table 0x80580ED0 (GUESS name) */
-u8 kpad_work[0x1B8];                   /* +0x8065AE90: KPAD work area `fn_80045048`/`fn_80044D78` use (GUESS name) */
+u8 kpad_work[0x1B8];                   /* +0x8065AE90: KPAD work area `fn_80045048`/`kpad_pointer_read` use (GUESS name) */
 u8 wpad_sampling_buf_fmt8[4][0x1518];  /* +0x8065B048: per-channel 100-sample buffer for data format 8 */
 u8 wpad_sampling_buf_fmt5[4][0x1388];  /* +0x806604A8: per-channel 100-sample buffer for data format 5 */
 u8 wpad_sampling_buf_fmt2[4][0x1068];  /* +0x806652C8: per-channel 100-sample buffer for data format 2 */
 MEMAllocator wpad_mem2_allocator;      /* +0x80669468: allocator over the MEM2 pad heap (align 0x20) */
-s16 pointer_hist_x[16];                /* +0x80669478: pointer x history ring, zeroed by `fn_80043BAC` (GUESS) */
+s16 pointer_hist_x[16];                /* +0x80669478: pointer x history ring, zeroed by `pointer_reset` (GUESS) */
 s16 pointer_hist_y[16];                /* +0x80669498: pointer y history ring (GUESS) */
 f32 pointer_center[3];                 /* +0x806694B8: half of `Screen_w.width_f`/`height_f` (GUESS name) */
 f32 pointer_offset[3];                 /* +0x806694C4: zeroed pointer offset (GUESS name) */

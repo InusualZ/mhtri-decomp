@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* 0x800AB658 (0xC) - the sine of an angle in radians (the angle scaled onto the 256-step index table). */
-inline __attribute__((never_inline)) f32 fn_800AB658(f32 x);
+inline __attribute__((never_inline)) f32 math_sin_rad(f32 x);
 
 /* 0x800AB740 - puts `target` on the manager's closing list and marks it retired (`ef/ef_particle.cpp`'s
  * closing slot hands its particle over through it). */

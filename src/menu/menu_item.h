@@ -64,7 +64,7 @@ struct ItemDataRecord {
                                        * as a signed byte, and clamps both on overflow and on a negative
                                        * merge) */
     /* +0x004 */ u8 tex_idx_0x004;    /* the texture index `draw_itemicon_item_id`/`draw_itemicon_item_id_idx`
-                                       * (both in `hud/layout.cpp`) hand to `fn_80055C5C`, and the
+                                       * (both in `hud/layout.cpp`) hand to `atlas_digit_uv_get`, and the
                                        * byte `fn_802E1024`'s callers read next to `kind`.  Spliced
                                        * out of the `unused_0x003[2]` filler this record carried, one
                                        * byte at +0x004, so no member's offset moved (playbook 56). */
@@ -171,7 +171,7 @@ struct MenuPlaceRec {
     /* +0x10 */ s16 field_0x10;
     /* +0x12 */ s16 field_0x12;
     /* +0x14 */ u32 key;            /* the id `place_list_key_count` counts and `place_rec_key_ptr` hands out */
-    /* +0x18 */ u8 body[0x0C];      /* the 16-byte body `fn_8004EAF4` copies over +0x14 */
+    /* +0x18 */ u8 body[0x0C];      /* the 16-byte body `place_rec_copy` copies over +0x14 */
 }; /* size: 0x24 */
 
 /* One of the two 0x330-byte working records of the menu work area at `.bss:0x806AC8C8`; the area is
@@ -282,7 +282,7 @@ struct MenuFrameWork {
     /* +0x008 */ u8 slot_index;       /* the `MenuSlot` index `menu_item_frame_update` selects */
     /* +0x009 */ u8 unused_0x009[0x5BC - 0x009];
     /* +0x5BC */ u8 field_0x5BC;
-    /* +0x5BD */ u8 unused_0x5BD;
+    /* +0x5BD */ u8 field_0x5BD;
     /* +0x5BE */ u8 field_0x5BE;
 };
 

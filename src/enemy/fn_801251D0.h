@@ -35,7 +35,7 @@ void em_owner_slot_update(struct _ENEMY_WORK* work);
 s32 fn_80126098(struct _ENEMY_WORK* work);
 s32 fn_801260BC(struct _ENEMY_WORK* work);
 s32 fn_801260E0(struct _ENEMY_WORK* work);
-s32 fn_80126104(struct _ENEMY_WORK* work);
+s32 em_hit_parts_get(struct _ENEMY_WORK* work);
 /* 0x80126278 - three arguments, from the call sites (`enemy/em018_prog.cpp`'s `fn_8019D9BC` sets all three):
  * r3 the `_ENEMY_WORK`, r4 the 16-bit id, r5 the `VEC3*` fill target. */
 void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);

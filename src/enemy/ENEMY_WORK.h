@@ -377,7 +377,7 @@ struct _ENEMY_WORK {
                                         * measures its aim angle against (`em_act_aim` passes it
                                         * with `pos` to `calcVecAngX2`) */
     };
-    /* +0x1AC */ f32 field_0x1AC;       /* the height `fn_8012F39C` compares against 0.9 * the model scale */
+    /* +0x1AC */ f32 field_0x1AC;       /* the height `em_tall_ck` compares against 0.9 * the model scale */
     /* +0x1B0 */ nw4r::math::VEC3 aim;   /* one position, two readers: the second position
                                          * `enemy/em030_prog.cpp`'s `fn_801B0810` copies the matching
                                          * record's `pos` into, and the aim point `fn_801D75D0`

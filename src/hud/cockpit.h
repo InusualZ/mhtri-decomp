@@ -8,8 +8,8 @@
 
 extern "C" {
 
-/* 0x802DFC6C - a cockpit entry with no arguments that the note band's pane code calls (no body yet). */
-void fn_802DFC6C(void);
+/* 0x802DFC6C - hides the quest notice (the note band's pane code calls it). */
+void cockpit_notice_quest_clear(void);
 
 }
 

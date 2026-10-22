@@ -4157,7 +4157,7 @@ extern "C" s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag)
 }
 
 /* Maps a weapon/skill id to the bonus class the pick tables use. */
-extern "C" u8 fn_8027403C(u16 kind)
+extern "C" u8 item_bonus_class_get(u16 kind)
 {
     switch (kind) {
     case 0x8B:
@@ -4841,7 +4841,7 @@ extern "C" u32 Pl_item_id_usable_ck(u16 id, s32 mode)
     if (item_category_ck(id, 0x10) != 0) {
         return 0;
     }
-    if (fn_8027403C(id) != 0) {
+    if (item_bonus_class_get(id) != 0) {
         return 0;
     }
     if ((u32)(id - 0x1B6) <= 1U || id == 0x2B || id == 0x35 || id == 0xDF) {

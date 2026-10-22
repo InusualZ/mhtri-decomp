@@ -87,7 +87,7 @@ typedef struct EnemyData {
     /* +0x074 */ f32 water_depth_0x74;  /* `em_float_depth_get` */
     /* +0x078 */ f32 lift_height_0x78;  /* `em_dive_depth_get` */
     /* +0x07C */ f32 ceiling_depth_0x7C;  /* `em_ceiling_depth_get` */
-    /* +0x080 */ f32 model_height_0x80;  /* `em_model_height_get` (`fn_8012F39C` scales it by 0.9) */
+    /* +0x080 */ f32 model_height_0x80;  /* `em_model_height_get` (`em_tall_ck` scales it by 0.9) */
     /* +0x084 */ s16** motion_frames;      /* per hundred motion numbers, a table of s16 frame values (`em_common.cpp`) */
     /* +0x088 */ struct EmPartBreakRec* part_breaks_0x88;  /* the part-break records `em_parts_refresh` walks */
     /* +0x08C */ struct EmMotionAttr* motion_attrs;  /* `{motion, value}` pairs, closed by motion 0xFFFFFFFF */

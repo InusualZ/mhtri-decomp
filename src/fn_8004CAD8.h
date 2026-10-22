@@ -274,7 +274,7 @@ void capsule_box_from_points(void* a, void* b, void* c, f32 d);
 void MTX33_ctor(void* out);
 /* 0x8004EAF4 - the 16-byte struct copy MWCC emits for a four-word assignment (`dst[0..3] = src[0..3]`)
  * as four separate word moves.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */
-void fn_8004EAF4(void* dst, const void* src);
+void place_rec_copy(void* dst, const void* src);
 /* 0x8004EA58 - the 8-row item table's insert: it fills the first empty row with the caller's 16-byte
  * record, and when every row is full shifts the table down one row and writes the record into the
  * last.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */

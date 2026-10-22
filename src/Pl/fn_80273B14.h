@@ -136,7 +136,7 @@ s32 pl_act_menu_lock_ck(struct _PLW* plw);
 
 /* 0x8027403C / 0x8027408C / 0x802740EC / 0x80274174 / 0x80274370 / 0x80274570 / 0x80274584 /
  * 0x80274624 / 0x80274904 / 0x80274988 / 0x80274A04 / 0x80274B5C - the section's other entry points. */
-u8 fn_8027403C(u16 kind);
+u8 item_bonus_class_get(u16 kind);
 s32 fn_8027408C(struct _PLW* plw);
 void fn_802740EC(struct _PLW* plw);
 s16 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out);

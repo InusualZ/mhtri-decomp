@@ -41,6 +41,16 @@ s32 place_rec_skill_set(PlaceRec* rec, u16 skill);
 /* 0x8034D22C - fill a help record of kind 7 (a skill tree; added with `menu/menu_infomation.cpp`'s skill rows). */
 s32 menu_row_rec_init(PlaceRec* rec, u16 tree);
 
+/* The row and placement-list entries `hud/cockpit.cpp`'s pointer page calls (the owner's definitions' signatures). */
+struct MenuRowData;
+u32 menu_row_find(const struct MenuRowData* entry);
+u8 menu_row_empty_count(void);
+u32 menu_row_reserve(struct MenuRowData* entry);
+void place_list_deactivate_all(void);
+s32 place_list_overlap_find(s16 x, s16 y, s16 width, s16 height);
+u32* place_rec_key_ptr(s8 index);
+u8 place_list_key_count(u32 key);
+
 #ifdef __cplusplus
 }
 #endif

@@ -13,13 +13,43 @@
 extern "C" {
 #endif
 
+/* The looping-animation work of a kind-1 notice (`hud/cockpit.cpp`'s kind-1 update/draw pair).  size: 0x8 */
+typedef struct HudNoticeLoop {
+    /* +0x00 */ const u16* ids;      /* the sprite id run, one past the table row's lead id */
+    /* +0x04 */ u8 last_frame;       /* the frame the animation wraps after */
+    /* +0x05 */ u8 pad_0x05[3];
+} HudNoticeLoop;
+
+/* The two-layer scroll work of a kind-2 notice (`hud/cockpit.cpp`'s kind-2 update/draw pair).  size: 0xC */
+typedef struct HudNoticeScroll {
+    /* +0x00 */ const u16* front_ids; /* the run drawn over the back layer, one sprite at a time */
+    /* +0x04 */ const u16* back_ids;  /* the back layer (a wide-screen variant exists) */
+    /* +0x08 */ s16 tex_ofs;          /* the random texture offset added to each front sprite */
+    /* +0x0A */ s16 hold_timer;       /* frames the notice holds before it fades out */
+} HudNoticeScroll;
+
+/* The kind-specific tail of a notice (`hud_notice_work_get` returns its address).  size: 0x10 */
+typedef union HudNoticeWork {
+    /* +0x00 */ HudNoticeLoop loop;
+    /* +0x00 */ HudNoticeScroll scroll;
+    /* +0x00 */ u8 raw[0x10];
+} HudNoticeWork;
+
 /* One 0x20-byte slot of the HUD notice pool at 0x806BD808 (16 slots; `hud_notice_spawn` returns the
- * free slot it filled, or 0 when the pool is full).  Only the watched-flag pointer the cockpit
- * sets is written by the consumers.  size: 0x20 */
+ * free slot it filled, or 0 when the pool is full).  size: 0x20 */
 typedef struct HudNotice {
-    /* +0x00 */ u8 unused_0x00[0x08 - 0x00];
+    /* +0x00 */ u8 active;      /* the slot is in use */
+    /* +0x01 */ u8 kind;        /* the update/draw table index (0..2) */
+    /* +0x02 */ u8 id;          /* the notice id inside its kind (the per-kind tables' row) */
+    /* +0x03 */ u8 pad_0x03;
+    /* +0x04 */ u8 state;       /* the per-kind step counter */
+    /* +0x05 */ u8 visible;     /* drawn while set */
+    /* +0x06 */ u8 animating;   /* the frame advances while set */
+    /* +0x07 */ u8 frame;       /* the animation frame */
     /* +0x08 */ u8* flag_ptr;   /* the byte the notice reads its live state from */
-    /* +0x0C */ u8 unused_0x0C[0x20 - 0x0C];
+    /* +0x0C */ s16 x;          /* the anchor the sprites are drawn at */
+    /* +0x0E */ s16 y;
+    /* +0x10 */ HudNoticeWork work;
 } HudNotice;
 
 /* 0x802DA1A8 - stores the watched flag pointer into the slot `hud_notice_spawn` returned. */

@@ -4,7 +4,7 @@
  *   its kind 1-9 at +0x00 and its halfwords from +0x04) and the `MenuSlot::place_entries` placement list.  C++; every
  *   plain `fn_` definition is `extern "C"`.
  * RANGE. .text 0x8034C1D0-0x8034D2B0 (27 functions); extab, extabindex, .sdata2 0x8079B368-0x8079B3A8 (the pool
- *   `fn_8034CDDC` loads).  The right edge is where the extabindex and `.sdata2` runs break and the callees turn to `_PLW`.
+ *   `place_list_highlight_draw` loads).  The right edge is where the extabindex and `.sdata2` runs break and the callees turn to `_PLW`.
  *   The left edge is open: `menu/menu_note.cpp`'s `get_note_item_slot` (0x8034C0C4), which `note_slot_cursor_step`
  *   calls first, may be the head of this TU; `tudiscover.py` reports only weak cuts inside (0x8034CBE4, 0x8034CCBC).
  * FLAGS. `cflags_menu` (configure.py); `place_list_overlap_find` alone sits under a scoped `#pragma peephole on` /
@@ -15,7 +15,7 @@
  *   bodies, in the band's scheme (`get_note_item_slot`, `item_page_option_row_index`).
  *   GUESS (from each body and its callers): `place_rec_alloc_spr`, `place_rec_alloc_idx`, `menu_row_rec_init`.
  * RESIDUALS. 13 rows unwritten (objdiff scores them zero): `menu_row_monster_index_get` (8 B), 0x8034CCBC-0x8034D2B0
- *   (`place_rec_alloc_spr`, `place_rec_alloc_idx`, `fn_8034CDDC` and the nine fillers).  `place_rec_alloc_spr`/`place_rec_alloc_idx` read
+ *   (`place_rec_alloc_spr`, `place_rec_alloc_idx`, `place_list_highlight_draw` and the nine fillers).  `place_rec_alloc_spr`/`place_rec_alloc_idx` read
  *   `_SPR_DATA_`'s rectangle, and `hud/layout.h` (its owner) and `menu/menu_item_page.h` both define `_mh_ivec2_`, so the two
  *   headers collide in one TU.  The 10 partial rows include:
  *  - `menu_row_find`: retail duplicates the four-halfword compare block for the kinds 1/2 and 3/4/5 ranges; ours shares
@@ -388,6 +388,6 @@ extern "C" u8 place_rec_alloc(const void* src, s16 x, s16 y, s16 width, s16 heig
     rec->height = height;
     rec->field_0x10 = a;
     rec->field_0x12 = b;
-    fn_8004EAF4(&rec->key, src);
+    place_rec_copy(&rec->key, src);
     return rec->index;
 }

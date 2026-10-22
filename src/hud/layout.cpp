@@ -444,7 +444,7 @@ void fn_802E1024(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *rec;
 
-    fn_80055C5C(&work.uv0, &work.uv1, tex_idx);
+    atlas_digit_uv_get(&work.uv0, &work.uv1, tex_idx);
     work.color = color_mult(work.color, color);
     draw_sprite(work, pos);
 }
@@ -478,7 +478,7 @@ void put_itemicon_tex(s16 x, s16 y, s16 size, u32 color, u8 tex_idx, u16 tex_fla
     _mh_tex_uv_ uv0;
     _mh_tex_uv_ uv1;
 
-    fn_80055C5C(&uv0, &uv1, tex_idx);
+    atlas_digit_uv_get(&uv0, &uv1, tex_idx);
     drawshape_init(3, 0xFFFF);
     drawshape_set_vertex_rect(x, y, size, size);
     drawshape_set_flat_color(color);
@@ -555,7 +555,7 @@ void draw_sprite_uv_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* p
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 
-    fn_80055D8C(&work.uv0, &work.uv1, tex_idx);
+    atlas_icon_uv_get(&work.uv0, &work.uv1, tex_idx);
     work.color = color;
     draw_sprite(work, pos);
 }

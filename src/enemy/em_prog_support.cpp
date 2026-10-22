@@ -181,7 +181,7 @@ extern "C" void note_pen_seed(void) {
     lbl_806C2418.field_0x008 = 4;
     lbl_806C2418.cursor_x_0x00 = (u16)(lbl_8079BF60 * Screen_w.frame_scale);
     lbl_806C2418.field_0x003 = 0;
-    fn_802DFC6C();
+    cockpit_notice_quest_clear();
 }
 
 /* 0x80384380 */
@@ -209,7 +209,7 @@ extern "C" void note_page_open(NotePane* self, u8 a) {
     self->field_0x01C = 0;
     fn_80384304();
     self->field_0x01C = (s8)(s16)(lbl_806C2418.field_0x008 - 1);
-    fn_802DFC6C();
+    cockpit_notice_quest_clear();
 }
 
 /* 0x80384F48 */

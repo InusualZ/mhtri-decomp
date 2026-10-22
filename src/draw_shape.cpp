@@ -18,7 +18,7 @@
  * Results (objdiff, source compiled with the unit's real `cflags_main` command line, measured as the old `draw_shape.cpp` range):
  * 100 %: fn_80054C64, res_file_assign, fn_80054FDC, fn_8005504C, set_arena_idx, set_arena_idx_switch, arena_idx_get, fn_80055E50,
  *        fn_80055E58, fn_80055E64.
- * 90-100 %: res_file_ctor 95.80, fn_80055D8C 93.00.  80-90 %: fn_80055D20 87.22, fn_80055C5C 86.73, fn_80055DC8 86.73,
+ * 90-100 %: res_file_ctor 95.80, atlas_icon_uv_get 93.00.  80-90 %: fn_80055D20 87.22, atlas_digit_uv_get 86.73, fn_80055DC8 86.73,
  *        fn_80054C74 82.45, fn_80055CC4 81.96.
  *
  * Not reconstructed: the four named resource loaders (they need the nw4r `ResFile` owner type, rule 9) and the load callbacks
@@ -161,7 +161,7 @@ void set_arena_idx_switch(u8 idx) {
  * (top, bottom) 16-bit coordinates in the atlas.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_80055C5C(s16* a, s16* b, u32 raw) {
+extern "C" void atlas_digit_uv_get(s16* a, s16* b, u32 raw) {
     u8 value = (u8)raw;
     s16 ones = (s16)((value % 10) * 0x26);
     a[0] = ones;
@@ -188,7 +188,7 @@ extern "C" void fn_80055D20(s16* a, s16* b, u32 raw) {
     b[1] = (s16)(a[1] + 0x14);
 }
 
-extern "C" void fn_80055D8C(s16* a, s16* b, u32 raw) {
+extern "C" void atlas_icon_uv_get(s16* a, s16* b, u32 raw) {
     u8 value = (u8)raw;
     s16 lo = (s16)(lbl_80581910[value] * 0x14);
     a[0] = lo;

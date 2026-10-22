@@ -50,6 +50,9 @@ s32 hud_msg_push(u32 ch, const char* text);
  * HUD log: builds the line from the string table and the item name.  `hud_item_msg_push` is a GUESS name from
  * those two uses. */
 s32 hud_item_msg_push(s32 kind, s32 id, u16 arg);
+/* 0x8035B878 / 0x8035B97C - replaces the second line of message `id`; the id of the message on screen. */
+s32 hud_msg_sub_set(u8 id, const char* text);
+s32 hud_msg_shown_id_get(void);
 
 #ifdef __cplusplus
 }

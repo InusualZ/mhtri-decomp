@@ -75,9 +75,9 @@ extern "C" {
 void fn_800526E4(void* dst, const void* src);                  /* 0x800526E4 */
 void uv_pair_copy(void* dst, const void* src);                  /* 0x800526F8 */
 void fn_80053E78(const f32* scale, const f32* offset, u16 id); /* 0x80053E78 */
-void fn_80055C5C(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055C5C */
+void atlas_digit_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055C5C */
 void fn_80055D20(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D20 */
-void fn_80055D8C(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D8C */
+void atlas_icon_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D8C */
 void fn_80055CC4(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055CC4 */
 void fn_80055DC8(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055DC8 */
 void spr_data_copy(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, the record copy */

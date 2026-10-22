@@ -79,7 +79,7 @@ void setSoftresetFlag(bool flag)
  * 0x80047234 - 0x8004726C  (32-bit word copy)
  * ------------------------------------------------------------------ */
 
-extern "C" s32 fn_80047234(s32* src)
+extern "C" s32 word_read(s32* src)
 {
     return *src;
 }

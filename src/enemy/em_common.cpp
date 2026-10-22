@@ -109,7 +109,7 @@
  *    `addi r4,r4,1`) and loads `lbl_80796C68`/`lbl_80796C80` where ours names its own `.sdata2` magic;
  *    `em_motion_window_ck`: the same magic, and ours materialises the final test branch-free (`mfcr` + `extrwi`);
  *  - `em_sleep_ck`: retail shares one `return 0` through both `bne` arms, ours a `li r3,0` per arm;
- *    `fn_8012F39C`: the constant is loaded before the field (f0/f1 against retail's f2/f0);
+ *    `em_tall_ck`: the constant is loaded before the field (f0/f1 against retail's f2/f0);
  *  - `em_pl_target_ck`, `em_act_kind6_ck`: ours compares unsigned where retail uses `cmpwi` (`em_pl_target_ck` also an extra
  *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
@@ -878,7 +878,7 @@ extern "C" s32 fn_801260E0(struct _ENEMY_WORK* work)
     return get_enemy_data(work)->field_0x20;
 }
 
-extern "C" s32 fn_80126104(struct _ENEMY_WORK* work)
+extern "C" s32 em_hit_parts_get(struct _ENEMY_WORK* work)
 {
     return get_enemy_data(work)->field_0x24;
 }
@@ -5455,7 +5455,7 @@ u32 em_sleep_ck(_ENEMY_WORK* self, u8 kind)
 }
 
 /* "The record's kind is 4 and its height is above 0.9 * the model scale `em_height_base_get` returns". */
-extern "C" s32 fn_8012F39C(_ENEMY_WORK* self)
+extern "C" s32 em_tall_ck(_ENEMY_WORK* self)
 {
     if (self->field_0x1E2 == 4) {
         if (self->field_0x1AC > lbl_80796CD0 * em_height_base_get(self)) return 1;
@@ -7782,7 +7782,7 @@ extern "C" u32 em_markable_ck(_ENEMY_WORK* self)
     if (self->team == 0x28) {
         return 0;
     }
-    if (self->field_0x1E2 == 4 && fn_8012F39C(self) == 0) {
+    if (self->field_0x1E2 == 4 && em_tall_ck(self) == 0) {
         return 0;
     }
     return 1;

@@ -1073,7 +1073,7 @@ void fn_8028F1E8(u8* self) {
 }
 
 /* 0x8028F204 - the `+0x22D7` byte == 1 predicate. */
-u32 fn_8028F204(void) {
+u32 pl_root_lock_ck(void) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     if (root == 0) {
         return 0;

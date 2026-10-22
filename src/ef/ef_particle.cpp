@@ -583,7 +583,7 @@ extern "C" u8 ef_particle_flick_alpha(EfParticle* self)
         }
         break;
     case 5:
-        out = (s16)(128.0f + (f32)p->amplitude * fn_800AB658((6.2831855f * (f32)rem) / (f32)count));
+        out = (s16)(128.0f + (f32)p->amplitude * math_sin_rad((6.2831855f * (f32)rem) / (f32)count));
         break;
     default:
         nw4r::db::Panic(ef_particle_file_name, 353, ef_particle_err_false);
@@ -601,6 +601,6 @@ extern "C" u8 ef_particle_flick_alpha(EfParticle* self)
 
 /* 0x800AB658 (0xC): the sine of an angle in radians (the angle scaled onto the 256-step index table); the weak
  * copy of nw4r::math::SinRad, kept after its first user. */
-extern "C" inline __attribute__((never_inline)) f32 fn_800AB658(f32 x) {
+extern "C" inline __attribute__((never_inline)) f32 math_sin_rad(f32 x) {
     return nw4r::math::SinFIdx(40.743664f * x);
 }
