@@ -1411,6 +1411,33 @@ The 2026-10-21 game-module wave showed where landing time goes; this section is 
 * Never truncate `land.py` output in a pipeline (`| Select-Object -First N`, `| head`): it kills the process mid-apply and leaves MAIN dirty (incident 2026-10-21); redirect to a log file and read the tail.
 
 * **A lane's last step is its own re-cut** (2026-10-22, em006/em008): before reporting, the lane cuts `<branch>-r2` from main's current tip, re-applies its files, re-runs its own-row renames, respells main's renames since its base into its sources (`.pi/tmp/respell.py BASE FILE...` until it becomes a tool), drops every STOPGAP whose symbol main now declares (owner header, or a `_c1` cast view where the signature differs), and re-runs the gates against main. The branch then lands with `land.py land --branch` and no integrator. Landing a branch cut before main moved fails on exactly these points (STOPGAP declarations clashing with the owner's new declarations, old callee spellings).
+* **A registry callee is declared in a leaf header, never a STOPGAP** (2026-10-22, em003/em010): `src/<owner module>/<name>.h`, named after a symbol it declares, one declaration per symbol, with a comment that names the owner unit. Once the registry name is in the map, a STOPGAP declaration of it is a rule-2 finding. A leaf whose symbol already has a declaration in the owner's header is deleted in favour of that header. A type definition inside a leaf makes it stop counting as a leaf, so the type goes to the owner's header (menu_plsearch's friend picker moved into `menu/movie.h`).
+* **The registry never carries a C++ member mangling for a row other units call by a C name** (em_model): the `--rewrite` sweep would spell the mangling as a C identifier in those callers (rule 9). Such a row is renamed by the lane that models the class and converts every caller in the same branch (enemy-userdata, fa920d31).
+* **Landing dry run** (2026-10-22, menu_infomation refused at the gate): before reporting, the lane does in its re-cut tree what the landing will do:
+  1. apply `names.py export` with `symedit.py rename-batch FILE --rewrite --comments`;
+  2. run the other-unit respell (`.pi/tmp/ownrefs.py`, below);
+  3. check that `ninja -k 0` shows 0 FAILED, that `stylelint --diff main --list-added` adds nothing (or lists the rule-12 tokens the orchestrator must allow deliberately), and that `undefrefs.py <units>` refuses nothing;
+  4. revert the trial.
+
+  The clashes this catches appear only after the rewrite: an older declaration of a renamed row with another signature, a leaf duplicating an owner header, or a row's own rename lost in a merge. The rule is to keep one declaration, the owner's, and use a `_c1` cast view where the type differs.
+* **The orchestrator's landing script** is `.pi/tmp/landlane.py BRANCH MANIFEST [--message M] [--resume] [--allow-rule12 T ...] [--allow-orphan A ...]` (the candidate for a `land.py` mode). Its steps:
+  1. It refuses a dirty tree and runs `record-base`.
+  2. It applies the branch's merge-base diff three-way, passing the bytes (text mode turned the patch into CRLF on Windows).
+  3. A conflict only in `symbols.txt` goes to `.pi/tmp/mapmerge.py`, which resolves it row by row, preferring the non-generated name. When both sides renamed the same row it stops; `--prefer-ours` keeps main's name and the branch is respelled to it. Any other conflict stops the script, leaving the tree to be fixed by hand; `--resume` then continues.
+  4. It applies the registry names (`names.py export` and `rename-batch --rewrite --comments`).
+  5. It runs `.pi/tmp/ownrefs.py`, which respells other units' code references to the branch's own-row renames (made with `--no-refs`, so foreign callers kept the old stem) and to registry names that lost to a name already in the map.
+  6. It widens the manifest to the changed paths and units, naming untracked non-`src/` paths (a new playbook idea) in `--units`.
+  7. It runs `land --already-applied --no-outbox` with the output in `.pi/tmp/landlane-<branch>.log`.
+* **When main moves under a finished branch, the lane re-cuts; the orchestrator does not merge by hand** beyond a name clash or a duplicated leaf: em001 over the user-data class model, menu_item and lb_npc over clashing leaf declarations. A refused landing restores main (`git reset`, `git checkout -- .`, and removal of every untracked file the branch carries, checked with `git cat-file -e <branch>:<path>`), then sends the lane the refusal's items and asks for an r(N+1) cut from the new tip.
+* **`record-base` runs on a clean tree only**: a base recorded with the batch already applied makes the row-regression check compare the batch with itself (menu_plsearch, 8be47465; the lane's own by-address comparison stood in).
 
 ### 16.5 Status of the tooling
+* 2026-10-22 (2b1245a8): `objcompare.symbol_rows` resolves a compiler-local `stem$NNNN` (`__arraydtor$9000`) by its stem when neither name nor address finds it. Before, the verifier's per-symbol re-measure refused a 100 % row whose number had moved because a header changed.
+* Asked for by lanes, not built yet:
+  * `names.py check-decls`: every declaration of each registry name, with the registry applied.
+  * a re-cut helper that takes main's map and replays the lane's own-row renames.
+  * a `recompile.py --all-errors` option (the real command uses `-maxerrors 1`).
+  * a leaf-header writer that takes a map row and a prototype.
+  * `measure.py --diff --all`.
+  * a declaration-order search tool.
 * Landed on main 2026-10-22 (5ae159f5, 33ebc69e, 024161e1): the `own_rows` gate check with `land --branch` taking a manifest's `units` (16.1, 16.4); the name registry `tools/symbols/names.py` (16.2); the `integrate.py` fixes - a C++-typed declaration goes to the symbol's leaf header with the includes its types need, a leaf `fn_X.h` is renamed with its symbol and its includes respelled, a request whose row main already named reports `main already named it N` and uses N, a float parameter placed differently from the owner's prototype is reported (never refused), scratch stays inside the tree (TMP/TEMP when they point inside it, else `build/tmp/integrate`), and `--gate-ref main` judges the gate pre-run against main (`docs/tools/spec/integrate.md`).
