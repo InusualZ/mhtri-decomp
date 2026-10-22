@@ -11,7 +11,8 @@ typedef struct EmAreaEntry {
     /* +0x00 */ u8 active;           /* nonzero while the entry is in use */
     /* +0x01 */ u8 unused_0x01;
     /* +0x02 */ u8 group;            /* matched against `_ENEMY_WORK::group` */
-    /* +0x03 */ u8 unused_0x03[0x0A - 0x03];
+    /* +0x03 */ u8 team_0x03;  /* the enemy kind (`em_area_entry_near_ck` hands it to `enemy_data_by_team_get`) */
+    /* +0x04 */ u8 unused_0x04[0x0A - 0x04];
     /* +0x0A */ u8 area_no;          /* matched against `_ENEMY_WORK::field_0x00A` */
     /* +0x0B */ u8 unused_0x0B;
     /* +0x0C */ u8 field_0x0C;       /* must be 1 for the entry to count */

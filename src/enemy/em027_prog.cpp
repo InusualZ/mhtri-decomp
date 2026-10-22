@@ -1022,7 +1022,7 @@ void fn_801AD704(struct _ENEMY_WORK* self) {
         return;
     case 6:
         if (em_frame_check(self, 1, lbl_807989C0, lbl_8079893C) == 1) {
-            fn_80132160(self);
+            em_flag_0x115_set(self);
         }
         if (em_demo_time_ck(0x51E) == 1) {
             self->state++;
@@ -1032,7 +1032,7 @@ void fn_801AD704(struct _ENEMY_WORK* self) {
         return;
     case 7:
         if (em_frame_check(self, 1, lbl_807989C0, lbl_8079893C) == 1) {
-            fn_80132160(self);
+            em_flag_0x115_set(self);
         }
         return;
     }

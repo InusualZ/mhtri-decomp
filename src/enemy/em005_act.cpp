@@ -182,7 +182,7 @@ extern "C" {
 
 /* The enemy-band callees, declared with the call sites' signatures: `enemy/em_common.cpp`'s first. */
 void em_se_tbl_play(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);void em_se_tbl_play_alt(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
-void fn_801277F4(struct _ENEMY_WORK* self, u32 a);
+void em_patrol_step(struct _ENEMY_WORK* self, u32 a);
 void em_action_finish(struct _ENEMY_WORK* self);
 void em_action_finish_fall(struct _ENEMY_WORK* self);
 void em_action_finish_walk(struct _ENEMY_WORK* self);
@@ -199,9 +199,9 @@ u32 em_busy_ck(struct _ENEMY_WORK* self);
 u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
-void fn_8012F7D4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
+void em_mot_layer_blend_step(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
 void em_mat_blend_reset(struct _ENEMY_WORK* self);
-void fn_8012F860(struct _ENEMY_WORK* self, f32 a, f32 b);
+void em_motion_blend_step(struct _ENEMY_WORK* self, f32 a, f32 b);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 f32 get_em_base_scale(struct _ENEMY_WORK* self);
@@ -217,15 +217,15 @@ void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
 void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
 struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
-void fn_80131BD4(struct _ENEMY_WORK* self);
+void em_any_player_seen_ck(struct _ENEMY_WORK* self);
 void em_frame_flag_set(struct _ENEMY_WORK* self);
 void em_ceiling_latch(struct _ENEMY_WORK* self);
-void fn_80131E00(struct _ENEMY_WORK* self);
+void em_fx_flag2_set(struct _ENEMY_WORK* self);
 void em_busy_timer_reset(struct _ENEMY_WORK* self);
 void em_hit_arm_set(struct _ENEMY_WORK* self);
 f32 stg_area_ceiling_get(u8 area);
 u32 em_turn_to_target(struct _ENEMY_WORK* self, u32 a);
-void fn_80133CC8(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_turn_to_target_3d(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
 void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
 u32 em_approach_step(struct _ENEMY_WORK* self, s32 a, s32 b);
@@ -556,8 +556,8 @@ void fn_801CD2EC(struct _ENEMY_WORK* self) {
         } else {
             angle = (f32)(s16)delta * lbl_80799278 / lbl_8079927C / lbl_80799284;
         }
-        fn_8012F860(self, angle, lbl_807992D0);
-        fn_8012F7D4(self, 0x23, 0x24, (u32)(s32)em_mot_frame_get(self), self->field_0x464);
+        em_motion_blend_step(self, angle, lbl_807992D0);
+        em_mot_layer_blend_step(self, 0x23, 0x24, (u32)(s32)em_mot_frame_get(self), self->field_0x464);
         break;
     }
     }
@@ -599,7 +599,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
                         break;
                     }
                     if (self->field_0x43D == 1) {
-                        fn_80131BD4(self);
+                        em_any_player_seen_ck(self);
                     }
                 }
                 break;
@@ -639,7 +639,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
                 if (self->field_0x1E7 == 0) {
                     fn_801CAF70(self);
                 } else {
-                    fn_801277F4(self, 0);
+                    em_patrol_step(self, 0);
                     em_act_set_unless_act11(self, 3, 0x0E);
                 }
                 return;
@@ -765,7 +765,7 @@ void fn_801CD944(struct _ENEMY_WORK* self) {
         em_hit_arm_set(self);
         switch (self->state_0x006) {
         case 0:
-            fn_80133CC8(self, 0x100, 0x100);
+            em_turn_to_target_3d(self, 0x100, 0x100);
             if (em_frame_check(self, 1, lbl_80799294, lbl_80799220) == 1) {
                 self->state_0x006++;
                 em_move_vec2_clr(self);
@@ -959,7 +959,7 @@ void fn_801CE014(struct _ENEMY_WORK* self) {
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
     em_ceiling_latch(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1040,7 +1040,7 @@ void fn_801CE2B0(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
     em_ceiling_latch(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1082,7 +1082,7 @@ void fn_801CE3F0(struct _ENEMY_WORK* self) {
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
     em_ceiling_latch(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1104,7 +1104,7 @@ void fn_801CE4A0(struct _ENEMY_WORK* self) {
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
     em_ceiling_latch(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1136,7 +1136,7 @@ void fn_801CE5A0(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
     em_ceiling_latch(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1180,7 +1180,7 @@ void fn_801CE71C(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
     em_ceiling_latch(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;

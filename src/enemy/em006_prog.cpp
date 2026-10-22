@@ -61,7 +61,7 @@ extern "C" void fn_801BD6C0(_ENEMY_WORK* self, u8 arg1)
     nw4r::math::VEC3 pos;
 
     VEC3_ctor(&pos);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -107,7 +107,7 @@ extern "C" void fn_801BD838(_ENEMY_WORK* self)
     nw4r::math::VEC3 pos;
 
     VEC3_ctor(&pos);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -209,13 +209,13 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
         em_busy_set(self);
         em_busy_timer_reset(self);
         em_shake_req_set(self);
-        fn_80131E00(self);
+        em_fx_flag2_set(self);
         break;
     case 1:
         em_busy_set(self);
         em_busy_timer_reset(self);
         if (em_frame_check(self, 2, lbl_80798E54, lbl_80798E40) == 1) {
-            fn_80131E00(self);
+            em_fx_flag2_set(self);
         }
         if (em_frame_check(self, 2, lbl_80798ED8, lbl_80798E40) == 1) {
             em_shake_req_set(self);

@@ -976,8 +976,8 @@ extern "C" void fn_80156EA4(_ENEMY_WORK* self) {
             em_mot_set(self, 0xDA, 6, 0);
             return;
         }
-        fn_8012F860(self, (lbl_80797148 * (f32) (s16) (self->pos_0x1BC.y - temp_r31)) / lbl_8079714C, lbl_80797150);
-        fn_8012F7D4(self, 0xD4, 0xD5, (s32) em_mot_frame_get(self), self->frames_0x454[4]);
+        em_motion_blend_step(self, (lbl_80797148 * (f32) (s16) (self->pos_0x1BC.y - temp_r31)) / lbl_8079714C, lbl_80797150);
+        em_mot_layer_blend_step(self, 0xD4, 0xD5, (s32) em_mot_frame_get(self), self->frames_0x454[4]);
         return;
     case 2:
         if (em_mot_end_ck(self) == 1U) {
@@ -1244,8 +1244,8 @@ extern "C" void fn_80157650(_ENEMY_WORK* self) {
                 var_f1 = lbl_807970C0;
             }
         }
-        fn_8012F860(self, var_f1, lbl_80797168);
-        fn_8012F7D4(self, 0x23, 0x24, (s32) em_mot_frame_get(self), self->frames_0x454[4]);
+        em_motion_blend_step(self, var_f1, lbl_80797168);
+        em_mot_layer_blend_step(self, 0x23, 0x24, (s32) em_mot_frame_get(self), self->frames_0x454[4]);
         return;
     }
 }

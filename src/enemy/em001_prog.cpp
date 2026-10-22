@@ -58,8 +58,8 @@
 #include "enemy/lbl_805A1368.h" /* lbl_805A1368 (rule 2: the owner's header) */
 #include "enemy/em_busy_set.h" /* em_busy_set (rule 2: the owner's header) */
 #include "enemy/em_eft_active_ck.h" /* em_eft_active_ck (rule 2: the owner's header) */
-#include "enemy/fn_80131BD4.h" /* fn_80131BD4 (rule 2: the owner's header) */
-#include "enemy/fn_801277F4.h" /* fn_801277F4 (rule 2: the owner's header) */
+#include "enemy/em_any_player_seen_ck.h" /* em_any_player_seen_ck (rule 2: the owner's header) */
+#include "enemy/em_patrol_step.h" /* em_patrol_step (rule 2: the owner's header) */
 #include "enemy/em_action_finish_fall.h" /* em_action_finish_fall (rule 2: the owner's header) */
 #include "enemy/em_approach_start.h" /* em_approach_start (rule 2: the owner's header) */
 #include "enemy/em_action_finish_walk.h" /* em_action_finish_walk (rule 2: the owner's header) */
@@ -74,9 +74,9 @@
 #include "enemy/em_act11_wait_ck.h" /* em_act11_wait_ck (rule 2: the owner's header) */
 #include "enemy/em_alt_mode_ck.h" /* em_alt_mode_ck (rule 2: the owner's header) */
 #include "enemy/em_area_roam_pick.h" /* em_area_roam_pick (rule 2: the owner's header) */
-#include "enemy/fn_80129D3C.h" /* fn_80129D3C (rule 2: the owner's header) */
+#include "enemy/em_area_stun_move_ck.h" /* em_area_stun_move_ck (rule 2: the owner's header) */
 #include "enemy/em_area_break_ck.h" /* em_area_break_ck (rule 2: the owner's header) */
-#include "enemy/fn_80129E48.h" /* fn_80129E48 (rule 2: the owner's header) */
+#include "enemy/em_area_player_follow_ck.h" /* em_area_player_follow_ck (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
@@ -134,7 +134,7 @@
 #define em_ground_ck_c1 ((u32 (*)(_ENEMY_WORK*))em_ground_ck)
 #define fn_801303FC_c1 ((void (*)(_ENEMY_WORK*, f32))em_height_add)
 #define fn_801493A8_c1 ((void (*)(_ENEMY_WORK*, u32, u8, u32))fn_801493A8)
-#define fn_80133F4C_c1 ((void (*)(_ENEMY_WORK*, f32, f32))fn_80133F4C)
+#define fn_80133F4C_c1 ((void (*)(_ENEMY_WORK*, f32, f32))em_turn_in_window2)
 #define em_ground_ck_c2 ((u32 (*)(_ENEMY_WORK*, f32))em_ground_ck)
 #define fn_801303FC_c2 ((void (*)(_ENEMY_WORK*))em_height_add)
 #define fn_8012D3E0_c1 ((u8 (*)(_ENEMY_WORK*, u32))fn_8012D3E0)
@@ -154,7 +154,7 @@
 #define getKeyData_c1 ((f32 (*)(void*))getKeyData)
 #define em_mot_speed_set_c1 ((void (*)(_ENEMY_WORK*))em_mot_speed_set)
 #define fn_801545B8_c2 ((void (*)(void*, u32, u16, u32))fn_801545B8)
-#define fn_800AD9C0_c1 ((void (*)(void*, void*, f32))fn_800AD9C0)
+#define fn_800AD9C0_c1 ((void (*)(void*, void*, f32))vec3_div)
 #define fn_80131EC0_c2 ((void (*)(_ENEMY_WORK*))em_timer_0x81C_arm)
 #define mhchar_mat_tev_set_view1 ((void (*)(void*, s32, s32, u8, s32, s32, u8, f32))mhchar_mat_tev_set)
 #define fn_8013918C_view1 ((void (*)(void*, s32))em_res_user_data_dtor)
@@ -416,7 +416,7 @@ extern f32 lbl_80796F5C;
 extern f32 lbl_80796F80;
 
 extern f32 lbl_80796F88;
-extern void fn_800AD9C0();
+extern void vec3_div();
 
 extern f32 lbl_80796ECC;
 extern f32 lbl_80796FAC;
@@ -1488,7 +1488,7 @@ extern "C" void fn_80149AFC(_ENEMY_WORK* self) {
 }
 
 /* The seventh action's body: motion 31, then release toward the target with the angle rate (per frame at
- * 60 fps) fed to `fn_8012F860` and `em_mot_frame_get`'s frame count to `fn_8012F7D4`. */
+ * 60 fps) fed to `em_motion_blend_step` and `em_mot_frame_get`'s frame count to `em_mot_layer_blend_step`. */
 extern "C" void fn_80149C58(_ENEMY_WORK* self) {
     u16 angle;
     u16 diff;
@@ -1511,8 +1511,8 @@ extern "C" void fn_80149C58(_ENEMY_WORK* self) {
         } else {
             rate = lbl_80796E1C;
         }
-        fn_8012F860(self, rate, lbl_80796EDC);
-        fn_8012F7D4(self, 35, 36, (s32)em_mot_frame_get(self), self->field_0x464);
+        em_motion_blend_step(self, rate, lbl_80796EDC);
+        em_mot_layer_blend_step(self, 35, 36, (s32)em_mot_frame_get(self), self->field_0x464);
         break;
     }
 }
@@ -1655,7 +1655,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                     self->state_0x007 = 1;
                     break;
                 }
-                if (self->field_0x43D == 1 && fn_80131BD4(self) == 1) {
+                if (self->field_0x43D == 1 && em_any_player_seen_ck(self) == 1) {
                     self->state_0x007 = 2;
                 }
                 break;
@@ -1735,7 +1735,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                         break;
                     }
                 } else {
-                    fn_801277F4(self, 0);
+                    em_patrol_step(self, 0);
                     switch (arg) {
                     default:
                         fn_80128A70_view1(self, 3, 14);
@@ -1891,7 +1891,7 @@ void fn_8014A418(_ENEMY_WORK *self) {
         temp_r0 = self->state_0x006;
         switch ((s32) temp_r0) {
         case 0:
-            fn_80133CC8(self, 0x100, 0x100);
+            em_turn_to_target_3d(self, 0x100, 0x100);
             if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
                 em_move_vec2_clr(self);
@@ -2748,7 +2748,7 @@ void fn_8014BFE4(_ENEMY_WORK *self, s32 arg1) {
             return;
         }
         if (em_frame_check(self, 1, lbl_80796F4C, lbl_80796E1C) == 1U) {
-            temp_f31 = fn_8012F8F4(self) - lbl_80796F4C;
+            temp_f31 = em_mot_frame_end_get(self) - lbl_80796F4C;
             em_height_set(self, lbl_80796F3C * ((em_mot_frame_get(self) - lbl_80796F4C) / temp_f31));
             return;
         }
@@ -3895,7 +3895,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         return;
     case 1:
         em_hit_arm_set(self);
-        fn_80136D4C(self, lbl_80796F00);
+        em_height_follow(self, lbl_80796F00);
         switch ((s32) arg2) {
         case 0:
             spC = 0x2800;
@@ -5190,7 +5190,7 @@ s32 fn_801542D0(struct _ENEMY_WORK* self, u16 arg1) {
         self->field_0x1FF = 4;
         return 1;
     }
-    if (fn_80129D3C(self) == 1) {
+    if (em_area_stun_move_ck(self) == 1) {
         return 1;
     }
     armed = 0;
@@ -5215,7 +5215,7 @@ s32 fn_801542D0(struct _ENEMY_WORK* self, u16 arg1) {
         }
     }
     if (armed == 0) {
-        temp2 = fn_80129E48(self);
+        temp2 = em_area_player_follow_ck(self);
         if (temp2 == 1) {
             return 0;
         }

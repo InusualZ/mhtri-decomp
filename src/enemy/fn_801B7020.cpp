@@ -189,7 +189,7 @@ extern "C" void fn_801B70A4(EmProgWork* self) {
     rot.z = 45.0f;
     rotVecY(&rot, self->field_0x1C0);
     out = *(EmVecWords*)&rot;
-    fn_80130350((struct _ENEMY_WORK*)self, &out);
+    em_move_vec_set((struct _ENEMY_WORK*)self, &out);
 }
 
 /* Picks the random-motion kind for the work's `field_0x01A` entry: 0 = no record, 1/2 = the kind the
@@ -256,7 +256,7 @@ extern "C" void fn_801B71F4(EmProgWork* self, u8 mode) {
     if (self->field_0x00A & 2) {
         self->value_0x328 = 3000.0f;
         self->value_0x1CC = 1.0f;
-        fn_80131FA0((struct _ENEMY_WORK*)self, 80);
+        em_max_hp_set((struct _ENEMY_WORK*)self, 80);
     } else if (self->field_0x00A & 1) {
         self->value_0x328 = 1200.0f;
         self->field_0x330 = 150;

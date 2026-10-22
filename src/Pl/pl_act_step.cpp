@@ -775,7 +775,7 @@ extern "C" void fn_80247CC4(_PLW* self) {
     VEC3 work;
     VEC3 vec;
     VEC3_ctor(&vec);
-    fn_8012A624(&work);
+    em_land_data_init(&work);
     vec.x = pl_float_zero;
     vec.y = pl_float_zero;
     vec.z = pl_frame_window_3;
@@ -3013,7 +3013,7 @@ void fn_8025F478(_PLW* self) {
     VEC3 work;
     f32 value;
 
-    fn_8012A624(&work);
+    em_land_data_init(&work);
     if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         self->ground_y_0x060 = value;
         self->kind_0x09 = 0;
@@ -3313,7 +3313,7 @@ void fn_8025FA00(_PLW* self) {
     VEC3 work;
     f32 value;
 
-    fn_8012A624(&work);
+    em_land_data_init(&work);
     if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         self->ground_y_0x060 = value;
         switch (self->kind_0x09) {
@@ -3451,7 +3451,7 @@ s32 fn_8025F588(_PLW* self) {
     VEC3 work;
     f32 value;
 
-    fn_8012A624(&work);
+    em_land_data_init(&work);
     if (fn_802919FC(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         self->ground_y_0x060 = value;
         switch (self->kind_0x09) {
@@ -3649,7 +3649,7 @@ void fn_8025F088(_PLW* self) {
     }
     self->field_0x46C = self->field_0x46D;
     if (Pl_master_ck(self) == 1) {
-        if (fn_80131934(self->chunk_ofs) == 1) {
+        if (em_player_spotted_set(self->chunk_ofs) == 1) {
             self->field_0x46C = 1;
         } else {
             self->field_0x46C = 0;

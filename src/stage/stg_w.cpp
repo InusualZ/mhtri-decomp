@@ -1535,7 +1535,7 @@ extern "C" void fn_802B414C(StageRuntime* st)
             if ((f32)i >= strip[2] / strip[1]) {
                 break;
             }
-            if (fn_800E16DC((void*)st->area_char[0], 0, 0, *strip + (f32)i * strip[1], lbl_8079A448) != 0) {
+            if (mhchar_frame_check((void*)st->area_char[0], 0, 0, *strip + (f32)i * strip[1], lbl_8079A448) != 0) {
                 vec_to_mh_vec3(&pos, (struct Vec*)slot);
                 ::eft028_set_koware(0xB, &pos, st->areano, 0);
             }

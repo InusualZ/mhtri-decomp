@@ -780,9 +780,9 @@ extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const 
 extern "C" void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
 extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" void fn_80075258(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
-extern "C" void fn_800FA3E8(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
+extern "C" void pl_segment_init(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
 extern "C" void eft_vec_ctor(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
-extern "C" u8 fn_80290598(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
+extern "C" u8 pl_segment_sphere_hit(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
 extern "C" s32 stage_water_enabled_ck(void);
 extern "C" u32 fn_802B45D4(void);
 extern "C" u32 camera_mode1_ck(void);
@@ -809,7 +809,7 @@ extern "C" void setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(_EmHandle* se
 /* --- the functions, in address order ------------------------------------------------------------ */
 extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos);
 extern "C" void fn_801027D0(EmEffectWork* work);
-extern "C" EmEffectQuad* fn_8010294C(EmEffectQuad* quad);
+extern "C" EmEffectQuad* pl_segment_box_init(EmEffectQuad* quad);
 
 void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
 
@@ -1057,8 +1057,8 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
     u32 i;
 
     unit = work->unit;
-    fn_800FA3E8(&seg);
-    fn_8010294C(&quad);
+    pl_segment_init(&seg);
+    pl_segment_box_init(&quad);
     eft_vec_ctor(&point.pos);
     if (unit->probes == 0) {
         unit->scale_rate = 1.0f;
@@ -1071,7 +1071,7 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
     for (i = 0; unit->probes[i].scale > 0.0f; i++) {
         vec_to_mh_vec3(&point.pos, (Vec*)&unit->probes[i].pos);
         point.scale = unit->probes[i].scale;
-        hit = fn_80290598(&quad, &point.pos, 0, 0);
+        hit = pl_segment_sphere_hit(&quad, &point.pos, 0, 0);
         if (hit != 0) {
             break;
         }
@@ -1098,7 +1098,7 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
 #pragma peephole on
 
 /* Zeroes the four positions of a caller's frame; the effect's own vector initialiser. */
-extern "C" EmEffectQuad* fn_8010294C(EmEffectQuad* quad) {
+extern "C" EmEffectQuad* pl_segment_box_init(EmEffectQuad* quad) {
     VEC3_ctor(&quad->v[0]);
     VEC3_ctor(&quad->v[1]);
     VEC3_ctor(&quad->v[2]);

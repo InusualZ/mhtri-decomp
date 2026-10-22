@@ -463,10 +463,10 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
                 (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
             if (data != 0) {
                 if (self->area_no == data->field_0x14) {
-                    fn_80127308(self, &data->vec_0x24, &self->pos, 0);
+                    em_part_spot_nearest_get(self, &data->vec_0x24, &self->pos, 0);
                     em_wave_amp(&self->pos, &self->pos, lbl_807974F0, 0, (u16)ran_suu(0));
                 } else {
-                    fn_80127308(self, &origin, &self->pos, 0);
+                    em_part_spot_nearest_get(self, &origin, &self->pos, 0);
                     em_wave_amp(&self->pos, &self->pos, lbl_807974F0, 0, (u16)ran_suu(0));
                 }
                 self->field_0x1C4 = 0;

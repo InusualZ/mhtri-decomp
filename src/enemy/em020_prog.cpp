@@ -48,7 +48,7 @@
 
 extern "C" {
 extern f32 lbl_8079B83C; /* 0.0 */
-extern f32 lbl_8079B854; /* the approach scale `fn_80136D4C` takes */
+extern f32 lbl_8079B854; /* the approach scale `em_height_follow` takes */
 extern f32 lbl_8079B858;
 extern f32 lbl_8079B85C;
 extern f32 lbl_8079B874;
@@ -161,7 +161,7 @@ void em020_arm_mot1_wait20(_ENEMY_WORK* self)
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     default:
         break;
@@ -205,7 +205,7 @@ void em020_arm_mot3_wait50(_ENEMY_WORK* self)
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     default:
         break;
@@ -244,7 +244,7 @@ void em020_arm_approach_mot1_wait55(_ENEMY_WORK* self, u8 mode)
         break;
     case 2:
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     default:
         break;
@@ -262,7 +262,7 @@ void em020_arm_mot1_wait58(_ENEMY_WORK* self)
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     default:
         break;
@@ -285,14 +285,14 @@ void em020_arm_mot1_facing_wait77(_ENEMY_WORK* self)
             em_turn_to_target(self, 0x40);
         }
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     default:
         break;
     }
 }
 
-/* The 0x4f/0x0a-frame pose's wake-up: step 1 re-aims with `fn_80136D4C`, closes with `em_turn_to_target`
+/* The 0x4f/0x0a-frame pose's wake-up: step 1 re-aims with `em_height_follow`, closes with `em_turn_to_target`
  * when a frame window ends, and re-arms the turn. */
 void em020_arm_mot1_turn_wait79(_ENEMY_WORK* self)
 {
@@ -306,14 +306,14 @@ void em020_arm_mot1_turn_wait79(_ENEMY_WORK* self)
     case 1: {
         if (em_frame_check(self, 2, lbl_8079B8EC, lbl_8079B83C) == 1 ||
             em_frame_check(self, 3, lbl_8079B8F0, lbl_8079B8C4) == 1) {
-            fn_80136D4C(self, lbl_8079B854);
+            em_height_follow(self, lbl_8079B854);
             em_turn_to_target(self, 0x50);
         }
         f32 lo = lbl_8079B8EC;
         f32 hi = lbl_8079B8F0;
         em_turn_in_window(self, lo, hi, 0x10000);
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     }
     default:
@@ -335,11 +335,11 @@ void em020_arm_mot1_effects_wait78(_ENEMY_WORK* self)
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_8079B8A4, lbl_8079B83C) == 0) {
-            fn_80136D4C(self, lbl_8079B854);
+            em_height_follow(self, lbl_8079B854);
             em_turn_to_target(self, 0x40);
         }
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     default:
         break;
@@ -366,7 +366,7 @@ void em020_arm_mot1_side_wait80(_ENEMY_WORK* self, u8 right)
         f32 hi = lbl_8079B8C4;
         em_turn_in_window(self, lo, hi, right == 0 ? 0x4000 : -0x4000);
         if (em_mot_end_ck(self) == 1)
-            fn_80128030(self);
+            em_action_finish_swim(self);
         break;
     }
     default:

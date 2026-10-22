@@ -13,7 +13,7 @@
  *   joint_mtx_store is a GUESS (0x80139A64); joint_mtx_load is a GUESS (0x80139A7C).
  * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`fn_80139B6C`, the per-item matrix builder).
  *  - `fn_80138074`, `fn_8013823C`, `fn_80138B60`, `fn_801391FC`, `fn_801394D4`, `em_userdata_record_find_back`,
- *    `fn_8013A900`, `em_res_user_data_dtor`, `fn_80139858`: register colouring, a narrowing mask or a fused compare still
+ *    `em_userdata_state_kind_get`, `em_res_user_data_dtor`, `fn_80139858`: register colouring, a narrowing mask or a fused compare still
  *    differs with the scoped `#pragma peephole off` (see SHAPES);
  *  - `fn_801391FC`, `fn_80139620`: ours converts int to float through the object's own `.sdata2` magic where retail
  *    references `lbl_80796D78`/`lbl_80796D80`, and `fn_801391FC` lacks retail's `__cvt_fp2unsigned` call; `fn_801391FC` and `fn_80138F3C` also differ in the `psq_st` f31 spill;
@@ -33,30 +33,30 @@
  * SHAPES. `#pragma peephole off` is scoped to the 18 bodies whose retail keeps the unfused `clrlwi`/`rlwinm` +
  *   `cmpwi`, `clrlwi` + `slwi` and narrowing masks (a per-function sweep, no row lower).  `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
  *   `fn_801391FC`'s `total` are 32-bit accumulators narrowed at the use (`u16` locals re-mask every iteration);
- *   `fn_8013A900` is a `switch` inside `for (;;)`, not three `if`s.  The unit's own symbols are plain C names, so its
+ *   `em_userdata_state_kind_get` is a `switch` inside `for (;;)`, not three `if`s.  The unit's own symbols are plain C names, so its
  *   definitions and its callees' map spellings sit in one `extern "C"` block; the nw4r members are called as C++.
  */
 
 struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */
 #include "enemy/em_motion_param_set.h" /* em_motion_param_set (rule 2: the owner's header) */
 #include "enemy/get_enemy_data__FP11_ENEMY_WORK.h" /* get_enemy_data__FP11_ENEMY_WORK (rule 2: the owner's header) */
-#include "enemy/fn_801252DC.h" /* fn_801252DC (rule 2: the owner's header) */
+#include "enemy/em_owner_slot_update.h" /* em_owner_slot_update (rule 2: the owner's header) */
 #include "enemy/fn_80126098.h" /* fn_80126098 (rule 2: the owner's header) */
 #include "enemy/em_data_point_get.h" /* em_data_point_get (rule 2: the owner's header) */
-#include "enemy/fn_801264BC.h" /* fn_801264BC (rule 2: the owner's header) */
+#include "enemy/em_hook_get.h" /* em_hook_get (rule 2: the owner's header) */
 #include "enemy/em_hit_mask_get.h" /* em_hit_mask_get (rule 2: the owner's header) */
 #include "enemy/fn_801281EC.h" /* fn_801281EC (rule 2: the owner's header) */
 #include "enemy/fn_801281F8.h" /* fn_801281F8 (rule 2: the owner's header) */
 #include "enemy/fn_80128204.h" /* fn_80128204 (rule 2: the owner's header) */
-#include "enemy/fn_80128308.h" /* fn_80128308 (rule 2: the owner's header) */
+#include "enemy/em_delay_act_tick.h" /* em_delay_act_tick (rule 2: the owner's header) */
 #include "enemy/em_target_pos_set.h" /* em_target_pos_set (rule 2: the owner's header) */
-#include "enemy/fn_8012987C.h" /* fn_8012987C (rule 2: the owner's header) */
-#include "enemy/fn_8012A3B4.h" /* fn_8012A3B4 (rule 2: the owner's header) */
+#include "enemy/em_timers_update.h" /* em_timers_update (rule 2: the owner's header) */
+#include "enemy/em_ground_probe.h" /* em_ground_probe (rule 2: the owner's header) */
 #include "enemy/fn_8012A414.h" /* fn_8012A414 (rule 2: the owner's header) */
 #include "enemy/em_area_change.h" /* em_area_change (rule 2: the owner's header) */
-#include "enemy/fn_8012B64C.h" /* fn_8012B64C (rule 2: the owner's header) */
+#include "enemy/em_hate_update.h" /* em_hate_update (rule 2: the owner's header) */
 #include "enemy/em_busy_set.h" /* em_busy_set (rule 2: the owner's header) */
-#include "enemy/fn_80133BCC.h" /* fn_80133BCC (rule 2: the owner's header) */
+#include "enemy/em_idle_flag_get.h" /* em_idle_flag_get (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/fn_8012BDF4.h"
@@ -219,10 +219,10 @@ void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1);
 UserDataItem* fn_8013A6C0(EnemyWork* work);
 s32 fn_8013A6F4(EnemyWork* work);
 void fn_8013A770(UserDataCursor* cursor, EnemyWork* work);
-s32 fn_8013A830(EnemyWork* work, u8 arg1);
+s32 em_break_part_data_get(EnemyWork* work, u8 arg1);
 u32 fn_8013A884(EnemyWork* work, u8 arg1);
 s32 fn_8013A8B4(EnemyWork* work, u8 arg1, u8 arg2);
-s32 fn_8013A900(EnemyWork* work);
+s32 em_userdata_state_kind_get(EnemyWork* work);
 void fn_8013A954(EnemyWork* work, u8 arg1);
 void fn_8013A978(EnemyWork* work);
 void fn_8013A9F4(EnemyWork* work);
@@ -697,7 +697,7 @@ void fn_8013823C(EnemyWork* self) {
             }
         }
     }
-    fn_801252DC(self);
+    em_owner_slot_update(self);
     if (self->field_0x1F9 == 1 && self->field_0x1E1 != self->field_0x9F7) {
         if (self->field_0x380 == 8) {
             if (em_busy_ck(self) == 1 && (self->field_0x99A & 1) == 0 && self->field_0x99B == 1 &&
@@ -751,10 +751,10 @@ void fn_8013823C(EnemyWork* self) {
             self->field_0x94A = 0;
             self->field_0x94C = 0;
             self->field_0x812 = 0;
-            fn_801324E0(self);
+            em_poison_init(self);
         }
     }
-    fn_80128308(self);
+    em_delay_act_tick(self);
     setVector3__FPQ34nw4r4math4VEC3fff(&self->field_0x1A0, lbl_80796D40, lbl_80796D40, lbl_80796D40);
     self->field_0x1DF = 0;
     self->field_0x79A = 0;
@@ -765,37 +765,37 @@ void fn_8013823C(EnemyWork* self) {
     self->field_0x30F = 0;
     copyVec3(&self->field_0x194, &self->field_0x188);
     was_special = self->field_0x1E2;
-    fn_80133C30(self);
+    em_approach_3d_clear(self);
     if (self->field_0x767 == 1) {
         copyVec3(&self->field_0x778, &self->field_0x76C);
     }
     self->field_0x767 = 1;
     self->field_0x740 = 0;
     self->field_0x43F = 0;
-    fn_8012987C(self);
+    em_timers_update(self);
     if (event_demo_ck__Fv() == 0 && self->field_0x46A == 0) {
         fn_80138F3C(self);
-        fn_8012FCE4(self);
-        fn_80131150(self);
-        fn_8012B64C(self);
+        em_motion_param_step(self);
+        em_sight_update(self);
+        em_hate_update(self);
         fn_8012BDF4(self);
         fn_8012C600(self);
-        fn_8012C9AC(self);
+        em_act_pick(self);
     }
-    fn_801320A4(self);
+    em_shell_rate_init(self);
     if (event_demo_ck__Fv() == 0 && self->field_0x46A == 0) {
         fn_8011F5C0(self);
         flag = fn_8011F654(self);
     }
     {
-        void (*cb)(EnemyWork*) = fn_801264BC(self, 2);
+        void (*cb)(EnemyWork*) = em_hook_get(self, 2);
         if (cb != NULL) {
             cb(self);
         }
     }
     if (flag == 1) {
         em_state_refresh(self);
-    } else if (fn_80133BCC(self) == 1 && self->field_0x46A == 0) {
+    } else if (em_idle_flag_get(self) == 1 && self->field_0x46A == 0) {
         em_userdata_script_run((struct EmWork*)self);
     } else if ((self->flags_0x1C8 & 8) == 0) {
         em_target_pos_set(self, 0);
@@ -810,13 +810,13 @@ void fn_8013823C(EnemyWork* self) {
             }
         }
     } else {
-        fn_80131E0C(self);
+        em_fx_flag3_set(self);
     }
     {
-        void (*cb)(EnemyWork*) = fn_801264BC(self, 3);
+        void (*cb)(EnemyWork*) = em_hook_get(self, 3);
         if (cb != NULL) {
             if (fn_80137C9C(self, cb) != 0) {
-                if (fn_80133BCC(self) == 1 && self->field_0x46A == 0 && em_userdata_script_run((struct EmWork*)self) == 1) {
+                if (em_idle_flag_get(self) == 1 && self->field_0x46A == 0 && em_userdata_script_run((struct EmWork*)self) == 1) {
                     fn_801281EC_c1(self);
                 }
                 if (fn_80128204_c1(self) == 1) {
@@ -836,7 +836,7 @@ void fn_8013823C(EnemyWork* self) {
         }
         fn_80138E64(self);
         if (self->field_0x1E2 == 3) {
-            fn_80130438(self);
+            em_fall_step(self);
         }
         if (self->field_0x1E2 != 4 && self->field_0x1DF == 0) {
             if (ef_fabsf(self->field_0x1AC) <= lbl_80796D54) {
@@ -858,7 +858,7 @@ void fn_8013823C(EnemyWork* self) {
         }
         if (em_act_ck__FP11_ENEMY_WORKUcUc(self, 0xC, 0xFF) == 0 &&
             ((em_area_ck__FP11_ENEMY_WORK(self) == 1 && self->field_0x001 != 0) ||
-             fn_80135BC4(self, 0) == 1)) {
+             em_break_part_active_ck(self, 0) == 1)) {
             self->char_0x024.field_0x34 = 1;
         } else {
             self->char_0x024.field_0x34 = 0;
@@ -899,8 +899,8 @@ void fn_8013823C(EnemyWork* self) {
         subVec3(&v8, &self->field_0x188, &self->field_0x194);
         copyVec3(&self->field_0x470, &v8);
         fn_80138074(self, 0);
-        fn_8012A3B4(self);
-        fn_8012FF38(self);
+        em_ground_probe(self);
+        em_height_limit_update(self);
         fn_80137DD0(self);
         fn_80138E64(self);
         fn_800E0914(EM_CHAR(self));
@@ -922,8 +922,8 @@ void fn_80138B60(EnemyWork* self) {
         if (self->field_0x8C0 != 0) {
             addVec3To(&self->field_0x188, &self->field_0x8B4);
             fn_80138074(self, 1);
-            fn_8012A3B4(self);
-            fn_8012FF38(self);
+            em_ground_probe(self);
+            em_height_limit_update(self);
         }
         found = -1;
         if (self->field_0x1E2 == 1 && self->field_0x1E3 == 1) {
@@ -960,17 +960,17 @@ void fn_80138B60(EnemyWork* self) {
             } else {
                 self->field_0x764 = (s16)(self->field_0x764 - 1);
                 if (self->field_0x764 <= 0) {
-                    fn_80133B5C(self);
+                    em_latch_0x762_roll(self);
                 }
             }
         }
         {
-            void (*cb)(EnemyWork*) = fn_801264BC(self, 6);
+            void (*cb)(EnemyWork*) = em_hook_get(self, 6);
             if (cb != NULL) {
                 cb(self);
             }
         }
-        fn_801333E0(self);
+        em_ailment_fx_update(self);
         if ((self->flags_0x1C8 & 1) == 0) {
             fn_80136E38(self, 0);
         } else if ((self->flags_0x1C8 & 0x40000) != 0) {
@@ -987,12 +987,12 @@ void fn_80138B60(EnemyWork* self) {
             }
         }
         {
-            void (*cb)(EnemyWork*) = fn_801264BC(self, 8);
+            void (*cb)(EnemyWork*) = em_hook_get(self, 8);
             if (cb != NULL) {
                 cb(self);
             }
         }
-        fn_8012FC60(self);
+        em_joint_visibility_update_all(self);
         if (self->field_0x1E2 == 4) {
             em_shake_req_set(self);
         }
@@ -1645,7 +1645,7 @@ void fn_8013A770(UserDataCursor* cursor, EnemyWork* work) {
 
 #pragma peephole off
 /* Reads one entry of the enemy data's secondary table. */
-s32 fn_8013A830(EnemyWork* work, u8 arg1) {
+s32 em_break_part_data_get(EnemyWork* work, u8 arg1) {
     EnemyData* data = get_enemy_data__FP11_ENEMY_WORK(work);
 
     if (data != NULL && data->table_0x98 != NULL) {
@@ -1677,7 +1677,7 @@ s32 fn_8013A8B4(EnemyWork* work, u8 arg1, u8 arg2) {
 }
 
 /* Resolves the work's current user-data state through the table's redirect entries. */
-s32 fn_8013A900(EnemyWork* work) {
+s32 em_userdata_state_kind_get(EnemyWork* work) {
     s32 state = work->field_0x95C;
     u8 index = work->field_0x9A8;
 

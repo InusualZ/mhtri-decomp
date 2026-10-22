@@ -49,7 +49,7 @@ void fn_802BE7E8(void* self, void* channel, u8 index);
  * 0x802BE638 - the rest of the `.text` range this unit owns (0x802B5C58-0x802BEAAC).  Their
  * consumers read them out of `unsplit/lobby.h` and `unsplit/unknown.h` while the
  * addresses were unclaimed; both of those headers include this one now (docs/plan.md 6.5 rule 2).
- * `fn_802BE638`/`fn_802B8DF8` keep the call sites' spellings - neither body is written yet. */
+ * `camera_enemy_focus_pos_set`/`fn_802B8DF8` keep the call sites' spellings - neither body is written yet. */
 
 /* 0x802BBA64 - stores the argument in the camera work's +0x47E byte (1 while the sub-scene is up). */
 void camera_talk_lock_set(u8 value);
@@ -64,7 +64,7 @@ void fn_802BBAC4(u8 value);
 void fn_802B8DF8(struct _PLW* self);
 
 /* 0x802BE638 - r3 the enemy work, r4 a kind, r5 an output `Vec3`; `enemy/fn_8019ED34.cpp` calls it. */
-void fn_802BE638(struct _ENEMY_WORK* self, s32 a, Vec3* v);
+void camera_enemy_focus_pos_set(struct _ENEMY_WORK* self, s32 a, Vec3* v);
 }
 
 #endif /* __cplusplus */

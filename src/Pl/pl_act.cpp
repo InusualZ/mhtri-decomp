@@ -46,7 +46,7 @@
  *   `sweepcomments.py --unit Pl/pl_act` lists every run.  Known blockers among them: the rig at
  *   0x80269AC4-0x80269F88 (`new` of 0x1560 bytes) needs its 0x90/0x110-byte element types (vtables
  *   0x805BAB58/0x805BAB74); `Pl_chr_set_attr`/0x8026A178/`Pl_chr_setX`
- *   funnel into `fn_800E12CC`, whose argument order is open; `fn_8027D8A0`, `pl_stg_weapon_near_find`, `fn_8027E5E4` and
+ *   funnel into `mhchar_motion_layer_set`, whose argument order is open; `fn_8027D8A0`, `pl_stg_weapon_near_find`, `fn_8027E5E4` and
  *   `fn_8027F3CC` carry paired-single / `cror` instructions the front end cannot emit.
  *  - flipcheck's undefined reference `get_ControlType` (the map's `get_ControlType__Fl` needs C++ scope): a linkage
  *    item for a fixer.
@@ -202,7 +202,7 @@ u16 Get_motion_no(_PLW* self)
  * the model layer in their place, which is why the two floats are unused here. */
 u32 Pl_frame_check(_PLW* self, u32 frame, f32 a, f32 b)
 {
-    return fn_800E16DC(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, (u16)frame, 0);
+    return mhchar_frame_check(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, (u16)frame, 0);
 }
 
 void pl_get_joint_wpos(_PLW* self, u32 joint, nw4r::math::VEC3* out)
@@ -390,7 +390,7 @@ void pl_model_set_value(_PLW* self, s32 index, f32 value)
 /* Hands the model layer the scale the work record carries. */
 void fn_8026A2BC(_PLW* self)
 {
-    fn_800E1640(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, self->field_0x354);
+    mhchar_motion_speed_set(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, self->field_0x354);
 }
 
 void fn_8026A2D0(_PLW* self, u8 value)
@@ -416,13 +416,13 @@ void fn_8026A2F8(_PLW* self)
 /* The same frame check as `Pl_frame_check`, with the model layer's second flag set. */
 u32 fn_8026A328(_PLW* self, u16 frame, f32 a, f32 b)
 {
-    return fn_800E16DC(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, frame, 1);
+    return mhchar_frame_check(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, frame, 1);
 }
 
 /* The model layer's frame reset. */
 u32 Pl_motion_end_ck(_PLW* self)
 {
-    return fn_800E2198(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, 0);
+    return mhchar_motion_end_ck(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, 0);
 }
 
 f32 pl_rig_get_motion_frame(_PLW* self)
@@ -5639,7 +5639,7 @@ extern "C" u8 pl_act_kind_get(u8);
 extern "C" s32 fn_80331104(void);
 extern "C" void fn_8010D688(_PLW*);
 extern "C" u32 fn_8026FE44(_PLW*);
-extern "C" void fn_800E1640(u8*, f32);
+extern "C" void mhchar_motion_speed_set(u8*, f32);
 extern "C" u32 fn_802B0688(void*);
 extern "C" void fn_8026FEF0(_PLW*, s32);
 extern "C" void pl_act_enter(_PLW*, s32, u16, u16);
@@ -6165,7 +6165,7 @@ extern "C" s32 fn_8027CF24(_PLW* self)
 }
 
 /* 0x8027CF70 */
-extern "C" s32 fn_8027CF70(_PLW* self)
+extern "C" s32 pl_condition_ck_20000(_PLW* self)
 {
     return Pl_condition_ck(self, 0x20000);
 }
@@ -6253,11 +6253,11 @@ extern "C" void fn_80277BC4(_PLW* self, u8 arg1)
 extern "C" void fn_80277EC0(_PLW* self)
 {
     if (self->unk3A2 > 0) {
-        fn_800E1640(((u8*)self->physics_0x13C) + 4, lbl_8079A084);
+        mhchar_motion_speed_set(((u8*)self->physics_0x13C) + 4, lbl_8079A084);
     } else if (self->unk3A3 > 0) {
-        fn_800E1640(((u8*)self->physics_0x13C) + 4, lbl_8079A0C8 * self->unk354);
+        mhchar_motion_speed_set(((u8*)self->physics_0x13C) + 4, lbl_8079A0C8 * self->unk354);
     } else {
-        fn_800E1640(((u8*)self->physics_0x13C) + 4, self->unk354);
+        mhchar_motion_speed_set(((u8*)self->physics_0x13C) + 4, self->unk354);
     }
     self->unk358 = *(f32*)(((u8*)self->physics_0x13C) + 0x60);
 }
@@ -6285,7 +6285,7 @@ extern "C" s32 fn_80277F54(_PLW* self)
 /* 0x802782B8 */
 extern "C" s32 fn_802782B8(_PLW* self)
 {
-    if (fn_80277FE8(self) == 1 && fn_80278144(self->area_0x16, (u8*)self + 60, self->unk5A6) == 1) {
+    if (fn_80277FE8(self) == 1 && fn_80278144(self->area_0x16, (u8*)self + 60, self->water_area_0x5A6) == 1) {
         return 1;
     }
     return 0;
@@ -6294,7 +6294,7 @@ extern "C" s32 fn_802782B8(_PLW* self)
 /* 0x80278450 */
 extern "C" s32 fn_80278450(_PLW* self)
 {
-    if (fn_80277FE8(self) == 1 && fn_80278310(self->area_0x16, (u8*)self + 60, self->unk5A6) == 1) {
+    if (fn_80277FE8(self) == 1 && fn_80278310(self->area_0x16, (u8*)self + 60, self->water_area_0x5A6) == 1) {
         return 1;
     }
     return 0;

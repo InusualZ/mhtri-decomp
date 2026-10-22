@@ -39,7 +39,7 @@ struct _HIT_W {
     /* +0x0F */ u8 unused_0x0F;
     /* +0x10 */ void* owner_0x10;
     /* +0x14 */ void* owner_0x14;
-    /* +0x18 */ u16 field_0x018;      /* the four values `fn_8029F4C4` stores */
+    /* +0x18 */ u16 field_0x018;      /* the four values `hit_motion_set` stores */
     /* +0x1A */ u16 field_0x01A;
     /* +0x1C */ u16 field_0x01C;
     /* +0x1E */ u16 field_0x01E;
@@ -57,7 +57,8 @@ struct _HIT_W {
         f32 field_0x03C;       /* the s16 `hit_knock_set` widens and stores */
     };
     /* +0x40 */ s16 life_0x40;           /* the hit's remaining frames (scaled by an enemy master's rate) */
-    /* +0x42 */ u8 unused_0x42[0x48 - 0x42];
+    /* +0x42 */ u8 unused_0x42[0x46 - 0x42];
+    /* +0x46 */ u16 mask_0x46;  /* the attack mask `em_hit_buff_apply` (`enemy/em_common.cpp`) tests against the enemy data's buff */
     /* +0x48 */ u16 field_0x048;     /* the attack-set band (`Pl/pl_act.cpp`) stores a rate word here */
     /* +0x4A */ u8 field_0x04A;
     /* +0x4B */ u8 field_0x04B;

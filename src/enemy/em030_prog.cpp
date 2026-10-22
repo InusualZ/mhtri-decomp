@@ -1098,7 +1098,7 @@ extern "C" void fn_801B1B30(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B1BD0 (0x90).  The motion-0x02 approach: the per-frame `fn_80132154` step, then the
+/* 0x801B1BD0 (0x90).  The motion-0x02 approach: the per-frame `em_flag_0x116_set` step, then the
  * 0x400-flag wait. */
 extern "C" void fn_801B1BD0(_ENEMY_WORK* work) {
     switch (work->state) {
@@ -1106,10 +1106,10 @@ extern "C" void fn_801B1BD0(_ENEMY_WORK* work) {
         work->state = work->state + 1;
         em_move_mode_set(work, 0);
         em_mot_set(work, 0x02, 4, 0);
-        fn_80132154(work);
+        em_flag_0x116_set(work);
         break;
     case 1:
-        fn_80132154(work);
+        em_flag_0x116_set(work);
         if (em_turn_to_target(work, 0x400) == 1) {
             em_action_finish(work);
         }

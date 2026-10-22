@@ -61,7 +61,7 @@ void em_attack_done_set(struct _ENEMY_WORK* self);
 void em_ground_snap(struct _ENEMY_WORK* self);
 void eft_rot_vec_copy(_CP_VECTOR* dst, const _CP_VECTOR* src);
 u32 quest_sub_state_end_ck(u32 a);
-void fn_80130350(struct _ENEMY_WORK* self, void* vec);
+void em_move_vec_set(struct _ENEMY_WORK* self, void* vec);
 void fn_8027D3F0(struct _PLW* self, u8 a);
 void em_attack_start(struct _ENEMY_WORK* self);
 void* em_res_user_data_ctor(void* self);
@@ -168,7 +168,7 @@ extern "C" void em_eff_offset_set(_EM_CHARA_WORK* self)
     offset.z = lbl_8079B110;
     rotVecY(&offset, self->rot_y);
     out = *(_CP_VECTOR*)&offset;
-    fn_80130350((_ENEMY_WORK*)self, &out);
+    em_move_vec_set((_ENEMY_WORK*)self, &out);
 }
 
 /* Clears the effect offset block and the state word next to it. */
@@ -372,7 +372,7 @@ extern "C" void em_act_arm_mot2(_EM_CHARA_WORK* self)
 extern "C" void em_act_arm_mot_mode(_EM_CHARA_WORK* self, u32 action)
 {
     if ((action & 0xFF) == 1) {
-        fn_80131E00((_ENEMY_WORK*)self);
+        em_fx_flag2_set((_ENEMY_WORK*)self);
     }
     switch (self->state) {
     case 0:
@@ -728,7 +728,7 @@ extern "C" void em_act_arm_mot201_hit7_2(_EM_CHARA_WORK* self)
 extern "C" void em_act_arm_mot203_204(_EM_CHARA_WORK* self, u32 action)
 {
     if ((u8)action == 1) {
-        fn_80131E00((_ENEMY_WORK*)self);
+        em_fx_flag2_set((_ENEMY_WORK*)self);
     }
     switch (self->state) {
     case 0:

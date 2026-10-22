@@ -211,7 +211,7 @@ u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 f32 get_em_base_scale(struct _ENEMY_WORK* self);
-f32 fn_8012F8F4(struct _ENEMY_WORK* self);
+f32 em_mot_frame_end_get(struct _ENEMY_WORK* self);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
 f32 em_height_base_get(struct _ENEMY_WORK* self);
@@ -223,7 +223,7 @@ void em_busy_timer_reset(struct _ENEMY_WORK* self);
 void em_timer_0x81C_arm(struct _ENEMY_WORK* self);
 void em_turn_to_target(struct _ENEMY_WORK* self, u32 a);
 void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
-void fn_80133F4C(struct _ENEMY_WORK* self, u32 a, f32 b, f32 c);
+void em_turn_in_window2(struct _ENEMY_WORK* self, u32 a, f32 b, f32 c);
 void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
 u32 em_approach_step(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b, u32 c);
@@ -702,7 +702,7 @@ extern "C" void fn_801D8E9C(struct _ENEMY_WORK* self) {
         if (em_frame_check(self, 3, lbl_80799578, lbl_80799504) == 1) {
             CancelFade(self);
         }
-        fn_80133F4C(self, 0x8000, lbl_80799578, lbl_80799504);
+        em_turn_in_window2(self, 0x8000, lbl_80799578, lbl_80799504);
         temp_r3 = self->state_0x006;
         if ((temp_r3 == 0) && (self->field_0xA69 == 0)) {
             self->state_0x006 = temp_r3 + 1;
@@ -1666,7 +1666,7 @@ extern "C" void fn_801DB3F8(struct _ENEMY_WORK* self) {
         em_target_pos_set(self, &sp30);
         em_turn_seq_start(self, lbl_80570680, 2, 1, sp8);
         em_move_vec_clr(self);
-        vec3_scale(&spC, &sp24, lbl_807994F8 / fn_8012F8F4(self));
+        vec3_scale(&spC, &sp24, lbl_807994F8 / em_mot_frame_end_get(self));
         copyVec3(&self->offset_0x30C.vec_0x310, &spC);
         self->field_0x314 = lbl_807994FC;
         return;
@@ -2479,7 +2479,7 @@ u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 
 void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
-u32 fn_80129D3C(struct _ENEMY_WORK* self);
+u32 em_area_stun_move_ck(struct _ENEMY_WORK* self);
 u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
 u8 em_area_break_ck(struct _ENEMY_WORK* self);
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
@@ -2869,7 +2869,7 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
     if ((u8)kind - 1 > 4) {
         return 0;
     }
-    if (fn_80129D3C(self) == 1) {
+    if (em_area_stun_move_ck(self) == 1) {
         return 1;
     }
     found = 0;

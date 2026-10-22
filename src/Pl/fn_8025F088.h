@@ -56,8 +56,8 @@ u32 fn_8027DCA8(struct _PLW* self);
 u32 hit_attack_list_push(void* p);
 
 /* ---- callees another registered unit owns whose header does not declare them ---- */
-u32 fn_8012A624(void* out);
-u32 fn_80131934(u8 index);
+u32 em_land_data_init(void* out);
+u32 em_player_spotted_set(u8 index);
 u32 fn_80224AC4(void* physics);
 u32 fn_80262940(struct _PLW* self);
 u32 fn_802657F8(struct _PLW* self);

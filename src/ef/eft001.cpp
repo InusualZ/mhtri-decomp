@@ -21,7 +21,7 @@
 
 #include "ef/fn_800FAD90.h" /* fn_800FAD90 (rule 2: the owner's header) */
 #include "ef/fn_800FADCC.h" /* fn_800FADCC (rule 2: the owner's header) */
-#include "enemy/fn_80135998.h" /* fn_80135998 (rule 2: the owner's header) */
+#include "enemy/em_fx_scale_get.h" /* em_fx_scale_get (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"
@@ -220,7 +220,7 @@ extern "C" void fn_800FAE08(_EFT* self)
 
             work->models[0]->setVisibility(1, false);
             work->models[0]->setVisibility(2, true);
-            scale = fn_80135998(enemy);
+            scale = em_fx_scale_get(enemy);
             for (i = 0; i < work->count; i++) {
                 MHchar* model = work->models[i];
                 setVector3(&model->scale_0x1C, scale, scale, scale);
@@ -389,7 +389,7 @@ extern "C" void fn_800FB160(_EFT* self)
             rotLocalMatY(self->rot_0x24.y, &mtx);
             rotLocalMatX(self->rot_0x24.x, &mtx);
             mtx34_set_trans(&mtx, &self->pos_0x18);
-            scale = fn_80135998(enemy);
+            scale = em_fx_scale_get(enemy);
             setVector3(&work->models[0]->scale_0x1C, 1.65f * scale, scale, 2.91f * scale);
             work->models[0]->move2(&mtx, 0);
             return;
@@ -406,7 +406,7 @@ extern "C" void fn_800FB160(_EFT* self)
                     alpha_keys = eft001_alpha_keys;
                     cycle = eft001_cycle_frames[0];
                 }
-                scale = fn_80135998(enemy);
+                scale = em_fx_scale_get(enemy);
                 if (self->field_0x06 != 0) {
                     self->field_0x06--;
                 }
@@ -423,7 +423,7 @@ extern "C" void fn_800FB160(_EFT* self)
                         }
             self->timer_0x0C = 0;
             self->field_0x10++;
-            scale = fn_80135998(enemy);
+            scale = em_fx_scale_get(enemy);
             if (scale > 0.5f) {
                 rate = 1.0f + (scale - 0.5f);
             } else {
@@ -445,7 +445,7 @@ extern "C" void fn_800FB160(_EFT* self)
                 }
             }
             size = getKeyData(scale_keys, self->field_0x10 * (1.0f / rate));
-            size *= fn_80135998(enemy);
+            size *= em_fx_scale_get(enemy);
             setVector3(&work->models[1]->scale_0x1C, size, size, size);
             stage_color = get_stg_eft_col(self->area_0x44, 1);
             color[0] = (stage_color & 0xFF000000) >> 24;
@@ -462,7 +462,7 @@ extern "C" void fn_800FB160(_EFT* self)
                 }
             }
 
-            scale = fn_80135998(enemy);
+            scale = em_fx_scale_get(enemy);
             if (scale > 0.5f) {
                 rate = 1.0f + (scale - 0.5f);
             } else {
@@ -484,7 +484,7 @@ extern "C" void fn_800FB160(_EFT* self)
             color[3] = color[3] * enemy->alpha_0x1D4;
             work->models[0]->setTevKColor(0, GX_KCOLOR0, (_GXColor*)color);
             self->pos_0x18.y = 5.0f + enemy->value_0x20C;
-            size = fn_80135998(enemy);
+            size = em_fx_scale_get(enemy);
             setVector3(&work->models[0]->scale_0x1C, size, size, size);
             self->rot_0x24.y = enemy->rot_y_0x1C0;
             self->demo_flag_0x08 = 0;

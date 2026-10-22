@@ -994,7 +994,7 @@ struct _PLW {
     };
     /* +0x5A2 */ u8 unk5A2[0x5A4 - 0x5A2];
     /* +0x5A4 */ u16 field_0x5A4;
-    /* +0x5A6 */ u8 unk5A6;
+    /* +0x5A6 */ u8 water_area_0x5A6;  /* the water area `enemy/em_common.cpp`'s target pick gates on */
     /* +0x5A7 */ u8 field_0x5A7;
     /* +0x5A8 */ union { /* the original and later names of the same 16 bytes (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */

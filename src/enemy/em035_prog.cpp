@@ -163,7 +163,7 @@ extern "C" void em035_frame_tick(_ENEMY_WORK* work)
     }
     if (work->timer_0x32A > 0)
         work->timer_0x32A -= 1;
-    fn_80131E00(work);
+    em_fx_flag2_set(work);
 }
 
 /* 0x8035F314 (0x88): arms sub-state 1's motion pair, then runs the 90-frame wait out. */

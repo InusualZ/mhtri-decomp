@@ -55,7 +55,7 @@ void hit_flags_clear(struct _HIT_W* hit);
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void eft004_key_spawn(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
 void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, s32 a, s32 b, f32 c);
-void fn_8012A624(nw4r::math::VEC3* out);
+void em_land_data_init(nw4r::math::VEC3* out);
 void fn_800524C0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
                   nw4r::math::VEC3* c, f32 d);
 void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
@@ -74,11 +74,11 @@ s32 abs(s16 value);
 /* ---- the model (`sound/mhchar.cpp`'s range) ---- */
 void fn_800E0914(struct MHchar* chr);
 void mhchar_joint_mtx_get(struct MHchar* chr);
-void fn_800E11C0(struct MHchar* chr, u32 a, u32 b, u16 motion, s32 c, s32 d, s32 e, f32 f,
+void mhchar_motion_set(struct MHchar* chr, u32 a, u32 b, u16 motion, s32 c, s32 d, s32 e, f32 f,
                  f32 g);
-void fn_800E1640(struct MHchar* chr, f32 value);
-u32 fn_800E16DC(struct MHchar* chr, u32 motion, s32 flag);
-u32 fn_800E2198(struct MHchar* chr, s32 flag);
+void mhchar_motion_speed_set(struct MHchar* chr, f32 value);
+u32 mhchar_frame_check(struct MHchar* chr, u32 motion, s32 flag);
+u32 mhchar_motion_end_ck(struct MHchar* chr, s32 flag);
 
 /* ---- the sound bridge ---- */
 void fn_800DCB74(u32 handle, s32 index, nw4r::math::VEC3* pos);

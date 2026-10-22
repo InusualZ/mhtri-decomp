@@ -47,10 +47,10 @@
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
-#include "enemy/fn_8012A354.h" /* fn_8012A354 (rule 2: the owner's header) */
-#include "enemy/fn_8012999C.h" /* fn_8012999C (rule 2: the owner's header) */
+#include "enemy/em_area_enter_init.h" /* em_area_enter_init (rule 2: the owner's header) */
+#include "enemy/em_idle_flag2_set.h" /* em_idle_flag2_set (rule 2: the owner's header) */
 #include "enemy/em_action_finish.h" /* em_action_finish (rule 2: the owner's header) */
-#include "enemy/fn_80128030.h" /* fn_80128030 (rule 2: the owner's header) */
+#include "enemy/em_action_finish_swim.h" /* em_action_finish_swim (rule 2: the owner's header) */
 #include "enemy/em_gauge_tick.h" /* em_gauge_tick (rule 2: the owner's header) */
 #include "enemy/em_tint_hold_start.h" /* em_tint_hold_start (rule 2: the owner's header) */
 #include "enemy/em_tint_hold_end.h" /* em_tint_hold_end (rule 2: the owner's header) */
@@ -573,7 +573,7 @@ extern "C" void em015_event_notify(_ENEMY_WORK* self, u8 kind, u8 sub) {
         switch (s) {
           case 0x19:
           case 0x1A:
-            fn_8012A354(self);
+            em_area_enter_init(self);
             break;
           case 0x1D:
             em_bait_react(self);
@@ -633,7 +633,7 @@ extern "C" void em015_event_notify(_ENEMY_WORK* self, u8 kind, u8 sub) {
       case 0xA:
         switch (sub) {
           case 0xB1:
-            fn_8012999C(self);
+            em_idle_flag2_set(self);
             break;
           case 0xC9:
           case 0xD1:
@@ -727,7 +727,7 @@ extern "C" void em015_act0_04(_ENEMY_WORK* self) {
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -742,7 +742,7 @@ extern "C" void em015_act0_05(_ENEMY_WORK* self) {
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1221,7 +1221,7 @@ extern "C" void em015_act5_00(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1253,11 +1253,11 @@ extern "C" void em015_act5_swim_turn(_ENEMY_WORK* self, u32 flag) {
             }
         }
         if (em_turn_seq_step(self, (void*)em015_turn_seq_swim) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         } else if (self->field_0x482 != 0) {
-            fn_80136D4C(self, 5.0f);
+            em_height_follow(self, 5.0f);
         } else {
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
@@ -1306,7 +1306,7 @@ extern "C" void em015_swim_in(_ENEMY_WORK* self, u32 kind, u32 motion) {
         switch ((u8)kind) {
         case 3:
             em_approach_step(self, 0, 0x80);
-            fn_80136D4C(self, 3.0f);
+            em_height_follow(self, 3.0f);
             self->timer_0x020--;
             if (self->timer_0x020 <= 0 ||
                 self->pos.y >= self->vec_0x36C.y - (10.0f + em_float_depth_get(self)) * get_em_chg_scale(self)) {
@@ -1331,7 +1331,7 @@ extern "C" void em015_swim_in(_ENEMY_WORK* self, u32 kind, u32 motion) {
     }
     case 2:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1349,7 +1349,7 @@ extern "C" void em015_act5_03(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1366,11 +1366,11 @@ extern "C" void em015_act5_swim_turn_long(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_turn_seq_step(self, (void*)em015_turn_seq_swim_long) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         } else if (self->field_0x482 != 0) {
-            fn_80136D4C(self, 5.0f);
+            em_height_follow(self, 5.0f);
         } else {
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
@@ -1427,9 +1427,9 @@ extern "C" void em015_circle_attack(_ENEMY_WORK* self, u32 dir, u32 mode) {
         switch ((u8)mode) {
         case 0:
             if (em_frame_check(self, 3, 80.0f, 130.0f) == 1) {
-                fn_80133CC8(self, 0x40, 0x80);
+                em_turn_to_target_3d(self, 0x40, 0x80);
             } else {
-                fn_80133CC8(self, 0x40, 0x40);
+                em_turn_to_target_3d(self, 0x40, 0x40);
             }
             em_hit_arm_set(self);
             done = 0;
@@ -1498,11 +1498,11 @@ extern "C" void em015_circle_attack(_ENEMY_WORK* self, u32 dir, u32 mode) {
     case 3:
         if (self->state_0x007 == 1) {
             if (em_mot_end_ck(self) == 1) {
-                fn_80128030(self);
+                em_action_finish_swim(self);
             }
         } else {
             if (em_frame_check(self, 1, 20.0f, 0.0f) == 1) {
-                fn_80133CC8(self, 0x40, 0x200);
+                em_turn_to_target_3d(self, 0x40, 0x200);
             }
             em_hit_arm_set(self);
             if ((s32)(u8)mode != 0) {
@@ -1560,7 +1560,7 @@ extern "C" void em015_discharge(_ENEMY_WORK* self) {
             eft_em_spawn(self, 3, 0x19, &vec, 1.0f);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1614,7 +1614,7 @@ extern "C" void em015_leap(_ENEMY_WORK* self) {
             em_state_set(self, 5, 0x19);
         } else if (self->field_0x314 < 0.0f) {
             if (self->field_0x210 > self->pos.y + em_float_depth_get(self) * get_em_chg_scale(self)) {
-                fn_80128030(self);
+                em_action_finish_swim(self);
             }
         }
         break;
@@ -1671,7 +1671,7 @@ extern "C" void em015_dive(_ENEMY_WORK* self) {
 }
 
 /* 0x801794CC (0x130): arms motion 0x39; on the frame window it rises by ten times the climb past 30 (capped at
- * 100) and turns to the target, completing with `fn_80128030`. */
+ * 100) and turns to the target, completing with `em_action_finish_swim`. */
 extern "C" void em015_rise(_ENEMY_WORK* self) {
     em015_part_flag_set(self, 1);
     switch (self->state) {
@@ -1681,7 +1681,7 @@ extern "C" void em015_rise(_ENEMY_WORK* self) {
         em_mot_set_blend(self, 0x39, 0xA, 0, 1);
         break;
     case 1:
-        fn_80136D4C(self, 10.0f);
+        em_height_follow(self, 10.0f);
         if (em_frame_check(self, 1, 28.0f, 0.0f) == 1) {
             f32 rise = 10.0f * (em_mot_frame_get(self) - 30.0f);
             if (rise > 100.0f) {
@@ -1693,7 +1693,7 @@ extern "C" void em015_rise(_ENEMY_WORK* self) {
             em_turn_to_target(self, 0x30);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1781,7 +1781,7 @@ extern "C" void em015_act5_turn_angle(_ENEMY_WORK* self) {
     case 1:
         em_turn_in_window(self, 30.0f, 110.0f, self->state_0x007 << 8);
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         } else {
             em_busy_set(self);
         }
@@ -1800,7 +1800,7 @@ extern "C" void em015_act5_20(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1849,7 +1849,7 @@ extern "C" void em015_act5_shake(_ENEMY_WORK* self) {
 }
 
 /* 0x80179AC4 (0x174): the surfacing splash: lifts by 400 onto the water line with the camera shake and the three
- * splash effects, then motion 0x42 with the 500 rise, completing with `fn_80128030`. */
+ * splash effects, then motion 0x42 with the 500 rise, completing with `em_action_finish_swim`. */
 extern "C" void em015_surface(_ENEMY_WORK* self) {
     VEC3 vec;
 
@@ -1878,7 +1878,7 @@ extern "C" void em015_surface(_ENEMY_WORK* self) {
         break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1895,7 +1895,7 @@ extern "C" void em015_act5_27(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1912,7 +1912,7 @@ extern "C" void em015_act5_29(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1937,7 +1937,7 @@ extern "C" void em015_act5_30(_ENEMY_WORK* self) {
         break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1954,7 +1954,7 @@ extern "C" void em015_act5_38(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2098,7 +2098,7 @@ extern "C" void em015_act7_00(_ENEMY_WORK* self) {
             em_turn_to_target(self, 0x40);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2106,7 +2106,7 @@ extern "C" void em015_act7_00(_ENEMY_WORK* self) {
 
 /* 0x8017A0BC (0x300): the spin: motion 0x4A with the 0x4B/0x4C layer for `kind` 1..4, the material blend fading
  * in over frames 0..40 and out over 160..230 (half strength for kinds 3/4), the second hit window and the two
- * turn windows, completing with `fn_80128030`. */
+ * turn windows, completing with `em_action_finish_swim`. */
 extern "C" void em015_spin(_ENEMY_WORK* self, u32 kind) {
     switch (self->state) {
     case 0:
@@ -2165,7 +2165,7 @@ extern "C" void em015_spin(_ENEMY_WORK* self, u32 kind) {
         em_turn_in_window(self, 0.0f, 70.0f, -0x1555);
         em_turn_in_window(self, 70.0f, 140.0f, 0x9555);
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2292,12 +2292,12 @@ extern "C" void em015_lunge(_ENEMY_WORK* self, u32 kind) {
             }
             em_turn_in_window(self, 60.0f, 130.0f, 0x8000);
             if (em_mot_end_ck(self) == 1) {
-                fn_80128030(self);
+                em_action_finish_swim(self);
             }
             break;
         case 1:
             if (em_mot_end_ck(self) == 1) {
-                fn_80128030(self);
+                em_action_finish_swim(self);
             }
             break;
         case 2:
@@ -2337,7 +2337,7 @@ extern "C" void em015_lunge(_ENEMY_WORK* self, u32 kind) {
         }
         em_turn_in_window(self, 60.0f, 130.0f, 0x8000);
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2399,7 +2399,7 @@ extern "C" void em015_charge_field(_ENEMY_WORK* self, u32 kind) {
             }
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2497,7 +2497,7 @@ extern "C" void em015_great_discharge(_ENEMY_WORK* self, u32 kind) {
             break;
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2527,7 +2527,7 @@ extern "C" void em015_tail_slam(_ENEMY_WORK* self, u32 kind, u32 chain) {
         break;
     case 1:
         if (em_frame_check(self, 2, 100.0f, 0.0f) == 1) {
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
             em_turn_to_target(self, 0x50);
         }
         if ((s32)(u8)kind != 1) {
@@ -2565,7 +2565,7 @@ extern "C" void em015_tail_slam(_ENEMY_WORK* self, u32 kind, u32 chain) {
         }
         if ((s32)(u8)chain != 1) {
             if (em_mot_end_ck(self) == 1) {
-                fn_80128030(self);
+                em_action_finish_swim(self);
             }
         } else {
             switch (self->state_0x006) {
@@ -2785,14 +2785,14 @@ extern "C" void em015_back_step(_ENEMY_WORK* self, u8 kind) {
                 em_act_set_unless_act11(self, 7, 0x2B);
                 break;
             default:
-                fn_80128030(self);
+                em_action_finish_swim(self);
                 break;
             }
         }
         break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2869,7 +2869,7 @@ extern "C" void em015_thunder_ball(_ENEMY_WORK* self) {
             ((ShellRecJobFn)shell_set_func_ptr->method_0x3C)(self, &rec, 2);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2952,11 +2952,11 @@ extern "C" void em015_act7_27(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_frame_check(self, 1, 50.0f, 0.0f) == 0) {
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
             em_turn_to_target(self, 0x40);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -3008,14 +3008,14 @@ extern "C" void em015_rolling_charge(_ENEMY_WORK* self, u32 kind) {
         break;
     case 1:
         if (em_frame_check(self, 2, 30.0f, 0.0f) == 1) {
-            fn_80133CC8(self, 0x180, 0x280);
+            em_turn_to_target_3d(self, 0x180, 0x280);
         }
         if (em_frame_check(self, 2, 190.0f, 0.0f) == 1) {
             em_hit_arm_set(self);
         }
         em_turn_in_window(self, 190.0f, 240.0f, 0x8000);
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         if ((s32)(u8)kind == 0) {
             if (em_frame_check(self, 0, 70.0f, 0.0f) == 1) {
@@ -3057,14 +3057,14 @@ extern "C" void em015_act7_spin_turn(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_frame_check(self, 2, 30.0f, 0.0f) == 1) {
-            fn_80133CC8(self, 0x180, 0x280);
+            em_turn_to_target_3d(self, 0x180, 0x280);
         }
         if (em_frame_check(self, 2, 190.0f, 0.0f) == 1) {
             em_hit_arm_set(self);
         }
         em_turn_in_window(self, 160.0f, 230.0f, 0x8000);
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -3123,7 +3123,7 @@ extern "C" void em015_turn_slam(_ENEMY_WORK* self, u32 kind) {
     case 1:
         if (em_frame_check(self, 2, 70.0f, 0.0f) == 1) {
             em015_part_flag_set(self, 1);
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
             if (em_frame_check(self, 2, 14.0f, 0.0f) == 1) {
                 em_turn_to_target_h(self, 22.857143f * em_mot_frame_get(self));
             } else if (em_frame_check(self, 2, 24.0f, 0.0f) == 1) {
@@ -3176,7 +3176,7 @@ extern "C" void em015_turn_slam(_ENEMY_WORK* self, u32 kind) {
             break;
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -3205,7 +3205,7 @@ extern "C" void em015_thunder_burst(_ENEMY_WORK* self, u32 kind) {
             self->pos.y = self->pos.y - 14.0f;
         }
         if (em_frame_check(self, 2, 50.0f, 0.0f) == 1) {
-            fn_80133CC8(self, 0x180, 0x180);
+            em_turn_to_target_3d(self, 0x180, 0x180);
         }
         if (em_frame_check(self, 0, 12.0f, 0.0f) == 1) {
             eft007_part_set(self, 8);
@@ -3228,7 +3228,7 @@ extern "C" void em015_thunder_burst(_ENEMY_WORK* self, u32 kind) {
             ((ShellRecJobFn)shell_set_func_ptr->method_0x3C)(self, &rec, 0x13);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -3259,7 +3259,7 @@ extern "C" void em015_thunder_burst_great(_ENEMY_WORK* self, u32 kind, u32 chain
             self->pos.y = self->pos.y - 14.0f;
         }
         if (em_frame_check(self, 2, 50.0f, 0.0f) == 1) {
-            fn_80133CC8(self, 0x180, 0x180);
+            em_turn_to_target_3d(self, 0x180, 0x180);
         }
         if (em_frame_check(self, 2, 90.0f, 0.0f) == 1) {
             em_hit_arm_set(self);
@@ -3292,7 +3292,7 @@ extern "C" void em015_thunder_burst_great(_ENEMY_WORK* self, u32 kind, u32 chain
             done = em_mot_end_ck(self) == 1;
         }
         if (done != 0) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -4055,9 +4055,9 @@ extern "C" void em015_act13_swim_turn(_ENEMY_WORK* self) {
         if (em_turn_seq_step(self, (void*)em015_turn_seq_swim) == 1) {
             em_state_set(self, 0xD, 1);
         } else if (self->field_0x482 != 0) {
-            fn_80136D4C(self, 5.0f);
+            em_height_follow(self, 5.0f);
         } else {
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
@@ -4078,7 +4078,7 @@ extern "C" void em015_act13_swim_in(_ENEMY_WORK* self) {
         u32 done = em_approach_step(self, 0, 0x80);
 
         em_mot_speed_set(self, 1.3f);
-        fn_80136D4C(self, 2.0f);
+        em_height_follow(self, 2.0f);
         if (done == 1 && em_mot_frame_started_ck(self) == 0) {
             self->state++;
             em_mot_set_blend(self, 0x2F, 0x28, 0, 1);
@@ -4106,14 +4106,14 @@ extern "C" void em015_act13_hit_pair(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_frame_check(self, 1, 50.0f, 0.0f) == 0) {
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
             em_turn_to_target(self, 0x80);
         }
         if (em_mot_end_ck(self) == 1 && em_busy_ck(self) == 1) {
             if (em015_ally_front_ck(self, 0) == 1) {
                 em_state_set(self, 0xD, 3);
             } else {
-                fn_80128030(self);
+                em_action_finish_swim(self);
             }
         }
         break;
@@ -4170,9 +4170,9 @@ extern "C" void em015_reposition(_ENEMY_WORK* self) {
                 }
             }
         } else if (self->field_0x482 != 0) {
-            fn_80136D4C(self, 5.0f);
+            em_height_follow(self, 5.0f);
         } else {
-            fn_80136D4C(self, 10.0f);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
@@ -4214,7 +4214,7 @@ extern "C" void em015_act13_05(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -4511,7 +4511,7 @@ extern "C" void em015_act13_demo_a(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -4550,7 +4550,7 @@ extern "C" void em015_act13_demo_c(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -4584,7 +4584,7 @@ extern "C" void em015_act13_13(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -5552,7 +5552,7 @@ u32 em015_area_start_ck(_ENEMY_WORK* self, u32 arg) {
 /* The area's follow-up arming: when the action has run out (not action 10, 0x81A <= 0) pick the two motion ids
  * the 0x1E2 mode names. */
 void em015_area_follow(_ENEMY_WORK* self) {
-    fn_80128B80(self);
+    em_combat_reset(self);
     if (self->action != 10 && self->field_0x81A <= 0) {
         switch (self->field_0x1E2) {
         case 0:

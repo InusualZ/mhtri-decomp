@@ -506,7 +506,7 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
                 eft_net_send(slot, 7, slot->work_0x03);
                 return;
             }
-            if (fn_80143BF8() == 1) {
+            if (emc_host_ck() == 1) {
                 eft_net_send(slot, 7, slot->work_0x03);
             }
         } else {
@@ -519,7 +519,7 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
             eft_net_send(slot, 8, 0);
         }
     } else {
-        if (fn_80143BF8() == 1) {
+        if (emc_host_ck() == 1) {
             slot->armed_0x02 = 1;
             eft_net_send(slot, 5, 0);
             return;
@@ -1053,7 +1053,7 @@ extern "C" void eft_slot_mode_set_work(void* slot, _ENEMY_WORK* work, u8 kind, u
     u8 third = b;
 
     if (kind <= 4) {
-        fn_8012A9E8(work, &first, &second, &third);
+        em_target_select(work, &first, &second, &third);
         eft_slot_mode_set_map(slot, first, second, third, immediate);
         return;
     }

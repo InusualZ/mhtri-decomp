@@ -801,7 +801,7 @@ extern "C" void fn_802C5624(struct _AINPC_W* self, u8 arg) {
 extern "C" void fn_802C58DC(struct _AINPC_W* self) {
     LandData land;
     f32 ground;
-    fn_8012A624(&land);
+    em_land_data_init(&land);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1050,7 +1050,7 @@ extern "C" void fn_802C6110(struct _AINPC_W* self)
     f32 height;
 
     VEC3_ctor(&vec);
-    fn_8012A624(&land);
+    em_land_data_init(&land);
     fn_802D3A2C(self, 2);
     fn_802D84D0(self, 2);
     switch (self->state) {
@@ -2923,7 +2923,7 @@ void fn_802D1710(struct _AINPC_W* self)
     nw4r::math::VEC3 base;
     f32 value;
 
-    fn_8012A624(&base);
+    em_land_data_init(&base);
     self->field_0x3CE = 0;
     if (self->field_0x3D0 <= 0 && ai_npc_flag_ck(self, 2) == 0) {
         if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &value, -6) == 1) {
@@ -3432,7 +3432,7 @@ s32 fn_802D282C(s32 index)
 /* 0x802D287C - plays `motion` on the model with the row `fn_802D282C` resolves. */
 void fn_802D287C(struct _AINPC_W* self, s32 motion, s32 a, s32 b, s32 c)
 {
-    fn_800E11C0(&self->model, 3, 0, (u16)motion, a, fn_802D282C((u16)motion), b, (f32)c,
+    mhchar_motion_set(&self->model, 3, 0, (u16)motion, a, fn_802D282C((u16)motion), b, (f32)c,
                 lbl_8079A678);
 }
 
@@ -3455,7 +3455,7 @@ void fn_802D2984(struct _AINPC_W* self)
 {
     MHchar* model = &self->model;
 
-    fn_800E2198(model, 0);
+    mhchar_motion_end_ck(model, 0);
 }
 
 /* 0x802D2990 - plays `motion` as a loop. */
@@ -3463,7 +3463,7 @@ void fn_802D2990(struct _AINPC_W* self, s32 motion)
 {
     MHchar* model = &self->model;
 
-    fn_800E16DC(model, (u16)motion, 0);
+    mhchar_frame_check(model, (u16)motion, 0);
 }
 
 /* 0x802D29A0 - plays `motion` as a one-shot. */
@@ -3471,7 +3471,7 @@ void fn_802D29A0(struct _AINPC_W* self, s32 motion)
 {
     MHchar* model = &self->model;
 
-    fn_800E16DC(model, (u16)motion, 1);
+    mhchar_frame_check(model, (u16)motion, 1);
 }
 
 /* 0x802D29B8 - arms the model's second state flag. */
@@ -3489,7 +3489,7 @@ void fn_802D29C0(struct _AINPC_W* self)
 /* 0x802D29CC - sets the model's speed to the record's +0x44C times `scale`. */
 void fn_802D29CC(struct _AINPC_W* self, f32 scale)
 {
-    fn_800E1640(&self->model, self->field_0x44C * scale);
+    mhchar_motion_speed_set(&self->model, self->field_0x44C * scale);
 }
 
 /* 0x802D29DC - the model rotation component the scale setters read back. */

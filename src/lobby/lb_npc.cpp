@@ -112,10 +112,10 @@ u16 fn_802FB54C(s32);
 u8 fn_802FB948(void);
 void fn_80220078(void);
 void fn_801E9AA8(u8);
-s32 fn_800E11C0(void* self, u8 kind, s32 a3, u16 id, s32 a5, s32 motion, s32 a7, f32 c, f32 k);
-void fn_800E16DC(void* self, u16 a, s32 b);
-void fn_800E2198(void* self, s32 a);
-void fn_800E1640(void* self);
+s32 mhchar_motion_set(void* self, u8 kind, s32 a3, u16 id, s32 a5, s32 motion, s32 a7, f32 c, f32 k);
+void mhchar_frame_check(void* self, u16 a, s32 b);
+void mhchar_motion_end_ck(void* self, s32 a);
+void mhchar_motion_speed_set(void* self);
 s32 fn_8026A00C(u16 id);
 s32 fn_802D282C(u16 id);
 s32 abs(s32 a);
@@ -417,7 +417,7 @@ void fn_801FDFE4(_LB_NPC* self, u32 motion_id, s32 a, s32 b)
     } else {
         motion = fn_802D282C((u16)motion_id);
     }
-    fn_800E11C0(self->body_0x058, self->field_0x210, 0, (u16)motion_id, a, motion, 0, (f32)b,
+    mhchar_motion_set(self->body_0x058, self->field_0x210, 0, (u16)motion_id, a, motion, 0, (f32)b,
                  lbl_80799884);
 }
 
@@ -471,24 +471,24 @@ s32 fn_801FE1AC(_LB_NPC* self, u32 motion_id)
 /* 0x801FE1CC / 0x801FE1DC - play the NPC's motion, once or looped. */
 void lb_npc_motion_play(_LB_NPC* self, u32 motion_id)
 {
-    fn_800E16DC(self->body_0x058, (u16)motion_id, 0);
+    mhchar_frame_check(self->body_0x058, (u16)motion_id, 0);
 }
 
 void fn_801FE1DC(_LB_NPC* self, u32 motion_id)
 {
-    fn_800E16DC(self->body_0x058, (u16)motion_id, 1);
+    mhchar_frame_check(self->body_0x058, (u16)motion_id, 1);
 }
 
 /* 0x801FE1EC - stop the NPC's motion. */
 void fn_801FE1EC(_LB_NPC* self)
 {
-    fn_800E2198(self->body_0x058, 0);
+    mhchar_motion_end_ck(self->body_0x058, 0);
 }
 
 /* 0x801FE1F8 - finalise the NPC's model. */
 void fn_801FE1F8(_LB_NPC* self)
 {
-    fn_800E1640(self->body_0x058);
+    mhchar_motion_speed_set(self->body_0x058);
 }
 
 }

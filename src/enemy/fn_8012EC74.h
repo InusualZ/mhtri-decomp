@@ -64,9 +64,9 @@ void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* r3 (`self`) and f1, the fade duration it stores and passes on.  `enemy/em001_prog.cpp` calls
  * it with two arguments too, but this is the form its own C++ consumer needs. */
 #ifdef __cplusplus
-void fn_80136D4C(struct _ENEMY_WORK* self, f32 a);
+void em_height_follow(struct _ENEMY_WORK* self, f32 a);
 #else
-void fn_80136D4C();
+void em_height_follow();
 #endif
 /* `UpdateValue` (0x8012FDA0): its map name is unmangled, so it is declared at C linkage; the answer is in r3. */
 u32 UpdateValue(struct _ENEMY_WORK* self);
@@ -74,7 +74,7 @@ u32 UpdateValue(struct _ENEMY_WORK* self);
  * `shell_attack_set` drops an attack bit for a weak master. */
 u8 em_get_rank(struct _ENEMY_WORK* self);
 /* 0x80132154 - r3 the work record and nothing else. */
-void fn_80132154(struct _ENEMY_WORK* self);
+void em_flag_0x116_set(struct _ENEMY_WORK* self);
 /* 0x801339AC - r3 the work record, the answer in r3 (compared against 1 by every call site). */
 u32 em_break_state_ck(struct _ENEMY_WORK* self);
 /* 0x80133DB0 - the angle stepper: three `u16` arguments (`enemy/em001_prog.cpp` passes three `(u16)` casts) and a
@@ -83,19 +83,19 @@ u16 em_angle_approach(u16 a, u16 b, u16 c);
 
 /* 0x80130350 - r3 `self` and r4 (the `VEC3*` the caller builds); the body writes through r4 only, so no caller
  * reads a return value. */
-void fn_80130350(struct _ENEMY_WORK* self, void* vec);
+void em_move_vec_set(struct _ENEMY_WORK* self, void* vec);
 /* 0x8013072C - r3 (`self`), r4 (narrowed with `clrlwi r4,r4,24`) and r5; the action-mode/latch setter
  * the enemy program functions call.  Names of the two scalars are this unit's call sites' (2/0 and
  * 0/0); the body compares r4 against `self->+0x43B`. */
 void em_motion_kind_set(struct _ENEMY_WORK* self, u32 mode, u32 value);
 /* 0x80131FA0 - r3 (`self`) and r4 (the scalar the motion modes pass: 80). */
-void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
+void em_max_hp_set(struct _ENEMY_WORK* self, u32 a);
 /* The effect-slot step band the per-action state machines drive the motion through; the signatures are the call
  * sites' (each is a leaf this unit never re-enters). */
 /* `em_mot_speed_set` is deliberately NOT declared here: it is one of the 0x8012F symbols whose C
  * consumer (`enemy/em001_prog.cpp`) calls it with `self` only and relies on the old-style
  * declaration, so `unsplit/enemy.h` carries its `#ifdef __cplusplus` / `#else void
- * em_mot_speed_set();` split form - the shape `em_ground_ck`, `em_height_add`, `fn_80133F4C` and
+ * em_mot_speed_set();` split form - the shape `em_ground_ck`, `em_height_add`, `em_turn_in_window2` and
  * `em_move_offset_step_update` keep there too, and the form the C++ consumers that do not include this header
  * (`enemy/em003_prog.cpp`, `enemy/em008_prog.cpp`) reach it through.  A prototype here is an
  * MWCC 10563 redeclaration against that declaration as soon as a C consumer includes both
@@ -112,7 +112,7 @@ f32 em_mot_frame_get(struct _ENEMY_WORK* self);
 /* r3 the work record; the per-frame motion tick the escaping actions run at their head. */
 void em_frame_flag_set(struct _ENEMY_WORK* self);
 /* r3 the work record; plays the armed motion's end reaction. */
-void fn_80132160(struct _ENEMY_WORK* self);
+void em_flag_0x115_set(struct _ENEMY_WORK* self);
 
 /* Called by `enemy/em022_prog.cpp`. */
 void em_height_move_apply(struct _ENEMY_WORK* self);

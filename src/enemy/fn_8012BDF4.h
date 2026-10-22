@@ -23,7 +23,7 @@ void fn_8012BDF4(struct _ENEMY_WORK* work);
  * use. */
 void em_hit_by_set(struct _ENEMY_WORK* self, s16 timer, u8 index);
 void fn_8012C600(struct _ENEMY_WORK* work);
-void fn_8012C9AC(struct _ENEMY_WORK* work);
+void em_act_pick(struct _ENEMY_WORK* work);
 s32 em_pl_target_ck(struct _ENEMY_WORK* enemy, void* move);
 s32 fn_8012D188(struct _ENEMY_WORK* enemy, struct _ENEMY_WORK* other);
 u32 em_busy_ck(struct _ENEMY_WORK* work);

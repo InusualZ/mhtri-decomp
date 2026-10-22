@@ -8,6 +8,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/cp_vector.h" /* _CP_VECTOR (rule 1) */
 
 /* The sound-work record (`sound/se.h`) whose handle the `enemy` band's action steps hand
  * `se_req_pos_ps`/`shell_se_req`; forward-declared so this header stays light (rule 4's 0xB14). */
@@ -21,7 +22,7 @@ struct _PLW;
  * `field_0x9FD` bit is clear).
  * size: 0x03 */
 struct EmProgEntry {
-    /* +0x0 */ u8 code;       /* `fn_801262BC`'s lookup key */
+    /* +0x0 */ u8 code;       /* `em_route_entry_get`'s lookup key */
     /* +0x1 */ u8 field_0x01; /* the `fn_8013C36C` argument the state-1 branch hands over */
     /* +0x2 */ u8 field_0x02; /* the one the state-2 branch hands over */
 };
@@ -138,6 +139,56 @@ struct EmMotionSlot {
     /* +0x008 */ nw4r::math::VEC3 vec; /* `calcVecAngXY`'s input */
 };
 
+/* One delayed action of `_ENEMY_WORK::delays_0xAF0`: the frames left (negative: none), the action pair and the
+ * target to restore when it fires (`em_delay_act_set`/`em_delay_act_fire`, `enemy/em_common.cpp`).
+ * size: 0x14 */
+struct EmDelayRec {
+    /* +0x00 */ s16 timer;
+    /* +0x02 */ u8 act;
+    /* +0x03 */ u8 sub;
+    /* +0x04 */ u8 target_kind;
+    /* +0x05 */ u8 target_sub;
+    /* +0x06 */ u8 target_index;
+    /* +0x07 */ u8 pad_0x07;
+    /* +0x08 */ nw4r::math::VEC3 target;
+};
+
+/* One of the enemy's two breakable parts at `_ENEMY_WORK::break_parts_0x488` (0x84 apart: the `mulli r,r,0x84` of
+ * every reader): its step, the area it runs in, the timers, the position it flies from, the model matrix and the
+ * velocity and acceleration (`em_break_parts_reset`, `em_break_part_motion_step`, `enemy/em_common.cpp`).
+ * size: 0x84 */
+struct EmBreakPart {
+    /* +0x00 */ u8 step;            /* the part's state step, advanced as it breaks off, falls and lands */
+    /* +0x01 */ u8 field_0x01;
+    /* +0x02 */ u8 field_0x02;
+    /* +0x03 */ u8 field_0x03;
+    /* +0x04 */ u8 active;          /* set when the part starts to break off */
+    /* +0x05 */ u8 hit_kind;        /* the pending break hit (1/2), or-ed into +0x836 (`em_part_hit_set`) */
+    /* +0x06 */ u8 area;            /* the area it was reset in (`area_no`) */
+    /* +0x07 */ u8 kind;            /* 2: no part */
+    /* +0x08 */ u8 pad_0x08;
+    /* +0x09 */ u8 hold;            /* the break-off step waits while it is 0 */
+    /* +0x0A */ s16 timer;
+    /* +0x0C */ s16 counter_0x0C;
+    /* +0x0E */ s16 counter_0x0E;
+    /* +0x10 */ s16 duration;       /* the frames of the flight step */
+    /* +0x12 */ u8 pad_0x12[2];
+    /* +0x14 */ nw4r::math::VEC3 pos;
+    /* +0x20 */ nw4r::math::VEC3 origin;
+    /* +0x2C */ nw4r::math::MTX34 mtx;
+    /* +0x5C */ nw4r::math::VEC3 vel;
+    /* +0x68 */ nw4r::math::VEC3 accel;
+    /* +0x74 */ _CP_VECTOR rot;
+    /* +0x80 */ s32 effect;         /* the effect handle, -1 for none */
+};
+
+/* The storage of one of the enemy's two attack hit records: a `_HIT_W` (`Pl/hit_w.h`) whose last 4 bytes overlap the
+ * next record, 0x5C apart (`em_hit_window_set`, `enemy/em_common.cpp`).
+ * size: 0x5C */
+struct EmHitSlot {
+    /* +0x00 */ u8 bytes[0x5C];
+};
+
 struct EmPartState {
     /* +0x000 (+0x740) */ u8 field_0x740;  /* the part flag `em015_part_flag_set` writes from its argument
                                           * and `em015_user_data_node_calc` sets */
@@ -217,10 +268,10 @@ struct _ENEMY_WORK {
     /* +0x012 */ u8 field_0x012;        /* the second counter `fn_8013791C`'s states run */
     /* +0x013 */ u8 area_slot_0x013;     /* the area list its spawn record was filed under */
     /* +0x014 */ u8 field_0x014;        /* the mode  maps to a two-state mask */
-    /* +0x015 */ u8 unused_0x015[1];
+    /* +0x015 */ u8 frames_index_0x015;  /* the frame-table index `em_frames_get` reads */
     /* +0x016 */ u8 field_0x016;        /* the first counter `fn_8013791C`'s states run */
     /* +0x017 */ u8 state_0x017;        /* the state `fn_8013791C`'s second switch dispatches on */
-    /* +0x018 */ s16 field_0x018;       /* `fn_80126844`'s joint/motion index */
+    /* +0x018 */ s16 field_0x018;       /* `em_frames2_get`'s joint/motion index */
     /* +0x01A */ u16 field_0x01A;       /* passed to `em_spawn_request` */
     /* +0x01C */ u8 unused_0x01C[0x01E - 0x01C];
     /* +0x01E */ u8 net_seq_0x01E;   /* the message counter every enemy net sender post-increments (the step `em_net_ident_set` stores) */
@@ -231,7 +282,21 @@ struct _ENEMY_WORK {
     /* +0x058 */ u8 model_flag_0x058;   /* set, the tail of `fn_8013791C` refreshes the scene model */
     /* +0x059 */ u8 unused_0x059[7];
     /* +0x060 */ u8* field_0x60;
-    /* +0x064 */ u8 unused_0x064[216];
+    /* +0x064 */ u8 unused_0x064[0x068 - 0x064];
+    /* +0x068 */ f32 mot_frame_0x068;   /* the embedded MHchar's motion frame `em_mot_frame_started_ck` tests above 0 */
+    /* +0x06C */ u8 unused_0x06C[0x070 - 0x06C];
+    /* +0x070 */ u32 mot_flags_0x070;  /* the embedded MHchar's motion flags (bit 0: `em_hit_window_set` ignores the frame shift) */
+    /* +0x074 */ u16 mot_no_0x074;      /* the embedded MHchar's current motion number (`em_get_mot_no`) */
+    /* +0x076 */ u8 unused_0x076[0x080 - 0x076];
+    /* +0x080 */ f32 base_scale_0x080;  /* the model's base scale `get_em_base_scale` returns */
+    /* +0x084 */ u8 unused_0x084[0x098 - 0x084];
+    /* +0x098 */ f32 mot_frame_0x098;       /* the embedded MHchar's current motion frame (`em_mot_frame_get`) */
+    /* +0x09C */ u8 unused_0x09C[0x0C8 - 0x09C];
+    /* +0x0C8 */ f32 mot_frame_end_0x0C8;       /* the current motion's end frame (`em_mot_frame_end_get`) */
+    /* +0x0CC */ u8 unused_0x0CC[0x115 - 0x0CC];
+    /* +0x115 */ u8 flag_0x115;  /* set by `em_flag_0x115_set` */
+    /* +0x116 */ u8 flag_0x116;  /* set by `em_flag_0x116_set` */
+    /* +0x117 */ u8 unused_0x117[0x13C - 0x117];
     /* +0x13C */ u32 field_0x13C;       /* the scene-model id `g3d_root_model_bind` is handed */
     /* +0x140 */ u8 unused_0x140[48];
     /* +0x170 */ u8 state_0x170;
@@ -245,9 +310,8 @@ struct _ENEMY_WORK {
     union {
         struct {
             /* +0x194 */ Vec3 prev_pos;
-            /* +0x1A0 */ u8 unused_0x1A0[4];
-            /* +0x1A4 */ f32 fall_speed_0x1A4; /* the fall speed `enemy/em019_ai.cpp`'s dive clears */
-            /* +0x1A8 */ u8 unused_0x1A8[4];
+            /* +0x1A0 */ nw4r::math::VEC3 move_0x1A0;  /* the per-frame move vector the height helpers scale (+0x1A4 is its y,
+                                                    * the fall speed `enemy/em019_ai.cpp`'s dive clears) */
         };
         /* +0x194 */ nw4r::math::VEC3 vec_0x194;  /* the second target position the 0x803253BC band
                                         * measures its aim angle against (`em_act_aim` passes it
@@ -267,9 +331,10 @@ struct _ENEMY_WORK {
                                         * at +0x0A */
     /* +0x1D0 */ f32 field_0x1D0;       /* the scale `fn_80142958` returns */
     /* +0x1D4 */ f32 field_0x1D4;        /* the alpha ratio `fn_801A9210` scales by 255 */
-    /* +0x1D8 */ u8 unused_0x1D8[0x1DE - 0x1D8];
+    /* +0x1D8 */ f32 param_target_0x1D8;  /* the value `em_motion_param_step` steps +0x1D4 towards */
+    /* +0x1DC */ s16 param_steps_0x1DC;  /* the frames left in that step */
     /* +0x1DE */ u8 field_0x1DE;        /* `fn_8013791C`'s request-to-redraw byte */
-    /* +0x1DF */ u8 unused_0x1DF[1];
+    /* +0x1DF */ u8 height_set_0x1DF;  /* set when `em_height_set` stores +0x1AC */
     /* +0x1E0 */ u8 field_0x1E0;        /* passed to `stage_map_kind_get` (map lookup) */
     /* +0x1E1 */ u8 area_no;
     /* +0x1E2 */ u8 field_0x1E2;
@@ -280,7 +345,8 @@ struct _ENEMY_WORK {
     /* +0x1E7 */ u8 field_0x1E7;        /* set to 1 once the action's entry block has run */
     /* +0x1E8 */ u8 field_0x1E8;
     /* +0x1E9 */ u8 field_0x1E9;
-    /* +0x1EA */ u8 unused_0x1EA[0x1EC - 0x1EA];
+    /* +0x1EA */ u8 queued_act_0x1EA;  /* the action `em_act_queued_arm` re-arms */
+    /* +0x1EB */ u8 queued_sub_0x1EB;  /* its sub step */
     /* +0x1EC */ u16 bits_0x1EC;      /* the 5-bit value `enemy/em016_prog.cpp`'s `fn_8018493C`
                                         * reads as `lhz` + `clrlwi ...,27` to derive its 0x96/0x5A timer */
     /* +0x1EE */ u8 field_0x1EE;
@@ -290,7 +356,7 @@ struct _ENEMY_WORK {
     /* +0x1F4 */ u8 field_0x1F4;
     /* +0x1F5 */ u8 field_0x1F5;
     /* +0x1F6 */ s8 owner_slot_0x1F6;   /* the player slot the enemy is bound to (compared with `my_player_no`) */
-    /* +0x1F7 */ u8 unused_0x1F7[1];
+    /* +0x1F7 */ u8 idle_flag_0x1F7;  /* the idle flag `em_finish_flag_set` raises and `em_idle_flag_get` reports */
     /* +0x1F8 */ u8 field_0x1F8;
     /* +0x1F9 */ u8 field_0x1F9;        /* nonzero, `fn_801400BC`'s command is skipped */
     /* +0x1FA */ u8 field_0x1FA;
@@ -306,8 +372,9 @@ struct _ENEMY_WORK {
                                         * +0x1FC/+0x1FE */
     /* +0x200 */ s16 field_0x200;
     /* +0x202 */ s16 field_0x202;
-    /* +0x204 */ u32 joint_0x204;      /* the joint `enemy/em019_ai.cpp`'s jump and dive drop from */
-    /* +0x208 */ u8 unused_0x208[4];
+    /* +0x204 */ u32 joint_0x204;      /* the joint `enemy/em019_ai.cpp`'s jump and dive drop from and
+                                        * `em_paralysis_fx_update` hands the spark effect */
+    /* +0x208 */ s32 ground_mode_0x208;  /* 1: `UpdateValue`/`em_ground_ck` lift the floor by the scaled height */
     /* +0x20C */ f32 field_0x20C;        /* one height, three readers: the effect spawn height
                                          * `fn_801D4DD8`/`fn_801D428C` add to the work record's y,
                                          * the height `fn_801A4504` compares its joint samples
@@ -320,17 +387,23 @@ struct _ENEMY_WORK {
                                         * `fn_8038874C`/`fn_8038A7B8` add to the joint position
                                         * before `eft009_set_pos` */
     /* +0x218 */ u32 field_0x218;       /* nonzero, `em_motion_slot_angle_avg` has slots to average */
-    /* +0x21C */ u8 unused_0x21C[0x228 - 0x21C];
+    /* +0x21C */ nw4r::math::VEC3 move_param_0x21C;  /* the move-mode parameter vector `em_move_mode_set` copies from the enemy data */
     /* +0x228 */ u16 field_0x228;      /* `enemy/em018_prog.cpp`'s `fn_8019D8B8` case 4: the low
                                         * two bits are the "blocked" gate (`lhz` + `clrlwi ...,30`). */
-    /* +0x22A */ u8 unused_0x22A[0x23C - 0x22A];
+    /* +0x22A */ u8 water_area_0x22A;  /* bit 7: lava; bits 0-6: the water area `em_phase_get` returns */
+    /* +0x22B */ u8 unused_0x22B[0x23C - 0x22B];
     /* +0x23C */ u8 field_0x23C;       /* the action-ready byte `enemy/em004_act.cpp`'s
                                         * `em004_state_query` case 0 reports */
-    /* +0x23D */ u8 unused_0x23D[0x244 - 0x23D];
+    /* +0x23D */ u8 unused_0x23D[0x240 - 0x23D];
+    /* +0x240 */ f32 ceiling_0x240;  /* the ceiling `em_ground_snap_offset_ck` holds the position under while +0x23C is set */
     /* +0x244 */ EmMotionSlot slots_0x244[10];  /* the per-motion slot set `em_motion_slot_angle_avg` averages */
     union {
         struct {
-            /* +0x30C */ u8 unused_0x30C[0x314 - 0x30C];
+            /* +0x30C */ u8 frame_flag_0x30C;  /* the per-frame flag `em_frame_flag_set` raises */
+            /* +0x30D */ u8 frame_flag_0x30D;  /* the per-frame flag `em_hide_set` raises */
+            /* +0x30E */ u8 no_ceiling_0x30E;  /* set, `em_height_limit_update` skips the ceiling clamp in move mode 1 */
+            /* +0x30F */ u8 no_surface_0x30F;  /* set, `em_height_limit_update` skips the water-surface clamp in move mode 2 */
+            /* +0x310 */ u8 unused_0x310[0x314 - 0x310];
             /* +0x314 */ f32 field_0x314;  /* the effect scale `fn_80148BD0` writes */
             /* +0x318 */ f32 field_0x318;  /* the effect radius `fn_801493A8` writes from `em_key_curve_eval` */
         };
@@ -633,7 +706,8 @@ struct _ENEMY_WORK {
     /* +0x360 */ s16 field_0x360;      /* fn_8013FD98's "already in this mode" countdown */
     /* +0x362 */ s16 field_0x362;      /* `enemy/em018_prog.cpp`'s `fn_8019D8B8` case 7: `<= 0`
                                         * answers 1 (`lha` + `cmpwi 0` + `bgt`). */
-    /* +0x364 */ u8 unused_0x364[0x36C - 0x364];
+    /* +0x364 */ u8 unused_0x364[0x368 - 0x364];
+    /* +0x368 */ f32 fall_height_0x368;  /* the fall height `em_fall_height_latch` copies from the enemy data */
     /* +0x36C */ nw4r::math::VEC3 vec_0x36C;  /* the target position `calcVecDistXZ` measures against
                                         * `pos` (`fn_8013F764`'s distance test) */
     /* +0x378 */ f32 value_0x378;       /* em015_act2_drift/em015_act2_drift_long clamp this against a pool float */
@@ -650,7 +724,7 @@ struct _ENEMY_WORK {
                                          * function */
     /* +0x382 */ u8 field_0x382;        /* `fn_8013FD1C` writes it from the stream; 0xFF means
                                          * "no special part", which `fn_801D6758` rejects */
-    /* +0x383 */ u8 field_0x383;        /* set once `fn_801262BC`'s record is latched */
+    /* +0x383 */ u8 field_0x383;        /* set once `em_route_entry_get`'s record is latched */
     /* +0x384 */ f32 field_0x384;       /* the record's +0x04 float, copied in with it */
     /* +0x388 */ u16 field_0x388;
     /* +0x38A */ u8 field_0x38A;
@@ -658,7 +732,7 @@ struct _ENEMY_WORK {
     /* +0x38C */ u8 field_0x38C;        /* bit 0 gates `fn_8012C870` */
     /* +0x38D */ u8 field_0x38D;        /* `fn_80137C9C`'s action-end block clears it */
     /* +0x38E */ u8 field_0x38E;        /* `fn_80137C9C`'s action-end block clears it */
-    /* +0x38F */ u8 field_0x38F;        /* the per-attacker bit set `fn_8012C9AC` masks against */
+    /* +0x38F */ u8 field_0x38F;        /* the per-attacker bit set `em_act_pick` masks against */
     /* +0x390 */ s32 values_0x390[5];   /* index 4 is `fn_8012C204` */
     union {
         struct {
@@ -671,13 +745,13 @@ struct _ENEMY_WORK {
             /* +0x421 */ u8 unused_0x421;
             /* +0x422 */ s16 count_0x422;
             /* +0x424 */ u32 timer_0x424;
-            /* +0x428 */ u8 unused_0x428[0x438 - 0x428];
+            /* +0x428 */ s32 hate_0x428[4];  /* per player, the hate `em_hate_add` keeps in [0, 20000] */
         };
     };
-    /* +0x438 */ u8 unused_0x438[0x439 - 0x438];
+    /* +0x438 */ u8 spotted_0x438;  /* the players `em_player_spotted_set` has marked, one bit each */
     /* +0x439 */ u8 field_0x439;
     /* +0x43A */ u8 field_0x43A;
-    /* +0x43B */ u8 field_0x43B;        /* the per-motion kind gate `fn_8012F474` tests against 2 */
+    /* +0x43B */ u8 field_0x43B;        /* the per-motion kind gate `em_motion_blend_scale_get` tests against 2 */
     /* +0x43C */ u8 field_0x43C;        /* the second half of the em030 state pair `fn_801B0A28`
                                         * dispatches on (named by `enemy/em030_prog.cpp`) */
     /* +0x43D */ u8 field_0x43D;
@@ -686,7 +760,8 @@ struct _ENEMY_WORK {
     /* +0x440 */ s16 field_0x440;    /* the action frame counter `enemy/em034_prog.cpp`'s
                                         * `fn_801B47A4` tests against 0x1C2 and `enemy/em030_prog.cpp`'s
                                         * em030 `fn_801B0A28` against 300/1800 */
-    /* +0x442 */ u8 unused_0x442[10];
+    /* +0x442 */ s16 status_timer_0x442;  /* the frames the +0x43D status has run */
+    /* +0x444 */ s16 sight_timer_0x444[4];  /* per player, the frames its sight mark (+0x38F) holds */
     /* +0x44C */ s16 value_0x44C;
     /* +0x44E */ s16 value_0x44E;
     /* +0x450 */ s16 field_0x450;       /* the first of the two `lha` gates `enemy/em007_act.cpp`'s
@@ -695,9 +770,10 @@ struct _ENEMY_WORK {
     union {
         struct {
         /* +0x454 */ u8 unused_0x454[0x464 - 0x454];
-        /* +0x464 */ f32 field_0x464;      /* the motion parameter `fn_80149C58` hands to `fn_8012F7D4` */
+        /* +0x464 */ f32 field_0x464;      /* the motion parameter `fn_80149C58` hands to `em_mot_layer_blend_step` */
         /* +0x468 */ u16 sync_flag_0x468;   /* cleared by every enemy net send and receive */
-        /* +0x46A */ u8 unused_0x46A[0x46C - 0x46A];
+        /* +0x46A */ u8 freeze_0x46A;  /* set, `em_timers_update` runs only the motion and shake timers */
+        /* +0x46B */ u8 unused_0x46B[0x46C - 0x46B];
         /* +0x46C */ u8 field_0x46C;       /* the area/entry byte `fn_80170804` latches to 0xFF */
         /* +0x46D */ u8 state_0x46D;
         /* +0x46E */ u8 state_0x46E;
@@ -707,18 +783,27 @@ struct _ENEMY_WORK {
         /* `fn_8012BA00`'s view of +0x454..+0x474 */
         /* +0x454 */ f32 frames_0x454[8];  /* the per-part frame cost `fn_8012BA00`'s distance test reads */
     };
-    /* +0x47C */ u8 unused_0x47C[0x482 - 0x47C];
+    /* +0x47C */ u32 approach_yaw_0x47C;  /* the fixed approach yaw `em_approach_start` latches with flag 8 */
+    /* +0x480 */ u16 approach_flags_0x480;  /* the `em_approach_start` flags `em_approach_step` steers by */
     /* +0x482 */ u8 field_0x482;       /* nonzero picks the second approach float in
                                         * `enemy/em016_prog.cpp`'s `fn_80184CE0` */
-    /* +0x483 */ u8 unused_0x483[0x48E - 0x483];
-    /* +0x48E */ u8 field_0x48E;        /* the part-kind byte `enemy/em007_act.cpp`'s `fn_801DF2F8`
-                                        * compares against 4 and 6 */
-    /* +0x48F */ u8 field_0x48F;      /* the part-damage special-case byte `em015_tev_color_update` tests
-                                        * against 1 before painting the 0x1E4 colour white */
-    /* +0x490 */ u8 unused_0x490[0x491 - 0x490];
-    /* +0x491 */ u8 field_0x491;      /* `enemy/em008_prog.cpp`'s `fn_8015DB68` sets it at action
-                                      * 0xA's sub-state 0xC8 */
-    /* +0x492 */ u8 unused_0x492[306];
+    /* +0x483 */ u8 turn_flags_0x483;  /* the `em_turn_seq_start` flags `em_turn_seq_step` and `em_turn_apply` read */
+    /* +0x484 */ u8 unused_0x484[0x488 - 0x484];
+    union {
+        struct {
+            /* +0x488 */ u8 unused_0x488[0x48E - 0x488];
+            /* +0x48E */ u8 field_0x48E;        /* the part-kind byte `enemy/em007_act.cpp`'s `fn_801DF2F8`
+                                                * compares against 4 and 6 */
+            /* +0x48F */ u8 field_0x48F;      /* the part-damage special-case byte `em015_tev_color_update` tests
+                                                * against 1 before painting the 0x1E4 colour white */
+            /* +0x490 */ u8 unused_0x490[0x491 - 0x490];
+            /* +0x491 */ u8 field_0x491;      /* `enemy/em008_prog.cpp`'s `fn_8015DB68` sets it at action
+                                              * 0xA's sub-state 0xC8 */
+            /* +0x492 */ u8 unused_0x492[0x590 - 0x492];
+        }; /* size: 0x108 */
+        /* +0x488 */ EmBreakPart break_parts_0x488[2];  /* the two breakable parts (`em_break_parts_reset`) */
+    };
+    /* +0x590 */ u8 unused_0x590[0x5C4 - 0x590];
     /* +0x5C4 */ u8 flags_0x5C4;
     /* +0x5C5 */ u8 unused_0x5C5[67];
     /* +0x608 */ u32 field_0x608;      /* the X rotation word `fn_801661FC` hands `rotMatrixX` */
@@ -727,7 +812,12 @@ struct _ENEMY_WORK {
     /* +0x614 */ u8 unused_0x614[0x740 - 0x614];
     /* +0x740 */ struct EmPartState part_0x740; /* the per-part flags/counters `em015_part_flag_set`/
                                         * `em015_user_data_node_calc` write */
-    /* +0x74E */ u8 unused_0x74E[0x761 - 0x74E];
+    /* +0x74E */ u8 unused_0x74E[0x750 - 0x74E];
+    /* +0x750 */ u32 field_0x750;  /* cleared by `em_record_0x750_clear` */
+    /* +0x754 */ u32 field_0x754;  /* cleared by `em_record_0x750_clear` */
+    /* +0x758 */ u32 field_0x758;  /* cleared by `em_record_0x750_clear` */
+    /* +0x75C */ s32 field_0x75C;  /* set to -1 by `em_record_0x750_clear` */
+    /* +0x760 */ u8 field_0x760;  /* cleared by `em_record_0x750_clear` */
     /* +0x761 */ u8 field_0x761;       /* one byte, three readers: `enemy/em025_prog.cpp`'s slot bit
                                         * map (`fn_8019EA04` clears it, `fn_8019EA80` scans its low
                                         * 8 bits for free slot indices), `enemy/em005_act.cpp`'s
@@ -739,38 +829,49 @@ struct _ENEMY_WORK {
     /* +0x762 */ u8 field_0x762;       /* `enemy/em005_act.cpp`'s latch `fn_801D4F78` checks before
                                         * setting bit 1, and the em030 motion flag
                                         * `enemy/em030_prog.cpp`'s `fn_801B055C` state ring reads */
-    /* +0x763 */ u8 unused_0x763[0x76C - 0x763];
+    /* +0x763 */ u8 unused_0x763[0x764 - 0x763];
+    /* +0x764 */ s16 latch_timer_0x764;  /* the +0x762 latch's timer (`em_latch_0x762_roll`) */
+    /* +0x766 */ u8 unused_0x766[0x76C - 0x766];
     /* +0x76C */ nw4r::math::VEC3 vec_0x76C; /* the position `calcVecAngX` is handed in
                                          * `fn_801D4CE0` */
     /* +0x778 */ u8 unused_0x778[0x784 - 0x778];
     /* +0x784 */ u8 field_0x784;
-    /* +0x785 */ u8 unused_0x785[0x794 - 0x785];
+    /* +0x785 */ u8 approach_3d_0x785;  /* set while the approach runs in 3D (`em_hit_arm_set`) */
+    /* +0x786 */ u8 fly_state_0x786;  /* 0 while the flight heads for its target, 1 once past it (`em_fly_step`) */
+    /* +0x787 */ u8 unused_0x787[0x788 - 0x787];
+    /* +0x788 */ nw4r::math::VEC3 fly_start_0x788;  /* the position the flight started from (`em_fly_start`) */
     /* +0x794 */ u16 field_0x794;
     /* +0x796 */ s16 field_0x796;
     /* +0x798 */ u8 field_0x798;
     /* +0x799 */ u8 field_0x799;
     /* +0x79A */ u8 field_0x79A;
     /* +0x79B */ u8 field_0x79B;
-    /* +0x79C */ u8 unused_0x79C[0x7A0 - 0x79C];
+    /* +0x79C */ s16 shake_timer_0x79C;  /* the camera shake request `em_shake_req_set` arms */
+    /* +0x79E */ u8 unused_0x79E[0x7A0 - 0x79E];
     /* +0x7A0 */ u32 field_0x7A0;       /* the numerator of the ratio `fn_8014001C` reports */
     /* +0x7A4 */ u32 field_0x7A4;       /* its denominator */
     /* +0x7A8 */ u8 unused_0x7A8[0x7AC - 0x7A8];
     /* +0x7AC */ u32 field_0x7AC;       /* the second frame counter `em_team_damage_over_ck` measures against `field_0x7A0` */
     /* +0x7B0 */ f32 field_0x7B0;       /* the `team == 0xf` threshold `fn_8012EFDC` tests against 0.0 */
     /* +0x7B4 */ f32 shell_rate_0x7B4;  /* the factor `shell_attack_set` scales a shell's hit life by */
-    /* +0x7B8 */ u8 unused_0x7B8[0x7BC - 0x7B8];
-    /* +0x7BC */ f32 field_0x7BC;       /* the effect radius `fn_8012F474` scales */
+    /* +0x7B8 */ f32 field_0x7B8;  /* the second rank rate `em_shell_rate_init` sets */
+    /* +0x7BC */ f32 field_0x7BC;       /* the effect radius `em_motion_blend_scale_get` scales */
     /* +0x7C0 */ f32 field_0x7C0;       /* its second factor */
     /* +0x7C4 */ f32 field_0x7C4;       /* the value `em_mot_set_blend` clears to 1.0f */
     /* +0x7C8 */ u8 field_0x7C8;        /* the action id `fn_8014278C` picks */
-    /* +0x7C9 */ u8 unused_0x7C9[0x812 - 0x7C9];
+    /* +0x7C9 */ u8 unused_0x7C9[0x810 - 0x7C9];
+    /* +0x810 */ s16 mark_timer_0x810;  /* the frames the enemy stays marked (`em_net_flag_apply_0`) */
     /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
     /* +0x816 */ u16 field_0x816;
     /* +0x818 */ s16 field_0x818;       /* the motion timer `fn_8012F110` arms before its mode switch */
     /* +0x81A */ s16 field_0x81A;     /* the motion timer `em015_area_follow` gates its arming on
                                         * (<= 0) */
-    /* +0x81C */ u8 unused_0x81C[0x833 - 0x81C];
+    /* +0x81C */ s16 timer_0x81C;  /* the two-frame timer `em_timer_0x81C_arm` arms */
+    /* +0x81E */ s16 timer_0x81E;  /* the two-frame timer `em_timer_0x81E_arm` arms */
+    /* +0x820 */ u8 status_bits_0x820;  /* the bits `em_status_bit_set` raises for two frames */
+    /* +0x821 */ s8 status_bits_timer_0x821;  /* their timer */
+    /* +0x822 */ u8 unused_0x822[0x833 - 0x822];
     /* +0x833 */ u8 field_0x833;       /* the "approach armed" byte TWO readers branch on:
                                         * `enemy/em030_prog.cpp`'s em030 `fn_801B0A28` and
                                         * `enemy/em034_prog.cpp`'s `fn_801B47A4` */
@@ -781,6 +882,7 @@ struct _ENEMY_WORK {
     /* +0x838 */ EmPartRec parts_0x838[8];   /* the eight part records the net sync packs (0x838..0x868) */
     union {
         /* +0x868 */ u32 values_0x868[14];  /* the 14-word view `em_common`'s indexed reader takes (0x868..0x8A0) */
+        /* +0x868 */ u8* part_tbls_0x868[8];  /* per part, the 9-byte part table `em_part_rec_reset` points at */
         struct {
             /* +0x868 */ u8 unused_0x868[0x888 - 0x868];
             /* +0x888 */ s32 field_0x888;       /* the effect handle `enemy/em034_prog.cpp`'s `fn_801B4E3C`
@@ -790,47 +892,67 @@ struct _ENEMY_WORK {
             /* +0x89F */ u8 field_0x89F;        /* the mode `em_motion_mode_set` latches */
         };
     };
-    /* +0x8A0 */ u8 unused_0x8A0[0x8A2 - 0x8A0];
+    /* +0x8A0 */ u16 stamina_max_0x8A0;  /* the stamina maximum `em_stamina_add` caps +0x8A2 at */
     /* +0x8A2 */ u16 field_0x8A2;       /* the counter `fn_801CD400` gates its target search on
                                         * (`lhz` + `cmplwi 0xFA`) */
     /* +0x8A4 */ s16 field_0x8A4;       /* the timer `em_motion_mode_set` arms from `fn_80126494` */
     /* +0x8A6 */ s16 field_0x8A6;       /* the timer `fn_801409C8` compares against the enemy data's */
-    /* +0x8A8 */ u8 unused_0x8A8[0x8AA - 0x8A8];
+    /* +0x8A8 */ s16 field_0x8A8;  /* the hold timer `em_anger_add` tests (<= 0) before raising the anger state */
     /* +0x8AA */ u8 mode_0x8AA;         /* `em_alt_mode_set` latches it (0/1); `em_alt_mode_ck` tests it
                                         * against 1 */
-    /* +0x8AB */ u8 unused_0x8AB[0x8B3 - 0x8AB];
+    /* +0x8AB */ u8 faint_0x8AB;  /* set while the enemy is knocked out (`em_tint_hold_start`) */
+    /* +0x8AC */ u8 flag_0x8AC;  /* set by `em_rest_flag_set` */
+    /* +0x8AD */ u8 flag_0x8AD;  /* set by `em_flag_0x8AD_set` */
+    /* +0x8AE */ u8 flag_0x8AE;  /* set by `em_guard_set` */
+    /* +0x8AF */ u8 flag_0x8AF;  /* set by `em_flag_0x8AF_set` */
+    /* +0x8B0 */ u8 flag_0x8B0;  /* set by `em_idle_flag2_set` once the enemy is idle */
+    /* +0x8B1 */ u8 unused_0x8B1[0x8B3 - 0x8B1];
     /* +0x8B3 */ u8 flags_0x8B3;        /* the action bitmap `fn_801376BC`/`DC`/`04` mask */
-    /* +0x8B4 */ u8 unused_0x8B4[0x8C8 - 0x8B4];
+    /* +0x8B4 */ u8 unused_0x8B4[0x8C2 - 0x8B4];
+    /* +0x8C2 */ s16 fx_timer_0x8C2;  /* the effect timer `em_fx_flag_set` arms */
+    /* +0x8C4 */ s16 fx_timer_0x8C4;  /* the effect timer `em_fx_flag2_set` arms */
+    /* +0x8C6 */ s16 fx_timer_0x8C6;  /* the effect timer `em_fx_flag3_set` arms */
     /* +0x8C8 */ u32 field_0x8C8;       /* `fn_801260BC`'s value `fn_80137C20` latches */
     /* +0x8CC */ u32 field_0x8CC;       /* `fn_801260E0`'s value `fn_80137C20` latches */
     /* +0x8D0 */ u8 unused_0x8D0[0x8D3 - 0x8D0];
     /* +0x8D3 */ u8 field_0x8D3;        /* `fn_80137614` matches it against 1 */
     /* +0x8D4 */ u8 unused_0x8D4[0x916 - 0x8D4];
     /* +0x916 */ s16 field_0x916;
-    /* +0x918 */ u8 unused_0x918[1];
+    /* +0x918 */ u8 level_kind_0x918;  /* the kind `em_level_raise` was last raised with */
     /* +0x919 */ u8 field_0x919;
-    /* +0x91A */ u8 unused_0x91A[0x91C - 0x91A];
+    /* +0x91A */ u8 recover_count_0x91A[2];  /* the two recovery kinds' trigger counts (`em_recover_timer_set`) */
     /* +0x91C */ u8 field_0x91C;
-    /* +0x91D */ u8 unused_0x91D[0x924 - 0x91D];
+    /* +0x91D */ u8 paralysis_count_0x91D;  /* the paralysis triggers so far (`em_ailment_limit_raise`) */
+    /* +0x91E */ u8 sleep_count_0x91E;  /* the sleep triggers so far */
+    /* +0x91F */ u8 stun_count_0x91F;  /* the stun triggers so far */
+    /* +0x920 */ u8 exhaust_count_0x920;  /* the exhaust triggers so far */
+    /* +0x921 */ u8 unused_0x921[0x922 - 0x921];
+    /* +0x922 */ s16 poison_limit_0x922;  /* the poison buildup that triggers the poison */
     /* +0x924 */ s16 field_0x924;
     /* +0x926 */ s16 field_0x926;
-    /* +0x928 */ u8 unused_0x928[0x92E - 0x928];
+    /* +0x928 */ s16 poison_damage_0x928;  /* the poison damage of this frame */
+    /* +0x92A */ s16 poison_decay_0x92A;  /* the frames to the next poison decay */
+    /* +0x92C */ s16 paralysis_limit_0x92C;  /* the paralysis buildup that triggers the paralysis */
     /* +0x92E */ s16 field_0x92E;
-    /* +0x930 */ u8 unused_0x930[0x934 - 0x930];
+    /* +0x930 */ s16 paralysis_decay_0x930;  /* the frames to the next paralysis decay */
+    /* +0x932 */ s16 sleep_limit_0x932;  /* the sleep buildup that puts the enemy to sleep */
     /* +0x934 */ s16 field_0x934;
-    /* +0x936 */ u8 unused_0x936[0x938 - 0x936];
+    /* +0x936 */ s16 sleep_decay_0x936;  /* the frames to the next sleep decay */
     /* +0x938 */ s16 field_0x938;       /* the motion timer `em_motion_window_ck` gates its window test on */
     /* +0x93A */ s16 field_0x93A;
-    /* +0x93C */ u8 unused_0x93C[0x93E - 0x93C];
+    /* +0x93C */ s16 ailment8_decay_0x93C;  /* the frames to the next status-8 decay (300) */
     /* +0x93E */ s16 field_0x93E;
-    /* +0x940 */ u8 unused_0x940[0x944 - 0x940];
+    /* +0x940 */ s16 stun_limit_0x940;  /* the stun buildup that stuns the enemy */
+    /* +0x942 */ s16 stun_decay_0x942;  /* the frames to the next stun decay */
     /* +0x944 */ s16 field_0x944;
-    /* +0x946 */ u8 unused_0x946[0x94A - 0x946];
+    /* +0x946 */ s16 exhaust_limit_0x946;  /* the exhaust buildup that exhausts the enemy */
+    /* +0x948 */ s16 exhaust_decay_0x948;  /* the frames to the next exhaust decay */
     /* +0x94A */ u16 field_0x94A;       /* the action-end block clears it */
     /* +0x94C */ u16 field_0x94C;       /* the action-end block clears it */
-    /* +0x94E */ u8 unused_0x94E[1];
+    /* +0x94E */ u8 ailment_0x94E;  /* the running ailments: 1 sleep, 2 poison, 4 paralysis (`em_status_ck`) */
     /* +0x94F */ u8 field_0x94F;
-    /* +0x950 */ u8 unused_0x950[0x954 - 0x950];
+    /* +0x950 */ s16 sleep_timer_0x950;  /* the frames the sleep lasts (`em_sleep_start`) */
+    /* +0x952 */ s16 recover_timer_0x952;  /* the recovery timer `em_recover_timer_set` arms */
     /* +0x954 */ s32** field_0x954;
     /* +0x958 */ s32 field_0x958;
     /* +0x95C */ u8 field_0x95C;
@@ -905,36 +1027,43 @@ struct _ENEMY_WORK {
     /* +0x0A05 */ u8 field_0xA05;
     /* +0x0A06 */ u8 field_0xA06;
     /* +0x0A07 */ u8 field_0xA07;
-    /* +0x0A08 */ u8 hit_0xA08[0xA0D - 0xA08];  /* the hit reference `enemy/em018_prog.cpp`'s `fn_80198150` hands
-                                        * `hit_list_capsule_ck` with its capsule */
-    /* +0x0A0D */ u8 field_0xA0D;       /* em015_act2_hit_chain's per-frame gate */
-    /* +0x0A0E */ u8 unused_0xA0E[0xA14 - 0xA0E];
-    /* +0x0A14 */ u16 shell_flags_0xA14; /* the flag word `enemy/em015_prog.cpp` hands the `ShellSetFuncs` +0x2C job */
-    /* +0xA16 */ u8 field_0xA16;      /* the byte `enemy/em030_prog.cpp`'s `fn_801B203C` tests against
-                                        * 0xFF/5 before it latches the counter-attack */
-    /* +0xA17 */ u8 unused_0xA17[0xA34 - 0xA17];
-    /* +0xA34 */ _PLW* plw_0xA34;     /* the player work `fn_801B203C` hands `fn_801B0230` */
-    /* +0xA38 */ u8 field_0xA38;      /* the third gate `fn_801B203C` tests */
-    /* +0xA39 */ u8 unused_0xA39[0xA64 - 0xA39];
-    /* +0xA64 */ union {
-        /* +0xA64 */ u8 hit_0xA64[0x60];  /* the record's own `_HIT_W` (`Pl/hit_w.h`, size 0x60): `enemy/em029_prog.cpp`'s
-                                           * `em_action3_sub0` hands it to `hit_mask_ck`.  A byte view: `_HIT_W` has two
-                                           * definitions (`Pl/hit_w.h`, `ai/ai_npc.h`) and this header includes neither */
+    union {
         struct {
-            /* +0xA64 */ u8 unused_0xA64[0xA69 - 0xA64];
-            /* +0xA69 */ u8 field_0xA69;       /* em015_act2_hit_chain's second gate (the `_HIT_W`'s +0x05 byte) */
-            /* +0xA6A */ u8 unused_0xA6A[20];
-            /* +0xA7E */ u16 field_0xa7e;      /* the `_HIT_W`'s +0x1A halfword */
+            /* +0x0A08 */ u8 hit_0xA08[0xA0D - 0xA08];  /* the hit reference `enemy/em018_prog.cpp`'s `fn_80198150`
+                                                        * hands `hit_list_capsule_ck` with its capsule */
+            /* +0x0A0D */ u8 field_0xA0D;       /* em015_act2_hit_chain's per-frame gate */
+            /* +0x0A0E */ u8 unused_0xA0E[0xA14 - 0xA0E];
+            /* +0x0A14 */ u16 shell_flags_0xA14; /* the flag word `enemy/em015_prog.cpp` hands the `ShellSetFuncs` +0x2C job */
+            /* +0xA16 */ u8 field_0xA16;      /* the byte `enemy/em030_prog.cpp`'s `fn_801B203C` tests against
+                                                * 0xFF/5 before it latches the counter-attack */
+            /* +0xA17 */ u8 unused_0xA17[0xA34 - 0xA17];
+            /* +0xA34 */ _PLW* plw_0xA34;     /* the player work `fn_801B203C` hands `fn_801B0230` */
+            /* +0xA38 */ u8 field_0xA38;      /* the third gate `fn_801B203C` tests */
+            /* +0xA39 */ u8 unused_0xA39[0xA64 - 0xA39];
+            /* +0xA64 */ union {
+                /* +0xA64 */ u8 hit_0xA64[0x60];  /* the record's own `_HIT_W` (`Pl/hit_w.h`, size 0x60): `enemy/em029_prog.cpp`'s
+                                                   * `em_action3_sub0` hands it to `hit_mask_ck`.  A byte view: `_HIT_W` has two
+                                                   * definitions (`Pl/hit_w.h`, `ai/ai_npc.h`) and this header includes neither */
+                struct {
+                    /* +0xA64 */ u8 unused_0xA64[0xA69 - 0xA64];
+                    /* +0xA69 */ u8 field_0xA69;       /* em015_act2_hit_chain's second gate (the `_HIT_W`'s +0x05 byte) */
+                    /* +0xA6A */ u8 unused_0xA6A[20];
+                    /* +0xA7E */ u16 field_0xa7e;      /* the `_HIT_W`'s +0x1A halfword */
+                };
+            };
         };
+        /* +0xA08 */ EmHitSlot hit_slots_0xA08[2];  /* the two attack hit records (`_HIT_W`, 0x5C apart) `em_hit_window_set` arms */
     };
     /* +0xAC4 */ u8 unused_0xAC4[0xAE9 - 0xAC4];
     /* +0x0AE9 */ u8 field_0xAE9;       /* the one-shot flag `enemy/em009_act.cpp`'s
                                         * `fn_80389C50` tests (== 1) to choose its motion set */
     /* +0x0AEA */ u16 field_0xAEA;      /* the eighteen-bit flag word `enemy/em007_act.cpp`'s
                                         * effect calls hand the shell callback */
-    /* +0xAEC */ u8 unused_0xAEC[0xAEE - 0xAEC];
+    /* +0xAEC */ u8 hit_flags_0xAEC[2];  /* per hit record, bit 0: the window was set with flag 2 (`em_hit_window_set`) */
     /* +0xAEE */ u8 field_0xAEE;        /* `fn_8013791C`'s one-shot action-setup request */
-    /* +0xAEF */ u8 unused_0xAEF[0xB14 - 0xAEF];
+    /* +0xAEF */ u8 unused_0xAEF[0xAF0 - 0xAEF];
+    /* +0xAF0 */ EmDelayRec delays_0xAF0[1];  /* the delayed action `em_delay_act_set` queues */
+    /* +0xB04 */ u8 unused_0xB04[0xB14 - 0xB04];
     /* +0xB14 */ struct _se_w* se_0xB14;  /* the sound-work handle `enemy/em006_prog.cpp`'s
                                            * `se_req_pos_ps`/`shell_se_req` calls take */
 };

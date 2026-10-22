@@ -102,7 +102,7 @@ u8 em_nearest_area_get(struct EnemyData* data, nw4r::math::VEC3* pos, u8 area);
 u32 em_eft_hide_ck(_ENEMY_WORK* enemy);
 
 /* 0x8012F74C */
-void em_mot_layer_set(struct _ENEMY_WORK* self, u32 layer, u16 motion, u32 a, u32 b);
+void em_mot_layer_set(struct _ENEMY_WORK* self, s32 layer, u32 motion, s32 start, s32 frame);
 /* 0x80130088 */
 s32 em_surface_reach_ck(struct _ENEMY_WORK* self, f32 depth);
 /* 0x80135468 */

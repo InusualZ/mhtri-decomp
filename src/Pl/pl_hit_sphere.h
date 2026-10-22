@@ -51,6 +51,10 @@ void pl_segment_box_set(const PlSegment* seg, PlSegmentBox* box);
 /* 0x8028F558 (0xC4): fills `box` from the capsule. */
 void pl_capsule_box_set(const PlCapsule* capsule, PlCapsuleBox* box);
 
+/* 0x8028F44C (0x68): builds the first 0x24 bytes of box `b` from the two vectors at the head of `a` and their
+ * difference (`enemy/em_common.cpp`'s reach test hands it a segment). */
+void pl_box_set(struct PlBox* a, struct PlBox* b);
+
 }
 
 /* 0x8028F61C (0x50): 1 when `point` lies inside the sphere of `radius` around `center`. */

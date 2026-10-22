@@ -1051,7 +1051,7 @@ extern "C" void fn_8015EFAC(_ENEMY_WORK* self) {
     f32 temp_f0;
     f32 temp_f1;
 
-    temp_r31 = fn_80126454(self);
+    temp_r31 = em_sight2_get(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
     case 0:
@@ -1190,7 +1190,7 @@ extern "C" void fn_8015F39C(_ENEMY_WORK* self) {
     s32 temp_r0;
 
     em_busy_timer_reset(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
@@ -1215,7 +1215,7 @@ extern "C" void fn_8015F450(_ENEMY_WORK* self) {
     u8 temp_r3;
 
     em_busy_timer_reset(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
@@ -1241,7 +1241,7 @@ extern "C" void fn_8015F510(_ENEMY_WORK* self, u8 arg1) {
     f31 = lbl_80797330;
     em_busy_set(self);
     em_busy_timer_reset(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
@@ -1267,7 +1267,7 @@ extern "C" void fn_8015F60C(_ENEMY_WORK* self) {
     u8 temp_r3;
 
     em_busy_timer_reset(self);
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
@@ -1526,7 +1526,7 @@ u32 fn_80165FC8(_ENEMY_WORK* self, u32 arg1) {
     if ((s32)entry != 2) {
         return 0;
     }
-    if (fn_80129D3C(self) == 1) {
+    if (em_area_stun_move_ck(self) == 1) {
         return 1;
     }
     sel = 0xFF;

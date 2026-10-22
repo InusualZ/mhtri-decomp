@@ -377,17 +377,17 @@ extern "C" u32 fn_80385B28(NoteWork* self, u16 index) {
 
 /* 0x80385C64 */
 extern "C" u32 note_pane_motion_end_ck(NoteWork* self) {
-    return fn_800E2198(&self->model, 0);
+    return mhchar_motion_end_ck(&self->model, 0);
 }
 
 /* 0x80385C70 */
 extern "C" u32 note_pane_motion_frame_ck(NoteWork* self, u32 a, f32 frame, f32 range) {
-    return fn_800E16DC(&self->model, (u16)a, 0);
+    return mhchar_frame_check(&self->model, (u16)a, 0);
 }
 
 /* 0x80385C80 */
 extern "C" u32 note_pane_motion_frame_pass_ck(NoteWork* self, u32 a) {
-    return fn_800E16DC(&self->model, (u16)a, 1);
+    return mhchar_frame_check(&self->model, (u16)a, 1);
 }
 
 /* 0x80385C90 - the quest NPC's motion number. */

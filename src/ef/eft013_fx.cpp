@@ -162,7 +162,7 @@ struct _EFT013_PL_PHYS {
 };
 /* size: 0x05 - lower bound, an approximation. */
 
-/* Pool block of the `fn_80107804` family: the setter state at +0x28 and the two payload bytes. */
+/* Pool block of the `eft013_spark_set` family: the setter state at +0x28 and the two payload bytes. */
 struct _EFT013_WORK_E {
     /* +0x00 */ u8 unused_0x00[0x28];
     /* +0x28 */ u8 state_0x28;
@@ -1030,7 +1030,7 @@ extern "C" void fn_801077C4(_EFT013_PL* self) {
 }
 
 /* 0x80107804 - arm the enemy setter (state 1) and copy the action/state bytes into the work block. */
-extern "C" void fn_80107804(_ENEMY_WORK* self, u32 a) {
+extern "C" void eft013_spark_set(_ENEMY_WORK* self, u32 a) {
     f32 scale;
     _EFT013* e = (_EFT013*)fn_80107A18(self, 9, a, scale, self->act_id);
     if (e != NULL) {
@@ -1041,7 +1041,7 @@ extern "C" void fn_80107804(_ENEMY_WORK* self, u32 a) {
     }
 }
 
-/* 0x80107860 - the player variant of fn_80107804 (state 2, player record's key/state bytes). */
+/* 0x80107860 - the player variant of eft013_spark_set (state 2, player record's key/state bytes). */
 extern "C" void fn_80107860(_EFT013_PL* self, u32 a) {
     f32 scale;
     _EFT013* e = (_EFT013*)fn_80107A18(self, 9, a, scale, self->field_0x1A4);

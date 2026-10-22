@@ -104,6 +104,11 @@ void vec3_scale_inv(VEC3* v, f32 len);
 
 #ifdef __cplusplus
 }
+
+/* 0x80295924 - the segment test `from` -> `to` against the stage collision of `area` for the hit mask; 0 when nothing
+ * is in the way (`enemy/em_common.cpp`'s meat search).  The parameter names beyond the three vectors are GUESSES. */
+s32 findInterSection(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::VEC3* out, u8 mode, u32 mask, u8 area,
+                     u16 hit_mask, u8* out_kind);
 #endif
 
 #ifdef __cplusplus

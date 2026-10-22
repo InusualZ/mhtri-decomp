@@ -39,12 +39,12 @@ u32 em_frame_check__FP11_ENEMY_WORKUsff(struct _ENEMY_WORK *self, u16 a, f32 b, 
 u32 em_sleep_ck__FP11_ENEMY_WORKUc(struct _ENEMY_WORK* enemy, u8 kind);
 /* 0x8012F7D4 - reads r3, r4, r5, r6 and f1 (its body does `mr r4,r5` / `mr r5,r6` before the tail
  * call to 0x8012F758), so the four scalar arguments and the float are in the call sites' order. */
-void fn_8012F7D4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
+void em_mot_layer_blend_step(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
 /* 0x8012F810 - one `self` argument, no return (restores the motion state). */
 void em_mat_blend_reset(struct _ENEMY_WORK* self);
 /* 0x8012F860 - reads f1 and f2 (`fcmpo cr0,f1,f0` then `fadds f0,f0,f2`), so it takes two floats;
  * `enemy/fn_80156EA4` sets f1 (the computed ratio) and f2 (`lbl_80797150`) before the call. */
-void fn_8012F860(struct _ENEMY_WORK* self, f32 a, f32 b);
+void em_motion_blend_step(struct _ENEMY_WORK* self, f32 a, f32 b);
 /* 0x8012F8C8 - two arguments: r3 (`self`) and f1, which it stores at +0x7c4 and multiplies by the
  * float at +0x7bc before tail-calling 0x800E1640.  The 0-argument form this band used to carry was
  * wrong: `enemy/fn_8014A1BC.c` calls it with `self` only and `enemy/fn_801550FC.cpp` with a float,
@@ -55,12 +55,12 @@ void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 void em_mot_speed_set();
 #endif
 f32 em_mot_frame_get(struct _ENEMY_WORK *self);
-f32 fn_8012F8F4(struct _ENEMY_WORK *self);
+f32 em_mot_frame_end_get(struct _ENEMY_WORK *self);
 u32 em_mot_end_ck(struct _ENEMY_WORK *self);
 u32 em_mot_frame_started_ck(struct _ENEMY_WORK *self);
-void fn_8012FC60(struct _ENEMY_WORK* work);
-void fn_8012FCE4(struct _ENEMY_WORK* work);
-void fn_8012FF38(struct _ENEMY_WORK* work);
+void em_joint_visibility_update_all(struct _ENEMY_WORK* work);
+void em_motion_param_step(struct _ENEMY_WORK* work);
+void em_height_limit_update(struct _ENEMY_WORK* work);
 /* 0x80130008 - r3 (`self`) and f1 (it does `fmr f31,f1` and uses it against `get_em_scale`), return
  * in r3 (1/0).  C keeps the old-style declaration because `enemy/fn_8014A1BC.c` calls it both with
  * one and with two arguments; C++ gets the one-argument form `enemy/fn_801550FC.cpp` uses (it leaves
@@ -86,39 +86,39 @@ void em_height_add(struct _ENEMY_WORK* self, f32 a);
 #else
 void em_height_add();
 #endif
-void fn_80130438(struct _ENEMY_WORK* work);
-void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
+void em_fall_step(struct _ENEMY_WORK* work);
+void em_anger_add(struct _ENEMY_WORK* enemy, s16 value);
 /* 0x80130CDC - r3 (`self`) and r4, which it sign-extends (`extsh r4,r4`) before tail-calling
  * 0x80130B6C; `enemy/fn_8014A1BC.c` calls it with two arguments, so the prototype is safe for C. */
 void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
-u32 fn_80130DF8(void);
+u32 em_niku_search(void);
 struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
-void fn_80131150(struct _ENEMY_WORK* work);
+void em_sight_update(struct _ENEMY_WORK* work);
 void em_ceiling_latch(struct _ENEMY_WORK* work);
 void em_motion_timer_arm(struct _ENEMY_WORK* work);
 void em_fx_flag_set(struct _ENEMY_WORK* work);
-void fn_80131E0C(struct _ENEMY_WORK* work);
-void fn_80131E00(struct _ENEMY_WORK* work);
+void em_fx_flag3_set(struct _ENEMY_WORK* work);
+void em_fx_flag2_set(struct _ENEMY_WORK* work);
 f32 em_height_base_get(struct _ENEMY_WORK* work);
-u32 fn_80132198(struct _ENEMY_WORK* work);
-void fn_801321B0(struct _ENEMY_WORK* work);
+u32 em_flag_0x8AD_set(struct _ENEMY_WORK* work);
+void em_flag_0x8AD_ck(struct _ENEMY_WORK* work);
 void em_timer_0x81C_arm(struct _ENEMY_WORK* self);
-void fn_801320A4(struct _ENEMY_WORK* work);
-u32 fn_80132184(void);
-void fn_801324E0(struct _ENEMY_WORK* work);
-void fn_801333E0(struct _ENEMY_WORK* work);
-void fn_80133B5C(struct _ENEMY_WORK* work);
+void em_shell_rate_init(struct _ENEMY_WORK* work);
+u32 em_flag_0x8AC_ck(void);
+void em_poison_init(struct _ENEMY_WORK* work);
+void em_ailment_fx_update(struct _ENEMY_WORK* work);
+void em_latch_0x762_roll(struct _ENEMY_WORK* work);
 void em_finish_flag_set(struct _ENEMY_WORK* enemy);
-void fn_80133C30(struct _ENEMY_WORK* work);
+void em_approach_3d_clear(struct _ENEMY_WORK* work);
 void em_hit_arm_set(struct _ENEMY_WORK *self);
-void fn_80133CC8(struct _ENEMY_WORK *self, u32 a, u32 b);
+void em_turn_to_target_3d(struct _ENEMY_WORK *self, u32 a, u32 b);
 /* 0x80133F4C - r3 (`self`), f1, f2 and r4 (the callee's body does `fmr f30,f1` / `fmr f31,f2` /
  * `mr r31,r4`), so the real signature is four-argument; `enemy/fn_8014BDF8` (C) leaves r4 as the
  * tail of its preceding call, so C keeps the old-style declaration (docs/plan.md 6.5 rule 6). */
 #ifdef __cplusplus
-void fn_80133F4C(struct _ENEMY_WORK* self, f32 a, f32 b, s32 c);
+void em_turn_in_window2(struct _ENEMY_WORK* self, f32 a, f32 b, s32 c);
 #else
-void fn_80133F4C();
+void em_turn_in_window2();
 #endif
 void em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
 u32 em_turn_seq_step(struct _ENEMY_WORK *self, void *tbl);
@@ -140,7 +140,7 @@ u32 em_move_offset_step_update();
 #endif
 f32 em_key_curve_eval(struct _ENEMY_WORK *self, void *tbl);
 f32 em_target_dist_ratio_get(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
-u32 fn_80135BC4(struct _ENEMY_WORK* work, s32 arg1);
+u32 em_break_part_active_ck(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801363F8(struct _ENEMY_WORK* work);
 /* Declarations for the action band 0x80178378.. (`enemy/fn_80178378.cpp`): the arming helpers its 64
  * action functions call and no registered unit owns.  Signatures are the call sites' - the argument
@@ -166,7 +166,7 @@ void fn_801409C8(struct _ENEMY_WORK *self, u8 *in, u32 id, u32 sub, s32 value);
 void fn_80140AF8(struct _ENEMY_WORK *self, u32 a, u32 b);
 void fn_80140B10(struct _ENEMY_WORK *self, u32 a, u32 b);
 void enemy_work_release(void);
-void fn_80144584(s32 kind);
+void emc_kill_report(s32 kind);
 f32 get_em_chg_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 f32 get_em_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* work, u32 joint, Vec3* out);

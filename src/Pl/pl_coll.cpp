@@ -15,8 +15,8 @@
  *   0x80291664-0x802919FC, 0x80291A70-0x80291B08, 0x80291B48-0x80291BBC, 0x80291CD0-0x80292468, 0x802924C0-0x80293A7C,
  *   0x80293A88-0x8029573C, 0x8029576C-0x80295924, 0x80295998-0x802961F8, 0x80296260-0x80296368, 0x80296448-0x802969A8,
  *   0x802969F8-0x8029708C, 0x802970A0-0x802977E4, 0x80297814-0x80297BE4, 0x80297C30-0x80297D9C.  Known blockers:
- *   `fn_80291A70`/`fn_80291B48` read `_PLW` bytes with no field (+0x1E1 inside `equipB2.deco_level`, +0x004 inside
- *   `unk003`), and `fn_80291A70` needs `_HIT_TENJO_DATA`'s layout (still a forward declaration); `GetGroundHit2`,
+ *   `pl_ground_probe`/`fn_80291B48` read `_PLW` bytes with no field (+0x1E1 inside `equipB2.deco_level`, +0x004 inside
+ *   `unk003`), and `pl_ground_probe` needs `_HIT_TENJO_DATA`'s layout (still a forward declaration); `GetGroundHit2`,
  *   `hit_ground_comon` and `findInterSection3` walk `pl_land_data` (0x88 stride) and `pl_hit_id_list` with a 0x40-byte
  *   hit record that is not `LandData` and needs naming first; the query half `fn_8028FA20`-`fn_80290D08` takes a record
  *   with `VEC3` fields at +0x18/+0x1C/+0x28 and radii at +0x0C/+0x34 (`fn_802900F8` is the cheapest way in).
@@ -69,7 +69,7 @@ extern "C" {
 s32 fn_8028F66C(HitSphere* a, HitSphere* b, VEC3* out);
 s32 fn_8028F758(HitSphere* a, HitSphere* b, VEC3* out);
 f32 fn_8028F84C(f32 value, f32 low, f32 high);
-f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param);
+f32 pl_box_point_dist_sq(PlBox* box, const VEC3* point, f32* param);
 f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out);
 void fn_802910C0(VEC3* out, const VEC3* in, f32 scale);
 s32 fn_802919FC(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
@@ -102,7 +102,7 @@ s32 fn_8028F66C(HitSphere* a, HitSphere* b, VEC3* out) {
             vec3_scale_by(&sep.x, &sep.x, b->radius / sqrt_f32(dist));
             vec3_add_ps(out, &sep, &b->pos);
         } else {
-            fn_80050028(out, &b->pos);
+            vec3_copy(out, &b->pos);
         }
         return 1;
     }
@@ -151,7 +151,7 @@ f32 fn_8028F84C(f32 value, f32 low, f32 high) {
 
 /* 0x8028F86C - the parametric position of `point` along `box`'s axis in `*param` (clamped to 0..1),
  * and the squared distance from `point` to that position. */
-f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
+f32 pl_box_point_dist_sq(PlBox* box, const VEC3* point, f32* param) {
     VEC3 sep;
     f32 axis_len2;
     f32 t;
@@ -182,13 +182,13 @@ f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out) {
     f32 param;
     f32 dist;
 
-    fn_8012A8F8(&box);
+    em_pl_box_init(&box);
     param = 0.0f;
     copyVec3(&box.vec_0x00, start);
     copyVec3(&box.vec_0x0C, end);
     subVec3(&diff, end, start);
     copyVec3(&box.vec_0x18, &diff);
-    dist = fn_8028F86C(&box, point, &param);
+    dist = pl_box_point_dist_sq(&box, point, &param);
     vec3_scale(&scaled, &box.vec_0x18, param);
     addVec3(&pos, &scaled, start);
     copyVec3(out, &pos);
@@ -232,7 +232,7 @@ s32 fn_80291BBC(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind) {
     LandData land;
     s32 found;
 
-    fn_8012A624(&land);
+    em_land_data_init(&land);
     fn_802977E4(&land);
     *hit_layer = 0;
     found = hit_ground_comon(pos, flag, &land, out, kind, 1, 0, 0, 0);

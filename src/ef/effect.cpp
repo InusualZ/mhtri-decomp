@@ -87,7 +87,7 @@ typedef struct EftShape {
     /* +0x28 */ nw4r::math::VEC3 b_0x28;
 } EftShape; /* size: 0x34 */
 
-/* The two-vector head `fn_800FA3E8` zeroes (the first 0x18 bytes of a box/shape record). */
+/* The two-vector head `pl_segment_init` zeroes (the first 0x18 bytes of a box/shape record). */
 typedef struct EftVectors {
     /* +0x00 */ nw4r::math::VEC3 a_0x00;
     /* +0x0C */ nw4r::math::VEC3 b_0x0C;
@@ -169,7 +169,7 @@ u32 hit_point_sphr(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 r);
 
 /* The unit's own symbols other units call. */
 extern "C" void eft_state_flags_set(EftFrameState* self, u8 a, u8 b);
-extern "C" EftVectors* fn_800FA3E8(EftVectors* self);
+extern "C" EftVectors* pl_segment_init(EftVectors* self);
 extern "C" nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self);
 
 /* the unit's own helpers, used before their definitions below */
@@ -640,12 +640,12 @@ extern "C" EftShape* eft_shape_init(EftShape* self) {
 
 /* 0x800FA3B8 - construct the sphere record. */
 extern "C" EftVectors* eft_capsule_ctor(EftVectors* self) {
-    fn_800FA3E8(self);
+    pl_segment_init(self);
     return self;
 }
 
 /* 0x800FA3E8 - zero the two vectors of a record. */
-extern "C" EftVectors* fn_800FA3E8(EftVectors* self) {
+extern "C" EftVectors* pl_segment_init(EftVectors* self) {
     VEC3_ctor(&self->a_0x00);
     VEC3_ctor(&self->b_0x0C);
     return self;

@@ -41,9 +41,9 @@ void fn_800E3264(MHchar* track, u32 arg);
  * this header (rule 2); `Pl/fn_802693c4.cpp` and `Pl/pl_act.cpp` are the call sites.  The value
  * setters' return is `u32` because `Pl_frame_check`/`Pl_motion_end_ck` pass it straight back to their own
  * callers, which compare it against 1. */
-void fn_800E1640(MHchar* chr, f32 value);
-u32 fn_800E16DC(MHchar* chr, u16 motion, s32 flag);
-u32 fn_800E2198(MHchar* chr, s32 flag);
+void mhchar_motion_speed_set(MHchar* chr, f32 value);
+u32 mhchar_frame_check(MHchar* chr, u16 motion, s32 flag);
+u32 mhchar_motion_end_ck(MHchar* chr, s32 flag);
 void mhchar_mat_blend_set(MHchar* chr, u32 index, f32 value);
 /* 0x800E0A14 - the joint's world position through the model; the same signature `unsplit/sound.h`
  * carries, so a TU that includes both headers sees one declaration, not an overload. */

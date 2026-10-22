@@ -8,7 +8,7 @@
  * FLAGS. `cflags_menu` (configure.py: the lib's `-opt nopeephole`, which makes the old `#pragma peephole off`
  *   redundant).  The Pl tail's functions compile instruction-identical under Wii/1.0 and Wii/1.3; the menu half needs 1.3.
  *   The range keeps `bl`s to its tiny same-file helpers (`GetItemData` from `fn_8029F704`/`item_category_ck`,
- *   `hit_flag_set` from `fn_8029F4C4`): `cflags_main`'s `-inline noauto`.
+ *   `hit_flag_set` from `hit_motion_set`): `cflags_main`'s `-inline noauto`.
  * NAMES. Module and file from the `__FILE__` string `lbl_805CDFC8` = "menu_item.cpp", passed by every
  *   `nw4r::db::Panic` of the range (the dump's `_802a22a4s_menu_item.cpp_805cdfc8`, emitted by 0x802A22A4).  The runtime
  *   dump's real names: `body_set`, `hit_flag_set`, `hit_result_check`, `get_item_data_ptr`, `ItemName`, `ItemExp`,
@@ -1070,7 +1070,7 @@ void body_set(_BODY_W* body, _BODY_DATA* data, u8 kind, u32 work, u8 mode)
 }
 
 /* 0x8029F4C4: flags a hit entry as populated and stores the four values the caller resolved. */
-extern "C" void fn_8029F4C4(_HIT_W* hit, u16 a, u16 b, u16 c, u16 d)
+extern "C" void hit_motion_set(_HIT_W* hit, u16 a, u16 b, u16 c, u16 d)
 {
     hit_flag_set(hit, 0x100);
     hit->field_0x018 = a;

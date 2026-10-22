@@ -68,14 +68,14 @@
 #include "enemy/em_move_mode_set.h" /* em_move_mode_set (rule 2: the owner's header) */
 #include "enemy/em_frame_flag_set.h" /* em_frame_flag_set (rule 2: the owner's header) */
 #include "enemy/em_busy_timer_reset.h" /* em_busy_timer_reset (rule 2: the owner's header) */
-#include "enemy/fn_801321DC.h" /* fn_801321DC (rule 2: the owner's header) */
+#include "enemy/em_flag_0x8AE_ck.h" /* em_flag_0x8AE_ck (rule 2: the owner's header) */
 #include "enemy/em_hit_arm_set.h" /* em_hit_arm_set (rule 2: the owner's header) */
 #include "enemy/em_angle_approach.h" /* em_angle_approach (rule 2: the owner's header) */
 #include "enemy/em_turn_in_window.h" /* em_turn_in_window (rule 2: the owner's header) */
 #include "enemy/em_flags836_ck.h" /* em_flags836_ck (rule 2: the owner's header) */
 #include "enemy/em_camera_req.h" /* em_camera_req (rule 2: the owner's header) */
 #include "enemy/em_shake_req_set.h" /* fn_80136D14 (rule 2: the owner's header) */
-#include "enemy/fn_80129D3C.h" /* fn_80129D3C (rule 2: the owner's header) */
+#include "enemy/em_area_stun_move_ck.h" /* em_area_stun_move_ck (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"
@@ -119,7 +119,7 @@
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define em_alt_mode_ck_c1 ((u32 (*)(_ENEMY_WORK*))em_alt_mode_ck)
 #define fn_8012EC3C_c1 ((u32 (*)(_ENEMY_WORK*))em_eft_active_ck)
-#define fn_80129D3C_c1 ((u32 (*)(EmActWork*))fn_80129D3C)
+#define fn_80129D3C_c1 ((u32 (*)(EmActWork*))em_area_stun_move_ck)
 #define fn_80182D5C_noarg ((void (*)(void))fn_80182D5C)
 #define stage_map_kind_get_view3 ((u8 (*)(u8))stage_map_kind_get)
 #define stage_map_kind_get_view1 ((u8 (*)(u8))stage_map_kind_get)
@@ -128,7 +128,7 @@
 #define fn_80182D5C_view1 ((void (*)(void))fn_80182D5C)
 #define fn_8013A654_view1 ((void (*)(EmUserData*, u32))em_res_user_data_flag_set)
 #define fn_8013918C_view1 ((void (*)(void*, s16))em_res_user_data_dtor)
-#define fn_801321DC_view1 ((u32 (*)(EmActWork*))fn_801321DC)
+#define fn_801321DC_view1 ((u32 (*)(EmActWork*))em_flag_0x8AE_ck)
 #define fn_8012EC3C_view1 ((u32 (*)(EmActWork*))em_eft_active_ck)
 #define fn_8012A204_view1 ((s32 (*)(EmActWork*))em_area_leave_ck)
 #define fn_8012A014_view1 ((u32 (*)(EmActWork*, u32, u32, u16, u32, u8*))em_pack_area_pick)
@@ -774,7 +774,7 @@ extern "C" void fn_80183C44(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -791,7 +791,7 @@ extern "C" void fn_80183CC4(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1419,11 +1419,11 @@ extern "C" void fn_80184CE0(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_turn_seq_step(self, lbl_80570010) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         } else if (self->field_0x482 != 0) {
-            fn_80136D4C(self, lbl_80797EE8);
+            em_height_follow(self, lbl_80797EE8);
         } else {
-            fn_80136D4C(self, lbl_80797EEC);
+            em_height_follow(self, lbl_80797EEC);
         }
         break;
     }
@@ -1456,11 +1456,11 @@ extern "C" void fn_80184C28(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_turn_seq_step(self, lbl_8056FFD0) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         } else if (self->field_0x482 != 0) {
-            fn_80136D4C(self, lbl_80797EE8);
+            em_height_follow(self, lbl_80797EE8);
         } else {
-            fn_80136D4C(self, lbl_80797EEC);
+            em_height_follow(self, lbl_80797EEC);
         }
         break;
     }
@@ -1478,7 +1478,7 @@ extern "C" void fn_801856B8(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1495,7 +1495,7 @@ extern "C" void fn_80185738(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1512,7 +1512,7 @@ extern "C" void fn_801857B8(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1529,7 +1529,7 @@ extern "C" void fn_80185838(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1546,7 +1546,7 @@ extern "C" void fn_801858B8(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1564,7 +1564,7 @@ extern "C" void fn_80185BEC(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1581,7 +1581,7 @@ extern "C" void fn_80185FA0(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1632,7 +1632,7 @@ extern "C" void fn_80185B0C(_ENEMY_WORK* self) {
     case 1:
         em_turn_in_window(self, lbl_80797EB4, lbl_80797ECC, (s32)(self->state_0x007 << 8));
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -1650,7 +1650,7 @@ extern "C" void fn_801850F8(_ENEMY_WORK* self) {
         break;
     }
     case 1:
-        fn_80136D4C(self, lbl_80797EEC);
+        em_height_follow(self, lbl_80797EEC);
 
         if (em_frame_check(self, 1, lbl_80797F00, lbl_80797E88) == 1) {
             f32 blend = lbl_80797EEC * (em_mot_frame_get(self) - lbl_80797EB4);
@@ -1664,7 +1664,7 @@ extern "C" void fn_801850F8(_ENEMY_WORK* self) {
             em_turn_to_target(self, 0x30);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_80128030(self);
+            em_action_finish_swim(self);
         }
         break;
     }
@@ -2841,7 +2841,7 @@ s32 fn_801913FC(_ENEMY_WORK* self, u8 arg1) {
     case 21:
         switch (arg1) {
         case 3:
-            if (fn_801321DC(self) == 1U) {
+            if (em_flag_0x8AE_ck(self) == 1U) {
                 return 1;
             }
             break;

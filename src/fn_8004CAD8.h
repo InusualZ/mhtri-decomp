@@ -72,6 +72,10 @@ s32 calcVecAng2(VEC3* a, VEC3* b);
  * locally in their own sources. */
 void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
+/* 0x80050FB8 / 0x80051114 - the x- and z-axis rotations beside `rotVecY` (`rotVecX__FPQ34nw4r4math4VEC3Ul`,
+ * `rotVecZ__FPQ34nw4r4math4VEC3Ul`); `enemy/em_common.cpp`'s approach step calls them. */
+void rotVecX(nw4r::math::VEC3* v, u32 angle);
+void rotVecZ(nw4r::math::VEC3* v, u32 angle);
 /* 0x80050AA4 / 0x80050B48 - the vector's yaw and pitch (`calcVecAng3__FPQ34nw4r4math4VEC3`,
  * `calcVecAngX__FPQ34nw4r4math4VEC3`): 16-bit angles, masked by their callers (`clrlwi r3,r3,16`). */
 s32 calcVecAng3(nw4r::math::VEC3* v);
@@ -138,7 +142,7 @@ f32 vec3_dot(const f32* a, const f32* b);
  * ef_cylinder 0x800CBD20/0x800CBD3C).  The `(f32, f32)` spelling this symbol used to carry in
  * `ef.h` was the wrong view and made every TU including both headers fail to compile. */
 f32 sqrt_f32(f32 x);
-/* 0x8005024C - the `SinFIdx` wrapper `enemy/fn_80181E24.cpp`'s alpha computation calls: it narrows
+/* 0x8005024C - the `SinFIdx` wrapper `enemy/em015_tev_color_update.cpp`'s alpha computation calls: it narrows
  * its argument to u16 (`clrlwi r3,r3,16`), scales the `anim_tick_angle` result and returns
  * `nw4r::math::SinFIdx`, so the signature is `(u16) -> f32` (settled from the callee's own body,
  * docs/plan.md 6.5 rule 6).  Added with proposal/80181C88. */
@@ -212,7 +216,7 @@ void* vec3_normalize_into(void* dst, const void* src);
 f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
  * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `vec3_add_ps(out, a, b)`
- * is the paired-single add `out = a + b`, `fn_80050028(out, src)` the field-by-field three-float copy,
+ * is the paired-single add `out = a + b`, `vec3_copy(out, src)` the field-by-field three-float copy,
  * `vec3_scale(out, in, s)` the scale (`VEC3_ctor` then `vec3_scale_by`; in its leaf header), and `vec3_scale_in_place` the
  * in-place scale.  Added with `Pl/fn_8028F66C.cpp`, the first consumer to need them here.  The
  * parameter spellings are the ones the consumers that already include this header declare
@@ -220,7 +224,7 @@ f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
  * value is ignored at every call site in the tree, so it is declared `void` - a `VEC3*` return here
  * would be a second overload and `(10505) illegal overloading`. */
 void vec3_add_ps(VEC3* out, VEC3* a, VEC3* b);
-void fn_80050028(VEC3* out, const VEC3* src);
+void vec3_copy(VEC3* out, const VEC3* src);
 void vec3_scale_in_place(VEC3* v, f32 scale);
 /* 0x80053960 / 0x80054178 - the two draw-shape helpers the cockpit band (`menu/fn_802E4978.cpp`,
  * 0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses; the signatures are that

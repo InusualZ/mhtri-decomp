@@ -48,7 +48,7 @@
 #include "enemy/em_mot_end_ck.h" /* em_mot_end_ck (rule 2: the owner's header) */
 #include "enemy/em_action_finish.h" /* em_action_finish (rule 2: the owner's header) */
 #include "enemy/em_hit_by_set.h" /* fn_8012CEB4 (rule 2: the owner's header) */
-#include "enemy/fn_80132184.h" /* fn_80132184 (rule 2: the owner's header) */
+#include "enemy/em_flag_0x8AC_ck.h" /* em_flag_0x8AC_ck (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
@@ -142,7 +142,7 @@ u8 stage_map_kind_get(u8 map);
 void assignVec3(void* out, void* in);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void capsule_box_from_points(void* a, void* b, void* c, f32 d);
-void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
+void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 vec3_distance(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
 void eft_shape_init(void* out);
@@ -303,7 +303,7 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
             vec_to_mh_vec3(&a, (Vec*)list->vec_0x04);
             vec_to_mh_vec3(&b, (Vec*)list->vec_0x10);
             addVec3(&delta, &a, &b);
-            fn_800AD9C0(&point, &delta, lbl_80798C6C);
+            vec3_div(&point, &delta, lbl_80798C6C);
             copyVec3(&mid, &point);
         } else {
             vec_to_mh_vec3(&a, (Vec*)list->vec_0x04);
@@ -1711,7 +1711,7 @@ extern "C" void fn_801B6FB0(void) {
 
 /* 0x801B701C (0x4).  The tail-call slot the neighbouring unit's table keeps. */
 extern "C" u32 em034_eft_ck(_ENEMY_WORK* self) {
-    return fn_80132184();
+    return em_flag_0x8AC_ck();
 }
 
 /* The unit's `.bss` (0x806A7AA0-0x806A7AB8): the two-vector record its static constructor `fn_801B6FB0` builds

@@ -69,7 +69,7 @@ struct EmSaveRec {
     /* +0x04 */ u32 value;
 };
 
-/* size: 0x08 - an approximation: the record `fn_80130DF8` reports, of which this range reads +0x05
+/* size: 0x08 - an approximation: the record `em_niku_search` reports, of which this range reads +0x05
  * and +0x06 only. */
 struct EmRunRec {
     /* +0x00 */ u8 unused_0x00[0x05];
@@ -263,14 +263,14 @@ u32 fn_8013F764(EmWork* self, u8* in);
 u32 fn_8013C254(EmWork* self);
 
 /* the rest of the enemy band */
-u32 fn_80130134(EmWork* self, u32 value);
-void fn_8012A254(EmWork* self, u32 index);
+u32 em_in_water_ck(EmWork* self, u32 value);
+void em_area_decide(EmWork* self, u32 index);
 void em_reaction_req(EmWork* self, u32 a, u32 b, u8 c);
 void em_target_pos_set(EmWork* self, s32 mode);
 u32 em_eft_active_ck(EmWork* self);
 u8 fn_801408B4(EmWork* self);
 void fn_801409C8(EmWork* self);
-u8* fn_80130DF8(EmWork* self);
+u8* em_niku_search(EmWork* self);
 u32 em_status_set(EmWork* self, u32 kind);
 void em_state_refresh(EmWork* self);
 void fn_80140AF8(EmWork* self, u32 a, u8 b);
@@ -314,7 +314,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
         return 0;
     }
 
-    if ((u8)fn_8013A900(EM_ENEMY_WORK(self)) != 0xc && fn_8013A884(EM_ENEMY_WORK(self), 0xc) == 1 && fn_80130134(self, 0) == 1) {
+    if ((u8)em_userdata_state_kind_get(EM_ENEMY_WORK(self)) != 0xc && fn_8013A884(EM_ENEMY_WORK(self), 0xc) == 1 && em_in_water_ck(self, 0) == 1) {
         fn_8013AB74(EM_ENEMY_WORK(self), 0xc, 0);
     }
 
@@ -366,7 +366,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
             } else if (self->field_0x89F == 3 && fn_8013A884(EM_ENEMY_WORK(self), 9) == 1) {
                 fn_8013AB74(EM_ENEMY_WORK(self), 9, 0);
             } else if (seeded == 0) {
-                fn_8012A254(self, (u16)roll);
+                em_area_decide(self, (u16)roll);
                 roll = em_userdata_roll(EM_ENEMY_WORK(self), (u16)roll);
                 seeded = 1;
             }
@@ -841,7 +841,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
                     if (niku_enemy_serial_matches(niku_find(self->field_0x381, self->field_0x382), (struct _ENEMY_WORK*)self) == 1) {
                         fn_8013AB74(EM_ENEMY_WORK(self), self->field_0x95C, 1);
                     } else {
-                        EmRunRec* run = (EmRunRec*)fn_80130DF8(self);
+                        EmRunRec* run = (EmRunRec*)em_niku_search(self);
 
                         if (run != NULL) {
                             fn_8013AB74(EM_ENEMY_WORK(self), 0xa, 0);

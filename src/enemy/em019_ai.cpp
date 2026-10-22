@@ -1074,7 +1074,7 @@ void em019_approach_dispatch(_ENEMY_WORK* self)
  * frame), then finishes standing. */
 void em019_act6_stand(_ENEMY_WORK* self, u8 kind)
 {
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     em019_action_run_flag_set(self);
     switch (self->state) {
     case 0:
@@ -1176,7 +1176,7 @@ void em019_act6_sub2(_ENEMY_WORK* self)
 /* Action 6's slide: motion 89 toward the target, then finishes standing. */
 void em019_act6_slide(_ENEMY_WORK* self, u8 kind)
 {
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     em019_action_run_flag_set(self);
     switch (self->state) {
     case 0:
@@ -1211,7 +1211,7 @@ void em019_act6_slide(_ENEMY_WORK* self, u8 kind)
 /* Action 6's turn: the turn sequence (kind 1 shakes the camera), then finishes standing. */
 void em019_act6_turn(_ENEMY_WORK* self, u8 kind)
 {
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     em019_action_run_flag_set(self);
     switch (self->state) {
     case 0:
@@ -1984,7 +1984,7 @@ void em019_act7_dive(_ENEMY_WORK* self)
             self->state++;
             get_joint_wpos_em(self, self->joint_0x204, &joint);
             self->pos.y = joint.y;
-            self->fall_speed_0x1A4 = 0.0f;
+            self->move_0x1A0.y = 0.0f;
             self->field_0x1AC = 0.0f;
             em_mot_set(self, 214, 0, 0);
             em_move_vec2_clr(self);
@@ -3078,9 +3078,9 @@ extern "C" void em_act_prog_2(_ENEMY_WORK* self) {
 }
 
 /* Program channel 3: phase 0 arms motion 4 and the `em019_turn_tbl` sequence, phase 1 polls it and lands
- * +0x1E4 on part 13/4 (`fn_80131E00` runs every frame). */
+ * +0x1E4 on part 13/4 (`em_fx_flag2_set` runs every frame). */
 extern "C" void em_act_prog_3(_ENEMY_WORK* self) {
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3100,7 +3100,7 @@ extern "C" void em_act_prog_3(_ENEMY_WORK* self) {
 /* Program channel 4: phase 0 arms motion 89 and the `em019_turn_tbl` table, phase 1 waits 256 frames and
  * lands +0x1E4 on part 13/5. */
 extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
-    fn_80131E00(self);
+    em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3136,13 +3136,13 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
         em_shake_req_set(self);
         em_hit_window_set(self, 0, 32, 8);
         em_hit_window_set(self, 1, 31, 24);
-        fn_80131E00(self);
+        em_fx_flag2_set(self);
         break;
     case 1:
         if (em_frame_check(self, 2, 90.0f, 0.0f) == 1)
             em_shake_req_set(self);
         if (em_frame_check(self, 2, 200.0f, 0.0f) == 1)
-            fn_80131E00(self);
+            em_fx_flag2_set(self);
         if (em_frame_check(self, 0, 220.0f, 0.0f) == 1) {
             nw4r::math::VEC3 off;
 

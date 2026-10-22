@@ -31,7 +31,7 @@ void em_act_step_arm(struct _ENEMY_WORK* work, u8 a, u8 b, u32 c);
 void em_act_advance(struct _ENEMY_WORK* work, u8 mode);
 /* 0x80129674 - registers the hit record `hit` (a shell's embedded record) with the enemy `self`. */
 void em_hit_buff_apply(struct _ENEMY_WORK* self, struct _HIT_W* hit);
-void fn_801252DC(struct _ENEMY_WORK* work);
+void em_owner_slot_update(struct _ENEMY_WORK* work);
 s32 fn_80126098(struct _ENEMY_WORK* work);
 s32 fn_801260BC(struct _ENEMY_WORK* work);
 s32 fn_801260E0(struct _ENEMY_WORK* work);
@@ -39,7 +39,7 @@ s32 fn_80126104(struct _ENEMY_WORK* work);
 /* 0x80126278 - three arguments, from the call sites (`enemy/em018_prog.cpp`'s `fn_8019D9BC` sets all three):
  * r3 the `_ENEMY_WORK`, r4 the 16-bit id, r5 the `VEC3*` fill target. */
 void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
-void (*fn_801264BC(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);
+void (*em_hook_get(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);
 u16 em_hit_mask_get(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
@@ -64,13 +64,13 @@ void em_action_finish_walk(struct _ENEMY_WORK* self);
 void em_act_set_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_act_arm_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 fn_80128204(struct _ENEMY_WORK* work);
-void fn_80128308(struct _ENEMY_WORK* work);
+void em_delay_act_tick(struct _ENEMY_WORK* work);
 void em_target_pos_set(struct _ENEMY_WORK* work, VEC3* pos);
-void fn_8012987C(struct _ENEMY_WORK* work);
-void fn_8012A3B4(struct _ENEMY_WORK* work);
+void em_timers_update(struct _ENEMY_WORK* work);
+void em_ground_probe(struct _ENEMY_WORK* work);
 void fn_8012A414(struct _ENEMY_WORK* work);
 void em_area_change(struct _ENEMY_WORK* work, s32 arg1);
-void fn_8012B64C(struct _ENEMY_WORK* work);
+void em_hate_update(struct _ENEMY_WORK* work);
 
 /* 0x801251D0 - two views of one body, which forwards r3/r4/r5 to 0x80124C5C: the C consumers pass the table in r3
  * (`enemy/em001_prog.cpp`), the C++ ones (`enemy/fn_802F5138.cpp`) the work record, table, selector and id. */
@@ -84,7 +84,7 @@ u8 em_area_break_ck(struct _ENEMY_WORK* self);
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 u32 em_area_leave_ck(struct _ENEMY_WORK* self);
 void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80128B80(struct _ENEMY_WORK* self);
+void em_combat_reset(struct _ENEMY_WORK* self);
 
 /* 0x801251D8 - narrows r5 and tail-calls 0x80124C5C: C keeps the three-argument form `enemy/em001_prog.cpp` uses
  * (the table first), C++ the four-argument one `enemy/em003_prog.cpp` uses (`self`, table, selector, value). */
@@ -94,7 +94,7 @@ void em_se_tbl_play_alt(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
 void em_se_tbl_play_alt(u32 a, u32 b, u32 c);
 #endif
 /* 0x80128030 - r3 `self` only; the action band's completion hook. */
-void fn_80128030(struct _ENEMY_WORK* self);
+void em_action_finish_swim(struct _ENEMY_WORK* self);
 /* 0x80129724 - r3 (`self`) and one scalar argument (every call site sets r4). */
 void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 /* 0x80127CC4 - installs the enemy data's default hit-part record for slot `slot`. */
@@ -104,7 +104,7 @@ void em_part_rec_alt_set(struct _ENEMY_WORK* self, u32 slot, u32 sel);
 
 /* 0x80129744 - r3 `self` only; the action band's release hook (`enemy/em009_act.cpp`'s `fn_80389E1C` calls it when
  * its sub-state count reaches 4). */
-void fn_80129744(struct _ENEMY_WORK* self);
+void em_hit_window_clear_all(struct _ENEMY_WORK* self);
 void em_owner_slot_set(struct _ENEMY_WORK* self, u8 a);
 void fn_8012554C(struct _ENEMY_WORK* self);
 u8 fn_80125F88(u32 idx);
@@ -112,14 +112,14 @@ u32 enemy_kind_same_ck(u32 a, u32 b);
 u32 fn_80125FF0(u32 a, u32 b);
 /* 0x8012A9E8 - r3 the `_ENEMY_WORK`, r4/r5/r6 three byte pointers the effect spawner (`ef/eft_slot.cpp`) hands
  * over. */
-void fn_8012A9E8(struct _ENEMY_WORK* self, u8* a, u8* b, u8* c);
+void em_target_select(struct _ENEMY_WORK* self, u8* a, u8* b, u8* c);
 u8* fn_80126044(struct _ENEMY_WORK* self);
 void* fn_80126704(struct _ENEMY_WORK* self);
 void fn_80126898(struct _ENEMY_WORK* self);
 void em_action_finish_stand(struct _ENEMY_WORK* self);
 /* 0x80128030 - one `self` argument, no return; the state machines of `enemy/em015_prog.cpp`, `enemy/em016_prog.cpp`,
  * `enemy/em018_prog.cpp` and `enemy/em020_prog.cpp` call it after `em_mot_end_ck` reports done. */
-void fn_80128030(struct _ENEMY_WORK* self);
+void em_action_finish_swim(struct _ENEMY_WORK* self);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80128AEC - r3 the work record, r4/r5 two scalars it hands to the 0x80128A3C slot helper (`enemy/em025_prog.cpp`'s
  * `fn_801A9724` asks the area table for action 13's slot through it). */
@@ -129,11 +129,11 @@ void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80126454 - `get_enemy_data(self)->extra->table_0x1C` indexed by `self->field_0x38a` in
  * 0x10-byte steps; the caller (`enemy/em008_prog.cpp`'s `fn_8015EFAC`) reads the f32 at +0x4. */
-f32* fn_80126454(struct _ENEMY_WORK* self);
+f32* em_sight2_get(struct _ENEMY_WORK* self);
 void fn_80129864(struct _ENEMY_WORK* self);
 void fn_80129984(struct _ENEMY_WORK* self);
 u32 fn_8012B5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
-void fn_8012B604(void);
+void em_target_refresh(void);
 
 /* 0x80125F54 - r3 is the caller's `EmSelRec`; the body zeroes its +0x08 vector (`VEC3_ctor(out + 8)`) and returns
  * the same pointer. */

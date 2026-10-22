@@ -722,7 +722,7 @@ extern "C" void fn_800AD514(void* a, void* b, f32 f) {
 }
 
 /* The reciprocal-rate wrapper: `out = in * (1 / f)`. */
-extern "C" void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f) {
+extern "C" void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f) {
     vec3_scale(out, in, 1.0f / f);
 }
 
@@ -883,7 +883,7 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
             if (ptcl->age == 0) {
                 copyVec3(&base, velocity);
             } else {
-                fn_800AD9C0(&prev, (nw4r::math::VEC3*)prevVelocity, ptcl->accelScale);
+                vec3_div(&prev, (nw4r::math::VEC3*)prevVelocity, ptcl->accelScale);
                 copyVec3(&base, &prev);
             }
             break;

@@ -137,7 +137,7 @@ extern "C" s32 fn_800E0DD8(MHchar* self)
 }
 
 /* Whether the model's +0x4C flag set intersects `mask`. */
-extern "C" u32 fn_800E1958(MHchar* self, u32 mask)
+extern "C" u32 mhchar_motion_flag_ck(MHchar* self, u32 mask)
 {
     return (self->field_0x4C & mask) != 0;
 }

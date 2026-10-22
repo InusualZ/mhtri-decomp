@@ -192,7 +192,7 @@ extern "C" void fn_802F5C58(_ENEMY_WORK* work) {
         break;
     case 1:
         if (em_mot_end_ck(work) == 1) {
-            fn_80128030(work);
+            em_action_finish_swim(work);
         }
         break;
     }
@@ -301,7 +301,7 @@ extern "C" void fn_802F87B8(_ENEMY_WORK* work) {
         }
         break;
     default:
-        fn_80128030(work);
+        em_action_finish_swim(work);
         break;
     }
 }
@@ -381,7 +381,7 @@ extern "C" s32 fn_802F8B68(_ENEMY_WORK* work) {
 extern "C" void fn_802F929C(_ENEMY_WORK* work) {
     em_move_mode_set(work, 2);
     em_mot_set(work, 10, 0, 0);
-    fn_80128030(work);
+    em_action_finish_swim(work);
 }
 
 /* Sub-state dispatcher of the band's own "place" action. */
@@ -433,7 +433,7 @@ extern "C" void fn_802F943C(_ENEMY_WORK* work) {
         break;
     case 1:
         if (em_mot_end_ck(work) == 1) {
-            fn_80128030(work);
+            em_action_finish_swim(work);
         }
         break;
     }
@@ -469,7 +469,7 @@ extern "C" void fn_802F95C8(_ENEMY_WORK* work) {
         break;
     case 1:
         if (em_mot_end_ck(work) == 1) {
-            fn_80128030(work);
+            em_action_finish_swim(work);
         }
         break;
     }
@@ -618,7 +618,7 @@ extern "C" void fn_802F621C(_ENEMY_WORK* work) {
         break;
     case 1:
         if (em_turn_seq_step(work, lbl_80570740) == 1) {
-            fn_80128030(work);
+            em_action_finish_swim(work);
         }
         break;
     }
@@ -634,7 +634,7 @@ extern "C" void fn_802F62A8(_ENEMY_WORK* work) {
         break;
     case 1:
         if (em_turn_seq_step(work, lbl_80570780) == 1) {
-            fn_80128030(work);
+            em_action_finish_swim(work);
         }
         break;
     }

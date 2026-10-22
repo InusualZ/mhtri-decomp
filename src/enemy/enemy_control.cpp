@@ -20,7 +20,7 @@
  *  - `fn_801413D0`: ours loads the +0x1 byte ahead of the first check;
  *  - `fn_801417FC`, `fn_80141A4C`: retail sign-extends the halfword with `extsh` after the load, ours loads it with
  *    `lha` (and `fn_801417FC` sets up its arguments in a different order);
- *  - `fn_80143BF8`: ours narrows the `(b - 1) == 0` result with an extra `clrlwi`; `em_kind_slot_find`: register allocation.
+ *  - `emc_host_ck`: ours narrows the `(b - 1) == 0` result with an extra `clrlwi`; `em_kind_slot_find`: register allocation.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.sbss`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the
  *   claim; `ckResourceName` is referenced unmangled where the map spells `ckResourceName__FPc`.
  * SHAPES. `#pragma peephole off` over the bodies (retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs).
@@ -440,7 +440,7 @@ void* em_vec3_copy(void* dst, void* src, s32 arg2) {
 }
 
 /* whether the em001 control byte at +0x36B is 1. */
-u8 fn_80143BF8(void) {
+u8 emc_host_ck(void) {
     return emc_work.field_0x36B == 1;
 }
 
@@ -450,7 +450,7 @@ void fn_80147ABC(void) {
 }
 
 /* the em001 control block's transition word (`s16` at +0x368; `fn_8014128C` sets it to -1). */
-s16 fn_801444FC(void) {
+s16 emc_delay_frames_get(void) {
     return emc_work.field_0x368;
 }
 

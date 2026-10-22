@@ -1,5 +1,5 @@
 /*
- * `Pl/pl_coll.cpp`'s collision records and outbound declarations.  `fn_8012A624`/`fn_8012A8F8` belong to
+ * `Pl/pl_coll.cpp`'s collision records and outbound declarations.  `em_land_data_init`/`em_pl_box_init` belong to
  * `enemy/em_common.cpp`, whose header does not declare them, so the shapes here are this unit's call sites.
  */
 #ifndef MHTRI_PL_FN_8028F66C_H
@@ -16,7 +16,7 @@ extern "C" {
 /* One 0x14-byte land/hit record: the six scalar fields the hit queries carry plus the hit position
  * at +0x08.  Evidence: `fn_802977E4` - the record's own initialiser at 0x802977E4 - writes exactly
  * this shape (`sth` +0x00, `stb` +0x02, `stb` +0x03, `sth` +0x04, `stb` +0x06, `stb` +0x07, then
- * `setVector3(+0x08, ...)`), and `fn_8012A624` constructs only the +0x08 vector.  The scalar fields
+ * `setVector3(+0x08, ...)`), and `em_land_data_init` constructs only the +0x08 vector.  The scalar fields
  * keep offsets until a reader names them (rule 5's accepted fallback, as in `pl.h`).
  * size: 0x14 */
 struct LandData {
@@ -36,10 +36,10 @@ struct LandData {
 s32 pl_coll_sweep_ck(nw4r::math::VEC3* from, nw4r::math::VEC3* to, f32 radius, u32 flags, u32 arg, u8 area, u16 mask);
 
 /* 0x8012A624 - the `LandData` constructor: constructs the +0x08 vector. */
-void fn_8012A624(LandData* land);
+void em_land_data_init(LandData* land);
 
 /* 0x8012A8F8 - the `PlBox` constructor: zeroes (constructs) all three of its vectors. */
-void fn_8012A8F8(PlBox* box);
+void em_pl_box_init(PlBox* box);
 
 /* 0x802977E4 - resets a `LandData` to its default record (all six scalars zero, +0x08 a constant vector). */
 void fn_802977E4(LandData* land);

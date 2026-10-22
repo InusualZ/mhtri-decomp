@@ -38,22 +38,22 @@
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
 #include "enemy/emc_work.h" /* emc_work (rule 2: the owner's header) */
-#include "enemy/fn_80131BD4.h" /* fn_80131BD4 (rule 2: the owner's header) */
+#include "enemy/em_any_player_seen_ck.h" /* em_any_player_seen_ck (rule 2: the owner's header) */
 #include "enemy/fn_80125FF0.h" /* fn_80125FF0 (rule 2: the owner's header) */
 #include "enemy/em_act_step_arm.h" /* em_act_step_arm (rule 2: the owner's header) */
 #include "enemy/em_data_point_get.h" /* em_data_point_get (rule 2: the owner's header) */
 #include "enemy/em_reaction_req.h" /* em_reaction_req (rule 2: the owner's header) */
 #include "enemy/em_target_pos_set.h" /* em_target_pos_set (rule 2: the owner's header) */
-#include "enemy/fn_80126DAC.h" /* fn_80126DAC (rule 2: the owner's header) */
-#include "enemy/fn_80126F80.h" /* fn_80126F80 (rule 2: the owner's header) */
-#include "enemy/fn_801272C4.h" /* fn_801272C4 (rule 2: the owner's header) */
-#include "enemy/fn_801275F0.h" /* fn_801275F0 (rule 2: the owner's header) */
-#include "enemy/fn_80127A7C.h" /* fn_80127A7C (rule 2: the owner's header) */
+#include "enemy/em_area_next.h" /* em_area_next (rule 2: the owner's header) */
+#include "enemy/em_area_allowed_ck.h" /* em_area_allowed_ck (rule 2: the owner's header) */
+#include "enemy/em_special_part_nearest.h" /* em_special_part_nearest (rule 2: the owner's header) */
+#include "enemy/em_patrol_nearest_get.h" /* em_patrol_nearest_get (rule 2: the owner's header) */
+#include "enemy/em_patrol_prev_closer_ck.h" /* em_patrol_prev_closer_ck (rule 2: the owner's header) */
 #include "enemy/em_area_change.h" /* em_area_change (rule 2: the owner's header) */
-#include "enemy/fn_801262BC.h" /* fn_801262BC (rule 2: the owner's header) */
+#include "enemy/em_route_entry_get.h" /* em_route_entry_get (rule 2: the owner's header) */
 #include "enemy/em_break_state_ck.h" /* em_break_state_ck (rule 2: the owner's header) */
 #include "enemy/fn_80137704.h" /* fn_80137704 (rule 2: the owner's header) */
-#include "enemy/fn_801358D0.h" /* fn_801358D0 (rule 2: the owner's header) */
+#include "enemy/em_hook9_call.h" /* em_hook9_call (rule 2: the owner's header) */
 #include "enemy/em_motion_mode_set.h" /* em_motion_mode_set (rule 2: the owner's header) */
 #include "enemy/fn_80126494.h" /* fn_80126494 (rule 2: the owner's header) */
 #include "sound/snd_bank_loader.h" /* snd_bank_loader (rule 2: the owner's header) */
@@ -87,7 +87,7 @@
 /* the call sites use the argument-less view: a cast call is the same direct call. */
 #define em_mot_finished_ck_c1 ((u32 (*)(void))em_mot_finished_ck)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
-#define fn_80131BD4_c1 ((u32 (*)(void))fn_80131BD4)
+#define fn_80131BD4_c1 ((u32 (*)(void))em_any_player_seen_ck)
 #define fn_80125FF0_c1 ((u32 (*)(u8, u8))fn_80125FF0)
 #define fn_80137704_c1 ((u32 (*)(_ENEMY_WORK*, u32))fn_80137704)
 #define em_motion_mode_set_c1 ((void (*)(_ENEMY_WORK*, u32))em_motion_mode_set)
@@ -103,9 +103,9 @@
 #define fn_801406E0_view1 ((u32 (*)(u32, u32))fn_801406E0)
 #define fn_8013C36C_view1 ((void (*)(_ENEMY_WORK*, u8, u8*))fn_8013C36C)
 #define fn_8013BDE4_view1 ((void (*)(u8**, u8, s16*))fn_8013BDE4)
-#define fn_801321B0_view1 ((u32 (*)(_ENEMY_WORK*))fn_801321B0)
+#define fn_801321B0_view1 ((u32 (*)(_ENEMY_WORK*))em_flag_0x8AD_ck)
 #define fn_80130CDC_view1 ((void (*)(_ENEMY_WORK*, s32))em_stamina_add)
-#define fn_80130858_view1 ((void (*)(_ENEMY_WORK*, s32))fn_80130858)
+#define fn_80130858_view1 ((void (*)(_ENEMY_WORK*, s32))em_anger_add)
 #define fn_8013023C_view1 ((u32 (*)(_ENEMY_WORK*))em_phase_get)
 #define fn_8012B380_view1 ((void (*)(_ENEMY_WORK*, u32, u32, u8))em_reaction_req)
 #define calcVecDistXZ_view1 ((f32 (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))calcVecDistXZ)
@@ -219,7 +219,7 @@ extern f32 stg_area_ceiling_get(u32 idx);
 }
 
 
-/* A neighbouring record `fn_80130DF8` returns; only the two bytes this unit reads are named. */
+/* A neighbouring record `em_niku_search` returns; only the two bytes this unit reads are named. */
 /* size: 0x8 (lower bound: the unit reads +0x05 and +0x06) */
 typedef struct _ENEMY_OTHER {
     /* +0x000 */ u8 pad_0x00[0x5];
@@ -273,7 +273,7 @@ struct EmcWork {
     /* +0x14 */ u8 unused_0x14[4];
 }; /* size: 0x18 */
 
-/* the record `fn_801262BC` hands `fn_8013F764` */
+/* the record `em_route_entry_get` hands `fn_8013F764` */
 struct EmActionInfo {
     /* +0x00 */ u8 field_0x00;
     /* +0x01 */ u8 unused_0x01[3];
@@ -1000,7 +1000,7 @@ s16 fn_8013ECA4(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (fn_80132184() == 0) {
+        if (em_flag_0x8AC_ck() == 0) {
             in += (u8)fn_801406E0_view1(66, in[0]);
             fn_8013BDE4(&in, 66, &result);
         }
@@ -1166,7 +1166,7 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
         if (self->field_0x9F8 == 253) {
             self->field_0x9F8 = self->field_0x1FF;
         }
-        self->field_0x9F7 = fn_80126DAC(self, self->area_no, self->field_0x9F8);
+        self->field_0x9F7 = em_area_next(self, self->area_no, self->field_0x9F8);
         break;
     case 2: {
         u8 preset = in[1];
@@ -1175,15 +1175,15 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
         if (preset == 253) {
             preset = self->field_0x1FF;
         }
-        current = fn_80126DAC(self, self->area_no, preset);
+        current = em_area_next(self, self->area_no, preset);
         self->field_0x9F7 = current;
         self->field_0x9F8 = preset;
         while ((u8)current != preset) {
-            if (fn_80126F80(self, self->field_0x1E0, (u8)current) == 1) {
+            if (em_area_allowed_ck(self, self->field_0x1E0, (u8)current) == 1) {
                 self->field_0x9F8 = current;
                 break;
             }
-            current = fn_80126DAC(self, (u8)current, preset);
+            current = em_area_next(self, (u8)current, preset);
         }
         break;
     }
@@ -1195,16 +1195,16 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
         if (entry != 0) {
             id = eft_slot_effect_key((struct EftSlot *)entry);
             self->field_0x9F8 = id;
-            self->field_0x9F7 = fn_80126DAC(self, self->area_no, (u8)id);
+            self->field_0x9F7 = em_area_next(self, self->area_no, (u8)id);
         } else {
-            id = fn_801272C4(self, &self->pos, self->area_no);
+            id = em_special_part_nearest(self, &self->pos, self->area_no);
             self->field_0x9F7 = id;
             self->field_0x9F8 = id;
         }
         break;
     }
     case 3: {
-        u32 id = fn_801272C4(self, &self->pos, self->area_no);
+        u32 id = em_special_part_nearest(self, &self->pos, self->area_no);
 
         self->field_0x9F7 = id;
         self->field_0x9F8 = id;
@@ -1576,8 +1576,8 @@ void fn_8013CDB4(_ENEMY_WORK *self, u8 *in) {
             self->field_0x383 |= 0x80;
         }
     }
-    piece = fn_801275F0(self, 1);
-    if ((u8)fn_80127A7C(self, (u8)piece) == 0) {
+    piece = em_patrol_nearest_get(self, 1);
+    if ((u8)em_patrol_prev_closer_ck(self, (u8)piece) == 0) {
         em_reaction_req(self, 10, 1, (u8)piece);
     } else {
         em_reaction_req(self, 10, 2, (u8)piece);
@@ -1664,7 +1664,7 @@ s16 fn_8013E7C0(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0: {
-        _ENEMY_OTHER *other = (_ENEMY_OTHER *)fn_80130DF8();
+        _ENEMY_OTHER *other = (_ENEMY_OTHER *)em_niku_search();
 
         if (other != 0) {
             if (fn_8013A884(self, 10) == 1) {
@@ -1713,7 +1713,7 @@ u8 fn_8013F764(_ENEMY_WORK* self, u8* in) {
             entry = &prog->entries_0x04[self->field_0x9FC];
         }
         if (self->field_0x9FE == 0) {
-            EmActionInfo* info = (EmActionInfo*)(void*)fn_801262BC(self, entry->code);
+            EmActionInfo* info = (EmActionInfo*)(void*)em_route_entry_get(self, entry->code);
             self->field_0x383 = 1;
             self->field_0x384 = info->value_0x04;
             fn_8012B380_view1(self, 5, 8, info->field_0x00);
@@ -2182,7 +2182,7 @@ void fn_80140648(_ENEMY_WORK* self, u8* in) {                   /* 0x6A, two-arg
 
 void fn_80140670(_ENEMY_WORK* self, u8* in) {                   /* 0x6C, two-argument */
     if (in[0] == 0) {
-        fn_8013BE60(self, in, 0x6C, 0, (s16)(u8)fn_801358D0(self, in[1]));
+        fn_8013BE60(self, in, 0x6C, 0, (s16)(u8)em_hook9_call(self, in[1]));
     } else {
         fn_8013C244(self, in, 0x6C);
     }

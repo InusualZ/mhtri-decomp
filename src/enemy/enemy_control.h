@@ -87,6 +87,12 @@ struct EmcWork {
     /* +0xF4C */ u32 field_0xF4C;
 };
 
+#ifdef __cplusplus
+/* The enemy-control work blob (0x806A4590), defined by `enemy/enemy_control.cpp`; `enemy/em_common.cpp`'s sight test
+ * reads its sparkle and smoke arrays. */
+extern EmcWork emc_work;
+#endif
+
 #include "types.h"
 
 struct _ENEMY_WORK;
@@ -145,7 +151,7 @@ void em_spawn_request(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 
 u32 em_area_entry_make(u8* area, u8 kind, u8 index);
 
 /* 0x80143BF8 - no arguments; returns a word the effect band's slot scan (`ef/eft_slot.cpp`) compares with 1. */
-u8 fn_80143BF8(void);
+u8 emc_host_ck(void);
 
 #ifdef __cplusplus
 }

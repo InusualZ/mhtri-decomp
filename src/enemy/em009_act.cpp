@@ -1254,7 +1254,7 @@ extern "C" void fn_80389E1C(_ENEMY_WORK* self, u8 a)
         if (self->state_0x006 >= 4) {
             self->state++;
             em_mot_set(self, 0x14, 4, 0);
-            fn_80129744(self);
+            em_hit_window_clear_all(self);
         }
         return;
     case 3:

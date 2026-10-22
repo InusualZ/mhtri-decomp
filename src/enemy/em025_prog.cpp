@@ -1520,7 +1520,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_807987B8);
             eft_em_spawn_param(self, 0x9F, 0x19, &v14, lbl_80798528, 0);
             setVector3(&v2C, lbl_80798538, lbl_80798538, lbl_80798538);
-            fn_802BE638(self, 9, &v2C);
+            camera_enemy_focus_pos_set(self, 9, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_807987C8, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_80798538);
@@ -1628,23 +1628,23 @@ void fn_801A4504(_ENEMY_WORK* self) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_807987B8);
             eft_em_spawn(self, 0x8A, 0x14, &v14, lbl_80798528);
             setVector3(&v2C, lbl_80798538, lbl_80798538, lbl_807985EC);
-            fn_802BE638(self, 2, &v2C);
+            camera_enemy_focus_pos_set(self, 2, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_807987F4, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_807986D0);
             eft_em_spawn(self, 0xA2, 0x14, &v14, lbl_80798528);
             setVector3(&v2C, lbl_80798538, lbl_80798538, lbl_807985EC);
-            fn_802BE638(self, 4, &v2C);
+            camera_enemy_focus_pos_set(self, 4, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_807987F8, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_80798680);
             eft_em_spawn(self, 0x8A, 0x14, &v14, lbl_80798528);
             setVector3(&v2C, lbl_80798538, lbl_80798538, lbl_807985EC);
-            fn_802BE638(self, 9, &v2C);
+            camera_enemy_focus_pos_set(self, 9, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_807987D4, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798538, lbl_80798538, lbl_807985EC);
-            fn_802BE638(self, 9, &v2C);
+            camera_enemy_focus_pos_set(self, 9, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_80798654, lbl_80798538) == 1U) {
             em_camera_req(self, -1, 0xC6);
@@ -1784,7 +1784,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
             setVector3(&v14, lbl_80798778, lbl_80798538, lbl_80798734);
             eft_em_spawn_param(self, 0x9E, 4, &v14, lbl_80798528, 0x471C);
             setVector3(&v2C, lbl_80798538, lbl_80798538, lbl_80798538);
-            fn_802BE638(self, 6, &v2C);
+            camera_enemy_focus_pos_set(self, 6, &v2C);
         }
         if ((em_after_frame_check(self, 3, lbl_807986A8, lbl_80798690) == 0) && ((s32) (system_w.field_0x0c % 9) == 0)) {
             eft_spawn_type_at_area(self, 8);
@@ -1872,7 +1872,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
         }
         if (em_after_frame_check(self, 0, lbl_80798830, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798600, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 0x46, &v2C);
+            camera_enemy_focus_pos_set(self, 0x46, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_80798690, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_80798538);
@@ -1888,17 +1888,17 @@ void fn_801A4504(_ENEMY_WORK* self) {
         }
         if (em_after_frame_check(self, 0, lbl_80798838, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798714, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 0x45, &v2C);
+            camera_enemy_focus_pos_set(self, 0x45, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_8079883C, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798714, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 0x46, &v2C);
+            camera_enemy_focus_pos_set(self, 0x46, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_80798548, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_807986B0, lbl_80798538, lbl_807987E8);
             eft_em_spawn(self, 0x8A, 0x25, &v14, lbl_80798528);
             setVector3(&v2C, lbl_80798714, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 0x46, &v2C);
+            camera_enemy_focus_pos_set(self, 0x46, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_8079878C, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_80798538);
@@ -1959,7 +1959,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
         }
         if (em_after_frame_check(self, 0, lbl_80798644, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798538, lbl_80798538, lbl_80798538);
-            fn_802BE638(self, 9, &v2C);
+            camera_enemy_focus_pos_set(self, 9, &v2C);
         }
         break;
     case 0x13:
@@ -1972,7 +1972,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                     eft_em_spawn(self, 0x7E, 0x14, &v14, lbl_80798528);
                     fn_8019E960(self, 0);
                     setVector3(&v2C, lbl_807985EC, lbl_80798538, lbl_80798538);
-                    fn_802BE638(self, 5, &v2C);
+                    camera_enemy_focus_pos_set(self, 5, &v2C);
                 }
             }
             if (fn_8019E9AC(self, 3) == 0) {
@@ -1983,7 +1983,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                     eft_em_spawn(self, 0x8A, 0x14, &v14, lbl_80798528);
                     fn_8019E960(self, 3);
                     setVector3(&v2C, lbl_807985EC, lbl_80798538, lbl_80798538);
-                    fn_802BE638(self, 5, &v2C);
+                    camera_enemy_focus_pos_set(self, 5, &v2C);
                 }
             }
             if (fn_8019E9AC(self, 4) == 0) {
@@ -2252,7 +2252,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
         }
         if (em_after_frame_check(self, 0, lbl_80798830, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798714, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 6, &v2C);
+            camera_enemy_focus_pos_set(self, 6, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_80798690, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_80798538);
@@ -2268,17 +2268,17 @@ void fn_801A4504(_ENEMY_WORK* self) {
         }
         if (em_after_frame_check(self, 0, lbl_80798838, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798600, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 0x45, &v2C);
+            camera_enemy_focus_pos_set(self, 0x45, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_8079883C, lbl_80798538) == 1U) {
             setVector3(&v2C, lbl_80798600, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 0x46, &v2C);
+            camera_enemy_focus_pos_set(self, 0x46, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_80798548, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_807987B8, lbl_80798538, lbl_807987E8);
             eft_em_spawn(self, 0x8A, 0x25, &v14, lbl_80798528);
             setVector3(&v2C, lbl_80798600, lbl_80798600, lbl_80798538);
-            fn_802BE638(self, 0x46, &v2C);
+            camera_enemy_focus_pos_set(self, 0x46, &v2C);
         }
         if (em_after_frame_check(self, 0, lbl_8079878C, lbl_80798538) == 1U) {
             setVector3(&v14, lbl_80798538, lbl_80798538, lbl_80798538);
@@ -2352,7 +2352,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                     eft_em_spawn(self, 0x8A, 0x19, &v14, lbl_80798528);
                     fn_8019E960(self, 0);
                     setVector3(&v2C, lbl_80798734, lbl_80798538, lbl_807986D4);
-                    fn_802BE638(self, 5, &v2C);
+                    camera_enemy_focus_pos_set(self, 5, &v2C);
                 }
             }
             if (fn_8019E9AC(self, 1) == 0) {
@@ -2400,7 +2400,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                     eft_em_spawn(self, 0x8A, 0x14, &v14, lbl_80798528);
                     fn_8019E960(self, 0);
                     setVector3(&v2C, lbl_807987E8, lbl_80798538, lbl_80798848);
-                    fn_802BE638(self, 5, &v2C);
+                    camera_enemy_focus_pos_set(self, 5, &v2C);
                 }
             }
             if ((em_after_frame_check(self, 3, lbl_80798614, lbl_8079887C) == 1U) && (fn_8019E9AC(self, 1) == 0)) {

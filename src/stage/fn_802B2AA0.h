@@ -327,7 +327,7 @@ extern "C" s32 fn_8007A1B8(const void* a, s32 b, void* c, void* d, s32 e, s32 f,
 extern "C" void my_player_no_set(s8 value);  /* s8 is the owner's spelling (the argument
  * narrows with `extsb` in retail); `ef/fn_800CDB2C.h` declares it the same way. */
 extern "C" void fn_800DD38C(void);
-extern "C" u32 fn_800E16DC(void* chr, s32 a, s32 b, f32 c, f32 d);
+extern "C" u32 mhchar_frame_check(void* chr, s32 a, s32 b, f32 c, f32 d);
 extern "C" void eft_capsule_ctor(nw4r::math::VEC3* out);
 extern "C" void eft_vec_ctor(nw4r::math::VEC3* out);
 extern "C" void mhchar_construct(void* out);

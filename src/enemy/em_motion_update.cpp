@@ -12,20 +12,20 @@
 #include "enemy/em_act_advance.h" /* em_act_advance (rule 2: the owner's header) */
 #include "enemy/fn_801260BC.h" /* fn_801260BC (rule 2: the owner's header) */
 #include "enemy/fn_801260E0.h" /* fn_801260E0 (rule 2: the owner's header) */
-#include "enemy/fn_80126844.h" /* fn_80126844 (rule 2: the owner's header) */
-#include "enemy/fn_80127D94.h" /* fn_80127D94 (rule 2: the owner's header) */
-#include "enemy/fn_8012820C.h" /* fn_8012820C (rule 2: the owner's header) */
+#include "enemy/em_frames2_get.h" /* em_frames2_get (rule 2: the owner's header) */
+#include "enemy/em_part_rec_reset_all.h" /* em_part_rec_reset_all (rule 2: the owner's header) */
+#include "enemy/em_act_queued_arm.h" /* em_act_queued_arm (rule 2: the owner's header) */
 #include "enemy/fn_80128A30.h" /* fn_80128A30 (rule 2: the owner's header) */
 #include "enemy/em_act_end.h" /* em_act_end (rule 2: the owner's header) */
 #include "enemy/em_status_set.h" /* em_status_set (rule 2: the owner's header) */
-#include "enemy/fn_80130844.h" /* fn_80130844 (rule 2: the owner's header) */
-#include "enemy/fn_80130B28.h" /* fn_80130B28 (rule 2: the owner's header) */
+#include "enemy/em_anger_clear.h" /* em_anger_clear (rule 2: the owner's header) */
+#include "enemy/em_stamina_reset.h" /* em_stamina_reset (rule 2: the owner's header) */
 #include "enemy/em_motion_timer_arm.h" /* fn_80131DB4 (rule 2: the owner's header) */
 #include "enemy/em_fx_flag_set.h" /* fn_80131DF4 (rule 2: the owner's header) */
-#include "enemy/fn_80132064.h" /* fn_80132064 (rule 2: the owner's header) */
-#include "enemy/fn_801322B4.h" /* fn_801322B4 (rule 2: the owner's header) */
+#include "enemy/em_max_hp_init.h" /* em_max_hp_init (rule 2: the owner's header) */
+#include "enemy/em_ailment_reset.h" /* em_ailment_reset (rule 2: the owner's header) */
 #include "enemy/em_state_refresh.h" /* em_state_refresh (rule 2: the owner's header) */
-#include "enemy/fn_80133C48.h" /* fn_80133C48 (rule 2: the owner's header) */
+#include "enemy/em_approach_3d_get.h" /* em_approach_3d_get (rule 2: the owner's header) */
 #include "enemy/em_angle_approach.h" /* em_angle_approach (rule 2: the owner's header) */
 #include "types.h"
 #include "hud/em_net_send.h" /* the owner's leaf header (rule 2) */
@@ -77,7 +77,7 @@ void fn_8011E5EC(_ENEMY_WORK* self);
 void fn_8011E960(_ENEMY_WORK* self);
 u8 fn_8014278C(u16 a, u16 b);
 f32 fn_80142958(u16 a, u16 b);
-void fn_80144584(_ENEMY_WORK* self, s32 mode);
+void emc_kill_report(_ENEMY_WORK* self, s32 mode);
 }
 
 #pragma peephole off
@@ -129,7 +129,7 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
                 self->field_0x1D0 = fn_80142958(self->field_0x01A, rnd);
                 em_net_send(self, 4, 0);
             } else {
-                fn_80144584(self, 2);
+                emc_kill_report(self, 2);
             }
             em_act_advance(self, 1);
             refresh = 1;
@@ -200,8 +200,8 @@ extern "C" void fn_80137C20(_ENEMY_WORK* self)
     self->field_0x8C8 = fn_801260BC_c1(self);
     self->field_0x8CC = fn_801260E0_c1(self);
     fn_8011E5EC(self);
-    fn_80127D94(self);
-    fn_80132064(self);
+    em_part_rec_reset_all(self);
+    em_max_hp_init(self);
     fn_8011E960(self);
     fn_8013A978(self);
 }
@@ -225,9 +225,9 @@ extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
     if (self->field_0x011 == 2) {
         if ((self->field_0x1C8 & 8) != 0) {
             em_status_set(self, 0);
-            fn_80130844(self);
-            fn_80130B28(self);
-            fn_801322B4(self, 247);
+            em_anger_clear(self);
+            em_stamina_reset(self);
+            em_ailment_reset(self, 247);
             self->field_0x916 = 0;
             self->field_0x38E = 0;
             self->field_0x38F = 0;
@@ -237,7 +237,7 @@ extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
             self->field_0x94A = 0;
             self->field_0x011 = 0;
             self->field_0x1E7 = 1;
-            self->field_0x018 = fn_80126844(self);
+            self->field_0x018 = em_frames2_get(self);
             fn_80128A30(self, 12, 255);
             em_state_refresh(self);
             return 1;
@@ -246,7 +246,7 @@ extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
     }
     return (u8)(self->state_0x017 + 253) > 1;
     }
-    fn_8012820C(self);
+    em_act_queued_arm(self);
     return 1;
 }
 
@@ -254,7 +254,7 @@ extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
 extern "C" void fn_80137DD0(_ENEMY_WORK* self)
 {
     if ((u32)(self->field_0x1E2 - 1) <= 3) {
-    if (fn_80133C48() == 0) {
+    if (em_approach_3d_get() == 0) {
         u16 angle = (u16)self->field_0x1BC;
 
         if (angle < 32768) {
