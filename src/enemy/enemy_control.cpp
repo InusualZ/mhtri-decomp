@@ -13,6 +13,7 @@
  *   GUESSES from their bodies or call sites (the dump answers only `zz_` for each).
  *   GUESS (from each body and its callers): em_kind_slot_find, em_kind_slot_release, em_area_entries_release,
  *   GUESS: em_res_buffer_get, em_area_entry_release
+ *   GUESS (from each body and its callers): `em_vec3_copy`, `enemy_work_release`.
  * RESIDUALS. 126 rows unwritten: 0x80141B88-0x80143174, 0x80143190-0x80143BF8, 0x80143C14-0x80144240,
  *   0x80144244-0x801444FC, 0x8014450C-0x80144FB4, 0x80144FE0-0x80147ABC, 0x80147AC8-0x80147C94.
  *  - `fn_8014128C`: ours re-materialises r3 before the `fn_80144FE0` call (148 B against 144 B);
@@ -428,7 +429,7 @@ void fn_80141B4C(void) {
 }
 
 /* Copies a `VEC3` (`src` -> `dst`); returns `dst` (the helper `src/Pl/pl_act.cpp` calls). */
-void* fn_80143174(void* dst, void* src, s32 arg2) {
+void* em_vec3_copy(void* dst, void* src, s32 arg2) {
     nw4r::math::VEC3* d = (nw4r::math::VEC3*)dst;
     nw4r::math::VEC3* s = (nw4r::math::VEC3*)src;
     (void)arg2;

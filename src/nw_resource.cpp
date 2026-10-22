@@ -48,6 +48,7 @@
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: force-active in retail .comment, not in ours: `fn_800D4C14`, `fn_800D4CA4`, `fn_800D516C`,
  *     `fn_800D5250`, `fn_800D5360`.
+ *   GUESS (from each body and its callers): `nw_resource_init`.
  */
 
 #include "types.h"
@@ -58,7 +59,7 @@
 #include "g3d/g3d_scnobj.h" /* nw4r::g3d::ScnGroup::Clear, owner g3d/g3d_scnobj.cpp (rule 2) */
 
 /* The two `.sbss` words this unit defines (0x80794970-0x80794978): the resource manager every function below walks, and the
- * g3d model root (stored once, by `fn_800D32CC`; read by `nwWorkInitialize`/`nwMoveStart`/`nwMoveEnd`).  Definer of both:
+ * g3d model root (stored once, by `nw_resource_init`; read by `nwWorkInitialize`/`nwMoveStart`/`nwMoveEnd`).  Definer of both:
  * `.sbss` follows text order and the unit's first word is 0x80794970 (seam evidence in the header). */
 ResManager* nw_res_manager;
 s32 pRoot;

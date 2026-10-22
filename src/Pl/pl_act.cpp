@@ -40,6 +40,8 @@
  *   GUESS (fields, from their readers): `PlWeaponRec::bonus_0x06` (`fn_8027E708`), `PlWeaponRec::bonus_flag_0x15`
  *   (`fn_8027FFFC`), `PlSlotRec::dye_mode` (`EnableChangeColor` tests 2), `PlSlotRec::color_index`
  *   (`equip_color_index_get`); `PlRgba` (the stack word the colour getters assemble)
+ *   GUESS (from each body and its callers): `pl_status_bit_ck`, `pl_stagger_level_get`,
+ *   `pl_impact_pos_get`, `pl_charge_stage_get`, `pl_act_frame_get`.
  * RESIDUALS. 110 functions unwritten (objdiff scores them 0) in 21 runs; the largest is 0x80280050-0x802840DC, and
  *   `sweepcomments.py --unit Pl/pl_act` lists every run.  Known blockers among them: the rig at
  *   0x80269AC4-0x80269F88 (`new` of 0x1560 bytes) needs its 0x90/0x110-byte element types (vtables
@@ -144,7 +146,7 @@
  *    MWCC form the base first;
  *  - `extern u8 lbl_80792150;` taken by address gives retail's `@sda21` form where an unsized array gives `lis/addi`;
  *  - `fn_802784B8`'s first case falls through into a `default:` written between the cases; `fn_8027A57C`'s shared
- *    tail is the `switch`'s `default:` after the last case; `fn_8027C064` writes its `default:` first;
+ *    tail is the `switch`'s `default:` after the last case; `pl_impact_pos_get` writes its `default:` first;
  *  - `fn_8027C208` ends in `return 0` with an explicit `default: return 1`, and every refused path is
  *    `if (!c) return 1; break;` (the `if (c) return 0; return 1;` form if-converts; playbook 34);
  *  - `fn_8027A340` writes its cases in body address order (0, 4, 2) with the range guard negated and its arms swapped;
@@ -152,7 +154,7 @@
  *    store, which reproduces retail's `blelr ... sth ... bltlr`;
  *  - `pl_pos_blend_start` writes `(f32)(s16)arg1` inline at each division (retail recomputes the conversion);
  *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `fn_8027993C` casts its `u16` index to
- *    `s16` each iteration; `fn_8027C064`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
+ *    `s16` each iteration; `pl_impact_pos_get`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
  *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
  *  - `fn_8027D0D4`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
  *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
@@ -2324,7 +2326,7 @@ namespace s_8026BA1C {
 
 
 /* 0x8026FE98: tests one bit of the two status words; the mask's top bit picks the word. */
-extern "C" u32 fn_8026FE98(_PLW* self, u32 mask)
+extern "C" u32 pl_status_bit_ck(_PLW* self, u32 mask)
 {
     if ((mask & 0x80000000) == 0) {
         return self->field_0x35C & mask;
@@ -4531,7 +4533,7 @@ extern "C" void* fn_80274850(struct _PLW* plw)
 }
 
 /* Buckets the player's stagger timer into 0-3. */
-extern "C" s32 fn_802748C8(void* self)
+extern "C" s32 pl_stagger_level_get(void* self)
 {
     struct _PLW* plw = (struct _PLW*)self;
     s32 value = 0;
@@ -5689,7 +5691,7 @@ extern "C" void pl_item_add(_PLW*, u16, s16);
 extern "C" void fn_802E5D68(u16);
 
 extern "C" s32 pl_part_flag_ck(_PLW*, s32);
-extern "C" u8 fn_802748C8(_PLW*);
+extern "C" u8 pl_stagger_level_get(_PLW*);
 
 extern "C" u32 pl_carry_item_get(_PLW*);
 extern "C" s32 fn_80272C80(_PLW*, u8);
@@ -6214,7 +6216,7 @@ extern "C" s32 fn_8027D51C(_PLW* self)
 /* 0x8027D584 */
 extern "C" void pl_act_hold_motion_set(_PLW* self, u8* arg1)
 {
-    self->unk59C = arg1[3] | 0x8000;
+    self->armed_motion_0x59C = arg1[3] | 0x8000;
     self->unk59E = 0;
     self->unk5A0 = 0;
 }
@@ -6710,7 +6712,7 @@ extern "C" void fn_8027CA48(_PLW* self, s16 arg1)
         if (self->unk386 >= 100) {
             self->unk386 = 100;
         }
-        switch ((u8)fn_802748C8(self)) {
+        switch ((u8)pl_stagger_level_get(self)) {
         case 1:
             fn_8027C89C(self, 900);
             break;
@@ -7614,7 +7616,7 @@ s32 Pl_critical_get(_PLW*);
  * hit rate multipliers and the critical roll - from the attack flags and the actor's skills. */
 void Pl_attack_set_sub(_PLW* self, _HIT_DATA* hit, _HIT_W* data, u16 flags)
 {
-    using s_80276B58::fn_80273ED8; using s_80276B58::fn_802748C8; using s_80276B58::pl_frame_eft_color_get; using s_80276B58::lbl_8079A08C; using s_80276B58::lbl_8079A0A8; using s_80276B58::lbl_8079A0AC; using s_80276B58::lbl_8079A0B0; using s_80276B58::lbl_8079A0B4;
+    using s_80276B58::fn_80273ED8; using s_80276B58::pl_stagger_level_get; using s_80276B58::pl_frame_eft_color_get; using s_80276B58::lbl_8079A08C; using s_80276B58::lbl_8079A0A8; using s_80276B58::lbl_8079A0AC; using s_80276B58::lbl_8079A0B0; using s_80276B58::lbl_8079A0B4;
     s32 f8;
     s32 f10;
     data->attack_flags_0x31 = 0xF;
@@ -7706,7 +7708,7 @@ void Pl_attack_set_sub(_PLW* self, _HIT_DATA* hit, _HIT_W* data, u16 flags)
         }
     }
     if (self->field_0x002 == 7 && (flags & 1) != 0) {
-        switch (fn_802748C8(self)) {
+        switch (pl_stagger_level_get(self)) {
         case 1:
             data->life_0x40 = (s16)(lbl_8079A0AC * (f32)data->life_0x40);
             break;
@@ -9024,7 +9026,7 @@ extern "C" void fn_8027AC2C(_PLW* self, u8 arg1, u8 arg2)
 
 /* 0x8027C064: builds the impact vector an attacking part starts from - the per-weapon-class motion, the
  * hit matrix and the actor's world offset. */
-extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
+extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
 {
     nw4r::math::VEC3 v;
     u8 buf[12];
@@ -9045,7 +9047,7 @@ extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
         break;
     case 1:
         if (self->field_0x002 == 3) {
-            copyVec3(&v, (const nw4r::math::VEC3*)fn_80143174(buf, lbl_805BAC98 + self->field_0x002 * 0x18 + 0xC,
+            copyVec3(&v, (const nw4r::math::VEC3*)em_vec3_copy(buf, lbl_805BAC98 + self->field_0x002 * 0x18 + 0xC,
                                                               self->field_0x002 * 0x18));
         }
         /* fall through */

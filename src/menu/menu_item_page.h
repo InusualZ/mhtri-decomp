@@ -119,7 +119,9 @@ void* get_userdata(void);
  * `.sbss:0x80794880`, loaded through sda21.  Only the two offsets this unit names are fields.
  * size: 0x3F06 (approximate: the highest offset this unit touches + 2) */
 typedef struct LbItemDb {
-    /* +0x0000 */ u8 unused_0x0000[0x0180];
+    /* +0x0000 */ u8 unused_0x0000[0x0018];
+    /* +0x0018 */ s32 money_0x0018;    /* the money `score_add_clamped` adds a sale to */
+    /* +0x001C */ u8 unused_0x001C[0x0180 - 0x001C];
     /* +0x0180 */ u8 field_0x0180;     /* the sub-block `item_slots_count_sum` is handed */
     /* +0x0181 */ u8 unused_0x0181[0x3F04 - 0x0181];
     /* +0x3F04 */ u16 field_0x3F04;    /* the value the "%d" price line prints */
@@ -149,6 +151,7 @@ void draw_font_idx(u16 id, s8* text, u32 flag, const _mh_ivec2_* pos);
 void draw_sprite_idx(u16 id, const _mh_ivec2_* pos);
 void draw_sprite_anim_idx(u16 id, u16 anim, const _mh_ivec2_* pos);
 void draw_sprite_anim_ary(const u16* ids, u16 anim, const _mh_ivec2_* pos);
+void draw_sprite_ary(const u16* ids, const _mh_ivec2_* pos);
 void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos);
 void font_set_size(s16 w, s16 h);
 s32 chk_pointer(void);

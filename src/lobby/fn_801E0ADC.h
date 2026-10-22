@@ -13,6 +13,8 @@ extern "C" {
 /* 0x801E2D04 - spawns effect `id` at `joint`'s world position when it passes the height test, with `pos` and `scale`
  * in its work block and `life` in the record (the float precedes the integer: the callers load it first). */
 void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 joint, u32 id, nw4r::math::VEC3* pos, f32 scale, u32 life);
+/* 0x801E72F4 - the price of item `id`. */
+u16 item_price_get(u16 id);
 }
 #endif
 

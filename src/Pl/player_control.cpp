@@ -5,6 +5,7 @@
  * NAMES. `set_max_player`, `init_player_work`, `player_control_move`, `player_init_data_load`, `player_move_start_ck`,
  *   `player_move_start`, `player_control_release` and `parts_mdl_release_all` are the runtime dump's names; the file
  *   name follows them.
+ *   GUESS (from each body and its callers): `player_work_array_get`.
  * RESIDUALS. 16 functions unwritten (objdiff scores them 0) in 5 runs: 0x802673E8-0x80267A78, 0x80267AA0-0x80267C84,
  *   0x80267D00-0x802681D4, 0x8026837C-0x80268E38, 0x80268E70-0x80269394.  4 partial, none with
  *   a recorded cause: `player_move_start_ck`..`fn_80268308` (0x802681EC-0x8026837C) and `fn_80268E48`.

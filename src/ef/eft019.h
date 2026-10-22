@@ -21,6 +21,9 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 param);
 struct _CP_VECTOR;
 void eft019_set_vec(nw4r::math::VEC3* pos, struct _CP_VECTOR* rot, u8 area, u8 type, f32 scale);
 
+/* 0x801127A4 - spawns a landing record that keeps only the rotation's yaw, with a scale. */
+void eft019_set_tyakudan(nw4r::math::VEC3* pos, struct _CP_VECTOR* rot, u8 area, u8 type, f32 scale);
+
 /* 0x80114C20 - spawns the eft020 record keyed `key` on an actor, in the actor's area; C linkage (the map row is
  * unmangled).  `Pl/pl_act.cpp` and `Pl/pl_act_step.cpp` pass the player work. */
 extern "C" {

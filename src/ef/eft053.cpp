@@ -14,9 +14,9 @@
  *   (the creation entry, `eft050_set`'s shape without arguments), `eft053_release`/`eft053_dispatch` (its `+0x40`
  *   and `+0x34` hooks), `eft053_slot_rot_step`/`eft053_slot_move_step` (one slot's rotation and translation step),
  *   each a GUESS from its own body.
- * RESIDUALS. 8 rows unwritten: 0x80367124-0x80368A30 (`fn_80367124`, `fn_80367760`, `fn_80368374`) and
- *   0x8036928C-0x8036A828 (`fn_8036928C`, `fn_80369D50`, `fn_8036A690`, `fn_8036A814`, `fn_8036A824`).
- *   8 partial rows; `eft053_release` and `eft053_dispatch` match:
+ * RESIDUALS. 3 rows unwritten: `fn_80367760` (0xC14), `fn_8036928C` (0xAC4), `fn_80369D50` (0x940).
+ *   `fn_80367124`, `fn_80368374` and `fn_8036A690` are partial (register colouring, the O4 switch tables named
+ *   locally where retail names `jumptable_805EDFB8`).  Older partial rows; `eft053_release` and `eft053_dispatch` match:
  *  - `eft053_shell_pos_project`: frame 0x70 against retail's 0x80 (same instruction count, stack slots only);
  *  - `eft053_model_list_get`: ours fuses `clrlwi.` where retail keeps `clrlwi` + `cmpwi`;
  *  - `eft053_get_shell_data`: ours compares the map cases unsigned (`cmplwi`), drops a `clrlwi`, and emits its
@@ -53,6 +53,15 @@
 #include "ef/fn_800CDB2C.h"    /* ran_suu (the family's frame randomiser) */
 #include "ef/eft001.h"         /* eft_rot_vec_copy (the rotation copy) */
 #include "g3d/g3d_calcworld.h"  /* addVec3To (the vector add) */
+#include "quest/quest_entry.h"   /* quest_grade_rank_get */
+#include "enemy/em025_prog.h"    /* fn_8019E70C */
+#include "Pl/Pl_master_ck.h"     /* Pl_master_ck */
+#include "Pl/pl_act.h"           /* Pl_bari_ck */
+#include "sound/fn_800D7F54.h"   /* shell_se_req */
+#include "stage/stg_w.h"         /* get_now_areano */
+#include "Runtime.PPCEABI.H/memset.h" /* memset */
+#include "ef/get_move_work_adrs.h" /* get_move_work_adrs / get_move_work_max */
+#include "stage/get_now_mapno.h" /* get_now_mapno */
 
 /* ---------------------------------------------------------------------------------------------------
  * this range's own data (declared, never defined - playbook 29)
@@ -140,14 +149,18 @@ typedef struct Eft053Work {
     /* +0x004 */ MHchar* models[8]; /* one pooled model handle per slot; `models[0]` is what the
                                      * release path (`eft_res_models_release`) is handed as its list base */
     /* +0x024 */ u8 kind_0x24;   /* the stage model-list kind `eft053_model_list_get` writes */
-    /* +0x025 */ u8 pad_0x25[0x10];
+    /* +0x025 */ u8 sub_0x25[8];  /* per-slot sub-kind (the record's +0x02, the shown joint) */
+    /* +0x02D */ u8 rec_kind_0x2D[8]; /* per-slot record kind (0/2 timed by the gate block, 3 a rank gimmick) */
     /* +0x035 */ u8 field_0x35[8]; /* per-slot placement index into the family's `Vec` table
                                     * (`lbl_805EDEB0`, 0xC bytes an entry) */
     /* +0x03D */ u8 pad_0x3D[0x3];
     /* +0x040 */ s32 counters[8]; /* per-slot frame counter */
     /* +0x060 */ u8 states[8];   /* per-slot state byte */
-    /* +0x068 */ u8 field_0x68[6]; /* per-slot flag byte `fn_80369D50` sets to 0xA */
-    /* +0x06E */ u16 field_0x6E[8]; /* per-slot frame window the step is divided into */
+    /* +0x068 */ u8 field_0x68[2]; /* the two rank gimmicks' state byte (`fn_80369D50` sets 0xA) */
+    /* +0x06A */ u16 field_0x6A[2];
+    /* +0x06E */ u16 field_0x6E[2]; /* the frame window the step is divided into */
+    /* +0x072 */ u8 field_0x72[2][4];
+    /* +0x07A */ u8 pad_0x7A[0x2];
 } Eft053Work; /* size: 0x7C (approximate past +0x68: no body of this unit reads further) */
 
 /* the range's `.data` tables and its `.rodata` arm table */
@@ -182,6 +195,9 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index);
 extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 randomize);
 extern "C" void fn_8036928C(_EFT* self);
 extern "C" void fn_80369D50(_EFT* self, s32 index);
+extern "C" void fn_8036A690(_EFT* self);
+extern "C" void fn_8036A814(_EFT* self);
+extern "C" void fn_8036A824(_EFT* self);
 
 /* One entry of the current stage's model list, reached through `lbl_805EDE88`'s pointer table.
  * size: 0x18 (the loop stride the target multiplies the index by) */
@@ -783,3 +799,413 @@ extern "C" void eft053_dispatch(_EFT* self)
         return fn_8036A824(self);
     }
 }
+
+#pragma push
+#pragma optimization_level 4
+/* Builds the family's models from the stage's model list (the model id from the map and area), places and orients
+ * them, arms the timed slots from the gate block, and on maps 6/17 places the two rank gimmicks by the em025 state. */
+extern "C" void fn_80367124(_EFT* self)
+{
+    Eft053Work* work = (Eft053Work*)self->work_0x38;
+    PlSlotGate* gate = lbl_806BB7A0;
+    VEC3 offset;
+    u16 id;
+    EftModelRec* rec;
+    s32 i;
+    u32 j;
+    s32 found;
+    _ENEMY_WORK* enemy;
+    u16 max;
+
+    VEC3_ctor(&offset);
+    self->state_0x05++;
+    self->flag_0x01 = 1;
+    self->field_0x10 = 0;
+    self->timer_0x0C = 0;
+    switch (get_now_mapno()) {
+    case 6:
+        switch (self->area_0x44) {
+        case 1:
+            id = 0x7B;
+            break;
+        case 2:
+            id = 0x7D;
+            break;
+        }
+        break;
+    case 17:
+        switch (self->area_0x44) {
+        case 1:
+            id = 0x7C;
+            break;
+        case 2:
+            id = 0x7E;
+            break;
+        }
+        break;
+    case 7:
+        if (self->area_0x44 == 3) {
+            id = 0x82;
+        }
+        break;
+    case 18:
+        if (self->area_0x44 == 3) {
+            id = 0x83;
+        }
+        break;
+    case 8:
+        if (self->area_0x44 == 1) {
+            id = 0x88;
+        }
+        break;
+    case 19:
+        if (self->area_0x44 == 1) {
+            id = 0x89;
+        }
+        break;
+    case 9:
+        switch (self->area_0x44) {
+        case 0:
+            id = 0x8A;
+            break;
+        case 1:
+            id = 0x8B;
+            break;
+        }
+        break;
+    case 11:
+        if (self->area_0x44 == 1) {
+            id = 0x8C;
+        }
+        break;
+    case 20:
+        if (self->area_0x44 == 1) {
+            id = 0x8D;
+        }
+        break;
+    }
+    rec = ((EftModelRec**)lbl_805EDE88)[work->kind_0x24];
+    for (i = 0; i < work->count; i++, rec++) {
+        if (res_eft_model_create_light(work->models[i], id, 0x28, 2) == NULL) {
+            fn_8036A824(self);
+            return;
+        }
+        vec_to_mh_vec3(&work->models[i]->pos_0x04, &rec->pos_0x04);
+        setVector3(&work->models[i]->scale_0x1C, 1.0f, 1.0f, 1.0f);
+        work->models[i]->field_0x28 = rec->rot_x;
+        work->models[i]->field_0x2C = rec->rot_y;
+        work->models[i]->field_0x30 = rec->rot_z;
+        work->models[i]->ready = 0;
+        work->sub_0x25[i] = rec->field_0x02;
+        work->counters[i] = 0;
+        work->states[i] = 0;
+        work->rec_kind_0x2D[i] = rec->kind;
+        work->field_0x35[i] = rec->index;
+        switch (get_now_mapno()) {
+        case 6:
+        case 17:
+            if ((u8)(work->sub_0x25[i] - 2) <= 1) {
+                vec_to_mh_vec3(&offset, &lbl_805EDEA4);
+                rotVecY(&offset, work->models[i]->field_0x2C);
+                addVec3To(&work->models[i]->pos_0x04, &offset);
+            }
+            break;
+        case 7:
+        case 18:
+            if (work->sub_0x25[i] == 4) {
+                vec_to_mh_vec3(&offset, &lbl_805EDEA4);
+                rotVecY(&offset, work->models[i]->field_0x2C);
+                addVec3To(&work->models[i]->pos_0x04, &offset);
+            }
+            break;
+        }
+        for (j = 0; j < work->models[i]->get_joint_num(); j++) {
+            if (rec->field_0x02 == j) {
+                work->models[i]->setVisibility(j, 1);
+            } else {
+                work->models[i]->setVisibility(j, 0);
+            }
+        }
+        if (work->rec_kind_0x2D[i] == 0) {
+            if (gate[0].flag_0x00 == 0) {
+                work->states[i] = 0;
+            } else {
+                work->counters[i] = gate[0].length_0x04;
+                work->states[i] = 8;
+            }
+        }
+        if (work->rec_kind_0x2D[i] == 2) {
+            if (gate[1].flag_0x00 == 0) {
+                work->states[i] = 0;
+            } else {
+                work->counters[i] = gate[1].length_0x04;
+                work->states[i] = 6;
+            }
+        }
+    }
+    if (get_now_mapno() == 6 || get_now_mapno() == 17) {
+        found = 0;
+        enemy = (_ENEMY_WORK*)get_move_work_adrs(3);
+        max = get_move_work_max(3);
+        for (i = 0; i < max; i++, enemy++) {
+            if (enemy->team == 25 && enemy->area_no == self->area_0x44 && em_work_die_ck(enemy) != 1) {
+                found = 1;
+                break;
+            }
+        }
+        for (i = 0; i < 2; i++) {
+            if (work->count < 8 || work->rec_kind_0x2D[6 + i] != 3) {
+                continue;
+            }
+            if (i == 0) {
+                if (quest_grade_rank_get(0x4B) != 0) {
+                    work->field_0x68[i] = 11;
+                    continue;
+                }
+            } else if (i == 1 && quest_grade_rank_get(0x32) != 0) {
+                work->field_0x68[i] = 11;
+                continue;
+            }
+            if (self->area_0x44 == 1) {
+                if (found != 0 && enemy != NULL) {
+                    if (eft053_work_act_ck(enemy) != 0) {
+                        vec_to_mh_vec3(&work->models[6 + i]->pos_0x04, &lbl_805EDEB0[i + 10]);
+                        work->field_0x68[i] = 13;
+                    } else {
+                        switch ((u8)em025_shore_phase_get(enemy)) {
+                        case 0:
+                            work->field_0x68[i] = 0;
+                            vec_to_mh_vec3(&work->models[6 + i]->pos_0x04, &lbl_805EDEB0[i]);
+                            break;
+                        case 1:
+                        case 3:
+                            work->field_0x68[i] = 3;
+                            vec_to_mh_vec3(&work->models[6 + i]->pos_0x04, &lbl_805EDEB0[i + 4]);
+                            break;
+                        case 4:
+                            work->field_0x68[i] = 5;
+                            vec_to_mh_vec3(&work->models[6 + i]->pos_0x04, &lbl_805EDEB0[i + 6]);
+                            break;
+                        case 2:
+                            work->field_0x68[i] = 9;
+                            vec_to_mh_vec3(&work->models[6 + i]->pos_0x04, &lbl_805EDEB0[i + 8]);
+                            break;
+                        default:
+                            work->field_0x68[i] = 0;
+                            vec_to_mh_vec3(&work->models[6 + i]->pos_0x04, &lbl_805EDEB0[i]);
+                            break;
+                        }
+                    }
+                } else {
+                    work->field_0x68[i] = 0;
+                    vec_to_mh_vec3(&work->models[6 + i]->pos_0x04, &lbl_805EDEB0[i]);
+                }
+            } else {
+                work->field_0x68[i] = 12;
+            }
+            work->field_0x6A[i] = 0;
+            work->field_0x6E[i] = 0;
+            memset(work->field_0x72[i], 0, 4);
+        }
+    }
+    fn_8036A690(self);
+}
+#pragma pop
+
+/* Runs a lever slot (models `index` and `index + 1`): a player of the area standing in it with the lever action and
+ * the slot's key turns it (the local master first, else any other), the turn and tilt sounds play, and the lever
+ * follows the player's facing and shell angle; untouched, it returns to its list placement. */
+extern "C" void fn_80368374(_EFT* self, s32 index)
+{
+    Eft053Work* work = (Eft053Work*)self->work_0x38;
+    VEC3 pos;
+    s32 tilt = 0;
+    s32 master = 0;
+    u32 moved = 0;
+    _PLW* plw = (_PLW*)get_move_work_adrs(2);
+    u16 max = get_move_work_max(2);
+    u8 kind;
+    u8 on[4];
+    s32 count;
+    s32 i;
+    EftModelRec* recs;
+
+    VEC3_ctor(&pos);
+    for (i = 0; i < max; i++, plw++) {
+        on[i] = 0;
+        if (plw->slot_active != 0 && plw->field_0x001 != 0 && plw->area_0x16 == self->area_0x44 &&
+            Pl_bari_ck(plw, 2) == 1 && (u8)plw->field_0x0B6 == work->field_0x35[index]) {
+            on[i] = 1;
+            if (Pl_master_ck(plw) != 0) {
+                master = 1;
+            }
+        }
+    }
+    if (master != 0) {
+        plw = (_PLW*)get_move_work_adrs(2) + (s8)my_player_no();
+        pos.x = work->models[index]->pos_0x04.x;
+        pos.y = plw->motion_pos_0x40;
+        pos.z = work->models[index]->pos_0x04.z;
+        if (vec3_dist_sq(&plw->vec_0x03C, &pos) <= 40000.0f) {
+            if ((u16)plw->field_0x058 != (u16)work->counters[index] && work->states[index] == 1 &&
+                self->area_0x44 == get_now_areano()) {
+                shell_se_req(NULL, &work->models[index]->pos_0x04, 0x12, work->field_0x35[index]);
+            }
+            if (plw->shell_ang_s_0x583 != work->counters[index + 1] && work->states[index] == 1 &&
+                self->area_0x44 == get_now_areano()) {
+                shell_se_req(NULL, &work->models[index]->pos_0x04, 0x13, work->field_0x35[index]);
+            }
+            tilt = plw->shell_ang_s_0x583;
+            work->counters[index + 1] = tilt;
+            work->counters[index] = (u16)plw->field_0x058;
+            work->states[index] = 1;
+            moved = 1;
+        }
+    } else {
+        plw = (_PLW*)get_move_work_adrs(2);
+        for (i = 0; i < max; i++, plw++) {
+            if (plw->slot_active == 0 || plw->field_0x001 == 0 || plw->area_0x16 != self->area_0x44 ||
+                Pl_master_ck(plw) != 0 || on[i] == 0) {
+                continue;
+            }
+            pos.x = work->models[index]->pos_0x04.x;
+            pos.y = plw->motion_pos_0x40;
+            pos.z = work->models[index]->pos_0x04.z;
+            if (vec3_dist_sq(&plw->vec_0x03C, &pos) > 40000.0f) {
+                continue;
+            }
+            if ((u16)plw->field_0x058 != (u16)work->counters[index] && work->states[index] == 1 &&
+                self->area_0x44 == get_now_areano()) {
+                shell_se_req(NULL, &work->models[index]->pos_0x04, 0x12, work->field_0x35[index]);
+            }
+            if (plw->shell_ang_s_0x583 != work->counters[index + 1] && work->states[index] == 1 &&
+                self->area_0x44 == get_now_areano()) {
+                shell_se_req(NULL, &work->models[index]->pos_0x04, 0x13, work->field_0x35[index]);
+            }
+            tilt = plw->shell_ang_s_0x583;
+            work->counters[index + 1] = tilt;
+            work->counters[index] = (u16)plw->field_0x058;
+            work->states[index] = 1;
+            moved = 1;
+            break;
+        }
+    }
+    if (moved == 1) {
+        if (eft053_model_list_get(&kind, &count) == 1) {
+            recs = ((EftModelRec**)lbl_805EDE88)[kind];
+            for (i = 0; i < count; i++) {
+                if (recs[i].kind == work->rec_kind_0x2D[index] && recs[i].index == work->field_0x35[index]) {
+                    vec_to_mh_vec3(&work->models[index]->pos_0x04, &recs[i].pos_0x04);
+                    break;
+                }
+            }
+        }
+        if (tilt >= 0) {
+            work->models[index]->field_0x28 =
+                (s16)-(u16)(s32)(0.5f + (65536.0f * (0.01f * (45.0f * (f32)tilt))) / 360.0f);
+        } else {
+            work->models[index]->field_0x28 =
+                (s16)-(u16)(s32)(0.5f + (65536.0f * (0.01f * (35.0f * (f32)tilt))) / 360.0f);
+        }
+        work->models[index]->field_0x2C = (u16)work->counters[index];
+        vec_to_mh_vec3(&pos, &lbl_805EDEA4);
+        rotVecY(&pos, work->models[index]->field_0x2C);
+        addVec3To(&work->models[index]->pos_0x04, &pos);
+        work->models[index + 1]->field_0x2C = (u16)work->counters[index];
+        return;
+    }
+    if (eft053_model_list_get(&kind, &count) == 1) {
+        recs = ((EftModelRec**)lbl_805EDE88)[kind];
+        for (i = 0; i < count; i++) {
+            if (recs[i].kind == work->rec_kind_0x2D[index] && recs[i].index == work->field_0x35[index]) {
+                work->models[index]->field_0x28 = recs[i].rot_x;
+                work->models[index]->field_0x2C = recs[i].rot_y;
+                vec_to_mh_vec3(&work->models[index]->pos_0x04, &recs[i].pos_0x04);
+                vec_to_mh_vec3(&pos, &lbl_805EDEA4);
+                rotVecY(&pos, work->models[index]->field_0x2C);
+                addVec3To(&work->models[index]->pos_0x04, &pos);
+                work->states[index] = 0;
+                work->models[index + 1]->field_0x28 = recs[i + 1].rot_x;
+                work->models[index + 1]->field_0x2C = recs[i + 1].rot_y;
+                return;
+            }
+        }
+    }
+}
+
+#pragma push
+#pragma optimization_level 4
+/* Steps every slot by its list kind and sub-kind (the motion, shell, rotation and rank programs), then moves and
+ * spawns its model when it is shown. */
+extern "C" void fn_8036A690(_EFT* self)
+{
+    Eft053Work* work = (Eft053Work*)self->work_0x38;
+    s32 i;
+    MHchar** model = work->models;
+    MHchar** list = work->models;
+
+    for (i = 0; i < work->count; i++, model++, list++) {
+        switch (work->kind_0x24) {
+        case 0:
+        case 1:
+            switch (work->sub_0x25[i]) {
+            case 1:
+                fn_80367760(self, i);
+                break;
+            case 2:
+            case 3:
+                fn_80368374(self, i);
+                break;
+            case 6:
+                eft053_slot_rot_step(self, i);
+                break;
+            case 7:
+                fn_80369D50(self, i);
+                break;
+            }
+            break;
+        case 2:
+            switch (work->sub_0x25[i]) {
+            case 1:
+            case 2:
+            case 3:
+                fn_80367760(self, i);
+                break;
+            case 4:
+                fn_80368374(self, i);
+                break;
+            }
+            break;
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+            switch (work->sub_0x25[i]) {
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+                fn_80367760(self, i);
+                break;
+            }
+            break;
+        }
+        (*model)->move(0);
+        if ((*model)->field_0x34 != 0) {
+            eft_res_models_spawn(self, (void**)list, 2, 1, 0);
+        }
+    }
+}
+
+/* Advances the record's state. */
+extern "C" void fn_8036A814(_EFT* self)
+{
+    self->state_0x05++;
+}
+
+/* Retires the record to the pool. */
+extern "C" void fn_8036A824(_EFT* self)
+{
+    eft_res_slot_release(self);
+}
+#pragma pop

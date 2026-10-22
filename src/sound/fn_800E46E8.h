@@ -54,4 +54,13 @@ void set_stream_main_vol_flag(u8 slot, u8 is_bgm);
 void PlayStream(u32 a, u32 b);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800E4E3C - sets the master volume slot (the system core's sound toggle). */
+void stream_volume_slot_set(s32 slot);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_SOUND_FN_800E46E8_H */

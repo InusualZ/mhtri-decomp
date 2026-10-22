@@ -26,6 +26,11 @@ extern "C" {
  * system core and the network message pool all skip their work while it reads 1. */
 BOOL isMoviePlaying(void);
 
+/* 0x8043F088 - waits while the movie player holds the drive (`info` the file a read was just queued on, or NULL);
+ * the system core's loaders call it around every disc access. */
+struct DVDFileInfo;
+void movie_drive_wait(struct DVDFileInfo* info);
+
 #ifdef __cplusplus
 }
 #endif

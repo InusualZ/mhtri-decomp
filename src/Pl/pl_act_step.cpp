@@ -2548,7 +2548,7 @@ extern "C" void fn_80258FCC(_PLW* self, s16 a2, s16 a3, u8 a4)
         }
         return;
     }
-    if (fn_8026FE98((_ENEMY_WORK*)self, 0x1C0) == 0) {
+    if (pl_status_bit_ck((_ENEMY_WORK*)self, 0x1C0) == 0) {
         return;
     }
     if (a2 == 1 && self->field_0x28 != 0) {
@@ -3150,7 +3150,7 @@ s32 fn_8025FF0C(_PLW* self, u8 mode) {
 
     switch (self->kind_0x09) {
     default:
-        if (fn_8026FE98((_ENEMY_WORK*)self, 4544) != 0) {
+        if (pl_status_bit_ck((_ENEMY_WORK*)self, 4544) != 0) {
             if (self->field_0x00A == 0) {
                 s32 act = self->act_no;
                 if ((u32)(act - 128) <= 6 || (u32)(act - 15) <= 1 || act == 123 || act == 139 || act == 182) {
@@ -3175,7 +3175,7 @@ s32 fn_8025FF0C(_PLW* self, u8 mode) {
         }
         break;
     case 3:
-        if (fn_8026FE98((_ENEMY_WORK*)self, 4544) != 0) {
+        if (pl_status_bit_ck((_ENEMY_WORK*)self, 4544) != 0) {
             if (self->field_0x00A == 0) {
                 s32 act = self->act_no;
                 if ((u32)(act - 140) <= 9 || (u32)(act - 25) <= 1 || act == 124) {
@@ -3905,7 +3905,7 @@ u8 fn_8026495C(_PLW* self) {
         } else {
             level = 1;
         }
-    } else if (Pl_Skill_ck(self, 0x21) == 1 || fn_8026FE98((_ENEMY_WORK*)self, 0x2000) != 0) {
+    } else if (Pl_Skill_ck(self, 0x21) == 1 || pl_status_bit_ck((_ENEMY_WORK*)self, 0x2000) != 0) {
         if (level > 0xB) {
             level -= 0xA;
         } else {

@@ -16,6 +16,7 @@
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: `.sdata2` claimed, not emitted.
  * NAMES. GUESS: `mhchar_joint_mtx_get`, `mhchar_node_count`
+ *   GUESS (from each body and its callers): `copied_mat_access_valid_ck`.
  */
 
 #include "types.h"
@@ -196,7 +197,7 @@ extern "C" u32 fn_800E28E4(MHchar* self)
 }
 
 /* Whether the model's +0x00 word is non-zero. */
-extern "C" u32 fn_800E2994(MHchar* self)
+extern "C" u32 copied_mat_access_valid_ck(MHchar* self)
 {
     return self->field_0x00 != 0;
 }

@@ -194,7 +194,7 @@
  * (`fn_802F3B48`/`fn_802F3D94`/`fn_802F49C8`/`fn_802F49D8`).
  *
  * Data.  The `.data` tables, the `.sdata` property tables (`lbl_80792860`, `lbl_80792868`,
- * `lbl_80792870`, `lbl_80792878`) and the `.sdata2` constants are `extern`-declared by their map
+ * `eft035_alpha_keys_2`, `eft035_color_keys_7`) and the `.sdata2` constants are `extern`-declared by their map
  * names and never defined (playbook 29).
  *
  * Residuals.  17 of the range's 39 functions are reconstructed; 11 of them are byte-identical and
@@ -230,13 +230,13 @@
  * fn_802F1944 (0x1D8), fn_802F1B1C (0x1DC), fn_802F1CF8 (0x23C), fn_802F1F34 (0x1A4),
  * fn_802F20D8 (0x48), fn_802F2120 (0x58), fn_802F2178 (0x30), fn_802F21A8 (0x60), fn_802F2208 (0x30),
  * fn_802F2988 (0x2F0), fn_802F2CB0 (0x540), fn_802F31F0 (0x168), fn_802F3358 (0x5E8),
- * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), fn_802F49DC (0x17C), fn_802F4B58 (0x2F0),
- * fn_802F4E48 (0x270), fn_802F50B8 (0x44), fn_802F50FC (0x3C).  What they need beyond this pass: the
+ * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), eft035_ray_flicker (0x17C), eft035_ray_origin_get (0x2F0),
+ * eft035_throw_start (0x270), eft035_orb_move (0x44), eft035_throw_act_ck (0x3C).  What they need beyond this pass: the
  * 11 HUD functions drive `cockpit_work`/`cockpit_state` (their types live in `hud/cockpit_quest.h` and
  * `hud/cockpit_quest_marker.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
  * `__construct_array` runtime helper (whose only declaration today sits in `sound/sound_work.h`);
  * the two tag-34 bodies (`fn_802F3B48`, `fn_802F3D94`) read the `_ENEMY_WORK` motion/sound block and
- * `fn_802F50FC` reads a `u16` at `_ENEMY_WORK`+0x306 that the shared header does not name yet.
+ * `eft035_throw_act_ck` reads a `u16` at `_ENEMY_WORK`+0x306 that the shared header does not name yet.
  */
 
 #include "types.h"
@@ -3310,14 +3310,14 @@ void fn_802EF0A0(_PLW* plw, void* out)
     fn_802EEDE4(&pos);
 }
 
-/* 0x802EF62C (0x84).  The quest HUD's gate: off while `menu_item_frame_update(0)` or `fn_802BE39C()` hold,
+/* 0x802EF62C (0x84).  The quest HUD's gate: off while `menu_item_frame_update(0)` or `camera_mode1_ck()` hold,
  * on only in area 1 with the act's state byte at 0 or 0xE. */
 s32 fn_802EF62C(_PLW* plw)
 {
     if (menu_item_frame_update(0) != 0) {
         return 0;
     }
-    if (fn_802BE39C() == 1) {
+    if (camera_mode1_ck() == 1) {
         return 0;
     }
 

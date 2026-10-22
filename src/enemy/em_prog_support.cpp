@@ -13,6 +13,7 @@
  *   GUESS (from each body and its callers): em_prog_slots_init, em_prog_work_init, qnpc_load_ck, qnpc_res_load_done
  *   GUESS (from each body and its callers): qnpc_snd_func_get, note_pane_motion_start
  *   GUESS (from each body and its callers): note_pane_joint_mtx_get, note_pane_motion_frame_ck
+ *   GUESS (from each body and its callers): `em_prog_support_reset`.
  * RESIDUALS. 28 rows unwritten: 0x80383148-0x803831B0, 0x803831B4-0x803836EC, 0x80383720-0x8038392C,
  *   0x80383944-0x803839C0, 0x803839EC-0x80384004, 0x80384048-0x80384304, 0x80384434-0x80384B34, 0x80384BA0-0x80384ECC,
  *   0x803850A4-0x803851D4, 0x8038530C-0x803853C8, 0x803855D4-0x8038575C, 0x80385828-0x80385A54, 0x80385CAC-0x80385E7C.
@@ -28,7 +29,7 @@
  *    drops it;
  *  - `fn_80384004`, `fn_80384B34`: retail keeps `extsh`/`extsb` + `cmpwi`, ours the record form; `fn_803843D8`:
  *    retail sign-extends twice more;
- *  - `fn_803852B8`, `fn_803854E4`, `fn_8038575C`: the loop's index setup is ordered differently; `fn_803857BC`: ours
+ *  - `fn_803852B8`, `em_prog_support_reset`, `fn_8038575C`: the loop's index setup is ordered differently; `fn_803857BC`: ours
  *    compares the narrowed value unsigned where retail compares signed.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.sbss`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
  *   short of the claim.
@@ -103,7 +104,7 @@ void fn_80385478(NoteWork* self);
 void fn_803857BC(NoteWork* self);
 void fn_80385AA8(NoteWork* self, u8 a, u8 b);
 void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b);
-void fn_803854E4(void);
+void em_prog_support_reset(void);
 void fn_80385598(void);
 void em_prog_work_init(void);
 void nw_res_entry_clear(s32 handle);
@@ -270,7 +271,7 @@ extern "C" void fn_8038541C(u8 idx) {
 }
 
 /* 0x803854E4 */
-extern "C" void fn_803854E4(void) {
+extern "C" void em_prog_support_reset(void) {
     for (u32 i = 0; i < 5; i++) {
         fn_80385478(&lbl_806C4A88[i]);
     }

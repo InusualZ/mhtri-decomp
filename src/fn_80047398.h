@@ -95,5 +95,14 @@ s32 isOnlineFlagClear(void);
 void subTransSetPrio(u8 slot, u32 func, s32 arg, u32* out);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800487C8 - the size of the user data block the system core lays out first (half of its arena). */
+u32 userdata_size_get(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_FN_80047398_H */
 

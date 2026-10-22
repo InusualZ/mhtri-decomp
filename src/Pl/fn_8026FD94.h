@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-s32 fn_8026FE98(struct _ENEMY_WORK* other, u32 mask);
+s32 pl_status_bit_ck(struct _ENEMY_WORK* other, u32 mask);
 u32 fn_8026FD94(struct _PLW* self);
 u32 fn_8026FE44(struct _PLW* self);
 u8 pl_act_param_tier_ck(struct _PLW* self, u32 idx);

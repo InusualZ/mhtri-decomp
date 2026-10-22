@@ -23,8 +23,8 @@ u32 move_work_state_ck(void);
  * hands the caller's mode byte on (`Pl/pl_act_step.cpp`'s act-175 arm calls it). */
 void ef_move_state_dispatch(u8 mode);
 
-s32 fn_800CED10(char* path, u32 dma, u32 size);
-s32 fn_800CEE2C(const char* path, void* info);
+s32 load_file_direct(char* path, u32 dma, u32 size);
+s32 dvd_open_wait(const char* path, void* info);
 /* The task-table entry `ef/fn_80059550.cpp` reads (its own return view is `_GXTexObj*`). */
 u8* fn_800D0568(s32 index);
 

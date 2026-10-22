@@ -26,7 +26,7 @@ struct EnemyData;
 extern "C" {
 #endif
 
-struct EnemyData* fn_80140C00(u8 group, u8 index);
+struct EnemyData* enemy_data_by_team_get(u8 group, u8 index);
 u8* fn_8014260C(u8 id);
 
 /* 0x803754F4 - the em020 band's own `+0x836` bit-0x8000 test (the handler below
@@ -70,7 +70,7 @@ u32 em_ground_ck(struct _ENEMY_WORK* self);
 #else
 u32 em_ground_ck();
 #endif
-u8 fn_8013023C(struct _ENEMY_WORK* work);
+u8 em_phase_get(struct _ENEMY_WORK* work);
 f32 em_dive_depth_get(struct _ENEMY_WORK* work);
 /* 0x801303EC - r3 (`self`) and f1 (stored at +0x1ac); 0x801303FC tail-calls it with `f0 + f1`.
  * `enemy/fn_8014A1BC.c` calls both with two arguments, so a real two-argument prototype is safe for
@@ -165,7 +165,7 @@ s32 fn_801408B4(struct _ENEMY_WORK* work);
 void fn_801409C8(struct _ENEMY_WORK *self, u8 *in, u32 id, u32 sub, s32 value);
 void fn_80140AF8(struct _ENEMY_WORK *self, u32 a, u32 b);
 void fn_80140B10(struct _ENEMY_WORK *self, u32 a, u32 b);
-void fn_80143190(void);
+void enemy_work_release(void);
 void fn_80144584(s32 kind);
 f32 get_em_chg_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 f32 get_em_scale__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);

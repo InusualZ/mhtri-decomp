@@ -150,15 +150,15 @@ u8 stage_map_kind_get(u8 map);
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
 void assignVec3(void* out, void* in);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void fn_8004FFC8(void* a, void* b, void* c, f32 d);
+void capsule_box_from_points(void* a, void* b, void* c, f32 d);
 void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 vec3_distance(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
-void fn_800FA378(void* out);
+void eft_shape_init(void* out);
 u32 move_work_state_ck(void);
 void mhchar_mat_tev_set(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f);
 s32 pl_capsule_box_set(void* a, void* b);
-s32 fn_802907BC(void* a, void* b);
+s32 pl_capsule_point_ck(void* a, void* b);
 void eft_spawn_pos_in_area(void* pos, u8 area, u8 kind, s32 mode, f32 scale);
 void eft009_spawn_at_joint(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale);
 void eft009_spawn_at_pos(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale,
@@ -336,15 +336,15 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
     nw4r::math::VEC3 b;
 
     rec = (EmSeatRec*)seat;
-    fn_800FA378(box);
+    eft_shape_init(box);
     VEC3_ctor(&a);
     VEC3_ctor(&b);
     if (rec->code == 1) {
         vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
         vec_to_mh_vec3(&b, (Vec*)rec->vec_0x10);
-        fn_8004FFC8(&a, &b, box, radius);
+        capsule_box_from_points(&a, &b, box, radius);
         pl_capsule_box_set(box, box);
-        if (fn_802907BC(point, box) == 1) {
+        if (pl_capsule_point_ck(point, box) == 1) {
             return 1;
         }
         return 0;

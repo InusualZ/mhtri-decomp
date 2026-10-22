@@ -7,6 +7,7 @@
  *   placeholders).
  *   GUESS (from each body and its class-7 callers): pl_act_attack_set, pl_act_motion_row_apply and its row type
  *   PlMotionRow (`Pl/fn_802840DC.h`)
+ *   GUESS (from each body and its callers): `pl_charge_stage2_get`.
  * RESIDUALS. 41 functions unwritten (objdiff scores them 0) in 5 runs: 0x802844B0-0x80284780, 0x802849F0-0x80286BF0,
  *   0x80286DF8-0x8028732C, 0x802873D4-0x80288B98, 0x80288C2C-0x80288CEC.  `fn_802872E4` waits for its two `_PLW`
  *   fields (`unk269`/`unk276`), whose meaning the band does not establish.
@@ -232,7 +233,7 @@ s32 fn_802843F0(_PLW* self)
 
 /* The actor's charge level: the charge gauge divided by the skill-adjusted rate, in the byte the
  * charge callers write at +0x312 and clamp. */
-u8 fn_80284474(_PLW* self)
+u8 pl_charge_stage2_get(_PLW* self)
 {
     return (u8)(self->charge_gauge_0x310 / (s16)fn_802843F0(self));
 }

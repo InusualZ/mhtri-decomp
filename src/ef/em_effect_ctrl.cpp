@@ -785,7 +785,7 @@ extern "C" void eft_vec_ctor(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" u8 fn_80290598(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
 extern "C" s32 stage_water_enabled_ck(void);
 extern "C" u32 fn_802B45D4(void);
-extern "C" u32 fn_802BE39C(void);
+extern "C" u32 camera_mode1_ck(void);
 extern "C" u8 get_option_21(void);
 /* get_now_areano / get_now_mapno / eftGetKeyAlpha / vec_to_mh_vec3 come from `unsplit/unknown.h` as
  * their real declarations (rule 9).  get_camera_pos / get_camera_direction are NOT converted: their map
@@ -948,7 +948,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
                 color.g = 0xFF - unit->entries[i].color_g;
                 color.b = 0xFF - unit->entries[i].color_b;
                 alpha = (u8)intensity - unit->entries[i].alpha_base;
-                if (fn_802BE39C() == 1) {
+                if (camera_mode1_ck() == 1) {
                     alpha /= 2;
                 }
                 if (alpha <= 0) {
@@ -971,7 +971,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     } else {
         part = 0;
     }
-    if (fn_802BE39C() == 0) {
+    if (camera_mode1_ck() == 0) {
         work->emitting = 1;
     } else {
         work->emitting = 0;

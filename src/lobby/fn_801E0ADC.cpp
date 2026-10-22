@@ -8,6 +8,7 @@
  * NAMES. The map and the dump give only placeholders (the run's real names `eft033_set`/`eft033_set_ofs` are used as
  *   they are), so the file keeps the map's stem.  Module `lobby`: every foreign call is the lobby/HUD API (`LbStr`,
  *   `GetMenuFontColor`, `get_lsp_data`, `draw_sprite_*`, `ItemName`) or one of 23 calls into `lobby/fn_80212810.cpp`.
+ *   GUESS (from each body and its callers): `item_price_get`.
  * RESIDUALS. 56 rows unwritten: 0x801E0ADC-0x801E1A2C, 0x801E1B68-0x801E3EDC, 0x801E3EF8-0x801E403C,
  *   0x801E41D0-0x801E448C, 0x801E451C-0x801E4E38, 0x801E4ED0-0x801E4F78, 0x801E5000-0x801E6850, 0x801E68B4-0x801E6DCC,
  *   0x801E6E04-0x801E6EA8, 0x801E6F80-0x801E72F4, 0x801E732C-0x801E7530.  Partial: `fn_801E1A40`, `fn_801E4E44`.
@@ -345,7 +346,7 @@ LbIdRow6* fn_801E6F48(u16 id)
 }
 
 /* Returns the payload the 6-byte table carries for an id, or 0. */
-u16 fn_801E72F4(u16 id)
+u16 item_price_get(u16 id)
 {
     LbIdRow6* row = lbl_805CA660;
 

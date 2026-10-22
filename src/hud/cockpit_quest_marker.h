@@ -84,7 +84,7 @@ void eft053_shell_pos_project(void* a, void* b); /* 0x80366618 */
 /* ---- unsplit callees whose map name is bare (C linkage), rule-2 debt ---- */
 u8 fn_803311A0(void);                       /* 0x803311A0 */
 void drawshape_copy_vec2(void* a, const f32* b);    /* 0x80053CF8 */
-u32 fn_802BE39C(void);                      /* 0x802BE39C */
+u32 camera_mode1_ck(void);                      /* 0x802BE39C */
 u8 get_now_areano(void);                    /* 0x802AFC84 -> get_now_areano__Fv */
 
 /* The quest work block `.bss` 0x806BDCC8 (two `CockpitWork` records, 0x328 B) and the blink record

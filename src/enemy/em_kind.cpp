@@ -7,6 +7,7 @@
  * NAMES. `em_kind_release` (0x80141050, the dump answers only `zz_`) and the static `em_prog_trace2` are GUESSES from
  *   their bodies, and the file name `em_kind` is a GUESS from `em_kind_release`; the other rows keep the map's `fn_`
  *   stems.
+ *   GUESS (from each body and its callers): `enemy_data_by_team_get`.
  * RESIDUALS. 5 rows unwritten: 0x8013BE60-0x8013C244, 0x8013C57C-0x8013C794, 0x8013E528-0x8013E6F4,
  *   0x8013EFD4-0x8013F764.
  *  - `fn_8013D1D0`: retail computes `in[0]` into a scratch register and `in + 1` from the unmodified pointer, ours
@@ -18,7 +19,7 @@
  *    local label);
  *  - `fn_8013C7E0`: ours re-narrows the bytes it stores at +0x9F7/+0x9F8; `fn_8013C988`: both sides read +0x9F7 and
  *    +0x1E1, retail in that order (`cmplw r5,r0`), ours the other way (`cmplw r0,r5`); `fn_8013CAA0`: the argument setup is ordered differently;
- *  - `fn_8013D8C8`, `fn_80140C00`: the shared `return 0` is reached through a different branch layout;
+ *  - `fn_8013D8C8`, `enemy_data_by_team_get`: the shared `return 0` is reached through a different branch layout;
  *    `fn_801409C8`: the same, and retail compares against a double (`lfd` + `fcmpo` + `cror`);
  *  - `fn_8014001C`: retail converts the two values as signed (`xoris 0x8000`), ours as unsigned;
  *    `fn_80140AF8`: ours masks the forwarded r5, retail passes it through; `fn_80140B20`: retail's word-copy loop
@@ -67,9 +68,9 @@
 #define fn_801409C8 fn_801409C8_hidden_enemy_h
 #define fn_80140AF8 fn_80140AF8_hidden_enemy_h
 #define fn_80140B10 fn_80140B10_hidden_enemy_h
-#define fn_80140C00 fn_80140C00_hidden_enemy_h
+#define enemy_data_by_team_get fn_80140C00_hidden_enemy_h
 #include "unsplit/enemy.h"
-#undef fn_80140C00
+#undef enemy_data_by_team_get
 #undef fn_80140B10
 #undef fn_80140AF8
 #undef fn_801409C8
@@ -92,7 +93,7 @@
 /* Callees the folded sources declared with different parameters: each call keeps its own view through a cast
  * (the same direct call). */
 #define get_worldworld_pos_out ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, u8))get_worldworld_pos)
-#define fn_80140C00_view1 ((struct EnemyData* (*)(u8, u8))fn_80140C00)
+#define fn_80140C00_view1 ((struct EnemyData* (*)(u8, u8))enemy_data_by_team_get)
 #define fn_80140B10_view1 ((void (*)(struct _ENEMY_WORK *, u32, u32))fn_80140B10)
 #define fn_80140AF8_view1 ((void (*)(struct _ENEMY_WORK *, u32, u32))fn_80140AF8)
 #define fn_801409C8_view1 ((void (*)(struct _ENEMY_WORK *, u8 *, u32, u32, s32))fn_801409C8)
@@ -104,7 +105,7 @@
 #define fn_801321B0_view1 ((u32 (*)(_ENEMY_WORK*))fn_801321B0)
 #define fn_80130CDC_view1 ((void (*)(_ENEMY_WORK*, s32))fn_80130CDC)
 #define fn_80130858_view1 ((void (*)(_ENEMY_WORK*, s32))fn_80130858)
-#define fn_8013023C_view1 ((u32 (*)(_ENEMY_WORK*))fn_8013023C)
+#define fn_8013023C_view1 ((u32 (*)(_ENEMY_WORK*))em_phase_get)
 #define fn_8012B380_view1 ((void (*)(_ENEMY_WORK*, u32, u32, u8))fn_8012B380)
 #define calcVecDistXZ_view1 ((f32 (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))calcVecDistXZ)
 
@@ -198,7 +199,7 @@ typedef struct _ENEMY_DATA {
 
 extern "C" {
 /* `enemy_data_find` (0x803438E4): its owner's header, `ef/eft_slot.h` (rule 2). */
-extern u32 fn_80345A6C(void *a, u8 b, Vec3 *c, f32 d);
+extern u32 eft_slot_shape_hit_ck(void *a, u8 b, Vec3 *c, f32 d);
 }
 
 u32 PlayMode_ck(void);
@@ -240,7 +241,7 @@ extern f32 lbl_80796DBC;
 extern f32 lbl_80796DC0;
 extern f32 lbl_80796DC4;
 /* the row base `fn_80140CA0` indexes with `fn_800D4DD8`'s answer */
-/* the system work record `fn_80140C00` looks its extra table up in */
+/* the system work record `enemy_data_by_team_get` looks its extra table up in */
 extern u8 system_w[];
 
 /* The four mangled callees, declared at C++ scope with the signature each mangling encodes. */
@@ -301,7 +302,7 @@ struct EmEnemyData {
     /* +0xA0 */ EmEnemyDataSub* sub_0xA0;
 };
 
-/* `system_w` as far as this unit reads it: its +0x898 word is the extra table array `fn_80140C00` indexes by
+/* `system_w` as far as this unit reads it: its +0x898 word is the extra table array `enemy_data_by_team_get` indexes by
  * enemy id and then by kind (`SystemWork` is `mh3_pad/system_work.h`'s).
  * size: 0x89C */
 struct SystemWorkTables {
@@ -833,7 +834,7 @@ s16 fn_8013E180(_ENEMY_WORK *self, u8 *in) {
         if (data == 0) {
             fn_80140AF8_view1(self, 8, 50);
             fn_8013BDE4(&in, 50, &result);
-        } else if (fn_80345A6C(data, data->field_0x36, &self->pos, lbl_80796DA0) == 0) {
+        } else if (eft_slot_shape_hit_ck(data, data->field_0x36, &self->pos, lbl_80796DA0) == 0) {
             fn_8013BDE4(&in, 50, &result);
         }
         break;
@@ -2374,7 +2375,7 @@ void fn_80140B20(void) {
     }
 }
 
-u32 fn_80140C00(u8 id, u8 kind) {
+u32 enemy_data_by_team_get(u8 id, u8 kind) {
     u8 sel = id;
     u32 sub;
 

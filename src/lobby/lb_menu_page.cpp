@@ -48,13 +48,13 @@ typedef struct LbPageRecord {
     /* +0x02 */ u16 flags_0x02;    /* bits 1/2/3 select the text ids (0x2/0x4/0x8) */
     /* +0x04 */ u16 value_0x04;    /* `fn_80217F4C`'s value for the row */
     /* +0x06 */ u8 unused_0x06[0x2];
-    /* +0x08 */ void* data_0x08;   /* `fn_80214FB8`'s third argument */
+    /* +0x08 */ void* data_0x08;   /* `lb_help_num_put`'s third argument */
     /* +0x0C */ u8 unused_0x0C[0xC];
 } LbPageRecord; /* size: 0x18 */
 
 /* One 0x10-byte entry of the page's entry table at +0x328. size: 0x10 */
 typedef struct LbPageEntry {
-    /* +0x00 */ void* data_0x00;   /* `fn_80214FB8`'s third argument */
+    /* +0x00 */ void* data_0x00;   /* `lb_help_num_put`'s third argument */
     /* +0x04 */ u8 unused_0x04[0x6];
     /* +0x0A */ u16 flags_0x0A;    /* bits 1/2/5 select the text ids (0x2/0x4/0x20) */
     /* +0x0C */ u8 unused_0x0C[0x4];
@@ -73,7 +73,7 @@ typedef struct LbMenuPage {
     /* +0x006 */ u8 unused_0x006[0x6];
     /* +0x00C */ s16 list_mode_0x0C;    /* the row/list index into `records_0x264` and `entries_0x328` */
     /* +0x00E */ u8 unused_0x00E[0x8];
-    /* +0x016 */ u16 record_index_0x16; /* the row index `fn_80214FB8`'s argument comes from */
+    /* +0x016 */ u16 record_index_0x16; /* the row index `lb_help_num_put`'s argument comes from */
     /* +0x018 */ s16 has_entries_0x18;  /* non-zero while the entry table has a live row (guess) */
     /* +0x01A */ u8 unused_0x01A[0x2];
     /* +0x01C */ s16 sub_mode_0x1C;     /* picks between the two text ids of the 0x78/0x79 pair */
@@ -89,7 +89,7 @@ typedef struct LbMenuPage {
     /* +0x200 */ s32 data_0x200;        /* `lb_panel_yes_no_draw`'s second argument for the 6265 panel */
     /* +0x204 */ u8 unused_0x204[0x8];
     /* +0x20C */ LbIconRec icons_0x20C[4]; /* 12-byte icon records `equip_record_copy` copies */
-    /* +0x23C */ u32 values_0x23C[4];      /* the words `fn_80214FB8` is handed */
+    /* +0x23C */ u32 values_0x23C[4];      /* the words `lb_help_num_put` is handed */
     /* +0x24C */ u16 flags_0x24C[12];      /* the per-index flag run both text selectors read */
     /* +0x264 */ LbPageRecord records_0x264[8];
     /* +0x324 */ u8 unused_0x324[0x4];
@@ -109,7 +109,7 @@ s16 fn_801EF73C(void* work);                     /* 0x801EF73C - the icon index 
 s32 fn_801F0834(void* work);                     /* 0x801F0834 - non-zero while the sub-work is live */
 s32 fn_802142D8(LbIconRec* icon, s32 flag, void* table_a, void* table_b);
 s32 lb_panel_msg_draw(s32 page, s16 id);               /* the 0x1877 panel's primary text */
-s32 fn_80214FB8(s32 page, s32 id, void* data);   /* the same panel's row text plus its data */
+s32 lb_help_num_put(s32 page, s32 id, void* data);   /* the same panel's row text plus its data */
 s32 lb_panel_line_draw(s32 page, s16 id, s32 a, s32 b); /* its secondary text */
 s32 lb_panel_yes_no_draw(s32 page, s32 data);             /* its value */
 s32 fn_802179D4(LbIconRec* icon);                /* non-zero while the record is already held */
@@ -170,7 +170,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             break;
         case 1:
-            fn_80214FB8(6263, 95, self->records_0x264[self->record_index_0x16].data_0x08);
+            lb_help_num_put(6263, 95, self->records_0x264[self->record_index_0x16].data_0x08);
             lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 3:
@@ -267,7 +267,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             break;
         case 2:
-            fn_80214FB8(6263, 102, (void*)self->values_0x23C[self->index_0x128]);
+            lb_help_num_put(6263, 102, (void*)self->values_0x23C[self->index_0x128]);
             lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 3:
@@ -307,7 +307,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             break;
         case 1:
-            fn_80214FB8(6263, 95, self->records_0x264[self->record_index_0x16].data_0x08);
+            lb_help_num_put(6263, 95, self->records_0x264[self->record_index_0x16].data_0x08);
             lb_panel_yes_no_draw(6265, self->data_0x200);
             return;
         case 5:
@@ -361,7 +361,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             break;
         case 2:
-            fn_80214FB8(6263, 108, self->entries_0x328[self->list_mode_0x0C].data_0x00);
+            lb_help_num_put(6263, 108, self->entries_0x328[self->list_mode_0x0C].data_0x00);
             lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         }
@@ -403,7 +403,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             break;
         case 2:
-            fn_80214FB8(6263, 115, self->entries_0x328[self->list_mode_0x0C].data_0x00);
+            lb_help_num_put(6263, 115, self->entries_0x328[self->list_mode_0x0C].data_0x00);
             lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 3:

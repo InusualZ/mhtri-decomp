@@ -8,6 +8,7 @@
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sbss, .sdata, .sdata2, .text, extab,
  * extabindex).
+ * NAMES. GUESS (from each body and its callers): `light_work_reset`.
  */
 /* ---- header inherited from src/light/light.cpp (written against its pre-phase-4 range) ---- */
 /*

@@ -21,10 +21,10 @@ void sound_frame_entry(void);
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 /* Reconcile 2026-09-25: the owner (`sound/fn_800D7F54.cpp:134`) declares this
- * `SeSlot* fn_800DA72C(s32, s32, nw4r::math::VEC3*)`, so the `void*` here was a boundary artefact.
+ * `SeSlot* se_slot_req_pos(s32, s32, nw4r::math::VEC3*)`, so the `void*` here was a boundary artefact.
  * `sound/se.h` carries the owner's spelling - the two now agree and a consumer that includes both
  * no longer trips `(10505) illegal overloading` (no consumer reads the result). */
-struct SeSlot* fn_800DA72C(s32 kind, s32 id, Vec3* pos);
+struct SeSlot* se_slot_req_pos(s32 kind, s32 id, Vec3* pos);
 void fn_800DCF0C(s32 handle, Vec3* pos);
 void fn_800DA864(Vec3* pos);
 void fn_800DA8F4(Vec3* pos);
@@ -168,6 +168,14 @@ extern "C" {
 /* 0x800DBCD8 / 0x800DBE0C - request sound `id` on channel 32 / channel 2 when it is free (GUESS names). */
 void sysSE_bank32_req(s32 id);
 void se_ch2_req(s32 id);
+/* 0x800DB4EC - requests the orb sound `kind` (0 land, 1 hit, 2 throw) at `pos` (`ef/eft035.cpp`). */
+void se_req_orb(s32 kind, nw4r::math::VEC3* pos);
+/* 0x800DC858 - requests sound 78 at `pos` (`ef/eft019.cpp`'s timed record calls it every 30 frames). */
+void se_req_eft019_tick(nw4r::math::VEC3* pos);
+/* 0x800DBC00 - requests the item jingle (`ef/eft052.cpp`'s HUD messages of kind 1). */
+void se_req_item_jingle(void);
+/* 0x800DD1F0 - requests the splash sound `id` at `pos` (`ef/eft029.cpp`, `ef/eft052.cpp`). */
+void se_req_splash(u8 id, nw4r::math::VEC3* pos);
 }
 #endif
 

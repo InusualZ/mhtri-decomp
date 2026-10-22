@@ -2477,7 +2477,7 @@ u32 em_mot_end_ck(struct _ENEMY_WORK* self);
 s32 fn_8012F948(struct _ENEMY_WORK* self);
 void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
-u32 fn_8013023C(struct _ENEMY_WORK* self);
+u32 em_phase_get(struct _ENEMY_WORK* self);
 f32 fn_8013032C(struct _ENEMY_WORK* self);
 void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
@@ -2512,10 +2512,10 @@ void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* 
 void eft013_spawn_id(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, s32 d);
 void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
-void fn_800FA378(void* out);
+void eft_shape_init(void* out);
 void eft_capsule_ctor(void* out);
 void assignVec3(void* out, const void* in);
-void fn_8004FFC8(void* a, void* b, void* c, f32 d);
+void capsule_box_from_points(void* a, void* b, void* c, f32 d);
 void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
 
 /* This unit's dispatch targets in the blocks above, declared again for this block. */
@@ -2535,7 +2535,7 @@ void fn_801D3CF8(struct _ENEMY_WORK* self, u32 a);
 
 void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, u32 d);
 
-s32 fn_802907BC(s32 a, void* b);
+s32 pl_capsule_point_ck(s32 a, void* b);
 void fn_802B43A8(void* pos, u8 a, u16 b);
 void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 
@@ -2543,7 +2543,7 @@ void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos,
  * the records this unit needs locally
  * -------------------------------------------------------------------------------------------------- */
 
-/* The two stack records `fn_801D66BC` builds (`eft_capsule_ctor`/`fn_800FA378` fill them); only their sizes
+/* The two stack records `fn_801D66BC` builds (`eft_capsule_ctor`/`eft_shape_init` fill them); only their sizes
  * are known.  size: 0x20 */
 struct EmScratchA {
     /* +0x00 */ u8 unused_0x00[0x20];
@@ -2565,7 +2565,7 @@ struct EmAreaEntry801CCBC4 {
     /* +0x5A7 */ u8 unused_0x5A7[0x5A8 - 0x5A7];
 };
 
-/* One `lbl_805B6950` entry: the two records `fn_8004FFC8` interpolates between and the scale at +0x18.
+/* One `lbl_805B6950` entry: the two records `capsule_box_from_points` interpolates between and the scale at +0x18.
  * size: 0x1C */
 struct EmGrowTable801CCBC4 {
     /* +0x00 */ u8 rec_a[0xC];
@@ -3379,14 +3379,14 @@ s32 fn_801D66BC(u8 arg0, void* target) {
     EmGrowTable801CCBC4* entry;
 
     eft_capsule_ctor(&scratchA);
-    fn_800FA378(&scratchB);
+    eft_shape_init(&scratchB);
     if (arg0 >= 3) {
         return 0;
     }
     entry = (EmGrowTable801CCBC4*)lbl_805B6950 + arg0;
-    fn_8004FFC8(entry->rec_a, entry->rec_b, &scratchA, entry->scale);
+    capsule_box_from_points(entry->rec_a, entry->rec_b, &scratchA, entry->scale);
     pl_capsule_box_set((const PlCapsule*)&scratchA, (PlCapsuleBox*)&scratchB);
-    return fn_802907BC((s32)target, &scratchB) - 1 == 0;
+    return pl_capsule_point_ck((s32)target, &scratchB) - 1 == 0;
 }
 
 s32 fn_801D6758(struct _ENEMY_WORK* self) {

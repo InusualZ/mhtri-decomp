@@ -8,6 +8,7 @@
  *   closure and the `movie.cpp` `__FILE__` anchor, the right one `quest/arenatask.cpp`.
  * FLAGS. `cflags_menu` (configure.py; unmeasured).
  * NAMES. Module `menu` and the file from the `__FILE__` string "movie.cpp".
+ *   GUESS (from each body and its callers): `movie_drive_wait`.
  * RESIDUALS. every body (112 rows score zero) and the internal seams: the run holds at least three TUs (movie,
  *   `menu_friendlist.cpp` at 0x8043F398, the character make code).  The symbols are in the map
  *   (`python tools/units/ledger.py unit menu/movie.cpp`).

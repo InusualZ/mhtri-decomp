@@ -72,4 +72,18 @@ void nwMoveStart(void);
 void nwMoveEnd(void);
 #endif
 
+#ifdef __cplusplus
+/* 0x800D5C74 nwWorkInitialize__Fv - clears the network resource work (C++ scope in the owner). */
+void nwWorkInitialize(void);
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800D32CC - sets the network resource manager up (the system core's memory layout runs it). */
+void nw_resource_init(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NW_RESOURCE_H */

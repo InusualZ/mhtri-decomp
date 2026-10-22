@@ -1,6 +1,6 @@
 /* ef/fn_800FD520.c - the state-0 handler of the eft002 effect machine: it creates the nw4r effect for the actor's
  *   weapon class and places it at the weapon joint (the joint's world matrix through `_PLW::physics_0x13C + 4`, a
- *   per-class muzzle offset, then `SetRootMtxTrans`), the shape of `Pl/pl_act.cpp`'s `fn_8027C064`.
+ *   per-class muzzle offset, then `SetRootMtxTrans`), the shape of `Pl/pl_act.cpp`'s `pl_impact_pos_get`.
  * RANGE. .text 0x800FD520-0x800FD718 (1 function); extab 0x8000BDFC-0x8000BE04, extabindex 0x80025BE4-0x80025BF0,
  *   .sdata 0x807916E0-0x807916E8 (the per-class effect and parameter ids), .sdata2 0x80796658-0x80796688 (the 12
  *   per-class offsets).

@@ -49,4 +49,13 @@ void quest_snd_wk_init(void);
 void movie_bgm_load(void);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800F0554 - resets the sound bank loader (the system core's full reset). */
+void snd_bank_loader_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif

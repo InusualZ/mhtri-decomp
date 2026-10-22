@@ -53,7 +53,7 @@ void hit_attack_list_push(struct _HIT_W* hit);
 void hit_data_apply(struct _HIT_W* hit, void* owner, f32 value);
 void hit_flags_clear(struct _HIT_W* hit);
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
-void fn_801006A0(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
+void eft004_key_spawn(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
 void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, s32 a, s32 b, f32 c);
 void fn_8012A624(nw4r::math::VEC3* out);
 void fn_800524C0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,

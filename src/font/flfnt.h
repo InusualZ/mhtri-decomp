@@ -16,6 +16,9 @@ void *fn_8005B1E4(void *self, u32 value);  /* 0x8005B1E4 - stores `value` at +0x
  * (GUESS name, from the 1/2 result the network message layout adds to its line width). */
 u16 getGlyphWidth(const char* glyph);
 
+/* 0x8005C7F0 - selects the font colour `index` for the next print (`font/flfnt.cpp`). */
+void font_color_set(s16 index);
+
 #ifdef __cplusplus
 }
 #endif
@@ -33,6 +36,9 @@ void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
  * 0x8005B874 `flfntStrLen` (a tail call into the decoding walker), 0x8005C9A8 `msg_str_gen` and 0x8005B878
  * `flKnjMsgNumPtr` (the pointer to the `index`-th character of `s`). */
 s32 flfntStrLen(char* s);
+/* 0x8005BA50 `flfntFontPuts__FPc` / 0x8005C7E4 `font_locate__Fss` (C++ scope): print `s` at the pen, move the pen. */
+void flfntFontPuts(char* s);
+void font_locate(s16 x, s16 y);
 /* The font cluster's position/size/colour setters and print-flush-reset sequence, at C++ scope so a call mangles
  * to `__Fll`, `__FUl`, `__FPce`, `__Fv`. */
 void flfntSetPos(s32 x, s32 y);
@@ -49,5 +55,14 @@ extern "C" char* flfntStrChr(char* s, s32 c);
 
 /* 0x8005BE40 `utf82unicode2` - the byte count of the UTF-8 character at the pointer; C++ scope (`__FPUc`). */
 s32 utf82unicode2(u8* str);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x8005B26C - the size of the font buffer the system core lays out. */
+u32 font_buffer_size_get(void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* MHTRI_FONT_FLFNT_H */

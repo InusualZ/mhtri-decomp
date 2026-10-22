@@ -19,14 +19,18 @@
 extern "C" {
 #endif
 
-/* One 0x38-byte slot of `system_w`'s task table at +0xBC (fn_800D0568/FDB0 index it by
- * `index * 0x38`); only the +0x00 live flag and the +0x04 body are touched by this unit. */
-typedef struct SysTask {
+/* One 0x38-byte texture slot of `system_w`'s table at +0xBC (fn_800D0568/FDB0 index it by `index * 0x38`): the live
+ * flag, the GX texture object (`body`) and the image parameters it was built from. */
+typedef struct _tex_info {
     /* +0x00 */ u8 active;
     /* +0x01 */ u8 pad_0x01[0x3];
-    /* +0x04 */ u8 body[0x20];
-    /* +0x24 */ u32 field_0x24;
-    /* +0x28 */ u8 pad_0x28[0x10];
+    /* +0x04 */ u8 body[0x20];       /* the `GXTexObj` */
+    /* +0x24 */ u32 field_0x24;      /* the image data */
+    /* +0x28 */ u16 width_0x28;
+    /* +0x2A */ u16 height_0x2A;
+    /* +0x2C */ u32 format_0x2C;
+    /* +0x30 */ u32 wrap_s_0x30;
+    /* +0x34 */ u32 wrap_t_0x34;
 } SysTask; /* size: 0x38 */
 
 /* The four-byte record at +0x7BC: fn_800CFBE0 reads it whole, fn_800CFBA0 sets its top byte. */
@@ -76,23 +80,38 @@ typedef struct SystemWork {
     /* +0x032 */ u8 field_0x32;
     /* +0x033 */ u8 field_0x33[4]; /* per-channel WPAD motor state */
     /* +0x037 */ u8 field_0x37[4]; /* per-channel WPAD motor timer */
-    /* +0x03B */ u8 pad_0x3b[0x11];
+    /* +0x03B */ u8 pad_0x3b[0x1];
+    /* +0x03C */ u32 arena_0x3c;       /* the MEM2 arena base the system core's memory layout sets */
+    /* +0x040 */ u32 arena_size_0x40;
+    /* +0x044 */ u32 stream_area_0x44; /* the stream area base */
+    /* +0x048 */ u32 stream_area_size_0x48;
     /* +0x04C */ u32 field_0x4c;
-    /* +0x050 */ u8 pad_0x50[0x10];
+    /* +0x050 */ u32 field_0x50;       /* the size of the +0x4C region */
+    /* +0x054 */ u32 field_0x54;
+    /* +0x058 */ u32 field_0x58;       /* a 4 MB region base */
+    /* +0x05C */ u32 field_0x5c;       /* its size */
     /* +0x060 */ u32 field_0x60;      /* MEMCreateExpHeapEx base */
     /* +0x064 */ u32 field_0x64;      /* MEMCreateExpHeapEx size */
     /* +0x068 */ u32 field_0x68;
     /* +0x06C */ u32 field_0x6c;
     /* +0x070 */ u32 field_0x70;
     /* +0x074 */ u32 field_0x74;
-    /* +0x078 */ u8 pad_0x78[0x18];
+    /* +0x078 */ u32 field_0x78;       /* the last MEM2 region base */
+    /* +0x07C */ u32 field_0x7c;       /* its size */
+    /* +0x080 */ u32 mem1_0x80;        /* the MEM1 region base */
+    /* +0x084 */ u32 mem1_size_0x84;
+    /* +0x088 */ u8 pad_0x88[0x8];
     /* +0x090 */ void* field_0x90;    /* the stream handle fn_800CF61C reads */
     /* +0x094 */ u8 mem_allocator[0x10]; /* MEMFreeToAllocator's allocator record */
     /* +0x0A4 */ MoveWork* field_0xa4; /* the move-work record work_mem_alloc builds */
     /* +0x0A8 */ u8 pad_0xa8[0x14];
     /* +0x0BC */ SysTask tasks[0x20];  /* fn_800D0568/FDB0's 0x38-stride table, ends at +0x7BC */
     /* +0x7BC */ SysWord field_0x7bc;
-    /* +0x7C0 */ u8 pad_0x7c0[0xC];
+    /* +0x7C0 */ u8 pad_0x7c0[0x8];
+    /* +0x7C8 */ u8 field_0x7c8;    /* the four flags the reset paths clear with +0x7CC/+0x7CD */
+    /* +0x7C9 */ u8 field_0x7c9;
+    /* +0x7CA */ u8 field_0x7ca;
+    /* +0x7CB */ u8 field_0x7cb;
     /* +0x7CC */ u8 field_0x7cc;
     /* +0x7CD */ u8 field_0x7cd;
     /* +0x7CE */ u8 field_0x7ce;
@@ -132,7 +151,7 @@ typedef struct SystemWork {
     /* +0x877 */ u8 field_0x877;
     /* +0x878 */ u32 field_0x878;
     /* +0x87C */ u32 field_0x87c;
-    /* +0x880 */ u8 pad_0x880[0x4];
+    /* +0x880 */ u32 field_0x880;     /* the loaded resident file `resident_file_load` reads */
     /* +0x884 */ u8 field_0x884;
     /* +0x885 */ u8 pad_0x885[0x1];
     /* +0x886 */ u8 field_0x886;
@@ -177,9 +196,20 @@ typedef struct SystemWork {
     /* +0x910 */ u8 save_keep_0x910[2];  /* GUESS name: two bytes `multi_box_phase_input` keeps across a box save */
     /* +0x912 */ u8 pad_0x912[0x1F];
     /* +0x931 */ u8 unk2353;
-    /* +0x932 */ u8 pad_0x932[0x16];
+    /* +0x932 */ u8 pad_0x932[0xE];
+    /* +0x940 */ u32 layout_0x940;     /* the system core's memory layout: the user data block */
+    /* +0x944 */ u32 layout_0x944;     /* the font buffer */
     /* +0x948 */ void* field_0x948;    /* work-heap base, cleared by fn_800CE5B4 */
-    /* +0x94C */ u8 pad_0x94c[0x104];
+    /* +0x94C */ u32 layout_0x94c;
+    /* +0x950 */ u32 layout_0x950;
+    /* +0x954 */ u32 layout_0x954;
+    /* +0x958 */ u32 layout_0x958;
+    /* +0x95C */ u32 layout_0x95c;
+    /* +0x960 */ u32 layout_0x960;
+    /* +0x964 */ u8 pad_0x964[0x4];
+    /* +0x968 */ u32 layout_0x968;
+    /* +0x96C */ SysTask tex_0x96c[3];   /* the texture slots 0xFF, 0xFE and 0xFD of the TPL loaders */
+    /* +0xA14 */ u8 pad_0xa14[0x3C];
     /* +0xA50 */ u8 transfer_mode_0xa50;    /* the network transfer mode (the network control's start-up sets 1) */
     /* +0xA51 */ u8 transfer_flag_0xa51;    /* cleared with it (0) */
     /* +0xA52 */ u8 transfer_level_0xa52;   /* the transfer level handed to the mediator (start-up sets 4) */

@@ -173,7 +173,7 @@
  * unwritten, and their inventory is `config/RMHE08/symbols.txt` (their target objects are
  * `build/RMHE08/obj/`).  Everything written is byte-identical except `get_camera_pos`, whose residual
  * is on the function (and is shared by the whole accessor family: `get_current_view_mtx`,
- * `get_camera_direction`, `fn_802BDC90`, `fn_802BDDB0`, `fn_802BDE90`, `fn_802BDFC0`, `fn_802BDFFC`,
+ * `get_camera_direction`, `fn_802BDC90`, `get_camera_target_pos`, `fn_802BDE90`, `fn_802BDFC0`, `fn_802BDFFC`,
  * `fn_802BE088`, `camera_position_set`, `fn_802BE1EC`, `fn_802BE0F4` - they all start from `fn_80047398()`,
  * copy the handle through `word_copy_return_dst` and read a field, and all need MWCC to alias their returned
  * local to the `sret` pointer, which the spellings tried so far do not achieve).
@@ -610,7 +610,7 @@ extern "C" void fn_802B5738(StageAreaObj* area)
     fn_802B2E2C();
     fn_802BEAAC(area, kind);
     fn_802BE1EC(area);
-    fn_802BDDB0(&pos);
+    get_camera_target_pos(&pos);
     subVec3(&world, &::get_camera_pos(), &pos);
     copyVec3(&poly, &world);
     if (screen_split_mode_ck() != 0) {

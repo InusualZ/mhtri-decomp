@@ -185,7 +185,7 @@ typedef struct _EFT_WORK {
  * is canonical here. size: 0x48 */
 typedef struct _EFT _EFT;
 struct _EFT {
-    /* +0x000 */ u8 pad_0x0[0x1];
+    /* +0x000 */ u8 used_0x00;          /* the slot is live (`eft_res_slot_get` hands it out) */
     /* +0x001 */ u8 flag_0x01;
     /* +0x002 */ u8 type_0x02;
     /* +0x003 */ u8 field_0x03;

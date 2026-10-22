@@ -348,4 +348,13 @@ struct QuestWork;
 QuestWork* quest_init(u8 kind);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x803B4104 - whether the quest's clear percentage reaches `grade` (`ef/eft053.cpp` gates its rank gimmicks on it). */
+s32 quest_grade_rank_get(u8 grade);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_QUEST_QUEST_ENTRY_H */

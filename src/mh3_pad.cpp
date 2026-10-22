@@ -32,7 +32,7 @@
  * in this window: it sits in the DVD library's `.bss`.
  *
  * This session reconstructed 67 of the 145 functions to the 80 % bar: the RSO sub-overlay loader state
- * machine (fn_800408A8..fn_80040FDC), the task-slot table (fn_80041640..fn_80041944), the vector
+ * machine (fn_800408A8..fn_80040FDC), the task-slot table (fn_80041640..arena_task_start), the vector
  * helpers (copyVec3..fn_80041E9C), the RcRecord accessors (fn_80042B34..fn_80042F60), the pad
  * callbacks and the Psw pad-record accessors, the KPAD/WPAD setup and the small flag/word helpers.
  *
@@ -58,7 +58,7 @@
  *     `lbl_80790E30`, `lbl_80790E28`.
  *   config/RMHE08/config.yml `block_relocations`: the `.data` table `lbl_8057CED0` (0x8057CED0..0x80580058, 0x3188 B,
  *     the base `fn_80041138` hands to the byte-stream decoder `fn_80040FEC`) is packed byte data; dtk read 43 of its
- *     words as addresses (0x8057F8CC as `VFsys+0x23DDC`, 0x8057D564 as `memcpy`, `fn_800CFF60+0xA8`,
+ *     words as addresses (0x8057F8CC as `VFsys+0x23DDC`, 0x8057D564 as `memcpy`, `work_stack_free_index+0xA8`,
  *     `stage_dcm_file_table+0xE3`, ...), so the whole table is blocked and the target object carries no relocation
  *     inside it.
  *   flipcheck: `.sbss` claimed, not emitted.
@@ -68,6 +68,8 @@
  * NAMES. GUESS (from each body and its callers): stage_map_set
  *   GUESS (from each body and its callers): rso_overlay_release_all, rso_overlay_mode2_load, rso_overlay_mode4_load
  *   GUESS: pad_input_clear
+ *   GUESS (from each body and its callers): `pad_module_init`, `task_slot_table_clear`, `arena_task_start`,
+ *   `pad_motor_stop_all`.
  */
 
 #include "types.h"
@@ -438,7 +440,7 @@ extern "C" void fn_8004166C(f32 x, f32 y, f32 z)
     *(volatile f32*)0xCC008000 = z;
 }
 
-extern "C" void fn_80041680(void)
+extern "C" void task_slot_table_clear(void)
 {
     memset(task_slot_table, 0, 0x200);
 }
@@ -496,7 +498,7 @@ extern "C" TaskSlot* fn_8004192C(s16 slot)
 }
 
 /* The arena-select task entry: load the four-overlay mode and hand slot 4 to `arena_task`. */
-extern "C" void fn_80041944(void)
+extern "C" void arena_task_start(void)
 {
     fn_80040CA8();
     if (task_func != 0) {
@@ -795,7 +797,7 @@ extern "C" void fn_80044A30(u8 chan)
     WPADControlMotor(chan, 0, 0);
 }
 
-extern "C" void fn_80044A54(void)
+extern "C" void pad_motor_stop_all(void)
 {
     u8 chan;
 

@@ -815,6 +815,8 @@ config.libs = [
             # Flags: unit header of src/ef/ef_sphere.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(NonMatching, "ef/ef_sphere.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/system_core.cpp"),
+            # Data-only unit: src/ef/sys_tex_file_table.cpp header.
+            Object(NonMatching, "ef/sys_tex_file_table.cpp"),
             Object(Matching, "ef/eft001.cpp"),
             Object(NonMatching, "ef/eft_res.cpp"),
             Object(NonMatching, "ef/effect.cpp"),

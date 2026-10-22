@@ -24,4 +24,13 @@ void pad_connect_disp_set(u32 on);
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80047020 - resets the pad connection state (the system core's resets). */
+void pad_connect_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_PAD_CONNECT_H */

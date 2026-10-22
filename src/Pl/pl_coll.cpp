@@ -10,6 +10,7 @@
  *   `findInterSection3` are the map's (mangled) names; every other function keeps its unmangled map stem in an
  *   `extern "C"` block.
  *   GUESS: `vec3_scale_inv`
+ *   GUESS (from each body and its callers): `pl_coll_table_clear`.
  * RESIDUALS. 53 functions unwritten (objdiff scores them 0) in 16 runs: 0x8028FA20-0x802910C0, 0x80291114-0x8029163C,
  *   0x80291664-0x802919FC, 0x80291A70-0x80291B08, 0x80291B48-0x80291BBC, 0x80291CD0-0x80292468, 0x802924C0-0x80293A7C,
  *   0x80293A88-0x8029573C, 0x8029576C-0x80295924, 0x80295998-0x802961F8, 0x80296260-0x80296368, 0x80296448-0x802969A8,
@@ -342,7 +343,7 @@ extern "C" PlLandCell* fn_80297D9C(PlLandCell* self)
 }
 
 /* Clears the whole table. */
-extern "C" void fn_8029708C(void)
+extern "C" void pl_coll_table_clear(void)
 {
     memset(pl_land_data, 0, 0x7F8);
 }

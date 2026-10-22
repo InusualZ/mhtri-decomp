@@ -61,4 +61,13 @@ s32 userdata_item_count_total(u16 id, u8* userdata);
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80048F98 - resets the user data's frame state (the system core's resets). */
+void userdata_frame_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_USERDATA_ITEM_H */

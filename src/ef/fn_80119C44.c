@@ -2,7 +2,7 @@
  * RANGE. .text 0x80119C44-0x80119DEC (5 functions); extab 0x8000C554-0x8000C56C, extabindex 0x800266E8-0x8002670C,
  *   .sdata2 0x80796B2C-0x80796B30.  `fn_80119C44` takes a 0x48-byte `_EFT_HEAP` record with a 0x18-byte work block
  *   from `eft_res_slot_get`, installs `fn_80119D10` (pool release, +0x40) and `fn_80119D9C` (the four-state dispatch,
- *   +0x34); `fn_80119D9C` runs the type-2 start `fn_80119DEC` or the type handlers in `ef/eft029.cpp`.
+ *   +0x34); `fn_80119D9C` runs the type-2 start `eft028_start_by_area` or the type handlers in `ef/eft029.cpp`.
  * NAMES. The map has only `fn_` stems for this range.  The file is C: the unit's own symbols are plain (a mangled
  *   callee is not evidence of a C++ unit); its extab/extabindex come from `cflags_main`'s `-Cpp_exceptions on`.
  *   GUESS: `eft028_state0_dispatch` (0x80119DD8, the file-local state-0 function the map folds into `fn_80119D9C`'s
@@ -62,11 +62,11 @@ struct _EFT_HEAP_WORK {
 
 extern u32 get_now_areano__Fv(void);
 extern struct _EFT_HEAP* eft_res_slot_get(u32 block_size);
-extern void fn_80119DEC(struct _EFT_HEAP* self);
-extern void fn_8011A2A0(struct _EFT_HEAP* self);
-extern void fn_8011A34C(struct _EFT_HEAP* self);
-extern void fn_8011ACF0(struct _EFT_HEAP* self);
-extern void fn_8011AD00(struct _EFT_HEAP* self);
+extern void eft028_start_by_area(struct _EFT_HEAP* self);
+extern void eft028_start(struct _EFT_HEAP* self);
+extern void eft028_move(struct _EFT_HEAP* self);
+extern void eft028_state_next(struct _EFT_HEAP* self);
+extern void eft028_free(struct _EFT_HEAP* self);
 
 extern void push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(void** effects, long count);
 
@@ -148,13 +148,13 @@ void fn_80119D9C(struct _EFT_HEAP* self)
         eft028_state0_dispatch(self);
         break;
     case 1:
-        fn_8011A34C(self);
+        eft028_move(self);
         break;
     case 2:
-        fn_8011ACF0(self);
+        eft028_state_next(self);
         break;
     case 3:
-        fn_8011AD00(self);
+        eft028_free(self);
         break;
     }
 }
@@ -165,10 +165,10 @@ static void eft028_state0_dispatch(struct _EFT_HEAP* self)
 {
     switch (self->type_0x02) {
     default:
-        fn_80119DEC(self);
+        eft028_start_by_area(self);
         break;
     case 2:
-        fn_8011A2A0(self);
+        eft028_start(self);
         break;
     }
 }

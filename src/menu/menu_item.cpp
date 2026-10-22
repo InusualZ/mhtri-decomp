@@ -16,6 +16,7 @@
  *   named rows are GUESSes from their bodies (the dump answers `zz_` for them).
  *   GUESS (from each body and its callers): hit_mask_ck
  *   GUESS: `menu_row_table_get`
+ *   GUESS (from each body and its callers): `menu_item_close`.
  * RESIDUALS. 96 rows unwritten (objdiff scores them zero): 0x80297E34-0x80299ED8, 0x80299EF8-0x8029A140,
  *   0x8029A19C-0x8029B8F4, 0x8029B918-0x8029D6FC, 0x8029D744-0x8029EFDC, 0x8029F204-0x8029F3C8 (`hit_data_apply`),
  *   0x8029F834-0x8029FA74, 0x8029FCFC-0x8029FFB8, 0x802A0568-0x802A16F8, 0x802A1714-0x802A2550,
@@ -1545,7 +1546,7 @@ extern "C" void fn_8029FB00(MenuSlot* slot)
 }
 
 /* 0x802A0188: releases both menu slots and puts the menu back into its unloaded state. */
-extern "C" void fn_802A0188(void)
+extern "C" void menu_item_close(void)
 {
     MenuSlot* slot;
     s32 i;

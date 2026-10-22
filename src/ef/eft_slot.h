@@ -40,7 +40,7 @@ u32 eft_slot_persist_ck(struct EftSlot* slot);
 void eft_slot_kind_set(struct EftSlot* slot, u8 key, u8 force);
 void eft_slot_state_set(struct EftSlot* slot, u8 state, struct _ENEMY_WORK* work, u8 index);
 /* 0x803461EC - stores the two marks a received mark message carries on the slot. */
-void eft_slot_marks_set(struct EftSlot* slot, u8 a, u8 b);
+u32 eft_slot_marks_set(struct EftSlot* slot, u8 a, u8 b);
 
 /* 0x80349914 - the two-byte copy MWCC emits for a `u16` pair assignment (`*dst = *src`); `menu/menu_row.cpp` calls
  * it.  It is `menu/menu_effect_slot.cpp`'s, declared here until that unit has a header. */

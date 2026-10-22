@@ -1902,7 +1902,7 @@ s32 res_file_assign(void* dst, void* src);
 void* res_file_ctor(void* out, u32 value);
 void fn_800D5CAC(void* rec);
 void fn_800E3358(u32 kind, u8 arg, void* str);
-void fn_800F6520(void);
+void eft_res_pool_reset(void);
 void eft_control_init(void);
 void eft_common_load(void);
 void fn_801E92B0(void);
@@ -1938,7 +1938,7 @@ void fn_802BB0EC(void);
 void stage_dcm_path_get(char* buf, u8 index);
 void sprite_frame_apply(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
 void fn_8032422C(void);
-void fn_8035A9E4(void);
+void hud_msg_init(void);
 void lobby_res_slots_init(void);
 void fn_803C3A70(void);
 void fn_803C3F60(void);
@@ -2065,7 +2065,7 @@ void fn_801FB2A8(u8 a, u8 b, u8 c)
     fn_800D5CAC((void*)lbl_80582988);
     fn_800D5CAC((void*)lbl_8058AA98);
     fn_801FCA80(a);
-    fn_800F6520();
+    eft_res_pool_reset();
     eft_common_load();
     if (isCityMode() == 0 || system_w.field_0x8b1 == 1) {
         village_tex_load();
@@ -2117,7 +2117,7 @@ void fn_801FB438(void)
     fn_8021D9F8();
     menu_item_work_init();
     fn_8032422C();
-    fn_8035A9E4();
+    hud_msg_init();
     fn_803C3A70();
 }
 

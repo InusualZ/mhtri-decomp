@@ -13,6 +13,7 @@
  *   `fn_` stems for the functions.  `stage_map_kind_get` is the owner's `u8` form (`stage/stg_w.h`),
  *   `quest_flag_200000_ck` takes a `QuestRecord*` (`enemy/em_pop.h`) and `em_roster_record_release` is
  *   `em_pop.h`'s `u32`.
+ *   GUESS (from each body and its callers): `em025_shore_phase_get`.
  * RESIDUALS. 36 rows unwritten: 0x8019EC38-0x8019ECD4, 0x8019ED34-0x8019EF40, 0x8019EF44-0x8019F07C,
  *   0x8019F378-0x8019F56C, 0x801A0210-0x801A05B4, 0x801A0684-0x801A0FEC, 0x801A10AC-0x801A12C8,
  *   0x801A1894-0x801A2DAC, 0x801A2E30-0x801A30D4, 0x801A30E8-0x801A3DBC, 0x801A3E90-0x801A4218,
@@ -348,7 +349,7 @@ u32 fn_8019E670(struct _ENEMY_WORK* self, u32 mode, u32 lo, u32 hi) {
 
 /* 0x8019E70C - the "which sub-phase of the shore action" query: 255 when the record is not the one
  * this table describes, else the phase the byte at +0x961 falls into. */
-u32 fn_8019E70C(struct _ENEMY_WORK* self) {
+u32 em025_shore_phase_get(struct _ENEMY_WORK* self) {
     if (self == 0) {
         return 255;
     }
@@ -2570,7 +2571,7 @@ void fn_801A4504(_ENEMY_WORK* self) {
                 if (idx != 0xFF) {
                     EmDataEntry* e = &data->table_0x2C[idx];
                     get_joint_wmat_em(self, e->joint, &mtx);
-                    copyVec3(&v2C, (const nw4r::math::VEC3*)fn_80143174(&rec8, &e->vec, 0));
+                    copyVec3(&v2C, (const nw4r::math::VEC3*)em_vec3_copy(&rec8, &e->vec, 0));
                     mulVecMatAddTrans(&v2C, &mtx);
                     em_roster_record_pos_set(self->handles_0x328[i], &v2C, self->area_no);
                 }
@@ -2589,7 +2590,7 @@ void fn_801A9210(_ENEMY_WORK* self) {
     MTX34_ctor(&mtx);
     if (stage_map_kind_get(self->field_0x1E0) == 6 && self->area_no == 1) {
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*) self->field_0x13C, 6);
-        if (fn_800E2994(&access) != 0) {
+        if (copied_mat_access_valid_ck(&access) != 0) {
             nw4r::g3d::ResTexSrt srt;
             u32 handle = access.GetResTexSrt(false);
             res_tex_srt_copy_ctor(&srt, handle);

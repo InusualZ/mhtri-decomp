@@ -1027,7 +1027,7 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
 
     {
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)work->model->field_0x118, 0);
-        if (fn_800E2994(&access) != 0) {
+        if (copied_mat_access_valid_ck(&access) != 0) {
             nw4r::g3d::ResTexSrt srt;
             res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false));
             srt.GetEffectMtx(0, &mtx_b);
@@ -1037,7 +1037,7 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
     }
     {
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)work->model->field_0x118, 1);
-        if (fn_800E2994(&access) != 0) {
+        if (copied_mat_access_valid_ck(&access) != 0) {
             nw4r::g3d::ResTexSrt srt;
             res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false));
             srt.GetEffectMtx(0, &mtx_b);

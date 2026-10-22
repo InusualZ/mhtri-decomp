@@ -53,6 +53,9 @@ void pl_act_attack_set(struct _PLW* self, s16 value, u8 kind);
  * with `step_table` and its attack entry; `mode` 0 on the step half also advances the act step byte (+0x05). */
 void pl_act_motion_row_apply(struct _PLW* self, u8 mode, const PlMotionRow* row, u32 step_table);
 
+/* 0x80284474 - the player's charge stage for the second weapon class (`ef/eft029_fx.cpp` reads it). */
+u8 pl_charge_stage2_get(struct _PLW* plw);
+
 #ifdef __cplusplus
 }
 #endif

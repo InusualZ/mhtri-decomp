@@ -6,6 +6,7 @@
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  * NAMES. GUESS (from each body and its callers): snd_player_banks_load, snd_em_se_slot_release, snd_npc_voice_bank_load
  *   GUESS (from each body and its callers): lobby_bgm_load, snd_area_bank_load
+ *   GUESS (from each body and its callers): `snd_bank_loader_reset`.
  */
 
 /* Retired header of `sound/fn_800EF7D8.cpp` (kept for its notes and residuals): */
@@ -357,7 +358,7 @@ extern "C" void fn_800F0410(s32 idx);
 extern "C" void fn_800F0448(void* ctx, void* unused_1, void* unused_2, u32* args);
 extern "C" s32 fn_800F04FC(s32 idx);
 extern "C" void snd_area_bank_load(u8 kind, u8 index);
-extern "C" void fn_800F0554(void);
+extern "C" void snd_bank_loader_reset(void);
 extern "C" void fn_800F0560(u8 a, u8 b);
 extern "C" void fn_800F06AC(u8 kind, u8 arg1);
 extern "C" u32 fn_800F08E0(void);
@@ -585,7 +586,7 @@ extern "C" void fn_800F0448(void* ctx, void* unused_1, void* unused_2, u32* args
 }
 
 /* The "no bank" SE state: bank 0, 30 voices. */
-extern "C" void fn_800F0554(void)
+extern "C" void snd_bank_loader_reset(void)
 {
     fn_800F0560(0, 0x1E);
 }
@@ -619,7 +620,7 @@ extern "C" void scene_se_bank_load(u8 a, u8 b)
     lbl_80794A2C->stream_ok = 0;
     if ((s32)lbl_80794A2C->stream_dma != 0) {
         sprintf(name, lbl_80598F80, a);
-        if (fn_800CED10(name, lbl_80794A2C->stream_dma, 0x8000) != 0) {
+        if (load_file_direct(name, lbl_80794A2C->stream_dma, 0x8000) != 0) {
             load_file_req(name, lbl_80794A2C->stream_dma, 0x8000, (u32)fn_800F02D4, 0, 0);
         }
     }
@@ -813,7 +814,7 @@ extern "C" void fn_800EFDD8(_PLW* work)
 
 void title_snd_init(void)
 {
-    fn_800F0554();
+    snd_bank_loader_reset();
     snd_bank_layout(0);
     title_se_load();
 }

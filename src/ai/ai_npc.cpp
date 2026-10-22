@@ -4410,7 +4410,7 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
         case 0:
         case 17:
             code = 1;
-            fn_801006A0(2, &pos, effect, self->area, 2, scale);
+            eft004_key_spawn(2, &pos, effect, self->area, 2, scale);
             break;
         case 6:
         case 7:
@@ -4419,7 +4419,7 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
             break;
         case 18:
             code = 1;
-            fn_801006A0(2, &pos, effect, self->area, 2, scale);
+            eft004_key_spawn(2, &pos, effect, self->area, 2, scale);
             break;
         case 40:
             code = 0x0E;
@@ -4427,23 +4427,23 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
         case 42:
         case 43:
         case 44:
-            fn_801006A0(0x23, &pos, effect, self->area, 3, scale);
+            eft004_key_spawn(0x23, &pos, effect, self->area, 3, scale);
             return;
         case 45:
-            fn_801006A0(0x23, &pos, effect, self->area, 1, scale);
+            eft004_key_spawn(0x23, &pos, effect, self->area, 1, scale);
             return;
         case 46:
-            fn_801006A0(2, &pos, effect, self->area, 1, scale);
+            eft004_key_spawn(2, &pos, effect, self->area, 1, scale);
             return;
         case 47:
-            fn_801006A0(1, &pos, effect, self->area, 1, scale);
-            fn_801006A0(2, &pos, effect, self->area, 1, scale);
+            eft004_key_spawn(1, &pos, effect, self->area, 1, scale);
+            eft004_key_spawn(2, &pos, effect, self->area, 1, scale);
             return;
         case 48:
-            fn_801006A0(1, &pos, effect, self->area, 1, scale);
+            eft004_key_spawn(1, &pos, effect, self->area, 1, scale);
             return;
         }
-        fn_801006A0(code, &pos, effect, self->area, 2, scale);
+        eft004_key_spawn(code, &pos, effect, self->area, 2, scale);
     } else {
         pos.y = lbl_8079A7B8 + self->field_0x19C;
         switch (code) {
@@ -4469,7 +4469,7 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
             code = 1;
             break;
         }
-        fn_801006A0(code, &pos, effect, self->area, 2, scale);
+        eft004_key_spawn(code, &pos, effect, self->area, 2, scale);
     }
 }
 }

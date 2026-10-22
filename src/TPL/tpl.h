@@ -14,7 +14,9 @@ struct TPLImageHeader {
     /* +0x02 */ u16 width;
     /* +0x04 */ u32 format; /* the GX texel format */
     /* +0x08 */ void* data; /* image data offset, relocated to a pointer on bind */
-    /* +0x0C */ u8 pad_0x0C[0x17];
+    /* +0x0C */ u32 wrapS;
+    /* +0x10 */ u32 wrapT;
+    /* +0x14 */ u8 pad_0x14[0xF];
     /* +0x23 */ u8 unpacked; /* set once the data offset has been relocated */
 };
 

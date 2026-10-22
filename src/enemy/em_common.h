@@ -90,6 +90,13 @@ s32 em_area_entry_near_ck(struct EmAreaEntry* entry, u8 index, u8 sub);
 s32 em_mini_kill_kind_get(struct _ENEMY_WORK* enemy);
 /* 0x8013763C - sets the record's +0x43F latch the roar step arms (GUESS name). */
 void em_roar_latch_set(struct _ENEMY_WORK* self);
+/* 0x8013023C - the stage byte of the enemy record `work` (`ef/eft_slot.cpp` reads it for its bound enemy). */
+u8 em_phase_get(struct _ENEMY_WORK* work);
+/* 0x8012D878 - whether the enemy record `work` is in its enraged state (`ef/eft_slot.cpp`'s tracking reads it). */
+s32 em_action_mid_ck(struct _ENEMY_WORK* work);
+/* 0x801271BC - the area of `data`'s map table nearest `pos` from area `area` (`ef/eft_slot.cpp` flees to it). */
+struct EnemyData;
+u8 em_nearest_area_get(struct EnemyData* data, nw4r::math::VEC3* pos, u8 area);
 
 /* 0x80136D38 */
 u32 em_eft_hide_ck(_ENEMY_WORK* enemy);

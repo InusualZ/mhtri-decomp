@@ -450,7 +450,7 @@ extern u16 lbl_805E728C[];         /* .data */
 void* fn_803438E4(u8 a, u8 b);
 void* fn_80343B74(u8 a, u8 b, u8 c);
 s32 fn_80343B44(void* entry);
-void fn_802A0188(void);
+void menu_item_close(void);
 void snd_quest_start_bgm_set(void);
 void quest_slot_arm_all_a(s8 index);
 void fn_802E5D68(u16 id, s8 index);

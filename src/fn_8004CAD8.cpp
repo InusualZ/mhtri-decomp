@@ -81,6 +81,7 @@
  *   GUESS (from each body and its callers): vec3_dist_sq
  *   GUESS (from each body and its callers): userdata_progress_flag_ck
  *   GUESS (from its 39 call sites, all `v *= s`): vec3_scale_in_place (0x800513F0)
+ *   GUESS (from each body and its callers): `userdata_box_item_ck`, `capsule_box_from_points`.
  */
 
 #include "types.h"

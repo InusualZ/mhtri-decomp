@@ -107,10 +107,10 @@ void emc_mini_step(struct _ENEMY_MINI_WORK* mini);
 void emc_marker_replay(struct _ENEMY_MINI_WORK* mini, u8 a, u8 b, u16 id, u8 c, u8 d, u8 e, const nw4r::math::VEC3* pos,
                  s32* values, s32 count);
 
-/* the entry points this unit publishes to its consumers (docs/plan.md 6.5 rule 2).  `fn_80143174`
+/* the entry points this unit publishes to its consumers (docs/plan.md 6.5 rule 2).  `em_vec3_copy`
  * is `src/Pl/pl_act.cpp`'s - it is registered but not yet reconstructed (see the unit source's
  * Status). */
-void* fn_80143174(void* a, void* b, s32 c);
+void* em_vec3_copy(void* a, void* b, s32 c);
 /* The action band's arming helpers in this unit's range that `enemy/em015_prog.cpp` calls (unwritten; the
  * signatures are the call sites'). */
 void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);

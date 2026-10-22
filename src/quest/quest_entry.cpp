@@ -117,7 +117,7 @@
 #include "lobby/lb_event_request.h"        /* lb_event_request (rule 2) */
 #include "menu/demo_play_ck.h"             /* demo_play_ck (rule 2) */
 #include "pad_hold_ck.h"                   /* pad_hold_ck (rule 2) */
-#include "ef/quest_enter_system_reset.h"   /* quest_enter_system_reset (rule 2) */
+#include "ef/loading_caption_set.h"   /* loading_caption_set (rule 2) */
 #include "camera/stage_dcm_path_get.h"     /* stage_dcm_path_get (rule 2) */
 #include "ai/result_hunt_rank_get.h"       /* the result rank helpers (rule 2) */
 #include "stage_map_set.h"                 /* stage_map_set (rule 2) */
@@ -2135,7 +2135,7 @@ void quest_enter_load(void) {
     work->item_flag_0x110 = 0;
     quest_work_ptr->entry_send_0x6A3A[2] = 2;
     quest_result_field_text_get(quest_work_ptr->record_0x03C, 0);
-    quest_enter_system_reset();
+    loading_caption_set();
     quest_work_start_reset();
     quest_monsters_spawn_now(0);
     if (quest_work_ptr->record_0x03C->field_0x08B == 7) {

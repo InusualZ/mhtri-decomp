@@ -2,8 +2,8 @@
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * Two RSO/file loaders plus the keyboard (`kbd`) dispatch group: `.text` 0x80040598-0x800408A8.
  *
- * The loaders open a path with `fn_800CEE2C` (a `DVDOpen`-shaped wrapper that fills a 0x3C-byte
- * `DVDFileInfo`), read `ALIGN32(fileInfo.length)` bytes with `fn_800CEDD4`, flush the destination, and
+ * The loaders open a path with `dvd_open_wait` (a `DVDOpen`-shaped wrapper that fills a 0x3C-byte
+ * `DVDFileInfo`), read `ALIGN32(fileInfo.length)` bytes with `dvd_read_wait`, flush the destination, and
  * hand the loaded object to the RSO runtime (`RSOLinkList` / `RSOListInit` = list-add-and-locate).
  * The two paths they are called with are `01/hbm_data.rso` (0x8057CA40, .data) and `mh3.sel`
  * (0x80790E30, .sdata), from the caller at 0x800408A8 - the same caller that publishes the `system_w`
@@ -83,10 +83,10 @@
 
 #define ALIGN32(x) (((u32)(x) + 31) & ~31)
 
-/* Loading helpers outside this unit; `fn_800CEE2C` fills the SDK's 0x3C-byte `DVDFileInfo` and
- * `fn_800CEDD4` clamps the read to its byte count at +0x34. */
-extern "C" int fn_800CEE2C(const char* path, DVDFileInfo* fileInfo);
-extern "C" int fn_800CEDD4(DVDFileInfo* fileInfo, void* dest, u32 size, int prio);
+/* Loading helpers outside this unit; `dvd_open_wait` fills the SDK's 0x3C-byte `DVDFileInfo` and
+ * `dvd_read_wait` clamps the read to its byte count at +0x34. */
+extern "C" int dvd_open_wait(const char* path, DVDFileInfo* fileInfo);
+extern "C" int dvd_read_wait(DVDFileInfo* fileInfo, void* dest, u32 size, int prio);
 extern "C" void DCFlushRange(void* addr, u32 size);
 
 /* The pool tops this unit maintains, and the sub-overlay index block the caller at 0x800408A8 clears. */
@@ -111,13 +111,13 @@ extern "C" void* fn_80040598(const char* path, void* buffer, u32 mode)
     u32 bssSize;
     u32 end;
 
-    if (fn_800CEE2C(path, &fileInfo) == 0) {
+    if (dvd_open_wait(path, &fileInfo) == 0) {
         return NULL;
     }
 
     size = ALIGN32(fileInfo.length);
 
-    if (fn_800CEDD4(&fileInfo, buffer, size, 0) == 0) {
+    if (dvd_read_wait(&fileInfo, buffer, size, 0) == 0) {
         return NULL;
     }
 
@@ -155,13 +155,13 @@ extern "C" void* CntSdRsoTerminate(const char* path, void* buffer)
     DVDFileInfo fileInfo;
     u32 size;
 
-    if (fn_800CEE2C(path, &fileInfo) == 0) {
+    if (dvd_open_wait(path, &fileInfo) == 0) {
         return NULL;
     }
 
     size = ALIGN32(fileInfo.length);
 
-    if (fn_800CEDD4(&fileInfo, buffer, size, 0) == 0) {
+    if (dvd_read_wait(&fileInfo, buffer, size, 0) == 0) {
         return NULL;
     }
 

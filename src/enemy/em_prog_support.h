@@ -49,4 +49,13 @@ void qn_chr_flag_set(_QNPC_W* self, u8 flag);
 
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x803854E4 - resets the enemy program support state (the system core's full reset). */
+void em_prog_support_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_ENEMY_EM_PROG_SUPPORT_H */

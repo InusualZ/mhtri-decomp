@@ -5,6 +5,7 @@
 #define MHTRI_CAMERA_CAMERA_MAIN_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,6 +13,12 @@ extern "C" {
 
 /* 0x802BE038 */
 u32 get_camera_rot_y(void);
+
+/* 0x802BDDB0 - the current camera's target (look-at) position, written through `out`. */
+void get_camera_target_pos(nw4r::math::VEC3* out);
+
+/* 0x802BE39C - 1 when the camera work is idle and the current camera's +0x188 mode byte is 1. */
+u32 camera_mode1_ck(void);
 
 #ifdef __cplusplus
 }

@@ -34,8 +34,8 @@
 
 #include "ef/eft_res_spawn_gate_ck.h" /* eft_res_spawn_gate_ck (rule 2: the owner's header) */
 #include "enemy/fn_80192410.h" /* fn_80192410 (rule 2: the owner's header) */
-#include "ef/lbl_805A0730.h" /* lbl_805A0730 (rule 2: the owner's header) */
-#include "ef/lbl_806A4548.h" /* lbl_806A4548 (rule 2: the owner's header) */
+#include "ef/eft028_alpha_by_id.h" /* eft028_alpha_by_id (rule 2: the owner's header) */
+#include "ef/eft028_capsule_ends.h" /* eft028_capsule_ends (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
@@ -711,7 +711,7 @@ extern "C" void fn_8011870C(_EFT* self)
         {
             nw4r::g3d::ScnMdl::CopiedMatAccess access(
                 (nw4r::g3d::ScnMdl*)work->chara[0]->field_0x118, (u32)i);
-            if (fn_800E2994(&access) != 0) {
+            if (copied_mat_access_valid_ck(&access) != 0) {
                 _EFT26_MATOBJ obj;
                 u32 handle = scn_mdl_mat_access_get_tev_color(&access, 0);
                 u32 ignored;
@@ -1036,7 +1036,7 @@ extern "C" void fn_80119450(_EFT* self)
         {
             nw4r::g3d::ScnMdl::CopiedMatAccess access(
                 (nw4r::g3d::ScnMdl*)work->chara[0]->field_0x118, (u32)i);
-            if (fn_800E2994(&access) != 0) {
+            if (copied_mat_access_valid_ck(&access) != 0) {
                 _EFT26_MATOBJ obj;
                 u32 handle = scn_mdl_mat_access_get_tev_color(&access, 0);
                 res_mat_tev_color_copy_ctor(&obj, &handle);
@@ -1172,7 +1172,7 @@ extern "C" void eft028_set(u8 kind, u8 variant, u8 id)
     work->key_0x15 = 0xff;
     work->key_0x16 = 0xff;
     if (get_now_mapno() == 0) {
-        work->key_0x17 = lbl_805A0730[id];
+        work->key_0x17 = eft028_alpha_by_id[id];
     } else {
         work->key_0x17 = 0xff;
     }
@@ -1210,8 +1210,8 @@ extern "C" void eft028_set_capsule(u8 area)
     eft_state_flags_set(rec, 0, 0);
     work = (_EFT28_WORK*)rec->work_0x38;
     work->mode = 1;
-    copyVec3(&param.a, &lbl_806A4548[0]);
-    copyVec3(&param.b, &lbl_806A4548[1]);
+    copyVec3(&param.a, &eft028_capsule_ends[0]);
+    copyVec3(&param.b, &eft028_capsule_ends[1]);
     param.c = 410.0f;
     pl_capsule_box_set(&param, &work->param_0x0C[0]);
     work->col_r = 0xff;

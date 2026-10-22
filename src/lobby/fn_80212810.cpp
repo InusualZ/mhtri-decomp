@@ -11,6 +11,8 @@
  *   GUESS: lb_page_arrow_draw, lb_list_row_draw, lb_frame_draw_at, lb_panel_close, lb_scene_npc_refresh
  *   GUESS (from each body and its callers): lb_item_need_list_draw, lb_window_draw
  *   GUESS: `lb_item_cell_draw_wide`, `lb_item_cell_draw`, `lb_panel_close`, `lb_panel_msg_draw`
+ *   GUESS (from each body and its callers): `lb_count_window_draw`, `lb_help_text_put`, `lb_help_num_put`,
+ *   `lb_item_row_draw`.
  * RESIDUALS. 68 rows unwritten: 0x80212B1C-0x80214EF0, 0x80214F30-0x80215A74, 0x80215AE4-0x80215E6C,
  *   0x80215E84-0x802164F0, 0x8021677C-0x80216A08, 0x80216A68-0x80217934, 0x802179D4-0x80217B04, 0x80217C68-0x80217DA0,
  *   0x80217DD8-0x80217F4C, 0x80217FA0-0x802180D8, 0x80218138-0x80219080.  `lb_choice_draw` among them: `unsplit/lobby.h`
@@ -337,7 +339,7 @@ void fn_80216714(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
     fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 11);
 }
 
-void fn_8021674C(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
+void lb_item_row_draw(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
 {
     fn_80215F8C((u16)a, b, c, d, e, f, g, (u16)h, 1);
 }
@@ -388,11 +390,11 @@ s32 fn_80217988(s32 a, s32 b, s32 bits)
     return (((LbItemFlags*)fn_8027E2A8((u8)a, (u16)b))->flags_0x06 & (u8)bits) == (u8)bits;
 }
 
-s32 fn_80214F30(u16 a, void* str);
+s32 lb_help_text_put(u16 a, void* str);
 
 s32 lb_panel_msg_draw(s32 a, s16 b)
 {
-    return fn_80214F30((u16)a, LbStr(3, (u16)b));
+    return lb_help_text_put((u16)a, LbStr(3, (u16)b));
 }
 
 /* The page-arrow table pointer the `PutPageArrow` helper reads. */

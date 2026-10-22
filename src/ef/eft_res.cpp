@@ -16,6 +16,7 @@
  *   (enemy_control), `eft028_set`/`eft028_set_capsule` (eft026_fx), `nw_res_anm_work_num`/`nw_res_anm_create`
  *   (nw_resource), and draw_shape's common file descriptors `q_comn_efm_file`, `lobby_eft_mdl_file`,
  *   `lb_comn_eft_file`, `q_comn_eft_file`.
+ *   GUESS (from each body and its callers): `eft_res_pool_reset`.
  * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps every `clrlwi`+`cmpwi` pair and the
  *   narrowing `clrlwi` of the `u8`/`u16` parameters; with the pass on most rows score lower).
  * RESIDUALS. `fn_800F8634` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
@@ -190,7 +191,7 @@ typedef struct EftProHdrSlot {
     /* +0x18 */ s32 field_0x18;
 } EftProHdrSlot; /* size: 0x1C (the last field is the next record's +0x00) */
 
-/* The records start 4 bytes into the table (its 4-byte header is zeroed by fn_800F6520 and counted down
+/* The records start 4 bytes into the table (its 4-byte header is zeroed by eft_res_pool_reset and counted down
  * by fn_800F7778). */
 inline EftProSlot* eft_pro_slots(void) {
     return (EftProSlot*)(lbl_806A2D34 + 4);
@@ -204,7 +205,7 @@ inline EftProSlot* eft_pro_slots(void) {
 extern "C" {
 #endif
 
-void fn_800F6520(void);
+void eft_res_pool_reset(void);
 void eft_control_init(void);
 void eft_res_release_all(void);
 void fn_800F6984(u8, u8, EftResFile*, u8*);
@@ -311,7 +312,7 @@ void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long ligh
  * ------------------------------------------------------------------------------------------------- */
 
 /* 0x800F6520 - zero the control block, then build all 256 slot-table records. */
-extern "C" void fn_800F6520(void) {
+extern "C" void eft_res_pool_reset(void) {
     memset(&eft_control, 0, sizeof(eft_control));
     lbl_806A2D34[0] = 0;
     lbl_806A2D34[1] = 0;
@@ -437,7 +438,7 @@ extern "C" void fn_800F6A24(void) {
     }
 }
 
-/* 0x800F6A78 - build one slot-table record (the id fn_800F6520 files it under). */
+/* 0x800F6A78 - build one slot-table record (the id eft_res_pool_reset files it under). */
 extern "C" void fn_800F6A78(u8 id) {
     u8* p = lbl_806A2D34;
     EftProHdrSlot* slot;

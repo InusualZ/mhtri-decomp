@@ -13,6 +13,7 @@
  *   GUESS (from what they hold and who reads them): `eft004_effect_ids`, `eft004_param_ids`, `eft004_rgb_keys_39`,
  *   `eft004_alpha_keys_39`, `eft004_joint_offset_x/y/z`; the callees `get_stg_eft_col_pos`, `se_eft004_req`,
  *   `se_eft004_demo_req`.
+ *   GUESS (from each body and its callers): `eft004_key_spawn`.
  * RESIDUALS. None: every row matches and flipcheck is READY.
  * SHAPES. The four-case dispatchers `fn_80100A6C`/`fn_80101774`/`fn_80101DB8` `return` from each case (a `break`
  *   emits a shared trailing branch).
@@ -220,7 +221,7 @@ void eft004_set_pl2(_PLW* self, u8 type, u32 param, f32 a, f32 b, f32 c, u32 ext
 }
 
 /* Spawns an effect from a vector, then stamps its key byte. */
-extern "C" void fn_801006A0(u8 type, nw4r::math::VEC3* pos, u32 param, u8 flag, u8 key, f32 scale)
+extern "C" void eft004_key_spawn(u8 type, nw4r::math::VEC3* pos, u32 param, u8 flag, u8 key, f32 scale)
 {
     s32 params[3];
     Eft004* effect;
@@ -769,13 +770,13 @@ extern "C" void fn_80101470(Eft004* self)
     case 0:
         switch (self->type_0x02) {
         case 1: case 14: case 15: case 24: case 26: case 34:
-            fn_800DA72C(0, 19, &self->pos_0x18);
+            se_slot_req_pos(0, 19, &self->pos_0x18);
             break;
         case 13: case 29: case 32:
-            fn_800DA72C(0, 20, &self->pos_0x18);
+            se_slot_req_pos(0, 20, &self->pos_0x18);
             break;
         case 35: case 46:
-            fn_800DA72C(0, 37, &self->pos_0x18);
+            se_slot_req_pos(0, 37, &self->pos_0x18);
             break;
         case 39:
             map_se_req(11, &self->pos_0x18);
@@ -788,15 +789,15 @@ extern "C" void fn_80101470(Eft004* self)
     case 3:
         switch (self->type_0x02) {
         case 1: case 14: case 15: case 24: case 26: case 34:
-            fn_800DA72C(0, 19, &self->pos_0x18);
+            se_slot_req_pos(0, 19, &self->pos_0x18);
             break;
         case 13: case 29: case 35:
             switch (state) {
             case 2:
-                fn_800DA72C(0, 37, &self->pos_0x18);
+                se_slot_req_pos(0, 37, &self->pos_0x18);
                 break;
             case 3:
-                fn_800DA72C(0, 19, &self->pos_0x18);
+                se_slot_req_pos(0, 19, &self->pos_0x18);
                 break;
             }
             break;
@@ -804,7 +805,7 @@ extern "C" void fn_80101470(Eft004* self)
             fn_800DCF0C(((Eft004Owner*)self->owner_0x30)->handle_0x498, &self->pos_0x18);
             break;
         case 46:
-            fn_800DA72C(0, 37, &self->pos_0x18);
+            se_slot_req_pos(0, 37, &self->pos_0x18);
             break;
         case 39:
             map_se_req(11, &self->pos_0x18);

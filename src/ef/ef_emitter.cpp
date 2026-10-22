@@ -95,7 +95,7 @@ void* fn_800A5484(void* p);
 void* ef_effect_root_mtx(void* manager);
 void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
 void ef_pm_handle(void* dst, const void* src);
-void fn_8035B998(void* p);
+void eft_area_se_req(void* p);
 void ef_anim_curve_f32(void* rec, void* target, u32 life, u16 seed, s32 range);
 void* ef_resource_instance(void);
 
@@ -1258,7 +1258,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
                 ef_pm_handle(&b, pm);
                 ef_word_copy(&a, &b);
                 if ((*(u8*)((u8*)ef_emitter_tex_flags(&a) + 3) & 0x20) != 0) {
-                    fn_8035B998(self->managerEF->field_0x44);
+                    eft_area_se_req(self->managerEF->field_0x44);
                 }
             }
         }

@@ -13,6 +13,9 @@
  * `fn_800DD1F0` (the address was never its start; GUESS `se_req`: it is the SE request cluster's body, no `__FILE__` string names it).
  *
  * What is reconstructed here: filled in per function as it is measured.
+ * NAMES. GUESS (from each body and its callers): `pl_se_req_charge_end`, `pl_se_req_charge_start`,
+ *   `pl_se_req_charge_level`, `pl_se_req_charge_7`, `pl_se_req_charge_end_b`, `pl_se_req_charge_2`,
+ *   `pl_se_req_charge_burst`, `pl_se_req_charge_tip`.
  */
 
 #include "types.h"
@@ -32,15 +35,15 @@
 
 extern "C" SeSlot* fn_800DD504(nw4r::math::VEC3* pos)
 {
-    return fn_800DA72C(46, 64, pos);
+    return se_slot_req_pos(46, 64, pos);
 }
 
 extern "C" SeSlot* fn_800DD514(nw4r::math::VEC3* pos)
 {
-    return fn_800DA72C(46, 13, pos);
+    return se_slot_req_pos(46, 13, pos);
 }
 
-extern "C" void fn_800DD524(_PLW* self)
+extern "C" void pl_se_req_charge_end(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
@@ -48,7 +51,7 @@ extern "C" void fn_800DD524(_PLW* self)
     }
 }
 
-extern "C" void fn_800DD544(_PLW* self, u32 flag)
+extern "C" void pl_se_req_charge_start(_PLW* self, u32 flag)
 {
     _se_w* work = self->field_0xAFC;
     if (!work) {
@@ -58,7 +61,7 @@ extern "C" void fn_800DD544(_PLW* self, u32 flag)
     return fn_800D9CC8(work, id, 3, 3);
 }
 
-extern "C" void fn_800DD574(_PLW* self, u32 arg)
+extern "C" void pl_se_req_charge_level(_PLW* self, u32 arg)
 {
     _se_w* work = self->field_0xAFC;
     if (!work) {
@@ -79,7 +82,7 @@ extern "C" void fn_800DD574(_PLW* self, u32 arg)
     return fn_800D9CC8(work, id, 3, 3);
 }
 
-extern "C" void fn_800DD5CC(_PLW* self)
+extern "C" void pl_se_req_charge_7(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
@@ -87,7 +90,7 @@ extern "C" void fn_800DD5CC(_PLW* self)
     }
 }
 
-extern "C" void fn_800DD5EC(_PLW* self)
+extern "C" void pl_se_req_charge_end_b(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
@@ -95,7 +98,7 @@ extern "C" void fn_800DD5EC(_PLW* self)
     }
 }
 
-extern "C" void fn_800DD60C(_PLW* self)
+extern "C" void pl_se_req_charge_2(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
@@ -112,7 +115,7 @@ extern "C" void fn_800DD62C(_PLW* self, nw4r::math::VEC3* pos)
     }
 }
 
-extern "C" void fn_800DD69C(_PLW* self, nw4r::math::VEC3* pos)
+extern "C" void pl_se_req_charge_burst(_PLW* self, nw4r::math::VEC3* pos)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
@@ -121,7 +124,7 @@ extern "C" void fn_800DD69C(_PLW* self, nw4r::math::VEC3* pos)
     }
 }
 
-extern "C" void fn_800DD700(_PLW* self, nw4r::math::VEC3* pos)
+extern "C" void pl_se_req_charge_tip(_PLW* self, nw4r::math::VEC3* pos)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {

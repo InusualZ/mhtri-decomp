@@ -253,7 +253,7 @@ struct Q_ItemWork {
 
 /* The game's save/user block, seen only as the four count blocks this unit reads.  It is the arena
  * buffer `get_userdata` hands out (`*(void**)(&system_w + 0x95C)`, set by `ef/system_core.cpp`'s
- * `fn_800CF3E4`), and 0x6000 is the whole extent `fn_80047398.cpp`'s `fn_800497B4`/`fn_800498EC`
+ * `memory_layout_init`), and 0x6000 is the whole extent `fn_80047398.cpp`'s `fn_800497B4`/`fn_800498EC`
  * clear with `memset(get_userdata(), 0, 0x6000)`.  Nothing reads at or past it: of the 344 functions
  * that reach the block the furthest is `menu/get_pop_dat_ptr.cpp`'s `fn_803C0F3C`, at `+0x5364` for
  * sixteen 2-byte entries, so the run past the count sets stays unnamed filler. */
@@ -369,7 +369,7 @@ typedef struct QuestSpawnRec {
 
 /* The per-slot "move work" `get_move_work_adrs` indexes; only the fields this unit names are here.
  * MEASURED size 0x22E8 (was 0x22E0 approximate): the record is the stride its own allocator clears -
- * `ef/system_core.cpp`'s `fn_800CF948` sizes slot 0's block as `max * 0x22E8` (`mulli r30,r3,8936` at
+ * `ef/system_core.cpp`'s `move_work_kind_alloc` sizes slot 0's block as `max * 0x22E8` (`mulli r30,r3,8936` at
  * 0x800CF9D4) and memsets exactly that (0x800CFA68), and no other site in the DOL indexes a move work by
  * a different constant (`grep 8936` = 1 site).  The literal and the reach disagree by 4 bytes, which is
  * the interesting case: the furthest access anything makes is +0x22E3 (`lb_area_change_flag`'s

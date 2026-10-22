@@ -148,7 +148,7 @@ extern "C" void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
 void setVector3(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 
-/* The work heap.  File load (`fn_800CEE2C`/`DVDClose`), the eft004 pool helpers and `memcpy`
+/* The work heap.  File load (`dvd_open_wait`/`DVDClose`), the eft004 pool helpers and `memcpy`
  * come from their owners' headers (rule 2). */
 void* work_mem_alloc(u32 size);
 void work_mem_free(void* ptr);
@@ -161,7 +161,7 @@ u32 LbCheckKujiraEvent();
 /* types                                                                                              */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The 0x3C-byte file stat `fn_800CEE2C` fills; only the byte count at +0x34 is read here.  It keeps its own name
+/* The 0x3C-byte file stat `dvd_open_wait` fills; only the byte count at +0x34 is read here.  It keeps its own name
  * because `src/fn_80040598.cpp` carries the SDK spelling of the same record and this unit reads one field. */
 struct EftFileStat {
     /* +0x00 */ u8 pad_0x00[0x34];
@@ -1463,7 +1463,7 @@ extern "C" void fn_800FE978(_EFT* self)
     }
 
     if (size != 0) {
-        if (fn_800CEE2C(name, &info) != 0) {
+        if (dvd_open_wait(name, &info) != 0) {
             size = (info.length + 0x1F) & ~0x1FU;
             DVDClose((DVDFileInfo*)&info);
             mem = work_mem_alloc(size);

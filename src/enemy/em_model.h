@@ -65,4 +65,13 @@ s32 em_drop_item_spawn(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 perce
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x803B9FC8 - resets the enemy model pool (the system core's full reset). */
+void em_model_pool_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_ENEMY_EM_MODEL_H */

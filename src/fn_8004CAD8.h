@@ -85,6 +85,8 @@ u16 calcVecAngX(nw4r::math::VEC3* v);
 #ifdef __cplusplus
 extern "C" {
 u32 userdata_progress_flag_ck(s32 id);
+/* 0x8004D328 - whether the user data `userdata` holds item `id` in its box (`ef/eft052.cpp`'s item box). */
+s32 userdata_box_item_ck(struct LbItemDb* userdata, u16 id);
 /* 0x8004D210 - sets progress flag `id` (the halfword bit run at +0x47DA `userdata_progress_flag_ck` reads).  GUESS. */
 void userdata_progress_flag_set(u32 id);
 /* 0x8004D70C - the event-flag test that shares the same table `userdata_progress_flag_ck` reads; added with
@@ -262,7 +264,7 @@ void drawshape_set_tex_offset_f32(const f32* scale, u16 tex_no, const f32* offse
 /* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
  * had not declared it yet). */
 s32 fn_80050C40(void* a, void* b);
-void fn_8004FFC8(void* a, void* b, void* c, f32 d);
+void capsule_box_from_points(void* a, void* b, void* c, f32 d);
 void MTX33_ctor(void* out);
 /* 0x8004EAF4 - the 16-byte struct copy MWCC emits for a four-word assignment (`dst[0..3] = src[0..3]`)
  * as four separate word moves.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */
@@ -303,6 +305,8 @@ void mulVecMatAddTrans(VEC3* v, MTX34* m);
  * manglings `rotMatrixX__FUlPQ34nw4r4math5MTX34` / `rotMatrixZ__...`). */
 void rotMatrixX(u32 angle, MTX34* m);
 void rotMatrixZ(u32 angle, MTX34* m);
+/* 0x8005027C - the same about Y (`rotMatrixY__FUlPQ34nw4r4math5MTX34`). */
+void rotMatrixY(u32 angle, MTX34* m);
 
 /* 0x80050990 - build an MTX34 from the Z-X-Y Euler triple `_CP_VECTOR`.  The address sits between the
  * registered `fn_8004C9A0.cpp` and `draw_shape.cpp` units, so no unit owns it yet; the callers are

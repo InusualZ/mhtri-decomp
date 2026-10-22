@@ -524,7 +524,7 @@ void fn_802680C4(void);
 void fn_802B58D4(void);
 void fn_802ADB98(void);
 void fn_800F8DA4(void);
-void fn_8035AB50(void);
+void hud_msg_frame(void);
 void ai_npc_reaction_forward(void);
 void fn_802DB2EC(void);
 void fn_802A07A0(void);
@@ -573,7 +573,7 @@ void lobby_frame_update(void)
         fn_802ADB98();
         light_move();
         fn_800F8DA4();
-        fn_8035AB50();
+        hud_msg_frame();
         ai_npc_reaction_forward();
         fn_802DB2EC();
         system_w.field_0x8C0 = 0;

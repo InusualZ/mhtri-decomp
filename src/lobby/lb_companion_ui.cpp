@@ -408,7 +408,7 @@ void lb_act_award_handover(u8 unused, LbActReq* req) {
                     quest_time_limit_set((s32)(lbl_8079B2B8 * Screen_w.scale_0x14));
                 }
                 if (req->sel_0x04.word_0x00 == 3) {
-                    fn_802A0188();
+                    menu_item_close();
                     work->state_0xFA = 3;
                     companion->value_0x20 = companion->value_0x24;
                     companion->step_0x2C = companion->step_0x2C + 1;

@@ -25,6 +25,7 @@
  *   GUESS (from each body and its callers): em_shake_req_set, em_move_target_set, em_hit_timer_ck, em_fx_flag_set
  *   GUESS: em_motion_timer_arm, em_attack_done_set, em_attack_start, pl_torch_ck, em_hit_by_set
  *   GUESS: em_act_arm_unless_down, em_move_work_pick, em_roar_latch_set, em_area_entry_near_ck
+ *   GUESS (from each body and its callers): `em_nearest_area_get`, `em_action_mid_ck`, `em_phase_get`.
  * RESIDUALS. 379 rows unwritten in 23 runs, the largest 0x8012F3F4-0x80137604 (270 functions);
  *   `sweepcomments.py --unit enemy/em_common` lists them.
  *  - `fn_8012E040`, `fn_8012E5D4`: dense-case dispatch trees; retail shares one tail per constant return and lowers
@@ -506,7 +507,7 @@ extern "C" s32 fn_80126104(struct _ENEMY_WORK* work)
 
 EnemyData* get_enemy_data(struct _ENEMY_WORK* work)
 {
-    return fn_80140C00(work->team, work->field_0x00A);
+    return enemy_data_by_team_get(work->team, work->field_0x00A);
 }
 
 extern "C" void* fn_80126704(struct _ENEMY_WORK* self)
@@ -794,7 +795,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
         flag = (fn_8012D0B4_view1(enemy, other) == 1);
         extra = motion->extra_frames;
         if (extra != 0) {
-            if (fn_8026FE98(other, 0x200) != 0) {
+            if (pl_status_bit_ck(other, 0x200) != 0) {
                 result = extra[0];
             }
             if ((other->flags_0x5C4 & 0xF) != 0) {
@@ -1425,7 +1426,7 @@ extern "C" s32 fn_8012D850(_ENEMY_WORK* enemy)
 }
 
 /* Whether the enemy is in the mid-range part of its action state. */
-extern "C" s32 fn_8012D878(_ENEMY_WORK* enemy)
+extern "C" s32 em_action_mid_ck(_ENEMY_WORK* enemy)
 {
     if (enemy->action == 0x0A && (u32)(enemy->state_sub - 0x58) <= 0x1F) {
         return 1;

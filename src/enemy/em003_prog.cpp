@@ -11,6 +11,7 @@
  * NAMES. `em003_call_act_type_ck`, `em003_atama_koware_act_ck`, `em003_yobi_boss_em_ck` and `em003_prog_tbl` are
  *   the runtime dump's names; the map has only `fn_` stems for the other rows.
  *   The `.bss` record names (`vec_pair_801550FC_*`) are GUESSes.
+ *   GUESS (from each body and its callers): `em003_skip_ck`.
  * RESIDUALS. 40 rows unwritten: 0x801550FC-0x80155664, 0x80155BA8-0x80155DD8, 0x801560B8-0x801564DC,
  *   0x80156C18-0x80156E9C, 0x80157764-0x80157ABC, 0x80157B40-0x80157EC4, 0x801580E8-0x801581F0,
  *   0x80158820-0x80158928, 0x80158A50-0x80158B4C, 0x80158C48-0x801592CC, 0x80159540-0x80159984,

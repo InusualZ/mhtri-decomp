@@ -17,7 +17,7 @@
  * the dump showing a wider `prim_*` family elsewhere.
  *
  * What the range is, read off the disassembly:
- *   * `fn_800E3CBC` / `prim_init_all` / `fn_800E3D7C` / `fn_800E3DE0` reset and rebuild the two record
+ *   * `fn_800E3CBC` / `prim_init_all` / `fn_800E3D7C` / `sound_free_lists_reset` reset and rebuild the two record
  *     pools (`.sbss` bases `prim_rec_pool`, counts `prim_rec_count`, capacities `prim_rec_capacity`, all three
  *     GUESS names) and the six pointer free-lists (`.data` bases `lbl_80597D20`, counts `lbl_80597D38`).
  *   * `fn_800E3E1C` walks both record lists and drives per-record visibility, callbacks and state.
@@ -31,7 +31,7 @@
  *
  * Measured against this range's split object with `recompile.py --measure` (the official report metric):
  *
- *   fn_800E3CBC     99.33 (132/132 B)   fn_800E3DE0   100.00   fn_800E444C     85.27 (296/288 B)
+ *   fn_800E3CBC     99.33 (132/132 B)   sound_free_lists_reset   100.00   fn_800E444C     85.27 (296/288 B)
  *   prim_init_all  100.00               fn_800E3E1C    88.10 (812/820 B)   set_blendmode  100.00
  *   fn_800E3D7C     89.40 (100/100 B)   fn_800E4148    89.75 (316/324 B)   set_zmode       97.50
  *   fn_800E4284     94.33 (268/264 B)   fn_800E4390    98.06 (124/124 B)
@@ -46,6 +46,7 @@
  *     `_savegpr_19`, `_restgpr_20`, `_restgpr_19`, `vec3_dot`.
  *   flipcheck: `.bss` claimed, not emitted.
  *   flipcheck: `.sdata2` size gap.
+ * NAMES. GUESS (from each body and its callers): `sound_free_lists_reset`.
  */
 
 #include "types.h"
@@ -131,7 +132,7 @@ s32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
 s32 fn_802AFF58(void);
 s32 fn_800D0724(void);
-s32 fn_802BE39C(void);
+s32 camera_mode1_ck(void);
 s32 camera_work_ck(void);
 s32 my_player_no(void);
 void* ef_effect_root_mtx(void* p);
@@ -187,7 +188,7 @@ extern "C" void fn_800E3D7C(u8 idx)
 }
 
 /* Rebuild all six free-lists. */
-extern "C" void fn_800E3DE0(void)
+extern "C" void sound_free_lists_reset(void)
 {
     for (u32 i = 0; i < 6; i++) {
         fn_800E3D7C(i);
@@ -225,7 +226,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
                 }
             }
             if (p->flags & 0xC08) {
-                if (fn_802BE39C() == 1) {
+                if (camera_mode1_ck() == 1) {
                     if ((p->flags & 0x400) && (s8)my_player_no() == 0) {
                         continue;
                     }

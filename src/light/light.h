@@ -47,4 +47,13 @@ void light_init(void);
 void light_move(void);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x802BF5BC - resets the light work (the system core's full reset). */
+void light_work_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_LIGHT_LIGHT_H */

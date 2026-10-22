@@ -175,6 +175,11 @@ void equip_from_item_id(u16 item_id, struct _EQUIP* out);
 s32 pl_act_grabbed_ck(_PLW* self);
 /* 0x8027D584 */
 void pl_act_hold_motion_set(_PLW* self, u8* arg1);
+/* The charge-level and weapon queries `ef/eft029_fx.cpp` reads: the player's charge stage, a signed frame value of the
+ * act tables and the weapon tip's world position. */
+u8 pl_charge_stage_get(struct _PLW* plw);
+s16 pl_act_frame_get(struct _PLW* plw, s32 a, s32 b);
+void pl_impact_pos_get(struct _PLW* plw, nw4r::math::VEC3* out);
 
 #ifdef __cplusplus
 }

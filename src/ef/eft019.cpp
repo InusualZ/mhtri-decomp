@@ -10,19 +10,10 @@
  * NAMES. The nine `eft019_set*` entries are the runtime dump's own names; the map has only `fn_` stems for the rest,
  *   so plain definitions are `extern "C"`.  `_EFT019_ACTOR` reads the actor's +0x1E1 byte as the area number (the
  *   canonical `enemy.h` calls it `act_id`; every ef consumer compares it as an area).
- * RESIDUALS. 1 row unwritten: 0x8011392C-0x8011484C (`fn_8011392C`, the per-frame update).
- *  - `eft019_set` and `eft019_set_subtype` load the pooled constants `lbl_807969DC`, `lbl_807969E8` and
- *    `lbl_807969F4` by name where retail's loads carry no symbol (retail folds them into its own pool).
- *   7 partial rows:
- *  - `eft019_set`: frame 0x100 against retail's 0x90; ours copies each case's `VEC3` through a second stack slot;
- *  - `fn_80112D58`: frame 0x80 against 0x70, and ours places the `lbl_8059FB40` colour block inline;
- *  - `eft019_set_brethend`, `fn_80112B7C`: ours inverts the last test of the chain, so the two bodies sit in the other
- *    order;
- *  - `fn_80112B7C`: retail puts the `type_0x02 = 103` body out of line (the `else-if` and empty-`then` spellings
- *    do not reproduce it);
- *  - `eft019_set_mazule`, `eft019_set_subtype`, `fn_801148E4` have no recorded cause (`symdiff.py -u ef/eft019`).
- *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted; `.text` (0x1E60 of 0x2C58), extab (0xA0 of 0xA8), extabindex
- *   (0xF0 of 0xFC) and `.data` (0x254 of 0xA48) short of the claim and differing.
+ * RESIDUALS. none in code.
+ *   flipcheck: `.data` is 0x4C4 of the claim's 0xA48 and differs from the target's, `.sdata` and
+ *   `.sdata2` are claimed, not emitted.  The tail 0x80114C20-0x80114E34 (`ef_inst_spawn` and three more) shares its
+ *   pool with `ef/fn_80114E34.cpp`'s functions, so it is likely that unit's.
  * SHAPES. The `_CP_VECTOR*` setters copy the rotation triple with word reads (`effect->rot_0x24 = *rot;`): through a
  *   `nw4r::math::VEC3*` it emits an `fctiwz` per component.
  *   `eft019_set` keeps one `VEC3` per camera case (nine).
@@ -34,6 +25,7 @@
 #include "pl.h"
 #include "ef/eft001.h"
 #include "ef/eft004.h"
+#include "camera/camera.h" /* get_camera_pos (rule 2) */
 #include "ef/effect.h"
 #include "ef/fn_80114E34.h"
 #include "g3d/g3d_calcworld.h"
@@ -47,6 +39,11 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
+#include "ef/eft002.h" /* eft_effect_foreach_pm_scale (rule 2) */
+#include "ef/eft_stage_spawn_flag.h" /* eft_stage_spawn_flag (rule 2) */
+#include "rotLocalMatX.h" /* rotLocalMatY (rule 2) */
+#include "ef/eft_res_models_spawn.h" /* eft_res_models_spawn (rule 2) */
+#include "fn_8004CAD8.h" /* mtx34_identity (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the unit's own prototypes (plain C linkage: the map's stems must stay unmangled)
@@ -75,11 +72,9 @@ void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale);
 
 /* Callees other units own, declared locally (a rule-2 residual): `vec3_normalize_into`/`vec3_scale_in_place` are
  * `fn_8004CAD8.cpp`'s, `fn_8005696C`/`fn_80056A20` `draw_shape_arm.cpp`'s, `eft_res_slot_get`/`eft_res_slot_release`
- * `ef/eft_res.cpp`'s, `fn_80306D6C` `ef/fn_8030681C.cpp`'s, `fn_80331210` `hud/pl_frame_sync.cpp`'s and
+ * `ef/eft_res.cpp`'s, `fn_80306D6C` `ef/fn_8030681C.cpp`'s, `pl_frame_eft_color_get` `hud/pl_frame_sync.cpp`'s and
  * `fn_800E0A14` `sound/mhchar.cpp`'s. */
-void vec3_normalize_into(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
-void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
-void fn_8005696C(s32 id, s32 kind, s32 mode, s32* color, s32 timer, f32 x, f32 y);
+void fn_8005696C(s32 id, s32 kind, s32 mode, f32 x, f32 y, _GXColor color, s32 timer);
 void fn_80056A20(f32 a, f32 b);
 _EFT* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(_EFT* self);
@@ -107,8 +102,8 @@ void eft019_set_ring(nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot);
 void eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer);
 
 /* The effect-manager id table and the sound-object hooks `fn_80112D58` case 0x88 drives, declared locally with C
- * linkage (the target references their plain names): `ef_system_memory_manager`/`fn_800A51D8` are `ef/ef_effect.cpp`'s,
- * `fn_800A970C`/`fn_800A9714`/`fn_800A67E8` `ef/ef_emitter.cpp`'s (a rule-2 residual). */
+ * linkage (the target references their plain names): `ef_system_memory_manager`/`ef_effect_emitter_get` are `ef/ef_effect.cpp`'s,
+ * `ef_emitter_pm_count`/`ef_emitter_pm_get`/`fn_800A67E8` `ef/ef_emitter.cpp`'s (a rule-2 residual). */
 extern "C" {
 void** ef_system_memory_manager(s32 id);
 void* ef_effect_emitter_get(nw4r::ef::Effect* effect, u32 arg);
@@ -117,17 +112,13 @@ void* ef_emitter_pm_get(void* obj, u16 index);
 void fn_800A67E8(void* obj, void* value);
 }
 
-/* The object `ef_system_memory_manager` returns: a vtable word at +0 and the 4th virtual slot at +0x0C, which
- * retail calls with the object itself as `this`. size: 0x04 */
-struct _EFT019_SND_OBJ {
-    /* +0x00 */ void** vtable;
+/* The memory manager `ef_system_memory_manager` returns, reached through its second virtual slot (+0x0C); declared
+ * only, so this unit emits no table of its own.  size: 0x04 - lower bound, an approximation (the vtable word) */
+class EftMemoryManager {
+public:
+    virtual void virtual_0x08();
+    virtual void virtual_0x0C();
 };
-struct _EFT019_SND_VTABLE {
-    /* +0x00 */ void (*v0)(void);
-    /* +0x04 */ void (*v1)(void);
-    /* +0x08 */ void (*v2)(void);
-    /* +0x0C */ void (*slot_0x0C)(_EFT019_SND_OBJ* self);
-}; /* size: 0x10 */
 
 /* The effect manager's control block `eft_control` is the band's one record (`unsplit/ef_control.h`); this unit only hands its +0x04 word to `ef_system_memory_manager`. */
 #include "unsplit/ef_control.h"
@@ -137,10 +128,11 @@ struct _EFT019_SND_VTABLE {
 void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
 
-/* The camera entries: the map spells both `__Fv`, but every call site passes an out pointer, so the declaration
- * carries it (the relocation name differs from the map's; playbook 23). */
+/* `get_camera_pos__Fv` returns its vector through the caller's slot: every call site passes it in r3, which the
+ * by-value spelling only reproduces with a temporary, so the call goes through the out-pointer view. */
+#define EFT_CAMERA_POS(out) ((void (*)(nw4r::math::VEC3*))get_camera_pos)(out)
+/* The camera direction entry (`get_camera_direction__Fv`). */
 nw4r::math::VEC3 get_camera_direction(void); /* target references get_camera_direction__Fv (relocaudit) */
-void get_camera_pos(nw4r::math::VEC3* out);
 
 /* `get_enemy_data`'s map spelling is `get_enemy_data__FP11_ENEMY_WORK`; the tag is forward-declared
  * here so the declaration emits that exact mangling without pulling in `enemy.h`'s record view. */
@@ -225,7 +217,7 @@ extern u16 lbl_8059F6FC[]; /* the effect id table `res_eft_create` is fed (.data
 extern u16 lbl_8059F810[]; /* its second field (.data 0x8059F810, 0x114) */
 extern u16 lbl_8059F924[]; /* the two-model ids (.data 0x8059F924) */
 extern s32 lbl_8059FB40[]; /* the three colour-table pointers the variant switch picks (.data) */
-extern u8 lbl_8059FB4C[];  /* one 0x0C-byte colour record per variant (.data 0x8059FB4C) */
+extern u8 lbl_8059FB4C[];  /* one RGB triple per variant (.data 0x8059FB4C) */
 extern u8 lbl_8059FB5C[];  /* ditto */
 extern u8 lbl_8059FB68[];  /* ditto */
 extern u8 lbl_8059FB7C[];  /* ditto */
@@ -233,7 +225,9 @@ extern u8 lbl_8059FB88[];  /* ditto */
 extern u8 lbl_8059FBB8[];  /* ditto */
 extern u8 lbl_8059FBC4[];  /* ditto */
 extern u8 lbl_8059FBD0[];  /* ditto */
-extern u8 lbl_8059FBDC[];  /* ditto */
+extern u8 lbl_8059FBDC[];  /* one RGB triple per 0x84 variant (.data 0x8059FBDC) */
+extern u8 eft019_alpha_keys_32[8]; /* the type-0x20 fade-out alpha keys (.sdata 0x807918E8) */
+extern u8 eft019_alpha_keys_57[8]; /* the type-0x39 alpha keys (.sdata 0x807918F0) */
 
 extern f32 lbl_807969D8; /* .sdata2 0x807969D8 .. 0x80796A24, the scale/colour constants */
 extern f32 lbl_807969DC;
@@ -257,13 +251,13 @@ extern f32 lbl_80796A24;
 
 /* The bodies keep retail's `u8` argument masks and unfused record-form compares (playbook 39). */
 #pragma peephole off
+#pragma optimization_level 4
 
 /* 0x801121DC (0x434): Spawns an eft019 record and orients it per camera case. */
 
 void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
 {
     nw4r::math::VEC3 v;
-    nw4r::math::VEC3 d0, d1, d2, d3, d4, d5, d6, d7, d8;
     _EFT* effect;
 
     VEC3_ctor(&v);
@@ -274,8 +268,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
 
     switch (type) {
     case 0: {
-        d0 = get_camera_direction();
-        copyVec3(&v, &d0);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
@@ -284,33 +277,28 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 1: {
         _EFT019_WORK* work;
-        d1 = get_camera_direction();
-        copyVec3(&v, &d1);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_b_0x48 = lbl_807969DC;
-        work->scale_a_0x44 = lbl_807969DC;
+        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969DC;
         return;
     }
     case 2: {
         _EFT019_WORK* work;
-        d2 = get_camera_direction();
-        copyVec3(&v, &d2);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_b_0x48 = lbl_807969E8;
-        work->scale_a_0x44 = lbl_807969E8;
+        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
         return;
     }
     case 14: {
-        d3 = get_camera_direction();
-        copyVec3(&v, &d3);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
@@ -318,8 +306,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         return;
     }
     case 15: {
-        d4 = get_camera_direction();
-        copyVec3(&v, &d4);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
@@ -327,8 +314,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         return;
     }
     case 16: {
-        d5 = get_camera_direction();
-        copyVec3(&v, &d5);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
@@ -339,39 +325,33 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         _EFT019_WORK* work;
         eft019_set_core(pos, area, 12, lbl_807969F0, lbl_807969F0);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_b_0x48 = lbl_807969F4;
-        work->scale_a_0x44 = lbl_807969F4;
+        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969F4;
         return;
     }
     case 28: {
         _EFT019_WORK* work;
-        d6 = get_camera_direction();
-        copyVec3(&v, &d6);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E8, lbl_807969E8);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_b_0x48 = lbl_807969E8;
-        work->scale_a_0x44 = lbl_807969E8;
+        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
         return;
     }
     case 29: {
         _EFT019_WORK* work;
-        d7 = get_camera_direction();
-        copyVec3(&v, &d7);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969E8, lbl_807969E8);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_b_0x48 = lbl_807969E8;
-        work->scale_a_0x44 = lbl_807969E8;
+        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
         return;
     }
     case 57: {
-        d8 = get_camera_direction();
-        copyVec3(&v, &d8);
+        copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
@@ -419,19 +399,21 @@ void eft019_set_brethend(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 typ
     _EFT* effect;
     _EFT019_WORK* work;
 
-    /* `type` arrives in r6 and is the register the result lives in on the path where no id matches, so
-     * retail carries the raw id into the `effect != 0` test.  The three ids this function is called
-     * with are the ones below (3..5 -> 11, 18/21/22/83 -> 17); the fall-through cannot be reached. */
+    /* The three ids this function is called with are the ones below (3..5 -> 11, 18/21/22/83 -> 17); on any other
+     * id `effect` is never set (retail tests the id's register). */
     effect = (_EFT*)type;
-    {
-        u8 t = (u8)type;
-        if ((u32)(t - 3) > 2) {
-            if ((u32)(t - 21) <= 1 || (s32)t == 18 || (s32)t == 83) {
-                effect = fn_80114A1C(pos, area, 17);
-            }
-        } else {
-            effect = fn_80114A1C(pos, area, 11);
-        }
+    switch (type) {
+    case 3:
+    case 4:
+    case 5:
+        effect = fn_80114A1C(pos, area, 11);
+        break;
+    case 18:
+    case 21:
+    case 22:
+    case 83:
+        effect = fn_80114A1C(pos, area, 17);
+        break;
     }
     if (effect != 0) {
         effect->rot_0x24 = *rot;
@@ -504,7 +486,8 @@ void eft019_set_mazule(u8 id, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot, _
             effect->demo_flag_0x08 = 1;
         }
         effect->source_0x30 = plw;
-        effect->rot_0x24 = *rot;
+        effect->rot_0x24.x = rot->x;
+        effect->rot_0x24.y = rot->y;
         effect->rot_0x24.z = 0;
         work = (_EFT019_WORK*)effect->work_0x38;
         work->subtype_0x40 = id;
@@ -516,7 +499,6 @@ void eft019_set_mazule(u8 id, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot, _
 void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot,
                         s32 timer, f32 scale)
 {
-    nw4r::math::VEC3 dir;
     nw4r::math::VEC3 v;
     _EFT* effect;
     _EFT019_WORK* work;
@@ -527,8 +509,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
         work = (_EFT019_WORK*)effect->work_0x38;
         switch (type) {
         case 0: {
-            dir = get_camera_direction();
-            copyVec3(&v, &dir);
+            copyVec3(&v, &get_camera_direction());
             vec3_normalize_into(&v, &v);
             vec3_scale_in_place(&v, lbl_807969D8);
             addVec3To(pos, &v);
@@ -536,25 +517,21 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             break;
         }
         case 1: {
-            dir = get_camera_direction();
-            copyVec3(&v, &dir);
+            copyVec3(&v, &get_camera_direction());
             vec3_normalize_into(&v, &v);
             vec3_scale_in_place(&v, lbl_807969D8);
             addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
-            work->scale_b_0x48 = lbl_807969DC;
-            work->scale_a_0x44 = lbl_807969DC;
+            work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969DC;
             break;
         }
         case 2: {
-            dir = get_camera_direction();
-            copyVec3(&v, &dir);
+            copyVec3(&v, &get_camera_direction());
             vec3_normalize_into(&v, &v);
             vec3_scale_in_place(&v, lbl_807969D8);
             addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
-            work->scale_b_0x48 = lbl_807969E8;
-            work->scale_a_0x44 = lbl_807969E8;
+            work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
             break;
         }
         default:
@@ -578,9 +555,8 @@ void fn_80112B7C(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VE
 {
     _EFT* effect;
     _EFT019_WORK* work;
-    u8 variant;
+    u8 t;
 
-    variant = subtype;
     effect = fn_80114A1C(pos, ((_EFT019_ACTOR*)source)->area_0x16, key);
     if (effect != 0) {
         effect->rot_0x24 = *rot;
@@ -589,18 +565,19 @@ void fn_80112B7C(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VE
         work->scale_b_0x48 = scale;
         work->scale_a_0x44 = scale;
         if ((s32)key == 102) {
-            u8 t = pl_frame_eft_color_get(source);
-            if ((u32)t > 2) {
-                if ((s32)t != 3) {
-                    /* 4 and up keep the record's own id */
-                } else {
-                    effect->type_0x02 = 103;
-                }
-            } else {
-                variant = t;
+            t = pl_frame_eft_color_get(source);
+            switch (t) {
+            case 0:
+            case 1:
+            case 2:
+                subtype = t;
+                break;
+            case 3:
+                effect->type_0x02 = 103;
+                break;
             }
         }
-        work->subtype_0x40 = variant;
+        work->subtype_0x40 = subtype;
     }
 }
 
@@ -668,11 +645,12 @@ void fn_80112D58(_EFT* self)
 {
     nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 cam;
     _EFT019_WORK* work;
-    _EFT019_SND_OBJ* obj;
+    struct EfPmManager* pm;
+    void* emitter;
     s32 snd;
     s32 i;
+    u16 snd_count;
 
     if (self->type_0x02 == 6) {
         self->state_0x05++;
@@ -757,13 +735,6 @@ void fn_80112D58(_EFT* self)
                 fn_8011485C(self);
                 return;
             }
-            {
-                u8* tint = ((u8**)lbl_8059FB40[0])[work->subtype_0x40];
-                work->color_0x4C[0].r = tint[0];
-                work->color_0x4C[0].g = tint[1];
-                work->color_0x4C[0].b = tint[2];
-                work->color_0x4C[0].a = 0xFF;
-            }
             break;
         case 9:
         case 10:
@@ -834,9 +805,9 @@ void fn_80112D58(_EFT* self)
             work->effects[i]->SetRootMtx(mtx);
             {
                 u8* tint = ((u8**)lbl_8059FB40[i])[work->subtype_0x40];
-                work->color_0x4C[i].r = tint[0];
-                work->color_0x4C[i].g = tint[1];
-                work->color_0x4C[i].b = tint[2];
+                work->color_0x4C[i].r = tint[1];
+                work->color_0x4C[i].g = tint[2];
+                work->color_0x4C[i].b = tint[3];
                 work->color_0x4C[i].a = 0xFF;
             }
         }
@@ -861,14 +832,12 @@ void fn_80112D58(_EFT* self)
             return;
         }
         break;
-    case 0x20: {
-        u8* tint = lbl_8059FB4C + work->subtype_0x40 * 0xC;
-        work->color_0x4C[0].r = tint[0];
-        work->color_0x4C[0].g = tint[1];
-        work->color_0x4C[0].b = tint[2];
+    case 0x20:
+        work->color_0x4C[0].r = lbl_8059FB4C[work->subtype_0x40 * 3];
+        work->color_0x4C[0].g = lbl_8059FB4C[work->subtype_0x40 * 3 + 1];
+        work->color_0x4C[0].b = lbl_8059FB4C[work->subtype_0x40 * 3 + 2];
         work->color_0x4C[0].a = 0xFF;
         break;
-    }
     case 0x21:
         fn_800DA8AC(&self->pos_0x18);
         break;
@@ -950,8 +919,8 @@ void fn_80112D58(_EFT* self)
     case 0x7F: {
         u32 col = get_stg_eft_col(self->area_0x44, 0);
         work->color_0x4C[0].r = (u8)(col >> 24);
-        work->color_0x4C[0].g = (u8)(col >> 16);
-        work->color_0x4C[0].b = (u8)(col >> 8);
+        work->color_0x4C[0].g = (col >> 16) & 0xFF;
+        work->color_0x4C[0].b = (col >> 8) & 0xFF;
         work->color_0x4C[0].a = (u8)col;
         break;
     }
@@ -960,8 +929,8 @@ void fn_80112D58(_EFT* self)
     case 0x53: {
         u32 col = get_stg_eft_col(self->area_0x44, 1);
         work->color_0x4C[0].r = (u8)(col >> 24);
-        work->color_0x4C[0].g = (u8)(col >> 16);
-        work->color_0x4C[0].b = (u8)(col >> 8);
+        work->color_0x4C[0].g = (col >> 16) & 0xFF;
+        work->color_0x4C[0].b = (col >> 8) & 0xFF;
         work->color_0x4C[0].a = (u8)col;
         break;
     }
@@ -1038,32 +1007,30 @@ void fn_80112D58(_EFT* self)
         {
             u32 col = get_stg_eft_col(self->area_0x44, 1);
             work->color_0x4C[0].r = (u8)(col >> 24);
-            work->color_0x4C[0].g = (u8)(col >> 16);
-            work->color_0x4C[0].b = (u8)(col >> 8);
+            work->color_0x4C[0].g = (col >> 16) & 0xFF;
+            work->color_0x4C[0].b = (col >> 8) & 0xFF;
             work->color_0x4C[0].a = (u8)col;
         }
         break;
-    case 0x84: {
-        u8* tint = lbl_8059FBDC + work->subtype_0x40 * 0xC;
+    case 0x84:
         cpSetRotMatrix(&self->rot_0x24, &mtx);
         for (i = 0; i < work->count; i++) {
             work->effects[i]->SetRootMtx(mtx);
         }
-        work->color_0x4C[0].r = tint[0];
-        work->color_0x4C[0].g = tint[1];
-        work->color_0x4C[0].b = tint[2];
+        work->color_0x4C[0].r = lbl_8059FBDC[work->subtype_0x40 * 3];
+        work->color_0x4C[0].g = lbl_8059FBDC[work->subtype_0x40 * 3 + 1];
+        work->color_0x4C[0].b = lbl_8059FBDC[work->subtype_0x40 * 3 + 2];
         work->color_0x4C[0].a = 0xFF;
         break;
-    }
     case 0x88:
         SetRootMtxTrans(work->effects[0], &self->pos_0x18);
         effect_retire(work->effects[0], 0);
-        obj = (_EFT019_SND_OBJ*)ef_effect_emitter_get(work->effects[0], 0);
-        i = (s32)ef_emitter_pm_get(obj, (u16)(ef_emitter_pm_count() - 1));
-        fn_800AB9F4((struct EfPmManager*)i);
-        fn_800A67E8(obj, (void*)i);
-        obj = (_EFT019_SND_OBJ*)ef_system_memory_manager(snd);
-        ((_EFT019_SND_VTABLE*)obj->vtable)->slot_0x0C(obj);
+        emitter = ef_effect_emitter_get(work->effects[0], 0);
+        snd_count = ef_emitter_pm_count();
+        pm = (struct EfPmManager*)ef_emitter_pm_get(emitter, snd_count - 1);
+        fn_800AB9F4(pm);
+        fn_800A67E8(emitter, pm);
+        ((EftMemoryManager*)ef_system_memory_manager(snd))->virtual_0x0C();
         break;
     }
 
@@ -1071,8 +1038,7 @@ void fn_80112D58(_EFT* self)
         SetRootMtxTrans(work->effects[i], &self->pos_0x18);
     }
     if ((u32)(self->type_0x02 - 0x66) <= 1) {
-        cam = get_camera_direction();
-        copyVec3(&dir, &cam);
+        copyVec3(&dir, &get_camera_direction());
         vec3_normalize_into(&dir, &dir);
         vec3_scale_in_place(&dir, lbl_807969D8);
         for (i = 1; i < work->count; i++) {
@@ -1090,6 +1056,10 @@ void fn_80112D58(_EFT* self)
         }
         break;
     case 1:
+        if (work->subtype_0x40 == 0) {
+            fn_800DA9C4(&self->pos_0x18);
+        }
+        break;
     case 2:
         if (work->subtype_0x40 == 0) {
             fn_800DA9C4(&self->pos_0x18);
@@ -1123,11 +1093,483 @@ void fn_80112D58(_EFT* self)
         fn_800DA9B4(&self->pos_0x18);
         break;
     case 0x83:
-        fn_800DA72C(0, 0x14, &self->pos_0x18);
+        se_slot_req_pos(0, 0x14, &self->pos_0x18);
         break;
     }
     fn_8011392C(self);
 }
+
+#pragma fp_contract off
+/* 0x8011392C (0xF20): Runs the record one frame by type: moves the effects, steps the colour keys and the per-type
+ * placement, ends the record when its effects finish, and spawns the models (the player's stage flag joins the mode). */
+void fn_8011392C(_EFT* self)
+{
+    u8 done = 0;
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 pos;
+    _EFT019_WORK* work;
+    _PLW* src;
+    nw4r::ef::EffectSystem* sys;
+    s32 mode;
+    s32 i;
+    s32 j;
+    s32 hold;
+    _GXColor col;
+    u8* keys;
+    s32 frame;
+
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&pos);
+    work = (_EFT019_WORK*)self->work_0x38;
+    src = (_PLW*)self->source_0x30;
+    sys = (nw4r::ef::EffectSystem*)eft_control.field_0x04;
+    if (self->type_0x02 == 6) {
+        fn_801148E4(self);
+        return;
+    }
+    if (self->field_0x07 == 1 && event_demo_ck() == 0) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    switch (self->type_0x02) {
+    case 0x00:
+    case 0x01:
+    case 0x02:
+    case 0x1C:
+    case 0x39:
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        self->field_0x10++;
+        switch (self->type_0x02) {
+        case 0x00:
+        case 0x1C:
+            eftGetKeyRGB(lbl_8059FB68, self->field_0x10, &work->color_0x4C[0].r, &work->color_0x4C[0].g,
+                         &work->color_0x4C[0].b);
+            work->color_0x4C[0].a = eftGetKeyAlpha(lbl_8059FB7C, self->field_0x10);
+            change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+            break;
+        case 0x39:
+            eftGetKeyRGB(lbl_8059FB88, self->field_0x10, &work->color_0x4C[0].r, &work->color_0x4C[0].g,
+                         &work->color_0x4C[0].b);
+            work->color_0x4C[0].a = eftGetKeyAlpha(eft019_alpha_keys_57, self->field_0x10);
+            change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+            break;
+        }
+        copyVec3(&pos, &self->pos_0x18);
+        pos.y += lbl_80796A04 * work->scale_a_0x44;
+        eft_res_models_spawn(self, (void**)work->effects, 1, work->count, &pos);
+        return;
+    case 0x03:
+    case 0x04:
+    case 0x05:
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        mtx34_identity(&mtx);
+        rotLocalMatY(self->rot_0x24.y, &mtx);
+        mtx.m[0][3] = self->pos_0x18.x;
+        mtx.m[1][3] = self->pos_0x18.y;
+        mtx.m[2][3] = self->pos_0x18.z;
+        work->effects[0]->SetRootMtx(mtx);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        break;
+    case 0x07:
+    case 0x3B:
+        if (--self->timer_0x0C < 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        for (i = 0; i < work->count; i++) {
+            effect_retire(work->effects[i], 0);
+        }
+        if ((s32)self->type_0x02 == 0x3B) {
+            change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+        }
+        break;
+    case 0x08:
+        if (--self->timer_0x0C < 0) {
+            work->count = work->live_0x3C;
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        for (i = 0; i < work->live_0x3C; i++) {
+            if (effect_emitter_alive_ck(work->effects[i]) == 0) {
+                sys->RetireEffect(work->effects[i]);
+                for (j = i; j < work->live_0x3C - 1; j++) {
+                    work->effects[j] = work->effects[j + 1];
+                }
+                work->live_0x3C--;
+                work->effects[work->live_0x3C] = NULL;
+            }
+        }
+        if (--self->field_0x10 < 0) {
+            if (work->live_0x3C <= work->count) {
+                work->effects[work->live_0x3C] = res_eft_create(0x36, 8, 0);
+                if (work->effects[work->live_0x3C] == NULL) {
+                    self->flag_0x01 = 0;
+                    self->state_0x05++;
+                    return;
+                }
+                SetRootMtxTrans(work->effects[work->live_0x3C++], &self->pos_0x18);
+            }
+            self->field_0x10 = 8;
+        }
+        for (i = 0; i < work->live_0x3C; i++) {
+            effect_retire(work->effects[i], 0);
+        }
+        break;
+    case 0x0B:
+        if (++self->field_0x10 == 5) {
+            eft019_set_tyakudan(&self->pos_0x18, &self->rot_0x24, self->area_0x44, work->subtype_0x40,
+                                work->scale_a_0x44);
+        }
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        break;
+    case 0x0C:
+    case 0x3A:
+        eft_effect_foreach_pm_scale(work->effects[0], (u32)&work->scale_a_0x44, 1);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        copyVec3(&pos, &self->pos_0x18);
+        switch (self->type_0x02) {
+        case 0x0C:
+            pos.y += lbl_80796A04 * work->scale_a_0x44;
+            break;
+        case 0x3A:
+            pos.y += lbl_80796A04 * work->scale_a_0x44;
+            change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+            break;
+        }
+        eft_res_models_spawn(self, (void**)work->effects, 1, work->count, &pos);
+        return;
+    case 0x0E:
+    case 0x0F:
+    case 0x10:
+    case 0x1D:
+        hold = 0;
+        for (i = 0; i < work->count; i++) {
+            if (effect_move(work->effects[i]) == 0) {
+                hold++;
+            }
+        }
+        if (hold == work->count) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        eft_res_models_spawn(self, (void**)&work->effects[0], 1, 1, NULL);
+        {
+            nw4r::math::VEC3 cam;
+            EFT_CAMERA_POS(&cam);
+            if (cam.y < lbl_80796A08) {
+                eft_res_models_spawn(self, (void**)&work->effects[1], 1, 1, NULL);
+            }
+        }
+        return;
+    case 0x13:
+        self->field_0x10++;
+        for (i = 0; i < work->count; i++) {
+            if (effect_move(work->effects[i]) == 0) {
+                done++;
+            }
+        }
+        if (done >= work->count) {
+            self->state_0x05++;
+            self->flag_0x01 = 0;
+            return;
+        }
+        switch (work->subtype_0x40) {
+        case 9:
+        case 10:
+        case 11:
+            hold = 0xFF;
+            break;
+        case 12:
+        case 13:
+        case 14:
+            hold = 3;
+            for (i = 1; i < work->count; i++) {
+                change_paramscale_eff(work->effects[i], work->scale_a_0x44);
+            }
+            break;
+        default:
+            hold = 0;
+            break;
+        }
+        if (self->field_0x06 != 0) {
+            keys = ((u8**)lbl_8059FB40[1])[work->subtype_0x40];
+            if (self->field_0x10 > hold) {
+                eftGetKeyRGB(keys, self->field_0x10 - hold, &work->color_0x4C[1].r, &work->color_0x4C[1].g,
+                             &work->color_0x4C[1].b);
+            }
+            keys = ((u8**)lbl_8059FB40[2])[work->subtype_0x40];
+            if (self->field_0x10 > 3) {
+                eftGetKeyRGB(keys, self->field_0x10 - hold, &work->color_0x4C[2].r, &work->color_0x4C[2].g,
+                             &work->color_0x4C[2].b);
+            }
+        }
+        switch (work->subtype_0x40) {
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 7:
+        case 8:
+        case 12:
+        case 13:
+        case 14:
+            fn_80114B20(self, &mtx);
+            switch (work->subtype_0x40) {
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 7:
+            case 8:
+                mtx34_trans_get(&mtx, &pos);
+                SetRootMtxTrans(work->effects[2], &pos);
+                work->color_0x4C[1].a = 0x87;
+                break;
+            case 12:
+            case 13:
+            case 14:
+                mtx34_trans_get(&mtx, &pos);
+                for (i = 1; i < work->count; i++) {
+                    SetRootMtxTrans(work->effects[i], &pos);
+                }
+                work->color_0x4C[2].a = 0x87;
+                break;
+            }
+            for (i = 0; i < work->count; i++) {
+                change_color_eff(work->effects[i], &self->pos_0x18, work->color_0x4C[i]);
+            }
+            break;
+        case 6:
+            work->color_0x4C[1].a = 0x87;
+            if (self->demo_flag_0x08 == 1) {
+                for (i = 0; i < work->count; i++) {
+                    change_color_eff(work->effects[i], &self->pos_0x18, work->color_0x4C[i]);
+                }
+            } else {
+                for (i = 0; i < work->count - 1; i++) {
+                    change_color_eff(work->effects[i], &self->pos_0x18, work->color_0x4C[i]);
+                }
+            }
+            break;
+        case 15:
+        case 16:
+            work->color_0x4C[1].a = 0x87;
+            for (i = 0; i < work->count - 1; i++) {
+                change_color_eff(work->effects[i], &self->pos_0x18, work->color_0x4C[i]);
+            }
+            break;
+        case 17:
+        case 18:
+            work->color_0x4C[1].a = 0x87;
+            for (i = 0; i < work->count; i++) {
+                change_color_eff(work->effects[i], &self->pos_0x18, work->color_0x4C[i]);
+            }
+            break;
+        }
+        if (self->field_0x06 == 0) {
+            self->field_0x06++;
+        }
+        break;
+    case 0x14:
+    case 0x1B:
+    case 0x40:
+    case 0x41:
+    case 0x42:
+    case 0x48:
+    case 0x49:
+    case 0x4A:
+    case 0x4B:
+    case 0x4C:
+    case 0x4D:
+    case 0x4E:
+    case 0x4F:
+    case 0x50:
+    case 0x55:
+    case 0x56:
+    case 0x57:
+    case 0x5E:
+    case 0x5F:
+    case 0x60:
+    case 0x62:
+    case 0x63:
+    case 0x64:
+    case 0x6B:
+    case 0x70:
+    case 0x7F:
+    case 0x82:
+    case 0x83:
+    case 0x84:
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+        break;
+    case 0x20:
+        if (--self->timer_0x0C <= 0) {
+            if (self->field_0x06 != 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            self->timer_0x0C = 20;
+            self->field_0x06++;
+        }
+        if (self->field_0x06 != 0) {
+            work->color_0x4C[0].a = eftGetKeyAlpha(eft019_alpha_keys_32, self->timer_0x0C);
+        }
+        if (self->field_0x10 % 30 == 0) {
+            se_req_eft019_tick(&self->pos_0x18);
+        }
+        self->field_0x10++;
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        effect_move(work->effects[0]);
+        change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+        break;
+    case 0x2F:
+        if (--self->timer_0x0C < 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        effect_move(work->effects[0]);
+        break;
+    case 0x38:
+        frame = ++self->field_0x10;
+        eftGetKeyRGB(lbl_8059FB5C, frame, &work->color_0x4C[0].r, &work->color_0x4C[0].g, &work->color_0x4C[0].b);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+        break;
+    case 0x52:
+    case 0x53:
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        {
+            nw4r::math::VEC3 cam;
+            EFT_CAMERA_POS(&cam);
+            if (cam.y < lbl_80796A08) {
+                change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+                eft_res_models_spawn(self, (void**)work->effects, 1, work->count, NULL);
+            }
+        }
+        return;
+    case 0x66:
+        self->field_0x10++;
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        change_paramscale_eff(work->effects[1], work->scale_a_0x44);
+        change_paramscale_eff(work->effects[2], lbl_80796A0C * work->scale_a_0x44);
+        for (i = 0; i < work->count; i++) {
+            if (effect_move(work->effects[i]) == 0) {
+                done++;
+            }
+        }
+        if (done >= work->count) {
+            self->state_0x05++;
+            self->flag_0x01 = 0;
+            return;
+        }
+        col.a = 0xFF;
+        eftGetKeyRGB(((u8**)lbl_8059FBB8)[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
+        change_color_eff(work->effects[0], &self->pos_0x18, col);
+        eftGetKeyRGB(((u8**)lbl_8059FBC4)[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
+        change_color_eff(work->effects[1], &self->pos_0x18, col);
+        eftGetKeyRGB(((u8**)lbl_8059FBD0)[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
+        change_color_eff(work->effects[2], &self->pos_0x18, col);
+        break;
+    case 0x67:
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        change_paramscale_eff(work->effects[1], work->scale_a_0x44);
+        change_paramscale_eff(work->effects[2], lbl_80796A0C * work->scale_a_0x44);
+        for (i = 0; i < work->count; i++) {
+            if (effect_move(work->effects[i]) == 0) {
+                done++;
+            }
+        }
+        if (done >= work->count) {
+            self->state_0x05++;
+            self->flag_0x01 = 0;
+            return;
+        }
+        break;
+    case 0x6E:
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        switch (get_now_mapno()) {
+        case 7:
+        case 18:
+            change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
+            break;
+        }
+        break;
+    case 0x88:
+        self->field_0x10++;
+        eft_effect_foreach_pm_scale(work->effects[0], (u32)&work->scale_a_0x44, 1);
+        if (self->field_0x10 > 5) {
+            if (effect_move(work->effects[0]) == 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+        } else {
+            effect_retire(work->effects[0], 0);
+        }
+        copyVec3(&pos, &self->pos_0x18);
+        pos.y += lbl_80796A04 * work->scale_a_0x44;
+        eft_res_models_spawn(self, (void**)work->effects, 1, work->count, &pos);
+        return;
+    default:
+        change_paramscale_eff(work->effects[0], work->scale_a_0x44);
+        if (effect_move(work->effects[0]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        break;
+    }
+    mode = 1;
+    if (src != NULL && Pl_master_ck(src) == 1) {
+        mode = eft_stage_spawn_flag(src) | 1;
+    }
+    eft_res_models_spawn(self, (void**)work->effects, mode, work->count, NULL);
+}
+#pragma fp_contract reset
 
 /* 0x8011484C (0x10): Advances the record's state. */
 
@@ -1162,11 +1604,12 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area)
 
 /* 0x801148E4 (0x138): Plays the on-screen impact sound and normalises its screen position. */
 
+#pragma fp_contract off
 void fn_801148E4(_EFT* self)
 {
     f32 v[3];
     f32 max[2];
-    s32 color;
+    _GXColor color;
     s32 handle;
     f32 rx;
     f32 ry;
@@ -1184,13 +1627,16 @@ void fn_801148E4(_EFT* self)
             ry = v[1] - max[1] * lbl_80796A10;
             v[0] = rx / max[0];
             v[1] = ry / max[1];
-            color = 0xFF;
+            color.r = 0xFF;
+            color.g = 0;
+            color.b = 0;
             fn_80056A20(ry, rx);
-            fn_8005696C(128, 3, 32, &color, self->timer_0x0C, v[0], v[1]);
+            fn_8005696C(128, 3, 32, v[0], v[1], color, self->timer_0x0C);
         }
     }
     self->state_0x05++;
 }
+#pragma fp_contract reset
 
 /* 0x80114A1C (0x104): Allocates an eft019 record in the current area, tags it 19 and installs its hooks. */
 

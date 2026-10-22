@@ -17,7 +17,7 @@
  * orthographic GX pipeline (fn_80047D6C builds C_MTXOrtho/GXSetProjection and pushes TPL quads).
  *
  * Status: partial.  Written, in address order: the accessors and the face animation helpers up to `fn_80047D38` and the GX pipe
- * writers `fn_80048764..fn_800487C8`; the biggest unwritten are `fn_80047D6C` (0x9F8), `fn_800478F0` (0x200), `fn_80047634` (0x170).
+ * writers `fn_80048764..userdata_size_get`; the biggest unwritten are `fn_80047D6C` (0x9F8), `fn_800478F0` (0x200), `fn_80047634` (0x170).
  *
  * Residual: the four functions that read `Screen_w` (fn_80047398, fn_800473F4, fn_800478F0, fn_80047D6C) are NOT written:
  * `ScreenWork` is defined inside `main.cpp`, and reaching its fields from a second unit needs that type moved to `include/` first
@@ -31,6 +31,7 @@
  *   carry an `@ha`/`@l` pair on `face_work` that retail's object does not relocate.
  *
  * Inventory / addresses / sizes: `python tools/units/ledger.py unit fn_80047398.cpp`.
+ * NAMES. GUESS (from each body and its callers): `userdata_size_get`.
  */
 
 #include "types.h"
@@ -309,7 +310,7 @@ extern "C" void fn_800487C4(void)
 }
 
 /* The unit's fixed display-list id. */
-extern "C" u32 fn_800487C8(void)
+extern "C" u32 userdata_size_get(void)
 {
     return 0x4880;
 }

@@ -129,6 +129,7 @@
  * (the two 2^52 conversion doubles plus the `1.0f` `color_lerp` subtracts).  It grew by 4 B this run
  * because a new body cannot reference the `lbl_8079A8D8` word without a rule-7 finding of its own;
  * the pool claim stays blocked until every word of the 28-byte run is written, per the note above.
+ *   GUESS (from each body and its callers): `note_line_draw`, `note_text_draw`.
  * NAMES. GUESS: `draw_itemicon_anim_idx`, `draw_equipicon_idx`, `draw_sprite_uv_color_idx`, `draw_sprite_uv_idx`
  */
 

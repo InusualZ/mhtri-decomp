@@ -76,7 +76,7 @@ struct _PLWORK {
 };
 
 /* The 0x47C-byte player-global record `lbl_80794B28` (`Pl/player_control.cpp`'s `.sbss`) points at - the allocation
- * size `fn_80267548` requests.  The middle fields are named from the player-control code's uses.
+ * size `player_work_array_get` requests.  The middle fields are named from the player-control code's uses.
  * size: 0x47C */
 struct _PLGLOBAL {
     /* +0x000 */ u8 state;              /* the player-control state machine, 0..5 */

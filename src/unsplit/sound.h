@@ -30,7 +30,7 @@ void setScaleAll__6MHcharFf(struct MHchar* ch, f32 scale);
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 void fn_800DD7E0(struct MHchar* model, Vec3* pos, s32 flag);
 void mhchar_joint_mtx_get(void* mhchar, u32 joint, Mtx34* out);
-int fn_800E2994(void* handle);
+int copied_mat_access_valid_ck(void* handle);
 void fn_800E3B2C(void);
 /* Merged 2026-09-24: the 0x800EF7D8 proposal's consumer needed this one. */
 void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void));

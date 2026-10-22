@@ -147,7 +147,7 @@ struct _mh_ivec2_;
 struct MenuPlaceRec;
 
 /* One of the two 0x330-byte working records of the menu work area at `.bss:0x806AC8C8`; the area is
- * `MenuSlot slot[2]` (0x660 = the whole `.bss` run, and `fn_802A0188` walks it with an 816-byte
+ * `MenuSlot slot[2]` (0x660 = the whole `.bss` run, and `menu_item_close` walks it with an 816-byte
  * stride).  The three entry arrays and their counts are the ones the setters below walk; the other
  * fields are the ones this unit's bodies touch.  The item page's draw layer
  * (`menu/menu_item_page.cpp`) named the bytes it introduced: the page index at +0x01C, the per-kind
@@ -213,12 +213,12 @@ struct MenuSlot {
     /* +0x324 */ MenuPlaceRec* place_entries; /* the 0x24-byte placement list `menu/menu_row.cpp` walks */
     /* +0x328 */ s32 place_count;
     /* +0x32C */ u8 unused_0x32C[0x1];
-    /* +0x32D */ u8 field_0x32D;      /* the flag `fn_802A0188` clears after `kbd_close_call` */
+    /* +0x32D */ u8 field_0x32D;      /* the flag `menu_item_close` clears after `kbd_close_call` */
     /* +0x32E */ u8 unused_0x32E[0x330 - 0x32E];
 };
 
 /* The menu work area itself: the two slots, `.bss` 0x806AC8C8..0x806ACF28 (0x660 B - exactly two
- * 0x330-byte slots, which is what `fn_802A0188`'s 816-byte stride walks). */
+ * 0x330-byte slots, which is what `menu_item_close`'s 816-byte stride walks). */
 struct MenuWork {
     /* +0x000 */ MenuSlot slot[2];
 };
@@ -384,6 +384,15 @@ extern "C" {
 #endif
 /* 0x802A0568 - clears the item box work (GUESS name). */
 void menu_item_work_init(void);
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x802A0188 - closes the item menu (the move-state dispatcher's quest exit). */
+void menu_item_close(void);
 #ifdef __cplusplus
 }
 #endif

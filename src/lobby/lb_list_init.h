@@ -33,6 +33,14 @@ void lb_panel_str_print(u16 panel, s16 str, s16 color);
 void lb_panel_line_draw(u16 panel, s16 str, s16 color, s32 row);
 /* 0x80215170 - draws the yes/no choice on panel `panel` with `sel` picked (GUESS name). */
 void lb_panel_yes_no_draw(u16 panel, s32 sel);
+/* 0x80214F30 - puts text `text` on help panel `panel`. */
+s32 lb_help_text_put(u16 panel, s8* text);
+/* 0x80214FB8 - puts lobby string `str` with the number `value` on help panel `panel`. */
+s32 lb_help_num_put(s32 panel, s32 str, s32 value);
+/* 0x80214D00 - draws the count window of panel `panel`/`sub_panel`: `value` of `max` at `price` each. */
+void lb_count_window_draw(s32 panel, s32 sub_panel, s32 value, s32 max, s32 price, s32 flag, s32 moved);
+/* 0x8021674C - draws one item row: item `id`, `count`, at `pos`, with its enabled, picked, active and marked looks. */
+void lb_item_row_draw(s32 id, s32 count, s32 pos, s32 enabled, s32 picked, s32 active, s32 marked, s32 flag);
 /* 0x802159F0 - puts the page arrows of page `page` of `pages` on panel `panel` (GUESS name). */
 void lb_page_arrow_draw(u16 panel, s16 page, s16 pages, u16 x, s32 active);
 /* 0x80215C98 - draws a list frame with text `text` at `pos` (GUESS name). */

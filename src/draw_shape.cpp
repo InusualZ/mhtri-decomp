@@ -24,6 +24,7 @@
  * Not reconstructed: the four named resource loaders (they need the nw4r `ResFile` owner type, rule 9) and the load callbacks
  * fn_800553B4/fn_80055534/fn_80055674/fn_80055770/fn_80055838/fn_80055AC4 (they need `load_file_req` and the `nw_resource` loader
  * entry points).
+ * NAMES. GUESS (from each body and its callers): `draw_shape_reset`.
  */
 
 #include "types.h"

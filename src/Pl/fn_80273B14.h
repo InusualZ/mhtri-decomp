@@ -73,7 +73,7 @@ void fn_80276A3C(struct _PLW* plw);
  * `fn_802745DC` returns `u32`: its own body is byte-identical either way, and its caller `fn_8027D6DC` reproduces
  * retail's `mr r0,r3` result copy only with the wider return.  The `s16` parameter is narrowed by retail's `extsh`. */
 u32 fn_802745DC(struct _PLW* plw, s16 kind);
-s32 fn_802748C8(void* self);
+s32 pl_stagger_level_get(void* self);
 s32 fn_80274AB8(struct _PLW* plw);
 s32 fn_80274AEC(u8 kind);
 

@@ -56,4 +56,13 @@ void gpframe_tex_load(void);
 void menu_tex_load(void);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80052760 - resets the shape draw queue (the system core's full reset). */
+void draw_shape_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_DRAW_SHAPE_H */

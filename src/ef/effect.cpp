@@ -9,6 +9,8 @@
  *   `eftGetKeyRGB` and `eftGetKeyAlpha` are the runtime dump's own names; the map has only `fn_` stems for the rest.
  *   GUESS (from the body): `effect_retire` (0x800F996C) calls the effect's retire slot with the flag as a bool.
  *   GUESS: `change_color_scale_eff` (0x800F99D4), `eft_water_state_ck` (0x800F9D80: the water-flag legality test).
+ *   GUESS (from each body and its callers): `effect_layer_reset`, `eft_rand_unit`, `eft_rand_signed_half`,
+ *   `eft_shape_init`.
  * RESIDUALS. 21 partial rows, including:
  *  - `fn_800FA9B8`: ours inverts the name-table walk's test and drops the second record check (`lwz`/`cmpwi`);
  *  - `fn_800FA208`: ours keeps an extra saved register and lays the state compares out 1, 2, 3 where retail
@@ -16,7 +18,7 @@
  *  - `change_color_scale_eff`: ours turns the `u8` flag test into `neg`/`or`/`srwi` where retail passes it through;
  *  - `fn_800FA5D4`: the stack slots and the loop's exit branch differ;
  *  - `eftGetKeyRGB`: ours re-masks each channel with an extra `clrlwi`;
- *  - `fn_800F9CDC`: ours drops the `xoris` of the signed int-to-float conversion;
+ *  - `eft_rand_unit`: ours drops the `xoris` of the signed int-to-float conversion;
  *  - `fn_800F9A70`: ours advances the key pointer before the load;
  *  - `fn_800F97F0`: retail reads the table through `eft_name_tbl_ptr` (`@sda21`, `.sbss` 0x80794A70); ours indexes
  *    `lbl_8058A880` directly.
@@ -78,7 +80,7 @@ typedef struct EftBox {
     /* +0x18 */ f32 radius_0x18;
 } EftBox; /* size: 0x1C */
 
-/* The 0x34-byte record `fn_800FA378` constructs: a box plus two more vectors. */
+/* The 0x34-byte record `eft_shape_init` constructs: a box plus two more vectors. */
 typedef struct EftShape {
     /* +0x00 */ EftBox box_0x00;
     /* +0x1C */ nw4r::math::VEC3 a_0x1C;
@@ -174,7 +176,7 @@ extern "C" nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self);
 extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec);
 extern "C" void fn_800FA318(EftBox* dst, const EftBox* src);
 extern "C" void fn_800FA354(EftSphere* dst, const EftSphere* src);
-extern "C" EftShape* fn_800FA378(EftShape* self);
+extern "C" EftShape* eft_shape_init(EftShape* self);
 extern "C" EftVectors* eft_capsule_ctor(EftVectors* self);
 extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColorParams* params, u8 flag);
 
@@ -208,7 +210,7 @@ s32 ef_resource_instance(void);
 void ef_resource_remove_all_effect_projects(void);
 void ef_resource_remove_all_texture_projects(s32 handle);
 s32 fn_800E28E4(void* chr);
-s32 fn_800E2994(void* access);
+s32 copied_mat_access_valid_ck(void* access);
 
 void* scn_mdl_mat_access_get_tev_color(void* access, u32 idx);
 void* scn_mdl_mat_access_get_chan(void* access, u32 idx);
@@ -222,7 +224,7 @@ void* fn_802B0420(void);
 u32 stage_water_area_ck(void);
 u32 stage_water_enabled_ck(void);
 void pl_capsule_box_set(void* a, void* b);
-u32 fn_802907BC(void* a, void* b);
+u32 pl_capsule_point_ck(void* a, void* b);
 f32 vec3_length_sq(void* v);
 
 /* the file/alloc helpers */
@@ -297,7 +299,7 @@ extern "C" void fn_800F95A4(void* self) {
 }
 
 /* 0x800F9628 - retire the two live effect emitters and release the model. */
-extern "C" void fn_800F9628(void) {
+extern "C" void effect_layer_reset(void) {
     void* effect = eft_control.effect_0x04;
     if (eft_control.initialised_0x00 == 0 || effect == 0) {
         return;
@@ -481,14 +483,14 @@ extern "C" void fn_800F9C20(void* dst, u8 area, u8 slot) {
 }
 
 /* 0x800F9CDC - a random 0.0..1.0 scale factor. */
-extern "C" f32 fn_800F9CDC(void) {
+extern "C" f32 eft_rand_unit(void) {
     u16 r = (u16)ran_suu(1);
     u32 v = (u32)(r & 0x3FF);
     return (f32)v * lbl_807965E0;
 }
 
 /* 0x800F9D2C - a random -0.5..0.5 scale factor. */
-extern "C" f32 fn_800F9D2C(void) {
+extern "C" f32 eft_rand_signed_half(void) {
     u16 r = (u16)ran_suu(1);
     s32 v = (s32)(r & 0x3FF) - 0x200;
     return (f32)v * lbl_807965F0;
@@ -592,7 +594,7 @@ extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec) {
     u32 result = 0;
     eft_vec_ctor((nw4r::math::VEC3*)&sphere);
     eft_capsule_ctor((EftVectors*)&box);
-    fn_800FA378(&box2);
+    eft_shape_init(&box2);
     switch (rec->mode_0x00) {
     case 0:
         break;
@@ -605,7 +607,7 @@ extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec) {
     case 2:
         fn_800FA318(&box, (const EftBox*)rec->box_0x14);
         pl_capsule_box_set(&box, &box2);
-        if (fn_802907BC(pos, &box2) == 1) {
+        if (pl_capsule_point_ck(pos, &box2) == 1) {
             result = 1;
         }
         break;
@@ -629,7 +631,7 @@ extern "C" void fn_800FA354(EftSphere* dst, const EftSphere* src) {
 }
 
 /* 0x800FA378 - construct the box record and its two vectors. */
-extern "C" EftShape* fn_800FA378(EftShape* self) {
+extern "C" EftShape* eft_shape_init(EftShape* self) {
     eft_capsule_ctor((EftVectors*)&self->box_0x00);
     VEC3_ctor(&self->a_0x1C);
     VEC3_ctor(&self->b_0x28);
@@ -667,7 +669,7 @@ extern "C" void fn_800FA450(void* effect) {
     eft_vec_ctor((nw4r::math::VEC3*)&sphere);
     eft_capsule_ctor((EftVectors*)&box);
     VEC3_ctor(&pos);
-    fn_800FA378(&box2);
+    eft_shape_init(&box2);
     ef_store_word(&mode, 0);
     u16 count = ef_effect_emitter_count(effect);
     if (count == 0) {
@@ -724,13 +726,13 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
     eft_vec_ctor((nw4r::math::VEC3*)&sphere2);
     eft_capsule_ctor((EftVectors*)&box);
     VEC3_ctor(&pos);
-    fn_800FA378(&shape);
+    eft_shape_init(&shape);
     s32 count = fn_800E28E4(chr);
     u8 flags = owner->flags_0x14;
     if ((flags & 1) != 0) {
         for (s32 i = 0; i < count; i++) {
             nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)(u32)chr->field_0x118, (u32)i);
-            if (fn_800E2994(&access) == 0) {
+            if (copied_mat_access_valid_ck(&access) == 0) {
                 return;
             }
             u32 handle = (u32)scn_mdl_mat_access_get_tev_color(&access, 0);
@@ -743,7 +745,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
     } else if ((flags & 2) != 0) {
         for (s32 i = 0; i < count; i++) {
             nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)(u32)chr->field_0x118, (u32)i);
-            if (fn_800E2994(&access) == 0) {
+            if (copied_mat_access_valid_ck(&access) == 0) {
                 return;
             }
             u32 handle = (u32)scn_mdl_mat_access_get_chan(&access, 0);

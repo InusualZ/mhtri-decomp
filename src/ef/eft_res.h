@@ -48,6 +48,22 @@ nw4r::ef::Effect* res_eft_create(u16 group, u16 id, u32 flags);
 void* res_eft_model_create(MHchar* model, u16 id, u32 arg);
 void* res_eft_UV_model_create(MHchar* model, u16 id, u32 arg, long mode, struct _g3d_work** list,
                               long count, u8 flag);
+
+/* The UV-animated model `res_eft_UV_model_create` returns, reached through its table: slot 0x24 steps the animation,
+ * slot 0x28 sets its scalar.  Declared only (its owner emits the table).  size: 0x04 - lower bound, an approximation
+ * (the vtable word) */
+class EftUvModelObject {
+public:
+    virtual void unused_0x08();
+    virtual void unused_0x0C();
+    virtual void unused_0x10();
+    virtual void unused_0x14();
+    virtual void unused_0x18();
+    virtual void unused_0x1C();
+    virtual void unused_0x20();
+    virtual void update();
+    virtual void set_scalar(f32 value);
+};
 #endif
 
 #ifdef __cplusplus
@@ -63,6 +79,15 @@ u8 eft_pro_slot_assign(u8 group, u8 kind, u8 set, u8 sub, u8 index);
 /* 0x800F6688 - releases every live effect slot (GUESS name). */
 void eft_res_release_all(void);
 
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800F6520 - resets the effect resource pool (the system core's resets). */
+void eft_res_pool_reset(void);
 #ifdef __cplusplus
 }
 #endif

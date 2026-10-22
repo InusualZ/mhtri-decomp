@@ -19,14 +19,14 @@
  *   - `_se_w` is the work object; `fn_800D843C()` is the "SE disabled" predicate (1 = skip), and
  *     `fn_800D8E58(_se_w*, s32)` returns the first free slot (byte +0 is the in-use flag, 32 slots of
  *     0x50 bytes at +0x3C).
- *   - `fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos)` is the common "start a positional sound"
- *     helper. The dozens of 16-byte `fn_*` wrappers are `fn_800DA72C(0, id, pos)` with a fixed id; the
+ *   - `se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos)` is the common "start a positional sound"
+ *     helper. The dozens of 16-byte `fn_*` wrappers are `se_slot_req_pos(0, id, pos)` with a fixed id; the
  *     72-byte ones pick the id from `fn_800D8D8C(pos)` first.
  *   - `fn_800DBB78(s32 bank, s32 id)` is the non-positional (`sysSE_req`/`titleSE_req`) path.
  *
  * Build: `cflags_main` plus a file-scope `#pragma peephole off` and a file-scope
  * `#pragma optimization_level 4`. The retail object keeps `clrlwi`+`cmpwi`
- * unfused and uses non-record forms in `sysSE_req`, `sysSE_stop`, `fn_800DB4EC`, `fn_800DC53C` and
+ * unfused and uses non-record forms in `sysSE_req`, `sysSE_stop`, `se_req_orb`, `fn_800DC53C` and
  * `fn_800DAADC`; `-opt nopeephole` reproduces all of them and changes none of the other functions, so the
  * pragma is a stand-in for the per-unit cflags group the outbox requests (playbook 33). The level-4
  * pragma is measured too: it moves `fn_800D9B6C` 96.667 -> 99.483 (retail's contiguous-case dispatch is
@@ -59,6 +59,8 @@
  *   GUESS (from each body and its callers): se_req_pos_id72, se_req_pos_id73, se_req_pos_id53, se_req_pos_id74
  *   GUESS (from each body): se_req_pos_id228, se_req_pos_id250, se_req_pos_id63, se_req_pos_id54, se_req_pos_id84
  *   GUESS (from each body): se_req_pos_id83, se_req_pos_id49
+ *   GUESS (from each body and its callers): `se_slot_req_pos`, `se_req_orb`, `se_req_item_jingle`,
+ *   `se_req_eft019_tick`, `se_req_splash`.
  * NAMES. GUESS: `sysSE_bank32_req`, `sysSE_bank20_req`, `sysSE_bank24_req`, `se_talk_point_set`
  */
 #pragma optimization_level 4
@@ -99,7 +101,7 @@
 #define fn_800E8080_c1 ((void (*)(s32, s32))fn_800E8080)
 #define fn_800E8150_c1 ((s32 (*)(s32, s32, nw4r::math::VEC3*, s32))fn_800E8150)
 /* One of the 32 sound-slot records the SE work object carries at +0x3C. `fn_800D8E58` walks them
- * looking for a clear `in_use` byte and `fn_800DA72C` fills one in; the offsets below are read off that
+ * looking for a clear `in_use` byte and `se_slot_req_pos` fills one in; the offsets below are read off that
  * pair and off `se_req_pos_ps`. Fields whose meaning is not established yet keep their offset as a name.
  * size: 0x50 */
 struct SeSlot {
@@ -130,7 +132,7 @@ struct SeSlot {
 };
 
 /* The SE work object: one per sound source. +0x08 and +0x0C are read by `se_req_pos_ps` and by
- * `fn_800DA72C`'s callee; the 32 slots start at +0x3C and `fn_800D7F54` clears 0x2966C bytes and writes
+ * `se_slot_req_pos`'s callee; the 32 slots start at +0x3C and `fn_800D7F54` clears 0x2966C bytes and writes
  * a 16-step float ramp at +0x29238. The bytes between the slots and the ramp are not reached yet.
  * size: 0x295F4 (at least; the object is cleared to 0x2966C) */
 struct _se_w {
@@ -162,7 +164,7 @@ struct SeWork {
     /* +0x113 */ u8 pad_0x113[0x25];
     /* +0x138 */ _se_w* se[64];
 };
-extern "C" SeSlot* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos);
+extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800DBFAC(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800D8E58(_se_w* work, s32 id);
@@ -183,101 +185,101 @@ extern "C" void se_handle_clear(u8* p) {
 
 extern "C" void fn_800DA864(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 51 : 151;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DA8AC(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 55 : 155;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DA8F4(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 50 : 150;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DA93C(nw4r::math::VEC3* pos) { fn_800DBFAC(0, 50, pos); }
 
-extern "C" void fn_800DA94C(nw4r::math::VEC3* pos) { fn_800DA72C(0, 59, pos); }
+extern "C" void fn_800DA94C(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 59, pos); }
 
 extern "C" void fn_800DA95C(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 36 : 136;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DA9A4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 57, pos); }
+extern "C" void fn_800DA9A4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 57, pos); }
 
-extern "C" void fn_800DA9B4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 56, pos); }
+extern "C" void fn_800DA9B4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 56, pos); }
 
-extern "C" void fn_800DA9C4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 58, pos); }
+extern "C" void fn_800DA9C4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 58, pos); }
 
-extern "C" void fn_800DA9D4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 157, pos); }
+extern "C" void fn_800DA9D4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 157, pos); }
 
-extern "C" void fn_800DA9E4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 156, pos); }
+extern "C" void fn_800DA9E4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 156, pos); }
 
-extern "C" void fn_800DA9F4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 158, pos); }
+extern "C" void fn_800DA9F4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 158, pos); }
 
 void utiagebom_SE_req(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 79 : 179;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DAA4C(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 52 : 152;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void se_req_pos_id54(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 54 : 154;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DAD60(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 162 : 62;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DADA8(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 85 : 185;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DADF0(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 86 : 186;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DAE38(nw4r::math::VEC3* pos) { fn_800DA72C(0, 186, pos); }
+extern "C" void fn_800DAE38(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 186, pos); }
 
-extern "C" void fn_800DB4BC(nw4r::math::VEC3* pos) { fn_800DA72C(0, 27, pos); }
+extern "C" void fn_800DB4BC(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 27, pos); }
 
-extern "C" void se_req_pos_id228(nw4r::math::VEC3* pos) { fn_800DA72C(0, 228, pos); }
+extern "C" void se_req_pos_id228(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 228, pos); }
 
-extern "C" void se_req_pos_id250(nw4r::math::VEC3* pos) { fn_800DA72C(0, 250, pos); }
+extern "C" void se_req_pos_id250(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 250, pos); }
 
 extern "C" void fn_800DB684(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 174 : 74;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DB6CC(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 226 : 126;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DB714(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 226 : 126;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void se_req_pos_id84(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 84 : 184;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DB964(nw4r::math::VEC3* pos) { fn_800DA72C(0, 97, pos); }
+extern "C" void fn_800DB964(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 97, pos); }
 
-extern "C" void fn_800DBC00(void) { fn_800DBB78(0, 36); }
+extern "C" void se_req_item_jingle(void) { fn_800DBB78(0, 36); }
 
 extern "C" void fn_800DBC0C(void) { fn_800DBB78(0, 37); }
 
@@ -287,77 +289,77 @@ extern "C" void fn_800DBC24(void) { fn_800DBB78(0, 12); }
 
 extern "C" void se_eft004_demo_req(nw4r::math::VEC3* pos) { fn_800DBE94(0, 23, pos); }
 
-extern "C" void fn_800DC338(nw4r::math::VEC3* pos) { fn_800DA72C(0, 101, pos); }
+extern "C" void fn_800DC338(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 101, pos); }
 
-extern "C" void se_req_pos_id63(nw4r::math::VEC3* pos) { fn_800DA72C(0, 63, pos); }
+extern "C" void se_req_pos_id63(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 63, pos); }
 
 extern "C" void se_req_pos_id53(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 53 : 153;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DC44C(nw4r::math::VEC3* pos) { fn_800DA72C(0, 99, pos); }
+extern "C" void fn_800DC44C(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 99, pos); }
 
-extern "C" void fn_800DC45C(nw4r::math::VEC3* pos) { fn_800DA72C(0, 98, pos); }
+extern "C" void fn_800DC45C(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 98, pos); }
 
 extern "C" void fn_800DC46C(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 70 : 170;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DC4B4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 71, pos); }
+extern "C" void fn_800DC4B4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 71, pos); }
 
-extern "C" void se_req_pos_id72(nw4r::math::VEC3* pos) { fn_800DA72C(0, 72, pos); }
+extern "C" void se_req_pos_id72(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 72, pos); }
 
-extern "C" void se_req_pos_id73(nw4r::math::VEC3* pos) { fn_800DA72C(0, 73, pos); }
+extern "C" void se_req_pos_id73(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 73, pos); }
 
-extern "C" void fn_800DC4E4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 46, pos); }
+extern "C" void fn_800DC4E4(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 46, pos); }
 
 extern "C" void se_req_pos_id74(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 74 : 174;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 void bomb_tenka_se_req(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 168 : 68;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 void bomb_doukasen_se_req(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 169 : 69;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-void kemuri_hit_se_req(nw4r::math::VEC3* pos) { fn_800DA72C(0, 48, pos); }
+void kemuri_hit_se_req(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 48, pos); }
 
-void koyasi_hit_se_req(nw4r::math::VEC3* pos) { fn_800DA72C(0, 126, pos); }
+void koyasi_hit_se_req(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 126, pos); }
 
 extern "C" void se_req_pos_id49(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 149 : 49;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-void ana_set_se_req(nw4r::math::VEC3* pos) { fn_800DA72C(0, 4, pos); }
+void ana_set_se_req(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 4, pos); }
 
-void ana_eff_se_req(nw4r::math::VEC3* pos) { fn_800DA72C(0, 5, pos); }
+void ana_eff_se_req(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 5, pos); }
 
-extern "C" void fn_800DC858(nw4r::math::VEC3* pos) { fn_800DA72C(0, 78, pos); }
+extern "C" void se_req_eft019_tick(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 78, pos); }
 
-extern "C" void fn_800DC868(nw4r::math::VEC3* pos) { fn_800DA72C(0, 0, pos); }
+extern "C" void fn_800DC868(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 0, pos); }
 
 extern "C" void fn_800DC878(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 187 : 87;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DCA08(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 167 : 67;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void se_req_pos_id83(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 183 : 83;
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 extern "C" void fn_800DCC0C(void) { fn_800DBB78(28, 27); }
@@ -466,10 +468,10 @@ extern "C" void fn_800DC60C(nw4r::math::VEC3* pos, s32 mode) {
         id = 24;
         break;
     }
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DB4EC(u8 mode, nw4r::math::VEC3* pos) {
+extern "C" void se_req_orb(u8 mode, nw4r::math::VEC3* pos) {
     s32 id = (s32)pos;
     switch (mode) {
     case 0:
@@ -482,12 +484,12 @@ extern "C" void fn_800DB4EC(u8 mode, nw4r::math::VEC3* pos) {
         id = 20;
         break;
     }
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 /* 232 when the flag is clear, 233 otherwise. */
 extern "C" void fn_800DC53C(u8 flag, nw4r::math::VEC3* pos) {
-    fn_800DA72C(0, (flag == 0) ? 232 : 233, pos);
+    se_slot_req_pos(0, (flag == 0) ? 232 : 233, pos);
 }
 
 /* The two-title sound ids; both tail-call `sysSE_req`. */
@@ -1048,7 +1050,7 @@ void se_req_frame_set_sp(_se_w* work, s32 a, s32 param, s32 d, s32 e, s32 f) {
 }
 
 /* ---------------------------------------------------------------------------------------------------
- * 0x800DBE94  the lobby's positional request: same as `fn_800DA72C` but the work object is the lobby's
+ * 0x800DBE94  the lobby's positional request: same as `se_slot_req_pos` but the work object is the lobby's
  * own, so no kind lookup. The id's top bit is the "loud" flag, stripped off and recorded as no owner.
  */
 extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos) {
@@ -1181,7 +1183,7 @@ extern "C" void fn_800DB974(_se_w* work, nw4r::math::VEC3* pos) {
  * position in and initialises the slot's playback state. The id's top bit is a "loud" flag that is
  * stripped off and recorded as "no owner".
  */
-extern "C" SeSlot* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos) {
+extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
     if (fn_800D843C() == 1) {
         return NULL;
     }
@@ -1236,7 +1238,7 @@ extern "C" SeSlot* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  * fn_800D9DB4      99.590  same mask residual as `fn_800D9CC8`.
  * se_req_pos_ps    99.062  the `p` counter (r30 retail / r31 ours) and the bank-then-slot pointer
  *                          (r31 retail / r30 ours) are mirrored.
- * fn_800DA72C      98.718  allocator colouring only: retail `kind`/slot r30, `loud` r29, `work` r31;
+ * se_slot_req_pos      98.718  allocator colouring only: retail `kind`/slot r30, `loud` r29, `work` r31;
  *                          ours r29, r31, r30. Declaration order, a `u8`/`bool` `loud`, a local copy of
  *                          `kind`, the arm order and a `? :` remap were all tried and do not move it.
  * fn_800DBE94      99.857  `&lobby_w` shares r31 with the `work` pointer it feeds (`lwz r31,184(r31)`);
@@ -1412,7 +1414,7 @@ extern "C" void fn_800DB608(u8 row, nw4r::math::VEC3* pos, u8 col) {
     if (fn_800D8D8C(pos) == 1) {
         id += 100;
     }
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 /* --- 0x800DB75C -------------------------------------------------------------------------------- */
@@ -1523,7 +1525,7 @@ extern "C" void fn_800DC348(nw4r::math::VEC3* pos, s32 kind) {
         }
         break;
     }
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 /* --- 0x800DC560 -------------------------------------------------------------------------------- */
@@ -1556,7 +1558,7 @@ extern "C" void fn_800DC560(nw4r::math::VEC3* pos, s32 kind) {
         }
         break;
     }
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 /* --- 0x800DC6D8 -------------------------------------------------------------------------------- */
@@ -1579,7 +1581,7 @@ extern "C" void fn_800DC6D8(nw4r::math::VEC3* pos, s32 kind) {
         id = 94;
         break;
     }
-    SeSlot* slot = fn_800DA72C(0, id, pos);
+    SeSlot* slot = se_slot_req_pos(0, id, pos);
     if (slot != NULL) {
         slot->param = 8;
     }
@@ -1595,7 +1597,7 @@ extern "C" void se_eft004_req(nw4r::math::VEC3* pos) {
     if (GameMode_ck() == 2) {
         fn_800DBE94(0, id, pos);
     } else {
-        fn_800DA72C(0, id, pos);
+        se_slot_req_pos(0, id, pos);
     }
 }
 
@@ -1767,7 +1769,7 @@ void taru_put_se_req(nw4r::math::VEC3* pos, s32 type) {
         id = 15;
         break;
     }
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 /* Requests the em015 electric effect sound; `c` indexes the per-channel id table. */
@@ -2542,7 +2544,7 @@ struct Case10View {
 
 /* --- external symbols ----------------------------------------------------------------------------- */
 
-extern "C" void fn_8027C064(_PLW* plw, nw4r::math::VEC3* pos);
+extern "C" void pl_impact_pos_get(_PLW* plw, nw4r::math::VEC3* pos);
 extern "C" void fn_80385B20(_PLW* plw, u32 joint, nw4r::math::VEC3* pos);
 
 /* The sound-system work object `lbl_80794978` points at, as `fn_800D92E4` reads it (b.cpp calls the same
@@ -2629,7 +2631,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
             s.field_0x10 = s.pos;
             break;
         case 4:
-            fn_8027C064(plw, &s.pos);
+            pl_impact_pos_get(plw, &s.pos);
             s.field_0x10 = s.pos;
             break;
         }
@@ -2802,7 +2804,7 @@ void paralyzeTrap_SE_req(u8 kind, u8 trap, nw4r::math::VEC3* pos) {
     /* the original has no `default:` arm: an unknown trap falls into the play call with whatever the id
      * register holds - that is what the target's dispatch branches to (the tail) */
     }
-    fn_800DA72C(0, id, pos);
+    se_slot_req_pos(0, id, pos);
 }
 
 /* ---------------------------------------------------------------------------------------------------
@@ -3532,7 +3534,7 @@ extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
                 VEC3 fixed_pos;
 
                 setVec3(&fixed_pos, lbl_80796410, lbl_80796414, lbl_80796418);
-                fn_800DA72C(46, 8, &fixed_pos);
+                se_slot_req_pos(46, 8, &fixed_pos);
                 return;
             }
             se_code = (u8)arg0 + 5;
@@ -3559,7 +3561,7 @@ extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
         }
         se_code = (u8)arg0 + 3;
     }
-    fn_800DA72C(46, se_code, pos);
+    se_slot_req_pos(46, se_code, pos);
 }
 
 /* Non-positional SE: bank 46, id 15. */
@@ -3570,12 +3572,12 @@ extern "C" s32 fn_800DD38C(void)
 
 SeSlot* st_ice_se_req(nw4r::math::VEC3* pos)
 {
-    return fn_800DA72C(46, 18, pos);
+    return se_slot_req_pos(46, 18, pos);
 }
 
 SeSlot* st_ice_break_se_req(nw4r::math::VEC3* pos)
 {
-    return fn_800DA72C(46, 19, pos);
+    return se_slot_req_pos(46, 19, pos);
 }
 
 /* Positional SE: bank 46, id `30 + (arg & 3)`, at the caller's position broadcast over all three axes. */
@@ -3584,5 +3586,5 @@ extern "C" SeSlot* fn_800DD3B8(u32 arg)
     nw4r::math::VEC3 v;
     f32 c = lbl_807963E0;
     setVec3(&v, c, c, c);
-    return fn_800DA72C(46, ((u8)arg & 3) + 30, &v);
+    return se_slot_req_pos(46, ((u8)arg & 3) + 30, &v);
 }

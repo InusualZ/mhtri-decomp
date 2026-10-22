@@ -103,4 +103,24 @@ void ArenaSelExec(void);
 extern float (*anm_play_policy_table[2])(float startFrame, float endFrame, float frame);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80044A54 / 0x80041680 / 0x80041944 - the pad module's resets the system core's reset paths run. */
+void pad_motor_stop_all(void);
+void task_slot_table_clear(void);
+void arena_task_start(void);
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800410F0 - sets the pad module up after the memory layout (the system core calls it). */
+void pad_module_init(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_MH3_PAD_H */

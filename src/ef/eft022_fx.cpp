@@ -422,7 +422,7 @@ extern "C" void fn_80115A80(_EFT* self)
                 return;
             }
             plw = (_PLW*)self->source_0x30;
-            r = fn_802748C8(plw);
+            r = pl_stagger_level_get(plw);
             if (r == 0) {
                 t = plw->field_0x384;
                 if (t < 0x3C) {

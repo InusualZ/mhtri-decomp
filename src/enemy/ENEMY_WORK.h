@@ -1,4 +1,4 @@
-/* The enemy-side work record (`get_move_work_adrs(3)`, 0xB18 apart: `mulli r30,r3,2840` at 0x800CFA0C in `fn_800CF948`,
+/* The enemy-side work record (`get_move_work_adrs(3)`, 0xB18 apart: `mulli r30,r3,2840` at 0x800CFA0C in `move_work_kind_alloc`,
  * `ef/system_core.cpp`), the one shared home for `_ENEMY_WORK`: the union
  * of the field sets the enemy units measure, every field at its offset and named from its use, untouched bytes kept as
  * `unused_0xNN`.  `pos` is `nw4r::math::VEC3`, so the header is C++-only.

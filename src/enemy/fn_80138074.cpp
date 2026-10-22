@@ -1006,7 +1006,7 @@ void fn_80138E18(EnemyWork* self) {
 void fn_80138E28(EnemyWork* self) {
     u8 owner = self->field_0x008;
 
-    fn_80143190();
+    enemy_work_release();
     self->field_0x008 = owner;
 }
 
@@ -1789,7 +1789,7 @@ u8 em_userdata_record_find_back(EnemyWork* work, u8 arg1, u8 arg2) {
         EmDataRecord* rec = &data->records[(s16)index];
         while ((s16)index >= 0) {
             if (rec->field_0x0B == 0 || arg2 == rec->field_0x0B) {
-                if (rec->field_0x09 != fn_8013023C(work)) {
+                if (rec->field_0x09 != em_phase_get(work)) {
                     return index;
                 }
                 if (rec->field_0x0A != 1) {

@@ -395,7 +395,7 @@ extern "C" void em020_model_refresh(_ENEMY_WORK* self) {
         nw4r::g3d::ScnMdl::CopiedMatAccess access_a((nw4r::g3d::ScnMdl*) self->field_0x13C, 8);
         nw4r::g3d::ScnMdl::CopiedMatAccess access_b((nw4r::g3d::ScnMdl*) self->field_0x13C, 9);
 
-        if (fn_800E2994(&access_a) != 0 && fn_800E2994(&access_b) != 0) {
+        if (copied_mat_access_valid_ck(&access_a) != 0 && copied_mat_access_valid_ck(&access_b) != 0) {
             nw4r::g3d::ResTexSrt srt_a;
             nw4r::g3d::ResTexSrt srt_b;
 

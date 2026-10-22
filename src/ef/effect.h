@@ -52,6 +52,31 @@ void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
 void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale);
 /* 0x800F9BA0 - sets the pooled effect's per-axis parameter scale (`change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3`). */
 void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* scale);
+/* 0x800FA7A0 / 0x800FA8F8 - the RGB and alpha of a colour key strip at `frame` (`eftGetKeyRGB__FPUclPUcPUcPUc`,
+ * `eftGetKeyAlpha__FPUcl`). */
+void eftGetKeyRGB(u8* keys, long frame, u8* r, u8* g, u8* b);
+u8 eftGetKeyAlpha(u8* keys, long frame);
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800F9D2C / 0x800F9CDC - the effect layer's random floats (`ef/eft035.cpp` seeds a throw with them). */
+f32 eft_rand_signed_half(void);
+f32 eft_rand_unit(void);
+/* 0x800FA378 - constructs a hit-shape record (a capsule box and two more vectors) and returns it. */
+struct EftShape* eft_shape_init(struct EftShape* self);
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800F9628 - resets the effect layer (the system core's full reset). */
+void effect_layer_reset(void);
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* MHTRI_EF_EFFECT_H */

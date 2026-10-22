@@ -51,4 +51,13 @@ void prim_init_all(void);
 void set_blendmode(u8 src, u8 dst, u8 op);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800E3DE0 - the sound resets the system core's full reset runs after prim_init_all. */
+void sound_free_lists_reset(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_SOUND_FN_800E3CBC_H */

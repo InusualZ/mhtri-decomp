@@ -2,6 +2,7 @@
  *
  * `.text` 0x800E46E8..0x800E5430, 65 functions written (the rest of the range is not decompiled yet).
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
+ * NAMES. GUESS (from each body and its callers): `stream_volume_slot_set`.
  */
 
 /* Retired header of `sound/fn_800E46E8.cpp` (kept for its notes and residuals): */
@@ -512,7 +513,7 @@ extern "C" void fn_800E4E38(StreamRec* rec)
 }
 
 /* Selects the volume slot a stream plays through. */
-extern "C" void fn_800E4E3C(s32 slot)
+extern "C" void stream_volume_slot_set(s32 slot)
 {
     fn_800E4E70(fn_800E4A18(), (s16)slot);
 }

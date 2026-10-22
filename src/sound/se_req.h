@@ -22,6 +22,18 @@ u32 fn_800E0428(struct _se_w* work, nw4r::math::VEC3* pos);
 /* 0x800DD40C - starts the pool's point voice `kind` (0..2 pick voices 9..11) at `pos`.  GUESS name. */
 void se_point_req(u8 kind, nw4r::math::VEC3* pos);
 
+/* The player SE requests the eft029 effects play (r3 the player work, whose +0xAFC SE work they take; `ef/eft029_fx.cpp`
+ * calls them). */
+struct _PLW;
+void pl_se_req_charge_end(struct _PLW* plw);
+void pl_se_req_charge_start(struct _PLW* plw, u8 kind);
+void pl_se_req_charge_level(struct _PLW* plw, u8 kind);
+void pl_se_req_charge_7(struct _PLW* plw);
+void pl_se_req_charge_end_b(struct _PLW* plw);
+void pl_se_req_charge_2(struct _PLW* plw);
+void pl_se_req_charge_burst(struct _PLW* plw, nw4r::math::VEC3* pos);
+void pl_se_req_charge_tip(struct _PLW* plw, nw4r::math::VEC3* pos);
+
 #ifdef __cplusplus
 }
 #endif

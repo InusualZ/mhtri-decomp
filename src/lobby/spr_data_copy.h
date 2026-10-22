@@ -4,14 +4,15 @@
 #define MHTRI_LOBBY_SPR_DATA_COPY_H
 
 #include "types.h"
-#include "hud/layout_types.h"
+
+struct _SPR_DATA_; /* `hud/layout_types.h` */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* 0x801E6850 - copies sprite record `src` into `dst`. */
-void spr_data_copy(_SPR_DATA_* dst, const _SPR_DATA_* src);
+void spr_data_copy(struct _SPR_DATA_* dst, const struct _SPR_DATA_* src);
 
 #ifdef __cplusplus
 }

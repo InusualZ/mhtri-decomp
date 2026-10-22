@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* 0x803428A8 - spawns interior effect `id` at `pos` with `scale` (the map kind picks the effect set; GUESS name). */
-void eft050_interior_fx_spawn(u8 id, nw4r::math::VEC3* pos, f32 scale, u8 flag);
+void eft050_interior_fx_spawn(u32 id, nw4r::math::VEC3* pos, f32 scale, u32 size);
 
 #ifdef __cplusplus
 }

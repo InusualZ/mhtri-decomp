@@ -448,13 +448,13 @@ struct _PLW {
                 /* +0x310 */ s16 charge_gauge_0x310;  /* the accumulating charge gauge
                                                        * `Pl/fn_802840DC.cpp` advances a frame at a
                                                        * time and saturates at 999 (`fn_802843CC`);
-                                                       * `fn_80284474` divides it by the charge rate
+                                                       * `pl_charge_stage2_get` divides it by the charge rate
                                                        * to get the level, so the byte below stays
                                                        * put */
             };
             /* +0x312 */ union {   /* one byte, two spellings (rule 5) */
                 /* +0x312 */ u8 field_0x312;          /* the byte `fn_80280678` clears on entry */
-                /* +0x312 */ u8 charge_level_0x312;   /* the level the gauge buys: `fn_80284474`
+                /* +0x312 */ u8 charge_level_0x312;   /* the level the gauge buys: `pl_charge_stage2_get`
                                                        * writes gauge/rate here and its callers
                                                        * clamp it to 2 */
             };
@@ -585,7 +585,7 @@ struct _PLW {
     /* +0x384 */ s16 field_0x384;
     /* +0x386 */ union {
         /* +0x386 */ s16 unk386;
-        /* +0x386 */ s16 field_0x386;  /* the stagger timer `fn_802748C8` buckets into 0-3 */
+        /* +0x386 */ s16 field_0x386;  /* the stagger timer `pl_stagger_level_get` buckets into 0-3 */
     };
     /* +0x388 */ union {
         /* +0x388 */ u8 unk388;
@@ -987,7 +987,7 @@ struct _PLW {
     /* +0x59C */ union {   /* the three armed-motion words (`x | 0x8000`, `Pl/pl_act.cpp:1067`) */
         /* +0x59C */ u16 field_0x59C[3];
         struct {          /* the view of the same six bytes: three separate u16s */
-            /* +0x59C */ u16 unk59C;
+            /* +0x59C */ u16 armed_motion_0x59C;
             /* +0x59E */ u16 unk59E;
             /* +0x5A0 */ u16 unk5A0;
         };

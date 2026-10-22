@@ -379,7 +379,7 @@ extern "C" s32 fn_802BB7FC(StageAreaObj* area);
 extern "C" s32 fn_802BBEE0(StageAreaObj* area);
 extern "C" s32 fn_802BC1E4(StageAreaObj* area);
 extern "C" void fn_802BD658(void);
-extern "C" void fn_802BDDB0(nw4r::math::VEC3* out);
+extern "C" void get_camera_target_pos(nw4r::math::VEC3* out);
 extern "C" u32 fn_802BE088(void);
 extern "C" void fn_802BE0F4(s32 a, StageAreaObj* area, void* vec, f32 pitch, f32 span);
 extern "C" void fn_802BE1EC(StageAreaObj* area);

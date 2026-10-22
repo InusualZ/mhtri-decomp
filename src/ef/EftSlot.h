@@ -35,9 +35,9 @@ struct EftSlot {
     /* +0x17 */ u8 field_0x17;
     /* +0x18 */ u32 field_0x18;  /* `eft_slot_live_ck` gates on it being non-zero */
     /* +0x1C */ s16 field_0x1C;
-    /* +0x1E */ u16 field_0x1E;
-    /* +0x20 */ u16 field_0x20;
-    /* +0x22 */ u16 field_0x22;
+    /* +0x1E */ s16 field_0x1E;  /* the net resend timer (negative: due) */
+    /* +0x20 */ s16 field_0x20;  /* the state-3 countdown */
+    /* +0x22 */ s16 field_0x22;  /* the state timer the tracking step counts */
     union {   /* the position triple the net sync copies as one VEC3 */
         /* +0x24 */ nw4r::math::VEC3 pos_0x24;
         struct {

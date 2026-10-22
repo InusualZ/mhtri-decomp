@@ -106,4 +106,13 @@ void vec3_scale_inv(VEC3* v, f32 len);
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x8029708C - resets the player collision work (the system core's move-work reset). */
+void pl_coll_table_clear(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_PL_PL_COLL_H */

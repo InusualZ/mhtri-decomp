@@ -338,7 +338,7 @@ extern "C" void fn_80040144(void);
 extern "C" void fn_800408A8(void);
 extern "C" void fn_80040FDC(void);
 extern "C" void fn_80041304(void);
-extern "C" void fn_80044A54(void);
+extern "C" void pad_motor_stop_all(void);
 extern "C" void fn_80046C80(void);
 extern "C" void fn_80046D34(void);
 extern "C" int fn_804ED620(void);
@@ -451,7 +451,7 @@ int main(void)
             }
         }
         if (fn_804ED620() == 3) {
-            fn_80044A54();
+            pad_motor_stop_all();
         }
         if (lbl_807947A5 != 0 && system_w.unk2158 != 0) {
             system_w.unk2276();

@@ -1859,7 +1859,7 @@ s32 fn_8012F948(struct _ENEMY_WORK* self);
 void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 void em_fall_height_get(struct _ENEMY_WORK* self);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
-u32 fn_8013023C(struct _ENEMY_WORK* self);
+u32 em_phase_get(struct _ENEMY_WORK* self);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
 void em_hit_arm_set(struct _ENEMY_WORK* self);
@@ -1892,9 +1892,9 @@ void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* 
 void eft013_spawn_id(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, s32 d);
 void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
-void fn_800FA378(void* out);
+void eft_shape_init(void* out);
 void eft_capsule_ctor(void* out);
-void fn_8004FFC8(void* a, void* b, void* c, f32 d);
+void capsule_box_from_points(void* a, void* b, void* c, f32 d);
 void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
 
 /* `enemy/em005_act.cpp`'s dispatch targets this block tail-calls. */
@@ -1914,7 +1914,7 @@ void fn_801D3CF8(struct _ENEMY_WORK* self, u32 a);
 
 void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, u32 d);
 
-s32 fn_802907BC(s32 a, void* b);
+s32 pl_capsule_point_ck(s32 a, void* b);
 void fn_802B43A8(void* pos, u8 a, u16 b);
 
 /* ----------------------------------------------------------------------------------------------------
@@ -2069,7 +2069,7 @@ void fn_801D75D0(struct _ENEMY_WORK* self) {
         for (i = 0; i < max; i++) {
             if (other->active != 0 && (other->field_0x1C8 & 1) != 0 && other != self &&
                 self->area_no == other->area_no &&
-                fn_8013023C(other) == fn_8013023C(self) && other->action == 0xB) {
+                em_phase_get(other) == em_phase_get(self) && other->action == 0xB) {
                 copyVec3(&self->aim, &other->pos);
                 self->action_0x328.field_0x345 = 1;
                 found = 1;
@@ -2489,7 +2489,7 @@ u32 em_act11_wait_ck(struct _ENEMY_WORK* self);
 
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
-u32 fn_8013023C(struct _ENEMY_WORK* self);
+u32 em_phase_get(struct _ENEMY_WORK* self);
 u8* em_move_work_pick(u8 index);
 void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 em_flags836_ck(struct _ENEMY_WORK* self, u32 a);
@@ -2951,7 +2951,7 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
                     } else {
                         state = 0xff;
                     }
-                    if (state != 0xff && state != fn_8013023C(self)) {
+                    if (state != 0xff && state != em_phase_get(self)) {
                         u8 mode;
                         if ((u8)kind == 2) {
                             mode = 8;

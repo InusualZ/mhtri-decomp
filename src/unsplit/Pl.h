@@ -26,7 +26,7 @@ typedef struct PlSeVecPair {
 extern "C" {
 #endif
 
-s32 fn_802748C8(void* a);
+s32 pl_stagger_level_get(void* a);
 
 /* Pl-band helpers with no registered owner, called by `Pl/fn_80262940.cpp` (proposal /80262940,
  * `.text` 0x80262940-0x802693C4): they sit in the unclaimed runs 0x80258FCC-0x80262940 and
