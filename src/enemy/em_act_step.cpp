@@ -6,7 +6,7 @@
  *   `lbl_805E04E0` last), .bss 0x806BE328-0x806BE340, .sdata 0x80792D18-0x80792D28, .sdata2 0x8079B108-0x8079B210,
  *   extab, extabindex.  The band's last four functions are `enemy/em_act_step_tail.cpp`.
  * SEAM. The band's end 0x8033041C (against `hud/pl_frame_sync.cpp`) is settled: extabindex entry 57 (0x800357A8)
- *   is `fn_8033041C`; the `.sdata2` run cuts at 0x8079B20C | 0x8079B210 with no label shared and MWCC's u32->f32
+ *   is `eft_frame_state_init`; the `.sdata2` run cuts at 0x8079B20C | 0x8079B210 with no label shared and MWCC's u32->f32
  *   magic emitted once per side (0x8079B140 and 0x8079B228); the `.data` run cuts at 0x805E0510.  The cut at
  *   0x80330194 is the reconciled candidate's and unproven.
  * NAMES. Every symbol the unit defines is a GUESS from its body on the module's `em_<noun>_<verb>` scheme:

@@ -9,9 +9,11 @@
 
 extern "C" {
 
-/* 0x803865B4 - the pane routine `enemy/em_prog_support.cpp` hands over to (the last reader of the note records). */
-void fn_803865B4(NoteWork* self);
+/* 0x803865B4 - the motion-keyed effect cues `enemy/em_prog_support.cpp` hands over to (the last reader of the note
+ * records). */
+void note_pane_motion_effects(NoteWork* self);
 
 }
+
 
 #endif /* MHTRI_ENEMY_EM_PROG_TAIL_H */

@@ -26,13 +26,13 @@
  * THE SEAM, MEASURED - three independent instruments agree on 0x8033041C:
  *
  *  - the extabindex run 0x800357A8..0x800359A0: an extabindex entry names its own function, and entry
- *    57 (at 0x800357A8) names `fn_8033041C`.  The run's 42 entries cover this unit's 42 framed
+ *    57 (at 0x800357A8) names `eft_frame_state_init`.  The run's 42 entries cover this unit's 42 framed
  *    functions; the first half takes the other 57 of the 99.
  *  - the `.sdata2` pool run 0x8079B108..0x8079B2AC is **two objects' pools**, cut at 0x8079B20C |
  *    0x8079B210: the first half's labels are referenced only by functions 0x8032C920..0x80330128, this
  *    unit's only by functions 0x803305F8..0x80334398, and no label is shared.  The duplicated
  *    constants are the proof: MWCC's u32->f32 magic `0x4330000080000000` is emitted at 0x8079B140
- *    (first half - `em_act_arm_mot5`, `em_act_arm_mot7`) and at 0x8079B228 (this unit - `fn_803305F8`), and
+ *    (first half - `em_act_arm_mot5`, `em_act_arm_mot7`) and at 0x8079B228 (this unit - `eft_frame_state_step`), and
  *    0.0f (0x8079B108 / 0x8079B240), 0.5f (0x8079B1E4 / 0x8079B214), 1.0f (0x8079B130 / 0x8079B284),
  *    10.0f (0x8079B110 / 0x8079B238), 20.0f (0x8079B160 / 0x8079B21C), 30.0f (0x8079B12C /
  *    0x8079B218 + 0x8079B258), 60.0f (0x8079B168 / 0x8079B220), 0.8f (0x8079B178 / 0x8079B2A0) and
@@ -42,7 +42,7 @@
  *    so two copies mean two emitters, i.e. two TUs.
  *  - the `.data` run: the first half's table fragment ends with the class vtable 0x805E04E0 (0x30 B,
  *    installed by `em_work_ctor`) and this unit's begins at 0x805E0510 with six objects that
- *    `fn_803305F8` alone references; the referrer addresses jump 0x8032FA88 -> 0x803305F8 exactly at
+ *    `eft_frame_state_step` alone references; the referrer addresses jump 0x8032FA88 -> 0x803305F8 exactly at
  *    that fragment edge.
  *
  * SECTIONS.  `.text` 0x8033041C..0x80334568; extab 0x8001662C..0x8001677C (42 x 8 B); extabindex
@@ -57,7 +57,7 @@
  * claimable whole, and a run with an unclaimed hole in it becomes an `auto_*_data` unit in the middle
  * of the unit's range (playbook 53).  The measured object list, for the data pass that claims it:
  * 0x805E0510 / 0x805E0540 / 0x805E0570 (0x30 each), 0x805E05A0 (0x38), 0x805E05D8 (0xC),
- * jumptable_805E05E4 (0x50) - all `fn_803305F8`; 0x805E0638 / 0x805E0688 / 0x805E06D8 (0x50 each, no
+ * jumptable_805E05E4 (0x50) - all `eft_frame_state_step`; 0x805E0638 / 0x805E0688 / 0x805E06D8 (0x50 each, no
  * referrer); 0x805E0728 (0xC) + 0x805E0734 (0x32C) - `fn_80331238`; then one object per function from
  * 0x805E0A60 (`pl_act_handler_00`) to 0x805E1E20 (`pl_act_handler_27`), plus 0x805E1F6C (`pl_act_handler_28`) and
  * 0x805E1F98 (`pl_act_handler_29`).
@@ -71,7 +71,7 @@
  * half drives the player work record (`_PLW` reached with `get_move_work_adrs(2)`, then
  * `Pl_frame_check` / `Get_motion_no` / `Pl_chr_setX` / `Pl_master_ck`, and the documented `+4` ->
  * `get_joint_wpos` idiom) and it owns a second class's table family (vtable 0x805E0510 plus
- * `fn_803305F8`'s six objects at 0x805E0510..0x805E0634).
+ * `eft_frame_state_step`'s six objects at 0x805E0510..0x805E0634).
  *
  * The name `em_pl_frame` is **provisional** - the merger lane's 2026-09-26 naming pass had to leave a
  * `fn_XXXXXXXX` file stem behind (the gate's rule 7 row exempts a bodyless unit from the rule itself,
@@ -94,7 +94,7 @@
  * (listed under SECTIONS) are NOT declared there and have to be declared, as externs, in this unit's
  * own header when its bodies arrive.
  *
- * NEXT.  Write the 48 bodies in address order from `fn_8033041C` (0x1DC B, the per-attacker effect spawn
+ * NEXT.  Write the 48 bodies in address order from `eft_frame_state_init` (0x1DC B, the per-attacker effect spawn
  * that continues `em_act_arm_mot201_hit7_2`'s scan shape): `python tools/units/m2cinput.py` for a draft,
  * then `python tools/units/recompile.py enemy/em_pl_frame.cpp --measure <symbol> --main .`, one function
  * per pass, best-scoring variant, never a regression.

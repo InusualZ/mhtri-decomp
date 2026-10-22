@@ -12,12 +12,9 @@
  *   em_userdata_record_find_back is a GUESS (0x8013AC08); em_res_user_data_ck is a GUESS (0x801391E8);
  *   joint_mtx_store is a GUESS (0x80139A64); joint_mtx_load is a GUESS (0x80139A7C).
  * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`fn_80139B6C`, the per-item matrix builder).
- *  - `fn_80138074`, `fn_8013823C`, `fn_80138B60`, `fn_80138EC8`, `fn_801391FC`, `fn_801394D4`, `fn_8013A5E4`,
- *    `em_userdata_record_find_back`: retail keeps `rlwinm`/`clrlwi`/`extsh` + `cmpwi`, ours emits the record form;
- *  - `fn_8013823C`, `fn_8013A830`, `fn_8013A884`, `fn_8013A8B4`, `fn_8013A900`, `fn_8013AB74`: retail keeps `clrlwi`
- *    + `slwi`, ours fuses them into `clrlslwi`;
- *  - `fn_801394C0` (the `clrlwi r0,r4,16` before the `sth`), `em_res_user_data_dtor`, `fn_80139858`, `fn_8013A954`,
- *    `fn_8013AA1C`, `em_userdata_state_exit`: retail narrows the value, ours elides the mask;
+ *  - `fn_80138074`, `fn_8013823C`, `fn_80138B60`, `fn_801391FC`, `fn_801394D4`, `em_userdata_record_find_back`,
+ *    `fn_8013A900`, `em_res_user_data_dtor`, `fn_80139858`: register colouring, a narrowing mask or a fused compare still
+ *    differs with the scoped `#pragma peephole off` (see SHAPES);
  *  - `fn_801391FC`, `fn_80139620`: ours converts int to float through the object's own `.sdata2` magic where retail
  *    references `lbl_80796D78`/`lbl_80796D80`, and `fn_801391FC` lacks retail's `__cvt_fp2unsigned` call; `fn_801391FC` and `fn_80138F3C` also differ in the `psq_st` f31 spill;
  *  - `fn_8013A29C`, `fn_8013A338`, `fn_8013A4E8`: ours forms the `lbl_807919F0`/`F4`/`F8` addresses with `lis` +
@@ -33,7 +30,8 @@
  *     `fn_805012E8`, `MTX34ToMTX33__Q24nw4r4mathFPQ34nw4r4math5MTX33PCQ34nw4r4math5MTX34`, `lbl_807919F4`,
  *     `lbl_807919F0`, `lbl_807919F8`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_805012E8`.
- * SHAPES. `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
+ * SHAPES. `#pragma peephole off` is scoped to the 18 bodies whose retail keeps the unfused `clrlwi`/`rlwinm` +
+ *   `cmpwi`, `clrlwi` + `slwi` and narrowing masks (a per-function sweep, no row lower).  `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
  *   `fn_801391FC`'s `total` are 32-bit accumulators narrowed at the use (`u16` locals re-mask every iteration);
  *   `fn_8013A900` is a `switch` inside `for (;;)`, not three `if`s.  The unit's own symbols are plain C names, so its
  *   definitions and its callees' map spellings sit in one `extern "C"` block; the nw4r members are called as C++.
@@ -593,6 +591,7 @@ struct _ENEMY_WORK { /* size: 0xB00 */
 /* 0x80138074..0x801391E8 - the ENEMY_WORK per-frame driver                                       */
 /* --------------------------------------------------------------------------------------------- */
 
+#pragma peephole off
 /* Applies the work's current rotation to the EmCharBase base and pushes the animation frame. */
 void fn_80138074(EnemyWork* self, u8 arg1) {
     Vec3 saved;
@@ -619,6 +618,7 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
     }
 }
 
+#pragma peephole on
 /* Loads the current motion's first frame into the EmCharBase base. */
 void em_userdata_motion_head_load(EnemyWork* self) {
     EnemyData* data = self->field_0x9A4;
@@ -642,6 +642,7 @@ void fn_801381F4(EnemyWork* self) {
     }
 }
 
+#pragma peephole off
 /* Per-frame update: ages the action timers, resolves the user-data target, then runs the state. */
 void fn_8013823C(EnemyWork* self) {
     Vec3 vD4;
@@ -912,6 +913,7 @@ void fn_8013823C(EnemyWork* self) {
     }
 }
 
+#pragma peephole on
 /* The sleep/death half of the per-frame update. */
 void fn_80138B60(EnemyWork* self) {
     s32 found;
@@ -1021,6 +1023,7 @@ void fn_80138E64(EnemyWork* self) {
     copyVec3(&ch->field_0x04, &self->field_0x188);
 }
 
+#pragma peephole off
 /* Advances one of the two per-entity effect slots. */
 void fn_80138EC8(EnemyWork* self, u32 arg1) {
     u8 index = (u8)arg1;
@@ -1056,6 +1059,7 @@ void fn_80138F3C(EnemyWork* self) {
     }
 }
 
+#pragma peephole on
 /* The action-state step: enters the wait state, then picks the next action. */
 void fn_80139024(EnemyWork* self) {
     u8 state;
@@ -1106,6 +1110,7 @@ void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1) {
     }
 }
 
+#pragma peephole off
 /* Releases a heap block the work allocated, then hands the pointer back. */
 void em_res_user_data_dtor(void* arg0, s16 arg1) {
     if (arg0 != 0) {
@@ -1116,11 +1121,13 @@ void em_res_user_data_dtor(void* arg0, s16 arg1) {
     }
 }
 
+#pragma peephole on
 /* Reports whether the work has a user-data accessor installed. */
 s32 em_res_user_data_ck(EnemyWork* self) {
     return self->field_0x484 != NULL;
 }
 
+#pragma peephole off
 /* Re-aims the work toward the nearest user-data joint, clamped to the joint's key span. */
 void fn_801391FC(EnemyWork* self) {
     f32 v;
@@ -1193,21 +1200,25 @@ void fn_801391FC(EnemyWork* self) {
 /* 0x801394B8..0x8013AC08 - the g3d_resuser_ac accessor                                           */
 /* --------------------------------------------------------------------------------------------- */
 
+#pragma peephole on
 /* Re-enters the accessor's default flag state. */
 void fn_801394B8(ResUserDataAc* self) {
     em_res_user_data_flag_set(self, 1);
 }
 
+#pragma peephole off
 /* Stores the cursor's item index. */
 void fn_801394C0(UserDataCursor* self, u32 arg1) {
     self->field_0x06 = (u16)(arg1 & 0xFFFF);
 }
 
+#pragma peephole on
 /* Reads the cursor's item index. */
 u32 fn_801394CC(UserDataCursor* self) {
     return self->field_0x06;
 }
 
+#pragma peephole off
 /* Dispatches every user-data item of the cursor's index to the accessor's virtuals. */
 void fn_801394D4(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3) {
     u32 index = fn_801394CC(arg3);
@@ -1240,6 +1251,7 @@ void fn_801394D4(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3)
     }
 }
 
+#pragma peephole on
 /* Builds the effect transform for one user-data item and applies it to the EmCharBase. */
 void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4, UserDataItem* arg5) {
     Vec3 angles;
@@ -1548,6 +1560,7 @@ void fn_8013A5D8(ResUserData* dst, ResUserData* src) {
     dst->data = src->data;
 }
 
+#pragma peephole off
 /* Stores the value header, asserting it is 4-byte aligned. */
 ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data) {
     fn_8013A648(self, data);
@@ -1557,6 +1570,7 @@ ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data) {
     return self;
 }
 
+#pragma peephole on
 /* Stores the value header pointer. */
 void fn_8013A648(ResUserData* self, ResUserDataItemData* data) {
     self->data = data;
@@ -1629,6 +1643,7 @@ void fn_8013A770(UserDataCursor* cursor, EnemyWork* work) {
     }
 }
 
+#pragma peephole off
 /* Reads one entry of the enemy data's secondary table. */
 s32 fn_8013A830(EnemyWork* work, u8 arg1) {
     EnemyData* data = get_enemy_data__FP11_ENEMY_WORK(work);
@@ -1672,7 +1687,7 @@ s32 fn_8013A900(EnemyWork* work) {
             state = work->field_0x99C;
             break;
         case 1:
-            index = (u8)(index - 1);
+            index -= 1;
             state = work->field_0x9AC[index].field_0x00;
             break;
         case 0xA:
@@ -1695,6 +1710,7 @@ void fn_8013A954(EnemyWork* work, u8 arg1) {
     em_userdata_state_exit(work, arg1);
 }
 
+#pragma peephole on
 /* Installs the work's user-data state table and re-enters the default state. */
 void fn_8013A978(EnemyWork* work) {
     work->field_0x954 = (u32**)fn_80126098_c1();
@@ -1723,6 +1739,7 @@ void fn_8013AA00(EnemyWork* work) {
     work->field_0xA00 = 0;
 }
 
+#pragma peephole off
 /* Re-enters the work's user-data state, preferring the special index when the work is in state 3. */
 void fn_8013AA1C(EnemyWork* work, u8 arg1) {
     if (work->field_0x89F == 3 && fn_8013A884(work, 9) == 1) {
@@ -1737,11 +1754,13 @@ void fn_8013AA1C(EnemyWork* work, u8 arg1) {
     fn_8013A954(work, arg1);
 }
 
+#pragma peephole on
 /* Re-enters the work's user-data state in the default mode. */
 void em_user_data_reenter(EnemyWork* work) {
     fn_8013AA1C(work, 1);
 }
 
+#pragma peephole off
 /* Tears down the work's user-data state, keeping the key table when it is still in use. */
 void em_userdata_state_exit(EnemyWork* work, u8 arg1) {
     if (em_busy_ck(work) == 1) {
@@ -1758,11 +1777,13 @@ void em_userdata_state_exit(EnemyWork* work, u8 arg1) {
     work->field_0x9FF = 0;
 }
 
+#pragma peephole on
 /* Re-enters the work's user-data state in the non-default mode. */
 void em_userdata_state_reenter_alt(EnemyWork* work) {
     fn_8013AA1C(work, 0);
 }
 
+#pragma peephole off
 /* Selects the work's user-data state and caches the selected value. */
 s32 fn_8013AB74(EnemyWork* work, u8 arg1, u8 arg2) {
     if (fn_8013A884(work, arg1) == 1) {
@@ -1775,11 +1796,13 @@ s32 fn_8013AB74(EnemyWork* work, u8 arg1, u8 arg2) {
     return 0;
 }
 
+#pragma peephole on
 /* Draws one random number for the work's user-data roll. */
 void em_userdata_roll(void) {
     ran_suu__Fl(1);
 }
 
+#pragma peephole off
 /* Walks the work's per-motion records backwards to the first one matching the current state. */
 u8 em_userdata_record_find_back(EnemyWork* work, u8 arg1, u8 arg2) {
     u8 index = arg1;
@@ -1804,3 +1827,5 @@ u8 em_userdata_record_find_back(EnemyWork* work, u8 arg1, u8 arg2) {
 }
 
 }  /* extern "C" */
+
+#pragma peephole on

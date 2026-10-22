@@ -4,7 +4,7 @@
  *   .sdata 0x80793340-0x80793348, .sdata2 0x8079B668-0x8079B71C, extab, extabindex.  0x8035BAB4-0x8035E034 is the
  *   tail of the band `ef/eft052.cpp` heads; 0x8035E034-0x8035F060 is em033 (`em033_prog_tbl`, 0x805ED370, lists
  *   `fn_8035E034`/`fn_8035E578`/`fn_8035E1E0`) and 0x8035F060-0x8035F2B4 the head of em035 (`em035_prog_tbl`,
- *   0x805ED838, lists `fn_8035F060`/`fn_8035F174`/`fn_8035F178`).
+ *   0x805ED838, lists `em035_init`/`em035_noop`/`em035_event_notify`).
  * SEAM. Unproven at both edges: `tudiscover.py at 0x8035E034` puts a strong seam at 0x8035F060 (the `.sdata2` run
  *   jumps `lbl_8079B710` -> `lbl_8079B718`) where `em035_prog_tbl` starts, and `lbl_805ED808` (this unit's `.data`)
  *   mixes `fn_8035F004`/`fn_8035EF50`/`fn_8035EF58` with `enemy/fn_80138074.c`'s `fn_801394D4`..`fn_8013A650`.
@@ -22,8 +22,8 @@
  *    `anm_chr_result_scale_set` at a later point;
  *  - `fn_8035E81C`, `fn_8035E984`: ours calls `get_now_areano` a second time where retail reuses the narrowed
  *    result, and compares unsigned where retail uses `cmpwi`;
- *  - `fn_8035ECD8`, `fn_8035EE40`, `fn_8035F178`: retail keeps `clrlwi` + `slwi`, ours fuses them into `clrlslwi`;
- *    `fn_8035F004`, `fn_8035F060`: retail keeps `extsh`/`clrlwi` + `cmpwi`, ours emits the record forms;
+ *  - `fn_8035ECD8`, `fn_8035EE40`, `em035_event_notify`: retail keeps `clrlwi` + `slwi`, ours fuses them into `clrlslwi`;
+ *    `fn_8035F004`, `em035_init`: retail keeps `extsh`/`clrlwi` + `cmpwi`, ours emits the record forms;
  *  - `fn_8035E034`: retail's frame is 0x50 against our 0x40 and it extracts the id with `extrwi`;
  *    `fn_8035EB80`: retail spills f31 with `psq_st` and saves one register fewer; `fn_8035EAA0`: retail narrows the
  *    return with `clrlwi`/`extsh`.
@@ -551,7 +551,7 @@ extern "C" _ENEMY_WORK* fn_8035F004(_ENEMY_WORK* p, u16 a)
 }
 
 /* 0x8035F060 (0x114): the em035 run-state constructor. */
-extern "C" void fn_8035F060(_ENEMY_WORK* self, u8 a)
+extern "C" void em035_init(_ENEMY_WORK* self, u8 a)
 {
     self->init_0x320.field_0x328 = 0x708;
     self->init_0x320.field_0x32A = 0xB4;
@@ -588,12 +588,12 @@ extern "C" void fn_8035F060(_ENEMY_WORK* self, u8 a)
 }
 
 /* 0x8035F174 (0x4): an empty virtual slot. */
-extern "C" void fn_8035F174(void)
+extern "C" void em035_noop(void)
 {
 }
 
 /* 0x8035F178 (0x13C): em035's effect-summon hook. */
-extern "C" void fn_8035F178(_ENEMY_WORK* self, u8 a, u8 b)
+extern "C" void em035_event_notify(_ENEMY_WORK* self, u8 a, u8 b)
 {
     u32 s[3];
 

@@ -2,12 +2,11 @@
  *   an inner action switch) with its init, action callbacks and angle helpers.
  * RANGE. .text 0x8013791C-0x80138074 (7 functions); extab, extabindex.
  * NAMES. `em_motion_update` is a GUESS from what the driver does; the map has only `fn_` stems for the range.
- * RESIDUALS. `fn_80137EE0`: retail narrows the mode (`clrlwi r30,r4,24`) after the first call where ours does it
- *   at entry, and lays out the `-1` return as a branch past a shared block where ours duplicates it.
- *   flipcheck: `.text` differs from the target (53 of 1880 bytes).
+ * RESIDUALS. none: every row matches and flipcheck reports the unit READY.
  * SHAPES. `#pragma peephole off` over the bodies (retail keeps the `clrlwi`/`rlwinm`/`and` + `cmpwi` bit tests
- *   unfused); `u32 kind_lo = (u8)kind` in `fn_80137EE0` is the only spelling that keeps the mask (`u8 kind_lo = kind`
- *   drops it).
+ *   unfused).  `fn_80137EE0`: the slot scan stops at the first empty slot (`break`), the mode is narrowed inside the
+ *   loop test (`(u8)kind == 1`, hoisted by the optimizer after the loop setup), and the count is dispatched with a
+ *   `switch` (0 returns -1, 1 takes the first angle, the rest average) whose `s8` counter is declared before `sum`.
  */
 
 #include "enemy/em_act_advance.h" /* em_act_advance (rule 2: the owner's header) */
@@ -302,15 +301,14 @@ extern "C" s32 fn_80137EE0(_ENEMY_WORK* self, u32 kind)
         return -1;
     }
     {
-        u32 kind_lo = (u8)kind;
         u32 count = 0;
         s32 i;
 
         for (i = 0; i < 10; i++) {
             if (self->slots_0x244[i].flags == 0) {
-                continue;
+                break;
             }
-            if (kind_lo == 1) {
+            if ((u8)kind == 1) {
                 if ((u32)(self->slots_0x244[i].value - 24576) > 16384) {
                     continue;
                 }
@@ -327,25 +325,29 @@ extern "C" s32 fn_80137EE0(_ENEMY_WORK* self, u32 kind)
                 count++;
             }
         }
-        if (count == 0) {
-            return -1;
-        }
-        if (count == 1) {
-            return angles[0] & 0xFFFF;
-        }
         {
-            s32 sum = angles[0];
             s8 n;
+            s32 sum;
 
-            for (n = 1; (u32)n < count; n++) {
-                s32 delta = angles[n] - sum;
+            switch (count) {
+            case 0:
+                return -1;
+            case 1:
+                sum = angles[0];
+                break;
+            default:
+                sum = angles[0];
+                for (n = 1; (u32)n < count; n++) {
+                    s32 delta = angles[n] - sum;
 
-                if (delta > 32768) {
-                    delta -= 65536;
-                } else if (delta < -32768) {
-                    delta += 65536;
+                    if (delta > 32768) {
+                        delta -= 65536;
+                    } else if (delta < -32768) {
+                        delta += 65536;
+                    }
+                    sum += delta / (n + 1);
                 }
-                sum += delta / (n + 1);
+                break;
             }
             return sum & 0xFFFF;
         }

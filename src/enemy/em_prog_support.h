@@ -44,6 +44,12 @@ void note_pane_joint_mtx_get(NoteWork* self, u32 joint, nw4r::math::MTX34* out);
  * through to the model's test in f1/f2 (GUESS name). */
 u32 note_pane_motion_frame_ck(NoteWork* self, u32 a, f32 frame, f32 range);
 
+/* 0x80385AA8 - clears the sub-state bytes, saves the old animation pair and enters (a, b) (GUESS name). */
+void note_pane_anim_pair_enter(NoteWork* self, u8 a, u8 b);
+
+/* 0x80385C80 - the mode-1 twin of `note_pane_motion_frame_ck`: whether the motion passed the frame (GUESS name). */
+u32 note_pane_motion_frame_pass_ck(NoteWork* self, u32 a);
+
 /* 0x80385C98 - stores the quest NPC model's flag byte (GUESS name; the tail sets it to 90). */
 void qn_chr_flag_set(_QNPC_W* self, u8 flag);
 

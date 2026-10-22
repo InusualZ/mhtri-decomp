@@ -5,30 +5,23 @@
  *   .sdata2 0x80798C68-0x80798CF8, extab, extabindex.
  * NAMES. `em034_prog` is a GUESS from `em034_prog_tbl` (0x805B17A8), the first object of the unit's `.data`; the
  *   `.bss` record name is a GUESS (a pair of model-space points).
- * RESIDUALS. Every row is written.
- *  - `fn_801B4458`, `fn_801B47A4`, `fn_801B4C54`, `fn_801B5200`, `fn_801B529C`, `fn_801B5338`, `fn_801B563C`,
- *    `fn_801B5774`, `fn_801B5D24`, `fn_801B63E8`, `fn_801B65B8`, `fn_801B670C`: retail keeps `clrlwi`/`rlwinm` +
- *    `cmpwi`, ours emits the record form;
- *  - `fn_801B4398`, `fn_801B4694`, `fn_801B47A4`, `fn_801B5774`, `fn_801B5D24`: retail keeps `clrlwi` + `slwi`,
- *    ours fuses them into `clrlslwi`;
- *  - `fn_801B5200`, `fn_801B529C`, `fn_801B563C`, `fn_801B5774`, `fn_801B5908`, `fn_801B5BEC`, `fn_801B5D24`: ours
- *    loads `state_sub` (+0x5) at a different point of the body;
- *  - `fn_801B5030`, `fn_801B5ED4`, `fn_801B6010`, `fn_801B63E8`, `fn_801B563C`, `fn_801B5774`, `fn_801B5D24`: ours
- *    emits an extra `b` to the shared tail ahead of a case body;
- *  - `fn_801B4D14`, `fn_801B6EF4`, `fn_801B6C38`, `fn_801B5A08`: retail narrows the `u8` argument with `clrlwi`
- *    before the compare, ours compares the register;
- *  - `fn_801B47A4`: retail's frame is 0x50 against our 0x40 and its loops count with `mtctr`/`bdnz`;
- *    `fn_801B6FB0`: frame 0x30 against 0x20, the two `setVec3` calls colour their float registers differently;
- *    `fn_801B4458`, `fn_801B563C`, `fn_801B5774`, `fn_801B65B8`: retail spills f31 with `psq_st`;
- *  - `fn_801B670C`: ours lacks one of retail's `em_after_frame_check` calls (with its `lbl_80798CA0`/`lbl_80798C74`
- *    window);
- *  - `fn_801B45B0`: ours materialises the seat-code compare with `cntlzw`/`srwi` where retail branches;
- *    `fn_801B6B94`: ours loads the +0x1D4 field before retail's `lbl_80798CD0`; `fn_801B6C84`: the stack-vector
- *    setup is ordered differently; `fn_801B610C`, `fn_801B6308`: register allocation only.
+ * RESIDUALS. Every row is written; 5 partial rows.
+ *  - `fn_801B4694`, `fn_801B4458`: register colouring of the loop index and the narrowed kind (retail compares
+ *    `cmplw kind, code`, ours the operands swapped);
+ *  - `fn_801B47A4`: retail's frame is 0x50 against our 0x40 and its loops count with `mtctr`/`bdnz` (1200 B against
+ *    1180 B);
+ *  - `fn_801B45B0`: retail sets r5 (`addi r5,r1,0x20`) after `fmr f1,f31` before `capsule_box_from_points`, ours before;
+ *  - `fn_801B63E8`: retail narrows the chosen motion with `clrlwi r4,r4,16` after the select; a `u16`/`u32`/`s32`
+ *    local, a `(u16)` cast and the if-form do not reproduce it.
  *   flipcheck: `.ctors`/`.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.data`/`.text` short of the claim.
- * SHAPES. The 10 callees the folded sources declared with different signatures are called through cast macros
+ * SHAPES. The callees the folded sources declared with different signatures are called through cast macros
  *   (`<name>_cN`, `<name>_viewN`: the same direct call), and the header declarations that disagree are renamed away
- *   around their `#include` (`#define <name> <name>_hidden_<header>`).  No peephole pragma (docs/enemy.md).
+ *   around their `#include` (`#define <name> <name>_hidden_<header>`).  `#pragma peephole off` is scoped to the
+ *   bodies whose retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi` + `slwi` forms (a file-wide
+ *   pragma costs the bodies that keep the fused ones, docs/enemy.md).  The state machines switch on `self->state`
+ *   and bump it with `+= 1` inside case 0 (a `u8 state` local loads it at entry); case-level exits are `break`;
+ *   `kind == 1 || kind == 4` tests compare `(s32)kind`; the SE-table calls pass `self` through the 4-argument view;
+ *   `fn_801B670C`'s motion 0x12 re-tests its frame window before the plain effect.
  */
 
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
@@ -107,8 +100,6 @@
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_rot_vec_copy_c1 ((void (*)(void*, void*))eft_rot_vec_copy)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
-#define em_se_tbl_play_c1 ((void (*)(void*, u32, u32))em_se_tbl_play)
-#define em_se_tbl_play_alt_c1 ((void (*)(void*, u32, u32))em_se_tbl_play_alt)
 #define em_hit_window_set_default_c1 ((u32 (*)(struct _ENEMY_WORK*, u32, u32))em_hit_window_set_default)
 #define fn_8012D0B4_c1 ((u32 (*)(struct _ENEMY_WORK*, void*))em_pl_target_ck)
 #define fn_8012D1A8_c1 ((u32 (*)(u8))em_pl_slot_leaving_ck)
@@ -253,6 +244,7 @@ extern "C" void fn_801B4348(_ENEMY_WORK* work) {
     }
 }
 
+#pragma peephole off
 /* 0x801B4398 (0xC0).  The em030 program-table lookup: the `lbl_805B1B08` entry whose +0x1E0 key
  * matches the work record's, then the 8-byte entry list under it, keyed by the kind. */
 extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
@@ -261,7 +253,7 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
     for (i = 0; lbl_805B1B08[i].code != 0xFF; i++) {
         EmCodeListEntry* entry;
 
-        if (fn_80125FF0(work->field_0x1E0, 0) != 1) {
+        if (fn_80125FF0(work->field_0x1E0, lbl_805B1B08[i].code) != 1) {
             continue;
         }
         entry = (EmCodeListEntry*)lbl_805B1B08[i].list_0x04;
@@ -327,6 +319,7 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
     return best;
 }
 
+#pragma peephole on
 /* 0x801B45B0 (0xE4): whether the seat record is within `radius` of `point`; a two-point seat (code 1) tests the
  * box between its points, a single-point seat the straight distance. */
 extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
@@ -344,18 +337,19 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
         vec_to_mh_vec3(&b, (Vec*)rec->vec_0x10);
         capsule_box_from_points(&a, &b, box, radius);
         pl_capsule_box_set(box, box);
-        if (pl_capsule_point_ck(point, box) == 1) {
+        if ((u32)pl_capsule_point_ck(point, box) == 1) {
             return 1;
         }
-        return 0;
-    }
-    vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
-    if (vec3_distance(point, &a) < radius) {
-        return 1;
+    } else {
+        vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
+        if (vec3_distance(point, &a) < radius) {
+            return 1;
+        }
     }
     return 0;
 }
 
+#pragma peephole off
 /* 0x801B4694 (0x110): moves the aim to seat `index` - a segment (`fn_8013581C`) for a two-point seat, the point
  * itself (`em_wave_amp`) otherwise, each with the seat's own float and a random u16 phase. */
 extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
@@ -471,7 +465,7 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
                 n = count;
                 if (count != 0) {
                     do {
-                        k = (u8)(k + 1);
+                        k += 1;
                         if (k >= count) {
                             k = 0;
                         }
@@ -543,7 +537,7 @@ extern "C" s32 fn_801B4C54(u16 id) {
 extern "C" void fn_801B4D14(_ENEMY_WORK* self, u8 kind) {
     s8 mode;
 
-    if (kind == 1 || kind == 4) {
+    if ((s32)kind == 1 || (s32)kind == 4) {
         mode = fn_801B4C54(self->field_0x01A);
         if (mode == 1) {
             self->field_0x00A = (u8)(self->field_0x00A & 0xFD);
@@ -573,6 +567,7 @@ extern "C" void fn_801B4D14(_ENEMY_WORK* self, u8 kind) {
     self->flag_0x329 = 0;
 }
 
+#pragma peephole on
 /* 0x801B4E38 (0x4).  The empty slot the neighbour's function table keeps. */
 extern "C" void fn_801B4E38(void) {}
 
@@ -600,11 +595,10 @@ extern "C" void fn_801B4EA8(_ENEMY_WORK* self) {
 
 /* 0x801B4F08 (0x7C).  Seat sub-state 0: set motion 1/4, then wait. */
 extern "C" void fn_801B4F08(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set_ck(self, 1, 4, 0);
         return;
@@ -618,11 +612,10 @@ extern "C" void fn_801B4F08(_ENEMY_WORK* self) {
 
 /* 0x801B4F84 (0x7C).  Seat sub-state 0: set motion 0x11/4, then wait. */
 extern "C" void fn_801B4F84(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set_ck(self, 0x11, 4, 0);
         return;
@@ -652,28 +645,26 @@ extern "C" void fn_801B5000(_ENEMY_WORK* self) {
 /* 0x801B5030 (0xD8).  Seat sub-state 2: arm motion 2/2 and latch the +0x1EC bit, then run the
  * latch down before finishing. */
 extern "C" void fn_801B5030(_ENEMY_WORK* self) {
-    u8 state = self->state;
     u8 latch;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 2, 2, 0);
         self->state_0x006 = (u8)(self->bits_0x1EC & 1);
-        return;
+        break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
             latch = self->state_0x006;
             if (latch == 0) {
-                self->state = (u8)(self->state + 1);
+                self->state += 1;
                 em_mot_set(self, 7, 4, 0);
                 return;
             }
             self->state_0x006 = (u8)(latch - 1);
-            return;
         }
-        return;
+        break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -684,11 +675,10 @@ extern "C" void fn_801B5030(_ENEMY_WORK* self) {
 
 /* 0x801B5108 (0x7C).  Seat sub-state 3: arm motion 3/2, then wait. */
 extern "C" void fn_801B5108(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 3, 2, 0);
         return;
@@ -702,11 +692,10 @@ extern "C" void fn_801B5108(_ENEMY_WORK* self) {
 
 /* 0x801B5184 (0x7C).  Seat sub-state 4: arm motion 4/4, then wait. */
 extern "C" void fn_801B5184(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 4, 4, 0);
         return;
@@ -718,14 +707,14 @@ extern "C" void fn_801B5184(_ENEMY_WORK* self) {
     }
 }
 
+#pragma peephole off
 /* 0x801B5200 (0x9C).  Seat sub-state 5: motion 5 (0x23 with the +0x0A bit), then wait. */
 extern "C" void fn_801B5200(_ENEMY_WORK* self) {
-    u8 state = self->state;
     u32 motion = 5;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         if ((self->field_0x00A & 1) != 0) {
             motion = 0x23;
@@ -742,12 +731,11 @@ extern "C" void fn_801B5200(_ENEMY_WORK* self) {
 
 /* 0x801B529C (0x9C).  Seat sub-state 6: motion 6 (0x24 with the +0x0A bit), then wait. */
 extern "C" void fn_801B529C(_ENEMY_WORK* self) {
-    u8 state = self->state;
     u32 motion = 6;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         if ((self->field_0x00A & 1) != 0) {
             motion = 0x24;
@@ -765,11 +753,10 @@ extern "C" void fn_801B529C(_ENEMY_WORK* self) {
 /* 0x801B5338 (0xB0).  Seat sub-state 7: motion 0x26 with the +0x0A bit, else 0x15 plus the +0x1CC
  * weight reset. */
 extern "C" void fn_801B5338(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         if ((self->field_0x00A & 1) != 0) {
             em_mot_set(self, 0x26, 4, 0);
@@ -786,13 +773,13 @@ extern "C" void fn_801B5338(_ENEMY_WORK* self) {
     }
 }
 
+#pragma peephole on
 /* 0x801B53E8 (0x7C).  Seat sub-state 8: motion 1/4, then wait. */
 extern "C" void fn_801B53E8(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 4, 0);
         return;
@@ -806,11 +793,10 @@ extern "C" void fn_801B53E8(_ENEMY_WORK* self) {
 
 /* 0x801B5464 (0x7C).  Seat sub-state 9: motion 0x11/4, then wait. */
 extern "C" void fn_801B5464(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x11, 4, 0);
         return;
@@ -824,11 +810,10 @@ extern "C" void fn_801B5464(_ENEMY_WORK* self) {
 
 /* 0x801B54E0 (0x7C).  Seat sub-state 10: motion 0x26/4, then wait. */
 extern "C" void fn_801B54E0(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x26, 4, 0);
         return;
@@ -878,11 +863,10 @@ extern "C" void fn_801B555C(_ENEMY_WORK* self) {
 /* 0x801B55A8 (0x94).  Seat sub-state 11: motion 8/4 plus the +0x34004 motion timer, then wait for
  * its 0xA0-frame gate. */
 extern "C" void fn_801B55A8(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 8, 4, 0);
         em_approach_start_c1(self, lbl_80798C8C, 0);
@@ -895,58 +879,56 @@ extern "C" void fn_801B55A8(_ENEMY_WORK* self) {
     }
 }
 
+#pragma peephole off
 /* 0x801B563C (0x138).  Seat sub-state 12 (two variants): motion 9/4 with the kind-selected timer,
  * then either finish or continue with 0x25/4. */
 extern "C" void fn_801B563C(_ENEMY_WORK* self, u8 kind) {
-    u8 state = self->state;
     f32 timer = lbl_80798C8C;
     u32 motion = 0x0D;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 9, 4, 0);
         if (kind == 1) {
             timer = lbl_80798C90;
         }
         em_approach_start_c1(self, timer, 0);
-        return;
+        break;
     case 1:
         if (em_approach_step(self, 0, 0xA0) == 1) {
             if (kind == 0) {
                 em_action_finish(self);
                 return;
             }
-            self->state = (u8)(self->state + 1);
+            self->state += 1;
             if ((self->field_0x00A & 1) != 0) {
                 motion = 0x25;
             }
             em_mot_set(self, motion, 4, 0);
-            return;
         }
-        return;
+        break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }
-        return;
+        break;
     default:
-        return;
+        break;
     }
 }
 
 /* 0x801B5774 (0x194).  Seat sub-state 13: motion 0xA/4 with the kind-selected timer and the +0x10
  * flag/timer, then either finish or continue with 0x25/4. */
 extern "C" void fn_801B5774(_ENEMY_WORK* self, u8 kind, u8 flag) {
-    u8 state = self->state;
     f32 timer = lbl_80798C8C;
-    u32 motion = 0x0D;
     u32 done;
+    u32 motion = 0x0D;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x0A, 4, 0);
         if (kind == 1) {
@@ -956,12 +938,12 @@ extern "C" void fn_801B5774(_ENEMY_WORK* self, u8 kind, u8 flag) {
         if (flag == 1) {
             self->state_0x006 = (u8)(((self->bits_0x1EC & 1) * 2) + 2);
         }
-        return;
+        break;
     case 1:
         done = em_approach_step(self, 0, 0x100);
         if (flag == 1 && em_mot_end_ck(self) == 1) {
             if (self->state_0x006 != 0) {
-                self->state_0x006 = (u8)(self->state_0x006 - 1);
+                self->state_0x006 -= 1;
             } else {
                 done = 1;
             }
@@ -971,33 +953,31 @@ extern "C" void fn_801B5774(_ENEMY_WORK* self, u8 kind, u8 flag) {
                 em_action_finish(self);
                 return;
             }
-            self->state = (u8)(self->state + 1);
+            self->state += 1;
             if ((self->field_0x00A & 1) != 0) {
                 motion = 0x25;
             }
             em_mot_set(self, motion, 4, 0);
-            return;
         }
-        return;
+        break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }
-        return;
+        break;
     default:
-        return;
+        break;
     }
 }
 
 /* 0x801B5908 (0x100).  Seat sub-state 14: motion 0xB/4 (0xC with kind) repeated `count` times,
  * then finish. */
 extern "C" void fn_801B5908(_ENEMY_WORK* self, u8 kind, u8 count) {
-    u8 state = self->state;
     u32 motion = 0x0B;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         self->state_0x006 = count;
         if (kind == 1) {
@@ -1012,7 +992,7 @@ extern "C" void fn_801B5908(_ENEMY_WORK* self, u8 kind, u8 count) {
                 return;
             }
             self->state = 1;
-            self->state_0x006 = (u8)(self->state_0x006 - 1);
+            self->state_0x006 -= 1;
             if (em_get_mot_no(self) == 0x0B) {
                 motion = 0x0C;
             }
@@ -1024,12 +1004,11 @@ extern "C" void fn_801B5908(_ENEMY_WORK* self, u8 kind, u8 count) {
 
 /* 0x801B5A08 (0xDC).  Seat sub-state 15: motion 0xE/4 (0xF with flag), then the +0x33E3C angle set. */
 extern "C" void fn_801B5A08(_ENEMY_WORK* self, u8 flag) {
-    u8 state = self->state;
     u32 motion = 0x0E;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         if (flag == 1) {
             motion = 0x0F;
@@ -1049,13 +1028,13 @@ extern "C" void fn_801B5A08(_ENEMY_WORK* self, u8 flag) {
     }
 }
 
+#pragma peephole on
 /* 0x801B5AE4 (0x7C).  Seat sub-state 16: motion 0x10/4, then wait. */
 extern "C" void fn_801B5AE4(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x10, 4, 0);
         return;
@@ -1069,11 +1048,10 @@ extern "C" void fn_801B5AE4(_ENEMY_WORK* self) {
 
 /* 0x801B5B60 (0x8C).  Seat sub-state 17: the +0x80570260 motion set, then wait on its gate. */
 extern "C" void fn_801B5B60(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_turn_seq_start_c1(self, lbl_80570260, 0, 1, 0);
         return;
@@ -1085,16 +1063,16 @@ extern "C" void fn_801B5B60(_ENEMY_WORK* self) {
     }
 }
 
+#pragma peephole off
 /* 0x801B5BEC (0x138).  Seat sub-state 18: motion 0xE/4 for a low +0x1EC mod-5, else 0xF/4, then the
  * +0x33E3C angle set selected by that mod. */
 extern "C" void fn_801B5BEC(_ENEMY_WORK* self) {
-    u8 state = self->state;
     u32 motion = 0x0F;
     s32 angle = 0;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         self->state_0x006 = (u8)(self->bits_0x1EC % 5);
         if (self->state_0x006 < 3) {
@@ -1131,18 +1109,17 @@ extern "C" void fn_801B5BEC(_ENEMY_WORK* self) {
 /* 0x801B5D24 (0xFC).  Seat sub-state 19: motion 0xA/4 with a +0x1EC-derived countdown, then either
  * finish or continue with 0x25/4. */
 extern "C" void fn_801B5D24(_ENEMY_WORK* self, u8 flag) {
-    u8 state = self->state;
     u32 motion = 0x0D;
     s32 timer;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x0A, 4, 0);
         timer = self->bits_0x1EC & 3;
         self->timer_0x020 = (timer * 0x10) - timer + 0x28;
-        return;
+        break;
     case 1:
         timer = self->timer_0x020 - 1;
         self->timer_0x020 = timer;
@@ -1151,22 +1128,22 @@ extern "C" void fn_801B5D24(_ENEMY_WORK* self, u8 flag) {
                 em_action_finish(self);
                 return;
             }
-            self->state = (u8)(state + 1);
+            self->state += 1;
             if ((self->field_0x00A & 1) != 0) {
                 motion = 0x25;
             }
             em_mot_set(self, motion, 4, 0);
-            return;
         }
-        return;
+        break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }
-        return;
+        break;
     }
 }
 
+#pragma peephole on
 /* 0x801B5E20 (0xB4).  Dispatches the 0x801B55A8..0x801B5D24 set on the +0x1E6 sub-state. */
 extern "C" void fn_801B5E20(_ENEMY_WORK* self) {
     switch (self->state_sub) {
@@ -1223,71 +1200,65 @@ extern "C" void fn_801B5E20(_ENEMY_WORK* self) {
     }
 }
 
+#pragma peephole off
 /* 0x801B5ED4 (0x13C).  Seat sub-state 20: motion 0x12/4 plus the +0x29668 gate, then either the
  * frame window or the 0x13/0x14 pair. */
 extern "C" void fn_801B5ED4(_ENEMY_WORK* self, u8 flag) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x12, 4, 0);
         em_hit_window_set_default_c1(self, 0, 1);
-        return;
+        break;
     case 1:
-        if (flag == 0) {
+        if ((s32)flag == 0) {
             if (em_mot_end_ck(self) == 1) {
                 em_action_finish(self);
-                return;
             }
-            return;
-        }
-        if (em_frame_check(self, 1, lbl_80798C98, lbl_80798C74) == 1) {
-            self->state = (u8)(self->state + 1);
+        } else if (em_frame_check(self, 1, lbl_80798C98, lbl_80798C74) == 1) {
+            self->state += 1;
             em_mot_set(self, 0x13, 0, 0);
-            return;
         }
-        return;
+        break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
-            self->state = (u8)(self->state + 1);
+            self->state += 1;
             em_mot_set(self, 0x14, 0, 8);
             em_hit_window_set_default_c1(self, 0, 2);
-            return;
         }
-        return;
+        break;
     case 3:
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }
-        return;
+        break;
     }
 }
 
+#pragma peephole on
 /* 0x801B6010 (0xC4).  The 0x801B5ED4 variant without the frame window: 0x13 then 0x14. */
 extern "C" void fn_801B6010(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x13, 0, 0);
-        return;
+        break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            self->state = (u8)(self->state + 1);
+            self->state += 1;
             em_mot_set(self, 0x14, 0, 8);
             em_hit_window_set_default_c1(self, 0, 2);
-            return;
         }
-        return;
+        break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }
-        return;
+        break;
     }
 }
 
@@ -1311,52 +1282,52 @@ extern "C" void fn_801B60D4(_ENEMY_WORK* self) {
 extern "C" void fn_801B610C(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0x01:
-        em_se_tbl_play_c1(lbl_805B1BB0, 0, 1);
+        em_se_tbl_play_view1(self, lbl_805B1BB0, 0, 1);
         return;
     case 0x02:
-        em_se_tbl_play_c1(lbl_805B1BD8, 0, 2);
+        em_se_tbl_play_view1(self, lbl_805B1BD8, 0, 2);
         return;
     case 0x17:
-        em_se_tbl_play_c1(lbl_805B1C30, 1, 0x17);
+        em_se_tbl_play_view1(self, lbl_805B1C30, 1, 0x17);
         return;
     case 0x05:
-        em_se_tbl_play_c1(lbl_805B1C30, 1, 5);
+        em_se_tbl_play_view1(self, lbl_805B1C30, 1, 5);
         return;
     case 0x23:
-        em_se_tbl_play_c1(lbl_805B1C30, 1, 0x23);
+        em_se_tbl_play_view1(self, lbl_805B1C30, 1, 0x23);
         return;
     case 0x7A:
-        em_se_tbl_play_c1(lbl_805B1C78, 0, 0x7A);
+        em_se_tbl_play_view1(self, lbl_805B1C78, 0, 0x7A);
         return;
     case 0x7B:
-        em_se_tbl_play_c1(lbl_805B1CA0, 0, 0x7B);
+        em_se_tbl_play_view1(self, lbl_805B1CA0, 0, 0x7B);
         return;
     case 0x7C:
-        em_se_tbl_play_c1(lbl_805B1CC8, 0, 0x7C);
+        em_se_tbl_play_view1(self, lbl_805B1CC8, 0, 0x7C);
         return;
     case 0x8D:
-        em_se_tbl_play_c1(lbl_805B1CF0, 0, 0x8D);
+        em_se_tbl_play_view1(self, lbl_805B1CF0, 0, 0x8D);
         return;
     case 0x7D:
-        em_se_tbl_play_c1(lbl_805B1D30, 0, 0x7D);
+        em_se_tbl_play_view1(self, lbl_805B1D30, 0, 0x7D);
         return;
     case 0x8E:
-        em_se_tbl_play_c1(lbl_805B1DA0, 0, 0x8E);
+        em_se_tbl_play_view1(self, lbl_805B1DA0, 0, 0x8E);
         return;
     case 0x84:
-        em_se_tbl_play_c1(lbl_805B1C30, 1, 0x84);
+        em_se_tbl_play_view1(self, lbl_805B1C30, 1, 0x84);
         return;
     case 0x9F:
-        em_se_tbl_play_c1(lbl_805B1DC8, 0, 0x9F);
+        em_se_tbl_play_view1(self, lbl_805B1DC8, 0, 0x9F);
         return;
     case 0xA0:
-        em_se_tbl_play_c1(lbl_805B1DC8, 0, 0xA0);
+        em_se_tbl_play_view1(self, lbl_805B1DC8, 0, 0xA0);
         return;
     case 0xA8:
-        em_se_tbl_play_c1(lbl_805B1E08, 0, 0xA8);
+        em_se_tbl_play_view1(self, lbl_805B1E08, 0, 0xA8);
         return;
     case 0xA9:
-        em_se_tbl_play_c1(lbl_805B1C30, 1, 0xA9);
+        em_se_tbl_play_view1(self, lbl_805B1C30, 1, 0xA9);
         return;
     default:
         em_action_finish(self);
@@ -1369,67 +1340,65 @@ extern "C" void fn_801B610C(_ENEMY_WORK* self) {
 extern "C" void fn_801B6308(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0x00:
-        em_se_tbl_play_alt_c1(lbl_805B1E50, 1, 0);
+        em_se_tbl_play_alt_view1(self, lbl_805B1E50, 1, 0);
         return;
     case 0x05:
-        em_se_tbl_play_alt_c1(lbl_805B1E50, 1, 5);
+        em_se_tbl_play_alt_view1(self, lbl_805B1E50, 1, 5);
         return;
     case 0x1D:
-        em_se_tbl_play_alt_c1(lbl_805B1E90, 0, 0x1D);
+        em_se_tbl_play_alt_view1(self, lbl_805B1E90, 0, 0x1D);
         return;
     case 0x1E:
-        em_se_tbl_play_alt_c1(lbl_805B1E50, 1, 0x1E);
+        em_se_tbl_play_alt_view1(self, lbl_805B1E50, 1, 0x1E);
         return;
     case 0x38:
-        em_se_tbl_play_alt_c1(lbl_805B1F18, 0, 0x38);
+        em_se_tbl_play_alt_view1(self, lbl_805B1F18, 0, 0x38);
         return;
     case 0x25:
-        em_se_tbl_play_alt_c1(lbl_805B1FF0, 0, 0x25);
+        em_se_tbl_play_alt_view1(self, lbl_805B1FF0, 0, 0x25);
         return;
     case 0x2A:
-        em_se_tbl_play_alt_c1(lbl_805B20E8, 1, 0x2A);
+        em_se_tbl_play_alt_view1(self, lbl_805B20E8, 1, 0x2A);
         return;
     default:
-        em_se_tbl_play_alt_c1(lbl_805B1E50, 0, 0);
+        em_se_tbl_play_alt_view1(self, lbl_805B1E50, 0, 0);
         return;
     }
 }
 
+#pragma peephole off
 /* 0x801B63E8 (0x100).  Seat sub-state 21: motion 0xA/4 with the +0x10/-500 timer, then the ground
  * hook or 0x25/4 by the +0x43B kind. */
 extern "C" void fn_801B63E8(_ENEMY_WORK* self) {
-    u8 state = self->state;
 
-    switch (state) {
+    switch (self->state) {
     case 0:
-        self->state = (u8)(state + 1);
+        self->state += 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x0A, 4, 0);
         em_approach_start_c1(self, lbl_80798C90, 0x10);
         if (self->field_0x43B != 3 && self->field_0x43B != 2) {
             fn_801B4348(self);
-            return;
         }
-        return;
+        break;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1) {
-            u32 motion = 0x0D;
-            self->state = (u8)(self->state + 1);
-            if ((self->field_0x00A & 1) != 0) {
-                motion = 0x25;
-            }
+            u16 motion;
+
+            self->state += 1;
+            motion = (self->field_0x00A & 1) != 0 ? 0x25 : 0x0D;
             em_mot_set(self, motion, 4, 0);
-            return;
         }
-        return;
+        break;
     case 2:
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }
-        return;
+        break;
     }
 }
 
+#pragma peephole on
 /* 0x801B64E8 (0x14).  Seat sub-state 22: 0x801B63E8 only on its first sub-state. */
 extern "C" void fn_801B64E8(_ENEMY_WORK* self) {
     if (self->state_sub == 0) {
@@ -1468,6 +1437,7 @@ extern "C" void fn_801B64FC(_ENEMY_WORK* self) {
     }
 }
 
+#pragma peephole off
 /* 0x801B65B8 (0x154).  Spawns the seat's effect at the motion's joint (kind 1) or directly (kind 0),
  * with the +0x228 gate selecting the "blocked" id/scale. */
 extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 arg4, f32 scale) {
@@ -1503,7 +1473,8 @@ extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 ar
     case 1:
         get_joint_wpos_em(self, joint, &pos);
         pos.y = self->field_0x20C;
-        eft_spawn_pos_in_area(&pos, self->area_no, id, arg4, scale * get_em_chg_scale(self));
+        scale *= get_em_chg_scale(self);
+        eft_spawn_pos_in_area(&pos, self->area_no, id, arg4, scale);
         return;
     default:
         return;
@@ -1577,8 +1548,10 @@ extern "C" void fn_801B670C(_ENEMY_WORK* self) {
                 eft009_spawn_at_pos(self, 0x1A, 0x33, 0, lbl_80798CA4, &pos);
                 return;
             }
-            setVector3(&pos, lbl_80798C74, lbl_80798C74, lbl_80798CC4);
-            eft009_spawn_at_pos(self, 0x1A, 9, 0, lbl_80798CB8, &pos);
+            if (em_after_frame_check(self, 0, lbl_80798CA0, lbl_80798C74) == 1) {
+                setVector3(&pos, lbl_80798C74, lbl_80798C74, lbl_80798CC4);
+                eft009_spawn_at_pos(self, 0x1A, 9, 0, lbl_80798CB8, &pos);
+            }
         }
         return;
     case 0x67:
@@ -1598,13 +1571,11 @@ extern "C" void fn_801B670C(_ENEMY_WORK* self) {
 /* 0x801B6B94 (0xA4).  Seeds the two alpha/colour passes of the embedded MHchar base from the +0x1D4
  * ratio. */
 extern "C" void fn_801B6B94(_ENEMY_WORK* self) {
-    f32 ratio;
     s32 a;
     s32 c;
 
-    ratio = self->field_0x1D4;
-    a = (s32)(lbl_80798CD0 * ratio);
-    c = (s32)(lbl_80798CD4 * ratio);
+    a = (s32)(lbl_80798CD0 * self->field_0x1D4);
+    c = (s32)(lbl_80798CD4 * self->field_0x1D4);
     mhchar_mat_tev_set(self->char_0x024, 0, 6, (u8)a, 0, 3, (u8)c);
     mhchar_mat_tev_set(self->char_0x024, 1, 6, (u8)a, 0, 3, (u8)c);
 }
@@ -1618,13 +1589,15 @@ extern "C" s32 fn_801B6C38(_ENEMY_WORK* self, u8 flag) {
     return 0;
 }
 
+#pragma peephole on
 /* 0x801B6C84 (0x270): maps the map kind (`stage_map_kind_get`) and area to a motion pair through `em_move_target_set`;
  * with no match it reports the unmatched state and copies the control record's position/rotation onto the work. */
 extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     EmGroundRec rec;
-    u32 unmatched = 0;
+    u32 unmatched;
 
     em_ground_rec_clear(&rec);
+    unmatched = 0;
     switch (stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         switch (self->area_no) {
@@ -1675,10 +1648,13 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
         }
         break;
     case 5:
-        if (self->area_no == 1) {
+        switch (self->area_no) {
+        case 1:
             em_move_target_set(self, 2, 3, lbl_80798CE0);
-        } else {
+            break;
+        default:
             unmatched = 1;
+            break;
         }
         break;
     default:
@@ -1700,12 +1676,13 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     }
 }
 
+#pragma peephole off
 /* 0x801B6EF4 (0xBC).  The `fn_801B4D14` variant on the second control record (+0x016 id, +0x003
  * mode byte). */
 extern "C" void fn_801B6EF4(_ENEMY_WORK* self, u8 kind) {
     s8 mode;
 
-    if ((u8)kind == 1 || (u8)kind == 4) {
+    if ((s32)kind == 1 || (s32)kind == 4) {
         mode = fn_801B4C54(*(u16*)&self->field_0x016);
         if (mode == 1) {
             self->team = (u8)(self->team & 0xFD);
@@ -1722,14 +1699,14 @@ extern "C" void fn_801B6EF4(_ENEMY_WORK* self, u8 kind) {
     }
 }
 
+#pragma peephole on
 /* 0x801B6FB0 (0x6C).  The `.ctors` static initializer: seed the two global control vectors. */
 extern "C" void fn_801B6FB0(void) {
-    nw4r::math::VEC3 tmp;
+    nw4r::math::VEC3 first;
+    nw4r::math::VEC3 second;
 
-    setVec3(&tmp, lbl_80798C74, lbl_80798CE8, lbl_80798CEC);
-    assignVec3(vec_pair_801B4458_0, &tmp);
-    setVec3(&tmp, lbl_80798C74, lbl_80798CF0, lbl_80798CF4);
-    assignVec3(&vec_pair_801B4458_0[1], &tmp);
+    assignVec3(vec_pair_801B4458_0, setVec3(&first, lbl_80798C74, lbl_80798CE8, lbl_80798CEC));
+    assignVec3(&vec_pair_801B4458_0[1], setVec3(&second, lbl_80798C74, lbl_80798CF0, lbl_80798CF4));
 }
 
 /* 0x801B701C (0x4).  The tail-call slot the neighbouring unit's table keeps. */

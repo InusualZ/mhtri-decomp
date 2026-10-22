@@ -6,7 +6,7 @@
  *   .sdata2 0x8079BF60-0x8079BF90, extab, extabindex.
  * SEAM. The left edge closes `enemy/em019_ai.cpp`, whose static initializer `em019_se_shift_init` ends there.  This unit's
  *   own initializer `fn_80385E7C` constructs the `lbl_806C4A88` array with `fn_80385E9C`, emitted after it; the pool
- *   repeats 41c00000 at `lbl_8079BFAC` (first read by `fn_803865B4`), so the next TU starts in
+ *   repeats 41c00000 at `lbl_8079BFAC` (first read by `note_pane_motion_effects`), so the next TU starts in
  *   0x80385E7C-0x80386028 and the right edge 0x80385EE0 is a GUESS.
  * NAMES. `em_prog_support` and the `note_pane_*`/`qn_chr_flag_set` names are GUESSES from the band's role and the
  *   bodies; `qn_get_motion_no` is the map's mangled name.
@@ -22,7 +22,7 @@
  *  - `fn_803851D4`: ours indexes `lbl_806C4A88[i]`, retail walks a pointer by +0x1F8;
  *  - `fn_80385A78`: ours copies the position to +0x30/+0x34 and a byte at +0x38, retail stores the three words to
  *    +0x2C/+0x30/+0x34;
- *  - `note_pane_motion_end_ck`, `note_pane_motion_frame_ck`, `fn_80385C80`: retail adds 4 to r3 before the argument setup of the
+ *  - `note_pane_motion_end_ck`, `note_pane_motion_frame_ck`, `note_pane_motion_frame_pass_ck`: retail adds 4 to r3 before the argument setup of the
  *    tail call, ours after;
  *  - `fn_80384F48`, `qnpc_load_ck`, `fn_80384FF8`, `fn_803853C8`, `fn_8038541C`, `fn_80385538`, `fn_80385B28`,
  *    `note_pane_motion_start`, `note_pane_anim_pair_ck`, `note_pane_motion_set`: retail narrows the argument with `clrlwi`, ours
@@ -102,7 +102,7 @@ NoteWork* fn_803853C8(u8 idx);
 void fn_8038530C(u8 idx);
 void fn_80385478(NoteWork* self);
 void fn_803857BC(NoteWork* self);
-void fn_80385AA8(NoteWork* self, u8 a, u8 b);
+void note_pane_anim_pair_enter(NoteWork* self, u8 a, u8 b);
 void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b);
 void em_prog_support_reset(void);
 void fn_80385598(void);
@@ -313,7 +313,7 @@ extern "C" void fn_80385A54(NoteWork* self) {
         note_pane_get_motion(self);
         return;
     case 2:
-        fn_803865B4(self);
+        note_pane_motion_effects(self);
         return;
     }
 }
@@ -332,7 +332,7 @@ extern "C" void note_pane_mode_set(NoteWork* self, u8 a) {
 }
 
 /* 0x80385AA8 */
-extern "C" void fn_80385AA8(NoteWork* self, u8 a, u8 b) {
+extern "C" void note_pane_anim_pair_enter(NoteWork* self, u8 a, u8 b) {
     self->field_0x169 = 0;
     self->field_0x16A = 0;
     self->field_0x16B = 0;
@@ -346,7 +346,7 @@ extern "C" void fn_80385AA8(NoteWork* self, u8 a, u8 b) {
 /* 0x80385AD4 */
 extern "C" void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b) {
     self->field_0x1A1 = 1;
-    fn_80385AA8(self, (u8)a, (u8)b);
+    note_pane_anim_pair_enter(self, (u8)a, (u8)b);
 }
 
 /* 0x80385AE8 */
@@ -386,7 +386,7 @@ extern "C" u32 note_pane_motion_frame_ck(NoteWork* self, u32 a, f32 frame, f32 r
 }
 
 /* 0x80385C80 */
-extern "C" u32 fn_80385C80(NoteWork* self, u32 a) {
+extern "C" u32 note_pane_motion_frame_pass_ck(NoteWork* self, u32 a) {
     return fn_800E16DC(&self->model, (u16)a, 1);
 }
 

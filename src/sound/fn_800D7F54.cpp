@@ -592,7 +592,7 @@ extern "C" s32 fn_800F2890(s32 bank, s32 id);
 extern "C" u8 fn_800F0C74(s32 owner);
 extern "C" u32 fn_802D29A0(_PLW* plw, s32 zero, f32 a, f32 b);
 extern "C" u32 fn_801FE1DC(_LB_NPC* npc, s32 zero, f32 a, f32 b);
-extern "C" u32 fn_80385C80(_PLW* plw, s32 zero, f32 a, f32 b);
+extern "C" u32 note_pane_motion_frame_pass_ck(_PLW* plw, s32 zero, f32 a, f32 b);
 extern "C" u32 ai_get_motion_no__FP8_AINPC_W(_PLW* plw);
 extern "C" _UserData* get_userdata__Fv(void);
 extern "C" f32 lbl_807963E0;
@@ -982,7 +982,7 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
         break;
     case 10:
     case 12:
-        if (fn_80385C80(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
+        if (note_pane_motion_frame_pass_ck(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
             return;
         }
         if ((u16)param == 0xFFFF) {
@@ -1038,7 +1038,7 @@ void se_req_frame_set_sp(_se_w* work, s32 a, s32 param, s32 d, s32 e, s32 f) {
         break;
     case 10:
     case 12:
-        if (fn_80385C80(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
+        if (note_pane_motion_frame_pass_ck(w->field_0x004, 0, (f32)a, lbl_807963E0) != 1) {
             return;
         }
         if ((u16)param == 0xFFFF) {

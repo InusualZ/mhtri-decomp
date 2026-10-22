@@ -62,7 +62,8 @@ struct NoteWork {
     /* +0x19F */ u8 field_0x19F;
     /* +0x1A0 */ u8 field_0x1A0;
     /* +0x1A1 */ u8 field_0x1A1;
-    /* +0x1A2 */ u8 pad_0x1A2[0x1A8 - 0x1A2];
+    /* +0x1A2 */ u8 pad_0x1A2[0x1A4 - 0x1A2];
+    /* +0x1A4 */ f32 effect_y_ofs_0x1A4; /* added to 5.0 for the y of the joint effects `enemy/em_prog_tail.cpp` places */
     /* +0x1A8 */ u32 field_0x1A8;   /* the position `note_pane_pos_step` (this band) eases +0x18C onto */
     /* +0x1AC */ u8 flag_0x1AC;     /* set by `note_pane_init` */
     /* +0x1AD */ u8 pad_0x1AD[0x1B0 - 0x1AD];

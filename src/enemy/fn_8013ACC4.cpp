@@ -8,14 +8,17 @@
  * NAMES. The map stem; the dump answers only `zz_` placeholders for the three symbols.
  *   em_userdata_script_run is a GUESS (0x8013ACC4: it interprets the user-data command stream through fn_8013BDE4).
  * RESIDUALS. Every row is written.
- *  - `em_userdata_script_run`: retail keeps the loop constants 0/1 in r15/r16 (ours r16/r15) and the copiers' index in r14,
- *    which hoists the jump-table base out of the loop; retail's `continue` edges branch to the loop test, ours to the
- *    loop head (the exit test at the top of `for (;;)` scores lower and grows `.text` by 8 B); the `field_0x95C` range
- *    probe is `subi` + `cmplwi` in retail, a two-sided compare chain in ours; `bl VEC3_ctor` runs one slot earlier
- *    in retail.
- *   flipcheck: `.text` is laid out in the source's definition order, not the address order (the three functions sit
- *   at other addresses); extab/extabindex follow from it.
- * SHAPES. `#pragma peephole off` over the unit; a `switch` for the inner `case 10` sub-command; each branch's then
+ *  - `em_userdata_script_run`: the `field_0x95C` dispatch (cases 3-5 and 6) is `lbz r3` + `subi r0,r3,3` +
+ *    `cmplwi r0,2` + `ble` in retail, a two-sided `cmpwi 3`/`blt` + `cmpwi 5`/`ble` chain in ours (one instruction
+ *    longer, 4360 B against 4356 B); a `switch` over `(s32)`/`(u32)`/a local, `default`, case 6 first, and the
+ *    if/else-if spellings (`>= 3 && <= 5`, `(u8)(x - 3) <= 2`, `(u32)(x - 3) <= 2`) all measure the same or lower,
+ *    and so does `#pragma optimize_for_size on`.  `enemy/em_kind.cpp`'s `fn_801408B4` shows the same lowering.
+ *   flipcheck: `.text` differs from the target object (the residual above shifts the bytes after it).
+ * SHAPES. `#pragma peephole off` over the unit; the interpreter loop is `while (finished == 0)` with the abort test
+ *   after it (retail enters through a `b` to the test and every `continue` branches there); the two locals `finished`
+ *   and `aborted` are declared before `save`, whose `VEC3_ctor` runs between them and the other initialisers; the
+ *   helpers are defined after the interpreter (address order); a `switch` for the inner `case 10` sub-command; each
+ *   branch's then
  *   block first (`if (stack_0x961[1] == 0) em_userdata_state_reenter_alt(); else fn_801408B4();`); `case 2` re-reads +0x9A4 in each
  *   block; the locals' declaration order (finished, aborted, roll, save380..383, save384, save424, seeded, frames,
  *   flag, byte, count, len, i) is retail's r31..r19; a counter declared inside its loop keeps a saved register
@@ -283,36 +286,14 @@ s16 fn_80140778(u8* in, u8 code, u8 mode);
 s32 ran_suu(long index);
 
 /* ----------------------------------------------------------------------------------------------- */
-/* 0x8013BDC8 - the 8-byte record copier.                                                             */
-/* ----------------------------------------------------------------------------------------------- */
-
-extern "C" void fn_8013BDC8(EmSaveRec* dst, EmSaveRec* src) {
-    dst->code = src->code;
-    dst->sub = src->sub;
-    dst->value = src->value;
-}
-
-/* ----------------------------------------------------------------------------------------------- */
-/* 0x8013BDE4 - the stream reader: consume one `id` record at `*in`, report its value in `*out` and     */
-/* advance the cursor by the record's own length.                                                      */
-/* ----------------------------------------------------------------------------------------------- */
-
-extern "C" void fn_8013BDE4(u8** in, u32 id, s16* out) {
-    s16 n = fn_80140778(*in, (u8)id, 0);
-
-    *out += n;
-    *in += n;
-    *out += (s16)((u8)fn_80140768(*in) + 1);
-}
-
-/* ----------------------------------------------------------------------------------------------- */
 /* 0x8013ACC4 - the interpreter.                                                                      */
 /* ----------------------------------------------------------------------------------------------- */
 
 extern "C" u32 em_userdata_script_run(EmWork* self) {
-    EmUserSave save;
     u32 finished = 0;
     u32 aborted = 0;
+    EmUserSave save;
+    VEC3_ctor(&save.vec_0x00);
     u32 roll;
     u8 save380, save381, save382, save383;
     f32 save384;
@@ -324,8 +305,6 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
     u8 count = 0;
     u8 len;
     u32 i = 0;
-
-    VEC3_ctor(&save.vec_0x00);
 
     if (self->stream_0x958 == NULL) {
         return 0;
@@ -375,17 +354,15 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
 
     em_target_pos_set(self, 0);
 
-    for (;;) {
+    while (finished == 0) {
         frames++;
         if ((s16)frames > 0x3e8) {
             em_user_data_reenter(EM_ENEMY_WORK(self));
         }
 
         if (self->stream_0x958 == (u8*)self->field_0x954[0][0]) {
-            if (self->field_0x916 > 0) {
-                if (fn_8013A884(EM_ENEMY_WORK(self), 8) == 1) {
-                    fn_8013AB74(EM_ENEMY_WORK(self), 8, 0);
-                }
+            if (self->field_0x916 > 0 && fn_8013A884(EM_ENEMY_WORK(self), 8) == 1) {
+                fn_8013AB74(EM_ENEMY_WORK(self), 8, 0);
             } else if (self->field_0x89F == 3 && fn_8013A884(EM_ENEMY_WORK(self), 9) == 1) {
                 fn_8013AB74(EM_ENEMY_WORK(self), 9, 0);
             } else if (seeded == 0) {
@@ -889,13 +866,33 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
         }
 
         self->stream_0x958 += (u8)len;
-
-        if (finished != 0) {
-            if (aborted == 0) {
-                em_state_refresh(self);
-                return 1;
-            }
-            return 0;
-        }
     }
+    if (aborted == 0) {
+        em_state_refresh(self);
+        return 1;
+    }
+    return 0;
+}
+
+/* ----------------------------------------------------------------------------------------------- */
+/* 0x8013BDC8 - the 8-byte record copier.                                                             */
+/* ----------------------------------------------------------------------------------------------- */
+
+extern "C" void fn_8013BDC8(EmSaveRec* dst, EmSaveRec* src) {
+    dst->code = src->code;
+    dst->sub = src->sub;
+    dst->value = src->value;
+}
+
+/* ----------------------------------------------------------------------------------------------- */
+/* 0x8013BDE4 - the stream reader: consume one `id` record at `*in`, report its value in `*out` and     */
+/* advance the cursor by the record's own length.                                                      */
+/* ----------------------------------------------------------------------------------------------- */
+
+extern "C" void fn_8013BDE4(u8** in, u32 id, s16* out) {
+    s16 n = fn_80140778(*in, (u8)id, 0);
+
+    *out += n;
+    *in += n;
+    *out += (s16)((u8)fn_80140768(*in) + 1);
 }

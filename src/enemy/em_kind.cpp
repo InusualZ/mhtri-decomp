@@ -29,7 +29,8 @@
  *    `fn_80140E48`, `fn_80140EE8`, `fn_80140FB0`, `em_kind_release`: register allocation.
  *   flipcheck: `.data` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim; row 36:
  *   `fn_80140B20` is force-active in retail and not in ours.
- * SHAPES. `#pragma peephole off` from the first interpreter body to the end of the file and `#pragma fp_contract off`
+ * SHAPES. `#pragma peephole off` from the first interpreter body to the end of the file (back on around
+ *   `fn_8013C7E0` and `fn_80140CA0`, measured per function) and `#pragma fp_contract off`
  *   up to the run driver (measured in docs/enemy.md); `em_prog_trace2` is a static empty helper so `fn_80140B10`
  *   branches past its own body; the 16 callees the folded sources declared differently are called through cast macros
  *   (`<name>_cN`, `<name>_viewN`) and the disagreeing header declarations are renamed away around their `#include`.
@@ -1152,6 +1153,7 @@ void fn_8013C458(_ENEMY_WORK *self, u8 *in) {
 /* The remaining action entries. */
 /* --------------------------------------------------------------------------------------------- */
 
+#pragma peephole on
 /* Recomputes the current action's parameter ids from the type byte and the preset byte. */
 void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
     switch (in[0]) {
@@ -1215,6 +1217,7 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
     }
 }
 
+#pragma peephole off
 /* Copies the position the record aims at into the aim vector. */
 void fn_8013D41C(_ENEMY_WORK *self, u8 *in) {
     switch (in[0]) {
@@ -2409,6 +2412,7 @@ u32 enemy_data_by_team_get(u8 id, u8 kind) {
     return ((SystemWorkTables*)system_w)->tables_0x898[sel][sub];
 }
 
+#pragma peephole on
 /* The enemy file loader. */
 void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     EmcWork* work = (EmcWork*)&emc_work[*ctx * 0x18];
@@ -2439,6 +2443,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     fn_800D5D60(work);
 }
 
+#pragma peephole off
 void fn_80140DAC(EmFileRow* dst, EmFileRow* src) {
     *dst = *src;
 }
