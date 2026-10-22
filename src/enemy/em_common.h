@@ -132,6 +132,8 @@ f32 em_ceiling_depth_get(struct _ENEMY_WORK* self);
 void em_move_sub_mode_set(struct _ENEMY_WORK* self, u8 sub);
 /* 0x80130CE8 */
 void em_stamina_regen(struct _ENEMY_WORK* self, f32 rate, s16 delta, s16 period);
+/* 0x80131E80 */
+void em_busy_timer_clear(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }
