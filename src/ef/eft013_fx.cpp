@@ -172,7 +172,7 @@ struct _EFT013_WORK_E {
 };
 /* size: 0x34 - lower bound, an approximation. */
 
-/* Pool block of the `fn_80107518` family: the placement position at +0x30, a word at +0x40 and the
+/* Pool block of the `eft013_em_place` family: the placement position at +0x30, a word at +0x40 and the
  * setter state at +0x44. */
 struct _EFT013_WORK_F {
     /* +0x00 */ s32 count;
@@ -773,7 +773,7 @@ extern "C" void fn_8010A728(_EFT013* self, u32 mode) {
 }
 
 /* 0x8010A8CC - spawn a 12-slot enemy effect at joint 3 and hand it to fn_8010AA24. */
-extern "C" void fn_8010A8CC(_ENEMY_WORK* self, u32 a, f32 scale) {
+extern "C" void eft013_em_spawn_head(_ENEMY_WORK* self, u32 a, f32 scale) {
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
     VEC3_ctor(&v);
@@ -991,7 +991,7 @@ extern "C" void fn_80107914(_EFT013_SEL* self) {
 }
 
 /* 0x80107518 - enemy-joint setter: spawn via `fn_80107640` and place the pooled effect (state 1). */
-extern "C" void fn_80107518(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b) {
+extern "C" void eft013_em_place(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b) {
     u32 areano = self->act_id;
     if (areano != get_now_areano()) {
         return;
@@ -1005,7 +1005,7 @@ extern "C" void fn_80107518(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a, f32
     }
 }
 
-/* 0x801075AC - the player variant of fn_80107518 (state 2, area from the player record). */
+/* 0x801075AC - the player variant of eft013_em_place (state 2, area from the player record). */
 extern "C" void fn_801075AC(_EFT013_PL* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b) {
     u32 areano = self->field_0x1A4;
     if (areano != get_now_areano()) {

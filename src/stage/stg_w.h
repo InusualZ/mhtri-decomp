@@ -139,6 +139,9 @@ s8 stage_area_free_slot_get(void);
 /* 0x802B0B04 */
 bool stg_area_flag_ck(u8 index, u8 bit);
 
+/* 0x802B1FDC */
+void stage_demo_event_set(void);
+
 #ifdef __cplusplus
 }
 #endif

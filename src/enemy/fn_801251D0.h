@@ -55,13 +55,13 @@ void em_move_target_set(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x8012B380 - r3 `self` and three scalars; the motion/state setter the action band calls after `em_mot_end_ck`
  * reports done. */
-void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
+void em_reaction_req(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return. */
 void em_action_finish_fall(struct _ENEMY_WORK* self);
 void em_action_finish_walk(struct _ENEMY_WORK* self);
 /* 0x80128A70 / 0x80128AAC - r3 (`self`) and two u8 arguments (`clrlwi r4,r4,24` /
  * `clrlwi r5,r5,24`); 0x80128AAC supplies the constant third argument itself. */
-void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_act_set_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_act_arm_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 fn_80128204(struct _ENEMY_WORK* work);
 void fn_80128308(struct _ENEMY_WORK* work);

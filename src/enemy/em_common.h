@@ -117,6 +117,11 @@ void em_joint_drop_start(struct _ENEMY_WORK* self, u32 joint);
 /* 0x80131D90 */
 void em_hide_set(struct _ENEMY_WORK* self);
 
+/* 0x8012F6A0 */
+void em_mot_layer_blend_set(struct _ENEMY_WORK* self, u32 layer, u16 motion, u32 frames, s32 start, u32 mode);
+/* 0x8013216C */
+void em_rest_flag_set(struct _ENEMY_WORK* self);
+
 #ifdef __cplusplus
 }
 #endif

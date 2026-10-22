@@ -381,7 +381,7 @@ extern "C" void* fn_802B0420()
 }
 
 /* Tail-calls fn_802B1558(stage_w, 1). */
-extern "C" void fn_802B1FDC()
+extern "C" void stage_demo_event_set()
 {
     fn_802B1558(stage_w, 1);
 }

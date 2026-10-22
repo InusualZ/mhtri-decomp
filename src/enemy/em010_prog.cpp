@@ -442,7 +442,7 @@ u32 fn_801663E4(_ENEMY_WORK* self) {
         self->field_0x1C4 = 0;
         self->field_0x1C0 = 0;
         self->field_0x1BC = 0;
-        fn_8012B380(self, 5, 2, 0xA);
+        em_reaction_req(self, 5, 2, 0xA);
     }
     return 0;
 }
@@ -570,7 +570,7 @@ void fn_801671AC(_ENEMY_WORK* self) {
                 if (data->field_0x08 == 0xFF) {
                     self->field_0x46C = 0xFF;
                     em_user_data_reenter(self);
-                    fn_8012B380(self, 6, 0xFF, 0);
+                    em_reaction_req(self, 6, 0xFF, 0);
                 }
             }
         }

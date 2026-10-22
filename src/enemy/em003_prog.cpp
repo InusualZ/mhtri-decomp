@@ -1109,7 +1109,7 @@ extern "C" void fn_801571F0(_ENEMY_WORK* self) {
     case 3:
         em_turn_to_target(self, 0x100);
         if (em_mot_end_ck(self) == 1U) {
-            fn_80128A70(self, 3, 2);
+            em_act_set_unless_act11(self, 3, 2);
         }
         break;
     }
@@ -1627,7 +1627,7 @@ extern "C" void fn_80158928(_ENEMY_WORK* self, u8 a1) {
         self->field_0x20 = temp_r0;
         if (temp_r0 <= 0) {
             if (((s32) a1 == 0) || ((s32) a1 == 2)) {
-                fn_80128A70(self, 4, 1);
+                em_act_set_unless_act11(self, 4, 1);
                 return;
             }
             em_action_finish_walk(self);
@@ -1797,7 +1797,7 @@ extern "C" void fn_80159984(_ENEMY_WORK* self) {
         fn_80130CDC(self, -0xC);
         em_mot_set(self, 0x38, 6, 0);
         em_move_vec2_clr(self);
-        fn_801303EC(self, lbl_807970C0);
+        em_height_set(self, lbl_807970C0);
         em_hit_window_set_default(self, 0, 2);
         return;
     case 1:

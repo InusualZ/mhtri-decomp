@@ -433,7 +433,7 @@ extern "C" void em_act_arm_mot1_hit1_1(_EM_CHARA_WORK* self)
         self->state += 1;
         em_move_mode_set((_ENEMY_WORK*)self, 0);
         em_mot_set((_ENEMY_WORK*)self, 1, 0, 0);
-        fn_801303EC((_ENEMY_WORK*)self, lbl_8079B124);
+        em_height_set((_ENEMY_WORK*)self, lbl_8079B124);
         self->field_0x20 = 0;
         break;
     case 1: {
@@ -441,7 +441,7 @@ extern "C" void em_act_arm_mot1_hit1_1(_EM_CHARA_WORK* self)
         _PLW* work;
         u8 i;
 
-        fn_801303EC((_ENEMY_WORK*)self, lbl_8079B124);
+        em_height_set((_ENEMY_WORK*)self, lbl_8079B124);
         if ((self->field_0x20 & 0x1F) != 0) {
             break;
         }

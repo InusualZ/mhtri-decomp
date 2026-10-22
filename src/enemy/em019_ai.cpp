@@ -503,7 +503,7 @@ void em019_act0_sub7(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
@@ -1081,7 +1081,7 @@ void em019_act6_stand(_ENEMY_WORK* self, u8 kind)
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         em019_part_state_set(self, 0xFF);
         switch (kind) {
         default:
@@ -1114,7 +1114,7 @@ void em019_act6_sub1(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 201, 4, 0);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         break;
     case 1:
         if (em_frame_check(self, 1, 196.0f, 0.0f) == 1)
@@ -1145,7 +1145,7 @@ void em019_act6_sub2(_ENEMY_WORK* self)
         em_move_mode_set(self, 0);
         em_mot_set(self, 202, 0, 0);
         em_mot_speed_set(self, 1.25f);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         em019_part_state_set(self, 0xFF);
         em_shake_req_set(self);
         break;
@@ -1197,7 +1197,7 @@ void em019_act6_slide(_ENEMY_WORK* self, u8 kind)
             em_mot_speed_set(self, 5.0f);
             break;
         }
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         em019_part_state_set(self, 0xFF);
         self->timer_0x020 = 0;
         break;
@@ -1222,7 +1222,7 @@ void em019_act6_turn(_ENEMY_WORK* self, u8 kind)
             em_mot_speed_set(self, 5.0f);
         else
             em_mot_speed_set(self, 1.0f);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         em019_part_state_set(self, 0xFF);
         self->timer_0x020 = 0;
         break;
@@ -1662,7 +1662,7 @@ void em019_act7_roar(_ENEMY_WORK* self, u8 kind)
             em_mot_set(self, 204, 0, 0);
             break;
         }
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         em019_part_state_set(self, 0xFF);
         em_guard_set(self);
         em_shake_req_set(self);
@@ -1751,7 +1751,7 @@ void em019_act7_rush(_ENEMY_WORK* self, u8 kind)
         em_move_mode_set(self, 0);
         em_mot_set(self, 211, 0, 0);
         em_mot_speed_set(self, 1.25f);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         switch (kind) {
         default:
             em_approach_start(self, 1000.0f, 0);
@@ -1884,7 +1884,7 @@ void em019_act7_jump(_ENEMY_WORK* self)
         fn_80130CDC(self, -15);
         em_mot_set(self, 205, 0, 0);
         em_mot_speed_set(self, 1.25f);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         em019_part_state_set(self, 0xFF);
         em_shake_req_set(self);
         break;
@@ -1963,7 +1963,7 @@ void em019_act7_dive(_ENEMY_WORK* self)
         em_fall_start(self);
         em_mot_set(self, 207, 0, 0);
         em_ground_snap(self);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         em019_part_state_set(self, 0xFF);
         em_shake_req_set(self);
         break;
@@ -2044,7 +2044,7 @@ void em019_act7_magma_dig(_ENEMY_WORK* self, u8 kind)
             em_mot_set(self, 200, 0, 0);
         else
             em_mot_set(self, 203, 0, 0);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         em019_part_state_set(self, 0xFF);
         em_mot_speed_set(self, 1.2f);
         self->state_0x007 = 0;
@@ -3057,7 +3057,7 @@ extern "C" void em_act_prog_2(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 201, 4, 0);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         break;
     case 1:
         if (em_frame_check(self, 1, 196.0f, 0.0f) == 1)
@@ -3070,7 +3070,7 @@ extern "C" void em_act_prog_2(_ENEMY_WORK* self) {
             em_hit_window_clear(self, 0);
         if (em_mot_end_ck(self) == 1) {
             em_move_mode_set(self, 4);
-            fn_801303EC(self, fn_8013032C(self));
+            em_height_set(self, fn_8013032C(self));
             em_state_set(self, 13, 3);
         }
         break;
@@ -3087,7 +3087,7 @@ extern "C" void em_act_prog_3(_ENEMY_WORK* self) {
         em_move_mode_set(self, 4);
         em_turn_seq_start(self, (void*)em019_turn_tbl, 0, 0, 0);
         em_mot_speed_set(self, 5.0f);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         em019_part_state_set(self, 255);
         break;
     case 1:
@@ -3108,7 +3108,7 @@ extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
         em_mot_set(self, 89, 0, 0);
         em_approach_start(self, 0.0f, 0);
         em_mot_speed_set(self, 5.0f);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         em019_part_state_set(self, 255);
         break;
     case 1:
@@ -3131,7 +3131,7 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 202, 0, 0);
-        fn_801303EC(self, 0.0f);
+        em_height_set(self, 0.0f);
         em019_part_state_set(self, 255);
         em_shake_req_set(self);
         em_hit_window_set(self, 0, 32, 8);

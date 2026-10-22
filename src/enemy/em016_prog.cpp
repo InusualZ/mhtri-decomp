@@ -283,7 +283,7 @@ void eft_spawn_type10(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 
 void eft_spawn_pos_in_area(nw4r::math::VEC3* p, u8 a, u32 b, u32 c, f32 d);
 void em_eft_fx_spawn(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
 void em_eft_fx_spawn_pair(_ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
-void fn_8011D690(_ENEMY_WORK* self, u32 a, u32 b, f32 c);
+void em_eft_fx_spawn_anchor(_ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void eft_em_spawn_joint(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, u32 c, f32 d);
 void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 c);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
@@ -804,7 +804,7 @@ extern "C" void fn_80183D44(_ENEMY_WORK* self) {
         self->state = state + 1;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 0xCA, 6, 0);
-        fn_801303EC(self, lbl_80797E88);
+        em_height_set(self, lbl_80797E88);
         break;
     }
     case 1:
@@ -1031,7 +1031,7 @@ extern "C" void fn_801842FC(_ENEMY_WORK* self) {
         self->state = state + 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xC9, 6, 0);
-        fn_801303EC(self, lbl_80797E88);
+        em_height_set(self, lbl_80797E88);
         break;
     }
     case 1:
@@ -3054,10 +3054,10 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
         case 0x4D:
             if ((s32) (self->flags_0x836 & 1) == 0) {
                 if (em_after_frame_check(self, 0, lbl_80797F84, lbl_80797E88) == 1U) {
-                    fn_8011D690(self, 8, 0x28, lbl_80797E9C);
+                    em_eft_fx_spawn_anchor(self, 8, 0x28, lbl_80797E9C);
                 }
                 if (em_after_frame_check(self, 0, lbl_80797FB0, lbl_80797E88) == 1U) {
-                    fn_8011D690(self, 9, 0x29, lbl_80797E9C);
+                    em_eft_fx_spawn_anchor(self, 9, 0x29, lbl_80797E9C);
                 }
                 if (em_after_frame_check(self, 0, lbl_8079817C, lbl_80797E88) == 1U) {
                     setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_807981C8 * get_em_chg_scale(self));

@@ -106,7 +106,7 @@ typedef struct _EFT26_WORK {
  * shared header does not name yet are kept here (rule 3/4) rather than added to the shared record. */
 typedef struct _EFT26_EM {
     /* +0x000 */ u8 pad_0x000[0x03];
-    /* +0x003 */ u8 team;          /* fn_8011D7B0's last argument */
+    /* +0x003 */ u8 team;          /* em_eft_fx_spawn_free's last argument */
     /* +0x004 */ u8 pad_0x004[0x16 - 0x04];
     /* +0x016 */ u8 area_0x16;     /* copied into `_EFT::area_0x44` */
     /* +0x017 */ u8 pad_0x017[0x40 - 0x17];
@@ -237,7 +237,7 @@ void eft_capsule_ctor(_EFT28_PARAM* param);
 u32 scn_mdl_mat_access_get_tev_color(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
 void res_mat_tev_color_copy_ctor(_EFT26_MATOBJ* out, void* in);
 void res_mat_tev_color_end_edit(_EFT26_MATOBJ* obj);
-void fn_8011D7B0(s32 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 area, u8 team);
+void em_eft_fx_spawn_free(s32 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 area, u8 team);
 
 /* The unit's data.  `.sdata`: the six 8-byte alpha key runs ({frame, alpha} pairs, a 0xFF frame ends one).  `.data`:
  * per type (12) the model's effect id, the handler kind, the duration, the spin rate in degrees per frame, the scale
@@ -848,7 +848,7 @@ extern "C" void fn_80118B2C(_EFT* self)
         }
         self->field_0x10++;
         if (self->field_0x10 > 5) {
-            fn_8011D7B0(6, &self->pos_0x18, &self->rot_0x24, 1.0f, self->area_0x44, em->team);
+            em_eft_fx_spawn_free(6, &self->pos_0x18, &self->rot_0x24, 1.0f, self->area_0x44, em->team);
             self->field_0x10 = 0;
         }
         switch (self->type_0x02) {

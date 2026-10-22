@@ -10,7 +10,7 @@
  *   address order.
  * FLAGS. `cflags_main`; `#pragma peephole off` over the third block.
  * NAMES. `em007` is the runtime dump's `em007_prog_tbl`, which opens the TU's `.data`; the `_act` suffix is a
- *   GUESS.  The map has only `fn_` stems for the functions.  `fn_8013032C` returns `f32` and `fn_801303EC` takes
+ *   GUESS.  The map has only `fn_` stems for the functions.  `fn_8013032C` returns `f32` and `em_height_set` takes
  *   it; the one argument-less call is a cast call.
  * RESIDUALS. 11 rows unwritten: 0x801DBE0C-0x801DF2F8, 0x801DFEEC-0x801E0058, 0x801E0240-0x801E04DC,
  *   0x801E0574-0x801E0AC0.
@@ -199,7 +199,7 @@ void em_target_pos_set(struct _ENEMY_WORK* self, void* p);
 void em_hit_window_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 
-void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_reaction_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_busy_set(struct _ENEMY_WORK* self);
 u32 em_busy_ck(struct _ENEMY_WORK* self);
 u32 fn_8012D23C(struct _ENEMY_WORK* self, u32 a, u8 b);
@@ -215,7 +215,7 @@ f32 fn_8012F8F4(struct _ENEMY_WORK* self);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
 f32 fn_8013032C(struct _ENEMY_WORK* self);
-void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
+void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
 void fn_80130CE8(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
@@ -236,7 +236,7 @@ void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_shake_req_set(struct _ENEMY_WORK* self);
 
 /* `enemy/fn_8011D448.cpp`'s damage/knockback helper */
-void fn_8011E6EC(struct _ENEMY_WORK* self, s32 a, u32 b, f32 c, f32 d);
+void em_gauge_period_step(struct _ENEMY_WORK* self, s32 a, u32 b, f32 c, f32 d);
 
 /* This unit's own functions, declared before use. */
 void fn_801D791C(struct _ENEMY_WORK* self);
@@ -544,7 +544,7 @@ extern "C" void fn_801D89F4(struct _ENEMY_WORK* self) {
             em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_801303EC(self, fn_8013032C(self));
+            em_height_set(self, fn_8013032C(self));
             em_action_finish_stand(self);
         }
         return;
@@ -563,7 +563,7 @@ extern "C" void fn_801D8AC4(struct _ENEMY_WORK* self) {
         self->state = temp_r3 + 1;
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         self->timer_0x020 = 0x5A;
         return;
     case 1:
@@ -589,7 +589,7 @@ extern "C" void fn_801D8B70(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0xA, 4, 0);
         em_mot_speed_set(self, lbl_80799520);
         em_approach_start(self, lbl_807994FC, 0);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         return;
     case 1:
         if (em_approach_step(self, 0, 0x100) == 1) {
@@ -610,7 +610,7 @@ extern "C" void fn_801D8C34(struct _ENEMY_WORK* self) {
         self->state = temp_r3 + 1;
         em_move_mode_set(self, 4);
         em_turn_seq_start(self, lbl_80570500, 0, 0, 0);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         return;
     case 1:
         if (em_turn_seq_step(self, lbl_80570500) == 1) {
@@ -629,7 +629,7 @@ extern "C" void fn_801D8CE4(struct _ENEMY_WORK* self) {
         self->state = temp_r4 + 1;
         em_move_mode_set(self, 4);
         em_mot_set(self, 0x27, 0, 0);
-        ((void (*)(struct _ENEMY_WORK*))fn_801303EC)(self);
+        ((void (*)(struct _ENEMY_WORK*))em_height_set)(self);
         em_hit_window_set_default(self, 0, 0xA);
         em_busy_set(self);
         em_busy_timer_reset(self);
@@ -1105,7 +1105,7 @@ extern "C" void fn_801D9CE4(struct _ENEMY_WORK* self) {
         }
         if ((em_frame_check(self, 1, lbl_807995FC, lbl_807994FC) == 1) && (em_busy_ck(self) == 1)) {
             if (fn_8012D3E0(self, 0) != 0xFF) {
-                fn_8012B380(self, 1, 2);
+                em_reaction_req(self, 1, 2);
                 em_state_set(self, 8, 0);
                 return;
             }
@@ -1431,7 +1431,7 @@ extern "C" void fn_801DA8DC(struct _ENEMY_WORK* self, u8 arg1) {
         case 0:
             if (em_frame_check(self, 0, lbl_80799630, lbl_807994FC) == 1) {
                 temp_f2 = (f32)self->field_0x7A4;
-                fn_8011E6EC(self, (s32)(lbl_80799634 * temp_f2), 1, lbl_807994F8, temp_f2);
+                em_gauge_period_step(self, (s32)(lbl_80799634 * temp_f2), 1, lbl_807994F8, temp_f2);
                 fn_80130CE8(self, 0x32, 1, lbl_807994F8);
             }
             if (em_frame_check(self, 0, lbl_80799638, lbl_807994FC) == 1) {
@@ -2144,7 +2144,7 @@ void fn_801D7890(struct _ENEMY_WORK* self) {
         em_move_mode_set(self, 4);
         em_mot_set_ck(self, 1, 0, 0);
         fn_8013032C(self);
-        fn_801303EC(self, fn_8013032C(self));
+        em_height_set(self, fn_8013032C(self));
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {

@@ -829,7 +829,7 @@ extern "C" void* eft007_part_set(_ENEMY_WORK* enemy, u32 part)
 
 /* Builds the part's emitter and, when it exists, copies the emitter's joint offset into the caller's
  * vector. */
-extern "C" void fn_80103968(_ENEMY_WORK* enemy, u32 part, nw4r::math::VEC3* offset)
+extern "C" void eft007_part_offset_get(_ENEMY_WORK* enemy, u32 part, nw4r::math::VEC3* offset)
 {
     _EFT_EMITTER* emitter = (_EFT_EMITTER*)fn_80103B60(enemy, part);
 

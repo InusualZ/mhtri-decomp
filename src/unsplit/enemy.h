@@ -75,7 +75,7 @@ f32 em_dive_depth_get(struct _ENEMY_WORK* work);
 /* 0x801303EC - r3 (`self`) and f1 (stored at +0x1ac); 0x801303FC tail-calls it with `f0 + f1`.
  * `enemy/fn_8014A1BC.c` calls both with two arguments, so a real two-argument prototype is safe for
  * C too. */
-void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
+void em_height_set(struct _ENEMY_WORK* self, f32 a);
 /* 0x801303FC - r3 (`self`) plus the f1 `0x801303EC` consumes (its body does `lfs f0,0x1ac(r3);
  * fadds f1,f0,f1; b 0x801303EC`).  The callee READS f1, so the real signature is two-argument
  * (docs/plan.md 6.5 rule 6: settled from the callee's body).  `enemy/fn_8014A1BC.c` also calls it
@@ -145,11 +145,11 @@ void fn_801363F8(struct _ENEMY_WORK* work);
 /* Declarations for the action band 0x80178378.. (`enemy/fn_80178378.cpp`): the arming helpers its 64
  * action functions call and no registered unit owns.  Signatures are the call sites' - the argument
  * counts are what the callers set in r4..r6/f1..f3 and the functions are in this band. */
-void fn_801823A0(struct _ENEMY_WORK* self, u32 a);
+void em015_part_flag_set(struct _ENEMY_WORK* self, u32 a);
 /* fn_8012F948(self) is declared above with the rest of the 0x8012F band - the sibling landing
  * `enemy/fn_8015E854.cpp` had added it there first, so this branch's copy was dropped by hand
  * instead of leaving two identical prototypes. */
-u32 fn_80182430(struct _ENEMY_WORK* self, u32 a);
+u32 em015_ally_front_ck(struct _ENEMY_WORK* self, u32 a);
 void fn_802B1FEC(void);
 void em_shake_req_set(struct _ENEMY_WORK* work);
 void fn_80136E38(struct _ENEMY_WORK* work, s32 arg1);
@@ -182,7 +182,7 @@ void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(struct _ENEMY_WORK* 
  * (`clrlwi r4,r4,24`/`clrlwi r5,r5,24`), so the definition takes u32 and the declaration here is
  * widened to match the owner (enemy/fn_801251D0.cpp).  Three landed units used to declare them three
  * ways in their own files (`u8` in
- * fn_80149D6C, `u32` in fn_8014A1BC, `s32` in fn_80177890) - the same rule-2 debt.  Every
+ * fn_80149D6C, `u32` in fn_8014A1BC, `s32` in em015_act1_02) - the same rule-2 debt.  Every
  * call site passes a constant, so the spelling is codegen-neutral. */
 void fn_80170A54(struct _ENEMY_WORK* self);
 void fn_80170AD0(struct _ENEMY_WORK* self);

@@ -634,7 +634,7 @@ extern "C" void fn_80128A30(struct _ENEMY_WORK* self, u32 a, u32 b)
     fn_801281EC(self);
 }
 
-extern "C" void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void em_act_set_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
     if (self->action == 11) {
         return;

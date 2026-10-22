@@ -12,7 +12,7 @@
  * RESIDUALS. 39 rows unwritten: 0x8035BAB4-0x8035E034 (`fn_8035BAB4` .. `fn_8035DFC0`).
  *  - `fn_8035E580` saves from r20 where retail calls `_restgpr_22`; `fn_8035EF58` saves no registers through
  *    the helpers where retail calls `_savegpr_27`/`_restgpr_27` (register pressure, not a callee choice).
- *  - `fn_8035E1E0`: retail repeats the `em_move_target_set` call (with `lbl_8079B70C`) and the `fn_8012B380` tail in every
+ *  - `fn_8035E1E0`: retail repeats the `em_move_target_set` call (with `lbl_8079B70C`) and the `em_reaction_req` tail in every
  *    case body (920 B), ours shares them (756 B);
  *  - `fn_8035E580`: retail reads the `prev` byte before any store (uninitialised), ours starts it at 0, and the
  *    loop colours differently (`_savegpr_22` against our `_savegpr_20`);
@@ -30,7 +30,7 @@
  *   flipcheck: `.data`/`.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim.
  */
 
-#include "enemy/fn_8012B380.h" /* fn_8012B380 (rule 2: the owner's header) */
+#include "enemy/em_reaction_req.h" /* em_reaction_req (rule 2: the owner's header) */
 #include "enemy/em_hit_by_set.h" /* fn_8012CEB4 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
@@ -150,7 +150,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         default:
             *out_a = 0xC;
             *out_b = 0;
-            fn_8012B380(self, 5, 2, 10);
+            em_reaction_req(self, 5, 2, 10);
             break;
         }
         break;
@@ -179,7 +179,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         default:
             *out_a = 0xC;
             *out_b = 0;
-            fn_8012B380(self, 5, 2, 10);
+            em_reaction_req(self, 5, 2, 10);
             break;
         }
         break;
@@ -203,7 +203,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         default:
             *out_a = 0xC;
             *out_b = 0;
-            fn_8012B380(self, 5, 2, 10);
+            em_reaction_req(self, 5, 2, 10);
             break;
         }
         break;
@@ -213,13 +213,13 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         if (self->act_id == 2) {
             em_move_target_set(self, 0, 2, lbl_8079B70C);
         } else {
-            fn_8012B380(self, 5, 2, 10);
+            em_reaction_req(self, 5, 2, 10);
         }
         break;
     default:
         *out_a = 0xC;
         *out_b = 0;
-        fn_8012B380(self, 5, 2, 10);
+        em_reaction_req(self, 5, 2, 10);
         break;
     }
 }
@@ -403,7 +403,7 @@ extern "C" void fn_8035EAA0(_ENEMY_WORK* self, u8 a)
     if (id != 0xFF) {
         self->field_0x33B = id;
         copyVec3(&self->target, em_roster_kind_aim_pos_get(id, self->act_id));
-        fn_8012B380(self, 6, 0xFF, 0);
+        em_reaction_req(self, 6, 0xFF, 0);
         fn_8013072C(self, 5, 1);
     } else {
         self->field_0x33B = 0xFF;
@@ -438,7 +438,7 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
         }
         if (keep) {
             copyVec3(&self->target, p);
-            fn_8012B380(self, 6, 0xFF, 0);
+            em_reaction_req(self, 6, 0xFF, 0);
             self->field_0x33F = 2;
         }
     } else {

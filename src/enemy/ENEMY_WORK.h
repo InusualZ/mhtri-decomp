@@ -138,10 +138,10 @@ struct EmMotionSlot {
 };
 
 struct EmPartState {
-    /* +0x000 (+0x740) */ u8 field_0x740;  /* the part flag `fn_801823A0` writes from its argument
-                                          * and `fn_801823C0` sets */
+    /* +0x000 (+0x740) */ u8 field_0x740;  /* the part flag `em015_part_flag_set` writes from its argument
+                                          * and `em015_user_data_node_calc` sets */
     /* +0x001 (+0x741) */ u8 pad_0x741;
-    /* +0x002 (+0x742) */ s16 field_0x742; /* the six per-part counters `fn_801823C0` clears */
+    /* +0x002 (+0x742) */ s16 field_0x742; /* the six per-part counters `em015_user_data_node_calc` clears */
     /* +0x004 (+0x744) */ s16 field_0x744;
     /* +0x006 (+0x746) */ s16 field_0x746;
     /* +0x008 (+0x748) */ s16 field_0x748;
@@ -150,20 +150,20 @@ struct EmPartState {
 };
 
 /* The 0xC-byte colour/step block at +0x328 this range's MHchar material steppers read as one float
- * followed by the K-colour bytes (`fn_80181CC0` writes them, `fn_80181E24` reads them back).  It is
+ * followed by the K-colour bytes (`em015_color_step` writes them, `em015_tev_color_update` reads them back).  It is
  * the same bytes the header's other +0x328 views spell as the aim vector / handle set / action block.
  * size: 0x0C */
 struct EmColorBlock {
-    /* +0x000 (+0x328) */ f32 field_0x328; /* the scalar `fn_80181CC0` steps toward the mode target */
-    /* +0x004 (+0x32C) */ u8 field_0x32C;  /* GX K-colour red   (`fn_80181CC0`/`fn_80181E24`) */
+    /* +0x000 (+0x328) */ f32 field_0x328; /* the scalar `em015_color_step` steps toward the mode target */
+    /* +0x004 (+0x32C) */ u8 field_0x32C;  /* GX K-colour red   (`em015_color_step`/`em015_tev_color_update`) */
     /* +0x005 (+0x32D) */ u8 field_0x32D;  /* its green */
     /* +0x006 (+0x32E) */ u8 field_0x32E;  /* its blue */
-    /* +0x007 (+0x32F) */ u8 field_0x32F;  /* the aim/approach byte `fn_801825A4` kind 2 returns
-                                          * and `fn_801820DC` gates on (== 0) */
-    /* +0x008 (+0x330) */ u8 field_0x330;  /* the "special part armed" byte `fn_801820DC` tests and
-                                          * `fn_801825A4` kind 6 returns as != 0 */
+    /* +0x007 (+0x32F) */ u8 field_0x32F;  /* the aim/approach byte `em015_state_query` kind 2 returns
+                                          * and `em015_area_start_ck` gates on (== 0) */
+    /* +0x008 (+0x330) */ u8 field_0x330;  /* the "special part armed" byte `em015_area_start_ck` tests and
+                                          * `em015_state_query` kind 6 returns as != 0 */
     /* +0x009 (+0x331) */ u8 pad_0x331;
-    /* +0x00A (+0x332) */ s16 field_0x332; /* the part-3 timer `fn_801825A4` kind 4 compares
+    /* +0x00A (+0x332) */ s16 field_0x332; /* the part-3 timer `em015_state_query` kind 4 compares
                                           * against 900 */
 };
 
@@ -198,8 +198,8 @@ struct _ENEMY_WORK {
     /* +0x003 */ u8 team;
     /* +0x004 */ u8 field_0x004;        /* `em_work_die_ck` treats values below 2 as still alive */
     /* +0x005 */ u8 state;              /* the per-motion step the update functions switch on */
-    /* +0x006 */ u8 state_0x006;        /* fn_80177D54's weapon sub-state */
-    /* +0x007 */ u8 state_0x007;        /* fn_80177D54's second sub-state */
+    /* +0x006 */ u8 state_0x006;        /* em015_act2_hit_chain's weapon sub-state */
+    /* +0x007 */ u8 state_0x007;        /* em015_act2_hit_chain's second sub-state */
     /* +0x008 */ u8 field_0x008;
     /* +0x009 */ u8 field_0x009;        /* `fn_80170610` gates the position seat on it */
     /* +0x00A */ u8 field_0x00A;        /* the area `fn_8012E968` matches the work records'
@@ -224,7 +224,7 @@ struct _ENEMY_WORK {
     /* +0x01C */ u8 unused_0x01C[0x01E - 0x01C];
     /* +0x01E */ u8 net_seq_0x01E;   /* the message counter every enemy net sender post-increments (the step `em_net_ident_set` stores) */
     /* +0x01F */ u8 unused_0x01F[1];
-    /* +0x020 */ s32 timer_0x020;       /* fn_8017799C runs this down */
+    /* +0x020 */ s32 timer_0x020;       /* em015_act1_wait runs this down */
     /* +0x024 */ u8 char_0x024[0x34];   /* the embedded `MHchar` base `fn_800E0914` takes (0x40 bytes
                                         * in this band's view; its +0x34 byte is named below) */
     /* +0x058 */ u8 model_flag_0x058;   /* set, the tail of `fn_8013791C` refreshes the scene model */
@@ -275,7 +275,7 @@ struct _ENEMY_WORK {
     /* +0x1E3 */ u8 field_0x1E3;
     /* +0x1E4 */ u8 field_0x1E4;  /* `enemy/em025_prog.cpp`'s `fn_8019E908`: bit 0 is the * "armed" flag and the byte counts down while it is set * (`lbz`/`clrlwi ...,31` guard, then `addi -1`).  Both views agree on bit 0; bit 0 is the `fn_801A9384` kind-0 flag */
     /* +0x1E5 */ u8 action;             /* the action id `em_act_ck` matches */
-    /* +0x1E6 */ u8 state_sub;          /* fn_80177BA4's dispatch index */
+    /* +0x1E6 */ u8 state_sub;          /* em015_act1_dispatch's dispatch index */
     /* +0x1E7 */ u8 field_0x1E7;        /* set to 1 once the action's entry block has run */
     /* +0x1E8 */ u8 field_0x1E8;
     /* +0x1E9 */ u8 field_0x1E9;
@@ -470,7 +470,7 @@ struct _ENEMY_WORK {
             /* +0x329 */ u8 flag_0x329;
             /* +0x32A */ u8 unused_0x32Af[0x354 - 0x32A];
         };
-        /* this range's colour/step view (`fn_80181CC0`/`fn_80181E24`/`fn_801820DC`/`fn_801825A4`). */
+        /* this range's colour/step view (`em015_color_step`/`em015_tev_color_update`/`em015_area_start_ck`/`em015_state_query`). */
         struct EmColorBlock color_0x328;
         /* the em030 program's own field view `enemy/em030_prog.cpp` reaches field by field
          * (`plw_0x32C` is the +0x328 move that unit latched); a union member because the views above already own these
@@ -620,7 +620,7 @@ struct _ENEMY_WORK {
     /* +0x364 */ u8 unused_0x364[0x36C - 0x364];
     /* +0x36C */ nw4r::math::VEC3 vec_0x36C;  /* the target position `calcVecDistXZ` measures against
                                         * `pos` (`fn_8013F764`'s distance test) */
-    /* +0x378 */ f32 value_0x378;       /* fn_80177F30/fn_8017801C clamp this against a pool float */
+    /* +0x378 */ f32 value_0x378;       /* em015_act2_drift/em015_act2_drift_long clamp this against a pool float */
     /* +0x37C */ u32 field_0x37C;       /* the rotation word `fn_801CEF44` latches from `field_0x1C0`
                                         * and hands `em_move_offset_rot_apply` (`enemy/em005_act.cpp`), and the
                                         * angle `enemy/em030_prog.cpp`'s `fn_801B2298` computes with
@@ -697,7 +697,7 @@ struct _ENEMY_WORK {
     /* +0x483 */ u8 unused_0x483[0x48E - 0x483];
     /* +0x48E */ u8 field_0x48E;        /* the part-kind byte `enemy/em007_act.cpp`'s `fn_801DF2F8`
                                         * compares against 4 and 6 */
-    /* +0x48F */ u8 field_0x48F;      /* the part-damage special-case byte `fn_80181E24` tests
+    /* +0x48F */ u8 field_0x48F;      /* the part-damage special-case byte `em015_tev_color_update` tests
                                         * against 1 before painting the 0x1E4 colour white */
     /* +0x490 */ u8 unused_0x490[0x491 - 0x490];
     /* +0x491 */ u8 field_0x491;      /* `enemy/em008_prog.cpp`'s `fn_8015DB68` sets it at action
@@ -709,8 +709,8 @@ struct _ENEMY_WORK {
     /* +0x60C */ u8 unused_0x60C[0x610 - 0x60C];
     /* +0x610 */ u32 field_0x610;      /* the Z rotation word the same function hands `rotMatrixZ` */
     /* +0x614 */ u8 unused_0x614[0x740 - 0x614];
-    /* +0x740 */ struct EmPartState part_0x740; /* the per-part flags/counters `fn_801823A0`/
-                                        * `fn_801823C0` write */
+    /* +0x740 */ struct EmPartState part_0x740; /* the per-part flags/counters `em015_part_flag_set`/
+                                        * `em015_user_data_node_calc` write */
     /* +0x74E */ u8 unused_0x74E[0x761 - 0x74E];
     /* +0x761 */ u8 field_0x761;       /* one byte, three readers: `enemy/em025_prog.cpp`'s slot bit
                                         * map (`fn_8019EA04` clears it, `fn_8019EA80` scans its low
@@ -752,7 +752,7 @@ struct _ENEMY_WORK {
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
     /* +0x816 */ u16 field_0x816;
     /* +0x818 */ s16 field_0x818;       /* the motion timer `fn_8012F110` arms before its mode switch */
-    /* +0x81A */ s16 field_0x81A;     /* the motion timer `fn_80182320` gates its arming on
+    /* +0x81A */ s16 field_0x81A;     /* the motion timer `em015_area_follow` gates its arming on
                                         * (<= 0) */
     /* +0x81C */ u8 unused_0x81C[0x833 - 0x81C];
     /* +0x833 */ u8 field_0x833;       /* the "approach armed" byte TWO readers branch on:
@@ -891,8 +891,9 @@ struct _ENEMY_WORK {
     /* +0x0A07 */ u8 field_0xA07;
     /* +0x0A08 */ u8 hit_0xA08[0xA0D - 0xA08];  /* the hit reference `enemy/em018_prog.cpp`'s `fn_80198150` hands
                                         * `hit_list_capsule_ck` with its capsule */
-    /* +0x0A0D */ u8 field_0xA0D;       /* fn_80177D54's per-frame gate */
-    /* +0x0A0E */ u8 unused_0xA0E[0xA16 - 0xA0E];
+    /* +0x0A0D */ u8 field_0xA0D;       /* em015_act2_hit_chain's per-frame gate */
+    /* +0x0A0E */ u8 unused_0xA0E[0xA14 - 0xA0E];
+    /* +0x0A14 */ u16 shell_flags_0xA14; /* the flag word `enemy/em015_prog.cpp` hands the `ShellSetFuncs` +0x2C job */
     /* +0xA16 */ u8 field_0xA16;      /* the byte `enemy/em030_prog.cpp`'s `fn_801B203C` tests against
                                         * 0xFF/5 before it latches the counter-attack */
     /* +0xA17 */ u8 unused_0xA17[0xA34 - 0xA17];
@@ -905,7 +906,7 @@ struct _ENEMY_WORK {
                                            * definitions (`Pl/hit_w.h`, `ai/ai_npc.h`) and this header includes neither */
         struct {
             /* +0xA64 */ u8 unused_0xA64[0xA69 - 0xA64];
-            /* +0xA69 */ u8 field_0xA69;       /* fn_80177D54's second gate (the `_HIT_W`'s +0x05 byte) */
+            /* +0xA69 */ u8 field_0xA69;       /* em015_act2_hit_chain's second gate (the `_HIT_W`'s +0x05 byte) */
             /* +0xA6A */ u8 unused_0xA6A[20];
             /* +0xA7E */ u16 field_0xa7e;      /* the `_HIT_W`'s +0x1A halfword */
         };

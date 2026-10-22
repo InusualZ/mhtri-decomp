@@ -12,8 +12,8 @@
  *   GUESS (from each body and its callers): em_status_bits_set
  * RESIDUALS. 75 rows unwritten: 0x8011DA24-0x8011DE2C, 0x8011DE5C-0x8011E378, 0x8011E3A8-0x8011E51C,
  *   0x8011E7F4-0x8011E9DC, 0x8011E9F0-0x8011F230, 0x8011F240-0x801251D0.
- *  - `fn_8011D690`, `fn_8011D7B0`: ours stores the scale and the id word at +0x8C/+0x90 where retail stores +0xC/
- *    +0x10; `fn_8011D690` also stores one word more and `fn_8011D7B0` moves r6/r7 earlier;
+ *  - `em_eft_fx_spawn_anchor`, `em_eft_fx_spawn_free`: ours stores the scale and the id word at +0x8C/+0x90 where retail stores +0xC/
+ *    +0x10; `em_eft_fx_spawn_anchor` also stores one word more and `em_eft_fx_spawn_free` moves r6/r7 earlier;
  *  - `fn_8011D8F0`: retail hoists `&work[i].slots` out of the outer loop and advances both pointers by 0x44, ours
  *    re-forms `+8` in the body (132 B against 140 B);
  *  - `fn_8011D9B8`: retail tests `state_0x05 == 0` and lays its body after the four stage tail calls, ours lets the
@@ -142,8 +142,8 @@ extern "C" void em_eft_fx_spawn(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, 
 
 /* 0x8011D4AC - the same spawn, with the target vector copied from the caller's record instead of the
  * table. */
-extern "C" void fn_8011D4AC(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, const nw4r::math::VEC3* pos,
-                            f32 scale)
+extern "C" void em_eft_fx_spawn_at(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, const nw4r::math::VEC3* pos,
+                                   f32 scale)
 {
     _EFT* effect = fn_8011D558(self, type, id, id, scale, timer);
     _EFT_FX_FULL* work;
@@ -207,7 +207,7 @@ extern "C" _EFT* fn_8011D558(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, f32 
 
 /* 0x8011D690 - the `0x20`-pool creator for the same family: the enemy's own anchor, its pose
  * rotation and the table's work state word. */
-extern "C" void fn_8011D690(_ENEMY_WORK* self, u32 type, u32 id, f32 scale)
+extern "C" void em_eft_fx_spawn_anchor(_ENEMY_WORK* self, u32 type, u32 id, f32 scale)
 {
     _EFT* effect;
     _EFT_FX_FULL* work;
@@ -244,8 +244,8 @@ extern "C" void fn_8011D690(_ENEMY_WORK* self, u32 type, u32 id, f32 scale)
 
 /* 0x8011D7B0 - the `0x20`-pool creator that belongs to nobody: the caller passes the type, position, rotation
  * and area, so `source_0x30` stays NULL. */
-extern "C" void fn_8011D7B0(u32 type, const nw4r::math::VEC3* pos, const _CP_VECTOR* rot, u8 area,
-                            u8 demo, f32 scale)
+extern "C" void em_eft_fx_spawn_free(u32 type, const nw4r::math::VEC3* pos, const _CP_VECTOR* rot, u8 area,
+                                     u8 demo, f32 scale)
 {
     _EFT* effect;
     _EFT_FX_FULL* work;
@@ -464,7 +464,7 @@ extern "C" void em_gauge_step(_ENEMY_WORK* self, s32 step)
 
 /* 0x8011E6EC - steps the gauge on every `period`-th system tick (an unsigned `divwu` modulo: a `u32` counter
  * against the sign-extended `s16`). */
-extern "C" void fn_8011E6EC(_ENEMY_WORK* self, s32 step, s16 period, f32 scale)
+extern "C" void em_gauge_period_step(_ENEMY_WORK* self, s32 step, s16 period, f32 scale)
 {
     if (system_w.field_0x0c % period == 0) {
         fn_8011E658(self, step, (s32)((f32)(s32)self->field_0x7a4 * scale));

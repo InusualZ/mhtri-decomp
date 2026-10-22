@@ -222,7 +222,7 @@ void em_act_arm_m06s07(_ENEMY_WORK* self) {
 void em_act_hold(_ENEMY_WORK* self) {
     u8 state = self->state;
 
-    fn_801303EC(self, lbl_8079AF5C);
+    em_height_set(self, lbl_8079AF5C);
     switch (state) {
     case 0:
         self->state = (u8)(state + 1);
@@ -246,7 +246,7 @@ void em_act_follow(_ENEMY_WORK* self) {
         self->state = (u8)(state + 1);
         em_move_mode_set(self, 4);
         fn_8012F5C4(self, 1, 6, 0, 3);
-        fn_801303EC(self, lbl_8079AF54);
+        em_height_set(self, lbl_8079AF54);
         return;
     case 1:
         em_act_move_step(NULL, 0, lbl_8079AF58);

@@ -187,11 +187,11 @@ void em_action_finish(struct _ENEMY_WORK* self);
 void em_action_finish_fall(struct _ENEMY_WORK* self);
 void em_action_finish_walk(struct _ENEMY_WORK* self);
 void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_act_set_unless_act11(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 
-void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
+void em_reaction_req(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void CancelFade(struct _ENEMY_WORK* self);
 void em_busy_set(struct _ENEMY_WORK* self);
 u32 em_busy_ck(struct _ENEMY_WORK* self);
@@ -211,7 +211,7 @@ s32 fn_8012F948(struct _ENEMY_WORK* self);
 u32 em_ground_ck(struct _ENEMY_WORK* self, f32 a);
 f32 em_fall_height_get(struct _ENEMY_WORK* self);
 f32 fn_8013032C(struct _ENEMY_WORK* self);
-void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
+void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_height_add(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
@@ -428,7 +428,7 @@ void fn_801CCE10(struct _ENEMY_WORK* self) {
     case 3:
         em_turn_to_target(self, 0x100);
         if (em_mot_end_ck(self) == 1) {
-            fn_80128A70(self, 3, 2);
+            em_act_set_unless_act11(self, 3, 2);
         }
         break;
     }
@@ -608,7 +608,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
                 case 1: {
                     struct _ENEMY_WORK* target = em_ally_find(self, 0x1C, 1);
                     if (target != 0) {
-                        fn_8012B380(self, 3, 2, target->group);
+                        em_reaction_req(self, 3, 2, target->group);
                         em_state_set(self, 0x0D, 0);
                         em_user_data_reenter(self);
                         return;
@@ -640,7 +640,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
                     fn_801CAF70(self);
                 } else {
                     fn_801277F4(self, 0);
-                    fn_80128A70(self, 3, 0x0E);
+                    em_act_set_unless_act11(self, 3, 0x0E);
                 }
                 return;
             default:
@@ -2479,7 +2479,7 @@ void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 u32 em_phase_get(struct _ENEMY_WORK* self);
 f32 fn_8013032C(struct _ENEMY_WORK* self);
-void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
+void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
 void em_hit_arm_set(struct _ENEMY_WORK* self);
@@ -3042,12 +3042,12 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
             em_mot_speed_set(self, lbl_80799280);
             em_demo_rot_set(self, lbl_80799220, lbl_80799400, lbl_80799220);
             em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
-            fn_801303EC(self, self->pos.y - self->field_0x20C);
+            em_height_set(self, self->pos.y - self->field_0x20C);
         }
         break;
     case 5:
         em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
-        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        em_height_set(self, self->pos.y - self->field_0x20C);
         if (em_demo_time_ck(0x2AE) == 1) {
             self->state++;
             em_mot_set(self, 0xDB, 0, 0);
@@ -3055,7 +3055,7 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
         break;
     case 6:
         em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
-        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        em_height_set(self, self->pos.y - self->field_0x20C);
         if (em_frame_check(self, 0, lbl_80799404, lbl_80799220) == 1) {
             get_joint_wpos_em(self, 3, &spot);
             spot.y = lbl_807992E8 + self->pos.y;
@@ -3069,7 +3069,7 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
         break;
     case 7:
         em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
-        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        em_height_set(self, self->pos.y - self->field_0x20C);
         if (em_frame_check(self, 1, lbl_80799354, lbl_80799220) == 1) {
             self->state++;
             em_mot_speed_set(self, lbl_80799240);
@@ -3077,13 +3077,13 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
         break;
     case 8:
         em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
-        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        em_height_set(self, self->pos.y - self->field_0x20C);
         if (em_demo_time_ck(0x3FC) == 1) {
             self->state++;
             em_mot_set(self, 2, 0, 0x110);
             em_demo_rot_set(self, lbl_80799220, lbl_8079940C, lbl_80799220);
             em_demo_pos_set(self, lbl_80799410, lbl_80799220, lbl_80799414);
-            fn_801303EC(self, lbl_80799220);
+            em_height_set(self, lbl_80799220);
         }
         break;
     case 9:
@@ -3096,7 +3096,7 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
         if (em_demo_time_ck(0x42A) == 1) {
             em_demo_rot_set(self, lbl_80799220, lbl_8079941C, lbl_80799220);
             em_demo_key3_apply(self, em_demo_frame_get(), lbl_805B63E8, 0);
-            fn_801303EC(self, self->pos.y - self->field_0x20C);
+            em_height_set(self, self->pos.y - self->field_0x20C);
         } else if (fn_8012F948(self) == 0) {
             self->field_0x318 = em_key_curve_eval(self, lbl_805B52D8);
             em_move_offset_rot_apply(self, &self->field_0x1BC);
@@ -3110,7 +3110,7 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
     case 11:
         em_demo_rot_set(self, lbl_80799220, lbl_8079941C, lbl_80799220);
         em_demo_key3_apply(self, em_demo_frame_get(), lbl_805B63E8, 0);
-        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        em_height_set(self, self->pos.y - self->field_0x20C);
         if (em_frame_check(self, 1, lbl_80799424, lbl_80799220) == 1) {
             self->state++;
             em_mot_speed_set(self, lbl_80799240);
@@ -3119,7 +3119,7 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
     case 12:
         em_demo_rot_set(self, lbl_80799220, lbl_8079941C, lbl_80799220);
         em_demo_key3_apply(self, em_demo_frame_get(), lbl_805B63E8, 0);
-        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        em_height_set(self, self->pos.y - self->field_0x20C);
         if (em_demo_time_ck(0x49C) == 1) {
             self->state++;
             em_demo_rot_set(self, lbl_80799220, lbl_80799428, lbl_80799220);
@@ -3174,7 +3174,7 @@ void fn_801D4B84(struct _ENEMY_WORK* self) {
         em_mot_set(self, 2, 0, 0);
         em_demo_rot_set(self, lbl_80799220, lbl_80799428, lbl_80799220);
         em_demo_pos_set(self, lbl_80799438, lbl_80799220, lbl_8079943C);
-        fn_801303EC(self, lbl_80799220);
+        em_height_set(self, lbl_80799220);
         em_demo_enable(self);
         break;
     case 1:

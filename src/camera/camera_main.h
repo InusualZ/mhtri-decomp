@@ -20,6 +20,9 @@ void get_camera_target_pos(nw4r::math::VEC3* out);
 /* 0x802BE39C - 1 when the camera work is idle and the current camera's +0x188 mode byte is 1. */
 u32 camera_mode1_ck(void);
 
+/* 0x802BE5D0 - posts the camera request `kind` for the enemy `self`. */
+void camera_em_shake_req(struct _ENEMY_WORK* self, u32 kind);
+
 #ifdef __cplusplus
 }
 #endif

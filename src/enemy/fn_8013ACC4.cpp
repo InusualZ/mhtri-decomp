@@ -95,7 +95,7 @@ struct EmWork {
     /* +0x0390 */ u8 unused_0x0390[0x0424 - 0x0390];
     /* +0x0424 */ u32 field_0x424; /* the state snapshot's word (`fn_8013A0xx` writes it) */
     /* +0x0428 */ u8 unused_0x0428[0x0798 - 0x0428];
-    /* +0x0798 */ u8 field_0x798;  /* the byte the snapshot's `fn_8012B380` command carries */
+    /* +0x0798 */ u8 field_0x798;  /* the byte the snapshot's `em_reaction_req` command carries */
     /* +0x0799 */ u8 unused_0x0799;
     /* +0x079A */ u8 field_0x79A;  /* nonzero: the interpreter saves the state before it runs */
     /* +0x079B */ u8 unused_0x079B[0x089F - 0x079B];
@@ -265,7 +265,7 @@ u32 fn_8013C254(EmWork* self);
 /* the rest of the enemy band */
 u32 fn_80130134(EmWork* self, u32 value);
 void fn_8012A254(EmWork* self, u32 index);
-void fn_8012B380(EmWork* self, u32 a, u32 b, u8 c);
+void em_reaction_req(EmWork* self, u32 a, u32 b, u8 c);
 void em_target_pos_set(EmWork* self, s32 mode);
 u32 em_eft_active_ck(EmWork* self);
 u8 fn_801408B4(EmWork* self);
@@ -335,13 +335,13 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
         case 4:
         case 5:
             if (self->field_0x798 != 0xff) {
-                fn_8012B380(self, 1, 2, self->field_0x798);
+                em_reaction_req(self, 1, 2, self->field_0x798);
             } else {
-                fn_8012B380(self, 4, 0, 0);
+                em_reaction_req(self, 4, 0, 0);
             }
             break;
         case 6:
-            fn_8012B380(self, 4, 0, 0);
+            em_reaction_req(self, 4, 0, 0);
             break;
         }
 
@@ -845,7 +845,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
 
                         if (run != NULL) {
                             fn_8013AB74(EM_ENEMY_WORK(self), 0xa, 0);
-                            fn_8012B380(self, 7, run->field_0x05, run->field_0x06);
+                            em_reaction_req(self, 7, run->field_0x05, run->field_0x06);
                             em_target_pos_set(self, 0);
                         } else {
                             fn_801408B4(self);

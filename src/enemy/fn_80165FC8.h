@@ -65,7 +65,7 @@ u8 em_area_break_ck(struct _ENEMY_WORK* self);
  * being included together (same class as `em_act_arm_unless_down`). */
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 u32 em_area_leave_ck(struct _ENEMY_WORK* self);
-void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
+void em_reaction_req(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_hit_by_set(struct _ENEMY_WORK* self, s16 timer, u8 index);
 u8 fn_8015D934(struct _ENEMY_WORK* self);
 void em_attack_start(struct _ENEMY_WORK* self);

@@ -17,6 +17,9 @@ int mhchar_node_count(MHchar* self);
  * `shell_chara_heap_tbl` slot). */
 void mhchar_reset(MHchar* self);
 
+/* 0x800E26B4 */
+void mhchar_mat_blend_set(MHchar* self, u32 index, f32 value);
+
 #ifdef __cplusplus
 }
 #endif

@@ -31,7 +31,8 @@ struct ShellSetFuncs {
     /* +0x38 */ void (*request)(struct _AINPC_W* self, s32 id, ShellSetFuncs* table);
     /* untyped: caller-owned payload, each call site passes its own job record */
     /* +0x3C */ void (*method_0x3C)(struct _ENEMY_WORK* self, void* rec, u32 mode, ShellSetFuncs* table);
-    /* +0x40 */ u8 pad_0x40[0x54 - 0x40];
+    /* +0x40 */ u8 pad_0x40[0x50 - 0x40];
+    /* +0x50 */ void (*method_0x50)(struct _ENEMY_WORK* self, u32 a, u32 b, ShellSetFuncs* table);
     /* +0x54 */ void (*method_0x54)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos,
                                     ShellSetFuncs* table);
     /* +0x58 */ void (*method_0x58)(struct _ENEMY_WORK* self, u32 id);

@@ -42,7 +42,7 @@
 #include "enemy/fn_80125FF0.h" /* fn_80125FF0 (rule 2: the owner's header) */
 #include "enemy/em_act_step_arm.h" /* em_act_step_arm (rule 2: the owner's header) */
 #include "enemy/em_data_point_get.h" /* em_data_point_get (rule 2: the owner's header) */
-#include "enemy/fn_8012B380.h" /* fn_8012B380 (rule 2: the owner's header) */
+#include "enemy/em_reaction_req.h" /* em_reaction_req (rule 2: the owner's header) */
 #include "enemy/em_target_pos_set.h" /* em_target_pos_set (rule 2: the owner's header) */
 #include "enemy/fn_80126DAC.h" /* fn_80126DAC (rule 2: the owner's header) */
 #include "enemy/fn_80126F80.h" /* fn_80126F80 (rule 2: the owner's header) */
@@ -107,7 +107,7 @@
 #define fn_80130CDC_view1 ((void (*)(_ENEMY_WORK*, s32))fn_80130CDC)
 #define fn_80130858_view1 ((void (*)(_ENEMY_WORK*, s32))fn_80130858)
 #define fn_8013023C_view1 ((u32 (*)(_ENEMY_WORK*))em_phase_get)
-#define fn_8012B380_view1 ((void (*)(_ENEMY_WORK*, u32, u32, u8))fn_8012B380)
+#define fn_8012B380_view1 ((void (*)(_ENEMY_WORK*, u32, u32, u8))em_reaction_req)
 #define calcVecDistXZ_view1 ((f32 (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))calcVecDistXZ)
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1475,13 +1475,13 @@ void fn_8013D34C(_ENEMY_WORK *self) {
     }
     switch (data->mode_0x0F) {
     case 0:
-        fn_8012B380(self, 1, 2, data->value_0x10);
+        em_reaction_req(self, 1, 2, data->value_0x10);
         break;
     case 1:
-        fn_8012B380(self, 2, 2, data->value_0x10);
+        em_reaction_req(self, 2, 2, data->value_0x10);
         break;
     case 2:
-        fn_8012B380(self, 3, 2, data->value_0x10);
+        em_reaction_req(self, 3, 2, data->value_0x10);
         break;
     default:
         break;
@@ -1507,7 +1507,7 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
         if (self->field_0x9F7 != 255) {
             self->field_0x1F9 = 1;
             self->field_0x1FA = 1;
-            fn_8012B380(self, 9, self->field_0x9F7, 255);
+            em_reaction_req(self, 9, self->field_0x9F7, 255);
             em_target_pos_set(self, 0);
         }
         break;
@@ -1540,7 +1540,7 @@ void fn_8013CAA0(_ENEMY_WORK *self, u8 *in) {
     self->state_0x99D = self->field_0x95D;
     self->ptr_0x9A0 = (u32)(in + 2);
     if (fn_8013A884(self, self->field_0x95C) == 1) {
-        fn_8012B380(self, 8, self->state_0x998, 255);
+        em_reaction_req(self, 8, self->state_0x998, 255);
         if (self->recs_0x9A4 != 0) {
             value = ((_ENEMY_TABLE *)self->recs_0x9A4)->entries[self->field_0x382].value_0x08;
         }
@@ -1578,9 +1578,9 @@ void fn_8013CDB4(_ENEMY_WORK *self, u8 *in) {
     }
     piece = fn_801275F0(self, 1);
     if ((u8)fn_80127A7C(self, (u8)piece) == 0) {
-        fn_8012B380(self, 10, 1, (u8)piece);
+        em_reaction_req(self, 10, 1, (u8)piece);
     } else {
-        fn_8012B380(self, 10, 2, (u8)piece);
+        em_reaction_req(self, 10, 2, (u8)piece);
     }
     em_target_pos_set(self, 0);
     self->field_0x1E7 = in[0];
@@ -1673,7 +1673,7 @@ s16 fn_8013E7C0(_ENEMY_WORK *self, u8 *in) {
                 self->field_0x9EC = (u32)(in + 1);
                 fn_8013AB74(self, 10, 0);
             }
-            fn_8012B380(self, 7, other->field_0x05, other->field_0x06);
+            em_reaction_req(self, 7, other->field_0x05, other->field_0x06);
             em_target_pos_set(self, 0);
         } else {
             in += (u8)fn_801406E0_view1(58, in[0]);

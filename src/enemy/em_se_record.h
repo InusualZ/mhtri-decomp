@@ -21,6 +21,15 @@ struct EmSePos {
     /* +0x0C */ s32 pad_0x0C;
 }; /* size: 0x10 */
 
+/* The 0x0C-byte sound-position record a kind 0x0A entry points at in the enemy programs whose records carry no
+ * pad word (`EmSePos` without its +0x0C). */
+struct EmSePosRec {
+    /* +0x00 */ f32 x_0x00;
+    /* +0x04 */ f32 y_0x04;
+    /* +0x08 */ s16 channel_0x08;
+    /* +0x0A */ s16 angle_0x0A;
+}; /* size: 0x0C */
+
 /* One sound-effect record of a per-motion table: the id runs 0x64..0x72, the delay is a small frame count. */
 struct EmSeRecord {
     /* +0x00 */ u16 se_id_0x00;
