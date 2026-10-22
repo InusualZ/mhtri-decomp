@@ -19,7 +19,7 @@
  *   members call).  res_mdl_ctor_referencer is a GUESS (the dead-stripped caller that places the ResMdl constructor).
  *   IScnObjCallback's empty ExecCallback_CALC_VIEW/CALC_MAT/CALC_WORLD/DRAW_XLU/DRAW_OPA are the slots of
  *   `lobby/lb_npc.cpp`'s callback vtables 0x805B8D80/0x805B8DA0.
- * RESIDUALS. fn_8007B864, fn_8007BA08 and fn_8007BA38 keep the map stems: two handle copies other units call by
+ * RESIDUALS. fn_8007B864, res_mdl_copy_ctor and fn_8007BA38 keep the map stems: two handle copies other units call by
  *   name.  `res_mdl_ctor_referencer` (dead-stripped) is 0x28 bytes with no unwind record where the C spelling was a
  *   4-byte tail call, so the object's `.text` is longer while the image is unchanged.
  * SHAPES. Definitions follow retail's address order.  The ResMdl constructor is `inline` and placed by a 4-byte
@@ -59,7 +59,7 @@ extern "C" {
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 /* internal */ struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ void fn_8007B864(struct ResHandle* pDst, const struct ResHandle* pSrc);
-/* internal */ struct ResHandle* fn_8007BA08(struct ResHandle* pDst, const struct ResHandle* pSrc);
+/* internal */ struct ResHandle* res_mdl_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ void fn_8007BA38(struct ResHandle* pDst, const struct ResHandle* pSrc);
 /* internal */ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
 } /* extern "C" */
@@ -319,7 +319,7 @@ bool nw4r::g3d::IScnObjGather::IsUserSorted() const
 extern "C" {
 
 /* 0x8007BA08 (0x30): copy-constructs a handle through its base-handle copy and returns the destination. */
-struct ResHandle* fn_8007BA08(struct ResHandle* pDst, const struct ResHandle* pSrc) {
+struct ResHandle* res_mdl_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc) {
     fn_8007BA38(pDst, pSrc);
     return pDst;
 }

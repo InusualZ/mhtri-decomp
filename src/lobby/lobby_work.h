@@ -143,7 +143,10 @@ typedef struct LbLobbyWork {
     /* +0x131 */ u8 param_0x131;
     /* +0x132 */ s8 invite_0x132;   /* the arm wrestle's rematch answer */
     /* +0x133 */ s8 invite_0x133;   /* the opponent's copy of it */
-    /* +0x134 */ u8 unused_0x134[0x11];
+    /* +0x134 */ union {
+        u8 unused_0x134[0x11];
+        u8 place_ids_0x134[0x11];   /* the interior ids of the lobby rooms' placed models (`menu/menu_placeinfo.cpp`) */
+    };
     /* +0x145 */ u8 field_0x145;
     /* +0x146 */ u8 field_0x146;
     /* +0x147 */ u8 field_0x147;

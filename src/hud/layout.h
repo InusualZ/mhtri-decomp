@@ -124,7 +124,7 @@ void str_tbl_utf16_build(s8* src, s8* dst, s32 count);
 void fn_802E16E0(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void draw_tex_icon_square_arena(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
-void fn_802E18D4(u16 id, u8 tex_idx, const _mh_ivec2_* pos);
+void draw_award_icon_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos);
 s8 fn_802E1978(u8 index);
 void fn_802E198C(_SPR_DATA_* rec, u8 tex_idx, const _mh_ivec2_* pos);
 u32 fn_802E1A7C(u16 id, u16 part, u8 tex_idx, const _mh_ivec2_* pos);

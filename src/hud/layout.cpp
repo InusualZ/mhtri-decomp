@@ -608,7 +608,7 @@ void draw_tex_icon_square_arena(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
 }
 
 /* 0x802E18D4 (0xA4) - the sprite record with a `fn_80055CC4` uv pair. */
-void fn_802E18D4(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
+void draw_award_icon_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 

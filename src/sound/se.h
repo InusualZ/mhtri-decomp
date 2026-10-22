@@ -47,12 +47,24 @@ struct SeSlot {
 /* The SE work object: one per sound source.  +0x08 and +0x0C are read by `se_req_pos_ps`.
  * size: 0x295F4 (at least; `fn_800D7F54` clears 0x2966C bytes) */
 struct _se_w {
-    /* +0x000 */ u8 pad_0x000[8];
+    /* +0x000 */ union {
+        u8 pad_0x000[8];
+        struct {   /* size: 0x4 */
+            /* +0x000 */ u8 pad_0x000b[3];
+            /* +0x003 */ u8 call_se_step_0x003;   /* the next entry of em003's call-SE timeline (`menu/menu_placeinfo.cpp`) */
+        };
+    };
     /* +0x008 */ s32 field_0x08;
     /* +0x00C */ s32 field_0x0C;
     /* +0x010 */ u8 pad_0x010[0x2C];
     /* +0x03C */ SeSlot slots[32];
-    /* +0x0A3C */ u8 pad_0x0A3C[0x287FC];
+    /* +0x0A3C */ union {
+        u8 pad_0x0A3C[0x287FC];
+        struct {   /* size: 0x8 */
+            /* +0x0A3C */ u8 pad_0x0A3Cb[6];
+            /* +0x0A42 */ s16 call_se_timer_0xA42;   /* frames since em003's call SE timeline started */
+        };
+    };
     /* +0x29238 */ f32 ramp[16];
     /* +0x29278 */ f32 field_0x29278;
     /* +0x2927C */ u8 pad_0x2927C[0x368];
@@ -107,7 +119,7 @@ extern "C" {
 #endif
 
 /* C-linkage helpers of the SE request layer (`src/sound/fn_800D7F54.cpp`). */
-void fn_800D9CC8(_se_w* work, s32 a, s32 b, s32 c);
+void se_frame_req(_se_w* work, s32 a, s32 b, s32 c);
 u32 fn_800D8D8C(nw4r::math::VEC3* pos);
 SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos);
 s32 se_bank_req(s32 bank, s32 id);

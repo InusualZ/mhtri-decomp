@@ -184,7 +184,10 @@ typedef struct NetPlayerCard {
  * `filters_0x8D84` (64 entries): an enabled flag, a kind (0 = always, 1 = id range, 2 = bit lookup)
  * and the range or index words the kind reads. */
 typedef struct NetFilterRec {
-    /* +0x00 */ u8 pad_0x00[0x1E];
+    /* +0x00 */ union {
+        u8 pad_0x00[0x1E];
+        char name_0x00[0x1E];   /* the filter's display name (`menu/menu_placeinfo.cpp`'s layer panel) */
+    };
     /* +0x1E */ u8 enabled_0x1E;
     /* +0x1F */ u8 kind_0x1F;
     /* +0x20 */ u16 low_0x20;
@@ -240,7 +243,10 @@ typedef struct NetSchedule {
 /* One 0x34-byte event entry (`NetCtrlWk::events_0x85E4`): an enabled flag and a bit mask of the
  * `NetCtrlWk::collectEvents` categories it applies to. */
 typedef struct NetEventRec {
-    /* +0x00 */ u8 pad_0x00[0x31];
+    /* +0x00 */ union {
+        u8 pad_0x00[0x31];
+        char name_0x00[0x31];   /* the event's display name (`menu/menu_placeinfo.cpp`'s layer panel) */
+    };
     /* +0x31 */ u8 enabled_0x31;
     /* +0x32 */ u8 mask_0x32;
     /* +0x33 */ u8 pad_0x33;

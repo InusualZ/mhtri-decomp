@@ -250,7 +250,7 @@ void sound_job_request(s32, u8, s32, s32, s32, void*, s32);
 void mhchar_reset(void*);
 void mhchar_draw_mode_set(void*, s32);
 void mhchar_model_create(MHchar*, u32*, u32, s32);
-void fn_8007BA08(void*, void*);
+void res_mdl_copy_ctor(void*, void*);
 extern s32 ef_system_memory_manager(void*);
 extern void* fn_800A5484(void*);
 extern void* fn_800A5A90(void*, void*, void*, u32);
@@ -1907,7 +1907,7 @@ void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long ligh
     mhchar_model_create(model, &res.data_0x00, arg, light);
     model->ready = 1;
     nw4r::g3d::ResMdl scn_mdl = ((nw4r::g3d::ScnMdlSimple*)model->field_0x118)->GetResMdl();
-    fn_8007BA08(&mdl, &scn_mdl);
+    res_mdl_copy_ctor(&mdl, &scn_mdl);
     if (nw_res_anm_work_num(res, *(EftResFileHandle*)&mdl, 5, list) <= count) {
         if ((u32)(flag - 1) <= 1) {
             strength = 1.0f;

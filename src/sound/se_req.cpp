@@ -47,7 +47,7 @@ extern "C" void pl_se_req_charge_end(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
-        return fn_800D9CC8(work, 0, 3, 3);
+        return se_frame_req(work, 0, 3, 3);
     }
 }
 
@@ -58,7 +58,7 @@ extern "C" void pl_se_req_charge_start(_PLW* self, u32 flag)
         return;
     }
     s32 id = ((u8)flag == 0) ? 1 : 2;
-    return fn_800D9CC8(work, id, 3, 3);
+    return se_frame_req(work, id, 3, 3);
 }
 
 extern "C" void pl_se_req_charge_level(_PLW* self, u32 arg)
@@ -79,14 +79,14 @@ extern "C" void pl_se_req_charge_level(_PLW* self, u32 arg)
         id = 9;
         break;
     }
-    return fn_800D9CC8(work, id, 3, 3);
+    return se_frame_req(work, id, 3, 3);
 }
 
 extern "C" void pl_se_req_charge_7(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
-        return fn_800D9CC8(work, 7, 3, 3);
+        return se_frame_req(work, 7, 3, 3);
     }
 }
 
@@ -94,7 +94,7 @@ extern "C" void pl_se_req_charge_end_b(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
-        return fn_800D9CC8(work, 0, 3, 3);
+        return se_frame_req(work, 0, 3, 3);
     }
 }
 
@@ -102,7 +102,7 @@ extern "C" void pl_se_req_charge_2(_PLW* self)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {
-        return fn_800D9CC8(work, 2, 3, 3);
+        return se_frame_req(work, 2, 3, 3);
     }
 }
 

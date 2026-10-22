@@ -358,7 +358,7 @@ void fn_800FA9B8(u8* rec, u8 id);
 /* the shared layers the range's helpers call */
 void* res_file_ctor(void* out, u32 a);
 void res_file_assign(void* dst, void* src);
-void fn_8007BA08(void* a, void* b);
+void res_mdl_copy_ctor(void* a, void* b);
 s32 fn_800D56F4(char* name, u32 data);
 void* nw_res_entry_get(s32 handle);
 s32 res_mem_index_get(char* name);
@@ -2438,7 +2438,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
     em_res_file_setup(&h1);
     res = fn_800924CC(&h1, 0);
-    fn_8007BA08(&h2, &res);
+    res_mdl_copy_ctor(&h2, &res);
     mhchar_mdl_prepare(&h2);
     fn_800D5D60(work);
 }

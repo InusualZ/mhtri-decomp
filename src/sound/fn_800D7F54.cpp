@@ -713,7 +713,7 @@ extern "C" void fn_800D9B6C(_se_w* work, SeSlot* slot) {
 /* ---------------------------------------------------------------------------------------------------
  * 0x800D9CC8  starts a "frame" sound from an id plus a packed (kind-high-byte, sub-kind) parameter.
  */
-extern "C" void fn_800D9CC8(_se_w* work, s32 id, u32 param, s32 value) {
+extern "C" void se_frame_req(_se_w* work, s32 id, u32 param, s32 value) {
     SeWorkObj* w = (SeWorkObj*)work;
     if (work == NULL) {
         return;
@@ -748,7 +748,7 @@ extern "C" void fn_800D9CC8(_se_w* work, s32 id, u32 param, s32 value) {
 }
 
 /* ---------------------------------------------------------------------------------------------------
- * 0x800D9DB4  the same request as `fn_800D9CC8`, plus the actor's two extra ids.
+ * 0x800D9DB4  the same request as `se_frame_req`, plus the actor's two extra ids.
  */
 extern "C" void fn_800D9DB4(_se_w* work, s32 id, u32 param, s32 id2, s32 id3) {
     SeWorkObj* w = (SeWorkObj*)work;
@@ -860,7 +860,7 @@ extern "C" void fn_800DA428(_se_w* work, s32 a, u32 param, s32 d, s32 e) {
     if ((u16)param == 0xFFFF) {
         return;
     }
-    fn_800D9CC8(work, param, e, d);
+    se_frame_req(work, param, e, d);
 }
 
 /* ---------------------------------------------------------------------------------------------------
@@ -889,7 +889,7 @@ void se_req_frame_set_aifs(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
     if ((u16)param == 0xFFFF) {
         return;
     }
-    fn_800D9CC8(work, param, e, d);
+    se_frame_req(work, param, e, d);
 }
 
 /* ---------------------------------------------------------------------------------------------------
@@ -915,7 +915,7 @@ void se_req_frame_set_npc(_se_w* work, _LB_NPC* npc, s32 a, s32 param, s32 e) {
     if ((u16)param == 0xFFFF) {
         return;
     }
-    fn_800D9CC8(work, param + bump, e, (s32)npc);
+    se_frame_req(work, param + bump, e, (s32)npc);
 }
 
 /* ---------------------------------------------------------------------------------------------------
@@ -939,7 +939,7 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
         if ((u16)param == 0xFFFF) {
             return;
         }
-        fn_800D9CC8(work, param, e, d);
+        se_frame_req(work, param, e, d);
         break;
     case 4:
         {
@@ -956,7 +956,7 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
             if ((u8)(plw->field_0x003 + 229) <= 1 && plw->field_0x00A == 2) {
                 param += 100;
             }
-            fn_800D9CC8(work, param, e, d);
+            se_frame_req(work, param, e, d);
         }
         break;
     case 9:
@@ -976,7 +976,7 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
                     param = 102;
                 }
             }
-            fn_800D9CC8(work, param, e, d);
+            se_frame_req(work, param, e, d);
         }
         break;
     case 10:
@@ -987,7 +987,7 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
         if ((u16)param == 0xFFFF) {
             return;
         }
-        fn_800D9CC8(work, param, e, d);
+        se_frame_req(work, param, e, d);
         break;
     }
 }
@@ -1231,10 +1231,10 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  *                          cmplwi r,1; ble` (3 instrs), ours to `cmpwi r,9; blt; cmpwi r,10; ble` (4).
  *                          `found` also lands in r29 and `p` in r30, retail has them the other way
  *                          round; the bodies, the two lookup loops and the compare chain order are equal.
- * fn_800D9CC8      99.831  `param &= 0xFFFFFF` is folded into the else arm's store (`clrlwi r5,r29,8` +
+ * se_frame_req      99.831  `param &= 0xFFFFFF` is folded into the else arm's store (`clrlwi r5,r29,8` +
  *                          `clrlwi r0,r5,24`), retail keeps it in the parameter's own r29
  *                          (`clrlwi r29,r29,8` then `clrlwi r0,r29,24`). Same two instructions.
- * fn_800D9DB4      99.590  same mask residual as `fn_800D9CC8`.
+ * fn_800D9DB4      99.590  same mask residual as `se_frame_req`.
  * se_req_pos_ps    99.062  the `p` counter (r30 retail / r31 ours) and the bank-then-slot pointer
  *                          (r31 retail / r30 ours) are mirrored.
  * se_slot_req_pos      98.718  allocator colouring only: retail `kind`/slot r30, `loud` r29, `work` r31;
@@ -1246,7 +1246,7 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  * fn_800DBFAC      99.831  same as `fn_800DBE94` (+0xBC instead of +0xB8).
  *
  * Shared-type notes for the orchestrator (the prelude was NOT edited):
- *   - `_se_w` needs `u8 field_0x002` at +0x02 (a flag: `fn_800D9CC8`/`fn_800D9DB4`/`fn_800DB974` read
+ *   - `_se_w` needs `u8 field_0x002` at +0x02 (a flag: `se_frame_req`/`fn_800D9DB4`/`fn_800DB974` read
  *     it) and `_se_w* field_0x0AFC` at +0xAFC (`fn_800DB974`); the 32 `SeSlot`s really end at +0xA3C,
  *     so +0xAFC is inside the prelude's unmodelled tail. This part carries `SeWorkObj` for both.
  *   - `SeSlot` needs `u8 field_0x25` at +0x25 (the sub-sound byte `fn_800D9B6C` writes); the prelude
@@ -1655,7 +1655,7 @@ extern "C" void fn_800DCB74(_se_w* se, s32 kind, nw4r::math::VEC3* pos) {
 
 extern "C" u32 fn_800D843C(void);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
-extern "C" void fn_800D9CC8(_se_w* work, s32 id, u32 param, s32 value);
+extern "C" void se_frame_req(_se_w* work, s32 id, u32 param, s32 value);
 
 void se_req_pos_ps(_se_w* work, s32 id, s32 arg, nw4r::math::VEC3* pos);
 void shell_se_req(_se_w* work, nw4r::math::VEC3* pos, u8 id, u32 arg);
@@ -1807,15 +1807,15 @@ void ainpc_boomerang_se_req(_se_w* work, nw4r::math::VEC3* pos) {
 extern "C" void fn_800DCC24(_se_w* work, s32 kind, u8 c) {
     if (kind == 7) {
         u32 bank = (get_chacha_dance1_bank() << 24) | 3;
-        fn_800D9CC8(work, 7, bank, 4);
-        fn_800D9CC8(work, 8, bank, 4);
+        se_frame_req(work, 7, bank, 4);
+        se_frame_req(work, 8, bank, 4);
         bank = (get_chacha_dance2_bank() << 24) | 3;
-        fn_800D9CC8(work, 7, bank, 4);
-        fn_800D9CC8(work, 8, bank, 4);
+        se_frame_req(work, 7, bank, 4);
+        se_frame_req(work, 8, bank, 4);
     } else {
         s32 id = fn_800EF56C(c, kind);
         if (id != -1) {
-            fn_800D9CC8(work, 0, (id << 24) | 3, 4);
+            se_frame_req(work, 0, (id << 24) | 3, 4);
         }
     }
 }
