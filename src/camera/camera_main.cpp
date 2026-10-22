@@ -1333,7 +1333,7 @@ void fn_802BC820(u32 base, u32 arg)
 /*
  * Puts the camera into `mode` and holds it for 8 frames.
  */
-void fn_802BC7C8(u8 mode, u32 arg)
+void camera_demo_event_set(u8 mode, u32 arg)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 

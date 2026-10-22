@@ -126,9 +126,9 @@ f32 get_em_chg_scale(_ENEMY_WORK* self);
 s32 calcVecAng2(VEC3* a, VEC3* b);
 void rotVecY(VEC3* v, u32 angle);
 
-/* Callees whose owners' headers do not declare them: `lobby/fn_8030121C.cpp`'s effect spawns `fn_80305924`
+/* Callees whose owners' headers do not declare them: `lobby/fn_8030121C.cpp`'s effect spawns `eft_em_spawn_tinted`
  * and `eft_em_spawn`, and `enemy/em_model.cpp`'s `em_drop_item_spawn`. */
-extern "C" void fn_80305924(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, s32 id);
+extern "C" void eft_em_spawn_tinted(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, s32 id);
 extern "C" void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s);
 extern "C" void em_drop_item_spawn(_ENEMY_WORK* self, void* pos, s32 value);
 
@@ -463,7 +463,7 @@ void em008_event_notify(_ENEMY_WORK* self, u8 arg, u8 sub) {
             if (em008_part_flag_clear_ck(self, 1) == 1) {
                 self->field_0x1E4 |= 1;
                 setVector3(&v1, 0.0f, 50.0f, 150.0f);
-                fn_80305924(self, 1, 0x14, &v1, 1.0f, -1);
+                eft_em_spawn_tinted(self, 1, 0x14, &v1, 1.0f, -1);
                 em_drop_item_spawn(self, &self->pos, 0x1E);
             }
             break;
@@ -473,7 +473,7 @@ void em008_event_notify(_ENEMY_WORK* self, u8 arg, u8 sub) {
             if (em008_part_flag_clear_ck(self, 0x20) == 1) {
                 self->field_0x1E4 |= 0x20;
                 setVector3(&v1, 0.0f, 0.0f, 0.0f);
-                fn_80305924(self, 1, 0x2D, &v1, 1.0f, -1);
+                eft_em_spawn_tinted(self, 1, 0x2D, &v1, 1.0f, -1);
                 em_drop_item_spawn(self, &self->pos, 0x1E);
             }
             break;
@@ -3925,7 +3925,7 @@ void em008_part_break_set(_ENEMY_WORK* self, u8 part) {
         if (em008_part_flag_clear_ck(self, 1) == 1) {
             self->field_0x1E4 |= 1;
             setVector3(&vec, 0.0f, 50.0f, 150.0f);
-            fn_80305924(self, 1, 0x14, &vec, 1.0f, -1);
+            eft_em_spawn_tinted(self, 1, 0x14, &vec, 1.0f, -1);
             em_drop_item_spawn(self, &self->pos, 0x1E);
         }
         break;
@@ -3933,9 +3933,9 @@ void em008_part_break_set(_ENEMY_WORK* self, u8 part) {
         if (em008_part_flag_clear_ck(self, 2) == 1) {
             self->field_0x1E4 |= 2;
             setVector3(&vec, 0.0f, -200.0f, 0.0f);
-            fn_80305924(self, 1, 4, &vec, 1.2f, -1);
+            eft_em_spawn_tinted(self, 1, 4, &vec, 1.2f, -1);
             setVector3(&vec, 0.0f, 100.0f, 0.0f);
-            fn_80305924(self, 1, 4, &vec, 1.0f, -1);
+            eft_em_spawn_tinted(self, 1, 4, &vec, 1.0f, -1);
             em_drop_item_spawn(self, &self->pos, 0x1E);
         }
         break;
@@ -3943,7 +3943,7 @@ void em008_part_break_set(_ENEMY_WORK* self, u8 part) {
         if (em008_part_flag_clear_ck(self, 4) == 1) {
             self->field_0x1E4 |= 4;
             setVector3(&vec, 0.0f, -200.0f, 100.0f);
-            fn_80305924(self, 1, 4, &vec, 1.0f, -1);
+            eft_em_spawn_tinted(self, 1, 4, &vec, 1.0f, -1);
             em_drop_item_spawn(self, &self->pos, 0x1E);
         }
         break;
@@ -3951,7 +3951,7 @@ void em008_part_break_set(_ENEMY_WORK* self, u8 part) {
         if (em008_part_flag_clear_ck(self, 8) == 1) {
             self->field_0x1E4 |= 8;
             setVector3(&vec, 0.0f, 0.0f, 0.0f);
-            fn_80305924(self, 1, 0x23, &vec, 1.0f, -1);
+            eft_em_spawn_tinted(self, 1, 0x23, &vec, 1.0f, -1);
             em_drop_item_spawn(self, &self->pos, 0x1E);
         }
         break;
@@ -3959,7 +3959,7 @@ void em008_part_break_set(_ENEMY_WORK* self, u8 part) {
         if (em008_part_flag_clear_ck(self, 0x10) == 1) {
             self->field_0x1E4 |= 0x10;
             setVector3(&vec, 0.0f, 0.0f, 0.0f);
-            fn_80305924(self, 1, 0x1B, &vec, 1.0f, -1);
+            eft_em_spawn_tinted(self, 1, 0x1B, &vec, 1.0f, -1);
             em_drop_item_spawn(self, &self->pos, 0x1E);
         }
         break;
@@ -3967,7 +3967,7 @@ void em008_part_break_set(_ENEMY_WORK* self, u8 part) {
         if (em008_part_flag_clear_ck(self, 0x20) == 1) {
             self->field_0x1E4 |= 0x20;
             setVector3(&vec, 0.0f, 0.0f, 0.0f);
-            fn_80305924(self, 1, 0x2D, &vec, 1.0f, -1);
+            eft_em_spawn_tinted(self, 1, 0x2D, &vec, 1.0f, -1);
             em_drop_item_spawn(self, &self->pos, 0x1E);
         }
         break;

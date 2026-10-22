@@ -247,7 +247,7 @@ extern void fn_80110FE0(Eft* self);
 extern void fn_80111344(Eft* self);
 extern s32 res_eft_model_create_light__FP6MHcharUsUll(EftLight* light, u16 id, u32 a, s32 b);
 extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec3* v, f32 x, f32 y, f32 z);
-extern s16 fn_802BF814(void);
+extern s16 light_id_next(void);
 extern void fn_80111870(void);
 extern s32 fn_8026A328(s32 a, f32 b, f32 c);
 extern u16 Get_motion_no__FP4_PLW(Plw* plw);
@@ -692,7 +692,7 @@ void fn_8010D928(Eft* self)
         copyVec3((struct VEC3*)&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
-    work->field_0x2C = fn_802BF814();
+    work->field_0x2C = light_id_next();
     work->field_0x2E = source->field_0x16;
     fn_8010E008(self);
 }
@@ -717,7 +717,7 @@ void fn_8010DE40(Eft* self)
         copyVec3((struct VEC3*)&work->effect, &work->slots_0x10.items.items_0x10[i]->pos_0x1C);
         work->slots_0x10.items.items_0x10[i]->field_0x35 = 0;
     }
-    work->field_0x2C = fn_802BF814();
+    work->field_0x2C = light_id_next();
     fn_8010E008(self);
 }
 

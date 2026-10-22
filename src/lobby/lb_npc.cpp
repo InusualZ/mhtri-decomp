@@ -94,7 +94,7 @@ extern "C" f32 lbl_807998D8;
 extern "C" LbNpcSystemWork system_w;   /* .bss 0x806585E0 */
 extern "C" u8 lobby_state_block[];
 extern "C" u8 lbl_806AA6F0[];
-extern "C" u8 lbl_80794AB0;
+extern "C" u8 lobby_hidden_flag;
 extern "C" u8* lobby_wp;
 extern "C" void* npc_data_town[];
 extern "C" void* npc_data_village[];
@@ -517,7 +517,7 @@ extern "C" {
 void fn_80212370(void);
 void fn_8021261C(void);
 void fn_803C3F6C(void);
-void fn_80375D30(void);
+void lobby_net_update(void);
 void fn_802DB2B8(void);
 void fn_80211E68(void);
 void fn_802680C4(void);
@@ -556,10 +556,10 @@ void lobby_frame_update(void)
     fn_803C3F6C();
     lobby_w.field_0x027 = lobby_w.field_0x000;
     if (isNetCityMode() == 1) {
-        fn_80375D30();
+        lobby_net_update();
     }
     player_control_move();
-    lbl_80794AB0 = 0;
+    lobby_hidden_flag = 0;
     if (isNetCityMode() == 1 && lobby_state_block[3] == 0 && lobby_w.field_0x16F == 0 &&
         lobby_w.field_0x163 == 0) {
         lobby_w.field_0x12C = 1;
@@ -2781,7 +2781,7 @@ __declspec(noinline) u32 fn_80208AB8(void);
 __declspec(noinline) u32 fn_80208AC0(_PLW* self);
 __declspec(noinline) u32 fn_80208AE8(_PLW* self);
 void lb_npc_act_set(_PLW* self, u32 a, u16 b, u16 c);
-__declspec(noinline) void fn_8020A5D4(_PLW* self, u32 a, s32 b, s32 c);
+__declspec(noinline) void lb_npc_act_req(_PLW* self, u32 a, s32 b, s32 c);
 __declspec(noinline) void fn_8020A5EC(_PLW* self, u8 id);
 void fn_8020A5F4(_PLW* self, u32 a, s32 b, s32 c, u16 d);
 __declspec(noinline) void fn_8020A70C(_PLW* self, u32 a, s32 b, s32 c);
@@ -3104,7 +3104,7 @@ __declspec(noinline) u32 fn_80208AE8(_PLW* self)
  */
 
 /* 0x8020A5D4 - set the act latch byte at +0xE and re-enter the family's main handler. */
-__declspec(noinline) void fn_8020A5D4(_PLW* self, u32 a, s32 b, s32 c)
+__declspec(noinline) void lb_npc_act_req(_PLW* self, u32 a, s32 b, s32 c)
 {
     self->act_state_0x00E[0] = 1;
     lb_npc_act_set(self, (u8)a, (u16)b, (u16)c);
@@ -3133,13 +3133,13 @@ void fn_8020A5F4(_PLW* self, u32 id, s32 arg, s32 speed, u16 flags)
     self->flag_0x30E = 1;
     if (fn_80208AB8() != 0 || fn_80208AC0(self) != 0) {
         Pl_chr_set_attr_default(self, 51, speed, arg);
-        fn_8020A5D4(self, 12, 0, flags);
+        lb_npc_act_req(self, 12, 0, flags);
     } else if (fn_80208AE8(self) == 1) {
         Pl_chr_set_attr_default(self, 21, speed, arg);
-        fn_8020A5D4(self, 0, 0, flags);
+        lb_npc_act_req(self, 0, 0, flags);
     } else {
         Pl_chr_set_attr_default(self, 1, speed, arg);
-        fn_8020A5D4(self, 0, 0, flags);
+        lb_npc_act_req(self, 0, 0, flags);
     }
 }
 
@@ -3302,7 +3302,7 @@ extern "C" u32 lobby_input_locked_ck(void) {
     if (get_fade_stat(3) == 1 || get_fade_stat(3) == 2) {
         return 1;
     }
-    return fn_803768F8();
+    return lobby_net_busy_ck();
 }
 
 /* The four player-0 command-mask testers; all report "clear" while the screen is not owned. */

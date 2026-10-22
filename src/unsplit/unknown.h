@@ -112,6 +112,15 @@ void fn_80526D00(void* record);
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+
+/* The three jump error messages (`.sbss` 0x80794B10, unclaimed): `enemy/em020_prog.cpp`'s lobby error window and
+ * `menu/menu_placeinfo.cpp` read them.  size: 0xC */
+struct JumpErrMsgTable {
+    /* +0x00 */ char* msg_0x00;
+    /* +0x04 */ char* msg_0x04;
+    /* +0x08 */ char* msg_0x08;
+};
+extern struct JumpErrMsgTable* jump_err_msg_str;
 #ifdef __cplusplus
 }
 #endif

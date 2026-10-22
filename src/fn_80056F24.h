@@ -56,4 +56,9 @@ void GlareFilter_on(void);
 void fade_reset(long slot);
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+s32 get_fade_stat(long slot);
+#endif
+
 #endif /* MHTRI_FN_80056F24_H */

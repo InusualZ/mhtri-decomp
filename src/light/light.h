@@ -56,4 +56,13 @@ void light_work_reset(void);
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+struct _GXColor;
+extern "C" {
+u16 light_id_next(void);
+void light_point_set(u16 id, nw4r::math::VEC3* pos, struct _GXColor* color, f32 range, f32 falloff);
+}
+#endif
+
 #endif /* MHTRI_LIGHT_LIGHT_H */

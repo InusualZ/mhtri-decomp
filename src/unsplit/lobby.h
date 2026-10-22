@@ -459,7 +459,7 @@ s32 fn_8033C1AC(void);
 s32 eft052_item_get_open(void *, void *);
 s32 eft052_item_get_step(void);
 s32 eft052_box_list_draw(s32, void*, void*, s32, s32);
-/* `fn_803768F8` (0x803768F8) and `fn_80377664` (0x80377664) are owned by
+/* `lobby_net_busy_ck` (0x803768F8) and `lobby_net_profile_part1_send` (0x80377664) are owned by
  * `enemy/em020_ai.cpp` now that its range is registered - rule 2: their declarations moved to the
 owner's header and are included here. */
 #include "enemy/em020_ai.h"

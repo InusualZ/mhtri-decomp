@@ -357,4 +357,11 @@ s32 quest_grade_rank_get(u8 grade);
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+extern "C" {
+s32 quest_grade_get(void);
+}
+#endif
+
 #endif /* MHTRI_QUEST_QUEST_ENTRY_H */

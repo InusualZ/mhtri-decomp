@@ -1213,4 +1213,11 @@ u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+extern "C" {
+s32 sendReqServerTime(NetworkInstance* self);
+}
+#endif
+
 #endif /* MHTRI_NETWORK_PATINTERFACE_H */

@@ -48,7 +48,7 @@ extern "C" {
 
 
 
-void fn_8021FCE0(u8 a, s32 b, u16 c, s32 d);
+void lobby_player_place_ex(u8 a, s32 b, u16 c, s32 d);
 
 
 
@@ -113,9 +113,9 @@ void fn_8021F298(void)
 }
 
 /* The two-argument row draw the three table variants share. */
-void fn_8021FCD0(u8 a, s32 b, u16 c)
+void lobby_player_place(u8 a, s32 b, u16 c)
 {
-    fn_8021FCE0(a, b, c, 1);
+    lobby_player_place_ex(a, b, c, 1);
 }
 
 

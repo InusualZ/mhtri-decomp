@@ -239,4 +239,18 @@ u32 lb_player_angle_to(struct _PLW* self, VEC3* target);
 u16 lb_npc_Get_motion_no(_LB_NPC* self);
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+struct PlayerPad;
+extern "C" {
+void lb_npc_walk_blend_set(_PLW* plw, s32 frames);
+void lb_npc_act_req(_PLW* self, u32 kind, s32 act, s32 flags);
+s32 lb_npc_act_busy_ck(u8 kind, u16 act);
+void lb_npc_net_flag_on(void);
+void lb_npc_net_flag_off(void);
+void lb_pad_input_flush(struct PlayerPad* pad);
+extern u8 lobby_hidden_flag;
+}
+#endif
+
 #endif /* MHTRI_LOBBY_LB_NPC_H */

@@ -25,4 +25,13 @@ extern u8 lbl_805BAC98[];
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+struct _PLW;
+struct _PLW_PHYSICS;
+extern "C" {
+void pl_physics_rebind(struct _PLW_PHYSICS* physics, struct _PLW* plw);
+}
+#endif
+
 #endif /* MHTRI_LOBBY_LB_EQUIP_PAGE_H */

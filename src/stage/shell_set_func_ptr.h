@@ -37,7 +37,7 @@ struct ShellSetFuncs {
                                     ShellSetFuncs* table);
     /* +0x58 */ void (*method_0x58)(struct _ENEMY_WORK* self, u32 id);
     /* +0x5C */ u8 pad_0x5C[0x64 - 0x5C];
-    /* +0x64 */ void (*method_0x64)(struct _ENEMY_WORK* self, u32 a, u32 joint, f32 scale, u16 id,
+    /* +0x64 */ void (*method_0x64)(struct _ENEMY_WORK* self, u32 kind, u32 joint, f32 scale, u16 id,
                                     ShellSetFuncs* table);
     /* +0x68 */ u8 pad_0x68[0x74 - 0x68];
     /* +0x74 */ void (*method_0x74)(struct _ENEMY_WORK* self, u32 kind, u32 joint, nw4r::math::VEC3* pos, f32 scale,

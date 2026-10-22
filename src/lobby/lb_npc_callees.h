@@ -17,7 +17,7 @@ s32 game_ready_ck(void);
 void fn_801E9888(void);
 void fn_801E9C58(void);
 void fn_802FF2C0(void);
-u32 fn_803768F8(void);
+u32 lobby_net_busy_ck(void);
 
 #ifdef __cplusplus
 }

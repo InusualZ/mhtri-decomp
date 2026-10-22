@@ -610,13 +610,13 @@ struct _ENEMY_WORK {
         /* the em020 program's own field view `enemy/em020_prog.cpp` reaches:
          * the +0x334/+0x336 halfword pair its init clears, the +0x338 per-frame latch and the
          * +0x33E countdown `em020_timers_tick` ticks, and the +0x339/+0x33A/+0x33B triple
-         * `fn_80372DAC` fills.  A union member because the views above already own these bytes. */
+         * `em020_glow_color_get` fills.  A union member because the views above already own these bytes. */
         struct {
-            /* +0x328 */ u8 unused_0x328gt[0x334 - 0x328];
+            /* +0x328 */ nw4r::math::VEC3 home_0x328; /* the target position the circling charge saves and restores */
             /* +0x334 */ s16 timer_0x334;   /* the per-frame countdown `em020_timers_tick` ticks */
-            /* +0x336 */ s16 value_0x336;   /* armed from the map lookup at init */
+            /* +0x336 */ u16 value_0x336;   /* the stage light id the reset slot takes, which the light update publishes */
             /* +0x338 */ u8 latch_0x338;    /* "map 7 and area 3" for this frame */
-            /* +0x339 */ u8 sel_0x339;      /* out of the `fn_80372DAC` lookup */
+            /* +0x339 */ u8 sel_0x339;      /* out of the `em020_glow_color_get` lookup */
             /* +0x33A */ u8 sel_0x33A;
             /* +0x33B */ u8 sel_0x33B;
             /* +0x33C */ u8 flag_0x33C;

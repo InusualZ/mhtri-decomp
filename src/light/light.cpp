@@ -142,13 +142,13 @@ extern "C" u16 fn_802BF7E8(void)
 }
 
 /* Ticks the light level counter. */
-extern "C" void fn_802BF814(void)
+extern "C" void light_id_next(void)
 {
     fn_802BF7E8();
 }
 
 /* Adds a light of the given id at the vector. */
-extern "C" void fn_802BFAE0(u16 id, void* vector, void* arg, f32 a, f32 b)
+extern "C" void light_point_set(u16 id, void* vector, void* arg, f32 a, f32 b)
 {
     fn_802BFA00(id, vector, arg, a, b);
 }

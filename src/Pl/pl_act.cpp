@@ -12,7 +12,7 @@
  *   0x8002F6E8 -> 0x802695A4 this unit's first; `fn_80269394` and `fn_802693C4`..`fn_80269508` are frameless, so
  *   extab cannot place the 0x802693C4 seam.
  * FLAGS. `cflags_pl` (docs/pl.md).  The skill section is under `#pragma optimization_level 4` (docs/pl.md: level 3
- *   rematerialises `fn_8027350C`'s base); the file is under `#pragma peephole off` from the act-entry section on.  The
+ *   rematerialises `pl_parts_refresh`'s base); the file is under `#pragma peephole off` from the act-entry section on.  The
  *   master section's `#pragma peephole off` runs from `fn_8026BE94` through `fn_8026CBE4` (including `fn_8026BF98`),
  *   and `off`/`reset` pairs scope `fn_8026F888`, `fn_8026F9A4` and `Pl_act_ck`..`fn_8026FEF0`: recorded as
  *   load-bearing in six places (they turn the fused record form back into retail's `clrlwi`/`rlwinm`/`and` + `cmpwi`
@@ -67,7 +67,7 @@
  *    tests, and in `fn_80271E0C` the `deco_count` bound retail re-masks from r0; the label-chain shape that rule 8
  *    removed reproduced more rows (docs/pl.md);
  *  - `Pl_cat_skill_ck`: MWCC reassociates `(plw + 4) + 0x612` into `plw + 0x616` for every walk tried;
- *  - `fn_8027350C`: the three call-spanning values are coloured base/`pend`/mask in r24/r25/r26 by retail, mask/base/
+ *  - `pl_parts_refresh`: the three call-spanning values are coloured base/`pend`/mask in r24/r25/r26 by retail, mask/base/
  *    `pend` by ours;
  *  - `fn_802751B4`: retail saves `f31` through a `psq_st`/`vmrghb` pair (the compiler's own float-save form);
  *  - `fn_80278144`/`fn_80278310`: the early `(u32)((u8)m - 6) <= 1` exit inlines `li r3,0; b epilogue` (+8 B each)
@@ -121,7 +121,7 @@
  *  - the record walks index the typed arrays (`rec->skill_id[i]`); `fn_80273044`/`pl_item_room_get` scan `plw->slot_id`
  *    with a flat `for (i = 0; i < 24; i++)` (unrolled eight-wide under `mtctr 3`), and `pl_item_room_get`'s spare-slot scan
  *    is a `u16*` walk (`p[i * 2]`); `Pl_cat_skill_ck` is a two-iteration loop over a `u16*` walk (`p += 2`);
- *  - the valid-bit updates in `fn_80273998`/`fn_8027373C`/`fn_802738E8` are compound (`plw->set_valid &= (u16)~mask`);
+ *  - the valid-bit updates in `pl_parts_color_set`/`fn_8027373C`/`pl_equip_model_set` are compound (`plw->set_valid &= (u16)~mask`);
  *    the plain assignment adds a `clrlwi` before the `sth`;
  *  - narrow returns decide where MWCC re-converts: `item_take` and `pl_item_add` return `s16`, `fn_802736A0`'s
  *    `Get_pl_type__FP6_EQUIPP6_EQUIP` returns `u8`, `fn_802724E8`/`fn_8027252C` take signed-byte `s8*`/`s8` levels;
@@ -2458,7 +2458,7 @@ u8* GetItemData__FUs(u16);
 u16 fn_80273044(_PLW*, u16);
 s32 fn_8004BD30(s16*);
 
-void fn_8027350C(_PLW*, s32);
+void pl_parts_refresh(_PLW*, s32);
 
 
 void* fn_8027E344(void);
@@ -3324,7 +3324,7 @@ extern "C" u8 fn_802738D8(u8 idx) {
 }
 
 /* Stores one skill value into a set slot and updates its valid bit. */
-extern "C" void fn_80273998(_PLW* plw, u8 idx, s32 val) {
+extern "C" void pl_parts_color_set(_PLW* plw, u8 idx, s32 val) {
     if (val == plw->set_applied[idx]) {
         plw->set_valid &= (u16)~(1 << idx);
         return;
@@ -3493,7 +3493,7 @@ extern "C" s32 pl_item_room_get(_PLW* plw, u16 item, s16 value) {
 }
 
 /* Flushes the skill sets whose cached values no longer resolve, and the decoration slots. */
-extern "C" void fn_8027350C(_PLW* plw, s32 arg) {
+extern "C" void pl_parts_refresh(_PLW* plw, s32 arg) {
     u8 i;
     u8 id;
     u32 mask;
@@ -3834,7 +3834,7 @@ extern "C" int Pl_item_timer_get(_PLW* plw, u16 slot) {
 }
 
 /* Stores one equipment record into the saved set selected by its own slot id and marks it valid. */
-extern "C" void fn_802738E8(_PLW* plw, u8* rec) {
+extern "C" void pl_equip_model_set(_PLW* plw, u8* rec) {
     u8 idx = (u8)fn_8027E290(rec[0]);
 
     fn_8027E98C(rec);
@@ -3842,7 +3842,7 @@ extern "C" void fn_802738E8(_PLW* plw, u8* rec) {
     plw->equip_valid |= (u16)(1 << idx);
     idx = fn_802738D8(idx);
     if (idx != 0xFF) {
-        fn_80273998(plw, idx, fn_8027EBA8(plw, rec));
+        pl_parts_color_set(plw, idx, fn_8027EBA8(plw, rec));
     }
 }
 
@@ -3871,7 +3871,7 @@ extern "C" s32 fn_802739F0(_PLW* plw, s16 value, s32 mode, s8* out) {
 }
 
 /* Stores two decoration equipment records into the spare slots, clearing whichever is absent. */
-extern "C" void fn_802737B0(_PLW* plw, u8* a2, u8* a3, u8* a4) {
+extern "C" void pl_equip_models_set(_PLW* plw, u8* a2, u8* a3, u8* a4) {
     fn_8027E98C(a2);
     equip_record_copy((_EQUIP*)((u8*)plw + 0x1DC), (_EQUIP*)a2);
     if (a3 != 0) {

@@ -21,12 +21,19 @@ extern "C" {
  * and sent to the community layer: only the bytes this unit reads or writes are named.  size: 0x100 */
 typedef struct NetUserProfile {
     /* +0x00 */ u16 id_0x00;
-    /* +0x02 */ u8 pad_0x02[0x2];
+    /* +0x02 */ u8 field_0x02;           /* the profile byte the lobby copies to the player work's +0x260 */
+    /* +0x03 */ u8 field_0x03;           /* the profile byte the lobby copies to the player work's +0x1C */
     /* +0x04 */ u8 status_0x04;         /* copied into a peer card's last byte (GUESS name) */
     /* +0x05 */ u8 region_0x05;
-    /* +0x06 */ u8 pad_0x06[0xA];
+    /* +0x06 */ u8 pad_0x06[0x2];
+    /* +0x08 */ u32 word_0x08;           /* four profile bytes the lobby spreads over the player work's +0x258 */
+    /* +0x0C */ u32 word_0x0C;           /* four more, spread over +0x25C */
     /* +0x10 */ u8 equip_0x10[9][0xC];  /* nine `_EQUIP` records (`Pl/plw.h`) the peer card copies */
-    /* +0x7C */ u8 pad_0x7C[0x20];
+    /* +0x7C */ u8 field_0x7C[0x5];
+    /* +0x81 */ char partner_0x81[0x11];  /* the Poogie name the lobby dresses its Poogie with (GUESS) */
+    /* +0x92 */ u8 pad_0x92[0x2];
+    /* +0x94 */ u8 dress_0x94;           /* the Poogie costume */
+    /* +0x95 */ u8 pad_0x95[0x7];
     /* +0x9C */ u8 record_0x9C[0x56];   /* the comment text handed to the mediator's filter (0x80415FAC) */
     /* +0xF2 */ u8 rank_0xF2;
     /* +0xF3 */ u8 level_0xF3;

@@ -39,7 +39,7 @@ extern s32 net_layer_error_message;
 /* 0x80375858 - clears the lobby state block's quest-active byte. */
 void em020_quest_active_clear(void);
 /* 0x803759BC - stores the lobby message band's flag byte. */
-void em020_unknown_flag_set(u8 flag);
+void em020_unknown_flag_set(s8 flag);
 /* 0x80376978 - clears the hunter-card pages. */
 void em020_quest_pages_clear(void);
 /* 0x803759C4 - draws the lobby's network error window from `lobby_w`'s error message (GUESS name). */

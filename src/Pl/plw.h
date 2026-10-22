@@ -1039,6 +1039,10 @@ struct _PLW {
                                                     * `fn_8027D6DC` sets on every call */
                     /* +0x5CA */ union {   /* the 0x1B-byte tail, two spellings (rule 5) */
                         /* +0x5CA */ u8 pad_0x5CA[0x1B];
+                        /* +0x5CA */ struct {   /* the lobby's view: the hunter name and id text a peer card loads.  size: 0x1B */
+                            /* +0x5CA */ char name_0x5CA[0x11];
+                            /* +0x5DB */ char id_0x5DB[0xA];
+                        } hunter_0x5CA;
                         /* +0x5CA */ u8 user_profile_0x5CA[0x5E5 - 0x5CA]; /* the 17 bytes `arena_eqdata_from_userdata` copies out of the game's user-data block (its offsets 3..19); GUESS - the run has no name in the dump */
                     };
                 };
@@ -1156,7 +1160,8 @@ struct _PLW {
     /* +0xB04 */ u8 field_0xB04;   /* `fn_80224AC4`: non-zero suppresses the up-swing gate;
                                     * the lobby's latch block runs to this byte as well (+0xB00..+0xB04) */
     /* +0xB05 */ u8 name_0xB05[10];  /* the hunter name the lobby compares with the move work */
-    /* +0xB0F */ u8 pad_0xB0F[0xB];
+    /* +0xB0F */ char partner_0xB0F[0xA];  /* the trade partner's name the lobby packets carry (GUESS) */
+    /* +0xB19 */ u8 pad_0xB19;
     /* +0xB1A */ u8 field_0xB1A;
     /* +0xB1B */ u8 pad_0xB1B[0x1];
     /* +0xB1C */ u8 user_profile_0xB1C[0x4];  /* the four profile bytes `arena_eqdata_from_vsuser`

@@ -245,7 +245,7 @@ s32 equip_record_copy(LbEquipRec* dst, const LbEquipRec* src);
 u16 userdata_box_capacity(LbItemDb* db);
 s16 fn_8004AE98(LbItemDb* db);
 s16 userdata_pouch_size(u8 side);
-s16 fn_8004AF20(LbItemDb* db);
+s16 userdata_item_slot_count(LbItemDb* db);
 IdValue* userdata_pouch_get(LbItemDb* db, u8 side);
 IdValue* userdata_equip_item_slots_get(LbItemDb* db);
 u16 fn_8004AFC8(LbItemDb* db, s16 index);
@@ -291,7 +291,7 @@ void fn_802190FC(void* p, void* a, void* b, void* c, void* d);
 s32 fn_80219530(void* p);
 void fn_80219590(void* p, void* a);
 s32 fn_8021B7EC(s32 a);
-s32 fn_802738E8(s32 a);
+s32 pl_equip_model_set(s32 a);
 s32 equip_kind_table_class(u8 kind);
 s32 fn_802BBAC4(s32 a);
 s32 fn_8031BFEC(void* p, s32 a, s32 b);
@@ -306,7 +306,7 @@ s32 fn_8033AAFC(void);
 s32 fn_8033AC78(u16 a, s32 b);
 s32 eft052_item_value_get(u16 id);
 s32 hud_item_msg_push(s32 a, s32 b, s32 c);
-u32 fn_803768F8(void);
+u32 lobby_net_busy_ck(void);
 }
 } /* namespace s_801EC9F8 */
 
@@ -328,7 +328,7 @@ extern "C" s32 fn_801EC9F8(s16* x, s16* y, s16 x_min, s16 x_max, s16 y_min, s16 
     s16 vx;
     s16 vy;
 
-    if (fn_803768F8() == 1U) {
+    if (lobby_net_busy_ck() == 1U) {
         return 0;
     }
     if ((buttons & 0x3C00) != 0) {
@@ -566,7 +566,7 @@ extern "C" s16 fn_801ED184(s16 index)
     LbItemDb* db;
     u16 count;
 
-    if (index >= fn_8004AF20(lobby_world_block)) {
+    if (index >= userdata_item_slot_count(lobby_world_block)) {
         return 0;
     }
     db = lobby_world_block;
@@ -577,7 +577,7 @@ extern "C" s16 fn_801ED184(s16 index)
 /* Whether the slot holds an item at all (and which side it came from). */
 extern "C" s16 fn_801ED200(s16 index, u8 side)
 {
-    if (index >= fn_8004AF20(lobby_world_block)) {
+    if (index >= userdata_item_slot_count(lobby_world_block)) {
         return 0;
     }
     if (fn_8004AFC8(lobby_world_block, index) == 0) {
@@ -892,14 +892,14 @@ extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
             index = fn_801ED9E4(value);
             self->pick_0x16 = index;
             if (index > 0) {
-                limit = fn_8004AF20(lobby_world_block);
+                limit = userdata_item_slot_count(lobby_world_block);
                 move = item_pair_index_find(lobby_world_block->slots_0x180[self->cursor_0x1A].id,
                                    userdata_equip_item_slots_get(lobby_world_block), limit);
                 list->entry_max_0x022 = move;
                 list->item_id_0x024 = lobby_world_block->slots_0x180[self->cursor_0x1A].id;
                 if (move < 0) {
                     self->phase_0x00 += 1;
-                    limit = fn_8004AF20(lobby_world_block);
+                    limit = userdata_item_slot_count(lobby_world_block);
                     move = item_pair_index_find(0, userdata_equip_item_slots_get(lobby_world_block), limit);
                     if (move >= 0) {
                         if (list->side_0x005 == 1 && *GetItemData(list->item_id_0x024) == 1) {
@@ -975,14 +975,14 @@ extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
                             &userdata_pouch_get(lobby_world_block, list->side_0x005)[list->entry_max_0x022], 1, 1, 0);
                 fn_8004B870(&lobby_world_block->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
             }
-            limit = fn_8004AF20(lobby_world_block);
+            limit = userdata_item_slot_count(lobby_world_block);
             list->entry_max_0x022 = item_pair_index_find(id, userdata_equip_item_slots_get(lobby_world_block), limit);
             list->row_sub_0x016 = list->entry_max_0x022 / 8;
             self->phase_0x00 += 1;
             sysSE_stop(5);
             break;
         case 2:
-            limit = fn_8004AF20(lobby_world_block);
+            limit = userdata_item_slot_count(lobby_world_block);
             if (item_pair_index_find(lobby_world_block->slots_0x180[self->cursor_0x1A].id,
                             userdata_equip_item_slots_get(lobby_world_block), limit) < 0) {
                 self->phase_0x00 -= 1;
@@ -1029,14 +1029,14 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
             self->move_max_0x01E = index;
             if (index > 0) {
                 side = self->side_0x005 == 0;
-                limit = fn_8004AF20(lobby_world_block);
+                limit = userdata_item_slot_count(lobby_world_block);
                 move = item_pair_index_find(userdata_pouch_get(lobby_world_block, side)[id].id,
                                    userdata_equip_item_slots_get(lobby_world_block), limit);
                 self->entry_max_0x022 = move;
                 self->item_id_0x024 = userdata_pouch_get(lobby_world_block, side)[id].id;
                 if (move < 0) {
                     self->phase_0x001 += 1;
-                    limit = fn_8004AF20(lobby_world_block);
+                    limit = userdata_item_slot_count(lobby_world_block);
                     move = item_pair_index_find(0, userdata_equip_item_slots_get(lobby_world_block), limit);
                     if (move >= 0) {
                         if (self->side_0x005 == 1 && *GetItemData(self->item_id_0x024) == 1) {
@@ -1088,7 +1088,7 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
                                 &userdata_pouch_get(lobby_world_block, self->side_0x005)[id], 1, 1, 0);
                     fn_8004BBEC(lobby_world_block, self->item_id_0x024, -self->move_max_0x01E, side, 1);
                     fn_8004BBEC(lobby_world_block, tmp2.id, tmp2.value, side, 1);
-                    limit = fn_8004AF20(lobby_world_block);
+                    limit = userdata_item_slot_count(lobby_world_block);
                     self->entry_max_0x022 = item_pair_index_find(self->item_id_0x024,
                                                         userdata_equip_item_slots_get(lobby_world_block), limit);
                     self->row_sub_0x016 = self->entry_max_0x022 / 8;
@@ -1130,14 +1130,14 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
                             &userdata_pouch_get(lobby_world_block, self->side_0x005)[self->entry_max_0x022], 1, 1, 0);
                 fn_8004BBEC(lobby_world_block, self->item_id_0x024, -self->entry_0x020, side, 1);
             }
-            limit = fn_8004AF20(lobby_world_block);
+            limit = userdata_item_slot_count(lobby_world_block);
             self->entry_max_0x022 = item_pair_index_find(self->item_id_0x024, userdata_equip_item_slots_get(lobby_world_block), limit);
             self->row_sub_0x016 = self->entry_max_0x022 / 8;
             self->phase_0x001 += 1;
             sysSE_stop(5);
             break;
         case 2:
-            limit = fn_8004AF20(lobby_world_block);
+            limit = userdata_item_slot_count(lobby_world_block);
             if (item_pair_index_find(self->item_id_0x024, userdata_equip_item_slots_get(lobby_world_block), limit) < 0) {
                 self->phase_0x001 -= 1;
             } else {
@@ -1407,7 +1407,7 @@ extern "C" {
 
 #pragma peephole off
 /* 0x801F3294 - tick one lobby page request: a three-state machine that reads the pad mask, advances the
- * page cursor and pushes the new selection through `fn_802738E8`. */
+ * page cursor and pushes the new selection through `pl_equip_model_set`. */
 u32 fn_801F3294(LbPageOwner* self, LbPage* req)
 {
     u32 ret = 0;
@@ -1442,15 +1442,15 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                     sub->flag_0x01C = world->count_0x009E;
                     memset(&arg, 0, sizeof(arg));
                     arg.kind_0x00 = 1;
-                    fn_802738E8((struct _PLW*)sub, (u8*)&arg);
+                    pl_equip_model_set((struct _PLW*)sub, (u8*)&arg);
                     arg.kind_0x00 = 2;
-                    fn_802738E8((struct _PLW*)sub, (u8*)&arg);
+                    pl_equip_model_set((struct _PLW*)sub, (u8*)&arg);
                     arg.kind_0x00 = 3;
-                    fn_802738E8((struct _PLW*)sub, (u8*)&arg);
+                    pl_equip_model_set((struct _PLW*)sub, (u8*)&arg);
                     arg.kind_0x00 = 4;
-                    fn_802738E8((struct _PLW*)sub, (u8*)&arg);
+                    pl_equip_model_set((struct _PLW*)sub, (u8*)&arg);
                     arg.kind_0x00 = 5;
-                    fn_802738E8((struct _PLW*)sub, (u8*)&arg);
+                    pl_equip_model_set((struct _PLW*)sub, (u8*)&arg);
                     fn_801EC7AC(self);
                 } else {
                     sysSE_req(2);
@@ -1461,7 +1461,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                     req->state_0x000++;
                     sysSE_stop(0x28);
                     fn_8004D0E0(world, (u8)req->value_0x004);
-                    fn_80273998((struct _PLW*)sub, 5, world->count_0x0002);
+                    pl_parts_color_set((struct _PLW*)sub, 5, world->count_0x0002);
                     fn_801EC7AC(self);
                 } else {
                     sysSE_req(2);

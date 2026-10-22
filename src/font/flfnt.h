@@ -65,4 +65,10 @@ u32 font_buffer_size_get(void);
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+void font_locate(s16 x, s16 y);
+void font_print(s8* fmt, ...);
+#endif
+
 #endif /* MHTRI_FONT_FLFNT_H */

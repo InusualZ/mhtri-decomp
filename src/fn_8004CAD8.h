@@ -71,6 +71,8 @@ s32 calcVecAng2(VEC3* a, VEC3* b);
  * so they are declared here rather than inside the `extern "C"` block - rule 9.  Consumers used to spell them
  * locally in their own sources. */
 void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
+/* 0x80050B48 - the vector's X (pitch) angle in the low 16 bits of the returned word (`calcVecAngX__FPQ34nw4r4math4VEC3`). */
+u16 calcVecAngX(nw4r::math::VEC3* v);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
 /* 0x80050FB8 / 0x80051114 - the x- and z-axis rotations beside `rotVecY` (`rotVecX__FPQ34nw4r4math4VEC3Ul`,
  * `rotVecZ__FPQ34nw4r4math4VEC3Ul`); `enemy/em_common.cpp`'s approach step calls them. */
@@ -142,7 +144,7 @@ f32 vec3_dot(const f32* a, const f32* b);
  * ef_cylinder 0x800CBD20/0x800CBD3C).  The `(f32, f32)` spelling this symbol used to carry in
  * `ef.h` was the wrong view and made every TU including both headers fail to compile. */
 f32 sqrt_f32(f32 x);
-/* 0x8005024C - the `SinFIdx` wrapper `enemy/em015_tev_color_update.cpp`'s alpha computation calls: it narrows
+/* 0x8005024C - the `SinFIdx` wrapper `enemy/em015_prog.cpp`'s `em015_tev_color_update` alpha computation calls: it narrows
  * its argument to u16 (`clrlwi r3,r3,16`), scales the `anim_tick_angle` result and returns
  * `nw4r::math::SinFIdx`, so the signature is `(u16) -> f32` (settled from the callee's own body,
  * docs/plan.md 6.5 rule 6).  Added with proposal/80181C88. */
@@ -363,6 +365,16 @@ void quest_stat_copy(Q_QuestStat* dst, const Q_QuestStat* src);
 /* 0x8004FFA4 - a bare `b strstr`: the first occurrence of `needle` in `haystack`, or NULL (GUESS name; the
  * network message layout tests it against its tag names). */
 char* findSubstring(const char* haystack, const char* needle);
+}
+#endif
+
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+struct LobbyFriendList;
+struct LobbyTimerRow;
+extern "C" {
+void lobby_friend_list_sort(struct LobbyFriendList* list);
+void lobby_friend_row_copy(struct LobbyTimerRow* dst, const struct LobbyTimerRow* src);
 }
 #endif
 

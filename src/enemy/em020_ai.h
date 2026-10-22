@@ -1,6 +1,6 @@
 /*
  * enemy/em020_ai.h - declarations `enemy/em020_prog.cpp` owns that other units call: `getInstance_`,
- * `fn_803768F8`, `fn_80377664`, `em020_aim_target_ck` and `em020_hit_info_get`.
+ * `lobby_net_busy_ck`, `lobby_net_profile_part1_send`, `em020_aim_target_ck` and `em020_hit_info_get`.
  */
 #ifndef MHTRI_ENEMY_EM020_AI_H
 #define MHTRI_ENEMY_EM020_AI_H
@@ -20,9 +20,9 @@ extern "C" {
 /* 0x803768F0 - the network singleton (an 8-byte accessor); nothrow, so callers record no cleanup around it. */
 PatInterface* getInstance_(void) __attribute__((nothrow));
 /* 0x803768F8 - the lobby's "can leave the map" predicate (`lobby_w` +0x163/+0x16F/+0x0B0). */
-u32 fn_803768F8(void);
+u32 lobby_net_busy_ck(void);
 /* 0x80377664 - the network big-data request entry (the `fn_804273EC(1, 0, 0)` wrapper). */
-s32 fn_80377664(void* unused);
+s32 lobby_net_profile_part1_send(void);
 /* 0x803754F4 - the "aim target found" predicate (`+0x836` bit 15). */
 u32 em020_aim_target_ck(struct _ENEMY_WORK* self);
 /* The out record `em020_hit_info_get` fills (the first 8 bytes of a `Q_QuestStat`).  size: 0x08 */

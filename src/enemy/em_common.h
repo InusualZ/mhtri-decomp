@@ -139,4 +139,12 @@ void em_busy_timer_clear(struct _ENEMY_WORK* self);
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+extern "C" {
+/* 0x80131DA8 */
+void em_water_surface_latch(struct _ENEMY_WORK* self);
+}
+#endif
+
 #endif /* MHTRI_ENEMY_EM_COMMON_H */

@@ -33,7 +33,7 @@ void fn_80219530(void*, void*);
 s32 fn_802754B4(void*);
 s32 fn_8027E354(u8, u16);
 s32 lb_unlock_cond_ck(u16);
-u32 fn_803768F8(void);
+u32 lobby_net_busy_ck(void);
 u32 chk_pointer(void);
 void eft_res_slot_release(void* obj);
 void fn_8021AA78(void*, u32, void*, void*, void*);
@@ -176,7 +176,7 @@ void fn_80219530(void*, void*);
 s32 fn_802754B4(void*);
 s32 fn_8027E354(u8, u16);
 s32 lb_unlock_cond_ck(u16);
-u32 fn_803768F8(void);
+u32 lobby_net_busy_ck(void);
 u32 chk_pointer(void);
 void eft_res_slot_release(void* obj);
 void fn_8021AA78(void*, u32, void*, void*, void*);
@@ -438,7 +438,7 @@ void fn_801E4E44(LbEftWork* self)
     u16 flags;
 
     if (chk_pointer() != 1) {
-        if (fn_803768F8() != 1) {
+        if (lobby_net_busy_ck() != 1) {
             flags = Psw.press_0x2C8;
             if (flags & 0x0C00) {
                 if (flags & 0x0800) {

@@ -56,4 +56,9 @@ void* work_mem_alloc(u32 size); /* untyped: a byte range the caller types */
 void hbm_disable(void);
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+u8** get_str_tbl(s32 idx);
+#endif
+
 #endif /* MHTRI_EF_SYSTEM_CORE_H */

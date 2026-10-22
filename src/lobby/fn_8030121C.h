@@ -16,4 +16,11 @@ void eft_em_spawn(struct _ENEMY_WORK* self, u32 id, u32 joint, nw4r::math::VEC3*
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+extern "C" {
+void eft_em_spawn_tinted(struct _ENEMY_WORK* self, u32 id, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 color);
+}
+#endif
+
 #endif /* MHTRI_LOBBY_FN_8030121C_H */

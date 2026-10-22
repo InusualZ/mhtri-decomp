@@ -63,7 +63,7 @@ IdValue* item_pair_copy(void* dst, const void* src);
 u16 userdata_box_capacity(void* userdata);
 /* 0x8004AEC0 - `userdata_gunner_ck`: declared in the leaf header `fn_80047398/userdata_gunner_ck.h`. */
 s32 userdata_pouch_size(u8 idx);
-s16 fn_8004AF20(void* userdata);
+s16 userdata_item_slot_count(void* userdata);
 void* userdata_pouch_get(void* userdata, u8 idx);
 /* 0x8004AF78 - the item-slot run `userdata_gunner_ck` selects (`userdata_pouch_get`'s set 1 for a gunner set, else set 0).  GUESS name. */
 void* userdata_equip_item_slots_get(void* userdata);

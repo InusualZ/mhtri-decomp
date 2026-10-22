@@ -1345,4 +1345,14 @@ void updateTransferMode(void);
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+extern "C" {
+char* getSelfName(void);
+char* getMessageEntry(s32 index);
+s32 getMessageTableState(void);
+void clearMessageTableState(void);
+}
+#endif
+
 #endif /* MHTRI_NETWORK_NETWORK_PAT_CONTROL_H */

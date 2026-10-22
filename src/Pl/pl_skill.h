@@ -29,7 +29,7 @@ u32 Pl_cat_skill_ck__FP4_PLWUs(struct _PLW* work, u16 skill);
 #ifdef __cplusplus
 extern "C" {
 #endif
-void fn_8027350C(struct _PLW* self, s32 part);
+void pl_parts_refresh(struct _PLW* self, s32 part);
 /* 0x80272E30 - `pl_item_add`, the item/skill value setter `Pl/pl_act_step.cpp` calls; declared in the leaf
  * header `Pl/pl_item_add.h`, included below. */
 /* 0x802739F0 - the equipment-slot record resolver the act-entry section's act-kind switch calls. */

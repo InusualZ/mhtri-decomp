@@ -547,7 +547,7 @@ extern "C" void hud_msg_draw(void);
 /* 0x8035902C (0x114): Returns the three item-page counts of one item id through optional out pointers. */
 extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 {
-    u32 a = fn_8004AF20(lobby_world_block);
+    u32 a = userdata_item_slot_count(lobby_world_block);
     u32 b = item_count_find(id, userdata_equip_item_slots_get(lobby_world_block), a);
     u32 c = item_slots_count_sum(id, &lobby_world_block->field_0x0180, userdata_box_capacity(lobby_world_block));
     u32 d;

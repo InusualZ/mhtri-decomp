@@ -23,4 +23,13 @@ void lb_event_schedule_step(void);
 }
 #endif
 
+/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
+#ifdef __cplusplus
+namespace nw4r { namespace math { struct VEC3; } }
+extern "C" {
+void lobby_player_place(u8 mode, nw4r::math::VEC3* pos, u16 angle);
+void lobby_player_place_ex(u8 mode, nw4r::math::VEC3* pos, u16 angle, s32 kind);
+}
+#endif
+
 #endif /* MHTRI_LOBBY_LB_MENU_POS_TBL_H */

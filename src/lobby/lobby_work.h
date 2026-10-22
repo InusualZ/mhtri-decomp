@@ -143,18 +143,20 @@ typedef struct LbLobbyWork {
     /* +0x164 */ s16 net_wait_0x164;   /* frames the game-mode flow waits before it offers to leave a dropped session */
     /* +0x166 */ u8 pad_0x166[0x2];
     /* +0x168 */ char* net_err_0x168;  /* the network error message `lobby_net_err_draw` shows */
-    /* +0x16C */ u8 pad_0x16C;
+    /* +0x16C */ u8 err_ack_0x16C;   /* set once the player confirmed the session error window */
     /* +0x16D */ s8 friend_sync_0x16D; /* the result `requestFriendSync` writes */
-    /* +0x16E */ u8 pad_0x16E;
+    /* +0x16E */ u8 sub_err_step_0x16E; /* the sub-error window's step */
     /* +0x16F */ s8 field_0x16F;
-    /* +0x170 */ u8 pad_0x170[0x2];
+    /* +0x170 */ s16 sub_err_wait_0x170; /* the sub-error window's frame counter */
     /* +0x172 */ union {
         s16 field_0x172;
         u16 busy_0x172;   /* nonzero while a lobby transition owns the screen */
     };
     /* +0x174 */ s16 leave_wait_0x174;  /* frames the game-mode flow waits before it leaves the lobby */
     /* +0x176 */ u8 field_0x176;
-    /* +0x177 */ u8 unused_0x177[0x5];
+    /* +0x177 */ u8 refresh_step_0x177;  /* the friend-list refresh request's step */
+    /* +0x178 */ s8 refresh_result_0x178; /* its result code */
+    /* +0x179 */ u8 unused_0x179[0x3];
 } LbLobbyWork; /* size: 0x17C */
 
 #endif /* MHTRI_LOBBY_LOBBY_WORK_H */

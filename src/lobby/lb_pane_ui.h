@@ -111,7 +111,7 @@ typedef struct LbSelRec {
     /* +0x06 */ u8 unused_0x06[4];
 } LbSelRec; /* size: 0xA */
 
-/* The 0xC-byte per-step argument `fn_801F3294` fills for `fn_802738E8`: the first byte is the kind and
+/* The 0xC-byte per-step argument `fn_801F3294` fills for `pl_equip_model_set`: the first byte is the kind and
  * the rest is left zeroed.  size: 0xC */
 typedef struct LbStepArg {
     /* +0x00 */ u8 kind_0x00;
