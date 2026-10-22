@@ -120,6 +120,7 @@ typedef struct LbLobbyWork {
         struct LbShopWork* shop_0x0AC;            /* screen 0x02, the NPC shop (`lobby/lb_npc.cpp`) */
         struct LbScreen26Work* screen26_0x0AC;    /* screen 0x1A, the combine/trade counter (`lobby/lb_server_sel_trans.cpp`) */
         struct LbServerSelWork* server_sel_0x0AC; /* screen 0x1B, the server select (`lobby/lb_server_sel_trans.cpp`) */
+        struct MenuQuestWork* quest_0x0AC;        /* screens 0x0C/0x1D, the quest accept and join screens (`menu/fn_8031EA8C.cpp`) */
     };
     /* +0x0B0 */ u8 field_0x0B0;
     /* +0x0B1 */ u8 sub_0x0B1;

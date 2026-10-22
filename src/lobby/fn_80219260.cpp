@@ -75,7 +75,7 @@ struct LbMenuState {
     /* +0x009 */ u8 flags_0x009;    /* bit 0 = a slot is set, bit 1 = the selection timer is armed */
     /* +0x00A */ u8 unused_0x00A[2];
     /* +0x00C */ u8 unused_0x00C[4];
-    /* +0x010 */ u32 word_0x010;    /* the menu value `fn_8021D170` publishes */
+    /* +0x010 */ u32 word_0x010;    /* the menu value `lb_talk_page_value_set` publishes */
     /* +0x014 */ u32 word_0x014;
     /* +0x018 */ u32 word_0x018;
     /* +0x01C */ s32 word_0x01C;    /* the selection timer `fn_8021D1D4` advances */
@@ -467,7 +467,7 @@ extern "C" u32 lb_talk_page_value_get(void) {
 }
 
 /* Sets the page's menu value and its previous value. */
-extern "C" void fn_8021D170(s32 value) {
+extern "C" void lb_talk_page_value_set(s32 value) {
     lbl_806AA790.word_0x010 = (u8)value;
     lbl_806AA790.word_0x014 = (u8)value;
 }

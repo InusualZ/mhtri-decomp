@@ -7694,7 +7694,7 @@ void camera_work_init(void);
 void camera_area_default_set(void);
 void stage_dcm_path_get(char* buf, u8 index);
 void sprite_frame_apply(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
-void fn_8032422C(void);
+void lobby_hud_reset(void);
 void hud_msg_init(void);
 void lobby_res_slots_init(void);
 void demo_work_start(void);
@@ -8314,7 +8314,7 @@ void fn_801FB438(void)
     camera_work_init();
     fn_8021D9F8();
     menu_item_work_init();
-    fn_8032422C();
+    lobby_hud_reset();
     hud_msg_init();
     demo_work_start();
 }

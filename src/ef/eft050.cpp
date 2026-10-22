@@ -267,7 +267,7 @@ void fn_8033F560(CockpitPanel* self, const _mh_ivec2_* pos);
 void fn_8033F638(CockpitRecord* self);
 void fn_8033F6C4(s32 value, _mh_ivec2_* out);
 void fn_8033FA2C(void);
-s32 fn_8033FD78(void);
+s32 lb_npc_mark_state_get(void);
 void fn_8033FEE8(_EFT* self);
 void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param, u8 area);
 void fn_8033FF24(_EFT* self);
@@ -550,7 +550,7 @@ extern "C" void fn_8033FA2C(void)
 
 /* Reports the hold's state: 0 while the busy flag is set, -1 while the hold flag is clear, 1
  * otherwise. */
-extern "C" s32 fn_8033FD78(void)
+extern "C" s32 lb_npc_mark_state_get(void)
 {
     CockpitSharedDb* db = lobby_world_block;
     if (db->busy_flag_0x5228 != 0) {

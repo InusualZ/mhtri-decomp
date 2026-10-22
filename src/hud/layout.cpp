@@ -440,7 +440,7 @@ void fn_802E0F78(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx)
 
 /* 0x802E1024 (0xAC) - blit a *copy* of the record with texture `tex_idx` and the colour
  * multiplied by `color`. */
-void fn_802E1024(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
+void draw_tex_icon(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *rec;
 
@@ -455,13 +455,13 @@ void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos)
 {
     ItemDataRecord* item = GetItemData(id);
 
-    fn_802E1024((_SPR_DATA_*)&spr, item->tex_idx_0x004, item_kind_color_tbl[item->kind], pos);
+    draw_tex_icon((_SPR_DATA_*)&spr, item->tex_idx_0x004, item_kind_color_tbl[item->kind], pos);
 }
 
 /* 0x802E1134 (0x5C) - the same from the sprite id. */
 void draw_tex_icon_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
-    fn_802E1024(get_lsp_data(id, 0), tex_idx, color, pos);
+    draw_tex_icon(get_lsp_data(id, 0), tex_idx, color, pos);
 }
 
 /* 0x802E1190 (0x64) - the item icon drawn with an arbitrary sprite id. */
@@ -499,7 +499,7 @@ u32 draw_itemicon_frame_idx(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_i
     _SPR_DATA_ work;
     u32 drawn = sprite_frame_apply(&work, id, part, 0);
 
-    fn_802E1024(&work, tex_idx, color, pos);
+    draw_tex_icon(&work, tex_idx, color, pos);
     return drawn;
 }
 
@@ -527,7 +527,7 @@ void draw_equipicon_rare(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, 
         if (equip->kind == 0xB && !Gunner_opt_ok_ck(equip)) {
             fn_802E1518(spr, Get_pl_type(equip, 0), get_rare_color(rare), pos);
         } else {
-            fn_802E1024(spr, lbl_805D57B8[equip->kind], get_rare_color(rare), pos);
+            draw_tex_icon(spr, lbl_805D57B8[equip->kind], get_rare_color(rare), pos);
         }
     }
 }
@@ -541,7 +541,7 @@ void draw_equipicon_idx(u16 id, _EQUIP* equip, const _mh_ivec2_* pos)
 /* 0x802E1518 (0x14) - the weapon icon: the player type selects the texture out of a byte table. */
 void fn_802E1518(_SPR_DATA_* spr, u8 kind, u32 color, const _mh_ivec2_* pos)
 {
-    fn_802E1024(spr, lbl_805D57C8[kind], color, pos);
+    draw_tex_icon(spr, lbl_805D57C8[kind], color, pos);
 }
 
 /* 0x802E152C (0x5C) - the same for a sprite id. */

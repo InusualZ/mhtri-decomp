@@ -1434,7 +1434,7 @@ extern "C" void fn_800DB75C(_PLW* plw, nw4r::math::VEC3* pos) {
 /* --- 0x800DB7C8 -------------------------------------------------------------------------------- */
 
 /* Requests the player's other footstep sound through the player's own sound work. */
-extern "C" void fn_800DB7C8(_PLW* plw, nw4r::math::VEC3* pos) {
+extern "C" void pl_se_pos_req(_PLW* plw, nw4r::math::VEC3* pos) {
     if (plw == NULL) {
         return;
     }

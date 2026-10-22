@@ -16,7 +16,7 @@ typedef struct LbMenuRow {
 } LbMenuRow; /* size: 0x10 */
 
 typedef struct LbMenuScratch {
-    /* +0x000 */ u32 unused_0x000;
+    /* +0x000 */ struct _PLW* plw_0x000; /* the local player's move work (the menu effect follows it) */
     /* +0x004 */ s16* fixed_a_0x004;  /* the -2 mode's string row */
     /* +0x008 */ u8* fixed_b_0x008;   /* the -2 mode's model row */
     /* +0x00C */ LbMenuRow rows_0x00C[20];
@@ -24,7 +24,7 @@ typedef struct LbMenuScratch {
     /* +0x14E */ u8 unused_0x14E[0x02];
     /* +0x150 */ u32 timer_0x150;
     /* +0x154 */ u8 count_0x154;
-    /* +0x155 */ u8 unused_0x155[0x01];
+    /* +0x155 */ u8 hidden_0x155;   /* non-zero: the menu effect skips placing its models */
     /* +0x156 */ u8 flags_0x156[8];  /* one byte per selected slot (`lobby/fn_80219260.cpp`) */
     /* +0x15E */ u8 unused_0x15E[0x02];
     /* +0x160 */ VEC3 slots_0x160[8];

@@ -65,7 +65,7 @@ struct ItemDataRecord {
                                        * merge) */
     /* +0x004 */ u8 tex_idx_0x004;    /* the texture index `draw_itemicon_item_id`/`draw_itemicon_item_id_idx`
                                        * (both in `hud/layout.cpp`) hand to `atlas_digit_uv_get`, and the
-                                       * byte `fn_802E1024`'s callers read next to `kind`.  Spliced
+                                       * byte `draw_tex_icon`'s callers read next to `kind`.  Spliced
                                        * out of the `unused_0x003[2]` filler this record carried, one
                                        * byte at +0x004, so no member's offset moved (playbook 56). */
     /* +0x005 */ u8 kind;             /* indexes the .data colour table `item_kind_color_tbl` */

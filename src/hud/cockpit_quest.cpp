@@ -850,7 +850,7 @@ void cockpit_frame_update(void) {
     if (pad_hold_ck() != 1) {
         work->field_0x0D1 = 0;
         cockpit_frame_tick();
-        fn_803839EC();
+        hud_info_toggle_step();
         cockpit_notice_update();
         quest_gauge_update(work, 0xFF);
         cockpit_item_tag_update(plw, &work->item_tag_0x02C);

@@ -3389,7 +3389,7 @@ void ai_npc_reaction_forward(void);
 void ainpc_page_idle(void);
 void menu_work_update(void);
 void fn_8021DC24(void);
-void fn_80324274(void);
+void lobby_hud_frame_update(void);
 void ainpc_page_update(void);
 void fn_801FD0F8(void);
 void fn_801FD174(_LB_NPC* self);
@@ -3439,7 +3439,7 @@ void lobby_frame_update(void)
             menu_work_update();
         }
         fn_8021DC24();
-        fn_80324274();
+        lobby_hud_frame_update();
         ainpc_page_update();
     }
 }
