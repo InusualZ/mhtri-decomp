@@ -3053,7 +3053,7 @@ s32 fn_80260198(_PLW* self) {
             if (kind == 0) {
                 break;
             }
-            value = fn_80050A40(entry->x_0x08, entry->z_0x10, pl_float_zero, pl_float_zero);
+            value = calc_xz_angle(entry->x_0x08, entry->z_0x10, pl_float_zero, pl_float_zero);
             if ((kind & 2) != 0) {
                 self->field_0x058 = value;
                 self->field_0x0A8 = value;

@@ -75,7 +75,7 @@ s32 pl_item_room_get(struct _PLW* self, u16 item_id, s16 value);
 u32 pl_act_kind_get(struct _PLW* self);
 
 /* ---- library callees (the owners' headers do not declare these) ---- */
-u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
+u32 calc_xz_angle(f32 a, f32 b, f32 c, f32 d);
 u32 fn_800524C0(f32 a, void* b, void* c, void* d, void* e);
 u32 mhchar_model_mtx_update(void* p);
 u32 event_demo_running_ck(void);

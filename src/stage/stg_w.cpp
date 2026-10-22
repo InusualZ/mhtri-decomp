@@ -398,7 +398,7 @@ extern "C" void fn_802AE980(u8* dst, const u8* src)
 }
 
 /* Returns the id-remapped byte at stage_w.bitmask[index]. */
-extern "C" u8 fn_802B0AEC(u8 index)
+extern "C" u8 stage_area_bit_get(u8 index)
 {
     const u8* p = &SW->bitmask[0];
     return p[(u8)index];

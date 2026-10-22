@@ -250,7 +250,7 @@ extern "C" {
 
 void draw_font_idx_num(u16 id, s32 value, u32 mode, const _mh_ivec2_* pos);
 void addVec3To(VEC3* dst, const VEC3* src);
-u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
+u32 calc_xz_angle(f32 a, f32 b, f32 c, f32 d);
 const u8* fn_802D773C(u8 index);
 void fn_802D7754(u8 a, u8 b, u16* out);
 const u8* lb_entry_id_get(u8 index);
@@ -710,7 +710,7 @@ extern "C" Eft050Slot* fn_803401CC(s8 index)
 /* The squared distance of the two points' x/z pairs, narrowed to the u16 the caller wants. */
 extern "C" u16 fn_803401E4(const VEC3* a, const VEC3* b)
 {
-    return (u16)fn_80050A40(a->x, a->z, b->x, b->z);
+    return (u16)calc_xz_angle(a->x, a->z, b->x, b->z);
 }
 
 /* Moves `cur` towards `target` by at most `step`, returning the step actually applied. */

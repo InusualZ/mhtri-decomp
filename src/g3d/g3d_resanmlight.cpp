@@ -63,7 +63,7 @@ typedef struct {
 } ResAnmLightResult; /* size: 0x40 */
 
 /* Forward declarations for the unit's own functions (defined below in address order). */
-extern "C" f32 fn_8008FFFC(void);
+extern "C" f32 floorf_thunk(void);
 extern "C" u32 fn_80090000(u32 *self, s32 offset);
 
 /* The `g3d_resanm_ac.h` bool-channel accessors: `inline`, called out of line (`dont_inline`), defined in the
@@ -123,7 +123,7 @@ extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pRes
     clamped = fn_8008A1A8((u16 *)(fn_80090000((u32 *)arg0, res->field_0x04) + 0x34), frame);
     pResult->flags = flags & 0x3F;
     if ((flags & 0x00800000) == 0) {
-        if (fn_8008FD04(&res->dataOffset, (s32)fn_8008FFFC()) != 0) {
+        if (fn_8008FD04(&res->dataOffset, (s32)floorf_thunk()) != 0) {
             pResult->flags |= 0x4;
         }
     }
@@ -170,7 +170,7 @@ extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pRes
 }
 
 /* The global frame thunk (a tail call into the shared frame getter). */
-extern "C" f32 fn_8008FFFC(void)
+extern "C" f32 floorf_thunk(void)
 {
     return floorf();
 }

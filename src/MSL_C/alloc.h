@@ -77,7 +77,7 @@ int __fpclassifyf(float x);
 /* untyped: caller-owned heap block */
 void free(void* ptr);
 
-/* 0x80463E74 - the global frame thunk `g3d/g3d_resanmlight.cpp`'s `fn_8008FFFC` tail-calls. */
+/* 0x80463E74 - the global frame thunk `g3d/g3d_resanmlight.cpp`'s `floorf_thunk` tail-calls. */
 f32 floorf(void);
 
 #ifdef __cplusplus

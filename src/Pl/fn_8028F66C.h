@@ -48,8 +48,8 @@ void fn_802977E4(LandData* land);
  * `LandData`/out/kind.  The AI band reads the ground under its own work record, so its call site casts it. */
 s32 fn_80291B08(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
 
-/* 0x802907BC - tests point `a` against the capsule box `b` (C linkage: the map row is the plain name). */
-u32 pl_capsule_point_ck(void* a, void* b);
+/* 0x802907BC - 1 when `point` lies inside the capsule box `capsule` (C linkage: the map row is the plain name). */
+u32 pl_capsule_point_ck(nw4r::math::VEC3* point, struct PlCapsuleBox* capsule);
 
 #ifdef __cplusplus
 }

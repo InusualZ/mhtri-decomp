@@ -270,7 +270,7 @@ extern s32 ran_suu__Fl(s32 n);
 
 extern void em_damage_reenter_ck(EnemyWork* work);
 extern u32 em_damage_eval(EnemyWork* work);
-extern void fn_80295578(EnemyWork* work, u8 arg1, u16 arg2);
+extern void em_coll_shape_set(EnemyWork* work, u8 arg1, u16 arg2);
 extern void hit_attack_list_push(void* arg0);
 extern void hit_knock_set(void* arg0, s32 arg1);
 extern void fn_802B01AC(Vec3* out, const Vec3* v, u8 area);
@@ -563,12 +563,12 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
             setVector3__FPQ34nw4r4math4VEC3fff(&offset, lbl_80796D40, lbl_80796D40, lbl_80796D44);
             rotVecY__FPQ34nw4r4math4VEC3Ul(&offset, self->field_0x1C0);
             addVec3To(&self->field_0x188, &offset);
-            fn_80295578(self, arg1, em_hit_mask_get(self));
+            em_coll_shape_set(self, arg1, em_hit_mask_get(self));
             if (self->field_0x218 == 0) {
                 copyVec3(&self->field_0x188, &saved);
             }
         } else {
-            fn_80295578(self, arg1, em_hit_mask_get(self));
+            em_coll_shape_set(self, arg1, em_hit_mask_get(self));
         }
     }
 }
