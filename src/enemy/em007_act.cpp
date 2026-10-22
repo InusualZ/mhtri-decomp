@@ -202,7 +202,7 @@ void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_reaction_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_busy_set(struct _ENEMY_WORK* self);
 u32 em_busy_ck(struct _ENEMY_WORK* self);
-u32 fn_8012D23C(struct _ENEMY_WORK* self, u32 a, u8 b);
+u32 em_team_mate_state_ck(struct _ENEMY_WORK* self, u32 a, u8 b);
 u8 fn_8012D3E0(struct _ENEMY_WORK* self, u32 a);
 
 u32 em_eft_active_ck(struct _ENEMY_WORK* self);
@@ -217,10 +217,10 @@ u32 em_mot_end_ck(struct _ENEMY_WORK* self);
 f32 fn_8013032C(struct _ENEMY_WORK* self);
 void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
-void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
-void fn_80130CE8(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
+void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
+void em_stamina_regen(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void em_busy_timer_reset(struct _ENEMY_WORK* self);
-void fn_80131EC0(struct _ENEMY_WORK* self);
+void em_timer_0x81C_arm(struct _ENEMY_WORK* self);
 void em_turn_to_target(struct _ENEMY_WORK* self, u32 a);
 void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
 void fn_80133F4C(struct _ENEMY_WORK* self, u32 a, f32 b, f32 c);
@@ -256,9 +256,9 @@ void vec3_scale(void* out, void* a, f32 b);
 void addVec3To(void* a, void* b);
 void eft007_part_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_spawn_rec_init(void* out);
-void fn_802B43A8(void* pos, u8 a, u16 b);
-void fn_802B954C(void);
-void fn_802B9574(u32 a);
+void stg_ground_impact_set(void* pos, u8 a, u16 b);
+void camera_flag_0x145_set(void);
+void camera_target_slot_clear(u32 a);
 void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, void* pos, f32 c);
 void em_drop_item_spawn(struct _ENEMY_WORK* self, void* pos, u32 a);
 
@@ -281,7 +281,7 @@ extern "C" void fn_801D80EC(struct _ENEMY_WORK* self, u32 arg1, u32 arg2) {
         em_mot_set_ck(self, 0xA, 4, 0);
         em_mot_speed_set(self, lbl_80799520);
         em_hit_window_set(self, 0, 0xC, 2);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         switch ((u8)arg1) {
         case 0: em_approach_start(self, lbl_80799524, 0); return;
         case 1: em_approach_start(self, lbl_80799528, 0); return;
@@ -690,7 +690,7 @@ extern "C" void fn_801D8E9C(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0x15, 4, 0);
         em_hit_window_set(self, 0, 2, 0x88);
         em_hit_window_set(self, 1, 0x34, 0x18);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         em_move_vec2_clr(self);
         temp_f31 = get_em_chg_scale(self);
         self->field_0x318 = lbl_80799574 * get_em_base_scale(self) * temp_f31;
@@ -731,7 +731,7 @@ extern "C" void fn_801D9024(struct _ENEMY_WORK* self, u8 arg1) {
         }
         em_hit_window_set(self, 0, var_r5, 0x88);
         em_hit_window_set(self, 1, 0x37, 0x18);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         return;
     case 1:
         if (em_frame_check(self, 0, lbl_80799578, lbl_807994FC) == 1) {
@@ -770,7 +770,7 @@ extern "C" void fn_801D9150(struct _ENEMY_WORK* self, u8 arg1) {
         }
         em_hit_window_set(self, 0, var_r5, 0x88);
         em_hit_window_set(self, 1, 0x39, 0x18);
-        fn_80130CDC(self, (u32)-0x32);
+        em_stamina_add(self, (u32)-0x32);
         self->timer_0x020 = 0x3E8;
         em_approach_start(self, lbl_807994FC, 0);
         return;
@@ -842,7 +842,7 @@ extern "C" void fn_801D944C(struct _ENEMY_WORK* self) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x17, 6, 0);
         em_hit_window_set(self, 0, 7, 0x80);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         subVec3(&sp10, &self->vec_0x36C, &self->pos);
         copyVec3(&sp1C, &sp10);
         calcVecAngXY(&sp1C, &spC, &sp8);
@@ -882,7 +882,7 @@ extern "C" void fn_801D9584(struct _ENEMY_WORK* self, u8 arg1) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x18, 6, 0);
         em_hit_window_set(self, 0, 8, 0x80);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         subVec3(&sp10, &self->vec_0x36C, &self->pos);
         copyVec3(&sp1C, &sp10);
         calcVecAngXY(&sp1C, &spC, &sp8);
@@ -920,7 +920,7 @@ extern "C" void fn_801D9708(struct _ENEMY_WORK* self, u8 arg1) {
         self->state = temp_r3 + 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, (u16)(((arg1 - 1) == 0) + 0x2A), 6, 0);
-        fn_80130CDC(self, (u32)-0x32);
+        em_stamina_add(self, (u32)-0x32);
         return;
     case 1:
         if ((em_frame_check(self, 3, lbl_807995B0, lbl_80799504) == 1) && ((system_w.field_0x0c & 1) == 0)) {
@@ -1005,7 +1005,7 @@ extern "C" void fn_801D9918(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
         em_mot_set(self, var_r4, 2, 0);
         em_hit_window_set(self, 0, var_r28, 0x88);
         em_hit_window_set(self, 1, var_r29, 0x90);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         return;
     case 1:
         if (em_frame_check(self, 2, lbl_8079950C, lbl_807994FC) == 1) {
@@ -1079,7 +1079,7 @@ extern "C" void fn_801D9CE4(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0x19, 4, 0);
         em_mot_speed_set(self, lbl_80799520);
         em_hit_window_set(self, 0, 9, 0x88);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         em_target_pos_set(self, 0);
         var_f31 = calcVecDistXZ(&self->pos, &self->vec_0x36C) - lbl_807995E8;
         if (var_f31 > lbl_807995EC) {
@@ -1180,7 +1180,7 @@ extern "C" void fn_801DA0D8(struct _ENEMY_WORK* self) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x1D, 4, 0);
         em_hit_window_set(self, 0, 1, 0x88);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         return;
     case 1:
         if (em_frame_check(self, 0, lbl_80799608, lbl_807994FC) == 1) {
@@ -1193,7 +1193,7 @@ extern "C" void fn_801DA0D8(struct _ENEMY_WORK* self) {
             setVector3(&sp8, lbl_80799610, lbl_807994FC, lbl_807994FC);
             shell_set_func_ptr->method_0x2C(self, 9, 0x29, &sp8, lbl_80799614, self->field_0xAEA,
                                            shell_set_func_ptr);
-            fn_802B43A8(&self->pos, self->area_no, self->bits_0x1EC);
+            stg_ground_impact_set(&self->pos, self->area_no, self->bits_0x1EC);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1316,7 +1316,7 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
         self->field_0x314 = lbl_807994FC;
         return;
     case 1:
-        fn_80131EC0(self);
+        em_timer_0x81C_arm(self);
         if (em_frame_check(self, 3, lbl_80799628, lbl_8079962C) == 1) {
             em_move_offset_apply(self);
             em_turn_seq_step(self, lbl_80570680);
@@ -1329,7 +1329,7 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
         }
         return;
     case 2:
-        fn_80131EC0(self);
+        em_timer_0x81C_arm(self);
         temp_r0 = self->timer_0x020 - 1;
         self->timer_0x020 = temp_r0;
         if (temp_r0 < 0) {
@@ -1337,7 +1337,7 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
         }
         if (em_busy_ck(self) == 1) {
             if (fn_801DA410(self, self->field_0x382) == 1) {
-                if (fn_8012D23C(self, 1, self->field_0x382) == 1) {
+                if (em_team_mate_state_ck(self, 1, self->field_0x382) == 1) {
                     self->field_0x1E7 = 5;
                     if (em_eft_active_ck(self) == 1) {
                         em_state_set(self, 9, 3);
@@ -1346,7 +1346,7 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
                     em_state_set(self, 9, 1);
                     return;
                 }
-                if ((self->timer_0x020 <= 0) || (fn_8012D23C(self, 0, self->field_0x382) == 0)) {
+                if ((self->timer_0x020 <= 0) || (em_team_mate_state_ck(self, 0, self->field_0x382) == 0)) {
                     em_state_set(self, 1, 7);
                     return;
                 }
@@ -1371,7 +1371,7 @@ extern "C" void fn_801DA7B4(struct _ENEMY_WORK* self) {
     u8 temp_r0;
     u8 temp_r3;
 
-    fn_80131EC0(self);
+    em_timer_0x81C_arm(self);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1382,7 +1382,7 @@ extern "C" void fn_801DA7B4(struct _ENEMY_WORK* self) {
         return;
     case 1:
         if (em_busy_ck(self) == 1) {
-            if ((fn_8012D23C(self, 1, self->field_0x382) == 1) &&
+            if ((em_team_mate_state_ck(self, 1, self->field_0x382) == 1) &&
                 (fn_801DA410(self, self->field_0x382) == 1)) {
                 temp_r0 = self->field_0x1E7 - 1;
                 self->field_0x1E7 = temp_r0;
@@ -1411,7 +1411,7 @@ extern "C" void fn_801DA8DC(struct _ENEMY_WORK* self, u8 arg1) {
     u8 temp_r0;
     u8 temp_r3;
 
-    fn_80131EC0(self);
+    em_timer_0x81C_arm(self);
     temp_r3 = self->state;
     switch (temp_r3) {
     case 0:
@@ -1432,7 +1432,7 @@ extern "C" void fn_801DA8DC(struct _ENEMY_WORK* self, u8 arg1) {
             if (em_frame_check(self, 0, lbl_80799630, lbl_807994FC) == 1) {
                 temp_f2 = (f32)self->field_0x7A4;
                 em_gauge_period_step(self, (s32)(lbl_80799634 * temp_f2), 1, lbl_807994F8, temp_f2);
-                fn_80130CE8(self, 0x32, 1, lbl_807994F8);
+                em_stamina_regen(self, 0x32, 1, lbl_807994F8);
             }
             if (em_frame_check(self, 0, lbl_80799638, lbl_807994FC) == 1) {
                 em_camera_req(self, 0x16, 7);
@@ -1442,7 +1442,7 @@ extern "C" void fn_801DA8DC(struct _ENEMY_WORK* self, u8 arg1) {
                 em_mot_set(self, 0x35, 4, 0);
             case 1:
                 if (em_busy_ck(self) == 1) {
-                    if ((fn_8012D23C(self, 1, self->field_0x382) == 1) &&
+                    if ((em_team_mate_state_ck(self, 1, self->field_0x382) == 1) &&
                         (fn_801DA410(self, self->field_0x382) == 1)) {
                         em_state_set(self, 9, 0);
                         return;
@@ -1468,15 +1468,15 @@ extern "C" void fn_801DAAC8(struct _ENEMY_WORK* self) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x33, 2, 0);
         em_hit_window_set_default(self, 0, 0x19);
-        fn_80131EC0(self);
-        fn_802B954C();
+        em_timer_0x81C_arm(self);
+        camera_flag_0x145_set();
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_80799648, lbl_807994FC) == 1) {
-            fn_802B9574(0);
+            camera_target_slot_clear(0);
         }
         if (em_frame_check(self, 3, lbl_8079951C, lbl_807994FC) == 1) {
-            fn_80131EC0(self);
+            em_timer_0x81C_arm(self);
         }
         if (em_frame_check(self, 0, lbl_8079951C, lbl_807994FC) == 1) {
             em_drop_item_spawn(self, &self->pos, 0x64);
@@ -1583,7 +1583,7 @@ extern "C" void fn_801DB100(struct _ENEMY_WORK* self) {
         em_mot_set_ck(self, 0xA, 4, 0);
         em_mot_speed_set(self, lbl_80799520);
         em_hit_window_set(self, 0, 0xC, 2);
-        fn_80130CDC(self, (u32)-0x14);
+        em_stamina_add(self, (u32)-0x14);
         em_approach_start(self, lbl_80799528, 0);
         return;
     case 1:
@@ -1725,7 +1725,7 @@ extern "C" void fn_801DB648(struct _ENEMY_WORK* self) {
         self->state = temp_r4 + 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x33, 2, 0);
-        fn_80130CDC(self, 0x3E8);
+        em_stamina_add(self, 0x3E8);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -1865,8 +1865,8 @@ void em_fall_start(struct _ENEMY_WORK* self);
 void em_hit_arm_set(struct _ENEMY_WORK* self);
 void em_move_offset_rot_apply(struct _ENEMY_WORK* self, void* p);
 f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
-void fn_801369A0(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
-void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
+void em_ground_impact_set(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
+void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
 void em_bait_react(struct _ENEMY_WORK* self);
 struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void em_gauge_tick(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
@@ -1915,7 +1915,7 @@ void fn_801D3CF8(struct _ENEMY_WORK* self, u32 a);
 void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, u32 d);
 
 s32 pl_capsule_point_ck(s32 a, void* b);
-void fn_802B43A8(void* pos, u8 a, u16 b);
+void stg_ground_impact_set(void* pos, u8 a, u16 b);
 
 /* ----------------------------------------------------------------------------------------------------
  * the records this unit needs locally
@@ -2224,7 +2224,7 @@ void fn_801D7A74(struct _ENEMY_WORK* self) {
         if (em_frame_check(self, 0, lbl_80799504, lbl_807994FC) == 1) {
             em_hit_window_set(self, 0, 0xB, 5);
             draw_shape_arm(self, 0x17, 0xA);
-            fn_802B43A8(&self->pos, self->area_no, self->bits_0x1EC);
+            stg_ground_impact_set(&self->pos, self->area_no, self->bits_0x1EC);
         }
         if (em_frame_check(self, 0, lbl_80799504, lbl_807994FC) == 1) {
             setVector3(&pos, lbl_807994FC, lbl_80799508, lbl_8079950C);
@@ -2317,7 +2317,7 @@ void fn_801D7E44(struct _ENEMY_WORK* self, u32 arg1) {
         em_mot_set_blend(self, 0xC9, 6, 0, 1);
         em_hit_window_set_default(self, 0, 0x3D);
         if (arg1 == 1) {
-            fn_80130CDC(self, 0x3E8);
+            em_stamina_add(self, 0x3E8);
         }
         break;
     case 1:

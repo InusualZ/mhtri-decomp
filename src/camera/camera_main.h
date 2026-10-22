@@ -23,6 +23,11 @@ u32 camera_mode1_ck(void);
 /* 0x802BE5D0 - posts the camera request `kind` for the enemy `self`. */
 void camera_em_shake_req(struct _ENEMY_WORK* self, u32 kind);
 
+/* 0x802B954C */
+void camera_flag_0x145_set(void);
+/* 0x802B9574 */
+void camera_target_slot_clear(u8 reset);
+
 #ifdef __cplusplus
 }
 #endif

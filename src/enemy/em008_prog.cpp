@@ -632,7 +632,7 @@ extern "C" void fn_8015E338(_ENEMY_WORK* self) {
 }
 
 /* 0x8015E454 - the two-step state: motion set (0xC8, 8) and the +0x20 counter at 3 plus the
- * `fn_80130CDC` arm on entry; the 120-frame window hands over to `em_state_set`. */
+ * `em_stamina_add` arm on entry; the 120-frame window hands over to `em_state_set`. */
 extern "C" void fn_8015E454(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
@@ -640,7 +640,7 @@ extern "C" void fn_8015E454(_ENEMY_WORK* self) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xC8, 8, 0);
         self->timer_0x020 = 3;
-        fn_80130CDC(self, 0x3E8);
+        em_stamina_add(self, 0x3E8);
         break;
       case 1:
         if (em_frame_check(self, 1, lbl_8079735C, lbl_80797330) == 1) {
@@ -1127,7 +1127,7 @@ extern "C" void fn_80161D24(_ENEMY_WORK* self) {
         em_mot_set(self, 0x18, 2, 0);
         em_hit_window_set_default(self, 0, 2);
         em_hit_window_set_default(self, 1, 0x10);
-        fn_80130CDC(self, -0x1E);
+        em_stamina_add(self, -0x1E);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -1151,7 +1151,7 @@ extern "C" void fn_80161DCC(_ENEMY_WORK* self, u8 arg1) {
         } else {
             em_hit_window_set(self, 0, 0x14, 0x40);
         }
-        fn_80130CDC(self, -0x1E);
+        em_stamina_add(self, -0x1E);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {

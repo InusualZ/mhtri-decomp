@@ -2017,7 +2017,7 @@ void fn_8019687C(struct _ENEMY_WORK* self, u32 side, u32 aim) {
         }
         em_mot_set(self, motion, 4, 0);
         em_hit_window_set_default(self, 0, window);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         if ((u8)aim == 1) {
             u32 turn;
             subVec3(&diff, &self->vec_0x36C, &self->pos);
@@ -2070,7 +2070,7 @@ void fn_80196BF4(struct _ENEMY_WORK* self, u32 lunge, u32 track) {
         em_mot_set(self, 0x4F, 4, 0);
         em_hit_window_set(self, 0, 0xA, 8);
         em_hit_window_set(self, 1, 0x18, 0x10);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         if ((u8)lunge == 1) {
             em_move_vec2_clr(self);
             self->field_0x318 = 40.0f;
@@ -2192,7 +2192,7 @@ void fn_80196E10(struct _ENEMY_WORK* self, u32 kind) {
             self->state_0x006 = 1;
         }
         em_approach_start(self, 500.0f, 0x16);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         break;
     case 1:
         switch (self->state_0x006) {
@@ -2426,7 +2426,7 @@ void fn_801976B8(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0xCE, 0, 0);
         em_height_set(self, fn_8013032C(self));
         self->timer_0x020 = 0x18;
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         self->field_0x359 = 1;
         self->field_0x35B = 1;
         break;
@@ -2575,7 +2575,7 @@ void fn_80197F04(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0xCE, 0, 0);
         em_height_set(self, fn_8013032C(self));
         self->timer_0x020 = 0xC;
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         self->field_0x359 = 1;
         self->field_0x35B = 1;
         break;
@@ -3289,7 +3289,7 @@ void fn_80196B1C(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0x4E, 0xA, 0);
         em_hit_window_set(self, 0, 8, 8);
         em_hit_window_set(self, 1, 9, 0x10);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_80798338, lbl_80798238) == 0) {
@@ -3339,7 +3339,7 @@ void fn_80196768(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0x59, 0xA, 0);
         em_hit_window_set(self, 0, 3, 3);
         em_approach_start(self, lbl_80798328, 0);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         break;
     case 1:
         if (em_approach_step(self, 0, 0x40) == 1) {
@@ -3399,7 +3399,7 @@ void fn_80198150(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
         em_mot_set(self, 0xD4, 0, 0);
         em_height_set(self, 0.0f);
         fn_80192358((EmActWork*)self, 8);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -3668,7 +3668,7 @@ void fn_80195ED4(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0xDA, 0, 0);
         em_hit_window_set_default(self, 0, 0xF);
         em_height_set(self, lbl_80798238);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         self->field_0x359 = 1;
         em_shake_req_set(self);
         break;
@@ -3699,7 +3699,7 @@ void fn_80196004(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0xDB, 0, 0);
         em_height_set(self, lbl_80798238);
         em_hit_window_set_default(self, 0, 0x10);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         self->field_0x359 = 1;
         em_shake_req_set(self);
         break;
@@ -3837,14 +3837,14 @@ void fn_801993E0(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80199468 - the same shape with this action's own arming pair (mode 46, duration 6, the 1000 ms
- * `fn_80130CDC` timer) and `fn_80128030` as the completion. */
+ * `em_stamina_add` timer) and `fn_80128030` as the completion. */
 void fn_80199468(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
         em_mot_set_blend(self, 46, 6, 0, 1);
-        fn_80130CDC(self, 1000);
+        em_stamina_add(self, 1000);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {

@@ -127,12 +127,13 @@ struct EmFileEntry {
     /* +0x4 */ char* name_0x04;
 };
 
-/* One 0x14-byte per-motion slot of `_ENEMY_WORK::slots_0x244` (`fn_80137EE0` averages the angles
+/* One 0x14-byte per-motion slot of `_ENEMY_WORK::slots_0x244` (`em_motion_slot_angle_avg` averages the angles
  * `calcVecAngXY` derives from the slot's vector).
  * size: 0x14 */
 struct EmMotionSlot {
     /* +0x000 */ u16 flags;            /* bit 0x800 admits the slot to the average */
-    /* +0x002 */ u8 unused_0x002[0x004 - 0x002];
+    /* +0x002 */ u8 kind;              /* the route-point set `enemy/em004_act.cpp`'s nearest-point pick reads */
+    /* +0x003 */ u8 unused_0x003;
     /* +0x004 */ u32 value;            /* the slot's own angle/id, filtered when the kind is 1 */
     /* +0x008 */ nw4r::math::VEC3 vec; /* `calcVecAngXY`'s input */
 };
@@ -318,15 +319,15 @@ struct _ENEMY_WORK {
     /* +0x214 */ f32 field_0x214;      /* the effect spawn height `enemy/em009_act.cpp`'s
                                         * `fn_8038874C`/`fn_8038A7B8` add to the joint position
                                         * before `eft009_set_pos` */
-    /* +0x218 */ u32 field_0x218;       /* nonzero, `fn_80137EE0` has slots to average */
+    /* +0x218 */ u32 field_0x218;       /* nonzero, `em_motion_slot_angle_avg` has slots to average */
     /* +0x21C */ u8 unused_0x21C[0x228 - 0x21C];
     /* +0x228 */ u16 field_0x228;      /* `enemy/em018_prog.cpp`'s `fn_8019D8B8` case 4: the low
                                         * two bits are the "blocked" gate (`lhz` + `clrlwi ...,30`). */
     /* +0x22A */ u8 unused_0x22A[0x23C - 0x22A];
     /* +0x23C */ u8 field_0x23C;       /* the action-ready byte `enemy/em004_act.cpp`'s
-                                        * `fn_801CA40C` case 0 reports */
+                                        * `em004_state_query` case 0 reports */
     /* +0x23D */ u8 unused_0x23D[0x244 - 0x23D];
-    /* +0x244 */ EmMotionSlot slots_0x244[10];  /* the per-motion slot set `fn_80137EE0` averages */
+    /* +0x244 */ EmMotionSlot slots_0x244[10];  /* the per-motion slot set `em_motion_slot_angle_avg` averages */
     union {
         struct {
             /* +0x30C */ u8 unused_0x30C[0x314 - 0x30C];
@@ -441,7 +442,7 @@ struct _ENEMY_WORK {
             /* +0x32C */ u8 unused_0x32Cc[0x338 - 0x32C];
         };
         /* the float/word/short-timer view the action band of `enemy/em004_act.cpp` and `enemy/em005_act.cpp` writes and reads
-         * (`fn_801CAA8C` clears 0x328/0x32C, `fn_801CA40C` reads the three 0x330/0x332/0x334
+         * (`fn_801CAA8C` clears 0x328/0x32C, `em004_state_query` reads the three 0x330/0x332/0x334
          * halfwords; the 0x330 byte flag `armed_0x328.field_0x330` above is the same byte). */
         struct {
             /* +0x328 */ f32 field_0x328;
@@ -451,6 +452,16 @@ struct _ENEMY_WORK {
             /* +0x334 */ s16 field_0x334;
             /* +0x336 */ u8 unused_0x336j[0x354 - 0x336];
         } timer_0x328;
+        /* the glow/height view `enemy/em004_act.cpp` keeps: the K-colour alpha it fades, the height bias the
+         * size scale gives, and its three halfword action timers (the state query reads them). */
+        struct {
+            /* +0x328 */ f32 fade_0x328;
+            /* +0x32C */ f32 height_bias_0x32C;
+            /* +0x330 */ s16 timer_0x330;
+            /* +0x332 */ s16 count_0x332;
+            /* +0x334 */ s16 timer_0x334;
+            /* +0x336 */ u8 unused_0x336e4[0x354 - 0x336];
+        } em004_0x328; /* size: 0x2C */
         /* the four `s16` action slots `enemy/em_action.cpp`'s `em_act_slots_clr` clears and its state
          * machine reads back (`em_act_frame_ck` arms +0x32A/+0x32C, `fn_803257C4` counts +0x334 down and
          * clamps +0x336).  A union member because the countdown view above already owns +0x32A. */

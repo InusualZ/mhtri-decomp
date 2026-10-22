@@ -122,6 +122,17 @@ void em_mot_layer_blend_set(struct _ENEMY_WORK* self, u32 layer, u16 motion, u32
 /* 0x8013216C */
 void em_rest_flag_set(struct _ENEMY_WORK* self);
 
+/* 0x8012813C */
+void em_action_finish_sub2(struct _ENEMY_WORK* self);
+/* 0x80128194 */
+void em_action_finish_dive(struct _ENEMY_WORK* self);
+/* 0x80130308 */
+f32 em_ceiling_depth_get(struct _ENEMY_WORK* self);
+/* 0x801306C0 */
+void em_move_sub_mode_set(struct _ENEMY_WORK* self, u8 sub);
+/* 0x80130CE8 */
+void em_stamina_regen(struct _ENEMY_WORK* self, f32 rate, s16 delta, s16 period);
+
 #ifdef __cplusplus
 }
 #endif

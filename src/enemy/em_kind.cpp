@@ -104,7 +104,7 @@
 #define fn_8013C36C_view1 ((void (*)(_ENEMY_WORK*, u8, u8*))fn_8013C36C)
 #define fn_8013BDE4_view1 ((void (*)(u8**, u8, s16*))fn_8013BDE4)
 #define fn_801321B0_view1 ((u32 (*)(_ENEMY_WORK*))fn_801321B0)
-#define fn_80130CDC_view1 ((void (*)(_ENEMY_WORK*, s32))fn_80130CDC)
+#define fn_80130CDC_view1 ((void (*)(_ENEMY_WORK*, s32))em_stamina_add)
 #define fn_80130858_view1 ((void (*)(_ENEMY_WORK*, s32))fn_80130858)
 #define fn_8013023C_view1 ((u32 (*)(_ENEMY_WORK*))em_phase_get)
 #define fn_8012B380_view1 ((void (*)(_ENEMY_WORK*, u32, u32, u8))em_reaction_req)
@@ -215,7 +215,7 @@ extern f32 atan2f(f32 y, f32 x);
 /* `eft_slot_effect_key` (0x8034539C): its owner's header, `ef/eft_slot.h` (rule 2). */
 extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u32 flag);
 extern void fn_802B01AC(Vec3 *out, Vec3 *in, u32 idx);
-extern f32 fn_802B0430(u32 idx);
+extern f32 stg_area_ceiling_get(u32 idx);
 }
 
 
@@ -1517,7 +1517,7 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
             copyVec3(&a, &c);
             fn_802B01AC(&d, &a, self->field_0x9F7);
             copyVec3(&self->pos, &d);
-            self->pos.y = fn_802B0430(self->field_0x9F7);
+            self->pos.y = stg_area_ceiling_get(self->field_0x9F7);
             em_area_change(self, 0);
             em_target_pos_set(self, 0);
         }

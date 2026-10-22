@@ -1099,7 +1099,7 @@ extern "C" void fn_801571F0(_ENEMY_WORK* self) {
     case 2:
         self->v_0x310.y = em_key_curve_eval(self, &lbl_805A45F0);
         em_fall_height_get(self);
-        fn_80135584(self, &self->pos_0x1BC);
+        em_move_rot_ground_step(self, &self->pos_0x1BC);
         if (em_mot_end_ck(self) == 1U) {
             self->state_0x05 = (u8) (self->state_0x05 + 1);
             em_mot_set(self, 0x1A, 6, 0);
@@ -1138,7 +1138,7 @@ extern "C" void fn_80157330(_ENEMY_WORK* self) {
     case 2:
         self->v_0x310.y = em_key_curve_eval(self, &lbl_805A45F0);
         em_fall_height_get(self);
-        fn_80135584(self, &self->pos_0x1BC);
+        em_move_rot_ground_step(self, &self->pos_0x1BC);
         if (em_mot_end_ck(self) == 1U) {
             em_action_finish_fall(self);
         }
@@ -1579,7 +1579,7 @@ extern "C" void fn_80158764(_ENEMY_WORK* self) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
-        fn_80134F70(self, &lbl_8056FB24);
+        em_fly_start(self, &lbl_8056FB24);
         em_approach_start(self, lbl_807970C0, 9);
         return;
     case 1:
@@ -1587,9 +1587,9 @@ extern "C" void fn_80158764(_ENEMY_WORK* self) {
             em_action_finish_walk(self);
             return;
         }
-        fn_80135000(self, 0, &lbl_8056FB24);
+        em_fly_step(self, 0, &lbl_8056FB24);
         em_fall_height_get(self);
-        fn_80135584(self, &self->pos_0x1BC);
+        em_move_rot_ground_step(self, &self->pos_0x1BC);
         return;
     }
 }
@@ -1758,7 +1758,7 @@ extern "C" void fn_8015941C(_ENEMY_WORK* self) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         em_mot_set(self, 0x36, 2, 0);
         em_hit_window_set_default(self, 0, 5);
         em_move_vec_clr(self);
@@ -1794,7 +1794,7 @@ extern "C" void fn_80159984(_ENEMY_WORK* self) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
-        fn_80130CDC(self, -0xC);
+        em_stamina_add(self, -0xC);
         em_mot_set(self, 0x38, 6, 0);
         em_move_vec2_clr(self);
         em_height_set(self, lbl_807970C0);

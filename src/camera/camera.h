@@ -6,7 +6,7 @@
  * (`get_camera_pos__Fv`, `set_quake_sub__FUcPQ34nw4r4math4VEC3`), so they are declared at global scope
  * with their real signatures - never as the mangled spelling (rule 9).
  *
- * The band's still-unnamed accessors (`fn_802B9740`, `fn_802B9574`, ...) move here from
+ * The band's still-unnamed accessors (`fn_802B9740`, `camera_target_slot_clear`, ...) move here from
  * `unsplit/camera.h` as their consumers migrate; that header keeps only what no unit owns.
  */
 #ifndef MHTRI_CAMERA_CAMERA_H

@@ -4,7 +4,7 @@
  * NAMES. `em_motion_update` is a GUESS from what the driver does; the map has only `fn_` stems for the range.
  * RESIDUALS. none: every row matches and flipcheck reports the unit READY.
  * SHAPES. `#pragma peephole off` over the bodies (retail keeps the `clrlwi`/`rlwinm`/`and` + `cmpwi` bit tests
- *   unfused).  `fn_80137EE0`: the slot scan stops at the first empty slot (`break`), the mode is narrowed inside the
+ *   unfused).  `em_motion_slot_angle_avg`: the slot scan stops at the first empty slot (`break`), the mode is narrowed inside the
  *   loop test (`(u8)kind == 1`, hoisted by the optimizer after the loop setup), and the count is dispatched with a
  *   `switch` (0 returns -1, 1 takes the first angle, the rest average) whose `s8` counter is declared before `sum`.
  */
@@ -293,7 +293,7 @@ extern "C" void fn_80137DD0(_ENEMY_WORK* self)
 }
 
 /* The average of the angles `calcVecAngXY` derives from the record's motion slots. */
-extern "C" s32 fn_80137EE0(_ENEMY_WORK* self, u32 kind)
+extern "C" s32 em_motion_slot_angle_avg(_ENEMY_WORK* self, u32 kind)
 {
     u32 angles[10];
 
@@ -355,7 +355,7 @@ extern "C" s32 fn_80137EE0(_ENEMY_WORK* self, u32 kind)
 }
 
 /* Steps the record's second angle field through `em_angle_approach`. */
-extern "C" void fn_80138024(_ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void em_turn_away_step(_ENEMY_WORK* self, u32 a, u32 b)
 {
     self->field_0x1C0 = em_angle_approach((u16)(b + 0x8000), (u16)self->field_0x1C0, (u16)a);
 }

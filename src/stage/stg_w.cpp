@@ -629,7 +629,7 @@ extern "C" void fn_802B13A8(void* self)
 }
 
 /* Returns the current map's descriptor field +0x34 for `id`, or a default float. */
-extern "C" f32 fn_802B0430(u8 id)
+extern "C" f32 stg_area_ceiling_get(u8 id)
 {
     StageWork* w = SW;
     StageElem* e;
@@ -1580,7 +1580,7 @@ extern "C" void fn_802B428C(StageRuntime* st)
 }
 
 /* Seats the map/area's joint effects on the `shell_set_func_ptr` job table. */
-extern "C" void fn_802B43A8(MHchar* chr, u8 kind, u16 flags)
+extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
 {
     nw4r::math::VEC3 pos;
     s8 order[3];

@@ -323,7 +323,7 @@ extern "C" void fn_80387C28(_ENEMY_WORK* self)
     case 0:
         self->state++;
         em_mot_set(self, 0xCA, 4, 0);
-        fn_80130CDC(self, 0x3E8);
+        em_stamina_add(self, 0x3E8);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -1037,7 +1037,7 @@ extern "C" void fn_803896E8(_ENEMY_WORK* self)
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x12, 4, 0);
         em_hit_window_set(self, 0, 1, 8);
-        fn_80130CDC(self, -0x1E);
+        em_stamina_add(self, -0x1E);
         ang = (u16)(calcVecAng2(&self->pos, &self->vec_0x36C) - self->field_0x1C0);
         if (ang >= 0x8000) {
             ang = 0x10000 - ang;
@@ -1205,7 +1205,7 @@ extern "C" void fn_80389E1C(_ENEMY_WORK* self, u8 a)
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x13, 4, 0);
         em_mot_speed_set(self, lbl_8079C114);
-        fn_80130CDC(self, -0xA);
+        em_stamina_add(self, -0xA);
         self->state_0x006 = 0;
         self->state_0x007 = 0;
         return;
@@ -1526,7 +1526,7 @@ extern "C" void fn_8038A198(_ENEMY_WORK* self, u8 a)
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x16, 6, 0);
         em_mot_speed_set(self, lbl_8079C124);
-        fn_80130CDC(self, -0xA);
+        em_stamina_add(self, -0xA);
         if ((u32)(a - 3) > 2) {
             switch (a) {
             default: self->state_0x007 = 0; break;

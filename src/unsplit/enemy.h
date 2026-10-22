@@ -90,11 +90,11 @@ void fn_80130438(struct _ENEMY_WORK* work);
 void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
 /* 0x80130CDC - r3 (`self`) and r4, which it sign-extends (`extsh r4,r4`) before tail-calling
  * 0x80130B6C; `enemy/fn_8014A1BC.c` calls it with two arguments, so the prototype is safe for C. */
-void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
+void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
 u32 fn_80130DF8(void);
 struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void fn_80131150(struct _ENEMY_WORK* work);
-void fn_80131D9C(struct _ENEMY_WORK* work);
+void em_ceiling_latch(struct _ENEMY_WORK* work);
 void em_motion_timer_arm(struct _ENEMY_WORK* work);
 void em_fx_flag_set(struct _ENEMY_WORK* work);
 void fn_80131E0C(struct _ENEMY_WORK* work);
@@ -102,7 +102,7 @@ void fn_80131E00(struct _ENEMY_WORK* work);
 f32 fn_8013032C(struct _ENEMY_WORK* work);
 u32 fn_80132198(struct _ENEMY_WORK* work);
 void fn_801321B0(struct _ENEMY_WORK* work);
-void fn_80131EC0();
+void em_timer_0x81C_arm();
 void fn_801320A4(struct _ENEMY_WORK* work);
 u32 fn_80132184(void);
 void fn_801324E0(struct _ENEMY_WORK* work);
@@ -122,10 +122,10 @@ void fn_80133F4C();
 #endif
 void em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
 u32 em_turn_seq_step(struct _ENEMY_WORK *self, void *tbl);
-void fn_80134F70(struct _ENEMY_WORK* self, void* tbl);
-void fn_80135000(struct _ENEMY_WORK* self, u32 a, void* tbl);
+void em_fly_start(struct _ENEMY_WORK* self, void* tbl);
+void em_fly_step(struct _ENEMY_WORK* self, u32 a, void* tbl);
 void em_move_offset_rot_apply(struct _ENEMY_WORK *self, void *p);
-void fn_80135584(struct _ENEMY_WORK* self, void* p);
+void em_move_rot_ground_step(struct _ENEMY_WORK* self, void* p);
 /* 0x801355C8 - r3 (`self`) and r4, the pointer it forwards to `em_move_offset_rot_apply` unchanged; the C
  * callers pass `&self->field_0x1bc`, so the owner's argument is a pointer, not the integer the
  * consumer used to spell. */
@@ -156,8 +156,8 @@ void fn_80136E38(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801373D0(struct _ENEMY_WORK* work);
 s32 fn_80137C9C(struct _ENEMY_WORK* work, void* arg1);
 void fn_80137DD0(struct _ENEMY_WORK* work);
-s32 fn_80137EE0(struct _ENEMY_WORK* work, s32 arg1);
-void fn_80138024(struct _ENEMY_WORK* work, s32 a, s32 b);
+s32 em_motion_slot_angle_avg(struct _ENEMY_WORK* work, s32 arg1);
+void em_turn_away_step(struct _ENEMY_WORK* work, s32 a, s32 b);
 void fn_8013BDE4(u8 **in, u32 id, s16 *out);
 u32 fn_801406E0(u32 id, u32 cmd);
 s16 fn_80140778(u8 *stream, u32 id, u32 mode);

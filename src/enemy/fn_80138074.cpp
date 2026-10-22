@@ -278,7 +278,7 @@ extern void fn_80295578(EnemyWork* work, u8 arg1, u16 arg2);
 extern void hit_attack_list_push(void* arg0);
 extern void hit_knock_set(void* arg0, s32 arg1);
 extern void fn_802B01AC(Vec3* out, const Vec3* v, u8 area);
-extern f32 fn_802B0430(u8 area);
+extern f32 stg_area_ceiling_get(u8 area);
 extern u8 stage_map_kind_get(u8 arg0);
 extern void em_roster_record_release(s32 arg0);
 extern s32 em_roster_record_slot_id_get(s32 arg0);
@@ -736,7 +736,7 @@ void fn_8013823C(EnemyWork* self) {
             if (vec3_dot(&vA4, &v98) >= lbl_80796D40) {
                 fn_802B01AC(&v14, &vD4, self->field_0x9F7);
                 copyVec3(&self->field_0x188, &v14);
-                self->field_0x188.y = fn_802B0430(self->field_0x9F7);
+                self->field_0x188.y = stg_area_ceiling_get(self->field_0x9F7);
                 em_area_change(self, 0);
             }
         }
@@ -832,7 +832,7 @@ void fn_8013823C(EnemyWork* self) {
         if (self->field_0x784 != 0) {
             em_busy_timer_reset(self);
             em_busy_set_c1(self);
-            fn_80131D9C(self);
+            em_ceiling_latch(self);
         }
         fn_80138E64(self);
         if (self->field_0x1E2 == 3) {
@@ -927,9 +927,9 @@ void fn_80138B60(EnemyWork* self) {
         }
         found = -1;
         if (self->field_0x1E2 == 1 && self->field_0x1E3 == 1) {
-            found = fn_80137EE0(self, 0);
+            found = em_motion_slot_angle_avg(self, 0);
             if (found != -1) {
-                fn_80138024(self, 0x400, found);
+                em_turn_away_step(self, 0x400, found);
             }
         }
         if (self->field_0x8C0 != 0 || found != -1) {

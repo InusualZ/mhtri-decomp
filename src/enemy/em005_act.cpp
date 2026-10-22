@@ -215,15 +215,15 @@ void em_height_set(struct _ENEMY_WORK* self, f32 a);
 void em_height_add(struct _ENEMY_WORK* self, f32 a);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
-void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
+void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
 struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void fn_80131BD4(struct _ENEMY_WORK* self);
 void em_frame_flag_set(struct _ENEMY_WORK* self);
-void fn_80131D9C(struct _ENEMY_WORK* self);
+void em_ceiling_latch(struct _ENEMY_WORK* self);
 void fn_80131E00(struct _ENEMY_WORK* self);
 void em_busy_timer_reset(struct _ENEMY_WORK* self);
 void em_hit_arm_set(struct _ENEMY_WORK* self);
-f32 fn_802B0430(u8 area);
+f32 stg_area_ceiling_get(u8 area);
 u32 em_turn_to_target(struct _ENEMY_WORK* self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
@@ -234,13 +234,13 @@ void em_lift_start(struct _ENEMY_WORK* self);
 void em_lift_step(struct _ENEMY_WORK* self);
 void em_dive_start(struct _ENEMY_WORK* self);
 void em_dive_step(struct _ENEMY_WORK* self);
-void fn_80134F70(struct _ENEMY_WORK* self, void* tbl);
-void fn_80135000(struct _ENEMY_WORK* self, u32 a, void* tbl);
+void em_fly_start(struct _ENEMY_WORK* self, void* tbl);
+void em_fly_step(struct _ENEMY_WORK* self, u32 a, void* tbl);
 void em_move_vec_clr(struct _ENEMY_WORK* self);
 void em_move_vec2_clr(struct _ENEMY_WORK* self);
 void em_move_offset_apply(struct _ENEMY_WORK* self);
 void em_move_offset_rot_apply(struct _ENEMY_WORK* self, void* p);
-void fn_80135584(struct _ENEMY_WORK* self, void* p);
+void em_move_rot_ground_step(struct _ENEMY_WORK* self, void* p);
 void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
 u32 em_move_offset_step_update(struct _ENEMY_WORK* self, void* p);
 f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
@@ -419,7 +419,7 @@ void fn_801CCE10(struct _ENEMY_WORK* self) {
     case 2:
         self->field_0x314 = em_key_curve_eval(self, lbl_805B5088);
         em_fall_height_get(self);
-        fn_80135584(self, &self->field_0x1BC);
+        em_move_rot_ground_step(self, &self->field_0x1BC);
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             em_mot_set(self, 0x1A, 6, 0);
@@ -459,7 +459,7 @@ void fn_801CCF50(struct _ENEMY_WORK* self, u8 mode) {
     case 2:
         self->field_0x314 = em_key_curve_eval(self, lbl_805B5088);
         em_fall_height_get(self);
-        fn_80135584(self, &self->field_0x1BC);
+        em_move_rot_ground_step(self, &self->field_0x1BC);
         if (em_mot_end_ck(self) == 1) {
             em_action_finish_fall(self);
         }
@@ -567,7 +567,7 @@ void fn_801CD2EC(struct _ENEMY_WORK* self) {
  * group through `em_ally_find`; early finishes `return` to the shared epilogue. */
 void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
         if ((u32)(self->area_no - 4) <= 2) {
             em_shake_req_set(self);
@@ -578,10 +578,10 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
         self->state++;
         self->state_0x006 = 0;
         self->state_0x007 = 0;
-        fn_80134F70(self, lbl_805704D0);
+        em_fly_start(self, lbl_805704D0);
         em_approach_start(self, lbl_80799220, 0x19);
         em_fall_height_get(self);
-        fn_80135584(self, &self->field_0x1BC);
+        em_move_rot_ground_step(self, &self->field_0x1BC);
         break;
     case 1:
         if (mode == 1) {
@@ -650,27 +650,27 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
         }
         switch (mode) {
         case 2:
-            fn_80135000(self, 2, lbl_805704D0);
+            em_fly_step(self, 2, lbl_805704D0);
             break;
         case 3:
-            fn_80135000(self, 3, lbl_805704D0);
+            em_fly_step(self, 3, lbl_805704D0);
             break;
         default:
-            fn_80135000(self, 2, lbl_805704D0);
+            em_fly_step(self, 2, lbl_805704D0);
             break;
         }
         em_fall_height_get(self);
-        fn_80135584(self, &self->field_0x1BC);
+        em_move_rot_ground_step(self, &self->field_0x1BC);
         break;
     }
 }
 
 /* 0x801CD71C - aims at the reference height: run `lbl_805B5000` twice, then `em_lift_step`; the mode picks
- * the height (area height, own vector y, or `fn_802B0430`). */
+ * the height (area height, own vector y, or `stg_area_ceiling_get`). */
 void fn_801CD71C(struct _ENEMY_WORK* self, u8 mode) {
     f32 limit;
     em_busy_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -707,7 +707,7 @@ void fn_801CD71C(struct _ENEMY_WORK* self, u8 mode) {
             limit = self->vec_0x36C.y;
             break;
         default:
-            limit = fn_802B0430(self->area_no) - lbl_807992D8;
+            limit = stg_area_ceiling_get(self->area_no) - lbl_807992D8;
             if (limit - self->field_0x20C < lbl_807992DC) {
                 limit = lbl_807992DC + self->field_0x20C;
             }
@@ -725,7 +725,7 @@ void fn_801CD71C(struct _ENEMY_WORK* self, u8 mode) {
 void fn_801CD8A0(struct _ENEMY_WORK* self, u8 mode) {
     if (mode == 1) {
         em_busy_set(self);
-        fn_80131D9C(self);
+        em_ceiling_latch(self);
     }
     switch (self->state) {
     case 0:
@@ -848,7 +848,7 @@ void fn_801CD944(struct _ENEMY_WORK* self) {
 /* 0x801CDCDC - the mode-gated turn: state 0 arms, state 1 turns by 0x180 (mode 1) and ends. */
 void fn_801CDCDC(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -871,7 +871,7 @@ void fn_801CDCDC(struct _ENEMY_WORK* self, u8 mode) {
  * control back to `fn_801CAF70` when it expires. */
 void fn_801CDD94(struct _ENEMY_WORK* self) {
     em_busy_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -895,7 +895,7 @@ void fn_801CDD94(struct _ENEMY_WORK* self) {
  * scale and ends through `fn_801CAF70`. */
 void fn_801CDE34(struct _ENEMY_WORK* self) {
     em_busy_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -926,7 +926,7 @@ void fn_801CDF10(struct _ENEMY_WORK* self, u8 mode) {
         em_busy_set(self);
         em_busy_timer_reset(self);
         em_frame_flag_set(self);
-        fn_80131D9C(self);
+        em_ceiling_latch(self);
     }
     switch (self->state) {
     case 0:
@@ -958,7 +958,7 @@ void fn_801CE014(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     fn_80131E00(self);
     switch (self->state) {
     case 0:
@@ -1039,7 +1039,7 @@ void fn_801CE2B0(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     fn_80131E00(self);
     switch (self->state) {
     case 0:
@@ -1081,7 +1081,7 @@ void fn_801CE3F0(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     fn_80131E00(self);
     switch (self->state) {
     case 0:
@@ -1103,7 +1103,7 @@ void fn_801CE4A0(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     fn_80131E00(self);
     switch (self->state) {
     case 0:
@@ -1135,7 +1135,7 @@ void fn_801CE5A0(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     fn_80131E00(self);
     switch (self->state) {
     case 0:
@@ -1179,7 +1179,7 @@ void fn_801CE71C(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     em_frame_flag_set(self);
-    fn_80131D9C(self);
+    em_ceiling_latch(self);
     fn_80131E00(self);
     switch (self->state) {
     case 0:
@@ -1435,7 +1435,7 @@ void fn_801CEF44(struct _ENEMY_WORK* self, u8 mode) {
         self->field_0x37C = self->field_0x1C0;
         self->timer_0x328.field_0x328 =
             em_target_dist_ratio_get(self, lbl_80799240, lbl_8079932C, lbl_80799330);
-        fn_80130CDC(self, (u32)-0x0A);
+        em_stamina_add(self, (u32)-0x0A);
         break;
     case 1: {
         struct EmWord3 rec;
@@ -1602,7 +1602,7 @@ void fn_801D3C38(struct _ENEMY_WORK* self) {
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             em_mot_set(self, 0x14, 8, 0);
-            fn_80130CDC(self, 0x3E8);
+            em_stamina_add(self, 0x3E8);
         }
         break;
     case 2:
@@ -1881,10 +1881,10 @@ void fn_801D2ED0(struct _ENEMY_WORK* self) {
             em_fall_start(self);
             copyVec3(&self->action_0x328.vec_0x334, &self->vec_0x36C);
             copyVec3(&self->vec_0x36C, &spot);
-            fn_80134F70(self, lbl_805704D0);
+            em_fly_start(self, lbl_805704D0);
             em_approach_start(self, lbl_80799220, 0x19);
             em_fall_height_get(self);
-            fn_80135584(self, &self->field_0x1BC);
+            em_move_rot_ground_step(self, &self->field_0x1BC);
         } else {
             self->state = 3;
             em_fall_height_get(self);
@@ -1900,9 +1900,9 @@ void fn_801D2ED0(struct _ENEMY_WORK* self) {
             copyVec3(&self->vec_0x36C, &self->action_0x328.vec_0x334);
             em_mot_set(self, 0x1A, 0x0A, 0);
         } else {
-            fn_80135000(self, 2, lbl_805704D0);
+            em_fly_step(self, 2, lbl_805704D0);
             em_fall_height_get(self);
-            fn_80135584(self, &self->field_0x1BC);
+            em_move_rot_ground_step(self, &self->field_0x1BC);
         }
         break;
     case 2:
@@ -2485,8 +2485,8 @@ void em_fall_start(struct _ENEMY_WORK* self);
 void em_hit_arm_set(struct _ENEMY_WORK* self);
 void em_move_offset_rot_apply(struct _ENEMY_WORK* self, void* p);
 f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
-void fn_801369A0(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
-void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
+void em_ground_impact_set(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
+void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
 void em_bait_react(struct _ENEMY_WORK* self);
 struct _ENEMY_WORK* em_ally_find(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 void em_gauge_tick(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
@@ -2536,7 +2536,7 @@ void fn_801D3CF8(struct _ENEMY_WORK* self, u32 a);
 void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, u32 d);
 
 s32 pl_capsule_point_ck(s32 a, void* b);
-void fn_802B43A8(void* pos, u8 a, u16 b);
+void stg_ground_impact_set(void* pos, u8 a, u16 b);
 void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 
 /* ----------------------------------------------------------------------------------------------------
@@ -2661,7 +2661,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
         if (em_after_frame_check(self, 0, lbl_807992F4, lbl_80799220) == 1) {
             fn_801D4DD8(self, 0, 5, 3, 0, lbl_80799460);
             setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079928C);
-            fn_801369A0(self, 1, 0, &spot, lbl_80799460);
+            em_ground_impact_set(self, 1, 0, &spot, lbl_80799460);
         }
         break;
     case 0x2A:
@@ -2673,7 +2673,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
         if (em_after_frame_check(self, 0, lbl_80799318, lbl_80799220) == 1) {
             fn_801D4DD8(self, 1, 4, 3, 0, lbl_80799288);
             setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079928C);
-            fn_801369A0(self, 2, 0, &spot, lbl_80799368);
+            em_ground_impact_set(self, 2, 0, &spot, lbl_80799368);
             em_camera_req(self, -1, 7);
         }
         break;
@@ -2937,7 +2937,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
         break;
     case 0xED:
         if (em_after_frame_check(self, 0, lbl_80799348, lbl_80799220) == 1) {
-            fn_801369A0(self, 1, 0, NULL, lbl_80799240);
+            em_ground_impact_set(self, 1, 0, NULL, lbl_80799240);
         }
         break;
     case 0xEF:

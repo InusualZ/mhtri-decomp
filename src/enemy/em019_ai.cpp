@@ -671,7 +671,7 @@ void em019_act1_sub6(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 10, 6, 0);
-        fn_80130CDC(self, 1000);
+        em_stamina_add(self, 1000);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
@@ -1312,7 +1312,7 @@ void em019_act7_sub1(_ENEMY_WORK* self)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -15);
+        em_stamina_add(self, -15);
         em_mot_set(self, 83, 10, 0);
         em_approach_start(self, 0.0f, 0);
         self->timer_0x020 = 0;
@@ -1347,7 +1347,7 @@ void em019_act7_sub2(_ENEMY_WORK* self)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -15);
+        em_stamina_add(self, -15);
         em_mot_set(self, 82, 4, 0);
         em_hit_window_set(self, 0, 22, 8);
         em_hit_window_set(self, 1, 7, 24);
@@ -1408,7 +1408,7 @@ void em019_act7_bite(_ENEMY_WORK* self, u8 kind)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -15);
+        em_stamina_add(self, -15);
         if ((s32)kind != 1)
             em_mot_set(self, 87, 6, 0);
         else
@@ -1653,7 +1653,7 @@ void em019_act7_roar(_ENEMY_WORK* self, u8 kind)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -15);
+        em_stamina_add(self, -15);
         switch (kind) {
         case 0:
             em_mot_set(self, 209, 0, 0);
@@ -1881,7 +1881,7 @@ void em019_act7_jump(_ENEMY_WORK* self)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -15);
+        em_stamina_add(self, -15);
         em_mot_set(self, 205, 0, 0);
         em_mot_speed_set(self, 1.25f);
         em_height_set(self, 0.0f);
@@ -2039,7 +2039,7 @@ void em019_act7_magma_dig(_ENEMY_WORK* self, u8 kind)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -15);
+        em_stamina_add(self, -15);
         if (kind == 0)
             em_mot_set(self, 200, 0, 0);
         else
@@ -3274,7 +3274,7 @@ extern "C" void em_act_prog_8(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 10, 6, 0);
-        fn_80130CDC(self, 1000);
+        em_stamina_add(self, 1000);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)

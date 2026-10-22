@@ -598,7 +598,7 @@ void fn_80182C40(_ENEMY_WORK* self, u32 kind, void* out) {
 /* Forwards the value to the motion setter only for team 0x10. */
 void fn_80182D44(_ENEMY_WORK* self, u32 arg) {
     if (self->team == 0x10) {
-        fn_80130CDC(self, (s16)arg);
+        em_stamina_add(self, (s16)arg);
     }
 }
 

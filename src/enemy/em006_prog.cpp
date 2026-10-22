@@ -205,7 +205,7 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
         em_mot_set(self, 0xCE, 0, 0);
         em_hit_window_set_default(self, 0, 0x16);
         em_height_set(self, fn_8013032C(self));
-        fn_80130CDC(self, -0xA);
+        em_stamina_add(self, -0xA);
         em_busy_set(self);
         em_busy_timer_reset(self);
         em_shake_req_set(self);
@@ -239,7 +239,7 @@ extern "C" void fn_801BE198(_ENEMY_WORK* self, u8 arg1)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xD4, 6, 0);
-        fn_80130CDC(self, -6);
+        em_stamina_add(self, -6);
         em_hit_window_set(self, 0, 9, 8);
         em_hit_window_set(self, 1, 0x29, 0x18);
         break;

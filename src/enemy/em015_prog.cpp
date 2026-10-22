@@ -2181,7 +2181,7 @@ extern "C" void em015_lunge(_ENEMY_WORK* self, u32 kind) {
 
         self->state++;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -10);
+        em_stamina_add(self, -10);
         switch ((u8)kind) {
         default:
             motion = 0x46;
@@ -2418,7 +2418,7 @@ extern "C" void em015_great_discharge(_ENEMY_WORK* self, u32 kind) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -10);
+        em_stamina_add(self, -10);
         em_mot_set_blend(self, 0xD0, 0x14, 0, 1);
         self->state_0x006 = 0;
         self->timer_0x020 = 0;
@@ -2517,7 +2517,7 @@ extern "C" void em015_tail_slam(_ENEMY_WORK* self, u32 kind, u32 chain) {
         self->state++;
         self->state_0x006 = 0;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -10);
+        em_stamina_add(self, -10);
         em_mot_set_blend(self, 0x4F, 0xA, 0, 1);
         if ((s32)(u8)kind != 1) {
             em_hit_window_set_default(self, 0, 6);
@@ -2599,7 +2599,7 @@ extern "C" void em015_act7_hit_pair(_ENEMY_WORK* self) {
         self->state_0x006 = 0;
         self->state_0x007 = 0;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -5);
+        em_stamina_add(self, -5);
         em_mot_set(self, 0x50, 0xA, 0);
         em_hit_window_set(self, 0, 7, 8);
         em_hit_window_set(self, 1, 0x20, 0x18);
@@ -2629,7 +2629,7 @@ extern "C" void em015_bite(_ENEMY_WORK* self, u32 kind) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -5);
+        em_stamina_add(self, -5);
         em_mot_set(self, 0x53, 0xA, 0);
         em_approach_start(self, 0.0f, 0);
         self->timer_0x020 = 0;
@@ -2680,7 +2680,7 @@ extern "C" void em015_act7_turn_pair(_ENEMY_WORK* self) {
     case 0: {
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -5);
+        em_stamina_add(self, -5);
         em_mot_set(self, 0x52, 4, 0);
         em_hit_window_set_default(self, 0, 9);
         break;
@@ -2814,7 +2814,7 @@ extern "C" void em015_thunder_ball(_ENEMY_WORK* self) {
         self->state++;
         self->state_0x006 = 0;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -10);
+        em_stamina_add(self, -10);
         em_mot_set(self, 0x5A, 0xA, 0);
         em_height_set(self, 0.0f);
         break;
@@ -2889,7 +2889,7 @@ extern "C" void em015_thunder_ball_aimed(_ENEMY_WORK* self, u32 kind) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80130CDC(self, -5);
+        em_stamina_add(self, -5);
         em_mot_set(self, 0x57, 6, 0);
         break;
     case 1:
@@ -2996,7 +2996,7 @@ extern "C" void em015_rolling_charge(_ENEMY_WORK* self, u32 kind) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -10);
+        em_stamina_add(self, -10);
         em_mot_set(self, 0x44, 4, 0);
         em_hit_window_set(self, 0, 0x16, 8);
         if ((s32)(u8)kind == 0) {
@@ -3049,7 +3049,7 @@ extern "C" void em015_act7_spin_turn(_ENEMY_WORK* self) {
     case 0: {
         self->state++;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -0xA);
+        em_stamina_add(self, -0xA);
         em_mot_set(self, 0x25, 6, 0);
         em_hit_window_set_default(self, 0, 0x19);
         em_hit_window_set_default(self, 1, 0x1A);
@@ -3197,7 +3197,7 @@ extern "C" void em015_thunder_burst(_ENEMY_WORK* self, u32 kind) {
         self->state++;
         self->state_0x006 = 0;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -10);
+        em_stamina_add(self, -10);
         em_mot_set(self, 0x5D, 0xA, 0);
         break;
     case 1:
@@ -3249,7 +3249,7 @@ extern "C" void em015_thunder_burst_great(_ENEMY_WORK* self, u32 kind, u32 chain
         self->state++;
         self->state_0x006 = 0;
         em_move_mode_set(self, 2);
-        fn_80130CDC(self, -10);
+        em_stamina_add(self, -10);
         em_mot_set(self, 0x5E, 0xA, 0);
         break;
     case 1: {
@@ -4209,7 +4209,7 @@ extern "C" void em015_act13_05(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 2);
         em_mot_set_blend(self, 0x21, 4, 0, 1);
-        fn_80130CDC(self, 0x3E8);
+        em_stamina_add(self, 0x3E8);
         break;
     }
     case 1:

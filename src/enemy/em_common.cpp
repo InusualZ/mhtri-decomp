@@ -84,7 +84,7 @@
 #define em_pl_target_ck fn_8012D0B4_hidden_fn_8012BDF4_h
 #define fn_8012D188 fn_8012D188_hidden_fn_8012BDF4_h
 #define em_pl_slot_leaving_ck fn_8012D1A8_hidden_fn_8012BDF4_h
-#define fn_8012D23C fn_8012D23C_hidden_fn_8012BDF4_h
+#define em_team_mate_state_ck fn_8012D23C_hidden_fn_8012BDF4_h
 #define fn_8012D3E0 fn_8012D3E0_hidden_fn_8012BDF4_h
 #define pl_torch_ck fn_8012D7FC_hidden_fn_8012BDF4_h
 #define fn_8012D8D0 fn_8012D8D0_hidden_fn_8012BDF4_h
@@ -98,7 +98,7 @@
 #undef fn_8012D8D0
 #undef pl_torch_ck
 #undef fn_8012D3E0
-#undef fn_8012D23C
+#undef em_team_mate_state_ck
 #undef em_pl_slot_leaving_ck
 #undef fn_8012D188
 #undef em_pl_target_ck
@@ -145,8 +145,8 @@
 #define fn_8012D7FC_view1 ((u32 (*)(struct _ENEMY_WORK*))pl_torch_ck)
 #define fn_8012D3E0_view4 ((u8 (*)())fn_8012D3E0)
 #define fn_8012D3E0_view2 ((u8 (*)())fn_8012D3E0)
-#define fn_8012D23C_view4 ((u32 (*)())fn_8012D23C)
-#define fn_8012D23C_view2 ((u32 (*)())fn_8012D23C)
+#define fn_8012D23C_view4 ((u32 (*)())em_team_mate_state_ck)
+#define fn_8012D23C_view2 ((u32 (*)())em_team_mate_state_ck)
 #define fn_8012D1A8_view5 ((s32 (*)(u8))em_pl_slot_leaving_ck)
 #define fn_8012D1A8_view3 ((s32 (*)(u8))em_pl_slot_leaving_ck)
 #define fn_8012D1A8_view1 ((s32 (*)(u8))em_pl_slot_leaving_ck)
@@ -283,7 +283,7 @@ extern "C" s32 quest_time_limit_get(void);
 extern "C" s32 quest_time_elapsed_get(void);
 
 extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind);
-extern "C" u32 fn_8012D23C(_ENEMY_WORK* enemy, u32 kind, u32 slot);
+extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot);
 extern "C" void* fn_8012D498(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 pl_torch_ck(void* arg);
 extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag);
@@ -1385,7 +1385,7 @@ extern "C" s32 em_pl_target_ck(_ENEMY_WORK* enemy, _PLW* work)
 /* 0x8012D23C is not written yet (420 bytes, a two-level switch over the state byte and the state_sub timer).  Its
  * per-slot predicate `fn_8012D3E0` and the search helpers below are. */
 
-/* The first attacker slot whose per-kind predicate `fn_8012D23C` accepts the enemy. */
+/* The first attacker slot whose per-kind predicate `em_team_mate_state_ck` accepts the enemy. */
 extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind)
 {
     u16 max;
@@ -1393,7 +1393,7 @@ extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind)
 
     max = get_move_work_max(2);
     for (i = 0; i < max; i++) {
-        if (fn_8012D23C(enemy, kind, (u8)i) == 1) {
+        if (em_team_mate_state_ck(enemy, kind, (u8)i) == 1) {
             return (u8)i;
         }
     }

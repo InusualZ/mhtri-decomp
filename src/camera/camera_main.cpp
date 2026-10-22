@@ -329,9 +329,9 @@ typedef struct CamWork {
     /* +0x102 */ u8 field_0x102[0xA];        /* fn_802B81C0 stores its value argument here */
     /* +0x10C */ u8 field_0x10C[0x8];        /* fn_802B81C0 clears one byte here */
     /* +0x114 */ u8 pad_0x114[0x4];
-    /* +0x118 */ s8 field_0x118;             /* fn_802B9574 sets -1, fn_802B95B4 tests > 0 */
+    /* +0x118 */ s8 field_0x118;             /* camera_target_slot_clear sets -1, fn_802B95B4 tests > 0 */
     /* +0x119 */ u8 pad_0x119[0x2C];
-    /* +0x145 */ u8 field_0x145;             /* fn_802B954C raises it */
+    /* +0x145 */ u8 field_0x145;             /* camera_flag_0x145_set raises it */
     /* +0x146 */ u8 pad_0x146[0x36];
     /* +0x17C */ f32 field_0x17C;            /* fn_802B9740 subtracts field_0x1D0 from it */
     /* +0x180 */ u8 pad_0x180[0x50];
@@ -814,7 +814,7 @@ u8 fn_802B8E48(void)
 /*
  * Raises the +0x145 flag of the current camera work.
  */
-void fn_802B954C(void)
+void camera_flag_0x145_set(void)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
@@ -824,7 +824,7 @@ void fn_802B954C(void)
 /*
  * Invalidates the +0x118 timer of the current camera work when `reset` is zero.
  */
-void fn_802B9574(u8 reset)
+void camera_target_slot_clear(u8 reset)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
