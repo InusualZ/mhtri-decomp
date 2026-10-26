@@ -86,7 +86,7 @@ typedef struct Eft042Work {
     Eft042Model models[1];   /* +0x04 */
     union {
         /* effect 41 (`ef/fn_803066F0.c`'s `EftWorkData::works`) and the kind-0 bodies, which use
-         * only the last two slots (`fn_80306D14`/`fn_80306E04` clear them, `fn_80306F40` releases
+         * only the last two slots (`eft042_set`/`fn_80306E04` clear them, `fn_80306F40` releases
          * them, `fn_80307068` fills them). */
         void* works[4];      /* +0x0C */
         struct {             /* size: 0x10 */
@@ -176,7 +176,7 @@ extern "C" void eft041_kill(_EFT* self);
 extern "C" void eft_spawn_type_at_area(_ENEMY_WORK* source, u8 type);
 extern "C" void eft_area_slot_bind(_ENEMY_WORK* source, u8 type, s32 timer);
 extern "C" _EFT* fn_80306BFC(u8 type, u8 area);
-extern "C" void fn_80306D14(MHchar* model, u8 type);
+extern "C" void eft042_set(MHchar* model, u8 type);
 extern "C" void fn_80306D6C(void* source, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale,
                             u8 area);
 extern "C" _EFT* fn_80306E04(u8 type, u8 area);
@@ -387,7 +387,7 @@ extern "C" _EFT* fn_80306BFC(u8 type, u8 area)
 
 /* Spawns effect 42 from a model: the record is placed at the model's rotation and the model is filed
  * as the effect's origin. */
-extern "C" void fn_80306D14(MHchar* model, u8 type)
+extern "C" void eft042_set(MHchar* model, u8 type)
 {
     _EFT* eft = fn_80306E04(type, model->area_0x16);
 

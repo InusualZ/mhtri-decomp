@@ -407,7 +407,7 @@ struct _PLW {
     /* +0x26D */ u8 ammo_icon_kind_0x26D;  /* the loaded ammo's icon kind (`pl_item_icon_kind_get`) */
     /* +0x26E */ u16 item_slot_sel;   /* the selected item slot; 0x80 marks the second page (`menu/menu_item.cpp`) */
     /* +0x270 */ s16 magazine_0x270;      /* non-zero while a magazine is loaded (`hud/cockpit_quest.cpp`'s ammo gauge) */
-    /* +0x272 */ s16 unk272;
+    /* +0x272 */ s16 magazine_shown_0x272;   /* the magazine the weapon-4/5/6 fire act copies after a shot */
     /* +0x274 */ union { /* the original and later names of the same byte (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
             /* +0x274 */ u8 unk274;
@@ -416,7 +416,7 @@ struct _PLW {
             /* +0x274 */ u8 field_0x274;   /* nonzero picks the kind-4 attachment's raised pose (`lobby/lb_equip_page.cpp`) */
         };
     };
-    /* +0x275 */ u8 unk275;
+    /* +0x275 */ u8 capacity_shown_0x275;   /* the capacity the weapon-4/5/6 fire act copies after a shot */
     /* +0x276 */ union { /* the original and later names of the same byte (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
             /* +0x276 */ u8 unk276;

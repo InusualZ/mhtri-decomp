@@ -101,7 +101,7 @@ struct LbIdTable {
     /* +0x00 */ u8 unused_0x00[0x10];
     /* +0x10 */ u16 ids_0x10[14];
 }; /* size: 0x2C */
-extern LbIdTable lbl_805C9F40;
+extern LbIdTable pl_weapon2_steps_lead;
 
 /* The 6-byte selection-range table `lb_title_range_find` scans: `lbl_805C9608` (0x390 B) with its rows at
  * +0x18 (id, range start, range length; 0xFFFF-terminated) and the fallback base row at +0x84. */
@@ -110,7 +110,7 @@ struct LbRangeTable {
     /* +0x018 */ u16 rows_0x018[0x36];
     /* +0x084 */ u16 base_0x084[2];
 }; /* size: 0x390 */
-extern LbRangeTable lbl_805C9608;
+extern LbRangeTable pl_weapon2_hit_table;
 
 /* A menu slot record (`fn_8021D188`'s argument and `lb_npc_talk_flag_ck`'s only one). */
 struct LbMenuSlot {
@@ -368,7 +368,7 @@ extern "C" void userdata_award_bit_set(LbEquipWork* self, s32 index) {
 extern "C" s16 lb_title_range_find(s32 value) {
     s16 found = -1;
     s32 i = 0;
-    const u16* row = lbl_805C9608.rows_0x018;
+    const u16* row = pl_weapon2_hit_table.rows_0x018;
     s16 v = (s16)value;
 
     while (row[0] != 0xFFFF) {
@@ -379,7 +379,7 @@ extern "C" s16 lb_title_range_find(s32 value) {
         row += 3;
     }
     if (found < 0) {
-        found = i + (v - (s32)lbl_805C9608.base_0x084[1]);
+        found = i + (v - (s32)pl_weapon2_hit_table.base_0x084[1]);
     }
     return found;
 }
@@ -450,7 +450,7 @@ extern "C" s32 fn_8021B91C(void) {
 
 /* Whether `id` is one of the ids in the page's own id table. */
 extern "C" s32 fn_8021C900(u16 id) {
-    const u16* p = lbl_805C9F40.ids_0x10;
+    const u16* p = pl_weapon2_steps_lead.ids_0x10;
 
     while (*p != 0) {
         if (id == *p) {

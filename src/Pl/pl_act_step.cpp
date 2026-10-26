@@ -1220,7 +1220,7 @@ extern "C" void pl_act_state_reset(_PLW* self) {
     self->field_0x125 = 0;
     self->field_0x126 = 0;
     self->field_0x127 = 0;
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     pl_act_clear_flag5bb(self);
 }
 
@@ -1552,7 +1552,7 @@ extern "C" void pl_act_rest(_PLW* self) {
             }
         }
         if (Pl_master_ck(self) == 1 && pl_item_page2_ck(self) == 1 && self->field_0x18 == 1) {
-            fn_8027A57C(self, 0x3E9, 0);
+            pl_motion_stick_move(self, 0x3E9, 0);
         }
         switch (Get_motion_no(self)) {
         case 0x15:
@@ -1887,7 +1887,7 @@ extern "C" void pl_act_flinch(_PLW* self, s32 variant) {
         pl_act_arm_flags(self, 1);
         pl_stun_tick(self);
         pl_guard_latch_set(self);
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         pl_act_clear_mode5c4(self);
         if (variant == 0 || variant == 2) {
             self->act_step_0x05 = 2;
@@ -2299,7 +2299,7 @@ extern "C" void pl_act_knockback(_PLW* self, s32 variant, s32 level, u8 alt) {
             fn_80277BC4(self, 0);
         }
         Pl_act_set_motion(self, 0, 0, 0);
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         pl_act_set_motion_gate(self, 0);
         fn_80276B58(self, -150);
         pl_guard_latch_set(self);
@@ -2547,7 +2547,7 @@ extern "C" void pl_act_item_throw(_PLW* self, s32 kind) {
 /* 0x80249424 - the "down/knock-down" act handler: arms the down motion, then ends the act once the
  * master gate and the hit check agree. */
 extern "C" void fn_80249424(_PLW* self, s32 arg1) {
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     self->act_handler_entered = 1;
     switch (self->act_step_0x05) {
     case 0:
@@ -2577,7 +2577,7 @@ extern "C" void fn_80249424(_PLW* self, s32 arg1) {
 /* 0x80249558 - the get-up handler: arms the get-up motion, then hands the actor's kind to the motion
  * table once the pose check passes. */
 extern "C" void fn_80249558(_PLW* self, s32 arg1) {
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     self->act_handler_entered = 1;
     switch (self->act_step_0x05) {
     case 0:
@@ -2604,7 +2604,7 @@ extern "C" void fn_8024963C(_PLW* self, s32 arg1, s32 arg2) {
     u16 item;
     s16 value;
 
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     self->act_handler_entered = 1;
     switch (self->act_step_0x05) {
     case 0:
@@ -2638,7 +2638,7 @@ extern "C" void fn_80249768(_PLW* self, s32 arg1) {
 
     self->act_handler_entered = 1;
     cockpit_ticket_acquire(self, &self->field_0x598);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -2702,7 +2702,7 @@ extern "C" void fn_802498E0(_PLW* self) {
             }
         }
         if (Pl_master_ck(self) == 1 && pl_item_page2_ck(self) == 1 && self->field_0x018 == 1) {
-            fn_8027A57C(self, 0x41A, 0);
+            pl_motion_stick_move(self, 0x41A, 0);
         }
         if (self->field_0x018 != 1) {
             if (fn_80276800(self, 0) == 1) {
@@ -2741,7 +2741,7 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
             fn_80277BC4(self, 0);
             fn_80276B58(self, -150);
         }
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         pl_act_set_flag(self, 0x1000);
         pl_act_arm_flags(self, 1);
         Pl_act_set_motion(self, 3, 0, 0);
@@ -2967,7 +2967,7 @@ extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
         }
         pl_act_set_motion_gate(self, 0);
         fn_80276B58(self, -0x96);
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         pl_act_set_flag(self, 0x1000);
         pl_act_arm_flags(self, 1);
         if (self->field_0x018 == 0) {
@@ -5554,22 +5554,22 @@ extern "C" void pl_act_sit(_PLW* self, s32 variant) {
         if (Pl_motion_end_ck(self) == 1) {
             self->act_step_0x05++;
             Pl_chr_set_attr_default(self, 8, 6, 0);
-            fn_8027A57C(self, 8, 1);
+            pl_motion_stick_move(self, 8, 1);
         } else {
-            fn_8027A57C(self, 7, 1);
+            pl_motion_stick_move(self, 7, 1);
         }
         break;
     case 2:
         if (Pl_master_ck(self) != 0) {
             if (variant == 2) {
-                fn_8027A57C(self, 0x76, 1);
+                pl_motion_stick_move(self, 0x76, 1);
             } else {
-                fn_8027A57C(self, 8, 1);
+                pl_motion_stick_move(self, 8, 1);
             }
             if (self->field_0x28 > 0) {
                 self->field_0x28--;
             } else if (pl_part_flag_ck(self, 7) == 1 || pl_part_flag_ck(self, 1) == 1 || Pl_motion_input_ck(1) == 1) {
-                fn_8027A17C(self);
+                pl_camera_lock_clear(self);
                 if (variant == 2) {
                     Pl_act_set_motion_slot(self, 3, 4, 0);
                 } else {
@@ -5908,7 +5908,7 @@ extern "C" void pl_act_idle(_PLW* self) {
         /* fallthrough */
     case 1:
         if (Pl_master_ck(self) == 1 && pl_item_page2_ck(self) == 1 && self->field_0x18 == 1) {
-            fn_8027A57C(self, 0x3E9, 0);
+            pl_motion_stick_move(self, 0x3E9, 0);
         }
         break;
     }
@@ -6155,7 +6155,7 @@ extern "C" void pl_act_slinger_aim(_PLW* self, s32 variant, s32 kneel) {
             break;
         }
         if (self->field_0x006 == 0) {
-            fn_8027A57C(self, attr, 2);
+            pl_motion_stick_move(self, attr, 2);
             if (pl_part_flag_ck(self, 0x4C) == 1 && Pl_item_timer_get(self, self->field_0x306) >= 1) {
                 if (kneel == 0) {
                     pl_act_enter(self, 0, 0xAB, 0x6C);
@@ -7558,7 +7558,7 @@ extern "C" void pl_act_dash_turn(_PLW* self) {
             fn_802771A0(self, 0);
         }
         self->field_0x313 = 30;
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         break;
     case 1:
         if (Pl_motion_end_ck(self) == 1) {
@@ -7582,7 +7582,7 @@ extern "C" void pl_act_dash_stop(_PLW* self) {
         Pl_chr_set_attr_default(self, 0x6C, 4, 0);
         self->rot_0x54.x = 0;
         self->field_0x0AC = 0;
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         break;
     case 1:
         if (Pl_motion_end_ck(self) == 1) {
@@ -7924,7 +7924,7 @@ extern "C" void pl_act_jump(_PLW* self, s32 variant) {
     case 0:
         self->act_step_0x05++;
         Pl_act_set_motion(self, 2, 0, 0);
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         switch (variant) {
         case 0:
             Pl_chr_set_attr_default(self, 0xF, 0, 0);
@@ -8079,7 +8079,7 @@ extern "C" void pl_act_climb_down(_PLW* self, s32 variant) {
             }
             break;
         }
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         pl_act_set_frame_timer(self);
         self->field_0x28 = 0;
         break;
@@ -10361,7 +10361,7 @@ extern "C" void pl_act_roar_flinch(_PLW* self, s32 drawn) {
         pl_act_arm_flags(self, 1);
         pl_stun_tick(self);
         pl_guard_latch_set(self);
-        fn_8027A17C(self);
+        pl_camera_lock_clear(self);
         pl_act_clear_mode5c4(self);
         Pl_act_set_motion(self, 0, 0, 1);
         Pl_chr_set_attr_default(self, 0x1C, 2, 0);
@@ -10390,7 +10390,7 @@ extern "C" void pl_act_roar_flinch(_PLW* self, s32 drawn) {
 /* The hit-act dispatcher: drops the act latches and runs the hit, knock-back, ailment and environment act's step
  * handler; an unknown act falls back to the idle slot. */
 extern "C" void pl_act_group6_dispatch(_PLW* self) {
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     pl_act_clear_mode5c4(self);
     pl_act_set_motion_gate(self, 0);
     switch (self->act_no) {
@@ -10872,7 +10872,7 @@ extern "C" void pl_act_kill_cut_taunt(_PLW* self) {
 /* The kill-cut dispatcher: drops the act latches and runs the kill-cut act's step handler; an unknown act falls
  * back to the idle slot. */
 extern "C" void pl_act_group7_dispatch(_PLW* self) {
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     pl_act_clear_mode5c4(self);
     switch (self->act_no) {
     case 0:
@@ -10918,7 +10918,7 @@ extern "C" void pl_act_carted(_PLW* self, s32 variant) {
 
     pl_act_set_gauge_arm(self, 2);
     pl_act_set_step_time(self, 10);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     pl_act_clear_wait(self, 0);
     self->field_0x5BC = 0;
     self->take_menu_open_0x5BE = 0;
@@ -10989,7 +10989,7 @@ extern "C" void pl_act_carted_drawn(_PLW* self) {
     pl_act_set_gauge_arm(self, 2);
     pl_act_clear_wait(self, 0);
     pl_act_set_step_time(self, 10);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -11025,7 +11025,7 @@ extern "C" void pl_act_carted_drawn(_PLW* self) {
  * back to the idle slot. */
 extern "C" void pl_act_group8_dispatch(_PLW* self) {
     pl_act_clear_mode5c4(self);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     switch (self->act_no) {
     case 0:
         pl_act_carted(self, 0);
@@ -11499,7 +11499,7 @@ extern "C" void pl_act_meditate_end(_PLW* self, s32 kneel) {
 /* The lobby-gesture dispatcher: drops the act latches and runs the gesture act's step handler (acts 14-27 the
  * kneeling twins of 0-13); an unknown act falls back to the idle slot. */
 extern "C" void pl_act_group11_dispatch(_PLW* self) {
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     switch (self->act_no) {
     case 0:
         pl_act_kneel_gesture(self, 0, 0);
@@ -12150,7 +12150,7 @@ extern "C" void pl_act_camp_rest(_PLW* self, s32 variant) {
 extern "C" void pl_act_leave_asleep(_PLW* self, s32 variant) {
     pl_act_set_step_time(self, 10);
     pl_act_set_gauge_arm(self, 10);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     pl_act_clear_flag5bb(self);
     self->field_0x5BC = 0;
     self->quest_menu_open_0x5BD = 0;
@@ -12196,7 +12196,7 @@ extern "C" void pl_act_leave_asleep(_PLW* self, s32 variant) {
 extern "C" void pl_act_leave_fainted(_PLW* self, s32 variant) {
     pl_act_set_step_time(self, 10);
     pl_act_set_gauge_arm(self, 10);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     pl_act_clear_flag5bb(self);
     self->field_0x5BC = 0;
     self->quest_menu_open_0x5BD = 0;
@@ -12856,7 +12856,7 @@ extern "C" void fn_8025ED00(_PLW* self) {
                 self->field_0x5E6 = 0;
             }
             if (pl_act_true_ck(self) == 0) {
-                fn_8027A17C(self);
+                pl_camera_lock_clear(self);
             }
         } else if (self->field_0x18 == 0) {
             if (Pl_bari_ck(self, 1) == 1) {
@@ -12866,13 +12866,13 @@ extern "C" void fn_8025ED00(_PLW* self) {
             } else if (pl_act_no_68_71_ck(self) == 1) {
                 self->field_0x5E6 = 1;
             } else {
-                fn_8027A17C(self);
+                pl_camera_lock_clear(self);
             }
         } else if (pl_item_page2_ck(self) == 0) {
             if (pl_act_no_68_71_ck(self) == 1) {
                 self->field_0x5E6 = 1;
             } else {
-                fn_8027A17C(self);
+                pl_camera_lock_clear(self);
             }
         }
     }
@@ -12945,7 +12945,7 @@ void fn_8025F088(_PLW* self) {
     }
     fn_8025EC58(self);
     if (pl_item_page2_ck(self) == 1) {
-        fn_802872E4(self);
+        pl_gun_guard_row_latch(self);
     }
     self->field_0x3B4 = 0;
     self->field_0x3B5 = 0;

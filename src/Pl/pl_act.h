@@ -54,7 +54,7 @@ s32 fn_80277DAC(struct _PLW* self, s32 a, f32 b, f32 c);
  * act-175/act-89 handlers call them. */
 void pl_act_set_gauge_arm(struct _PLW* self, s16 value);
 u32 pl_act_no_68_71_ck(struct _PLW* self);
-void fn_8027A17C(struct _PLW* self);
+void pl_camera_lock_clear(struct _PLW* self);
 /* 0x8027A190 - the always-true act predicate (`li r3,1; blr`); its consumer tests the result. */
 s32 pl_act_true_ck(struct _PLW* self);
 /* 0x80277C94 - the ground-height probe along the actor's facing: 1 and the height in `out->x` when it hits inside
@@ -76,7 +76,7 @@ s32 fn_8027D40C(struct _PLW* self);
  * `pl_act_set_frame_timer` is declared in the block below. */
 void fn_802771A0(struct _PLW* self, s32 value);
 s32 pl_target_lock_ck(struct _PLW* self);
-void fn_8027A57C(struct _PLW* self, u16 a, u8 b);
+void pl_motion_stick_move(struct _PLW* self, u16 a, u8 b);
 void pl_act_clear_mode5c4(struct _PLW* self);
 void fn_80277BC4(struct _PLW* self, u8 flag);
 void pl_act_set_motion_gate(struct _PLW* self, s16 value);

@@ -38,7 +38,8 @@ struct ShellSetFuncs {
     /* +0x3C */ void (*method_0x3C)(struct _ENEMY_WORK* self, void* rec, u32 mode, ShellSetFuncs* table);
     /* untyped: caller-owned payload, the spawn record `enemy/em003_prog.cpp`'s swipe steps build */
     /* +0x40 */ void (*method_0x40)(struct _ENEMY_WORK* self, void* rec, u32 mode, u32 hit_id, ShellSetFuncs* table);
-    /* +0x44 */ u8 pad_0x44[0x4C - 0x44];
+    /* +0x44 */ void (*method_0x44)(struct _PLW* self, u32 ammo, ShellSetFuncs* table, f32 scale);  /* the gunner shot (`Pl/fn_802840DC.cpp`) */
+    /* +0x48 */ u8 pad_0x48[0x4C - 0x48];
     /* +0x4C */ void (*method_0x4C)(struct _PLW* self, s32 kind, ShellSetFuncs* table);  /* the shot act's shell (`hud/pl_frame_sync.cpp`) */
     /* +0x50 */ void (*method_0x50)(struct _ENEMY_WORK* self, u32 a, u32 b, ShellSetFuncs* table);
     /* +0x54 */ void (*method_0x54)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos,

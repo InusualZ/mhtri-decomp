@@ -95,7 +95,7 @@
  *  - `fn_80278144`/`pl_area_spot_valid_ck`: the early `(u32)((u8)m - 6) <= 1` exit inlines `li r3,0; b epilogue` (+8 B each)
  *    where retail shares one block through a label (rule 8; docs/pl.md);
  *  - `Pl_motion_input_ck`: the case-3/5 failures return inline where retail branches to a shared `return 0`;
- *  - `fn_8027A57C`: the conformant if/else-if dispatch interleaves the case tests retail lays out `switch`-shaped;
+ *  - `pl_motion_stick_move`: the conformant if/else-if dispatch interleaves the case tests retail lays out `switch`-shaped;
  *  - `pl_skill_update`: retail's `mr r0,r3; mr r3,self; extsh r4,r0` says `fn_802753E4` returns `s16`; the declaration
  *    stays wider (`pl_skill_update2`/`fn_80278D1C` depend on it) and each of the five `(s16)` call sites costs one row;
  *  - `fn_8027B0BC`: six `clrlwi r0,r0,24` before the `stb`s into `q + 0x5E1` (a peephole-level residual);
@@ -162,14 +162,14 @@
  *    `fn_80278674`, `fn_8027D5A4`; playbook 38); `field = field + value` and a temporary extend at the store, and
  *    `field--` stores raw where `field = field - 1` extends (`fn_8027B0BC`);
  *  - a 32-bit accumulator that retail sign-extends only at each compare is an `s32` with `b = (s16)(b + N)` on the
- *    arms that convert and `a -= b` for the difference (`fn_80279490`, `fn_802791FC`, `pl_carry_item_get`);
+ *    arms that convert and `a -= b` for the difference (`fn_80279490`, `pl_gun_reload_tier_get`, `pl_carry_item_get`);
  *  - equality on a `u16`/`u8` value pairs as `cmpwi` through a signed local or cast (`s32 id = self->act_no`,
  *    `(s32)(u8)x`, `(s32)arg0 == N`) and `(u32)` on an `s32` helper gives `cmplwi` (`pl_act_add_class7_gauge`, `pl_skill_update2`);
  *  - `x <= N ? 1 : 2` gives retail's `xoris/subfic/addc/subfe/addi` and `x == N ? a : b` its `addi/subfic/nor/srawi`
- *    (`Get_Shell_bure_type`, `fn_802791FC`, `fn_80279490`); a constant before the index (`lbl + k + idx * 4`) makes
+ *    (`Get_Shell_bure_type`, `pl_gun_reload_tier_get`, `fn_80279490`); a constant before the index (`lbl + k + idx * 4`) makes
  *    MWCC form the base first;
  *  - `extern u8 lbl_80792150;` taken by address gives retail's `@sda21` form where an unsized array gives `lis/addi`;
- *  - `fn_802784B8`'s first case falls through into a `default:` written between the cases; `fn_8027A57C`'s shared
+ *  - `fn_802784B8`'s first case falls through into a `default:` written between the cases; `pl_motion_stick_move`'s shared
  *    tail is the `switch`'s `default:` after the last case; `pl_impact_pos_get` writes its `default:` first;
  *  - `pl_item_now_usable_ck` ends in `return 0` with an explicit `default: return 1`, and every refused path is
  *    `if (!c) return 1; break;` (the `if (c) return 0; return 1;` form if-converts; playbook 34);
@@ -179,7 +179,7 @@
  *  - `pl_pos_blend_start` writes `(f32)(s16)arg1` inline at each division (retail recomputes the conversion);
  *  - `pl_attack_range_tier_get` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `pl_item_slot_next_get` casts its `u16` index to
  *    `s16` each iteration; `pl_impact_pos_get`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
- *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
+ *    constant `-0x1006`; `pl_gun_ammo_entry_get`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
  *  - `pl_area_buff_apply`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
  *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
  *    `pl_step_se_kind_get` declares its loop index before `v` (the r8/r9 order); `pl_item_icon_kind_get` is `while (row[0] != 0)` with
@@ -915,7 +915,7 @@ namespace s_8026BA1C {
 extern "C" u8 pl_act_param_tier_ck(_PLW* self, u32 idx);
 extern "C" u32 fn_8026F9A4(_PLW* self, u32 idx, u16 low, u16 high);
 extern "C" u32 fn_8026FA6C(_PLW* self, u32 idx, u16 low, u16 high);
-extern "C" u32 fn_8026FB20(_PLW* self, s32 kind);
+extern "C" u32 pl_stick_dir_ck(_PLW* self, s32 kind);
 extern "C" u32 fn_8026FC40(_PLW* self, u32 idx, u16 low, u16 high);
 extern "C" u32 fn_8026CBE4(_PLW* self, u8 which, u32 arg2, u32 arg3);
 
@@ -2055,9 +2055,9 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 if ((s32) (st->unk7E & 8) != 0) {
                     fn_8026A678(self, 1);
                     fn_8026A678(self, 4);
-                    if (fn_8026FB20(self, 0x800) == 1U) {
+                    if (pl_stick_dir_ck(self, 0x800) == 1U) {
                         fn_8026A678(self, 0x12);
-                    } else if (fn_8026FB20(self, 0x400) == 1U) {
+                    } else if (pl_stick_dir_ck(self, 0x400) == 1U) {
                         fn_8026A678(self, 0x11);
                     }
                 }
@@ -2212,7 +2212,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 0x12);
                     fn_8026A678(self, 7);
                     fn_8026A678(self, 0x16);
-                    if (fn_8026FB20(self, 0x1000) == 1U) {
+                    if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                         fn_8026A678(self, 8);
                     }
                 }
@@ -2229,7 +2229,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     fn_8026A678(self, 7);
                     fn_8026A678(self, 4);
                     fn_8026A678(self, 0x13);
-                    if (fn_8026FB20(self, 0x1000) == 1U) {
+                    if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                         fn_8026A678(self, 8);
                         return;
                     }
@@ -2250,7 +2250,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     }
                     fn_8026A678(self, 7);
                     fn_8026A678(self, 0x16);
-                    if (fn_8026FB20(self, 0x1000) == 1U) {
+                    if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                         fn_8026A678(self, 8);
                     }
                 } else {
@@ -2277,13 +2277,13 @@ extern "C" void fn_8026CC7C(_PLW* self)
                     if ((s32) (st->flagsBC & 0x100) != 0) {
                         fn_8026A678(self, 6);
                         fn_8026A678(self, 7);
-                        if (fn_8026FB20(self, 0x1000) == 1U) {
+                        if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                             fn_8026A678(self, 8);
                         }
                     }
                     if ((s32) (self->field_0x0CC & 0x3C) != 0) {
                         fn_8026A678(self, 7);
-                        if (fn_8026FB20(self, 0x1000) == 1U) {
+                        if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                             fn_8026A678(self, 8);
                         }
                     }
@@ -2316,7 +2316,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
             if ((s32) (st->flagsBC & 0x40) != 0) {
                 fn_8026A678(self, 6);
                 fn_8026A678(self, 7);
-                if (fn_8026FB20(self, 0x1000) == 1U) {
+                if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                     fn_8026A678(self, 8);
                 }
                 fn_8026A678(self, 4);
@@ -2333,7 +2333,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 }
                 fn_8026A678(self, 0x1C);
                 fn_8026A678(self, 7);
-                if (fn_8026FB20(self, 0x1000) == 1U) {
+                if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                     fn_8026A678(self, 8);
                 }
                 fn_8026A678(self, 0x16);
@@ -2379,7 +2379,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 fn_8026A678(self, 7);
                 fn_8026A678(self, 0x1B);
                 fn_8026A678(self, 0x1C);
-                if (fn_8026FB20(self, 0x1000) == 1U) {
+                if (pl_stick_dir_ck(self, 0x1000) == 1U) {
                     fn_8026A678(self, 8);
                 }
                 if ((s32) pl_act_param_tier_ck(self, 0) == 0) {
@@ -2515,7 +2515,7 @@ extern "C" u32 fn_8026FA6C(_PLW* self, u32 idx, u16 low, u16 high)
 }
 
 /* 0x8026FB20: picks the angle window for a direction code. */
-extern "C" u32 fn_8026FB20(_PLW* self, s32 kind)
+extern "C" u32 pl_stick_dir_ck(_PLW* self, s32 kind)
 {
     switch (kind) {
     case 8192:
@@ -3565,7 +3565,7 @@ extern "C" void fn_80272D5C(_PLW* plw) {
     s16 v = pl_item_slot_count_get(plw, (u8)plw->item_slot_sel);
 
     plw->magazine_0x270 = v;
-    plw->unk272 = (s16)v;
+    plw->magazine_shown_0x272 = (s16)v;
     if ((s16)v < plw->unk269) {
         plw->unk269 = (u8)(s16)v;
         plw->unk274 = (u8)(s16)v;
@@ -3664,8 +3664,8 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
     if (slot == plw->item_slot_sel) {
         plw->item_slot_sel = pl_item_slot_next_get(plw, (u16)slot, 2);
         pl_held_item_refresh(plw);
-        plw->unk272 = plw->magazine_0x270;
-        plw->unk275 = plw->ammo_capacity_0x26A;
+        plw->magazine_shown_0x272 = plw->magazine_0x270;
+        plw->capacity_shown_0x275 = plw->ammo_capacity_0x26A;
         plw->unk274 = 0;
         return;
     }
@@ -5362,9 +5362,9 @@ extern "C" void pl_act_enter_raw(struct _PLW* plw, u8 kind, u16 no, u16 mask)
             break;
         }
         if (Pl_master_ck(plw) == 1U) {
-            if (fn_8026FB20(plw, 0x800) == 1U) {
+            if (pl_stick_dir_ck(plw, 0x800) == 1U) {
                 plw->field_0x0A8 += step;
-            } else if (fn_8026FB20(plw, 0x400) == 1U) {
+            } else if (pl_stick_dir_ck(plw, 0x400) == 1U) {
                 plw->field_0x0A8 -= step;
             }
         }
@@ -5610,13 +5610,13 @@ extern "C" void pl_act_reset_down(struct _PLW* self, u32 a, u32 b, u32 c)
     fn_80275C34(self, a, b, c, 2, 1);
 }
 
-extern "C" void fn_80279EBC(_PLW*, u16, u16);
+extern "C" void pl_aim_motion_set(_PLW*, u16, u16);
 
 /* The motion-parameter act-state entry: enters the act state, then hands the two motion parameters on. */
-extern "C" void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c, u32 param_a, u32 param_b)
+extern "C" void pl_act_state_enter_aim(struct _PLW* self, u32 a, u32 b, u32 c, u32 param_a, u32 param_b)
 {
     fn_80275C34(self, a, b, c, 1, 0);
-    fn_80279EBC(self, param_a, param_b);
+    pl_aim_motion_set(self, param_a, param_b);
 }
 
 /* Clears the act's hold latch and re-enters the act state. */
@@ -5932,7 +5932,7 @@ extern "C" void pl_act_enter(_PLW*, s32, u16, u16);
 
 /* In-unit callees that the appended bodies reference before their own definition. */
 extern "C" void pl_skill_update2(_PLW*, s32);
-extern "C" void fn_8027A17C(_PLW*);
+extern "C" void pl_camera_lock_clear(_PLW*);
 extern "C" u32 fn_80278144(u8, u8*, u8);
 extern "C" u32 pl_area_spot_valid_ck(u8, u8*, u8);
 extern "C" void pl_dodge_motion_start(_PLW*, s32, s32);
@@ -5984,7 +5984,7 @@ extern "C" s32 pl_item_slot_item_get(_PLW*, u8);
 extern "C" u8 pl_item_icon_kind_get(u16);
 extern "C" s16 pl_item_slot_count_get(_PLW*, u8);
 extern "C" u8 fn_80274D98(_PLW*, u8);
-extern "C" u32 fn_8028732C(_PLW*);
+extern "C" u32 pl_scan_rows_id252_ck(_PLW*);
 extern "C" u8* equip_weapon_rec_get(void*);
 extern "C" u8* gun_ammo_entry_find(u8*, u8);
 
@@ -6335,7 +6335,7 @@ extern "C" void fn_8027A044(_PLW* self, s16 arg1)
 }
 
 /* 0x8027A17C */
-extern "C" void fn_8027A17C(_PLW* self)
+extern "C" void pl_camera_lock_clear(_PLW* self)
 {
     self->unk5E6 = 0;
     self->unk5E5 = 0;
@@ -6619,7 +6619,7 @@ extern "C" void pl_dodge_motion_start(_PLW* self, s32 arg1, s32 arg2)
     self->health = 0;
     self->unk376 = 0;
     pl_skill_update2(self, 1);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     pl_act_enter(self, 8, (u16)arg1, (u16)(arg2 | 32));
 }
 
@@ -6634,7 +6634,7 @@ extern "C" void pl_ride_down_set(_PLW* self)
     self->health = 0;
     self->unk376 = 0;
     pl_skill_update2(self, 1);
-    fn_8027A17C(self);
+    pl_camera_lock_clear(self);
     if (self->kind_0x09 == 3) {
         pl_dodge_motion_start(self, 1, 0);
     } else {
@@ -6787,14 +6787,14 @@ extern "C" s32 pl_aim_act_ck(_PLW* self)
             v = 1;
         }
     }
-    if (fn_8028732C(self) == 1) {
+    if (pl_scan_rows_id252_ck(self) == 1) {
         v = 1;
     }
     return v;
 }
 
 /* 0x80279414: looks the given id up in the actor's two reaction tables. */
-extern "C" u8* fn_80279414(_PLW* self, u8 arg1)
+extern "C" u8* pl_gun_ammo_entry_get(_PLW* self, u8 arg1)
 {
     u8* p = gun_ammo_entry_find(equip_weapon_rec_get((u8*)self + 464), arg1);
     if (p != 0) {
@@ -8334,7 +8334,7 @@ extern "C" void pl_skill_update(_PLW* self, s32 arg1, s32 arg2)
 
 /* 0x802791FC: the shell-level cap one equipment slot contributes, before the actor's skill modifiers
  * are applied. */
-extern "C" s32 fn_802791FC(_PLW* self, u8 arg1)
+extern "C" s32 pl_gun_reload_tier_get(_PLW* self, u8 arg1)
 {
     if ((s32)pl_item_page2_ck(self) == 0) {
         return 1;
@@ -8425,12 +8425,12 @@ extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
         return 2;
     }
     s32 a = *(u8*)(lbl_805BF538 + arg1 * 4);
-    u8* p = fn_80279414(self, arg1);
+    u8* p = pl_gun_ammo_entry_get(self, arg1);
     if (p != 0) {
         return (s16)(*(u8*)(p + 3) + 3);
     }
     s32 b = 0;
-    if (fn_80279414(self, arg1) == 0) {
+    if (pl_gun_ammo_entry_get(self, arg1) == 0) {
         b = *(u8*)(equip_weapon_rec_get(&self->equipB) + 7);
         if (((u8*)&self->equipD)[0] == 0xD) {
             b += *(u8*)(equip_weapon_rec_get(&self->equipD) + 7);
@@ -8470,7 +8470,7 @@ extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
 }
 
 extern "C" s32 pl_part_flag2_ck(_PLW*, s32);
-extern "C" void fn_80279EBC(_PLW*, u16, u16);
+extern "C" void pl_aim_motion_set(_PLW*, u16, u16);
 extern "C" s32 pl_target_lock_ck(_PLW*);
 extern "C" u32 pl_act4_phase_ck(_PLW*, s32);
 extern "C" void camera_aim_zoom_get(_PLW*, u8*, u8*, f32*);
@@ -8481,7 +8481,7 @@ extern "C" { extern const f32 lbl_8079A0F0; }
 
 /* 0x8027A57C: resolves one motion's stick input into movement - the four pad-direction flags, the direction and
  * magnitude the move table interpolates for the current speed, and the per-motion write-back. */
-extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
+extern "C" void pl_motion_stick_move(_PLW* self, u16 arg1, u8 arg2)
 {
     u8 sp9;
     u8 sp8;
@@ -8674,10 +8674,10 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
         fn_8027A000(self, dir);
         switch (arg1) {
         case 0x3E9:
-            fn_80279EBC(self, 0x406, 0x407);
+            pl_aim_motion_set(self, 0x406, 0x407);
             return;
         case 0x41A:
-            fn_80279EBC(self, 0x438, 0x439);
+            pl_aim_motion_set(self, 0x438, 0x439);
             return;
         }
         break;
@@ -9175,7 +9175,7 @@ extern "C" void fn_80279C20(_PLW* self)
 }
 
 /* 0x80279EBC: starts the shell-swap motion, scaled by the actor's stored shell count. */
-extern "C" void fn_80279EBC(_PLW* self, u16 arg1, u16 arg2)
+extern "C" void pl_aim_motion_set(_PLW* self, u16 arg1, u16 arg2)
 {
     s32 v = *(s8*)((u8*)self + 0x64F);
     if (v == 0) {

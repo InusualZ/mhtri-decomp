@@ -114,7 +114,7 @@ u8 pl_act_stage_get(struct _PLW* plw);
 void pl_act_kind_set(struct _PLW* plw, u8 value);
 
 /* 0x802761DC - the motion-parameter act-state entry. */
-void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c, u32 param_a, u32 param_b);
+void pl_act_state_enter_aim(struct _PLW* self, u32 a, u32 b, u32 c, u32 param_a, u32 param_b);
 
 /* 0x80274810 / 0x80274850 - the player's own move work record and its sibling scan. */
 void* pl_partner_work_get(struct _PLW* plw);

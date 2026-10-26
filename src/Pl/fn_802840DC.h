@@ -56,6 +56,107 @@ void pl_act_motion_row_apply(struct _PLW* self, u8 mode, const PlMotionRow* row,
 /* 0x80284474 - the player's charge stage for the second weapon class (`ef/eft029_fx.cpp` reads it). */
 u8 pl_charge_stage2_get(struct _PLW* plw);
 
+/* One 18-byte attack row of a weapon-2 row act: `mode` selects which half of the motion/parameter fields
+ * applies. size: 0x12 (`mulli ...,<kind>,18` at every call site) */
+typedef struct ShellAtkRow {
+    /* +0x00 */ u16 mode;       /* the motion when `mode == 0xFFFF` picks the second field set, the
+                                 * row's alternate-selector when the caller asks for kind 1 */
+    /* +0x02 */ s16 value_0x02; /* second set: the motion's first argument */
+    /* +0x04 */ s16 value_0x04; /* second set: the motion's second argument */
+    /* +0x06 */ u16 add_0x06;   /* second set: frames added to the actor's own frame counters */
+    /* +0x08 */ s16 gate_0x08;  /* > 0 arms the motion gate (`pl_act_set_motion_gate`) with this value */
+    /* +0x0A */ u16 motion_0x0A;  /* first set: the motion `Pl_chr_set_attr_default` sets */
+    /* +0x0C */ s16 param_0x0C;   /* first set: the motion's first argument */
+    /* +0x0E */ s16 param_0x0E;   /* first set: the motion's second argument */
+    /* +0x10 */ s16 attack_0x10;  /* first set: the attack value `pl_weapon2_attack_set` is run with */
+} ShellAtkRow;
+
+/* The weapon-2 band's own `.data` tables (`Pl/fn_802840DC.cpp`'s claim 0x805C9568-0x805CBFC0), declared, not yet
+ * emitted: the hit table its attack entries walk and its `.sdata` id list, the two charge-stage act lists, the
+ * `ShellAtkRow` tables its row acts index by kind, and the step tables `Pl_act_set_step_table` is handed. */
+extern u8 pl_weapon2_hit_table[];
+extern s32 pl_weapon2_hit_ids[2];
+extern u16 pl_weapon2_charge_acts_a[6];
+extern u16 pl_weapon2_charge_acts_b[6];
+extern ShellAtkRow pl_weapon2_rows_a[];
+extern ShellAtkRow pl_weapon2_rows_b[];
+extern ShellAtkRow pl_weapon2_rows_c[];
+extern ShellAtkRow pl_weapon2_alt_rows_a[];
+extern ShellAtkRow pl_weapon2_alt_rows_b[];
+extern ShellAtkRow pl_weapon2_alt_rows_c[];
+extern ShellAtkRow pl_weapon2_alt_rows_lunge[];
+extern ShellAtkRow pl_weapon2_alt_rows_d[];
+extern ShellAtkRow pl_weapon2_alt_rows_e[];
+extern u8 pl_weapon2_steps_rapid[];
+extern u8 pl_weapon2_steps_rapid_loop[];
+extern u8 pl_weapon2_alt_steps_rapid[];
+extern u8 pl_weapon2_alt_steps_rapid_loop[];
+extern u8 pl_weapon2_steps_row_a[];
+extern u8 pl_weapon2_steps_row_b[];
+extern u8 pl_weapon2_steps_row_b1[];
+extern u8 pl_weapon2_steps_lead[];
+extern u8 pl_weapon2_steps_lead_swing[];
+extern u8 pl_weapon2_steps_row_c[];
+extern u8 pl_weapon2_steps_row_c1[];
+extern u8 pl_weapon2_steps_back_swing[];
+extern u8 pl_weapon2_steps_swing_g[];
+extern u8 pl_weapon2_steps_charge[];
+extern u8 pl_weapon2_steps_lunge[];
+extern u8 pl_weapon2_steps_lunge_timed[];
+extern u8 pl_weapon2_steps_lunge_long[];
+extern u8 pl_weapon2_steps_shell_fire[];
+extern u8 pl_weapon2_steps_swing_f[];
+extern u8 pl_weapon2_steps_step_motion[];
+extern u8 pl_weapon2_alt_steps_row_a[];
+extern u8 pl_weapon2_alt_steps_row_b[];
+extern u8 pl_weapon2_alt_steps_row_b1[];
+extern u8 pl_weapon2_alt_steps_lead_swing[];
+extern u8 pl_weapon2_alt_steps_row_c[];
+extern u8 pl_weapon2_alt_steps_row_c1[];
+extern u8 pl_weapon2_alt_steps_step_motion[];
+extern u8 pl_weapon2_alt_steps_back_swing[];
+extern u8 pl_weapon2_alt_steps_row_d[];
+extern u8 pl_weapon2_alt_steps_charge[];
+extern u8 pl_weapon2_alt_steps_lunge[];
+extern u8 pl_weapon2_alt_steps_lunge_timed[];
+extern u8 pl_weapon2_alt_steps_lunge_b[];
+extern u8 pl_weapon2_alt_steps_shell_fire[];
+extern u8 pl_weapon2_alt_steps_row_e[];
+/* The weapon-4/5/6 and class-7 attack entries' hit tables and `.sdata` id lists (a *sized* id list is what makes
+ * MWCC address it through r13, the target's `@sda21` form). */
+extern u8 pl_weapon456_hit_table[];
+extern s32 pl_weapon456_hit_ids[1];
+extern u8 pl_class7_hit_table[];
+extern s32 pl_class7_hit_ids[2];
+
+/* One fire-motion row of the weapon-4/5/6 fire act: the fire motion and its aim pair. size: 0x6 */
+typedef struct PlGunFireMotion {
+    /* +0x0 */ u16 motion;
+    /* +0x2 */ u16 up_motion;
+    /* +0x4 */ u16 down_motion;
+} PlGunFireMotion;
+
+/* The weapon-4/5/6 tables: the melee step tables per weapon class, the two forms' fire-motion rows and fire step
+ * tables, the crouch fire's frame counts per ammo and its two follow-up act lists. */
+extern u8 pl_weapon456_steps_melee_4[];
+extern u8 pl_weapon456_steps_melee_5[];
+extern u8 pl_weapon456_steps_melee_6[];
+extern u8 pl_weapon456_alt_steps_melee_4[];
+extern u8 pl_weapon456_alt_steps_melee_56[];
+extern PlGunFireMotion pl_weapon456_fire_motions[];
+extern PlGunFireMotion pl_weapon456_alt_fire_motions[];
+extern u32 pl_weapon456_fire_steps_5[];
+extern u32 pl_weapon456_fire_steps_6[];
+extern u32 pl_weapon456_alt_fire_steps[];
+extern s32 pl_weapon456_crouch_frames[];
+extern u16 pl_weapon456_crouch_acts[3];
+extern u16 pl_weapon456_alt_crouch_acts[3];
+
+/* 0x802872E4 (0x48): latches +0x276 while a magazine is loaded and the scan rows hold the id-252 row. */
+void pl_gun_guard_row_latch(struct _PLW* self);
+/* 0x8028732C (0x60): 1 when the actor's scan rows (+0x318) hold a kind-4 row with id 252. */
+u32 pl_scan_rows_id252_ck(struct _PLW* self);
+
 /* 0x805CAD48: the step table the guard-break act hands Pl_act_set_step_table for weapon kind 2 */
 extern u32 pl_flinch_steps_kind2[];
 void pl_weapon1_act_dispatch(struct _PLW* self);

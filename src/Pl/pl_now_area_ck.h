@@ -20,7 +20,7 @@ void pl_act_set_flag(struct _PLW* self, u32 bits);
 u32 pl_model_pos_sync(struct _PLW* self);
 void pl_cond_flags_clear(struct _PLW* self, s32 v);
 u32 pl_input_active_ck(struct _PLW* self);
-u32 fn_8026FB20(struct _PLW* self, u32 mask);
+u32 pl_stick_dir_ck(struct _PLW* self, u32 mask);
 
 #ifdef __cplusplus
 }
