@@ -12,7 +12,7 @@ extern "C" {
 
 /* 0x8033A920 - requests lobby event `id`: 1 when it was armed, 0 when the lobby refuses (server-select screen,
  * outside game mode 1, or busy). */
-u32 lb_event_request(u32 id);
+u32 lb_event_request(u16 id);
 
 #ifdef __cplusplus
 }

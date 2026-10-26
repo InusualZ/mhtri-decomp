@@ -901,7 +901,7 @@ u32 root_mode2_ck(void) {
 }
 
 /* 0x8028D574 - the `flag_0x114 == 1` predicate, 1 when the work is absent. */
-u32 fn_8028D574(void) {
+u32 quest_move_idle_ck(void) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     if (root == 0) {
         return 1;

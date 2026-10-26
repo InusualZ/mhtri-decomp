@@ -3181,7 +3181,7 @@ namespace s_80270018 {
 
 
 /* Whether `skill` is one of the player's eight base skill ids. */
-extern "C" u32 fn_802714F0(_PLW* plw, u16 skill) {
+extern "C" u32 pl_skill_have_ck(_PLW* plw, u16 skill) {
     int i;
 
     for (i = 0; i < 8; i++) {

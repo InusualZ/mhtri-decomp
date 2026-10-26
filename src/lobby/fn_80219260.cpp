@@ -59,7 +59,7 @@ s32 Gunner_opt_ok_ck(_EQUIP* equip);
 /* Unsplittable callees whose bracketing registered units name different modules (rule 2's named gap:
  * `ai` below, `ef`/`hud`/`stage` above), so they are declared here. */
 void fn_800D0754(u8 value);
-void fn_800DCFE4(void);
+void sysSE_window_open_play(void);
 const u16* get_menu_lsp_tbl(u16 id);
 s32 lb_menu_step(u8 a, s32 b, s32 c, s32 d);
 
@@ -552,7 +552,7 @@ extern "C" void lb_screen07_step(void) {
     switch (state) {
     case 0:
         lbl_806AA790.state_0x008++;
-        fn_800DCFE4();
+        sysSE_window_open_play();
         break;
     case 1:
         if ((u32)(lb_talk_page_mode_reset() - 1) <= 1U) {

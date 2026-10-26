@@ -11,20 +11,12 @@
 #include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
 #include "stage/shell.h" /* ShellSerialEntry, serial_find, serial_state_set_word (rule 2) */
 #include "lobby/lobby_hunter_cards.h" /* LbQuestPage, lobby_hunter_cards - this unit's leaf header */
+#include "id_value.h" /* IdValue, the item box slots */
+#include "hud/layout.h" /* _mh_ivec2_, _SPR_DATA_ and the draw_* family (rule 1, rule 2) */
 
 /* `quest_element_pick_ck` (owner `lobby/lb_quest_screen.h`) is declared below with the owner's signature. */
 struct QuestWork;
 
-/* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
- * size: 0x4 */
-typedef struct _mh_ivec2_ {
-    /* +0x00 */ s16 x;
-    /* +0x02 */ s16 y;
-} _mh_ivec2_;
-
-/* The sprite-data record the `draw_sprite`/`draw_font` family takes by reference; only ever passed
- * through, so the incomplete type is enough here. */
-struct _SPR_DATA_;
 
 /* ---------------------------------------------------------------------------------------------- *
  * The records this band works on.
@@ -108,7 +100,7 @@ typedef struct LbCompanionWork {
     /* +0x05E2 */ LbCompanionPair pairs_0x5E2[1];  /* the per-companion id/value pairs */
     /* +0x05E6 */ u8 unused_0x05E6[0x9E];
     /* +0x0684 */ u32 bits_0x684[2];   /* the mask words the act handlers set (`index >> 5`) */
-    /* +0x068C */ u8 unused_0x068C[0x2EC];
+    /* +0x068C */ u8 unused_0x068C[0x62EC];
     /* +0x06978 */ u8 mode_0x6978;     /* set to 3 by the area-change announcement */
     /* +0x06979 */ u8 unused_0x06979[0x2B];
     /* +0x069A4 */ u8 count_0x69A4;    /* incremented once per tick (`lb_companion_tick`) */
@@ -342,12 +334,13 @@ typedef union LbEntryId {
 } LbEntryId; /* size: 0x4 */
 
 typedef struct LbDataBlock {
-    /* +0x0000 */ u8 unused_0x0000[0x3960];
+    /* +0x0000 */ u8 unused_0x0000[0x180];
+    /* +0x0180 */ IdValue box_0x180[0x3E8];  /* the item box (`userdata_box_capacity` slots; the count is a GUESS) */
+    /* +0x1120 */ u8 unused_0x1120[0x2840];
     /* +0x3960 */ u8 bits_0x3960[0x8];   /* the per-entry bit field `lb_page_entry_bit_set` sets */
     /* +0x3968 */ u8 unused_0x3968[0x49B];
     /* +0x3E03 */ u8 entry_0x3E03;    /* the selected entry, low 7 bits = index, 0x80 = "changed" */
-    /* +0x3E04 */ u8 unused_0x3E04[0x13F8];
-    /* +0x51FC */ u8 unused_0x51FC[0x4];
+    /* +0x3E04 */ u8 unused_0x3E04[0x137C];
     /* +0x5180 */ LbEntryId ids_0x5180[1];  /* the per-entry id table `lb_entry_id_get`/`lb_entry_model_publish` use */
     /* +0x5184 */ u8 unused_0x5184[0x18];
     /* +0x519C */ s32 flags_0x519C;    /* the OR-ed page flags `lb_page_flags_update` sets */
@@ -374,22 +367,33 @@ typedef struct LbPageWork {
 } LbPageWork; /* size: 0x9C (>= 0x9C read) */
 
 
-/* The tutorial/quest announcement block (`lbl_806BEF20`, 0x10 B): the state bytes the state machine
- * walks and the data pointer it hands out.  size: 0x10 */
+/* One 10-byte row of a tutorial event's entry list (`lb_tutorial_entry_lists[event]`, ended by a negative
+ * `flag_0x00`): the row is taken when its kind matches, its own progress flag is still clear, `need_0x06` is set
+ * (or -1) and `block_0x08` is clear (or -1).  size: 0xA */
+typedef struct LbTutorialEntry {
+    /* +0x00 */ s16 flag_0x00;    /* the progress flag the row sets once shown */
+    /* +0x02 */ u16 kind_0x02;    /* compared with `LbQuestWork::kind_0x06` */
+    /* +0x04 */ u8 page_0x04;     /* the page set `lb_tutorial_entry_find` returns */
+    /* +0x05 */ s8 note_0x05;     /* the note list the row opens (negative: none) */
+    /* +0x06 */ s16 need_0x06;    /* a progress flag that must be set, or -1 */
+    /* +0x08 */ s16 block_0x08;   /* a progress flag that must be clear, or -1 */
+} LbTutorialEntry; /* size: 0xA */
+
+/* The tutorial announcement block (`lb_tutorial_work`, 0x10 B): the state `lb_tutorial_step` walks (0 idle, 1 the
+ * pages, 2 the note list, 3 closing), the page cursor and the entry row it shows.  size: 0x10 */
 typedef struct LbQuestWork {
-    /* +0x00 */ u8 active_0x00;   /* 0 while the block is idle */
-    /* +0x01 */ u8 state_0x01;
-    /* +0x02 */ u8 value_0x02;
-    /* +0x03 */ u8 value_0x03;
-    /* +0x04 */ u8 flag_0x04;
-    /* +0x05 */ u8 unused_0x05;
-    /* +0x06 */ u8 kind_0x06;
-    /* +0x07 */ u8 index_0x07;
-    /* +0x08 */ u8 flag_0x08;
-    /* +0x09 */ u8 value_0x09;
-    /* +0x0A */ s8 mode_0x0A;
-    /* +0x0B */ u8 timer_0x0B;
-    /* +0x0C */ void* ptr_0x0C;
+    /* +0x00 */ u8 active_0x00;      /* the state; 0 while the block is idle */
+    /* +0x01 */ u8 page_0x01;        /* the page shown */
+    /* +0x02 */ u8 page_count_0x02;  /* the last page (`lb_triplet_value2_get`) */
+    /* +0x03 */ u8 note_row_0x03;    /* the note list's cursor row */
+    /* +0x04 */ u16 cursor_0x04;     /* the frame cursor word, cleared every step */
+    /* +0x06 */ u8 kind_0x06;        /* the tutorial kind `lb_quest_work_init` stores */
+    /* +0x07 */ u8 index_0x07;       /* the page set the request picked */
+    /* +0x08 */ u8 flag_0x08;        /* a request is pending */
+    /* +0x09 */ u8 last_0x09;        /* the last page is up */
+    /* +0x0A */ s8 mode_0x0A;        /* the requesting event id */
+    /* +0x0B */ u8 timer_0x0B;       /* the input delay after opening */
+    /* +0x0C */ LbTutorialEntry* ptr_0x0C;  /* the entry row shown */
 } LbQuestWork; /* size: 0x10 */
 
 /* The 0xC-byte settings record `lb_settings_copy` copies whole.  size: 0x10 */
@@ -403,18 +407,36 @@ typedef struct LbSettings {
     /* +0x0D */ u8 unused_0x0D[0x3];
 } LbSettings; /* size: 0x10 */
 
-/* One 3-byte row of the per-kind tables `lbl_805E69E8` indexes.  size: 0x3 */
+/* One 3-byte row of the per-kind tables `tutorial_page_sets` indexes.  size: 0x3 */
 typedef struct LbTriplet {
     /* +0x00 */ u8 value_0x00;
     /* +0x01 */ u8 value_0x01;
     /* +0x02 */ u8 value_0x02;
 } LbTriplet; /* size: 0x3 */
 
-/* One 4-byte row of the page table `lbl_806043E8`.  size: 0x4 */
-typedef struct LbRowRef {
+/* One 8-byte combine recipe of `lb_combo_recipe_tbl`: the second ingredient (the first is the index row's item), the
+ * result, the rate class, the yield list and the progress bit that marks it known.  size: 0x8 */
+typedef struct LbComboRecipe {
+    /* +0x00 */ s16 partner_0x00;   /* the second ingredient */
+    /* +0x02 */ s16 result_0x02;    /* the item the combination makes */
+    /* +0x04 */ s8 rate_0x04;       /* the `lb_combo_base_rates` class */
+    /* +0x05 */ u8 yield_0x05;      /* the `lb_combo_yield_odds`/`lb_combo_yield_tbl` index */
+    /* +0x06 */ u8 known_bit_0x06;  /* the bit of `LbDataBlock::bits_0x3960` that marks it known */
+    /* +0x07 */ u8 flags_0x07;      /* bit 0 hides it; 2/4/8/0x10 grant 100 % with a skill */
+} LbComboRecipe; /* size: 0x8 */
+
+/* One 4-byte row of `lb_combo_index_tbl`: a first ingredient and its run of recipes.  size: 0x4 */
+typedef struct LbComboIndex {
+    /* +0x00 */ u16 item_0x00;      /* 0xFFFF ends the table */
+    /* +0x02 */ u8 count_0x02;
+    /* +0x03 */ u8 first_0x03;      /* the run's first `lb_combo_recipe_tbl` row */
+} LbComboIndex; /* size: 0x4 */
+
+/* One 4-byte row of `lb_combo_pair_tbl`: the two ingredients of a listed recipe.  size: 0x4 */
+typedef struct LbComboPair {
     /* +0x00 */ u16 first_0x00;
     /* +0x02 */ u16 second_0x02;
-} LbRowRef; /* size: 0x4 */
+} LbComboPair; /* size: 0x4 */
 
 /* ---------------------------------------------------------------------------------------------- *
  * The `.bss`/`.sbss`/`.sdata` objects this band reads.  An `extern` for an unsplit symbol belongs in
@@ -433,11 +455,15 @@ extern u8 lbl_80794B90[8];         /* .sbss 0x80794B90 - the per-entry "seen" bi
 extern u8 lbl_80794B98[8];         /* .sbss 0x80794B98 - the per-entry "handled" byte array */
 extern const f32 lbl_8079B2B8;     /* .sdata2 - the delay `lb_act_award_handover` scales by Screen_w */
 extern const f32 lbl_8079B2BC;     /* .sdata2 */
-extern LbQuestWork lbl_806BEF20;   /* .bss 0x806BEF20 - the tutorial/quest announcement block */
-extern u16 lbl_805E6A20[];         /* .data 0x805E6A20 - the three-level table (see the cast below) */
-extern LbTriplet* lbl_805E69E8[];  /* .data 0x805E69E8 - the per-kind 3-byte row tables */
-extern u16 lbl_806042B8[];         /* .data 0x806042B8 - the id table `lb_page_id_find` scans */
-extern LbRowRef lbl_806043E8[];    /* .data 0x806043E8 - the page table `lb_page_row_apply` indexes */
+extern LbQuestWork lb_tutorial_work;   /* .bss 0x806BEF20 - the tutorial announcement block */
+extern LbTutorialEntry* lb_tutorial_entry_lists[];  /* .data 0x805E68FC - the entry list of each tutorial event */
+extern s8** tutorial_name;              /* .sbss 0x80794BD0 - the tutorial kinds' title strings */
+extern s8** tutorial_end;               /* .sbss 0x80794BD4 - the two closing-page strings */
+extern u16 tutorial_kind_sprite_ids[4];  /* .sdata 0x80792D38 - the title sprite of each tutorial kind */
+extern u16 tutorial_end_sprite_ids[4];   /* .sdata 0x80792D40 - the closing page's button sprites */
+extern u16 tutorial_end_sprite_ids_alt[4];  /* .sdata 0x80792D48 - the same with option 7 set */
+extern s8*** tutorial_page_texts[]; /* .data 0x805E6A20 - each tutorial kind's page texts, by page set */
+extern LbTriplet* tutorial_page_sets[];  /* .data 0x805E69E8 - each tutorial kind's page sets */
 extern u16 lbl_805E723C[];         /* .data - the arrow sprite rows `lb_subpage_arrow_draw` draws */
 extern s32* tutorial_quest_name;   /* .sbss - the tutorial quest name pointer */
 extern s32* tutorial_quest_msg;    /* .sbss - the tutorial message table */
@@ -467,14 +493,7 @@ void camera_slot_bit_set(u8 index, u8 value);
 s32 fn_802D7B5C(u16 id);
 s32 fn_802D7C6C(u16 id);
 void lb_panel_close(void);
-void fn_800DCFE4(void);
-void fn_800DBD1C(s32 a, u8 b);
 void userdata_progress_flag_set(u32 a);
-void fn_80046EE4(void);
-s32 event_demo_running_ck(void* psw);
-s32 fn_8028D574(void);
-u8* lb_combo_recipe_find(u16 a, u16 b, s32 c);
-s8 lb_combo_rate_get(s16* out, s32 a, s32 b);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */
@@ -499,21 +518,13 @@ LbMoveWork* get_move_work_adrs(u8 kind);
  * reproduces each map name exactly and the call site writes the plain function. */
 void* LbStr(u8 kind, u16 index);
 u32 chk_pointer(void);
-void get_lsp_data(u16 id, _mh_ivec2_* out);
 u8 get_option_cfg(u8 index);
 void sysSE_req(s32 id);
 void font_flush(void);
 void set_blendmode(u8 a, u8 b, u8 c);
-void set_zmode(u32 a, u8 b, u32 c);
-void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos);
-void draw_sprite_ary(const u16* table, const _mh_ivec2_* pos);
-void draw_sprite_idx(u16 id, const _mh_ivec2_* pos);
-void draw_sprite_anim_ary(const u16* table, u16 index, const _mh_ivec2_* pos);
-void draw_sprite_anim_idx(u16 id, u16 index, const _mh_ivec2_* pos);
-void draw_font_idx(u16 id, s8* text, u32 len, const _mh_ivec2_* pos);
+void set_zmode(bool test, u8 func, bool update);
 u8 get_now_areano(void);
 u16 ran_suu(s32 index);
-void Pl_cat_skill_ck(struct _PLW* plw, u16 skill);
 
 #endif /* __cplusplus */
 

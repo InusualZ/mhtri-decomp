@@ -367,7 +367,7 @@ extern "C" void se_npc_revive_play(void) { se_bank_req(28, 35); }
 
 extern "C" void fn_800DCFC0(void) { se_slot_req(0); }
 
-extern "C" void fn_800DCFE4(void) { sysSE_req(12); }
+extern "C" void sysSE_window_open_play(void) { sysSE_req(12); }
 
 
 /* --- hand-reconstructed functions ---------------------------------------------------------------- */
@@ -416,7 +416,7 @@ extern "C" void sysSE_bank32_req(s32 id) {
 }
 
 /* Picks the id out of the 3x6 byte table `lbl_80597A20`, indexed `row * 5 + column`. */
-extern "C" void fn_800DBD1C(u32 row, u32 column) {
+extern "C" void se_guide_voice_play(u32 row, u32 column) {
     if (row > 2) {
         return;
     }

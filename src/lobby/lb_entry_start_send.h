@@ -13,7 +13,7 @@ extern "C" {
 
 /* 0x80339AC8 - starts the lobby entry with result `value`, the quest's time `arg` and `flag` (1: the
  * reward is gone). */
-void lb_entry_start_send(struct LbCompanionWork* companion, s8 value, s32 arg, u8 flag);
+void lb_entry_start_send(struct LbCompanionWork* companion, u8 value, s32 arg, u8 flag);
 
 #ifdef __cplusplus
 }

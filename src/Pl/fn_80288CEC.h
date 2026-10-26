@@ -63,7 +63,7 @@ struct _PL_ROOT {
     /* +0x00FB */ u8 seq_0xFB;           /* `pl_quest_end_request` stores 4 or 6 */
     /* +0x00FC */ u8 seq_0xFC;           /* `pl_net_move_handover` stores 4 */
     /* +0x00FD */ u8 unused_0x00FD[0x0114 - 0x00FD];
-    /* +0x0114 */ s32 flag_0x114;       /* `fn_8028D574` tests `<= 0`; `root_wait_frames_set` stores */
+    /* +0x0114 */ s32 flag_0x114;       /* `quest_move_idle_ck` tests `<= 0`; `root_wait_frames_set` stores */
     /* +0x0118 */ u8 unused_0x0118[0x0128 - 0x0118];
     /* +0x0128 */ VEC3 pos_0x128;        /* the master's world position (`hud/cockpit_quest.cpp`'s marker) */
     /* +0x0134 */ u16 rot_y_0x134;       /* its facing, 0x18000 minus it picks the marker's icon rotation */

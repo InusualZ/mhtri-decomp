@@ -25,12 +25,12 @@
  * 0x80046EE4 - 0x800470B4  (system flags)
  * ------------------------------------------------------------------ */
 
-extern "C" void fn_80046EE4(void)
+extern "C" void pad_hold_set(void)
 {
     system_w.field_0x30 = 1;
 }
 
-extern "C" void fn_80046EF8(void)
+extern "C" void pad_hold_clear(void)
 {
     system_w.field_0x30 = 0;
 }

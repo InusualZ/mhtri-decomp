@@ -1,62 +1,57 @@
 /*
  * lobby/lb_companion_ui.cpp - the lobby companion/status UI band: the act dispatchers and their per-act handlers, the
- *   page/dialog chain and its drawing helpers, and the quest cockpit's map icon tables.
+ *   tutorial page block, the item-combine rules, the delivery menu, the page/dialog chain and its drawing helpers,
+ *   and the quest cockpit's map icon tables.
  * RANGE. .text 0x80338808-0x8033F270 (133 functions); .data 0x805E27D4-0x805E7410 (from `lb_act_dispatch`'s switch
  *   table `jumptable_805E27D4`; the icon tables 0x805E6A58-0x805E70F8), .bss 0x806BE340-0x806BF0A0, .sdata
  *   0x80792D38-0x8079308C (the icon id lists of 8 bytes or less and their pointer arrays, 0x80792D80-0x80792F8C), .sbss
  *   0x80794B90-0x80794BE0, .sdata2 0x8079B2B8-0x8079B2C0, extab, extabindex.  The seam is undecidable from the DOL
  *   (docs/lobby.md).  The icon tables are defined ahead of the code; the lists `hud/cockpit_quest.cpp` and
  *   `ef/eft035.cpp` read at 0x805E6EF8-0x805E70C8 are not emitted, so the slot and flash id lists sit 0x1F0 bytes
- *   early.
+ *   early.  The combine tables (.data 0x80603EA0-0x80604638, .sdata 0x80793A28-0x80793A67) are inside
+ *   `menu/menu_placeinfo.cpp`'s claim and are read through `menu/lb_combo_recipe_tbl.h`.
  * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps `clrlwi` + `slwi` and
  *   `lobby_world_block + (i >> 3)` in a register; measured in docs/lobby.md).
- * NAMES. The 79 defined functions are named from their bodies.  GUESSes: the link-gated senders whose caller is
+ * NAMES. The defined functions are named from their bodies.  GUESSes: the link-gated senders whose caller is
  *   unwritten, after the protocol sub-command they build (`lb_sub0a_send`, ...), and the icon tables (`<table>_area<n>`
- *   is entry n).  GUESS: `lb_sub16_send` (builds sub-command 0x16).  GUESS: `lobby_hunter_cards` (.bss 0x806BE340, ten 0x130-byte records keyed by a hunter id at +0x03
- *   with the hunter's 0x100-byte card at +0x24, which `updatePeerCardBlock` refreshes).  `hud_key_lookup` (0x8033A0BC)
- *   is the map's.  The dump's `homebutton::MotorCallback(OSAlarm...)` for
- *   0x8033C4D8/0x8033C570 is not adopted: both are 0x24-byte refresh wrappers without an argument.  The game-root
- *   dispatcher at 0x80432154 calls `lb_act_dispatch`/`lb_act_dispatch_ex` as `(u8 index, LbActReq* req)`.  Module
- *   `lobby`: `lobby_w`, `lb_param_w`, `lb_deli_data`, 11 `LbStr` calls.
+ *   is entry n).  GUESS: `lb_sub16_send` (builds sub-command 0x16).  GUESS: `lobby_hunter_cards` (.bss 0x806BE340, ten
+ *   0x130-byte records keyed by a hunter id at +0x03 with the hunter's 0x100-byte card at +0x24, which
+ *   `updatePeerCardBlock` refreshes).  `hud_key_lookup` (0x8033A0BC) is the map's.  The dump's
+ *   `homebutton::MotorCallback(OSAlarm...)` for 0x8033C4D8/0x8033C570 is not adopted: both are 0x24-byte refresh
+ *   wrappers without an argument.  The game-root dispatcher at 0x80432154 calls `lb_act_dispatch`/`lb_act_dispatch_ex`
+ *   as `(u8 index, LbActReq* req)`.  Module `lobby`: `lobby_w`, `lb_param_w`, `lb_deli_data`, 11 `LbStr` calls.
  *   GUESS (from each body and its callers): `lb_combo_item_known_ck`, `lb_combo_recipe_find`, `lb_page_row_pair_get`,
  *   `lb_combo_rate_get`, `lb_combo_recipe_known_ck`, `lb_combo_exec`, `lb_combo_rate_sprintf`, `lb_deli_list_build`,
- *   `lb_deli_menu_step`, `lb_deli_menu_draw`.
- * RESIDUALS. 55 rows unwritten or scoring zero: 0x80339F10-0x8033A0BC (`lb_act_dispatch_ex`), 0x8033A160-0x8033A850,
- *   0x8033A868-0x8033A9F4, 0x8033AAFC-0x8033ADAC, 0x8033ADD0-0x8033AE58, 0x8033AED0-0x8033B298, 0x8033B2C8-0x8033B7D0
- *   (`lb_combo_rate_sprintf` among the `sprintf` users that need the `.sdata` format operand), 0x8033B808-0x8033C36C,
- *   0x8033C4FC-0x8033C570, 0x8033C594-0x8033CEC0, 0x8033CF18-0x8033E050 (with the written `lb_byte_list_has`, which
- *   scores zero), 0x8033E088-0x8033F270.
- *  - `lb_page_entry_bit_set`: retail forms `lobby_world_block + (index >> 3)` in a register and keeps the bit-field
- *    offset as the load displacement (`add r5,r3,r0; lbz r4,14688(r5)`), ours folds it into the base
- *    (`addi r5,r3,14688`);
+ *   `lb_deli_menu_step`, `lb_deli_menu_draw`, `lb_combo_index_find`, `lb_combo_pair_recipe_find`,
+ *   `lb_combo_recipe_open_ck`, `lb_combo_rate_find`, `lb_combo_recipe_learn`, `lb_tutorial_step`,
+ *   `lb_tutorial_page_draw`, `lb_tutorial_note_draw`, `lb_tutorial_entry_find`, `lb_tutorial_page_text_get`,
+ *   `lb_tutorial_work`, `lb_tutorial_entry_lists`, `tutorial_page_texts`, `tutorial_page_sets`,
+ *   `tutorial_kind_sprite_ids`, `tutorial_end_sprite_ids`, `tutorial_end_sprite_ids_alt`.  Registry GUESSes for other
+ *   units' rows: `pad_hold_set`/`pad_hold_clear`, `pl_my_lock_timer_set`, `pl_skill_have_ck`, the `lb_combo_*` tables.
+ * RESIDUALS. Rows unwritten: 0x8033B6C0-0x8033C36C (the delivery menu, 10 rows), 0x8033C4FC-0x8033C570,
+ *   0x8033C594-0x8033CEC0, 0x8033CF18-0x8033E050 (with the written `lb_byte_list_has`, which scores zero),
+ *   0x8033E088-0x8033F270.
  *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local does not change it);
- *  - `lb_act_limit_set`, `lb_companion_tick`, `lb_companion_mode_set`, `lb_entry_start_send`, `lb_act_entry_start`:
- *    retail addresses the companion work at +0x6A2A/+0x69A4/+0x6978/+0x6A40/+0x6A3C where ours uses
- *    +0xA2A/+0x9A4/+0x978/+0xA40/+0xA3C (an `LbCompanionWork` offset 0x6000 off); `lb_act_entry_start` also copies the
- *    request's +0x18..+0x1B bytes ours drops;
- *  - `lb_entry_id_get`, `lb_entry_publish`, `lb_page_flags_update`, `lb_entry_model_publish`: retail reads
- *    `lobby_world_block` +0x5180/+0x519C/+0x51A0/+0x51A4/+0x51A6 where ours is 0x80 higher (+0x5200 ...);
- *    `lb_entry_publish` reads a record's +0x1/+0x2/+0x3 where ours reads +0x0 three times, `lb_entry_model_publish`
- *    stores a byte where ours stores a word;
  *  - `lb_act_value_apply`, `lb_act_limit_set`, `lb_act_slot_write`: retail reads the request's +0x4 (+0x9) where ours
  *    reads +0x8 (+0x7);
  *  - `lb_act_row_apply`: retail loads +0x6 with `lhz`, ours `lbz` + `clrlwi` (a field width);
- *  - `lb_tbl3_get`: retail scales by 4 and loads a word, ours by 2 with `lhzx` (the table holds `u32`s);
- *  - `lb_entry_start_default`: retail zero-extends the byte, ours sign-extends it (the parameter is `u8`, not `s8`);
- *  - `lb_seen_bit_set`, `lb_act_award_handover`, `lb_companion_tick`, `lb_act_slot_write`: ours emits a `clrlwi` or
- *    `extsb` retail does not; `lb_quest_work_init`: retail narrows the kind before storing it;
- *  - `lb_page_id_find`: retail tests at the bottom of the loop with a 4-byte stride, ours at the top with 8;
- *  - `lb_page_row_ck`: ours passes two extra zero arguments; `lb_act_announce`: ours adds one `b`;
- *  - `lb_act_handover`: ours saves one register fewer and its branch targets shift;
- *  - `lb_name_tail_copy`: the word copies' load/store order;
+ *  - `lb_act_award_handover`, `lb_act_slot_write`: ours emits a `clrlwi` or `extsb` retail does not;
+ *  - `lb_act_announce`: ours adds one `b`; `lb_act_handover`: ours saves one register fewer and its branch targets
+ *    shift; `lb_name_tail_copy`: the word copies' load/store order;
+ *  - `lb_entry_start_send`, `lb_act_entry_start`: the companion work's parameter bytes and the request's +0x18..+0x1B;
+ *  - `lb_entry_publish`, `lb_entry_model_publish`: a record's byte offsets and a byte against a word store;
+ *  - `lb_combo_rate_get`: `userdata_item_slot_count`'s `s16` result is sign-extended where retail keeps it (the owner
+ *    header's width), and the item box capacity's `clrlwi` is scheduled after the item load;
  *  - `lb_seen_pad_ck`, `lb_act_row_update`, `lb_act_best_keep`, `lb_triplet_value2_get`, `lb_triplet_value1_get`,
- *    `lb_page_bits_set`: register colouring only.
+ *    `lb_page_bits_set`, `lb_tutorial_note_draw`: register colouring only.
  *   flipcheck: `.bss`/`.sbss`/`.sdata2` claimed, not emitted; `.data` 0x4F0 against 0x4C3C; `.sdata` 0x20C against
  *   0x354; `.text`/extab/extabindex short of the claim; the `.sdata`/`.sdata2` pool is shared with
  *   `hud/cockpit_quest.cpp` and `menu/menu_placeinfo.cpp` (a low-confidence fold candidate); the source still spells
  *   `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck` and `eft_slot_spawn` by their old stems `fn_800CF384`,
  *   `fn_803438E4`, `fn_80343B44`, `fn_80343B74`.
+ * SHAPES. Declaration order decides the callee-saved colours of `lb_combo_rate_get`/`lb_combo_exec` (playbook 63);
+ *   `lb_combo_exec`'s yield roll is a `for (;;)` with the test first (retail does not rotate it).
  */
 
 #include "types.h"
@@ -190,6 +185,27 @@ u16 cockpit_flash_anim_ids[] = { 0x0BCF, 0x0BD0, 0x0BD1, 0x0BD3, 0x0BD4, 0xFFFF 
 #include "lobby/lb_quest_screen.h"   /* quest_time_limit_set, quest_element_done_mark (rule 2) */
 #include "enemy/em_pop.h"            /* quest_score_deduct (rule 2) */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
+#include "mh3_pad/Psw.h"              /* Psw (rule 2) */
+#include "lobby/event_demo_running_ck.h" /* event_demo_running_ck (rule 2) */
+#include "pad_hold_set.h"             /* pad_hold_set, pad_hold_clear (rule 2) */
+#include "Pl/pl_input_lock_set.h"  /* pl_my_lock_timer_set (rule 2) */
+#include "menu/note_slot_cursor_step.h" /* note_slot_cursor_step, note_slot_draw_row (rule 2) */
+#include "menu/item_page_draw_option_frame.h" /* item_page_draw_option_frame (rule 2) */
+#include "ai/fn_802D44F4.h"           /* ainpc_entry_update_all, ainpc_entry_draw_all (rule 2) */
+#include "fn_80047398.h"              /* subTransSetPrio (rule 2) */
+#include "hud/draw_spin_icon.h"       /* draw_spin_icon (rule 2) */
+#include "userdata_progress_flag_ck.h" /* userdata_progress_flag_ck (rule 2) */
+#include "menu/menu_item.h"           /* GetItemData, ItemDataRecord (rule 2) */
+#include "menu/lb_combo_recipe_tbl.h"  /* the combine tables (rule 2) */
+#include "menu/lb_combo_yield_tbl.h"   /* lb_combo_yield_tbl (rule 2) */
+#include "item_box_take.h"            /* item_box_slot_take, item_box_take (rule 2) */
+#include "Pl/pl_skill_have_ck.h"      /* pl_skill_have_ck (rule 2) */
+#include "Pl/pl_skill.h"              /* Pl_cat_skill_ck, pl_item_slot_find (rule 2) */
+#include "MSL_C/printf.h"             /* sprintf */
+#include "ef/GameMode_ck.h"          /* GameMode_ck (rule 2) */
+#include "sound/se_guide_voice_play.h" /* se_guide_voice_play, sysSE_window_open_play (rule 2) */
+#include "Pl/quest_move_idle_ck.h"    /* quest_move_idle_ck (rule 2) */
+#include "lobby/lb_event_request.h"   /* this unit's own leaf header */
 #include "ai/ainpc_move.h"           /* ai_skill_mask_get (rule 2) */
 
 extern "C" {
@@ -200,6 +216,17 @@ void lb_handled_set(u8 unused, u8 index);
 void lb_sub0d_send(u8 index, LbActReq* req, s8 flag);
 void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value);
 void lb_name_tail_copy(LbNameTail* dst, LbNameTail* src);
+s8* lb_tutorial_page_text_get(u8 kind, u8 set, u8 page);
+u8 lb_triplet_value2_get(u8 a, u8 b);
+u8 lb_triplet_value0_get(u8 a, u8 b);
+u8 lb_triplet_value1_get(u8 a, u8 b);
+LbComboIndex* lb_combo_index_find(u16 item);
+LbComboRecipe* lb_combo_recipe_find(u16 a, u16 b, s32 mode);
+u32 lb_combo_recipe_open_ck(_PLW* plw, LbComboRecipe* recipe);
+s8 lb_combo_rate_get(LbComboRecipe* recipe, s32 mode);
+void lb_tutorial_page_draw(void);
+void lb_tutorial_note_draw(void);
+s32 lb_tutorial_entry_find(LbTutorialEntry* entry);
 LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd);
 }
 
@@ -360,7 +387,7 @@ void lb_act_entry_publish(u8 unused, LbActReq* req) {
 
 /* Sets bit `bit` of the per-entry byte `lbl_80794B90[index]`. */
 void lb_seen_bit_set(u8 bit, u8 index) {
-    lbl_80794B90[(u8)index] = lbl_80794B90[(u8)index] | (u8)(1 << (u8)bit);
+    lbl_80794B90[index] |= 1 << bit;
 }
 
 /* Writes 1 into the per-entry byte `lbl_80794B98[index]` (the first parameter is unused). */
@@ -719,7 +746,7 @@ void lb_sub15_send(void) {
 }
 
 /* Increments the companion work's tick counter `count_0x69A4`. */
-void lb_companion_tick(void) {
+void lb_companion_tick(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
 
@@ -727,7 +754,7 @@ void lb_companion_tick(void) {
     if (work != NULL) {
         companion = work->companion_0xDC;
         if (companion != NULL) {
-            companion->count_0x69A4 = companion->count_0x69A4 + 1;
+            companion->count_0x69A4++;
         }
     }
 }
@@ -829,7 +856,7 @@ void lb_sub18_send(void) {
 }
 
 /* Puts the companion work into mode 3 (`mode_0x6978`), the area-change announcement. */
-void lb_companion_mode_set(void) {
+void lb_companion_mode_set(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
 
@@ -844,7 +871,7 @@ void lb_companion_mode_set(void) {
 
 /* Sends the sub-0x19 entry-start command and records the start (`started_0x6A40`); while the act is already
  * announced the caller's flag is dropped. */
-void lb_entry_start_send(LbCompanionWork* companion, s8 value, s32 arg, u8 flag) {
+void lb_entry_start_send(LbCompanionWork* companion, u8 value, s32 arg, u8 flag) {
     LbCmdSub19 cmd;
     u8 started;
 
@@ -968,7 +995,7 @@ void lb_area_change_send(u8 index) {
 }
 
 /* Flags the area change in the move work (`work->flag_0x22E3 = 1`) without sending anything. */
-void lb_area_change_flag(void) {
+void lb_area_change_flag(u8 unused, LbActReq* req) {
     LbMoveWork* work;
 
     work = get_move_work_adrs(0);
@@ -992,6 +1019,94 @@ void lb_act_pad_apply(u8 unused, LbActReq* req) {
     arena_other_player_eq_set(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
 }
 
+/* The second act dispatcher: switches on `act_0x03` 1..29 into the per-act handlers; acts 5, 19 and 24 apply only to
+ * another pad's request. */
+void lb_act_dispatch_ex(u8 index, LbActReq* req) {
+    u8 pad;
+
+    switch (req->act_0x03) {
+    case 1:
+    case 12:
+        lb_act_handover(index, req);
+        break;
+    case 5:
+        pad = req->index_0x01;
+        if ((s32)pad != fn_800CF384()) {
+            quest_slot_arm_all_a((s8)pad);
+        }
+        break;
+    case 6:
+    case 7:
+        lb_act_announce(index, req);
+        break;
+    case 8:
+        lb_act_award_handover(index, req);
+        break;
+    case 9:
+        lb_act_entry_publish(index, req);
+        break;
+    case 10:
+        lb_act_seen_set(index, req);
+        break;
+    case 11:
+        lb_act_handled_set(index, req);
+        break;
+    case 13:
+        lb_act_row_update(index, req);
+        break;
+    case 14:
+        lb_act_row_apply(index, req);
+        break;
+    case 15:
+        lb_text_apply(index, (LbCmdSub0F*)req);
+        break;
+    case 16:
+        lb_act_byte_apply(index, req);
+        break;
+    case 17:
+        lb_act_pair_apply(index, req);
+        break;
+    case 18:
+        lb_act_index_apply(index, req);
+        break;
+    case 19:
+        if ((s32)req->index_0x01 != fn_800CF384()) {
+            lb_act_value_apply(index, req);
+        }
+        break;
+    case 20:
+        lb_act_limit_set(index, req);
+        break;
+    case 21:
+    case 28:
+        lb_companion_tick(index, req);
+        break;
+    case 22:
+        lb_act_slot_write(index, req);
+        break;
+    case 23:
+        lb_act_best_keep(index, req);
+        break;
+    case 24:
+        if ((s32)req->index_0x01 != fn_800CF384()) {
+            lb_companion_mode_set(index, req);
+        }
+        break;
+    case 25:
+        lb_act_entry_start(index, (LbCmdSub19*)req);
+        break;
+    case 26:
+        lb_act_page_apply(index, req);
+        break;
+    case 27:
+        lb_area_change_flag(index, req);
+        break;
+    case 29:
+        lb_act_pad_apply(index, req);
+        break;
+    }
+}
+
 /* Scans the ten 0x130-byte page records for the six-byte key the caller points at; 0xFF on a hole.  The name is the
  * map's (`hud/move_work_update.cpp` calls it by it). */
 u8 hud_key_lookup(u8* key) {
@@ -1005,39 +1120,281 @@ u8 hud_key_lookup(u8* key) {
     return 0xFF;
 }
 
-/* Resets the tutorial/quest announcement block `lbl_806BEF20`'s four fields and stores the kind byte. */
-void lb_quest_work_init(u8 kind) {
-    lbl_806BEF20.active_0x00 = 0;
-    lbl_806BEF20.flag_0x08 = 0;
-    lbl_806BEF20.kind_0x06 = kind;
-    lbl_806BEF20.ptr_0x0C = NULL;
+/* Resets the tutorial/quest announcement block `lb_tutorial_work`'s four fields and stores the kind byte. */
+void lb_quest_work_init(u16 kind) {
+    lb_tutorial_work.active_0x00 = 0;
+    lb_tutorial_work.flag_0x08 = 0;
+    lb_tutorial_work.kind_0x06 = kind;
+    lb_tutorial_work.ptr_0x0C = NULL;
 }
 
-/* Whether the announcement block is active (`lbl_806BEF20.active_0x00 != 0`). */
+/* Steps the tutorial block: 0 opens a pending request's pages (area-gated per event), 1 pages through them, 2 runs
+ * the entry's note list, 3 closes and re-requests event 15. */
+void lb_tutorial_step(void) {
+    LbQuestWork* work = &lb_tutorial_work;
+    PlayerPad* pad = Psw;
+    u16 pressed;
+
+    work->cursor_0x04 = 0;
+    if ((u8)event_demo_running_ck() != 1 && quest_move_idle_ck() != 0 &&
+        (quest_sub_state_end_ck(1) == 0 || work->mode_0x0A == 13)) {
+        switch (work->active_0x00) {
+        case 0:
+            if (work->flag_0x08 != 0) {
+                work->flag_0x08 = 0;
+                switch (work->mode_0x0A) {
+                case 26:
+                    if (get_now_areano() != 0) {
+                        work->ptr_0x0C = NULL;
+                        return;
+                    }
+                    break;
+                case 18:
+                    if (get_now_areano() != 1) {
+                        work->ptr_0x0C = NULL;
+                        return;
+                    }
+                    break;
+                case 2:
+                    if (get_now_areano() != 3) {
+                        work->ptr_0x0C = NULL;
+                        return;
+                    }
+                    break;
+                case 3:
+                    if (get_now_areano() != 11) {
+                        work->ptr_0x0C = NULL;
+                        return;
+                    }
+                    break;
+                case 27:
+                    if (get_now_areano() != 12) {
+                        work->ptr_0x0C = NULL;
+                        return;
+                    }
+                    break;
+                }
+                work->active_0x00 = 1;
+                work->page_0x01 = 0;
+                work->page_count_0x02 = lb_triplet_value2_get(work->kind_0x06, work->index_0x07);
+                work->note_row_0x03 = 0;
+                work->last_0x09 = 0;
+                work->timer_0x0B = 10;
+                sysSE_window_open_play();
+                switch (lb_triplet_value0_get(work->kind_0x06, work->index_0x07)) {
+                case 0:
+                    se_guide_voice_play(2, lb_triplet_value1_get(work->kind_0x06, work->index_0x07));
+                    break;
+                case 1:
+                    se_guide_voice_play(1, lb_triplet_value1_get(work->kind_0x06, work->index_0x07));
+                    break;
+                case 2:
+                    se_guide_voice_play(0, lb_triplet_value1_get(work->kind_0x06, work->index_0x07));
+                    break;
+                }
+                if (work->ptr_0x0C != NULL) {
+                    userdata_progress_flag_set(work->ptr_0x0C->flag_0x00);
+                }
+                pad_hold_set();
+            }
+            break;
+        case 1:
+            if (work->timer_0x0B != 0) {
+                work->timer_0x0B--;
+            } else if (work->last_0x09 != 0) {
+                pressed = pad->button_0x2C0.pressed_0x04;
+                if ((pressed & 0x10) != 0) {
+                    if (work->ptr_0x0C->note_0x05 >= 0) {
+                        work->active_0x00 = 2;
+                        work->note_row_0x03 = 0;
+                        work->last_0x09 = 0;
+                        ainpc_entry_update_all();
+                        subTransSetPrio(7, (u32)lb_tutorial_note_draw, 0, 0);
+                        subTransSetPrio(7, (u32)ainpc_entry_draw_all, 0, 0);
+                        sysSE_req(6);
+                        return;
+                    }
+                    work->active_0x00 = 3;
+                    pl_input_lock_set(10);
+                    sysSE_req(1);
+                } else if ((pressed & 0x4000) != 0) {
+                    work->page_0x01 = 0;
+                    work->last_0x09 = 0;
+                    work->cursor_0x04 = 0;
+                    sysSE_req(12);
+                }
+            } else if ((pad->button_0x2C0.pressed_0x04 & 0x10) != 0) {
+                if (++work->page_0x01 >= work->page_count_0x02) {
+                    work->last_0x09 = 1;
+                }
+                sysSE_req(6);
+            }
+            subTransSetPrio(7, (u32)lb_tutorial_page_draw, 0, 0);
+            break;
+        case 2:
+            if (work->last_0x09 == 0) {
+                if ((u32)note_slot_cursor_step(work->ptr_0x0C->note_0x05, &work->note_row_0x03,
+                                               pad->button_0x2C0.pressed_0x04, &work->cursor_0x04) == 1) {
+                    ainpc_entry_update_all();
+                    subTransSetPrio(7, (u32)lb_tutorial_note_draw, 0, 0);
+                    subTransSetPrio(7, (u32)ainpc_entry_draw_all, 0, 0);
+                    return;
+                }
+                work->last_0x09 = 1;
+                subTransSetPrio(7, (u32)lb_tutorial_page_draw, 0, 0);
+                return;
+            }
+            pressed = pad->button_0x2C0.pressed_0x04;
+            if ((pressed & 0x10) != 0) {
+                work->active_0x00 = 3;
+                sysSE_req(1);
+                pl_input_lock_set(10);
+                sysSE_req(1);
+            } else if ((pressed & 0x4000) != 0) {
+                work->note_row_0x03 = 0;
+                work->last_0x09 = 0;
+                sysSE_req(12);
+                ainpc_entry_update_all();
+                subTransSetPrio(7, (u32)lb_tutorial_note_draw, 0, 0);
+                subTransSetPrio(7, (u32)ainpc_entry_draw_all, 0, 0);
+                return;
+            }
+            subTransSetPrio(7, (u32)lb_tutorial_page_draw, 0, 0);
+            break;
+        case 3:
+            work->active_0x00 = 0;
+            pad_hold_clear();
+            work->ptr_0x0C = NULL;
+            lb_event_request(15);
+            break;
+        }
+    }
+}
+
+/* Draws the tutorial page: the option frame, the kind's title, the page text (or the closing page's buttons and
+ * strings), the kind's sprite and the waiting spinner. */
+void lb_tutorial_page_draw(void) {
+    LbQuestWork* work = &lb_tutorial_work;
+    _mh_ivec2_ pos;
+    _mh_ivec2_ icon;
+    u8 kind;
+
+    kind = 5;
+    set_zmode(0, 0, 0);
+    set_blendmode(4, 5, 1);
+    font_flush();
+    if (work->last_0x09 != 0) {
+        kind |= 8;
+    }
+    item_page_draw_option_frame((s8)work->page_0x01, (s8)work->page_count_0x02, work->cursor_0x04, 5, kind, &pos);
+    if (work->active_0x00 <= 1) {
+        kind = lb_triplet_value0_get(work->kind_0x06, work->index_0x07);
+        draw_font_idx(0x514, tutorial_name[kind], 4, &pos);
+    }
+    if (work->last_0x09 != 0) {
+        if (get_option_cfg(7) == 0) {
+            draw_sprite_ary(tutorial_end_sprite_ids, &pos);
+        } else {
+            draw_sprite_ary(tutorial_end_sprite_ids_alt, &pos);
+        }
+        draw_font_idx(0x526, tutorial_end[0], 0, &pos);
+        draw_font_idx(0x529, tutorial_end[1], 0, &pos);
+    } else {
+        draw_font_anim_idx(0x516, 5, lb_tutorial_page_text_get(work->kind_0x06, work->index_0x07, work->page_0x01), 0, &pos);
+    }
+    if (work->active_0x00 <= 1) {
+        get_lsp_data(0x726, &icon);
+        draw_sprite_idx(tutorial_kind_sprite_ids[kind], &icon);
+    }
+    if (work->last_0x09 == 0) {
+        icon.x = pos.x + 375;
+        icon.y = pos.y + 82;
+        draw_spin_icon(icon.x, icon.y, 0);
+    }
+}
+
+/* Draws the entry's note list and the waiting spinner beside it. */
+void lb_tutorial_note_draw(void) {
+    _SPR_DATA_ spr;
+    _mh_ivec2_ pos;
+
+    LbQuestWork* work;
+
+    font_flush();
+    work = &lb_tutorial_work;
+    note_slot_draw_row(work->ptr_0x0C->note_0x05, work->note_row_0x03, work->cursor_0x04);
+    sprite_frame_apply(&spr, 0x4FE, 5, &pos);
+    draw_spin_icon(pos.x + 375, pos.y + 82, 0);
+}
+/* Whether the announcement block is active (`lb_tutorial_work.active_0x00 != 0`). */
 s32 lb_quest_work_active_ck(void) {
-    return lbl_806BEF20.active_0x00 != 0;
+    return lb_tutorial_work.active_0x00 != 0;
 }
 
-/* The three-level table lookup `lbl_805E6A20[a][b][c]` the triplet getters share. */
-s32 lb_tbl3_get(u8 a, u8 b, u8 c) {
-    u32** level = (u32**)lbl_805E6A20[a];
+/* Scans an event's entry list for the first row the tutorial kind and the progress flags admit, records it and
+ * returns its page set; -1 when none does. */
+s32 lb_tutorial_entry_find(LbTutorialEntry* entry) {
+    LbQuestWork* work;
 
-    return (s32)level[b][c];
+    if (entry == NULL) {
+        return -1;
+    }
+    work = &lb_tutorial_work;
+    for (; entry->flag_0x00 >= 0; entry++) {
+        if (entry->kind_0x02 == work->kind_0x06 && userdata_progress_flag_ck(entry->flag_0x00) == 0 &&
+            (entry->need_0x06 == -1 || userdata_progress_flag_ck(entry->need_0x06) == 1) &&
+            (entry->block_0x08 == -1 || userdata_progress_flag_ck(entry->block_0x08) == 0)) {
+            work->ptr_0x0C = entry;
+            return entry->page_0x04;
+        }
+    }
+    return -1;
+}
+/* Requests tutorial event `id`: offline single-player only, with a kind set and nothing pending; 1 when an entry
+ * row was found. */
+u32 lb_event_request(u16 id) {
+    s32 page;
+
+    if (isServerSelectState() == 1) {
+        return 0;
+    }
+    if (GameMode_ck() != 1) {
+        return 0;
+    }
+    if (lb_tutorial_work.kind_0x06 == 0) {
+        return 0;
+    }
+    if (lb_tutorial_work.flag_0x08 != 0) {
+        return 0;
+    }
+    page = lb_tutorial_entry_find(lb_tutorial_entry_lists[id]);
+    if ((s8)page >= 0) {
+        lb_tutorial_work.flag_0x08 = 1;
+        lb_tutorial_work.index_0x07 = page;
+        lb_tutorial_work.mode_0x0A = (s8)id;
+        return 1;
+    }
+    return 0;
 }
 
-/* The third byte of the 12-byte `LbTriplet` row at `lbl_805E69E8[a][b]`. */
+/* The text of page `page` of the tutorial kind's page set `set` (`tutorial_page_texts[kind][set][page]`). */
+s8* lb_tutorial_page_text_get(u8 kind, u8 set, u8 page) {
+    return tutorial_page_texts[kind][set][page];
+}
+
+/* The third byte of the 12-byte `LbTriplet` row at `tutorial_page_sets[a][b]`. */
 u8 lb_triplet_value2_get(u8 a, u8 b) {
-    return lbl_805E69E8[a][b].value_0x02;
+    return tutorial_page_sets[a][b].value_0x02;
 }
 
 /* The first byte of that row. */
 u8 lb_triplet_value0_get(u8 a, u8 b) {
-    return lbl_805E69E8[a][b].value_0x00;
+    return tutorial_page_sets[a][b].value_0x00;
 }
 
 /* The second byte of that row. */
 u8 lb_triplet_value1_get(u8 a, u8 b) {
-    return lbl_805E69E8[a][b].value_0x01;
+    return tutorial_page_sets[a][b].value_0x01;
 }
 
 /* The tutorial quest's name pointer (`*tutorial_quest_name`). */
@@ -1050,47 +1407,349 @@ s32 lb_quest_msg_get(u8 index) {
     return *(tutorial_quest_msg + index);
 }
 
-/* Scans the 4-word-stride `lbl_806042B8` id table for `id`; the 0xFFFF terminator answers NULL. */
-u16* lb_page_id_find(u16 id) {
-    u16* row;
+/* The `lb_combo_index_tbl` row of first ingredient `item`; NULL when the item starts no recipe. */
+LbComboIndex* lb_combo_index_find(u16 item) {
+    LbComboIndex* row;
 
-    row = lbl_806042B8;
-    do {
-        if (*row == id) {
+    for (row = lb_combo_index_tbl; row->item_0x00 != 0xFFFF; row++) {
+        if (row->item_0x00 == item) {
             return row;
         }
-        row += 4;
-    } while (*row != 0xFFFF);
+    }
     return NULL;
 }
 
-/* Forwards the two halfwords of the page table row `lbl_806043E8[index]` to the row writer `lb_combo_recipe_find`. */
-void lb_page_row_apply(u16 index, s32 value) {
-    lb_combo_recipe_find(lbl_806043E8[index].first_0x00, lbl_806043E8[index].second_0x02, value);
+/* 1 when the player can see a recipe that uses `item`, as the first ingredient or as another item's partner. */
+s32 lb_combo_item_known_ck(u16 item) {
+    ItemDataRecord* data;
+    LbMoveEntry* moves;
+    _PLW* plw;
+    LbComboIndex* index;
+    LbComboRecipe* recipe;
+    s32 i;
+    s32 j;
+
+    data = GetItemData(item);
+    moves = (LbMoveEntry*)get_move_work_adrs(2);
+    if (moves == NULL) {
+        return 0;
+    }
+    plw = (_PLW*)&moves[fn_800CF384()];
+    if ((data->field_0x002 & 0x20) != 0) {
+        index = lb_combo_index_find(item);
+        if (index != NULL) {
+            recipe = &lb_combo_recipe_tbl[index->first_0x03];
+            for (i = 0; i < index->count_0x02; i++, recipe++) {
+                if (lb_combo_recipe_open_ck(plw, recipe) == 1) {
+                    return 1;
+                }
+            }
+        }
+        for (i = 0; i < item; i++) {
+            if ((GetItemData(i)->field_0x002 & 0x20) != 0) {
+                index = lb_combo_index_find(i);
+                if (index != NULL) {
+                    recipe = &lb_combo_recipe_tbl[index->first_0x03];
+                    for (j = 0; j < index->count_0x02; j++, recipe++) {
+                        if (recipe->partner_0x00 == item && lb_combo_recipe_open_ck(plw, recipe) == 1) {
+                            return 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return 0;
 }
 
-/* Act 26: whether the request's fourth byte has bit 0 (the "already handled" bit) clear. */
-u32 lb_act_handled_bit_ck(u8 unused, LbActReq* req) {
-    if (req != NULL && (req->sel_0x04.bytes_0x00.d_0x03 & 1) == 0) {
+/* The recipe combining `a` and `b` (in either order); with bit 0 of `mode` clear it must also be open to the
+ * player.  NULL when there is none. */
+LbComboRecipe* lb_combo_recipe_find(u16 a, u16 b, s32 mode) {
+    LbComboIndex* index;
+    LbComboRecipe* recipe;
+    LbMoveEntry* moves;
+    u16 swap;
+    s32 count;
+
+    if (a > b) {
+        swap = b;
+        b = a;
+        a = swap;
+    }
+    if ((GetItemData(a)->field_0x002 & 0x20) == 0) {
+        return NULL;
+    }
+    if ((GetItemData(b)->field_0x002 & 0x20) == 0) {
+        return NULL;
+    }
+    index = lb_combo_index_find(a);
+    if (index != NULL) {
+        recipe = &lb_combo_recipe_tbl[index->first_0x03];
+        for (count = index->count_0x02; count > 0; count--, recipe++) {
+            if (recipe->partner_0x00 == b) {
+                if ((mode & 1) != 0) {
+                    return recipe;
+                }
+                moves = (LbMoveEntry*)get_move_work_adrs(2);
+                if (lb_combo_recipe_open_ck((_PLW*)&moves[fn_800CF384()], recipe) == 1) {
+                    return recipe;
+                }
+                break;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* The recipe of the combine list's pair `index` (`lb_combo_recipe_find` with `mode`). */
+LbComboRecipe* lb_combo_pair_recipe_find(u16 index, s32 mode) {
+    return lb_combo_recipe_find(lb_combo_pair_tbl[index].first_0x00, lb_combo_pair_tbl[index].second_0x02, mode);
+}
+
+/* Writes the combine list's pair `index` out when its recipe applies (0 and 0 when not); returns the recipe. */
+LbComboRecipe* lb_page_row_pair_get(u16 index, u16* item_a, u16* item_b, s32 mode) {
+    LbComboRecipe* recipe;
+
+    recipe = lb_combo_pair_recipe_find(index, mode);
+    if (recipe != NULL) {
+        *item_a = lb_combo_pair_tbl[index].first_0x00;
+        *item_b = lb_combo_pair_tbl[index].second_0x02;
+    } else {
+        *item_b = 0;
+        *item_a = 0;
+    }
+    return recipe;
+}
+
+/* 1 when the recipe is not hidden (bit 0 of its flags clear); the player is not consulted. */
+u32 lb_combo_recipe_open_ck(_PLW* plw, LbComboRecipe* recipe) {
+    if (recipe != NULL && (recipe->flags_0x07 & 1) == 0) {
         return 1;
     }
     return 0;
 }
 
-/* `lb_combo_recipe_find`'s row lookup: -1 when the row is not in the page table, else the row goes to `lb_combo_rate_get`. */
-s8 lb_page_row_ck(u16 id, u16 value, s16* out) {
-    if (lb_combo_recipe_find(id, value, 0) == NULL) {
+/* The success rate of combining `a` and `b`; -1 when there is no such recipe. */
+s8 lb_combo_rate_find(u16 a, u16 b, s32 mode) {
+    LbComboRecipe* recipe;
+
+    recipe = lb_combo_recipe_find(a, b, 0);
+    if (recipe == NULL) {
         return -1;
     }
-    return lb_combo_rate_get(out, 0, 0);
+    return lb_combo_rate_get(recipe, mode);
 }
 
-/* Sets the bit for `index` in the page block's per-entry bit field `lobby_world_block->bits_0x3960`. */
-void lb_page_entry_bit_set(u8 unused, LbActReq* req) {
-    u8 index = req->sel_0x04.bytes_0x00.c_0x02;
+/* The success rate of `recipe` in percent: 100 with a granting skill, else the class's base rate moved by the
+ * skills and by the bonus books held (mode 0: carried, mode 2: pouches or box), clamped to 0..100; mode 1 is 100. */
+s8 lb_combo_rate_get(LbComboRecipe* recipe, s32 mode) {
+    LbMoveEntry* moves;
+    _PLW* plw;
+    u16* item;
+    s16 rate;
+    s32 i;
+    s32 count;
 
-    lobby_world_block->bits_0x3960[index >> 3] =
-        lobby_world_block->bits_0x3960[index >> 3] | (u8)(1 << (index & 7));
+    if (mode == 0 || mode == 2) {
+        moves = (LbMoveEntry*)get_move_work_adrs(2);
+        if (moves == NULL) {
+            return -1;
+        }
+        plw = (_PLW*)&moves[fn_800CF384()];
+        if (lb_combo_recipe_open_ck(plw, recipe) == 0) {
+            return -1;
+        }
+        if ((recipe->flags_0x07 & 2) != 0 && pl_skill_have_ck(plw, 0x43) == 1) {
+            return 100;
+        }
+        if ((recipe->flags_0x07 & 4) != 0 && pl_skill_have_ck(plw, 0xB8) == 1) {
+            return 100;
+        }
+        if ((recipe->flags_0x07 & 8) != 0 && Pl_cat_skill_ck(plw, 0x2A) == 1) {
+            return 100;
+        }
+        if ((recipe->flags_0x07 & 0x10) != 0 &&
+            (pl_skill_have_ck(plw, 0xCC) == 1 || Pl_cat_skill_ck(plw, 0x2D) == 1 || Pl_cat_skill_ck(plw, 0x15) == 1)) {
+            return 100;
+        }
+        rate = lb_combo_base_rates[recipe->rate_0x04];
+        if (pl_skill_have_ck(plw, 0x9C) == 1) {
+            rate += 45;
+        } else if (pl_skill_have_ck(plw, 0x9B) == 1) {
+            rate += 25;
+        } else if (pl_skill_have_ck(plw, 0x9A) == 1) {
+            rate += 15;
+        } else if (pl_skill_have_ck(plw, 0x9D) == 1) {
+            rate -= 5;
+        } else if (pl_skill_have_ck(plw, 0x9E) == 1) {
+            rate -= 10;
+        } else if (pl_skill_have_ck(plw, 0x9F) == 1) {
+            rate -= 15;
+        }
+        if (Pl_cat_skill_ck(plw, 0xC) == 1) {
+            rate += 20;
+        }
+        if (Pl_cat_skill_ck(plw, 0xD) == 1) {
+            rate += 10;
+        }
+        for (i = 0, item = lb_combo_bonus_items; i < 5; item++, i++) {
+            if (mode == 0) {
+                if (GameMode_ck() == 2) {
+                    count = userdata_item_slot_count(lobby_world_block);
+                    if (item_pair_index_find(*item, (IdValue*)userdata_equip_item_slots_get(lobby_world_block), count) < 0) {
+                        break;
+                    }
+                } else if (pl_item_slot_find(plw, *item) == 0xFFFF) {
+                    break;
+                }
+            } else if (mode == 2) {
+                count = userdata_pouch_size(0);
+                if (item_pair_index_find(*item, (IdValue*)userdata_pouch_get(lobby_world_block, 0), count) < 0) {
+                    count = userdata_pouch_size(1);
+                    if (item_pair_index_find(*item, (IdValue*)userdata_pouch_get(lobby_world_block, 1), count) < 0 &&
+                        (s32)item_slots_count_sum(*item, lobby_world_block->box_0x180,
+                                                  userdata_box_capacity(lobby_world_block)) <= 0) {
+                        break;
+                    }
+                }
+            }
+        }
+        rate += lb_combo_bonus_rates[i];
+    } else if (mode == 1) {
+        return 100;
+    } else {
+        rate = lb_combo_base_rates[recipe->rate_0x04];
+    }
+    if (rate > 100) {
+        rate = 100;
+    } else if (rate < 0) {
+        rate = 0;
+    }
+    return rate;
+}
+
+/* Marks `recipe` known: sets its bit in `lobby_world_block->bits_0x3960`. */
+void lb_combo_recipe_learn(LbComboRecipe* recipe) {
+    u8 bit = recipe->known_bit_0x06;
+
+    lobby_world_block->bits_0x3960[bit >> 3] |= 1 << (bit & 7);
+}
+
+/* 1 when `recipe` is known (its bit in `bits_0x3960` is set); with bit 0 of `mode` clear it must also be open. */
+u32 lb_combo_recipe_known_ck(LbComboRecipe* recipe, s32 mode) {
+    LbMoveEntry* moves;
+    u8 bit;
+
+    if ((mode & 1) == 0) {
+        moves = (LbMoveEntry*)get_move_work_adrs(2);
+        if (moves == NULL) {
+            return 0;
+        }
+        if (lb_combo_recipe_open_ck((_PLW*)&moves[fn_800CF384()], recipe) != 1) {
+            return 0;
+        }
+    }
+    bit = recipe->known_bit_0x06;
+    if (((1 << (bit & 7)) & lobby_world_block->bits_0x3960[bit >> 3]) == 0) {
+        return 0;
+    }
+    return 1;
+}
+
+/* Combines `item_a` and `item_b`: rolls the recipe's success rate, writes the yield (the fixed yield in mode 1 or
+ * with skill 0xA0, else rolled down the odds list) and takes one of each ingredient from the player (mode 0), the
+ * user data (mode 1) or the box (mode 2, by slot when the slot still holds it).  Returns the result item, -1 on a
+ * failure or when there is no recipe. */
+s16 lb_combo_exec(u8* yield, u16 item_a, u16 item_b, s32 mode, u16 slot_a, u16 slot_b) {
+    LbComboRecipe* recipe;
+    LbMoveEntry* moves;
+    _PLW* plw;
+    u8 roll;
+    u8* odds;
+    u8* step;
+    s32 rate;
+    s16 result;
+
+    recipe = lb_combo_recipe_find(item_a, item_b, 0);
+    if (recipe == NULL) {
+        return -1;
+    }
+    rate = lb_combo_rate_find(item_a, item_b, mode);
+    if (lb_combo_recipe_known_ck(recipe, 0) == 0) {
+        rate = 100;
+    }
+    if ((s32)(ran_suu(1) % 100) < rate) {
+        result = recipe->result_0x02;
+        if (mode == 1) {
+            *yield = lb_combo_yield_tbl[recipe->yield_0x05];
+        } else {
+            moves = (LbMoveEntry*)get_move_work_adrs(2);
+            if (pl_skill_have_ck((_PLW*)&moves[fn_800CF384()], 0xA0) == 1) {
+                *yield = lb_combo_yield_tbl[recipe->yield_0x05];
+            } else {
+                roll = ran_suu(1) % 100;
+                odds = lb_combo_yield_odds[recipe->yield_0x05];
+                *yield = odds[0];
+                step = odds + 1;
+                for (;;) {
+                    if (roll < *step) {
+                        break;
+                    }
+                    (*yield)++;
+                    roll -= *step;
+                    step++;
+                }
+            }
+        }
+    } else {
+        result = -1;
+        *yield = 0;
+    }
+    switch (mode) {
+    case 0:
+        if (GameMode_ck() == 2) {
+            userdata_item_give(lobby_world_block, item_a, -1, 1);
+            userdata_item_give(lobby_world_block, item_b, -1, 1);
+        } else {
+            moves = (LbMoveEntry*)get_move_work_adrs(2);
+            if (moves != NULL) {
+                plw = (_PLW*)&moves[fn_800CF384()];
+                pl_item_add(plw, item_a, -1);
+                pl_item_add(plw, item_b, -1);
+            }
+        }
+        break;
+    case 1:
+        userdata_item_consume(lobby_world_block, item_a, -1);
+        userdata_item_consume(lobby_world_block, item_b, -1);
+        break;
+    case 2:
+        if (slot_a != 0xFFFF && item_a == lobby_world_block->box_0x180[slot_a].id) {
+            item_box_slot_take(lobby_world_block->box_0x180, slot_a, -1);
+        } else {
+            item_box_take(item_a, -1);
+        }
+        if (slot_b != 0xFFFF && item_b == lobby_world_block->box_0x180[slot_b].id) {
+            item_box_slot_take(lobby_world_block->box_0x180, slot_b, -1);
+        } else {
+            item_box_take(item_b, -1);
+        }
+        break;
+    }
+    return result;
+}
+
+/* Prints the recipe's yield into `text`: "n" when the odds list cannot raise it, else "min-max". */
+void lb_combo_rate_sprintf(char* text, LbComboRecipe* recipe) {
+    u8 group = recipe->yield_0x05;
+    u8 low = lb_combo_yield_odds[group][0];
+    u8 high = lb_combo_yield_tbl[group];
+
+    if (low == high) {
+        sprintf(text, "%d", low, high);
+        return;
+    }
+    sprintf(text, "%d-%d", low, high);
 }
 
 /* Copies the 0xC-byte `LbSettings` record from one owner to another, field by field. */
