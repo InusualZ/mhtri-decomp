@@ -175,7 +175,7 @@ struct HkbWidget {
     /* the vptr the virtuals above require sits at +0x0000 and is compiler-emitted; the data
      * members below therefore start at +0x0004. */
     /* +0x0004 */ void* vtable_04;           /* base #1 (adjustor thunk `addi r3, r3, 4`) */
-    /* +0x0008 */ u32 value_08;              /* the word fn_8054F788 clears, fn_80555110 stores */
+    /* +0x0008 */ u32 value_08;              /* the word hbmNodeReset clears, fn_80555110 stores */
     /* +0x000C */ u32 value_0C;              /* the word fn_80554AD8 stores */
     /* +0x0010 */ void* vtable_10;           /* base #2 (adjustor thunk `subi 0x10`) */
     /* +0x0014 */ void* vtable_14;           /* base #3 (adjustor thunk `subi 0x14`) */
@@ -243,7 +243,7 @@ struct HkbWidget {
     /* +0x1B88 */ u8 flag_1B88;              /* the byte fn_80550768 stores */
 };
 
-/* The (target, argument) node hbmNodeNotify and fn_8054F788 drive.  size: 0x0C (approximate - the
+/* The (target, argument) node hbmNodeNotify and hbmNodeReset drive.  size: 0x0C (approximate - the
  * band never reads past +0x08). */
 struct HkbNode {
     /* +0x00 */ u32 pad_00;

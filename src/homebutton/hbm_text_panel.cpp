@@ -4195,7 +4195,7 @@ void hbmPanelTypeIntoTarget(HbmPanelView* self, u16 c)
 void fn_80549C50(HbmTextPanel* self)
 {
     ((HbmPanelView*)self)->v_0x018(6, NULL);
-    fn_8054F788(&self->field_0x118);
+    hbmNodeReset(&self->field_0x118);
     ((HbmPanelSubView*)&self->sub)->v_0x090();
     ((HbmPanelSubView*)&self->sub)->v_0x094();
 }
@@ -5919,7 +5919,7 @@ extern "C" void hbmNodeNotify(HkbNode* self) {
 
 /* Clears the node's argument and dispatches the target's own reset when one is installed. */
 /* untyped: opaque node record, typed by the callers' views */
-extern "C" void fn_8054F788(void* record) {
+extern "C" void hbmNodeReset(void* record) {
     HkbNode* self = (HkbNode*)record;
     HkbWidget* target = self->target;
     self->argument = 0;

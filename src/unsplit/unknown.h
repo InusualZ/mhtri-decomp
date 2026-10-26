@@ -104,7 +104,7 @@ extern u32 frame_counter;
  * yet, so rule 2's owner has no header to name).  Signatures are the call sites': r3 is the address
  * the caller hands over, and `hbmTextWriterSetStandardScreen` takes the sub-object plus the mode word the caller
  * materialises. */
-void fn_8054F788(void* record);
+void hbmNodeReset(void* record);
 void fn_80553670(void* record);
 void fn_80526D00(void* record);
 /* 0x8055A3E0 / 0x8055BEF0 / 0x8055C1D4 / 0x8055C2CC are inside the registered band

@@ -317,7 +317,7 @@ typedef struct Panel805482CC_Cell {
     /* +0x06 */ u16 pad_0x06;
 } Panel805482CC_Cell; /* size: 0x08 */
 
-/* The embedded record at +0x118: `fn_80542D8C` writes three words there and `fn_8054F788` takes
+/* The embedded record at +0x118: `fn_80542D8C` writes three words there and `hbmNodeReset` takes
  * its address.  Its tail is not touched by this band, so the size is a lower bound. */
 typedef struct Panel805482CC_Sub118 {
     /* +0x00 */ u32 field_0x00;
