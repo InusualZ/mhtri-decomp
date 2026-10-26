@@ -50,7 +50,7 @@ typedef struct MoveWork {
 /* size: 0xA5C */
 typedef struct SystemWork {
     /* +0x000 */ u8 pad_0x00[0x1];
-    /* +0x001 */ u8 unk1;
+    /* +0x001 */ u8 language_0x01;  /* the console language (`main.cpp` sets it); indexes `lang_select_table` */
     /* +0x002 */ u8 pad_0x02[0x3];
     /* +0x005 */ u8 field_0x05;
     /* +0x006 */ u8 pad_0x06[0x2];
@@ -58,7 +58,8 @@ typedef struct SystemWork {
     /* +0x009 */ u8 field_0x09; /* message-language index selecting the 0x8060B1A8/B200/B2F0 tables */
     /* +0x00A */ u8 pad_0x0A[0x2];
     /* +0x00C */ u32 field_0x0c;
-    /* +0x010 */ u8 pad_0x10[0x8];
+    /* +0x010 */ u32 pause_0x10;    /* GUESS name: non-zero holds task slots 2..10 (`task_slot_table_run`) */
+    /* +0x014 */ u8 pad_0x14[0x4];
     /* +0x018 */ u16 field_0x18[4];   /* ran_suu's u16 ring, cells +0x18/+0x1A/+0x1C/+0x1E */
     /* +0x020 */ u8 field_0x20;
     /* +0x021 */ u8 field_0x21;
@@ -191,7 +192,7 @@ typedef struct SystemWork {
     /* +0x8C4 */ void (*reset_func_0x8c4)(void);   /* GUESS name: the hook `game_mode_flow_task` runs when the lobby is left for the title */
     /* +0x8C8 */ u8 pad_0x8c8[0xC];
     /* +0x8D4 */ void (*field_0x8d4)(void);
-    /* +0x8D8 */ u32 (*unk2264)(void);
+    /* +0x8D8 */ u32 (*pad_lock_ck_0x8d8)(void);   /* GUESS name: 1 stops the pad reads (`pad_frame_read`) */
     /* +0x8DC */ void (*field_0x8dc)(void);
     /* +0x8E0 */ void (*unk2272)(void);
     /* +0x8E4 */ void (*unk2276)(void);

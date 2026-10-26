@@ -79,7 +79,7 @@ void MEMDestroyExpHeap(void* heap);
 void* memset(void* dst, int val, u32 n);
 int strcmp(const char* a, const char* b);
 char* strcpy(char* dst, const char* src);
-char* fn_80041404(const char* str, int ch);
+char* str_rfind(const char* str, int ch);
 }
 
 /* The Dolphin `MEMAllocator`: a function pointer and its heap/parameter words. */
@@ -302,7 +302,7 @@ void fn_800D5250(void) {
 s32 fn_800D4CE4(const char* path) {
     ResManager* m = nw_res_manager;
     s32 i;
-    char* p = fn_80041404(path, 47);
+    char* p = str_rfind(path, 47);
     if (p != 0) {
         path = p + 1;
     }
@@ -319,7 +319,7 @@ s32 fn_800D4CE4(const char* path) {
 s32 res_mem_index_get(const char* path) {
     ResManager* m = nw_res_manager;
     s32 i;
-    char* p = fn_80041404(path, 47);
+    char* p = str_rfind(path, 47);
     if (p != 0) {
         path = p + 1;
     }
@@ -336,7 +336,7 @@ ResEntry* ckResourceName(char* path) {
     ResManager* m = nw_res_manager;
     ResEntry* e = m->resTable;
     s32 i;
-    char* p = fn_80041404(path, 47);
+    char* p = str_rfind(path, 47);
     if (p != 0) {
         path = p + 1;
     }
@@ -353,7 +353,7 @@ s32 fn_800D5360(char* path) {
     ResManager* m = nw_res_manager;
     ResEntry* e = m->resTable;
     s32 i;
-    char* p = fn_80041404(path, 47);
+    char* p = str_rfind(path, 47);
     if (p != 0) {
         path = p + 1;
     }
@@ -596,7 +596,7 @@ s32 pull_res_mem(char* path, u32 size, s32 mode) {
         return -1;
     }
     if (path != 0) {
-        char* p = fn_80041404(path, 47);
+        char* p = str_rfind(path, 47);
         name = p != 0 ? p + 1 : path;
         if (mode != 1) {
             for (i = 0; i < 1024; i++) {
@@ -643,7 +643,7 @@ s32 nwAddResource(char* name, void* data) {
     if (name[0] == 0) {
         return -1;
     }
-    char* p = fn_80041404(name, 47);
+    char* p = str_rfind(name, 47);
     if (p != 0) {
         name = p + 1;
     }

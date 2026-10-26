@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 /* 0x80044B14 - the per-player mode/act setter the player act band calls. */
-void fn_80044B14(u8 kind, u8 flag);
+void pad_motor_start_level(u8 kind, u8 flag);
 
 #ifdef __cplusplus
 }

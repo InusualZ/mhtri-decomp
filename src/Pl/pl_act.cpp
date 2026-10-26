@@ -4908,7 +4908,7 @@ extern "C" void pl_act_hold_notify(struct _PLW* plw, u8 flag)
         if (PlayMode_ck() == 2) {
             kind = plw->chunk_ofs;
         }
-        fn_80044B14(kind, flag);
+        pad_motor_start_level(kind, flag);
     }
 }
 

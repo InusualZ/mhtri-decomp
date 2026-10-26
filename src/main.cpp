@@ -253,7 +253,7 @@ extern u16 lbl_80794794;
 extern u8 lbl_807947A4;
 extern void* lbl_807947AC;
 extern u32 lbl_807947B0;
-extern void* lbl_8079483C;
+extern void* wpad_mem2_heap;
 extern void* lbl_80794A20;
 extern u8 lbl_80790E20;
 extern char lbl_8057C82C[];
@@ -336,9 +336,9 @@ extern "C" void fn_8003FE30(void);
 extern "C" void fn_8003FEBC(void);
 extern "C" void frame_copy_display(void);
 extern "C" void frame_swap_wait(void);
-extern "C" void fn_800408A8(void);
-extern "C" void fn_80040FDC(void);
-extern "C" void fn_80041304(void);
+extern "C" void rso_overlay_boot(void);
+extern "C" void rso_pool_reset(void);
+extern "C" void lang_index_set(void);
 extern "C" void pad_motor_stop_all(void);
 extern "C" void fn_80046C80(void);
 extern "C" void fn_80046D34(void);
@@ -416,14 +416,14 @@ int main(void)
     system_w.unk2148 = 0xFF;
     system_w.unk8 = 1;
     if ((u32)(lbl_80794782 - 1) <= 5) {
-        system_w.unk1 = lbl_80794782;
+        system_w.language_0x01 = lbl_80794782;
     } else {
-        system_w.unk1 = 1;
+        system_w.language_0x01 = 1;
     }
 
-    fn_80041304();
-    fn_800408A8();
-    fn_80040FDC();
+    lang_index_set();
+    rso_overlay_boot();
+    rso_pool_reset();
     fn_80046C80();
 
     while (1) {
@@ -444,7 +444,7 @@ int main(void)
             continue;
         }
         if (reset_request != 0) {
-            if (system_w.unk2264() == 1) {
+            if (system_w.pad_lock_ck_0x8d8() == 1) {
                 system_w.unk2272();
                 system_w.system_halt_0x871 = 1;
                 continue;
@@ -580,7 +580,7 @@ extern "C" void fn_8003F620(void)
     void* mem2Hi = OSGetMEM2ArenaHi();
     mem2_arena_bounds[1] = (u32)mem2Lo;
     mem2_arena_bounds[2] = (u32)mem2Hi;
-    lbl_8079483C = fn_8003F728((void*)0x90308000, 0x40000);
+    wpad_mem2_heap = fn_8003F728((void*)0x90308000, 0x40000);
     lbl_80794A20 = MEMCreateExpHeapEx((void*)0x92B78000, 0x80000, 4);
 }
 

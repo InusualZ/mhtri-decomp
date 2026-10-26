@@ -315,7 +315,7 @@ void system_w_clr(void);
 extern "C" void fn_800CFC64(void);
 
 extern "C" s32 fn_800D02C0(TPLPalette* pal, SysTask* slot);
-extern "C" void fn_800417F0(void* fn, u32 count);
+extern "C" void tsk_start(void* fn, u32 count);
 extern "C" void* MEMAllocFromAllocator(void* allocator, u32 size);
 extern "C" void MEMFreeToAllocator(void* allocator, void* ptr);
 extern "C" void MEMDestroyExpHeap(void* heap);
@@ -634,7 +634,7 @@ void fn_800CE610(void) {
     memset(&lbl_80694C68, 0, 0x4C);
     lbl_80694C68.buf = buf;
     memset(buf, 0, sizeof(SysBuf));
-    fn_800417F0((void*)fn_800CE6A0, 0x0F);
+    tsk_start((void*)fn_800CE6A0, 0x0F);
 }
 
 /* 0x800CE9F0 - hand out the next side-table entry. */
