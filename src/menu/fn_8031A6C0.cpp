@@ -53,7 +53,7 @@ s32  lb_combo_item_known_ck(u16 a);
 s32  lb_combo_recipe_find(u16 a, u16 b, s32 c);
 s16  lb_combo_exec(void* self, u16 a, u16 b, s32 kind, s16 c, s16 d);
 u16  item_count_find(u16 a, s32 b, s32 c);
-s32  fn_8004B3A0(u16 a, s32 b, s32 c);
+s32  item_room_or_full_get(u16 a, s32 b, s32 c);
 void fn_800DCFC0(void);
 extern MenuSharedSlots* lobby_world_block;
 }
@@ -96,10 +96,10 @@ extern "C" s32 fn_8031AD30(u16 id, s32 b, s32 c) {
 /* 0x8031AD9C - apply or clear the item's bonus */
 extern "C" void fn_8031AD9C(u16 id, s32 a, s32 b) {
     if (item_count_find(id, a, 0x18) == 0 && b != 0 &&
-        GetItemData(id)->kind_0x00 == 1 && fn_8004B3A0(id, b, 8) >= 0) {
+        GetItemData(id)->kind_0x00 == 1 && item_room_or_full_get(id, b, 8) >= 0) {
         return;
     }
-    fn_8004B3A0(id, a, 0x18);
+    item_room_or_full_get(id, a, 0x18);
 }
 
 /* ============================================================================================== */

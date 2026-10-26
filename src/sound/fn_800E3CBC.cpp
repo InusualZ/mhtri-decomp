@@ -20,26 +20,26 @@
  *   * `fn_800E3CBC` / `prim_init_all` / `fn_800E3D7C` / `sound_free_lists_reset` reset and rebuild the two record
  *     pools (`.sbss` bases `prim_rec_pool`, counts `prim_rec_count`, capacities `prim_rec_capacity`, all three
  *     GUESS names) and the six pointer free-lists (`.data` bases `lbl_80597D20`, counts `lbl_80597D38`).
- *   * `fn_800E3E1C` walks both record lists and drives per-record visibility, callbacks and state.
- *   * `fn_800E4148` / `fn_800E4284` / `fn_800E4390` / `fn_800E440C` / `fn_800E444C` are the draw queue:
+ *   * `prim_list_exec` walks both record lists and drives per-record visibility, callbacks and state.
+ *   * `fn_800E4148` / `fn_800E4284` / `fn_800E4390` / `fn_800E440C` / `prim_queue_draw` are the draw queue:
  *     a depth metric, a sorted insertion and the per-bucket draw dispatch.
  *   * `set_blendmode` / `set_zmode` are thin GX state wrappers (GXSetBlendMode / GXSetZMode).
  *
  * `#pragma peephole off` is load-bearing, as on the sibling `sound/` units: with the peephole pass on,
- * `fn_800E444C`'s `rlwinm`+`cmpwi` zero test fuses into `rlwinm.`+`bne` and the whole unit loses ~5
- * points (fn_800E444C 74.5 -> 85.3, fn_800E4148 85.8 -> 89.7, fn_800E4284 89.9 -> 94.3).
+ * `prim_queue_draw`'s `rlwinm`+`cmpwi` zero test fuses into `rlwinm.`+`bne` and the whole unit loses ~5
+ * points (prim_queue_draw 74.5 -> 85.3, fn_800E4148 85.8 -> 89.7, fn_800E4284 89.9 -> 94.3).
  *
  * Measured against this range's split object with `recompile.py --measure` (the official report metric):
  *
- *   fn_800E3CBC     99.33 (132/132 B)   sound_free_lists_reset   100.00   fn_800E444C     85.27 (296/288 B)
- *   prim_init_all  100.00               fn_800E3E1C    88.10 (812/820 B)   set_blendmode  100.00
+ *   fn_800E3CBC     99.33 (132/132 B)   sound_free_lists_reset   100.00   prim_queue_draw     85.27 (296/288 B)
+ *   prim_init_all  100.00               prim_list_exec    88.10 (812/820 B)   set_blendmode  100.00
  *   fn_800E3D7C     89.40 (100/100 B)   fn_800E4148    89.75 (316/324 B)   set_zmode       97.50
  *   fn_800E4284     94.33 (268/264 B)   fn_800E4390    98.06 (124/124 B)
  *   fn_800E440C    100.00
  *
  * All twelve are at or above the 80 % bar; the unit is 92.16 % fuzzy, 4 of 12 byte-identical.  Residuals:
- * `fn_800E3E1C` (+8 B) and `fn_800E4148` (+8 B) materialise an address the peephole pass would fold, and
- * `fn_800E444C` (-8 B) keeps one `lwz` fewer than retail across the `rec = (PrimRec*)local` reload;
+ * `prim_list_exec` (+8 B) and `fn_800E4148` (+8 B) materialise an address the peephole pass would fold, and
+ * `prim_queue_draw` (-8 B) keeps one `lwz` fewer than retail across the `rec = (PrimRec*)local` reload;
  * `fn_800E3CBC`/`fn_800E3D7C`/`fn_800E4390`/`set_zmode` are size-exact and differ only in register
  * colouring.  `fn_800E4284` (-4 B) is the `(u32)((f32)(n - 1) * t)` conversion sequence.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_20`,
@@ -67,7 +67,7 @@
 
 /* ------------------------------------------------------------------ types */
 
-/* The working buffer `MTX34_ctor` initialises; fn_800E4148 reads +0x20..+0x2C, fn_800E3E1C reads +0x1C.
+/* The working buffer `MTX34_ctor` initialises; fn_800E4148 reads +0x20..+0x2C, prim_list_exec reads +0x1C.
  * Only the read fields are named; the rest is untouched padding.  size: 0x30 (approximate) */
 typedef struct WorkBuf {
     /* 0x00 */ u8 pad_0x00[0x1C];
@@ -84,7 +84,7 @@ typedef struct DrawCtx {
     /* 0xBC */ u8 pad_0xBC[0x00];
 };
 
-/* The leading vtable of a draw handle (`fn_800E3E1C` calls slot 3 = +0xC).  size: 0x10 */
+/* The leading vtable of a draw handle (`prim_list_exec` calls slot 3 = +0xC).  size: 0x10 */
 typedef struct Obj Obj;
 typedef struct ObjVtbl {
     /* 0x00 */ void (*slot0)();
@@ -93,7 +93,7 @@ typedef struct ObjVtbl {
     /* 0x0C */ void (*slot3)(Obj* self, u32 a, u32 b, WorkBuf* c);
 } ObjVtbl;
 
-/* The secondary interface `fn_800E444C` reaches through +0x1C and whose slot at +0x1C it calls.
+/* The secondary interface `prim_queue_draw` reaches through +0x1C and whose slot at +0x1C it calls.
  * size: 0x20 (approximate) */
 typedef struct ObjSub {
     /* 0x00 */ u8 pad_0x00[0x1C];
@@ -137,7 +137,7 @@ s32 camera_work_ck(void);
 s32 my_player_no(void);
 void* ef_effect_root_mtx(void* p);
 f32 vec3_dot(const VEC3* a, const VEC3* b);
-void fn_80049728(void* p, s32 n);
+void scn_mdl_draw(void* p, s32 n);
 void GXInvalidateVtxCache(void);
 void GXSetBlendMode(u32 a, u32 b, u32 c, u32 d);
 void GXSetZMode(u32 a, u32 b, u32 c);
@@ -197,7 +197,7 @@ extern "C" void sound_free_lists_reset(void)
 
 /* The per-frame driver: for both record lists, run each live record's callback, state and draw setup.
  * `mode` selects the state filter (`1` keeps only the flag-0x2 records). */
-extern "C" void fn_800E3E1C(void* a, u8 mode)
+extern "C" void prim_list_exec(void* a, u8 mode)
 {
     WorkBuf b40;
     WorkBuf b10;
@@ -403,7 +403,7 @@ extern "C" u32 fn_800E440C(u32* p)
 }
 
 /* Draw one free-list bucket.  `mode` filters on the record state. */
-extern "C" void fn_800E444C(u8 idx, u8 mode)
+extern "C" void prim_queue_draw(u8 idx, u8 mode)
 {
     u32 local = (u32)lbl_80597D20[idx];
     PrimRec* rec;
@@ -429,9 +429,9 @@ extern "C" void fn_800E444C(u8 idx, u8 mode)
         rec = (PrimRec*)local;
         if (rec->kind <= 1) {
             if (mode == 1) {
-                fn_80049728(rec->handle, 4);
+                scn_mdl_draw(rec->handle, 4);
             } else {
-                fn_80049728(rec->handle, -1);
+                scn_mdl_draw(rec->handle, -1);
             }
             continue;
         }

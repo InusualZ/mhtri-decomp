@@ -26,7 +26,7 @@ void ef_move_state_dispatch(u8 mode);
 s32 load_file_direct(char* path, u32 dma, u32 size);
 s32 dvd_open_wait(const char* path, void* info);
 /* The task-table entry `ef/fn_80059550.cpp` reads (its own return view is `_GXTexObj*`). */
-u8* fn_800D0568(s32 index);
+u8* sys_tex_obj_get(s32 index);
 
 /* 0x800D0708 - `system_w`'s +0x7D3 byte, which the consumers compare against 1; the name comes from the call
  * surface.  Unmangled, so it sits at C scope: its consumers declare it `extern "C"` too, and a C++-scope

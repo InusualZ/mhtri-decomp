@@ -403,7 +403,8 @@ struct Q_UserData {
     /* +0x0092 */ u16 box_armour_0x0092[6];
     /* +0x009E */ u8 hunter_equip_0x009E;   /* the character make's demo equipment set */
     /* +0x009F */ u8 hunter_voice_0x009F;
-    /* +0x00A0 */ u8 pad_0x00A0[0x180 - 0xA0];
+    /* +0x00A0 */ IdValue pouch_a_0x00A0[0x18];  /* the blademaster item pouch (`userdata_pouch_get` kind 0) */
+    /* +0x0100 */ IdValue pouch_b_0x0100[0x20];  /* the gunner item pouch (kind 1); its last 8 are the ammo page */
     /* +0x0180 */ IdValue box_0x180[0x18];  /* the item box's first page */
     /* +0x01E0 */ u8 pad_0x01E0[0x490 - 0x1E0];
     /* +0x0490 */ Q_CountSet set_c;
@@ -412,10 +413,12 @@ struct Q_UserData {
     /* +0x0E00 */ _EQUIP equip_box_0x0E00[800];   /* the equipment box `userdata_equip_box_add_new` fills */
     /* +0x3380 */ Q_MySet my_set_0x3380[20];      /* the saved equipment sets (`my_set_*`) */
     /* +0x36C8 */ Q_GunSet gun_set_0x36C8[20];    /* the saved bowgun sets (`gun_set_*`) */
-    /* +0x3920 */ u8 pad_0x3920[0x39A0 - 0x3920];
+    /* +0x3920 */ u16 seed_0x3920[0x20];   /* the random seeds; the first four are `system_w`'s `ran_suu` ring */
+    /* +0x3960 */ u8 flags_0x3960[0x40];   /* a bit set the new game seeds from `userdata_default_flag_bits` */
     /* +0x39A0 */ u8 face_type_0x39A0;
     /* +0x39A1 */ u8 face_eye_0x39A1;
-    /* +0x39A2 */ u8 pad_0x39A2[0x39BA - 0x39A2];
+    /* +0x39A2 */ u16 slots_0x39A2[8];      /* eight ids a new game sets to 0xFFFF (none) */
+    /* +0x39B2 */ u8 slot_bytes_0x39B2[8];  /* cleared beside them */
     /* +0x39BA */ u8 appearance_0x39BA;    /* an appearance byte the VS user block carries beside the face and makeup */
     /* +0x39BB */ u8 pad_0x39BB;
     /* +0x39BC */ u32 inner_color_0x39BC;    /* the inner-wear colour as an RGBA word */
@@ -429,16 +432,28 @@ struct Q_UserData {
     /* +0x3DE4 */ u16 hunter_rank_0x3DE4;    /* the hunter rank */
     /* +0x3DE6 */ u8 makeup_0x3DE6;
     /* +0x3DE7 */ u8 makeup_color_0x3DE7;
-    /* +0x3DE8 */ u8 pad_0x3DE8[0x3F04 - 0x3DE8];
+    /* +0x3DE8 */ u8 pad_0x3DE8[0x3E01 - 0x3DE8];
+    /* +0x3E01 */ u8 state_0x3E01;          /* three bytes a new game clears */
+    /* +0x3E02 */ u8 state_0x3E02;
+    /* +0x3E03 */ u8 state_0x3E03;
+    /* +0x3E04 */ u8 pad_0x3E04[0x3F04 - 0x3E04];
     /* +0x3F04 */ s32 points_0x3F04;          /* the resource points (`userdata_zenny_add` credits them) */
-    /* +0x3F08 */ u8 pad_0x3F08[0x3F28 - 0x3F08];
+    /* +0x3F08 */ u8 pad_0x3F08[0x3F0A - 0x3F08];
+    /* +0x3F0A */ u8 profile_0x3F0A;         /* the community profile's +0x92 byte */
+    /* +0x3F0B */ u8 net_rank_0x3F0B;        /* the community profile's rank byte (+0xF2) */
+    /* +0x3F0C */ u8 net_level_0x3F0C;       /* its level byte (+0xF3) */
+    /* +0x3F0D */ u8 opening_seen_0x3F0D;    /* set once the opening movie has played (`userdata_opening_seen_set`) */
+    /* +0x3F0E */ u8 pad_0x3F0E[0x3F28 - 0x3F0E];
     /* +0x3F28 */ Q_QuestStat quest_stat;  /* the stat `quest_init` copies into the work block's own */
-    /* +0x3F38 */ u8 pad_0x3F38[0x3F95 - 0x3F38];
+    /* +0x3F38 */ u8 record_0x3F38[0x24];    /* a record a new game clears */
+    /* +0x3F5C */ u8 pad_0x3F5C[0x3F95 - 0x3F5C];
     /* +0x3F95 */ u8 cat_name_0x3F95[3];   /* the name index of each of the three kitchen Felynes (NPC kinds 0x14..0x16) */
     /* +0x3F98 */ EmSetSave em_set_0x3F98;   /* the free hunt's monster records (`em_set_work_init`) */
     /* +0x406E */ u8 pad_0x406E[0x4078 - 0x406E];
     /* +0x4078 */ Q_ItemRow item_rows_0x4078[8];  /* the item menu's eight row records (`userdata_item_rows_get`) */
-    /* +0x40F8 */ u8 pad_0x40F8[0x4114 - 0x40F8];
+    /* +0x40F8 */ u8 pad_0x40F8[0x40FC - 0x40F8];
+    /* +0x40FC */ u8 profile_0x40FC[5];      /* the community profile's +0x7C bytes */
+    /* +0x4101 */ u8 pad_0x4101[0x4114 - 0x4101];
     /* +0x4114 */ Q_ArenaRow arena_rows_0x4114[12];  /* one row per arena quest (`userdata_arena_rows_export`) */
     /* +0x42D0 */ Q_ArenaRecord arena_0x42D0[12];  /* the arena quests' record holders, by arena quest */
     /* +0x4540 */ u8 pad_0x4540[0x4654 - 0x4540];
@@ -448,18 +463,34 @@ struct Q_UserData {
                                                     * extent runs to the next named field) */
     /* +0x483A */ u8 pig_name_0x483A;   /* the Poogie's name index (`name_menu_step`) */
     /* +0x483B */ u8 pig_dress_0x483B;  /* the Poogie's costume (`pig_menu_step`) */
-    /* +0x483C */ u8 pad_0x483C[0x484E - 0x483C];
+    /* +0x483C */ char profile_0x483C[0x11];   /* the community profile's +0x81 bytes; a new game fills them with 0xFF */
+    /* +0x484D */ u8 profile_0x484D;         /* the community profile's +0x93 byte */
     /* +0x484E */ u16 kitchen_seed_0x484E;    /* the kitchen's roll seed, re-drawn after every meal */
-    /* +0x4850 */ u8 pad_0x4850[0x4AD8 - 0x4850];
+    /* +0x4850 */ u8 record_0x4850[0x10];    /* four records a new game clears */
+    /* +0x4860 */ u8 record_0x4860[0x78];
+    /* +0x48D8 */ u8 record_0x48D8[0x100];
+    /* +0x49D8 */ u8 record_0x49D8[0x100];
     /* +0x4AD8 */ u32 item_seen_0x4AD8[30];         /* one bit per item id (`userdata_item_seen_set` takes ids 0..746) */
     /* +0x4B50 */ u8 equip_flags_0x4B50[1500];      /* per equipment item: bit flags (bit 2 the "new" mark), indexed by
                                                     * the kind's base plus the item id */
     /* +0x512C */ u32 event_flags_0x512C[0x10];     /* one bit per event in the event-id table (`userdata_flag_ck`) */
-    /* +0x516C */ u8 kitchen_pairs_0x516C[0xF0];  /* the ingredient pairs tried offline, one bit per pair */
+    /* +0x516C */ union {   /* one run, two views (rule 5) */
+        /* +0x516C */ u8 kitchen_pairs_0x516C[0xF0];  /* the ingredient pairs tried offline, one bit per pair */
+        struct {
+            /* +0x516C */ u8 kitchen_bits_0x516C[0x30];
+            /* +0x519C */ u32 timer_0x519C;   /* a new game sets 60 */
+            /* +0x51A0 */ u16 count_0x51A0;
+            /* +0x51A2 */ u16 count_0x51A2;
+            /* +0x51A4 */ u8 flag_0x51A4;
+            /* +0x51A5 */ u8 flag_0x51A5;     /* a new game sets 1 */
+            /* +0x51A6 */ u8 record_0x51A6[0xE];
+            /* +0x51B4 */ u8 pad_0x51B4[0x525C - 0x51B4];
+        };
+    };
     /* +0x525C */ u8 kitchen_pairs_0x525C[0x14];  /* the pairs tried online (approximate: to the note timer) */
     /* +0x5270 */ NoteTimer note_timer_0x5270;   /* the note trade's voyage record (`note_timer_*`, `note_trade_*`) */
     /* +0x5288 */ u32 note_rewards_0x5288;   /* one bit per route reward won (route * 6 + reward) */
-    /* +0x528C */ u8 pad_0x528C[0x52E2 - 0x528C];
+    /* +0x528C */ u8 comment_0x528C[0x56];   /* the community profile's comment record (+0x9C) */
     /* +0x52E2 */ u16 event_bits_0x52E2;  /* the event flags the result screen reports as new */
     /* +0x52E4 */ u32 vs_slot_a_0x52E4[10];  /* the VS user block's `slot_a_0x6C`, copied in before a box save */
     /* +0x530C */ u32 vs_slot_b_0x530C[10];  /* its `slot_b_0x94` */

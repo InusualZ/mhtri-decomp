@@ -14,12 +14,12 @@
  * `{size, name}` tables at 0x80582D38/0x80582E58/0x80582EE0, binds them as GX texture objects into a work block at `face_work`
  * (0x4D0 B, cleared by face_work_init, whose three `void*` slots start at 0x04), keeps a per-player face/frame/animation state there
  * (the byte arrays at 0x448, 0x456, 0x4B0, 0x4BA, 0x4C4 and the ten-entry pointer runs at 0x460/0x488) and draws the 2D face with an
- * orthographic GX pipeline (fn_80047D6C builds C_MTXOrtho/GXSetProjection and pushes TPL quads).
+ * orthographic GX pipeline (face_draw builds C_MTXOrtho/GXSetProjection and pushes TPL quads).
  *
  * Status: partial.  Written, in address order: the accessors and the face animation helpers up to `fn_80047D38` and the GX pipe
- * writers `fn_80048764..userdata_size_get`; the biggest unwritten are `fn_80047D6C` (0x9F8), `face_tex_bind` (0x200), `face_tex_load` (0x170).
+ * writers `fn_80048764..userdata_size_get`; the biggest unwritten are `face_draw` (0x9F8), `face_tex_bind` (0x200), `face_tex_load` (0x170).
  *
- * Residual: the four functions that read `Screen_w` (scene_current_camera_get, scene_current_camera_set, face_tex_bind, fn_80047D6C) are NOT written:
+ * Residual: the four functions that read `Screen_w` (scene_current_camera_get, scene_current_camera_set, face_tex_bind, face_draw) are NOT written:
  * `ScreenWork` is defined inside `main.cpp`, and reaching its fields from a second unit needs that type moved to `include/` first
  * (rule 1).  fn_80047634/fn_80047780 are declared and called by fn_80047884/fn_80047CAC but their load_file_req/load_file bodies
  * are unwritten (their real signatures come from the map's `load_file_req__FPcUllUllPUl` / `load_file__FPcUll`, which rule 9
@@ -305,7 +305,7 @@ extern "C" void fn_800487B8(u32 a, u32 b, u32 c, u32 d)
 }
 
 /* Empty stub. */
-extern "C" void fn_800487C4(void)
+extern "C" void frame_draw_end_hook(void)
 {
 }
 

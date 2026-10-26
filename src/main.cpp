@@ -889,7 +889,7 @@ extern "C" void frame_copy_display(void)
     GXSetAlphaUpdate(1);
     GXSetColorUpdate(1);
 
-    f32 scale = (system_w.unk2159 == 2) ? lbl_80795ACC : lbl_80790E24;
+    f32 scale = (system_w.screen_tex_mode_0x86F == 2) ? lbl_80795ACC : lbl_80790E24;
     u8 filter[7];
     for (int i = 0; i < 7; i++) {
         filter[i] = (u8)(scale * (f32)Rmode->vfilter[i]);

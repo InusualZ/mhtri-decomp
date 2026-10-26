@@ -31,7 +31,7 @@
  *     `i * 4`, so `color[4]` at +0x00, `state[4]` at +0x10, `rate[4]` at +0x30, `tbl[4]` at +0x40,
  *     `target[4]` at +0x50 and `inc[4]` at +0x60.
  *   * `lbl_8066ACF8` (.bss, 0x14C B) - the draw/filter state block the fade and glare setters write and
- *     `fn_80058BD0`/`fn_8005920C` drive.  Only the bytes this range touches are named.
+ *     `screen_tex_draw`/`layout_overlay_draw` drive.  Only the bytes this range touches are named.
  *   * `lbl_8058B178` (.data, 0xA8 B) - the fade step table, 0x18 B per entry.
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked
@@ -44,7 +44,7 @@
  *
  * Status: partial (phase B first pass).  The straightforward setters, slots and FIFO writers are
  * reconstructed; the large GX setup bodies (`fn_80056F24`, `fn_800572F0`, `fn_800579A4`, `fn_8005880C`,
- * `fn_80058BD0`, `fn_80057DE0`, `fn_80057EF4`, `fn_80058140`, `fn_8005920C`, the `disp_beta` trio) are
+ * `screen_tex_draw`, `fn_80057DE0`, `fn_80057EF4`, `fn_80058140`, `layout_overlay_draw`, the `disp_beta` trio) are
  * not written yet.  The per-symbol scores are in the unit notes / outbox.
  * NAMES. GUESS (from each body and its callers): filter_panel_on
  *   GUESS (from each body and its callers): filter_flag_clear, filter_panel_flag_clear

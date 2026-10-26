@@ -31,9 +31,16 @@ typedef struct NetUserProfile {
     /* +0x10 */ u8 equip_0x10[9][0xC];  /* nine `_EQUIP` records (`Pl/plw.h`) the peer card copies */
     /* +0x7C */ u8 field_0x7C[0x5];
     /* +0x81 */ char partner_0x81[0x11];  /* the Poogie name the lobby dresses its Poogie with (GUESS) */
-    /* +0x92 */ u8 pad_0x92[0x2];
+    /* +0x92 */ u8 profile_0x92;         /* the save's +0x3F0A byte */
+    /* +0x93 */ u8 profile_0x93;         /* the save's +0x484D byte */
     /* +0x94 */ u8 dress_0x94;           /* the Poogie costume */
-    /* +0x95 */ u8 pad_0x95[0x7];
+    /* +0x95 */ u8 sex_0x95;             /* the hunter's sex, face and voice (the save's +0x00/+0x01/+0x9F) */
+    /* +0x96 */ u8 face_0x96;
+    /* +0x97 */ u8 voice_0x97;
+    /* +0x98 */ u8 makeup_0x98;          /* the save's makeup and its colour (+0x3DE6/+0x3DE7) */
+    /* +0x99 */ u8 makeup_color_0x99;
+    /* +0x9A */ u8 face_type_0x9A;       /* the save's face type and eye (+0x39A0/+0x39A1) */
+    /* +0x9B */ u8 face_eye_0x9B;
     /* +0x9C */ u8 record_0x9C[0x56];   /* the comment text handed to the mediator's filter (0x80415FAC) */
     /* +0xF2 */ u8 rank_0xF2;
     /* +0xF3 */ u8 level_0xF3;

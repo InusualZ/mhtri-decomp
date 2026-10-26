@@ -215,7 +215,7 @@ extern PlSlotGate lbl_806BB7A0[3];
  * tables `fn_8027E2A8`/`fn_8027E354` index after `equip_kind_table_class` validates the kind. */
 extern u8** lbl_806AB810[8];
 extern u32 lbl_805706C0[];  /* the per-kind row counts the two lookups clamp against */
-extern u32 lbl_805706D8[];  /* the sibling counts `fn_8027E918` reads for kinds 7-15 */
+extern u32 lbl_805706D8[];  /* the sibling counts `equip_kind_item_count` reads for kinds 7-15 */
 
 /* The three per-kind item-id tables `fn_8027DE88`/`fn_8027DF38` walk until the 0xFFFF sentinel
  * (`.sdata` 0x80792030/0x80792038 at 0x8 B each, `.data` 0x805BFFE0 at 0x18 B - the map's sizes). */

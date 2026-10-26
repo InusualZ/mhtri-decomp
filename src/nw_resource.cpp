@@ -139,7 +139,7 @@ u32 fn_800D476C(u32 size, s32 align);
 void fn_800D4784(void* self);
 u32 fn_800D4794(u16 a, u16 b, u16 c, u16 d, u32 e);
 void fn_800D4848(void);
-void fn_800D48AC(void);
+void nw_res_view_mtx_apply(void);
 void fn_800D4908(void* a, void* b);
 void fn_800D490C(void);
 void* fn_800D4A74(void* startAddress, u32 size);
@@ -414,7 +414,7 @@ void fn_800D4848(void) {
 }
 
 /* 0x800D48AC - hand the current view matrix to the work system. */
-void fn_800D48AC(void) {
+void nw_res_view_mtx_apply(void) {
     ResManager* m = nw_res_manager;
     if (m->ptr_0x29074 != 0 && m->ptr_0x29084 != 0) {
         fn_800D4908(m->ptr_0x29084, &get_current_view_mtx());

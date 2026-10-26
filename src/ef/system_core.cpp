@@ -43,7 +43,7 @@
  *  - `set_move_work_max`, `GameMode_set`, `PlayMode_set`, `get_move_work_adrs`, `get_move_work_max`: retail narrows
  *    the argument (`clrlwi`) at entry, ours folds it into the store or the `clrlslwi`;
  *  - `fn_800D20B4`: retail `extsh`s both GX-FIFO halfwords before the `sth`;
- *  - `fn_800D0568`, `fn_800D05A4`, `sys_tex_image_get`: retail hoists `lis`/`addi system_w` above the `index < 0x20`
+ *  - `sys_tex_obj_get`, `sys_tex_info_get`, `sys_tex_image_get`: retail hoists `lis`/`addi system_w` above the `index < 0x20`
  *    check, ours materialises the base after the branch;
  *  - `fn_800CFD20`: the branch sense around the `fn_800CFC64` call is inverted;
  *  - `tex_palette_bind`, `fn_800D02C0`, `tex_palette_bind_point`: retail reloads the slot's image fields for `GXInitTexObj`, ours
@@ -402,7 +402,7 @@ void quest_system_reset(void) {
     fn_800CFBA0((u8*)&color);
     fade_reset(0);
     filter_flag_clear();
-    userdata_frame_reset();
+    subTransReset();
     system_w.field_0x2a = 0;
     system_w.field_0x7c8 = 0;
     system_w.field_0x7c9 = 0;
@@ -833,7 +833,7 @@ void fn_800CFDB0(void) {
 }
 
 /* 0x800D0568/0x800D05A4/0x800D05DC - the task table accessors. */
-u8* fn_800D0568(s32 index) {
+u8* sys_tex_obj_get(s32 index) {
     if (index >= 0x20) {
         return 0;
     }
@@ -843,7 +843,7 @@ u8* fn_800D0568(s32 index) {
     return system_w.tasks[index].body;
 }
 
-SysTask* fn_800D05A4(s32 index) {
+SysTask* sys_tex_info_get(s32 index) {
     if (index >= 0x20) {
         return 0;
     }
@@ -1496,7 +1496,7 @@ void all_reset(void) {
     fn_800CFBA0((u8*)&color);
     fade_reset(0);
     filter_flag_clear();
-    userdata_frame_reset();
+    subTransReset();
     system_w.field_0x2a = 0;
     system_w.field_0x7c8 = 0;
     system_w.field_0x7c9 = 0;

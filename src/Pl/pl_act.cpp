@@ -2456,7 +2456,7 @@ u16 pl_item_slot_next_get(_PLW*, u16, int);
 void pl_held_item_refresh(_PLW*);
 u8* GetItemData__FUs(u16);
 u16 pl_item_slot_find(_PLW*, u16);
-s32 fn_8004BD30(s16*);
+s32 item_pair_clear(s16*);
 
 void pl_parts_refresh(_PLW*, s32);
 
@@ -3284,9 +3284,9 @@ extern "C" s32 pl_equip_slot_count_get(_PLW* plw, u16 slot) {
 
     if (id != 0xFFFF) {
         if (id & 0x80) {
-            return fn_8004BD30((s16*)&plw->slot_id[(id & 0x7F) + 26]);
+            return item_pair_clear((s16*)&plw->slot_id[(id & 0x7F) + 26]);
         }
-        return fn_8004BD30((s16*)&plw->slot_id[id]);
+        return item_pair_clear((s16*)&plw->slot_id[id]);
     }
     return 2;
 }
@@ -9776,7 +9776,7 @@ extern "C" s32 equip_kind_table_class(u8 kind) {
 }
 
 /* The per-kind equipment row count the kind's own table class selects. */
-extern "C" s32 fn_8027E918(u8 kind) {
+extern "C" s32 equip_kind_item_count(u8 kind) {
     s32 count = 0;
     if ((u32)(kind - 7) > 8U) {
         if ((u32)(kind - 1) <= 5U) {

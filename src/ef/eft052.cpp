@@ -569,7 +569,7 @@ extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 extern "C" void eft052_page_count_add(u16 id, s16 delta)
 {
     if (id != 0)
-        fn_8004B200(lobby_world_block, id, -delta);
+        userdata_item_consume(lobby_world_block, id, -delta);
 }
 
 /* 0x80359164 (0xB8): Moves `count` of an item from the page's own count into the caller's hand. */

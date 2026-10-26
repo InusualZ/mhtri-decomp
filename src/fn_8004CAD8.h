@@ -75,6 +75,13 @@ u16 calcVecAngX(nw4r::math::VEC3* v);
 #ifdef __cplusplus
 extern "C" {
 u32 userdata_progress_flag_ck(s32 id);
+/* 0x8004CDA4 - rebuilds the save's worn equipment records from their equipment-box indices. */
+void userdata_worn_refresh(struct Q_UserData* user);
+/* 0x8004D3D0 - sets bit `bit` of the equipment record's flag byte in the save's equipment flags. */
+void userdata_equip_rec_flag_set(struct _EQUIP* rec, u16 bit);
+/* 0x8004D8FC / 0x8004DC2C - whether saved equipment set / bowgun set `index` uses equipment-box record `box`. */
+u32 my_set_box_used_ck(struct Q_UserData* user, u16 box, u8 index);
+u32 gun_set_box_used_ck(struct Q_UserData* user, u16 box, u8 index);
 /* 0x8004D328 - whether the user data `userdata` holds item `id` in its box (`ef/eft052.cpp`'s item box). */
 s32 userdata_box_item_ck(struct LbItemDb* userdata, u16 id);
 /* 0x8004D210 - sets progress flag `id` (the halfword bit run at +0x47DA `userdata_progress_flag_ck` reads).  GUESS. */

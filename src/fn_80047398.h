@@ -11,20 +11,7 @@
 #include "id_value.h"
 #include "fn_80047398/userdata_gunner_ck.h"   /* userdata_gunner_ck (leaf header) */
 
-/* The 2D sprite record `drawSpr2TF` consumes. size: 0x18 */
-typedef struct fltSpr2TF {
-    /* +0x00 */ s16 x;
-    /* +0x02 */ s16 y;
-    /* +0x04 */ s16 w;
-    /* +0x06 */ s16 h;
-    /* +0x08 */ s16 angle; /* degrees; drawSpr2TF scales it to radians */
-    /* +0x0A */ s16 pad_0x0A;
-    /* +0x0C */ u32 color;
-    /* +0x10 */ s16 r;
-    /* +0x12 */ s16 g;
-    /* +0x14 */ s16 b;
-    /* +0x16 */ s16 a;
-} fltSpr2TF; /* size: 0x18 */
+#include "spr2tf.h" /* fltSpr2TF, the record drawSpr2TF queues (rule 1) */
 
 #ifdef __cplusplus
 void drawSpr2TF(u8 id, fltSpr2TF* spr, u8 flag);
@@ -69,7 +56,7 @@ void* userdata_pouch_get(void* userdata, u8 idx);
 void* userdata_equip_item_slots_get(void* userdata);
 u32 item_count_find(u16 id, void* a, s32 b);
 u32 item_slots_count_sum(u16 id, void* a, u16 b);
-void fn_8004B200(void* userdata, u16 id, s16 delta);
+void userdata_item_consume(void* userdata, u16 id, s16 delta);
 s32 userdata_item_total_count(void* userdata, u16 id);
 s32 item_slots_room_get(u16 id, void* a, u16 b);
 s16 userdata_item_give(void* userdata, u16 id, s16 count, s32 flag);

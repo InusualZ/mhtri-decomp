@@ -146,7 +146,7 @@ f32 CosFIdx(f32 idx);
 /* The message-box draw helpers whose map names are C++ manglings - declared at global scope with C++
  * linkage, so the linker sees the mangling (`font_print_ex__FsssPSce` etc.), never the `extern "C"`
  * unmangled stem.  `drawSpr2TF`/`subTransSet`/`get_ScreenSize`/`ck_WideMode`/`wii_sysmsg_gen`/
- * `fn_800D0568` come from their owner headers (rule 2). */
+ * `sys_tex_obj_get` come from their owner headers (rule 2). */
 void disp_beta_tex(Vec* a, Vec2* b, _GXColor color, _GXTexObj* c);
 void font_print_ex(s16 x, s16 y, s16 flag, signed char* fmt, ...);
 void font_set_size(s16 w, s16 h);
@@ -198,7 +198,7 @@ void fn_80059550(u32 unused, BetaWork** pp) {
         size.z = 0.0f;
         size.y = 0.0f;
     }
-    disp_beta_tex(&size, &pos, lbl_80791110, (_GXTexObj*)fn_800D0568(work->taskIndex + 5));
+    disp_beta_tex(&size, &pos, lbl_80791110, (_GXTexObj*)sys_tex_obj_get(work->taskIndex + 5));
 }
 
 /* ---------------------------------------------------------------------------------------------------

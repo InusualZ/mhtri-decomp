@@ -143,13 +143,16 @@ typedef struct SystemWork {
     /* +0x866 */ u8 field_0x866;
     /* +0x867 */ u8 field_0x867;      /* TPLtexLoad group: loading display flag */
     /* +0x868 */ u8 field_0x868;
-    /* +0x869 */ u8 pad_0x869[0x1];
+    /* +0x869 */ union {   /* one byte, two spellings (rule 5) */
+        /* +0x869 */ u8 pad_0x869[0x1];
+        /* +0x869 */ u8 screen_tex_on_0x869;   /* 1: the frame draw shows the captured screen over a single screen */
+    };
     /* +0x86A */ u8 field_0x86A;
     /* +0x86B */ u8 field_0x86b;      /* hbm_enable: == 1 keeps the menu suppressed */
     /* +0x86C */ u8 pad_0x86c[0x1];
     /* +0x86D */ u8 title_req_0x86d;   /* GUESS name: cleared by `game_mode_flow_task` before it runs the +0x8C4 reset hook */
     /* +0x86E */ u8 unk2158;
-    /* +0x86F */ u8 unk2159;
+    /* +0x86F */ u8 screen_tex_mode_0x86F;   /* non-zero: the frame draw shows only the captured screen */
     /* +0x870 */ u8 hbm_disabled;     /* hbm_disable sets 1; hbm_enable follows +0x86B */
     /* +0x871 */ u8 system_halt_0x871; /* set on a fatal drive error or a handled reset: the main loop stops polling */
     /* +0x872 */ u8 pad_0x872[0x1];
