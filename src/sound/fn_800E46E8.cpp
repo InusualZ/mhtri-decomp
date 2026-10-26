@@ -197,7 +197,7 @@ extern "C" s32 fn_800E46E8(u32 kind)
 }
 
 /* Builds a projection matrix from the current screen setup and hands it to GX. */
-extern "C" void fn_800E4754(void)
+extern "C" void camera_projection_load(void)
 {
     Mtx44 mtx;
     Mtx44 src;

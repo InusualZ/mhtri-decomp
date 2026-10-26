@@ -9,6 +9,13 @@
 #include "types.h"
 #include "nw4r/math.h"
 
+/* One end of `draw_line_2d`'s line (`_DRAW_POINT_2D` in its mangling): the s16 position and the colour.  size: 0x8 */
+typedef struct _DRAW_POINT_2D {
+    /* +0x00 */ s16 x;
+    /* +0x02 */ s16 y;
+    /* +0x04 */ u32 color;
+} _DRAW_POINT_2D;
+
 /* One entry of the resource-file descriptor arrays the effect loaders walk: a byte size and the file name. */
 typedef struct EftResFile {
     /* +0x00 */ u32 size_0x00;

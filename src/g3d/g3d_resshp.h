@@ -48,6 +48,10 @@ struct ResTevData {
 /* The texture block.  size: 0x30 (a lower bound) */
 struct ResTexData {
     /* +0x00 */ u32 signature;
+    /* +0x04 */ u8 pad_0x04[0x18 - 0x4];
+    /* +0x18 */ u32 flag;         /* bit 0: a colour-indexed format (`ResTex::IsCIFmt`) */
+    /* +0x1C */ u16 width;        /* `ResTex::GetWidth` */
+    /* +0x1E */ u16 height;       /* `ResTex::GetHeight` */
 };
 
 /* The palette block.  size: 0x20 (a lower bound) */
@@ -55,6 +59,9 @@ struct ResPlttData {
     /* +0x00 */ u32 signature;
     /* +0x04 */ u8 pad_0x04[0x10 - 0x4];
     /* +0x10 */ s32 toPlttData;   /* offset to the colour data, 0 when absent */
+    /* +0x14 */ u8 pad_0x14[0x18 - 0x14];
+    /* +0x18 */ u32 fmt;          /* the TLUT format (`ResPltt::GetFmt`) */
+    /* +0x1C */ u16 numEntries;   /* the colour count (`ResPltt::GetNumEntries`) */
 };
 
 /* size: 0x4 */

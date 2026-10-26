@@ -154,8 +154,8 @@ u32 fn_800924A8(u32* p);
 const char* fn_800924B0(void);
 u32 fn_800924B8(u32* p);
 u32 res_file_get_res_mdl(void* self, u32 arg);
-u32 fn_80092790(void* self, u32 arg);
-u32 fn_80092A54(void* self, u32 arg);
+u32 res_file_pltt_by_index(void* self, u32 arg);
+u32 res_file_tex_by_index(void* self, u32 arg);
 u32 res_file_get_res_anm_chr(void* self, u32 arg);
 u32 fn_80092DBC(void* self, u32 arg);
 u32 fn_80092F70(void* self, u32 arg);
@@ -258,7 +258,7 @@ ResPltt ResFile::GetResPltt(const ResName name) const {
 }  // namespace nw4r
 
 /* `ResFile::GetResPltt(int)`. */
-extern "C" u32 fn_80092790(void* self, u32 arg) {
+extern "C" u32 res_file_pltt_by_index(void* self, u32 arg) {
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_pltt)];
     if (entry != 0) {
         return *(u32*)res_pltt_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
@@ -267,7 +267,7 @@ extern "C" u32 fn_80092790(void* self, u32 arg) {
 }
 
 /* `ResFile::GetResPltt(u32)`. */
-extern "C" void* fn_80092848(void* self, u32 arg) { return (void*)fn_80092790(self, arg); }
+extern "C" void* fn_80092848(void* self, u32 arg) { return (void*)res_file_pltt_by_index(self, arg); }
 
 /* `ResFile::GetResPlttNumEntries()`. */
 extern "C" u32 fn_8009284C(void* self) {
@@ -302,7 +302,7 @@ ResTex ResFile::GetResTex(const ResName name) const {
 }  // namespace nw4r
 
 /* `ResFile::GetResTex(int)`. */
-extern "C" u32 fn_80092A54(void* self, u32 arg) {
+extern "C" u32 res_file_tex_by_index(void* self, u32 arg) {
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_tex)];
     if (entry != 0) {
         return *(u32*)res_tex_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
@@ -311,7 +311,7 @@ extern "C" u32 fn_80092A54(void* self, u32 arg) {
 }
 
 /* `ResFile::GetResTex(u32)`. */
-extern "C" void* fn_80092B0C(void* self, u32 arg) { return (void*)fn_80092A54(self, arg); }
+extern "C" void* fn_80092B0C(void* self, u32 arg) { return (void*)res_file_tex_by_index(self, arg); }
 
 /* `ResFile::GetResTexNumEntries()`. */
 extern "C" u32 fn_80092B10(void* self) {

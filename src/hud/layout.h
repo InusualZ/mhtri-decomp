@@ -74,12 +74,12 @@ extern "C" {
  * the rest are the pipeline steps the `draw_*` family drives. */
 void tex_uv_copy(_mh_tex_uv_* dst, const _mh_tex_uv_* src);  /* 0x800526E4 */
 void uv_pair_copy(void* dst, const void* src);                  /* 0x800526F8 */
-void fn_80053E78(const f32* scale, const f32* offset, u16 id); /* 0x80053E78 */
+void drawshape_set_rot_scale(const f32* scale, const f32* offset, u16 id); /* 0x80053E78 */
 void atlas_digit_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055C5C */
-void fn_80055D20(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D20 */
+void atlas_cell20_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D20 */
 void atlas_icon_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055D8C */
-void fn_80055CC4(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055CC4 */
-void fn_80055DC8(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055DC8 */
+void atlas_cell28_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055CC4 */
+void atlas_cell64_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055DC8 */
 void spr_data_copy(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, the record copy */
 
 const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */

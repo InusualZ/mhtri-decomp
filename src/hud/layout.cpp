@@ -213,7 +213,7 @@ void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos)
     drawshape_set_vertex_rect(anchor.x, anchor.y, spr.width, spr.height);
     drawshape_set_flat_color(spr.color);
     drawshape_set_texture_rect(spr.tex_flag, &uv0, &uv1);
-    fn_80053E78(scale, posf, spr.tex_id);
+    drawshape_set_rot_scale(scale, posf, spr.tex_id);
     drawshape_exec();
 }
 
@@ -565,7 +565,7 @@ void draw_sprite_uv_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 
-    fn_80055D20(&work.uv0, &work.uv1, tex_idx);
+    atlas_cell20_uv_get(&work.uv0, &work.uv1, tex_idx);
     draw_sprite(work, pos);
 }
 
@@ -574,7 +574,7 @@ void draw_sprite_cell_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_*
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 
-    fn_80055D20(&work.uv0, &work.uv1, tex_idx);
+    atlas_cell20_uv_get(&work.uv0, &work.uv1, tex_idx);
     work.color = color;
     draw_sprite(work, pos);
 }
@@ -585,7 +585,7 @@ void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
     _mh_tex_uv_ uv0;
     _mh_tex_uv_ uv1;
 
-    fn_80055D20(&uv0, &uv1, tex_idx);
+    atlas_cell20_uv_get(&uv0, &uv1, tex_idx);
     drawshape_init(3, 0xFFFF);
     drawshape_set_vertex_rect(x, y, size, size);
     drawshape_set_flat_color(color);
@@ -599,7 +599,7 @@ void draw_tex_icon_square_arena(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
     _mh_tex_uv_ uv0;
     _mh_tex_uv_ uv1;
 
-    fn_80055D20(&uv0, &uv1, tex_idx);
+    atlas_cell20_uv_get(&uv0, &uv1, tex_idx);
     drawshape_init(3, 0xFFFF);
     drawshape_set_vertex_rect(x, y, size, size);
     drawshape_set_flat_color(color);
@@ -612,7 +612,7 @@ void draw_award_icon_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 
-    fn_80055CC4(&work.uv0, &work.uv1, tex_idx);
+    atlas_cell28_uv_get(&work.uv0, &work.uv1, tex_idx);
     draw_sprite(work, pos);
 }
 
@@ -629,7 +629,7 @@ void draw_monstericon_rec(_SPR_DATA_* rec, u8 tex_idx, const _mh_ivec2_* pos)
     _SPR_DATA_ work = *rec;
 
     if (fn_802E1978(tex_idx) >= 0) {
-        fn_80055DC8(&work.uv0, &work.uv1, tex_idx);
+        atlas_cell64_uv_get(&work.uv0, &work.uv1, tex_idx);
         draw_sprite(work, pos);
     }
 }
