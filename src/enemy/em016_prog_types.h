@@ -38,7 +38,7 @@ struct EmAimRec {
     /* +0x32 */ u8 flag_0x32;
     /* +0x33 */ u8 flag_0x33;      /* nonzero: `fn_801923CC` reports */
     /* +0x34 */ u8 flag_0x34;
-    /* +0x35 */ u8 flags_0x35;     /* bit 0x01 `fn_80192618`, 0x02 `fn_801923E0`, 0x08 `fn_80192410` */
+    /* +0x35 */ u8 flags_0x35;     /* bit 0x01 `fn_80192618`, 0x02 `em018_aim_flag2_ck`, 0x08 `fn_80192410` */
     /* +0x36 */ s16 value_0x36;
     /* +0x38 */ s16 value_0x38;
     /* +0x3A */ s16 value_0x3A;

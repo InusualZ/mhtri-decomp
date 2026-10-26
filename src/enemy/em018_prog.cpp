@@ -150,7 +150,7 @@ void fn_80192348(EmActWork* self, u8 mask);
 void fn_80192358(EmActWork* self, u8 mask);
 u32 fn_8019238C(EmActWork* self);
 u32 fn_801923CC(EmActWork* self);
-u32 fn_801923E0(EmActWork* self);
+u32 em018_aim_flag2_ck(EmActWork* self);
 u32 fn_80192410(EmActWork* self);
 f32 em018_glow_get(EmActWork* self);
 s32 fn_80192448(EmActWork* self);
@@ -381,7 +381,7 @@ u32 fn_801923CC(EmActWork* self) {
 }
 
 /* Reports whether the aim record's bit 0x02 is set. */
-u32 fn_801923E0(EmActWork* self) {
+u32 em018_aim_flag2_ck(EmActWork* self) {
     return fn_80192370((struct _ENEMY_WORK*)self, 2) == 1;
 }
 

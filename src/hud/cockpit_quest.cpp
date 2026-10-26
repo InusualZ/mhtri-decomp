@@ -262,7 +262,7 @@ void cockpit_work_init(CockpitWork* self, CockpitMove* move) {
 
     memset(self, 0, 0x194);
     self->move = move;
-    self->field_0x048 = (MenuWorkView*)fn_802D27E0();
+    self->field_0x048 = (MenuWorkView*)ainpc_work_get();
     self->field_0x0C6 = -1;
     self->field_0x0C4 = -1;
     self->field_0x0C2 = -1;

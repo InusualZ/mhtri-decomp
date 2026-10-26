@@ -137,7 +137,7 @@ void get_joint_wpos_ai(struct _AINPC_W* self, u32 joint, nw4r::math::VEC3* out);
 extern "C" {
 #endif
 
-u8* fn_802D27E0(void);
+u8* ainpc_work_get(void);
 s32 fn_802D282C(s32 index);
 void ai_npc_motion_play(struct _AINPC_W* self, s32 motion, s32 a, s32 b, s32 c);
 void ai_npc_motion_set(struct _AINPC_W* self, u32 motion, s32 a, s32 b);

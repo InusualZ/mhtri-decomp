@@ -12,7 +12,7 @@ extern "C" {
 
 /* The cluster's owns with plain `fn_XXXXXXXX` map names, so C linkage. */
 /* 0x80064C14 - releases the object the second argument points at (`light/light.cpp`'s fn_802C1AD8 tail-calls it). */
-void fn_80064C14(void *self, const f32 *v);
+void light_obj_pos_vec_set(void *self, const f32 *v);
 u32 fn_800651BC(void *self);                /* 0x800651BC - reads the word at +0x0 of `self` */
 void *vec3_copy_construct(void *out, void *in);     /* 0x80067E54 - copies a VEC3 (three floats), returns `out` */
 s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */

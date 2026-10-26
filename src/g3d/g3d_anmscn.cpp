@@ -19,7 +19,7 @@
  *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
  * RESIDUALS. The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`,
  *   the map's fn_800651BC); fn_800651BC stays defined as the C stem `g3d/g3d_resanm.cpp` calls.
- *   fn_8006522C: retail's ternary join branch.
+ *   light_setting_get_light_set: retail's ternary join branch.
  *   Data: the `.data` strings are not in `.text` order in retail (Construct's follow G3dProc's, GetLightSet's follow
  *   GetFog's); the `_ac.h` inline tail (0x8058C928-0x8058CC40, its "ref" copies in `.sdata`) is still extern; the
  *   weak `ut::Color` constructor/destructor copies MWCC emits here are retail's dead copies (linker-folded).
@@ -113,13 +113,13 @@ extern "C" u32 fn_80090860(const ResHandle *p);
 
 /* This unit's own accessor copies, declared ahead of the definitions (which follow retail's address order). */
 extern "C" {
-void fn_80064BE4(LightObj *p);
+void light_obj_alpha_disable(LightObj *p);
 void fn_80064BF4(LightObj *p);
 void fn_80064C04(LightObj *self, const math::VEC3 *v);
 void fn_80064CE0(LightObj *self, const math::VEC3 *v);
-u32 *fn_800651E8(const LightSetting *p);
+u32 *light_setting_get_amb_light_obj_array(const LightSetting *p);
 void fn_800651F0(LightSet *dst, const LightSet *src);
-void fn_8006522C(LightSet *out, LightSetting *self, s32 index);
+void light_setting_get_light_set(LightSet *out, LightSetting *self, s32 index);
 u32 fn_8006527C(const LightSetting *p);
 LightSet *obj_delete_flagged(LightSet *pSelf, s16 flag);
 u32 fn_80065828(const ResHandle *p);
@@ -213,7 +213,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
     switch (type) {
     case 0:
         pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
-        fn_80064C14(pObj, &pResult->pos.x);
+        light_obj_pos_vec_set(pObj, &pResult->pos.x);
         pObj->InitLightSpot(0.0f, 0);
         pObj->InitLightDistAttn(pResult->refDistance, pResult->refBrightness, pResult->distFunc);
         fn_8007A5E4(pObj, 0.0f, 0.0f, 0.0f);
@@ -225,7 +225,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
         subVec3(&dir, &pResult->aim, &pResult->pos);
         vec3_scale(&pos, &dir, -1.0e10f);
         pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
-        fn_80064C14(pObj, &pos.x);
+        light_obj_pos_vec_set(pObj, &pos.x);
         pObj->InitLightAttnA(1.0f, 0.0f, 0.0f);
         pObj->InitLightAttnK(1.0f, 0.0f, 0.0f);
         fn_8007A5E4(pObj, 0.0f, 0.0f, 0.0f);
@@ -237,7 +237,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
         subVec3(&dir, &pResult->aim, &pResult->pos);
         vec3_normalize_into(&dir, &dir);
         pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
-        fn_80064C14(pObj, &pResult->pos.x);
+        light_obj_pos_vec_set(pObj, &pResult->pos.x);
         pObj->InitLightSpot(pResult->cutoff, pResult->spotFunc);
         pObj->InitLightDistAttn(pResult->refDistance, pResult->refBrightness, pResult->distFunc);
         fn_80064C04(pObj, &dir);
@@ -251,7 +251,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
         fn_80064BF4(pObj);
     }
     if (!(pResult->flags & LightAnmResult::FLAG_ALPHA_ENABLE)) {
-        fn_80064BE4(pObj);
+        light_obj_alpha_disable(pObj);
     }
     light_obj_enable(pObj);
 }
@@ -271,7 +271,7 @@ void MakeSpecularLightObj(LightObj *pObj, const LightAnmResult *pResult)
         fn_80064BF4(pObj);
     }
     if (!(pResult->flags & LightAnmResult::FLAG_ALPHA_ENABLE)) {
-        fn_80064BE4(pObj);
+        light_obj_alpha_disable(pObj);
     }
     light_obj_enable(pObj);
 }
@@ -286,7 +286,7 @@ extern "C" void light_obj_enable(LightObj *p)
     p->mFlag |= 4;
 }
 
-extern "C" void fn_80064BE4(LightObj *p)
+extern "C" void light_obj_alpha_disable(LightObj *p)
 {
     p->mFlag |= 0x20;
 }
@@ -302,7 +302,7 @@ extern "C" void fn_80064C04(LightObj *self, const math::VEC3 *v)
     fn_8007A5E4(self, v->x, v->y, v->z);
 }
 
-extern "C" void fn_80064C14(void *self, const f32 *v)
+extern "C" void light_obj_pos_vec_set(void *self, const f32 *v)
 {
     fn_8007A5A8(self, v[0], v[1], v[2]);
 }
@@ -336,7 +336,7 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
             LightSet set;
             LightSet arg;
 
-            fn_8006522C(&set, pSetting, i);
+            light_setting_get_light_set(&set, pSetting, i);
             NW4R_ASSERT(light_set_is_valid(&set), ANMSCN_FILE, 198, "NW4R:Failed assertion lightSet.IsValid()");
             fn_800651F0(&arg, &set);
             GetLightSet(arg, i);
@@ -345,7 +345,7 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
     }
 
     if (numAmbLight != 0) {
-        u32 *pAmbColor = fn_800651E8(pSetting);
+        u32 *pAmbColor = light_setting_get_amb_light_obj_array(pSetting);
         u32 numLightObj = light_setting_get_num_light_obj(pSetting);
         u32 n = *g3d_min_u32(&numAmbLight, &numLightObj);
 
@@ -412,7 +412,7 @@ extern "C" u32 light_setting_get_num_light_obj(const LightSetting *p)
     return p->mNumLight;
 }
 
-extern "C" u32 *fn_800651E8(const LightSetting *p)
+extern "C" u32 *light_setting_get_amb_light_obj_array(const LightSetting *p)
 {
     return (u32 *)p->mpAmbLightObjArray;
 }
@@ -434,7 +434,7 @@ extern "C" s32 light_set_is_valid(const LightSet *p)
 }
 
 /* Out-of-range lookups store a NULL record but always store the setting. */
-extern "C" void fn_8006522C(LightSet *out, LightSetting *self, s32 index)
+extern "C" void light_setting_get_light_set(LightSet *out, LightSetting *self, s32 index)
 {
     LightSetData *elem;
     if (index < (s32)self->mNumLightSet && index >= 0)

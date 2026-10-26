@@ -9574,7 +9574,7 @@ s32 fn_802D2264(struct _AINPC_W* self)
 extern "C" {
 
 /* 0x802D27E0 - the address of the band's shared `.bss` work block. */
-u8* fn_802D27E0(void)
+u8* ainpc_work_get(void)
 {
     return (u8*)&ainpc_w;
 }

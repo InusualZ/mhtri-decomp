@@ -76,7 +76,7 @@ typedef struct CockpitText {
     /* +0x019 */ u8 field_0x019;   /* the item's sub index the icon is drawn with */
 } CockpitText; /* size: 0x1C (0x1A named, rounded to the u32 member's alignment) */
 
-/* The menu frame work `fn_802D27E0` returns; only the one byte this unit reads is named.
+/* The menu frame work `ainpc_work_get` returns; only the one byte this unit reads is named.
  * size: 0x3C8 (approximate: max touched offset + 1, 4-aligned) */
 typedef struct MenuWorkView {
     /* +0x000 */ u8 unused_0x000[0x3C4];
@@ -111,7 +111,7 @@ typedef struct CockpitWork {
     /* +0x02A */ u8 unused_0x02A;
     /* +0x02B */ u8 field_0x02B;
     /* +0x02C */ CockpitText text;
-    /* +0x048 */ MenuWorkView* field_0x048; /* the menu work `fn_802D27E0` hands back */
+    /* +0x048 */ MenuWorkView* field_0x048; /* the menu work `ainpc_work_get` hands back */
     /* +0x04C */ u32 field_0x04C;
     /* +0x050 */ u32 field_0x050;
     /* +0x054 */ u8 unused_0x054[0x0BE - 0x054];
@@ -214,7 +214,7 @@ extern "C" {
 #endif
 
 u32 pad_hold_ck(void*);                /* 0x80046F0C mh3_pad.cpp */
-s32 fn_802D27E0(void);                  /* 0x802D27E0 ai/ai_npc.cpp */
+s32 ainpc_work_get(void);                  /* 0x802D27E0 ai/ai_npc.cpp */
 s32 sprite_anim_last_frame(u16);                   /* 0x802E0B54 hud/layout.cpp */
 u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
 /* 0x80050BC0 - `fn_8004CAD8.h` settles ONE float argument (from the callee's own body), and
