@@ -81,7 +81,7 @@ s32 fn_80274AEC(u8 kind);
  * definitions' signatures. */
 void* equip_slot_rec_get(struct _EQUIP* equip);
 s32 equip_defense_get(void* slot);
-s16 fn_8027E5E4(struct _EQUIP* equip);
+s16 equip_gun_level_bonus_get(struct _EQUIP* equip);
 s32 fn_8027E708(struct _EQUIP* equip);
 void* equip_weapon_rec_get(void* equip);
 void fn_8027ED28(struct _EQUIP* equip);

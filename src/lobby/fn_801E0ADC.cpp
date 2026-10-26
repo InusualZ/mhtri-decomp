@@ -96,7 +96,7 @@ void lb_scroll_tables_set(void*, s32, s32, void*, void*);
 void lb_equip_compare_set(void*, void*);
 s32 lb_unlock_cond_ck(u16);
 s32 pl_model_refresh_req(void*);
-s32 fn_8027E354(u8, u16);
+s32 equip_armor_ex_rec_find(u8, u16);
 void eft_res_slot_release(void* obj);
 void lb_equip_records_copy(void*, u32, void*, void*, void*);
 s32 lb_panel_close(void);
@@ -200,7 +200,7 @@ typedef struct LbTradePairRow {
     /* +0x06 */ u16 pad_0x06;
 } LbTradePairRow;
 
-/* The lookup record `fn_8027E354` hands back for a slot and an item id: `lobby/fn_80212810.cpp` defines the same record
+/* The lookup record `equip_armor_ex_rec_find` hands back for a slot and an item id: `lobby/fn_80212810.cpp` defines the same record
  * as `LbRefEntry` in its `.cpp` (s32 fields at +0x04/+0x08/+0x0C), so this view keeps its own name until one header
  * holds it (rule 1).  Only +0x08 is read here. */
 typedef struct LbItemRef {
@@ -1566,7 +1566,7 @@ s32 lb_shop_row_unlocked_ck(LbIdRow6* row)
 /* The sprite index the weapon record carries for a slot and an item id. */
 u32 lb_weapon_price_get(u8 slot, u16 id)
 {
-    LbItemRef* rec = (LbItemRef*)fn_8027E354(slot, id);
+    LbItemRef* rec = (LbItemRef*)equip_armor_ex_rec_find(slot, id);
 
     return rec->value_0x08 << 1;
 }

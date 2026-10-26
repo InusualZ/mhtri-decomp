@@ -11,7 +11,7 @@
  *   0x8030230C-0x80302754, 0x80302790-0x80302844, 0x80302880-0x8030326C, 0x803032EC-0x80303580, 0x80303630-0x80304088,
  *   0x80304194-0x80304508, 0x80304550-0x80304804, 0x8030487C-0x80305910, 0x80305924-0x80306510, 0x803066B4-0x803066F0.
  *  - `fn_80302274`: retail compares with `cmpwi` against 3 and 5, ours `cmplwi` (a signedness difference);
- *  - `fn_803035F8`: register allocation only (the table pointer in r4/r5 against ours r0/r4);
+ *  - `lb_tr_flag_get`: register allocation only (the table pointer in r4/r5 against ours r0/r4);
  *  - `lb_area_fx_set`: retail copies the argument to r30 before narrowing, ours narrows into r30 and copies back;
  *  - `fn_80306614`: retail's frame is 0x30 saving from r25, ours 0x20 from r26.
  *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim; `sprintf`
@@ -200,7 +200,7 @@ void fn_80303580(void) {
 
 /* 0x803035F8 - finds the `_tr_flag` record whose leading id matches `id`, or returns the table base
  * when the 0xFFFF terminator is reached.  Records are 0xC bytes. */
-void* fn_803035F8(u32 id) {
+void* lb_tr_flag_get(u32 id) {
     u8* base = (u8*)lb_tr_flag_data;
     u8* p = base;
     u16 want = (u16)id;

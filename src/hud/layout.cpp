@@ -9,7 +9,7 @@
  * Naming note: the symbol map had only fn_XXXXXXXX for most of this range; this run named every row it
  * wrote and the rows they call inside the unit (see "Renames" below).  The rows still carrying a
  * `fn_` stem are the ones with no body yet, plus the pre-existing debt (`fn_802E1978`,
- * `fn_802E198C`, `spr_anim_frame_set`, `sprite_anim_last_frame`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
+ * `draw_monstericon_rec`, `spr_anim_frame_set`, `sprite_anim_last_frame`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
  * `draw_sprite_idx_color`, `fn_802E099C`, `sprite_frame_apply`, `draw_uv_rect`, `fn_802E1AEC`, `fn_802E1C74`,
  * `fn_802E1D30`, `fn_802E0714`) - filed as a naming sweep, not fixed here because each needs its
  * own evidence and the two that are called from outside this unit are cross-unit sweeps.
@@ -124,7 +124,7 @@
  * `note_box_size` 91.67 %, `color_lerp` 95.99 % (the four channel extractions' declaration order and
  * the pack's OR order), `color_scale` 97.04 % (the pack's OR order), `anim_step_tex_id` 97.37 %
  * (`cur`/`prev` land in the opposite register pair), `anim_step_uv` 98.91 %, `anim_step_color`
- * 98.96 %, plus the pre-existing `fn_802E1978` 79.0 %, `fn_802E198C` 89.98 %, `draw_uv_rect` 91.05 %,
+ * 98.96 %, plus the pre-existing `fn_802E1978` 79.0 %, `draw_monstericon_rec` 89.98 %, `draw_uv_rect` 91.05 %,
  * `spr_anim_frame_set` 93.86 %, `fn_802E1D30` 97.39 %, `put_button_icon_tex` 97.9 %,
  * `fn_802E099C` 99.88 % (the switch's arm order), `sprite_ary_last_frame` 99.4 % and `draw_sprite` 99.96 %
  * (retail materialises the 0x4330 conversion high word twice; MWCC CSEs ours, 4 bytes short).
@@ -487,7 +487,7 @@ void put_itemicon_tex(s16 x, s16 y, s16 size, u32 color, u8 tex_idx, u16 tex_fla
 }
 
 /* 0x802E1288 (0x18) - the same with the standard texture flag. */
-void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
+void put_itemicon(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
 {
     put_itemicon_tex(x, y, size, color, tex_idx, 0);
 }
@@ -624,7 +624,7 @@ s8 fn_802E1978(u8 index)
 
 /* 0x802E198C (0xA4) - the sprite record with a `fn_80055DC8` uv pair, skipped when the kind has no
  * texture in the table (the `-1` the byte-table helper answers). */
-void fn_802E198C(_SPR_DATA_* rec, u8 tex_idx, const _mh_ivec2_* pos)
+void draw_monstericon_rec(_SPR_DATA_* rec, u8 tex_idx, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *rec;
 
@@ -637,7 +637,7 @@ void fn_802E198C(_SPR_DATA_* rec, u8 tex_idx, const _mh_ivec2_* pos)
 /* 0x802E1A30 (0x4C) - the monster icon for a sprite id. */
 void draw_monstericon_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
 {
-    fn_802E198C(get_lsp_data(id, 0), tex_idx, pos);
+    draw_monstericon_rec(get_lsp_data(id, 0), tex_idx, pos);
 }
 
 /* 0x802E1A7C (0x70) - the monster icon on an animation-built record. */
@@ -646,7 +646,7 @@ u32 fn_802E1A7C(u16 id, u16 part, u8 tex_idx, const _mh_ivec2_* pos)
     _SPR_DATA_ work;
     u32 drawn = sprite_frame_apply(&work, id, part, 0);
 
-    fn_802E198C(&work, tex_idx, pos);
+    draw_monstericon_rec(&work, tex_idx, pos);
     return drawn;
 }
 

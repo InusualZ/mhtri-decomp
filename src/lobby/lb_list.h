@@ -20,7 +20,8 @@ typedef struct LbList {
     /* +0x10 */ s16* help_tbl_0x10;    /* per-row help string pairs */
     /* +0x14 */ s32 se_ok_0x14;        /* the decide sound (-1: none) */
     /* +0x18 */ u32 flags_0x18;        /* passed to the cursor step */
-    /* +0x1C */ u8 pad_0x1C[0x4];
+    /* +0x1C */ s16 width_0x1C;      /* a table-built list's dialog size (`lb_list_size_calc`) */
+    /* +0x1E */ s16 height_0x1E;
 } LbList;
 
 /* The template `lb_choice_init` copies a list from: the row count, string group, first string, help line, help

@@ -212,7 +212,7 @@ typedef struct PlSlotGate {
 extern PlSlotGate stg_place_timers[3];
 
 /* 0x806AB810 (.bss, 0x20 B = eight 4-byte table pointers, the map's size): the two per-kind row
- * tables `fn_8027E2A8`/`fn_8027E354` index after `equip_kind_table_class` validates the kind. */
+ * tables `equip_slot_rec_find`/`equip_armor_ex_rec_find` index after `equip_kind_table_class` validates the kind. */
 extern u8** lbl_806AB810[8];
 extern u32 lbl_805706C0[];  /* the per-kind row counts the two lookups clamp against */
 extern u32 lbl_805706D8[];  /* the sibling counts `equip_kind_item_count` reads for kinds 7-15 */

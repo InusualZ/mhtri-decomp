@@ -9,7 +9,7 @@
 
 struct _PLW;
 
-/* The blademaster weapon row `equip_blade_rec_get` hands back (the 0x18-byte stride `fn_8027EC50` indexes kinds 7-11/14-15
+/* The blademaster weapon row `equip_blade_rec_get` hands back (the 0x18-byte stride `equip_blade_rec_find` indexes kinds 7-11/14-15
  * with).  The element pairs are read by `menu/menu_infomation.cpp` (`weapon_element_compare`, `weapon_status_compare`): the type is
  * shown as `type + 6`, a negative value only under skill 201.  `slot_count` is a GUESS: the byte `weapon_slot_count_get`
  * hands to the 2061-sprite putter.  size: 0x18 (the row stride) */
@@ -46,7 +46,7 @@ typedef struct PlWeaponRec {
     /* +0x16 */ u8 pad_0x16[0xE];
 } PlWeaponRec; /* size: 0x24 */
 
-/* The per-slot record `equip_slot_rec_get` hands back (the 0x18-byte row `fn_8027E2A8` indexes); `fn_80273ED8` sums one
+/* The per-slot record `equip_slot_rec_get` hands back (the 0x18-byte row `equip_slot_rec_find` indexes); `fn_80273ED8` sums one
  * signed byte per act kind out of it. size: 0x18 (the row stride) */
 typedef struct PlSlotRec {
     /* +0x00 */ u8 pad_0x00[0x4];

@@ -47,7 +47,7 @@ extern "C" {
 
 /* Owned by `lobby/fn_80212810.cpp` (whose header does not exist yet), declared with the neutral
  * object pointer both units pass. */
-void fn_80218138(void* self);
+void lb_scroll_rows_build(void* self);
 
 /* Pl-band helpers with no registered owner (the bracketing Pl units make `unsplit/Pl.h`
  * their rule-2 home). */
@@ -230,7 +230,7 @@ extern "C" void lb_equip_compare_set(LbEquipWork* self, _EQUIP* src) {
     _EQUIP* equip = fn_80219260(self, src->kind);
 
     fn_80219340(self, equip, 1);
-    fn_80218138(self);
+    lb_scroll_rows_build(self);
     if (self->index_0x08 >= self->index_max_0x0A) {
         self->index_0x08 = 0;
     }
@@ -240,7 +240,7 @@ extern "C" void lb_equip_compare_set(LbEquipWork* self, _EQUIP* src) {
  * its maximum. */
 extern "C" void lb_equip_base_set(LbEquipWork* self, _EQUIP* src) {
     fn_80219340(self, src, 0);
-    fn_80218138(self);
+    lb_scroll_rows_build(self);
     if (self->index_0x08 >= self->index_max_0x0A) {
         self->index_0x08 = 0;
     }

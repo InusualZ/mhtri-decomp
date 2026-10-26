@@ -35,7 +35,7 @@ s32 equip_custom_color_rgba_get(struct _EQUIP* equip);
 u8 item_species_class_get(u16 id);
 u32 fn_8027E120(struct _PLW* worker);
 /* untyped: the equipment-slot record the caller casts to its own view */
-void* fn_8027E354(u8 kind, u16 index);
+void* equip_armor_ex_rec_find(u8 kind, u16 index);
 void pl_act_enter(struct _PLW* plw, s32 a, u16 b, u16 c);
 
 /* The four action helpers `Pl/pl_act_step.cpp`'s main/control cluster (0x80262940-0x802673A4) calls. */

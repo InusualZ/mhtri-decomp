@@ -46,7 +46,7 @@
  *   `sweepcomments.py --unit Pl/pl_act` lists every run.  Known blockers among them: the rig at
  *   0x80269AC4-0x80269F88 (`new` of 0x1560 bytes) needs its 0x90/0x110-byte element types (vtables
  *   0x805BAB58/0x805BAB74); `Pl_chr_set_attr`/0x8026A178/`Pl_chr_setX`
- *   funnel into `mhchar_motion_layer_set`, whose argument order is open; `fn_8027D8A0`, `pl_stg_weapon_near_find`, `fn_8027E5E4` and
+ *   funnel into `mhchar_motion_layer_set`, whose argument order is open; `fn_8027D8A0`, `pl_stg_weapon_near_find`, `equip_gun_level_bonus_get` and
  *   `fn_8027F3CC` carry paired-single / `cror` instructions the front end cannot emit.
  *  - flipcheck's undefined reference `get_ControlType` (the map's `get_ControlType__Fl` needs C++ scope): a linkage
  *    item for a fixer.
@@ -4009,9 +4009,9 @@ extern "C" s32 pl_weapon_stat_get(struct _PLW* plw, s32 mode, u8 flag, struct _E
 
         if (kind == 1) {
             if (mode == 6) {
-                value = fn_8027E5E4(equip0);
+                value = equip_gun_level_bonus_get(equip0);
                 if (equip1 != NULL && equip1->kind == 12) {
-                    value += fn_8027E5E4(equip1);
+                    value += equip_gun_level_bonus_get(equip1);
                 }
             } else if (mode == 0) {
                 value = fn_8027E708(equip0);
@@ -4086,7 +4086,7 @@ extern "C" s32 pl_weapon_stat_get(struct _PLW* plw, s32 mode, u8 flag, struct _E
         }
     } else {
         if (equip1 != NULL && mode == 6 && equip1->kind == 12) {
-            value = fn_8027E5E4(equip1);
+            value = equip_gun_level_bonus_get(equip1);
         }
         if (equip2 != NULL && mode == 0 && equip2->kind == 13) {
             value += fn_8027E708(equip2);
@@ -9273,7 +9273,7 @@ extern "C" u8 fn_8027E290(u8 kind);
 extern "C" u8 weapon_class_index(s32 kind);
 
 /* The 1-based kind's 0x18-byte equipment row (the row stride is the `mulli r0,r0,24` in retail). */
-extern "C" void* fn_8027E2A8(u8 kind, u16 index) {
+extern "C" void* equip_slot_rec_find(u8 kind, u16 index) {
     u8** base = lbl_806AB810[0];
     if ((u8)equip_kind_table_class(kind) != 0) {
         return 0;
@@ -9286,7 +9286,7 @@ extern "C" void* fn_8027E2A8(u8 kind, u16 index) {
 }
 
 /* The sibling 0x1C-byte row of the second table. */
-extern "C" void* fn_8027E354(u8 kind, u16 index) {
+extern "C" void* equip_armor_ex_rec_find(u8 kind, u16 index) {
     u8** base = lbl_806AB810[1];
     if ((u8)equip_kind_table_class(kind) != 0) {
         return 0;
@@ -9299,25 +9299,25 @@ extern "C" void* fn_8027E354(u8 kind, u16 index) {
 }
 
 /* The 7-based kind's 0x18-byte row of the fifth table (no kind guard, unlike the 1-based pair). */
-extern "C" void* fn_8027EC50(u8 kind, u16 index) {
+extern "C" void* equip_blade_rec_find(u8 kind, u16 index) {
     u8** base = lbl_806AB810[4];
     return base[weapon_class_index(kind)] + index * 0x18;
 }
 
 /* The sibling 0x24-byte row of the same table. */
-extern "C" void* fn_8027ECBC(u8 kind, u16 index) {
+extern "C" void* equip_weapon_rec_find(u8 kind, u16 index) {
     u8** base = lbl_806AB810[4];
     return base[weapon_class_index(kind)] + index * 0x24;
 }
 
 /* In-unit callees referenced before their own definition (this TU is their owner). */
-extern "C" void* fn_8027EC50(u8 kind, u16 item_id);
-extern "C" void* fn_8027ECBC(u8 kind, u16 item_id);
-extern "C" void* fn_8027ED6C(u8 kind, u16 item_id, u32 a, u32 b);
+extern "C" void* equip_blade_rec_find(u8 kind, u16 item_id);
+extern "C" void* equip_weapon_rec_find(u8 kind, u16 item_id);
+extern "C" void* equip_weapon_recs_find(u8 kind, u16 item_id, u32 a, u32 b);
 extern "C" void* fn_8027FB84(u8 kind, u16 item_id, u8 deco_count);
 extern "C" void* fn_8027FE50(u8 kind, u16 item_id);
-extern "C" void* fn_8027E2A8(u8 kind, u16 index);
-extern "C" void* fn_8027E354(u8 kind, u16 index);
+extern "C" void* equip_slot_rec_find(u8 kind, u16 index);
+extern "C" void* equip_armor_ex_rec_find(u8 kind, u16 index);
 
 /* True while the player's health is at or below zero. */
 extern "C" s32 fn_8027D684(_PLW* self) {
@@ -9632,28 +9632,28 @@ extern "C" u8 weapon_class_index(s32 kind) {
 
 /* Looks up the 0x18-byte equipment row an `_EQUIP` record names. */
 extern "C" void* equip_slot_rec_get(_EQUIP* equip) {
-    return fn_8027E2A8(equip->kind, equip->item_id);
+    return equip_slot_rec_find(equip->kind, equip->item_id);
 }
 
 /* Looks up the 0x1C-byte sibling row the same record names. */
-extern "C" void* fn_8027E3F4(_EQUIP* equip) {
-    return fn_8027E354(equip->kind, equip->item_id);
+extern "C" void* equip_armor_ex_rec_get(_EQUIP* equip) {
+    return equip_armor_ex_rec_find(equip->kind, equip->item_id);
 }
 
 /* The `_EQUIP` -> data-row lookup the table helper and the sound unit share. */
 extern "C" PlSkillRec* equip_blade_rec_get(_EQUIP* equip) {
-    return (PlSkillRec*)fn_8027EC50(equip->kind, equip->item_id);
+    return (PlSkillRec*)equip_blade_rec_find(equip->kind, equip->item_id);
 }
 
 /* The `_EQUIP` -> item lookup the four Pl consumers share. */
 extern "C" void* equip_weapon_rec_get(void* equip) {
     _EQUIP* e = (_EQUIP*)equip;
-    return fn_8027ECBC(e->kind, e->item_id);
+    return equip_weapon_rec_find(e->kind, e->item_id);
 }
 
 /* The three-argument sibling of `equip_weapon_rec_get`. */
 extern "C" void* fn_8027EE08(_EQUIP* equip, u32 arg2, u32 arg3) {
-    return fn_8027ED6C(equip->kind, equip->item_id, arg2, arg3);
+    return equip_weapon_recs_find(equip->kind, equip->item_id, arg2, arg3);
 }
 
 /* The `_EQUIP` -> row lookup that also passes the decoration count. */

@@ -453,6 +453,8 @@ void lb_npc_net_flag_on(void);
 void lb_npc_net_flag_off(void);
 void lb_pad_input_flush(struct PlayerPad* pad);
 extern u8 lobby_hidden_flag;
+/* .bss 0x806A7BA0 - the lobby's eighteen NPC records. */
+extern _LB_NPC lb_npc[0x12];
 }
 #endif
 

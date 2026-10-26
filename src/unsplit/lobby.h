@@ -440,7 +440,7 @@ s32 lb_page_arrow_draw(s32, s16, s16, u16, u32);
 s32 lb_points_draw(s32);
 s32 lb_list_row_draw(s32, s16 *, s32, s32);
 s32 lb_item_cell_draw_layout1(u16, u16, s16 *, s32, s32, s32, s32);
-s32 fn_80216678(u16, s32, s16 *, s32, s32, s32, s32);
+s32 lb_item_cell_draw_layout10(u16, s32, s16 *, s32, s32, s32, s32);
 s32 lb_panel_close(void);
 s32 lb_talk_page_open(s32);
 s32 lb_talk_page_mode_reset(void);

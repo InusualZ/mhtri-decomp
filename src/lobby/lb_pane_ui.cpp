@@ -557,7 +557,7 @@ u16 lobby_cmd_trig_get(void);
 u16 lobby_cmd_release_get(void);
 s32 lobby_cmd_release_ck(u32 mask);
 s32 lb_yes_no_step(void* p);
-s16 fn_80213374(u8 a, s16 b, void* c, u16 d, s32 e, s32 f, u8 g);
+s16 lb_equip_row_next(u8 a, s16 b, void* c, u16 d, s32 e, s32 f, u8 g);
 void lb_scroll_init(struct LbPage* page, LbPaneScroll* scroll, u8 kind, u8 mode);
 void lb_scroll_flag_set(LbPaneScroll* scroll, u8 kind);
 void lb_scroll_tables_set(LbPaneScroll* scroll, LbEquipRec* a, LbEquipRec* b, LbEquipRec* c, LbEquipRec* d);
@@ -2402,7 +2402,7 @@ extern "C" void lb_entry_pane_sort_apply(LbEntryPane* self, u8 kind)
     id = -1;
     i = 0;
     do {
-        id = fn_80213374(order, id, &lobby_world_block->equip_0x0E00[0], count, kinds, picked, weapon);
+        id = lb_equip_row_next(order, id, &lobby_world_block->equip_0x0E00[0], count, kinds, picked, weapon);
         self->sorted_ids_0x16C[(u16)i] = (u16)id;
         i++;
     } while (i < 100);
@@ -2781,7 +2781,7 @@ extern "C" s32 lb_entry_pane_menu_step(LbEntryPane* self, LbEquipBoxWork* owner,
             count = userdata_box_capacity(lobby_world_block);
             rec = &lobby_world_block->equip_0x0E00[0];
             for (i = 0; i < count; i++, rec++) {
-                j = (u16)fn_80213374(order, -1, rec, count - i, kinds, picked, weapon) + i;
+                j = (u16)lb_equip_row_next(order, -1, rec, count - i, kinds, picked, weapon) + i;
                 for (; j > i; j--) {
                     lb_equip_record_swap(j - 1, j, set);
                 }

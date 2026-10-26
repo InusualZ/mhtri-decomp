@@ -84,6 +84,8 @@ u32 my_set_box_used_ck(struct Q_UserData* user, u16 box, u8 index);
 u32 gun_set_box_used_ck(struct Q_UserData* user, u16 box, u8 index);
 /* 0x8004D328 - whether the user data `userdata` holds item `id` in its box (`ef/eft052.cpp`'s item box). */
 s32 userdata_box_item_ck(struct LbItemDb* userdata, u16 id);
+/* 0x8004D4BC - whether flag `bit` of equipment record `rec` is set. */
+u32 userdata_equip_rec_flag_ck(struct _EQUIP* rec, u16 bit);
 /* 0x8004D210 - sets progress flag `id` (the halfword bit run at +0x47DA `userdata_progress_flag_ck` reads).  GUESS. */
 void userdata_progress_flag_set(u32 id);
 /* 0x8004D70C - the event-flag test that shares the same table `userdata_progress_flag_ck` reads; added with
