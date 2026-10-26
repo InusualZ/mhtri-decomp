@@ -55,7 +55,7 @@ u32 snd_handle_get(void);
 void __dl__FPv(void* p);
 
 
-s32 fn_800E885C(void);
+s32 snd_level_volume_get(void);
 s16 fn_800E852C(void);
 
 
@@ -279,7 +279,7 @@ extern "C" u32 snd_handle_get(void)
 }
 
 /* The global level setting's level word. */
-extern "C" s32 fn_800E885C(void)
+extern "C" s32 snd_level_volume_get(void)
 {
     return fn_800E8880(fn_800E8690());
 }
@@ -524,7 +524,7 @@ extern "C" void fn_800E85E8(u32 idx)
 {
     u32 level = OSDisableInterrupts();
 
-    snd_reverb_state_advance(fn_800E66D0(), idx);
+    snd_reverb_state_advance(snd_reverb_mgr_get(), idx);
     OSRestoreInterrupts(level);
 }
 
@@ -638,5 +638,5 @@ extern "C" void fn_800E87E4(u32 mode)
     case 3: AXSetMode(2); break;
     }
     MIXSetSoundMode(mode);
-    snd_handle_store((u32*)fn_800E66D0());
+    snd_handle_store((u32*)snd_reverb_mgr_get());
 }

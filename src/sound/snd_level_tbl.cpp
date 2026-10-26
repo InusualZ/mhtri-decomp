@@ -7,16 +7,16 @@
 
 #include "types.h"
 
-extern u32 lbl_80597E20[128];       /* the level table fn_800E8E48 indexes */
+extern u32 lbl_80597E20[128];       /* the level table snd_level_to_db indexes */
 
 extern "C" {
-u32 fn_800E8E48(s16 idx);
+u32 snd_level_to_db(s16 idx);
 }
 
 #pragma peephole off
 
 /* One entry of the level table. */
-extern "C" u32 fn_800E8E48(s16 idx)
+extern "C" u32 snd_level_to_db(s16 idx)
 {
     return lbl_80597E20[idx];
 }

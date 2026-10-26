@@ -8,7 +8,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-u32 fn_800E8E48(s16 idx);
+u32 snd_level_to_db(s16 idx);
 #ifdef __cplusplus
 }
 #endif

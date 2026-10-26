@@ -75,7 +75,7 @@ typedef struct SndRefTable {
     /* +0x40 */ SndRef* ref_40;
 } SndRefTable; /* size: 0x44 */
 
-/* The object fn_800E96BC dispatches loop handling through; slots 5, 6 and 9 are reached here. */
+/* The object snd_envelope_update dispatches loop handling through; slots 5, 6 and 9 are reached here. */
 typedef struct Sound2Vtbl {
     /* +0x00 */ void (*method_00)(void);
     /* +0x04 */ void (*method_04)(void);
@@ -98,7 +98,7 @@ typedef struct Sound2 {
 typedef struct AxVoiceBlock {
     /* +0x00 */ u8 unused_00[2];
     /* +0x02 */ s16 field_02;   /* pan */
-    /* +0x04 */ s16 loop_value; /* the value fn_800E96BC ramps */
+    /* +0x04 */ s16 loop_value; /* the value snd_envelope_update ramps */
     /* +0x06 */ s16 field_06;
     /* +0x08 */ u8 unused_08[8];
     /* +0x10 */ s16 field_10;
@@ -239,7 +239,7 @@ typedef struct SndEdHost {
     /* +0x110 */ SndEdRec member_0x110;
 } SndEdHost; /* size: 0x138 */
 
-/* The voice-manager block `fn_800EDB24`/`fn_800EDB50` walk: a voice list at +0x110. */
+/* The voice-manager block `snd_voice_first`/`snd_voice_last` walk: a voice list at +0x110. */
 typedef struct SndVoiceMgr {
     /* +0x0000 */ u8 pad_0x00[0x110];
     /* +0x0110 */ SndListNode voice_list;
@@ -266,7 +266,7 @@ typedef struct SndAbHost {
     /* +0x2C */ SndAbVoiceHost* voice;
 } SndAbHost; /* size: 0x30 */
 
-/* A block with a mode word at +0x04 (`fn_800EE868`/`fn_800EE8B4`). */
+/* A block with a mode word at +0x04 (`snd_format_bytes_to_addr`/`snd_format_addr_to_bytes`). */
 typedef struct SndModeWord {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u32 mode;
@@ -283,8 +283,8 @@ typedef struct SndTri16 {
 
 extern SndPool lbl_80698AF0;      /* the 0x4C pool, constructed by fn_800E9C1C/fn_800E9C10 */
 extern SndPool2 lbl_8069A8E8;     /* the 0x110 pool, constructed by fn_800EDF1C/fn_800EDF10 */
-extern u8 lbl_8069A810[0xD8];     /* the stream manager (fn_800E46E8.cpp's StreamWork) */
-extern u16 lbl_80791468;          /* the 16-bit PRNG seed fn_800E9D00 advances */
+extern u8 g_stream_mgr[0xD8];     /* the stream manager (fn_800E46E8.cpp's StreamWork) */
+extern u16 stream_rand_seed;          /* the 16-bit PRNG seed fn_800E9D00 advances */
 extern u32 lbl_80794A20;          /* the expand heap fn_800EEA2C frees into */
 extern f32 lbl_807964E8;          /* fn_800E8F78's clamp */
 extern f32 lbl_807964EC;          /* 1.0f: the ratio denominator */
@@ -303,13 +303,13 @@ extern u8 lbl_806A1110[0x10];     /* the expand-heap allocator fn_800EE9EC alloc
 extern "C" {
 #endif
 
-void* fn_800E4A18(void);
-void* fn_800E7578(RelocState* state, u32 idx);
-void* fn_800E614C(void* node);
-void* fn_800E7264(void* node);
-void* fn_800E7CA4(void* state);
-void* dtor_800E54A8(void* obj, s32 flags);
-void* fn_800E5690(void* obj, s32 flags);
+void* stream_mgr_get(void);
+void* snd_reloc_state_entry(RelocState* state, u32 idx);
+void* snd_voice_next(void* node);
+void* snd_voice_prev(void* node);
+void* snd_reloc_state_clear(void* state);
+void* snd_player_base_destruct(void* obj, s32 flags);
+void* snd_reloc_state_release(void* obj, s32 flags);
 void MEMGetAllocatableSizeForExpHeapEx(void* p, s32 kind);
 void* MEMAllocFromAllocator(void* allocator, u32 size);
 void MEMFreeToExpHeap(void* heap, void* ptr);

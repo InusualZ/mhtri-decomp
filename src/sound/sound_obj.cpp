@@ -1,7 +1,7 @@
 /* sound/sound_obj.cpp - the global sound object and its reverb delay lines
  *
  * `.text` 0x800E5430..0x800E7D34, 65 functions written (the rest of the range is not decompiled yet).
- * Name is a GUESS: the unit owns the 0xE60 B global sound object `lbl_80697980` and the line destructors `dtor_800E54A8`/`dtor_800E5548`.
+ * Name is a GUESS: the unit owns the 0xE60 B global sound object `lbl_80697980` and the line destructors `snd_player_base_destruct`/`dtor_800E5548`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 
@@ -17,8 +17,8 @@
 #include "types.h"
 #include "sound/fn_800E46E8_types.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
-#define fn_800EDB24_c1 ((void* (*)(void*))fn_800EDB24)
-#define fn_800EDA88_c1 ((void* (*)(void*, void*))fn_800EDA88)
+#define fn_800EDB24_c1 ((void* (*)(void*))snd_voice_first)
+#define fn_800EDA88_c1 ((void* (*)(void*, void*))snd_voice_free)
 
 /* The 49-line bank `fn_800E5430` destroys at +0x90. */
 typedef struct ReverbBank {
@@ -38,10 +38,10 @@ typedef struct SlotEntry {
     /* +0x0E */ s16 field_0E;  /* fn_800E7878's third argument */
 } SlotEntry; /* size: 0x10 */
 
-/* One voice of the manager's voice list (fn_800EDB24 walks it, fn_800E614C returns the next). */
+/* One voice of the manager's voice list (snd_voice_first walks it, snd_voice_next returns the next). */
 typedef struct VoiceEntry {
     /* +0x00 */ u32 kind;         /* 0..4, fn_800E5F40 */
-    /* +0x04 */ struct VoiceEntry* next; /* fn_800E614C */
+    /* +0x04 */ struct VoiceEntry* next; /* snd_voice_next */
     /* +0x08 */ u8 unused_08[8];
     /* +0x10 */ u32 owner;        /* compared against the slot's owner */
     /* +0x14 */ u32 key;          /* compared against the config's key */
@@ -194,7 +194,7 @@ extern f32 lbl_807964B8;            /* fn_800E7CD4's scale factor */
 extern u8 lbl_80597DF8[0x28];       /* a vtable fn_800E7D24 installs */
 
 extern u8 lbl_80597DA8[0x28];       /* the sound object's vtable (fn_800E7ABC) */
-extern u8 lbl_80597DD0[0x28];       /* the sound object's base vtable (fn_800E7CE0) */
+extern u8 lbl_80597DD0[0x28];       /* the sound object's base vtable (snd_player_base_construct) */
 extern f32 lbl_807964B0;            /* fn_800E7ABC's initial field_88 */
 extern f32 lbl_807964B4;            /* fn_800E7ABC's field_8C source */
 
@@ -202,12 +202,12 @@ extern u8 lbl_80697980[0xE60];      /* the global sound object (fn_800E5714) */
 
 extern "C" {
 ReverbBank* fn_800E5430(ReverbBank* bank, s32 flags);
-void* dtor_800E54A8(void* obj, s32 flags);
+void* snd_player_base_destruct(void* obj, s32 flags);
 void* fn_800E5504(void* obj, s32 flags);
 void* dtor_800E5548(void* obj, s32 flags);
 void* fn_800E5608(void* obj, s32 flags);
 void* fn_800E564C(void* obj, s32 flags);
-void* fn_800E5690(void* obj, s32 flags);
+void* snd_reloc_state_release(void* obj, s32 flags);
 void fn_800E56D4(void* arg);
 Sound* fn_800E5714(void);
 
@@ -215,42 +215,42 @@ void __destroy_arr(void* array, void* dtor, int size, int count);
 void __dl__FPv(void* p);
 
 void fn_800E5EC4(void* unused, SoundOwner* owner);
-void fn_800E5F18(SoundSlot* slot, u32 mask);
-void fn_800E5F28(SoundSlot* slot, u32 mask);
+void snd_slot_flag_set(SoundSlot* slot, u32 mask);
+void snd_slot_flag_clear(SoundSlot* slot, u32 mask);
 AxVoiceBlock* fn_800E5F38(void* p);
 void fn_800E5F40(Sound2* self);
 u32 fn_800E60B4(u8* list, u8* entry);
 u32 fn_800E60E8(u8* a, u8* b);
 u8* fn_800E60F8(u8* list);
-u32 fn_800E6100(u8* list, u8* entry);
+u32 snd_voice_list_end_ck(u8* list, u8* entry);
 u32 fn_800E6134(u8* a, u8* b);
 u8* fn_800E6144(u8* list);
-VoiceEntry* fn_800E614C(VoiceEntry* voice);
+VoiceEntry* snd_voice_next(VoiceEntry* voice);
 SlotEntry* fn_800E6154(u8* entry);
 u8* fn_800E615C(void);
 u32 fn_800E6168(void* unused, SoundOwner* owner);
-u32 fn_800E6238(SoundSlot* slot, u32 mask);
+u32 snd_slot_flag_test(SoundSlot* slot, u32 mask);
 void fn_800E6250(Sound2* self, SoundSlot* slot);
 void fn_800E6314(Sound2* self, AxVoiceBlock* ax);
-void fn_800E96BC(Sound2* self, SoundSlot* slot, AxVoiceBlock* ax);
+void snd_envelope_update(Sound2* self, SoundSlot* slot, AxVoiceBlock* ax);
 void* fn_800E9B5C(u8* list, void* entry);
 void* fn_800E9BE4(u8* list);
 void AXFreeVoice(AxVoice* voice);
 
 void fn_800E65EC(void* unused, SoundSlot* slot);
-u32 fn_800E66C8(ReverbMgr* mgr);
-ReverbMgr* fn_800E66D0(void);
+u32 snd_reverb_flags_get(ReverbMgr* mgr);
+ReverbMgr* snd_reverb_mgr_get(void);
 void fn_800E66DC(void* unused, u32 owner, u32 kind, u8 a, u8 b, u8 c, u8 d, s16 e, s16 f);
-u32 fn_800E7264(WordAt8* p);
-u32 fn_800E726C(u8* list, u8* entry);
+u32 snd_voice_prev(WordAt8* p);
+u32 snd_voice_list_head_ck(u8* list, u8* entry);
 u32 fn_800E72A0(u8* a, u8* b);
 void fn_800E72B0(void* unused, VoiceCfg* cfg, u32 arg);
 void fn_800E737C(Sound2* self, VoiceCfg* cfg, u32 arg);
 void fn_800E745C(Sound2* self, void* p1, VoiceCfg* cfg, u32 p3, u32 p4);
 void* fn_800E7570(void* p, u32 idx);
-void* fn_800E7578(RelocState* state, u32 idx);
+void* snd_reloc_state_entry(RelocState* state, u32 idx);
 Sound* fn_800E7AB0(void);
-void fn_800E7CA4(Pair32* p);
+void snd_reloc_state_clear(Pair32* p);
 void fn_800E7CB4(Pair32* p);
 void fn_800E7CC4(Pair32* p);
 f32 fn_800E7CD4(f32 v);
@@ -273,7 +273,7 @@ s16 fn_800E78F8(void* unused, u32 key);
 void fn_800E7990(void* unused, u32 key, u16 pitch);
 Sound* fn_800E7ABC(Sound* snd);
 ReverbLine* fn_800E7C34(ReverbLine* line);
-Sound* fn_800E7CE0(Sound* snd);
+Sound* snd_player_base_construct(Sound* snd);
 
 
 void fn_800E8E60(AxVoice* voice, u32 a, s16 b);
@@ -304,7 +304,7 @@ extern "C" ReverbBank* fn_800E5430(ReverbBank* bank, s32 flags)
 {
     if (bank != 0) {
         __destroy_arr(&bank->lines, (void*)dtor_800E5548, sizeof(ReverbLine), 49);
-        dtor_800E54A8(bank, 0);
+        snd_player_base_destruct(bank, 0);
         if ((s16)flags > 0) {
             __dl__FPv(bank);
         }
@@ -313,7 +313,7 @@ extern "C" ReverbBank* fn_800E5430(ReverbBank* bank, s32 flags)
 }
 
 /* Destroys one delay line's own members, then frees it. */
-extern "C" void* dtor_800E54A8(void* obj, s32 flags)
+extern "C" void* snd_player_base_destruct(void* obj, s32 flags)
 {
     if (obj != 0) {
         fn_800E5504(obj, 0);
@@ -339,13 +339,13 @@ extern "C" void* dtor_800E5548(void* obj, s32 flags)
     ReverbLine* line = (ReverbLine*)obj;
 
     if (line != 0) {
-        fn_800E5690(&line->part[8], -1);
-        fn_800E5690(&line->part[7], -1);
-        fn_800E5690(&line->part[6], -1);
-        fn_800E5690(&line->part[5], -1);
-        fn_800E5690(&line->part[4], -1);
-        fn_800E5690(&line->part[3], -1);
-        fn_800E5690(&line->part[2], -1);
+        snd_reloc_state_release(&line->part[8], -1);
+        snd_reloc_state_release(&line->part[7], -1);
+        snd_reloc_state_release(&line->part[6], -1);
+        snd_reloc_state_release(&line->part[5], -1);
+        snd_reloc_state_release(&line->part[4], -1);
+        snd_reloc_state_release(&line->part[3], -1);
+        snd_reloc_state_release(&line->part[2], -1);
         fn_800E564C(&line->part[1], -1);
         fn_800E5608(&line->part[0], -1);
         if ((s16)flags > 0) {
@@ -374,7 +374,7 @@ extern "C" void* fn_800E564C(void* obj, s32 flags)
 }
 
 /* Frees an object if the delete flag asks for it. */
-extern "C" void* fn_800E5690(void* obj, s32 flags)
+extern "C" void* snd_reloc_state_release(void* obj, s32 flags)
 {
     if (obj != 0 && (s16)flags > 0) {
         __dl__FPv(obj);
@@ -399,7 +399,7 @@ extern "C" Sound* fn_800E5714(void)
 /* Scales the three global level factors and the config's own levels into a 0..127 voice volume. */
 extern "C" s32 fn_800E5D68(SoundCfg* cfg)
 {
-    f32 a = (f32)(s16)fn_800E885C() / lbl_80796490;
+    f32 a = (f32)(s16)snd_level_volume_get() / lbl_80796490;
     f32 b = (f32)(s16)fn_800E8594(cfg->voice_id) / lbl_80796490;
     f32 c = (f32)(s16)fn_800E852C() / lbl_80796490;
     f32 d = (f32)cfg->level / lbl_80796490;
@@ -424,18 +424,18 @@ extern "C" void fn_800E5EC4(void* unused, SoundOwner* owner)
 
     ax->voice = 0;
     ax->field_40 = 0;
-    fn_800E5F28(slot, 1);
-    fn_800E5F18(slot, 1024);
+    snd_slot_flag_clear(slot, 1);
+    snd_slot_flag_set(slot, 1024);
 }
 
 /* Sets bits in a sound slot's flag word. */
-extern "C" void fn_800E5F18(SoundSlot* slot, u32 mask)
+extern "C" void snd_slot_flag_set(SoundSlot* slot, u32 mask)
 {
     slot->flags |= mask;
 }
 
 /* Clears bits in a sound slot's flag word. */
-extern "C" void fn_800E5F28(SoundSlot* slot, u32 mask)
+extern "C" void snd_slot_flag_clear(SoundSlot* slot, u32 mask)
 {
     slot->flags &= ~mask;
 }
@@ -455,7 +455,7 @@ extern "C" void fn_800E5F40(Sound2* self)
         SlotEntry* info = fn_800E6154((u8*)iter);
         VoiceEntry* voice = (VoiceEntry*)fn_800EDB24_c1(snd_bank_table_get());
 
-        while (fn_800E6100((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
+        while (snd_voice_list_end_ck((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
             if (voice->active == 1 && voice->owner == info->owner) {
                 switch (voice->kind) {
                 case 0: self->vtable->method_18(self, voice); break;
@@ -465,7 +465,7 @@ extern "C" void fn_800E5F40(Sound2* self)
                 case 4: fn_800E7878(self, voice, info->field_0E); break;
                 }
             }
-            voice = fn_800E614C(voice);
+            voice = snd_voice_next(voice);
         }
         iter = (VoiceEntry*)fn_800E9B5C(fn_800E615C(), iter);
     }
@@ -490,7 +490,7 @@ extern "C" u8* fn_800E60F8(u8* list)
 }
 
 /* Whether a voice list has reached its end marker. */
-extern "C" u32 fn_800E6100(u8* list, u8* entry)
+extern "C" u32 snd_voice_list_end_ck(u8* list, u8* entry)
 {
     return fn_800E6134(fn_800E6144(list), entry);
 }
@@ -508,7 +508,7 @@ extern "C" u8* fn_800E6144(u8* list)
 }
 
 /* The next voice in a list. */
-extern "C" VoiceEntry* fn_800E614C(VoiceEntry* voice)
+extern "C" VoiceEntry* snd_voice_next(VoiceEntry* voice)
 {
     return voice->next;
 }
@@ -531,15 +531,15 @@ extern "C" u32 fn_800E6168(void* unused, SoundOwner* owner)
     SoundSlot* slot = owner->slot;
     AxVoiceBlock* ax = fn_800E5F38(slot);
 
-    if (fn_800E6238(slot, 1024)) {
+    if (snd_slot_flag_test(slot, 1024)) {
         if (ax->voice != 0) {
             AXFreeVoice(ax->voice);
         }
         owner->slot = (SoundSlot*)fn_800EDA88_c1(snd_bank_table_get(), owner->slot);
         return 1;
     }
-    if (fn_800E6238(slot, 512) != 1) {
-        if (fn_800E6238(slot, 256) != 0) {
+    if (snd_slot_flag_test(slot, 512) != 1) {
+        if (snd_slot_flag_test(slot, 256) != 0) {
             AxVoice* voice = ax->voice;
             if (voice->field_38 == 0) {
                 AXFreeVoice(voice);
@@ -552,7 +552,7 @@ extern "C" u32 fn_800E6168(void* unused, SoundOwner* owner)
 }
 
 /* Tests whether any of a sound slot's flag bits is set. */
-extern "C" u32 fn_800E6238(SoundSlot* slot, u32 mask)
+extern "C" u32 snd_slot_flag_test(SoundSlot* slot, u32 mask)
 {
     return (slot->flags & mask) != 0;
 }
@@ -571,7 +571,7 @@ extern "C" void fn_800E6250(Sound2* self, SoundSlot* slot)
             ax->field_20 = (u32)-1;
         }
     }
-    fn_800E96BC(self, slot, ax);
+    snd_envelope_update(self, slot, ax);
     fn_800E6314(self, ax);
 }
 
@@ -586,25 +586,25 @@ extern "C" void fn_800E65EC(void* unused, SoundSlot* slot)
     s32 e;
 
     fn_800EE014(ax->field_40, ax->voice, ax->field_10, ax->field_1A);
-    a = fn_800E8E48(ax->field_5A);
-    b = fn_800E8E48(ax->field_18);
-    c = fn_800E8E48(ax->field_16);
-    d = fn_800E8E48(ax->field_14);
-    e = fn_800E8E48(ax->field_06);
-    fn_804C2840(ax->voice, fn_800E66C8(fn_800E66D0()), e, d, c, b, ax->field_12, ax->field_4A, a);
+    a = snd_level_to_db(ax->field_5A);
+    b = snd_level_to_db(ax->field_18);
+    c = snd_level_to_db(ax->field_16);
+    d = snd_level_to_db(ax->field_14);
+    e = snd_level_to_db(ax->field_06);
+    fn_804C2840(ax->voice, snd_reverb_flags_get(snd_reverb_mgr_get()), e, d, c, b, ax->field_12, ax->field_4A, a);
     fn_80471610(ax->voice, 1);
-    fn_800E5F18(slot, 256);
+    snd_slot_flag_set(slot, 256);
     ax->field_3A = 1;
 }
 
 /* The manager's pending-bit word. */
-extern "C" u32 fn_800E66C8(ReverbMgr* mgr)
+extern "C" u32 snd_reverb_flags_get(ReverbMgr* mgr)
 {
     return mgr->flags;
 }
 
 /* The global reverb manager. */
-extern "C" ReverbMgr* fn_800E66D0(void)
+extern "C" ReverbMgr* snd_reverb_mgr_get(void)
 {
     return &snd_reverb_mgr;
 }
@@ -632,13 +632,13 @@ extern "C" void fn_800E66DC(void* unused, u32 owner, u32 kind, u8 a, u8 b, u8 c,
 }
 
 /* One word of a sound object. */
-extern "C" u32 fn_800E7264(WordAt8* p)
+extern "C" u32 snd_voice_prev(WordAt8* p)
 {
     return p->word;
 }
 
 /* Whether a voice list has reached its end marker. */
-extern "C" u32 fn_800E726C(u8* list, u8* entry)
+extern "C" u32 snd_voice_list_head_ck(u8* list, u8* entry)
 {
     return fn_800E72A0(fn_800E6144(list), entry);
 }
@@ -656,12 +656,12 @@ extern "C" void fn_800E72B0(void* unused, VoiceCfg* cfg, u32 arg)
     u32 flag = cfg->field_06 & 1;
     u32 key = ((flag == 0 ? arg : 255) << 24) | (flag << 16) | ((u32)cfg->field_0B << 8) | cfg->field_0A;
 
-    while (fn_800E6100((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
+    while (snd_voice_list_end_ck((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
         if (voice->active == 1 && voice->key == key) {
             AxVoiceBlock* ax = fn_800E5F38(voice);
             ax->field_3A = 5;
         }
-        voice = fn_800E614C(voice);
+        voice = snd_voice_next(voice);
     }
 }
 
@@ -672,11 +672,11 @@ extern "C" void fn_800E737C(Sound2* self, VoiceCfg* cfg, u32 arg)
     u32 flag = cfg->field_06 & 1;
     u32 key = ((flag == 0 ? arg : 255) << 24) | (flag << 16) | ((u32)cfg->field_0B << 8) | cfg->field_0A;
 
-    while (fn_800E6100((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
+    while (snd_voice_list_end_ck((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
         if (voice->active == 1 && voice->key == key) {
             self->vtable->method_18(self, voice);
         }
-        voice = fn_800E614C(voice);
+        voice = snd_voice_next(voice);
     }
 }
 
@@ -691,7 +691,7 @@ extern "C" void fn_800E745C(Sound2* self, void* p1, VoiceCfg* p2, u32 p3, u32 p4
     if (table == 0 || table->count == 0) {
         return;
     }
-    roll = (s32)(u8)fn_800E9D00() % 100;
+    roll = (s32)(u8)stream_rand() % 100;
     total = 0;
     for (i = 0; i < table->count; i++) {
         total += table->entries[i].weight;
@@ -712,11 +712,11 @@ extern "C" void fn_800E745C(Sound2* self, void* p1, VoiceCfg* p2, u32 p3, u32 p4
 /* A relocation-table state inside a group. */
 extern "C" void* fn_800E7570(void* p, u32 idx)
 {
-    return fn_800E7578(&((RelocGroup*)p)->state[7], idx);
+    return snd_reloc_state_entry(&((RelocGroup*)p)->state[7], idx);
 }
 
 /* Looks up one entry of a relocation table. */
-extern "C" void* fn_800E7578(RelocState* state, u32 idx)
+extern "C" void* snd_reloc_state_entry(RelocState* state, u32 idx)
 {
     if (state->table == 0) {
         return 0;
@@ -734,7 +734,7 @@ extern "C" Sound* fn_800E7AB0(void)
 }
 
 /* Clears a two-word block. */
-extern "C" void fn_800E7CA4(Pair32* p)
+extern "C" void snd_reloc_state_clear(Pair32* p)
 {
     p->a = 0;
     p->b = 0;
@@ -774,9 +774,9 @@ extern "C" void fn_800E75B0(void* unused, SoundSlot* slot)
     if (slot == 0) {
         return;
     }
-    fn_800E5F28(slot, 512);
-    fn_800E5F28(slot, 1);
-    fn_800E5F18(slot, 1024);
+    snd_slot_flag_clear(slot, 512);
+    snd_slot_flag_clear(slot, 1);
+    snd_slot_flag_set(slot, 1024);
     ax = fn_800E5F38(slot);
     if (ax->voice != 0) {
         fn_80471610(ax->voice, 0);
@@ -795,7 +795,7 @@ extern "C" void fn_800E7620(void* unused, SoundSlot* slot)
     if (ax->voice == 0) {
         return;
     }
-    fn_800E5F18(slot, 512);
+    snd_slot_flag_set(slot, 512);
     fn_80471610(ax->voice, 0);
 }
 
@@ -807,10 +807,10 @@ extern "C" void fn_800E7688(void* unused, SoundSlot* slot)
     if (slot == 0) {
         return;
     }
-    if (fn_800E6238(slot, 512) != 1) {
+    if (snd_slot_flag_test(slot, 512) != 1) {
         return;
     }
-    fn_800E5F28(slot, 512);
+    snd_slot_flag_clear(slot, 512);
     ax = fn_800E5F38(slot);
     if (ax->voice == 0) {
         return;
@@ -827,11 +827,11 @@ extern "C" u32 fn_800E7700(void* unused, u32 key)
     VoiceEntry* voice = (VoiceEntry*)fn_800EDB24_c1(snd_bank_table_get());
     u32 count = 0;
 
-    while (fn_800E6100((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
+    while (snd_voice_list_end_ck((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
         if (voice->active == 1 && key == voice->owner) {
             count++;
         }
-        voice = fn_800E614C(voice);
+        voice = snd_voice_next(voice);
     }
     return count;
 }
@@ -842,7 +842,7 @@ extern "C" void fn_800E778C(Sound* snd, u32 idx, u32 entry_idx)
     ReverbCfg* cfg = (ReverbCfg*)fn_800E77DC(&snd->lines[idx], entry_idx);
 
     if (cfg != 0) {
-        snd_reverb_unit_set(fn_800E66D0(), cfg);
+        snd_reverb_unit_set(snd_reverb_mgr_get(), cfg);
     }
 }
 
@@ -905,12 +905,12 @@ extern "C" s16 fn_800E78F8(void* unused, u32 key)
     VoiceEntry* voice = (VoiceEntry*)fn_800EDB24_c1(snd_bank_table_get());
     s16 pitch = 0;
 
-    while (fn_800E6100((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
+    while (snd_voice_list_end_ck((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
         if (voice->active == 1 && key == voice->owner) {
             pitch = fn_800E5F38(voice)->field_10;
             break;
         }
-        voice = fn_800E614C(voice);
+        voice = snd_voice_next(voice);
     }
     return pitch;
 }
@@ -920,7 +920,7 @@ extern "C" void fn_800E7990(void* unused, u32 key, u16 pitch)
 {
     VoiceEntry* voice = (VoiceEntry*)fn_800EDB24_c1(snd_bank_table_get());
 
-    while (fn_800E6100((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
+    while (snd_voice_list_end_ck((u8*)snd_bank_table_get(), (u8*)voice) == 1) {
         if (voice->active == 1 && key == voice->owner) {
             AxVoiceBlock* ax;
             u16 p = pitch;
@@ -951,7 +951,7 @@ extern "C" void fn_800E7990(void* unused, u32 key, u16 pitch)
                 }
             }
         }
-        voice = fn_800E614C(voice);
+        voice = snd_voice_next(voice);
     }
 }
 
@@ -960,7 +960,7 @@ extern "C" Sound* fn_800E7ABC(Sound* snd)
 {
     u32 i;
 
-    fn_800E7CE0(snd);
+    snd_player_base_construct(snd);
     snd->vtable = (const SoundVtbl*)lbl_80597DA8;
     snd->field_08 = 127;
     snd->field_6E = 127;
@@ -986,18 +986,18 @@ extern "C" ReverbLine* fn_800E7C34(ReverbLine* line)
 {
     fn_800E7CC4((Pair32*)&line->part[0]);
     fn_800E7CB4((Pair32*)&line->part[1]);
-    fn_800E7CA4((Pair32*)&line->part[2]);
-    fn_800E7CA4((Pair32*)&line->part[3]);
-    fn_800E7CA4((Pair32*)&line->part[4]);
-    fn_800E7CA4((Pair32*)&line->part[5]);
-    fn_800E7CA4((Pair32*)&line->part[6]);
-    fn_800E7CA4((Pair32*)&line->part[7]);
-    fn_800E7CA4((Pair32*)&line->part[8]);
+    snd_reloc_state_clear((Pair32*)&line->part[2]);
+    snd_reloc_state_clear((Pair32*)&line->part[3]);
+    snd_reloc_state_clear((Pair32*)&line->part[4]);
+    snd_reloc_state_clear((Pair32*)&line->part[5]);
+    snd_reloc_state_clear((Pair32*)&line->part[6]);
+    snd_reloc_state_clear((Pair32*)&line->part[7]);
+    snd_reloc_state_clear((Pair32*)&line->part[8]);
     return line;
 }
 
 /* The base constructor of the sound object. */
-extern "C" Sound* fn_800E7CE0(Sound* snd)
+extern "C" Sound* snd_player_base_construct(Sound* snd)
 {
     fn_800E7D24((VtblHolder*)snd);
     snd->vtable = (const SoundVtbl*)lbl_80597DD0;

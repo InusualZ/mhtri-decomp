@@ -11,7 +11,7 @@ extern "C" {
 s16 fn_800E852C(void);
 s16 fn_800E8594(u32 idx);
 u32 snd_handle_get(void);
-s32 fn_800E885C(void);
+s32 snd_level_volume_get(void);
 /* 0x800E89E0 - records whether the network transfer mode is 1 (GUESS name: the network transfer-mode switch
  * is the caller). */
 void setStreamTransferMode(u32 mode);

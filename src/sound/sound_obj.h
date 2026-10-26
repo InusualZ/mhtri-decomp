@@ -14,7 +14,7 @@ extern "C" {
 #endif
 Sound* fn_800E5714(void);
 void fn_800E5F40(Sound2* self);
-ReverbMgr* fn_800E66D0(void);
+ReverbMgr* snd_reverb_mgr_get(void);
 /* untyped: an opaque handle passed through (the callee reads no field of it) */
 void fn_800E66DC(void* unused, u32 owner, u32 kind, u8 a, u8 b, u8 c, u8 d, s16 e, s16 f);
 void* fn_800E6764(Sound* snd, u32 a, u32 b, u32 c);

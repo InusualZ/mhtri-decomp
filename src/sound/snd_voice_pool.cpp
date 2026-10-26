@@ -11,7 +11,7 @@
 extern "C" void* dtor_800ED780(SndEdHost* self, s16 flags);
 extern "C" void* dtor_800ED7EC(void* self, s16 flags);
 extern "C" void* fn_800ED848(void* self, s16 flags);
-extern "C" void fn_800ED88C(SndPool2* self);
+extern "C" void snd_voice_alloc(SndPool2* self);
 extern "C" SndNode2* fn_800ED8DC(SndPool2* self);
 extern "C" SndNode2* fn_800ED954(SndNode2* self);
 extern "C" void fn_800ED9B8(SndPool2* self, SndNode2* src, u32 count);
@@ -50,7 +50,7 @@ extern "C" void fn_800EDA7C(SndNode2* self)
 }
 
 /* Resets a voice record and hands it to the state machine. */
-extern "C" void fn_800EDA88(SndNode2* list, SndNode2* node)
+extern "C" void snd_voice_free(SndNode2* list, SndNode2* node)
 {
     node->field_0x0C = 0;
     node->field_0x10 = 0;
@@ -68,9 +68,9 @@ extern "C" void fn_800EDB08(SndNode2* node)
 }
 
 /* The first voice of the manager's voice list. */
-extern "C" void* fn_800EDB24(SndVoiceMgr* self)
+extern "C" void* snd_voice_first(SndVoiceMgr* self)
 {
-    return fn_800E614C(fn_800EDB48(self));
+    return snd_voice_next(fn_800EDB48(self));
 }
 
 /* The manager's voice-list sentinel. */
@@ -80,9 +80,9 @@ extern "C" SndListNode* fn_800EDB48(SndVoiceMgr* self)
 }
 
 /* The manager's voice list walked through the other list helper. */
-extern "C" void* fn_800EDB50(SndVoiceMgr* self)
+extern "C" void* snd_voice_last(SndVoiceMgr* self)
 {
-    return fn_800E7264(fn_800EDB48(self));
+    return snd_voice_prev(fn_800EDB48(self));
 }
 
 /* The sound table's constructor entry point. */
@@ -134,7 +134,7 @@ extern "C" void* fn_800ED848(void* self, s16 flags)
 }
 
 /* Initialises the second pool on first use and allocates one node. */
-extern "C" void fn_800ED88C(SndPool2* self)
+extern "C" void snd_voice_alloc(SndPool2* self)
 {
     if (self->initialised == 0) {
         fn_800ED9B8(self, &self->nodes[0], 96);
@@ -196,7 +196,7 @@ extern "C" void fn_800EDA10(SndNode2* list, SndNode2* src, u32 count)
 /* Moves `node` to the head of `list` and returns its former successor. */
 extern "C" void* fn_800EDAA8(SndNode2* list, SndNode2* node)
 {
-    SndNode2* next = (SndNode2*)fn_800E614C(node);
+    SndNode2* next = (SndNode2*)snd_voice_next(node);
 
     fn_800EDB08(node);
     fn_800ED93C(list, node);

@@ -33,7 +33,7 @@ typedef struct StreamWork {
     /* +0x04 */ u32 flags;          /* snd_bank_pending_ck / snd_bank_pending_clear / snd_bank_pending_set bit ops */
     /* +0x08 */ u8 unused_08[0x1C];
     /* +0x24 */ s16 cur_slot;       /* fn_800E4E70 writes it, fn_800E4E9C reads it */
-    /* +0x26 */ s16 slot_tab[3];    /* fn_800E4EE8, bounded <3 by fn_800E4EA4 */
+    /* +0x26 */ s16 slot_tab[3];    /* fn_800E4EE8, bounded <3 by stream_bank_volume_get */
     /* +0x2C */ u8 unused_2C[0x30];
     /* +0x5C */ StreamRec recs[3];  /* fn_800E4C90 */
 } StreamWork; /* size: 0xD8 */

@@ -8,8 +8,8 @@
 #include "sound/sound_work.h"
 
 extern "C" void fn_800EE524(SndCopy28* dst, SndCopy28* src);
-extern "C" u32 fn_800EE868(SndModeWord* self, u32 v);
-extern "C" u32 fn_800EE8B4(SndModeWord* self, u32 v);
+extern "C" u32 snd_format_bytes_to_addr(SndModeWord* self, u32 v);
+extern "C" u32 snd_format_addr_to_bytes(SndModeWord* self, u32 v);
 extern "C" void* fn_800EE9EC(u32 size);
 
 #pragma peephole off
@@ -38,7 +38,7 @@ extern "C" void fn_800EE524(SndCopy28* dst, SndCopy28* src)
 }
 
 /* Scales `v` by the mode in the word at +0x04. */
-extern "C" u32 fn_800EE868(SndModeWord* self, u32 v)
+extern "C" u32 snd_format_bytes_to_addr(SndModeWord* self, u32 v)
 {
     u32 r = 0;
 
@@ -60,7 +60,7 @@ extern "C" u32 fn_800EE868(SndModeWord* self, u32 v)
 }
 
 /* Scales `v` by the mode in the word at +0x04 (the inverse mapping). */
-extern "C" u32 fn_800EE8B4(SndModeWord* self, u32 v)
+extern "C" u32 snd_format_addr_to_bytes(SndModeWord* self, u32 v)
 {
     u32 r = 0;
 

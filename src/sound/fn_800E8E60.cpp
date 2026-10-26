@@ -33,7 +33,7 @@
  * copy) is written but scores 74.40 % - MWCC schedules its load/store pairs differently from the target
  * and no source shape tried recovers it.  The 67 unwritten functions score 0 %; the biggest are
  * `fn_800EB314` (1844 B), `fn_800E9E94` (1456 B, MWCC-vectorised paired-single) and `fn_800EE014`
- * (1268 B).  Two further residual families are below the bar or structurally stuck: `fn_800E96BC`
+ * (1268 B).  Two further residual families are below the bar or structurally stuck: `snd_envelope_update`
  * (81.12 %) outlines its loop-machine cases to a helper whose argument move (`mr r4,r5`) the inlined
  * body here does not reproduce, and `fn_800E960C` (93.68 %) differs only in branch displacements.
  *
@@ -50,8 +50,8 @@ extern "C" u32 fn_800E960C(SndRefTable* self, u32 index);
 extern "C" SndRef* fn_800E96A4(SndRef** slot);
 extern "C" SndRef* fn_800E96AC(SndRef** slot);
 extern "C" SndRef* fn_800E96B4(SndRef** slot);
-extern "C" void fn_800E96BC(Sound2* self, SoundSlot* slot, AxVoiceBlock* ax);
-extern "C" void fn_800E9848(void* self, AxVoiceBlock* ax);
+extern "C" void snd_envelope_update(Sound2* self, SoundSlot* slot, AxVoiceBlock* ax);
+extern "C" void snd_envelope_release(void* self, AxVoiceBlock* ax);
 extern "C" void* dtor_800E9854(void* self, s16 flags);
 extern "C" void* dtor_800E98C0(void* self, s16 flags);
 extern "C" void* fn_800E991C(void* self, s16 flags);
@@ -141,7 +141,7 @@ extern "C" SndRef* fn_800E96B4(SndRef** slot)
 }
 
 /* Advances a voice's loop state machine one step; state 0 and state 5 dispatch through the owner's vtable. */
-extern "C" void fn_800E96BC(Sound2* self, SoundSlot* slot, AxVoiceBlock* ax)
+extern "C" void snd_envelope_update(Sound2* self, SoundSlot* slot, AxVoiceBlock* ax)
 {
     switch (ax->field_3A) {
     case 0:
@@ -192,7 +192,7 @@ extern "C" void fn_800E96BC(Sound2* self, SoundSlot* slot, AxVoiceBlock* ax)
 }
 
 /* Forces a voice's loop state to the wrap state. */
-extern "C" void fn_800E9848(void* self, AxVoiceBlock* ax)
+extern "C" void snd_envelope_release(void* self, AxVoiceBlock* ax)
 {
     ax->field_3A = 5;
 }

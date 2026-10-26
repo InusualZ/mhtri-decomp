@@ -12,10 +12,10 @@
  * 196 functions in one C++ TU.  Two globals carry the state:
  *   * the stream manager `lbl_8069A810` (0xD8 B, `.bss`): a flag word at +0x04, the current slot index at
  *     +0x24 with its three-entry table at +0x26, and three per-stream records at +0x5C, stride 0x28
- *     (`fn_800E4C90` is `base + i*0x28 + 0x5C`, `fn_800E4EA4` bounds the index at 3).  Each record holds
+ *     (`fn_800E4C90` is `base + i*0x28 + 0x5C`, `stream_bank_volume_get` bounds the index at 3).  Each record holds
  *     four relocation-table states (`table` + resolved `entries`) at +0x00/+0x08/+0x10/+0x18 and two
  *     scalars at +0x20/+0x24; `snd_reloc_state_rebase` walks one state's table and adds the table base to every entry
- *     whose top bit is clear (`fn_800E7578` is the read side, `fn_800E7E94`..`7FBC` the per-offset
+ *     whose top bit is clear (`snd_reloc_state_entry` is the read side, `fn_800E7E94`..`7FBC` the per-offset
  *     installers).
  *   * the sound object `lbl_80697980` (0xE60 B): a vtable, the level table `levels[49]` at +0x0A, three
  *     level words at +0x7C, two floats at +0x88/+0x8C and the 49 72-byte reverb delay lines at +0x90.
@@ -28,7 +28,7 @@
  *
  * Flags: `auto` / `Wii/1.3` / `cflags_main` (`-O3 -inline noauto`), but retail's codegen is
  * **peephole-off** throughout - the tell is the unfused `clrlwi r0,r3,24` before a `u8` use
- * (`set_stream_main_vol_flag`, `fn_800E48E4`, `fn_800E4908`, the `fn_800E46E8` selector) and the
+ * (`set_stream_main_vol_flag`, `stream_bus_volume_get`, `fn_800E4908`, the `fn_800E46E8` selector) and the
  * unfused `slwi`/`addi r0` elsewhere, which the peephole removes.  The whole-file
  * `#pragma peephole off` below carries that; the outbox asks for a per-region `-opt nopeephole` cflags
  * group so the pragma can go.
@@ -46,7 +46,7 @@
  *     `fn_800E4FB4` are the "materialise the state pointer, then a redundant branch" shape: retail emits
  *     `addi r3,r3,OFF` / `b` where ours folds `OFF` into the displacement (24-64 B, 66-93 %).  Neither
  *     `&block->state[i]`, `block->state + i`, a `for(;;) { ...; break; }`, a `while` nor a `do/while(0)`
- *     reproduces it, and marking `fn_800E7578` `inline` (so the wrappers inline it) does not either - it
+ *     reproduces it, and marking `snd_reloc_state_entry` `inline` (so the wrappers inline it) does not either - it
  *     only loses `fn_800E4FB4`'s 87 %.  The logic itself is byte-identical.
  *   * `fn_800E46E8`'s jump table is `jumptable_80597D88`, which lives in the unit's **unclaimed** `.data`
  *     range (0x80597D88), so our object emits its own local `@NN` table; the score is unaffected
@@ -166,7 +166,7 @@ void fn_8046F210(void);
 void fn_8046F280(void);
 void* memset(void* dst, int val, u32 n);
 
-StreamWork* fn_800E4A18(void);
+StreamWork* stream_mgr_get(void);
 /* untyped: the stream manager and the sound objects both keep their flag word at +4: a caller-owned payload */
 u32 snd_bank_pending_ck(void* work, u32 mask);
 /* untyped: the stream manager and the sound objects both keep their flag word at +4: a caller-owned payload */
@@ -264,13 +264,13 @@ extern "C" void fn_800E48B0(void)
 }
 
 /* The stream subsystem is always ready. */
-extern "C" s32 fn_800E48DC(void)
+extern "C" s32 stream_bus_dirty_ck(void)
 {
     return 1;
 }
 
 /* Picks the smoothed volume of the bus one slot is assigned to. */
-extern "C" f32 fn_800E48E4(u8 slot)
+extern "C" f32 stream_bus_volume_get(u8 slot)
 {
     if (lbl_807949B0[slot] == 0) {
         return lbl_807949B8.cur;
@@ -299,19 +299,19 @@ extern "C" f32 fn_800E492C(void)
 extern "C" void snd_bank_select_pending(void)
 {
     fn_800E48B0();
-    if (snd_bank_pending_ck(fn_800E4A18(), 1) != 0) {
+    if (snd_bank_pending_ck(stream_mgr_get(), 1) != 0) {
         snd_bank1_install(snd_bank_table_get(), 2);
-        snd_bank_pending_clear(fn_800E4A18(), 1);
+        snd_bank_pending_clear(stream_mgr_get(), 1);
         return;
     }
-    if (snd_bank_pending_ck(fn_800E4A18(), 2) != 0) {
+    if (snd_bank_pending_ck(stream_mgr_get(), 2) != 0) {
         snd_bank2_install(snd_bank_table_get(), 2);
-        snd_bank_pending_clear(fn_800E4A18(), 2);
+        snd_bank_pending_clear(stream_mgr_get(), 2);
         return;
     }
-    if (snd_bank_pending_ck(fn_800E4A18(), 4) != 0) {
+    if (snd_bank_pending_ck(stream_mgr_get(), 4) != 0) {
         snd_bank3_install(snd_bank_table_get(), 2);
-        snd_bank_pending_clear(fn_800E4A18(), 4);
+        snd_bank_pending_clear(stream_mgr_get(), 4);
     }
 }
 
@@ -336,23 +336,23 @@ extern "C" u32 snd_bank_pending_ck(void* work, u32 mask)
 }
 
 /* The global stream manager. */
-extern "C" StreamWork* fn_800E4A18(void)
+extern "C" StreamWork* stream_mgr_get(void)
 {
-    return &lbl_8069A810;
+    return &g_stream_mgr;
 }
 
 /* Resets the volume block and hands the three sound-bank parameters to the bank installer. */
 extern "C" void fn_800E4A24(u32 a, u32 b, u32 c)
 {
     fn_800E4850();
-    fn_800EBAE8(fn_800E4A18(), a, b, c);
+    stream_buffers_setup(stream_mgr_get(), a, b, c);
 }
 
 /* Marks bank 1 pending, with interrupts off. */
 extern "C" void resumeSoundEngine(void)
 {
     u32 level = OSDisableInterrupts();
-    snd_bank_pending_set(fn_800E4A18(), 1);
+    snd_bank_pending_set(stream_mgr_get(), 1);
     OSRestoreInterrupts(level);
 }
 
@@ -367,7 +367,7 @@ extern "C" void snd_bank_pending_set(void* work, u32 mask)
 extern "C" void snd_track_pause(void)
 {
     u32 level = OSDisableInterrupts();
-    snd_bank_pending_set(fn_800E4A18(), 2);
+    snd_bank_pending_set(stream_mgr_get(), 2);
     OSRestoreInterrupts(level);
 }
 
@@ -375,7 +375,7 @@ extern "C" void snd_track_pause(void)
 extern "C" void snd_track_resume(void)
 {
     u32 level = OSDisableInterrupts();
-    snd_bank_pending_set(fn_800E4A18(), 4);
+    snd_bank_pending_set(stream_mgr_get(), 4);
     OSRestoreInterrupts(level);
 }
 
@@ -385,11 +385,11 @@ extern "C" void fn_800E4B4C(u32 idx, RelocDesc* desc, u32 a, u32 b)
     RelocTable* t4 = (RelocTable*)(desc->reloc_04 + (u32)desc);
     RelocTable* t8 = (RelocTable*)(desc->reloc_08 + (u32)desc);
     RelocTable* tC = (RelocTable*)(desc->reloc_0C + (u32)desc);
-    fn_800E4C88(fn_800E4C90(fn_800E4A18(), idx), (RelocTable*)(desc->reloc_00 + (u32)desc));
-    fn_800E4C80(fn_800E4C90(fn_800E4A18(), idx), t4);
-    fn_800E4C78(fn_800E4C90(fn_800E4A18(), idx), t8);
-    fn_800E4C18(fn_800E4C90(fn_800E4A18(), idx), tC);
-    fn_800E4C0C(fn_800E4C90(fn_800E4A18(), idx), a, b);
+    fn_800E4C88(fn_800E4C90(stream_mgr_get(), idx), (RelocTable*)(desc->reloc_00 + (u32)desc));
+    fn_800E4C80(fn_800E4C90(stream_mgr_get(), idx), t4);
+    fn_800E4C78(fn_800E4C90(stream_mgr_get(), idx), t8);
+    fn_800E4C18(fn_800E4C90(stream_mgr_get(), idx), tC);
+    fn_800E4C0C(fn_800E4C90(stream_mgr_get(), idx), a, b);
 }
 
 /* Stores a stream's two scalar words. */
@@ -448,7 +448,7 @@ extern "C" StreamRec* fn_800E4C90(StreamWork* work, u32 idx)
 void PlayStream(u32 a, u32 b)
 {
     u32 level = OSDisableInterrupts();
-    fn_800EBC24(fn_800E4A18(), a, b, 0);
+    stream_play(stream_mgr_get(), a, b, 0);
     OSRestoreInterrupts(level);
 }
 
@@ -456,7 +456,7 @@ void PlayStream(u32 a, u32 b)
 extern "C" void fn_800E4D00(u32 a, u32 b)
 {
     u32 level = OSDisableInterrupts();
-    fn_800EBDDC(fn_800E4A18(), a, b, 0);
+    stream_play_cmd(stream_mgr_get(), a, b, 0);
     OSRestoreInterrupts(level);
 }
 
@@ -466,11 +466,11 @@ extern "C" void fn_800E4D60(u32 idx)
     u32 level = OSDisableInterrupts();
 
     fn_800EDD00(snd_bank_table_get(), 2, idx);
-    fn_800E4E38(fn_800E4C90(fn_800E4A18(), idx));
-    fn_800E4E30(fn_800E4C90(fn_800E4A18(), idx));
-    fn_800E4E28(fn_800E4C90(fn_800E4A18(), idx));
-    fn_800E4E10(fn_800E4C90(fn_800E4A18(), idx));
-    fn_800E4E00(fn_800E4C90(fn_800E4A18(), idx));
+    fn_800E4E38(fn_800E4C90(stream_mgr_get(), idx));
+    fn_800E4E30(fn_800E4C90(stream_mgr_get(), idx));
+    fn_800E4E28(fn_800E4C90(stream_mgr_get(), idx));
+    fn_800E4E10(fn_800E4C90(stream_mgr_get(), idx));
+    fn_800E4E00(fn_800E4C90(stream_mgr_get(), idx));
     OSRestoreInterrupts(level);
 }
 
@@ -515,7 +515,7 @@ extern "C" void fn_800E4E38(StreamRec* rec)
 /* Selects the volume slot a stream plays through. */
 extern "C" void stream_volume_slot_set(s32 slot)
 {
-    fn_800E4E70(fn_800E4A18(), (s16)slot);
+    fn_800E4E70(stream_mgr_get(), (s16)slot);
 }
 
 /* Stores the manager's current slot index. */
@@ -525,9 +525,9 @@ extern "C" void fn_800E4E70(StreamWork* work, s16 slot)
 }
 
 /* The manager's current slot index. */
-extern "C" s16 fn_800E4E78(void)
+extern "C" s16 stream_master_volume_get(void)
 {
-    return fn_800E4E9C(fn_800E4A18());
+    return fn_800E4E9C(stream_mgr_get());
 }
 
 /* The manager's current slot index. */
@@ -537,12 +537,12 @@ extern "C" s16 fn_800E4E9C(StreamWork* work)
 }
 
 /* The volume slot of one of the three banks, or 0 for an out-of-range bank. */
-extern "C" s16 fn_800E4EA4(u32 idx)
+extern "C" s16 stream_bank_volume_get(u32 idx)
 {
     if (idx >= 3) {
         return 0;
     }
-    return fn_800E4EE8(fn_800E4A18(), idx);
+    return fn_800E4EE8(stream_mgr_get(), idx);
 }
 
 /* The volume slot stored for one bank. */
@@ -555,7 +555,7 @@ extern "C" s16 fn_800E4EE8(StreamWork* work, u32 idx)
 u32 GetStreamStatus(u32 id)
 {
     u32 level = OSDisableInterrupts();
-    u32 status = fn_800ED5B4(fn_800E4A18(), id);
+    u32 status = stream_status(stream_mgr_get(), id);
 
     OSRestoreInterrupts(level);
     return status;
@@ -565,7 +565,7 @@ u32 GetStreamStatus(u32 id)
 extern "C" void* fn_800E4F4C(u32 idx, u32 entry_idx)
 {
     u32 level = OSDisableInterrupts();
-    void* entry = fn_800E4FB4(fn_800E4C90(fn_800E4A18(), idx), entry_idx);
+    void* entry = fn_800E4FB4(fn_800E4C90(stream_mgr_get(), idx), entry_idx);
 
     OSRestoreInterrupts(level);
     return entry;
