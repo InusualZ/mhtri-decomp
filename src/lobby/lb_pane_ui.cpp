@@ -570,13 +570,13 @@ void lb_list_init(LbList* list, s16 count, u8 kind, u16 str_base, s16 help_str, 
 s32 lb_choice_step(void* list);
 s32 camera_lobby_manual_set(s32 a);
 void menu_sel_cursor_init(MenuSelCursor* cur, s8 kind, MenuSel* owner);
-s32 fn_8031C028(MenuSelCursor* cur, u16 slot, u16 item_id);
-u32 fn_8031C0B8(MenuSelCursor* cur);
-s32 fn_8031C408(MenuSelCursor* cur, s32* flag, u16 a, u16 b, u16 c);
-void fn_8031C514(MenuSelCursor* cur, u8 which);
-u32 fn_8031C5FC(MenuSelCursor* cur, u16 a, u16 b);
-void fn_8031C8EC(MenuSelCursor* cur);
-s32 fn_8031C934(MenuSelCursor* cur, u16 a, u16 b);
+s32 menu_sel_cursor_second_set(MenuSelCursor* cur, u16 slot, u16 item_id);
+u32 menu_sel_cursor_status_update(MenuSelCursor* cur);
+s32 menu_sel_cursor_confirm_step(MenuSelCursor* cur, s32* flag, u16 a, u16 b, u16 c);
+void menu_sel_cursor_combine_start(MenuSelCursor* cur, u8 which);
+u32 menu_sel_cursor_combine_step(MenuSelCursor* cur, u16 a, u16 b);
+void menu_sel_cursor_apply_start(MenuSelCursor* cur);
+s32 menu_sel_cursor_apply_step(MenuSelCursor* cur, u16 a, u16 b);
 s32 lb_combo_item_known_ck(u16 item_id);
 s32 lb_combo_recipe_find(u16 a, u16 b, s32 c);
 s32 eft052_item_value_get(u16 id);
@@ -1509,9 +1509,9 @@ extern "C" s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbList
                 }
                 break;
             case 1:
-                if (slot->id != 0 && fn_8031C028(cur, value, slot->id) == 1U) {
+                if (slot->id != 0 && menu_sel_cursor_second_set(cur, value, slot->id) == 1U) {
                     self->phase_0x00++;
-                    if (fn_8031C0B8(cur) == 1U) {
+                    if (menu_sel_cursor_status_update(cur) == 1U) {
                         self->stepper_0x04 = 0;
                     } else {
                         self->stepper_0x04 = 1;
@@ -1540,14 +1540,14 @@ extern "C" s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbList
         break;
     case 2:
         cur->mode_0x16 = 0;
-        if (fn_8031C0B8(cur) == 0) {
+        if (menu_sel_cursor_status_update(cur) == 0) {
             self->stepper_0x04 = 1;
         }
-        r = fn_8031C408(cur, &self->stepper_0x04, hold, repeat, trig);
+        r = menu_sel_cursor_confirm_step(cur, &self->stepper_0x04, hold, repeat, trig);
         switch (r) {
         case 1:
             self->phase_0x00++;
-            fn_8031C514(cur, 0);
+            menu_sel_cursor_combine_start(cur, 0);
             break;
         case 2:
             if ((u16)cur->slot_a_0x08 == 0xFFFF || (u16)cur->slot_b_0x0A == 0xFFFF) {
@@ -1555,21 +1555,21 @@ extern "C" s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbList
                 self->sub_0x01 = 0;
                 menu_sel_cursor_init(cur, 2, 0);
             } else {
-                fn_8031C028(cur, 0xFFFF, 0);
+                menu_sel_cursor_second_set(cur, 0xFFFF, 0);
                 self->phase_0x00 = 1;
             }
             break;
         }
         break;
     case 3:
-        if (fn_8031C5FC(cur, trig, hold) == 1U) {
+        if (menu_sel_cursor_combine_step(cur, trig, hold) == 1U) {
             if (item_slots_room_get(cur->value_0x0C, &lobby_world_block->slots_0x180[0],
                                     userdata_box_capacity(lobby_world_block)) <= 0) {
                 hud_item_msg_push(2, 0x11, (u16)cur->value_0x0C);
             } else if (item_box_store(cur->value_0x0C, cur->anim_0x15, &out) != 0) {
                 hud_item_msg_push(2, 0x11, (u16)cur->value_0x0C);
             }
-            fn_8031C8EC(cur);
+            menu_sel_cursor_apply_start(cur);
             self->phase_0x00++;
             if ((u16)cur->slot_a_0x08 == 0xFFFF || (u16)cur->slot_b_0x0A == 0xFFFF) {
                 self->stepper_0x04 = 1;
@@ -1577,10 +1577,10 @@ extern "C" s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbList
         }
         break;
     case 4:
-        r = fn_8031C934(cur, trig, hold);
+        r = menu_sel_cursor_apply_step(cur, trig, hold);
         switch (r) {
         case 1:
-            fn_8031C514(cur, 1);
+            menu_sel_cursor_combine_start(cur, 1);
             self->phase_0x00 = 3;
             break;
         case 2:

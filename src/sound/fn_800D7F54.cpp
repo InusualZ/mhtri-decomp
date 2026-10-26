@@ -365,7 +365,7 @@ extern "C" void se_npc_faint_play(void) { se_bank_req(28, 27); }
 
 extern "C" void se_npc_revive_play(void) { se_bank_req(28, 35); }
 
-extern "C" void fn_800DCFC0(void) { se_slot_req(0); }
+extern "C" void se_combo_mix_req(void) { se_slot_req(0); }
 
 extern "C" void sysSE_window_open_play(void) { sysSE_req(12); }
 
@@ -492,7 +492,7 @@ extern "C" void fn_800DC53C(u8 flag, nw4r::math::VEC3* pos) {
 }
 
 /* The two-title sound ids; both tail-call `sysSE_req`. */
-extern "C" void fn_800DCFC8(u8 which) {
+extern "C" void se_combo_result_req(u8 which) {
     if (which == 0) {
         sysSE_req(11);
     } else {

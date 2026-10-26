@@ -4653,7 +4653,7 @@ extern "C" void pl_weapon_class_refresh(struct _PLW* plw)
 #pragma optimization_level reset
 
 /* True while the player's act is armed with a weapon. */
-extern "C" s32 fn_80274570(struct _PLW* plw)
+extern "C" s32 pl_weapon_drawn_ck(struct _PLW* plw)
 {
     return plw->field_0x30A != 0;
 }
@@ -8472,7 +8472,7 @@ extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
 extern "C" s32 pl_part_flag2_ck(_PLW*, s32);
 extern "C" void fn_80279EBC(_PLW*, u16, u16);
 extern "C" s32 pl_target_lock_ck(_PLW*);
-extern "C" u32 fn_80287244(_PLW*, s32);
+extern "C" u32 pl_act4_phase_ck(_PLW*, s32);
 extern "C" void camera_aim_zoom_get(_PLW*, u8*, u8*, f32*);
 extern "C" u8 get_cfg(u8, s32);
 extern "C" { extern u8 lbl_805C6118[]; }
@@ -8528,7 +8528,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
         switch (arg2) {
         case 0:
             if (pl_target_lock_ck(self) != 0 ||
-                ((s32)self->unk5E6 == 0 && (u32)fn_80287244(self, 0) == 1)) {
+                ((s32)self->unk5E6 == 0 && (u32)pl_act4_phase_ck(self, 0) == 1)) {
                 u8 c;
                 u8 r;
                 if (pl_part_flag2_ck(self, 0) != 0) {

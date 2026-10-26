@@ -460,7 +460,7 @@ struct _PLW {
                 /* +0x30A */ u8 unk30A[0x30C - 0x30A];
                 struct {
                     /* +0x30A */ u8 field_0x30A;  /* the act's armed byte (`pl_act_reenter` sets
-                                                   * 0xFF); `fn_80274570` tests it */
+                                                   * 0xFF); `pl_weapon_drawn_ck` tests it */
                     /* +0x30B */ u8 pad_0x30B;
                 };
             };

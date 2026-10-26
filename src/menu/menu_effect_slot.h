@@ -9,7 +9,7 @@
 extern "C" {
 
 /* 0x80349184 - the selection screen's call over one slot record (no body yet). */
-void fn_80349184(void* a);
+void menu_combo_list_open(void* a);
 
 }
 

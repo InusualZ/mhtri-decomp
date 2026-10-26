@@ -194,7 +194,7 @@ extern "C" void fn_800DF948(_se_w* work)
 
 
 /* Claim a free slot for the ryugeki positional SE (bank 46) and fill it in. */
-extern "C" void fn_800DD9FC(_PLW* self, nw4r::math::VEC3* pos, u8 kind)
+extern "C" void pl_ryugeki_se_req(_PLW* self, nw4r::math::VEC3* pos, u8 kind)
 {
     _se_w* work = self->field_0xAFC;
     if (!work) {

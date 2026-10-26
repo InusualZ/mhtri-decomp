@@ -1003,7 +1003,7 @@ extern "C" void menu_item_count_arrow_draw(MenuSlot* self, const _mh_ivec2_* pos
 
 /* The player work record's item-list test, through the Pl unit's own entry point. */
 extern "C" s32 menu_item_worker_ck(_PLW* plw) {
-    return fn_80274570(plw);
+    return pl_weapon_drawn_ck(plw);
 }
 
 /* Re-tests the entry the cursor sits on and records whether it may be picked. */

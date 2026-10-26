@@ -292,7 +292,7 @@ void info_gun_parts_draw(u16 id, _EQUIP* frame, _EQUIP* barrel, _EQUIP* stock);
  * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `unsplit/menu.h`).
  * The two below cannot: `fn_8031AE38`/`menu_sel_cursor_init` are owned by `menu/fn_8031A6C0.cpp`, whose header
  * declares neither and `unsplit/menu.h` may not.  Declared here as this unit's view. */
-void fn_8031AE38(MenuSlot* self);
+void menu_equip_entries_update(MenuSlot* self);
 void menu_sel_cursor_init(void* cursor, s32 kind, MenuSlot* owner);
 
 
@@ -7788,7 +7788,7 @@ void equip_panel_slot_reset(MenuSlot* self) {
     self->field_0x1A1 = (s8)h;
     self->field_0x1A2 = 0;
     menu_slot_entry_b_select(self, 0);
-    fn_8031AE38(self);
+    menu_equip_entries_update(self);
     menu_sel_cursor_init(&self->field_0x1EC[0], 0, self);
 }
 
