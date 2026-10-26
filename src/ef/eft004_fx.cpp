@@ -70,7 +70,7 @@ struct EftScaledPool {
     /* +0x08 */ f32 scale_0x08;
 };
 
-/* The pool block `fn_80101C74` fills: a count, twelve heap handles at +0x10, one more at +0x40 and a
+/* The pool block `eft004_area_set` fills: a count, twelve heap handles at +0x10, one more at +0x40 and a
  * field at +0x5C. size: 0x60 - lower bound, an approximation */
 struct EftHeapPool {
     /* +0x00 */ s32 count;
@@ -1057,7 +1057,7 @@ extern "C" void fn_80101C70(Eft004* self)
 }
 
 /* Creates an effect with a twelve-entry heap pool and one extra handle; destroys it on any failure. */
-extern "C" void fn_80101C74(u32 type)
+extern "C" void eft004_area_set(u32 type)
 {
     s32 i;
     Eft004* effect;

@@ -150,7 +150,7 @@ void em015_part_flag_set(struct _ENEMY_WORK* self, u32 a);
  * `enemy/fn_8015E854.cpp` had added it there first, so this branch's copy was dropped by hand
  * instead of leaving two identical prototypes. */
 u32 em015_ally_front_ck(struct _ENEMY_WORK* self, u32 a);
-void fn_802B1FEC(void);
+void stage_parts_break_all(void);
 void em_shake_req_set(struct _ENEMY_WORK* work);
 void fn_80136E38(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801373D0(struct _ENEMY_WORK* work);

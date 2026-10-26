@@ -543,17 +543,17 @@ void player_count_set(u8 value) {
 }
 
 /* 0x800CF624 - reset the loaded-byte counter. */
-void fn_800CF624(void) {
+void system_work_mem_reset(void) {
     system_w.field_0x74 = 0;
 }
 
 /* 0x800CF638 - bytes loaded plus the streaming offset. */
-u32 fn_800CF638(void) {
+u32 system_work_mem_ptr_get(void) {
     return system_w.field_0x6c + system_w.field_0x74;
 }
 
 /* 0x800CF650 - the remaining byte count. */
-u32 fn_800CF650(void) {
+u32 system_work_mem_free_get(void) {
     return system_w.field_0x70 - system_w.field_0x74;
 }
 

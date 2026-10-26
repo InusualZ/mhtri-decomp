@@ -51,8 +51,8 @@ extern "C" {
 void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult);
 void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult);
 void fn_80099134(ResNodeData* pSelf);
-void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z);
-void fn_80099278(ResHandle* pSelf, f32 x, f32 y, f32 z);
+void res_node_trans_set(ResHandle* pSelf, f32 x, f32 y, f32 z);
+void res_node_rot_set(ResHandle* pSelf, f32 x, f32 y, f32 z);
 u32 fn_80099378(ResHandle* pSelf);
 u32 fn_800993B4(ResHandle* pSelf, u32 ofs);
 
@@ -193,7 +193,7 @@ void fn_80099134(ResNodeData* pSelf) {
 }
 
 /* Store the translate triple, setting the channel bit when the triple is zeroed. */
-void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z) {
+void res_node_trans_set(ResHandle* pSelf, f32 x, f32 y, f32 z) {
     if (res_node_is_valid(pSelf) == 0) {
         nw4r::db::Panic("g3d_resnode.cpp", 0xEF, "NW4R:Failed assertion IsValid()");
     }
@@ -212,7 +212,7 @@ void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z) {
 }
 
 /* Store the rotate triple, setting the channel bit when the triple is zeroed. */
-void fn_80099278(ResHandle* pSelf, f32 x, f32 y, f32 z) {
+void res_node_rot_set(ResHandle* pSelf, f32 x, f32 y, f32 z) {
     if (res_node_is_valid(pSelf) == 0) {
         nw4r::db::Panic("g3d_resnode.cpp", 0x103, "NW4R:Failed assertion IsValid()");
     }

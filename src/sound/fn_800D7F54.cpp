@@ -3471,7 +3471,7 @@ extern const f32 lbl_80796418;
 
 /* Requests SE work 46 at the caller's position, with the SE code the current map region and area number
  * select. */
-extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
+extern "C" void se_area_part_play(u32 arg0, VEC3* pos)
 {
     u32 m = stage_map_kind_get((u8)get_now_mapno());
     u8 areano = get_now_areano();

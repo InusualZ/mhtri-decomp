@@ -130,7 +130,7 @@ extern f64 lbl_80796470;
 void* word_read(void* a);
 s32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
-s32 fn_802AFF58(void);
+s32 stage_water_b_enabled_ck(void);
 s32 system_lobby_flag_get(void);
 s32 camera_mode1_ck(void);
 s32 camera_work_ck(void);
@@ -216,7 +216,7 @@ extern "C" void prim_list_exec(void* a, u8 mode)
         f31 = lbl_80796458;
         fn_80074AA8(a, 0, &scalef, 0);
     }
-    s32 sub = fn_802AFF58();
+    s32 sub = stage_water_b_enabled_ck();
     for (u32 i = 0; i < 2; i++) {
         PrimRec* p = (PrimRec*)prim_rec_pool[i];
         for (u32 j = 0; j < prim_rec_count[i]; j++, p++) {

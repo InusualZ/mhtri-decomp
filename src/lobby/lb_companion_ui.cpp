@@ -642,7 +642,7 @@ void lb_sub11_send(s8 a, s8 b) {
 
 /* Act 17: hands the request's two bytes to `fn_802B09B8`. */
 void lb_act_pair_apply(u8 unused, LbActReq* req) {
-    fn_802B09B8(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
+    stage_area_flag_set(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
 }
 
 /* Sends the sub-0x12 command with one byte, or hands it to `fn_802B45F4` when the link is down. */
@@ -650,7 +650,7 @@ void lb_sub12_send(u8 value) {
     LbCmdSub12 cmd;
 
     if (isServerSelectState() == 0) {
-        fn_802B45F4(value);
+        stage_area_timer_arm(value);
         return;
     }
     ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x12);
@@ -660,7 +660,7 @@ void lb_sub12_send(u8 value) {
 
 /* Act 18: hands the request's byte to `fn_802B45F4`. */
 void lb_act_index_apply(u8 unused, LbActReq* req) {
-    fn_802B45F4(req->sel_0x04.bytes_0x00.a_0x00);
+    stage_area_timer_arm(req->sel_0x04.bytes_0x00.a_0x00);
 }
 
 /* Sends the sub-0x13 command: the value byte, two halfwords and this pad's index.  GUESS name: caller unwritten. */

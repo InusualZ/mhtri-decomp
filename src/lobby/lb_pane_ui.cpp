@@ -7687,7 +7687,7 @@ void menu_item_work_init(void);
 void stage_work_init(void);
 s32 stage_area_load(u32 a, u8 b, u8 c);
 s32 stage_area_enter(u8 a, u8 b);
-void fn_802AFA40(void);
+void stage_area_slots_reset(void);
 s32 stage_area_slot_get(u8 a, u8 b);
 void stage_map_obj_load(u8 mode);
 void camera_work_init(void);
@@ -8258,7 +8258,7 @@ void fn_801FB2A8(u8 a, u8 b, u8 c)
 {
     init_player_work();
     lobby_res_slots_init();
-    fn_802AFA40();
+    stage_area_slots_reset();
     player_init_data_load();
     nw_res_list_load((void*)npc_model_res_ids);
     nw_res_list_load((void*)ainpc_anim_res_ids);

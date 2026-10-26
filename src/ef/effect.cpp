@@ -148,7 +148,7 @@ typedef struct EftNameNode {
     /* +0x04 */ u32 field_0x04;
 } EftNameNode; /* size: 0x08 */
 
-/* One 8-byte scenario-box descriptor (`fn_800F9C20` walks the table). */
+/* One 8-byte scenario-box descriptor (`eft_scnbox_load` walks the table). */
 typedef struct EftScnboxEntry {
     /* +0x00 */ u32 size_0x00;
     /* +0x04 */ char* name_0x04;
@@ -220,7 +220,7 @@ void res_mat_chan_copy_ctor(void* out, void* handle);
 /* the emitter data helpers */
 s32 fn_800F6984(u32 a, u32 b, void* table, void* names);
 
-void* fn_802B0420(void);
+void* stage_effect_block_get(void);
 u32 stage_water_area_ck(void);
 u32 stage_water_enabled_ck(void);
 void pl_capsule_box_set(void* a, void* b);
@@ -464,7 +464,7 @@ void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* v) {
 }
 
 /* 0x800F9C20 - load a 0xD0-byte scenario-box record for the area. */
-extern "C" void fn_800F9C20(void* dst, u8 area, u8 slot) {
+extern "C" void eft_scnbox_load(void* dst, u8 area, u8 slot) {
     EftScnboxEntry* entry = (EftScnboxEntry*)eft_scnbox_data_ptr[area];
     if (entry == NULL) {
         memset(dst, 0, 0xD0);
@@ -706,7 +706,7 @@ extern "C" void fn_800FA450(void* effect) {
     pos.x = root->m[0][3];
     pos.y = root->m[1][3];
     pos.z = root->m[2][3];
-    EftEmitterRecord* rec = (EftEmitterRecord*)fn_802B0420();
+    EftEmitterRecord* rec = (EftEmitterRecord*)stage_effect_block_get();
     for (s32 j = 0; j < 4; j++) {
         if (fn_800FA208(&pos, rec) == 1) {
             fn_800F9E04(NULL, effect, 0, (EftColorParams*)rec, which);
@@ -759,7 +759,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
         return;
     }
     s32 flag = flags & 0x80;
-    EftEmitterRecord* rec = (EftEmitterRecord*)fn_802B0420();
+    EftEmitterRecord* rec = (EftEmitterRecord*)stage_effect_block_get();
     chr->get_joint_wpos(0, &pos);
     for (s32 j = 0; j < 4; j++) {
         if (fn_800FA208(&pos, rec) == 1) {

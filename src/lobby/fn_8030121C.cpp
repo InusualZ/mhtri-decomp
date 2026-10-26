@@ -12,7 +12,7 @@
  *   0x80304194-0x80304508, 0x80304550-0x80304804, 0x8030487C-0x80305910, 0x80305924-0x80306510, 0x803066B4-0x803066F0.
  *  - `fn_80302274`: retail compares with `cmpwi` against 3 and 5, ours `cmplwi` (a signedness difference);
  *  - `fn_803035F8`: register allocation only (the table pointer in r4/r5 against ours r0/r4);
- *  - `fn_80306524`: retail copies the argument to r30 before narrowing, ours narrows into r30 and copies back;
+ *  - `lb_area_fx_set`: retail copies the argument to r30 before narrowing, ours narrows into r30 and copies back;
  *  - `fn_80306614`: retail's frame is 0x30 saving from r25, ours 0x20 from r26.
  *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim; `sprintf`
  *   is declared with C++ linkage, so the object references `sprintf__FPcPCce`, which nothing defines.
@@ -87,7 +87,7 @@ void fn_803066B4(_EFT* self);
 /* Unclaimed band addresses (rule 2's named unsplit gap - no registered unit owns them yet). */
 /* `stage/fn_802B2AA0.h` cannot be included here: it pulls `sound/mhchar.h`, whose
  * `_GXChannelID` enum clashes with the one `pl.h` (via `hud/layout.h`) defines. */
-u8* fn_802B04A0(u8 kind);
+u8* stage_area_word_get(u8 kind);
 s32 lb_item_box_count_draw(u8*, s32, u8);
 s32 eft052_box_list_draw(s32, const void*, const void*, s32, s32);
 
@@ -295,7 +295,7 @@ void fn_80301A20(u8* self) {
 
 /* 0x80306524 - builds the effect-41 spawner: pools a 0x20-byte effect record, installs the
  * `fn_803066B4` dispatcher / `fn_80306614` releaser, fills its one model slot and arms it. */
-void fn_80306524(void) {
+void lb_area_fx_set(void) {
     s32 area = get_now_areano();
     u8* res;
     _EFT* rec;
@@ -303,7 +303,7 @@ void fn_80306524(void) {
     Eft8030EffectSlot* slots;
     s32 i;
 
-    res = fn_802B04A0(area);
+    res = stage_area_word_get(area);
     if (res == NULL) {
         return;
     }

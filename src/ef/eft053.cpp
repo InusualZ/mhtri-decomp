@@ -416,7 +416,7 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
     s32 c;
 
     work = (Eft053Work*)self->work_0x38;
-    timer = lbl_806BB7A0;
+    timer = stg_place_timers;
     VEC3_ctor(&pos);
     work->counters[index] += 1;
     switch (self->area_0x44) {
@@ -806,7 +806,7 @@ extern "C" void eft053_dispatch(_EFT* self)
 extern "C" void fn_80367124(_EFT* self)
 {
     Eft053Work* work = (Eft053Work*)self->work_0x38;
-    PlSlotGate* gate = lbl_806BB7A0;
+    PlSlotGate* gate = stg_place_timers;
     VEC3 offset;
     u16 id;
     EftModelRec* rec;

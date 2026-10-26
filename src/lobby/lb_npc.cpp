@@ -3382,7 +3382,7 @@ void ainpc_page_reset(void);
 void fn_80211E68(void);
 void fn_802680C4(void);
 void camera_update(void);
-void fn_802ADB98(void);
+void stage_frame_update(void);
 void fn_800F8DA4(void);
 void hud_msg_frame(void);
 void ai_npc_reaction_forward(void);
@@ -3428,7 +3428,7 @@ void lobby_frame_update(void)
         fn_80211E68();
         fn_802680C4();
         camera_update();
-        fn_802ADB98();
+        stage_frame_update();
         light_move();
         fn_800F8DA4();
         hud_msg_frame();

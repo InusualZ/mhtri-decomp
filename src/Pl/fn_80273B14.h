@@ -107,7 +107,7 @@ s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag);
 /* 0x802740F4 / 0x802744A0 / 0x80274748 / 0x80274794 - the armed-value and follow-up stage helpers. */
 void pl_weapon_record_read(struct _PLW* plw, struct _EQUIP* equip);
 void pl_weapon_class_refresh(struct _PLW* plw);
-s32 fn_80274794(struct _PLW* plw);
+s32 pl_warp_ready_ck(struct _PLW* plw);
 
 /* 0x80274808 / 0x80275AFC - the follow-up stage byte and the act kind byte. */
 u8 pl_act_stage_get(struct _PLW* plw);

@@ -42,10 +42,10 @@ u32 stage_pos_z_low_ck(void* self);
 
 /* 0x802B0A98 - the stage table selector `enemy/em020_handlers.cpp`'s `em020_area_model_set` calls
  * for the two em020 area models: `idx` indexes the two-byte records at 0x805DEF38, whose bytes are
- * handed to `fn_802B0A3C`, and `value` is stored into the stage work block's +0x2EAC byte
+ * handed to `stage_area_event_raise`, and `value` is stored into the stage work block's +0x2EAC byte
  * (`0x806BB7AC`) once per call.  Added with that registration (rule 2: this range owns the address;
  * the signature is the callee's own body - `clrlwi r3,24` for the index, a `stb` for the value). */
-void fn_802B0A98(u8 idx, u8 value);
+void stage_area_event_pair_raise(u8 idx, u8 value);
 
 #ifdef __cplusplus
 namespace nw4r { namespace math { struct VEC3; } }
@@ -66,7 +66,7 @@ u32 get_stg_eft_col_pos(u8 area, nw4r::math::VEC3* pos);
 /* 0x802AEC00 - the stage pack reset `light/light.cpp`'s `light_demo_end` calls; added with that
  * registration (rule 2: this range owns the address).  The owner's body does not exist yet, so the
  * signature is the call site's view: no arguments, no result. */
-void fn_802AEC00(void);
+void stage_area_ambient_apply(void);
 
 /* 0x802B2E2C - copies the current area's staged colour record out of the stage block and drives it (no arguments). */
 void stage_area_colour_update(void);
@@ -75,7 +75,7 @@ void stage_area_colour_update(void);
 void stage_area_objects_refresh(void);
 
 /* 0x802AFF38 / 0x802AFFF4 - the water tests for a shell's two area bits; each answers 1 while the point is under
- * water (no arguments, the answer in r3).  `stage_water_enabled_ck` is `s32` because `stage/fn_802B2AA0.h` declares it so. */
+ * water (no arguments, the answer in r3).  `stage_water_enabled_ck` is `s32` because `stage/stage_light_blend_set.h` declares it so. */
 s32 stage_water_enabled_ck(void);
 u32 stage_water_area_ck(void);
 

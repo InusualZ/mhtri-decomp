@@ -1015,7 +1015,7 @@ extern "C" u32 fn_800403DC(void)
 }
 
 /* Reports whether the calibration block's third flag is set. */
-extern "C" u32 fn_800403F8(void)
+extern "C" u32 screen_split_ck(void)
 {
     return Screen_w.split_mode != 0;
 }

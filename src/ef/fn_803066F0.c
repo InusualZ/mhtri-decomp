@@ -3,7 +3,7 @@
  *   the step timers, resets the models and runs the state-1 handler `fn_8030681C` directly.
  * RANGE. .text 0x803066F0-0x8030681C (1 function); extab 0x80015AAC-0x80015AB4, extabindex 0x80034668-0x80034674,
  *   .sdata 0x80792B70-0x80792B78 (the ".brres" string).  The dispatcher `fn_803066B4` and the creator
- *   `fn_80306524` (`eft_res_slot_get(32)`, `+0x03 = 41`) are `lobby/fn_8030121C.cpp`'s.
+ *   `lb_area_fx_set` (`eft_res_slot_get(32)`, `+0x03 = 41`) are `lobby/fn_8030121C.cpp`'s.
  * NAMES. The map has only the `fn_` stem (the runtime dump has a placeholder for 0x803066F0).  The file is C; the
  *   two mangled callees are called by their map spelling.
  * RESIDUALS. none in code: the row matches.
@@ -73,7 +73,7 @@ struct EftWork {
     u8   pad_0x45[0x03];       /* +0x45 */
 };                             /* size: 0x48 */
 
-extern void* fn_802B050C(u8 index); /* a `stage_w` name buffer for the stage's effect resource */
+extern void* stage_char_res_body_get(u8 index); /* a `stage_w` name buffer for the stage's effect resource */
 extern void  fn_8030681C(EftWork* self);
 extern void  fn_80306A94(EftWork* self);
 extern void* res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc(UvModelTail* model, char* name,
@@ -91,7 +91,7 @@ void fn_803066F0(EftWork* self)
     char* name;
 
     data = self->data;
-    name = fn_802B050C(0);
+    name = stage_char_res_body_get(0);
     strcat(name, ".brres");
 
     for (i = 0; i < data->count; i++) {

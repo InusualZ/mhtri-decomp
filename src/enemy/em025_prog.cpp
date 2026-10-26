@@ -115,7 +115,7 @@ void em_status_bits_set(struct _ENEMY_WORK* self, u32 mask);
 void em_status_bits_clr(struct _ENEMY_WORK* self, u32 mask);
 
 /* `stage/stg_w.cpp`'s blend helper: r3 is the `_ENEMY_WORK` (set by the caller), f1 the scalar. */
-void fn_802B08DC(f32 a);
+void stage_anim_rate_target_set(f32 a);
 
 void em025_act0_dispatch(struct _ENEMY_WORK* self);
 void em025_act2_0(struct _ENEMY_WORK* self);
@@ -838,9 +838,9 @@ void em025_frame_update(struct _ENEMY_WORK* self) {
         self->field_0x8CC = (u32)em025_body_tbl;
     }
     if (em025_shore_window_ck(self) == 1) {
-        fn_802B08DC(0.5f);
+        stage_anim_rate_target_set(0.5f);
     } else {
-        fn_802B08DC(1.0f);
+        stage_anim_rate_target_set(1.0f);
     }
 }
 

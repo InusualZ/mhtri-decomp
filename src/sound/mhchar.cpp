@@ -70,7 +70,7 @@ extern "C" void fn_800E0808(MHchar* self, nw4r::math::VEC3* src)
 }
 
 /* Store the model's +0x3C word. */
-extern "C" void fn_800E090C(MHchar* self, u32 value)
+extern "C" void mhchar_draw_callback_set(MHchar* self, u32 value)
 {
     self->field_0x3C = value;
 }
@@ -121,7 +121,7 @@ extern "C" s32 mhchar_wld_mtx_array_get(MHchar* self)
 }
 
 /* Copy the +0x114 joint entry selected by `arg` into `dst`. */
-extern "C" void fn_800E0B9C(MHchar* self, void* dst, void* arg)
+extern "C" void mhchar_res_node_get(MHchar* self, void* dst, void* arg)
 {
     void* entry = reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNode((u32)arg).mpData;
     res_node_assign(dst, &entry);

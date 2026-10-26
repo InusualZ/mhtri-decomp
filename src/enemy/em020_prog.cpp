@@ -749,10 +749,10 @@ void em020_init(_ENEMY_WORK* self)
             self->parts_0x838[3].damage_level = 2;
         if ((stat->byte_0x01 & 8) != 0)
             self->parts_0x838[5].damage_level = 1;
-        fn_802B0A98(6, 0);
-        fn_802B0A98(7, 0);
-        fn_802B0A98(9, 0);
-        fn_802B0A98(10, 0);
+        stage_area_event_pair_raise(6, 0);
+        stage_area_event_pair_raise(7, 0);
+        stage_area_event_pair_raise(9, 0);
+        stage_area_event_pair_raise(10, 0);
         ainpc_element_report_set(1);
     }
 }
@@ -3090,11 +3090,11 @@ extern "C" void em020_area_model_set(_ENEMY_WORK* self) {
     if (stage_map_kind_get(self->field_0x1E0) == 7) {
         switch (self->area_no) {
         case 2:
-            fn_802B0A98(9, 1);
+            stage_area_event_pair_raise(9, 1);
             ainpc_element_report_set(0);
             break;
         case 3:
-            fn_802B0A98(10, 1);
+            stage_area_event_pair_raise(10, 1);
             ainpc_element_report_set(1);
             break;
         }

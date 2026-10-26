@@ -142,11 +142,11 @@ struct EmActRec {
     /* +0x2 */ s16 value;
 };
 
-/* The file row `fn_80140DAC` copies (the 19 words of the table `res_mem_index_get` indexes).  The unit
+/* The file row `em_res_file_row_copy` copies (the 19 words of the table `res_mem_index_get` indexes).  The unit
  * only copies the record - it reads none of its fields - so they stay `unused_0xNN`, at the offsets
  * the target's word-by-word copy names.
  * size: 0x4C */
-/* The 0x4C-byte file row `fn_80140DAC` copies (the table `res_mem_index_get` indexes).  This unit only
+/* The 0x4C-byte file row `em_res_file_row_copy` copies (the table `res_mem_index_get` indexes).  This unit only
  * copies the record - it reads none of its fields - so they stay `unused_0xNN`, at the offsets the
  * target's own copy names.  The middle 0x40 bytes are 8-byte aligned on both sides, which is why the
  * target copies them two words at a time (measured: an `f64 unused_0x08[8]` member reproduces the

@@ -26,7 +26,7 @@
 #include "fn_80047398.h" /* color_rgba_copy, owned by userdata_item.cpp's range (rule 2) */
 
 extern "C" {
-void  fn_80057810(u32 a, u32 b, u32 c);
+void  light_mode_set(u32 a, u32 b, u32 c);
 
 /* SDK. */
 void  DCInvalidateRange(void* p, u32 size);
@@ -108,7 +108,7 @@ extern "C" void fn_80056E1C(DrawShape2D* self) {
     self->field_0x02 = 0xFF;
     self->field_0x03 = 0xFF;
     self->field_0x04 = 0xFF;
-    fn_80057810(0, 0, 1);
+    light_mode_set(0, 0, 1);
     self->field_0x28 = 0x40;
     self->field_0x2C = 0xC0;
     self->field_0x30 = draw_shape_sprite_scale_x;
@@ -228,5 +228,5 @@ extern "C" void fn_80056E00(void) {
 
 extern "C" void fn_80056F04(void) {
     lbl_8066ACF8.field_0x74 = 0;
-    fn_80057810(0, 0, 1);
+    light_mode_set(0, 0, 1);
 }

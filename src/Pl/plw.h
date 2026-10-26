@@ -129,7 +129,7 @@ struct _PLW {
     /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `pl_rig_model_move` */
     /* +0x01F */ union {   /* one byte, two spellings (rule 5) */
         /* +0x01F */ u8 field_0x01F;   /* the act's follow-up stage latch: `pl_act_stage_latch_set` arms it,
-                                       * `fn_80274794` tests it and `pl_act_stage_get` reads it */
+                                       * `pl_warp_ready_ck` tests it and `pl_act_stage_get` reads it */
         /* +0x01F */ u8 pad_0x01F[0x1]; /* the padding spelling of the same byte */
     };
     /* +0x020 */ union {   /* one u32, two spellings (rule 5) */

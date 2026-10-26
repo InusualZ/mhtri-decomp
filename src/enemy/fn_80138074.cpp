@@ -273,7 +273,7 @@ extern u32 em_damage_eval(EnemyWork* work);
 extern void em_coll_shape_set(EnemyWork* work, u8 arg1, u16 arg2);
 extern void hit_attack_list_push(void* arg0);
 extern void hit_knock_set(void* arg0, s32 arg1);
-extern void fn_802B01AC(Vec3* out, const Vec3* v, u8 area);
+extern void get_worldlocal_pos(Vec3* out, const Vec3* v, u8 area);
 extern f32 stg_area_ceiling_get(u8 area);
 extern u8 stage_map_kind_get(u8 arg0);
 extern void em_roster_record_release(s32 arg0);
@@ -689,7 +689,7 @@ void fn_8013823C(EnemyWork* self) {
             subVec3(&v20, &vD4, &vB0);
             copyVec3(&v98, &v20);
             if (vec3_dot(&vA4, &v98) >= lbl_80796D40) {
-                fn_802B01AC(&v14, &vD4, self->field_0x9F7);
+                get_worldlocal_pos(&v14, &vD4, self->field_0x9F7);
                 copyVec3(&self->field_0x188, &v14);
                 self->field_0x188.y = stg_area_ceiling_get(self->field_0x9F7);
                 em_area_change(self, 0);

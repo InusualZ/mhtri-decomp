@@ -77,7 +77,7 @@ struct EftModelRecord {
     /* +0x10 */ u32 unused_0x10;
 }; /* size: 0x14 */
 
-/* The per-state model set `fn_800F8B44` allocates; `fn_80101C74` passes 0x60 as its size to
+/* The per-state model set `fn_800F8B44` allocates; `eft004_area_set` passes 0x60 as its size to
  * `eft_res_slot_get`.  `fn_80101D70` releases `chars[0..char_count-1]` and then `main_char`. */
 /* One entry of a per-area table, 0x10 B: a position and a radius (GUESS from the values); a zero entry
  * ends the table.  `EftModelSet::area_spheres` holds the current area's table. */
@@ -107,7 +107,7 @@ struct EftModelSet {
 
 /* The effect-state record `eft_res_slot_get` hands out of its pool (record stride 0x48).  `fn_80101DB8` is
  * installed at +0x34 as the state dispatcher and `fn_80101D70` at +0x40 as the update handler;
- * `fn_80101C74` is the constructor and `eft_res_slot_release` the release path. */
+ * `eft004_area_set` is the constructor and `eft_res_slot_release` the release path. */
 struct EftState {
     /* +0x00 */ u8 in_use;   /* the pool allocator's busy flag */
     /* +0x01 */ u8 field_01; /* set once the state has been set up */
@@ -784,7 +784,7 @@ extern "C" void pl_segment_init(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0
 extern "C" void eft_vec_ctor(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" u8 pl_segment_sphere_hit(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
 extern "C" s32 stage_water_enabled_ck(void);
-extern "C" u32 fn_802B45D4(void);
+extern "C" u32 stage_oneshot_clear_ck(void);
 extern "C" u32 camera_mode1_ck(void);
 extern "C" u8 get_option_21(void);
 /* get_now_areano / get_now_mapno / eftGetKeyAlpha / vec_to_mh_vec3 come from `unsplit/unknown.h` as
@@ -874,7 +874,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     if (vec3_length_sq(&unit->world_pos) < 0.0001f) {
         return;
     }
-    if (fn_802B45D4() == 1) {
+    if (stage_oneshot_clear_ck() == 1) {
         return;
     }
     if (stage_water_enabled_ck() != 0) {

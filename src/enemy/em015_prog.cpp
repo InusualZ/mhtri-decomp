@@ -4533,7 +4533,7 @@ extern "C" void em015_act13_demo_c(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 2);
         em_mot_set(self, 0x28, 0, 0);
-        fn_802B1FEC();
+        stage_parts_break_all();
         em_demo_pos_set(self, -4150.0f, -480.0f, -7130.0f);
         em_demo_rot_set(self, 0.0f, 427.0f, 0.0f);
         break;

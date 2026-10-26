@@ -1,4 +1,4 @@
-/* The `stage` band unit `stage/fn_802B2AA0.cpp` - its types, its own entry points and the
+/* The `stage` band unit `stage/stage_light_blend_set.cpp` - its types, its own entry points and the
  * declarations of the symbols it calls (docs/plan.md 6.5 rules 1-5).
  *
  * `.text` 0x802B2AA0-0x802B5C58.  The unit's own notes, extent, flag evidence and residuals
@@ -24,7 +24,7 @@
 /* The band's `#pragma peephole off` is NOT here: a codegen pragma in a shared header leaks into every
  * including TU, so a lane matched a file only because of the leak and another lost rows until the
  * pragma was restated.  It belongs to the `.c`/`.cpp` that measured the dependency, and every including
- * TU that depends on it now states it there itself: `stage/fn_802B2AA0.cpp`, `enemy/em019_prog.cpp`,
+ * TU that depends on it now states it there itself: `stage/stage_light_blend_set.cpp`, `enemy/em019_prog.cpp`,
  * `enemy/em020_ai.cpp` and `enemy/em020_prog.cpp`.  `tools/units/stylelint.py` rule 10 fails a codegen
  * pragma in a shared header. */
 
@@ -33,7 +33,7 @@
  * ------------------------------------------------------------------------------------------------ */
 
 /* One 0x10-byte colour record the band stages (`stage_w` area slot +0x1BC / +0x1CC, and the blend
- * table records `fn_802B4E58` interpolates). */
+ * table records `stage_colour_cycle_update` interpolates). */
 /* size: 0x10 */
 typedef struct StageColourRec {
     /* +0x00 */ u32 colour;
@@ -175,7 +175,7 @@ typedef struct StageAreaObj {
     /* +0x4F7 */ u8 field_0x4F7;
 } StageAreaObj;
 
-/* One 0x10-byte record of the area blend table `fn_802B4CD0` picks and `fn_802B4D24` reads. */
+/* One 0x10-byte record of the area blend table `stage_blend_table_get` picks and `stage_colour_cycle_weight_get` reads. */
 /* size: 0x10 */
 /* The two joint-id lists one map/area entry holds: the ids to show and the ids to hide. */
 /* size: 0x08 */
@@ -211,7 +211,7 @@ typedef struct StageActorJoints {
     /* +0x15C */ u32 joint_count;
 } StageActorJoints;
 
-/* The colour blend source `fn_802B2AA0` reads: three 4-word groups, each a base colour, an axis
+/* The colour blend source `stage_light_blend_set` reads: three 4-word groups, each a base colour, an axis
  * colour and the two targets the base blends towards. */
 /* size: 0x10 */
 typedef struct StageBlendGroup {
@@ -235,9 +235,9 @@ typedef struct StageBlendRec {
  * ------------------------------------------------------------------------------------------------ */
 
 #include "unsplit/stage.h" /* `stage_w` (moved to the band header so a `pl.h` consumer can name it) */
-extern "C" u8 lbl_806BB7B8[];
-extern "C" u8 lbl_806BB7C4[];
-extern "C" u8 lbl_806BB7D0[];
+extern "C" u8 stg_entry_pos_none[];
+extern "C" u8 stg_entry_pos_menu[];
+extern "C" u8 stg_entry_pos_work[];
 extern "C" u8 camera_work[];
 
 /* ------------------------------------------------------------------------------------------------
@@ -336,32 +336,32 @@ extern "C" f32 lb_item_list_depth_get(u32 index);
 extern "C" s32 getItemListSelection(void);
 extern "C" u32 Pl_motion_input_ck(void* work);
 extern "C" s32 stage_water_surface_get(void* a, u8 area, s32 handle, void* out, s32 limit);
-extern "C" void fn_802AE1DC(StageColourRec* rec);
-extern "C" void fn_802AE250(void* out, const void* in);
+extern "C" void stage_fog_apply(StageColourRec* rec);
+extern "C" void stage_fog_copy(void* out, const void* in);
 extern "C" s32 stage_water_enabled_ck(void);
-extern "C" u8* fn_802B04A0(u8 kind);
-extern "C" void fn_802B0B7C(StageRuntime* st, u8 index);
+extern "C" u8* stage_area_word_get(u8 kind);
+extern "C" void stage_part_defs_get(StageRuntime* st, u8 index);
 extern "C" void stage_area_colour_update(void);
-extern "C" void fn_802B2F3C(StageColourRec* dst, const StageColourRec* src);
-extern "C" void fn_802B2F60(StageRuntime* st, u8 kind);
-extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode);
+extern "C" void stage_colour_rec_copy(StageColourRec* dst, const StageColourRec* src);
+extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind);
+extern "C" void stage_area_joint_visibility_set(StageRuntime* st, MHchar* chr, u8 mode);
 extern "C" u8 lb_unlock_cond5_get(void);
 extern "C" u8 lb_world_upgrade_get(s32 index);
 extern "C" u8 lb_unlock_cond22_flag_ck(void);
 extern "C" u8 lb_event_state_ck(void);
 extern "C" u32 lb_event_gate2_ck(void);
-extern "C" s32 fn_802B2978(u32 from, u32 to, f32 t);
+extern "C" s32 stage_colour_blend(u32 from, u32 to, f32 t);
 extern "C" s32 stage_torch_unlit_ck(u8 index);
 extern "C" s32 camera_angle_y_get(void);
 extern "C" void stage_area_event_dispatch(void* plw, u8 index);
-extern "C" f32 fn_802B4D24(s16 index, f32 span);
-extern "C" u32 fn_802B53CC(u32 base);
-extern "C" u32 fn_802B5488(u32 block);
-extern "C" u32 fn_802B54C4(u32 block);
-extern "C" u32 fn_802B5538(u32 rec);
-extern "C" u32 fn_802B5590(u32 slot);
-extern "C" u32 fn_802B55E8(u32 block);
-extern "C" StageBlendEntry* fn_802B4CD0(void);
+extern "C" f32 stage_colour_cycle_weight_get(s16 index, f32 span);
+extern "C" u32 stage_work_construct(u32 base);
+extern "C" u32 stage_sub34_clear(u32 block);
+extern "C" u32 stage_part_construct(u32 block);
+extern "C" u32 stage_area_construct(u32 rec);
+extern "C" u32 stage_area_row_construct(u32 slot);
+extern "C" u32 stage_slot_construct(u32 block);
+extern "C" StageBlendEntry* stage_blend_table_get(void);
 extern "C" void camera_work_setup(StageAreaObj* area, u8 index);
 extern "C" void camera_scene_posture_init(u8 index, s32 camera);
 extern "C" void camera_water_cell_update(StageAreaObj* area);
@@ -399,13 +399,13 @@ void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 area, long param);
  * the unit's own entry points (rule 2: other units include this header, not a local copy)
  * ------------------------------------------------------------------------------------------------ */
 
-extern "C" s32 fn_802B45D4(void);
-extern "C" void fn_802B45F4(u8 index);
-extern "C" u32 fn_802B53CC(u32 base);
-extern "C" u32 fn_802B5488(u32 block);
-extern "C" u32 fn_802B54C4(u32 block);
-extern "C" u32 fn_802B5538(u32 rec);
-extern "C" u32 fn_802B5590(u32 slot);
-extern "C" u32 fn_802B55E8(u32 block);
+extern "C" s32 stage_oneshot_clear_ck(void);
+extern "C" void stage_area_timer_arm(u8 index);
+extern "C" u32 stage_work_construct(u32 base);
+extern "C" u32 stage_sub34_clear(u32 block);
+extern "C" u32 stage_part_construct(u32 block);
+extern "C" u32 stage_area_construct(u32 rec);
+extern "C" u32 stage_area_row_construct(u32 slot);
+extern "C" u32 stage_slot_construct(u32 block);
 
 #endif /* MHTRI_STAGE_FN_802B2AA0_H */

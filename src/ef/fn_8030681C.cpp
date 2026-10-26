@@ -94,7 +94,7 @@ typedef struct Eft042Work {
             f32              angle;/* +0x18  its yaw (kind 1) */
         } kind1;
     } v_0x0C;
-    void*       resource;    /* +0x1C  the area resource `fn_80306524` stores */
+    void*       resource;    /* +0x1C  the area resource `lb_area_fx_set` stores */
 } Eft042Work;
 
 /* The kind-1 work area's own view (the kind-1 types' state bodies): the placement offset and its

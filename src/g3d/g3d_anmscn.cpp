@@ -161,8 +161,8 @@ ResHandle *fn_80067098(ResHandle *dst, const u32 &src);
 void fn_800670C8(u32 *dst, const u32 *src);
 LightAnmResult *fn_800677D8(LightAnmResult *self);
 void fog_set_color(Fog *self, GXColor color);
-void fn_80067A5C(Fog *self, f32 startz, f32 endz);
-void fn_80067AE4(Fog *self, s32 type);
+void fog_range_set(Fog *self, f32 startz, f32 endz);
+void fog_type_set(Fog *self, s32 type);
 FogAnmResult *fn_80067B5C(FogAnmResult *self);
 CameraAnmResult *fn_80067EB4(CameraAnmResult *self);
 u32 res_anm_light_get_id(const ResHandle *p);
@@ -1143,8 +1143,8 @@ void AnmScnRes::GetFog(Fog fog, u32 refNumber)
     FogAnmResult result;
     fn_80067B5C(&result);
     const FogAnmResult *pResult = GetFogResult(&result, refNumber);
-    fn_80067AE4(&fog, pResult->type);
-    fn_80067A5C(&fog, pResult->startz, pResult->endz);
+    fog_type_set(&fog, pResult->type);
+    fog_range_set(&fog, pResult->startz, pResult->endz);
     fog_set_color(&fog, static_cast<const ut::Color&>(pResult->color));
 }
 
@@ -1170,7 +1170,7 @@ typedef struct {
 } FogDataHead; /* size: 0xC (approximate - the record continues with its colour at +0x14) */
 
 /* Sets the fog's z range. */
-extern "C" void fn_80067A5C(Fog *self, f32 startz, f32 endz)
+extern "C" void fog_range_set(Fog *self, f32 startz, f32 endz)
 {
     if (fog_is_valid(self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CBC8, 0x4b, (const char *)lbl_8058CBA8);
@@ -1182,7 +1182,7 @@ extern "C" void fn_80067A5C(Fog *self, f32 startz, f32 endz)
 }
 
 /* Sets the fog's type. */
-extern "C" void fn_80067AE4(Fog *self, s32 type)
+extern "C" void fog_type_set(Fog *self, s32 type)
 {
     if (fog_is_valid(self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CB98, 0x41, (const char *)lbl_8058CB78);

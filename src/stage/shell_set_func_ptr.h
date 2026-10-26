@@ -49,7 +49,7 @@ struct ShellSetFuncs {
     /* +0x64 */ void (*method_0x64)(struct _ENEMY_WORK* self, u32 kind, u32 joint, f32 scale, u16 id,
                                     ShellSetFuncs* table);
     /* +0x68 */ void (*method_0x68)(struct _ENEMY_WORK* self, u32 kind, u32 id, f32 scale, nw4r::math::VEC3* pos);
-    /* +0x6C */ u8 pad_0x6C[0x70 - 0x6C];
+    /* +0x6C */ void (*slinger_special_fire)(struct _PLW* self, ShellSetFuncs* table);  /* the slinger special shell (`stage/stg_w.cpp`) */
     /* +0x70 */ void (*method_0x70)(struct _ENEMY_WORK* self, ShellSetFuncs* table);
     /* +0x74 */ void (*method_0x74)(struct _ENEMY_WORK* self, u32 kind, u32 joint, nw4r::math::VEC3* pos, f32 scale,
                                     u32 a, u16 b, ShellSetFuncs* table);

@@ -4451,7 +4451,7 @@ extern "C" void pl_act_stage_latch_set(struct _PLW* plw, u8 stage)
 }
 
 /* True when the act's follow-up stage is open and the player is in a state that may use it. */
-extern "C" s32 fn_80274794(struct _PLW* plw)
+extern "C" s32 pl_warp_ready_ck(struct _PLW* plw)
 {
     if (Pl_master_ck(plw) == 0) {
         return 0;
@@ -9390,17 +9390,17 @@ extern "C" s32 pl_act_84_86_ck(_PLW* self) {
 
 /* Reports the first of the three per-slot gate bytes at 0x806BB7A0 as empty. */
 extern "C" s32 pl_work_flag0_clear_ck(void) {
-    return lbl_806BB7A0[0].flag_0x00 == 0;
+    return stg_place_timers[0].flag_0x00 == 0;
 }
 
 /* Reports the second gate byte as empty. */
 extern "C" s32 pl_work_flag8_clear_ck(void) {
-    return lbl_806BB7A0[1].flag_0x00 == 0;
+    return stg_place_timers[1].flag_0x00 == 0;
 }
 
 /* Reports the third gate byte as empty. */
 extern "C" s32 fn_8027DC90(void) {
-    return lbl_806BB7A0[2].flag_0x00 == 0;
+    return stg_place_timers[2].flag_0x00 == 0;
 }
 
 /* The +0x460 timer, as a boolean. */

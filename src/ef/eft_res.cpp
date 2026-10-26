@@ -209,15 +209,15 @@ void eft_res_pool_reset(void);
 void eft_control_init(void);
 void eft_res_release_all(void);
 void fn_800F6984(u8, u8, EftResFile*, u8*);
-void fn_800F69A0(u32, EftResFile*, u8*);
-void fn_800F69B8(void);
+void eft_pro_slot_list_set(u32, EftResFile*, u8*);
+void eft_res_stage_release_all(void);
 void fn_800F6A24(void);
 void fn_800F6A78(u8);
 EftProSlot* fn_800F6AC8(u32);
 u32 eft_res_release(u8);
 EftProSlot* fn_800F7AA4(u32);
 void fn_800F7BF0(EftProSlot*);
-void fn_800F7C74(u32);
+void eft_res_bind(u32);
 void fn_800F7D44(u8*, void*, EftLoadCtx*, EftLoadCtx*);
 void fn_800F7F18(EftResFile*, s32, u32, u8*);
 void fn_800F8358(char*, void*, u32, EftFileLoadCtx*);
@@ -332,7 +332,7 @@ extern "C" void eft_control_init(void) {
     u8* heap;
     u32 count;
 
-    fn_800F7C74(0);
+    eft_res_bind(0);
 
     eft_control.slots_0x10 = (EftResSlot*)get_move_work_adrs(4);
     eft_control.slot_count_0x0C = get_move_work_max(4);
@@ -411,12 +411,12 @@ extern "C" void fn_800F6984(u8 a, u8 b, EftResFile* desc, u8* table) {
 }
 
 /* 0x800F69A0 - load one resource set with flag word 1. */
-extern "C" void fn_800F69A0(u32 a, EftResFile* desc, u8* table) {
+extern "C" void eft_pro_slot_list_set(u32 a, EftResFile* desc, u8* table) {
     fn_800F7F18(desc, (u8)a, 1, table);
 }
 
 /* 0x800F69B8 - retire every slot whose kind/state pair says its resource list is live. */
-extern "C" void fn_800F69B8(void) {
+extern "C" void eft_res_stage_release_all(void) {
     EftProSlot* slot = &eft_pro_slots()[0x100 - 1];
 
     for (s32 i = 0xFF; i >= 0; i--) {
@@ -1251,7 +1251,7 @@ extern "C" void fn_800F7BF0(EftProSlot* slot) {
 }
 
 /* 0x800F7C74 - rebuild the resource walker and (in mode 0) hand every armed slot to fn_800F7BF0. */
-extern "C" void fn_800F7C74(u32 mode) {
+extern "C" void eft_res_bind(u32 mode) {
     EftControl* ctrl = &eft_control;
 
     if ((u8)mode == 0) {
@@ -1325,7 +1325,7 @@ extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx
         slot->field_0x14 = ef_resource_add_texture_project(work, data);
         break;
     }
-    fn_800F7C74(1);
+    eft_res_bind(1);
 }
 
 /* 0x800F7F18 (0x440): requests the load of every file of a descriptor run into the proID slots `ids` names: mode
@@ -1564,7 +1564,7 @@ extern "C" void fn_800F8358(char* path, void* data, u32 size, EftFileLoadCtx* ct
             ctrl->loaded_b_0x34++;
             slot->field_0x14 = ef_resource_add_texture_project(resource, file);
             slot->field_0x05 = table[3]++;
-            fn_800F7C74(1);
+            eft_res_bind(1);
             break;
         }
         slot->kind_0x00 = 2;

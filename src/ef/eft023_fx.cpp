@@ -1,12 +1,12 @@
 /* ef/eft023_fx.cpp - the eft023 and eft024 job machines.  Each creator takes the 0x48-byte `_EFT` record with a work
- *   block from `eft_res_slot_get`, stamps `+0x03` and installs its hooks: 23 `fn_80116770` (0x4C `_EFT_JOB_WORK`,
- *   release `fn_8011688C`, dispatch `fn_8011689C`), 24 `fn_80116DA4` (0x84 `_EFT_JOB2_WORK`, `fn_80116FCC`,
+ *   block from `eft_res_slot_get`, stamps `+0x03` and installs its hooks: 23 `eft023_area_fx_set` (0x4C `_EFT_JOB_WORK`,
+ *   release `fn_8011688C`, dispatch `fn_8011689C`), 24 `eft023_area_fx2_set` (0x84 `_EFT_JOB2_WORK`, `fn_80116FCC`,
  *   `fn_80116FDC`).
  * RANGE. .text 0x80116770-0x8011722C (19 functions); extab 0x8000C464-0x8000C494, extabindex 0x80026580-0x800265C8,
  *   .data 0x805A0380-0x805A0460, .sdata2 0x80796A60-0x80796A80.  A TU of its own: its `.sdata2` pool repeats
  *   `ef/eft022_fx.cpp`'s 1.0f, -1.0f, 0.5f and int-to-float magic (0x80796A60..0x80796A7C, read by `fn_801168D8`/
  *   `fn_80116B00`), its `.data` 0x805A0380-0x805A0460 is read only by `fn_801168D8`, and extabindex 0x80026580 opens on
- *   `fn_80116770`.  `ef/fn_8011722C.c` follows.
+ *   `eft023_area_fx_set`.  `ef/fn_8011722C.c` follows.
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (playbook 39) and `#pragma unroll off` around
  *   `fn_80117120`.
  * NAMES. The file name is a GUESS (the next family number after `ef/eft022_fx.cpp`).  The map has only `fn_` stems,
@@ -91,14 +91,14 @@ struct _EFT_JOB2_WORK {
     /* +0x82 */ s16 per_type[1];
 };
 
-extern "C" void fn_80116770(void);
+extern "C" void eft023_area_fx_set(void);
 extern "C" void fn_8011688C(_EFT*);
 extern "C" void fn_8011689C(_EFT*);
 extern "C" void fn_801168D8(_EFT*);
 extern "C" void fn_80116B00(_EFT*);
 extern "C" void fn_80116D90(_EFT*);
 extern "C" void fn_80116DA0(_EFT*);
-extern "C" void fn_80116DA4(void);
+extern "C" void eft023_area_fx2_set(void);
 extern "C" void* fn_80116E14(s16);
 extern "C" void fn_80116E1C(_EFT*, s16, s32);
 extern "C" s16 fn_80116EEC(_EFT*);
@@ -126,7 +126,7 @@ extern "C" f64 lbl_80796A78;
  * --------------------------------------------------------------------------------------------------- */
 
 /* Creates the eft023 record and its per-area model set. */
-extern "C" void fn_80116770(void)
+extern "C" void eft023_area_fx_set(void)
 {
     _EFT* effect;
     _EFT_JOB_WORK* work;
@@ -323,7 +323,7 @@ extern "C" void fn_80116DA0(_EFT* self)
  * --------------------------------------------------------------------------------------------------- */
 
 /* Creates the eft024 job record. */
-extern "C" void fn_80116DA4(void)
+extern "C" void eft023_area_fx2_set(void)
 {
     _EFT* effect = eft_res_slot_get_c1(0x84);
 

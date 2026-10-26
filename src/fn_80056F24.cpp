@@ -296,9 +296,9 @@ extern "C" void fn_80058BA4(u32 a, u32 b, u32 c, u32 d) {
  * Glare-filter setters.
  * ------------------------------------------------------------------------------------------------- */
 
-/* `fn_80057810`: the glare blend/filter selectors. arg0 picks the source fade mode, arg1 the filter
+/* `light_mode_set`: the glare blend/filter selectors. arg0 picks the source fade mode, arg1 the filter
  * mode and arg2 the compare mode. */
-extern "C" void fn_80057810(u8 arg0, u8 arg1, u8 arg2) {
+extern "C" void light_mode_set(u8 arg0, u8 arg1, u8 arg2) {
     GameDrawState* s = &lbl_8066ACF8;
     if (arg0 == 0) {
         s->field_0x07A = 1;
@@ -319,8 +319,8 @@ extern "C" void fn_80057810(u8 arg0, u8 arg1, u8 arg2) {
     s->field_0x08C = 2;
 }
 
-/* `fn_80057888`: the glare colour. */
-extern "C" void fn_80057888(u8 r, u8 g, u8 b) {
+/* `light_mode_rgb_set`: the glare colour. */
+extern "C" void light_mode_rgb_set(u8 r, u8 g, u8 b) {
     lbl_8066ACF8.field_0x076 = r;
     lbl_8066ACF8.field_0x077 = g;
     lbl_8066ACF8.field_0x078 = b;

@@ -457,8 +457,8 @@ void cockpit_pointer_target_set(u16 id, s8 index);
 void em_ground_rec_clear(void* text);
 void em_small_spawn_stat(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void em_res_peer_count_inc(s8 value, u8 index);
-void fn_802B09B8(u8 a, u8 b);
-void fn_802B45F4(u8 index);
+void stage_area_flag_set(u8 a, u8 b);
+void stage_area_timer_arm(u8 index);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */

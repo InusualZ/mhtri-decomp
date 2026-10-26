@@ -209,7 +209,7 @@ typedef struct PlSlotGate {
                                   * state machine reloads entry 1's copy after its last state */
 } PlSlotGate;
 
-extern PlSlotGate lbl_806BB7A0[3];
+extern PlSlotGate stg_place_timers[3];
 
 /* 0x806AB810 (.bss, 0x20 B = eight 4-byte table pointers, the map's size): the two per-kind row
  * tables `fn_8027E2A8`/`fn_8027E354` index after `equip_kind_table_class` validates the kind. */

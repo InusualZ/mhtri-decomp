@@ -92,7 +92,7 @@
 /* ------------------------------------------------------------------------------------------------ */
 
 extern "C" u16 lbl_80794B68;
-extern "C" void* fn_802C1D68(u8 index);
+extern "C" void* light_obj_area_select(u8 index);
 extern "C" void fn_802C1E14(void* self, void* arg);
 extern "C" LightWrap* fn_802C2664(LightWrap* self);
 extern "C" LightWrap2* fn_802C2698(LightWrap2* self);
@@ -182,7 +182,7 @@ extern "C" s32 fn_802C2510(s32 value, s32 low, s32 high)
 /* Rebuilds the light the given slot's record holds. */
 extern "C" void light_dir_set(void* arg)
 {
-    fn_802C1E14(fn_802C1D68(0), arg);
+    fn_802C1E14(light_obj_area_select(0), arg);
 }
 
 /* Constructs a record by constructing its +0x04 member. */
@@ -209,7 +209,7 @@ extern "C" LightVecAt4* fn_802C26CC(LightVecAt4* self)
 /* Re-initialises the light work after the pad's motor callback. */
 extern "C" void light_demo_end(void)
 {
-    fn_802AEC00();
+    stage_area_ambient_apply();
     fn_802C0728();
 }
 

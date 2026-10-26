@@ -956,7 +956,7 @@ extern "C" void eft_spawn_type11(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 k
 }
 
 /* 0x801067F4 - spawn a type-11 enemy effect and install the fn_801068E4/fn_80106920 pair. */
-extern "C" void fn_801067F4(u8 type, nw4r::math::VEC3* pos, f32 scale, u8 areano, u32 timer) {
+extern "C" void eft_area_part_break_set(u8 type, nw4r::math::VEC3* pos, f32 scale, u8 areano, u32 timer) {
     if ((u8)areano != get_now_areano()) {
         return;
     }

@@ -215,7 +215,7 @@ extern f32 sqrt_f32(f32 x);
 extern f32 atan2f(f32 y, f32 x);
 /* `eft_slot_effect_key` (0x8034539C): its owner's header, `ef/eft_slot.h` (rule 2). */
 extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u32 flag);
-extern void fn_802B01AC(Vec3 *out, Vec3 *in, u32 idx);
+extern void get_worldlocal_pos(Vec3 *out, Vec3 *in, u32 idx);
 extern f32 stg_area_ceiling_get(u32 idx);
 }
 
@@ -329,7 +329,7 @@ u8 fn_80140768(u8* in);
 s16 fn_80140778(u8* in, u8 code, u8 mode);
 void fn_80140AF8(_ENEMY_WORK* self, u32 a, u8 b);
 void fn_80140B0C(u8 a, u8 b, u8 c);
-void fn_80140DAC(EmFileRow* dst, EmFileRow* src);
+void em_res_file_row_copy(EmFileRow* dst, EmFileRow* src);
 s32 fn_80140E48(char* name, u32 size, u8 flag);
 void fn_80140EE8(char* name, u32 size, u32 a, u32 b, u32 c, u32* ctx);
 s32 fn_80140FB0(char* name, u32 size, u8 flag);
@@ -1515,7 +1515,7 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
         if (self->field_0x9F7 != self->area_no && self->field_0x9F7 != 255) {
             get_worldworld_pos_out(&c, &self->pos, self->area_no);
             copyVec3(&a, &c);
-            fn_802B01AC(&d, &a, self->field_0x9F7);
+            get_worldlocal_pos(&d, &a, self->field_0x9F7);
             copyVec3(&self->pos, &d);
             self->pos.y = stg_area_ceiling_get(self->field_0x9F7);
             em_area_change(self, 0);
@@ -2431,7 +2431,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
         return;
     }
     rec = (u8*)nw_res_entry_get(work->handle_0x08);
-    fn_80140DAC(&row, (EmFileRow*)((u8*)nw_res_manager + res_mem_index_get(name) * 0x4C + 0x3070));
+    em_res_file_row_copy(&row, (EmFileRow*)((u8*)nw_res_manager + res_mem_index_get(name) * 0x4C + 0x3070));
     if (rec == NULL) {
         return;
     }
@@ -2444,7 +2444,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
 }
 
 #pragma peephole off
-void fn_80140DAC(EmFileRow* dst, EmFileRow* src) {
+void em_res_file_row_copy(EmFileRow* dst, EmFileRow* src) {
     *dst = *src;
 }
 
