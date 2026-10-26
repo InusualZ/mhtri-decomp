@@ -133,7 +133,7 @@ extern "C" void pl_se_req_charge_tip(_PLW* self, nw4r::math::VEC3* pos)
     }
 }
 
-extern "C" void fn_800DD770(_PLW* self, nw4r::math::VEC3* pos)
+extern "C" void pl_se_charge_level_req(_PLW* self, nw4r::math::VEC3* pos)
 {
     _se_w* work = self->field_0xAFC;
     if (work) {

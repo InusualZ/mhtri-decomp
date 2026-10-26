@@ -37,109 +37,109 @@ void pl_weapon1_act_dispatch(_PLW* self)
 {
     switch (self->act_no) {
     case 0:
-        fn_80282CCC(self, 0);
+        pl_weapon1_act_combo(self, 0);
         return;
     case 1:
-        fn_80282CCC(self, 1);
+        pl_weapon1_act_combo(self, 1);
         return;
     case 2:
-        fn_80282CCC(self, 2);
+        pl_weapon1_act_combo(self, 2);
         return;
     case 3:
-        fn_80282CCC(self, 3);
+        pl_weapon1_act_combo(self, 3);
         return;
     case 4:
-        fn_80282ED8(self, 0);
+        pl_weapon1_act_shell_swing(self, 0);
         return;
     case 5:
-        fn_80282ED8(self, 1);
+        pl_weapon1_act_shell_swing(self, 1);
         return;
     case 6:
-        fn_80283010(self, 0);
+        pl_weapon1_act_double(self, 0);
         return;
     case 7:
-        fn_80283010(self, 1);
+        pl_weapon1_act_double(self, 1);
         return;
     case 8:
-        fn_80283010(self, 2);
+        pl_weapon1_act_double(self, 2);
         return;
     case 9:
-        fn_802831EC(self, 0);
+        pl_weapon1_act_turn_swing(self, 0);
         return;
     case 10:
-        fn_802831EC(self, 1);
+        pl_weapon1_act_turn_swing(self, 1);
         return;
     case 11:
-        fn_802831EC(self, 2);
+        pl_weapon1_act_turn_swing(self, 2);
         return;
     case 12:
-        fn_802833F4(self, 0);
+        pl_weapon1_act_swing2(self, 0);
         return;
     case 13:
-        fn_802833F4(self, 1);
+        pl_weapon1_act_swing2(self, 1);
         return;
     case 14:
-        fn_8028350C(self);
+        pl_weapon1_act_chain(self);
         return;
     case 15:
-        fn_802835D8(self);
+        pl_weapon1_act_single(self);
         return;
     case 16:
-        fn_802836A4(self, 0);
+        pl_weapon1_act_combo3(self, 0);
         return;
     case 17:
-        fn_802836A4(self, 1);
+        pl_weapon1_act_combo3(self, 1);
         return;
     case 18:
-        fn_802836A4(self, 2);
+        pl_weapon1_act_combo3(self, 2);
         return;
     case 19:
-        fn_80283810(self, 1);
+        pl_weapon1_act_rise(self, 1);
         return;
     case 20:
-        fn_80283810(self, 0);
+        pl_weapon1_act_rise(self, 0);
         return;
     case 21:
-        fn_802839A8(self, 0);
+        pl_weapon1_act_double3(self, 0);
         return;
     case 22:
-        fn_802839A8(self, 1);
+        pl_weapon1_act_double3(self, 1);
         return;
     case 23:
-        fn_80283B88(self);
+        pl_weapon1_act_single3(self);
         return;
     case 24:
-        fn_80283C60(self, 0);
+        pl_weapon1_act_finisher3(self, 0);
         return;
     case 25:
-        fn_80283DB0(self);
+        pl_weapon1_act_chain3(self);
         return;
     case 26:
-        fn_80283E80(self);
+        pl_weapon1_act_kick3(self);
         return;
     case 27:
-        fn_80283F24(self);
+        pl_weapon1_act_kick(self);
         return;
     case 28:
-        fn_802831EC(self, 3);
+        pl_weapon1_act_turn_swing(self, 3);
         return;
     case 29:
-        fn_802831EC(self, 4);
+        pl_weapon1_act_turn_swing(self, 4);
         return;
     case 30:
-        fn_80283FC8(self, 0);
+        pl_weapon1_act_turn3(self, 0);
         return;
     case 31:
-        fn_80283FC8(self, 1);
+        pl_weapon1_act_turn3(self, 1);
         return;
     case 32:
-        fn_80283FC8(self, 2);
+        pl_weapon1_act_turn3(self, 2);
         return;
     case 33:
-        fn_802839A8(self, 2);
+        pl_weapon1_act_double3(self, 2);
         return;
     case 34:
-        fn_80283C60(self, 1);
+        pl_weapon1_act_finisher3(self, 1);
         return;
     }
 }

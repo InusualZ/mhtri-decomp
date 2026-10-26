@@ -276,7 +276,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
 /* This unit's own entry points, in address order, and the callees its written bodies call.
  *
  * The callees split three ways by whose header can supply a declaration (rule 2):
- *   * `Pl/pl_act.cpp` (`fn_8027EB18`, `fn_8027E120`), `pad_connect.cpp` (`screen_split_mode_ck`) and
+ *   * `Pl/pl_act.cpp` (`fn_8027EB18`, `pl_alive_act_ck`), `pad_connect.cpp` (`screen_split_mode_ck`) and
  *     `fn_80040598.cpp` (`kbd_close_call`) have no header that declares these, so the shapes here are this unit's
  *     call sites'; `mh3_pad.h` cannot be included here because it and `ef.h` (which `pl.h` pulls in) collide.
  *   * `GameMode_ck` keeps its owner's (`ef/fn_800CDB2C.h`) `u8` spelling: a `u32` view is `(10505) illegal

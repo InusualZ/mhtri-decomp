@@ -87,6 +87,7 @@ void rotVecX(VEC3* v, u32 angle);
 void rotVecY(VEC3* v, u32 angle);
 void rotVecZ(VEC3* v, u32 angle);
 void rotVecXYZ(VEC3* v, struct _CP_VECTOR* ang);
+void rotVecZXY(VEC3* v, struct _CP_VECTOR* ang);
 void mulVecMat(VEC3* v, MTX34* m);
 void copyMat33(MTX34* dst, MTX34* src);
 

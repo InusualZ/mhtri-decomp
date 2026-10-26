@@ -16,22 +16,22 @@ extern "C" {
  * families are the ones carrying an index argument and the ones that take only the actor).  The
  * call site's own register width is all there is to go on: the index is `li`-materialised (0-4) and
  * the actor is the same `_PLW` every other Pl entry takes. */
-void fn_80282CCC(struct _PLW* self, u32 arg);
-void fn_80282ED8(struct _PLW* self, u32 arg);
-void fn_80283010(struct _PLW* self, u32 arg);
-void fn_802831EC(struct _PLW* self, u32 arg);
-void fn_802833F4(struct _PLW* self, u32 arg);
-void fn_8028350C(struct _PLW* self);
-void fn_802835D8(struct _PLW* self);
-void fn_802836A4(struct _PLW* self, u32 arg);
-void fn_80283810(struct _PLW* self, u32 arg);
-void fn_802839A8(struct _PLW* self, u32 arg);
-void fn_80283B88(struct _PLW* self);
-void fn_80283C60(struct _PLW* self, u32 arg);
-void fn_80283DB0(struct _PLW* self);
-void fn_80283E80(struct _PLW* self);
-void fn_80283F24(struct _PLW* self);
-void fn_80283FC8(struct _PLW* self, u32 arg);
+void pl_weapon1_act_combo(struct _PLW* self, u32 arg);
+void pl_weapon1_act_shell_swing(struct _PLW* self, u32 arg);
+void pl_weapon1_act_double(struct _PLW* self, u32 arg);
+void pl_weapon1_act_turn_swing(struct _PLW* self, u32 arg);
+void pl_weapon1_act_swing2(struct _PLW* self, u32 arg);
+void pl_weapon1_act_chain(struct _PLW* self);
+void pl_weapon1_act_single(struct _PLW* self);
+void pl_weapon1_act_combo3(struct _PLW* self, u32 arg);
+void pl_weapon1_act_rise(struct _PLW* self, u32 arg);
+void pl_weapon1_act_double3(struct _PLW* self, u32 arg);
+void pl_weapon1_act_single3(struct _PLW* self);
+void pl_weapon1_act_finisher3(struct _PLW* self, u32 arg);
+void pl_weapon1_act_chain3(struct _PLW* self);
+void pl_weapon1_act_kick3(struct _PLW* self);
+void pl_weapon1_act_kick(struct _PLW* self);
+void pl_weapon1_act_turn3(struct _PLW* self, u32 arg);
 
 /* One row of a class-7 handler's motion-row table (`pl_act_class7_handler_04_rows` and its siblings): a plain
  * motion with its two set-up values, then the motion the step table drives with its two values and the attack

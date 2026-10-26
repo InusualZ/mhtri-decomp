@@ -1352,7 +1352,7 @@ extern "C" u32 menu_item_input_ok(MenuSlot* slot)
         if (Pl_motion_input_ck(0) == 1) {
             return 0;
         }
-        if (fn_8027E120(worker) == 0) {
+        if (pl_alive_act_ck(worker) == 0) {
             return 0;
         }
     } else {

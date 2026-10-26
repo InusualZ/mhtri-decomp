@@ -321,8 +321,8 @@ struct _PLW {
     /* +0x0D0 */ union {   /* 0x0D0-0x10F: the id bit sets as u32 words, and the master band's two per-part u16 tables over the same bytes */
         struct {
             /* +0x0D0 */ u8 pad_0xD0[0xC];
-            /* +0x0DC */ u32 id_flags_0xDC;  /* the id bit set/tested/cleared by fn_8026A6D8 / pl_id_bit_ck /
-                                              * fn_8026A718 (bit `id & 31`) */
+            /* +0x0DC */ u32 id_flags_0xDC;  /* the id bit set/tested/cleared by pl_id_bit_set / pl_id_bit_ck /
+                                              * pl_id_bit_clear (bit `id & 31`) */
             /* +0x0E0 */ u32 id_flags_0xE0[4];  /* 128 ids, set/tested by fn_8026A618 / pl_part_flag_ck */
             /* +0x0F0 */ u32 id_flags_0xF0[4];  /* 128 ids, set/tested by fn_8026A678 / pl_part_flag2_ck */
             /* +0x100 */ u8 pad_0x100[0x10];
@@ -575,7 +575,8 @@ struct _PLW {
                                 /* +0x364 */ u32 field_0x364;
         };
     };
-    /* +0x368 */ u8 unk368;
+    /* +0x368 */ u8 charge_stage_seen_0x368;   /* the charge stage the charge sound last announced (the weapon-0
+                                               * dispatcher copies +0x312 here each frame, `Pl/pl_act.cpp`) */
     /* +0x369 */ union { /* the original and later names of the same byte (rule 5) */
         struct {   /* the original layout: every member keeps its own offset */
             /* +0x369 */ u8 unk369;

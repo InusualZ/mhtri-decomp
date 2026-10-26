@@ -14,7 +14,7 @@ extern "C" {
 
 /* 0x8027D7EC - 1 when the player's act hides its effects (act 10..14/102..103 for mode <= 1, 74..78/104..105 for
  * mode 0 or 2, with +0x0A clear), else 0.  GUESS name. */
-u32 pl_act_no_eft_ck(struct _PLW* plw, u32 mode);
+u32 pl_act_no_eft_ck(struct _PLW* plw, s32 mode);
 
 #ifdef __cplusplus
 }

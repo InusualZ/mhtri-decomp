@@ -75,17 +75,17 @@ void pl_guard_break_apply(struct _PLW* plw);
 u32 fn_802745DC(struct _PLW* plw, s16 kind);
 s32 pl_stagger_level_get(void* self);
 s32 pl_weapon_guard_ck(struct _PLW* plw);
-s32 fn_80274AEC(u8 kind);
+s32 fn_80274AEC(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind);
 
 /* The equipment-slot resolvers of `Pl/pl_act.cpp`'s equipment section (0x8027D684-0x802840DC), with their
  * definitions' signatures. */
 void* equip_slot_rec_get(struct _EQUIP* equip);
 s32 equip_defense_get(void* slot);
-s16 equip_gun_level_bonus_get(struct _EQUIP* equip);
+s32 equip_gun_level_bonus_get(struct _EQUIP* equip);
 s32 fn_8027E708(struct _EQUIP* equip);
 void* equip_weapon_rec_get(void* equip);
-void fn_8027ED28(struct _EQUIP* equip);
-void* fn_8027EE08(struct _EQUIP* equip, u32 arg2, u32 arg3);
+u8 equip_bowgun_frame_kind_get(struct _EQUIP* equip);
+s32 fn_8027EE08(struct _EQUIP* equip, struct PlSkillRec** blade, struct PlWeaponRec** gun);
 s32 equip_gun_clip_get(struct _EQUIP* equip, u8 kind);
 u32 equip_gun_bonus_ck(struct _EQUIP* equip);
 
@@ -111,10 +111,10 @@ s32 pl_warp_ready_ck(struct _PLW* plw);
 
 /* 0x80274808 / 0x80275AFC - the follow-up stage byte and the act kind byte. */
 u8 pl_act_stage_get(struct _PLW* plw);
-void pl_act_kind_set(struct _PLW* plw, s8 value);
+void pl_act_kind_set(struct _PLW* plw, u8 value);
 
 /* 0x802761DC - the motion-parameter act-state entry. */
-void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c);
+void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c, u32 param_a, u32 param_b);
 
 /* 0x80274810 / 0x80274850 - the player's own move work record and its sibling scan. */
 void* pl_partner_work_get(struct _PLW* plw);
@@ -139,7 +139,7 @@ s32 pl_act_menu_lock_ck(struct _PLW* plw);
 u8 item_bonus_class_get(u16 kind);
 s32 pl_act_kind_column_get(struct _PLW* plw);
 void pl_weapon_alt_form_ck(struct _PLW* plw);
-s16 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out);
+s32 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out);
 s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 s32 fn_80274570(struct _PLW* plw);

@@ -13,6 +13,10 @@ extern "C" {
 
 /* 0x802BE038 */
 u32 get_camera_rot_y(void);
+/* 0x802BE060 - the current camera's pitch (x rotation), 16 bits in the low word. */
+u32 get_camera_rot_x(void);
+/* 0x802B8E48 - the camera's tilt state byte (0: level). */
+u8 camera_tilt_state_get(void);
 
 /* 0x802BDDB0 - the current camera's target (look-at) position, written through `out`. */
 void get_camera_target_pos(nw4r::math::VEC3* out);

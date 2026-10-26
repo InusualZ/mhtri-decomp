@@ -33,7 +33,7 @@ u32 skill_name_get(u16 id);
 s32 equip_custom_color_rgba_get(struct _EQUIP* equip);
 /* 0x8027F0F4 (0x28): the class byte (+0x00) of the species record `id` selects. */
 u8 item_species_class_get(u16 id);
-u32 fn_8027E120(struct _PLW* worker);
+u32 pl_alive_act_ck(struct _PLW* worker);
 /* untyped: the equipment-slot record the caller casts to its own view */
 void* equip_armor_ex_rec_find(u8 kind, u16 index);
 void pl_act_enter(struct _PLW* plw, s32 a, u16 b, u16 c);
@@ -183,7 +183,7 @@ void pl_act_hold_motion_set(_PLW* self, u8* arg1);
 /* The charge-level and weapon queries `ef/eft029_fx.cpp` reads: the player's charge stage, a signed frame value of the
  * act tables and the weapon tip's world position. */
 u8 pl_charge_stage_get(struct _PLW* plw);
-s16 pl_act_frame_get(struct _PLW* plw, s32 a, s32 b);
+s32 pl_act_frame_get(struct _PLW* plw, u8 mode, s32 elapsed);
 void pl_impact_pos_get(struct _PLW* plw, nw4r::math::VEC3* out);
 
 s32 pl_attack_range_tier_get(struct _PLW* self);

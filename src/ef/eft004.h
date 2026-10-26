@@ -34,6 +34,8 @@ void eft004_hold_item_spawn(void* self);
  * this is the callable spelling of the map name `eft004_set_pl2__FP4_PLWUcUlfffUl` (rule 9). */
 struct _PLW;
 void eft004_set_pl2(struct _PLW* self, u8 type, u32 param, f32 a, f32 b, f32 c, u32 extra);
+/* 0x801004B8 - the player-owned eft004 setter; C++ scope, the callable spelling of `eft004_set_pl__FP4_PLWUcfffUl`. */
+void eft004_set_pl(struct _PLW* self, u8 type, f32 a, f32 b, f32 c, u32 param);
 #endif
 
 #endif /* MHTRI_EF_EFT004_H */

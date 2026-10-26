@@ -14,7 +14,9 @@ struct _PLW;
  * shown as `type + 6`, a negative value only under skill 201.  `slot_count` is a GUESS: the byte `weapon_slot_count_get`
  * hands to the 2061-sprite putter.  size: 0x18 (the row stride) */
 typedef struct PlSkillRec {
-    /* +0x00 */ u8 pad_0x00[0x8];
+    /* +0x00 */ u16 variant;         /* the model variant `equip_variant_get` hands back */
+    /* +0x02 */ u8 rarity;           /* `Get_equip_rare`'s value for a blademaster weapon */
+    /* +0x03 */ u8 pad_0x03[0x5];
     /* +0x08 */ u8 level_a;          /* scaled by 0x32 and biased by 0x96 into `+0x56E` (`pl_weapon_record_read`) */
     /* +0x09 */ u8 level_b;          /* the sibling level the same function scales */
     /* +0x0A */ u8 pad_0x0A[0x2];
@@ -24,14 +26,19 @@ typedef struct PlSkillRec {
     /* +0x0F */ s8 element_a_value;  /* negative = hidden */
     /* +0x10 */ u8 element_b_type;   /* 0 = none */
     /* +0x11 */ s8 element_b_value;  /* negative = hidden */
-    /* +0x12 */ u8 pad_0x12[0x1];
+    /* +0x12 */ u8 deco_slots;       /* the decoration slots (`equip_deco_slots_get`) */
     /* +0x13 */ u8 phial_type;       /* a switch axe's phial (string table 0x2F's row); GUESS, from the info screen */
-    /* +0x14 */ u8 pad_0x14[0x4];
+    /* +0x14 */ u8 pad_0x14[0x2];
+    /* +0x16 */ u8 dye;              /* the blade dye; `equip_color_tier_get` groups it by five */
+    /* +0x17 */ u8 pad_0x17[0x1];
 } PlSkillRec; /* size: 0x18 */
 
 /* The weapon/skill record an equipment slot resolves to (the 0x24-byte sibling table). size: 0x24 */
 typedef struct PlWeaponRec {
-    /* +0x00 */ u8 pad_0x00[0x6];
+    /* +0x00 */ u16 variant;     /* the model variant `equip_variant_get` hands back (0: none, for kinds 12/13) */
+    /* +0x02 */ u8 rarity;       /* `Get_equip_rare`'s value for a gun part */
+    /* +0x03 */ u8 growth_row;   /* the row of the gun growth table `equip_gun_level_bonus_get` sums */
+    /* +0x04 */ s16 base_value;  /* the value `equip_gun_level_bonus_get` adds the growth rows onto */
     /* +0x06 */ u8 bonus_0x06;   /* the mode-0 points `pl_weapon_stat_get` reads through `fn_8027E708` */
     /* +0x07 */ s8 bonus_0x07;   /* the points `pl_gun_recoil_get` accumulates */
     /* +0x08 */ u8 defense_bonus; /* the defence a weapon adds (the info screen sums a bowgun's three parts) */
@@ -39,28 +46,42 @@ typedef struct PlWeaponRec {
     /* +0x0A */ s16 bonus_0x0A;  /* the bonus `pl_gun_deviation_get` scales by 1/100 */
     /* +0x0C */ u8 pad_0x0C[0x4];
     /* +0x10 */ u8 recoil_kind;   /* the row of the info screen's recoil tables (a frame's rating and icon, a stock's) */
-    /* +0x11 */ u8 pad_0x11[0x1];
+    /* +0x11 */ u8 deco_slots;    /* the decoration slots (`equip_deco_slots_get`) */
     /* +0x12 */ s8 bonus_0x12;   /* the points `pl_weapon_affinity_get`/`pl_weapon_class_refresh` add up */
-    /* +0x13 */ u8 pad_0x13[0x2];
+    /* +0x13 */ u8 pad_0x13[0x1];
+    /* +0x14 */ u8 clip_row;      /* the row of the clip table `equip_gun_clip_get` reads */
     /* +0x15 */ u8 bonus_flag_0x15; /* non-zero: a gun slot's bonus applies (`equip_gun_bonus_ck`) */
-    /* +0x16 */ u8 pad_0x16[0xE];
+    /* +0x16 */ u8 pad_0x16[0x6];
+    /* +0x1C */ u32 clip_mask[2]; /* one bit per shell kind a bowgun frame loads (`equip_gun_clip_get`) */
 } PlWeaponRec; /* size: 0x24 */
 
 /* The per-slot record `equip_slot_rec_get` hands back (the 0x18-byte row `equip_slot_rec_find` indexes); `fn_80273ED8` sums one
  * signed byte per act kind out of it. size: 0x18 (the row stride) */
 typedef struct PlSlotRec {
-    /* +0x00 */ u8 pad_0x00[0x4];
+    /* +0x00 */ u8 defense;       /* the base defence `equip_defense_get` adds the level steps onto */
+    /* +0x01 */ u8 top_step;      /* the defence of the last level step; non-zero: the piece has that step */
+    /* +0x02 */ u8 model_id[2];   /* the model per hunter body (`_PLW` +0x14) */
     /* +0x04 */ u8 dye_mode;      /* 2: the piece can always be recoloured (`EnableChangeColor`) */
     /* +0x05 */ u8 color_index;   /* the colour-table row `equip_color_index_get` hands back */
     /* +0x06 */ u8 wear_flags;    /* bit 2: a blademaster can wear it, bit 3: a gunner (the info screen's wear check) */
-    /* +0x07 */ u8 pad_0x07[0x1];
+    /* +0x07 */ u8 rarity;        /* `Get_equip_rare`'s value for an armour piece */
     /* +0x08 */ s8 value_0x08;
     /* +0x09 */ s8 value_0x09;
     /* +0x0A */ s8 value_0x0A;
     /* +0x0B */ s8 value_0x0B;
     /* +0x0C */ s8 value_0x0C;
-    /* +0x0D */ u8 pad_0x0D[0xB];
+    /* +0x0D */ u8 deco_slots;    /* the decoration slots (`equip_deco_slots_get`) */
+    /* +0x0E */ u8 pad_0x0E[0xA];
 } PlSlotRec; /* size: 0x18 */
+
+/* The armour piece's level row `fn_8027E3F4` hands back (the 0x1C-byte row `fn_8027E354` indexes): the defence step
+ * row and the last level of each defence stage.  size: 0x1C (the row stride) */
+typedef struct PlArmorLevelRec {
+    /* +0x00 */ u8 pad_0x00[0x2];
+    /* +0x02 */ u8 step_row;      /* the row of the defence step table `equip_defense_get` reads */
+    /* +0x03 */ u8 stage_end[5];  /* the last level of defence stages 0-4 (`equip_level_stage_get`) */
+    /* +0x08 */ u8 pad_0x08[0x14];
+} PlArmorLevelRec; /* size: 0x1C */
 
 /* An RGBA colour built byte by byte (red first, alpha last) and handed back as one register word (the colour getters build it; `menu/menu_infomation.cpp` reads it back by channel). size: 0x4 */
 typedef union PlRgba {

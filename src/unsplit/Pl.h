@@ -78,6 +78,30 @@ extern u16 lbl_805C4A6C[]; /* 0x805C4A6C - the sibling motion row table `fn_8024
 extern u32 lbl_805C9118[]; /* 0x805C9118 - an effect/motion table `Pl_act_set_step_table` is handed */
 extern u32 lbl_805CAD74[]; /* 0x805CAD74 - the sibling table for the other actor kind */
 extern u32 pl_flinch_steps_kind8_guard[]; /* 0x805E2048 - the sibling table for the third actor kind */
+/* The weapon-1 act handlers' step tables (`Pl/pl_act.cpp`, 0x80282BDC-0x802840DC), handed to
+ * `Pl_act_set_step_table`; the `.data` run 0x805C80A8-0x805C9568 is unclaimed. */
+extern u8 pl_weapon1_steps_combo_a[]; /* 0x805C8134 */
+extern u8 pl_weapon1_steps_combo_b[]; /* 0x805C8228 */
+extern u8 pl_weapon1_steps_combo_c[]; /* 0x805C831C */
+extern u8 pl_weapon1_steps_shell_a[]; /* 0x805C8410 */
+extern u8 pl_weapon1_steps_shell_b[]; /* 0x805C8494 */
+extern u8 pl_weapon1_steps_double[]; /* 0x805C8518 */
+extern u8 pl_weapon1_steps_chain[]; /* 0x805C859C */
+extern u8 pl_weapon1_steps_turn[]; /* 0x805C85C8 */
+extern u8 pl_weapon1_steps_swing2_a[]; /* 0x805C864C */
+extern u8 pl_weapon1_steps_swing2_b[]; /* 0x805C86E8 */
+extern u8 pl_weapon1_steps_single[]; /* 0x805C8784 */
+extern u8 pl_weapon1_steps_kick[]; /* 0x805C8850 */
+extern u8 pl_weapon1_steps_combo3_a[]; /* 0x805C89B8 */
+extern u8 pl_weapon1_steps_combo3_b[]; /* 0x805C8AC0 */
+extern u8 pl_weapon1_steps_combo3_c[]; /* 0x805C8BC8 */
+extern u8 pl_weapon1_steps_double3[]; /* 0x805C8CC0 */
+extern u8 pl_weapon1_steps_rise[]; /* 0x805C8DC8 */
+extern u8 pl_weapon1_steps_single3[]; /* 0x805C8E64 */
+extern u8 pl_weapon1_steps_finisher3_a[]; /* 0x805C8F2C */
+extern u8 pl_weapon1_steps_finisher3_b[]; /* 0x805C8FF4 */
+extern u8 pl_weapon1_steps_kick3[]; /* 0x805C90BC */
+extern u8 pl_weapon1_steps_chain3[]; /* 0x805C90E8 */
 /* The `.sdata2` frame windows and float constants this band's frame checks gate on are owned by the
  * data-only unit `Pl/pl_frame_data.cpp` (`.sdata2` 0x80799E00-0x80799F98): a consumer includes
  * `Pl/pl_frame_data.h` and declares none of them here (rule 2). */
@@ -151,8 +175,8 @@ extern u8* lbl_807913D8[];
  * bytes at +0x08 are the 2^52 double MWCC's u32->f32 conversion uses, which overlaps the -0.0f at
  * +0x0C).  No registered unit claims the run, so this band header is its rule-2 home - declared, never
  * defined (defining it would rebuild the pool). */
-extern const f32 lbl_8079A000; /* 0.0f */
-extern const f32 lbl_8079A004; /* 1.0f */
+extern const f32 pl_act_float_zero; /* 0.0f */
+extern const f32 pl_act_float_one; /* 1.0f */
 
 /* The `.data` lookup tables the motion-number helpers at 0x8026A00C/0x8026A068 index: ten row
  * pointers (one per hundred of the 0-999 range) and, for the 1000+ range, a two-level table keyed by
@@ -194,7 +218,7 @@ extern u8 lbl_805C5F30[];         /* the melee act-name table rows `pl_act_name_
 extern u8 lbl_805C5F50[];
 extern u8 lbl_805C5F70[];
 
-/* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined).  `lbl_8079A000`
+/* This unit's pooled `.sdata2` constants (playbook 29: declared, never defined).  `pl_act_float_zero`
  * is the same word the run above names, so it is declared once, there. */
 extern const f32 lbl_8079A044;
 extern const f32 lbl_8079A080;

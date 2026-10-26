@@ -24,6 +24,9 @@ u8 pl_eft_draw_ck(struct _PLW* plw);
  * indexes by the weapon type (`_PLW::field_0x002`). */
 extern u8 pl_rig_attach_kind_tbl[];
 extern u8 pl_rig_pose_drawn[];
+/* 0x805BAAEC - the bowgun frame kind of each kind-11 model variant (`Pl/pl_act.cpp`'s
+ * `equip_bowgun_frame_kind_get`). */
+extern u8 lb_bowgun_frame_kinds[];
 
 #ifdef __cplusplus
 }
