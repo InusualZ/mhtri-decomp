@@ -11,11 +11,11 @@
 extern "C" {
 #endif
 
-/* 0x80330EF8 - writes the inverse transpose of `src`'s 3x3 part into `dst`. */
-void mtx34_inverse_transpose(MTX34* dst, const MTX34* src);
+/* 0x80330EF8 - writes the inverse transpose of `src`'s 3x3 part into `dst` (zero translation); 0 when it is singular. */
+u32 mtx34_inverse_transpose(MTX34* dst, const MTX34* src);
 
-/* 0x80330E14 - writes the 3x3 part of `src` into `dst`. */
-void mtx34_to_mtx33(nw4r::math::MTX33* dst, const MTX34* src);
+/* 0x80330E14 - writes the inverse of `src`'s 3x3 part into `dst`; 0 (the part copied) when it is singular. */
+u32 mtx34_to_mtx33(nw4r::math::MTX33* dst, const MTX34* src);
 
 /* 0x80331000 - inverts the affine matrix `src` into `dst`; 1 on success, 0 when it is singular. */
 u32 mtx34_inverse_affine(MTX34* dst, const MTX34* src);

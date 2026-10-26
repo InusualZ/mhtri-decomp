@@ -590,7 +590,8 @@ struct _PLW {
     };
     /* +0x36B */ u8 unk36B;
     /* +0x36C */ s16 field_0x36C;
-    /* +0x36E */ u8 unk36E[0x370 - 0x36E];
+    /* +0x36E */ s16 guard_timer_0x36E;   /* set to 150 by the frame handler's guard variants
+                                           * (`hud/pl_frame_sync.cpp`) */
     /* +0x370 */ union { /* the health pair: current and cap, both signed 16-bit (`pl_act_add_hold_gauge`
                          * adds a signed delta to the current, `pl_gauge_ceiling_grow` moves the cap and clamps
                          * the current to it, and the reset sets current = cap) */
@@ -619,7 +620,7 @@ struct _PLW {
     };
     /* +0x37A */ union {   /* one s16, two spellings */
         /* +0x37A */ s16 unk37A;
-        /* +0x37A */ s16 field_0x37A;  /* the `s16` the act handlers hand to `fn_80276868` and gate a
+        /* +0x37A */ s16 field_0x37A;  /* the `s16` the act handlers hand to `pl_sub_gauge_add` and gate a
                                        * motion on (`<= 0x96`) */
     };
     /* +0x37C */ union {

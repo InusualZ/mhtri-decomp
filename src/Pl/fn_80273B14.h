@@ -65,7 +65,7 @@ u32 fn_80276800(struct _PLW* self, s32 v);
 u32 Pl_act_state_ck(struct _PLW* plw);
 
 /* 0x80276868 / 0x802768F8 / 0x80276A3C - the stagger-budget setters. */
-void fn_80276868(struct _PLW* plw, s16 amount);
+void pl_sub_gauge_add(struct _PLW* plw, s16 amount);
 void pl_act_gauge_gate(struct _PLW* plw, s16 amount);
 void pl_guard_break_apply(struct _PLW* plw);
 

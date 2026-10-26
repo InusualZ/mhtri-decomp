@@ -5501,7 +5501,7 @@ extern "C" u32 Pl_act_state_ck(struct _PLW* plw)
 }
 
 /* Steps the act's stagger budget by `amount`, clamped to 0..`+0x37A`. */
-extern "C" void fn_80276868(struct _PLW* plw, s16 amount)
+extern "C" void pl_sub_gauge_add(struct _PLW* plw, s16 amount)
 {
     if (Pl_master_ck(plw) != 0 && (amount >= 0 || Pl_act_state_ck(plw) != 1)) {
         s16 value;
@@ -5542,7 +5542,7 @@ extern "C" void pl_act_gauge_gate(struct _PLW* plw, s16 amount)
             value = value * 2;
         }
     }
-    fn_80276868(plw, value);
+    pl_sub_gauge_add(plw, value);
 }
 
 /* The act's guard-break entry: picks the stagger step from the defence skills and applies it. */
@@ -5571,7 +5571,7 @@ extern "C" void pl_guard_break_apply(struct _PLW* plw)
         if (Pl_Skill_ck(plw, 0xA9) == 1U && plw->frame_0x020 % 5 == 0) {
             step *= 2;
         }
-        fn_80276868(plw, step);
+        pl_sub_gauge_add(plw, step);
     }
 }
 
@@ -5595,7 +5595,7 @@ namespace s_80276B58 {
 
 
 extern "C" u32 Pl_act_state_ck(_PLW*);
-extern "C" void fn_80276868(_PLW*, s16);
+extern "C" void pl_sub_gauge_add(_PLW*, s16);
 extern "C" void fn_80276CE8(_PLW*, s16);
 extern "C" u8 pl_act_kind_get(u8);
 extern "C" s32 pl_mode8_free_ck(void);
@@ -5693,8 +5693,8 @@ extern "C" { extern const f32 lbl_8079A0C4; }
 extern "C" { extern const f32 lbl_8079A0EC; }
 extern "C" { extern const f32 lbl_8079A110; }
 
-extern "C" { extern u32 lbl_805E2248[]; }
-extern "C" { extern u32 lbl_805E25D0[]; }
+extern "C" { extern u32 pl_steps_kind8_guard[]; }
+extern "C" { extern u32 pl_steps_kind8_slot3_guard[]; }
 
 /* 0x80276B58: the attack-scale multiplier the actor's active skills grant for a signed modifier. */
 extern "C" void fn_80276B58(_PLW* self, s32 arg1)
@@ -5726,7 +5726,7 @@ extern "C" void fn_80276B58(_PLW* self, s32 arg1)
                 f *= lbl_8079A08C;
             }
         }
-        fn_80276868(self, (s16)f);
+        pl_sub_gauge_add(self, (s16)f);
     }
 }
 
@@ -5852,13 +5852,13 @@ extern "C" void fn_802771A0(_PLW* self, s32 arg1)
 {
     if (self->kind_0x09 != 3) {
         if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
-            Pl_act_set_step_table(self, (u32)lbl_805E2248, (s16)arg1);
+            Pl_act_set_step_table(self, (u32)pl_steps_kind8_guard, (s16)arg1);
         } else {
             Pl_act_set_step_table(self, lbl_805BF448[self->field_0x002], (s16)arg1);
         }
     } else {
         if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
-            Pl_act_set_step_table(self, (u32)lbl_805E25D0, (s16)arg1);
+            Pl_act_set_step_table(self, (u32)pl_steps_kind8_slot3_guard, (s16)arg1);
         } else {
             Pl_act_set_step_table(self, lbl_805BF46C[self->field_0x002], (s16)arg1);
         }
@@ -6428,7 +6428,7 @@ extern "C" s32 pl_carry_light_ck(_PLW* self)
 }
 
 /* 0x8027CBC8: the highest carve-slot value the actor has available. */
-extern "C" u8 fn_8027CBC8(_PLW* self)
+extern "C" u8 pl_hit_level_max_get(_PLW* self)
 {
     u8 v = 0;
     if (self->unk489 != 0 && self->unk492 != 255) {

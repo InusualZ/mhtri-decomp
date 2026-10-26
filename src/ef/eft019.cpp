@@ -53,7 +53,7 @@
 extern "C" {
 #endif
 
-void fn_80112B7C(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VECTOR* rot,
+void eft019_shot_set(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VECTOR* rot,
                  f32 scale);
 void fn_80112CE0(_EFT* self);                                    /* pool release (`release_0x40`) */
 void fn_80112D1C(_EFT* self);                                    /* per-frame dispatch (`dispatch_0x34`) */
@@ -550,7 +550,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
 
 /* 0x80112B7C (0xCC): Spawns an eft019 record in a source actor's area with its rotation, source and variant. */
 
-void fn_80112B7C(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VECTOR* rot,
+void eft019_shot_set(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VECTOR* rot,
                  f32 scale)
 {
     _EFT* effect;

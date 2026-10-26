@@ -499,9 +499,6 @@ void eft_net_recv_release(EftSlot* slot, NetEftReleaseMsg* msg);
 void eft_net_send(EftSlot* slot, u32 mode, u32 value);
 
 
-/* .data 0x805E1ED0 - the per-step table `Pl_act_step_table_enter` installs.  Rule-12 debt: the run is sole-owned by this
- * unit but span-blocked (`enemy/em_pl_frame` reads `lbl_805E1F6C` between it and the claim), so it cannot be claimed yet. */
-extern u8 lbl_805E1ED0[];
 
 #ifdef __cplusplus
 }

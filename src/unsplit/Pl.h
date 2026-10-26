@@ -62,7 +62,7 @@ void se_req_frame_set_part4(struct _se_w* work, s32 a, s32 b, s32 c);
 /* The second argument is `u16`: retail keeps the `clrlwi r4,r4,16` that narrows the `lis`/`subi`
  * constant at the `0x8001`/`0x8003` call sites, which MWCC only emits for a narrower parameter.
  * `Pl/pl_act_step.cpp`'s calls pass 0/3, so the width is immaterial there. */
-void fn_80276868(struct _PLW* self, s16 value);
+void pl_sub_gauge_add(struct _PLW* self, s16 value);
 u32 fn_80276800(struct _PLW* self, s32 v);
 
 /* The unclaimed `.data` tables this unit's act handlers index (no registered `.data` range covers
@@ -77,7 +77,7 @@ extern u16 lbl_805C4A60[]; /* 0x805C4A60 - the sibling motion row table `fn_8024
 extern u16 lbl_805C4A6C[]; /* 0x805C4A6C - the sibling motion row table `fn_8024B46C` indexes */
 extern u32 lbl_805C9118[]; /* 0x805C9118 - an effect/motion table `Pl_act_set_step_table` is handed */
 extern u32 lbl_805CAD74[]; /* 0x805CAD74 - the sibling table for the other actor kind */
-extern u32 lbl_805E2048[]; /* 0x805E2048 - the sibling table for the third actor kind */
+extern u32 pl_flinch_steps_kind8_guard[]; /* 0x805E2048 - the sibling table for the third actor kind */
 /* The `.sdata2` frame windows and float constants this band's frame checks gate on are owned by the
  * data-only unit `Pl/pl_frame_data.cpp` (`.sdata2` 0x80799E00-0x80799F98): a consumer includes
  * `Pl/pl_frame_data.h` and declares none of them here (rule 2). */

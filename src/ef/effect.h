@@ -48,6 +48,8 @@ nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self);
 u32 effect_move(nw4r::ef::Effect* effect);
 /* 0x800F96E0 - sets the pooled effect's root matrix translation to `pos` (`SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3`). */
 void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
+/* 0x800F9988 - sets the pooled effect's colour at `pos` (`change_color_eff__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC38_GXColor`). */
+void change_color_eff(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos, struct _GXColor color);
 /* 0x800F9AC0 - sets the pooled effect's parameter scale (`change_paramscale_eff__FPQ34nw4r2ef6Effectf`). */
 void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale);
 /* 0x800F9BA0 - sets the pooled effect's per-axis parameter scale (`change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3`). */

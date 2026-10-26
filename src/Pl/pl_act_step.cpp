@@ -1954,7 +1954,7 @@ extern "C" void fn_80247C2C(_PLW* self) {
     if (Pl_cat_skill_ck(self, 0x21) == 1) {
         amount = (s16)amount / 2;
     }
-    fn_80276868(self, amount);
+    pl_sub_gauge_add(self, amount);
 }
 
 /* 0x80247CC4 (0xB0): Steps the actor forward along its facing and picks the ground/air kind from the height. */
@@ -2988,7 +2988,7 @@ extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
             return;
         case 8:
             if (pl_mode8_free_ck() == 0) {
-                Pl_act_set_step_table(self, (u32)lbl_805E2048, 0);
+                Pl_act_set_step_table(self, (u32)pl_flinch_steps_kind8_guard, 0);
                 return;
             }
             return;
@@ -3095,7 +3095,7 @@ extern "C" void fn_8024A6CC(_PLW* self) {
 extern "C" void fn_8024A75C(_PLW* self, s32 arg1) {
     s32 timer;
 
-    fn_80276868(self, 4);
+    pl_sub_gauge_add(self, 4);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -3124,7 +3124,7 @@ extern "C" void fn_8024A75C(_PLW* self, s32 arg1) {
         return;
     case 2:
         if (Pl_motion_end_ck(self) == 1) {
-            fn_80276868(self, self->field_0x37A);
+            pl_sub_gauge_add(self, self->field_0x37A);
             if (arg1 == 0 || arg1 == 2) {
                 Pl_act_set_motion_slot(self, 0, 6, 0);
                 return;
@@ -5289,7 +5289,7 @@ extern "C" void pl_act_launched(_PLW* self) {
         Pl_chr_set_attr_default(self, 0x2E, 4, 0);
         Pl_act_set_motion(self, 2, 0, 0);
         pl_act_set_motion_gate(self, 0);
-        fn_80276868(self, -150);
+        pl_sub_gauge_add(self, -150);
         pl_act_set_flag(self, 0x1000);
         pl_act_arm_flags(self, 1);
         pl_act_set_gauge_arm(self, 2);
