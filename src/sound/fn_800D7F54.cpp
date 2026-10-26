@@ -199,7 +199,7 @@ extern "C" void fn_800DA8F4(nw4r::math::VEC3* pos) {
 
 extern "C" void fn_800DA93C(nw4r::math::VEC3* pos) { fn_800DBFAC(0, 50, pos); }
 
-extern "C" void fn_800DA94C(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 59, pos); }
+extern "C" void se_req_pos_id59(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 59, pos); }
 
 extern "C" void fn_800DA95C(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 36 : 136;
@@ -250,7 +250,7 @@ extern "C" void fn_800DADF0(nw4r::math::VEC3* pos) {
 
 extern "C" void fn_800DAE38(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 186, pos); }
 
-extern "C" void fn_800DB4BC(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 27, pos); }
+extern "C" void se_req_pos_id27(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 27, pos); }
 
 extern "C" void se_req_pos_id228(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 228, pos); }
 

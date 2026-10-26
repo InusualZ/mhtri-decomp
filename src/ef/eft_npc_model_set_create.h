@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-/* 0x8010D678 (0x10): builds the AI NPC's three-model effect set (fn_8010D70C with 3, 2, 1) */
+/* 0x8010D678 (0x10): builds the AI NPC's three-model effect set (eft_light_spawn with 3, 2, 1) */
 void eft_npc_model_set_create(struct _AINPC_W* owner);
 
 #ifdef __cplusplus

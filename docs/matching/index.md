@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (159)
+## Ideas that work (160)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -168,6 +168,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 177 | [An out-pointer vector helper whose result lands in a temporary: call it through a view that returns the vector](177-sret-helper-view.md) | works | source-shape, allocator | The stack slots of the helper results (subVec3/addVec3 outputs copied with copyVec3) are ordered differently from retail, shifting every addi rN,r1,X |
 | 178 | [A float argument loaded early among the integer argument setup: move the float parameter forward in the callee's declaration](178-float-param-position.md) | works | source-shape | The lfs f1 of a float argument sits before (or after) the li/addi of the integer arguments in retail, and the whole argument block is misaligned in the diff |
 | 179 | [A stack copy whose address is passed is a by-value struct parameter](179-stack-copy-whose-address.md) | works | source-shape, allocator | The caller copies a local struct word by word (lwz/stw) to a fresh stack slot and passes that slot's address |
+| 180 | [A -lang=c unit whose callees are C++ manglings compiles as C++ under #pragma cplusplus on](180-lang-c-unit-whose.md) | works | pragma, source-shape | A unit registered as a `.c` file (compiled `-lang=c`) calls C++ members and mangled free functions, so new bodies can only spell `foo__FPQ34nw4r4math4VEC3` identifiers and local externs, which the gate refuses as added... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

@@ -31,7 +31,7 @@
 #include "enemy/em_status_ck.h" /* em_status_ck (rule 2: the owner's header) */
 #include "enemy/fn_80137614.h" /* fn_80137614 (rule 2: the owner's header) */
 #include "enemy/fn_80137648.h" /* fn_80137648 (rule 2: the owner's header) */
-#include "ef/lbl_8059F574.h" /* lbl_8059F574 (rule 2: the owner's header) */
+#include "ef/eft_slot_angle_scales.h" /* eft_slot_angle_scales (rule 2: the owner's header) */
 #include "types.h"
 
 #pragma peephole off
@@ -607,7 +607,7 @@ extern "C" void fn_8010CFCC(_EFT* self, nw4r::math::MTX34* out, nw4r::math::MTX3
     setVec3(&v8, lbl_80796810, lbl_80796810, work->scale_0x44 * lbl_8059F518[index]);
     copyVec3(&v20, &v8);
     rotVecY(&v20, self->rot_0x24.y + index * 0x3333);
-    angle = lbl_8079682C * lbl_8059F574[index];
+    angle = lbl_8079682C * eft_slot_angle_scales[index];
     angle = angle / lbl_80796830;
     angle = lbl_80796828 + angle;
     rotVecZ(&v20, (u16)(s32)angle);

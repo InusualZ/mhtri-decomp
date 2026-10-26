@@ -11,7 +11,7 @@
  *   `eft025_effect_ids` (map `lbl_80791938`, the `res_eft_create` id per type).
  * RESIDUALS. none in bytes: every row, `.sdata` and `.sdata2` match.
  * SHAPES. `fn_801173AC` accumulates the spins and angles with `+=` (an explicit `(s16)(a + b)` keeps an `extsh`/`clrlwi`
- *   before each `sth`).  The setter `fn_80117688` and the allocator `fn_80117760` take the kind as `u32` (retail
+ *   before each `sth`).  The setter `eft025_pl_set` and the allocator `fn_80117760` take the kind as `u32` (retail
  *   narrows it only at the `stb`).  `fn_80117894` declares one `actor` after `work`/`vec`/`mtx`; `fn_80117A1C` loads
  *   `work` after the constructors and stores the facing in `rot_0x24.y`; `_EFT25_WORK::motion` is `u32` (`cmplw`).
  *   `get_camera_pos`/`get_camera_direction` are declared with C++ linkage (their map names are `__Fv`).
@@ -74,7 +74,7 @@ typedef struct _EFT25_WORK {
 extern "C" {
 /* this unit's own symbols (definitions below; the map's plain stems) */
 void fn_801173AC(_EFT* self);
-void fn_80117688(_PLW* plw, u32 kind);
+void eft025_pl_set(_PLW* plw, u32 kind);
 void fn_801176F0(_PLW* plw, f32 value);
 _EFT* fn_80117760(u32 kind, u8 area);
 void fn_8011781C(_EFT* self);
@@ -161,7 +161,7 @@ extern "C" void fn_801173AC(_EFT* self)
 
 /* The two spawn setters: they gate on the caller record's area and hand the family allocator the
  * kind, then remember the caller as the record's source. */
-extern "C" void fn_80117688(_PLW* plw, u32 kind)
+extern "C" void eft025_pl_set(_PLW* plw, u32 kind)
 {
     u8 area = plw->area_0x16;
     _EFT* rec;

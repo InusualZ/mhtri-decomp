@@ -11,7 +11,7 @@ struct _PLW;
 extern "C" {
 #endif
 
-/* 0x8010D608 - initialises the player's effect set (GameMode_ck, fn_8010D70C) */
+/* 0x8010D608 - initialises the player's effect set (GameMode_ck, eft_light_spawn) */
 void ef_pl_effects_init(struct _PLW* self);
 
 #ifdef __cplusplus

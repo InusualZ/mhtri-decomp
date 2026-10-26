@@ -6245,7 +6245,7 @@ namespace s_802076D4 {
 extern "C" int memcmp(const void* a, const void* b, u32 n);
 
 extern "C" {
-__declspec(noinline) u32 fn_80208AB8(_PLW* self);
+__declspec(noinline) u32 lb_pl_act_off_ck(_PLW* self);
 __declspec(noinline) u32 fn_80208AC0(_PLW* self);
 __declspec(noinline) u32 fn_80208AE8(_PLW* self);
 void lb_npc_act_set(_PLW* self, u32 a, u16 b, u16 c);
@@ -6547,7 +6547,7 @@ __declspec(noinline) u32 fn_80208A84(_PLW* self)
 }
 
 /* 0x80208AB8 - always "no". */
-__declspec(noinline) u32 fn_80208AB8(_PLW* self)
+__declspec(noinline) u32 lb_pl_act_off_ck(_PLW* self)
 {
     return 0;
 }
@@ -7601,7 +7601,7 @@ s32 lb_npc_act_busy_ck(u32 kind, u32 act)
  * lobby act latches). */
 u32 lb_player_facing_away_ck(_PLW* self)
 {
-    if (fn_80208AB8(self) != 0 || fn_80208AC0(self) != 0 || fn_80208AE8(self) != 0) {
+    if (lb_pl_act_off_ck(self) != 0 || fn_80208AC0(self) != 0 || fn_80208AE8(self) != 0) {
         return 0;
     }
     pl_act_set_cam_ang(self);
@@ -7994,7 +7994,7 @@ void fn_8020A5F4(_PLW* self, u32 id, s32 arg, s32 speed, u16 flags)
     }
     self->kind_0x09 = (u8)id;
     self->flag_0x30E = 1;
-    if (fn_80208AB8(self) != 0 || fn_80208AC0(self) != 0) {
+    if (lb_pl_act_off_ck(self) != 0 || fn_80208AC0(self) != 0) {
         Pl_chr_set_attr_default(self, 51, speed, arg);
         lb_npc_act_req(self, 12, 0, flags);
     } else if (fn_80208AE8(self) == 1) {
@@ -8732,7 +8732,7 @@ void fn_8020A5EC(_PLW* self, u8 id);
 void fn_8020A70C(_PLW* self, u32 a, s32 b, s32 c);
 void lb_npc_act_req(_PLW* self, u32 a, s32 b, u16 c);
 void lb_npc_act_set(_PLW* self, u32 a, u16 b, u16 c);
-u32 fn_80208AB8(_PLW* self);
+u32 lb_pl_act_off_ck(_PLW* self);
 u32 fn_80208AC0(_PLW* self);
 u32 fn_80208AE8(_PLW* self);
 void fn_80208A3C(_PLW* self);
@@ -9292,7 +9292,7 @@ void lb_act_run(_PLW* self)
             } else {
                 Pl_chr_setX(self, 3, 4, 0);
             }
-            if (fn_80208AB8(self) == 0 && fn_80208AC0(self) == 0) {
+            if (lb_pl_act_off_ck(self) == 0 && fn_80208AC0(self) == 0) {
                 self->field_0x354 = 1.25f;
             }
         }
@@ -9331,14 +9331,14 @@ void lb_act_stop(_PLW* self) {
         pl_act_set_flag(self, 0xC0);
         self->field_0x0A8 = self->rot_0x54.y;
         Pl_chr_set_attr_default(self, 0x1E, 4, 0);
-        if ((fn_80208AB8(self) != 0) || (fn_80208AC0(self) != 0)) {
+        if ((lb_pl_act_off_ck(self) != 0) || (fn_80208AC0(self) != 0)) {
             self->field_0x28 = 0xA;
         }
         break;
     case 1:
         if (Pl_motion_end_ck(self) == 1) {
             fn_8020A70C(self, 0, 0xA, 0);
-        } else if ((fn_80208AB8(self) != 0) || (fn_80208AC0(self) != 0)) {
+        } else if ((lb_pl_act_off_ck(self) != 0) || (fn_80208AC0(self) != 0)) {
             if (--self->field_0x28 <= 0xA) {
                 fn_8020A70C(self, 0, 0xA, 0);
             }
@@ -9823,7 +9823,7 @@ void lb_act_carry_run(_PLW* self)
         } else {
             Pl_chr_setX(self, 59, 4, 0);
         }
-        if (fn_80208AB8(self) == 0 && fn_80208AC0(self) == 0) {
+        if (lb_pl_act_off_ck(self) == 0 && fn_80208AC0(self) == 0) {
             self->field_0x354 = 1.25f;
         }
         self->field_0x266 = 10;
@@ -9862,7 +9862,7 @@ void lb_act_carry_stop(_PLW* self) {
         pl_act_set_flag(self, 0xC0);
         self->field_0x0A8 = self->rot_0x54.y;
         Pl_chr_set_attr_default(self, 0x35, 4, 0);
-        if ((fn_80208AB8(self) != 0) || (fn_80208AC0(self) != 0)) {
+        if ((lb_pl_act_off_ck(self) != 0) || (fn_80208AC0(self) != 0)) {
             self->field_0x28 = 0xA;
             return;
         }
@@ -9872,7 +9872,7 @@ void lb_act_carry_stop(_PLW* self) {
             fn_8020A70C(self, 0, 0xA, 0);
             return;
         }
-        if ((fn_80208AB8(self) != 0) || (fn_80208AC0(self) != 0)) {
+        if ((lb_pl_act_off_ck(self) != 0) || (fn_80208AC0(self) != 0)) {
             if (--self->field_0x28 <= 0xA) {
                 fn_8020A70C(self, 0, 0xA, 0);
             }
@@ -9913,7 +9913,7 @@ void lb_act_carry_put(_PLW* self) {
     case 1:
         if (Pl_frame_check(self, 0, 114.0f, 0.0f) == 1) {
             self->act_step_0x05++;
-            if (fn_80208AB8(self) == 1) {
+            if (lb_pl_act_off_ck(self) == 1) {
                 fn_80208A3C(self);
             } else if (fn_80208AC0(self) == 1) {
                 fn_80208A48(self);
@@ -10138,7 +10138,7 @@ u32 game_ready_ck(void);
 u32 menu_busy_ck(void);
 s32 lb_cmd_pressed_ck(u16 mask);
 u32 fn_80208928(_PLW* plw);
-u32 fn_80208AB8(_PLW* self);
+u32 lb_pl_act_off_ck(_PLW* self);
 u32 fn_80208AC0(_PLW* self);
 void lb_player_latch_release(_PLW* self);
 u32 lb_player_facing_away_ck(_PLW* self);
