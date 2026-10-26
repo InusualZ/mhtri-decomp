@@ -182,7 +182,10 @@ struct MenuSlot {
     /* +0x01A */ s8 field_0x01A;      /* the sub-list row cursor (`entries_c`) */
     /* +0x01B */ s8 field_0x01B;      /* the top-menu row cursor (`entries_b`) */
     /* +0x01C */ s8 page_index;       /* 0..3: the page the detail draw switches on */
-    /* +0x01D */ u8 field_0x01D;      /* kind 1's selected row offset (the page-0 blend index) */
+    /* +0x01D */ union {
+        u8 field_0x01D;               /* kind 1's selected row offset (the page-0 blend index) */
+        s8 sub_cursor_0x01D;          /* the lobby sub-pages' second cursor (`menu/menu_item_sub.cpp`) */
+    };
     /* +0x01E */ u8 field_0x01E;      /* kind 2's */
     /* +0x01F */ u8 field_0x01F;      /* kind 3's */
     /* +0x020 */ u8 sub_list_open;    /* 1 while the third entry array (`entries_c`) is shown */

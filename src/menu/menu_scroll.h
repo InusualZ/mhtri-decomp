@@ -29,6 +29,10 @@ struct MenuScroll {
             /* +0x00A */ s8 equip_page;      /* the equipment page the status page shows */
             /* +0x00B */ s8 equip_page_count; /* its page count (`equip_list_page_count` + 2) */
         }; /* size: 0x2 */
+        struct {
+            /* +0x00A */ s8 info_page;       /* the quest info page shown (`menu/menu_item_sub.cpp`'s page 10) */
+            /* +0x00B */ s8 info_page_count; /* its page count (1, 3 or 4 by the info mode) */
+        }; /* size: 0x2 */
     }; /* size: 0x2 */
 }; /* size: 0xC */
 

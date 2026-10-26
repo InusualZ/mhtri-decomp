@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (161)
+## Ideas that work (162)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -170,6 +170,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 179 | [A stack copy whose address is passed is a by-value struct parameter](179-stack-copy-whose-address.md) | works | source-shape, allocator | The caller copies a local struct word by word (lwz/stw) to a fresh stack slot and passes that slot's address |
 | 180 | [A -lang=c unit whose callees are C++ manglings compiles as C++ under #pragma cplusplus on](180-lang-c-unit-whose.md) | works | pragma, source-shape | A unit registered as a `.c` file (compiled `-lang=c`) calls C++ members and mangled free functions, so new bodies can only spell `foo__FPQ34nw4r4math4VEC3` identifiers and local externs, which the gate refuses as added... |
 | 181 | [A retail frsp before a float use is a store-to-load forward: read the value back from the field or the temporary](181-retail-frsp-before-a.md) | works | source-shape | Retail rounds an f32 value it already holds (`frsp f0,f1; fneg f0,f0`, or `frsp` before a pane-translation store) and no cast or f64 spelling reproduces it |
+| 182 | [A flag handed to a bool parameter is a bool local](182-flag-handed-to-a.md) | works | source-shape, allocator | Ours converts a 0/1 local before every call to a `bool` parameter (`cntlzw`/`srwi` twice, hoisted out of a loop) where retail passes the register straight (`mr r4,rN`) |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

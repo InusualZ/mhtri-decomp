@@ -22,7 +22,7 @@
  *   0x8021D72C-0x8021D86C, 0x8021D884-0x8021D9E0, 0x8021D9F8-0x8021DED8, 0x8021DEFC-0x8021E1EC.
  *  - `fn_80219340`, `fn_80219640`: the two guard pairs and the `kind` byte are read from `self` in another order;
  *  - `fn_8021C900`: retail addresses the id table at 0x805C9F50 as its own base, the map's only symbol there is
- *    `lbl_805C9F40`, so ours needs one more `addi`; `fn_8021B5AC`: the same at 0x805C968C plus one `extsh`;
+ *    `lbl_805C9F40`, so ours needs one more `addi`; `lb_title_range_find`: the same at 0x805C968C plus one `extsh`;
  *  - `lb_screen07_step`: the base and byte registers swap (r4/r3). `fn_80218138` (owned by `lobby/fn_80212810.cpp`, which
  *    has no header) is declared here; `lb_talk_page_open` and `lb_talk_page_mode_reset`, this unit's own, are also declared in
  *    `unsplit/lobby.h`.
@@ -103,7 +103,7 @@ struct LbIdTable {
 }; /* size: 0x2C */
 extern LbIdTable lbl_805C9F40;
 
-/* The 6-byte selection-range table `fn_8021B5AC` scans: `lbl_805C9608` (0x390 B) with its rows at
+/* The 6-byte selection-range table `lb_title_range_find` scans: `lbl_805C9608` (0x390 B) with its rows at
  * +0x18 (id, range start, range length; 0xFFFF-terminated) and the fallback base row at +0x84. */
 struct LbRangeTable {
     /* +0x000 */ u8 unused_0x000[0x18];
@@ -365,7 +365,7 @@ extern "C" void userdata_award_bit_set(LbEquipWork* self, s32 index) {
 
 /* Returns the entry of the 6-byte range table whose [start, start + length) interval holds `value`,
  * or the index past the table's base row when no interval does. */
-extern "C" s16 fn_8021B5AC(s32 value) {
+extern "C" s16 lb_title_range_find(s32 value) {
     s16 found = -1;
     s32 i = 0;
     const u16* row = lbl_805C9608.rows_0x018;
@@ -385,7 +385,7 @@ extern "C" s16 fn_8021B5AC(s32 value) {
 }
 
 /* Whether item index 0-117 is in the page's owned-item bit mask. */
-extern "C" u32 fn_8021B624(LbEquipWork* self, s32 index) {
+extern "C" u32 lb_title_owned_ck(LbEquipWork* self, s32 index) {
     s16 i = (s16)index;
 
     if (i > 117) {
