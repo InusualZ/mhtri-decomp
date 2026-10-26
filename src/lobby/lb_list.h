@@ -37,6 +37,19 @@ typedef struct LbListTmpl {
     /* +0x14 */ u8 pad_0x14[0x4];
 } LbListTmpl;
 
+/* The template layout the retail tables use (`LbListTmpl` without its 4 trailing bytes): `menu/get_pop_dat_ptr.cpp`'s
+ * screen tables are arrays of it.  size: 0x14 */
+typedef struct LbChoiceTmpl {
+    /* +0x00 */ s16 count_0x00;
+    /* +0x02 */ u8 kind_0x02;
+    /* +0x03 */ u8 pad_0x03;
+    /* +0x04 */ s16 str_base_0x04;
+    /* +0x06 */ s16 help_str_0x06;
+    /* +0x08 */ s16* help_tbl_0x08;
+    /* +0x0C */ s32 se_ok_0x0C;
+    /* +0x10 */ u32 flags_0x10;
+} LbChoiceTmpl;
+
 /* An item and a count, the pair the lobby item lists walk.  size: 0x4 */
 typedef struct LbItemCount {
     /* +0x00 */ u16 item_0x00;

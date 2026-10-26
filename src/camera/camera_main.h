@@ -31,6 +31,12 @@ void camera_target_slot_clear(u8 reset);
 void camera_pl_quake_req(struct _PLW* player, u8 kind);
 void camera_mode2_req(void);
 void camera_mode3_req(void);
+
+/* 0x802BBA3C / 0x802BBAF4 / 0x802BBB78 - disarm the lobby camera, set its view `index` (`snap` jumps there), and
+ * release its goal. */
+void camera_lobby_disarm(void);
+void camera_lobby_view_set(u8 index, u8 snap);
+void camera_lobby_goal_release(void);
 #ifdef __cplusplus
 }
 #endif

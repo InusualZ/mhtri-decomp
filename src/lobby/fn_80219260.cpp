@@ -527,12 +527,12 @@ extern "C" s32 lb_npc_talk_flag_ck(LbMenuSlot* slot) {
 }
 
 /* Publishes one selected slot's byte in the selection table. */
-extern "C" void fn_8021D86C(s32 index, u8 value) {
+extern "C" void lb_menu_row_mark_set(s32 index, u8 value) {
     lb_menu_scratch.flags_0x156[(u8)index] = value;
 }
 
 /* Clears the selection table. */
-extern "C" void fn_8021D9E0(void) {
+extern "C" void lb_menu_row_marks_clear(void) {
     memset(lb_menu_scratch.flags_0x156, 0, 8);
 }
 

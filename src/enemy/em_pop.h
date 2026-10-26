@@ -99,6 +99,25 @@ struct EmPopSpare {
     /* +0x124 */ EmPopSpareKind kinds_0x124[8];
 };
 
+/* One point of a pop file, as `em_roster_pop_entry_add` takes it (`menu/get_pop_dat_ptr.cpp` builds it from the file's
+ * 0x38-byte record).  size: 0x34 */
+struct EmPopEntry {
+    /* +0x00 */ nw4r::math::VEC3 pos_0x00;
+    /* +0x0C */ _CP_VECTOR rot_0x0C;
+    /* +0x18 */ f32 radius_0x18;
+    /* +0x1C */ f32 height_0x1C;
+    /* +0x20 */ u16 point_0x20;
+    /* +0x22 */ u16 point_kind_0x22;
+    /* +0x24 */ u16 count_0x24;
+    /* +0x26 */ u16 bonus_0x26;
+    /* +0x28 */ u16 uses_0x28;
+    /* +0x2A */ u16 uses_max_0x2A;
+    /* +0x2C */ s8 model_0x2C;
+    /* +0x2D */ u8 area_0x2D;           /* the area the point is filed under (the caller's second argument) */
+    /* +0x2E */ u8 pad_0x2E[2];
+    /* +0x30 */ u32 item_0x30;
+};
+
 /* One roster record.  Written by the allocator (`state_0x000 = 1`), read by every
  * `em_roster_record_*` helper. */
 struct EmPopRec : EmPopObj {

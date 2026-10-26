@@ -128,23 +128,6 @@ struct EmCarveEntry {
     /* +0x0C */ u8 pad_0x0C[4];
 };
 
-/* One point of a pop file (`em_roster_pop_entry_add`).  size: 0x34 */
-struct EmPopEntry {
-    /* +0x00 */ nw4r::math::VEC3 pos_0x00;
-    /* +0x0C */ _CP_VECTOR rot_0x0C;
-    /* +0x18 */ f32 radius_0x18;
-    /* +0x1C */ f32 height_0x1C;
-    /* +0x20 */ u16 point_0x20;
-    /* +0x22 */ u16 point_kind_0x22;
-    /* +0x24 */ u16 count_0x24;
-    /* +0x26 */ u16 bonus_0x26;
-    /* +0x28 */ u16 uses_0x28;
-    /* +0x2A */ u16 uses_max_0x2A;
-    /* +0x2C */ s8 model_0x2C;
-    /* +0x2D */ u8 pad_0x2D[3];
-    /* +0x30 */ u32 item_0x30;
-};
-
 /* The context a population-file load hands its completion.  size: 0x8 */
 struct EmPopResLoad {
     /* +0x0 */ EmPopWork* work;

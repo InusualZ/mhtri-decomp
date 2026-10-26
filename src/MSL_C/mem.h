@@ -18,6 +18,9 @@ void* __memrchr(const void* buf, int ch, u32 n);
 /* untyped: byte range */
 void* memchr(const void* buf, int ch, u32 n);
 
+/* 0x8045B6BC: compares the first `n` bytes of `a` and `b` (0 when equal). */
+int memcmp(const void* a, const void* b, u32 n); /* untyped: byte range */
+
 #ifdef __cplusplus
 }
 #endif

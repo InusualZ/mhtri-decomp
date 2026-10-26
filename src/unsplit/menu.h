@@ -70,39 +70,8 @@ void drawshape_set_texture_array(u16, const _mh_tex_uv_*, s32);
 void drawshape_exec(void);
 #endif
 
-/* The `src/menu/get_pop_dat_ptr.cpp` band's own unowned data (its `.text` 0x803BE30C..0x803C4BA0 is
- * registered, so the symbols below resolve to no owning unit's data range and this is their rule-2
- * home).  Each is declared, never defined here. */
+/* `option_w` (owned by src/mh3_pad.cpp); the option tables `menu/get_pop_dat_ptr.cpp` owns are defined there. */
 #include "mh3_pad/option_w.h" /* `option_w`, owned by src/mh3_pad.cpp (rule 2) */
-extern u8 option_value_max[];   /* .data 0x805F8528 - the per-index ceiling `ck_option_cfg` clamps to */
-extern u8 option_default_tbl[]; /* .data 0x805F8548 - the 31-byte default table */
-extern u8 option_value_tbl[];   /* .sdata 0x807936B8 - option id -> (value, flag) byte pairs */
-extern const char pop_file_name_c[]; /* .data 0x805F84E0 - "m%03d_%06d_c_pop.dat" */
-extern const char pop_file_name_f[]; /* .data 0x805F84F8 - "06/m%03d_%06d_f_pop.dat" */
-extern const char pop_file_name_r[]; /* .data 0x805F8510 - "06/m%03d_%06d_r_pop.dat" */
-extern u32 demo_init_word_0;   /* .sdata 0x80790E7C */
-extern u32 demo_init_word_1;   /* .sdata 0x80790E80 */
-extern u32 demo_saved_words[2]; /* .sbss 0x80794C88, two words */
-
-/* The band's `.bss` work blocks.  dtk's split objects carry no `.bss` content, so no unit claims
- * these and this header is their rule-2 home; both are referenced only from inside the band. */
-typedef struct PopData PopData;
-
-/* One pop-list entry.  The stride is 0x1A4; only the bytes the band's accessors touch are named.
- * size: 0x1A4 */
-typedef struct PopEntry {
-    /* +0x000 */ u8 pad_0x000[0x1];
-    /* +0x001 */ u8 field_0x001;
-    /* +0x002 */ u8 field_0x002;
-    /* +0x003 */ u8 pad_0x003[0x2];
-    /* +0x005 */ u8 count_0x005;  /* the byte `counter_inc` advances */
-    /* +0x006 */ u8 pad_0x006[0xE2];
-    /* +0x0E8 */ u32 field_0x0E8;
-    /* +0x0EC */ u16 field_0x0EC;
-    /* +0x0EE */ u8 pad_0x0EE[0x5E];
-    /* +0x14C */ u16 field_0x14C;
-    /* +0x14E */ u8 pad_0x14E[0x56];
-} PopEntry; /* size: 0x1A4 */
 
 /* `DemoWork` (the demo/event work `demo_work`, .bss 0x806D2B20) is `lobby/lb_server_sel_trans.cpp`'s type; its header,
  * which `menu/get_pop_dat_ptr.h` includes below, defines it. */

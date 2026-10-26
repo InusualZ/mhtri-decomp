@@ -50,8 +50,8 @@ void arena_cfg_set(u8 player, u8 index, u8 value);
 struct NoteGoods;
 extern struct NoteGoods* note_goods_tbl[];
 
-/* 0x803BECC8: 1 when option byte `value` lies in [low, high] (GUESS reading of the owner's name) */
-u32 option_cfg_eq_ck(u8 value, u32 low, u32 high);
+/* 0x803BECC8 (0x70): 1 when option `index` (of the option table, or player `player`'s arena profile) holds `value`. */
+u32 option_cfg_eq_ck(u8 player, u8 index, u8 value);
 #ifdef __cplusplus
 }
 #endif

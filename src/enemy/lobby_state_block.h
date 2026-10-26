@@ -23,14 +23,35 @@ struct LobbyTimerRow {
     /* +0x20 */ s32 timer_0x20;
 }; /* size: 0x24 */
 
+/* The 0x100-byte card a peer publishes; only the room bytes the room-visit screen (`menu/get_pop_dat_ptr.cpp`) reads
+ * are named.  size: 0x100 */
+struct LobbyPeerCard {
+    /* +0x00 */ u8 unused_0x00[0x7C];
+    /* +0x7C */ u8 pass_0x7C[0x5];    /* the room's password */
+    /* +0x81 */ u8 place_0x81[0x11];  /* the room's placed models (`place_info_set`) */
+    /* +0x92 */ u8 lock_0x92;         /* 0 closed, 1 open, 2 password */
+    /* +0x93 */ u8 room_0x93;         /* the room layout: 1 and 2 pick lobby areas 6 and 7, else 5 */
+    /* +0x94 */ u8 pig_dress_0x94;    /* the room's Poogie costume */
+    /* +0x95 */ u8 unused_0x95[0x6B];
+}; /* size: 0x100 */
+
 /* One 0x120-byte copy of a connected peer the lobby keeps (the network pat control's `updatePeerCardBlock` finds the
  * row by the peer's id and refreshes its card): the id text, the name and the 0x100-byte card. */
 struct LobbyPeerCopy {
     /* +0x000 */ char id_0x00[0xA];
     /* +0x00A */ char name_0x0A[0x14];
     /* +0x01E */ u8 pad_0x1E[0x2];
-    /* +0x020 */ u8 card_0x20[0x100];
+    /* +0x020 */ union {
+        u8 card_0x20[0x100];
+        struct LobbyPeerCard card;
+    };
 }; /* size: 0x120 */
+
+/* The peer list as the network control copies it out: the count, then the four peer records.  size: 0x484 */
+struct LobbyPeerList {
+    /* +0x000 */ s32 count_0x000;
+    /* +0x004 */ struct LobbyPeerCopy peers_0x004[4];
+}; /* size: 0x484 */
 
 /* The text fields of the lobby's lists, each its own type so a row copy goes field by field (as the retail copies do). */
 struct LobbyNameText {
@@ -90,8 +111,13 @@ struct LobbyTimerBlock {
     /* +0x0001 */ u8 substep_0x0001;
     /* +0x0002 */ u8 field_0x0002;
     /* +0x0003 */ u8 quest_active_0x0003;    /* 1 while a quest is posted */
-    /* +0x0004 */ s32 peer_count_0x0004;     /* the `NetPeerList` the network control copies out: the count... */
-    /* +0x0008 */ struct LobbyPeerCopy peers_0x0008[4]; /* ...and the four peer records */
+    /* +0x0004 */ union {
+        struct {
+            /* +0x0004 */ s32 peer_count_0x0004;     /* the `NetPeerList` the network control copies out: the count... */
+            /* +0x0008 */ struct LobbyPeerCopy peers_0x0008[4]; /* ...and the four peer records */
+        }; /* size: 0x484 */
+        struct LobbyPeerList peer_list_0x0004;    /* the same run as one list (the room-visit screen's view) */
+    };
     /* +0x0488 */ u8 block_0x0488[0xD4C];
     /* +0x11D4 */ u8 block_0x11D4[0x212];
     /* +0x13E6 */ u8 rows_0x13E6[12][0x1F];  /* twelve 31-byte rows, each cleared by its first word */

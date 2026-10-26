@@ -203,6 +203,12 @@ void note_trade_draw(void);
 void quest_screen_enemy_start(struct Q_MoveWork* work);
 void quest_area_res_load(u8 map, u8 area);
 
+/* 0x803A4F7C / 0x803A5070 - the note slot a goods value sits in, and the value of a slot (GUESS names). */
+u32 note_value_to_slot(u16 value);
+u16 note_slot_to_value(u8 slot);
+/* 0x803A7D64 - the model scale of interior kind `kind`. */
+f32 lb_interior_scale_get(u8 kind);
+
 #ifdef __cplusplus
 }
 #endif

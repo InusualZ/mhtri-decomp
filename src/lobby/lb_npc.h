@@ -23,11 +23,17 @@ typedef struct LbNpcUserData {
     /* +0x3E01 */ u8 field_0x3E01;
     /* +0x3E02 */ u8 pad_0x3E02;
     /* +0x3E03 */ u8 field_0x3E03;
-    /* +0x3E04 */ u8 pad_0x3E04[0x264];
+    /* +0x3E04 */ u8 pad_0x3E04[0x106];
+    /* +0x3F0A */ u8 room_lock_0x3F0A;      /* the room's visit lock (the room-visit screen's 0 / 1 / 2) */
+    /* +0x3F0B */ u8 pad_0x3F0B[0x15D];
     /* +0x4068 */ u8 name_0x4068[0x10];
-    /* +0x4078 */ u8 pad_0x4078[0x7C3];
+    /* +0x4078 */ u8 pad_0x4078[0x84];
+    /* +0x40FC */ u8 room_pass_0x40FC[0x5]; /* the room's password */
+    /* +0x4101 */ u8 pad_0x4101[0x73A];
     /* +0x483B */ u8 field_0x483B;
-    /* +0x483C */ u8 place_0x483C[0x960];   /* the place info `place_info_set` shows */
+    /* +0x483C */ u8 place_0x483C[0x11];    /* the place info `place_info_set` shows (one interior id per room spot) */
+    /* +0x484D */ u8 room_layout_0x484D;    /* the room layout the screen-0x1E list picked */
+    /* +0x484E */ u8 pad_0x484E[0x94E];
     /* +0x519C */ u32 field_0x519C;          /* the rank point bits the quest results OR in */
     /* +0x51A0 */ u16 hunt_rank_0x51A0;      /* the last quest's hunt rank */
     /* +0x51A2 */ u16 time_rank_0x51A2;      /* its time rank */
