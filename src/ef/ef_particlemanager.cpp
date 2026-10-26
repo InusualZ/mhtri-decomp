@@ -1,5 +1,5 @@
 /*
- * ef/ef_particlemanager.cpp - the nw4r::ef::ParticleManager bookkeeping object: its constructor `fn_800AB664`
+ * ef/ef_particlemanager.cpp - the nw4r::ef::ParticleManager bookkeeping object: its constructor `ef_particle_manager_ctor`
  *   (installs the table `lbl_805934E0`, slots 2-7 = fn_800AB730, fn_800AB73C, ef_pm_initialize, ef_pm_create_particle,
  *   fn_800AC2F8, fn_800ADED8), the object's lifecycle, and the static initializer `fn_800AEE14`, which constructs
  *   the file's two static matrices.
@@ -473,7 +473,7 @@ extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src)
 extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin);
 
 /* ParticleManager constructor: base ctor, vtable, then the three sub-objects at +0x38/+0x58/+0x8C. */
-extern "C" EfPmManager* fn_800AB664(EfPmManager* self) {
+extern "C" EfPmManager* ef_particle_manager_ctor(EfPmManager* self) {
     fn_800A4080(self);
     self->vtable = lbl_805934E0;
     fn_800A3FFC(&self->list, 0x14);
@@ -611,7 +611,7 @@ extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, co
 }
 
 /* Delete-like helper: free only a live object. */
-extern "C" void* fn_800AC178(void* p, s32 n) {
+extern "C" void* ef_particle_manager_delete(void* p, s32 n) {
     if (p != NULL && (s16)n > 0)
         operator delete(p);
     return p;

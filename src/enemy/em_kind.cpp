@@ -359,11 +359,11 @@ void fn_800FA9B8(u8* rec, u8 id);
 void* res_file_ctor(void* out, u32 a);
 void res_file_assign(void* dst, void* src);
 void res_mdl_copy_ctor(void* a, void* b);
-s32 fn_800D56F4(char* name, u32 data);
+s32 nw_res_entry_add(char* name, u32 data);
 void* nw_res_entry_get(s32 handle);
 s32 res_mem_index_get(char* name);
-void fn_800D5D60(void* work);
-void fn_800D5E30(void* work);
+void nw_res_em_mdl_handle_set(void* work);
+void nw_res_em_mot_handle_set(void* work);
 void mhchar_mdl_prepare(void* a);
 void mhchar_res_bank_set(u32 a, u8 b, void* c);
 s32 res_file_get_res_mdl(void* a, u32 b);
@@ -2426,7 +2426,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     u8* rec;
 
     get_move_work_adrs(0);
-    work->handle_0x08 = fn_800D56F4(name, data);
+    work->handle_0x08 = nw_res_entry_add(name, data);
     if (work->handle_0x08 == -1) {
         return;
     }
@@ -2440,7 +2440,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     res = res_file_get_res_mdl(&h1, 0);
     res_mdl_copy_ctor(&h2, &res);
     mhchar_mdl_prepare(&h2);
-    fn_800D5D60(work);
+    nw_res_em_mdl_handle_set(work);
 }
 
 #pragma peephole off
@@ -2469,14 +2469,14 @@ void fn_80140EE8(char* name, u32 size, u32 a, u32 b, u32 c, u32* ctx) {
     u32 tmp;
 
     res_file_ctor(&h1, 0);
-    work->handle_0x10 = fn_800D56F4(name, size);
+    work->handle_0x10 = nw_res_entry_add(name, size);
     if (work->handle_0x10 != -1) {
         u8* rec = (u8*)nw_res_entry_get(work->handle_0x10);
         if (rec != NULL) {
             res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
             em_res_file_setup(&h1);
             mhchar_res_bank_set(2, work->field_0x00, &h1);
-            fn_800D5E30(work);
+            nw_res_em_mot_handle_set(work);
         }
     }
     em_kind_slot_ready_set(work);

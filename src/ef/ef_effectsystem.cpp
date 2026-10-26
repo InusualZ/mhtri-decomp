@@ -130,13 +130,13 @@ char ef_effectsystem_err_list_size[] = "NW4R:Failed assertion UtlistSize(&mActiv
 
 extern "C" {
 /* this unit's own symbols */
-u32 fn_800A56B0(EfSys* self, u32 maxGroupID);
+u32 ef_system_initialize(EfSys* self, u32 maxGroupID);
 u32 fn_800A5948(EfSys* self, EfSysEffect* target);
 EfSysEffect* fn_800A5A90(EfSys* self, void* emitter, u32 groupID, u16 flag);
-u32 fn_800A5D8C(EfSys* self, u32 groupID);
+u32 ef_system_retire_group(EfSys* self, u32 groupID);
 u32 fn_800A5E6C(EfSys* self, u32 groupID);
 u32 fn_800A5F4C(EfSys* self, u32 groupID);
-EfSys* fn_800A56A4(void);
+EfSys* ef_system_get_instance(void);
 void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src, f32 a, f32 b);
 void* ef_draw_info_projection(EfSysAccessObj* self);
 nw4r::math::MTX34* ef_effect_root_mtx(EfSysAccessObj* self);
@@ -280,12 +280,12 @@ EfSys::EfSys() {
 /* 0x800A5618 (0x8C): retires every group's effects. */
 EfSys::~EfSys() {
     for (u32 i = 0; i < mMaxGroupID; i++) {
-        fn_800A5D8C(this, i);
+        ef_system_retire_group(this, i);
     }
 }
 
 /* 0x800A56A4 - the singleton accessor. */
-extern "C" EfSys* fn_800A56A4(void) {
+extern "C" EfSys* ef_system_get_instance(void) {
     return &ef_system_instance;
 }
 
@@ -295,7 +295,7 @@ extern "C" EfSys* fn_800A56A4(void) {
  * 0x800A56B0 - `Initialize`: build the group table and bind the borrowed objects.
  * =================================================================================================== */
 
-extern "C" u32 fn_800A56B0(EfSys* self, u32 maxGroupID) {
+extern "C" u32 ef_system_initialize(EfSys* self, u32 maxGroupID) {
 #line 79
     NW4R_POINTER_ASSERT(self->mMemoryManager, ef_effectsystem_err_memory_manager);
 #line 80
@@ -380,7 +380,7 @@ u32 nw4r::ef::EffectSystem::RetireEffect(Effect* target_) {
 }
 
 /* 0x800A5D8C - retires every effect on one group's active list. */
-extern "C" u32 fn_800A5D8C(EfSys* self, u32 groupID) {
+extern "C" u32 ef_system_retire_group(EfSys* self, u32 groupID) {
     u32 count = 0;
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
 

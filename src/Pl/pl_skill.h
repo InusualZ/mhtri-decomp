@@ -103,7 +103,7 @@ struct _PLGLOBAL {
     /* +0x22C */ s8 count22C;
     /* +0x22D */ u8 unk22D[0x3];
     /* +0x230 */ u8 slot_state[0x21C];    /* indexed by the player index (a `_PLW` +0x008) */
-    /* +0x44C */ u32 players_0x44C[8];    /* `fn_80267A78` indexes it (one word per player) */
+    /* +0x44C */ u32 players_0x44C[8];    /* `pl_res_buffer_get` indexes it (one word per player) */
     /* +0x46C */ u8 unk46C[0xC];
     /* +0x478 */ s8 limit478;
     /* +0x479 */ s8 limit479;

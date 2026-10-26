@@ -29,8 +29,8 @@
 
 extern "C" {
 s32 fn_802673B8(void);
-void fn_802673D4(u8 index);
-u32 fn_80267A78(u8 index);
+void pl_res_loaded_set(u8 index);
+u32 pl_res_buffer_get(u8 index);
 u8 fn_80267C84(struct _PLW* self);
 u32 pl_net_slot_ready_ck(struct _PLW* self);
 s32 pl_obj_ready_ck(struct _PLOBJ* obj);
@@ -60,7 +60,7 @@ s32 fn_802673B8(void) {
 }
 
 /* 0x802673D4 - marks one player slot as ready. */
-void fn_802673D4(u8 index) {
+void pl_res_loaded_set(u8 index) {
     lbl_80794B2C[index] = 1;
 }
 
@@ -95,7 +95,7 @@ u32 player_move_start_ck(void) {
 }
 
 /* 0x80267A78 - one player's per-player work word. */
-u32 fn_80267A78(u8 index) {
+u32 pl_res_buffer_get(u8 index) {
     if (pl_global == NULL) {
         return 0;
     }

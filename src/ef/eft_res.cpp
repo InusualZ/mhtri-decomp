@@ -61,7 +61,6 @@
 #include "sound/fn_800DD1F0.h"
 #include "sound/sound_job.h" /* split_screen_size_class (rule 2) */
 #include "ef/pRoot.h"
-#include "ef/fn_800D3C0C.h"
 #include "stage/get_now_mapno.h"
 #include "draw_shape.h" /* res_file_ctor / res_file_assign (rule 2) */
 #include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple::GetResMdl (rule 2) */
@@ -1240,11 +1239,11 @@ extern "C" void fn_800F7BF0(EftProSlot* slot) {
     if (res == 0x7FFFFFFF || res < 0 || slot->field_0x05 == 0xFF) {
         return;
     }
-    if (fn_800D4D9C(res) == 0) {
+    if (res_mem_name_get(res) == 0) {
         return;
     }
     if (slot->field_0x01 == 3) {
-        slot->field_0x0C = fn_800D56F4(NULL, NULL);
+        slot->field_0x0C = nw_res_entry_add(NULL, NULL);
     } else {
         slot->field_0x0C = nwAddResource(NULL, NULL);
     }
@@ -1263,7 +1262,7 @@ extern "C" void eft_res_bind(u32 mode) {
             slot++;
         }
     }
-    ctrl->system_0x04 = (void*)fn_800D3C0C();
+    ctrl->system_0x04 = (void*)nw_res_ef_system_get();
     ctrl->resource_0x08 = ef_resource_instance();
     u16 count = (u16)ef_resource_num_texture_projects((EfResourceManager*)ctrl->resource_0x08);
     for (int i = 0; i < count; i++) {
@@ -1288,7 +1287,7 @@ extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx
     switch (ctx->mode) {
     case 3:
         slot->field_0x06 = (s16)ctrl->loaded_c_0x38;
-        slot->field_0x0C = fn_800D56F4(name, data);
+        slot->field_0x0C = nw_res_entry_add((char*)name, data);
         ctrl->id_c_0x83C[ctrl->loaded_c_0x38] = slot->field_0x0C;
         ctrl->loaded_c_0x38++;
         if (unshared == 1) {
@@ -1374,7 +1373,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                         table->slots_0x04[id].field_0x01 = 3;
                         table->slots_0x04[id].field_0x08 = flags;
                     } else {
-                        handle = fn_800D4CE4(file->name_0x04);
+                        handle = res_mem_index_ref(file->name_0x04);
                         if (handle < 0) {
                             handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
                             if (handle < 0) {
@@ -1422,7 +1421,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                             table->slots_0x04[id].field_0x01 = 1;
                             table->slots_0x04[id].field_0x08 = flags;
                         } else {
-                            handle = fn_800D4CE4(file->name_0x04);
+                            handle = res_mem_index_ref(file->name_0x04);
                             if (handle < 0) {
                                 handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
                                 if (handle < 0) {
@@ -1470,7 +1469,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                             table->slots_0x04[id].field_0x01 = 2;
                             table->slots_0x04[id].field_0x08 = flags;
                         } else {
-                            handle = fn_800D4CE4(file->name_0x04);
+                            handle = res_mem_index_ref(file->name_0x04);
                             if (handle < 0) {
                                 handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
                                 if (handle < 0) {
@@ -1544,7 +1543,7 @@ extern "C" void fn_800F8358(char* path, void* data, u32 size, EftFileLoadCtx* ct
         switch (slot->field_0x01) {
         case 3:
             slot->field_0x06 = (s16)ctrl->loaded_c_0x38;
-            slot->field_0x0C = fn_800D56F4(*names, file);
+            slot->field_0x0C = nw_res_entry_add(*names, file);
             ctrl->id_c_0x83C[ctrl->loaded_c_0x38] = slot->field_0x0C;
             ctrl->loaded_c_0x38++;
             slot->field_0x05 = table[1]++;
@@ -1584,7 +1583,7 @@ extern "C" void fn_800F8634(EftResFile* desc, u32 mode, void* unused, u8* name, 
         if (desc->size_0x00 == 0) {
             return;
         }
-        if (fn_800D4CE4(desc->name_0x04) >= 0) {
+        if (res_mem_index_ref(desc->name_0x04) >= 0) {
             return;
         }
         s32 handle = pull_res_mem(desc->name_0x04, desc->size_0x00, 0);
@@ -1605,7 +1604,7 @@ extern "C" void fn_800F8634(EftResFile* desc, u32 mode, void* unused, u8* name, 
     if (desc->size_0x00 == 0) {
         return;
     }
-    if (fn_800D4CE4(desc->name_0x04) >= 0) {
+    if (res_mem_index_ref(desc->name_0x04) >= 0) {
         return;
     }
     s32 handle = pull_res_mem(desc->name_0x04, desc->size_0x00, 0);

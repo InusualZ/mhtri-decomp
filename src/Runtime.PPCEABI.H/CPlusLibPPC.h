@@ -15,6 +15,16 @@ extern "C" {
  * `dtor` for them.  The map's name is unmangled, so the declaration is C linkage. */
 void __construct_array(void* array, void* ctor, void* dtor, u32 size, u32 count);
 
+/* An element constructor or destructor as the array runtime calls it: the object and the delete flag. */
+/* untyped: raw element storage - the runtime calls it for elements of any class */
+typedef void (*ConstructorDestructor)(void* obj, s16 flag);
+
+/* 0x80456958 - writes the new[] header into `block` and constructs `n` elements of `size` bytes after it;
+ * returns the first element.  A new-expression whose class names its constructor and destructor by C linkage
+ * spells this call out. */
+/* untyped: raw element storage of a caller-owned array */
+void* __construct_new_array(void* block, ConstructorDestructor ctor, ConstructorDestructor dtor, u32 size, u32 n);
+
 #ifdef __cplusplus
 }
 #endif

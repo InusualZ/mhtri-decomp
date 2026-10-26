@@ -196,7 +196,7 @@ void fn_800AC100(void* mgr, u8 mode, u8* a, u8* b, u8* c, f32 scale);
 /* the effect pool / emitter walk */
 void fn_800A5F4C(void* effect, u32 idx);
 void fn_800A5E6C(void* effect, u32 idx);
-void fn_800A5D8C(void* effect, u32 idx);
+void ef_system_retire_group(void* effect, u32 idx);
 void* ef_system_memory_manager(void* effect);
 void* ef_effect_root_mtx(void* effect);
 u16 ef_effect_emitter_count(void* effect);
@@ -307,7 +307,7 @@ extern "C" void effect_layer_reset(void) {
     for (u32 i = 0; i < 2; i++) {
         fn_800A5F4C(effect, i);
         fn_800A5E6C(effect, i);
-        fn_800A5D8C(effect, i);
+        ef_system_retire_group(effect, i);
     }
     void** vt = (void**)ef_system_memory_manager(effect);
     ((void (*)(void*))vt[3])(ef_system_memory_manager(effect));
