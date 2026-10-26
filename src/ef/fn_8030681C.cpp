@@ -11,11 +11,11 @@
  *   `jumptable_805DCB68`), 0x80307E44-0x803088FC (`fn_80307E44`, kind-0 state-1), 0x80308A30-0x80308D00
  *   (`fn_80308A30`, kind-2 state-1; it needs the `nw4r::g3d::ScnMdl::CopiedMatAccess` class views).
  *   18 partial rows, including:
- *  - `fn_8030681C`, `fn_803088FC`, `menu_status_page_step`: ours call `get_now_mapno`, `eft004_set`, `rotLocalMatX`,
+ *  - `eft041_move`, `fn_803088FC`, `menu_status_page_step`: ours call `get_now_mapno`, `eft004_set`, `rotLocalMatX`,
  *    `rotLocalMatY` and `sysSE_req` by their plain names where retail calls the manglings (`get_now_mapno__Fv`,
  *    `eft004_set__FUcPQ34nw4r4math4VEC3fUlUc`, `rotLocalMatX__FUlPQ34nw4r4math5MTX34`, `sysSE_req__Fl`, ...);
- *    `fn_8030681C` also has a 0x50 frame against retail's 0x60 (retail keeps `f31` live for `lbl_8079ADE8`);
- *  - `fn_8030681C`, `fn_80308D00`, `eft042_set2`: ours fuse `subic.`/`rlwinm.` where retail keeps the compare
+ *    `eft041_move` also has a 0x50 frame against retail's 0x60 (retail keeps `f31` live for `lbl_8079ADE8`);
+ *  - `eft041_move`, `fn_80308D00`, `eft042_set2`: ours fuse `subic.`/`rlwinm.` where retail keeps the compare
  *    separate, and drop the `clrlwi` narrowing of the `u8` arguments (also `fn_80306D6C`, `fn_80308E38`);
  *  - `fn_80306D6C`: retail stores `source_0x30` twice (`NULL`, then the source); ours drops the first store;
  *  - `fn_80306FF0`: ours compares the states 1, 2, 3, 0 where retail compares 0, 1, 2, 3 (case 0 is written last;
@@ -25,11 +25,11 @@
  *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted (the `.sdata2` pool is shared with
  *   `ef/fn_803066F0.c`: a fold candidate); `.text` (0xEFC of 0x2798), extab (0x88 of 0xA0) and extabindex (0xCC of
  *   0xF0) short of the claim and differing; the five plain-named callees above have no map row.
- * SHAPES. `fn_8030681C` calls the two `created` slots through the `EftUvModel` vtable view (slots 7 and 9 of an
+ * SHAPES. `eft041_move` calls the two `created` slots through the `EftUvModel` vtable view (slots 7 and 9 of an
  *   `nw4r::ef::Effect`) and reads the joint table as the stage's `Vec` array (`lbl_805DC5E8`).
  *   `fn_80306F10`: `kind` is `u32`, so `kind - 1 <= 1` emits `cmplwi`.
  *   `Eft042Work`'s unions name the per-family tails of the 64-byte `_EFT::work_0x38` block.
- *   `ef/fn_803066F0.c` declares `fn_8030681C`/`fn_80306A94` itself through its private `EftWork` view of `_EFT`.
+ *   `ef/fn_803066F0.c` declares `eft041_move`/`eft041_kill` itself through its private `EftWork` view of `_EFT`.
  */
 #include "types.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -126,10 +126,10 @@ typedef struct EftUvModelVtbl {
     void (*slot_0x14)(void*);   /* +0x14 */
     void (*slot_0x18)(void*);   /* +0x18 */
     /* the frame the created model is put at when the effect starts its second step
-     * (`fn_8030681C` calls it with 0.0f); it takes the frame as an `f32`. */
+     * (`eft041_move` calls it with 0.0f); it takes the frame as an `f32`. */
     void (*setFrame_0x1C)(void* self, f32 frame);  /* +0x1C */
     void (*slot_0x20)(void*);   /* +0x20 */
-    /* the retire call `fn_8030681C` makes once the step timer has run out. */
+    /* the retire call `eft041_move` makes once the step timer has run out. */
     void (*retire_0x24)(void* self);               /* +0x24 */
 } EftUvModelVtbl;
 
@@ -170,9 +170,9 @@ extern u32 lbl_805DCB1C[];     /* per-type joint number (the type-7 state-2 body
  * this unit's own bodies, forward-declared (address order)
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_8030681C(_EFT* self);
-extern "C" void fn_80306A84(_EFT* self);
-extern "C" void fn_80306A94(_EFT* self);
+extern "C" void eft041_move(_EFT* self);
+extern "C" void eft041_end(_EFT* self);
+extern "C" void eft041_kill(_EFT* self);
 extern "C" void eft_spawn_type_at_area(_ENEMY_WORK* source, u8 type);
 extern "C" void eft_area_slot_bind(_ENEMY_WORK* source, u8 type, s32 timer);
 extern "C" _EFT* fn_80306BFC(u8 type, u8 area);
@@ -213,7 +213,7 @@ extern "C" void sysSE_req(s32 id);
 
 /* Walks the work area's model records: places each model when its step timer expires, reveals its joints, walks it
  * and retires it after the second timer, then hands its position to `eft004_set`. */
-extern "C" void fn_8030681C(_EFT* self)
+extern "C" void eft041_move(_EFT* self)
 {
     Eft042Work* work = (Eft042Work*)self->work_0x38;
     u8 mapno = get_now_mapno();
@@ -286,13 +286,13 @@ extern "C" void fn_8030681C(_EFT* self)
 }
 
 /* The machine's state-2 step: one step further into the effect. */
-extern "C" void fn_80306A84(_EFT* self)
+extern "C" void eft041_end(_EFT* self)
 {
     self->state_0x05++;
 }
 
 /* The machine's state-3 step (and every failure path): retire the effect. */
-extern "C" void fn_80306A94(_EFT* self)
+extern "C" void eft041_kill(_EFT* self)
 {
     eft_res_slot_release(self);
 }

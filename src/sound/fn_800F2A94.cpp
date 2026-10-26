@@ -23,7 +23,7 @@
  * `eft_control` (`.bss` 0x806A20F0, 0xC44 B) and the `get_move_work_adrs__FUc` work buffers - the effect
  * (eft/efm/efx) resource block.  Rule 2 confirmed it independently: with the whole range registered,
  * 39 `extern` declarations in **twelve `ef` units** (`eft002/004/007/009`, `fn_800FD520`, `fn_800FD718`,
- * `fn_80104BD0`, `fn_8010D1A8`, `fn_80114E34`, `fn_8011722C`, `fn_80119C44`, `fn_803066F0`) resolved to
+ * `fn_80104BD0`, `fn_8010D1A8`, `fn_80114E34`, `fn_8011722C`, `fn_80119C44`, `eft041_model_create`) resolved to
  * *this* unit as their owner - i.e. the ef block's symbols belong to an `ef` unit, not to a `sound` one.
  * The registration therefore stops at 0x800F6520 and the remainder (0x800F6520..0x800F95A4, 43
  * functions, 12420 bytes, `eft_control` + the eft/efm/efx resource loaders) is left for its own `ef`

@@ -1,6 +1,6 @@
 /* ef/fn_803066F0.c - the state-0 handler of the effect-41 machine: it builds the stage's effect-resource name
  *   (`fn_802B050C(0)` plus ".brres"), creates each model through `res_eft_UV_model_create_name`, and on success arms
- *   the step timers, resets the models and runs the state-1 handler `fn_8030681C` directly.
+ *   the step timers, resets the models and runs the state-1 handler `eft041_move` directly.
  * RANGE. .text 0x803066F0-0x8030681C (1 function); extab 0x80015AAC-0x80015AB4, extabindex 0x80034668-0x80034674,
  *   .sdata 0x80792B70-0x80792B78 (the ".brres" string).  The dispatcher `fn_803066B4` and the creator
  *   `lb_area_fx_set` (`eft_res_slot_get(32)`, `+0x03 = 41`) are `lobby/fn_8030121C.cpp`'s.
@@ -14,7 +14,7 @@
  * SHAPES. `created` is `void* volatile`: retail stores the call result and re-reads it (`stw r3,8(r28);
  *   lwz r0,8(r28)`), which no flag set reproduces.
  *   The declarations run `data; i; name;` (with `name` first the `name`/`i` registers swap; playbook 18).
- *   `EftWork` is this unit's view of the 0x48-byte `_EFT` record, and declares `fn_8030681C`/`fn_80306A94` through it.
+ *   `EftWork` is this unit's view of the 0x48-byte `_EFT` record, and declares `eft041_move`/`eft041_kill` through it.
  */
 
 #include "types.h"
@@ -74,8 +74,8 @@ struct EftWork {
 };                             /* size: 0x48 */
 
 extern void* stage_char_res_body_get(u8 index); /* a `stage_w` name buffer for the stage's effect resource */
-extern void  fn_8030681C(EftWork* self);
-extern void  fn_80306A94(EftWork* self);
+extern void  eft041_move(EftWork* self);
+extern void  eft041_kill(EftWork* self);
 extern void* res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc(UvModelTail* model, char* name,
                                                                         u32 a, u32 b, void** works,
                                                                         s32 n, u8 c);
@@ -84,7 +84,7 @@ extern char* strcat(char* dst, const char* src);
 
 /* Creates the effect's models from the stage's ".brres" resource name, resets the model transforms and
  * the step timers, then advances the effect to its next state and runs that state's handler. */
-void fn_803066F0(EftWork* self)
+void eft041_model_create(EftWork* self)
 {
     EftWorkData* data;
     u32 i;
@@ -98,7 +98,7 @@ void fn_803066F0(EftWork* self)
         data->models[i].created = res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc(
             data->models[i].model, name, 0x108, 0, &data->works[i][0], 3, 2);
         if (data->models[i].created == NULL) {
-            fn_80306A94(self);
+            eft041_kill(self);
             return;
         }
     }
@@ -116,5 +116,5 @@ void fn_803066F0(EftWork* self)
         data->models[i].model->ready = 1;
     }
 
-    fn_8030681C(self);
+    eft041_move(self);
 }

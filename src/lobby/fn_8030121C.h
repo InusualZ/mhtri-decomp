@@ -7,6 +7,15 @@
 
 struct _ENEMY_WORK;
 
+/* One `_tr_flag` record (`lb_tr_flag_get`, the table `lb_tr_flag_data` points at): the goods id, its name and its
+ * description.  size: 0xC */
+typedef struct LbTrFlag {
+    /* +0x00 */ u16 id_0x00;     /* 0xFFFF ends the table */
+    /* +0x02 */ u8 pad_0x02[2];
+    /* +0x04 */ s8* name_0x04;
+    /* +0x08 */ s8* text_0x08;
+} LbTrFlag; /* size: 0xC */
+
 #ifdef __cplusplus
 extern "C" {
 
