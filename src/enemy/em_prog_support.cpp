@@ -128,7 +128,7 @@ void mhchar_model_release(void* chr);
 void g3d_root_model_bind(s32 root, u32 id);
 void fn_80385828(NoteWork* self);
 void fn_803858F8(NoteWork* self);
-void fn_800E1280(MHchar* self, u32 a, u16 b, u32 c, u32 d, u32 e, f32 f, f32 g);
+void mhchar_motion_start_no(MHchar* self, u32 a, u16 b, u32 c, u32 d, u32 e, f32 f, f32 g);
 extern f32 lbl_8079BF6C;
 }
 
@@ -530,7 +530,7 @@ extern "C" void fn_803857BC(NoteWork* self) {
 /* 0x80385B5C */
 extern "C" void note_pane_motion_start(NoteWork* self, u16 a, u32 b, s32 c) {
     if (a <= 16) {
-        fn_800E1280(&self->model, 0, a, b, fn_80385B28(self, a), 0, (f32)c, lbl_8079BF6C);
+        mhchar_motion_start_no(&self->model, 0, a, b, fn_80385B28(self, a), 0, (f32)c, lbl_8079BF6C);
     }
 }
 

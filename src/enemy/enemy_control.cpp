@@ -135,9 +135,9 @@ void Panic(const char* file, int line, const char* fmt, ...);
 extern "C" {
 /* external callees whose owners' headers do not declare them */
 s32  fn_80093B0C(void);
-void fn_80093990(void* self);
-u32  fn_800E264C(void* self);
-u32  fn_8009380C(void* self, s32* value);
+void res_file_init(void* self);
+u32  res_file_bind_self(void* self);
+u32  res_file_bind(void* self, s32* value);
 u32  isServerSelectState(void);
 u8   isReadyCountOne(void);
 }
@@ -355,8 +355,8 @@ void em_res_file_setup(u32* file) {
     if (fn_80093B0C() == 0) {
         nw4r::db::Panic("enemy_control.cpp", 810, "NW4R:Failed assertion bRevision");
     }
-    fn_80093990(file);
-    bound = fn_800E264C(file);
+    res_file_init(file);
+    bound = res_file_bind_self(file);
     if (bound != 1) {
         ResEntry* res = ckResourceName("shadow_tex.brres");
         if (res != 0) {
@@ -364,7 +364,7 @@ void em_res_file_setup(u32* file) {
             s32 value;
             res_file_ctor((u32*)&tmp, (u32)res->data);
             value = tmp;
-            bound = fn_8009380C(file, &value);
+            bound = res_file_bind(file, &value);
         }
     }
     if (bound == 0) {

@@ -22,6 +22,9 @@ int strcmp(const char* a, const char* b);
 /* 0x8045F7E0 (0x30): returns the first occurrence of `c` in `s`, or NULL. */
 char* strchr(const char* s, int c);
 
+/* 0x8045F97C (0x6C): returns the first occurrence of `needle` in `haystack`, or NULL. */
+char* strstr(const char* haystack, const char* needle);
+
 #ifdef __cplusplus
 }
 #endif

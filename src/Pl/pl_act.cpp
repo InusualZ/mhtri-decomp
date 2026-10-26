@@ -880,7 +880,7 @@ u32 fn_8026B934(_PLW* self);
 u32 fn_8026BA04(_PLW* self);
 u32 option_cfg_eq_ck(u8 value, u32 low, u32 high);
 void fn_8026AF08(_PLW* self, u32 value);
-void fn_800E09D0(void* dst, void* src);
+void mhchar_ofs_set(void* dst, void* src);
 u8 GameMode_ck(void);
 s8 my_player_no(void);
 u32 lobby_input_locked_ck(void);
@@ -2573,7 +2573,7 @@ extern "C" void pl_model_pos_sync(_PLW* self)
     vec.x = self->field_0x068;
     vec.y = self->unk6C;
     vec.z = self->unk70;
-    fn_800E09D0(p, &vec);
+    mhchar_ofs_set(p, &vec);
 }
 
 /* 0x8026FD94: true when the actor is in the area the player is currently in. */

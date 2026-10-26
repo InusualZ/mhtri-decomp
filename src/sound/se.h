@@ -128,11 +128,11 @@ s32 se_bank_req(s32 bank, s32 id);
  * 0x80041E40 is owned by `src/mh3_pad.cpp`; this copy is normalised to that owner's body
  * (`returns dst`) - its header cannot be included from the `ef` band (VEC3_ctor/
  * setVec3 conflict, filed 2026-09-27). */
-void fn_800D3ACC(void* sub);
+void frame_ctrl_set_play_policy(void* sub);
 void scn_mdl_clean_mat_buffer(void* obj);
-void fn_800E2680(void* sub);
+void res_file_release(void* sub);
 
-void fn_80093AA0(void* obj);
+void res_file_terminate(void* obj);
 void CleanUpTracks(void* obj);
 void res_node_assign(void* obj, void* sub);
 int res_node_mtx_id_get(void* sub);

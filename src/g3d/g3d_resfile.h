@@ -55,7 +55,7 @@ u32 fn_80092B10(void* p);
 void* fn_80092B0C(void* p, u32 i);
 u32 fn_8009284C(void* p);
 void* fn_80092848(void* p, u32 i);
-u32 fn_80092CC4(void* p);
+u32 res_file_get_res_anm_chr_num(void* p);
 void* fn_80092CC0(void* p, u32 i);
 u32 fn_80092E78(void* p);
 void* fn_80092E74(void* p, u32 i);

@@ -809,7 +809,7 @@ void fn_8013823C(EnemyWork* self) {
         {
             f32 step = self->field_0x1AC * get_em_chg_scale__FP11_ENEMY_WORK(self);
             self->field_0x1A0.y = self->field_0x1A0.y + step;
-            fn_800E09D0(EM_CHAR(self), &self->field_0x1A0, step);
+            mhchar_ofs_set(EM_CHAR(self), &self->field_0x1A0, step);
         }
         if (em_act_ck__FP11_ENEMY_WORKUcUc(self, 0xC, 0xFF) == 0 &&
             ((em_area_ck__FP11_ENEMY_WORK(self) == 1 && self->field_0x001 != 0) ||
@@ -932,12 +932,12 @@ void em_post_update(EnemyWork* self) {
             if (em_die_ck__FP11_ENEMY_WORK(self) == 1) {
                 u32 i;
                 for (i = 0; i < mhchar_mat_num_get(EM_CHAR(self)); i++) {
-                    fn_800E30DC(EM_CHAR(self), i, 0x10);
+                    mhchar_mat_buffer_clean(EM_CHAR(self), i, 0x10);
                 }
             } else {
                 u32 i;
                 for (i = 0; i < mhchar_mat_num_get(EM_CHAR(self)); i++) {
-                    fn_800E2EBC(EM_CHAR(self), i, 2);
+                    mhchar_cull_mode_set(EM_CHAR(self), i, 2);
                 }
             }
         }

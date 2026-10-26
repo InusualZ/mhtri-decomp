@@ -366,7 +366,7 @@ void fn_800D5D60(void* work);
 void fn_800D5E30(void* work);
 void mhchar_mdl_prepare(void* a);
 void mhchar_res_bank_set(u32 a, u8 b, void* c);
-s32 fn_800924CC(void* a, u32 b);
+s32 res_file_get_res_mdl(void* a, u32 b);
 
 extern "C" void fn_801409C8(_ENEMY_WORK* self);
 extern "C" void fn_80140B10(u32 unused, u32 a, u32 b);
@@ -2437,7 +2437,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     }
     res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
     em_res_file_setup(&h1);
-    res = fn_800924CC(&h1, 0);
+    res = res_file_get_res_mdl(&h1, 0);
     res_mdl_copy_ctor(&h2, &res);
     mhchar_mdl_prepare(&h2);
     fn_800D5D60(work);

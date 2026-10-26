@@ -153,17 +153,17 @@ u32 fn_80092444(void* self);
 u32 fn_800924A8(u32* p);
 const char* fn_800924B0(void);
 u32 fn_800924B8(u32* p);
-u32 fn_800924CC(void* self, u32 arg);
+u32 res_file_get_res_mdl(void* self, u32 arg);
 u32 fn_80092790(void* self, u32 arg);
 u32 fn_80092A54(void* self, u32 arg);
-u32 fn_80092C08(void* self, u32 arg);
+u32 res_file_get_res_anm_chr(void* self, u32 arg);
 u32 fn_80092DBC(void* self, u32 arg);
 u32 fn_80092F70(void* self, u32 arg);
 u32 fn_80093124(void* self, u32 arg);
 u32 fn_800932D8(void* self, u32 arg);
 u32 fn_8009348C(void* self, u32 arg);
 u32 fn_800935D4(void* self, u32 arg);
-void* fn_80092B9C(u32* self, u32 ptr);
+void* res_anm_chr_ctor(u32* self, u32 ptr);
 void* fn_80092D50(u32* self, u32 ptr);
 void* fn_80092F04(u32* self, u32 ptr);
 void* fn_800930B8(u32* self, u32 ptr);
@@ -214,7 +214,7 @@ extern "C" __declspec(noinline) inline u32 fn_800924B8(u32* p) {
 
 
 /* `ResFile::GetResMdl(int)`. */
-extern "C" u32 fn_800924CC(void* self, u32 arg) {
+extern "C" u32 res_file_get_res_mdl(void* self, u32 arg) {
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_mdl)];
     if (entry != 0) {
         return *(u32*)&nw4r::g3d::ResMdl(nw4r::g3d::ResDic((void*)entry)[(int)arg]);
@@ -223,7 +223,7 @@ extern "C" u32 fn_800924CC(void* self, u32 arg) {
 }
 
 /* `ResFile::GetResMdl(u32)`, forwarding to the `int` overload. */
-extern "C" void* fn_80092584(void* self, u32 arg) { return (void*)fn_800924CC(self, arg); }
+extern "C" void* fn_80092584(void* self, u32 arg) { return (void*)res_file_get_res_mdl(self, arg); }
 
 /* `ResFile::GetResMdlNumEntries()`. */
 extern "C" u32 fn_80092588(void* self) {
@@ -325,11 +325,11 @@ extern "C" u32 fn_80092B10(void* self) {
 /* Constructs a `ResAnmChr` handle; dead-stripped, it places the inline constructor's weak copy here. */
 extern "C" void* res_file_anm_chr_init(u32* self, u32 ptr) /* untyped: opaque handle - the constructed resource handle */
 {
-    return fn_80092B9C(self, ptr);
+    return res_anm_chr_ctor(self, ptr);
 }
 
 /* `ResAnmChr(void*)`: stores the block pointer and asserts its 4-byte alignment. */
-extern "C" __declspec(noinline) inline void* fn_80092B9C(u32* self, u32 ptr) {
+extern "C" __declspec(noinline) inline void* res_anm_chr_ctor(u32* self, u32 ptr) {
     fn_80092C00(self, ptr);
     if ((ptr & 3) != 0) {
         nw4r::db::Panic("g3d_resanmchr_ac.h", 39, "NW4R:Failed assertion !((u32)p & 0x3)");
@@ -344,19 +344,19 @@ extern "C" __declspec(noinline) inline void fn_80092C00(u32* self, u32 ptr) { *s
 
 
 /* `ResFile::GetResAnmChr(int)`. */
-extern "C" u32 fn_80092C08(void* self, u32 arg) {
+extern "C" u32 res_file_get_res_anm_chr(void* self, u32 arg) {
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_chr)];
     if (entry != 0) {
-        return *(u32*)fn_80092B9C(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+        return *(u32*)res_anm_chr_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
     }
-    return *(u32*)fn_80092B9C(&ResHandleTemp().self()->word, 0);
+    return *(u32*)res_anm_chr_ctor(&ResHandleTemp().self()->word, 0);
 }
 
 /* `ResFile::GetResAnmChr(u32)`. */
-extern "C" void* fn_80092CC0(void* self, u32 arg) { return (void*)fn_80092C08(self, arg); }
+extern "C" void* fn_80092CC0(void* self, u32 arg) { return (void*)res_file_get_res_anm_chr(self, arg); }
 
 /* `ResFile::GetResAnmChrNumEntries()`. */
-extern "C" u32 fn_80092CC4(void* self) {
+extern "C" u32 res_file_get_res_anm_chr_num(void* self) {
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_chr)];
     if (entry != 0) {
         return nw4r::g3d::ResDic((void*)entry).GetNumData();
@@ -596,7 +596,7 @@ extern "C" u32 fn_80093690(void* self) {
 }
 
 /* Whether the file has an `AnmChr` category. */
-extern "C" u32 fn_8009371C(void* self) {
+extern "C" u32 res_file_has_anm_chr(void* self) {
     return (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_chr)] != 0;
 }
 
@@ -606,7 +606,7 @@ extern "C" u32 fn_80093794(void* self) {
 }
 
 /* Binds every model and scene animation of the file against `arg`; false when one fails. */
-extern "C" u32 fn_8009380C(void* self, u32* arg) {
+extern "C" u32 res_file_bind(void* self, u32* arg) {
     u32 i;
     u32 present = 1;
     u32 count = fn_80092588(self);
@@ -679,7 +679,7 @@ extern "C" u32 fn_8009466C(ResHandle* p);
 
 /* 0x80093990 - the file-checked destructor walk: assert `CheckRevision()`, then release each of the
  * three object categories through its own helper. */
-extern "C" void fn_80093990(ResHandle* pSelf) {
+extern "C" void res_file_init(ResHandle* pSelf) {
     if (fn_80093B0C(pSelf) == 0) {
         nw4r::db::Panic("g3d_resfile.cpp", 0xDF, "NW4R:Failed assertion CheckRevision()");
     }
@@ -712,7 +712,7 @@ extern "C" u32 fn_80093A98(void* p) {
 }
 
 /* 0x80093AA0 - release every entry of the first category through `ResMdl::Terminate`. */
-extern "C" void fn_80093AA0(ResHandle* pSelf) {
+extern "C" void res_file_terminate(ResHandle* pSelf) {
     u32 count = fn_80092588(pSelf);
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
@@ -751,7 +751,7 @@ extern "C" u32 fn_80093B0C(ResHandle* pSelf) {
         }
     }
 
-    count = fn_80092CC4(pSelf);
+    count = res_file_get_res_anm_chr_num(pSelf);
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
         item.mpData = fn_80092CC0(pSelf, i);

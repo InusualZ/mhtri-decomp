@@ -106,7 +106,9 @@ struct ResAnmChrData {
     /* +0x08 */ u32 revision;
     /* +0x0C */ u8 pad_0x0C[0x4];
     /* +0x10 */ s32 toChrDataDic;
-    /* +0x14 */ u8 pad_0x14[0xC];
+    /* +0x14 */ u8 pad_0x14[0x4];
+    /* +0x18 */ s32 toName;           /* the block offset of the animation's name (`sound/mhchar.cpp` reads it) */
+    /* +0x1C */ u8 pad_0x1C[0x4];
     /* +0x20 */ u16 numFrame;
     /* +0x22 */ u16 numNode;
     /* +0x24 */ AnmPolicy policy;
