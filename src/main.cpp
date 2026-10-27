@@ -22,7 +22,7 @@
  * anchors); main.cpp is first in link order, so its `.data` pool at 0x8057C820 is the first fragment of
  * `.data` and `OSPanic` in `fn_8003F730` names `__FILE__` from that pool, which no other file in the range
  * does; and the `.sdata2` label set 0x80795AA0-0x80795AD8 is shared across `main` <-> `fn_8003F9E4` <->
- * `fn_8004030C`, which a per-TU literal pool cannot be split across. The runtime dump names the untitled
+ * `screen_size_float_get`, which a per-TU literal pool cannot be split across. The runtime dump names the untitled
  * ones: `fn_8003F620` = create_memory_heaps, `fn_8003F728` = mem_create_exp_heap, `fn_8003F730` = render
  * init, `render_mode_copy` = GXRenderModeObj copy, `fn_8003F9E4` = TV-mode re-init, `fn_8003FCCC` = GX/VI setup,
  * `fn_804E7110` = AIRegisterDMACallback.
@@ -37,7 +37,7 @@
  * this file only *declares* the pool labels; the constants MWCC synthesises for the int->float conversions
  * still live in our object's own pool under `@NN` names, so each `lfd` that retail points at
  * `lbl_80795AC0`/`lbl_80795AD0` is one ARG row (playbook 23; four sites: `main`, `fn_8003FEBC`,
- * `frame_copy_display`, `fn_8004030C`).
+ * `frame_copy_display`, `screen_size_float_get`).
  *
  * Flags - measured this batch against `build/RMHE08/obj/main.o`, all of it per-library for `main` (never
  * `cflags_base`):
@@ -128,7 +128,7 @@
  * Residual (all measured with the committed `cflags_main`, i.e. `-O3 -inline noauto`; the five functions
  * whose `.text` sizes were wrong now match the target's size exactly):
  *   * the pool `lfd` ARG rows - `main` 99.91 %, `fn_8003FEBC` 99.82 %, `frame_copy_display` 99.95 %,
- *     `fn_8003FCCC` 99.94 %, `fn_8004030C` 99.76 %: the int->float conversions `lfd` the target's
+ *     `fn_8003FCCC` 99.94 %, `screen_size_float_get` 99.76 %: the int->float conversions `lfd` the target's
  *     `lbl_80795AC0`/`lbl_80795AD0` (the signed/unsigned 2^52 doubles) where our object loads its own
  *     synthesised pool entry (`@91`/`@302`). Our `.sdata2` is 0x10 B - those two f64s - against the target's
  *     0x38 B (the 8 f32 constants at 0x80795AA0-0x80795ABC, `lbl_80795AC0`, 0.0f/1.0f at AC8/ACC,
@@ -976,7 +976,7 @@ void get_ScreenSize(_MH_VEC2* v)
 }
 
 /* Writes the screen size as floats, signed, for the display-list paths that need a float size. */
-extern "C" void fn_8004030C(_MH_VEC2* v)
+extern "C" void screen_size_float_get(_MH_VEC2* v)
 {
     v->x = (f32)(s16)Screen_w.width;
     v->y = (f32)(s16)Screen_w.height;

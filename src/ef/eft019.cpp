@@ -74,8 +74,8 @@ void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale);
  * `fn_8004CAD8.cpp`'s, `fn_8005696C`/`fn_80056A20` `draw_shape_arm.cpp`'s, `eft_res_slot_get`/`eft_res_slot_release`
  * `ef/eft_res.cpp`'s, `fn_80306D6C` `ef/fn_8030681C.cpp`'s, `pl_frame_eft_color_get` `hud/pl_frame_sync.cpp`'s and
  * `fn_800E0A14` `sound/mhchar.cpp`'s. */
-void fn_8005696C(s32 id, s32 kind, s32 mode, f32 x, f32 y, _GXColor color, s32 timer);
-void fn_80056A20(f32 a, f32 b);
+void draw_sprite_set(s32 id, s32 kind, s32 mode, f32 x, f32 y, _GXColor color, s32 timer);
+void draw_sprite_start(f32 a, f32 b);
 _EFT* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(_EFT* self);
 void eft042_set_placed(void* self, s32 a, void* b, void* c, u8 d, f32 e);
@@ -1616,7 +1616,7 @@ void fn_801148E4(_EFT* self)
 
     VEC3_ctor((nw4r::math::VEC3*)v);
     if (self->area_0x44 == get_now_areano() && self->timer_0x0C > 0) {
-        fn_8004030C((struct _MH_VEC2*)max);
+        screen_size_float_get((struct _MH_VEC2*)max);
         handle = scn_root_get_current_camera(pRoot);
         camera_world_to_screen((nw4r::g3d::Camera*)&handle, (u8*)v, &self->pos_0x18);
         if (v[2] <= lbl_80796A08 || v[2] >= lbl_807969DC || v[0] < lbl_80796A08 ||
@@ -1630,8 +1630,8 @@ void fn_801148E4(_EFT* self)
             color.r = 0xFF;
             color.g = 0;
             color.b = 0;
-            fn_80056A20(ry, rx);
-            fn_8005696C(128, 3, 32, v[0], v[1], color, self->timer_0x0C);
+            draw_sprite_start(ry, rx);
+            draw_sprite_set(128, 3, 32, v[0], v[1], color, self->timer_0x0C);
         }
     }
     self->state_0x05++;

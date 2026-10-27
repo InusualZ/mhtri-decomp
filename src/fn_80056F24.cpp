@@ -232,18 +232,18 @@ extern f32 screen_fade_f32_step3; /* 0.65f */
 namespace nw4r { namespace math { f32 SinFIdx(f32); } }
 
 extern "C" {
-s32   fn_80056AF0(void* p);
-void  fn_80056A3C(s32 count);
+s32   draw_sprite_track(void* p);
+void  draw_sprite_stop(s32 count);
 }
 
 /* The band neighbours below are plain `fn_` thunks: the target object references them by their plain map
  * name, so they carry C linkage. */
 extern "C" {
-void fn_80055EC4(void* block);
-void fn_80056E1C(void* block);
-void fn_80055F58(void);
-void fn_800569CC(void);
-void fn_80056F04(void);
+void draw_sprite_init(void* block);
+void glare_filter_init(void* block);
+void draw_sprite_draw(void);
+void draw_sprite_reset(void);
+void glare_filter_off(void);
 }
 
 extern "C" {
@@ -917,8 +917,8 @@ void fade_draw_lower(void) {
 
 /* `filter_reset`: re-run the glare teardown and the panel reset. */
 void filter_reset(void) {
-    fn_800569CC();
-    fn_80056F04();
+    draw_sprite_reset();
+    glare_filter_off();
     filter_panel_reset();
 }
 
@@ -936,7 +936,7 @@ extern "C" void capture_size_get(_MH_VEC2* dst) {
 extern "C" void game_draw_init(void) {
     GameDrawState* s = &lbl_8066ACF8;
     memset(s, 0, 0x14C);
-    fn_8004030C(&s->capture_size);
+    screen_size_float_get(&s->capture_size);
     get_ScreenSize(&s->screen_size);
     s->capture_buf_size = 0x118000;
     s->capture_buf = (u8*)0x90B48000;
@@ -947,14 +947,14 @@ extern "C" void game_draw_init(void) {
     s->layer_mask |= 2;
     s->layer_mask |= 4;
     s->layer_mask |= 8;
-    s->layer_draw[1] = (DrawLayerFunc)fn_80055F58;
+    s->layer_draw[1] = (DrawLayerFunc)draw_sprite_draw;
     s->layer_draw[2] = (DrawLayerFunc)glare_filter_draw;
     s->layer_draw[3] = (DrawLayerFunc)filter_panel_draw;
     s->layer_arg[1] = &s->sprite_0x3C;
     s->layer_arg[2] = &s->glare;
     s->layer_arg[3] = &s->panel;
-    fn_80055EC4(&s->sprite_0x3C);
-    fn_80056E1C(&s->glare);
+    draw_sprite_init(&s->sprite_0x3C);
+    glare_filter_init(&s->glare);
     filter_panel_init(&s->panel);
     s->layer_order[1] = 1;
     s->layer_order[2] = 2;
@@ -1248,10 +1248,10 @@ extern "C" f32 math_sin_deg(f32 x) {
 /* `draw_sprite_tick`: tick the sprite slot at +0x3C while its owner says it is not finished. */
 extern "C" void draw_sprite_tick(GameDrawState* s) {
     DrawSpriteSlot* slot = &s->sprite_0x3C;
-    if (fn_80056AF0(slot) != 1) {
+    if (draw_sprite_track(slot) != 1) {
         s32 remaining = slot->count;
         if (remaining <= 0) {
-            fn_80056A3C(remaining);
+            draw_sprite_stop(remaining);
         } else {
             slot->count = remaining - 1;
         }

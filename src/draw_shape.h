@@ -52,7 +52,7 @@ u32* res_file_assign(u32* dst, u32* src);
 void draw_shape_arm(u32 a, u32 b, u32 c);
 /* 0x80056A84 - the effect step's shape request: the position, the handle and the area byte.  Added
  * with `ef/eft053.cpp`, whose state machine fires it (`fn_80056A84(&pos, 10, area)`). */
-void fn_80056A84(const nw4r::math::VEC3* pos, u32 handle, u8 flag);
+void draw_shape_arm_pos(const nw4r::math::VEC3* pos, u32 handle, u8 flag);
 
 /* 0x800553B4 - loads the stage's shape textures (GUESS name). */
 void draw_shape_stage_load(u8 stage);

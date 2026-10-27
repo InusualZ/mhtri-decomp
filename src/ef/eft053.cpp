@@ -1438,7 +1438,7 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
             work->states[index] += 1;
             work->counters[index] = 0;
             eft019_set_core(&pos, self->area_0x44, 111, lbl_8079B7EC, lbl_8079B7EC);
-            fn_80056A84(&pos, 10, self->area_0x44);
+            draw_shape_arm_pos(&pos, 10, self->area_0x44);
             if (get_now_areano() == self->area_0x44) {
                 map_se_req(9, &pos);
             }
