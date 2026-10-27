@@ -63,7 +63,7 @@ typedef struct LbPage {
     /* +0x003 */ u8 kind_0x003;            /* the entry kind, 0..2 */
     /* +0x004 */ union {
         /* +0x004 */ s16 value_0x004;      /* the cursor `fn_801F3294` advances */
-        /* +0x004 */ u16 part_0x004;       /* the dye pane's armour piece (0 = all) */
+        /* +0x004 */ s16 part_0x004;       /* the dye pane's armour piece (0 = all) */
     };
     /* +0x006 */ s16 count_0x006;          /* its bound */
     /* +0x008 */ s16 field_0x008;          /* zeroed by the initialiser */
@@ -153,7 +153,7 @@ extern const s16 lbl_805B8798[];   /* .data 0x805B8798, idem for the other kind 
 extern const s16 lb_dye_grid_cells_a[16]; /* .data 0x805B8778, the dye grid's cells (kind 1) */
 extern const s16 lb_dye_grid_cells_b[16]; /* .data 0x805B87A8, the dye grid's cells (kind 2) */
 extern const s16 lb_color_grid_widths[8]; /* .data 0x805B87C8, the colour grid's row widths */
-extern const s16 lb_box_sub_str_bases[8];  /* .data 0x805B85E8, each category's first sub-row string */
+extern const u16 lb_box_sub_str_bases[8];  /* .data 0x805B85E8, each category's first sub-row string */
 extern const u16 lb_box_sub_frame_kinds[8]; /* .data 0x805B8608, the sub frame's animation frame per row count */
 extern const u16 lb_box_top_frame[18];     /* .data 0x805B8824, the top list's frame sprites */
 extern const u16 lb_box_top_frame_alt[16]; /* .data 0x805B8848, idem off the first page */
@@ -205,7 +205,7 @@ void fn_801EC828(LbPageOwner* owner);
 void fn_801EC7AC(LbPageOwner* owner);
 u32 userdata_flag_ck(s32 id);
 void put_page_count(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
-void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u32 frame, _mh_ivec2_* pos);
+u32 sprite_frame_apply(_SPR_DATA_* spr, u16 id, u16 frame, _mh_ivec2_* pos);
 void equip_record_copy(LbIconRec* dst, const LbIconRec* src);
 void fn_801F353C(const s16* table, s16* out_max, s16* out_count);
 void sysSE_stop(s32 id);

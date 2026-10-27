@@ -20,48 +20,57 @@
  *   `lb_cursor_box_step`, `lb_progress_rewards_check`, `lobby_scene_setup_step`, `lb_digit_pane_value`,
  *   `lb_list_pane_init`, `lb_list_pane_pos_set`, `lb_page_walk_head`, `lb_pane_draw`) and every named `.data`/`.sdata`
  *   table.  Foreign callees named through the registry (lane lobby-pane-ui) are GUESS names too.
- * RESIDUALS. All 129 rows are written; 56 short of 100, by cause:
- *  - `toggle_word_step`'s 0xFFFF argument: retail builds it for a `u16` parameter (`lis`/`subi`/`clrlwi`),
- *    `menu/menu_message.h` declares it `s32` so the `clrlwi` is missing (`fn_801ED048`, `fn_801ED56C`, `fn_801EEFA0`,
- *    `lb_entry_pane_menu_step`, `lb_entry_pane_sell_step`, `lb_my_set_load_step`, `lb_my_set_save_step`,
- *    `lb_gun_set_load_step`, `lb_gun_set_save_step`, `lb_dye_inner_step`, `lb_equip_box_wear_step`; request filed);
- *  - `lb_my_set_copy`: the first `LbSetOpts` copy calls the compiler's `__as__9LbSetOpts` (and emits it and
- *    `__as__9LbSetName`), retail inlines it as `lwz`/`stw`; `lb_gun_set_copy`, compiled after it, inlines;
- *  - `lb_gun_set_cells_draw`: retail hoists the three kind constants and `mark - 1` into saved registers and colours
- *    the loop differently (r14-r31); same instruction count;
- *  - shared tails: retail's step machines branch into a sibling case's tail (`fn_801F3294`, `lb_color_pane_step`,
- *    `lobby_enter_seq_step`, `lobby_scene_setup_step`), ours repeats the tail; `lobby_enter_seq_step`/`lobby_scene_setup_step` also
- *    binary-search their dispatch where ours compares linearly;
- *  - `lb_choice_draw` is reached through `unsplit/lobby.h`'s five-argument view, so `lb_pane_draw` misses the sixth
- *    (`li r8,0`);
- *  - register colouring / scheduling only: `lb_box_top_draw`, `lb_model_pane_draw`, `lb_dye_pane_step`,
- *    `lb_dye_pane_draw`, `lb_color_pane_draw` (retail spills one float register fewer), `lb_box_grid_draw`,
- *    `lb_pane_draw`, `lb_my_set_list_draw`, `lb_equip_set_pane_step`, `lb_entry_pane_sort_masks_get`,
- *    `lb_entry_pane_sort_apply`, `lb_equip_record_swap`, `lb_entry_pane_menu_step` (the sort loop),
- *    `lb_equip_icon_cell_draw` (the `draw_frame_rect_z` arguments load after the float), `lb_count_box_draw` (one
- *    `mr` source), `lb_gun_set_detail_draw` (plus retail's two dead branches after `Gunner_opt_ok_ck`);
- *  - `lb_entry_pane_list_reset`: register colouring of the cursor/delta pair;
- *  - the panes' `fn_801ECEF0`/`lb_entry_pane_blink_tick`, `fn_801ECF74`, `fn_801ED184`, `fn_801ED200`, `fn_801ED464`,
- *    `fn_801ED9E4`, `fn_801EDA34`, `fn_801EDA9C`, `fn_801EDB34`, `fn_801EDC4C`, `fn_801EE1E4`, `lb_equip_set_pane_init`: allocator
- *    and narrowing deltas; `fn_801ED688`, `fn_801EEDC4`: register colouring; `fn_801F5534`: `(u16)count <= 1` needs a
- *    bare `cmplwi r5,1`; `fn_801F86FC`: retail keeps the `flags` pointer in r30, ours in r31; `fn_801FB364`: frame 0x30
- *    against 0x20 with the same local offsets.
+ * RESIDUALS. All 129 rows are written; 40 short of 100, by cause:
+ *  - shared tails: retail's step machines branch into a sibling case's tail (`fn_801F3294`, `lb_color_pane_step`'s
+ *    "record done" tails; `lobby_enter_seq_step`/`lobby_scene_setup_step`'s "system file done" tail, reached backwards
+ *    from `case 0x64` too); ours repeats the tail (MWCC does not cross-jump, idea 183 cannot express a backward entry),
+ *    and `lb_color_pane_step`'s `do { } while (0)` exits return `result` where retail branches to one `mr r3,r29`;
+ *  - an `s16` index retail re-extends at every use where ours extends once at the definition (`lb_pane_draw`'s and
+ *    `lb_box_grid_draw`'s grid walks, `fn_801EEDC4`'s slot index), and register colouring / scheduling:
+ *    `lb_box_grid_draw` (keeps `reason` on the stack), `lb_dye_inner_draw`, `lb_color_pane_draw`, `lb_dye_pane_draw`,
+ *    `lb_box_lists_draw`, `lb_box_menu_draw`, `lb_entry_pane_menu_step` (the sort loop), `lb_entry_pane_sort_apply`,
+ *    `lb_entry_pane_list_reset` (the `-(owner == NULL)` delta), `lb_model_pane_draw` (the row text id from the
+ *    unmasked counter), `lb_my_set_detail_draw`/`lb_gun_set_detail_draw` (the page row count re-masked at the use),
+ *    `lb_box_top_draw`, `lb_my_set_list_draw`, `lb_equip_set_pane_step`, `lb_equip_set_pane_init` (parameter homes),
+ *    `lb_equip_box_wear_step`, `lb_entry_pane_scroll_refresh` (the `kind == 10` test is `cmplwi`), `fn_801EE1E4`,
+ *    `fn_801EDC4C`, `fn_801ED184`, `fn_801ED200`, `fn_801ED464`, `fn_801ED688`, `fn_801EDB34`;
+ *  - `lb_equip_icon_cell_draw`: the `draw_frame_rect_z` arguments load after the float; `fn_801EDA34`: retail's
+ *    `bge`/`b` pair around the minimum; `fn_801EDA9C`: the box capacity's `clrlwi` scheduled late; `fn_801ECF74`,
+ *    `fn_801F5534` (`(u16)count <= 1` needs a bare `cmplwi r5,1`), `fn_801F86FC` (retail keeps the `flags` pointer in
+ *    r30), `fn_801FB364` (frame 0x30 against 0x20 with the same local offsets), `lb_count_box_draw` (one `mr` source).
  *   Data: the `.sdata` tables the code reads are defined here in address order (0x80791C58-0x80791C68 in the panes band,
- *   0x80791C70-0x80791D40 in the page band), `lb_icon_frame_z` is the `.sdata2` word at 0x80799870; the `.data` tables
- *   (0x805B85D8-0x805B8D44) are still `extern` (declared in `lobby/lb_pane_ui.h` and the panes band), and the string
- *   literals "1"/"2"/"3"/"" at 0x80791D40-0x80791D4C come from the compiler.
- *   flipcheck: `.data` claimed, not emitted; extab/extabindex short of the claim; the two `__as__` copies are extra.
+ *   0x80791C70-0x80791D40 in the page band); `.sdata2` is the compiler's pool (0.0f and the signed int-to-float
+ *   constant, 16 bytes like the target; the map names them `lb_icon_frame_z` and `lbl_80799878`); the `.data` tables
+ *   (0x805B85D8-0x805B8BC0, 49 tables, no relocations) are still `extern` (declared in `lobby/lb_pane_ui.h`, the panes
+ *   band and `unsplit/lobby.h`, several as `const`), the five jump tables are the compiler's, and `lbl_805B8CE0` is the
+ *   "mot_aicom.brres" literal of `fn_801FB364`; the string literals "1"/"2"/"3"/"" at 0x80791D40-0x80791D4C come from
+ *   the compiler.
+ *   flipcheck: `.data` claimed, not emitted; extab/extabindex short of the claim.
  * SHAPES. The step machines are `switch`es laid out in retail's case order (MWCC places case bodies in source order);
  *   an `s16` local for `lb_digit_pane_value`'s result before indexing `lobby_world_block` keeps retail's load order;
  *   one-case byte tests are `switch`es with the other path as `default:`; `(u32)(x - 1) > 4` keeps retail's range test
  *   where the source branches on it first; in the page/panel band `__declspec(noinline)` on `fn_801F353C`,
  *   `fn_801F3588`, `fn_801F6034`; `while (*table != -1)` (retail tests below the body); `fn_801F37C8`, `fn_801F3998`
  *   and `fn_801F4444` with the labels in the order -1, -3, -2, `fn_801F3EDC`, and `fn_801F3DEC` with `default` first;
- *   a `u32`/`u16` parameter narrowed at the use (`fn_801F8ABC`, `fn_801F60D4`) but a `u8` one for `fn_801F3DEC`.
+ *   a `u32`/`u16` parameter narrowed at the use (`fn_801F8ABC`, `fn_801F60D4`) but a `u8` one for `fn_801F3DEC`;
+ *   the never-called inline `lb_set_parts_copy` ahead of `lb_my_set_copy` makes the `LbSetOpts`/`LbSetName`
+ *   assignments inline (without it the first copy calls an emitted `__as__`); MWCC colours registers by declaration
+ *   order, so several functions' locals are in the order that reproduces retail's allocation; the font colour and
+ *   arrow flags handed to `GetMenuFontColor`/`LbPutAnaPageArrow` are `bool` locals; a `switch` on a callee's result
+ *   (`game_save_wait`, `fn_801EDA9C`/`fn_801EDB34`, `menu_cursor_page_move`) where retail range-tests it; values a
+ *   call consumes are computed before the call when retail does (`lb_pane_draw`'s and `lb_box_grid_draw`'s uv row,
+ *   `lb_my_set_list_draw`'s mark mode, `lb_equip_set_pane_step`'s row count); a set's three ids are walked in a loop
+ *   (`lb_equip_record_swap`); the sort masks' kind bits are set one statement each; `lb_color_pane_step` wraps its
+ *   switch in `do { } while (0)` (idea 183: `break` reaches the "left with the old colour" tail, `continue` the
+ *   "new colour" one); the page band calls `lb_choice_draw`/`lb_help_num_put` through `_c1` views on the owner's
+ *   signatures (`unsplit/lobby.h` declares other ones) and sees `lb_entry_pane_scroll_kind_get` returning a word (its
+ *   definition returns `u8`); `Screen_w`'s size is converted signed (`(f32)(s16)`) where retail loads it with `lha`.
  */
 #include "types.h"
 #include "id_value.h"
 #include "menu/menu_message.h"
+#include "nw4r/math.h"
+#include "sound/fn_800D7F54.h" /* sysSE_req (rule 2) */
 
 #include "Runtime.PPCEABI.H/memset.h"
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
@@ -180,8 +189,8 @@ typedef struct LbDigitPane {
     /* +0x10 */ s16 timer_0x10;
     /* +0x12 */ s16 blink_a_0x12;       /* -1 when idle, ticks 0..6 */
     /* +0x14 */ s16 blink_b_0x14;
-    /* +0x16 */ s16 pick_0x16;
-    /* +0x18 */ s16 pick_max_0x18;
+    /* +0x16 */ s16 pick_max_0x16;      /* how many of the item can be taken */
+    /* +0x18 */ s16 pick_count_0x18;    /* how many are picked, 1..pick_max_0x16 */
     /* +0x1A */ s16 cursor_0x1A;
     /* +0x1C */ u8 active_0x1C;         /* the "a pane is open" latch `fn_801ED048` waits on */
     /* +0x1D */ u8 done_0x1D;
@@ -243,8 +252,8 @@ typedef struct LbPaneScroll {
     /* +0x0C */ u8 unused_0x0C[4];
     /* +0x10 */ u8 flags_0x10;
     /* +0x11 */ u8 unused_0x11[0x17];
-    /* +0x28 */ u8 kakou_0x28;         /* the crafting state `lb_kakou_icon_build` returned */
-    /* +0x29 */ u8 unused_0x29[3];
+    /* +0x28 */ u16 kakou_0x28;        /* the crafting state `lb_kakou_icon_build` returned */
+    /* +0x2A */ u8 unused_0x2A[2];
     /* +0x2C */ u8* kakou_icon_0x2C;   /* the crafting icon record it built */
     /* +0x30 */ u8 unused_0x30[0x50];
 } LbPaneScroll; /* size: 0x80 */
@@ -321,7 +330,7 @@ typedef struct LbGunSet {
 typedef struct LbItemDb {
     /* +0x0000 */ u8 unused_0x0000[0x18];
     /* +0x0018 */ u8 data_0x18[0x74];  /* the block `score_add_clamped` is handed as a work area */
-    /* +0x008C */ s16 kind_0x8C;       /* the equipped item's kind (0xB is a bowgun) */
+    /* +0x008C */ u16 kind_0x8C;       /* the equipped item's kind (0xB is a bowgun) */
     /* +0x008E */ s16 sub_0x8E;
     /* +0x0090 */ s16 sub_0x90;
     /* +0x0092 */ u16 worn_a_0x92;     /* the worn armour record ids, in `my_set_store`'s order */
@@ -437,8 +446,8 @@ void fn_801ECEF0(LbDigitPane* self);
 void fn_801ECF74(LbListPane* self);
 s32 fn_801ED048(LbDigitPane* self, LbListPane* list);
 s16 fn_801ED160(LbDigitPane* self);
-s32 fn_801ED184(s16 index);
-s16 fn_801ED200(s16 index, u8 side);
+s32 fn_801ED184(s32 index);
+s32 fn_801ED200(s32 index, u8 side);
 void fn_801ED284(LbListPane* self);
 void fn_801ED3E8(LbListPane* self);
 void fn_801ED464(LbListPane* self);
@@ -446,9 +455,9 @@ s16 fn_801ED53C(LbListPane* self);
 s16 fn_801ED554(LbListPane* self);
 s32 fn_801ED56C(LbListPane* self, u8 arg);
 s32 fn_801ED688(LbListPane* self, u8 arg);
-s16 fn_801ED9E4(s16 index);
-s16 fn_801EDA34(u16 index, u8 side);
-u8 fn_801EDA9C(u16 index, u16 item_id);
+s32 fn_801ED9E4(s32 index);
+s32 fn_801EDA34(s32 index, u8 side);
+u8 fn_801EDA9C(LbListPane* self, u16 index, u16 item_id);
 u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id);
 s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list);
 s32 fn_801EE1E4(LbListPane* self);
@@ -523,10 +532,10 @@ s16 userdata_pouch_size(u8 side);
 s32 userdata_item_slot_count(LbItemDb* db);
 IdValue* userdata_pouch_get(LbItemDb* db, u8 side);
 IdValue* userdata_equip_item_slots_get(LbItemDb* db);
-u16 userdata_equip_item_id_get(LbItemDb* db, s16 index);
+u16 userdata_equip_item_id_get(LbItemDb* db, s32 index);
 s16 userdata_equip_item_value_get(LbItemDb* db, s16 index);
 s32 userdata_pouch_room_get(LbItemDb* db, u8 side);
-s16 userdata_item_total_count(LbItemDb* db, u16 id);
+s32 userdata_item_total_count(LbItemDb* db, u16 id);
 s32 item_slots_room_get(u16 id, void* slots, s32 count);
 s32 item_pair_index_find(u16 id, IdValue* base, s32 count);
 s32 item_take(u16 id, s16 a, void* p, s32 b, s32 c, s32 d);
@@ -534,7 +543,7 @@ void userdata_pouch_item_give(LbItemDb* db, u16 id, s16 a, u8 side, s32 b);
 s32 item_pair_clear(void* p);
 s32 item_slots_store(void* dst, u16 count, u16 id, s16 v, void* tmp);
 s32 item_box_slot_take(IdValue* slots, u16 index, s16 delta);
-s32 item_box_store(u16 id, s32 a, s16* out);
+s32 item_box_store(u16 id, s32 a, u16* out);
 s32 item_slots_merge(void* dst, u16 count);
 u16 item_slots_free_count(void* slots, u16 count);
 void userdata_pl_look_apply(struct LbPage* page, LbItemDb* db);
@@ -543,7 +552,6 @@ s32 score_add_clamped(s32 a, void* p);
 s32 userdata_progress_flag_ck(s32 a);
 s32 userdata_flag_ck(s32 a);
 void sysSE_stop(s32 id);
-void sysSE_req(s32 id);
 s32 fn_801EC7AC(LbMenuPanel* self);
 void fn_801EC804(s16* value);
 s32 fn_801EC828(LbMenuPanel* self);
@@ -557,7 +565,7 @@ u16 lobby_cmd_trig_get(void);
 u16 lobby_cmd_release_get(void);
 s32 lobby_cmd_release_ck(u32 mask);
 s32 lb_yes_no_step(void* p);
-s16 lb_equip_row_next(u8 a, s16 b, void* c, u16 d, s32 e, s32 f, u8 g);
+s32 lb_equip_row_next(u8 a, s16 b, void* c, u16 d, s32 e, s32 f, u8 g);
 void lb_scroll_init(struct LbPage* page, LbPaneScroll* scroll, u8 kind, u8 mode);
 void lb_scroll_flag_set(LbPaneScroll* scroll, u8 kind);
 void lb_scroll_tables_set(LbPaneScroll* scroll, LbEquipRec* a, LbEquipRec* b, LbEquipRec* c, LbEquipRec* d);
@@ -738,29 +746,22 @@ extern "C" void fn_801ECDD4(LbDigitPane* self)
 /* Ticks the two blink timers and the pane's frame counter. */
 extern "C" void fn_801ECEF0(LbDigitPane* self)
 {
-    s16 v;
-
-    v = self->blink_a_0x12;
-    if (v >= 0) {
-        v += 1;
-        self->blink_a_0x12 = v;
-        if (v > 6) {
+    if (self->blink_a_0x12 >= 0) {
+        self->blink_a_0x12++;
+        if (self->blink_a_0x12 > 6) {
             self->blink_a_0x12 = -1;
             self->timer_0x10 = 0;
         }
     }
-    v = self->blink_b_0x14;
-    if (v >= 0) {
-        v += 1;
-        self->blink_b_0x14 = v;
-        if (v > 6) {
+    if (self->blink_b_0x14 >= 0) {
+        self->blink_b_0x14++;
+        if (self->blink_b_0x14 > 6) {
             self->blink_b_0x14 = -1;
             self->timer_0x10 = 0;
         }
     }
-    v = self->timer_0x10 + 1;
-    self->timer_0x10 = v;
-    if (v > 0x1E) {
+    self->timer_0x10++;
+    if (self->timer_0x10 > 0x1E) {
         self->timer_0x10 = 0;
     }
 }
@@ -808,25 +809,26 @@ extern "C" s32 fn_801ED048(LbDigitPane* self, LbListPane* list)
             sysSE_req(0xD);
             return 1;
         }
-        return 0;
+    } else {
+        result = toggle_word_step(&self->stepper_0x04, lobby_cmd_trig_get(), 4, 8, 0xFFFF);
+        switch (result) {
+        case 1:
+            count = userdata_box_capacity(lobby_world_block);
+            item_slots_merge(&lobby_world_block->slots_0x180[0], count);
+            item_pairs_compact_sort(&lobby_world_block->slots_0x180[0], count);
+            self->active_0x1C = 0;
+            self->digit_ones_0x0A = 0;
+            self->digit_tens_0x0C = 0;
+            self->digit_hundreds_0x02 = 0;
+            sysSE_req(0);
+            break;
+        case 2:
+            self->active_0x1C = 0;
+            break;
+        }
+        return 1;
     }
-    result = toggle_word_step(&self->stepper_0x04, lobby_cmd_trig_get(), 4, 8, 0xFFFF);
-    switch (result) {
-    case 1:
-        count = userdata_box_capacity(lobby_world_block);
-        item_slots_merge(&lobby_world_block->slots_0x180[0], count);
-        item_pairs_compact_sort(&lobby_world_block->slots_0x180[0], count);
-        self->active_0x1C = 0;
-        self->digit_ones_0x0A = 0;
-        self->digit_tens_0x0C = 0;
-        self->digit_hundreds_0x02 = 0;
-        sysSE_req(0);
-        break;
-    case 2:
-        self->active_0x1C = 0;
-        break;
-    }
-    return 1;
+    return 0;
 }
 
 /* The three decimal digits as a number. */
@@ -836,7 +838,7 @@ extern "C" s16 fn_801ED160(LbDigitPane* self)
 }
 
 /* How many of the slot's item the player can afford. */
-extern "C" s32 fn_801ED184(s16 index)
+extern "C" s32 fn_801ED184(s32 index)
 {
     LbItemDb* db;
     s32 count;
@@ -850,7 +852,7 @@ extern "C" s32 fn_801ED184(s16 index)
 }
 
 /* Whether the slot holds an item at all (and which side it came from). */
-extern "C" s16 fn_801ED200(s16 index, u8 side)
+extern "C" s32 fn_801ED200(s32 index, u8 side)
 {
     if (index >= userdata_item_slot_count(lobby_world_block)) {
         return 0;
@@ -892,7 +894,7 @@ extern "C" void fn_801ED284(LbListPane* self)
 /* Slides the pane's item out of the slot by one column. */
 extern "C" void fn_801ED3E8(LbListPane* self)
 {
-    s16 out;
+    u16 out;
 
     item_box_store(userdata_equip_item_id_get(lobby_world_block, self->entry_max_0x022), self->entry_0x020, &out);
     userdata_pouch_item_give(lobby_world_block, userdata_equip_item_id_get(lobby_world_block, self->entry_max_0x022), -self->entry_0x020,
@@ -946,31 +948,32 @@ extern "C" s32 fn_801ED56C(LbListPane* self, u8 arg)
             sysSE_req(0xD);
             return 1;
         }
-        return 0;
-    }
-    result = toggle_word_step(&self->stepper_0x02C, lobby_cmd_trig_get(), 4, 8, 0xFFFF);
-    switch (result) {
-    case 1:
-        if (arg == 0) {
-            side = self->side_0x005;
-        } else {
-            side = self->side_0x005 == 0;
+    } else {
+        result = toggle_word_step(&self->stepper_0x02C, lobby_cmd_trig_get(), 4, 8, 0xFFFF);
+        switch (result) {
+        case 1:
+            if (arg == 0) {
+                side = self->side_0x005;
+            } else {
+                side = self->side_0x005 == 0;
+            }
+            pool = userdata_pouch_get(lobby_world_block, side);
+            if (side == 1) {
+                off = &pool[0x18];
+            } else {
+                off = 0;
+            }
+            item_pages_sort(pool, off);
+            self->active_0x026 = 0;
+            sysSE_req(0);
+            break;
+        case 2:
+            self->active_0x026 = 0;
+            break;
         }
-        pool = userdata_pouch_get(lobby_world_block, side);
-        if (side == 1) {
-            off = &pool[0x18];
-        } else {
-            off = 0;
-        }
-        item_pages_sort(pool, off);
-        self->active_0x026 = 0;
-        sysSE_req(0);
-        break;
-    case 2:
-        self->active_0x026 = 0;
-        break;
+        return 1;
     }
-    return 1;
+    return 0;
 }
 
 /* The pane's item-selection step machine (pick / drag / confirm). */
@@ -1068,11 +1071,11 @@ extern "C" s32 fn_801ED688(LbListPane* self, u8 arg)
 }
 
 /* The affordable count of the slot's item. */
-extern "C" s16 fn_801ED9E4(s16 index)
+extern "C" s32 fn_801ED9E4(s32 index)
 {
     IdValue* slot;
-    s16 limit;
-    s16 value;
+    s32 limit;
+    s32 value;
 
     slot = &lobby_world_block->slots_0x180[index];
     limit = userdata_item_total_count(lobby_world_block, slot->id);
@@ -1084,23 +1087,23 @@ extern "C" s16 fn_801ED9E4(s16 index)
 }
 
 /* The affordable count of the `index`-th entry of the side's own slot table. */
-extern "C" s16 fn_801EDA34(u16 index, u8 side)
+extern "C" s32 fn_801EDA34(s32 index, u8 side)
 {
     IdValue* slot;
-    s16 limit;
-    s16 value;
+    s32 limit;
+    s32 value;
 
     slot = &userdata_pouch_get(lobby_world_block, side == 0)[index];
     limit = userdata_item_total_count(lobby_world_block, slot->id);
     value = slot->value;
-    if (limit < value) {
-        return limit;
+    if (limit >= value) {
+        limit = value;
     }
-    return value;
+    return limit;
 }
 
 /* Whether the entry can be picked: 1 unknown item, 2 an occupied slot, 0 free. */
-extern "C" u8 fn_801EDA9C(u16 index, u16 item_id)
+extern "C" u8 fn_801EDA9C(LbListPane* self, u16 index, u16 item_id)
 {
     if ((u8)*GetItemData(item_id) != 1 && index >= 0x18U) {
         return 1;
@@ -1144,15 +1147,19 @@ extern "C" u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id)
 extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
 {
     IdValue tmp;
-    IdValue* slots;
+    LbItemDb* db;
+    IdValue* entry;
     s32 result;
-    s16 value;
+    u16 value;
     s16 index;
-    s16 limit;
+    s32 limit;
     s16 move;
+    s32 free;
+    s32 extra;
     u16 id;
 
     result = 0;
+    db = lobby_world_block;
     self->flags_0x08 = 0;
     fn_801EC804(&self->anim_0x0E);
     fn_801ECEF0(self);
@@ -1162,39 +1169,38 @@ extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
             return 0;
         }
         if (lb_cmd_pressed_ck(0x10) == 1U) {
-            value = fn_801ED160(self);
-            self->cursor_0x1A = value;
-            index = fn_801ED9E4(value);
-            self->pick_0x16 = index;
+            self->cursor_0x1A = fn_801ED160(self);
+            index = fn_801ED9E4(self->cursor_0x1A);
+            self->pick_max_0x16 = index;
             if (index > 0) {
+                entry = &lobby_world_block->slots_0x180[self->cursor_0x1A];
                 limit = userdata_item_slot_count(lobby_world_block);
-                move = item_pair_index_find(lobby_world_block->slots_0x180[self->cursor_0x1A].id,
-                                   userdata_equip_item_slots_get(lobby_world_block), limit);
+                move = item_pair_index_find(entry->id, userdata_equip_item_slots_get(lobby_world_block), limit);
                 list->entry_max_0x022 = move;
-                list->item_id_0x024 = lobby_world_block->slots_0x180[self->cursor_0x1A].id;
+                list->item_id_0x024 = entry->id;
                 if (move < 0) {
                     self->phase_0x00 += 1;
                     limit = userdata_item_slot_count(lobby_world_block);
-                    move = item_pair_index_find(0, userdata_equip_item_slots_get(lobby_world_block), limit);
-                    if (move >= 0) {
+                    free = item_pair_index_find(0, userdata_equip_item_slots_get(lobby_world_block), limit);
+                    if (free >= 0) {
                         if (list->side_0x005 == 1 && *GetItemData(list->item_id_0x024) == 1) {
-                            s16 extra = item_pair_index_find(0, &userdata_equip_item_slots_get(lobby_world_block)[0x18], 8);
+                            extra = item_pair_index_find(0, &userdata_equip_item_slots_get(lobby_world_block)[0x18], 8);
                             if (extra >= 0) {
-                                move = extra + 0x18;
+                                free = extra + 0x18;
                             }
                         }
-                        list->row_sub_0x016 = move / 8;
-                        list->row_0x014 = move % 8;
+                        list->row_sub_0x016 = free / 8;
+                        list->row_0x014 = (u8)(free % 8);
                     } else {
                         list->row_sub_0x016 = 0;
                         list->row_0x014 = 0;
                     }
                 } else {
                     self->phase_0x00 = 2;
-                    list->row_sub_0x016 = move / 8;
-                    list->row_0x014 = move % 8;
+                    list->row_sub_0x016 = list->entry_max_0x022 / 8;
+                    list->row_0x014 = (u8)(list->entry_max_0x022 % 8);
                 }
-                self->pick_max_0x18 = 1;
+                self->pick_count_0x18 = 1;
                 sysSE_req(0);
             } else {
                 sysSE_req(2);
@@ -1213,7 +1219,7 @@ extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
         if (lb_cmd_pressed_ck(0x10) == 1U) {
             id = fn_801ED53C(list);
             value = id;
-            if (fn_801EDA9C(id, list->item_id_0x024) == 0) {
+            if (fn_801EDA9C(list, id, list->item_id_0x024) == 0) {
                 self->phase_0x00 += 1;
                 list->entry_max_0x022 = value;
                 sysSE_req(0);
@@ -1231,24 +1237,22 @@ extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
         }
         break;
     case 2:
-        index = menu_cursor_page_move(&self->pick_0x16, self->pick_max_0x18, lobby_w.count_0x084,
-                                      lb_cmd_repeat_get(), &self->flags_0x08);
-        switch (index) {
+        switch (menu_cursor_page_move(&self->pick_count_0x18, self->pick_max_0x16, lobby_w.count_0x084,
+                                      lb_cmd_repeat_get(), &self->flags_0x08)) {
         case 1:
-            slots = &lobby_world_block->slots_0x180[0];
-            id = slots[self->cursor_0x1A].id;
-            if (userdata_equip_item_slots_get(lobby_world_block)[list->entry_max_0x022].id != 0
-                && id != userdata_equip_item_slots_get(lobby_world_block)[list->entry_max_0x022].id) {
-                item_pair_copy(&tmp, &userdata_equip_item_slots_get(lobby_world_block)[list->entry_max_0x022]);
-                item_pair_clear(&userdata_pouch_get(lobby_world_block, list->side_0x005)[list->entry_max_0x022]);
-                item_take(id, self->pick_max_0x18,
-                            &userdata_pouch_get(lobby_world_block, list->side_0x005)[list->entry_max_0x022], 1, 1, 0);
-                item_box_slot_take(&lobby_world_block->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
+            id = db->slots_0x180[self->cursor_0x1A].id;
+            entry = &userdata_equip_item_slots_get(lobby_world_block)[list->entry_max_0x022];
+            if (entry->id != 0 && id != entry->id) {
+                item_pair_copy(&tmp, entry);
+                item_pair_clear(&userdata_pouch_get(lobby_world_block, list->side_0x005)[(u16)list->entry_max_0x022]);
+                item_take(id, self->pick_count_0x18,
+                            &userdata_pouch_get(lobby_world_block, list->side_0x005)[(u16)list->entry_max_0x022], 1, 1, 0);
+                item_box_slot_take(&lobby_world_block->slots_0x180[0], self->cursor_0x1A, -self->pick_count_0x18);
                 item_box_store(tmp.id, tmp.value, &value);
             } else {
-                item_take(id, self->pick_max_0x18,
+                item_take(id, self->pick_count_0x18,
                             &userdata_pouch_get(lobby_world_block, list->side_0x005)[list->entry_max_0x022], 1, 1, 0);
-                item_box_slot_take(&lobby_world_block->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
+                item_box_slot_take(&lobby_world_block->slots_0x180[0], self->cursor_0x1A, -self->pick_count_0x18);
             }
             limit = userdata_item_slot_count(lobby_world_block);
             list->entry_max_0x022 = item_pair_index_find(id, userdata_equip_item_slots_get(lobby_world_block), limit);
@@ -1282,10 +1286,13 @@ extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
 extern "C" s32 fn_801EE1E4(LbListPane* self)
 {
     IdValue tmp2;
+    IdValue* pouch;
     s16 value;
     s16 index;
     s32 limit;
     s16 move;
+    s32 free;
+    s32 extra;
     u16 id;
     s32 result;
     s32 r;
@@ -1303,33 +1310,32 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
             index = fn_801EDA34(id, self->side_0x005);
             self->move_max_0x01E = index;
             if (index > 0) {
-                side = self->side_0x005 == 0;
+                pouch = userdata_pouch_get(lobby_world_block, self->side_0x005 == 0);
                 limit = userdata_item_slot_count(lobby_world_block);
-                move = item_pair_index_find(userdata_pouch_get(lobby_world_block, side)[id].id,
-                                   userdata_equip_item_slots_get(lobby_world_block), limit);
+                move = item_pair_index_find(pouch[id].id, userdata_equip_item_slots_get(lobby_world_block), limit);
                 self->entry_max_0x022 = move;
-                self->item_id_0x024 = userdata_pouch_get(lobby_world_block, side)[id].id;
+                self->item_id_0x024 = pouch[id].id;
                 if (move < 0) {
                     self->phase_0x001 += 1;
                     limit = userdata_item_slot_count(lobby_world_block);
-                    move = item_pair_index_find(0, userdata_equip_item_slots_get(lobby_world_block), limit);
-                    if (move >= 0) {
+                    free = item_pair_index_find(0, userdata_equip_item_slots_get(lobby_world_block), limit);
+                    if (free >= 0) {
                         if (self->side_0x005 == 1 && *GetItemData(self->item_id_0x024) == 1) {
-                            s16 extra = item_pair_index_find(0, &userdata_equip_item_slots_get(lobby_world_block)[0x18], 8);
+                            extra = item_pair_index_find(0, &userdata_equip_item_slots_get(lobby_world_block)[0x18], 8);
                             if (extra >= 0) {
-                                move = extra + 0x18;
+                                free = extra + 0x18;
                             }
                         }
-                        self->row_sub_0x016 = move / 8;
-                        self->row_0x014 = move % 8;
+                        self->row_sub_0x016 = free / 8;
+                        self->row_0x014 = (u8)(free % 8);
                     } else {
                         self->row_sub_0x016 = 0;
                         self->row_0x014 = 0;
                     }
                 } else {
                     self->phase_0x001 = 2;
-                    self->row_sub_0x016 = move / 8;
-                    self->row_0x014 = move % 8;
+                    self->row_sub_0x016 = self->entry_max_0x022 / 8;
+                    self->row_0x014 = (u8)(self->entry_max_0x022 % 8);
                 }
                 self->entry_0x020 = 1;
                 sysSE_req(0);
@@ -1391,13 +1397,13 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
                                   lb_cmd_repeat_get(), &self->move_0x01C);
         switch (r) {
         case 1:
+            pouch = &userdata_equip_item_slots_get(lobby_world_block)[self->entry_max_0x022];
             side = self->side_0x005 == 0;
-            if (userdata_equip_item_slots_get(lobby_world_block)[self->entry_max_0x022].id != 0
-                && self->item_id_0x024 != userdata_equip_item_slots_get(lobby_world_block)[self->entry_max_0x022].id) {
-                item_pair_copy(&tmp2, &userdata_equip_item_slots_get(lobby_world_block)[self->entry_max_0x022]);
-                item_pair_clear(&userdata_pouch_get(lobby_world_block, self->side_0x005)[self->entry_max_0x022]);
+            if (pouch->id != 0 && self->item_id_0x024 != pouch->id) {
+                item_pair_copy(&tmp2, pouch);
+                item_pair_clear(&userdata_pouch_get(lobby_world_block, self->side_0x005)[(u16)self->entry_max_0x022]);
                 item_take(self->item_id_0x024, self->entry_0x020,
-                            &userdata_pouch_get(lobby_world_block, self->side_0x005)[self->entry_max_0x022], 1, 1, 0);
+                            &userdata_pouch_get(lobby_world_block, self->side_0x005)[(u16)self->entry_max_0x022], 1, 1, 0);
                 userdata_pouch_item_give(lobby_world_block, self->item_id_0x024, -self->entry_0x020, side, 1);
                 userdata_pouch_item_give(lobby_world_block, tmp2.id, tmp2.value, side, 1);
             } else {
@@ -1457,7 +1463,7 @@ extern "C" s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbList
 {
     IdValue* slot;
     s32 result;
-    s16 out;
+    u16 out;
     s16 value;
     u16 hold;
     u16 repeat;
@@ -1599,7 +1605,6 @@ extern "C" s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbList
 extern "C" s32 fn_801EEDC4(LbDigitPane* self, LbListPane* list)
 {
     IdValue tmp;
-    IdValue* slots;
     s32 result;
     s16 value;
 
@@ -1623,15 +1628,16 @@ extern "C" s32 fn_801EEDC4(LbDigitPane* self, LbListPane* list)
                 sysSE_req(0xE);
                 break;
             case 1:
-                slots = &lobby_world_block->slots_0x180[0];
-                if ((slots[value].id == 0 && slots[self->cursor_0x1A].id == 0)
+                if ((lobby_world_block->slots_0x180[value].id == 0
+                     && lobby_world_block->slots_0x180[self->cursor_0x1A].id == 0)
                     || value == self->cursor_0x1A) {
                     sysSE_req(2);
                 } else {
                     self->phase_0x00 -= 1;
-                    item_pair_copy(&tmp, &slots[value]);
-                    item_pair_copy(&slots[value], &slots[self->cursor_0x1A]);
-                    item_pair_copy(&slots[self->cursor_0x1A], &tmp);
+                    item_pair_copy(&tmp, &lobby_world_block->slots_0x180[value]);
+                    item_pair_copy(&lobby_world_block->slots_0x180[value],
+                                   &lobby_world_block->slots_0x180[self->cursor_0x1A]);
+                    item_pair_copy(&lobby_world_block->slots_0x180[self->cursor_0x1A], &tmp);
                     sysSE_req(0xF);
                 }
                 break;
@@ -1666,8 +1672,8 @@ extern "C" s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
     s16 index;
     s32 r;
 
-    db = lobby_world_block;
     result = 0;
+    db = lobby_world_block;
     self->flags_0x08 = 0;
     fn_801EC804(&self->anim_0x0E);
     fn_801ECEF0(self);
@@ -1680,10 +1686,10 @@ extern "C" s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
             value = fn_801ED160(self);
             self->cursor_0x1A = value;
             index = db->slots_0x180[value].value;
-            self->pick_0x16 = index;
+            self->pick_max_0x16 = index;
             if (index > 0) {
                 self->phase_0x00 += 1;
-                self->pick_max_0x18 = 1;
+                self->pick_count_0x18 = 1;
                 sysSE_req(0);
             } else {
                 sysSE_req(2);
@@ -1696,7 +1702,7 @@ extern "C" s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         }
         break;
     case 1:
-        r = menu_cursor_page_move(&self->pick_max_0x18, self->pick_0x16, lobby_w.count_0x084,
+        r = menu_cursor_page_move(&self->pick_count_0x18, self->pick_max_0x16, lobby_w.count_0x084,
                                   lb_cmd_repeat_get(), &self->flags_0x08);
         switch (r) {
         case 1:
@@ -1715,10 +1721,10 @@ extern "C" s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         switch (r) {
         case 1:
             self->phase_0x00 = 0;
-            score_add_clamped(self->pick_max_0x18 * eft052_item_value_get(db->slots_0x180[self->cursor_0x1A].id),
-                        &db->data_0x18[0]);
+            score_add_clamped(self->pick_count_0x18 * eft052_item_value_get(db->slots_0x180[self->cursor_0x1A].id),
+                        &lobby_world_block->data_0x18[0]);
             sysSE_req(9);
-            item_box_slot_take(&db->slots_0x180[0], self->cursor_0x1A, -self->pick_max_0x18);
+            item_box_slot_take(&lobby_world_block->slots_0x180[0], self->cursor_0x1A, -self->pick_count_0x18);
             break;
         case 2:
             self->phase_0x00 -= 1;
@@ -1748,6 +1754,7 @@ extern "C" s32 fn_801EF1D0(LbEquipPane* self)
 extern "C" void lb_equip_set_pane_init(LbEquipPane* self, s16 index, u16 a, u16 b, u16 c, u8 side, struct LbPage* page)
 {
     u16 id_a;
+    LbEquipRec* rec;
     u16 id_b;
     u16 id_c;
 
@@ -1764,20 +1771,17 @@ extern "C" void lb_equip_set_pane_init(LbEquipPane* self, s16 index, u16 a, u16 
                 id_a = lobby_world_block->kind_0x8C;
             }
         }
-        if (id_a != 0xFFFFU) {
-            if (Gunner_opt_ok_ck((_EQUIP*)&lobby_world_block->equip_0x0E00[id_a]) == 0) {
-                id_b = 0xFFFF;
-                id_c = 0xFFFF;
-            }
-        } else {
+        rec = id_a != 0xFFFFU ? &lobby_world_block->equip_0x0E00[id_a] : NULL;
+        if (rec != NULL && Gunner_opt_ok_ck((_EQUIP*)rec) == 0) {
             id_b = 0xFFFF;
-            id_c = 0xFFFF;
-        }
-        if (id_b == 0xFFFFU) {
-            id_b = lobby_world_block->sub_0x8E;
-        }
-        if (id_c == 0xFFFFU) {
-            id_c = lobby_world_block->sub_0x90;
+            id_c = id_b;
+        } else {
+            if (id_b == 0xFFFFU) {
+                id_b = lobby_world_block->sub_0x8E;
+            }
+            if (id_c == 0xFFFFU) {
+                id_c = lobby_world_block->sub_0x90;
+            }
         }
     }
     self->ids_0x04[0] = id_a;
@@ -1799,6 +1803,7 @@ extern "C" void lb_equip_set_pane_init(LbEquipPane* self, s16 index, u16 a, u16 
 extern "C" s32 lb_equip_set_pane_step(LbEquipPane* self, LbEntryPane* entry, LbEquipBoxWork* owner)
 {
     s32 result;
+    s32 rows;
     s16 id_a;
     s16 id_b;
     s16 id_c;
@@ -1810,17 +1815,20 @@ extern "C" s32 lb_equip_set_pane_step(LbEquipPane* self, LbEntryPane* entry, LbE
     case 0:
         if (lb_cmd_pressed_ck(0x10) == 1U) {
             id = self->ids_0x04[0];
-            id_a = -1;
             if (id != 0xFFFF) {
                 id_a = id;
+            } else {
+                id_a = -1;
             }
-            id_b = -1;
             if (self->ids_0x04[1] != 0xFFFF) {
                 id_b = self->ids_0x04[1];
+            } else {
+                id_b = -1;
             }
-            id_c = -1;
             if (self->ids_0x04[2] != 0xFFFF) {
                 id_c = self->ids_0x04[2];
+            } else {
+                id_c = -1;
             }
             switch (self->index_0x02) {
             case 0:
@@ -1859,8 +1867,8 @@ extern "C" s32 lb_equip_set_pane_step(LbEquipPane* self, LbEntryPane* entry, LbE
             self->stepper_0x0C = 0;
             sysSE_req(1);
         } else if (lb_cmd_repeat_ck(3) != 0) {
-            self->index_0x02 = menu_cursor_step(self->index_0x02, (s16)((fn_801EF1D0(self) == 1) + 3),
-                                                lb_cmd_repeat_get(), 1, 2);
+            rows = (fn_801EF1D0(self) == 1) + 3;
+            self->index_0x02 = menu_cursor_step(self->index_0x02, (s16)rows, lb_cmd_repeat_get(), 1, 2);
         } else if (lobby_cmd_release_ck(0xC00) != 0) {
             self->scroll_0x10.row_0x08 = (u8)menu_cursor_step_fixed_tail(
                 self->scroll_0x10.row_0x08, self->scroll_0x10.rows_0x0A, lobby_cmd_release_get(), 0x800, 0x400,
@@ -1936,7 +1944,7 @@ extern "C" void lb_entry_pane_scroll_refresh(LbEntryPane* self)
         if (self->slot_kind_0x016 >= 1 && self->slot_kind_0x016 <= 3) {
             memset(set, 0, sizeof(set));
             kind = self->scroll_0x04C.kind_0x00;
-            if ((kind >= 5 && kind <= 6) || kind == 10) {
+            if ((u32)(kind - 5) <= 1 || kind == 10) {
                 if (self->set_ids_0x018[0] != -1) {
                     equip_record_copy(&set[0], &db->equip_0x0E00[self->set_ids_0x018[0]]);
                 } else {
@@ -2255,7 +2263,12 @@ extern "C" void lb_entry_pane_sort_masks_get(LbEntryPane* self, s32* kinds, s32*
     case 1:
         switch (self->sort_lists_0x0CC[1].cursor_0x00) {
         case 1:
-            *kinds = *kinds | 0x80 | 0x100 | 0x200 | 0x400 | 0x4000 | 0x8000;
+            *kinds |= 0x80;
+            *kinds |= 0x100;
+            *kinds |= 0x200;
+            *kinds |= 0x400;
+            *kinds |= 0x4000;
+            *kinds |= 0x8000;
             if (userdata_progress_flag_ck(0xF) == 0 && userdata_progress_flag_ck(0xE) == 1U) {
                 table = lb_sort_blade_classes_late;
             } else {
@@ -2283,7 +2296,9 @@ extern "C" void lb_entry_pane_sort_masks_get(LbEntryPane* self, s32* kinds, s32*
             }
             break;
         case 2:
-            *kinds = *kinds | 0x800 | 0x1000 | 0x2000;
+            *kinds |= 0x800;
+            *kinds |= 0x1000;
+            *kinds |= 0x2000;
             switch (self->sort_lists_0x0CC[2].cursor_0x00) {
             case 1:
                 *picked |= 0x800;
@@ -2299,7 +2314,11 @@ extern "C" void lb_entry_pane_sort_masks_get(LbEntryPane* self, s32* kinds, s32*
         }
         break;
     case 2:
-        *kinds = *kinds | 0x20 | 0x2 | 0x4 | 0x8 | 0x10;
+        *kinds |= 0x20;
+        *kinds |= 0x2;
+        *kinds |= 0x4;
+        *kinds |= 0x8;
+        *kinds |= 0x10;
         switch (self->sort_lists_0x0CC[2].cursor_0x00) {
         case 1:
             *picked |= 0x20;
@@ -2412,8 +2431,8 @@ extern "C" void lb_entry_pane_sort_apply(LbEntryPane* self, u8 kind)
  * there is no owner screen, and one fewer again when the record slot is empty). */
 extern "C" void lb_entry_pane_list_reset(LbEntryPane* self, LbEquipBoxWork* owner)
 {
-    s16 cursor;
     s16 delta;
+    s16 cursor;
     s16 index;
 
     delta = -(owner == NULL);
@@ -2421,7 +2440,7 @@ extern "C" void lb_entry_pane_list_reset(LbEntryPane* self, LbEquipBoxWork* owne
     if (lobby_world_block->equip_0x0E00[index].kind_0x00 == 0) {
         delta--;
     }
-    if (!(self->slot_kind_0x016 >= 1 && self->slot_kind_0x016 <= 3)) {
+    if ((u32)(self->slot_kind_0x016 - 1) > 2) {
         if (self->list_mode_0x021 == 2 && self->list_0x02C.cursor_0x00 >= 2) {
             self->list_0x02C.cursor_0x00 -= 2;
         }
@@ -2819,29 +2838,22 @@ extern "C" s32 lb_entry_pane_menu_step(LbEntryPane* self, LbEquipBoxWork* owner,
 /* Ticks the two blink timers and the pane's frame counter. */
 extern "C" void lb_entry_pane_blink_tick(LbEntryPane* self)
 {
-    s16 v;
-
-    v = self->blink_a_0x012;
-    if (v >= 0) {
-        v += 1;
-        self->blink_a_0x012 = v;
-        if (v > 6) {
+    if (self->blink_a_0x012 >= 0) {
+        self->blink_a_0x012++;
+        if (self->blink_a_0x012 > 6) {
             self->blink_a_0x012 = -1;
             self->timer_0x010 = 0;
         }
     }
-    v = self->blink_b_0x014;
-    if (v >= 0) {
-        v += 1;
-        self->blink_b_0x014 = v;
-        if (v > 6) {
+    if (self->blink_b_0x014 >= 0) {
+        self->blink_b_0x014++;
+        if (self->blink_b_0x014 > 6) {
             self->blink_b_0x014 = -1;
             self->timer_0x010 = 0;
         }
     }
-    v = self->timer_0x010 + 1;
-    self->timer_0x010 = v;
-    if (v > 0x1E) {
+    self->timer_0x010++;
+    if (self->timer_0x010 > 0x1E) {
         self->timer_0x010 = 0;
     }
 }
@@ -2861,6 +2873,7 @@ extern "C" void lb_equip_record_swap(u16 id_a, u16 id_b, LbEquipPane* set)
 {
     LbEquipRec tmp;
     LbItemDb* db;
+    s32 i;
     s8 class_change;
     u8 worn_a;
     u8 worn_b;
@@ -2881,20 +2894,12 @@ extern "C" void lb_equip_record_swap(u16 id_a, u16 id_b, LbEquipPane* set)
     my_set_equip_id_swap(db, id_a, id_b);
     my_set_gun_id_swap(db, id_a, id_b);
     if (set != NULL) {
-        if (id_a == set->ids_0x04[0]) {
-            set->ids_0x04[0] = id_b;
-        } else if (id_b == set->ids_0x04[0]) {
-            set->ids_0x04[0] = id_a;
-        }
-        if (id_a == set->ids_0x04[1]) {
-            set->ids_0x04[1] = id_b;
-        } else if (id_b == set->ids_0x04[1]) {
-            set->ids_0x04[1] = id_a;
-        }
-        if (id_a == set->ids_0x04[2]) {
-            set->ids_0x04[2] = id_b;
-        } else if (id_b == set->ids_0x04[2]) {
-            set->ids_0x04[2] = id_a;
+        for (i = 0; i < 3; i++) {
+            if (id_a == set->ids_0x04[i]) {
+                set->ids_0x04[i] = id_b;
+            } else if (id_b == set->ids_0x04[i]) {
+                set->ids_0x04[i] = id_a;
+            }
         }
     }
 }
@@ -3396,6 +3401,13 @@ extern "C" s32 lb_my_set_move_step(LbMySetPane* self)
 
 #pragma push
 #pragma dont_inline off
+/* Copies a set's option ids and name; never called, it makes the compiler generate both blocks' assignments before
+ * the set copies below use them, so they inline. */
+inline void lb_set_parts_copy(LbSetOpts* dst_opts, const LbSetOpts* src_opts, LbSetName* dst_name, const LbSetName* src_name)
+{
+    *dst_opts = *src_opts;
+    *dst_name = *src_name;
+}
 /* Copies one stored equipment set. */
 extern "C" void lb_my_set_copy(LbMySet* dst, LbMySet* src)
 {
@@ -3732,7 +3744,6 @@ s32 lb_list_row_draw(s32 text, u8 flag, s16* pos, s32 color, u8 mode);
 #include "hud/spr_data.h"
 /* C++-linkage callees of this section that `unsplit/lobby.h` does not declare: they stay at global scope (their manglings are made there). */
 void PutPageArrow(u16* table, s16 a, s16 b, u16 c, const _mh_ivec2_* pos, u8 flags);
-void sysSE_req(s32 id);
 void set_blendmode(u8 a, u8 b, u8 c);
 #include "types.h"
 
@@ -3740,6 +3751,12 @@ void set_blendmode(u8 a, u8 b, u8 c);
 namespace s_801F3294 {
 #define LOBBY_VIEW_IN_NAMESPACE 1
 #include "lobby/lb_pane_ui.h"
+
+/* The owner's views of two `lobby/fn_80212810.cpp` entries that `unsplit/lobby.h`, which this band includes, declares
+ * differently: `lb_choice_draw` takes six arguments (`lobby/lb_panel_msg_draw.h`), `lb_help_num_put` a word value
+ * (`lobby/lb_list_init.h`). */
+#define lb_choice_draw_c1 ((void (*)(u8*, u16, const u16*, const u16*, u16, u8))lb_choice_draw)
+#define lb_help_num_put_c1 ((s32 (*)(s32, s32, s32))lb_help_num_put)
 
 /* The colour pane `lb_color_pane_init` seeds and `lb_color_pane_step` drives: the step, the done code, the inner (0)
  * or hair (1) mode, the changed flag, the grid cursor and its extent, the free cursor, the three colour words (the
@@ -3834,23 +3851,23 @@ void lb_model_pane_init(::LbModelPane* self, ::_PLW* plw, u8 mode);
 void lb_box_menu_draw(void);
 s16 fn_801ED53C(::LbListPane* self);
 s16 fn_801ED554(::LbListPane* self);
-s32 fn_801ED184(s16 index);
-s16 fn_801ED200(s16 index, u8 side);
-u8 fn_801EDA9C(u16 index, u16 item_id);
-s16 fn_801EDA34(u16 index, u8 side);
+s32 fn_801ED184(s32 index);
+s32 fn_801ED200(s32 index, u8 side);
+u8 fn_801EDA9C(::LbListPane* self, u16 index, u16 item_id);
+s32 fn_801EDA34(s32 index, u8 side);
 u8 fn_801EDB34(::LbListPane* self, u16 index, u16 item_id);
-u16 userdata_equip_item_id_get(::LbItemDb* db, s16 index);
+u16 userdata_equip_item_id_get(::LbItemDb* db, s32 index);
 s16 userdata_pouch_size(u8 side);
 s32 item_pair_index_find(u16 id, ::IdValue* base, s32 count);
 ::IdValue* userdata_pouch_get(::LbItemDb* db, u8 side);
 u16 userdata_box_capacity(::LbItemDb* db);
-u8 lb_entry_pane_scroll_kind_get(::LbEntryPane* self);
+u32 lb_entry_pane_scroll_kind_get(::LbEntryPane* self);
 u8* lb_entry_pane_kind_tbl_get(::LbEntryPane* self);
 s16 lb_digit_pane_value(::LbEntryPane* self);
 void lb_entry_pane_scroll_refresh(::LbEntryPane* self);
 u32 userdata_equip_box_worn_ck(::LbItemDb* db, u16 id);
 s16 fn_801ED160(::LbDigitPane* self);
-s16 fn_801ED9E4(s16 index);
+s32 fn_801ED9E4(s32 index);
 s32 userdata_item_slot_count(::LbItemDb* db);
 ::IdValue* userdata_equip_item_slots_get(::LbItemDb* db);
 u32 fn_801EE900(u16 item_id);
@@ -4180,77 +4197,110 @@ void fn_801F3998(LbPage* self, u32 rgb, u8 which)
  * it in the world block; returns 2 when left with the old colour, 1 with a new one. */
 u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
 {
-    PlayerPad* pad;
-    LbWorldBlock* world;
-    LbPage* page;
     const s16* cells;
-    _SPR_DATA_* box;
+    PlayerPad* pad;
     u32 result;
+    LbWorldBlock* world;
     u16 index;
+    LbPage* page;
+    _SPR_DATA_* box;
+    const s16* widths;
 
     result = 0;
     pad = &Psw[0];
     world = lobby_world_block;
     page = (LbPage*)self->plw_0x24;
     fn_801EC804(&self->anim_0x0C);
-    switch (self->phase_0x00) {
-    case 0:
-        if (self->done_0x01 == 1) {
-            self->phase_0x00 = 2;
-            self->done_0x01 = 0;
-            if (lb_page_record_empty_ck(page) == 1) {
-                result = 2;
+    do {
+        switch (self->phase_0x00) {
+        case 0:
+            if (self->done_0x01 == 1) {
+                self->phase_0x00 = 2;
+                self->done_0x01 = 0;
+                break;
             }
-            break;
-        }
-        if (self->done_0x01 == 2) {
-            self->phase_0x00 = 3;
-            self->done_0x01 = 0;
-            if (lb_page_record_empty_ck(page) == 1) {
-                result = 1;
+            if (self->done_0x01 == 2) {
+                self->phase_0x00 = 3;
+                self->done_0x01 = 0;
+                continue;
             }
-            break;
-        }
-        if (lb_cmd_pressed_ck(0x80) == 1) {
-            fn_801EC828(owner);
-            return 0;
-        }
-        cells = lbl_805B87D8;
-        if (self->mode_0x02 == 0) {
-            cells = lbl_805B87F4;
-        }
-        if (lb_cmd_pressed_ck(0x10) == 1) {
-            index = lb_color_grid_index(lb_color_grid_widths, self->column_0x04, self->row_0x06);
-            switch (cells[index]) {
-            case -2:
-                switch (self->mode_0x02) {
-                case 1:
-                    world->hair_color_0x0014 = self->picked_0x18;
+            if (lb_cmd_pressed_ck(0x80) == 1) {
+                fn_801EC828(owner);
+                return 0;
+            }
+            widths = lb_color_grid_widths;
+            cells = lbl_805B87D8;
+            if (self->mode_0x02 == 0) {
+                cells = lbl_805B87F4;
+            }
+            if (lb_cmd_pressed_ck(0x10) == 1) {
+                index = lb_color_grid_index(widths, self->column_0x04, self->row_0x06);
+                switch (cells[index]) {
+                default:
+                    fn_801F37C8(self, cells[index]);
+                    fn_801F3998(page, self->picked_0x18, self->mode_0x02);
+                    if (cells[index] >= 0) {
+                        self->cursor_x_0x0E = lbl_805B8674[cells[index]].cursor_x_0x06;
+                        self->cursor_y_0x10 = lbl_805B8674[cells[index]].cursor_y_0x08;
+                    }
+                    self->changed_0x03 = 1;
+                    sysSE_stop(4);
+                    return result;
+                case -2:
+                    switch (self->mode_0x02) {
+                    case 1:
+                        world->hair_color_0x0014 = self->picked_0x18;
+                        break;
+                    case 0:
+                        world->inner_color_0x39BC = self->picked_0x18;
+                        break;
+                    }
+                    userdata_pl_look_apply(page, world);
+                    fn_801EC7AC(owner);
+                    sysSE_req(0);
+                    self->done_0x01 = 2;
                     break;
-                case 0:
-                    world->inner_color_0x39BC = self->picked_0x18;
+                case -3:
                     break;
                 }
-                userdata_pl_look_apply(page, world);
-                fn_801EC7AC(owner);
-                sysSE_req(0);
-                self->done_0x01 = 2;
-                break;
-            case -3:
-                break;
-            default:
-                fn_801F37C8(self, cells[index]);
-                fn_801F3998(page, self->picked_0x18, self->mode_0x02);
-                if (cells[index] >= 0) {
-                    self->cursor_x_0x0E = lbl_805B8674[cells[index]].cursor_x_0x06;
-                    self->cursor_y_0x10 = lbl_805B8674[cells[index]].cursor_y_0x08;
+            } else if (lb_cmd_pressed_ck(0x20) == 1) {
+                if (self->changed_0x03 == 0) {
+                    switch (self->mode_0x02) {
+                    case 1:
+                        world->hair_color_0x0014 = self->original_0x1C;
+                        break;
+                    case 0:
+                        world->inner_color_0x39BC = self->original_0x1C;
+                        break;
+                    }
+                    userdata_pl_look_apply(page, world);
+                    self->done_0x01 = 1;
+                } else {
+                    self->phase_0x00++;
+                    self->stepper_0x20 = 0;
                 }
-                self->changed_0x03 = 1;
-                sysSE_stop(4);
+                sysSE_req(1);
+            } else if (lb_color_grid_step(widths, &self->column_0x04, &self->row_0x06, self->rows_0x0A) == 0) {
+                index = lb_color_grid_index(widths, self->column_0x04, self->row_0x06);
+                if (cells[index] == -3) {
+                    box = (_SPR_DATA_*)get_lsp_data(0x1CA8, NULL);
+                    if (lb_cursor_box_step(&self->cursor_x_0x0E, &self->cursor_y_0x10, 1, box->width - 1, 1,
+                                           box->height - 1, pad->button_0x2C0.press_0x08) == 1U) {
+                        self->changed_0x03 = 1;
+                        fn_801F37C8(self, cells[index]);
+                        fn_801F3998(page, self->picked_0x18, self->mode_0x02);
+                    }
+                }
+            }
+            break;
+        case 1:
+            if (self->done_0x01 == 1) {
+                self->phase_0x00++;
+                self->done_0x01 = 0;
                 break;
             }
-        } else if (lb_cmd_pressed_ck(0x20) == 1) {
-            if (self->changed_0x03 == 0) {
+            switch (toggle_word_step(&self->stepper_0x20, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+            case 1:
                 switch (self->mode_0x02) {
                 case 1:
                     world->hair_color_0x0014 = self->original_0x1C;
@@ -4260,63 +4310,28 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
                     break;
                 }
                 userdata_pl_look_apply(page, world);
+                sysSE_req(0);
                 self->done_0x01 = 1;
-            } else {
-                self->phase_0x00++;
-                self->stepper_0x20 = 0;
-            }
-            sysSE_req(1);
-        } else if (lb_color_grid_step(lb_color_grid_widths, &self->column_0x04, &self->row_0x06, self->rows_0x0A) == 0) {
-            index = lb_color_grid_index(lb_color_grid_widths, self->column_0x04, self->row_0x06);
-            if (cells[index] == -3) {
-                box = (_SPR_DATA_*)get_lsp_data(0x1CA8, NULL);
-                if (lb_cursor_box_step(&self->cursor_x_0x0E, &self->cursor_y_0x10, 1, box->width - 1, 1,
-                                       box->height - 1, pad->button_0x2C0.press_0x08) == 1) {
-                    self->changed_0x03 = 1;
-                    fn_801F37C8(self, cells[index]);
-                    fn_801F3998(page, self->picked_0x18, self->mode_0x02);
-                }
-            }
-        }
-        break;
-    case 1:
-        if (self->done_0x01 == 1) {
-            self->phase_0x00++;
-            self->done_0x01 = 0;
-            if (lb_page_record_empty_ck(page) == 1) {
-                result = 2;
-            }
-            break;
-        }
-        switch (toggle_word_step(&self->stepper_0x20, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
-        case 1:
-            switch (self->mode_0x02) {
-            case 1:
-                world->hair_color_0x0014 = self->original_0x1C;
                 break;
-            case 0:
-                world->inner_color_0x39BC = self->original_0x1C;
+            case 2:
+                self->phase_0x00--;
                 break;
             }
-            userdata_pl_look_apply(page, world);
-            sysSE_req(0);
-            self->done_0x01 = 1;
-            break;
+            return result;
         case 2:
-            self->phase_0x00--;
             break;
+        case 3:
+            continue;
+        default:
+            return result;
         }
-        break;
-    case 2:
         if (lb_page_record_empty_ck(page) == 1) {
             result = 2;
         }
-        break;
-    case 3:
-        if (lb_page_record_empty_ck(page) == 1) {
-            result = 1;
-        }
-        break;
+        return result;
+    } while (0);
+    if (lb_page_record_empty_ck(page) == 1) {
+        result = 1;
     }
     return result;
 }
@@ -4691,12 +4706,12 @@ void lb_dye_part_color_restore(LbPage* self, u16 part)
  * button stores it, cancel puts the old colour back.  Returns 2 when left. */
 u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
 {
-    PlayerPad* pad;
-    const s16* cells;
+    s16 index;
     const s16* widths;
     _SPR_DATA_* box;
     u32 result;
-    u16 index;
+    const s16* cells;
+    PlayerPad* pad;
 
     result = 0;
     pad = &Psw[0];
@@ -4723,7 +4738,7 @@ u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
             sysSE_req(1);
             result = 2;
         } else if (lb_cmd_repeat_ck(3) != 0) {
-            self->part_0x004 = menu_cursor_step((s16)self->part_0x004, 6, lb_cmd_repeat_get(), 1, 2);
+            self->part_0x004 = menu_cursor_step(self->part_0x004, 6, lb_cmd_repeat_get(), 1, 2);
         }
         break;
     case 1:
@@ -4741,16 +4756,8 @@ u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
         if (lb_cmd_pressed_ck(0x10) == 1) {
             index = lb_color_grid_index(widths, self->count_0x006, self->field_0x008);
             switch (cells[index]) {
-            case -2:
-                self->state_0x000--;
-                lb_dye_part_color_commit(self, self->part_0x004);
-                fn_801EC7AC(owner);
-                sysSE_req(0);
-                break;
-            case -3:
-                break;
             default:
-                fn_801F4444(self, (s16)self->part_0x004, cells[index]);
+                fn_801F4444(self, self->part_0x004, cells[index]);
                 lb_dye_part_color_apply(self, self->part_0x004);
                 fn_801F3F78(self, lobby_world_block->field_0x39BA);
                 if (cells[index] >= 0) {
@@ -4759,6 +4766,14 @@ u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
                 }
                 self->field_0x023 = 1;
                 sysSE_stop(4);
+                break;
+            case -2:
+                self->state_0x000--;
+                lb_dye_part_color_commit(self, self->part_0x004);
+                fn_801EC7AC(owner);
+                sysSE_req(0);
+                break;
+            case -3:
                 break;
             }
         } else if (lb_cmd_pressed_ck(0x20) == 1) {
@@ -4776,9 +4791,9 @@ u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
             if (cells[index] == -3) {
                 box = (_SPR_DATA_*)get_lsp_data(0x1CA8, NULL);
                 if (lb_cursor_box_step(&self->cursor_x_0x010, &self->cursor_y_0x012, 1, box->width - 1, 1,
-                                       box->height - 1, pad->button_0x2C0.press_0x08) == 1) {
+                                       box->height - 1, pad->button_0x2C0.press_0x08) == 1U) {
                     self->field_0x023 = 1;
-                    fn_801F4444(self, (s16)self->part_0x004, cells[index]);
+                    fn_801F4444(self, self->part_0x004, cells[index]);
                     lb_dye_part_color_apply(self, self->part_0x004);
                     fn_801F3F78(self, lobby_world_block->field_0x39BA);
                 }
@@ -5162,20 +5177,21 @@ s16 fn_801F5534(LbPage* self)
  * pick would be refused (with the reason on the help line), then the guide. */
 void lb_box_top_draw(LbBoxMenu* self)
 {
-    _SPR_DATA_ spr;
-    _mh_ivec2_ base;
-    _mh_ivec2_ pos;
-    const u16* panels;
-    const u16* sub_panels;
-    const s16* str_bases;
     u32 color;
-    s32 selected;
-    s32 i;
-    s32 enabled;
+    const u16* sub_panels;
     s16 reason;
-    s16 reason_row;
+    _mh_ivec2_ base;
     u32 closing;
+    s32 i;
+    const u16* panels;
+    _SPR_DATA_ spr;
+    s16 reason_row;
     s8* text;
+    _mh_ivec2_ pos;
+    s32 selected;
+    const u16* str_bases;
+    bool enabled;
+    bool lit;
 
     reason = -1;
     reason_row = 1;
@@ -5188,15 +5204,15 @@ void lb_box_top_draw(LbBoxMenu* self)
         } else {
             draw_sprite_anim_ary(lb_box_top_frame_alt, 1, &base);
         }
-        panels = lb_box_top_row_panels;
-        for (i = 0; i < self->menu_rows_0x00C; i++) {
+        for (i = 0, panels = lb_box_top_row_panels; i < self->menu_rows_0x00C; i++) {
             if (self->menu_row_0x006 == i) {
                 selected = self->menu_page_0x00A == 0;
-                color = GetMenuFontColor(1, 1, self->menu_page_0x00A == 0, 0);
+                lit = 1;
             } else {
                 selected = 0;
-                color = GetMenuFontColor(1, 0, self->menu_page_0x00A == 0, 0);
+                lit = 0;
             }
+            color = GetMenuFontColor(1, lit, self->menu_page_0x00A == 0, 0);
             lb_frame_draw_at(0x1A80, *panels, (s8*)LbStr(0, i + 0x212), selected, color, 0);
             panels++;
         }
@@ -5204,9 +5220,8 @@ void lb_box_top_draw(LbBoxMenu* self)
             sprite_frame_apply(&spr, 0x1A9C, self->menu_row_0x006, &base);
             draw_sprite_anim_ary(lb_box_sub_frame, lb_box_sub_frame_kinds[self->menu_subrows_0x00E], &base);
             reason = -1;
-            sub_panels = lb_box_sub_row_panels;
-            str_bases = lb_box_sub_str_bases;
-            for (i = 0; i < self->menu_subrows_0x00E; i++) {
+            for (i = 0, sub_panels = lb_box_sub_row_panels, str_bases = lb_box_sub_str_bases;
+                 i < self->menu_subrows_0x00E; i++) {
                 enabled = 1;
                 switch (self->menu_row_0x006) {
                 case 5:
@@ -5219,7 +5234,10 @@ void lb_box_top_draw(LbBoxMenu* self)
                     }
                     break;
                 case 6:
-                    if ((u32)(i - 2) <= 1 || i == 0) {
+                    switch (i) {
+                    case 0:
+                    case 2:
+                    case 3:
                         if (gun_set_any_ck(lobby_world_block) == 0) {
                             enabled = 0;
                             if (self->menu_cursor_0x008 == i) {
@@ -5227,7 +5245,8 @@ void lb_box_top_draw(LbBoxMenu* self)
                                 reason_row = 2;
                             }
                         }
-                    } else if (i == 1) {
+                        break;
+                    case 1:
                         if (userdata_gunner_ck(lobby_world_block) == 0) {
                             enabled = 0;
                             if (self->menu_cursor_0x008 == i) {
@@ -5235,6 +5254,7 @@ void lb_box_top_draw(LbBoxMenu* self)
                                 reason_row = 2;
                             }
                         }
+                        break;
                     }
                     break;
                 case 4:
@@ -5249,11 +5269,12 @@ void lb_box_top_draw(LbBoxMenu* self)
                 }
                 if (self->menu_cursor_0x008 == i) {
                     selected = 1;
-                    color = GetMenuFontColor(enabled, 1, 1, 0);
+                    lit = 1;
                 } else {
                     selected = 0;
-                    color = GetMenuFontColor(enabled, 0, 1, 0);
+                    lit = 0;
                 }
+                color = GetMenuFontColor(enabled, lit, 1, 0);
                 sprite_frame_apply(&spr, *sub_panels, self->menu_row_0x006, &pos);
                 pos.x += base.x;
                 pos.y += base.y;
@@ -5359,7 +5380,7 @@ u8 lb_box_lists_draw(::LbListPane* self, u16 parts)
                 entry->present_0x02 = 0;
             }
         } else if ((parts & 0x10) != 0) {
-            if (fn_801EDA9C(index, self->item_id_0x024) == 0) {
+            if (fn_801EDA9C(self, index, self->item_id_0x024) == 0) {
                 entry->present_0x02 = 1;
             } else {
                 entry->present_0x02 = 0;
@@ -5438,14 +5459,14 @@ u8 lb_box_lists_draw(::LbListPane* self, u16 parts)
 void lb_count_box_draw(const _mh_ivec2_* unused, u8 value, u8 max, u16 flags, u16 frame, s16 pulse, s16 left,
                        s16 right)
 {
-    _SPR_DATA_ spr;
-    _mh_ivec2_ pos;
     u32 color;
     u16 pulse_b;
     u16 arrow_r;
-    u16 pulse_a;
     u16 arrow_l;
+    _mh_ivec2_ pos;
+    u16 pulse_a;
     u16 shown;
+    _SPR_DATA_ spr;
 
     color = 0;
     get_lsp_data(0x1B20, &pos);
@@ -5540,38 +5561,39 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
                       ::IdValue* items, ::_PLW* plw)
 {
     _SPR_DATA_ spr;
-    _mh_ivec2_ cell;
-    _mh_ivec2_ col;
-    _mh_ivec2_ row_pos;
-    _mh_ivec2_ pos;
-    ::IdValue* slot;
-    ::IdValue* listed;
-    ::IdValue* pick_slot;
-    const u16* rows;
-    const u16* cols;
-    s32 index;
-    s32 c;
-    s32 marking;
-    s16 row;
-    s16 picked;
-    s16 marked;
-    s16 pulse;
-    s16 help;
     s16 reason;
     s16 count;
-    s16 left;
-    s16 right;
-    s16 mark;
-    u32 base_color;
-    u16 flags;
-    u8 enabled;
-    u8 selected;
-    u8 dim;
-    u8 page;
-    u8 pages;
-    u8 confirm;
     u8 counts;
+    u8 selected;
+    const u16* cols;
+    _mh_ivec2_ cell;
+    ::IdValue* slot;
+    _mh_ivec2_ row_pos;
+    _mh_ivec2_ pos;
+    s16 right;
+    const u16* rows;
+    s32 index;
+    s16 row;
+    s16 marked;
+    s32 marking;
+    s16 picked;
+    s32 c;
+    s16 pulse;
+    u8 confirm;
+    s16 help;
+    u8 enabled;
+    ::IdValue* listed;
+    u8 dim;
+    s16 mark;
+    s16 left;
+    ::IdValue* pick_slot;
+    u16 flags;
+    _SPR_DATA_* uv;
+    u8 page;
+    u32 base_color;
     u8 guide;
+    u8 pages;
+    _mh_ivec2_ col;
 
     enabled = 1;
     selected = 0;
@@ -5582,7 +5604,8 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
     counts = 1;
     marking = 1;
     draw_sprite_ary(lb_box_grid_frame, base);
-    if (kind == 5) {
+    switch (kind) {
+    case 5:
         picked = -1;
         if (value != -1) {
             page = value / 100;
@@ -5590,14 +5613,17 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
             page = 0;
         }
         pages = menu_page_count(userdata_box_capacity((::LbItemDb*)lobby_world_block), 100);
-    } else {
+        break;
+    default:
         picked = fn_801ED160(digits);
         pulse = digits->anim_0x0E;
         page = digits->digit_hundreds_0x02;
         pages = digits->digit_hundreds_max_0x03;
+        break;
     }
+    uv = (_SPR_DATA_*)get_lsp_data(lb_box_grid_cols[0], &cell);
     spr_data_copy((s16*)&spr, get_lsp_data(lb_box_grid_cols[8], NULL));
-    uv_pair_copy(&spr, (_SPR_DATA_*)get_lsp_data(lb_box_grid_cols[0], &cell));
+    uv_pair_copy(&spr, uv);
     base_color = spr.color_0x1C;
     if (digits != NULL && digits->active_0x1C != 0) {
         confirm = 1;
@@ -5666,16 +5692,19 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
                         marked = index;
                     }
                     if ((u32)(digits->phase_0x00 - 2) > 2) {
-                        if (digits->phase_0x00 != 1) {
+                        switch (digits->phase_0x00) {
+                        default:
                             enabled = fn_801EE900(slot->id) == 1;
                             selected = 0;
-                        } else {
+                            break;
+                        case 1:
                             enabled = fn_801EE940(cursor->item_a_0x04, slot->id) == 1;
                             if (slot->id != 0 && slot->id == cursor->item_a_0x04) {
                                 selected = 1;
                             } else {
                                 selected = 0;
                             }
+                            break;
                         }
                     } else {
                         marking = 0;
@@ -5692,9 +5721,11 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
                     if (index == picked) {
                         marked = index;
                     }
-                    if (digits->phase_0x00 != 1) {
+                    switch (digits->phase_0x00) {
+                    default:
                         selected = 0;
-                    } else {
+                        break;
+                    case 1:
                         if (((::LbItemDb*)lobby_world_block)->slots_0x180[digits->cursor_0x1A].id == 0 && slot->id == 0) {
                             enabled = 0;
                         } else {
@@ -5706,6 +5737,7 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
                         } else {
                             selected = 0;
                         }
+                        break;
                     }
                     break;
                 case 5:
@@ -5761,18 +5793,23 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
         }
         break;
     case 3:
-        if (digits->phase_0x00 == 1) {
+        switch (digits->phase_0x00) {
+        case 1:
             guide = 0;
+            break;
         }
         break;
     case 2:
-        if (digits->phase_0x00 != 0) {
-            if (digits->phase_0x00 == 1) {
-                guide = 0;
-            } else {
-                counts = 0;
-                guide = 0;
-            }
+        switch (digits->phase_0x00) {
+        case 0:
+            break;
+        case 1:
+            guide = 0;
+            break;
+        default:
+            counts = 0;
+            guide = 0;
+            break;
         }
         break;
     }
@@ -5828,13 +5865,13 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
                 break;
             case 1:
                 help = 0xC4;
-                lb_count_window_draw(0x1ADE, 0x1ADF, digits->pick_max_0x18, digits->pick_0x16,
+                lb_count_window_draw(0x1ADE, 0x1ADF, digits->pick_count_0x18, digits->pick_max_0x16,
                                      eft052_item_value_get(slot->id), 0, digits->flags_0x08);
                 break;
             case 2:
                 lb_panel_yes_no_draw(0x1893, digits->stepper_0x04);
                 if (slot->id != 0) {
-                    lb_help_num_put(0x1878, 0x36, digits->pick_max_0x18 * eft052_item_value_get(slot->id));
+                    lb_help_num_put_c1(0x1878, 0x36, digits->pick_count_0x18 * eft052_item_value_get(slot->id));
                 }
                 break;
             }
@@ -5924,8 +5961,6 @@ void lb_box_combine_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor)
 }
 
 } /* extern "C" */
-/* The equipment cell's highlight depth (`lb_equip_icon_cell_draw`). */
-extern "C" const f32 lb_icon_frame_z = 0.0f;
 extern "C" {
 
 /* 0x801F6CE4 (0xD8): one equipment cell: the cursor icon, the record's icon (dimmed on request) and, on request, the
@@ -5942,7 +5977,7 @@ void lb_equip_icon_cell_draw(const _mh_ivec2_* pos, ::LbEquipRec* rec, u8 framed
         }
         draw_equipicon(spr, (::_EQUIP*)rec, pos);
         if (framed != 0) {
-            draw_frame_rect_z(pos->x, pos->y, spr.width, spr.height, 95, 0xFFC400FF, lb_icon_frame_z);
+            draw_frame_rect_z(pos->x, pos->y, spr.width, spr.height, 95, 0xFFC400FF, 0.0f);
         }
     }
 }
@@ -5963,7 +5998,9 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
     const u16* rows;
     const u16* cols;
     const u16* titles;
+    const u16* classes;
     ::LbEquipRec* rec;
+    _SPR_DATA_* uv;
     s32 sorting;
     s32 active;
     s32 c;
@@ -5977,7 +6014,7 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
     s16 reason;
     s16 line;
     u16 frame;
-    u16 selected;
+    s16 selected;
     u16 flags;
     u16 dim;
     u8 enabled;
@@ -6022,8 +6059,10 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
         }
         break;
     case 5:
-        if (self->phase_0x000 == 1) {
+        switch (self->phase_0x000) {
+        case 1:
             guide = 0;
+            break;
         }
         break;
     }
@@ -6038,11 +6077,12 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
         base.x = x;
         base.y = y;
         draw_sprite_anim_ary(lb_box_grid_frame, frame, &base);
+        uv = (_SPR_DATA_*)get_lsp_data(lb_box_grid_cols[0], &cell);
         spr_data_copy((s16*)&spr, get_lsp_data(lb_box_grid_cols[9], NULL));
-        uv_pair_copy(&spr, (_SPR_DATA_*)get_lsp_data(lb_box_grid_cols[0], &cell));
+        uv_pair_copy(&spr, uv);
         if (self->slot_kind_0x016 == 6) {
             picked = self->set_ids_0x018[0];
-            selected = 0xFFFF;
+            selected = -1;
             if (picked != -1) {
                 page = picked / 100;
             } else {
@@ -6118,9 +6158,11 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                         }
                         break;
                     case 5:
-                        if (self->phase_0x000 != 1) {
+                        switch (self->phase_0x000) {
+                        default:
                             marked = 0;
-                        } else {
+                            break;
+                        case 1:
                             if (rec->kind_0x00 == 0
                                 && ((::LbItemDb*)lobby_world_block)->equip_0x0E00[self->mark_0x01E].kind_0x00 == 0) {
                                 enabled = 0;
@@ -6133,6 +6175,7 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                             } else {
                                 marked = 0;
                             }
+                            break;
                         }
                         break;
                     case 6:
@@ -6207,7 +6250,7 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                     spr.color_0x1C = color_mult(spr.color_0x1C, 0x7E7E7EFF);
                 }
                 draw_sprite(spr, &pos);
-                if (index == (s16)selected && self->held_0x020 == 0 && sorting == 0) {
+                if (index == selected && self->held_0x020 == 0 && sorting == 0) {
                     lb_equip_icon_cell_draw(&pos, rec, worn, self->anim_0x00E, marked, dim);
                 } else {
                     lb_equip_icon_cell_draw(&pos, rec, worn, -1, marked, dim);
@@ -6307,7 +6350,7 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
         get_lsp_data(0x1968, &pos);
         switch (self->sort_step_0x023) {
         case 1:
-            lb_choice_draw((u8*)&self->sort_lists_0x0CC[0], lb_sort_menu_frame, lb_sort_menu_rows, NULL, 0);
+            lb_choice_draw_c1((u8*)&self->sort_lists_0x0CC[0], 0x1968, lb_sort_menu_frame, lb_sort_menu_rows, 0, 0);
             draw_sprite_idx(0x196B, &pos);
             help = 0xEA;
             break;
@@ -6367,9 +6410,12 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                     line = 0x103;
                     break;
                 case 1:
-                    switch ((userdata_progress_flag_ck(0xF) == 0 && userdata_progress_flag_ck(0xE) == 1
-                                 ? lb_sort_blade_classes_late
-                                 : lb_sort_blade_classes)[self->sort_lists_0x0CC[2].cursor_0x00]) {
+                    if (userdata_progress_flag_ck(0xF) == 0 && userdata_progress_flag_ck(0xE) == 1U) {
+                        classes = lb_sort_blade_classes_late;
+                    } else {
+                        classes = lb_sort_blade_classes;
+                    }
+                    switch (classes[self->sort_lists_0x0CC[2].cursor_0x00]) {
                     case 0:
                         line = 0xEC;
                         break;
@@ -6600,9 +6646,9 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
                     lb_panel_yes_no_draw(0x1893, self->stepper_0x004);
                     if (picked != -1) {
                         if (equip_deco_count((::_EQUIP*)rec) > 0) {
-                            lb_help_num_put(0x1878, 0xDE, equip_sell_price_get((::_EQUIP*)rec));
+                            lb_help_num_put_c1(0x1878, 0xDE, equip_sell_price_get((::_EQUIP*)rec));
                         } else {
-                            lb_help_num_put(0x1878, 0x36, equip_sell_price_get((::_EQUIP*)rec));
+                            lb_help_num_put_c1(0x1878, 0x36, equip_sell_price_get((::_EQUIP*)rec));
                         }
                     }
                     break;
@@ -6627,18 +6673,17 @@ void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
 s32 lb_gun_set_cells_draw(u16* ids, s16 cursor, const _mh_ivec2_* base, u8 mode, u8 mark)
 {
     _mh_ivec2_ pos;
-    ::_EQUIP blank;
-    ::_EQUIP* gun;
-    ::_EQUIP* rec;
     const u16* lsp;
-    u16* id;
-    s32 result;
-    s32 options;
-    u32 lit;
     s16 i;
+    ::_EQUIP* gun;
+    u32 sel;
+    u32 lit;
+    ::_EQUIP* rec;
+    s32 result;
+    ::_EQUIP blank;
     u8 flags;
+    s32 options;
 
-    id = ids;
     result = 1;
     if (*ids != 0xFFFF) {
         gun = (::_EQUIP*)&((::LbItemDb*)lobby_world_block)->equip_0x0E00[*ids];
@@ -6650,32 +6695,33 @@ s32 lb_gun_set_cells_draw(u16* ids, s16 cursor, const _mh_ivec2_* base, u8 mode,
     } else {
         options = 0;
     }
-    i = 0;
-    lsp = lb_gun_set_cell_lsp;
-    do {
+    for (i = 0, lsp = lb_gun_set_cell_lsp; i < 3; i++) {
         flags = 0;
         get_lsp_data(*lsp, &pos);
         pos.x += base->x;
         pos.y += base->y;
+        sel = i == cursor;
         lit = mark != 1;
-        if (*id != 0xFFFF) {
-            rec = (::_EQUIP*)&((::LbItemDb*)lobby_world_block)->equip_0x0E00[*id];
+        if (*ids != 0xFFFF) {
+            rec = (::_EQUIP*)&((::LbItemDb*)lobby_world_block)->equip_0x0E00[*ids];
         } else {
             memset(&blank, 0, sizeof(blank));
-            if (i != 1) {
-                if (i != 2) {
-                    blank.kind = 0xB;
-                } else {
-                    blank.kind = 0xD;
-                }
-            } else {
+            switch (i) {
+            default:
+                blank.kind = 0xB;
+                break;
+            case 1:
                 blank.kind = 0xC;
+                break;
+            case 2:
+                blank.kind = 0xD;
+                break;
             }
             if (options == 0) {
                 result = 0;
                 blank.item_id = 0;
                 if (mode == 0) {
-                    flags = 4;
+                    flags |= 4;
                 }
             } else {
                 if (mode == 0) {
@@ -6685,11 +6731,10 @@ s32 lb_gun_set_cells_draw(u16* ids, s16 cursor, const _mh_ivec2_* base, u8 mode,
             }
             rec = &blank;
         }
-        lb_equip_cell_draw_layout3(rec, 0, &pos, lit, i == cursor, 1, flags, 0);
+        lb_equip_cell_draw_layout3(rec, 0, &pos, lit, sel, 1, flags, 0);
         lsp++;
-        id++;
-        i++;
-    } while (i < 3);
+        ids++;
+    }
     flfntFlush();
     flfntStackReset();
     return result;
@@ -6850,7 +6895,7 @@ void lb_my_set_detail_draw(u16 lsp, ::LbMySetPane* pane, u16 weapon, u16 armor_d
     ::_EQUIP recs[9];
     u16 present;
     ::_PLW* plw;
-    u32 arrows;
+    bool arrows;
     u8 rows;
     u8 page;
 
@@ -6939,6 +6984,7 @@ void lb_my_set_list_draw(::LbMySetPane* self)
     s16 reason;
     LbItemDb* db;
     s16 reason_row;
+    u8 same;
 
     db = (::LbItemDb*)lobby_world_block;
     set = &db->my_sets_0x3380[self->index_0x04];
@@ -7006,16 +7052,16 @@ void lb_my_set_list_draw(::LbMySetPane* self)
                                   moved->armor_0x06[5], moved->opts_0x02.ids[0], moved->opts_0x02.ids[1], 0, 0);
             fn_801F8ABC(0x1BD5, self->mark_0x06, self->count_0x05, 0, 0);
             draw_sprite_ary(lb_my_set_list_frame, &pos);
+            same = self->mark_0x06 == self->index_0x04 ? 2 : 0;
             get_lsp_data(0x1BF9, &pos);
             lb_my_set_detail_draw(0x1BF9, self, set->weapon_0x00, set->armor_0x06[3], set->armor_0x06[4],
                                   set->armor_0x06[0], set->armor_0x06[1], set->armor_0x06[2], set->armor_0x06[5],
-                                  set->opts_0x02.ids[0], set->opts_0x02.ids[1], 0,
-                                  self->mark_0x06 == self->index_0x04 ? 2 : 0);
+                                  set->opts_0x02.ids[0], set->opts_0x02.ids[1], 0, same);
             draw_sprite_ary(lb_my_set_list_frame, &pos);
             fn_801F8ABC(0x1BFA, self->index_0x04, self->count_0x05, self->moved_0x08, room);
             sprite_frame_apply(&spr, 0x1BD0, (u16)self->blink_0x0C, &mark_pos);
             sprite_frame_apply(&spr, 0x1BD3, (u16)self->blink_0x0C, &pos);
-            pos = mark_pos;
+            pos.x = mark_pos.x;
             draw_sprite_ary(lb_my_set_move_mark, &pos);
             break;
         }
@@ -7111,7 +7157,7 @@ void lb_gun_set_detail_draw(const _mh_ivec2_* base, ::LbMySetPane* pane, u16 wea
     ::_PLW* plw;
     ::_EQUIP* table;
     ::_EQUIP* gun;
-    s32 arrows;
+    bool arrows;
     u8 page;
     u8 type;
 
@@ -7365,12 +7411,13 @@ void lb_model_pane_draw(::LbModelPane* self)
 {
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
-    LbWorldBlock* world;
     u32 color;
-    s32 enabled;
-    s32 worn;
-    s32 selected;
+    LbWorldBlock* world;
+    bool selected;
     s16 help;
+    bool enabled;
+    s32 text;
+    bool worn;
     u8 i;
 
     help = -1;
@@ -7388,6 +7435,7 @@ void lb_model_pane_draw(::LbModelPane* self)
         break;
     }
     for (i = 0; i < self->part_0x06; i++) {
+        text = i + 0x23F;
         selected = self->cursor_0x04 == i;
         enabled = 1;
         worn = 0;
@@ -7409,7 +7457,7 @@ void lb_model_pane_draw(::LbModelPane* self)
         get_lsp_data(lb_model_pane_rows[i], &pos);
         pos.x += base.x;
         pos.y += base.y;
-        lb_chg::lb_list_row_draw((s32)LbStr(0, i + 0x23F), selected, (s16*)&pos, color, 0xD);
+        lb_chg::lb_list_row_draw((s32)LbStr(0, text), selected, (s16*)&pos, color, 0xD);
     }
     fn_801F54C4();
     if (help != -1) {
@@ -7482,7 +7530,7 @@ void lb_color_pane_draw(LbColorPane* self)
     u16 frame;
     u8 i;
     u8 selected;
-    u32 lit;
+    bool lit;
     s16 help;
 
     cells = lbl_805B87D8;
@@ -7533,8 +7581,8 @@ void lb_color_pane_draw(LbColorPane* self)
                 spr.pos_y = self->cursor_y_0x10;
                 pos.x += origin.x;
                 pos.y += origin.y;
-                GXPeekARGB((u16)((f32)(pos.x + spr.pos_x) * ((f32)Screen_w.width / Screen_w.width_f)),
-                           (u16)((f32)(pos.y + spr.pos_y) * ((f32)Screen_w.height / Screen_w.height_f)), &color);
+                GXPeekARGB((u16)((f32)(pos.x + spr.pos_x) * ((f32)(s16)Screen_w.width / Screen_w.width_f)),
+                           (u16)((f32)(pos.y + spr.pos_y) * ((f32)(s16)Screen_w.height / Screen_w.height_f)), &color);
                 self->color_0x14 = (color << 8) | 0xFF;
                 draw_sprite(spr, &pos);
             }
@@ -7595,6 +7643,7 @@ void lb_color_pane_draw(LbColorPane* self)
 #include "enemy/enemy_net_work_reset.h"
 #include "lobby/lb_progress_unlock.h"
 #include "menu/quest_group_clear_count.h"
+#include "menu/menu_plsearch.h" /* the save-file steps and chg_nand_err2msgcode (rule 2) */
 
 #pragma peephole off
 
@@ -7699,11 +7748,6 @@ void hud_msg_init(void);
 void lobby_res_slots_init(void);
 void demo_work_start(void);
 void demo_work_update(void);
-s32 game_data_file_create_start(void);
-s32 game_system_file_create_start(void);
-s32 game_system_file_create_wait(void);
-s32 game_save_wait(void);
-s32 chg_nand_err2msgcode(void);
 }
 
 /* The C++-linkage callees: their map names are manglings, and these signatures reproduce them. */
@@ -7720,28 +7764,6 @@ void subTransSet(u32 a, long b, u32* value);
 void village_tex_load(void);
 void* work_mem_alloc(u32 size);
 
-/* Fills the caller's colour word and shape outputs from the hair-colour table entry `index` names. */
-void get_change_hair_color(u8 index, u32* color, u16* out_id, s16* out_value_0x06, s16* out_value_0x08)
-{
-    const LbChangeColorRec* rec = &lbl_805B8674[lbl_805B87D8[index]];
-
-    *out_id = rec->id_0x00;
-    *color = ((u32)rec->r_0x03 << 24) | ((u32)rec->g_0x04 << 16) | ((u32)rec->b_0x05 << 8) | 0xFF;
-    *out_value_0x06 = rec->value_0x06;
-    *out_value_0x08 = rec->value_0x08;
-}
-
-/* Fills the caller's colour word and shape outputs from the inner-colour table entry `index` names. */
-void get_change_inner_color(u8 index, u32* color, u16* out_id, s16* out_value_0x06, s16* out_value_0x08)
-{
-    const LbChangeColorRec* rec = &lbl_805B8674[lbl_805B87F4[index]];
-
-    *out_id = rec->id_0x00;
-    *color = ((u32)rec->r_0x03 << 24) | ((u32)rec->g_0x04 << 16) | ((u32)rec->b_0x05 << 8) | 0xFF;
-    *out_value_0x06 = rec->value_0x06;
-    *out_value_0x08 = rec->value_0x08;
-}
-
 /* The range's own `fn_XXXXXXXX` definitions keep C linkage so objdiff pairs them by the map's
  * spelling (`extern "C"` - the mangled stem would pair nothing; playbook row 42). */
 extern "C" {
@@ -7757,7 +7779,7 @@ void lb_dye_inner_draw(LbChgColorWork* self)
     s16 value;
     s32 color;
     s32 selected;
-    s32 active;
+    bool active;
 
     get_lsp_data(0x1C61U, &origin);
     draw_sprite_ary((const u16*)lbl_805B89D0, &origin);
@@ -7826,7 +7848,6 @@ void lb_dye_pane_draw(LbPage* self)
     _mh_ivec2_ pos;
     _mh_ivec2_ base;
     _mh_ivec2_ origin;
-    _mh_ivec2_ at;
     u32 color;
     const s16* cells;
     ::_EQUIP* equip;
@@ -7837,9 +7858,9 @@ void lb_dye_pane_draw(LbPage* self)
     u8 i;
     u8 selected;
     u8 dye;
-    u32 lit;
-    s32 enabled;
-    s32 locked;
+    bool lit;
+    bool enabled;
+    bool locked;
     s16 help;
 
     if ((u32)(self->state_0x000 - 1) > 1) {
@@ -7872,8 +7893,7 @@ void lb_dye_pane_draw(LbPage* self)
                     } else {
                         dye = self->next_0x028->sub_0x262;
                     }
-                    at = base;
-                    Put_equip_dtl_syo_item1(equip, NULL, lit, locked, dye, at, lb_dye_part_lsp[i]);
+                    Put_equip_dtl_syo_item1(equip, NULL, lit, locked, dye, base, lb_dye_part_lsp[i]);
                 }
                 i++;
             } while (i < 6);
@@ -7935,8 +7955,8 @@ void lb_dye_pane_draw(LbPage* self)
                     spr.pos_y = self->cursor_y_0x012;
                     pos.x += origin.x;
                     pos.y += origin.y;
-                    GXPeekARGB((u16)((f32)(pos.x + spr.pos_x) * ((f32)Screen_w.width / Screen_w.width_f)),
-                               (u16)((f32)(pos.y + spr.pos_y) * ((f32)Screen_w.height / Screen_w.height_f)), &color);
+                    GXPeekARGB((u16)((f32)(pos.x + spr.pos_x) * ((f32)(s16)Screen_w.width / Screen_w.width_f)),
+                               (u16)((f32)(pos.y + spr.pos_y) * ((f32)(s16)Screen_w.height / Screen_w.height_f)), &color);
                     color <<= 8;
                     self->sel_id_0x014 = (((color >> 24) & 0xF8) << 8) | (((color >> 16) & 0xFC) << 3)
                                          | (((color >> 8) & 0xF8) >> 3);
@@ -8084,8 +8104,9 @@ void lb_box_menu_draw(void)
         case 1:
             if (lb_box_lists_draw((::LbListPane*)self, 0x14) == 0) {
                 lb_panel_msg_draw(0x1877, 0xB9);
+                index = fn_801ED53C((::LbListPane*)self);
                 str = -1;
-                switch (fn_801EDA9C(fn_801ED53C((::LbListPane*)self), self->item_id_0x024)) {
+                switch (fn_801EDA9C((::LbListPane*)self, index, self->item_id_0x024)) {
                 case 1:
                     str = 0xCD;
                     break;
@@ -8102,7 +8123,7 @@ void lb_box_menu_draw(void)
             if (lb_box_lists_draw((::LbListPane*)self, 6) == 0) {
                 lb_panel_msg_draw(0x1877, 0xB8);
             }
-            fn_801F5FB0(digits->pick_max_0x18, digits->pick_0x16, digits->flags_0x08, 0);
+            fn_801F5FB0(digits->pick_count_0x18, digits->pick_max_0x16, digits->flags_0x08, 0);
             break;
         case 3:
             if (lb_box_lists_draw((::LbListPane*)self, 0xA) == 0) {
@@ -8142,9 +8163,12 @@ void lb_box_menu_draw(void)
         case 1:
             if (lb_box_lists_draw((::LbListPane*)self, 0x44) == 0) {
                 lb_panel_msg_draw(0x1877, 0xB9);
+                index = fn_801ED53C((::LbListPane*)self);
                 str = -1;
-                if (fn_801EDB34((::LbListPane*)self, fn_801ED53C((::LbListPane*)self), self->item_id_0x024) == 1) {
+                switch (fn_801EDB34((::LbListPane*)self, index, self->item_id_0x024)) {
+                case 1:
                     str = 0xCD;
+                    break;
                 }
                 if (str != -1) {
                     lb_panel_str_print(0x1877, str, 2);
@@ -8250,6 +8274,28 @@ void lb_box_menu_draw(void)
 } /* extern "C" */
 } /* namespace s_801F3294 */
 
+/* Fills the caller's colour word and shape outputs from the hair-colour table entry `index` names. */
+void get_change_hair_color(u8 index, u32* color, u16* out_id, s16* out_value_0x06, s16* out_value_0x08)
+{
+    const LbChangeColorRec* rec = &lbl_805B8674[lbl_805B87D8[index]];
+
+    *out_id = rec->id_0x00;
+    *color = ((u32)rec->r_0x03 << 24) | ((u32)rec->g_0x04 << 16) | ((u32)rec->b_0x05 << 8) | 0xFF;
+    *out_value_0x06 = rec->value_0x06;
+    *out_value_0x08 = rec->value_0x08;
+}
+
+/* Fills the caller's colour word and shape outputs from the inner-colour table entry `index` names. */
+void get_change_inner_color(u8 index, u32* color, u16* out_id, s16* out_value_0x06, s16* out_value_0x08)
+{
+    const LbChangeColorRec* rec = &lbl_805B8674[lbl_805B87F4[index]];
+
+    *out_id = rec->id_0x00;
+    *color = ((u32)rec->r_0x03 << 24) | ((u32)rec->g_0x04 << 16) | ((u32)rec->b_0x05 << 8) | 0xFF;
+    *out_value_0x06 = rec->value_0x06;
+    *out_value_0x08 = rec->value_0x08;
+}
+
 extern "C" {
 
 /* 0x801FB2A8 - bring the editor screen up: the player/word init chain, the two lobby resource loads,
@@ -8341,6 +8387,118 @@ void fn_801FB478(void)
     }
 }
 
+/* 0x801FB524 - the editor's sequence driver: one state step per frame, returning whether the sequence
+ * has finished. */
+s32 lobby_enter_seq_step(LbChgSeqWork* self)
+{
+    u16 status = Psw[0].button_0x2C0.pressed_0x04;
+    s32 done = 0;
+    Q_ResultWork* q;
+    s32 v;
+
+    switch (self->state_0x0B) {
+    case 0:
+        fn_801FBAE4();
+        fn_801FC810();
+        lobby_w.field_0x006 = 1;
+        lobby_w.field_0x001 = 0x16;
+        lobby_w.field_0x002 = 0;
+        create_move_work(2);
+        if (system_w.field_0x7ce == 2) {
+            lobby_w.field_0x002 = 2;
+        }
+        lb_quest_return_apply();
+        fn_801FC874();
+        fn_801FC8C8();
+        fn_801E92B0();
+        q = get_qResult_work();
+        if (q != NULL && system_w.field_0x2d == 0 &&
+            (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
+            if (game_data_file_create_start() != 0) {
+                self->state_0x0B = 1;
+                system_w.field_0x865 = 1;
+                break;
+            }
+            if (game_system_file_create_start() != 0) {
+                self->state_0x0B = 2;
+                break;
+            }
+        }
+        system_w.field_0x865 = 0;
+        self->state_0x0B = 3;
+        break;
+    case 1:
+        switch (game_save_wait()) {
+        case 1:
+            if (game_system_file_create_start() != 0) {
+                self->state_0x0B = 2;
+                break;
+            }
+            system_w.field_0x865 = 0;
+            self->state_0x0B = 3;
+            break;
+        case -2:
+        case -1:
+            self->state_0x0B = 0x64;
+            break;
+        }
+        break;
+    case 2:
+        switch (game_system_file_create_wait()) {
+        case 1:
+            system_w.field_0x865 = 0;
+            self->state_0x0B = 3;
+            break;
+        case -2:
+        case -1:
+            self->state_0x0B = 0x64;
+            break;
+        }
+        break;
+    case 3:
+        fn_801FB2A8(0, lobby_w.field_0x001, lobby_w.field_0x002);
+        self->state_0x0B++;
+        setSoftresetFlag(0);
+        break;
+    case 4:
+        if (file_loading_ck(NULL, NULL) != 1U) {
+            fn_801FB364(0);
+            lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
+            self->state_0x0B++;
+        }
+        break;
+    case 5:
+        fn_801FB438();
+        fn_801FB478();
+        self->state_0x0B++;
+        break;
+    case 6:
+        stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
+        demo_work_update();
+        lb_npc_map_setup();
+        camera_area_default_set();
+        self->step_0x0A++;
+        self->state_0x0B = 0;
+        setSoftresetFlag(1);
+        return 0;
+    case 0x64:
+        if ((status & 0x10) != 0) {
+            system_w.field_0x865 = 0;
+            self->state_0x0B = 3;
+        } else {
+            s32 code = chg_nand_err2msgcode();
+
+            done = 1;
+            subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
+        }
+        break;
+    }
+    if (self->state_0x0B >= 3) {
+        player_control_move();
+    }
+    return done;
+}
+
 /* 0x801FB80C (0x2D8): the lobby scene's setup sequence: one state step per frame (the save, the area load and the
  * scene objects), returning 1 when a save error hands over to the error screen. */
 s32 lobby_scene_setup_step(LbChgSeqWork* self)
@@ -8382,39 +8540,39 @@ s32 lobby_scene_setup_step(LbChgSeqWork* self)
         self->state_0x0B = 3;
         break;
     case 1:
-        v = game_save_wait();
-        if ((u32)(v + 2) <= 1U) {
+        switch (game_save_wait()) {
+        case 1:
+            if (game_system_file_create_start() != 0) {
+                self->state_0x0B = 2;
+                break;
+            }
+            system_w.field_0x865 = 0;
+            self->state_0x0B = 3;
+            break;
+        case -2:
+        case -1:
             self->state_0x0B = 0x64;
             break;
         }
-        if (v != 1) {
-            break;
-        }
-        if (game_system_file_create_start() != 0) {
-            self->state_0x0B = 2;
-            break;
-        }
-        system_w.field_0x865 = 0;
-        self->state_0x0B = 3;
         break;
     case 2:
-        v = game_system_file_create_wait();
-        if ((u32)(v + 2) <= 1U) {
+        switch (game_system_file_create_wait()) {
+        case 1:
+            system_w.field_0x865 = 0;
+            self->state_0x0B = 3;
+            break;
+        case -2:
+        case -1:
             self->state_0x0B = 0x64;
             break;
         }
-        if (v != 1) {
-            break;
-        }
-        system_w.field_0x865 = 0;
-        self->state_0x0B = 3;
         break;
     case 3:
         fn_801FB2A8(1, lobby_w.field_0x001, lobby_w.field_0x002);
         self->state_0x0B++;
         break;
     case 4:
-        if (file_loading_ck(NULL, NULL) != 1) {
+        if (file_loading_ck(NULL, NULL) != 1U) {
             fn_801FB364(1);
             lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
             self->state_0x0B++;
@@ -8636,117 +8794,6 @@ void lb_progress_rewards_check(void)
         }
         break;
     }
-}
-
-/* 0x801FB524 - the editor's sequence driver: one state step per frame, returning whether the sequence
- * has finished. */
-s32 lobby_enter_seq_step(LbChgSeqWork* self)
-{
-    u16 status = Psw[0].button_0x2C0.pressed_0x04;
-    s32 done = 0;
-    Q_ResultWork* q;
-    s32 v;
-
-    switch (self->state_0x0B) {
-    case 0:
-        fn_801FBAE4();
-        fn_801FC810();
-        lobby_w.field_0x006 = 1;
-        lobby_w.field_0x001 = 0x16;
-        lobby_w.field_0x002 = 0;
-        create_move_work(2);
-        if (system_w.field_0x7ce == 2) {
-            lobby_w.field_0x002 = 2;
-        }
-        lb_quest_return_apply();
-        fn_801FC874();
-        fn_801FC8C8();
-        fn_801E92B0();
-        q = get_qResult_work();
-        if (q != NULL && system_w.field_0x2d == 0 &&
-            (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
-            if (game_data_file_create_start() != 0) {
-                self->state_0x0B = 1;
-                system_w.field_0x865 = 1;
-                break;
-            }
-            if (game_system_file_create_start() != 0) {
-                self->state_0x0B = 2;
-                break;
-            }
-        }
-        system_w.field_0x865 = 0;
-        self->state_0x0B = 3;
-        break;
-    case 1:
-        v = game_save_wait();
-        if ((u8)(v + 2) <= 1U) {
-            self->state_0x0B = 0x64;
-            break;
-        }
-        if (v != 1) {
-            break;
-        }
-        if (game_system_file_create_start() != 0) {
-            self->state_0x0B = 2;
-            break;
-        }
-        system_w.field_0x865 = 0;
-        self->state_0x0B = 3;
-        break;
-    case 2:
-        v = game_system_file_create_wait();
-        if ((u8)(v + 2) <= 1U) {
-            self->state_0x0B = 0x64;
-            break;
-        }
-        if (v != 1) {
-            break;
-        }
-        if (game_system_file_create_start() != 0) {
-            self->state_0x0B = 2;
-            break;
-        }
-        system_w.field_0x865 = 0;
-        self->state_0x0B = 3;
-        break;
-    case 3:
-        fn_801FB2A8(0, lobby_w.field_0x001, lobby_w.field_0x002);
-        self->state_0x0B++;
-        setSoftresetFlag(0);
-        break;
-    case 4:
-        if (file_loading_ck(NULL, NULL) != 1) {
-            fn_801FB364(0);
-            lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
-            self->state_0x0B++;
-        }
-        break;
-    case 6:
-        stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
-        demo_work_update();
-        lb_npc_map_setup();
-        camera_area_default_set();
-        self->step_0x0A++;
-        self->state_0x0B = 0;
-        setSoftresetFlag(1);
-        return 0;
-    case 0x64:
-        if ((status & 0x10) != 0) {
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-        } else {
-            s32 code = chg_nand_err2msgcode();
-
-            done = 1;
-            subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
-        }
-        break;
-    }
-    if (self->state_0x0B >= 3) {
-        player_control_move();
-    }
-    return done;
 }
 
 } /* extern "C" */

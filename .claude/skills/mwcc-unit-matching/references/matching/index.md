@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (184)
+## Ideas that work (186)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -193,6 +193,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 202 | [A copy member that returns *this keeps r3 and r4 live, so its loop takes fresh registers](202-copy-member-that-returns.md) | works | source-shape, allocator | A small copy member matches except its trailing copy loop, where retail moves the pointers into r5/r6 and ours reuses r3/r4. |
 | 203 | [A case that jumps to another case's head: re-dispatch with state = N; continue in a for (;;)](203-case-that-jumps-to.md) | works | source-shape | One switch case ends in a `b` to another case's first instruction (retail shares that case's whole body), and the goto-free copy of the body makes the function longer by the body's size |
 | 204 | [Out-params each switch case passes by address get their own stack pair: scope them per case](204-out-params-each-switch.md) | works | allocator, source-shape | Retail's frame is larger and every call site that takes `&a, &b` uses its own stack pair (0x24/0x20, 0x1c/0x18, ...), ours reuses one pair (0xc/0x8) for all of them |
+| 205 | [The first implicit struct assignment calls __as__ out of line: instantiate it earlier in a never-called inline](205-implicit-assign-first-use.md) | works | source-shape | The first function that assigns a small struct (`dst->opts = src->opts`) calls an emitted `__as__<len><Type>FRC<len><Type>` where retail copies it inline with `lwz`/`stw`, while a later function's identical copy is... |
+| 206 | [A run of OR-ed constant bits kept as separate ori: one compound assignment per bit](206-or-bits-one-statement.md) | works | source-shape | Retail ORs a word with several constants as one `ori`/`oris` each between one `lwz` and one `stw`, where `*p = *p \| A \| B \| C` folds them into a single `ori` of the combined mask |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 
