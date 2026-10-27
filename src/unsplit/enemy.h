@@ -226,19 +226,19 @@ void em_tint_hold_end(struct _ENEMY_WORK* self);
  * declarations belong in this band header until the run's own unit claims them.  Every one of them
  * takes the `_ENEMY_WORK` record and returns nothing - they are called as `fn(self); break;` from a
  * `void` dispatcher and the target tail-calls the last ones. */
-void fn_80198F28(struct _ENEMY_WORK* self);
-void fn_80198FE8(struct _ENEMY_WORK* self);
-void fn_801990E0(struct _ENEMY_WORK* self);
-void fn_801991E4(struct _ENEMY_WORK* self);
-void fn_80192F24(struct _ENEMY_WORK* self);
-void fn_80193394(struct _ENEMY_WORK* self);
-void fn_801938D8(struct _ENEMY_WORK* self);
-void fn_801953BC(struct _ENEMY_WORK* self);
-void fn_80196618(struct _ENEMY_WORK* self);
-void fn_801987E4(struct _ENEMY_WORK* self);
-void fn_80198910(struct _ENEMY_WORK* self);
-void fn_80198E00(struct _ENEMY_WORK* self);
-void fn_80198F14(struct _ENEMY_WORK* self);
+void em018_turn_seq_e_step(struct _ENEMY_WORK* self);
+void em018_mot37_turn(struct _ENEMY_WORK* self);
+void em018_hunt_bite(struct _ENEMY_WORK* self);
+void em018_closing_turn(struct _ENEMY_WORK* self);
+void em018_act0_dispatch(struct _ENEMY_WORK* self);
+void em018_act1_dispatch(struct _ENEMY_WORK* self);
+void em018_act2_dispatch(struct _ENEMY_WORK* self);
+void em018_act5_dispatch(struct _ENEMY_WORK* self);
+void em018_act6_dispatch(struct _ENEMY_WORK* self);
+void em018_act7_dispatch(struct _ENEMY_WORK* self);
+void em018_se_program(struct _ENEMY_WORK* self);
+void em018_se_alt_program(struct _ENEMY_WORK* self);
+void em018_act8_dispatch(struct _ENEMY_WORK* self);
 /* 0x801B701C - unowned (it is the last 4-byte word of the still-unregistered 0x801926EC..0x801B7020
  * hole; both bracketing registered units are `enemy`).  Its body is a bare `blr`, so it returns its
  * own r3 argument, and every caller compares that return with 0 - `src/ef/eft001.cpp` declares it

@@ -14,9 +14,9 @@ extern "C" {
 
 /* 0x80192370 - r3 (`self`) and r4, a selector; the return is compared against 0 by its caller, so
  * it reports a status word rather than a pointer. */
-u32 fn_80192370(struct _ENEMY_WORK* self, u32 a);
+u32 em018_aim_bits_ck(struct _ENEMY_WORK* self, u32 a);
 /* 0x80192618 - r3 (`self`) only, no return; the tail every action of this band runs. */
-void fn_80192618(struct _ENEMY_WORK* self);
+void em018_aim_arm(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

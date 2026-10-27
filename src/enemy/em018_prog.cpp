@@ -6,47 +6,60 @@
  * RANGE. .text 0x80192348-0x8019E670 (128 functions); extab 0x8000EDC4-0x8000F124, extabindex
  *   0x8002A390-0x8002A8A0, .ctors 0x8056F340-0x8056F344 (`em018_static_init`), .rodata 0x80570050-0x80570150, .data
  *   0x805AD370-0x805AE750 (`em018_prog_tbl` first), .bss 0x806A7A70-0x806A7A88, .sdata 0x80791A78-0x80791A80,
- *   .sdata2 0x80798238-0x80798518.  Left edge: the function after `fn_80192204`, `enemy/em016_prog.cpp`'s static
- *   initializer; right edge: `em018_static_init` (the two vectors at `lbl_806A7A70`) is this TU's static initializer,
- *   and `fn_8019E670` is the first reader of the next 0.0 pool entry `lbl_80798538`.
+ *   .sdata2 0x80798238-0x80798518.  Left edge: the function after `em016_static_init`, `enemy/em016_prog.cpp`'s
+ *   static initializer; right edge: `em018_static_init` (the two vectors of `em018_seg_points`) is this TU's static
+ *   initializer, and `em025_byte_stack_range_ck` is the first reader of the next 0.0 pool entry.
  * FLAGS. `cflags_main`; `#pragma peephole off` for the whole file (retail keeps the unfused `rlwinm`+`cmpwi`,
- *   `extsh`+`cmpwi` and `subi`+`stw`+`cmpwi` forms throughout).
+ *   `extsh`+`cmpwi` and `subi`+`stw`+`cmpwi` forms throughout); `#pragma fp_contract off` for the whole file (the
+ *   target object has no fused multiply-add: `em018_leap` keeps `fmuls`+`fadds`).
  * NAMES. The file name follows the runtime dump's `em018_prog_tbl`, which opens the TU's `.data`.
  *   GUESS (the program-table slot each fills, `Em024ProgTbl`'s scheme): em018_init, em018_frame_update,
  *   em018_event_notify, em018_motion_events, em018_tev_color_update, em018_action_select, em018_static_init.
  *   GUESS (from the bodies and callers): em018_effect_spawn, em018_drip_effect, em018_glow_fade,
- *   `Em018UserData`; data em018_se_seq_<sub-state>, em018_se_alt_seq_<sub-state>,
- *   em018_demo_keys, em018_pick_a, em018_pick_b; the `EmFadeRec` field names.
+ *   `Em018UserData`, `Em018HitSphere`; data em018_se_seq_<sub-state>, em018_se_alt_seq_<sub-state>,
+ *   em018_demo_keys, em018_pick_a, em018_pick_b, em018_turn_desc_a..d, em018_seg_points; the `EmFadeRec` field names.
+ *   GUESS (from each body, the motion number or behaviour it arms): every other em018_ function row - the aim-bit
+ *   helpers em018_aim_*, the dispatchers em018_act<N>_dispatch / em018_action_dispatch / em018_sub_state_dispatch,
+ *   the motion steps em018_mot<motion>_<shape>, and the named steps (em018_leap, em018_dive, em018_grab,
+ *   em018_spin, em018_breach, em018_entrance, ...).
  *   The callee names this unit asked for (`enemy-em018#N`) are GUESS except where the owner's comment names the
- *   behaviour.  The `.bss` record names (`vec_pair_801926EC_0`) are GUESSes.
+ *   behaviour.
  * RESIDUALS. Partial rows:
- *  - `em018_motion_events`: retail shares the motion 0x55/0x56 water tail (case 0x56 branches into case 0x55's
- *    tail); the source repeats it (160 B long), the only shape without a `goto`;
- *  - `em018_drip_effect`: retail recomputes `angle + 0x8000` at each test, ours keeps it in a register;
- *  - `em018_effect_spawn`, `fn_801991E4`, `fn_80194AE4`, `fn_80198150`, `fn_80195214`: register colouring and
- *    one-instruction schedule differences;
- *  - `fn_8019E398`, `fn_8019E49C`: register allocation on the `||` blocks and the f30 save of the radius test;
- *  - `fn_801934EC`: retail hoists `mr r3,self` before the height ternary;
- *  - `fn_80192448`: one callee-saved register coloured differently (the `work`/`i` pair);
- *  - `em018_glow_fade`: retail compares the fade state 0, 1, 2 with the bodies laid out 1, 2, 0.
- *   The `MHchar::getAmbColor`/`setNumTevStages` calls (0x800E2C38/0x800E2DFC) read as relocation-name
- *   differences while those map rows keep their generated names.
+ *  - `em018_motion_events`: retail shares the motion 0x55/0x56 water tail (case 0x55 branches into case 0x56's
+ *    copy); the source repeats it (160 B long).  Measured: 98.70 with the copy; 99.32 (every instruction paired)
+ *    with `case 0x56:` placed inside an `if (0) { ... }` after case 0x55's head, a case label used as a control-flow
+ *    device that rule 8 forbids, so it is not used;
+ *  - `em018_mot9_height_step`, `em018_action_select`: retail keeps a `clrlwi` on a two-constant choice passed to a
+ *    `u16`/`u8` parameter (`li r4,2; bne; li r4,9; clrlwi r4,r4,16`); MWCC drops it for every spelling tried
+ *    (cast, local of each width, ternary, if);
+ *  - `em018_side_swipe`: retail computes `(state == 1) + 0x52` in r4 (`addi r4,r4,0x52`), ours in r0 (casts,
+ *    operand order and a local measured equal or worse);
+ *  - `em018_glow_fade`: retail compares the fade state 0, 1, 2 with the bodies laid out 1, 2, 0 (selector casts
+ *    to s32/u32/s8 measured equal or worse).
  *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` and `.sdata2` not emitted in retail
- *   order (the SE tables, demo keys and pick records are `extern`).
+ *   order (the SE tables, demo keys, turn descriptors and pick records are `extern`).
  * SHAPES. `Em018UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
- *   `u8 >= 2` in `fn_8019238C` compiles to the borrow sequence (`li r3,2; orc; addi; srwi; subf; srwi`):
- *   the source keeps the comparison.  `fn_80192448` declares its locals `max`, `i`, `work`, which gives retail's
- *   r31/r30/r29.  A one-case parameter test that retail compares signed (`cmpwi`) is a `switch` with `default:`
- *   first (`fn_80196E10`); a `cmplwi` range test with the in-range body last is `if ((u32)(x - 1) > 1) {...} else`
- *   (`fn_80195720`); the four-part frame-cost scan is a `for` loop MWCC unrolls (`fn_801963A8`).  Float literals
- *   are written in place (the pool is not emitted yet).  `em_water_check` is called through a `u32` view: the
- *   owner header declares an `f32` return, which compiles the `== 1` test as a float compare.
+ *   `u8 >= 2` in `em018_aim_part_level_ck` compiles to the borrow sequence (`li r3,2; orc; addi; srwi; subf; srwi`):
+ *   the source keeps the comparison.  Retail compares several callees' results unsigned (`cmplwi`) where their
+ *   owner headers return `s32` (`em_act_ck`, `em_pl_target_ck`, `pl_act_grabbed_ck`, `em_work_die_ck`,
+ *   `em_surface_reach_ck`, the roll-cooldown view): those sites cast to `u32`; a `u8` compared signed (`cmpwi`) is
+ *   cast to `s32`.  A one-case parameter test that retail compares signed is a `switch` with `default:` first
+ *   (`em018_charge`); a `cmplwi` range test with the in-range body last is `if ((u32)(x - 1) > 1) {...} else`
+ *   (`em018_flag_approach`); `(u8)(motion + 0xFE)` gives retail's `addi r0,r5,0xfe` (`em018_swim_in`).  The
+ *   four-part frame-cost scan is a `for` loop with a `u8` counter that MWCC unrolls (`em018_jaw_scan`).
+ *   `em018_drip_effect`: the first pitch test spells `0x8000U` and the later ones `0x8000`, so MWCC recomputes the
+ *   sum at each test as retail does; the motion cases `break` and the body is the switch's `default:`.
+ *   `em018_effect_spawn`: the 3/4 and 5 cases are a `switch`, and `scale *= get_em_chg_scale(self)` precedes the call.
+ *   `em018_spin`'s capsule-hit record is a 0x10-byte `Em018HitSphere` (the frame reserves 0x10 bytes for it).
+ *   Loop locals are declared in the order that gives retail's callee-saved registers (`em018_event_notify`,
+ *   `em018_bound_hold`, `em018_spin`).  `em_eft_fx_spawn`/`em_eft_fx_spawn_pair` are called through float-first
+ *   views and shell slot +0x2C without its trailing table argument (`em015_prog.cpp`/`em016_prog.cpp` do the
+ *   same), which schedules the argument loads where retail has them.  Float literals are written in place (the
+ *   pool is not emitted yet).  `em_water_check` is called through a `u32` view: the owner header declares an `f32`
+ *   return, which compiles the `== 1` test as a float compare.
  */
-
-#include "enemy/lbl_80797E88.h" /* lbl_80797E88 (rule 2: the owner's header) */
-#include "enemy/lbl_8079800C.h" /* lbl_8079800C (rule 2: the owner's header) */
 #include "ef/mtx34_trans_add.h" /* mtx34_trans_add (rule 2: the owner's header) */
 #include "ef/mtx34_trans_get.h" /* mtx34_trans_get (rule 2: the owner's header) */
 #include "types.h"
@@ -62,7 +75,6 @@
 #include "enemy/fn_80138074.h"  /* em_res_user_data_set, em_res_user_data_ck, ResUserDataAc */
 #include "MSL/new.h" /* the placement `operator new` */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
-#include "enemy/fn_80191598.h" /* fn_80192370, fn_80192618 */
 #include "fn_8004CAD8.h"       /* calcDistanceSqXZ */
 #include "unsplit/enemy.h"     /* the plain enemy-band callees (rule 2 band header) */
 #include "ef/eft009.h"          /* eft009_set_pos / eft009_spawn_at_joint / eft009_spawn_at_pos */
@@ -101,6 +113,7 @@
 #include "g3d/anm_chr_result_scale_get.h" /* anm_chr_result_scale_get / _trans_get / _scale_set / _trans_set */
 #include "camera/camera_mode12_set.h" /* camera_mode12_set */
 #pragma peephole off
+#pragma fp_contract off
 
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define mtx34_trans_add_c1 ((void (*)(MTX34*, VEC3*))mtx34_trans_add)
@@ -118,18 +131,23 @@
 #define anm_chr_result_scale_set_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_scale_set)
 #define anm_chr_result_trans_set_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_trans_set)
 #define camera_mode12_set_c1 ((void (*)(struct _ENEMY_WORK*))camera_mode12_set)
+/* Slot +0x2C of `shell_set_func_ptr` as this unit calls it: without the trailing table argument the header spells. */
+typedef void (*Em018ShellJobFn)(struct _ENEMY_WORK* self, u32 kind, u32 count, VEC3* pos, f32 scale, u16 id);
+/* The spin's capsule-hit record: `eft_vec_ctor` zeroes its point and `hit_list_capsule_ck` writes the hit point
+ * into it; the frame reserves 0x10 bytes for it (the layout `ef/effect.cpp`'s `EftSphere` gives). size: 0x10 */
+struct Em018HitSphere {
+    /* +0x00 */ VEC3 center;
+    /* +0x0C */ f32 radius;
+};
+/* the effect spawners with the float-first order the call sites evaluate (the owner header lists it last) */
+#define em_eft_fx_spawn_ff ((void (*)(struct _ENEMY_WORK*, u32, u32, f32, u32))em_eft_fx_spawn)
+#define em_eft_fx_spawn_pair_ff ((void (*)(struct _ENEMY_WORK*, u32, u32, u32, f32, u32))em_eft_fx_spawn_pair)
 
 /* ------------------------------------------------------------------------------------------------ */
 /* the unit's pool, declared, not defined                                                            */
 /* ------------------------------------------------------------------------------------------------ */
 
-extern const f32 lbl_80798238;
 
-extern const f32 lbl_80798244;
-extern const f32 lbl_80798248;
-extern const f32 lbl_8079824C;
-extern const f32 lbl_80798250;
-extern const f32 lbl_80798254;
 
 /* ------------------------------------------------------------------------------------------------ */
 /* callees                                                                                           */
@@ -146,47 +164,21 @@ void senko_set(VEC3* pos, f32 value, u8 a, s16 b);
 
 extern "C" {
 
-void fn_80192348(EmActWork* self, u8 mask);
-void fn_80192358(EmActWork* self, u8 mask);
-u32 fn_8019238C(EmActWork* self);
-u32 fn_801923CC(EmActWork* self);
+void em018_aim_bits_set(EmActWork* self, u8 mask);
+void em018_aim_bits_clear(EmActWork* self, u8 mask);
+u32 em018_aim_part_level_ck(EmActWork* self);
+u32 em018_aim_glint_ck(EmActWork* self);
 u32 em018_aim_flag2_ck(EmActWork* self);
 u32 fn_80192410(EmActWork* self);
 f32 em018_glow_get(EmActWork* self);
-s32 fn_80192448(EmActWork* self);
-void fn_8019255C(EmActWork* self);
-void fn_80192630(EmActWork* self);
+s32 em018_team_aim_free_ck(EmActWork* self);
+void em018_aim_effect_fire(EmActWork* self);
+void em018_aim_init(EmActWork* self);
 }
 
 /* The unit's `.sdata2` and `.data` labels, declared, not defined: the source does not emit them yet. */
-extern f32 lbl_80798264;
-extern f32 lbl_80798268;
-extern f32 lbl_8079826C;
-extern f32 lbl_80798270;
-extern f32 lbl_80798260;
-extern f32 lbl_8079827C;
-extern f32 lbl_80798288;
-extern f32 lbl_80798290;
-extern f32 lbl_80798298;
 
-extern f32 lbl_80798308;
-extern f32 lbl_8079830C;
-extern f32 lbl_80798310;
-extern f32 lbl_80798314;
-extern f32 lbl_80798328;
-extern f32 lbl_8079832C;
-extern f32 lbl_80798338;
-extern f32 lbl_80798370;
-extern f32 lbl_80798398;
-extern f32 lbl_8079839C;
-extern f32 lbl_807983A0;
-extern f32 lbl_807982E0;
-extern f32 lbl_807983B0;
-extern f32 lbl_807983F0;
-extern f32 lbl_807983F4;
-extern f32 lbl_807983F8;
-extern f32 lbl_80798510;
-/* The per-sub-state sound programs `fn_80198910`/`fn_80198E00` play (`.data`, entry-list tables of
+/* The per-sub-state sound programs `em018_se_program`/`em018_se_alt_program` play (`.data`, entry-list tables of
  * `EmSeEntry`; the names carry the first sub-state that plays each and are a GUESS). */
 extern EmSeEntry em018_se_seq_17[]; /* 0x805AD5E0 */
 extern EmSeEntry em018_se_seq_18[]; /* 0x805AD608 */
@@ -228,114 +220,114 @@ extern EmSeEntry em018_se_alt_seq_1C[]; /* 0x805AE040 */
 extern EmSeEntry em018_se_alt_seq_0A[]; /* 0x805AE080 */
 extern EmSeEntry em018_se_alt_seq_0B[]; /* 0x805AE0D0 */
 extern EmSeEntry em018_se_alt_seq_34[]; /* 0x805AE100 */
-/* The key path the scripted entrance `fn_801994F4` replays through `em_demo_key3_apply` (`.data`, 0x1E0 bytes;
+/* The key path the scripted entrance `em018_entrance` replays through `em_demo_key3_apply` (`.data`, 0x1E0 bytes;
  * the name is a GUESS). */
 extern u8 em018_demo_keys[];
 /* The two 0xC-byte pick records `em018_action_select` hands `em_pack_area_pick` for action 0x17 (`.data`; names GUESS). */
 extern u8 em018_pick_a[];
 extern u8 em018_pick_b[];
 /* The `em_turn_seq_start`/`em_turn_seq_step` descriptor blocks this band arms (`.data` tables). */
-extern u8 lbl_80570050[];
-extern u8 lbl_80570090[];
-extern u8 lbl_805700D0[];
-extern u8 lbl_80570110[];
+extern u8 em018_turn_desc_a[];
+extern u8 em018_turn_desc_b[];
+extern u8 em018_turn_desc_c[];
+extern u8 em018_turn_desc_d[];
 
 extern "C" {
 
 /* This unit's own functions, declared so the dispatchers can tail-call them. */
-void fn_801993E0(struct _ENEMY_WORK* self);
-void fn_80199468(struct _ENEMY_WORK* self);
-void fn_801994F4(struct _ENEMY_WORK* self);
-void fn_80199A2C(struct _ENEMY_WORK* self);
-void fn_80199ADC(struct _ENEMY_WORK* self);
-void fn_8019E398(struct _ENEMY_WORK* self);
+void em018_state13_step(struct _ENEMY_WORK* self);
+void em018_mot46_swim(struct _ENEMY_WORK* self);
+void em018_entrance(struct _ENEMY_WORK* self);
+void em018_demo_pin(struct _ENEMY_WORK* self);
+void em018_sub_state_dispatch(struct _ENEMY_WORK* self);
+void em018_done_flags_update(struct _ENEMY_WORK* self);
 
-void fn_801928B8(void);
+void em018_nop(void);
 
-void fn_80192C10(struct _ENEMY_WORK* self);
-void fn_80192C8C(struct _ENEMY_WORK* self);
-void fn_80192D08(struct _ENEMY_WORK* self);
-void fn_80192D84(struct _ENEMY_WORK* self);
-void fn_80192E04(struct _ENEMY_WORK* self);
-void fn_80192E84(struct _ENEMY_WORK* self);
-void fn_80192F24(struct _ENEMY_WORK* self);
-void fn_80192F78(struct _ENEMY_WORK* self);
-void fn_80192FFC(struct _ENEMY_WORK* self);
-void fn_80193078(struct _ENEMY_WORK* self);
-void fn_801930F4(struct _ENEMY_WORK* self);
-void fn_801931A4(struct _ENEMY_WORK* self);
-void fn_80193220(struct _ENEMY_WORK* self);
-void fn_8019329C(struct _ENEMY_WORK* self);
-void fn_80193318(struct _ENEMY_WORK* self);
-void fn_80193394(struct _ENEMY_WORK* self);
-void fn_801933DC(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_801934EC(struct _ENEMY_WORK* self, u32 a);
-void fn_801935A0(struct _ENEMY_WORK* self);
-void fn_8019362C(struct _ENEMY_WORK* self);
-void fn_801936A8(struct _ENEMY_WORK* self);
-void fn_801938D8(struct _ENEMY_WORK* self);
-void fn_80193964(struct _ENEMY_WORK* self, u8 a);
-void fn_80193A34(struct _ENEMY_WORK* self);
-void fn_80193AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80193CC8(struct _ENEMY_WORK* self);
-void fn_80193DE8(struct _ENEMY_WORK* self, u32 a);
-void fn_80193EF0(struct _ENEMY_WORK* self);
-void fn_80193F70(struct _ENEMY_WORK* self);
-void fn_80193FF8(struct _ENEMY_WORK* self);
-void fn_80194078(struct _ENEMY_WORK* self, u32 a);
-void fn_80194318(struct _ENEMY_WORK* self);
-void fn_801943A0(struct _ENEMY_WORK* self, u32 a);
-void fn_80194584(struct _ENEMY_WORK* self);
-void fn_801946E8(struct _ENEMY_WORK* self, u32 a);
-void fn_8019485C(struct _ENEMY_WORK* self, u8 a);
-void fn_80194938(struct _ENEMY_WORK* self);
-void fn_801949B4(struct _ENEMY_WORK* self);
-void fn_80194A64(struct _ENEMY_WORK* self);
-void fn_80194AE4(struct _ENEMY_WORK* self);
-void fn_80194CC8(struct _ENEMY_WORK* self);
-void fn_80194D6C(struct _ENEMY_WORK* self);
-void fn_80194FA0(struct _ENEMY_WORK* self);
-void fn_80195098(struct _ENEMY_WORK* self);
-void fn_8019515C(struct _ENEMY_WORK* self);
-void fn_80195214(struct _ENEMY_WORK* self);
-void fn_8019533C(struct _ENEMY_WORK* self);
-void fn_801953BC(struct _ENEMY_WORK* self);
-void fn_80195504(struct _ENEMY_WORK* self, u32 a);
-void fn_80195638(struct _ENEMY_WORK* self, u32 a);
-void fn_80195720(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80195860(struct _ENEMY_WORK* self);
-void fn_80195BCC(struct _ENEMY_WORK* self, u8 a);
-void fn_80195CA4(struct _ENEMY_WORK* self);
-void fn_80195D80(struct _ENEMY_WORK* self);
-void fn_80195ED4(struct _ENEMY_WORK* self);
-void fn_80196004(struct _ENEMY_WORK* self);
-void fn_8019610C(struct _ENEMY_WORK* self, u8 a);
-void fn_801961C8(struct _ENEMY_WORK* self, u8 a);
-void fn_80196278(struct _ENEMY_WORK* self);
-void fn_801963A8(struct _ENEMY_WORK* self);
-void fn_80196618(struct _ENEMY_WORK* self);
-void fn_801966DC(struct _ENEMY_WORK* self);
-void fn_80196768(struct _ENEMY_WORK* self);
-void fn_8019687C(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80196A50(struct _ENEMY_WORK* self, u8 a);
-void fn_80196B1C(struct _ENEMY_WORK* self);
-void fn_80196BF4(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80196E10(struct _ENEMY_WORK* self, u32 a);
-void fn_80197294(struct _ENEMY_WORK* self);
-void fn_80197404(struct _ENEMY_WORK* self);
-void fn_80197570(struct _ENEMY_WORK* self, u32 a);
-void fn_801976B8(struct _ENEMY_WORK* self);
-void fn_80197BC0(struct _ENEMY_WORK* self);
-void fn_80197C84(struct _ENEMY_WORK* self);
-void fn_80197D50(struct _ENEMY_WORK* self);
-void fn_80197F04(struct _ENEMY_WORK* self);
-void fn_80198150(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_801986AC(struct _ENEMY_WORK* self);
-void fn_801987E4(struct _ENEMY_WORK* self);
-void fn_80198F10(struct _ENEMY_WORK* self);
-void fn_80198F14(struct _ENEMY_WORK* self);
+void em018_mot1_loop(struct _ENEMY_WORK* self);
+void em018_mot20_loop(struct _ENEMY_WORK* self);
+void em018_mot29_loop(struct _ENEMY_WORK* self);
+void em018_mot40_swim(struct _ENEMY_WORK* self);
+void em018_mot54_swim(struct _ENEMY_WORK* self);
+void em018_flag_arm_stand(struct _ENEMY_WORK* self);
+void em018_act0_dispatch(struct _ENEMY_WORK* self);
+void em018_mot6_state_set(struct _ENEMY_WORK* self);
+void em018_mot7_step(struct _ENEMY_WORK* self);
+void em018_mot1a_step(struct _ENEMY_WORK* self);
+void em018_mot1e_effect(struct _ENEMY_WORK* self);
+void em018_mot72_step(struct _ENEMY_WORK* self);
+void em018_mot8_step(struct _ENEMY_WORK* self);
+void em018_mot20_step(struct _ENEMY_WORK* self);
+void em018_mot1d_step(struct _ENEMY_WORK* self);
+void em018_act1_dispatch(struct _ENEMY_WORK* self);
+void em018_mot9_height_step(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em018_mot21_height_step(struct _ENEMY_WORK* self, u32 a);
+void em018_turn_seq_a_step(struct _ENEMY_WORK* self);
+void em018_mot1b_step(struct _ENEMY_WORK* self);
+void em018_wake_back_step(struct _ENEMY_WORK* self);
+void em018_act2_dispatch(struct _ENEMY_WORK* self);
+void em018_turn_seq_release_step(struct _ENEMY_WORK* self, u8 a);
+void em018_turn_seq_c_step(struct _ENEMY_WORK* self);
+void em018_swim_in(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em018_climb_turn(struct _ENEMY_WORK* self);
+void em018_wake_mot_step(struct _ENEMY_WORK* self, u32 a);
+void em018_mot32_swim(struct _ENEMY_WORK* self);
+void em018_mot31_state_set(struct _ENEMY_WORK* self);
+void em018_mot3a_swim(struct _ENEMY_WORK* self);
+void em018_leap(struct _ENEMY_WORK* self, u32 a);
+void em018_mot3d_step(struct _ENEMY_WORK* self);
+void em018_dive(struct _ENEMY_WORK* self, u32 a);
+void em018_surface_splash(struct _ENEMY_WORK* self);
+void em018_slide(struct _ENEMY_WORK* self, u32 a);
+void em018_mot_ca_step(struct _ENEMY_WORK* self, u8 a);
+void em018_mot68_swim(struct _ENEMY_WORK* self);
+void em018_mot1f_effect(struct _ENEMY_WORK* self);
+void em018_mot2e_swim(struct _ENEMY_WORK* self);
+void em018_grab(struct _ENEMY_WORK* self);
+void em018_release(struct _ENEMY_WORK* self);
+void em018_knockback_arc(struct _ENEMY_WORK* self);
+void em018_stranded(struct _ENEMY_WORK* self);
+void em018_mot7f_step(struct _ENEMY_WORK* self);
+void em018_turn_seq_d_step(struct _ENEMY_WORK* self);
+void em018_grab_wait(struct _ENEMY_WORK* self);
+void em018_mot36_swim(struct _ENEMY_WORK* self);
+void em018_act5_dispatch(struct _ENEMY_WORK* self);
+void em018_dim_rise(struct _ENEMY_WORK* self, u32 a);
+void em018_mot_d0_hold(struct _ENEMY_WORK* self, u32 a);
+void em018_flag_approach(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em018_bound_hold(struct _ENEMY_WORK* self);
+void em018_flag_release(struct _ENEMY_WORK* self, u8 a);
+void em018_flag_rise(struct _ENEMY_WORK* self);
+void em018_flag_hold(struct _ENEMY_WORK* self);
+void em018_mot_da_effect(struct _ENEMY_WORK* self);
+void em018_mot_db_effect(struct _ENEMY_WORK* self);
+void em018_flag_turn(struct _ENEMY_WORK* self, u8 a);
+void em018_flag_stand(struct _ENEMY_WORK* self, u8 a);
+void em018_dim_sink(struct _ENEMY_WORK* self);
+void em018_jaw_scan(struct _ENEMY_WORK* self);
+void em018_act6_dispatch(struct _ENEMY_WORK* self);
+void em018_mot54_hit(struct _ENEMY_WORK* self);
+void em018_mot59_step(struct _ENEMY_WORK* self);
+void em018_tail_sweep(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em018_mot57_step(struct _ENEMY_WORK* self, u8 a);
+void em018_mot4e_hold(struct _ENEMY_WORK* self);
+void em018_bite(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em018_charge(struct _ENEMY_WORK* self, u32 a);
+void em018_jaw_effect(struct _ENEMY_WORK* self);
+void em018_side_swipe(struct _ENEMY_WORK* self);
+void em018_backstep(struct _ENEMY_WORK* self, u32 a);
+void em018_breach(struct _ENEMY_WORK* self);
+void em018_turn_about(struct _ENEMY_WORK* self);
+void em018_mot_a_step(struct _ENEMY_WORK* self);
+void em018_jaw_dim(struct _ENEMY_WORK* self);
+void em018_lunge(struct _ENEMY_WORK* self);
+void em018_spin(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em018_mot_d6_step(struct _ENEMY_WORK* self);
+void em018_act7_dispatch(struct _ENEMY_WORK* self);
+void em018_act6_s3_forward(struct _ENEMY_WORK* self);
+void em018_act8_dispatch(struct _ENEMY_WORK* self);
 void em018_glow_fade(struct _ENEMY_WORK* self);
-u32 fn_8019E49C(struct _ENEMY_WORK* self, u32 flag);
+u32 em018_hunt_reach_ck(struct _ENEMY_WORK* self, u32 flag);
 }
 
 /* The user-data accessor `em018_init` installs: the base accessor with its own destructor, attach hook and
@@ -352,42 +344,42 @@ public:
 
 extern "C" {
 /* Sets the aim bits the caller's mask names. */
-void fn_80192348(EmActWork* self, u8 mask) {
+void em018_aim_bits_set(EmActWork* self, u8 mask) {
     self->aim_0x328.flags_0x35 |= mask;
 }
 
 /* Clears the aim bits the caller's mask names. */
-void fn_80192358(EmActWork* self, u8 mask) {
+void em018_aim_bits_clear(EmActWork* self, u8 mask) {
     self->aim_0x328.flags_0x35 &= ~mask;
 }
 
 /* Reports whether every aim bit of the caller's mask is set (narrowed in the source: retail masks the
  * incoming register, `clrlwi r0,r4,24`). */
-u32 fn_80192370(struct _ENEMY_WORK* self_, u32 mask) {
+u32 em018_aim_bits_ck(struct _ENEMY_WORK* self_, u32 mask) {
     EmActWork* self = (EmActWork*)self_;
     return (self->aim_0x328.flags_0x35 & (u8)mask) != 0;
 }
 
 /* Reports whether the damage part's level is in the aim group's admitted range (`u8 >= 2`). */
-u32 fn_8019238C(EmActWork* self) {
+u32 em018_aim_part_level_ck(EmActWork* self) {
     u8 v = em_parts_damage_level_get((struct _ENEMY_WORK*)self, 1);
 
     return v >= 2;
 }
 
 /* Reports whether the aim record's third flag byte is set. */
-u32 fn_801923CC(EmActWork* self) {
+u32 em018_aim_glint_ck(EmActWork* self) {
     return self->aim_0x328.flag_0x33 != 0;
 }
 
 /* Reports whether the aim record's bit 0x02 is set. */
 u32 em018_aim_flag2_ck(EmActWork* self) {
-    return fn_80192370((struct _ENEMY_WORK*)self, 2) == 1;
+    return em018_aim_bits_ck((struct _ENEMY_WORK*)self, 2) == 1;
 }
 
 /* Reports whether the aim record's bit 0x08 is set. */
 u32 fn_80192410(EmActWork* self) {
-    return fn_80192370((struct _ENEMY_WORK*)self, 8) == 1;
+    return em018_aim_bits_ck((struct _ENEMY_WORK*)self, 8) == 1;
 }
 
 /* Reads the aim vector's z. */
@@ -396,12 +388,12 @@ f32 em018_glow_get(EmActWork* self) {
 }
 
 /* Reports whether another live work of team 0x12 already runs one of the four aim actions. */
-s32 fn_80192448(EmActWork* self) {
+s32 em018_team_aim_free_ck(EmActWork* self) {
     u16 max = get_move_work_max(3);
     u8 i;
     EmActWork* work = (EmActWork*)get_move_work_adrs(3);
 
-    for (i = 0; (u32)i < max; i++, work++) {
+    for (i = 0; i < max; i++, work++) {
         if (work->active == 0) {
             continue;
         }
@@ -425,7 +417,7 @@ s32 fn_80192448(EmActWork* self) {
 }
 
 /* Fires the aim effect at the work's 0x1A joint, scaled by the work's own scale. */
-void fn_8019255C(EmActWork* self) {
+void em018_aim_effect_fire(EmActWork* self) {
     VEC3 out;
     VEC3 ofs;
     MTX34 mtx;
@@ -434,38 +426,38 @@ void fn_8019255C(EmActWork* self) {
     VEC3_ctor(&ofs);
     MTX34_ctor(&mtx);
     em_hit_window_set((struct _ENEMY_WORK*)self, 0, 0x12, 0x205);
-    setVector3(&ofs, lbl_80797E88, lbl_80797E88, lbl_8079800C);
+    setVector3(&ofs, 0.0f, 0.0f, 500.0f);
     get_joint_wmat_em((struct _ENEMY_WORK*)self, 0x1A, &mtx);
     mulVecMat(&ofs, &mtx);
     mtx34_trans_add_c1(&mtx, &ofs);
     mtx34_trans_get_c1(&mtx, &out);
-    senko_set(&out, lbl_80798238 * get_em_scale((struct _ENEMY_WORK*)self), self->act_id, 0);
+    senko_set(&out, 1200.0f * get_em_scale((struct _ENEMY_WORK*)self), self->act_id, 0);
 }
 
 /* Arms the two aim values and sets the aim record's bit 0x01. */
-void fn_80192618(struct _ENEMY_WORK* self_) {
+void em018_aim_arm(struct _ENEMY_WORK* self_) {
     EmActWork* self = (EmActWork*)self_;
-    self->aim_0x328.value_0x28 = lbl_80798244;
-    self->aim_0x328.value_0x2C = lbl_80798248;
-    fn_80192348(self, 1);
+    self->aim_0x328.value_0x28 = 0.0001f;
+    self->aim_0x328.value_0x2C = 0.5f;
+    em018_aim_bits_set(self, 1);
 }
 
 /* Initialises the aim record. */
-void fn_80192630(EmActWork* self) {
+void em018_aim_init(EmActWork* self) {
     EmAimRec* rec = &self->aim_0x328;
     VEC3 v1;
     VEC3 v2;
 
     /* The aim record's +0x00 is read as a scalar, but retail copies a whole 3-float record over it. */
     copyVec3((nw4r::math::VEC3*)&rec->angle_0x00,
-             setVec3(&v1, lbl_8079824C, lbl_8079824C, lbl_8079824C));
+             setVec3(&v1, 1.0f, 1.0f, 1.0f));
     copyVec3((nw4r::math::VEC3*)&rec->rot_0x10,
-             setVec3(&v2, lbl_8079824C, lbl_8079824C, lbl_8079824C));
-    rec->vec_0x1C.x = lbl_80798238;
-    rec->vec_0x1C.y = lbl_80798250;
-    rec->vec_0x1C.z = lbl_80798254;
-    rec->value_0x28 = lbl_8079824C;
-    rec->value_0x2C = lbl_8079824C;
+             setVec3(&v2, 1.0f, 1.0f, 1.0f));
+    rec->vec_0x1C.x = 0.0f;
+    rec->vec_0x1C.y = 127.0f;
+    rec->vec_0x1C.z = 255.0f;
+    rec->value_0x28 = 1.0f;
+    rec->value_0x2C = 1.0f;
     rec->flag_0x30 = 0;
     rec->flag_0x31 = 0;
     rec->flag_0x32 = 0;
@@ -495,8 +487,8 @@ void em018_init(struct _ENEMY_WORK* self, u8 mode) {
         setVector3(&vec, 0.0f, 10.0f, 0.0f);
         eft013_spawn(self, 0xC, 0x1A, &vec);
     }
-    if (mode == 2) {
-        if (stage_map_kind_get(self->field_0x1E0) == 3) {
+    if ((s32)mode == 2) {
+        if ((s32)stage_map_kind_get(self->field_0x1E0) == 3) {
             switch (self->area_no) {
             case 3:
                 em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | 6), &self->pos);
@@ -566,12 +558,14 @@ void em018_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
             break;
         case 36:
             if (em_busy_ck(self) == 1) {
-                u16 max = get_move_work_max(2);
-                _PLW* plw = (_PLW*)get_move_work_adrs(2);
+                u16 max;
                 u16 i;
+                _PLW* plw;
+                max = get_move_work_max(2);
+                plw = (_PLW*)get_move_work_adrs(2);
                 for (i = 0; i < max; i++, plw++) {
                     if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 && em_pl_target_ck(self, plw) != 0 &&
-                        pl_act_grabbed_ck(plw) != 0 && fn_80192448((EmActWork*)self) != 0) {
+                        pl_act_grabbed_ck(plw) != 0 && em018_team_aim_free_ck((EmActWork*)self) != 0) {
                         if (self->owner_slot_0x1F6 != i) {
                             em_owner_slot_set(self, i);
                         }
@@ -610,7 +604,7 @@ void em018_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
  * per-frame action-start pair. */
 void em018_frame_update(struct _ENEMY_WORK* self) {
     if (em_die_ck(self) == 0 && em_eft_active_ck(self) == 1 && em_water_check_c1(self) == 0) {
-        fn_80192348((EmActWork*)self, 0x10);
+        em018_aim_bits_set((EmActWork*)self, 0x10);
     }
     if (self->field_0x358 == 0) {
         self->flags_0x836 |= 0x8000;
@@ -632,11 +626,11 @@ void em018_frame_update(struct _ENEMY_WORK* self) {
 
 extern "C" {
 /* ---------------------------------------------------------------------------------------------- */
-/* the per-motion step group dispatched by fn_80192F24 (states 0,1,2,4,5,7)                         */
+/* the per-motion step group dispatched by em018_act0_dispatch (states 0,1,2,4,5,7)                         */
 /* ---------------------------------------------------------------------------------------------- */
 
 /* 0x80192C10 - arms motion 1 for 4 frames; state 1 waits and re-enters the motion. */
-void fn_80192C10(struct _ENEMY_WORK* self) {
+void em018_mot1_loop(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -652,7 +646,7 @@ void fn_80192C10(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80192C8C - the same shape with motion 20. */
-void fn_80192C8C(struct _ENEMY_WORK* self) {
+void em018_mot20_loop(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -668,7 +662,7 @@ void fn_80192C8C(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80192D08 - the same shape with motion 29. */
-void fn_80192D08(struct _ENEMY_WORK* self) {
+void em018_mot29_loop(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -685,7 +679,7 @@ void fn_80192D08(struct _ENEMY_WORK* self) {
 
 /* 0x80192D84 - arms motion mode 2 with the four-argument setter (40/20/0/3) and the
  * `em_action_finish_swim` completion. */
-void fn_80192D84(struct _ENEMY_WORK* self) {
+void em018_mot40_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -701,7 +695,7 @@ void fn_80192D84(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80192E04 - the same shape with (54/20/0/3). */
-void fn_80192E04(struct _ENEMY_WORK* self) {
+void em018_mot54_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -718,7 +712,7 @@ void fn_80192E04(struct _ENEMY_WORK* self) {
 
 /* 0x80192E84 - the flag-arming step: sets the two action-start flags, arms mode 4 with motion 0xCE
  * and the fresh-scale pair, then waits on `em_action_finish_stand`. */
-void fn_80192E84(struct _ENEMY_WORK* self) {
+void em018_flag_arm_stand(struct _ENEMY_WORK* self) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     switch (self->state) {
@@ -738,35 +732,35 @@ void fn_80192E84(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80192F24 - the action-0 dispatcher: `state_sub` selects this group's six steps. */
-void fn_80192F24(struct _ENEMY_WORK* self) {
+void em018_act0_dispatch(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
-        fn_80192C10(self);
+        em018_mot1_loop(self);
         break;
     case 1:
-        fn_80192C8C(self);
+        em018_mot20_loop(self);
         break;
     case 2:
-        fn_80192D08(self);
+        em018_mot29_loop(self);
         break;
     case 4:
-        fn_80192D84(self);
+        em018_mot40_swim(self);
         break;
     case 5:
-        fn_80192E04(self);
+        em018_mot54_swim(self);
         break;
     case 7:
-        fn_80192E84(self);
+        em018_flag_arm_stand(self);
         break;
     }
 }
 
 /* ---------------------------------------------------------------------------------------------- */
-/* the step group dispatched by fn_80193394 (states 0..7)                                           */
+/* the step group dispatched by em018_act1_dispatch (states 0..7)                                           */
 /* ---------------------------------------------------------------------------------------------- */
 
 /* 0x80192F78 - arms motion 6 for 10 frames; state 1 runs `em_state_set(self, 1, 5)`. */
-void fn_80192F78(struct _ENEMY_WORK* self) {
+void em018_mot6_state_set(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -782,7 +776,7 @@ void fn_80192F78(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80192FFC - arms motion 7 for 4 frames. */
-void fn_80192FFC(struct _ENEMY_WORK* self) {
+void em018_mot7_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -798,7 +792,7 @@ void fn_80192FFC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80193078 - arms motion 0x1A for 4 frames. */
-void fn_80193078(struct _ENEMY_WORK* self) {
+void em018_mot1a_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -815,7 +809,7 @@ void fn_80193078(struct _ENEMY_WORK* self) {
 
 /* 0x801930F4 - arms motion 0x1E for 4 frames; state 1 fires the joint effect when `em_frame_check`
  * reports the frame and then waits on `em_mot_end_ck`. */
-void fn_801930F4(struct _ENEMY_WORK* self) {
+void em018_mot1e_effect(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -823,7 +817,7 @@ void fn_801930F4(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0x1E, 4, 0);
         break;
     case 1:
-        if (em_frame_check(self, 0, lbl_80798264, lbl_80798238) == 1) {
+        if (em_frame_check(self, 0, 56.0f, 0.0f) == 1) {
             self->field_0x358 = 1;
             em_camera_req(self, -1, 7);
         }
@@ -835,7 +829,7 @@ void fn_801930F4(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801931A4 - arms motion 0x72 for 10 frames. */
-void fn_801931A4(struct _ENEMY_WORK* self) {
+void em018_mot72_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -851,7 +845,7 @@ void fn_801931A4(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80193220 - arms motion 8 for 4 frames. */
-void fn_80193220(struct _ENEMY_WORK* self) {
+void em018_mot8_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -867,7 +861,7 @@ void fn_80193220(struct _ENEMY_WORK* self) {
 }
 
 /* 0x8019329C - arms motion 20 for 4 frames. */
-void fn_8019329C(struct _ENEMY_WORK* self) {
+void em018_mot20_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -883,7 +877,7 @@ void fn_8019329C(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80193318 - arms motion 0x1D for 4 frames. */
-void fn_80193318(struct _ENEMY_WORK* self) {
+void em018_mot1d_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -899,42 +893,42 @@ void fn_80193318(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80193394 - the action-1 dispatcher (states 0..7). */
-void fn_80193394(struct _ENEMY_WORK* self) {
+void em018_act1_dispatch(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
-        fn_80192F78(self);
+        em018_mot6_state_set(self);
         break;
     case 1:
-        fn_80192FFC(self);
+        em018_mot7_step(self);
         break;
     case 2:
-        fn_80193078(self);
+        em018_mot1a_step(self);
         break;
     case 3:
-        fn_801930F4(self);
+        em018_mot1e_effect(self);
         break;
     case 4:
-        fn_801931A4(self);
+        em018_mot72_step(self);
         break;
     case 5:
-        fn_80193220(self);
+        em018_mot8_step(self);
         break;
     case 6:
-        fn_8019329C(self);
+        em018_mot20_step(self);
         break;
     case 7:
-        fn_80193318(self);
+        em018_mot1d_step(self);
         break;
     }
 }
 
 /* ---------------------------------------------------------------------------------------------- */
-/* the step group dispatched by fn_801938D8 (states 0..10)                                          */
+/* the step group dispatched by em018_act2_dispatch (states 0..10)                                          */
 /* ---------------------------------------------------------------------------------------------- */
 
 /* 0x801933DC - arms motion `a == 1 ? 9 : 2` and picks the height by `b`; `default:` first (playbook 37),
  * selectors narrowed at use and the motion to `u16` (retail's `clrlwi` pair). */
-void fn_801933DC(struct _ENEMY_WORK* self, u32 a, u32 b) {
+void em018_mot9_height_step(struct _ENEMY_WORK* self, u32 a, u32 b) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -945,16 +939,16 @@ void fn_801933DC(struct _ENEMY_WORK* self, u32 a, u32 b) {
         }
         switch ((u8)b) {
         default:
-            em_approach_start(self, lbl_80798268, 0);
+            em_approach_start(self, -200.0f, 0);
             break;
         case 1:
-            em_approach_start(self, lbl_80798238, 0);
-            if (self->value_0x378 > lbl_8079826C) {
-                self->value_0x378 = lbl_8079826C;
+            em_approach_start(self, 0.0f, 0);
+            if (self->value_0x378 > 700.0f) {
+                self->value_0x378 = 700.0f;
             }
             break;
         case 2:
-            em_approach_start(self, lbl_80798270, 0);
+            em_approach_start(self, -700.0f, 0);
             break;
         }
         break;
@@ -967,16 +961,13 @@ void fn_801933DC(struct _ENEMY_WORK* self, u32 a, u32 b) {
 }
 
 /* 0x801934EC - arms motion 21 and picks the height by `a`. */
-void fn_801934EC(struct _ENEMY_WORK* self, u32 a) {
+void em018_mot21_height_step(struct _ENEMY_WORK* self, u32 a) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 21, 4, 0);
-        {
-            f32 height = (u8)a == 1 ? lbl_80798270 : lbl_80798268;
-            em_approach_start(self, height, 0);
-        }
+        em_approach_start(self, (u8)a == 1 ? -700.0f : -200.0f, 0);
         break;
     case 1:
         if (em_approach_step(self, 0, 0x40) == 1) {
@@ -986,16 +977,16 @@ void fn_801934EC(struct _ENEMY_WORK* self, u32 a) {
     }
 }
 
-/* 0x801935A0 - arms the `lbl_80570050` descriptor and waits on `em_turn_seq_step`. */
-void fn_801935A0(struct _ENEMY_WORK* self) {
+/* 0x801935A0 - arms the `em018_turn_desc_a` descriptor and waits on `em_turn_seq_step`. */
+void em018_turn_seq_a_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        em_turn_seq_start(self, lbl_80570050, 0, 0, 0);
+        em_turn_seq_start(self, em018_turn_desc_a, 0, 0, 0);
         break;
     case 1:
-        if (em_turn_seq_step(self, lbl_80570050) == 1) {
+        if (em_turn_seq_step(self, em018_turn_desc_a) == 1) {
             em_action_finish(self);
         }
         break;
@@ -1003,7 +994,7 @@ void fn_801935A0(struct _ENEMY_WORK* self) {
 }
 
 /* 0x8019362C - arms motion 0x1B for 4 frames. */
-void fn_8019362C(struct _ENEMY_WORK* self) {
+void em018_mot1b_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -1020,7 +1011,7 @@ void fn_8019362C(struct _ENEMY_WORK* self) {
 
 /* 0x801936A8 (0x230): arms motion 0xA with the backward approach, sprays the wake every fourth frame of the
  * window, then switches to motion 0xB and fires the three splash effects. */
-void fn_801936A8(struct _ENEMY_WORK* self) {
+void em018_wake_back_step(struct _ENEMY_WORK* self) {
     VEC3 vec;
 
     VEC3_ctor(&vec);
@@ -1063,8 +1054,8 @@ void fn_801936A8(struct _ENEMY_WORK* self) {
 
 /* 0x80193AEC (0x1DC): the swim-in step: `motion` picks 0x37 or 0x30, `height` the approach target and the
  * +0x378 cap; state 1 waits on the approach and the turn, then motion 0x2F completes with `em_action_finish_swim`. */
-void fn_80193AEC(struct _ENEMY_WORK* self, u32 height, u32 motion) {
-    if ((u8)((u8)motion - 2) <= 1) {
+void em018_swim_in(struct _ENEMY_WORK* self, u32 height, u32 motion) {
+    if ((u8)(motion + 0xFE) <= 1) {
         em_busy_set(self);
     }
     switch (self->state) {
@@ -1117,7 +1108,7 @@ void fn_80193AEC(struct _ENEMY_WORK* self, u32 height, u32 motion) {
 
 /* 0x80193CC8 (0x120): arms motion 0x39; on the frame window it rises by ten times the climb past 30
  * (capped at 100) and turns to the target, completing with `em_action_finish_swim`. */
-void fn_80193CC8(struct _ENEMY_WORK* self) {
+void em018_climb_turn(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -1145,7 +1136,7 @@ void fn_80193CC8(struct _ENEMY_WORK* self) {
 
 /* 0x80193DE8 (0x108): arms motion 0x29 (`a == 1`) or 0x35 and fires the wake effect on the frame for the
  * latter, completing with `em_action_finish_swim`. */
-void fn_80193DE8(struct _ENEMY_WORK* self, u32 a) {
+void em018_wake_mot_step(struct _ENEMY_WORK* self, u32 a) {
     VEC3 vec;
 
     VEC3_ctor(&vec);
@@ -1179,7 +1170,7 @@ void fn_80193DE8(struct _ENEMY_WORK* self, u32 a) {
 
 /* 0x80194078 (0x2A0): the leap out of the water: motion 0x3C, the launch vector on the frame, the arc until it
  * clears the surface (splash effects, motion 0x40), then the fall back down to `em_state_set(self, 5, 0xE)`. */
-void fn_80194078(struct _ENEMY_WORK* self, u32 a) {
+void em018_leap(struct _ENEMY_WORK* self, u32 a) {
     VEC3 vec;
 
     VEC3_ctor(&vec);
@@ -1227,8 +1218,7 @@ void fn_80194078(struct _ENEMY_WORK* self, u32 a) {
             em_move_mode_set(self, 0);
             em_state_set(self, 5, 0xE);
         } else if (self->field_0x314 < 0.0f) {
-            f32 scale = get_em_chg_scale(self);
-            if (self->field_0x210 > self->pos.y + em_float_depth_get(self) * scale) {
+            if (self->field_0x210 > self->pos.y + em_float_depth_get(self) * get_em_chg_scale(self)) {
                 em_action_finish_swim(self);
             }
         }
@@ -1239,7 +1229,7 @@ void fn_80194078(struct _ENEMY_WORK* self, u32 a) {
 
 /* 0x801943A0 (0x1E4): the dive: motion 0x3E, the fall with the 268 lift and the step-offset arc, then either the
  * surface catch (`em_state_set(self, 5, 0x10)`) or the landing motion 0x3B. */
-void fn_801943A0(struct _ENEMY_WORK* self, u32 a) {
+void em018_dive(struct _ENEMY_WORK* self, u32 a) {
     VEC3 vec;
 
     VEC3_ctor(&vec);
@@ -1289,7 +1279,7 @@ void fn_801943A0(struct _ENEMY_WORK* self, u32 a) {
 
 /* 0x80194584 (0x164): the surfacing splash: lifts by 400 onto the water line with the three splash effects,
  * then motion 0x42 with the 350 rise, completing with `em_action_finish_swim`. */
-void fn_80194584(struct _ENEMY_WORK* self) {
+void em018_surface_splash(struct _ENEMY_WORK* self) {
     VEC3 vec;
 
     VEC3_ctor(&vec);
@@ -1324,7 +1314,7 @@ void fn_80194584(struct _ENEMY_WORK* self) {
 
 /* 0x801946E8 (0x174): the slide: motion 0xC8 at double speed with the -15 push, the offset step until the
  * ground catches it (motion 0xC9) or the 180-frame timer runs out. */
-void fn_801946E8(struct _ENEMY_WORK* self, u32 a) {
+void em018_slide(struct _ENEMY_WORK* self, u32 a) {
     if ((u8)a == 1) {
         em_busy_set(self);
     }
@@ -1366,40 +1356,40 @@ void fn_801946E8(struct _ENEMY_WORK* self, u32 a) {
 }
 
 /* 0x801938D8 - the action-2 dispatcher (states 0..10). */
-void fn_801938D8(struct _ENEMY_WORK* self) {
+void em018_act2_dispatch(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
-        fn_801933DC(self, 0, 0);
+        em018_mot9_height_step(self, 0, 0);
         break;
     case 1:
-        fn_801934EC(self, 0);
+        em018_mot21_height_step(self, 0);
         break;
     case 2:
-        fn_801935A0(self);
+        em018_turn_seq_a_step(self);
         break;
     case 3:
-        fn_8019362C(self);
+        em018_mot1b_step(self);
         break;
     case 4:
-        fn_801933DC(self, 1, 0);
+        em018_mot9_height_step(self, 1, 0);
         break;
     case 5:
-        fn_801936A8(self);
+        em018_wake_back_step(self);
         break;
     case 6:
-        fn_801933DC(self, 0, 1);
+        em018_mot9_height_step(self, 0, 1);
         break;
     case 7:
-        fn_801933DC(self, 1, 1);
+        em018_mot9_height_step(self, 1, 1);
         break;
     case 8:
-        fn_801934EC(self, 1);
+        em018_mot21_height_step(self, 1);
         break;
     case 9:
-        fn_801933DC(self, 0, 2);
+        em018_mot9_height_step(self, 0, 2);
         break;
     case 10:
-        fn_801933DC(self, 1, 2);
+        em018_mot9_height_step(self, 1, 2);
         break;
     }
 }
@@ -1410,7 +1400,7 @@ void fn_801938D8(struct _ENEMY_WORK* self) {
 
 /* 0x80194AE4 (0x1E4): the bound-player grab: motion 0x28 with the 60-frame window; while the bound player is in
  * reach it is pulled into the hold, and its hold action completes the step with `em_state_set(self, 5, 0x1F)`. */
-void fn_80194AE4(struct _ENEMY_WORK* self) {
+void em018_grab(struct _ENEMY_WORK* self) {
     _PLW* plw;
 
     em_busy_set(self);
@@ -1423,8 +1413,8 @@ void fn_80194AE4(struct _ENEMY_WORK* self) {
         self->timer_0x020 = 0x3C;
         if (em_busy_ck(self) == 1) {
             plw = &((_PLW*)get_move_work_adrs(2))[self->owner_slot_0x1F6];
-            if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 && em_pl_target_ck(self, plw) == 1 &&
-                pl_act_grabbed_ck(plw) == 1 && fn_80192448((EmActWork*)self) == 1) {
+            if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 && (u32)em_pl_target_ck(self, plw) == 1 &&
+                (u32)pl_act_grabbed_ck(plw) == 1 && (u32)em018_team_aim_free_ck((EmActWork*)self) == 1) {
                 plw->field_0x59A = self->timer_0x020;
                 pl_act_hold_motion_set(plw, (u8*)self);
                 pl_act_hold_notify(plw, 1);
@@ -1437,8 +1427,8 @@ void fn_80194AE4(struct _ENEMY_WORK* self) {
         }
         if (em_busy_ck(self) == 1) {
             plw = &((_PLW*)get_move_work_adrs(2))[self->owner_slot_0x1F6];
-            if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 && em_pl_target_ck(self, plw) == 1 &&
-                fn_80192448((EmActWork*)self) == 1 && Pl_act_ck(plw, 0, 0x9A) != 0) {
+            if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 && (u32)em_pl_target_ck(self, plw) == 1 &&
+                (u32)em018_team_aim_free_ck((EmActWork*)self) == 1 && Pl_act_ck(plw, 0, 0x9A) != 0) {
                 em_state_set(self, 5, 0x1F);
             } else if (self->timer_0x020 <= 0) {
                 em_action_finish_swim(self);
@@ -1451,7 +1441,7 @@ void fn_80194AE4(struct _ENEMY_WORK* self) {
 /* 0x80194D6C (0x234): the knock-back arc: motion 0x7C with the (110, 70, -4) offset step, the splash when it
  * crosses the water line, then either the landing (`em_state_set(self, 5, 0x21)`) or the surface catch
  * (motion 0xE1 with the 300 rise). */
-void fn_80194D6C(struct _ENEMY_WORK* self) {
+void em018_knockback_arc(struct _ENEMY_WORK* self) {
     VEC3 vec;
 
     VEC3_ctor(&vec);
@@ -1505,7 +1495,7 @@ void fn_80194D6C(struct _ENEMY_WORK* self) {
 
 /* 0x80194FA0 (0xF8): the stranded step: motion 0x7D with the 100-unit roster binding, then motion 0x7E for
  * 240 frames before `em_state_set(self, 5, 0x22)`. */
-void fn_80194FA0(struct _ENEMY_WORK* self) {
+void em018_stranded(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -1532,7 +1522,7 @@ void fn_80194FA0(struct _ENEMY_WORK* self) {
 
 /* 0x80195214 (0x128): motion 0x28 with the 60-frame window: a bound player in reach completes the step with
  * `em_state_set(self, 5, 0x1E)`, the timer running out with `em_action_finish_swim`. */
-void fn_80195214(struct _ENEMY_WORK* self) {
+void em018_grab_wait(struct _ENEMY_WORK* self) {
     _PLW* plw;
 
     em_busy_set(self);
@@ -1549,8 +1539,8 @@ void fn_80195214(struct _ENEMY_WORK* self) {
         }
         if (em_busy_ck(self) == 1) {
             plw = &((_PLW*)get_move_work_adrs(2))[self->owner_slot_0x1F6];
-            if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 && em_pl_target_ck(self, plw) == 1 &&
-                pl_act_grabbed_ck(plw) == 1) {
+            if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 && (u32)em_pl_target_ck(self, plw) == 1 &&
+                (u32)pl_act_grabbed_ck(plw) == 1) {
                 em_state_set(self, 5, 0x1E);
             } else if (self->timer_0x020 <= 0) {
                 em_action_finish_swim(self);
@@ -1562,7 +1552,7 @@ void fn_80195214(struct _ENEMY_WORK* self) {
 
 /* 0x80195504 (0x134): motion 0xCB, then the flag-armed motion 0xD9 that raises aim bit 0x04 and the dim flag
  * on its frames, completing with `em_action_finish_stand`.  The dispatcher's argument is unused. */
-void fn_80195504(struct _ENEMY_WORK* self, u32 a) {
+void em018_dim_rise(struct _ENEMY_WORK* self, u32 a) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -1582,7 +1572,7 @@ void fn_80195504(struct _ENEMY_WORK* self, u32 a) {
         em_busy_set(self);
         self->field_0x35B = 1;
         if (em_frame_check(self, 0, 36.0f, 0.0f) == 1) {
-            fn_80192348((EmActWork*)self, 4);
+            em018_aim_bits_set((EmActWork*)self, 4);
         }
         if (em_frame_check(self, 1, 10.0f, 0.0f) == 1) {
             self->field_0x359 = 1;
@@ -1596,7 +1586,7 @@ void fn_80195504(struct _ENEMY_WORK* self, u32 a) {
 
 /* 0x80195720 (0x140): the flag-armed approach: motion 0xD1 at the `speed` pick (0.8 for 1 and 2, 1.2 for 0),
  * the `dist` pick of the approach target, completing with `em_action_finish_stand`. */
-void fn_80195720(struct _ENEMY_WORK* self, u32 speed, u32 dist) {
+void em018_flag_approach(struct _ENEMY_WORK* self, u32 speed, u32 dist) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     if ((u8)speed == 2) {
@@ -1642,7 +1632,7 @@ void fn_80195720(struct _ENEMY_WORK* self, u32 speed, u32 dist) {
 
 /* 0x80195860 (0x36C): the bound hold: motion 0xCC, then 0xCF with the roster binding; every 16 frames a part
  * whose frame cost has dropped low ends the hold, otherwise the three timers pick the release action. */
-void fn_80195860(struct _ENEMY_WORK* self) {
+void em018_bound_hold(struct _ENEMY_WORK* self) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     em_busy_set(self);
@@ -1671,9 +1661,9 @@ void fn_80195860(struct _ENEMY_WORK* self) {
     case 2:
         self->timer_0x020++;
         if (em_busy_ck(self) == 1) {
+            u8 i;
             s32 done = 0;
             if ((self->timer_0x020 & 0xF) == 0) {
-                u8 i;
                 for (i = 0; i < 4; i++) {
                     f32 cost = self->frames_0x454[i];
                     if (cost > 0.0f) {
@@ -1700,12 +1690,14 @@ void fn_80195860(struct _ENEMY_WORK* self) {
                         self->state_0x006 = 2;
                         self->timer_0x020 = 0;
                     } else if (self->field_0x43D != 1) {
-                        u16 max = get_move_work_max(2);
-                        _PLW* plw = (_PLW*)get_move_work_adrs(2);
+                        u16 max;
                         u16 j;
+                        _PLW* plw;
+                        max = get_move_work_max(2);
+                        plw = (_PLW*)get_move_work_adrs(2);
                         for (j = 0; j < max; j++, plw++) {
                             if (plw->slot_active != 0 && em_pl_slot_leaving_ck(plw->chunk_ofs) == 0 &&
-                                em_pl_target_ck(self, plw) == 1 && pl_act_grabbed_ck(plw) == 1) {
+                                (u32)em_pl_target_ck(self, plw) == 1 && (u32)pl_act_grabbed_ck(plw) == 1) {
                                 em_state_set(self, 6, 4);
                                 return;
                             }
@@ -1739,7 +1731,7 @@ void fn_80195860(struct _ENEMY_WORK* self) {
 
 /* 0x80195CA4 (0xDC): the flag-armed rise: motion 0xCE with the -250 drop, then climbs 5 per frame until the
  * +0x1AC height reaches the ground, completing with `em_state_set(self, 6, 1)`. */
-void fn_80195CA4(struct _ENEMY_WORK* self) {
+void em018_flag_rise(struct _ENEMY_WORK* self) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     em_busy_set(self);
@@ -1764,7 +1756,7 @@ void fn_80195CA4(struct _ENEMY_WORK* self) {
 
 /* 0x80195D80 (0x154): the flag-armed hold: motion 0xCC, then 0xCF for 1800 frames with the tint pulse, then
  * motion 0xCD, completing with `em_action_finish_stand`. */
-void fn_80195D80(struct _ENEMY_WORK* self) {
+void em018_flag_hold(struct _ENEMY_WORK* self) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     em_busy_set(self);
@@ -1802,134 +1794,134 @@ void fn_80195D80(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801953BC - the action-5 dispatcher (states 0..39). */
-void fn_801953BC(struct _ENEMY_WORK* self) {
+void em018_act5_dispatch(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
-        fn_80193964(self, 0);
+        em018_turn_seq_release_step(self, 0);
         break;
     case 1:
-        fn_80193A34(self);
+        em018_turn_seq_c_step(self);
         break;
     case 2:
-        fn_80193AEC(self, 0, 0);
+        em018_swim_in(self, 0, 0);
         break;
     case 3:
-        fn_80193AEC(self, 1, 0);
+        em018_swim_in(self, 1, 0);
         break;
     case 4:
-        fn_80193AEC(self, 2, 0);
+        em018_swim_in(self, 2, 0);
         break;
     case 5:
-        fn_80193AEC(self, 0, 1);
+        em018_swim_in(self, 0, 1);
         break;
     case 6:
-        fn_80193AEC(self, 1, 1);
+        em018_swim_in(self, 1, 1);
         break;
     case 7:
-        fn_80193AEC(self, 2, 1);
+        em018_swim_in(self, 2, 1);
         break;
     case 8:
-        fn_80193CC8(self);
+        em018_climb_turn(self);
         break;
     case 9:
-        fn_80193DE8(self, 0);
+        em018_wake_mot_step(self, 0);
         break;
     case 10:
-        fn_80193EF0(self);
+        em018_mot32_swim(self);
         break;
     case 11:
-        fn_80193F70(self);
+        em018_mot31_state_set(self);
         break;
     case 12:
-        fn_80193FF8(self);
+        em018_mot3a_swim(self);
         break;
     case 13:
-        fn_80194078(self, 0);
+        em018_leap(self, 0);
         break;
     case 14:
-        fn_80194318(self);
+        em018_mot3d_step(self);
         break;
     case 15:
-        fn_801943A0(self, 0);
+        em018_dive(self, 0);
         break;
     case 16:
-        fn_80194584(self);
+        em018_surface_splash(self);
         break;
     case 17:
-        fn_801946E8(self, 0);
+        em018_slide(self, 0);
         break;
     case 18:
-        fn_8019485C(self, 0);
+        em018_mot_ca_step(self, 0);
         break;
     case 19:
-        fn_80194938(self);
+        em018_mot68_swim(self);
         break;
     case 20:
-        fn_801949B4(self);
+        em018_mot1f_effect(self);
         break;
     case 21:
-        fn_80193DE8(self, 1);
+        em018_wake_mot_step(self, 1);
         break;
     case 22:
-        fn_80193AEC(self, 3, 0);
+        em018_swim_in(self, 3, 0);
         break;
     case 23:
-        fn_80193AEC(self, 3, 1);
+        em018_swim_in(self, 3, 1);
         break;
     case 24:
-        fn_80193964(self, 1);
+        em018_turn_seq_release_step(self, 1);
         break;
     case 25:
-        fn_80193AEC(self, 3, 2);
+        em018_swim_in(self, 3, 2);
         break;
     case 26:
-        fn_80193AEC(self, 3, 3);
+        em018_swim_in(self, 3, 3);
         break;
     case 27:
-        fn_801946E8(self, 1);
+        em018_slide(self, 1);
         break;
     case 28:
-        fn_8019485C(self, 1);
+        em018_mot_ca_step(self, 1);
         break;
     case 29:
-        fn_80194A64(self);
+        em018_mot2e_swim(self);
         break;
     case 30:
-        fn_80194AE4(self);
+        em018_grab(self);
         break;
     case 31:
-        fn_80194CC8(self);
+        em018_release(self);
         break;
     case 32:
-        fn_80194D6C(self);
+        em018_knockback_arc(self);
         break;
     case 33:
-        fn_80194FA0(self);
+        em018_stranded(self);
         break;
     case 34:
-        fn_80195098(self);
+        em018_mot7f_step(self);
         break;
     case 35:
-        fn_8019515C(self);
+        em018_turn_seq_d_step(self);
         break;
     case 36:
-        fn_80195214(self);
+        em018_grab_wait(self);
         break;
     case 37:
-        fn_8019533C(self);
+        em018_mot36_swim(self);
         break;
     case 38:
-        fn_80194078(self, 1);
+        em018_leap(self, 1);
         break;
     case 39:
-        fn_801943A0(self, 1);
+        em018_dive(self, 1);
         break;
     }
 }
 
 /* 0x80196278 (0x130): motion 0xCB, then the flag-armed motion 0xD9 sinking 2 per frame, raising aim bit 0x04
  * and the dim flag on its frames and completing with `em_action_finish_stand`. */
-void fn_80196278(struct _ENEMY_WORK* self) {
+void em018_dim_sink(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -1948,7 +1940,7 @@ void fn_80196278(struct _ENEMY_WORK* self) {
         self->field_0x35B = 1;
         em_height_add(self, -2.0f);
         if (em_frame_check(self, 0, 36.0f, 0.0f) == 1) {
-            fn_80192348((EmActWork*)self, 4);
+            em018_aim_bits_set((EmActWork*)self, 4);
         }
         if (em_frame_check(self, 1, 10.0f, 0.0f) == 1) {
             self->field_0x359 = 1;
@@ -1962,7 +1954,7 @@ void fn_80196278(struct _ENEMY_WORK* self) {
 
 /* 0x801963A8 (0x270): the flag-armed motion 0xE2: on its frames it fires the jaw effect ahead of joint 0x1A and the
  * aim effect, then picks the follow-up by whether any part's frame cost has dropped to 800. */
-void fn_801963A8(struct _ENEMY_WORK* self) {
+void em018_jaw_scan(struct _ENEMY_WORK* self) {
     VEC3 pos;
     VEC3 ofs;
 
@@ -1978,22 +1970,22 @@ void fn_801963A8(struct _ENEMY_WORK* self) {
         em_height_set(self, em_height_base_get(self));
         break;
     case 1:
-        if (em_frame_check(self, 0, 150.0f, 0.0f) == 1 && fn_8019238C((EmActWork*)self) == 0) {
+        if (em_frame_check(self, 0, 150.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
             get_joint_wpos_em(self, 0x1A, &pos);
             setVector3(&ofs, 0.0f, 20.0f * get_em_scale(self), -50.0f * get_em_scale(self));
             rotVecY(&ofs, self->field_0x1C0);
             addVec3To(&pos, &ofs);
             eft022_spawn(self, &pos, self->area_no);
         }
-        if (em_frame_check(self, 0, 210.0f, 0.0f) == 1 && fn_8019238C((EmActWork*)self) == 0) {
-            fn_8019255C((EmActWork*)self);
+        if (em_frame_check(self, 0, 210.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
+            em018_aim_effect_fire((EmActWork*)self);
         }
         if (em_frame_check(self, 1, 200.0f, 0.0f) == 1) {
             self->field_0x359 = 1;
         }
         if (em_mot_end_ck(self) == 1 && em_busy_ck(self) == 1) {
             u32 low = 0;
-            s32 i;
+            u8 i;
             for (i = 0; i < 4; i++) {
                 if (self->frames_0x454[i] > 0.0f && self->frames_0x454[i] <= 800.0f) {
                     low = 1;
@@ -2012,7 +2004,7 @@ void fn_801963A8(struct _ENEMY_WORK* self) {
 
 /* 0x8019687C (0x1D4): the tail sweep: motion 0x56 (`side == 1`) or 0x55 with its hit window; with `aim == 1` it
  * stores the clamped turn toward the target (at most 60 degrees) and turns through it while the motion runs. */
-void fn_8019687C(struct _ENEMY_WORK* self, u32 side, u32 aim) {
+void em018_tail_sweep(struct _ENEMY_WORK* self, u32 side, u32 aim) {
     VEC3 dir;
     VEC3 diff;
     u32 pitch;
@@ -2075,7 +2067,7 @@ void fn_8019687C(struct _ENEMY_WORK* self, u32 side, u32 aim) {
 
 /* 0x80196BF4 (0x21C): the bite: motion 0x4F with the two hit windows; on its frames it turns toward the target
  * (clamped to +-0x900), steps forward when `lunge == 1` and turns once more when `track == 1`. */
-void fn_80196BF4(struct _ENEMY_WORK* self, u32 lunge, u32 track) {
+void em018_bite(struct _ENEMY_WORK* self, u32 lunge, u32 track) {
     VEC3 dir;
     VEC3 diff;
     u32 pitch;
@@ -2126,70 +2118,70 @@ void fn_80196BF4(struct _ENEMY_WORK* self, u32 lunge, u32 track) {
 }
 
 /* 0x80196618 - the action-6 dispatcher (states 0..24). */
-void fn_80196618(struct _ENEMY_WORK* self) {
+void em018_act6_dispatch(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
-        fn_80195504(self, 0);
+        em018_dim_rise(self, 0);
         break;
     case 1:
-        fn_80195638(self, 0);
+        em018_mot_d0_hold(self, 0);
         break;
     case 2:
-        fn_80195720(self, 0, 2);
+        em018_flag_approach(self, 0, 2);
         break;
     case 3:
-        fn_80195860(self);
+        em018_bound_hold(self);
         break;
     case 4:
-        fn_80195BCC(self, 0);
+        em018_flag_release(self, 0);
         break;
     case 5:
-        fn_80195CA4(self);
+        em018_flag_rise(self);
         break;
     case 7:
-        fn_80195D80(self);
+        em018_flag_hold(self);
         break;
     case 10:
-        fn_80195ED4(self);
+        em018_mot_da_effect(self);
         break;
     case 11:
-        fn_80196004(self);
+        em018_mot_db_effect(self);
         break;
     case 12:
-        fn_8019610C(self, 0);
+        em018_flag_turn(self, 0);
         break;
     case 13:
-        fn_801961C8(self, 0);
+        em018_flag_stand(self, 0);
         break;
     case 14:
-        fn_80196278(self);
+        em018_dim_sink(self);
         break;
     case 15:
-        fn_80195720(self, 1, 0);
+        em018_flag_approach(self, 1, 0);
         break;
     case 16:
-        fn_80195720(self, 0, 1);
+        em018_flag_approach(self, 0, 1);
         break;
     case 18:
-        fn_80195504(self, 1);
+        em018_dim_rise(self, 1);
         break;
     case 19:
-        fn_80195638(self, 1);
+        em018_mot_d0_hold(self, 1);
         break;
     case 20:
-        fn_80195720(self, 2, 0);
+        em018_flag_approach(self, 2, 0);
         break;
     case 21:
-        fn_8019610C(self, 1);
+        em018_flag_turn(self, 1);
         break;
     case 22:
-        fn_801961C8(self, 1);
+        em018_flag_stand(self, 1);
         break;
     case 23:
-        fn_801963A8(self);
+        em018_jaw_scan(self);
         break;
     case 24:
-        fn_80195BCC(self, 1);
+        em018_flag_release(self, 1);
         break;
     }
 }
@@ -2197,7 +2189,7 @@ void fn_80196618(struct _ENEMY_WORK* self) {
 /* 0x80196E10 (0x484): the charge: `kind == 2` arms motion 0x50 then 0x51, the others the blended 0x46; it runs
  * the approach with the turn clamped to +-0x1800 and the bite windows, then recovers with 0x48/0x49 (kind 1
  * re-arms the windows once more on the way back). */
-void fn_80196E10(struct _ENEMY_WORK* self, u32 kind) {
+void em018_charge(struct _ENEMY_WORK* self, u32 kind) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -2315,7 +2307,7 @@ void fn_80196E10(struct _ENEMY_WORK* self, u32 kind) {
 
 /* 0x80197294 (0x170): motion 0xD8: on its frames the jaw effect ahead of joint 0x1A and the aim effect, then
  * `em_action_finish`. */
-void fn_80197294(struct _ENEMY_WORK* self) {
+void em018_jaw_effect(struct _ENEMY_WORK* self) {
     VEC3 pos;
     VEC3 ofs;
 
@@ -2328,15 +2320,15 @@ void fn_80197294(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0xD8, 4, 0);
         break;
     case 1:
-        if (em_frame_check(self, 0, 120.0f, 0.0f) == 1 && fn_8019238C((EmActWork*)self) == 0) {
+        if (em_frame_check(self, 0, 120.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
             get_joint_wpos_em(self, 0x1A, &pos);
             setVector3(&ofs, 0.0f, 20.0f * get_em_scale(self), -60.0f * get_em_scale(self));
             rotVecY(&ofs, self->field_0x1C0);
             addVec3To(&pos, &ofs);
             eft022_spawn(self, &pos, self->area_no);
         }
-        if (em_frame_check(self, 0, 180.0f, 0.0f) == 1 && fn_8019238C((EmActWork*)self) == 0) {
-            fn_8019255C((EmActWork*)self);
+        if (em_frame_check(self, 0, 180.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
+            em018_aim_effect_fire((EmActWork*)self);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -2347,7 +2339,7 @@ void fn_80197294(struct _ENEMY_WORK* self) {
 
 /* 0x80197404 (0x16C): the side swipe: stores the turn toward the target clamped to 60..300 degrees, picks motion
  * 0x52/0x53 by its side and turns through it while the motion runs. */
-void fn_80197404(struct _ENEMY_WORK* self) {
+void em018_side_swipe(struct _ENEMY_WORK* self) {
     VEC3 dir;
     VEC3 diff;
     u32 pitch;
@@ -2395,7 +2387,7 @@ void fn_80197404(struct _ENEMY_WORK* self) {
 
 /* 0x80197570 (0x148): the backstep: motion 0x3A with the -400 approach, then the `next` pick of the follow-up
  * action (5, 6, 11 or 20 of action 7) or `em_action_finish_swim`. */
-void fn_80197570(struct _ENEMY_WORK* self, u32 next) {
+void em018_backstep(struct _ENEMY_WORK* self, u32 next) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -2431,7 +2423,7 @@ void fn_80197570(struct _ENEMY_WORK* self, u32 next) {
 /* 0x801976B8 (0x508): the breach: the flag-armed motion 0xCE with its 24-frame build-up (splash and sound on the
  * first frame), motion 0xDD with the bite windows, the rise 0xDF until it clears the surface, the arc 0xE0 with its
  * splashes, then the landing (`em_state_set(self, 7, 0x12)`) or the surface catch 0xE1. */
-void fn_801976B8(struct _ENEMY_WORK* self) {
+void em018_breach(struct _ENEMY_WORK* self) {
     VEC3 ofs;
     VEC3 pos;
 
@@ -2489,7 +2481,7 @@ void fn_801976B8(struct _ENEMY_WORK* self) {
         break;
     case 3:
         em_move_offset_apply(self);
-        if (em_surface_reach_ck(self, 50.0f + em_float_depth_get(self)) == 1) {
+        if ((u32)em_surface_reach_ck(self, 50.0f + em_float_depth_get(self)) == 1) {
             self->state++;
             em_fall_start_c1(self, 0.0f);
         }
@@ -2545,7 +2537,7 @@ void fn_801976B8(struct _ENEMY_WORK* self) {
 
 /* 0x80197D50 (0x1B4): the flag-armed motion 0xD2: on its frames the jaw effect ahead of joint 0x1A and the aim
  * effect, then the dim flag, completing with `em_action_finish_stand`. */
-void fn_80197D50(struct _ENEMY_WORK* self) {
+void em018_jaw_dim(struct _ENEMY_WORK* self) {
     VEC3 pos;
     VEC3 ofs;
 
@@ -2561,15 +2553,15 @@ void fn_80197D50(struct _ENEMY_WORK* self) {
         em_height_set(self, em_height_base_get(self));
         break;
     case 1:
-        if (em_frame_check(self, 0, 150.0f, 0.0f) == 1 && fn_8019238C((EmActWork*)self) == 0) {
+        if (em_frame_check(self, 0, 150.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
             get_joint_wpos_em(self, 0x1A, &pos);
             setVector3(&ofs, 0.0f, 20.0f * get_em_scale(self), -50.0f * get_em_scale(self));
             rotVecY(&ofs, self->field_0x1C0);
             addVec3To(&pos, &ofs);
             eft022_spawn(self, &pos, self->area_no);
         }
-        if (em_frame_check(self, 0, 210.0f, 0.0f) == 1 && fn_8019238C((EmActWork*)self) == 0) {
-            fn_8019255C((EmActWork*)self);
+        if (em_frame_check(self, 0, 210.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
+            em018_aim_effect_fire((EmActWork*)self);
         }
         if (em_frame_check(self, 1, 200.0f, 0.0f) == 1) {
             self->field_0x359 = 1;
@@ -2583,7 +2575,7 @@ void fn_80197D50(struct _ENEMY_WORK* self) {
 
 /* 0x80197F04 (0x24C): the lunge: the flag-armed motion 0xCE for 12 frames, then motion 0xDC with its hit window and
  * the 50 push: it turns, steps, splashes and fires the joint 0xF effect on its frames, then `em_action_finish`. */
-void fn_80197F04(struct _ENEMY_WORK* self) {
+void em018_lunge(struct _ENEMY_WORK* self) {
     VEC3 ofs;
 
     VEC3_ctor(&ofs);
@@ -2639,110 +2631,110 @@ void fn_80197F04(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801987E4 - the action-7 dispatcher (states 0..31). */
-void fn_801987E4(struct _ENEMY_WORK* self) {
+void em018_act7_dispatch(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
-        fn_801966DC(self);
+        em018_mot54_hit(self);
         break;
     case 1:
-        fn_80196768(self);
+        em018_mot59_step(self);
         break;
     case 2:
-        fn_8019687C(self, 0, 0);
+        em018_tail_sweep(self, 0, 0);
         break;
     case 3:
-        fn_8019687C(self, 1, 0);
+        em018_tail_sweep(self, 1, 0);
         break;
     case 4:
-        fn_80196A50(self, 0);
+        em018_mot57_step(self, 0);
         break;
     case 5:
-        fn_80196B1C(self);
+        em018_mot4e_hold(self);
         break;
     case 6:
-        fn_80196BF4(self, 0, 0);
+        em018_bite(self, 0, 0);
         break;
     case 7:
-        fn_80196E10(self, 0);
+        em018_charge(self, 0);
         break;
     case 8:
-        fn_80196E10(self, 1);
+        em018_charge(self, 1);
         break;
     case 9:
-        fn_80197294(self);
+        em018_jaw_effect(self);
         break;
     case 10:
-        fn_80196E10(self, 2);
+        em018_charge(self, 2);
         break;
     case 11:
-        fn_80197404(self);
+        em018_side_swipe(self);
         break;
     case 12:
-        fn_80196A50(self, 1);
+        em018_mot57_step(self, 1);
         break;
     case 13:
-        fn_80197570(self, 0);
+        em018_backstep(self, 0);
         break;
     case 14:
-        fn_80197570(self, 1);
+        em018_backstep(self, 1);
         break;
     case 15:
-        fn_80197570(self, 2);
+        em018_backstep(self, 2);
         break;
     case 16:
-        fn_80197570(self, 3);
+        em018_backstep(self, 3);
         break;
     case 17:
-        fn_801976B8(self);
+        em018_breach(self);
         break;
     case 18:
-        fn_80197BC0(self);
+        em018_turn_about(self);
         break;
     case 19:
-        fn_80197C84(self);
+        em018_mot_a_step(self);
         break;
     case 20:
-        fn_80196BF4(self, 1, 0);
+        em018_bite(self, 1, 0);
         break;
     case 21:
-        fn_80197D50(self);
+        em018_jaw_dim(self);
         break;
     case 22:
-        fn_80197F04(self);
+        em018_lunge(self);
         break;
     case 23:
-        fn_80198150(self, 0, 0);
+        em018_spin(self, 0, 0);
         break;
     case 24:
-        fn_801986AC(self);
+        em018_mot_d6_step(self);
         break;
     case 25:
-        fn_80198150(self, 1, 0);
+        em018_spin(self, 1, 0);
         break;
     case 26:
-        fn_80198150(self, 0, 1);
+        em018_spin(self, 0, 1);
         break;
     case 27:
-        fn_80198150(self, 1, 1);
+        em018_spin(self, 1, 1);
         break;
     case 28:
-        fn_8019687C(self, 0, 1);
+        em018_tail_sweep(self, 0, 1);
         break;
     case 29:
-        fn_8019687C(self, 1, 1);
+        em018_tail_sweep(self, 1, 1);
         break;
     case 30:
-        fn_80196BF4(self, 0, 1);
+        em018_bite(self, 0, 1);
         break;
     case 31:
-        fn_80196BF4(self, 1, 1);
+        em018_bite(self, 1, 1);
         break;
     }
 }
 
 /* 0x80198910 (0x4F0): the sound program of the current sub-state: plays its SE sequence table, or finishes
  * the action for a sub-state with none. */
-void fn_80198910(struct _ENEMY_WORK* self) {
+void em018_se_program(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0x17:
         em_se_tbl_play(self, em018_se_seq_17, 0, 0x17);
@@ -2935,7 +2927,7 @@ void fn_80198910(struct _ENEMY_WORK* self) {
 
 /* 0x80198E00 (0x110): the alternate sound program of the current sub-state (the default plays sub-state
  * 0's table). */
-void fn_80198E00(struct _ENEMY_WORK* self) {
+void em018_se_alt_program(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0x0:
         em_se_tbl_play_alt(self, em018_se_alt_seq_00, 0, 0);
@@ -2968,19 +2960,19 @@ void fn_80198E00(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80198F10 - forwards to this band's action-6 state-3 step. */
-void fn_80198F10(struct _ENEMY_WORK* self) {
-    fn_80195CA4(self);
+void em018_act6_s3_forward(struct _ENEMY_WORK* self) {
+    em018_flag_rise(self);
 }
 
-/* 0x80198F14 - runs `fn_80198F10` while the action-8 sub-state is 0. */
-void fn_80198F14(struct _ENEMY_WORK* self) {
+/* 0x80198F14 - runs `em018_act6_s3_forward` while the action-8 sub-state is 0. */
+void em018_act8_dispatch(struct _ENEMY_WORK* self) {
     if (self->state_sub == 0) {
-        fn_80198F10(self);
+        em018_act6_s3_forward(self);
     }
 }
 
 /* 0x801928B8 - a bare `return` (the target body is a single `blr`). */
-void fn_801928B8(void) {
+void em018_nop(void) {
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -2988,7 +2980,7 @@ void fn_801928B8(void) {
 /* ---------------------------------------------------------------------------------------------- */
 
 /* 0x80193EF0 - arms mode 2 with (0x32/0x14/0/3) and the `em_action_finish_swim` completion. */
-void fn_80193EF0(struct _ENEMY_WORK* self) {
+void em018_mot32_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3004,7 +2996,7 @@ void fn_80193EF0(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80193F70 - arms mode 2 with (0x31/0x14/0/1) and the `em_state_set(self, 5, 0x1D)` completion. */
-void fn_80193F70(struct _ENEMY_WORK* self) {
+void em018_mot31_state_set(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3020,7 +3012,7 @@ void fn_80193F70(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80193FF8 - arms mode 2 with (0x3A/0x0A/0/1) and the `em_action_finish_swim` completion. */
-void fn_80193FF8(struct _ENEMY_WORK* self) {
+void em018_mot3a_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3036,7 +3028,7 @@ void fn_80193FF8(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80194938 - arms mode 2 with motion 0x68 for 10 frames; completion `em_action_finish_swim`. */
-void fn_80194938(struct _ENEMY_WORK* self) {
+void em018_mot68_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3052,7 +3044,7 @@ void fn_80194938(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80194A64 - arms mode 2 with (0x2E/6/0/1); completion `em_action_finish_swim`. */
-void fn_80194A64(struct _ENEMY_WORK* self) {
+void em018_mot2e_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3068,7 +3060,7 @@ void fn_80194A64(struct _ENEMY_WORK* self) {
 }
 
 /* 0x8019533C - arms mode 2 with (0x36/0x14/0/3); completion `em_action_finish_swim`. */
-void fn_8019533C(struct _ENEMY_WORK* self) {
+void em018_mot36_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3084,7 +3076,7 @@ void fn_8019533C(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801966DC - arms motion 0x54 for 10 frames with the `em_hit_window_set_default(self, 0, 1)` pair. */
-void fn_801966DC(struct _ENEMY_WORK* self) {
+void em018_mot54_hit(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3101,7 +3093,7 @@ void fn_801966DC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80196A50 - arms motion 0x57 for 10 frames and the two joint slots whose ids depend on `a`. */
-void fn_80196A50(struct _ENEMY_WORK* self, u8 a) {
+void em018_mot57_step(struct _ENEMY_WORK* self, u8 a) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3130,7 +3122,7 @@ void fn_80196A50(struct _ENEMY_WORK* self, u8 a) {
 
 /* 0x80194CC8 - the release step: clears the bit pair, arms motion 0x80 and runs the +0x020 timer
  * down to zero, then completes with `em_state_set(self, 5, 0x20)`. */
-void fn_80194CC8(struct _ENEMY_WORK* self) {
+void em018_release(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     switch (self->state) {
@@ -3151,7 +3143,7 @@ void fn_80194CC8(struct _ENEMY_WORK* self) {
 
 /* 0x80195BCC - the flag-arming release step: arms motion 0xCD, refreshes the scale, then either
  * the `em_state_set(self, 6, 1)` completion (`a == 1`) or `em_action_finish_stand`. */
-void fn_80195BCC(struct _ENEMY_WORK* self, u8 a) {
+void em018_flag_release(struct _ENEMY_WORK* self, u8 a) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     em_busy_set(self);
@@ -3176,7 +3168,7 @@ void fn_80195BCC(struct _ENEMY_WORK* self, u8 a) {
 }
 
 /* 0x80194318 - arms motion 0x3D with the common `em_action_finish` completion. */
-void fn_80194318(struct _ENEMY_WORK* self) {
+void em018_mot3d_step(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -3193,8 +3185,8 @@ void fn_80194318(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80193964 - the requested-motion step: `a == 1` primes the two-state release first; state 1
- * waits on the `lbl_80570090` descriptor and runs `em_action_finish_swim` when it finishes. */
-void fn_80193964(struct _ENEMY_WORK* self, u8 a) {
+ * waits on the `em018_turn_desc_b` descriptor and runs `em_action_finish_swim` when it finishes. */
+void em018_turn_seq_release_step(struct _ENEMY_WORK* self, u8 a) {
     if (a == 1) {
         em_busy_set(self);
     }
@@ -3202,76 +3194,76 @@ void fn_80193964(struct _ENEMY_WORK* self, u8 a) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        em_turn_seq_start(self, lbl_80570090, 0, 1, 0);
+        em_turn_seq_start(self, em018_turn_desc_b, 0, 1, 0);
         break;
     case 1:
-        if (em_turn_seq_step(self, lbl_80570090) == 1) {
+        if (em_turn_seq_step(self, em018_turn_desc_b) == 1) {
             em_action_finish_swim(self);
         } else if (self->field_0x482 != 0) {
-            em_height_follow(self, lbl_80798298);
+            em_height_follow(self, 5.0f);
         } else {
-            em_height_follow(self, lbl_80798260);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
 }
 
-/* 0x80193A34 - the same shape for the `lbl_805700D0` descriptor. */
-void fn_80193A34(struct _ENEMY_WORK* self) {
+/* 0x80193A34 - the same shape for the `em018_turn_desc_c` descriptor. */
+void em018_turn_seq_c_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        em_turn_seq_start(self, lbl_805700D0, 0, 1, 0);
+        em_turn_seq_start(self, em018_turn_desc_c, 0, 1, 0);
         break;
     case 1:
-        if (em_turn_seq_step(self, lbl_805700D0) == 1) {
+        if (em_turn_seq_step(self, em018_turn_desc_c) == 1) {
             em_action_finish_swim(self);
         } else if (self->field_0x482 != 0) {
-            em_height_follow(self, lbl_80798298);
+            em_height_follow(self, 5.0f);
         } else {
-            em_height_follow(self, lbl_80798260);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
 }
 
-/* 0x80198F28 - the same descriptor shape as `fn_80193964` with the
+/* 0x80198F28 - the same descriptor shape as `em018_turn_seq_release_step` with the
  * `em_state_set(self, 0xD, 1)` completion. */
-void fn_80198F28(struct _ENEMY_WORK* self) {
+void em018_turn_seq_e_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        em_turn_seq_start(self, lbl_80570090, 0, 1, 0);
+        em_turn_seq_start(self, em018_turn_desc_b, 0, 1, 0);
         break;
     case 1:
-        if (em_turn_seq_step(self, lbl_80570090) == 1) {
+        if (em_turn_seq_step(self, em018_turn_desc_b) == 1) {
             em_state_set(self, 0xD, 1);
         } else if (self->field_0x482 != 0) {
-            em_height_follow(self, lbl_80798298);
+            em_height_follow(self, 5.0f);
         } else {
-            em_height_follow(self, lbl_80798260);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
 }
 
-/* 0x8019515C - the same descriptor shape for `lbl_80570110`. */
-void fn_8019515C(struct _ENEMY_WORK* self) {
+/* 0x8019515C - the same descriptor shape for `em018_turn_desc_d`. */
+void em018_turn_seq_d_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        em_turn_seq_start(self, lbl_80570110, 0, 1, 0);
+        em_turn_seq_start(self, em018_turn_desc_d, 0, 1, 0);
         break;
     case 1:
-        if (em_turn_seq_step(self, lbl_80570110) == 1) {
+        if (em_turn_seq_step(self, em018_turn_desc_d) == 1) {
             em_action_finish_swim(self);
         } else if (self->field_0x482 != 0) {
-            em_height_follow(self, lbl_80798298);
+            em_height_follow(self, 5.0f);
         } else {
-            em_height_follow(self, lbl_80798260);
+            em_height_follow(self, 10.0f);
         }
         break;
     }
@@ -3279,7 +3271,7 @@ void fn_8019515C(struct _ENEMY_WORK* self) {
 
 /* 0x801949B4 - arms motion 0x1F for 4 frames, fires the joint effect on the frame and completes with
  * `em_action_finish_swim`. */
-void fn_801949B4(struct _ENEMY_WORK* self) {
+void em018_mot1f_effect(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3287,7 +3279,7 @@ void fn_801949B4(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0x1F, 4, 0);
         break;
     case 1:
-        if (em_frame_check(self, 0, lbl_80798264, lbl_80798238) == 1) {
+        if (em_frame_check(self, 0, 56.0f, 0.0f) == 1) {
             self->field_0x358 = 1;
             em_camera_req(self, -1, 7);
         }
@@ -3300,7 +3292,7 @@ void fn_801949B4(struct _ENEMY_WORK* self) {
 
 /* 0x80196B1C - arms motion 0x4E with the two joint slots 8/9; while the frame effect has not
  * expired it keeps the two-state release armed. */
-void fn_80196B1C(struct _ENEMY_WORK* self) {
+void em018_mot4e_hold(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3311,8 +3303,8 @@ void fn_80196B1C(struct _ENEMY_WORK* self) {
         em_stamina_add(self, -0xC);
         break;
     case 1:
-        if (em_frame_check(self, 1, lbl_80798338, lbl_80798238) == 0) {
-            em_height_follow(self, lbl_80798260);
+        if (em_frame_check(self, 1, 50.0f, 0.0f) == 0) {
+            em_height_follow(self, 10.0f);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish_swim(self);
@@ -3323,22 +3315,22 @@ void fn_80196B1C(struct _ENEMY_WORK* self) {
 
 /* 0x80195638 - the flag-armed step: arms motion 0xD0, then holds the two flags while the frame
  * effects run.  The second argument the dispatcher passes is unused. */
-void fn_80195638(struct _ENEMY_WORK* self, u32 a) {
+void em018_mot_d0_hold(struct _ENEMY_WORK* self, u32 a) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xD0, 0, 0);
-        em_height_set(self, lbl_80798238);
+        em_height_set(self, 0.0f);
         em_shake_req_set(self);
         self->field_0x359 = 1;
         break;
     case 1:
         em_busy_set(self);
-        if (em_frame_check(self, 2, lbl_80798290, lbl_80798238) == 1) {
+        if (em_frame_check(self, 2, 34.0f, 0.0f) == 1) {
             self->field_0x359 = 1;
         }
-        if (em_frame_check(self, 2, lbl_8079827C, lbl_80798238) == 1) {
+        if (em_frame_check(self, 2, 120.0f, 0.0f) == 1) {
             em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
@@ -3350,14 +3342,14 @@ void fn_80195638(struct _ENEMY_WORK* self, u32 a) {
 
 /* 0x80196768 - the three-state step: arm motion 0x59, advance to 0x5A when the frame gate fires,
  * then complete with `em_action_finish`. */
-void fn_80196768(struct _ENEMY_WORK* self) {
+void em018_mot59_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x59, 0xA, 0);
         em_hit_window_set(self, 0, 3, 3);
-        em_approach_start(self, lbl_80798328, 0);
+        em_approach_start(self, -300.0f, 0);
         em_stamina_add(self, -0xC);
         break;
     case 1:
@@ -3367,7 +3359,7 @@ void fn_80196768(struct _ENEMY_WORK* self) {
         }
         break;
     case 2:
-        if (em_frame_check(self, 0, lbl_8079832C, lbl_80798238) == 1) {
+        if (em_frame_check(self, 0, 54.0f, 0.0f) == 1) {
             em_hit_window_clear(self, 0);
         }
         if (em_mot_end_ck(self) == 1) {
@@ -3377,18 +3369,18 @@ void fn_80196768(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80197C84 - arms motion 0xA for 8 frames and the `lbl_80798270` blend; completes with
+/* 0x80197C84 - arms motion 0xA for 8 frames and the `-700.0f` blend; completes with
  * `em_act_set_unless_act11(self, 7, 0)`. */
-void fn_80197C84(struct _ENEMY_WORK* self) {
+void em018_mot_a_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set_blend(self, 0xA, 8, 0, 1);
-        em_approach_start(self, lbl_80798270, 0x10);
+        em_approach_start(self, -700.0f, 0x10);
         break;
     case 1:
-        if (em_frame_check(self, 1, lbl_80798370, lbl_80798238) == 1 &&
+        if (em_frame_check(self, 1, 24.0f, 0.0f) == 1 &&
             (em_approach_step(self, 0, 0x40) == 1 || em_mot_end_ck(self) == 1)) {
             em_act_set_unless_act11(self, 7, 0);
         }
@@ -3399,16 +3391,16 @@ void fn_80197C84(struct _ENEMY_WORK* self) {
 /* 0x80198150 (0x55C): the spin: motion 0xD4, then 0xD5 with the spin window; for 180 frames the two material blends
  * follow a cosine and the heading swings with it, the capsule hit plays the shell SE, a pinned player ends the
  * sweep early, and the recovery runs 30 frames before `em_state_set(self, 7, 0x18)`. */
-void fn_80198150(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
+void em018_spin(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
     VEC3 unused;
     VEC3 ofs;
-    VEC3 hit;
+    Em018HitSphere hit;
     nw4r::math::CAPSULE capsule;
     f32 blend;
 
     VEC3_ctor(&unused);
     VEC3_ctor(&ofs);
-    eft_vec_ctor(&hit);
+    eft_vec_ctor(&hit.center);
     eft_capsule_ctor(&capsule);
     em_shake_req_set(self);
     switch (self->state) {
@@ -3417,7 +3409,7 @@ void fn_80198150(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xD4, 0, 0);
         em_height_set(self, 0.0f);
-        fn_80192358((EmActWork*)self, 8);
+        em018_aim_bits_clear((EmActWork*)self, 8);
         em_stamina_add(self, -0xC);
         break;
     case 1:
@@ -3453,7 +3445,10 @@ void fn_80198150(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
             blend = 0.5f * (1.0f + cosf((6.2831855f * deg) / 360.0f));
             c = cosf((6.2831855f * deg) / 360.0f);
             sinf((6.2831855f * deg) / 360.0f);
-            self->field_0x1C0 = (u16)(self->field_0x1C0 + (s32)(224.0f * c));
+            {
+                s32 d = 224.0f * c;
+                self->field_0x1C0 = (u16)(self->field_0x1C0 + d);
+            }
         } else {
             blend = 1.0f;
         }
@@ -3468,16 +3463,16 @@ void fn_80198150(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
             if (0.0f == self->offset_0x30C.vec_0x310.x && em_frame_check(self, 0, 50.0f, 0.0f) == 1) {
                 self->offset_0x30C.vec_0x310.x = 1.0f;
             }
-            if (self->offset_0x30C.vec_0x310.x > 0.0f && hit_list_capsule_ck(self->hit_0xA08, &capsule, &hit, 0) == 1 &&
+            if (self->offset_0x30C.vec_0x310.x > 0.0f && hit_list_capsule_ck(self->hit_0xA08, &capsule, &hit.center, 0) == 1 &&
                 self->area_no == get_now_areano()) {
                 shell_se_req2(self->se_0xB14, &capsule, 7, self->field_0x01A);
             }
         }
         switch (self->state_0x006) {
         case 0: {
-            u16 max;
-            _PLW* plw;
             s32 i;
+            s32 max;
+            _PLW* plw;
             if ((u8)reverse == 1) {
                 self->field_0x1C0 = (u16)(self->field_0x1C0 - 0x60);
             } else {
@@ -3511,7 +3506,7 @@ void fn_80198150(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
             self->state_0x006++;
             self->state_0x007 = 0;
             em_hit_window_clear(self, 0);
-            fn_80192348((EmActWork*)self, 8);
+            em018_aim_bits_set((EmActWork*)self, 8);
         default:
             if (self->state_0x007 < 0x1E) {
                 self->state_0x007++;
@@ -3525,19 +3520,19 @@ void fn_80198150(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
 }
 
 /* 0x801986AC - the three-state step: arm motion 0xD6, advance to 0xD3 on completion, then the
- * `lbl_8079839C` joint release and `em_action_finish_swim`. */
-void fn_801986AC(struct _ENEMY_WORK* self) {
+ * `6.0f` joint release and `em_action_finish_swim`. */
+void em018_mot_d6_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set_blend(self, 0xD6, 0x14, 0, 1);
         em_hit_window_set(self, 0, 2, 3);
-        em_height_set(self, lbl_80798238);
+        em_height_set(self, 0.0f);
         em_shake_req_set(self);
         break;
     case 1:
-        if (em_frame_check(self, 2, lbl_80798398, lbl_80798238) == 1) {
+        if (em_frame_check(self, 2, 198.0f, 0.0f) == 1) {
             em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
@@ -3547,7 +3542,7 @@ void fn_801986AC(struct _ENEMY_WORK* self) {
         }
         break;
     case 2:
-        if (em_frame_check(self, 0, lbl_8079839C, lbl_80798238) == 1) {
+        if (em_frame_check(self, 0, 6.0f, 0.0f) == 1) {
             em_hit_window_clear(self, 0);
         }
         if (em_mot_end_ck(self) == 1) {
@@ -3559,7 +3554,7 @@ void fn_801986AC(struct _ENEMY_WORK* self) {
 
 /* 0x80197BC0 - the two-stage rotation step: state 0 advances the +0x1C0 angle by 0x8000, state 1
  * arms motion 0x7F, state 2 completes with `em_action_finish`. */
-void fn_80197BC0(struct _ENEMY_WORK* self) {
+void em018_turn_about(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3583,7 +3578,7 @@ void fn_80197BC0(struct _ENEMY_WORK* self) {
 
 /* 0x801961C8 - the flag-armed step: arms motion 0xCE, refreshes the scale and completes through
  * `em_action_finish_stand`.  `a` only selects the two-state release at entry. */
-void fn_801961C8(struct _ENEMY_WORK* self, u8 a) {
+void em018_flag_stand(struct _ENEMY_WORK* self, u8 a) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     if (a == 1) {
@@ -3604,8 +3599,8 @@ void fn_801961C8(struct _ENEMY_WORK* self, u8 a) {
     }
 }
 
-/* 0x8019610C - the same arming as `fn_801961C8` with the `em_turn_to_target(self, 0x300)` completion. */
-void fn_8019610C(struct _ENEMY_WORK* self, u8 a) {
+/* 0x8019610C - the same arming as `em018_flag_stand` with the `em_turn_to_target(self, 0x300)` completion. */
+void em018_flag_turn(struct _ENEMY_WORK* self, u8 a) {
     self->field_0x359 = 1;
     self->field_0x35B = 1;
     if (a == 1) {
@@ -3628,7 +3623,7 @@ void fn_8019610C(struct _ENEMY_WORK* self, u8 a) {
 }
 
 /* 0x8019485C - arms motion 0xCA for 10 frames, advances to 0xDE on completion, then `em_action_finish_swim`. */
-void fn_8019485C(struct _ENEMY_WORK* self, u8 a) {
+void em018_mot_ca_step(struct _ENEMY_WORK* self, u8 a) {
     if (a == 1) {
         em_busy_set(self);
     }
@@ -3654,7 +3649,7 @@ void fn_8019485C(struct _ENEMY_WORK* self, u8 a) {
 }
 
 /* 0x80195098 - arms motion 0x7F, advances to 0x82 on completion, then `em_action_finish`. */
-void fn_80195098(struct _ENEMY_WORK* self) {
+void em018_mot7f_step(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -3678,7 +3673,7 @@ void fn_80195098(struct _ENEMY_WORK* self) {
 
 /* 0x80195ED4 - arms motion 0xDA with the joint slot 0xF; the frame effects re-arm the flag and
  * fire the joint effect, and `em_action_finish` completes the step. */
-void fn_80195ED4(struct _ENEMY_WORK* self) {
+void em018_mot_da_effect(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -3686,19 +3681,19 @@ void fn_80195ED4(struct _ENEMY_WORK* self) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xDA, 0, 0);
         em_hit_window_set_default(self, 0, 0xF);
-        em_height_set(self, lbl_80798238);
+        em_height_set(self, 0.0f);
         em_stamina_add(self, -0xC);
         self->field_0x359 = 1;
         em_shake_req_set(self);
         break;
     case 1:
-        if (em_frame_check(self, 2, lbl_80798288, lbl_80798238) == 1) {
+        if (em_frame_check(self, 2, 100.0f, 0.0f) == 1) {
             em_shake_req_set(self);
         }
-        if (em_frame_check(self, 2, lbl_80798308, lbl_80798238) == 1) {
+        if (em_frame_check(self, 2, 39.0f, 0.0f) == 1) {
             self->field_0x359 = 1;
         }
-        if (em_frame_check(self, 3, lbl_8079830C, lbl_80798288) == 1) {
+        if (em_frame_check(self, 3, 48.0f, 100.0f) == 1) {
             em_turn_to_target(self, 0x400);
         }
         if (em_mot_end_ck(self) == 1) {
@@ -3709,24 +3704,24 @@ void fn_80195ED4(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80196004 - arms motion 0xDB with the joint slot 0x10 and the two frame-effect hooks. */
-void fn_80196004(struct _ENEMY_WORK* self) {
+void em018_mot_db_effect(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xDB, 0, 0);
-        em_height_set(self, lbl_80798238);
+        em_height_set(self, 0.0f);
         em_hit_window_set_default(self, 0, 0x10);
         em_stamina_add(self, -0xC);
         self->field_0x359 = 1;
         em_shake_req_set(self);
         break;
     case 1:
-        if (em_frame_check(self, 2, lbl_80798310, lbl_80798238) == 1) {
+        if (em_frame_check(self, 2, 64.0f, 0.0f) == 1) {
             em_shake_req_set(self);
         }
-        if (em_frame_check(self, 2, lbl_80798314, lbl_80798238) == 1) {
+        if (em_frame_check(self, 2, 49.0f, 0.0f) == 1) {
             self->field_0x359 = 1;
         }
         if (em_mot_end_ck(self) == 1) {
@@ -3736,18 +3731,18 @@ void fn_80196004(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80198FE8 - arms mode 2 with (0x37/0x14/0/1) and the `lbl_807983A0` blend; state 1 waits on the
+/* 0x80198FE8 - arms mode 2 with (0x37/0x14/0/1) and the `-750.0f` blend; state 1 waits on the
  * descriptor and advances to (0x2F/0x28/0/1), completing with `em_state_set(self, 0xD, 2)`. */
-void fn_80198FE8(struct _ENEMY_WORK* self) {
+void em018_mot37_turn(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
         em_mot_set_blend(self, 0x37, 0x14, 0, 1);
-        em_approach_start(self, lbl_807983A0, 0x12);
+        em_approach_start(self, -750.0f, 0x12);
         break;
     case 1:
-        em_height_follow(self, lbl_807982E0);
+        em_height_follow(self, 2.0f);
         if (em_approach_step(self, 0, 0x80) == 1 && em_mot_frame_started_ck(self) == 0) {
             self->state++;
             em_mot_set_blend(self, 0x2F, 0x28, 0, 1);
@@ -3763,7 +3758,7 @@ void fn_80198FE8(struct _ENEMY_WORK* self) {
 
 /* 0x801990E0 (0x104): motion 0x4E with the two hit windows, holding the two-state release until its frame; on the
  * end it chases the hunted record (`em_state_set(self, 0xD, 3)`) when it is in reach, else `em_action_finish_swim`. */
-void fn_801990E0(struct _ENEMY_WORK* self) {
+void em018_hunt_bite(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3777,7 +3772,7 @@ void fn_801990E0(struct _ENEMY_WORK* self) {
             em_height_follow(self, 10.0f);
         }
         if (em_mot_end_ck(self) == 1 && em_busy_ck(self) == 1) {
-            if (fn_8019E49C(self, 0) == 1) {
+            if (em018_hunt_reach_ck(self, 0) == 1) {
                 em_state_set(self, 0xD, 3);
             } else {
                 em_action_finish_swim(self);
@@ -3787,11 +3782,11 @@ void fn_801990E0(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801991E4 (0x1FC): the closing turn: arms the `lbl_80570090` descriptor and a 50-frame glide toward the
+/* 0x801991E4 (0x1FC): the closing turn: arms the `em018_turn_desc_b` descriptor and a 50-frame glide toward the
  * target that stops 600 short (at most 50 per frame), then picks the hunted-record chase or action 5's step 10. */
-void fn_801991E4(struct _ENEMY_WORK* self) {
-    VEC3 diff;
+void em018_closing_turn(struct _ENEMY_WORK* self) {
     VEC3 dir;
+    VEC3 diff;
 
     VEC3_ctor(&dir);
     switch (self->state) {
@@ -3800,13 +3795,15 @@ void fn_801991E4(struct _ENEMY_WORK* self) {
         f32 step;
         self->state++;
         em_move_mode_set(self, 2);
-        em_turn_seq_start(self, lbl_80570090, 0, 1, 0);
+        em_turn_seq_start(self, em018_turn_desc_b, 0, 1, 0);
         self->timer_0x020 = 0x32;
         subVec3(&diff, &self->vec_0x36C, &self->pos);
         copyVec3(&dir, &diff);
         angle = calcVecAng3(&dir);
         dir.y = 0.0f;
-        step = (vec3_len((const f32*)&dir) - 600.0f * get_em_chg_scale(self)) / self->timer_0x020;
+        step = vec3_len((const f32*)&dir);
+        step -= 600.0f * get_em_chg_scale(self);
+        step /= self->timer_0x020;
         if (step > 50.0f) {
             step = 50.0f;
         } else if (step < -50.0f) {
@@ -3821,9 +3818,9 @@ void fn_801991E4(struct _ENEMY_WORK* self) {
             self->timer_0x020--;
             em_move_offset_apply(self);
         }
-        if (em_turn_seq_step(self, lbl_80570090) == 1) {
+        if (em_turn_seq_step(self, em018_turn_desc_b) == 1) {
             if (em_busy_ck(self) == 1) {
-                if (fn_8019E49C(self, 1) == 1) {
+                if (em018_hunt_reach_ck(self, 1) == 1) {
                     em_state_set(self, 0xD, 4);
                 } else {
                     em_state_set(self, 5, 0xA);
@@ -3840,7 +3837,7 @@ void fn_801991E4(struct _ENEMY_WORK* self) {
 
 /* 0x801993E0 - the state-advance entry: state 0 arms the motion, state 1 waits for `em_mot_end_ck` and runs
  * `em_state_set(self, 13, 5)`. */
-void fn_801993E0(struct _ENEMY_WORK* self) {
+void em018_state13_step(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3857,7 +3854,7 @@ void fn_801993E0(struct _ENEMY_WORK* self) {
 
 /* 0x80199468 - the same shape with this action's own arming pair (mode 46, duration 6, the 1000 ms
  * `em_stamina_add` timer) and `em_action_finish_swim` as the completion. */
-void fn_80199468(struct _ENEMY_WORK* self) {
+void em018_mot46_swim(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
@@ -3876,7 +3873,7 @@ void fn_80199468(struct _ENEMY_WORK* self) {
 /* 0x801994F4 (0x538): the scripted entrance: a chain of demo-timed motions (0xCE, 0xCF, 0xD4, 0xD5, 0xD3 along the
  * `em018_demo_keys` path, 0x28, 0x1F) with the demo position and rotation pins, the joint 0xF effects and the
  * depth clamp at -1110. */
-void fn_801994F4(struct _ENEMY_WORK* self) {
+void em018_entrance(struct _ENEMY_WORK* self) {
     VEC3 vec;
     MTX34 mtx;
 
@@ -3933,7 +3930,10 @@ void fn_801994F4(struct _ENEMY_WORK* self) {
             em_demo_key3_apply(self, em_demo_frame_get(), em018_demo_keys, 0);
             em_demo_rot_set(self, 0.0f, -178.0f, 0.0f);
             if (self->pos.y < -1110.0f) {
-                em_height_set(self, 1110.0f + self->pos.y);
+                {
+                f32 h = 1110.0f + self->pos.y;
+                em_height_set(self, h);
+            }
             } else {
                 em_height_set(self, 0.0f);
             }
@@ -3951,7 +3951,10 @@ void fn_801994F4(struct _ENEMY_WORK* self) {
         }
         em_demo_key3_apply(self, em_demo_frame_get(), em018_demo_keys, 0);
         if (self->pos.y < -1110.0f) {
-            em_height_set(self, 1110.0f + self->pos.y);
+            {
+                f32 h = 1110.0f + self->pos.y;
+                em_height_set(self, h);
+            }
         } else {
             em_height_set(self, 0.0f);
         }
@@ -3987,17 +3990,17 @@ void fn_801994F4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80199A2C - `fn_80199ADC`'s case 7: arm mode 31 with the `em_demo_pos_set`/`em_demo_rot_set` pair and zero
+/* 0x80199A2C - `em018_sub_state_dispatch`'s case 7: arm mode 31 with the `em_demo_pos_set`/`em_demo_rot_set` pair and zero
  * the stored height, then wait for `em_mot_end_ck` and run `em_action_finish_swim`. */
-void fn_80199A2C(struct _ENEMY_WORK* self) {
+void em018_demo_pin(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
         em_mot_set(self, 31, 0, 0);
-        em_demo_pos_set(self, lbl_807983F0, lbl_807983F4, lbl_807983F8);
-        em_demo_rot_set(self, lbl_80798238, lbl_807983B0, lbl_80798238);
-        em_height_set(self, lbl_80798238);
+        em_demo_pos_set(self, -592.5f, -788.5f, -2266.0f);
+        em_demo_rot_set(self, 0.0f, 182.0f, 0.0f);
+        em_height_set(self, 0.0f);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -4009,75 +4012,75 @@ void fn_80199A2C(struct _ENEMY_WORK* self) {
 
 /* 0x80199ADC - the action-id dispatcher: `self->state_sub` (0x1E6) selects this unit's per-action
  * update. */
-void fn_80199ADC(struct _ENEMY_WORK* self) {
+void em018_sub_state_dispatch(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
-        fn_80198F28(self);
+        em018_turn_seq_e_step(self);
         break;
     case 1:
-        fn_80198FE8(self);
+        em018_mot37_turn(self);
         break;
     case 2:
-        fn_801990E0(self);
+        em018_hunt_bite(self);
         break;
     case 3:
-        fn_801991E4(self);
+        em018_closing_turn(self);
         break;
     case 4:
-        fn_801993E0(self);
+        em018_state13_step(self);
         break;
     case 5:
-        fn_80199468(self);
+        em018_mot46_swim(self);
         break;
     case 6:
-        fn_801994F4(self);
+        em018_entrance(self);
         break;
     case 7:
-        fn_80199A2C(self);
+        em018_demo_pin(self);
         break;
     }
 }
 
 /* 0x80199B24 - the `action` (0x1E5) dispatcher, plus the shared tail: the +0x1E2 gate that runs
- * `em_busy_set`/`em_busy_timer_reset`, then `fn_8019E398`. */
-void fn_80199B24(struct _ENEMY_WORK* self) {
+ * `em_busy_set`/`em_busy_timer_reset`, then `em018_done_flags_update`. */
+void em018_action_dispatch(struct _ENEMY_WORK* self) {
     switch (self->action) {
     case 0:
-        fn_80192F24(self);
+        em018_act0_dispatch(self);
         break;
     case 1:
-        fn_80193394(self);
+        em018_act1_dispatch(self);
         break;
     case 2:
-        fn_801938D8(self);
+        em018_act2_dispatch(self);
         break;
     case 5:
-        fn_801953BC(self);
+        em018_act5_dispatch(self);
         break;
     case 6:
-        fn_80196618(self);
+        em018_act6_dispatch(self);
         break;
     case 7:
-        fn_801987E4(self);
+        em018_act7_dispatch(self);
         break;
     case 10:
-        fn_80198910(self);
+        em018_se_program(self);
         break;
     case 11:
-        fn_80198E00(self);
+        em018_se_alt_program(self);
         break;
     case 12:
-        fn_80198F14(self);
+        em018_act8_dispatch(self);
         break;
     case 13:
-        fn_80199ADC(self);
+        em018_sub_state_dispatch(self);
         break;
     }
     if (self->field_0x1E2 == 1) {
         em_busy_set(self);
         em_busy_timer_reset(self);
     }
-    fn_8019E398(self);
+    em018_done_flags_update(self);
 }
 
 
@@ -4152,7 +4155,9 @@ void em018_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s
         return;
     case 1:
         if ((self->field_0x228 & 6) != 0) {
-            if ((u32)(id - 3) <= 1) {
+            switch (id) {
+            case 3:
+            case 4:
                 if (joint == 0xFF) {
                     vec.x = self->pos.x;
                     vec.y = 5.0f + self->field_0x210;
@@ -4162,8 +4167,7 @@ void em018_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s
                 }
                 eft009_spawn_at_joint(self, joint, 0x11, delta, scale);
                 return;
-            }
-            if (id == 5) {
+            case 5:
                 if (joint == 0xFF) {
                     vec.x = self->pos.x;
                     vec.y = 5.0f + self->field_0x210;
@@ -4181,7 +4185,8 @@ void em018_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s
             get_joint_wpos_em(self, joint, &vec);
         }
         vec.y = self->field_0x20C;
-        eft_spawn_pos_in_area(&vec, self->area_no, id, self->field_0x1C0 + delta, scale * get_em_chg_scale(self));
+        scale *= get_em_chg_scale(self);
+        eft_spawn_pos_in_area(&vec, self->area_no, id, self->field_0x1C0 + delta, scale);
         return;
     case 2:
         if (joint == 0xFF) {
@@ -4190,7 +4195,8 @@ void em018_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s
             get_joint_wpos_em(self, joint, &vec);
         }
         vec.y = self->field_0x20C;
-        eft_spawn_type11(self, &vec, id, scale * get_em_chg_scale(self));
+        scale *= get_em_chg_scale(self);
+        eft_spawn_type11(self, &vec, id, scale);
         return;
     }
 }
@@ -4207,8 +4213,8 @@ void em018_drip_effect(struct _ENEMY_WORK* self) {
     if (em_alt_mode_ck(self) == 0) {
         return;
     }
-    angle = calcVecAngX(&self->vec_0x76C);
-    if ((u16)(angle + 0x8000) <= 0x671B) {
+    angle = (u16)calcVecAngX(&self->vec_0x76C);
+    if ((u16)(angle + 0x8000U) <= 0x671B) {
         return;
     }
     switch (em_get_mot_no(self)) {
@@ -4224,27 +4230,28 @@ void em018_drip_effect(struct _ENEMY_WORK* self) {
     case 0xD4:
     case 0xD5:
     case 0xD6:
-        return;
-    }
-    setVector3(&vec, 0.0f, -20.0f, 70.0f);
-    get_joint_wmat_em(self, 0xF, &mtx);
-    mulVecMat(&vec, &mtx);
-    vec.x += mtx.m[0][3];
-    vec.y += mtx.m[1][3];
-    vec.z += mtx.m[2][3];
-    if (em_water_check_c1(self) == 1 && vec.y < self->field_0x210) {
-        if ((system_w.field_0x0c & 0x1F) == 0) {
-            if ((u16)(angle + 0x8000) > 0x6E38) {
-                eft_spawn_type10(self, 0x12, 0xF, &vec, 1.0f);
-            } else {
-                eft_spawn_type10(self, 0x11, 0xF, &vec, 1.0f);
+        break;
+    default:
+        setVector3(&vec, 0.0f, -20.0f, 70.0f);
+        get_joint_wmat_em(self, 0xF, &mtx);
+        mulVecMat(&vec, &mtx);
+        vec.x += mtx.m[0][3];
+        vec.y += mtx.m[1][3];
+        vec.z += mtx.m[2][3];
+        if (em_water_check_c1(self) == 1 && vec.y < self->field_0x210) {
+            if ((system_w.field_0x0c & 0x1F) == 0) {
+                if ((u16)(angle + 0x8000) > 0x6E38) {
+                    eft_spawn_type10(self, 0x12, 0xF, &vec, 1.0f);
+                } else {
+                    eft_spawn_type10(self, 0x11, 0xF, &vec, 1.0f);
+                }
             }
-        }
-    } else if ((system_w.field_0x0c & 0x1F) == 0) {
-        if ((u16)(angle + 0x8000) > 0x6E38) {
-            eft_spawn_type10(self, 0x10, 0xF, &vec, 1.0f);
-        } else {
-            eft_spawn_type10(self, 0xF, 0xF, &vec, 1.0f);
+        } else if ((system_w.field_0x0c & 0x1F) == 0) {
+            if ((u16)(angle + 0x8000) > 0x6E38) {
+                eft_spawn_type10(self, 0x10, 0xF, &vec, 1.0f);
+            } else {
+                eft_spawn_type10(self, 0xF, 0xF, &vec, 1.0f);
+            }
         }
     }
 }
@@ -4470,11 +4477,11 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
         break;
     case 0x39:
         if (em_after_frame_check(self, 0, 18.0f, 0.0f) == 1) {
-            em_eft_fx_spawn(self, 0, 0x2A, 8, 1.0f);
+            em_eft_fx_spawn_ff(self, 0, 0x2A, 1.0f, 8);
             vec.x = 0.0f;
             vec.y = -100.0f;
             vec.z = 100.0f;
-            shell_set_func_ptr->method_0x2C(self, 3, 1, &vec, 0.7f, 0xFFFF, shell_set_func_ptr);
+            ((Em018ShellJobFn)shell_set_func_ptr->method_0x2C)(self, 3, 1, &vec, 0.7f, 0xFFFF);
         }
         break;
     case 0x3B:
@@ -4507,17 +4514,17 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
         break;
     case 0x46:
         if (em_after_frame_check(self, 0, 62.0f, 0.0f) == 1) {
-            em_eft_fx_spawn_pair(self, 2, 0x2A, 0xF, 0x1E, 0.9f);
+            em_eft_fx_spawn_pair_ff(self, 2, 0x2A, 0xF, 0.9f, 0x1E);
         }
         break;
     case 0x47:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-            em_eft_fx_spawn_pair(self, 2, 0x2A, 0xF, 0x1E, 0.9f);
+            em_eft_fx_spawn_pair_ff(self, 2, 0x2A, 0xF, 0.9f, 0x1E);
         }
         break;
     case 0x49:
         if (em_after_frame_check(self, 0, 178.0f, 0.0f) == 1) {
-            em_eft_fx_spawn_pair(self, 2, 0x2A, 0xF, 0x18, 0.7f);
+            em_eft_fx_spawn_pair_ff(self, 2, 0x2A, 0xF, 0.7f, 0x18);
         }
         break;
     case 0x4E:
@@ -4955,7 +4962,7 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
         }
         break;
     case 0xD2:
-        if ((fn_8019238C((EmActWork*)self) == 0) && ((em_after_frame_check(self, 0, 64.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 94.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 122.0f, 0.0f) == 1))) {
+        if ((em018_aim_part_level_ck((EmActWork*)self) == 0) && ((em_after_frame_check(self, 0, 64.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 94.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 122.0f, 0.0f) == 1))) {
             setVector3(&vec, 0.0f, 10.0f, 0.0f);
             eft_em_spawn(self, 0x29, 0x1A, &vec, 1.0f);
         }
@@ -4977,7 +4984,7 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
         }
         break;
     case 0xD8:
-        if ((fn_8019238C((EmActWork*)self) == 0) && ((em_after_frame_check(self, 0, 30.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 62.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 90.0f, 0.0f) == 1))) {
+        if ((em018_aim_part_level_ck((EmActWork*)self) == 0) && ((em_after_frame_check(self, 0, 30.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 62.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 90.0f, 0.0f) == 1))) {
             setVector3(&vec, 0.0f, 10.0f, 0.0f);
             eft_em_spawn(self, 0x29, 0x1A, &vec, 1.0f);
         }
@@ -5032,11 +5039,11 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
         break;
     case 0xDF:
         if (em_after_frame_check(self, 0, 8.0f, 0.0f) == 1) {
-            em_eft_fx_spawn_pair(self, 2, 0x2A, 0xF, 0x1E, 0.9f);
+            em_eft_fx_spawn_pair_ff(self, 2, 0x2A, 0xF, 0.9f, 0x1E);
         }
         break;
     case 0xE2:
-        if ((fn_8019238C((EmActWork*)self) == 0) && ((em_after_frame_check(self, 0, 62.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 94.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 90.0f, 0.0f) == 1))) {
+        if ((em018_aim_part_level_ck((EmActWork*)self) == 0) && ((em_after_frame_check(self, 0, 62.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 94.0f, 0.0f) == 1) || (em_after_frame_check(self, 0, 90.0f, 0.0f) == 1))) {
             setVector3(&vec, 0.0f, 10.0f, 0.0f);
             eft_em_spawn(self, 0x29, 0x1A, &vec, 1.0f);
         }
@@ -5051,7 +5058,7 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
             eft_em_spawn(self, 0x37, 0xF, &vec, 1.0f);
         }
     }
-    if ((em_alt_mode_ck(self) != 0) && (fn_801923CC((EmActWork*)self) == 0)) {
+    if ((em_alt_mode_ck(self) != 0) && (em018_aim_glint_ck((EmActWork*)self) == 0)) {
         if ((self->field_0x358 == 0) && (em_get_mot_no(self) != 0x1E) && (em_get_mot_no(self) != 0x1F)) {
             self->field_0x358 = 1;
         }
@@ -5070,7 +5077,7 @@ void em018_tev_color_update(struct _ENEMY_WORK* self) {
     f32 ceiling;
     f32 step;
 
-    if (fn_801923CC((EmActWork*)self) != 0) {
+    if (em018_aim_glint_ck((EmActWork*)self) != 0) {
         if ((rec->glint_0x1C = 8.5f + rec->glint_0x1C) > 255.0f) {
             rec->glint_0x1C = 255.0f;
         }
@@ -5088,8 +5095,8 @@ void em018_tev_color_update(struct _ENEMY_WORK* self) {
     ((MHchar*)self->char_0x024)->getTevKColor(5, GX_KCOLOR2, &color);
     if (em_flags836_ck(self, 1) == 1) {
         if (color.a != 0) {
-            s16 a = color.a - 1;
-            if (a < 0) {
+            s32 a = color.a - 1;
+            if ((s16)a < 0) {
                 a = 0;
             }
             color.a = a;
@@ -5114,11 +5121,11 @@ void em018_tev_color_update(struct _ENEMY_WORK* self) {
         step = 4.266667f;
         break;
     }
-    if (fn_801923CC((EmActWork*)self) != 0) {
+    if (em018_aim_glint_ck((EmActWork*)self) != 0) {
         if ((rec->ambient_0x20 += step) > ceiling) {
             rec->ambient_0x20 = ceiling;
-            if (fn_80192370(self, 2) == 0) {
-                fn_80192348((EmActWork*)self, 2);
+            if (em018_aim_bits_ck(self, 2) == 0) {
+                em018_aim_bits_set((EmActWork*)self, 2);
             }
         }
     } else if ((rec->ambient_0x20 -= step) < 127.0f) {
@@ -5131,8 +5138,8 @@ void em018_tev_color_update(struct _ENEMY_WORK* self) {
     if (((MHchar*)self->char_0x024)->getAmbColor(5, GX_COLOR0A0, &color) != 0) {
         if (em_flags836_ck(self, 1) == 1) {
             if (color.r != 0) {
-                s16 v = color.r - 1;
-                if (v < 0) {
+                s32 v = color.r - 1;
+                if ((s16)v < 0) {
                     v = 0;
                 }
                 color.r = color.g = color.b = v;
@@ -5142,12 +5149,12 @@ void em018_tev_color_update(struct _ENEMY_WORK* self) {
         }
         ((MHchar*)self->char_0x024)->setAmbColor(5, GX_COLOR0A0, color, false);
     }
-    if (fn_80192370(self, 4) == 1) {
-        fn_80192348((EmActWork*)self, 2);
-        fn_80192358((EmActWork*)self, 4);
+    if (em018_aim_bits_ck(self, 4) == 1) {
+        em018_aim_bits_set((EmActWork*)self, 2);
+        em018_aim_bits_clear((EmActWork*)self, 4);
     }
-    if (fn_801923CC((EmActWork*)self) == 0 && fn_80192370(self, 2) == 1) {
-        fn_80192358((EmActWork*)self, 2);
+    if (em018_aim_glint_ck((EmActWork*)self) == 0 && em018_aim_bits_ck(self, 2) == 1) {
+        em018_aim_bits_clear((EmActWork*)self, 2);
     }
     ((MHchar*)self->char_0x024)->getTevKColor(3, GX_KCOLOR3, &color);
     if (em_eft_active_ck(self) == 1) {
@@ -5158,7 +5165,7 @@ void em018_tev_color_update(struct _ENEMY_WORK* self) {
         color.a = (s32)(30.0f * (0.5f * (1.0f + sin_idx_get((u16)(system_w.field_0x0c * 0x2000))))) + 0x87;
     }
     ((MHchar*)self->char_0x024)->setTevKColor(3, GX_KCOLOR3, &color);
-    if (fn_8019238C((EmActWork*)self) == 1) {
+    if (em018_aim_part_level_ck((EmActWork*)self) == 1) {
         if (em_eft_active_ck(self) == 1) {
             if (rec->pulse_up_0x32 > 0) {
                 if ((rec->pulse_0x24 += 8.333333f) >= 50.0f) {
@@ -5203,7 +5210,7 @@ void em018_tev_color_update(struct _ENEMY_WORK* self) {
 }
 
 /* 0x8019D8B8 - the per-mode "this action may run" predicate the band's dispatchers gate on. */
-u32 fn_8019D8B8(struct _ENEMY_WORK* self, u8 mode) {
+u32 em018_action_mode_ck(struct _ENEMY_WORK* self, u8 mode) {
     switch (mode) {
     case 0:
         if (em_water_check_c1(self) == 1) {
@@ -5226,12 +5233,12 @@ u32 fn_8019D8B8(struct _ENEMY_WORK* self, u8 mode) {
         }
         break;
     case 4:
-        if (self->vec_0x36C.z - self->pos.y >= lbl_80798288) {
+        if (self->vec_0x36C.y - self->pos.y >= 100.0f) {
             return 1;
         }
         break;
     case 5:
-        if (fn_80192370((struct _ENEMY_WORK*)self, 16) == 0) {
+        if (em018_aim_bits_ck((struct _ENEMY_WORK*)self, 16) == 0) {
             return 1;
         }
         break;
@@ -5251,7 +5258,7 @@ u32 fn_8019D8B8(struct _ENEMY_WORK* self, u8 mode) {
 
 /* 0x8019D9BC - the "load the action's joint position" init: arm mode 4, publish the two record
  * bytes and ask `em_data_point_get` for the area's joint, then run the band's common tail. */
-void fn_8019D9BC(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
+void em018_area_point_init(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
     em_move_mode_set(self, 4);
     *out_a = 12;
     *out_b = 0;
@@ -5268,19 +5275,19 @@ void fn_8019D9BC(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
         break;
     case 9:
     case 11:
-        if (self->area_no == 1) {
+        if ((s32)self->area_no == 1) {
             em_data_point_get(self, (u16)((self->area_no & 0xF) << 8), &self->pos);
         }
         break;
     }
-    fn_80192618((struct _ENEMY_WORK*)self);
+    em018_aim_arm((struct _ENEMY_WORK*)self);
 }
 
 /* 0x8019DAC0 - the area dispatch of the "already in mode" state: the map lookup picks the area
  * group, this area decides whether the state is armed. */
-void fn_8019DAC0(struct _ENEMY_WORK* self) {
+void em018_area_mode_set(struct _ENEMY_WORK* self) {
     u32 state = 0;
-    if (stage_map_kind_get(self->field_0x1E0) == 3) {
+    if ((s32)stage_map_kind_get(self->field_0x1E0) == 3) {
         switch (self->area_no) {
         case 1:
             state = 1;
@@ -5289,7 +5296,7 @@ void fn_8019DAC0(struct _ENEMY_WORK* self) {
             state = 2;
             break;
         case 3:
-            if (self->field_0x9F6 == 2) {
+            if ((s32)self->field_0x9F6 == 2) {
                 state = 1;
             }
             break;
@@ -5306,7 +5313,7 @@ void fn_8019DAC0(struct _ENEMY_WORK* self) {
 
 /* 0x8019DB9C - the "action 2 still running" gate: true only in mode 4 of the enemy-control state
  * machine while `em_alt_mode_ck` reports not-yet-armed. */
-u32 fn_8019DB9C(struct _ENEMY_WORK* self) {
+u32 em018_act2_running_ck(struct _ENEMY_WORK* self) {
     if (self->field_0x1E2 == 4 && em_alt_mode_ck(self) == 0) {
         return 1;
     }
@@ -5346,7 +5353,7 @@ u32 em018_action_select(struct _ENEMY_WORK* self, u32 arg) {
         }
     }
     if (hit == 0) {
-        if (fn_80192370(self, 0x10) == 0) {
+        if (em018_aim_bits_ck(self, 0x10) == 0) {
             if (em_eft_active_ck(self) == 1 && (self->value_0x452 >= self->field_0x450 || self->field_0x43D != 1)) {
                 u32 area = 0xFF;
                 switch (kind) {
@@ -5394,13 +5401,13 @@ u32 em018_action_select(struct _ENEMY_WORK* self, u32 arg) {
         u16 max = get_move_work_max(3);
         u16 i;
         for (i = 0; i < max; i++, work++) {
-            if (self->active != 0 && self->group != i && em_work_die_ck(work) != 1 && work->team == 0x12 &&
+            if (self->active != 0 && self->group != i && (u32)em_work_die_ck(work) != 1 && work->team == 0x12 &&
                 work->area_no == self->area_no) {
                 found = 1;
                 break;
             }
         }
-        if (found == 1 && em_roll_cooldown_ck_c1(self, (u16)arg, 0x32, (s16*)&self->tev_0x35E) == 1) {
+        if (found == 1 && (u32)em_roll_cooldown_ck_c1(self, (u16)arg, 0x32, (s16*)&self->tev_0x35E) == 1) {
             self->field_0x1FC = 1;
             self->field_0x1FE = 2;
             self->field_0x1FF = 0xFF;
@@ -5468,7 +5475,7 @@ void Em018UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* holder, nw4r::g3d::Re
             break;
         case 24:
             anm_chr_result_trans_get_c1(holder, &vec);
-            if (fn_80192370(work, 1) == 1) {
+            if (em018_aim_bits_ck(work, 1) == 1) {
                 vec.y -= 25.0f;
             }
             anm_chr_result_trans_set_c1(holder, &vec);
@@ -5550,7 +5557,7 @@ void em018_glow_fade(struct _ENEMY_WORK* self) {
     if (rec->dim_0x31 != 0) {
         if ((rec->fade_0x28 -= 0.075f) < 0.0001f) {
             rec->fade_0x28 = 0.0001f;
-            fn_80192348((EmActWork*)self, 1);
+            em018_aim_bits_set((EmActWork*)self, 1);
         }
         if ((rec->fade_0x2C -= 0.05f) < 0.5f) {
             rec->fade_0x2C = 0.5f;
@@ -5562,22 +5569,22 @@ void em018_glow_fade(struct _ENEMY_WORK* self) {
         if ((rec->fade_0x2C += 0.05f) > 1.0f) {
             rec->fade_0x2C = 1.0f;
         }
-        if (fn_80192370(self, 1) == 1) {
-            fn_80192358((EmActWork*)self, 1);
+        if (em018_aim_bits_ck(self, 1) == 1) {
+            em018_aim_bits_clear((EmActWork*)self, 1);
         }
     }
 }
 /* 0x8019E398 - the two +0x35C completion flags: each is set while its action pair matches and
  * cleared once the enemy has moved on to another action. */
-void fn_8019E398(struct _ENEMY_WORK* self) {
-    if (em_act_ck(self, 6, 0) == 1 || em_act_ck(self, 6, 1) == 1) {
+void em018_done_flags_update(struct _ENEMY_WORK* self) {
+    if ((u32)em_act_ck(self, 6, 0) == 1 || (u32)em_act_ck(self, 6, 1) == 1) {
         if ((self->field_0x35C & 1) == 0) {
             self->field_0x35C |= 1;
         }
     } else if (self->action != 0 && (self->field_0x35C & 1) != 0) {
         self->field_0x35C &= ~1;
     }
-    if (em_act_ck(self, 5, 17) == 1 || em_act_ck(self, 5, 18) == 1) {
+    if ((u32)em_act_ck(self, 5, 17) == 1 || (u32)em_act_ck(self, 5, 18) == 1) {
         if ((self->field_0x35C & 2) == 0) {
             self->field_0x35C |= 2;
         }
@@ -5588,15 +5595,14 @@ void fn_8019E398(struct _ENEMY_WORK* self) {
 
 /* 0x8019E49C - "is the record we are hunting within reach": true when the paired record exists and
  * the xz distance is inside the scaled radius (or when the caller asked for the trivial answer). */
-u32 fn_8019E49C(struct _ENEMY_WORK* self, u32 flag) {
+u32 em018_hunt_reach_ck(struct _ENEMY_WORK* self, u32 flag) {
     struct _ENEMY_WORK* other = em_ally_find(self, 23, 0);
     if (other != 0 && em_act11_wait_ck(other) == 1) {
         if ((u8)flag == 0) {
             return 1;
         }
         f32 dist = calcDistanceSqXZ(&self->pos, &other->pos);
-        f32 range = get_em_chg_scale(self) * lbl_80798510;
-        if (dist < range * (get_em_chg_scale(self) * lbl_80798510)) {
+        if (dist < (get_em_chg_scale(self) * 1000.0f) * (get_em_chg_scale(self) * 1000.0f)) {
             return 1;
         }
     }
@@ -5619,13 +5625,13 @@ Em018UserData::~Em018UserData() {
 
 /* The unit's `.bss`: the two-vector record `em018_static_init` seeds.  The name is a GUESS (a pair of model-space
  * points). */
-VEC3 vec_pair_801926EC_0[2];  /* +0x806A7A70 */
+VEC3 em018_seg_points[2];  /* +0x806A7A70 */
 
 /* 0x8019E604 (0x6C): the static initializer: seeds the two vectors of the pair. */
 extern "C" void em018_static_init(void) {
-    VEC3 lo;
     VEC3 hi;
+    VEC3 lo;
 
-    assignVec3_c1(&vec_pair_801926EC_0[0], setVec3(&hi, 0.0f, 54.0f, 0.0f));
-    assignVec3_c1(&vec_pair_801926EC_0[1], setVec3(&lo, 0.0f, -2.4f, 0.0f));
+    assignVec3_c1(&em018_seg_points[0], setVec3(&hi, 0.0f, 54.0f, 0.0f));
+    assignVec3_c1(&em018_seg_points[1], setVec3(&lo, 0.0f, -2.4f, 0.0f));
 }
