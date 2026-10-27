@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): `ef/fn_8010BDE4.cpp`'s `eft_npc_aura_create`, the one declaration `ai/ai_npc.cpp` needs.
+/* Leaf header (docs/plan.md 6.5 rule 2): `ef/eft016.cpp`'s `eft_npc_aura_create`, the one declaration `ai/ai_npc.cpp` needs.
  * GUESS name, from the body (listed on the NAMES line of ai/ai_npc.cpp). */
 #ifndef MHTRI_EF_EFT_NPC_AURA_CREATE_H
 #define MHTRI_EF_EFT_NPC_AURA_CREATE_H

@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): `ef/fn_8010D1A8.c`'s `ef_pl_effects_init`, the one declaration `lobby/lb_npc.cpp` needs.
+/* Leaf header (docs/plan.md 6.5 rule 2): `ef/eft018.cpp`'s `ef_pl_effects_init`, the one declaration `lobby/lb_npc.cpp` needs.
  * C linkage (the map row is a plain name).  GUESS name. */
 #ifndef MHTRI_EF_EF_PL_EFFECTS_INIT_H
 #define MHTRI_EF_EF_PL_EFFECTS_INIT_H

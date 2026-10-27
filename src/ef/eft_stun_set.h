@@ -1,4 +1,4 @@
-/* ef/eft_stun_set.h - the declarations of `eft_stun_set`, which `ef/fn_8010BDE4.cpp` owns (docs/plan.md 6.5 rule 2), with the
+/* ef/eft_stun_set.h - the declarations of `eft_stun_set`, which `ef/eft016.cpp` owns (docs/plan.md 6.5 rule 2), with the
  * argument views `enemy/em_common.cpp` calls them through. */
 #ifndef MHTRI_EF_EFT_STUN_SET_H
 #define MHTRI_EF_EFT_STUN_SET_H

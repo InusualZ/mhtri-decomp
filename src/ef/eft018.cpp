@@ -1,40 +1,36 @@
-/* ef/fn_8010D1A8.c - the player and NPC light effects: the area effect (`eft_spawn_pos_in_area` builds an `_EFT`
+/* ef/eft018.cpp - the player and NPC light effects: the area effect (`eft_spawn_pos_in_area` builds an `_EFT`
  *   record whose `eft_area_effect_*` states create, colour and retire one nw4r effect) and the light family
  *   (`eft_light_spawn` pools the light models, `eft_light_dispatch`/`eft_light_update` run one init and one update
  *   body per variant: 0 the lantern, 2 the dropped light, 3 the NPC's lantern, 4 the lobby lantern).
- * RANGE. .text 0x8010D1A8-0x801121DC (37 functions); extab 0x8000C25C-0x8000C32C, extabindex 0x80026274-0x800263AC,
- *   .data 0x8059F530-0x8059F670, .sdata 0x80791828-0x80791840, .sdata2 0x80796838-0x807969D8.
- *   Seam: `fn_8010D1A8`, `fn_8010D29C` and `fn_8010D2AC` are called only from `ef/fn_8010BDE4.cpp`; the `.sdata2` run
- *   0x80796838..0x80796848 (-1.0, 0.0, the int-to-float magic) is read only by `fn_8010D1A8` and repeats values the
- *   rest of the pool carries again (0x80796884, 0x807968CC, 0x807969B8); `.data` 0x8059F574 is read only by
- *   `ef/fn_8010BDE4.cpp` and sits between `fn_8010D1A8`'s two tables.  The TU edge is 0x8010D2B0 (request filed).
- * FLAGS. `cflags_main` (`-lang=c`); `#pragma cplusplus on` makes the file C++: every callee it reaches is a C++
- *   mangling (`MHchar` members, nw4r functions, `Pl_frame_check`), and the target carries extab/extabindex for its
- *   functions.  The unit's own definitions are `extern "C"`: the map has only plain names for them.
+ * RANGE. .text 0x8010D2B0-0x801121DC (34 functions); extab 0x8000C264-0x8000C32C, extabindex 0x80026280-0x800263AC,
+ *   .data 0x8059F588-0x8059F670, .sdata 0x80791828-0x80791840, .sdata2 0x80796848-0x807969D8.
+ *   Seam: the three functions before 0x8010D2B0 are called only from `ef/eft016.cpp`, whose object owns them, the
+ *   `.sdata2` run 0x80796838..0x80796848 and the `.data` tables through 0x8059F588.
+ *   Name: GUESS - the ef units are named by the family tag their allocator stores at `_EFT+0x03`; `eft_light_spawn`
+ *   stores 0x12 (and `eft_spawn_pos_in_area` 0x11, riding along as in `ef/eft002.cpp`).
+ * FLAGS. `cflags_main`; C++ (every callee it reaches is a C++ mangling - `MHchar` members, nw4r functions,
+ *   `Pl_frame_check` - and the target carries extab/extabindex for its functions).  The unit's own definitions are
+ *   `extern "C"`: the map has only plain names for them.
  *   `#pragma peephole off` around `eft_area_effect_create`, `eft_light_trail_update`, `eft_light_lantern_update`,
  *   `eft_light_drop_update`, `eft_light_npc_update`, `eft_light_lobby_update` and `eft_light_ring_colors_get` (retail
  *   keeps the unfused `clrlwi`/`extsb` + `cmpwi` pairs and the reloads after a store); `#pragma fp_contract off`
  *   around `eft_light_drop_update` (retail keeps `fmuls` + `fadds`); `#pragma optimization_level 4` around
  *   `eft_light_drop_init`, `eft_light_lantern_update` and `eft_light_drop_update` (retail's `subi`/`cmplwi` switch
  *   ranges and prologue-hoisted int-to-float magic, playbook 108).
- * NAMES. GUESS, from each body and its callers: every `eft_area_effect_*` and `eft_light_*` function,
- *   `eft_spawn_pos_in_area`, and the data `eft_day_scale_keys`, `eft_day_key_offsets`, `eft_slot_angle_scales`,
- *   `eft_area_effect_groups`, `eft_area_effect_ids`, `eft_light_colors_a`/`_b`, `eft_light_tint_color`,
- *   `eft_light_fade_keys`, `eft_light_model_ids`.  Registry: `se_req_pos_id27`, `se_req_pos_id59`, `eft025_pl_set`,
+ * NAMES. GUESS, from each body and its callers: the unit's file name, every `eft_area_effect_*` and `eft_light_*`
+ *   function, `eft_spawn_pos_in_area`, and the data `eft_area_effect_groups`, `eft_area_effect_ids`,
+ *   `eft_light_colors_a`/`_b`, `eft_light_tint_color`, `eft_light_fade_keys`, `eft_light_model_ids`.  Registry: `se_req_pos_id27`, `se_req_pos_id59`, `eft025_pl_set`,
  *   `lb_pl_act_off_ck` (foreign rows, GUESS for the last two).
  * RESIDUALS. Every row is written.
  *  - `eft_light_lantern_update`: the target shares one `eft_light_trail_update` tail between every early exit of its
  *    motion switch; written without `goto`, each exit repeats the call (+0x194 bytes); two colour loads add the base
  *    where retail indexes `lbzx` from precomputed offsets (a `u8` or `s32` offset local does not reach it);
- *  - `fn_8010D1A8`: ours materialises the int-to-float magic from its own pool where retail reads the shared
- *    `lbl_80796840`, reloads the table base, and fuses an `fmadds`;
  *  - `eft_light_dispatch`: case 0 is written last; ours still compares 1, 2, 3, 0 against retail's 0, 1, 2, 3;
  *  - `ef_pl_effects_init`: ours drops two `cmpwi`/`bne` null tests retail keeps;
  *  - `eft_light_beam_aim_job`: the three joint sums are kept in `f3`/`f2`/`f1` in retail, ours in `f2`/`f3`;
  *  - register colouring only: `eft_light_drop_init`, `eft_light_lantern_init`, `eft_light_lobby_init`.
- *   The other partial rows have no recorded cause (`symdiff.py -u ef/fn_8010D1A8 --all`).
- *   flipcheck: `.text` and `.sdata2` differ (the `.sdata2` run past `fn_8010D1A8`'s three values is byte-identical up
- *   to the drop light's own magic, which ours pools once); the four registry callees have no map row yet.
+ *   The other partial rows have no recorded cause (`symdiff.py -u ef/eft018 --all`).
+ *   flipcheck: `.text` differs (the rows above).
  * SHAPES. `eft_area_effect_create`'s colour split uses explicit `(color & mask) >> shift` terms: `(color >> shift) &
  *   0xFF` folds into one `rlwinm`.  A one-case compare on a `u8`/`u16` value is a `switch` with the other path as
  *   `default` (retail's `cmpwi`); a colour index is a `u8` local (retail's `lbzx` from precomputed offsets).
@@ -43,8 +39,6 @@
  *   `EftWorkHead`, `EftWorkSlots` and `EftWorkBody` are unions: the variants reuse the same bytes for different
  *   payloads.
  */
-
-#pragma cplusplus on
 
 #include "types.h"
 #include "nw4r/math.h"
@@ -86,7 +80,6 @@
 #include "ef/change_color_eff.h"
 #include "ef/push_eft_effect_heap_num.h"
 #include "ef/GameMode_ck.h"
-#include "ef/eft_slot_angle_scales.h"
 #include "stage/stg_w.h" /* get_now_areano */
 #include "stage/get_stg_eft_col.h"
 #include "lobby/lb_server_sel_trans.h" /* event_demo_ck */
@@ -199,25 +192,8 @@ typedef struct Rgb3 {
     /* +0x02 */ u8 b;
 } Rgb3; /* size: 0x03 */
 
-/* A day-cycle keyframe: the position the segment starts at and the scale reached there. size: 0x08 */
-typedef struct EftDayKey {
-    /* +0x00 */ f32 pos;
-    /* +0x04 */ f32 scale;
-} EftDayKey; /* size: 0x08 */
-
 extern "C" {
 
-extern f32 lbl_80796838; /* -1.0f, the day-key terminator */
-extern f64 lbl_80796840; /* the int-to-double magic */
-
-/* The day-cycle scale keyframes `fn_8010D1A8` interpolates, ended by a -1 position. */
-EftDayKey eft_day_scale_keys[6] = {
-    {0.0f, 1.3f}, {12.0f, 0.2f}, {15.0f, 0.2f}, {24.0f, 1.3f}, {32.0f, 1.3f}, {-1.0f, 0.0f},
-};
-/* The per-area offset into the day cycle `fn_8010D1A8` adds to the record's timer. */
-u32 eft_day_key_offsets[5] = {0, 13, 25, 7, 17};
-/* The per-slot angle scales `ef/fn_8010BDE4.cpp`'s `fn_8010CFCC` reads (declared in `ef/eft_slot_angle_scales.h`). */
-f32 eft_slot_angle_scales[5] = {0.0f, 30.0f, -20.0f, 20.0f, -30.0f};
 /* The resource group and effect id `eft_area_effect_create` creates the area effect from, per record type. */
 u16 eft_area_effect_groups[10] = {0x2F, 0x12A, 0x12B, 0x12C, 0xF9, 0x12D, 0x131, 0x122, 0x123, 0};
 u16 eft_area_effect_ids[10] = {0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0, 0, 0};
@@ -271,42 +247,6 @@ void eft_light_ring_colors_get(u8 arg0, s32 arg1, _GXColor* arg2, _GXColor* arg3
 s32 eft_light_motion_part_get(_PLW* self);
 void eft_light_trail_update(_EFT* self, u8 active);
 void eft_light_blade_place(_EFT* self);
-
-/* Interpolates the effect scale over the day-cycle keyframes and applies the record's own scale. */
-f32 fn_8010D1A8(_EFT* self, s32 arg1, f32 farg0)
-{
-    s32 idx;
-    EftWork* work;
-    EftDayKey* key;
-    s32 pos;
-    s32 i;
-
-    work = EFT_WORK(self);
-    key = eft_day_scale_keys;
-    pos = self->timer_0x0C + eft_day_key_offsets[(s16)arg1];
-    if (pos >= 32) {
-        pos -= 32;
-    }
-    idx = self->timer_0x0C;
-    for (i = 1; key[i].pos != lbl_80796838; i++) {
-        if ((f32)pos <= key[i].pos) {
-            idx = i - 1;
-            break;
-        }
-    }
-    key = &eft_day_scale_keys[idx];
-    return work->body_0x34.as_scaled.scale_0x44 * (key->scale + ((key[1].scale - key->scale) / (key[1].pos - key->pos)) * ((f32)pos - key->pos)) * farg0;
-}
-
-void fn_8010D29C(_EFT* self)
-{
-    self->state_0x05++;
-}
-
-void fn_8010D2AC(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
 
 void eft_spawn_pos_in_area(VEC3* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
 {
