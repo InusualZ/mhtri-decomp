@@ -941,13 +941,13 @@ extern "C" void* vi_next_frame_buffer(void)
 }
 
 /* The active framebuffer width. */
-extern "C" u16 fn_80040274(void)
+extern "C" u16 rmode_fb_width_get(void)
 {
     return Rmode->fbWidth;
 }
 
 /* The active EFB height. */
-extern "C" u16 fn_80040280(void)
+extern "C" u16 rmode_efb_height_get(void)
 {
     return Rmode->efbHeight;
 }

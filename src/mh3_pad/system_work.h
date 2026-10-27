@@ -64,7 +64,7 @@ typedef struct SystemWork {
     /* +0x020 */ u8 field_0x20;
     /* +0x021 */ u8 field_0x21;
     /* +0x022 */ u8 field_0x22;      /* fn_800CFD20: < 2 selects the C64 path */
-    /* +0x023 */ u8 pad_0x23[0x1];
+    /* +0x023 */ u8 print_mode_0x23; /* GUESS name: 3 with pause_0x10 set suppresses the font print entry points */
     /* +0x024 */ u8 game_mode;        /* GameMode_set/GameMode_ck (values < 4) */
     /* +0x025 */ u8 play_mode;        /* PlayMode_set/PlayMode_ck (values < 7) */
     /* +0x026 */ u8 field_0x26;
