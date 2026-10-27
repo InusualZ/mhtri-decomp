@@ -65,7 +65,7 @@ extern "C" void eft_pl_model_slot_bind(void* owner) {
 }
 
 /* 0x800FACF0 - register the area owner and the slot-1 handler. */
-extern "C" void fn_800FACF0(void* owner) {
+extern "C" void eft_em_slot_attach(void* owner) {
     EftPoolSlot* slot = (EftPoolSlot*)fn_800FBD68(1);
     if (slot != NULL) {
         slot->state_0x03 = 0;

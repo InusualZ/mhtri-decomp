@@ -351,12 +351,15 @@ struct _ENEMY_WORK {
     /* +0x098 */ f32 mot_frame_0x098;       /* the embedded MHchar's current motion frame (`em_mot_frame_get`) */
     /* +0x09C */ u8 unused_0x09C[0x0C8 - 0x09C];
     /* +0x0C8 */ f32 mot_frame_end_0x0C8;       /* the current motion's end frame (`em_mot_frame_end_get`) */
-    /* +0x0CC */ u8 unused_0x0CC[0x115 - 0x0CC];
+    /* +0x0CC */ u8 unused_0x0CC[0x110 - 0x0CC];
+    /* +0x110 */ s32 joint_0x110;   /* the joint `em_area_buff_apply` places its effect on when `joint_0x204` is -1 */
+    /* +0x114 */ u8 unused_0x114;
     /* +0x115 */ u8 flag_0x115;  /* set by `em_flag_0x115_set` */
     /* +0x116 */ u8 flag_0x116;  /* set by `em_flag_0x116_set` */
     /* +0x117 */ u8 unused_0x117[0x130 - 0x117];
     /* +0x130 */ struct _g3d_work* g3d_0x130;  /* the scene work `enemy_work_release` hands back with `push_g3d_wk` */
-    /* +0x134 */ u8 unused_0x134[0x13C - 0x134];
+    /* +0x134 */ u8 unused_0x134[0x138 - 0x134];
+    /* +0x138 */ u32 res_mdl_0x138;     /* the model resource handle (the embedded `MHchar`'s +0x114 `ResMdl`) */
     /* +0x13C */ u32 field_0x13C;       /* the scene-model id `g3d_root_model_bind` is handed */
     /* +0x140 */ u8 unused_0x140[48];
     /* +0x170 */ u8 state_0x170;
@@ -456,7 +459,8 @@ struct _ENEMY_WORK {
     /* +0x230 */ u8 unused_0x230[0x23C - 0x230];
     /* +0x23C */ u8 field_0x23C;       /* the action-ready byte `enemy/em004_act.cpp`'s
                                         * `em004_state_query` case 0 reports */
-    /* +0x23D */ u8 unused_0x23D[0x240 - 0x23D];
+    /* +0x23D */ u8 field_0x23D;        /* cleared with +0x23C when the work is set up (`em_act_advance`) */
+    /* +0x23E */ u8 unused_0x23E[0x240 - 0x23E];
     /* +0x240 */ f32 ceiling_0x240;  /* the ceiling `em_ground_snap_offset_ck` holds the position under while +0x23C is set */
     /* +0x244 */ EmMotionSlot slots_0x244[10];  /* the per-motion slot set `em_motion_slot_angle_avg` averages */
     union {
@@ -989,10 +993,13 @@ struct _ENEMY_WORK {
                                         * `enemy/em030_prog.cpp`'s `fn_801B055C` state ring reads */
     /* +0x763 */ u8 unused_0x763[0x764 - 0x763];
     /* +0x764 */ s16 latch_timer_0x764;  /* the +0x762 latch's timer (`em_latch_0x762_roll`) */
-    /* +0x766 */ u8 unused_0x766[0x76C - 0x766];
+    /* +0x766 */ u8 field_0x766;        /* cleared when the work is set up (`em_act_advance`) */
+    /* +0x767 */ u8 unused_0x767;
+    /* +0x768 */ s16 field_0x768;       /* cleared when the work is set up (`em_act_advance`) */
+    /* +0x76A */ u8 unused_0x76A[0x76C - 0x76A];
     /* +0x76C */ nw4r::math::VEC3 vec_0x76C; /* the position `calcVecAngX` is handed in
                                          * `fn_801D4CE0` */
-    /* +0x778 */ u8 unused_0x778[0x784 - 0x778];
+    /* +0x778 */ nw4r::math::VEC3 vec_0x778;  /* zeroed with `vec_0x76C` when the work is set up (`em_act_advance`) */
     /* +0x784 */ u8 field_0x784;
     /* +0x785 */ u8 approach_3d_0x785;  /* set while the approach runs in 3D (`em_hit_arm_set`) */
     /* +0x786 */ u8 fly_state_0x786;  /* 0 while the flight heads for its target, 1 once past it (`em_fly_step`) */
@@ -1008,7 +1015,7 @@ struct _ENEMY_WORK {
     /* +0x79E */ u8 unused_0x79E[0x7A0 - 0x79E];
     /* +0x7A0 */ u32 field_0x7A0;       /* the numerator of the ratio `fn_8014001C` reports */
     /* +0x7A4 */ u32 field_0x7A4;       /* its denominator */
-    /* +0x7A8 */ u8 unused_0x7A8[0x7AC - 0x7A8];
+    /* +0x7A8 */ f32 hp_ratio_0x7A8;   /* the share of `field_0x7A4` the work starts with (capped at 1.0, `em_act_advance`) */
     /* +0x7AC */ u32 field_0x7AC;       /* the second frame counter `em_team_damage_over_ck` measures against `field_0x7A0` */
     /* +0x7B0 */ f32 field_0x7B0;       /* the `team == 0xf` threshold `em_damage_area_ok_ck` tests against 0.0 */
     /* +0x7B4 */ f32 shell_rate_0x7B4;  /* the factor `shell_attack_set` scales a shell's hit life by */
@@ -1017,7 +1024,9 @@ struct _ENEMY_WORK {
     /* +0x7C0 */ f32 field_0x7C0;       /* its second factor */
     /* +0x7C4 */ f32 field_0x7C4;       /* the value `em_mot_set_blend` clears to 1.0f */
     /* +0x7C8 */ u8 field_0x7C8;        /* the action id `em_stat_level_roll` picks */
-    /* +0x7C9 */ u8 unused_0x7C9[0x810 - 0x7C9];
+    /* +0x7C9 */ u8 unused_0x7C9[0x801 - 0x7C9];
+    /* +0x801 */ u8 field_0x801;        /* cleared when the work is set up (`em_act_advance`) */
+    /* +0x802 */ u8 unused_0x802[0x810 - 0x802];
     /* +0x810 */ s16 mark_timer_0x810;  /* the frames the enemy stays marked (`em_net_flag_apply_0`) */
     /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
@@ -1210,6 +1219,11 @@ struct _ENEMY_WORK {
                                                    * `em_action3_sub0` hands it to `hit_mask_ck`.  A byte view: `_HIT_W` has two
                                                    * definitions (`Pl/hit_w.h`, `ai/ai_npc.h`) and this header includes neither */
                 struct {
+                    /* +0xA64 */ u8 pad_0xA64[0xAC0 - 0xA64];
+                    /* +0xAC0 */ u16 hit_ids_0xAC0[2];  /* the head of the hit id list (`hit_id_list_clear`), running
+                                                      * on to its count at +0xAE8 */
+                };
+                struct {
                     /* +0xA64 */ u8 unused_0xA64[0xA69 - 0xA64];
                     /* +0xA69 */ u8 field_0xA69;       /* em015_act2_hit_chain's second gate (the `_HIT_W`'s +0x05 byte) */
                     /* +0xA6A */ u8 unused_0xA6A[20];
@@ -1219,7 +1233,8 @@ struct _ENEMY_WORK {
         };
         /* +0xA08 */ EmHitSlot hit_slots_0xA08[2];  /* the two attack hit records (`_HIT_W`, 0x5C apart) `em_hit_window_set` arms */
     };
-    /* +0xAC4 */ u8 unused_0xAC4[0xAE9 - 0xAC4];
+    /* +0xAC4 */ u8 unused_0xAC4[0xAE8 - 0xAC4];
+    /* +0xAE8 */ u8 hit_id_count_0xAE8;  /* the length of the hit id list at +0xAC0 (`hit_id_list_clear`) */
     /* +0x0AE9 */ u8 field_0xAE9;       /* the one-shot flag `enemy/em009_act.cpp`'s
                                         * `fn_80389C50` tests (== 1) to choose its motion set */
     /* +0x0AEA */ u16 field_0xAEA;      /* the eighteen-bit flag word `enemy/em007_act.cpp`'s

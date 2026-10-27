@@ -159,6 +159,10 @@ void vec3_scale_inv(VEC3* v, f32 len);
  * is in the way (`enemy/em_common.cpp`'s meat search).  The parameter names beyond the three vectors are GUESSES. */
 s32 findInterSection(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::VEC3* out, u8 mode, u32 mask, u8 area,
                      u16 hit_mask, u8* out_kind);
+
+/* 0x8029595C - the same query with a `LandData` record (`enemy/em_common.cpp`'s area-edge probe). */
+s32 findInterSection2(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::VEC3* out, u8 group,
+                      u32 ground, u8 area_no, u16 angle, u8* out_flags, struct LandData* land);
 #endif
 
 #ifdef __cplusplus

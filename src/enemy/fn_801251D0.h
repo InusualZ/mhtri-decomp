@@ -68,7 +68,7 @@ void em_delay_act_tick(struct _ENEMY_WORK* work);
 void em_target_pos_set(struct _ENEMY_WORK* work, VEC3* pos);
 void em_timers_update(struct _ENEMY_WORK* work);
 void em_ground_probe(struct _ENEMY_WORK* work);
-void fn_8012A414(struct _ENEMY_WORK* work);
+void em_cell_span_update(struct _ENEMY_WORK* work);
 void em_area_change(struct _ENEMY_WORK* work, s32 arg1);
 void em_hate_update(struct _ENEMY_WORK* work);
 

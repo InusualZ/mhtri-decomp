@@ -167,6 +167,11 @@ void em_action_finish_swim(struct _ENEMY_WORK* self);
 
 u32 em_player_watched_ck(u8 player);
 s32 em_search_record_ck(u32 selector, struct _PLW* work, s8* out_flag);
+
+/* The per-frame part, colour and material steps `enemy/fn_80138074.cpp` calls. */
+void em_break_parts_update(struct _ENEMY_WORK* self);
+void em_ambient_color_update(struct _ENEMY_WORK* self, u8 snap);
+void em_mat_alpha_apply(struct _ENEMY_WORK* self);
 #ifdef __cplusplus
 }
 #endif

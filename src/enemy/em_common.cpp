@@ -76,7 +76,9 @@
  *   em_hate_add, em_hate_update, em_spawn_rec_live_ck, em_spawn_rec_live_ck2, em_act_pick, em_wave_offset,
  *   em_wave_segment, em_land_data_init, em_pl_box_init, em_target_reach_ck, em_break_part_motion_clear,
  *   em_break_part_motion_step, em_break_parts_reset, em_break_part_active_ck, em_break_part_return_step,
- *   em_entry_proc_get, em_break_part_spin
+ *   em_entry_proc_get, em_break_part_spin, em_kill_cut_target_get, em_area_buff_apply, em_act_advance,
+ *   em_act_end, em_cell_span_update, em_break_part_launch, em_break_parts_update, em_ambient_color_update,
+ *   em_mat_alpha_apply
  *   GUESS, other units' rows this unit named:
  *   emc_host_ck, mhchar_motion_set, mhchar_motion_layer_set, mhchar_mat_blend_set, mhchar_motion_speed_set,
  *   pl_segment_init, pl_segment_box_init, eft_vec_ctor, pl_segment_sphere_hit, em_gauge_period_step, em_se_stop_all,
@@ -84,14 +86,21 @@
  *   camera_enemy_focus_pos_set, em_part_limit_default, emc_delay_frames_get, em_kill_sub_kind_ck, emc_kill_report,
  *   hit_motion_set, pl_ground_probe, em_hate_bands_default, vec3_polar_offset, vec3_polar_offset2,
  *   vec3_segment_offset, vec3_segment_offset2, stg_area_ceiling_get, pl_box_point_dist_sq, pl_condition_ck_20000,
- *   em_break_part_data_get, mhchar_mat_hide_set
- * RESIDUALS. 10 rows unwritten: em_act_advance 0x8012555C (0x9F8), em_hook_get 0x801264BC (0x13C, reads the
- *   unclaimed sound-proc table), 0x8012A414 (0x210), 0x8012D498 (0x180), 0x8012D618 (0x1E4), em_act_end
- *   0x8012E728 (0x15C), 0x80135E44 (0x2B8), 0x801363F8 (0x5A8), 0x80136E38 (0x598), 0x801373D0 (0x234); the
- *   breakable-part pair 0x80135E44/0x801363F8 needs `ResMdl` at +0x138 and the matrix helpers declared.
- *  - 97 written rows short of 100 %, most of them register allocation or instruction scheduling only; the
+ *   em_break_part_data_get, mhchar_mat_hide_set, ef_inst_spawn_joint, em_user_data_items_get, em_char_pose_sync,
+ *   eft_em_slot_attach, eft_em_model_fx_spawn (registry proposals)
+ * RESIDUALS. Every row is written.
+ *  - `em_area_buff_apply`: the loop index and the work pointer take each other's register (r29/r31);
+ *    `em_act_advance`: the recover-band pointer and the stat level take each other's register (r3/r4);
+ *    `em_ambient_color_update`: the point-light blend converts the channel before the half difference (the
+ *    scheduler; an `s16` step local moves the `fctiwz` the other way);
+ *  - the definitions in 0x80128308..0x80128BF8 are not in address order (`em_delay_act_fire`, `fn_80128590`,
+ *    `fn_801285A0`, `em_state_set`..`fn_80128AEC`, `em_combat_reset`), so `extabindex` pairs with the wrong functions
+ *    from 0x80026F34 on;
+ *  - the data this unit reads from `em_snd_proc_tbl` (.bss 0x806A7734, `em_hook_get` slot 7) is shared with
+ *    `enemy/em_kind.cpp` and left unclaimed;
+ *  - 86 written rows short of 100 %, most of them register allocation or instruction scheduling only; the
  *    shapes known not to reach retail: `em_delay_act_set`/`em_delay_act_tick` (retail's `li r0,0` + `mulli`
- *    index), `em_motion_param_set` (an extra `frsp`), `em_height_limit_update` (the range switch lowers to
+ *    index), `em_height_limit_update` (the range switch lowers to
  *    compares), the `u16` fields retail reads as `s16` (+0x812/+0x814/+0x94A/+0x94C),
  *    `em_break_part_active_ck` (retail adds the 0x488 base before the loop);
  *  - `em_act_sleep_side_get`, `fn_8012E5D4`: dense-case dispatch trees; retail shares one tail per constant return and lowers
@@ -103,20 +112,19 @@
  *    forms `ainpc_w`'s address, which retail does not reference;
  *  - `em_team_area_alert_set_near`, `fn_8012C4E8`: the distance test (`vec3_dist_sq`, `fmuls`) is laid out with the opposite branch
  *    polarity;
- *  - `em_team_area_alert_set`, `fn_8012C600`, `fn_8012C6F4`, `fn_8012C870`, `fn_8012CDF4`, `fn_8012CF04`, `fn_8012D3E0`: the
+ *  - `em_team_area_alert_set`, `fn_8012C600`, `fn_8012C6F4`, `fn_8012C870`, `fn_8012CDF4`, `fn_8012D3E0`: the
  *    `clrlwi` narrowing sits at a different point (at entry in one, at the use or store in the other);
  *  - `em_team_damage_under_ck`, `em_team_damage_over_ck`: retail keeps a dead loop counter (`li r4,0` +
  *    `addi r4,r4,1`) and loads `lbl_80796C68`/`lbl_80796C80` where ours names its own `.sdata2` magic;
  *    `em_motion_window_ck`: the same magic, and ours materialises the final test branch-free (`mfcr` + `extrwi`);
  *  - `em_sleep_ck`: retail shares one `return 0` through both `bne` arms, ours a `li r3,0` per arm;
- *    `em_tall_ck`: the constant is loaded before the field (f0/f1 against retail's f2/f0);
  *  - `em_pl_target_ck`, `em_act_kind6_ck`: ours compares unsigned where retail uses `cmpwi` (`em_pl_target_ck` also an extra
  *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
  *    earlier;
  *  - `fn_8012B86C`, `em_team_member_claim`, `em_attack_start`, `em_area_vacant_wait_ck`: register allocation only.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.rodata`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
- *   short of the claim (the unwritten rows above).
+ *   differ from the target (the rows above, and `.sdata2` pooled per literal rather than at the map's addresses).
  * SHAPES. `#pragma peephole off` from the first body to the end (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi`
  *   + `slwi` unfused) and `#pragma fp_contract off` around `fn_8012BA00` (retail keeps `fmuls` + `fadds`); the
  *   `em_act_ck__FP11_ENEMY_WORKUcUc`-style map names are declared `extern "C"` under the map's spelling, so the
@@ -127,6 +135,12 @@
  *   are called through cast macros (`<name>_viewN`) and the disagreeing header declarations are renamed away around
  *   their `#include`; `em_part_hit_set`'s `switch` puts `default: return;` first (a trailing default costs two
  *   branches), and its material ids compare unsigned against 0xFFFFFFFF (retail's `addis` + `cmplwi 0xFFFF`).
+ *   `em_cell_span_update` sits in its own `fp_contract off` pair (retail keeps `fmuls` + `fsubs`); `eft_stun_set` is
+ *   called through `eft_stun_set_c1`, its scale ahead of the kind (playbook 178: retail loads the scale before
+ *   `li r6`); the resource model is reached as `res_mdl_0x138` (through the `MHchar` base MWCC keeps one `addi` in
+ *   a saved register instead of retail's per-call `addi`); the stack order of the locals follows the declarations
+ *   (the last declared lowest), so they are declared highest-first; `em_motion_param_set` takes its target first
+ *   and stores it once through an `f64` cast (retail's second store is `frsp` + `stfs`).
  */
 
 /* Names the included headers declare with the callers' older signatures, hidden while they are read. */
@@ -236,7 +250,9 @@
 #define em_act_paralysis_ck fn_8012DB3C_hidden_fn_8012BDF4_h
 #define fn_8012E21C fn_8012E21C_hidden_fn_8012BDF4_h
 #define em_act11_wait_ck fn_8012E5A8_hidden_fn_8012BDF4_h
+#define em_act_end em_act_end_hidden_band_h
 #include "enemy/fn_8012BDF4.h"
+#undef em_act_end
 #undef em_act11_wait_ck
 #undef fn_8012E21C
 #undef em_act_paralysis_ck
@@ -271,6 +287,39 @@
 #include "Pl/pl_hit_sphere.h" /* PlSegment / PlSegmentBox / pl_segment_box_set (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* MTX34_ctor (rule 2) */
 #include "enemy/enemy_control.h" /* emc_work / SenkoRec (rule 2) */
+#include "enemy/ENEMY_MINI_WORK.h" /* _ENEMY_MINI_WORK (rule 1) */
+#include "quest/quest_types.h" /* QuestSpawnRec (rule 1) */
+#include "unsplit/em_snd_proc_tbl.h" /* em_snd_proc_tbl (rule 2: the band) */
+#include "ef/ef_inst_spawn_joint.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMat / ResMatPix (rule 1) */
+#include "sound/mhchar_mat_num_get.h" /* mhchar_mat_num_get (the owner's leaf header, rule 2) */
+#include "sound/mhchar_mat_buffer_clean.h"
+#include "enemy/res_user_data_ac.h" /* UserDataItem (rule 1) */
+#include "enemy/em_user_data_items_get.h" /* em_user_data_items_get (the owner's leaf header, rule 2) */
+#include "light/light_point_color_get.h" /* light_point_color_get (the owner's leaf header, rule 2) */
+#include "color_rgba_copy.h" /* color_rgba_copy (the owner's leaf header, rule 2) */
+#include "enemy/em_char_pose_sync.h" /* em_char_pose_sync (the owner's leaf header, rule 2) */
+#include "enemy/em_damage_record_clear.h" /* em_damage_record_clear (the owner's leaf header, rule 2) */
+#include "enemy/em_static_data_latch.h" /* em_static_data_latch (the owner's leaf header, rule 2) */
+#include "ef/eft_em_slot_attach.h" /* eft_em_slot_attach (the owner's leaf header, rule 2) */
+#include "menu/eft_em_model_fx_spawn.h" /* eft_em_model_fx_spawn (the owner's leaf header, rule 2) */
+#include "sound/fn_800D7F54.h" /* se_entry_request (rule 2) */
+#include "Pl/pl_yure.h" /* yure_enemy_init (rule 2) */
+#include "g3d/fn_8005AA28.h" /* res_node_is_valid (rule 2) */
+#include "enemy/em_model.h" /* em_roster_slot_effect_set / em_roster_record_slot_id_get / em_roster_record_release (rule 2) */
+#include "g3d/mtx34_rot_xyz_deg.h" /* mtx34_rot_xyz_deg (the owner's leaf header, rule 2) */
+#include "g3d/mtx34_inverse.h" /* mtx34_inverse (the owner's leaf header, rule 2) */
+#include "g3d/g3d_calcview.h" /* mtx34_concat (rule 2) */
+#include "ef/eft001.h" /* mtx34_set_trans (rule 2) */
+#include "mtx34_scale_in_place.h" /* mtx34_scale_in_place (the owner's leaf header, rule 2) */
+#define res_node_mtx_id_get res_node_mtx_id_get_hidden_se_h
+#define res_node_assign res_node_assign_hidden_se_h
+#include "sound/se.h" /* se_req_pos_ps (rule 2) */
+#undef res_node_assign
+#undef res_node_mtx_id_get
+#include "g3d/res_node_assign.h" /* res_node_assign (the owner's leaf header, rule 2) */ /* mhchar_mat_buffer_clean (the owner's leaf header, rule 2) */ /* ef_inst_spawn_joint (the owner's leaf header, rule 2) */
+/* `enemy/enemy_control.cpp`'s release, through the record argument the unsplit declaration omits. */
+#define enemy_work_release_c1 ((void (*)(_ENEMY_WORK*))enemy_work_release)
 #include "ef/fn_800CDB2C.h" /* ran_suu (rule 2) */
 #include "MSL_C/file_io.h" /* abs (rule 2) */
 #include "ef/ef_emitter.h" /* ef_truncate_float (rule 2) */
@@ -303,16 +352,24 @@
 #define camera_em_shake_req_c1 ((void (*)(struct _ENEMY_WORK*, u8))camera_em_shake_req)
 #define camera_enemy_focus_pos_set_c1 ((void (*)(struct _ENEMY_WORK*, u8, nw4r::math::VEC3*))camera_enemy_focus_pos_set)
 #include "ef/eft_stun_set.h" /* the owner's symbols this unit calls (rule 2) */
+/* the stun-star setter through the scale-before-kind order this unit's calls evaluate in. */
+#define eft_stun_set_c1 ((void (*)(struct _ENEMY_WORK*, u32, nw4r::math::VEC3*, f32, u32))eft_stun_set)
 #include "ef/eft013_em_place.h" /* eft013_em_place / eft013_spark_set (rule 2) */
 /* the placement and spark setters through the argument order and the scale this unit passes. */
-#define eft013_em_place_c1 ((void (*)(struct _ENEMY_WORK*, nw4r::math::VEC3*, u32, u32, f32))eft013_em_place)
+#define eft013_em_place_c1 ((void (*)(struct _ENEMY_WORK*, nw4r::math::VEC3*, u32, f32, u32))eft013_em_place)
 #define eft013_spark_set_c1 ((void (*)(struct _ENEMY_WORK*, u32, f32))eft013_spark_set)
 #include "sound/em_se_stop_all.h" /* the owner's symbols this unit calls (rule 2) */
 #include "calcMtxAng3.h" /* the owner's symbols this unit calls (rule 2) */
+/* the segment offsets through the floats-first order this unit's calls evaluate in. */
+#define vec3_segment_offset_c1 ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32, f32, u32))vec3_segment_offset)
+#define vec3_segment_offset2_c1 ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32, f32, u32, u32))vec3_segment_offset2)
 #include "Pl/pl_segment_sphere_hit.h" /* the owner's symbols this unit calls (rule 2) */
 #include "ef/pl_segment_box_init.h" /* the owner's symbols this unit calls (rule 2) */
 #include "ef/pl_segment_init.h" /* the owner's symbols this unit calls (rule 2) */
 #include "sound/mhchar_motion_set.h" /* the owner's symbols this unit calls (rule 2) */
+/* the motion setters through the owner's own parameter order (the start frame ahead of the loop count). */
+#define mhchar_motion_set_c1 ((void (*)(struct MHchar*, u32, s32, u16, s32, f32, s32, u32, f32))mhchar_motion_set)
+#define mhchar_motion_layer_set_c1 ((void (*)(struct MHchar*, s32, u32, s32, u16, s32, f32, s32, u32, f32))mhchar_motion_layer_set)
 #include "enemy/ENEMY_DATA.h" /* _ENEMY_DATA (rule 1) */
 #undef get_move_work_max
 #undef get_move_work_adrs
@@ -492,6 +549,27 @@ struct EnemyActionSet {
     /* +0x008 */ EnemyActionTable* table_0x008;
 };
 
+/* One weighted choice of a recover band: its weight and the recover frames it gives.  size: 0x04 */
+struct EmRecoverChoice {
+    /* +0x00 */ s16 weight;   /* -1 ends the list */
+    /* +0x02 */ s16 frames;
+};
+
+/* One recover band: the highest stat level it covers (0xFF ends the list) and its weighted choices.  size: 0x08 */
+struct EmRecoverBand {
+    /* +0x00 */ u8 max_level;
+    /* +0x01 */ u8 pad_0x01[3];
+    /* +0x04 */ EmRecoverChoice* choices;
+};
+
+/* The action-timer block `fn_80126494` returns: the motion-mode 2 timer and the recover bands `em_act_advance`
+ * rolls the recover timer from.  size: 0x08 (lower bound; `enemy/em_kind.cpp` reads a list at +0x08) */
+struct EmActTimers {
+    /* +0x00 */ s16 mode2_frames;
+    /* +0x02 */ u8 pad_0x02[2];
+    /* +0x04 */ EmRecoverBand* recover;
+};
+
 /* The block at `get_enemy_data(enemy)->field_0x0A0`; only the action-set pointer and the blend scale are named.
  * size: 0x58 (lower bound) */
 struct EnemyExtraData {
@@ -507,7 +585,7 @@ struct EnemyExtraData {
     /* +0x024 */ EnemyActionSet* action_set;
     /* +0x028 */ struct EmAngerTable* anger;  /* the anger gauge limit and gain rates `em_anger_add` reads */
     /* +0x02C */ f32* blend_scale;   /* the motion blend scale override `em_motion_blend_scale_get` prefers */
-    /* +0x030 */ s16* act_timers;                  /* the action timer list `fn_80126494` returns */
+    /* +0x030 */ EmActTimers* act_timers;          /* the action timer block `fn_80126494` returns */
     /* +0x034 */ struct EmAilmentTable* poison;    /* the poison buildup block */
     /* +0x038 */ struct EmAilmentTable* sleep;     /* the sleep buildup block */
     /* +0x03C */ struct EmAilmentTable* paralysis; /* the paralysis buildup block */
@@ -601,9 +679,9 @@ extern "C" u32 stage_pos_z_low_ck(void* pos);
 extern "C" u8 Pl_area_flag_get(u32 value);
 extern "C" void em_hate_misc_add(_ENEMY_WORK* enemy, s32 value);
 extern "C" void fn_8012CE8C(_ENEMY_WORK* enemy, u16 flag);
-extern "C" void fn_8012CE9C(_ENEMY_WORK* enemy, u32 flag);
+extern "C" void fn_8012CE9C(_ENEMY_WORK* enemy, u16 flag);
 extern "C" void fn_8012CDF4(_ENEMY_WORK* enemy, u32 state, u32 sub);
-extern "C" u32 fn_8012CF04(_ENEMY_WORK* enemy, u32 flag);
+extern "C" u32 fn_8012CF04(_ENEMY_WORK* enemy, u16 flag);
 
 /* Map-mangled callees, kept as the map spells them (see the signature note in the file header). */
 u8 get_now_areano(void);
@@ -704,8 +782,10 @@ extern "C" {
 void em_act_flag1_set(_ENEMY_WORK* self);
 void fn_801376BC(_ENEMY_WORK* self, u8 flag);
 void fn_801376DC(_ENEMY_WORK* self, u8 flag);
+void em_net_flag_apply_1(_ENEMY_WORK* self);
+LandData* em_land_data_init(LandData* land);
 
-s16* fn_80126494(_ENEMY_WORK* self);
+EmActTimers* fn_80126494(_ENEMY_WORK* self);
 
 /* `enemy/em_common.cpp` */
 u32 em_busy_ck(_ENEMY_WORK* self);
@@ -838,6 +918,370 @@ extern "C" void fn_8012554C(struct _ENEMY_WORK* self)
     self->state_0x9FA = 0;
 }
 
+/* This unit's own entry points `em_act_advance` calls ahead of their definitions. */
+extern "C" {
+EmGroundRec* em_ground_rec_clear(EmGroundRec* rec);
+void em_break_parts_reset(_ENEMY_WORK* self);
+void em_anger_clear(_ENEMY_WORK* self);
+void em_shell_rate_init(_ENEMY_WORK* self);
+void em_mot_set(_ENEMY_WORK* self, s32 motion, s32 start, s32 frame);
+void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index);
+void fn_801281F8(struct _ENEMY_WORK* self);
+void em_delay_act_clear0(_ENEMY_WORK* self);
+void (*em_hook_get(_ENEMY_WORK* self, s32 index))(_ENEMY_WORK*);
+void em_finish_flag_set(_ENEMY_WORK* self);
+void em_state_refresh(_ENEMY_WORK* self);
+void fn_80129984(struct _ENEMY_WORK* self);
+void em_stamina_reset(_ENEMY_WORK* self);
+void em_area_status_init(_ENEMY_WORK* self);
+void em_poison_init(_ENEMY_WORK* self);
+void em_paralysis_init(_ENEMY_WORK* self);
+void em_sleep_init(_ENEMY_WORK* self);
+void em_ailment8_init(_ENEMY_WORK* self);
+void em_stun_init(_ENEMY_WORK* self);
+void em_exhaust_init(_ENEMY_WORK* self);
+void em_ailment_clear(_ENEMY_WORK* self);
+void em_ailment_mask_clear(_ENEMY_WORK* self);
+void em_hit_window_clear(_ENEMY_WORK* self, u32 slot);
+void em_record_0x750_clear(_ENEMY_WORK* self);
+void em_latch_0x762_roll(_ENEMY_WORK* self);
+void em_joint_visibility_update_all(_ENEMY_WORK* self);
+void em_state_byte_set(_ENEMY_WORK* self, u8 state);
+void em_fall_height_latch(_ENEMY_WORK* self);
+void em_stun_fx_set(_ENEMY_WORK* self);
+void em_ground_probe(_ENEMY_WORK* self);
+void em_ambient_color_update(_ENEMY_WORK* self, u8 snap);
+}
+
+/* 0x8012555C (0x9F8): sets the work up for action `kind` (1: a fresh spawn placed from its ground record, 2: keeps
+ * the +0xA04 block, 4: placed like a spawn): clears the per-life state, rolls the recover timer, finds the "COG"
+ * joint, arms the breakable parts and the hit records, scales the health and, the first time, attaches the effects
+ * and the sound entry. */
+extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
+{
+    EnemyData* data = get_enemy_data(self);
+    EmGroundRec rec;
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 stun_pos;
+    nw4r::math::VEC3 stun_offset;
+    nw4r::g3d::ResNode node(NULL);
+    EmActTimers* timers;
+    EmRecoverChoice* choice;
+    EmRecoverChoice* it;
+    EmRecoverBand* band;
+    EmBreakPart* part;
+    s32 j;
+    EmBreakPartData* part_data;
+    EmAilmentFx* stun;
+    s16 total;
+    s16 roll;
+    s32 frames;
+    s32 i;
+    u8 act;
+    u8 sub;
+
+    VEC3_ctor(&offset);
+    em_ground_rec_clear(&rec);
+    self->visible_0x001 = 1;
+    if (kind == 1) {
+        em_roster_records_release(self);
+        self->field_0x9F6 = 0xFF;
+        memset(self->data_0xB04, 0, sizeof(self->data_0xB04));
+        self->field_0x011 = 0;
+    } else {
+        emc_event_size_reset_ck(self);
+    }
+    em_break_parts_reset(self);
+    em_static_data_latch(self);
+    self->field_0x011 = 0;
+    self->state_0x017 = 0;
+    self->field_0x018 = 0;
+    if ((self->field_0x1C8 & 1) || self->field_0x00C == 0) {
+        self->field_0x1C8 |= 8;
+    }
+    self->param_target_0x1D8 = 1.0f;
+    self->field_0x1D4 = 1.0f;
+    self->param_steps_0x1DC = 0;
+    em_anger_clear(self);
+    em_shell_rate_init(self);
+    self->field_0x7C0 = 1.0f;
+    self->field_0x1E2 = 0;
+    self->field_0x1E4 = 0;
+    em_mot_set(self, 1, 0, 0);
+    em_reaction_req(self, 0xFF, 0, 0);
+    self->field_0x383 = 0;
+    self->field_0x38A = 0;
+    self->field_0x38B = 0;
+    self->field_0x38C = 3;
+    self->field_0x38D = 0;
+    self->unused_0x8B1[0] = 0;
+    self->unused_0x8B1[1] = 0;
+    self->flags_0x8B3 = 0;
+    fn_801281F8(self);
+    self->field_0x1E0 = get_now_mapno();
+    self->field_0x1E8 = 0;
+    self->field_0x1E9 = 0;
+    self->queued_act_0x1EA = 0;
+    self->queued_sub_0x1EB = 0;
+    em_delay_act_clear0(self);
+    self->field_0xAEE = 0;
+    self->sync_flag_0x468 = 0;
+    if (self->field_0x009 == 0) {
+        em_owner_slot_pick(self);
+        self->net_seq_0x01E = 0;
+    }
+    self->field_0x1F8 = 0;
+    void (*init_hook)(_ENEMY_WORK*) = em_hook_get(self, 0);
+    if (init_hook != NULL) {
+        init_hook(self);
+    }
+    em_finish_flag_set(self);
+    switch (kind) {
+    case 1:
+    case 4:
+        if (em_ground_rec_find(self->field_0x01A, &rec) == 1) {
+            self->area_no = rec.area_0x01;
+            copyVec3(&self->pos, &rec.pos_0x08);
+            eft_rot_vec_copy((_CP_VECTOR*)&self->field_0x1BC, &rec.rot_0x14);
+        }
+        self->break_parts_0x488[0].area = self->area_no;
+        self->break_parts_0x488[1].area = self->area_no;
+        act = 0;
+        sub = 0;
+        void (*start_hook)(_ENEMY_WORK*, u8*, u8*) = (void (*)(_ENEMY_WORK*, u8*, u8*))em_hook_get(self, 12);
+        if (start_hook != NULL) {
+            start_hook(self, &act, &sub);
+            em_state_refresh(self);
+        }
+        em_act_step_arm(self, act, sub, 1);
+        break;
+    default:
+        em_act_step_arm(self, 0, 0, 1);
+        break;
+    }
+    self->field_0x1CC = data->base_scale_0x08;
+    self->field_0x9F7 = 0xFF;
+    self->field_0x9F8 = 0xFF;
+    self->field_0x1F9 = 0;
+    self->field_0x1FA = 1;
+    self->field_0x1FB = 0;
+    fn_80129984(self);
+    self->field_0x200 = 0;
+    self->field_0x1FD = 0;
+    self->field_0x202 = 900;
+    self->field_0x79A = 0;
+    fn_8012CE9C(self, 0xFFFF);
+    self->field_0x79B = 0;
+    self->field_0x9E4 = 0;
+    fn_8012554C(self);
+    if (kind != 2) {
+        self->flags_0xA04 = 0;
+        self->field_0xA05 = 0xFF;
+        self->field_0xA06 = 0;
+    }
+    self->field_0xA07 = 0;
+    self->field_0x38E = 0;
+    self->field_0x38F = 0;
+    self->spotted_0x438 = 0;
+    self->field_0x43B = 0;
+    self->field_0x43C = 0;
+    self->field_0x440 = 0;
+    self->field_0x43D = 0;
+    self->field_0x43E = 0;
+    self->field_0x439 = 0;
+    self->field_0x43A = 0;
+    self->status_timer_0x442 = 0;
+    self->freeze_0x46A = 0;
+    self->state_0x46F = 0;
+    for (i = 0; i < 4; i++) {
+        self->values_0x390[i] = 0;
+        self->hate_0x428[i] = 0;
+        self->frames_0x454[i] = -1.0f;
+    }
+    self->values_0x390[4] = 0;
+    for (i = 0; i < 32; i++) {
+        self->values_0x3A4[i] = 0;
+    }
+    em_damage_record_clear(self);
+    self->field_0x801 = 0;
+    self->field_0x888 = -1;
+    for (i = 0; i < 3; i++) {
+        self->drop_rec_0x88C[i] = -1;
+        self->drop_timer_0x898[i] = 0;
+    }
+    if (data->drops_left_0x6C != NULL) {
+        self->drop_left_0x89E = *data->drops_left_0x6C;
+    } else {
+        self->drop_left_0x89E = 0;
+    }
+    self->flags_0x836 = 0;
+    self->mark_timer_0x810 = 0;
+    self->field_0x94A = 0;
+    self->field_0x94C = 0;
+    self->field_0x812 = 0;
+    self->field_0x814 = 0;
+    self->field_0x834 = 0;
+    self->field_0x835 = 0;
+    em_stamina_reset(self);
+    timers = fn_80126494(self);
+    if (quest_flag_100000_ck(0) == 1 || quest_flag_10_ck(0) == 1) {
+        self->field_0x8A2 = 500;
+    } else if (timers != NULL) {
+        frames = 1000;
+        band = timers->recover;
+        do {
+            if (self->field_0x7C8 <= band->max_level) {
+                choice = band->choices;
+                it = choice;
+                total = 0;
+                while (it->weight != -1) {
+                    total += it->weight;
+                    it++;
+                }
+                if (total != 0) {
+                    roll = (u16)ran_suu(1) % total;
+                    for (; choice->weight != -1; choice++) {
+                        roll -= choice->weight;
+                        if (roll < 0) {
+                            frames = choice->frames;
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+        } while ((band++)->max_level != 0xFF);
+        self->field_0x8A2 = frames;
+    } else {
+        self->field_0x8A2 = 1000;
+    }
+    em_area_status_init(self);
+    self->field_0x818 = 0;
+    self->fx_timer_0x8C2 = 0;
+    self->fx_timer_0x8C4 = 0;
+    self->fx_timer_0x8C6 = 0;
+    self->field_0x81A = 0;
+    self->timer_0x81C = 0;
+    self->timer_0x81E = 0;
+    self->status_bits_0x820 = 0;
+    self->status_bits_timer_0x821 = 0;
+    self->field_0x8D3 = 0;
+    em_poison_init(self);
+    em_paralysis_init(self);
+    em_sleep_init(self);
+    em_ailment8_init(self);
+    em_stun_init(self);
+    em_exhaust_init(self);
+    self->faint_0x8AB = 0;
+    self->flag_0x8AC = 0;
+    self->flag_0x8AD = 0;
+    self->flag_0x8AE = 0;
+    self->flag_0x8AF = 0;
+    self->flag_0x8B0 = 0;
+    em_ailment_clear(self);
+    em_ailment_mask_clear(self);
+    self->sleep_timer_0x950 = 0;
+    self->recover_timer_0x952 = 0;
+    self->level_kind_0x918 = 0;
+    self->field_0x916 = 0;
+    self->field_0x919 = 0;
+    self->recover_count_0x91A[0] = 0;
+    self->recover_count_0x91A[1] = 0;
+    for (i = 0; i < 2; i++) {
+        em_hit_window_clear(self, (u8)i);
+        hit_source_set((_HIT_W*)&self->hit_slots_0xA08[i], 1, self);
+        hit_owner_set((_HIT_W*)&self->hit_slots_0xA08[i], 1, self);
+    }
+    self->field_0xAE9 = 0;
+    self->field_0xAEA = 0;
+    hit_id_list_clear(self->hit_ids_0xAC0, &self->hit_id_count_0xAE8);
+    yure_enemy_init((YureEnemyWork*)self);
+    em_record_0x750_clear(self);
+    nw4r::g3d::ResNode found = ((nw4r::g3d::ResMdl*)&self->res_mdl_0x138)->GetResNode("COG");
+    res_node_assign((ResHandle*)&node, (const ResHandle*)&found);
+    if (res_node_is_valid((const ResHandle*)&node) == 1) {
+        self->joint_0x204 = res_node_get_id((const ResHandle*)&node);
+    } else {
+        self->joint_0x204 = -1;
+    }
+    em_latch_0x762_roll(self);
+    self->field_0x761 = 0;
+    em_joint_visibility_update_all(self);
+    self->field_0x766 = 0;
+    self->field_0x768 = 0;
+    setVector3(&self->vec_0x76C, 0.0f, 0.0f, 0.0f);
+    setVector3(&self->vec_0x778, 0.0f, 0.0f, 0.0f);
+    self->hp_ratio_0x7A8 = 1.0f;
+    self->field_0x7B0 = -1.0f;
+    for (i = 0; i < 2; i++) {
+        part = &self->break_parts_0x488[i];
+        part_data = em_break_part_data_get(self, (u8)i);
+        if (part_data != NULL) {
+            em_state_byte_set((_ENEMY_WORK*)part, part_data->step);
+            for (j = 0; j < 3; j++) {
+                if (part_data->mats[j] != 0xFFFFFFFF) {
+                    mhchar_mat_hide_set((struct MHchar*)self->char_0x024, part_data->mats[j], self->group + 8);
+                }
+            }
+        }
+    }
+    void (*act_hook)(_ENEMY_WORK*, u8) = (void (*)(_ENEMY_WORK*, u8))em_hook_get(self, 1);
+    if (act_hook != NULL) {
+        act_hook(self, kind);
+    }
+    if (kind == 1) {
+        if (self->hp_ratio_0x7A8 > 1.0f) {
+            self->hp_ratio_0x7A8 = 1.0f;
+        }
+        self->field_0x7A0 = self->field_0x7AC = (s32)((s32)self->field_0x7A4 * self->hp_ratio_0x7A8);
+        self->field_0x014 = 0;
+    } else if ((s32)self->field_0x7A0 == -1) {
+        if (self->hp_ratio_0x7A8 > 1.0f) {
+            self->hp_ratio_0x7A8 = 1.0f;
+        }
+        self->field_0x7A0 = self->field_0x7AC = (s32)((s32)self->field_0x7A4 * self->hp_ratio_0x7A8);
+    }
+    em_char_pose_sync(self);
+    em_fall_height_latch(self);
+    self->field_0x1AC = 0.0f;
+    copyVec3(&self->aim, &self->pos);
+    copyVec3(&self->prev_pos, &self->pos);
+    self->field_0x214 = self->field_0x210 = self->field_0x20C = self->pos.y;
+    self->ground_mode_0x208 = -1;
+    self->field_0x218 = 0;
+    self->field_0x23C = 0;
+    self->field_0x23D = 0;
+    self->ceiling_0x240 = 0.0f;
+    if (self->field_0x009 == 0) {
+        eft_em_slot_attach(self);
+        em_stun_fx_set(self);
+        stun = data->ailment_fx_0x9C->stun_stars;
+        if (stun != NULL) {
+            copyVec3(&offset, setVec3(&stun_offset, stun->x, stun->y, stun->z));
+            eft_stun_set_c1(self, stun->joint, &offset, stun->scale, 3);
+        } else {
+            setVec3(&stun_pos, 0.0f, 100.0f, 0.0f);
+            eft_stun_set_c1(self, 2, &stun_pos, 2.0f, 3);
+        }
+        if ((self->field_0x1C8 & 1) && data->ailment_fx_0x9C->model_fx != 0) {
+            eft_em_model_fx_spawn(self);
+        }
+        self->se_0xB14 = (struct _se_w*)se_entry_request(4, self, (void (*)(_ENEMY_WORK*, s32))em_hook_get(self, 7));
+        self->field_0x009 = 1;
+    }
+    em_ground_probe(self);
+    if (!(self->field_0x1C8 & 1)) {
+        em_ambient_color_update(self, 1);
+    }
+}
+
+/* 0x80125F54 (0x34): prepares a ground record (constructs its position). */
+extern "C" EmGroundRec* em_ground_rec_clear(EmGroundRec* rec)
+{
+    VEC3_ctor(&rec->pos_0x08);
+    return rec;
+}
+
 extern "C" u8 fn_80125F88(u32 idx)
 {
     return em_kind_index_tbl[(u8)idx];
@@ -889,13 +1333,6 @@ EnemyData* get_enemy_data(struct _ENEMY_WORK* work)
 }
 
 extern "C" void* fn_80126704(struct _ENEMY_WORK* self);
-
-/* 0x80125F54 (0x34): prepares a ground record (constructs its position). */
-extern "C" EmGroundRec* em_ground_rec_clear(EmGroundRec* rec)
-{
-    VEC3_ctor(&rec->pos_0x08);
-    return rec;
-}
 
 /* One area route of a route map: the area, its points and its entries.
  * size: 0xC */
@@ -1021,7 +1458,7 @@ extern "C" EmSight2* em_sight2_get(_ENEMY_WORK* self)
 }
 
 /* 0x80126494 (0x28): the enemy data's action timer list. */
-extern "C" s16* fn_80126494(_ENEMY_WORK* self)
+extern "C" EmActTimers* fn_80126494(_ENEMY_WORK* self)
 {
     return get_enemy_data(self)->extra->act_timers;
 }
@@ -1029,12 +1466,75 @@ extern "C" s16* fn_80126494(_ENEMY_WORK* self)
 /* One marker callback of an enemy kind; `enemy/enemy_control.cpp` calls it with the area entry. */
 typedef void (*EmEntryProc)(EmAreaEntry* entry);
 
-/* The enemy data's marker-callback block (`EnemyData::entry_procs_0x10`): the callbacks of markers 23..26.
- * size: 0x6C (a lower bound: only the callbacks are reached) */
+/* One per-kind hook of an enemy kind (`em_hook_get`); the callers cast it to the signature of its slot. */
+typedef void (*EmHook)(_ENEMY_WORK* self);
+
+/* The enemy data's hook block (`EnemyData::entry_procs_0x10`): the 23 work hooks `em_hook_get` hands out (slot 7
+ * is unused: that hook comes from `em_snd_proc_tbl`), then the callbacks of markers 23..26.  size: 0x6C */
 struct EmEntryProcs {
-    /* +0x00 */ u8 pad_0x00[0x5C];
+    /* +0x00 */ EmHook hooks[23];
     /* +0x5C */ EmEntryProc procs[4];
 };
+
+/* 0x801264BC (0x13C): the enemy kind's hook `index` (0..22); slot 7 is the team's sound proc.  NULL for none. */
+extern "C" EmHook em_hook_get(_ENEMY_WORK* self, s32 index)
+{
+    EmEntryProcs* procs = get_enemy_data(self)->entry_procs_0x10;
+
+    if (procs != NULL) {
+        switch ((u8)index) {
+        case 0:
+            return procs->hooks[0];
+        case 1:
+            return procs->hooks[1];
+        case 2:
+            return procs->hooks[2];
+        case 3:
+            return procs->hooks[3];
+        case 4:
+            return procs->hooks[4];
+        case 5:
+            return procs->hooks[5];
+        case 6:
+            return procs->hooks[6];
+        case 7:
+            return (EmHook)em_snd_proc_tbl[self->team];
+        case 8:
+            return procs->hooks[8];
+        case 9:
+            return procs->hooks[9];
+        case 10:
+            return procs->hooks[10];
+        case 11:
+            return procs->hooks[11];
+        case 12:
+            return procs->hooks[12];
+        case 13:
+            return procs->hooks[13];
+        case 14:
+            return procs->hooks[14];
+        case 15:
+            return procs->hooks[15];
+        case 16:
+            return procs->hooks[16];
+        case 17:
+            return procs->hooks[17];
+        case 18:
+            return procs->hooks[18];
+        case 19:
+            return procs->hooks[19];
+        case 20:
+            return procs->hooks[20];
+        case 21:
+            return procs->hooks[21];
+        case 22:
+            return procs->hooks[22];
+        default:
+            return NULL;
+        }
+    }
+    return NULL;
+}
 
 /* 0x801265F8 (0x98): the enemy kind's callback for marker `marker` (23..26) of the area entry; NULL for none. */
 extern "C" EmEntryProc em_entry_proc_get(EmAreaEntry* entry, u8 marker)
@@ -1433,17 +1933,15 @@ extern "C" EmSpecialPart* em_special_part_get(EmSpecialPartSet* set, u8 code, u8
 {
     s8 count = set->count;
     EmSpecialPart* part = set->parts;
-    s8 i;
+    s32 i;
 
     if (index == 0xFF) {
-        for (i = count; i > 0; i--, part++) {
+        for (i = 0; i < count; i++, part++) {
             if (part->code == code) {
                 return part;
             }
         }
-        return NULL;
-    }
-    if (index < count) {
+    } else if (index < count) {
         return &part[index];
     }
     return NULL;
@@ -2932,6 +3430,54 @@ extern "C" void em_ground_probe(_ENEMY_WORK* self)
     }
 }
 
+#pragma fp_contract off
+/* 0x8012A414 (0x210): sets +0x760 when a large enemy in the player's area stands on a coloured cell and the ground
+ * one body radius ahead and behind it (probed from above) is the same cell. */
+extern "C" void em_cell_span_update(_ENEMY_WORK* self)
+{
+    LandData land;
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 from;
+    nw4r::math::VEC3 to;
+    nw4r::math::VEC3 hit;
+    nw4r::math::VEC3 ahead;
+    nw4r::math::VEC3 behind;
+    f32 radius;
+
+    VEC3_ctor(&offset);
+    VEC3_ctor(&from);
+    VEC3_ctor(&to);
+    VEC3_ctor(&hit);
+    em_land_data_init(&land);
+    self->field_0x760 = 0;
+    if (self->area_no == get_now_areano() && (self->field_0x1C8 & 1) && self->cell_0x22F != 0) {
+        radius = get_enemy_data(self)->size_0x54->radius_0x24;
+        setVector3(&offset, 0.0f, 0.0f, radius);
+        rotVecY(&offset, self->field_0x1C0);
+        addVec3(&ahead, &self->pos, &offset);
+        copyVec3(&from, &ahead);
+        from.y += radius;
+        copyVec3(&to, &from);
+        to.y -= 2.0f * radius;
+        if (findInterSection2(&from, &to, &hit, 2, 0x20, self->area_no, 0, NULL, &land) <= 0
+            || self->cell_0x22F == land.field_0x07) {
+            offset.x = -offset.x;
+            offset.y = -offset.y;
+            offset.z = -offset.z;
+            addVec3(&behind, &self->pos, &offset);
+            copyVec3(&from, &behind);
+            from.y += radius;
+            copyVec3(&to, &from);
+            to.y -= 2.0f * radius;
+            if (findInterSection2(&from, &to, &hit, 2, 0x20, self->area_no, 0, NULL, &land) <= 0
+                || self->cell_0x22F == land.field_0x07) {
+                self->field_0x760 = 1;
+            }
+        }
+    }
+}
+#pragma fp_contract on
+
 /* 0x8012A624 (0x34): the `LandData` constructor (constructs the hit position). */
 extern "C" LandData* em_land_data_init(LandData* land)
 {
@@ -3052,16 +3598,16 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
 {
     nw4r::math::VEC3 from;
     nw4r::math::VEC3 to;
-    u8 pick_player = 0xFF;
-    u8 pick_enemy = 0xFF;
-    u8 pick_npc = 0xFF;
-    u8 ties = 0;
-    f32 dist = -1.0f;
-    f32 best_dist = 0.0f;
-    s32 best = -1;
-    u8 result = 1;
-    u8 picked = 0xFF;
-    struct _ENEMY_DATA* data = NULL;
+    u8 pick_player;
+    u8 pick_enemy;
+    u8 pick_npc;
+    u8 ties;
+    f32 dist;
+    f32 best_dist;
+    s32 best;
+    u8 result;
+    u8 picked;
+    struct _ENEMY_DATA* data;
     u32 hidden;
     u32 torch;
     u32 ground;
@@ -3079,6 +3625,16 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
 
     VEC3_ctor(&from);
     VEC3_ctor(&to);
+    pick_player = 0xFF;
+    pick_enemy = 0xFF;
+    pick_npc = 0xFF;
+    ties = 0;
+    dist = -1.0f;
+    best_dist = 0.0f;
+    best = -1;
+    result = 1;
+    picked = 0xFF;
+    data = NULL;
     if (*sel & 0x80) {
         hidden = 1;
         *sel &= 0x7F;
@@ -3621,7 +4177,8 @@ extern "C" u32 em_area_roam_pick(_ENEMY_WORK* self, u16 seed)
     u32 hit;
     u16 chance;
     s32 rival;
-    u8 rank;
+    u32 rank;
+    u32 other;
     u16 i;
 
     if (self->field_0x202 <= 0) {
@@ -3653,29 +4210,36 @@ extern "C" u32 em_area_roam_pick(_ENEMY_WORK* self, u16 seed)
         for (i = 0; i < max; i++, work++) {
             if (self->group != i && work->active != 0 && work->area_no == self->area_no && work->action != 0xB &&
                 work->action != 0xC && (u32)em_ally_kind_ck(self, work->team) != 1) {
-                if ((u8)em_get_rank(work) > (u8)rank) {
+                other = em_get_rank(work);
+                if ((u8)other > (u8)rank) {
                     rival = 2;
                     break;
                 }
-                if ((u8)em_get_rank(work) == (u8)rank) {
+                if ((u8)other == (u8)rank) {
                     rival = 1;
                 }
             }
         }
         for (i = 0; i < rolls; i++) {
-            if (rival == 1) {
+            switch (rival) {
+            default:
+                if (hit == 1) {
+                    chance = 20;
+                }
+                break;
+            case 1:
                 if (hit == 1) {
                     chance = 50;
                 } else {
                     chance = 20;
                 }
-            } else if (rival == 2) {
+                break;
+            case 2:
                 chance = 40;
                 if (hit == 1) {
                     chance = 80;
                 }
-            } else if (hit == 1) {
-                chance = 20;
+                break;
             }
             if (em_hit_timer_ck(self) == 1) {
                 if ((s16)self->field_0x814 & 8) {
@@ -4497,7 +5061,7 @@ extern "C" void fn_8012CE8C(_ENEMY_WORK* enemy, u16 flag)
 }
 
 /* Clears the given bits in the per-attacker flag word. */
-extern "C" void fn_8012CE9C(_ENEMY_WORK* enemy, u32 flag)
+extern "C" void fn_8012CE9C(_ENEMY_WORK* enemy, u16 flag)
 {
     enemy->field_0x794 &= ~flag;
 }
@@ -4511,7 +5075,7 @@ extern "C" void em_hit_by_set(_ENEMY_WORK* enemy, s16 timer, u8 index)
 }
 
 /* Whether any of the given bits is set in the per-attacker flag word. */
-extern "C" u32 fn_8012CF04(_ENEMY_WORK* enemy, u32 flag)
+extern "C" u32 fn_8012CF04(_ENEMY_WORK* enemy, u16 flag)
 {
     return (enemy->field_0x794 & flag) != 0;
 }
@@ -4724,6 +5288,104 @@ extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind)
 extern "C" s32 em_search_record_ck(u32 selector, _PLW* work, s8* out_flag)
 {
     return em_kill_cut_target_get((u8)selector, work, out_flag) != NULL;
+}
+
+/* 0x8012D498 (0x180): the one live monster the player can finish (kind 0: action 8, kind 1: action 8 or 9) and
+ * that has marked the player; null with `*out_flag` set when there are several. */
+extern "C" void* em_kill_cut_target_get(u32 selector, _PLW* player, s8* out_flag)
+{
+    _ENEMY_WORK* found = NULL;
+    _ENEMY_WORK* work = get_move_work_adrs_view3(3);
+    s32 max = get_move_work_max(3);
+    s32 i;
+    s32 marked;
+
+    *out_flag = 0;
+    for (i = 0; i < max; i++, work++) {
+        if (work->active == 0 || em_pl_target_ck(work, player) == 0) {
+            continue;
+        }
+        marked = 0;
+        if (work->team == 4) {
+            if (work->field_0x380 == 1 && work->state_0x381 == 10 && (work->field_0x382 & (1 << player->chunk_ofs))) {
+                marked = 1;
+            }
+        } else if (fn_8012B5C4(work, 1, 2, player->chunk_ofs) == 1) {
+            marked = 1;
+        }
+        if (marked != 1) {
+            continue;
+        }
+        switch ((u8)selector) {
+        case 0:
+            if (work->action == 8) {
+                if (found == NULL) {
+                    found = work;
+                } else {
+                    *out_flag = 1;
+                    return NULL;
+                }
+            }
+            break;
+        case 1:
+            if ((u32)(work->action - 8) <= 1) {
+                if (found == NULL) {
+                    found = work;
+                } else {
+                    *out_flag = 1;
+                    return NULL;
+                }
+            }
+            break;
+        }
+    }
+    return found;
+}
+
+/* 0x8012D618 (0x1E4): applies an area-wide effect to every live monster standing in `area_no` (mode 0: drains 3 %
+ * of the gauge, 1: angers the others, 2: sets net flag 1), each with its area effect where it applies. */
+extern "C" void em_area_buff_apply(_ENEMY_WORK* self, u8 area_no, u8 mode)
+{
+    s32 i;
+    _ENEMY_WORK* work;
+    s32 max;
+    EnemyData* data;
+
+    work = get_move_work_adrs_view3(3);
+    max = get_move_work_max(3);
+    for (i = 0; i < max; i++, work++) {
+        if (work->active == 0 || work->area_no != area_no || work->team == 40) {
+            continue;
+        }
+        if (work->action == 11 || work->action == 12) {
+            continue;
+        }
+        switch (mode) {
+        case 0:
+            em_gauge_step(work, 0.03f * (s32)work->field_0x7A4);
+            data = get_enemy_data(work);
+            if (work->joint_0x204 != -1) {
+                ef_inst_spawn_joint(work, 0, work->joint_0x204, data->ailment_fx_0x9C->area_fx_scale);
+            } else {
+                ef_inst_spawn_joint(work, 0, work->joint_0x110, data->ailment_fx_0x9C->area_fx_scale);
+            }
+            break;
+        case 1:
+            if (self != work) {
+                em_anger_add(work, 600);
+            }
+            break;
+        case 2:
+            em_net_flag_apply_1(work);
+            data = get_enemy_data(work);
+            if (work->joint_0x204 != -1) {
+                ef_inst_spawn_joint(work, 2, work->joint_0x204, data->ailment_fx_0x9C->area_fx_scale);
+            } else {
+                ef_inst_spawn_joint(work, 2, work->joint_0x110, data->ailment_fx_0x9C->area_fx_scale);
+            }
+            break;
+        }
+    }
 }
 
 
@@ -5194,6 +5856,54 @@ extern "C" u32 em_spawn_rec_live_ck2(_ENEMY_WORK* self)
     return fn_8012E6A0(self->field_0x00C, *(u16*)&self->field_0x016);
 }
 
+/* 0x8012E728 (0x15C): retires the work: mode 0 re-files a live spawn record as a large entry, 1 stores it as a
+ * mini work and steps it, 2 stores it with spawn kind 3; then releases the work. */
+extern "C" void em_act_end(_ENEMY_WORK* self, u8 mode)
+{
+    EmGroundRec rec;
+    QuestSpawnRec* spawn;
+    _ENEMY_MINI_WORK* mini;
+
+    em_ground_rec_clear(&rec);
+    switch (mode) {
+    case 0:
+        if ((u32)em_spawn_rec_live_ck(self) == 1 && self->field_0x00C == 3) {
+            spawn = (QuestSpawnRec*)quest_spawn_rec_find(self->field_0x01A);
+            if (spawn != NULL) {
+                em_ground_rec_set(&rec, &spawn->slot_0x8->element_0x08);
+                if (self->field_0x1C8 & 1) {
+                    mini = em_large_entry_new(self->team, &rec, self->field_0x01A, self);
+                } else {
+                    mini = em_large_entry_new(self->team, &rec, self->field_0x01A, NULL);
+                }
+                if (mini != NULL) {
+                    mini->phase_0x1C = self->field_0x016 + 1;
+                    mini->step_0x12 = 0;
+                    mini->stat_level_0x1F = self->field_0x7C8;
+                    mini->size_scale_0x24 = self->field_0x1D0;
+                    mini->element_0x0D = self->field_0x00D;
+                    mini->area_slot_0x1D = self->area_slot_0x013;
+                    emc_entry_report(mini, 2);
+                }
+            }
+        }
+        break;
+    case 1:
+        mini = em_area_entry_store(self);
+        if (mini != NULL) {
+            emc_mini_step(mini);
+        }
+        break;
+    case 2:
+        mini = em_area_entry_store(self);
+        if (mini != NULL) {
+            mini->spawn_kind_0x0E = 3;
+        }
+        break;
+    }
+    enemy_work_release_c1(self);
+}
+
 /* Whether the enemy is in the "charge" state pair. */
 extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy)
 {
@@ -5458,7 +6168,9 @@ u32 em_sleep_ck(_ENEMY_WORK* self, u8 kind)
 extern "C" s32 em_tall_ck(_ENEMY_WORK* self)
 {
     if (self->field_0x1E2 == 4) {
-        if (self->field_0x1AC > lbl_80796CD0 * em_height_base_get(self)) return 1;
+        f32 base = em_height_base_get(self);
+        f32 height = self->field_0x1AC;
+        if (height > lbl_80796CD0 * base) return 1;
     }
     return 0;
 }
@@ -5527,8 +6239,8 @@ extern "C" void em_mot_set_blend(_ENEMY_WORK* self, u32 motion, u32 start, u32 f
     if ((self->field_0x1C8 & 4) == 0) {
         self->field_0x7C4 = 1.0f;
         frames = em_motion_frame_get(self, (u16)motion);
-        mhchar_motion_set((struct MHchar*)self->char_0x024, 2, self->field_0x00B, (u16)motion, start, frames, loop,
-                          (f32)(s32)frame, em_motion_blend_scale_get(self));
+        mhchar_motion_set_c1((struct MHchar*)self->char_0x024, 2, self->field_0x00B, (u16)motion, start, (f32)(s32)frame,
+                             frames, loop, em_motion_blend_scale_get(self));
         em_mat_blend_reset(self);
     }
 }
@@ -5564,8 +6276,8 @@ extern "C" void em_mot_layer_blend_set(_ENEMY_WORK* self, s32 layer, u32 motion,
 
     if ((self->field_0x1C8 & 4) == 0) {
         frames = em_motion_frame_get(self, (u16)motion);
-        mhchar_motion_layer_set((struct MHchar*)self->char_0x024, layer, 2, self->field_0x00B, (u16)motion, start,
-                                frames, loop, (f32)frame, em_motion_blend_scale_get(self));
+        mhchar_motion_layer_set_c1((struct MHchar*)self->char_0x024, layer, 2, self->field_0x00B, (u16)motion, start,
+                                   (f32)frame, frames, loop, em_motion_blend_scale_get(self));
     }
 }
 
@@ -5819,12 +6531,12 @@ extern "C" void em_joint_visibility_update_all(_ENEMY_WORK* self)
 }
 
 /* 0x8012FCC4 (0x20): sets the +0x1D4 target and the frames to reach it; 0 frames sets it at once. */
-extern "C" void em_motion_param_set(_ENEMY_WORK* self, s16 steps, f64 target)
+extern "C" void em_motion_param_set(_ENEMY_WORK* self, f32 target, s16 steps)
 {
     self->param_target_0x1D8 = target;
     self->param_steps_0x1DC = steps;
     if (steps == 0) {
-        self->field_0x1D4 = target;
+        self->field_0x1D4 = (f64)target;
     }
 }
 
@@ -5833,7 +6545,7 @@ extern "C" void em_motion_param_step(_ENEMY_WORK* self)
 {
     if (self->param_steps_0x1DC > 0) {
         if (self->param_steps_0x1DC == 1) {
-            em_motion_param_set(self, 0, self->param_target_0x1D8);
+            em_motion_param_set(self, self->param_target_0x1D8, 0);
         } else {
             f32 target;
             f32 cur;
@@ -7312,11 +8024,11 @@ extern "C" void em_poison_fx_set(_ENEMY_WORK* self)
         fx = get_enemy_data(self)->ailment_fx_0x9C->poison;
         if (fx != NULL) {
             copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
-            eft013_em_place_c1(self, &offset, fx->joint, 2, fx->scale);
+            eft013_em_place_c1(self, &offset, fx->joint, fx->scale, 2);
             return;
         }
         copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
-        eft013_em_place_c1(self, &offset, 2, 2, 2.0f);
+        eft013_em_place_c1(self, &offset, 2, 2.0f, 2);
     }
 }
 
@@ -7409,11 +8121,11 @@ extern "C" void em_sleep_fx_update(_ENEMY_WORK* self)
         fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
         if (fx != NULL) {
             copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
-            eft013_em_place_c1(self, &offset, fx->joint, 0xA, fx->scale);
+            eft013_em_place_c1(self, &offset, fx->joint, fx->scale, 0xA);
             return;
         }
         copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
-        eft013_em_place_c1(self, &offset, 2, 0xA, 2.0f);
+        eft013_em_place_c1(self, &offset, 2, 2.0f, 0xA);
     }
 }
 
@@ -7561,11 +8273,11 @@ extern "C" void em_stun_fx_set(_ENEMY_WORK* self)
     fx = get_enemy_data(self)->ailment_fx_0x9C->stun;
     if (fx != NULL) {
         copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
-        eft_stun_set(self, fx->joint, &offset, 2, fx->scale);
+        eft_stun_set_c1(self, fx->joint, &offset, fx->scale, 2);
         return;
     }
     copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
-    eft_stun_set(self, 2, &offset, 2, 2.0f);
+    eft_stun_set_c1(self, 2, &offset, 2.0f, 2);
 }
 
 /* 0x80133068 (0xA4): resets the exhaust buildup; its limit is scaled by the rank. */
@@ -7608,10 +8320,10 @@ extern "C" void em_exhaust_end(_ENEMY_WORK* self)
 {
     EnemyData* data = get_enemy_data(self);
     EmRankRecord* rank = (EmRankRecord*)em_rank_rec_get(self);
+    EmAilmentTable* table = data->extra->exhaust;
 
     self->field_0x944 = 0;
-    em_ailment_limit_raise(self, data->extra->exhaust, &self->exhaust_count_0x920, &self->exhaust_limit_0x946,
-                           &self->field_0x944);
+    em_ailment_limit_raise(self, table, &self->exhaust_count_0x920, &self->exhaust_limit_0x946, &self->field_0x944);
     self->exhaust_limit_0x946 = self->exhaust_limit_0x946 * rank->exhaust_scale;
 }
 
@@ -7877,10 +8589,10 @@ extern "C" void em_hit_fx_set(_ENEMY_WORK* self)
     if (self->team != 0x28 && (u32)em_die_ck(self) != 1) {
         setVector3(&offset, 0.0f, 0.0f, 0.0f);
         if (self->joint_0x204 != 0xFFFFFFFF) {
-            eft013_em_place_c1(self, &offset, self->joint_0x204, 0x12, em_hit_fx_scale_get(self));
+            eft013_em_place_c1(self, &offset, self->joint_0x204, em_hit_fx_scale_get(self), 0x12);
             return;
         }
-        eft013_em_place_c1(self, &offset, 2, 0x12, em_hit_fx_scale_get(self));
+        eft013_em_place_c1(self, &offset, 2, em_hit_fx_scale_get(self), 0x12);
     }
 }
 
@@ -7961,7 +8673,7 @@ extern "C" void em_break_fx_set(_ENEMY_WORK* self)
         if (joint == 0xFFFFFFFF) {
             joint = 2;
         }
-        eft013_em_place_c1(self, &offset, joint, kind, scale);
+        eft013_em_place_c1(self, &offset, joint, scale, kind);
     }
 }
 
@@ -8347,7 +9059,7 @@ extern "C" s32 em_roll_to_get(_ENEMY_WORK* self, nw4r::math::VEC3* target)
     VEC3_ctor(&dir);
     subVec3(&diff, target, &self->pos);
     copyVec3(&dir, &diff);
-    rotVecY(&dir, (u16)(self->field_0x1C0 * -1));
+    rotVecY(&dir, (u16)-self->field_0x1C0);
     return vec3_angle_xy((f32*)&dir);
 }
 
@@ -8804,10 +9516,10 @@ extern "C" void em_wave_segment(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r
 
     switch (kind) {
     case 0:
-        vec3_segment_offset(out, a, b, value & 0xFF00, reach, (s32)(u8)(v >> 4) / 255.0f);
+        vec3_segment_offset_c1(out, a, b, reach, (s32)((v >> 4) & 0xFF) / 255.0f, value & 0xFF00);
         break;
     case 1:
-        vec3_segment_offset2(out, a, b, (v << 8) & 0xFF00, value & 0xFF00, reach, (s32)(u8)(v >> 4) / 255.0f);
+        vec3_segment_offset2_c1(out, a, b, reach, (s32)((v >> 4) & 0xFF) / 255.0f, (v << 8) & 0xFF00, value & 0xFF00);
         break;
     }
 }
@@ -9017,6 +9729,73 @@ extern "C" void em_part_hit_set(_ENEMY_WORK* self, u32 index, u32 flags)
     }
 }
 
+extern "C" const f32* em_res_node_trans_get(const ResHandle* node);
+extern "C" const f32* em_res_node_rot_get(const ResHandle* node);
+extern "C" const f32* em_res_node_scale_get(const ResHandle* node);
+
+/* 0x80135E44 (0x2B8): launches breakable part `index` from its user-data node: the part matrix is the node's rest
+ * pose carried by its joint, and the flight (the data's frames and gravity, a lifted part twice as long) ends on
+ * its origin. */
+extern "C" void em_break_part_launch(_ENEMY_WORK* self, EmBreakPart* part, u8 index, UserDataItem* item)
+{
+    nw4r::math::MTX34 pose;
+    nw4r::math::MTX34 inverse;
+    nw4r::math::VEC3 v;
+    nw4r::math::VEC3 diff;
+    EmBreakPartData* data;
+    s16 frames;
+    f32 gravity;
+
+    MTX34_ctor(&pose);
+    MTX34_ctor(&inverse);
+    VEC3_ctor(&v);
+    mtx34_identity(&pose);
+    nw4r::g3d::ResNode scale_node = ((nw4r::g3d::ResMdl*)&self->res_mdl_0x138)->GetResNode(item->field_0x00);
+    copyVec3(&v, (nw4r::math::VEC3*)em_res_node_scale_get((const ResHandle*)&scale_node));
+    mtx34_scale_in_place(&pose, &v);
+    nw4r::g3d::ResNode rot_node = ((nw4r::g3d::ResMdl*)&self->res_mdl_0x138)->GetResNode(item->field_0x00);
+    copyVec3(&v, (nw4r::math::VEC3*)em_res_node_rot_get((const ResHandle*)&rot_node));
+    mtx34_rot_xyz_deg(&pose, v.x, v.y, v.z);
+    nw4r::g3d::ResNode trans_node = ((nw4r::g3d::ResMdl*)&self->res_mdl_0x138)->GetResNode(item->field_0x00);
+    copyVec3(&v, (nw4r::math::VEC3*)em_res_node_trans_get((const ResHandle*)&trans_node));
+    mtx34_set_trans(&pose, &v);
+    mtx34_inverse(&inverse, &pose);
+    get_joint_wmat_em(self, item->field_0x0C, &pose);
+    mtx34_concat(&part->mtx, &pose, &inverse);
+    data = em_break_part_data_get(self, index);
+    if (data != NULL) {
+        frames = data->frames;
+        gravity = data->gravity;
+    } else {
+        frames = 26;
+        gravity = -1.8f;
+    }
+    v.x = part->mtx.m[0][3];
+    v.y = part->mtx.m[1][3];
+    v.z = part->mtx.m[2][3];
+    if ((u32)em_area_ck(self) == 1) {
+        se_req_pos_ps(self->se_0xB14, 0x24, 2, &v);
+    }
+    subVec3(&diff, &part->origin, &v);
+    copyVec3(&v, &diff);
+    em_break_part_motion_clear(part);
+    if (part->kind == 1) {
+        part->duration = 2.0f * frames;
+    } else {
+        part->duration = frames;
+        part->vel.x = v.x / frames;
+        part->vel.y = v.y / frames - 0.5f * gravity * frames;
+        part->vel.z = v.z / frames;
+        part->accel.y = gravity;
+    }
+    part->pos.x = part->mtx.m[0][3];
+    part->pos.y = part->mtx.m[1][3];
+    part->pos.z = part->mtx.m[2][3];
+    part->rot.x = 0;
+    part->rot.y = self->field_0x1C0;
+    part->rot.z = 0;
+}
+
 /* 0x801360FC (0x24): the node's rest translation. */
 extern "C" const f32* em_res_node_trans_get(const ResHandle* node)
 {
@@ -9102,14 +9881,169 @@ extern "C" void em_break_part_spin(EmBreakPart* part, EmBreakPartData* data, _CP
     rot->z += (u16)(0.5f + 65536.0f * spin.z / 360.0f);
 }
 
+/* 0x801363F8 (0x5A8): steps both breakable parts: once the part's hit is marked it breaks off and launches from
+ * its user-data node, flies (spinning) to its origin, then lies there scaled with the enemy, a lifted part bobbing
+ * and rocking, until its effect slot is gone. */
+extern "C" void em_break_parts_update(_ENEMY_WORK* self)
+{
+    _CP_VECTOR rot;
+    nw4r::math::VEC3 scale;
+    EmBreakPart* part;
+    UserDataItem* item;
+    EmBreakPartData* data;
+    u32 i;
+    u32 flag;
+    u32 kind;
+    u8 effect_flags;
+    f32 bob;
+    f32 s;
+
+    VEC3_ctor(&scale);
+    for (i = 0; i < 2; i++) {
+        part = &self->break_parts_0x488[(u8)i];
+        if (part->kind == 2) {
+            continue;
+        }
+        switch (part->hit_kind) {
+        case 2:
+            flag = 2;
+            kind = 3;
+            break;
+        case 1:
+            flag = 1;
+            kind = 0;
+            break;
+        default:
+            continue;
+        }
+        item = em_user_data_items_get(self);
+        if (item == NULL) {
+            continue;
+        }
+        while (item->field_0x00 != 0xFFFFFFFF) {
+            if (item->field_0x04 == kind && item->field_0x08 == 1) {
+                break;
+            }
+            item++;
+        }
+        if (item->field_0x00 == 0xFFFFFFFF) {
+            continue;
+        }
+        data = em_break_part_data_get(self, (u8)i);
+        switch (part->step) {
+        case 0:
+            if (em_flags836_ck(self, flag) == 1) {
+                part->step++;
+                part->active = 1;
+                part->timer = 0;
+            } else {
+                part->area = self->area_no;
+                break;
+            }
+        case 1:
+            if (part->hold == 0) {
+                part->step++;
+                em_break_part_launch(self, part, (u8)i, item);
+            }
+            break;
+        case 2:
+            part->timer++;
+            eft_rot_vec_copy(&rot, &part->rot);
+            if (data != NULL && data->curves != NULL) {
+                em_break_part_spin(part, data, &rot);
+            }
+            if (part->timer >= part->duration) {
+                part->step++;
+                if (part->kind != 1) {
+                    em_break_part_return_step(part);
+                    part->pos.x = part->origin.x;
+                    part->pos.y = part->origin.y;
+                    part->pos.z = part->origin.z;
+                }
+                part->counter_0x0C = 0;
+                part->counter_0x0E = 0;
+            } else if (part->kind == 1) {
+                em_break_part_return_step(part);
+            } else {
+                em_break_part_motion_step(part);
+            }
+            cpSetRotMatrixZXY(&rot, &part->mtx);
+            s = get_em_scale(self);
+            scale.z = s;
+            scale.y = s;
+            scale.x = s;
+            mtx34_scale_in_place(&part->mtx, &scale);
+            part->mtx.m[0][3] = part->pos.x;
+            part->mtx.m[1][3] = part->pos.y;
+            part->mtx.m[2][3] = part->pos.z;
+            break;
+        case 3:
+            part->step++;
+            effect_flags = 2;
+            if (self->team == 20) {
+                effect_flags |= 0x10;
+            } else if (part->kind == 1) {
+                effect_flags |= 4;
+            }
+            em_roster_slot_effect_set(self, (u8)i + 1, &part->effect, effect_flags, (u8)i);
+        default:
+            s = get_em_scale(self);
+            scale.z = s;
+            scale.y = s;
+            scale.x = s;
+            if (part->timer < 1000) {
+                part->timer++;
+                if (part->kind == 0) {
+                    eft_rot_vec_copy(&rot, &part->rot);
+                    if (data != NULL && data->curves != NULL) {
+                        em_break_part_spin(part, data, &rot);
+                    }
+                    cpSetRotMatrixZXY(&rot, &part->mtx);
+                    mtx34_scale_in_place(&part->mtx, &scale);
+                    part->mtx.m[0][3] = part->pos.x;
+                    part->mtx.m[1][3] = part->pos.y;
+                    part->mtx.m[2][3] = part->pos.z;
+                }
+            }
+            if (part->kind == 1) {
+                if (++part->counter_0x0C > 300) {
+                    part->counter_0x0C = 0;
+                }
+                if (++part->counter_0x0E > 420) {
+                    part->counter_0x0E = 0;
+                }
+                eft_rot_vec_copy(&rot, &part->rot);
+                em_break_part_spin(part, data, &rot);
+                em_break_part_return_step(part);
+                bob = 20.0f * sin_idx_get(65535.0f * (part->counter_0x0C / 300.0f));
+                rot.x += (u16)(0.5f + 65536.0f * (10.0f * sin_idx_get(65535.0f * (part->counter_0x0E / 420.0f))) / 360.0f);
+                cpSetRotMatrixZXY(&rot, &part->mtx);
+                mtx34_scale_in_place(&part->mtx, &scale);
+                part->mtx.m[0][3] = part->pos.x;
+                part->mtx.m[1][3] = part->pos.y + bob;
+                part->mtx.m[2][3] = part->pos.z;
+            }
+            if (part->effect != -1 && em_roster_record_slot_id_get(part->effect) < 0) {
+                em_roster_record_release(part->effect);
+                part->effect = -1;
+            }
+            break;
+        }
+    }
+}
+
+/* The shell job's ground-impact slot (+0x28) in the order its calls evaluate: the scale ahead of the id. */
+typedef void (*ShellImpactSet)(_ENEMY_WORK* self, nw4r::math::VEC3* pos, s32 mode, f32 scale, u16 id,
+                               ShellSetFuncs* table);
+
 /* 0x801369A0 (0x1B0): on the ground, spawns the ground impact (`kind` 1/2: the shell job's dust, at `offset`
  * rotated by the yaw) and, with `fx` 1, the impact effect. */
-extern "C" void em_ground_impact_set(_ENEMY_WORK* self, u8 kind, u8 fx, nw4r::math::VEC3* offset, f32 scale)
+extern "C" void em_ground_impact_set(_ENEMY_WORK* self, u8 kind, u8 fx, f32 scale, nw4r::math::VEC3* offset)
 {
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 rot;
-    nw4r::math::VEC3 a;
     nw4r::math::VEC3 b;
+    nw4r::math::VEC3 a;
     f32 size;
 
     VEC3_ctor(&pos);
@@ -9128,10 +10062,10 @@ extern "C" void em_ground_impact_set(_ENEMY_WORK* self, u8 kind, u8 fx, nw4r::ma
         }
         switch (kind) {
         case 1:
-            shell_set_func_ptr->method_0x28(self, &pos, 1, (u16)0xFFFF, shell_set_func_ptr, scale);
+            ((ShellImpactSet)shell_set_func_ptr->method_0x28)(self, &pos, 1, scale, 0xFFFF, shell_set_func_ptr);
             break;
         case 2:
-            shell_set_func_ptr->method_0x28(self, &pos, 2, (u16)0xFFFF, shell_set_func_ptr, scale);
+            ((ShellImpactSet)shell_set_func_ptr->method_0x28)(self, &pos, 2, scale, 0xFFFF, shell_set_func_ptr);
             size *= 0.5f;
             break;
         }
@@ -9248,6 +10182,159 @@ extern "C" void em_record_0x750_clear(_ENEMY_WORK* self)
     self->field_0x760 = 0;
 }
 
+/* 0x80136E38 (0x598): steps the materials' channel-0 colour (+0x75C) toward the stage cell's light tint (the
+ * underwater cells under water), brightened by the nearest point light; `snap` 1 takes the target at once,
+ * otherwise each channel moves 5 per call. */
+extern "C" void em_ambient_color_update(_ENEMY_WORK* self, u8 snap)
+{
+    s16 target[3];
+    s16 cur[3];
+    _GXColor ref;
+    _GXColor tint;
+    _GXColor light;
+    _GXColor color = {255, 255, 255, 255};
+    u32 num;
+    u8 cell;
+    u8 air;
+    s16 max;
+    u8 bright;
+    f32 ratio;
+    s32 i;
+    u32 n;
+
+    num = mhchar_mat_num_get((MHchar*)self->char_0x024);
+    air = 0;
+    cell = self->cell_0x22F;
+    if (em_water_check(self) == 1 && self->pos.y < self->field_0x210) {
+        air = 3;
+        cell += 3;
+    }
+    u32 ref_word = stage_cell_get(air, 1);
+    color_rgba_copy((u8*)&ref, (u8*)&ref_word);
+    u32 tint_word = stage_cell_get(cell, 1);
+    color_rgba_copy((u8*)&tint, (u8*)&tint_word);
+    target[0] = (ref.r == 0) ? (s16)color.r : (s16)(tint.r * color.r / ref.r);
+    if (ref.g == 0) {
+        target[1] = color.g;
+    } else {
+        target[1] = (s16)(tint.g * color.g / ref.g);
+    }
+    if (ref.b == 0) {
+        target[2] = color.b;
+    } else {
+        target[2] = (s16)(tint.b * color.b / ref.b);
+    }
+    max = 0;
+    for (i = 0; i < 3; i++) {
+        if (target[i] > 255 && max < target[i]) {
+            max = target[i];
+        }
+    }
+    for (i = 0; i < 3; i++) {
+        if (max > 255) {
+            target[i] = target[i] * 255 / max;
+        }
+        if (target[i] > 255) {
+            target[i] = 255;
+        } else if (target[i] < 0) {
+            target[i] = 0;
+        }
+    }
+    if (light_point_color_get(&self->pos, &light) != 0) {
+        if (light.r >= light.g) {
+            if (light.r >= light.b) {
+                bright = light.r;
+            } else {
+                bright = light.b;
+            }
+        } else {
+            bright = light.b;
+            if (light.g >= bright) {
+                bright = light.g;
+            }
+        }
+        ratio = bright / 255.0f;
+        target[0] = (s16)(0.5f * (color.r - target[0])) * ratio + target[0];
+        target[1] = (s16)(0.5f * (color.g - target[1])) * ratio + target[1];
+        target[2] = (s16)(0.5f * (color.b - target[2])) * ratio + target[2];
+        for (i = 0; i < 3; i++) {
+            if (target[i] > 255) {
+                target[i] = 255;
+            } else if (target[i] < 0) {
+                target[i] = 0;
+            }
+        }
+    }
+    cur[0] = (s16)((u32)self->field_0x75C >> 24);
+    cur[1] = (s16)(((u32)self->field_0x75C >> 16) & 0xFF);
+    cur[2] = (s16)(((u32)self->field_0x75C >> 8) & 0xFF);
+    for (i = 0; i < 3; i++) {
+        if (snap == 1) {
+            cur[i] = target[i];
+        } else if (target[i] < cur[i]) {
+            cur[i] -= 5;
+            if (cur[i] < target[i]) {
+                cur[i] = target[i];
+            }
+        } else {
+            cur[i] += 5;
+            if (cur[i] > target[i]) {
+                cur[i] = target[i];
+            }
+        }
+    }
+    color.r = cur[0];
+    color.g = cur[1];
+    color.b = cur[2];
+    for (n = 0; n < num; n++) {
+        ((MHchar*)self->char_0x024)->setMatColor(n, (_GXChannelID)0, color, false);
+    }
+    self->field_0x75C = (color.r << 24) | (color.g << 16) | (color.b << 8) | 0xFF;
+}
+
+/* 0x801373D0 (0x234): applies the +0x1D4 alpha ratio to every material: the channel-4 colour's alpha, the blend
+ * mode (opaque at 1.0 or above) and the alpha-compare references. */
+extern "C" void em_mat_alpha_apply(_ENEMY_WORK* self)
+{
+    nw4r::g3d::ResMatPix pix(NULL);
+    _GXCompare comp0;
+    _GXCompare comp1;
+    _GXAlphaOp alpha_op;
+    _GXBlendMode type;
+    _GXBlendFactor src;
+    _GXBlendFactor dst;
+    _GXLogicOp op;
+    _GXColor color;
+    u8 ref0;
+    u8 ref1;
+    MHchar* model;
+    u32 num;
+    u32 i;
+
+    model = (MHchar*)self->char_0x024;
+    num = mhchar_mat_num_get(model);
+    for (i = 0; i < num; i++) {
+        pix = ((nw4r::g3d::ResMdl*)&model->field_0x114)->GetResMat(i).GetResMatPix();
+        if (model->getMatColor(i, (_GXChannelID)4, &color) == 1) {
+            color.a = 255.0f * self->field_0x1D4;
+            model->setMatColor(i, (_GXChannelID)4, color, false);
+            if (self->field_0x1D4 >= 1.0f) {
+                mhchar_mat_buffer_clean(model, i, 0x80);
+            } else {
+                pix.GXGetBlendMode(&type, &src, &dst, &op);
+                if (src != 4 || type == 0) {
+                    model->setMatAlphaBlendMode(i, (_GXBlendMode)1, (_GXBlendFactor)4, (_GXBlendFactor)5, (_GXLogicOp)0);
+                }
+            }
+        }
+        pix.GXGetAlphaCompare(&comp0, &ref0, &alpha_op, &comp1, &ref1);
+        if (ref0 != 0 || ref1 != 0xFF) {
+            mhchar_mat_tev_set(model, i, comp0, (u8)((f32)ref0 * self->field_0x1D4), alpha_op, comp1,
+                               (u8)((f32)ref1 * self->field_0x1D4), self->field_0x1D4);
+        }
+    }
+}
+
 /* 0x80137604..0x801376B4 - the state accessors. */
 
 /* Stores the record's byte +0x0D. */
@@ -9330,11 +10417,11 @@ extern "C" void em_motion_mode_set(_ENEMY_WORK* self, u8 mode)
     self->field_0x89F = mode;
     switch (mode) {
     case 2: {
-        s16* timer = fn_80126494(self);
+        EmActTimers* timer = fn_80126494(self);
 
         fn_801376BC(self, 1);
         if (timer != NULL) {
-            self->field_0x8A4 = *timer;
+            self->field_0x8A4 = timer->mode2_frames;
         } else {
             self->field_0x8A4 = 3600;
         }

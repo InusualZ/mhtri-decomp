@@ -12,7 +12,10 @@ struct EmBreakPartCurves;
  * number `em_parts_break` takes and the three model materials it hides.
  * size: 0x20 (a lower bound: only these fields are reached) */
 struct EmBreakPartData {
-    /* +0x00 */ u8 pad_0x00[0x8];
+    /* +0x00 */ u8 step;             /* the step the part starts in (`em_act_advance`) */
+    /* +0x01 */ u8 pad_0x01;
+    /* +0x02 */ s16 frames;         /* the frames of its flight (`em_break_part_launch`) */
+    /* +0x04 */ f32 gravity;        /* the per-frame fall acceleration of its flight */
     /* +0x08 */ f32 lift;
     /* +0x0C */ struct EmBreakPartCurves* curves;  /* the spin curves (`em_break_part_spin`) */
     /* +0x10 */ u8 part;

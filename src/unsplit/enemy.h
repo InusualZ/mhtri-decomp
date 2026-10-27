@@ -141,7 +141,6 @@ u32 em_move_offset_step_update();
 f32 em_key_curve_eval(struct _ENEMY_WORK *self, void *tbl);
 f32 em_target_dist_ratio_get(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
 u32 em_break_part_active_ck(struct _ENEMY_WORK* work, s32 arg1);
-void fn_801363F8(struct _ENEMY_WORK* work);
 /* Declarations for the action band 0x80178378.. (`enemy/fn_80178378.cpp`): the arming helpers its 64
  * action functions call and no registered unit owns.  Signatures are the call sites' - the argument
  * counts are what the callers set in r4..r6/f1..f3 and the functions are in this band. */
@@ -152,8 +151,6 @@ void em015_part_flag_set(struct _ENEMY_WORK* self, u32 a);
 u32 em015_ally_front_ck(struct _ENEMY_WORK* self, u32 a);
 void stage_parts_break_all(void);
 void em_shake_req_set(struct _ENEMY_WORK* work);
-void fn_80136E38(struct _ENEMY_WORK* work, s32 arg1);
-void fn_801373D0(struct _ENEMY_WORK* work);
 s32 fn_80137C9C(struct _ENEMY_WORK* work, void* arg1);
 void fn_80137DD0(struct _ENEMY_WORK* work);
 s32 em_motion_slot_angle_avg(struct _ENEMY_WORK* work, s32 arg1);

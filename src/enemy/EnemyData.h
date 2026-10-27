@@ -29,7 +29,9 @@ struct EmAilmentFxBlock {
     /* +0x08 */ struct EmAilmentFx* poison;
     /* +0x0C */ struct EmAilmentFx* sleep;
     /* +0x10 */ struct EmAilmentFx* stun;
-    /* +0x14 */ u8 unused_0x14[0x20 - 0x14];
+    /* +0x14 */ struct EmAilmentFx* stun_stars;  /* the stun stars `em_act_advance` places (NULL: the default) */
+    /* +0x18 */ u32 model_fx;          /* nonzero, a large enemy spawns its model effect (`em_act_advance`) */
+    /* +0x1C */ f32 area_fx_scale;     /* the effect scale `em_area_buff_apply` spawns its area effect at */
     /* +0x20 */ f32 hit_scale;         /* the hit effect scale `em_hit_fx_scale_get` returns */
 };
 
@@ -89,7 +91,7 @@ typedef struct EnemyData {
     /* +0x060 */ u8 pad_0x060[0x064 - 0x060];
     /* +0x064 */ u8* values;
     /* +0x068 */ struct EmHitBuff* hit_buff_0x68;  /* the hit buff `em_hit_buff_apply` reads (`em_common.cpp`) */
-    /* +0x06C */ u8 pad_0x06C[0x070 - 0x06C];
+    /* +0x06C */ s8* drops_left_0x6C;  /* the drop count a fresh work starts with (`em_act_advance`; NULL: 0) */
     /* +0x070 */ f32 fall_height_0x70;  /* `em_fall_height_get` */
     /* +0x074 */ f32 water_depth_0x74;  /* `em_float_depth_get` */
     /* +0x078 */ f32 lift_height_0x78;  /* `em_dive_depth_get` */

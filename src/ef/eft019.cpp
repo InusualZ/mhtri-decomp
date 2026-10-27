@@ -66,7 +66,7 @@ void fn_801148E4(_EFT* self);                                    /* the on-scree
 _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type);       /* the family allocator */
 void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx);            /* place the record on its actor */
 void ef_inst_spawn(void* actor, u8 key);                           /* eft020 wrappers, per actor kind */
-void fn_80114C6C(void* actor, u8 key, s32 joint);
+void ef_inst_spawn_joint(void* actor, u8 key, s32 joint);
 void fn_80114CC8(void* actor, u8 key);
 void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale);
 
@@ -1715,7 +1715,7 @@ void ef_inst_spawn(void* actor, u8 key)
 
 /* 0x80114C6C (0x5C): Spawns an eft020 record on an actor's joint in the actor's area. */
 
-void fn_80114C6C(void* actor, u8 key, s32 joint)
+void ef_inst_spawn_joint(void* actor, u8 key, s32 joint)
 {
     _EFT* effect;
     /* retail passes the third argument as whatever the caller left in `f1` (the original translation

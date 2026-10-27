@@ -63,7 +63,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "enemy/em_target_pos_set.h" /* em_target_pos_set (rule 2: the owner's header) */
 #include "enemy/em_timers_update.h" /* em_timers_update (rule 2: the owner's header) */
 #include "enemy/em_ground_probe.h" /* em_ground_probe (rule 2: the owner's header) */
-#include "enemy/fn_8012A414.h" /* fn_8012A414 (rule 2: the owner's header) */
+#include "enemy/em_cell_span_update.h" /* em_cell_span_update (rule 2: the owner's header) */
 #include "enemy/em_area_change.h" /* em_area_change (rule 2: the owner's header) */
 #include "enemy/em_hate_update.h" /* em_hate_update (rule 2: the owner's header) */
 #include "enemy/em_busy_set.h" /* em_busy_set (rule 2: the owner's header) */
@@ -176,7 +176,7 @@ void fn_8013823C(EnemyWork* self);
 void em_post_update(EnemyWork* self);
 void fn_80138E18(EnemyWork* self);
 void fn_80138E28(EnemyWork* self);
-void fn_80138E64(EnemyWork* self);
+void em_char_pose_sync(EnemyWork* self);
 void fn_80138EC8(EnemyWork* self, u32 arg1);
 void fn_80138F3C(EnemyWork* self);
 void fn_80139024(EnemyWork* self);
@@ -212,7 +212,7 @@ void fn_8013A5D8(ResUserData* dst, ResUserData* src);
 ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data);
 void fn_8013A648(ResUserData* self, ResUserDataItemData* data);
 void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1);
-UserDataItem* fn_8013A6C0(EnemyWork* work);
+UserDataItem* em_user_data_items_get(EnemyWork* work);
 s32 fn_8013A6F4(EnemyWork* work);
 void fn_8013A770(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work);
 s32 em_break_part_data_get(EnemyWork* work, u8 arg1);
@@ -789,7 +789,7 @@ void fn_8013823C(EnemyWork* self) {
             em_busy_set_c1(self);
             em_ceiling_latch(self);
         }
-        fn_80138E64(self);
+        em_char_pose_sync(self);
         if (self->field_0x1E2 == 3) {
             em_fall_step(self);
         }
@@ -818,7 +818,7 @@ void fn_8013823C(EnemyWork* self) {
         } else {
             self->char_0x024.field_0x34 = 0;
         }
-        fn_801373D0(self);
+        em_mat_alpha_apply(self);
         if (lbl_80796D40 == self->field_0x1D4) {
             self->char_0x024.field_0x34 = 0;
         } else if (lbl_80796D64 != self->field_0x1D4) {
@@ -857,7 +857,7 @@ void fn_8013823C(EnemyWork* self) {
         em_ground_probe(self);
         em_height_limit_update(self);
         fn_80137DD0(self);
-        fn_80138E64(self);
+        em_char_pose_sync(self);
         mhchar_model_mtx_update(EM_CHAR(self));
         {
             u8 slot;
@@ -888,10 +888,10 @@ void em_post_update(EnemyWork* self) {
             }
         }
         if (self->field_0x8C0 != 0 || found != -1) {
-            fn_80138E64(self);
+            em_char_pose_sync(self);
             mhchar_model_mtx_update(EM_CHAR(self));
         }
-        fn_8012A414(self);
+        em_cell_span_update(self);
         if (self->field_0x766 == 0) {
             if (self->field_0x767 == 1) {
                 self->field_0x766 = (u8)(self->field_0x766 + 1);
@@ -902,7 +902,7 @@ void em_post_update(EnemyWork* self) {
             }
         }
         fn_801391FC(self);
-        fn_801363F8(self);
+        em_break_parts_update(self);
         if (self->field_0x764 >= 0) {
             if (em_sleep_ck__FP11_ENEMY_WORKUc(self, 0) == 1) {
                 self->field_0x762 = 1;
@@ -927,7 +927,7 @@ void em_post_update(EnemyWork* self) {
         }
         em_ailment_fx_update(self);
         if ((self->flags_0x1C8 & 1) == 0) {
-            fn_80136E38(self, 0);
+            em_ambient_color_update(self, 0);
         } else if ((self->flags_0x1C8 & 0x40000) != 0) {
             if (em_die_ck__FP11_ENEMY_WORK(self) == 1) {
                 u32 i;
@@ -968,7 +968,7 @@ void fn_80138E28(EnemyWork* self) {
 }
 
 /* Copies the work's scale and rotation into its EmCharBase base. */
-void fn_80138E64(EnemyWork* self) {
+void em_char_pose_sync(EnemyWork* self) {
     EmCharBase* ch = &self->char_0x024;
 
     setScaleAll__6MHcharFf((MHchar*)ch, get_em_scale__FP11_ENEMY_WORK(self));
@@ -1098,7 +1098,7 @@ void fn_801391FC(EnemyWork* self) {
     if (self->field_0x740 == 0) {
         v = lbl_80796D40;
     } else {
-        item = fn_8013A6C0(self);
+        item = em_user_data_items_get(self);
         while (item != NULL && item->field_0x00 != (u32)-1) {
             if (item->field_0x04 == 1) {
                 if (best == (u32)-1 || best > item->field_0x00) {
@@ -1121,7 +1121,7 @@ void fn_801391FC(EnemyWork* self) {
             v = -(f32)(u16)total;
         }
     }
-    item = fn_8013A6C0(self);
+    item = em_user_data_items_get(self);
     if (item != NULL) {
         while (item->field_0x00 != (u32)-1) {
             if (item->field_0x04 == 1) {
@@ -1190,7 +1190,7 @@ void ResUserDataAc::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::R
         pos.z = lbl_80796D40;
         anm_chr_result_trans_set(pResult, &pos);
     }
-    item = fn_8013A6C0(work);
+    item = em_user_data_items_get(work);
     while (item != NULL && item->field_0x00 != (u32)-1) {
         if (item->field_0x00 == index) {
             if (item->field_0x04 == 0 || (u32)(item->field_0x04 - 3) <= 1) {
@@ -1280,7 +1280,7 @@ void ResUserDataAc::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::R
 /* Dispatches every user-data item of the cursor's index to the accessor's second virtual pair. */
 void ResUserDataAc::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
     u32 index = pFuncObj->GetCallbackNodeID();
-    UserDataItem* item = fn_8013A6C0(work);
+    UserDataItem* item = em_user_data_items_get(work);
 
     while (item != NULL && item->field_0x00 != (u32)-1) {
         if (item->field_0x00 == index) {
@@ -1558,7 +1558,7 @@ void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1) {
 }
 
 /* Returns the work's user-data item list. */
-UserDataItem* fn_8013A6C0(EnemyWork* work) {
+UserDataItem* em_user_data_items_get(EnemyWork* work) {
     EnemyData* data = get_enemy_data__FP11_ENEMY_WORK(work);
 
     if (data != NULL) {
@@ -1570,7 +1570,7 @@ UserDataItem* fn_8013A6C0(EnemyWork* work) {
 /* Builds the accessor's per-type flag word from the work's user-data list. */
 s32 fn_8013A6F4(EnemyWork* work) {
     s32 flags = 1;
-    UserDataItem* item = fn_8013A6C0(work);
+    UserDataItem* item = em_user_data_items_get(work);
 
     if (item != NULL) {
         while (item->field_0x00 != (u32)-1) {
@@ -1590,7 +1590,7 @@ s32 fn_8013A6F4(EnemyWork* work) {
 void fn_8013A770(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work) {
     u32 current = cursor->GetCallbackNodeID();
     u32 best = current;
-    UserDataItem* item = fn_8013A6C0(work);
+    UserDataItem* item = em_user_data_items_get(work);
 
     if (item != NULL) {
         while (item->field_0x00 != (u32)-1) {
