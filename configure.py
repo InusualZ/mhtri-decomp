@@ -795,7 +795,7 @@ config.libs = [
             Object(Matching, "ef/ef_drawdirectionalstrategy.cpp"),
                         Object(Matching, "ef/ef_drawpointstrategy.cpp"),
                         Object(Matching, "ef/ef_drawlinestrategy.cpp"),
-                        Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
+                        Object(Matching, "ef/ef_drawsmoothstripestrategy.cpp"),
             # Flags: unit header of src/ef/ef_drawstrategyimpl.cpp (`-pool off`, playbook 43).
             Object(NonMatching, "ef/ef_drawstrategyimpl.cpp", extra_cflags=["-pool off"]),
             Object(Matching, "ef/ef_drawfreestrategy.cpp"),
