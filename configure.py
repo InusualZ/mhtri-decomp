@@ -757,7 +757,7 @@ config.libs = [
             # Registered (a 0x800E8E60 run discovery proposed).
             # The quest/challenge sound work system: 149 functions / 0x6978 bytes.  C++ from the range's
             # own mangled symbols; no `__FILE__` string survives, so the map's stem is the file name.
-            Object(NonMatching, "sound/fn_800E8E60.cpp"),
+            Object(Matching, "sound/fn_800E8E60.cpp"),
             Object(NonMatching, "sound/snd_stream_mgr.cpp"),
             Object(NonMatching, "sound/snd_voice_pool.cpp"),
             Object(Matching, "sound/quest_snd.cpp"),
@@ -1657,7 +1657,7 @@ config.libs = [
             # file name is evidenced by the `__FILE__` string `mh3_pad.cpp` (0x80580EF0) that its own
             # `fn_80041AA4` assert references; same lib and flags as the game-root system files beside it.
             Object(NonMatching, "mh3_pad.cpp"),
-            Object(NonMatching, "pad_connect.cpp"),
+            Object(Matching, "pad_connect.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80047398` - the character
             # face/skin TPL render unit (117 functions / 0x5610 B, 0x80047398..0x8004C9A0).  Game-root
             # band: the link neighbour `mh3_pad.cpp` ends at 0x80047398 and this unit's link neighbours
