@@ -321,19 +321,24 @@ def trailing_pad(section: str, ours_size: int, claim_size: int, align: int, targ
 LINKED_PAD_NEVER = ("extab", "extabindex", ".init")
 #: The largest alignment a flipped successor may carry that the link pads up to (`-func_align 16` objects).
 LINKED_PAD_MAX_ALIGN = 16
+#: The largest alignment an UNFLIPPED successor may carry: its target object places itself at the alignment
+#: splits.txt gives it (`align:32` on g3d/g3d_resanmscn's `.data`), so the link pads up to that.
+UNFLIPPED_PAD_MAX_ALIGN = 32
 
 
 def linked_trailing_pad(section: str, ours_size: int, claim_size: int, target_bytes: bytes | None,
-                        target_symbols: dict, start: int | None, successor_aligns: list[int]) -> str | None:
+                        target_symbols: dict, start: int | None, successor_aligns: list[int],
+                        max_align: int = LINKED_PAD_MAX_ALIGN) -> str | None:
     """Why a section `claim_size - ours_size` bytes short of its claim is excused because its SUCCESSOR is a linked
-    (flipped) object: the link pads our section up to the successor's alignment. All of: not an exception table;
-    the target's tail is all zero (NOBITS: no bytes) with no symbol in it but dtk's `gap_` labels; and the
-    successor, at every alignment OUR object carries (`successor_aligns`, at most `LINKED_PAD_MAX_ALIGN`), starts
+    object: the link pads our section up to the successor's alignment. All of: not an exception table; the target's
+    tail is all zero (NOBITS: no bytes) with no symbol in it but dtk's `gap_` labels; and the successor, at every
+    alignment it carries (`successor_aligns`, each a power of two of at most `max_align`: `LINKED_PAD_MAX_ALIGN`
+    for a flipped successor's own object, `UNFLIPPED_PAD_MAX_ALIGN` for an unflipped one's target object), starts
     exactly at the claim's end (`start` is the claim's address). No linked successor, no judgement."""
     short = claim_size - ours_size
     if section in LINKED_PAD_NEVER or short <= 0 or start is None or not successor_aligns:
         return None
-    if any(a < 1 or a > LINKED_PAD_MAX_ALIGN for a in successor_aligns):
+    if any(a < 1 or a > max_align or a & (a - 1) for a in successor_aligns):
         return None
     if target_bytes is not None and (len(target_bytes) < claim_size or any(target_bytes[ours_size:claim_size])):
         return None
@@ -343,7 +348,7 @@ def linked_trailing_pad(section: str, ours_size: int, claim_size: int, target_by
     end = start + ours_size
     if any((end + a - 1) // a * a != start + claim_size for a in successor_aligns):
         return None
-    return ("%s: 0x%X of 0x%X bytes - the 0x%X-byte tail is link padding (target zero, no symbol, the flipped "
+    return ("%s: 0x%X of 0x%X bytes - the 0x%X-byte tail is link padding (target zero, no symbol, the linked "
             "successor aligned to %s starts at the claim's end)" % (section, ours_size, claim_size, short,
                                                                       "/".join(str(a) for a in sorted(set(successor_aligns)))))
 

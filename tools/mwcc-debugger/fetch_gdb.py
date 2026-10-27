@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fetch a native mingw-w64 gdb (plus its runtime DLLs) without MSYS2/pacman, for the mwcc-debugger port.
-Spec: docs/tools/spec/mwcc-debugger.md. CLI: fetch_gdb.py --dest DIR."""
+Spec: docs/tools/spec/mwcc-debugger.md. CLI: fetch_gdb.py --dest DIR [--cache DIR] [--url URL] [--packages ...]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -9,8 +9,6 @@ import os
 import sys
 import tarfile
 import urllib.request
-
-import zstandard
 
 DEFAULT_URL = "https://repo.msys2.org/mingw/mingw64"
 
@@ -32,6 +30,8 @@ EXTRA = [
 
 def parse_db(path):
     """{package name: {FIELD: [values]}} from an MSYS2 .db archive."""
+    import zstandard
+
     pkgs = {}
     with open(path, "rb") as fh:
         dctx = zstandard.ZstdDecompressor()
@@ -80,6 +80,8 @@ def fetch(url, filename, cache):
 
 
 def extract(path, dest):
+    import zstandard
+
     print("extract", os.path.basename(path))
     dctx = zstandard.ZstdDecompressor()
     try:
@@ -90,7 +92,12 @@ def extract(path, dest):
         print("  warning:", exc, file=sys.stderr)
 
 
-def main():
+#: The package cache's directory name under `--dest` when `--cache` is not given.
+CACHE_NAME = "mwcc-dbg-pkgs"
+
+
+def parse_args(argv=None):
+    """The command line; `--cache` defaults to `<dest>/mwcc-dbg-pkgs`, never the current directory."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dest", required=True, help="prefix directory to unpack into")
     ap.add_argument("--url", default=DEFAULT_URL, help="MSYS2 mingw64 repository URL")
@@ -98,9 +105,17 @@ def main():
         "--packages", nargs="*", default=WANTED, help="packages to install"
     )
     ap.add_argument(
-        "--cache", default="mwcc-dbg-pkgs", help="where to keep the downloaded packages"
+        "--cache", default=None,
+        help=f"where to keep the downloaded packages (default: DEST/{CACHE_NAME})",
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+    if args.cache is None:
+        args.cache = os.path.join(args.dest, CACHE_NAME)
+    return args
+
+
+def main(argv=None):
+    args = parse_args(argv)
 
     db_path = os.path.join(args.cache, "mingw64.db")
     os.makedirs(args.cache, exist_ok=True)

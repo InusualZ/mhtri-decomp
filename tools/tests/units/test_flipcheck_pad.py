@@ -141,6 +141,15 @@ def test_linked_successor_pad(c):
         c.check("an unflipped successor whose target object splits.txt aligns to 16 pads the shortfall itself",
                 (problems, any("link padding" in n for n in notes)), ([], True))
     with testing.FixtureTree() as t:
+        problems, notes = run("OS/OSLink", link_tree(t, "NonMatching", tgt_align_exp=5))
+        c.check("an unflipped successor whose target object splits.txt aligns to 32 pads the shortfall itself "
+                "(g3d/g3d_resanmlight before g3d_resanmscn's align:32 .data)",
+                (problems, any("aligned to 32" in n for n in notes)), ([], True))
+    with testing.FixtureTree() as t:
+        problems, _n = run("OS/OSLink", link_tree(t, "Matching", succ_align_exp=5))
+        c.check("a flipped successor our object aligns to 32 stays refused (the flipped cap is 16)",
+                len([p for p in problems if p.startswith(".text: object is 0x")]), 1)
+    with testing.FixtureTree() as t:
         problems, _n = run("OS/OSLink", link_tree(t, "NonMatching", batch={"OS/OSMessage"}))
         c.check("... accepted when the successor is flipped in the same batch", problems, [])
     with testing.FixtureTree() as t:
@@ -153,6 +162,14 @@ def test_linked_successor_pad(c):
                 len([p for p in problems if p.startswith(".text: object is 0x")]), 1)
     c.check(".text before a flipped 16-aligned successor is fill at the objcompare level",
             bool(objcompare.linked_trailing_pad(".text", 0x18, 0x20, b"\0" * 0x20, {}, 0x804D1440, [16])), True)
+    c.check("a 32-aligned successor is past the flipped cap",
+            objcompare.linked_trailing_pad(".data", 0x208, 0x220, b"\0" * 0x220, {}, 0x80590440, [32]), None)
+    c.check("... and within the unflipped cap (g3d/g3d_resanmlight .data 0x208 of 0x220 at 0x80590440)",
+            bool(objcompare.linked_trailing_pad(".data", 0x208, 0x220, b"\0" * 0x220, {}, 0x80590440, [32],
+                                                max_align=objcompare.UNFLIPPED_PAD_MAX_ALIGN)), True)
+    c.check("a 64-aligned successor is past the unflipped cap",
+            objcompare.linked_trailing_pad(".data", 0x208, 0x240, b"\0" * 0x240, {}, 0x80590400, [64],
+                                           max_align=objcompare.UNFLIPPED_PAD_MAX_ALIGN), None)
     c.check("extab never is", objcompare.linked_trailing_pad("extab", 0x18, 0x20, b"\0" * 0x20, {}, 0x804D1440, [16]), None)
     c.check("no successor alignment known: not judged",
             objcompare.linked_trailing_pad(".text", 0x18, 0x20, b"\0" * 0x20, {}, 0x804D1440, []), None)

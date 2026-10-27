@@ -78,7 +78,10 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   successor (the stand-in fills its own claim, so there is no chain): `flipcheck.linked_pad_note` reads the stand-in's
   alignment and `padding_chain_break` ends the chain there. Measured on 201 `.text` splits that start 16-aligned: 9 units
   became READY (IPC/ipcMain, MTX/mtxvec, MTX/vec, OS/OSIpc, OS/OSMemory, OS/OSMutex, OS/OSNandbootInfo, OS/OSReboot,
-  OS/OSSync), none lost it, and flipping all nine together keeps the DOL hash.
+  OS/OSSync), none lost it, and flipping all nine together keeps the DOL hash. The stand-in's alignment may be up to 32
+  (`objcompare.UNFLIPPED_PAD_MAX_ALIGN`; a flipped successor's own object stays capped at 16): g3d/g3d_resanmlight's
+  `.data` is 0x208 of a 0x220 claim before g3d/g3d_resanmscn's `align:32` `.data`, and reads READY with a trial flip
+  keeping `main.dol` OK (flip-sweep#1, 2026-10-27).
 * **A function the link dead-strips is not compared (2026-10-14).** A unit may carry a GUESS body of a function the
   retail linker stripped (written so its strings land in the pool): our `.text` is longer than the claim, and a trial flip
   links byte-identical because mwld strips it again. `flipcheck.deadstrip_model` takes such a function out before the size

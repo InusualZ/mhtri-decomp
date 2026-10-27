@@ -28,6 +28,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | the runtime dump's symbol map, by address | `lib/dumpsyms.py` | `spec/lib-dumpsyms.md` | dumpmap, lanecheck |
 | comment vocabulary: stale-path and narrative markers, the stale judgement | `lib/comments.py` | `spec/lib-comments.md` | stylelint (rule 15), sweepcomments |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
+| a one-function TU from a C/C++ file | `lib/cextract.py` | `spec/lib-cextract.md` | mwcc-debugger (`--extract`, `extract.py`) |
 | a function's declaration block (leading run or `--lines A-B`), its orders and one-move neighbours | `lib/declperm.py` | `spec/lib-declperm.md` | tryvar (`--permdecl`, `--hill`, `mt.py permdecl`/`hill`), unittry (`--permute`) |
 | pending map edits (renames, row splits) applied to a copy of a split target | `lib/pendingmap.py` | `spec/lib-pendingmap.md` | measure, tryvar (`--rename-map`) |
 | a function's raw bytes against the target's, relocated bits masked | `lib/rawsame.py` | `spec/lib-rawsame.md` | rawsame |

@@ -30,8 +30,10 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   `trailing_pad(section, ours_size, claim_size, align, target_bytes, target_symbols, start, next_aligns) -> note | None`
   (a short section whose tail is only alignment fill: never `PAD_NEVER`, align <= `PAD_MAX_ALIGN`, zero tail, no
   symbol but `gap_` labels, the next section placed at the claim's end; flipcheck's rule, see its spec).
-  `linked_trailing_pad(section, ours_size, claim_size, target_bytes, target_symbols, start, successor_aligns) -> note | None`
-  (the same tail test, but excused by a linked successor our object aligns to <= 16, so `.text` qualifies; never `LINKED_PAD_NEVER`).
+  `linked_trailing_pad(section, ours_size, claim_size, target_bytes, target_symbols, start, successor_aligns, max_align=16) -> note | None`
+  (the same tail test, but excused by a linked successor aligned to a power of two <= `max_align`, so `.text` qualifies; never
+  `LINKED_PAD_NEVER`). The cap is `LINKED_PAD_MAX_ALIGN` (16) for a flipped successor's own object and `UNFLIPPED_PAD_MAX_ALIGN`
+  (32) for an unflipped successor's target object, which places itself at its splits.txt alignment.
   `leading_fill(section, ours_size, ours_align, claim_size, target_bytes, target_symbols, start, prev_end_ok) -> lead | None`
   (the fill the link puts before our section: the claim's start rounded up to our alignment, zero target bytes, no
   symbol but fill labels, the predecessor judged by the caller; never `LINKED_PAD_NEVER`). `is_fill_label(name)`: dtk's

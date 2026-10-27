@@ -116,8 +116,25 @@ which links `[eax] = next`, `[eax+4] = prev`, `[eax+8] = owning block`:
 +0x0 kind  0=register 1/2=immediate 4=fixup 6=label 8=placeholder
 +0x1 class register file when kind==0: 4=GPR 3=FPR 1=CR field 0=special
 +0x2 u16   operand value for kinds 1/2/4/6; use/def flag (1/2) for a register
-+0x4 s16   register number (virtual >= 32 before regalloc); label id for kind 6
++0x4 s16   register number (virtual >= 32 before regalloc)
++0x2 u32   kind 6: the PCodeLabel record (next @0, block @4, u16 index @0xA)
 ```
+
+The `+0x4` "label id" earlier dumps printed for kind 6 was the upper half of
+that pointer, so every branch of a function read the same `@L<id>`.
+
+**Block edges and labels** (2026-10-27, probed on `lobby/lb_npc` and
+`NAND/NANDCheck` with the raw records printed): the block keeps upstream's GC
+offsets - labels @0x8, predecessors @0xC, successors @0x10, code offset @0x20
+(set at assembly).  An edge is a 0x18-byte record shared by both lists:
+`+4` next successor of the source, `+8` next predecessor of the target, `+0xC`
+source block, `+0x10` target block, `+0x14` an edge id.  On ten final dumps
+the successor and predecessor lists are exact mirrors (1093 edges, 0
+asymmetric), every branch operand's offset is the object's branch target, and 2
+of 435 branches target a block outside their block's successor list: a late
+branch-threading pass (`bf` past an empty `b` block, camera/camera_main B69,
+lobby/lb_npc `lb_player_remote_follow` B43) retargets the branch without
+updating the edges, and the object agrees with the operand.
 
 The probe that pinned this down printed, for the first block of
 `fn_8004C9A0`:
@@ -160,7 +177,7 @@ that is exactly what 0x5b9bc0..0x5b9c2d does.
 * **Frontend records** - `ENode`, `Statement`, `Type`.  The AST breakpoints and
   the node-name table are located, but the record layouts are not, so the tool
   announced and skipped the AST dumps rather than printing garbage.
-* Block successors/predecessors/label lists, and per-instruction line numbers.
+* Per-instruction line numbers.
 * The `variables.txt` frame layout.
 
 ## Repeating this for another Wii build

@@ -183,7 +183,8 @@ def linked_pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_
     if standin and start is not None:
         # an unflipped successor is its target object, which fills its own claim: it carries the alignment
         # splits.txt gives it (`align:N`), so the link pads this unit up to it without any chain
-        note = objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, [1 << standin[1]])
+        note = objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, [1 << standin[1]],
+                                              max_align=objcompare.UNFLIPPED_PAD_MAX_ALIGN)
         if note:
             return note, None
     if start is not None and objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, [16]):

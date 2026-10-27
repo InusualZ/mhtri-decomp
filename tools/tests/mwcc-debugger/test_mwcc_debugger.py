@@ -76,5 +76,58 @@ def test_detect(c):
         c.check("a missing file is None", versions.detect(td / "nope.exe"), None)
 
 
+def load_fetch_gdb():
+    spec = importlib.util.spec_from_file_location("mwcc_fetch_gdb", TOOL / "fetch_gdb.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _zst_tar(path, members):
+    """A `.tar.zst` at `path` holding `{name: bytes}`."""
+    import io
+    import tarfile
+    import zstandard
+
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as tf:
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tf.addfile(info, io.BytesIO(data))
+    path.write_bytes(zstandard.ZstdCompressor().compress(raw.getvalue()))
+
+
+def test_fetch_gdb_cache_under_dest(c):
+    """`fetch_gdb.py --dest X` keeps its package cache under X, never in the current directory."""
+    fg = load_fetch_gdb()
+    dest = str(Path("C:/x/prefix") if sys.platform == "win32" else Path("/x/prefix"))
+    c.check("the default cache is DEST/mwcc-dbg-pkgs", fg.parse_args(["--dest", dest]).cache,
+            str(Path(dest) / "mwcc-dbg-pkgs"))
+    c.check("--cache still wins", fg.parse_args(["--dest", dest, "--cache", "elsewhere"]).cache, "elsewhere")
+    try:
+        import zstandard  # noqa: F401
+    except ImportError:
+        c.skip("a fetch from a file:// repository", "zstandard is not installed")
+        return
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        repo, cwd, dest = td / "repo", td / "cwd", td / "dest"
+        for d in (repo, cwd):
+            d.mkdir()
+        pkg = "mingw-w64-x86_64-gdb-1-1-any.pkg.tar.zst"
+        desc = "\n".join(["%NAME%", "mingw-w64-x86_64-gdb", "", "%VERSION%", "1-1", "", "%FILENAME%", pkg, ""])
+        _zst_tar(repo / "mingw64.db", {"mingw-w64-x86_64-gdb-1-1/desc": desc.encode()})
+        _zst_tar(repo / pkg, {"mingw64/bin/gdb.exe": b"MZ"})
+        proc = subprocess.run([sys.executable, str(TOOL / "fetch_gdb.py"), "--dest", str(dest),
+                               "--url", repo.resolve().as_uri()], cwd=cwd, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace")
+        c.check("a fetch from a file:// repository installs gdb", (proc.returncode, (dest / "mingw64/bin/gdb.exe")
+                                                                   .is_file()), (0, True))
+        c.check("... with the packages cached under DEST", sorted(p.name for p in (dest / "mwcc-dbg-pkgs").iterdir())
+                if (dest / "mwcc-dbg-pkgs").is_dir() else None, sorted(["mingw64.db", pkg]))
+        c.check("... and nothing left in the current directory", sorted(p.name for p in cwd.iterdir()), [])
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

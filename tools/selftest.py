@@ -60,6 +60,12 @@ SOURCE_ENTRIES = {
     "docs/matching/": ("tools/agents/sync_playbook_index", "tools/agents/ideas"),
     SKILL_MATCHING: ("tools/agents/sync_playbook_index", "tools/agents/ideas"),
     ".claude/skills/mwcc-unit-matching/SKILL.md": ("tools/agents/sync_playbook_index",),
+    # test_mwcc_debugger.py regenerates the port from upstream/ with make_port.py and fetches through fetch_gdb.py
+    "tools/mwcc-debugger/make_port.py": ("tools/mwcc-debugger/mwcc_debugger",),
+    "tools/mwcc-debugger/fetch_gdb.py": ("tools/mwcc-debugger/mwcc_debugger",),
+    "tools/mwcc-debugger/upstream/": ("tools/mwcc-debugger/mwcc_debugger",),
+    "tools/lib/cextract.py": ("tools/mwcc-debugger/extract",),
+    "tools/mwcc-debugger/locate/verify_pcode.py": ("tools/mwcc-debugger/verify_pcode",),
 }
 SOURCE_CHECKS = {
     "docs/matching.md": ((SR_REL, ("--check",)), ("tools/agents/sync_playbook_index.py", ("--check",))),
@@ -631,6 +637,8 @@ def changed_entries(entries: list[Entry], ref: str | None, root: str) -> tuple[l
         if entry is not None and entry.name not in names:
             picked.append(entry)
             names.add(entry.name)
+    # a changed source the table maps to an existing entry is covered by it (claimed, not "unclaimed")
+    claimed |= {c for c in changed if any(k in by_key for k in _source_lookup(SOURCE_ENTRIES, c))}
     for name, tail in mapped_checks(changed, rng):
         if name in names:
             continue
@@ -742,6 +750,9 @@ def selftest() -> int:
     check("docs/plan.md selects the sync_profiles selftest", mapped_entries(["docs/plan.md"]),
           ["tools/agents/sync_profiles"])
     check("a tools-only diff maps to no extra entry", mapped_entries(["tools/units/measure.py"]), [])
+    check("make_port.py and fetch_gdb.py select the mwcc-debugger test",
+          (mapped_entries(["tools/mwcc-debugger/make_port.py"]), mapped_entries(["tools/mwcc-debugger/fetch_gdb.py"])),
+          (["tools/mwcc-debugger/mwcc_debugger"], ["tools/mwcc-debugger/mwcc_debugger"]))
     check("a Windows-style path maps identically", mapped_entries(["docs\\plan.md"]),
           ["tools/agents/sync_profiles"])
     md_checks = mapped_checks(["docs/matching.md"])

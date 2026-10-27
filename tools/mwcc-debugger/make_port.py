@@ -38,7 +38,7 @@ except ImportError:
 
 HEADER_NEW = '''#!/usr/bin/env python3
 """Dump MWCC compiler internals while it compiles a file: the Windows-native port of cadmic/mwcc-debugger.
-Spec: docs/tools/spec/mwcc-debugger.md. CLI: mwcc_debugger.py -a ARGS [--exe EXE] [-e EMULATOR] [-g GDB] [--gdb-port P] [--timeout S] FUNCTION [OUTPUT_DIR]."""
+Spec: docs/tools/spec/mwcc-debugger.md. CLI: mwcc_debugger.py -a ARGS [--exe EXE] [-e EMULATOR] [-g GDB] [--gdb-port P] [--timeout S] [--extract] [--no-fallback] FUNCTION [OUTPUT_DIR]."""
 from __future__ import annotations
 @@PROLOGUE@@
 
@@ -92,6 +92,8 @@ MWCC_EMULATOR: Optional[str] = None
 MWCC_GDB_PORT: int = 9001
 FUNCTION_NAME: str = ""
 OUTPUT_DIR: str = ""
+# PORT: the one-function TU compiled instead of the unit (--extract), or "".
+EXTRACTED: str = ""
 # PORT: for the native path - the compiler executable and its argument string,
 # already escaped for gdb's own parser (see gdb_escape_path/_gdb_quote_args).
 MWCC_EXE_GDB: str = ""
@@ -120,6 +122,7 @@ def init_mwcc_version():
         MWCC_GDB_PORT=params.get("gdb_port", 9001),
         MWCC_EXE_GDB=params.get("gdb_file", ""),
         MWCC_ARGS_GDB=params.get("gdb_args", ""),
+        EXTRACTED=params.get("extracted", ""),
     )
     MWCC_VERSION = versions.build(params["version"], Path(params["exe"]))
     print(f"MWCC version: {MWCC_VERSION.name}")
@@ -200,7 +203,7 @@ WII13_ARG_SIZE = 0x0E
 
 
 def decode_arg_wii13(kind_byte: int, regclass: int, field2: int,
-                     field4: int) -> MwccPCodeArg:
+                     field4: int, pointer: int = 0) -> MwccPCodeArg:
     """One Wii/1.3 PCode operand.
 
     PORT/RE: the 0x0E-byte record, read off a live dump of what
@@ -211,8 +214,10 @@ def decode_arg_wii13(kind_byte: int, regclass: int, field2: int,
         +0x1  class   register file, only meaningful when kind == 0
         +0x2  u16     operand value for kinds 1/2/4/6; use/def flags for a
                       register (1 = use, 2 = def)
-        +0x4  s16     register number (virtual, >= 32, before regalloc); for
-                      kind 6 a label id
+        +0x4  s16     register number (virtual, >= 32, before regalloc)
+        +0x2  u32     kind 6: the PCodeLabel record (`pointer`; its upper
+                      half is what +0x4 reads, which is why every branch of a
+                      function once printed as the same `@L<id>`)
 
     The register-file numbers are the compiler's own enum, the same one the
     colouring loop uses (4 = GPR, 3 = FPR), plus 1 = condition-register field
@@ -238,9 +243,15 @@ def decode_arg_wii13(kind_byte: int, regclass: int, field2: int,
     if kind_byte == 8:
         return MwccPCodeArg(MwccPCodeArg.Kind.PLACEHOLDER)
     if kind_byte == 6:
-        # A branch target.  Resolving it needs the block's label list, which
-        # is not derived yet, so show the record's label id.
-        return MwccPCodeArg(f"@L{field4 & 0xFFFF}")
+        # A branch target: label record -> its block -> the block index, as
+        # upstream prints a label operand (`B<n>`).
+        try:
+            label = MwccPCodeLabel.load(pointer)
+            index = read_s32(label.block_addr + WII13_BLOCK_INDEX)
+        except gdb.MemoryError:
+            note_dump_problem(f"unreadable label record at {pointer:#x}")
+            return MwccPCodeArg(f"@L?{pointer:#x}")
+        return MwccPCodeArg(MwccPCodeArg.Kind.LABEL, block_index=index)
     if kind_byte == 4:
         # A relocation the assembler patches later (TOC offset, call address);
         # the record names the fixup kind in +2.
@@ -264,6 +275,7 @@ def load_pcode_wii13(addr: int) -> MwccPcode:
                     parse_u8(arg_mem, off + 0x1),
                     parse_u16(arg_mem, off + 0x2),
                     parse_s16(arg_mem, off + 0x4),
+                    parse_u32(arg_mem, off + 0x2),
                 )
             )
     return MwccPcode(next_addr=next_addr, line=None, op=op, args=args)
@@ -283,27 +295,75 @@ BLOCK_HELPER = '''
 # PORT/RE: Wii/1.3 basic-block record.  `_makepcblock` (0x5a0e20) allocates
 # 0x2E bytes and stores the current source line at +0x24 and the block index at
 # +0x1C; `_appendpcode` (0x5a0ba0) keeps the instruction list head at +0x14,
-# the tail at +0x18 and bumps the instruction count at +0x28.  The successor /
-# predecessor / label fields are *not* derived yet (see locate/README.md), so
-# the dump says so rather than printing zeros.
+# the tail at +0x18 and bumps the instruction count at +0x28.  The edge and
+# label fields are upstream's GC offsets, read off live records (lobby/lb_npc,
+# 2026-10-27): labels @8, predecessors @0xC, successors @0x10, and the code
+# offset @0x20 (0 until assembly; in `after-code-labels` B1 of a 5-instruction
+# B0 reads 0x14).
+WII13_BLOCK_INDEX = 0x1C
+# A 0x18-byte edge record: +4 the next edge out of the same block (the source's
+# successor list), +8 the next edge into the same block (the target's
+# predecessor list), +0xC the source block, +0x10 the target block, +0x14 an
+# edge id; +0 is not read (measured on NAND/NANDCheck: B37's predecessor chain
+# B7 -> B10 -> B22 -> ... runs through +8).
+WII13_EDGE_NEXT_PRED = 0x8
+WII13_EDGE_NEXT_SUCC = 0x4
+WII13_EDGE_FROM = 0xC
+WII13_EDGE_TO = 0x10
+
+
+@dataclass
+class MwccBlockWii13(MwccBlock):
+    code_offset: int = 0
+
+
 def load_block_wii13(addr: int) -> MwccBlock:
     mem = read_mem(addr, 0x2E)
     line = parse_s32(mem, 0x24)
     if line == -1:
         line = None
-    return MwccBlock(
+    return MwccBlockWii13(
         next_addr=parse_u32(mem, 0x0),
-        prev_addr=0,
-        label_addr=0,
-        predecessors_addr=0,
-        successors_addr=0,
+        prev_addr=parse_u32(mem, 0x4),
+        label_addr=parse_u32(mem, 0x8),
+        predecessors_addr=parse_u32(mem, 0xC),
+        successors_addr=parse_u32(mem, 0x10),
         instr_addr=parse_u32(mem, 0x14),
-        index=parse_s32(mem, 0x1C),
+        index=parse_s32(mem, WII13_BLOCK_INDEX),
         line=line,
         loop_weight=0,
         pcode_count=parse_u16(mem, 0x28),
         flags=0,
+        code_offset=parse_u32(mem, 0x20),
     )
+
+
+def wii13_edges(head: int, block_field: int, next_field: int) -> str:
+    """The `B<n>` list of one edge chain, or the point where it became unreadable."""
+    out, rec = [], head
+    while rec != 0 and len(out) < 4096:
+        try:
+            out.append(f"B{read_s32(read_u32(rec + block_field) + WII13_BLOCK_INDEX)}")
+            rec = read_u32(rec + next_field)
+        except gdb.MemoryError:
+            note_dump_problem(f"unreadable edge record at {rec:#x}")
+            out.append("?")
+            break
+    return " ".join(out)
+
+
+def wii13_labels(head: int) -> str:
+    out, rec = [], head
+    while rec != 0 and len(out) < 4096:
+        try:
+            label = MwccPCodeLabel.load(rec)
+        except gdb.MemoryError:
+            note_dump_problem(f"unreadable label record at {rec:#x}")
+            out.append("?")
+            break
+        out.append(f"L{label.index}")
+        rec = label.next_addr
+    return " ".join(out)
 '''
 
 PRINT_BLOCK_OLD = '''def print_block(f, block: MwccBlock):
@@ -319,24 +379,132 @@ PRINT_BLOCK_NEW = '''def print_block(f, block: MwccBlock):
 PRINT_BLOCK_HELPER = '''
 
 def print_block_wii13(f, block: MwccBlock):
-    """PORT: keep the instruction stream; say plainly what is not derived."""
-    print(f"B{block.index}: ", end="", file=f)
+    """PORT: upstream's block header (edges and labels), then the line, the
+    instruction count and the code offset (assigned at assembly)."""
+    succ = wii13_edges(block.successors_addr, WII13_EDGE_TO, WII13_EDGE_NEXT_SUCC)
+    pred = wii13_edges(block.predecessors_addr, WII13_EDGE_FROM, WII13_EDGE_NEXT_PRED)
+    labels = wii13_labels(block.label_addr)
     line_str = f"line={block.line} " if block.line is not None else ""
     print(
-        f"{line_str}pcode={block.pcode_count} "
-        "(successors/predecessors/labels not dumped: record layout not derived)",
+        f"B{block.index}: Successors = {{ {succ} }}  Predecessors = {{ {pred} }}  "
+        f"Labels = {{ {labels} }}  {line_str}pcode={block.pcode_count} "
+        f"offset={block.code_offset:#x}",
         file=f,
     )
     instr_addr = block.instr_addr
     count = 0
     while instr_addr != 0 and count < 20000:
-        instr = MwccPcode.load(instr_addr)
+        # PORT: an unreadable record ends this block's walk, not the run: the
+        # early dump points of a multi-function unit can see a block list whose
+        # records the previous function freed (gdb.MemoryError at 0x34, 0x104,
+        # 0x3b ...).  The dump and the run summary say where it stopped.
+        try:
+            instr = MwccPcode.load(instr_addr)
+        except gdb.MemoryError:
+            print(f"  ... unreadable pcode record at {instr_addr:#x}: walk of "
+                  f"B{block.index} stopped after {count} of {block.pcode_count}",
+                  file=f)
+            note_dump_problem(f"B{block.index}: unreadable pcode record at "
+                              f"{instr_addr:#x}")
+            break
         print_instruction(f, instr, block.line)
         instr_addr = instr.next_addr
         count += 1
     if count >= 20000:
         print("  ... (instruction chain did not terminate)", file=f)
+        note_dump_problem(f"B{block.index}: instruction chain did not terminate")
     print("", file=f)
+'''
+
+PRINT_INSTRUCTION_OLD = '''    mnemonic = MWCC_OPCODE_INFO[instr.op].mnemonic.lower()
+'''
+PRINT_INSTRUCTION_NEW = '''    # PORT: an opcode outside the table is a garbage record, printed as such
+    # instead of raising IndexError (camera/camera_main, 2026-10-27).
+    if 0 <= instr.op < len(MWCC_OPCODE_INFO):
+        mnemonic = MWCC_OPCODE_INFO[instr.op].mnemonic.lower()
+    else:
+        mnemonic = f"op{instr.op}?"
+        note_dump_problem(f"opcode {instr.op} outside the opcode table")
+'''
+
+PRINT_PCODE_OLD = '''def print_pcode(pass_number: int, pass_name: str):
+    output_path = Path(OUTPUT_DIR) / f"backend-{pass_number:02}-{pass_name}.txt"
+    print(f"Dumping PCode to {output_path}")
+    with open(output_path, "w") as f:
+        block_addr = read_u32(MWCC_VERSION.pcbasicblocks_addr)
+        while block_addr != 0:
+            block = MwccBlock.load(block_addr)
+            print_block(f, block)
+            block_addr = block.next_addr
+'''
+PRINT_PCODE_NEW = '''# PORT: what went wrong while writing the current dump, and per dump for the
+# run summary ({file name: [problem, ...]}).
+DUMP_PROBLEMS: list = []
+RUN_PROBLEMS: dict = {}
+# PORT: the head of the block list when the requested function's code
+# generation began - the previous function's list, whose records may already
+# be freed and reused.  Until a dump point sees the head move off it (Wii/1.3:
+# `after-initpcode` sees it emptied), a dump point fires before this
+# function's PCode exists and the list is not walked.  Measured on ten units
+# (lobby/lb_npc, camera/camera_main, NAND/NANDCheck, RVLGX/GXTev, ...):
+# `backend-00`/`-01` are always that list, `-02` always empty.
+STALE_HEAD: int = 0
+LIST_RESET_SEEN: bool = False
+MAX_BLOCKS = 100000
+
+
+def note_dump_problem(text: str):
+    DUMP_PROBLEMS.append(text)
+
+
+def print_pcode(pass_number: int, pass_name: str):
+    global LIST_RESET_SEEN
+    output_path = Path(OUTPUT_DIR) / f"backend-{pass_number:02}-{pass_name}.txt"
+    print(f"Dumping PCode to {output_path}")
+    DUMP_PROBLEMS.clear()
+    with open(output_path, "w") as f:
+        # PORT: every dump names the function it was taken for.
+        print(f"; function {FUNCTION_NAME}, dump {pass_number:02} {pass_name}"
+              + (f", extracted TU {EXTRACTED}" if EXTRACTED else ""), file=f)
+        block_addr = read_u32(MWCC_VERSION.pcbasicblocks_addr)
+        if block_addr != STALE_HEAD:
+            LIST_RESET_SEEN = True
+        if block_addr != 0 and not LIST_RESET_SEEN:
+            print(f"; stale: the block list (head {block_addr:#x}) is the one left "
+                  "over from before this function's code generation; not walked",
+                  file=f)
+            note_dump_problem("stale block list from before this function")
+            block_addr = 0
+        blocks = 0
+        while block_addr != 0 and blocks < MAX_BLOCKS:
+            try:
+                block = MwccBlock.load(block_addr)
+            except gdb.MemoryError:
+                print(f"; unreadable block record at {block_addr:#x}: walk stopped "
+                      f"after {blocks} block(s)", file=f)
+                note_dump_problem(f"unreadable block record at {block_addr:#x}")
+                break
+            print_block(f, block)
+            block_addr = block.next_addr
+            blocks += 1
+        if blocks >= MAX_BLOCKS:
+            note_dump_problem(f"block chain did not terminate in {MAX_BLOCKS}")
+    if DUMP_PROBLEMS:
+        RUN_PROBLEMS[output_path.name] = list(DUMP_PROBLEMS)
+        print(f"  incomplete dump: {DUMP_PROBLEMS[0]}"
+              + (f" (+{len(DUMP_PROBLEMS) - 1} more)" if len(DUMP_PROBLEMS) > 1 else ""))
+
+
+def print_run_summary():
+    """PORT: one line per incomplete dump, so a reader knows which to ignore."""
+    if not RUN_PROBLEMS:
+        print("mwcc-debugger: every dump was read completely")
+        return
+    print(f"mwcc-debugger: {len(RUN_PROBLEMS)} dump(s) incomplete (the rest are "
+          "complete):")
+    for name, problems in RUN_PROBLEMS.items():
+        print(f"  {name}: {problems[0]}"
+              + (f" (+{len(problems) - 1} more)" if len(problems) > 1 else ""))
 '''
 
 IGNODE_OLD = '''    def load(cls, addr: int) -> MwccIGNode:
@@ -640,6 +808,7 @@ RUN_NEW = '''
 
 def run_compiler():
     """gdb-side entry point (this file sourced as a gdb command script)."""
+    global STALE_HEAD
     gdb.execute("set python print-stack full")
     gdb.execute("set confirm off")
     gdb.execute("set pagination off")
@@ -697,6 +866,9 @@ def run_compiler():
 
     print(f"Found function {func.linkname or func.name}")
     print()
+    # PORT: the block list as code generation of this function begins - still
+    # the previous function's (print_pcode refuses to walk it again).
+    STALE_HEAD = read_u32(MWCC_VERSION.pcbasicblocks_addr)
 
     # Set breakpoints
     for addr in MWCC_VERSION.ast_breakpoints:
@@ -741,6 +913,7 @@ def run_compiler():
 
         if current_addr == MWCC_VERSION.codegen_end_addr:
             print_variables()
+            print_run_summary()
             gdb.execute("quit")
 
 
@@ -868,84 +1041,52 @@ def gdb_quote_args(argv: list) -> str:
     return " ".join(out)
 
 
-def start_gdb():
-    parser = argparse.ArgumentParser(
-        description="Dump MWCC compiler internals while compiling a file."
-    )
-    parser.add_argument(
-        "--args",
-        "-a",
-        required=True,
-        help="compiler command line (in quotes), starting with mwcceppc.exe",
-    )
-    parser.add_argument(
-        "--exe",
-        "-E",
-        default=None,
-        help="path to mwcceppc.exe (default: first word of --args)",
-    )
-    parser.add_argument(
-        "--emulator",
-        "-e",
-        default=None,
-        help="POSIX hosts only: run the compiler under this retrowin32 binary "
-        "(upstream behaviour) instead of running it natively",
-    )
-    parser.add_argument(
-        "--gdb",
-        "-g",
-        default=None,
-        help="path to the gdb to use (default: gdb on PATH)",
-    )
-    parser.add_argument(
-        "--gdb-port",
-        type=int,
-        default=9001,
-        help="port of the retrowin32 gdb stub (default: 9001)",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=float,
-        default=900.0,
-        help="seconds to allow the whole debug session (default: 900)",
-    )
-    parser.add_argument("FUNCTION_NAME", help="name of the function to analyze")
-    parser.add_argument(
-        "OUTPUT_DIR",
-        nargs="?",
-        help="output directory for the dump files "
-        "(default: debug-FUNCTION_NAME, sanitized)",
-    )
-    args = parser.parse_args()
+#: PORT: the suffixes a compiler argument must carry to be the translation unit.
+SOURCE_SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".cxx")
 
-    output_dir = args.OUTPUT_DIR or f"debug-{safe_dir_name(args.FUNCTION_NAME)}"
 
-    compiler_argv = split_command_line(args.args)
-    if not compiler_argv:
-        raise SystemExit("mwcc-debugger: --args is empty")
-    if args.exe:
-        compiler_argv[0] = args.exe
-    exe_path = Path(compiler_argv[0])
-    if not exe_path.exists():
+def extract_unit(compiler_argv: list, function: str, output_dir: str) -> Tuple[list, str]:
+    """PORT: write the one-function TU for `function` (lib.cextract) under
+    OUTPUT_DIR/extract/ and return the compiler arguments that compile it
+    instead of the unit, with the unit's own directory first on the include
+    path (its quoted includes resolve as before), and the TU's path."""
+    index = next(
+        (
+            i
+            for i in range(len(compiler_argv) - 1, 0, -1)
+            if compiler_argv[i].lower().endswith(SOURCE_SUFFIXES)
+            and Path(compiler_argv[i]).is_file()
+        ),
+        None,
+    )
+    if index is None:
         raise SystemExit(
-            f"mwcc-debugger: compiler {compiler_argv[0]!r} not found.  Pass the "
-            "path to mwcceppc.exe as the first word of --args (or with --exe)."
+            "mwcc-debugger: --extract needs the source file in --args (an "
+            "existing " + "/".join(SOURCE_SUFFIXES) + " argument)"
         )
+    from tools.lib import cextract
 
-    info = versions.detect(exe_path)
-    if info is None:
-        raise SystemExit(
-            f"mwcc-debugger: {exe_path} is not a compiler build this tool "
-            "knows.  Known builds: "
-            + ", ".join(versions.known())
-            + ".  Add one in tools/mwcc-debugger/versions.py; "
-            "locate/README.md records how the Wii/1.3 entry was derived."
-        )
-    print(f"Detected MWCC version: {info.name}", file=sys.stderr)
+    source = Path(compiler_argv[index])
+    result = cextract.extract(source.read_text(encoding="utf-8"), function)
+    out = Path(output_dir).resolve() / "extract" / source.name
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(result.text, encoding="utf-8", newline="")
+    print(
+        f"extract: {out} keeps {', '.join(result.kept)}; {len(result.stubbed)} "
+        f"function(s) reduced to a declaration, {len(result.dropped)} member "
+        f"definition(s) dropped, {len(result.whole)} inline/template kept whole",
+        file=sys.stderr,
+    )
+    argv = list(compiler_argv)
+    argv[index] = str(out)
+    first_i = next((i for i, a in enumerate(argv) if a == "-i"), index)
+    argv[first_i:first_i] = ["-i", str(source.resolve().parent)]
+    return argv, str(out)
 
-    os.makedirs(output_dir, exist_ok=True)
-    gdb_path = find_gdb(args.gdb)
 
+def run_session(args, gdb_path: str, info, exe_path: Path, compiler_argv: list,
+                output_dir: str, extracted: str) -> int:
+    """PORT: one gdb session over one compiler command line; its exit code."""
     params = {
         "function_name": args.FUNCTION_NAME,
         "output_dir": str(Path(output_dir).resolve()),
@@ -955,6 +1096,7 @@ def start_gdb():
         "gdb_port": args.gdb_port,
         "gdb_file": gdb_escape_path(str(exe_path.resolve())),
         "gdb_args": gdb_quote_args(compiler_argv[1:]),
+        "extracted": extracted,
     }
     env = dict(os.environ)
     # PORT: state crosses into gdb through the environment, not through a
@@ -997,10 +1139,121 @@ def start_gdb():
                 emulator_process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 emulator_process.kill()
+    return gdb_result.returncode
 
-    if gdb_result.returncode != 0:
+
+def start_gdb():
+    parser = argparse.ArgumentParser(
+        description="Dump MWCC compiler internals while compiling a file."
+    )
+    parser.add_argument(
+        "--args",
+        "-a",
+        required=True,
+        help="compiler command line (in quotes), starting with mwcceppc.exe",
+    )
+    parser.add_argument(
+        "--exe",
+        "-E",
+        default=None,
+        help="path to mwcceppc.exe (default: first word of --args)",
+    )
+    parser.add_argument(
+        "--emulator",
+        "-e",
+        default=None,
+        help="POSIX hosts only: run the compiler under this retrowin32 binary "
+        "(upstream behaviour) instead of running it natively",
+    )
+    parser.add_argument(
+        "--gdb",
+        "-g",
+        default=None,
+        help="path to the gdb to use (default: gdb on PATH)",
+    )
+    parser.add_argument(
+        "--gdb-port",
+        type=int,
+        default=9001,
+        help="port of the retrowin32 gdb stub (default: 9001)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=900.0,
+        help="seconds to allow the whole debug session (default: 900)",
+    )
+    parser.add_argument(
+        "--extract",
+        action="store_true",
+        help="compile a one-function TU instead of the unit: the preamble, the "
+        "target's definition and every other function reduced to a declaration "
+        "(lib.cextract; written to OUTPUT_DIR/extract/)",
+    )
+    parser.add_argument(
+        "--no-fallback",
+        action="store_true",
+        help="do not retry on a one-function TU when the full unit fails",
+    )
+    parser.add_argument("FUNCTION_NAME", help="name of the function to analyze")
+    parser.add_argument(
+        "OUTPUT_DIR",
+        nargs="?",
+        help="output directory for the dump files "
+        "(default: debug-FUNCTION_NAME, sanitized)",
+    )
+    args = parser.parse_args()
+
+    output_dir = args.OUTPUT_DIR or f"debug-{safe_dir_name(args.FUNCTION_NAME)}"
+
+    compiler_argv = split_command_line(args.args)
+    if not compiler_argv:
+        raise SystemExit("mwcc-debugger: --args is empty")
+    if args.exe:
+        compiler_argv[0] = args.exe
+    exe_path = Path(compiler_argv[0])
+    if not exe_path.exists():
         raise SystemExit(
-            f"mwcc-debugger: gdb exited with code {gdb_result.returncode}"
+            f"mwcc-debugger: compiler {compiler_argv[0]!r} not found.  Pass the "
+            "path to mwcceppc.exe as the first word of --args (or with --exe)."
+        )
+
+    info = versions.detect(exe_path)
+    if info is None:
+        raise SystemExit(
+            f"mwcc-debugger: {exe_path} is not a compiler build this tool "
+            "knows.  Known builds: "
+            + ", ".join(versions.known())
+            + ".  Add one in tools/mwcc-debugger/versions.py; "
+            "locate/README.md records how the Wii/1.3 entry was derived."
+        )
+    print(f"Detected MWCC version: {info.name}", file=sys.stderr)
+
+    os.makedirs(output_dir, exist_ok=True)
+    gdb_path = find_gdb(args.gdb)
+
+    if args.extract:
+        compiler_argv, extracted = extract_unit(compiler_argv, args.FUNCTION_NAME, output_dir)
+        returncode = run_session(args, gdb_path, info, exe_path, compiler_argv, output_dir, extracted)
+    else:
+        returncode = run_session(args, gdb_path, info, exe_path, compiler_argv, output_dir, "")
+        if returncode != 0 and not args.no_fallback:
+            # PORT: the full unit failed; the one-function TU is the documented
+            # workaround (NAND/NANDCheck, lobby/lb_pane_ui), so take it once.
+            print(
+                f"mwcc-debugger: the full unit failed (gdb exit {returncode}); "
+                "retrying on a one-function TU (--no-fallback disables this)",
+                file=sys.stderr,
+            )
+            for old in Path(output_dir).glob("*.txt"):
+                if old.name.startswith(("backend-", "regalloc-", "frontend-", "variables")):
+                    old.unlink()
+            compiler_argv, extracted = extract_unit(compiler_argv, args.FUNCTION_NAME, output_dir)
+            returncode = run_session(args, gdb_path, info, exe_path, compiler_argv, output_dir, extracted)
+
+    if returncode != 0:
+        raise SystemExit(
+            f"mwcc-debugger: gdb exited with code {returncode}"
         )
     print(f"Dumps written to {output_dir}")
 
@@ -1042,6 +1295,8 @@ def main():
     src = sub_once(src, "def print_pcode(pass_number: int, pass_name: str):",
                    PRINT_BLOCK_HELPER.strip() + "\n\n\ndef print_pcode(pass_number: int, pass_name: str):",
                    "print_block helper")
+    src = sub_once(src, PRINT_INSTRUCTION_OLD, PRINT_INSTRUCTION_NEW, "print_instruction opcode")
+    src = sub_once(src, PRINT_PCODE_OLD, PRINT_PCODE_NEW, "print_pcode")
     src = sub_once(src, IGNODE_OLD, IGNODE_NEW, "ignode load")
     src = sub_once(src, "MWCC_OPCODE_INFO: list[MwccOpcodeInfo] = []\n\n\ndef load_opcode_info",
                    IGNODE_HELPER.strip() + "\n\n\nMWCC_OPCODE_INFO: list[MwccOpcodeInfo] = []\n\n\ndef load_opcode_info",

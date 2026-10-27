@@ -41,6 +41,9 @@ python tools/mwcc-debugger/fetch_gdb.py --dest C:/tools/mwcc-dbg
 # then, e.g. --gdb C:/tools/mwcc-dbg/mingw64/bin/gdb.exe
 ```
 
+The downloaded packages are cached under `DIR/mwcc-dbg-pkgs/` (`--cache` moves
+them), never in the current directory.
+
 Either way put it on `PATH` and `--gdb` can be omitted.  If no gdb is found the
 tool prints exactly this advice instead of a traceback.
 
@@ -104,14 +107,41 @@ frontend-NN-ast-<pass>.txt       AST dumps (Wii/1.3: not yet, see below)
 variables.txt                    stack frame layout (GC/1.1 only)
 ```
 
-The `NN` is the order the dump points *fired*, not a pass number: `backend-00`
-is the frontend optimizer's output, the middle of the list is the -O3
-propagation/peephole pipeline, and the last file is the state just before
-assembly (for a -O3 unit: 35 dumps, ending `backend-34-after-code-labels.txt`).
-So the directory is a **timeline**, and the interesting thing about an early dump
-is the difference between it and the last one - that difference names the pass
-responsible for whatever the object does that the source does not.  See
-*Verification* for the tool that reads it that way.
+The `NN` is the order the dump points *fired*, not a pass number: the middle of
+the list is the -O3 propagation/peephole pipeline, and the last file is the
+state just before assembly (for a -O3 unit: 35 dumps, ending
+`backend-34-after-code-labels.txt`).  So the directory is a **timeline**, and
+the interesting thing about an early dump is the difference between it and the
+last one - that difference names the pass responsible for whatever the object
+does that the source does not.  See *Verification* for the tool that reads it
+that way.
+
+Every dump opens with `; function <name>, dump NN <pass>` (plus the extracted
+TU's path under `--extract`).  On Wii/1.3 the first two dump points
+(`after-frontend-optimizer`, `after-toc-expansion`) fire **before** the
+function's PCode exists: the block list is still the previous function's, its
+records often already freed.  The tool does not walk that list; the dump says
+`; stale: ...` and the run ends with a summary naming every incomplete dump
+(measured on ten units: `backend-00`/`-01` stale, `-02` empty, the rest the
+function's).  An unreadable record (`gdb.MemoryError`) or an opcode outside the
+table ends that block's or that dump's walk with a line saying where, never the
+run - before this, every multi-function unit tried (`lobby/lb_pane_ui`,
+`camera/camera_main`, `NAND/NANDCheck`, `RVLGX/GXTev`, ...: 7 of 10) died at
+`backend-00`.
+
+### One-function TU (`--extract`)
+
+`--extract` compiles `OUTPUT_DIR/extract/<file>` instead of the unit:
+`tools/lib/cextract.py` keeps the preamble, every declaration and type, the target's
+definition and every `inline`/`template` definition, reduces every other free
+function to its declaration and drops out-of-class member definitions (their
+class declares them).  Removed text is blanked, so **every line keeps its
+number** and every preprocessor line stays; the unit's own directory goes first
+on the include path.  When a full-unit run fails the tool retries once this way
+(`--no-fallback` turns that off).  The TU is a probe of the same function, not
+the unit: check its final dump against the unit's object with
+`verify_pcode.py --symbol`.  Standalone: `python tools/mwcc-debugger/extract.py
+SOURCE FUNCTION -o OUT [--json]`.
 
 ## What works, and what does not
 
@@ -132,13 +162,17 @@ responsible for whatever the object does that the source does not.  See
   apply: Wii/1.3 is a later Metrowerks core with different records throughout.
 * `variables.txt` - the stack-frame dump (upstream only ever had it for
   GC/1.1).
-* Successor/predecessor/label lists and per-instruction line numbers inside
-  the PCode dumps.  The instruction stream and block index/line/count are
-  there; the block's edge fields are not derived, and each dump says so.
-* Operand *rendering* for two cases: kinds the compiler calls "fixups"
-  (printed `fixup[...]`, they are the relocations the assembler patches later,
-  e.g. the TOC address of a `lis`/`addi` pair) and branch targets (printed
-  `@L<id>`, they need the block label list).
+* Per-instruction line numbers inside the PCode dumps (blocks carry a line).
+* Operand *rendering* for the kind the compiler calls "fixups" (printed
+  `fixup[...]`: the relocations the assembler patches later, e.g. the TOC
+  address of a `lis`/`addi` pair).
+
+Block headers read like upstream's: `B1: Successors = { B99 B2 }
+Predecessors = { B0 }  Labels = { L1 }  line=1 pcode=7 offset=0x14`, and a
+branch operand names its target block (`bt cr0,1,B99`).  `offset` is the
+block's code offset, assigned at assembly (0 before).  A late branch-threading
+pass can retarget a branch without updating the edge lists (2 of 435 branches
+on ten units; the operand is the one the object has).
 
 The GC/1.1 and GC/2.6 rows are carried over from upstream unchanged except for
 the address-base conversion (see `versions.py`).  They cannot be exercised on
@@ -189,8 +223,18 @@ The port was checked end-to-end on `src/fn_8004C9A0.cpp`
 `build/binutils/powerpc-eabi-objdump.exe`, which the repository already has):
 
 ```
-python tools/mwcc-debugger/locate/verify_pcode.py <backend-NN-....txt> <file.o>
+python tools/mwcc-debugger/locate/verify_pcode.py <backend-NN-....txt> <file.o> [--symbol NAME]
 ```
+
+It compares **one function**: `--symbol`, or else the function the dump's
+first line names (when the object defines it), so a dump of one function in a
+multi-function unit is checked against that function and not the whole
+`.text`.  objdump runs with `-M gekko`; in a final dump every branch's target
+(its block's `offset=`) is compared with the object's too.  A MATCH prints what
+it did not compare (relocated `fixup[...]` operands, `bl`'s register list, ...).
+Measured on ten real functions of multi-function units (lobby/lb_npc,
+camera/camera_main, NAND/NANDCheck, quest/arenatask, RVLGX/GXTev, ...): all
+MATCH, 434 branch targets compared.
 
 It **classifies the dump first**, because only one dump in the run claims to be
 the final code:
@@ -241,4 +285,5 @@ upstream/           the upstream files, byte-for-byte as cloned
 make_port.py        regenerates mwcc_debugger.py from upstream/ (reviewable diff)
 locate/             how the Wii/1.3 facts were derived + verification tooling
 fetch_gdb.py        installs a native gdb without MSYS2
+extract.py          CLI of lib.cextract, the one-function TU of --extract
 ```

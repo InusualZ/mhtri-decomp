@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Classify a PCode dump (final vs earlier pass) and compare it to the object: MATCH / FAIL / PASS-DELTA.
-Spec: docs/tools/spec/verify_pcode.md. CLI: verify_pcode.py <backend-NN-....txt> <file.o> [--json]."""
+Spec: docs/tools/spec/verify_pcode.md. CLI: verify_pcode.py <backend-NN-....txt> <file.o> [--symbol NAME] [--json]."""
 from __future__ import annotations
 
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -34,9 +34,14 @@ ALIASES = {
     "subi": "addi",
     "subic": "addic",
     "subis": "addis",
+    # the object's extended spellings of what the dump prints in base form
+    "cmpw": "cmp",
+    "cmplw": "cmpl",
+    "crclr": "crxor",
+    "crset": "creqv",
 }
 
-# bt/bf on cr0 map onto the disassembler's named conditions.
+# bt/bf on a CR field bit map onto the disassembler's named conditions.
 CR0_BRANCHES = {
     ("bt", 0): "blt",
     ("bt", 1): "bgt",
@@ -70,12 +75,33 @@ NO_IMM_COMPARE = {
     "ble",
     "bne",
     "bns",
+    # `crclr 4*cr1+eq` against `crxor cr1,2,cr1,2,cr1,2`: the CR bits are spelled differently
+    "crxor",
+    "creqv",
 }
 
+#: Paired-single loads/stores: only the displacement is compared. The dump's third immediate reads 1 where
+#: every object tried reads I=0 (camera/camera_main, RVLGX/GXTransform), so W/I are not established.
+PSQ_PREFIX = "psq_"
+
+#: What a MATCH does not cover, printed with it so a reader can tell a fully compared function from one where
+#: operands were markers.
+NOT_COMPARED = ("relocated operands (`fixup[...]` in the dump, `0`/a self-address in the object: TOC, SDA and "
+                "call targets), `bl` operand lists, immediates of " + ", ".join(sorted(NO_IMM_COMPARE)))
+
 DUMP_LINE = re.compile(r"^\s*\d+\s+([a-z0-9_.]+)\s*(.*)$")
+#: A dump's first line names the function it was taken for (`; function NAME, dump NN pass`).
+DUMP_FUNCTION = re.compile(r"^; function (\S+?),")
+#: A Wii/1.3 block header's index and code offset (`B12: ... offset=0x30`).
+DUMP_BLOCK = re.compile(r"^B(\d+):.* offset=(0x[0-9a-f]+)")
+#: A dump branch operand naming its target block (`bt cr0,1,B99`).
+DUMP_TARGET = re.compile(r"(?:^|,)B(\d+)$")
+#: An objdump branch operand: the target address, then `<sym+off>`.
+BRANCH_TARGET = re.compile(r"^([0-9a-f]+)(?:\s+<[^>]*>)?$")
 MNEMONIC = re.compile(r"[a-z0-9_.]+")
 DUMP_NAME = re.compile(r"^backend-(\d+)-(.+)\.txt$")
 REG = re.compile(r"\b([rf])(\d+)\b")
+CR_FIELD = re.compile(r"\bcr([1-7])\b")
 IMM = re.compile(r"(?<![\w])(-?0x[0-9a-f]+|-?\d+)\b")
 
 # How many hunks of a delta to print, and how many instructions per hunk.
@@ -99,13 +125,68 @@ def read_dump(path):
     return insns
 
 
-def read_objdump(obj_path, objdump=OBJDUMP):
-    out = lib_objdump.run_objdump(objdump, ["-d", "--no-show-raw-insn"], obj_path, check=True).stdout
+def dump_function(path):
+    """The function the dump's header line names, or None (a dump written before headers, a hand-written one)."""
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    m = DUMP_FUNCTION.match(text)
+    return m.group(1) if m else None
+
+
+def dump_targets(path):
+    """Each dump instruction's branch target as a code offset (the target block's `offset=`), None for a
+    non-branch; all None when no block has a non-zero offset (a dump taken before assembly)."""
+    offsets, insns = {}, []
+    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
+        b = DUMP_BLOCK.match(line)
+        if b:
+            offsets[int(b.group(1))] = int(b.group(2), 16)
+            continue
+        m = DUMP_LINE.match(line)
+        if m:
+            t = DUMP_TARGET.search(m.group(2).replace(" ", ""))
+            insns.append(int(t.group(1)) if t and m.group(1).startswith("b") else None)
+    if not any(offsets.values()):
+        return [None] * len(insns)
+    return [offsets.get(t) if t is not None else None for t in insns]
+
+
+#: The disassembler's CPU: Gekko/Broadway, so the paired-single `psq_*` forms decode as what MWCC emitted
+#: (without it `psq_st`/`psq_lx` read as `xsmsubmsp`/`vmrghb`).
+OBJDUMP_CPU = "gekko"
+
+
+def read_objdump(obj_path, objdump=OBJDUMP, symbol=None, targets=None):
+    """`[(mnemonic, operands)]` of the object's code, or of one function's when `symbol` is given (its label to
+    the next label). `targets`, a list, receives each instruction's branch target as an offset from the
+    function's start (None for a non-branch or a relocated call). FileNotFoundError when `symbol` is absent."""
+    out = lib_objdump.run_objdump(objdump, ["-M", OBJDUMP_CPU, "-d", "--no-show-raw-insn"], obj_path,
+                                  check=True).stdout
     insns = []
+    inside = symbol is None
+    found = False
+    start = 0
     for line in out.splitlines():
         tok = lib_objdump.tokenize(line)
-        if tok is not None and tok.kind == "insn" and MNEMONIC.fullmatch(tok.mnemonic):
+        if tok is None:
+            continue
+        if tok.kind == "label":
+            start = tok.address or 0
+            if symbol is not None:
+                inside = tok.name == symbol
+                found = found or inside
+            continue
+        if inside and tok.kind == "insn" and MNEMONIC.fullmatch(tok.mnemonic):
             insns.append((tok.mnemonic, tok.operands))
+            if targets is not None:
+                m = BRANCH_TARGET.match(tok.operands.split(",")[-1].strip())
+                targets.append(int(m.group(1), 16) - start if m and tok.mnemonic.startswith("b") else None)
+    if symbol is not None and not found:
+        raise FileNotFoundError(f"no function {symbol!r} in {obj_path}")
+    # zero words after the last instruction are the alignment fill before the next function (RVLGX/GXAttr)
+    while symbol is not None and insns and insns[-1] == (".long", "0x0"):
+        insns.pop()
+        if targets is not None:
+            targets.pop()
     return insns
 
 
@@ -114,6 +195,10 @@ def normalise(insns):
     for mnemonic, operands in insns:
         text = operands.replace(" ", "")
         text = re.sub(r"<[^>]*>", "", text)  # symbolic branch targets
+        # an SDA21 operand's base is r0 in the dump and a literal `(0)` in the object (the linker writes r13/r2)
+        text = text.replace(",r0,fixup[", ",fixup[")
+        # a relocated operand (`fixup[kind]`, its value patched later) is not a register or an immediate
+        text = re.sub(r"fixup\[[^\]]*\]", "", text)
         if mnemonic in ("bt", "bf"):
             cr, bit = 0, None
             for part in text.split(","):
@@ -122,17 +207,23 @@ def normalise(insns):
                     cr = int(cm.group(1))
                 if re.fullmatch(r"-?\d+", part):
                     bit = int(part)
-            named = CR0_BRANCHES.get((mnemonic, (bit or 0) + 4 * cr))
+            # the bit is within the named CR field, which stays an operand (`bf cr1,1,B16` is `ble cr1,...`)
+            named = CR0_BRANCHES.get((mnemonic, bit or 0))
             if named:
                 mnemonic = named
         mnemonic = ALIASES.get(mnemonic, mnemonic)
-        regs = {f"{a}{b}" for a, b in REG.findall(text)}
+        # `bl`'s registers in the dump are the call's clobber/argument list, not operands
+        regs = set() if mnemonic == "bl" else {f"{a}{b}" for a, b in REG.findall(text)}
+        # a CR field other than cr0 is compared like a register (the disassembler leaves cr0 implicit)
+        regs |= {f"cr{n}" for n in CR_FIELD.findall(text)}
         imms = []
         for value in IMM.findall(text):
             try:
                 imms.append(int(value, 0))
             except ValueError:
                 pass
+        if mnemonic.startswith(PSQ_PREFIX):
+            imms = imms[:1]
         out.append((mnemonic, regs, imms))
     return out
 
@@ -177,6 +268,19 @@ def positional_problems(dump_insns, obj_insns):
         else:
             problems.append(f"#{i} {a[0]}: immediates {a[2]} vs {b[2]}")
     return problems
+
+
+def target_problems(dump_keys, dump_offsets, obj_targets):
+    """`([problem], compared)`: each branch whose target the dump knows (its block's code offset, assigned at
+    assembly) is compared with the object's target, as offsets from the function's start."""
+    problems, compared = [], 0
+    for i, (key, want, got) in enumerate(zip(dump_keys, dump_offsets, obj_targets)):
+        if want is None or got is None:
+            continue
+        compared += 1
+        if want != got:
+            problems.append(f"#{i} {key[0]}: branch target +{want:#x} (dump) vs +{got:#x} (object)")
+    return problems, compared
 
 
 def align(a_insns, b_insns):
@@ -293,20 +397,42 @@ def sibling_dumps(path: Path):
     return out
 
 
-def analyse(dump_path, obj_path, version=None, force_final=False, objdump=OBJDUMP):
-    """Classify the dump and compare it - the one function the CLI and the tests share."""
+def resolve_symbol(dump_path, obj_path, symbol, objdump):
+    """`(symbol or None, how)`: the `--symbol` given, else the function the dump's header names when the object
+    defines it, else None (the whole object is compared)."""
+    if symbol:
+        return symbol, "--symbol"
+    named = dump_function(dump_path)
+    if named:
+        try:
+            read_objdump(obj_path, objdump, named)
+            return named, "the dump's header"
+        except FileNotFoundError:
+            return None, f"the dump's header names {named}, which the object does not define"
+    return None, None
+
+
+def analyse(dump_path, obj_path, version=None, force_final=False, objdump=OBJDUMP, symbol=None):
+    """Classify the dump and compare it - the one function the CLI and the tests share. With `symbol` (or a dump
+    header naming a function the object defines) only that function's code is compared."""
     dump_path = Path(dump_path)
     obj_path = Path(obj_path)
     m = DUMP_NAME.match(dump_path.name)
     pass_index, pass_name = (int(m.group(1)), m.group(2)) if m else (None, None)
     siblings = sibling_dumps(dump_path)
 
+    symbol, symbol_from = resolve_symbol(dump_path, obj_path, symbol, objdump)
     dump_insns = read_dump(dump_path)
-    obj_insns = read_objdump(obj_path, objdump)
+    obj_targets = []
+    obj_insns = read_objdump(obj_path, objdump, symbol, obj_targets)
     dump_keys = normalise(dump_insns)
     obj_keys = normalise(obj_insns)
 
     problems = positional_problems(dump_keys, obj_keys)
+    targets_compared = 0
+    if symbol and len(dump_keys) == len(obj_keys):
+        target_rows, targets_compared = target_problems(dump_keys, dump_targets(dump_path), obj_targets)
+        problems += target_rows
     hunks = align(dump_keys, obj_keys)
     changes = [hunk_text(dump_insns, obj_insns, h) for h in (hunks or [])]
 
@@ -386,6 +512,9 @@ def analyse(dump_path, obj_path, version=None, force_final=False, objdump=OBJDUM
         "status": status,
         "dump": str(dump_path),
         "object": str(obj_path),
+        "symbol": symbol,
+        "symbol_from": symbol_from,
+        "targets_compared": targets_compared,
         "pass": pass_name,
         "pass_index": pass_index,
         "final_pass": final_pass,
@@ -435,6 +564,10 @@ def render_report(rep, show_all=False) -> str:
         pass_line(rep),
         f"object:  {rep['object']}",
     ]
+    if rep.get("symbol"):
+        out.append(f"symbol:  {rep['symbol']} (from {rep['symbol_from']}; only its code is compared)")
+    elif rep.get("symbol_from"):
+        out.append(f"symbol:  none - {rep['symbol_from']}; the whole object is compared")
     counts = (
         f"instructions: dump {rep['dump_instructions']}, "
         f"object {rep['object_instructions']}"
@@ -444,7 +577,9 @@ def render_report(rep, show_all=False) -> str:
     out.append(counts)
 
     if rep["status"] == "match":
-        out.append("MATCH: every mnemonic, register and compared immediate agrees")
+        out.append("MATCH: every mnemonic, register and compared immediate agrees"
+                   + (f", and {rep['targets_compared']} branch target(s)" if rep.get("targets_compared") else ""))
+        out.append("not compared: " + NOT_COMPARED)
         if rep["note"]:
             out.append(f"note:    {rep['note']}")
         return "\n".join(out)
@@ -527,6 +662,12 @@ def main(argv=None) -> int:
     )
     parser.add_argument("dump", help="a backend-NN-<pass>.txt dump")
     parser.add_argument("object", help="the object the same command line emitted")
+    parser.add_argument(
+        "--symbol",
+        default=None,
+        help="compare only this function of the object (default: the function the dump's header names, "
+        "when the object defines it; else the whole object)",
+    )
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument(
         "--all", action="store_true", help="print every change, not the first 20"
@@ -558,6 +699,7 @@ def main(argv=None) -> int:
             version=args.version,
             force_final=args.final,
             objdump=Path(args.objdump),
+            symbol=args.symbol,
         )
     except FileNotFoundError as exc:
         print(f"verify_pcode: {exc}", file=sys.stderr)

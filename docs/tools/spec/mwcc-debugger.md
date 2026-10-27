@@ -12,7 +12,8 @@ no caller in the tracked tree
 
 ## CLI
 
-Flags: `--args`, `--emulator`, `--exe`, `--gdb`, `--gdb-port`, `--timeout`.
+Flags: `--args`, `--emulator`, `--exe`, `--gdb`, `--gdb-port`, `--timeout`, `--extract`, `--no-fallback`.
+`extract.py SOURCE FUNCTION [-o OUT] [--json]` builds the one-function TU on its own.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -28,6 +29,18 @@ Inputs -> outputs: source + flags -> build/mwcc-debug dumps.
 * sourced by gdb -> `run_compiler()`: set the breakpoints for that build and dump compiler state to text files.
 * Everything build-specific (addresses, table sizes, record layouts) lives in versions.py; this file is mechanism only.
 * PORT: changes from upstream are marked with a `PORT:` comment.
+* Every dump opens `; function <name>, dump NN <pass>`. A dump point that fires while the block list is still the one
+  standing when the function's code generation began (Wii/1.3: `backend-00`/`-01`, before `after-initpcode` empties
+  it) is written `; stale: ...` and not walked; an unreadable record (`gdb.MemoryError`) ends that block's or that
+  dump's walk, and an opcode outside the table prints `op<N>?` - the run continues and ends with one summary line
+  per incomplete dump. Measured 2026-10-27 on ten units (lobby/lb_npc x2, lobby/lb_pane_ui, camera/camera_main,
+  NAND/NANDCheck, NAND/NANDLogging, quest/arenatask, RVLGX/GXTev, GXAttr, GXTransform): 7 died at `backend-00`
+  before, all ten write every dump after.
+* `--extract` (and the automatic retry when a full-unit run fails, `--no-fallback` off) compiles
+  `OUTPUT_DIR/extract/<file>`: `lib.cextract` (`spec/lib-cextract.md`; CLI `extract.py`) keeps the target's definition, every `inline`/`template` definition and
+  everything that is not a function definition, reduces every other free function to its declaration, drops
+  out-of-class member definitions, blanks what it removes (line numbers and preprocessor lines kept) and puts the
+  unit's directory first on the include path.
 
 ## Lib dependencies
 
@@ -44,7 +57,10 @@ refuses (SystemExit, naming the symbol) a blob that puts a row symbol elsewhere,
 a non-i386 image and a missing file. `locate/verify_pcode_selftest.py` stays as it is. Measured in WP5 on the live
 tree: `versions.detect` over the 30 `build/compilers/*/*/mwcceppc.exe`, `dissect.py syms|dis`, `pass_points.py` and
 `extract_upstream_tables.py` print the same as before, and a real gdb session (Wii/1.3, `-O4,p`) writes 41 dump files
-identical to the old port's.
+identical to the old port's. `tools/tests/mwcc-debugger/test_extract.py`: the one-function TU of a fixture unit keeps
+the target, every line number and preprocessor line, stubs the free functions, keeps inline/template definitions,
+drops an out-of-class member, and resolves mangled targets (`send__16NetworkSingleTcpFPCUcl` -> `send`,
+`__ct__3BoxFv` -> `Box`).
 
 ## Known gaps
 
@@ -65,6 +81,9 @@ into a self-contained prefix.
 
     python fetch_gdb.py --dest ~/.local/tools/mwcc-dbg/prefix
     ~/.local/tools/mwcc-dbg/prefix/mingw64/bin/gdb.exe --version
+
+The package cache defaults to `<dest>/mwcc-dbg-pkgs` (`--cache DIR` overrides it); it is never written to the current
+directory (`test_fetch_gdb_cache_under_dest` fetches from a `file://` repository and checks the cwd stays empty).
 
 Then point the debugger at it:
 
