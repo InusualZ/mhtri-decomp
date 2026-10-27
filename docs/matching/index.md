@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (220)
+## Ideas that work (221)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -229,6 +229,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 241 | [A case that jumps forward into the middle of the next case: put the next case's label inside an if (0) block](241-case-that-jumps-forward.md) | works | source-shape | Retail's switch case ends with a `b` into the middle of the following case (past that case's own test), so the shared tail exists once; the goto-free source repeats the tail in each case and the function grows by its... |
 | 242 | [Member constructors kept out of line after __sinit with an in-class never_inline attribute](242-member-constructors-kept-out.md) | works | source-shape, sections | Retail's `__sinit` calls one class constructor, followed in `.text` by a chain of member-array constructors (`do { bl ctor; p += size; } while (p < end)`) that call out-of-line leaf constructors; ours inlines the whole... |
 | 243 | [MWCC's GPR colouring is a reproducible cascade: simulate it from the dump and renumber the locals](243-mwccs-gpr-colouring-is.md) | works | source-shape, allocator, tooling | A function matches every opcode but whole groups of callee-saved registers are permuted (parameters in r28-r31 where retail has them in r26-r29 under loop state, a counter and a pointer swapped), and declaration hill... |
+| 244 | [Read the colouring order from the mwcc-debugger: reverse declaration numbering, split webs, conversion temps](244-read-the-colouring-order.md) | works | source-shape, allocator | Same-size rows whose only diff is two callee-saved (or volatile) registers swapped, where blind declaration permutes find nothing. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

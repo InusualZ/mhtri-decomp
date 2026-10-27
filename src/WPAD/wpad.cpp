@@ -45,17 +45,23 @@
  *   `WPADControlSpeaker` (the first two one-byte writes of the "off" path) and `WPADControlDpd` (its three one-byte
  *   writes): the value/size bytes and the command and its by-value copy take each other's stack slots (alternate
  *   builder orders and a wrapper builder move the whole frame instead).
- *   Register numbering only (declaration orders searched): `wpadHidOpenCallback`, `wpadUpdateRadioSensitivity`,
- *   `wpadCountIdleReports`, `wpadPollSample`, `wpadSendWbcCommand`, `__wpadIsBusyStream`, `wpadSendCommand`,
- *   `wpadFilterButtons`; `wpadSendReadMemory`, `WPADiSendWriteData` and `WPADiSendSetReportType` keep `queue` in r31
- *   where the original has r30 (body, declaration and inline-wrapper orders tried).
+ *   Register numbering only (the colouring order is read with tools/mwcc-debugger, playbook idea 244):
+ *   `wpadSendReadMemory`, `WPADiSendWriteData` and `WPADiSendSetReportType` keep `queue` in r31 where the original has
+ *   r30 (the `queue` parameter is the node left when simplification stalls, so it is coloured before the push's
+ *   `level`); `__wpadIsBusyStream` (`deviceType` is the stalled node and takes r31, the original gives r31 to `level`);
+ *   `wpadHidOpenCallback` (the inlined push's `level`/`used` take r28/r27 for the original's r30/r31,
+ *   the inlined peek's swap r27/r28); `wpadCountIdleReports` (`format` is a local or frontend temporary numbered below the
+ *   backend `chan * 4`, which takes r3; the original gives r3 to `format`); `wpadFilterButtons` (the back-sample
+ *   pointer takes r5 before the extension-code loads, the original r6); `wpadUpdateRadioSensitivity` (`average`
+ *   takes r3, the original r5).
  *   `wpadSamplingFiber`: the loop's callee-saved registers and command stack slots are numbered differently.
  *   `wpadSampleChanged`: five callee-saved registers where the original uses four, and the original truncates `changed`
  *   after every debounce.  `changed = changed | wpadDebounceMove(...)` at all four sites reproduces the size and every
  *   instruction but colours `changed` r7 instead of r10 and scores lower; `=` at the first site and `|=` at the others
  *   scores best (8 bytes short).
- *   `wpadInitSequence`: its 0x1A report is built in the body; through `wpadQueueDpdEnable2` the frame becomes identical
- *   but `level` and the callback's high half swap r30/r31, which scores lower.
+ *   `wpadInitSequence`: its 0x1A report is built in the body, so the command lies above its copy where the original
+ *   has it below; through `wpadQueueDpdEnable2` the frame becomes identical but the last two pushes' `level`/`used`
+ *   swap r26/r27, which scores lower.
  *   Flip blocker: .text (the partial rows).
  *   The data sections otherwise differ only in their aligned tails.
  * SHAPES. A command is a local `WPADCommand` passed by value to an inline push (`wpadQueuePush`): the 0x30-byte stack copy
@@ -72,7 +78,11 @@
  *   not an inline: inline calls in an or-chain are expanded last-term first, while the macro's conditionals keep the
  *   original's order (second term, first, then the rest).  The report parser picks the back sample with
  *   `wpadSpareSample` (WPAD/wpad.h, `(u8)(index == 0)`); this file's own `wpadBackSample` spells the index
- *   `(u8)(index == 0 ? 1 : 0)`, which keeps the byte mask the original has here.
+ *   `(u8)(index == 0 ? 1 : 0)`, which keeps the byte mask the original has here.  Register numbers follow the
+ *   declarations (playbook idea 244): a second critical section takes its own block-local level
+ *   (`reconnectLevel` in `wpadShutdownCallback`, `sendLevel` in `wpadSendWbcCommand`), `wpadDropLink` copies the handle into an `s8` (the
+ *   field's type), `wpadPollSample` spells the back sample in place, `wpadUpdateRadioSensitivity` accumulates `sum` in
+ *   two statements and `wpadInitSequence` picks `calSize` with `?:`.
  */
 
 #include "types.h"
@@ -467,16 +477,16 @@ BOOL wpadShutdownCallback(BOOL final, u32 event)
             OSRestoreInterrupts(level);
         }
     } else {
-        level = OSDisableInterrupts();
+        u32 reconnectLevel = OSDisableInterrupts();
         if (wpadInitialized == 0) {
-            OSRestoreInterrupts(level);
+            OSRestoreInterrupts(reconnectLevel);
         } else if (wpadShutdownRequested != 0) {
-            OSRestoreInterrupts(level);
+            OSRestoreInterrupts(reconnectLevel);
         } else {
             wpadShutdownRequested = 1;
             wpadReconnectMode = 1;
             WPADiDebugPrint("Wait for %d ms until start reconnect!\n", wpadReconnectDelayMs);
-            OSRestoreInterrupts(level);
+            OSRestoreInterrupts(reconnectLevel);
         }
     }
     return FALSE;
@@ -491,7 +501,7 @@ static inline void wpadDropLink(s32 chan)
     if (wpadGetStatus(chan) != -1) {
         WPADCB* cb = wpadCBTable[chan];
         u32 level = OSDisableInterrupts();
-        u8 handle = cb->devHandle;
+        s8 handle = cb->devHandle;
         const u8* addr;
         u8 bdAddr[6];
         OSRestoreInterrupts(level);
@@ -521,11 +531,11 @@ void wpadSendCommand(s32 chan, WPADCommand cmd)
     BT_HDR* buf;
     u32 level;
     s32 rumble;
-    u8* data;
-    WPADCB* cb;
     s8 handle;
+    WPADCB* cb;
     u8* payload;
     u8 reportId;
+    u8* data;
     s32 prevStatus;
     u16 length;
 
@@ -595,7 +605,8 @@ void wpadUpdateRadioSensitivity(s32 chan)
     if (wpadRadioTick == 10) {
         u16 received = cb->sampleCount;
         u8 previous = cb->radioSensitivity;
-        u16 sum = (u16)(previous * 9) + (u16)((u32)(received * 100) >> 1);
+        u16 sum = (u16)(previous * 9);
+        sum += (u16)((u32)(received * 100) >> 1);
         u16 average = sum / 10;
         u16 level = (average <= 100) ? average : 100;
         cb->radioSensitivity = level;
@@ -783,12 +794,12 @@ void wpadCountIdleReports(s32 chan, WPADSample* sample)
 /* Reads the newest sample, refreshes the last-input time and drops the link after the idle limit. */
 void wpadPollSample(s32 chan)
 {
-    BOOL changed = FALSE;
     WPADCB* cb = wpadCBTable[chan];
+    BOOL changed = FALSE;
 
     if (wpadPollState == 5) {
         u32 level = OSDisableInterrupts();
-        WPADSample* sample = wpadBackSample(cb);
+        WPADSample* sample = &cb->samples[(u8)(cb->sampleIndex == 0 ? 1 : 0)];
         BOOL different;
         OSRestoreInterrupts(level);
         different = wpadSampleChanged(cb, sample, &cb->lastSample);
@@ -1296,10 +1307,7 @@ void wpadInitSequence(s32 chan, s32 result)
     cb->calibrationPhase = result == 0;
     cb->status = 0;
     OSRestoreInterrupts(level);
-    calSize = 42;
-    if (result == 0) {
-        calSize = 20;
-    }
+    calSize = (result == 0) ? 20 : 42;
     calAddr = (result == 0) ? 0x176C : 0;
     WPADiDebugPrint(" ==>this error means that the firmware is for NDEV %s\n", cb->calibrationPhase != 0 ? "2.0" : "2.1 or later");
     leds = (cb->deviceType == 3) ? 1 : (1 << chan);
@@ -1354,13 +1362,15 @@ s32 wpadAssignChannel(WPADDeviceInfo* info)
 /* The HID open/close callback: binds a connected remote to a channel and starts its handshake, or tears a channel down. */
 void wpadHidOpenCallback(WPADDeviceInfo* info, s32 connected)
 {
-    u8 handle = info->handle;
+    WPADCB* cb;
+    u8 handle;
+    s32 chan;
 
+    handle = info->handle;
     WPADiDebugPrint("connection is %s\n", connected != 0 ? "opened" : "closed");
     if (connected != 0) {
-        s32 chan = wpadAssignChannel(info);
+        chan = wpadAssignChannel(info);
         if (chan >= 0) {
-            WPADCB* cb;
             wpadHandleToChan[handle] = chan;
             wpadResetChannel(chan);
             cb = wpadCBTable[chan];
@@ -1385,11 +1395,11 @@ void wpadHidOpenCallback(WPADDeviceInfo* info, s32 connected)
             __VIResetDimmingControlA();
         }
     } else {
-        s32 chan = wpadHandleToChan[handle];
+        chan = wpadHandleToChan[handle];
         wpadHandleToChan[handle] = -1;
         if (chan != -1) {
-            WPADCB* cb = wpadCBTable[chan];
             WPADCommand pending;
+            cb = wpadCBTable[chan];
             cb->status = -1;
             if (cb->cmdCallback != NULL) {
                 cb->cmdCallback(chan, -1);
@@ -2415,8 +2425,8 @@ s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
 {
     u32 level;
     s32 status;
-    WPADCB* cb;
     s32 ready;
+    WPADCB* cb;
     u8 data[7];
 
     cb = wpadCBTable[chan];
@@ -2435,7 +2445,7 @@ s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
             data[6] = command;
             data[5] = command;
             data[4] = command;
-            level = OSDisableInterrupts();
+            u32 sendLevel = OSDisableInterrupts();
             switch (command) {
             case 0xAA: {
                 s8 used;
@@ -2450,7 +2460,7 @@ s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
                     WPADWriteExtReg(chan, data, 1, 0xF1, NULL);
                     WPADWriteExtReg(chan, data, 1, 0xF1, NULL);
                     WPADWriteExtReg(chan, data, 1, 0xF1, callback);
-                    OSRestoreInterrupts(level);
+                    OSRestoreInterrupts(sendLevel);
                     return 0;
                 }
                 status = -2;
@@ -2459,14 +2469,14 @@ s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
             case 0x55:
                 status = WPADWriteExtReg(chan, data, 7, 0xF1, callback);
                 if (status == 0) {
-                    OSRestoreInterrupts(level);
+                    OSRestoreInterrupts(sendLevel);
                     return 0;
                 }
                 break;
             case 0:
                 status = WPADWriteExtReg(chan, data, 1, 0xF1, callback);
                 if (status == 0) {
-                    OSRestoreInterrupts(level);
+                    OSRestoreInterrupts(sendLevel);
                     return 0;
                 }
                 break;
@@ -2474,7 +2484,7 @@ s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
                 status = -2;
                 break;
             }
-            OSRestoreInterrupts(level);
+            OSRestoreInterrupts(sendLevel);
         }
     }
     if (callback != NULL) {
