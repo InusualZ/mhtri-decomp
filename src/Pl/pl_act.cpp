@@ -103,7 +103,7 @@
  *    r30, ours the mirror (playbook 22); `pl_item_now_usable_ck`: the frame is 0x30 against retail's 0x40 (unused locals);
  *  - `pl_target_lock_ck`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
  *    `Pl_bari_ck`: retail lays the first arm out of line and the second inline, the natural chain is the mirror;
- *  - `pl_kind_item_equip_find`/`fn_8027DFE4`/`fn_8027E06C`: one or two register or block choices around the id scans;
+ *  - `pl_kind_item_equip_find`/`pl_act_held_class_get`/`fn_8027E06C`: one or two register or block choices around the id scans;
  *  - `pl_weapon0_hit_feedback`: the self/quake callee-saved registers are swapped (r31/r30), every spelling tried;
  *  - `pl_weapon_parts_refresh`: the weapon pointer and the variant sit in r26/r29 where retail has r27/r27 (98.5 %);
  *  - `pl_input_pause_flag_set`: retail forms `Psw + pad * 0x350` with the index first; `equip_defense_get`,
@@ -9857,7 +9857,7 @@ extern "C" u16 pl_kind_item_equip_find(_PLW* self, s32 arg1) {
 }
 
 /* The act-number class of the held actor, as the handler's return code. */
-extern "C" s32 fn_8027DFE4(_PLW* self) {
+extern "C" s32 pl_act_held_class_get(_PLW* self) {
     switch (self->field_0x00A) {
     case 0:
         switch (self->act_no) {

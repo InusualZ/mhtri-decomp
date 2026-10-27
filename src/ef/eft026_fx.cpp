@@ -200,7 +200,7 @@ typedef struct _EFT26_RECCOL {
 
 extern "C" {
 void eft026_pl_spawn(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u32 joint, f32 scale);
-void fn_80117EFC(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, f32 scale);
+void eft026_ramp_place_set(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, f32 scale);
 _EFT* fn_80117FF8(u8 area, u8 kind);
 void fn_80118154(_EFT* self);
 void fn_801181D8(_EFT* self);
@@ -390,7 +390,7 @@ extern "C" void eft026_pl_spawn(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u
 
 /* The position/rotation setter: only the two ramping kinds (7 and 10) take it, every other kind is
  * destroyed again; the record's rot comes from the caller, the position from the vector. */
-extern "C" void fn_80117EFC(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, f32 scale)
+extern "C" void eft026_ramp_place_set(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, f32 scale)
 {
     _EFT* rec = fn_80117FF8(area, kind);
     _EFT26_WORK* work;

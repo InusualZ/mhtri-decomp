@@ -55,7 +55,7 @@ struct ShellSetFuncs {
     /* +0x74 */ void (*method_0x74)(struct _ENEMY_WORK* self, u32 kind, u32 joint, nw4r::math::VEC3* pos, f32 scale,
                                     u32 a, u16 b, ShellSetFuncs* table);
     /* +0x78 */ void (*method_0x78)(struct _PLW* self, u32 kind, ShellSetFuncs* table);  /* the slinger shell (`Pl/pl_act_step.cpp`) */
-    /* +0x7C */ u8 pad_0x7C[0x80 - 0x7C];
+    /* +0x7C */ void (*method_0x7C)(nw4r::math::VEC3* pos, u32* angle, u32 area, ShellSetFuncs* table);  /* the gimmick shot (`ef/eft053.cpp`) */
     /* +0x80 */ void (*method_0x80)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* table);
     /* +0x84 */ void (*method_0x84)(struct _ENEMY_WORK* self, u32 kind, nw4r::math::VEC3* pos, f32 scale, u32 id,
                                     ShellSetFuncs* table);
