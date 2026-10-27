@@ -1,39 +1,39 @@
 /* enemy/em_kind.cpp - the enemy program interpreter: the parameter interpreter `fn_8013BE60` and its per-action
  *   entries, the run driver `fn_8013F764`, the stream readers and command-length/stream-walk helpers, and the enemy
  *   file loader that `load_file_req` drives (`em_kind_release`).
- * RANGE. .text 0x8013BE60-0x801411B8 (123 functions); .data 0x805A19D0-0x805A1A80, .sdata2 0x80796D90-0x80796DC8,
- *   extab, extabindex.  The interpreter walks `prog_0xA00` (3-byte `EmProgTbl` entries) through the `emNNN_prog_tbl`
- *   array `em_prog_tbl_list` and the 0x6D-byte command-length table `lbl_805A1530`.
+ * RANGE. .text 0x8013BE60-0x801411B8 (123 functions, defined in address order); .data 0x805A19D0-0x805A1A80 (the
+ *   three jump tables of `fn_8013BE60`/`em_prog_partner_cond_ck`), .sdata2 0x80796D90-0x80796DC8 (the float pool,
+ *   emitted from literals), extab, extabindex.  The interpreter walks `prog_0xA00` (3-byte `EmProgTbl` entries)
+ *   through the `emNNN_prog_tbl` array `em_prog_tbl_list` and the 0x6D-byte command-length table `lbl_805A1530`.
  * NAMES. `em_kind_release` (0x80141050, the dump answers only `zz_`) and the static `em_prog_trace2` are GUESSES from
  *   their bodies, and the file name `em_kind` is a GUESS from `em_kind_release`; the other rows keep the map's `fn_`
  *   stems.
- *   GUESS (from each body and its callers): `enemy_data_by_team_get`.
- * RESIDUALS. 5 rows unwritten: 0x8013BE60-0x8013C244, 0x8013C57C-0x8013C794, 0x8013E528-0x8013E6F4,
- *   0x8013EFD4-0x8013F764.
- *  - `fn_8013D1D0`: retail computes `in[0]` into a scratch register and `in + 1` from the unmodified pointer, ours
- *    loads `in[0]` into r4 first;
- *  - `fn_8013D588`: retail tests the 16-bit angle difference as `abs((s16)diff)` (`clrlwi` + `cmplwi 0x8000` +
- *    `subf 0x10000`), ours as `extsh` + `cmpw`;
- *  - `fn_801408B4`: retail lowers the 7-way `field_0x95C` dispatch with a range test, ours as a compare chain
- *    (docs/enemy.md); `fn_80140B10`: only the tail branch differs (ours names `em_prog_trace2`, retail branches to a
- *    local label);
- *  - `fn_8013C7E0`: ours re-narrows the bytes it stores at +0x9F7/+0x9F8; `fn_8013C988`: both sides read +0x9F7 and
- *    +0x1E1, retail in that order (`cmplw r5,r0`), ours the other way (`cmplw r0,r5`); `fn_8013CAA0`: the argument setup is ordered differently;
- *  - `fn_8013D8C8`, `enemy_data_by_team_get`: the shared `return 0` is reached through a different branch layout;
- *    `fn_801409C8`: the same, and retail compares against a double (`lfd` + `fcmpo` + `cror`);
- *  - `fn_8014001C`: retail converts the two values as signed (`xoris 0x8000`), ours as unsigned;
- *    `fn_80140AF8`: ours masks the forwarded r5, retail passes it through; `fn_80140B20`: retail's word-copy loop
- *    stores before it loads;
- *  - `fn_80140778`: retail enters its loop through a `b` and allocates one register fewer;
- *  - `fn_8013D054`, `fn_8013F764`, `fn_8013FD98`, `fn_8014026C`, `fn_80140354`, `fn_801406E0`, `fn_80140CA0`,
- *    `fn_80140E48`, `fn_80140EE8`, `fn_80140FB0`, `em_kind_release`: register allocation.
- *   flipcheck: `.data` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim; row 36:
- *   `fn_80140B20` is force-active in retail and not in ours.
+ *   GUESS (from each body and its callers): `enemy_data_by_team_get`, `em_prog_route_start` (latches the route
+ *   program and sends the enemy to its first/last/nearest entry), `em_prog_partner_cond_ck` (command 0x4B, the tracked
+ *   partner's condition), `em_prog_sight_line_ck` (command 0x4C, `pl_coll_sweep_ck` between the enemy and its target),
+ *   and the `Pl/pl_act.cpp` callees `pl_act6_52_54_61_62_ck`/`pl_act6_class_ck` (registry proposals).
+ * RESIDUALS. Every row is written.
+ *  - `fn_8013BE60` (+16 B): the in-loop exits (`return result`) each reload the result where retail branches to one
+ *    shared `lha` (a goto shape, rule 8); this size difference shifts every later function, so it blocks a flip;
+ *  - `fn_80140778`: retail adds the recursive offset to `pos` before it sign-extends it for `in` and keeps one more
+ *    register free; `fn_8013C7E0`: retail narrows the first `em_area_next` answer into r30 and schedules the
+ *    `eft_slot_effect_key` narrowing later; `fn_8013D8C8`: retail ends the case-0 block with two branches;
+ *  - `fn_8013CAA0`: retail re-narrows the table byte it passes to `fn_8013AB74` (`clrlwi`);
+ *  - `fn_8013C57C`, `em_prog_partner_cond_ck`, `fn_8013D054`, `fn_8013FD98`, `fn_80140354`, `fn_801406E0`,
+ *    `fn_80140E48`, `fn_80140FB0`, `em_kind_release`: register allocation only;
+ *  - `fn_80140B10`: its bytes match; the map's row is 16 B because it covers `em_prog_trace2`'s `blr` too.
+ *   flipcheck: `.text` +4 B (`fn_8013BE60`), and `pl_act6_52_54_61_62_ck`/`pl_act6_class_ck` stay undefined until the
+ *   registry names land in the map.
+ *   `em_snd_proc_tbl` (.bss 0x806A7734) is not this unit's: it sits after `enemy/enemy_control.cpp`'s `.bss` and
+ *   `em_common.cpp`'s `em_hook_get` reads it too.
  * SHAPES. `#pragma peephole off` from the first interpreter body to the end of the file (back on around
- *   `fn_8013C7E0` and `fn_80140CA0`, measured per function) and `#pragma fp_contract off`
- *   up to the run driver (measured in docs/enemy.md); `em_prog_trace2` is a static empty helper so `fn_80140B10`
- *   branches past its own body; the 16 callees the folded sources declared differently are called through cast macros
- *   (`<name>_cN`, `<name>_viewN`) and the disagreeing header declarations are renamed away around their `#include`.
+ *   `fn_8013C7E0`, measured per function), `#pragma fp_contract off` up to the run driver (docs/enemy.md), and
+ *   `#pragma optimization_level 4` around `fn_8013BE60` and `fn_801408B4`: only level 4 lowers a two-value `switch`
+ *   range as `subi` + `cmplwi` (the same pragma regresses `fn_801406E0` and `em_kind_release`, so it is scoped);
+ *   `*in++` reads keep retail's pointer-increment order; `em_prog_trace2` is a static empty helper defined right after
+ *   `fn_80140B10` so its `b` lands on the next word; `fn_80140B20` is `__declspec(export)` (force-active in retail);
+ *   the 16 callees the folded sources declared differently are called through cast macros (`<name>_cN`,
+ *   `<name>_viewN`) and the disagreeing header declarations are renamed away around their `#include`.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -85,6 +85,21 @@
 #include "enemy/em_pop.h" /* quest_flag_100000_ck, quest_flag_10_ck (rule 2: their owner) */
 #include "ef/nw_res_manager.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
+#include "enemy/em_sight2_get.h" /* em_sight2_get (rule 2: the owner's leaf header) */
+#include "enemy/fn_80137604.h" /* em_move_work_pick (rule 2: the owner's header) */
+#include "enemy/em_pl_target_ck.h" /* em_pl_target_ck (rule 2: the owner's header) */
+#include "enemy/em_hit_mask_get.h" /* em_hit_mask_get (rule 2: the owner's header) */
+#include "enemy/em_act_trap_ck.h" /* em_ally_kind_ck (rule 2: the owner's header) */
+#include "enemy/fn_8012EC74.h" /* em_sleep_ck (rule 2: the owner's header) */
+#include "Pl/plw.h" /* _PLW (rule 1) */
+#include "Pl/pl_act.h" /* Pl_condition_ck, Pl_dm_condition_ck (rule 2) */
+#include "Pl/pl_act_no_eft_ck.h" /* pl_act_no_eft_ck (rule 2: the owner's leaf header) */
+#include "Pl/pl_act6_52_54_61_62_ck.h" /* pl_act6_52_54_61_62_ck (rule 2: the owner's leaf header) */
+#include "Pl/pl_act6_class_ck.h" /* pl_act6_class_ck (rule 2: the owner's leaf header) */
+#include "Pl/fn_8028F66C.h" /* pl_coll_sweep_ck (rule 2: the owner's header) */
+#include "ai/ainpc.h" /* _AINPC_W (rule 1) */
+#include "ai/ainpc_w.h" /* ainpc_w, owned by ai/ai_npc.cpp (rule 2) */
+#include "ai/ai_npc_motion_step_ck.h" /* ai_npc_motion_step_ck (rule 2: the owner's leaf header) */
 /* the call sites use the argument-less view: a cast call is the same direct call. */
 #define em_mot_finished_ck_c1 ((u32 (*)(void))em_mot_finished_ck)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -103,7 +118,7 @@
 #define fn_80140778_view1 ((s16 (*)(u8 *, u32, u32))fn_80140778)
 #define fn_801406E0_view1 ((u32 (*)(u32, u32))fn_801406E0)
 #define fn_8013C36C_view1 ((void (*)(_ENEMY_WORK*, u8, u8*))fn_8013C36C)
-#define fn_8013BDE4_view1 ((void (*)(u8**, u8, s16*))fn_8013BDE4)
+#define fn_8013BDE4_view1 ((s16 (*)(u8**, u8, s16*))fn_8013BDE4)
 #define fn_801321B0_view1 ((u32 (*)(_ENEMY_WORK*))em_flag_0x8AD_ck)
 #define fn_80130CDC_view1 ((void (*)(_ENEMY_WORK*, s32))em_stamina_add)
 #define fn_80130858_view1 ((void (*)(_ENEMY_WORK*, s32))em_anger_add)
@@ -163,7 +178,7 @@ extern "C" {
 /* --------------------------------------------------------------------------------------------- */
 /* The generic parameter interpreter and its two-argument tail. */
 /* --------------------------------------------------------------------------------------------- */
-s16 fn_8013BE60(_ENEMY_WORK *self, u8 *in, u32 id, u32 sub, s16 value);
+s16 fn_8013BE60(_ENEMY_WORK *self, u8 *in, u8 id, u8 sub, s16 value);
 void fn_8013C36C(_ENEMY_WORK *self, u8 value, u32 param);
 }
 
@@ -207,14 +222,10 @@ extern u32 eft_slot_shape_hit_ck(void *a, u8 b, Vec3 *c, f32 d);
 u32 PlayMode_ck(void);
 
 extern "C" {
-extern f32 lbl_80796DA0; /* 0.0f */
-extern f32 lbl_80796DA4; /* 0.5f */
-extern f32 lbl_80796DA8; /* 65536.0f */
-extern f32 lbl_80796DAC; /* 6.2831855f */
 extern f32 sqrt_f32(f32 x);
 extern f32 atan2f(f32 y, f32 x);
 /* `eft_slot_effect_key` (0x8034539C): its owner's header, `ef/eft_slot.h` (rule 2). */
-extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u32 flag);
+extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u8 flag);
 extern void get_worldlocal_pos(Vec3 *out, Vec3 *in, u32 idx);
 extern f32 stg_area_ceiling_get(u32 idx);
 }
@@ -229,8 +240,8 @@ typedef struct _ENEMY_OTHER {
     /* +0x007 */ u8 pad_0x07;
 } _ENEMY_OTHER;
 
-/* Data the range loads, declared and never defined (playbook 29): the file tables are `draw_shape.cpp`'s `.data`,
- * the `.sdata2` words this unit's own pool, `system_w` is `mh3_pad.cpp`'s `.bss`. */
+/* Data the range loads and other units own: the file tables are `draw_shape.cpp`'s `.data`, `system_w` is
+ * `mh3_pad.cpp`'s `.bss`. */
 
 /* the 0x6D-byte command-length table `fn_801406E0` reads */
 /* the `em001_prog_tbl`..`em040_prog_tbl` pointer array, NULL-terminated (`fn_80140B20` arms it) */
@@ -238,10 +249,6 @@ typedef struct _ENEMY_OTHER {
 /* the two `{key, name}` file tables `em_kind_release` walks */
 extern EmFileEntry lbl_80581E20[];
 extern EmFileEntry lbl_80582348[];
-/* the `.sdata2` pool the range's float work reads */
-extern f32 lbl_80796DBC;
-extern f32 lbl_80796DC0;
-extern f32 lbl_80796DC4;
 /* the row base `fn_80140CA0` indexes with `res_mem_index_get`'s answer */
 /* the system work record `enemy_data_by_team_get` looks its extra table up in */
 extern u8 system_w[];
@@ -327,21 +334,20 @@ extern "C" {
 u8 fn_801406E0(u32 code, u32 sub);
 u8 fn_80140768(u8* in);
 s16 fn_80140778(u8* in, u8 code, u8 mode);
-void fn_80140AF8(_ENEMY_WORK* self, u32 a, u8 b);
-void fn_80140B0C(u8 a, u8 b, u8 c);
+void fn_80140AF8(_ENEMY_WORK* self, u32 a, u32 b);
+void fn_80140B0C(u8 a, u32 b, u8 c);
 void em_res_file_row_copy(EmFileRow* dst, EmFileRow* src);
 s32 fn_80140E48(char* name, u32 size, u8 flag);
-void fn_80140EE8(char* name, u32 size, u32 a, u32 b, u32 c, u32* ctx);
+void fn_80140EE8(char* name, u32 data, u32 size, u32* ctx);
 s32 fn_80140FB0(char* name, u32 size, u8 flag);
 void fn_8013F994(_ENEMY_WORK* self);
 
 /* the parameter interpreter (0x8013BE60) and its two-argument tail */
-s16 fn_8013BE60(_ENEMY_WORK* self, u8* in, u32 id, u32 sub, s16 value);
+s16 fn_8013BE60(_ENEMY_WORK* self, u8* in, u8 id, u8 sub, s16 value);
 void fn_8013C244(_ENEMY_WORK* self, u8* in, u32 id);
 
 /* the enemy band's other units */
 void fn_8013AA00(_ENEMY_WORK* self);
-u32 pl_act_grabbed_ck(EmAreaWork* rec);
 u32 stg_area_flag_index_ck(u8 id);
 char* em_res_buffer_alloc(u8 id);
 void em_res_peer_count_dec(s32 id);
@@ -371,679 +377,180 @@ s32 res_file_get_res_mdl(void* a, u32 b);
 extern "C" void fn_801409C8(_ENEMY_WORK* self);
 extern "C" void fn_80140B10(u32 unused, u32 a, u32 b);
 
-/* The empty static helper `fn_80140B10` branches to (its `blr` sits 4 bytes after that function's); `fn_80140AF8`
- * reaches the same shape through the global `fn_80140B0C`. */
-static void em_prog_trace2(u8 a, u32 b) {
+static void em_prog_trace2(u8 a, u32 b);
 }
-}
-
-#pragma fp_contract off
-#pragma peephole off
 
 extern "C" {
+#pragma fp_contract off
+#pragma peephole off
+#pragma optimization_level 4
+/* Runs the parameter-test command `id`: sub-command `sub` compares each record's value against `value` (a
+ * distance in the distance modes) and jumps to the first record that passes. */
+s16 fn_8013BE60(_ENEMY_WORK* self, u8* in, u8 id, u8 sub, s16 value) {
+    s16 result;
+    f32 dist;
+    f32 limit;
+    s16 cur;
+    s16 count;
+    f32* sight;
+    s32 found;
+    Vec3 point;
+    u8 len;
+
+    dist = -1.0f;
+    limit = dist;
+    result = 0;
+    cur = 0;
+    count = 0;
+    sight = 0;
+    found = 0;
+    VEC3_ctor(&point);
+    len = fn_801406E0(id, in[0]);
+    switch (in[0]) {
+    case 0:
+        in += len;
+        switch (sub) {
+        case 4:
+            sight = em_sight2_get(self);
+        case 5:
+            dist = vec3_distance(&self->pos, &self->vec_0x36C);
+            break;
+        case 6:
+            dist = vec3_distance(&self->pos, &self->aim);
+            break;
+        case 7:
+            em_data_point_get(self, value, &point);
+            dist = calcVecDistXZ(&self->pos, &point);
+            break;
+        case 12:
+            sight = em_sight2_get(self);
+        case 13:
+            dist = calcVecDistXZ(&self->pos, &self->vec_0x36C);
+            break;
+        case 14:
+            dist = calcVecDistXZ(&self->pos, &self->aim);
+            break;
+        }
+        for (;;) {
+            s16 step = fn_8013BDE4_view1(&in, id, &result);
+            if (in[0] == id) {
+                switch (in[1]) {
+                case 1: {
+                    s16 x = in[2];
+                    switch (sub) {
+                    default:
+                        cur = x;
+                        break;
+                    case 1:
+                        cur += x;
+                        break;
+                    case 4:
+                    case 12:
+                        limit = sight[x];
+                        break;
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 13:
+                    case 14:
+                        limit = x * 100;
+                        break;
+                    case 8:
+                        cur = (s16)((x + 64) & 0xFF);
+                        break;
+                    case 10:
+                        cur = count++;
+                        break;
+                    }
+                    break;
+                }
+                case 2:
+                case 255:
+                    switch (sub) {
+                    case 11:
+                        if (self->field_0x9F6 == 255) {
+                            return -1;
+                        }
+                        break;
+                    }
+                    return result;
+                default:
+                    fn_80140AF8(self, 0, 0);
+                    return result;
+                }
+                in += step;
+            } else {
+                fn_80140AF8(self, 0, 0);
+                return result;
+            }
+            switch (sub) {
+            default:
+                if (cur == value) {
+                    found = 1;
+                }
+                break;
+            case 1:
+            case 3:
+            case 8:
+                if (cur > value) {
+                    found = 1;
+                }
+                break;
+            case 2:
+                if (cur >= value) {
+                    found = 1;
+                }
+                break;
+            case 4:
+            case 5:
+            case 6:
+            case 7:
+            case 12:
+            case 13:
+            case 14:
+                if (limit >= dist) {
+                    found = 1;
+                }
+                break;
+            case 9:
+                if (cur & value) {
+                    found = 1;
+                }
+                break;
+            case 11:
+                if (cur == self->field_0x9F6) {
+                    found = 1;
+                }
+                break;
+            case 15:
+                if (fn_80125FF0_c1(value, cur) == 1) {
+                    found = 1;
+                }
+                break;
+            }
+            if (found != 0) {
+                break;
+            }
+        }
+        break;
+    case 1:
+    case 2:
+        in += len;
+        result = fn_80140778(in, id, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+#pragma optimization_level 3
 /* The two-argument tail: sub-command 0 and a value of 0. */
 void fn_8013C244(_ENEMY_WORK *self, u8 *in, u32 id) {
     fn_8013BE60(self, in, (u8)id, 0, 0);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-/* Byte-set entries: a one-byte record copied straight into the work record. */
-/* --------------------------------------------------------------------------------------------- */
-void fn_8013C97C(_ENEMY_WORK *self, u8 *in) {
-    self->state_0x9F9 = in[0];
-}
-
-void fn_8013E05C(_ENEMY_WORK *self, u8 *in) {
-    self->state_0x95F = in[0];
-}
-
-void fn_8013E9C8(_ENEMY_WORK *self, u8 *in) {
-    self->state_0x960 = in[0];
-}
-
-void fn_8013D684(_ENEMY_WORK *self, u8 *in) {
-    self->timer_0x424 = in[0] * 100;
-}
-
-void fn_8013E6F4(_ENEMY_WORK *self) {
-    self->value_0x452 = 0;
-}
-
-void fn_8013DED4(_ENEMY_WORK *self, u8 *in) {
-    self->field_0x1BC = in[0] << 8;
-    self->field_0x1C0 = in[1] << 8;
-    self->field_0x1C4 = in[2] << 8;
-}
-
-/* --------------------------------------------------------------------------------------------- */
-/* Two-argument parameter entries: `in[0] == 0` applies the value, anything else re-sends the id. */
-/* --------------------------------------------------------------------------------------------- */
-void fn_8013CBE4(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 7, 0, self->area_no);
-    } else {
-        fn_8013C244(self, in, 7);
-    }
-}
-
-void fn_8013CC0C(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 8, 0, self->field_0x43B);
-    } else {
-        fn_8013C244(self, in, 8);
-    }
-}
-
-void fn_8013CC34(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 9, 0, self->field_0x43C);
-    } else {
-        fn_8013C244(self, in, 9);
-    }
-}
-
-void fn_8013CC5C(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 10, 0, self->field_0x43D);
-    } else {
-        fn_8013C244(self, in, 10);
-    }
-}
-
-void fn_8013CC84(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 11, 4, 0);
-    } else {
-        fn_8013C244(self, in, 11);
-    }
-}
-
-void fn_8013CCA8(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 12, 0, self->field_0x1E2);
-    } else {
-        fn_8013C244(self, in, 12);
-    }
-}
-
-void fn_8013D2C8(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 22, 5, 0);
-    } else {
-        fn_8013C244(self, in, 22);
-    }
-}
-
-void fn_8013D2EC(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 23, 6, 0);
-    } else {
-        fn_8013C244(self, in, 23);
-    }
-}
-
-void fn_8013D310(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 24, 7, (s16)(u16)(((self->area_no & 0xF) << 8) | in[1]));
-    } else {
-        fn_8013C244(self, in, 24);
-    }
-}
-
-void fn_8013D990(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 35, 0, self->field_0x00C);
-    } else {
-        fn_8013C244(self, in, 35);
-    }
-}
-
-void fn_8013DE08(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 41, 0, self->field_0x00A);
-    } else {
-        fn_8013C244(self, in, 41);
-    }
-}
-
-void fn_8013DE30(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 68, 9, self->field_0x00A);
-    } else {
-        fn_8013C244(self, in, 68);
-    }
-}
-
-void fn_8013DE58(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 42, 15, self->field_0x1E0);
-    } else {
-        fn_8013C244(self, in, 42);
-    }
-}
-
-void fn_8013E9D4(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 61, 0, self->state_0x960);
-    } else {
-        fn_8013C244(self, in, 61);
-    }
-}
-
-void fn_8013EBA0(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 64, 0, self->field_0x1FE);
-    } else {
-        fn_8013C244(self, in, 64);
-    }
-}
-
-void fn_8013EF14(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 70, 0, self->team);
-    } else {
-        fn_8013C244(self, in, 70);
-    }
-}
-
-void fn_8013EF3C(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 71, 0, self->field_0x1E3);
-    } else {
-        fn_8013C244(self, in, 71);
-    }
-}
-
-void fn_8013EF64(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 73, 0, self->field_0x9F7);
-    } else {
-        fn_8013C244(self, in, 73);
-    }
-}
-
-void fn_8013EF8C(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 74, 1, self->field_0x1F2 % 100);
-    } else {
-        fn_8013C244(self, in, 74);
-    }
-}
-
-/* A three-argument entry: the caller supplies a value whose low 16 bits are reduced modulo 100. */
-void fn_8013C794(_ENEMY_WORK *self, u8 *in, u32 value) {
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 2, 1, (u16)value % 100);
-    } else {
-        fn_8013C244(self, in, 2);
-    }
-}
-
-/* Forwards the stream one byte in and the first byte as the value. */
-void fn_8013D1D0(_ENEMY_WORK *self, u8 *in) {
-    u8 value = in[0];
-
-    fn_8013C36C(self, value, (u32)(in + 1));
-}
-
-/* --------------------------------------------------------------------------------------------- */
-/* The stream readers: `switch (in[0])` over the command byte, each case advancing the stream
- * through `fn_801406E0`/`fn_8013BDE4` and reporting a `s16` back through the stack slot. */
-/* --------------------------------------------------------------------------------------------- */
-s16 fn_8013CCD0(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C) == 0) {
-            in += (u8)fn_801406E0_view1(14, in[0]);
-            fn_8013BDE4(&in, 14, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(14, in[0]);
-        result = fn_80140778_view1(in, 14, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013CEB0(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (self->field_0x382 == 255) {
-            in += (u8)fn_801406E0_view1(17, in[0]);
-            fn_8013BDE4(&in, 17, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(17, in[0]);
-        result = fn_80140778_view1(in, 17, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013D4C4(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (em_alt_mode_ck(self) == 0) {
-            in += (u8)fn_801406E0_view1(28, in[0]);
-            fn_8013BDE4(&in, 28, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(28, in[0]);
-        result = fn_80140778_view1(in, 28, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013D694(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (self->value_0x44C > 0) {
-            in += (u8)fn_801406E0_view1(31, in[0]);
-            fn_8013BDE4(&in, 31, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(31, in[0]);
-        result = fn_80140778_view1(in, 31, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013D80C(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (self->field_0x916 <= 0) {
-            in += (u8)fn_801406E0_view1(33, in[0]);
-            fn_8013BDE4(&in, 33, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(33, in[0]);
-        result = fn_80140778_view1(in, 33, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013D9B8(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (em_eft_active_ck(self) == 0) {
-            in += (u8)fn_801406E0_view1(36, in[0]);
-            fn_8013BDE4(&in, 36, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(36, in[0]);
-        result = fn_80140778_view1(in, 36, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013DA7C(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0: {
-        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
-        if (data == 0 || data->mode_0x14 != self->area_no) {
-            in += (u8)fn_801406E0_view1(37, in[0]);
-            fn_8013BDE4(&in, 37, &result);
-        }
-        break;
-    }
-    case 2:
-        in += (u8)fn_801406E0_view1(37, in[0]);
-        result = fn_80140778_view1(in, 37, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013DC58(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0: {
-        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
-        if (data == 0 || data->mode_0x17 == 255) {
-            in += (u8)fn_801406E0_view1(39, in[0]);
-            fn_8013BDE4(&in, 39, &result);
-        }
-        break;
-    }
-    case 2:
-        in += (u8)fn_801406E0_view1(39, in[0]);
-        result = fn_80140778_view1(in, 39, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013DD48(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if ((self->field_0x1C8 & 0x8) == 0) {
-            in += (u8)fn_801406E0_view1(40, in[0]);
-            fn_8013BDE4(&in, 40, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(40, in[0]);
-        result = fn_80140778_view1(in, 40, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013DF78(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if ((u16)(calcVecAng2(&self->pos, &self->vec_0x36C) -
-                  self->field_0x1C0) >= 0x8000) {
-            in += (u8)fn_801406E0_view1(46, in[0]);
-            fn_8013BDE4(&in, 46, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(46, in[0]);
-        result = fn_80140778_view1(in, 46, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013E180(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0: {
-        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
-        in += (u8)fn_801406E0_view1(50, in[0]);
-        if (data == 0) {
-            fn_80140AF8_view1(self, 8, 50);
-            fn_8013BDE4(&in, 50, &result);
-        } else if (eft_slot_shape_hit_ck(data, data->field_0x36, &self->pos, lbl_80796DA0) == 0) {
-            fn_8013BDE4(&in, 50, &result);
-        }
-        break;
-    }
-    case 2:
-        in += (u8)fn_801406E0_view1(50, in[0]);
-        result = fn_80140778_view1(in, 50, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013E388(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (self->value_0x452 < (s16)(in[2] * 30 + in[1] * 1800)) {
-            in += (u8)fn_801406E0_view1(52, in[0]);
-            fn_8013BDE4(&in, 52, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(52, in[0]);
-        result = fn_80140778_view1(in, 52, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013E464(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (em_mot_finished_ck_c1() == 0) {
-            in += (u8)fn_801406E0_view1(53, in[0]);
-            fn_8013BDE4(&in, 53, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(53, in[0]);
-        result = fn_80140778_view1(in, 53, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013E700(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (self->value_0x452 < self->value_0x44E) {
-            in += (u8)fn_801406E0_view1(56, in[0]);
-            fn_8013BDE4(&in, 56, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(56, in[0]);
-        result = fn_80140778_view1(in, 56, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-/* --------------------------------------------------------------------------------------------- */
-/* The stream readers: `switch (in[0])` over the command byte, each case advancing the stream
- * through `fn_801406E0`/`fn_8013BDE4` and reporting a `s16` back through the stack slot. */
-/* --------------------------------------------------------------------------------------------- */
-s16 fn_8013E900(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if ((u8)PlayMode_ck() != 2) {
-            in += (u8)fn_801406E0_view1(59, in[0]);
-            fn_8013BDE4(&in, 59, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(59, in[0]);
-        result = fn_80140778_view1(in, 59, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013EAE4(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (self->field_0x1FC == 0) {
-            in += (u8)fn_801406E0_view1(63, in[0]);
-            fn_8013BDE4(&in, 63, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(63, in[0]);
-        result = fn_80140778_view1(in, 63, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013EBC8(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (self->field_0x8A2 > in[1] * 10 && em_eft_active_ck(self) == 0) {
-            in += (u8)fn_801406E0_view1(65, in[0]);
-            fn_8013BDE4(&in, 65, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(65, in[0]);
-        result = fn_80140778_view1(in, 65, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013ECA4(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (em_flag_0x8AC_ck() == 0) {
-            in += (u8)fn_801406E0_view1(66, in[0]);
-            fn_8013BDE4(&in, 66, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(66, in[0]);
-        result = fn_80140778_view1(in, 66, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-s16 fn_8013ED68(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if (fn_80131BD4_c1() == 0) {
-            in += (u8)fn_801406E0_view1(67, in[0]);
-            fn_8013BDE4(&in, 67, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(67, in[0]);
-        result = fn_80140778_view1(in, 67, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-/* Forwards its arguments to the second parameter interpreter. */
-void fn_8013E068(_ENEMY_WORK *self, u8 *in, u32 id, u32 sub, s32 value) {
-    fn_801409C8_view1(self, in, id, sub, value);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1149,11 +656,98 @@ void fn_8013C458(_ENEMY_WORK *self, u8 *in) {
     em_act_step_arm(self, value, sub, 0);
 }
 
+/* Requests the reaction `in[0..2]` unless, with `flag` 1, the partner kind it names already holds the enemy's
+ * attention; then re-aims the enemy. */
+void fn_8013C57C(_ENEMY_WORK* self, u8* in, u8 flag) {
+    u8 kind;
+    u8 mode;
+    u8 arg;
+    u32 kind_ok = 0;
+    s32 held = 0;
+
+    kind = in[0];
+    mode = in[1];
+    arg = in[2];
+
+    if (flag == 1) {
+        switch (kind) {
+        case 0: {
+            s32 partner = self->field_0x380;
+            if (partner >= 1 && partner <= 2) {
+                kind_ok = 1;
+            }
+            break;
+        }
+        case 1:
+            if ((s32)self->field_0x380 == 1) {
+                kind_ok = 1;
+            }
+            break;
+        case 2:
+            if ((s32)self->field_0x380 == 2) {
+                kind_ok = 1;
+            }
+            break;
+        case 3:
+            if ((s32)self->field_0x380 == 3) {
+                kind_ok = 1;
+            }
+            break;
+        case 4: {
+            s32 partner = self->field_0x380;
+            if (partner >= 1 && partner <= 3) {
+                kind_ok = 1;
+            }
+            break;
+        }
+        }
+        if (kind_ok == 1 && mode != 2 && self->state_0x381 != 255 && self->field_0x382 != 255) {
+            switch (self->field_0x380) {
+            case 1: {
+                _PLW* pl = (_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382);
+                if (pl->slot_active != 0 && (u32)em_pl_target_ck(self, pl) == 1) {
+                    held = 1;
+                }
+                break;
+            }
+            case 2: {
+                _AINPC_W* npc = &ainpc_w;
+                if (npc->active != 0 && self->area_no == npc->field_0x1A4) {
+                    held = 1;
+                }
+                break;
+            }
+            case 3: {
+                _ENEMY_WORK* other = (_ENEMY_WORK*)get_move_work_adrs(3) + self->field_0x382;
+                if (other->active != 0 && self->area_no == other->area_no && self->team != other->team &&
+                    (u32)em_ally_kind_ck(self, other->team) == 1 && other->action != 11 && other->action != 12) {
+                    held = 1;
+                }
+                break;
+            }
+            }
+        }
+    }
+    if (held == 0) {
+        em_reaction_req(self, kind, mode, arg);
+    }
+    em_target_pos_set(self, 0);
+}
+
+/* A three-argument entry: the caller supplies a value whose low 16 bits are reduced modulo 100. */
+void fn_8013C794(_ENEMY_WORK *self, u8 *in, u32 value) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 2, 1, (u16)value % 100);
+    } else {
+        fn_8013C244(self, in, 2);
+    }
+}
+
+#pragma peephole on
 /* --------------------------------------------------------------------------------------------- */
 /* The remaining action entries. */
 /* --------------------------------------------------------------------------------------------- */
 
-#pragma peephole on
 /* Recomputes the current action's parameter ids from the type byte and the preset byte. */
 void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
     switch (in[0]) {
@@ -1218,275 +812,11 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
 }
 
 #pragma peephole off
-/* Copies the position the record aims at into the aim vector. */
-void fn_8013D41C(_ENEMY_WORK *self, u8 *in) {
-    switch (in[0]) {
-    case 0:
-        copyVec3(&self->aim, &self->pos);
-        break;
-    case 1:
-        copyVec3(&self->aim, &self->vec_0x36C);
-        break;
-    default:
-        fn_80140AF8_view1(self, 9, 0);
-        break;
-    }
-}
-
-/* Sets the aim timer and the motion blend from a parameter record, then re-runs the movement entry. */
-void fn_8013D45C(_ENEMY_WORK *self, u8 *in, u32 flag) {
-    self->field_0x383 = 1;
-    self->field_0x384 = (f32)(in[3] * 100);
-    if (in[4] == 1) {
-        self->field_0x383 |= 0x80;
-    }
-    fn_8013C57C(self, in, (u8)flag);
-}
-
-/* True while the difference between the stored facing and the vector to the target is greater than the
- * tolerance the record carries. */
-void fn_8013D588(_ENEMY_WORK *self, u8 *in, u32 unused) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        if ((s16)(calcVecAng2(&self->pos, &self->vec_0x36C) -
-                  self->field_0x1C0) > in[1] * 256) {
-            in += (u8)fn_801406E0_view1(29, in[0]);
-            fn_8013BDE4(&in, 29, &result);
-        }
-        break;
-    case 2:
-        in += (u8)fn_801406E0_view1(29, in[0]);
-        result = fn_80140778_view1(in, 29, 1);
-        break;
-    case 255:
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-}
-
-/* Queues a sub-action pointer for the movement entry, or re-seeds the current action when the queue
- * is already occupied. */
-void fn_8013D750(_ENEMY_WORK *self, u8 *in) {
-    u8 value = in[0];
-    u8 *next = in + 1;
-
-    if (self->field_0x95C != 0) {
-        fn_80140AF8_view1(self, 10, self->field_0x95C);
-        self->field_0x958 = (u32)next;
-    } else {
-        if (self->state_0x962 >= 10) {
-            fn_80140AF8_view1(self, 11, 0);
-            self->state_0x962--;
-        }
-        self->bytes_0x963[self->state_0x962] = self->field_0x95D;
-        self->values_0x970[self->state_0x962] = (u32)next;
-        self->state_0x962++;
-        fn_8013AB74(self, 0, value);
-    }
-}
-
-/* Sends the parameter's remainder modulo the record's step count. */
-void fn_8013D8C8(_ENEMY_WORK *self, u8 *in, u32 param) {
-    if (in[0] == 0) {
-        if (fn_8013BE60(self, in, 34, 11, 1) >= 0) {
-            return;
-        }
-        {
-            u8 *next = in + (u8)fn_801406E0_view1(34, in[0]);
-            s16 step = fn_80140778_view1(next, 34, 2);
-
-            fn_8013BE60(self, in, 34, 10, (s16)((u16)param % step));
-        }
-        return;
-    }
-    fn_8013C244(self, in, 34);
-}
-
-/* Moves the converted target position into the record's position and remembers the old one. */
-void fn_8013DE80(_ENEMY_WORK *self, u8 *in) {
-    em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &self->pos);
-    copyVec3(&self->prev_pos, &self->pos);
-}
-
-/* Rebuilds the aim vector from a parameter record and stores the facing angle and zero offsets. */
-void fn_8013DEFC(_ENEMY_WORK *self, u8 *in) {
-    Vec3 v;
-
-    VEC3_ctor(&v);
-    em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &v);
-    self->field_0x1BC = 0;
-    self->field_0x1C0 = calcVecAng2(&self->pos, &v);
-    self->field_0x1C4 = 0;
-}
-
-/* Sends the horizontal bearing to the target as a byte-scaled angle. */
-void fn_8013E2B0(_ENEMY_WORK *self, u8 *in) {
-    if (in[0] == 0) {
-        f32 dx = self->vec_0x36C.x - self->pos.x;
-        f32 dz = self->vec_0x36C.z - self->pos.z;
-        f32 dist = sqrt_f32(dx * dx + dz * dz);
-        f32 angle = atan2f(-(self->vec_0x36C.y - self->pos.y), dist);
-        u16 raw = (u16)(s32)(lbl_80796DA8 * angle / lbl_80796DAC + lbl_80796DA4);
-
-        fn_8013BE60(self, in, 51, 8, (s16)(u8)(((s32)raw >> 8) + 64));
-    } else {
-        fn_8013C244(self, in, 51);
-    }
-}
-
-/* Starts, advances and retires a repeated parameter record; returns -1 while one is still active. */
-s16 fn_8013E06C(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-
-    switch (in[0]) {
-    case 0:
-        self->state_0x9F4 = in[1];
-        self->state_0x9F5 = in[2];
-        self->ptr_0x9F0 = (u32)(in + 3);
-        break;
-    case 3:
-        self->state_0x9F4 = 255;
-        in += (u8)fn_801406E0_view1(49, in[0]);
-        result = fn_80140778_view1(in, 49, 1);
-        break;
-    case 255:
-        switch (self->state_0x9F4) {
-        default:
-            fn_80140AF8_view1(self, 14, self->state_0x9F4);
-            break;
-        case 0:
-            result = -1;
-            self->field_0x958 = self->ptr_0x9F0;
-            break;
-        case 1:
-            self->state_0x9F5--;
-            if (self->state_0x9F5 != 0) {
-                result = -1;
-                self->field_0x958 = self->ptr_0x9F0;
-            }
-            break;
-        case 255:
-            break;
-        }
-        break;
-    default:
-        fn_80140AF8_view1(self, 0, 0);
-        break;
-    }
-    return result;
-}
-
-/* Reads the data record's action field or, when there is none, the record's own parsed value. */
-s16 fn_8013E9FC(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
-                                                   self->field_0x46C);
-
-    if (data == 0) {
-        fn_80140AF8_view1(self, 8, 62);
-        if (in[0] <= 2) {
-            in += (u8)fn_801406E0_view1(62, in[0]);
-            result = fn_80140778_view1(in, 62, 1);
-        }
-        return result;
-    }
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 62, 0, data->field_0x0B);
-    } else {
-        fn_8013C244(self, in, 62);
-    }
-}
-
-/* Same reader as `fn_8013E9FC`, for the action id 69 and the data record's +0x0D field. */
-s16 fn_8013EE2C(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
-                                                   self->field_0x46C);
-
-    if (data == 0) {
-        fn_80140AF8_view1(self, 8, 18);
-        if (in[0] <= 2) {
-            in += (u8)fn_801406E0_view1(69, in[0]);
-            result = fn_80140778_view1(in, 69, 1);
-        }
-        return result;
-    }
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 69, 2, data->field_0x0D);
-    } else {
-        fn_8013C244(self, in, 69);
-    }
-}
-
-/* Same reader as `fn_8013E9FC`, for the action id 38 and the data record's +0x08 field. */
-s16 fn_8013DB70(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
-                                                   self->field_0x46C);
-
-    if (data == 0) {
-        fn_80140AF8_view1(self, 8, 38);
-        if (in[0] <= 2) {
-            in += (u8)fn_801406E0_view1(38, in[0]);
-            result = fn_80140778_view1(in, 38, 1);
-        }
-        return result;
-    }
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 38, 0, data->field_0x08);
-    } else {
-        fn_8013C244(self, in, 38);
-    }
-}
-
-/* Same reader as `fn_8013E9FC`, for the action id 21 and the data record's +0x0F field. */
-s16 fn_8013D1E0(_ENEMY_WORK *self, u8 *in) {
-    s16 result = 0;
-    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
-                                                   self->field_0x46C);
-
-    if (data == 0) {
-        fn_80140AF8_view1(self, 8, 21);
-        if (in[0] <= 2) {
-            in += (u8)fn_801406E0_view1(21, in[0]);
-            result = fn_80140778_view1(in, 21, 1);
-        }
-        return result;
-    }
-    if (in[0] == 0) {
-        fn_8013BE60(self, in, 21, 0, data->mode_0x0F);
-    } else {
-        fn_8013C244(self, in, 21);
-    }
-}
-
-/* Selects the combat sub-command the data record's mode byte names. */
-void fn_8013D34C(_ENEMY_WORK *self) {
-    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
-                                                   self->field_0x46C);
-
-    if (data == 0) {
-        fn_80140AF8_view1(self, 8, 25);
-        return;
-    }
-    switch (data->mode_0x0F) {
-    case 0:
-        em_reaction_req(self, 1, 2, data->value_0x10);
-        break;
-    case 1:
-        em_reaction_req(self, 2, 2, data->value_0x10);
-        break;
-    case 2:
-        em_reaction_req(self, 3, 2, data->value_0x10);
-        break;
-    default:
-        break;
-    }
-    em_target_pos_set(self, 0);
+/* --------------------------------------------------------------------------------------------- */
+/* Byte-set entries: a one-byte record copied straight into the work record. */
+/* --------------------------------------------------------------------------------------------- */
+void fn_8013C97C(_ENEMY_WORK *self, u8 *in) {
+    self->state_0x9F9 = in[0];
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1512,7 +842,7 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
         }
         break;
     case 255:
-        if (self->field_0x9F7 != self->area_no && self->field_0x9F7 != 255) {
+        if (self->area_no != self->field_0x9F7 && self->field_0x9F7 != 255) {
             get_worldworld_pos_out(&c, &self->pos, self->area_no);
             copyVec3(&a, &c);
             get_worldlocal_pos(&d, &a, self->field_0x9F7);
@@ -1530,21 +860,17 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
 
 /* Starts a repeated parameter record and restores the action pair when it cannot be served. */
 void fn_8013CAA0(_ENEMY_WORK *self, u8 *in) {
-    u32 value;
 
     self->state_0x999 = 0;
     self->recs_0x9A4 = 0;
-    self->state_0x998 = in[0];
-    self->field_0x99A = in[1];
+    self->state_0x998 = *in++;
+    self->field_0x99A = *in++;
     self->state_0x99C = self->field_0x95C;
     self->state_0x99D = self->field_0x95D;
-    self->ptr_0x9A0 = (u32)(in + 2);
+    self->ptr_0x9A0 = (u32)in;
     if (fn_8013A884(self, self->field_0x95C) == 1) {
         em_reaction_req(self, 8, self->state_0x998, 255);
-        if (self->recs_0x9A4 != 0) {
-            value = ((_ENEMY_TABLE *)self->recs_0x9A4)->entries[self->field_0x382].value_0x08;
-        }
-        if (fn_8013AB74(self, 2, (u8)value) == 1) {
+        if (fn_8013AB74(self, 2, self->recs_0x9A4 != 0 ? ((_ENEMY_TABLE *)self->recs_0x9A4)->entries[self->field_0x382].value_0x08 : 0) == 1) {
             em_target_pos_set(self, 0);
             if (self->recs_0x9A4 != 0 &&
                 (u32)((*(u8 *)self->recs_0x9A4) - 252) > 3) {
@@ -1562,6 +888,84 @@ void fn_8013CAA0(_ENEMY_WORK *self, u8 *in) {
     self->field_0x95C = self->state_0x99C;
     self->field_0x95D = self->state_0x99D;
     self->field_0x958 = self->ptr_0x9A0;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* Two-argument parameter entries: `in[0] == 0` applies the value, anything else re-sends the id. */
+/* --------------------------------------------------------------------------------------------- */
+void fn_8013CBE4(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 7, 0, self->area_no);
+    } else {
+        fn_8013C244(self, in, 7);
+    }
+}
+
+void fn_8013CC0C(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 8, 0, self->field_0x43B);
+    } else {
+        fn_8013C244(self, in, 8);
+    }
+}
+
+void fn_8013CC34(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 9, 0, self->field_0x43C);
+    } else {
+        fn_8013C244(self, in, 9);
+    }
+}
+
+void fn_8013CC5C(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 10, 0, self->field_0x43D);
+    } else {
+        fn_8013C244(self, in, 10);
+    }
+}
+
+void fn_8013CC84(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 11, 4, 0);
+    } else {
+        fn_8013C244(self, in, 11);
+    }
+}
+
+void fn_8013CCA8(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 12, 0, self->field_0x1E2);
+    } else {
+        fn_8013C244(self, in, 12);
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* The stream readers: `switch (in[0])` over the command byte, each case advancing the stream
+ * through `fn_801406E0`/`fn_8013BDE4` and reporting a `s16` back through the stack slot. */
+/* --------------------------------------------------------------------------------------------- */
+s16 fn_8013CCD0(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C) == 0) {
+            in += (u8)fn_801406E0_view1(14, in[0]);
+            fn_8013BDE4(&in, 14, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(14, in[0]);
+        result = fn_80140778_view1(in, 14, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
 }
 
 /* Applies a motion blend record and asks the movement entry for the blended piece. */
@@ -1584,6 +988,29 @@ void fn_8013CDB4(_ENEMY_WORK *self, u8 *in) {
     }
     em_target_pos_set(self, 0);
     self->field_0x1E7 = in[0];
+}
+
+s16 fn_8013CEB0(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (self->field_0x382 == 255) {
+            in += (u8)fn_801406E0_view1(17, in[0]);
+            fn_8013BDE4(&in, 17, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(17, in[0]);
+        result = fn_80140778_view1(in, 17, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
 }
 
 /* Same reader as `fn_8013D1E0`, for the action id 18 and the data record's +0x0E field. */
@@ -1637,10 +1064,10 @@ s16 fn_8013D054(_ENEMY_WORK *self, u8 *in) {
         case 2:
             if (self->state_0x46F == 255 ||
                 self->state_0x46E > data->field_0x39 - 1) {
-                if (self->state_0x46E > data->field_0x37) {
-                    self->state_0x46F = 255;
-                } else {
+                if (self->state_0x46E <= data->field_0x37) {
                     self->state_0x46F = 0;
+                } else {
+                    self->state_0x46F = 255;
                 }
             }
             value = self->state_0x46F;
@@ -1656,6 +1083,665 @@ s16 fn_8013D054(_ENEMY_WORK *self, u8 *in) {
     } else {
         fn_8013C244(self, in, 19);
     }
+}
+
+/* Forwards the stream one byte in and the first byte as the value. */
+void fn_8013D1D0(_ENEMY_WORK *self, u8 *in) {
+    u8 value = *in++;
+
+    fn_8013C36C(self, value, (u32)in);
+}
+
+/* Same reader as `fn_8013E9FC`, for the action id 21 and the data record's +0x0F field. */
+s16 fn_8013D1E0(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
+                                                   self->field_0x46C);
+
+    if (data == 0) {
+        fn_80140AF8_view1(self, 8, 21);
+        if (in[0] <= 2) {
+            in += (u8)fn_801406E0_view1(21, in[0]);
+            result = fn_80140778_view1(in, 21, 1);
+        }
+        return result;
+    }
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 21, 0, data->mode_0x0F);
+    } else {
+        fn_8013C244(self, in, 21);
+    }
+}
+
+void fn_8013D2C8(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 22, 5, 0);
+    } else {
+        fn_8013C244(self, in, 22);
+    }
+}
+
+void fn_8013D2EC(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 23, 6, 0);
+    } else {
+        fn_8013C244(self, in, 23);
+    }
+}
+
+void fn_8013D310(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 24, 7, (s16)(u16)(((self->area_no & 0xF) << 8) | in[1]));
+    } else {
+        fn_8013C244(self, in, 24);
+    }
+}
+
+/* Selects the combat sub-command the data record's mode byte names. */
+void fn_8013D34C(_ENEMY_WORK *self) {
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
+                                                   self->field_0x46C);
+
+    if (data == 0) {
+        fn_80140AF8_view1(self, 8, 25);
+        return;
+    }
+    switch (data->mode_0x0F) {
+    case 0:
+        em_reaction_req(self, 1, 2, data->value_0x10);
+        break;
+    case 1:
+        em_reaction_req(self, 2, 2, data->value_0x10);
+        break;
+    case 2:
+        em_reaction_req(self, 3, 2, data->value_0x10);
+        break;
+    default:
+        break;
+    }
+    em_target_pos_set(self, 0);
+}
+
+/* Copies the position the record aims at into the aim vector. */
+void fn_8013D41C(_ENEMY_WORK *self, u8 *in) {
+    switch (in[0]) {
+    case 0:
+        copyVec3(&self->aim, &self->pos);
+        break;
+    case 1:
+        copyVec3(&self->aim, &self->vec_0x36C);
+        break;
+    default:
+        fn_80140AF8_view1(self, 9, 0);
+        break;
+    }
+}
+
+/* Sets the aim timer and the motion blend from a parameter record, then re-runs the movement entry. */
+void fn_8013D45C(_ENEMY_WORK *self, u8 *in, u32 flag) {
+    self->field_0x383 = 1;
+    self->field_0x384 = (f32)(in[3] * 100);
+    if (in[4] == 1) {
+        self->field_0x383 |= 0x80;
+    }
+    fn_8013C57C(self, in, (u8)flag);
+}
+
+s16 fn_8013D4C4(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (em_alt_mode_ck(self) == 0) {
+            in += (u8)fn_801406E0_view1(28, in[0]);
+            fn_8013BDE4(&in, 28, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(28, in[0]);
+        result = fn_80140778_view1(in, 28, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+/* True while the difference between the stored facing and the vector to the target is greater than the
+ * tolerance the record carries. */
+s16 fn_8013D588(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0: {
+        u32 diff = (u16)(calcVecAng2(&self->pos, &self->vec_0x36C) - self->field_0x1C0);
+        if (diff >= 0x8000) {
+            diff = 0x10000 - diff;
+        }
+        if (diff > (u32)(in[1] << 8)) {
+            in += (u8)fn_801406E0_view1(29, in[0]);
+            fn_8013BDE4(&in, 29, &result);
+        }
+        break;
+    }
+    case 2:
+        in += (u8)fn_801406E0_view1(29, in[0]);
+        result = fn_80140778_view1(in, 29, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+void fn_8013D684(_ENEMY_WORK *self, u8 *in) {
+    self->timer_0x424 = in[0] * 100;
+}
+
+s16 fn_8013D694(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (self->value_0x44C > 0) {
+            in += (u8)fn_801406E0_view1(31, in[0]);
+            fn_8013BDE4(&in, 31, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(31, in[0]);
+        result = fn_80140778_view1(in, 31, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+/* Queues a sub-action pointer for the movement entry, or re-seeds the current action when the queue
+ * is already occupied. */
+void fn_8013D750(_ENEMY_WORK *self, u8 *in) {
+    u8 value = in[0];
+    u8 *next = in + 1;
+
+    if (self->field_0x95C != 0) {
+        fn_80140AF8_view1(self, 10, self->field_0x95C);
+        self->field_0x958 = (u32)next;
+    } else {
+        if (self->state_0x962 >= 10) {
+            fn_80140AF8_view1(self, 11, 0);
+            self->state_0x962--;
+        }
+        self->bytes_0x963[self->state_0x962] = self->field_0x95D;
+        self->values_0x970[self->state_0x962] = (u32)next;
+        self->state_0x962++;
+        fn_8013AB74(self, 0, value);
+    }
+}
+
+s16 fn_8013D80C(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (self->field_0x916 <= 0) {
+            in += (u8)fn_801406E0_view1(33, in[0]);
+            fn_8013BDE4(&in, 33, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(33, in[0]);
+        result = fn_80140778_view1(in, 33, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+/* Sends the parameter's remainder modulo the record's step count. */
+void fn_8013D8C8(_ENEMY_WORK *self, u8 *in, u32 param) {
+    if (in[0] == 0) {
+        if (fn_8013BE60(self, in, 34, 11, 1) >= 0) {
+            return;
+        }
+        {
+            u8 *next = in + (u8)fn_801406E0_view1(34, in[0]);
+            s16 step = fn_80140778_view1(next, 34, 2);
+
+            fn_8013BE60(self, in, 34, 10, (s16)((u16)param % step));
+        }
+        return;
+    }
+    fn_8013C244(self, in, 34);
+}
+
+void fn_8013D990(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 35, 0, self->field_0x00C);
+    } else {
+        fn_8013C244(self, in, 35);
+    }
+}
+
+s16 fn_8013D9B8(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (em_eft_active_ck(self) == 0) {
+            in += (u8)fn_801406E0_view1(36, in[0]);
+            fn_8013BDE4(&in, 36, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(36, in[0]);
+        result = fn_80140778_view1(in, 36, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+s16 fn_8013DA7C(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0: {
+        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
+        if (data == 0 || data->mode_0x14 != self->area_no) {
+            in += (u8)fn_801406E0_view1(37, in[0]);
+            fn_8013BDE4(&in, 37, &result);
+        }
+        break;
+    }
+    case 2:
+        in += (u8)fn_801406E0_view1(37, in[0]);
+        result = fn_80140778_view1(in, 37, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+/* Same reader as `fn_8013E9FC`, for the action id 38 and the data record's +0x08 field. */
+s16 fn_8013DB70(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
+                                                   self->field_0x46C);
+
+    if (data == 0) {
+        fn_80140AF8_view1(self, 8, 38);
+        if (in[0] <= 2) {
+            in += (u8)fn_801406E0_view1(38, in[0]);
+            result = fn_80140778_view1(in, 38, 1);
+        }
+        return result;
+    }
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 38, 0, data->field_0x08);
+    } else {
+        fn_8013C244(self, in, 38);
+    }
+}
+
+s16 fn_8013DC58(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0: {
+        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
+        if (data == 0 || data->mode_0x17 == 255) {
+            in += (u8)fn_801406E0_view1(39, in[0]);
+            fn_8013BDE4(&in, 39, &result);
+        }
+        break;
+    }
+    case 2:
+        in += (u8)fn_801406E0_view1(39, in[0]);
+        result = fn_80140778_view1(in, 39, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+s16 fn_8013DD48(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if ((self->field_0x1C8 & 0x8) == 0) {
+            in += (u8)fn_801406E0_view1(40, in[0]);
+            fn_8013BDE4(&in, 40, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(40, in[0]);
+        result = fn_80140778_view1(in, 40, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+void fn_8013DE08(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 41, 0, self->field_0x00A);
+    } else {
+        fn_8013C244(self, in, 41);
+    }
+}
+
+void fn_8013DE30(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 68, 9, self->field_0x00A);
+    } else {
+        fn_8013C244(self, in, 68);
+    }
+}
+
+void fn_8013DE58(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 42, 15, self->field_0x1E0);
+    } else {
+        fn_8013C244(self, in, 42);
+    }
+}
+
+/* Moves the converted target position into the record's position and remembers the old one. */
+void fn_8013DE80(_ENEMY_WORK *self, u8 *in) {
+    em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &self->pos);
+    copyVec3(&self->prev_pos, &self->pos);
+}
+
+void fn_8013DED4(_ENEMY_WORK *self, u8 *in) {
+    self->field_0x1BC = in[0] << 8;
+    self->field_0x1C0 = in[1] << 8;
+    self->field_0x1C4 = in[2] << 8;
+}
+
+/* Rebuilds the aim vector from a parameter record and stores the facing angle and zero offsets. */
+void fn_8013DEFC(_ENEMY_WORK *self, u8 *in) {
+    Vec3 v;
+
+    VEC3_ctor(&v);
+    em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &v);
+    self->field_0x1BC = 0;
+    self->field_0x1C0 = calcVecAng2(&self->pos, &v);
+    self->field_0x1C4 = 0;
+}
+
+s16 fn_8013DF78(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if ((u16)(calcVecAng2(&self->pos, &self->vec_0x36C) -
+                  self->field_0x1C0) >= 0x8000) {
+            in += (u8)fn_801406E0_view1(46, in[0]);
+            fn_8013BDE4(&in, 46, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(46, in[0]);
+        result = fn_80140778_view1(in, 46, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+void fn_8013E05C(_ENEMY_WORK *self, u8 *in) {
+    self->state_0x95F = in[0];
+}
+
+/* Forwards its arguments to the second parameter interpreter. */
+void fn_8013E068(_ENEMY_WORK *self, u8 *in, u32 id, u32 sub, s32 value) {
+    fn_801409C8_view1(self, in, id, sub, value);
+}
+
+/* Starts, advances and retires a repeated parameter record; returns -1 while one is still active. */
+s16 fn_8013E06C(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        self->state_0x9F4 = in[1];
+        self->state_0x9F5 = in[2];
+        self->ptr_0x9F0 = (u32)(in + 3);
+        break;
+    case 3:
+        self->state_0x9F4 = 255;
+        in += (u8)fn_801406E0_view1(49, in[0]);
+        result = fn_80140778_view1(in, 49, 1);
+        break;
+    case 255:
+        switch (self->state_0x9F4) {
+        default:
+            fn_80140AF8_view1(self, 14, self->state_0x9F4);
+            break;
+        case 0:
+            result = -1;
+            self->field_0x958 = self->ptr_0x9F0;
+            break;
+        case 1:
+            self->state_0x9F5--;
+            if (self->state_0x9F5 != 0) {
+                result = -1;
+                self->field_0x958 = self->ptr_0x9F0;
+            }
+            break;
+        case 255:
+            break;
+        }
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+s16 fn_8013E180(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0: {
+        _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
+        in += (u8)fn_801406E0_view1(50, in[0]);
+        if (data == 0) {
+            fn_80140AF8_view1(self, 8, 50);
+            fn_8013BDE4(&in, 50, &result);
+        } else if (eft_slot_shape_hit_ck(data, data->field_0x36, &self->pos, 0.0f) == 0) {
+            fn_8013BDE4(&in, 50, &result);
+        }
+        break;
+    }
+    case 2:
+        in += (u8)fn_801406E0_view1(50, in[0]);
+        result = fn_80140778_view1(in, 50, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+/* Sends the horizontal bearing to the target as a byte-scaled angle. */
+void fn_8013E2B0(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        f32 dx = self->vec_0x36C.x - self->pos.x;
+        f32 dz = self->vec_0x36C.z - self->pos.z;
+        f32 dist = sqrt_f32(dx * dx + dz * dz);
+        f32 angle = atan2f(-(self->vec_0x36C.y - self->pos.y), dist);
+        u16 raw = (u16)(s32)(65536.0f * angle / 6.2831855f + 0.5f);
+
+        fn_8013BE60(self, in, 51, 8, (s16)(u8)(((s32)raw >> 8) + 64));
+    } else {
+        fn_8013C244(self, in, 51);
+    }
+}
+
+s16 fn_8013E388(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (self->value_0x452 < (s16)(in[2] * 30 + in[1] * 1800)) {
+            in += (u8)fn_801406E0_view1(52, in[0]);
+            fn_8013BDE4(&in, 52, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(52, in[0]);
+        result = fn_80140778_view1(in, 52, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+s16 fn_8013E464(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (em_mot_finished_ck_c1() == 0) {
+            in += (u8)fn_801406E0_view1(53, in[0]);
+            fn_8013BDE4(&in, 53, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(53, in[0]);
+        result = fn_80140778_view1(in, 53, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+/* Starts a route program: latches the program table the record selects and sends the enemy to its first entry
+ * (the last one walking backwards, or the nearest one with bit 2). */
+void em_prog_route_start(_ENEMY_WORK* self, u8* in) {
+    Vec3 point;
+    EmActionInfo* cand;
+    EmActionInfo* info;
+    u8 i;
+    u8 flags;
+
+    VEC3_ctor(&point);
+    self->state_0x9FB = in[0];
+    flags = in[1];
+    self->field_0x9FD = flags;
+    if ((flags & 2) && (self->bits_0x1EC & 1)) {
+        self->field_0x9FD = flags | 1;
+    }
+    self->field_0x9FE = 0;
+    self->prog_0xA00 = (EmProgTbl*)fn_8013C2B0(self);
+    if (self->prog_0xA00 != NULL) {
+        if (self->field_0x9FD & 4) {
+            f32 best = 999999.0f;
+            info = NULL;
+            for (i = 0; i < self->prog_0xA00->count_0x00; i++) {
+                cand = (EmActionInfo*)em_route_entry_get(self, self->prog_0xA00->entries_0x04[i].code);
+                f32 dist;
+                em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | cand->field_0x00), &point);
+                dist = calcVecDistXZ(&self->pos, &point);
+                if (dist < best) {
+                    self->field_0x9FC = i;
+                    info = cand;
+                    best = dist;
+                }
+            }
+        } else {
+            EmProgEntry* entry;
+            self->field_0x9FC = 0;
+            if (self->field_0x9FD & 1) {
+                entry = &self->prog_0xA00->entries_0x04[self->prog_0xA00->count_0x00 - 1];
+            } else {
+                entry = self->prog_0xA00->entries_0x04;
+            }
+            info = (EmActionInfo*)em_route_entry_get(self, entry->code);
+        }
+        if (info != NULL) {
+            self->field_0x383 = 1;
+            self->field_0x384 = info->value_0x04;
+            em_reaction_req(self, 5, 8, info->field_0x00);
+            em_target_pos_set(self, 0);
+            self->field_0x9FF = 1;
+        }
+    }
+}
+
+void fn_8013E6F4(_ENEMY_WORK *self) {
+    self->value_0x452 = 0;
+}
+
+s16 fn_8013E700(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (self->value_0x452 < self->value_0x44E) {
+            in += (u8)fn_801406E0_view1(56, in[0]);
+            fn_8013BDE4(&in, 56, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(56, in[0]);
+        result = fn_80140778_view1(in, 56, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
 }
 
 /* Starts or advances a repeated parameter record against the current enemy data. */
@@ -1693,16 +1779,489 @@ s16 fn_8013E7C0(_ENEMY_WORK *self, u8 *in) {
     }
     return result;
 }
+
+/* --------------------------------------------------------------------------------------------- */
+/* The stream readers: `switch (in[0])` over the command byte, each case advancing the stream
+ * through `fn_801406E0`/`fn_8013BDE4` and reporting a `s16` back through the stack slot. */
+/* --------------------------------------------------------------------------------------------- */
+s16 fn_8013E900(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if ((u8)PlayMode_ck() != 2) {
+            in += (u8)fn_801406E0_view1(59, in[0]);
+            fn_8013BDE4(&in, 59, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(59, in[0]);
+        result = fn_80140778_view1(in, 59, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+void fn_8013E9C8(_ENEMY_WORK *self, u8 *in) {
+    self->state_0x960 = in[0];
+}
+
+void fn_8013E9D4(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 61, 0, self->state_0x960);
+    } else {
+        fn_8013C244(self, in, 61);
+    }
+}
+
+/* Reads the data record's action field or, when there is none, the record's own parsed value. */
+s16 fn_8013E9FC(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
+                                                   self->field_0x46C);
+
+    if (data == 0) {
+        fn_80140AF8_view1(self, 8, 62);
+        if (in[0] <= 2) {
+            in += (u8)fn_801406E0_view1(62, in[0]);
+            result = fn_80140778_view1(in, 62, 1);
+        }
+        return result;
+    }
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 62, 0, data->field_0x0B);
+    } else {
+        fn_8013C244(self, in, 62);
+    }
+}
+
+s16 fn_8013EAE4(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (self->field_0x1FC == 0) {
+            in += (u8)fn_801406E0_view1(63, in[0]);
+            fn_8013BDE4(&in, 63, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(63, in[0]);
+        result = fn_80140778_view1(in, 63, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+void fn_8013EBA0(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 64, 0, self->field_0x1FE);
+    } else {
+        fn_8013C244(self, in, 64);
+    }
+}
+
+s16 fn_8013EBC8(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (self->field_0x8A2 > in[1] * 10 && em_eft_active_ck(self) == 0) {
+            in += (u8)fn_801406E0_view1(65, in[0]);
+            fn_8013BDE4(&in, 65, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(65, in[0]);
+        result = fn_80140778_view1(in, 65, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+s16 fn_8013ECA4(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (em_flag_0x8AC_ck() == 0) {
+            in += (u8)fn_801406E0_view1(66, in[0]);
+            fn_8013BDE4(&in, 66, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(66, in[0]);
+        result = fn_80140778_view1(in, 66, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+s16 fn_8013ED68(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+
+    switch (in[0]) {
+    case 0:
+        if (fn_80131BD4_c1() == 0) {
+            in += (u8)fn_801406E0_view1(67, in[0]);
+            fn_8013BDE4(&in, 67, &result);
+        }
+        break;
+    case 2:
+        in += (u8)fn_801406E0_view1(67, in[0]);
+        result = fn_80140778_view1(in, 67, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8_view1(self, 0, 0);
+        break;
+    }
+    return result;
+}
+
+/* Same reader as `fn_8013E9FC`, for the action id 69 and the data record's +0x0D field. */
+s16 fn_8013EE2C(_ENEMY_WORK *self, u8 *in) {
+    s16 result = 0;
+    _ENEMY_DATA *data = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
+                                                   self->field_0x46C);
+
+    if (data == 0) {
+        fn_80140AF8_view1(self, 8, 18);
+        if (in[0] <= 2) {
+            in += (u8)fn_801406E0_view1(69, in[0]);
+            result = fn_80140778_view1(in, 69, 1);
+        }
+        return result;
+    }
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 69, 2, data->field_0x0D);
+    } else {
+        fn_8013C244(self, in, 69);
+    }
+}
+
+void fn_8013EF14(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 70, 0, self->team);
+    } else {
+        fn_8013C244(self, in, 70);
+    }
+}
+
+void fn_8013EF3C(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 71, 0, self->field_0x1E3);
+    } else {
+        fn_8013C244(self, in, 71);
+    }
+}
+
+void fn_8013EF64(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 73, 0, self->field_0x9F7);
+    } else {
+        fn_8013C244(self, in, 73);
+    }
+}
+
+void fn_8013EF8C(_ENEMY_WORK *self, u8 *in) {
+    if (in[0] == 0) {
+        fn_8013BE60(self, in, 74, 1, self->field_0x1F2 % 100);
+    } else {
+        fn_8013C244(self, in, 74);
+    }
+}
+
+/* Command 0x4B: tests the partner the enemy tracks (a player, the AI companion or another enemy) for the
+ * condition `in[1]` names and jumps past the record when it does not hold. */
+s16 em_prog_partner_cond_ck(_ENEMY_WORK* self, u8* in) {
+    s16 value = 0;
+    s32 hit = 0;
+
+    switch (in[0]) {
+    case 0: {
+        u8 cond = in[1];
+        u8 arg = in[2];
+        switch (cond) {
+        case 0:
+            if (self->field_0x382 != 255) {
+                switch (self->field_0x380) {
+                case 1:
+                    if (((_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382))->kind_0x09 == 3) {
+                        hit = 1;
+                    }
+                    break;
+                case 3:
+                    if ((arg & 0x40) == 0 &&
+                        ((_ENEMY_WORK*)get_move_work_adrs(3) + self->field_0x382)->field_0x1E2 == 2) {
+                        hit = 1;
+                    }
+                    break;
+                case 2:
+                    if ((arg & 0x80) == 0) {
+                        _AINPC_W* npc = &ainpc_w;
+                        if (npc->active != 0 && npc->variant == 2) {
+                            hit = 1;
+                        }
+                    }
+                    break;
+                }
+            }
+            break;
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+            if (self->field_0x382 != 255 && (s32)self->field_0x380 == 1) {
+                _PLW* pl = (_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382);
+                u32 mask;
+                switch (cond) {
+                case 1:
+                    mask = 0x400;
+                    break;
+                case 2:
+                    mask = 0x800;
+                    break;
+                case 3:
+                    mask = 0x1000;
+                    break;
+                case 4:
+                    mask = 0x2000;
+                    break;
+                case 5:
+                    mask = 0x4000;
+                    break;
+                default:
+                    mask = 0;
+                    break;
+                }
+                if (Pl_dm_condition_ck(pl, mask) == 1) {
+                    hit = 1;
+                }
+            }
+            break;
+        case 6:
+            if (self->field_0x382 != 255 && (s32)self->field_0x380 == 1) {
+                if ((u32)pl_act6_52_54_61_62_ck((_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382)) == 1) {
+                    hit = 1;
+                }
+            }
+            break;
+        case 7:
+            if (self->field_0x382 != 255) {
+                u8 phase = 0;
+                switch (self->field_0x380) {
+                case 1:
+                    phase = ((_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382))->water_area_0x5A6 & 0x7F;
+                    break;
+                case 3:
+                    if ((arg & 0x40) == 0) {
+                        phase = em_phase_get((_ENEMY_WORK*)get_move_work_adrs(3) + self->field_0x382);
+                    }
+                    break;
+                case 2:
+                    if ((arg & 0x80) == 0) {
+                        _AINPC_W* npc = &ainpc_w;
+                        if (npc->active != 0) {
+                            phase = npc->field_0x326 & 0x7F;
+                        }
+                    }
+                    break;
+                }
+                if (phase == em_phase_get(self)) {
+                    hit = 1;
+                }
+            }
+            break;
+        case 8:
+            if (self->field_0x382 != 255) {
+                switch (self->field_0x380) {
+                case 1:
+                    if (Pl_condition_ck((_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382), 2) == 1) {
+                        hit = 1;
+                    }
+                    break;
+                case 3:
+                    if ((arg & 0x40) == 0 &&
+                        em_sleep_ck((_ENEMY_WORK*)get_move_work_adrs(3) + self->field_0x382, 0) == 1) {
+                        hit = 1;
+                    }
+                    break;
+                case 2:
+                    if ((arg & 0x80) == 0) {
+                        _AINPC_W* npc = &ainpc_w;
+                        if (npc->active != 0 &&
+                            ((u32)ai_npc_motion_step_ck(npc, 4, 10) == 1 || (u32)ai_npc_motion_step_ck(npc, 4, 21) == 1)) {
+                            hit = 1;
+                        }
+                    }
+                    break;
+                }
+            }
+            break;
+        case 9:
+            if (self->field_0x382 != 255) {
+                switch (self->field_0x380) {
+                case 1: {
+                    _PLW* pl = (_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382);
+                    if (pl->field_0x00A == 6) {
+                        if (arg == 0) {
+                            hit = 1;
+                        } else if ((arg & 1) && (u32)pl_act6_class_ck(pl, 2) == 1) {
+                            hit = 1;
+                        }
+                    }
+                    break;
+                }
+                case 3:
+                    if ((arg & 0x40) == 0 &&
+                        ((_ENEMY_WORK*)get_move_work_adrs(3) + self->field_0x382)->action == 10 && arg == 0) {
+                        hit = 1;
+                    }
+                    break;
+                case 2:
+                    if ((arg & 0x80) == 0) {
+                        _AINPC_W* npc = &ainpc_w;
+                        if (npc->active != 0 && npc->field_0x171 == 4 && arg == 0) {
+                            hit = 1;
+                        }
+                    }
+                    break;
+                }
+            }
+            break;
+        case 10:
+            if (self->field_0x382 != 255 && (s32)self->field_0x380 == 1) {
+                if (pl_act_no_eft_ck((_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382), 0) == 1) {
+                    hit = 1;
+                }
+            }
+            break;
+        case 11:
+            if (self->field_0x382 != 255) {
+                u8 phase = 0;
+                switch (self->field_0x380) {
+                case 1:
+                    phase = ((_PLW*)em_move_work_pick(self->state_0x381, self->field_0x382))->water_area_0x5A6 & 0x7F;
+                    break;
+                case 3:
+                    if ((arg & 0x40) == 0) {
+                        phase = em_phase_get((_ENEMY_WORK*)get_move_work_adrs(3) + self->field_0x382);
+                    }
+                    break;
+                case 2:
+                    if ((arg & 0x80) == 0) {
+                        _AINPC_W* npc = &ainpc_w;
+                        if (npc->active != 0) {
+                            phase = npc->field_0x326 & 0x7F;
+                        }
+                    }
+                    break;
+                }
+                if (phase == arg) {
+                    hit = 1;
+                }
+            }
+            break;
+        }
+        if (hit == 0) {
+            in += fn_801406E0(0x4B, in[0]);
+            fn_8013BDE4_view1(&in, 0x4B, &value);
+        }
+        break;
+    }
+    case 2:
+        in += fn_801406E0(0x4B, in[0]);
+        value = fn_80140778(in, 0x4B, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8(self, 0, 0);
+        break;
+    }
+    return value;
+}
+
+/* Command 0x4C: sweeps a line from the enemy to its target (or the aim point, or a data point) and jumps past
+ * the record when the line is blocked. */
+s16 em_prog_sight_line_ck(_ENEMY_WORK* self, u8* in) {
+    s16 value = 0;
+    Vec3 from;
+    Vec3 to;
+
+    VEC3_ctor(&from);
+    VEC3_ctor(&to);
+    switch (in[0]) {
+    case 0: {
+        f32 height;
+        s32 mode;
+        switch (in[1]) {
+        default:
+            copyVec3(&to, &self->vec_0x36C);
+            break;
+        case 1:
+            copyVec3(&to, &self->aim);
+            break;
+        case 2:
+            em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[2]), &to);
+            break;
+        }
+        copyVec3(&from, &self->pos);
+        mode = self->field_0x1E2;
+        if (mode >= 1 && mode <= 2) {
+            height = 0.0f;
+        } else {
+            height = 50.0f;
+        }
+        from.y += height;
+        to.y += height;
+        if (pl_coll_sweep_ck(&from, &to, 20.0f, 1, 0xFFFF, self->area_no, em_hit_mask_get(self)) != 0) {
+            in += fn_801406E0(0x4C, in[0]);
+            fn_8013BDE4_view1(&in, 0x4C, &value);
+        }
+        break;
+    }
+    case 2:
+        in += fn_801406E0(0x4C, in[0]);
+        value = fn_80140778(in, 0x4C, 1);
+        break;
+    case 255:
+        break;
+    default:
+        fn_80140AF8(self, 0, 0);
+        break;
+    }
+    return value;
 }
 
 #pragma fp_contract on
-
-extern "C" {
 /* The run driver. */
 u8 fn_8013F764(_ENEMY_WORK* self, u8* in) {
     EmProgEntry* entry;
-    u8 first = in[0];
-    u8* p = in + 1;
+    u8 first = *in++;
     u8 ret = 0;
     EmProgTbl* prog = self->prog_0xA00;
 
@@ -1720,18 +2279,18 @@ u8 fn_8013F764(_ENEMY_WORK* self, u8* in) {
             em_target_pos_set(self, 0);
             self->field_0x9FE++;
         }
-        if (calcVecDistXZ_view1(&self->pos, &self->vec_0x36C) < lbl_80796DBC) {
+        if (calcVecDistXZ_view1(&self->pos, &self->vec_0x36C) < 800.0f) {
             self->field_0x9FE = 2;
         } else {
             self->field_0x9FE = 1;
         }
         switch (self->field_0x9FE) {
         case 1:
-            fn_8013C36C_view1(self, entry->field_0x01, p);
+            fn_8013C36C_view1(self, entry->field_0x01, in);
             ret = 1;
             break;
         case 2:
-            fn_8013C36C_view1(self, entry->field_0x02, p);
+            fn_8013C36C_view1(self, entry->field_0x02, in);
             ret = 1;
             if (first == 0) {
                 fn_8013F994(self);
@@ -1741,23 +2300,6 @@ u8 fn_8013F764(_ENEMY_WORK* self, u8* in) {
     }
     self->field_0x9FF = 1;
     return ret;
-}
-
-void fn_8013F994(_ENEMY_WORK* self) {
-    EmProgTbl* prog = self->prog_0xA00;
-
-    if (prog == NULL) {
-        return;
-    }
-    if (self->field_0x9FE != 2) {
-        return;
-    }
-    self->field_0x9FC++;
-    if ((u8)self->field_0x9FC >= prog->count_0x00) {
-        fn_8013AA00(self);
-        return;
-    }
-    self->field_0x9FE = 0;
 }
 
 /* The stream readers (command id in the trailing comment). */
@@ -1782,6 +2324,23 @@ s16 fn_8013F8D8(_ENEMY_WORK* self, u8* in) {                    /* 0x4E */
         break;
     }
     return value;
+}
+
+void fn_8013F994(_ENEMY_WORK* self) {
+    EmProgTbl* prog = self->prog_0xA00;
+
+    if (prog == NULL) {
+        return;
+    }
+    if (self->field_0x9FE != 2) {
+        return;
+    }
+    self->field_0x9FC++;
+    if ((u8)self->field_0x9FC >= prog->count_0x00) {
+        fn_8013AA00(self);
+        return;
+    }
+    self->field_0x9FE = 0;
 }
 
 s16 fn_8013F9D8(_ENEMY_WORK* self, u8* in) {                    /* 0x50 */
@@ -1917,7 +2476,7 @@ s16 fn_8013FD98(_ENEMY_WORK* self, u8* in) {                    /* 0x59 */
             u16 count = get_move_work_max(2);
             EmAreaWork* rec = (EmAreaWork*)get_move_work_adrs(2);
             for (u16 i = 0; i < count; i++) {
-                if (rec->active != 0 && rec->area_no == self->area_no && pl_act_grabbed_ck(rec) != 0) {
+                if (rec->active != 0 && rec->area_no == self->area_no && pl_act_grabbed_ck((_PLW*)rec) != 0) {
                     found = 1;
                     break;
                 }
@@ -1990,7 +2549,7 @@ s16 fn_8013FF5C(_ENEMY_WORK* self, u8* in) {                    /* 0x5E */
 void fn_8014001C(_ENEMY_WORK* self, u8* in) {                    /* 0x5F, two-argument with a ratio */
     if (in[0] == 0) {
         fn_8013BE60(self, in, 0x5F, 2,
-                    (s16)(s32)(lbl_80796DC0 * ((f32)self->field_0x7A0 / (f32)self->field_0x7A4)));
+                    (s16)(100.0f * ((f32)(s32)self->field_0x7A0 / (f32)(s32)self->field_0x7A4)));
     } else {
         fn_8013C244(self, in, 0x5F);
     }
@@ -2056,9 +2615,9 @@ void fn_80140244(_ENEMY_WORK* self, u8* in) {                   /* 0x63, two-arg
     }
 }
 
-void fn_8014026C(_ENEMY_WORK* self, u8* in, u32 arg) {           /* 0x65, two-argument */
+void fn_8014026C(_ENEMY_WORK* self, u8* in, u8 arg) {            /* 0x65, two-argument */
     if (in[0] == 0) {
-        fn_8013BE60(self, in, 0x65, 0, (s16)(arg & 0xFF));
+        fn_8013BE60(self, in, 0x65, 0, arg);
     } else {
         fn_8013C244(self, in, 0x65);
     }
@@ -2097,13 +2656,12 @@ s16 fn_80140354(_ENEMY_WORK* self, u8* in) {                    /* 0x67 */
         u8 found = 0;
         u16 count = get_move_work_max(3);
         _ENEMY_WORK* rec = (_ENEMY_WORK*)get_move_work_adrs(3);
-        for (u16 i = 0; i < count; i++) {
+        for (u16 i = 0; i < count; i++, rec++) {
             if (self->group != i && rec->active != 0 && rec->team == hit_team &&
                 (rec->field_0x1C8 & 8) != 0) {
                 found = 1;
                 break;
             }
-            rec++;
         }
         if (found == 0) {
             in += fn_801406E0(0x67, in[0]);
@@ -2221,44 +2779,49 @@ u8 fn_80140768(u8* in) {
 }
 
 s16 fn_80140778(u8* in, u8 code, u8 mode) {
-    s16 result = 0;
-    s16 prev = 0;
-    u8 stop = 0;
-    u16 pos = 0;
-    u8 want = code;
+    s32 stop;
+    s16 pos;
+    s16 prev;
+    s16 result;
+    u8 want;
 
-    for (;;) {
+    pos = 0;
+    prev = 0;
+    stop = 0;
+    want = code;
+
+    while (stop == 0) {
         if (in[0] == 0xFF) {
             fn_80140B0C(2, code, 0);
             break;
         }
         if (in[0] == want) {
             if (in[1] == 0) {
-                u8 skip = fn_80140768(in) + 1;
-                s16 off = fn_80140778(in + skip, code, 1) + skip;
+                s32 skip = ((s32 (*)(u8*))fn_80140768)(in) + 1;
+                s16 off = fn_80140778(in + (u8)skip, code, 1) + (u8)skip;
                 pos += off;
                 in += off;
-                continue;
-            }
-            switch (mode) {
-            case 0:
-                stop = 1;
-                result = pos;
-                break;
-            case 1:
-                if (in[1] == 0xFF) {
+            } else {
+                switch (mode) {
+                case 0:
                     stop = 1;
                     result = pos;
+                    break;
+                case 1:
+                    if (in[1] == 0xFF) {
+                        stop = 1;
+                        result = pos;
+                    }
+                    break;
+                case 2:
+                    if (in[1] == 0xFF) {
+                        stop = 1;
+                        result = prev;
+                    } else {
+                        prev++;
+                    }
+                    break;
                 }
-                break;
-            case 2:
-                if (in[1] == 0xFF) {
-                    stop = 1;
-                    result = prev;
-                } else {
-                    prev++;
-                }
-                break;
             }
         }
         if (stop == 0) {
@@ -2266,27 +2829,29 @@ s16 fn_80140778(u8* in, u8 code, u8 mode) {
             pos += skip;
             in += skip;
         }
-        if (stop != 0) {
-            break;
-        }
     }
     return result;
 }
 
-void fn_80140AF8(_ENEMY_WORK* self, u32 a, u8 b) {
-    u8 a8 = a;
-    fn_80140B0C(a8, b, self->team);
-}
-
-void fn_80140B0C(u8 a, u8 b, u8 c) {
-}
-
-void fn_80140B10(u32 unused, u32 a, u32 b) {
-    em_prog_trace2((u8)a, b);
-}
-
+#pragma optimization_level 4
 u8 fn_801408B4(_ENEMY_WORK* self) {
     switch (self->field_0x95C) {
+    case 0: {
+        u8 depth;
+        if (self->stack_0x961[1] == 0) {
+            return 0;
+        }
+        self->stack_0x961[1]--;
+        depth = self->stack_0x961[1];
+        self->field_0x95D = (&self->stack_0x961[2])[depth];
+        self->field_0x958 = self->values_0x970[depth];
+        break;
+    }
+    case 2:
+        self->field_0x95C = self->rec_0x99C.code;
+        self->field_0x95D = self->rec_0x99C.sub;
+        self->field_0x958 = self->rec_0x99C.value;
+        break;
     case 3:
     case 4:
     case 5:
@@ -2296,23 +2861,7 @@ u8 fn_801408B4(_ENEMY_WORK* self) {
         self->field_0x95C = self->field_0x9DC;
         self->field_0x95D = self->field_0x9DD;
         self->field_0x958 = self->field_0x9E0;
-        return 1;
-    case 0: {
-        u8 depth;
-        if (self->stack_0x961[1] == 0) {
-            return 0;
-        }
-        self->stack_0x961[1]--;
-        depth = self->stack_0x961[1];
-        self->field_0x95D = self->stack_0x961[2 + depth];
-        self->field_0x958 = self->values_0x970[depth];
-        return 1;
-    }
-    case 2:
-        self->field_0x95C = self->rec_0x99C.code;
-        self->field_0x95D = self->rec_0x99C.sub;
-        self->field_0x958 = self->rec_0x99C.value;
-        return 1;
+        break;
     case 1: {
         u8 idx;
         self->count_0x9A8--;
@@ -2320,18 +2869,20 @@ u8 fn_801408B4(_ENEMY_WORK* self) {
         self->field_0x95C = self->recs_0x9AC[idx].code;
         self->field_0x95D = self->recs_0x9AC[idx].sub;
         self->field_0x958 = self->recs_0x9AC[idx].value;
-        return 1;
+        break;
     }
     case 0xA:
         self->field_0x95C = self->field_0x9E8;
         self->field_0x95D = self->field_0x9E9;
         self->field_0x958 = self->field_0x9EC;
-        return 1;
+        break;
     default:
         return 0;
     }
+    return 1;
 }
 
+#pragma optimization_level 3
 void fn_801409C8(_ENEMY_WORK* self) {
     struct EnemyData* data = get_enemy_data(self);
     s32 value;
@@ -2340,35 +2891,54 @@ void fn_801409C8(_ENEMY_WORK* self) {
         value = 0x3E8;
     } else {
         EmActList* list = fn_80126494(self);
-        if (list == NULL) {
-            value = 0x1F4;
-        } else {
-            u8 act = self->field_0x7C8;
+        if (list != NULL) {
             EmActRec* rec = list->entries_0x08;
-            value = 0;
-            for (; rec->code != 0xFF; rec++) {
-                if (act > rec->code) {
+            u8 act = self->field_0x7C8;
+            EmActRec* cur;
+            do {
+                cur = rec;
+                if (act <= rec->code) {
                     value = rec->value;
                 }
-            }
+                rec++;
+            } while (cur->code != 0xFF);
+        } else {
+            value = 0x1F4;
         }
     }
     fn_80130CDC_view1(self, value);
     em_motion_mode_set_c1(self, 0);
     {
         s16* limit = ((EmEnemyData*)(void*)data)->sub_0xA0->value_0x28;
-        if ((f32)self->field_0x8A6 == lbl_80796DC4 * (f32)(limit != NULL ? *limit : 0x258)) {
+        if ((f32)self->field_0x8A6 >= 0.8f * (f32)(limit != NULL ? *limit : 0x258)) {
             fn_80130858_view1(self, 0x258);
         }
     }
 }
 
-void fn_80140B20(void) {
-    u32* src = em_prog_tbl_list;
-    u32* dst = (u32*)0x90348000;
+void fn_80140AF8(_ENEMY_WORK* self, u32 a, u32 b) {
+    u8 a8 = a;
+    fn_80140B0C(a8, b, self->team);
+}
 
-    while (*src != 0) {
-        *dst++ = *src++;
+void fn_80140B0C(u8 a, u32 b, u8 c) {
+}
+
+void fn_80140B10(u32 unused, u32 a, u32 b) {
+    em_prog_trace2((u8)a, b);
+}
+
+/* The empty static helper `fn_80140B10` branches to (its `blr` sits 4 bytes after that function's); `fn_80140AF8`
+ * reaches the same shape through the global `fn_80140B0C`. */
+static void em_prog_trace2(u8 a, u32 b) {
+}
+
+__declspec(export) void fn_80140B20(void) {
+    u32* dst = (u32*)0x90348000;
+    u32* src = em_prog_tbl_list;
+
+    for (; *src != 0; dst++, src++) {
+        *dst = *src;
     }
     {
         u32 i;
@@ -2384,6 +2954,9 @@ u32 enemy_data_by_team_get(u8 id, u8 kind) {
 
     if ((s32)(u8)sel == 0x20) {
         switch ((u8)kind) {
+        default:
+            sub = 0;
+            break;
         case 1:
             sub = 1;
             break;
@@ -2402,9 +2975,6 @@ u32 enemy_data_by_team_get(u8 id, u8 kind) {
         case 6:
             sub = 6;
             break;
-        default:
-            sub = 0;
-            break;
         }
     } else {
         sub = 0;
@@ -2412,9 +2982,8 @@ u32 enemy_data_by_team_get(u8 id, u8 kind) {
     return ((SystemWorkTables*)system_w)->tables_0x898[sel][sub];
 }
 
-#pragma peephole on
 /* The enemy file loader. */
-void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
+void fn_80140CA0(char* name, u32 data, u32 size, u32* ctx) {
     EmcWork* work = (EmcWork*)&emc_work[*ctx * 0x18];
     u32 h1;
 
@@ -2431,7 +3000,10 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
         return;
     }
     rec = (u8*)nw_res_entry_get(work->handle_0x08);
-    em_res_file_row_copy(&row, (EmFileRow*)((u8*)nw_res_manager + res_mem_index_get(name) * 0x4C + 0x3070));
+    {
+        s32 index = res_mem_index_get(name);
+        em_res_file_row_copy(&row, (EmFileRow*)((u8*)nw_res_manager + index * 0x4C + 0x3070));
+    }
     if (rec == NULL) {
         return;
     }
@@ -2443,7 +3015,6 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     nw_res_em_mdl_handle_set(work);
 }
 
-#pragma peephole off
 void em_res_file_row_copy(EmFileRow* dst, EmFileRow* src) {
     *dst = *src;
 }
@@ -2453,8 +3024,8 @@ s32 fn_80140E48(char* name, u32 size, u8 flag) {
     char* file;
     u32 ctx;
 
-    work->flags_0x03 |= 1;
     ctx = flag;
+    work->flags_0x03 |= 1;
     file = em_res_buffer_alloc(work->index_0x02);
     if (file == NULL) {
         return 0;
@@ -2463,13 +3034,13 @@ s32 fn_80140E48(char* name, u32 size, u8 flag) {
     return (s32)file;
 }
 
-void fn_80140EE8(char* name, u32 size, u32 a, u32 b, u32 c, u32* ctx) {
+void fn_80140EE8(char* name, u32 data, u32 size, u32* ctx) {
     EmcWork* work = (EmcWork*)&emc_work[*ctx * 0x18];
     u32 h1;
     u32 tmp;
 
     res_file_ctor(&h1, 0);
-    work->handle_0x10 = nw_res_entry_add(name, size);
+    work->handle_0x10 = nw_res_entry_add(name, data);
     if (work->handle_0x10 != -1) {
         u8* rec = (u8*)nw_res_entry_get(work->handle_0x10);
         if (rec != NULL) {
@@ -2487,8 +3058,8 @@ s32 fn_80140FB0(char* name, u32 size, u8 flag) {
     char* file;
     u32 ctx;
 
-    work->flags_0x03 |= 2;
     ctx = flag;
+    work->flags_0x03 |= 2;
     file = em_res_buffer_alloc(work->index_0x02);
     if (file == NULL) {
         return 0;
@@ -2499,6 +3070,8 @@ s32 fn_80140FB0(char* name, u32 size, u8 flag) {
 
 s32 em_kind_release(u8 id) {
     s32 loaded = 0;
+    u8 sub;
+    EmFileEntry* entry;
 
     if (em_kind_slot_find(id) != 0xFF) {
         s8 v = em_res_class_tbl[id];
@@ -2507,31 +3080,32 @@ s32 em_kind_release(u8 id) {
         }
         return 0;
     }
-    {
-        u8 sub = em_kind_slot_claim(id);
-        if (sub == 0xFF) {
-            return -1;
-        }
-        if (em_res_buffer_claim(id) == 0) {
-            return -1;
-        }
-        if (lbl_80581E20[id].key_0x00 != 0) {
-            fn_80140E48(lbl_80581E20[id].name_0x04, lbl_80581E20[id].key_0x00, sub);
-            loaded = 1;
-        }
-        if (lbl_80582348[id].key_0x00 != 0) {
-            fn_80140FB0(lbl_80582348[id].name_0x04, lbl_80582348[id].key_0x00, sub);
-            loaded++;
-        }
+    sub = em_kind_slot_claim(id);
+    if (sub == 0xFF) {
+        return -1;
+    }
+    if (em_res_buffer_claim(id) == 0) {
+        return -1;
+    }
+    entry = &lbl_80581E20[id];
+    if (entry->key_0x00 != 0) {
+        fn_80140E48(entry->name_0x04, entry->key_0x00, sub);
+        loaded = 1;
+    }
+    entry = &lbl_80582348[id];
+    if (entry->key_0x00 != 0) {
+        fn_80140FB0(entry->name_0x04, entry->key_0x00, sub);
+        loaded++;
     }
     em_sub_buffer_claim(id);
     if (em_sub_buffer_refs_get(id) == 1) {
         s32 idx = em_sub_buffer_index_get(id, 0);
         if (idx >= 0) {
-            fn_800FA9B8(&emc_work[0xEA0 + idx * 0x17], id);
+            fn_800FA9B8(&(emc_work + 0xEA0)[idx * 0x17], id);
         }
     }
     fn_800F0F9C(id);
     return loaded;
 }
+
 }

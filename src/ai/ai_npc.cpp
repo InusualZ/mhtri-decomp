@@ -248,7 +248,7 @@ extern "C" {
 u32 fn_8027D74C(struct _PLW* plw);
 void ai_npc_enemy_track(struct _AINPC_W* self, u32 a);
 void fn_802D32B4(struct _AINPC_W* self, void* entry);
-u32 fn_8027E06C(struct _PLW* plw, u32 a);
+u32 pl_act6_class_ck(struct _PLW* plw, u32 a);
 u32 fn_802D86D4(struct _AINPC_W* self, u16* a, s16* b);
 void fn_802D65CC(struct _AINPC_W* self);
 void fn_802D675C(struct _AINPC_W* self);
@@ -8458,10 +8458,10 @@ s16 fn_802CD20C(struct _AINPC_W* self)
     if (Pl_condition_ck(plw, 0x40000) == 1) {
         return ai_torch_ck(self) != 1;
     }
-    if (fn_8027E06C(plw, 0) == 1) {
+    if (pl_act6_class_ck(plw, 0) == 1) {
         return 0;
     }
-    return fn_8027E06C(plw, 1) != 1;
+    return pl_act6_class_ck(plw, 1) != 1;
 }
 
 /* 0x802CD2E0 - latch the +0x34D gate once the predicate chain answers non-negative. */

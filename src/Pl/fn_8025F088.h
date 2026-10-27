@@ -49,7 +49,7 @@ u32 fn_80278C7C(struct _PLW* self);
 u32 fn_80278CD0(struct _PLW* self);
 s32 pl_ground_check(struct _PLW* self, void* a, void* b, f32* out, s32 slot);
 u32 pl_coll_shape_set(struct _PLW* self, u8 mode, u16 flags);
-u32 fn_8027DCA8(struct _PLW* self);
+u32 pl_act6_52_54_61_62_ck(struct _PLW* self);
 
 /* ---- callees another registered unit owns whose header does not declare them ---- */
 u32 em_land_data_init(void* out);

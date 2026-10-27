@@ -13281,7 +13281,7 @@ void fn_8025FA00(_PLW* self) {
             if (self->vec_0x03C.y - value <= pl_frame_window_30) {
                 self->vec_0x03C.y = value;
                 self->field_0x585 = 0;
-                if (fn_8027DCA8(self) == 1 || (self->field_0x5A4 & 0x1000) == 0) {
+                if (pl_act6_52_54_61_62_ck(self) == 1 || (self->field_0x5A4 & 0x1000) == 0) {
                     break;
                 }
                 if (self->field_0x00A != 8) {

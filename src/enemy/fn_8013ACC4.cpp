@@ -207,8 +207,8 @@ s16 fn_8013EF14(EmWork* self, u8* in);
 s16 fn_8013EF3C(EmWork* self, u8* in);
 s16 fn_8013EF64(EmWork* self, u8* in);
 s16 fn_8013EF8C(EmWork* self, u8* in);
-s16 fn_8013EFD4(EmWork* self, u8* in);
-s16 fn_8013F5B8(EmWork* self, u8* in);
+s16 em_prog_partner_cond_ck(EmWork* self, u8* in);
+s16 em_prog_sight_line_ck(EmWork* self, u8* in);
 s16 fn_8013F8D8(EmWork* self, u8* in);
 s16 fn_8013F9D8(EmWork* self, u8* in);
 s16 fn_8013FA9C(EmWork* self, u8* in);
@@ -252,7 +252,7 @@ void fn_8013DED4(EmWork* self, u8* in);
 void fn_8013DEFC(EmWork* self, u8* in);
 void fn_8013E05C(EmWork* self, u8* in);
 void fn_8013E068(EmWork* self, u8* in);
-void fn_8013E528(EmWork* self, u8* in);
+void em_prog_route_start(EmWork* self, u8* in);
 void fn_8013E6F4(EmWork* self, u8* in);
 void fn_8013E9C8(EmWork* self, u8* in);
 void fn_8013F994(EmWork* self, u8* in);
@@ -561,7 +561,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
             self->stream_0x958 += (s16)fn_8013E464(self, self->stream_0x958);
             break;
         case 0x36:
-            fn_8013E528(self, self->stream_0x958);
+            em_prog_route_start(self, self->stream_0x958);
             break;
         case 0x37:
             fn_8013E6F4(self, self->stream_0x958);
@@ -626,10 +626,10 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
             self->stream_0x958 += (s16)fn_8013EF8C(self, self->stream_0x958);
             break;
         case 0x4B:
-            self->stream_0x958 += (s16)fn_8013EFD4(self, self->stream_0x958);
+            self->stream_0x958 += (s16)em_prog_partner_cond_ck(self, self->stream_0x958);
             break;
         case 0x4C:
-            self->stream_0x958 += (s16)fn_8013F5B8(self, self->stream_0x958);
+            self->stream_0x958 += (s16)em_prog_sight_line_ck(self, self->stream_0x958);
             break;
         case 0x4D:
             if (fn_8013F764(self, self->stream_0x958) == 1) {
