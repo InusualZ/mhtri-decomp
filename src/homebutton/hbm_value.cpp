@@ -2211,15 +2211,7 @@ void hbmVuSetStandardScreen(VuObject* self)
 /* Two factories: allocate a sub-object from the owner's allocator, then build or construct it. */
 VuHeader* fn_8055DF3C(VuOwner* self)
 {
-    VuHeader* obj = (VuHeader*)MEMAllocFromAllocator((MEMAllocator*)self->allocator, 0x14);
-
-    if (obj != 0) {
-        obj->vt = (void*)lbl_8064F0B0;
-        obj->field_0x04 = 0;
-        obj->field_0x08 = 0;
-        obj->field_0x0C = 0;
-    }
-    return obj;
+    return (VuHeader*)new ((MEMAllocator*)self->allocator) HbmTextBufferSet;
 }
 
 void fn_8055DF88(VuOwner* self)

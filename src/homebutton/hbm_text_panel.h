@@ -7,7 +7,8 @@
 #include "types.h"
 
 #ifdef __cplusplus
-class HbmTextBufferSet;
+#include "homebutton/hbm_text_buffer_set.h"
+
 class HbmPanelView;
 struct MEMAllocator;
 
@@ -93,8 +94,6 @@ void fn_8054F12C(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
 void fn_8054F130(void* self);
-
-extern u8  lbl_8064F0B0[];   /* the vtable/type record a factory stores into its fresh object */
 
 /* Returns the spacing character of the dead key `c` (the key the keyboard animates for it). */
 u16 hbmKbDeadKeyToSpacing(u16 c);

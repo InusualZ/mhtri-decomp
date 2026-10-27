@@ -24,16 +24,18 @@
  *            a text-field key handler leaves on one `v_0x054() || !v_0x0CC()` return (playbook 160); a local whose
  *            Rect is zeroed is declared after the code retail runs first (playbook 199); slot 0x23C takes one
  *            argument and the scroll view's slot 0x10 returns f64; the caret phase goes through hbmSinDeg.
- * RESIDUALS. hbmPanelHandleMessage (0x8054358C): frame 0x250 against retail 0x270; retail keeps message 0's two
- *            HbmInputModeState records in memory (0x90/0x98: every field stored and reloaded) where ours promotes them
- *            to registers (an array, a constructor, an inline member and reference-taking inline helpers all leave
- *            them promoted), and the saved-register numbering of the case bodies differs.
+ * RESIDUALS. hbmPanelHandleMessage (0x8054358C): retail keeps message 0's two HbmInputModeState records in memory
+ *            (0x90/0x98: every field stored and reloaded) where ours promotes them to registers (an array, a
+ *            constructor, an inline member, reference-taking inline helpers and function-scope declarations all leave
+ *            them promoted), so ours saves r22..r31 against retail's r23..r31 and the case bodies' numbering differs.
  * RESIDUALS. hbmTextCellListInit (0x80542BE0): retail reloads the count for the free-list index (`slwi`, no
  *            `clrlwi`) where ours reuses the loop's; hbmPanelGetTextOrigin (0x8054826C): retail loads the rect before
  *            the 0.0f; hbmPanelLayoutText (0x80545C44), hbmKbWidgetCalc: frame size; register allocation otherwise.
- * RESIDUALS. hbmPanelHitTest (0x80547D00), hbmPanelFindLineOverflow: retail copies slot 0x18C's Vec2f into `scale`
- *            (dead stores at 0x20/0x24) besides its temporary, ours builds it in place (direct-init, a reference and
- *            an assignment tried); the stack offsets after it shift by 8.
+ * SHAPES.    Slot 0x18C's/0x188's Vec2f result is named through a temporary (`Vec2f scaleTemp = ...; Vec2f scale =
+ *            scaleTemp;`): retail stores the returned r3/r4 into both and reads the temporary.
+ * RESIDUALS. hbmPanelHitTest (0x80547D00): the stack order of the slot-0x18C temporaries (retail: scale 0x20, the pen
+ *            temporary 0x28, scaleTemp 0x30) and the f30/f31 halves of scale; declaring scale apart and assigning it
+ *            measures worse.
  * RESIDUALS. The line-cell family (hbmPanelClearText, Reset, Relayout, SetWordWrap, Create, OnTextChanged,
  *            CursorUp/Down, SetItemCaret, DeleteBackward, TruncateText): the volatile-register numbering inside the
  *            inlined unlink/insertAfter/syncCursorCell differs per caller; every declaration order of their locals
@@ -49,22 +51,26 @@
  *            literal `(u16)(key + 0xCF65)` reproduces it, and `(u16)(key - 0x309B)` is kept.
  * RESIDUALS. fn_8054F178: retail loads both arguments before either store (`lbz r4; lwz r0; stb; stw`); every spelling
  *            tried keeps one load/store pair after the other.
- * RESIDUALS. Unwritten: the keyboard widget's destructor fn_8054CF38 (0x134).  It stores the widget's four tables
- *            (0x8064ECC0, +0x20, +0xB8, +0x1AC), so it needs the widget as a class (HbmKbTextPanel + HbmPaneManager);
- *            homebutton/hbm_value.cpp (0x8055E948) and this unit's adjustor thunk fn_8054F6BC call it by its C name with
- *            a destructor flag, so its mangled name needs those callers re-spelled first.
- * RESIDUALS. hbmKbWidgetCreatePanel: retail keeps the widget, the allocator and the per-key animation count in
- *            r23/r24/r22, ours in r22/r23/r24 (four declaration placements of the count measured, none better).
- * RESIDUALS. Relocation names that wait on other rows: the constructor's tables 0x80657678/0x80651708 and the
- *            text-buffer base destructor 0x80558F38 (registry names __vt__16HbmKbEventSource, __vt__15HbmPanelSubView,
- *            __dt__19HbmKbTextBufferBaseFv); HbmTextBufferSet's emitted table is lbl_8064F0B0 in the map, which
- *            homebutton/hbm_value.cpp and homebutton/hbm_text_panel.h still spell by that C name.
+ * SHAPES.    fn_8054CF38 is HbmKbTextWidget's destructor (mangled __dt__15HbmKbTextWidgetFv); it stays a C-named wrapper
+ *            `if (self) { self->HbmKbTextWidget::~HbmKbTextWidget(); if (flag > 0) delete }` around the inline destructor:
+ *            its callers (the adjustor thunk fn_8054F6BC and homebutton/hbm_value.cpp's derived destructor
+ *            0x8055E948) pass the destructor flag through, which source can express only once the widget's table
+ *            and its thunks are emitted here (a qualified destructor call passes -1, measured).
+ * RESIDUALS. fn_8054CF38: the wrapper keeps the inline destructor's own `beq` after the outer one (one extra
+ *            instruction); dropping the outer test or deleting through `delete self` measures worse.
+ * RESIDUALS. hbmKbWidgetCreatePanel: retail hoists def->numAnims into r22 (buffers in r18); a named count local colours
+ *            before the widget and the allocator (r22/r23/r24 rotate; six placements measured), so the loop reads
+ *            def->numAnims each pass. tools/mwcc-debugger has no GC/3.0a5.2 tables to ask.
  * SHAPES.    The constructor builds the scroll record's first 0x10 bytes as HbmKbScrollerView
  *            (homebutton/hbm_kb_scroller.h); the code reads it through HbmPanelScrollView, whose slot 0x10 returns f64
  *            and slot 0x14 an s32 where homebutton/hbm_kb_widget.cpp's callers measure f32 and bool.
- * RESIDUALS. Flip blockers in .text: ours emits weak copies of __dt__15HbmPanelSubViewFv, __dt__16HbmTextCellStoreFv,
- *            __dt__14HbmPaneHandlerFv and __dt__15HbmEventHandlerFv that retail does not; HbmTextBufferSet's table is
- *            emitted here while the panel's and the buffers' tables are not.
+ * RESIDUALS. Weak copies: a constructor makes MWCC emit a weak copy of every inline base or member destructor it
+ *            builds (a probe measures it with -Cpp_exceptions off under -ipa function, -inline auto and -O4,s alike), so
+ *            ours carries __dt__15HbmPanelSubViewFv, __dt__16HbmTextCellStoreFv, __dt__Q34nw4r2ut5ColorFv,
+ *            __dt__14HbmPaneHandlerFv and __dt__15HbmEventHandlerFv; retail's object keeps only the referenced
+ *            __dt__16HbmKbEventSourceFv (after hbmKbSlot150DeletingDtor, ours directly after the constructor), the
+ *            link drops the unreferenced ones. HbmTextBufferSet's table is emitted here while the panel's, the
+ *            widget's and the buffers' tables are not.
  * NAMES.     Other units' symbols come from their owners' headers (hbm_value, hbm_hermite, hbm_kb_event, hbm_kb_widget,
  *            hkb_keyboard, hkb_widget_tail, tiHKBManager, hbm_gui_draw, KPR, MSL_C extras).
  * RESIDUALS. .data 0x8064E760..0x8064F360 spans at least 3 TUs (datagap.py emission-order seams at 0x8064F0BC and
@@ -76,6 +82,7 @@
  *            included here, so the rename sweep cannot make it clash with the typed definitions.
  * NAMES.     GUESS classes HbmPanelPart and its kind HbmPanelPartA (band keys with a state word; members reset,
  *            setState, getResource, getState).
+ * NAMES.     GUESS class HbmKbTextWidget (the keyboard widget: the panel plus the pane manager, table 0x8064ECC0).
  * NAMES.     GUESS classes HbmKbTextPanel (the panel as its constructor builds it), HbmKbEventSource (its first base, a
  *            receiver list broadcast through slot 0x18), HbmKbCandidateBuffer/HbmKbConverterBuffer (the 0x200-character
  *            text buffers of tables 0x8064F1C0/0x8064F0BC, after the panel's candidateList/converter fields),
@@ -109,6 +116,7 @@
 #include "homebutton/hbm_kb_event.h"
 #include "homebutton/hbm_kb_widget.h"
 #include "homebutton/hbm_kb_scroller.h"
+#include "homebutton/hbm_text_buffer_set.h"
 #include "homebutton/hbm_gui_draw.h"
 #include "homebutton/tiHKBManager.h"
 #include "MSL_C/extras.h"
@@ -640,19 +648,6 @@ public:
     /* slot +0x008 */ virtual ~HbmKbConverterBuffer();
 }; /* size: 0x50 */
 
-/* The set of the panel's three text buffers: hbmTextBuffersInit builds them, the destructor (0x805425E4) destroys
- * them; its class table (0x8064F0B0) holds only the destructor.  size: 0x14 */
-class HbmTextBufferSet {
-public:
-    /* slot +0x008 */ virtual ~HbmTextBufferSet();
-
-    /* +0x00 is the compiler-emitted vptr */
-    /* +0x04 */ HbmKbTextBuffer* textField;
-    /* +0x08 */ HbmKbCandidateBuffer* candidateList;
-    /* +0x0C */ HbmKbConverterBuffer* converter;
-    /* +0x10 */ MEMAllocator* allocator;
-}; /* size: 0x14 */
-
 /* The glyph box the text writer's slot 0x68 measures: the bounds it fills in for the character `code`.
  * size: 0x14 */
 struct HbmCharBox {
@@ -664,7 +659,7 @@ struct HbmCharBox {
 /* Where hbmPanelDrawComposition reports the composition's caret.
  * size: 0x0C */
 struct HbmCaretSpot {
-    /* +0x00 */ u32 unused_0x00;
+    /* +0x00 */ u32 position;
     /* +0x04 */ f32 x;
     /* +0x08 */ f32 y;
 };
@@ -1473,6 +1468,62 @@ public:
 
     /* slot +0x00C */ virtual void v_0x00C();
     /* slot +0x008 */ virtual ~HbmKbTextPanel();
+    /* The panel's own slots, appended after the candidate strings' part of its table. */
+    /* slot +0x0D0 */ virtual void v_0x0D0();
+    /* slot +0x0D4 */ virtual void v_0x0D4();
+    /* slot +0x0D8 */ virtual void v_0x0D8();
+    /* slot +0x0DC */ virtual void v_0x0DC();
+    /* slot +0x0E0 */ virtual void v_0x0E0();
+    /* slot +0x0E4 */ virtual void v_0x0E4();
+    /* slot +0x0E8 */ virtual void v_0x0E8();
+    /* slot +0x0EC */ virtual void v_0x0EC();
+    /* slot +0x0F0 */ virtual void v_0x0F0();
+    /* slot +0x0F4 */ virtual void v_0x0F4();
+    /* slot +0x0F8 */ virtual void v_0x0F8();
+    /* slot +0x0FC */ virtual void v_0x0FC();
+    /* slot +0x100 */ virtual void v_0x100();
+    /* slot +0x104 */ virtual void v_0x104();
+    /* slot +0x108 */ virtual void v_0x108();
+    /* slot +0x10C */ virtual void v_0x10C();
+    /* slot +0x110 */ virtual void v_0x110();
+    /* slot +0x114 */ virtual void v_0x114();
+    /* slot +0x118 */ virtual void v_0x118();
+    /* slot +0x11C */ virtual void v_0x11C();
+    /* slot +0x120 */ virtual void v_0x120();
+    /* slot +0x124 */ virtual void v_0x124();
+    /* slot +0x128 */ virtual void v_0x128();
+    /* slot +0x12C */ virtual void v_0x12C();
+    /* slot +0x130 */ virtual void v_0x130();
+    /* slot +0x134 */ virtual void v_0x134();
+    /* slot +0x138 */ virtual void v_0x138();
+    /* slot +0x13C */ virtual void v_0x13C();
+    /* slot +0x140 */ virtual void v_0x140();
+    /* slot +0x144 */ virtual void v_0x144();
+    /* slot +0x148 */ virtual void v_0x148();
+    /* slot +0x14C */ virtual void v_0x14C();
+    /* slot +0x150 */ virtual void v_0x150();
+    /* slot +0x154 */ virtual void v_0x154();
+    /* slot +0x158 */ virtual void v_0x158();
+    /* slot +0x15C */ virtual void v_0x15C();
+    /* slot +0x160 */ virtual void v_0x160();
+    /* slot +0x164 */ virtual void v_0x164();
+    /* slot +0x168 */ virtual void v_0x168();
+    /* slot +0x16C */ virtual void v_0x16C();
+    /* slot +0x170 */ virtual void v_0x170();
+    /* slot +0x174 */ virtual void v_0x174();
+    /* slot +0x178 */ virtual void v_0x178();
+    /* slot +0x17C */ virtual void v_0x17C();
+    /* slot +0x180 */ virtual void v_0x180();
+    /* slot +0x184 */ virtual void v_0x184();
+    /* slot +0x188 */ virtual void v_0x188();
+    /* slot +0x18C */ virtual void v_0x18C();
+    /* slot +0x190 */ virtual void v_0x190();
+    /* slot +0x194 */ virtual void v_0x194();
+    /* slot +0x198 */ virtual void v_0x198();
+    /* slot +0x19C */ virtual void v_0x19C();
+    /* slot +0x1A0 */ virtual void v_0x1A0();
+    /* slot +0x1A4 */ virtual void v_0x1A4();
+    /* slot +0x1A8 */ virtual void v_0x1A8();
 
     /* +0x1880 */ u8 unused_0x1880[0x78];
     /* +0x18F8 */ nw4r::ut::Rect textRect;
@@ -1526,6 +1577,43 @@ public:
     /* +0x19FC */ u32 minVisibleLines;
     /* +0x1A00 */ u32 value_0x1A00;                          /* cleared by the constructor */
 }; /* size: 0x1A04 */
+
+/* The keyboard widget: the text panel with the pane manager as its second base (+0x1A04), the pane listener and
+ * the built-in font (class table 0x8064ECC0 with its secondary tables at +0x20, +0xB8 and +0x1AC).  Its first new
+ * slot (0x220) is declared first, so it stays the key function and the table is not emitted here; the destructor
+ * (0x8054CF38) is inline and reached through fn_8054CF38.
+ * size: 0x1AF4 */
+class HbmKbTextWidget : public HbmKbTextPanel, public HbmPaneManager {
+public:
+    /* slot +0x220 */ virtual void v_0x220();
+    /* slot +0x008 */ virtual ~HbmKbTextWidget() {
+        if (paneListener != NULL) {
+            paneListener->~HbmTextPaneListener();
+        }
+        MEMFreeToAllocator(HbmKbTextPanel::allocator, paneListener);
+        for (HbmKey* key = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL); key != NULL;
+             key = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL)) {
+            nw4r::ut::List_Remove(&mComponents, key);
+            key->destroy(HbmKbTextPanel::allocator);
+        }
+    }
+
+    /* +0x1AAC */ const char* textBoxName;
+    /* +0x1AB0 */ const char* fontName;
+    /* +0x1AB4 */ u8 scrollUpShown;
+    /* +0x1AB5 */ u8 scrollDownShown;
+    /* +0x1AB6 */ u8 separatorShown;
+    /* +0x1AB7 */ u8 pad_0x1AB7;
+    /* +0x1AB8 */ HbmTextPaneListener* paneListener;
+    /* +0x1ABC */ nw4r::ut::ResFont font;
+    /* +0x1AD8 */ s32 repeatBit0001;
+    /* +0x1ADC */ s32 repeatBit4000;
+    /* +0x1AE0 */ s32 repeatBit0002;
+    /* +0x1AE4 */ s32 repeatBit8000;
+    /* +0x1AE8 */ s32 repeatBit1000;
+    /* +0x1AEC */ u8 unused_0x1AEC[0x4];
+    /* +0x1AF0 */ u32 pressedButtons;
+}; /* size: 0x1AF4 */
 
 #ifdef __cplusplus
 extern "C" {
@@ -1797,7 +1885,7 @@ void hbmTextCellListInit(HbmTextCellList* list)
     }
     {
         HbmTextCell* free = &list->cells[list->count];
-        u16 last = list->count - 1;
+        u16 last = i - 1;
 
         HbmTextCell* cells;
 
@@ -1997,10 +2085,13 @@ u8* hbmKbSlot150DeletingDtor(u8* self, s32 flag)
     return self;
 }
 
+#pragma push
+#pragma auto_inline on
 /* 0x80543020 (0x74): Frees the line cells and destroys the text writer. */
 HbmKbTextPanel::~HbmKbTextPanel()
 {
 }
+#pragma pop
 
 /* 0x80543094 (0x118): Resets the panel's caret, scroll and colour state, its key queue and the writer's fixed width,
  * then refreshes the candidates and the writer. */
@@ -2442,7 +2533,8 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
     case 14:
         if (targetIsText && target->v_0x0CC()) {
             HbmPointMessage* point = (HbmPointMessage*)arg;
-            Vec2f origin = self->v_0x188();
+            Vec2f originTemp = self->v_0x188();
+            Vec2f origin = originTemp;
 
             hbmPanelSetItemCaret(self, target, self->v_0x184(point->x - origin.x, point->y - origin.y));
             self->v_0x17C(5);
@@ -2457,7 +2549,8 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
     case 15:
         if (target->v_0x084()) {
             HbmPointMessage* point = (HbmPointMessage*)arg;
-            Vec2f origin = self->v_0x188();
+            Vec2f originTemp = self->v_0x188();
+            Vec2f origin = originTemp;
 
             hbmPanelSetItemCaret(self, target, self->v_0x184(point->x - origin.x, point->y - origin.y));
             self->v_0x018(13, NULL);
@@ -2466,7 +2559,8 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
     case 16:
         if (target->v_0x084()) {
             HbmPointMessage* point = (HbmPointMessage*)arg;
-            Vec2f origin = self->v_0x188();
+            Vec2f originTemp = self->v_0x188();
+            Vec2f origin = originTemp;
             u32 start;
             u32 end;
             u32 position;
@@ -2971,9 +3065,11 @@ inline void hbmPanelLayoutText(HbmPanelView* self)
     self->writer.mCursorPos.y = y;
     self->writer.mCursorPos.x = position.x;
     {
-        Vec2f scale = self->v_0x18C();
+        Vec2f scaleTemp = self->v_0x18C();
+        Vec2f scale = scaleTemp;
         nw4r::ut::Rect clip;
-        Vec2f origin = self->v_0x188();
+        Vec2f originTemp = self->v_0x188();
+        Vec2f origin = originTemp;
 
         clip.left = origin.x;
         clip.bottom = origin.y;
@@ -3124,24 +3220,24 @@ HbmTextWriterMark* hbmTextWriterGetMark(HbmPanelSubView* writer)
 /* 0x805461F8 (0x110): Draws the text in the panel's colour: wrapped through the line cells, or as one run. */
 void hbmPanelDrawText(HbmPanelView* self, u32 cursor)
 {
-    Vec2f offset;
-    u32 position = cursor;
+    HbmCaretSpot caret;
 
-    offset.x = 0.0f;
-    offset.y = 0.0f;
+    caret.position = cursor;
+    caret.x = 0.0f;
+    caret.y = 0.0f;
     self->textColor.a = self->textAlpha;
     self->writer.SetTextColor(self->textColor);
     if (self->wrapLines) {
-        hbmPanelLayoutLines(self, &position);
-        hbmTextWriterDraw((HbmTextWriter*)&self->writer, (HbmTextCaret*)&position);
-        hbmPanelDrawTrailingLines(self, &position);
+        hbmPanelLayoutLines(self, &caret.position);
+        hbmTextWriterDraw((HbmTextWriter*)&self->writer, (HbmTextCaret*)&caret);
+        hbmPanelDrawTrailingLines(self, &caret.position);
     } else {
         u32 length = self->textField->v_0x01C();
 
         hbmTextWriterSetText((HbmTextWriter*)&self->writer, self->textField->v_0x048(), 0, length);
-        hbmTextWriterDraw((HbmTextWriter*)&self->writer, (HbmTextCaret*)&position);
+        hbmTextWriterDraw((HbmTextWriter*)&self->writer, (HbmTextCaret*)&caret);
     }
-    self->v_0x168(offset.x, offset.y);
+    self->v_0x168(caret.x, caret.y);
 }
 
 /* 0x80546308 (0x8): Returns the text buffer's length. */
@@ -3816,7 +3912,8 @@ u32 hbmPanelHitTest(HbmPanelView* self, f32 x, f32 y)
     lineTop = 0.0f;
     lineBottom = lineTop;
     {
-        Vec2f scale = self->v_0x18C();
+        Vec2f scaleTemp = self->v_0x18C();
+        Vec2f scale = scaleTemp;
 
         i = 0;
         self->drawPosition = 0;
@@ -5237,6 +5334,19 @@ void hbmPanelResetCandidate(HbmTextPanel* self)
     }
 }
 
+/* 0x8054CF38 (0x134): Destroys the keyboard widget (its pane listener, its pane parts, the font, the pane manager and
+ * the panel) and frees it when `flag` is positive. */
+extern "C" HbmKbTextWidget* fn_8054CF38(HbmKbTextWidget* self, s32 flag)
+{
+    if (self != NULL) {
+        self->HbmKbTextWidget::~HbmKbTextWidget();
+        if (flag > 0) {
+            operator delete(self);
+        }
+    }
+    return self;
+}
+
 /* 0x8054D06C (0x40): Deleting destructor of a helper with no base destructor to run. */
 u8* hbmPanelHelperDeletingDtor(u8* self, s32 flag)
 {
@@ -5301,9 +5411,7 @@ void hbmKbWidgetCreatePanel(HbmPanelView* self, MEMAllocator* allocator, HbmText
         }
         nw4r::ut::List_Append(&self->components, part);
         group = def->group;
-        u16 j = 0;
-        u32 numAnims = def->numAnims;
-        for (; j < numAnims; j++) {
+        for (u16 j = 0; j < def->numAnims; j++) {
             const void* res = self->resAccessor->GetResource(0, def->anims[j]->name, NULL);
             nw4r::lyt::AnimTransform* anim = hbmPanelPaneManager(self)->getLayout()->CreateAnimTransform(res, self->resAccessor);
             if (group == NULL) {
@@ -5642,7 +5750,8 @@ u32 hbmPanelFindLineOverflow(HbmPanelView* self, u32 maxLines, const u16* text)
         return 0;
     }
     x = self->v_0x18C().x;
-    Vec2f scale = self->v_0x18C();
+    Vec2f scaleTemp = self->v_0x18C();
+    Vec2f scale = scaleTemp;
     i = 0;
     lines = 0;
     self->drawPosition = 0;
@@ -6137,11 +6246,8 @@ extern "C" void fn_8054F6B4(HkbWidget* self) {
 #pragma pop
 
 /* Adjustor thunk: base #7 -> fn_8054CF38. */
-/* The keyboard widget's destructor (0x8054CF38); its body is not written yet. */
-extern "C" void fn_8054CF38(HkbWidget* self, s32 flag);
-
 extern "C" void fn_8054F6BC(HkbWidget* self, s32 flag) {
-    fn_8054CF38((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_1A04)), flag);
+    fn_8054CF38((HbmKbTextWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_1A04)), flag);
 }
 
 /* Adjustor thunk: base #2 -> hbmPanelDrawCaret. */
