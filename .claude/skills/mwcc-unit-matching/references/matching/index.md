@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (165)
+## Ideas that work (167)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -174,6 +174,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 183 | [A switch case that skips the shared tail, or a case that runs another case's tail: continue inside do { } while (0)](183-switch-case-that-skips.md) | works | source-shape | Retail's switch has one copy of a tail that several cases share (or that some cases skip), reached by a `b` from a case body; duplicating the tail in each case adds a copy (MWCC does not tail-merge) and `break` cannot... |
 | 184 | [A run of identical stores to consecutive slots is a constant-count loop MWCC unrolls](184-unrolled-store-run-loop.md) | works | source-shape | A long run of `stw r3,N(r31)` / `sth r0,N(rX)` with one value is matched by hand-written stores except for the scheduling of the value's `li` and the base register's `addi`, which land in the other order. |
 | 185 | [A narrow parameter updated in place is narrowed lazily, a fresh narrow local at once](185-narrow-parameter-updated-in.md) | works | source-shape, allocator | Retail adds to an `s16`/`u16` value and then stores it, adds to it or passes it on with no `extsh`/`clrlwi` after the add, while our `s16 top = y - 8;` (or an `s32` local) emits the narrowing at the definition and again... |
+| 186 | [An asm block that fills a local frame record: reference the parameters in the asm, peephole and optimizewithasm off](186-asm-block-that-fills.md) | works | pragma, source-shape | Retail stores a function's parameters to stack slots at entry and keeps `addi r3,r1,N` + `psq_stx` pairs inside an asm block; ours keeps the parameters in registers, fuses each pair into `psq_st` and reorders the asm... |
+| 187 | [An extab range or an 8-aligned vtable that only a merged object reproduces names a false TU seam](187-extab-range-or-an.md) | works | sections, linker | Every function of a unit is instruction-identical, yet one extab range starts a call too early and a vtable lands 4 bytes late in .data, so the unit can never flip. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 
