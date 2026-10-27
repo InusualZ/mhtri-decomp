@@ -11,7 +11,7 @@ extern "C" {
 
 /* 0x80291C50 - probes the ground under `pos` in area `area` into `out`; nonzero on a hit (GUESS name). */
 struct EmPopGround;
-u8 pl_area_ground_probe(nw4r::math::VEC3* pos, u8 area, struct EmPopGround* out, s32 mode);
+s32 pl_area_ground_probe(nw4r::math::VEC3* pos, u8 area, struct EmPopGround* out, s32 mode);
 
 #ifdef __cplusplus
 }

@@ -28,26 +28,29 @@
  *    FuncObjCalcWorld::Get/SetCallbackNodeID) keep the map's generated rows: other units still call them by C names
  *    until those classes are modelled there, so the relocations differ by name only;
  *  - `em_pop_obj_callback_bind`: retail's first search jumps into the second loop's bind tail (a shared tail); without
- *    `goto` the best shape is a break-out first loop and a guarded second loop (88.3; the flag-free unrolled form
- *    measured 56.8);
- *  - `em_pop_obj_tint_set`: retail re-sign-extends the s16 channels at every use and does not fold the `max < r`
- *    test with `r > 0xFF`; its two colour words sit at 0x18/0x14 (ours 0x20/0x1C); s32 channels measured worse;
- *  - `em_pop_spare_init`: retail rebuilds each 5-byte run's base (`li; addis; addi 0x4A49; add`), ours folds it;
- *  - `em_pop_spare_spawn`: retail indexes the lists as `work + (i + 0x34A49)`, ours as `(work + i) + 0x4A49`;
- *  - `em_roster_spare_draw`, `em_pop_work_alloc`, `em_pop_obj_glow_step`, `em_pop_spare_step`: register allocation;
- *  - `em_roster_record_get`: retail returns through `bne` + `mr r3,r4` + `blr`, ours through `beqlr` (the ternary,
- *    early-return, result-variable and byte-local spellings measured the same or worse);
- *  - `em_weight_table_pick`: retail reloads the weight halfword in both loop bodies (`lhz`);
- *  - `em_pop_rec_step`: retail tail-merges the three `field_0x008 = 3` exits of step 2 into the first one;
- *  - `em_roster_pop_entry_add`: retail's switch range test is `subi`/`cmplwi` on r3, ours `cmpwi` pairs on r0;
- *  - `em_pop_spring_bubble_spawn`: retail moves `area` after `height`;
- *  - `em_drop_item_spawn`: the `em_drop_tbl` load is scheduled one instruction later in retail;
- *    `em_roster_slot_effect_set`: `quest_id_get() == 1` is `cmpwi` in retail.
+ *    `goto` the best shape is a break-out first loop and a guarded second loop (the flag-free unrolled form is worse);
+ *  - `em_pop_obj_tint_set`: retail re-sign-extends the channels at every use and keeps `0 < r` as `li 0; cmpw`, the
+ *    shape of inline helpers' argument copies (a max helper and a scale/clamp helper); `dont_inline` (needed for the
+ *    out-of-line ResMat/ResMatChan copies) keeps any helper out of line, so the copies are written as blocks over s32
+ *    channels; its two colour words sit at 0x18/0x14 (ours 0x20/0x1C);
+ *  - `em_roster_spare_draw`: register colouring - the dump colours `total` r30, `place`/`num` r29, `kind` r30 and
+ *    `rec` r28 (retail: `rec` r29, `place`/`num` r28); declaration orders and a separate `kinds` base measured equal;
+ *  - `em_pop_work_alloc`: the 0x11200 and 0x80 constants and the table walk take swapped saved registers;
+ *  - `em_pop_rec_step`: step 2's first exit block (`field_0x008 = 3`) is the target of later backward branches (a
+ *    shared tail); the nested and `||` spellings measured equal or worse;
+ *  - `pl_area_ground_probe` is `void` in its owner `Pl/pl_coll.cpp`, but retail leaves `hit_ground_comon`'s s32 in r3
+ *    and this unit truncates it (`clrlwi` before the store), so its leaf header returns s32 (request enemy-em-model#1);
+ *  - the out-of-line nw4r copies `dont_inline` produces (ResMat/ResMatChan copy ctors, the ResMat/ResMdl assignments,
+ *    ICalcWorldCallback's dtor) are weak definitions in this object that the target's object does not carry.
  * SHAPES. `#pragma fp_contract off` and `#pragma pool_data off` file-wide (retail has no fused multiply-adds and
  *   addresses each table by its own symbol); `#pragma dont_inline on` around the callback class's ctor/dtor, the tint
  *   and the entry-add functions makes the inline nw4r handle members out-of-line calls as retail has them, and off
  *   elsewhere (on, the spare copy becomes a call).  A `switch` whose `default:` is listed first gives retail's
- *   branch-free default (`em_roster_record_result_get`, `em_drop_offset_get`).
+ *   branch-free default (`em_roster_record_result_get`, `em_drop_offset_get`).  `optimization_level 4` on
+ *   `em_pop_spare_init` (retail rebuilds each 5-byte run's base), `em_pop_spare_spawn`, `em_roster_spare_draw`,
+ *   `em_roster_pop_entry_add` and `em_drop_item_spawn`; `opt_common_subs off` on `em_weight_table_pick` (the weight
+ *   reload); `opt_propagation off` on `em_roster_spare_draw`.  `x / 2.0f` (not `x * 0.5f`) keeps retail's
+ *   `fmuls x, 0.5` operand order; `rec = recs; rec += index;` keeps the result out of r3 (`em_roster_record_get`).
  */
 
 
@@ -241,7 +244,7 @@ void em_pop_rec_bob_step(EmPopRec* rec);
 void em_pop_obj_glow_step(EmPopObj* obj);
 void em_pop_rec_step(EmPopObj* obj);
 void em_pop_spare_step(EmPopObj* obj);
-void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, u8 area, f32 height);
+void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, f32 height, u8 area);
 void em_pop_bubble_offset_get(nw4r::math::VEC3* out, f32 radius);
 void em_pop_sub_bubble_step(EmPopObj* obj);
 void em_pop_obj_callback_bind(EmPopObj* obj, u8 mode);
@@ -343,7 +346,7 @@ s32 em_roster_slot_effect_set(_ENEMY_WORK* self, s32 index, s32* slot, s32 a, s3
                     break;
                 }
                 drops = m_item_tbl[0][entry->item_0x00];
-                if ((u16)quest_id_get() == 1 && self->team == 0x1b) {
+                if ((s32)(u16)quest_id_get() == 1 && self->team == 0x1b) {
                     drops = em_drop_default_tbl;
                 }
             } else if (move_work_state_ck() != 0) {
@@ -509,6 +512,8 @@ void em_drop_rec_step(EmPopObj* obj) {
 
 /* Rolls `percent` and places one of the enemy's three drops at `pos` in a free drop slot (its drop table at the
  * enemy's variant offset); returns 1 when placed. */
+#pragma push
+#pragma optimization_level 4
 s32 em_drop_item_spawn(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 percent) {
     u32 slot = 0xFF;
     nw4r::math::VEC3 at;
@@ -593,6 +598,7 @@ s32 em_drop_item_spawn(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 percent) {
     }
     return 0;
 }
+#pragma pop
 
 /* Whether the record is live and still in its first two states. */
 u32 em_roster_record_alive_ck(u32 index) {
@@ -699,11 +705,15 @@ u32 em_roster_sub_record_clear(EmPopSubRec* rec) {
 
 /* Draws the record's placement and kind from its spare record, by count and by weight; returns 1 when one was
  * drawn. */
+#pragma push
+#pragma optimization_level 4
+#pragma push
+#pragma opt_propagation off
 u32 em_roster_spare_draw(EmPopRec* rec) {
     u8 map;
     s32 num;
-    EmPopSparePlace* place;
     s32 total;
+    EmPopSparePlace* place;
     s32 roll;
     s32 i;
     s32 acc;
@@ -739,7 +749,8 @@ u32 em_roster_spare_draw(EmPopRec* rec) {
         }
         if (num != 0) {
             roll = ran_suu(0) % num;
-            place = &rec->spare_0x1E8->places_0x004[roll];
+            place = rec->spare_0x1E8->places_0x004;
+            place += roll;
             total = 0;
             if (rec->spare_0x1E8->kinds_0x124[0].valid_0x07 != 0) {
                 total = rec->spare_0x1E8->kinds_0x124[0].weight_0x00;
@@ -835,6 +846,8 @@ u32 em_roster_spare_draw(EmPopRec* rec) {
     }
     return 0;
 }
+#pragma pop
+#pragma pop
 
 /* Steps the population work: once its files are loaded it clears the spare table and loads the pop files; while
  * running it runs every live record's and sub-record's step. */
@@ -940,12 +953,12 @@ void em_pop_res_load(u8 map) {
 void em_pop_res_loaded(char* name, void* data /* untyped: byte range - the loaded file image */, s32 size,
                        EmPopResLoad* load) {
     EmPopWork* work = load->work;
-    u32 file;
 
     if (load->index == 0) {
         nwAddResource(name, data);
         work->res_0x008 = ckResourceName(name);
         if (work->res_0x008 != NULL) {
+            u32 file;
             res_file_assign(&work->res_file_0x00C, res_file_ctor(&file, (u32)work->res_0x008->data));
         }
         work->state_0x000 = 2;
@@ -954,6 +967,7 @@ void em_pop_res_loaded(char* name, void* data /* untyped: byte range - the loade
     nwAddResource(name, data);
     work->res_0x014 = ckResourceName(name);
     if (work->res_0x014 != NULL) {
+        u32 file;
         res_file_assign(&work->res_file_0x018, res_file_ctor(&file, (u32)work->res_0x014->data));
     }
 }
@@ -1106,6 +1120,8 @@ u8 em_roster_area_gather_take(u8 area, nw4r::math::VEC3* pos, u32 word) {
 
 /* Picks one entry of a 0xFFFF-terminated weight table at random, by weight; returns its value (0xFFFF when the
  * table is empty). */
+#pragma push
+#pragma opt_common_subs off
 u16 em_weight_table_pick(const EmWeightEntry* table) {
     const EmWeightEntry* entry;
     u16 total;
@@ -1129,6 +1145,7 @@ u16 em_weight_table_pick(const EmWeightEntry* table) {
     }
     return 0xFFFF;
 }
+#pragma pop
 
 /* The nearest point of `area` within `range` of `pos` (searched from the last record): its id, or 0xFFFF when it is
  * used up; its kind, centre, drop table and radius go out through the pointers. */
@@ -1228,10 +1245,10 @@ void em_pop_obj_tint_set(EmPopRec* rec) {
     u8 index;
     s32 num;
     s32 i;
-    s16 r;
-    s16 g;
-    s16 b;
-    s16 max;
+    s32 r;
+    s32 g;
+    s32 b;
+    s32 max;
     u32 color0;
     u32 color1;
     s32 model;
@@ -1265,38 +1282,68 @@ void em_pop_obj_tint_set(EmPopRec* rec) {
         g = (s16)((tint[1] * amb[1]) / base[1]);
         b = (s16)((tint[2] * amb[2]) / base[2]);
         max = 0;
-        if (r > 0xFF && max < r) {
-            max = r;
+        {
+            s16 m = max;
+            s16 c = r;
+            if (c > 0xFF && m < c) {
+                m = c;
+            }
+            max = m;
         }
-        if (g > 0xFF && max < g) {
-            max = g;
+        {
+            s16 m = max;
+            s16 c = g;
+            if (c > 0xFF && m < c) {
+                m = c;
+            }
+            max = m;
         }
-        if (b > 0xFF && max < b) {
-            max = b;
+        {
+            s16 m = max;
+            s16 c = b;
+            if (c > 0xFF && m < c) {
+                m = c;
+            }
+            max = m;
         }
-        if (max > 0xFF) {
-            r = (s16)((r * 0xFF) / max);
+        {
+            s16 c = r;
+            s16 m = max;
+            if (m > 0xFF) {
+                c = (s16)((c * 0xFF) / m);
+            }
+            if (c > 0xFF) {
+                c = 0xFF;
+            } else if (c < 0x3C) {
+                c = 0x3C;
+            }
+            r = c;
         }
-        if (r > 0xFF) {
-            r = 0xFF;
-        } else if (r < 0x3C) {
-            r = 0x3C;
+        {
+            s16 c = g;
+            s16 m = max;
+            if (m > 0xFF) {
+                c = (s16)((c * 0xFF) / m);
+            }
+            if (c > 0xFF) {
+                c = 0xFF;
+            } else if (c < 0x3C) {
+                c = 0x3C;
+            }
+            g = c;
         }
-        if (max > 0xFF) {
-            g = (s16)((g * 0xFF) / max);
-        }
-        if (g > 0xFF) {
-            g = 0xFF;
-        } else if (g < 0x3C) {
-            g = 0x3C;
-        }
-        if (max > 0xFF) {
-            b = (s16)((b * 0xFF) / max);
-        }
-        if (b > 0xFF) {
-            b = 0xFF;
-        } else if (b < 0x3C) {
-            b = 0x3C;
+        {
+            s16 c = b;
+            s16 m = max;
+            if (m > 0xFF) {
+                c = (s16)((c * 0xFF) / m);
+            }
+            if (c > 0xFF) {
+                c = 0xFF;
+            } else if (c < 0x3C) {
+                c = 0x3C;
+            }
+            b = c;
         }
         amb[0] = (u8)r;
         amb[1] = (u8)g;
@@ -1372,9 +1419,9 @@ extern "C" {
 /* The glow step of the 0x81 models: it fades the glow in and out along its key frames and resets the scale. */
 void em_pop_obj_glow_step(EmPopObj* obj) {
     s32 num;
-    u32 i;
     f32** keys;
     EmPopColor* color;
+    u32 i;
     s8 rgba[4];
 
     if (obj->field_0x005 == 0x81) {
@@ -1423,7 +1470,7 @@ void em_pop_rec_step(EmPopObj* obj) {
         rec->field_0x00A = 0;
         rec->fade_0x00E = 0x14;
         rec->timer_0x220 = 0;
-        if (rec->field_0x005 == 0xA) {
+        if ((s32)rec->field_0x005 == 0xA) {
             rec->timer_0x00C = 1;
             break;
         }
@@ -1447,7 +1494,7 @@ void em_pop_rec_step(EmPopObj* obj) {
             switch (rec->field_0x005) {
             case 0xA:
                 if (--rec->timer_0x00C <= 0) {
-                    em_pop_spring_bubble_spawn(&rec->aim_0x1D0, rec->kind_0x004, rec->height_0x1F4);
+                    em_pop_spring_bubble_spawn(&rec->aim_0x1D0, rec->height_0x1F4, rec->kind_0x004);
                     rec->timer_0x00C = 0x14;
                 }
                 if ((++rec->timer_0x220 & 0x1F) == 0) {
@@ -1620,7 +1667,7 @@ void em_pop_spare_step(EmPopObj* obj) {
             switch (rec->field_0x005) {
             case 0xA:
                 if (--rec->timer_0x00C <= 0) {
-                    em_pop_spring_bubble_spawn(&rec->aim_0x1D0, rec->kind_0x004, rec->height_0x1F4);
+                    em_pop_spring_bubble_spawn(&rec->aim_0x1D0, rec->height_0x1F4, rec->kind_0x004);
                     rec->timer_0x00C = (s16)((s32)ran_suu(0) % 10 + 20);
                 }
                 break;
@@ -1694,7 +1741,7 @@ void em_pop_spare_step(EmPopObj* obj) {
 
 /* Spawns the spring's bubbles at `pos`: one rising from below the spring (half its height down) and one orbiting
  * it. */
-void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, u8 area, f32 height) {
+void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, f32 height, u8 area) {
     nw4r::math::VEC3 ofs;
     nw4r::math::VEC3 at;
     nw4r::math::VEC3 at2;
@@ -1717,7 +1764,7 @@ void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, u8 area, f32 height) {
             sub->field_0x005 = 0xA;
             addVec3(&at, pos, &ofs);
             copyVec3(&sub->pos_0x014, &at);
-            sub->pos_0x014.y -= height * 0.5f;
+            sub->pos_0x014.y -= height / 2.0f;
             mhchar_reset(&sub->model_0x038);
             mhchar_model_create(&sub->model_0x038, &work->res_file_0x00C, 0x68, 7);
             sub->step_0x1BC = em_pop_sub_bubble_step;
@@ -1824,7 +1871,7 @@ void em_pop_sub_bubble_step(EmPopObj* obj) {
                         scale.y *= -1.0f;
                     }
                     speed = sub->speed_0x1D4;
-                    half = speed * 0.5f;
+                    half = speed / 2.0f;
                     scale.x = speed - scale.x * half;
                     scale.y = speed - scale.y * half;
                     sub->wobble_x_0x1D8 = (u16)(sub->wobble_x_0x1D8 + 0x1000);
@@ -1926,7 +1973,7 @@ void EmModelCallback::ExecCallbackA(nw4r::g3d::ChrAnmResult* result, nw4r::g3d::
         scale.z = 1.0f;
         scale.y = 1.0f;
     } else {
-        scale.y = scale.x = getKeyData(keys, (f32)obj->frame_0x1C6);
+        scale.x = scale.y = getKeyData(keys, (f32)obj->frame_0x1C6);
         scale.z = 1.0f;
     }
     scale.x *= em_pop_node_scale_tbl[node - 1].x;
@@ -2081,6 +2128,8 @@ void em_pop_sub_mote_step(EmPopObj* obj) {
 
 #pragma dont_inline on
 /* Adds a roster record for the pop-file point `entry` of `area`; NULL when the work or the pool is unavailable. */
+#pragma push
+#pragma optimization_level 4
 EmPopRec* em_roster_pop_entry_add(const EmPopEntry* entry, u8 area) {
     nw4r::g3d::ResMdl mdl(NULL);
     nw4r::g3d::ResMat mat(NULL);
@@ -2123,11 +2172,6 @@ EmPopRec* em_roster_pop_entry_add(const EmPopEntry* entry, u8 area) {
     rec->uses_max_0x206 = entry->uses_max_0x2A;
     rec->drops_0x1EC = pop_place_item_tbl[map][entry->item_0x30];
     switch (rec->state_0x1F8) {
-    case 5:
-    case 6:
-    case 7:
-        rec->field_0x005 = 0xFF;
-        break;
     case 8:
         if (move_work_state_ck() == 0) {
             quest = quest_record_get();
@@ -2147,6 +2191,9 @@ EmPopRec* em_roster_pop_entry_add(const EmPopEntry* entry, u8 area) {
         eft_rot_vec_copy(&rec->rot_0x020, &rec->aim_rot_0x1DC);
         rec->field_0x005 = 0xFF;
         break;
+    case 5:
+    case 6:
+    case 7:
     case 0xA:
     case 0x10:
         rec->field_0x005 = 0xFF;
@@ -2203,6 +2250,7 @@ EmPopRec* em_roster_pop_entry_add(const EmPopEntry* entry, u8 area) {
     rec->on_ground_0x21C = 0;
     return rec;
 }
+#pragma pop
 
 /* Adds a roster record for the spare record `src` of `area`, kept in the work's spare table at `slot` (slots 0x14
  * and up are the glow motes). */
@@ -2269,6 +2317,8 @@ EmPopSpare* em_roster_record_copy(EmPopSpare* dst, const EmPopSpare* src) {
     return dst;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Resets the spare-record pool and, in the free hunt, draws how many spares of each list will spawn. */
 void em_pop_spare_init(void) {
     EmPopWork* work = em_pop_w.work;
@@ -2302,6 +2352,7 @@ void em_pop_spare_init(void) {
     }
 }
 
+#pragma pop
 /* Pushes the spare record `spare` into the work's spare table and its index into the free-hunt list of `slot`. */
 void em_pop_spare_push(EmPopSpare* spare, u8 area, s32 slot) {
     EmPopWork* work;
@@ -2325,6 +2376,8 @@ void em_pop_spare_push(EmPopSpare* spare, u8 area, s32 slot) {
 }
 
 /* Spawns the drawn spares of both lists, each at a random pushed spare of its list. */
+#pragma push
+#pragma optimization_level 4
 void em_pop_spare_spawn(void) {
     EmPopWork* work;
     EmPopSpare** tbl;
@@ -2365,6 +2418,7 @@ void em_pop_spare_spawn(void) {
         }
     }
 }
+#pragma pop
 
 /* Returns the live roster record at `index`, or NULL when the slot is out of range or not live. */
 EmPopRec* em_roster_record_get(u32 index) {
@@ -2372,7 +2426,8 @@ EmPopRec* em_roster_record_get(u32 index) {
     if ((s32)index >= (s32)work->rec_num) {
         return NULL;
     }
-    EmPopRec* rec = &work->recs[index];
+    EmPopRec* rec = work->recs;
+    rec += index;
     if (rec->state_0x000 == 1) {
         return rec;
     }
