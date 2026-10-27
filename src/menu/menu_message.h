@@ -48,11 +48,14 @@ typedef struct MenuLspPos {
  * size: 0x18 */
 typedef struct MenuListEntry {
     /* +0x00 */ u8 unused_0x00;
-    /* +0x01 */ u8 field_0x01;       /* zeroed on every entry */
-    /* +0x02 */ u8 present_0x02;     /* 1 while the source record's word is non-zero */
+    /* +0x01 */ s8 field_0x01;       /* the selected flag; the entry builders zero it */
+    /* +0x02 */ s8 present_0x02;     /* 1 while the source record's word is non-zero */
     /* +0x03 */ u8 unused_0x03[0x006 - 0x003];
     /* +0x06 */ s16 index_0x06;      /* the entry's ordinal */
-    /* +0x08 */ u8 unused_0x08[0x018 - 0x008];
+    /* +0x08 */ u32 unused_0x08;
+    /* +0x0C */ u32 text_color_0x0C;  /* the row's own name colour (with draw flag 0x04), 0 for the default */
+    /* +0x10 */ u32 count_color_0x10; /* the row's own count colour */
+    /* +0x14 */ u32 icon_color_0x14;  /* the row's own icon colour */
 } MenuListEntry;
 
 /* The menu list work record.  Only the bytes this range touches are named; +0x1E0 is the last
@@ -110,17 +113,19 @@ void menu_scroll_init(struct MenuScroll* scroll, u16 index, u16 total, u8 rows_p
 void menu_scroll_step(struct MenuScroll* scroll, u16 buttons, s32 sfx);
 void item_pairs_compact_sort(IdValue* pairs, s32 count);
 void item_pages_sort(IdValue* pool, IdValue* page);
+/* 0x802A9CD8 - the slot code of item `id` in the two item lists (0x80 set for the second page), 0xFF when absent. */
+u16 item_slot_code_find(IdValue* pool, IdValue* page, u16 id);
 /* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
-s32 toggle_word_step_dpad(void* state, u16 keys, s32 dec_mask, s32 inc_mask);
+s32 toggle_word_step_dpad(void* state, u16 keys, u16 dec_mask, u16 inc_mask);
 /* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
-s32 toggle_word_step(void* state, u16 pad, s32 a, s32 b, s32 c);
+s32 toggle_word_step(void* state, u16 keys, u16 dec_mask, u16 inc_mask, u16 sfx);
 s8* get_item_name_str(u8 index);
 s8* get_player_name_str(u8 index);
 s8* get_group2_name_str(u8 index);
 s8* get_digit_str(u8 index);
 /* 0x802A6F64 - draws a block-framed item page: the `items` the `entries` index, page `row` of `rows`, with the
  * page-arrow `flags`, at `pos`. */
-void menu_frame_draw_blocks(IdValue* items, MenuListEntry* entries, s8 row, s8 rows, u16 timer, s32 flags,
+void menu_frame_draw_blocks(IdValue* items, MenuListEntry* entries, s8 row, s8 rows, u16 timer, u32 flags,
                             struct _mh_ivec2_* pos);
 /* 0x802A79B8 - draws an item row's two count columns (`a`, `b`) beside the item. */
 void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
@@ -129,6 +134,8 @@ void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
 s16 menu_text_block_center_x(char* text, s32 center, s16 size, s16* out_lines);
 /* 0x802A907C - draws the yes/no dialog row at layout `id` with the answer `sel` (0 = yes) highlighted.  GUESS name. */
 void menu_yes_no_draw(u16 id, s32 sel);
+/* 0x802AA4F4 - draws `spr` additively, its alpha scaled by the cockpit blink factor.  GUESS name. */
+void draw_sprite_blink(struct _SPR_DATA_* spr, const struct _mh_ivec2_* pos);
 
 #ifdef __cplusplus
 /* 0x802A7978 - draws the item row `item` (item and count) at sprite `id`. */

@@ -1,47 +1,55 @@
 /*
  * menu/menu_message.cpp - the menu band's list and cursor layer (the selection list `MenuListWork`, its cursor and
- *   scroll steps, the item pairs) and its message/frame dialog helpers.  C++; a bare map row is declared `extern "C"`,
- *   a mangled one at global scope (`PutPageArrow`, `get_lsp_data`, `get_wide_offset`, `flfntStrLen`).
- * RANGE. .text 0x802A6624-0x802AA6A8 (70 functions); extab, extabindex, .data 0x805CE00C-0x805CE198, .sdata
- *   0x807922A0-0x807922B0 (`"%d"`, the two `"%s"`), .sdata2 0x8079A3F8 (120.0f).  The right edge is `stage/shell.cpp`'s
- *   `shell_work_init` (0x802AA6A8).  A TU boundary very likely lies inside 0x802A7B80-0x802A9F48: the two `"%s"` copies
- *   (0x807922A4 read from 0x802A78F4/0x802A7B0C, 0x807922A8 from 0x802AA078-0x802AA234) cannot share a TU under
- *   `-str reuse`.
- * FLAGS. `cflags_menu` (configure.py).
+ *   scroll steps, the item pairs), its item-row and list-page draws, and its dialog frame / message window helpers.
+ *   C++; a bare map row is defined `extern "C"`, a mangled one at global scope (`put_message`, `put_frame_dialog`,
+ *   `put_message_sys`, `GetMenuFontColor*`).
+ * RANGE. .text 0x802A6624-0x802AA6A8 (70 functions, all written); extab, extabindex, .data 0x805CE00C-0x805CE198,
+ *   .sdata 0x807922A0-0x807922B0 (`"%d"`, `"%s"`, `"%s"`), .sdata2 0x8079A3F8 (120.0f, `draw_sprite_blink`).  The right
+ *   edge is `stage/shell.cpp`'s `shell_work_init` (0x802AA6A8).  The range is two TUs, seam at 0x802A7C44
+ *   (`draw_dialog_piece`): the `"%s"` copies (0x807922A4 read from 0x802A78F4/0x802A7B0C, 0x807922A8 from
+ *   0x802AA078-0x802AA234) cannot share a TU under `-str reuse`, and the `.data` tiles as a 4-aligned 0x34-byte first
+ *   object (0x805CE00C, `menu_item_row_draw_values`'s) and an 8-aligned rest from 0x805CE040 (`menu_pad_map_set`'s,
+ *   `draw_dialog_piece`'s and `menu_yes_no_draw`'s tables), which one object cannot lay out.
+ * FLAGS. `cflags_menu` (configure.py); `#pragma pool_data off` for the file: retail addresses each `.data` table with
+ *   its own `lis`/`addi` pair (`menu_yes_no_draw` reads three; with pooling on it is 81.99 against 100).
  * NAMES. Module `menu` from the left neighbour `menu/menu_item.cpp` and the range's own entry points
- *   (`put_message__FPScsUl`, `put_frame_dialog__FssssUlUl`, `GetMenuFontColor__Fbbbb`).
- *   The file name is a GUESS from what the range does (the selection list and its cursor, the frame dialog); no
- *   `__FILE__` string covers it.  GUESSes from the bodies: `menu_page_count` (a ceil-divide, a 0 divisor read as 1),
- *   `menu_text_*center_x*`, `menu_item_pick_seek`, `item_pair*`/`item_pages_*`, `menu_slot_*`, `get_group2_name_str`,
- *   `menu_item_row_sprite_ids`, the `.data` tables marked in place, and the cursor page move's 0x04/0x08 bits as
- *   "first"/"last".
- *   GUESS (from each body and its callers): `put_frame_dialog_title`, `put_frame_header`, `put_frame_label`,
- *   `put_frame_separator`, `put_frame_cursor_bar`, `put_message_window`, `menu_select_window_draw`,
- *   `menu_choice_window_draw`, `menu_pad_map_set`.
- * RESIDUALS. 22 rows unwritten (objdiff scores them zero): 0x802A6F64-0x802A736C, 0x802A7524-0x802A7978,
- *   0x802A79B8-0x802A7B80, 0x802A7C44-0x802A8D74, 0x802A907C-0x802A91AC, 0x802A9BCC-0x802A9CD8,
- *   0x802A9F48-0x802AA3EC, 0x802AA4F4-0x802AA59C, 0x802AA68C-0x802AA6A8.  They need the `.sdata2` 120.0f (sole referrer
- *   `fn_802AA4F4`) or callees no header declares with a usable signature (`draw_window_box`, `cockpit_blink_get`, `draw_itemicon_anim_idx`,
- *   `get_rare_color`, `draw_number_idx`, `pl_item_slot_next_get`/`pl_held_item_refresh`, and `font_print`, `char*` in `unsplit/menu.h` where
- *   the map's variadic `font_print__FPSce` sets `crclr`).  The 6 partial rows:
- *  - `menu_page_count`: retail `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B; five shapes measured);
+ *   (`put_message__FPScsUl`, `put_frame_dialog__FssssUlUl`, `GetMenuFontColor__Fbbbb`).  The file name is a GUESS from
+ *   what the range does; the DOL's one `menu_message.cpp` string (0x80607870) is cited only by `plsearch_step`
+ *   (0x8044E94E), inside `menu/menu_plsearch.cpp`'s registered range, so the retail `menu_message.cpp` is not this range.
+ *   GUESSes from the bodies: `menu_page_count` (a ceil-divide, a 0 divisor read as 1), `menu_text_*center_x*`,
+ *   `menu_item_pick_seek`, `item_pair*`/`item_pages_*`, `menu_slot_*`, `get_group2_name_str`, `menu_item_row_sprite_ids`,
+ *   the `.data` tables marked in place, the cursor page move's 0x04/0x08 bits as "first"/"last", `put_frame_dialog_title`,
+ *   `put_frame_header`, `put_frame_label`, `put_frame_separator`, `put_frame_side_arrows`, `put_frame_cursor_bar`,
+ *   `put_message_window`, `menu_select_window_draw`, `menu_choice_window_draw`, `menu_entry_window_draw`,
+ *   `menu_pad_map_set`, `menu_yes_no_draw`, `draw_sprite_blink` (alpha scaled by `cockpit_blink_get`),
+ *   `menu_item_pages_resort` (re-sorts the pages and re-points the pick and the selected slot), `MenuRowLayout`.
+ * RESIDUALS. 10 rows below 100 %, register allocation or branch layout only:
+ *  - `menu_page_count`: retail `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B);
  *  - `menu_list_fill`: `self` and the record pointer in r29/r30 swapped, each `id` extension before the record test;
- *  - `menu_scroll_init`: an inverted branch and a dropped `b` (116 vs 120 B);
+ *  - `menu_scroll_init`: retail `blt`+`b` around the `rows` copy, ours one `bge` (116 vs 120 B; if, ternary and
+ *    empty-then forms measured the same);
  *  - `GetMenuFontColor`: retail keeps the inner `if (b == 1)` as `bne` + `blr`, MWCC folds it into a conditional return;
- *  - `item_pairs_shell_sort`, `menu_frame_page_draw`: register allocation only.
- *  - `.data` is emitted whole but 0x190 against 0x18C: MWCC 8-aligns the three 8-multiple objects the target keeps at
- *    4-mod-8 (the pointer table +0x84, the rectangles +0x94, the frame sprite ids +0x154), so the bytes from +0x84 sit
- *    4 late; `#pragma pack/align`, `aligned(4)`, a struct wrapper and Wii 1.0-1.7 give the same.
- *   flipcheck: `.sdata` (0x10) and `.sdata2` (0x4) claimed but not emitted; short `.text` 0x1D80 of 0x4084, extab 0x108
- *   of 0x1B0, extabindex 0x18C of 0x288; `.data` 4 bytes long; the bytes of all four differ.
- *   `menu/menu_item.cpp` and `menu/fn_8031A6C0.cpp` still declare `menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`
- *   and `menu_cursor_column_step` themselves, over their `MENU_ITEM_W`/`MenuSel` views of `MenuListWork`.
+ *  - `menu_choice_window_draw`, `menu_entry_window_draw`: retail tests the entry colour with `beq` over a `b`, ours one
+ *    `bne` (4 B each), plus register order;
+ *  - `draw_sprite_blink`: retail loads the colour word into r3 and masks it after the multiply, ours masks first (the
+ *    operand order and a separate local measured the same);
+ *  - `item_pairs_shell_sort`, `put_message`, `put_message_window`: register allocation only.
+ *  - `.data` is 0x190 against 0x18C and `.sdata` 7 against 16 B: one object cannot reproduce the two TUs above (the
+ *    second `"%s"` copy and the 4-mod-8 start of the first `.data` object).
+ *  - `menu_select_window_draw` is defined with the types its body uses (`s8** texts`, `s16* flags`); its leaf
+ *    `menu/menu_select_window_draw.h` still carries `menu/fn_8031A6C0.cpp`'s call-site view and is not included here.
+ *   `menu/menu_item.cpp` and `menu/fn_8031A6C0.cpp` still declare `menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`,
+ *   `menu_cursor_column_step`, `menu_choice_window_draw` and `fn_802A9BCC` (`menu_item_pages_resort`) themselves.
  * SHAPES. `++x`/`x--` instead of `x = x + 1` keeps a narrow local in place (`menu_cursor_move`,
  *   `menu_frame_entries_build`, `menu_cursor_page_move`).
  *  - A local declared first and assigned later, in the target's register order, picks its callee-saved register
- *    (`item_pairs_compact_sort`, `menu_item_pick_seek`, `menu_text_block_center_x`).
+ *    (`item_pairs_compact_sort`, `menu_item_pick_seek`, `menu_text_block_center_x`, `menu_frame_row_draw`,
+ *    `put_frame_dialog_title`'s and `put_frame_header`'s `left`).
  *  - `menu_frame_entries_build_row` is a four-iteration `for`, not four blocks; `menu_slot_find`'s pooled `u16` result
  *    needs a `u16` variable, not a cast.
+ *  - The draw helpers' default colours are `if (c == 0) c = ...;` on the parameter; a value `x = a ? b : c` is a
+ *    ternary where retail loads the else value first (`menu_frame_row_draw`); a `switch` on `flags & 3` needs the
+ *    `u32` parameter for its `cmplwi` chain (`menu_frame_draw_blocks`); `put_message` keeps the text y in `size`.
  */
 
 #include "types.h"
@@ -55,8 +63,28 @@
 #include "fn_80047398.h"
 #include "hud/layout.h"
 #include "menu/get_pop_dat_ptr.h"
+#include "menu/put_frame_dialog_title.h"
+#include "sound/set_zmode__FbUcb.h"
+#include "hud/cockpit_blink_get.h"
+#include "hud/cockpit.h"
+#include "hud/draw_window_box.h"
+#include "mh3_pad/Screen_w.h"
+#include "menu/put_message_sys.h"
+#include "menu/put_frame_side_arrows.h"
+#include "menu/menu_choice_window_draw.h"
+#include "menu/menu_entry_window_draw.h"
+#include "menu/menu_pad_map_set.h"
+#include "Pl/pl_item_slot_item_get.h"
+#include "Pl/pl_act.h"
+#include "pad_wait_table_set.h"
+#include "MSL_C/printf.h"
+#include "hud/draw_sprite_blink_idx.h"
+#include "hud/put_button_guide_b.h"
 
 extern "C" char* strcpy(char* dst, const char* src);
+
+/* Retail addresses each `.data` table with its own `lis`/`addi` pair (`menu_yes_no_draw` reads three). */
+#pragma pool_data off
 
 /* ---------------------------------------------------------------------------------------------------
  * The range's own entry points and the callees its written bodies call.  A `fn_XXXXXXXX` stem is the
@@ -102,15 +130,15 @@ u8* menu_pad_slot_map_tbl[4] = {menu_pad_slot_map_0, menu_pad_slot_map_1, menu_p
 
 /* The dialog frame's piece rectangles, read by `draw_dialog_piece` and the frame builder (`.data` 0x805CE0A0).  GUESS: each row's
  * four halfwords are a texture rectangle (left/top/right/bottom). */
-u16 dialog_piece_uv_tbl[24][4] = {
-    {0x0067, 0x0083, 0x0069, 0x0085}, {0x0060, 0x0060, 0x0080, 0x0061}, {0x0080, 0x0060, 0x00A0, 0x0061},
-    {0x0080, 0x0060, 0x0081, 0x0080}, {0x0060, 0x0040, 0x0080, 0x0060}, {0x0080, 0x0040, 0x00A0, 0x0060},
-    {0x0060, 0x0060, 0x0080, 0x0080}, {0x0080, 0x0060, 0x00A0, 0x0080}, {0x00A2, 0x004C, 0x00B2, 0x006C},
-    {0x00B2, 0x004C, 0x00BA, 0x006C}, {0x0095, 0x006E, 0x00A9, 0x007E}, {0x00A9, 0x006E, 0x00B1, 0x007E},
-    {0x01C5, 0x005F, 0x01FB, 0x008B}, {0x01FA, 0x005F, 0x01FB, 0x008B}, {0x01B9, 0x00D7, 0x01C2, 0x00EB},
-    {0x01BF, 0x00D7, 0x01C2, 0x00EB}, {0x00B7, 0x0000, 0x00C5, 0x0017}, {0x00B7, 0x0000, 0x00BE, 0x0017},
-    {0x00B7, 0x0000, 0x00B8, 0x0017}, {0x00A4, 0x0000, 0x00AB, 0x001B}, {0x00AB, 0x0000, 0x00AD, 0x001B},
-    {0x00A5, 0x000B, 0x00A6, 0x0011}, {0x0093, 0x002C, 0x00A3, 0x003E}, {0x00A3, 0x002C, 0x0093, 0x003E},
+_mh_tex_uv_ dialog_piece_uv_tbl[24][2] = {
+    {{0x0067, 0x0083}, {0x0069, 0x0085}}, {{0x0060, 0x0060}, {0x0080, 0x0061}}, {{0x0080, 0x0060}, {0x00A0, 0x0061}},
+    {{0x0080, 0x0060}, {0x0081, 0x0080}}, {{0x0060, 0x0040}, {0x0080, 0x0060}}, {{0x0080, 0x0040}, {0x00A0, 0x0060}},
+    {{0x0060, 0x0060}, {0x0080, 0x0080}}, {{0x0080, 0x0060}, {0x00A0, 0x0080}}, {{0x00A2, 0x004C}, {0x00B2, 0x006C}},
+    {{0x00B2, 0x004C}, {0x00BA, 0x006C}}, {{0x0095, 0x006E}, {0x00A9, 0x007E}}, {{0x00A9, 0x006E}, {0x00B1, 0x007E}},
+    {{0x01C5, 0x005F}, {0x01FB, 0x008B}}, {{0x01FA, 0x005F}, {0x01FB, 0x008B}}, {{0x01B9, 0x00D7}, {0x01C2, 0x00EB}},
+    {{0x01BF, 0x00D7}, {0x01C2, 0x00EB}}, {{0x00B7, 0x0000}, {0x00C5, 0x0017}}, {{0x00B7, 0x0000}, {0x00BE, 0x0017}},
+    {{0x00B7, 0x0000}, {0x00B8, 0x0017}}, {{0x00A4, 0x0000}, {0x00AB, 0x001B}}, {{0x00AB, 0x0000}, {0x00AD, 0x001B}},
+    {{0x00A5, 0x000B}, {0x00A6, 0x0011}}, {{0x0093, 0x002C}, {0x00A3, 0x003E}}, {{0x00A3, 0x002C}, {0x0093, 0x003E}},
 };
 
 /* Three sprite-id runs (terminated by 0xFFFF, the last word padding) the dialog's sprite draw passes to `draw_sprite_ary`
@@ -122,8 +150,17 @@ u16 dialog_sprite_ids_frame[16] = {
 u16 dialog_sprite_ids_a[6] = {0x01B5, 0x01B2, 0x01B3, 0x01B4, 0xFFFF, 0x0000};
 u16 dialog_sprite_ids_b[6] = {0x01BD, 0x01BA, 0x01BB, 0x01BC, 0xFFFF, 0x0000};
 
+/* One row style of the item list's layout table (`get_menu_lsp_tbl(18)`, indexed by style): the sprite-id runs
+ * `menu_frame_row_draw` draws.  size: 0x10 */
+typedef struct MenuRowLayout {
+    /* +0x00 */ u16* frame_ids;   /* the row frame's sprite run */
+    /* +0x04 */ u16* icon_ids;    /* [0] the item icon's layout, [1]/[2] the icon cell when selected/not */
+    /* +0x08 */ u16* text_ids;    /* [0] the name's layout, [1]/[2] the count's for one/two digits */
+    /* +0x0C */ u16* cursor_ids;  /* the cursor sprite run */
+} MenuRowLayout;
+
 /* This unit's own bodies, in address order. */
-extern "C" void menu_frame_row_draw(s32 select, u32* dst, void* entry, s32 flags, struct _mh_ivec2_* pos);
+extern "C" void menu_frame_row_draw(s32 select, IdValue* item, MenuListEntry* entry, s32 flags, struct _mh_ivec2_* pos);
 extern "C" void menu_item_row_draw(u16* item, struct _mh_ivec2_* pos);
 extern "C" void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
 extern "C" void eft052_page_counts_get(u16 id, s32* a, s32* b, s32* c);
@@ -436,62 +473,280 @@ extern "C" void menu_frame_draw_page(void* a, void* b, s8 c, s8 d, u16 e, s32 f)
     menu_frame_draw_blocks((IdValue*)a, (MenuListEntry*)b, c, d, e, f, (struct _mh_ivec2_*)lsp);
 }
 
+/* Draws a block-framed item page at `pos`: the frame in the style `flags & 3` picks (3 drops the page counter), the
+ * blinking page arrows and the page `row` of `rows`, the eight entry rows, then the footer `flags` selects (the
+ * button guide, the selected item's row, or the frame message). */
+extern "C" void menu_frame_draw_blocks(IdValue* items, MenuListEntry* entries, s8 row, s8 rows, u16 timer, u32 flags,
+                                       struct _mh_ivec2_* pos)
+{
+    _mh_ivec2_ at;
+    s16 dx;
+    s16 dy;
+    s32 counter;
+    s32 style;
+    s32 footer;
+    u16* frame;
+    u16 arrows;
+    _SPR_DATA_* lsp;
+    IdValue* picked;
+    s32 i;
+
+    counter = 1;
+    style = 0;
+    lsp = get_lsp_data(628, NULL);
+    dx = pos->x - lsp->pos.x;
+    dy = pos->y - lsp->pos.y;
+    switch (flags & 3) {
+    case 0:
+        frame = (u16*)get_menu_lsp_tbl(40);
+        break;
+    case 1:
+        frame = (u16*)get_menu_lsp_tbl(41);
+        style = 1;
+        break;
+    case 2:
+        frame = (u16*)get_menu_lsp_tbl(42);
+        style = 1;
+        break;
+    case 3:
+        frame = (u16*)get_menu_lsp_tbl(68);
+        counter = 0;
+        break;
+    default:
+        return;
+    }
+    draw_sprite_anim_ary(frame, timer, pos);
+    if (counter != 0) {
+        arrows = 0;
+        if ((flags & 8) != 0) {
+            arrows |= 4;
+        }
+        if ((flags & 0x10) != 0) {
+            arrows |= 8;
+        }
+        if ((flags & 0x20) == 0 && timer == 0) {
+            draw_sprite_blink_idx(641, 642, 0xFFE347FF, arrows, pos);
+        }
+        draw_number_anim(648, timer, row, (flags & 0x18) != 0, pos);
+        draw_number_anim(647, timer, rows, 0, pos);
+    }
+    footer = 0;
+    if ((flags & 0x800) == 0) {
+        if ((flags & 0x20) != 0) {
+            footer = 2;
+        } else if ((flags & 0x40) != 0) {
+            footer = 1;
+        }
+    }
+    lsp = get_lsp_data(657, NULL);
+    at.x = lsp->pos.x + dx;
+    at.y = lsp->pos.y + dy;
+    picked = NULL;
+    if (timer != 0) {
+        flags |= 0x400;
+    }
+    i = 0;
+    do {
+        menu_frame_row_draw(style, &items[entries->index_0x06], entries, flags, &at);
+        if (entries->field_0x01 != 0) {
+            picked = &items[entries->index_0x06];
+        }
+        at.y += 26;
+        i++;
+        entries++;
+    } while (i < 8);
+    switch (footer) {
+    case 0:
+        if ((flags & 0x180) != 0 && chk_pointer() == 0) {
+            lsp = get_lsp_data(734, NULL);
+            at.x = lsp->pos.x + dx;
+            at.y = lsp->pos.y + dy;
+            if (get_cfg(0, 7) == 0) {
+                put_button_guide_b(5, &at);
+            } else {
+                put_button_guide_b(11, &at);
+            }
+        }
+        break;
+    case 1:
+        if (picked != NULL) {
+            menu_item_row_draw_by_lsp(735, (u16*)picked);
+            if ((flags & 0x180) != 0 && chk_pointer() == 0) {
+                ainpc_page_hold_clear();
+                lsp = get_lsp_data(733, NULL);
+                at.x = lsp->pos.x + dx;
+                at.y = lsp->pos.y + dy;
+                if (get_cfg(0, 7) == 0) {
+                    put_button_guide_b(4, &at);
+                } else {
+                    put_button_guide_b(10, &at);
+                }
+            }
+        }
+        break;
+    case 2:
+        lsp = get_lsp_data(732, NULL);
+        at.x = lsp->pos.x + dx;
+        at.y = lsp->pos.y + dy;
+        draw_window_frame_preset(at.x, at.y, 0);
+        font_set_size(16, 16);
+        font_print_ex(at.x + 24, at.y + 16, 0, (s8*)get_menu_msg(37, 7));
+        break;
+    }
+    font_flush();
+}
+
 /* Draws a four-row page at the page's anchor plus the per-kind offset, 26 pixels per row, from the block
  * `menu_frame_entries_build`/`menu_frame_entries_build_row` filled; `mode` 0..2 picks the style, anything else is a no-op. */
-extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 flags_in, u8 mode)
+extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 flags, u8 mode)
 {
-    MenuLspPos pos;
-    MenuLspPos rows;
-    MenuLspPos* base;
-    u16 flags;
-    u16* tbl;
-    s32 select;
-    u32 flags_ = flags_in;
-    s32 i;
-    s16 dy;
+    _mh_ivec2_ pos;
+    _mh_ivec2_ at;
     s16 dx;
+    s16 dy;
+    s32 select;
+    u16* frame;
+    u16 arrows;
+    _SPR_DATA_* lsp;
+    s32 i;
 
-    get_lsp_data(((u16*)get_menu_lsp_tbl(361))[mode], (struct _mh_ivec2_*)&pos);
-    base = (MenuLspPos*)get_lsp_data(3936, 0);
-    dx = pos.x - base->x;
-    dy = pos.y - base->y;
-    switch (flags_in & 3) {
+    get_lsp_data(((u16*)get_menu_lsp_tbl(361))[mode], &pos);
+    lsp = get_lsp_data(3936, NULL);
+    dx = pos.x - lsp->pos.x;
+    dy = pos.y - lsp->pos.y;
+    switch (flags & 3) {
     case 0:
-        tbl = (u16*)get_menu_lsp_tbl(362);
+        frame = (u16*)get_menu_lsp_tbl(362);
         select = 2;
         break;
     case 1:
-        tbl = (u16*)get_menu_lsp_tbl(363);
+        frame = (u16*)get_menu_lsp_tbl(363);
         select = 3;
         break;
     case 2:
-        tbl = (u16*)get_menu_lsp_tbl(364);
+        frame = (u16*)get_menu_lsp_tbl(364);
         select = 3;
         break;
     default:
         return;
     }
-    draw_sprite_anim_ary(tbl, c, (struct _mh_ivec2_*)&pos);
-    flags = 0;
-    if ((flags_in & 8) != 0) {
-        flags |= 4;
+    draw_sprite_anim_ary(frame, c, &pos);
+    arrows = 0;
+    if ((flags & 8) != 0) {
+        arrows |= 4;
     }
-    if ((flags_in & 0x10) != 0) {
-        flags |= 8;
+    if ((flags & 0x10) != 0) {
+        arrows |= 8;
     }
-    PutPageArrow((u16*)get_menu_lsp_tbl(365), a, b, flags, (struct _mh_ivec2_*)&pos, 0);
-    base = (MenuLspPos*)get_lsp_data(3961, 0);
-    rows.x = dx + base->x;
-    rows.y = dy + base->y;
+    PutPageArrow((u16*)get_menu_lsp_tbl(365), a, b, arrows, &pos, 0);
+    lsp = get_lsp_data(3961, NULL);
+    at.x = dx + lsp->pos.x;
+    at.y = dy + lsp->pos.y;
     if (c != 0) {
-        flags_ |= 1024;
+        flags |= 0x400;
     }
-    for (i = 0; i < 4; i++) {
-        menu_frame_row_draw(select, &dst[entries[i].index_0x06], &entries[i], flags_,
-                    (struct _mh_ivec2_*)&rows);
-        rows.y += 26;
-    }
+    i = 0;
+    do {
+        menu_frame_row_draw(select, (IdValue*)&dst[entries->index_0x06], entries, flags, &at);
+        at.y += 26;
+        i++;
+        entries++;
+    } while (i < 4);
     font_flush();
+}
+
+/* Draws one item-list row in style `select` at `pos`: the row frame, the item's name and count (in the entry's own
+ * colours, or by its pickable/selected bytes and `flags`), the item icon and its cell, and the cursor. */
+extern "C" void menu_frame_row_draw(s32 select, IdValue* item, MenuListEntry* entry, s32 flags, struct _mh_ivec2_* pos)
+{
+    char buf[4];
+    _SPR_DATA_ spr;
+    MenuRowLayout* layout;
+    u32 text_color;
+    u32 count_color;
+    u32 icon_color;
+    u16 id;
+    s32 font_flags;
+    s16 max;
+
+    layout = ((MenuRowLayout**)get_menu_lsp_tbl(18))[(u8)select];
+    draw_sprite_ary(layout->frame_ids, pos);
+    id = item->id;
+    if ((flags & 4) != 0 && (text_color = entry->text_color_0x0C) != 0) {
+        count_color = entry->count_color_0x10;
+        icon_color = entry->icon_color_0x14;
+    } else if (entry->present_0x02 != 0) {
+        if ((flags & 0x400) == 0) {
+            text_color = 0xC3C3C3FF;
+            count_color = 0xDC2323FF;
+            icon_color = 0xDFDFDFFF;
+            if (entry->field_0x01 != 0) {
+                text_color = (flags & 0x200) != 0 ? 0xE8A40FFF : 0xF0F0F0FF;
+                count_color = 0xF53737FF;
+                icon_color = 0xFFFFFFFF;
+            }
+        } else {
+            text_color = entry->field_0x01 != 0 ? 0xE8A40FFF : 0x878787FF;
+            count_color = 0xAA1414FF;
+            icon_color = 0xAAAAAAFF;
+        }
+    } else {
+        text_color = 0x646464FF;
+        count_color = 0x870F0FFF;
+        icon_color = 0x8A8A8AFF;
+    }
+    font_flags = entry->field_0x01 != 0 ? 4 : 0;
+    spr_data_copy(&spr, get_lsp_data(layout->text_ids[0], NULL));
+    spr.color = text_color;
+    draw_font(spr, id != 0 ? (s8*)ItemName(id) : (s8*)get_menu_msg(37, 9), font_flags, pos);
+    if (id != 0) {
+        max = GetItemData(id)->max_num_0x003;
+        if (max > 1 || (flags & 0x1000) != 0) {
+            sprintf(buf, "%d", item->value);
+            spr_data_copy(&spr, get_lsp_data(layout->text_ids[item->value < 10 ? 1 : 2], NULL));
+            if (item->value < max) {
+                count_color = text_color;
+            }
+            spr.color = count_color;
+            draw_font(spr, (s8*)buf, font_flags | 1, pos);
+        }
+    }
+    spr_data_copy(&spr, get_lsp_data(layout->icon_ids[entry->field_0x01 != 0 ? 1 : 2], NULL));
+    spr.color = color_mult(spr.color, icon_color);
+    draw_sprite(spr, pos);
+    if (id != 0) {
+        spr_data_copy(&spr, get_lsp_data(layout->icon_ids[0], NULL));
+        spr.color = icon_color;
+        draw_itemicon_item_id(spr, id, pos);
+    }
+    if ((flags & 0x200) == 0 && entry->field_0x01 != 0) {
+        put_menu_cursor(layout->cursor_ids, 0, pos);
+    }
+}
+
+/* Draws an item row at `pos`: the row frame, then for a non-empty `item` its icon, name, description and the
+ * rarity-coloured rank badge. */
+extern "C" void menu_item_row_draw(u16* item, struct _mh_ivec2_* pos)
+{
+    _SPR_DATA_ spr;
+    _SPR_DATA_* lsp;
+    ItemDataRecord* data;
+    u32 color;
+
+    draw_sprite_ary((u16*)get_menu_lsp_tbl(46), pos);
+    if (item != NULL && item[0] != 0) {
+        draw_itemicon_anim_idx(158, 0, item[0], pos);
+        draw_font_idx(162, (s8*)ItemName(item[0]), 1, pos);
+        lsp = get_lsp_data(163, NULL);
+        font_set_size(lsp->width, lsp->height);
+        font_print_ex(pos->x + lsp->pos.x, pos->y + lsp->pos.y, 0, (s8*)"%s", (s8*)ItemExp(item[0]));
+        data = GetItemData(item[0]);
+        color = get_rare_color(data->level_0x01);
+        spr_data_copy(&spr, get_lsp_data(159, NULL));
+        spr.color = color;
+        draw_sprite(spr, pos);
+        draw_number_idx(160, data->level_0x01 + 1, color, pos);
+    }
 }
 
 /* Reads the position the caller's LSP id names and draws one item row at it. */
@@ -501,6 +756,480 @@ extern "C" void menu_item_row_draw_by_lsp(u16 id, u16* item)
 
     get_lsp_data(id, (struct _mh_ivec2_*)&pos);
     menu_item_row_draw(item, (struct _mh_ivec2_*)&pos);
+}
+
+/* Draws an item row with its two counts at `pos`: the row frame, then for a non-empty `item` its icon, name, the
+ * `count` (warning red at the item's cap) and the `stock` (capped at 999), the description and the rank badge. */
+extern "C" void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 count, s32 stock)
+{
+    char buf[16];
+    _SPR_DATA_ spr;
+    _SPR_DATA_* lsp;
+    ItemDataRecord* data;
+    u32 color;
+
+    draw_sprite_ary(menu_item_row_sprite_ids, pos);
+    if (item != NULL && item[0] != 0) {
+        data = GetItemData(item[0]);
+        draw_itemicon_anim_idx(158, 0, item[0], pos);
+        draw_font_idx(175, (s8*)ItemName(item[0]), 1, pos);
+        spr_data_copy(&spr, get_lsp_data(176, NULL));
+        if (count >= data->max_num_0x003) {
+            spr.color = 0xFF435DFF;
+        }
+        sprintf(buf, "%d", count);
+        draw_font(spr, (s8*)buf, 1, pos);
+        if (stock > 999) {
+            stock = 999;
+        }
+        sprintf(buf, "%d", stock);
+        draw_font_idx(177, (s8*)buf, 2, pos);
+        lsp = get_lsp_data(163, NULL);
+        font_set_size(lsp->width, lsp->height);
+        font_print_ex(pos->x + lsp->pos.x, pos->y + lsp->pos.y, 0, (s8*)"%s", (s8*)ItemExp(item[0]));
+        color = get_rare_color(data->level_0x01);
+        spr_data_copy(&spr, get_lsp_data(159, NULL));
+        spr.color = color;
+        draw_sprite(spr, pos);
+        draw_number_idx(160, data->level_0x01 + 1, color, pos);
+    }
+}
+
+/* Draws the item row at the caller's position: `eft052_page_counts_get`'s two value words through
+ * `menu_item_row_draw_values`; a null or empty item is skipped. */
+extern "C" void menu_item_row_draw_pages(u16* item, struct _mh_ivec2_* pos)
+{
+    s32 value;
+    s32 low;
+    s32 high;
+    s32 sum;
+
+    if (item != NULL) {
+        if (item[0] != 0) {
+            eft052_page_counts_get(item[0], &value, &low, &high);
+            sum = low + high;
+        } else {
+            value = 0;
+            sum = 0;
+        }
+        menu_item_row_draw_values(item, pos, value, sum);
+    }
+}
+
+/* Reads the position the caller's LSP id names and draws one item row at it. */
+extern "C" void menu_hold_row_draw_by_lsp(u16 id, u16* item)
+{
+    MenuLspPos pos;
+
+    get_lsp_data(id, (struct _mh_ivec2_*)&pos);
+    menu_item_row_draw_pages(item, (struct _mh_ivec2_*)&pos);
+}
+
+/* Places the dialog piece `index` of the frame atlas at (`x`, `y`) relative to `pos`, `width` x `height`, and draws it. */
+extern "C" void draw_dialog_piece(_SPR_DATA_* spr, s16 x, s16 y, s16 width, s16 height, u16 index,
+                                  const _mh_ivec2_* pos)
+{
+    _mh_tex_uv_* uv;
+
+    spr->pos.x = x;
+    spr->pos.y = y;
+    spr->width = width;
+    spr->height = height;
+    uv = dialog_piece_uv_tbl[index];
+    tex_uv_copy(&spr->uv0, &uv[0]);
+    tex_uv_copy(&spr->uv1, &uv[1]);
+    draw_sprite(*spr, pos);
+}
+
+/* Draws a titled dialog frame `width` x `height` at (`x` widened by `wide`, `y`): the backdrop in `frame_color`, the
+ * border in `color`, the title plate, and `title` in `title_color`; returns the widened x. */
+extern "C" s32 put_frame_dialog_title(s16 x, s16 y, s16 width, s16 height, u32 color, u32 frame_color,
+                                      u32 title_color, s8* title, u32 wide)
+{
+    s16 left;
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+
+    left = x + get_wide_offset(wide);
+    pos.x = left;
+    pos.y = y;
+    memset(&spr, 0, sizeof(spr));
+    spr.u_scale = spr.v_scale = 100;
+    if (color == 0) {
+        color = 0x965A3CFF;
+    }
+    if (frame_color == 0) {
+        frame_color = 0x14120AB2;
+    }
+    if (title_color == 0) {
+        title_color = 0xEFF095FF;
+    }
+    spr.tex_flag = 5;
+    spr.color = frame_color;
+    draw_dialog_piece(&spr, 6, 8, width - 13, height - 20, 0, &pos);
+    memset(&spr, 0, sizeof(spr));
+    spr.u_scale = spr.v_scale = 100;
+    spr.tex_flag = 5;
+    spr.color = color;
+    draw_dialog_piece(&spr, -8, 24, 32, height - 48, 1, &pos);
+    draw_dialog_piece(&spr, width - 24, 24, 32, height - 48, 2, &pos);
+    draw_dialog_piece(&spr, 24, height - 24, width - 48, 32, 3, &pos);
+    draw_dialog_piece(&spr, -8, -8, 32, 32, 4, &pos);
+    draw_dialog_piece(&spr, width - 24, -8, 32, 32, 5, &pos);
+    draw_dialog_piece(&spr, -8, height - 24, 32, 32, 6, &pos);
+    draw_dialog_piece(&spr, width - 24, height - 24, 32, 32, 7, &pos);
+    draw_dialog_piece(&spr, 18, -14, 16, 32, 8, &pos);
+    draw_dialog_piece(&spr, 34, -14, width - 69, 32, 9, &pos);
+    draw_dialog_piece(&spr, width - 19, -14, -16, 32, 8, &pos);
+    spr.tex_flag = 7;
+    draw_dialog_piece(&spr, 26, -4, 20, 16, 10, &pos);
+    draw_dialog_piece(&spr, 46, -4, width - 91, 16, 11, &pos);
+    draw_dialog_piece(&spr, width - 25, -4, -20, 16, 10, &pos);
+    if (title != NULL) {
+        pos.x += 40;
+        pos.y -= 10;
+        font_set_size(18, 18);
+        font_print_ex(pos.x + 2, pos.y + 1, 1, title);
+        flfntSetColor(title_color);
+        font_locate(pos.x, pos.y);
+        font_print(title);
+    }
+    return left;
+}
+
+/* Draws a plain dialog frame `width` x `height` at (`x`, `y`): the backdrop in `frame_color`, the border in `color`. */
+void put_frame_dialog(s16 x, s16 y, s16 width, s16 height, u32 color, u32 frame_color)
+{
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+
+    pos.x = x;
+    pos.y = y;
+    memset(&spr, 0, sizeof(spr));
+    spr.u_scale = spr.v_scale = 100;
+    if (color == 0) {
+        color = 0x965A3CFF;
+    }
+    if (frame_color == 0) {
+        frame_color = 0x14120AB2;
+    }
+    spr.tex_flag = 5;
+    spr.color = frame_color;
+    draw_dialog_piece(&spr, 6, 8, width - 13, height - 20, 0, &pos);
+    memset(&spr, 0, sizeof(spr));
+    spr.u_scale = spr.v_scale = 100;
+    spr.tex_flag = 5;
+    spr.color = color;
+    draw_dialog_piece(&spr, 24, -2, width - 48, 32, 3, &pos);
+    draw_dialog_piece(&spr, -8, 24, 32, height - 48, 1, &pos);
+    draw_dialog_piece(&spr, width - 24, 24, 32, height - 48, 2, &pos);
+    draw_dialog_piece(&spr, 24, height - 24, width - 48, 32, 3, &pos);
+    draw_dialog_piece(&spr, -8, -8, 32, 32, 4, &pos);
+    draw_dialog_piece(&spr, width - 24, -8, 32, 32, 5, &pos);
+    draw_dialog_piece(&spr, -8, height - 24, 32, 32, 6, &pos);
+    draw_dialog_piece(&spr, width - 24, height - 24, 32, 32, 7, &pos);
+}
+
+/* Draws the screen header plate sized to `text` at (`x` widened by `wide`, `y`) - the default corner when both are 0 -
+ * and `text` in `color` inside it. */
+extern "C" s16 put_frame_header(s16 x, s16 y, u32 color, s8* text, u32 wide)
+{
+    s16 left;
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    s32 len;
+    s32 width;
+
+    if (x == 0 && y == 0) {
+        pos.x = get_wide_offset(2) + 16;
+        pos.y = 13;
+    } else {
+        pos.x = x + get_wide_offset(wide);
+        pos.y = y;
+    }
+    if (color == 0) {
+        color = 0xF3E8ABFF;
+    }
+    left = pos.x;
+    memset(&spr, 0, sizeof(spr));
+    spr.u_scale = spr.v_scale = 100;
+    spr.tex_flag = 28;
+    spr.color = 0xFFFFFFFF;
+    len = flfntStrLen((char*)text);
+    draw_dialog_piece(&spr, 0, 0, 54, 44, 12, &pos);
+    width = ((len + 1) >> 1) * 26;
+    draw_dialog_piece(&spr, 54, 0, width, 44, 13, &pos);
+    draw_dialog_piece(&spr, width + 108, 0, -54, 44, 12, &pos);
+    if (text != NULL) {
+        pos.x += 54;
+        pos.y += 8;
+        font_set_size(26, 26);
+        font_print_ex(pos.x + 2, pos.y + 1, 1, text);
+        flfntSetColor(color);
+        font_locate(pos.x, pos.y);
+        font_print(text);
+    }
+    return left;
+}
+
+/* Draws a label plate `width` wide (sized to `text` when 0) at (`x`, `y`) in `color`, and `text` in `text_color`. */
+extern "C" void put_frame_label(s16 x, s16 y, s16 width, u32 color, s16 text_color, s8* text)
+{
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    s32 len = flfntStrLen((char*)text);
+
+    pos.x = x;
+    pos.y = y;
+    if (width == 0) {
+        width = ((len >> 1) + 1) * 18;
+    }
+    if (color == 0) {
+        color = 0x3C4100FF;
+    }
+    if (text_color == 0) {
+        text_color = (s16)0xB3FF;
+    }
+    memset(&spr, 0, sizeof(spr));
+    spr.u_scale = spr.v_scale = 100;
+    spr.tex_flag = 27;
+    spr.color = color;
+    draw_dialog_piece(&spr, 0, 0, 9, 23, 14, &pos);
+    draw_dialog_piece(&spr, 9, 0, width - 18, 23, 15, &pos);
+    draw_dialog_piece(&spr, width, 0, -9, 23, 14, &pos);
+    if (text != NULL) {
+        pos.x += 9;
+        pos.y += 2;
+        font_set_size(18, 18);
+        font_print_ex(pos.x + 2, pos.y + 1, 1, text);
+        flfntSetColor(text_color);
+        font_locate(pos.x, pos.y);
+        font_print(text);
+    }
+}
+
+/* Draws a list row's separator line `width` x `height` at (`x`, `y`). */
+extern "C" void put_frame_separator(s16 x, s16 y, s16 width, s16 height, u32 flags)
+{
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+
+    pos.x = x;
+    pos.y = y;
+    memset(&spr, 0, sizeof(spr));
+    spr.u_scale = spr.v_scale = 100;
+    spr.tex_flag = 7;
+    spr.color = 0xFFFFFFFF;
+    draw_dialog_piece(&spr, 18, 2, -14, height - 4, 17, &pos);
+    draw_dialog_piece(&spr, 18, 2, width - 32, height - 4, 18, &pos);
+    draw_dialog_piece(&spr, width - 18, 2, 14, height - 4, 17, &pos);
+}
+
+/* Draws the two page arrows beside a `width` x `height` row at (`x`, `y`), each in `hi_color` while its `moved` bit
+ * (0x04 left, 0x08 right) is set and in `color` otherwise; nothing while the pointer is in use. */
+extern "C" void put_frame_side_arrows(s16 x, s16 y, s16 width, s16 height, u16 moved, u32 color, u32 hi_color)
+{
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    s32 arrow_y;
+
+    if ((u32)chk_pointer() != 1) {
+        pos.x = pos.y = 0;
+        memset(&spr, 0, sizeof(spr));
+        spr.u_scale = spr.v_scale = 100;
+        spr.tex_flag = 7;
+        if (color == 0) {
+            color = 0x507C2FFF;
+        }
+        if (hi_color == 0) {
+            hi_color = 0x7BCA60FF;
+        }
+        if ((moved & 4) != 0) {
+            spr.color = hi_color;
+        } else {
+            spr.color = color;
+        }
+        arrow_y = y + (height >> 1) - 9;
+        draw_dialog_piece(&spr, x - 18, arrow_y, 16, 18, 22, &pos);
+        if ((moved & 8) != 0) {
+            spr.color = hi_color;
+        } else {
+            spr.color = color;
+        }
+        draw_dialog_piece(&spr, x + width, arrow_y, 16, 18, 23, &pos);
+    }
+}
+
+/* Draws the cursor bar `width` x `height` at (`x`, `y`): a blinking glow in `glow_color` under the bar in `color`;
+ * nothing while the pointer is in use. */
+extern "C" void put_frame_cursor_bar(s16 x, s16 y, s16 width, s16 height, u32 color, u32 glow_color)
+{
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+
+    if ((u32)chk_pointer() != 1) {
+        pos.x = x;
+        pos.y = y;
+        if (glow_color == 0) {
+            glow_color = 0xC88C3750;
+        }
+        if (color == 0) {
+            color = 0xFAA014FF;
+        }
+        memset(&spr, 0, sizeof(spr));
+        spr.u_scale = spr.v_scale = 100;
+        spr.tex_flag = 7;
+        spr.color = 0xFFFFFFFF;
+        spr.pos.x = 3;
+        spr.pos.y = 1;
+        spr.width = width - 6;
+        spr.height = height - 3;
+        tex_uv_copy(&spr.uv0, &dialog_piece_uv_tbl[21][0]);
+        tex_uv_copy(&spr.uv1, &dialog_piece_uv_tbl[21][1]);
+        spr.color = glow_color;
+        draw_sprite_blink(&spr, &pos);
+        spr.color = color;
+        draw_dialog_piece(&spr, 0, 0, 7, height, 19, &pos);
+        draw_dialog_piece(&spr, 7, 0, width - 14, height, 20, &pos);
+        draw_dialog_piece(&spr, width, 0, -7, height, 19, &pos);
+    }
+}
+
+/* Draws the message `msg` (glyph size `size`, 18 when 0) centred on screen inside a dialog frame, in `color`. */
+void put_message(s8* msg, s16 size, u32 color)
+{
+    s16 lines;
+    s16 center_x;
+    s16 center_y;
+    s16 text_x;
+    s16 text_y;
+
+    font_flush();
+    if (size == 0) {
+        size = 18;
+    }
+    if (color == 0) {
+        color = 0xFFFFFFFF;
+    }
+    font_set_size(size, size);
+    center_x = get_wide_offset(3) + 320;
+    center_y = (s32)Screen_w.height_f >> 1;
+    text_x = menu_text_block_center_x((char*)msg, center_x, size, &lines);
+    size = center_y - lines * (size >> 1);
+    put_frame_dialog(text_x - 40, size - 30, (center_x - (text_x - 40)) * 2, (center_y - (size - 30)) * 2, 0, 0);
+    flfntSetColor(color);
+    font_locate(text_x, size);
+    font_print(msg);
+}
+
+/* Draws the yes/no question `msg` centred on screen in a window, with the `yes`/`no` answers below it and the cursor
+ * bar on answer `sel` (0 = yes). */
+extern "C" void put_message_window(s8* msg, s8* yes, s8* no, s32 sel, s16 size, u32 color)
+{
+    s16 lines;
+    s16 center_x;
+    s16 center_y;
+    s16 text_x;
+    s16 text_y;
+    s32 left;
+    s32 top;
+    s16 width;
+    s16 height;
+    u32 yes_len;
+    u32 no_len;
+    u32 len;
+    s16 pad;
+    s32 bar_w;
+    s32 bottom;
+    s32 bar_y;
+    s32 yes_x;
+    s32 no_x;
+    s32 label_y;
+
+    font_flush();
+    if (size == 0) {
+        size = 18;
+    }
+    if (color == 0) {
+        color = 0xFFFFFFFF;
+    }
+    font_set_size(size, size);
+    center_x = get_wide_offset(3) + 320;
+    center_y = (s32)Screen_w.height_f >> 1;
+    text_x = menu_text_block_center_x((char*)msg, center_x, size, &lines);
+    text_y = center_y - lines * (size >> 1) - 20;
+    left = text_x - 40;
+    width = (center_x - left) * 2;
+    top = text_y - 30;
+    height = (center_y - top) * 2;
+    if (width < 340) {
+        draw_window_box(center_x - 170, top, 340, height, 0x926239FF, 0x1C190FFF);
+    } else {
+        draw_window_box(left, top, width, height, 0x926239FF, 0x1C190FFF);
+    }
+    yes_len = flfntStrLen((char*)yes);
+    no_len = flfntStrLen((char*)no);
+    len = yes_len < no_len ? no_len : yes_len;
+    if (len > 6) {
+        pad = (len - 6) * 9;
+    } else {
+        pad = 0;
+    }
+    bar_w = pad + 74;
+    bottom = center_y + (height >> 1);
+    bar_y = bottom - 50;
+    yes_x = center_x - 80 - pad;
+    put_frame_separator(yes_x, bar_y, bar_w, 30, 0);
+    no_x = center_x + 6;
+    put_frame_separator(no_x, bar_y, bar_w, 30, 0);
+    if (sel == 0) {
+        put_frame_cursor_bar(yes_x, bar_y, bar_w, 30, 0, 0);
+    } else {
+        put_frame_cursor_bar(no_x, bar_y, bar_w, 30, 0, 0);
+    }
+    flfntSetColor(color);
+    font_locate(text_x, text_y);
+    font_print(msg);
+    font_set_size(18, 18);
+    flfntSetColor(0xFFFFFFFF);
+    label_y = bottom - 44;
+    font_locate(yes_x + ((u32)(bar_w - yes_len * 9) >> 1), label_y);
+    font_print(yes);
+    font_locate(no_x + ((u32)(bar_w - no_len * 9) >> 1), label_y);
+    font_print(no);
+}
+
+/* Draws the system message `text` in `text_color` inside the fixed system dialog frame (`color`, `frame_color`). */
+void put_message_sys(s8* text, u32 text_color, u32 color, u32 frame_color)
+{
+    s32 x;
+
+    font_flush();
+    if (text_color == 0) {
+        text_color = 0xFFFFFFFF;
+    }
+    font_set_size(18, 18);
+    x = get_wide_offset(3) + 120;
+    if (frame_color == 0) {
+        frame_color = 0x14120AE6;
+    }
+    put_frame_dialog(x, 120, 400, 198, color, frame_color);
+    flfntSetColor(text_color);
+    font_locate(x + 15, 150);
+    font_print(text);
+}
+
+/* Draws the system dialog's OK button: the icon index is 2 when the option row 7 is set and 0 when it
+ * is not, at the dialog's own button x. */
+void put_message_sys_ok_button(void)
+{
+    s32 x = get_wide_offset(3) + 470;
+
+    if (get_option_cfg(7) != 0) {
+        put_button_icon(x, 268, 32, -1, 2, 0);
+    } else {
+        put_button_icon(x, 268, 32, -1, 0, 0);
+    }
 }
 
 /* Steps `value` down when `keys` holds the `dec_mask` bits and up when it holds `inc_mask`, wrapping inside
@@ -580,18 +1309,18 @@ extern "C" s16 menu_page_count(s16 a, s16 b)
  * 0, else 2) and 0x20 selects state 1 (2 when it already was), while `dec_mask` / `inc_mask` move it to 0 / 1.
  * The move SE is skipped for `sfx` 0xFFFE.  Returns 0 when it only moved. */
 /* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
-extern "C" s32 toggle_word_step(void* state, u16 keys, s32 dec_mask, s32 inc_mask, s32 sfx)
+extern "C" s32 toggle_word_step(void* state, u16 keys, u16 dec_mask, u16 inc_mask, u16 sfx)
 {
     s32* word = (s32*)state;
 
     if ((keys & 0x10) != 0) {
         if (*word == 0) {
-            if ((u16)sfx < 0xFFFE) {
+            if (sfx < 0xFFFE) {
                 sysSE_req(0);
             }
             return 1;
         }
-        if ((u16)sfx != 0xFFFE) {
+        if (sfx != 0xFFFE) {
             sysSE_req(0);
         }
         return 2;
@@ -601,17 +1330,17 @@ extern "C" s32 toggle_word_step(void* state, u16 keys, s32 dec_mask, s32 inc_mas
             *word = 1;
             sysSE_req(1);
         } else {
-            if ((u16)sfx != 0xFFFE) {
+            if (sfx != 0xFFFE) {
                 sysSE_req(1);
             }
             return 2;
         }
-    } else if ((keys & (u16)dec_mask) != 0) {
+    } else if ((keys & dec_mask) != 0) {
         if (*word != 0) {
             *word = 0;
             sysSE_req(3);
         }
-    } else if ((keys & (u16)inc_mask) != 0) {
+    } else if ((keys & inc_mask) != 0) {
         if (*word != 1) {
             *word = 1;
             sysSE_req(3);
@@ -622,39 +1351,38 @@ extern "C" s32 toggle_word_step(void* state, u16 keys, s32 dec_mask, s32 inc_mas
 
 /* The pad-only form of `toggle_word_step`: no SE override. */
 /* untyped: caller-owned payload - the callers pass their own `s32 stepper_*` / `u32` state word */
-extern "C" s32 toggle_word_step_dpad(void* state, u16 keys, s32 dec_mask, s32 inc_mask)
+extern "C" s32 toggle_word_step_dpad(void* state, u16 keys, u16 dec_mask, u16 inc_mask)
 {
-    return toggle_word_step(state, keys, (u16)dec_mask, (u16)inc_mask, 0);
+    return toggle_word_step(state, keys, dec_mask, inc_mask, 0);
 }
 
-/* Draws the item row at the caller's position: `eft052_page_counts_get`'s two value words through
- * `menu_item_row_draw_values`; a null or empty item is skipped. */
-extern "C" void menu_item_row_draw_pages(u16* item, struct _mh_ivec2_* pos)
+/* Draws the yes/no dialog at layout `id`: its frame, the two answers (the chosen one highlighted) and the cursor on
+ * answer `sel` (0 = yes). */
+extern "C" void menu_yes_no_draw(u16 id, s32 sel)
 {
-    s32 value;
-    s32 low;
-    s32 high;
-    s32 sum;
+    _mh_ivec2_ pos;
+    _SPR_DATA_ spr;
+    u8** strs;
+    bool yes_on;
+    bool no_on;
 
-    if (item != NULL) {
-        if (item[0] != 0) {
-            eft052_page_counts_get(item[0], &value, &low, &high);
-            sum = low + high;
-        } else {
-            value = 0;
-            sum = 0;
-        }
-        menu_item_row_draw_values(item, pos, value, sum);
+    get_lsp_data(id, &pos);
+    draw_sprite_ary(dialog_sprite_ids_frame, &pos);
+    if (sel == 0) {
+        yes_on = true;
+        no_on = false;
+    } else {
+        yes_on = false;
+        no_on = true;
     }
-}
-
-/* Reads the position the caller's LSP id names and draws one item row at it. */
-extern "C" void menu_hold_row_draw_by_lsp(u16 id, u16* item)
-{
-    MenuLspPos pos;
-
-    get_lsp_data(id, (struct _mh_ivec2_*)&pos);
-    menu_item_row_draw_pages(item, (struct _mh_ivec2_*)&pos);
+    strs = get_str_tbl(67);
+    spr_data_copy(&spr, get_lsp_data(430, NULL));
+    spr.color = GetMenuFontColor(true, yes_on, true, false);
+    draw_font(spr, (s8*)strs[0], 1, &pos);
+    spr_data_copy(&spr, get_lsp_data(438, NULL));
+    spr.color = GetMenuFontColor(true, no_on, true, false);
+    draw_font(spr, (s8*)strs[1], 1, &pos);
+    put_menu_cursor(sel == 0 ? dialog_sprite_ids_a : dialog_sprite_ids_b, 0, &pos);
 }
 
 /* Moves the 1-based cursor inside [1, max] (`keys` 0x04/0x08 first/last, `held` 0x01/0x02 up/down), plays the move SE
@@ -784,21 +1512,11 @@ extern "C" void menu_scroll_step(MenuScroll* scroll, u16 buttons, s32 sfx)
     scroll->index = row + scroll->rows_per_page * col;
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * The text-centring helpers and the item-pair list layer (0x802A9508..0x802A9E20).
- * --------------------------------------------------------------------------------------------------- */
-
 /* The x a single line of text starts at so that it is centred on `center`: half the line's width, where
  * a glyph is `size / 2` wide. */
 extern "C" s16 menu_text_center_x(char* text, s32 center, s16 size)
 {
     return center - (size * flfntStrLen(text)) / 4;
-}
-
-/* The x a line starts at when its glyph cells are `size` apart, so a line of n glyphs spans n - 1 gaps. */
-extern "C" s16 menu_text_center_x_by_gaps(char* text, s32 center, s16 size)
-{
-    return center - (size * (flfntStrLen(text) - 1)) / 2;
 }
 
 /* The x a block of newline-separated lines starts at so that its widest line is centred on `center`;
@@ -838,6 +1556,12 @@ extern "C" s16 menu_text_block_center_x(char* text, s32 center, s16 size, s16* o
         *out_lines = lines;
     }
     return center - (widest >> 1) * (size >> 1);
+}
+
+/* The x a line starts at when its glyph cells are `size` apart, so a line of n glyphs spans n - 1 gaps. */
+extern "C" s16 menu_text_center_x_by_gaps(char* text, s32 center, s16 size)
+{
+    return center - (size * (flfntStrLen(text) - 1)) / 2;
 }
 
 /* Stores as the new pick the next of the 26 slots after the current one whose item is pickable and not kind 1;
@@ -1045,6 +1769,43 @@ extern "C" void item_pages_sort(IdValue* pool, IdValue* page)
     }
 }
 
+/* Re-sorts the item pool and its second page, then points the player's pick and selected item slot back at the items
+ * they named before the sort. */
+extern "C" void menu_item_pages_resort(_PLW* plw, IdValue* pool, IdValue* page)
+{
+    u8 saved;
+    IdValue picked;
+    IdValue selected;
+    s32 has_selected;
+    s32 index;
+
+    menu_item_pick_seek(plw, pool);
+    item_pair_copy(&picked, &pool[plw->field_0x304]);
+    has_selected = 0;
+    if (page != NULL) {
+        plw->item_slot_sel = pl_item_slot_next_get(plw, plw->item_slot_sel, 2);
+        saved = plw->field_0x269;
+        pl_held_item_refresh(plw);
+        plw->field_0x269 = saved;
+        if (plw->item_slot_sel != 0xFF) {
+            if ((plw->item_slot_sel & 0x80) != 0) {
+                item_pair_copy(&selected, &page[plw->item_slot_sel & 0x7F]);
+            } else {
+                item_pair_copy(&selected, &pool[plw->item_slot_sel]);
+            }
+            has_selected = 1;
+        }
+    }
+    item_pages_sort(pool, page);
+    index = item_pair_index_find(picked.id, pool, 26);
+    if (index >= 0) {
+        plw->field_0x304 = index;
+    }
+    if (has_selected != 0) {
+        plw->item_slot_sel = item_slot_code_find(pool, page, selected.id);
+    }
+}
+
 /* The slot code of `id` in the item lists: the index of its slot in the 9-slot `page` with the 0x80 bit set
  * when it is there, else its index in the 24-slot `pool`, else 0xFF. */
 extern "C" u16 item_slot_code_find(IdValue* pool, IdValue* page, u16 id)
@@ -1143,9 +1904,131 @@ extern "C" s16 menu_slot_find(MenuListWork* self, u16 id)
     return 0xFF;
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * The dialog/page draw layer and the palette getters (0x802A7C44, 0x802A8020, 0x802AA3EC..0x802AA4F4).
- * --------------------------------------------------------------------------------------------------- */
+/* Draws a window of `count` text rows `texts` at `pos`, the cursor on row `sel`; each row is printed with its entry of
+ * `flags` (all 0 when `flags` is NULL). */
+extern "C" void menu_select_window_draw(u8 sel, u8 count, s8** texts, const _mh_ivec2_* pos, s16* flags)
+{
+    s16 no_flags;
+    _mh_ivec2_ row;
+    _SPR_DATA_* lsp;
+    s32 step;
+    s32 i;
+    s16 x;
+    s16 y;
+
+    draw_window_box(pos->x, pos->y, 112, (count + 1) * 30, 0, 0);
+    row.x = pos->x + 9;
+    row.y = pos->y + 17;
+    lsp = get_lsp_data(740, NULL);
+    font_set_size(lsp->width, lsp->height);
+    if (flags != NULL) {
+        step = 1;
+    } else {
+        flags = &no_flags;
+        no_flags = 0;
+        step = 0;
+    }
+    for (i = 0; i < count; i++) {
+        draw_sprite_ary((u16*)get_menu_lsp_tbl(43), &row);
+        x = menu_text_center_x((char*)*texts, (s16)(row.x + lsp->pos.x), lsp->width);
+        y = row.y + lsp->pos.y;
+        if (i == sel) {
+            put_menu_cursor((u16*)get_menu_lsp_tbl(44), 0, &row);
+            font_print_ex(x + 2, y + 1, 1, (s8*)"%s", *texts);
+        }
+        font_print_ex(x, y, *flags, (s8*)"%s", *texts);
+        flags += step;
+        row.y += 30;
+        texts++;
+    }
+}
+
+/* Draws a window of `count` menu entries at `pos`: each entry's text in its own colour (or grey/white by its
+ * pickable/selected bytes), the selected one with a shadow and the cursor. */
+extern "C" void menu_choice_window_draw(MenuEntry* entries, u8 count, _mh_ivec2_* pos)
+{
+    _mh_ivec2_ row;
+    _SPR_DATA_* lsp;
+    s32 i;
+    s16 x;
+    s16 y;
+    u32 color;
+
+    draw_window_box(pos->x, pos->y, 112, (count + 1) * 30, 0, 0);
+    row.x = pos->x + 9;
+    row.y = pos->y + 17;
+    lsp = get_lsp_data(740, NULL);
+    font_set_size(lsp->width, lsp->height);
+    for (i = 0; i < count; i++) {
+        draw_sprite_ary((u16*)get_menu_lsp_tbl(43), &row);
+        x = menu_text_center_x((char*)entries->field_0x08, (s16)(row.x + lsp->pos.x), lsp->width);
+        y = row.y + lsp->pos.y;
+        color = entries->field_0x0C;
+        if (color == 0) {
+            if (entries->field_0x02 != 0) {
+                if (entries->selected != 0) {
+                    font_print_ex(x + 2, y + 1, 1, (s8*)"%s", (s8*)entries->field_0x08);
+                    color = 0xF0F0F0FF;
+                } else {
+                    color = 0xC3C3C3FF;
+                }
+            } else {
+                color = 0x646464FF;
+            }
+        }
+        font_locate(x, y);
+        flfntSetColor(color);
+        font_print((s8*)"%s", (s8*)entries->field_0x08);
+        if (entries->selected != 0) {
+            put_menu_cursor((u16*)get_menu_lsp_tbl(44), 0, &row);
+        }
+        row.y += 30;
+        entries++;
+    }
+}
+
+/* Draws the window at layout `id` with `count` entry rows: the row frame `frame_ids` (its first two words the row and
+ * text layout ids), each entry's text in its colour, and the cursor sprites `cursor_ids` on the selected one. */
+extern "C" void menu_entry_window_draw(u16 id, u32* frame_ids, u32* cursor_ids, MenuEntry* rows, u8 count)
+{
+    _mh_ivec2_ box;
+    _mh_ivec2_ row;
+    _SPR_DATA_ spr;
+    _SPR_DATA_* lsp;
+    u16* frame = (u16*)frame_ids;
+    s32 i;
+    u32 color;
+    u32 flags;
+
+    lsp = get_lsp_data(id, &box);
+    draw_window_box(box.x, box.y, lsp->width, lsp->height, 0, 0);
+    get_lsp_data(frame[0], &row);
+    for (i = 0; i < count; i++) {
+        draw_sprite_ary(&frame[2], &row);
+        flags = 1;
+        color = rows->field_0x0C;
+        if (color == 0) {
+            if (rows->field_0x02 != 0) {
+                if (rows->selected != 0) {
+                    flags |= 4;
+                    color = 0xF0F0F0FF;
+                } else {
+                    color = 0xC3C3C3FF;
+                }
+            } else {
+                color = 0x646464FF;
+            }
+        }
+        spr_data_copy(&spr, get_lsp_data(frame[1], NULL));
+        spr.color = color;
+        draw_font(spr, (s8*)rows->field_0x08, flags, &row);
+        if (rows->selected != 0) {
+            put_menu_cursor((u16*)cursor_ids, 0, &row);
+        }
+        row.y += 30;
+        rows++;
+    }
+}
 
 /* The menu text colour (RGBA8888): `d == 1` first, `a == 0` (disabled) second, then `c`/`b` pick one of four grey/amber
  * shades; the arms are in the order the target branches on them. */
@@ -1158,15 +2041,16 @@ s32 GetMenuFontColor(bool a, bool b, bool c, bool d)
         return 0x646464FF;
     }
     if (c == 1) {
-        if (b != 1) {
+        if (b == 1) {
+            return 0xF0F0F0FF;
+        } else {
             return 0xC3C3C3FF;
         }
-        return 0xF0F0F0FF;
     }
     if (b == 1) {
-        return 0x878787FF;
+        return 0xE8A40FFF;
     }
-    return 0xE8A40FFF;
+    return 0x878787FF;
 }
 
 /* The same palette's red variant: `a == 0` first, then the `c`/`(d | b)` pair and the last shade. */
@@ -1200,6 +2084,17 @@ s32 GetMenuIconColor(bool a, bool b, bool c, bool d)
     return 0xAAAAAAFF;
 }
 
+/* Draws `spr` additively with its alpha scaled by the cockpit blink factor (136..256 of 256). */
+extern "C" void draw_sprite_blink(_SPR_DATA_* spr, const _mh_ivec2_* pos)
+{
+    u16 alpha = (s32)(120.0f * cockpit_blink_get()) + 136;
+
+    set_blendmode(4, 1, 1);
+    spr->color = (spr->color & 0xFFFFFF00) + (u16)(((u8)spr->color * alpha) >> 8);
+    draw_sprite(*spr, pos);
+    set_blendmode(4, 5, 1);
+}
+
 /* The string-table accessors: the `index`-th string of `get_str_tbl(group)`, group 0 the item names, 1 the player-slot
  * names, 3 the digit glyphs; group 2's content is unpinned, a GUESS, so its accessor keeps an index-based name. */
 extern "C" s8* get_item_name_str(u8 index)
@@ -1225,15 +2120,8 @@ extern "C" s8* get_digit_str(u8 index)
     return (s8*)get_str_tbl(3)[index];
 }
 
-/* Draws the system dialog's OK button: the icon index is 2 when the option row 7 is set and 0 when it
- * is not, at the dialog's own button x. */
-void put_message_sys_ok_button(void)
+/* Hands the pad layer channel `chan` the slot map `map` of the four per-slot value runs. */
+extern "C" void menu_pad_map_set(s32 chan, s32 map)
 {
-    s32 x = get_wide_offset(3) + 470;
-
-    if (get_option_cfg(7) != 0) {
-        put_button_icon(x, 268, 32, -1, 2, 0);
-    } else {
-        put_button_icon(x, 268, 32, -1, 0, 0);
-    }
+    pad_wait_table_set((u8)chan, menu_pad_slot_map_tbl[(u8)map]);
 }

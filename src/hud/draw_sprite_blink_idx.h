@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* 0x802DAE24 - draws the sprite pair `left`/`right` (0xFFFF: none) in `color`, the one `moved` names blinking. */
-void draw_sprite_blink_idx(u16 left, u16 right, u32 color, s16 moved, const struct _mh_ivec2_* pos);
+void draw_sprite_blink_idx(u16 left, u16 right, u32 color, u16 moved, const struct _mh_ivec2_* pos);
 
 #ifdef __cplusplus
 }

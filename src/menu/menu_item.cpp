@@ -404,7 +404,7 @@ s32 menu_list_names_set(MenuSlot* self, u8 index);
 void menu_cursor_column_step(void* key);
 void menu_frame_entries_build(void* page_a, void* page_b, s8 rows, s32 id, s32 flag);
 void menu_frame_draw_page(void* page, void* slots, s8 cols, s8 rows, u16 timer, u32 flags);
-void fn_802A9BCC(_PLW* plw, void* page_a, void* page_b);
+void menu_item_pages_resort(_PLW* plw, void* page_a, void* page_b);
 s32 menu_slot_index_is_page_b(MenuSlot* self, s16 index);
 u32 menu_item_slot_accepts(MenuSlot* self, u16 item_id, s16 index);
 IdValue* menu_slot_get(MenuSlot* self, s16 index);
@@ -645,7 +645,7 @@ extern "C" s32 menu_item_page_step(MenuSlot* self) {
                 if (self->field_0x00F == 2) {
                     item_pages_sort(self->page_a, self->page_b);
                 } else {
-                    fn_802A9BCC(self->worker, self->page_a, self->page_b);
+                    menu_item_pages_resort(self->worker, self->page_a, self->page_b);
                 }
                 self->field_0x1B0 = 0;
                 sysSE_req(0);
@@ -2105,7 +2105,7 @@ extern "C" s32 menu_split_item_page_step(MenuSlot* self)
         if (self->field_0x1B0 != 0) {
             switch (toggle_word_step_dpad(&self->field_0x18C, keys, 4, 8)) {
             case 1:
-                fn_802A9BCC(self->worker, self->page_a, self->page_b);
+                menu_item_pages_resort(self->worker, self->page_a, self->page_b);
                 self->field_0x1B0 = 0;
                 sysSE_req(0);
                 break;
