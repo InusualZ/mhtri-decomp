@@ -12,7 +12,8 @@
  * FLAGS. `cflags_main`; file-wide `#pragma fp_contract off` (no fused multiply-add in the target), `#pragma
  *   pool_data off` (each table is addressed with its own `lis`/`addi`) and `#pragma peephole off` (retail keeps the
  *   unfused `clrlwi`/`rlwinm` + `cmpwi` pairs), with `#pragma peephole on` around `em003_frame_update` and
- *   `em003_act7_7`.
+ *   `em003_act7_7`; `#pragma opt_common_subs off` around `em003_act4_10`, `em003_act7_2`, `em003_act7_10`,
+ *   `em003_act7_13`, `em003_act7_19` and `em003_act7_20` (retail loads `shell_set_func_ptr` after the arguments).
  * NAMES. `em003_prog_tbl`, `em003_call_act_type_ck`, `em003_atama_koware_act_ck` and `em003_yobi_boss_em_ck` are the
  *   runtime dump's names; every other row is named here.
  *   GUESS (the program-table slot each fills): em003_timers_clear, em003_init, em003_frame_update,
@@ -31,16 +32,12 @@
  *   The foreign callees em_team_member_claim, em_area_buff_apply, pl_area_buff_apply, eft_area_slot_bind,
  *   em003_call_se_reset and em003_call_se_step are this unit's registry proposals for 0x8012C220, 0x8012D618,
  *   0x8027D0D4, 0x80306B10, 0x8043B410 and 0x8043B424 (declared in their owners' leaf headers).
- * RESIDUALS. `em003_act7_2`/`em003_act7_20`: retail keeps the swipe angles in r0/r6 and loads the shell table after the
- *   arguments; ours picks r5/r0 and loads it first.  The shell-job calls of `em003_act4_10`, `em003_act7_10`,
- *   `em003_act7_13` and `em003_act7_19` load `shell_set_func_ptr` before the arguments (retail after them; a local,
- *   a `(*p->f)` call and the flag spelling all leave it).  `em003_act1_7`/`_8`/`_9`: retail moves `self` into r3
- *   right after `get_em_base_scale` returns, ours just before `em_mot_speed_set` (operand order, a temporary and an
- *   inline helper all leave it); `em003_act2_6` the reverse for `em_motion_blend_step`.  `em003_ground_impact_fx`:
- *   the f1 load and the `&vec` argument are swapped.  `em003_color_approach`: the sum lands in r4 then r3.
- *   Register allocation only: `em003_call_group_pick`, `em003_call_kind_pick`, `em003_color_update`,
- *   `em003_event_notify`, `em003_area_start_ck`, `em003_motion_events` (one argument load), `em003_act7_3` (the
- *   step rate's `clrlwi`).
+ * RESIDUALS. `em003_act7_3`: retail narrows the approach rate after the `0x80`/`0x40` merge (`clrlwi r5,r5,16`,
+ *   4 bytes); a `(u16)` cast, u16/int locals, a switch, a u16-parameter view and an inline helper all fold it.
+ *   Register allocation only: `em003_call_group_pick` (each loop has its own index/pair, retail colours them
+ *   r28/r22 and r31/r28), `em003_color_update` (retail keeps `b` in r30, ours r28; every declaration order and
+ *   reusing the first block's variables were measured).
+ *   .sdata2: the target's 4-byte tail pad after `lbl_80797328` (620 of 624 bytes emitted).
  *   flipcheck: the rows above.
  * SHAPES. `Em003UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
@@ -52,6 +49,10 @@
  *   `&em_area_entry_tbl[0][0]`; a `get_move_work_max` count is held as u32 and narrowed at the loop.  Data is
  *   defined between the functions in retail order (the act-7 aim curve before `em003_act7_0`, the act-10 and act-11
  *   sound programs before their players, the demo keys before `em003_act12_0`).
+ *   Callees take their owner's parameter order through call-site views where the shared header differs
+ *   (`em_ground_impact_set`: the scale ahead of the offset; `em_area_break_ck`: the area reference).  A swipe
+ *   angle that depends on `arg1` is an `if`/`else` pair; `get_em_base_scale` goes into a local before
+ *   `em_mot_speed_set`, and the blend ratio into a local before `em_motion_blend_step`.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -128,6 +129,10 @@
 #define em_fall_start_f ((void (*)(_ENEMY_WORK*, f32))em_fall_start)
 /* the offset step reports whether the move landed */
 #define em_move_offset_step_update_v ((u32 (*)(_ENEMY_WORK*, void*))em_move_offset_step_update)
+/* the area-break test takes the area reference its owner reads (the header spells it with `self` only) */
+#define em_area_break_ck_view1 ((u32 (*)(_ENEMY_WORK*, u8))em_area_break_ck)
+/* the ground impact in its owner's parameter order: the scale ahead of the offset */
+#define em_ground_impact_set_view1 ((void (*)(_ENEMY_WORK*, u8, u8, f32, VEC3*))em_ground_impact_set)
 
 
 /* One entry of the call tables `em003_call_group_pick`/`em003_call_kind_pick` and the call event scan: a group
@@ -662,6 +667,7 @@ void em003_event_notify(_ENEMY_WORK* self, u8 kind, u8 sub) {
         case 0x16: {
             s32 found;
             u8 group;
+            s32 j;
 
             self->em003_0x328.call_done = 1;
             if (self->em003_0x328.call_count < 0xFF) {
@@ -671,7 +677,7 @@ void em003_event_notify(_ENEMY_WORK* self, u8 kind, u8 sub) {
             group = self->em003_0x328.call_group;
             if (group != 0) {
                 entry = &em_area_entry_tbl[0][0];
-                for (i = 0; i < 128; i++, entry++) {
+                for (j = 0; j < 128; j++, entry++) {
                     if (entry->active != 0 && entry->kind_0x08 == 1 && entry->group == group) {
                         found = 1;
                         break;
@@ -1060,7 +1066,8 @@ void em003_act1_7(_ENEMY_WORK *self) {
             self->timer_0x020 = 0x96;
         }
         if ((u8) self->field_0x7C8 >= 0x29) {
-            em_mot_speed_set(self, 2.0f * (1.2f / get_em_base_scale(self)));
+            f32 s = get_em_base_scale(self);
+            em_mot_speed_set(self, 2.0f * (1.2f / s));
             self->timer_0x020 = ((f32) self->timer_0x020 / 1.2f);
         }
         em003_call_se_reset(self);
@@ -1085,7 +1092,8 @@ void em003_act1_8(_ENEMY_WORK *self, u8 arg1) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xC8, 4, 0);
         if (arg1 == 1) {
-            em_mot_speed_set(self, 2.0f * (1.5f / get_em_base_scale(self)));
+            f32 s = get_em_base_scale(self);
+            em_mot_speed_set(self, 2.0f * (1.5f / s));
         }
         self->timer_0x020 = 0x6E;
         if (em003_atama_koware_act_ck(self) == 1) {
@@ -1099,7 +1107,8 @@ void em003_act1_8(_ENEMY_WORK *self, u8 arg1) {
             self->state_0x006 = 0;
             em_mot_set(self, 0xCA, 0, 0);
             if (arg1 == 1) {
-                em_mot_speed_set(self, 2.0f * (1.5f / get_em_base_scale(self)));
+                f32 s = get_em_base_scale(self);
+                em_mot_speed_set(self, 2.0f * (1.5f / s));
                 break;
             }
         }
@@ -1130,7 +1139,8 @@ void em003_act1_9(_ENEMY_WORK *self, u8 arg1) {
             self->timer_0x020 = 0xD2;
         }
         if ((u8) self->field_0x7C8 >= 0x29) {
-            em_mot_speed_set(self, 2.0f * (1.2f / get_em_base_scale(self)));
+            f32 s = get_em_base_scale(self);
+            em_mot_speed_set(self, 2.0f * (1.2f / s));
             self->timer_0x020 = ((f32) self->timer_0x020 / 1.2f);
             break;
         }
@@ -1570,7 +1580,8 @@ void em003_act2_6(_ENEMY_WORK *self) {
             em_mot_set(self, 0xDA, 6, 0);
             return;
         }
-        em_motion_blend_step(self, (360.0f * (f32) (s16) (self->field_0x1C0 - temp_r31)) / 65536.0f, 0.02f);
+        f32 turn = (360.0f * (f32) (s16) (self->field_0x1C0 - temp_r31)) / 65536.0f;
+        em_motion_blend_step(self, turn, 0.02f);
         em_mot_layer_blend_step(self, 0xD4, 0xD5, (s32)em_mot_frame_get(self), self->field_0x464);
         return;
     case 0x2:
@@ -2479,6 +2490,7 @@ void em003_act4_8(_ENEMY_WORK *self, u8 arg1) {
     }
 }
 
+#pragma opt_common_subs off
 void em003_act4_10(_ENEMY_WORK *self) {
     VEC3 vec;
 
@@ -2501,6 +2513,7 @@ void em003_act4_10(_ENEMY_WORK *self) {
         return;
     }
 }
+#pragma opt_common_subs reset
 
 void em003_act4_dispatch(_ENEMY_WORK *self) {
     u8 temp_r0;
@@ -2608,6 +2621,7 @@ void em003_act7_1(_ENEMY_WORK *self) {
 
 /* 0x80158E24 (0x1CC): the three-hit swipe: on frames 126/130/134 it hands the shell job a spawn record whose
  * angles sweep across (wider on the first variant), then walks out. */
+#pragma opt_common_subs off
 void em003_act7_2(_ENEMY_WORK* self, u8 arg1) {
     EmSpawnRec rec;
     int angle_a;
@@ -2636,23 +2650,26 @@ void em003_act7_2(_ENEMY_WORK* self, u8 arg1) {
         if (hit != -1) {
             switch (hit) {
             default:
-                angle_a = 0x11C7;
                 if (arg1 == 0) {
                     angle_a = 0x271C;
+                } else {
+                    angle_a = 0x11C7;
                 }
                 angle_b = 0xE38F;
                 break;
             case 1:
-                angle_a = 0xE39;
                 if (arg1 == 0) {
                     angle_a = 0x271C;
+                } else {
+                    angle_a = 0xE39;
                 }
                 angle_b = 0xF1C8;
                 break;
             case 2:
-                angle_a = 0xC17;
                 if (arg1 == 0) {
                     angle_a = 0x238E;
+                } else {
+                    angle_a = 0xC17;
                 }
                 angle_b = 0;
                 break;
@@ -2667,6 +2684,7 @@ void em003_act7_2(_ENEMY_WORK* self, u8 arg1) {
         break;
     }
 }
+#pragma opt_common_subs reset
 
 void em003_act7_3(_ENEMY_WORK *self, u8 arg1) {
     s32 temp_r0;
@@ -2878,6 +2896,7 @@ void em003_act7_9(_ENEMY_WORK *self, u8 arg1, u8 arg2, u8 arg3) {
     }
 }
 
+#pragma opt_common_subs off
 void em003_act7_10(_ENEMY_WORK *self, u8 arg1) {
     VEC3 sp14;
     VEC3 vec;
@@ -2939,6 +2958,7 @@ void em003_act7_10(_ENEMY_WORK *self, u8 arg1) {
         break;
     }
 }
+#pragma opt_common_subs reset
 
 void em003_act7_12(_ENEMY_WORK *self) {
     f32 temp_f1;
@@ -2973,6 +2993,7 @@ void em003_act7_12(_ENEMY_WORK *self) {
     }
 }
 
+#pragma opt_common_subs off
 void em003_act7_13(_ENEMY_WORK* self, u8 arg1, u8 arg2, u8 arg3) {
     VEC3 vec;
     s32 winding;
@@ -3053,6 +3074,7 @@ void em003_act7_13(_ENEMY_WORK* self, u8 arg1, u8 arg2, u8 arg3) {
         break;
     }
 }
+#pragma opt_common_subs reset
 
 void em003_act7_15(_ENEMY_WORK *self) {
     switch (self->state) {
@@ -3069,6 +3091,7 @@ void em003_act7_15(_ENEMY_WORK *self) {
     }
 }
 
+#pragma opt_common_subs off
 void em003_act7_19(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     VEC3 vec;
 
@@ -3101,8 +3124,10 @@ void em003_act7_19(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* 0x80159FF0 (0x1CC): the standing three-hit swipe: the same sweep on frames 100/108/118. */
+#pragma opt_common_subs off
 void em003_act7_20(_ENEMY_WORK* self, u8 arg1) {
     EmSpawnRec rec;
     int angle_a;
@@ -3131,23 +3156,26 @@ void em003_act7_20(_ENEMY_WORK* self, u8 arg1) {
         if (hit != -1) {
             switch (hit) {
             default:
-                angle_a = 0x11C7;
                 if (arg1 == 0) {
                     angle_a = 0x271C;
+                } else {
+                    angle_a = 0x11C7;
                 }
                 angle_b = 0xE38F;
                 break;
             case 1:
-                angle_a = 0xE39;
                 if (arg1 == 0) {
                     angle_a = 0x271C;
+                } else {
+                    angle_a = 0xE39;
                 }
                 angle_b = 0xF1C8;
                 break;
             case 2:
-                angle_a = 0xC17;
                 if (arg1 == 0) {
                     angle_a = 0x238E;
+                } else {
+                    angle_a = 0xC17;
                 }
                 angle_b = 0;
                 break;
@@ -3162,6 +3190,7 @@ void em003_act7_20(_ENEMY_WORK* self, u8 arg1) {
         break;
     }
 }
+#pragma opt_common_subs reset
 
 void em003_act7_dispatch(_ENEMY_WORK *self) {
     u8 temp_r0;
@@ -3973,7 +4002,7 @@ void em003_ground_impact_fx(_ENEMY_WORK *self, u8 arg1) {
     VEC3_ctor(&vec);
     if (self->em003_0x328.tick == 0) {
         setVector3(&vec, 0.0f, 0.0f, 100.0f);
-        em_ground_impact_set(self, arg1, 1, &vec, 0.65f);
+        em_ground_impact_set_view1(self, arg1, 1, 0.65f, &vec);
     }
 }
 
@@ -4189,7 +4218,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
     case 0x2A:
         if (em_after_frame_check(self, 0, 52.0f, 0.0f) == 1) {
             setVector3(&vec, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set(self, 2, 1, &vec, 0.65f);
+            em_ground_impact_set_view1(self, 2, 1, 0.65f, &vec);
             break;
         }
         break;
@@ -4237,7 +4266,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
             } else {
                 em003_effect_spawn(self, 1, 4, 0xFF, 0, 0.7f);
             }
-            em_ground_impact_set(self, 1, 0, NULL, 0.65f);
+            em_ground_impact_set_view1(self, 1, 0, 0.65f, NULL);
             em_camera_req(self, -1, 7);
             break;
         }
@@ -4255,7 +4284,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
             } else {
                 em003_effect_spawn(self, 0, 5, 0xFF, 0, 0.5f);
             }
-            em_ground_impact_set(self, 1, 1, NULL, 0.65f);
+            em_ground_impact_set_view1(self, 1, 1, 0.65f, NULL);
             break;
         }
         break;
@@ -4455,7 +4484,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
         break;
     case 0xD7:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-            em_ground_impact_set(self, 1, 1, NULL, 0.65f);
+            em_ground_impact_set_view1(self, 1, 1, 0.65f, NULL);
             break;
         }
         break;
@@ -4467,7 +4496,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
         break;
     case 0xD9:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-            em_ground_impact_set(self, 1, 1, NULL, 0.65f);
+            em_ground_impact_set_view1(self, 1, 1, 0.65f, NULL);
         }
         if (em_after_frame_check(self, 0, 8.0f, 0.0f) == 1) {
             em_camera_req(self, -1, 7);
@@ -4550,9 +4579,7 @@ u8 em003_color_approach(u8 cur, u8 target, u8 step) {
         if (cur + step < target) {
             return cur + step;
         }
-        return target;
-    }
-    if (cur > target && cur > target + step) {
+    } else if (cur > target && cur > target + step) {
         return cur - step;
     }
     return target;
@@ -4752,7 +4779,7 @@ u8 em003_state_query(_ENEMY_WORK* self, u8 kind) {
 u32 em003_area_start_ck(_ENEMY_WORK* self, u16 arg1) {
     u8 map;
     s32 broken;
-    u32 ref;
+    u8 ref;
     u32 area;
 
     map = stage_map_kind_get(self->field_0x1E0);
@@ -4778,7 +4805,7 @@ u32 em003_area_start_ck(_ENEMY_WORK* self, u16 arg1) {
         break;
     }
     if (ref != 0xFF) {
-        switch (em_area_break_ck(self)) {
+        switch ((u8)em_area_break_ck_view1(self, ref)) {
         case 1:
             broken = 1;
             break;
@@ -4862,16 +4889,24 @@ void em003_spawn_rec_set(EmSpawnRec* out, u8 kind, u16 angle_a, u16 angle_b) {
 /* 0x8015D288 (0x204): picks, at random among the candidates, a call group: a placed area entry or a live enemy in
  * another area whose group/team pair is in `em003_call_group_tbl` and that may enter this area. */
 u8 em003_call_group_pick(_ENEMY_WORK* self) {
-    const Em003CallPair* pair;
-    const Em003CallPair* tbl = em003_call_group_tbl;
-    s32 count = 0;
-    u8 pick = 0;
-    _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    s32 k;
+    const Em003CallPair* tbl;
+    u8 pick;
+    s32 count;
     s32 i;
     s32 j;
-    u32 max = get_move_work_max(3);
-    EmAreaEntry* entry = &em_area_entry_tbl[0][0];
+    const Em003CallPair* pair;
+    _ENEMY_WORK* work;
+    const Em003CallPair* work_pair;
+    u32 max;
+    EmAreaEntry* entry;
 
+    tbl = em003_call_group_tbl;
+    count = 0;
+    pick = 0;
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
+    entry = &em_area_entry_tbl[0][0];
     for (i = 0; i < 128; i++, entry++) {
         if (entry->active != 0 && entry->kind_0x08 == 1 && entry->spawn_0x30 != 0) {
             for (j = 0, pair = tbl; pair->id != 0; pair++, j++) {
@@ -4887,11 +4922,11 @@ u8 em003_call_group_pick(_ENEMY_WORK* self) {
     }
     for (i = 0; i < (u16)max; i++, work++) {
         if (work->active != 0 && work->area_no != self->area_no && em_die_ck_view1(work) != 1) {
-            for (j = 0, pair = tbl; pair->id != 0; pair++, j++) {
-                if (work->team == pair->id && (pair->team == 0xFF || work->field_0x00A == pair->team) &&
+            for (k = 0, work_pair = tbl; work_pair->id != 0; work_pair++, k++) {
+                if (work->team == work_pair->id && (work_pair->team == 0xFF || work->field_0x00A == work_pair->team) &&
                     em_area_enter_ck(work, self->field_0x1E0, self->area_no) == 1 &&
                     ran_suu(1) % (count + 1) == 0) {
-                    pick = tbl[j].id;
+                    pick = tbl[k].id;
                     count++;
                     break;
                 }
@@ -4905,10 +4940,10 @@ u8 em003_call_group_pick(_ENEMY_WORK* self) {
  * pair is in `em003_call_kind_tbl`, each table row tried once. */
 u8 em003_call_kind_pick(_ENEMY_WORK* self) {
     u8 tried[4];
-    EmAreaEntry* entry;
     u8* mark;
-    s32 i;
     const Em003CallPair* pair;
+    EmAreaEntry* entry;
+    s32 i;
     s32 j;
     s32 count = 0;
     const Em003CallPair* tbl = em003_call_kind_tbl;

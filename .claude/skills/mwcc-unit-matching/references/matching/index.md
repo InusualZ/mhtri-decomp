@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (212)
+## Ideas that work (213)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -221,6 +221,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 233 | [An element pointer whose base must load first into its own register: assign the base, then index the pointer](233-element-pointer-whose-base.md) | works | source-shape, allocator | Retail loads an array's base pointer first, straight into the element pointer's register (`lwz r29,0x168(r30) ; mulli ; add r29,r29,r0`), where `p = &work->arr[i]` loads the index first or computes into a scratch... |
 | 234 | [Retail recomputes one address at two call sites: spell the two uses differently (union member, element address) to defeat the CSE](234-retail-recomputes-one-address.md) | works | source-shape, allocator | Ours keeps an address used by two calls in a callee-saved register (`addi r27,r28,0x35` + `mr r4,r27` / `mr r6,r27`) where retail recomputes it as each call's argument (`addi r4,r28,0x35` ... `addi r6,r28,0x35`). |
 | 235 | [Under peephole off, a redundant (s16) cast on a stored s16 parameter keeps retail's extsh](235-under-peephole-off-a.md) | works | source-shape, pragma | Retail stores an s16 parameter through `extsh r0,rN ; sth r0,..` where ours stores the saved register directly (`sth rN,..`), one instruction short. |
+| 236 | [A call result folded into a later call's argument: hold it in a local so the outer call's self move follows the inner call](236-call-result-folded-into.md) | works | source-shape, allocator | Retail moves self into r3 right after an inner call returns (before the float math on its result); ours moves it just before the outer bl, or the reverse |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
