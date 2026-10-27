@@ -202,7 +202,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 211 | [A pool literal ordered before its first use comes from a dead initialiser earlier in the function](211-pool-literal-ordered-before.md) | works | data, source-shape | The unit's .sdata2 holds the right literals but one sits earlier in the target than the instruction that first loads it |
 | 212 | [A pool base register that names a mid-section object marks the TU's own section start](212-pool-base-register-that.md) | works | data, sections, measurement | Every `addi rX,rBase,off` that reads a pooled string differs by one constant (ours higher), and retail's `lis`/`addi` base relocation names an object in the middle of the unit's `.data` where ours names the section... |
 
-## Ruled out - tried and it did not work, do not re-run (11)
+## Ruled out - tried and it did not work, do not re-run (12)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -217,6 +217,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 89 | [Perturbation probe](089-perturbation-probe.md) | ruled-out | source-shape, allocator | The stack-slot outcome of `camellia_setup256` is sensitive to IR shape (level 4 flips the frame); deliberately perturbing one independent statement and watching whether `subL[29]` coalesces was meant to lead to a... |
 | 90 | [Absorb `dw` / `CAMELLIA_RL1` IR shape](090-absorb-rl1-ir-shape.md) | ruled-out | source-shape, allocator | With the level-4 pragma the frame is right and only a window in the key-schedule absorb chain differs (register choice plus where `CAMELLIA_RL1` is computed); source rewrites of that chain were the highest-probability... |
 | 91 | [Pragma combination search](091-pragma-combination-search.md) | ruled-out | pragma, flags | With the level-4 pragma the frame is correct and only a short window differs; a per-function pragma (or a combination) that suppresses the level-4 reassociation while keeping the frame would finish the job. |
+| 213 | [A branch into the middle of another case is not an optimisation: MWCC Wii/1.3 has no tail-merge or cross-jump pass](213-branch-into-the-middle.md) | ruled-out | source-shape, tooling | Retail's switch branches into the middle of a sibling case's code (forwards or backwards) and holds one copy of a shared tail; every goto-free spelling either repeats the tail or moves it, and no flag, pragma or pass... |
 
 ## Not tried yet (7)
 

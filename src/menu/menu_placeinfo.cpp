@@ -29,8 +29,10 @@
  * RESIDUALS.
  *  - `lb_community_select_step`: retail reaches its page-count tail (pages = total / 8, cursor clamp) by jumps from seven
  *    places; the source calls the static helper `lb_community_page_count_set` (rule 8), an extra function in our object.
+ *    The tail after the switch (idea 183) is 3360 B against 3312 and scores lower; a scratch `goto` spelling 99.24.
  *  - `lb_city_select_screen_step`: state 5 step 3 repeats state 4 step 1's enter-city tail, which retail reaches by a
- *    jump (rule 8; MWCC does not merge the identical copy).
+ *    backward jump (rule 8; idea 213: MWCC has no pass that merges the identical copy). The tail after the switch
+ *    (idea 183) is retail's 3704 B but scores 96.30; a scratch `goto` spelling 100.
  *  - `lb_city_select_draw`: state 8 re-enters state 5's search-dialog body through a `for (;;)` re-dispatch (playbook
  *    203); retail branches straight to case 5, ours loops back to the compare chain (`li r3,5 ; b`), hoists the
  *    `lobby_w.state_0x000` load and colours `work` in r29 where retail has r31.

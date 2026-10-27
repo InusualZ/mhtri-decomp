@@ -22,9 +22,13 @@
  *   table.  Foreign callees named through the registry (lane lobby-pane-ui) are GUESS names too.
  * RESIDUALS. All 129 rows are written; 40 short of 100, by cause:
  *  - shared tails: retail's step machines branch into a sibling case's tail (`fn_801F3294`, `lb_color_pane_step`'s
- *    "record done" tails; `lobby_enter_seq_step`/`lobby_scene_setup_step`'s "system file done" tail, reached backwards
- *    from `case 0x64` too); ours repeats the tail (MWCC does not cross-jump, idea 183 cannot express a backward entry),
- *    and `lb_color_pane_step`'s `do { } while (0)` exits return `result` where retail branches to one `mr r3,r29`;
+ *    "record done" tails); ours repeats the tail (MWCC has no tail-merge pass, idea 213), and `lb_color_pane_step`'s
+ *    `do { } while (0)` exits return `result` where retail branches to one `mr r3,r29`;
+ *  - `lobby_enter_seq_step`/`lobby_scene_setup_step`: retail keeps one "system file done" block (`field_0x865 = 0;
+ *    state = 3`) inside case 2, entered from case 0, case 1 and backwards from `case 0x64`, and one
+ *    `game_system_file_create_start` test inside case 1 that case 0 enters; ours has the done block once after the
+ *    switch (idea 183) and the create test twice (a third exit kind needs a flag).  Retail's flow graph is the
+ *    source's own (idea 213: no pass merges the copies); a scratch `goto` spelling measures 98.92 / 744 B;
  *  - an `s16` index retail re-extends at every use where ours extends once at the definition (`lb_pane_draw`'s and
  *    `lb_box_grid_draw`'s grid walks, `fn_801EEDC4`'s slot index), and register colouring / scheduling:
  *    `lb_box_grid_draw` (keeps `reason` on the stack), `lb_dye_inner_draw`, `lb_color_pane_draw`, `lb_dye_pane_draw`,
@@ -62,7 +66,8 @@
  *   `lb_my_set_list_draw`'s mark mode, `lb_equip_set_pane_step`'s row count); a set's three ids are walked in a loop
  *   (`lb_equip_record_swap`); the sort masks' kind bits are set one statement each; `lb_color_pane_step` wraps its
  *   switch in `do { } while (0)` (idea 183: `break` reaches the "left with the old colour" tail, `continue` the
- *   "new colour" one); the page band calls `lb_choice_draw`/`lb_help_num_put` through `_c1` views on the owner's
+ *   "new colour" one), and so do `lobby_enter_seq_step`/`lobby_scene_setup_step` (the "system file done" block after
+ *   the switch, `done = 1` before the error-code call); the page band calls `lb_choice_draw`/`lb_help_num_put` through `_c1` views on the owner's
  *   signatures (`unsplit/lobby.h` declares other ones) and sees `lb_entry_pane_scroll_kind_get` returning a word (its
  *   definition returns `u8`); `Screen_w`'s size is converted signed (`(f32)(s16)`) where retail loads it with `lha`.
  */
@@ -8396,103 +8401,107 @@ s32 lobby_enter_seq_step(LbChgSeqWork* self)
     Q_ResultWork* q;
     s32 v;
 
-    switch (self->state_0x0B) {
-    case 0:
-        fn_801FBAE4();
-        fn_801FC810();
-        lobby_w.field_0x006 = 1;
-        lobby_w.field_0x001 = 0x16;
-        lobby_w.field_0x002 = 0;
-        create_move_work(2);
-        if (system_w.field_0x7ce == 2) {
-            lobby_w.field_0x002 = 2;
-        }
-        lb_quest_return_apply();
-        fn_801FC874();
-        fn_801FC8C8();
-        fn_801E92B0();
-        q = get_qResult_work();
-        if (q != NULL && system_w.field_0x2d == 0 &&
-            (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
-            if (game_data_file_create_start() != 0) {
-                self->state_0x0B = 1;
-                system_w.field_0x865 = 1;
-                break;
+    do {
+        switch (self->state_0x0B) {
+        case 0:
+            fn_801FBAE4();
+            fn_801FC810();
+            lobby_w.field_0x006 = 1;
+            lobby_w.field_0x001 = 0x16;
+            lobby_w.field_0x002 = 0;
+            create_move_work(2);
+            if (system_w.field_0x7ce == 2) {
+                lobby_w.field_0x002 = 2;
             }
-            if (game_system_file_create_start() != 0) {
-                self->state_0x0B = 2;
-                break;
+            lb_quest_return_apply();
+            fn_801FC874();
+            fn_801FC8C8();
+            fn_801E92B0();
+            q = get_qResult_work();
+            if (q != NULL && system_w.field_0x2d == 0 &&
+                (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
+                if (game_data_file_create_start() != 0) {
+                    self->state_0x0B = 1;
+                    system_w.field_0x865 = 1;
+                    continue;
+                }
+                if (game_system_file_create_start() != 0) {
+                    self->state_0x0B = 2;
+                    continue;
+                }
             }
+            break;
+        case 1:
+            switch (game_save_wait()) {
+            case 1:
+                if (game_system_file_create_start() != 0) {
+                    self->state_0x0B = 2;
+                    continue;
+                }
+                break;
+            case -2:
+            case -1:
+                self->state_0x0B = 0x64;
+                continue;
+            default:
+                continue;
+            }
+            break;
+        case 2:
+            switch (game_system_file_create_wait()) {
+            case 1:
+                break;
+            case -2:
+            case -1:
+                self->state_0x0B = 0x64;
+                continue;
+            default:
+                continue;
+            }
+            break;
+        case 3:
+            fn_801FB2A8(0, lobby_w.field_0x001, lobby_w.field_0x002);
+            self->state_0x0B++;
+            setSoftresetFlag(0);
+            continue;
+        case 4:
+            if (file_loading_ck(NULL, NULL) != 1U) {
+                fn_801FB364(0);
+                lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
+                self->state_0x0B++;
+            }
+            continue;
+        case 5:
+            fn_801FB438();
+            fn_801FB478();
+            self->state_0x0B++;
+            continue;
+        case 6:
+            stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
+            demo_work_update();
+            lb_npc_map_setup();
+            camera_area_default_set();
+            self->step_0x0A++;
+            self->state_0x0B = 0;
+            setSoftresetFlag(1);
+            return 0;
+        case 0x64:
+            if ((status & 0x10) != 0) {
+                break;
+            } else {
+                s32 code;
+
+                done = 1;
+                code = chg_nand_err2msgcode();
+                subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
+            }
+            continue;
+        default:
+            continue;
         }
         system_w.field_0x865 = 0;
         self->state_0x0B = 3;
-        break;
-    case 1:
-        switch (game_save_wait()) {
-        case 1:
-            if (game_system_file_create_start() != 0) {
-                self->state_0x0B = 2;
-                break;
-            }
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-            break;
-        case -2:
-        case -1:
-            self->state_0x0B = 0x64;
-            break;
-        }
-        break;
-    case 2:
-        switch (game_system_file_create_wait()) {
-        case 1:
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-            break;
-        case -2:
-        case -1:
-            self->state_0x0B = 0x64;
-            break;
-        }
-        break;
-    case 3:
-        fn_801FB2A8(0, lobby_w.field_0x001, lobby_w.field_0x002);
-        self->state_0x0B++;
-        setSoftresetFlag(0);
-        break;
-    case 4:
-        if (file_loading_ck(NULL, NULL) != 1U) {
-            fn_801FB364(0);
-            lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
-            self->state_0x0B++;
-        }
-        break;
-    case 5:
-        fn_801FB438();
-        fn_801FB478();
-        self->state_0x0B++;
-        break;
-    case 6:
-        stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
-        demo_work_update();
-        lb_npc_map_setup();
-        camera_area_default_set();
-        self->step_0x0A++;
-        self->state_0x0B = 0;
-        setSoftresetFlag(1);
-        return 0;
-    case 0x64:
-        if ((status & 0x10) != 0) {
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-        } else {
-            s32 code = chg_nand_err2msgcode();
-
-            done = 1;
-            subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
-        }
-        break;
-    }
+    } while (0);
     if (self->state_0x0B >= 3) {
         player_control_move();
     }
@@ -8508,100 +8517,104 @@ s32 lobby_scene_setup_step(LbChgSeqWork* self)
     Q_ResultWork* q;
     s32 v;
 
-    switch (self->state_0x0B) {
-    case 0:
-        lobby_state_reset(self->mode_0x14);
-        enemy_net_work_reset();
-        NetCtrlWk::clearSessionFlag();
-        fn_801FBAE4();
-        fn_801FC810();
-        lobby_w.field_0x001 = 0x15;
-        if (self->mode_0x14 == 1) {
-            lobby_w.field_0x002 = 2;
-        } else {
-            lobby_w.field_0x002 = 0;
-        }
-        PlayMode_set(4);
-        create_move_work(1);
-        lb_quest_return_apply();
-        q = get_qResult_work();
-        if (q != NULL && system_w.field_0x2d == 0 && (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
-            if (game_data_file_create_start() != 0) {
-                self->state_0x0B = 1;
-                system_w.field_0x865 = 1;
-                break;
+    do {
+        switch (self->state_0x0B) {
+        case 0:
+            lobby_state_reset(self->mode_0x14);
+            enemy_net_work_reset();
+            NetCtrlWk::clearSessionFlag();
+            fn_801FBAE4();
+            fn_801FC810();
+            lobby_w.field_0x001 = 0x15;
+            if (self->mode_0x14 == 1) {
+                lobby_w.field_0x002 = 2;
+            } else {
+                lobby_w.field_0x002 = 0;
             }
-            if (game_system_file_create_start() != 0) {
-                self->state_0x0B = 2;
-                break;
+            PlayMode_set(4);
+            create_move_work(1);
+            lb_quest_return_apply();
+            q = get_qResult_work();
+            if (q != NULL && system_w.field_0x2d == 0 && (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
+                if (game_data_file_create_start() != 0) {
+                    self->state_0x0B = 1;
+                    system_w.field_0x865 = 1;
+                    continue;
+                }
+                if (game_system_file_create_start() != 0) {
+                    self->state_0x0B = 2;
+                    continue;
+                }
             }
+            break;
+        case 1:
+            switch (game_save_wait()) {
+            case 1:
+                if (game_system_file_create_start() != 0) {
+                    self->state_0x0B = 2;
+                    continue;
+                }
+                break;
+            case -2:
+            case -1:
+                self->state_0x0B = 0x64;
+                continue;
+            default:
+                continue;
+            }
+            break;
+        case 2:
+            switch (game_system_file_create_wait()) {
+            case 1:
+                break;
+            case -2:
+            case -1:
+                self->state_0x0B = 0x64;
+                continue;
+            default:
+                continue;
+            }
+            break;
+        case 3:
+            fn_801FB2A8(1, lobby_w.field_0x001, lobby_w.field_0x002);
+            self->state_0x0B++;
+            continue;
+        case 4:
+            if (file_loading_ck(NULL, NULL) != 1U) {
+                fn_801FB364(1);
+                lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
+                self->state_0x0B++;
+            }
+            continue;
+        case 5:
+            fn_801FB438();
+            self->state_0x0B++;
+            continue;
+        case 6:
+            stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
+            lb_npc_map_setup();
+            camera_area_default_set();
+            self->step_0x0A++;
+            self->state_0x0B = 0;
+            NetCtrlWk::setFetchMode(1);
+            return 0;
+        case 0x64:
+            if ((status & 0x10) != 0) {
+                break;
+            } else {
+                s32 code;
+
+                done = 1;
+                code = chg_nand_err2msgcode();
+                subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
+            }
+            continue;
+        default:
+            continue;
         }
         system_w.field_0x865 = 0;
         self->state_0x0B = 3;
-        break;
-    case 1:
-        switch (game_save_wait()) {
-        case 1:
-            if (game_system_file_create_start() != 0) {
-                self->state_0x0B = 2;
-                break;
-            }
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-            break;
-        case -2:
-        case -1:
-            self->state_0x0B = 0x64;
-            break;
-        }
-        break;
-    case 2:
-        switch (game_system_file_create_wait()) {
-        case 1:
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-            break;
-        case -2:
-        case -1:
-            self->state_0x0B = 0x64;
-            break;
-        }
-        break;
-    case 3:
-        fn_801FB2A8(1, lobby_w.field_0x001, lobby_w.field_0x002);
-        self->state_0x0B++;
-        break;
-    case 4:
-        if (file_loading_ck(NULL, NULL) != 1U) {
-            fn_801FB364(1);
-            lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
-            self->state_0x0B++;
-        }
-        break;
-    case 5:
-        fn_801FB438();
-        self->state_0x0B++;
-        break;
-    case 6:
-        stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
-        lb_npc_map_setup();
-        camera_area_default_set();
-        self->step_0x0A++;
-        self->state_0x0B = 0;
-        NetCtrlWk::setFetchMode(1);
-        return 0;
-    case 0x64:
-        if ((status & 0x10) != 0) {
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-        } else {
-            s32 code = chg_nand_err2msgcode();
-
-            done = 1;
-            subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
-        }
-        break;
-    }
+    } while (0);
     if (self->state_0x0B >= 3) {
         player_control_move();
     }

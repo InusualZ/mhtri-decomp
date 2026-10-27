@@ -31,6 +31,8 @@ switch is table-driven: entries that point past the tail are the skip cases.
 **Result.** `Pl/fn_802840DC` (Wii/1.3, -O3): `pl_weapon2_hit_react` 75.30 -> 100 % (the act-number switch with six
 skip cases, eight 64-quake cases and a 0-quake default sharing one hit-latch tail; 52.28 % when the tail was
 duplicated); `pl_weapon2_alt_act_charge` 91.19 -> 100 % (640 B; the duplicated hold tail was 688 B).
+Also when retail's single copy sits *mid-switch* (reached by branches into a sibling case, idea 213): `lobby/lb_pane_ui`
+`lobby_enter_seq_step` 85.20 -> 89.54 and `lobby_scene_setup_step` 84.88 -> 89.31 with the block moved after the switch.
 
 **Example.**
 
