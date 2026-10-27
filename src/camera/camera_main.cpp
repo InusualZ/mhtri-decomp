@@ -24,8 +24,13 @@
  *   - The unit's `.data`, `.bss`, `.sdata` and `.ctors` are not emitted: the tables are declared `extern` under their
  *     map names (the camera ranges, shake, aim-eye, kill-cut key, area, lobby, script and demo-camera tables) and
  *     the two camera works are not a defined static object (camera_work_construct is the `.ctors` entry).
- *   - camera_follow_collide: the goto-free shape (a `turned` flag around the push pass) measures 95.70; the
- *     original's two jumps into the ground clamp measure 97.96 (rule 8 keeps the flag).
+ *   - camera_follow_collide: retail jumps from the wall turn (and its step limit) straight into the ground clamp and
+ *     from the swimming line check past it, which MWCC builds only from jumps (it neither threads a flag nor merges
+ *     tails, playbook 213).  The goto-free shape (playbook 219) is two inline helpers: camera_follow_collide_move, a
+ *     `do { } while (0)` whose `break` reaches the ground clamp and a `return` that skips it, and
+ *     camera_follow_wall_turn, whose step limit returns past the rotation.  Every branch pairs; the residual is
+ *     colouring (kind/area/yaw shifted in r29..r31, the helper's `step` copy in r24, three temporaries' stack
+ *     slots).  A goto spelling with `clamped` hoisted and the floor stored to `pos.y` first measures 98.66.
  *   - Register allocation: camera_follow_shake_update keeps two slot bases (`cam + i` for the state and the timer
  *     bytes) where retail keeps one (a sub-struct, a 2-D array and every index type tried); camera_quake_apply keeps
  *     the row where retail keeps the row's byte offset (row types and an inline index tried);
@@ -1477,95 +1482,87 @@ extern "C" u8 camera_follow_wall_ck(CamFollow* cam, nw4r::math::VEC3* pos, u16 y
     return coll_line_check(&probe, &cam->target, 28.0f, NULL, 1, 0xFFFF, area, 1) > 0;
 }
 
-/* Keeps the follow camera out of the walls and the ground: turns it off a wall the player hugs, pushes it out of
- * the collision, clamps it over the ground and pulls the target back when the camera got closer. */
-extern "C" void camera_follow_collide(CamWork* work, CamFollow* cam, _PLW* player)
+/* Turns the follow camera off the wall it is pressed against, in 0x80 steps towards its wall side. */
+static inline void camera_follow_wall_turn(CamFollow* cam, _PLW* player, u32 yaw, nw4r::math::VEC3* rel, u32 step)
 {
-    nw4r::math::VEC3 old_pos;
-    nw4r::math::VEC3 old_target;
-    nw4r::math::VEC3 hit;
-    nw4r::math::VEC3 rel;
-    nw4r::math::VEC3 before;
-    f32 dist_a;
+    u32 turn;
+    u8 blocked;
+
+    blocked = 1;
+    turn = 0;
+    while (blocked != 0) {
+        step += 0x80;
+        if (step >= 0x10000)
+            return;
+        turn = (u16)-step;
+        if (cam->wall_side == 1)
+            turn = (u16)step;
+        blocked = camera_follow_wall_ck(cam, &player->vec_0x03C, yaw + turn);
+    }
+    copyVec3(rel, &vec3_sub(&cam->pos, &cam->target));
+    rotVecY(rel, (u16)turn);
+    copyVec3(&cam->pos, &vec3_add(&cam->target, rel));
+    cam->yaw_goal = (u16)(cam->yaw_goal + (u16)turn);
+}
+
+/* Moves the follow camera out of the walls: turns it off a wall the player hugs, or pushes it out of the collision and
+ * the line to its target, then clamps it over the ground; returns the kind of the target-line hit (0 none). */
+static inline u8 camera_follow_collide_move(CamFollow* cam, _PLW* player, nw4r::math::VEC3* old_pos,
+                                            nw4r::math::VEC3* old_target, nw4r::math::VEC3* hit, nw4r::math::VEC3* rel,
+                                            nw4r::math::VEC3* before)
+{
     f32 dist_b;
-    f32 old_dist;
-    f32 new_dist;
-    u8 kind;
-    u32 step;
-    u32 yaw;
+    f32 dist_a;
     u8 area;
     u32 pushed;
-    u8 turned;
+    u32 clamped;
+    u32 yaw;
+    u32 step;
+    u8 kind;
 
-    VEC3_ctor(&old_pos);
-    VEC3_ctor(&old_target);
-    VEC3_ctor(&hit);
-    VEC3_ctor(&rel);
-    VEC3_ctor(&before);
     kind = 0;
     step = 0;
     yaw = 0;
-    turned = 0;
-    copyVec3(&old_pos, &cam->pos);
-    copyVec3(&old_target, &cam->target);
+    clamped = 0;
+    copyVec3(old_pos, &cam->pos);
+    copyVec3(old_target, &cam->target);
     area = get_now_areano();
-    if ((pl_status_bit_ck_c1(player, 0x1C0) != 0 || cam->wall_side != 0) && player->kind_0x09 != 3) {
-        if (coll_line_check(&old_pos, &old_target, 28.0f, &hit, 1, 0xFFFF, area, 1) > 0 && cam->hit_kind == 0) {
-            u32 turn;
-            u8 blocked;
-
-            yaw = (u16)cam->yaw;
-            if (cam->wall_side == 0) {
-                if (camera_follow_wall_dist(cam, &player->vec_0x03C, yaw + 0x80, &dist_a) == 0)
-                    cam->wall_side = 1;
-                else if (camera_follow_wall_dist(cam, &player->vec_0x03C, yaw - 0x80, &dist_b) == 0)
-                    cam->wall_side = 2;
-                else if (dist_a > dist_b)
-                    cam->wall_side = 1;
-                else
-                    cam->wall_side = 2;
+    do {
+        if ((pl_status_bit_ck_c1(player, 0x1C0) != 0 || cam->wall_side != 0) && player->kind_0x09 != 3) {
+            if (coll_line_check(old_pos, old_target, 28.0f, hit, 1, 0xFFFF, area, 1) > 0 && cam->hit_kind == 0) {
+                yaw = (u16)cam->yaw;
+                if (cam->wall_side == 0) {
+                    if (camera_follow_wall_dist(cam, &player->vec_0x03C, yaw + 0x80, &dist_a) == 0)
+                        cam->wall_side = 1;
+                    else if (camera_follow_wall_dist(cam, &player->vec_0x03C, yaw - 0x80, &dist_b) == 0)
+                        cam->wall_side = 2;
+                    else if (dist_a > dist_b)
+                        cam->wall_side = 1;
+                    else
+                        cam->wall_side = 2;
+                }
+                camera_follow_wall_turn(cam, player, yaw, rel, step);
+                break;
+            } else {
+                cam->wall_side = 0;
             }
-            blocked = 1;
-            turn = 0;
-            while (blocked != 0) {
-                step += 0x80;
-                if (step >= 0x10000)
-                    break;
-                turn = (u16)-step;
-                if (cam->wall_side == 1)
-                    turn = (u16)step;
-                blocked = camera_follow_wall_ck(cam, &player->vec_0x03C, yaw + turn);
-            }
-            if (blocked == 0) {
-                copyVec3(&rel, &vec3_sub(&cam->pos, &cam->target));
-                rotVecY(&rel, (u16)turn);
-                copyVec3(&cam->pos, &vec3_add(&cam->target, &rel));
-                cam->yaw_goal = (u16)(cam->yaw_goal + (u16)turn);
-            }
-            turned = 1;
-        } else {
-            cam->wall_side = 0;
         }
-    }
-    if (turned == 0) {
-        copyVec3(&before, &cam->pos);
+        copyVec3(before, &cam->pos);
         coll_push_out(&cam->pos, 20.0f, 1, 1);
         pushed = 0;
         if (cam->yaw_snap == 1 || (s8)cam->yaw_hold > 0 || (s8)cam->pitch_hold > 0)
             pushed = 1;
         if (pushed == 0 && cam->pushed == 1 && cam->moved == 1)
             cam->push_hold = 1;
-        if (vec3_dist_sq(&before, &cam->pos) > 0.0f) {
+        if (vec3_dist_sq(before, &cam->pos) > 0.0f) {
             cam->moved = 1;
             if (pushed == 0 && cam->push_hold == 0) {
-                copyVec3(&rel, &vec3_sub(&cam->pos, &cam->target));
+                copyVec3(rel, &vec3_sub(&cam->pos, &cam->target));
                 if (player->kind_0x09 == 3) {
                     u32 pitch;
-                    u32 clamped;
 
-                    clamped = 0;
-                    rel.y += cam->range_rec->target_offset.y;
-                    pitch = calcVecAngX(&rel);
+                    rel->y += cam->range_rec->target_offset.y;
+                    pitch = calcVecAngX(rel);
                     cam->pitch_goal = pitch;
                     if ((s16)pitch > 0x3E94) {
                         cam->pitch_goal = 0x3E94;
@@ -1575,10 +1572,10 @@ extern "C" void camera_follow_collide(CamWork* work, CamFollow* cam, _PLW* playe
                         clamped = 1;
                     }
                     if (clamped != 0)
-                        rotVecX(&rel, (u16)(cam->pitch_goal - pitch));
+                        rotVecX(rel, (u16)(cam->pitch_goal - pitch));
                 }
-                rel.y = 0.0f;
-                cam->yaw_goal = (u16)calcVecAng3(&rel);
+                rel->y = 0.0f;
+                cam->yaw_goal = (u16)calcVecAng3(rel);
             }
         } else {
             cam->moved = 0;
@@ -1586,30 +1583,54 @@ extern "C" void camera_follow_collide(CamWork* work, CamFollow* cam, _PLW* playe
         }
         cam->pushed = pushed;
         if (player->kind_0x09 == 3) {
-            turned = 2;
-            if (coll_line_check(&cam->target, &cam->pos, 25.0f, &hit, 3, -5, area, 1) > 0) {
-                cam->pos.x = hit.x;
-                cam->pos.y = hit.y;
-                cam->pos.z = hit.z;
+            if (coll_line_check(&cam->target, &cam->pos, 25.0f, hit, 3, -5, area, 1) > 0) {
+                cam->pos.x = hit->x;
+                cam->pos.y = hit->y;
+                cam->pos.z = hit->z;
                 kind = 2;
             }
+            return kind;
         } else {
-            if (coll_line_check(&cam->target, &cam->pos, 25.0f, &hit, 1, 0xFFFF, area, 1) > 0) {
-                cam->pos.x = cam->goal_pos.x = hit.x;
-                cam->pos.z = cam->goal_pos.z = hit.z;
+            if (coll_line_check(&cam->target, &cam->pos, 25.0f, hit, 1, 0xFFFF, area, 1) > 0) {
+                cam->pos.x = cam->goal_pos.x = hit->x;
+                cam->pos.z = cam->goal_pos.z = hit->z;
                 kind = 1;
             }
         }
-    }
-    if (turned != 2) {
+    } while (0);
+    {
         f32 ground_y;
         f32 floor;
 
         ground_y = GetGroundHit(&cam->pos, -5, area);
         floor = ground_y + cam->range_rec->clearance;
-        if (floor > cam->pos.y && 1000.0f > ground_y - cam->pos.y)
-            cam->pos.y = cam->goal_pos.y = floor;
+        if (floor > cam->pos.y && 1000.0f > ground_y - cam->pos.y) {
+            cam->pos.y = floor;
+            cam->goal_pos.y = floor;
+        }
     }
+    return kind;
+}
+
+/* Keeps the follow camera out of the walls and the ground: turns it off a wall the player hugs, pushes it out of
+ * the collision, clamps it over the ground and pulls the target back when the camera got closer. */
+extern "C" void camera_follow_collide(CamWork* work, CamFollow* cam, _PLW* player)
+{
+    nw4r::math::VEC3 old_pos;
+    nw4r::math::VEC3 old_target;
+    nw4r::math::VEC3 hit;
+    nw4r::math::VEC3 rel;
+    nw4r::math::VEC3 before;
+    f32 old_dist;
+    f32 new_dist;
+    u8 kind;
+
+    VEC3_ctor(&old_pos);
+    VEC3_ctor(&old_target);
+    VEC3_ctor(&hit);
+    VEC3_ctor(&rel);
+    VEC3_ctor(&before);
+    kind = camera_follow_collide_move(cam, player, &old_pos, &old_target, &hit, &rel, &before);
     old_dist = vec3_distance(&old_pos, &old_target);
     new_dist = vec3_distance(&cam->pos, &old_target);
     if (old_dist <= 0.00001f) {

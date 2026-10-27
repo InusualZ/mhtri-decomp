@@ -52,8 +52,8 @@
  *    `checkLayerEntry` dispatch, step 6 into step 2's success block); without `goto` (rule 8) those two blocks are
  *    inline helpers, so the dispatch is emitted three times and the success block twice (0x3FC B larger, the whole
  *    .text excess); merging them through flags measured lower.  MWCC does not tail-merge identical blocks (measured on
- *    a demo), so only a `goto` reaches retail's shape.  Also the chat-entry scan keeps its `i >= 16` test where retail
- *    branches past the send loop.
+ *    a demo), so only a `goto` reaches retail's shape (backward entries into blocks no loop heads, playbook 213).
+ *    Also the chat-entry scan keeps its `i >= 16` test where retail branches past the send loop.
  *  - `updateNetworkPatControl`: retail keeps every nested `switch` as a compare tree (`cmpwi`/`beq`/`bge`); ours goes
  *    through MWCC's `IRO_OptimizeSwitches` ("optimizing switch into ifs") and becomes `beq` chains.  Only a scoped
  *    `#pragma global_optimizer off` keeps the trees (and retail's 0x50 frame) but adds a frame pointer and scores

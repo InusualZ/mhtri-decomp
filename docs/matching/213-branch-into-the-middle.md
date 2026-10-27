@@ -6,7 +6,7 @@ problem: retail's switch branches into the middle of a sibling case's code (forw
 tags: [source-shape, tooling]
 applies: [Wii/1.3]
 demo: 
-related: [183, 203, 145]
+related: [183, 203, 145, 214]
 ---
 
 # 213. A branch into the middle of another case is not an optimisation: MWCC Wii/1.3 has no tail-merge or cross-jump pass
@@ -56,6 +56,14 @@ committed) to know the ceiling, then pick the best goto-free spelling and record
 | `lobby/lb_pane_ui` `lobby_scene_setup_step` | 84.88 (756 B) | - | **89.31** (756 B; same shape) |
 | `menu/menu_placeinfo` `lb_city_select_screen_step` | 98.26 (3768 B) | 100.0 (3704 B) | 98.26 kept; 183 tail-after-switch 96.30 (3704 B) |
 | `menu/menu_placeinfo` `lb_community_select_step` | 96.31 (helper) | 99.24 (3336 B) | 96.31 kept; 183 tail-after-switch 3360 B, worse |
+
+The same diagnosis on four more rows (scratch TUs with `cflags_main`: a constant flag before a `break`, a loop
+variable re-tested after its own loop and an inline function's constant `return` all keep their compare, also under
+`optimization_level 4`; identical `if` and `case` tails both stay): `enemy/em018_prog` `em018_motion_events` (case 0x55
+into case 0x56's water tail, 98.70; Duff 99.32), `Network/network_pat_control` `updateMessagePool` (states 3/4/6
+backwards into states 1/2, 75.96) and `quest/quest_entry` `quest_main_step` (fail and clear tails entered backwards,
+83.72) stay; `camera/camera_main` `camera_follow_collide`, whose jumps are all forward, has a goto-free spelling
+(idea 214).
 
 The second shared block of the lobby pair (the `game_system_file_create_start` test reached from case 0 and case 1)
 stays duplicated: with the "system file done" block after the switch, a third exit kind (skip both) is not

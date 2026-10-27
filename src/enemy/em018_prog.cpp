@@ -28,7 +28,8 @@
  *  - `em018_motion_events`: retail shares the motion 0x55/0x56 water tail (case 0x55 branches into case 0x56's
  *    copy); the source repeats it (160 B long).  Measured: 98.70 with the copy; 99.32 (every instruction paired)
  *    with `case 0x56:` placed inside an `if (0) { ... }` after case 0x55's head, a case label used as a control-flow
- *    device that rule 8 forbids, so it is not used;
+ *    device that rule 8 forbids, so it is not used; MWCC neither merges the two copies nor threads a flag, and no
+ *    goto-free statement reaches the middle of the next case (playbook 213);
  *  - `em018_mot9_height_step`, `em018_action_select`: retail keeps a `clrlwi` on a two-constant choice passed to a
  *    `u16`/`u8` parameter (`li r4,2; bne; li r4,9; clrlwi r4,r4,16`); MWCC drops it for every spelling tried
  *    (cast, local of each width, ternary, if);

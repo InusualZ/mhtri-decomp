@@ -39,7 +39,8 @@
  * RESIDUALS. Every row is written.
  *  - quest_main_step: the target shares its fail and clear tails between branches through backward jumps (a goto
  *    shape, rule 8); the goto-free inline helpers duplicate them (3168 B against 2832; the single-tail flag form is
- *    2888 B but scores lower, and a flag-threaded loop keeps its flag tests - MWCC does not thread jumps).
+ *    2888 B but scores lower, and a flag-threaded loop keeps its flag tests - MWCC does not thread jumps).  The jumps
+ *    run backwards into blocks no loop heads, so only `goto` reaches them (playbook 213).
  *  - quest_lot_pick, quest_lot_pick_first, quest_lot_pick_last: retail sign-extends the payload byte to 16 bits
  *    (`lbz` + `extsh`) before storing it; no cast of the u8 field reproduces the `extsh`.
  *  - quest_intruder_step, quest_successive_step: retail re-tests the variant rank after its scan as `clrlwi` of

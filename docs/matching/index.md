@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (195)
+## Ideas that work (196)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -204,6 +204,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 214 | [A global whose address stays in a saved register all function long is read through a pointer local](214-global-whose-address-stays.md) | works | source-shape, allocator | Retail forms a global's address once (`lis`/`addi` into a saved register) and every later field access goes through it, while ours re-forms `lis`/`addi` before each late access and saves one register fewer. |
 | 215 | [A dead value in r3 at a call to a void(void) callee: declare the callee with the owner's empty parameter list](215-dead-value-in-r3.md) | works | source-shape | Retail calls a function with some value already in r3 and no extension, while ours passes it as an argument (an extra `extsb`/`clrlwi`, the call moved before a store) because a consumer's declaration invented a... |
 | 216 | [A u16 loop bound narrowed after the counter's li: keep the call's raw result and narrow it in the loop condition](216-u16-loop-bound-narrowed.md) | works | source-shape, allocator | Retail sets the loop counter (`li r27,0`) before narrowing the bound (`clrlwi r29,r3,16`), and ours narrows first, so the two instructions swap and the counter, pointer and bound registers rotate. |
+| 219 | [Forward jumps into joins at two nesting depths: an inline helper's return for the far one, a do-while(0) break for the near one](219-forward-jumps-two-depths.md) | works | source-shape | Retail jumps forward from one arm past a whole later pass into a shared block, and from another arm past that block too (or from a loop's limit exit past the code after the loop); a flag keeps its test (MWCC does not... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
