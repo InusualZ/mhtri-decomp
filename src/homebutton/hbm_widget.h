@@ -128,7 +128,7 @@ struct HbmWidget {
     /* +0xC9 */ u8 flag_C9;
     /* +0xCA */ u8 pad_0xCA[2];
     /* +0xCC */ HbmAllocator* allocator;/* freed through MEMFreeToAllocator */
-    /* +0xD0 */ union {                  /* one word in fn_8055A43C, single bytes for the flags */
+    /* +0xD0 */ union {                  /* one word in hbmTextWriterSetLineRange, single bytes for the flags */
                     u32 word_D0;
                     HbmTailFlags bytes;
                 } tail;
@@ -173,7 +173,7 @@ struct HbmIdValue {
     /* +0x04 */ f32 value;
 };
 
-/* The timer cluster fn_8055A40C loads (offsets +0xE8..+0x104).  size: 0x108 (approximate) */
+/* The timer cluster hbmTextWriterRecordCaret loads (offsets +0xE8..+0x104).  size: 0x108 (approximate) */
 struct HbmTimer {
     /* +0x00 */ u8 pad_0x00[0xE8];
     /* +0xE8 */ f32 start;

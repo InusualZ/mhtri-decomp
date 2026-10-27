@@ -1441,7 +1441,7 @@ void fn_80568C60(KbObject* self)
         self->tail_0x1A04.float_0x118 = self->tail_0x1A04.float_0x118 + lbl_8079D774;
     if (self->tail_0x1A04.float_0x114 == self->tail_0x1A04.float_0x11C)
         self->tail_0x1A04.float_0x114 = self->tail_0x1A04.float_0x114 + lbl_8079D774;
-    (void)fn_8055B174(&self->field_0x010, &self->tail_0x1A04.float_0x110);
+    hbmTextWriterBeginDraw((HbmTextWriter*)&self->field_0x010, (const nw4r::ut::Rect*)&self->tail_0x1A04.float_0x110);
 }
 
 /* 0x80568CA8 (0x4): ignores a text-position change (slot 0x16C): the keyboard scrolls its text itself. */
@@ -1671,11 +1671,11 @@ void fn_8056985C(KbObject* self, void* arg)
     hbmPanelSetDrawPosition(self, arg);
 }
 
-void fn_80569910(KbObject* self, void* arg)
+void fn_80569910(KbObject* self, u16 code)
 {
     if (self->tail_0x1A04.field_0x1E4 == 1)
         ((HbmCursorPartView*)self->tail_0x1A04.field_0x1D0)->v_0x010();
-    fn_8055A888((HbmWidget*)&self->field_0x010, (int)arg);
+    hbmTextWriterPrintChar((HbmTextWriter*)&self->field_0x010, code);
 }
 
 /* 0x805698BC (0x54): In mode 1, plays the part's new-line animation (10), then breaks the line. */
@@ -1807,7 +1807,7 @@ HbmKbCursorKey::~HbmKbCursorKey() {
 void hbmKbCursorAdj10Refresh(u8* base) { fn_80568DBC((KbObject*)(base - 0x10)); }
 
 /* 0x80569D44 (0x8): +0x10 base -> fn_80569910. */
-void hbmKbCursorAdj10Deactivate(u8* base, u32 arg) { fn_80569910((KbObject*)(base - 0x10), (void*)arg); }
+void hbmKbCursorAdj10Deactivate(u8* base, u16 code) { fn_80569910((KbObject*)(base - 0x10), code); }
 
 /* 0x80569D4C (0x8): +0x10 base -> hbmKbCursorNewLine. */
 void hbmKbCursorAdj10NewLine(u8* base) { hbmKbCursorNewLine((HbmCursorInput*)(base - 0x10)); }

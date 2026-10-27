@@ -17,27 +17,24 @@ struct HbmTextWriter;
 /* Stores the writer's standard-screen flag and loads the 4:3 (set) or 16:9 screen rectangle. */
 void hbmTextWriterSetStandardScreen(struct HbmTextWriter* writer, s32 standard);
 
-u32 fn_8055A888(HbmWidget* self, int arg);
-
-/* untyped: opaque band object, typed by the callers' views */
-void* fn_8055B174(void* a, void* b);
+/* Prints `code`, or '*' while the writer masks its input. */
+f32 hbmTextWriterPrintChar(struct HbmTextWriter* writer, u16 code);
 
 extern f32 lbl_8079D700;
 
 /* The text writer (the panel's +0x10 sub-object) and the band's text buffer, as the callers name them. */
 struct HbmTextWriter;
+struct HbmTextCaret;
 #ifdef __cplusplus
 class HbmTextBuffer;
 #endif
 
-/* Refreshes the text writer. */
-void hbmTextWriterRefresh(struct HbmTextWriter* writer);
 /* Hands the text writer the characters [start, end) of `text`. */
 void hbmTextWriterSetText(struct HbmTextWriter* writer, const u16* text, u32 start, u32 end);
-/* Draws the writer's line at the panel's draw position. */
-void hbmTextWriterDrawLine(struct HbmTextWriter* writer);
+/* Draws the lines [line, lineEnd) from the character `position` on, reporting the caret through `cursor`. */
+void hbmTextWriterDrawLine(struct HbmTextWriter* writer, struct HbmTextCaret* caret, u32 position, s32 line, s32 lineEnd);
 /* Draws the writer's text, the caret at `cursor`. */
-void hbmTextWriterDraw(struct HbmTextWriter* writer, u32* cursor);
+void hbmTextWriterDraw(struct HbmTextWriter* writer, struct HbmTextCaret* caret);
 /* Initialises the text writer. */
 void hbmTextWriterInit(struct HbmTextWriter* writer);
 #ifdef __cplusplus
@@ -58,6 +55,22 @@ void hbmAnimSaveState(HbmWidgetNodeView* anim, HbmIdValue* out);
 void hbmAnimRestoreState(HbmWidgetNodeView* anim, const HbmIdValue* state);
 
 #ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+namespace nw4r {
+namespace ut {
+class Font;
+struct Rect;
+}  // namespace ut
+}  // namespace nw4r
+
+extern "C" {
+/* Takes the font, clears the character-width cache and measures the codes 0x20..0x17F into it. */
+void hbmTextWriterRefresh(struct HbmTextWriter* writer, const nw4r::ut::Font* font);
+/* Saves the viewport and projection and sets up an orthographic draw clipped to `clip`. */
+void hbmTextWriterBeginDraw(struct HbmTextWriter* writer, const nw4r::ut::Rect* clip);
 }
 #endif
 

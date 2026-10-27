@@ -15,6 +15,12 @@
  *            HbmVuLinkPart, HbmVuNodeView and HbmWidgetView (dispatch views); slots are named by offset.
  * NAMES.     GUESS function names (hbmText*, hbmVu*, hbmDeletingDtorThunk*): read off the bodies; map rows renamed with
  *            them (requests hbm-value#1..#41 and hb-value-event#9).
+ * NAMES.     GUESS text-writer names hbmTextWriterPlaceCaret / GetLineHeight / MeasureGlyph / CalcStringWidth /
+ *            BeginDraw / EndDraw / PrintChar / RecordCaret / SetLineRange / CountLine / PlaceCaretOverride /
+ *            OnCharBegin / OnCharEnd / OnTextBegin / OnTextEnd / Slot10Stub / Slot64Stub (its table 0x80651708's slots
+ *            0x58, 0x28, 0x68, 0x30, 0x20, 0x24, 0x54, 0x7C, 0x74, 0x50, 0x5C, 0x40, 0x44, 0x48, 0x4C, 0x10, 0x64,
+ *            read off the bodies and the callers), the view HbmTextWriter with its fields, HbmGlyphBox, HbmTextCaret,
+ *            HbmTextScale (slot 0x38's r3:r4 pair) and the .bss cache hbmTextCharWidths.
  * NAMES.     GUESS HbmPaneManager::drawPane / calcDrawMtx / createRoot (slots 0x38, 0x6C, 0x70: draw a named pane, flip
  *            a matrix's y axis behind the view matrix, build the component manager); slots v_0x03C/v_0x040 switch the
  *            16:9 / 4:3 screen and v_0x044 loads the matching projection.
@@ -36,9 +42,6 @@
  * SHAPES.    hbmVuDispatchPointer / hbmVuDispatchInput OR the results as `list | panel | wrapped | mode` (the only order of
  *            24 that reproduces retail's two-pair tree); hbmVuApplyAspectRatio's body is an inline create also uses.
  * SHAPES.    hbmTextAppendChar's character buffer is `u16[12]` (retail's 0x30-byte frame).
- * RESIDUALS. fn_8055A888 calls the stale name fn_805041F4 (relocdiff: the target names CharWriter::Print) and returns
- *            u32 where retail passes Print's f32 through; its prototype is in homebutton/hbm_value.h (request
- *            hbm-value#72).
  * RESIDUALS. HbmTextBuffer duplicates the HbmU16Array and HbmTextValue views of homebutton/hbm_widget.h (same object; only
  *            this unit uses them); the merge is a header change outside this unit.
  * RESIDUALS. HbmPaneCursor (the manager's +0x8C) is the five-entry container homebutton/hkb_keyboard.h models as the
@@ -48,18 +51,30 @@
  * RESIDUALS. getPaneVisible: retail loads mpLyt before the prologue's saves; calcDrawMtx: retail sets r3 for the final
  *            PSMTXCopy at the end of each branch; v_0x03C: retail's 4:3 rectangle sits above the 16:9 one on the stack;
  *            hbmTextPutChar: retail keeps the `(u16)count` mask the u32 count drops.
- * RESIDUALS. Unwritten, need the unowned .bss table 0x80790250 (0x580 bytes, read only by hbmTextWriterInit and hbmTextWriterRefresh)
- *            claimed first; its link slot (between hbm_text_panel's and hbm_anim_record's .bss) leaves the owner
- *            ambiguous (request hbm-value#70): hbmTextWriterInit, hbmTextWriterRefresh.
+ * RESIDUALS. The text writer's width cache (.bss 0x80790250, 0x580 bytes; hbmTextCharWidths, registry name) is used
+ *            only here, but its link slot (between hbm_text_panel's and hbm_anim_record's .bss) puts its definition in
+ *            hbm_text_panel, hbm_kb_widget, hbm_kb_list or hbm_kb_child; it is declared in unsplit/homebutton.h.
+ * RESIDUALS. HbmTextWriter duplicates hbm_text_panel.cpp's file-local HbmPanelSubView (the same object, table 0x80651708,
+ *            whose constructor is hbm_text_panel's); merging them is a header change outside this unit.
+ * RESIDUALS. hbmTextWriterDrawLine / hbmTextWriterDraw: retail loads the cursor x before caretEndX for the caret-moved
+ *            test and compares in the other operand order; hbmTextWriterMeasureGlyph: the width, scale and font-scale
+ *            floats take f31/f30/f29 in another order (register colouring only).
  * RESIDUALS. Unwritten, store a vtable whose class this unit would have to emit (rule 10): fn_80558F38, fn_8055B710,
  *            fn_8055CAD0, fn_8055CB34 (the Vu object's constructor and destructor, table 0x80651950), createRoot (the gui
  *            manager's tables 0x80658358/0x806582FC) and the eight part factories in 0x8055DFCC..0x8055E778.
- * RESIDUALS. Unwritten: fn_8055EAA8, the unit's static initialiser (its .ctors entry), which stores lbl_8060E748 into the
- *            .sbss word lbl_80795A70; hbmTextWriterSetStandardScreen; the text writer's
- *            0x8055A4BC..0x8055B434 run (hbmTextWriterDraw/DrawLine and five neighbours, the panel's sub-object view).
- * RESIDUALS. 26 functions (7728 bytes) are unwritten, the largest hbmTextWriterDraw (1272), hbmTextWriterDrawLine (724),
- *            calcComponents (668) and fn_8055CB34 (492); the list is `python tools/units/sweepcomments.py --unit
- *            homebutton/hbm_value`.
+ * RESIDUALS. Unwritten: fn_8055EAA8, the unit's static initialiser (its .ctors entry), which constructs the Vu
+ *            object's default handler (.sbss lbl_80795A70, a SysKbdHandlerBase: its vptr __vt__17SysKbdHandlerBase);
+ *            the class is menu/menu_sysmsg.cpp's file-local model, so it needs a shared header first.
+ * RESIDUALS. The factories construct their parts inline (HbmKbToolbar over HbmKbList, whose constructor
+ *            hbm_kb_list.cpp defines out of line; HbmKeyboard / the text panel's class over intermediate tables) and
+ *            createRoot builds tiHKBManager's component manager, whose tables that unit stores by hand: each needs
+ *            its owner's class model first.
+ * RESIDUALS. 14 functions (3304 bytes) are unwritten, the largest calcComponents (668) and fn_8055CB34 (492); the list
+ *            is `python tools/units/sweepcomments.py --unit homebutton/hbm_value`.
+ * SHAPES.    The text writer: hbmTextWriterDrawLine / hbmTextWriterDraw take a typed HbmTextCaret* (a cast local puts
+ *            the caret and the writer in swapped registers); a newline is compared as L'\n' (cmplwi); BeginDraw halves
+ *            with `/ 2.0f` (operand order of the fmuls) and converts the scissor's left/top before width/height;
+ *            Refresh counts with a u32 indexed through (u16); PlaceCaret takes the cursor into locals y-first.
  * RESIDUALS. .data 0x80651568..0x80652340 spans at least 10 TUs (datagap.py emission-order seams), so the data cannot match
  *            until the range is re-cut.
  */
@@ -86,6 +101,10 @@
 #include "homebutton/hbm_value.h"
 #include "homebutton/hbm_hermite.h"
 #include "homebutton/hbm_kb_event.h"
+#include "homebutton/hbmTextWriterGetTextColor.h"
+#include "homebutton/hbmPanelIsReadyToCommit.h"
+#include "nw4r/ut_Rect.h"
+#include "unsplit/homebutton.h"
 #include "MSL_C/wstring.h"
 #include "SC/SCApi.h"
 #include "KPR/kpr.h"
@@ -113,6 +132,32 @@ public:
     /* slot +0x00C */ virtual void v_0x00C();
     /* slot +0x010 */ virtual void v_0x010();
     /* slot +0x014 */ virtual void v_0x014(HkbKbWrapped* wrapped);
+};
+
+/* The two objects the Vu object's slots 0x84 and 0x9C return, as hbmKbdIsTextEmpty asks them: slot 0x10 and slot 0x50
+ * report whether they hold input.
+ * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class HbmVuQueryView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual BOOL v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual BOOL v_0x050();
 };
 
 /* The dispatch view of the band's Vu objects (VuObject, its +0x1C sub-object and the objects its slots 0x68 and
@@ -147,19 +192,19 @@ public:
     /* slot +0x060 */ virtual void v_0x060();
     /* slot +0x064 */ virtual void v_0x064();
     /* slot +0x068 */ virtual HbmVuView* v_0x068();
-    /* slot +0x06C */ virtual void v_0x06C();
+    /* slot +0x06C */ virtual struct HbmTextPanel* v_0x06C();
     /* slot +0x070 */ virtual void v_0x070();
     /* slot +0x074 */ virtual void v_0x074();
     /* slot +0x078 */ virtual void v_0x078();
     /* slot +0x07C */ virtual void v_0x07C();
     /* slot +0x080 */ virtual void v_0x080();
-    /* slot +0x084 */ virtual void v_0x084();
+    /* slot +0x084 */ virtual HbmVuQueryView* v_0x084();
     /* slot +0x088 */ virtual void v_0x088();
     /* slot +0x08C */ virtual void v_0x08C();
     /* slot +0x090 */ virtual void v_0x090();
     /* slot +0x094 */ virtual void v_0x094();
     /* slot +0x098 */ virtual void v_0x098();
-    /* slot +0x09C */ virtual void v_0x09C();
+    /* slot +0x09C */ virtual HbmVuQueryView* v_0x09C();
     /* slot +0x0A0 */ virtual void v_0x0A0();
     /* slot +0x0A4 */ virtual void v_0x0A4();
     /* slot +0x0A8 */ virtual VuHeader* v_0x0A8();
@@ -827,6 +872,111 @@ public:
     /* +0xD8 */ u32 lineMode;
 };
 
+/* The glyph box the text writer's slot 0x68 measures: the bounds it fills in for the character `code`.
+ * size: 0x14 */
+struct HbmGlyphBox {
+    /* +0x00 */ nw4r::ut::Rect bounds;
+    /* +0x10 */ u16 code;
+    /* +0x12 */ u8 pad_0x12[0x2];
+};
+
+/* Where the text writer reports the caret: the character index it stands before and its position.
+ * size: 0x0C */
+struct HbmTextCaret {
+    /* +0x00 */ u32 index;
+    /* +0x04 */ f32 x;
+    /* +0x08 */ f32 y;
+};
+
+/* The pair the text writer's slot 0x38 returns (in r3:r4): the horizontal and vertical glyph scale.
+ * size: 0x08 */
+struct HbmTextScale {
+    /* +0x00 */ f32 x;
+    /* +0x04 */ f32 y;
+};
+
+/* The panel's text writer (homebutton/hbm_text_panel.cpp's +0x10 member): an nw4r::ut::CharWriter whose class adds
+ * its vptr at +0x4C (table 0x80651708, stored by the panel's constructor), the character-width cache and the line
+ * and caret state below.  Slots are named by offset; nothing is constructed here, so no table is emitted (rule 10).
+ * size: 0x108 (the panel's constructor fills it through +0x105) */
+struct HbmTextWriter : public nw4r::ut::CharWriter {
+    /* +0x00 is the CharWriter, +0x4C the compiler-emitted vptr */
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C(HbmTextCaret* caret);
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020(const nw4r::ut::Rect* clip);
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual f32 v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual f32 v_0x030(const u16* text);
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual HbmTextScale v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040(const u16* text, u32 index, HbmGlyphBox* box);
+    /* slot +0x044 */ virtual void v_0x044(const u16* text, u32 index, HbmGlyphBox* box);
+    /* slot +0x048 */ virtual void v_0x048(u32 index);
+    /* slot +0x04C */ virtual void v_0x04C(u32 index);
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual f32 v_0x054(u16 code);
+    /* slot +0x058 */ virtual void v_0x058(HbmTextCaret* caret, s32 line);
+    /* slot +0x05C */ virtual BOOL v_0x05C(HbmTextCaret* caret);
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual void v_0x064();
+    /* slot +0x068 */ virtual void v_0x068(HbmGlyphBox* box);
+    /* slot +0x06C */ virtual void v_0x06C();
+    /* slot +0x070 */ virtual void v_0x070();
+    /* slot +0x074 */ virtual void v_0x074();
+    /* slot +0x078 */ virtual void v_0x078();
+    /* slot +0x07C */ virtual void v_0x07C(s32 line, u32 index, f32 fromX, f32 fromY, f32 toX, f32 toY);
+    /* slot +0x080 */ virtual BOOL v_0x080();
+    /* slot +0x084 */ virtual s32 v_0x084();
+    /* slot +0x088 */ virtual s32 v_0x088();
+    /* slot +0x08C */ virtual void v_0x08C();
+    /* slot +0x090 */ virtual void v_0x090();
+    /* slot +0x094 */ virtual void v_0x094();
+
+    /* +0x050 */ const u16* text;           /* the characters hbmTextWriterSetText hands over */
+    /* +0x054 */ f32 savedViewport[6];      /* GXGetViewportv's copy, restored after drawing */
+    /* +0x06C */ f32 savedProjection[7];    /* GXGetProjectionv's copy */
+    /* +0x088 */ VuVec4 screen;             /* the 4:3 or 16:9 screen rectangle (left, top, right, bottom) */
+    /* +0x098 */ f32 referenceWidth;        /* 640: the width the viewport scales the screen to */
+    /* +0x09C */ u8 standardScreen;         /* set for the 4:3 screen */
+    /* +0x09D */ u8 pad_0x09D[0x3];
+    /* +0x0A0 */ s32 lineCounter;           /* the lines laid out so far (slot 0x50) */
+    /* +0x0A4 */ f32 lineSpace;             /* the text box's line spacing */
+    /* +0x0A8 */ f32 charSpacing;           /* added to the cursor after every printed character */
+    /* +0x0AC */ f32 fontWidth;             /* the text box's font size */
+    /* +0x0B0 */ f32 fontHeight;
+    /* +0x0B4 */ f32 endX;                  /* the cursor where the last draw ended */
+    /* +0x0B8 */ f32 textHeight;            /* the laid-out text's height */
+    /* +0x0BC */ u32 textStart;             /* the range hbmTextWriterSetText hands over */
+    /* +0x0C0 */ u32 textEnd;
+    /* +0x0C4 */ u32 index;                 /* the character being drawn */
+    /* +0x0C8 */ u8 maskInput;              /* set: every character prints as '*' */
+    /* +0x0C9 */ u8 pad_0x0C9[0x3];
+    /* +0x0CC */ s32 firstLine;             /* the first line of the window */
+    /* +0x0D0 */ s32 lastLine;              /* the last line of the window (slot 0x74) */
+    /* +0x0D4 */ s32 lineCount;             /* the line after the window */
+    /* +0x0D8 */ s32 lastWindowLine;
+    /* +0x0DC */ u32 windowStart;           /* the first character of the window */
+    /* +0x0E0 */ u32 windowEnd;             /* the character after the window */
+    /* +0x0E4 */ u8 windowValid;            /* set once windowStart / windowEnd are known */
+    /* +0x0E5 */ u8 pad_0x0E5[0x3];
+    /* +0x0E8 */ f32 caretEndX;             /* the cursor after the caret's character, less the scroll */
+    /* +0x0EC */ f32 caretEndY;
+    /* +0x0F0 */ f32 scrollY;               /* the text's vertical scroll */
+    /* +0x0F4 */ s32 caretLine;             /* the line the caret is on */
+    /* +0x0F8 */ u32 caretIndex;            /* the character the caret stands before */
+    /* +0x0FC */ f32 caretX;               /* the cursor before the caret's character */
+    /* +0x100 */ f32 caretY;               /* less the scroll */
+    /* +0x104 */ u8 caretPlaced;           /* set by slot 0x7C */
+    /* +0x105 */ u8 caretMoved;            /* set when the cursor left caretEndX / caretEndY */
+    /* +0x106 */ u8 pad_0x106[0x2];
+};
+
 /* 0x8055A0A4 (0xDC): Whether the cursor sits, with no selection open, right after a sentence end ('.', '!' or '?'). */
 extern "C" s32 hbmTextIsAfterSentenceEnd(HbmTextBuffer* self) {
     u32 first;
@@ -897,6 +1047,26 @@ extern "C" void hbmTextTruncateClamped(HbmTextBuffer* self, u16 length) {
     }
 }
 
+/* 0x8055A338 (0xA8): Marks every cached character width unmeasured and sets the 640-wide reference. */
+extern "C" void hbmTextWriterInit(HbmTextWriter* writer) {
+    int i;
+
+    for (i = 0; i < 0x160; i++) {
+        hbmTextCharWidths[i] = -1;
+    }
+    writer->referenceWidth = 640.0f;
+}
+
+/* 0x8055A3E0 (0x1C): Stores the standard-screen flag and loads the 4:3 (set) or 16:9 screen rectangle. */
+extern "C" void hbmTextWriterSetStandardScreen(HbmTextWriter* writer, s32 standard) {
+    writer->standardScreen = standard;
+    if (standard) {
+        hbmGetScreenRect4x3(&writer->screen);
+    } else {
+        hbmGetScreenRect16x9(&writer->screen);
+    }
+}
+
 /* Hands the text writer the characters [start, end) of `text`. */
 extern "C" void hbmTextWriterSetText(HbmTextWriter* writer, const u16* text, u32 start, u32 end) {
     HbmWidget* self = (HbmWidget*)writer;
@@ -906,22 +1076,23 @@ extern "C" void hbmTextWriterSetText(HbmTextWriter* writer, const u16* text, u32
     self->ptr_C0 = (void*)end;
 }
 
-/* Loads a timer from its two key positions. */
-extern "C" void fn_8055A40C(HbmTimer* self, u32 id, u32 kind, f32 a, f32 b, f32 c, f32 d) {
-    f32 base = self->base;
-    self->id = id;
-    self->kind = kind;
-    self->a = a;
-    self->b = b - base;
-    self->start = c;
-    self->end = d - base;
-    self->active = 1;
+/* 0x8055A40C (0x30): Records the caret's line and character and the cursor before and after it, less the scroll. */
+extern "C" void hbmTextWriterRecordCaret(HbmTextWriter* writer, s32 line, u32 index, f32 x, f32 y, f32 endX,
+                                         f32 endY) {
+    f32 scroll = writer->scrollY;
+    writer->caretLine = line;
+    writer->caretIndex = index;
+    writer->caretX = x;
+    writer->caretY = y - scroll;
+    writer->caretEndX = endX;
+    writer->caretEndY = endY - scroll;
+    writer->caretPlaced = 1;
 }
 
-/* Stores the two callback pointers of the band's observer interface. */
-extern "C" void fn_8055A43C(HbmWidget* self, HbmAllocator* allocator, u32 tail) {
-    self->allocator = allocator;
-    self->tail.word_D0 = tail;
+/* 0x8055A43C (0xC): Sets the first and last line of the window. */
+extern "C" void hbmTextWriterSetLineRange(HbmTextWriter* writer, s32 firstLine, s32 lastLine) {
+    writer->firstLine = firstLine;
+    writer->lastLine = lastLine;
 }
 
 /* 0x8055A448 (0x74): Sets the shown line (clamped at 0) and its mode, re-laying the text out when the line changes. */
@@ -936,46 +1107,375 @@ extern "C" void hbmTextLayoutSetLine(HbmTextLayoutView* self, s32 line, u32 line
     self->lineMode = lineMode;
 }
 
-/* A null slot of the band's observer interface. */
-extern "C" u32 fn_8055A594(void) {
+/* 0x8055A4BC (0xD8): Reports the cursor to the caret unless slot 0x5C placed it, then records the caret's line,
+ * character and the cursor before and after it unless slot 0x80 holds the layout. */
+extern "C" void hbmTextWriterPlaceCaret(HbmTextWriter* writer, HbmTextCaret* caret, s32 line) {
+    f32 x = writer->mCursorPos.x;
+    f32 y = writer->mCursorPos.y;
+
+    if (!writer->v_0x05C(caret)) {
+        caret->x = writer->mCursorPos.x;
+        caret->y = writer->mCursorPos.y;
+    }
+    if (!writer->v_0x080()) {
+        f32 toY = writer->mCursorPos.y;
+        f32 toX = writer->mCursorPos.x;
+
+        writer->v_0x07C(line, caret->index, x, y, toX, toY);
+    }
+}
+
+/* 0x8055A594 (0x8): Reports that no override placed the caret (slot 0x5C). */
+extern "C" u32 hbmTextWriterPlaceCaretOverride(void) {
     return 0;
 }
 
-/* Counts one child of the widget. */
-extern "C" void fn_8055A870(HbmWidget* self) {
-    self->count_A0++;
-}
+/* 0x8055A59C (0x2D4): Draws the lines [line, lineEnd) from the character `position` on, reporting the caret through
+ * `cursor`; while slot 0x80 holds the layout it only steps the lines and replays the recorded caret. */
+extern "C" void hbmTextWriterDrawLine(HbmTextWriter* writer, HbmTextCaret* caret, u32 position, s32 line, s32 lineEnd) {
+    const u16* text;
+    const u16* p;
+    f32 prevY;
 
-/* Empty virtual slot. */
-extern "C" void fn_8055A880(void) {
-}
-
-/* Empty virtual slot. */
-extern "C" void fn_8055A884(void) {
-}
-
-/* Reports the widget's own completion code. */
-extern "C" u32 fn_8055A888(HbmWidget* self, int arg) {
-    if (self->flag_C8 == 0) {
-        return fn_805041F4(self, arg);
+    if (caret->index != writer->caretIndex) {
+        writer->v_0x094();
     }
-    return fn_805041F4(self, 0x2A);
+    if (writer->v_0x080()) {
+        caret->x = writer->caretX;
+        caret->y = writer->caretY + writer->scrollY;
+        for (; line < lineEnd; line++) {
+            if (writer->caretLine == line) {
+                u8 moved;
+
+                writer->mCursorPos.x = caret->x;
+                writer->v_0x05C(caret);
+                moved = 1;
+                if (writer->mCursorPos.x == writer->caretEndX &&
+                    writer->mCursorPos.y - writer->scrollY == writer->caretEndY) {
+                    moved = 0;
+                }
+                writer->caretMoved = moved;
+            }
+            writer->v_0x050();
+        }
+        return;
+    }
+    text = writer->text;
+    if (text != NULL) {
+        p = text + position;
+        prevY = writer->mCursorPos.y;
+        while (*p != 0) {
+            HbmGlyphBox box;
+
+            box.code = *p;
+            writer->v_0x068(&box);
+            writer->v_0x040(text, position, &box);
+            if (caret != NULL && caret->index == position) {
+                writer->v_0x058(caret, line + (prevY != writer->mCursorPos.y));
+            }
+            if (*p == L'\n') {
+                writer->v_0x050();
+                break;
+            }
+            writer->mCursorPos.x += (box.bounds.right - box.bounds.left) * writer->v_0x038().x;
+            writer->v_0x044(text, position, &box);
+            if (prevY != writer->mCursorPos.y) {
+                line++;
+            }
+            prevY = writer->mCursorPos.y;
+            p++;
+            position++;
+        }
+        if (caret != NULL && *p == 0 && caret->index == position) {
+            writer->v_0x058(caret, line);
+        }
+    }
+}
+
+/* 0x8055A870 (0x10): Counts one more laid-out line. */
+extern "C" void hbmTextWriterCountLine(HbmTextWriter* writer) {
+    writer->lineCounter++;
 }
 
 /* Empty virtual slot. */
-extern "C" void fn_8055AD98(void) {
+extern "C" void hbmTextWriterOnCharBegin(void) {
 }
 
 /* Empty virtual slot. */
-extern "C" void fn_8055AD9C(void) {
+extern "C" void hbmTextWriterOnCharEnd(void) {
+}
+
+/* 0x8055A888 (0x18): Prints `code`, or '*' while the writer masks its input. */
+extern "C" f32 hbmTextWriterPrintChar(HbmTextWriter* writer, u16 code) {
+    if (writer->maskInput == 0) {
+        return writer->Print(code);
+    }
+    return writer->Print('*');
+}
+
+/* 0x8055A8A0 (0x4F8): Draws the writer's characters from the window start (or the handed-over range) to its end,
+ * reporting the caret through `cursor` and a newline as a grey return mark, and records the window's characters. */
+extern "C" void hbmTextWriterDraw(HbmTextWriter* writer, HbmTextCaret* caret) {
+    const u16* p = writer->text;
+    u32 end;
+    f32 prevY;
+    s32 line;
+    u32 start;
+
+    if (writer->mFont == NULL) {
+        return;
+    }
+    if (caret->index != writer->caretIndex) {
+        writer->v_0x094();
+    }
+    if (writer->v_0x080()) {
+        caret->x = writer->caretX;
+        caret->y = writer->caretY + writer->scrollY;
+    }
+    prevY = writer->mCursorPos.y;
+    line = writer->v_0x084();
+    if (writer->windowValid) {
+        s32 i;
+
+        for (i = writer->firstLine; i < writer->lineCount; i++) {
+            if (writer->v_0x080() && writer->caretLine == i) {
+                f32 y = writer->mCursorPos.y;
+                u8 moved;
+
+                writer->mCursorPos.x = caret->x;
+                writer->v_0x05C(caret);
+                moved = 1;
+                if (writer->mCursorPos.x == writer->caretEndX &&
+                    writer->mCursorPos.y - writer->scrollY == writer->caretEndY) {
+                    moved = 0;
+                }
+                writer->caretMoved = moved;
+                if (y != writer->mCursorPos.y) {
+                    continue;
+                }
+            }
+            writer->v_0x050();
+        }
+        start = writer->windowStart;
+        end = writer->windowEnd;
+    } else {
+        start = writer->textStart;
+        end = writer->textEnd;
+        writer->windowStart = start;
+    }
+    writer->index = start;
+    writer->v_0x048(start);
+    p += start;
+    writer->SetFontSize(writer->fontWidth * writer->v_0x038().x, writer->fontHeight * writer->v_0x038().y);
+    writer->SetupGX();
+    while (*p != 0 && writer->index < end) {
+        HbmGlyphBox box;
+
+        box.code = *p;
+        writer->v_0x068(&box);
+        writer->v_0x040(writer->text, writer->index, &box);
+        if (caret != NULL && caret->index == writer->index) {
+            writer->v_0x058(caret, line + (prevY != writer->mCursorPos.y));
+        }
+        if (*p == L'\n') {
+            nw4r::ut::Color saved = hbmTextWriterGetTextColor(writer);
+
+            writer->SetTextColor(nw4r::ut::Color(200, 200, 200, saved.a));
+            writer->Print(0xE056);
+            writer->SetTextColor(saved);
+            writer->v_0x050();
+        } else if (*p != 0xFFFF) {
+            writer->v_0x054(*p);
+            writer->mCursorPos.x += writer->charSpacing * writer->v_0x038().x;
+        }
+        writer->v_0x044(writer->text, writer->index, &box);
+        if (prevY != writer->mCursorPos.y) {
+            if (!writer->windowValid) {
+                if (line == writer->lastWindowLine + 1) {
+                    writer->windowEnd = writer->index;
+                }
+                if (line + 1 == writer->lineCount) {
+                    writer->windowStart = writer->index;
+                }
+            }
+            line++;
+        }
+        p++;
+        prevY = writer->mCursorPos.y;
+        writer->index++;
+    }
+    if (caret != NULL && caret->index == writer->index) {
+        writer->v_0x058(caret, line);
+    }
+    if (!writer->windowValid) {
+        if (line - 1 <= writer->lastWindowLine) {
+            writer->windowEnd = writer->index;
+        }
+        writer->windowValid = 1;
+    } else if (*p != 0) {
+        while (line < writer->v_0x088()) {
+            writer->v_0x050();
+            line++;
+        }
+    }
+    writer->v_0x04C(writer->index);
 }
 
 /* Empty virtual slot. */
-extern "C" void fn_8055B434(void) {
+extern "C" void hbmTextWriterOnTextBegin(void) {
 }
 
 /* Empty virtual slot. */
-extern "C" void fn_8055B438(void) {
+extern "C" void hbmTextWriterOnTextEnd(void) {
+}
+
+/* 0x8055ADA0 (0xA0): Returns the scaled line height (font height plus line spacing), at least 1; 1 when the vertical
+ * scale is 0. */
+extern "C" f32 hbmTextWriterGetLineHeight(HbmTextWriter* writer) {
+    f32 height;
+
+    if (0.0f == writer->v_0x038().y) {
+        return 1.0f;
+    }
+    height = (writer->fontHeight + writer->lineSpace) * writer->v_0x038().y;
+    return (height >= 1.0f) ? height : 1.0f;
+}
+
+/* 0x8055AE40 (0x154): Takes `font`, clears the character-width cache and measures the codes 0x20..0x17F into it. */
+extern "C" void hbmTextWriterRefresh(HbmTextWriter* writer, const nw4r::ut::Font* font) {
+    int i;
+    u32 code;
+
+    writer->mFont = font;
+    for (i = 0; i < 0x160; i++) {
+        hbmTextCharWidths[i] = -1;
+    }
+    code = 0x20;
+    do {
+        HbmGlyphBox box;
+
+        box.code = code;
+        writer->v_0x068(&box);
+        hbmTextCharWidths[(u16)code - 0x20] = box.bounds.right - box.bounds.left;
+        code++;
+    } while (code <= 0x17F);
+}
+
+/* 0x8055AF94 (0x144): Fills in the glyph box of `box->code`: the line height, and the width the font gives the
+ * character (or the fixed width) scaled to the font size, plus the character spacing. */
+extern "C" void hbmTextWriterMeasureGlyph(HbmTextWriter* writer, HbmGlyphBox* box) {
+    f32 width;
+    u16 code;
+
+    box->bounds.left = 0.0f;
+    code = box->code;
+    box->bounds.right = 0.0f;
+    box->bounds.top = 0.0f;
+    box->bounds.bottom = writer->v_0x028();
+    width = 0.0f;
+    width += writer->charSpacing;
+    if (writer->mIsWidthFixed) {
+        width += writer->mFixedWidth;
+    } else {
+        const nw4r::ut::Font* font;
+        f32 sx;
+        f32 scale = writer->v_0x038().x;
+
+        if (0.0f == scale) {
+            scale = 0.0001f;
+        }
+        font = writer->mFont;
+        sx = writer->mScale.x;
+        width += font->GetCharWidth(code) * sx / scale;
+    }
+    box->bounds.right = (box->bounds.right < width) ? width : box->bounds.right;
+}
+
+/* 0x8055B0D8 (0x9C): Returns the width of the zero-terminated `text`: the sum of its glyph boxes' widths. */
+extern "C" f32 hbmTextWriterCalcStringWidth(HbmTextWriter* writer, const u16* text) {
+    f32 width = 0.0f;
+    HbmGlyphBox box;
+
+    while (*text != 0) {
+        box.code = *text;
+        writer->v_0x068(&box);
+        text++;
+        width += box.bounds.right - box.bounds.left;
+    }
+    return width;
+}
+
+/* 0x8055B174 (0x1E8): Saves the viewport and projection, then draws orthographically into `clip` (scaled from the
+ * screen rectangle to the reference width) with the scissor on it and an identity position matrix. */
+extern "C" void hbmTextWriterBeginDraw(HbmTextWriter* writer, const nw4r::ut::Rect* clip) {
+    Mtx44 projection;
+    Mtx position;
+    f32 viewport[6];
+    f32 screenWidth;
+    f32 ratio;
+    f32 x;
+    u32 left;
+    u32 top;
+    u32 width;
+    u32 height;
+
+    writer->index = 0;
+    GXGetViewportv(writer->savedViewport);
+    GXGetProjectionv(writer->savedProjection);
+    C_MTXOrtho(projection, 0.0f, clip->top - clip->bottom, -50.0f, 50.0f + (clip->right - clip->left), -1.0f, 1.0f);
+    GXSetProjection(projection, GX_ORTHOGRAPHIC);
+    screenWidth = writer->screen.z - writer->screen.x;
+    ratio = writer->referenceWidth / screenWidth;
+    x = (clip->left + screenWidth / 2.0f) - 50.0f;
+    viewport[0] = x + x * (ratio - 1.0f);
+    viewport[1] = clip->bottom + (writer->screen.w - writer->screen.y) / 2.0f;
+    viewport[2] = ratio * (100.0f + (clip->right - clip->left));
+    viewport[3] = clip->top - clip->bottom;
+    viewport[4] = writer->savedViewport[4];
+    viewport[5] = writer->savedViewport[5];
+    GXSetViewport(viewport[0], viewport[1], viewport[2], viewport[3], viewport[4], viewport[5]);
+    left = viewport[0];
+    top = viewport[1];
+    width = viewport[2];
+    if (width >= 1500) {
+        width = 1500;
+    }
+    height = viewport[3];
+    if (height >= 1500) {
+        height = 1500;
+    }
+    GXSetScissor(left, top, width, height);
+    PSMTXIdentity(position);
+    GXLoadPosMtxImm(position, 0);
+    writer->lineCounter = 0;
+    writer->textHeight = writer->mCursorPos.y;
+    if (writer->caretMoved) {
+        writer->caretMoved = 0;
+        writer->v_0x090();
+        writer->v_0x094();
+    }
+}
+
+/* 0x8055B35C (0xD8): Restores the saved viewport and its scissor, keeps where the cursor ended and grows the text
+ * height by the last line. */
+extern "C" void hbmTextWriterEndDraw(HbmTextWriter* writer) {
+    f32 y;
+
+    GXSetViewport(writer->savedViewport[0], writer->savedViewport[1], writer->savedViewport[2],
+                  writer->savedViewport[3], writer->savedViewport[4], writer->savedViewport[5]);
+    GXSetScissor(writer->savedViewport[0], writer->savedViewport[1], writer->savedViewport[2],
+                 writer->savedViewport[3]);
+    y = writer->mCursorPos.y;
+    writer->endX = writer->mCursorPos.x;
+    writer->textHeight = (writer->textHeight - y) + writer->v_0x028();
+}
+
+/* Empty virtual slot. */
+extern "C" void hbmTextWriterSlot64Stub(void) {
+}
+
+/* Empty virtual slot. */
+extern "C" void hbmTextWriterSlot10Stub(void) {
 }
 
 /* 0x8055B43C (0x6C): Hands a manager event on as a pane event, then lets the sound player sound the pane. */
@@ -1738,6 +2238,21 @@ void* fn_8055E59C(void* self, s32 flag)
             operator delete(self);
     }
     return self;
+}
+
+/* 0x8055E69C (0xDC): Whether the keyboard object has no text to commit: true without a text panel or a slot-0x9C
+ * object, false while slot 0x9C's object is idle and slot 0x84's holds input, else the panel's commit test. */
+s32 hbmKbdIsTextEmpty(VuObject* self)
+{
+    HbmVuView* vu = (HbmVuView*)self;
+
+    if (vu->v_0x06C() == NULL || vu->v_0x09C() == NULL) {
+        return 1;
+    }
+    if (!vu->v_0x09C()->v_0x010() && vu->v_0x084()->v_0x050()) {
+        return 0;
+    }
+    return hbmPanelIsReadyToCommit(vu->v_0x06C());
 }
 
 /* ---------------------------------------------------------------------------------------------------

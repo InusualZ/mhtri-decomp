@@ -2732,7 +2732,7 @@ void hbmPanelDrawLineAt(HbmPanelView* self, u32* cursor, u32 position, s32 line,
     u32 saved = self->drawPosition;
 
     self->drawPosition = position;
-    hbmTextWriterDrawLine((HbmTextWriter*)&self->writer);
+    hbmTextWriterDrawLine((HbmTextWriter*)&self->writer, (HbmTextCaret*)cursor, position, line, lineEnd);
     self->drawPosition = saved;
 }
 
@@ -2864,13 +2864,13 @@ void hbmPanelDrawText(HbmPanelView* self, u32 cursor)
     self->writer.SetTextColor(self->textColor);
     if (self->wrapLines) {
         hbmPanelLayoutLines(self, &position);
-        hbmTextWriterDraw((HbmTextWriter*)&self->writer, &position);
+        hbmTextWriterDraw((HbmTextWriter*)&self->writer, (HbmTextCaret*)&position);
         hbmPanelDrawTrailingLines(self, &position);
     } else {
         u32 length = self->textField->v_0x01C();
 
         hbmTextWriterSetText((HbmTextWriter*)&self->writer, self->textField->v_0x048(), 0, length);
-        hbmTextWriterDraw((HbmTextWriter*)&self->writer, &position);
+        hbmTextWriterDraw((HbmTextWriter*)&self->writer, (HbmTextCaret*)&position);
     }
     self->v_0x168(offset.x, offset.y);
 }
@@ -2945,9 +2945,9 @@ void hbmPanelAdvanceWord1A00(HbmPanelView* self)
 }
 
 /* 0x80546658 (0x8): Forwards the panel's slot 0xEC to its text writer. */
-void hbmPanelWriterRefresh(HbmPanelView* self)
+void hbmPanelWriterRefresh(HbmPanelView* self, const nw4r::ut::Font* font)
 {
-    hbmTextWriterRefresh((HbmTextWriter*)&self->writer);
+    hbmTextWriterRefresh((HbmTextWriter*)&self->writer, font);
 }
 
 #pragma push
@@ -5859,8 +5859,8 @@ extern "C" Vec2f fn_8054F704(HkbWidget* self) {
 }
 
 /* Adjustor thunk: base #2 -> hbmPanelWriterRefresh. */
-extern "C" void fn_8054F70C(HkbWidget* self) {
-    hbmPanelWriterRefresh((HbmPanelView*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_10)));
+extern "C" void fn_8054F70C(HkbWidget* self, const nw4r::ut::Font* font) {
+    hbmPanelWriterRefresh((HbmPanelView*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_10)), font);
 }
 
 /* Adjustor thunk: base #2 -> hbmKbWidgetCalc. */
