@@ -6,23 +6,31 @@
  *   jump tables are emitted in retail order by defining each table before its first user; no seam inside the range
  *   (the data runs in function order, no vtable, no repeated pool value).
  * FLAGS. `cflags_lobby`; file-scope `#pragma peephole off` (the kept `clrlwi` + `slwi` index scales and unfused narrow
- *   compares), `pool_data off` (each table addressed by its own `lis`/`addi`) and `fp_contract off` (the price tables'
- *   `fmuls` + `fadds`).
+ *   compares), `pool_data off` (each table addressed by its own `lis`/`addi`), `fp_contract off` (the price tables'
+ *   `fmuls` + `fadds`) and `optimization_level 4` (the switches' range-first `subi` + `cmplwi` tests, playbook 108).
  * NAMES. No `__FILE__` string covers the range; the file keeps the map's stem (request lobby-80212810#1 proposes
  *   `lobby/lb_item_ui`, GUESS, after `lb_pane_ui`/`lb_companion_ui`/`lb_quest_ui`).  `LbPutAnaPageArrow` is the map's real
  *   name.  GUESS (from each body and its callers): every other `lb_*` name, `draw_font_idx_num`,
  *   `equip_sell_price_get`, and the data `lb_*_ids`/`lb_*_tbl`/`lb_*_layout` (each named for the sprites or values it
  *   holds and the function that reads it).  The foreign names this unit proposed are in the name registry.
  * RESIDUALS.
- *   - `lb_scroll_rows_build`, `lb_recipe_material_flags_get`: a `switch` whose first case range retail tests with
- *     `subi`+`cmplwi` ours tests with two `cmpwi`s (the case groups 1..2 / 2..3); a switch subject cast, a local copy and
- *     an `if` chain all measure lower.
+ *   - `lb_scroll_rows_build`: retail stores `right_rows_0x1D[2]`/`[3]` of the group-2 rows through index registers
+ *     (`li r3,2` + `add`); row-indexed spellings fold to constant offsets.  The rest is register colouring.
  *   - `.data` is 4 bytes long: MWCC 8-aligns the 64-byte `lb_equip_kind_rank_tbl` (any object whose size is a multiple of
- *     8) where retail has it 4-aligned at +0x44, so every later table sits 4 bytes late; an `s32[16]`, a struct array
- *     and a function-local static all align it to 8.
- *   - register colouring or scheduling only: `lb_text_center_print`, `lb_list_dialog_draw`, `lb_list_draw_ex`,
- *     `lb_item_info_draw`, `lb_item_window_draw`, `lb_seisan_materials_get`, `lb_seisan_row_flags_get`,
- *     `lb_kakou_weapon_flags_get`, `lb_kakou_icon_build`, `lb_item_sort_key_get`, `lb_row_blink_mark_draw`.
+ *     8) where retail has it 4-aligned at +0x44, so every later table sits 4 bytes late; an `s32[16]`, a struct array,
+ *     a struct wrapper, an unsized array, `__attribute__((aligned(4)))` and a function-local static all align it to 8.
+ *   - `lb_seisan_materials_get`: retail computes `bonus * 2` and the `gun_level_bonus_tbl` address before clearing
+ *     `out`, ours in the loop preheader; a clearing loop and other clear spellings do not move them.
+ *   - `lb_list_dialog_draw`: retail keeps `x = frame + 20` unextended (`addi r25,r3,0x14`); the call result
+ *     assigned to the `s16` is extended first.
+ *   - `lb_kakou_weapon_cost_flags_get`, `lb_deco_row_flags_get`: retail loads the table row pointer straight into
+ *     the saved register (`lwzx r30` + `add r30,r30`).
+ *   - `lb_sprite_pulse_draw`, `lb_count_window_draw`: `mullw` operand order; both source orders give ours.
+ *   - register colouring or scheduling only: `lb_text_center_print` (retail loads `spr.width` before `spr.pos.x`),
+ *     `lb_list_draw_ex`, `lb_item_window_draw`, `lb_seisan_row_flags_get`, `lb_kakou_weapon_flags_get`,
+ *     `lb_kakou_icon_build`, `lb_recipe_material_flags_get`, `lb_gun_recipe_material_flags_get`,
+ *     `lb_item_cell_draw_layout`, `lb_kakou_source_draw`, `lb_item_need_list_draw`, `lb_equip_row_next`,
+ *     `lb_scene_npc_refresh` (retail steps the NPC pointer before the counter).
  *   - this unit's views of foreign records (`LbArmorView`, `LbArmorExView`, `LbBladeView`, `LbGunView` over the Pl rows,
  *     `LbSmithRow`/`LbSmithGunRow`/`LbSmithKakouRow` over `lobby/lb_screen_step.cpp`'s recipes, `LbShopGoodsRow` over
  *     `lobby/fn_801E0ADC.cpp`'s `LbIdRow6`, `LbUserNames` over the user data) name bytes their owners leave as padding or
@@ -39,6 +47,7 @@
 #pragma peephole off
 #pragma pool_data off
 #pragma fp_contract off
+#pragma optimization_level 4
 
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -739,12 +748,12 @@ s32 lb_equip_sort_key_get(_EQUIP* equip, u8 sort)
  * in sort order `sort`, the kind rank and the penalties first, or -1. */
 s32 lb_equip_row_next(u8 sort, s32 prev, _EQUIP* rows, u16 count, s32 kinds, s32 picked, u8 wearer)
 {
-    s32 best_key;
-    s32 best;
     s32 base;
-    s32 i;
+    s32 best;
     s32 key;
+    s32 best_key;
     _EQUIP* row;
+    s32 i;
 
     best_key = 0x80000000;
     best = -1;
@@ -905,12 +914,12 @@ u16 lb_gun_recipe_material_flags_get(Q_UserData* user, LbSmithGunRow* row, u8 le
 
 u16 lb_seisan_row_flags_get(u16 kind, u16 idx, u8 level)
 {
-    Q_UserData* user;
-    PlSkillRec* blade;
     PlWeaponRec* gun;
-    u16 flags;
+    PlSkillRec* blade;
     u16 item;
+    Q_UserData* user;
     u8 locked;
+    u16 flags;
     LbSmithRow* row;
     u32 gun_kind;
 
@@ -1050,22 +1059,22 @@ void lb_kakou_materials_get(u8 kind, u16 item, u8 level, LbItemCount* out)
 u16 lb_kakou_armor_flags_get(u8 kind, u16 item, u8 level)
 {
     Q_UserData* user;
-    u16 flags;
-    _EQUIP equip;
     LbItemCount mats[4];
+    _EQUIP equip;
     s32 i;
+    u16 flags;
     LbItemCount* mat;
 
     user = (Q_UserData*)lobby_world_block;
     flags = 0;
     lb_row_init(&equip, kind, item);
     if (lb_armor_upgrade_price_get(&equip, level) > user->zenny_0x18) {
-        flags = 4;
+        flags |= 4;
     }
     lb_kakou_materials_get(kind, item, level, mats);
-    for (i = 0, mat = mats; i < 4; i++, mat++) {
-        if (mat->item_0x00 != 0 && mat->count_0x02 > 0 &&
-            userdata_item_count_total(mat->item_0x00, lobby_world_block) < mat->count_0x02) {
+    for (i = 0; i < 4; i++) {
+        if (mats[i].item_0x00 != 0 && mats[i].count_0x02 > 0 &&
+            userdata_item_count_total(mats[i].item_0x00, lobby_world_block) < mats[i].count_0x02) {
             flags |= 8;
         }
     }
@@ -1077,8 +1086,8 @@ void lb_seisan_materials_get(u8 kind, u16 item, u8 level, LbItemCount* out)
     LbGunView* gun;
     LbSmithGunRow* row;
     s32 bonus;
-    s16 n;
     s16 i;
+    s16 n;
 
     gun = (LbGunView*)equip_weapon_rec_find(11, item);
     for (row = (LbSmithGunRow*)seisan_data[kind]; row->item_0x02 != 0xFFFF; row++) {
@@ -1099,12 +1108,18 @@ void lb_seisan_materials_get(u8 kind, u16 item, u8 level, LbItemCount* out)
     for (i = 0; i < 6; i++) {
         switch ((row->cond_0x1C[i] & 0xF0) >> 4) {
         case 0:
+            if (level != 0) {
+                continue;
+            }
+            break;
+        case 1:
             if (level == 0) {
                 break;
             }
-            continue;
-        case 1:
-            if (level == 0 || (gun_level_bonus_tbl[bonus] == 0 && level < 4)) {
+            if (gun_level_bonus_tbl[bonus] != 0) {
+                continue;
+            }
+            if (level < 4) {
                 break;
             }
             continue;
@@ -1152,21 +1167,21 @@ void lb_seisan_materials_get(u8 kind, u16 item, u8 level, LbItemCount* out)
 u16 lb_kakou_gun_flags_get(u8 kind, u16 item, u8 level)
 {
     Q_UserData* user;
-    u16 flags;
-    _EQUIP equip;
     LbItemCount mats[4];
+    _EQUIP equip;
     s32 i;
+    u16 flags;
     LbItemCount* mat;
 
     user = (Q_UserData*)lobby_world_block;
     flags = 0;
     lb_row_init(&equip, kind, item);
     if (lb_gun_upgrade_price_get(&equip, level) > user->zenny_0x18) {
-        flags = 4;
+        flags |= 4;
     }
     lb_seisan_materials_get(kind, item, level, mats);
-    for (i = 0, mat = mats; i < 4; i++, mat++) {
-        if (mat->item_0x00 != 0 && userdata_item_count_total(mat->item_0x00, lobby_world_block) < mat->count_0x02) {
+    for (i = 0; i < 4; i++) {
+        if (mats[i].item_0x00 != 0 && userdata_item_count_total(mats[i].item_0x00, lobby_world_block) < mats[i].count_0x02) {
             flags |= 8;
         }
     }
@@ -1177,8 +1192,8 @@ u16 lb_kakou_gun_flags_get(u8 kind, u16 item, u8 level)
 u16 lb_kakou_weapon_cost_flags_get(u8 kind, u16 idx)
 {
     Q_UserData* user;
-    u16 flags;
     LbItemCount* mat;
+    u16 flags;
     s32 i;
 
     user = (Q_UserData*)lobby_world_block;
@@ -1200,16 +1215,16 @@ u16 lb_kakou_weapon_flags_get(u8 kind, u16 idx, _EQUIP* equip)
 {
     LbItemCount species[3];
     u16 decos[3];
-    s32 kinds;
     u16 flags;
     s32 count;
     s32 room;
+    s32 kinds;
     s32 i;
 
     kinds = 0;
     flags = lb_kakou_weapon_cost_flags_get(kind, idx);
     count = equip_deco_count(equip);
-    room = item_slots_free_count(((Q_UserData*)lobby_world_block)->box_0x180, userdata_box_capacity(lobby_world_block));
+    room = (u16)item_slots_free_count(((Q_UserData*)lobby_world_block)->box_0x180, userdata_box_capacity(lobby_world_block));
     if (room < count) {
         u16* deco;
         LbItemCount* entry;
@@ -1354,8 +1369,8 @@ s32 lb_kakou_icon_build(_EQUIP* equip, s32 wearer, _EQUIP* out, s32* prices)
 /* 0x802145A4 (0xB0): sizes a table-built list from its longest row string and its row count. */
 void lb_list_size_calc(LbList* list)
 {
-    s32 width;
     s16 i;
+    s32 width;
 
     width = 0;
     for (i = 0; i < list->count_0x06; i++) {
@@ -1377,7 +1392,7 @@ void lb_list_init(LbList* list, s16 count, u8 kind, s16 str_base, s16 help_str, 
     memset(list, 0, sizeof(LbList));
     list->count_0x06 = count;
     list->kind_0x08 = kind;
-    list->str_base_0x0A = str_base;
+    list->str_base_0x0A = (s16)str_base;
     list->help_str_0x0C = help_str;
     list->help_tbl_0x10 = NULL;
     list->off_mask_0x02 = off_mask;
@@ -1435,11 +1450,14 @@ void lb_row_blink_mark_draw(u16 panel, u16 row)
 {
     _mh_ivec2_ pos;
     _SPR_DATA_* spr;
+    s16 x;
+    s16 y;
 
     get_lsp_data(panel, &pos);
     spr = get_lsp_data(row, NULL);
-    put_itemicon((s16)((f32)(pos.x + spr->pos.x) - 24.0f), (s16)((f32)(pos.y + spr->pos.y) - 3.0f), 30, 0xDC1E1EFF,
-                0x73);
+    x = (f32)(pos.x + spr->pos.x) - 24.0f;
+    y = (f32)(pos.y + spr->pos.y) - 3.0f;
+    put_itemicon(x, y, 30, 0xDC1E1EFF, 0x73);
 }
 
 void lb_list_draw_ex(LbList* list, u16 panel, const u16* sprites, const u16* rows, u16 help_panel, u8 flag,
@@ -1457,10 +1475,10 @@ void lb_list_draw_ex(LbList* list, u16 panel, const u16* sprites, const u16* row
 {
     _mh_ivec2_ pos;
     bool active;
-    s32 i;
-    s32 sel;
-    u32 color;
     s32 bit;
+    s32 i;
+    u32 color;
+    s32 sel;
     const u16* str;
 
     get_lsp_data(panel, &pos);
@@ -1499,26 +1517,26 @@ void lb_list_draw_ex(LbList* list, u16 panel, const u16* sprites, const u16* row
 /* 0x80214B30 (0x1D0): draws `list` as a titled dialog at (`x`, `y`), or at the screen's top right for (0, 0). */
 void lb_list_dialog_draw(LbList* list, s16 x, s16 y, s8* title, bool active)
 {
-    u32 color;
-    s16 i;
-    s32 left;
-    s32 text_x;
     s32 shadow_x;
+    s32 text_x;
+    s16 i;
     bool cur;
+    u32 color;
 
     if (x == 0 && y == 0) {
         x = 640 - (list->width_0x1C + 15);
         y = 64;
     }
-    left = put_frame_dialog_title(x, y, list->width_0x1C, list->height_0x1E, 0, 0, 0, title, 4) + 20;
+    x = put_frame_dialog_title(x, y, list->width_0x1C, list->height_0x1E, 0, 0, 0, title, 4);
     y += 20;
-    shadow_x = (s16)left + 12;
-    text_x = (s16)left + 10;
+    x += 20;
+    shadow_x = x + 12;
+    text_x = x + 10;
     for (i = 0; i < list->count_0x06; i++) {
-        put_frame_separator(left, y, list->width_0x1C - 40, 26, 0);
+        put_frame_separator(x, y, list->width_0x1C - 40, 26, 0);
         if (list->cursor_0x00 == i) {
             cur = 1;
-            put_frame_cursor_bar(left, y, list->width_0x1C - 40, 26, 0, 0);
+            put_frame_cursor_bar(x, y, list->width_0x1C - 40, 26, 0, 0);
         } else {
             cur = 0;
         }
@@ -1627,7 +1645,7 @@ void lb_panel_line_draw(u16 panel, s16 str, s16 color, s32 row)
 
     get_lsp_data(panel, &pos);
     font_set_size(18, 18);
-    font_print_ex(pos.x + 20, pos.y + row * 20 + 16, color, (s8*)LbStr(3, (u16)str));
+    font_print_ex(pos.x + 20, pos.y + (row * 20 + 16), color, (s8*)LbStr(3, (u16)str));
 }
 
 /* The yes/no box's frame and its two cursor rows. */
@@ -1642,7 +1660,6 @@ void lb_panel_yes_no_draw(u16 panel, s32 sel)
     _SPR_DATA_ spr;
     bool yes;
     bool no;
-    u16* cursor;
 
     get_lsp_data(panel, &pos);
     draw_sprite_ary(lb_yes_no_frame_ids, &pos);
@@ -1659,17 +1676,13 @@ void lb_panel_yes_no_draw(u16 panel, s32 sel)
     spr_data_copy(&spr, get_lsp_data(0x1884, NULL));
     spr.color = GetMenuFontColor(1, no, 1, 0);
     draw_font(spr, (s8*)LbStr(1, 0x2E), 1, &pos);
-    cursor = lb_no_cursor_ids;
-    if (sel == 0) {
-        cursor = lb_yes_cursor_ids;
-    }
-    put_menu_cursor(cursor, 0, &pos);
+    put_menu_cursor(sel == 0 ? lb_yes_cursor_ids : lb_no_cursor_ids, 0, &pos);
 }
 
 /* Prints the number `value` with the layout sprite `id`'s font. */
 void draw_font_idx_num(u16 id, s32 value, u32 flags, const _mh_ivec2_* pos)
 {
-    char buf[16];
+    char buf[32];
 
     sprintf(buf, "%d", value);
     draw_font_idx(id, (s8*)buf, flags, pos);
@@ -1678,7 +1691,7 @@ void draw_font_idx_num(u16 id, s32 value, u32 flags, const _mh_ivec2_* pos)
 /* 0x80215310 (0x6C): prints the number `value` with sprite record `spr`'s font. */
 void lb_sprite_num_draw(const _SPR_DATA_* spr, s32 value, u32 flags, const _mh_ivec2_* pos)
 {
-    char buf[16];
+    char buf[32];
 
     sprintf(buf, "%d", value);
     draw_font(*spr, (s8*)buf, flags, pos);
@@ -1708,17 +1721,16 @@ void lb_font_puts(s16 x, s16 y, s8* str, u32 color, u32 flags)
 /* 0x802154A8 (0xB4): prints `str` centred on `cx` with its middle at `cy`, at font size `size`. */
 void lb_font_center_print(s16 cx, s32 cy, s8* str, s16 size, u32 color, u32 flags)
 {
-    s16 y;
     s16 x;
 
-    y = cy - (size >> 1);
+    cy -= size >> 1;
     x = menu_text_center_x((char*)str, cx, size);
     font_set_size(size, size);
     if ((flags & 4) != 0) {
-        font_print_ex(x + 2, y + 1, 1, str);
+        font_print_ex(x + 2, cy + 1, 1, str);
     }
     flfntSetColor(color);
-    font_locate(x, y);
+    font_locate(x, cy);
     font_print(str);
 }
 
@@ -1752,8 +1764,8 @@ u16 lb_prompt_arrow_ids[7] = { 0x182E, 0x182D, 0x1831, 0x1832, 0x182F, 0x1830, 0
 s32 lb_cursor_prompt_draw(u8 kind, _mh_ivec2_* pos)
 {
     u16 frame;
-    u16 anim;
     s32 mode;
+    u16 anim;
 
     mode = kind & 0x7F;
     if (mode == 1 && chk_pointer() == 0) {
@@ -1781,8 +1793,8 @@ u16 lb_cancel_arrow_ids[5] = { 0x183E, 0x183F, 0x1840, 0x1841, 0xFFFF };
 void lb_cancel_prompt_draw(u8 kind, _mh_ivec2_* pos)
 {
     u16 frame;
-    u16 anim;
     s32 mode;
+    u16 anim;
 
     mode = kind & 0x7F;
     if (mode == 1 && chk_pointer() == 0) {
@@ -1820,7 +1832,7 @@ void lb_sprite_pulse_draw(const u16* ids, const _mh_ivec2_* pos)
 
 s32 lb_button_prompt_draw(s32 kind, _mh_ivec2_* pos)
 {
-    if (chk_pointer() != 1) {
+    if ((u32)chk_pointer() != 1) {
         if (get_option_cfg(7) == 0) {
             draw_sprite_anim_idx(0x1821, (u16)kind, pos);
         } else {
@@ -2022,8 +2034,8 @@ void lb_list_row_draw(s8* text, s32 sel, _mh_ivec2_* pos, u32 color, u8 kind)
 
 void lb_frame_draw_at(u16 panel, u16 sub_panel, s8* text, s32 sel, u32 color, u8 mode)
 {
-    _mh_ivec2_ pos;
     _mh_ivec2_ at;
+    _mh_ivec2_ pos;
     _SPR_DATA_* spr;
 
     get_lsp_data(panel, &pos);
@@ -2352,7 +2364,7 @@ void lb_equip_cell_draw_layout(_EQUIP* equip, s32 count, _mh_ivec2_* pos, bool e
     s32 font_flags;
     u16 id;
 
-    if (kind != 5) {
+    if ((s32)kind != 5) {
         layout = lb_cell3_layout;
         frame = lb_cell3_frame_ids;
         cursor = lb_cell3_cursor_ids;
@@ -2433,11 +2445,11 @@ void lb_item_need_list_draw(const LbItemCount* items, s8 count, u8 flag, _mh_ive
     _mh_ivec2_ at;
     u16 need_digit_ids[3] = { 0x186D, 0x186E, 0x186D };
     PlaceRec place;
+    u16* row;
     _SPR_DATA_ spr;
     s8 i;
-    u16* row;
     u16* place_id;
-    s16 have;
+    s32 have;
     u32 color;
 
     draw_sprite_ary(lb_need_frame_ids, pos);
@@ -2620,15 +2632,15 @@ void lb_item_detail_panel_draw(u16 panel, u16 item, u8 side)
 
 void lb_item_detail_draw(u16 panel, u16 item, const u16* ids, u16 box_mark, u16 pouch_mark)
 {
-    _mh_ivec2_ pos;
     u32 have;
     u32 box;
     u32 pouch;
+    _mh_ivec2_ pos;
     char buf[16];
     _SPR_DATA_ spr;
     ItemDataRecord* data;
     u32 color;
-    s16 total;
+    s32 total;
 
     data = GetItemData(item);
     get_lsp_data(panel, &pos);
@@ -2642,7 +2654,7 @@ void lb_item_detail_draw(u16 panel, u16 item, const u16* ids, u16 box_mark, u16 
         spr_data_copy(&spr, get_lsp_data(ids[3], NULL));
         draw_itemicon_item_id(spr, item, &pos);
         eft052_page_counts_get(item, &have, &box, &pouch);
-        sprintf(buf, "%d", (s16)have);
+        sprintf(buf, "%d", have);
         if (eft052_page_count_ck(item, 0) == 0) {
             spr_data_copy(&spr, get_lsp_data(ids[4], NULL));
             spr.color = 0xFF435DFF;
@@ -2714,9 +2726,9 @@ void lb_item_window_draw(u16 item, _mh_ivec2_* pos)
     u16 decos[3];
     _SPR_DATA_ spr;
     ItemDataRecord* data;
+    u16 species;
     u32 color;
     s32 have;
-    u16 species;
     s32 used;
     u16 i;
     u16 slots;
@@ -2763,11 +2775,11 @@ void lb_item_window_draw(u16 item, _mh_ivec2_* pos)
 void lb_equip_cell_draw(u16 panel, _EQUIP* equip, u8 flags)
 {
     _mh_ivec2_ pos;
-    char buf[16];
-    _EQUIP frame;
     _EQUIP barrel;
-    _SPR_DATA_ spr;
+    _EQUIP frame;
+    char buf[16];
     u32 color;
+    _SPR_DATA_ spr;
     u8 rare;
 
     get_lsp_data(panel, &pos);
@@ -2791,7 +2803,7 @@ void lb_equip_cell_draw(u16 panel, _EQUIP* equip, u8 flags)
     if ((flags & 1) != 0) {
         draw_sprite_ary(lb_window_have_ids, &pos);
         if (equip->item_id != 0) {
-            sprintf(buf, "%d", (s16)userdata_equip_box_count(equip->kind, equip->item_id));
+            sprintf(buf, "%d", userdata_equip_box_count(equip->kind, equip->item_id));
             draw_font_idx(0x1905, (s8*)buf, 2, &pos);
         }
     }
@@ -2808,16 +2820,15 @@ void lb_equip_cell_draw(u16 panel, _EQUIP* equip, u8 flags)
 s32 lb_scene_npc_refresh(s32 on)
 {
     s32 i;
-    _LB_NPC* npc;
 
     if (on == 0) {
         lobby_w.state_0x000 = 0;
         lobby_w.active_0x008 = 0;
         camera_lobby_disarm();
     }
-    for (i = 0, npc = lb_npc; i < 18; i++, npc++) {
-        if (npc->field_0x000 != 0) {
-            lb_npc_talk_select(npc);
+    for (i = 0; i < 18; i++) {
+        if (lb_npc[i].field_0x000 != 0) {
+            lb_npc_talk_select(&lb_npc[i]);
         }
     }
 }
@@ -2837,13 +2848,15 @@ s32 lb_scene_npc_refresh_all(void)
 /* 0x80217944 (0x44): whether the armour row of `equip` has every wear flag of `bits`. */
 s32 lb_item_flags_ck(_EQUIP* equip, u8 bits)
 {
-    return (equip_slot_rec_get(equip)->wear_flags & bits) == bits;
+    PlSlotRec* rec = equip_slot_rec_get(equip);
+    return (rec->wear_flags & bits) == bits;
 }
 
 /* 0x80217988 (0x4C): the same test on armour `id` of kind `kind`. */
 s32 lb_equip_flags_ck(u8 kind, u16 id, u8 bits)
 {
-    return (equip_slot_rec_find(kind, id)->wear_flags & bits) == bits;
+    PlSlotRec* rec = equip_slot_rec_find(kind, id);
+    return (rec->wear_flags & bits) == bits;
 }
 
 /* 0x802179D4 (0x130): whether the hunter's worn armour can all be worn with blade `equip` (1 when it can). */
@@ -2933,8 +2946,8 @@ s32 lb_equip_base_price_get(u8 kind, u16 id)
 /* 0x80217BE4 (0x84): the summed value of the first `count` decorations set in `equip`. */
 s32 lb_equip_deco_value_get(_EQUIP* equip, u8 count)
 {
-    s32 sum;
     s32 i;
+    s32 sum;
 
     sum = 0;
     for (i = 0; i < count; i++) {
@@ -2962,7 +2975,7 @@ s32 equip_sell_price_get(_EQUIP* equip)
         }
         break;
     case 1:
-        if (equip->kind == 11 && equip->deco_count != 0) {
+        if ((s32)equip->kind == 11 && equip->deco_count != 0) {
             for (i = 1; i < equip->deco_count; i++) {
                 upgrades += lb_gun_upgrade_price_get(equip, i);
             }
@@ -3446,24 +3459,6 @@ void lb_scroll_rows_build(LbScrollWork* self)
             self->left_group_0x11 = 2;
             self->right_group_0x12 = 2;
             switch (self->mode_0x02) {
-            case 1:
-            case 2:
-                count = 6;
-                self->left_mode_0x04 = 1;
-                self->right_mode_0x05 = 1;
-                self->left_rows_0x13[0] = 1;
-                self->right_rows_0x1D[0] = 15;
-                self->left_rows_0x13[1] = 10;
-                self->right_rows_0x1D[1] = 0;
-                self->left_rows_0x13[2] = 2;
-                self->right_rows_0x1D[2] = 6;
-                self->left_rows_0x13[3] = 11;
-                self->right_rows_0x1D[3] = 0;
-                self->left_rows_0x13[4] = 12;
-                self->right_rows_0x1D[4] = 0;
-                self->left_rows_0x13[5] = 13;
-                self->right_rows_0x1D[5] = 0;
-                break;
             case 0:
                 count = 6;
                 self->left_mode_0x04 = 1;
@@ -3481,12 +3476,23 @@ void lb_scroll_rows_build(LbScrollWork* self)
                 self->left_rows_0x13[5] = 13;
                 self->right_rows_0x1D[5] = 0;
                 break;
-            case 4:
-                count = 1;
+            case 1:
+            case 2:
+                count = 6;
                 self->left_mode_0x04 = 1;
                 self->right_mode_0x05 = 1;
                 self->left_rows_0x13[0] = 1;
-                self->right_rows_0x1D[0] = 2;
+                self->right_rows_0x1D[0] = 15;
+                self->left_rows_0x13[1] = 10;
+                self->right_rows_0x1D[1] = 0;
+                self->left_rows_0x13[2] = 2;
+                self->right_rows_0x1D[2] = 6;
+                self->left_rows_0x13[3] = 11;
+                self->right_rows_0x1D[3] = 0;
+                self->left_rows_0x13[4] = 12;
+                self->right_rows_0x1D[4] = 0;
+                self->left_rows_0x13[5] = 13;
+                self->right_rows_0x1D[5] = 0;
                 break;
             case 3:
             case 6:
@@ -3513,6 +3519,13 @@ void lb_scroll_rows_build(LbScrollWork* self)
                 self->right_rows_0x1D[5] = 0;
                 self->left_rows_0x13[6] = 13;
                 self->right_rows_0x1D[6] = 0;
+                break;
+            case 4:
+                count = 1;
+                self->left_mode_0x04 = 1;
+                self->right_mode_0x05 = 1;
+                self->left_rows_0x13[0] = 1;
+                self->right_rows_0x1D[0] = 2;
                 break;
             }
             break;
