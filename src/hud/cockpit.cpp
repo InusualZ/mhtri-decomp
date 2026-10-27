@@ -20,30 +20,46 @@
  *   `atlas_icon_uv_get`, `pointer_reset`, `kpad_pointer_read`, `pointer_update`, `pointer_dpd_state`,
  *   `se_req_page_toggle`, `se_item_get_play`, `place_rec_copy`, `word_read`, `em_hit_parts_get`, `em_tall_ck`,
  *   `em_part_sphere_get`, `place_list_highlight_draw`, `pl_root_lock_ck`, `item_bonus_class_get`, `chara_icon_tex_tbl`.
- * RESIDUALS. `get_ControlType`: `mh3_pad/control.h` declares it inside `extern "C"`, the target calls the C++
- *   `get_ControlType__Fl` (owner fix filed; a flip would not link).
- *   `setCockpitTransferMode` 79.2: the s32 `mode` is narrowed (`clrlwi`) before the byte store; an s8 parameter
- *   matches but clashes with `unsplit/menu.h`'s s32 declaration.
- *   `ainpc_page_select_button_ck` 87.8: the `down == 1 ? 0 : 1` inversion is branchless in ours, two branches in retail.
- *   `cockpit_notice_show` 89.8 / `cockpit_notice_init` 95.2 / `cockpit_notice_update` 96.6: the bit mask's `clrlwi`
- *   placement and the loop-variable registers.
- *   `hud_edge_dir_get` 92.4: the three pointer parameters get r29/r30/r31 in another order.
- *   `cockpit_msg_slot_split_draw` 95.1, `cockpit_msg_slot_draw` 98.6, `cockpit_msg_slot_update` 97.9: the stored
- *   `hud_item_msg_push` result is `extsb`ed, the shared `return 0` paths merge, register order.
- *   `hud_trail_sprite_draw` 96.1, `hud_pointer_ray_get` 96.3, `ainpc_page_label_pos_get` 97.0,
- *   `ainpc_page_cursor_pad_move` 97.4, `ainpc_page_monster_count` 98.6, `ainpc_page_monster_pick` 99.4: register
- *   colouring / stack-slot order only.
- *   `ainpc_page_label_draw` 96.5, `ainpc_page_cursor_draw` 97.2, `ainpc_page_label_text_draw` 98.6,
- *   `draw_lsp_element` 98.9, `put_button_guide_c_idx` 97.3, `put_button_guide_r` 99.4: argument scheduling and
- *   register order.
- *   `ainpc_page_sel_state_get` 98.2: `menu_row_empty_count` is u8 in its owner; retail narrows its result to u16.
- *   `ainpc_page_update` 99.7: the confirm clock's range test (`(u8)(clock + 196) > 19`) keeps one `clrlwi` fewer.
- *   `ainpc_page_target_pick` 99.9 / `ainpc_page_cursor_in_box_ck` 99.7: stack slots of the by-value label temporaries.
- *   `cockpit_msg_slot_choice_a/b_build` 99.4/99.2, `cockpit_msg_slot_page_usable_ck` 99.9: register order.
+ * RESIDUALS. `setCockpitTransferMode` 82.5: retail stores the s32 `mode` raw after narrowing only `slot`; peephole off
+ *   adds an `extsb`, the scoped `peephole on` drops both (an s8 parameter matches but clashes with the s32 declaration
+ *   `unsplit/menu.h` and `menu/fn_8031EA8C.cpp` carry).
+ *   `cockpit_notice_show` 89.8: the `1 << kind` mask is shifted into r0 and narrowed into r5; retail shifts and
+ *   narrows in r5.
+ *   `cockpit_notice_update` 97.8: retail sets `ofs` after the loop's pointer induction (`li r8` after `mr r7`).
+ *   `ainpc_page_select_button_ck` 96.6: the inversion needs `else if (down == 0)` to stay branched (a plain `else`
+ *   becomes `subfic/or/srwi`); ours keeps the redundant compare.
+ *   `ainpc_page_label_draw` 98.4: retail tests steps 2..3 as one unsigned range (`subi; cmplwi 1`), ours as two
+ *   signed compares.
+ *   `hud_edge_dir_get` 99.8: the four `out->x` sums land in r3 where retail uses r0, and the unmoved branch rotates
+ *   r4/r5/r6.
+ *   `cockpit_msg_slot_update` 99.3: `ef/eft052.h` declares `hud_item_msg_push` returning s32 and `hud_msg_sub_set`
+ *   taking u8, so ours `extsb`s the stored id and drops the `extsb` before the call; declaring s8 for both gives 100
+ *   (the owner's definitions would change with it; requests hud-cockpit#3/#4).
+ *   `ainpc_page_target_pick` 99.9: retail pairs each by-value cursor copy with its label result (0x38/0x3C,
+ *   0x30/0x34, ...), ours pools the copies apart; an inline label helper pairs them but in the other order (99.89).
+ *   `ainpc_page_cursor_in_box_ck` 99.7: retail loads the box offset before the cursor and the box position; no operand
+ *   order of the sums moves the loads.
+ *   `cockpit_msg_slot_choice_a/b_build` 99.4/99.2: the hoisted 0/1 constants take r31/r30 the other way round
+ *   (no statement order moves them).
  * SHAPES. The range tests are spelled as MWCC's own u8 forms (`(u8)(step + 253) <= 1`); a `switch` with default
- *   first places the default arm right after the compare chain (`ainpc_page_open_ck`, `item_get_with_msg`); a
- *   `_mh_ivec2_` result is bound to a `const&` before `uv_pair_copy` (no copy temporary); `put_button_guide_r` copies
- *   the frame sprite through the word view `HudSprWords` (retail's lwz/stw pairs).
+ *   first places the default arm right after the compare chain (`ainpc_page_open_ck`, `item_get_with_msg`,
+ *   `ainpc_page_label_draw`); a `_mh_ivec2_` result is bound to a `const&` before `uv_pair_copy` (no copy
+ *   temporary); `put_button_guide_r` copies the frame sprite through the word view `HudSprWords` (retail's lwz/stw
+ *   pairs).
+ *   `hud_edge_dir_get` takes `const` source points (they stay cached across the stores to `out`), adds each
+ *   offset into an s16 local with `+=` (the sum is stored raw, then `extsh`ed for the compare) and loads both source
+ *   coordinates into locals before the margins; the message-slot rows pick layout ids with a ternary (the default
+ *   `li` lands after the compare), declare the s16 anchor offsets first (r31/r30) and test `choice != 0` before the
+ *   switch; `prompt` is u8 and `rows` u8 so the u16/s16 parameters get retail's `clrlwi`/`extsh`.
+ *   Retail narrows the u8 results of `get_ControlType`, `note_timer_lobby_ready_ck`, `mailbox_unread_ck` and
+ *   `ck_WideMode` at the call (`(u8)`/`(u32)` casts there); a u8 field compared with `== 4` is `(s32)` for `cmpwi`;
+ *   `x / 2.0f` keeps retail's `fmuls x,0.5` operand and load order (`ainpc_page_label_pos_get`); a `(u16)` before the
+ *   `& 0xFFF0` mask keeps retail's `clrlwi` (`ainpc_page_label_text_draw`); the confirm clock is incremented as a
+ *   statement and re-read for its range test; the monster count and pick declare the enemy pointer first; the cursor
+ *   draw switch takes `default` first and declares `id` before the flags; the pad move centres with
+ *   `(s32)(screen.x / 2.0f)` (retail `extsh`es the s16); the pointer ray stages its forward scale in a float local and
+ *   declares the scalars in retail's stack order; the trail loop starts with `i = 1, alpha = step`; the name tag's
+ *   rank colour is a ternary; the guide width adds `w < 0 ? -w : w` (the `extsh` lands at the join).
  */
 
 #include "types.h"
@@ -330,7 +346,7 @@ HudRay* hud_ray_init(HudRay* ray);
 u8 ainpc_page_monster_count(void);
 u8 ainpc_page_pick_kind_get(CockpitPointerPage* st);
 _mh_ivec2_ ainpc_page_label_pos_get(s8 kind, _mh_ivec2_ cursor);
-s32 hud_edge_dir_get(_mh_ivec2_* out, _mh_ivec2_* from, _mh_ivec2_* to);
+s32 hud_edge_dir_get(_mh_ivec2_* out, const _mh_ivec2_* from, const _mh_ivec2_* to);
 void hud_pick_mark_draw(u8 state, u8 frame);
 void ainpc_page_label_text_draw(CockpitPointerPage* st, s8 kind, u16 id, _mh_ivec2_ pos);
 void hud_trail_sprite_draw(CockpitPointerPage* st, u16 id, u8 frame, u32 color);
@@ -1267,7 +1283,8 @@ void ainpc_page_update(void)
                     st->in_box = ainpc_page_cursor_in_box_ck(&st->cursor);
                     if (ainpc_page_select_button_ck(st, trigger, hold) == 1) {
                         if (st->in_box != 0) {
-                            if ((u8)(++st->confirm_clock + 196) > 19) {
+                            st->confirm_clock++;
+                            if ((u8)(st->confirm_clock + 196) > 19) {
                                 st->confirm_clock = 60;
                             }
                         } else {
@@ -1569,17 +1586,18 @@ u32 hud_ray_sphere_hit_ck(HudSphere* sphere, HudRay* ray, f32* dist)
  * its normalised direction. */
 void hud_pointer_ray_get(VEC3* origin, VEC3* dir, _mh_ivec2_* screen)
 {
-    s32 handle;
     s32 handle_copy;
+    f32 sin;
+    f32 cos;
+    s32 handle;
     HudCamera* camera;
     VEC3 right;
     VEC3 up;
     VEC3 fwd;
-    VEC3 tmp;
     VEC3 step;
+    VEC3 tmp;
     _MH_VEC2 half;
-    f32 sin;
-    f32 cos;
+    f32 scale;
 
     handle = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&handle_copy, &handle);
@@ -1597,7 +1615,8 @@ void hud_pointer_ray_get(VEC3* origin, VEC3* dir, _mh_ivec2_* screen)
     half.x *= 0.5f;
     half.y *= 0.5f;
     sin_cos_deg(&sin, &cos, 0.5f * camera->fovy);
-    vec3_scale_by(&dir->x, &fwd.x, half.y * cos / sin);
+    scale = half.y * cos / sin;
+    vec3_scale_by(&dir->x, &fwd.x, scale);
     VEC3_ctor(&step);
     vec3_scale_by(&step.x, &right.x, (f32)screen->x - half.x);
     addVec3To(dir, &step);
@@ -1612,12 +1631,12 @@ void hud_pointer_ray_get(VEC3* origin, VEC3* dir, _mh_ivec2_* screen)
 u32 ainpc_page_monster_pick(void)
 {
     CockpitPointerPage* st = &ainpc_page_state;
+    _ENEMY_WORK* em;
     u16 max = get_move_work_max(3);
     u8 area = get_now_areano();
     nw4r::math::CAPSULE capsule;
     HudSphere sphere;
     HudRay ray;
-    _ENEMY_WORK* em;
     s16* part;
     u32 i;
     f32 best;
@@ -1680,11 +1699,13 @@ HudRay* hud_ray_init(HudRay* ray)
 /* 0x802DC498 (0xD0): counts the live monsters of this area the pointer page can pick. */
 u8 ainpc_page_monster_count(void)
 {
+    _ENEMY_WORK* em;
     u16 max = get_move_work_max(3);
     u8 area = get_now_areano();
     u8 count = 0;
-    _ENEMY_WORK* em = (_ENEMY_WORK*)get_move_work_adrs(3);
     u32 i;
+
+    em = (_ENEMY_WORK*)get_move_work_adrs(3);
 
     for (i = 0; i < max; i++, em++) {
         if (em->active == 0) {
@@ -1772,7 +1793,7 @@ u8 ainpc_page_pick_kind_get(CockpitPointerPage* st)
 u8 ainpc_page_sel_state_get(CockpitPointerPick* sel, PlaceRec* row)
 {
     if (sel->kind > 3) {
-        if (sel->kind == 4 && monster_mark_ck(sel->id) != 0) {
+        if ((s32)sel->kind == 4 && monster_mark_ck(sel->id) != 0) {
             return 1;
         }
     } else {
@@ -1796,7 +1817,7 @@ void ainpc_page_buttons_get(u16* trigger, u16* hold)
     *hold = 0;
     *trigger = 0;
     if (lobby_net_busy_ck() != 1) {
-        switch (get_ControlType(0)) {
+        switch ((u8)get_ControlType(0)) {
         case 1:
             *trigger = Psw[0].control_0x0FC;
             *hold = Psw[0].field_0x100;
@@ -1814,7 +1835,7 @@ u32 ainpc_page_open_button_ck(u16 trigger)
 {
     u32 down = 0;
 
-    switch (get_ControlType(0)) {
+    switch ((u8)get_ControlType(0)) {
     case 1:
         if (trigger & 4) {
             down = 1;
@@ -1851,7 +1872,7 @@ u32 ainpc_page_select_button_ck(CockpitPointerPage* st, u16 trigger, u16 hold)
         if ((u8)(st->step + 253) <= 1) {
             if (down == 1) {
                 down = 0;
-            } else {
+            } else if (down == 0) {
                 down = 1;
             }
         }
@@ -1918,9 +1939,9 @@ void ainpc_page_cursor_pad_move(CockpitPointerPage* st, u16 trigger)
     } else {
         st->pointer_valid = 1;
         st->pad_speed = -16;
-        cx = 0.5f * screen.x;
+        cx = (s32)(screen.x / 2.0f);
         st->cursor.x = cx;
-        cy = 0.5f * screen.y;
+        cy = (s32)(screen.y / 2.0f);
         st->cursor.y = cy;
         st->trail[0].x = cx;
         st->trail[1].x = cx;
@@ -1991,7 +2012,7 @@ f32 hud_edge_corner_hi_y = 0.9f;
 
 /* 0x802DCE8C (0x67C): the screen-edge point the pointer left through (from the last two trail points) and the
  * direction code of the edge (0 right, 2 bottom, 4 left, 6 top; the odd codes are the corners, 5 when unmoved). */
-s32 hud_edge_dir_get(_mh_ivec2_* out, _mh_ivec2_* from, _mh_ivec2_* to)
+s32 hud_edge_dir_get(_mh_ivec2_* out, const _mh_ivec2_* from, const _mh_ivec2_* to)
 {
     _MH_VEC2 screen;
     s16 dx;
@@ -2000,6 +2021,8 @@ s32 hud_edge_dir_get(_mh_ivec2_* out, _mh_ivec2_* from, _mh_ivec2_* to)
     s16 near;
     s16 right;
     s16 bottom;
+    s16 edge;
+    s16 top;
 
     get_ScreenSize(&screen);
     dx = from->x - to->x;
@@ -2007,30 +2030,42 @@ s32 hud_edge_dir_get(_mh_ivec2_* out, _mh_ivec2_* from, _mh_ivec2_* to)
     if (dx != 0) {
         if (dy != 0) {
             if (from->x < to->x) {
-                out->y = (s16)((-to->x * dy) / dx) + to->y;
+                edge = (s16)((-to->x * dy) / dx);
+                edge += to->y;
+                out->y = edge;
                 if (out->y >= 0 && out->y <= screen.y) {
                     out->x = 0;
                     dir = 4;
                 } else if (out->y < 0) {
-                    out->x = (s16)((-to->y * dx) / dy) + to->x;
+                    edge = (s16)((-to->y * dx) / dy);
+                    edge += to->x;
+                    out->x = edge;
                     out->y = 0;
                     dir = 6;
                 } else {
-                    out->x = (s16)(dx * (screen.y - to->y) / dy) + to->x;
+                    edge = (s32)(dx * (screen.y - to->y) / dy);
+                    edge += to->x;
+                    out->x = edge;
                     out->y = screen.y;
                     dir = 2;
                 }
             } else {
-                out->y = (s16)(dy * (screen.x - to->x) / dx) + to->y;
+                edge = (s32)(dy * (screen.x - to->x) / dx);
+                edge += to->y;
+                out->y = edge;
                 if (out->y >= 0 && out->y <= screen.y) {
                     out->x = screen.x;
                     dir = 0;
                 } else if (out->y < 0) {
-                    out->x = (s16)((-to->y * dx) / dy) + to->x;
+                    edge = (s16)((-to->y * dx) / dy);
+                    edge += to->x;
+                    out->x = edge;
                     out->y = 0;
                     dir = 6;
                 } else {
-                    out->x = (s16)(dx * (screen.y - to->y) / dy) + to->x;
+                    edge = (s32)(dx * (screen.y - to->y) / dy);
+                    edge += to->x;
+                    out->x = edge;
                     out->y = screen.y;
                     dir = 2;
                 }
@@ -2062,17 +2097,18 @@ s32 hud_edge_dir_get(_mh_ivec2_* out, _mh_ivec2_* from, _mh_ivec2_* to)
         }
     } else {
         uv_pair_copy(out, from);
+        top = from->y;
         near = from->x;
-        right = screen.x - from->x;
-        bottom = screen.y - from->y;
+        right = screen.x - near;
+        bottom = screen.y - top;
         if (near < right) {
             dir = 4;
         } else {
             near = right;
             dir = 0;
         }
-        if (from->y < near) {
-            near = from->y;
+        if (top < near) {
+            near = top;
             dir = 6;
         }
         if (bottom < near) {
@@ -2146,11 +2182,12 @@ void ainpc_page_cursor_draw(void)
     u32 color = 0;
     u8 draw = st->active == 1;
     s32 marked = 0;
+    u16 id;
     u8 can_pick = 0;
     u8 state = 0;
-    u16 id;
     _mh_ivec2_ pos;
     _SPR_DATA_ spr;
+    s32 dir;
 
     set_zmode(0, 0, 0);
     set_blendmode(4, 5, 1);
@@ -2166,6 +2203,8 @@ void ainpc_page_cursor_draw(void)
         break;
     }
     switch (st->step) {
+    default:
+        return;
     case 0:
         draw = 0;
         break;
@@ -2191,8 +2230,6 @@ void ainpc_page_cursor_draw(void)
         id = 1122;
         marked = 1;
         break;
-    default:
-        return;
     }
     if (can_pick != 0) {
         if (st->selecting != 0) {
@@ -2213,9 +2250,9 @@ void ainpc_page_cursor_draw(void)
     }
     if (draw != 0) {
         if (st->pointer_valid == 0) {
-            state = hud_edge_dir_get(&pos, &st->trail[0], &st->trail[1]);
+            dir = hud_edge_dir_get(&pos, &st->trail[0], &st->trail[1]);
             sprite_frame_apply(&spr, 1124, st->cycle, 0);
-            spr.tex_id = state << 13;
+            spr.tex_id = (u16)dir << 13;
             draw_sprite(spr, &pos);
             return;
         }
@@ -2231,14 +2268,19 @@ void ainpc_page_cursor_draw(void)
 void ainpc_page_label_draw(void)
 {
     CockpitPointerPage* st = &ainpc_page_state;
-    s32 show = 1;
-    s32 confirming = 0;
-    u8 can_pick = 0;
-    u8 frame = 3;
-    u8 state = 0;
+    s32 confirming;
+    s32 show;
+    u8 can_pick;
+    u8 frame;
+    u8 state;
     u32 index;
     u8 len;
 
+    show = 1;
+    confirming = 0;
+    can_pick = 0;
+    frame = 3;
+    state = 0;
     set_zmode(0, 0, 0);
     set_blendmode(4, 5, 1);
     font_flush();
@@ -2257,6 +2299,8 @@ void ainpc_page_label_draw(void)
         break;
     }
     switch (st->step) {
+    default:
+        return;
     case 0:
         show = 0;
         frame = 0;
@@ -2271,8 +2315,6 @@ void ainpc_page_label_draw(void)
         confirming = 1;
         frame = st->confirm_clock;
         break;
-    default:
-        return;
     }
     if (can_pick != 0) {
         if (st->selecting != 0) {
@@ -2297,7 +2339,7 @@ void ainpc_page_label_draw(void)
     place_list_highlight_draw(1, &index);
     if (show != 0 && st->sel.valid != 0) {
         if (st->sel.kind > 3) {
-            if (st->sel.kind == 4 && st->selecting != 0 && confirming == 0) {
+            if ((s32)st->sel.kind == 4 && st->selecting != 0 && confirming == 0) {
                 len = flfntStrLen((char*)str_tbl_33_get(st->sel.id));
                 if (len < 4) {
                     len = 4;
@@ -2349,14 +2391,14 @@ _mh_ivec2_ ainpc_page_label_pos_get(s8 kind, _mh_ivec2_ cursor)
     f32 half;
 
     get_ScreenSize(&screen);
-    if (ck_WideMode() == 1) {
-        if (screen.x * 0.5f < cursor.x) {
+    if ((u32)ck_WideMode() == 1) {
+        if (screen.x / 2.0f < cursor.x) {
             pos.x = 48.0f;
         } else {
             pos.x = screen.x - w - 48.0f;
         }
     } else {
-        half = screen.x * 0.5f;
+        half = screen.x / 2.0f;
         if (half < cursor.x) {
             pos.x = 8.0f + (half - w);
         } else {
@@ -2395,8 +2437,8 @@ void ainpc_page_label_text_draw(CockpitPointerPage* st, s8 kind, u16 id, _mh_ive
             break;
         }
         if (guide == 1) {
-            at.x = pos.x + (s16)(w & 0xFFF0) - 20;
-            at.y = (s16)(h & 0xFFF0) + pos.y - 28;
+            at.x = pos.x + (s16)((u16)w & 0xFFF0) - 20;
+            at.y = (s16)((u16)h & 0xFFF0) + pos.y - 28;
             put_button_guide_r(18, &at);
         }
     }
@@ -2451,8 +2493,7 @@ void hud_trail_sprite_draw(CockpitPointerPage* st, u16 id, u8 frame, u32 color)
     base = spr.color;
     rgb = base & 0xFFFFFF00;
     step = base & 0xFF;
-    alpha = step;
-    for (i = 1; i < 4; i++) {
+    for (i = 1, alpha = step; i < 4; i++) {
         spr.color = rgb | ((alpha / 4) * 75 / 100);
         draw_sprite(spr, &st->trail[4 - i]);
         alpha += step;
@@ -2765,7 +2806,7 @@ IdValue* cockpit_msg_slot_entry_get(CockpitMsgSlot* slot, s16 index)
 s32 cockpit_msg_slot_page_usable_ck(CockpitMsgSlot* slot)
 {
     if (GetItemData(slot->item)->kind_0x00 != 1 &&
-        cockpit_msg_slot_box_ck(slot, slot->list.page * slot->list.columns) != 0) {
+        cockpit_msg_slot_box_ck(slot, slot->list.columns * slot->list.page) != 0) {
         return 0;
     }
     return 1;
@@ -2838,7 +2879,7 @@ s32 cockpit_msg_slot_update(u8 idx)
 {
     CockpitMsgSlot* slot = &cockpit_msg_slots[idx];
     IdValue* entry;
-    s16 rows;
+    u8 rows;
 
     if (slot->state == 0) {
         if (slot->hold != 0) {
@@ -2874,13 +2915,14 @@ s32 cockpit_msg_slot_update(u8 idx)
             slot->list.page = 0;
             slot->list.pages = menu_page_count(rows, slot->list.columns);
             slot->list.column = 0;
-            return 0;
+        } else {
+            if (slot->msg_id == (s8)hud_msg_shown_id_get()) {
+                slot->state++;
+                slot->msg_delay = 6;
+            }
+            break;
         }
-        if (slot->msg_id == (s8)hud_msg_shown_id_get()) {
-            slot->state++;
-            slot->msg_delay = 6;
-        }
-        break;
+        return 0;
     case 2:
         if (slot->msg_delay != 0) {
             u8** text = get_str_tbl(4);
@@ -2972,7 +3014,7 @@ void cockpit_msg_slot_draw(u32 idx)
     s32 flags;
     s32 card;
     s32 choice;
-    u16 prompt;
+    u8 prompt;
     _mh_ivec2_ pos;
     _SPR_DATA_* text;
 
@@ -3048,12 +3090,14 @@ void cockpit_msg_slot_draw(u32 idx)
                                                                                          slot->list.page));
             break;
         }
-        switch (choice) {
-        case 1:
-        case 2:
-            get_lsp_data(855, &pos);
-            menu_choice_window_draw(slot->choice, 2, &pos);
-            break;
+        if (choice != 0) {
+            switch (choice) {
+            case 1:
+            case 2:
+                get_lsp_data(855, &pos);
+                menu_choice_window_draw(slot->choice, 2, &pos);
+                break;
+            }
         }
         get_lsp_data(732, &pos);
         draw_window_frame_preset(pos.x, pos.y, 0);
@@ -3067,12 +3111,6 @@ void cockpit_msg_slot_draw(u32 idx)
  * and the new item's card, placed relative to the half's anchor. */
 void cockpit_msg_slot_split_draw(u32 idx)
 {
-    CockpitMsgSlot* slot = &cockpit_msg_slots[(u8)idx];
-    s32 grid;
-    s32 box;
-    s32 flags;
-    s32 card;
-    u32 choice;
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
     _SPR_DATA_* base;
@@ -3080,6 +3118,12 @@ void cockpit_msg_slot_split_draw(u32 idx)
     s16 dx;
     s16 dy;
     u16 id;
+    CockpitMsgSlot* slot = &cockpit_msg_slots[(u8)idx];
+    s32 grid;
+    s32 box;
+    s32 flags;
+    s32 card;
+    u32 choice;
 
     if (slot->state > 1) {
         set_zmode(0, 0, 0);
@@ -3128,10 +3172,7 @@ void cockpit_msg_slot_split_draw(u32 idx)
         dx = anchor.x - base->pos.x;
         dy = anchor.y - base->pos.y;
         if (choice == 2) {
-            id = 4125;
-            if ((u8)idx == 0) {
-                id = 4106;
-            }
+            id = (u8)idx == 0 ? 4106 : 4125;
             get_lsp_data(id, &pos);
             menu_choice_window_draw(slot->choice, 2, &pos);
             font_flush();
@@ -3141,18 +3182,12 @@ void cockpit_msg_slot_split_draw(u32 idx)
                                  slot->fade, flags, idx);
         }
         if (choice == 1) {
-            id = 4125;
-            if ((u8)idx == 0) {
-                id = 4106;
-            }
+            id = (u8)idx == 0 ? 4106 : 4125;
             get_lsp_data(id, &pos);
             menu_choice_window_draw(slot->choice, 2, &pos);
         }
         if (card != 0) {
-            id = 4123;
-            if ((u8)idx == 0) {
-                id = 4091;
-            }
+            id = (u8)idx == 0 ? 4091 : 4123;
             at = get_lsp_data(id, 0);
             pos.x = dx + at->pos.x;
             pos.y = dy + at->pos.y;
@@ -3234,9 +3269,9 @@ void put_button_guide(s32 kind, const _mh_ivec2_* pos)
 /* 0x802DF834 (0x118): draws button guide `guide` right-aligned to `pos` (moved left by the frame's width). */
 void put_button_guide_r(u8 guide, _mh_ivec2_* pos)
 {
+    u16* id;
     s32 width = 0;
     s16 height = 0;
-    u16* id;
     _mh_ivec2_ at;
     s16 w;
 
@@ -3244,9 +3279,7 @@ void put_button_guide_r(u8 guide, _mh_ivec2_* pos)
         HudSprWords spr = *(HudSprWords*)get_lsp_data(*id, 0);
 
         w = spr.spr.width;
-        if (w < 0) {
-            w = -w;
-        }
+        w = w < 0 ? -w : w;
         width += w;
         height = spr.spr.height;
     }
@@ -3333,7 +3366,7 @@ void put_button_guide_c_idx(u32 lsp, u32 index)
 
     if (chk_pointer() == 0) {
         get_lsp_data(lsp, &pos);
-        put_button_guide_c(index, &pos);
+        put_button_guide_c((u8)index, &pos);
     }
 }
 
@@ -3451,10 +3484,10 @@ void cockpit_notice_clear(u8 kind)
 void cockpit_notice_init(void)
 {
     memset(&cockpit_notice, 0, 0xE);
-    if (note_timer_lobby_ready_ck() == 1) {
+    if ((u32)note_timer_lobby_ready_ck() == 1) {
         cockpit_notice_note_show();
     }
-    if (game_ready_ck() == 1 && mailbox_unread_ck() == 1) {
+    if (game_ready_ck() == 1 && (u32)mailbox_unread_ck() == 1) {
         cockpit_notice_show(1, 1);
     }
 }
@@ -3463,17 +3496,16 @@ void cockpit_notice_init(void)
 void cockpit_notice_update(void)
 {
     CockpitNotice* notice = &cockpit_notice;
-    s32 i;
     s32 ofs;
     s32 bit;
+    s32 i;
 
     if (!(cockpit_notice.frame_flags & 8)) {
         cockpit_notice_lobby_clear();
     }
     notice->frame_flags = 0;
     if (notice->active != 0) {
-        ofs = 0;
-        for (i = 0; i < 4; i++) {
+        for (i = 0, ofs = 0; i < 4; i++) {
             bit = 1 << i;
             if (notice->active & bit) {
                 if (notice->fresh & bit) {
@@ -3554,7 +3586,6 @@ void cockpit_notice_quest_draw(s16 frame)
  * the icon `icon` beside it.  Returns the tag height (-18), or 0 when the player is not shown. */
 s32 draw_lsp_element(_PLW* plw, u8 icon, u8 arrow, u16 rank)
 {
-    s32 handle;
     s32 camera;
     VEC3 screen;
     VEC3 world;
@@ -3566,6 +3597,7 @@ s32 draw_lsp_element(_PLW* plw, u8 icon, u8 arrow, u16 rank)
     s16 uv0[2];
     s16 uv1[2];
     _mh_ivec2_ pos;
+    s32 handle;
     u32 color;
 
     handle = scn_root_get_current_camera(pRoot);
@@ -3617,10 +3649,7 @@ s32 draw_lsp_element(_PLW* plw, u8 icon, u8 arrow, u16 rank)
     } else if (rank < 31) {
         color = 0xF0F0F0FF;
     } else {
-        color = 0xF53737FF;
-        if (rank < 999) {
-            color = 0xE8A40FFF;
-        }
+        color = rank < 999 ? 0xE8A40FFF : 0xF53737FF;
     }
     flfntSetColor(color);
     font_locate(pos.x, pos.y);
@@ -3651,7 +3680,9 @@ void chara_icon_pos_get(_PLW* plw, u8 kind, VEC3* out)
 }
 
 /* 0x802E0468 (0x18): sets player slot `slot`'s transfer-mode icon. */
+#pragma peephole on
 void setCockpitTransferMode(u8 slot, s32 mode)
 {
     cockpit_state.transfer_mode_0x07C[slot] = mode;
 }
+#pragma peephole off
