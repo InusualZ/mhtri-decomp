@@ -760,7 +760,7 @@ config.libs = [
             Object(NonMatching, "sound/fn_800E8E60.cpp"),
             Object(NonMatching, "sound/snd_stream_mgr.cpp"),
             Object(NonMatching, "sound/snd_voice_pool.cpp"),
-            Object(NonMatching, "sound/quest_snd.cpp"),
+            Object(Matching, "sound/quest_snd.cpp"),
             Object(NonMatching, "sound/snd_bank_loader.cpp"),
             # Registered (a 0x800F2A94 run discovery proposed,
             # 88 functions / 27408 B).  Same lib and same cflags as its neighbours: the range continues the
