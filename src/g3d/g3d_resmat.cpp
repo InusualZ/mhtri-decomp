@@ -19,6 +19,7 @@
  *   elsewhere), `.sdata` 0x4 emitted and not claimed.
  * SHAPES. every accessor copy another unit keeps is called through its class (g3d/g3d_rescommon.h); the copies
  *   this TU keeps are defined here in retail's order.
+ *   ResMat::GetResTexPlttInfo is retail's `g3d_resmat_ac.h` inline: both of its asserts cite that header's name.
  *   ResTexPlttInfo::Bind copy-constructs its two names and the found texture/palette out of line into
  *   `ResHandleTemp` locals, from the by-value results bound through res_temp_ref (retail's copies of the return
  *   temporaries).
@@ -946,10 +947,11 @@ NW4R_G3D_RESCOMMON_CTOR(ResTexPlttInfoData)
 
 /* 0x8009733C (0xB0): returns texture-palette record `idx`. */
 ResTexPlttInfo ResMat::GetResTexPlttInfo(u32 idx) {
-    RESMAT_ASSERT(idx < GetNumResTexPlttInfo(), 726, "idx < GetNumResTexPlttInfo()");
+    (void)((idx < GetNumResTexPlttInfo()) ||
+           (nw4r::db::Panic(RESMAT_AC_FILE, 726, "NW4R:Failed assertion idx < GetNumResTexPlttInfo()"), 0));
     ResTexPlttInfoData* p = ofs_to_ptr<ResTexPlttInfoData>(ref().toResTexPlttInfo);
     if (p == NULL) {
-        nw4r::db::Panic(RESMAT_FILE, 728, "NW4R:Pointer must not be NULL (p)");
+        nw4r::db::Panic(RESMAT_AC_FILE, 728, "NW4R:Pointer must not be NULL (p)");
     }
     return ResTexPlttInfo(&p[idx]);
 }

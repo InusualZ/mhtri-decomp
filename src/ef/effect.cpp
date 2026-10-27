@@ -18,7 +18,6 @@
  *  - `change_color_scale_eff`: ours turns the `u8` flag test into `neg`/`or`/`srwi` where retail passes it through;
  *  - `fn_800FA5D4`: the stack slots and the loop's exit branch differ;
  *  - `eftGetKeyRGB`: ours re-masks each channel with an extra `clrlwi`;
- *  - `eft_rand_unit`: ours drops the `xoris` of the signed int-to-float conversion;
  *  - `fn_800F9A70`: ours advances the key pointer before the load;
  *  - `fn_800F97F0`: retail reads the table through `eft_name_tbl_ptr` (`@sda21`, `.sbss` 0x80794A70); ours indexes
  *    `lbl_8058A880` directly.
@@ -485,8 +484,8 @@ extern "C" void eft_scnbox_load(void* dst, u8 area, u8 slot) {
 /* 0x800F9CDC - a random 0.0..1.0 scale factor. */
 extern "C" f32 eft_rand_unit(void) {
     u16 r = (u16)ran_suu(1);
-    u32 v = (u32)(r & 0x3FF);
-    return (f32)v * lbl_807965E0;
+    s32 v = (s32)(r & 0x3FF);
+    return lbl_807965E0 * (f32)v;
 }
 
 /* 0x800F9D2C - a random -0.5..0.5 scale factor. */

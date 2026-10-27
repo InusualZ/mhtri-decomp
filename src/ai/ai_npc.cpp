@@ -8000,7 +8000,7 @@ void fn_802CF704(struct _AINPC_W* self)
             fn_802D4230(self, 30.0f);
             fn_802D2A00(self, 2, 8, 0);
         } else {
-            fn_802D4230(self, 30.0f);
+            fn_802D4230(self, 50.0f);
             fn_802D2A00(self, 2, 4, 0);
         }
         self->step += 1;

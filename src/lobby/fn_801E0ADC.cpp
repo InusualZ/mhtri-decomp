@@ -1250,20 +1250,20 @@ void eft033_move_joint(_EFT* eft)
         break;
     case 7:
         level = pl_stagger_level_get(plw);
-        if (level > 1) {
-            switch (level) {
-            case 2:
-                alpha = eft033_alpha_keys_low;
-                work->scale_0x18 = 0.8f;
-                break;
-            case 3:
-                alpha = eft033_alpha_keys_high;
-                work->scale_0x18 = 1.3f;
-                break;
-            }
-        } else {
+        switch (level) {
+        case 0:
+        case 1:
             alpha = eft033_alpha_keys_low;
             work->scale_0x18 = 0.3f;
+            break;
+        case 2:
+            alpha = eft033_alpha_keys_low;
+            work->scale_0x18 = 0.8f;
+            break;
+        case 3:
+            alpha = eft033_alpha_keys_high;
+            work->scale_0x18 = 1.3f;
+            break;
         }
         copyVec3(&pos, &work->ofs_0x0C);
         mulVecMat(&pos, &mtx);

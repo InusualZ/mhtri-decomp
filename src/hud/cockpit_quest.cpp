@@ -703,7 +703,7 @@ void cockpit_item_tag_update(_PLW* plw, CockpitItemTag* tag) {
             if (tag->bob_frame_0x0D >= 138) {
                 tag->bob_frame_0x0D = 90;
             }
-            tag->ofs_y_0x0F = 6.0f * math_sin_rad(0.0174532924f * (tag->bob_frame_0x0D - 90));
+            tag->ofs_y_0x0F = 6.0f * math_sin_rad(0.130899697f * (tag->bob_frame_0x0D - 90));
         }
         tag->open_frame_0x0E++;
         if (tag->open_frame_0x0E >= 50) {

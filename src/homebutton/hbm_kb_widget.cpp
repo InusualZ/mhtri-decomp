@@ -852,7 +852,7 @@ static inline void hbmKbResetHighlights(HbmKbCandidateList* list) {
 /* The prediction window's key animations (.rodata 0x8057B2F0). */
 const HkbAnimDef hbmKbWidgetAnimDefs[13] = {
     {0, "fs_VK_predictInput_a_normal.brlan"},
-    {1, "fs_VK_predictInput_a_Focus_IN.brlan"},
+    {1, "fs_VK_predictInput_a_Foucus_IN.brlan"},
     {2, "fs_VK_predictInput_a_Focus_OUT.brlan"},
     {4, "fs_VK_predictInput_a_Pushed.brlan"},
     {5, "fs_VK_predictInput_a_Fade_IN.brlan"},

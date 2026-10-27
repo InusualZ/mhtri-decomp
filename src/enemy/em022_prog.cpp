@@ -2016,7 +2016,7 @@ void em022_act6_rush(_ENEMY_WORK* self, u8 mode) {
             if ((s32)mode == 0) {
                 em_act_move_step(self, 1, 5.0f);
             } else {
-                em_act_move_step(self, 1, 32.0);
+                em_act_move_step(self, 1, 3.0f);
             }
         }
         break;
