@@ -285,7 +285,7 @@ extern SndPool lbl_80698AF0;      /* the 0x4C pool, constructed by fn_800E9C1C/f
 extern SndPool2 lbl_8069A8E8;     /* the 0x110 pool, constructed by fn_800EDF1C/fn_800EDF10 */
 extern u8 g_stream_mgr[0xD8];     /* the stream manager (fn_800E46E8.cpp's StreamWork) */
 extern u16 stream_rand_seed;          /* the 16-bit PRNG seed fn_800E9D00 advances */
-extern u32 lbl_80794A20;          /* the expand heap fn_800EEA2C frees into */
+extern u32 snd_exp_heap;          /* the expand heap snd_heap_free frees into */
 extern f32 lbl_807964E8;          /* snd_distance_atten's clamp */
 extern f32 lbl_807964EC;          /* 1.0f: the ratio denominator */
 extern f32 lbl_80796514;          /* snd_distance_volume's scale */
@@ -295,7 +295,7 @@ extern u8 lbl_80598020[0xC];      /* a node vtable (fn_800E9C74 installs it) */
 extern u8 lbl_8059802C[0xC];      /* a node base vtable (fn_800E9CB0 installs it) */
 extern u8 lbl_80598090[0xC];      /* the 0x110-node derived vtable (fn_800EDF74 installs it) */
 extern u8 lbl_8059809C[0xC];      /* the 0x110-node base vtable (fn_800EDFC4 installs it) */
-extern u8 lbl_806A1110[0x10];     /* the expand-heap allocator fn_800EE9EC allocates from */
+extern u8 snd_heap_allocator[0x10];     /* the expand-heap allocator snd_heap_alloc allocates from */
 
 /* --- band and SDK functions this unit calls --------------------------------------------------- */
 
@@ -318,7 +318,7 @@ void __destroy_arr(void* array, void* dtor, int size, int count);
 
 /* Owned by sound/fn_800E8E60.cpp (rule 2); its first caller outside the owner is
  * sound/fn_800EF7D8.cpp. */
-void fn_800EEA44(u32 ctx, u32 chunk);
+void snd_chunk_install(u32 ctx, u32 chunk);
 
 #ifdef __cplusplus
 }

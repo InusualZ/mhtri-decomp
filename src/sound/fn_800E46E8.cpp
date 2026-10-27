@@ -342,7 +342,7 @@ extern "C" StreamWork* stream_mgr_get(void)
 }
 
 /* Resets the volume block and hands the three sound-bank parameters to the bank installer. */
-extern "C" void fn_800E4A24(u32 a, u32 b, u32 c)
+extern "C" void snd_stream_buffers_init(u32 a, u32 b, u32 c)
 {
     fn_800E4850();
     stream_buffers_setup(stream_mgr_get(), a, b, c);

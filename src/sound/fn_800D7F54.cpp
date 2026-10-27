@@ -69,7 +69,7 @@
 #include "enemy/em_after_frame_check__FP11_ENEMY_WORKUsff.h" /* em_after_frame_check__FP11_ENEMY_WORKUsff (rule 2: the owner's header) */
 #include "sound/snd_stream_reloc_busy_ck.h" /* snd_stream_reloc_busy_ck / snd_stream_reloc_stop (rule 2) */
 #include "sound/fn_800E8354.h" /* fn_800E8354 (rule 2: the owner's header) */
-#include "sound/fn_800EF56C.h" /* fn_800EF56C (rule 2: the owner's header) */
+#include "sound/chacha_dance_bank_find.h" /* chacha_dance_bank_find (rule 2: the owner's header) */
 #include "sound/fn_800E8498.h" /* fn_800E8498 (rule 2: the owner's header) */
 #include "enemy/em_area_ck__FP11_ENEMY_WORK.h" /* em_area_ck__FP11_ENEMY_WORK (rule 2: the owner's header) */
 #include "sound/snd_stream_bank_reset.h" /* fn_800E8294 (rule 2: the owner's header) */
@@ -1803,7 +1803,7 @@ void ainpc_boomerang_se_req(_se_w* work, nw4r::math::VEC3* pos) {
 }
 
 /* Starts the Chacha dance sound bank; `kind` 7 takes both dance banks, anything else the sound the
- * `fn_800EF56C` lookup returns for `kind`. */
+ * `chacha_dance_bank_find` lookup returns for `kind`. */
 extern "C" void fn_800DCC24(_se_w* work, s32 kind, u8 c) {
     if (kind == 7) {
         u32 bank = (get_chacha_dance1_bank() << 24) | 3;
@@ -1813,7 +1813,7 @@ extern "C" void fn_800DCC24(_se_w* work, s32 kind, u8 c) {
         se_frame_req(work, 7, bank, 4);
         se_frame_req(work, 8, bank, 4);
     } else {
-        s32 id = fn_800EF56C(c, kind);
+        s32 id = chacha_dance_bank_find(c, kind);
         if (id != -1) {
             se_frame_req(work, 0, (id << 24) | 3, 4);
         }

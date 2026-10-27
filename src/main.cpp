@@ -254,7 +254,7 @@ extern u8 lbl_807947A4;
 extern void* lbl_807947AC;
 extern u32 lbl_807947B0;
 extern void* wpad_mem2_heap;
-extern void* lbl_80794A20;
+extern void* snd_exp_heap;
 extern u8 lbl_80790E20;
 extern char lbl_8057C82C[];
 extern char lbl_8057C850[];
@@ -581,7 +581,7 @@ extern "C" void fn_8003F620(void)
     mem2_arena_bounds[1] = (u32)mem2Lo;
     mem2_arena_bounds[2] = (u32)mem2Hi;
     wpad_mem2_heap = fn_8003F728((void*)0x90308000, 0x40000);
-    lbl_80794A20 = MEMCreateExpHeapEx((void*)0x92B78000, 0x80000, 4);
+    snd_exp_heap = MEMCreateExpHeapEx((void*)0x92B78000, 0x80000, 4);
 }
 
 /* Creates an expansion heap over a raw memory range with the default (blocking) allocation mode. */

@@ -77,7 +77,7 @@ void snd_fade_level_set(u8 v);
 void fn_800E858C(Sound* snd, u8 v);
 s16 fn_800E85D8(Sound* snd, u32 idx);
 LevelSetting* fn_800E8690(void);
-void fn_800E87E0(void* alloc, void* free);
+void snd_fx_hooks_set(void* alloc, void* free);
 
 s16 fn_800E8880(LevelSetting* setting);
 void* getInstance(void);
@@ -128,8 +128,8 @@ void AXQuit(void* obj);
 void __register_global_object(void* obj, void* dtor, void* ref);
 
 void* fn_800E8888(void);
-void fn_800E8730(void);
-void fn_800E87E4(u32 mode);
+void snd_audio_init(void);
+void snd_output_mode_set(u32 mode);
 
 void AIInit(u32 mode);
 void AXInitEx(u32 v);
@@ -267,7 +267,7 @@ extern "C" LevelSetting* fn_800E8690(void)
 }
 
 /* Installs the AX reverb hooks. */
-extern "C" void fn_800E87E0(void* alloc, void* free)
+extern "C" void snd_fx_hooks_set(void* alloc, void* free)
 {
     AXFXSetHooks(alloc, free);
 }
@@ -603,7 +603,7 @@ extern "C" void* fn_800E8DE0(void* obj, s32 flags)
 }
 
 /* Brings up the audio subsystem. */
-extern "C" void fn_800E8730(void)
+extern "C" void snd_audio_init(void)
 {
     u32 level;
 
@@ -614,7 +614,7 @@ extern "C" void fn_800E8730(void)
     SEQInit();
     AXRegisterCallback((void*)fn_800E8698);
     AXSetCompressor(0);
-    fn_800E87E4(1);
+    snd_output_mode_set(1);
     level = OSDisableInterrupts();
     lbl_807949D8 = AIRegisterDMACallback((void*)fn_800E8888);
     OSRestoreInterrupts(level);
@@ -629,7 +629,7 @@ extern "C" void fn_800E8730(void)
 }
 
 /* Selects the output mode. */
-extern "C" void fn_800E87E4(u32 mode)
+extern "C" void snd_output_mode_set(u32 mode)
 {
     switch (mode) {
     case 0:

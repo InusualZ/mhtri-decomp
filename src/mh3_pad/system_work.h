@@ -51,7 +51,9 @@ typedef struct MoveWork {
 typedef struct SystemWork {
     /* +0x000 */ u8 pad_0x00[0x1];
     /* +0x001 */ u8 language_0x01;  /* the console language (`main.cpp` sets it); indexes `lang_select_table` */
-    /* +0x002 */ u8 pad_0x02[0x3];
+    /* +0x002 */ u8 pad_0x02[0x1];
+    /* +0x003 */ u8 sound_mode_0x03; /* the console sound mode `snd_bank_loader_init` copies (0 mono, 2 surround) */
+    /* +0x004 */ u8 pad_0x04[0x1];
     /* +0x005 */ u8 field_0x05;
     /* +0x006 */ u8 pad_0x06[0x2];
     /* +0x008 */ u8 unk8;
