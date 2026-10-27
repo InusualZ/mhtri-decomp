@@ -7,6 +7,7 @@
 #define MHTRI_VS_USER_DATA_H
 
 #include "types.h"
+#include "id_value.h"   /* IdValue (the item slots' halves) */
 
 #ifdef __cplusplus
 /* The hunter name the block carries (copied as one 17-byte record).  size: 0x11 */
@@ -40,7 +41,10 @@ struct _vs_user_data {
     /* +0x26 */ u8 makeup_color_0x26;
     /* +0x27 */ u8 save_slot_0x27;   /* the save slot the block was filled from */
     /* +0x28 */ u32 inner_color_0x28;
-    /* +0x2C */ u32 item_0x2C[0x10]; /* the 16 four-byte item slots `item_count_find`/`item_take` walk */
+    /* +0x2C */ union {   /* one run, two views (rule 5) */
+        /* +0x2C */ u32 item_0x2C[0x10]; /* the 16 four-byte item slots `item_count_find`/`item_take` walk */
+        /* +0x2C */ IdValue item_pairs_0x2C[0x10];  /* the same slots as item and count halves */
+    };
     /* +0x6C */ u32 slot_a_0x6C[10]; /* the first of the two per-slot flag runs `multi_box_phase_ck` counts (ten words: `arena_result_next` walks them all) */
     /* +0x94 */ u32 slot_b_0x94[10]; /* its sibling; the two are read as a pair per slot */
     /* +0xBC */ u16 ready_mask_0xBC; /* the per-player ready bits the phase gate tests against 0x380 (the save's event bits) */

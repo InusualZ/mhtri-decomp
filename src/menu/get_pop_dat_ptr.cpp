@@ -18,26 +18,36 @@
  *   set (`lb_room_wpad_*`, `lb_room_lock_*`, `lb_room_menu_*`, `lb_room_list_draw`), `lb_item_slot_draw`,
  *   `lb_item_box_panel_draw`, `lb_item_box_rows_draw`, `lb_menu_frame_sprites`, `lb_menu_title_sprites`,
  *   `lb_menu_row_sprites`, `lb_item_box_frame_sprites`, `eft_em_model_ring_attach`, the `eft_em_model_pair_*` set,
- *   and the types `PopFile`, `PopFilePoint`, `LbPopWork`, `LbRoomWork`, `LbScreen30Work`, `LbScreen34Work`,
- *   `PopEftModels`.
- * RESIDUALS. Unwritten (objdiff scores them zero; 12 functions, 8076 B): 0x803C0F3C (`lb_room_wpad_step`),
- *   0x803C1B98-0x803C20A4, 0x803C2148, 0x803C2370-0x803C27B8, 0x803C2AE4-0x803C3018, 0x803C3098, 0x803C3510.
- *   Partial rows:
+ *   `lb_room_rooms_draw` (0x803C1B98: the move screen's other-rooms list), `lb_pop_peer_list_draw` (0x803C2AE4: the
+ *   room-visit peer list), `note_goods_set_0`/`_1`, the sprite tables `lb_room_*_sprites`, `lb_pop_*_sprites`,
+ *   `lb_item_box_*_sprites`, `move_work_name_sprites`, `lb_room_lock_row_modes`, the fields `LbRoomWork::source_0x03`,
+ *   `gifts_0x108`, `zenny_0x148`, `PopEftModels::phase_0x24`, and the types `PopFile`, `PopFilePoint`, `LbPopWork`,
+ *   `LbRoomWork`, `LbScreen30Work`, `LbScreen34Work`, `PopEftModels`.
+ * RESIDUALS. Every function is written.  Partial rows:
  *  - `pop_dat_spare_load`: `em_pop_spare_push` is declared with a `u8` area (`enemy/em_model.h`), so ours keeps a
  *    `clrlwi` the retail call (an unnarrowed `lhz`) does not have;
  *  - `lb_pop_room_enter`: retail leaves the peer search with no `i < 4` test after the loop (`b` to the end), ours
  *    tests `i` again (+4 B); the `while`/`return` shapes measure lower;
  *  - `entry_list_update`: `note_slot_flat_table` is declared 4 entries long (`lobby/lb_quest_screen.h`), so ours
  *    reaches it through `@sda21` where retail uses `lis`/`addi`;
- *  - `lb_room_move_step`, `lb_room_place_step`, `lb_room_lock_step`: retail passes `toggle_word_step` a `clrlwi`-ed
- *    0xFFFF (a `u16` parameter); `menu/menu_message.h` declares it `s32`;
+ *  - `lb_pop_screen_draw`: retail range-checks steps 0/1 with `cmplwi` and compares 2/3/4 signed; the `(u32)` switch
+ *    makes every compare unsigned (97.5), the plain switch and the if/else shapes measure 82-95;
+ *  - `move_work_name_draw`: ours keeps an `extsh` before the `sth` of `pos.x += get_wide_offset(4)` (the file's
+ *    peephole off; a scoped `peephole on` measures lower), +4 B;
+ *  - `lb_room_wpad_step`: `r6`/`r7` swap in the VS slot merge loop (a value temporary and a pointer temporary measure
+ *    lower);
  *  - `__sinit_\get_pop_dat_ptr_cpp`: our second load is scheduled before the `li`, retail's after it;
  *  - the rest (`lb_screen30_step`, `lb_room_slot_release`, `lb_room_box_list_set`, `lb_room_move_open`,
- *    `lb_room_place_put`, `lb_pop_peer_*`, `pop_dat_place_load`, `lb_name_entry_screen_step`,
+ *    `lb_room_place_put`, `lb_pop_peer_*`, `pop_dat_place_load`, `lb_name_entry_screen_step`, `lb_screen24_step`,
  *    `eft_em_model_pair_create`): register numbering or one scheduling swap.
- *   Data: `.data`, `.sdata`, `.sbss` and `.sdata2` are emitted only as far as the written functions define them (the
- *   option, room, sprite and effect tables, the file-name strings); `note_goods_tbl` and the draw tables of the
- *   unwritten draws are not defined yet, and the emission order is not measured.
+ *   Data: `.data`, `.sdata`, `.sdata2`, `.sbss`, `.bss` are byte-identical to the target (the definitions sit where
+ *   the retail emission order puts them: the `.data` tables after the pop file loads, the small tables beside their
+ *   draws; the tables `lb_room_lock_draw` and `lb_pop_peer_list_draw` read are defined after those draws, which keeps
+ *   MWCC from pooling their addresses).  `lb_room_sub_row_sprites` and `lb_item_box_frame_sprites` are one entry
+ *   shorter than their runs (the trailing zero is alignment padding in the target).
+ * SHAPES. `lb_room_rooms_draw` passes `(u8)sel != 0`; `lb_item_box_rows_draw` spells `(u8)(state + 0xFF) <= 1` for
+ *   retail's `addi 0xFF`; `eft_em_model_pair_move` declares its colours after the model block load and sits under
+ *   `#pragma fp_contract off` (retail keeps `fmuls`+`fadds`); declaration orders were picked with `permdecl`.
  */
 
 #include "types.h"
@@ -126,6 +136,20 @@
 #include "lobby/lb_list_draw_ex.h"
 #include "sound/set_zmode.h"
 #include "ef/eft052_item_get_open.h" /* eft052_item_box */
+#include "lobby/LbStr.h"
+#include "menu/put_frame_dialog_title.h" /* put_message_window */
+#include "menu/put_message_sys.h"
+#include "lobby/lb_menu_kind_pair_ck.h"
+#include "vs_user_work_clear.h"
+#include "pl.h"               /* MHchar */
+#include "lobby/menu_scratch.h" /* LbMenuScratch */
+#include "enemy/fn_8012BDF4.h" /* em_work_die_ck / em_die_ck */
+#include "enemy/fn_8012EC74.h" /* get_joint_wmat_em */
+#include "enemy/em025_prog.h" /* em025_shore_target_ck */
+#include "ef/math_sin_rad.h"
+#include "fn_8004CAD8/mtx.h"  /* MTX34_ctor */
+#include "font/flfnt.h"     /* font_set_size / font_print_ex / font_flush */
+#include "Network/network_pat_control.h" /* NetCtrlWk::getBigDataText */
 
 /* One point record of a place / free-hunt pop file.  size: 0x38 */
 struct PopFilePoint {
@@ -177,40 +201,6 @@ struct LbPopWork {
     /* +0x30 */ u8 unused_0x30[0x2000 - 0x30];
 };
 
-/* The per-option maxima (`.data` 0x805F8528): `set_option_cfg` and the arena twin clamp to them. */
-extern "C" {
-u8 option_cfg_max[0x20] = {
-    1, 1, 3, 4, 1, 2, 1, 2, 3, 3, 1, 2, 1, 1, 1, 1, 2, 7, 7, 1, 1, 1, 1, 150, 0, 0, 1, 1, 1, 1, 0, 0,
-};
-}
-
-/* The default option table (`.data` 0x805F8548) `set_def_option`/`option_cfg_load` start from. */
-u8 option_default_tbl[0x20] = {
-    0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 7, 0, 0, 0, 0, 100, 0, 0, 1, 1, 1, 0, 0, 0,
-};
-
-/* Option id -> (value, flag) byte pairs for options 1, 5, 6 and 7 (`.sdata` 0x807936B8). */
-u8 option_value_tbl[8] = {0, 3, 3, 2, 5, 4, 9, 8};
-
-/* The lobby menus' frame and title sprites (`.data` 0x805F8828 / 0x805F8840), 0xFFFF-terminated. */
-u16 lb_menu_frame_sprites[12] = {0x226D, 0x2266, 0x2267, 0x2270, 0x226E, 0x226F, 0x2253, 0x2254, 0x2255, 0xFFFF, 0, 0};
-u16 lb_menu_title_sprites[8] = {0x2251, 0x2252, 0x2268, 0x2269, 0x226A, 0x226B, 0x226C, 0xFFFF};
-
-/* The item-box panel's frame sprites (`.data` 0x805F88AC), 0xFFFF-terminated. */
-u16 lb_item_box_frame_sprites[0x24] = {
-    0x22C1, 0x22C2, 0x22BE, 0x22BF, 0x22C0, 0x22A4, 0x22A5, 0x22A6, 0x22A7, 0x22A8, 0x22A9, 0x22AA,
-    0x22AB, 0x22AC, 0x22AD, 0x22AE, 0x22AF, 0x22B0, 0x22B1, 0x22B2, 0x22B3, 0x22B4, 0x22B5, 0x22B6,
-    0x22B7, 0x22B8, 0x22B9, 0x22BA, 0x22BB, 0x22BC, 0x22BD, 0x22A1, 0x22A2, 0x22A3, 0xFFFF, 0x0000,
-};
-
-/* The 0x38 model effect's per-variant scale and model id (`.sdata` 0x80793730 / 0x80793728). */
-f32 eft_em_model_pair_scales[2] = {10.0f, 30.0f};
-u16 eft_em_model_pair_ids[4] = {59, 171, 0, 0};
-
-/* The two colours of the 0x38 model effect (`.sbss` 0x80794C88), filled by the static initialiser from the white and
- * red colour words of `src/mh3_pad.cpp`. */
-u32 eft_em_model_pair_colors[2] = {eft_color_white, eft_color_red};
-
 /* Screen 0x1E's work (`LbLobbyWork::screen30_0x0AC`): the room-layout list and its confirmation.  size: 0x2000 */
 struct LbScreen30Work {
     /* +0x00 */ s8 step_0x00;
@@ -239,7 +229,7 @@ struct LbRoomWork {
     /* +0x000 */ s8 step_0x00;
     /* +0x001 */ s8 sub_0x01;              /* the room menu's sub-screen */
     /* +0x002 */ s8 mode_0x02;             /* the move / place sub-screen's step */
-    /* +0x003 */ u8 pad_0x03;
+    /* +0x003 */ s8 source_0x03;           /* the Wii Remote data's source (0 the lobby's store, 1 the Wii Remote) */
     /* +0x004 */ s8 kbd_0x04;              /* the password keyboard's step */
     /* +0x005 */ u8 pad_0x05[0x3];
     /* +0x008 */ LbList menu_0x08;         /* the top menu */
@@ -266,34 +256,23 @@ struct LbRoomWork {
     /* +0x0F5 */ char input_0xF5[0xB];     /* the keyboard's buffer */
     /* +0x100 */ struct _PLW* player_0x100;
     /* +0x104 */ struct _PLW* partner_0x104;
-    /* +0x108 */ u8 pad_0x108[0x44];
+    /* +0x108 */ LbItemCount gifts_0x108[0x10]; /* the items the Wii Remote data hands over */
+    /* +0x148 */ s32 zenny_0x148;          /* the zenny it hands over */
     /* +0x14C */ u16 field_0x14C;
     /* +0x14E */ u8 unused_0x14E[0x2000 - 0x14E];
 };
 
-/* The room menu's list templates (`.data` 0x805F87B0 / 0x805F87D8): the top menu and the place / move sub-list, the
- * second pair for a ready game (no help line). */
-LbChoiceTmpl lb_room_menu_tmpls[2] = {
-    {2, 1, 0, 0x1EE, 0x1BD, NULL, 5, 3},
-    {2, 2, 0, 0x1F1, -1, NULL, -1, 3},
-};
-LbChoiceTmpl lb_room_menu_tmpls_ready[2] = {
-    {2, 1, 0, 0x1EE, -1, NULL, 5, 3},
-    {2, 2, 0, 0x1F1, -1, NULL, -1, 3},
-};
+/* The tables `lb_pop_peer_list_draw` and the draws after it define (`.data` 0x805F8850..0x805F8920). */
+extern u16 lb_room_lock_frame_sprites[10];
+extern u16 lb_pop_frame_sprites[10];
+extern u16 lb_pop_row_sprites[10];
+extern u16 lb_pop_lock_sprites[10];
+extern u16 lb_item_box_cell_sprites[6];
+extern u16 lb_item_box_frame_sprites[35];
+extern u16 lb_room_gift_list_sprites[10];
+extern u16 lb_room_zenny_frame_sprites[12];
 
 extern "C" {
-/* The four rooms' option ids (`.sdata` 0x807936C0), and the top menu's row actions (0 place, 1 Wii Remote data, 2 lock) without
- * and with a ready game (0x807936C4 / 0x807936C8). */
-u8 lb_room_option_ids[4] = {1, 5, 6, 7};
-u8 lb_room_menu_actions[4] = {0, 1, 0, 0};
-u8 lb_room_menu_actions_ready[4] = {0, 2, 0, 0};
-/* The room menu's row titles and help lines for a ready game (0x807936CC / 0x807936D0), and the menus' row sprites
- * (0x807936E0). */
-u16 lb_room_menu_titles[2] = {0x1EE, 0x1F0};
-u16 lb_room_menu_helps[2] = {0x1BD, 0x1BF};
-u16 lb_menu_row_sprites[4] = {0x2275, 0x2276, 0x2277, 0};
-
 void lb_screen30_draw(void);
 void lb_screen34_draw(void);
 void lb_screen24_draw(void);
@@ -328,17 +307,24 @@ void lb_room_menu_draw(LbRoomWork* work);
 void lb_room_wpad_draw(LbRoomWork* work);
 void lb_room_lock_draw(LbRoomWork* work);
 void lb_room_list_draw(LbRoomWork* work);
+void lb_room_rooms_draw(LbRoomWork* work);
 }
 
 /* The model block `_EFT::work_0x38` points at for the 0x38 model effects (not an `_EFT_WORK`): the model count, the
  * models and the colour.  size: 0x2C (approximation: the highest offset written + 2) */
 struct PopEftModels {
     /* +0x00 */ s32 count_0x00;
-    /* +0x04 */ EftModel* models_0x04[8];
-    /* +0x24 */ u16 field_0x24;
+    /* +0x04 */ MHchar* models_0x04[8];
+    /* +0x24 */ u16 phase_0x24;     /* the models' bob phase, advanced 0x200 a frame */
     /* +0x26 */ u8 color_0x26[4];      /* the models' colour (`color_rgba_copy`) */
     /* +0x2A */ u8 pad_0x2A[0x2];
 };
+
+/* The save block the lobby caches in `lobby_world_block`, in its record view. */
+static inline Q_UserData* user_block(void)
+{
+    return (Q_UserData*)lobby_world_block;
+}
 
 /* The ten pop-data pointers (.bss 0x806D2AF8) the accessor below hands out; this unit's whole `.bss` claim. */
 const struct EmWeightEntry*** pop_dat_ptrs[10];
@@ -356,6 +342,10 @@ const struct EmWeightEntry*** pop_item_tbl_7;
 const struct EmWeightEntry*** pop_item_tbl_8;
 const struct EmWeightEntry*** pop_item_tbl_9;
 }
+
+/* The two colours of the 0x38 model effect (`.sbss` 0x80794C88), filled by the static initialiser from the white
+ * and red colour words of `src/mh3_pad.cpp`. */
+u32 eft_em_model_pair_colors[2] = {eft_color_white, eft_color_red};
 
 /* Hands out the ten pop-data pointers. */
 const struct EmWeightEntry**** get_pop_dat_ptr(void)
@@ -375,6 +365,7 @@ LobbyPeerCard* lb_pop_peer_card_find(LbPopWork* work);
 void lb_pop_peer_id_copy(LbPopWork* work);
 LobbyPeerCard* lb_pop_peer_card_get(LbPopWork* work);
 void lb_pop_screen_draw(void);
+void lb_pop_peer_list_draw(LbPopWork* work, s32 unused, u8* sel_closed);
 
 /* Loads a place pop file into the move work's buffer and files each used point with the roster. */
 void pop_dat_place_load(Q_MoveWork* work, char* path)
@@ -544,6 +535,90 @@ void pop_dat_r_load(void)
     sprintf(path, "06/m%03d_%06d_r_pop.dat", pop_map_kind_get(), variant);
     pop_dat_spare_load(work, path);
 }
+
+} /* extern "C" */
+
+/* The per-option maxima (`.data` 0x805F8528): `set_option_cfg` and the arena twin clamp to them. */
+extern "C" {
+u8 option_cfg_max[0x20] = {
+    1, 1, 3, 4, 1, 2, 1, 2, 3, 3, 1, 2, 1, 1, 1, 1, 2, 7, 7, 1, 1, 1, 1, 150, 0, 0, 1, 1, 1, 1, 0, 0,
+};
+}
+
+/* The default option table (`.data` 0x805F8548) `set_def_option`/`option_cfg_load` start from. */
+u8 option_default_tbl[0x20] = {
+    0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 7, 0, 0, 0, 0, 100, 0, 0, 1, 1, 1, 0, 0, 0,
+};
+
+/* The note trade's two goods lists (`.data` 0x805F8568 / 0x805F86F8), each 0-terminated: the items the captain
+ * asks for with their counts, and the trade's points. */
+NoteGoods note_goods_set_0[40] = {
+    {{{0x99, 2}, {0, 0}}, 20}, {{{0x63, 2}, {0, 0}}, 20}, {{{0x97, 2}, {0, 0}}, 20}, {{{0x234, 1}, {0, 0}}, 20},
+    {{{0x151, 1}, {0, 0}}, 20}, {{{0x141, 2}, {0, 0}}, 30}, {{{0x132, 2}, {0, 0}}, 30}, {{{0x95, 1}, {0, 0}}, 30},
+    {{{0x147, 2}, {0, 0}}, 30}, {{{0x1BF, 2}, {0, 0}}, 30}, {{{0x148, 1}, {0, 0}}, 35}, {{{0x9A, 1}, {0, 0}}, 35},
+    {{{0x96, 1}, {0, 0}}, 40}, {{{0x152, 1}, {0, 0}}, 40}, {{{0x155, 2}, {0, 0}}, 40}, {{{0x8C, 2}, {0, 0}}, 40},
+    {{{0x25A, 1}, {0, 0}}, 40}, {{{0xE3, 1}, {0, 0}}, 40}, {{{0x1C2, 1}, {0, 0}}, 50}, {{{0x234, 4}, {0, 0}}, 50},
+    {{{0x226, 1}, {0, 0}}, 50}, {{{0x1A5, 1}, {0, 0}}, 60}, {{{0x1A4, 1}, {0, 0}}, 60}, {{{0x125, 1}, {0, 0}}, 60},
+    {{{0x113, 1}, {0, 0}}, 60}, {{{0x14A, 1}, {0x6B, 1}}, 30}, {{{0x64, 2}, {0x162, 1}}, 35},
+    {{{0x131, 2}, {0x130, 2}}, 35}, {{{0x233, 1}, {0x88, 2}}, 35}, {{{0x230, 1}, {0x232, 2}}, 40},
+    {{{0x190, 1}, {0x91, 2}}, 40}, {{{0x142, 1}, {0x77, 2}}, 40}, {{{0x95, 1}, {0x89, 2}}, 40},
+    {{{0x220, 1}, {0x9A, 1}}, 45}, {{{0x1C0, 2}, {0x1BF, 2}}, 45}, {{{0x65, 2}, {0x64, 2}}, 45},
+    {{{0x68, 2}, {0xD6, 1}}, 50}, {{{0x96, 1}, {0x78, 1}}, 50}, {{{0x226, 1}, {0x228, 1}}, 50}, {{{0, 0}, {0, 0}}, 0},
+};
+NoteGoods note_goods_set_1[18] = {
+    {{{0x148, 2}, {0, 0}}, 30}, {{{0x148, 2}, {0x1BF, 3}}, 35}, {{{0x1BC, 2}, {0, 0}}, 40},
+    {{{0x1BC, 1}, {0x65, 1}}, 45}, {{{0x64, 3}, {0, 0}}, 25}, {{{0x64, 2}, {0x63, 2}}, 30},
+    {{{0x65, 1}, {0x63, 3}}, 40}, {{{0x1C0, 3}, {0, 0}}, 30}, {{{0x1C0, 1}, {0x147, 3}}, 35},
+    {{{0x1C2, 2}, {0, 0}}, 40}, {{{0x1C2, 1}, {0x1C1, 2}}, 45}, {{{0x1BB, 1}, {0, 0}}, 35},
+    {{{0x1BB, 1}, {0x1BF, 2}}, 45}, {{{0x96, 3}, {0x164, 1}}, 35}, {{{0x95, 3}, {0, 0}}, 25},
+    {{{0x96, 1}, {0x95, 1}}, 35}, {{{0x164, 2}, {0, 0}}, 25}, {{{0, 0}, {0, 0}}, 0},
+};
+
+/* The room menu's list templates (`.data` 0x805F87B0 / 0x805F87D8): the top menu and the place / move sub-list, the
+ * second pair for a ready game (no help line). */
+LbChoiceTmpl lb_room_menu_tmpls[2] = {
+    {2, 1, 0, 0x1EE, 0x1BD, NULL, 5, 3},
+    {2, 2, 0, 0x1F1, -1, NULL, -1, 3},
+};
+LbChoiceTmpl lb_room_menu_tmpls_ready[2] = {
+    {2, 1, 0, 0x1EE, -1, NULL, 5, 3},
+    {2, 2, 0, 0x1F1, -1, NULL, -1, 3},
+};
+
+/* The room sub-menu's frame sprites (`.data` 0x805F8800) and the move list's (0x805F8818), 0xFFFF-terminated. */
+u16 lb_room_sub_frame_sprites[12] = {0x2627, 0x2628, 0x2629, 0x2625, 0x2626, 0x2623, 0x2624, 0x261F, 0x2620, 0x2621,
+                                     0x2622, 0xFFFF};
+u16 lb_room_move_frame_sprites[8] = {0x2610, 0x2611, 0x2612, 0x2613, 0x2614, 0x2615, 0x2616, 0xFFFF};
+
+/* The lobby menus' frame and title sprites (`.data` 0x805F8828 / 0x805F8840), 0xFFFF-terminated. */
+u16 lb_menu_frame_sprites[12] = {0x226D, 0x2266, 0x2267, 0x2270, 0x226E, 0x226F, 0x2253, 0x2254, 0x2255, 0xFFFF, 0, 0};
+u16 lb_menu_title_sprites[8] = {0x2251, 0x2252, 0x2268, 0x2269, 0x226A, 0x226B, 0x226C, 0xFFFF};
+
+extern "C" {
+/* The note trade's goods table (`.sdata` 0x807936B0): its first word is the list `note_trade_*` read. */
+NoteGoods* note_goods_tbl[2] = {note_goods_set_0, note_goods_set_1};
+
+/* Option id -> (value, flag) byte pairs for options 1, 5, 6 and 7 (`.sdata` 0x807936B8). */
+u8 option_value_tbl[8] = {0, 3, 3, 2, 5, 4, 9, 8};
+
+/* The four rooms' option ids (`.sdata` 0x807936C0), and the top menu's row actions (0 place, 1 Wii Remote data, 2
+ * lock) without and with a ready game (0x807936C4 / 0x807936C8). */
+u8 lb_room_option_ids[4] = {1, 5, 6, 7};
+u8 lb_room_menu_actions[4] = {0, 1, 0, 0};
+u8 lb_room_menu_actions_ready[4] = {0, 2, 0, 0};
+/* The room menu's row titles and help lines for a ready game (0x807936CC / 0x807936D0). */
+u16 lb_room_menu_titles[2] = {0x1EE, 0x1F0};
+u16 lb_room_menu_helps[2] = {0x1BD, 0x1BF};
+/* The room sub-menu's and the room list's row sprites (0x807936D4), the move list's (0x807936DC) and the menus'
+ * (0x807936E0). */
+u16 lb_room_sub_row_sprites[3] = {0x262A, 0x262B, 0x262C};
+u16 lb_room_move_row_sprites[2] = {0x2617, 0x2618};
+u16 lb_menu_row_sprites[4] = {0x2275, 0x2276, 0x2277, 0};
+/* The item box's row sprites (0x807936E8), and the Wii Remote data's gift rows and frame (0x807936F0 /
+ * 0x807936F8). */
+u16 lb_item_box_row_sprites[4] = {0x22C3, 0x22C4, 0x22C5, 0x22C6};
+u16 lb_room_gift_row_sprites[4] = {0x22DD, 0x22DE, 0x22DF, 0};
+u16 lb_room_wpad_frame_sprites[4] = {0x229C, 0x229D, 0x229E, 0xFFFF};
 
 /* Publishes the ten pop-data pointers into their small-data copies. */
 void pop_dat_ptrs_bind(void)
@@ -1718,7 +1793,7 @@ s32 lb_room_move_step(LbRoomWork* work)
         }
         break;
     case 2:
-        switch (toggle_word_step(&work->toggle_0xE8, lobby_cmd_trig_get(), 4, 8, (u16)0xFFFF)) {
+        switch (toggle_word_step(&work->toggle_0xE8, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
         case 1:
             lb_room_slot_release(work);
             lb_room_slots_build(work);
@@ -1888,7 +1963,7 @@ s32 lb_room_place_step(LbRoomWork* work)
         }
         break;
     case 2:
-        switch (toggle_word_step(&work->toggle_0xE8, lobby_cmd_trig_get(), 4, 8, (u16)0xFFFF)) {
+        switch (toggle_word_step(&work->toggle_0xE8, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
         case 1:
             lb_room_place_put(work);
             entry_list_update(work);
@@ -1916,6 +1991,243 @@ void entry_state_reset(LbRoomWork* work)
     work->lock_sel_0xEC = 0;
     work->field_0x14C = 0;
     work->toggle_0xE8 = 0;
+}
+
+/* 0x803C0F3C (0x92C): steps the Wii Remote data sub-screen: the question, the read of the lobby's store or of the Wii
+ * Remote's memory, the hand-over window; 1 once done, 2 once cancelled. */
+s32 lb_room_wpad_step(LbRoomWork* work)
+{
+    s32 result = 0;
+    u32 found = 0;
+    _vs_user_data* vs;
+    s32 i;
+
+    switch (work->sub_0x01) {
+    case 0:
+        if (lb_cmd_pressed_ck(0x10)) {
+            switch (work->toggle_0xE8) {
+            case 0:
+                for (i = 0; i < 0x10; i++) {
+                    if (user_block()->vs_item_pairs_0x5364[i].id != 0 && user_block()->vs_item_pairs_0x5364[i].value != 0) {
+                        found = 1;
+                        break;
+                    }
+                }
+                if (user_block()->vs_point_0x53A4 != 0) {
+                    found = 1;
+                }
+                if (found == 1) {
+                    work->sub_0x01 = 3;
+                    work->toggle_0xE8 = 0;
+                    sysSE_req(5);
+                } else {
+                    work->sub_0x01 = 2;
+                    work->toggle_0xE8 = -1;
+                }
+                sysSE_req(5);
+                work->source_0x03 = 0;
+                break;
+            case 1:
+                work->sub_0x01 = 1;
+                work->mode_0x02 = 0;
+                work->source_0x03 = 1;
+                work->toggle_0xE8 = -1;
+                break;
+            }
+        } else if (lb_cmd_pressed_ck(0x20)) {
+            result = 2;
+            sysSE_req(1);
+        } else {
+            work->toggle_0xE8 = menu_cursor_step(work->toggle_0xE8, 2, lobby_cmd_trig_get(), 4, 8);
+        }
+        break;
+    case 1:
+        switch (work->source_0x03) {
+        case 0:
+            work->sub_0x01 = 3;
+            work->toggle_0xE8 = 0;
+            break;
+        case 1:
+            switch (work->mode_0x02) {
+            case 0:
+                wpad_memory_access_init(0, 0);
+                work->mode_0x02 = 1;
+                system_w.hbm_disabled = 1;
+                break;
+            case 1:
+                switch (read_wpad_memory(get_vsUser_work(0), 1)) {
+                case 0:
+                    work->toggle_0xE8 = 0;
+                    break;
+                case 1:
+                    work->sub_0x01 = 3;
+                    work->mode_0x02 = 0;
+                    work->toggle_0xE8 = 0;
+                    sysSE_req(5);
+                    system_w.hbm_disabled = 0;
+                    break;
+                case -100:
+                case -6:
+                case -5:
+                    work->toggle_0xE8 = 8;
+                    work->sub_0x01 = 2;
+                    work->mode_0x02 = 0;
+                    sysSE_req(5);
+                    system_w.hbm_disabled = 0;
+                    break;
+                default:
+                    work->toggle_0xE8 = 7;
+                    work->sub_0x01 = 2;
+                    work->mode_0x02 = 0;
+                    sysSE_req(5);
+                    system_w.hbm_disabled = 0;
+                    break;
+                }
+                break;
+            }
+            break;
+        }
+        break;
+    case 2:
+        if (lb_cmd_pressed_ck(0x30)) {
+            result = 1;
+            sysSE_req(0);
+        }
+        break;
+    case 3:
+        switch (toggle_word_step(&work->toggle_0xE8, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+        case 1:
+            if (work->source_0x03 == 0) {
+                work->sub_0x01 = 5;
+                for (i = 0; i < 0x10; i++) {
+                    item_pair_copy(&work->gifts_0x108[i], &user_block()->vs_item_pairs_0x5364[i]);
+                    user_block()->vs_item_pairs_0x5364[i].id = 0;
+                    user_block()->vs_item_pairs_0x5364[i].value = 0;
+                }
+                work->zenny_0x148 = user_block()->vs_point_0x53A4;
+                user_block()->vs_point_0x53A4 = 0;
+                eft052_item_get_open((Eft052ItemGetReq*)work->gifts_0x108, lb_item_get_data + 0xE0);
+                sysSE_req(8);
+            } else {
+                work->sub_0x01 = 4;
+                work->mode_0x02 = 0;
+            }
+            break;
+        case 2:
+            result = 2;
+            break;
+        }
+        break;
+    case 4:
+        switch (work->mode_0x02) {
+        case 0:
+            wpad_memory_access_init(0, 0);
+            work->mode_0x02 = 1;
+            system_w.hbm_disabled = 1;
+            break;
+        case 1:
+            switch (read_wpad_memory(get_vsUser_work(0), 1)) {
+            case 0:
+                work->toggle_0xE8 = 0;
+                break;
+            case 1:
+                work->mode_0x02 = 2;
+                vs_user_work_clear(1);
+                wpad_memory_access_init(1, 0);
+                break;
+            case -100:
+                work->toggle_0xE8 = 8;
+                work->sub_0x01 = 2;
+                work->mode_0x02 = 0;
+                sysSE_req(5);
+                system_w.hbm_disabled = 0;
+                break;
+            case -6:
+            case -5:
+                work->toggle_0xE8 = 8;
+                work->sub_0x01 = 2;
+                work->mode_0x02 = 0;
+                sysSE_req(5);
+                system_w.hbm_disabled = 0;
+                break;
+            default:
+                work->toggle_0xE8 = 7;
+                work->sub_0x01 = 2;
+                work->mode_0x02 = 0;
+                sysSE_req(5);
+                system_w.hbm_disabled = 0;
+                break;
+            }
+            break;
+        case 2:
+            switch (write_wpad_memory(1, 1)) {
+            case 0:
+                work->toggle_0xE8 = 6;
+                break;
+            case 1:
+                work->sub_0x01 = 5;
+                vs = get_vsUser_work(0);
+                for (i = 0; i < 0x10; i++) {
+                    work->gifts_0x108[i].item_0x00 = vs->item_pairs_0x2C[i].id;
+                    work->gifts_0x108[i].count_0x02 = vs->item_pairs_0x2C[i].value;
+                    vs->item_pairs_0x2C[i].id = 0;
+                    vs->item_pairs_0x2C[i].value = 0;
+                }
+                for (i = 0; i < 10; i++) {
+                    if (vs->slot_a_0x6C[i] != 0 &&
+                        (user_block()->vs_slot_a_0x52E4[i] == 0 || user_block()->vs_slot_a_0x52E4[i] > vs->slot_a_0x6C[i])) {
+                        user_block()->vs_slot_a_0x52E4[i] = vs->slot_a_0x6C[i];
+                    }
+                    if (vs->slot_b_0x94[i] != 0 &&
+                        (user_block()->vs_slot_b_0x530C[i] == 0 || user_block()->vs_slot_b_0x530C[i] > vs->slot_b_0x94[i])) {
+                        user_block()->vs_slot_b_0x530C[i] = vs->slot_b_0x94[i];
+                    }
+                }
+                work->zenny_0x148 = vs->point_0x18;
+                user_block()->event_bits_0x52E2 |= vs->ready_mask_0xBC;
+                vs->ready_mask_0xBC = 0;
+                vs->point_0x18 = 0;
+                work->mode_0x02 = 0;
+                work->toggle_0xE8 = 0;
+                eft052_item_get_open((Eft052ItemGetReq*)work->gifts_0x108, lb_item_get_data + 0xE0);
+                sysSE_req(8);
+                system_w.hbm_disabled = 0;
+                break;
+            case 101:
+                work->toggle_0xE8 = 8;
+                work->sub_0x01 = 2;
+                work->mode_0x02 = 0;
+                sysSE_req(5);
+                system_w.hbm_disabled = 0;
+                break;
+            case -6:
+            case -5:
+                work->toggle_0xE8 = 8;
+                work->sub_0x01 = 2;
+                work->mode_0x02 = 0;
+                sysSE_req(5);
+                system_w.hbm_disabled = 0;
+                break;
+            default:
+                work->toggle_0xE8 = 7;
+                work->sub_0x01 = 2;
+                work->mode_0x02 = 0;
+                sysSE_req(5);
+                system_w.hbm_disabled = 0;
+                break;
+            }
+            break;
+        }
+        break;
+    case 5:
+        if ((u32)(eft052_item_get_step() - 1) <= 1) {
+            result = 1;
+            score_add_clamped(work->zenny_0x148, &lobby_world_block->money_0x18);
+            work->zenny_0x148 = 0;
+        }
+        break;
+    }
+    return result;
 }
 
 /* Opens the lock sub-screen with the room's current lock and password. */
@@ -1985,7 +2297,7 @@ s32 lb_room_lock_step(LbRoomWork* work)
         }
         break;
     case 2:
-        switch (toggle_word_step(&work->toggle_0xE8, lobby_cmd_trig_get(), 4, 8, (u16)0xFFFF)) {
+        switch (toggle_word_step(&work->toggle_0xE8, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
         case 1:
             result = 1;
             lobby_world_block->room_lock_0x3F0A = work->lock_0xEE;
@@ -1993,10 +2305,12 @@ s32 lb_room_lock_step(LbRoomWork* work)
                 memset(work->pass_0xF0, 0, 5);
             }
             memcpy(lobby_world_block->room_pass_0x40FC, work->pass_0xF0, 5);
-            if (work->lock_0xEE == 1 || work->lock_0xEE == 2) {
+            if ((u32)(work->lock_0xEE - 1) > 1) {
+                if (work->lock_0xEE == 0) {
+                    sysSE_stop(29);
+                }
+            } else {
                 sysSE_stop(28);
-            } else if (work->lock_0xEE == 0) {
-                sysSE_stop(29);
             }
             break;
         case 2:
@@ -2008,6 +2322,149 @@ s32 lb_room_lock_step(LbRoomWork* work)
         break;
     }
     return result;
+}
+
+/* 0x803C1B98 (0x134): draws the move screen's list of the other rooms, greyed where the room is refused. */
+void lb_room_rooms_draw(LbRoomWork* work)
+{
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    u32 color;
+    bool sel;
+    s16 i;
+
+    get_lsp_data(0x261C, &base);
+    draw_sprite_anim_ary(lb_room_sub_frame_sprites, work->rooms_0xA8 - 1, &base);
+    draw_sprite_idx(0x261E, &base);
+    for (i = 0; i < work->rooms_0xA8 - 1; i++) {
+        sel = i == work->rooms_0x68.cursor_0x00;
+        color = GetMenuFontColor((work->rooms_0x68.off_mask_0x02 & (1 << i)) == 0, sel, 1, 0);
+        get_lsp_data(lb_room_sub_row_sprites[i], &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        lb_list_row_draw((s8*)LbStr(0, work->other_rooms_0x89[i] + 0x1F5), (u8)sel != 0, &pos, color, 2);
+    }
+}
+
+/* 0x803C1CCC (0x134): draws the room sub-menu (place / move) and the move screen's lists. */
+void lb_room_menu_draw(LbRoomWork* work)
+{
+    _mh_ivec2_ pos;
+
+    switch (work->sub_0x01) {
+    case 0:
+        lb_choice_draw(&work->sub_0x28, 0x261C, lb_room_sub_frame_sprites, lb_room_sub_row_sprites, 0x1877, 0);
+        get_lsp_data(0x261C, &pos);
+        draw_sprite_idx(0x261D, &pos);
+        break;
+    case 1:
+        if (work->mode_0x02 == 0) {
+            eft052_hold_draw(0);
+        }
+        break;
+    case 2:
+        switch (work->mode_0x02) {
+        case 0:
+            lb_choice_draw(&work->sub_0x28, 0x261C, lb_room_sub_frame_sprites, lb_room_sub_row_sprites, 0x1877, 1);
+            get_lsp_data(0x261C, &pos);
+            draw_sprite_idx(0x261D, &pos);
+            lb_choice_draw(&work->move_0x48, 0x260F, lb_room_move_frame_sprites, lb_room_move_row_sprites, 0x1877, 0);
+            break;
+        case 3:
+            lb_room_rooms_draw(work);
+            break;
+        case 4:
+            eft052_hold_draw(0);
+            break;
+        }
+        break;
+    }
+}
+
+/* 0x803C1E00 (0x2A4): puts the room screen's help line and its second line for the current sub-screen. */
+void lb_room_list_draw(LbRoomWork* work)
+{
+    u16 item;
+    u16 msg = 0xFFFF;
+    u16 line = 0xFFFF;
+    s32 row = 1;
+
+    if (work->step_0x00 == 2) {
+        switch (work->sub_0x01) {
+        case 0:
+            msg = work->sub_0x28.cursor_0x00 + 0x1C0;
+            if (work->sub_0x28.cursor_0x00 == 0 && (work->sub_0x28.off_mask_0x02 & 1)) {
+                line = 0x1C2;
+                row = 2;
+            }
+            break;
+        case 1:
+            switch (work->mode_0x02) {
+            case 1:
+                msg = 0x1C4;
+                break;
+            case 2:
+                msg = 0x1C5;
+                lb_panel_yes_no_draw(0x1879, work->toggle_0xE8);
+                break;
+            }
+            break;
+        case 2:
+            switch (work->mode_0x02) {
+            case 0:
+                msg = work->move_0x48.cursor_0x00 + 0x1C9;
+                if (work->move_0x48.off_mask_0x02 & (1 << work->move_0x48.cursor_0x00)) {
+                    line = 0x1CB;
+                    row = 2;
+                }
+                break;
+            case 1:
+                msg = 0x1C6;
+                if (work->slots_0x93[work->slot_sel_0xAA] == 0xFF) {
+                    item = 0;
+                } else {
+                    item = note_slot_to_value(lobby_w.place_ids_0x134[work->slots_0x93[work->slot_sel_0xAA]]);
+                }
+                if (!(work->slot_marks_0x9B[work->slot_sel_0xAA] & 2)) {
+                    line = item == 0 ? 0x1CB : 0x1C7;
+                    row = 2;
+                } else {
+                    item = note_slot_to_value(lobby_w.place_ids_0x134[work->slots_0x93[work->slot_sel_0xAA]]);
+                    if (eft052_page_count_ck(item, 1) <= 0) {
+                        line = 0x1C7;
+                        row = 2;
+                    }
+                }
+                break;
+            case 2:
+                msg = 0x1C8;
+                lb_panel_yes_no_draw(0x1879, work->toggle_0xE8);
+                break;
+            case 3:
+                msg = 0x1CC;
+                if (work->rooms_0x68.off_mask_0x02 & (1 << work->rooms_0x68.cursor_0x00)) {
+                    line = 0x1CD;
+                    row = 2;
+                }
+                break;
+            case 4:
+                msg = 0x1C6;
+                eft052_hold_row_get(&item, NULL);
+                if (item != 0 && eft052_page_count_ck(item, 1) <= 0) {
+                    line = 0x1C7;
+                    row = 2;
+                }
+                break;
+            }
+            break;
+        }
+    }
+    if (msg != 0xFFFF) {
+        lb_panel_msg_draw(0x1877, msg);
+        if (line != 0xFFFF) {
+            lb_panel_line_draw(0x1877, line, 2, row);
+        }
+    }
 }
 
 /* Draws an item slot's icon, with its blinking frame when `blink` and `active` are set and the pointer is idle. */
@@ -2023,6 +2480,51 @@ void lb_item_slot_draw(const _mh_ivec2_* pos, u16 item, u16 anim, s32 blink, s32
     }
 }
 
+/* 0x803C2148 (0x1CC): draws the item box's four rows of four cells, then the picked cell's frame over the cursor. */
+void lb_item_box_rows_draw(Eft052ItemBox* box)
+{
+    _SPR_DATA_ spr;
+    _mh_ivec2_ row_pos;
+    _mh_ivec2_ pos;
+    _mh_ivec2_ mark;
+    _mh_ivec2_ base;
+    s32 row;
+    s32 col;
+    s32 cell;
+    s32 marked;
+    s32 active;
+
+    active = (u8)(box->state_0x00 + 0xFF) <= 1;
+    get_lsp_data(0x22A0, &base);
+    marked = 0;
+    cell = 0;
+    for (row = 0; row < 4; row++) {
+        get_lsp_data(lb_item_box_row_sprites[row], &row_pos);
+        row_pos.x += base.x;
+        row_pos.y += base.y;
+        draw_sprite_ary(lb_item_box_cell_sprites, &row_pos);
+        for (col = 0; col < 4; col++) {
+            get_lsp_data(lb_item_box_cell_sprites[col], &pos);
+            pos.x += row_pos.x;
+            pos.y = row_pos.y;
+            if (box->cursor_0x0E == cell) {
+                uv_pair_copy(&mark, &pos);
+                marked = 1;
+            }
+            lb_item_slot_draw(&pos, box->cells_0x24[cell].item_0x00, box->frame_0x08, box->hover_0x10 == cell, active);
+            cell++;
+        }
+    }
+    if (box->picked_0x0C != 0 && marked != 0) {
+        set_blendmode(4, 1, 1);
+        spr_data_copy(&spr, get_lsp_data(0x22C9, NULL));
+        spr_anim_draw(&spr, box->frame_0x0A, &mark);
+        set_blendmode(4, 5, 1);
+        spr_data_copy(&spr, get_lsp_data(0x22CA, NULL));
+        spr_anim_draw(&spr, box->frame_0x0A, &mark);
+    }
+}
+
 /* Draws the item-box panel: its frame, its rows and its count. */
 void lb_item_box_panel_draw(void)
 {
@@ -2032,6 +2534,109 @@ void lb_item_box_panel_draw(void)
     draw_sprite_ary(lb_item_box_frame_sprites, &pos);
     lb_item_box_rows_draw(&eft052_item_box);
     lb_item_box_count_draw(&eft052_item_box, 8863, 0);
+}
+
+/* 0x803C2370 (0x25C): draws the Wii Remote data sub-screen: its question, its messages, and the items and zenny
+ * received. */
+void lb_room_wpad_draw(LbRoomWork* work)
+{
+    _mh_ivec2_ pos;
+    char text[0x100];
+
+    set_zmode(false, 0, false);
+    set_blendmode(4, 5, 1);
+    switch (work->sub_0x01) {
+    case 0:
+        put_message_window((s8*)LbStr(0, 0x290), (s8*)LbStr(1, 0x34), (s8*)LbStr(1, 0x35), work->toggle_0xE8, 24,
+                           0xF0F0F0FF);
+        break;
+    case 1:
+    case 4:
+        if (work->source_0x03 == 0) {
+            put_message((s8*)LbStr(0, 0x28E), 24, 0xF0F0F0FF);
+        } else if (work->toggle_0xE8 > 0) {
+            wii_sysmsg_gen(work->toggle_0xE8, text, 0);
+            put_message_sys((s8*)text, 0, 0, 0);
+        }
+        break;
+    case 2:
+        if (work->toggle_0xE8 == -1) {
+            put_message((s8*)LbStr(0, 0x291), 24, 0xF0F0F0FF);
+        } else {
+            wii_sysmsg_gen(work->toggle_0xE8, text, 0);
+            put_message_sys((s8*)text, 0, 0, 0);
+            put_message_sys_ok_button();
+        }
+        break;
+    case 3:
+        put_message_window((s8*)LbStr(0, 0x28F), (s8*)LbStr(1, 0x2D), (s8*)LbStr(1, 0x2E), work->toggle_0xE8, 24,
+                           0xF0F0F0FF);
+        break;
+    case 5:
+        get_lsp_data(0x229B, &pos);
+        draw_sprite_ary(lb_room_wpad_frame_sprites, &pos);
+        lb_item_box_panel_draw();
+        eft052_box_list_draw(0x22D3, lb_room_gift_list_sprites, lb_room_gift_row_sprites, 0x22D1, 0);
+        get_lsp_data(0x22E0, &pos);
+        draw_sprite_ary(lb_room_zenny_frame_sprites, &pos);
+        sprintf(text, "%dz", work->zenny_0x148);
+        draw_font_idx(0x22E2, (s8*)text, 1, &pos);
+        break;
+    }
+}
+
+/* The lock list's row kinds and row sprites (`.sdata` 0x80793704 / 0x80793708). */
+u8 lb_room_lock_row_modes[4] = {0x11, 0x10, 0x12, 0};
+u16 lb_room_lock_row_sprites[4] = {0x228D, 0x228E, 0x228F, 0};
+
+/* 0x803C25CC (0x1EC): draws the lock sub-screen: the lock list, the password row and the help line. */
+void lb_room_lock_draw(LbRoomWork* work)
+{
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    s32 i;
+    u16 msg;
+    u32 color;
+    bool sel;
+
+    set_zmode(false, 0, false);
+    set_blendmode(4, 5, 1);
+    get_lsp_data(0x2250, &base);
+    draw_sprite_anim_ary(lb_menu_frame_sprites, 5, &base);
+    draw_sprite_anim_ary(lb_room_lock_frame_sprites, 5, &base);
+    draw_sprite_anim_ary(lb_menu_title_sprites, 5, &base);
+    msg = 0xFFFF;
+    for (i = 0; i < 4; i++) {
+        sel = i == work->lock_sel_0xEC;
+        color = GetMenuFontColor(1, sel, 1, i == work->lock_0xEE);
+        if (i == 3) {
+            if (work->lock_0xEE == 2) {
+                draw_font_idx(0x2271, (s8*)work->pass_0xF0, 0, &base);
+            } else {
+                draw_font_idx(0x2271, (s8*)"----", 0, &base);
+            }
+        } else {
+            get_lsp_data(lb_room_lock_row_sprites[i], &pos);
+            pos.x += base.x;
+            pos.y += base.y;
+            lb_list_row_draw((s8*)LbStr(0, i + 0x1F9), sel, &pos, color, lb_room_lock_row_modes[i]);
+        }
+    }
+    switch (work->sub_0x01) {
+    case 1:
+        msg = 0x1D2;
+        break;
+    case 0:
+        msg = work->lock_sel_0xEC + 0x1CF;
+        break;
+    case 2:
+        msg = 0x1D3;
+        lb_panel_yes_no_draw(0x1879, work->toggle_0xE8);
+        break;
+    }
+    if (msg != 0xFFFF) {
+        lb_panel_msg_draw(0x1877, msg);
+    }
 }
 
 /* Draws the room screen: its top menu, or the place / Wii Remote data / lock sub-screen, then the room list. */
@@ -2117,6 +2722,152 @@ void lb_room_lock_icon_draw(const _mh_ivec2_* pos, u8 lock)
     }
 }
 
+/* 0x803C2AE4 (0x24C): draws the room-visit list of the other peers with their lock icons; sets `sel_closed` when the
+ * peer under the cursor keeps the room closed. */
+void lb_pop_peer_list_draw(LbPopWork* work, s32 unused, u8* sel_closed)
+{
+    LobbyPeerList* list = &lobby_state_block.peer_list_0x0004;
+    s16 count = list->count_0x000;
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    s32 i;
+    s16 row;
+    bool sel;
+    LobbyPeerCard* card;
+    u32 color;
+    bool open;
+
+    if (work->count_0x04 == 0) {
+        get_lsp_data(0x2250, &base);
+        draw_sprite_anim_ary(lb_menu_frame_sprites, 1, &base);
+        draw_sprite_anim_ary(lb_pop_frame_sprites, 1, &base);
+        draw_sprite_anim_ary(lb_menu_title_sprites, 1, &base);
+        return;
+    }
+    get_lsp_data(0x2250, &base);
+    draw_sprite_anim_ary(lb_menu_frame_sprites, list->count_0x000, &base);
+    draw_sprite_anim_ary(lb_pop_frame_sprites, list->count_0x000, &base);
+    draw_sprite_anim_ary(lb_menu_title_sprites, list->count_0x000, &base);
+    row = 0;
+    for (i = 1; i < 4; i++) {
+        if (list->peers_0x004[i].id_0x00[0] != 0) {
+            card = &list->peers_0x004[i].card;
+            open = card->lock_0x92 != 0;
+            if (work->sel_0x0C == row) {
+                sel = 1;
+                if (!open) {
+                    *sel_closed = 1;
+                }
+            } else {
+                sel = 0;
+            }
+            get_lsp_data(lb_pop_row_sprites[row], &pos);
+            pos.x += base.x;
+            pos.y += base.y;
+            color = GetMenuFontColor(open, sel, 1, 0);
+            lb_list_row_draw(get_option_cfg(12) == 0 ? (s8*)list->peers_0x004[i].name_0x0A
+                                                     : (s8*)list->peers_0x004[i].id_0x00,
+                             sel, &pos, color, 3);
+            get_lsp_data(lb_pop_lock_sprites[row], &pos);
+            pos.x += base.x;
+            pos.y += base.y;
+            lb_room_lock_icon_draw(&pos, card->lock_0x92);
+            row++;
+            if (row >= count - 1) {
+                break;
+            }
+        }
+    }
+}
+
+/* 0x803C2D30 (0x11C): draws the room-visit screen: the peer list and the step's help lines. */
+void lb_pop_screen_draw(void)
+{
+    LbPopWork* work = lobby_w.pop_0x0AC;
+    u8 sel_closed;
+    u16 msg;
+    u16 line;
+
+    set_zmode(false, 0, false);
+    set_blendmode(4, 5, 1);
+    sel_closed = 0;
+    lb_pop_peer_list_draw(work, 1, &sel_closed);
+    msg = 0xFFFF;
+    line = 0xFFFF;
+    switch ((u32)work->step_0x00) {
+    case 0:
+    case 1:
+        msg = 0x1D4;
+        if (sel_closed == 1) {
+            line = 0x1D5;
+        }
+        break;
+    case 2:
+        msg = 0x1D6;
+        break;
+    case 3:
+        msg = 0x1D8;
+        lb_panel_yes_no_draw(0x1879, work->yes_no_0x08);
+        break;
+    case 4:
+        msg = 0x1D7;
+        break;
+    }
+    if (msg != 0xFFFF) {
+        lb_panel_msg_draw(0x1877, msg);
+        if (line != 0xFFFF) {
+            lb_panel_str_print(0x1877, line, 2);
+        }
+    }
+}
+
+/* 0x803C2E4C (0x1CC): draws screen 0x22: the titled page with its heading, its text and the page arrows. */
+void lb_screen34_draw(void)
+{
+    LbScreen34Work* work = lobby_w.screen34_0x0AC;
+    _mh_ivec2_ pos;
+
+    set_zmode(false, 0, false);
+    set_blendmode(4, 5, 1);
+    if (work->step_0x00 == 1) {
+        put_frame_dialog_title(280, 60, 310, 220, 0, 0x14120ADC, 0, (s8*)LbStr(0, 0x292), 1);
+        font_set_size(20, 20);
+        font_print_ex(get_wide_offset(1) + 306, 91, 1, (s8*)LbStr(0, work->cursor_0x0C + 0x293));
+        font_print_ex(get_wide_offset(1) + 304, 90, 5, (s8*)LbStr(0, work->cursor_0x0C + 0x293));
+        font_set_size(18, 18);
+        font_print_ex(get_wide_offset(1) + 318, 120, 0, (s8*)"%s",
+                      NetCtrlWk::getBigDataText((work->cursor_0x0C + 5) % 6));
+        pos.x = get_wide_offset(1) + 478;
+        pos.y = 49;
+        PutPageArrow((u16*)get_menu_lsp_tbl(0), work->cursor_0x0C, 6, work->moved_0x02, &pos, 0);
+    }
+}
+
+} /* extern "C" */
+
+/* The lock list's frame sprites (`.data` 0x805F8850), 0xFFFF-terminated. */
+u16 lb_room_lock_frame_sprites[10] = {0x2263, 0x2264, 0x2265, 0x2272, 0x2273, 0x2274, 0x2259, 0x225C, 0xFFFF, 0};
+/* The room-visit list's frame, row and lock-icon sprites (`.data` 0x805F8864 / 0x805F8878 / 0x805F888C). */
+u16 lb_pop_frame_sprites[10] = {0x225D, 0x225E, 0x225F, 0x2260, 0x2261, 0x2262, 0x2257, 0x225A, 0x225B, 0xFFFF};
+u16 lb_pop_row_sprites[10] = {0x227B, 0x227C, 0x227D, 0x227E, 0x227F, 0x2280, 0x2281, 0x2282, 0x2283, 0};
+u16 lb_pop_lock_sprites[10] = {0x2284, 0x2285, 0x2286, 0x2287, 0x2288, 0x2289, 0x228A, 0x228B, 0x228C, 0};
+/* The item box's cell sprites of one row (`.data` 0x805F88A0), 0xFFFF-terminated. */
+u16 lb_item_box_cell_sprites[6] = {0x22CD, 0x22CE, 0x22CF, 0x22D0, 0xFFFF, 0};
+
+/* The item-box panel's frame sprites (`.data` 0x805F88AC), 0xFFFF-terminated. */
+u16 lb_item_box_frame_sprites[35] = {
+    0x22C1, 0x22C2, 0x22BE, 0x22BF, 0x22C0, 0x22A4, 0x22A5, 0x22A6, 0x22A7, 0x22A8, 0x22A9, 0x22AA,
+    0x22AB, 0x22AC, 0x22AD, 0x22AE, 0x22AF, 0x22B0, 0x22B1, 0x22B2, 0x22B3, 0x22B4, 0x22B5, 0x22B6,
+    0x22B7, 0x22B8, 0x22B9, 0x22BA, 0x22BB, 0x22BC, 0x22BD, 0x22A1, 0x22A2, 0x22A3, 0xFFFF,
+};
+
+/* The Wii Remote data's gift list and zenny frame sprites (`.data` 0x805F88F4 / 0x805F8908), 0xFFFF-terminated. */
+u16 lb_room_gift_list_sprites[10] = {0x22D4, 0x22D5, 0x22D6, 0x22D7, 0x22D8, 0x22D9, 0x22DA, 0x22DB, 0x22DC, 0xFFFF};
+u16 lb_room_zenny_frame_sprites[12] = {0x22E6, 0x22E7, 0x22E8, 0x22E9, 0x22EA, 0x22EB, 0x22EC, 0x22E1, 0x22E3, 0x22E4,
+                                       0x22E5, 0xFFFF};
+
+extern "C" {
+
 /* Points the lobby camera at the selected spot's half of room 7 (spots 4.. on the far side). */
 void lb_room_slot_preview(LbRoomWork* work)
 {
@@ -2133,8 +2884,49 @@ void lb_room_slot_preview(LbRoomWork* work)
     }
 }
 
+/* The room owner's name banner sprites (`.sdata` 0x80793720), 0xFFFF-terminated. */
+u16 move_work_name_sprites[4] = {0x2293, 0x2294, 0x2295, 0xFFFF};
+
+/* 0x803C3098 (0x138): draws the visited room owner's name banner while the player stands in a visited room. */
+void move_work_name_draw(struct _PLW* player)
+{
+    s8* name = NULL;
+    LobbyTimerBlock* block = &lobby_state_block;
+    LobbyPeerCopy* peer;
+    _mh_ivec2_ pos;
+    s32 i;
+
+    if (menu_busy_ck() == 1) {
+        return;
+    }
+    if (lb_menu_kind_pair_ck(player->kind_0x015, player->area_0x16) == 1 && player->field_0xB03 == 2) {
+        get_lsp_data(0x2292, &pos);
+        pos.x = pos.x + get_wide_offset(4);
+        draw_sprite_ary(move_work_name_sprites, &pos);
+        draw_font_idx(0x2296, (s8*)LbStr(0, 0x1FC), 0, &pos);
+        for (peer = block->peers_0x0008, i = 0; i < 4; i++, peer++) {
+            if (memcmp(player->name_0xB05, peer->id_0x00, 10) == 0) {
+                if (get_option_cfg(12) == 0) {
+                    name = (s8*)peer->name_0x0A;
+                } else {
+                    name = (s8*)peer->id_0x00;
+                }
+                break;
+            }
+        }
+        if (name != NULL) {
+            draw_font_idx(0x2297, name, 0, &pos);
+        }
+    }
+    font_flush();
+}
+
+/* The 0x38 model effect's per-variant model id and scale (`.sdata` 0x80793728 / 0x80793730). */
+u16 eft_em_model_pair_ids[4] = {59, 171, 0, 0};
+f32 eft_em_model_pair_scales[2] = {10.0f, 30.0f};
+
 /* Spawns the eight-model effect (kind 0x38, variant 0) for `owner`. */
-void eft_em_model_ring_attach(void* owner /* untyped: opaque handle - the owner the effect follows */)
+void eft_em_model_ring_attach(LbMenuScratch* owner)
 {
     _EFT* self;
     PopEftModels* models;
@@ -2149,9 +2941,9 @@ void eft_em_model_ring_attach(void* owner /* untyped: opaque handle - the owner 
     self->dispatch_0x34 = eft_em_model_pair_update;
     models = (PopEftModels*)self->work_0x38;
     models->count_0x00 = 8;
-    models->field_0x24 = 0;
+    models->phase_0x24 = 0;
     for (i = 0; i < models->count_0x00; i++) {
-        models->models_0x04[i] = (EftModel*)eft_res_model_get();
+        models->models_0x04[i] = (MHchar*)eft_res_model_get();
         if (models->models_0x04[i] == NULL) {
             eft_res_slot_release(self);
             return;
@@ -2184,9 +2976,9 @@ void eft_em_model_pair_attach(struct _ENEMY_WORK* enemy)
     self->dispatch_0x34 = eft_em_model_pair_update;
     models = (PopEftModels*)self->work_0x38;
     models->count_0x00 = 2;
-    models->field_0x24 = 0;
+    models->phase_0x24 = 0;
     for (i = 0; i < models->count_0x00; i++) {
-        models->models_0x04[i] = (EftModel*)eft_res_model_get();
+        models->models_0x04[i] = (MHchar*)eft_res_model_get();
         if (models->models_0x04[i] == NULL) {
             eft_res_slot_release(self);
             return;
@@ -2239,15 +3031,122 @@ void eft_em_model_pair_create(_EFT* self)
 
     self->state_0x05++;
     for (i = 0; i < models->count_0x00; i++) {
-        if (res_eft_model_create((MHchar*)models->models_0x04[i], eft_em_model_pair_ids[self->type_0x02], 4) == NULL) {
+        if (res_eft_model_create(models->models_0x04[i], eft_em_model_pair_ids[self->type_0x02], 4) == NULL) {
             eft_em_model_pair_end(self);
             return;
         }
-        setVector3(&models->models_0x04[i]->pos_0x1C, scale, scale, scale);
+        setVector3(&models->models_0x04[i]->scale_0x1C, scale, scale, scale);
     }
     color_rgba_copy(models->color_0x26, (u8*)&eft_em_model_pair_colors[self->type_0x02]);
     eft_em_model_pair_move(self);
 }
+
+#pragma fp_contract off
+/* 0x803C3510 (0x520): places the effect's models each frame: over the room spots the scratch block marks (variant 0),
+ * or at the em025 joints the shore target picks (variant 1); ends the effect once its owner is gone. */
+void eft_em_model_pair_move(_EFT* self)
+{
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 pos;
+    _GXColor color;
+    u8 first;
+    u8 count;
+    struct _PLW* player;
+    s32 i;
+    PopEftModels* models;
+    f32 scale;
+    LbMenuScratch* scratch;
+    f32 wave;
+    struct _ENEMY_WORK* enemy;
+
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&pos);
+    models = (PopEftModels*)self->work_0x38;
+    _GXColor hot = {0xFF, 0x40, 0x00, 0xFF};
+    _GXColor dim = {0x40, 0x40, 0x40, 0xFF};
+
+    switch (self->type_0x02) {
+    case 0:
+        scratch = (LbMenuScratch*)self->source_0x30;
+        player = scratch->plw_0x000;
+        if (GameMode_ck() != 2) {
+            self->state_0x05++;
+            self->flag_0x01 = 0;
+            break;
+        }
+        self->flag_0x01 = player->field_0x001;
+        self->area_0x44 = player->area_0x16;
+        get_option_pair(self->area_0x44, &first, &count);
+        for (i = 0; i < count; i++) {
+            if (scratch->flags_0x156[i] != 0 && (scratch->flags_0x156[i] & 1)) {
+                scale = 10.0f;
+                color_rgba_copy((u8*)&color, models->color_0x26);
+                copyVec3(&pos, &scratch->slots_0x160[i]);
+                pos.y += lb_interior_scale_get(lobby_w.place_ids_0x134[first + i]);
+                if (scratch->flags_0x156[i] & 4) {
+                    scale = 15.0f;
+                    color_rgba_copy((u8*)&color, (u8*)&hot);
+                    pos.y += 10.0f * math_sin_rad((6.2831855f * (s32)(u16)(models->phase_0x24 * 2)) / 65536.0f);
+                }
+                if (!(scratch->flags_0x156[i] & 2)) {
+                    color_rgba_copy((u8*)&color, (u8*)&dim);
+                }
+                setVector3(&models->models_0x04[i]->scale_0x1C, scale, scale, scale);
+                models->models_0x04[i]->setMatColor(0, GX_COLOR0A0, color, false);
+                copyVec3(&models->models_0x04[i]->pos_0x04, &pos);
+                eft_rot_vec_copy(&models->models_0x04[i]->rot_0x28, &self->rot_0x24);
+                models->models_0x04[i]->move(0);
+                eft_res_models_spawn(self, (void**)&models->models_0x04[i], 2, 1, NULL);
+            }
+        }
+        self->rot_0x24.y += 0xFF;
+        models->phase_0x24 += 0x200;
+        break;
+    case 1:
+        enemy = (struct _ENEMY_WORK*)self->source_0x30;
+        wave = 50.0f * math_sin_rad((6.2831855f * (s32)(u16)(models->phase_0x24 * 2)) / 65536.0f);
+        if (self->area_0x44 != enemy->area_no || em_work_die_ck(enemy) != 0 || em_die_ck(enemy) != 0) {
+            self->state_0x05++;
+            self->flag_0x01 = 0;
+            break;
+        }
+        for (i = 0; i < models->count_0x00; i++) {
+            models->models_0x04[i]->field_0x34 = 0;
+        }
+        switch ((u8)em025_shore_target_ck(enemy)) {
+        case 1:
+            get_joint_wmat_em(enemy, 37, &mtx);
+            setVector3(&pos, 780.0f, -140.0f + wave, -400.0f);
+            mulVecMatAddTrans(&pos, &mtx);
+            copyVec3(&models->models_0x04[0]->pos_0x04, &pos);
+            models->models_0x04[0]->field_0x34 = 1;
+            break;
+        case 2:
+            get_joint_wmat_em(enemy, 20, &mtx);
+            setVector3(&pos, 380.0f, 220.0f + wave, 1950.0f);
+            mulVecMatAddTrans(&pos, &mtx);
+            copyVec3(&models->models_0x04[0]->pos_0x04, &pos);
+            models->models_0x04[0]->field_0x34 = 1;
+            get_joint_wmat_em(enemy, 20, &mtx);
+            setVector3(&pos, -380.0f, 220.0f + wave, 1950.0f);
+            mulVecMatAddTrans(&pos, &mtx);
+            copyVec3(&models->models_0x04[1]->pos_0x04, &pos);
+            models->models_0x04[1]->field_0x34 = 1;
+            break;
+        }
+        for (i = 0; i < models->count_0x00; i++) {
+            eft_rot_vec_copy(&models->models_0x04[i]->rot_0x28, &self->rot_0x24);
+            models->models_0x04[i]->move(0);
+            if (models->models_0x04[i]->field_0x34 != 0) {
+                eft_res_models_spawn(self, (void**)&models->models_0x04[i], 2, 1, NULL);
+            }
+        }
+        self->rot_0x24.y += 0xFF;
+        models->phase_0x24 += 0x200;
+        break;
+    }
+}
+#pragma fp_contract reset
 
 /* Advances the effect's step. */
 void counter_inc(_EFT* self)

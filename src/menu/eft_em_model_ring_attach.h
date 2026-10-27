@@ -3,13 +3,14 @@
 #define MHTRI_MENU_EFT_EM_MODEL_RING_ATTACH_H
 
 #include "types.h"
+#include "lobby/menu_scratch.h" /* LbMenuScratch */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Spawns the eight-model ring effect for `owner`. */
-void eft_em_model_ring_attach(void* owner /* untyped: opaque handle - the owner the effect follows */);
+void eft_em_model_ring_attach(LbMenuScratch* owner);
 
 #ifdef __cplusplus
 }

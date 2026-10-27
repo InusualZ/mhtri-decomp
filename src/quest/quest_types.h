@@ -495,7 +495,10 @@ struct Q_UserData {
     /* +0x52E4 */ u32 vs_slot_a_0x52E4[10];  /* the VS user block's `slot_a_0x6C`, copied in before a box save */
     /* +0x530C */ u32 vs_slot_b_0x530C[10];  /* its `slot_b_0x94` */
     /* +0x5334 */ u32 arena_best_0x5334[12];  /* the arena quests' best times in frames, 0 when unset */
-    /* +0x5364 */ u32 vs_items_0x5364[0x10];  /* the VS user block's 16 item slots (`item_0x2C`) */
+    /* +0x5364 */ union {   /* one run, two views (rule 5) */
+        /* +0x5364 */ u32 vs_items_0x5364[0x10];  /* the VS user block's 16 item slots (`item_0x2C`) */
+        /* +0x5364 */ IdValue vs_item_pairs_0x5364[0x10];  /* the same slots as item and count halves */
+    };
     /* +0x53A4 */ s32 vs_point_0x53A4;       /* its `point_0x18` credit */
     /* +0x53A8 */ u32 seed_0x53A8;           /* the save slot in the top byte and a random value */
     /* +0x53AC */ Q_FriendBook friends_0x53AC;   /* the saved friend list (`lobby_friend_list_sort` keeps it in step) */
