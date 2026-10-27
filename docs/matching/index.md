@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (218)
+## Ideas that work (219)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -227,6 +227,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 239 | [An addi+cmplwi test of -1 and 0 is written as one unsigned compare of c + 1](239-addi-cmplwi-test-of.md) | works | source-shape | Retail tests a value against -1 and 0 with `addi r0,c,1; cmplwi r0,1; ble skip`; ours with `c != -1 && c != 0` emits two compares and branches. |
 | 240 | [A subfc/subfe compare feeding an addi is a ternary between consecutive constants](240-ternary-consecutive-constants.md) | works | source-shape | Retail materialises a signed compare as `subfc ; srwi ; srwi ; subfe` and adds a constant, where ours (`K + (a >= b)`) uses `srawi ; srwi ; subfc ; adde` - and the two constants differ by one. |
 | 241 | [A case that jumps forward into the middle of the next case: put the next case's label inside an if (0) block](241-case-that-jumps-forward.md) | works | source-shape | Retail's switch case ends with a `b` into the middle of the following case (past that case's own test), so the shared tail exists once; the goto-free source repeats the tail in each case and the function grows by its... |
+| 242 | [Member constructors kept out of line after __sinit with an in-class never_inline attribute](242-member-constructors-kept-out.md) | works | source-shape, sections | Retail's `__sinit` calls one class constructor, followed in `.text` by a chain of member-array constructors (`do { bl ctor; p += size; } while (p < end)`) that call out-of-line leaf constructors; ours inlines the whole... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

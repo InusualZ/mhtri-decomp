@@ -32,50 +32,7 @@
  * the shared types of the band
  * ------------------------------------------------------------------------------------------------ */
 
-/* One 0x10-byte colour record the band stages (`stage_w` area slot +0x1BC / +0x1CC, and the blend
- * table records `stage_colour_cycle_update` interpolates). */
-/* size: 0x10 */
-typedef struct StageColourRec {
-    /* +0x00 */ u32 colour;
-    /* +0x04 */ f32 a;
-    /* +0x08 */ f32 b;
-    /* +0x0C */ u32 flags;
-} StageColourRec;
-
-/* One 0x1DC-byte per-area record of `stage_w`.  The record array starts at +0xC20 (the sibling
- * `stage/stg_w.cpp` names the same stride); the two staged colour records sit at +0x1BC and +0x1CC
- * inside it, which retail folds into the single `addi r4,r4,0xDDC` after `mulli r0,r0,476`. */
-/* size: 0x1DC */
-typedef struct StageAreaSlot {
-    /* +0x000 */ u8 pad_0x000[0x1BC];
-    /* +0x1BC */ StageColourRec colour_a; /* 0xDDC */
-    /* +0x1CC */ StageColourRec colour_b; /* 0xDEC */
-} StageAreaSlot;
-
-/* The `stage_w` block (map symbol, .bss 0x806B87C0, 0x2FE0 B).  Only the fields this band touches are
- * named; everything else carries its offset as padding. */
-/* size: 0x2FE0 */
-typedef struct StageRuntime {
-    /* +0x000 */ u8 pad_0x000[0x004];
-    /* +0x004 */ MHchar* area_char[4]; /* the per-area actor whose joints the band seats on */
-    /* +0x014 */ u8 pad_0x014[0xBB1];
-    /* +0xBC5 */ u8 mapno;
-    /* +0xBC6 */ u8 areano;
-    /* +0xBC7 */ u8 pad_0xBC7[0x04E];
-    /* +0xC15 */ u8 joint_state[0x8];
-    /* +0xC1D */ u8 pad_0xC1D[0x003];
-    /* +0xC20 */ StageAreaSlot area[15];
-    /* +0x2804 */ u8 pad_0x2804[0x6A9];
-    /* +0x2EAD */ u8 field_0x2EAD[8]; /* the joint ids the current map wants visible */
-    /* +0x2EB5 */ u8 pad_0x2EB5[0x0DC];
-    /* +0x2F91 */ u8 field_0x2F91; /* the one-shot flag byte */
-    /* +0x2F92 */ u16 field_0x2F92; /* the 16-bit area mask */
-    /* +0x2F94 */ u32 field_0x2F94[16]; /* one 4-second timer per area */
-    /* +0x2FD4 */ void* map_group_direct;   /* the record group `stage_map_group_get` returns for an id the kind table keeps */
-    /* +0x2FD8 */ void* map_group_remapped; /* the record group it returns for a remapped id */
-    /* +0x2FDC */ s16 field_0x2FDC; /* the demo-placement countdown */
-    /* +0x2FDE */ u8 pad_0x2FDE[0x002];
-} StageRuntime;
+/* The `stage_w` block itself is `StageWork` (`stage/stage_work.h`). */
 
 /* One 0x4F8-byte per-area runtime object (two of them at `lbl_806BB7E0`). */
 /* size: 0x4F8 */
@@ -203,15 +160,6 @@ typedef struct StageBlendEntry {
     /* +0x0C */ u32 colour_c;
 } StageBlendEntry;
 
-/* The `MHchar` actor as this band's joint loop sees it: the joint count sits inside the
- * `sound/mhchar.h` view's padding at +0x15C, so the loop keeps a local view instead of editing a
- * shared header. */
-/* size: 0x160 */
-typedef struct StageActorJoints {
-    /* +0x000 */ u8 pad_0x000[0x15C];
-    /* +0x15C */ u32 joint_count;
-} StageActorJoints;
-
 /* The colour blend source `stage_light_blend_set` reads: three 4-word groups, each a base colour, an axis
  * colour and the two targets the base blends towards. */
 /* size: 0x10 */
@@ -233,85 +181,11 @@ typedef struct StageBlendRec {
 #include "g3d/g3d_scnroot.h" /* `nw4r::g3d::ScnRoot`, the scene root the two camera calls go through */
 
 /* ------------------------------------------------------------------------------------------------
- * the block symbols (.bss: no registered unit owns them, so the declarations live here)
+ * the block symbols
  * ------------------------------------------------------------------------------------------------ */
 
-#include "unsplit/stage.h" /* `stage_w` (moved to the band header so a `pl.h` consumer can name it) */
-extern "C" u8 stg_entry_pos_none[];
-extern "C" u8 stg_entry_pos_menu[];
-extern "C" u8 stg_entry_pos_work[];
+#include "unsplit/stage.h" /* `StageMapView`, the two-byte view of `stage_w` a `pl.h` consumer can name */
 extern "C" u8 camera_work[];
-
-/* ------------------------------------------------------------------------------------------------
- * the pooled `.data` / `.sdata2` constants (declared, never defined: the pool belongs to the data pass)
- * ------------------------------------------------------------------------------------------------ */
-
-/* .sdata2 floats */
-extern f32 lbl_8079A448; /* 0.0f     */
-extern f32 lbl_8079A468; /* 1.0f     */
-extern f32 lbl_8079A484; /* 0.5f     */
-extern f32 lbl_8079A49C; /* 16384.0f */
-extern f32 lbl_8079A4A0; /* 23700.0f */
-extern f32 lbl_8079A4A4; /* -25000.0f */
-extern f32 lbl_8079A4A8; /* 16900.0f */
-extern f32 lbl_8079A4AC; /* 38400.0f */
-extern f32 lbl_8079A4B0; /* -32900.0f */
-extern f32 lbl_8079A4B4; /* -44000.0f */
-extern f32 lbl_8079A4B8; /* 3028.0f  */
-extern f32 lbl_8079A4BC; /* 200.0f   */
-extern f32 lbl_8079A4C0; /* 30.0f    */
-extern f32 lbl_8079A4C4; /* 0.3f     */
-extern f32 lbl_8079A4C8; /* 52.0f    */
-extern f32 lbl_8079A4CC; /* -573.0f  */
-extern f32 lbl_8079A4D0; /* 1465.0f  */
-extern f32 lbl_8079A4D8; /* 0.0f     */
-extern f32 lbl_8079A4DC; /* 0.5f     */
-extern f32 lbl_8079A4E0; /* -1.0f    */
-extern f32 lbl_8079A4E4; /* 100.0f   */
-extern f32 lbl_8079A4E8; /* 55.0f    */
-
-/* .data - the band's own tables (0x805CF60C-0x805CFBE8; only the jump table is claimed, see the
- * file header) */
-extern StageJointLists* lbl_805CF60C[];
-extern StageJointLists** lbl_805CF644[23]; /* per map, each area's joint lists (null where none) */
-extern StageJointLists* lbl_805CF6A0[]; /* the mapno 1/12 per-area list pair */
-extern u8 lbl_805CF6D4[];
-extern u8 lbl_805CF6E8[];
-extern u8 lbl_805CF6F4[];
-extern u8 lbl_805CF700[];
-extern f32 lbl_805CF784[];
-extern u8 lbl_805CF7C0[]; /* the 0xC-byte Vec records the strips seat on */
-extern f32 lbl_805CF7F0[];
-extern u8 lbl_805CF7FC[];
-extern u8* lbl_805CF8E0[];
-extern u8* lbl_805CF8F0[];
-extern StageDemoEntry lbl_805CFA38[];
-extern f32 lbl_805CFA58[];
-extern StageBlendEntry lbl_805CFA68[];
-extern StageBlendEntry lbl_805CFAE8[];
-extern StageBlendEntry lbl_805CFB68[];
-
-/* .sdata - the band's joint-id lists */
-extern StageJointLists lbl_80792310;
-extern StageJointLists lbl_80792330;
-extern StageJointLists* lbl_807923C8[2];
-extern StageJointLists lbl_80792410;
-extern StageJointLists lbl_80792440;
-extern StageJointLists lbl_80792450;
-extern StageJointLists lbl_80792470;
-extern u8 lbl_80792418[0x4];
-extern u8 lbl_8079241C[0x4];
-extern u8 lbl_80792420[0x8];
-extern u8 lbl_80792428[0x8];
-extern u8 lbl_80792430[0x8];
-extern u8 lbl_80792458[0x8];
-extern u8 lbl_80792460[0x4];
-extern u8 lbl_80792464[0x4];
-extern u8 lbl_80792498[4];
-extern u8 lbl_8079249C[4];
-extern u8 lbl_807924A0[4];
-extern u8 lbl_807924A4[4];
-extern u8 lbl_807924A8[8];
 
 /* ------------------------------------------------------------------------------------------------
  * the callees (C linkage: the map spells every one of these plainly)
@@ -338,15 +212,10 @@ extern "C" f32 lb_item_list_depth_get(u32 index);
 extern "C" s32 getItemListSelection(void);
 extern "C" u32 Pl_motion_input_ck(void* work);
 extern "C" s32 stage_water_surface_get(void* a, u8 area, s32 handle, void* out, s32 limit);
-extern "C" void stage_fog_apply(StageColourRec* rec);
 extern "C" void stage_fog_copy(void* out, const void* in);
 extern "C" s32 stage_water_enabled_ck(void);
 extern "C" u8* stage_area_word_get(u8 kind);
-extern "C" void stage_part_defs_get(StageRuntime* st, u8 index);
 extern "C" void stage_area_colour_update(void);
-extern "C" void stage_colour_rec_copy(StageColourRec* dst, const StageColourRec* src);
-extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind);
-extern "C" void stage_area_joint_visibility_set(StageRuntime* st, MHchar* chr, u8 mode);
 extern "C" u8 lb_unlock_cond5_get(void);
 extern "C" u8 lb_world_upgrade_get(s32 index);
 extern "C" u8 lb_unlock_cond22_flag_ck(void);
@@ -357,12 +226,6 @@ extern "C" s32 stage_torch_unlit_ck(u8 index);
 extern "C" s32 camera_angle_y_get(void);
 extern "C" void stage_area_event_dispatch(void* plw, u8 index);
 extern "C" f32 stage_colour_cycle_weight_get(s16 index, f32 span);
-extern "C" u32 stage_work_construct(u32 base);
-extern "C" u32 stage_sub34_clear(u32 block);
-extern "C" u32 stage_part_construct(u32 block);
-extern "C" u32 stage_area_construct(u32 rec);
-extern "C" u32 stage_area_row_construct(u32 slot);
-extern "C" u32 stage_slot_construct(u32 block);
 extern "C" StageBlendEntry* stage_blend_table_get(void);
 extern "C" void camera_work_setup(StageAreaObj* area, u8 index);
 extern "C" void camera_scene_posture_init(u8 index, s32 camera);
@@ -403,11 +266,5 @@ void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 area, long param);
 
 extern "C" s32 stage_oneshot_clear_ck(void);
 extern "C" void stage_area_timer_arm(u8 index);
-extern "C" u32 stage_work_construct(u32 base);
-extern "C" u32 stage_sub34_clear(u32 block);
-extern "C" u32 stage_part_construct(u32 block);
-extern "C" u32 stage_area_construct(u32 rec);
-extern "C" u32 stage_area_row_construct(u32 slot);
-extern "C" u32 stage_slot_construct(u32 block);
 
 #endif /* MHTRI_STAGE_FN_802B2AA0_H */

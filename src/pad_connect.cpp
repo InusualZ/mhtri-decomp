@@ -65,7 +65,7 @@
 #include "menu/movie.h"              /* dvd_error_* (rule 2) */
 #include "menu/kbd_hooks_set.h"
 #include "stage/get_stg_w.h"
-#include "stage/fn_802B2AA0.h"        /* StageRuntime (rule 1) */
+#include "stage/stage_work.h"         /* StageWork (rule 1) */
 #include "Pl/set_demo_equip_data_func.h"
 #include "font/flfnt.h"              /* flfntStackReset, flfntFlush (rule 2) */
 #include "main.h"                    /* ck_WideMode (rule 2) */
@@ -236,11 +236,11 @@ extern "C" u32 pad_hold_ck(void)
 extern "C" void game_init_hooks_clear(void)
 {
     char name[16];
-    StageRuntime* stage;
+    StageWork* stage;
 
     sprintf(name, "ttt");
     strupr(name);
-    stage = (StageRuntime*)get_stg_w();
+    stage = (StageWork*)get_stg_w();
     stage->map_group_direct = 0;
     stage->map_group_remapped = 0;
     bg_tex_disp_func.func = 0;
