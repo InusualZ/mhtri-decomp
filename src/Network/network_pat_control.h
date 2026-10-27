@@ -160,7 +160,7 @@ typedef struct NetPeerRec {
     /* +0x1E */ u8 pad_0x1E[0x2];
     /* +0x20 */ NetPeerBlob blob_0x20;
 
-    void assign(const NetPeerRec* src);
+    NetPeerRec& assign(const NetPeerRec* src);
 } NetPeerRec; /* size: 0x120 */
 
 /* The peer list `NetCtrlWk::copyPeerList` copies out for the caller: the count, then the four records. */
@@ -1002,7 +1002,7 @@ typedef struct NetCtrlWk {
     static BOOL startLayerRefresh(s8* result);
     static BOOL submitSlotRequest(const NetSlotIds* ids, s8* result);
     static void copyFriendList(NetFriendListView* out, u8 use_own);
-    static s32 copyCommunityViews(NetCommunityView* views, s16 first, s32 max, s16* total);
+    static s32 copyCommunityViews(NetCommunityView* views, s32 first, s32 max, s16* total);
     static BOOL hasFriendDetail(const NetId* id);
     static void setFetchMode(u32 mode);
     s32 stepFileDownloads(void);

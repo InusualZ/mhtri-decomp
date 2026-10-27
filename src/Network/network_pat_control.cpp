@@ -63,18 +63,24 @@
  *  - `layerReflectCallback`: a joining peer's id address is shared between `formatNetId` and `importNetId`, and its
  *    name and slot offset are re-derived for `postChatLogLine`, where retail does the opposite (`opt_common_subs off`
  *    scores lower here).
- *  - `getUtf8CharLength`: the final trail-byte test is if-converted (`subfc`/`subfe`/`andc`) where retail branches;
- *    split tests, negated arms, `u8` locals and scoped pragmas all score lower.
- *  - `submitSlotRequest`: retail reloads the slot id for the store; ours keeps the compare's load.
- *  - `copyCommunityViews`: ours sign-extends `first` (`extsh`) where retail uses the incoming register.
- *  - `layoutTextRuns`: retail keeps the `tag != 4/8/9` loop test on a constant 0.
+ *  - `getUtf8CharLength`: retail tests each trail byte's zero and range separately (`bne` over `li 0; blr`); a
+ *    split pair is if-converted (`subfc`/`subfe`/`andc`), so both tests are one `||` (a `beq` and two fewer
+ *    instructions each); `&&`/range forms, negated arms, `u8` locals and scoped pragmas score lower.
+ *  - `submitSlotRequest`: retail reloads the slot id for the store; ours keeps the compare's load (an `s32` view of
+ *    the ids or a signed compare score lower).
+ *  - `layoutTextRuns`: retail keeps the `tag != 4/8/9` loop test on a constant 0 (tested once at entry, every path
+ *    then branches to the body); `#pragma opt_propagation off` keeps the test and the size but scores lower (94.3),
+ *    as does `optimization_level 2`; an inner `for (;;)` changes nothing.
  *  - `importLayerPeers`, `resetArenaVectors`, `updatePeerCardBlock`, `readCommunityMemberCards`, `readFriendCards`,
- *    `updateFriendTransferModes`, `loadPeerCard`, `checkLayerEntry`: callee-saved or volatile registers coloured
- *    differently (declaration orders and increment orders searched);
+ *    `updateFriendTransferModes`, `loadPeerCard`: callee-saved or volatile registers coloured differently
+ *    (declaration orders and increment orders searched; `updatePeerCardBlock` keeps one more peer-address induction
+ *    copy than retail, and `const char*` casts on the `sprintf` names change nothing);
  *  - `updateTransferMode`: `NetworkLayer::getFriendFlagC084_EC` is declared `u8`, so ours masks the result retail
- *    compares whole; `drawTextRuns`: retail multiplies the centred pen as `fmuls f0,f0,f31`, ours `f31,f0`;
- *    `initWorkRecord`/`initNetworkPatControl`/`stepFileDownloads`/`requestEnterCity`/`assign`/
- *    `getSelectedServerTypeName`/`resetMessagePool`: scheduling or one operand order each.
+ *    compares whole (the owner `Network/NetworkLayerPat.cpp` returns `u8`), and the slot counter and peer pointer
+ *    take each other's callee-saved register (all declaration orders searched); `drawTextRuns`: retail multiplies the centred pen as `fmuls f0,f0,f31`, ours `f31,f0`;
+ *    `initWorkRecord`/`initNetworkPatControl`/`stepFileDownloads`/`resetMessagePool`: scheduling or one operand
+ *    order each; `getSelectedServerTypeName`: retail loads the flags word first and the type into the dead server
+ *    register (`flags | type` keeps ours' order and swaps the `or`).
  *  - flip blockers: `.bss` is 0xDFE4 against the 0xE100 claim and `.data` 0x5E0 against 0x620 (statics and tables the
  *    unwritten rows own; retail's `.data` also carries `language_group_table` and `pat_server_host`); retail keeps
  *    `netNullQuery`, `netNullHook`, `netUtf8ToUtf16` force-active (`.comment`), ours lets the linker strip them;
@@ -111,6 +117,13 @@
  *    through the `chars_0x035` view for the log and `text_0x035` for the mediator, and `layerReflectCallback`'s peer
  *    id is spelled `(char*)&...id_0x00` where retail keeps a second copy; the invite resets walk a pointer and the
  *    invite list is indexed, as retail forms them;
+ *  - `copyCommunityViews` takes `first` as `s32` (the lobby passes `page * 8` with no `extsh`, and an `s16`
+ *    parameter costs an `extsh` here); its loop advances `views`, `community`, `copied`, `index` in that order;
+ *  - `checkLayerEntry` compares `wanted` against `now` for the server and the reverse for the city and room, and
+ *    indexes the rank range in each bound test (retail reads the hunter rank before forming the range address);
+ *    `readCommunityMemberCards` takes the community table's address before indexing it (+0x11C member offset kept);
+ *  - `NetPeerRec::assign` returns `*this` (retail keeps r3/r4 live through the blob copy); `requestEnterCity` takes
+ *    the city list's address and indexes it (retail folds the entries' +4 into each field offset);
  *  - `initNetworkLibrary` is handed `PatLibraryParams` cast to the owner's `sNetworkLibraryInitParam` (one 0x2C block
  *    read two ways: this unit names the allocator/game words, the owner keeps `gameInfo[8]`; folding them is a rule-1
  *    item).
@@ -1835,10 +1848,10 @@ s32 findFriendIndex(const NetId* id)
 void resetMessagePool(void)
 {
     char id_text[8];
-    s32 slot;
+    s32 n;
     NetCtrlWk* work = net_ctrl_wk;
     s32 i;
-    s32 n;
+    s32 slot;
 
     if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
         memset(work->msgTable_0x7488, 0, 0x480);
@@ -2366,13 +2379,14 @@ s32 readCommunityMemberCards(const NetCommunitySelection* selection, NetFriendCa
     NetFriendCard* card;
     NetFriendRoster* roster;
     NetFriendSession* session;
+    s32 end;
     NetFriendRec* rec;
     u32 status;
     u32 settings;
     s32 total;
     s32 filled;
-    s32 end;
     s32 i;
+    NetCommunityRec* community;
 
     total = getNetworkLayerPat(getPatsObject(), 0)->communities_F1AC.count_0x00000;
     if (total == 0) {
@@ -2382,9 +2396,8 @@ s32 readCommunityMemberCards(const NetCommunitySelection* selection, NetFriendCa
         return 0;
     }
     /* the record's member table and sessions are one roster's two runs */
-    roster = (NetFriendRoster*)&getNetworkLayerPat(getPatsObject(), 0)
-                 ->communities_F1AC.entries_0x00004[selection->community_0x60]
-                 .members_0x011C;
+    community = getNetworkLayerPat(getPatsObject(), 0)->communities_F1AC.entries_0x00004;
+    roster = (NetFriendRoster*)&community[selection->community_0x60].members_0x011C;
     card = out;
     for (i = 0; i < count; i++, card++) {
         memset(card, 0, sizeof(NetFriendCard));
@@ -2492,7 +2505,6 @@ s32 checkLayerEntry(const NetworkLayerId* target, const NetUserProfile* profile)
     NetLayerIdText wanted;
     NetworkLayerId id;
     NetFilterRec* filter;
-    NetRange* range;
     NetSrvList* list;
     u32 i;
 
@@ -2512,11 +2524,11 @@ s32 checkLayerEntry(const NetworkLayerId* target, const NetUserProfile* profile)
     getNetworkLayerPat(getPatsObject(), 0)->exportLayerId_8C(&id);
     getNetworkLayerPat(getPatsObject(), 0);
     NetworkLayerIdExportTo(&id, (u8*)&now, 16);
-    if (now.server_0x04 == wanted.server_0x04 && now.city_0x0A == wanted.city_0x0A && now.room_0x0C == wanted.room_0x0C) {
+    if (wanted.server_0x04 == now.server_0x04 && wanted.city_0x0A == now.city_0x0A && wanted.room_0x0C == now.room_0x0C) {
         return 4;
     }
-    range = &config->ranges_0x13AC[server->type_0x3C - 1LL];
-    if (user->hunter_rank_0x3DE4 < (s16)range->low_0x00 || user->hunter_rank_0x3DE4 > (s16)range->high_0x02) {
+    if (user->hunter_rank_0x3DE4 < (s16)config->ranges_0x13AC[server->type_0x3C - 1LL].low_0x00 ||
+        user->hunter_rank_0x3DE4 > (s16)config->ranges_0x13AC[server->type_0x3C - 1LL].high_0x02) {
         return 3;
     }
     if (profile != NULL && wanted.room_0x0C != 0) {
@@ -2529,7 +2541,7 @@ s32 checkLayerEntry(const NetworkLayerId* target, const NetUserProfile* profile)
     if (wanted.city_0x0A == 0) {
         return 2;
     }
-    return now.server_0x04 != wanted.server_0x04;
+    return wanted.server_0x04 != now.server_0x04;
 }
 
 /*
@@ -2803,11 +2815,11 @@ void resetSystemState(struct SystemWork* system)
  * peer and message tables, fetch state, the MEM2 file buffers and the friend list built in place. */
 void initWorkRecord(void)
 {
-    NetCtrlWk* work = &net_ctrl_work;
+    NetCtrlWk* work;
     u8* buffer;
     s32 i;
 
-    net_ctrl_wk = work;
+    work = net_ctrl_wk = &net_ctrl_work;
     work->pats_0x000 = NULL;
     work->session_manager_0x004 = NULL;
     work->layer_0x008 = NULL;
@@ -5336,10 +5348,7 @@ s32 getUtf8CharLength(u8* bytes)
         }
         s32 fourth = bytes[3];
 
-        if (fourth == 0) {
-            return 0;
-        }
-        if ((u32)(fourth - 0x80) > 0x3F) {
+        if (fourth == 0 || (u32)(fourth - 0x80) > 0x3F) {
             return 0;
         }
         return 3;
@@ -6071,14 +6080,15 @@ void NetCtrlWk::requestListRefreshAlias(s8* result)
 s32 NetCtrlWk::requestEnterCity(s8* result, s32 index, u8 forced)
 {
     NetCtrlWk* work = net_ctrl_wk;
+    NetCityList* cities;
     NetCityRec* city;
 
     if (work != NULL) {
         work->flag_0x82C4 = 0;
     }
     *result = 0;
-    city = getNetworkLayerPat(getPatsObject(), 0)->cities_540.entries_0x004;
-    city = &city[index];
+    cities = &getNetworkLayerPat(getPatsObject(), 0)->cities_540;
+    city = &cities->entries_0x004[index];
     if (city->hidden_0x79 == 0) {
         if (city->population_0x48 == 0) {
             work->sub_error_0xC259 = 9;
@@ -6225,11 +6235,12 @@ s32 NetCtrlWk::copyPeerList(NetPeerList* list)
 /*
  * Copy one connected-peer record.
  */
-void NetPeerRec::assign(const NetPeerRec* src)
+NetPeerRec& NetPeerRec::assign(const NetPeerRec* src)
 {
     id_0x00 = src->id_0x00;
     name_0x0A = src->name_0x0A;
     blob_0x20 = src->blob_0x20;
+    return *this;
 }
 
 /*
@@ -7012,13 +7023,13 @@ void NetCtrlWk::copyFriendList(NetFriendListView* out, u8 use_own)
 /*
  * Copy up to `max` community rows starting at `first` into `views`; `*total` receives the community count.
  */
-s32 NetCtrlWk::copyCommunityViews(NetCommunityView* views, s16 first, s32 max, s16* total)
+s32 NetCtrlWk::copyCommunityViews(NetCommunityView* views, s32 first, s32 max, s16* total)
 {
     NetworkLayerPat* layer = getNetworkLayerPat(getPatsObject(), 0);
+    s32 index;
     NetCommunityRec* community;
     s32 count = layer->communities_F1AC.count_0x00000;
     s32 copied;
-    s32 index;
 
     *total = count;
     if (count - 1 < first) {
@@ -7027,7 +7038,7 @@ s32 NetCtrlWk::copyCommunityViews(NetCommunityView* views, s16 first, s32 max, s
     community = getNetworkLayerPat(getPatsObject(), 0)->communities_F1AC.entries_0x00004;
     community = &community[first];
     copied = 0;
-    for (index = first; index < first + max; community++, index++, views++) {
+    for (index = first; index < first + max; views++, community++, copied++, index++) {
         if (index >= count || index - first >= max) {
             break;
         }
@@ -7043,7 +7054,6 @@ s32 NetCtrlWk::copyCommunityViews(NetCommunityView* views, s16 first, s32 max, s
         views->slots_0x64[1] = community->slot_0x0104;
         views->slots_0x64[2] = community->slot_0x010C;
         views->slots_0x64[3] = community->slot_0x0114;
-        copied++;
     }
     return copied;
 }
@@ -8088,8 +8098,7 @@ void updateTransferMode(void)
             }
         }
     } else {
-        peer = work->peers_0x7488;
-        for (i = 0; i < 4; i++, peer++) {
+        for (i = 0, peer = work->peers_0x7488; i < 4; peer++, i++) {
             if (work->used_0x7988[i] == 0) {
                 setCockpitTransferMode(i, 0);
                 continue;
