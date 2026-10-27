@@ -119,7 +119,7 @@
  *    `em_motion_window_ck`: the same magic, and ours materialises the final test branch-free (`mfcr` + `extrwi`);
  *  - `em_sleep_ck`: retail shares one `return 0` through both `bne` arms, ours a `li r3,0` per arm;
  *  - `em_pl_target_ck`, `em_act_kind6_ck`: ours compares unsigned where retail uses `cmpwi` (`em_pl_target_ck` also an extra
- *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
+ *    `b`); `em_pl_hate_get`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
  *    earlier;
  *  - `fn_8012B86C`, `em_team_member_claim`, `em_attack_start`, `em_area_vacant_wait_ck`: register allocation only.
@@ -3584,7 +3584,7 @@ extern "C" u32 em_target_reach_ck(_ENEMY_WORK* self, u8 mode, nw4r::math::VEC3* 
     return 1;
 }
 
-extern "C" s32 fn_8012C0EC(_ENEMY_WORK* enemy, u32 index);
+extern "C" s32 em_pl_hate_get(_ENEMY_WORK* enemy, u32 index);
 extern "C" s32 fn_8012C204(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012C20C(_ENEMY_WORK* enemy, u32 index);
 extern "C" u32 em_area_exit_ck(_ENEMY_WORK* self, u8 exit);
@@ -3778,7 +3778,7 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
             if (em_sight_player_ck2(self, i) == 0 || em_area_exit_ck(self, plw->water_area_0x5A6) == 0) {
                 continue;
             }
-            hate = fn_8012C0EC(self, i);
+            hate = em_pl_hate_get(self, i);
             if (nearest == 0 && hate < (s32)self->timer_0x424) {
                 continue;
             }
@@ -4664,7 +4664,7 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
 
 /* The attacker's damage against one player-side record: the stored value plus the two table
  * adjustments whose conditions the player passes. */
-extern "C" s32 fn_8012C0EC(_ENEMY_WORK* enemy, u32 index)
+extern "C" s32 em_pl_hate_get(_ENEMY_WORK* enemy, u32 index)
 {
     EnemyActionSet* set;
     EnemyActionTable* table;
