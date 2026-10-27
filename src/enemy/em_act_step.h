@@ -6,9 +6,9 @@
 #include "enemy/res_user_data_ac.h" /* ResUserDataAc (rule 1) */
 
 #ifdef __cplusplus
-/* The user-data accessor this unit's constructor builds (`.data` 0x805E04E0 is its table): the base accessor with
- * its own destructor, attach hook and matrix item hook - the range's own tail (0x8032FFEC..0x80330128), still
- * unwritten except the destructor.  The class name is a GUESS from the unit.  size: 0xC */
+/* The user-data accessor `em026_init` installs (`.data` 0x805E04E0 is its table): the base accessor with its own
+ * destructor, attach hook (flag 2) and matrix item hook (the clinging joint follows the player's joint).  The class
+ * name is a GUESS from the unit.  size: 0xC (`operator new(0xC)`) */
 class EmActStepUserData : public ResUserDataAc {
 public:
     EmActStepUserData();

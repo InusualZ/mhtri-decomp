@@ -291,6 +291,18 @@ struct Em025Block {
     /* +0x02B (+0x353) */ u8 flag_0x353;         /* the flag the kind-1 state query reports */
 };
 
+/* The grip block `enemy/em_act_step.cpp`'s program keeps at +0x328: the effect offset (and, while it clings to a
+ * player, the offset on that player's joint), the joint it clings to, the "has clung" latch its state query
+ * reports and the frames it has clung.
+ * size: 0x14 */
+struct EmGripBlock {
+    /* +0x00 */ nw4r::math::VEC3 offset;  /* the local offset `rotVecY` turns / the joint matrix places */
+    /* +0x0C */ u32 joint_0x0C;           /* the player joint `pl_joint_mtx_get` reads (3 once aimed) */
+    /* +0x10 */ u8 clung_0x10;            /* set once the grip has run its 150 frames (kept across a store) */
+    /* +0x11 */ u8 pad_0x11;
+    /* +0x12 */ s16 cling_frames_0x12;    /* the frames the grip has held, counted to 150 */
+};
+
 /* size: 0xB18 */
 /* The saved position block em035's init (`enemy/em033_prog.cpp`) keeps at `_ENEMY_WORK::run_0xB04`.
  * size: 0x10 */
@@ -781,6 +793,7 @@ struct _ENEMY_WORK {
             /* +0x329 */ u8 hit_prev_0x329;
             /* +0x32A */ u8 unused_0x32Aem029[0x354 - 0x32A];
         } em029_0x328; /* size: 0x2C */
+        /* +0x328 */ struct EmGripBlock grip_0x328;  /* `enemy/em_act_step.cpp`'s grip block */
         /* the em024 monster program's own field view `enemy/em024_ai.cpp` reaches: the three state bytes, the four
          * `s16` gauge/timer words and the two position vectors the program latches.  A union member because the views above already own these
          * bytes. */

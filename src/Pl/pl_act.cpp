@@ -6470,7 +6470,7 @@ namespace s_80276B58 {
 
 
 /* 0x8027D3F0 */
-extern "C" void fn_8027D3F0(_PLW* self, u8 arg1)
+extern "C" void pl_cling_req_set(_PLW* self, u8 arg1)
 {
     self->unk3AC |= 1 << arg1;
 }
@@ -6482,7 +6482,7 @@ extern "C" void fn_8027D4F0(_PLW* self)
 }
 
 /* 0x8027D4FC */
-extern "C" s32 fn_8027D4FC(_PLW* self)
+extern "C" s32 pl_shake_off_ck(_PLW* self)
 {
     return self->unk3B4 != 0;
 }
@@ -6494,7 +6494,7 @@ extern "C" void pl_guard_latch_set(_PLW* self)
 }
 
 /* 0x8027D51C */
-extern "C" s32 fn_8027D51C(_PLW* self)
+extern "C" s32 pl_guard_latch_ck(_PLW* self)
 {
     return self->unk3B5 != 0;
 }
