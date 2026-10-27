@@ -244,9 +244,12 @@ def selftest() -> int:
     # The dead-key proof on the real incident file: `src/ef/eft053.cpp` carries a `rule 7 deferred:`
     # comment AND unrenamed `fn_` references, and must still report every one of them. If this ever goes
     # quiet the comment is suppressing again - which is the defect this whole change exists to remove.
-    if os.path.exists("src/ef/eft053.cpp"):
+    # Runs only while the file still spells a generated name: the ratchet is meant to empty it, and the
+    # synthetic cases above keep covering the comment once it does (2026-10-27, eft053's pool went literal).
+    real_text = read_text("src/ef/eft053.cpp") if os.path.exists("src/ef/eft053.cpp") else ""
+    if "rule 7 deferred:" in real_text and re.search(r"\b(?:fn|lbl)_[0-9A-Fa-f]{8}\b", real_text):
         real = [f for f in lint_source(Source("src/ef/eft053.cpp", "src/ef/eft053.cpp",
-                                              read_text("src/ef/eft053.cpp"))) if f["rule"] == 7]
+                                              real_text)) if f["rule"] == 7]
         check("rule7 deferred: the real ef/eft053.cpp (comment + generated names) still reports rule 7",
               bool(real), True)
         check("... and every finding is a generated name, not an unk field",
