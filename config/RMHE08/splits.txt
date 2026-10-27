@@ -2059,25 +2059,24 @@ quest/quest_item_slot.cpp:
 	.sdata2     start:0x8079C4C0 end:0x8079C50C
 
 quest/quest_entry.cpp:
-	extab       start:0x80018B0C end:0x80018DC4
-	extabindex  start:0x80038EF8 end:0x8003930C
-	.text       start:0x803AB3BC end:0x803B465C
-	.data       start:0x805F2A98 end:0x805F7C68
+	extab       start:0x80018B0C end:0x80018F4C
+	extabindex  start:0x80038EF8 end:0x80039558
+	.text       start:0x803AB3BC end:0x803B744C
+	.data       start:0x805F2A98 end:0x805F7CE8
 	.bss        start:0x806C5558 end:0x806CC420
 	.sdata      start:0x807935D8 end:0x80793684
-	.sbss       start:0x80794C18 end:0x80794C48
-	.sdata2     start:0x8079C510 end:0x8079C560
+	.sbss       start:0x80794C18 end:0x80794C50
+	.sdata2     start:0x8079C510 end:0x8079C568
 
 enemy/em_pop.cpp:
-	extab       start:0x80018DC4 end:0x80018FEC
-	extabindex  start:0x8003930C end:0x80039648
-	.text       start:0x803B465C end:0x803B936C
+	extab       start:0x80018F4C end:0x80018FEC
+	extabindex  start:0x80039558 end:0x80039648
+	.text       start:0x803B744C end:0x803B936C
 	.ctors      start:0x8056F3B4 end:0x8056F3B8
-	.data       start:0x805F7C68 end:0x805F8220
+	.data       start:0x805F7CE8 end:0x805F8220
 	.bss        start:0x806CC420 end:0x806D2A68
 	.sdata      start:0x80793688 end:0x80793690
-	.sbss       start:0x80794C48 end:0x80794C50
-	.sdata2     start:0x8079C560 end:0x8079C5B8
+	.sdata2     start:0x8079C568 end:0x8079C5B8
 
 enemy/em_model.cpp:
 	extab       start:0x80018FEC end:0x80019164

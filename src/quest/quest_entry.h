@@ -58,18 +58,8 @@ extern u8 quest_pair_table[];      /* .data 0x805F7898, read [index * 2 + sub] *
 extern u8 quest_byte_table[];      /* .data 0x805F78B4 */
 extern u16* arena_time_table[];    /* .data 0x805F7AF8, 12 pointers to u16 time tables */
 extern u16 multi_arena_clr_time[];     /* .data 0x805F7B28, 10 u16 pairs */
-/* Pooled float constants the target objects address as globals (playbook 29: declare, never
- * define - a definition would make MWCC emit a second copy in `.sdata2`). */
-extern const f32 frames_per_second_60f;   /* .sdata2 0x8079C524 */
-extern const f32 percent_scale_100f;      /* .sdata2 0x8079C558 */
-extern const f32 quest_grade_ratio_10f;   /* .sdata2 0x8079C540 */
-extern const f32 quest_grade_ratio_30f;   /* .sdata2 0x8079C55C */
-extern const f32 quest_intruder_wait_3f;  /* .sdata2 0x8079C54C: the intruder's three-second wait */
-extern const f64 quest_timer_zero_d;      /* .sdata2 0x8079C510: 0.0 */
-extern const f64 quest_timer_start_d;     /* .sdata2 0x8079C518: 29970.0 */
 /* The sixteen ascending quest-id thresholds `quest_init` scans per list record (.data 0x805F2A98). */
 extern u16 quest_id_threshold_tbl[20];
-extern const f32 quest_grade_ratio_50f;   /* .sdata2 0x8079C520 */
 
 /* One 8-byte entry of a monster's variant list: the quest rank it applies to (0xFF ends the list) and the
  * monster slot records (the work block's own `QuestEntrySlot` layout) a slot pair's group indexes. size: 0x8 */
@@ -365,5 +355,12 @@ extern "C" {
 s32 quest_grade_get(void);
 }
 #endif
+
+/* The staged file's header as `matchesFileVersion` reads it; only the version halfword is evidenced.
+ * size: 0x2E (lower bound) */
+typedef struct StagingFileHeader {
+    /* +0x00 */ u8 unused_0x00[0x2C];
+    /* +0x2C */ u16 version_0x2C;
+} StagingFileHeader;
 
 #endif /* MHTRI_QUEST_QUEST_ENTRY_H */

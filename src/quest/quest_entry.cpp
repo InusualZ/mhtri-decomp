@@ -2,15 +2,22 @@
  * quest/quest_entry.cpp - the quest system's core: the quest list loaders and `quest_init`, the lot picks and the
  *   pair/reward rolls, the monster spawns, the quest entry, the per-frame quest step and its intruder and successive
  *   hunts, and the result screen's record accessors and text getters.
- * RANGE. .text 0x803AB3BC-0x803B465C (102 functions); extab 0x80018B0C-0x80018DC4, extabindex 0x80038EF8-0x8003930C,
- *   .data 0x805F2A98-0x805F7C68, .bss 0x806C5558-0x806CC420, .sdata 0x807935D8-0x80793684, .sbss 0x80794C18-0x80794C48,
- *   .sdata2 0x8079C510-0x8079C560.  The head 0x803AA4A4-0x803AB3BC is `quest/quest_item_slot.cpp` (the `.data`
- *   emission-order seam of its static initialiser).  `enemy/em_pop.cpp`'s head 0x803B465C-0x803B6F2C reads this
- *   unit's private `.data` tables and pooled `.sdata2` constants, so it is this TU's tail (seam request quest-q1#27).
+ * RANGE. .text 0x803AB3BC-0x803B744C (158 functions); extab 0x80018B0C-0x80018F4C, extabindex 0x80038EF8-0x80039558,
+ *   .data 0x805F2A98-0x805F7CE8, .bss 0x806C5558-0x806CC420, .sdata 0x807935D8-0x80793684, .sbss 0x80794C18-0x80794C50,
+ *   .sdata2 0x8079C510-0x8079C568.  The head 0x803AA4A4-0x803AB3BC is `quest/quest_item_slot.cpp` (the `.data`
+ *   emission-order seam of its static initialiser).  The tail 0x803B465C-0x803B744C (the result-row field, flag and
+ *   slot accessors, the arena element passes, the score, supply and bonus steps, the key-row and extra-condition
+ *   tests, the staging-download version helpers) reads this unit's `.data` tables and pool: quest_score_deduct loads
+ *   0.0f 0x8079C530 and the pool's last literal 9950.0f 0x8079C560, quest_supply_drop_step 60.0f 0x8079C524, the
+ *   int-to-float magic 0x8079C528 and 5.0f 0x8079C548, and quest_result_field_text_cur_get's jump table 0x805F7C68
+ *   ends this unit's run.  `enemy/em_pop.cpp` starts at 0x803B744C with its own copies of 60.0f and the magic
+ *   (0x8079C568/0x8079C570) behind the `.sdata` hole at 0x80793684; the rows 0x803B6F2C-0x803B744C carry no pool
+ *   or private data, so the cut there rests on that hole and on em_set_entry_rec_apply's em_set-only callers.
  * DATA. Emitted in retail order and byte-identical: `.data` (the tables above the bodies, then the bodies' literals
  *   and jump tables), `.bss` (the picked-pair tables, `quest_work`, `quest_text_buffer`, `nora_set_proc`), `.sbss`
- *   and `.sdata`.  Not emitted: the named `.sdata2` constants (playbook 29; part of the pool is read only by
- *   `enemy/em_pop.cpp`'s head, the seam above).  `quest_name_unavailable_text` (.data 0x8060E888, unclaimed, between
+ *   (`quest_ex_condition_tbl` last), `.sdata` and `.sdata2` (every pooled literal is written in place, so MWCC emits
+ *   the pool in first-use order; 84 B against the claim's 88, the last word being the section's alignment pad).
+ *   `quest_name_unavailable_text` (.data 0x8060E888, unclaimed, between
  *   `menu/menu_sysmsg.cpp` and `Gecko_ExceptionPPC.cp`) is declared in `unsplit/menu.h` (rule 12, claim request).
  * FLAGS. the `menu` lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, Wii/1.3), plus
  *   `#pragma pool_data off` (retail addresses each table through its own symbol although they precede the bodies)
@@ -18,7 +25,8 @@
  *   quest_item_count_sum, quest_monsters_release, quest_monsters_spawn and quest_part_reward_roll rise under it);
  *   per function `opt_propagation off` (quest_enter_load, quest_arena_summary_step, quest_arena_time_text_get: the
  *   arena id's `- 9000` is then computed before the `system_w` column bool, as retail does) and `opt_lifetimes off`
- *   (quest_work_start_reset's callee-saved colours).
+ *   (quest_work_start_reset's callee-saved colours); `fp_contract off` over quest_supply_drop_step and
+ *   `opt_common_subs off` over quest_bonus_pick (idea 208).
  * NAMES. Module `quest` from the dump's globals (`q_result_msg_adrs`, `em_bui_tbl`, `em_hokaku_rem_l/h`,
  *   `nora_set_proc`) and its one function name `quest_init(unsigned char)`.  GUESS: the file name and every function
  *   and field name derived from a body, among them quest_list_load_hunt/_arena, quest_record_find,
@@ -26,8 +34,8 @@
  *   quest_pair_apply, quest_monster_spawn_area, quest_monsters_spawn, quest_enter_load, quest_entry_setup (supply
  *   fields), quest_main_step, quest_intruder_step, quest_successive_step, quest_item_deposit, quest_intro_step,
  *   quest_entry_point_warp; the tables quest_id_threshold_tbl, quest_monster_variant_tbl, quest_area_monster_tbl,
- *   quest_time_class_tbl, quest_supply_drop_tbl, quest_bonus_pick_tbl; the constants quest_timer_zero_d/start_d,
- *   quest_intruder_wait_3f; the types QuestListBlock, QuestEntrySlot, QuestSpawnRec, QuestBossSpawn, NoraSetProc.
+ *   quest_time_class_tbl, quest_supply_drop_tbl, quest_bonus_pick_tbl; the map's pool rows quest_timer_zero_d/start_d
+ *   and quest_intruder_wait_3f (literals in the source); the types QuestListBlock, QuestEntrySlot, QuestSpawnRec, QuestBossSpawn, NoraSetProc.
  *   GUESS (from each body and its callers): quest_part_reward_roll, quest_capture_reward_roll, quest_monster_setup
  *   GUESS: quest_list_load_hunt, quest_list_load_arena, quest_monsters_spawn_now, quest_monster_spawn_area
  *   GUESS: quest_monsters_spawn, quest_pair_apply, quest_element_copy, quest_pair_copy, quest_area_list_init
@@ -41,6 +49,13 @@
  *   quest_monster_variants_NN (quest_monster_variant_tbl[NN]), quest_variant_slots_NN_K (entry K of variant list NN),
  *   quest_supply_drop_NN (quest_supply_drop_tbl[NN]), quest_supply_drop_empty (its no-drop entries),
  *   quest_bonus_pick_NN (quest_bonus_pick_tbl[NN], first index), quest_bonus_items_N (the bonus lists' item rows).
+ *   The tail's names are GUESSes from each body (the flag masks, offsets and callers its comment names):
+ *   GUESS: quest_result_field_text_cur_get, quest_slot_byte_get, quest_slot_word_get, quest_field32C_ck, quest_flag_*_ck
+ *   GUESS: quest_special_element_step, quest_grade_goal_step, quest_stat_get, quest_score_deduct, quest_supply_drop_step
+ *   GUESS: quest_bonus_pick, quest_key_row_ck, quest_key20_flag_ck, quest_ex_condition_show_ck, quest_ex_condition_ck
+ *   GUESS: quest_element_progress_step, quest_arena_need_get, quest_all_player_item_count_sum, em_work_slot_pair_get
+ *   GUESS: stepStagingDownloadForVersion, matchesFileVersion, quest_ex_condition_tbl.  `quest_flag_2000000_ck` and
+ *   `quest_flag_800000_ck` are two-bit predicates (0x2000000 or 0x100; 0x800000 or exactly 0x40 of 0xC0).
  * RESIDUALS. Every row is written.
  *  - quest_main_step: the target shares its fail and clear tails between branches through backward jumps (a goto
  *    shape, rule 8).  The first two fail checks share one tail through one `||` condition (3068 B against 2832); the
@@ -54,13 +69,18 @@
  *    quest_start_load: register colouring (callee-saved permutations) that declaration order, per-function
  *    `opt_*` pragmas and fresh loop variables do not reach.
  *  - quest_enter_load: retail keeps `stage * 8` across `stage_dcm_path_get`; ours recomputes it.
- *  - flipcheck: .sdata2 short of the claim (the em_pop seam); quest_main_step is not 100 %.
+ *  - quest_supply_drop_step: `kind` and `id` swap colours (decl permutes and block-local copies tried);
+ *  - quest_all_player_item_count_sum: the `li` of the element index is scheduled before the base `addi`;
+ *  - quest_arena_need_get: `flags` and the work base swap colours and the row add takes its operands reversed;
+ *  - quest_slot_byte_get, quest_element_progress_step, quest_special_element_step: register numbering.
+ *  - flipcheck: `.text` (the rows above), one `extabindex` size word; quest_main_step is not 100 %.
  * SHAPES. Declaration order decides the callee-saved colours (playbook 63): see quest_list_load_*, quest_pair_apply,
  *   quest_monster_setup, quest_item_deposit, quest_capture_reward_roll.  Loop counters the target keeps dead are
  *   written as their own variables (`u16 j` in quest_item_deposit, the threshold scan in quest_init).  The bodies are
  *   in address order; the `.data` tables sit above them, the `.sdata` rows too so the `"%s"` object is last; the switch
  *   arms of quest_result_field_text_get follow its jump table's order.  Out-params of `em_get_unique_work` are
- *   block-scoped per case (retail gives each call site its own stack pair).
+ *   block-scoped per case (retail gives each call site its own stack pair).  The extra-condition tests count their six
+ *   board rows with an `s16` index (an `s32` one splits the unrolled loop); quest_stat_get follows quest_score_deduct.
  */
 
 #include "quest/quest_entry.h"
@@ -128,6 +148,10 @@
 #include "mh3_pad/lb_param_w.h"            /* lb_param_w (rule 2) */
 #include "enemy/em_quest_element_set.h"     /* em_quest_element_set (rule 2) */
 #include "enemy/em_mot_finished_ck.h"      /* em_mot_finished_ck (rule 2) */
+#include "lobby/lb_quest_board_data.h"
+#include "lobby/lb_sub17_send.h"
+#include "enemy/fn_8012EC74.h"
+#include "enemy/em020_area2_action20_ck.h"
 
 
 /* The band's quest-work pointer in this unit's own view of the record.  `quest_work_ptr` itself is
@@ -2085,9 +2109,9 @@ QuestWork* quest_init(u8 kind) {
     }
     memcpy(&quest_work_ptr->userdata_0x698, get_userdata(), sizeof(Q_UserData));
     quest_stat_copy(&quest_work_ptr->stat_0x6AA4, &quest_work_ptr->userdata_0x698.quest_stat);
-    quest_work_ptr->timer_0x6A48 = quest_timer_zero_d;
-    quest_work_ptr->timer_0x6A50 = quest_timer_zero_d;
-    quest_work_ptr->timer_0x6A58 = quest_timer_start_d;
+    quest_work_ptr->timer_0x6A48 = 0.0;
+    quest_work_ptr->timer_0x6A50 = 0.0;
+    quest_work_ptr->timer_0x6A58 = 29970.0;
     quest_work_ptr->slot_ids_0x309[0] = 0xFF;
     quest_work_ptr->slot_ids_0x309[1] = 0xFF;
     quest_work_ptr->slot_ids_0x309[2] = 0xFF;
@@ -2993,15 +3017,15 @@ void quest_enter_load(void) {
         }
     }
     if (quest_select_ready_ck() == 1) {
-        quest_work_ptr->field_0x01C = quest_grade_ratio_50f * (frames_per_second_60f * Screen_w.frame_scale);
+        quest_work_ptr->field_0x01C = 50.0f * (60.0f * Screen_w.frame_scale);
     } else {
-        quest_work_ptr->field_0x01C = quest_work_ptr->record_0x03C->field_0x13A * (frames_per_second_60f * Screen_w.frame_scale);
+        quest_work_ptr->field_0x01C = quest_work_ptr->record_0x03C->field_0x13A * (60.0f * Screen_w.frame_scale);
     }
     quest_time_limit_set(quest_work_ptr->field_0x01C);
     work->area_0xEE = work->sub_0xEA;
     ((StageMapView*)stage_w)->mapno = work->map_0xED;
     ((StageMapView*)stage_w)->areano = work->sub_0xEA;
-    minutes = quest_work_ptr->field_0x01C / (frames_per_second_60f * Screen_w.frame_scale);
+    minutes = quest_work_ptr->field_0x01C / (60.0f * Screen_w.frame_scale);
     time_class = 2;
     if (minutes <= quest_time_class_tbl[2]) {
         time_class = 1;
@@ -3250,7 +3274,7 @@ void quest_result_enter(Q_ItemWork* item, Q_MoveWork* work, u8 kind) {
     item->time_base_0x20 = item->time_limit_0x24;
     item->step_0x2C = 2;
     item->field_0x2D = 0;
-    quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
+    quest_time_limit_set((s32)(10.0f * Screen_w.frame_scale));
     ai_slots_clear();
     quest_result_stat_fill((QuestWork*)item);
     if (kind == 1) {
@@ -3294,7 +3318,7 @@ void quest_start_enter(Q_ItemWork* item, Q_MoveWork* work) {
         }
     }
     if (work->kind_0xFC == 4) {
-        quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
+        quest_time_limit_set((s32)(10.0f * Screen_w.frame_scale));
         if (system_w.field_0x7cf == 0x15) {
             hud_msg_push(0, quest_str_tbl_35_get(0));
         } else {
@@ -3313,7 +3337,7 @@ void quest_start_enter(Q_ItemWork* item, Q_MoveWork* work) {
                 hud_msg_push(0, quest_str_tbl_35_get(3));
             }
         } else {
-            quest_time_limit_set((s32)(frames_per_second_60f * Screen_w.frame_scale));
+            quest_time_limit_set((s32)(60.0f * Screen_w.frame_scale));
             if (system_w.field_0x7cf == 0x15) {
                 hud_msg_push(0, quest_str_tbl_35_get(4));
             } else {
@@ -3488,7 +3512,7 @@ void quest_main_step(void) {
         if (item->time_warned_0x6A39 == 0) {
             mark = item->time_total_0x1C;
             if (mark - 10 >= item->time_limit_0x24) {
-                sprintf(text, quest_str_tbl_35_get(7), (s32)((f32)mark / (frames_per_second_60f * Screen_w.frame_scale)));
+                sprintf(text, quest_str_tbl_35_get(7), (s32)((f32)mark / (60.0f * Screen_w.frame_scale)));
                 hud_msg_push(0, text);
                 item->time_warned_0x6A39 = 1;
             }
@@ -3513,7 +3537,7 @@ void quest_main_step(void) {
         }
         if ((quest_flag_8_ck(NULL) != 1 || (work->field_0xFB != 6 && work->field_0xFB != 4)) && item->time_class_0x6A38 > 0) {
             mark = quest_time_class_tbl[item->time_class_0x6A38];
-            if ((f32)left <= frames_per_second_60f * Screen_w.frame_scale * (f32)mark) {
+            if ((f32)left <= 60.0f * Screen_w.frame_scale * (f32)mark) {
                 sprintf(text, quest_str_tbl_35_get(6), mark);
                 hud_msg_push(0, text);
                 item->time_class_0x6A38--;
@@ -3676,7 +3700,7 @@ void quest_finish_step(void) {
     case 0:
         work->counter_0x697C = work->counter_0x697C + 1;
         if (work->hunt_end_0x6977 != 0) {
-            if ((f32)work->counter_0x697C < 5.0f * (frames_per_second_60f * Screen_w.frame_scale)) {
+            if ((f32)work->counter_0x697C < 5.0f * (60.0f * Screen_w.frame_scale)) {
                 return;
             }
         }
@@ -3743,7 +3767,7 @@ void quest_intruder_step(void) {
         if (quest_flag_100_ck(NULL) == 1) {
             if (quest->intruder_index_0x6977 != 2) {
                 quest->field_0x697C++;
-                if (!((f32)quest->field_0x697C < quest_intruder_wait_3f * (frames_per_second_60f * Screen_w.frame_scale))) {
+                if (!((f32)quest->field_0x697C < 3.0f * (60.0f * Screen_w.frame_scale))) {
                     memcpy(&quest->key_rows_0x0319[3], &quest->release_0x6760, sizeof(Q_SlotPair));
                     if (isServerSelectState() == 0) {
                         quest->field_0x6978 = 4;
@@ -3759,7 +3783,7 @@ void quest_intruder_step(void) {
             case 1:
                 if (quest->intruder_index_0x6977 != 2) {
                     quest->field_0x697C++;
-                    if (!((f32)quest->field_0x697C < quest_intruder_wait_3f * (frames_per_second_60f * Screen_w.frame_scale))) {
+                    if (!((f32)quest->field_0x697C < 3.0f * (60.0f * Screen_w.frame_scale))) {
                         quest->field_0x697C = 0;
                         quest->field_0x6978++;
                         return;
@@ -3773,7 +3797,7 @@ void quest_intruder_step(void) {
                 if (quest->intruder_index_0x6977 != 1 && quest->spawn_count_0x308 == 1 &&
                     (u8)em_get_unique_work(0, &enemy, &mini) != 0 && (u32)em_mot_finished_ck(enemy) != 1) {
                     quest->field_0x697C++;
-                    if (!((f32)quest->field_0x697C < quest_intruder_wait_3f * (frames_per_second_60f * Screen_w.frame_scale))) {
+                    if (!((f32)quest->field_0x697C < 3.0f * (60.0f * Screen_w.frame_scale))) {
                         quest->field_0x697C = 0;
                         quest->field_0x6978++;
                         return;
@@ -3801,7 +3825,7 @@ void quest_intruder_step(void) {
                     }
                     if (live <= 1 && (u8)em_get_unique_work(last, &enemy, &mini) != 0 && (u32)em_mot_finished_ck(enemy) != 1) {
                         quest->field_0x697C++;
-                        if (!((f32)quest->field_0x697C < quest_intruder_wait_3f * (frames_per_second_60f * Screen_w.frame_scale))) {
+                        if (!((f32)quest->field_0x697C < 3.0f * (60.0f * Screen_w.frame_scale))) {
                             quest->field_0x697C = 0;
                             quest->field_0x6978++;
                             return;
@@ -4374,10 +4398,10 @@ void quest_result_fill(Q_MoveWork* work) {
         memcpy(&result->items_0x154[0x18], me->spare_slot_id, sizeof(me->spare_slot_id));
     }
     result->elapsed_0x148 = quest_elapsed_time_get();
-    result->seconds_0x14C = result->elapsed_0x148 / (frames_per_second_60f * Screen_w.frame_scale);
+    result->seconds_0x14C = result->elapsed_0x148 / (60.0f * Screen_w.frame_scale);
     result->time_base_0x150 = quest->field_0x020;
     result->rank_0x3A6 = result_hunt_rank_get(&QUEST_WORK->set_c, &QUEST_WORK->set_d);
-    result->time_rank_0x3A8 = result_time_rank_get((s32)(quest_elapsed_time_get() / (frames_per_second_60f * Screen_w.frame_scale)));
+    result->time_rank_0x3A8 = result_time_rank_get((s32)(quest_elapsed_time_get() / (60.0f * Screen_w.frame_scale)));
     result_rank_rows_fill(result->rank_rows_0x3AA);
     result->rank_points_0x3DC = result_rank_points_get(&QUEST_WORK->set_c, &QUEST_WORK->set_d);
     memcpy(result->count_a, &QUEST_WORK->set_c, sizeof(result->count_a));
@@ -4468,7 +4492,7 @@ void quest_arena_summary_step(Q_MoveWork* work) {
     players = (struct _PLW*)get_move_work_adrs(2);
     me = &players[(s8)my_player_no()];
     result->elapsed_0x148 = quest_elapsed_time_get();
-    result->seconds_0x14C = result->elapsed_0x148 / (frames_per_second_60f * Screen_w.frame_scale);
+    result->seconds_0x14C = result->elapsed_0x148 / (60.0f * Screen_w.frame_scale);
     result->time_base_0x150 = quest->field_0x020;
     row = result->progress_0x1E0 - 9000;
     if (multi_arena_clr_time[row * 2 + (system_w.field_0x8af != 0)] > result->elapsed_0x148) {
@@ -5022,7 +5046,7 @@ char* quest_field2E8_text_get(void) {
 char* quest_clear_time_text_get(void) {
     char** tbl = (char**)get_str_tbl(6);
     s32 time = quest_work.field_0x024;
-    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
+    f32 frames = 60.0f * Screen_w.frame_scale;
     s32 minutes = time / (s32)frames;
     s32 seconds;
 
@@ -5036,7 +5060,7 @@ char* quest_clear_time_text_get(void) {
 char* quest_elapsed_time_text_get(void) {
     char** tbl = (char**)get_str_tbl(6);
     s32 time = quest_work.field_0x01C - quest_work.field_0x020;
-    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
+    f32 frames = 60.0f * Screen_w.frame_scale;
     s32 minutes = time / (s32)frames;
     s32 seconds;
 
@@ -5125,7 +5149,7 @@ char* quest_arena_time_text_get(QuestRecord* rec, s32 which) {
     } else if (quest_flag_10_ck(rec) == 1) {
         time = arena_time_table[rec->field_0x02C - 60000][(u8)which] * 30;
     }
-    frames = frames_per_second_60f * Screen_w.frame_scale;
+    frames = 60.0f * Screen_w.frame_scale;
     minutes = time / (s32)frames;
     seconds = time - minutes * (s32)frames;
     seconds /= (s32)Screen_w.frame_scale;
@@ -5169,12 +5193,12 @@ char* quest_grade_text_cur_get(void) {
     if (quest_element_value_get(4, &total) == 0) {
         return quest_text_buffer;
     }
-    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
-    if (ratio <= quest_grade_ratio_10f) {
+    ratio = 100.0f * ((f32)quest_work.field_0x5D8 / (f32)total);
+    if (ratio <= 10.0f) {
         grade = 4;
-    } else if (ratio <= quest_grade_ratio_30f) {
+    } else if (ratio <= 30.0f) {
         grade = 3;
-    } else if (ratio <= quest_grade_ratio_50f) {
+    } else if (ratio <= 50.0f) {
         grade = 2;
     }
     return quest_grade_text_get(grade);
@@ -5189,14 +5213,14 @@ s32 quest_grade_get(void) {
     if (quest_element_value_get(4, &total) == 0) {
         return 0;
     }
-    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
-    if (ratio <= quest_grade_ratio_10f) {
+    ratio = 100.0f * ((f32)quest_work.field_0x5D8 / (f32)total);
+    if (ratio <= 10.0f) {
         return 4;
     }
-    if (ratio <= quest_grade_ratio_30f) {
+    if (ratio <= 30.0f) {
         return 3;
     }
-    if (ratio <= quest_grade_ratio_50f) {
+    if (ratio <= 50.0f) {
         return 2;
     }
     return 1;
@@ -5211,7 +5235,7 @@ s32 quest_grade_rank_get(u8 grade) {
     if (quest_element_value_get(4, &total) == 0) {
         return 0;
     }
-    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
+    ratio = 100.0f * ((f32)quest_work.field_0x5D8 / (f32)total);
     return ratio <= (f32)grade;
 }
 
@@ -5386,6 +5410,1499 @@ char* quest_result_field_text_get(QuestRecord* rec, u8 kind) {
         break;
     }
     return quest_text_buffer;
+}
+
+
+/* The text a result-screen field kind shows for the current row: kinds 0..31 pick one of the row's own text
+ * runs or one of the quest band's text getters. */
+char* quest_result_field_text_cur_get(u8 kind) {
+    char buf[256];
+    char* brk;
+    QuestRecord* rec = quest_record_get();
+
+    quest_text_buffer[0] = 0;
+    buf[0] = 0;
+    if (rec != NULL) {
+        switch (kind) {
+        case 0:
+        case 22:
+            msg_str_gen(rec->field_0x000, quest_text_buffer);
+            break;
+        case 1:
+            msg_str_gen(rec->field_0x02E, quest_text_buffer);
+            break;
+        case 2:
+            if (quest_flag_10000000_ck(rec) == 1) {
+                return quest_grade_text_get(0);
+            }
+            msg_str_gen(rec->field_0x08C, quest_text_buffer);
+            break;
+        case 3:
+            msg_str_gen(rec->field_0x0B5, quest_text_buffer);
+            break;
+        case 4:
+            msg_str_gen(rec->field_0x0DE, quest_text_buffer);
+            break;
+        case 5:
+            msg_str_gen(rec->field_0x13C, quest_text_buffer);
+            break;
+        case 7:
+            msg_str_gen(rec->field_0x19A, quest_text_buffer);
+            break;
+        case 8:
+            msg_str_gen(rec->field_0x1C9, quest_text_buffer);
+            break;
+        case 16:
+            msg_str_gen(rec->field_0x02E, quest_text_buffer);
+            brk = flfntStrChr(quest_text_buffer, 10);
+            if (brk != NULL) {
+                *brk = 0;
+            }
+            break;
+        case 17:
+            if (quest_flag_10000000_ck(rec) == 1) {
+                msg_str_gen(rec->field_0x08C, quest_text_buffer);
+            } else {
+                msg_str_gen(rec->field_0x02E, quest_text_buffer);
+                brk = flfntStrChr(quest_text_buffer, 10);
+                if (brk != NULL) {
+                    strcpy(buf, brk + 1);
+                    strcpy(quest_text_buffer, buf);
+                } else {
+                    quest_text_buffer[0] = 0;
+                }
+            }
+            break;
+        case 6:
+            return quest_field198_text_get();
+        case 9:
+            return quest_name_text_get();
+        case 10:
+            return quest_field13A_text_get();
+        case 11:
+            return quest_time_text_get(0);
+        case 13:
+            return quest_time_text_get(1);
+        case 14:
+            return quest_time_text_get(2);
+        case 15:
+            return quest_time_text_get(3);
+        case 12:
+            return quest_field348_text_get();
+        case 18:
+            return quest_clear_time_text_get();
+        case 19:
+            return quest_field2E8_text_get();
+        case 20:
+            return quest_score_text_get();
+        case 21:
+            return quest_elapsed_time_text_get();
+        case 23:
+            return quest_arena_items_text_get(0);
+        case 24:
+            return quest_arena_items_text_get(1);
+        case 25:
+            return quest_arena_items_text_get(2);
+        case 26:
+            return quest_arena_time_text_get(rec, 0);
+        case 27:
+            return quest_arena_time_text_get(rec, 1);
+        case 28:
+            return quest_arena_time_text_get(rec, 2);
+        case 29:
+            return quest_grade_text_cur_get();
+        case 30:
+            return quest_monster_text_get(rec, 0);
+        case 31:
+            return quest_monster_text_get(rec, 1);
+        }
+    }
+    return quest_text_buffer;
+}
+
+/* The row's halfword at +0x37A (0 when there is no row). */
+u16 quest_field37A_get(QuestRecord* rec) {
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    return rec->field_0x37A;
+}
+
+/* The slot's value byte: from the armed byte run when the 0x2000000 test passes, else from the
+ * halfword run while the matching state bits are set; 0 when nothing applies. */
+u8 quest_slot_byte_get(QuestRecord* rec, u8 slot) {
+    QuestRecord* row;
+    if (rec == NULL) {
+        row = quest_record_get();
+        if (row == NULL) {
+            return 0;
+        }
+    } else {
+        row = rec;
+    }
+    if (slot >= 3) {
+        return 0;
+    }
+    if (quest_flag_2000000_ck(row) == 1) {
+        if (row->slot_bytes_0x314[slot].armed == 0) {
+            return 0;
+        }
+        return row->slot_bytes_0x314[slot].value;
+    }
+    QuestRecordSlotWord* word = &row->slot_words_0x330[slot];
+    u32 flags = row->flags_0x310;
+    if (flags & 5) {
+        u32 slot_flags = word->flags;
+        if ((slot_flags & 1) || (slot_flags & 0x400) || (slot_flags & 0x4000)) {
+            return (u8)word->value;
+        }
+    }
+    if (flags & 0x200000) {
+        if (row->slot_bytes_0x314[slot].armed == 0) {
+            return 0;
+        }
+        return row->slot_bytes_0x314[slot].value;
+    }
+    return 0;
+}
+
+/* The slot's halfword value when both the row and the slot carry state bit 2; else 0. */
+u16 quest_slot_word_get(QuestRecord* rec, u8 slot) {
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (slot >= 3) {
+        return 0;
+    }
+    QuestRecordSlotWord* word = &rec->slot_words_0x330[slot];
+    if (rec->flags_0x310 & 2) {
+        if (word->flags & 2) {
+            return word->value;
+        }
+    }
+    return 0;
+}
+
+/* Whether the row carries flag 0x100 or has its +0x32C byte set. */
+u32 quest_field32C_ck(QuestRecord* rec) {
+    QuestRecord* row;
+    if (rec == NULL) {
+        row = quest_record_get();
+        if (row == NULL) {
+            return 0;
+        }
+    } else {
+        row = rec;
+    }
+    if (quest_flag_100_ck(row) == 1) {
+        return 1;
+    }
+    return row->field_0x32C != 0;
+}
+
+/* The row's byte at +0x32E (0 when there is no row). */
+u8 quest_field32E_get(QuestRecord* rec) {
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    return rec->field_0x32E;
+}
+
+/* Whether the result row carries flag 0x8. */
+u32 quest_flag_8_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x8) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x80000. */
+u32 quest_flag_80000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x80000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x2000000 or flag 0x100. */
+u32 quest_flag_2000000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x2000000) {
+        return 1;
+    }
+    return (rec->flags_0x310 & 0x100) != 0;
+}
+
+/* Whether the result row carries flag 0x80000000. */
+u32 quest_flag_80000000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x80000000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x4000000. */
+u32 quest_flag_4000000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x4000000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x100. */
+u32 quest_flag_100_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x100) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x10000000. */
+u32 quest_flag_10000000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x10000000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x100000. */
+u32 quest_flag_100000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x100000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x40000000. */
+u32 quest_flag_40000000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x40000000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x1000000. */
+u32 quest_flag_1000000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x1000000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x10. */
+u32 quest_flag_10_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x10) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x200000. */
+u32 quest_flag_200000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x200000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x800000, or has exactly flag 0x40 of the 0xC0 pair. */
+u32 quest_flag_800000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x800000) {
+        return 1;
+    }
+    return (rec->flags_0x310 & 0xC0) == 0x40;
+}
+
+/* Whether the result row carries flag 0x40000. */
+u32 quest_flag_40000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x40000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x80. */
+u32 quest_flag_80_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x80) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x2000000 or flag 0x80000000. */
+u32 quest_flag_2000000_or_80000000_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x2000000) {
+        return 1;
+    }
+    return (rec->flags_0x310 & 0x80000000) != 0;
+}
+
+/* Whether the result row carries flag 0x2000000 (the single-bit twin of the composite test above). */
+u32 quest_flag_2000000_only_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x2000000) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Whether the result row carries flag 0x800. */
+u32 quest_flag_800_ck(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    if (rec->flags_0x310 & 0x800) {
+        return 1;
+    }
+    return 0;
+}
+
+/* The objective code of a result row (the current one when `rec` is NULL), from its flag word: 1, 9, 2,
+ * 3 or 4, and 0 while the slot is in its entry state or no row exists. */
+u8 quest_objective_get(QuestRecord* rec) {
+    u8 objective = 0;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec != NULL || (rec = quest_record_get()) != NULL) {
+        u32 flags = rec->flags_0x310;
+        if (flags & 2) {
+            objective = 1;
+        } else if (flags & 8) {
+            objective = 9;
+        } else {
+            u32 pair = flags & 5;
+            if (pair == 5) {
+                objective = 2;
+            } else {
+                if (pair == 1) {
+                    objective = 3;
+                }
+                if (pair == 4) {
+                    objective = 4;
+                }
+            }
+        }
+    }
+    return objective;
+}
+
+/* The same objective code with the 0x200000 state reported as 7 (the result screen's own reading). */
+u8 quest_objective_result_get(QuestRecord* rec) {
+    u8 objective = 0;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec != NULL || (rec = quest_record_get()) != NULL) {
+        u32 flags = rec->flags_0x310;
+        if (flags & 8) {
+            objective = 9;
+        } else if (flags & 0x200000) {
+            objective = 7;
+        } else if (flags & 2) {
+            objective = 1;
+        } else {
+            u32 pair = flags & 5;
+            if (pair == 5) {
+                objective = 2;
+            } else {
+                if (pair == 1) {
+                    objective = 3;
+                }
+                if (pair == 4) {
+                    objective = 4;
+                }
+            }
+        }
+    }
+    return objective;
+}
+
+/* Whether the quest is over: the move work is in state 1, flag 0x4000000 is set, or the current row has its
+ * +0x32C byte set. */
+u32 quest_field32C_or_4000000_ck(void) {
+    QuestRecord* rec;
+    if (move_work_state_ck() == 1) {
+        return 1;
+    }
+    rec = quest_record_get();
+    if (rec == NULL) {
+        return 0;
+    }
+    if (quest_flag_4000000_ck(0) == 1) {
+        return 1;
+    }
+    return rec->field_0x32C != 0;
+}
+
+/* The leading word of entry `index` of the current row's third run (0 when there is no row). */
+u32 quest_row394_get(u8 index) {
+    QuestRecord* rec = quest_record_get();
+    if (rec == NULL) {
+        return 0;
+    }
+    return rec->rows_0x394[index].field_0x00;
+}
+
+/* Fills the result work's stat block from the item work when a finished quest's record is in state 7: cleared
+ * when the item work carries a stat, else the em020 hit info. */
+void quest_result_stat_fill(QuestWork* item) {
+    Q_ResultWork* result = get_qResult_work();
+    _ENEMY_WORK* work = NULL;
+    if (item->record_0x03C->field_0x08B == 7) {
+        em_get_unique_work(0, &work, NULL);
+        if (work != NULL) {
+            if (item->stat_gate_0x4B8 != 0) {
+                memset(&result->stat_0x3E0, 0, 16);
+            } else if (work->team == 20) {
+                em020_hit_info_get(work, (Em020HitInfo*)&result->stat_0x3E0);
+                result->stat_0x3E0.word_0x0C = item->stat_word_0x10;
+            }
+        }
+    }
+}
+
+/* Steps the special elements (flag 0x2000) by kind: 1 ends the quest when the area-2 em020 reaches action 20,
+ * 2 and 3 complete the element when their stage gate opens, 4 fails the quest once the score is gone. */
+void quest_special_element_step(QuestWork* work) {
+    Q_MoveWork* move;
+    struct _ENEMY_WORK* enemy;
+    struct _ENEMY_MINI_WORK* mini;
+    QuestElement* el = work->elements_0x0094;
+    s32 i = 0;
+
+    for (; i < 3; i++, el++) {
+        if ((el->flags & 0x2000) != 0x2000) {
+            continue;
+        }
+        switch (el->id) {
+        case 1:
+            enemy = NULL;
+            mini = NULL;
+            em_get_unique_work(0, &enemy, &mini);
+            if (enemy != NULL && em020_area2_action20_ck(enemy) == 1) {
+                el->flags |= 0x40;
+                move = (Q_MoveWork*)get_move_work_adrs(0);
+                if (move != NULL) {
+                    if (isServerSelectState() == 0) {
+                        quest_result_enter((Q_ItemWork*)work, move, 3);
+                    } else {
+                        lb_entry_start_default((struct LbCompanionWork*)work, 3, work->field_0x024);
+                    }
+                }
+            }
+            break;
+        case 2:
+            if (stage_gate_a_ck() == 1) {
+                quest_element_set(work, i, 0);
+            }
+            break;
+        case 3:
+            if (stage_gate_b_ck() == 1) {
+                quest_element_set(work, i, 0);
+            }
+            break;
+        case 4:
+            if ((el->flags & 0x40) == 0 && work->field_0x5D8 == 0) {
+                el->flags |= 0x40;
+                move = (Q_MoveWork*)get_move_work_adrs(0);
+                if (move != NULL) {
+                    quest_work_ptr->entry_send_0x6A3A[2] = 5;
+                    if (isServerSelectState() == 0) {
+                        quest_result_enter((Q_ItemWork*)work, move, 2);
+                    } else {
+                        lb_entry_start_default((struct LbCompanionWork*)work, 2, work->field_0x024);
+                    }
+                }
+            }
+            break;
+        }
+    }
+}
+
+/* Under quest flag 0x200000: completes the first unfinished team element (flag 0x400) once its team's damage
+ * drops under the mark, and raises the entry-send flag when the elements the grade asks for are picked. */
+void quest_grade_goal_step(QuestWork* work) {
+    QuestElement* el;
+    s32 found;
+    s32 i;
+    s32 done;
+    s32 picked;
+
+    if (quest_flag_200000_ck(NULL) == 0) {
+        return;
+    }
+    quest_time_elapsed_get();
+    found = 0;
+    el = work->elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        if ((el->flags & 0x10) != 0x10 && (el->flags & 0x400) == 0x400) {
+            found = 1;
+            break;
+        }
+    }
+    if (found == 0) {
+        return;
+    }
+    if (em_team_damage_under_ck((u8)el->id, (u8)el->target_count) == 1) {
+        quest_element_set(work, i, 0x400);
+    }
+    done = 0;
+    switch (work->grade_0x93) {
+    case 1:
+        if (quest_element_pick_ck(work, 0, 1) == 1 || quest_element_pick_ck(work, 1, 1) == 1 ||
+            quest_element_pick_ck(work, 2, 1) == 1) {
+            done = 1;
+        } else {
+            done = 0;
+        }
+        break;
+    case 2:
+        if (quest_element_pick_ck(work, 0, 1) == 1) {
+            done = 1;
+        } else {
+            done = 0;
+        }
+        break;
+    case 3:
+        if (quest_element_pick_ck(work, 0, 1) == 1 && quest_element_pick_ck(work, 1, 1) == 1) {
+            done = 1;
+        } else {
+            done = 0;
+        }
+        break;
+    case 4:
+        picked = 0;
+        for (i = 0; i < 3; i++) {
+            if (quest_element_live_ck(work, i) == 0) {
+                picked++;
+            } else if (quest_element_pick_ck(work, i, 1) == 1) {
+                picked++;
+            }
+        }
+        done = picked == 3;
+        break;
+    }
+    if (done == 1) {
+        work->entry_send_0x6A3A[0] = 1;
+    }
+}
+
+/* Scans the three elements for the em020 hunt goal, fills the result stat when one matches, and arms the
+ * element whose team window has closed; 1 when one was armed. */
+u32 quest_element_window_check(QuestWork* work) {
+    QuestElement* el;
+    s32 i;
+    s32 hit;
+    get_qResult_work();
+    hit = 0;
+    el = work->elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        if ((el->flags & 0x10) && ((el->flags & 0x400) || (el->flags & 0x4000)) && (u8)el->id == 20) {
+            hit = 1;
+            quest_result_stat_fill(work);
+        }
+    }
+    if (hit) {
+        work->entry_send_0x6A3A[1] = 2;
+    } else {
+        work->entry_send_0x6A3A[1] = 1;
+    }
+    el = work->elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        if (el->flags & 0x10) {
+            if ((el->flags & 0x4000) == 0x4000 && em_team_damage_over_ck((u8)el->id, (u8)el->target_count) == 1) {
+                quest_element_set(work, i, 0x400);
+                work->entry_send_0x6A3A[0] = 1;
+                return 1;
+            }
+            if ((el->flags & 0x404) == 0x404 && em_team_damage_under_ck((u8)el->id, (u8)el->target_count) == 1) {
+                quest_element_set(work, i, 0x400);
+                work->entry_send_0x6A3A[0] = 1;
+                return 1;
+            }
+        }
+    }
+    work->entry_send_0x6A3A[1] = 0;
+    return 0;
+}
+
+/* The state (0x4014, 0x414 or 0x404) of the element whose low id byte is `key`; 0 when none matches. */
+u32 quest_element_state_find(u8 key) {
+    QuestWork* work = quest_work_ptr;
+    u32 flags;
+    QuestElement* el;
+    s32 i;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (work == NULL) {
+        return 0;
+    }
+    el = work->elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        flags = el->flags;
+        if ((flags & 0x4014) == 0x4014 && (u8)el->id == key) {
+            return 0x4014;
+        }
+        if ((flags & 0x414) == 0x414 && (u8)el->id == key) {
+            return 0x414;
+        }
+        if ((flags & 0x404) == 0x404 && (u8)el->id == key) {
+            return 0x404;
+        }
+    }
+    return 0;
+}
+
+/* Whether any of the three elements carries state 0x404. */
+u32 quest_element_404_ck(void) {
+    QuestWork* work = quest_work_ptr;
+    QuestElement* el;
+    s32 i;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (work == NULL) {
+        return 0;
+    }
+    el = work->elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        if ((el->flags & 0x404) == 0x404) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Whether any element whose bit 0x10 is set is in its entry state (0x404 or 0x414): the gate the pair
+ * rolls in `quest_pair_roll_all` wait on. */
+u32 quest_element_state_ck(void) {
+    QuestWork* work = quest_work_ptr;
+    u32 flags;
+    QuestElement* el;
+    s32 i;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (work == NULL) {
+        return 0;
+    }
+    el = work->elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        flags = el->flags;
+        if (flags & 0x10) {
+            if ((flags & 0x404) == 0x404) {
+                return 1;
+            }
+            if ((flags & 0x414) == 0x414) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* The arena element `id`'s stored value into `out`; 0 when no element matches. */
+s32 quest_element_value_get(u16 id, s16* out) {
+    QuestElement* el = quest_work.elements_0x0094;
+    s32 i;
+    for (i = 0; i < 3; i++, el++) {
+        if ((el->flags & 0x2000) == 0x2000 && el->id == id) {
+            if (out != NULL) {
+                *out = el->value;
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Element `index`'s stored value, ignoring its id, else -1. */
+s32 quest_element_value_index_get(u16 index) {
+    QuestElement* el;
+    if (move_work_state_ck() == 1) {
+        return -1;
+    }
+    el = &quest_work.elements_0x0094[index];
+    if ((el->flags & 0xA) == 0xA) {
+        return el->target_count;
+    }
+    return -1;
+}
+
+/* Element `index`'s stored value when `id` matches its own id, else -1. */
+s32 quest_element_value_at(u16 id, u16 index) {
+    QuestElement* el;
+    if (move_work_state_ck() == 1) {
+        return -1;
+    }
+    el = &quest_work.elements_0x0094[index];
+    if ((el->flags & 0xA) == 0xA && el->id == id) {
+        return el->target_count;
+    }
+    return -1;
+}
+
+/* Fills `out` with element `index`'s id and what is still missing of its target; returns the id. */
+u16 em_work_slot_pair_get(u16 index, s16* out) {
+    QuestElement* el;
+    if (move_work_state_ck() == 1 && out != NULL) {
+        out[0] = 0;
+        out[1] = 0;
+        return 0;
+    }
+    el = &quest_work.elements_0x0094[index];
+    if ((el->flags & 0xA) == 0xA) {
+        if (out != NULL) {
+            Q_ItemPair* pair = (Q_ItemPair*)out;
+            s16 remaining;
+            pair->id = el->id;
+            remaining = el->target_count - quest_item_count_sum(el->id, 0);
+            if (remaining < 0) {
+                remaining = 0;
+            }
+            pair->num = remaining;
+        }
+        return el->id;
+    }
+    if (out != NULL) {
+        out[0] = 0;
+        out[1] = 0;
+    }
+    return 0;
+}
+
+/* Element `index`'s target minus the local player's held count, clamped up to 0. */
+s32 quest_element_remaining_get(u16 index) {
+    QuestElement* el;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    el = &quest_work.elements_0x0094[index];
+    if ((el->flags & 0xA) == 0xA) {
+        s32 remaining = el->target_count - quest_item_count_sum(el->id, 0);
+        if (remaining < 0) {
+            remaining = 0;
+        }
+        return remaining;
+    }
+    return 0;
+}
+
+/* The item `id`'s count over every player the system work covers; 0 when no element carries the id. */
+s32 quest_all_player_item_count_sum(u16 id) {
+    s32 i;
+    s32 total = 0;
+    s32 player;
+    QuestItemSlot* slots;
+    for (i = 0; i < 3; i++) {
+        QuestElement* el = &quest_work.elements_0x0094[i];
+        if ((el->flags & 0xA) == 0xA && el->id == id) {
+            break;
+        }
+    }
+    if (i >= 3) {
+        return 0;
+    }
+    slots = quest_work.player_items_0x6A6A[0];
+    for (player = 0; player < (s8)system_w.field_0x28; player++, slots += 3) {
+        if (slots[0].id == id) {
+            total += slots[0].count;
+        }
+        if (slots[1].id == id) {
+            total += slots[1].count;
+        }
+        if (slots[2].id == id) {
+            total += slots[2].count;
+        }
+    }
+    return total;
+}
+
+/* Whether arena element `id` carrying `value` still has that item recorded; clears the element when the
+ * record is the single-use kind. */
+u32 quest_arena_value_clear_ck(u16 id, u16 value) {
+    s32 i;
+    u32 result = 0;
+    QuestElement* el;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    el = quest_work.elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        if ((el->flags & 0x200) == 0x200 && el->id == id && el->target_count == value) {
+            if (quest_work.part_count_run_0x6803[el->id * 8 + value] == 1) {
+                quest_element_set(&quest_work, i, 0x200);
+            }
+            if (quest_work.part_count_run_0x6803[el->id * 8 + value] >= 1) {
+                result = 1;
+            }
+        }
+    }
+    return result;
+}
+
+/* Clears the first element that has state 0x1000 for `key` while its value's bit is set in the key's
+ * mask; 1 when one was cleared. */
+u32 quest_arena_key_clear(u8 key) {
+    QuestElement* el;
+    s32 i;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    el = quest_work.elements_0x0094;
+    for (i = 0; i < 3; i++, el++) {
+        if ((el->flags & 0x1000) == 0x1000 && el->id == key &&
+            ((1 << el->target_count) & quest_work.key_bits_0x694C[el->id])) {
+            quest_element_set(&quest_work, i, 0x1000);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Runs the per-frame countdown of the armed arena elements matching `kind`: flags the finished ones, posts
+ * the remaining-count message every fifth frame and stores the first finished index in `first`. */
+u32 quest_element_progress_step(u16 kind, u8 mode, s8* first) {
+    u32 armed;
+    s32 i;
+    s32 shown;
+    u32 result = 0;
+    QuestElement* el;
+    char text[0x20];
+    *first = -1;
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    armed = quest_flag_80000_ck(0);
+    if (armed == 0) {
+        armed = quest_flag_2000000_ck(0);
+    }
+    el = quest_work.elements_0x0094;
+    shown = 0;
+    for (i = 0; i < 3; i++, el++) {
+        if (el->flags & 0x60) {
+            continue;
+        }
+        if ((el->flags & 9) != 9) {
+            continue;
+        }
+        if (el->id != kind && enemy_kind_same_ck((u8)el->id, (u8)kind) == 0) {
+            continue;
+        }
+        if ((el->flags & 0x80) && mode != 1) {
+            el->flags |= 0x40;
+            *first = i;
+            return 0;
+        }
+        if ((el->flags & 0x100) && mode == 1) {
+            el->flags |= 0x40;
+            *first = i;
+            return 0;
+        }
+        if (el->target_count != 0) {
+            el->target_count--;
+        }
+        if (el->target_count == 0) {
+            quest_element_set(&quest_work, i, 0x100);
+            if (*first < 0) {
+                *first = i;
+            }
+            result = 1;
+        }
+        if (shown == 0) {
+            if (el->flags & 0x8000) {
+                s32 remaining = el->target_count;
+                if (remaining != 0 && remaining % 5 == 0) {
+                    sprintf(text, quest_str_tbl_35_get(37), remaining);
+                    hud_msg_push(0, text);
+                    shown = 1;
+                }
+            }
+            if (el->flags & 0x10000) {
+                s32 remaining = el->target_count;
+                if (remaining != 0 && remaining % 5 == 0) {
+                    sprintf(text, quest_str_tbl_35_get(38), remaining);
+                    hud_msg_push(0, text);
+                    shown = 1;
+                }
+            }
+            if (el->flags & 0x20000) {
+                u32 k;
+                s32 total = 0;
+                u32 count = (quest_flag_100_ck(0) == 1) ? 2 : 3;
+                for (k = 0; k < count; k++) {
+                    s32 need = quest_arena_need_get(k);
+                    if (need >= 0) {
+                        total += need;
+                    }
+                }
+                if (total != 0) {
+                    sprintf(text, quest_str_tbl_35_get(37), total);
+                    hud_msg_push(0, text);
+                    shown = 1;
+                }
+            }
+        }
+        if (armed == 1) {
+            break;
+        }
+    }
+    return result;
+}
+
+/* How many of arena element `index`'s item the player still needs (-1 when the element is not live). */
+s32 quest_arena_need_get(s32 index) {
+    QuestElement* el;
+    u32 flags;
+    if (move_work_state_ck() == 1) {
+        return -1;
+    }
+    el = &quest_work.elements_0x0094[index];
+    flags = el->flags;
+    if (flags != 0) {
+        if (flags & 0x200) {
+            if (el->target_count != 0) {
+                s32 held = quest_work.part_counts_0x6803[el->id][el->target_count];
+                if (held > 1) {
+                    held = 1;
+                }
+                return 1 - held;
+            }
+        }
+        if ((flags & 0x1000) || (flags & 0x2000)) {
+            if (flags & 0x20) {
+                return 0;
+            }
+            return 1;
+        }
+        if (flags & 2) {
+            return quest_element_remaining_get(index);
+        }
+        return el->target_count;
+    }
+    return -1;
+}
+
+/* How many of arena element `index`'s item the player still holds (-1 when the element is not live). */
+s32 quest_arena_count_get(s32 index) {
+    QuestElement* el;
+    u32 flags;
+    if (move_work_state_ck() == 1) {
+        return -1;
+    }
+    el = &quest_work.arena_elements_0x01B4[index];
+    flags = el->flags;
+    if (flags != 0) {
+        if (flags & 0x200) {
+            return 1;
+        }
+        if ((flags & 2) || (flags & 1)) {
+            return el->target_count;
+        }
+        if (flags & 0x10) {
+            return -1;
+        }
+        return 1;
+    }
+    return -1;
+}
+
+/* Takes `points` off the quest score (clamped at 0) and plays the penalty sound at the area's fixed spot,
+ * on enemy `unique_id`'s sound work. */
+void quest_score_deduct(u16 points, u16 unique_id) {
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 spot_a;
+    nw4r::math::VEC3 spot_b;
+    struct _ENEMY_WORK* enemy;
+    struct _ENEMY_MINI_WORK* mini;
+    s32 score;
+
+    if (move_work_state_ck() == 1) {
+        return;
+    }
+    score = quest_work.field_0x5D8 - points;
+    if (score < 0) {
+        score = 0;
+    }
+    quest_work.field_0x5D8 = score;
+    VEC3_ctor(&pos);
+    enemy = NULL;
+    mini = NULL;
+    if ((u8)em_get_unique_work(unique_id, &enemy, &mini) != 0 && enemy != NULL) {
+        switch (get_now_areano()) {
+        case 1:
+            copyVec3(&pos, setVec3(&spot_a, 0.0f, 0.0f, 0.0f));
+            break;
+        case 2:
+            copyVec3(&pos, setVec3(&spot_b, 9950.0f, 0.0f, 0.0f));
+            break;
+        default:
+            return;
+        }
+        se_req_pos_ps(enemy->se_0xB14, 0x44, 2, &pos);
+    }
+}
+
+/* The work block's quest stat (NULL while the block is absent or the move work is in state 1). */
+Q_QuestStat* quest_stat_get(void) {
+    QuestWork* work = quest_work_ptr;
+    if (move_work_state_ck() == 1) {
+        return NULL;
+    }
+    if (work == NULL) {
+        return NULL;
+    }
+    return &work->stat_0x6AA4;
+}
+
+#pragma fp_contract off
+/* Steps the quest's supply drops: kind 1 delivers on the time-rank schedule (each step's minute mark, a 1-in-128
+ * roll), kind 2 once five minutes before the end; each delivery adds the row's supply pairs (or sends them to the
+ * lobby on the server-select screen) and ends the drops at the stage's limit. */
+void quest_supply_drop_step(void) {
+    QuestWork* work = &quest_work;
+    u8* step;
+    u8 kind;
+    u16 id;
+
+    if (work == NULL) {
+        return;
+    }
+    if (work->supply_kind_0x8B == 0) {
+        return;
+    }
+    step = NULL;
+    switch (work->supply_kind_0x8B) {
+    case 1:
+        if (quest_slot_progress_get(NULL) != 1) {
+            return;
+        }
+        step = quest_supply_drop_tbl[work->time_rank_0x59];
+        break;
+    case 3:
+        return;
+    }
+    switch (work->supply_kind_0x8B) {
+    case 1:
+        step += work->supply_step_0x58 * 2;
+        if (step[0] == 0) {
+            return;
+        }
+        if (step[0] * 1800 < work->field_0x024) {
+            return;
+        }
+        if (isServerSelectState() == 1 && isReadyCountOne() == 0) {
+            return;
+        }
+        work->supply_step_0x58++;
+        if ((u8)(ran_suu(0) & 0x7F) >= step[1]) {
+            return;
+        }
+        work->supply_count_0x8F++;
+        kind = work->supply_kind_0x8B;
+        if (work->supply_count_0x8F == work->supply_limit_0x8E) {
+            work->supply_kind_0x8B = 0;
+        }
+        id = quest_field372_get(NULL);
+        if (isServerSelectState() == 0) {
+            quest_item_pair_copy_row(work->supply_0x5E2, id, work->supply_count_0x8F, kind);
+            hud_msg_push(1, quest_str_tbl_35_get(20));
+            return;
+        }
+        lb_sub17_send(id, work->supply_count_0x8F, work->supply_kind_0x8B, kind);
+        break;
+    case 2:
+        if (work->supply_count_0x8F > 0) {
+            return;
+        }
+        if ((f32)work->field_0x01C - 5.0f * (60.0f * Screen_w.frame_scale) < (f32)work->field_0x024) {
+            return;
+        }
+        if (isServerSelectState() == 1 && isReadyCountOne() == 0) {
+            return;
+        }
+        work->supply_count_0x8F++;
+        kind = work->supply_kind_0x8B;
+        if (work->supply_count_0x8F == work->supply_limit_0x8E) {
+            work->supply_kind_0x8B = 0;
+        }
+        id = quest_field372_get(NULL);
+        if (isServerSelectState() == 0) {
+            quest_item_pair_copy_row(work->supply_0x5E2, id, work->supply_count_0x8F, kind);
+            hud_msg_push(1, quest_str_tbl_35_get(20));
+            return;
+        }
+        lb_sub17_send(id, work->supply_count_0x8F, work->supply_kind_0x8B, kind);
+        break;
+    }
+}
+
+#pragma fp_contract reset
+/* Picks the quest's bonus byte (`+0x30D`) by weight from the row's bonus list for its name index (the stage
+ * hands the pick over when the row's +0x37A word is 1 and a lobby slot holds 0x1A); returns it. */
+#pragma opt_common_subs off
+u8 quest_bonus_pick(void) {
+    QuestWork* work;
+    u8 name;
+    u16 list_index;
+    s32 i;
+    u8* entry;
+    s32 total;
+    u8* scan;
+    s32 sum;
+    s32 roll;
+    u8 bonus;
+
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    work = &quest_work;
+    if (work == NULL) {
+        return 0;
+    }
+    name = quest_name_index_get(NULL);
+    list_index = quest_field37A_get(NULL);
+    if (list_index == 1) {
+        for (i = 0; i < 4; i++) {
+            if (lb_param_w.slots_0x16[i] == 0x1A) {
+                return stage_bonus_pick(name);
+            }
+        }
+    }
+    entry = quest_bonus_pick_tbl[name][list_index];
+    total = 0;
+    scan = entry;
+    while (*scan != 0xFF) {
+        total += *scan;
+        scan += 2;
+    }
+    roll = ran_suu(0) % total;
+    sum = 0;
+    while (*entry != 0xFF) {
+        sum += *entry++;
+        if (roll < sum) {
+            break;
+        }
+        entry++;
+    }
+    bonus = *entry;
+    work->bonus_0x30D = bonus;
+    return bonus;
+}
+#pragma opt_common_subs reset
+
+/* Whether any of the work block's three key rows holds `key`. */
+u32 quest_key_row_ck(u8 key) {
+    Q_SlotPair* row;
+    s32 i;
+    if (&quest_work == NULL) {
+        return 0;
+    }
+    row = quest_work.key_rows_0x0319;
+    for (i = 0; i < 3; i++, row++) {
+        if (row->id_0x00 == key) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* With key 0x14 present, whether flag 0x200000 is set (`invert` 0) or clear (`invert` non-zero). */
+u32 quest_key20_flag_ck(u8 invert) {
+    if (quest_key_row_ck(0x14) == 0) {
+        return 0;
+    }
+    if (invert == 0) {
+        return quest_flag_200000_ck(0) != 0;
+    }
+    return quest_flag_200000_ck(0) != 1;
+}
+
+/* One 6-byte row of the extra-condition table: the list's and the board's condition kinds and the range they
+ * test.  size: 0x6 */
+typedef struct QuestExCondition {
+    /* +0x0 */ u8 show_kind_0x0;
+    /* +0x1 */ u8 accept_kind_0x1;
+    /* +0x2 */ u16 lo_0x2;
+    /* +0x4 */ u16 hi_0x4;
+} QuestExCondition;
+
+/* The `.sbss` slot holding the extra-condition table (nothing in the game sets it, so both tests fail); the
+ * second word is the slot's filler.  size: 0x8 */
+typedef struct QuestExConditionSlot {
+    /* +0x0 */ QuestExCondition* rows;
+    /* +0x4 */ u32 unused_0x04;
+} QuestExConditionSlot;
+
+QuestExConditionSlot quest_ex_condition_tbl;
+
+/* The record's extra condition for the quest list: the first kind of its `quest_ex_condition_tbl` row decides -
+ * 0/4 pass, 1 tests `param` against the row's range, 2 tests `arg` against the range's low byte, 3 needs the
+ * board's six counters at 0. */
+u32 quest_ex_condition_show_ck(QuestRecord* rec, u16 param, u8 arg, LbQuestBoardData* data) {
+    QuestExCondition* row;
+    s16 i;
+    if (quest_ex_condition_tbl.rows == NULL) {
+        return 0;
+    }
+    if (rec == NULL) {
+        return 0;
+    }
+    row = &quest_ex_condition_tbl.rows[rec->condition_0x198];
+    switch (row->show_kind_0x0) {
+    case 0:
+    case 4:
+        return 1;
+    case 1:
+        if (row->lo_0x2 <= param && row->hi_0x4 >= param) {
+            return 1;
+        }
+        return 0;
+    case 2:
+        return (u8)row->lo_0x2 == arg;
+    case 3:
+        if (data != NULL) {
+            for (i = 0; i < 6; i++) {
+                if (data->rows_0x13C[i].count_0x6 >= 1) {
+                    return 0;
+                }
+            }
+            return 1;
+        }
+        return 0;
+    default:
+        return 0;
+    }
+}
+
+/* The same test with the row's second kind, for the quest board: kind 2 tests `arg` against the high byte. */
+u32 quest_ex_condition_ck(QuestRecord* rec, u16 param, u8 arg, LbQuestBoardData* data) {
+    QuestExCondition* row;
+    s16 i;
+    if (quest_ex_condition_tbl.rows == NULL) {
+        return 0;
+    }
+    if (rec == NULL) {
+        return 0;
+    }
+    row = &quest_ex_condition_tbl.rows[rec->condition_0x198];
+    switch (row->accept_kind_0x1) {
+    case 0:
+    case 4:
+        return 1;
+    case 1:
+        if (row->lo_0x2 <= param && row->hi_0x4 >= param) {
+            return 1;
+        }
+        return 0;
+    case 2:
+        return (u8)row->hi_0x4 == arg;
+    case 3:
+        if (data != NULL) {
+            for (i = 0; i < 6; i++) {
+                if (data->rows_0x13C[i].count_0x6 >= 1) {
+                    return 0;
+                }
+            }
+            return 1;
+        }
+        return 0;
+    default:
+        return 0;
+    }
+}
+
+/* Finds the staged file whose header carries `version` and steps its download; -1 when none does. */
+s32 stepStagingDownloadForVersion(u16 version) {
+    NetCtrlWk* wk = net_ctrl_wk;
+    s32 file;
+    s32 i;
+    if (wk != NULL) {
+        for (i = 0; i < 10; i++) {
+            StagingFileHeader* hdr = (StagingFileHeader*)wk->file_buffers_0xC39C[i];
+            if (hdr->version_0x2C == version) {
+                file = i;
+                break;
+            }
+        }
+    }
+    if (i >= 10) {
+        return -1;
+    }
+    return NetCtrlWk::stepStagingDownloadIfUp(file, version);
+}
+
+/* Whether `buffer`'s staged file header carries `version`. */
+u32 matchesFileVersion(const u8* buffer, u16 version) {
+    return ((const StagingFileHeader*)buffer)->version_0x2C == version;
 }
 
 }  /* extern "C" */
