@@ -296,8 +296,8 @@ u32 snd_obj_release(Sound* snd, SoundSlot** link);
 u32 snd_slot_flag_test(SoundSlot* slot, u32 mask);
 void snd_obj_update(Sound2* self, SoundSlot* slot);
 void snd_voice_3d_update(Sound* snd, AxVoiceBlock* ax);
-void* fn_800E9B5C(u8* list, void* entry);
-void* fn_800E9BE4(u8* list);
+void* snd_cmd_pool_free(u8* list, void* entry);
+void* snd_cmd_pool_first(u8* list);
 
 void snd_obj_start(void* unused, SoundSlot* slot);
 u32 snd_reverb_flags_get(ReverbMgr* mgr);
@@ -318,7 +318,7 @@ void snd_artic_table_clear(Pair32* p);
 f32 snd_deg_to_rad(f32 v);
 void snd_base_construct(VtblHolder* p);
 
-void* fn_800E9960(u8* list);
+void* snd_cmd_pool_alloc(u8* list);
 
 void snd_obj_stop(void* unused, SoundSlot* slot);
 void snd_obj_pause(void* unused, SoundSlot* slot);
@@ -334,7 +334,7 @@ Sound* snd_obj_construct(Sound* snd);
 ReverbLine* snd_line_construct(ReverbLine* line);
 Sound* snd_player_base_construct(Sound* snd);
 
-void fn_800E8E60(AxVoice* voice, u32 a, s16 b);
+void snd_voice_pitch_set(AxVoice* voice, u32 a, s16 b);
 
 void __construct_array(void* array, void* ctor, void* dtor, int size, int count);
 
@@ -636,7 +636,7 @@ extern "C" AxVoiceBlock* snd_slot_state_get(SoundSlot* slot)
 /* Dispatches every active voice of a slot to the handler its kind selects. */
 extern "C" void snd_cmd_list_run(Sound2* self)
 {
-    SoundSlot* iter = (SoundSlot*)fn_800E9BE4(snd_cmd_list_get());
+    SoundSlot* iter = (SoundSlot*)snd_cmd_pool_first(snd_cmd_list_get());
 
     while (snd_cmd_list_end_ck((u8*)snd_cmd_list_get(), (u8*)iter) != 1) {
         SlotEntry* info = snd_cmd_entry_info((u8*)iter);
@@ -654,7 +654,7 @@ extern "C" void snd_cmd_list_run(Sound2* self)
             }
             voice = snd_voice_next(voice);
         }
-        iter = (SoundSlot*)fn_800E9B5C(snd_cmd_list_get(), iter);
+        iter = (SoundSlot*)snd_cmd_pool_free(snd_cmd_list_get(), iter);
     }
 }
 
@@ -855,7 +855,7 @@ extern "C" void snd_cmd_post(void* unused, u32 owner, u32 kind, u8 a, u8 b, u8 c
     if (owner == 0) {
         return;
     }
-    entry = (u8*)fn_800E9960(snd_cmd_list_get());
+    entry = (u8*)snd_cmd_pool_alloc(snd_cmd_list_get());
     if (entry == 0) {
         return;
     }
@@ -1414,7 +1414,7 @@ extern "C" void snd_obj_pitch_set(void* unused, SoundSlot* slot, s16 pitch)
         v = -ax->bend_down;
     }
     ax->pitch = v;
-    fn_800E8E60((AxVoice*)ax->voice, ax->wave->field_04, ax->pitch);
+    snd_voice_pitch_set((AxVoice*)ax->voice, ax->wave->field_04, ax->pitch);
 }
 
 /* The pitch of the first voice one owner holds. */

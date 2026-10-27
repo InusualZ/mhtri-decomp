@@ -18,7 +18,7 @@ s32 snd_pan_calc(Vec* rel, f32 dist, f32 angle, f32 pan_dist, f32 pan_angle, f32
 s32 snd_span_calc(Vec* rel, f32 dist, f32 pan_dist, f32 atten);
 s32 snd_distance_volume(s16 volume, f32 dist, f32 scale);
 s32 snd_distance_priority(f32 dist, f32 scale);
-u32 snd_ref_table_count(SndRefTable* table, u32 index);
+u32 snd_ref_table_count(SndRefTable* table, s32 index);
 
 #ifdef __cplusplus
 }

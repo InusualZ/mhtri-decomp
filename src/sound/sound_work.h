@@ -281,7 +281,6 @@ typedef struct SndTri16 {
 
 /* --- globals owned elsewhere in the sound band ------------------------------------------------ */
 
-extern SndPool lbl_80698AF0;      /* the 0x4C pool, constructed by fn_800E9C1C/fn_800E9C10 */
 extern SndPool2 lbl_8069A8E8;     /* the 0x110 pool, constructed by fn_800EDF1C/fn_800EDF10 */
 extern u8 g_stream_mgr[0xD8];     /* the stream manager (fn_800E46E8.cpp's StreamWork) */
 extern u16 stream_rand_seed;          /* the 16-bit PRNG seed fn_800E9D00 advances */
@@ -291,8 +290,6 @@ extern f32 lbl_807964EC;          /* 1.0f: the ratio denominator */
 extern f32 lbl_80796514;          /* snd_distance_volume's scale */
 extern f32 lbl_80796518;          /* snd_distance_priority's numerator */
 extern f32 lbl_8079651C;          /* snd_distance_priority's scale */
-extern u8 lbl_80598020[0xC];      /* a node vtable (fn_800E9C74 installs it) */
-extern u8 lbl_8059802C[0xC];      /* a node base vtable (fn_800E9CB0 installs it) */
 extern u8 lbl_80598090[0xC];      /* the 0x110-node derived vtable (fn_800EDF74 installs it) */
 extern u8 lbl_8059809C[0xC];      /* the 0x110-node base vtable (fn_800EDFC4 installs it) */
 extern u8 snd_heap_allocator[0x10];     /* the expand-heap allocator snd_heap_alloc allocates from */

@@ -110,7 +110,7 @@ void fn_800E8498(u32 v, u8 idx);
 s16 fn_800E8594(u32 idx);
 void snd_reverb_advance(u32 idx);
 
-void fn_800E93E0(ReverbLine* line);
+void snd_wave_bank_relocate(ReverbLine* line);
 
 
 void snd_reverb_apply(u32 idx, u32 entry_idx);
@@ -363,7 +363,7 @@ extern "C" void snd_whd_install(u32 idx, RelocDesc* desc)
     fn_800E7EA4(fn_800E7ED0(snd_obj_get(), idx), t4);
     fn_800E7E9C(fn_800E7ED0(snd_obj_get(), idx), t8);
     fn_800E7E94(fn_800E7ED0(snd_obj_get(), idx), tC);
-    fn_800E93E0(fn_800E7ED0(snd_obj_get(), idx));
+    snd_wave_bank_relocate(fn_800E7ED0(snd_obj_get(), idx));
 }
 
 /* Installs one line's five relocation tables. */
