@@ -44,7 +44,7 @@ s32 menu_row_rec_init(PlaceRec* rec, u16 tree);
 /* The row and placement-list entries `hud/cockpit.cpp`'s pointer page calls (the owner's definitions' signatures). */
 struct MenuRowData;
 u32 menu_row_find(const struct MenuRowData* entry);
-u8 menu_row_empty_count(void);
+u16 menu_row_empty_count(void);
 u32 menu_row_reserve(struct MenuRowData* entry);
 void place_list_deactivate_all(void);
 s32 place_list_overlap_find(s16 x, s16 y, s16 width, s16 height);
