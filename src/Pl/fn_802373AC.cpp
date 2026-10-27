@@ -5,13 +5,12 @@
  *   `jumptable_805C2C60` and `fn_802399C8`'s 270-entry `jumptable_805C309C`), extab, extabindex.
  * NAMES. The functions keep the map's stems (no `__FILE__` string covers the band; the runtime dump answers a
  *   placeholder).
- * RESIDUALS. `fn_802373AC`: in four arms (0x465, 0x46A, 0x4C5, 0x4C6) MWCC colours the shared `partHi` onto r28, the
- *   register `part`'s last read frees, where retail keeps r27 (12 of 2439 instructions); an allocator web-priority
- *   residual - the declaration moved, `u32`/`int`/`register u32`, an initialiser, a cast, a dead copy of `part` and the
- *   inline `(part << 0x18)` spelling all measure the same.  flipcheck: 19 of the 20260 `.text` bytes differ (first at
- *   +0x1671); both jump tables, extab and extabindex are byte-identical.
+ * RESIDUALS. none.
  * SHAPES. The three `_se_w` locals are declared in a different order than they are assigned (`Pl/fn_8023C2D0.cpp`'s
  *   shape); `fn_802399C8`'s case 0x4C5 spells the shift in each argument instead of through `partHi`.
+ *  - `fn_802373AC` keeps `partHi` only in the arms 0x465, 0x46A, 0x4C5 and 0x4C6, which MWCC colours r27 as retail
+ *    does; case 0x45D spells `(part << 0x18) | 0x3` in both arguments - storing it in `partHi` too colours those four
+ *    arms r28 (12 instructions).
  */
 
 #include "types.h"
@@ -322,9 +321,8 @@ extern "C" void fn_802373AC(_PLW* work, u8 part) {
             return;
 
         case 0x45D:
-            partHi = ((part << 0x18) | 0x3);
-            se_req_frame_set_bank(seWorkFrame, 0xE, partHi, 0x11, 0x2);
-            se_req_frame_set_bank(seWorkFrame, 0x1C, partHi, 0x14, 0x2);
+            se_req_frame_set_bank(seWorkFrame, 0xE, ((part << 0x18) | 0x3), 0x11, 0x2);
+            se_req_frame_set_bank(seWorkFrame, 0x1C, ((part << 0x18) | 0x3), 0x14, 0x2);
             se_req_frame_set_bank(seWorkFrame, 0x38, ((part << 0x18) | 0x4), 0x11, 0x2);
             se_req_frame_set(seWorkMain, 0x6, 0x5, 0x14, 0x3);
             se_req_frame_set(seWorkPart, 0x20, 0x8, 0x14, 0x03000003);
