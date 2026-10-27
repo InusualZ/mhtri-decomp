@@ -726,7 +726,7 @@ config.libs = [
             Object(NonMatching, "enemy/em_prog_support.cpp"),
             Object(Matching, "enemy/em_prog_tail.cpp"),
             Object(NonMatching, "enemy/fn_802F5138.cpp"),
-            Object(NonMatching, "enemy/em_sub_state_prog.cpp"),
+            Object(Matching, "enemy/em_sub_state_prog.cpp"),
             Object(NonMatching, "enemy/em_act_step.cpp"),
             Object(Matching, "enemy/em_act_step_tail.cpp"),
         ],
@@ -903,7 +903,7 @@ config.libs = [
             Object(Matching, "Runtime.PPCEABI.H/runtime.cpp"),
             # The MSL C library run recut by file (unit headers of src/MSL_C/*.c carry the evidence).
             # Metrowerks' Gecko exception runtime (one TU, .cp resolved as C++): see the unit header.
-            Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
+            Object(Matching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
             Object(NonMatching, "MSL_C/GCN_Mem_Alloc.c"),
             Object(NonMatching, "MSL_C/alloc.cpp"),
             Object(Matching, "MSL_C/ansi_files.c"),
