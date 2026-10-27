@@ -7,6 +7,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/cp_vector.h"
+#include "mh3_pad/vec3.h"   /* VEC3_ctor, the constructor below (rule 2) */
 
 struct LbMenuWork;
 struct LbMenuPanel;
@@ -57,7 +58,10 @@ typedef struct LbLobbyWork {
     /* +0x015 */ u8 area_next_0x015;   /* the area the area change loads next (`lobby_area_change_step`) */
     /* +0x016 */ u8 area_prev_0x016;   /* the area it leaves */
     /* +0x017 */ u8 unused_0x017;
-    /* +0x018 */ u8 spawn_0x018[0xC];  /* the player spawn record `lb_player_spawn_set` reads */
+    /* +0x018 */ union {   /* the player spawn record `lb_player_spawn_set` reads: the position the placement copies in */
+        /* +0x018 */ u8 spawn_0x018[0xC];
+        /* +0x018 */ nw4r::math::VEC3 spawn_pos_0x018;
+    };
     /* +0x024 */ u16 spawn_id_0x024;   /* its entry id */
     /* +0x026 */ u8 area_change_0x026; /* 1 asks the game-mode flow for an area change */
     /* +0x027 */ union {
@@ -200,6 +204,9 @@ typedef struct LbLobbyWork {
     /* +0x177 */ u8 refresh_step_0x177;  /* the friend-list refresh request's step */
     /* +0x178 */ s8 refresh_result_0x178; /* its result code */
     /* +0x179 */ u8 unused_0x179[0x3];
+
+    /* Constructs the two position vectors (`lobby/lb_menu_pos_tbl.cpp` defines it; its `__sinit` runs it for `lobby_w`). */
+    LbLobbyWork();
 } LbLobbyWork; /* size: 0x17C */
 
 #endif /* MHTRI_LOBBY_LOBBY_WORK_H */

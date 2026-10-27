@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (171)
+## Ideas that work (173)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -180,6 +180,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 189 | [A function's schedule depends on the previously compiled function: anchor it with a dead-stripped predecessor](189-functions-schedule-depends-on.md) | works | source-shape, linker, process | The first function of a unit has two independent instructions in the wrong order (same size, same relocations) and no source shape, flag, pragma or compiler version moves them. |
 | 190 | [A run of conditional stores from a stepping address is a short loop: written out, the constants fold](190-run-of-conditional-stores.md) | works | source-shape | Retail keeps an address in a saved register and steps it with addis/subi between stores; ours folds every store to its own lis/addi constant and saves one more register |
 | 191 | [Float locals keep a quad's UV fadds that literal arguments fold away](191-float-locals-keep-a.md) | works | source-shape | Retail computes 0.0f + 1.0f at run time (fadds f1,f30,f28 from two hoisted registers); ours loads a folded 1.0f from the pool per vertex |
+| 192 | [A retail frsp on an f32 value that was just stored raw is a (f32)(f64) round trip](192-retail-frsp-on-an.md) | works | source-shape | Retail stores an f32 parameter or return value with plain `stfs f1` and then rounds the same register (`frsp f1,f1` / `frsp f0,f1`) for a compare or a second store; an `f64` parameter hoists the `frsp` above the stores... |
+| 193 | [A constructor emitted after __sinit is an inline member with __declspec(noinline) defined after the object](193-constructor-emitted-after-sinit.md) | works | source-shape, sections | Retail's `__sinit` calls a class constructor that sits right after it in `.text` (`bl __ct__...` then the ctor body); ours inlines the constructor into `__sinit`, or emits it before `__sinit` when it is an ordinary... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

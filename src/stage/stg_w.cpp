@@ -3765,7 +3765,7 @@ extern "C" void stage_colour_cycle_update(void)
     s16 high;
     s16 i;
 
-    count = fn_8021F218();
+    count = lb_item_list_step_get();
     peak = lb_item_list_depth_get(count);
     table = stage_blend_table_get();
     step = lbl_8079A4C0 / (f32)count;

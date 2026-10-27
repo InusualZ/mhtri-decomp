@@ -197,7 +197,7 @@ extern void field_game_task(void);
 extern void vs_game_task(void);
 extern void quest_game_task(void);
 extern void game_mode_flow_task(void);
-extern void fn_8021F3A8(void);
+extern void lobby_local_task(void);
 extern PadChanState pad_chan_state[4];
 }
 
@@ -1046,7 +1046,7 @@ extern "C" void arena_task_start(void)
     }
 }
 
-extern "C" void fn_80041A0C(void)
+extern "C" void field_game_task_start(void)
 {
     Tsk_Change((void*)&field_game_task, 4);
 }
@@ -3365,7 +3365,7 @@ void GameModeExec(void)
             Tsk_Change((void*)&game_mode_flow_task, 4);
             return;
         }
-        Tsk_Change((void*)&fn_8021F3A8, 4);
+        Tsk_Change((void*)&lobby_local_task, 4);
         return;
     }
 }

@@ -6536,7 +6536,7 @@ __declspec(noinline) void fn_80208A48(_PLW* self)
 }
 
 /* 0x80208A84 - whether the act layer is idle: an unknown id and a clear +0x30E byte. */
-__declspec(noinline) u32 fn_80208A84(_PLW* self)
+__declspec(noinline) u32 lb_pl_act_idle_ck(_PLW* self)
 {
     int id = self->field_0x00A;
 

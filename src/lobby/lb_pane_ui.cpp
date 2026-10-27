@@ -30,7 +30,7 @@
  *  - `lb_gun_set_cells_draw`: retail hoists the three kind constants and `mark - 1` into saved registers and colours
  *    the loop differently (r14-r31); same instruction count;
  *  - shared tails: retail's step machines branch into a sibling case's tail (`fn_801F3294`, `lb_color_pane_step`,
- *    `fn_801FB524`, `lobby_scene_setup_step`), ours repeats the tail; `fn_801FB524`/`lobby_scene_setup_step` also
+ *    `lobby_enter_seq_step`, `lobby_scene_setup_step`), ours repeats the tail; `lobby_enter_seq_step`/`lobby_scene_setup_step` also
  *    binary-search their dispatch where ours compares linearly;
  *  - `lb_choice_draw` is reached through `unsplit/lobby.h`'s five-argument view, so `lb_pane_draw` misses the sixth
  *    (`li r8,0`);
@@ -7630,7 +7630,7 @@ typedef struct LbChgColorWork {
     /* +0x28 */ void* table_0x28;
 } LbChgColorWork; /* size: 0x2C */
 
-/* The sequence record `fn_801FB524`'s caller owns: a step counter and the state the driver switches
+/* The sequence record `lobby_enter_seq_step`'s caller owns: a step counter and the state the driver switches
  * on. */
 typedef struct LbChgSeqWork {
     /* +0x00 */ u8 state_0x00;
@@ -8640,7 +8640,7 @@ void lb_progress_rewards_check(void)
 
 /* 0x801FB524 - the editor's sequence driver: one state step per frame, returning whether the sequence
  * has finished. */
-s32 fn_801FB524(LbChgSeqWork* self)
+s32 lobby_enter_seq_step(LbChgSeqWork* self)
 {
     u16 status = Psw[0].button_0x2C0.pressed_0x04;
     s32 done = 0;

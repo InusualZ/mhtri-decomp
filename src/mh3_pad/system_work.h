@@ -117,7 +117,10 @@ typedef struct SystemWork {
     /* +0x7CD */ u8 field_0x7cd;
     /* +0x7CE */ u8 field_0x7ce;
     /* +0x7CF */ u8 field_0x7cf;    /* 0x15 selects the second string of each quest entry message pair */
-    /* +0x7D0 */ u8 pad_0x7d0[0x1];
+    /* +0x7D0 */ union {   /* one byte, two spellings (rule 5) */
+        /* +0x7D0 */ u8 pad_0x7d0[0x1];
+        /* +0x7D0 */ u8 area_no_0x7d0;   /* the lobby's current area, stored with the map number at +0x7CF */
+    };
     /* +0x7D1 */ u8 field_0x7d1;    /* set to 1 with +0x7D2 by the lobby pre-quest flow */
     /* +0x7D2 */ u8 field_0x7d2;    /* == 1 is the quest-work busy gate (`quest_work_busy_ck`) */
     /* +0x7D3 */ u8 field_0x7d3;    /* game_ready_ck: == 1 */
@@ -167,7 +170,10 @@ typedef struct SystemWork {
     /* +0x884 */ u8 field_0x884;
     /* +0x885 */ u8 pad_0x885[0x1];
     /* +0x886 */ u8 field_0x886;
-    /* +0x887 */ u8 pad_0x887[0x1];
+    /* +0x887 */ union {   /* one byte, two spellings (rule 5) */
+        /* +0x887 */ u8 pad_0x887[0x1];
+        /* +0x887 */ u8 opening_movie_0x887;   /* nonzero: the offline lobby plays the opening movie first, then clears it */
+    };
     /* +0x888 */ u32 unlock_seen_0x888[2];   /* the unlock flags the result screen has already announced */
     /* +0x890 */ u32 field_0x890;
     /* +0x894 */ u32 field_0x894;

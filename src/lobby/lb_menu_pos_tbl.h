@@ -1,8 +1,27 @@
-/* The lobby menu-position unit `lobby/lb_menu_pos_tbl.cpp`: the lobby's own guard the NPC control band polls. */
+/* The declarations `lobby/lb_menu_pos_tbl.cpp` owns: the local lobby's game-mode task, the item list's clock and
+ * selection, the player placement, the exit positions and the trade tables. */
 #ifndef MHTRI_LOBBY_LB_MENU_POS_TBL_H
 #define MHTRI_LOBBY_LB_MENU_POS_TBL_H
 
 #include "types.h"
+
+#ifdef __cplusplus
+#include "nw4r/math.h"
+#include "mh3_pad/vec3.h"
+#include "mh3_pad/task.h"
+
+extern "C" {
+/* .data 0x805BA650 - each exit's trigger radius on the ground plane. */
+extern f32 lb_menu_pos_radius[4];
+
+/* 0x8021F2AC - clears the lobby work and parameters, allocates the menu work and loads the lobby map (GUESS name). */
+void lobby_local_init(void);
+/* 0x8021F3A8 - the offline lobby's game-mode task (`GameModeExec` hands it slot 4; GUESS name). */
+void lobby_local_task(TaskSlot* self);
+/* 0x8021F218 - the item list's per-tick row step (`lb_item_list_state` +0x18; GUESS name). */
+f32 lb_item_list_step_get(void);
+}
+#endif
 
 #ifdef __cplusplus
 extern "C" {

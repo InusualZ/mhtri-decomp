@@ -432,7 +432,8 @@ struct Q_UserData {
     /* +0x3DE4 */ u16 hunter_rank_0x3DE4;    /* the hunter rank */
     /* +0x3DE6 */ u8 makeup_0x3DE6;
     /* +0x3DE7 */ u8 makeup_color_0x3DE7;
-    /* +0x3DE8 */ u8 pad_0x3DE8[0x3E01 - 0x3DE8];
+    /* +0x3DE8 */ u8 pad_0x3DE8[0x3E00 - 0x3DE8];
+    /* +0x3E00 */ u8 item_list_sel_0x3E00;  /* the item list's saved row, restored when the offline lobby starts */
     /* +0x3E01 */ u8 state_0x3E01;          /* three bytes a new game clears */
     /* +0x3E02 */ u8 state_0x3E02;
     /* +0x3E03 */ u8 state_0x3E03;

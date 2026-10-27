@@ -157,8 +157,6 @@ extern "C" {
 extern LbMenuItemState lb_item_list_state; /* .bss 0x806AAA88 */
 extern LbPageState lb_page_state_0;  /* .bss 0x806AAAD8 */
 extern LbPageState lb_page_state_1;  /* .bss 0x806AAAF0 */
-extern VEC3 lb_menu_pos_tbl[4];      /* .bss 0x806AAB08 */
-extern VEC3 lb_menu_pos_extra;       /* .bss 0x806AAB38 */
 extern LbLobbyWork* lobby_wp;    /* .sbss 0x80794B18 - points at `lobby_w` (`lobby_flow_init`) */
 extern const f32 lbl_80799C60;       /* .sdata2 0x80799C60 - the y-window this range tests against */
 extern const u16 lb_ship_header_sprites[];     /* .sdata 0x80791F30 */

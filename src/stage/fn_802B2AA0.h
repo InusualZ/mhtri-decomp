@@ -331,7 +331,7 @@ extern "C" u32 mhchar_frame_check(void* chr, s32 a, s32 b, f32 c, f32 d);
 extern "C" void eft_capsule_ctor(nw4r::math::VEC3* out);
 extern "C" void eft_vec_ctor(nw4r::math::VEC3* out);
 extern "C" void mhchar_construct(void* out);
-extern "C" u32 fn_8021F218(void);
+extern "C" f32 lb_item_list_step_get(void);  /* f32, the owner's return type (`lobby/lb_menu_pos_tbl.cpp`): retail converts it with `__cvt_fp2unsigned` */
 extern "C" f32 lb_item_list_depth_get(u32 index);
 extern "C" s32 getItemListSelection(void);
 extern "C" u32 Pl_motion_input_ck(void* work);
