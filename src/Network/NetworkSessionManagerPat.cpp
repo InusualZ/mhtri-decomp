@@ -3324,7 +3324,7 @@ void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self)
 
 /* Opens a session slot (kind 6) for the layer member at `address` and connects it with the GameSpy thread;
  * the slot, 0 for this console's own address, -1 while the session is not ready, -2 when no slot is free. */
-s8 NetworkSessionManagerPat::connectPeer(const NetworkUniqueId* address, u32 value)
+s32 NetworkSessionManagerPat::connectPeer(const NetworkUniqueId* address, u32 value)
 {
     PatPeerConnect peer;
     s8 slot;

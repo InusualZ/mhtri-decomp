@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (189)
+## Ideas that work (190)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -198,6 +198,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 207 | [A switch on a u8 keeps unsigned compares in every arm only when the selector is cast to u32](207-switch-on-a-u8.md) | works | source-shape | A compare-tree switch on a `u8` selector opens with `cmplwi` but the later case tests read `cmpwi` where retail keeps `cmplwi` throughout. |
 | 208 | [Scope #pragma opt_common_subs off to a function whose retail reloads what MWCC keeps](208-scope-pragma-opt-common.md) | works | pragma, source-shape | Retail loads a value a second time where ours keeps it in a register - a field re-read after a call, a loop test's load repeated at the top of the body, or an indirect call's table pointer loaded after the arguments... |
 | 209 | [A signed cmpwi on a u8 or u16 value is a switch on the promoted operand](209-signed-cmpwi-on-a.md) | works | source-shape | Retail tests an unsigned byte or halfword (a u8 field, a u8 parameter, a call's u8 result) with a signed `cmpwi` where our `if (x == 2)` gives `cmplwi`, and the arms are often laid out in another order. |
+| 210 | [Under peephole off, a 0/1 byte stored or passed with no clrlwi is a bool](210-under-peephole-off-a.md) | works | source-shape, pragma | A peephole-off unit masks a flag with clrlwi r0,rX,24 before stb (or before passing it) where retail stores or passes the register raw, and no u8/u32/cast spelling removes it |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

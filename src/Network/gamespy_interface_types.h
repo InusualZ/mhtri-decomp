@@ -122,7 +122,7 @@ public:
     /* +0x447C */ u32 session_447C;
     /* +0x4480 */ s8  negotiationStep_4480;
     /* +0x4481 */ u8  pad_4481;
-    /* +0x4482 */ s16 bufferSize_4482;
+    /* +0x4482 */ u16 bufferSize_4482;
     /* +0x4484 */ s8  sessionOpen_4484;
     /* +0x4485 */ u32 profile_4485[5];
     /* +0x4499 */ u8  pad_4499[0x07];
@@ -178,7 +178,7 @@ public:
     /* spawns the worker thread */
     s32   GameSpyInterfaceThreadInit();
     /* sets the socket address buffer size */
-    void  setBufferSize(s16 size);
+    void  setBufferSize(u16 size);
     /* starts a NAT negotiation between the two peer ids */
     void  startNegotiation(const GameSpyPeerId* a, const GameSpyPeerId* b);
     /* sets the service-locator result the NAS login fills */

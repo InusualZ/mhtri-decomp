@@ -427,6 +427,7 @@ typedef struct NetworkFmpSlot NetworkFmpSlot;   /* Network/PatInterface.h - the 
 typedef struct PatTagList PatTagList;
 typedef struct PatLayerData PatLayerData;   /* the layer record a layer answer carries */
 typedef struct PatLayerUser PatLayerUser;   /* the user record a user answer carries */
+typedef struct PatServerBlock PatServerBlock;   /* Network/PatInterface.h - the server block a transfer match reads */
 
 /* The mixed voice of the transfer peers (the move warning's "mVoiceMixed.mSize"): the samples and their size in
  * bytes (528 is one whole frame). */
@@ -529,7 +530,7 @@ public:
     virtual void setFlag75(u32 value);                                        /* +0x0CC */
     virtual void setMediatorValue_D8(u32 value);                              /* +0x0D8 (GUESS: forwards to the mediator's terms flag) */
     virtual u8 getMediatorValue_DC();                                         /* +0x0DC */
-    virtual void setFriendTransferMode_E0(s8 slot, u32 mode);                 /* +0x0E0 */
+    virtual void setFriendTransferMode_E0(s8 slot, bool mode);                /* +0x0E0 */
     virtual BOOL isFriendTransferActive_E4(s8 slot);                          /* +0x0E4 */
     virtual BOOL isFriendTransferReady_E8(s8 slot);                           /* +0x0E8 */
     virtual u8 getFriendFlagC084_EC(s8 slot);                                 /* +0x0EC */
@@ -632,7 +633,7 @@ public:
     /* 0x803EF138 (GUESS) - the friend slot carrying unique id `id`, -1 when none does. */
     s32 findFriendById(const NetworkUniqueId* id);
     /* 0x803EF300 (GUESS) - sets the transfer mode of the friend carrying `id` and refreshes its transfer. */
-    void setFriendTransferModeById(const NetworkUniqueId* id, u8 mode);
+    void setFriendTransferModeById(const NetworkUniqueId* id, bool mode);
     /* 0x803EEAF8 (GUESS) - re-sends friend slot `slot`'s transfer state to the server; 0x803EEA44 (GUESS) - that state. */
     void refreshFriendTransfer(s8 slot, u32 flag);
     u32 getFriendTransferState(s8 slot);
@@ -658,6 +659,9 @@ public:
     void sendPairState(u32 from, u32 to, s8 state);
     /* 0x803EA61C (GUESS) - copies an FMP slot into a server record. */
     void exportServerRec(NetServerRec* out, const NetworkFmpSlot* slot);
+    /* inline (GUESS) - reads the server block into `server` and starts the GameSpy match with the transfer peer; the
+     * match's result. */
+    s32 startTransferMatch(PatServerBlock* server);
     /* 0x803EB75C (GUESS) - polls friend slot `index` (written later; declared for `pollLayerSlots`). */
     void pollFriendSlot(u32 index);
     /* 0x803EEBA4 (GUESS) - sends this console's binary record to friend slot `slot` (to every member when
@@ -706,7 +710,7 @@ public:
     /* +0x0450 */ NetLayerSettings presence_450;       /* `setPresence_A0`'s pairs; `move` sends them while `flag_3D2` is set */
     /* +0x0474 */ NetLayerAddress address_474;   /* this console's layer address (`exportLayerId_8C` exports it as kind 3) */
     /* +0x0484 */ char userName_484[0x40];   /* `readUserName_90` copies at most 63 characters */
-    /* +0x04C4 */ u8 hostMode_4C4;   /* selects the user-list step after the child-info reply */
+    /* +0x04C4 */ bool hostMode_4C4;   /* selects the user-list step after the child-info reply */
     /* +0x04C5 */ u8 pad_04C5[0x3];
     /* +0x04C8 */ s32 memberCount_4C8;   /* must be positive for a request to start */
     /* +0x04CC */ NetLayerInfoRec layerInfo_4CC;   /* the record the layer-info handlers report with their done event */
@@ -721,9 +725,9 @@ public:
     /* +0xC07C */ s8 transferSlot_C07C;   /* the friend slot whose transfer state the mode setters refresh (-1: none) */
     /* +0xC07D */ u8 pad_C07D[0x3];
     /* +0xC080 */ s32 sessionState_C080;   /* `resetLayerState` sets -2 */
-    /* +0xC084 */ u8 friendFlagC084_C084[100];
+    /* +0xC084 */ bool friendFlagC084_C084[100];
     /* +0xC0E8 */ u8 friendTransfer_C0E8[100];   /* per friend slot: the transfer is active */
-    /* +0xC14C */ u8 friendTransferMode_C14C[100];
+    /* +0xC14C */ bool friendTransferMode_C14C[100];
     /* +0xC1B0 */ GameSpyPeerId friendPeers_C1B0[100];   /* per friend slot: its GameSpy peer id (`move` negotiates pairs) */
     /* +0xC7F0 */ s8 pairState_C7F0[100][100];           /* per pair of friend slots: the NAT negotiation state
                                                             (GUESS: 0 none, 1 negotiated, 2 running, 3 failed, 4 retry) */

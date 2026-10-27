@@ -91,7 +91,7 @@ public:
     virtual void requestNews_38();                                    /* +0x38 */
     virtual void request_3C();                                        /* +0x3C */
     virtual void rejectRequest_40() = 0;                              /* +0x40 - reports the unsupported-request code */
-    virtual s32 isFriend(const NetworkUniqueId* id) = 0;              /* +0x44 - whether `id` is on the friend list */
+    virtual bool isFriend(const NetworkUniqueId* id) = 0;             /* +0x44 - whether `id` is on the friend list */
     virtual void request_48(u32 a, u32 b, u32 c);                     /* +0x48 */
     virtual void writeProfile_4C(const u8* data, u32 size) = 0;       /* +0x4C - the whole profile block */
     virtual void writeProfileRange_50(const u8* data, u32 size, u32 offset) = 0;   /* +0x50 - offset + size <= 0x100 */

@@ -144,10 +144,10 @@ public:
     virtual void readRoomHeader_C8(s32 index, u8* out) = 0;                  /* +0x0C8 */
     virtual void setFlag75(u32 value);             /* +0x0CC */
     virtual u8 getFlag75();                        /* +0x0D0 */
-    virtual void setFlag76(u8 value);              /* +0x0D4 */
+    virtual void setFlag76(bool value);            /* +0x0D4 */
     virtual void setMediatorValue_D8(u32 value) = 0;                         /* +0x0D8 */
     virtual u8 getMediatorValue_DC() = 0;                                    /* +0x0DC */
-    virtual void setFriendTransferMode_E0(s8 slot, u32 mode) = 0;            /* +0x0E0 */
+    virtual void setFriendTransferMode_E0(s8 slot, bool mode) = 0;            /* +0x0E0 */
     virtual BOOL isFriendTransferActive_E4(s8 slot) = 0;                     /* +0x0E4 */
     virtual BOOL isFriendTransferReady_E8(s8 slot) = 0;                      /* +0x0E8 */
     virtual u8 getFriendFlagC084_EC(s8 slot) = 0;                            /* +0x0EC */
@@ -181,7 +181,7 @@ public:
     /* +0x00C */ NetworkLayerRequest* requests_0C[21];  /* the running request of each starter, 0 when idle */
     /* +0x060 */ u8 requestState_60[21];           /* set while the request of the same index is moving */
     /* +0x075 */ u8 flag_75;                       /* `setFlag75`/`getFlag75`; the constructor sets it */
-    /* +0x076 */ u8 flag_76;                       /* `setFlag76`; the constructor sets it */
+    /* +0x076 */ bool flag_76;                     /* `setFlag76`; the constructor sets it */
     /* +0x077 */ u8 pad_077;
     /* +0x078 */ NetworkLayerRequest pool_78[2];        /* the two requests `allocRequest` hands out */
 };   /* size: 0x1C0 (the derived constructor's first member array starts at +0x1C8) */

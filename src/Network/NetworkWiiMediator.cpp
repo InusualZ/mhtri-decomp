@@ -1923,7 +1923,7 @@ u8 getPatTermsFlag(PatTerms* terms)
 }
 
 /* Activates slot `slot` with its mode and level (while the terms object is up) and empties its queue. */
-void NetworkWiiMediator::openTransferSlot(s8 slot, u8 mode, f32 level)
+void NetworkWiiMediator::openTransferSlot(s8 slot, bool mode, f32 level)
 {
     NetworkWiiMediatorTransferSlot* entry;
 
@@ -2014,7 +2014,7 @@ s32 NetworkWiiMediator::pushTransferRecord(s8 slot, const u8* data, s32 size)
 
 /* Takes the oldest record of the slot's queue into `out` (when it fits in `max` bytes) and returns its
  * length; also ages the slot's activity, re-judging it every 15 polls. */
-s32 NetworkWiiMediator::popTransferRecord(s8 slot, u8* out, s32 max)
+s32 NetworkWiiMediator::popTransferRecord(s8 slot, u8* out, s32 max, s32 flags)
 {
     u16 length;
     s32* queued;
@@ -2118,7 +2118,7 @@ s32 NetworkWiiMediator::suppressVoiceEcho(const u8* in, u8* out, s32 size)
 }
 
 /* 0x80417294 (0x38): whether the terms object's update finished; 0 without one. */
-u32 NetworkWiiMediator::isVoiceReady()
+bool NetworkWiiMediator::isVoiceReady()
 {
     if (getPatTerms() != NULL) {
         return isTermsUpdateFinished(getPatTerms());
@@ -2157,7 +2157,7 @@ f32 NetworkWiiMediator::getTransferLevel()
 }
 
 /* Sets an active slot's mode; mode 0 drops its queue. */
-void NetworkWiiMediator::setTransferSlotMode(s8 slot, u8 mode)
+void NetworkWiiMediator::setTransferSlotMode(s8 slot, bool mode)
 {
     NetworkWiiMediatorTransferSlot* entry;
 

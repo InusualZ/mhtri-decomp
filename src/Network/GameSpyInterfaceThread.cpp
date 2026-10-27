@@ -1186,7 +1186,7 @@ s32 GameSpyInterfaceThread::GameSpyInterfaceThreadInit()
 }
 
 /* Sets the socket address buffer size. */
-void GameSpyInterfaceThread::setBufferSize(s16 size)
+void GameSpyInterfaceThread::setBufferSize(u16 size)
 {
     bufferSize_4482 = size;
 }

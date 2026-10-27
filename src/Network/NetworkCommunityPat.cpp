@@ -27,9 +27,7 @@
  *   holds them in source order (0x20/0x08) where retail's inlined `postError(NetworkErrorInfo)` puts both copies below
  *   both records (0x14/0x08); `dont_inline off` around it inlines the copy right but also inlines the generated record
  *   constructors retail calls (wrong callees), and function-scope copies land above the frame's other records.
- * RESIDUALS. `handleUnblockPlayer`/`onPatEvent`: `setFriendTransferModeById` (NetworkLayerPat) takes `u8 mode`, so the
- *   three callers here emit a `clrlwi` retail lacks; an `s32 mode` in `NetworkLayerPat.h` removes all three (measured),
- *   so the parameter is int-wide in retail - the owner's change, requested.
+ * SHAPES. `setFriendTransferModeById` (NetworkLayerPat) takes a `u32 mode`: its callers here pass the flag unmasked.
  * SHAPES. The request record's `reset` and `clear` are defined before its destructor: MWCC then knows the destructor's
  *   call cannot throw and records no cleanup for the `NetworkMutex` member (retail's empty `extab` record).
  * SHAPES. The records a handler delivers are declared in the case block that fills them (retail constructs them there);
@@ -1985,7 +1983,7 @@ s32 NetworkCommunityPat::handleUnblockPlayer(NetworkCommunityPatRequest* request
 }
 
 /* Whether `id` is a friend and not on the block list. */
-s32 NetworkCommunityPat::isAcceptedPeer(const NetworkUniqueId* id)
+bool NetworkCommunityPat::isAcceptedPeer(const NetworkUniqueId* id)
 {
     s32 i;
 
@@ -2415,7 +2413,7 @@ void NetworkCommunityPat::rejectRequest_40()
 }
 
 /* Whether `id` is on the friend list. */
-s32 NetworkCommunityPat::isFriend(const NetworkUniqueId* id)
+bool NetworkCommunityPat::isFriend(const NetworkUniqueId* id)
 {
     s32 i;
 

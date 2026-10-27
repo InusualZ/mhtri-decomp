@@ -606,7 +606,7 @@ public:
     void readChatHeader(PatChatHeader* out, const u8* data);    /* 0x803DC0E4 (GUESS: parses the 10-byte chat header) */
     void sendSessionChat(const char* text, u32 tag, s8 target); /* 0x803DC184 (GUESS: the chat packet over the session) */
     void receiveSessionChat(const u8* data, u32 size);          /* 0x803DC2E4 (GUESS: reports a received chat packet, event 19) */
-    s8 connectPeer(const NetworkUniqueId* address, u32 value); /* 0x803DEB38 (GUESS: opens a session slot for a layer member) */
+    s32 connectPeer(const NetworkUniqueId* address, u32 value); /* 0x803DEB38 (GUESS: opens a session slot for a layer member) */
     void reportSessionError(const NetworkErrorInfo* info);      /* 0x803DEDE0 (GUESS: sends the record and the thread's error to the server) */
     void setSessionLog(NetworkRequest* request, u32 code, u32 arg_a, u32 arg_b); /* 0x803DF1CC (GUESS: the layer's `setCollectionLog`) */
     void setSessionLogAborted(NetworkRequest* request);     /* 0x803DF24C (GUESS: requestFlags bit 1, code 0x80050012) */

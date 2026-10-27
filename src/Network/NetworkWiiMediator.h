@@ -26,7 +26,7 @@
 /* One of the mediator's four transfer slots (`openMediatorTransferSlot` fills it).  size: 0x08 */
 typedef struct NetworkWiiMediatorTransferSlot {
     /* +0x00 */ u8  active;
-    /* +0x01 */ u8  mode;        /* 0 drops the slot's queue (`setMediatorTransferSlotMode`) */
+    /* +0x01 */ bool mode;       /* 0 drops the slot's queue (`setMediatorTransferSlotMode`) */
     /* +0x02 */ u8  flag;
     /* +0x03 */ u8  pad_03;
     /* +0x04 */ f32 level;
@@ -72,18 +72,18 @@ public:
     void deleteNetworkPool();
     void ECStart();
     char* getReflectName(char* out, u32 size);
-    void openTransferSlot(s8 slot, u8 mode, f32 level);
+    void openTransferSlot(s8 slot, bool mode, f32 level);
     void closeTransferSlot(s8 slot);
     void closeTransferSlots();
     void clearTransferQueue(s8 slot);
     s32  pushTransferRecord(s8 slot, const u8* data, s32 size);
-    s32  popTransferRecord(s8 slot, u8* out, s32 max);
+    s32  popTransferRecord(s8 slot, u8* out, s32 max, s32 flags);
     /* 0x80416DB0 / 0x804171A4 / 0x80417294 - the microphone side the layer's `move` drives (GUESS names): read up
      * to `size` bytes of samples from the terms (P-Mic) object while the transfer mode is on, whether `size` bytes
      * of samples average below the silence floor, and whether the terms object's update has finished. */
     s32  readVoice(u8* out, s32 size);
     s32  isVoiceSilent(const s16* samples, s32 size);
-    u32  isVoiceReady();
+    bool isVoiceReady();
     /* 0x80417080 / 0x804170D8 / 0x80417180 / 0x8041722C - the voice output side (GUESS names): write samples to the
      * terms object, DSP-ADPCM encode them, the encoded size of a sample block and the echo suppressor. */
     s32  writeVoice(const s16* samples, s32 size);
@@ -93,7 +93,7 @@ public:
     BOOL getTransferFlag6DD1();
     u8   getTransferFlag6DD2();
     f32  getTransferLevel();
-    void setTransferSlotMode(s8 slot, u8 mode);
+    void setTransferSlotMode(s8 slot, bool mode);
     BOOL getTransferSlotMode(s8 slot);
     void setTransferSlotFlag(s8 slot, u8 flag);
     u8   getTransferSlotFlag(s8 slot);

@@ -192,7 +192,7 @@ public:
     virtual void getName(char* out, s32 size);                               /* +0x28 */
     virtual void getTag(char* out, s32 size);                                /* +0x2C */
     virtual void rejectRequest_40();                                         /* +0x40 */
-    virtual s32 isFriend(const NetworkUniqueId* id);                         /* +0x44 */
+    virtual bool isFriend(const NetworkUniqueId* id);                        /* +0x44 */
     virtual void writeProfile_4C(const u8* data, u32 size);                  /* +0x4C */
     virtual void writeProfileRange_50(const u8* data, u32 size, u32 offset); /* +0x50 */
     virtual s32 handle_68(NetworkCommunityRequest* request);                 /* +0x68 */
@@ -243,7 +243,7 @@ public:
     void setCollectionLog(NetworkCommunityPatRequest* request, u32 code, u32 arg0, u32 arg1);
 
     /* 0x803F4E18 - whether `id` is a friend and not on the block list. */
-    s32 isAcceptedPeer(const NetworkUniqueId* id);
+    bool isAcceptedPeer(const NetworkUniqueId* id);
     /* 0x803F4EC0 - hands `command` and its result to the reflect callback (a failed one with the kept Pat error). */
     /* untyped: caller-owned payload - the record each command delivers */
     void notifyReflect(u32 command, s32 result, s32 count, void* data, u32 user);

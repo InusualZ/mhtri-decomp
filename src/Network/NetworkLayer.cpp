@@ -679,7 +679,7 @@ u8 NetworkLayer::getFlag75()
     return this->flag_75;
 }
 
-void NetworkLayer::setFlag76(u8 value)
+void NetworkLayer::setFlag76(bool value)
 {
     this->flag_76 = value;
 }

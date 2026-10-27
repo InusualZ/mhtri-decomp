@@ -33,6 +33,7 @@
  *   GUESS (reflect helpers 0x803EA82C..0x803EB678): `removeFriendSlot`, `unpackLayerSettings`.
  *   GUESS (records and fields): `restoreSentProfile` (NetworkCommunityPat), `NetLayerInfoRec`, `jumpTicket_3D8`.
  *   GUESS (records and fields): `matchKey_0x00F0`; the callee `sendNtcLayerUserTransfer` (0x80403230).
+ *   GUESS (the inline the three match starts share): `startTransferMatch`; `popTransferRecord`'s fourth argument `flags`.
  *   GUESS (reflect's notice records, 0x803EDEAC..0x803EDF94 their members): `NetUserFieldsNotice`, `NetUserPositionNotice`.
  *   GUESS (reflect's answer views and events): `NetLayerUserRow`, `NetLayerCommunityRow`, `LAYER_ERR_BAD_ANSWER`.
  *   GUESS (the chat event's record, after the other notices; layout of `NetworkSessionSlotInfo`): `NetChatNotice`.
@@ -51,19 +52,17 @@
  *   0x805FC324 is the two `getArgument` strings, not a TU boundary.
  * RESIDUALS. Partial rows:
  *  - `readSelectedServer_88`, `sendUserPosition_60`: retail's early return is a `bge`/`ble` + `b` pair around the call
- *    (ours one inverted branch);
- *  - `setFriendTransferModeById`, `applyLoginRecord`, `addFriendSlot`, `setFriendTransferMode_E0`: a `clrlwi` of a u8
- *    value retail stores or passes unmasked (a u8/u32 parameter, cast and local tried);
- *  - `downsampleVoice`: retail tests the count with `cmplwi`+`blelr` (`i != 0`, `i > 0`, `i >= 1` and an up-counting
- *    loop all differ);
- *  - `move`: two `pairState_C7F0` reads use `lbzx` off a precomputed row (the voice-ready result is the mediator's
- *    `u32` `isVoiceReady`, kept in a `u32` local: compared and stored without a mask, as retail);
- *  - `handleLayerCreate`, `handleLayerJump`: retail loads the friend peer's `port_0C` with `lhz` for the `s16`
- *    `setBufferSize` argument (ours `lha`), and gives `getFmpSelected`'s result (and in `handleLayerJump` two more
- *    temporaries) a different callee-saved register; `handleUserSearch`: one callee-saved register (r28 vs r26);
- *  - `reflect`: the callee-saved registers are coloured differently in places (the answer pointer r25 vs retail r26);
- *    the city-list rows reload `layerId`/`value_076` after each store in retail; `connectPeer`'s result is handled as
- *    an `s32` in retail (the class declares `s8`, so ours sign-extends first); the port's `lhz` as above.
+ *    (ours one inverted branch; if/else-return, empty if, `!`, do/while/for/switch, a scoped object, an inline helper
+ *    and an empty inline call in the return block all give the single branch or a longer row);
+ *  - `downsampleVoice`: retail tests the count with `cmplwi`+`blelr`; `(s32)i > 0` gives `cmpwi`+`blelr` (99.06, not
+ *    kept), `i != 0`, `i > 0u`, `i >= 1u`, `while (i--)` and up-counting loops differ more;
+ *  - `move`: retail stores `getNegotiationResult` into `pairState_C7F0` unextended and narrows the third call's result
+ *    lazily (`mr r0,r3` ... `extsb r6,r0`), i.e. the caller sees an `s8` return (an `s8` declaration takes `move` to
+ *    99.71) while the callee is `lbz` + `blr` with no `extsb` (47.5 with `s8`/`char`); the last negotiation block's
+ *    `peer` pointer is r26 where retail has r27 (declaration place and a local-free spelling measured);
+ *  - `reflect`: the callee-saved registers are coloured one apart in places (the answer pointer r25 vs retail r26);
+ *    the city-list rows reload `layerId`/`value_076` after each store in retail (a non-const row pointer and one
+ *    shared `layer` local change nothing).
  * SHAPES. The definitions follow the retail `.text` order.  Retail emits the request records' members right after
  *   their first caller: `NetworkLayerRequest`'s and most of `NetworkLayerPatRequest`'s are plain definitions at those
  *   places; `reset`/`clear` are inline and defined before the record's destructor (MWCC then knows the destructor's
@@ -82,7 +81,15 @@
  *    reuses its count variable as the batch's first row (`handleChildList`); the filter packers walk a pointer beside
  *    the counter, incremented first (`packLayerSettings`);
  *  - `setFlag75` and the base's slot take `u32` (no `clrlwi`; the base's store under a local `#pragma peephole on`);
- *    `popTransferRecord` returns `s32` and `GameSpyInterfaceThread::isNegotiating` `BOOL`, as `move` uses them;
+ *    `popTransferRecord` returns `s32` and takes a fourth argument (`move` passes 0), `connectPeer` returns `s32` and
+ *    `GameSpyInterfaceThread::isNegotiating` `BOOL`, as `move` and `reflect` use them;
+ *  - the yes/no flags are `bool` end to end (playbook 210): `hostMode_4C4`, the friend flag arrays at +0xC084/+0xC14C,
+ *    `isVoiceReady`/`isFriend`/`isAcceptedPeer`, the `mode` of `setFriendTransferModeById`/`setFriendTransferMode_E0`
+ *    and the mediator's transfer slot mode; the friend peer's port is `u16` down to `setBufferSize`;
+ *  - `startTransferMatch` is an inline member shared by `handleLayerCreate`, `handleLayerJump` and `reflect`, with
+ *    `getFmpSelected` passed straight to `startMatch`; `handleUserSearch` reuses `count` for the batch start;
+ *  - `move` holds the popped transfer size in a block-local `count`; `reflect` clamps the layer binary's size with a
+ *    conditional expression;
  *  - the friend table holds real `NetworkUniqueId`s (`NetFriendRec`); the records with a unique id inside
  *    (`NetFriendRec`, `NetFriendTable`, `NetFriendList`, `NetLayerRequest`, `NetCommunityList`, `NetLayerMediationList`,
  *    the notices) declare and define their ctors/dtors out of line (retail calls them); the layer and each community
@@ -592,7 +599,6 @@ void NetworkLayerPat::release()
     }
 }
 
-/* Asks for the layer `depth` levels above this one (the parent itself when `depth` is 1), with fields 1..4. */
 /* Halves `inSize` bytes of samples into `out`: each output sample is the mean of an input pair. */
 s32 NetworkLayerPat::downsampleVoice(s16* out, s32 outSize, const s16* in, s32 inSize)
 {
@@ -676,7 +682,7 @@ void NetworkLayerPat::move()
         return;
     }
     if (this->busy_3D1 == 0) {
-        u32 ready = getInstance()->isVoiceReady();
+        bool ready = getInstance()->isVoiceReady();
 
         if (ready != this->friendFlagC084_C084[this->transferSlot_C07C]) {
             this->friendFlagC084_C084[this->transferSlot_C07C] = ready;
@@ -690,10 +696,11 @@ void NetworkLayerPat::move()
             for (i = 0; i < 100; i++) {
                 if ((s8)i != this->transferSlot_C07C && this->friends_3568.entries_0x004[i].valid_0x35 != 0 &&
                     isFriendTransferActive_E4(i) != 0 && getFriendTransferFlag_F0(i) != 0) {
-                    size = getInstance()->popTransferRecord(i, (u8*)this->voiceInput_6E5AC, sizeof(this->voiceInput_6E5AC));
-                    if (size > 0) {
+                    s32 count = getInstance()->popTransferRecord(i, (u8*)this->voiceInput_6E5AC,
+                                                                 sizeof(this->voiceInput_6E5AC), 0);
+                    if (count > 0) {
                         mixed = mixVoice(this->voiceMixed_6EB94.mData, sizeof(this->voiceMixed_6EB94.mData),
-                                         this->voiceInput_6E5AC, size);
+                                         this->voiceInput_6E5AC, count);
                         if (this->voiceMixed_6EB94.mSize < mixed) {
                             this->voiceMixed_6EB94.mSize = mixed;
                         }
@@ -1869,6 +1876,20 @@ s32 NetworkLayerPat::stepRequest(NetworkLayerRequest* request)
 /* Enters (kind 0) or creates (kind 1, with two member limits) the child layer `layerId`: the down or create
  * exchange, the parent's child info and user list, then, in a two-member room, the member session and the GameSpy
  * match; a failure leaves to the parent layer and re-reads the city list. */
+/* Reads the server block into `server` and starts the GameSpy match with the transfer peer. */
+inline s32 NetworkLayerPat::startTransferMatch(PatServerBlock* server)
+{
+    copyServerBlock(getInstance_(), 1, (u8*)server);
+    GameSpyInterfaceThread::getInstance()->resetSlots();
+    GameSpyInterfaceThread::getInstance()->setBufferSize(this->friendPeers_C1B0[this->transferSlot_C07C].port_0C);
+    return GameSpyInterfaceThread::getInstance()->startMatch(
+        this->status_F034, this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
+        server->address_100[3] + (server->address_100[2] << 8) +
+            ((server->address_100[0] << 24) + (server->address_100[1] << 16)),
+        server->port_104, getFmpSelected(getInstance_()), (this->address_474.path_08[1] << 16) + this->address_474.path_08[2],
+        this->matchKey_3D4);
+}
+
 s32 NetworkLayerPat::handleLayerCreate(NetworkLayerRequest* request)
 {
     s32 kind = request->getArgument(0);
@@ -1883,7 +1904,6 @@ s32 NetworkLayerPat::handleLayerCreate(NetworkLayerRequest* request)
     s32 result;
     s32 index;
     s8 slot;
-    s32 fmp;
 
     if (kind == 1) {
         limitA = request->getArgument(2);
@@ -2111,17 +2131,7 @@ s32 NetworkLayerPat::handleLayerCreate(NetworkLayerRequest* request)
                     break;
                 }
                 if (GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
-                    copyServerBlock(getInstance_(), 1, (u8*)&server);
-                    GameSpyInterfaceThread::getInstance()->resetSlots();
-                    GameSpyInterfaceThread::getInstance()->setBufferSize(
-                        this->friendPeers_C1B0[this->transferSlot_C07C].port_0C);
-                    fmp = getFmpSelected(getInstance_());
-                    if (GameSpyInterfaceThread::getInstance()->startMatch(
-                            this->status_F034, this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
-                            server.address_100[3] + (server.address_100[2] << 8) +
-                                ((server.address_100[0] << 24) + (server.address_100[1] << 16)),
-                            server.port_104, fmp, (this->address_474.path_08[1] << 16) + this->address_474.path_08[2],
-                            this->matchKey_3D4) < 0) {
+                    if (startTransferMatch(&server) < 0) {
                         GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
                         setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
                         request->state_00 = 90;
@@ -3000,7 +3010,6 @@ s32 NetworkLayerPat::handleUserSearch(NetworkLayerRequest* request)
     s32 scope = request->getArgument(1);
     s32 kind;
     s32 filterCount;
-    s32 first;
     s32 batch;
     s32 result;
 
@@ -3107,9 +3116,9 @@ s32 NetworkLayerPat::handleUserSearch(NetworkLayerRequest* request)
         break;
     case 10:
         this->requestFlags_310[SLOT_USER_SEARCH] = 0;
-        first = this->listCursor_F1A0;
-        batch = (this->listTotal_F1A4 - first < 10) ? this->listTotal_F1A4 - first : 10;
-        this->requestIds_368[SLOT_USER_SEARCH] = sendReqUserSearchData(getInstance_(), first + 1, batch);
+        count = this->listCursor_F1A0;
+        batch = (this->listTotal_F1A4 - count < 10) ? this->listTotal_F1A4 - count : 10;
+        this->requestIds_368[SLOT_USER_SEARCH] = sendReqUserSearchData(getInstance_(), count + 1, batch);
         request->state_00 = 15;
         break;
     case 15:
@@ -3193,7 +3202,6 @@ s32 NetworkLayerPat::handleLayerJump(NetworkLayerRequest* request)
     s32 slot;
     s32 result;
     s32 depth;
-    s32 fmp;
     s8 friendSlot;
 
     switch (request->state_00) {
@@ -3331,8 +3339,7 @@ s32 NetworkLayerPat::handleLayerJump(NetworkLayerRequest* request)
     case 45:
         if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_STATE3_REPLY) {
             NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
-            slot = getFmpSlotIndex(getInstance_(), target.id_04);
-            chooseServerAddress(getInstance_(), 1, slot);
+            chooseServerAddress(getInstance_(), 1, getFmpSlotIndex(getInstance_(), target.id_04));
             this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
             setConnectServerType(getInstance_(), 1);
             resetNetworkState(getInstance_());
@@ -3550,17 +3557,7 @@ s32 NetworkLayerPat::handleLayerJump(NetworkLayerRequest* request)
                     break;
                 }
                 if (GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
-                    copyServerBlock(getInstance_(), 1, (u8*)&server);
-                    GameSpyInterfaceThread::getInstance()->resetSlots();
-                    GameSpyInterfaceThread::getInstance()->setBufferSize(
-                        this->friendPeers_C1B0[this->transferSlot_C07C].port_0C);
-                    fmp = getFmpSelected(getInstance_());
-                    if (GameSpyInterfaceThread::getInstance()->startMatch(
-                            this->status_F034, this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
-                            server.address_100[3] + (server.address_100[2] << 8) +
-                                ((server.address_100[0] << 24) + (server.address_100[1] << 16)),
-                            server.port_104, fmp, (this->address_474.path_08[1] << 16) + this->address_474.path_08[2],
-                            this->matchKey_3D4) < 0) {
+                    if (startTransferMatch(&server) < 0) {
                         GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
                         setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
                         request->state_00 = 94;
@@ -5147,7 +5144,6 @@ void NetworkLayerPat::reflect(s32 code, s32 requestId, s32 flag, s32 count, cons
     case 0x8015: {
         PatServerBlock server;
         s32 slot;
-        s32 fmp;
 
         slot = addFriendSlot(data, (const PatLayerUser*)data);
         this->memberUsed_F02C = this->friends_3568.count_0x000;
@@ -5158,17 +5154,7 @@ void NetworkLayerPat::reflect(s32 code, s32 requestId, s32 flag, s32 count, cons
             if (this->memberCount_4C8 == 2 && (s32)this->status_F034 > 1 && GameSpyInterfaceThread::getInstance() != NULL &&
                 GameSpyInterfaceThread::getInstance()->getState() == 1 &&
                 GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
-                copyServerBlock(getInstance_(), 1, (u8*)&server);
-                GameSpyInterfaceThread::getInstance()->resetSlots();
-                GameSpyInterfaceThread::getInstance()->setBufferSize(
-                    this->friendPeers_C1B0[this->transferSlot_C07C].port_0C);
-                fmp = getFmpSelected(getInstance_());
-                GameSpyInterfaceThread::getInstance()->startMatch(
-                    this->status_F034, this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
-                    server.address_100[3] + (server.address_100[2] << 8) +
-                        ((server.address_100[0] << 24) + (server.address_100[1] << 16)),
-                    server.port_104, fmp, (this->address_474.path_08[1] << 16) + this->address_474.path_08[2],
-                    this->matchKey_3D4);
+                startTransferMatch(&server);
             }
         }
         return;
@@ -5214,11 +5200,8 @@ void NetworkLayerPat::reflect(s32 code, s32 requestId, s32 flag, s32 count, cons
         s32 depth;
         const u16* path;
 
-        if (memcmp(layer->path_004, &this->address_474, sizeof(this->address_474)) == 0) {
-            size = 0x100;
-            if (layer->value_23E < 0x100) {
-                size = layer->value_23E;
-            }
+        if (memcmp(info->layer_004.path_004, &this->address_474, sizeof(this->address_474)) == 0) {
+            size = layer->value_23E < 0x100 ? layer->value_23E : 0x100;
             memcpy(binary.data_004, layer->binary_13E, size);
             binary.size_000 = size;
             unpackLayerSettings(&this->layerSettings_F03C, tags);
@@ -6200,7 +6183,7 @@ u8 NetworkLayerPat::getMediatorValue_DC()
 
 /* Sets friend slot `slot`'s mediator transfer mode; refreshes the transfer friend's active flag, or re-sends
  * another friend's state when it changed. */
-void NetworkLayerPat::setFriendTransferMode_E0(s8 slot, u32 mode)
+void NetworkLayerPat::setFriendTransferMode_E0(s8 slot, bool mode)
 {
     u32 before;
     BOOL active;
@@ -6512,7 +6495,7 @@ u8 NetworkLayerPat::getMemberStatus(const NetworkUniqueId* id)
 }
 
 /* Sets the transfer mode of the friend with unique id `id` (only in a two-member layer) and refreshes it. */
-void NetworkLayerPat::setFriendTransferModeById(const NetworkUniqueId* id, u8 mode)
+void NetworkLayerPat::setFriendTransferModeById(const NetworkUniqueId* id, bool mode)
 {
     s32 i;
 
