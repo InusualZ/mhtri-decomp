@@ -62,7 +62,7 @@ extern "C" void item_page_scroll_rows(MenuScroll* scroll, MenuEntry* rows, u16 b
 {
     menu_scroll_step(scroll, buttons, 6);
     if (scroll->move_flags != 0) {
-        fn_80349C9C(scroll, rows);
+        menu_monster_list_build(scroll, rows);
     }
 }
 

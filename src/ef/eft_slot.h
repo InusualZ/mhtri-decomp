@@ -44,7 +44,7 @@ u32 eft_slot_marks_set(struct EftSlot* slot, u8 a, u8 b);
 
 /* 0x80349914 - the two-byte copy MWCC emits for a `u16` pair assignment (`*dst = *src`); `menu/menu_row.cpp` calls
  * it.  It is `menu/menu_effect_slot.cpp`'s, declared here until that unit has a header. */
-void fn_80349914(u16* dst, const u16* src);
+void note_slot_pair_copy(u16* dst, const u16* src);
 
 /* 0x80343780 - clears the ten effect slots (`enemy/enemy_control.cpp`'s `enemy_work_reset`). */
 void eft_slot_pool_clear(void);

@@ -55,7 +55,7 @@ typedef struct _mh_ivec2_ {
 
 /* ---- this unit's entry points and its same-file helpers (the map's `fn_` stems) ---- */
 void item_page_scroll_rows(MenuScroll* scroll, MenuEntry* rows, u16 buttons);  /* 0x80349DD8 */
-void fn_80349C9C(MenuScroll* scroll, MenuEntry* rows);               /* 0x80349C9C, the list's own row build */
+void menu_monster_list_build(MenuScroll* scroll, MenuEntry* rows);               /* 0x80349C9C, the list's own row build */
 void item_page_fill_rows(MenuSlot* slot);                                    /* 0x80349E30 */
 void item_page_update_rows(MenuSlot* slot, u16 buttons);                       /* 0x80349F8C */
 void item_page_draw(MenuSlot* slot);                                    /* 0x80349FF0 */

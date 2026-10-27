@@ -579,7 +579,7 @@ extern "C" void menu_sel_cursor_pair_load(MenuSel* self) {
 /* 0x8031B5D0 - reset the work area's second record */
 extern "C" void menu_sel_second_reset(MenuSel* self) {
     MenuSel* second = self + 1;
-    menu_combo_list_open(second);
+    menu_combo_list_open((MenuSlot*)second);
     second->state_0x001 = 1;
     second->field_0x002 = 1;
     second->field_0x01C = 2;

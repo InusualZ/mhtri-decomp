@@ -188,7 +188,7 @@ extern "C" u32 note_slot_cursor_bounds(u8 kind, u8 index) {
     if (table == 0) {
         return (u32)slot.raw << 16;
     }
-    fn_80349914(&slot.raw, table + index);
+    note_slot_pair_copy(&slot.raw, table + index);
     remain = slot.count;
     for (i = 0; i < slot.count; i++) {
         if (slot.table != 0xFF) {
