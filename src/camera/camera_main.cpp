@@ -8,7 +8,8 @@
  *   config/RMHE08/splits.txt).  The `.sdata2` pool is emitted from the literals and is byte-identical.
  * FLAGS.  `cflags_main`; the file builds with `#pragma peephole off` (retail keeps the unfused `rlwinm` + `!= 0`,
  *   the `clrlwi`-before-`add` index masks and the `li r0,N` + `psq_lx` epilogue pair) and `#pragma fp_contract off`
- *   (retail keeps `fmuls` + `fadds` in camera_blend_mix and camera_follow_update).
+ *   (retail keeps `fmuls` + `fadds` in camera_blend_mix and camera_follow_update); four switch functions are
+ *   bracketed by `#pragma optimization_level 4` (SHAPES).
  * NAMES.  The record layout is traced from the constructors (camera_work_ctor builds the six cameras in order:
  *   camera_follow_ctor the follow camera's fifteen vectors, camera_aim_ctor the aim camera, camera_shoulder_ctor the
  *   shoulder camera, camera_event_ctor the event camera, camera_area_ctor the area camera, camera_lobby_ctor the lobby
@@ -25,21 +26,25 @@
  *     the two camera works are not a defined static object (camera_work_construct is the `.ctors` entry).
  *   - camera_follow_collide: the goto-free shape (a `turned` flag around the push pass) measures 95.70; the
  *     original's two jumps into the ground clamp measure 97.96 (rule 8 keeps the flag).
- *   - Switch lowering: camera_follow_yaw_input, camera_area_blend_update, camera_follow_kill_cut and
- *     camera_lobby_update test the two-value range first in retail (`subi`/`cmplwi`/`ble`); MWCC lowers our switches
- *     to a compare chain (case orders, `if` chains and `s32` selectors tried).
- *   - Register allocation and scheduling: camera_follow_update (the closest-height pick), camera_follow_shake_update
- *     (one slot pointer), camera_follow_lock_update, camera_follow_dive_ck, camera_aim_update, camera_shoulder_update,
- *     camera_event_script_step, camera_event_dcm_run, camera_quake_apply, camera_water_clamp, camera_lobby_viewport_fit,
- *     camera_work_init, camera_work_update (`beq`/`b` and two `clrlwi`s around the camera kind).
- *   - camera_quake_update: retail materialises the zero once at the top; ours rematerialises it per arm.
- *   - camera_event_ctor: the first run walk has its pointer/bound register pair swapped.
+ *   - Register allocation: camera_follow_shake_update keeps two slot bases (`cam + i` for the state and the timer
+ *     bytes) where retail keeps one (a sub-struct, a 2-D array and every index type tried); camera_quake_apply keeps
+ *     the row where retail keeps the row's byte offset (row types and an inline index tried);
+ *     camera_shoulder_update's plane intersection colours `normal.z` f2 where retail uses f10;
+ *     camera_event_script_step loads the latch mask into r0 before extending it into r4.
  * SHAPES.  The vector helpers that write through r3 (`subVec3`, `addVec3`, `vec3_scale`, `vec3_div`,
  *   `get_camera_target_pos`) are called through views returning the vector, which reproduces the original's
  *   temporaries and their stack slots; the C++ accessors return `CamVec3`/`CamMtx34`, whose copy constructor makes
  *   MWCC build the result in the caller's return slot (the manglings carry no return type).  A float parameter's
  *   position decides where its load is scheduled (coll_line_check takes the radius third).  Literals are written in
- *   the order the pool holds them (`0.7f + 0.3f * t`).
+ *   the order the pool holds them (`0.7f + 0.3f * t`).  The switches whose two-value case groups retail tests first
+ *   with `subi`/`cmplwi`/`ble` (camera_follow_yaw_input, camera_follow_kill_cut, camera_area_blend_update,
+ *   camera_lobby_update) are compiled under `#pragma optimization_level 4` (playbook 108).  `x *= c` keeps the
+ *   product's operand order where `x = x * c` puts the constant first (camera_lobby_viewport_fit, camera_dcm_step);
+ *   a field read through a local is loaded before the constant it is added to (camera_follow_dive_ck); unrolled
+ *   loops carry the per-slot updates (camera_follow_update's closest-height pick, camera_quake_update with an `s16`
+ *   index); a few byte fields compare signed through an `(s32)` cast (camera_kill_cut_start, camera_event_path_step);
+ *   camera_aim_update reads the scope pick through a signed-byte view of camera_aim_scope_get; camera_follow_snap
+ *   copies the range's look-at offset through an inline helper whose local takes the last stack slot.
  */
 
 #include "types.h"
@@ -246,7 +251,7 @@ struct CamEvent : CamView {
     /* +0x0F0 */ u8 field_0xF0[4];
     /* +0x0F4 */ CamScriptOp* mark;
     /* +0x0F8 */ f32 field_0xF8;
-    /* +0x0FC */ s8 field_0xFC;
+    /* +0x0FC */ u8 field_0xFC;
     /* +0x0FD */ u8 slot;                   /* the `stage_dcm_buffer_tbl` slot the keys came from */
     /* +0x0FE */ s16 frames;
     /* +0x100 */ s16 length;                /* returned by camera_event_length_get */
@@ -752,13 +757,11 @@ extern "C" void camera_work_setup(CamWork* work, u8 index)
 /* Resets both camera works. */
 extern "C" void camera_work_init(void)
 {
-    u8 index;
+    u32 index;
 
-    index = 0;
-    do {
-        camera_work_setup((CamWork*)&camera_work[index], index);
-        index++;
-    } while (index < 2U);
+    for (index = 0; index < 2; index++) {
+        camera_work_setup((CamWork*)&camera_work[(u8)index], index);
+    }
     camera_dcm_buffers_clear();
 }
 
@@ -767,7 +770,7 @@ extern "C" void camera_work_update(CamWork* work)
 {
     nw4r::math::VEC3 light;
     u32 move;
-    u8 kind;
+    u32 kind;
 
     VEC3_ctor(&light);
     move = (u32)get_move_work_adrs(2);
@@ -792,9 +795,7 @@ extern "C" void camera_work_update(CamWork* work)
         work->active_kind = 4U;
     }
     kind = work->active_kind;
-    if (kind == 0xFF) {
-        kind = work->kind;
-    }
+    kind = kind != 0xFF ? kind : work->kind;
     scene_current_camera_set(kind);
     stage_area_colour_update();
     camera_quake_update((LightWork*)work, kind);
@@ -835,12 +836,11 @@ extern "C" void camera_scene_posture_init(u8 index, s32 camera)
 extern "C" void camera_water_cell_update(CamWork* work)
 {
     nw4r::math::VEC3 poly;
-    nw4r::math::VEC3 cam;
-    nw4r::math::VEC3 out;
+    f32 height;
 
     VEC3_ctor(&poly);
     copyVec3(&poly, &::get_camera_pos());
-    if (stage_water_surface_get(&poly, ::get_now_areano(), &work->area_handle, (f32*)&out, 0xFFFF) == 0) {
+    if (stage_water_surface_get(&poly, ::get_now_areano(), &work->area_handle, &height, 0xFFFF) == 0) {
         work->area_handle = 0;
     }
 }
@@ -873,14 +873,14 @@ extern "C" void camera_follow_reset(CamWork* work)
     case 1:
         cam->range = 1;
         break;
+    default:
+        cam->range = 2;
+        break;
     case 3:
         cam->range = 3;
         break;
     case 4:
         cam->range = 4;
-        break;
-    default:
-        cam->range = 2;
         break;
     }
     cam->reset = 1;
@@ -1001,9 +1001,9 @@ extern "C" void camera_follow_update(CamWork* work)
             s32 frames;
             CamRange* table;
             u8 pick;
-            f32 y;
             f32 best;
             f32 d;
+            s32 i;
 
             frames = 20;
             work->follow.step = 1;
@@ -1014,29 +1014,13 @@ extern "C" void camera_follow_update(CamWork* work)
             table = camera_range_land;
             best = 100000000.0f;
             pick = 0;
-            y = diff.y;
-            d = table[1].offset.y - y;
-            d = d * d;
-            if (best > d) {
-                pick = 1;
-                best = d;
-            }
-            d = table[2].offset.y - y;
-            d = d * d;
-            if (best > d) {
-                pick = 2;
-                best = d;
-            }
-            d = table[3].offset.y - y;
-            d = d * d;
-            if (best > d) {
-                pick = 3;
-                best = d;
-            }
-            d = table[4].offset.y - y;
-            d = d * d;
-            if (best > d) {
-                pick = 4;
+            for (i = 1; i < 5; i++) {
+                d = table[i].offset.y - diff.y;
+                d = d * d;
+                if (best > d) {
+                    pick = i;
+                    best = d;
+                }
             }
             if (player->kind_0x09 == 3) {
                 u32 pitch = calcVecAngX_c1(&diff);
@@ -1228,6 +1212,7 @@ extern "C" void camera_follow_update(CamWork* work)
 
 /* Turns the follow camera from the player's input and the lock-on: the manual yaw turn, the snap behind the
  * player and the lock-on drift towards the player's facing. */
+#pragma optimization_level 4
 extern "C" void camera_follow_yaw_input(CamWork* work, CamFollow* cam, _PLW* player)
 {
     u32 speed;
@@ -1318,6 +1303,7 @@ extern "C" void camera_follow_yaw_input(CamWork* work, CamFollow* cam, _PLW* pla
     cam->lock_follow = follow;
     cam->lock_turn = turned;
 }
+#pragma optimization_level reset
 
 /* The lock-on drift for an angle between `low` and `high` (or their mirror past half a turn): zero at the
  * edges, `scale` times the squared distances from both edges in between. */
@@ -1661,7 +1647,9 @@ extern "C" u32 camera_follow_dive_ck(CamFollow* cam)
         depth = 1;
         if (player->motion_pos_0x40 < player->vec_0x048.y - 10.0f) {
             depth = 2;
-            if (player->motion_pos_0x40 > 300.0f + player->ground_y_0x060)
+            f32 ground = player->ground_y_0x060;
+
+            if (player->motion_pos_0x40 > 300.0f + ground)
                 depth = 3;
         }
     } else if (player->kind_0x09 == 3) {
@@ -2100,7 +2088,7 @@ extern "C" void camera_follow_push_apply(CamFollow* cam)
  * a lost lock-on lingers for three frames. */
 extern "C" void camera_follow_lock_update(CamFollow* cam, _PLW* player)
 {
-    s32 state;
+    s8 state;
 
     state = -1;
     if (pl_target_lock_ck_c1(player) == 1) {
@@ -2110,7 +2098,7 @@ extern "C" void camera_follow_lock_update(CamFollow* cam, _PLW* player)
             else
                 state = 3;
         } else {
-            state = (s8)(player->field_0x00A != 1);
+            state = player->field_0x00A != 1;
         }
     }
     if (state > 0) {
@@ -2147,6 +2135,14 @@ extern "C" void camera_area_reset(void)
     work->area.reload = 1;
 }
 
+/* Copies a range record's look-at offset into a vector. */
+inline nw4r::math::VEC3* camera_range_target(const CamRange* rec)
+{
+    nw4r::math::VEC3 look;
+
+    return em_vec3_from(&look, &rec->target_offset);
+}
+
 /* Snaps the follow camera behind the player at the distance record of its range. */
 extern "C" void camera_follow_snap(CamFollow* cam, _PLW* player)
 {
@@ -2176,12 +2172,8 @@ extern "C" void camera_follow_snap(CamFollow* cam, _PLW* player)
     offset.z = cam->range_rec->offset.z;
     rotVecY(&offset, cam->yaw_goal);
     copyVec3(&cam->pos, copyVec3(&cam->goal_pos, &vec3_add(&player->vec_0x03C, &offset)));
-    {
-        nw4r::math::VEC3 look;
-
-        copyVec3(&cam->target,
-                 copyVec3(&cam->goal_target, &vec3_add(&player->vec_0x03C, em_vec3_from(&look, &cam->range_rec->target_offset))));
-    }
+    copyVec3(&cam->target,
+             copyVec3(&cam->goal_target, &vec3_add(&player->vec_0x03C, camera_range_target(cam->range_rec))));
     setVector3(&cam->shake_pos_peak, 0.0f, 0.0f, 0.0f);
     setVector3(&cam->shake_pos, 0.0f, 0.0f, 0.0f);
     setVector3(&cam->shake_target_peak, 0.0f, 0.0f, 0.0f);
@@ -2211,6 +2203,7 @@ extern "C" u8 camera_tilt_state_get(void)
 
 /* Runs the kill-cut shot of the follow camera: the monster the player finished picks a keyed shot (or the
  * swing-around for kinds 1 and 2), played from the shot's start frame. */
+#pragma optimization_level 4
 extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
 {
     nw4r::math::VEC3 rel;
@@ -2357,7 +2350,8 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
         f32* target_keys;
         f32 t;
 
-        if (enemy->team == 4) {
+        switch (enemy->team) {
+        case 4:
             switch (cam->cut_step) {
             case 0:
                 pos_keys = camera_cut4_pos_keys0;
@@ -2368,7 +2362,8 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
                 target_keys = camera_cut4_target_keys1;
                 break;
             }
-        } else {
+            break;
+        case 7:
             switch (cam->cut_step) {
             case 0:
                 pos_keys = camera_cut7_pos_keys0;
@@ -2380,6 +2375,7 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
                 break;
             }
             cam->range = 2;
+            break;
         }
         t = (f32)(cam->cut_frame - shot->start);
         if (t > (f32)shot->length) {
@@ -2398,6 +2394,7 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
     }
     }
 }
+#pragma optimization_level reset
 
 /* Raises the current camera work's next-cut flag. */
 extern "C" void camera_flag_0x145_set(void)
@@ -2463,6 +2460,9 @@ extern "C" s32 camera_aim_scope_get(_PLW* player)
     return pl_item_page2_ck(player) == 1 ? 0 : -1;
 }
 
+/* camera_aim_update reads the scope pick as a signed byte (SHAPES). */
+#define camera_aim_scope_get_c1 ((s8 (*)(_PLW*))camera_aim_scope_get)
+
 /* Copies the aim camera's mode and zoom bytes out, writes the zoom scaled by the camera's own factor, and
  * returns the scope kind. */
 extern "C" u8 camera_aim_zoom_get(u32 unused, u8* out_mode, u8* out_zoom, f32* out_scale)
@@ -2510,7 +2510,7 @@ extern "C" void camera_aim_update(CamWork* work)
             cam->step = 0;
             return;
         }
-        cam->kind = camera_aim_scope_get(player);
+        cam->kind = camera_aim_scope_get_c1(player);
         if ((s8)cam->kind == -1)
             return;
         switch (cam->step) {
@@ -2766,7 +2766,8 @@ extern "C" void camera_shoulder_update(CamWork* work)
             normal.z = look.z;
             copyVec3(&from, &cam->pos);
             copyVec3(&to, &vec3_add(&cam->target, &look));
-            num = normal.z * (plane.z - to.z) + (normal.x * (plane.x - to.x) + normal.y * (plane.y - to.y));
+            num = normal.z * (plane.z - to.z);
+            num += normal.x * (plane.x - to.x) + normal.y * (plane.y - to.y);
             dir.x = to.x - from.x;
             dir.y = to.y - from.y;
             dir.z = to.z - from.z;
@@ -3090,6 +3091,7 @@ extern "C" void camera_area_fixed_blend(CamWork* work, CamArea* cam)
 }
 
 /* Starts the area camera's blend and runs the step its record's kind needs. */
+#pragma optimization_level 4
 extern "C" void camera_area_blend_update(CamWork* work, CamArea* cam)
 {
     if (cam->rec != NULL) {
@@ -3108,6 +3110,7 @@ extern "C" void camera_area_blend_update(CamWork* work, CamArea* cam)
         }
     }
 }
+#pragma optimization_level reset
 
 /* Takes an area record's parameters and position as the area camera's current and starting ones. */
 extern "C" void camera_area_rec_take(CamArea* cam, CamAreaRec* rec)
@@ -3203,6 +3206,7 @@ extern "C" f32 camera_lobby_blend_curve(CamLobbyGoal* goal, s16 t, u8 curve)
 
 /* Runs the lobby camera for one frame: blends from the area camera towards the goal the lobby set (an NPC,
  * the player under manual control, or a fixed look point). */
+#pragma optimization_level 4
 extern "C" void camera_lobby_update(CamWork* work, CamLobby* cam)
 {
     CamLobbyGoal* goal = &cam->goal;
@@ -3276,9 +3280,7 @@ extern "C" void camera_lobby_update(CamWork* work, CamLobby* cam)
         if (work->lobby_kind == 2) {
             range = &camera_lobby_range_kind2;
         } else {
-            range = &camera_lobby_range_default;
-            if (work->lobby_kind == 1)
-                range = &camera_lobby_range_kind1;
+            range = work->lobby_kind == 1 ? &camera_lobby_range_kind1 : &camera_lobby_range_default;
         }
         if (goal->manual != 0 && chk_pointer() == 0 && lobby_net_busy_ck() == 0) {
             if (lb_cmd_held_ck(0x100) == 1) {
@@ -3329,6 +3331,7 @@ extern "C" void camera_lobby_update(CamWork* work, CamLobby* cam)
     cam->active = 1;
     camera_view_apply(5, &cam->pos, &cam->target, cam->fovy, cam->roll);
 }
+#pragma optimization_level reset
 
 /* Tracks the lobby kind and re-aims the lobby camera when it changes, then runs it. */
 extern "C" void camera_lobby_frame(CamWork* work)
@@ -3521,8 +3524,8 @@ extern "C" void camera_lobby_viewport_fit(void)
     word_read((s32*)&cam);
     lb_screen_rect_get(&x, &y, &w, &h);
     aspect = (f32)w / (f32)h;
-    y = (f32)y * 0.93333334f;
-    h = (f32)h * 0.93333334f;
+    y *= 0.93333334f;
+    h *= 0.93333334f;
     x = (f32)x * (1.0f / hud_screen_width_get());
     w = (f32)w * (1.0f / hud_screen_width_get());
     camera_set_viewport(&cam, x, y, w, h);
@@ -3532,24 +3535,19 @@ extern "C" void camera_lobby_viewport_fit(void)
 /* Copies the area g3d camera's viewport to the lobby g3d camera and sets its perspective. */
 extern "C" void camera_lobby_viewport_copy(void)
 {
+    f32 viewport[6]; /* x, y, width, height, near, far */
     nw4r::g3d::Camera area_cam;
     nw4r::g3d::Camera lobby_cam;
     s32 area_handle;
     s32 lobby_handle;
-    f32 x;
-    f32 y;
-    f32 w;
-    f32 h;
-    f32 near;
-    f32 far;
 
     camera_work_get();
     area_handle = scene_camera_get(4);
     word_copy_return_dst(&area_cam, &area_handle);
     lobby_handle = scene_camera_get(5);
     word_copy_return_dst(&lobby_cam, &lobby_handle);
-    camera_get_viewport(&area_cam, &x, &y, &w, &h, &near, &far);
-    camera_set_viewport(&lobby_cam, x, y, w, h);
+    camera_get_viewport(&area_cam, &viewport[0], &viewport[1], &viewport[2], &viewport[3], &viewport[4], &viewport[5]);
+    camera_set_viewport(&lobby_cam, viewport[0], viewport[1], viewport[2], viewport[3]);
     lobby_cam.SetPerspective(camera_fovy_get(), screen_aspect_get(), 5.0f, 500000.0f);
 }
 
@@ -3606,7 +3604,7 @@ extern "C" u32 camera_slots_ready_ck(CamWork* work)
     SysQuestMove* quest;
     s8 count;
     u8 bits;
-    s32 i;
+    u8 i;
 
     count = 0;
     quest = (SysQuestMove*)get_move_work_adrs(0);
@@ -3767,7 +3765,7 @@ extern "C" void camera_kill_cut_start(u8 id, struct _ENEMY_WORK* enemy)
     if ((work->event.flags & 0x20) == 0 && quest_move_sub_state_ck() == 0 &&
         (quest == NULL || quest->menu_lock_0x112 != 1)) {
         system_copy_filter_request();
-        if (enemy->team == 24) {
+        if ((s32)enemy->team == 24) {
             if (em024_action11_state5_ck(enemy) == 0) {
                 mode = 66;
                 frames = 119;
@@ -3921,7 +3919,7 @@ extern "C" s32 camera_event_script_run(CamWork* work, CamEvent* cam)
     case 1:
         result = camera_event_script_step(work, cam);
         if (result <= 0)
-            return result;
+            break;
         cam->sub_step++;
     case 2:
         return 1;
@@ -3934,14 +3932,16 @@ extern "C" s32 camera_event_script_run(CamWork* work, CamEvent* cam)
 extern "C" s32 camera_event_script_step(CamWork* work, CamEvent* cam)
 {
     CamScriptOp* next;
-    CamScriptOp* op;
     s32 run;
+    CamScriptOp* op;
+    CamScriptOp* word;
     s32 result;
 
     cam->flags &= ~1;
     next = cam->script;
     run = 1;
     do {
+        word = next;
         op = next;
         next = (CamScriptOp*)((u32*)next + op->size);
         switch (op->opcode) {
@@ -3953,14 +3953,14 @@ extern "C" s32 camera_event_script_step(CamWork* work, CamEvent* cam)
             cam->pos_arg = op->bytes.low;
             break;
         case 2:
-            camera_script_pos_read(&(&cam->pos_start)[(s8)op->bytes.arg], cam, op);
+            camera_script_pos_read(&(&cam->pos_start)[(s8)op->bytes.arg], cam, word);
             break;
         case 3:
             cam->target_space = op->bytes.arg;
             cam->target_arg = op->bytes.low;
             break;
         case 4:
-            camera_script_target_read(&(&cam->target_start)[(s8)op->bytes.arg], cam, op);
+            camera_script_target_read(&(&cam->target_start)[(s8)op->bytes.arg], cam, word);
             break;
         case 5:
             cam->field_0x89 = op->bytes.arg;
@@ -3978,10 +3978,10 @@ extern "C" s32 camera_event_script_step(CamWork* work, CamEvent* cam)
             cam->field_0xA4 = op->value;
             break;
         case 10:
-            cam->field_0x90 = 0.0625f * (f32)op->data[0];
+            cam->field_0x90 = 0.0625f * (f32)word->data[0];
             break;
         case 11:
-            cam->field_0x94 = 0.0625f * (f32)op->data[0];
+            cam->field_0x94 = 0.0625f * (f32)word->data[0];
             break;
         case 12:
             cam->roll_start = op->value;
@@ -4238,7 +4238,7 @@ extern "C" void camera_event_path_step(CamWork* work, CamEvent* cam)
     else
         t = 1.0f;
     inv = 1.0f - t;
-    if (cam->interp == 1) {
+    if ((s32)cam->interp == 1) {
         vec3_lerp(&cam->target, &cam->target_start, &cam->target_end, t);
         vec3_lerp(&cam->pos, &cam->pos_start, &cam->pos_end, t);
     }
@@ -4323,21 +4323,18 @@ extern "C" void camera_dcm_buffers_clear(void)
 extern "C" s32 camera_event_dcm_run(CamWork* work, CamEvent* cam)
 {
     s32 done;
-    CamDcmEntry* entry;
-    u8 i;
+    s32 i;
 
     done = 0;
     switch (cam->sub_step) {
     case 0:
         cam->keys = NULL;
-        i = 0;
-        for (entry = camera_dcm_table; entry->mode != 0xFFFF; entry++) {
-            if (cam->mode == entry->mode) {
+        for (i = 0; camera_dcm_table[i].mode != 0xFFFF; i++) {
+            if (cam->mode == camera_dcm_table[i].mode) {
                 cam->keys = stage_dcm_buffer_tbl[i];
                 cam->slot = i;
                 break;
             }
-            i++;
         }
         if (cam->keys == NULL) {
             done = 1;
@@ -4416,6 +4413,7 @@ extern "C" s32 camera_dcm_step(CamWork* work, CamEvent* cam)
         }
         if (frame < key->frame) {
             f32 t = (f32)(frame - key[-1].frame) / (f32)(key->frame - key[-1].frame);
+            f32 d;
 
             copyVec3(&rel, &vec3_sub(&key->pos, &key[-1].pos));
             vec3_scale_in_place(&rel, t);
@@ -4423,8 +4421,12 @@ extern "C" s32 camera_dcm_step(CamWork* work, CamEvent* cam)
             copyVec3(&rel, &vec3_sub(&key->target, &key[-1].target));
             vec3_scale_in_place(&rel, t);
             copyVec3(&cam->target, &vec3_add(&rel, &key[-1].target));
-            cam->roll = (key->roll - key[-1].roll) * t + key[-1].roll;
-            cam->fovy = (key->fovy - key[-1].fovy) * t + key[-1].fovy;
+            d = key->roll - key[-1].roll;
+            d *= t;
+            cam->roll = d + key[-1].roll;
+            d = key->fovy - key[-1].fovy;
+            d *= t;
+            cam->fovy = d + key[-1].fovy;
             break;
         }
         key++;
@@ -4857,10 +4859,11 @@ extern "C" void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index)
         row = kind & 0x1F;
         amp = (f32)camera_quake_amplitude[row];
         amp *= 1.0f - (1.0f + sinf((6.2831855f * (90.0f + 180.0f * ((f32)slot->timer / (f32)camera_quake_frames[row]))) /
-                                   360.0f)) *
-                          0.5f;
-        fade = 1.0f;
-        if ((kind & 0x80) == 0) {
+                                   360.0f)) /
+                          2.0f;
+        if ((kind & 0x80) != 0) {
+            fade = 1.0f;
+        } else {
             f32 dist = vec3_distance(&slot->origin, &pos);
             f32 range = camera_quake_range[slot->level];
 
@@ -4873,7 +4876,7 @@ extern "C" void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index)
         if (((slot->timer >> 1) & 1) != 0)
             amp = -amp;
         if ((slot->kind & 0x40) != 0 && slot->timer > camera_quake_frames[row] - camera_quake_frames[row] / 2) {
-            side = amp * 0.5f;
+            side = amp / 2.0f;
             if (((slot->timer >> 1) & 2) != 0)
                 side = -side;
         } else {
@@ -4891,19 +4894,13 @@ extern "C" void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index)
 /* Ages the three quake timers by one and hands the slot the given camera selects to the per-slot update. */
 extern "C" void camera_quake_update(LightWork* self, u8 index)
 {
-    if (--self->channel[0].timer <= 0) {
-        self->channel[0].enable = 0;
-        self->channel[0].timer = 0;
-    }
+    s16 i;
 
-    if (--self->channel[1].timer <= 0) {
-        self->channel[1].enable = 0;
-        self->channel[1].timer = 0;
-    }
-
-    if (--self->channel[2].timer <= 0) {
-        self->channel[2].enable = 0;
-        self->channel[2].timer = 0;
+    for (i = 0; i < 3; i++) {
+        if (--self->channel[i].timer <= 0) {
+            self->channel[i].enable = 0;
+            self->channel[i].timer = 0;
+        }
     }
 
     if (index == 3) {
@@ -4936,10 +4933,8 @@ extern "C" u8 camera_water_clamp(CamView* cam, nw4r::math::VEC3* target)
     }
     if (stage_water_surface_get(&cam->pos, get_now_areano(), &cell, &height, 4) != 0) {
         if (camera_cut_active_ck() == 1) {
-            f32 top = 6.0f + height;
-
-            if (cam->pos.y < top && cam->pos.y >= height - 60.0f)
-                cam->pos.y = top;
+            if (cam->pos.y < 6.0f + height && cam->pos.y >= height - 60.0f)
+                cam->pos.y = 6.0f + height;
         } else if (cam->pos.y >= height) {
             f32 top = 6.0f + height + lift;
 
@@ -5106,26 +5101,27 @@ extern "C" LightOctal* camera_area_ctor(LightOctal* self)
 /* Constructs the event camera's four vectors and its two two-vector runs. */
 extern "C" LightParams* camera_event_ctor(LightParams* self)
 {
-    nw4r::math::VEC3* vec;
-    nw4r::math::VEC3* end;
+    nw4r::math::VEC3* first;
+    nw4r::math::VEC3* second;
 
     VEC3_ctor(&self->v0);
     VEC3_ctor(&self->v1);
     VEC3_ctor(&self->v2);
     VEC3_ctor(&self->v3);
 
-    vec = &self->runs[0];
-    end = &self->runs[2];
+    /* each run is walked from its start to the next run's start, which then starts the second walk */
+    first = &self->runs[0];
+    second = &self->runs[2];
     do {
-        VEC3_ctor(vec);
-        vec++;
-    } while (vec < end);
+        VEC3_ctor(first);
+        first++;
+    } while (first < second);
 
-    end = &self->runs[4];
+    first = &self->runs[4];
     do {
-        VEC3_ctor(vec);
-        vec++;
-    } while (vec < end);
+        VEC3_ctor(second);
+        second++;
+    } while (second < first);
     return self;
 }
 
