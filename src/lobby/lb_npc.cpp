@@ -10,9 +10,11 @@
  *   pool per TU), `__sinit` (`lb_npc_static_init`) sits mid-range, and the two vtables at 0x805B8D80/0x805B8DA0 are followed
  *   by `jumptable_805B8DC0` (a seam near 0x801FFCA0); not re-drawn here.
  * FLAGS. `cflags_lobby`; `#pragma optimization_level 4` for the whole file (retail lowers a switch range to
- *   `addi` + `cmplwi`, which -O4 reproduces with no row lost); `#pragma peephole off` around `fn_801FC268`, from
- *   `fn_80203114` to the end of the NPC work band, and over the act layer; the control band is under
- *   `#pragma dont_inline on` and `#pragma peephole off`.
+ *   `addi` + `cmplwi`, which -O4 reproduces with no row lost); `#pragma peephole off` from `fn_801FC268` to the end of
+ *   the NPC table band (except `fn_801FDEB4`, `fn_801FDEE4`, `fn_801FDF70` and `lb_npc_motion_restart`, which keep
+ *   it on), from `fn_80203114` to the end of the NPC work band, and over the act layer; the control band is under
+ *   `#pragma dont_inline on` and `#pragma peephole off`; `#pragma fp_contract off` around `lb_arm_wrestle_draw`
+ *   (retail keeps `fmuls` + `fadds`).
  * NAMES. `lb_npc`, `npc_data_town`, `npc_data_village`, `npc_lp_tbl`, `npc_model_*`, `npc_sub_data`,
  *   `npc_event_set_data`, `lb_npc_Get_motion_no`, `lb_npc_area_ck` and `get_talk_npc_data_ptr` are the map's; the dump
  *   gives only placeholders for the rest.
@@ -72,24 +74,23 @@
  *   chain and the hook's destructor and CALC_MAT override are written as free functions with the retail bodies; the
  *   class form needs `_LB_NPC` +0x54 modelled as a `LbNpcChar` member and the `VEC3` constructor calls
  *   (`VEC3_ctor`) as member construction, so the `.ctors` word and both vtables stay unemitted.
- *   57 rows below 100 (`python tools/objdiff/unitscore.py lobby/lb_npc --threshold 100`); the recorded causes:
- *  - `lb_npc_entry_flag_set`: retail's first store is `rlwinm r0,r4,0,24,24` and it materialises the `setVector3` pointer before
- *    the constant load; `(u8)(flag & 0x80)` matches the mask but MWCC schedules the `lfs` ahead of the `addi`;
- *  - `lb_npc_motion_play`, `fn_801FE1DC`, `fn_801FE1EC`: retail sets up the tail call with `addi r3,r3,0x58` first;
- *  - `fn_801FC8C8`: retail keeps `lbz; extsb; stb`, MWCC forwards the byte and drops the `extsb`; `fn_801FC810`:
- *    retail bumps the pointer before the counter; `fn_801FC874`: retail keeps a `clrlwi r0,r0,24` ours drops;
+ *   18 rows below 100 (`python tools/objdiff/unitscore.py lobby/lb_npc --threshold 100`); the recorded causes:
+ *  - `lb_player_control`, `lb_player_remote_follow`, `lb_arm_wrestle_step`: retail jumps from several switch cases
+ *    into one shared block (the failed spot cases into the post-switch idle test; family 1's case 3 into family 0's
+ *    walk block); without `goto` (rule 8) ours keeps flags or a second copy of the block;
+ *  - `lb_npc_act_set`, `fn_801FC810`: retail stores a `ran_suu` result into a halfword with no `clrlwi`/`extsh`;
+ *    that needs a `u16` return on the declaration, which costs `fn_80203664` and `fn_80203A24` their match;
+ *  - `lb_shop_sell_commit`: retail loads the row's price before the count; ours hoists the count load;
+ *  - `lb_act_carry_put`: retail loads the first float argument of `Pl_frame_check` before `li r4,0`;
  *  - `fn_802050AC`: retail schedules `lwz r4,44(r31)` between the `(s16)(u16)` mask and the signed `/ 5`;
- *  - `lb_npc_map_setup`, `lb_npc_model_release_all`: the loop counter/base registers are coloured differently;
- *  - `fn_801FCB68`: retail loads `npc_lp_tbl` early as an sda21 pointer, ours addresses it with `lis`/`addi`;
- *  - `fn_801FD0F8`: retail calls `fn_80207B28` before setting up the table base, ours after;
- *  - `fn_801FD174`: retail loads its float constant once into f1, ours reloads it, and keeps one more `clrlwi`;
- *  - `fn_801FDFE4`: ours loads a compiler-pooled double where retail uses `lbl_807998D0`;
- *  - `fn_801FE0AC`: retail narrows the motion id (`clrlwi r4,r29,16`) before the compare;
- *  - `lb_npc_motion_restart`, `fn_802076D4`: the float register of a constant (f1/f0, f31/f30);
- *  - `fn_80207938`: retail increments the state byte (`addi r0,rX,1`) where ours stores the constant 1;
- *  - `fn_80208928`, `lb_player_remote_follow`, `lb_arm_wrestle_step`, `lb_shop_box_preview_set`: retail branches to one
- *    shared tail where ours inverts the tests and returns early (the shared tail needs a `goto`, rule 8);
- *  - `lb_player_*`, `lb_act_*`, `lb_shop_*` rows at 89-99: register colouring and the order of independent loads.
+ *  - `fn_801FCB68`: the table and quotient registers (r5/r4) are swapped;
+ *  - `fn_8020623C`: `self` and `center` take r30/r31 the other way round;
+ *  - `lb_npc_ground_drop`: the second `+= 48.0f` adds with the operands' registers swapped;
+ *  - `lb_shop_sell_list_draw`: the arrow flags byte takes r29 where retail shares r26 with `picked`;
+ *  - `lb_npc_map_setup`: retail loads the record's first byte into r3 for the loop test;
+ *  - `lb_npc_walk_blend_set`: retail stores the raw frame count where ours reuses the `extsh` copy;
+ *  - `lb_player_menu_area_return`: the strength-reduced peer pointer and the counter are stepped in the other order;
+ *  - `mhchar_construct` and the two constructors: above and on the flipcheck line.
  *   flipcheck: `.bss`/`.ctors`/`.sbss`/`.sdata` claimed, not emitted; `.data` and `.sdata2` short of the claim (the
  *   tables and the float pool are written as literals and externs); `.text`/extab/extabindex short of the claim;
  *   `mhchar_construct` (MHchar's compiler-generated constructor in retail) builds its `nw4r::g3d::ResMdl` at +0x114
@@ -97,7 +98,13 @@
  *   90 functions are defined out of address order (the `.text` and `extabindex` order differ from the target's);
  *   lb_npc, lb_npc_func, lb_cat_name, lb_pig_name, lb_tr_flag_data, lb_item_get_data, lobby_hidden_flag and the
  *   `.data` tables other units read are not defined here.
- * SHAPES. `__declspec(noinline)` on the helpers retail keeps out of line (`fn_801FDE3C`, `fn_801FE11C`, `fn_801FE130`,
+ * SHAPES. A pass-through float argument is a parameter (`fn_801FE1F8(self, speed)`); a call's narrowing `clrlwi`
+ *   right after the `bl` comes from a wider return on the declaration (`ai_behaviour_scaled_get`,
+ *   `userdata_box_capacity`); `(s16)(s32)` / `(s32)` casts pick the operand order of a `mullw` and keep an `lha` +
+ *   `clrlwi`; `switch ((u32)byte)` gives `cmplwi`; a constant used twice is a literal, not an `extern` float
+ *   (stores through `self` would make MWCC reload it); the order of the increments in a `for` clause decides
+ *   which induction register steps first; a shared tail is a nested `if`, never an early return per test.
+ *   `__declspec(noinline)` on the helpers retail keeps out of line (`fn_801FDE3C`, `fn_801FE11C`, `fn_801FE130`,
  *   `lb_res_rec_copy`, and the eight rows `fn_80203114` dispatches to).  `fn_801FCB68` computes the value before the range
  *   test (`< 0x3E8`).  `fn_801FDE74` writes `if (a <= 0) {clear} else {tick}`.  `fn_801FE1AC`/`lb_npc_motion_play`/
  *   `fn_801FE1DC` take a full-width id narrowed with `(u16)` at the use.  Every `ran_suu` use narrows with `(u16)`.
@@ -282,9 +289,9 @@ extern "C" LbNpcSystemWork system_w;   /* .bss 0x806585E0 */
 extern "C" u8 lobby_state_block[];
 extern "C" u8 lobby_hidden_flag;
 extern "C" u8* lobby_wp;
-extern "C" void* npc_data_town[];
-extern "C" void* npc_data_village[];
-extern "C" void* npc_lp_tbl[];
+extern "C" void** npc_data_town;
+extern "C" void** npc_data_village;
+extern "C" void** npc_lp_tbl;
 extern "C" LbResId lbl_80582A68[];
 
 /* ---------------------------------------------------------------------------------------------------
@@ -298,10 +305,10 @@ u16 lb_unlock_cond_top_get(s32);
 u8 lb_progress_flag_b8_ck(void);
 void lb_ship_marks_set(void);
 void fn_801E9AA8(u8);
-s32 mhchar_motion_set(void* self, u8 kind, s32 a3, u16 id, s32 a5, s32 motion, s32 a7, f32 c, f32 k);
+s32 mhchar_motion_set(void* self, u8 kind, s32 a3, u16 id, s32 a5, s32 motion, f32 c, s32 a7, f32 k);
 u32 mhchar_frame_check(void* self, u16 a, s32 b, f32 frame, f32 speed);
 u32 mhchar_motion_end_ck(void* self, s32 a);
-void mhchar_motion_speed_set(void* self);
+void mhchar_motion_speed_set(void* self, f32 speed);
 s32 fn_8026A00C(u16 id);
 s32 fn_802D282C(u16 id);
 s32 abs(s32 a);
@@ -406,7 +413,6 @@ void fn_801FC268(void)
         break;
     }
 }
-#pragma peephole on
 
 /* 0x801FC2F0 - reset the menu layer and leave the menu. */
 void lb_ship_marks_refresh(void)
@@ -476,7 +482,7 @@ void fn_801FBF78(void);
 u32 userdata_item_slot_count(LbNpcUserData* data);
 _SLOTENT* userdata_equip_item_slots_get(LbNpcUserData* data);
 void lb_item_db_toggle(void);
-u16 ai_behaviour_scaled_get(u16 value, u32 kind);
+u32 ai_behaviour_scaled_get(u16 value, u32 kind);
 void item_take(u16 item, s16 count, u8* box, s32 a, s32 b, s32 c);
 void item_pair_copy(_SLOTENT* dst, IdValue* src);
 void note_timer_tick(void);
@@ -494,14 +500,12 @@ void lb_quest_return_apply(void)
     struct FqResultWork* free_hunt = get_FqResult_work();
     struct Q_ResultWork* result = get_qResult_work();
     s32 i;
+    LbNpcUserData* data;
 
     if (system_w.field_0x02D != 0) {
-        u32 bytes;
-        LbNpcUserData* data;
-
         fn_801FC268();
-        bytes = userdata_item_slot_count(lobby_world_block) * 4;
-        memcpy(userdata_equip_item_slots_get(lobby_world_block), free_hunt->pouch_0x1B4, bytes);
+        memcpy(userdata_equip_item_slots_get(lobby_world_block), free_hunt->pouch_0x1B4,
+               userdata_item_slot_count(lobby_world_block) * 4);
         lb_fq_result_items_take();
         if (free_hunt->seconds_0x1AC >= 2) {
             lb_item_db_toggle();
@@ -525,12 +529,9 @@ void lb_quest_return_apply(void)
     } else {
         switch (result->kind_0x1E3) {
         case 1: {
-            u32 bytes;
-            LbNpcUserData* data;
-
             fn_801FC268();
-            bytes = userdata_item_slot_count(lobby_world_block) * 4;
-            memcpy(userdata_equip_item_slots_get(lobby_world_block), result->items_0x154, bytes);
+            memcpy(userdata_equip_item_slots_get(lobby_world_block), result->items_0x154,
+                   userdata_item_slot_count(lobby_world_block) * 4);
             if (result->phase_0x1E2 != 3 && result->seconds_0x14C >= 2) {
                 lb_item_db_toggle();
             }
@@ -558,9 +559,8 @@ void lb_quest_return_apply(void)
             break;
         }
         case 3: {
-            u32 bytes = userdata_item_slot_count(lobby_world_block) * 4;
-
-            memcpy(userdata_equip_item_slots_get(lobby_world_block), result->items_0x154, bytes);
+            memcpy(userdata_equip_item_slots_get(lobby_world_block), result->items_0x154,
+                   userdata_item_slot_count(lobby_world_block) * 4);
             fn_801FBF78();
             if (result->phase_0x1E2 != 3) {
                 userdata_item_new_marks_clear();
@@ -620,7 +620,7 @@ s32 fn_801FDE3C(_LB_NPC* self, VEC3* target);
 void fn_801FDFE4(_LB_NPC* self, u32 motion_id, s32 a, s32 b);
 void fn_801FE11C(_LB_NPC* self);
 void fn_801FE130(_LB_NPC* self);
-void fn_801FE1F8(_LB_NPC* self);
+void fn_801FE1F8(_LB_NPC* self, f32 speed);
 }
 
 extern "C" {
@@ -665,6 +665,7 @@ void fn_801FDE74(_LB_NPC* self)
     }
 }
 
+#pragma peephole on
 /* 0x801FDEB4 - start a turn from the current angle to `to` over `ticks`. */
 void fn_801FDEB4(_LB_NPC* self, s32 to, s32 ticks)
 {
@@ -672,7 +673,9 @@ void fn_801FDEB4(_LB_NPC* self, s32 to, s32 ticks)
     self->field_0x1E8 = (u16)((s16)self->field_0x1D4 / (s16)ticks);
     self->field_0x1E4 = (s16)ticks;
 }
+#pragma peephole off
 
+#pragma peephole on
 /* 0x801FDEE4 - turn towards the motion record's first vector over `ticks`, latching the turn flag. */
 void fn_801FDEE4(_LB_NPC* self, s32 ticks)
 {
@@ -687,7 +690,9 @@ void fn_801FDEE4(_LB_NPC* self, s32 ticks)
     self->field_0x1E8 = (u16)((s16)self->field_0x1D4 / (s16)ticks);
     self->field_0x1E4 = (s16)ticks;
 }
+#pragma peephole off
 
+#pragma peephole on
 /* 0x801FDF70 - start a turn back to the latched angle over `ticks`. */
 void fn_801FDF70(_LB_NPC* self, s32 ticks)
 {
@@ -696,6 +701,7 @@ void fn_801FDF70(_LB_NPC* self, s32 ticks)
     self->field_0x1E4 = (s16)ticks;
     self->field_0x229 = 1;
 }
+#pragma peephole off
 
 /* 0x801FDFA4 - flag the NPC and zero its effect vector. */
 void lb_npc_entry_flag_set(_LB_NPC* self, u32 flag)
@@ -736,7 +742,7 @@ void fn_801FDFE4(_LB_NPC* self, u32 motion_id, s32 a, s32 b)
     } else {
         motion = fn_802D282C((u16)motion_id);
     }
-    mhchar_motion_set(self->body_0x058, self->field_0x210, 0, (u16)motion_id, a, motion, 0, (f32)b,
+    mhchar_motion_set(self->body_0x058, self->field_0x210, 0, (u16)motion_id, a, motion, (f32)b, 0,
                  lbl_80799884);
 }
 
@@ -766,6 +772,7 @@ __declspec(noinline) void fn_801FE130(_LB_NPC* self)
     self->field_0x14A = 0;
 }
 
+#pragma peephole on
 /* 0x801FE13C - restart the NPC's motion state machine. */
 void lb_npc_motion_restart(_LB_NPC* self, u16 motion_id)
 {
@@ -776,10 +783,11 @@ void lb_npc_motion_restart(_LB_NPC* self, u16 motion_id)
     self->field_0x1CC = motion_id;
     self->field_0x1D8 = (s16)ran_suu(1);
     self->field_0x1DC = lbl_80799884;
-    fn_801FE1F8(self);
+    fn_801FE1F8(self, self->field_0x1DC);
     fn_801FE11C(self);
     fn_801FE130(self);
 }
+#pragma peephole off
 
 /* 0x801FE1AC - true when `motion_id` is the NPC's current motion. */
 u32 fn_801FE1AC(_LB_NPC* self, u32 motion_id)
@@ -805,9 +813,9 @@ u32 fn_801FE1EC(_LB_NPC* self)
 }
 
 /* 0x801FE1F8 - finalise the NPC's model. */
-void fn_801FE1F8(_LB_NPC* self)
+void fn_801FE1F8(_LB_NPC* self, f32 speed)
 {
-    mhchar_motion_speed_set(self->body_0x058);
+    mhchar_motion_speed_set(self->body_0x058, speed);
 }
 
 }
@@ -2332,8 +2340,8 @@ void lb_npc_walk_leg(_LB_NPC* self)
 {
     VEC3 target;
     VEC3 step;
-    s32 divisor;
     u32 spun;
+    s32 divisor;
     f32 dist;
 
     VEC3_ctor(&target);
@@ -2382,7 +2390,7 @@ void lb_npc_walk_leg(_LB_NPC* self)
         case 53:
         case 54:
             fn_801FDFE4(self, 1106, 4, 0);
-            fn_801FE1F8(self);
+            fn_801FE1F8(self, 2.0f);
             fn_801FDFC8(self, 1);
             break;
         case 63:
@@ -3452,8 +3460,10 @@ void lb_npc_map_setup(void)
     _LB_NPC* npc;
     s32 count;
 
-    for (i = 0; i < 0x12; i++) {
-        fn_801FD174(&lb_npc[i]);
+    count = 0;
+    npc = lb_npc;
+    for (i = 0; i < 0x12; i++, npc++) {
+        fn_801FD174(npc);
     }
     if (lobby_wp[1] == 0x15) {
         data = (u8*)npc_data_town[lobby_wp[2]];
@@ -3461,7 +3471,6 @@ void lb_npc_map_setup(void)
         data = (u8*)npc_data_village[lobby_wp[2]];
     }
     npc = lb_npc;
-    count = 0;
     while (data[0] != 0) {
         if (count >= 0x12) {
             break;
@@ -3487,8 +3496,9 @@ void lb_npc_model_release_all(void)
     _LB_NPC* npc;
     s32 i;
 
+    i = 0;
     npc = lb_npc;
-    for (i = 0; i < 0x12; i++) {
+    for (; i < 0x12; i++) {
         if (npc->field_0x000 != 0) {
             if (npc->field_0x164 != 0) {
                 push_g3d_wk((struct _g3d_work*)npc->field_0x164);
@@ -3559,9 +3569,9 @@ void fn_801FD0F8(void)
     _LB_NPC* npc;
     s32 i;
 
-    npc = lb_npc;
     fn_80207B28();
-    for (i = 0; i < 0x12; i++) {
+    npc = lb_npc;
+    for (i = 0; i < 0x12; i++, npc++) {
         if (npc->field_0x000 != 0) {
             if (npc->field_0x005 == 0) {
                 fn_801FD4BC(npc);
@@ -3569,15 +3579,12 @@ void fn_801FD0F8(void)
             }
             fn_801FDBD0(npc);
         }
-        npc++;
     }
 }
 
 /* 0x801FD174 - clear one NPC slot back to its reset state. */
 void fn_801FD174(_LB_NPC* self)
 {
-    u16 last = 0xFFFF;
-
     self->field_0x000 = 0;
     self->field_0x001 = 0;
     self->field_0x002 = 0;
@@ -3588,34 +3595,34 @@ void fn_801FD174(_LB_NPC* self)
     self->field_0x007 = 0;
     self->field_0x008 = 0;
     self->field_0x00C = 0;
-    self->pos_0x10.x = lbl_80799880;
-    self->pos_0x10.y = lbl_80799880;
-    self->pos_0x10.z = lbl_80799880;
+    self->pos_0x10.x = 0.0f;
+    self->pos_0x10.y = 0.0f;
+    self->pos_0x10.z = 0.0f;
     copyVec3(&self->field_0x01C, &self->pos_0x10);
     self->field_0x028 = 0;
     self->field_0x02C = 0;
     self->field_0x030 = 0;
-    self->field_0x034 = lbl_80799880;
-    setVector3(&self->field_0x038, lbl_80799880, lbl_80799880, lbl_80799880);
-    setVector3(&self->field_0x044, lbl_80799880, lbl_80799880, lbl_80799880);
+    self->field_0x034 = 0.0f;
+    setVector3(&self->field_0x038, 0.0f, 0.0f, 0.0f);
+    setVector3(&self->field_0x044, 0.0f, 0.0f, 0.0f);
     self->model_0x050 = 0;
     lb_npc_char_bind((LbNpcChar*)self->field_0x054, self);
-    self->field_0x1CC = last;
+    self->field_0x1CC = 0xFFFF;
     self->field_0x1CE = 0;
-    self->field_0x1D0 = last;
+    self->field_0x1D0 = self->field_0x1CC;
     self->field_0x1D4 = 0;
     self->field_0x1D8 = 0;
-    self->field_0x1DC = lbl_80799884;
+    self->field_0x1DC = 1.0f;
     self->field_0x1E0 = 0;
     self->field_0x1E2 = 0;
     self->field_0x1E4 = 0;
     self->field_0x1E8 = 0;
-    setVector3(&self->target_0x1EC, lbl_80799880, lbl_80799880, lbl_80799880);
-    setVector3(&self->vel_0x1F8, lbl_80799880, lbl_80799880, lbl_80799880);
+    setVector3(&self->target_0x1EC, 0.0f, 0.0f, 0.0f);
+    setVector3(&self->vel_0x1F8, 0.0f, 0.0f, 0.0f);
     self->field_0x204 = 0;
     self->field_0x208 = 0;
     self->field_0x20A = 0;
-    self->field_0x20C = lbl_80799880;
+    self->field_0x20C = 0.0f;
     self->field_0x210 = 0xFF;
     self->field_0x214 = 0;
     self->field_0x218 = 0;
@@ -3640,7 +3647,7 @@ void fn_801FD174(_LB_NPC* self)
     self->field_0x254 = 0;
     self->field_0x255 = 0xFF;
     self->field_0x256 = 0;
-    setVector3(&self->field_0x258, lbl_80799880, lbl_80799880, lbl_80799880);
+    setVector3(&self->field_0x258, 0.0f, 0.0f, 0.0f);
     self->field_0x264 = 0;
 }
 
@@ -5623,12 +5630,14 @@ void lb_npc_pig_release(_LB_NPC* self)
     VEC3 offset;
     nw4r::math::MTX34 joint;
     nw4r::math::MTX34 unused;
-    u8 kind = 0xFF;
-    s32 locked = 0;
+    u8 kind;
+    s32 locked;
 
     VEC3_ctor(&offset);
     MTX34_ctor(&joint);
     MTX34_ctor(&unused);
+    kind = 0xFF;
+    locked = 0;
     fn_801FDFC8(self, 1);
     switch (self->field_0x006) {
     case 0:
@@ -5664,7 +5673,7 @@ void lb_npc_pig_release(_LB_NPC* self)
             LbNpcMotionEntry* table = fn_80207DC4(self, &kind);
 
             if (get_now_mapno() == 0x16 && self->field_0x004 == 2) {
-                switch (kind) {
+                switch ((u32)kind) {
                 case 1:
                     if (lb_world_upgrade_get(2) == 0) {
                         locked = 1;
@@ -5684,7 +5693,7 @@ void lb_npc_pig_release(_LB_NPC* self)
             } else {
                 self->field_0x208 = 0;
                 self->field_0x204 = lb_npc_move_data.table_0x14;
-                lb_npc_motion_restart(self, lb_npc_move_data.table_0x14->motion_0x0C);
+                lb_npc_motion_restart(self, self->field_0x204->motion_0x0C);
             }
         }
         break;
@@ -6286,6 +6295,8 @@ extern "C" {
 void fn_802076D4(_LB_NPC* self)
 {
     u8* work;
+    f32 radius;
+    f32 radius_far;
 
     work = (u8*)get_move_work_adrs(2);
     work += (s8)my_player_no() * 0xB20;
@@ -6297,11 +6308,9 @@ void fn_802076D4(_LB_NPC* self)
 
     switch (self->field_0x006) {
     case 0: {
-        f32 near;
-
         self->field_0x006++;
-        near = lbl_80799B18;
-        if (calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC) <= near * near) {
+        radius = lbl_80799B18;
+        if (calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC) <= radius * radius) {
             self->field_0x006 = 3;
             fn_801FE0AC(self, 1, 4, 0);
         } else {
@@ -6310,14 +6319,16 @@ void fn_802076D4(_LB_NPC* self)
         break;
     }
     case 1: {
-        f32 near = lbl_80799B18;
-        f32 far = lbl_80799B1C;
-        f32 d = calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC);
+        f32 d;
 
-        if (d <= near * near) {
+        radius = lbl_80799B18;
+        radius_far = lbl_80799B1C;
+        d = calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC);
+
+        if (d <= radius * radius) {
             self->field_0x006 = 3;
             fn_801FE0AC(self, 1, 4, 0);
-        } else if (d >= far * far) {
+        } else if (d >= radius_far * radius_far) {
             self->field_0x006 = 2;
             fn_801FE0AC(self, 11, 4, 0);
         }
@@ -6326,9 +6337,8 @@ void fn_802076D4(_LB_NPC* self)
         break;
     }
     case 2: {
-        f32 far = lbl_80799B20;
-
-        if (calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC) <= far * far) {
+        radius = lbl_80799B20;
+        if (calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC) <= radius * radius) {
             self->field_0x006 = 0;
         }
         self->field_0x1D4 = (s16)(u16)fn_801FDE3C(self, &self->target_0x1EC) / 10;
@@ -6336,9 +6346,8 @@ void fn_802076D4(_LB_NPC* self)
         break;
     }
     case 3: {
-        f32 far = lbl_80799B20;
-
-        if (calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC) >= far * far) {
+        radius = lbl_80799B20;
+        if (calcDistanceSqXZ(&self->pos_0x10, &self->target_0x1EC) >= radius * radius) {
             self->field_0x006 = 0;
         }
         break;
@@ -6355,13 +6364,13 @@ __declspec(noinline) void fn_80207938(_LB_NPC* self)
     VEC3_ctor(&scratch);
     switch (self->field_0x006) {
     case 0:
-        self->field_0x006 = 1;
+        self->field_0x006++;
         fn_801FE0AC(self, 2, 4, 0);
         fn_801FDEE4(self, 10);
         break;
     case 1:
         if (fn_801FE1EC(self) == 1 || fn_801FDFD0(self) == 1) {
-            self->field_0x006 = 2;
+            self->field_0x006++;
             fn_801FE0AC(self, 1, 4, 0);
         }
         break;
@@ -6490,19 +6499,17 @@ u32 fn_80208928(_PLW* self)
     if (self->area_0x16 != lobby_w.area_0x002) {
         return 0;
     }
-    if (Pl_master_ck(self) != 0) {
-        return 1;
-    }
-    if (lb_menu_kind_deco_ck(self->kind_0x015, self->area_0x16) == 1) {
-        return 0;
-    }
-    if (lb_menu_kind_pair_ck(self->kind_0x015, self->area_0x16) != 1) {
-        return 1;
-    }
-    work = (u8*)get_move_work_adrs(2);
-    work += (s8)my_player_no() * 0xB20;
-    if (memcmp(self->name_0xB05, work + 0xB05, 10) != 0) {
-        return 0;
+    if (Pl_master_ck(self) == 0) {
+        if (lb_menu_kind_deco_ck(self->kind_0x015, self->area_0x16) == 1) {
+            return 0;
+        }
+        if (lb_menu_kind_pair_ck(self->kind_0x015, self->area_0x16) == 1) {
+            work = (u8*)get_move_work_adrs(2);
+            work += (s8)my_player_no() * 0xB20;
+            if (memcmp(self->name_0xB05, work + 0xB05, 10) != 0) {
+                return 0;
+            }
+        }
     }
     return 1;
 }
@@ -6691,6 +6698,7 @@ LbNpcMotionEntry* fn_80207DC4(_LB_NPC* self, u8* kind)
     VEC3 pos;
     LbNpcMotionEntry* found;
     LbPigRegion* region;
+    LbPigSpot* spot;
     u8 index;
 
     index = 0;
@@ -6699,8 +6707,6 @@ LbNpcMotionEntry* fn_80207DC4(_LB_NPC* self, u8* kind)
     region = village_pig_release[self->field_0x004];
     if (region != 0) {
         for (; region->spots_0x0 != 0; region++, index++) {
-            LbPigSpot* spot;
-
             for (spot = region->spots_0x0; spot->radius_0xC > 0.0f; spot++) {
                 vec_to_mh_vec3(&pos, &spot->pos_0x0);
                 if (calcDistanceSqXZ(&pos, &self->pos_0x10) < spot->radius_0xC * spot->radius_0xC) {
@@ -6935,14 +6941,14 @@ void lb_player_frame(_PLW* self)
         break;
     case 1:
         pl_input_clear(self);
-        if (event_demo_running_ck() == 0 && event_demo_ck() == 0) {
+        if ((u8)event_demo_running_ck() == 0 && event_demo_ck() == 0) {
             lb_player_input_hold(self);
             if (fn_80208928(self) == 0) {
                 self->field_0x001 = 0;
             } else {
                 self->field_0x001 = 1;
             }
-            if (Pl_master_ck(self) == 0 && NetCtrlWk::hasFriendDetail((NetId*)self->hunter_0x5CA.id_0x5DB) == 1) {
+            if (Pl_master_ck(self) == 0 && (u32)NetCtrlWk::hasFriendDetail((NetId*)self->hunter_0x5CA.id_0x5DB) == 1) {
                 self->field_0xB04 = 0;
                 self->field_0xB01 = 0;
                 self->field_0xB02 = 0;
@@ -7283,53 +7289,60 @@ void lb_player_spawn_set(VEC3* pos, u16 angle, u8 map, u8 area)
     pl_act_stage_latch_set(plw, 0);
 }
 
+/* The peer list inside `lobby_state_block` (its +0x4 count, then the peer records) as the menu-area return walks
+ * it: ten records are scanned although the block holds four.  size: 0xB44 (the scanned extent) */
+typedef struct LbPeerTable {
+    /* +0x000 */ s32 count_0x000;
+    /* +0x004 */ LobbyPeerCopy peers_0x004[10];
+} LbPeerTable;
+
 /* 0x80209328 - online, sends a local player latched in a paired menu area (and not listed ready among the
  * session's peers) back to the plaza spot; 1 when it did. */
 u32 lb_player_menu_area_return(_PLW* self)
 {
-    s32 i;
     LobbyPeerCopy* peer;
-    LobbyTimerBlock* state;
+    s32 i;
     VEC3 pos;
     s32 seen;
+    LbPeerTable* list;
 
-    state = &lobby_state_block;
+    list = (LbPeerTable*)&lobby_state_block.peer_count_0x0004;
     setVec3(&pos, 83.71f, 7.41f, -886.41f);
     if (lobby_w.area_change_0x026 != 0) {
         return 0;
     }
     seen = 0;
-    if (lb_player_menu_area_ck(self) != 1) {
-        return 0;
-    }
-    for (i = 0, peer = state->peers_0x0008; i < 10; i++, peer++) {
-        if ((s8)peer->id_0x00[0] != 0) {
-            if (memcmp(self->name_0xB05, peer->id_0x00, 10) == 0) {
-                if (state->peers_0x0008[i].card_0x20[0x92] != 0) {
-                    return 0;
+    if (lb_player_menu_area_ck(self) == 1) {
+        for (i = 0, peer = list->peers_0x004; i < 10; peer++, i++) {
+            if ((s8)list->peers_0x004[i].id_0x00[0] != 0) {
+                if (memcmp(self->name_0xB05, peer->id_0x00, 10) == 0) {
+                    if (list->peers_0x004[i].card_0x20[0x92] != 0) {
+                        return 0;
+                    }
+                    break;
                 }
-                break;
-            }
-            if (++seen >= state->peer_count_0x0004) {
-                break;
+                if (++seen >= list->count_0x000) {
+                    break;
+                }
             }
         }
+        if (lobby_w.state_0x000 != 0) {
+            lb_panel_close();
+        }
+        lb_npc_act_req(self, 0, 0, (u16)0x8000);
+        lobby_player_place(3, &pos, 0);
+        pl_act_stage_latch_set(self, 6);
+        lobby_net_place_send(self, 3, &pos, 0);
+        return 1;
     }
-    if (lobby_w.state_0x000 != 0) {
-        lb_panel_close();
-    }
-    lb_npc_act_req(self, 0, 0, (u16)0x8000);
-    lobby_player_place(3, &pos, 0);
-    pl_act_stage_latch_set(self, 6);
-    lobby_net_place_send(self, 3, &pos, 0);
-    return 1;
+    return 0;
 }
 
 /* 0x80209488 - the lobby player's per-frame update: the act layer and its latches, the turn and walk, the rig, then
  * the ground under him and the paired-area check. */
 void lb_player_update(_PLW* self)
 {
-    PlSeRig* rig = (PlSeRig*)self->physics_0x13C;
+    MHchar* model = &((PlSeRig*)self->physics_0x13C)->models_0x004[0].model;
     LbNpcGround ground;
     f32 height;
 
@@ -7340,11 +7353,12 @@ void lb_player_update(_PLW* self)
     self->field_0x30A = 1;
     self->field_0x268 = 0;
     if (Pl_master_ck(self) == 1) {
-        _SLOTENT* slots = userdata_equip_item_slots_get(lobby_world_block);
         s32 i;
+        _SLOTENT* slots;
 
-        for (i = 0; i < 24; i++) {
-            item_pair_copy(&self->slot_id[i], &slots[i]);
+        slots = userdata_equip_item_slots_get(lobby_world_block);
+        for (i = 0; i < 24; i++, slots++) {
+            item_pair_copy(&self->slot_id[i], slots);
         }
         self->deco_skill_id[0] = lb_param_w.value_0x16;
         self->deco_skill_id[1] = lb_param_w.value_0x18;
@@ -7373,10 +7387,16 @@ void lb_player_update(_PLW* self)
     if (self->act_state_0x00E[0] != 0) {
         lb_player_act_run(self);
     }
-    if ((u32)(self->field_0x00A - 11) <= 1) {
+    switch (self->field_0x00A) {
+    case 0:
+        if (self->act_no != 0) {
+            self->field_0x30A = 0;
+        }
+        break;
+    case 11:
+    case 12:
         self->field_0x30A = 0;
-    } else if (self->field_0x00A == 0 && self->act_no != 0) {
-        self->field_0x30A = 0;
+        break;
     }
     if (Pl_act_ck(self, 0, 1) == 1) {
         self->field_0x268 = 1;
@@ -7387,15 +7407,14 @@ void lb_player_update(_PLW* self)
     lb_player_remote_ease(self);
     pl_model_pos_sync(self);
     self->drawn_0x01A = 1;
-    pl_rig_draw_mode_begin(rig);
-    pl_rig_model_move(rig);
-    pl_rig_draw_mode_end(rig);
-    copyVec3(&self->vec_0x03C, &rig->models_0x004[0].model.pos_0x04);
+    pl_rig_draw_mode_begin((PlSeRig*)self->physics_0x13C);
+    pl_rig_model_move((PlSeRig*)self->physics_0x13C);
+    pl_rig_draw_mode_end((PlSeRig*)self->physics_0x13C);
+    copyVec3(&self->vec_0x03C, &model->pos_0x04);
     if (Pl_master_ck(self) != 0) {
         pl_coll_shape_set(self, 0, 194);
         if (pl_ground_check(self, &self->vec_0x03C, (LbNpcGround*)&self->field_0x5A4, &height, -6) == 1) {
-            self->ground_y_0x060 = height;
-            self->vec_0x03C.y = height;
+            self->vec_0x03C.y = self->ground_y_0x060 = height;
         }
         if (game_ready_ck() == 0) {
             if (pl_ground_check(self, &self->vec_0x03C, &ground, &height, 4) == 1) {
@@ -7406,12 +7425,11 @@ void lb_player_update(_PLW* self)
             }
         }
     } else if (pl_ground_check(self, &self->vec_0x03C, (LbNpcGround*)&self->field_0x5A4, &height, -6) == 1) {
-        self->ground_y_0x060 = height;
-        self->vec_0x03C.y = height;
+        self->vec_0x03C.y = self->ground_y_0x060 = height;
     }
     lb_player_menu_area_return(self);
     pl_model_pos_sync(self);
-    mhchar_model_mtx_update(&rig->models_0x004[0].model);
+    mhchar_model_mtx_update(model);
 }
 
 /* 0x802097E8 - the lobby player's footstep, splash and steam effects by motion and frame (the hot-spring map 22 has
@@ -7806,12 +7824,12 @@ void lb_act_idle(_PLW* self)
             }
             break;
         }
-        if (self->field_0x006 == 0) {
-            self->field_0x006++;
-        } else {
-            lb_player_walk_hook(self);
-        }
         break;
+    }
+    if (self->field_0x006 == 0) {
+        self->field_0x006++;
+    } else {
+        lb_player_walk_hook(self);
     }
 }
 
@@ -7987,7 +8005,7 @@ __declspec(noinline) void fn_8020A70C(_PLW* self, u32 a, s32 b, s32 c)
 
 /* 0x8020A5F4 - the act-family handler: arm the act id, set the +0x30E flag and select the motion
  * from the latch state. */
-void fn_8020A5F4(_PLW* self, u32 id, s32 arg, s32 speed, u16 flags)
+void fn_8020A5F4(_PLW* self, u32 id, s32 speed, s32 arg, u16 flags)
 {
     if (speed > 0) {
         speed = -speed;
@@ -8012,24 +8030,24 @@ void fn_8020A5F4(_PLW* self, u32 id, s32 arg, s32 speed, u16 flags)
  */
 
 /* 0x8020AD14 - */
-void fn_8020AD14(_LB_NPC* self)
+void fn_8020AD14(_PLW* self)
 {
-    switch (self->field_0x005) {
+    switch (self->act_step_0x05) {
     case 0: {
         u8 index;
 
-        self->field_0x005++;
-        fn_8020A5EC((_PLW*)self, 0);
-        Pl_chr_setX((_PLW*)self, 610, 4, 0);
-        if (Pl_master_ck((_PLW*)self) == 1 && game_ready_ck() == 1) {
-            index = self->field_0x182;
+        self->act_step_0x05++;
+        fn_8020A5EC(self, 0);
+        Pl_chr_setX(self, 610, 4, 0);
+        if (Pl_master_ck(self) == 1 && game_ready_ck() == 1) {
+            index = self->field_0x0B6;
             checkOtherInvite(index + 1, (s8*)&lobby_w.param_0x12F);
         }
         break;
     }
     case 1:
-        if (Pl_motion_end_ck((_PLW*)self) == 1) {
-            fn_8020A70C((_PLW*)self, 0, 4, 0);
+        if (Pl_motion_end_ck(self) == 1) {
+            fn_8020A70C(self, 0, 4, 0);
         }
         break;
     }
@@ -8044,7 +8062,7 @@ void fn_8020AEF0(_PLW* self)
 
         self->act_step_0x05++;
         fn_8020A5EC(self, 0);
-        timer = self->field_0x058 + 0x18000;
+        timer = self->field_0x058 + 0x8000;
         self->field_0x058 = timer & 0xFFFF;
         self->field_0x0A8 = timer & 0xFFFF;
         Pl_chr_setX(self, 329, 0, 0);
@@ -9452,7 +9470,7 @@ void lb_act_item_use(_PLW* self, s32 index)
         self->act_step_0x05++;
         fn_8020A5EC(self, 0);
         args = &lb_item_motion_tbl[index];
-        Pl_chr_set_attr_default(self, args->motion_0x0, args->blend_0x2, args->start_0x4);
+        Pl_chr_set_attr_default(self, (s32)args->motion_0x0, args->blend_0x2, args->start_0x4);
         self->field_0x28 = 60;
         break;
     }
@@ -9481,7 +9499,7 @@ void lb_act_item_once(_PLW* self, s32 index)
         self->act_step_0x05++;
         fn_8020A5EC(self, 0);
         args = &lb_item_motion_once_tbl[index];
-        Pl_chr_set_attr_default(self, args->motion_0x0, args->blend_0x2, args->start_0x4);
+        Pl_chr_set_attr_default(self, (s32)args->motion_0x0, args->blend_0x2, args->start_0x4);
         break;
     }
     case 1:
@@ -10187,8 +10205,9 @@ u32 lb_player_item_request(_PLW* self)
 {
     s16 i;
     _PLW* plw;
-    s16 count;
     f32 range;
+    u32 slots;
+    s16 count;
 
     if (game_ready_ck() == 0) {
         return 0;
@@ -10210,8 +10229,7 @@ u32 lb_player_item_request(_PLW* self)
             strcmp(self->hunter_0x5CA.id_0x5DB, plw->partner_0xB0F) == 0) {
             self->field_0x658 = 90;
             if (userdata_item_total_count(lobby_world_block, plw->field_0x650) < plw->field_0x652) {
-                u32 slots = userdata_item_slot_count(lobby_world_block);
-
+                slots = userdata_item_slot_count(lobby_world_block);
                 if (item_pair_index_find(plw->field_0x650, userdata_equip_item_slots_get(lobby_world_block), slots) < 0) {
                     hud_item_msg_push(1, 0, 0);
                 } else {
@@ -10558,8 +10576,7 @@ void lb_player_walk_hook(_PLW* self)
 void lb_player_carry_control(_PLW* self)
 {
     if (pl_act_param_tier_ck(self, 0) >= 2) {
-        switch (self->act_no) {
-        case 0:
+        if (self->act_no == 0) {
             if (pl_part_flag_ck(self, 0) != 0) {
                 if (lb_player_facing_away_ck(self) != 0) {
                     lb_npc_act_set(self, 12, 5, 0);
@@ -10571,27 +10588,29 @@ void lb_player_carry_control(_PLW* self)
             } else {
                 lb_npc_act_set(self, 12, 2, 0);
             }
-            break;
-        case 1:
-            if (pl_part_flag_ck(self, 0) != 0) {
-                if (lb_player_facing_away_ck(self) != 0) {
-                    lb_npc_act_set(self, 12, 5, 0);
+        } else {
+            switch (self->act_no) {
+            case 1:
+                if (pl_part_flag_ck(self, 0) != 0) {
+                    if (lb_player_facing_away_ck(self) != 0) {
+                        lb_npc_act_set(self, 12, 5, 0);
+                    } else {
+                        lb_npc_act_set(self, 12, 3, 0);
+                    }
                 } else {
-                    lb_npc_act_set(self, 12, 3, 0);
+                    lb_npc_act_set(self, 12, 2, 0);
                 }
-            } else {
-                lb_npc_act_set(self, 12, 2, 0);
-            }
-            break;
-        case 2:
-            if (pl_part_flag_ck(self, 0) != 0) {
-                if (lb_player_facing_away_ck(self) != 0) {
-                    lb_npc_act_set(self, 12, 5, 0);
-                } else {
-                    lb_npc_act_set(self, 12, 3, 0);
+                break;
+            case 2:
+                if (pl_part_flag_ck(self, 0) != 0) {
+                    if (lb_player_facing_away_ck(self) != 0) {
+                        lb_npc_act_set(self, 12, 5, 0);
+                    } else {
+                        lb_npc_act_set(self, 12, 3, 0);
+                    }
                 }
+                break;
             }
-            break;
         }
     } else if (pl_act_param_tier_ck(self, 0) >= 1 && self->act_no == 0) {
         if (pl_part_flag_ck(self, 0) != 0) {
@@ -10885,6 +10904,7 @@ void lb_arm_wrestle_step(void)
     }
 }
 
+#pragma fp_contract off
 /* 0x802103AC - draws the arm-wrestle countdown digit, pulsing over each second. */
 void lb_arm_wrestle_draw(void)
 {
@@ -10901,15 +10921,18 @@ void lb_arm_wrestle_draw(void)
         digit = work->count_0x06 / 30 + 1;
         if (digit >= 3) {
             id = 10402;
+        } else if (digit == 2) {
+            id = 10403;
         } else {
-            id = 10404 - (digit == 2);
+            id = 10404;
         }
         spr_data_copy((s16*)&spr, get_lsp_data(id, 0));
         scale = 0.9f + 0.1f * (work->count_0x06 % 30);
-        spr.u_scale_0x0C = spr.v_scale_0x0E = 100.0f * scale;
+        spr.v_scale_0x0E = spr.u_scale_0x0C = 100.0f * scale;
         draw_sprite(*(struct _SPR_DATA_*)&spr, &pos);
     }
 }
+#pragma fp_contract reset
 
 } /* extern "C" */
 } /* namespace lb_npc_arm_wrestle */
@@ -10963,7 +10986,7 @@ _SLOTENT* userdata_equip_item_slots_get(LbNpcUserData* data);
 s32 item_pair_index_find(u16 item, _SLOTENT* slots, u32 count);
 s32 item_count_find(u16 item, _SLOTENT* slots, u32 count);
 u32 userdata_box_item_ck(LbNpcUserData* data, u16 item);
-u16 userdata_box_capacity(LbNpcUserData* data);
+u32 userdata_box_capacity(LbNpcUserData* data);
 u16 item_slots_free_count(_SLOTENT* slots, u16 count);
 s32 eft052_page_count_ck(u16 item, u8 kind);
 void eft052_page_take(_PLW* plw, u16 item, s16 count, u32 flag);
@@ -11016,9 +11039,9 @@ void lb_shop_close(void)
 }
 
 /* 0x8021054C - the stock list of the shop NPC `npc`, or null. */
-u16* lb_shop_stock_get(u32 npc)
+u16* lb_shop_stock_get(u16 npc)
 {
-    switch ((u16)npc) {
+    switch (npc) {
     case 5:
         return lb_shop_items_npc5;
     case 39:
@@ -11040,8 +11063,8 @@ void lb_shop_buy_list_build(LbShopWork* self, s16 page)
 {
     s32 first = page * 8;
     s32 count;
-    s32 i;
     u16* list;
+    s32 i;
 
     self->rows_0x012 = 0;
     self->page_0x008 = page;
@@ -11087,8 +11110,10 @@ void lb_shop_buy_list_build(LbShopWork* self, s16 page)
         }
     }
     for (i = 0; i < 8; i++) {
-        if (first + i < count) {
-            u16 item = self->items_0x044[first + i];
+        s32 index = first + i;
+
+        if (index < count) {
+            u16 item = self->items_0x044[index];
 
             self->rows_0x144[i].item_0x0 = item;
             self->rows_0x144[i].price_0x4 = lb_shop_price_get(item, &self->rows_0x144[i].discount_0x2);
@@ -11107,7 +11132,7 @@ u32 lb_shop_halfprice_ck(u32 item)
 {
     u16* entry;
 
-    for (entry = lb_shop_halfprice_skip; *entry != 0; entry += 2) {
+    for (entry = lb_shop_halfprice_skip; *entry != 0; entry++) {
         if ((u16)item == *entry) {
             return 0;
         }
@@ -11190,7 +11215,7 @@ u16 lb_shop_buy_flags_get(u32 item, s16 count)
             }
         }
     }
-    if (data->money_0x18 < (s16)count * lb_shop_price_get(item, 0)) {
+    if (data->money_0x18 < lb_shop_price_get(item, 0) * (s16)(s32)count) {
         flags |= 4;
     }
     return flags;
@@ -11214,7 +11239,7 @@ void lb_shop_box_preview_set(LbShopWork* self)
 {
     u32 slots;
     s32 pos;
-    s16 index;
+    s32 index;
     s32 i;
 
     memset(self->box_0x1A4, 0, 0xC0);
@@ -11222,12 +11247,13 @@ void lb_shop_box_preview_set(LbShopWork* self)
     pos = item_pair_index_find(self->item_0x00E, userdata_equip_item_slots_get(lobby_world_block), slots);
     self->box_page_0x264 = pos / 8;
     index = self->box_page_0x264 * 8;
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < 8; i++, index++) {
+        LbBoxCell* cell = &self->box_0x1A4[i];
+
         if (index == pos) {
-            self->box_0x1A4[i].selected_0x02 = 1;
+            cell->selected_0x02 = 1;
         }
-        self->box_0x1A4[i].index_0x06 = index;
-        index++;
+        cell->index_0x06 = index;
     }
     if (pl_item_page2_ck(self->plw_0x03C) != 0) {
         self->box_mode_0x266 = 4;
@@ -11239,9 +11265,9 @@ void lb_shop_box_preview_set(LbShopWork* self)
 /* 0x80210C20 - pays for and hands over the bought items (a box upgrade is applied at once). */
 void lb_shop_buy_commit(LbShopWork* self)
 {
-    score_add_clamped(-(lb_shop_price_get(self->item_0x00E, 0) * (s16)self->count_0x00C), &lobby_world_block->money_0x18);
+    score_add_clamped(-(lb_shop_price_get(self->item_0x00E, 0) * (s16)(s32)self->count_0x00C), &lobby_world_block->money_0x18);
     sysSE_req(9);
-    if (lb_shop_box_upgrade_ck(self->item_0x00E) == 1) {
+    if (lb_shop_box_upgrade_ck((s16)self->item_0x00E) == 1) {
         userdata_item_seen_set(lobby_world_block, self->item_0x00E);
         switch (self->item_0x00E) {
         case 580:
@@ -11343,14 +11369,15 @@ s32 lb_shop_buy_step(LbShopWork* self)
 /* 0x80211044 - rebuilds the sell list's page `page`: the pouch (pages 0..2) or the carried supplies (page 3). */
 void lb_shop_sell_list_build(LbShopWork* self, s16 page)
 {
+    s32 base = page * 8;
     s32 i;
 
     self->rows_0x012 = 0;
     memset(self->rows_0x144, 0, 0x60);
     if (page < 3) {
         for (i = 0; i < 8; i++) {
-            if (page * 8 + i < 24) {
-                u16 item = userdata_equip_item_id_get(lobby_world_block, page * 8 + i);
+            if (base + i < 24) {
+                u16 item = (s32)userdata_equip_item_id_get(lobby_world_block, base + i);
 
                 self->rows_0x144[i].item_0x0 = item;
                 self->rows_0x144[i].price_0x4 = eft052_item_value_get(item);
@@ -11558,11 +11585,11 @@ void lb_shop_buy_help_draw(LbShopWork* self, u32 item)
     }
     case 1:
         lb_panel_msg_draw(0x1877, 52);
-        lb_count_window_draw(0x14CA, 0x14D5, (s16)self->count_0x00C, (s16)self->count_max_0x010,
+        lb_count_window_draw(0x14CA, 0x14D5, self->count_0x00C, (s16)self->count_max_0x010,
                              lb_shop_price_get(item, 0), 0, (u16)self->blink_0x004);
         break;
     case 2:
-        lb_help_num_put(0x1877, 54, (s16)self->count_0x00C * lb_shop_price_get(item, 0));
+        lb_help_num_put(0x1877, 54, lb_shop_price_get(item, 0) * self->count_0x00C);
         lb_panel_yes_no_draw(0x1879, self->yes_no_0x014);
         break;
     case 3:
@@ -11580,11 +11607,11 @@ void lb_shop_sell_help_draw(LbShopWork* self, u32 item)
         break;
     case 1:
         lb_panel_msg_draw(0x1877, 53);
-        lb_count_window_draw(0x14CA, 0x14D5, (s16)self->count_0x00C, (s16)self->count_max_0x010,
+        lb_count_window_draw(0x14CA, 0x14D5, self->count_0x00C, (s16)self->count_max_0x010,
                              eft052_item_value_get(item), 0, (u16)self->blink_0x004);
         break;
     case 2:
-        lb_help_num_put(0x1877, 55, (s16)self->count_0x00C * eft052_item_value_get(item));
+        lb_help_num_put(0x1877, 55, eft052_item_value_get(item) * self->count_0x00C);
         lb_panel_yes_no_draw(0x1879, self->yes_no_0x014);
         break;
     }
@@ -11609,7 +11636,6 @@ void lb_shop_banner_draw(void)
 /* 0x802118D0 - draws the buy list's frame, page arrows and rows. */
 void lb_shop_buy_list_draw(LbShopWork* self)
 {
-    u16* ids;
     u32 active;
     LbShopCell cell;
     _mh_ivec2_ pos;
@@ -11619,15 +11645,15 @@ void lb_shop_buy_list_draw(LbShopWork* self)
     active = self->sub_0x001 == 0;
     get_lsp_data(0x1464, &base);
     draw_sprite_ary(lb_shop_buy_frame, &base);
-    lb_page_arrow_draw(0x144E, self->page_0x008, self->pages_0x00A, active == 1 ? (u16)self->blink_0x004 : 0, active);
-    for (i = 0, ids = lb_shop_buy_cells; i < self->rows_0x012; i++, ids++) {
+    lb_page_arrow_draw(0x144E, self->page_0x008, self->pages_0x00A, active == 1 ? (u16)self->blink_0x004 : (u16)0, active);
+    for (i = 0; i < self->rows_0x012; i++) {
         LbSprHead* spr;
         s32 enabled;
         s32 picked;
 
         cell.item_0x0 = self->rows_0x144[i].item_0x0;
         cell.price_0x2 = self->rows_0x144[i].price_0x4;
-        spr = (LbSprHead*)get_lsp_data(*ids, 0);
+        spr = (LbSprHead*)get_lsp_data(lb_shop_buy_cells[i], 0);
         pos.x = base.x + spr->pos.x;
         pos.y = base.y + spr->pos.y;
         enabled = self->rows_0x144[i].flags_0x8 == 0;
@@ -11674,14 +11700,14 @@ void lb_shop_sell_list_draw(LbShopWork* self)
     }
     get_lsp_data(0x144F, &pos);
     PutPageArrow(lb_page_arrow_ids, self->page_0x008, self->pages_0x00A, self->blink_0x004, &pos, arrow);
-    for (i = 0; i < 8; i++, ids++) {
+    for (i = 0; i < 8; i++) {
         LbSprHead* spr;
         s32 picked;
-        u16 mode;
+        u8 mode;
 
         cell.item_0x0 = self->rows_0x144[i].item_0x0;
         cell.price_0x2 = self->rows_0x144[i].price_0x4;
-        spr = (LbSprHead*)get_lsp_data(*ids, 0);
+        spr = (LbSprHead*)get_lsp_data(ids[i], 0);
         pos.x = base.x + spr->pos.x;
         pos.y = base.y + spr->pos.y;
         if (i == self->cursor_0x006) {
@@ -11692,12 +11718,13 @@ void lb_shop_sell_list_draw(LbShopWork* self)
         } else {
             picked = 0;
         }
-        mode = 2;
         if (self->rows_0x144[i].item_0x0 == 0) {
             mode = 0x80;
+        } else {
+            mode = 2;
         }
         if (self->page_0x008 == 3) {
-            lb_price_cell_draw(self->rows_0x144[i].price_0x4, &pos, 1, picked, active, mode);
+            lb_price_cell_draw(self->rows_0x144[i].item_0x0, self->rows_0x144[i].price_0x4, &pos, 1, picked, active, mode);
         } else {
             lb_item_cell_draw_layout1(self->rows_0x144[i].item_0x0, self->rows_0x144[i].price_0x4, &pos, 1, picked,
                                       active, mode);
@@ -11947,14 +11974,11 @@ void fn_80212370(void)
         return;
     }
     for (i = 0; i < 4; i++) {
-        PadButtons* pad = &Psw[i].button_0x2C0;
-        u16 pressed = pad->pressed_0x04;
-
-        lobby_w.cmd_mask_0x084[i][0] = pressed;
-        lobby_w.cmd_mask_0x084[i][2] = pad->held_0x14 | pressed;
-        lobby_w.cmd_mask_0x084[i][1] = pad->hold_0x00;
-        lobby_w.cmd_mask_0x084[i][4] = pad->edge_on_0x1F | (pad->edge_0x1D & ~pad->edge_off_0x1E);
-        lobby_w.cmd_mask_0x084[i][3] = pad->trigger_0x0C;
+        lobby_w.cmd_mask_0x084[i][0] = Psw[i].button_0x2C0.pressed_0x04;
+        lobby_w.cmd_mask_0x084[i][2] = Psw[i].button_0x2C0.held_0x14 | Psw[i].button_0x2C0.pressed_0x04;
+        lobby_w.cmd_mask_0x084[i][1] = Psw[i].button_0x2C0.hold_0x00;
+        lobby_w.cmd_mask_0x084[i][4] = Psw[i].button_0x2C0.edge_on_0x1F | (Psw[i].button_0x2C0.edge_0x1D & ~Psw[i].button_0x2C0.edge_off_0x1E);
+        lobby_w.cmd_mask_0x084[i][3] = Psw[i].button_0x2C0.trigger_0x0C;
     }
 }
 

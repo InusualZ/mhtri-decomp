@@ -127,7 +127,7 @@ typedef struct LbPlaceRec {
 /* The three `Pl_chr_set_attr_default` arguments of an item act: the motion, the blend frames and the start
  * frame.  size: 0x6 */
 typedef struct LbMotionArgs {
-    /* +0x0 */ u16 motion_0x0;
+    /* +0x0 */ s16 motion_0x0;
     /* +0x2 */ s16 blend_0x2;
     /* +0x4 */ s16 start_0x4;
 } LbMotionArgs;
@@ -184,7 +184,7 @@ typedef struct LbShopWork {
     /* +0x006 */ s16 cursor_0x006;
     /* +0x008 */ s16 page_0x008;
     /* +0x00A */ s16 pages_0x00A;
-    /* +0x00C */ u16 count_0x00C;
+    /* +0x00C */ s16 count_0x00C;
     /* +0x00E */ u16 item_0x00E;
     /* +0x010 */ s16 count_max_0x010;
     /* +0x012 */ s16 rows_0x012;
