@@ -22,16 +22,11 @@ extern "C" {
 /* 0x80304508 - spawns effect `id` for the enemy work at `joint` (`pos` an optional offset, `scale` the size); its body
  * reads only `id` before tail-calling the effect allocator. */
 void eft_em_spawn(struct _ENEMY_WORK* self, u32 id, u32 joint, nw4r::math::VEC3* pos, f32 scale);
-/* 0x80305924 - the same spawn with a colour word (`enemy/fn_8011D448.cpp`'s part-break effects). */
-void eft_em_spawn_tinted(struct _ENEMY_WORK* self, u32 id, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 color);
 }
 #endif
 
-/* Declarations `enemy/em020_prog.cpp` calls (its lobby/quest bands). */
-#ifdef __cplusplus
-extern "C" {
-void eft_em_spawn_tinted(struct _ENEMY_WORK* self, u32 id, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 color);
-}
-#endif
+/* The tinted spawn the enemy bands reach through this header (`enemy/fn_8011D448.cpp`, `enemy/em020_prog.cpp`) is
+ * `ef/eft_em_tint.cpp`'s. */
+#include "ef/eft_em_tint.h"
 
 #endif /* MHTRI_LOBBY_FN_8030121C_H */

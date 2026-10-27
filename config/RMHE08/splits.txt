@@ -1676,12 +1676,19 @@ lobby/fn_802FA9A0.cpp:
 	.sdata2     start:0x8079AC20 end:0x8079AD98
 
 lobby/fn_8030121C.cpp:
-	extab       start:0x80015964 end:0x80015AAC
-	extabindex  start:0x8003447C end:0x80034668
-	.text       start:0x8030121C end:0x803066F0
+	extab       start:0x80015964 end:0x80015A7C
+	extabindex  start:0x8003447C end:0x80034620
+	.text       start:0x8030121C end:0x80305924
 	.data       start:0x805DAFE8 end:0x805DBFB8
-	.sdata      start:0x80792A58 end:0x80792B70
-	.sdata2     start:0x8079AD98 end:0x8079ADE0
+	.sdata      start:0x80792A58 end:0x80792AA0
+	.sdata2     start:0x8079AD98 end:0x8079ADB8
+
+ef/eft_em_tint.cpp:
+	extab       start:0x80015A7C end:0x80015AAC
+	extabindex  start:0x80034620 end:0x80034668
+	.text       start:0x80305924 end:0x803066F0
+	.sdata      start:0x80792AA0 end:0x80792B70
+	.sdata2     start:0x8079ADB8 end:0x8079ADE0
 
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4

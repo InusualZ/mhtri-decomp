@@ -1619,6 +1619,7 @@ config.libs = [
             Object(NonMatching, "lobby/lb_equip_page.cpp"),
             Object(NonMatching, "lobby/fn_802FA9A0.cpp"),
             Object(NonMatching, "lobby/fn_8030121C.cpp"),
+            Object(NonMatching, "ef/eft_em_tint.cpp"),
             Object(NonMatching, "lobby/lb_companion_ui.cpp"),
             Object(NonMatching, "lobby/lb_screen_step.cpp"),
             Object(NonMatching, "lobby/lb_menu_page.cpp"),
