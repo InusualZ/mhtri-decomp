@@ -111,7 +111,7 @@ typedef struct LbSpot {
     /* +0x02 */ s16 id_0x02;
     /* +0x04 */ VEC3 pos_0x04;
     /* +0x10 */ u32 angle_0x10;
-    /* +0x14 */ u8 pad_0x14[4];
+    /* +0x14 */ f32 radius_0x14;   /* the XZ distance the lobby target marker picks the spot within */
 } LbSpot;
 
 /* An area entry the player is placed at (`lb_player_area_enter`): the area, the position and the facing.  size: 0x34 */

@@ -158,7 +158,6 @@ extern LbMenuItemState lb_item_list_state; /* .bss 0x806AAA88 */
 extern LbPageState lb_page_state_0;  /* .bss 0x806AAAD8 */
 extern LbPageState lb_page_state_1;  /* .bss 0x806AAAF0 */
 extern LbLobbyWork* lobby_wp;    /* .sbss 0x80794B18 - points at `lobby_w` (`lobby_flow_init`) */
-extern const f32 lbl_80799C60;       /* .sdata2 0x80799C60 - the y-window this range tests against */
 extern const u16 lb_ship_header_sprites[];     /* .sdata 0x80791F30 */
 extern const u16 lb_ship_header_frame[];     /* .data 0x805BA820 - the item page's sprite rows */
 extern const u16 lb_ship_panel_frame[];
