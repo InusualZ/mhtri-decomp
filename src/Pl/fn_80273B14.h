@@ -56,7 +56,7 @@ s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out);
 
 /* 0x802765B4 / 0x80276690 / 0x80276778 / 0x802767B4 - the gauge and stagger setters. */
 void pl_health_recover(struct _PLW* plw, s16 amount);
-void pl_gauge_ceiling_grow(struct _PLW* plw, s32 amount, u8 a);
+void pl_gauge_ceiling_grow(struct _PLW* plw, s16 amount, u8 a);
 void pl_stagger_budget_add(struct _PLW* plw, s16 amount);
 void pl_act_add_stagger(struct _PLW* plw, s16 amount);
 
@@ -117,7 +117,7 @@ void pl_act_kind_set(struct _PLW* plw, u8 value);
 void pl_act_state_enter_aim(struct _PLW* self, u32 a, u32 b, u32 c, u32 param_a, u32 param_b);
 
 /* 0x80274810 / 0x80274850 - the player's own move work record and its sibling scan. */
-void* pl_partner_work_get(struct _PLW* plw);
+struct _PLW* pl_partner_work_get(struct _PLW* plw);
 
 /* 0x80274918 - the act-name table row picker. */
 u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index);

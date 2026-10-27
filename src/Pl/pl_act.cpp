@@ -63,16 +63,33 @@
  *   `equip_drop_roll_tables`, `pl_input_button_masks`, `pl_act_float_zero/one/10/neg1`; the record fields split out of
  *   `PlSkillRec`/`PlWeaponRec`/`PlSlotRec` and `PlArmorLevelRec` (`Pl/fn_8027D684.h`); registry: pl_se_charge_level_req,
  *   pl_gun_clip_table, lb_bowgun_frame_kinds.
- * RESIDUALS. 9 functions unwritten (objdiff scores them 0), 4.9 KB: 0x80269AC4-0x8026A00C (`pl_net_slot_bind`,
- *   `fn_80269DD8`/`fn_80269E8C`/`fn_80269EC8`, `pl_model_release`, `fn_80269F88`: `new` of the 0x1560-byte rig, whose
- *   ctor/dtor build `LbEquipModelCallbackA`/`B` arrays - vtables 0x805BAB58/0x805BAB74 in `lobby/lb_equip_page`'s `.data`,
- *   a class model this unit does not own); 0x8026AF08 (`fn_8026AF08`, 0xA2C: the pad-input refresh, waiting for the
- *   `PlayerPad` fields 0xD8/0xE0-0xE6/0xF2/0xF4/0x106-0x11A in `mh3_pad/player_pad.h` and a `_PLW` +0xB8 `PlInput`
- *   member); 0x8027D8A0-0x8027DC64 (`fn_8027D8A0` needs a name and record for `enemy/em_prog_support`'s 0x80385698,
- *   `pl_stg_weapon_near_find` is unwritten).
- *  - flipcheck's undefined reference `get_ControlType` (the map's `get_ControlType__Fl` needs C++ scope): a linkage
- *    item for a fixer.
- *  - 90 functions partial in 53 runs (`sweepcomments.py --unit Pl/pl_act` lists them), including:
+ *   GUESS (from each body and its callers): `pl_input_refresh` 0x8026AF08 (refreshes the +0xB8 input block from the pad
+ *   record; `fn_8026F7B4`/`pl_input_clear` call it), `pl_note_near_ck` 0x8027D8A0 (the 300-unit reach to a note-pane
+ *   record), the pool rows `pl_input_acc_swing_min`/`pl_input_fs_acc_swing_min` (200.0/300.0, the swing thresholds
+ *   `vec3_len` is compared against), `pl_note_near_dist_sq` (90000.0) and `pl_stg_weapon_foot_ofs` (110.0); the
+ *   `StageWeaponWork` fields (`stage/get_stg_weapon_work.h`), `SysQuestMove::hold_off_0x001`/`player_hold_0x004`,
+ *   `_PLW::tail_slot_0x300` and `_PLW::bind_reset_0x00B`.
+ *   The rig's implicit members are the compiler's: `__ct__7PlSeRigFv`, `__dt__7PlSeRigFv` and the callback classes'
+ *   `__ct__21LbEquipModelCallbackA/BFv` (`Pl/pl_se_rig.h` holds the classes by value; `PlSeRig` is the GUESS name).
+ * RESIDUALS. Every function is written.
+ *  - flipcheck: the object emits no `.rodata` (0x40 claimed), `.sbss` (0x8) or `.sdata` (0x48); `.text` 0x1AD38,
+ *    `.data` 0x27C, `.sdata2` 0x10, extab 0x930 and extabindex 0xD5C against the claims 0x1AD18, 0x2178, 0x1D8, 0x928 and
+ *    0xD50; every compared section differs in bytes, and five symbols other units reference are not defined here
+ *    (`lbl_805C7A64`, `lbl_805C7C34`, `pl_steps_guard_kind0`, `pl_steps_guard_walk_kind0`, `set_demo_equip_data_func`).
+ *  - `pl_net_slot_bind`: the seven `set_valid |= bit` stores keep a `clrlwi` after every second `ori` where retail
+ *    truncates once after the fourth (the expression, loop and two-statement forms measured; +8 B);
+ *  - `pl_input_refresh`: the Classic Controller arm's held/alt/pressed locals take r3/r6 where retail has r6/r3 (block
+ *    locals and every declaration order measured);
+ *  - `pl_stg_weapon_near_find`: the second loop's index and row pointer sit in r28/r27 where retail has r27/r28;
+ *  - `fn_802753E4`: the lobby parameter block base and the id swap r3/r4, and retail keeps an `extsh` after the first
+ *    `lha` (`value +=`, `value = (s16)(value + x)` and a plain store measured);
+ *  - `fn_8026A068`: retail divides the id before it loads the work's byte (`kind` local, no local and a pre-computed
+ *    quotient all measured);
+ *  - `talisman_roll`: retail tests each skill's points with `bne`/`b` around the return and re-extends the points before
+ *    the `+ 10` (the nested, combined and `switch` forms measured);
+ *  - `equip_deco_slots_free`: the free-slot return forms `andc` where ours has `and` (three return spellings measured);
+ *  - `equip_gun_level_bonus_get`: the remainder loop bumps the index before the row pointer;
+ *  - 80 functions partial (`sweepcomments.py --unit Pl/pl_act` lists them), including:
  *  - `equip_color_rgba_get`/`armor_color_rgba_get`: retail forms the row address `add r3,r4,r3` (offset first), ours
  *    `add r3,r3,r4`; a row-pointer local is worse;
  *  - `pl_area_stamina_drain_step`: retail's `self->unk37C -= v` subtracts the unextended `v` (r31) after the `extsh r0` compare;
@@ -106,13 +123,10 @@
  *  - `pl_kind_item_equip_find`/`pl_act_held_class_get`/`pl_act6_class_ck`: one or two register or block choices around the id scans;
  *  - `pl_weapon0_hit_feedback`: the self/quake callee-saved registers are swapped (r31/r30), every spelling tried;
  *  - `pl_weapon_parts_refresh`: the weapon pointer and the variant sit in r26/r29 where retail has r27/r27 (98.5 %);
- *  - `pl_input_pause_flag_set`: retail forms `Psw + pad * 0x350` with the index first; `equip_defense_get`,
- *    `equip_gun_level_bonus_get`, `equip_deco_slots_free`, `pl_equip_model_id_get`: register and loop-shape residuals;
- *  - `fn_80275C34`: retail passes a narrowed `d` (`clrlwi r7`) and lays the kind-3 arm out differently;
+ *  - `equip_defense_get`: register and loop-shape residuals;
  *  - `pl_hit_result_best_get`: retail re-tests the second byte's range (`li r0,0xff; cmplwi; beq; cmplw; bge`) where ours
  *    folds it (20 B short); `fn_8027D40C`: the 32-bit scan's two induction variables sit in r5/r6 swapped;
  *  - `pl_stun_tick`: two extra `extsh` before its clamp stores (+8 B);
- *  - `fn_80277FF8`: the `t`-vs-`arg1` test polarity - about a dozen rows around an inlined `li r3,0; blr` (+12 B);
  *  - the other 54 partial rows have no recorded cause.
  *  - `fn_8026CC7C` is byte-identical; its switch table relocation goes through MWCC's local `@NNNN` where the target
  *    names `jumptable_805C5FA0` (same address).  The extab record names agree (`@etb_800126CC` is in both objects).
@@ -127,7 +141,17 @@
  *    0x2178, 0x1D8, 0x928 and 0xD50; every compared section differs in bytes.
  *  - `equip_color_table`/`armor_color_table` (0x805C6238/0x805C6278) are this unit's `.data`, read through `extern`
  *    declarations until the section is emitted.
- * SHAPES. A `switch` on an unsigned value puts the case blocks out of line with a forward `b` to the default
+ * SHAPES. `switch` with `default:` written first lays the default arm first (`fn_80275C34`, `Pl_act_set_motion`); a
+ *   case list whose bodies retail places shared puts the second body first (`fn_80277FF8`'s case 3: 1/8 then 5/6/9);
+ *  - a pad record reached through a local `PlayerPad*` (`rec = &Psw[pad]`) forms `Psw + pad * 0x350` index first
+ *    (`pl_input_pause_flag_set`, `pl_input_refresh`); a `u32` frame counter divided signed is `(s32)frame % 5`;
+ *  - the rig's `new PlSeRig`/`delete` sit under `#pragma dont_inline on`, which keeps the implicit constructor and
+ *    destructor out of line (retail's `__ct__7PlSeRigFv`/`__dt__7PlSeRigFv`);
+ *  - an `s16` parameter updated in place (`amount += (s16)(amount / 10)`, `value *= 3`) keeps retail's raw sums
+ *    (`pl_health_recover`, `pl_act_gauge_gate`, `pl_gauge_ceiling_grow`); an `s32` sum clamped through `(s8)` casts
+ *    (`pl_gun_recoil_get`, `pl_gun_reload_get`);
+ *  - `Pl_decide_mot_get` walks `pl_mot_pick_tbl` as a flat word table (`row += 4`, `[index * 4]`);
+ *  - A `switch` on an unsigned value puts the case blocks out of line with a forward `b` to the default
  *   (`pl_equip_skill_valid_ck`, `pl_skill_valid_ck`, `pl_bonus_skill_valid_ck`); `switch (u8)` promotes to a signed `cmpwi` chain.
  *  - the pool floats are `extern` declarations used as load operands, never definitions (playbook 29), and a multiply
  *    is written `lbl * value`, the target's `fmuls` operand order;
@@ -207,6 +231,16 @@
 #include "mh3_pad.h"              /* VEC3_ctor (rule 2) */
 #include "ef/fn_800CDB2C.h"       /* my_player_no (rule 2) */
 #include "Pl/equip_variant_get.h"
+#include "Pl/set_demo_equip_data_func.h"
+#include "Pl/arena_userdata_slot_apply.h"
+#include "Pl/Pl_master_ck.h"
+#include "quest/arenatask.h"           /* arena_eqdata_from_userdata / arena_eqdata_from_vsuser (rule 2) */
+#include "quest/quest_item_slot.h"     /* quest_move_state_valid_ck / quest_move_state_get (rule 2) */
+#include "userdata_item/userdata_pl_look_set.h"
+#include "vs_user_name_copy.h"
+#include "sound/fn_800D7F54.h"         /* se_handle_clear (rule 2) */
+#include "Network/network_pat_control.h" /* NetCtrlWk, isServerSelectState (rule 2) */
+#include "mh3_pad/system_w.h"          /* system_w (rule 2) */
 
 /* 0x8079A014: -1.0, this unit's `.sdata2` pool (a load, never a definition - playbook 29). */
 extern "C" {
@@ -405,6 +439,124 @@ void fn_802699C8(u8 player)
     }
     g->slot_state[player] = 0;
 }
+
+#pragma dont_inline on
+
+/* This unit's own callees, defined further down. */
+void fn_80273484(_PLW* plw);
+void pl_parts_refresh(_PLW* plw);
+void pl_push_clear(_PLW* plw);
+void pl_equip_refresh(_PLW* plw);
+void pl_info_text_set(_PLW* plw, const char* src);
+void pl_equip_model_set(_PLW* plw, u8* rec);
+void pl_parts_color_set(_PLW* plw, u8 idx, s32 val);
+
+/* 0x80269AC4 (0x314): binds a player work to the network slot `slot`: resets its record, takes its look from the
+ * mode's source (the demo hook, the arena, the server-select peer card or the user data), builds its model rig and
+ * resets its motion, position and equipment models. */
+void pl_net_slot_bind(_PLW* plw, s32 slot)
+{
+    plw->chunk_ofs = slot;
+    plw->slot_active = 1;
+    plw->field_0xB04 = 0;
+    plw->field_0x267 = 0;
+    plw->bind_reset_0x00B = 0;
+    memset(&plw->field_0x0B8, 0, 0x84);
+    plw->held_attack_0x5C5 = 0;
+    if (PlayMode_ck() != 2) {
+        if ((s32)GameMode_ck() == 0) {
+            if (set_demo_equip_data_func != NULL) {
+                set_demo_equip_data_func(plw);
+            }
+        } else if (GameMode_ck() == 3) {
+            arena_eqdata_from_userdata(plw);
+        } else if (isServerSelectState() == 1 || (u32)NetCtrlWk::isCityModeAlias() == 1) {
+            if (slot == (s8)my_player_no()) {
+                userdata_pl_look_set(plw);
+                if (system_w.net_session_0x90f == 1) {
+                    arena_eqdata_from_vsuser(plw);
+                }
+            } else if (isServerSelectState() == 1) {
+                NetCtrlWk::loadPeerCard((NetPlayerCard*)plw, slot);
+                if (system_w.net_session_0x90f == 1) {
+                    arena_eqdata_from_vsuser(plw);
+                }
+            }
+        } else {
+            userdata_pl_look_set(plw);
+        }
+    } else {
+        arena_userdata_slot_apply((u8*)plw);
+        vs_user_name_copy(plw, slot);
+    }
+    plw->physics_0x13C = (_PLW_PHYSICS*)new PlSeRig;
+    plw->slot_id[24].item_id = 0xDF;
+    plw->slot_id[24].value = 1;
+    if (Pl_master_ck(plw) == 1 && quest_move_state_valid_ck() == 1 && (u8)quest_move_state_get() == 4) {
+        plw->slot_id[25].item_id = 0x1B6;
+    } else {
+        plw->slot_id[25].item_id = 0x1B7;
+    }
+    plw->slot_id[25].value = 1;
+    plw->tail_slot_0x300.item_id = 0x35;
+    plw->tail_slot_0x300.value = 1;
+    plw->vec_0x03C.x = pl_act_float_zero;
+    plw->vec_0x03C.y = pl_act_float_zero;
+    plw->vec_0x03C.z = pl_act_float_zero;
+    copyVec3(&plw->vec_0x048, &plw->vec_0x03C);
+    plw->field_0x068 = pl_act_float_zero;
+    plw->field_0x06C = pl_act_float_zero;
+    plw->field_0x070 = pl_act_float_zero;
+    plw->param_0x54 = 0;
+    plw->field_0x058 = 0;
+    plw->rot_z_0x5C = 0;
+    plw->field_0x354 = pl_act_float_one;
+    fn_80273484(plw);
+    pl_equip_model_set(plw, (u8*)&plw->equipA[0]);
+    pl_equip_model_set(plw, (u8*)&plw->equipA[3]);
+    pl_equip_model_set(plw, (u8*)&plw->equipA[1]);
+    pl_equip_model_set(plw, (u8*)&plw->equipA[2]);
+    pl_equip_model_set(plw, (u8*)&plw->equipA[4]);
+    pl_equip_model_set(plw, (u8*)&plw->equipA[5]);
+    pl_parts_color_set(plw, 5, plw->field_0x25C[4]);
+    pl_parts_color_set(plw, 6, plw->field_0x25C[5]);
+    if (GameMode_ck() != 2) {
+        plw->set_valid |= 1;
+        plw->set_valid |= 2;
+        plw->set_valid |= 4;
+        plw->set_valid |= 8;
+        plw->set_valid |= 0x10;
+        plw->set_valid |= 0x20;
+        plw->set_valid |= 0x40;
+        pl_parts_refresh(plw);
+    }
+    pl_push_clear(plw);
+    pl_equip_refresh(plw);
+    plw->field_0xB00 = 0;
+    plw->field_0xB01 = 0;
+    plw->field_0xB02 = 0;
+    plw->field_0xB03 = 0;
+    pl_info_text_set(plw, NULL);
+}
+
+/* 0x80269F04 (0x84): releases the player's model rig: clears its object record and slot flags, deletes the rig, stops
+ * its three sound handles and clears the whole work record. */
+void pl_model_release(_PLW* plw)
+{
+    fn_802699C8(plw->chunk_ofs);
+    plw->slot_active = 0;
+    plw->field_0x001 = 0;
+    if (plw->physics_0x13C != NULL) {
+        delete (PlSeRig*)plw->physics_0x13C;
+        plw->physics_0x13C = NULL;
+        se_handle_clear((u8*)plw->field_0xAF4);
+        se_handle_clear((u8*)plw->field_0xAF8);
+        se_handle_clear((u8*)plw->field_0xAFC);
+        memset(plw, 0, sizeof(_PLW));
+    }
+}
+
+#pragma dont_inline reset
 
 /* The motion-number table lookup for the 0-999 range: row `id / 100`, entry `id % 100`. */
 s32 fn_8026A00C(u16 id)
@@ -879,7 +1031,7 @@ u32 fn_8026B99C(_PLW* self);
 u32 fn_8026B934(_PLW* self);
 u32 fn_8026BA04(_PLW* self);
 u32 option_cfg_eq_ck(u8 value, u32 low, u32 high);
-void fn_8026AF08(_PLW* self, u32 value);
+void pl_input_refresh(_PLW* self, u32 value);
 void mhchar_ofs_set(void* dst, void* src);
 u8 GameMode_ck(void);
 s8 my_player_no(void);
@@ -905,7 +1057,7 @@ namespace s_8026BA1C {
 
 /* This unit's own order: the file has to emit the functions in the map's address order. */
 extern "C" void fn_8026BE94(_PLW* self, ActState* req, u32 mask, u32 idx);
-extern "C" void fn_8026CC7C(_PLW* self);
+extern "C" void fn_8026CC7C(_PLW* self, u8 pad);
 extern "C" void fn_8026BA1C(_PLW* self);
 } /* namespace s_8026BA1C */
 
@@ -1025,7 +1177,7 @@ extern "C" void fn_8026BE94(_PLW* self, ActState* req, u32 mask, u32 idx)
 
 /* 0x8026BF98: the action dispatcher. Switches on the action state's mode byte and raises the command set
  * the actor's request words and hold state imply. */
-extern "C" void fn_8026BF98(_PLW* self)
+extern "C" void fn_8026BF98(_PLW* self, u8 pad)
 {
     ActState* st = (ActState*)&self->field_0x0B8;
     Vec3 vec[16];
@@ -1372,7 +1524,7 @@ extern "C" u32 fn_8026CC70(u32 value, u8* data)
 
 /* 0x8026CC7C: the per-weapon-class action dispatcher - a nine-entry jump table on the actor's weapon
  * class, each arm a further switch on the action state's mode byte. */
-extern "C" void fn_8026CC7C(_PLW* self)
+extern "C" void fn_8026CC7C(_PLW* self, u8 pad)
 {
     ActState* st = (ActState*)&self->field_0x0B8;
     fn_8026CC70((u32)self, (u8*)st);
@@ -2403,7 +2555,7 @@ extern "C" void fn_8026F7B4(_PLW* self)
         if (PlayMode_ck() == 2) {
             value = self->chunk_ofs;
         }
-        fn_8026AF08(self, value);
+        pl_input_refresh(self, value);
     }
 }
 
@@ -2413,7 +2565,7 @@ extern "C" void pl_input_clear(_PLW* self)
     if (Pl_master_ck(self) == 0 || lobby_input_locked_ck() == 1) {
         memset((u8*)self + 184, 0, 132);
     } else {
-        fn_8026AF08(self, 0);
+        pl_input_refresh(self, 0);
     }
 }
 
@@ -4266,14 +4418,6 @@ typedef struct PlEquipSlot {
     /* +0x12 */ u8 pad_0x12[0x2];
 } PlEquipSlot; /* size: 0x14 */
 
-/* One 8-byte row of the act/motion pick table `Pl_decide_mot_get` walks (0x805C60A8, 11 rows: the
- * motion, its parameter and the two control words the row is gated on). size: 0x8 */
-typedef struct PlMotRow {
-    /* +0x0 */ u16 motion;
-    /* +0x2 */ u16 param;
-    /* +0x4 */ u16 control_a;
-    /* +0x6 */ u16 control_b;
-} PlMotRow; /* size: 0x8 */
 namespace s_80273B14 {
 using ::_PLW;
 using ::_EQUIP;
@@ -4700,54 +4844,53 @@ extern "C" s32 pl_act_class_get(struct _PLW* plw)
     const u16* row;
     s32 index;
 
-    if (plw->field_0x00A != 0xB) {
-        return 0;
-    }
-    row = pl_act_no_tbl_melee;
-    index = 1;
-    while (row[1] != 0xFFFF) {
-        switch (row[1]) {
-        case 5:
-            if (plw->act_no == 5 || plw->act_no == 12) {
-                return index;
+    if (plw->field_0x00A == 0xB) {
+        row = &pl_act_no_tbl_melee[1];
+        index = 1;
+        while (*row != 0xFFFF) {
+            switch (*row) {
+            case 5:
+                if (plw->act_no == 5 || plw->act_no == 12) {
+                    return index;
+                }
+                break;
+            case 11:
+                if (plw->act_no == 11 || plw->act_no == 13) {
+                    return index;
+                }
+                break;
+            default:
+                if (plw->act_no == *row) {
+                    return index;
+                }
+                break;
             }
-            break;
-        case 11:
-            if (plw->act_no == 11 || plw->act_no == 13) {
-                return index;
-            }
-            break;
-        default:
-            if (plw->act_no == row[1]) {
-                return index;
-            }
-            break;
+            index++;
+            row += 1;
         }
-        index++;
-        row += 1;
-    }
-    row = pl_act_no_tbl_ranged;
-    index = 1;
-    while (row[1] != 0xFFFF) {
-        switch (row[1]) {
-        case 19:
-            if (plw->act_no == 19 || plw->act_no == 26) {
-                return index;
+        row = &pl_act_no_tbl_ranged[1];
+        index = 1;
+        while (*row != 0xFFFF) {
+            switch (*row) {
+            case 19:
+                if (plw->act_no == 19 || plw->act_no == 26) {
+                    return index;
+                }
+                break;
+            case 25:
+                if (plw->act_no == 25 || plw->act_no == 27) {
+                    return index;
+                }
+                break;
+            default:
+                if (plw->act_no == *row) {
+                    return index;
+                }
+                break;
             }
-            break;
-        case 25:
-            if (plw->act_no == 25 || plw->act_no == 27) {
-                return index;
-            }
-            break;
-        default:
-            if (plw->act_no == row[1]) {
-                return index;
-            }
-            break;
+            index++;
+            row += 1;
         }
-        index++;
-        row += 1;
     }
     return 0;
 }
@@ -4785,22 +4928,22 @@ extern "C" u8 pl_act_stage_get(struct _PLW* plw)
 /* The player's own move work record. */
 extern "C" struct _PLW* my_player_work_get(void)
 {
-    return (struct _PLW*)((u8*)get_move_work_adrs(2) + (s8)my_player_no() * 0xB20);
+    struct _PLW* work = (struct _PLW*)get_move_work_adrs(2);
+
+    return &work[(s8)my_player_no()];
 }
 
 /* The first move work record whose slot byte differs from this player's. */
-extern "C" void* pl_partner_work_get(struct _PLW* plw)
+extern "C" struct _PLW* pl_partner_work_get(struct _PLW* plw)
 {
-    u8* work = (u8*)get_move_work_adrs(2);
+    struct _PLW* work = (struct _PLW*)get_move_work_adrs(2);
     u16 count = (u16)get_move_work_max(2);
+    s32 i;
 
-    if ((s32)count > 0) {
-        do {
-            if (work[8] != plw->chunk_ofs) {
-                return work;
-            }
-            work += 0xB20;
-        } while (--count != 0);
+    for (i = 0; i < count; i++, work++) {
+        if (work->chunk_ofs != plw->chunk_ofs) {
+            return work;
+        }
     }
     return NULL;
 }
@@ -5043,11 +5186,12 @@ extern "C" s32 pl_item_pouch_ok_ck(struct _PLW* plw, u16 id)
 /* Sums the weapon records' `bonus_0x07` column and folds the skill tiers in, clamped to 0..6. */
 extern "C" u8 pl_gun_recoil_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
 {
-    s32 value = 0;
+    s32 value;
 
     *out = 0;
+    value = 0;
     if (equip0 != NULL && equip0->kind == 11) {
-        value = ((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x07;
+        value = (s8)(u8)((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x07;
         if (value == 0) {
             value = 1;
         }
@@ -5077,10 +5221,10 @@ extern "C" u8 pl_gun_recoil_get(struct _PLW* plw, struct _EQUIP* equip0, struct 
             *out = 2;
         }
     }
-    if (value < 0) {
+    if ((s8)value < 0) {
         value = 0;
     }
-    if (value > 6) {
+    if ((s8)value > 6) {
         value = 6;
     }
     return (u8)value;
@@ -5089,11 +5233,12 @@ extern "C" u8 pl_gun_recoil_get(struct _PLW* plw, struct _EQUIP* equip0, struct 
 /* Sums the weapon records' `bonus_0x09` column plus a fixed 3, clamped to 0..9. */
 extern "C" u8 pl_gun_reload_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out)
 {
-    s32 value = 0;
+    s32 value;
 
     *out = 0;
+    value = 0;
     if (equip0 != NULL && equip0->kind == 11) {
-        value = ((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x09;
+        value = (s8)(u8)((PlWeaponRec*)equip_weapon_rec_get(equip0))->bonus_0x09;
     }
     if (equip1 != NULL && equip1->kind == 13) {
         value += ((PlWeaponRec*)equip_weapon_rec_get(equip1))->bonus_0x09;
@@ -5121,10 +5266,10 @@ extern "C" u8 pl_gun_reload_get(struct _PLW* plw, struct _EQUIP* equip0, struct 
         }
     }
     value += 3;
-    if (value < 0) {
+    if ((s8)value < 0) {
         value = 0;
     }
-    if (value > 9) {
+    if ((s8)value > 9) {
         value = 9;
     }
     return (u8)value;
@@ -5202,14 +5347,19 @@ extern "C" s16 fn_802753E4(struct _PLW* plw, u16 id)
     if (plw->field_0x446 != 0 && Pl_cat_skill_ck(plw, 0x27) == 0) {
         return 0;
     }
-    if (id == lb_param_w.flag_0x0C[0]) {
-        value = lb_param_w.value_0x10[0];
-    }
-    if (id == lb_param_w.flag_0x0C[1]) {
-        value += lb_param_w.value_0x10[1];
-    }
-    if (id == lb_param_w.flag_0x0C[2]) {
-        value += lb_param_w.value_0x10[2];
+    {
+        LbParamWork* param = &lb_param_w;
+        s32 key = id;
+
+        if (key == param->flag_0x0C[0]) {
+            value = (s16)(value + param->value_0x10[0]);
+        }
+        if (key == param->flag_0x0C[1]) {
+            value += param->value_0x10[1];
+        }
+        if (key == param->flag_0x0C[2]) {
+            value += param->value_0x10[2];
+        }
     }
     return value;
 }
@@ -5245,49 +5395,58 @@ extern "C" void pl_info_text_set(struct _PLW* plw, const char* src)
 } /* namespace s_80273B14 */
 
 
-/* The 11 act/motion pick rows `Pl_decide_mot_get` walks: motion, parameter and the two control
- * words each row is gated on. size: 0x58 */
-PlMotRow pl_mot_pick_tbl[11] = {
-    {0x02D1, 0x02BD, 0x2000, 0x2000}, {0x02D3, 0x02BF, 0x0800, 0x0800},
-    {0x02D5, 0x02C3, 0x0400, 0x0400}, {0x02D7, 0x02C4, 0x1000, 0x1000},
-    {0x02DA, 0x02C7, 0x2000, 0x2000}, {0x02D2, 0x02BE, 0x0800, 0x0800},
-    {0x02D4, 0x02C0, 0x0400, 0x0400}, {0x02D6, 0x02C5, 0x1000, 0x1000},
-    {0x02D8, 0x02C6, 0x0040, 0x4000}, {0x02D9, 0x02C1, 0x0080, 0x8000},
-    {0x02DB, 0x02C2, 0x0030, 0x0014},
+/* The 11 act/motion pick rows `Pl_decide_mot_get` walks (0x805C60A8), four words each: the motion, its parameter and
+ * the two control words the row is gated on (the Wii Remote's, then the Classic Controller's); retail indexes it as a
+ * flat word table (`index * 4`, `index * 4 + 1`). size: 0x58 */
+u16 pl_mot_pick_tbl[11 * 4] = {
+    0x02D1, 0x02BD, 0x2000, 0x2000,
+    0x02D3, 0x02BF, 0x0800, 0x0800,
+    0x02D5, 0x02C3, 0x0400, 0x0400,
+    0x02D7, 0x02C4, 0x1000, 0x1000,
+    0x02DA, 0x02C7, 0x2000, 0x2000,
+    0x02D2, 0x02BE, 0x0800, 0x0800,
+    0x02D4, 0x02C0, 0x0400, 0x0400,
+    0x02D6, 0x02C5, 0x1000, 0x1000,
+    0x02D8, 0x02C6, 0x0040, 0x4000,
+    0x02D9, 0x02C1, 0x0080, 0x8000,
+    0x02DB, 0x02C2, 0x0030, 0x0014,
 };
 
 /* Picks the motion/parameter pair the player's current control state maps to. */
 void Pl_decide_mot_get(u16* motion, u16* param)
 {
-    u16 index = (u16)(ran_suu(1) % 5);
-    PlMotRow* row = pl_mot_pick_tbl;
+    u16* row;
     s32 i;
+    u16 index = (u16)(ran_suu(1) % 5);
+    u16 mask;
 
-    for (i = 0; i < 11; i++) {
+    for (i = 0, row = pl_mot_pick_tbl; i < 11; row += 4, i++) {
         switch ((u8)get_ControlType(0)) {
         case 1:
+            mask = row[2];
             if (i < 4) {
-                if ((Psw[0].control_0x104 & row[i].control_a) != 0) {
+                if ((Psw[0].control_0x104 & mask) != 0) {
                     index = (u16)i;
                 }
             } else if (i < 8) {
-                if ((Psw[0].control_0x104 & row[i].control_a) != 0 && (Psw[0].control_0x0FC & 4) != 0) {
+                if ((Psw[0].control_0x104 & mask) != 0 && (Psw[0].control_0x0FC & 4) != 0) {
                     index = (u16)i;
                 }
-            } else if ((Psw[0].control_0x0FC & row[i].control_a) != 0) {
+            } else if ((Psw[0].control_0x0FC & mask) != 0) {
                 index = (u16)i;
             }
             break;
         case 2:
+            mask = row[3];
             if (i < 4) {
-                if ((Psw[0].control_0x0DE & row[i].control_b) != 0) {
+                if ((Psw[0].control_0x0DE & mask) != 0) {
                     index = (u16)i;
                 }
             } else if (i < 8) {
-                if ((Psw[0].control_0x0DE & row[i].control_b) != 0 && (Psw[0].control_0x0D6 & 0x88) != 0) {
+                if ((Psw[0].control_0x0DE & mask) != 0 && (Psw[0].control_0x0D6 & 0x88) != 0) {
                     index = (u16)i;
                 }
-            } else if ((Psw[0].control_0x0D6 & row[i].control_b) != 0) {
+            } else if ((Psw[0].control_0x0D6 & mask) != 0) {
                 index = (u16)i;
             }
             break;
@@ -5295,8 +5454,8 @@ void Pl_decide_mot_get(u16* motion, u16* param)
             break;
         }
     }
-    *motion = row[index].motion;
-    *param = row[index].param;
+    *motion = pl_mot_pick_tbl[index * 4];
+    *param = pl_mot_pick_tbl[index * 4 + 1];
 }
 namespace s_80273B14 {
 
@@ -5433,7 +5592,10 @@ extern "C" void pl_act_kind_set(struct _PLW* plw, u8 value)
 /* Arms the act's three status bits from a packed mask. */
 extern "C" void Pl_act_set_motion(struct _PLW* plw, u16 a, u32 b, u32 c)
 {
-    switch ((u8)a) {
+    switch ((u8)(u32)a) {
+    default:
+        pl_act_kind_set(plw, 0);
+        break;
     case 1:
         pl_act_kind_set(plw, 1);
         break;
@@ -5443,21 +5605,18 @@ extern "C" void Pl_act_set_motion(struct _PLW* plw, u16 a, u32 b, u32 c)
     case 3:
         pl_act_kind_set(plw, 3);
         break;
-    default:
-        pl_act_kind_set(plw, 0);
-        break;
     }
     if ((a & 0x8000) != 0) {
         pl_cond_flags_clear(plw, 1);
     } else {
         pl_act_set_flag(plw, 1);
     }
-    if (b == 0) {
+    if ((u16)b == 0) {
         pl_cond_flags_clear(plw, 2);
     } else {
         pl_act_set_flag(plw, 2);
     }
-    if (c == 0) {
+    if ((u16)c == 0) {
         pl_cond_flags_clear(plw, 4);
         return;
     }
@@ -5480,25 +5639,9 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
     plw->field_0x5C4 = 0;
     plw->field_0x310 = 0;
     plw->kind_0x09 = (u8)kind;
-    if (kind != 1) {
-        if (kind != 3) {
-            if (plw->field_0x585 != 0) {
-                if (plw->field_0x018 == 1) {
-                    if (plw->field_0x002 == 8) {
-                        if (pl_mode8_free_ck() == 1U) {
-                            fn_80275C18(plw, 0x3E9, a, b, (u16)d);
-                        } else {
-                            fn_80275C18(plw, 0x3FC, a, b, (u16)d);
-                        }
-                    } else {
-                        fn_80275C18(plw, 0x3E9, a, b, (u16)d);
-                    }
-                } else {
-                    fn_80275C18(plw, 0x18, a, b, (u16)d);
-                }
-                pl_act_enter(plw, 0, 0x6A, (u16)c);
-                return;
-            }
+    switch (kind) {
+    default:
+        if (plw->field_0x585 != 0) {
             if (plw->field_0x018 == 1) {
                 if (plw->field_0x002 == 8) {
                     if (pl_mode8_free_ck() == 1U) {
@@ -5509,56 +5652,85 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
                 } else {
                     fn_80275C18(plw, 0x3E9, a, b, (u16)d);
                 }
-                pl_act_enter(plw, 0, 0, (u16)c);
-                return;
-            }
-            if (pl_item_menu_open_ck(plw) == 1U) {
-                fn_80275C18(plw, 0x190, a, b, (u16)d);
-                pl_act_enter(plw, 0xA, 0, (u16)c);
-                return;
-            }
-            if (plw->field_0x37A <= 0x96) {
-                fn_80275C18(plw, 0x12F, a, b, (u16)d);
             } else {
-                switch (pl_act_kind_get(plw->area_0x16)) {
-                case 1:
-                    if (Pl_Skill_ck(plw, 0x7C) == 1U || Pl_Skill_ck(plw, 0x7D) == 1U
-                        || Pl_condition_ck(plw, 0x400) == 1U) {
-                        fn_80275C18(plw, 1, a, b, (u16)d);
-                    } else {
-                        fn_80275C18(plw, 0x15, a, b, (u16)d);
-                    }
-                    break;
-                case 3:
-                    if (Pl_Skill_ck(plw, 0x7D) == 1U || Pl_condition_ck(plw, 0x400) == 1U) {
-                        fn_80275C18(plw, 1, a, b, (u16)d);
-                    } else {
-                        fn_80275C18(plw, 0x15, a, b, (u16)d);
-                    }
-                    break;
-                case 2:
-                    if (Pl_Skill_ck(plw, 0x80) == 1U || Pl_Skill_ck(plw, 0x81) == 1U
-                        || Pl_condition_ck(plw, 0x800) == 1U) {
-                        fn_80275C18(plw, 1, a, b, (u16)d);
-                    } else {
-                        fn_80275C18(plw, 0x14B, a, b, (u16)d);
-                    }
-                    break;
-                case 4:
-                    if (Pl_Skill_ck(plw, 0x81) == 1U || Pl_condition_ck(plw, 0x800) == 1U) {
-                        fn_80275C18(plw, 1, a, b, (u16)d);
-                    } else {
-                        fn_80275C18(plw, 0x14B, a, b, (u16)d);
-                    }
-                    break;
-                default:
-                    fn_80275C18(plw, 1, a, b, (u16)d);
-                    break;
+                fn_80275C18(plw, 0x18, a, b, (u16)d);
+            }
+            pl_act_enter(plw, 0, 0x6A, (u16)c);
+            return;
+        }
+        if (plw->field_0x018 == 1) {
+            if (plw->field_0x002 == 8) {
+                if (pl_mode8_free_ck() == 1U) {
+                    fn_80275C18(plw, 0x3E9, a, b, (u16)d);
+                } else {
+                    fn_80275C18(plw, 0x3FC, a, b, (u16)d);
                 }
+            } else {
+                fn_80275C18(plw, 0x3E9, a, b, (u16)d);
             }
             pl_act_enter(plw, 0, 0, (u16)c);
             return;
         }
+        if (pl_item_menu_open_ck(plw) == 1U) {
+            fn_80275C18(plw, 0x190, a, b, (u16)d);
+            pl_act_enter(plw, 0xA, 0, (u16)c);
+            return;
+        }
+        if (plw->field_0x37A <= 0x96) {
+            fn_80275C18(plw, 0x12F, a, b, (u16)d);
+        } else {
+            switch (pl_act_kind_get(plw->area_0x16)) {
+            case 1:
+                if (Pl_Skill_ck(plw, 0x7C) == 1U || Pl_Skill_ck(plw, 0x7D) == 1U
+                    || Pl_condition_ck(plw, 0x400) == 1U) {
+                    fn_80275C18(plw, 1, a, b, (u16)d);
+                } else {
+                    fn_80275C18(plw, 0x15, a, b, (u16)d);
+                }
+                break;
+            case 3:
+                if (Pl_Skill_ck(plw, 0x7D) == 1U || Pl_condition_ck(plw, 0x400) == 1U) {
+                    fn_80275C18(plw, 1, a, b, (u16)d);
+                } else {
+                    fn_80275C18(plw, 0x15, a, b, (u16)d);
+                }
+                break;
+            case 2:
+                if (Pl_Skill_ck(plw, 0x80) == 1U || Pl_Skill_ck(plw, 0x81) == 1U
+                    || Pl_condition_ck(plw, 0x800) == 1U) {
+                    fn_80275C18(plw, 1, a, b, (u16)d);
+                } else {
+                    fn_80275C18(plw, 0x14B, a, b, (u16)d);
+                }
+                break;
+            case 4:
+                if (Pl_Skill_ck(plw, 0x81) == 1U || Pl_condition_ck(plw, 0x800) == 1U) {
+                    fn_80275C18(plw, 1, a, b, (u16)d);
+                } else {
+                    fn_80275C18(plw, 0x14B, a, b, (u16)d);
+                }
+                break;
+            default:
+                fn_80275C18(plw, 1, a, b, (u16)d);
+                break;
+            }
+        }
+        pl_act_enter(plw, 0, 0, (u16)c);
+        return;
+    case 1:
+        if (plw->field_0x585 != 0) {
+            fn_80275C18(plw, 0x18, a, b, (u16)d);
+            pl_act_enter(plw, 0, 0x6A, (u16)c);
+            return;
+        }
+        fn_80275C18(plw, 8, a, b, (u16)d);
+        if (pl_item_menu_open_ck(plw) == 1U) {
+            pl_act_enter(plw, 0xA, 0xE, (u16)c);
+            return;
+        }
+        pl_act_enter(plw, 0, 0x1F, (u16)c);
+        return;
+    case 3:
         if (plw->field_0x018 == 0) {
             if (fn_80276800(plw, 0) == 1) {
                 fn_80275C18(plw, 0x79, a, b, (u16)d);
@@ -5581,17 +5753,6 @@ extern "C" void fn_80275C34(struct _PLW* plw, u32 kind, u32 a, u32 b, u32 c, u32
         pl_act_enter(plw, 0, 0x16, (u16)(c | 0x80));
         return;
     }
-    if (plw->field_0x585 != 0) {
-        fn_80275C18(plw, 0x18, a, b, (u16)d);
-        pl_act_enter(plw, 0, 0x6A, (u16)c);
-        return;
-    }
-    fn_80275C18(plw, 8, a, b, (u16)d);
-    if (pl_item_menu_open_ck(plw) == 1U) {
-        pl_act_enter(plw, 0xA, 0xE, (u16)c);
-        return;
-    }
-    pl_act_enter(plw, 0, 0x1F, (u16)c);
 }
 
 /* The three no-argument act-state entries. */
@@ -5733,43 +5894,38 @@ extern "C" s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out)
 /* Applies the skill-tier damage bonus and steps the hold gauge. */
 extern "C" void pl_health_recover(struct _PLW* plw, s16 amount)
 {
-    s16 value = amount;
-
     if (amount > 0) {
         if (Pl_cat_skill_ck(plw, 3) == 1U) {
-            value += amount / 10;
+            amount += (s16)(amount / 10);
         }
         if (Pl_Skill_ck(plw, 0x98) == 1U) {
-            value += value / 4;
+            amount += (s16)(amount / 4);
         } else if (Pl_Skill_ck(plw, 0x99) == 1U) {
-            value -= value / 4;
+            amount -= (s16)(amount / 4);
         }
     }
-    pl_act_add_hold_gauge(plw, value);
+    pl_act_add_hold_gauge(plw, amount);
 }
 
 /* Grows the act's gauge ceilings (and, when `a` is 0, the soft cap) by `amount`. */
-extern "C" void pl_gauge_ceiling_grow(struct _PLW* plw, s32 amount, u8 a)
+extern "C" void pl_gauge_ceiling_grow(struct _PLW* plw, s16 amount, u8 a)
 {
     if (Pl_master_ck(plw) != 0) {
-        s16 value;
-
-        plw->field_0x372 += (s16)amount;
+        plw->field_0x372 += amount;
         if (plw->field_0x372 <= 1) {
             plw->field_0x372 = 1;
         }
         if (plw->field_0x372 >= 0x96) {
             plw->field_0x372 = 0x96;
         }
-        value = plw->field_0x372;
-        if (plw->field_0x370 >= value) {
-            plw->field_0x370 = value;
+        if (plw->field_0x370 >= plw->field_0x372) {
+            plw->field_0x370 = plw->field_0x372;
         }
-        if (plw->field_0x376 >= value) {
-            plw->field_0x376 = value;
+        if (plw->field_0x376 >= plw->field_0x372) {
+            plw->field_0x376 = plw->field_0x372;
         }
         if (a == 0) {
-            plw->field_0x374 += (s16)amount;
+            plw->field_0x374 += amount;
             if (plw->field_0x374 <= 1) {
                 plw->field_0x374 = 1;
             }
@@ -5842,27 +5998,25 @@ extern "C" void pl_sub_gauge_add(struct _PLW* plw, s16 amount)
 }
 
 /* The same step with the defence-skill and combo modifiers folded in. */
-extern "C" void pl_act_gauge_gate(struct _PLW* plw, s16 amount)
+extern "C" void pl_act_gauge_gate(struct _PLW* plw, s16 value)
 {
-    s16 value = amount;
-
     if (Pl_master_ck(plw) == 0) {
         return;
     }
     if (value < 0) {
         if (Pl_dm_condition_ck(plw, 0x80) == 1U) {
-            value = value * 4 - value;
+            value *= 3;
         } else if (Pl_dm_condition_ck(plw, 0x40) == 1U) {
-            value = value * 4 - value;
+            value *= 3;
         }
         if (value == -1) {
             if (Pl_Skill_ck(plw, 0xA8) == 1U && (plw->frame_0x020 & 1) != 0) {
                 return;
             }
         } else if (Pl_Skill_ck(plw, 0xA8) == 1U) {
-            value = (s16)(((u32)value >> 0x1FU) + value >> 1);
+            value = value / 2;
         }
-        if (Pl_Skill_ck(plw, 0xA9) == 1U && plw->frame_0x020 % 5 == 0) {
+        if (Pl_Skill_ck(plw, 0xA9) == 1U && (s32)plw->frame_0x020 % 5 == 0) {
             value = value * 2;
         }
     }
@@ -5884,15 +6038,14 @@ extern "C" void pl_guard_break_apply(struct _PLW* plw)
         mask = 1;
     }
     if (Pl_cat_skill_ck(plw, 0x17) == 1U) {
-        s32 had = mask;
-
-        mask = 3;
-        if (had == 0) {
+        if (mask == 0) {
             mask = 1;
+        } else {
+            mask = 3;
         }
     }
     if ((u16)mask == 0 || (plw->frame_0x020 & (u16)mask) == 0) {
-        if (Pl_Skill_ck(plw, 0xA9) == 1U && plw->frame_0x020 % 5 == 0) {
+        if (Pl_Skill_ck(plw, 0xA9) == 1U && (s32)plw->frame_0x020 % 5 == 0) {
             step *= 2;
         }
         pl_sub_gauge_add(plw, step);
@@ -8779,18 +8932,20 @@ extern "C" s32 fn_80277FF8(u8 arg0, u8 arg1, s32 arg2)
         }
         break;
     case 3:
-        if ((u32)(arg1 - 5) <= 1U) {
-            if (t != 0) {
-                return 0;
-            }
-        } else if ((s32)(u8)arg1 == 1 || (s32)(u8)arg1 == 8) {
+        switch (arg1) {
+        case 1:
+        case 8:
             if ((u32)t > 1U) {
                 return 0;
             }
-        } else if ((s32)(u8)arg1 == 9) {
+            break;
+        case 5:
+        case 6:
+        case 9:
             if (t != 0) {
                 return 0;
             }
+            break;
         }
         break;
     case 4:
@@ -9581,6 +9736,17 @@ extern "C" s32 pl_item_now_usable_ck(_PLW* self, u16 arg1)
 #include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
 #include "ef/system_core.h" /* str_tbl_skill_get, str_tbl_item_kind_get (rule 2: the owner is `ef/system_core.cpp`) */
+#include "stage/get_stg_weapon_work.h"
+#include "lobby/npc_talk_flag_get.h"
+#include "enemy/note_work_find.h"
+#include "lobby/lb_fabsf.h"
+
+/* 0x8079A114 / 0x8079A118: 90000.0 (300 squared, the note-pane reach) and 110.0 (the placed weapon's foot offset), this
+ * unit's `.sdata2` pool (loads, never definitions - playbook 29). */
+extern "C" {
+extern f32 pl_note_near_dist_sq;
+extern const f32 pl_stg_weapon_foot_ofs;
+}
 
 /* 0x8027FCE0 - whether the piece is at its kind's level cap (`EnableChangeColor`'s fallback; this unit's, its
  * body not yet written).  0x805C6238 / 0x805C6278 - the equipment and armour colour palettes, one 3-byte RGB row
@@ -9604,10 +9770,12 @@ extern "C" void* equip_slot_rec_find(u8 kind, u16 index) {
         return 0;
     }
     u32 slot = weapon_kind_slot_index(kind);
+    u8* rows = base[slot];
     if ((s32)index >= (s32)lbl_805706C0[slot]) {
         index = 0;
     }
-    return base[slot] + index * 0x18;
+    rows += index * 0x18;
+    return rows;
 }
 
 /* The sibling 0x1C-byte row of the second table. */
@@ -9617,10 +9785,12 @@ extern "C" void* equip_armor_ex_rec_find(u8 kind, u16 index) {
         return 0;
     }
     u32 slot = weapon_kind_slot_index(kind);
+    u8* rows = base[slot];
     if ((s32)index >= (s32)lbl_805706C0[slot]) {
         index = 0;
     }
-    return base[slot] + index * 0x1C;
+    rows += index * 0x1C;
+    return rows;
 }
 
 /* The 7-based kind's 0x18-byte row of the fifth table (no kind guard, unlike the 1-based pair). */
@@ -9709,6 +9879,96 @@ extern "C" void fn_8027D76C(_PLW* self) {
 extern "C" s32 pl_act_84_86_ck(_PLW* self) {
     if (self->field_0x00A == 0 && (u32)(self->act_no - 0x54) <= 2U) {
         return 1;
+    }
+    return 0;
+}
+
+/* 0x8027D8A0 (0xC8): whether the actor stands within 300 units of the live note-pane record of `kind` (0 or 1) while
+ * no NPC talk counts down. */
+extern "C" u32 pl_note_near_ck(_PLW* self, u8 kind) {
+    u8 find;
+    NoteWork* note;
+
+    switch (kind) {
+    case 0:
+        find = 0;
+        break;
+    case 1:
+        find = 1;
+        break;
+    default:
+        return 0;
+    }
+    if (kind <= 1) {
+        if (npc_talk_flag_get() != 0) {
+            return 0;
+        }
+    } else {
+        return 0;
+    }
+    note = note_work_find(find);
+    if (note == NULL) {
+        return 0;
+    }
+    return vec3_dist_sq(&self->vec_0x03C, &note->vec_0x170) <= pl_note_near_dist_sq;
+}
+
+/* 0x8027D968 (0x2FC): finds the placed stage weapon the actor reaches (an xz radius and a height band; a gunner also
+ * needs kind 2's band above the foot offset), copies its position and hands back its id and word; 0 when none. */
+extern "C" s32 pl_stg_weapon_near_find(_PLW* self, nw4r::math::VEC3* out_pos, s32* out_id, s32* out_word) {
+    nw4r::math::VEC3 pos;
+    long count;
+    StageWeaponWork* table;
+    s32 i;
+    StageWeaponWork* rec;
+    f32 dist;
+    f32 height;
+
+    VEC3_ctor(&pos);
+    table = get_stg_weapon_work(self, &count);
+    *out_word = 0;
+    if (self->kind_0x09 == 3) {
+        for (i = 0, rec = table; i < count; rec++, i++) {
+            vec_to_mh_vec3(&pos, &rec->pos);
+            if (rec->kind == 2) {
+                dist = calcDistanceSqXZ(&self->vec_0x03C, &pos);
+                height = rec->height * s_80276B58::lbl_8079A088 - lb_fabsf(self->field_0x040 - pos.y);
+                if (dist <= rec->radius * rec->radius && height >= s_80276B58::lbl_8079A084) {
+                    copyVec3(out_pos, &pos);
+                    *out_id = table[i].id;
+                    *out_word = table[i].word_0x04;
+                    return table[i].kind;
+                }
+            } else {
+                dist = calcDistanceSqXZ(&self->vec_0x03C, &pos);
+                height = self->field_0x040 - (pos.y - pl_stg_weapon_foot_ofs);
+                if (dist <= rec->radius * rec->radius && height >= s_80276B58::lbl_8079A084 && height <= rec->height) {
+                    copyVec3(out_pos, &pos);
+                    *out_id = table[i].id;
+                    *out_word = table[i].word_0x04;
+                    return table[i].kind;
+                }
+            }
+        }
+        return 0;
+    }
+    for (i = 0, rec = table; i < count; i++, rec++) {
+        vec_to_mh_vec3(&pos, &rec->pos);
+        if (rec->kind == 2) {
+            dist = calcDistanceSqXZ(&self->vec_0x03C, &pos);
+            height = rec->height * s_80276B58::lbl_8079A088 - lb_fabsf(self->field_0x040 - pos.y);
+            if (dist <= rec->radius * rec->radius && height >= s_80276B58::lbl_8079A084) {
+                copyVec3(out_pos, &pos);
+                *out_id = table[i].id;
+                *out_word = table[i].word_0x04;
+                return table[i].kind;
+            }
+        } else if (calcDistanceSqXZ(&self->vec_0x03C, &pos) <= rec->radius * rec->radius) {
+            copyVec3(out_pos, &pos);
+            *out_id = table[i].id;
+            *out_word = table[i].word_0x04;
+            return table[i].kind;
+        }
     }
     return 0;
 }
@@ -10282,9 +10542,10 @@ s32 equip_gun_level_bonus_get(_EQUIP* equip)
     s16 i;
 
     for (i = 0; i < (s16)level; i++) {
-        sum += *row++;
+        sum += *row;
+        row++;
     }
-    return (s16)(rec->base_value + sum);
+    return (s16)((u16)rec->base_value + sum);
 }
 
 /* 0x8027E88C (0x44): stores the dye colour of a piece that can be recoloured. */
@@ -10339,7 +10600,7 @@ u32 equip_info_text_get(u8 kind, u16 id)
 
 /* 0x8027EB48 (0x60): the armour model of the piece for the hunter's body, or the profile's default model from
  * `defaults` when the piece has none. */
-u16 pl_armor_model_or_default_get(_PLW* self, _EQUIP* equip, u16* defaults)
+s32 pl_armor_model_or_default_get(_PLW* self, _EQUIP* equip, u16* defaults)
 {
     u8 model = ((PlSlotRec*)equip_slot_rec_get(equip))->model_id[self->se_name_set];
 
@@ -10358,13 +10619,13 @@ s32 pl_equip_model_id_get(_PLW* self, _EQUIP* equip)
     case 5:
         return ((PlSlotRec*)equip_slot_rec_get(equip))->model_id[self->se_name_set];
     case 1:
-        return (u8)pl_armor_model_or_default_get(self, equip, pl_armor_default_models_a);
+        return pl_armor_model_or_default_get(self, equip, pl_armor_default_models_a);
     case 2:
-        return (u8)pl_armor_model_or_default_get(self, equip, pl_armor_default_models_b);
+        return pl_armor_model_or_default_get(self, equip, pl_armor_default_models_b);
     case 4:
-        return (u8)pl_armor_model_or_default_get(self, equip, pl_armor_default_models_c);
+        return pl_armor_model_or_default_get(self, equip, pl_armor_default_models_c);
     case 6:
-        return 0xFF;
+        return -1;
     }
     return 0;
 }
@@ -10485,26 +10746,23 @@ s32 equip_deco_count(_EQUIP* equip)
 /* 0x8027F21C (0xBC): the decoration slots still free: the slots less the sizes (1-3) of the decorations held. */
 s32 equip_deco_slots_free(_EQUIP* equip)
 {
-    s32 slots = equip_deco_slots_get(equip);
-    u32 used;
     s32 i;
-    u16* id;
+    s32 used;
+    s32 slots = equip_deco_slots_get(equip);
     u8 size;
 
     if (slots <= 0) {
         return 0;
     }
     used = 0;
-    id = equip->skill_id;
     for (i = 0; i < slots; i++) {
-        if (*id != 0) {
-            size = item_species_class_get(*id);
+        if (equip->skill_id[i] != 0) {
+            size = item_species_class_get(equip->skill_id[i]);
             if (size == 0 || size > 3) {
                 size = 1;
             }
             used += size;
         }
-        id++;
     }
     return slots > used ? slots - used : 0;
 }
@@ -10518,7 +10776,7 @@ s32 equip_deco_fit_ck(_EQUIP* equip, u16 deco)
 }
 
 /* 0x8027F548 (0x7C): removes the decoration in slot `slot` (when the piece has that slot) and packs the rest. */
-void equip_deco_detach(_EQUIP* equip, u16 slot)
+void equip_deco_detach(_EQUIP* equip, s32 slot)
 {
     equip_deco_slots_get(equip);
     if (equip->skill_id[slot] != 0 && (u32)(slot + 1) <= equip_deco_slots_get(equip)) {
@@ -12924,13 +13182,11 @@ typedef struct PlInput {
     /* +0x04 */ u16 pressed;        /* the newly pressed buttons */
     /* +0x06 */ u16 pressed_prev;   /* last frame's `pressed` */
     /* +0x08 */ u16 copy_0x08[4];   /* the four words above, copied for the act layer */
-    /* +0x10 */ u16 stick_flags[4]; /* the stick direction words; bits 2-5 are cleared while a menu holds the pad */
-    /* +0x18 */ u16 stick_angle;    /* the left stick's angle (the heading `pl_act_set_cam_ang` turns to) */
-    /* +0x1A */ u16 stick_level;
-    /* +0x1C */ u16 stick2_angle;
-    /* +0x1E */ u16 stick2_level;
-    /* +0x20 */ u16 stick_cam_angle;
-    /* +0x22 */ u16 stick2_cam_angle;
+    /* +0x10 */ u16 stick_flags[4]; /* the stick direction words (held, last frame's, went down, last frame's went
+                                     * down); bits 2-5 are cleared while a menu holds the pad */
+    /* +0x18 */ u16 stick_angle[2]; /* the pad's stick angle pair (`PlayerPad` +0x10C / +0xE6) */
+    /* +0x1C */ u16 stick_dist[2];  /* the pad's stick distance pair (`PlayerPad` +0x118 / +0xF2) */
+    /* +0x20 */ u16 stick_cam_angle[2]; /* `stick_angle` turned by the camera's heading */
     /* +0x24 */ u32 id_flags;       /* `_PLW::id_flags_0xDC` */
     /* +0x28 */ u32 pad_0x28[8];
     /* +0x48 */ VEC3 accel_b;
@@ -12949,7 +13205,16 @@ typedef struct PlInput {
 /* The per-button masks the hold counters follow (this unit's `.data`, 0x805C5F90). */
 extern "C" {
 extern u16 pl_input_button_masks[8];
+/* 0x8079A018 / 0x8079A01C: 200.0 and 300.0, the remote's and the Nunchuk's swing threshold (this unit's `.sdata2`
+ * pool - loads, never definitions, playbook 29). */
+extern f32 pl_input_acc_swing_min;
+extern f32 pl_input_fs_acc_swing_min;
 }
+
+#include "mh3_pad/pad_acc_hist_get.h"
+#include "ef/sys_quest_move.h"
+#include "Pl/fn_80288CEC.h"  /* root_mode2_ck (rule 2) */
+#include "camera/camera.h"   /* camera_work_ck (rule 2) */
 
 namespace s_802693C4 {
 
@@ -13046,9 +13311,9 @@ void pl_input_menu_clear(_PLW* self, PlInput* in)
         in->stick_flags[1] &= 0xFFC3;
         in->stick_flags[2] &= 0xFFC3;
         in->stick_flags[3] &= 0xFFC3;
-        in->stick_level = 0;
-        in->stick2_level = 0;
-        in->stick2_cam_angle = 0;
+        in->stick_angle[1] = 0;
+        in->stick_dist[1] = 0;
+        in->stick_cam_angle[1] = 0;
         pl_id_bit_clear(self, 11);
         pl_id_bit_clear(self, 9);
         for (i = 0; i < 8; i++) {
@@ -13156,12 +13421,283 @@ void pl_input_act_flags_set(_PLW* self, PlInput* in)
  * Controller). */
 void pl_input_pause_flag_set(_PLW* self, u8 pad)
 {
+    PlayerPad* rec;
+
     if ((u8)get_ControlType(pad) == 1) {
-        if ((Psw[pad].field_0x100 & 0x40) != 0) {
+        rec = &Psw[pad];
+        if ((rec->field_0x100 & 0x40) != 0) {
             pl_id_bit_set(self, 24);
         }
-    } else if ((Psw[pad].field_0xda & 0x8000) != 0) {
-        pl_id_bit_set(self, 24);
+    } else {
+        rec = &Psw[pad];
+        if ((rec->field_0xda & 0x8000) != 0) {
+            pl_id_bit_set(self, 24);
+        }
+    }
+}
+
+/* 0x8026AF08 (0xA2C): refreshes the actor's pad-input block from its pad record: clears it while the actor is held,
+ * otherwise copies the pad kind's buttons and sticks, raises the input ids and runs the two action dispatchers. */
+void pl_input_refresh(_PLW* self, u32 value)
+{
+    PlInput* in = (PlInput*)&self->field_0x0B8;
+    Vec3 hist[16];
+    Vec3* p = hist;
+    Vec3 unused;
+    SysQuestMove* move;
+    PlayerPad* pad;
+    s32 swung;
+    s16 hold;
+    u16 pressed;
+    u16 pressed_prev;
+    u16 held;
+    u16 held_alt;
+
+    do {
+        VEC3_ctor(p);
+        p++;
+    } while (p < &hist[16]);
+    VEC3_ctor(&unused);
+    move = (SysQuestMove*)get_move_work_adrs(0);
+    in->id_flags = 0;
+    in->pad_kind = 0;
+    if (option_cfg_eq_ck(self->chunk_ofs, 6, 0) == 1) {
+        in->option_0x71 = 0;
+    } else {
+        in->option_0x71 = 1;
+    }
+    in->accel_flags = 0;
+    in->pad_0x28[0] = 0;
+    in->pad_0x28[1] = 0;
+    in->pad_0x28[2] = 0;
+    in->pad_0x28[3] = 0;
+    in->pad_0x28[4] = 0;
+    in->pad_0x28[5] = 0;
+    in->pad_0x28[6] = 0;
+    in->pad_0x28[7] = 0;
+    if (self->field_0x352 > 0) {
+        self->field_0x352--;
+    }
+    self->field_0x46F = 0;
+    if (GameMode_ck() == 1 && move != NULL) {
+        if (root_mode2_ck() == 1) {
+            if (PlayMode_ck() == 2) {
+                hold = move->player_hold_0x004[self->chunk_ofs & 1];
+            } else {
+                hold = move->player_hold_0x004[0];
+            }
+            if (move->hold_off_0x001 == 0) {
+                if (hold > 0 || self->field_0x453 != 0) {
+                    self->field_0x46F = 1;
+                }
+                self->field_0x453 = hold;
+            }
+        } else {
+            self->field_0x46F = 1;
+        }
+    }
+    if (self->field_0x352 > 0 || system_w.field_0x2a != 0 || self->field_0x46F == 1 ||
+        (GameMode_ck() == 1 && (s32)root_mode2_ck() == 0)) {
+        s32 count = in->hold_count[6];
+        u8 state = in->hold_state[6];
+
+        memset(in, 0, sizeof(PlInput));
+        in->hold_count[6] = count;
+        in->hold_state[6] = state;
+        if (self->field_0x352 > 0) {
+            pl_input_pause_flag_set(self, value);
+        }
+        return;
+    }
+    if (option_cfg_eq_ck(self->chunk_ofs, 7, 1) == 1) {
+        self->held_attack_0x5C5 = 1;
+    } else {
+        self->held_attack_0x5C5 = 0;
+    }
+    pl_input_pause_flag_set(self, value);
+    if ((u8)get_ControlType((u8)value) == 1) {
+        pad = &Psw[(u8)value];
+        in->pad_kind = 1;
+        in->stick_flags[1] = pad->fs_stick_prev_0x106;
+        in->stick_flags[0] = pad->control_0x104;
+        in->stick_flags[3] = in->stick_flags[2];
+        in->stick_flags[2] = pad->fs_stick_trig_0x108;
+        in->stick_angle[0] = pad->fs_angle_0x10C[0];
+        in->stick_angle[1] = pad->fs_angle_0x10C[1];
+        in->stick_dist[0] = pad->fs_dist_0x118[0];
+        in->stick_dist[1] = pad->fs_dist_0x118[1];
+        in->held_alt = held_alt = pad->fs_prev_0xFE & ~0x8000;
+        in->held = held = pad->control_0x0FC & ~0x8000;
+        in->pressed_prev = pressed_prev = in->pressed & ~0x8000;
+        in->pressed = pressed = pad->field_0x100 & ~0x8000;
+        in->extra_pressed = pad->field_0x11e & ~0x8000;
+        in->copy_0x08[0] = held;
+        in->copy_0x08[1] = held_alt;
+        in->copy_0x08[2] = pressed;
+        in->copy_0x08[3] = pressed_prev;
+        pl_input_trigger_flags_set(self, in, value);
+        pl_input_trigger_flags2_set(self, in, value);
+        pl_input_button_hold_count(self, in);
+        pl_input_hold_flags_set(self, in);
+        pl_input_menu_clear(self, in);
+        if (s_8026BA1C::pl_id_bit_ck(self, 11) != 1 && menu_item_frame_update((MenuFrameWork*)self) != 1) {
+            pad_acc_hist_get((u8)value, hist, 4);
+            copyVec3(&in->accel_a, hist);
+            in->accel_a_state = pad_acc_y_delta((u8)value);
+            if (vec3_len((f32*)&in->accel_a) >= pl_input_acc_swing_min) {
+                in->accel_flags |= 1;
+                if (in->accel_a.y < pl_act_float_zero) {
+                    in->accel_flags |= 4;
+                } else {
+                    in->accel_flags |= 0x10;
+                }
+            }
+            pad_fs_acc_hist_get((u8)value, hist, 4);
+            copyVec3(&in->accel_b, hist);
+            in->accel_b_state = pad_fs_acc_y_delta((u8)value);
+            if (vec3_len((f32*)&in->accel_b) >= pl_input_fs_acc_swing_min) {
+                in->accel_flags |= 2;
+                if (in->accel_a.y < pl_act_float_zero) {
+                    in->accel_flags |= 8;
+                } else {
+                    in->accel_flags |= 0x20;
+                }
+            }
+        }
+        if (s_8026BA1C::pl_id_bit_ck(self, 11) == 1) {
+            u32 dpad = in->pressed | pad->field_0x11e;
+
+            if ((dpad & 0x400) != 0) {
+                pl_id_bit_set(self, 15);
+            } else if ((dpad & 0x800) != 0) {
+                pl_id_bit_set(self, 14);
+            }
+            dpad = in->pressed | pad->field_0x11e;
+            if ((dpad & 0x1000) != 0) {
+                pl_id_bit_set(self, 13);
+            } else if ((dpad & 0x2000) != 0) {
+                pl_id_bit_set(self, 12);
+            }
+        }
+        if ((s32)pl_id_bit_ck(self, 11) == 0) {
+            u16 buttons;
+
+            pl_input_act_flags_set(self, in);
+            buttons = in->held;
+            if ((buttons & 0x2400) != 0) {
+                pl_id_bit_set(self, 16);
+            } else if ((buttons & 0x1800) != 0) {
+                pl_id_bit_set(self, 17);
+            }
+        }
+        if (self->field_0x308 != 0) {
+            in->held &= 0x32C;
+            in->held_alt &= 0x32C;
+            in->pressed &= 0x32C;
+            in->pressed_prev &= 0x32C;
+        }
+        if (camera_work_ck() == 1) {
+            in->held &= 0xFFBF;
+            in->held_alt &= 0xFFBF;
+            in->pressed &= 0xFFBF;
+            in->pressed_prev &= 0xFFBF;
+        }
+    } else {
+        PlayerPad* cl = &Psw[(u8)value];
+
+        in->pad_kind = 2;
+        in->stick_flags[1] = cl->cl_stick_prev_0xE0;
+        in->stick_flags[0] = cl->control_0x0DE;
+        in->stick_flags[3] = in->stick_flags[2];
+        in->stick_flags[2] = cl->cl_stick_trig_0xE2;
+        in->stick_angle[0] = cl->cl_angle_0xE6;
+        in->stick_angle[1] = cl->field_0xe8;
+        in->stick_dist[0] = cl->cl_dist_0xF2[0];
+        in->stick_dist[1] = cl->cl_dist_0xF2[1];
+        in->held_alt = held_alt = cl->cl_prev_0xD8 & ~2;
+        in->held = held = cl->control_0x0D6 & ~2;
+        in->pressed_prev = pressed_prev = in->pressed & ~2;
+        in->pressed = pressed = cl->field_0xda & ~2;
+        in->copy_0x08[0] = held;
+        in->copy_0x08[1] = held_alt;
+        in->copy_0x08[2] = pressed;
+        in->copy_0x08[3] = pressed_prev;
+        in->extra_pressed = cl->field_0xf8;
+        pl_input_trigger_flags_set(self, in, value);
+        pl_input_trigger_flags2_set(self, in, value);
+        pl_input_button_hold_count(self, in);
+        pl_input_hold_flags_set(self, in);
+        pl_input_menu_clear(self, in);
+        if (s_8026BA1C::pl_id_bit_ck(self, 11) == 1) {
+            u16 buttons = in->pressed;
+
+            if ((buttons & 0x20) != 0) {
+                pl_id_bit_set(self, 15);
+            } else if ((buttons & 0x200) != 0) {
+                pl_id_bit_set(self, 14);
+            }
+            buttons = in->pressed;
+            if ((buttons & 0x40) != 0) {
+                pl_id_bit_set(self, 13);
+            } else if ((buttons & 0x100) != 0) {
+                pl_id_bit_set(self, 12);
+            }
+        }
+        pl_input_act_flags_set(self, in);
+        if (s_8026BA1C::pl_stick_window_ck(self, 1, 0x6000, 0xA000) == 1 || (in->held & 0x1800) != 0) {
+            pl_id_bit_set(self, 17);
+        } else if (s_8026BA1C::pl_stick_window_ck(self, 1, 0xE000, 0x2000) == 1 || (in->held & 0x2400) != 0) {
+            pl_id_bit_set(self, 16);
+        }
+        if (self->held_attack_0x5C5 != 0 && s_8026BA1C::pl_act_param_tier_ck(self, 1) >= 1) {
+            swung = 0;
+            if (s_8026BA1C::pl_stick_window_gated_ck(self, 1, 0x5555, 0xAAAB) == 1) {
+                pl_id_bit_set(self, 5);
+                swung = 1;
+            } else if (s_8026BA1C::pl_stick_window_gated_ck(self, 1, 0xD555, 0x2AAB) == 1) {
+                pl_id_bit_set(self, 7);
+                swung = 1;
+            }
+            if (s_8026BA1C::pl_stick_window_level_ck(self, 1, 0x5555, 0xAAAB) == 1) {
+                pl_id_bit_set(self, 6);
+                swung = 1;
+            } else if (s_8026BA1C::pl_stick_window_level_ck(self, 1, 0xD555, 0x2AAB) == 1) {
+                pl_id_bit_set(self, 8);
+                swung = 1;
+            }
+            if (swung == 0 || self->kind_0x09 == 3) {
+                if (s_8026BA1C::pl_stick_window_gated_ck(self, 1, 0x2AAB, 0x5555) == 1) {
+                    pl_id_bit_set(self, 1);
+                } else if (s_8026BA1C::pl_stick_window_gated_ck(self, 1, 0xAAAB, 0xD555) == 1) {
+                    pl_id_bit_set(self, 3);
+                }
+                if (s_8026BA1C::pl_stick_window_level_ck(self, 1, 0x2AAB, 0x5555) == 1) {
+                    pl_id_bit_set(self, 2);
+                } else if (s_8026BA1C::pl_stick_window_level_ck(self, 1, 0xAAAB, 0xD555) == 1) {
+                    pl_id_bit_set(self, 4);
+                }
+            }
+        }
+        if (self->field_0x308 != 0) {
+            in->held &= 0x94;
+            in->held_alt &= 0x94;
+            in->pressed &= 0x94;
+            in->pressed_prev &= 0x94;
+        }
+        if (camera_work_ck() == 1) {
+            in->held &= 0x7FFF;
+            in->held_alt &= 0x7FFF;
+            in->pressed &= 0x7FFF;
+            in->pressed_prev &= 0x7FFF;
+        }
+    }
+    s_8026BA1C::fn_8026BF98(self, value);
+    s_8026BA1C::fn_8026CC7C(self, value);
+    {
+        u32 cam = ::get_camera_rot_y();
+
+        in->stick_cam_angle[0] = in->stick_angle[0] + cam;
+        in->stick_cam_angle[1] = in->stick_angle[1] + cam;
     }
 }
 

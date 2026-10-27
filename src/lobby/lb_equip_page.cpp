@@ -1641,44 +1641,6 @@ typedef struct PlRigNodeRule {
     /* +0x02 */ u16 joint_0x02;
 } PlRigNodeRule; /* size: 0x4 */
 
-/* The world-matrix callback of a rig model (the rig's `slots_0xE40` records): it pins each node to the body joint of
- * its name and sways the hair and cloth chains.  Declared before `LbEquipModelCallbackA` (MWCC emits the tables in
- * reverse order); the class names and `ApplyTiming` are GUESSes from the tables and the hook bodies.  size: 0x90 */
-class LbEquipModelCallbackB : public nw4r::g3d::ICalcWorldCallback {
-public:
-    virtual ~LbEquipModelCallbackB();
-    virtual void ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
-                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
-    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
-                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
-    virtual void ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg);
-
-    /* +0x04 */ _PLW* plw_0x04;
-    /* +0x08 */ MHchar* body_0x08;
-    /* +0x0C */ u32 index_0x0C;
-    /* +0x10 */ u32 node_map_0x10[32];
-};
-
-/* The world-matrix callback of a rig attachment (the rig's `attachments_0x1230` records): it applies the
- * attachment's joint adjustments by its kind's node rules.  size: 0x110 */
-class LbEquipModelCallbackA : public nw4r::g3d::ICalcWorldCallback {
-public:
-    virtual ~LbEquipModelCallbackA();
-    virtual void ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
-                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
-    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
-                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
-    virtual void ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg);
-
-    /* +0x004 */ MHchar* models_0x04;
-    /* +0x008 */ MHchar* model_0x08;
-    /* +0x00C */ u32 joint_0x0C;
-    /* +0x010 */ u8 kind_0x10;
-    /* +0x011 */ u8 allow_0x11;
-    /* +0x012 */ u8 pad_0x012[0x2];
-    /* +0x014 */ PlSeJointAdj adj_0x014[7];
-};
-
 /* One key of a guard-motion key table (`pl_rig_keys_*`): its motion frame (-1.0f ends the table), the root rotation
  * and translation.  size: 0x1C */
 typedef struct PlRigKey {
@@ -1953,7 +1915,7 @@ void pl_physics_rebind(PlSeRig* rig, _PLW* plw)
 
         attach->models_0x04 = 0;
         attach->joint_0x0C = 0;
-        attach->field_0x10 = pl_rig_attach_kind_tbl[plw->field_0x002];
+        attach->kind_0x10 = pl_rig_attach_kind_tbl[plw->field_0x002];
         for (j = 0; j < 7; j++) {
             pl_rig_joint_adj_reset(rig, &attach->adj_0x014[j]);
         }
@@ -2003,7 +1965,7 @@ void pl_rig_sub_reset(PlSeRig* rig, u32 slot)
     rig->sub_mat_0xA01[slot] = 0xFF;
     attach->models_0x04 = 0;
     attach->joint_0x0C = 0;
-    attach->field_0x10 = pl_rig_attach_kind_tbl[rig->plw->field_0x002];
+    attach->kind_0x10 = pl_rig_attach_kind_tbl[rig->plw->field_0x002];
     for (i = 0; i < 7; i++) {
         pl_rig_joint_adj_reset(rig, &attach->adj_0x014[i]);
     }
@@ -2695,7 +2657,7 @@ void pl_rig_slot_bind(PlSeRig* rig, PlSeSlot* slot, u32 index)
 /* 0x802247F0 (0x30): Binds attachment `attach` of kind `kind` to `model`; kinds 5 and 6 follow the sub-models. */
 void pl_rig_attach_bind(PlSeRig* rig, PlSeAttach* attach, u8 kind, MHchar* model)
 {
-    attach->field_0x10 = kind;
+    attach->kind_0x10 = kind;
     attach->model_0x08 = model;
     if ((u32)(kind - 5) <= 1) {
         attach->models_0x04 = rig->sub_0x0A14;
@@ -2868,9 +2830,9 @@ extern "C" void pl_rig_model_move(PlSeRig* rig)
         if (m->model.field_0x34 != 0) {
             pl_rig_sub_color_apply(rig, i);
         }
-        pl_rig_model_place(rig, &m->model, rig->plw, pl_rig_attach_pose_set(rig, i, a->field_0x10));
+        pl_rig_model_place(rig, &m->model, rig->plw, pl_rig_attach_pose_set(rig, i, a->kind_0x10));
         m->model.move((u16)v);
-        pl_rig_attach_motion_pose(rig, a, a->field_0x10);
+        pl_rig_attach_motion_pose(rig, a, a->kind_0x10);
     }
 
     if (flag != 0) {
@@ -5466,7 +5428,7 @@ void LbEquipModelCallbackA::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
             if (joint == 0xFFFF) {
                 joint = joint_0x0C;
             }
-            mhchar_joint_mtx_get(models_0x04, joint, (Mtx34*)&joint_mtx);
+            mhchar_joint_mtx_get(&models_0x04->model, joint, (Mtx34*)&joint_mtx);
             mtx34_concat((Mtx34*)&mtx, (Mtx34*)&joint_mtx, (Mtx34*)&mtx);
             world_mtx_attr_scale_set((VtxAttrRef*)pManip, adj->scale_0x00.x * model_0x08->scale_0x1C.x,
                                      adj->scale_0x00.y * model_0x08->scale_0x1C.y,
@@ -5482,7 +5444,7 @@ void LbEquipModelCallbackA::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
             if (joint == 0xFFFF || kind_0x10 == 7) {
                 joint = 0;
             }
-            mhchar_joint_mtx_get(models_0x04, joint, (Mtx34*)&joint_mtx);
+            mhchar_joint_mtx_get(&models_0x04->model, joint, (Mtx34*)&joint_mtx);
             mtx34_concat((Mtx34*)&mtx, (Mtx34*)&joint_mtx, (Mtx34*)&mtx);
             world_mtx_attr_scale_set((VtxAttrRef*)pManip, 1.0f, 1.0f, 1.0f);
         }

@@ -1,31 +1,50 @@
 /*
  * The player's SE/motion rig, the object `_PLW.physics_0x13C` points at: `pl_rig_model_move` (`lobby/lb_equip_page.cpp`'s
- * range) walks it and `Pl/pl_act.cpp`'s part accessors read the same records (rule 1).  The rig's constructor
- * `fn_80269DD8` fixes the 0x1560-byte extent (`__construct_array` of 7 x 0x90 at +0xE40 and 3 x 0x110 at +0x1230).
+ * range) walks it and `Pl/pl_act.cpp`'s part accessors read the same records (rule 1).  The rig's implicit
+ * constructor `__ct__7PlSeRigFv` (`Pl/pl_act.cpp`'s `new PlSeRig`) fixes the 0x1560-byte extent (`__construct_array`
+ * of 7 x 0x90 at +0xE40 and 3 x 0x110 at +0x1230), and its implicit destructor `__dt__7PlSeRigFv` destroys the two
+ * callback arrays.  The two callback classes are `lobby/lb_equip_page.cpp`'s (their key functions and tables are
+ * that unit's); they are defined here because the rig holds them by value.  C++ only.
  */
 #ifndef MHTRI_PL_PL_SE_RIG_H
 #define MHTRI_PL_PL_SE_RIG_H
 
 #include "types.h"
 #include "pl.h"
+#include "lobby/lb_npc.h"                  /* mhchar_construct, the model record's constructor call (rule 2) */
+#include "g3d/g3d_calcworld_callback.h"    /* nw4r::g3d::ICalcWorldCallback (rule 1) */
+
+namespace nw4r { namespace g3d { class ScnMdlSimple; } }
 
 /* The per-model record the rig's three arrays hold: an `MHchar` plus 0x24 B the model layer uses.
  * size: 0x164 */
 typedef struct PlSeModel {
     /* +0x000 */ MHchar model;
     /* +0x140 */ u8 field_0x140[0x24];
+
+    PlSeModel() { mhchar_construct(&model); }
 } PlSeModel; /* size: 0x164 */
 
-/* One element of the 0xE40 array: a 0x90-byte record whose first word is the vtable the array's
- * constructor `fn_80269DD8` installs through `fn_80269EC8` (`.data` record lbl_805BAB74).
- * size: 0x90 */
-typedef struct PlSeSlot {
-    /* +0x00 */ u32* vtable_0x00;
+/* The world-matrix callback of a rig model (the rig's `slots_0xE40` records): it pins each node to the body joint of
+ * its name and sways the hair and cloth chains.  Defined before `LbEquipModelCallbackA` (MWCC emits the tables in
+ * reverse order); the class names and `ApplyTiming` are GUESSes from the tables and the hook bodies.  size: 0x90 */
+class LbEquipModelCallbackB : public nw4r::g3d::ICalcWorldCallback {
+public:
+    virtual ~LbEquipModelCallbackB();
+    virtual void ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg);
+
     /* +0x04 */ _PLW* plw_0x04;          /* the rig's actor (`pl_rig_slot_bind`) */
     /* +0x08 */ MHchar* body_0x08;       /* the rig's first model, whose joints the slot follows */
     /* +0x0C */ u32 index_0x0C;          /* the slot's model index */
     /* +0x10 */ u32 node_map_0x10[32];   /* per node of the slot's model: the body joint it follows, -1 none */
-} PlSeSlot; /* size: 0x90 */
+};
+
+/* The rig's name for one slot record. */
+typedef LbEquipModelCallbackB PlSeSlot;
 
 /* One 24-byte vector pair of the rig's pose tables: a translation and a rotation.  size: 0x18 */
 typedef struct PlSeVecPair {
@@ -44,24 +63,33 @@ typedef struct PlSeJointAdj {
     /* +0x18 */ VEC3 rot_0x18;
 } PlSeJointAdj; /* size: 0x24 */
 
-/* The third array's element: 0x110 B of per-attachment state.
- * Its first word is the vtable the constructor `fn_80269E8C` installs (`.data` record lbl_805BAB58).
- * size: 0x110 */
-typedef struct PlSeAttach {
-    /* +0x000 */ u32* vtable_0x00;
+/* The world-matrix callback of a rig attachment (the rig's `attachments_0x1230` records): it applies the attachment's
+ * joint adjustments by its kind's node rules.  size: 0x110 */
+class LbEquipModelCallbackA : public nw4r::g3d::ICalcWorldCallback {
+public:
+    virtual ~LbEquipModelCallbackA();
+    virtual void ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
+    virtual void ApplyTiming(nw4r::g3d::ScnMdlSimple* track, s32 mode, u32 arg);
+
     /* +0x004 */ struct PlSeModel* models_0x04;   /* the model array the attachment's kind follows */
     /* +0x008 */ MHchar* model_0x08;              /* the attachment's own model */
     /* +0x00C */ u32 joint_0x0C;                  /* the body joint the attachment's root follows */
-    /* +0x010 */ u8 field_0x10;                   /* the attachment kind (`pl_rig_attach_kind_tbl`) */
+    /* +0x010 */ u8 kind_0x10;                    /* the attachment kind (`pl_rig_attach_kind_tbl`) */
     /* +0x011 */ u8 allow_0x11;                   /* the motion state `pl_rig_attach_pose_set` posed it for */
     /* +0x012 */ u8 pad_0x012[0x2];
     /* +0x014 */ PlSeJointAdj adj_0x014[7];
-} PlSeAttach; /* size: 0x110 */
+};
+
+/* The rig's name for one attachment record. */
+typedef LbEquipModelCallbackA PlSeAttach;
 
 /* The actor's SE/motion rig: the `_PLW*` at +0, seven model records, the per-model gate bytes, three
  * sub-model records, the seven 0x90-byte slot records and the three attachment records - the offsets
- * `pl_rig_model_move` walks and the ones the rig's constructor `fn_80269DD8` lays out (`__construct_array`
- * of 7 x 0x90 at +0xE40 and 3 x 0x110 at +0x1230, ending exactly at 0x1560).
+ * `pl_rig_model_move` walks and the ones the rig's implicit constructor lays out (`__construct_array` of 7 x 0x90
+ * at +0xE40 and 3 x 0x110 at +0x1230, ending exactly at 0x1560).
  * size: 0x1560 */
 typedef struct PlSeRig {
     /* +0x000 */ _PLW* plw;

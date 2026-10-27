@@ -199,7 +199,7 @@ void fn_802430E8(struct _PLW* self, u8 part);
  * band's unclaimed run 0x80273B14-0x80276B58, so the band header is its rule-2 home; where the two
  * lanes spelled one argument differently the MAIN spelling is kept (M7). */
 
-u32 fn_8027D8A0(struct _PLW* self, s32 a);
+u32 pl_note_near_ck(struct _PLW* self, s32 a);
 
 /* Pl-band callees and tables with no registered owner, added with `Pl/fn_80273B14.cpp`
  * (`.text` 0x80273B14-0x80276B58), which is their only consumer so far.  The addresses all sit in

@@ -9,7 +9,11 @@
 /* The quest move work (`get_move_work_adrs(0)`), as far as the system core and the item menu read it.
  * size: 0x114 (lower bound, an approximation) */
 typedef struct SysQuestMove {
-    /* +0x000 */ u8 unused_0x000[0xDC];
+    /* +0x000 */ u8 unused_0x000;
+    /* +0x001 */ u8 hold_off_0x001;   /* non-zero leaves the player hold counts alone (`Pl/pl_act.cpp`'s input refresh); GUESS name */
+    /* +0x002 */ u8 unused_0x002[0x4 - 0x2];
+    /* +0x004 */ s16 player_hold_0x004[2]; /* per player (two in a duel): > 0 holds the actor's input; GUESS name */
+    /* +0x008 */ u8 unused_0x008[0xDC - 0x8];
     /* +0x0DC */ struct QuestWork* quest_0x0DC;  /* the running quest's work (`ai/ai_npc.cpp` asks its element picks) */
     /* +0x0E0 */ u8 unused_0x0E0[0xEB - 0xE0];
     /* +0x0EB */ u8 area_0x0EB;      /* the stage area of `pos_0x128` (the cockpit ring's projection) */

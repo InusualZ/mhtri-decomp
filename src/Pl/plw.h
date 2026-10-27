@@ -70,7 +70,7 @@ struct _PLW {
     /* +0x009 */ u8 kind_0x09;   /* compared against 3; `ef/eft019.cpp` names this same `_PLW` byte
                                   * `kind_0x09` and `enemy.h` names the analogous byte `state_0x009` */
     /* +0x00A */ u8 field_0x00A;
-    /* +0x00B */ u8 unk00B;
+    /* +0x00B */ u8 bind_reset_0x00B;   /* cleared when the work binds to a slot (`pl_net_slot_bind`); GUESS name */
     /* +0x00C */ u16 act_no;      /* the action number `Pl_act_ck` compares as its `u16` argument
                                   * (`Pl_bari_ck` matches the rage actions 169..174 against it) */
     /* +0x00E */ union {   /* 0x00E-0x013: the state run kept whole, with the act-entry
@@ -449,7 +449,7 @@ struct _PLW {
         };
     };
     /* +0x2E0 */ _SLOTENT spare_slot_id[8];
-    /* +0x300 */ u8 unk300[0x304 - 0x300];
+    /* +0x300 */ _SLOTENT tail_slot_0x300;   /* the slot entry after the spare run (`pl_net_slot_bind` arms 0x35) */
     /* +0x304 */ u16 field_0x304;
     /* +0x306 */ union { /* the effect/motion id `pl_item_add` is fed and indexed on; one member per
                           * offset, both spellings kept (rule 5); `Pl/pl_act_step.cpp` and

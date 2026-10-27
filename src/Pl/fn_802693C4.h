@@ -58,7 +58,7 @@ void fn_8026A178(struct _PLW* self, s32 a, u16 motion, s32 b, s32 c, u32 e);
 u32 fn_8026B934(struct _PLW* self);
 u32 fn_8026B99C(struct _PLW* self);
 u32 fn_8026BA04(struct _PLW* self);
-void fn_8026AF08(struct _PLW* self, u32 value);
+void pl_input_refresh(struct _PLW* self, u32 value);
 
 #ifdef __cplusplus
 }

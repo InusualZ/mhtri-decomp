@@ -12576,14 +12576,14 @@ extern "C" u32 fn_8025E32C(_PLW* self)
         return 0;
     }
     if ((fn_8025E298(self, 0, 0xB1) == 1 || fn_8025E298(self, 0xC, 0xB) == 1) &&
-        fn_8027D8A0(self, 1) == 1) {
+        pl_note_near_ck(self, 1) == 1) {
         self->field_0x3E5 = 0x10;
         self->field_0x3E4 = 0x10;
         self->field_0x3E7 = 0;
         self->field_0x3E8 = 0;
         return 1;
     }
-    if (fn_8025E298(self, 0, 0xA6) == 1 && fn_8027D8A0(self, 0) == 1) {
+    if (fn_8025E298(self, 0, 0xA6) == 1 && pl_note_near_ck(self, 0) == 1) {
         self->field_0x3E5 = 0x10;
         self->field_0x3E4 = 0x10;
         self->field_0x3E7 = 0;
@@ -15256,13 +15256,13 @@ s32 pl_scan_act_select(_PLW* self) {
                 }
                 break;
             case 49:
-                if (fn_8027D8A0(self, 0) == 0) {
+                if (pl_note_near_ck(self, 0) == 0) {
                     *fired = 0;
                     continue;
                 }
                 break;
             case 50:
-                if (fn_8027D8A0(self, 1) == 0) {
+                if (pl_note_near_ck(self, 1) == 0) {
                     *fired = 0;
                     continue;
                 }

@@ -4,7 +4,7 @@
 
 #include "types.h"
 
-/* .sbss 0x80794B30 (0x8): the demo equipment hook `pl_net_slot_bind` reads; `pad_connect.cpp`'s boot clears it. */
-extern s32 set_demo_equip_data_func;
+/* .sbss 0x80794B30 (0x8): the demo equipment hook `pl_net_slot_bind` calls with the player work; `pad_connect.cpp`'s boot clears it. */
+extern void (*set_demo_equip_data_func)(struct _PLW* plw);
 
 #endif /* MHTRI_PL_SET_DEMO_EQUIP_DATA_FUNC_H */
