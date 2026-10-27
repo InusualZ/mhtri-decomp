@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (177)
+## Ideas that work (179)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -186,6 +186,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 195 | [A bne + b pair around a call that may replace a value is a ternary that keeps it: x = c ? x : f(x)](195-bne-b-pair-around.md) | works | source-shape | Retail has `cmplwi r3,1 ; bne L ; b skip ; L: ... bl f ; mr rX,r3 ; skip:` where ours has one `beq skip` |
 | 196 | [A by-value command copy above or below the command tells whether an inline builder built it](196-by-value-command-copy.md) | works | source-shape, allocator | A record built locally and passed by value to an inline push sits on the wrong side of its stack copy (every lwz/stw of the copy is off by the record size) |
 | 197 | [Inline calls in an or-chain expand last-term first; a conditional macro keeps the source order](197-inline-calls-in-an.md) | works | source-shape, allocator | An or-chain of small inline predicates evaluates its terms in reverse (the last field is loaded first) while the target loads them in order |
+| 198 | [A materialised flag test whose false arm comes first is flag == 0 ? 0 : cond](198-materialised-flag-test-whose.md) | works | source-shape | Retail tests a byte flag with cmpwi/bne into the true arm, lays the false arm (li r0,0; b) first and then compares the materialised 0/1 again; ours branches straight on && or puts the false arm last |
+| 199 | [A local with a constructor is initialised where it is declared, so declare it after the code retail runs first](199-local-with-a-constructor.md) | works | source-shape | Retail runs a local's constructor stores (a zeroed nw4r::ut::Rect, four stfs) after a call that precedes its first use; ours runs them at the top of the block, before that call |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

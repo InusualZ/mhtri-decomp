@@ -20,17 +20,35 @@
  * SHAPES.    The line-cell list (HbmTextCellList) is inline methods; its unlink/insert pair reproduces retail's
  *            `cmplw rX,rX` self-compare. Colour globals copy as words through `ToU32()`; `/ 2.0f` keeps retail's fmuls
  *            operand order; `nw4r::ut::Rect::GetWidth()` keeps its evaluation order.
- * RESIDUALS. hbmPanelHandleMessage (0x8054358C): frame 0x250 against retail 0x270, and the saved-register numbering of
- *            the case bodies differs.
- * RESIDUALS. hbmTextCellListInit (0x80542BE0), hbmPanelGetTextOrigin (0x8054826C), hbmPanelHitTest (0x80547D00),
- *            hbmPanelLayoutText (0x80545C44): register allocation and frame size; the instruction streams agree.
+ * SHAPES.    Composing tests are `inputLatched == 0 ? 0 : mode != 1` where retail materialises them (playbook 198);
+ *            a text-field key handler leaves on one `v_0x054() || !v_0x0CC()` return (playbook 160); a local whose
+ *            Rect is zeroed is declared after the code retail runs first (playbook 199); slot 0x23C takes one
+ *            argument and the scroll view's slot 0x10 returns f64; the caret phase goes through hbmSinDeg.
+ * RESIDUALS. hbmPanelHandleMessage (0x8054358C): frame 0x250 against retail 0x270; retail keeps message 0's two
+ *            HbmInputModeState records in memory (0x90/0x98: every field stored and reloaded) where ours promotes them
+ *            to registers (an array, a constructor, an inline member and reference-taking inline helpers all leave
+ *            them promoted), and the saved-register numbering of the case bodies differs.
+ * RESIDUALS. hbmTextCellListInit (0x80542BE0): retail reloads the count for the free-list index (`slwi`, no
+ *            `clrlwi`) where ours reuses the loop's; hbmPanelGetTextOrigin (0x8054826C): retail loads the rect before
+ *            the 0.0f; hbmPanelLayoutText (0x80545C44), hbmKbWidgetCalc: frame size; register allocation otherwise.
+ * RESIDUALS. hbmPanelHitTest (0x80547D00), hbmPanelFindLineOverflow: retail copies slot 0x18C's Vec2f into `scale`
+ *            (dead stores at 0x20/0x24) besides its temporary, ours builds it in place (direct-init, a reference and
+ *            an assignment tried); the stack offsets after it shift by 8.
+ * RESIDUALS. The line-cell family (hbmPanelClearText, Reset, Relayout, SetWordWrap, Create, OnTextChanged,
+ *            CursorUp/Down, SetItemCaret, DeleteBackward, TruncateText): the volatile-register numbering inside the
+ *            inlined unlink/insertAfter/syncCursorCell differs per caller; every declaration order of their locals
+ *            and five loop spellings of syncCursorCell were measured, none closes all callers.
+ * RESIDUALS. hbmPanelUpdate: retail stores slot 0x10's raw f64 to scrollY and its frsp copy to the writer, and loads
+ *            the caret phase before the 0x1A00 word; hbmPanelLayoutLines: retail recomputes start + visible where ours
+ *            keeps it; hbmPanelDrawComposition, hbmPanelPrepareGlyph, hbmPanelCheckWordWrap, hbmPanelFindLink: float
+ *            and saved-register colouring.
+ * RESIDUALS. hbmTextPaneListenerOnEvent, hbmKbWidgetUpdate: their only differences are the .data offsets of the pane
+ *            names (r31 + 0x46C/0x480/0x490 against ours), which follow the .data layout below.
  * RESIDUALS. fn_805482CC: retail loads its pooled float before the 0x195C store and rotates f1/f2 against ours.
  * RESIDUALS. hbmPanelHandleKeyDown (0x80548950): retail tests the key as `addis r3,r31,1; subi r0,r3,0x309B`; only the
  *            literal `(u16)(key + 0xCF65)` reproduces it, and `(u16)(key - 0x309B)` is kept.
  * RESIDUALS. fn_8054F178: retail loads both arguments before either store (`lbz r4; lwz r0; stb; stw`); every spelling
  *            tried keeps one load/store pair after the other.
- * RESIDUALS. Key-handler branch shapes (hbmPanelArrowLeft/Right, hbmPanelCaretForward, hbmPanelHandleSpecialKey): retail
- *            lays some `if` tails out as `bne; b` where ours falls through.
  * RESIDUALS. Unwritten (9 functions, 0xC1C bytes): the destructors fn_805425E4 (0xF4), fn_805426D8 (0x58),
  *            fn_80542730 (0x5C), fn_8054278C (0x5C), fn_80543020 (0x74) and fn_8054CF38 (0x134), the constructors
  *            hbmTextBuffersInit (0x1CC) and fn_80542D8C (0x214), and the widget create fn_8054D0AC (0x530); they store the
@@ -44,8 +62,8 @@
  * RESIDUALS. .data 0x8064E760..0x8064F360 spans at least 3 TUs (datagap.py emission-order seams at 0x8064F0BC and
  *            0x8064F338), so the data cannot match until the range is re-cut; string literals and the colour globals
  *            are emitted here meanwhile.
- * RESIDUALS. .sbss: ours adds s_emptyLength and the guarded local static s_kbdState (41 B against the target's 32 B,
- *            which holds the seven colours and one word).
+ * RESIDUALS. .sbss: ours adds s_emptyLength and hkbGetKbdState's guarded static (retail keeps that object once, at
+ *            .sbss 0x80794D64 with its guard at 0x80794D60, inside menu/menu_sysmsg.cpp's range).
  * RESIDUALS. homebutton/hbm_text_panel.h keeps the consumers' opaque prototypes under the map's names and is not
  *            included here, so the rename sweep cannot make it clash with the typed definitions.
  * NAMES.     GUESS classes HbmPanelPart and its kind HbmPanelPartA (band keys with a state word; members reset,
@@ -148,7 +166,7 @@ public:
     /* slot +0x07C */ virtual void v_0x07C();
     /* slot +0x080 */ virtual void v_0x080();
     /* slot +0x084 */ virtual s32 v_0x084();
-    /* slot +0x088 */ virtual s32 v_0x088();
+    /* slot +0x088 */ virtual u32 v_0x088();
     /* slot +0x08C */ virtual void v_0x08C(u32* start, u32* end);
     /* slot +0x090 */ virtual s32 v_0x090();
     /* slot +0x094 */ virtual s32 v_0x094();
@@ -392,7 +410,7 @@ class HbmPanelScrollView {
 public:
     /* slot +0x008 */ virtual void v_0x008(s32 a, s32 b, f32 c, f32 d, f32 e);
     /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual f32 v_0x010();
+    /* slot +0x010 */ virtual f64 v_0x010();
     /* slot +0x014 */ virtual s32 v_0x014();
 
     /* +0x00 is the compiler-emitted vptr */
@@ -674,8 +692,8 @@ public:
 
     /* +0x00 is the compiler-emitted vptr */
     /* +0x04 */ u8 unused_0x04[0x10];
-    /* +0x14 */ u32 keyboardType;         /* 1: letters a..z are not typed */
-    /* +0x18 */ u32 cursorMode;           /* 0 or 2: the cursor key may be selected */
+    /* +0x14 */ s32 keyboardType;         /* 1: letters a..z are not typed */
+    /* +0x18 */ s32 cursorMode;           /* 0 or 2: the cursor key may be selected */
     /* +0x1C */ u8 unused_0x1C[0xC];
     /* +0x28 */ u32 spaceFlags;           /* low four bits: when a space may start a candidate */
     /* +0x2C */ u32 unused_0x2C;
@@ -1045,9 +1063,9 @@ struct HbmTextCellList {
     }
     /* Unlinks `cell` and leaves it linked to itself. */
     void unlink(HbmTextCell* cell) {
-        HbmTextCell* list = cells;
         u16 next = cell->next;
         u16 prev = cell->prev;
+        HbmTextCell* list = cells;
         u16 index = list[next].prev;
 
         list[next].prev = prev;
@@ -1247,7 +1265,7 @@ public:
     /* slot +0x230 */ virtual s32 v_0x230();
     /* slot +0x234 */ virtual void v_0x234();
     /* slot +0x238 */ virtual void v_0x238();
-    /* slot +0x23C */ virtual void v_0x23C(s32 a, s32 b);
+    /* slot +0x23C */ virtual void v_0x23C(s32 a);
 
     /* Types `c` into the text field and books the text change. */
     void typeIntoTextField(u16 c) {
@@ -1549,10 +1567,13 @@ void hbmTextCellListInit(HbmTextCellList* list)
         HbmTextCell* free = &list->cells[list->count];
         u16 last = list->count - 1;
 
+        HbmTextCell* cells;
+
         free->prev = last;
         free->next = 0;
-        list->cells[last].next = list->count;
-        list->cells[0].prev = list->count;
+        cells = list->cells;
+        cells[last].next = list->count;
+        cells[0].prev = list->count;
     }
     {
         HbmTextCell* used = &list->cells[(u16)(list->count + 1)];
@@ -1840,9 +1861,7 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
     switch (id) {
     case 40:
         if (target == self->candidateList) {
-            static HkbKbdState s_kbdState;
-
-            if (s_kbdState.isShiftHeld()) {
+            if (hkbGetKbdState().isShiftHeld()) {
                 self->v_0x198(id);
             } else {
                 self->v_0x19C(id);
@@ -1867,7 +1886,7 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
             if (c == 0) {
                 break;
             }
-            if (self->inputLatched && self->mode != 1) {
+            if (self->inputLatched == 0 ? 0 : self->mode != 1) {
                 hbmPanelTypeChar(self, c, 0);
             } else {
                 hbmPanelTypeIntoTarget(self, c);
@@ -1902,7 +1921,7 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
                     hbmTextSetInputMode((HbmTextBuffer*)modeTarget, current.mode);
                 }
             }
-            if (self->inputLatched ? self->mode == 1 : 0) {
+            if (self->inputLatched == 0 ? 0 : self->mode == 1) {
                 saved.small = 0;
                 saved.wide = 0;
                 ((HbmPanelValueView*)self->candidateList)->v_0x134(current.small);
@@ -1932,7 +1951,7 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
             if (next == 0) {
                 break;
             }
-            if (self->inputLatched && self->mode != 1) {
+            if (self->inputLatched == 0 ? 0 : self->mode != 1) {
                 hbmPanelTypeChar(self, next, flags);
             } else {
                 hbmPanelTypeIntoTarget(self, next);
@@ -1956,7 +1975,7 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
             } else {
                 hbmTextSetInputMode((HbmTextBuffer*)modeTarget, saved.mode);
             }
-            if (self->inputLatched ? self->mode == 1 : 0) {
+            if (self->inputLatched == 0 ? 0 : self->mode == 1) {
                 ((HbmPanelValueView*)self->candidateList)->v_0x134(saved.small);
                 ((HbmPanelValueView*)self->candidateList)->v_0x128(saved.wide);
             }
@@ -2337,8 +2356,8 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
                 self->candidateList->v_0x06C(0);
                 {
                     const u16* selected = self->candidateList->v_0x0E8();
-                    u32 before = self->textField->v_0x088();
                     u32 after;
+                    u32 before = self->textField->v_0x088();
 
                     self->textField->v_0x06C(selected);
                     after = self->textField->v_0x088();
@@ -2599,14 +2618,16 @@ void hbmCandidatesAdd(HbmCandidateStrings* self, const u16* text)
  * message 35 handled them) and notifies the strings' target. */
 void hbmPanelRefreshCandidates(HbmPanelView* self)
 {
+    u16 text[62];
+
     if (!self->inputLatched) {
         return;
     }
     if (self->mode == 1) {
         if (((HbmPanelValueView*)self->candidateList)->v_0x118()) {
             const u16* selected = self->candidateList->v_0x0E8();
-            u32 before = self->textField->v_0x088();
             u32 after;
+            u32 before = self->textField->v_0x088();
 
             self->textField->v_0x06C(selected);
             after = self->textField->v_0x088();
@@ -2627,8 +2648,6 @@ void hbmPanelRefreshCandidates(HbmPanelView* self)
                 s32 i;
 
                 for (i = 0; i < count; i++) {
-                    u16 text[62];
-
                     ((HbmPanelValueView*)self->candidateList)->v_0x0F0(i, text);
                     hbmCandidatesAdd(&self->candidates, text);
                 }
@@ -2643,8 +2662,6 @@ void hbmPanelRefreshCandidates(HbmPanelView* self)
         self->candidates.v_0x014();
         count = self->converter->v_0x0DC();
         for (i = 0; i < count; i++) {
-            u16 text[62];
-
             self->converter->v_0x0E0(i, text);
             hbmCandidatesAdd(&self->candidates, text);
         }
@@ -2749,9 +2766,8 @@ void hbmPanelLayoutLines(HbmPanelView* self, u32* cursor)
     u32 firstPosition;
     s32 firstLine;
     f32 height = __fabsf(self->textRect.bottom - self->textRect.top);
-    Vec2f scale = self->v_0x18C();
 
-    visible = (s32)(0.5f + height / (self->writer.v_0x028() * scale.y));
+    visible = (s32)(0.5f + height / (self->writer.v_0x028() * self->v_0x18C().y));
 
     if (visible < self->minVisibleLines) {
         visible = self->minVisibleLines;
@@ -2881,6 +2897,12 @@ u16 hbmTextGetLength(HbmPanelItemView* self)
     return self->length;
 }
 
+/* Returns the sine of an angle in degrees through the 256-step index table. */
+static inline f32 hbmSinDeg(f32 deg)
+{
+    return nw4r::math::SinFIdx(deg * (256.0f / 360.0f));
+}
+
 /* 0x80546310 (0x294): Advances the scroll animation and the caret's blink colour. */
 void hbmPanelUpdate(HbmPanelView* self)
 {
@@ -2893,24 +2915,24 @@ void hbmPanelUpdate(HbmPanelView* self)
         self->v_0x170();
     }
     if (self->textField->v_0x084() == 0) {
-        self->scroll.idleTime += 1.0f;
+        self->scroll.idleTime = 1.0f + self->scroll.idleTime;
     }
     self->scroll.v_0x00C();
-    wave = nw4r::math::SinFIdx(0.7111111f * s_caretPhase);
+    wave = hbmSinDeg(s_caretPhase);
     self->caretColor.r = 2;
     self->caretColor.g = 90;
     self->caretColor.b = 253;
     self->caretColor.a = 150.0f + 30.0f * wave;
     if (self->textField->v_0x084() != 0) {
-        self->caretColor.g = 140;
         self->caretColor.r = 52;
+        self->caretColor.g = 140;
         self->caretColor.b = 253;
         self->caretColor.a = 50.0f + 10.0f * wave;
     } else if (self->scroll.idleTime <= 50.0f) {
         self->caretColor.r = hbmHermite(self->scroll.idleTime, 0.0f, 52.0f, 0.0f, 50.0f, 2.0f, 0.0f);
         self->caretColor.g = hbmHermite(self->scroll.idleTime, 0.0f, 140.0f, 0.0f, 50.0f, 90.0f, 0.0f);
         self->caretColor.b = hbmHermite(self->scroll.idleTime, 0.0f, 253.0f, 0.0f, 50.0f, 253.0f, 0.0f);
-        wave = nw4r::math::SinFIdx(0.7111111f * s_caretPhase);
+        wave = hbmSinDeg(s_caretPhase);
         self->caretColor.a = hbmHermite(self->scroll.idleTime, 0.0f, 50.0f, 0.0f, 50.0f, 150.0f, 0.0f) + 20.0f * wave;
     }
     self->unused_0x1A00 += 8;
@@ -2928,7 +2950,7 @@ void hbmFadeUpdate(HbmFade* fade)
 {
     if (fade->active) {
         if (fade->time < fade->duration) {
-            fade->time += 1.0f;
+            fade->time = 1.0f + fade->time;
         } else {
             if (fade->active && fade->owner != NULL) {
                 fade->owner->v_0x008(1, fade->id);
@@ -2981,7 +3003,7 @@ void hbmPanelClearText(HbmPanelView* self)
 void hbmTextSetAll(HbmPanelItemView* self, const u16* text)
 {
     hbmTextSet((HbmTextBuffer*)self, text);
-    self->cursor = self->anchor = self->v_0x01C();
+    self->anchor = self->cursor = self->v_0x01C();
 }
 
 /* 0x8054690C (0x270): Resets the panel and its text field, then clears the line cells like hbmPanelClearText. */
@@ -3132,8 +3154,8 @@ s32 hbmPanelFindLink(HbmPanelView* self, u32* linkStart, u32* linkEnd, const u16
  * the word, notes a hyphen inside it, and moves the draw position past it. */
 s32 hbmPanelCheckWordWrap(HbmPanelView* self, const u16* text, u32 position, f32 x)
 {
-    s32 over;
     const u16* p;
+    s32 over;
     u32 start;
     s32 prevKind;
     u32 i;
@@ -3417,14 +3439,13 @@ s32 hbmPanelDrawComposition(HbmPanelView* self, HbmCaretSpot* caret)
                 hbmGuiDrawLine(18, underline, left, bottom, right, bottom, 0.0f);
             }
             self->writer.SetupGX();
-            self->writer.SetTextColor(nw4r::ut::Color(0xC83232FF));
+            self->writer.SetTextColor(nw4r::ut::Color(0xC8, 0x32, 0x32, 0xFF));
             self->writer.SetTextColor(s_colorPendingKey.ToU32());
             self->writer.Print(c);
             self->writer.MoveCursorX(self->writer.charSpacing);
         }
     }
     while ((c = *lookahead) != 0) {
-        HbmCharBox box;
         f32 x;
         f32 y;
         f32 left;
@@ -3435,6 +3456,8 @@ s32 hbmPanelDrawComposition(HbmPanelView* self, HbmCaretSpot* caret)
         if (self->inputLatched) {
             c = hbmToFullWidth(c);
         }
+        HbmCharBox box;
+
         box.code = c;
         self->writer.v_0x068(&box);
         x = self->writer.mCursorPos.x;
@@ -3590,7 +3613,7 @@ u32 hbmPanelHitTest(HbmPanelView* self, f32 x, f32 y)
                 }
             } else {
                 if (x >= penX && x < charRight && py >= lineTop && py < lineBottom) {
-                    if (penX + (charRight - penX) * 0.5f > x) {
+                    if (penX + (charRight - penX) / 2.0f > x) {
                         return i;
                     }
                     return i + 1;
@@ -3604,7 +3627,7 @@ u32 hbmPanelHitTest(HbmPanelView* self, f32 x, f32 y)
             }
         }
     }
-    if (lineTop + (lineBottom - lineTop) * 0.5f <= py) {
+    if (lineTop + (lineBottom - lineTop) / 2.0f <= py) {
         return hbmPanelHitTest(self, x, 1.0f + lineTop + self->scrollY);
     }
     return hbmPanelHitTest(self, x, 1.0f);
@@ -3618,8 +3641,8 @@ Vec2f hbmPanelGetTextOrigin(HbmPanelView* self)
     f32 left = self->textRect.left;
     f32 bottom = self->textRect.bottom;
 
-    corner.x = left;
     corner.y = bottom;
+    corner.x = left;
     corner.z = 0.0f;
     PSMTXMultVec(self->textMtx, &corner, &corner);
     origin.x = corner.x;
@@ -3679,9 +3702,9 @@ void hbmPanelScrollToCaret(HbmPanelView* self)
         return;
     }
     if (self->candidateList->v_0x0E4() != 0) {
-        caretY = self->candidateCaretY + self->writer.v_0x028() * 0.5f;
+        caretY = self->candidateCaretY + self->writer.v_0x028() / 2.0f;
     } else {
-        caretY = self->caretY + self->writer.v_0x028() * 0.5f;
+        caretY = self->caretY + self->writer.v_0x028() / 2.0f;
     }
     if (caretY < 0.0f) {
         s32 lines = caretY / self->writer.v_0x028() - 1.0f;
@@ -3690,8 +3713,9 @@ void hbmPanelScrollToCaret(HbmPanelView* self)
         self->v_0x17C(11);
     }
     if (caretY >= (self->textRect.top - self->textRect.bottom) * self->v_0x18C().y) {
-        Vec2f scale = self->v_0x18C();
-        s32 lines = (caretY - (self->textRect.top - self->textRect.bottom) * scale.y) / self->writer.v_0x028() + 1;
+        s32 lines = (s32)((caretY - (self->textRect.top - self->textRect.bottom) * self->v_0x18C().y)
+                          / self->writer.v_0x028())
+                    + 1;
 
         self->scroll.v_0x008(0, 0, self->scrollY, self->scrollY - lines * self->writer.v_0x028(), 15.0f);
         self->v_0x17C(11);
@@ -3988,6 +4012,7 @@ void hbmPanelTruncateText(HbmPanelView* self, u32 length)
 {
     u32 removed;
     HbmTextCell* cell;
+    u32 i;
 
     if ((u16)self->textField->v_0x01C() > length) {
         removed = (u16)self->textField->v_0x01C() - length;
@@ -3996,7 +4021,7 @@ void hbmPanelTruncateText(HbmPanelView* self, u32 length)
     }
     self->textField->v_0x044(length);
     cell = self->cells.at(self->cells.usedList()->prev);
-    for (; removed > 0; removed--) {
+    for (i = 0; i < removed; i++) {
         s32 empty;
 
         if (self->cells.at(self->cells.usedList()->prev) == cell) {
@@ -4090,8 +4115,8 @@ void hbmPanelOnTextChanged(HbmPanelView* self, u32* from, u32* to)
 /* 0x80549570 (0x20C): Counts the lines the cell's characters (starting at `start` in the text) lay out to. */
 void hbmPanelCountCellLines(HbmPanelView* self, HbmTextCell* cell, u32 start)
 {
-    const u16* text = self->textField->v_0x048() + start;
     const u16* p;
+    const u16* text = self->textField->v_0x048() + start;
     f32 penX;
     u32 i;
 
@@ -4115,8 +4140,8 @@ void hbmPanelCountCellLines(HbmPanelView* self, HbmTextCell* cell, u32 start)
             cell->lines++;
             penX = self->v_0x18C().x;
         }
-        p++;
         penX += box.bounds.right - box.bounds.left;
+        p++;
     }
 }
 
@@ -4292,7 +4317,7 @@ void hbmPanelHandleSpecialKey(HbmPanelView* self, u32 key, u32 mods)
         if (self->owner->v_0x078()->keyboardType == 1) {
             return;
         }
-        if (self->inputLatched && self->mode != 1) {
+        if (self->inputLatched == 0 ? 0 : self->mode != 1) {
             s32 converting;
 
             if (!self->inputLatched) {
@@ -4322,7 +4347,7 @@ void hbmPanelHandleSpecialKey(HbmPanelView* self, u32 key, u32 mods)
                 }
                 self->v_0x0D8();
             }
-        } else if ((self->inputLatched ? self->mode == 1 : 0) && target == self->candidateList) {
+        } else if ((self->inputLatched == 0 ? 0 : self->mode == 1) && target == self->candidateList) {
             if (self->candidateList->v_0x0CC() == 0) {
                 self->candidateList->v_0x0D4();
             }
@@ -4354,7 +4379,7 @@ void hbmPanelHandleSpecialKey(HbmPanelView* self, u32 key, u32 mods)
         } else {
             KPRPutChar(&self->keyQueue, 32);
         }
-        if (self->inputLatched && self->mode != 1) {
+        if (self->inputLatched == 0 ? 0 : self->mode != 1) {
             for (;;) {
                 u16 c = hbmPanelNextKey(self);
 
@@ -4493,16 +4518,14 @@ void hbmPanelKeyLeft(HbmPanelView* self, s32 key)
         return;
     }
     if (target == self->textField) {
-        if (target->v_0x054()) {
+        if (target->v_0x054() || !target->v_0x0CC()) {
             return;
         }
-        if (target->v_0x0CC()) {
-            ((HbmPanelValueView*)self->candidateList)->v_0x130();
-            self->v_0x0D8();
-            if ((u16)self->candidateList->v_0x050() != 32) {
-                self->v_0x190();
-                self->v_0x018(49, NULL);
-            }
+        ((HbmPanelValueView*)self->candidateList)->v_0x130();
+        self->v_0x0D8();
+        if ((u16)self->candidateList->v_0x050() != 32) {
+            self->v_0x190();
+            self->v_0x018(49, NULL);
         }
     }
 }
@@ -4540,16 +4563,14 @@ void hbmPanelKeyRight(HbmPanelView* self, s32 key)
         return;
     }
     if (target == self->textField) {
-        if (target->v_0x054()) {
+        if (target->v_0x054() || !target->v_0x0CC()) {
             return;
         }
-        if (target->v_0x0CC()) {
-            ((HbmPanelValueView*)self->candidateList)->v_0x130();
-            self->v_0x0D8();
-            if ((u16)self->candidateList->v_0x050() != 32) {
-                self->v_0x194();
-                self->v_0x018(49, NULL);
-            }
+        ((HbmPanelValueView*)self->candidateList)->v_0x130();
+        self->v_0x0D8();
+        if ((u16)self->candidateList->v_0x050() != 32) {
+            self->v_0x194();
+            self->v_0x018(49, NULL);
         }
     }
 }
@@ -4562,10 +4583,7 @@ void hbmPanelCaretBack(HbmPanelView* self)
     u32 before = target->v_0x088();
 
     if (target == self->textField) {
-        if (target->v_0x054()) {
-            return;
-        }
-        if (!target->v_0x0CC()) {
+        if (target->v_0x054() || !target->v_0x0CC()) {
             return;
         }
         ((HbmPanelValueView*)self->candidateList)->v_0x130();
@@ -4602,10 +4620,7 @@ void hbmPanelCaretForward(HbmPanelView* self)
     s32 moved;
 
     if (target == self->textField) {
-        if (target->v_0x054()) {
-            return;
-        }
-        if (!target->v_0x0CC()) {
+        if (target->v_0x054() || !target->v_0x0CC()) {
             return;
         }
         ((HbmPanelValueView*)self->candidateList)->v_0x130();
@@ -4634,10 +4649,11 @@ void hbmPanelCaretForward(HbmPanelView* self)
     }
     self->scrollRequest = 1;
     if (track && target == self->textField && before != target->v_0x088()) {
-        if (++self->cursorOffset == self->cursorCell->length
-            && self->cells.at(self->cells.usedList()->prev) != self->cursorCell) {
+        HbmTextCell* cell = self->cursorCell;
+
+        if (++self->cursorOffset == cell->length && self->cells.at(self->cells.usedList()->prev) != cell) {
+            self->cursorCell = self->cells.at(cell->next);
             self->cursorOffset = 0;
-            self->cursorCell = self->cells.at(self->cursorCell->next);
         }
     }
 }
@@ -4651,14 +4667,12 @@ void hbmPanelKeyNext(HbmPanelView* self)
     if (target == self->textField) {
         ((HbmPanelValueView*)self->candidateList)->v_0x130();
         self->v_0x0D8();
-        if (target->v_0x054()) {
+        if (target->v_0x054() || !target->v_0x0CC()) {
             return;
         }
-        if (target->v_0x0CC()) {
-            if ((u16)self->candidateList->v_0x050() != 32) {
-                self->v_0x194();
-                self->v_0x018(49, NULL);
-            }
+        if ((u16)self->candidateList->v_0x050() != 32) {
+            self->v_0x194();
+            self->v_0x018(49, NULL);
         }
     } else if (self->candidateList == target) {
         if (self->candidateList->v_0x0CC() == 0) {
@@ -4687,6 +4701,7 @@ void hbmPanelKeyNext(HbmPanelView* self)
         }
         self->v_0x17C(10);
     } else if (self->converter == target) {
+        return;
     }
 }
 
@@ -4700,10 +4715,7 @@ void hbmPanelArrowLeft(HbmPanelView* self)
     hkbGetModifierState(&hkbManager);
     before = target->v_0x088();
     if (target == self->textField) {
-        if (target->v_0x054()) {
-            return;
-        }
-        if (!target->v_0x0CC()) {
+        if (target->v_0x054() || !target->v_0x0CC()) {
             return;
         }
         ((HbmPanelValueView*)self->candidateList)->v_0x130();
@@ -4750,15 +4762,16 @@ void hbmPanelArrowLeft(HbmPanelView* self)
         if (self->converter->v_0x0DC() < 0) {
             return;
         }
-        index = converting ? -2 : -1;
+        index = -1;
+        if (converting) {
+            index = -2;
+        }
         if (index < 0) {
             index = self->converter->v_0x0DC() - 1;
         }
         hbmPanelSetConversionMode(self, index);
         hbmKbCandShowSelected((HbmKbCandidateList*)&self->owner->v_0x090()->inputKindRecord);
         self->v_0x17C(6);
-    } else {
-        return;
     }
     self->scrollRequest = 1;
     if (target == self->textField && before != target->v_0x088()) {
@@ -4780,10 +4793,7 @@ void hbmPanelArrowRight(HbmPanelView* self)
     hkbGetModifierState(&hkbManager);
     before = target->v_0x088();
     if (target == self->textField) {
-        if (target->v_0x054()) {
-            return;
-        }
-        if (!target->v_0x0CC()) {
+        if (target->v_0x054() || !target->v_0x0CC()) {
             return;
         }
         ((HbmPanelValueView*)self->candidateList)->v_0x130();
@@ -4806,18 +4816,16 @@ void hbmPanelArrowRight(HbmPanelView* self)
             self->v_0x17C(6);
             self->v_0x0D8();
             hbmPanelSetConversionMode(self, 0);
-            return;
-        }
-        {
+        } else {
             s16 index = ((HbmPanelValueView*)self->candidateList)->v_0x100() + 1;
 
             if (index >= ((HbmPanelValueView*)self->candidateList)->v_0x0EC()) {
                 index = 0;
             }
             hbmPanelSetConversionMode(self, index);
+            hbmKbCandShowSelected((HbmKbCandidateList*)&self->owner->v_0x090()->inputKindRecord);
+            self->v_0x17C(6);
         }
-        hbmKbCandShowSelected((HbmKbCandidateList*)&self->owner->v_0x090()->inputKindRecord);
-        self->v_0x17C(6);
     } else if (target == self->converter) {
         u8 converting;
         s32 index;
@@ -4830,22 +4838,24 @@ void hbmPanelArrowRight(HbmPanelView* self)
         if (self->converter->v_0x0DC() < 0) {
             return;
         }
-        index = converting ? 0 : -1;
+        index = -1;
+        if (converting) {
+            index = 0;
+        }
         if (index >= self->converter->v_0x0DC()) {
             index = 0;
         }
         hbmPanelSetConversionMode(self, index);
         hbmKbCandShowSelected((HbmKbCandidateList*)&self->owner->v_0x090()->inputKindRecord);
         self->v_0x17C(6);
-    } else {
-        return;
     }
     self->scrollRequest = 1;
     if (target == self->textField && before != target->v_0x088()) {
-        if (++self->cursorOffset == self->cursorCell->length
-            && self->cells.at(self->cells.usedList()->prev) != self->cursorCell) {
+        HbmTextCell* cell = self->cursorCell;
+
+        if (++self->cursorOffset == cell->length && self->cells.at(self->cells.usedList()->prev) != cell) {
+            self->cursorCell = self->cells.at(cell->next);
             self->cursorOffset = 0;
-            self->cursorCell = self->cells.at(self->cursorCell->next);
         }
     }
 }
@@ -4863,8 +4873,8 @@ void hbmPanelSetConversionMode(HbmPanelView* self, s32 kind)
                 self->candidateList->v_0x06C(0);
                 {
                     const u16* selected = self->candidateList->v_0x0E8();
-                    u32 before = self->textField->v_0x088();
                     u32 after;
+                    u32 before = self->textField->v_0x088();
 
                     self->textField->v_0x06C(selected);
                     after = self->textField->v_0x088();
@@ -5002,7 +5012,7 @@ void hbmKbWidgetReset(HbmPanelView* self)
     self->repeatBit8000 = 0;
     self->pressedButtons = 0;
     self->textColor = s_colorShadow;
-    self->v_0x23C(0, 0);
+    self->v_0x23C(0);
     box = (nw4r::lyt::TextBox*)self->anim.layout->rootPane->v_0x03C(self->textBoxName, 1);
     box->SetString(L"", 0);
     self->writer.charSpacing = box->mCharSpace;
@@ -5039,11 +5049,13 @@ void hbmKbWidgetCalc(HbmPanelView* self)
  * scroll buttons on while the text can scroll that way. */
 void hbmKbWidgetUpdate(HbmPanelView* self)
 {
-    s32 canScrollUp = 0;
-    s32 canScrollDown = 0;
+    u32 canScrollUp;
+    u32 canScrollDown;
 
     hbmPanelUpdate(self);
     ((HbmPaneManager*)&self->anim)->HbmPaneManager::drawComponents();
+    canScrollUp = 0;
+    canScrollDown = 0;
     if (self->anim.v_0x02C("N_separateBarAll")) {
         self->anim.v_0x050("N_separateBarAll", self->separatorShown);
     }
@@ -5167,10 +5179,11 @@ void hbmPanelUpdateButtonRepeat(HbmTextPanel* self, s32 pressed, s32 held)
  * through the candidates, a held trigger drags the selection, a press in the text box moves the cursor. */
 s32 hbmKbWidgetInput(HbmPanelView* self, u32 unused1, u32 unused2, u32 trigger, u32 held, f32 x, f32 y)
 {
+    u32 pressed;
     s32 hit = ((HbmPaneManager*)&self->anim)->HbmPaneManager::updateComponents();
 
     if (self->candidateList->v_0x0E4() != 0 || hit != 0) {
-        u32 pressed = self->pressedButtons;
+        pressed = self->pressedButtons;
 
         if (pressed & 0x0002) {
             self->v_0x018(8, NULL);
@@ -5195,7 +5208,7 @@ s32 hbmKbWidgetInput(HbmPanelView* self, u32 unused1, u32 unused2, u32 trigger, 
 
         point.x = x;
         point.y = y;
-        if (-y < (self->textRect.top - self->textRect.bottom) * 0.5f + self->v_0x188().y) {
+        if (-y < (self->textRect.top - self->textRect.bottom) / 2.0f + self->v_0x188().y) {
             point.y = self->v_0x188().y - 1.0f;
         } else {
             point.y = 1.0f + ((self->textRect.top - self->textRect.bottom) + self->v_0x188().y);
