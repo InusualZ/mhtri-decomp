@@ -10,8 +10,13 @@
  * FLAGS. `cflags_main` (configure.py) with a file-wide `#pragma optimization_level 4` (the switch-range lowering
  *   `subi; cmplwi` of `ai_npc_step20_arm`; no row regresses).  `#pragma peephole off` from 0x802C2700 to the end of
  *   0x802D44F4's band, with `peephole on` wrapped around fn_802D1954, fn_802D2024, fn_802D29B8, fn_802D29CC,
- *   fn_802D29E4, fn_802D3398, fn_802D36B8, fn_802D3A34, fn_802D40A4 and fn_802D40EC; `fp_contract off` around
- *   `ai_npc_move_target_set` (retail's separate `fmuls`/`fadds`).
+ *   fn_802D29E4, fn_802D3A34, fn_802D40A4 and ai_npc_skill_group_get; `fp_contract off` around
+ *   `ai_npc_move_target_set` (retail's separate `fmuls`/`fadds`).  Per function (each measured, playbook 120's
+ *   narrower forms): `opt_common_subs off` (playbook 208) where retail reloads a value MWCC would keep (a field
+ *   across a call, a loop test, the `shell_set_func_ptr` table loaded after the arguments) - ai_npc_step13/31/57_arm,
+ *   ai_npc_m2_step0/2_arm, ai_npc_m3_step6/7/19_arm, ai_npc_move_target_set, ai_npc_weak_point_pos_get,
+ *   fn_802D32B4 (file-wide it loses 195 bytes); `opt_propagation off` where retail keeps a folded constant or a
+ *   re-mask - ai_npc_step4_arm, ai_npc_counter_target_ck (with `opt_lifetimes off`), fn_802D3F1C, fn_802D6690.
  * NAMES. Module `ai` from the record every function takes (`ai_skill_ck__FP8_AINPC_WUc`, `ai_area_ck__FP8_AINPC_W`,
  *   `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`); no `__FILE__` string covers the range and the runtime dump
  *   answers `zz_` for the `fn_` rows.  `ainpc_entry_tbl`/`ainpc_page_state` (`hud/cockpit.cpp`'s `.bss`) are GUESSes
@@ -39,43 +44,46 @@
  *   ai_npc_spawn_pos_tbl, ai_npc_hand_reach_dist_sq, ai_npc_f32_0_7; the record types AINPCBehaviour, AINPCTuning,
  *   AINPCSetup, AINPCStatus, EmWeakPoint, AINPCTimeChance, AINPCSpawnPos, ResultRankPoints; the view's fields
  *   `drift_vel`/`drift_active`, `phase`, `timer_0x1AC`, `hold_kind_0x492`/`hold_time_0x4C0` (`_PLW`).
- * RESIDUALS. 98 rows partial (objdiff); the measured ones:
- *  - `fn_802D0F34`: three `switch` layouts differ (MWCC tests the cases in another order);
- *  - `fn_802D4248`, `fn_802CD588`: the `switch` on +0x420 emits a signed range test where retail has `subi`/`cmplwi`;
- *  - `fn_802CDAB8`: retail's mixed-sign 64-bit compare idiom for `field_0x1F0 <= (s32)((f32)field_0x1F4 * budget)`;
- *  - `fn_802D7B24`: the range tests want the raw `subi` result in a 32-bit `cmplwi`; MWCC inserts `subfic`/`orc`;
- *  - `fn_802D3F1C`: retail keeps a provably-true `li r0,0xFF; cmplwi r0,0xFF; beq` our build folds away;
- *  - `ai_npc_weak_point_pos_get`: MWCC keeps `point->joint` in a saved register across `get_joint_num`, retail reloads;
- *  - `ai_npc_player_watch`: the eat/drink skips leave through an inline helper (no `goto`), which schedules the three
- *    zero initialisations after the `get_move_work_adrs` call;
- *  - `ai_npc_plan43_arm`: the approach's skip for player state 13 is a nested `if` (no `goto`); retail jumps into
- *    the next case;
+ * RESIDUALS. 40 rows partial (objdiff); the measured ones:
+ *  - `ai_npc_status_preview`, `ai_npc_move_target_set`, `ai_npc_enemy_scan`, `ai_npc_m2_step11_arm`,
+ *    `ai_npc_enemy_engage`, `ai_npc_step25_arm`, `ai_npc_item_stock_get`, `fn_802D6A00`, `fn_802D3F1C`,
+ *    `fn_802D67F8`/`fn_802D675C`, `fn_802D7F10`: callee-saved or scratch register colouring (declaration orders tried);
+ *  - `ai_npc_skill_group_get`: retail loads the list base after masking the id, ours (peephole on) uses `lwzu`;
+ *  - `fn_802D30F8`: the `else` arm masks `target` before the subtract; retail writes the result to `target`'s register;
  *  - `ai_npc_step4_arm`/`ai_npc_m4_step5_arm`: retail loads the motion `lha` and masks it (`clrlwi 16`) for the `u16`
  *    parameter; every spelling folds it into `lhz`;
- *  - `ai_npc_m3_step19_arm`, `ai_npc_m3_step6_arm`, `ai_npc_step57_arm`, `ai_npc_step31_arm`: the `shell_set_func_ptr`
- *    load schedules ahead of the arguments in ours (an inline helper does not move it);
- *  - `ai_npc_enemy_scan`, `ai_npc_move_target_set`, `ai_npc_status_preview`, `ai_npc_m2_step11_arm`,
- *    `ai_npc_counter_target_ck`, `ai_npc_enemy_engage`: callee-saved register colouring (declaration orders tried);
- *  - `ai_npc_step42_arm`/`ai_npc_step47_arm`: retail hoists the SE word's base+offset ahead of the `arg` compares;
- *  - `ai_npc_step32_arm`: retail's `arg == 5` is a signed `cmpwi` where the `u8` parameter gives `cmplwi`;
- *    `ai_npc_step25_arm`: one `lhz`-vs-`lha` load of `_PLW` +0x650 and the r29/r30 pairing;
- *  - `ai_npc_step83_arm`/`ai_npc_step85_arm`/`ai_npc_step86_arm`: retail reuses `setVec3`'s returned pointer (`mr r4,r3`);
- *  - `ai_npc_m2_step0_arm`/`_step2`/`_step5`/`_step7`: the `clrlwi r5,r5,16` retail masks a constant ternary's `u16`
- *    with, or one `cmpwi`/`cmplwi` case test;
+ *  - `ai_npc_m2_step2/5/7_arm`: retail masks the constant ternary it passes as `fn_802D30F8`'s limit
+ *    (`li r5,..; clrlwi r5,r5,16`); every spelling folds the constant;
+ *  - `ai_npc_m3_step5_arm`: retail masks `spin` (`u16`) at each assignment, ours at the call;
+ *  - `fn_802D1AFC`: retail moves `fn_802D89D4`'s result to r0 before masking it for the call;
+ *  - `fn_802CD20C`: retail's definition returns a full word (`srawi r3`), its callers want the `s16`;
+ *  - `fn_802D77DC`: retail's `li r3,30; bnelr` default (a `switch` gives the signed compares, not the layout);
+ *  - `ai_npc_pair_values_get`: retail's `lbzx` operand order (`index, base`); a `[4][4]` table view moves other rows;
  *  - `fn_802D2264`: the final `return 0`/`return 1` blocks are laid out in the other order;
+ *  - `fn_802D3398`: retail re-reads `*row` at the top of the second loop's body;
+ *  - `fn_802D2F7C`: retail adds the row offset to the table base (`addi; mulli; add`), ours multiplies first;
+ *  - `ai_npc_step82_arm`: retail re-masks `flag` for the second test (`opt_common_subs off` does not reach it);
  *  - `ai_taru_move_ck`: retail loads +0x450 into r0 before `extsb r3,r0`;
- *  - `result_hunt_rank_get`: the leaf header's `s16` return adds `extsh r3,r31` where retail returns the sum as is;
  *  - data: `.data` 0x9D4 of 0x1A18 and `.sdata2` 0x1DC of 0x208 emitted (the tables are declared, never defined),
- *    `.ctors` (0x4), `.sdata` (0x98) and `.sbss` (0x8) claimed but not emitted; `.text` 0x17774 of 0x177A4; the jump
- *    tables are emitted anonymous, so objdiff leaves the map's `jumptable_*` rows unpaired (playbook 23);
- *  - 17 callees carry registry names (`config/RMHE08/name_registry.jsonl`) the map does not have yet.
+ *    `.ctors` (0x4), `.sdata` (0x98) and `.sbss` (0x8) claimed but not emitted; the jump tables are emitted
+ *    anonymous, so objdiff leaves the map's `jumptable_*` rows unpaired (playbook 23);
+ *  - `ai/result_hunt_rank_get.h` declares `result_hunt_rank_get` `s16` for its callers; the definition returns `s32`
+ *    (retail returns the sum unextended), so this file does not include that leaf header.
  * SHAPES. Record views: the bodies written in `namespace view_fn_802D0F34` read `ai/ai_npc.h`'s `_AINPC_W` (the
  *   owner's view, with the model at +0x008); the older global bodies read `ai/ainpc.h`'s.  The namespace's declarations
  *   of this unit's global functions (and the view header `ai/fn_802D0F34.h`) restate them with the view's record;
  *   C linkage keeps one symbol.  `AINPC_VIEW` names `ainpc_w` through the view; the setup functions read it directly
  *   where retail addresses `ainpc_w@l` and through a local pointer elsewhere.  Unifying the views removes the namespace.
  *  - A callee whose retail caller passes a wider or narrower type than its declaration is called through a `_c1`/`_u16`
- *    cast view (`quest_move_state_get_c1`, `em_roster_area_use_take_c1`, `ai_npc_motion_set_u16`).
+ *    cast view (`quest_move_state_get_c1`, `em_roster_area_use_take_c1`, `ai_npc_motion_set_u16`,
+ *    `AINPC_SELECTOR_SET`, `AINPC_ITEM_ID_GET`); one whose retail caller loads the float argument earlier is called
+ *    with the float moved forward (`AINPC_KEY_SPAWN`, `AINPC_FX_SPAWN`, playbook 178), and the view header spells
+ *    `coll_wall_slide`, `vec3_move_damp`, `mhchar_motion_set` and `hit_data_apply` in their owners' parameter order.
+ *  - Retail's signed `cmpwi` on a `u8` field or `u8` argument is a `switch` (the promoted operand,
+ *    playbook 209), its case bodies in retail's layout order; a run of identical
+ *    tests over slots 8..11 is a loop MWCC unrolls (`fn_802D40EC`, playbook 184).
+ *  - Functions that address `ainpc_w` through a register take a local `_AINPC_W* w = &ainpc_w;` (retail's first test
+ *    still reads `ainpc_w@l`); a countdown that stores the raw sum is `x--`/`++x`, never `x = x - 1` (playbook 38).
  *  - Step dispatchers are `switch` statements on `motion_step` whose cases tail-call the arms (retail's `bctr` tables).
  *  - State steps are `self->state++`, never `self->state = state + 1` (a `clrlwi` retail lacks, playbook 38); the
  *    flag parameters of the older bodies are `u32` tested `(flag & 0xFF)`.
@@ -217,7 +225,7 @@ void fn_802D6690(struct _AINPC_W* self);
 void fn_802D9400(struct _AINPC_W* self);
 void fn_802D29CC(struct _AINPC_W* self, f32 a);
 u32 fn_802D3B34(struct _AINPC_W* self, s32 a, s32 b);
-u16 fn_802D30F8(u16 a, u16 b, u16 c);
+u16 fn_802D30F8(u16 a, u16 b, u32 c);
 void fn_802D3210(struct _AINPC_W* self, u32* out);
 
 /* `pl.h` pulls `ef.h` in, which declares `setVec3`/`VEC3_ctor` with their owner's type
@@ -226,6 +234,8 @@ void fn_802D3210(struct _AINPC_W* self, u32* out);
 /* Callees whose owner is a registered unit but whose header does not declare them yet: each spelling
  * is that owner's own declaration. */
 void fn_8010072C(struct _PLW* owner, u8 type, nw4r::math::VEC3* pos, u32 param, f32 scale);
+/* `fn_8010072C` with its scale fourth: retail loads f1 before r6. */
+#define AINPC_FX_SPAWN ((void (*)(struct _PLW*, u8, nw4r::math::VEC3*, f32, u32))fn_8010072C)
 u32 fn_8027DCE0(struct _PLW* self, u8 arg1);
 s32 fn_80291B08(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
 void fn_80114CC8(void* actor, u8 key);
@@ -297,7 +307,7 @@ extern void fn_802D3398(DispatchState* self, void* entry);
 /* The C++-spelled entry points of this range: their map names carry argument lists, so they are
  * declared at global C++ scope and the front-end reproduces the mangling (rule 9). */
 u32 ai_skill_ck(struct _AINPC_W* self, u8 skill);
-extern "C" s32 ai_npc_item_step_ck(struct _AINPC_W* self);
+extern "C" u32 ai_npc_item_step_ck(struct _AINPC_W* self);
 s32 ai_area_ck(struct _AINPC_W* self);
 
 extern "C" {
@@ -908,6 +918,7 @@ void ai_npc_step1_arm(_AINPC_W* self, u8 arg)
 
 /* 0x802C3178 (0x268): steps 4, 14, 26 and 52 - the gather motion: plays the row's motion, takes an item from the
  * area roster every 60 frames while it loops, and finishes with the row's closing motion. */
+#pragma opt_propagation off
 void ai_npc_step4_arm(_AINPC_W* self, u8 arg)
 {
     s16* row;
@@ -951,12 +962,14 @@ void ai_npc_step4_arm(_AINPC_W* self, u8 arg)
             }
         } else {
             if (--self->timer_0x1AC == 0) {
-                if (em_roster_area_use_take_c1(self->area, &self->pos_0x368, self->field_0x364) == 1) {
+                switch (em_roster_area_use_take_c1(self->area, &self->pos_0x368, self->field_0x364)) {
+                case 1:
                     item = em_weight_table_pick((const EmWeightEntry*)self->field_0x364);
                     if (item != 0) {
                         fn_802D40A4(self, item);
                         fn_802D7DF0(self, 90);
                     }
+                    break;
                 }
                 self->field_0x356++;
             }
@@ -973,6 +986,7 @@ void ai_npc_step4_arm(_AINPC_W* self, u8 arg)
         break;
     }
 }
+#pragma opt_propagation reset
 
 /* 0x802C33E0 (0x1A4): steps 5 and 55 - the hop: arg 1 launches the record along its +0x1D4 velocity with the
  * +0x1E0 gravity until it falls below the table's floor. */
@@ -1228,6 +1242,7 @@ void ai_npc_step12_arm(_AINPC_W* self, u8 arg)
 
 /* 0x802C3C80 (0x460): steps 13 and 60 - uses the item the record carries (+0x3F0): heals, buffs or throws it,
  * plays its effect, then loops the follow-up motion three times. */
+#pragma opt_common_subs off
 void ai_npc_step13_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 pos;
@@ -1352,6 +1367,7 @@ void ai_npc_step13_arm(_AINPC_W* self, u8 arg)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* 0x802C40E0 (0x7C): step 18 - holds motion 0x15 while +0x468 is 6. */
 void ai_npc_step18_arm(_AINPC_W* self)
@@ -1721,6 +1737,7 @@ extern "C" void ai_npc_step29_arm(struct _AINPC_W* self, u8 arg) {
 
 /* The four-stage aimed action: the swing, its hold, the settle (which hands the target to the shell
  * table's own state change) and the arm-out. */
+#pragma opt_common_subs off
 extern "C" void ai_npc_step31_arm(struct _AINPC_W* self, u8 arg) {
     u8 state = self->state;
     switch (state) {
@@ -1770,6 +1787,7 @@ extern "C" void ai_npc_step31_arm(struct _AINPC_W* self, u8 arg) {
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* The arrow's flight: the row keys the shot, `rotVecY` builds the shot vector out of the record's own
  * yaw, and the per-frame pass integrates the effect vector and the stage timer. */
@@ -1784,8 +1802,11 @@ extern "C" void ai_npc_step32_arm(struct _AINPC_W* self, u8 arg) {
         u16* row;
         nw4r::math::VEC3 out;
         self->state++;
-        if (arg == 0 || arg == 5) {
+        switch (arg) {
+        case 0:
+        case 5:
             self->sub_step = 1;
+            break;
         }
         row = &lbl_805D4784[arg * ROW7_WORDS];
         ai_npc_variant_set(self, (u8)(s16)row[ROW7_ANIM]);
@@ -1815,8 +1836,9 @@ extern "C" void ai_npc_step32_arm(struct _AINPC_W* self, u8 arg) {
             self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x600);
         }
         if (ai_npc_motion_end_ck(self) == 1) {
+            u16* row = &lbl_805D4784[arg * ROW7_WORDS + ROW7_MOTION];
             self->state++;
-            ai_npc_motion_set(self, lbl_805D4784[arg * ROW7_WORDS + ROW7_MOTION], (s16)lbl_805D4784[arg * ROW7_WORDS + ROW7_PARAM], 0);
+            ai_npc_motion_set(self, row[0], (s16)row[1], 0);
         } else if (arg < 5) {
             if (ai_npc_frame_ck(self, 3, lbl_8079A670, lbl_8079A6A8) != 0) {
                 self->field_0x3EE -= 0x889;
@@ -1836,9 +1858,11 @@ extern "C" void ai_npc_step32_arm(struct _AINPC_W* self, u8 arg) {
             if (self->sub_step == 0) {
                 fn_802D2ABC(self, 1, lbl_805D4784[arg * ROW7_WORDS + ROW7_SE], self->field_0x1EC);
             } else {
+                u16* row;
                 self->state = 1;
                 self->sub_step--;
-                ai_npc_motion_set(self, lbl_805D4784[arg * ROW7_WORDS + ROW7_MOTION], (s16)lbl_805D4784[arg * ROW7_WORDS + ROW7_PARAM], 0);
+                row = &lbl_805D4784[arg * ROW7_WORDS + ROW7_MOTION];
+                ai_npc_motion_set(self, row[0], (s16)row[1], 0);
                 fn_800DCC24(self->sound_0x498, 0, 1);
             }
         } else if (arg < 5) {
@@ -1919,7 +1943,9 @@ extern "C" void ai_npc_step42_arm(struct _AINPC_W* self, u8 arg) {
             self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x600);
         }
         if (ai_npc_motion_end_ck(self) == 1) {
+            u16* se;
             self->state++;
+            se = &lbl_805D4874[arg * ROW5_WORDS + ROW5_SE];
             if (arg == 0) {
                 ai_npc_motion_set(self, 0xcb, 0, 0);
                 fn_800DCC24(self->sound_0x498, 2, 1);
@@ -1927,7 +1953,7 @@ extern "C" void ai_npc_step42_arm(struct _AINPC_W* self, u8 arg) {
                 ai_npc_motion_set(self, 0xe2, 0, 0);
                 fn_800DCC24(self->sound_0x498, 2, 1);
             } else {
-                fn_802D2ABC(self, 1, lbl_805D4874[arg * ROW5_WORDS + ROW5_SE], self->field_0x1EC);
+                fn_802D2ABC(self, 1, *se, self->field_0x1EC);
             }
         }
         break;
@@ -1963,12 +1989,15 @@ extern "C" void ai_npc_step47_arm(struct _AINPC_W* self, u8 arg) {
         }
         if (ai_npc_motion_end_ck(self) == 1) {
             self->state++;
-            ai_npc_motion_set(self, lbl_805D48D8[arg * ROW7_WORDS + ROW7_MOTION2], (s16)lbl_805D48D8[arg * ROW7_WORDS + ROW7_PARAM2], 0);
+            u16* row = &lbl_805D48D8[arg * ROW7_WORDS + ROW7_MOTION2];
+            ai_npc_motion_set(self, row[0], (s16)row[1], 0);
         }
         break;
     case 2:
         if (ai_npc_motion_end_ck(self) == 1) {
+            u16* se;
             self->state++;
+            se = &lbl_805D48D8[arg * ROW7_WORDS + ROW7_SE];
             if (arg == 0) {
                 ai_npc_motion_set(self, 0xce, 0, 0);
                 fn_800DCC24(self->sound_0x498, 3, 1);
@@ -1976,7 +2005,7 @@ extern "C" void ai_npc_step47_arm(struct _AINPC_W* self, u8 arg) {
                 ai_npc_motion_set(self, 0xe5, 0, 0);
                 fn_800DCC24(self->sound_0x498, 3, 1);
             } else {
-                fn_802D2ABC(self, 1, lbl_805D48D8[arg * ROW7_WORDS + ROW7_SE], self->field_0x1EC);
+                fn_802D2ABC(self, 1, *se, self->field_0x1EC);
             }
         }
         break;
@@ -2051,6 +2080,7 @@ extern "C" void ai_npc_step56_arm(struct _AINPC_W* self) {
 
 /* The guard/parry action: the arm chooses the shell's own state table by the arg class, and the settle
  * asks the shell to play the class's SE. */
+#pragma opt_common_subs off
 extern "C" void ai_npc_step57_arm(struct _AINPC_W* self, u8 arg) {
     u8 state = self->state;
     switch (state) {
@@ -2112,6 +2142,7 @@ extern "C" void ai_npc_step57_arm(struct _AINPC_W* self, u8 arg) {
         break;
     }
 }
+#pragma opt_common_subs reset
 
 
 /* The per-motion step dispatcher: it arms the motion and its scale once, then steps the armed
@@ -2198,24 +2229,19 @@ extern "C" void ai_npc_step83_arm(struct _AINPC_W* self)
         self->state += 1;
         fn_802D2B98(self, 2);
         self->field_0x002 = 0;
-        setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
-        copyVec3(&vec, &offset);
+        copyVec3(&vec, setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6C4));
         rotVecY(&vec, self->field_0x194);
         addVec3To(&vec, &self->vec_0x178);
         vec.y = self->field_0x19C;
-        fn_8010072C((struct _PLW*)self, 42, &vec, 0, lbl_8079A678);
+        AINPC_FX_SPAWN((struct _PLW*)self, 42, &vec, lbl_8079A678, 0);
         self->field_0x1AC = lbl_80792598[(s16)fn_802D66B8(self)];
         self->sub_step = 0;
         break;
     }
     case 2: {
-        s16 step = self->field_0x442 + 1;
+        if (++self->field_0x442 > lbl_80792598[self->sub_step]) {
+            u8 slot = ++self->field_0x444;
 
-        self->field_0x442 = step;
-        if (step > lbl_80792598[self->sub_step]) {
-            u32 slot = self->field_0x444 + 1;
-
-            self->field_0x444 = slot;
             if (slot == 3) {
                 self->field_0x444 = 4;
             } else if (slot > 4) {
@@ -2223,7 +2249,7 @@ extern "C" void ai_npc_step83_arm(struct _AINPC_W* self)
             }
             self->sub_step += 1;
         }
-        if (self->field_0x442 > (s16)self->field_0x1AC) {
+        if (self->field_0x442 > self->field_0x1AC) {
             self->field_0x1AC = 20;
             self->state += 1;
         }
@@ -2280,12 +2306,11 @@ extern "C" void ai_npc_step85_arm(struct _AINPC_W* self)
             }
             self->field_0x002 = 0;
         } else if (frames == 2) {
-            setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6CC);
-            copyVec3(&vec, &offset);
+            copyVec3(&vec, setVec3(&offset, 0.0f, 0.0f, 143.0f));
             rotVecY(&vec, self->field_0x194);
             addVec3To(&vec, &self->vec_0x178);
             if (fn_8027DCE0(self->plw_0x16C, 0) == 1) {
-                fn_8010072C((struct _PLW*)self, 42, &vec, 0, lbl_8079A678);
+                AINPC_FX_SPAWN((struct _PLW*)self, 42, &vec, lbl_8079A678, 0);
             }
         }
         break;
@@ -2322,12 +2347,10 @@ extern "C" void ai_npc_step86_arm(struct _AINPC_W* self, u8 flag)
         self->vec_0x024.y = lbl_8079A674;
         self->vec_0x024.z = lbl_8079A674;
         if ((flag & 0xFF) == 0) {
-            setVec3(&front, lbl_8079A670, lbl_8079A670, lbl_8079A6CC);
-            copyVec3(&vec, &front);
+            copyVec3(&vec, setVec3(&front, 0.0f, 0.0f, 143.0f));
         } else {
             self->vec_0x178.y = self->field_0x19C;
-            setVec3(&back, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
-            copyVec3(&vec, &back);
+            copyVec3(&vec, setVec3(&back, lbl_8079A670, lbl_8079A670, lbl_8079A6C4));
         }
         if (ai_npc_flag_ck(self, 2) != 0) {
             break;
@@ -2335,7 +2358,7 @@ extern "C" void ai_npc_step86_arm(struct _AINPC_W* self, u8 flag)
         fn_802D2B88(self, 2);
         rotVecY(&vec, self->field_0x194);
         addVec3To(&vec, &self->vec_0x178);
-        fn_8010072C((struct _PLW*)self, 42, &vec, 0, lbl_8079A678);
+        AINPC_FX_SPAWN((struct _PLW*)self, 42, &vec, lbl_8079A678, 0);
         break;
     case 1: {
         s32 frames = self->field_0x1AC - 1;
@@ -2358,7 +2381,7 @@ extern "C" void ai_npc_step86_arm(struct _AINPC_W* self, u8 flag)
         } else {
             fn_802D6690(self);
             fn_802D40EC(self, 29, -1);
-            switch ((u32)self->field_0x444) {
+            switch (self->field_0x444) {
             case 0:
             case 1:
                 fn_802D2ABC(self, 1, 23, 0);
@@ -2395,7 +2418,7 @@ extern "C" void ai_npc_step88_arm(struct _AINPC_W* self, u8 flag)
             ai_npc_motion_set(self, 57, 4, 0);
         }
         self->field_0x1AC = 600;
-        if (self->field_0x420 - 3 <= 1) {
+        if ((u32)(self->field_0x420 - 3) <= 1) {
             break;
         }
         ai_npc_talk(self, (s8)self->field_0x482, 20, self->field_0x462, 2);
@@ -2798,6 +2821,7 @@ void ai_npc_step_dispatch(_AINPC_W* self)
 
 /* The two-state approach dispatcher: it picks the near/far ring the flag names, arms a 450-frame
  * approach, and gives up when the target leaves the ring or the timer runs out. */
+#pragma opt_common_subs off
 extern "C" void ai_npc_m2_step0_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 start;
@@ -2867,9 +2891,11 @@ extern "C" void ai_npc_m2_step0_arm(struct _AINPC_W* self, u32 flag)
     }
     }
 }
+#pragma opt_common_subs reset
 
 /* The two-state guard dispatcher: it waits for the target to close inside the `+0x1BC` ring, then
  * aims the motion at it and reports the aim window through the `+0x194` angle selector. */
+#pragma opt_common_subs off
 extern "C" void ai_npc_m2_step2_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 start;
@@ -2926,6 +2952,7 @@ extern "C" void ai_npc_m2_step2_arm(struct _AINPC_W* self, u32 flag)
     }
     }
 }
+#pragma opt_common_subs reset
 
 /* The two-state guard dispatcher: it arms one of two motions on the flag, then steers the motion
  * while the target stays inside the 2048-unit aim window and the 90-frame guard lasts. */
@@ -2941,7 +2968,7 @@ extern "C" void ai_npc_m2_step5_arm(struct _AINPC_W* self, u32 flag)
     switch (self->state) {
     case 0:
         self->state += 1;
-        switch (flag & 0xFF) {
+        switch ((u8)flag) {
         case 0:
             ai_npc_variant_set(self, 0);
             ai_npc_motion_change(self, 8, 4, 0);
@@ -3165,7 +3192,7 @@ void ai_npc_m2_step10_arm(_AINPC_W* self, u8 arg)
 }
 
 /* 0x802C7884 (0x240): motion 2 steps 11, 15 and 18 - the faster run toward the move target. */
-void ai_npc_m2_step11_arm(_AINPC_W* self, u8 arg)
+void ai_npc_m2_step11_arm(_AINPC_W* self, u32 arg)
 {
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 diff;
@@ -3193,7 +3220,7 @@ void ai_npc_m2_step11_arm(_AINPC_W* self, u8 arg)
         }
         break;
     case 1:
-        switch (arg) {
+        switch ((u8)arg) {
         case 0:
             arg = 90;
             break;
@@ -3220,7 +3247,7 @@ void ai_npc_m2_step11_arm(_AINPC_W* self, u8 arg)
         self->vec_0x190.y = fn_802D30F8(yaw, self->vec_0x190.y, turn);
         self->vec_0x190.x = fn_802D30F8(pitch, self->vec_0x190.x, 0x400);
         dist = vec3_dist_sq(&self->pos_0x178, &self->pos_0x1B0);
-        if (fn_802D3B34(self, arg, armed) == 1) {
+        if (::fn_802D3B34((::_AINPC_W*)self, arg, armed) == 1) {
             fn_802D2ABC(self, 1, 0x38, 0);
         } else if (dist <= self->field_0x1BC * self->field_0x1BC) {
             ai_npc_base_state_set(self, 2);
@@ -3739,6 +3766,7 @@ void ai_npc_m3_step5_arm(_AINPC_W* self, u8 arg)
 
 /* 0x802C8AA4 (0x3AC): motion 3 steps 6, 15, 21 and 22 - the aimed shot: winds up, turns toward the move target
  * and fires the quest's projectile at frame 94 (arg 2/3: the shell job at the target). */
+#pragma opt_common_subs off
 void ai_npc_m3_step6_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
@@ -3802,12 +3830,15 @@ void ai_npc_m3_step6_arm(_AINPC_W* self, u8 arg)
             copyVec3(&dir, &diff);
             ::calcVecAngXY(&dir, &pitch, &yaw);
             self->vec_0x190.y = fn_802D30F8(yaw, self->vec_0x190.y, 0x200);
-            if (arg == 1 || arg == 3) {
+            switch (arg) {
+            case 1:
+            case 3:
                 self->vec_0x190.x = fn_802D30F8(pitch, self->vec_0x190.x, 0x200);
                 if (ai_npc_frame_ck(self, 0, 88.0f, 0.0f) == 1) {
                     setVector3(&offset, 0.0f, 0.0f, 0.0f);
                     fn_801075AC(self, &offset, 8, 0.5f, 0x22);
                 }
+                break;
             }
         } else if (ai_npc_frame_ck(self, 0, 94.0f, 0.0f) == 1) {
             switch (arg) {
@@ -3838,9 +3869,11 @@ void ai_npc_m3_step6_arm(_AINPC_W* self, u8 arg)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* 0x802C8E50 (0x34C): motion 3 steps 7 and 16 - the triple shot: three rounds of the firing motion, each firing the
  * formation's projectile at frame 94. */
+#pragma opt_common_subs off
 void ai_npc_m3_step7_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
@@ -3917,6 +3950,7 @@ void ai_npc_m3_step7_arm(_AINPC_W* self, u8 arg)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* 0x802C919C (0x158): motion 3 step 8 - the vault: winds up, jumps with `ai_npc_vault_tbl` (hit row 5) and
  * lands. */
@@ -4144,6 +4178,7 @@ void ai_npc_m3_step18_arm(_AINPC_W* self)
 
 /* 0x802C9908 (0x1B8): motion 3 steps 19 and 20 - the carried run: asks the shell for the carry job and runs toward
  * the move target for 300 frames. */
+#pragma opt_common_subs off
 void ai_npc_m3_step19_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
@@ -4191,6 +4226,7 @@ void ai_npc_m3_step19_arm(_AINPC_W* self, u8 arg)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* 0x802C9AC0 (0xC0): runs the arm of the record's motion-3 step. */
 void ai_npc_motion3_dispatch(_AINPC_W* self)
@@ -5746,6 +5782,7 @@ extern "C" {
 #pragma fp_contract off
 /* 0x802CC794 (0x5FC): places the move target around the engaged enemy: watching (5) on the player's side of it,
  * attacking (4) at its reach plus a random spread, swinging the other way round when a wall is in between. */
+#pragma opt_common_subs off
 void ai_npc_move_target_set(_AINPC_W* self)
 {
     _ENEMY_WORK* enemies;
@@ -5884,6 +5921,7 @@ void ai_npc_move_target_set(_AINPC_W* self)
         self->pos_0x1B0.y = -10.0f;
     }
 }
+#pragma opt_common_subs reset
 #pragma fp_contract on
 
 }  /* extern "C" */
@@ -5958,6 +5996,8 @@ void ai_npc_target_ahead_set(_AINPC_W* self)
 
 /* 0x802CD04C (0x1C0): the counter-attack watch: while the player is down (+0x492 with a hold, or act group 6) it
  * marks a near enemy to strike ten frames later; then engages it. */
+#pragma opt_propagation off
+#pragma opt_lifetimes off
 u32 ai_npc_counter_target_ck(_AINPC_W* self)
 {
     _ENEMY_WORK* enemies = (_ENEMY_WORK*)::get_move_work_adrs(3);
@@ -5999,6 +6039,8 @@ u32 ai_npc_counter_target_ck(_AINPC_W* self)
     self->field_0x349 = down;
     return 0;
 }
+#pragma opt_lifetimes reset
+#pragma opt_propagation reset
 
 /* 0x802CD348 (0x240): looks for a carving or mining spot within reach (kinds 0, 3 and 4); when the formation's
  * roll allows, sets the move target beside it and claims it, else releases it. */
@@ -6068,91 +6110,6 @@ u32 ai_npc_carve_spot_find(_AINPC_W* self)
     return 0;
 }
 
-/* Updates +0x468 from the player's act class, its eating and drinking acts and the quest end state; leaves it
- * alone while the eat/drink report is already up or its cooldown (+0x46A) runs. */
-static inline void ai_npc_player_act_note(_AINPC_W* self, _PLW* plw, SysQuestMove* quest, u8 watch, u32 eating,
-                                          u32 drinking)
-{
-    switch ((s16)pl_act_class_get(plw)) {
-    case 5:
-        watch = 1;
-        break;
-    case 3:
-        watch = 2;
-        break;
-    case 4:
-    case 7:
-        watch = 3;
-        break;
-    case 6:
-        watch = 4;
-        break;
-    case 8:
-        watch = 5;
-        break;
-    case 9:
-        watch = 6;
-        break;
-    case 10:
-        watch = 7;
-        break;
-    case 11:
-        watch = 8;
-        break;
-    case 12:
-        watch = 9;
-        break;
-    case 1:
-    case 2:
-        watch = 10;
-        break;
-    }
-    if (fn_8027DCE0(plw, 0) == 1) {
-        eating = 1;
-    }
-    if (eating == 1 && fn_8027DCE0(plw, 1) == 0) {
-        if (self->field_0x468 == 12 || self->field_0x46A != 0) {
-            return;
-        }
-        watch = 12;
-    } else if (eating == 1 && fn_8027DCE0(plw, 2) == 0) {
-        if (self->field_0x468 == 16 || self->field_0x46A != 0) {
-            return;
-        }
-        watch = 16;
-    } else if (eating == 1) {
-        watch = 8;
-    }
-    if (pl_act_range2_ck(plw, 0) == 1) {
-        drinking = 1;
-    }
-    if (drinking == 1 && pl_act_range2_ck(plw, 1) == 0) {
-        if (self->field_0x468 == 12 || self->field_0x46A != 0) {
-            return;
-        }
-        watch = 12;
-    } else if (drinking == 1 && pl_act_range2_ck(plw, 2) == 0) {
-        if (self->field_0x468 == 16 || self->field_0x46A != 0) {
-            return;
-        }
-        watch = 16;
-    } else if (drinking == 1) {
-        watch = 6;
-    }
-    if (pl_act_84_86_ck(plw) == 1 && self->field_0x46A == 0) {
-        watch = 13;
-    }
-    switch (quest->result_0x0FA) {
-    case 4:
-        watch = 14;
-        break;
-    case 6:
-    case 7:
-        watch = 15;
-        break;
-    }
-    self->field_0x468 = watch;
-}
 
 /* 0x802CD770 (0x2AC): notes the player's situation in +0x468 and latches a carry spot (+0x451/+0x454) when the
  * player picks the companion up. */
@@ -6164,7 +6121,87 @@ void ai_npc_player_watch(_AINPC_W* self)
     _PLW* plw = self->plw_0x16C;
     SysQuestMove* quest = (SysQuestMove*)::get_move_work_adrs(0);
 
-    ai_npc_player_act_note(self, plw, quest, watch, eating, drinking);
+    do {
+        switch ((s16)pl_act_class_get(plw)) {
+        case 5:
+            watch = 1;
+            break;
+        case 3:
+            watch = 2;
+            break;
+        case 4:
+        case 7:
+            watch = 3;
+            break;
+        case 6:
+            watch = 4;
+            break;
+        case 8:
+            watch = 5;
+            break;
+        case 9:
+            watch = 6;
+            break;
+        case 10:
+            watch = 7;
+            break;
+        case 11:
+            watch = 8;
+            break;
+        case 12:
+            watch = 9;
+            break;
+        case 1:
+        case 2:
+            watch = 10;
+            break;
+        }
+        if (fn_8027DCE0(plw, 0) == 1) {
+            eating = 1;
+        }
+        if (eating == 1 && fn_8027DCE0(plw, 1) == 0) {
+            if (self->field_0x468 == 12 || self->field_0x46A != 0) {
+                break;
+            }
+            watch = 12;
+        } else if (eating == 1 && fn_8027DCE0(plw, 2) == 0) {
+            if (self->field_0x468 == 16 || self->field_0x46A != 0) {
+                break;
+            }
+            watch = 16;
+        } else if (eating == 1) {
+            watch = 8;
+        }
+        if (pl_act_range2_ck(plw, 0) == 1) {
+            drinking = 1;
+        }
+        if (drinking == 1 && pl_act_range2_ck(plw, 1) == 0) {
+            if (self->field_0x468 == 12 || self->field_0x46A != 0) {
+                break;
+            }
+            watch = 12;
+        } else if (drinking == 1 && pl_act_range2_ck(plw, 2) == 0) {
+            if (self->field_0x468 == 16 || self->field_0x46A != 0) {
+                break;
+            }
+            watch = 16;
+        } else if (drinking == 1) {
+            watch = 6;
+        }
+        if (pl_act_84_86_ck(plw) == 1 && self->field_0x46A == 0) {
+            watch = 13;
+        }
+        switch (quest->result_0x0FA) {
+        case 4:
+            watch = 14;
+            break;
+        case 6:
+        case 7:
+            watch = 15;
+            break;
+        }
+        self->field_0x468 = watch;
+    } while (0);
     if ((::Pl_act_ck(plw, 0, 60) == 1 || ::Pl_act_ck(plw, 0, 80) != 0) && plw->flag_0x30E != 0 &&
         self->field_0x445 == 0 && self->field_0x451 == 0) {
         self->field_0x451 = 1;
@@ -6382,11 +6419,16 @@ void ai_npc_plan43_arm(_AINPC_W* self, u8 arg)
     switch (self->field_0x1D0) {
     case 0:
         self->field_0x1D0++;
-        if (self->field_0x468 != 1 && self->field_0x468 != 13) {
-            if (self->field_0x468 == 8) {
+        do {
+            switch (self->field_0x468) {
+            case 8:
                 reach = 280.0f;
-            } else {
+                break;
+            case 13:
+                continue;
+            default:
                 reach = 180.0f;
+                break;
             }
             if (self->field_0x1C0 > reach) {
                 fn_802D4230(self, reach);
@@ -6395,9 +6437,9 @@ void ai_npc_plan43_arm(_AINPC_W* self, u8 arg)
                 } else {
                     fn_802D2A00(self, 2, 0xB, 0);
                 }
-                break;
+                return;
             }
-        }
+        } while (0);
     case 1:
         self->field_0x1D0++;
         switch (self->field_0x468) {
@@ -7051,6 +7093,7 @@ EmWeakPoint* ai_npc_weak_point_pick(_AINPC_W* self, u8 any_height)
 
 /* 0x802D7014 (0x154): the world position of a weak point: its fixed position (joint 1000), the enemy's position
  * past its last joint, else its offset on the joint pushed out by its radius toward the companion. */
+#pragma opt_common_subs off
 void ai_npc_weak_point_pos_get(_AINPC_W* self, EmWeakPoint* point, _ENEMY_WORK* enemy, nw4r::math::VEC3* out)
 {
     nw4r::math::MTX34 mtx;
@@ -7070,7 +7113,7 @@ void ai_npc_weak_point_pos_get(_AINPC_W* self, EmWeakPoint* point, _ENEMY_WORK* 
         out->z = point->offset.z;
         return;
     }
-    if (((MHchar*)enemy->char_0x024)->get_joint_num() <= (u32)point->joint) {
+    if ((u32)point->joint >= ((MHchar*)enemy->char_0x024)->get_joint_num()) {
         copyVec3(out, &enemy->pos);
         return;
     }
@@ -7088,6 +7131,7 @@ void ai_npc_weak_point_pos_get(_AINPC_W* self, EmWeakPoint* point, _ENEMY_WORK* 
     addVec3(&sum, &joint, &dir);
     copyVec3(out, &sum);
 }
+#pragma opt_common_subs reset
 
 /* 0x802D7168 (0x70): whether to aim at a weak point: always once one was taken (+0x382), else a 25 % roll. */
 s32 ai_npc_weak_point_roll(_AINPC_W* self)
@@ -7109,7 +7153,8 @@ u32 ai_npc_item_throw_roll(_AINPC_W* self)
 /* 0x802D7258 (0x94): the progress row's second (`which` 1) or first tuning value, as a float. */
 f32 ai_npc_tuning_get(_AINPC_W* self, u32 which)
 {
-    if ((which & 0xFF) == 1) {
+    switch ((u8)which) {
+    case 1:
         return ai_npc_tuning_tbl[self->field_0x339 * 3 + 2];
     }
     return ai_npc_tuning_tbl[self->field_0x339 * 3 + 1];
@@ -7182,17 +7227,18 @@ s16 ai_npc_item_stock_get(u16 item)
 /* 0x802D79A4 (0xAC): whether the companion stands by the player in motion 1 step 85 (within 200). */
 s32 ai_npc_beside_player_ck(void)
 {
-    if (AINPC_VIEW.active == 0) {
+    _AINPC_W* w = &AINPC_VIEW;
+
+    if (::ainpc_w.active == 0) {
         return 0;
     }
-    if (AINPC_VIEW.plw_0x16C == NULL) {
+    if (w->plw_0x16C == NULL) {
         return 0;
     }
-    if (AINPC_VIEW.area != AINPC_VIEW.plw_0x16C->area_0x16) {
+    if (w->area != w->plw_0x16C->area_0x16) {
         return 0;
     }
-    if (ai_npc_motion_step_ck(&AINPC_VIEW, 1, 0x55) == 1 &&
-        vec3_dist_sq(&AINPC_VIEW.pos_0x178, &AINPC_VIEW.plw_0x16C->vec_0x03C) < 40000.0f) {
+    if (ai_npc_motion_step_ck(w, 1, 0x55) == 1 && vec3_dist_sq(&w->pos_0x178, &w->plw_0x16C->vec_0x03C) < 40000.0f) {
         return 1;
     }
     return 0;
@@ -7271,14 +7317,14 @@ extern "C" {
  * attack, defence and gauge, the formation's adjustments, the skills' bonuses and the speed rank. */
 void ai_npc_status_preview(AINPCSetup* setup, AINPCStatus* status)
 {
+    s32 attack;
+    s32 defense;
+    s32 gauge;
     s32 attack_rate = 100;
     s32 defense_rate = 100;
     s32 gauge_rate = 100;
     s16 speed = 0;
     AINPCTuning* row;
-    s32 attack;
-    s32 defense;
-    s32 gauge;
     u8 i;
     s32 value;
 
@@ -7783,7 +7829,7 @@ s32 fn_802CCD90(struct _AINPC_W* self)
 }
 
 /* 0x802CCE04 - true while the gate byte is exactly 2. */
-s32 fn_802CCE04(struct _AINPC_W* self)
+u32 fn_802CCE04(struct _AINPC_W* self)
 {
     return self->field_0x354 == 2;
 }
@@ -8053,7 +8099,9 @@ u32 fn_802CD6FC(struct _AINPC_W* self)
  * factor. */
 u32 fn_802CDAB8(struct _AINPC_W* self)
 {
-    return self->field_0x1F0 <= (s32)((f32)self->field_0x1F4 * self->formation_0x41C->budget_0x0C);
+    f32 budget = self->formation_0x41C->budget_0x0C;
+
+    return self->field_0x1F0 <= (s32)((f32)self->field_0x1F4 * budget);
 }
 
 /* 0x802CDDC4 - the 4-step "switch to another action" handler. */
@@ -8278,7 +8326,7 @@ void fn_802D04CC(struct _AINPC_W* self)
     VEC3_ctor(&v);
     switch (self->step) {
     case 0:
-        if (self->field_0x1C0 == 400.0f) {
+        if (self->field_0x1C0 <= 400.0f) {
             s32 angle = calcVecAng2(&self->vec_0x1B0, &self->vec_0x178);
 
             setVector3(&v, 0.0f, 0.0f, 800.0f);
@@ -8317,7 +8365,7 @@ void fn_802D063C(struct _AINPC_W* self)
     VEC3_ctor(&v);
     switch (self->step) {
     case 0:
-        if (self->field_0x1C0 == 400.0f) {
+        if (self->field_0x1C0 <= 400.0f) {
             s32 angle = calcVecAng2(&self->vec_0x1B0, &self->vec_0x178);
 
             setVector3(&v, 0.0f, 0.0f, 800.0f);
@@ -8461,7 +8509,7 @@ s16 fn_802CD20C(struct _AINPC_W* self)
     if (pl_act6_class_ck(plw, 0) == 1) {
         return 0;
     }
-    return pl_act6_class_ck(plw, 1) != 1;
+    return pl_act6_class_ck(plw, 1) == 1 ? 0 : -1;
 }
 
 /* 0x802CD2E0 - latch the +0x34D gate once the predicate chain answers non-negative. */
@@ -8500,6 +8548,15 @@ u32 fn_802CD588(struct _AINPC_W* self)
         self->field_0x43D = 2;
         fn_802D4218(self);
         switch (self->field_0x420) {
+        case 1:
+            fn_802D65CC(self);
+            break;
+        case 2:
+            fn_802D675C(self);
+            break;
+        case 5:
+            fn_802D67F8(self);
+            break;
         case 3:
         case 4:
             if (fn_802D86D4(self, &a, &b) == 1) {
@@ -8512,15 +8569,6 @@ u32 fn_802CD588(struct _AINPC_W* self)
             } else {
                 ai_npc_talk(self, (s8)self->field_0x482, 0x11, 0, 2);
             }
-            break;
-        case 1:
-            fn_802D65CC(self);
-            break;
-        case 2:
-            fn_802D675C(self);
-            break;
-        case 5:
-            fn_802D67F8(self);
             break;
         default:
             ai_npc_talk(self, (s8)self->field_0x482, 0x11, 0, 2);
@@ -8740,7 +8788,7 @@ void fn_802CFE20(struct _AINPC_W* self)
             calcVecAngXY(&tmp, &x, &z);
             setVector3(&tmp, 0.0f, 0.0f, 800.0f);
             rotVecX(&tmp, x);
-            rotVecY(&tmp, (u16)z);
+            rotVecY(&tmp, z);
             addVec3(&offset, &self->vec_0x178, &tmp);
             copyVec3(&self->vec_0x1B0, &offset);
             self->field_0x389 = 0;
@@ -8918,18 +8966,14 @@ void fn_802D0F34(struct _AINPC_W* self)
                         }
                         break;
                     case 1:
-                        switch (self->field_0x354) {
-                        case 1:
+                        if (self->field_0x354 == 1) {
                             self->field_0x1CE = 2;
                             self->field_0x354 = 2;
-                            break;
-                        case 2:
+                        } else if (self->field_0x354 == 2) {
                             fn_802D0DCC(self);
-                            break;
-                        case 3:
+                        } else if (self->field_0x354 == 3) {
                             fn_802D41E0(self, 0x33, 1);
-                            break;
-                        default:
+                        } else {
                             if (self->variant == 2) {
                                 if (self->field_0x420 == 6) {
                                     fn_802D3398(self, (u16*)lbl_805D4150[1]);
@@ -8960,15 +9004,6 @@ void fn_802D0F34(struct _AINPC_W* self)
                                     fn_802D41E0(self, 1, 1);
                                 }
                             }
-                            break;
-                        }
-                        break;
-                    case 2:
-                    case 3:
-                        if (self->variant == 2) {
-                            fn_802D41E0(self, 0x11, 1);
-                        } else {
-                            fn_802D41E0(self, 6, 1);
                         }
                         break;
                     case 4:
@@ -9009,6 +9044,14 @@ void fn_802D0F34(struct _AINPC_W* self)
                         }
                         self->field_0x376 = 1;
                         break;
+                    case 2:
+                    case 3:
+                        if (self->variant == 2) {
+                            fn_802D41E0(self, 0x11, 1);
+                        } else {
+                            fn_802D41E0(self, 6, 1);
+                        }
+                        break;
                     case 6:
                         self->field_0x1CE = 0x10;
                         break;
@@ -9045,11 +9088,13 @@ void fn_802D15DC(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 probe;
     nw4r::math::VEC3 current;
-    u16 flags = 0x20;
-    s32 blocked = 0;
+    u32 flags;
+    s32 blocked;
 
     VEC3_ctor(&probe);
     VEC3_ctor(&current);
+    flags = 0x20;
+    blocked = 0;
     if (self->field_0x3CA > 0) {
         self->field_0x3C8 = 0;
         return;
@@ -9061,21 +9106,21 @@ void fn_802D15DC(struct _AINPC_W* self)
         blocked = 1;
     }
     if ((u32)(self->motion - 4) > 1 && blocked == 0) {
-        flags = 0x20 | 0xC0;
+        flags |= 0xC0;
     }
     copyVec3(&probe, &self->pos_0x184);
     probe.y = probe.y + lbl_8079A7A8;
     copyVec3(&current, &self->pos_0x178);
     current.y = current.y + lbl_8079A7A8;
-    self->field_0x3C8 = (s8)coll_wall_slide(&probe, &current, &self->pos_0x178, 0xFFFF, flags, 1,
-                                        self->area, lbl_8079A7A8);
+    self->field_0x3C8 = (u8)coll_wall_slide(&probe, &current, lbl_8079A7A8, &self->pos_0x178, 0xFFFF, flags, 1,
+                                        self->area);
 }
 
 /* 0x802D1710 - the step-height/ground probe: walks the two forward probes and re-seeds the motion
  * when the NPC has to step up or down. */
 void fn_802D1710(struct _AINPC_W* self)
 {
-    nw4r::math::VEC3 base;
+    ::LandData base;
     f32 value;
 
     em_land_data_init(&base);
@@ -9083,33 +9128,39 @@ void fn_802D1710(struct _AINPC_W* self)
     if (self->field_0x3D0 <= 0 && ai_npc_flag_ck(self, 2) == 0) {
         if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &value, -6) == 1) {
             self->field_0x19C = value;
-            if (self->variant == 0) {
-                if (self->pos_0x178.y - value <= lbl_8079A6A8) {
-                    self->pos_0x178.y = value;
+            switch (self->variant) {
+            case 0:
+                if (self->pos_0x178.y - self->field_0x19C <= lbl_8079A6A8) {
+                    self->pos_0x178.y = self->field_0x19C;
                 } else {
                     fn_802D2A00(self, 6, 0, 0);
                 }
-            } else if (self->variant == 2) {
+                break;
+            case 2:
                 if (ai_npc_motion_step_ck(self, 2, 0x0D) != 1) {
                     fn_802D2A00(self, 2, 0x0D, 0);
                     ai_npc_variant_set(self, 0);
                     fn_802D4200(self);
                 }
+                break;
             }
         } else if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &value, 1) == 1) {
             self->field_0x19C = value;
-            if (self->variant == 2) {
+            switch (self->variant) {
+            case 2:
                 if (self->pos_0x178.y > lbl_8079A6B0) {
                     self->pos_0x178.y = lbl_8079A6B0;
                     self->field_0x3CE = 1;
-                } else if (self->pos_0x178.y < lbl_8079A754 + value) {
-                    self->pos_0x178.y = lbl_8079A754 + value;
+                } else if (self->pos_0x178.y < lbl_8079A754 + self->field_0x19C) {
+                    self->pos_0x178.y = lbl_8079A754 + self->field_0x19C;
                     self->field_0x3CE = 1;
                 }
-            } else {
+                break;
+            default:
                 fn_802D2A00(self, 2, 0x0C, 0);
                 ai_npc_variant_set(self, 2);
                 fn_802D4200(self);
+                break;
             }
         }
         if (fn_80291B08(self, &self->pos_0x178, &base, &value, 4) == 1) {
@@ -9138,11 +9189,12 @@ void fn_802D18E8(struct _AINPC_W* self)
  * whole attack bookkeeping. */
 void fn_802D1954(struct _AINPC_W* self)
 {
-    _PLW* plw = self->plw_0x16C;
+    _PLW* plw;
     nw4r::math::VEC3 offset;
     nw4r::math::VEC3 position;
 
     VEC3_ctor(&offset);
+    plw = self->plw_0x16C;
     if (ai_npc_mode1_ck(self) != 1) {
         if (fn_802D94A0(self) == 1 && plw->area_0x16 == 0) {
             self->field_0x486 = 0x5A;
@@ -9152,16 +9204,18 @@ void fn_802D1954(struct _AINPC_W* self)
         setVector3(&offset, lbl_8079A7AC, lbl_8079A670, lbl_8079A7B0);
         rotVecY(&offset, self->vec_0x190.y);
         addVec3(&position, &plw->vec_0x03C, &offset);
-        copyVec3(&self->pos_0x184, &position);
-        copyVec3(&self->pos_0x178, &self->pos_0x184);
-        if (plw->kind_0x09 != 3) {
-            ai_npc_variant_set(self, 0);
-        } else {
+        copyVec3(&self->pos_0x178, copyVec3(&self->pos_0x184, &position));
+        switch (plw->kind_0x09) {
+        case 3:
             ai_npc_variant_set(self, 2);
+            break;
+        default:
+            ai_npc_variant_set(self, 0);
+            break;
         }
         if (self->motion == 5) {
             if ((u32)(self->motion_step - 5) <= 1) {
-                fn_802D2A00(self, 0, 0, 0);
+                fn_802D2A00(self, self->motion, self->motion_step, 0);
             }
         } else {
             ai_npc_base_state_set(self, self->variant);
@@ -9189,12 +9243,16 @@ void fn_802D1954(struct _AINPC_W* self)
 
 /* 0x802D1AFC - the weak-point roll: after the counter-attack window it picks one of the five
  * weak-point rates, bumps it and books the two hit effects. */
+/* `fn_802D89D4` read as a full word: retail masks its result at the argument, not at the return. */
+#define AINPC_ITEM_ID_GET ((u32 (*)(struct _AINPC_W*, u16))fn_802D89D4)
+
 void fn_802D1AFC(struct _AINPC_W* self)
 {
     u16 id;
     s16 count;
 
-    if (self->field_0x420 == 3) {
+    switch (self->field_0x420) {
+    case 3:
         if (fn_802D86D4(self, &id, &count) == 1) {
             if (self->field_0x422 <= 0 && self->field_0x461 == 0) {
                 self->field_0x422 = 0x384;
@@ -9202,19 +9260,20 @@ void fn_802D1AFC(struct _AINPC_W* self)
                 if (::ran_suu(1) % 100 < self->weak_point_0x427[self->field_0x426]) {
                     self->field_0x426 = ::ran_suu(1) % 5;
                 }
-                self->weak_point_0x427[self->field_0x426] = self->weak_point_0x427[self->field_0x426] + 0x0A;
+                self->weak_point_0x427[self->field_0x426] += 0x0A;
                 if (self->weak_point_0x427[self->field_0x426] >= 0x64) {
                     self->weak_point_0x427[self->field_0x426] = 0x64;
                 }
                 fn_802D40EC(self, id, (s16)-count);
                 if (self->field_0x42C != 0) {
-                    fn_802D40EC(self, fn_802D89D4(self, self->field_0x42C), count);
+                    fn_802D40EC(self, (u16)AINPC_ITEM_ID_GET(self, self->field_0x42C), count);
                 }
             }
         } else {
             self->field_0x422 = 0;
             self->field_0x426 = 0;
         }
+        break;
     }
 }
 
@@ -9231,14 +9290,12 @@ void fn_802D1C90(struct _AINPC_W* self)
         self->field_0x416 = 0;
     }
     if (self->field_0x416 == 0) {
-        self->field_0x38C = self->field_0x38C + 1;
-        if (self->field_0x38C >= 0x12C) {
+        if (++self->field_0x38C >= 0x12C) {
             self->field_0x38C = 0x12C;
             self->field_0x38E = 1;
         }
     } else if (self->field_0x416 == 1) {
-        self->field_0x38C = self->field_0x38C + 1;
-        if (self->field_0x38C >= 0x96) {
+        if (++self->field_0x38C >= 0x96) {
             self->field_0x38C = 0x96;
             self->field_0x38E = 1;
         }
@@ -9301,14 +9358,19 @@ void fn_802D1D90(struct _AINPC_W* self)
     fn_802D1FFC(self);
     self->model.move(0);
     copyVec3(&self->pos_0x178, &self->model.pos_0x04);
-    if (self->variant != 1) {
-        if (self->variant != 2) {
-            vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, &self->pos_0x178,
-                         lbl_8079A7B4);
-        } else if (self->pos_0x184.y < lbl_8079A688 + self->field_0x19C) {
-            vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, &self->pos_0x178,
-                         lbl_8079A73C);
+    switch (self->variant) {
+    case 1:
+        break;
+    default:
+        vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, lbl_8079A7B4,
+                     &self->pos_0x178);
+        break;
+    case 2:
+        if (self->pos_0x184.y < lbl_8079A688 + self->field_0x19C) {
+            vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, lbl_8079A73C,
+                         &self->pos_0x178);
         }
+        break;
     }
     fn_802D15DC(self);
     fn_802D1710(self);
@@ -9374,12 +9436,13 @@ void fn_802D214C(struct _AINPC_W* self)
         s16 count = self->field_0x21C;
 
         if (count > 0) {
-            self->field_0x220 = self->field_0x220 - 1;
-            if (self->field_0x220 <= 0) {
-                self->field_0x21C = count - 1;
+            if (--self->field_0x220 <= 0) {
+                self->field_0x21C--;
                 self->field_0x220 = 0x1E;
                 fn_801075AC(self, &offset, 0x0E, lbl_8079A674, 2);
-                fn_802D35EC(self, -1);
+                if (fn_802D35EC(self, -1) == 1) {
+                    return;
+                }
             }
         }
     }
@@ -9584,18 +9647,19 @@ u8* ainpc_work_get(void)
 s32 fn_802D282C(s32 index)
 {
     u16 value = index;
-    s32* row = (s32*)lbl_805D3FB8[value / 100];
+    s32 group = value / 100;
+    s32* row = (s32*)lbl_805D3FB8[group];
 
     if (row == NULL) {
         return 0;
     }
-    return row[value % 100];
+    return row[value - group * 100];
 }
 
 /* 0x802D287C - plays `motion` on the model with the row `fn_802D282C` resolves. */
 void ai_npc_motion_play(struct _AINPC_W* self, s32 motion, s32 a, s32 b, s32 c)
 {
-    mhchar_motion_set(&self->model, 3, 0, (u16)motion, a, fn_802D282C((u16)motion), b, (f32)c,
+    mhchar_motion_set(&self->model, 3, 0, (u16)motion, a, (f32)b, fn_802D282C((u16)motion), c,
                 lbl_8079A678);
 }
 
@@ -9681,7 +9745,7 @@ void ai_npc_variant_set(struct _AINPC_W* self, u8 variant)
 
 /* 0x802D2A00 - the motion state setter: latches the gauge word, saves the outgoing motion and
  * sub-step, clears the three follow-up bytes, re-arms the model flags and sets the speed. */
-void fn_802D2A00(struct _AINPC_W* self, u8 motion, u16 step, s16 gauge)
+void fn_802D2A00(struct _AINPC_W* self, u8 motion, u16 step, u16 gauge)
 {
     self->field_0x1EC = gauge;
     self->state = 0;
@@ -9810,20 +9874,20 @@ void fn_802D2BB0(struct _AINPC_W* self, struct _HIT_W* hit)
         hit->field_0x04A = (hit->field_0x04A * 0x82) / 100;
     }
     if (self->field_0x420 == 1 && self->field_0x422 > 0) {
-        hit->kind_word_0x42 = 0x11;
+        hit->kind_0x42 = 0x11;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 0x0D) == 1 && ::ran_suu(1) % 100 < 0x14) {
         hit->life_0x40 = (hit->life_0x40 * 0x7D) / 100;
         hit->field_0x04C |= 0x80;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 0x0C) == 1) {
-        hit->field_0x04E = (s8)(hit->field_0x04E * 0x78) / 100;
+        hit->field_0x04E = (s8)hit->field_0x04E * 0x78 / 100;
     }
     if (ai_npc_flag_ck(self, 4) != 0) {
         hit->attack_flags_0x31 = 1;
         hit->life_0x40 = 0;
         if (self->field_0x34E == 1) {
-            hit->kind_word_0x42 = 2;
+            hit->kind_0x42 = 2;
         }
         hit->field_0x04E = 0;
         hit->field_0x048 = 0;
@@ -9841,6 +9905,7 @@ void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row)
     struct _HIT_W* hit = &self->hit[index];
     struct MotionEntry* entry = (struct MotionEntry*)(lbl_805D3AD8 + row * 0x1A);
     f32 limit;
+    f32 frame;
 
     hit->size_data_0x08 = (_HIT_SIZE_DATA*)lbl_80792508[entry->motion_id_0x0F];
     hit_flags_clear(hit);
@@ -9853,46 +9918,43 @@ void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row)
     if (limit < lbl_8079A670 || (self->model.field_0x4C & 1) != 0) {
         limit = lbl_8079A670;
     }
+    frame = self->model.field_0x74;
     hit->delay_0x38 = entry->approach_0x00;
     hit->time_0x3C = entry->retreat_0x02;
     if (entry->approach_0x00 != 0) {
-        hit->delay_0x38 = hit->delay_0x38 + (limit - self->model.field_0x74);
+        hit->delay_0x38 = hit->delay_0x38 + (limit - frame);
         if (hit->delay_0x38 < lbl_8079A670) {
             hit->time_0x3C = hit->time_0x3C + hit->delay_0x38;
             hit->delay_0x38 = lbl_8079A670;
-            if (hit->time_0x3C == lbl_8079A670) {
+            if (hit->time_0x3C <= lbl_8079A670) {
                 hit->active_0x05 = 0;
                 return;
             }
         }
     }
-    hit_data_apply(hit, entry, lbl_8079A670);
+    hit_data_apply(hit, (struct _HIT_DATA*)entry);
     fn_802D2BB0(self, hit);
 }
 
 /* 0x802D30F8 - clamps the angle difference to `limit` degrees, taking the short way round. */
-u16 fn_802D30F8(u16 angle, u16 target, u16 limit)
+u16 fn_802D30F8(u16 angle, u16 target, u32 limit)
 {
     u16 diff = angle - target;
-    u16 result;
 
-    if (abs((s16)diff) < limit) {
-        result = angle;
+    if (abs((s16)diff) < (u16)limit) {
+        target = angle;
     } else {
-        result = target - limit;
-        if (diff < -0x8000) {
-            result = target + limit;
-        }
+        target = (diff < 0x8000) ? target + limit : target - limit;
     }
-    return result;
+    return target;
 }
 
 /* 0x802D3184 - whether the model's facing is outside `limit` degrees of the record's +0x194. */
 s32 fn_802D3184(struct _AINPC_W* self, u32 limit)
 {
-    u16 diff = self->vec_0x190.y - ::calcVecAng2(&self->pos_0x178, &self->pos_0x1B0);
+    u16 diff = self->vec_0x190.y - (u16)::calcVecAng2(&self->pos_0x178, &self->pos_0x1B0);
 
-    if (diff <= (u16)(limit * -1) && diff >= (u16)limit) {
+    if (diff <= (u16)-limit && diff >= (u16)limit) {
         return 0;
     }
     return 1;
@@ -9928,12 +9990,13 @@ void fn_802D327C(struct _AINPC_W* self, u32* angles)
 
 /* 0x802D32B4 - rolls one of the six-byte attack rows the skill table points at, weighted by the
  * rows' first word, and starts the motion the row names. */
+#pragma opt_common_subs off
 s32 fn_802D32B4(struct _AINPC_W* self, u16* row)
 {
-    u16 total = 0;
+    u16 walked;
     u16 roll;
-    u16 walked = 0;
     u16* walk = row;
+    u16 total = 0;
 
     while (*walk != 0xFFFF) {
         total += *walk;
@@ -9943,6 +10006,7 @@ s32 fn_802D32B4(struct _AINPC_W* self, u16* row)
         return 0;
     }
     roll = ::ran_suu(1) % total;
+    walked = 0;
     for (; *row != 0xFFFF; row += 3) {
         walked += *row;
         if (roll < walked) {
@@ -9952,15 +10016,18 @@ s32 fn_802D32B4(struct _AINPC_W* self, u16* row)
     }
     return 0;
 }
+#pragma opt_common_subs reset
 
-#pragma peephole on
+/* `fn_802D41E0` with an unsigned selector: retail passes the row's byte unextended. */
+#define AINPC_SELECTOR_SET ((void (*)(struct _AINPC_W*, u8, s32))fn_802D41E0)
+
 /* 0x802D3398 - the same for the four-byte rows the dispatchers use. */
 s32 fn_802D3398(struct _AINPC_W* self, u16* row)
 {
-    u16 total = 0;
+    u16 walked;
     u16 roll;
-    u16 walked = 0;
     u16* walk = row;
+    u16 total = 0;
 
     while (*walk != 0xFFFF) {
         total += *walk;
@@ -9970,10 +10037,11 @@ s32 fn_802D3398(struct _AINPC_W* self, u16* row)
         return 0;
     }
     roll = ::ran_suu(1) % total;
+    walked = 0;
     for (; *row != 0xFFFF; row += 2) {
         walked += *row;
         if (roll < walked) {
-            fn_802D41E0(self, (u8)row[1], 1);
+            AINPC_SELECTOR_SET(self, row[1], 1);
             return 1;
         }
     }
@@ -10002,14 +10070,17 @@ void fn_802D348C(struct _AINPC_W* self)
             fn_802D3474(self, 9, 0);
             return;
         }
-        if (self->variant != 2) {
-            fn_802D3474(self, 0, 0);
-        } else {
+        switch (self->variant) {
+        case 2:
             fn_802D3474(self, 4, 0);
+            break;
+        default:
+            fn_802D3474(self, 0, 0);
+            break;
         }
         if (::ai_skill_ck((::_AINPC_W*)self, 0x15) == 1) {
             if (self->field_0x43C < 7) {
-                self->field_0x43C = self->field_0x43C + 1;
+                self->field_0x43C += 1;
                 self->field_0x1FE = (self->field_0x1FE * 0x6A) / 100;
                 self->field_0x200 = (self->field_0x200 * 0x6A) / 100;
             }
@@ -10037,7 +10108,7 @@ u32 fn_802D35EC(struct _AINPC_W* self, s32 delta)
     if (Pl_motion_input_ck(0) == 1) {
         delta = 0;
     }
-    fn_802D35B4(self, delta);
+    fn_802D35B4(self, (s16)delta);
     if (ai_npc_mode1_ck(self) == 1) {
         fn_802D92F8(self);
     }
@@ -10066,104 +10137,103 @@ void fn_802D3694(struct _AINPC_W* self, s32 delta)
     }
 }
 
-#pragma peephole on
 /* 0x802D36B8 - the frame step: runs down every one of the band's countdowns. */
 void fn_802D36B8(struct _AINPC_W* self)
 {
     if (self->field_0x214 > 0) {
-        self->field_0x214 = self->field_0x214 - 1;
+        self->field_0x214--;
     }
     if (self->field_0x35A > 0) {
-        self->field_0x35A = self->field_0x35A - 1;
+        self->field_0x35A--;
     }
     if (self->field_0x35E > 0) {
-        self->field_0x35E = self->field_0x35E - 1;
+        self->field_0x35E--;
     }
     if (self->field_0x352 > 0) {
-        self->field_0x352 = self->field_0x352 - 1;
+        self->field_0x352--;
         if (self->field_0x352 == 1) {
             self->field_0x354 = 3;
         }
     }
     if (self->field_0x34A != 0) {
-        self->field_0x34A = self->field_0x34A - 1;
+        self->field_0x34A--;
     }
     if (self->field_0x3CA > 0) {
-        self->field_0x3CA = self->field_0x3CA - 1;
+        self->field_0x3CA--;
     }
     if (self->field_0x3D0 > 0) {
-        self->field_0x3D0 = self->field_0x3D0 - 1;
+        self->field_0x3D0--;
     }
     if (self->field_0x43E > 0) {
-        self->field_0x43E = self->field_0x43E - 1;
+        self->field_0x43E--;
     }
     if (self->field_0x422 > 0) {
-        self->field_0x422 = self->field_0x422 - 1;
+        self->field_0x422--;
         if (self->field_0x420 == 1 && (self->field_0x422 == 0 || self->variant == 2)) {
             self->field_0x422 = 0;
             fn_800DCCF8(self->sound_handle_0x498, &self->pos_0x178, 1);
         }
     }
     if (self->field_0x424 > 0) {
-        self->field_0x424 = self->field_0x424 - 1;
+        self->field_0x424--;
     }
     if (self->field_0x374 > 0) {
-        self->field_0x374 = self->field_0x374 - 1;
+        self->field_0x374--;
     }
     if (self->field_0x236 > 0) {
-        self->field_0x236 = self->field_0x236 - 1;
+        self->field_0x236--;
         if (self->field_0x236 == 0) {
             self->field_0x235 = 0;
         }
     }
     if (self->field_0x23A > 0) {
-        self->field_0x23A = self->field_0x23A - 1;
+        self->field_0x23A--;
         if (self->field_0x23A == 0) {
             self->field_0x239 = 0;
         }
     }
     if (self->field_0x3D4 < self->field_0x3D6) {
-        self->field_0x3DC = self->field_0x3DC - 1;
+        self->field_0x3DC--;
         if (self->field_0x3DC <= 0) {
             fn_802D6B2C(self, 1);
         }
     }
     if (self->field_0x23E > 0) {
-        self->field_0x23E = self->field_0x23E - 1;
+        self->field_0x23E--;
         if (self->field_0x23E <= 0) {
             self->field_0x23E = 0;
             self->field_0x23C = 0;
         }
     }
     if (self->field_0x408 > 0) {
-        self->field_0x408 = self->field_0x408 - 1;
+        self->field_0x408--;
     }
     if (self->field_0x40A > 0) {
-        self->field_0x40A = self->field_0x40A - 1;
+        self->field_0x40A--;
     }
     if (self->field_0x40C > 0) {
-        self->field_0x40C = self->field_0x40C - 1;
+        self->field_0x40C--;
     }
     if (self->field_0x40E > 0) {
-        self->field_0x40E = self->field_0x40E - 1;
+        self->field_0x40E--;
     }
     if (self->field_0x410 > 0) {
-        self->field_0x410 = self->field_0x410 - 1;
+        self->field_0x410--;
     }
     if (self->field_0x412 > 0) {
-        self->field_0x412 = self->field_0x412 - 1;
+        self->field_0x412--;
     }
     if (self->field_0x47C > 0) {
-        self->field_0x47C = self->field_0x47C - 1;
+        self->field_0x47C--;
     }
     if (self->field_0x46A > 0) {
-        self->field_0x46A = self->field_0x46A - 1;
+        self->field_0x46A--;
     }
     if (self->field_0x38A > 0) {
-        self->field_0x38A = self->field_0x38A - 1;
+        self->field_0x38A--;
     }
     if (self->field_0x486 > 0) {
-        self->field_0x486 = self->field_0x486 - 1;
+        self->field_0x486--;
     }
 }
 #pragma peephole off
@@ -10171,8 +10241,6 @@ void fn_802D36B8(struct _AINPC_W* self)
 /* 0x802D3984 - the 0..0x14 progress interpolation `high` -> `low`. */
 s16 fn_802D3984(struct _AINPC_W* self, s32 high, s32 low, u32 reverse)
 {
-    s16 hi = high;
-    s16 lo = low;
     s16 progress;
 
     if ((u8)reverse == 0) {
@@ -10180,7 +10248,7 @@ s16 fn_802D3984(struct _AINPC_W* self, s32 high, s32 low, u32 reverse)
     } else {
         progress = 0x14 - self->field_0x339;
     }
-    return lo + (progress * (hi - lo)) / 20;
+    return low + (progress * ((s16)high - (s16)low)) / 20;
 }
 
 /* 0x802D39DC - seeds the entry timer from that interpolation. */
@@ -10204,14 +10272,14 @@ void fn_802D3A2C(struct _AINPC_W* self, s16 value)
 #pragma peephole on
 /* 0x802D3A34 - adds to the +0x350 counter (halved without the skill) and clamps it to the
  * model's limit. */
-void fn_802D3A34(struct _AINPC_W* self, s16 delta)
+void fn_802D3A34(struct _AINPC_W* self, s32 delta)
 {
     s16 limit;
 
     if (::ai_skill_ck((::_AINPC_W*)self, 0x17) == 1) {
-        self->field_0x350 = self->field_0x350 + delta;
+        self->field_0x350 += delta;
     } else {
-        self->field_0x350 = self->field_0x350 + (s16)(delta / 2);
+        self->field_0x350 += (s16)((s16)delta / 2);
     }
     limit = ai_npc_counter_window_get(self);
     if (self->field_0x350 > limit) {
@@ -10263,8 +10331,7 @@ u32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy)
     u32 moved = 0;
 
     if (self->field_0x3C8 > 0) {
-        self->field_0x3C6 = self->field_0x3C6 + 1;
-        if (self->field_0x3C6 >= (s32)limit) {
+        if (++self->field_0x3C6 >= (s32)limit) {
             self->field_0x3C6 = limit;
             moved = 1;
         }
@@ -10272,8 +10339,7 @@ u32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy)
         self->field_0x3C6 = 0;
     }
     if (self->field_0x3CE > 0) {
-        self->field_0x3CC = self->field_0x3CC + 1;
-        if (self->field_0x3CC >= (s32)limit) {
+        if (++self->field_0x3CC >= (s32)limit) {
             self->field_0x3CC = limit;
             moved = 1;
         }
@@ -10281,8 +10347,7 @@ u32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy)
         self->field_0x3CC = 0;
     }
     if (self->drift_active != 0) {
-        self->field_0x480 = self->field_0x480 + 1;
-        if (self->field_0x480 >= (s32)limit) {
+        if (++self->field_0x480 >= (s32)limit) {
             self->field_0x480 = limit;
             moved = 1;
             self->field_0x389 = 0;
@@ -10418,6 +10483,7 @@ u32 fn_802D3F08(struct _AINPC_W* self)
 }
 
 /* 0x802D3F1C - the highest weak-point rate of the two hit entries. */
+#pragma opt_propagation off
 u8 fn_802D3F1C(struct _AINPC_W* self)
 {
     u8 highest = 0xFF;
@@ -10432,6 +10498,7 @@ u8 fn_802D3F1C(struct _AINPC_W* self)
     }
     return highest;
 }
+#pragma opt_propagation reset
 
 /* 0x802D3F70 - the percentage roll the +0x339 progress interpolates between `high` and `low`. */
 s32 fn_802D3F70(struct _AINPC_W* self, u8 high, u8 low)
@@ -10466,16 +10533,15 @@ void fn_802D40A4(struct _AINPC_W* self, u16 id)
 }
 #pragma peephole off
 
-#pragma peephole on
 /* 0x802D40EC - adds `delta` to the ring/pending entry `id` carries; a new id goes to the first free
  * pending slot. */
-void fn_802D40EC(struct _AINPC_W* self, s32 id, s32 delta)
+void fn_802D40EC(struct _AINPC_W* self, u16 id, s16 delta)
 {
     u8 i;
 
     for (i = 8; i < 12; i++) {
-        if ((u16)id == self->slots[i].id) {
-            self->slots[i].count = self->slots[i].count + (s16)delta;
+        if (id == self->slots[i].id) {
+            self->slots[i].count += delta;
             if (self->slots[i].count <= 0) {
                 self->slots[i].count = 0;
                 self->slots[i].id = 0;
@@ -10483,25 +10549,12 @@ void fn_802D40EC(struct _AINPC_W* self, s32 id, s32 delta)
             return;
         }
     }
-    if (self->slots[8].id == 0 && delta > 0) {
-        self->slots[8].id = id;
-        self->slots[8].count = delta;
-        return;
-    }
-    if (self->slots[9].id == 0 && delta > 0) {
-        self->slots[9].id = id;
-        self->slots[9].count = delta;
-        return;
-    }
-    if (self->slots[10].id == 0 && delta > 0) {
-        self->slots[10].id = id;
-        self->slots[10].count = delta;
-        return;
-    }
-    if (self->slots[11].id == 0 && delta > 0) {
-        self->slots[11].id = id;
-        self->slots[11].count = delta;
-        return;
+    for (i = 8; i < 12; i++) {
+        if (self->slots[i].id == 0 && delta > 0) {
+            self->slots[i].id = id;
+            self->slots[i].count = delta;
+            return;
+        }
     }
 }
 #pragma peephole off
@@ -10561,6 +10614,9 @@ void fn_802D4238(struct _AINPC_W* self)
     self->field_0x378 = 0;
 }
 
+/* `eft004_key_spawn` (`ef/eft004_fx.cpp`) with its scale third: retail loads f1 between r4 and r5. */
+#define AINPC_KEY_SPAWN ((void (*)(u8, nw4r::math::VEC3*, f32, s32, u8, s32))eft004_key_spawn)
+
 /* 0x802D4248 - spawns the attack's effect: takes the joint's world position (or the record's own),
  * drops it by the entry's offset and maps the attack kind onto the effect id the emitter takes. */
 void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f32 scale)
@@ -10569,7 +10625,10 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
     u8 code = kind;
 
     VEC3_ctor(&pos);
-    if ((self->field_0x324 & 0x4000) != 0 || a1 != 0) {
+    if ((self->field_0x324 & 0x4000) != 0) {
+        return;
+    }
+    if (a1 != 0) {
         return;
     }
     if (joint != 0xFF) {
@@ -10583,7 +10642,7 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
         case 0:
         case 17:
             code = 1;
-            eft004_key_spawn(2, &pos, effect, self->area, 2, scale);
+            AINPC_KEY_SPAWN(2, &pos, scale, effect, self->area, 2);
             break;
         case 6:
         case 7:
@@ -10592,7 +10651,7 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
             break;
         case 18:
             code = 1;
-            eft004_key_spawn(2, &pos, effect, self->area, 2, scale);
+            AINPC_KEY_SPAWN(2, &pos, scale, effect, self->area, 2);
             break;
         case 40:
             code = 0x0E;
@@ -10600,23 +10659,22 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
         case 42:
         case 43:
         case 44:
-            eft004_key_spawn(0x23, &pos, effect, self->area, 3, scale);
+            AINPC_KEY_SPAWN(0x23, &pos, scale, effect, self->area, 3);
             return;
         case 45:
-            eft004_key_spawn(0x23, &pos, effect, self->area, 1, scale);
+            AINPC_KEY_SPAWN(0x23, &pos, scale, effect, self->area, 1);
             return;
         case 46:
-            eft004_key_spawn(2, &pos, effect, self->area, 1, scale);
+            AINPC_KEY_SPAWN(2, &pos, scale, effect, self->area, 1);
             return;
         case 47:
-            eft004_key_spawn(1, &pos, effect, self->area, 1, scale);
-            eft004_key_spawn(2, &pos, effect, self->area, 1, scale);
+            AINPC_KEY_SPAWN(1, &pos, scale, effect, self->area, 1);
+            AINPC_KEY_SPAWN(2, &pos, scale, effect, self->area, 1);
             return;
         case 48:
-            eft004_key_spawn(1, &pos, effect, self->area, 1, scale);
+            AINPC_KEY_SPAWN(1, &pos, scale, effect, self->area, 1);
             return;
         }
-        eft004_key_spawn(code, &pos, effect, self->area, 2, scale);
     } else {
         pos.y = lbl_8079A7B8 + self->field_0x19C;
         switch (code) {
@@ -10642,8 +10700,8 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
             code = 1;
             break;
         }
-        eft004_key_spawn(code, &pos, effect, self->area, 2, scale);
     }
+    AINPC_KEY_SPAWN(code, &pos, scale, effect, self->area, 2);
 }
 }
 }  /* namespace view_fn_802D0F34 */
@@ -11140,7 +11198,6 @@ void get_joint_wpos_ai(struct _AINPC_W* self, u32 joint, nw4r::math::VEC3* out)
 
 
 #include "ai/ainpc_move.h"           /* this unit's own leaf header */
-#include "ai/result_hunt_rank_get.h" /* this unit's own leaf header */
 #include "lobby/lb_quest_screen.h"   /* quest_time_limit_get, quest_time_elapsed_get (rule 2) */
 #include "lobby/lb_server_sel_trans.h" /* event_demo_ck, get_demo_no (rule 2) */
 #include "menu/menu_item.h"          /* GetItemData, ItemDataRecord (rule 2) */
@@ -11157,24 +11214,26 @@ extern "C" {
  * +0x43E timer the long or short value by the distance test. */
 void ai_npc_hold_item_arm(void)
 {
+    _AINPC_W* w;
+
     if (quest_move_state_valid_ck() == 0) {
         return;
     }
+    w = &ainpc_w;
     if (ainpc_w.active == 0) {
         return;
     }
-    if (ainpc_w.field_0x171 == 5) {
+    if (w->field_0x171 == 5) {
         return;
     }
-    if (ainpc_w.field_0x43D != 0) {
+    if (w->field_0x43D != 0) {
         return;
     }
-    ainpc_w.field_0x43D = 1;
-    if (vec3_distance(&ainpc_w.vec_0x178,
-                    (nw4r::math::VEC3*)&ainpc_w.plw_0x16C->motion_pos_0x3C) >= lbl_8079A770) {
-        ainpc_w.field_0x43E = 0x258;
+    w->field_0x43D = 1;
+    if (vec3_distance(&w->vec_0x178, (nw4r::math::VEC3*)&w->plw_0x16C->motion_pos_0x3C) >= lbl_8079A770) {
+        w->field_0x43E = 0x258;
     } else {
-        ainpc_w.field_0x43E = 0x12C;
+        w->field_0x43E = 0x12C;
     }
 }
 
@@ -11185,22 +11244,23 @@ void fn_802D65CC(struct _AINPC_W* self)
     if (self->field_0x422 > 0x384) {
         self->field_0x422 = 0;
         fn_800DCCF8(self->sound_0x498, &self->vec_0x178, 1);
-        ai_npc_talk(self, self->field_0x482, 0x11, 0, 2);
+        ai_npc_talk(self, (s8)self->field_0x482, 0x11, 0, 2);
     } else if (self->variant != 2) {
         self->field_0x422 = (s16)(lbl_805D5354[self->field_0x33A] * 0x1E);
         fn_800DCCF8(self->sound_0x498, &self->vec_0x178, 0);
-        ai_npc_talk(self, self->field_0x482, 0x12, 0, 2);
+        ai_npc_talk(self, (s8)self->field_0x482, 0x12, 0, 2);
     }
 }
 
 /* 0x802D6690 - the hold countdown's frame budget, from the per-record tuning table's +0x3 byte. */
+#pragma opt_propagation off
 void fn_802D6690(struct _AINPC_W* self)
 {
-    u8 index = self->field_0x33A;
-    s16 value = (s16)(lbl_805D5360[index].field_0x3 * 0x708);
+    struct AINPCTuning* row = &lbl_805D5360[self->field_0x33A];
 
-    self->field_0x424 = value;
+    self->field_0x424 = row->field_0x3 * 0x708;
 }
+#pragma opt_propagation reset
 
 /* 0x802D66B8 - the weighted three-way choice: 1 while the roll is under the first threshold, 2 at
  * or past the sum of both, 0 in between. */
@@ -11212,7 +11272,7 @@ s32 fn_802D66B8(struct _AINPC_W* self)
     if (roll < first) {
         return 1;
     }
-    return (roll >= first + lbl_805D5360[self->field_0x33A].field_0x1) ? 2 : 0;
+    return (roll < first + lbl_805D5360[self->field_0x33A].field_0x1) ? 0 : 2;
 }
 
 /* 0x802D675C - holds the sub-state while the frame budget is running, then re-arms both timers from
@@ -11223,32 +11283,30 @@ void fn_802D675C(struct _AINPC_W* self)
         return;
     }
     if (self->field_0x424 > 0) {
-        if (self->field_0x422 != 0) {
-            return;
+        if (self->field_0x422 == 0) {
+            ai_npc_talk(self, (s8)self->field_0x482, 0x11, 0, 2);
         }
-        ai_npc_talk(self, self->field_0x482, 0x11, 0, 2);
-        return;
+    } else {
+        s16 first = (s16)(lbl_805D5378[self->field_0x33A * 2] * 0x1E);
+        self->field_0x422 = first;
+        self->field_0x424 = (s16)(first + lbl_805D5378[self->field_0x33A * 2 + 1] * 0x1E);
+        ai_npc_talk(self, (s8)self->field_0x482, 0x12, 0, 2);
     }
-    s16 first = (s16)(lbl_805D5378[self->field_0x33A * 2] * 0x1E);
-    self->field_0x422 = first;
-    self->field_0x424 = (s16)(first + lbl_805D5378[self->field_0x33A * 2 + 1] * 0x1E);
-    ai_npc_talk(self, self->field_0x482, 0x12, 0, 2);
 }
 
 /* 0x802D67F8 - the same hold/ re-arm pair as `fn_802D675C` but from the third tuning table. */
 void fn_802D67F8(struct _AINPC_W* self)
 {
     if (self->field_0x424 > 0) {
-        if (self->field_0x422 != 0) {
-            return;
+        if (self->field_0x422 == 0) {
+            ai_npc_talk(self, (s8)self->field_0x482, 0x11, 0, 2);
         }
-        ai_npc_talk(self, self->field_0x482, 0x11, 0, 2);
-        return;
+    } else {
+        s16 first = (s16)(lbl_805D5390[self->field_0x33A * 2] * 0x1E);
+        self->field_0x422 = first;
+        self->field_0x424 = (s16)(first + lbl_805D5390[self->field_0x33A * 2 + 1] * 0x1E);
+        ai_npc_talk(self, (s8)self->field_0x482, 0x12, 0, 2);
     }
-    s16 first = (s16)(lbl_805D5390[self->field_0x33A * 2] * 0x1E);
-    self->field_0x422 = first;
-    self->field_0x424 = (s16)(first + lbl_805D5390[self->field_0x33A * 2 + 1] * 0x1E);
-    ai_npc_talk(self, self->field_0x482, 0x12, 0, 2);
 }
 
 /* 0x802D6888 - rebuilds the behaviour flag word at +0x20C from the hold counters and the sub-state
@@ -11330,9 +11388,9 @@ void fn_802D6A00(struct _AINPC_W* self)
     u8 i;
 
     self->field_0x414 = 0;
-    w[0] = (u16)(self->field_0x3F6 * 5);
+    w[0] = (u16)(self->field_0x3F6 * 4 + self->field_0x3F6);
     w[1] = (u16)(self->field_0x3F6 * 4 + self->field_0x3F7);
-    w[2] = (u16)(self->field_0x3F7 * 5);
+    w[2] = (u16)(self->field_0x3F7 * 4 + self->field_0x3F7);
     w[3] = (u16)(self->field_0x3F7 * 4 + self->field_0x3F6);
     for (i = 0; i < 4; i++) {
         u16 v = w[i];
@@ -11347,17 +11405,21 @@ void fn_802D6A00(struct _AINPC_W* self)
         }
     }
     self->field_0x414 = fn_802D77DC((u8)best);
-    self->field_0x3F4 = (u16)(self->field_0x400[0] | self->field_0x400[1] | self->field_0x400[2] |
-                              self->field_0x400[3]);
+    {
+        u16 mask = self->field_0x400[0];
+
+        for (i = 1; i < 4; i++) {
+            mask = mask | self->field_0x400[i];
+        }
+        self->field_0x3F4 = mask;
+    }
 }
 
 /* 0x802D6B2C - moves the +0x3D4 gauge and clamps it into [0, +0x3D6], then mirrors +0x3DA. */
 void fn_802D6B2C(struct _AINPC_W* self, s16 delta)
 {
-    s16 value = self->field_0x3D4 + delta;
-
-    self->field_0x3D4 = value;
-    if (self->field_0x3D6 < value) {
+    self->field_0x3D4 += delta;
+    if (self->field_0x3D4 > self->field_0x3D6) {
         self->field_0x3D4 = self->field_0x3D6;
     }
     if (self->field_0x3D4 < 0) {
@@ -11370,10 +11432,8 @@ void fn_802D6B2C(struct _AINPC_W* self, s16 delta)
 void fn_802D6B6C(struct _AINPC_W* self, s16 delta)
 {
     if (self->field_0x3D6 < 0x96) {
-        s16 value = self->field_0x3D6 + delta;
-
-        self->field_0x3D6 = value;
-        if (value >= 0x96) {
+        self->field_0x3D6 += delta;
+        if (self->field_0x3D6 >= 0x96) {
             self->field_0x3D6 = 0x96;
         }
     }
@@ -11421,10 +11481,11 @@ void fn_802D7464(struct _AINPC_W* self)
         scale += 0x32;
     }
     self->field_0x3D4 = (s16)(self->field_0x3D4 * scale / 100);
-    self->field_0x3D6 = self->field_0x3D8 = self->field_0x3D4;
+    self->field_0x3D8 = self->field_0x3D6 = self->field_0x3D4;
 }
 
 /* 0x802D7688 - which of the four behaviour lists the given id belongs to (3 when in none). */
+#pragma peephole on
 s32 ai_npc_skill_group_get(u8 value)
 {
     s32 i;
@@ -11441,6 +11502,7 @@ s32 ai_npc_skill_group_get(u8 value)
     }
     return 3;
 }
+#pragma peephole reset
 
 }
 
@@ -11494,26 +11556,26 @@ s32 ai_npc_level_rank_get(u8 value)
 /* 0x802D77DC - the +0x414 timer for the best slot level, in frames. */
 s32 fn_802D77DC(u8 slot)
 {
-    if (slot == 1) {
+    switch (slot) {
+    case 1:
         return 0x32;
+    case 2:
+        return 0x46;
     }
-    s32 value = 0x1E;
-
-    if (slot == 2) {
-        value = 0x46;
-    }
-    return value;
+    return 0x1E;
 }
 
 /* 0x802D7A50 - raises the player-side AI NPC's "release" flag when the record is live, then
  * forwards to the shared dispatcher. */
 void ainpc_call_request(void)
 {
-    if (ainpc_w.active == 0) {
+    _AINPC_W* w = &ainpc_w;
+
+    if (w->active == 0) {
         return;
     }
-    ainpc_w.field_0x440 = 1;
-    fn_802D4218(&ainpc_w);
+    w->field_0x440 = 1;
+    fn_802D4218(w);
 }
 
 /* 0x802D7A74 - whether one of the four hold slots is holding the live-chain item (0x1D) while the
@@ -11523,20 +11585,19 @@ s32 fn_802D7A74(struct _AINPC_W* self)
     if (self->field_0x420 != 4) {
         return 0;
     }
-    if (self->field_0x1CC != 0 && self->field_0x1CC != 5) {
-        return 0;
-    }
-    if (self->item_slots[8].id == 0x1D && self->field_0x424 == 0) {
-        return 1;
-    }
-    if (self->item_slots[9].id == 0x1D && self->field_0x424 == 0) {
-        return 1;
-    }
-    if (self->item_slots[10].id == 0x1D && self->field_0x424 == 0) {
-        return 1;
-    }
-    if (self->item_slots[11].id == 0x1D && self->field_0x424 == 0) {
-        return 1;
+    if (self->field_0x1CC == 0 || self->field_0x1CC == 5) {
+        if (self->item_slots[8].id == 0x1D && self->field_0x424 == 0) {
+            return 1;
+        }
+        if (self->item_slots[9].id == 0x1D && self->field_0x424 == 0) {
+            return 1;
+        }
+        if (self->item_slots[10].id == 0x1D && self->field_0x424 == 0) {
+            return 1;
+        }
+        if (self->item_slots[11].id == 0x1D && self->field_0x424 == 0) {
+            return 1;
+        }
     }
     return 0;
 }
@@ -11544,16 +11605,8 @@ s32 fn_802D7A74(struct _AINPC_W* self)
 /* 0x802D7B24 - whether the +0x171 == 1 state's sub-state is one of the two 0x20/0x3D.. ranges. */
 s32 fn_802D7B24(struct _AINPC_W* self)
 {
-    u16 sub;
-
-    if (self->field_0x171 != 1) {
-        return 0;
-    }
-    sub = self->field_0x172;
-    if ((u32)(sub - 0x20) <= 0x13) {
-        return 1;
-    }
-    if ((u32)(sub - 0x3D) <= 0x13) {
+    if (self->field_0x171 == 1
+        && ((u32)(self->field_0x172 - 0x20) <= 0x13 || (u32)(self->field_0x172 - 0x3D) <= 0x13)) {
         return 1;
     }
     return 0;
@@ -11635,31 +11688,35 @@ s32 fn_802D7CB0(struct _AINPC_W* self)
  * step 7. */
 void ainpc_demo_start(u8 state)
 {
+    _AINPC_W* w = &ainpc_w;
+
     if (state != 0x1A) {
         return;
     }
-    if (ainpc_w.active == 0) {
+    if (w->active == 0) {
         return;
     }
-    if (ai_area_ck(&ainpc_w) == 0) {
+    if (ai_area_ck(w) == 0) {
         return;
     }
-    fn_802D2A00(&ainpc_w, 7, 0, 0);
+    fn_802D2A00(w, 7, 0, 0);
 }
 
 /* 0x802D7D4C - the matching "lost the player" reaction for the +0x171 == 7 state. */
 void ainpc_demo_end(void)
 {
-    if (ainpc_w.active == 0) {
+    _AINPC_W* w = &ainpc_w;
+
+    if (w->active == 0) {
         return;
     }
-    if (ai_area_ck(&ainpc_w) == 0) {
+    if (ai_area_ck(w) == 0) {
         return;
     }
-    if (ainpc_w.field_0x171 != 7) {
+    if (w->field_0x171 != 7) {
         return;
     }
-    fn_802D2A00(&ainpc_w, 7, 1, 0);
+    fn_802D2A00(w, 7, 1, 0);
 }
 
 /* 0x802D7DB4 - whether the +0x420 == 5 state's timer is running. */
@@ -11671,7 +11728,7 @@ s32 ai_npc_hold_ck(struct _AINPC_W* self)
     if (self->field_0x420 != 5) {
         return 0;
     }
-    return self->field_0x422 != 0;
+    return self->field_0x422 > 0;
 }
 
 /* 0x802D7DF0 - sets the +0x374 gauge. */
@@ -11686,7 +11743,7 @@ s32 ai_npc_wait_ck(struct _AINPC_W* self)
     if (self->active == 0) {
         return 0;
     }
-    return self->field_0x374 != 0;
+    return self->field_0x374 > 0;
 }
 
 /* 0x802D7E20 - whether the AI NPC has arrived (its step counter is at 1). */
@@ -11765,54 +11822,56 @@ s32 ai_npc_call_ck(struct _AINPC_W* self)
 /* 0x802D7804 - whether the AI NPC is close enough to the player to act on it. */
 s32 ai_npc_player_near_ck(u8 index, f32 distance)
 {
-    _PLW* plw;
+    _AINPC_W* w = &ainpc_w;
 
-    if (ainpc_w.active == 0) {
+    if (w->active == 0) {
         return 0;
     }
-    plw = ainpc_w.plw_0x16C;
-    if (plw == 0) {
+    if (w->plw_0x16C == 0) {
         return 0;
     }
     if (distance < lbl_8079A670) {
         return 1;
     }
-    if (ainpc_w.field_0x1A4 != plw->area_0x16) {
+    if (w->field_0x1A4 != w->plw_0x16C->area_0x16) {
         return 0;
     }
-    if (ainpc_w.field_0x171 == 5) {
+    if (w->field_0x171 == 5) {
         return 0;
     }
-    if (index == 4 && ai_npc_item_step_ck(&ainpc_w) == 1) {
+    if (index == 4 && ai_npc_item_step_ck(w) == 1) {
         return 0;
     }
-    return vec3_dist_sq(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
-           distance * distance;
+    if (vec3_dist_sq(&w->vec_0x178, (nw4r::math::VEC3*)&w->plw_0x16C->motion_pos_0x3C) < distance * distance) {
+        return 1;
+    }
+    return 0;
 }
 
 /* 0x802D78FC - whether the player is inside the AI NPC's current attack reach. */
 s32 ai_npc_player_in_reach_ck(void)
 {
-    _PLW* plw;
+    _AINPC_W* w = &ainpc_w;
 
-    if (ainpc_w.active == 0) {
+    if (w->active == 0) {
         return 0;
     }
-    if (ainpc_w.field_0x420 != 2) {
+    if (w->field_0x420 != 2) {
         return 0;
     }
-    plw = ainpc_w.plw_0x16C;
-    if (plw == 0) {
+    if (w->plw_0x16C == 0) {
         return 0;
     }
-    if (ainpc_w.field_0x1A4 != plw->area_0x16) {
+    if (w->field_0x1A4 != w->plw_0x16C->area_0x16) {
         return 0;
     }
-    if (ainpc_w.field_0x422 == 0) {
+    if (w->field_0x422 == 0) {
         return 0;
     }
-    return vec3_dist_sq(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
-           lbl_8079A870;
+    if (vec3_dist_sq(&w->vec_0x178, (nw4r::math::VEC3*)&w->plw_0x16C->motion_pos_0x3C) < lbl_8079A870) {
+        return 1;
+    }
+    return 0;
 }
 
 /* The tables and constants the companion and result helpers below read, in this unit's `.data` / `.sdata2`:
@@ -11957,7 +12016,7 @@ u16 fn_802D89D4(struct _AINPC_W* self, u16 motion)
 }
 
 /* 0x802D8ABC (0x20C): the quest's hunt rank: both count runs weighed by the rank table, plus the bonus. */
-s16 result_hunt_rank_get(struct Q_CountSet* counts_c, struct Q_CountSet* counts_d)
+s32 result_hunt_rank_get(struct Q_CountSet* counts_c, struct Q_CountSet* counts_d)
 {
     s32 sum = 0;
     struct _AINPC_W* self = &ainpc_w;

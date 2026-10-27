@@ -17,7 +17,7 @@ extern "C" {
 
 /* 0x80792598 - the four sub-state frame counts (180, 270, 285, 300) the AI-NPC step machines index
  * with their `+0x005` entry byte. */
-extern s16 lbl_80792598[];
+extern s16 lbl_80792598[4];
 
 /* The `.sdata2` pool run 0x8079A670-0x8079A77C the AI-NPC band loads its geometry/angle constants
  * from (the loads' own displacements resolve here). */
@@ -81,7 +81,7 @@ extern const f32 lbl_8079A778; /* 4000000.0 */
 }
 #endif
 
-extern const f32 lbl_8079A870; /* 5000.0 - the AI NPC's own attack reach */
+extern const f32 lbl_8079A870; /* 40000.0 - the AI NPC's own attack reach, squared */
 
 /* The hold-item tuning tables `src/ai/fn_802D44F4.cpp` reads (0x805D5354-0x805D5390): none of them is
  * covered by a registered unit's range, so they are the band's fallback declarations too. */

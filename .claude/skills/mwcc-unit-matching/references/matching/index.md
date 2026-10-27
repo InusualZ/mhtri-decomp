@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (187)
+## Ideas that work (189)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -196,6 +196,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 205 | [The first implicit struct assignment calls __as__ out of line: instantiate it earlier in a never-called inline](205-implicit-assign-first-use.md) | works | source-shape | The first function that assigns a small struct (`dst->opts = src->opts`) calls an emitted `__as__<len><Type>FRC<len><Type>` where retail copies it inline with `lwz`/`stw`, while a later function's identical copy is... |
 | 206 | [A run of OR-ed constant bits kept as separate ori: one compound assignment per bit](206-or-bits-one-statement.md) | works | source-shape | Retail ORs a word with several constants as one `ori`/`oris` each between one `lwz` and one `stw`, where `*p = *p \| A \| B \| C` folds them into a single `ori` of the combined mask |
 | 207 | [A switch on a u8 keeps unsigned compares in every arm only when the selector is cast to u32](207-switch-on-a-u8.md) | works | source-shape | A compare-tree switch on a `u8` selector opens with `cmplwi` but the later case tests read `cmpwi` where retail keeps `cmplwi` throughout. |
+| 208 | [Scope #pragma opt_common_subs off to a function whose retail reloads what MWCC keeps](208-scope-pragma-opt-common.md) | works | pragma, source-shape | Retail loads a value a second time where ours keeps it in a register - a field re-read after a call, a loop test's load repeated at the top of the body, or an indirect call's table pointer loaded after the arguments... |
+| 209 | [A signed cmpwi on a u8 or u16 value is a switch on the promoted operand](209-signed-cmpwi-on-a.md) | works | source-shape | Retail tests an unsigned byte or halfword (a u8 field, a u8 parameter, a call's u8 result) with a signed `cmpwi` where our `if (x == 2)` gives `cmplwi`, and the arms are often laid out in another order. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

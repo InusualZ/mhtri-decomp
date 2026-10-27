@@ -47,17 +47,17 @@ u8 ai_npc_in_range_ck(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 limit);
 u32 Pl_motion_input_ck(s32 a);
 s32 fn_80291B08(struct _AINPC_W* self, nw4r::math::VEC3* pos, void* angle, f32* out,
                s32 mode);
-s32 coll_wall_slide(nw4r::math::VEC3* probe, nw4r::math::VEC3* current, nw4r::math::VEC3* pos,
-               u16 mask, u16 flags, s32 a, u8 area, f32 offset);
+s32 coll_wall_slide(nw4r::math::VEC3* to, nw4r::math::VEC3* from, f32 radius, nw4r::math::VEC3* pos, u32 kind,
+               u16 layers, u8 mode, u8 area);
 void hit_attack_list_push(struct _HIT_W* hit);
-void hit_data_apply(struct _HIT_W* hit, void* owner, f32 value);
+void hit_data_apply(struct _HIT_W* hit, struct _HIT_DATA* data);
 void hit_flags_clear(struct _HIT_W* hit);
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void eft004_key_spawn(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
 void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b);
-void em_land_data_init(nw4r::math::VEC3* out);
-void vec3_move_damp(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
-                  nw4r::math::VEC3* c, f32 d);
+void em_land_data_init(::LandData* land);
+void vec3_move_damp(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::VEC3* dir, f32 k,
+                  nw4r::math::VEC3* out);
 void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void g3d_root_model_bind(s32 a, u32 b);
 void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
@@ -74,8 +74,8 @@ s32 abs(s16 value);
 /* ---- the model (`sound/mhchar.cpp`'s range) ---- */
 void mhchar_model_mtx_update(struct MHchar* chr);
 void mhchar_joint_mtx_get(struct MHchar* chr, u32 joint, nw4r::math::MTX34* out);
-void mhchar_motion_set(struct MHchar* chr, u32 a, u32 b, u16 motion, s32 c, s32 d, s32 e, f32 f,
-                 f32 g);
+void mhchar_motion_set(struct MHchar* chr, u32 kind, s32 index, u16 motion, s32 blend, f32 start, s32 loop,
+                 u32 flags, f32 rate);
 void mhchar_motion_speed_set(struct MHchar* chr, f32 value);
 u32 mhchar_frame_check(struct MHchar* chr, u16 layer, s32 flag, f32 low, f32 high);
 u32 mhchar_motion_end_ck(struct MHchar* chr, s32 flag);
@@ -116,7 +116,7 @@ extern const f32 lbl_8079A7B0;
 /* ---- the tables the band reads ---- */
 extern void* lbl_805D3FB8[8];              /* the two-level motion table `fn_802D282C` walks */
 extern u8 lbl_805D3AD8[];                  /* the motion-entry records `fn_802D2F7C` walks (stride 0x1A) */
-extern u32 lbl_80792508[];                 /* the motion ids the entries' +0x0F byte indexes */
+extern u32 lbl_80792508[2];                 /* the motion ids the entries' +0x0F byte indexes */
 extern void* lbl_805D4150[16];             /* the dispatcher table `fn_802D0DCC` also uses */
 
 /* ---- C++-linkage callees (their map names are manglings; rule 9) ---- */
@@ -151,7 +151,7 @@ void fn_802D29CC(struct _AINPC_W* self, f32 scale);
 void fn_802D29E4(struct _AINPC_W* self, s8 value);
 void fn_802D29EC(struct _AINPC_W* self);
 void ai_npc_variant_set(struct _AINPC_W* self, u8 variant);
-void fn_802D2A00(struct _AINPC_W* self, u8 motion, u16 step, s16 gauge);
+void fn_802D2A00(struct _AINPC_W* self, u8 motion, u16 step, u16 gauge);
 void fn_802D2ABC(struct _AINPC_W* self, s32 motion, s32 step, s32 gauge);
 void ai_npc_base_state_set(struct _AINPC_W* self, u32 variant);
 u32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step);
@@ -161,7 +161,7 @@ void fn_802D2B88(struct _AINPC_W* self, u16 flags);
 void fn_802D2B98(struct _AINPC_W* self, u16 flags);
 void fn_802D2BB0(struct _AINPC_W* self, struct _HIT_W* hit);
 void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row);
-u16 fn_802D30F8(u16 angle, u16 target, u16 limit);
+u16 fn_802D30F8(u16 angle, u16 target, u32 limit);
 s32 fn_802D3184(struct _AINPC_W* self, u32 limit);
 void fn_802D31FC(struct _AINPC_W* self);
 void fn_802D3210(struct _AINPC_W* self, u32* angles);
@@ -179,7 +179,7 @@ s16 fn_802D3984(struct _AINPC_W* self, s32 high, s32 low, u32 reverse);
 void fn_802D39DC(struct _AINPC_W* self);
 void fn_802D3A20(struct _AINPC_W* self);
 void fn_802D3A2C(struct _AINPC_W* self, s16 value);
-void fn_802D3A34(struct _AINPC_W* self, s16 delta);
+void fn_802D3A34(struct _AINPC_W* self, s32 delta);
 void fn_802D3AD8(struct _AINPC_W* self);
 void fn_802D3AF8(struct _AINPC_W* self);
 void fn_802D3B10(struct _AINPC_W* self);
@@ -199,7 +199,7 @@ u8 fn_802D3F1C(struct _AINPC_W* self);
 s32 fn_802D3F70(struct _AINPC_W* self, u8 high, u8 low);
 u32 fn_802D4020(struct _AINPC_W* self);
 void fn_802D40A4(struct _AINPC_W* self, u16 id);
-void fn_802D40EC(struct _AINPC_W* self, s32 id, s32 delta);
+void fn_802D40EC(struct _AINPC_W* self, u16 id, s16 delta);
 void fn_802D41C8(struct _AINPC_W* self);
 void fn_802D41D4(struct _AINPC_W* self);
 void fn_802D41E0(struct _AINPC_W* self, s8 selector, s32 reset);
