@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Relocation-level diff of one unit: the target object's relocations against ours, on both sides.
 Spec: docs/tools/spec/relocdiff.md. CLI: relocdiff.py <unit>... [--unit U] [--section S] [--rows N | --all] [--json F]
-[--check] [--by-owner] | --callees [unit...] [--json F|-] | --selftest."""
+[--check] [--by-owner] | --callees [unit...] [--json F|-] | --values [unit...] [--json F|-] | --selftest."""
 from __future__ import annotations
 
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -164,6 +164,88 @@ def run_callees(units: list[str], json_path: str | None = None) -> int:
     return status
 
 
+def value_context(root: str) -> tuple[object | None, dict]:
+    """`(retail DOL or None, {map name: address})`: where `--values` reads a target the object does not define
+    (`orig/<version>/sys/main.dol`, read-only, and the names `symbols.txt` defines once)."""
+    from tools.lib.binary.dol import Dol  # noqa: PLC0415
+    from tools.lib import project as _project  # noqa: PLC0415
+    dol_path = os.path.join(root, "orig", _repo.VERSION, "sys", "main.dol")
+    sym_path = os.path.join(root, "config", _repo.VERSION, "symbols.txt")
+    dol = Dol.read(dol_path) if os.path.exists(dol_path) else None
+    addresses = _project.SymbolMap(sym_path).unique_addresses() if os.path.exists(sym_path) else {}
+    return dol, addresses
+
+
+def value_record(spec: str, root: str | None = None, ctx: tuple | None = None, exact: bool = False) -> dict:
+    """`{unit, stem, pairs, same, differ, skipped, error}` for one unit (`--values`, `lib.objcompare.value_diffs`);
+    `exact` takes `spec` as a registered stem as it stands (the sweep's: `Unit.resolve` lists every unit per call)."""
+    root = root or _repo.repo_root()
+    unit = _units.Unit.make(spec, root) if exact else _units.Unit.resolve(spec, root)
+    rec = {"unit": unit.report_name, "stem": spec, "pairs": 0, "same": 0, "differ": [], "skipped": {}, "error": None}
+    missing = [p for p in (unit.obj_ours, unit.obj_target) if not os.path.exists(p)]
+    if missing:
+        rec["error"] = "object missing (%s) - build/split it first" % missing[0]
+        return rec
+    dol, addresses = ctx if ctx is not None else value_context(root)
+    try:
+        rec.update(objcompare.value_diffs(unit.obj_target, unit.obj_ours, dol, addresses))
+    except (ValueError, OSError) as exc:
+        rec["error"] = "unreadable object (%s)" % exc
+    return rec
+
+
+def value_line(d: dict) -> str:
+    """One value mismatch: `owner+0xOFF  TYPE  ours NAME = VALUE vs target NAME = VALUE`, then `[address, differs at +0xN]` when the
+    instruction takes the address (`addi`, a table word: the datum behind it is compared, and a base pointer the
+    code offsets from can differ without a wrong value) and `[bytes equal]` when the owner's two bodies are
+    otherwise byte-identical (the mismatch no score sees)."""
+    def side(name: str, addend: int, value: str) -> str:
+        return "%s%s = %s" % (name, "%+#x" % addend if addend else "", value)
+    return "%s+0x%x  %s  ours %s vs target %s%s" % (
+        d["owner"], d["offset"], d["type"], side(d["ours"], d["ours_addend"], d["ours_value"]),
+        side(d["target"], d["target_addend"], d["target_value"]),
+        ("  [address, differs at +0x%x]" % (d.get("first_difference") or 0) if d.get("kind") == "bytes" else "")
+        + ("  [bytes equal]" if d.get("owner_equal") else ""))
+
+
+def run_values(units: list[str], json_path: str | None = None) -> int:
+    """`--values`: every relocation pair whose two targets differ by name and whose bytes differ, one line each.
+    0 none, 1 some, 2 an object missing or unreadable."""
+    root = _repo.repo_root()
+    specs = units or registered_with_objects(root)
+    ctx = value_context(root)
+    if ctx[0] is None:
+        print("relocdiff --values: no retail DOL at orig/%s/sys/main.dol - undefined targets are not read"
+              % _repo.VERSION)
+    recs = [value_record(spec, root, ctx, exact=not units) for spec in specs]
+    status = 0
+    for rec in recs:
+        if rec["error"]:
+            print("%s: %s" % (rec["stem"], rec["error"]))
+            status = 2
+            continue
+        for d in rec["differ"]:
+            print("%s  %s" % (rec["stem"], value_line(d)))
+            status = max(status, 1)
+    n = sum(len(r["differ"]) for r in recs)
+    skipped: dict = {}
+    for r in recs:
+        for k, v in r["skipped"].items():
+            skipped[k] = skipped.get(k, 0) + v
+    print("relocdiff --values: %d value mismatch(es) in %d of %d unit(s); %d renamed pair(s) read, %d equal; "
+          "not read: %s" % (n, sum(1 for r in recs if r["differ"]), len(recs), sum(r["pairs"] for r in recs),
+                            sum(r["same"] for r in recs),
+                            ", ".join("%d %s" % (v, k) for k, v in sorted(skipped.items())) or "none"))
+    if json_path:
+        payload = json.dumps(recs, indent=1)
+        if json_path == "-":
+            print(payload)
+        else:
+            with open(json_path, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+    return status
+
+
 def unit_identical(rec: dict) -> bool:
     """True when every compared section's relocation sets are identical (an error is not identical)."""
     return not rec["error"] and all(s["diff"]["identical"] for s in rec["sections"])
@@ -316,6 +398,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="per written function, the relocation symbol names that differ (wrong callee, mangling, "
                          "linkage), one line per function; no unit = every registered unit with both objects; "
                          "--json F (or -) writes the record")
+    ap.add_argument("--values", action="store_true",
+                    help="every relocation pair whose two targets differ only by name (`@N` vs `lbl_X`), read on "
+                         "both sides (access width, or the symbol's size) and reported when the BYTES differ; no "
+                         "unit = every registered unit with both objects; exit 1 on a mismatch; --json F (or -)")
     ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     args = ap.parse_args(argv)
 
@@ -324,6 +410,8 @@ def main(argv: list[str] | None = None) -> int:
     units = list(args.units) + list(args.specs)
     if args.callees:
         return run_callees(units, args.json)
+    if args.values:
+        return run_values(units, args.json)
     if not units:
         ap.error("a unit is required (or --selftest)")
     if args.all and args.rows != 60:

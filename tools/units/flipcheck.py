@@ -297,11 +297,8 @@ def map_addresses() -> dict[str, int]:
     """`{name: address}` for every name `symbols.txt` defines exactly once (a duplicated name resolves nothing),
     read once per `SYMBOLS` path."""
     if SYMBOLS not in _MAP_ADDRESSES:
-        rows: dict[str, list[int]] = {}
-        if os.path.exists(SYMBOLS):
-            for row in _project.SymbolMap(SYMBOLS).rows():
-                rows.setdefault(row.name, []).append(row.address)
-        _MAP_ADDRESSES[SYMBOLS] = {n: a[0] for n, a in rows.items() if len(a) == 1}
+        _MAP_ADDRESSES[SYMBOLS] = (_project.SymbolMap(SYMBOLS).unique_addresses() if os.path.exists(SYMBOLS)
+                                   else {})
     return _MAP_ADDRESSES[SYMBOLS]
 
 
@@ -343,6 +340,42 @@ def relocation_place_problems(unit: str, claim: dict, src_path: str, obj_path: s
                    "so the link writes other addresses even where the bytes are equal - %s%s"
                    % (name, len(diffs), "; ".join(shown), more))
     return out
+
+
+#: The prefix of a note that is advisory - printed whatever the verdict, never a refusal.
+ADVISORY = "advisory: "
+#: How many value mismatches one advisory line spells before `...`.
+VALUE_FIRST = 4
+_DOLS: dict = {}
+
+
+def retail_dol():
+    """The retail DOL (`orig/RMHE08/sys/main.dol`, read-only) for the value row, or None when the tree has none."""
+    path = os.path.join(MAIN, "orig", "RMHE08", "sys", "main.dol")
+    if path not in _DOLS:
+        from tools.lib.binary.dol import Dol  # noqa: PLC0415
+        _DOLS[path] = Dol.read(path) if os.path.exists(path) else None
+    return _DOLS[path]
+
+
+def relocation_value_notes(src_path: str, obj_path: str) -> list[str]:
+    """The advisory value row (`relocdiff --values`, `lib.objcompare.value_diffs`): relocations at the same offset,
+    of the same type, in the same instruction, whose targets differ only by name (`@N` vs `lbl_X`) but whose BYTES
+    differ - a pool word or string no score sees. One `advisory:` line, or none; it never refuses (yet)."""
+    if not (os.path.exists(src_path) and os.path.exists(obj_path)):
+        return []
+    try:
+        rec = objcompare.value_diffs(obj_path, src_path, retail_dol(), map_addresses())
+    except (ValueError, OSError):
+        return []
+    if not rec["differ"]:
+        return []
+    shown = ["%s+0x%x ours %s = %s, target %s = %s" % (d["owner"], d["offset"], d["ours"], d["ours_value"],
+                                                        d["target"], d["target_value"])
+             for d in rec["differ"][:VALUE_FIRST]]
+    more = " (... %d more)" % (len(rec["differ"]) - VALUE_FIRST) if len(rec["differ"]) > VALUE_FIRST else ""
+    return ["%s%d relocation(s) name a different datum than the target's under another name, and the bytes differ "
+            "(relocdiff --values) - %s%s" % (ADVISORY, len(rec["differ"]), "; ".join(shown), more)]
 
 
 def unit_name_for(path: str) -> str:
@@ -1059,6 +1092,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     problems += positioned_symbol_problems(claim, ours, src_path, obj_path, leads=leads, link_ctx=link_ctx,
                                            target_rel=target_rel, notes=notes)
     problems += relocation_place_problems(unit, claim, src_path, obj_path, leads=leads, moves=moves)
+    notes += relocation_value_notes(src_path, obj_path)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
@@ -1156,6 +1190,9 @@ def main() -> int:
             print("NOT READY  %s" % unit)
             for p in problems:
                 print("   - %s" % p)
+            for n in notes:
+                if n.startswith(ADVISORY):
+                    print("   . %s" % n)
         else:
             print("READY      %s (%d section(s) match the claim)" % (unit, len(claim)))
             for n in notes:

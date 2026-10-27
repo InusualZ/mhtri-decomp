@@ -99,12 +99,17 @@ fails (or passes) for reasons unrelated to your unit — and `NonMatching` here 
    `DIFF_DELETE`. Pair index `i` with the same index on the right side to see what we emitted instead —
    inserts/deletes shift the alignment, so read them in order. Relocated operands (`bl 0x0`, `lis r3, 0x0`)
    legitimately show `0x0` in `formatted`; judge relocations from `.rela.text` / section evidence, not text.
-4. Compare sizes first (`symbol.size` on both sides). Equal size + 100 % is a match; a size delta alone is
+4. **A 100 % row can load the wrong constant.** objdiff scores `lfs f1, @123@sda21(r2)` against
+   `lfs f1, lbl_80796EE0@sda21(r2)` as equal whatever the two pool words hold (and `rawsame` agrees). Read the values:
+   `python tools/objdiff/relocdiff.py --values <unit>` prints every same-offset relocation pair whose targets differ by
+   name **and** whose bytes differ (`ours @5494 = 30.0 vs target lbl_8079A68C = 50.0`), exit 1 on any; `[bytes equal]`
+   marks a function no score can fault. Each line is a mismatch to fix before claiming the function.
+5. Compare sizes first (`symbol.size` on both sides). Equal size + 100 % is a match; a size delta alone is
    already a mismatch, no matter how similar the first instructions look.
-5. A symbol present in the target but absent from our object (or vice versa) is a mismatch — check both
+6. A symbol present in the target but absent from our object (or vice versa) is a mismatch — check both
    `symbols` lists for the name; if it is missing, look for an inlined or renamed counterpart and report
    which of the two it is.
-6. **Data symbols** (tables, vtables, `@etb_*`/`@eti_*`): compare `symbol.size` and then the raw bytes —
+7. **Data symbols** (tables, vtables, `@etb_*`/`@eti_*`): compare `symbol.size` and then the raw bytes —
    `scripts/elfsect.py` prints section sizes, and its `sections()` helper gives you the byte ranges to
    slice and diff. Section size equal ≠ section content equal.
 

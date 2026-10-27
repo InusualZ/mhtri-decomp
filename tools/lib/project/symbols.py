@@ -377,6 +377,13 @@ class SymbolMap:
             out.setdefault(e.name, []).append(e)
         return out
 
+    def unique_addresses(self) -> dict[str, int]:
+        """`{name: address}` for every name the map defines exactly once (a duplicated name resolves nothing)."""
+        rows: dict[str, list[int]] = {}
+        for e in self._all():
+            rows.setdefault(e.name, []).append(e.address)
+        return {n: a[0] for n, a in rows.items() if len(a) == 1}
+
     def by_section(self) -> dict[str, list[Symbol]]:
         """`section -> rows sorted by address`."""
         out: dict[str, list[Symbol]] = {}

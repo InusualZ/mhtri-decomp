@@ -49,7 +49,11 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   lines)`, `legacy_reloc_name(type, fallback)`; `callee_diffs(target, ours) -> [{function, diffs: [{kind, ours, target,
   offset}]}]` (per `.text` function both define and ours wrote - more than `STUB_MAX_BYTES` - the relocation symbol names
   that differ: sequences aligned, moved rows cancelled by name, our `LOCAL_LABEL_RE` labels cancelling the target's
-  `TARGET_LABEL_RE` pool/jump-table labels of the same type, the rest paired in order), `callee_kind(ours, target)`
+  `TARGET_LABEL_RE` pool/jump-table labels of the same type, the rest paired in order), `value_diffs(target, ours, dol,
+  addresses) -> {pairs, same, differ, skipped}` (`relocdiff --values`: a same-offset, same-type, same-instruction pair
+  whose symbol names differ, read on both sides - own section bytes or the DOL at the map address - at `value_width`
+  bytes with relocated words masked; spec `relocdiff.md`), `value_width(word, sizes)`, `format_value(data, kind)`,
+  `callee_kind(ours, target)`
   (`callee`/`mangling`/`linkage`/`extra`/`missing`, by `lib.names.owner_stem`).
 * Undefined names: `reloc_facts(obj) -> {relocs, defined, refs} | None`, `provides_global(entry)`, `link_inputs(ninja)`,
   `linker_assigned(ldscript)`, `link_index(root, inputs, cache_path, rebuild) -> {providers, ref_count, inputs, refs}`,

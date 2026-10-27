@@ -1009,6 +1009,224 @@ def callee_diffs(target, ours) -> list[dict]:
     return out
 
 
+# --- values: what a renamed relocation target actually holds ----------------------------------------------------
+
+#: The relocation kinds whose target is a datum an instruction or a table reads: the low half of an address, a
+#: 16-bit address, a small-data access and a 32-bit address. `@ha`/`@hi` carry only the high half (their `@l`
+#: partner is compared) and a branch's target is code (`callee_diffs`' question), so those are not read.
+VALUE_RELOCS = frozenset({1, 3, 4, 109})          # ADDR32, ADDR16, ADDR16_LO, EMB_SDA21
+#: How many bytes an address-taken target (`addi`, a table word) is read for when its symbol states no size.
+VALUE_DEFAULT_WIDTH = 4
+#: The longest datum one pair reads (a string or a table behind `addi`).
+VALUE_MAX_WIDTH = 256
+#: How many bytes of a longer datum `format_value` spells before `...` (the comparison reads all of them).
+VALUE_SHOWN_BYTES = 24
+#: FP loads/stores of a single (lfs/lfsu/stfs/stfsu) and of a double (lfd/lfdu/stfd/stfdu): shown as numbers.
+_FP_SINGLE_OPS = frozenset({48, 49, 52, 53})
+_FP_DOUBLE_OPS = frozenset({50, 51, 54, 55})
+#: lmw/stmw move a run of words: their target is read as a datum, not as one access.
+_MULTIPLE_OPS = frozenset({46, 47})
+SHF_EXECINSTR = 0x4
+#: How many symbols starting at or before a relocated offset are tried as its owner (aliases and nested labels).
+OWNER_LOOKBACK = 8
+
+
+def _owned_relocs(elf: Elf) -> tuple[dict, dict]:
+    """`({(section, owner name): [(offset in owner, type, Symbol, addend, instruction word or None)]},
+    {(section, owner name): the owner's bytes})` in offset order: the owner is the sized defined function/object
+    containing the relocated offset (a relocation outside every sized symbol is not grouped); the word is the
+    `.text` instruction the relocation patches."""
+    nsec = len(elf.sections)
+    table: dict[str, list] = {}
+    for s in elf.symbols:
+        sec = elf.sections[s.shndx].name if 0 < s.shndx < nsec else None
+        if s.name and sec and s.type in (0, 1, 2) and s.size:
+            table.setdefault(sec, []).append(s)
+    for lst in table.values():
+        lst.sort(key=lambda s: (s.value, -s.size))
+    starts = {sec: [s.value for s in lst] for sec, lst in table.items()}
+    targets = _reloc_targets(elf)
+    data: dict[str, bytes] = {}
+    syms = elf.symbols
+    out: dict = {}
+    body: dict = {}
+    for r in elf.relocs():
+        tsec = targets.get(r.rela_index)
+        lst = table.get(tsec, ())
+        own = None
+        hi = bisect.bisect_right(starts.get(tsec, ()), r.offset)
+        for s in reversed(lst[max(hi - OWNER_LOOKBACK, 0):hi]):   # the nearest start first; nesting is shallow
+            if r.offset < s.value + s.size:
+                own = s
+                break
+        if own is None or r.symbol >= len(syms):
+            continue
+        if tsec not in data:
+            data[tsec] = elf.section_bytes(tsec) or b""
+        key = (tsec, own.name)
+        if key not in body:
+            body[key] = data[tsec][own.value:own.value + own.size]
+        word = None
+        if tsec == ".text":
+            raw = data[tsec][r.offset & ~3:(r.offset & ~3) + 4]
+            word = int.from_bytes(raw, "big") if len(raw) == 4 else None
+        out.setdefault(key, []).append((r.offset - own.value, r.type, syms[r.symbol], r.addend, word))
+    for lst in out.values():
+        lst.sort(key=lambda row: (row[0], row[1]))
+    return out, body
+
+
+def value_width(word: int | None, sizes: list[int]) -> tuple[int, str]:
+    """`(bytes to read, how to show them)` for one relocated access. A D-form load/store reads its access width
+    (`ppc.WIDTH`; an FP access shows as `f32`/`f64`, an integer one as `int`); anything else (`addi`, a table word,
+    lmw/stmw) reads the datum: the smallest positive size of `sizes` (the two symbols' own sizes from the addend on;
+    the larger one runs into its neighbour or its padding), else `VALUE_DEFAULT_WIDTH`, capped at `VALUE_MAX_WIDTH`
+    (`bytes`). Pure."""
+    from tools.lib import ppc  # noqa: PLC0415 - only the value pass decodes instructions
+    op = None if word is None else word >> 26
+    if op in ppc.WIDTH and op not in _MULTIPLE_OPS:
+        return ppc.WIDTH[op], ("f32" if op in _FP_SINGLE_OPS else "f64" if op in _FP_DOUBLE_OPS else "int")
+    size = min((n for n in sizes if n > 0), default=VALUE_DEFAULT_WIDTH)
+    return min(size, VALUE_MAX_WIDTH), "bytes"
+
+
+def _relocated_words(elf: Elf) -> dict[str, set[int]]:
+    """`{section: offsets}` of every relocated field in the object's data sections: the bytes there are the
+    relocation's business (zero in a compiled object, sometimes the linked address in a split one), not data."""
+    out: dict[str, set[int]] = {}
+    for r in elf.relocs():
+        out.setdefault(r.section, set()).add(r.offset)
+    return out
+
+
+def _value_at(elf: Elf, sym, addend: int, width: int, dol, addresses: dict,
+              relocated: dict[str, set[int]] | None = None) -> tuple[str, bytes | None, set[int]]:
+    """What one relocation target holds: `("bytes", data, relocated)` from the object's own section (a defined
+    symbol, or a section symbol at the addend) - `relocated` the datum's offsets that a relocation fills (each
+    covers 4 bytes) - or from the DOL at the map's address plus the addend (an undefined name, nothing masked);
+    `("code", ...)` for a target in executable code, `("bss", ...)` for uninitialised data (nothing to compare)
+    and `("unresolved", ...)` for a name the map does not carry or a read past the section's end."""
+    if sym.defined and 0 < sym.shndx < len(elf.sections):
+        sec = elf.sections[sym.shndx]
+        if sec.flags & SHF_EXECINSTR:
+            return "code", None, set()
+        if sec.is_nobits:
+            return "bss", None, set()
+        start = (0 if sym.type == STT_SECTION else sym.value) + addend
+        data = sec.data[start:start + width]
+        if start < 0 or len(data) != width:
+            return "unresolved", None, set()
+        hit = {off - start for off in (relocated or {}).get(sec.name, ()) if start - 3 <= off < start + width}
+        return "bytes", data, hit
+    address = addresses.get(sym.name) if sym.name else None
+    if address is None or dol is None:
+        return "unresolved", None, set()
+    address += addend
+    if dol.in_text(address):
+        return "code", None, set()
+    data = dol.bytes_at(address, width)
+    return ("bytes", data, set()) if data is not None else ("bss", None, set())
+
+
+def _masked(data: bytes, relocated: set[int]) -> bytes:
+    """`data` with the 4 bytes at each relocated offset zeroed."""
+    out = bytearray(data)
+    for off in relocated:
+        for i in range(max(off, 0), min(off + 4, len(out))):
+            out[i] = 0
+    return bytes(out)
+
+
+def format_value(data: bytes, kind: str) -> str:
+    """One datum as text: a single/double as its number and hex, a printable NUL-terminated string quoted, else
+    hex. Pure."""
+    import struct  # noqa: PLC0415
+    if kind == "f32" and len(data) == 4:
+        return "%r (0x%s)" % (struct.unpack(">f", data)[0], data.hex())
+    if kind == "f64" and len(data) == 8:
+        return "%r (0x%s)" % (struct.unpack(">d", data)[0], data.hex())
+    text, _nul, rest = data.partition(b"\0")
+    if kind == "bytes" and len(text) >= 2 and not any(rest) and all(32 <= c < 127 for c in text):
+        return '"%s"' % text.decode("ascii")
+    if len(data) > VALUE_SHOWN_BYTES:
+        return "0x%s... (%d bytes)" % (data[:VALUE_SHOWN_BYTES].hex(), len(data))
+    return "0x" + data.hex()
+
+
+def _datum_size(sym, addend: int) -> int:
+    """The bytes of `sym`'s own datum from `addend` on (0 for a section symbol or an unsized one)."""
+    return 0 if sym.type == STT_SECTION or not sym.size else max(sym.size - addend, 0)
+
+
+def value_diffs(target, ours, dol=None, addresses: dict | None = None) -> dict:
+    """The relocation pairs whose targets differ by NAME, judged by the bytes each target holds.
+
+    objdiff and `rawsame` score `lfs f1, @123@sda21(r2)` against `lfs f1, lbl_80796EE0@sda21(r2)` as equal whatever
+    the two pool words hold. Per owner (function or data object) both objects define - a `.text` stub ours has not
+    written (`STUB_MAX_BYTES`) excepted - a relocation of ours pairs with the target's at the SAME offset in the
+    owner, of the same type and patching the same instruction word (relocated fields are zero in both objects; an
+    aligner on the type sequence, or a pair across two different instructions, reads a diverged body as a false
+    value mismatch - counted as `other-instruction`); every pair of a `VALUE_RELOCS` kind whose two symbol names differ is read
+    on both sides (`value_width` bytes at the addend: the object's own section for a defined
+    target, the DOL `dol` at `addresses[name]` for an undefined one) and the bytes compared - a word inside the datum
+    that a relocation fills on either side is masked on both (a pointer is the relocation's question, not a value),
+    and a datum made only of such words is skipped as `relocated`; `extab`/`extabindex` owners are not read.
+
+    Returns `{pairs, same, differ: [{owner, section, offset, type, ours, ours_addend, target, target_addend,
+    ours_value, target_value, width, kind, first_difference, owner_equal}], skipped: {code|bss|unresolved|relocated|
+    other-instruction: n}}`: `pairs` counts the name-differing pairs read on both sides, `offset` is the offset in
+    the owner, `kind` is `value_width`'s (`bytes`: an address-taken datum), `first_difference` the first differing
+    byte of the datum, and `owner_equal` says the owner's two bodies are byte-identical (relocated fields are zero
+    in both objects) - the case no score can see."""
+    addresses = addresses or {}
+    o_elf, t_elf = load(ours), load(target)
+    (a, a_body), (b, b_body) = _owned_relocs(o_elf), _owned_relocs(t_elf)
+    o_rel, t_rel = _relocated_words(o_elf), _relocated_words(t_elf)
+    o_funcs = _functions(o_elf)
+    out = {"pairs": 0, "same": 0, "differ": [], "skipped": Counter()}
+    for key in sorted(set(a) & set(b), key=lambda k: (k[0] or "", k[1] or "")):
+        sec, owner = key
+        if sec == ".text" and owner in o_funcs and o_funcs[owner][1] <= STUB_MAX_BYTES:
+            continue
+        if sec.startswith(BOOKKEEPING_SECTIONS):         # unwind records: flipcheck compares those bytes directly
+            continue
+        theirs = {(row[0], row[1]): row for row in b[key]}
+        for off, typ, osym, oadd, oword in a[key]:
+            pair = theirs.get((off, typ))
+            if pair is None:
+                continue
+            _toff, _ttyp, tsym, tadd, tword = pair
+            oname, tname = osym.name or "<%s>" % osym.section, tsym.name or "<%s>" % tsym.section
+            if typ not in VALUE_RELOCS or oname == tname:
+                continue
+            if oword != tword:                            # another instruction: the body diverged, not the datum
+                out["skipped"]["other-instruction"] += 1
+                continue
+            width, kind = value_width(tword if tword is not None else oword,
+                                      [_datum_size(tsym, tadd), _datum_size(osym, oadd)])
+            ok, ov, om = _value_at(o_elf, osym, oadd, width, dol, addresses, o_rel)
+            tk, tv, tm = _value_at(t_elf, tsym, tadd, width, dol, addresses, t_rel)
+            if ok != "bytes" or tk != "bytes":
+                out["skipped"][ok if ok != "bytes" else tk] += 1
+                continue
+            if om or tm:                                  # a relocated word is a pointer, not this datum's value
+                ov, tv = _masked(ov, om | tm), _masked(tv, om | tm)
+                if not any(ov) and not any(tv) and len(om | tm) * 4 >= width:
+                    out["skipped"]["relocated"] += 1
+                    continue
+            out["pairs"] += 1
+            if ov == tv:
+                out["same"] += 1
+                continue
+            out["differ"].append({"owner": owner, "section": sec, "offset": off, "type": reloc_name(typ),
+                                  "ours": oname, "ours_addend": oadd, "target": tname, "target_addend": tadd,
+                                  "ours_value": format_value(ov, kind), "target_value": format_value(tv, kind),
+                                  "width": width, "kind": kind, "first_difference": first_difference(ov, tv),
+                                  "owner_equal": a_body[key] == b_body[key]})
+    out["skipped"] = dict(out["skipped"])
+    return out
+
+
 # --- undefined names: what a flip would leave unresolved --------------------------------------------------------
 
 def reloc_facts(obj) -> dict | None:
