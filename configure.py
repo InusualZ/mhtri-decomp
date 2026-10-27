@@ -1050,7 +1050,7 @@ config.libs = [
             Object(Matching, "g3d/g3d_resanmamblight.c"),
             Object(Matching, "g3d/g3d_resanmcamera.cpp"),
             Object(Matching, "g3d/g3d_resanmfog.cpp"),
-            Object(NonMatching, "g3d/g3d_resanmlight.cpp"),
+            Object(Matching, "g3d/g3d_resanmlight.cpp"),
             Object(NonMatching, "g3d/g3d_resanmscn.cpp"),
             Object(Matching, "g3d/g3d_resfile.cpp"),
             Object(NonMatching, "g3d/g3d_resmat.cpp"),
