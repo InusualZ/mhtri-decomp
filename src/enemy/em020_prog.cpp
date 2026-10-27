@@ -101,6 +101,7 @@
 
 #include "enemy/em020_ai.h"
 #include "enemy/fn_8011D448.h"
+#include "enemy/em_eft_fx.h"
 #include "enemy/fn_80138074.h"
 #include "Network/network_pat_control.h"
 #include "sys_mem.h"

@@ -1,4 +1,4 @@
-/* enemy/em_eft_fx_spawn_at.h - the declarations of `em_eft_fx_spawn_at` and `em_eft_fx_spawn_free`, which `enemy/fn_8011D448.cpp` owns (docs/plan.md 6.5
+/* enemy/em_eft_fx_spawn_at.h - the declarations of `em_eft_fx_spawn_at` and `em_eft_fx_spawn_free`, which `enemy/em_eft_fx.cpp` owns (docs/plan.md 6.5
  * rule 2); the signatures are the owner's definitions. */
 #ifndef MHTRI_ENEMY_EM_EFT_FX_SPAWN_AT_H
 #define MHTRI_ENEMY_EM_EFT_FX_SPAWN_AT_H

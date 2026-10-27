@@ -83,6 +83,7 @@
 #include "MSL/new.h" /* the placement `operator new` */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
+#include "enemy/em_eft_fx.h"
 #include "fn_8004CAD8.h"       /* fn_8005024C/fn_80051378/rotVecY/calcDistanceSqXZ */
 #include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
 #include "sys_mem.h"           /* operator delete (the `__dl__FPv` global deleter) */
@@ -327,7 +328,6 @@ void eft009_spawn_at_joint(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
 void eft009_spawn_at_pos(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d, nw4r::math::VEC3* p);
 void eft_spawn_type10(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 d);
 void eft_spawn_pos_in_area(nw4r::math::VEC3* p, u8 a, u32 b, u32 c, f32 d);
-void em_eft_fx_spawn_anchor(_ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 c);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 sin_idx_get(u16 a);

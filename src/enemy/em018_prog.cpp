@@ -102,7 +102,8 @@
 #include "enemy/em_angle_approach.h"  /* em_angle_approach */
 #include "enemy/em_turn_in_window.h" /* em_turn_in_window */
 #include "Pl/pl_act.h"   /* pl_act_grabbed_ck, pl_act_hold_motion_set */
-#include "enemy/fn_8011D448.h"   /* em_gauge_step, em_gauge_set, em_eft_fx_spawn, em_eft_fx_spawn_pair */
+#include "enemy/fn_8011D448.h"   /* em_gauge_step, em_gauge_set */
+#include "enemy/em_eft_fx.h"      /* em_eft_fx_spawn, em_eft_fx_spawn_pair */
 #include "menu/hit_list_capsule_ck.h" /* hit_list_capsule_ck */
 #include "ef/effect.h"            /* eft_vec_ctor */
 #include "ef/eft022_spawn.h"      /* eft022_spawn */

@@ -694,6 +694,7 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
+            Object(NonMatching, "enemy/em_eft_fx.cpp"),
             Object(NonMatching, "enemy/fn_8011D448.cpp"),
             Object(NonMatching, "enemy/em_common.cpp"),
             Object(Matching, "enemy/em_motion_update.cpp"),

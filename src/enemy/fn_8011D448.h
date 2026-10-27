@@ -30,17 +30,10 @@ void em_status_bits_set(struct _ENEMY_WORK* self, u32 mask);
 
 #ifdef __cplusplus
 
-/* 0x8011D448 */
-void em_eft_fx_spawn(_ENEMY_WORK* self, u32 type, u32 id, u32 timer, f32 scale);
-/* 0x8011D4FC */
-void em_eft_fx_spawn_pair(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, u32 timer, f32 scale);
 /* 0x8011E6E4 */
 void em_gauge_step(_ENEMY_WORK* self, s32 step);
 /* 0x8011E760 */
 void em_gauge_set(_ENEMY_WORK* self, s32 value);
-
-/* 0x8011D690 */
-void em_eft_fx_spawn_anchor(_ENEMY_WORK* self, u32 type, u32 id, f32 scale);
 /* 0x8011E6EC */
 void em_gauge_period_step(_ENEMY_WORK* self, s32 step, s16 period, f32 scale);
 }

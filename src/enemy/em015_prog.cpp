@@ -87,6 +87,7 @@
 #include "enemy/fn_80138074.h" /* em_res_user_data_flag_set, ResUserDataAc */
 #include "MSL/new.h" /* the placement `operator new` */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
+#include "enemy/em_eft_fx.h"
 #include "fn_8004CAD8.h"       /* sin_idx_get/fn_80051378/rotVecY/calcDistanceSqXZ */
 #include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
 #include "sys_mem.h"           /* operator delete (the `__dl__FPv` global deleter) */
