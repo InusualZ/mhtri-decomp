@@ -224,7 +224,7 @@ struct _EFT013_WORK_M {
 };
 /* size: 0x3C */
 
-/* The selector record `fn_80107914` reads: a pointer at +0x2C and the variant at +0x30. */
+/* The selector record `eft013_target_set` reads: a pointer at +0x2C and the variant at +0x30. */
 struct _EFT013_SEL {
     /* +0x00 */ u8 unused_0x00[0x0F];
     /* +0x0F */ u8 area_0x0F;
@@ -235,7 +235,7 @@ struct _EFT013_SEL {
 };
 /* size: 0x34 - lower bound, an approximation. */
 
-/* The `fn_80107914` case-0/case-3 source (player or shell record): the id bytes and the area/key. */
+/* The `eft013_target_set` case-0/case-3 source (player or shell record): the id bytes and the area/key. */
 struct _EFT013_PL2 {
     /* +0x000 */ u8 unused_0x000[0x0A];
     /* +0x00A */ u8 field_0x00A;
@@ -251,7 +251,7 @@ struct _EFT013_PL2 {
 };
 /* size: 0x1A5 - lower bound, an approximation. */
 
-/* The `fn_80107914` case-1 enemy view: the action/state bytes and the word at +0x204. */
+/* The `eft013_target_set` case-1 enemy view: the action/state bytes and the word at +0x204. */
 struct _EFT013_ENEMY_VIEW {
     /* +0x000 */ u8 unused_0x000[0x1E1];
     /* +0x1E1 */ u8 act_id;
@@ -264,7 +264,7 @@ struct _EFT013_ENEMY_VIEW {
 };
 /* size: 0x208 - lower bound, an approximation. */
 
-/* The enemy-data record `fn_80107914` scales by: a stat pointer at +0x9C. */
+/* The enemy-data record `eft013_target_set` scales by: a stat pointer at +0x9C. */
 /* size: 0x08 - lower bound, an approximation. */
 struct _EFT013_ENEMY_STAT {
     /* +0x00 */ u32 field_0x00;
@@ -937,7 +937,7 @@ extern "C" _EFT013* fn_80107640(void* self, u32 a, f32 scale, u32 areano) {
 
 /* 0x80107914 - the per-variant setter: read the source record the selector names, then spawn the type
  * through fn_80107A18 and seed the work block's state/payload. */
-extern "C" void fn_80107914(_EFT013_SEL* self) {
+extern "C" void eft013_target_set(_EFT013_SEL* self) {
     _EFT013_ENEMY_VIEW* enemy;
     u32 b;
     u32 areano;

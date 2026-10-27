@@ -193,7 +193,7 @@ void fn_802D3CEC(struct _AINPC_W* self);
 void fn_802D3CFC(struct _AINPC_W* self, u8 full);
 void fn_802D3D84(struct _AINPC_W* self);
 u32 fn_802D3DE8(struct _AINPC_W* self);
-s32 fn_802D3E4C(struct _AINPC_W* self);
+s32 ai_npc_counter_roll(struct _AINPC_W* self);
 u32 fn_802D3F08(struct _AINPC_W* self);
 u8 fn_802D3F1C(struct _AINPC_W* self);
 s32 fn_802D3F70(struct _AINPC_W* self, u8 high, u8 low);

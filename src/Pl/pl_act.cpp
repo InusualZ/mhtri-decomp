@@ -79,7 +79,7 @@
  *    `-= (s16)v` reuses the extended copy (r3), and `-= v` moves the `extsh` ahead of the `sth`;
  *  - `pl_pos_blend_start`: retail stores the raw `arg1` (r31) to +0xB4 where ours reuses the `(s16)arg1` the
  *    condition extended (r0); the header's `s32` parameter fixes the spelling, and a `(u16)` store is worse;
- *  - `fn_80278674`: a `clrlwi` before the `stb` of `m` into +0x56B (peephole is off; a `u8` local is worse);
+ *  - `pl_sharpness_add`: a `clrlwi` before the `stb` of `m` into +0x56B (peephole is off; a `u8` local is worse);
  *  - `fn_80278D1C`: retail branches every id range test forward to its block (8, then 2, then 4) with a fall-through
  *    `b`; the nested if, the else-if chain and a `switch` all lay the blocks out differently;
  *  - `fn_802693C4`/`pl_parts_value_get`: retail adds the record offset into the base register (`add r4,r4,r0` /
@@ -158,8 +158,8 @@
  *  - `Pl_net_send` is called through its two-parameter view `PlNetSend2`: retail's call sites pass two arguments to
  *    the owner's three-parameter function, and a third argument would emit `li r5,X`;
  *  - an `s16`/`s8` parameter with a compound assignment stores the raw sum and sign-extends only at the compare
- *    (`pl_attack_up_set`, `pl_defense_up_set`, `fn_8027C89C`, `fn_8027A044`, `fn_80276CE8`, `fn_8027CA48`, `pl_area_stamina_drain_step`,
- *    `fn_80278674`, `fn_8027D5A4`; playbook 38); `field = field + value` and a temporary extend at the store, and
+ *    (`pl_attack_up_set`, `pl_defense_up_set`, `fn_8027C89C`, `fn_8027A044`, `fn_80276CE8`, `pl_class7_meter_add`, `pl_area_stamina_drain_step`,
+ *    `pl_sharpness_add`, `fn_8027D5A4`; playbook 38); `field = field + value` and a temporary extend at the store, and
  *    `field--` stores raw where `field = field - 1` extends (`fn_8027B0BC`);
  *  - a 32-bit accumulator that retail sign-extends only at each compare is an `s32` with `b = (s16)(b + N)` on the
  *    arms that convert and `a -= b` for the difference (`pl_shell_class_get`, `pl_gun_reload_tier_get`, `pl_carry_item_get`);
@@ -2968,9 +2968,9 @@ extern "C" void pl_gauge_step_b(_PLW* plw) {
 
         plw->unk3BA = fn_802703F4(plw, (u16)v, &flag);
     }
-    plw->unk3C0 = (f32)plw->unk3BA;
-    if (plw->unk3C0 < pl_act_float_one) {
-        plw->unk3C0 = pl_act_float_one;
+    plw->defense_0x3C0 = (f32)plw->unk3BA;
+    if (plw->defense_0x3C0 < pl_act_float_one) {
+        plw->defense_0x3C0 = pl_act_float_one;
     }
 }
 
@@ -6987,7 +6987,7 @@ extern "C" s32 pl_reload_motion_ck(_PLW* self)
 }
 
 /* 0x8027CA48: applies a charge delta to the weapon's charge timer. */
-extern "C" void fn_8027CA48(_PLW* self, s16 arg1)
+extern "C" void pl_class7_meter_add(_PLW* self, s16 arg1)
 {
     if (self->field_0x002 != 7) {
         return;
@@ -8096,7 +8096,7 @@ namespace s_80276B58 {
 
 
 extern "C" void pl_act_add_hold_gauge(_MOVE_WORK*, s32);
-extern "C" void fn_8027D6A4(_MOVE_WORK*, s32, s32);
+extern "C" void pl_defense_up_mark(_MOVE_WORK*, s32, s32);
 extern "C" void fn_8027D6C0(_MOVE_WORK*, s32, s32);
 
 /* 0x8027D0D4: applies one scripted action to every move-work record of type 2 whose kind byte matches
@@ -8180,7 +8180,7 @@ extern "C" void pl_area_buff_apply(u8 arg0, u8 arg1)
                 ef_inst_spawn((_PLW*)p, 5);
                 break;
             case 13:
-                fn_8027D6A4(p, 1, 0x1518);
+                pl_defense_up_mark(p, 1, 0x1518);
                 fn_8027D6C0(p, 1, 0x1518);
                 ef_inst_spawn((_PLW*)p, 9);
                 break;
@@ -8968,7 +8968,7 @@ extern "C" void pl_hit_attack_build(_PLW* self, _HIT_W* hit, u8* base, u16 idx, 
 }
 
 /* 0x80278674: adds a signed amount to the actor's stamina pool, with the two armour-skill modifiers. */
-extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
+extern "C" void pl_sharpness_add(_PLW* self, s16 arg1, u8 arg2)
 {
     s16 v = arg1;
     s32 changed = 0;
@@ -9650,13 +9650,13 @@ extern "C" s32 pl_health_out_ck(_PLW* self) {
 }
 
 /* Stores the raw pair the +0x452/+0x458 group holds. */
-extern "C" void fn_8027D698(_PLW* self, s8 arg1, s16 arg2) {
+extern "C" void pl_attack_up_mark(_PLW* self, s8 arg1, s16 arg2) {
     self->field_0x452 = arg1;
     self->field_0x458 = arg2;
 }
 
 /* Stores the byte and raises the +0x454 limit to the argument. */
-extern "C" void fn_8027D6A4(_PLW* self, u8 arg1, s16 arg2) {
+extern "C" void pl_defense_up_mark(_PLW* self, u8 arg1, s16 arg2) {
     self->field_0x450 = arg1;
     if (self->field_0x454 < arg2) {
         self->field_0x454 = arg2;

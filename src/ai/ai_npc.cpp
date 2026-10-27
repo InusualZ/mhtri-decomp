@@ -81,7 +81,6 @@
  *    flag parameters of the older bodies are `u32` tested `(flag & 0xFF)`.
  *  - The four motion tables (`lbl_805D4784`..`lbl_805D48D8`) and the step tables are `s16`/`u16` word arrays indexed
  *    `arg * N`: a row struct folds the index into one `mulli`.
- *  - `ai/ai_npc.h` still defines `_HIT_W` beside `Pl/hit_w.h` (rule 1); unifying the views folds it too.
  */
 
 #pragma optimization_level 4
@@ -671,8 +670,8 @@ void ainpc_start(_AINPC_W* self)
     self->field_0x212 = 0;
     self->field_0x218 = 0;
     for (i = 0; i < 2; i++) {
-        self->hit[i].field_0x05 = 0;
-        self->hit[i].field_0x0E = 0xFF;
+        self->hit[i].active_0x05 = 0;
+        self->hit[i].result = 0xFF;
         hit_source_set((::_HIT_W*)&self->hit[i], 3, self);
         hit_owner_set((::_HIT_W*)&self->hit[i], 3, self);
     }
@@ -9760,75 +9759,75 @@ void fn_802D2BB0(struct _AINPC_W* self, struct _HIT_W* hit)
 {
     u8 applied = 0;
 
-    hit->field_0x31 = 0x0A;
-    hit->field_0x32 = 4;
+    hit->attack_flags_0x31 = 0x0A;
+    hit->attack_kind_0x32 = 4;
     if (::ai_skill_ck((::_AINPC_W*)self, 2) == 1) {
-        hit->field_0x48 |= 0x10;
-        hit->field_0x4A = self->field_0x210;
+        hit->field_0x048 |= 0x10;
+        hit->field_0x04A = self->field_0x210;
         applied = 1;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 3) == 1) {
-        hit->field_0x48 |= 0x20;
-        hit->field_0x4A = self->field_0x210;
+        hit->field_0x048 |= 0x20;
+        hit->field_0x04A = self->field_0x210;
         applied = 1;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 4) == 1) {
-        hit->field_0x48 |= 0x200;
-        hit->field_0x4A = self->field_0x210;
+        hit->field_0x048 |= 0x200;
+        hit->field_0x04A = self->field_0x210;
         applied = 1;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 5) == 1) {
-        hit->field_0x48 |= 0x40;
-        hit->field_0x4A = self->field_0x210;
+        hit->field_0x048 |= 0x40;
+        hit->field_0x04A = self->field_0x210;
         applied = 1;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 6) == 1) {
-        hit->field_0x48 |= 0x80;
-        hit->field_0x4A = self->field_0x210;
+        hit->field_0x048 |= 0x80;
+        hit->field_0x04A = self->field_0x210;
         applied = 1;
     }
     if (::ran_suu(1) % 3 == 0) {
         if (::ai_skill_ck((::_AINPC_W*)self, 8) == 1) {
-            hit->field_0x48 |= 2;
-            hit->field_0x4A = self->field_0x210;
+            hit->field_0x048 |= 2;
+            hit->field_0x04A = self->field_0x210;
             applied |= 2;
         }
         if (::ai_skill_ck((::_AINPC_W*)self, 9) == 1) {
-            hit->field_0x48 |= 4;
-            hit->field_0x4A = self->field_0x210;
+            hit->field_0x048 |= 4;
+            hit->field_0x04A = self->field_0x210;
             applied |= 2;
         }
         if (::ai_skill_ck((::_AINPC_W*)self, 0x0A) == 1) {
-            hit->field_0x48 |= 1;
-            hit->field_0x4A = self->field_0x210;
+            hit->field_0x048 |= 1;
+            hit->field_0x04A = self->field_0x210;
             applied |= 2;
         }
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 7) == 1 && (applied & 1) != 0) {
-        hit->field_0x4A = (hit->field_0x4A * 0x82) / 100;
+        hit->field_0x04A = (hit->field_0x04A * 0x82) / 100;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 0x0B) == 1 && (applied & 2) != 0) {
-        hit->field_0x4A = (hit->field_0x4A * 0x82) / 100;
+        hit->field_0x04A = (hit->field_0x04A * 0x82) / 100;
     }
     if (self->field_0x420 == 1 && self->field_0x422 > 0) {
-        hit->field_0x42 = 0x11;
+        hit->kind_word_0x42 = 0x11;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 0x0D) == 1 && ::ran_suu(1) % 100 < 0x14) {
-        hit->field_0x40 = (hit->field_0x40 * 0x7D) / 100;
-        hit->field_0x4C |= 0x80;
+        hit->life_0x40 = (hit->life_0x40 * 0x7D) / 100;
+        hit->field_0x04C |= 0x80;
     }
     if (::ai_skill_ck((::_AINPC_W*)self, 0x0C) == 1) {
-        hit->field_0x4E = (s8)(hit->field_0x4E * 0x78) / 100;
+        hit->field_0x04E = (s8)(hit->field_0x04E * 0x78) / 100;
     }
     if (ai_npc_flag_ck(self, 4) != 0) {
-        hit->field_0x31 = 1;
-        hit->field_0x40 = 0;
+        hit->attack_flags_0x31 = 1;
+        hit->life_0x40 = 0;
         if (self->field_0x34E == 1) {
-            hit->field_0x42 = 2;
+            hit->kind_word_0x42 = 2;
         }
-        hit->field_0x4E = 0;
-        hit->field_0x48 = 0;
-        hit->field_0x4A = 0;
+        hit->field_0x04E = 0;
+        hit->field_0x048 = 0;
+        hit->field_0x04A = 0;
     }
     if ((applied & 3) != 0) {
         ::hit_flag_set((::_HIT_W*)hit, 0x800);
@@ -9843,26 +9842,26 @@ void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row)
     struct MotionEntry* entry = (struct MotionEntry*)(lbl_805D3AD8 + row * 0x1A);
     f32 limit;
 
-    hit->field_0x08 = lbl_80792508[entry->motion_id_0x0F];
+    hit->size_data_0x08 = (_HIT_SIZE_DATA*)lbl_80792508[entry->motion_id_0x0F];
     hit_flags_clear(hit);
     ::hit_flag_set((::_HIT_W*)hit, 0x320);
-    hit->motion_no_0x18 = ::ai_get_motion_no((::_AINPC_W*)self);
-    hit->field_0x1A = 0;
-    hit->field_0x1C = 0;
-    hit->field_0x1E = 0;
+    hit->field_0x018 = ::ai_get_motion_no((::_AINPC_W*)self);
+    hit->field_0x01A = 0;
+    hit->field_0x01C = 0;
+    hit->field_0x01E = 0;
     limit = self->model.field_0x44 - lbl_8079A730;
     if (limit < lbl_8079A670 || (self->model.field_0x4C & 1) != 0) {
         limit = lbl_8079A670;
     }
-    hit->offset_0x38 = entry->approach_0x00;
-    hit->offset_0x3C = entry->retreat_0x02;
+    hit->delay_0x38 = entry->approach_0x00;
+    hit->time_0x3C = entry->retreat_0x02;
     if (entry->approach_0x00 != 0) {
-        hit->offset_0x38 = hit->offset_0x38 + (limit - self->model.field_0x74);
-        if (hit->offset_0x38 < lbl_8079A670) {
-            hit->offset_0x3C = hit->offset_0x3C + hit->offset_0x38;
-            hit->offset_0x38 = lbl_8079A670;
-            if (hit->offset_0x3C == lbl_8079A670) {
-                hit->field_0x05 = 0;
+        hit->delay_0x38 = hit->delay_0x38 + (limit - self->model.field_0x74);
+        if (hit->delay_0x38 < lbl_8079A670) {
+            hit->time_0x3C = hit->time_0x3C + hit->delay_0x38;
+            hit->delay_0x38 = lbl_8079A670;
+            if (hit->time_0x3C == lbl_8079A670) {
+                hit->active_0x05 = 0;
                 return;
             }
         }
@@ -10394,7 +10393,7 @@ u32 fn_802D3DE8(struct _AINPC_W* self)
 }
 
 /* 0x802D3E4C - the counter-attack roll. */
-s32 fn_802D3E4C(struct _AINPC_W* self)
+s32 ai_npc_counter_roll(struct _AINPC_W* self)
 {
     s32 chance = 0x0A;
 
@@ -10422,12 +10421,12 @@ u32 fn_802D3F08(struct _AINPC_W* self)
 u8 fn_802D3F1C(struct _AINPC_W* self)
 {
     u8 highest = 0xFF;
-    u8 value = self->hit[0].field_0x0E;
+    u8 value = self->hit[0].result;
 
     if (value != 0xFF && (highest == 0xFF || highest < value)) {
         highest = value;
     }
-    value = self->hit[1].field_0x0E;
+    value = self->hit[1].result;
     if (value != 0xFF && (highest == 0xFF || highest < value)) {
         highest = value;
     }

@@ -3,7 +3,7 @@
  * RANGE. .text 0x800FBE64-0x800FD520 (24 functions); extab 0x8000BD8C-0x8000BDFC, extabindex 0x80025B3C-0x80025BE4,
  *   .data 0x8059B638-0x8059B9A8, .sdata 0x807916C8-0x807916E0, .sdata2 0x80796640-0x80796658.
  * FLAGS. `cflags_main`; file-scope `#pragma peephole off`, `optimization_level 4` (retail's switch lowering: the
- *   `addi`/`cmplwi` range tests of `fn_800FBE64`/`fn_800FCA54`; no other row moves), `pool_data off`, `fp_contract off`.
+ *   `addi`/`cmplwi` range tests of `eft002_pair_spawn`/`fn_800FCA54`; no other row moves), `pool_data off`, `fp_contract off`.
  * NAMES. `eft001_set_pos`, `eft002_set` and `eft002_set_shell` are the runtime dump's own names; `eft_rot_vec_copy`
  *   is a GUESS from its body; the map has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
  *   GUESS (from the body): `eft_effect_foreach_pm_scale` (0x800FCEB0) walks the particle managers with the scale callback.
@@ -79,7 +79,7 @@
 #pragma pool_data off
 #pragma fp_contract off
 
-/* The `fn_800FBE64` / `fn_800FC484` family block: two pooled effects and the model they share. */
+/* The `eft002_pair_spawn` / `fn_800FC484` family block: two pooled effects and the model they share. */
 struct _EFT001_EFFECT_WORK {
     /* +0x00 */ s32 count;
     /* +0x04 */ nw4r::ef::Effect* effect_0x04;  /* the primary pooled effect */
@@ -100,7 +100,7 @@ struct _EFT001_EFFECT_WORK {
 };
 /* size: 0x34 - lower bound, an approximation. */
 
-/* The opaque source record the `fn_800FBE64` / `fn_800FC1DC` builders read: the area byte at +0x0F
+/* The opaque source record the `eft002_pair_spawn` / `eft002_model_spawn` builders read: the area byte at +0x0F
  * and the joint/parameter word at +0x36.  Only the offsets this unit reads are named.
  * size: 0x3C - lower bound, an approximation. */
 struct _EFT001_SRC {
@@ -358,7 +358,7 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self);
 
 /* Builds a pooled two-effect record at `pos` for an actor in the current area: the scale and colour set come from
  * the actor's equipped shell, the rotation (or source handle) from its owner for the types that follow it. */
-extern "C" void fn_800FBE64(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* src, u8 color_set)
+extern "C" void eft002_pair_spawn(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* src, u8 color_set)
 {
     _EFT001_EFFECT_WORK* work;
     _EFT* effect;
@@ -490,7 +490,7 @@ extern "C" void eft_model_effect_spawn(nw4r::math::VEC3* pos, u32 type, u8 field
 
 /* Builds a model effect from a joint source: its +0x36 word and +0x0F area seed `fn_800FC27C`, and the
  * effect's `field_0x07` records whether the source owns the 0x800 flag. */
-extern "C" void fn_800FC1DC(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* src)
+extern "C" void eft002_model_spawn(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* src)
 {
     _EFT* effect = fn_800FC27C(pos, type, src->param_0x36, src->area_0x0F, 1.0f);
 

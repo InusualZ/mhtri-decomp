@@ -153,7 +153,7 @@
 #include "stage/shell_set_func_ptr.h" /* the shell-set job table (rule 2) */
 #include "enemy/em_model.h" /* em_roster_area_hit_find (rule 2) */
 #include "ef/cp_vector.h" /* `_CP_VECTOR`, the rotation `em_roster_area_hit_find` writes out (the type's shared header) */
-#include "ai/ai_npc_player_in_reach_ck.h" /* the owner's leaf header: `ai/ai_npc.h` redefines `_HIT_W` */
+#include "ai/ai_npc_player_in_reach_ck.h" /* the owner's leaf header: `ai/ai_npc.h` redefines `_AINPC_W` */
 #include "ai/ainpc_move.h" /* ai_npc_item_give (rule 2) */
 #include "ef/eft019.h" /* ef_inst_spawn (rule 2) */
 #include "stage/stage_zone_hit_ck.h"
@@ -401,9 +401,9 @@ extern u16 pl_shell_act_tbl_b[20];
  * alternate-form byte the draw/sheathe acts test; the same direct call through a cast. */
 /* pl_act_held_ck_c1: the owner declares a second, unused parameter its callers here never load; the same direct call
  * through a cast. */
-/* pl_hit_face_motion_c1: `fn_80278674` as the hit reaction calls it - the owner declares its motion `s16`, the caller
+/* pl_hit_face_motion_c1: `pl_sharpness_add` as the hit reaction calls it - the owner declares its motion `s16`, the caller
  * hands the unextended face angle; the same direct call through a cast. */
-#define pl_hit_face_motion_c1 ((void (*)(_PLW*, s32, u8))fn_80278674)
+#define pl_hit_face_motion_c1 ((void (*)(_PLW*, s32, u8))pl_sharpness_add)
 
 /* pl_armed_act_no_get_c1: the owner declares the act number `u32`; the step-table walk stores it as the `u16` it is,
  * the same direct call through a cast. */
@@ -5351,7 +5351,7 @@ extern "C" void pl_act_step_offhand_gesture(_PLW* self, s32 part)
                     motion = 100;
                     break;
                 }
-                fn_80278674(self, motion, 0);
+                pl_sharpness_add(self, motion, 0);
             }
         }
         if (Pl_motion_end_ck(self) == 1) {

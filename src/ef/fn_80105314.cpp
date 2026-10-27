@@ -16,7 +16,7 @@
  *   flipcheck: NOT READY on `.sdata2` alone (0x10 of 0x24, the pool above).
  * SHAPES. `eft_spawn_type10` takes its type as `u8` (retail stores it raw) while `ef/fn_80105314.h` keeps the `u32`
  *   its consumers use (`enemy/em016_prog.cpp` has a local `u32` copy), so the header's declaration is hidden here.
- *   `fn_80106DC8` and `eft013_shell_spawn` take the float before the trailing pointer (retail saves `f1` before it).
+ *   `eft013_guard_spawn` and `eft013_shell_spawn` take the float before the trailing pointer (retail saves `f1` before it).
  *   `em_water_check`/`em_die_ck` are called through `u32`-returning views (`cmplwi` in retail).
  *   Definitions follow retail's address order.
  */
@@ -73,7 +73,7 @@ struct _EFT013_POOL2 {
 };
 /* size: 0x10 - lower bound, an approximation. */
 
-/* The spawner source `fn_80106DC8` reads: the area byte, a pointer and a flag. */
+/* The spawner source `eft013_guard_spawn` reads: the area byte, a pointer and a flag. */
 struct _EFT013_SRC {
     /* +0x00 */ u8 unused_0x00[0x0F];
     /* +0x0F */ u8 area_0x0F;
@@ -1181,7 +1181,7 @@ extern "C" void eft013_shell_spawn(nw4r::math::VEC3* pos, u32 type, _CP_VECTOR* 
 
 /* 0x80106DC8 - spawn a type-3 effect on the caller's position/rotation and install the
  * fn_80106EE4/fn_80106F20 pair. */
-extern "C" void fn_80106DC8(nw4r::math::VEC3* pos, u32* rot, f32 scale, _EFT013_SRC* src) {
+extern "C" void eft013_guard_spawn(nw4r::math::VEC3* pos, u32* rot, f32 scale, _EFT013_SRC* src) {
     if (src->area_0x0F != get_now_areano()) {
         return;
     }

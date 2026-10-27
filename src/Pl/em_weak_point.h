@@ -17,7 +17,7 @@ struct EmWeakPoint {
     /* +0x00 */ s16 joint;
     /* +0x02 */ s16 joint_b;
     /* +0x04 */ u16 shape;
-    /* +0x06 */ u8 unused_0x06[0x08 - 0x06];
+    /* +0x06 */ u16 rates_index;    /* the part's damage-percentage record (`em_attacker_rec_get`), and its stun attacker index */
     /* +0x08 */ u16 kind;
     /* +0x0A */ u16 flags;
     /* +0x0C */ u16 part;

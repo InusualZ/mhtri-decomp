@@ -98,7 +98,7 @@ u32 pl_step_se_kind_get(struct _PLW* self);
  * `Pl/pl_act_step.cpp` drives. */
 void pl_act_set_step_time(struct _PLW* self, s32 arg);
 void pl_act_set_frame_timer(struct _PLW* self);
-void fn_80278674(struct _PLW* self, s16 motion, u8 a);
+void pl_sharpness_add(struct _PLW* self, s16 motion, u8 a);
 
 /* The act entry and frame step call these: 0x8027AC2C is the act's status-block store, 0x80278BE4 the act tail
  * the frame step falls into. */

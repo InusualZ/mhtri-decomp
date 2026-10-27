@@ -233,22 +233,22 @@ extern "C" void se_req_pos_id54(nw4r::math::VEC3* pos) {
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DAD60(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id62(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 162 : 62;
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DADA8(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id85(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 85 : 185;
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DADF0(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id86(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 86 : 186;
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DAE38(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 186, pos); }
+extern "C" void se_req_pos_id186(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 186, pos); }
 
 extern "C" void se_req_pos_id27(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 27, pos); }
 
@@ -288,7 +288,7 @@ extern "C" void se_talk_npc0_bank_req(void) { se_bank_req(0, 12); }
 
 extern "C" void se_eft004_demo_req(nw4r::math::VEC3* pos) { fn_800DBE94(0, 23, pos); }
 
-extern "C" void fn_800DC338(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 101, pos); }
+extern "C" void se_req_pos_id101(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 101, pos); }
 
 extern "C" void se_req_pos_id63(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 63, pos); }
 
@@ -297,9 +297,9 @@ extern "C" void se_req_pos_id53(nw4r::math::VEC3* pos) {
     se_slot_req_pos(0, id, pos);
 }
 
-extern "C" void fn_800DC44C(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 99, pos); }
+extern "C" void se_req_pos_id99(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 99, pos); }
 
-extern "C" void fn_800DC45C(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 98, pos); }
+extern "C" void se_req_pos_id98(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 98, pos); }
 
 extern "C" void fn_800DC46C(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 70 : 170;
@@ -346,7 +346,7 @@ extern "C" void se_req_eft019_tick(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 7
 
 extern "C" void se_slot0_pos_req(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 0, pos); }
 
-extern "C" void fn_800DC878(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id87(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 187 : 87;
     se_slot_req_pos(0, id, pos);
 }
@@ -1497,7 +1497,7 @@ extern "C" void se_talk_point_set(nw4r::math::VEC3* pos) {
 /* --- 0x800DC348 -------------------------------------------------------------------------------- */
 
 /* Requests the trap's sound; the id pair depends on the loudness flag. */
-extern "C" void fn_800DC348(nw4r::math::VEC3* pos, s32 kind) {
+extern "C" void se_req_pos_id110_level(nw4r::math::VEC3* pos, s32 kind) {
     s32 loud = (fn_800D8D8C(pos) == 1);
     s32 id;
 
@@ -1530,7 +1530,7 @@ extern "C" void fn_800DC348(nw4r::math::VEC3* pos, s32 kind) {
 /* --- 0x800DC560 -------------------------------------------------------------------------------- */
 
 /* Requests the trap's sound; the id pair depends on the loudness flag. */
-extern "C" void fn_800DC560(nw4r::math::VEC3* pos, s32 kind) {
+extern "C" void se_req_pos_id113_level(nw4r::math::VEC3* pos, s32 kind) {
     s32 loud = (fn_800D8D8C(pos) == 1);
     s32 id;
 
@@ -2316,7 +2316,7 @@ extern "C" SeEntry* se_entry_request(s32 kind, _ENEMY_WORK* enemy,
  * the actor's work object for each non-zero entry, once with the actor's own owner id and once with
  * the fixed owner 3, copying the request position into the slot both times.
  */
-extern "C" void fn_800DC0A8(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView* params,
+extern "C" void se_hit_bank_req(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView* params,
                             nw4r::math::VEC3* pos) {
     u8 bank = params->field_0x0E;
     _se_w* work;

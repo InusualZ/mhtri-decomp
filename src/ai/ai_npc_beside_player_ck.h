@@ -1,5 +1,5 @@
 /* Leaf header (docs/plan.md 6.5 rule 2): the `ai/ai_npc.cpp` symbol `Pl/pl_act_step.cpp`'s call-the-companion act
- * tests.  `ai/ai_npc.h` defines its own `_HIT_W`, which `Pl/hit_w.h` also defines. */
+ * tests.  `ai/ai_npc.h` defines its own view of `_AINPC_W`, which `ai/ainpc.h` also defines. */
 #ifndef MHTRI_AI_AI_NPC_BESIDE_PLAYER_CK_H
 #define MHTRI_AI_AI_NPC_BESIDE_PLAYER_CK_H
 

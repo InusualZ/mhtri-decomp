@@ -1,6 +1,6 @@
 /* Leaf header (docs/plan.md 6.5 rule 2): the `ai/ai_npc.cpp` symbols `Pl/pl_act_step.cpp`'s companion acts call.
- * `ai/ai_npc.h` defines its own `_HIT_W`, which `Pl/hit_w.h` also defines, so a unit that needs the hit registry cannot
- * include it. */
+ * `ai/ai_npc.h` defines its own view of `_AINPC_W`, which `ai/ainpc.h` also defines, so a unit that reads `ai/ainpc.h`
+ * cannot include it. */
 #ifndef MHTRI_AI_AINPC_CALL_REQUEST_H
 #define MHTRI_AI_AINPC_CALL_REQUEST_H
 

@@ -1,6 +1,6 @@
 /* Leaf header (docs/plan.md 6.5 rule 2): the `ai/ai_npc.cpp` symbol `Pl/pl_act_step.cpp` calls.  `ai/ai_npc.h` defines
- * its own `_HIT_W`, which `Pl/hit_w.h` (the hit registry's shared record) also defines, so a unit that needs the
- * hit registry cannot include the owner's full header. */
+ * its own view of `_AINPC_W`, which `ai/ainpc.h` also defines, so a unit that reads `ai/ainpc.h` cannot include the
+ * owner's full header. */
 #ifndef MHTRI_AI_AI_NPC_PLAYER_IN_REACH_CK_H
 #define MHTRI_AI_AI_NPC_PLAYER_IN_REACH_CK_H
 

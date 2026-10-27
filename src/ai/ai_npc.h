@@ -1,11 +1,11 @@
 /*
- * ai/ai_npc.h - the 0x802D0F34-0x802D44F4 bodies' view of the AI companion record `_AINPC_W` and of the attack record
- *   `_HIT_W` it embeds, read inside `ai/ai_npc.cpp`'s `namespace view_fn_802D0F34` (and by `ai/fn_802D0F34.h`).
+ * ai/ai_npc.h - the 0x802D0F34-0x802D44F4 bodies' view of the AI companion record `_AINPC_W` (with the two
+ *   `_HIT_W` attack entries it embeds), read inside `ai/ai_npc.cpp`'s `namespace view_fn_802D0F34` (and by `ai/fn_802D0F34.h`).
  * SHAPES. `_AINPC_W` is the spelling the map's manglings use (`ai_area_ck__FP8_AINPC_W`, `ai_get_motion_no__FP8_AINPC_W`,
  *   `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`); the record embeds the actor's `MHchar` at +0x008
  *   (`move__6MHcharFUs`, `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`, `setVisibility__6MHcharFUlb` take `self + 8`).
- *  - `ai/ainpc.h` is the other view of the same record and `Pl/hit_w.h` the shared `_HIT_W`; both pairs define the same
- *    tags, so a unit includes one of each pair.
+ *  - `ai/ainpc.h` is the other view of the same record; both define the same tags, so a unit includes one of the two.
+ *    The embedded attack entries are `Pl/hit_w.h`'s `_HIT_W`.
  */
 #ifndef MHTRI_AI_AI_NPC_H
 #define MHTRI_AI_AI_NPC_H
@@ -14,6 +14,7 @@
 #include "nw4r/math.h"
 #include "pl.h"
 #include "Pl/em_weak_point.h"
+#include "Pl/hit_w.h"
 
 /* One tuning row of a formation: what it adjusts (0 attack, 1 defence, 2 speed, 3 gauge) and the amount per
  * companion level.  size: 0xE */
@@ -65,43 +66,7 @@ struct AINPCStatus {
 
 /* One weak point of an enemy's list: `Pl/em_weak_point.h`'s `EmWeakPoint` (rule 1). */
 
-/* One attack entry of the two the AI NPC carries at +0x240 (stride 0x5C).  `hit_flag_set` /
- * `hit_flags_clear` are the shared registry helpers and take this pointer, which is what fixes the
- * type (`hit_flag_set__FP6_HIT_WUl`). size: 0x5C */
-struct _HIT_W {
-    /* +0x00 */ u8 unused_0x00[0x05];
-    /* +0x05 */ u8 field_0x05;        /* cleared when the entry's offsets collapse */
-    /* +0x06 */ u8 unused_0x06[0x08 - 0x06];
-    /* +0x08 */ s32 field_0x08;        /* the motion/attack id `fn_802D2F7C` stores */
-    /* +0x0C */ u8 unused_0x0C[0x0E - 0x0C];
-    /* +0x0E */ u8 field_0x0E;        /* the attack's weak-point rate `fn_802D3F1C` takes the
-                                        * highest of */
-    /* +0x0F */ u8 unused_0x0F[0x18 - 0x0F];
-    /* +0x18 */ u16 motion_no_0x18;    /* the NPC's motion number when the entry was filled */
-    /* +0x1A */ u16 field_0x1A;
-    /* +0x1C */ u16 field_0x1C;
-    /* +0x1E */ u16 field_0x1E;
-    /* +0x20 */ u32 flags;             /* the registry flag word `hit_flag_set` ORs into and
-                                        * `hit_flags_clear` clears */
-    /* +0x24 */ u8 unused_0x24[0x31 - 0x24];
-    /* +0x31 */ u8 field_0x31;         /* the attack selector: 0x0A for a fresh entry, 1 on a
-                                        * blocked one */
-    /* +0x32 */ u8 field_0x32;         /* the second selector byte (4 for a fresh entry) */
-    /* +0x33 */ u8 unused_0x33[0x38 - 0x33];
-    /* +0x38 */ f32 offset_0x38;       /* the entry's distance offset `fn_802D2F7C` fills */
-    /* +0x3C */ f32 offset_0x3C;
-    /* +0x40 */ s16 field_0x40;        /* the damage/rate value `fn_802D2BB0` scales */
-    /* +0x42 */ u16 field_0x42;        /* the hit kind (`0x11` for an active counter-attack) */
-    /* +0x44 */ u8 unused_0x44[0x48 - 0x44];
-    /* +0x48 */ u16 field_0x48;        /* the entry's own flag word (`fn_802D2BB0` ORs the attack
-                                        * ids in, `fn_802D2F7C` sets 0x320) */
-    /* +0x4A */ u8 field_0x4A;         /* the percentage `fn_802D2BB0` scales down */
-    /* +0x4B */ u8 unused_0x4B;
-    /* +0x4C */ u8 field_0x4C;         /* flag byte, 0x80 = the weak-point bonus was applied */
-    /* +0x4D */ u8 unused_0x4D;
-    /* +0x4E */ s8 field_0x4E;         /* the signed rate `fn_802D2BB0` scales */
-    /* +0x4F */ u8 unused_0x4F[0x5C - 0x4F];
-};
+/* The two attack entries at +0x240 are the hit registry's `_HIT_W` (`Pl/hit_w.h`, rule 1). */
 
 /* The AI-NPC work record.  `self + 8` is the actor model; the band's own state starts after it.
  * size: 0x4A8 (the map's size of the `ainpc_w` object) */
@@ -172,13 +137,16 @@ struct _AINPC_W {
     /* +0x208 */ f32 field_0x208;
     /* +0x20C */ u32 behaviour_flags;        /* the behaviour flag word `fn_802D6888` assembles */
     /* +0x210 */ u16 field_0x210;      /* the attack id stamped into every hit entry */
-    /* +0x212 */ u16 field_0x212;      /* the counter-attack window `fn_802D2264` drains */
+    /* +0x212 */ union {
+        u16 field_0x212;               /* the counter-attack window `fn_802D2264` drains */
+        s16 damage_0x212;              /* the same word as the damage `Pl/pl_hit.cpp`'s hits add up each frame */
+    };
     /* +0x214 */ s16 field_0x214;      /* a countdown set by `fn_802D3A2C` */
     /* +0x216 */ u8 field_0x216;       /* the gate at the top of `fn_802D2264` */
     /* +0x217 */ u8 unused_0x217;
     /* +0x218 */ u16 field_0x218;
     /* +0x21A */ u8 field_0x21A;       /* the attack selector the dispatcher switches on */
-    /* +0x21B */ u8 unused_0x21B;
+    /* +0x21B */ u8 hit_level_0x21B;    /* the level byte (+0x45) of the last hit taken (`Pl/pl_hit.cpp`) */
     /* +0x21C */ s16 field_0x21C;
     /* +0x21E */ s16 field_0x21E;
     /* +0x220 */ s16 field_0x220;
@@ -204,7 +172,7 @@ struct _AINPC_W {
                                         * `ai_npc_variant_set`'s dispatcher reads back */
     /* +0x2F8 */ u16 hit_ids[0x14];          /* the hit-id list `hit_id_list_clear` empties */
     /* +0x320 */ u8 hit_id_count;
-    /* +0x321 */ u8 field_0x321;       /* `fn_802D3E4C` sets it, `fn_802D3F08` reads it */
+    /* +0x321 */ u8 field_0x321;       /* `ai_npc_counter_roll` sets it, `fn_802D3F08` reads it */
     /* +0x322 */ u8 unused_0x322[0x324 - 0x322];
     /* +0x324 */ u16 field_0x324;      /* the damage-type flag word `fn_802D4248` tests */
     /* +0x326 */ u8 field_0x326;

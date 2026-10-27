@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (167)
+## Ideas that work (168)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -176,6 +176,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 185 | [A narrow parameter updated in place is narrowed lazily, a fresh narrow local at once](185-narrow-parameter-updated-in.md) | works | source-shape, allocator | Retail adds to an `s16`/`u16` value and then stores it, adds to it or passes it on with no `extsh`/`clrlwi` after the add, while our `s16 top = y - 8;` (or an `s32` local) emits the narrowing at the definition and again... |
 | 186 | [An asm block that fills a local frame record: reference the parameters in the asm, peephole and optimizewithasm off](186-asm-block-that-fills.md) | works | pragma, source-shape | Retail stores a function's parameters to stack slots at entry and keeps `addi r3,r1,N` + `psq_stx` pairs inside an asm block; ours keeps the parameters in registers, fuses each pair into `psq_st` and reorders the asm... |
 | 187 | [An extab range or an 8-aligned vtable that only a merged object reproduces names a false TU seam](187-extab-range-or-an.md) | works | sections, linker | Every function of a unit is instruction-identical, yet one extab range starts a call too early and a vtable lands 4 bytes late in .data, so the unit can never flip. |
+| 188 | [A u16 local cleared with a 16-bit constant keeps retail's andi. and its use-site clrlwi](188-u16-local-cleared-with.md) | works | source-shape | Retail clears bits of a u16 local with `andi. rN,rN,0xFFF7` / `rlwinm rN,rN,0,16,30` and masks it with `clrlwi r0,rN,16` at each test, where ours clears with `rlwinm r0,rN,0,29,27` + `clrlwi rN,r0,16` and folds the... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

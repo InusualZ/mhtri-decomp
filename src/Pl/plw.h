@@ -661,18 +661,23 @@ struct _PLW {
     };
     /* +0x389 */ u8 field_0x389;   /* cleared on an area entry */
     /* +0x38A */ s16 field_0x38A;   /* cleared by the lobby player's first frame */
-    /* +0x38C */ s16 unk38C;
-    /* +0x38E */ s16 unk38E;
-    /* +0x390 */ s16 unk390;
-    /* +0x392 */ s16 unk392;
-    /* +0x394 */ s16 unk394;
+    /* +0x38C */ union {   /* five s16, also indexed as one run by element (rule 5) */
+        struct {
+            /* +0x38C */ s16 unk38C;
+            /* +0x38E */ s16 unk38E;
+            /* +0x390 */ s16 unk390;
+            /* +0x392 */ s16 unk392;
+            /* +0x394 */ s16 unk394;
+        };
+        /* +0x38C */ s16 elem_hit_0x38C[5];   /* per element, the strongest element hit taken (`Pl/pl_hit.cpp`) */
+    };
     /* +0x396 */ union {   /* one s16, two spellings (rule 5) */
         /* +0x396 */ s16 unk396;
         /* +0x396 */ s16 field_0x396;  /* armed with the 2-frame hold by `pl_act_stage_latch_set`; > 0 is also
                                        * the first gate this unit's `pl_health_out_ck` peer tests */
     };
     /* +0x398 */ u16 field_0x398;        /* running damage dealt, `fn_80264940` accumulates into it */
-    /* +0x39A */ u8 unk39A[0x39C - 0x39A];
+    /* +0x39A */ u16 knock_dir_0x39A;   /* the facing a hit knocks the player towards (`Pl/pl_hit.cpp`) */
     /* +0x39C */ u16 field_0x39C;         /* shell/element charge gauge (`fn_80265748`) */
     /* +0x39E */ u8 hit_pending_0x39E;   /* a hit waits to be applied (`pl_hit_react`); cleared by `pl_motion_scratch_clear` */
     /* +0x39F */ u8 field_0x39F;         /* 27..31 refuse the guard (`pl_guard_ck`) */
@@ -733,7 +738,7 @@ struct _PLW {
     /* +0x3B8 */ u16 skill_point_0x3B8;   /* the skill point total (capped at 700) whose fraction +0x3BC holds */
     /* +0x3BA */ u16 unk3BA;
     /* +0x3BC */ f32 skill_rate_0x3BC;   /* the +0x3B8 skill points as a fraction (`Pl/pl_act.cpp`); `hit_owner_rate_get` hands it to a flag-0x20 hit */
-    /* +0x3C0 */ f32 unk3C0;
+    /* +0x3C0 */ f32 defense_0x3C0;   /* the defence a hit's damage is reduced by (`Pl/pl_hit.cpp`); at least 1 (`Pl/pl_act.cpp`) */
     /* +0x3C4 */ f32 elem_resist_0x3C4;   /* an element resistance the skills set (`pl_elem_resist_get`) */
     /* +0x3C8 */ f32 elem_resist_0x3C8;   /* an element resistance the skills set (`pl_elem_resist_get`) */
     /* +0x3CC */ f32 elem_resist_0x3CC;   /* an element resistance the skills set (`pl_elem_resist_get`) */
@@ -894,13 +899,13 @@ struct _PLW {
         /* +0x44E */ u8 unk44E[0x45A - 0x44E];
         struct {
             /* +0x44E */ s16 field_0x44E;   /* the item buff timer the 0x17/0x87 items arm */
-            /* +0x450 */ u8 field_0x450;   /* set by `fn_8027D6A4`, with the s16 at +0x454 */
+            /* +0x450 */ u8 field_0x450;   /* set by `pl_defense_up_mark`, with the s16 at +0x454 */
             /* +0x451 */ u8 field_0x451;   /* set by `fn_8027D6C0`, with the s16 at +0x456 */
-            /* +0x452 */ s8 field_0x452;   /* set by `fn_8027D698`, with the s16 at +0x458 */
+            /* +0x452 */ s8 field_0x452;   /* set by `pl_attack_up_mark`, with the s16 at +0x458 */
             /* +0x453 */ u8 field_0x453;
-            /* +0x454 */ s16 field_0x454;  /* raised to the argument, never lowered (`fn_8027D6A4`) */
+            /* +0x454 */ s16 field_0x454;  /* raised to the argument, never lowered (`pl_defense_up_mark`) */
             /* +0x456 */ s16 field_0x456;  /* raised to the argument, never lowered (`fn_8027D6C0`) */
-            /* +0x458 */ s16 field_0x458;  /* stored raw by `fn_8027D698` */
+            /* +0x458 */ s16 field_0x458;  /* stored raw by `pl_attack_up_mark` */
         };
     };
     /* +0x45A */ s16 field_0x45A;
@@ -1055,7 +1060,8 @@ struct _PLW {
         struct {   /* the act-entry field view */
             /* +0x566 */ u8 pad_0x566;    /* `field_0x566` is declared in the member above */
             /* +0x567 */ u8 pad_0x567;    /* `atk_act_flag`/`field_0x567` are declared above */
-            /* +0x568 */ u8 pad_0x568[0x2];
+            /* +0x568 */ u8 cut_rate_0x568;     /* the weapon's cut percentage a hit on an enemy part weighs (`Pl/pl_hit.cpp`) */
+            /* +0x569 */ u8 blunt_rate_0x569;   /* its blunt percentage */
             /* +0x56A */ u8 field_0x56A;   /* the weapon record's level byte (`pl_weapon_record_read`) */
             /* +0x56B */ u8 field_0x56B;   /* the armed weapon class the act-kind deltas index */
             /* +0x56C */ s16 field_0x56C;   /* the working copy of the armed attack value */

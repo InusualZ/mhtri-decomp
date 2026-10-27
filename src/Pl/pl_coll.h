@@ -188,6 +188,12 @@ u32 pl_capsule_capsule_push(struct PlCapsuleBox* a, struct PlCapsuleBox* b, nw4r
                             nw4r::math::VEC3* push_b);
 u32 pl_capsule_sphere_push(struct PlCapsuleBox* a, HitSphere* sphere, nw4r::math::VEC3* push_a,
                            nw4r::math::VEC3* push_sphere);
+
+/* The hit contact tests `Pl/pl_hit.cpp` calls: 1 when the two shapes touch, with the contact point in `out`. */
+s32 pl_sphere_contact(HitSphere* a, HitSphere* b, nw4r::math::VEC3* out);
+s32 pl_capsule_capsule_contact(struct PlCapsuleBox* a, struct PlCapsuleBox* b, nw4r::math::VEC3* out);
+s32 pl_capsule_sphere_contact(struct PlCapsuleBox* a, HitSphere* sphere, nw4r::math::VEC3* out);
+s32 pl_sphere_capsule_contact(HitSphere* sphere, struct PlCapsuleBox* a, nw4r::math::VEC3* out);
 #ifdef __cplusplus
 }
 #endif

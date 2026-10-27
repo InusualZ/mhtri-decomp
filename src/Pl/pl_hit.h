@@ -48,7 +48,7 @@ struct _BODY_W {
     /* +0x000 */ _BODY_W* next_0x00;   /* the list link `hit_body_list_push` writes */
     /* +0x004 */ u8 unused_0x004;
     /* +0x005 */ u8 field_0x005;      /* set to 1 on every call */
-    /* +0x006 */ u8 field_0x006;      /* cleared on every call */
+    /* +0x006 */ u8 struck_0x06;      /* cleared on every call; set when a hit damages the slot (`hit_apply_body`) */
     /* +0x007 */ u8 kind;             /* the kind argument, kept */
     /* +0x008 */ u8 source;           /* the byte the kind's source field supplied */
     /* +0x009 */ u8 source_kind;      /* the kind's sub-code */
@@ -64,16 +64,38 @@ struct _BODY_W {
         u32 field_0x010;            /* the owner, as `body_set` stores it */
         BodyOwnerObj* owner_0x10;   /* the same word as the placed object `body_shape_get` reads */
     };
-    /* +0x014 */ u16 field_0x014;
+    /* +0x014 */ s16 damage_0x14;     /* the damage the slot's hits added up (`hit_apply_body`) */
     /* +0x016 */ u16 hit_ids_0x16[20];  /* the hit ids that already struck the slot (`hit_id_list_absent_ck`) */
     /* +0x03E */ u8 hit_id_count_0x3E;
     /* +0x03F */ u8 field_0x03F;
 };
 
-/* The unit's own `.bss`/`.data` (declared, not yet emitted): the hit registry (0x10) and the 37-entry priority table of the
- * damage reactions `hit_reaction_priority_get` indexes. */
+/* One enemy part's damage percentages, the record `em_attacker_rec_get` hands out for the part's rate index: the cut and
+ * blunt percentages `hit_part_rate_get` weighs, the shell percentage, the five element percentages and the stun
+ * flag `hit_effect_spawn` tests.
+ * size: 0x9 (approximate: max touched offset + 1) */
+struct EmPartRates {
+    /* +0x0 */ u8 cut;
+    /* +0x1 */ u8 blunt;
+    /* +0x2 */ u8 shell;
+    /* +0x3 */ u8 elem[5];
+    /* +0x8 */ u8 stun_0x08;
+};
+
+/* The unit's own `.bss`/`.data`: the hit registry (0x10) and the 37-entry priority table of the damage reactions
+ * `hit_reaction_priority_get` indexes. */
 extern HitRegistry hit_registry;
 extern u8 hit_reaction_priority_tbl[];
+
+/* The unit's damage tables (`.data`), indexed by the attacking weapon's sharpness level (`_PLW` +0x56B) or by the hit's
+ * result: the level's cut rate by hit side (six per level), the level's raw, element and status rates, the gauge rate
+ * and the two weapon-wear values (plain, flag 0x1000) per result. */
+extern f32 hit_sharpness_side_rate_tbl[7 * 6];
+extern f32 hit_result_gauge_rate_tbl[6];
+extern f32 hit_sharpness_rate_tbl[7];
+extern f32 hit_sharpness_elem_rate_tbl[7];
+extern f32 hit_sharpness_status_rate_tbl[8];
+extern s16 hit_result_sharpness_tbl[6 * 2];
 
 /* The unit's C++-mangled entry points (the map names are these manglings, rule 9). */
 void body_set(_BODY_W* body, _BODY_DATA* data, u8 kind, u32 work, u8 mode);

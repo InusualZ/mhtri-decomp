@@ -1043,7 +1043,7 @@ struct _ENEMY_WORK {
     /* +0x810 */ s16 mark_timer_0x810;  /* the frames the enemy stays marked (`em_net_flag_apply_0`) */
     /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
-    /* +0x816 */ u16 field_0x816;
+    /* +0x816 */ u16 field_0x816;       /* the knock direction of the strongest hit taken (`Pl/pl_hit.cpp`) */
     /* +0x818 */ s16 field_0x818;       /* the motion timer `em_hit_kind_accept_ck` arms before its mode switch */
     /* +0x81A */ s16 field_0x81A;     /* the motion timer `em015_area_follow` gates its arming on
                                         * (<= 0) */
@@ -1051,7 +1051,12 @@ struct _ENEMY_WORK {
     /* +0x81E */ s16 timer_0x81E;  /* the two-frame timer `em_timer_0x81E_arm` arms */
     /* +0x820 */ u8 status_bits_0x820;  /* the bits `em_status_bit_set` raises for two frames */
     /* +0x821 */ s8 status_bits_timer_0x821;  /* their timer */
-    /* +0x822 */ u8 unused_0x822[0x833 - 0x822];
+    /* +0x822 */ u8 unused_0x822[0x828 - 0x822];
+    /* +0x828 */ u16 reaction_0x828;    /* the damage reaction of the strongest hit taken (`Pl/pl_hit.cpp`) */
+    /* +0x82A */ u16 reaction_b_0x82A;  /* the same reaction id, stored beside it */
+    /* +0x82C */ u8 unused_0x82C[0x830 - 0x82C];
+    /* +0x830 */ u8 reaction_level_0x830;  /* that hit's level byte */
+    /* +0x831 */ u8 unused_0x831[0x833 - 0x831];
     /* +0x833 */ u8 field_0x833;       /* the "approach armed" byte TWO readers branch on:
                                         * `enemy/em030_prog.cpp`'s em030 `fn_801B0A28` and
                                         * `enemy/em034_prog.cpp`'s `fn_801B47A4` */
@@ -1236,9 +1241,9 @@ struct _ENEMY_WORK {
                                                * 16-bit angle) `enemy/em003_prog.cpp`'s act-7 swipe steers */
             /* +0xA4D */ u8 unused_0xA4D[0xA64 - 0xA4D];
             /* +0xA64 */ union {
-                /* +0xA64 */ u8 hit_0xA64[0x60];  /* the record's own `_HIT_W` (`Pl/hit_w.h`, size 0x60): `enemy/em029_prog.cpp`'s
-                                                   * `em_action3_sub0` hands it to `hit_mask_ck`.  A byte view: `_HIT_W` has two
-                                                   * definitions (`Pl/hit_w.h`, `ai/ai_npc.h`) and this header includes neither */
+                /* +0xA64 */ u8 hit_0xA64[0x60];  /* the record's own `_HIT_W` (`Pl/hit_w.h`, size 0x5C) and a pad word: `enemy/em029_prog.cpp`'s
+                                                   * `em_action3_sub0` hands it to `hit_mask_ck`.  A byte view: this header does not
+                                                   * include `Pl/hit_w.h` */
                 struct {
                     /* +0xA64 */ u8 pad_0xA64[0xAC0 - 0xA64];
                     /* +0xAC0 */ u16 hit_ids_0xAC0[2];  /* the head of the hit id list (`hit_id_list_clear`), running

@@ -68,7 +68,7 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx);            /* place the re
 void ef_inst_spawn(void* actor, u8 key);                           /* eft020 wrappers, per actor kind */
 void ef_inst_spawn_joint(void* actor, u8 key, s32 joint);
 void fn_80114CC8(void* actor, u8 key);
-void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale);
+void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale);
 
 /* Callees other units own, declared locally (a rule-2 residual): `vec3_normalize_into`/`vec3_scale_in_place` are
  * `fn_8004CAD8.cpp`'s, `fn_8005696C`/`fn_80056A20` `draw_shape_arm.cpp`'s, `eft_res_slot_get`/`eft_res_slot_release`
@@ -169,10 +169,10 @@ struct _EFT020_WORK_A_JOINT {
     /* +0x1C */ u8 pad_0x1C[0x4];
 };
 
-/* The actor record a `fn_80114C*`/`fn_80114D28` wrapper hangs its effect off, as this unit reads it.
+/* The actor record a `fn_80114C*`/`eft020_actor_spawn` wrapper hangs its effect off, as this unit reads it.
  * One record, several views: +0x016 is `pl.h`'s `_PLW::area_0x16`, +0x1E1 the area both the player and
  * the enemy record carry, +0x1A4 `pl.h`'s `_PLW::effect_key_0x1A4`, +0x204 the enemy's joint id
- * (`ef/eft001.cpp` `joint_0x204`) and +0x110 the word `fn_80114D28` falls back to when it is -1.
+ * (`ef/eft001.cpp` `joint_0x204`) and +0x110 the word `eft020_actor_spawn` falls back to when it is -1.
  * +0x009 is the kind byte the mazule path compares against 3 (`pl.h` still spells it `unk009`,
  * `enemy.h` names the same byte `state_0x009`). size: 0x208 - lower bound (the record continues past
  * what this unit reads). */
@@ -1748,7 +1748,7 @@ void fn_80114CC8(void* actor, u8 key)
 
 /* 0x80114D28 (0x10C): Spawns an eft020 record on an actor, its area, scale and joint picked by the actor kind. */
 
-void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale)
+void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale)
 {
     _EFT019_ACTOR* a;
     _EFT* effect;

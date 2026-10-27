@@ -17,7 +17,7 @@ struct _HIT_SIZE_DATA {
     /* +0x00 */ s16 joint;
     /* +0x02 */ s16 joint_b;
     /* +0x04 */ u16 shape;
-    /* +0x06 */ u8 unused_0x06[0x08 - 0x06];
+    /* +0x06 */ u16 stab_0x06;       /* 1 picks the thrust column of the weapon's side-rate row (`hit_damage_em`) */
     /* +0x08 */ u16 part;
     /* +0x0A */ u8 unused_0x0A[0x0C - 0x0A];
     /* +0x0C */ f32 radius;
@@ -32,7 +32,7 @@ struct _HIT_SIZE_DATA {
  * `+0x10`/`+0x14` are the two owner pointers - `hit_data_apply` stores the hit id at `+0x0C` and reads the owner's area byte
  * through `+0x10`.  The accessors of `Pl/pl_hit.cpp` read the state bits at `+0x0A`, the result id at `+0x0E`, four stored
  * values at `+0x18..+0x1E`, the flag word at `+0x20` and the mask bytes at `+0x31`/`+0x5B`.
- * size: 0x60 (lower bound - the highest offset the units touch is +0x5B) */
+ * size: 0x5C (the AI NPC record embeds two at a 0x5C stride, `_AINPC_W::hit`) */
 struct _HIT_W {
     /* +0x00 */ _HIT_W* next_0x00;
     /* +0x04 */ u8 unused_0x04;
@@ -60,9 +60,9 @@ struct _HIT_W {
     /* +0x1E */ u16 field_0x01E;
     /* +0x20 */ u32 flags;            /* the hit flag word the setters OR/ANDC into */
     /* +0x24 */ f32 scale_0x24;          /* set to 1 by `hit_data_apply` */
-    /* +0x28 */ u32 field_0x028;         /* cleared by `hit_data_apply` */
-    /* +0x2C */ u32 field_0x02C;         /* cleared by `hit_data_apply` */
-    /* +0x30 */ u8 field_0x030;          /* cleared by `hit_data_apply` */
+    /* +0x28 */ struct EmWeakPoint* target_part_0x28;  /* the enemy part the hit landed on (`hit_damage_em`); cleared by `hit_data_apply` */
+    /* +0x2C */ void* target_0x2C;       /* the record the hit landed on */
+    /* +0x30 */ u8 target_kind_0x30;     /* its kind, as `owner_kind_0x06` (1 enemy, 3 AI NPC) */
     /* +0x31 */ union {
         u8 attack_flags_0x31;  /* the attack-flag byte `shell_attack_set` stores (bit 4 is dropped for a weak enemy master) */
         u8 field_0x031;        /* the mask byte `hit_attack_flag_ck` tests */
@@ -80,8 +80,13 @@ struct _HIT_W {
         f32 time_0x3C;         /* the same word as the live frames left (`hit_life_update`) */
     };
     /* +0x40 */ s16 life_0x40;           /* the hit's remaining frames (scaled by an enemy master's rate) */
-    /* +0x42 */ u8 kind_0x42;     /* the attack kind the targets filter on (0x0A/0x0B, 0x0E/0x0F, 0x10, 0x20) */
-    /* +0x43 */ u8 flags_0x43;    /* bit 4: the knock direction comes from the hit position (`hit_dir_y_get`) */
+    /* +0x42 */ union {
+        struct {
+            /* +0x42 */ u8 kind_0x42;     /* the attack kind the targets filter on (0x0A/0x0B, 0x0E/0x0F, 0x10, 0x20) */
+            /* +0x43 */ u8 flags_0x43;    /* bit 4: the knock direction comes from the hit position (`hit_dir_y_get`) */
+        };
+        /* +0x42 */ u16 kind_word_0x42;   /* the same two bytes as the one halfword the AI NPC's attack filler stores */
+    };
     /* +0x44 */ u8 dir_ofs_0x44;  /* the knock direction's offset, in 256ths of a turn */
     /* +0x45 */ u8 field_0x045;   /* the attack record's +0x09 byte */
     /* +0x46 */ u16 mask_0x46;  /* the attack mask `em_hit_buff_apply` (`enemy/em_common.cpp`) tests against the enemy data's buff */
@@ -98,7 +103,6 @@ struct _HIT_W {
     /* +0x59 */ u8 field_0x059;   /* the attack record's +0x16 byte */
     /* +0x5A */ u8 field_0x05A;
     /* +0x5B */ u8 field_0x05B;      /* the mask byte `hit_mask_ck` tests */
-    /* +0x5C */ u8 unused_0x5C[0x60 - 0x5C];
 };
 
 /* The hit registry itself (`.bss` `hit_registry`, size 0x10): two singly-linked lists of live hits (attacks at +0x00,

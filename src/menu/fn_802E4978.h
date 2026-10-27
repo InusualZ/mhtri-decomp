@@ -202,8 +202,8 @@ u32 get_move_work_max(u8 kind);
  *     `_mh_ivec2_`, `spr_data_copy`, `spr_anim_draw`, `draw_sprite_anim_ary`, `get_move_work_adrs` and
  *     `get_move_work_max`; `hud/cockpit_quest.h` additionally redefines `CockpitWork` and declares
  *     `cockpit_work` with its own record type.
- *   * `ai/fn_802D0F34.h` (0x802D27E0): redefines `_HIT_W` against `menu/menu_item.h`
- *     and declares `get_move_work_adrs` as `u8*` against this header's `void*`.
+ *   * `ai/fn_802D0F34.h` (0x802D27E0): declares `get_move_work_adrs` as `u8*` against this header's
+ *     `void*`.
  *   * `mh3_pad.h` (0x80046F0C): clashes with `pl.h` on its own pre-existing
  *     `setVec3` declaration.
  *
