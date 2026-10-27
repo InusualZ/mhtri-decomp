@@ -19,6 +19,9 @@ void syncItemListClock(u32 stamp, u32 count, f32 depth);
 /* 0x8021F0DC - steps the lobby's event schedule (GUESS name). */
 void lb_event_schedule_step(void);
 
+/* 0x8021F248 - selects row `selected` of the lobby item list. */
+void lb_item_list_select(s32 selected);
+
 #ifdef __cplusplus
 }
 #endif

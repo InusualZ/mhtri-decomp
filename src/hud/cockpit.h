@@ -75,6 +75,10 @@ void PutPageArrow(u16* table, s16 page, s16 count, u16 flags, const struct _mh_i
 extern "C" {
 #endif
 s16 item_get_with_msg(struct _PLW* plw, u16 item, u16 ticket, u8 flags, s16 count);
+/* 0x802DFB64 - raises the quest notice (the chat log's quiet arm). */
+void cockpit_notice_quest_show(void);
+/* 0x802D9F58 - the text colour of a player. */
+u32 player_color_get(u8 player);
 #ifdef __cplusplus
 }
 #endif

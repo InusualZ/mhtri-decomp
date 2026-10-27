@@ -129,6 +129,7 @@ typedef struct LbLobbyWork {
         struct LbRoomWork* room_0x0AC;            /* screen 0x18, the room (`menu/get_pop_dat_ptr.cpp`) */
         struct LbScreen30Work* screen30_0x0AC;    /* screen 0x1E, the room layout (`menu/get_pop_dat_ptr.cpp`) */
         struct LbScreen34Work* screen34_0x0AC;    /* screen 0x22 (`menu/get_pop_dat_ptr.cpp`) */
+        struct LbSpotWork* spot_0x0AC;            /* screen 0x10, the spot departure (`enemy/em_prog_support.cpp`) */
     };
     /* +0x0B0 */ u8 field_0x0B0;
     /* +0x0B1 */ u8 sub_0x0B1;

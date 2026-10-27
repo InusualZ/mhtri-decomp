@@ -13,8 +13,6 @@ extern "C" {
 typedef void (*QnpcSndFunc)(struct _ENEMY_WORK* work, s32 event);
 /* 0x80385414 - the NPC sound callback the quest NPC sets up (GUESS name). */
 QnpcSndFunc qnpc_snd_func_get(void);
-/* 0x80385B5C - starts motion `motion` on the pane's model whatever it is playing (GUESS name). */
-void note_pane_motion_start(NoteWork* self, u16 motion, u32 blend, s32 frame);
 
 /* 0x80384F80 - whether the quest NPC of (`map`, `area`) needs its models loaded (GUESS name). */
 u32 qnpc_load_ck(u8 map, u8 area);
@@ -54,6 +52,9 @@ u32 note_pane_motion_frame_pass_ck(NoteWork* self, u32 a);
 void qn_chr_flag_set(_QNPC_W* self, u8 flag);
 
 }
+
+/* 0x80385C90 - the quest NPC's motion number (C++ scope: `qn_get_motion_no__FP7_QNPC_W`). */
+u16 qn_get_motion_no(_QNPC_W* self);
 
 #ifdef __cplusplus
 extern "C" {

@@ -160,7 +160,7 @@ struct MenuSlot {
     /* +0x000 */ u8 field_0x000;      /* the slot's mode/state the predicates below compare */
     /* +0x001 */ u8 field_0x001;
     /* +0x002 */ u8 field_0x002;
-    /* +0x003 */ u8 unused_0x003;
+    /* +0x003 */ u8 step_0x003;       /* the page's third-level step (the chat log page's friend request) */
     /* +0x004 */ u16 buttons_trig;    /* the pad's pressed-this-frame word (`Psw` +0x2C4) `menu_pad_read` copies */
     /* +0x006 */ u16 buttons_0x006;   /* the pad's +0x2C0 word */
     /* +0x008 */ u16 field_0x008;     /* the option card's arrow word (`item_page_draw_closed_column`'s `arg5`);

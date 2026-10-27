@@ -444,6 +444,10 @@ void lb_player_act_latch(struct _PLW* self);
 u32 lb_player_angle_to(struct _PLW* self, VEC3* target);
 /* 0x801FE32C - true when the NPC's placement record has model kind `kind`. */
 u32 lb_npc_id_ck(struct _LB_NPC* self, u32 kind);
+/* 0x8020E8B8 - walks the player to a lobby spot and arms act 6. */
+void lb_player_spot_walk_act6(_PLW* self, LbSpot* spot);
+/* 0x802125C8 - toggles the lobby item database. */
+void lb_item_db_toggle(void);
 
 #ifdef __cplusplus
 }

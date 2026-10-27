@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* 0x803843D8 - menu page 25's opener (list 2 row 1, kind 0x19): seeds the note pane */
-void note_page_open(MenuSlot* slot, u8 kind);
+void note_page_open(MenuSlot* slot, s8 kind);
 
 #ifdef __cplusplus
 }

@@ -47,7 +47,7 @@
 /* This unit's own members, declared with the argument view their call sites use. */
 extern "C" {
 void fn_80385EE0(NoteWork* self);
-void fn_80385EEC(NoteWork* self);
+void note_pane_npc_init(NoteWork* self);
 void note_pane_npc_frame(NoteWork* self);
 void fn_80386028(NoteWork* self);
 void fn_803860B8(NoteWork* self);
@@ -67,7 +67,7 @@ extern "C" void fn_80385EE0(NoteWork* self) {
 }
 
 /* 0x80385EEC (0xC): clears the active flag and returns the pane to pair (0, 0). */
-extern "C" void fn_80385EEC(NoteWork* self) {
+extern "C" void note_pane_npc_init(NoteWork* self) {
     self->field_0x001 = 0;
     fn_80385EE0(self);
 }

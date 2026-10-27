@@ -30,13 +30,13 @@ struct NoteRestBlock {
 }; /* size: 0x10 */
 
 /* The note-pane object set (the 0x80385xxx half of the band).  Every body at 0x80385A54..0x80385CA0
- * works on ONE 0x1F8-byte record; `lbl_806C4A88` is the retail 5-record array of them and
- * `lbl_806C5460` a 3-record slot set.
+ * works on ONE 0x1F8-byte record; `note_works` is the retail 5-record array of them and
+ * `note_slots` a 3-record slot set.
  * size: 0x1F8 */
 struct NoteWork {
     /* +0x000 */ u8 field_0x000;
     /* +0x001 */ u8 field_0x001;
-    /* +0x002 */ u8 field_0x002;     /* the slot index `fn_803851D4` marks on a free record */
+    /* +0x002 */ u8 field_0x002;     /* the slot index `note_work_alloc` marks on a free record */
     /* +0x003 */ u8 field_0x003;
     /* +0x004 */ union {
         MHchar model;                   /* the actor model the note pane poses (0x140 of the 0x164) */
@@ -55,7 +55,7 @@ struct NoteWork {
     /* +0x194 */ u8 map_0x194;      /* the map whose home spot `note_pane_init` places the pane on */
     /* +0x195 */ u8 field_0x195;
     /* +0x196 */ u8 pad_0x196[0x198 - 0x196];
-    /* +0x198 */ u32 field_0x198;   /* the note id `fn_8038541C` records */
+    /* +0x198 */ u32 field_0x198;   /* the note id `note_npc_create` records */
     /* +0x19C */ u8 field_0x19C;
     /* +0x19D */ u8 field_0x19D;
     /* +0x19E */ u8 field_0x19E;
@@ -85,42 +85,21 @@ struct NoteWork {
         NoteRestBlock rest_0x1B4;   /* the same 0x0E bytes as one block: `note_pane_init` resets it through one pointer */
     };
     /* +0x1C4 */ u8 pad_0x1C4[0x1F4 - 0x1C4];
-    /* +0x1F4 */ s32 field_0x1F4;  /* the voice handle `fn_8038541C` stores */
+    /* +0x1F4 */ s32 field_0x1F4;  /* the voice handle `note_npc_create` stores */
+
+    /* The record constructor `__construct_array` runs over `note_works` (`enemy/em_prog_support.cpp`). */
+    NoteWork();
 };
 
-/* One 0x0C-byte entry of the 3-slot seat set `lbl_806C5460`.
+/* One 0x0C-byte entry of the 3-slot seat set `note_slots`.
  * size: 0x0C */
 struct NoteSlot {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
+    /* +0x00 */ u8 index_0x00;     /* the slot's own index */
+    /* +0x01 */ u8 state_0x01;     /* 0 free, 1 registered, 2 resolved */
+    /* +0x02 */ u8 kind_0x02;      /* the record kind whose model file it holds (0xFF: none) */
     /* +0x03 */ u8 pad_0x03;
     /* +0x04 */ s32 handle_0x04;
     /* +0x08 */ s32 handle_0x08;
-};
-
-/* The note screen's layout state at `.bss` 0x806C2418 (0x2670 bytes, `data:2byte`).
- * size: 0x2670 */
-struct NoteLayout {
-    /* +0x000 */ u16 cursor_x_0x00;
-    /* +0x002 */ u8 pad_0x002[0x003 - 0x002];
-    /* +0x003 */ u8 field_0x003;
-    /* +0x004 */ u8 field_0x004;
-    /* +0x005 */ u8 field_0x005;
-    /* +0x006 */ u8 field_0x006;
-    /* +0x007 */ u8 field_0x007;
-    /* +0x008 */ u8 field_0x008;
-    /* +0x009 */ u8 field_0x009;
-    /* +0x00A */ u8 pad_0x00A[0x2670 - 0x00A];
-};
-
-/* `Screen_w` (0x8065903C, .bss, unsplit): only the frame scale at +0x14, the field this band's
- * `note_pen_seed` multiplies its string width by (the same field `enemy/em_common.cpp` names).
- * size: 0x54 */
-struct NoteScreenScale {
-    /* +0x00 */ u8 pad_0x00[0x14];
-    /* +0x14 */ f32 frame_scale;
-    /* +0x18 */ u8 pad_0x18[0x54 - 0x18];
 };
 
 /* The quest-NPC record `qn_get_motion_no` reads (the +0x54 halfword).  The name is the map's own

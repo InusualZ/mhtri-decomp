@@ -70,6 +70,11 @@ s32 account_file_create_init(void);
 s32 account_file_create(void);
 s32 account_file_read_init(void);
 s32 account_file_read(void);
+/* 0x8044DFD4 / 0x8044F24C / 0x8044F2BC - the mailbox draft's draw, the message window with text `text` and the
+ * choice of kind `kind` with `cursor` on (the chat log's page draws them too). */
+void mailbox_mail_draw(struct LobbyMailRow* mail, u16 msg_row, s8 cursor);
+void plsearch_window_draw(s8* text);
+void plsearch_choice_draw(u8 kind, s8 cursor);
 
 #ifdef __cplusplus
 }

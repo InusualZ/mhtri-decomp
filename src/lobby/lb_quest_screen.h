@@ -208,6 +208,9 @@ u32 note_value_to_slot(u16 value);
 u16 note_slot_to_value(u8 slot);
 /* 0x803A7D64 - the model scale of interior kind `kind`. */
 f32 lb_interior_scale_get(u8 kind);
+/* 0x803A4214 / 0x803A42D8 - the quest pane record's init and frame (the quest NPC records run them by kind). */
+void note_pane_init(struct NoteWork* self);
+void note_pane_step(struct NoteWork* self);
 
 #ifdef __cplusplus
 }

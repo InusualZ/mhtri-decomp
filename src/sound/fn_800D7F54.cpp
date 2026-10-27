@@ -2544,7 +2544,7 @@ struct Case10View {
 /* --- external symbols ----------------------------------------------------------------------------- */
 
 extern "C" void pl_impact_pos_get(_PLW* plw, nw4r::math::VEC3* pos);
-extern "C" void fn_80385B20(_PLW* plw, u32 joint, nw4r::math::VEC3* pos);
+extern "C" void note_pane_joint_wpos_get(_PLW* plw, u32 joint, nw4r::math::VEC3* pos);
 
 /* The sound-system work object `se_pool` points at, as `se_slot_level_calc` reads it (b.cpp calls the same
  * object `SeSysWork`): the two distance vectors `vec3_distance` is handed and the byte at +0x2927D.
@@ -2733,12 +2733,12 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
             if (s.field_0x34 < 0) {
                 copyVec3(&s.pos, &((Case10View*)plw)->field_0x170);
             } else {
-                fn_80385B20(plw, s.field_0x34, &s.pos);
+                note_pane_joint_wpos_get(plw, s.field_0x34, &s.pos);
             }
             s.field_0x10 = s.pos;
             break;
         case 3:
-            fn_80385B20(plw, s.field_0x34, &s.pos);
+            note_pane_joint_wpos_get(plw, s.field_0x34, &s.pos);
             s.field_0x10 = s.pos;
             break;
         }

@@ -12,6 +12,8 @@ extern "C" {
 /* 0x803865B4 - the motion-keyed effect cues `enemy/em_prog_support.cpp` hands over to (the last reader of the note
  * records). */
 void note_pane_motion_effects(NoteWork* self);
+/* 0x80385EF8 - the lobby NPC record's frame. */
+void note_pane_npc_frame(NoteWork* self);
 
 }
 

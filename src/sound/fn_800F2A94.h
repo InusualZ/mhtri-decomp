@@ -32,6 +32,9 @@ int snd_bgm_hold_ck(void);
 void snd_quest_frame_begin(s32 mode, u8 phase, u8 sub);
 /* 0x800F590C: clears the BGM control's "behind the scene" flag. */
 void bgm_behind_flag_clear(void);
+/* 0x800F5924 / 0x800F5998: stops the lobby's channel 1 and arms the departure BGM. */
+void bgm_lobby_ch1_stop(void);
+void bgm_lobby_depart_set(void);
 
 #ifdef __cplusplus
 }

@@ -173,6 +173,8 @@ void lb_trade_open(s32 arg, LbTradeSource* source);
 void lb_trade_step(void);
 /* 0x80393994: spawns the scene effect. */
 void lb_scene_eft_spawn(void);
+/* 0x803928C8: whether the kitchen screen is idle. */
+u32 lb_kitchen_idle_ck(void);
 
 #ifdef __cplusplus
 }

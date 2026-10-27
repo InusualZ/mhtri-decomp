@@ -60,6 +60,8 @@ void lobby_net_err_draw(void);
 void em020_profile_send(void);
 /* 0x80377348 - sends the served meal's skills and bonuses to the area `area` (a 0x36-byte packet).  GUESS name. */
 void meal_result_send(u8 area);
+/* 0x803788A8 - whether the id text uid=197609(InusualZ) gid=197121 groups=197121 is on the recent-player list (its chat lines are muted). */
+u32 lobby_recent_has(const char* id);
 
 #ifdef __cplusplus
 }

@@ -409,7 +409,7 @@ void fn_801FC268(void)
 #pragma peephole on
 
 /* 0x801FC2F0 - reset the menu layer and leave the menu. */
-void fn_801FC2F0(void)
+void lb_ship_marks_refresh(void)
 {
     lb_ship_marks_set();
     fn_801E9AA8(0);
@@ -471,7 +471,7 @@ void fn_801FC8C8(void)
 namespace s_801FBF78 {
 extern "C" {
 void fn_801FC268(void);
-void fn_801FC2F0(void);
+void lb_ship_marks_refresh(void);
 void fn_801FBF78(void);
 u32 userdata_item_slot_count(LbNpcUserData* data);
 _SLOTENT* userdata_equip_item_slots_get(LbNpcUserData* data);
@@ -577,7 +577,7 @@ void lb_quest_return_apply(void)
         lb_item_list_select(lobby_world_block->field_0x3E00);
         lb_page_refresh();
         lb_entry_publish();
-        fn_801FC2F0();
+        lb_ship_marks_refresh();
         lobby_pig_dress_view_set(lobby_world_block->field_0x483B);
         if (lb_unlock_rank_get() == 1) {
             lb_param_w.hunt_option_0x0A = 0;

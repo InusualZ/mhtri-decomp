@@ -19,6 +19,10 @@ u16 getGlyphWidth(const char* glyph);
 /* 0x8005C7F0 - selects the font colour `index` for the next print (`font/flfnt.cpp`). */
 void font_color_set(s16 index);
 
+/* 0x8005B988 - stores `value` in the font console's attribute word (+0x1507C); the chat log sets it around a
+ * message (`enemy/em_prog_support.cpp`). */
+void flfntSetAttr(u32 value);
+
 #ifdef __cplusplus
 }
 #endif

@@ -16,6 +16,9 @@ int mhchar_node_count(MHchar* self);
 /* 0x800E0560 - resets the model object `self` points at (the shell pool runs it over a fresh
  * `shell_chara_heap_tbl` slot). */
 void mhchar_reset(MHchar* self);
+/* 0x800E1280 - starts the model's own motion `motion` on layer `layer`. */
+void mhchar_motion_start_no(MHchar* chr, s32 layer, u16 motion, s32 blend, f32 start, s32 loop, u32 flags,
+                            f32 rate);
 
 /* 0x800E26B4 */
 void mhchar_mat_blend_set(MHchar* self, u32 index, f32 value);
