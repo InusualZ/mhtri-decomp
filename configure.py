@@ -1008,7 +1008,7 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "Pl/fn_80230FBC.cpp"),
-            Object(NonMatching, "Pl/fn_802373AC.cpp"),
+            Object(Matching, "Pl/fn_802373AC.cpp"),
             Object(Matching, "Pl/fn_80229ECC.cpp"),
             Object(Matching, "Pl/fn_8023C2D0.cpp"),
             Object(Matching, "Pl/fn_80241558.cpp"),
