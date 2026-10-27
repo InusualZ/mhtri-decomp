@@ -9,9 +9,10 @@
  *   0x80793A80-0x80793B28, .sbss 0x80794D08-0x80794D18, .sdata2 0x8079C8D0-0x8079C960.  The left edge is the
  *   `movie.cpp` `__FILE__` anchor, the right one `quest/arenatask.cpp`.
  * FLAGS. `cflags_menu` (configure.py); file-scope `#pragma pool_data off` (MWCC otherwise addresses the strings and
- *   tables through one pooled base); `#pragma optimization_level 4` over the friend-list part only (its range compares
- *   and register colouring are -O4's: `friend_pick_draw` matches only under it and five other rows gain; the movie
- *   part loses rows under it and the character make is unchanged).
+ *   tables through one pooled base); `#pragma optimization_level 4` over the friend-list part and the character make
+ *   (their range compares and register colouring are -O4's: `friend_pick_draw` matches only under it, `charmake_move`'s
+ *   palette switches lower to range compares only under it; the movie part loses rows under it);
+ *   `#pragma opt_strength_reduction off` over `page17_rows_build` alone (see RESIDUALS).
  * NAMES. Module `menu` and the file from the `__FILE__` string "movie.cpp".  The THPSimple/THPDraw functions carry the
  *   SDK sample's names (the panic strings "THPSimpleOpen fail"/"THPSimplePreLoad fail" and the map's
  *   `THPSimpleGetTotalFrame` name the copy); its record layout is the sample's minus the audio fields.
@@ -31,16 +32,29 @@
  *  - `NetworkFriendInfo`'s inline destructor is emitted here as a weak function (retail's table points at the copy
  *    `Network/NetworkCommunityPat.cpp` emits), so `.text` is 0x44 bytes longer than retail's.
  *  - `THPSimpleOpen`: the header's component offset takes r29 where retail splits it (r30, then r29 after `+= 0x14`).
- *  - `THPSimpleCalcNeedMemory`, `THPSimpleSetBuffer`: `mullw` takes the size operands in the other order.
  *  - `VideoDecode`: `THP/THPDec.h` returns `u8`, so the result gets a `clrlwi` retail lacks (request menu-movie#2).
  *  - `friend_pick_step`: retail's friend-request step jumps from sub-steps 0 and 2 into the tails of sub-steps 1 and 2;
  *    the source repeats the tails (rule 8), so the function is 0x80 bytes longer.
- *  - `menu_friend_list_step`, `movie_page04_draw`, `movie_page04_split_draw`, the `*_rows_build` rows: retail lowers
- *    the case ranges in another order (range compares first) than MWCC builds from these switches.
- *  - `option_value_sprite_draw`: retail copies the `_SPR_DATA_` record by words, MWCC by fields (the record's layout).
+ *  - `movie_page04_draw`: retail reloads `row->page_kind` after each call in the value switch; MWCC keeps it in a
+ *    saved register.
+ *  - `page17_rows_build` matches only with `#pragma opt_strength_reduction off` (retail indexes the option tables with
+ *    the sign-extended row index each pass; the pragma over the whole friend-list part costs three rows); the
+ *    `page17_value_max` address takes its `add` operands in the other order.
  *  - `page17_transfer_get`: retail keeps the 0/1 returns as branches where MWCC folds them branch-free.
- *  - The disc-error, THPDraw and character-make rows below 100 differ only on relocation names (registry names not in
- *    the map yet) or one register.
+ *  - `charmake_move`: retail range-checks the palette cursor on the raw byte (`cmplwi`, `subi`+`clrlwi`+`cmplwi`) and
+ *    sign-extends only for the `== 12` case; MWCC sign-extends once before both switches' compares.
+ *  - `charmake_move` compares `lb_cursor_box_step`'s result unsigned (`cmplwi`) while `lobby/lb_pane_ui.cpp` declares
+ *    it `s32`, so the call site casts it to `u32`; `charmake_value_step` takes the pressed buttons it never reads (every
+ *    call passes them in r4).
+ *  - `movie_page04_draw`, `movie_page04_split_draw`, `movie_page17_draw`, `friend_card_equip_page_draw`,
+ *    `friend_card_confirm_draw`: retail clears the loop counter between the table call and the copy of its result
+ *    (`bl`, `li i,0`, `mr`); MWCC puts the `li` before the call or after the copy, whichever statement order is used.
+ *  - `movie_page17_draw`, `friend_pick_step`: register colouring of the page count and the list locals; no declaration
+ *    order among those tried reaches retail's.
+ *  - `option_cursor_draw`: retail compares the value state before materialising 0xFFFF (`cmpwi` first); MWCC schedules
+ *    the compare after it in every spelling tried (if/else, ternary, int locals).
+ *  - `THPSimpleCalcNeedMemory`, `THPSimpleSetBuffer`: `mullw` takes the size operands in the other order; the SDK's
+ *    `xSize * ySize` swaps the loads as well and scores lower than `ySize * xSize`.
  *  - `.sdata2`: retail pools 0.0f before the four TEV colours, ours after them.
  */
 
@@ -1187,13 +1201,13 @@ s32 movie_page18_step(MenuSlot* slot) {
 /* 0x8043F398 (0x6CC): fetches the page's cards one by one, lets the player pick a friend, shows its card and sends
  * a friend request; 1 picked (mode 1), 2 back, 3 nothing to fetch or the request failed, 4 closed. */
 s32 friend_pick_step(FriendPickWork* work) {
+    FriendCardView* view;
     s32 ret;
     MenuScroll* scroll;
-    FriendCardView* view;
     PlayerPad* pad;
     LobbyFriendList* list;
-    NetPeerCard* card;
     u8 index;
+    NetPeerCard* card;
     u8 col;
     s32 count;
     u8 fetched;
@@ -1578,7 +1592,7 @@ struct FriendCardView {
 FriendCardView friend_card_view;
 
 static void friend_card_rows_build(FriendCardView* view, s8 cursor);
-static u8 friend_card_row_enabled(FriendCardView* view, s8 row);
+static s8 friend_card_row_enabled(FriendCardView* view, s8 row);
 static void friend_card_rows_draw(FriendCardView* view);
 static void friend_card_profile_draw(FriendCardView* view, bool lit);
 static void friend_card_place_draw(FriendCardView* view);
@@ -1596,13 +1610,13 @@ void menu_friend_list_init(FriendCardView* view, NetPeerCard* card, u8 mode, u8 
     view->moved = 0;
     view->mode = mode;
     switch (mode) {
+    case 0:
+        view->row_count = 3;
+        break;
     case 1:
     case 2:
     case 3:
         view->row_count = 2;
-        break;
-    case 0:
-        view->row_count = 3;
         break;
     }
     view->online = online;
@@ -1621,8 +1635,8 @@ void menu_friend_list_init(FriendCardView* view, NetPeerCard* card, u8 mode, u8 
 
 /* 0x8044003C (0x14C): fills the three command rows: their message, whether they can be picked and their colour. */
 static void friend_card_rows_build(FriendCardView* view, s8 cursor) {
-    s8 i;
     MenuEntry* row;
+    s32 i;
     u32 lit;
     s8 hot;
     s32 dim;
@@ -1668,7 +1682,7 @@ static void friend_card_rows_build(FriendCardView* view, s8 cursor) {
 }
 
 /* 0x80440188 (0xE0): 1 when command `row` can be picked (not in the arena while the hunter is busy). */
-static u8 friend_card_row_enabled(FriendCardView* view, s8 row) {
+static s8 friend_card_row_enabled(FriendCardView* view, s8 row) {
     u8 enabled;
     _PLW* plw;
 
@@ -1703,14 +1717,16 @@ static u8 friend_card_row_enabled(FriendCardView* view, s8 row) {
 /* 0x80440268 (0x428): steps the view: the pages and commands, the mail page, the confirmation and the friend's
  * removal; 0 busy, 1 removed, 2 a request was picked, 3 back, 4 failed or unknown step. */
 s32 menu_friend_list_step(FriendCardView* view) {
+    PlMessageWork* message;
     s32 ret;
     MenuScroll* scroll;
     PlayerPad* pad;
-    LobbyMailRow* mail;
     NetPeerCard* card;
+    LobbyMailRow* mail;
 
     ret = 0;
     scroll = &view->scroll;
+    message = &plsearch_message_work;
     pad = Psw;
     if (chk_pointer() == 0) {
         view->input = pad->button_0x2C0.pressed_0x04 | (pad->button_0x2C0.held_0x14 & 0xF);
@@ -1763,11 +1779,11 @@ s32 menu_friend_list_step(FriendCardView* view) {
         card = view->card;
         sprintf(mail->name_0x00.text_0x00, "%s", card->name_0x000);
         sprintf(mail->id_0x14.text_0x00, "%s", card->id_0x014);
-        plsearch_work_init(&plsearch_message_work, 1, mail);
+        plsearch_work_init(message, 1, mail);
         view->step++;
         break;
     case 21:
-        switch (plsearch_step(&plsearch_message_work)) {
+        switch (plsearch_step(message)) {
         case 2:
             view->step = 0;
             break;
@@ -1827,7 +1843,7 @@ s32 menu_friend_list_step(FriendCardView* view) {
             ret = 2;
             break;
         case 6:
-            switch (lobby_friend_remove((LobbyRecentRow*)view->card)) {
+            switch ((u8)lobby_friend_remove((LobbyRecentRow*)view->card)) {
             case 1:
                 menu_slot0_lock_set(1);
                 view->step++;
@@ -1870,9 +1886,11 @@ void menu_friend_list_draw(FriendCardView* view) {
 
     drawn = 0;
     page = view->scroll.col;
-    if (view->step == 21) {
+    switch (view->step) {
+    case 21:
         plsearch_draw(&plsearch_message_work);
         drawn = 1;
+        break;
     }
     if (drawn == 0) {
         switch (page) {
@@ -1893,20 +1911,22 @@ void menu_friend_list_draw(FriendCardView* view) {
         }
         font_flush();
     }
-    if (view->step == 51) {
+    switch (view->step) {
+    case 51:
         friend_card_confirm_draw(view, view->confirm_choices, view->confirm);
+        break;
     }
 }
 
 /* 0x80440798 (0x188): draws the command rows' window, rows and cursor. */
 static void friend_card_rows_draw(FriendCardView* view) {
-    u16* anchors;
     u16 window;
+    u16* anchors;
     _SPR_DATA_ spr;
     _mh_ivec2_ pos;
     _mh_ivec2_ at;
-    s32 i;
     MenuEntry* row;
+    s32 i;
 
     anchors = NULL;
     window = 0xFFFF;
@@ -1958,15 +1978,15 @@ static void friend_card_profile_draw(FriendCardView* view, bool lit) {
     anchors = NULL;
     color = GetMenuFontColor(1, lit, lit, 0);
     switch (view->mode) {
-    case 2:
-    case 3:
-        anchors = (u16*)get_menu_lsp_tbl(0x135);
-        break;
     case 0:
         anchors = (u16*)get_menu_lsp_tbl(0x140);
         break;
     case 1:
         anchors = (u16*)get_menu_lsp_tbl(0x137);
+        break;
+    case 2:
+    case 3:
+        anchors = (u16*)get_menu_lsp_tbl(0x135);
         break;
     }
     get_lsp_data(anchors[1], &pos);
@@ -2065,18 +2085,16 @@ static void friend_card_equip_draw(FriendCardView* view) {
 /* 0x80440EB8 (0x250): draws the equipment page: the gun parts, the seven pieces and, when some piece cannot be
  * dyed, the dye colour. */
 static void friend_card_equip_page_draw(FriendCardView* view, _EQUIP* equip, u8 dye) {
-    _mh_ivec2_ at0;
-    _mh_ivec2_ at1;
+    _mh_ivec2_ pos;
     union {
         s32 word;
         GXColor rgba;
     } color;
-    _mh_ivec2_ pos;
     _SPR_DATA_ spr;
+    u16* anchors;
     s32 dyeable;
     _SPR_DATA_* frame;
     s32 i;
-    u16* anchors;
     _EQUIP* piece;
 
     dyeable = 1;
@@ -2086,8 +2104,8 @@ static void friend_card_equip_page_draw(FriendCardView* view, _EQUIP* equip, u8 
     info_gun_parts_draw(0x2982, &equip[6], &equip[7], &equip[8]);
     frame = get_lsp_data(0x2983, &pos);
     draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x141), &pos);
-    i = 0;
     anchors = (u16*)get_menu_lsp_tbl(0x142);
+    i = 0;
     do {
         piece = NULL;
         switch (i) {
@@ -2116,12 +2134,10 @@ static void friend_card_equip_page_draw(FriendCardView* view, _EQUIP* equip, u8 
         if (piece != NULL) {
             if (i == 0) {
                 if (piece->kind != 0) {
-                    at1 = frame->pos;
-                    Put_equip_dtl_syo_item1(piece, &equip[7], 0, 0, 0, at1, *anchors);
+                    Put_equip_dtl_syo_item1(piece, &equip[7], 0, 0, 0, frame->pos, *anchors);
                 }
             } else if (piece->kind != 0) {
-                at0 = frame->pos;
-                Put_equip_dtl_syo_item1(piece, NULL, 0, 0, 0, at0, *anchors);
+                Put_equip_dtl_syo_item1(piece, NULL, 0, 0, 0, frame->pos, *anchors);
             }
             if (i - 1 <= 4U && EnableChangeColor(piece) == 0) {
                 dyeable = 0;
@@ -2209,12 +2225,12 @@ static void friend_card_skills_draw(u16 id, u16* skills) {
 /* 0x80441300 (0xB8): writes the eight active-skill ids of `plw` to `ids`, flagged 0x4000 when the skill's tree has
  * no points and 0x8000 when the skill is not valid for the hunter. */
 void card_equip_ids_build(_PLW* plw, u16* ids) {
-    _EQUIP columns[10];
+    _EQUIP columns[9];
     s32 i;
     u16 flags;
 
     Set_equip_column_arrangement(plw, NULL, columns);
-    for (i = 0; i < 8; ids++, i++) {
+    for (i = 0; i < 8; i++) {
         flags = 0;
         if (plw->active_skill_id[i] != 0) {
             flags = (equip_columns_tree_points_get(columns, pl_skill_tree_get(plw->active_skill_id[i])) >> 31) & 0x4000;
@@ -2222,18 +2238,18 @@ void card_equip_ids_build(_PLW* plw, u16* ids) {
                 flags = 0x8000;
             }
         }
-        *ids = flags | plw->active_skill_id[i];
+        ids[i] = flags | plw->active_skill_id[i];
     }
 }
 
 /* 0x804413B8 (0x264): draws the confirmation window for `kind` with `choices` buttons and the cursor. */
 static void friend_card_confirm_draw(FriendCardView* view, u8 choices, u16 kind) {
-    _mh_ivec2_ at;
     _mh_ivec2_ pos;
+    _mh_ivec2_ at;
     _SPR_DATA_ spr;
     _SPR_DATA_* rect;
     u16* anchors;
-    u16 i;
+    s32 i;
 
     rect = get_lsp_data(0x299C, &pos);
     draw_layout_window(pos.x, pos.y, rect->width, rect->height);
@@ -2259,8 +2275,8 @@ static void friend_card_confirm_draw(FriendCardView* view, u8 choices, u16 kind)
         }
         break;
     case 2:
-        i = 0;
         anchors = (u16*)get_menu_lsp_tbl(0x143);
+        i = 0;
         do {
             rect = get_lsp_data(*anchors, NULL);
             at.x = pos.x + rect->pos.x;
@@ -2401,7 +2417,7 @@ static s16 option_value_step(u16 input, u8 option) {
     }
     next = value;
     if (input & 8) {
-        next = value + 1;
+        next++;
         moved = 8;
     } else if (input & 4) {
         if (value != 0) {
@@ -2437,7 +2453,7 @@ static s16 page17_transfer_step(u16 input, u8 row) {
     value = page17_transfer_get(row);
     next = value;
     if (input & 8) {
-        next = value + 1;
+        next++;
         moved = 8;
     } else if (input & 4) {
         if (value != 0) {
@@ -2460,7 +2476,7 @@ static u32 page04_control_row_ok(MenuSlot* slot) {
     u32 ok;
 
     ok = 0;
-    switch (get_ControlType(slot->field_0x011)) {
+    switch ((u8)get_ControlType(slot->field_0x011)) {
     case 0:
         ok = 1;
         break;
@@ -2482,7 +2498,7 @@ static u32 page04_pointer_row_ok(MenuSlot* slot) {
     u32 ok;
 
     ok = 0;
-    switch (get_ControlType(slot->field_0x011)) {
+    switch ((u8)get_ControlType(slot->field_0x011)) {
     case 0:
         ok = 1;
         break;
@@ -2501,10 +2517,10 @@ static u32 page04_pointer_row_ok(MenuSlot* slot) {
 
 /* 0x80441BDC (0x1A4): fills page 4's rows of the page: enabled, colour, and whether the value is at an end. */
 static void page04_rows_build(MenuSlot* slot) {
+    u8* option;
     MenuEntry* row;
     s16 index;
     s32 i;
-    u8* option;
     u8 value;
     u32 color;
 
@@ -2517,12 +2533,6 @@ static void page04_rows_build(MenuSlot* slot) {
         row->page_kind = index;
         row->selected = i == slot->scroll.row;
         switch (index) {
-        case 14:
-        case 15:
-            if (page04_pointer_row_ok(slot) == 0) {
-                row->field_0x02 = 0;
-            }
-            break;
         case 6:
             if (ck_cfg(slot->worker->chunk_ofs, 14) == 1) {
                 row->field_0x02 = 0;
@@ -2533,13 +2543,20 @@ static void page04_rows_build(MenuSlot* slot) {
                 row->field_0x02 = 0;
             }
             break;
+        case 14:
+        case 15:
+            if (page04_pointer_row_ok(slot) == 0) {
+                row->field_0x02 = 0;
+            }
+            break;
         }
         if (row->field_0x02 == 0) {
             row->field_0x0C = 0x8C8C8CFF;
         } else {
-            color = 0x6E8C7EFF;
             if (row->selected == 1) {
                 color = 0x7DE6BEFF;
+            } else {
+                color = 0x6E8C7EFF;
             }
             row->field_0x0C = color;
         }
@@ -2560,11 +2577,11 @@ void movie_page04_draw(MenuSlot* slot) {
     _mh_ivec2_ at;
     _SPR_DATA_ spr;
     u8 arrows;
-    MenuEntry* row;
     u16* names;
-    s32 i;
     u16* values;
+    s32 i;
     s8* text;
+    MenuEntry* row;
     s32 color;
     u16* sprites;
     u8** msgs;
@@ -2577,9 +2594,8 @@ void movie_page04_draw(MenuSlot* slot) {
                  arrows);
     row = slot->entries_b;
     names = (u16*)get_menu_lsp_tbl(0xDA);
-    i = 0;
     values = (u16*)get_menu_lsp_tbl(0xDB);
-    for (; i < slot->scroll.row_limit; values++, i++, row++) {
+    for (i = 0; i < slot->scroll.row_limit; values++, i++, row++) {
         if (names[row->page_kind] == 0xFFFF) {
             continue;
         }
@@ -2596,18 +2612,11 @@ void movie_page04_draw(MenuSlot* slot) {
             option_cursor_draw(slot, row, &at);
         }
         switch (row->page_kind) {
-        case 2:
-        case 3:
-            switch (row->field_0x06) {
-            case 0:
-                draw_number_idx(0x78B, ck_cfg(slot->worker->chunk_ofs, page04_option_ids[row->page_kind]), color, &at);
-                break;
-            case 1:
-                option_value_sprite_draw(0x789, color, &at);
-                break;
-            case 2:
-                option_value_sprite_draw(0x78A, color, &at);
-                break;
+        default:
+            sprites = ((u16**)get_menu_lsp_tbl(0xE2))[row->page_kind];
+            if (sprites != NULL) {
+                option_value_sprite_draw(sprites[ck_cfg(slot->worker->chunk_ofs, page04_option_ids[row->page_kind])],
+                                         color, &at);
             }
             break;
         case 6:
@@ -2620,11 +2629,18 @@ void movie_page04_draw(MenuSlot* slot) {
                                          color, &at);
             }
             break;
-        default:
-            sprites = ((u16**)get_menu_lsp_tbl(0xE2))[row->page_kind];
-            if (sprites != NULL) {
-                option_value_sprite_draw(sprites[ck_cfg(slot->worker->chunk_ofs, page04_option_ids[row->page_kind])],
-                                         color, &at);
+        case 2:
+        case 3:
+            switch (row->field_0x06) {
+            case 0:
+                draw_number_idx(0x78B, ck_cfg(slot->worker->chunk_ofs, page04_option_ids[row->page_kind]), color, &at);
+                break;
+            case 1:
+                option_value_sprite_draw(0x789, color, &at);
+                break;
+            case 2:
+                option_value_sprite_draw(0x78A, color, &at);
+                break;
             }
             break;
         }
@@ -2651,9 +2667,8 @@ void movie_page04_draw(MenuSlot* slot) {
 
 /* 0x8044214C (0x98): draws sprite record `id` in `color` at `pos`. */
 static void option_value_sprite_draw(u16 id, u32 color, _mh_ivec2_* pos) {
-    _SPR_DATA_ spr;
+    _SPR_DATA_ spr = *get_lsp_data(id, NULL);
 
-    spr = *get_lsp_data(id, NULL);
     spr.color = color;
     draw_sprite(spr, pos);
 }
@@ -2704,7 +2719,7 @@ static s16 arena_value_step(u16 input, u8 option, u8 player) {
     value = get_arena_cfg(player, option);
     next = value;
     if (input & 8) {
-        next = value + 1;
+        next++;
         moved = 8;
     } else if (input & 4) {
         if (value != 0) {
@@ -2724,10 +2739,10 @@ static s16 arena_value_step(u16 input, u8 option, u8 player) {
 
 /* 0x804423D0 (0x19C): fills the split page's rows of the page. */
 static void page04_split_rows_build(MenuSlot* slot) {
+    u8* option;
     MenuEntry* row;
     s16 index;
     s32 i;
-    u8* option;
     u8 value;
     u32 color;
 
@@ -2740,12 +2755,6 @@ static void page04_split_rows_build(MenuSlot* slot) {
         row->page_kind = index;
         row->selected = i == slot->scroll.row;
         switch (index) {
-        case 11:
-        case 12:
-            if (page04_pointer_row_ok(slot) == 0) {
-                row->field_0x02 = 0;
-            }
-            break;
         case 3:
             if (ck_arena_cfg(slot->field_0x011, 14) == 1) {
                 row->field_0x02 = 0;
@@ -2756,13 +2765,20 @@ static void page04_split_rows_build(MenuSlot* slot) {
                 row->field_0x02 = 0;
             }
             break;
+        case 11:
+        case 12:
+            if (page04_pointer_row_ok(slot) == 0) {
+                row->field_0x02 = 0;
+            }
+            break;
         }
         if (row->field_0x02 == 0) {
             row->field_0x0C = 0x8C8C8CFF;
         } else {
-            color = 0x6E8C7EFF;
             if (row->selected == 1) {
                 color = 0x7DE6BEFF;
+            } else {
+                color = 0x6E8C7EFF;
             }
             row->field_0x0C = color;
         }
@@ -2840,13 +2856,13 @@ void movie_page04_split_draw(MenuSlot* slot) {
     _mh_ivec2_ pos;
     _SPR_DATA_ spr;
     _mh_ivec2_ at;
-    MenuEntry* row;
     u16* names;
-    s32 i;
     u16* values;
+    s32 i;
     _SPR_DATA_* anchor;
+    MenuEntry* row;
     s32 color;
-    u16* sprites;
+    u16** sprites;
 
     get_lsp_data(((u16*)get_menu_lsp_tbl(0x18A))[slot->pad_no], &pos);
     draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x18B), &pos);
@@ -2854,9 +2870,8 @@ void movie_page04_split_draw(MenuSlot* slot) {
                  0);
     row = slot->entries_b;
     names = (u16*)get_menu_lsp_tbl(0x18E);
-    i = 0;
     values = (u16*)get_menu_lsp_tbl(0x18F);
-    for (; i < slot->scroll.row_limit; values++, i++, row++) {
+    for (i = 0; i < slot->scroll.row_limit; values++, i++, row++) {
         spr_data_copy(&spr, get_lsp_data(names[row->page_kind], NULL));
         spr.color = row->field_0x0C;
         draw_font(spr, (s8*)get_menu_msg(0x1F, row->page_kind), 4, &pos);
@@ -2869,18 +2884,20 @@ void movie_page04_split_draw(MenuSlot* slot) {
         }
         color = GetMenuFontColor(row->field_0x02 == 1, row->selected == 1, 1, 0);
         switch (row->page_kind) {
+        default:
+            sprites = (u16**)get_menu_lsp_tbl(0x190);
+            option_value_sprite_draw(
+                sprites[row->page_kind][ck_arena_cfg(slot->field_0x011, page04_split_option_ids[row->page_kind])],
+                color, &at);
+            break;
         case 3:
         case 4:
         case 8:
         case 10:
-            sprites = ((u16**)get_menu_lsp_tbl(0x190))[row->page_kind];
-            option_value_sprite_draw(sprites[ck_arena_cfg(slot->field_0x011, page04_split_option_ids[row->page_kind])],
-                                     color, &at);
-            break;
-        default:
-            sprites = ((u16**)get_menu_lsp_tbl(0x190))[row->page_kind];
-            option_value_sprite_draw(sprites[ck_arena_cfg(slot->field_0x011, page04_split_option_ids[row->page_kind])],
-                                     color, &at);
+            sprites = (u16**)get_menu_lsp_tbl(0x190);
+            option_value_sprite_draw(
+                sprites[row->page_kind][ck_arena_cfg(slot->field_0x011, page04_split_option_ids[row->page_kind])],
+                color, &at);
             break;
         }
     }
@@ -2958,6 +2975,7 @@ static void page17_transfer_set(u8 row, u8 value) {
 }
 
 /* 0x80442BA8 (0x1B8): fills page 17's rows of the page. */
+#pragma opt_strength_reduction off
 static void page17_rows_build(MenuSlot* slot) {
     MenuEntry* row;
     s16 index;
@@ -2976,19 +2994,23 @@ static void page17_rows_build(MenuSlot* slot) {
         } else {
             row->field_0x02 = 1;
         }
-        if (index == 4 || index == 5) {
+        switch (index) {
+        case 4:
+        case 5:
             if (page17_transfer_get(3) == 1) {
                 row->field_0x02 = 0;
             } else {
                 row->field_0x02 = 1;
             }
+            break;
         }
         if (row->field_0x02 == 0) {
             row->field_0x0C = 0x8C8C8CFF;
         } else {
-            color = 0x6E8C7EFF;
             if (row->selected == 1) {
                 color = 0x7DE6BEFF;
+            } else {
+                color = 0x6E8C7EFF;
             }
             row->field_0x0C = color;
         }
@@ -3014,6 +3036,7 @@ static void page17_rows_build(MenuSlot* slot) {
     }
 }
 
+#pragma opt_strength_reduction reset
 /* 0x80442D60 (0x1D4): steps page 17: the option rows and the transfer rows. */
 s32 movie_page17_step(MenuSlot* slot) {
     s32 ret;
@@ -3105,7 +3128,8 @@ static void terms_progress_draw(_mh_ivec2_* pos) {
     size.x = 200.0f;
     size.y = 5.0f;
     disp_beta(&at, &size, color_black);
-    rate = getNetTermsProgressLevel() * 0.0625f;
+    rate = getNetTermsProgressLevel();
+    rate *= 0.0625f;
     if (rate > 1.0f) {
         rate = 1.0f;
     } else if (rate < 0.0f) {
@@ -3128,14 +3152,15 @@ void movie_page17_draw(MenuSlot* slot) {
     u8 arrows;
     MenuEntry* row;
     u16* names;
-    s32 i;
     u16* values;
+    s32 i;
     s8* text;
     s32 color;
     u16* sprites;
     u8** msgs;
     u16 index;
     u8 value;
+    u8*** msg_tables;
 
     get_lsp_data(0x74C, &pos);
     draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xD7), &pos);
@@ -3146,9 +3171,8 @@ void movie_page17_draw(MenuSlot* slot) {
     }
     row = slot->entries_b;
     names = (u16*)get_menu_lsp_tbl(0xDA);
-    i = 0;
     values = (u16*)get_menu_lsp_tbl(0xDB);
-    for (; i < slot->scroll.row_limit; names++, values++, i++, row++) {
+    for (i = 0; i < slot->scroll.row_limit; names++, values++, i++, row++) {
         if (row->page_kind == -1 || *names == 0xFFFF) {
             continue;
         }
@@ -3210,22 +3234,27 @@ void movie_page17_draw(MenuSlot* slot) {
         }
         break;
     case 1:
-        index = slot->scroll.index;
-        msgs = ((u8***)get_menu_msg_tbl(0x24))[index];
-        if (index <= 2) {
-            text = (s8*)msgs[ck_option_cfg(page17_option_ids[index])];
-        } else if (index == 3 || index == 5) {
-            value = page17_transfer_get(index);
-            text = (s8*)MH3GetErrorString2(page17_value_msg[slot->scroll.index - 3] + value);
+        msg_tables = (u8***)get_menu_msg_tbl(0x24);
+        msgs = msg_tables[slot->scroll.index];
+        if (slot->scroll.index <= 2) {
+            text = (s8*)msgs[ck_option_cfg(page17_option_ids[slot->scroll.index])];
         } else {
-            text = (s8*)MH3GetErrorString2(page17_value_msg[index - 3]);
+            switch (slot->scroll.index) {
+            case 3:
+            case 5:
+                value = page17_transfer_get(slot->scroll.index);
+                text = (s8*)MH3GetErrorString2(value + page17_value_msg[slot->scroll.index - 3]);
+                break;
+            default:
+                text = (s8*)MH3GetErrorString2(page17_value_msg[slot->scroll.index - 3]);
+                break;
+            }
         }
         break;
     }
     font_print_ex(pos.x + 24, pos.y + 16, 0, text);
 }
 
-#pragma optimization_level 3
 /* ---------------------------------------------------------------------------------------------------------------- */
 /* The character make. */
 
@@ -3510,8 +3539,8 @@ void set_charmake_r_no(u8 index, u8 value) {
 
 /* 0x804437FC (0xA8): sets the scene's ambient and four directional lights. */
 static void charmake_light_set(void) {
-    s32 i;
     GXColor* color;
+    s32 i;
     CharmakeLightDir* dir;
 
     set_amblight(0, (GXColor){ 0x1A, 0x1A, 0x1A, 0xFF });
@@ -3525,15 +3554,15 @@ static void charmake_light_set(void) {
 /* 0x804438A4 (0xB4): sets the ending pose: each shown model plays the decided motion pair. */
 static void charmake_finish_pose(CharmakeWork* work) {
     u16 motion[2];
+    _PLW* plw;
     s32 i;
     u16 count;
-    _PLW* plw;
 
     Pl_decide_mot_get(&motion[0], &motion[1]);
     work->turn.y = 0;
     plw = (_PLW*)get_move_work_adrs(2);
     count = get_move_work_max(2);
-    for (i = 0; i < count; plw++, i++) {
+    for (i = 0; i < count; i++, plw++) {
         if (plw->slot_active != 0 && plw->field_0x001 != 0) {
             plw->field_0x058 = 0;
             Pl_chr_set_attr(plw, motion[i & 1], 10, 0, 1);
@@ -3543,16 +3572,16 @@ static void charmake_finish_pose(CharmakeWork* work) {
 
 /* 0x80443958 (0x1A4): turns, colours and poses the two models; only the edited sex's model is shown. */
 static void charmake_model_update(CharmakeWork* work) {
+    _PLW* plw;
     s32 i;
     u16 count;
-    _PLW* plw;
 
     if (work->palette_custom == 0) {
         charmake_turn_step(work);
     }
     plw = (_PLW*)get_move_work_adrs(2);
     count = get_move_work_max(2);
-    for (i = 0; i < count; plw++, i++) {
+    for (i = 0; i < count; i++, plw++) {
         plw->motion_pos_0x3C = 0.0f;
         plw->motion_pos_0x40 = 0.0f;
         plw->motion_pos_0x44 = 0.0f;
@@ -3597,8 +3626,8 @@ static void charmake_camera_goal_set(CharmakeWork* work, u8 index) {
 
 /* 0x80443B54 (0xCC): places the scene camera at camera position 0. */
 static void charmake_camera_init(CharmakeWork* work) {
-    s32 handle;
     nw4r::g3d::Camera camera;
+    s32 handle;
     nw4r::g3d::Camera::PostureInfo posture;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(0);
@@ -3624,8 +3653,8 @@ static void charmake_camera_toggle(CharmakeWork* work) {
 
 /* 0x80443C30 (0x110): moves the camera a tenth of the way to its goals. */
 static void charmake_camera_step(CharmakeWork* work) {
-    s32 handle;
     nw4r::g3d::Camera camera;
+    s32 handle;
     nw4r::g3d::Camera::PostureInfo posture;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(0);
@@ -3653,7 +3682,7 @@ static void charmake_turn_step(CharmakeWork* work) {
     pad = Psw;
     pressed = pad->button_0x2C0.pressed_0x04;
     turn = 0;
-    switch (get_ControlType(0)) {
+    switch ((u8)get_ControlType(0)) {
     case 1:
         if (pad->control_0x104 & 0x400) {
             turn = 1;
@@ -3812,9 +3841,9 @@ static void charmake_face_apply(CharmakeWork* work) {
 
 /* 0x80444340 (0xE4): applies the hair choice to the edited model (the previous one stays when it cannot be set). */
 static void charmake_hair_apply(CharmakeWork* work) {
-    _PLW* plw;
-    s8 prev;
+    u8 prev;
     u16* ids;
+    _PLW* plw;
     u8 count;
     s8 ok;
 
@@ -3839,8 +3868,8 @@ static void charmake_hair_apply(CharmakeWork* work) {
 
 /* 0x80444424 (0xF0): dresses the edited model in demo equipment set `equip`. */
 static void charmake_equip_apply(CharmakeWork* work) {
-    _PLW* plw;
     DemoEquipSet* set;
+    _PLW* plw;
 
     plw = (_PLW*)get_move_work_adrs(2);
     plw = &plw[work->sex];
@@ -3888,7 +3917,7 @@ static void charmake_userdata_store(CharmakeWork* work) {
 
 /* 0x8044468C (0x340): steps the value of the item rows with right/left (equipment, makeup, face, makeup colour,
  * hair, voice); 1 when the pad was taken. */
-static u32 charmake_value_step(CharmakeWork* work) {
+static u32 charmake_value_step(CharmakeWork* work, u16 caller_pressed) {
     PlayerPad* pad;
     u16 pressed;
 
@@ -3999,31 +4028,45 @@ static inline void charmake_palette_step(CharmakeWork* work, u16 pressed, u16 bu
             work->step--;
         } else if (pressed & 8) {
             sysSE_req(3);
-            if (++work->palette_cursor > 12) {
+            work->palette_cursor++;
+            if (work->palette_cursor > 12) {
                 work->palette_cursor = 0;
             }
         } else if (pressed & 4) {
             sysSE_req(3);
-            if (--work->palette_cursor < 0) {
+            work->palette_cursor--;
+            if (work->palette_cursor < 0) {
                 work->palette_cursor = 12;
             }
         } else if (pressed & 1) {
             sysSE_req(3);
-            if ((u8)work->palette_cursor <= 2) {
+            switch (work->palette_cursor) {
+            case 0:
+            case 1:
+            case 2:
                 work->palette_cursor = 12;
-            } else if (work->palette_cursor != 12) {
-                work->palette_cursor -= 3;
-            } else {
+                break;
+            case 12:
                 work->palette_cursor = 11;
+                break;
+            default:
+                work->palette_cursor -= 3;
+                break;
             }
         } else if (pressed & 2) {
             sysSE_req(3);
-            if ((u8)(work->palette_cursor - 9) <= 2) {
+            switch (work->palette_cursor) {
+            case 9:
+            case 10:
+            case 11:
                 work->palette_cursor = 12;
-            } else if (work->palette_cursor != 12) {
-                work->palette_cursor += 3;
-            } else {
+                break;
+            case 12:
                 work->palette_cursor = 0;
+                break;
+            default:
+                work->palette_cursor += 3;
+                break;
             }
         } else if (pressed & 0x10) {
             titleSE_req(4);
@@ -4039,7 +4082,7 @@ static inline void charmake_palette_step(CharmakeWork* work, u16 pressed, u16 bu
     } else if (pressed & 0x20) {
         sysSE_req(1);
         work->palette_custom = 0;
-    } else if (lb_cursor_box_step(&work->custom_x, &work->custom_y, 1, 199, 1, 87, buttons) == 1) {
+    } else if ((u32)lb_cursor_box_step(&work->custom_x, &work->custom_y, 1, 199, 1, 87, buttons) == 1) {
         charmake_func.set(kind ^ 1, rgb);
         *color = (rgb[0] << 24) | (rgb[1] << 16) | (rgb[2] << 8) | 0xFF;
     }
@@ -4050,10 +4093,10 @@ static inline void charmake_palette_step(CharmakeWork* work, u16 pressed, u16 bu
 s32 charmake_move(void) {
     CharmakeWork* work;
     PlayerPad* pad;
+    s32 ret;
     u16 pressed;
     u16 held;
     u16 buttons;
-    s32 ret;
     s32 key;
     _PLW* plw;
 
@@ -4244,12 +4287,14 @@ s32 charmake_move(void) {
             break;
         case 2:
             if (work->left_arrow >= 0) {
-                if (++work->left_arrow > 30) {
+                work->left_arrow++;
+                if (work->left_arrow > 30) {
                     work->left_arrow = -1;
                 }
             }
             if (work->right_arrow >= 0) {
-                if (++work->right_arrow > 30) {
+                work->right_arrow++;
+                if (work->right_arrow > 30) {
                     work->right_arrow = -1;
                 }
             }
@@ -4276,7 +4321,7 @@ s32 charmake_move(void) {
             }
             break;
         case 4:
-            if (charmake_model_ready_ck(work) != 0 && charmake_value_step(work) != 1 && (pressed & 0x20)) {
+            if (charmake_model_ready_ck(work) != 0 && charmake_value_step(work, pressed) != 1 && (pressed & 0x20)) {
                 sysSE_req(1);
                 work->step--;
             }
@@ -4285,7 +4330,7 @@ s32 charmake_move(void) {
             charmake_palette_step(work, pressed, buttons, 1, work->inner_rgb, &work->inner_color);
             break;
         case 6:
-            if (charmake_model_ready_ck(work) != 0 && charmake_value_step(work) != 1 && (pressed & 0x20)) {
+            if (charmake_model_ready_ck(work) != 0 && charmake_value_step(work, pressed) != 1 && (pressed & 0x20)) {
                 sysSE_req(1);
                 work->step--;
             }
@@ -4306,19 +4351,19 @@ s32 charmake_move(void) {
             }
             break;
         case 8:
-            if (charmake_value_step(work) != 1 && (pressed & 0x20)) {
+            if (charmake_value_step(work, pressed) != 1 && (pressed & 0x20)) {
                 sysSE_req(1);
                 work->step--;
             }
             break;
         case 7:
-            if (charmake_value_step(work) != 1 && (pressed & 0x20)) {
+            if (charmake_value_step(work, pressed) != 1 && (pressed & 0x20)) {
                 sysSE_req(1);
                 work->step--;
             }
             break;
         case 9:
-            if (charmake_model_ready_ck(work) != 0 && charmake_value_step(work) != 1 && (pressed & 0x20)) {
+            if (charmake_model_ready_ck(work) != 0 && charmake_value_step(work, pressed) != 1 && (pressed & 0x20)) {
                 sysSE_req(1);
                 work->step--;
             }
@@ -4330,7 +4375,7 @@ s32 charmake_move(void) {
             if (file_loading_ck(NULL, NULL) != 1) {
                 plw = (_PLW*)get_move_work_adrs(2);
     plw = &plw[work->sex];
-                if (charmake_value_step(work) == 1) {
+                if (charmake_value_step(work, pressed) == 1) {
                     if (plw->se_name_idx != work->voice) {
                         if (work->voice_handle != 0 && snd_stream_reloc_busy_ck(work->voice_handle) != 0) {
                             snd_stream_reloc_stop(work->voice_handle);
@@ -4345,7 +4390,7 @@ s32 charmake_move(void) {
                     sysSE_req(1);
                 } else if (pressed & 0x10) {
                     work->voice_handle = se_bank_req(work->sex + 0x14, work->voice_sample);
-                    work->voice_sample++;
+                    work->voice_sample = work->voice_sample + 1;
                     if (work->voice_sample >= 12) {
                         work->voice_sample = 0;
                     }
