@@ -55,13 +55,17 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   `linker_assigned(ldscript)`, `link_index(root, inputs, cache_path, rebuild) -> {providers, ref_count, inputs, refs}`,
   `external_candidates(ours, known)`, `spelling_hint(section, offset, name, target)`, `undefined(ours, target, *, map_set,
   providers, ref_count, target_rel, linker_set) -> [(name, hint)]`.
-* Dead-stripping: `dead_symbols(obj, roots) -> [Symbol] | None` (mwld's dead-strip on one object, judged
-  conservatively: live are the global/weak symbols `roots` names, the `.comment` force-active ones, every byte of a section
-  outside `STRIPPABLE_SECTIONS`, and transitively whatever a live byte range relocates; an `extabindex` entry roots nothing;
-  a relocation naming a section symbol, a 0-size label or a non-candidate keeps its whole section; every doubt is live),
+* Dead-stripping: `dead_symbols(obj, roots, removed=None, kept=None) -> [Symbol] | None` (mwld's dead-strip on one
+  object, judged conservatively: live are the global/weak symbols `roots` names, the symbol indices in `kept`, the
+  `.comment` force-active ones, every byte of a section outside `STRIPPABLE_SECTIONS`, and transitively whatever a live
+  byte range relocates - and bytes of a strippable section no candidate covers are live; an `extabindex` entry roots
+  nothing; the indices in `removed` - weak copies the link drops for
+  another input's definition - are never kept, root nothing and are not in the result; a relocation naming a section
+  symbol, a 0-size label or a non-candidate keeps its whole section; every doubt is live),
   `strip_section(obj, section, dead) -> bytes | None` (the section as the link lays it out without `dead`: each kept symbol
   at its `.comment` alignment, gaps zero; None unless the object already obeys that layout - no overlap, each symbol at the
-  previous end rounded up to its alignment, zero gaps, the last ending at the section's end), built on
+  previous end rounded up to its alignment, zero gaps, the last ending at the section's end or short of it by zero fill up
+  to the section's alignment, which the kept layout repeats as a last, empty move), built on
   `strip_moves(obj, section, dead) -> (bytes, [(start, end, new start)]) | None` (the same layout as spans) and
   `apply_moves(data, moves) -> bytes`; `moved_offset(moves, offset) -> int | None`.
 * Relocation places: `reloc_places(obj, bases, shifts, addresses, moves) -> {section: {offset: [(type, place)]}} | None`

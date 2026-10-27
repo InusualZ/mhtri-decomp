@@ -179,8 +179,10 @@ def test_refused(c):
         claim, ctx, rows = setup(t, ours, target_obj(data=strings), 0x24)
         claim[".data"] = (len(strings), 3)
         got = run(claim, ctx, rows)[0]
-    c.check("the btm_link_key shape: a string only the stripped function reads goes with it - refused, named",
-            any("dead-strips 1 data symbol(s)" in p and "@11 0xA B of .data" in p for p in got), True)
+    c.check("the btm_link_key shape: a string only the stripped function reads goes with it, and the target carries "
+            "its bytes - refused on the size the link keeps",
+            any(p.startswith(".data: object is 0x8, splits.txt claims 0x18") and "after the link drops 0x10 B" in p
+                for p in got), True)
 
 
 #: hkb_pane's `.data`: the class's own vtable (global, in the target) and a base class's implicit vtable that MWCC

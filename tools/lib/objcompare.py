@@ -2,8 +2,10 @@
 Spec: docs/tools/spec/lib-objcompare.md. CLI: none (library)."""
 from __future__ import annotations
 
+import bisect
 import difflib
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -13,7 +15,7 @@ from dataclasses import dataclass
 from tools.lib import cache as _cache
 from tools.lib import names as _names
 from tools.lib.binary.elf import (SHN_UNDEF, SHT_NULL, SHT_RELA, SHT_STRTAB, SHT_SYMTAB, STB_GLOBAL, STT_SECTION,
-                                  STB_WEAK, STT_FILE, Elf, ElfError, reloc_name)
+                                  STB_LOCAL, STB_WEAK, STT_FILE, Elf, ElfError, reloc_name)
 
 #: Bookkeeping tables, not a unit's code or data: they move with the symbol table and the compiler version.
 META_SECTIONS = frozenset({".comment", ".note.split", ".shstrtab", ".strtab", ".symtab", ".dynsym", ".dynstr"})
@@ -1053,15 +1055,21 @@ NON_ROOTING_SECTIONS = ("extabindex",)
 FORCE_ACTIVE_FLAG = 0x08
 
 
-def dead_symbols(obj, roots: set[str]) -> list | None:
+def dead_symbols(obj, roots: set[str], removed: set[int] | None = None, kept: set[int] | None = None) -> list | None:
     """The defined symbols of one object that mwld's dead-strip removes, judged conservatively; None when unreadable.
 
     Live: a global/weak symbol named in `roots` (what the rest of the link references, FORCEACTIVE, the entry), a
     symbol `.comment` marks force-active, every byte of a section outside `STRIPPABLE_SECTIONS`, and - transitively -
-    every symbol a live byte range relocates (an `extabindex` entry roots nothing). A relocation naming a section
+    every symbol a live byte range relocates (an `extabindex` entry roots nothing; bytes of a strippable section no
+    candidate covers are a live range). A relocation naming a section
     symbol, a 0-size label or a symbol that is not itself a strip candidate keeps its whole section, because the
     linker cannot tell which bytes behind it are used. Only a symbol of size > 0 in a strippable section can be dead.
-    Every doubt resolves to live: a wrong "live" refuses a flip, a wrong "dead" would pass a broken one."""
+    `removed` are the symbol indices the link drops before the strip (a weak copy another input defines first): a
+    reference to one resolves to that other definition, so it keeps nothing of this object alive, and its own bytes
+    root nothing; they are not in the result. `kept` are symbol indices the caller holds live whatever references
+    them (a caller that counts a symbol's bytes keeps what it references too). Every doubt resolves to live: a wrong
+    "live" refuses a flip, a wrong "dead" would pass a broken one."""
+    removed = removed or set()
     elf = be32(obj)
     if elf is None or elf.symtab is None:
         return None
@@ -1091,7 +1099,7 @@ def dead_symbols(obj, roots: set[str]) -> list | None:
         live.update(by_section.get(shndx, ()))
 
     def keep(i: int) -> None:
-        if i in live or not 0 <= i < len(syms):
+        if i in live or i in removed or not 0 <= i < len(syms):
             return
         s = syms[i]
         if i in cand:
@@ -1103,9 +1111,21 @@ def dead_symbols(obj, roots: set[str]) -> list | None:
     for s in elf.sections:
         if s.index and s.index not in strippable and s.type != SHT_RELA:
             work.append((s.index, 0, s.size))
+    # bytes of a strippable section that no candidate covers belong to nothing the strip can take: they stay, and so
+    # does whatever they relocate
+    for shndx in strippable:
+        spans = sorted((syms[i].value, syms[i].value + syms[i].size) for i in by_section.get(shndx, ()))
+        starts = [lo for lo, _hi in spans]
+        reach = list(itertools.accumulate((hi for _lo, hi in spans), max))
+        for off, sym in relocs.get(shndx, ()):
+            at = bisect.bisect_right(starts, off)
+            if not at or reach[at - 1] <= off:
+                keep(sym)
     for s in syms:
         if s.name in roots and s.bind in (STB_GLOBAL, STB_WEAK) and s.defined:
             keep(s.index)
+    for i in kept or ():
+        keep(i)
     comment = elf.comment
     for i, entry in enumerate(comment.entries if comment is not None else ()):
         if entry.active_flags & FORCE_ACTIVE_FLAG and i < len(syms) and syms[i].defined:
@@ -1115,7 +1135,7 @@ def dead_symbols(obj, roots: set[str]) -> list | None:
         for off, sym in relocs.get(shndx, ()):
             if lo <= off < hi:
                 keep(sym)
-    return sorted((syms[i] for i in cand - live), key=lambda s: (s.shndx, s.value))
+    return sorted((syms[i] for i in cand - live - removed), key=lambda s: (s.shndx, s.value))
 
 
 def _align_up(value: int, align: int) -> int:
@@ -1144,8 +1164,10 @@ def strip_moves(obj, section: str, dead: list) -> tuple[bytes, list[tuple[int, i
     Each kept symbol is placed at its alignment (its `.comment` entry's, else the section's) after the previous kept
     one, the gap zero-filled. The model is accepted only where the object itself already obeys it - the symbols of
     size > 0 do not overlap, the first starts at 0, each next one starts exactly at the previous end rounded up to its
-    own alignment, every gap byte is zero, and the last one ends at the section's end - so the kept layout differs
-    from the object's only by the stripped symbols."""
+    own alignment, every gap byte is zero, and the last one ends at the section's end, or short of it by zero fill
+    that rounds it up to the section's alignment (MWCC pads `extab` after an 18-byte record) - so the kept layout
+    differs from the object's only by the stripped symbols. Such a fill is kept as a last, empty move: the kept
+    bytes are rounded up to the section's alignment the same way."""
     elf = be32(obj)
     sec = elf.section(section) if elf is not None else None
     if sec is None or sec.is_nobits:
@@ -1166,7 +1188,7 @@ def strip_moves(obj, section: str, dead: list) -> tuple[bytes, list[tuple[int, i
         if lo != (_align_up(pos, span["align"]) if pos else 0) or any(data[pos:lo]):
             return None
         pos = hi
-    if pos != len(data):
+    if pos != len(data) and (_align_up(pos, max(sec.align, 1)) != len(data) or any(data[pos:])):
         return None
     moves, end = [], 0
     for (lo, hi), span in sorted(spans.items()):
@@ -1174,6 +1196,8 @@ def strip_moves(obj, section: str, dead: list) -> tuple[bytes, list[tuple[int, i
             new_lo = _align_up(end, span["align"])
             moves.append((lo, hi, new_lo))
             end = new_lo + hi - lo
+    if pos != len(data) and end:
+        moves.append((len(data), len(data), _align_up(end, max(sec.align, 1))))  # the object's own trailing fill
     return data, moves
 
 

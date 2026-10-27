@@ -136,7 +136,7 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   `dropped_unwind_symbols` removes the `extab`/`extabindex` symbols covering it (`lib.binary.extab.unwind_entries`,
   the rule `tools/elf/objextab.py` names the kept entries by) through the same `strip_moves` layout, and the
   relocation-place check maps the kept entries through those moves. The note reads `extab: 0xN of the object's 0xM
-  bytes are the unwind entries <names> of the dropped weak copies (the link drops them with the function); the 0xK
+  bytes are the unwind entries <names> of the removed function(s) (the link drops them with the function); the 0xK
   bytes the link keeps are compared`. A copy the link keeps (no earlier definer) keeps its entries counted, and an
   entry the old `objextab` named at its own offset (two slots late) is refused on the relocations. Measured on all
   651 registered units at `8b3cb635` with the patched `objextab`: READY 298 -> 301, the gains
@@ -144,6 +144,28 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   0x54 vs 0x3C before); no unit lost READY; their trial flip together hashes `main.dol: OK`. ef_drawfreestrategy's five
   named `.sdata2` pool rows (`ef_free_hundred`, `_epsilon`, `_int_to_double`, `_one`, `_zero`) are excused by the
   pool-name rule (`lib.objcompare.unnamed_spellings`) and read as a note.
+* **What a removed symbol alone reads goes with it (2026-10-27).** Three gaps closed together, measured on
+  Runtime.PPCEABI.H/Gecko_ExceptionPPC (an unreferenced `static` placed first for the scheduler, a weak `~exception`
+  nothing calls, and a weak `__RTTI__Q23std9exception` copy another input defines first): (1) a dead-stripped
+  function's `extab` record and `extabindex` entry leave with it, as a dropped weak copy's do
+  (`dropped_unwind_symbols` over both sets; the note now reads `... are the unwind entries <names> of the removed
+  function(s) ...` for both); (2) a dropped weak copy keeps nothing alive - `dead_symbols(..., removed=)` neither keeps
+  it nor follows its relocations - so the type-name string only that `__RTTI__` copy read is dead, and a dead
+  **local** data symbol with no target name and no map row leaves the layout like a dead weak one (note `...
+  dead-stripped local data <names> ...`) - but only when nothing the model still counts reads it: liveness is judged a
+  second time with every dead symbol the model keeps counted (a dead function the target names) held live (`kept=`),
+  and a local whose section cannot be laid out joins the data refusal; (3) `strip_moves` accepts a section that ends
+  in zero fill up to its alignment (MWCC pads `extab` after an 18-byte record) and repeats that fill after the kept
+  layout; (4) `dead_symbols` holds bytes of a strippable section that no symbol covers live, with what they relocate.
+  Globals and target-named data keep the refusal. Measured on all 655 units at `50425ad2` (before: main's
+  flipcheck, after: this one, same build): READY 347 -> 348, the gain Gecko_ExceptionPPC (`.rodata` 0x71 vs 0x68,
+  `extab` +8, `extabindex` +12 before); the 352 `Object(Matching)` units keep their verdicts and problem lines (347
+  READY; NAND/NANDCore, CPlusLibPPC, TRK_interrupt_vector_stubs, TRK_interrupt_vectors and `__start` refused as
+  before), five of them change only the unwind note's wording. Refused units that change: KPAD/kpad loses its
+  `.sdata2` refusal (`@329`, read only by the stripped `KPADSetBtnRepeat`, goes and the shifted pool is the target's
+  byte for byte), g3d/g3d_state and menu/menu_sysmsg lose their `extab`/`extabindex` size lines. Gecko_ExceptionPPC
+  flipped alone links `main.dol: OK` and reads READY flipped; on the flipped tree the same comparison gives the same
+  set (353 Matching: READY 347 -> 348, the gain Gecko_ExceptionPPC, no other Matching verdict or problem line changed).
 * **A leading alignment fill is not a size gap (2026-10-14).** dtk can start a claim at the previous object's end,
   before the unit's own aligned start (`DVD/dvd`'s `.sbss` claim 0x80795090 holds 0x10 bytes of fill, labelled
   `pad_10_80795090_sbss`, before its 32-aligned data). `lib.objcompare.leading_fill` accepts the lead when all of
@@ -235,7 +257,7 @@ The dead-strip model and the reverse-reference row: `tools/tests/units/test_flip
 shaped like gap_utils, btm_link_key and gki_buffer): accepted - a stripped function between two kept ones, the 16-aligned
 zero-gap layout, a function only another stripped one calls; refused - another input references it, a map row names it, a
 kept function calls it, FORCEACTIVE names it, the kept bytes differ, a non-zero gap, functions packed tighter than their
-`.comment` alignment, a string only the stripped function reads; the liveness rules (`.comment` 0x08, `extabindex`,
+`.comment` alignment, a string only the stripped function reads that the target carries (refused on the kept size); the liveness rules (`.comment` 0x08, `extabindex`,
 `.ctors`, a section-symbol reference, an unreadable object); hkb_pane's weak dead vtable accepted (read only by a
 stripped function, or by nothing), refused when a kept function reads it, a map row names it, the target defines it
 (the btm_link_key near miss, weak and global) or it is a global absent from the target; the reverse-reference row
@@ -254,6 +276,13 @@ bytes unchecked, lead symbols unchecked, predecessor not judged, linked predeces
 `test_auto_successor_pad` (4 more checks in `test_flipcheck_pad.py`, 37 in all): g3d/g3d_cpu-shaped - ready before an
 8-aligned auto object the split lists; refused by the size line alone before a 4-aligned one and before one only a stale
 file under `obj/` names; a short section's own bytes still compared. Mutation: main's flipcheck fails 3.
+The removed-symbol closure: `tools/tests/units/test_flipcheck_strip_unwind.py` (15 checks, Gecko_ExceptionPPC-shaped):
+accepted - an unreferenced static with its `extab` record and `extabindex` entry, a dropped weak `__RTTI__` copy's
+type-name string, `extab`'s trailing fill kept; refused - a static a kept function calls (`.text`/`extab`/`extabindex`
+stay over the claim), a weak copy no other input defines (its string stays), a global another input references, a
+string a dead target-named function reads; `dead_symbols`' `removed`, `kept` and uncovered bytes rooting their loads (the
+poolnames fixture's symbol-less `.text`); `strip_moves`' trailing fill (zero, up
+to the alignment). Mutations: main's flipcheck fails 7 (of 12 there: `dead_symbols` takes no `removed`); `kept` ignored fails 1.
 The relocation places: `tools/tests/units/test_flipcheck_reloc.py` (11 checks, g3d_resvtx-shaped): the same copies under
 other names ready; swapped copies refused with the verbatim line; the same place under another type refused; map
 aliases agree, another map address refused, an unmapped name compared by name; `strip_moves`/`apply_moves`, offsets
