@@ -1,33 +1,40 @@
-/* ef/eft050.cpp - the eft050 effect family and the cockpit item-hold band it spawns from.
- * RANGE. .text 0x8033F270-0x803432B4 (46 functions); extab 0x80016CA4-0x80016DB4, extabindex 0x8003615C-0x800362F4,
- *   .data 0x805E7410-0x805E7B50, .sdata 0x8079308C-0x807930F0, .sdata2 0x8079B2C0-0x8079B320.  One maximal run:
- *   `tudiscover.py at 0x8033F270` must-links only `fn_8033F270` and offers no anchored seam, so the band may hold
- *   more than one original TU.  The item-hold band (0x8033F270-0x8033FDA8) draws the hold through the `hud`
- *   sprite calls and reads `lobby_world_block` and the `_PLW` weapon state; the rest is the family's spawners
- *   (`eft050_set`, `fn_8033FDA8`), its `release_0x40`/`dispatch_0x34` hooks (`fn_8034305C`, `fn_803430F4`) and its
- *   `state_0x05` machine.
- * FLAGS. `cflags_main`; `#pragma peephole off` around `fn_80342AC0` (retail keeps the unfused countdown, `subi` +
- *   `cmpwi`, not the peephole's `subic.`).
- * NAMES. `eft050_set` is the runtime dump's own name; the map has only `fn_` stems for the other 45 rows, so plain
- *   definitions are `extern "C"`.  `Eft050Work`, `Eft051Work` and `Eft050SetWork` type `_EFT::work_0x38` per family
- *   from the offsets each reads; the first family's count byte at +0x04 overlaps its handle list above a count of 1.
- *   GUESS (from each body and its callers): eft050_interior_fx_spawn
- *   GUESS (from each body and its callers): `eft050_bite_strength_get`, `eft050_float_find`, `eft050_fish_appear`,
- *   `eft050_fish_swim`, `eft050_fish_bite`, `eft050_fish_hooked`, `eft050_fish_respawn`, `eft050_fish_flee`,
- *   `eft050_kind_roll`, `eft050_act_table_ck`, `eft051_spawn`.
- * RESIDUALS. 17 rows unwritten: 0x8033FAA4-0x8033FD78, 0x80340010-0x803401B8, 0x8034028C-0x80340594,
- *   0x803405C8-0x80342504, 0x803425C8-0x80342AC0, 0x80342B70-0x80342C60, 0x80342CAC-0x80342E80,
- *   0x80343130-0x803432B4.
- *   15 partial rows, including:
- *  - `fn_8033F40C`, `fn_8033F560`, `fn_8033FA2C`: retail addresses the `.sdata` tables `@sda21`
- *    (`lbl_8079308C`, `lbl_80793098`, `lbl_807930A0`), ours with `lis`/`addi` because the tables are `extern` here;
- *    `fn_8033F40C` also has a 0x20 frame against retail's 0x30;
- *  - `fn_8033F270`: retail narrows `anchor.x` with an `extsh` before the store; ours omits it;
- *  - `fn_80342E80`: ours narrows the sum (`extsh`) before the `sth`, retail only for the compare;
- *  - `fn_80340218`: ours sign-extends before the `neg` where retail masks after it (`clrlwi`).
- *   The other 9 partial rows have no recorded cause (`symdiff.py -u ef/eft050 --all`).
- *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0x1024 of 0x4044), extab (0x88 of 0x110) and
- *   extabindex (0xCC of 0x198) short of the claim and differing.
+/* ef/eft050.cpp - the eft050 fish family, the eft051 decoration, the eft050_set record, and the lobby screen-13
+ *   status page and item box draws that precede them.
+ * RANGE. .text 0x8033F270-0x803432B4 (46 functions, all written, in address order); extab 0x80016CA4-0x80016DB4,
+ *   extabindex 0x8003615C-0x800362F4, .data 0x805E7410-0x805E7B70, .sdata 0x8079308C-0x807930F0, .sdata2
+ *   0x8079B2C0-0x8079B320.  Seam candidates (filed as requests, not acted on): `eft050_set_move` (0x803432B4, 0x490,
+ *   registered in `ef/eft_slot.cpp`) is the `eft050_set` record's state 1 and reads `lbl_805E7B50` inside this unit's
+ *   `.data`; `.sdata2` holds 1.0f twice (0x8079B2EC read up to `eft050_interior_fx_spawn`, 0x8079B318 from
+ *   `eft050_set_create`) and `.data` puts `eft051_spots_m21` after the jump tables behind 4 pad bytes, so
+ *   0x80342B70 (`eft051_spawn`) .. 0x80343758 reads as a second TU; 0x8033F270-0x8033FDA8 is lobby screen-13 code
+ *   (`lb_screen13_draw` is the draw task `lobby/lb_companion_ui.cpp` queues).
+ * FLAGS. `cflags_main`; `#pragma peephole off`, `optimization_level 4` and `fp_contract off` for the file (the target
+ *   has no fused multiply-add anywhere), `peephole on` only around `eft050_catch_limit_get`..`eft050_act_table_ck`.
+ * NAMES. `eft050_set` is the runtime dump's name.  GUESS (from each body, its callers and its data):
+ *   `lb_s13_status_values_draw`, `lb_s13_status_skills_draw`, `lb_s13_status_dance_draw`, `lb_s13_status_page_draw`,
+ *   `lb_item_box_cell_pos_get`, `lb_item_box_grid_draw`, `lb_item_box_page_draw`, `eft050_fish_spawn`/`_release`/
+ *   `_dispatch`/`_create`/`_alive`/`_state_next`/`_retire`/`_kind_get`/`_kind_set`/`_school_spawn`, `eft050_xz_angle_get`,
+ *   `eft050_angle_step`, `eft050_hold_item_ck`, `eft050_model_joint_show`, `eft050_catch_limit_get`,
+ *   `eft051_release`/`_dispatch`/`_create`/`_alive`/`_state_next`/`_retire`, `eft050_set_release`/`_dispatch`/`_create`,
+ *   `eft050_bite_strength_get`, `eft050_float_find`, `eft050_fish_appear`/`_swim`/`_bite`/`_hooked`/`_respawn`/`_flee`,
+ *   `eft050_kind_roll`, `eft050_act_table_ck`, `eft050_interior_fx_spawn`, `eft051_spawn`, the data tables
+ *   `lb_s13_status_*_ids`, `lb_item_box_*_ids`, `eft050_fish_kinds`, `eft050_rolls_school_0`/`_12`, and the registry
+ *   proposals `eft050_set_move`, `lb_s13_status_icon_ids`.  `CockpitSharedDb` +0x51A4/+0x51A5 are the two dances
+ *   picked on screen 13 (`lobby/lb_companion_ui.cpp` copies them to and from `LbScreen13Work::dance_0x016` and hands
+ *   the same pair to `ai_npc_pair_values_get`).
+ * RESIDUALS. 4 partial rows:
+ *  - `lb_s13_status_skills_draw`: retail keeps the skill row address as base + offset (`add r25, r29, r30`, frame 0x30)
+ *    where ours strength-reduces it to one pointer (frame 0x20); retail reads `lb_s13_status_skill_name_ids` `@sda21`
+ *    (a 6-byte table; declaring it `[3]` gives the `@sda21` but scores lower, so the `[6]` spelling stays);
+ *  - `eft050_fish_appear`: register assignment only (retail: the shared zero in r31, `work` r30, `self` r29);
+ *  - `eft050_kind_roll`: retail reloads `tbl->weight` in both loop bodies (`lwz r0, 0(r3)`) where ours reuses the
+ *    condition's load; `optimization_level` 2/3 and `while`/index forms do not reproduce it;
+ *  - `lb_item_box_grid_draw`: retail narrows the sprite-id ternary with a `clrlwi r3, r3, 16`; u16/s32 locals and a cast
+ *    do not reproduce it.
+ *   Data: `.data`/`.sdata`/`.sdata2` claimed but not emitted (the tables are `extern`, the pool is ours), blocked on
+ *   the seam above (the `.sdata2` duplicate and the `.data` pad cannot come from one TU).  flipcheck also names
+ *   `eft050_set_move`/`lb_s13_status_icon_ids` (registry names not yet in the map) and `lbl_805E7B50` (read by
+ *   `ef/eft_slot.cpp`, not defined here).
  */
 
 #include "types.h"
@@ -49,6 +56,17 @@
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2) */
 #include "unsplit/ef_control.h" /* eft_control */
 #include "enemy/enemy_control.h" /* fn_80143174 */
+#include "sound/fn_800D7F54.h" /* se_req_orb (rule 2) */
+#include "Pl/Pl_master_ck.h" /* Pl_master_ck, Pl_act_ck (rule 2) */
+#include "Pl/pl_skill.h" /* Pl_Skill_ck (rule 2) */
+#include "lobby/lb_screen13_work.h" /* LbScreen13Work (rule 1) */
+#include "lobby/lb_s13_help_line_draw.h" /* the screen-13 draw helpers (rule 2) */
+#include "lobby/lobby_w.h" /* lobby_w (rule 2) */
+#include "hud/cockpit.h" /* menu_money_draw (rule 2) */
+#include "hud/draw_lsp_sprite_variant.h" /* draw_lsp_sprite_variant (rule 2) */
+#include "sound/set_zmode.h" /* set_zmode (rule 2) */
+#include "lobby/lb_s13_status_icon_ids.h" /* lb_s13_status_icon_ids (rule 2) */
+#include "ef/eft050_set_move.h" /* eft050_set_move (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the records this unit reads
@@ -61,8 +79,9 @@ typedef struct CockpitSharedDb {
     /* +0x0000 */ u8 unused_0x0000[0x3E03];
     /* +0x3E03 */ u8 player_slot_0x3E03; /* & 0x7F selects which player's hold is drawn */
     /* +0x3E04 */ u8 unused_0x3E04[0x13A0];
-    /* +0x51A4 */ u8 clock_hour_0x51A4;
-    /* +0x51A5 */ u8 clock_minute_0x51A5;
+    /* +0x51A4 */ u8 dance_a_0x51A4; /* the two dances picked on screen 13's dance page: `lobby/lb_companion_ui.cpp`
+                                     * copies them to and from `LbScreen13Work::dance_0x016` */
+    /* +0x51A5 */ u8 dance_b_0x51A5;
     /* +0x51A6 */ u8 unused_0x51A6[0x62];
     /* +0x5208 */ u16 hold_flag_0x5208;
     /* +0x520A */ u8 unused_0x520A[0x1E];
@@ -78,10 +97,10 @@ typedef struct CockpitItemSlot {
     /* +0x02 */ u16 unused_0x02;
 } CockpitItemSlot;
 
-/* The `.bss` hold block at 0x806BF310, the record `fn_8033F788` walks (the map makes it 0x58 = 88
+/* The `.bss` hold block at 0x806BF310, the record `lb_item_box_grid_draw` walks (the map makes it 0x58 = 88
  * bytes; only the fields this band reads are named). size: 0x28 (approximation) */
 typedef struct CockpitItemBlock {
-    /* +0x00 */ u8 state_0x00;      /* 1/2 draw the selection frame, `fn_8033F788` tests `+0xFF` */
+    /* +0x00 */ u8 state_0x00;      /* 1/2 draw the selection frame, `lb_item_box_grid_draw` tests `+0xFF` */
     /* +0x01 */ u8 unused_0x01[0x07];
     /* +0x08 */ u16 frame_id_0x08;  /* handed to `spr_anim_draw` as the frame's part */
     /* +0x0A */ u16 sel_id_0x0A;    /* the same, for the two cursor sprites */
@@ -92,7 +111,7 @@ typedef struct CockpitItemBlock {
     /* +0x24 */ const CockpitItemSlot* items_0x24; /* the 50-slot hold list */
 } CockpitItemBlock;
 
-/* The two-line panel `fn_8033F270`/`fn_8033F40C`/`fn_8033F560` draw; `fn_8033F638` addresses the one
+/* The two-line panel `lb_s13_status_values_draw`/`lb_s13_status_skills_draw`/`lb_s13_status_dance_draw` draw; `lb_s13_status_page_draw` addresses the one
  * at +0x9C of its record.  The field names come from the sprite id each value is drawn at (the
  * `draw_font_idx_num(sprite, value, mode, pos)` calls). size: 0x1A */
 typedef struct CockpitPanel {
@@ -102,7 +121,7 @@ typedef struct CockpitPanel {
     /* +0x04 */ s16 count_delta_0x04;
     /* +0x06 */ s16 count_0x06; /* + count_delta_0x08 -> 0x201F */
     /* +0x08 */ s16 count_delta_0x08;
-    /* +0x0A */ u8 icon_0x0A;   /* index into the icon table lbl_805E7180, 0xFF = none */
+    /* +0x0A */ u8 icon_0x0A;   /* index into the icon table lb_s13_status_icon_ids, 0xFF = none */
     /* +0x0B */ u8 unused_0x0B[0x01];
     /* +0x0C */ s16 gauge_0x0C; /* + gauge_delta_0x0E -> 0x2020 (>= 100 moves the panel) */
     /* +0x0E */ s16 gauge_delta_0x0E;
@@ -115,13 +134,7 @@ typedef struct CockpitPanel {
     /* +0x1A */ u8 label_0x1A;  /* + 0x1C2 is the `LbStr` id drawn at 0x2060 */
 } CockpitPanel;
 
-/* The record `fn_8033F638` walks: one panel at +0x9C of it. size: 0xB6 (approximation) */
-typedef struct CockpitRecord {
-    /* +0x00 */ u8 unused_0x00[0x9C];
-    /* +0x9C */ CockpitPanel panel_0x9C;
-} CockpitRecord;
-
-/* The `eft050` fish's work block (the 100-byte block `fn_8033FDA8` pools): its model, its home, scale, swim speed and
+/* The `eft050` fish's work block (the 100-byte block `eft050_fish_spawn` pools): its model, its home, scale, swim speed and
  * range, the float (`ef/eft035.cpp`'s tag-34 record) it is after, its heading and the bite state.  size: 0x64 */
 typedef struct Eft050Work {
     /* +0x00 */ MHchar* models_0x00[1]; /* the pooled handle list */
@@ -144,7 +157,7 @@ typedef struct Eft050Work {
     /* +0x4C */ s32 rot_x_0x4C;         /* the model's rotation */
     /* +0x50 */ s32 rot_y_0x50;
     /* +0x54 */ s32 rot_z_0x54;
-    /* +0x58 */ s8 kind_0x58;           /* the fish kind (`fn_803401CC`'s table index) */
+    /* +0x58 */ s8 kind_0x58;           /* the fish kind (`eft050_fish_kind_get`'s table index) */
     /* +0x59 */ u8 hooked_0x59;         /* set while it is hooked */
     /* +0x5A */ u8 slot_0x5A;           /* its slot in the player's catch list, 0xFF = none */
     /* +0x5B */ u8 respawn_0x5B;        /* respawn soon */
@@ -154,17 +167,17 @@ typedef struct Eft050Work {
     /* +0x60 */ u8 flag_0x60;           /* the kind came from the fishing act's own table */
 } Eft050Work;
 
-/* The family `fn_80342C70` drives (`eft051_spawn` pools 0x0C bytes): the pooled models, the spot and kind the source
+/* The family `eft051_dispatch` drives (`eft051_spawn` pools 0x0C bytes): the pooled models, the spot and kind the source
  * picked and its countdown.  size: 0x0C */
 typedef struct Eft051Work {
     /* +0x00 */ s32 count_0x00;         /* the pooled handle list's used length */
-    /* +0x04 */ MHchar* models_0x04[1]; /* the pooled handle list `fn_80342C60` releases */
+    /* +0x04 */ MHchar* models_0x04[1]; /* the pooled handle list `eft051_release` releases */
     /* +0x08 */ u8 spot_0x08;           /* the spot record of the map's table */
     /* +0x09 */ u8 kind_0x09;           /* the joint the model shows (kind + 1) */
-    /* +0x0A */ s16 timer_0x0A;         /* the countdown `fn_80342E80` runs to 0xB4 */
+    /* +0x0A */ s16 timer_0x0A;         /* the countdown `eft051_alive` runs to 0xB4 */
 } Eft051Work;
 
-/* The block `eft050_set` pools for the family `fn_803430F4` drives: a word count at +0x00, the four
+/* The block `eft050_set` pools for the family `eft050_set_dispatch` drives: a word count at +0x00, the four
  * pooled handles at +0x04, the extra record the fourth `eft_res_model_get` hands back at +0x14 and the
  * eight-byte run the spawner zeroes at +0x1C. size: 0x24 (the bytes this spawner writes) */
 typedef struct Eft050SetWork {
@@ -177,7 +190,7 @@ typedef struct Eft050SetWork {
     /* +0x28 */ f32 scale_0x28;     /* the UV model's scale */
 } Eft050SetWork;
 
-/* The item record `fn_80340594` tests (a flag byte that disables the gauge and the item id).
+/* The item record `eft050_hold_item_ck` tests (a flag byte that disables the gauge and the item id).
  * size: 0x10 (approximation: only the bytes this band reads are named) */
 typedef struct EftHoldItem {
     /* +0x00 */ u8 unused_0x00[0x0A];
@@ -186,12 +199,12 @@ typedef struct EftHoldItem {
     /* +0x0C */ u16 item_id_0x0C;
 } EftHoldItem;
 
-/* One hold row of `fn_8033F40C`: the three sprite ids a row draws, left to right. size: 0x6 */
+/* One hold row of `lb_s13_status_skills_draw`: the three sprite ids a row draws, left to right. size: 0x6 */
 typedef struct CockpitRow {
     /* +0x00 */ u16 icons_0x00[3];
 } CockpitRow;
 
-/* One fish kind of the table `fn_803401CC` addresses by the kind byte: the catch id, the bite strength and nibble
+/* One fish kind of the table `eft050_fish_kind_get` addresses by the kind byte: the catch id, the bite strength and nibble
  * count, and the adult scale. size: 0x14 */
 typedef struct Eft050Slot {
     /* +0x00 */ u16 id_0x00;            /* the catch id the player's catch list holds */
@@ -210,14 +223,9 @@ typedef struct EftFishRoll {
 /* One decoration spot of the eft051 tables: the position and the yaw. size: 0x10 */
 typedef struct EftSpot {
     /* +0x00 */ Vec pos;
-    /* +0x0C */ u32 yaw;
+    /* +0x0C */ u16 yaw;
+    /* +0x0E */ u16 pad_0x0E;
 } EftSpot;
-
-/* The lobby object `eft051_spawn` decorates: its spot index.  size: 0xB7 - lower bound, an approximation */
-typedef struct EftLobbySpot {
-    /* +0x00 */ u8 unused_0x00[0xB6];
-    /* +0xB6 */ u8 spot_0xB6;
-} EftLobbySpot;
 
 /* The fishing bytes of the player work `Pl/plw.h` keeps inside a padding run: the line is taut while the player reels,
  * and the catch count.  size: 0x5A2 - lower bound, an approximation (a view of `_PLW`) */
@@ -230,7 +238,7 @@ typedef struct _EFT050_PL_FISH {
     /* +0x59C */ u16 catches_0x59C[3];
 } _EFT050_PL_FISH;
 
-/* The record `fn_8034257C` reads its draw mode from and reaches the player work through.
+/* The record `eft050_catch_limit_get` reads its draw mode from and reaches the player work through.
  * size: 0x34 (approximation: only the bytes this band reads are named) */
 typedef struct HoldOwner {
     /* +0x00 */ u8 unused_0x00[0x08];
@@ -259,30 +267,30 @@ s8* get_player_name_str(u8 index);
 s8* get_digit_str(u8 id);
 void lb_item_box_count_draw(void* work, u16 id, u32 arg);
 void eft052_box_list_draw(u16 id, const void* tbl, const void* pos, u16 id2, u32 arg);
-void fn_8033F788(CockpitItemBlock* self);
+void lb_item_box_grid_draw(CockpitItemBlock* self);
 /* this unit's own bodies, forward-declared (address order) */
-void fn_8033F270(CockpitPanel* self, const _mh_ivec2_* pos);
-void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos);
-void fn_8033F560(CockpitPanel* self, const _mh_ivec2_* pos);
-void fn_8033F638(CockpitRecord* self);
-void fn_8033F6C4(s32 value, _mh_ivec2_* out);
-void fn_8033FA2C(void);
+void lb_s13_status_values_draw(CockpitPanel* self, const _mh_ivec2_* pos);
+void lb_s13_status_skills_draw(CockpitPanel* self, const _mh_ivec2_* pos);
+void lb_s13_status_dance_draw(CockpitPanel* self, const _mh_ivec2_* pos);
+void lb_s13_status_page_draw(LbScreen13Work* self);
+void lb_item_box_cell_pos_get(s32 value, _mh_ivec2_* out);
+void lb_item_box_page_draw(void);
 s32 lb_npc_mark_state_get(void);
-void fn_8033FEE8(_EFT* self);
-void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param, u8 area);
-void fn_8033FF24(_EFT* self);
-void fn_8033FF60(_EFT* self);
-void fn_80340010(_EFT* self);
-void fn_803401B8(_EFT* self);
-void fn_803401C8(_EFT* self);
-Eft050Slot* fn_803401CC(s8 index);
-u16 fn_803401E4(const VEC3* a, const VEC3* b);
-s32 fn_80340218(s32* cur, u32* target, s32 step);
-s32 fn_80340594(EftHoldItem* self);
-void fn_80342504(MHchar* model, u32 index);
-s32 fn_8034257C(HoldOwner* state, HoldOwner* owner);
-void fn_80342AC0(u32 kind, VEC3* pos, f32 scale, u8 flag);
-void fn_80342C60(_EFT* self);
+void eft050_fish_release(_EFT* self);
+void eft050_fish_spawn(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param, u8 area);
+void eft050_fish_dispatch(_EFT* self);
+void eft050_fish_create(_EFT* self);
+void eft050_fish_alive(_EFT* self);
+void eft050_fish_state_next(_EFT* self);
+void eft050_fish_retire(_EFT* self);
+Eft050Slot* eft050_fish_kind_get(s8 index);
+u32 eft050_xz_angle_get(const VEC3* a, const VEC3* b);
+s32 eft050_angle_step(s32* cur, u32* target, s32 step);
+s32 eft050_hold_item_ck(EftHoldItem* self);
+void eft050_model_joint_show(MHchar* model, u32 index);
+s32 eft050_catch_limit_get(HoldOwner* state, HoldOwner* owner);
+void eft050_fish_school_spawn(u32 kind, VEC3* pos, f32 scale, u8 flag);
+void eft051_release(_EFT* self);
 s32 eft050_bite_strength_get(_PLW* plw, s8 kind, _EFT* fish);
 _EFT* eft050_float_find(_EFT* self, s32 mode);
 void eft050_fish_appear(_EFT* self);
@@ -293,44 +301,42 @@ void eft050_fish_respawn(_EFT* self);
 void eft050_fish_flee(_EFT* self);
 u32 eft050_kind_roll(_EFT* self);
 u32 eft050_act_table_ck(_EFT* self);
-void eft051_spawn(struct EftLobbySpot* src, u8 kind);
-void fn_80342C70(_EFT* self);
-void fn_80342E80(_EFT* self);
-void fn_80342F20(_EFT* self);
-void fn_80342F30(_EFT* self);
-void fn_803430F4(_EFT* self);
-void fn_803401B8(_EFT* self);
-void fn_803401C8(_EFT* self);
-void fn_8034235C(_EFT* self, MHchar* model);
-void fn_80342CAC(_EFT* self);
-void fn_8034305C(_EFT* self);
-void fn_80343130(_EFT* self);
+void eft051_spawn(_PLW* src, u8 kind);
+void eft051_dispatch(_EFT* self);
+void eft051_alive(_EFT* self);
+void eft051_state_next(_EFT* self);
+void eft051_retire(_EFT* self);
+void eft050_set_dispatch(_EFT* self);
+void eft050_fish_state_next(_EFT* self);
+void eft050_fish_retire(_EFT* self);
+void eft050_fish_kind_set(_EFT* self, MHchar* model);
+void eft051_create(_EFT* self);
+void eft050_set_release(_EFT* self);
+void eft050_set_create(_EFT* self);
 void eft_instance_release(_EFT* self);
-void fn_803432B4(_EFT* self);
 void eft_state_advance(_EFT* self);
 void eft_instance_release(_EFT* self);
 
 /* This unit's own `.data` run (0x805E7400..0x805E7A70), its `.sdata` tables and its `.sdata2` pool -
  * referenced by name, never defined (playbook 29). */
-extern const u16 lbl_805E7410[];
-extern const u8 lbl_805E7180[];
-extern const u16 lbl_805E7438[];
-extern CockpitRow lbl_805E7450[];
-extern const u16 lbl_805E7464[];
-extern const u16 lbl_805E7498[];
-extern const u16 lbl_805E74F0[];
-extern const u16 lbl_805E7508[];
-extern const u16 lbl_805E7514[];
-extern const u16 lbl_805E7528[];
-extern const u16 lbl_805E753C[];
-extern Eft050Slot lbl_805E7578[];
-extern const u16 lbl_805E7760[];
-extern const u16 lbl_805E7794[];
-extern const u16 lbl_8079308C[6];
+extern const u16 lb_s13_status_values_sprite_ids[];
+extern const u16 lb_s13_status_skills_sprite_ids[];
+extern CockpitRow lb_s13_status_skill_rows[];
+extern const u16 lb_s13_status_dance_sprite_ids[];
+extern const u16 lb_s13_status_page_sprite_ids[];
+extern const u16 lb_item_box_col_layout_ids[];
+extern const u16 lb_item_box_row_layout_ids[];
+extern const u16 lb_item_box_grid_sprite_ids[];
+extern const u16 lb_item_box_list_layout_ids[];
+extern const u16 lb_item_box_page_sprite_ids[];
+extern Eft050Slot eft050_fish_kinds[];
+extern const u16 eft050_rolls_school_0[];
+extern const u16 eft050_rolls_school_12[];
+extern const u16 lb_s13_status_skill_name_ids[6];
 
 /* The fish tables of this unit's `.data`/`.sdata` (declared until the unit emits its data). */
 extern f32 eft050_bite_speed[];
-extern s16 eft050_tug_offsets[4];
+extern u16 eft050_tug_offsets[4];
 extern s8 eft050_respawn_waits[4];
 extern EftFishRoll eft050_rolls_act389[];
 extern EftFishRoll eft050_rolls_act351[];
@@ -351,10 +357,10 @@ extern EftSpot eft051_spots_m22[];
 extern EftSpot eft051_spots_m21[];
 extern f32 eft050_set_scales[];
 
-extern const u16 lbl_80793098[4];
-extern const u16 lbl_807930A0[4];
+extern const u16 lb_s13_status_dance_value_ids[4];
+extern const u16 lb_item_box_list_ids[4];
 
-/* The hold block at 0x806BF310 (`fn_8033FA2C` hands its address to `fn_8033F788`). */
+/* The hold block at 0x806BF310 (`lb_item_box_page_draw` hands its address to `lb_item_box_grid_draw`). */
 extern CockpitItemBlock eft052_item_box;
 
 #ifdef __cplusplus
@@ -366,13 +372,11 @@ s8* LbStr(u8 kind, u16 id);
 void draw_font_idx(u16 id, s8* str, u32 mode, const _mh_ivec2_* pos);
 u16 ran_suu(long index);
 s32 chk_pointer(void);
-u8 Pl_act_ck(_PLW* plw, u8 a, u16 b);
-u32 Pl_Skill_ck(_PLW* plw, u16 id);
-u8 Pl_master_ck(_PLW* plw);
 void eft004_set(u8 type, nw4r::math::VEC3* pos, f32 scale, u32 param, u8 flag);
 
 #pragma peephole off
 #pragma optimization_level 4
+#pragma fp_contract off
 
 /* The by-value spellings of the out-pointer vector helpers (the result pointer is the hidden first argument either
  * way): retail builds each result in a compiler temporary, in call order. */
@@ -381,6 +385,8 @@ void eft004_set(u8 type, nw4r::math::VEC3* pos, f32 scale, u32 param, u8 flag);
 #define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 /* `em_vec3_copy` returns its argument's copy by value. */
 #define EFT_VEC3_COPY ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*))em_vec3_copy)
+/* The bite body reads `eft050_catch_limit_get`'s result as the byte it is (the caller narrows it, not the callee). */
+#define EFT050_CATCH_LIMIT ((u8 (*)(HoldOwner*, HoldOwner*))eft050_catch_limit_get)
 
 /* ---------------------------------------------------------------------------------------------------
  * bodies, in address order
@@ -388,16 +394,16 @@ void eft004_set(u8 type, nw4r::math::VEC3* pos, f32 scale, u32 param, u8 flag);
 
 /* Draws one hold slot's panel: the frame, the two counters with their deltas, the gauge bar and the
  * four value/timer pairs, each at its own sprite id. */
-extern "C" void fn_8033F270(CockpitPanel* self, const _mh_ivec2_* pos)
+extern "C" void lb_s13_status_values_draw(CockpitPanel* self, const _mh_ivec2_* pos)
 {
     _mh_ivec2_ anchor = *pos;
-    draw_sprite_ary(lbl_805E7410, pos);
+    draw_sprite_ary(lb_s13_status_values_sprite_ids, pos);
     _SPR_DATA_ frame;
     spr_data_copy(&frame, get_lsp_data(0x2019, 0));
     frame.pos.x += 6;
     draw_sprite(frame, pos);
     if (self->icon_0x0A != 0) {
-        u8 icon = lbl_805E7180[self->icon_0x0A];
+        u8 icon = lb_s13_status_icon_ids[self->icon_0x0A];
         if (icon != 0xFF) {
             draw_tex_icon_square((s16)(pos->x + 0x3A), (s16)(pos->y + 0x6E), 0x12, 0xFFFFFFFF, icon);
         }
@@ -417,9 +423,9 @@ extern "C" void fn_8033F270(CockpitPanel* self, const _mh_ivec2_* pos)
 
 /* Draws the hold slot list the selected player carries: one row of three sprites and the entry's name
  * per item, or the "no items" label when the list is empty. */
-extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
+extern "C" void lb_s13_status_skills_draw(CockpitPanel* self, const _mh_ivec2_* pos)
 {
-    draw_sprite_ary(lbl_805E7438, pos);
+    draw_sprite_ary(lb_s13_status_skills_sprite_ids, pos);
     u8 sel = lobby_world_block->player_slot_0x3E03 & 0x7F;
     const u8* rows = ai_npc_behaviour_get(sel);
     const u8* slots = lb_entry_id_get(sel);
@@ -429,71 +435,76 @@ extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
         draw_font_idx(0x2046, LbStr(0, 0x1C1), 1, pos);
     } else {
         for (s8 i = 0; i < rows[slots[0] + 4]; i++) {
-            draw_sprite_idx(lbl_805E7450[i].icons_0x00[0], pos);
-            draw_sprite_idx(lbl_805E7450[i].icons_0x00[1], pos);
-            draw_sprite_idx(lbl_805E7450[i].icons_0x00[2], pos);
-            draw_font_idx(lbl_8079308C[i], get_item_name_str(slots[i + 1]), 1, pos);
+            draw_sprite_idx(lb_s13_status_skill_rows[i].icons_0x00[0], pos);
+            draw_sprite_idx(lb_s13_status_skill_rows[i].icons_0x00[1], pos);
+            draw_sprite_idx(lb_s13_status_skill_rows[i].icons_0x00[2], pos);
+            draw_font_idx(lb_s13_status_skill_name_ids[i], get_item_name_str(slots[i + 1]), 1, pos);
         }
     }
 }
 
-/* Draws the hold's gauge row, its label and the four clock digits the shared block carries. */
-extern "C" void fn_8033F560(CockpitPanel* self, const _mh_ivec2_* pos)
+/* Draws the status page's dance row: its value, its label and the four values of the dance pair the shared block
+ * carries (`ai_npc_pair_values_get`). */
+extern "C" void lb_s13_status_dance_draw(CockpitPanel* self, const _mh_ivec2_* pos)
 {
-    draw_sprite_ary(lbl_805E7464, pos);
+    draw_sprite_ary(lb_s13_status_dance_sprite_ids, pos);
     draw_font_idx_num(0x205F, self->value_0x16 + self->value_delta_0x18, 1, pos);
     draw_font_idx(0x2060, LbStr(0, (u16)(self->label_0x1A + 0x1C2)), 1, pos);
-    u16 digits[4];
-    ai_npc_pair_values_get(lobby_world_block->clock_hour_0x51A4, lobby_world_block->clock_minute_0x51A5, digits);
+    u16 values[4];
+    ai_npc_pair_values_get(lobby_world_block->dance_a_0x51A4, lobby_world_block->dance_b_0x51A5, values);
     for (u16 i = 0; i < 4; i++) {
-        draw_font_idx(lbl_80793098[i], get_digit_str((u8)digits[i]), 0, pos);
+        draw_font_idx(lb_s13_status_dance_value_ids[i], get_digit_str((u8)values[i]), 0, pos);
     }
 }
 
 /* Draws the three panels of one hold record: the frame sprite, then each panel at the anchor the
  * preceding `get_lsp_data` wrote. */
-extern "C" void fn_8033F638(CockpitRecord* self)
+extern "C" void lb_s13_status_page_draw(LbScreen13Work* self)
 {
     _mh_ivec2_ anchor;
     get_lsp_data(0x1FE1, &anchor);
-    draw_sprite_ary(lbl_805E7498, &anchor);
+    draw_sprite_ary(lb_s13_status_page_sprite_ids, &anchor);
     get_lsp_data(0x200D, &anchor);
-    fn_8033F270(&self->panel_0x9C, &anchor);
+    lb_s13_status_values_draw((CockpitPanel*)self->status_0x09C, &anchor);
     get_lsp_data(0x200E, &anchor);
-    fn_8033F40C(&self->panel_0x9C, &anchor);
+    lb_s13_status_skills_draw((CockpitPanel*)self->status_0x09C, &anchor);
     get_lsp_data(0x200F, &anchor);
-    fn_8033F560(&self->panel_0x9C, &anchor);
+    lb_s13_status_dance_draw((CockpitPanel*)self->status_0x09C, &anchor);
 }
 
 /* Places the two digit sprites of a two-digit value: the ones digit's for `value % 10` and the tens
  * digit's for `value / 10`, then writes the ones digit's anchor, moved right by 4, into `out`. */
-extern "C" void fn_8033F6C4(s32 value, _mh_ivec2_* out)
+extern "C" void lb_item_box_cell_pos_get(s32 value, _mh_ivec2_* out)
 {
-    const _SPR_DATA_* ones = get_lsp_data(lbl_805E74F0[value % 10], 0);
-    const _SPR_DATA_* tens = get_lsp_data(lbl_805E7508[value / 10], 0);
+    const _SPR_DATA_* ones = get_lsp_data(lb_item_box_col_layout_ids[value % 10], 0);
+    const _SPR_DATA_* tens = get_lsp_data(lb_item_box_row_layout_ids[value / 10], 0);
     out->x = (s16)(ones->pos.x + 4);
     out->y = tens->pos.y;
 }
 
 /* Draws the hold list of the block at 0x806BF310: its frame, its 50 item icons with the selected
  * slot's frame around them, and - while a selection is active - the two cursor sprites. */
-#pragma peephole on
-extern "C" void fn_8033F788(CockpitItemBlock* self)
+extern "C" void lb_item_box_grid_draw(CockpitItemBlock* self)
 {
-    _mh_ivec2_ anchor;
-    get_lsp_data(0x2081, &anchor);
-    draw_sprite_anim_ary(lbl_805E7514, 0, &anchor);
-    s32 found = 0;
+    _SPR_DATA_ rec;
     _SPR_DATA_ frame;
-    spr_data_copy(&frame, get_lsp_data(0x1307, 0));
+    _SPR_DATA_ sel;
+    _mh_ivec2_ digit;
     _mh_ivec2_ frame_pos;
+    _mh_ivec2_ cursor;
+    _mh_ivec2_ anchor;
+    s32 i;
+    s32 found;
+    u16 id;
+
+    get_lsp_data(0x2081, &anchor);
+    draw_sprite_anim_ary(lb_item_box_grid_sprite_ids, 0, &anchor);
+    found = 0;
+    spr_data_copy(&frame, get_lsp_data(0x1307, 0));
     uv_pair_copy(&frame_pos, &frame);
-    _mh_ivec2_ cursor = { 0, 0 };
-    for (s32 i = 0; i < 0x32; i++) {
-        _mh_ivec2_ digit;
-        fn_8033F6C4(i, &digit);
-        u16 id = (i < 0x14) ? 0x2092 : 0x209B;
-        _SPR_DATA_ rec;
+    for (i = 0; i < 0x32; i++) {
+        lb_item_box_cell_pos_get(i, &digit);
+        id = (i < 0x14) ? 0x2092 : 0x209B;
         spr_data_copy(&rec, get_lsp_data(id, 0));
         uv_pair_copy(&rec, &digit);
         frame.pos.x = (s16)(digit.x + frame_pos.x);
@@ -506,46 +517,146 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
         if ((u8)(self->state_0x00 + 0xFF) <= 1) {
             if (chk_pointer() == 0) {
                 if (self->cursor2_0x10 == i) {
-                    _SPR_DATA_ sel;
                     spr_data_copy(&sel, get_lsp_data(0x1304, 0));
-                    sel.pos.x = (s16)(sel.pos.x + digit.x);
-                    sel.pos.y = (s16)(sel.pos.y + digit.y);
+                    sel.pos.x += digit.x;
+                    sel.pos.y += digit.y;
                     set_blendmode(4, 1, 1);
                     spr_anim_draw(&sel, self->frame_id_0x08, &anchor);
                     set_blendmode(4, 5, 1);
                 }
             }
         }
-        u16 item = self->items_0x24[i].item_id_0x00;
-        if (item != 0) {
-            draw_itemicon_item_id(frame, item, &anchor);
+        if (self->items_0x24[i].item_id_0x00 != 0) {
+            draw_itemicon_item_id(frame, self->items_0x24[i].item_id_0x00, &anchor);
         }
     }
     if (self->sel_flag_0x0C != 0 && found != 0) {
         set_blendmode(4, 1, 1);
-        _SPR_DATA_ sel;
         spr_data_copy(&sel, get_lsp_data(0x1305, 0));
-        sel.pos.x = (s16)(sel.pos.x + cursor.x);
-        sel.pos.y = (s16)(sel.pos.y + cursor.y);
+        sel.pos.x += cursor.x;
+        sel.pos.y += cursor.y;
         spr_anim_draw(&sel, self->sel_id_0x0A, &anchor);
         set_blendmode(4, 5, 1);
         spr_data_copy(&sel, get_lsp_data(0x1306, 0));
-        sel.pos.x = (s16)(sel.pos.x + cursor.x);
-        sel.pos.y = (s16)(sel.pos.y + cursor.y);
+        sel.pos.x += cursor.x;
+        sel.pos.y += cursor.y;
         spr_anim_draw(&sel, self->sel_id_0x0A, &anchor);
     }
 }
-#pragma peephole off
 
 /* Draws the hold's own frame and the item-icon panel the shared block's selector points at. */
-extern "C" void fn_8033FA2C(void)
+extern "C" void lb_item_box_page_draw(void)
 {
     _mh_ivec2_ anchor;
     get_lsp_data(0x2066, &anchor);
-    draw_sprite_ary(lbl_805E753C, &anchor);
-    fn_8033F788(&eft052_item_box);
+    draw_sprite_ary(lb_item_box_page_sprite_ids, &anchor);
+    lb_item_box_grid_draw(&eft052_item_box);
     lb_item_box_count_draw(&eft052_item_box, 0x2090, 0);
-    eft052_box_list_draw(0x209F, lbl_805E7528, lbl_807930A0, 0x2065, 0);
+    eft052_box_list_draw(0x209F, lb_item_box_list_layout_ids, lb_item_box_list_ids, 0x2065, 0);
+}
+
+/* Draws screen 13 every frame: the main choice with its help (states 0/1), or the page of the state - the entry, dance,
+ * skill-slot or status page, or the item box - and the help line under it. */
+extern "C" void lb_screen13_draw(void)
+{
+    LbScreen13Work* work = lobby_w.screen13_0x0AC;
+
+    set_zmode(false, 0, false);
+    set_blendmode(4, 5, 1);
+    switch (work->state_0x000) {
+    case 0:
+    case 1:
+        if (work->help_0x003 == 0) {
+            lb_subpage_arrow_draw();
+            lb_s13_menu_draw(work);
+            lb_s13_help_draw();
+            if (get_option_cfg(7) == 0) {
+                draw_lsp_sprite_variant(0x1FE0, 2);
+            } else {
+                draw_lsp_sprite_variant(0x1FE0, 16);
+            }
+        } else {
+            if (get_option_cfg(7) == 0) {
+                draw_lsp_sprite_variant(0x1FE0, 3);
+            } else {
+                draw_lsp_sprite_variant(0x1FE0, 17);
+            }
+            return;
+        }
+        break;
+    case 7:
+        menu_money_draw(0x14FC);
+        lb_item_box_page_draw();
+        break;
+    case 3:
+        lb_subpage_arrow_draw();
+        switch (work->sub_0x001) {
+        case 0:
+            lb_s13_entry_list_draw(work, true);
+            lb_s13_entry_status_draw(work->ids_0x008[work->list_0x070.cursor_0x00]);
+            break;
+        case 1:
+            lb_s13_entry_list_draw(work, false);
+            lb_s13_entry_status_draw(work->ids_0x008[work->list_0x070.cursor_0x00]);
+            break;
+        }
+        break;
+    case 4:
+        lb_subpage_arrow_draw();
+        switch (work->sub_0x001) {
+        case 0:
+            lb_s13_dance_list_draw(work, false);
+            lb_s13_dance_pick_draw(work);
+            lb_s13_dance_values_draw(work);
+            break;
+        case 1:
+            lb_s13_dance_list_draw(work, true);
+            lb_s13_dance_pick_draw(work);
+            break;
+        case 2:
+        case 3:
+            lb_s13_dance_list_draw(work, false);
+            lb_s13_dance_pick_draw(work);
+            lb_s13_dance_values_draw(work);
+            break;
+        }
+        break;
+    case 5:
+        lb_subpage_arrow_draw();
+        switch (work->sub_0x001) {
+        case 0:
+            lb_s13_entry_list_draw(work, true);
+            lb_s13_entry_status_draw(work->ids_0x008[work->list_0x070.cursor_0x00]);
+            break;
+        case 1:
+            lb_s13_slot_list_draw(work, 1);
+            break;
+        case 2:
+            lb_s13_slot_list_draw(work, 0);
+            lb_s13_slot_action_draw(work);
+            break;
+        case 4:
+        case 5:
+            lb_s13_slot_list_draw(work, 0);
+            break;
+        case 3:
+            switch (work->picking_0x002) {
+            case 0:
+                lb_s13_skill_list_draw(work, true);
+                break;
+            case 1:
+                lb_s13_skill_list_draw(work, false);
+                break;
+            }
+            break;
+        }
+        break;
+    case 6:
+        lb_s13_status_page_draw(work);
+        lb_subpage_arrow_draw();
+        break;
+    }
+    lb_s13_help_line_draw(work);
 }
 
 /* Reports the hold's state: 0 while the busy flag is set, -1 while the hold flag is clear, 1
@@ -562,17 +673,9 @@ extern "C" s32 lb_npc_mark_state_get(void)
     return -1;
 }
 
-/* Releases the pooled handle list of a work block and clears its used length. */
-extern "C" void fn_8033FEE8(_EFT* self)
-{
-    Eft050Work* work = (Eft050Work*)self->work_0x38;
-    eft_res_models_release(work->models_0x00, work->count_0x04);
-    work->count_0x04 = 0;
-}
-
 /* Spawns the family's effect in its area: pools the record and work block, seeds the model handle, stamps the
  * type, area and hooks, and installs the state machine through `eft_state_flags_set`. */
-extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param, u8 area)
+extern "C" void eft050_fish_spawn(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param, u8 area)
 {
     s32 i;
     _EFT* eft;
@@ -586,8 +689,8 @@ extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param
         return;
     }
     eft->type_0x02 = type;
-    eft->release_0x40 = fn_8033FEE8;
-    eft->dispatch_0x34 = fn_8033FF24;
+    eft->release_0x40 = eft050_fish_release;
+    eft->dispatch_0x34 = eft050_fish_dispatch;
     work = (Eft050Work*)eft->work_0x38;
     work->count_0x04 = 1;
     for (i = 0; i < work->count_0x04; i++) {
@@ -611,21 +714,29 @@ extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param
     eft_state_flags_set(eft, 0, 0);
 }
 
-/* The state machine of the effect `fn_8033FDA8` spawns: 0 the model-create pass, 1 the alive body, 2
+/* Releases the pooled handle list of a work block and clears its used length. */
+extern "C" void eft050_fish_release(_EFT* self)
+{
+    Eft050Work* work = (Eft050Work*)self->work_0x38;
+    eft_res_models_release(work->models_0x00, work->count_0x04);
+    work->count_0x04 = 0;
+}
+
+/* The state machine of the effect `eft050_fish_spawn` spawns: 0 the model-create pass, 1 the alive body, 2
  * the state advance and 3 the pool release. */
-extern "C" void fn_8033FF24(_EFT* self)
+extern "C" void eft050_fish_dispatch(_EFT* self)
 {
     switch (self->state_0x05) {
-    case 0: return fn_8033FF60(self);
-    case 1: return fn_80340010(self);
-    case 2: return fn_803401B8(self);
-    case 3: return fn_803401C8(self);
+    case 0: return eft050_fish_create(self);
+    case 1: return eft050_fish_alive(self);
+    case 2: return eft050_fish_state_next(self);
+    case 3: return eft050_fish_retire(self);
     }
 }
 
 /* State 0: creates the family's model for every pooled handle and hands each to the alive-state body,
  * or retires the effect when the create fails, then advances to state 1. */
-extern "C" void fn_8033FF60(_EFT* self)
+extern "C" void eft050_fish_create(_EFT* self)
 {
     s32 i;
     Eft050Work* work = (Eft050Work*)self->work_0x38;
@@ -634,17 +745,17 @@ extern "C" void fn_8033FF60(_EFT* self)
     self->field_0x06 = 0;
     for (i = 0; i < work->count_0x04; i++) {
         if (res_eft_model_create(work->models_0x00[i], 0x44, 0xC) == NULL) {
-            fn_803401C8(self);
+            eft050_fish_retire(self);
             return;
         }
-        fn_8034235C(self, work->models_0x00[i]);
+        eft050_fish_kind_set(self, work->models_0x00[i]);
     }
-    fn_80340010(self);
+    eft050_fish_alive(self);
 }
 
 /* Runs the fish's state, keeps the swimming states inside the swim range, and pushes the rotation (with its wiggle),
  * position and scale onto the model. */
-extern "C" void fn_80340010(_EFT* self)
+extern "C" void eft050_fish_alive(_EFT* self)
 {
     Eft050Work* work;
     nw4r::math::VEC3 ofs;
@@ -690,35 +801,35 @@ extern "C" void fn_80340010(_EFT* self)
 }
 
 /* State 2 of the family's state machine: advances the state counter to the next body. */
-extern "C" void fn_803401B8(_EFT* self)
+extern "C" void eft050_fish_state_next(_EFT* self)
 {
     self->state_0x05++;
 }
 
 /* State 3 of the family's state machine: releases the pooled effect record. */
-extern "C" void fn_803401C8(_EFT* self)
+extern "C" void eft050_fish_retire(_EFT* self)
 {
     eft_res_slot_release(self);
 }
 
 /* Addresses one 0x14-byte slot of the table by its signed index. */
-extern "C" Eft050Slot* fn_803401CC(s8 index)
+extern "C" Eft050Slot* eft050_fish_kind_get(s8 index)
 {
-    return &lbl_805E7578[index];
+    return &eft050_fish_kinds[index];
 }
 
 /* The squared distance of the two points' x/z pairs, narrowed to the u16 the caller wants. */
-extern "C" u16 fn_803401E4(const VEC3* a, const VEC3* b)
+extern "C" u32 eft050_xz_angle_get(const VEC3* a, const VEC3* b)
 {
     return (u16)calc_xz_angle(a->x, a->z, b->x, b->z);
 }
 
 /* Moves `cur` towards `target` by at most `step`, returning the step actually applied. */
-extern "C" s32 fn_80340218(s32* cur, u32* target, s32 step)
+extern "C" s32 eft050_angle_step(s32* cur, u32* target, s32 step)
 {
     *target = (u16)*target;
     s32 delta = (u16)(*target - *cur);
-    s32 mag = (delta >= 0x8000) ? -(s16)delta : delta;
+    s32 mag = (delta >= 0x8000) ? (u16)-delta : delta;
     if (mag < step) {
         step = mag;
     }
@@ -734,7 +845,7 @@ extern "C" s32 fn_80340218(s32* cur, u32* target, s32 step)
  * fishing acts by the fish kind; a master player whose catch slot already holds another kind gets 0. */
 extern "C" s32 eft050_bite_strength_get(_PLW* plw, s8 kind, _EFT* fish)
 {
-    Eft050Slot* slot = fn_803401CC(((Eft050Work*)fish->work_0x38)->kind_0x58);
+    Eft050Slot* slot = eft050_fish_kind_get(((Eft050Work*)fish->work_0x38)->kind_0x58);
 
     if (Pl_master_ck(plw) == 0) {
         return 0;
@@ -752,18 +863,18 @@ extern "C" s32 eft050_bite_strength_get(_PLW* plw, s8 kind, _EFT* fish)
     case 205:
         return 1;
     case 389:
-        return 3 - (kind == 1);
+        return (kind == 1) ? 2 : 3;
     case 351:
         if (kind == 4 || kind == 10) {
             return 2;
         }
         return 3;
     case 353:
-        return 3 - ((u32)(kind - 5) <= 1);
+        return ((u32)(kind - 5) <= 1) ? 2 : 3;
     case 390:
-        return 3 - (kind == 2);
+        return (kind == 2) ? 2 : 3;
     case 355:
-        return 3 - (kind == 7);
+        return (kind == 7) ? 2 : 3;
     }
     return 0;
 }
@@ -772,9 +883,9 @@ extern "C" s32 eft050_bite_strength_get(_PLW* plw, s8 kind, _EFT* fish)
  * room, turning the fish towards it; otherwise any float of a master player that takes the fish. */
 extern "C" _EFT* eft050_float_find(_EFT* self, s32 mode)
 {
-    Eft050Work* work = (Eft050Work*)self->work_0x38;
-    _EFT* rec;
     s32 i;
+    _EFT* rec;
+    Eft050Work* work = (Eft050Work*)self->work_0x38;
     s32 level;
     _PLW* plw;
 
@@ -787,7 +898,7 @@ extern "C" _EFT* eft050_float_find(_EFT* self, s32 mode)
             return NULL;
         }
         self->demo_flag_0x08 = eft050_bite_strength_get((_PLW*)rec->source_0x30, work->kind_0x58, self);
-        level = fn_8034257C((HoldOwner*)self, (HoldOwner*)rec);
+        level = eft050_catch_limit_get((HoldOwner*)self, (HoldOwner*)rec);
         plw = (_PLW*)rec->source_0x30;
         if (mode == 0) {
             if (rec->field_0x06 != 2) {
@@ -800,7 +911,7 @@ extern "C" _EFT* eft050_float_find(_EFT* self, s32 mode)
                 return NULL;
             }
             if (Pl_master_ck(plw) == 1 && self->demo_flag_0x08 != 0) {
-                work->yaw_goal_0x40 = fn_803401E4(&self->pos_0x18, &rec->pos_0x18);
+                work->yaw_goal_0x40 = eft050_xz_angle_get(&self->pos_0x18, &rec->pos_0x18);
                 return rec;
             }
         } else if (Pl_master_ck(plw) == 1 && self->demo_flag_0x08 != 0) {
@@ -811,7 +922,7 @@ extern "C" _EFT* eft050_float_find(_EFT* self, s32 mode)
 }
 
 /* Whether the record's item id is one of the five ids the hold bar draws as a gauge. */
-extern "C" s32 fn_80340594(EftHoldItem* self)
+extern "C" s32 eft050_hold_item_ck(EftHoldItem* self)
 {
     if (self->gauge_off_0x0A == 0) {
         if ((u16)(self->item_id_0x0C + 0xFFC1) <= 4) {
@@ -826,13 +937,12 @@ extern "C" s32 fn_80340594(EftHoldItem* self)
 extern "C" void eft050_fish_appear(_EFT* self)
 {
     Eft050Work* work = (Eft050Work*)self->work_0x38;
-    Eft050Slot* slot = fn_803401CC(work->kind_0x58);
+    Eft050Slot* slot = eft050_fish_kind_get(work->kind_0x58);
     nw4r::math::VEC3 ofs;
     nw4r::math::MTX34 mtx;
     f32 inner;
     f32 dist;
-    u16 yaw;
-    u32 goal;
+    u32 yaw;
 
     VEC3_ctor(&ofs);
     MTX34_ctor(&mtx);
@@ -858,9 +968,7 @@ extern "C" void eft050_fish_appear(_EFT* self)
         self->timer_0x0C = 10;
         work->rot_x_0x4C = 0;
         work->rot_z_0x54 = 0;
-        goal = yaw + (ran_suu(0) & 0x1FFF) + 0x7000;
-        work->rot_y_0x50 = goal;
-        work->yaw_goal_0x40 = goal;
+        work->yaw_goal_0x40 = work->rot_y_0x50 = yaw + (ran_suu(0) & 0x1FFF) + 0x7000;
         work->turn_0x44 = 0x20;
         work->wiggle_0x48 = 0;
         work->respawn_0x5B = 0;
@@ -895,17 +1003,18 @@ extern "C" void eft050_fish_swim(_EFT* self)
     nw4r::math::VEC3 unused;
     nw4r::math::MTX34 mtx;
     _CP_VECTOR rot;
-    s32 bite = 0;
+    s32 bite;
     _EFT* flt;
     _EFT* rec;
     _PLW* plw;
     s32 frames;
-    u16 yaw;
+    u32 yaw;
 
     VEC3_ctor(&step);
     VEC3_ctor(&move);
     VEC3_ctor(&unused);
     MTX34_ctor(&mtx);
+    bite = 0;
     flt = eft050_float_find(self, 0);
     switch (self->field_0x07) {
     case 0:
@@ -914,13 +1023,13 @@ extern "C" void eft050_fish_swim(_EFT* self)
             self->demo_flag_0x08 = 0;
             work->wiggle_0x48 = 0x100;
             if (flt == NULL) {
-                yaw = fn_803401E4(&self->pos_0x18, &work->pos_0x08);
+                yaw = eft050_xz_angle_get(&self->pos_0x18, &work->pos_0x08);
                 work->yaw_goal_0x40 = yaw + ((ran_suu(1) & 0xF) << 11) - 0x4000;
             }
             work->speed_0x20 = 3.0f * eft050_bite_speed[self->demo_flag_0x08];
         }
         work->turn_0x44 += (0x20 - work->turn_0x44) / 8;
-        fn_80340218((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, work->turn_0x44);
+        eft050_angle_step((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, work->turn_0x44);
         work->biting_0x5F = 0;
         break;
     case 1:
@@ -963,11 +1072,12 @@ extern "C" void eft050_fish_swim(_EFT* self)
             work->wiggle_0x48 = 0;
         }
         work->turn_0x44 += (0x100 - work->turn_0x44) / 8;
-        fn_80340218((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, work->turn_0x44);
+        eft050_angle_step((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, work->turn_0x44);
         break;
     }
-    plw = (_PLW*)get_move_work_adrs(2) + (s8)my_player_no();
-    if (fn_80340594((EftHoldItem*)plw) == 0 && (plw->kind_0x09 == 3 || (plw->field_0x5A4 & 2) != 0) &&
+    plw = (_PLW*)get_move_work_adrs(2);
+    plw += (s8)my_player_no();
+    if (eft050_hold_item_ck((EftHoldItem*)plw) == 0 && (plw->kind_0x09 == 3 || (plw->field_0x5A4 & 2) != 0) &&
         hit_point_sphr(&plw->vec_0x03C, &work->pos_0x08, work->scale_0x30) == 1) {
         self->field_0x06 = 5;
         self->field_0x07 = 0;
@@ -997,6 +1107,295 @@ extern "C" void eft050_fish_swim(_EFT* self)
     }
 }
 
+/* Sends the fish back to swimming after a random 10-41 frame wait. */
+static inline void eft050_fish_swim_again(_EFT* self)
+{
+    self->field_0x06 = 1;
+    self->field_0x07 = 0;
+    self->timer_0x0C = (ran_suu(1) & 0x1F) + 10;
+}
+
+/* The fish bites: it nibbles at the float a random number of times, then takes it - darting off sideways while the
+ * player strikes - and sets the line's tug from its kind; it gives up when the float leaves or the player's catch
+ * slots are full. */
+extern "C" void eft050_fish_bite(_EFT* self)
+{
+    Eft050Work* work = (Eft050Work*)self->work_0x38;
+    Eft050Slot* slot = eft050_fish_kind_get(work->kind_0x58);
+    nw4r::math::VEC3 step;
+    nw4r::math::VEC3 move;
+    nw4r::math::MTX34 mtx;
+    _CP_VECTOR rot;
+    _EFT* flt;
+    _PLW* plw;
+    _EFT050_PL_FISH* fish;
+    u8 level;
+    s32 div;
+    u32 yaw;
+
+    VEC3_ctor(&step);
+    VEC3_ctor(&move);
+    MTX34_ctor(&mtx);
+    flt = eft050_float_find(self, 1);
+    if (flt != NULL) {
+        if (Pl_act_ck((_PLW*)flt->source_0x30, 0, 0x42) != 0 || Pl_act_ck((_PLW*)flt->source_0x30, 0, 0x43) != 0) {
+            eft050_fish_swim_again(self);
+            return;
+        }
+    } else {
+        eft050_fish_swim_again(self);
+        return;
+    }
+    plw = (_PLW*)flt->source_0x30;
+    fish = (_EFT050_PL_FISH*)plw;
+    switch (self->demo_flag_0x08) {
+    case 2:
+        Pl_Skill_ck(plw, 0x95);
+        if (work->slot_0x5A != 0xFF && fish->catches_0x59C[work->slot_0x5A] != 0 && Pl_act_ck(plw, 0, 0x41) != 0) {
+            self->field_0x06 = 3;
+            self->field_0x07 = 0;
+            return;
+        }
+        break;
+    default:
+        if (work->slot_0x5A != 0xFF && fish->catches_0x59C[0] != 0 && Pl_act_ck(plw, 0, 0x41) != 0) {
+            self->field_0x06 = 3;
+            self->field_0x07 = 0;
+            fish->catches_0x59C[0] = slot->id_0x00;
+            return;
+        }
+        break;
+    }
+    if (Pl_act_ck(plw, 0, 0x41) != 0) {
+        eft050_fish_swim_again(self);
+        return;
+    }
+    switch (self->field_0x07) {
+    case 0:
+        self->field_0x07++;
+        if (plw->field_0x306 == 205) {
+            work->nibbles_0x36 = 0;
+        } else if (self->demo_flag_0x08 >= 2 || plw->field_0x306 != 206) {
+            if (Pl_Skill_ck((_PLW*)flt->source_0x30, 0x95) == 1 && fish->catch_count_0x597 == 0) {
+                work->nibbles_0x36 = 0;
+            } else {
+                work->nibbles_0x36 = ran_suu(0) % slot->nibbles_0x03 + 1;
+            }
+        } else {
+            work->nibbles_0x36 = ran_suu(0) % slot->nibbles_0x03 + 1;
+        }
+        break;
+    case 1:
+        if (--work->nibbles_0x36 <= 0) {
+            self->field_0x07 = 5;
+        } else {
+            self->field_0x07++;
+        }
+        self->timer_0x0C = 5;
+        work->speed_0x20 = calcVecDistXZ(&self->pos_0x18, &flt->pos_0x18) / self->timer_0x0C;
+        yaw = eft050_xz_angle_get(&self->pos_0x18, &flt->pos_0x18);
+        work->rot_y_0x50 = yaw;
+        work->yaw_goal_0x40 = yaw;
+        break;
+    case 2:
+    case 5:
+        step.x = 0.0f;
+        step.y = 0.0f;
+        step.z = work->speed_0x20;
+        rot.x = work->rot_x_0x4C;
+        rot.y = work->rot_y_0x50;
+        rot.z = work->rot_z_0x54;
+        cpSetRotMatrixYXZ(&rot, &mtx);
+        mtx34_rotate_vec3(&move, &mtx, &step);
+        addVec3To(&self->pos_0x18, &move);
+        if (--self->timer_0x0C <= 0) {
+            if (fish->catches_0x59C[0] != 0 && fish->catches_0x59C[0] != slot->id_0x00) {
+                eft050_fish_swim_again(self);
+                break;
+            }
+            if (self->field_0x07 == 5) {
+                level = EFT050_CATCH_LIMIT((HoldOwner*)self, (HoldOwner*)flt);
+                switch (level) {
+                default:
+                    if (fish->catch_count_0x597 <= level - 1 && fish->reeling_0x596 != 0) {
+                        if ((ran_suu(0) & 3) == 0) {
+                            fish->reeling_0x596 = 0;
+                        }
+                        fish->tug_0x59A = slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3];
+                        if (Pl_Skill_ck(plw, 0x95) == 1) {
+                            fish->tug_0x59A *= 2;
+                        }
+                    } else {
+                        eft050_fish_swim_again(self);
+                        return;
+                    }
+                    break;
+                case 2:
+                    if (fish->catch_count_0x597 <= level - 1 && fish->reeling_0x596 != 0) {
+                        if (fish->catch_count_0x597 == level - 1) {
+                            if (ran_suu(0) % 3 == 0) {
+                                fish->reeling_0x596 = 0;
+                                fish->tug_0x59A = slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3];
+                            } else if (fish->tug_0x59A == 0) {
+                                fish->tug_0x59A = (self->demo_flag_0x08 - 1) * 200 +
+                                                  (slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3]);
+                            }
+                        } else {
+                            if ((ran_suu(0) & 3) == 0) {
+                                fish->reeling_0x596 = 0;
+                                fish->tug_0x59A = slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3];
+                            } else if (fish->tug_0x59A == 0) {
+                                fish->tug_0x59A = (self->demo_flag_0x08 - 1) * 200 +
+                                                  (slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3]);
+                            }
+                        }
+                    } else {
+                        eft050_fish_swim_again(self);
+                        return;
+                    }
+                    break;
+                case 3:
+                    if (fish->catch_count_0x597 <= level - 1 && fish->reeling_0x596 != 0) {
+                        if (fish->catch_count_0x597 == level - 1) {
+                            if (ran_suu(0) % 2 == 0) {
+                                fish->reeling_0x596 = 0;
+                                fish->tug_0x59A = slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3];
+                                fish->tug_0x59A *= 2;
+                            } else if (fish->tug_0x59A == 0) {
+                                fish->tug_0x59A = (self->demo_flag_0x08 - 1) * 200 +
+                                                  (slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3]);
+                                fish->tug_0x59A *= 2;
+                            }
+                        } else {
+                            div = (fish->catch_count_0x597 == 0) ? 5 : 3;
+                            if (ran_suu(0) % div == 0) {
+                                fish->reeling_0x596 = 0;
+                                fish->tug_0x59A = slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3];
+                                fish->tug_0x59A *= 2;
+                            } else if (fish->tug_0x59A == 0) {
+                                fish->tug_0x59A = (self->demo_flag_0x08 - 1) * 200 +
+                                                  (slot->bite_0x02 + eft050_tug_offsets[ran_suu(0) & 3]);
+                                fish->tug_0x59A *= 2;
+                            }
+                        }
+                    } else {
+                        eft050_fish_swim_again(self);
+                        return;
+                    }
+                    break;
+                }
+                work->slot_0x5A = fish->catch_count_0x597;
+                fish->catches_0x59C[work->slot_0x5A] = slot->id_0x00;
+                fish->catch_count_0x597++;
+                work->dart_0x5E = (ran_suu(0) & 0xF) + 20;
+                self->field_0x10 = 5;
+                work->biting_0x5F = 1;
+                pl_act_hold_notify(plw, 1);
+            } else {
+                level = EFT050_CATCH_LIMIT((HoldOwner*)self, (HoldOwner*)flt);
+                if (fish->catch_count_0x597 <= level - 1 && fish->reeling_0x596 != 0) {
+                    step.x = flt->pos_0x18.x;
+                    step.y = 10.0f + plw->field_0x064;
+                    step.z = flt->pos_0x18.z;
+                    eft004_set(2, &step, 0.7f, 0, plw->area_0x16);
+                    se_req_orb(0, &step);
+                    pl_act_hold_notify(plw, 4);
+                } else {
+                    eft050_fish_swim_again(self);
+                    return;
+                }
+            }
+            self->field_0x07++;
+            work->speed_0x20 = -3.5f;
+            work->accel_0x2C = 0.5f;
+        }
+        break;
+    case 3:
+    case 6:
+        move.x = 0.0f;
+        move.y = 0.0f;
+        move.z = work->speed_0x20;
+        rot.x = work->rot_x_0x4C;
+        rot.y = work->rot_y_0x50;
+        rot.z = work->rot_z_0x54;
+        rotVecY(&move, rot.y);
+        addVec3To(&self->pos_0x18, &move);
+        if ((work->speed_0x20 += work->accel_0x2C) >= 0.0f) {
+            self->field_0x07++;
+            level = EFT050_CATCH_LIMIT((HoldOwner*)self, (HoldOwner*)flt);
+            if (self->field_0x07 == 7) {
+                switch (level) {
+                case 2:
+                case 3:
+                    if (fish->catch_count_0x597 <= level) {
+                        self->timer_0x0C = fish->tug_0x59A;
+                    } else {
+                        self->field_0x06 = 1;
+                        self->field_0x07 = 0;
+                        fish->catch_count_0x597--;
+                        fish->catches_0x59C[work->slot_0x5A] = 0;
+                        work->slot_0x5A = 0xFF;
+                        self->timer_0x0C = (ran_suu(1) & 0x1F) + 10;
+                    }
+                    break;
+                default:
+                    self->timer_0x0C = 20;
+                    break;
+                }
+            } else {
+                self->timer_0x0C = 20;
+            }
+        }
+        break;
+    case 4:
+        if (--self->timer_0x0C <= 0) {
+            self->field_0x07 = 1;
+        }
+        break;
+    case 7:
+        if (fish->tug_0x59A == 0) {
+            self->field_0x07++;
+            self->timer_0x0C = (ran_suu(0) & 0x1F) + 60;
+            work->yaw_goal_0x40 = work->rot_y_0x50 + ((ran_suu(0) & 7) << 12);
+            fish->catches_0x59C[work->slot_0x5A] = 0;
+            work->slot_0x5A = 0xFF;
+            fish->catch_count_0x597--;
+            flt->demo_flag_0x08 = 0;
+            work->speed_0x20 = 8.0f;
+            work->accel_0x2C = -0.3f;
+        } else if (work->dart_0x5E <= 0) {
+            if (--self->field_0x10 >= 0) {
+                work->yaw_goal_0x40 = eft050_xz_angle_get(&self->pos_0x18, &flt->pos_0x18);
+                work->yaw_goal_0x40 -= 0x400;
+                work->yaw_goal_0x40 += ran_suu(0) & 0x7FF;
+                eft050_angle_step((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, 0x800);
+            } else {
+                work->yaw_goal_0x40 = eft050_xz_angle_get(&self->pos_0x18, &flt->pos_0x18);
+                eft050_angle_step((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, 0xFFFF);
+                work->dart_0x5E = (ran_suu(0) & 0xF) + 20;
+                self->field_0x10 = 5;
+            }
+        } else {
+            work->dart_0x5E--;
+        }
+        break;
+    case 8:
+        move.x = 0.0f;
+        move.y = 0.0f;
+        move.z = work->speed_0x20;
+        rot.x = work->rot_x_0x4C;
+        rot.y = work->rot_y_0x50;
+        rot.z = work->rot_z_0x54;
+        rotVecY(&move, rot.y);
+        addVec3To(&self->pos_0x18, &move);
+        if ((work->speed_0x20 += work->accel_0x2C) <= 0.0f) {
+            eft050_fish_swim_again(self);
+        }
+        break;
+    }
+    eft050_angle_step((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, 0x100);
+}
+
 /* The fish on the line: it follows its float (pulling sideways by its catch slot) and tugs the rod every ten frames
  * until the float is reeled in, then hangs from the float (sub-state 2). */
 extern "C" void eft050_fish_hooked(_EFT* self)
@@ -1018,9 +1417,9 @@ extern "C" void eft050_fish_hooked(_EFT* self)
         self->field_0x07++;
         self->timer_0x0C = 10;
     case 1:
-        work->yaw_goal_0x40 = fn_803401E4(&self->pos_0x18, &flt->pos_0x18);
+        work->yaw_goal_0x40 = eft050_xz_angle_get(&self->pos_0x18, &flt->pos_0x18);
         work->yaw_goal_0x40 += work->slot_0x5A << 12;
-        fn_80340218((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, 0x800);
+        eft050_angle_step((s32*)&work->rot_y_0x50, &work->yaw_goal_0x40, 0x800);
         self->pos_0x18.x = flt->pos_0x18.x;
         self->pos_0x18.z = flt->pos_0x18.z;
         if (--self->timer_0x0C <= 0) {
@@ -1059,16 +1458,16 @@ extern "C" void eft050_fish_respawn(_EFT* self)
 
     switch (self->field_0x07) {
     case 0:
-        fn_8034235C(self, work->models_0x00[0]);
+        eft050_fish_kind_set(self, work->models_0x00[0]);
         if (work->flag_0x60 == 1) {
             if (eft050_act_table_ck(self) == 1) {
                 self->field_0x07++;
-            } else if (eft050_float_find(self, 2) == NULL) {
+            } else if (eft050_float_find(self, 2) != NULL) {
+                return;
+            } else {
                 work->respawn_0x5B = 0;
                 work->act_0x5C = 0xFF;
-                fn_8034235C(self, work->models_0x00[0]);
-            } else {
-                return;
+                eft050_fish_kind_set(self, work->models_0x00[0]);
             }
         } else {
             self->field_0x07++;
@@ -1086,8 +1485,9 @@ extern "C" void eft050_fish_respawn(_EFT* self)
         break;
     case 1:
         if (--self->timer_0x0C <= 0.0f) {
-            plw = (_PLW*)get_move_work_adrs(2) + (s8)my_player_no();
-            if (fn_80340594((EftHoldItem*)plw) == 0 && (plw->kind_0x09 == 3 || (plw->field_0x5A4 & 2) != 0) &&
+            plw = (_PLW*)get_move_work_adrs(2);
+            plw += (s8)my_player_no();
+            if (eft050_hold_item_ck((EftHoldItem*)plw) == 0 && (plw->kind_0x09 == 3 || (plw->field_0x5A4 & 2) != 0) &&
                 hit_point_sphr(&plw->vec_0x03C, &work->pos_0x08, work->scale_0x24) == 1) {
                 self->timer_0x0C = 0;
                 return;
@@ -1116,7 +1516,7 @@ extern "C" void eft050_fish_flee(_EFT* self)
     VEC3_ctor(&away);
     MTX34_ctor(&mtx);
     work = (Eft050Work*)self->work_0x38;
-    slot = fn_803401CC(work->kind_0x58);
+    slot = eft050_fish_kind_get(work->kind_0x58);
     switch (self->field_0x07) {
     case 0:
         self->field_0x07++;
@@ -1126,7 +1526,7 @@ extern "C" void eft050_fish_flee(_EFT* self)
         players = (_PLW*)get_move_work_adrs(2);
         copyVec3(&away, &VEC3_SUB(&self->pos_0x18, &players[(s8)my_player_no()].vec_0x03C));
         copyVec3(&step, &VEC3_SCALE(&away, work->scale_0x24));
-        work->rot_y_0x50 = fn_803401E4(&self->pos_0x18, &step);
+        work->rot_y_0x50 = eft050_xz_angle_get(&self->pos_0x18, &step);
         work->rot_y_0x50 -= 0x4000;
         work->rot_y_0x50 += ran_suu(0) & 0x7FFF;
     case 1:
@@ -1242,7 +1642,7 @@ extern "C" u32 eft050_kind_roll(_EFT* self)
     Eft050Work* work = (Eft050Work*)self->work_0x38;
     EftFishRoll* tbl;
     u8 map = get_now_mapno();
-    s32 total;
+    u32 total;
     u32 roll;
     u32 sum;
 
@@ -1329,72 +1729,72 @@ extern "C" u32 eft050_kind_roll(_EFT* self)
 }
 
 /* Rolls a kind and shows its model joint (two kinds share a model). */
-extern "C" void fn_8034235C(_EFT* self, MHchar* model)
+extern "C" void eft050_fish_kind_set(_EFT* self, MHchar* model)
 {
     Eft050Work* work = (Eft050Work*)self->work_0x38;
 
     switch (eft050_kind_roll(self)) {
     case 0xCF:
-        fn_80342504(model, 1);
+        eft050_model_joint_show(model, 1);
         work->kind_0x58 = 1;
         break;
     case 0xD1:
-        fn_80342504(model, 4);
+        eft050_model_joint_show(model, 4);
         work->kind_0x58 = 4;
         break;
     case 0xD0:
-        fn_80342504(model, 2);
+        eft050_model_joint_show(model, 2);
         work->kind_0x58 = 2;
         break;
     case 0xD6:
-        fn_80342504(model, 10);
+        eft050_model_joint_show(model, 10);
         work->kind_0x58 = 10;
         break;
     case 0xD2:
-        fn_80342504(model, 3);
+        eft050_model_joint_show(model, 3);
         work->kind_0x58 = 3;
         break;
     case 0xD3:
-        fn_80342504(model, 8);
+        eft050_model_joint_show(model, 8);
         work->kind_0x58 = 8;
         break;
     case 0xD7:
-        fn_80342504(model, 9);
+        eft050_model_joint_show(model, 9);
         work->kind_0x58 = 9;
         break;
     case 0xD4:
-        fn_80342504(model, 5);
+        eft050_model_joint_show(model, 5);
         work->kind_0x58 = 5;
         break;
     case 0xD5:
-        fn_80342504(model, 6);
+        eft050_model_joint_show(model, 6);
         work->kind_0x58 = 6;
         break;
     case 0xD9:
-        fn_80342504(model, 7);
+        eft050_model_joint_show(model, 7);
         work->kind_0x58 = 7;
         break;
     case 0xD8:
-        fn_80342504(model, 7);
+        eft050_model_joint_show(model, 7);
         work->kind_0x58 = 11;
         break;
     case 0xE6:
-        fn_80342504(model, 12);
+        eft050_model_joint_show(model, 12);
         work->kind_0x58 = 12;
         break;
     case 0xE9:
-        fn_80342504(model, 11);
+        eft050_model_joint_show(model, 11);
         work->kind_0x58 = 13;
         break;
     default:
-        fn_80342504(model, 1);
+        eft050_model_joint_show(model, 1);
         work->kind_0x58 = 1;
         break;
     }
 }
 
 /* Shows or hides the model's twelve joints, leaving the one `index` visible. */
-extern "C" void fn_80342504(MHchar* model, u32 index)
+extern "C" void eft050_model_joint_show(MHchar* model, u32 index)
 {
     for (s32 i = 1; i <= 0xC; i++) {
         if (i == index) {
@@ -1405,9 +1805,10 @@ extern "C" void fn_80342504(MHchar* model, u32 index)
     }
 }
 
-/* The hold slot's draw state: 1 normally, 2/3 while the player carries skill 0x95. */
+/* How many fish the float's player can have on the line: 1, or 2/3 for a bite of strength 2 while the player has
+ * skill 0x95 (3 when `Pl_Skill_ck` reports 1). */
 #pragma peephole on
-extern "C" s32 fn_8034257C(HoldOwner* state, HoldOwner* owner)
+extern "C" s32 eft050_catch_limit_get(HoldOwner* state, HoldOwner* owner)
 {
     return (state->mode_0x08 == 2) ? (Pl_Skill_ck(owner->plw_0x30, 0x95) == 1) + 2 : 1;
 }
@@ -1543,18 +1944,19 @@ extern "C" u32 eft050_act_table_ck(_EFT* self)
 
 /* Spawns the five fish of an interior water spot: in a quest move it runs the plain spawner, otherwise the map kind
  * and spot pick the kind table (by `size`) and the scare-radius factor. */
+#pragma peephole off
 extern "C" void eft050_interior_fx_spawn(u32 id, nw4r::math::VEC3* pos, f32 scale, u32 size)
 {
     nw4r::math::VEC3 unused;
     u8 map;
-    EftFishRoll* tbl;
     f32 radius;
     s32 i;
+    EftFishRoll* tbl;
 
     VEC3_ctor(&unused);
     map = get_now_mapno();
     if (move_work_state_ck() == 1) {
-        fn_80342AC0((u8)id, pos, scale, 0);
+        eft050_fish_school_spawn((u8)id, pos, scale, 0);
         return;
     }
     radius = 1.0f;
@@ -1572,11 +1974,14 @@ extern "C" void eft050_interior_fx_spawn(u32 id, nw4r::math::VEC3* pos, f32 scal
         }
         break;
     case 2:
-        if ((s32)(u8)id != 9) {
+        switch ((u8)id) {
+        case 9:
+            tbl = eft050_rolls_m2_9[(u8)size];
+            radius = 0.5f;
+            break;
+        default:
             return;
         }
-        tbl = eft050_rolls_m2_9[(u8)size];
-        radius = 0.5f;
         break;
     case 3:
         switch ((u8)id) {
@@ -1593,52 +1998,55 @@ extern "C" void eft050_interior_fx_spawn(u32 id, nw4r::math::VEC3* pos, f32 scal
         }
         break;
     case 4:
-        if ((s32)(u8)id != 0) {
+        switch ((u8)id) {
+        case 0:
+            tbl = eft050_rolls_m4_0[(u8)size];
+            break;
+        default:
             return;
         }
-        tbl = eft050_rolls_m4_0[(u8)size];
         break;
     case 5:
-        if ((s32)(u8)id != 6) {
+        switch ((u8)id) {
+        case 6:
+            tbl = eft050_rolls_m5_6[(u8)size];
+            radius = 0.5f;
+            break;
+        default:
             return;
         }
-        tbl = eft050_rolls_m5_6[(u8)size];
-        radius = 0.5f;
         break;
     default:
         return;
     }
     for (i = 5; i > 0; i--) {
-        fn_8033FDA8(0, pos, scale, scale * radius, (u32)tbl, (u8)id);
+        eft050_fish_spawn(0, pos, scale, scale * radius, (u32)tbl, (u8)id);
     }
 }
 
-#pragma peephole off
-
 /* Spawns five of the family's effects around one position, one per rotation step. */
-#pragma peephole off
-extern "C" void fn_80342AC0(u32 kind, VEC3* pos, f32 scale, u8 flag)
+extern "C" void eft050_fish_school_spawn(u32 kind, VEC3* pos, f32 scale, u8 flag)
 {
     s32 i;
     const u16* ids;
 
     switch ((u8)kind) {
     case 0:
-        ids = lbl_805E7760;
+        ids = eft050_rolls_school_0;
         break;
     case 12:
-        ids = lbl_805E7794;
+        ids = eft050_rolls_school_12;
         break;
     default:
         return;
     }
     for (i = 5; i > 0; i--) {
-        fn_8033FDA8(1, pos, scale, scale, (u32)ids, kind);
+        eft050_fish_spawn(1, pos, scale, scale, (u32)ids, kind);
     }
 }
 
 /* Spawns the eft051 decoration of a lobby object `src` (kinds 0-2): one pooled model, the source's spot index. */
-extern "C" void eft051_spawn(EftLobbySpot* src, u8 kind)
+extern "C" void eft051_spawn(_PLW* src, u8 kind)
 {
     _EFT* rec;
     Eft051Work* work;
@@ -1651,7 +2059,7 @@ extern "C" void eft051_spawn(EftLobbySpot* src, u8 kind)
     if (rec == NULL) {
         return;
     }
-    rec->release_0x40 = fn_80342C60;
+    rec->release_0x40 = eft051_release;
     work = (Eft051Work*)rec->work_0x38;
     work->count_0x00 = 1;
     rec->area_0x44 = get_now_areano();
@@ -1663,16 +2071,16 @@ extern "C" void eft051_spawn(EftLobbySpot* src, u8 kind)
         }
     }
     rec->source_0x30 = NULL;
-    rec->dispatch_0x34 = fn_80342C70;
+    rec->dispatch_0x34 = eft051_dispatch;
     rec->field_0x03 = 49;
     eft_state_flags_set(rec, 8, 0);
-    work->spot_0x08 = src->spot_0xB6;
+    work->spot_0x08 = src->field_0x0B6;
     work->kind_0x09 = kind;
 }
 
 
 /* Releases a second family's pooled handle list, from its word behind the count. */
-extern "C" void fn_80342C60(_EFT* self)
+extern "C" void eft051_release(_EFT* self)
 {
     Eft051Work* work = (Eft051Work*)self->work_0x38;
     eft_res_models_release(work->models_0x04, work->count_0x00);
@@ -1680,30 +2088,30 @@ extern "C" void fn_80342C60(_EFT* self)
 
 /* The second family's state machine: 0 the model-create pass, 1 the alive body, 2 the state advance
  * and 3 the pool release. */
-extern "C" void fn_80342C70(_EFT* self)
+extern "C" void eft051_dispatch(_EFT* self)
 {
     switch (self->state_0x05) {
-    case 0: return fn_80342CAC(self);
-    case 1: return fn_80342E80(self);
-    case 2: return fn_80342F20(self);
-    case 3: return fn_80342F30(self);
+    case 0: return eft051_create(self);
+    case 1: return eft051_alive(self);
+    case 2: return eft051_state_next(self);
+    case 3: return eft051_retire(self);
     }
 }
 
 /* Builds the eft051 models at the spot of the map's table (map 22 area 0, map 21 area 2), each showing the kind's
  * joint; no table ends the record. */
-extern "C" void fn_80342CAC(_EFT* self)
+extern "C" void eft051_create(_EFT* self)
 {
     Eft051Work* work = (Eft051Work*)self->work_0x38;
     EftSpot* spots = NULL;
     s32 i;
-    u32 j;
+    s32 j;
     u32 joints;
 
     self->state_0x05++;
     for (i = 0; i < work->count_0x00; i++) {
         if (res_eft_model_create(work->models_0x04[i], 71, 8) == NULL) {
-            fn_80342F30(self);
+            eft051_retire(self);
             return;
         }
     }
@@ -1722,7 +2130,7 @@ extern "C" void fn_80342CAC(_EFT* self)
         break;
     }
     if (spots == NULL) {
-        fn_80342F30(self);
+        eft051_retire(self);
         return;
     }
     for (i = 0; i < work->count_0x00; i++) {
@@ -1741,55 +2149,36 @@ extern "C" void fn_80342CAC(_EFT* self)
             }
         }
     }
-    fn_80342E80(self);
+    eft051_alive(self);
 }
 
 
 /* State 1 of the second family: retires the effect once its timer runs past 0xB4, otherwise moves
  * every pooled model to its idle state and updates it. */
-extern "C" void fn_80342E80(_EFT* self)
+extern "C" void eft051_alive(_EFT* self)
 {
+    s32 i;
     Eft051Work* work = (Eft051Work*)self->work_0x38;
-    s16 timer = (s16)(work->timer_0x0A + 1);
-    work->timer_0x0A = timer;
-    if (timer > 0xB4) {
-        fn_80342F30(self);
+    if (++work->timer_0x0A > 0xB4) {
+        eft051_retire(self);
         return;
     }
-    for (s32 i = 0; i < work->count_0x00; i++) {
+    for (i = 0; i < work->count_0x00; i++) {
         work->models_0x04[i]->move(0);
         eft_res_models_spawn(self, (void**)&work->models_0x04[i], 2, 1, NULL);
     }
 }
 
 /* State 2 of the second family's state machine: advances to the next body. */
-extern "C" void fn_80342F20(_EFT* self)
+extern "C" void eft051_state_next(_EFT* self)
 {
     self->state_0x05++;
 }
 
 /* State 3 of the second family's state machine: releases the pooled effect record. */
-extern "C" void fn_80342F30(_EFT* self)
+extern "C" void eft051_retire(_EFT* self)
 {
     eft_res_slot_release(self);
-}
-
-/* Releases the `eft050` family's pools: every model handle one at a time, the two `_g3d_work`
- * handles in reverse order, then the record the create filled. */
-extern "C" void fn_8034305C(_EFT* self)
-{
-    s32 i;
-    Eft050SetWork* work = (Eft050SetWork*)self->work_0x38;
-
-    for (i = 0; i < work->count_0x00; i++) {
-        eft_res_models_release(&work->models_0x04[i], 1);
-    }
-    for (i = 1; i >= 0; i--) {
-        if (work->works_0x1C[i] != NULL) {
-            push_g3d_wk(work->works_0x1C[i]);
-        }
-    }
-    eft_res_models_release(&work->extra_0x14, 1);
 }
 
 /* Pools the `eft050` record: the effect, its work block, four pooled model handles, the extra record
@@ -1805,8 +2194,8 @@ void eft050_set(_PLW* plw, nw4r::math::VEC3* pos, u8 flag)
         return;
     }
     eft->type_0x02 = 0;
-    eft->dispatch_0x34 = fn_803430F4;
-    eft->release_0x40 = fn_8034305C;
+    eft->dispatch_0x34 = eft050_set_dispatch;
+    eft->release_0x40 = eft050_set_release;
     work = (Eft050SetWork*)eft->work_0x38;
     work->count_0x00 = 4;
     for (i = 0; i < work->count_0x00; i++) {
@@ -1832,12 +2221,30 @@ void eft050_set(_PLW* plw, nw4r::math::VEC3* pos, u8 flag)
     eft->field_0x10 = 0;
 }
 
+/* Releases the `eft050` family's pools: every model handle one at a time, the two `_g3d_work`
+ * handles in reverse order, then the record the create filled. */
+extern "C" void eft050_set_release(_EFT* self)
+{
+    s32 i;
+    Eft050SetWork* work = (Eft050SetWork*)self->work_0x38;
+
+    for (i = 0; i < work->count_0x00; i++) {
+        eft_res_models_release(&work->models_0x04[i], 1);
+    }
+    for (i = 1; i >= 0; i--) {
+        if (work->works_0x1C[i] != NULL) {
+            push_g3d_wk(work->works_0x1C[i]);
+        }
+    }
+    eft_res_models_release(&work->extra_0x14, 1);
+}
+
 /* The `eft050` family's own state machine (its three bodies sit in the band above this one). */
-extern "C" void fn_803430F4(_EFT* self)
+extern "C" void eft050_set_dispatch(_EFT* self)
 {
     switch (self->state_0x05) {
-    case 0: return fn_80343130(self);
-    case 1: return fn_803432B4(self);
+    case 0: return eft050_set_create(self);
+    case 1: return eft050_set_move(self);
     case 2: return eft_state_advance(self);
     case 3: return eft_instance_release(self);
     }
@@ -1845,11 +2252,10 @@ extern "C" void fn_803430F4(_EFT* self)
 
 /* Builds the eft050_set record's models: the UV model of the pool and the four plain models with their scales and a
  * random roll. */
-extern "C" void fn_80343130(_EFT* self)
+extern "C" void eft050_set_create(_EFT* self)
 {
     Eft050SetWork* work = (Eft050SetWork*)self->work_0x38;
     u32 i;
-    f32* scales;
 
     self->state_0x05++;
     work->created_0x18 = res_eft_UV_model_create((MHchar*)work->extra_0x14, 73, 332, 0, work->works_0x1C, 1, 0);
@@ -1869,14 +2275,12 @@ extern "C" void fn_80343130(_EFT* self)
     ((MHchar*)work->extra_0x14)->field_0x2C = 0;
     ((MHchar*)work->extra_0x14)->field_0x30 = 0;
     ((MHchar*)work->extra_0x14)->ready = 3;
-    scales = eft050_set_scales;
     for (i = 0; i < (u32)work->count_0x00; i++) {
-        setVector3(&work->models_0x04[i]->scale_0x1C, *scales, *scales, *scales);
+        setVector3(&work->models_0x04[i]->scale_0x1C, eft050_set_scales[i], eft050_set_scales[i], eft050_set_scales[i]);
         work->models_0x04[i]->field_0x28 = 0;
         work->models_0x04[i]->field_0x2C = 0;
         work->models_0x04[i]->field_0x30 = ran_suu(0);
         work->models_0x04[i]->ready = 1;
-        scales++;
     }
-    fn_803432B4(self);
+    eft050_set_move(self);
 }

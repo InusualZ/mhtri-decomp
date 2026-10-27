@@ -4,10 +4,10 @@
  * RANGE. .text 0x803432B4-0x80348A48 (76 functions); extab 0x80016DB4-0x80016F74, extabindex 0x800362F4-0x80036594,
  *   .ctors 0x8056F3A4-0x8056F3A8, .data 0x805E7B70-0x805E91E8, .bss 0x806BF0A0-0x806BF310, .sdata
  *   0x807930F0-0x807932F0, .sdata2 0x8079B320-0x8079B368.  The tail from 0x80348A48 is `menu/menu_effect_slot.cpp`.
- *   The left edge is false: `fn_803432B4` is the `eft050_set` record's move state (`ef/eft050.cpp`'s
+ *   The left edge is false: `eft050_set_move` is the `eft050_set` record's move state (`ef/eft050.cpp`'s
  *   `fn_80343130` and dispatcher call it, it reads `Eft050SetWork`), `eft_state_advance`/`eft_instance_release`
  *   are that dispatcher's other arms, and `.sdata2` 0x8079B320-0x8079B350 (20, 1900, 2.125, 400, 150, 0.625, 255
- *   and the magic) is `fn_803432B4`'s own pool - this unit starts at 0x80343758 (`eft_slot_clear`).  The `.data`
+ *   and the magic) is `eft050_set_move`'s own pool - this unit starts at 0x80343758 (`eft_slot_clear`).  The `.data`
  *   records 0x805E7FB0/0x805E87F0/0x805E8B48/0x805E9118/0x805E9140 are `{init, step, exit}` triples of this range's
  *   programs.
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps the unfused `clrlwi` + `cmpwi` of
@@ -40,7 +40,7 @@
  *   `eft_slot_link_marks_get`, `eft_slot_linked_step`, `eft_slot_linked_state_change`, `eft_slot_shape_block0_set`,
  *   `eft_slot_roam_step`, `eft_slot_arena_state_change`, `eft_slot_shape_block11_set`, `eft_slot_arena_step`,
  *   `eft_slot_roam_tables`.
- * RESIDUALS. 5 rows unwritten: `fn_803432B4` (0x490, the eft050 seam above), `eft_slot_marks_set_sync` (0x4C: retail calls it
+ * RESIDUALS. 5 rows unwritten: `eft050_set_move` (0x490, the eft050 seam above), `eft_slot_marks_set_sync` (0x4C: retail calls it
  *   `(entry, 2, area)` from `enemy/em022_prog.cpp`, whose source and `ef/eft_slot.h` spell two arguments - a filed
  *   request), and the compiler-emitted `fn_803489F0`/`fn_803489F4`/`fn_80348A14` (the pool's `__sinit`, which needs
  *   `EftSlot` to be a class with a constructed `VEC3`).

@@ -65,7 +65,7 @@
  *    header's `_HIT_W` collides with `Pl/hit_w.h`'s beside this unit's includes.
  *   flipcheck: `.bss`/`.sbss`/`.sdata2` claimed, not emitted (only `lb_deli_work`); `.data`/`.sdata` short of the
  *   claim (the delivery, screen-13 and draw tables are emitted, byte-identical; the act switch tables, the icon lists
- *   0x805E6EF8-0x805E70C8 and `lbl_805E7180` are not); `.text`/extab/extabindex short of the claim; the
+ *   0x805E6EF8-0x805E70C8 and `lb_s13_status_icon_ids` are not); `.text`/extab/extabindex short of the claim; the
  *   `.sdata`/`.sdata2` pool is shared with `hud/cockpit_quest.cpp` and `menu/menu_placeinfo.cpp` (a low-confidence fold
  *   candidate); the source still spells `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck` and `eft_slot_spawn`
  *   by their old stems `fn_800CF384`, `fn_803438E4`, `fn_80343B44`, `fn_80343B74`.
