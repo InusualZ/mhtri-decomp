@@ -45,6 +45,7 @@ extern "C" {
 #endif
 
 /* ---- this unit's bodies, in address order (a bare map name is C linkage) ---- */
+void cockpit_work_init(CockpitWork* work, _PLW* plw);                              /* 0x802E4978 */
 void cockpit_frame_tick(void);                                                     /* 0x802E4C24 */
 void cockpit_item_tag_update(_PLW* plw, CockpitItemTag* tag);                           /* 0x802E4C5C */
 void cockpit_npc_digit_update(CockpitWork* work);                           /* 0x802E5220 */
@@ -56,6 +57,7 @@ void cockpit_name_tags_draw(CockpitWork* work, u8 player);                      
 void cockpit_supply_box_update(void);                                                     /* 0x802E5A14 */
 void cockpit_take_menu_update(void);                                        /* 0x802E5BB4 */
 void cockpit_supply_cell_pos_get(_mh_ivec2_* pos, s8 cell);                                 /* 0x802E5C3C */
+void cockpit_pointer_target_set(u16 id, s8 cell);                                   /* 0x802E5D68 */
 void cockpit_supply_box_draw(void);                                                     /* 0x802E5E90 */
 void cockpit_take_menu_draw(void);                                                     /* 0x802E646C */
 void cockpit_quest_menu_draw(void);                                                     /* 0x802E6AAC */

@@ -124,7 +124,7 @@ typedef struct CockpitWork {
     /* +0x171 */ u8 unused_0x171[0x174 - 0x171];
     /* +0x174 */ u16 pointer_item_0x174;   /* the item flying from the supply box to the pointer (`cockpit_pointer_target_set`) */
     /* +0x176 */ u8 supply_busy_0x176;     /* the supply box took the frame (a pending take runs next frame) */
-    /* +0x177 */ s8 pointer_cell_0x177;    /* the supply box cell it flies from */
+    /* +0x177 */ u8 pointer_cell_0x177;    /* the supply box cell it flies from */
     /* +0x178 */ u8 pointer_time_0x178;    /* the flight's length in frames (0 = none) */
     /* +0x179 */ u8 pointer_left_0x179;    /* frames of it left */
     /* +0x17A */ u8 supply_notice_0x17A;   /* the byte the supply box notice watches: 0 shows it */
