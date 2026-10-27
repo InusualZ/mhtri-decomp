@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (175)
+## Ideas that work (177)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -184,6 +184,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 193 | [A constructor emitted after __sinit is an inline member with __declspec(noinline) defined after the object](193-constructor-emitted-after-sinit.md) | works | source-shape, sections | Retail's `__sinit` calls a class constructor that sits right after it in `.text` (`bl __ct__...` then the ctor body); ours inlines the constructor into `__sinit`, or emits it before `__sinit` when it is an ordinary... |
 | 194 | [#pragma pool_data off is the source-level -pool off: each string gets its own lis/addi](194-pragma-pool-data-off.md) | works | pragma, data | Retail addresses each string literal with its own lis/addi pair, ours shares one `...data.0` base register - and configure.py is not this lane's to change |
 | 195 | [A bne + b pair around a call that may replace a value is a ternary that keeps it: x = c ? x : f(x)](195-bne-b-pair-around.md) | works | source-shape | Retail has `cmplwi r3,1 ; bne L ; b skip ; L: ... bl f ; mr rX,r3 ; skip:` where ours has one `beq skip` |
+| 196 | [A by-value command copy above or below the command tells whether an inline builder built it](196-by-value-command-copy.md) | works | source-shape, allocator | A record built locally and passed by value to an inline push sits on the wrong side of its stack copy (every lwz/stw of the copy is off by the record size) |
+| 197 | [Inline calls in an or-chain expand last-term first; a conditional macro keeps the source order](197-inline-calls-in-an.md) | works | source-shape, allocator | An or-chain of small inline predicates evaluates its terms in reverse (the last field is loaded first) while the target loads them in order |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

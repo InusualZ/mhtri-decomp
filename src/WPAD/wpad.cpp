@@ -32,39 +32,47 @@
  *   GUESS `WPADControlDpd` (0x804F14A0: the SDK name by shape - KPAD's sampling callback passes a channel, a dpd command
  *   byte and a callback, and the body reads the dpd-enabled flag and the wanted format); GUESS `.rodata`
  *   `wpadDpdSensitivityBlockA/B` (0x80573C80/0x80573CB0: the camera sensitivity blocks it writes, indexed by the SC
- *   setting).  Struct fields are named from use; the `unused_0xNN` fields (+0x8C4, +0x8C9, +0x910, +0x982) are only
+ *   setting).  Struct fields are named from use (`WPADSample::balance.press` is `WPADBLStatus::press` at +0x2A: format 12
+ *   compares four `lhz` load cells); the `unused_0xNN` fields (+0x8C4, +0x8C9, +0x910, +0x982) are only
  *   cleared by the written bodies.
  *   Statics are named from use (the four `wpadInitHook0..3` hooks `wpadStart` calls are separate `.sbss` words; the map
- *   row `wpadInitHook` spans all four, request wpad-slice1#18); the `.sbss` rows `wpadChanStateA/B` are not understood
+ *   rows `wpadInitHook0..3` are one word each); the `.sbss` rows `wpadChanStateA/B` are not understood
  *   yet.  Foreign names given here: WUD (`WUDInit`, `WUDShutdown`, `WUDGetStatus`,
  *   `WUDRegisterAllocator`, `WUDSet*Callback`, `WUDStart*`, `WUDStop*`, `WUDSetHidRecvCallback`, `WUDSetHidConnCallback`,
  *   `WUDIsSyncing`, `WUDIsHistoryAddr`, from the `WUD...()` log strings where one exists), SC (`SCGetWpadMotorMode`,
  *   `SCGetWpadSensorBarPosition`, `SCGetWpadSpeakerVolume`), `OSReturnToMenuPending`.
  * RESIDUALS. `WPADControlDpd`: the zero byte and the report id swap r12/r31 in two of its queued reports.
- *   `WPADControlSpeaker`: the first two one-byte writes of the "off" path swap the stack slots of the value/size bytes
- *   and of the command and its by-value copy.  Register-numbering differences only (the variable order) remain in `WPADDisconnect`,
- *   `wpadHidOpenCallback`, `wpadUpdateRadioSensitivity`, `wpadCountIdleReports`, `wpadPollSample`, `WPADControlLed`,
- *   `wpadSendWbcCommand`, `__wpadIsBusyStream`, `wpadSendCommand`, `WPADSendStreamData` and `wpadSendWriteByte`
- *   (declaration orders searched).  `wpadSamplingFiber`: the status
- *   switch keeps a `beq case 2` + `b end` where the original falls into case 2 behind a `bne end` (no switch/if spelling
- *   found).  `wpadSampleChanged`: the or-chains are evaluated last-term first and five callee-saved registers are used
- *   where the original uses four and truncates `changed` after each debounce; the balance-board loop is spelled with two
- *   pointers because the indexed loop unrolls.  `wpadInitSequence`: register numbering and the stack slots of the command
- *   copies differ (no declaration order found).  `wpadQueueCount` (an `s8` count, re-truncated after the wrap) is the
- *   shape the push, peek and pop share.  The queue push, clear and read builders are inline helpers; the original shares
- *   their bodies with the out-of-line copies.  `wpadApplyDpdFormat` is queued as a completion callback, so its
- *   one-parameter prototype is cast to `WPADCallback`.
+ *   `WPADControlSpeaker` (the first two one-byte writes of the "off" path) and `WPADControlDpd` (its three one-byte
+ *   writes): the value/size bytes and the command and its by-value copy take each other's stack slots (alternate
+ *   builder orders and a wrapper builder move the whole frame instead).
+ *   Register numbering only (declaration orders searched): `wpadHidOpenCallback`, `wpadUpdateRadioSensitivity`,
+ *   `wpadCountIdleReports`, `wpadPollSample`, `wpadSendWbcCommand`, `__wpadIsBusyStream`, `wpadSendCommand`,
+ *   `wpadFilterButtons`; `wpadSendReadMemory`, `WPADiSendWriteData` and `WPADiSendSetReportType` keep `queue` in r31
+ *   where the original has r30 (body, declaration and inline-wrapper orders tried).
+ *   `wpadSamplingFiber`: the loop's callee-saved registers and command stack slots are numbered differently.
+ *   `wpadSampleChanged`: five callee-saved registers where the original uses four, and the original truncates `changed`
+ *   after every debounce.  `changed = changed | wpadDebounceMove(...)` at all four sites reproduces the size and every
+ *   instruction but colours `changed` r7 instead of r10 and scores lower; `=` at the first site and `|=` at the others
+ *   scores best (8 bytes short).
+ *   `wpadInitSequence`: its 0x1A report is built in the body; through `wpadQueueDpdEnable2` the frame becomes identical
+ *   but `level` and the callback's high half swap r30/r31, which scores lower.
  *   Flip blocker: .text (the partial rows).
- *   Flip blocker: .sbss `wpadInitHook` - the map row is one 0x10-byte object while the source defines four words
- *   `wpadInitHook0..3` (the relocations name them instead of `wpadInitHook`+0/+4/+8/+12; request wpad-slice1#18).
- *   Flip blocker: the undefined reference `BTA_DmSendHciReset` resolves only once the map row `fn_8047DAC4` carries that
- *   name (request wpad-slice1#1).
  *   The data sections otherwise differ only in their aligned tails.
  * SHAPES. A command is a local `WPADCommand` passed by value to an inline push (`wpadQueuePush`): the 0x30-byte stack copy
- *   and the `memset` + `memcpy` into the ring are the by-value parameter; `u32 level = OSDisableInterrupts(); ...
- *   OSRestoreInterrupts(level);` brackets every field read; `-1 & ~((-a | a) >> 31)` is `a != 0 ? 0 : -1`.  The report parser
- *   picks the back sample with `wpadSpareSample` (WPAD/wpad.h, `(u8)(index == 0)`); this file's own `wpadBackSample`
- *   spells the index `(u8)(index == 0 ? 1 : 0)`, which keeps the byte mask the original has here.
+ *   and the `memset` + `memcpy` into the ring are the by-value parameter.  The frame says where the command was built: one
+ *   built in the function's own body lies above its copy, one built inside an inline builder (`wpadQueueLed`,
+ *   `wpadQueueInfoRequest`, `wpadQueueStreamData`, `wpadQueueWriteByte`) usually lies below it (the residuals list the
+ *   exceptions).  The one-byte builders store the report id first.  `wpadSendWriteByte` forwards to `wpadQueueWriteByte`;
+ *   `wpadSendReadMemory` carries its own copy of the read body.  `wpadQueueCount` (an `s8` count, re-truncated after the
+ *   wrap) is the shape the push, peek and pop share.  `wpadApplyDpdFormat` is queued as a completion callback, so its
+ *   one-parameter prototype is cast to `WPADCallback`.  `u32 level = OSDisableInterrupts(); ... OSRestoreInterrupts(level);`
+ *   brackets every field read; `-1 & ~((-a | a) >> 31)` is `a != 0 ? 0 : -1`.  `WPADDisconnect` re-reads the status
+ *   through `wpadGetStatus`.  The sampling fiber's started/running dispatch is `if (status != 3) { if (status == 2) ... }
+ *   else ...` (a switch compares 2 first and branches over a `b end`).  The movement test is the `WPAD_MOVED_BY` macro,
+ *   not an inline: inline calls in an or-chain are expanded last-term first, while the macro's conditionals keep the
+ *   original's order (second term, first, then the rest).  The report parser picks the back sample with
+ *   `wpadSpareSample` (WPAD/wpad.h, `(u8)(index == 0)`); this file's own `wpadBackSample` spells the index
+ *   `(u8)(index == 0 ? 1 : 0)`, which keeps the byte mask the original has here.
  */
 
 #include "types.h"
@@ -254,8 +262,8 @@ static inline BOOL wpadQueueDpdEnable(WPADCmdQueue* queue, u8 value, WPADCallbac
 {
     WPADCommand cmd;
 
-    cmd.length = 1;
     cmd.reportId = 0x13;
+    cmd.length = 1;
     cmd.data[0] = value;
     cmd.callback = callback;
     return wpadQueuePush(queue, cmd);
@@ -266,9 +274,9 @@ static inline BOOL wpadQueueDpdEnable2(WPADCmdQueue* queue, u8 value, WPADCallba
 {
     WPADCommand cmd;
 
+    cmd.reportId = 0x1A;
     cmd.length = 1;
     cmd.data[0] = value;
-    cmd.reportId = 0x1A;
     cmd.callback = callback;
     return wpadQueuePush(queue, cmd);
 }
@@ -278,8 +286,8 @@ static inline BOOL wpadQueueSpeakerEnable(WPADCmdQueue* queue, u8 value, WPADCal
 {
     WPADCommand cmd;
 
-    cmd.length = 1;
     cmd.reportId = 0x14;
+    cmd.length = 1;
     cmd.data[0] = value;
     cmd.callback = callback;
     return wpadQueuePush(queue, cmd);
@@ -290,9 +298,21 @@ static inline BOOL wpadQueueSpeakerMute(WPADCmdQueue* queue, u8 value, WPADCallb
 {
     WPADCommand cmd;
 
+    cmd.reportId = 0x19;
     cmd.length = 1;
     cmd.data[0] = value;
-    cmd.reportId = 0x19;
+    cmd.callback = callback;
+    return wpadQueuePush(queue, cmd);
+}
+
+/* Queues an LED command (report 0x11): `leds` in the high nibble. */
+static inline BOOL wpadQueueLed(WPADCmdQueue* queue, u8 leds, WPADCallback callback)
+{
+    WPADCommand cmd;
+
+    cmd.reportId = 0x11;
+    cmd.length = 1;
+    cmd.data[0] = (leds << 4) & 0xF0;
     cmd.callback = callback;
     return wpadQueuePush(queue, cmd);
 }
@@ -302,11 +322,37 @@ static inline BOOL wpadQueueStatusRequest(WPADCmdQueue* queue, WPADCallback call
 {
     WPADCommand cmd;
 
-    cmd.data[0] = 0;
-    cmd.length = 1;
     cmd.reportId = 0x15;
+    cmd.length = 1;
+    cmd.data[0] = 0;
     cmd.callback = callback;
     cmd.param = NULL;
+    return wpadQueuePush(queue, cmd);
+}
+
+/* Queues a status request (report 0x15) whose reply fills `info`. */
+static inline BOOL wpadQueueInfoRequest(WPADCmdQueue* queue, void* info, WPADCallback callback) /* untyped: the caller-owned status record */
+{
+    WPADCommand cmd;
+
+    cmd.length = 1;
+    cmd.data[0] = 0;
+    cmd.reportId = 0x15;
+    cmd.callback = callback;
+    cmd.param = info;
+    return wpadQueuePush(queue, cmd);
+}
+
+/* Queues one packet of speaker data (report 0x18): the byte count in the top five bits of the first byte. */
+static inline BOOL wpadQueueStreamData(WPADCmdQueue* queue, const void* data, u32 length) /* untyped: byte range */
+{
+    WPADCommand cmd;
+
+    cmd.reportId = 0x18;
+    cmd.length = 0x15;
+    cmd.data[0] = (length * 8) & 0xF8;
+    cmd.callback = NULL;
+    memcpy(&cmd.data[1], data, length);
     return wpadQueuePush(queue, cmd);
 }
 
@@ -586,15 +632,8 @@ void wpadUpdateRadioSensitivity(s32 chan)
     }
 }
 
-/* TRUE when two readings differ by more than `limit`. */
-static inline BOOL wpadMovedBy(s32 a, s32 b, s32 limit)
-{
-    s32 diff = a - b;
-    if (diff < 0) {
-        diff = b - a;
-    }
-    return diff > limit;
-}
+/* 1 when two readings differ by more than `limit`, else 0. */
+#define WPAD_MOVED_BY(a, b, limit) (((((a) - (b)) < 0 ? ((b) - (a)) : ((a) - (b))) > (limit)) ? 1 : 0)
 
 /* Debounces one input group: TRUE once it moved on more consecutive samples than its hold count; a still sample
  * decays the count once per decay period. */
@@ -619,25 +658,24 @@ static inline BOOL wpadDebounceMove(WPADCB* cb, s32 moved, s32 group)
 BOOL wpadSampleChanged(WPADCB* cb, WPADSample* sample, WPADSample* last)
 {
     u8 changed = FALSE;
-    s32 moved;
     s32 i;
 
     if (cb->dataFormat != 14 && (sample->extensionError == 0 || sample->extensionError == -7)
         && (last->extensionError == 0 || last->extensionError == -7)) {
         changed |= sample->buttons != last->buttons;
-        changed |= wpadDebounceMove(cb,
-                                    wpadMovedBy(sample->accX, last->accX, 12) | wpadMovedBy(sample->accY, last->accY, 12)
-                                        | wpadMovedBy(sample->accZ, last->accZ, 12),
+        changed = changed | wpadDebounceMove(cb,
+                                    WPAD_MOVED_BY(sample->accX, last->accX, 12) | WPAD_MOVED_BY(sample->accY, last->accY, 12)
+                                        | WPAD_MOVED_BY(sample->accZ, last->accZ, 12),
                                     0);
         changed |= wpadDebounceMove(cb,
-                                    wpadMovedBy(sample->dpd[0].x, last->dpd[0].x, 2)
-                                        | wpadMovedBy(sample->dpd[0].y, last->dpd[0].y, 2)
-                                        | wpadMovedBy(sample->dpd[1].x, last->dpd[1].x, 2)
-                                        | wpadMovedBy(sample->dpd[1].y, last->dpd[1].y, 2)
-                                        | wpadMovedBy(sample->dpd[2].x, last->dpd[2].x, 2)
-                                        | wpadMovedBy(sample->dpd[2].y, last->dpd[2].y, 2)
-                                        | wpadMovedBy(sample->dpd[3].x, last->dpd[3].x, 2)
-                                        | wpadMovedBy(sample->dpd[3].y, last->dpd[3].y, 2),
+                                    WPAD_MOVED_BY(sample->dpd[0].x, last->dpd[0].x, 2)
+                                        | WPAD_MOVED_BY(sample->dpd[0].y, last->dpd[0].y, 2)
+                                        | WPAD_MOVED_BY(sample->dpd[1].x, last->dpd[1].x, 2)
+                                        | WPAD_MOVED_BY(sample->dpd[1].y, last->dpd[1].y, 2)
+                                        | WPAD_MOVED_BY(sample->dpd[2].x, last->dpd[2].x, 2)
+                                        | WPAD_MOVED_BY(sample->dpd[2].y, last->dpd[2].y, 2)
+                                        | WPAD_MOVED_BY(sample->dpd[3].x, last->dpd[3].x, 2)
+                                        | WPAD_MOVED_BY(sample->dpd[3].y, last->dpd[3].y, 2),
                                     1);
     }
     if (sample->extensionError == 0 && last->extensionError == 0) {
@@ -646,12 +684,12 @@ BOOL wpadSampleChanged(WPADCB* cb, WPADSample* sample, WPADSample* last)
         case 4:
         case 5:
             changed |= wpadDebounceMove(cb,
-                                        wpadMovedBy(sample->nunchuk.accX, last->nunchuk.accX, 12)
-                                            | wpadMovedBy(sample->nunchuk.accY, last->nunchuk.accY, 12)
-                                            | wpadMovedBy(sample->nunchuk.accZ, last->nunchuk.accZ, 12),
+                                        WPAD_MOVED_BY(sample->nunchuk.accX, last->nunchuk.accX, 12)
+                                            | WPAD_MOVED_BY(sample->nunchuk.accY, last->nunchuk.accY, 12)
+                                            | WPAD_MOVED_BY(sample->nunchuk.accZ, last->nunchuk.accZ, 12),
                                         2);
-            changed |= wpadMovedBy(sample->nunchuk.stickX, last->nunchuk.stickX, 1);
-            changed |= wpadMovedBy(sample->nunchuk.stickY, last->nunchuk.stickY, 1);
+            changed |= WPAD_MOVED_BY(sample->nunchuk.stickX, last->nunchuk.stickX, 1);
+            changed |= WPAD_MOVED_BY(sample->nunchuk.stickY, last->nunchuk.stickY, 1);
             break;
         case 6:
         case 7:
@@ -680,37 +718,33 @@ BOOL wpadSampleChanged(WPADCB* cb, WPADSample* sample, WPADSample* last)
                 break;
             }
             changed |= sample->classic.buttons != last->classic.buttons;
-            changed |= wpadMovedBy(sample->classic.leftX / stickDiv, last->classic.leftX / stickDiv, 1);
-            changed |= wpadMovedBy(sample->classic.leftY / stickDiv, last->classic.leftY / stickDiv, 1);
-            changed |= wpadMovedBy(sample->classic.rightX / rightDiv, last->classic.rightX / rightDiv, 1);
-            changed |= wpadMovedBy(sample->classic.rightY / rightDiv, last->classic.rightY / rightDiv, 1);
-            changed |= wpadMovedBy(sample->classic.leftTrigger / triggerDiv, last->classic.leftTrigger / triggerDiv, 1);
-            changed |= wpadMovedBy(sample->classic.rightTrigger / triggerDiv, last->classic.rightTrigger / triggerDiv, 1);
+            changed |= WPAD_MOVED_BY(sample->classic.leftX / stickDiv, last->classic.leftX / stickDiv, 1);
+            changed |= WPAD_MOVED_BY(sample->classic.leftY / stickDiv, last->classic.leftY / stickDiv, 1);
+            changed |= WPAD_MOVED_BY(sample->classic.rightX / rightDiv, last->classic.rightX / rightDiv, 1);
+            changed |= WPAD_MOVED_BY(sample->classic.rightY / rightDiv, last->classic.rightY / rightDiv, 1);
+            changed |= WPAD_MOVED_BY(sample->classic.leftTrigger / triggerDiv, last->classic.leftTrigger / triggerDiv, 1);
+            changed |= WPAD_MOVED_BY(sample->classic.rightTrigger / triggerDiv, last->classic.rightTrigger / triggerDiv, 1);
             break;
         }
         case 10:
             changed |= sample->simple.buttons != last->simple.buttons;
-            changed |= wpadMovedBy(sample->simple.stickX, last->simple.stickX, 1);
-            changed |= wpadMovedBy(sample->simple.stickY, last->simple.stickY, 1);
+            changed |= WPAD_MOVED_BY(sample->simple.stickX, last->simple.stickX, 1);
+            changed |= WPAD_MOVED_BY(sample->simple.stickY, last->simple.stickY, 1);
             break;
         case 12:
             changed |= wpadDebounceMove(cb,
-                                        wpadMovedBy((u16)sample->classic.buttons, (u16)last->classic.buttons, 50)
-                                            | wpadMovedBy((u16)sample->classic.leftX, (u16)last->classic.leftX, 50)
-                                            | wpadMovedBy((u16)sample->classic.leftY, (u16)last->classic.leftY, 50)
-                                            | wpadMovedBy((u16)sample->classic.rightX, (u16)last->classic.rightX, 50),
+                                        WPAD_MOVED_BY(sample->balance.press[0], last->balance.press[0], 50)
+                                            | WPAD_MOVED_BY(sample->balance.press[1], last->balance.press[1], 50)
+                                            | WPAD_MOVED_BY(sample->balance.press[2], last->balance.press[2], 50)
+                                            | WPAD_MOVED_BY(sample->balance.press[3], last->balance.press[3], 50),
                                         2);
             break;
         case 13:
         case 14:
-            changed |= (u8)sample->board.refC != (u8)last->board.refC;
-            changed |= wpadMovedBy((u16)sample->board.refB, (u16)last->board.refB, 32);
-            {
-                s16* weight = sample->board.weight;
-                s16* weightRef = sample->board.weightRef;
-                for (i = 0; i < 5; i++, weight++, weightRef++) {
-                    changed |= wpadMovedBy((u16)*weight, (u16)*weightRef, 32);
-                }
+            changed |= sample->board.refC != last->board.refC;
+            changed |= WPAD_MOVED_BY(sample->board.refB, last->board.refB, 32);
+            for (i = 0; i < 5; i++) {
+                changed |= WPAD_MOVED_BY(sample->board.weight[i], sample->board.weightRef[i], 32);
             }
             break;
         }
@@ -870,20 +904,19 @@ static inline BOOL wpadReconnectPending(void)
 void wpadSamplingFiber(void)
 {
     s32 chan;
+    s32 status;
 
-    switch (WUDGetStatus()) {
-    case 2:
-        if (wpadStackStarted == 0) {
-            wpadStackStarted = 1;
-            wpadReconnectDelayMs = 50;
-            WUDSetHidConnCallback((WUDHidConnCallback)wpadHidOpenCallback);
-            WUDSetHidRecvCallback(wpadHidDataCallback);
+    status = WUDGetStatus();
+    if (status != 3) {
+        if (status == 2) {
+            if (wpadStackStarted == 0) {
+                wpadStackStarted = 1;
+                wpadReconnectDelayMs = 50;
+                WUDSetHidConnCallback((WUDHidConnCallback)wpadHidOpenCallback);
+                WUDSetHidRecvCallback(wpadHidDataCallback);
+            }
         }
-        break;
-    case 3:
-        if (wpadReconnectPending()) {
-            break;
-        }
+    } else if (!wpadReconnectPending()) {
         if (wpadWifiCheckTick == 60000) {
             DCInvalidateRange(&WPAD_WIFI_CHANNEL, 1);
             WPADiDebugPrint("Check the update of WiFi using channel\n");
@@ -976,7 +1009,6 @@ void wpadSamplingFiber(void)
         wpadPollState = (wpadPollState == 5) ? 0 : wpadPollState + 1;
         wpadWifiCheckTick = (wpadWifiCheckTick == 60000) ? 0 : wpadWifiCheckTick + 1;
         BTA_HhGetAclQueueInfo();
-        break;
     }
 }
 
@@ -1280,26 +1312,11 @@ void wpadInitSequence(s32 chan, s32 result)
         cmd.callback = wpadAbortCallback;
         wpadQueuePush(&cb->cmdQueue, cmd);
     }
-    {
-        WPADCommand cmd;
-        cmd.data[0] = (leds << 4) & 0xF0;
-        cmd.length = 1;
-        cmd.reportId = 0x11;
-        cmd.callback = wpadAbortCallback;
-        wpadQueuePush(&cb->cmdQueue, cmd);
-    }
+    wpadQueueLed(&cb->cmdQueue, leds, wpadAbortCallback);
     wpadQueueReadMemory(&cb->cmdQueue, cb->extId, 0x38, 0x2A, wpadAbortCallback);
     wpadQueueReadMemory(&cb->cmdQueue, cb->extId, 0x38, 0x62, wpadAbortCallback);
     wpadQueueReadMemory(&cb->cmdQueue, cb->extId, calSize, calAddr, wpadInitDoneCallback);
-    {
-        WPADCommand cmd;
-        cmd.data[0] = 0;
-        cmd.length = 1;
-        cmd.reportId = 0x15;
-        cmd.param = NULL;
-        cmd.callback = NULL;
-        wpadQueuePush(&cb->cmdQueue, cmd);
-    }
+    wpadQueueStatusRequest(&cb->cmdQueue, NULL);
 }
 
 /* Picks the channel for a newly opened device: the balance board always takes channel 3, a remote takes its history slot. */
@@ -1452,13 +1469,10 @@ void WPADDisconnect(s32 chan)
     if (wpadGetStatus(chan) != -1) {
         WPADCB* cb;
         u32 level;
-        s32 status;
+
         WUDSetDeviceHistory(chan, NULL);
         cb = wpadCBTable[chan];
-        level = OSDisableInterrupts();
-        status = cb->status;
-        OSRestoreInterrupts(level);
-        if (status != -1) {
+        if (wpadGetStatus(chan) != -1) {
             level = OSDisableInterrupts();
             if (cb->disconnecting != 0) {
                 OSRestoreInterrupts(level);
@@ -1614,17 +1628,11 @@ s32 WPADGetInfoAsync(s32 chan, void* info, WPADCallback callback) /* untyped: th
         if (ready == 0 || pending != 0) {
             status = -2;
         } else {
-            WPADCommand cmd;
             level = OSDisableInterrupts();
             cb->infoPending = 1;
             cb->infoCallback = callback;
             OSRestoreInterrupts(level);
-            cmd.length = 1;
-            cmd.data[0] = 0;
-            cmd.reportId = 0x15;
-            cmd.callback = wpadInfoCallback;
-            cmd.param = info;
-            if (wpadQueuePush(&cb->cmdQueue, cmd)) {
+            if (wpadQueueInfoRequest(&cb->cmdQueue, info, wpadInfoCallback)) {
                 status = 0;
             } else {
                 status = -2;
@@ -1697,12 +1705,7 @@ s32 WPADControlLed(s32 chan, u8 leds, WPADCallback callback)
         if (ready == 0) {
             status = -2;
         } else {
-            WPADCommand cmd;
-            cmd.data[0] = (leds << 4) & 0xF0;
-            cmd.length = 1;
-            cmd.reportId = 0x11;
-            cmd.callback = callback;
-            status = wpadQueuePush(&cb->cmdQueue, cmd) ? 0 : -2;
+            status = wpadQueueLed(&cb->cmdQueue, leds, callback) ? 0 : -2;
         }
     }
     if (status != 0 && callback != NULL) {
@@ -2128,7 +2131,6 @@ s32 WPADSendStreamData(s32 chan, const void* data, u32 length) /* untyped: byte 
     u32 level;
     s32 ready;
     s32 status;
-    WPADCommand cmd;
 
     cb = wpadCBTable[chan];
     level = OSDisableInterrupts();
@@ -2144,12 +2146,7 @@ s32 WPADSendStreamData(s32 chan, const void* data, u32 length) /* untyped: byte 
     if (__wpadIsBusyStream(chan) != 0) {
         return -2;
     }
-    cmd.reportId = 0x18;
-    cmd.length = 0x15;
-    cmd.data[0] = (length * 8) & 0xF8;
-    cmd.callback = NULL;
-    memcpy(&cmd.data[1], data, length);
-    if (!wpadQueuePush(&cb->cmdQueue, cmd)) {
+    if (!wpadQueueStreamData(&cb->cmdQueue, data, length)) {
         return -2;
     }
     level = OSDisableInterrupts();
@@ -2340,18 +2337,7 @@ s32 WPADiSendSetReportType(WPADCmdQueue* queue, u32 type, s32 onChangeOnly, WPAD
 /* Queues a one-byte write of `value` to the remote address `addr`. */
 s32 wpadSendWriteByte(WPADCmdQueue* queue, u8 value, u32 addr, WPADCallback callback)
 {
-    WPADCommand cmd;
-    u8 size = 1;
-    u8 byteValue = value;
-    u32 address = addr;
-
-    cmd.reportId = 0x16;
-    cmd.length = 0x15;
-    cmd.callback = callback;
-    memcpy(&cmd.data[0], &address, 4);
-    memcpy(&cmd.data[4], &size, 1);
-    memcpy(&cmd.data[5], &byteValue, 1);
-    return wpadQueuePush(queue, cmd);
+    return wpadQueueWriteByte(queue, value, addr, callback);
 }
 
 /* Queues a write of `size` bytes (at most 16) from `src` to the remote address `addr`. */
@@ -2373,7 +2359,19 @@ s32 WPADiSendWriteData(WPADCmdQueue* queue, const void* src, s32 size, u32 addr,
 /* Queues a read of `size` bytes from the remote address `addr` into `dest`. */
 s32 wpadSendReadMemory(WPADCmdQueue* queue, void* dest, u16 size, u32 addr, WPADCallback callback) /* untyped: caller-owned byte buffer */
 {
-    return wpadQueueReadMemory(queue, dest, size, addr, callback);
+    WPADCommand cmd;
+    u32 address = addr;
+    u16 length = size;
+
+    cmd.reportId = 0x17;
+    cmd.length = 6;
+    cmd.callback = callback;
+    memcpy(&cmd.data[0], &address, 4);
+    memcpy(&cmd.data[4], &length, 2);
+    cmd.argB = length;
+    cmd.argA = (u32)dest;
+    cmd.argC = address;
+    return wpadQueuePush(queue, cmd);
 }
 
 /* Whether `count` more commands fit in the queue. */

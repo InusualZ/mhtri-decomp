@@ -88,17 +88,20 @@ typedef struct WPADSample {
             /* +0x2C */ u8 stickX;
             /* +0x2D */ u8 stickY;
         } simple; /* size: 0x04 */
+        struct { /* the balance checker: its four load cells (WPADBLStatus::press) */
+            /* +0x2A */ u16 press[4];
+        } balance; /* size: 0x08 */
         WPADDpdExt dpdExt[4]; /* the pointer boxes of an interleaved report, which carries no extension */
         struct { /* the balance-board extension (layout guessed from the decode) */
-            /* +0x2A */ s16 weight[5];
+            /* +0x2A */ u16 weight[5];
             /* +0x34 */ u8 temperature;
             /* +0x35 */ u8 pad_0x35;
-            /* +0x36 */ s16 weightRef[5];
+            /* +0x36 */ u16 weightRef[5];
             /* +0x40 */ u8 batteryRef;
             /* +0x41 */ u8 pad_0x41;
             /* +0x42 */ s16 refA;
-            /* +0x44 */ s16 refB;
-            /* +0x46 */ s8 refC;
+            /* +0x44 */ u16 refB;
+            /* +0x46 */ u8 refC;
             /* +0x47 */ s8 refD;
             /* +0x48 */ u8 refE;
             /* +0x49 */ u8 refF;
