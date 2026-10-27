@@ -125,7 +125,7 @@ u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index);
 /* 0x80274E6C / 0x80275014 / 0x802751B4 - the three weapon-record bonus sums. */
 u8 pl_gun_recoil_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
 u8 pl_gun_reload_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
-f32 pl_gun_deviation_get(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
+f32 pl_gun_deviation_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
 
 /* 0x802752C8 / 0x80275394 - the act-id and act-state pair predicates.  `Pl_item_id_usable_ck`'s second
  * argument is never read by its body, but every retail call site passes it (0 in `quest/quest_entry.cpp`, 1 in

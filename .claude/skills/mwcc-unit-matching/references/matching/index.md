@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (231)
+## Ideas that work (234)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -240,6 +240,9 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 251 | [A loop that hoists only its 0/1 stores (each zero its own register) wants #pragma opt_strength_reduction off](251-loop-that-hoists-only.md) | works | pragma, allocator | Retail's loop preheader copies one zero into a dozen registers and stack slots (`mr r22,r16` ..., `stw r16,0x130(r1)` ...) while ours hoists colour bytes, timer values and table addresses and shares one zero; the row is... |
 | 252 | [A backward branch into another case's code: a for (;;) headed by that code, with the jumping case's label inside the loop](252-backward-branch-into-another.md) | works | source-shape | Retail places a case after other cases and ends it with a `b` back to the start of an earlier case's code (or a step's `state = 0` re-entry lands on step 0's code, not on the dispatch); the fall-through or re-dispatch... |
 | 253 | [Split early-return tests if-converted to subfc/subfe/andc: scope #pragma opt_rebuildconditionals off](253-split-early-return-tests.md) | works | pragma, source-shape | Retail tests a value twice with separate early returns (`cmpwi 0; bne; li r3,0; blr`, then a range test), while ours folds the pair into a branchless `subfc`/`subfe`/`andc` sequence, or the `\|\|` spelling that avoids... |
+| 254 | [A binary tree of signed range compares on one value is a switch whose case labels spell out each run](254-binary-tree-of-signed.md) | works | source-shape | Retail tests one value with a `cmpwi K; bge` tree (`0x17`, `0xE`, `5`, then `0x13`/`0x32`/`0x1A`) and lays the arms out after the tree, where a hand-written nested `if` interleaves the tests and the arm bodies |
+| 255 | [An early exit tested with bne over a b to the epilogue is the second operand of an \|\| condition](255-early-exit-tested-with.md) | works | source-shape | Retail has `cmpwi r3,0 ; bne next ; b epilogue` for an early return where ours has one `beq epilogue` (4 bytes short, every later branch shifted) |
+| 256 | [Two record tests that keep an unfolded li/cmplwi on the starting constant are a two-iteration loop](256-two-record-tests-that.md) | works | source-shape | Retail repeats the same test on two records at a fixed stride and keeps `li r0,0xff ; cmplwi r0,0xff` (or `li r0,0 ; cmplw r0,rX`) on the accumulator's starting value, which ours folds away |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
