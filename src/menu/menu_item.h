@@ -352,7 +352,7 @@ u8 GameMode_ck(void);
 u32 move_work_state_ck(void);
 u32 game_ready_ck(void);
 u32 lb_unlock_cond5_on_ck(void);
-void fn_8031A638(MenuSlot* slot);
+void menu_slot_items_return(MenuSlot* slot);
 void ainpc_entry_kill_kind(s32 flag);
 void ainpc_page_state_init(void);
 void ainpc_page_hold_clear(void);

@@ -1306,7 +1306,7 @@ extern "C" void menu_item_close(void)
     ainpc_entry_kill_kind(1);
     for (i = 0, slot = &menu_work.slot[0]; i < 2; slot++, i++) {
         if (slot->active != 0) {
-            fn_8031A638(slot);
+            menu_slot_items_return(slot);
         }
     }
     menu_work.slot[1].active = 0;
