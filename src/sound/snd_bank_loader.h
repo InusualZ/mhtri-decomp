@@ -8,6 +8,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* 0x80791610 (.sdata) - the volume per option step `set_SE_volume`/`set_BGM_volume` index (GUESS name). */
+extern const u8 se_volume_table[];
 void fn_800F0F9C(u8 id);
 /* 0x800F0F38 - drops one reference of monster `id`'s SE slot, freeing it at zero. */
 void snd_em_se_slot_release(u8 id);

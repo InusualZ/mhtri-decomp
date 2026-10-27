@@ -126,47 +126,8 @@ typedef struct SndChunkRec {
     /* +0x04 */ u32 whd_size;  /* the `16/whd/...` half */
 } SndChunkRec; /* size: 0x8 */
 
-/* One `{id, chunk}` slot of the SE bank list `fn_800F06AC` fills and `fn_800F0C74` looks up. */
-typedef struct SndSeSlot {
-    /* +0x00 */ u8 id;         /* 0xFF when the slot is free */
-    /* +0x01 */ u8 chunk;      /* the chunk index its files were loaded into */
-} SndSeSlot; /* size: 0x2 */
-
-typedef struct SndWork {
-    /* +0x0000 */ u8   pad_0000[0x04];
-    /* +0x0004 */ u32  total_size;      /* the running file offset both bank walkers leave behind */
-    /* +0x0008 */ u32  bank_base_2;     /* cursor `snd_em_bank_level_load` walks from */
-    /* +0x000C */ u32  bank_base_1;     /* cursor `snd_bank_layout` walks from */
-    /* +0x0010 */ u32  whd_ofs[0x31];   /* per chunk: the `whd` half's offset */
-    /* +0x00D4 */ u32  whd_size[0x31];  /*               ... and its size */
-    /* +0x0198 */ u32  tsb_ofs[0x31];   /* per chunk: the `tsb` half's offset */
-    /* +0x025C */ u32  tsb_size[0x31];  /*               ... and its size */
-    /* +0x0320 */ u8   pad_0320[0x62];
-    /* +0x0382 */ u8   chunk_id_1[0x31][0x100]; /* fn_800F25DC/2680 write and read it */
-    /* +0x3482 */ u8   chunk_id_2[0x31][0x100]; /* the `fn_800F26B8` sibling (arg2 != 0) */
-    /* +0x6582 */ u8   chunk_id_3[0x31][0x100]; /* the `fn_800F26B8` sibling (arg2 == 0) */
-    /* +0x9682 */ u8   whd_ready[0x31]; /* set by the `fn_800F0230` callback for the `whd` half */
-    /* +0x96B3 */ u8   tsb_ready[0x31]; /* set by the `fn_800F0230` callback for the `tsb` half */
-    /* +0x96E4 */ SndSeSlot se_slot[0x10];
-    /* +0x9704 */ u8   se_slot_id[6];   /* fn_800F1250 / snd_em_se_slot_release / fn_800F0F9C */
-    /* +0x970A */ u8   se_slot_num[6];  /* its refcount */
-    /* +0x9710 */ u8   se_slot_bank[6]; /* get_em_se_bank returns it */
-    /* +0x9716 */ u8   se_slot_idx[6];  /* the request id fn_800F0F9C loads for it */
-    /* +0x971C */ u8   se_auto[2];      /* snd_em_bank_level_load's {start, count} */
-    /* +0x971E */ u8   chunk_handle[0x31]; /* snd_bank_layout clears it to 0xFF; nothing reads it here */
-    /* +0x974F */ u8   pad_974F[0x25];
-    /* +0x9774 */ u8   chunk_ready[0x31]; /* both halves are in */
-    /* +0x97A5 */ u8   stream_ready[3];  /* the three BGM streams (`fn_800F0448`, `srt_ready_ck`) */
-    /* +0x97A8 */ u8   demo_id;
-    /* +0x97A9 */ u8   se_param_a;       /* fn_800F0560 caches the pair it was last called with */
-    /* +0x97AA */ u8   se_param_b;
-    /* +0x97AB */ u8   load_count;
-    /* +0x97AC */ u8   pad_97AC[0x02];
-    /* +0x97AE */ u8   bgm_loading_1;
-    /* +0x97AF */ u8   bgm_loading_2;
-    /* +0x97B0 */ u32  stream_dma;       /* the address `fn_800F2900` hands out */
-    /* +0x97B4 */ u32  stream_ok;
-} SndWork; /* size: 0x97B8 */
+/* `SndSeSlot` and `SndWork` live in `sound/sound_work.h` (rule 1: the system core's HOME-menu sound fade reads the
+ * work too). */
 
 /* The `whd` header `fn_800F02D4` fixes up: a flag, a slot count and 0x48-byte slots. */
 typedef struct SndWhdSlot {
@@ -266,7 +227,7 @@ extern const f32 lbl_80796590; /* 1.0f  - the clamped ceiling */
 extern const char* lbl_80791590;
 extern const char* lbl_807915E8[2];
 extern const u8 lbl_8079160C[4];
-extern const u8 lbl_80791610[8];
+extern const u8 se_volume_table[8];
 extern const char* lbl_80791638[2];
 extern const char lbl_80791640[];
 extern const char lbl_80791648[];
@@ -598,12 +559,12 @@ extern "C" void fn_800F0560(u8 a, u8 b)
         return;
     }
     fn_800E8294();
-    fn_800E85E8(0);
-    fn_800E85E8(1);
+    snd_reverb_advance(0);
+    snd_reverb_advance(1);
     lbl_80794A2C->se_param_a = a;
     lbl_80794A2C->se_param_b = b;
-    fn_800E8634(0, lbl_80794A2C->se_param_a);
-    fn_800E8634(0, lbl_80794A2C->se_param_b);
+    snd_reverb_apply(0, lbl_80794A2C->se_param_a);
+    snd_reverb_apply(0, lbl_80794A2C->se_param_b);
 }
 
 /* The scene SE-bank loader: bank catalogue, per-kind banks, then the SE bank itself. */
@@ -1787,13 +1748,13 @@ extern "C" u8 snd_stream_bgm_flag_get(void)
 
 void set_SE_volume(u8 index)
 {
-    fn_800E84F0((s16)lbl_80791610[index]);
-    fn_800F2A1C(lbl_80791610[index], 1);
+    snd_se_level_set((s16)se_volume_table[index]);
+    fn_800F2A1C(se_volume_table[index], 1);
 }
 
 void set_BGM_volume(u8 index)
 {
-    fn_800F2A1C(lbl_80791610[index], 0);
+    fn_800F2A1C(se_volume_table[index], 0);
 }
 
 extern "C" void fn_800F2A1C(u8 volume, u8 is_bgm)

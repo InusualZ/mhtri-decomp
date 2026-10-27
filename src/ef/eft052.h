@@ -46,6 +46,9 @@ void eft052_hold_entry_set(void* entry, u8 flag);
  * entry's id (-1 when the list is missing or full).  GUESS name; `lobby/lb_companion_ui.h` still carries
  * its own two-argument view. */
 s32 hud_msg_push(u32 ch, const char* text);
+/* 0x8035B648 - queues text `text` of kind `kind` with room for a second line; returns its id or -1 (added with the
+ * `ef/system_core.cpp` pad-connection notice). */
+s32 hud_msg_push_two_line(s32 kind, const char* text);
 /* 0x8035B700 - pushes one item message (`kind` the channel, `id` the message, `arg` the item id it names) onto the
  * HUD log: builds the line from the string table and the item name.  `hud_item_msg_push` is a GUESS name from
  * those two uses. */

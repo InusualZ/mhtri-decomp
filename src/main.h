@@ -36,6 +36,9 @@ void fn_8004030C(struct _MH_VEC2* v);
 struct GXRenderModeObj;
 void render_mode_copy(struct GXRenderModeObj* dst, struct GXRenderModeObj* src);
 
+/* 0x8003F524 - the system VI clock counter `SetSystemVcnt` stores (1 at the normal frame rate). */
+s32 GetSystemVcnt(void);
+
 #ifdef __cplusplus
 }  /* extern "C" */
 

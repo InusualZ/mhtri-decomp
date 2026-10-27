@@ -22,6 +22,13 @@ void clearReverbWorkArea(void);
 void pushReverbSamples(s16* src, s32 count);
 /* 0x800E8D74 - advances the reverb time counter by 0xB with interrupts off (GUESS name). */
 void advanceReverbClock(void);
+/* 0x800E84F0 / 0x800E8558 - store the sound object's SE level word and its u8 fade level (GUESS names). */
+void snd_se_level_set(s32 level);
+void snd_fade_level_set(u8 level);
+/* 0x800E85E8 / 0x800E8634 - advance reverb state `idx`, apply reverb config `entry_idx` of bank `idx`, each with
+ * interrupts off (GUESS names). */
+void snd_reverb_advance(u32 idx);
+void snd_reverb_apply(u32 idx, u32 entry_idx);
 
 #ifdef __cplusplus
 }

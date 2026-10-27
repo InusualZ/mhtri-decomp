@@ -70,10 +70,10 @@ void fn_800E7FAC(void* group, RelocTable* table);
 void fn_800E7FB4(void* group, RelocTable* table);
 void fn_800E7FBC(void* group, RelocTable* table);
 void fn_800E84DC(Sound* p, u32 v, u8 idx);
-void fn_800E84F0(s32 v);
+void snd_se_level_set(s32 v);
 void fn_800E8524(Sound* snd, s16 v);
 s16 fn_800E8550(Sound* snd);
-void fn_800E8558(u8 v);
+void snd_fade_level_set(u8 v);
 void fn_800E858C(Sound* snd, u8 v);
 s16 fn_800E85D8(Sound* snd, u32 idx);
 LevelSetting* fn_800E8690(void);
@@ -108,12 +108,12 @@ void fn_800E83CC(u32 owner, s16 arg);
 s16 fn_800E8444(u32 key);
 void fn_800E8498(u32 v, u8 idx);
 s16 fn_800E8594(u32 idx);
-void fn_800E85E8(u32 idx);
+void snd_reverb_advance(u32 idx);
 
 void fn_800E93E0(ReverbLine* line);
 
 
-void fn_800E8634(u32 idx, u32 entry_idx);
+void snd_reverb_apply(u32 idx, u32 entry_idx);
 void fn_800E8698(void);
 void snd_master_volume_set(u32 id);
 void pushReverbSamples(s16* src, s32 count);
@@ -219,7 +219,7 @@ extern "C" void fn_800E84DC(Sound* p, u32 v, u8 idx)
 }
 
 /* Sets the global sound object's level word. */
-extern "C" void fn_800E84F0(s32 v)
+extern "C" void snd_se_level_set(s32 v)
 {
     fn_800E8524(fn_800E5714(), (s16)v);
 }
@@ -243,7 +243,7 @@ extern "C" s16 fn_800E8550(Sound* snd)
 }
 
 /* Stores the global sound object's mode byte. */
-extern "C" void fn_800E8558(u8 v)
+extern "C" void snd_fade_level_set(u8 v)
 {
     fn_800E858C(fn_800E5714(), v);
 }
@@ -520,7 +520,7 @@ extern "C" s16 fn_800E8594(u32 idx)
 }
 
 /* Releases one reverb unit, with interrupts off. */
-extern "C" void fn_800E85E8(u32 idx)
+extern "C" void snd_reverb_advance(u32 idx)
 {
     u32 level = OSDisableInterrupts();
 
@@ -529,7 +529,7 @@ extern "C" void fn_800E85E8(u32 idx)
 }
 
 /* Applies one reverb config from the global object's bank, with interrupts off. */
-extern "C" void fn_800E8634(u32 idx, u32 entry_idx)
+extern "C" void snd_reverb_apply(u32 idx, u32 entry_idx)
 {
     u32 level = OSDisableInterrupts();
 

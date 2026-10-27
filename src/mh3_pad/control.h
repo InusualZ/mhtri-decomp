@@ -14,6 +14,8 @@
 /* 0x80043B48 - the game's control-type query; `0` selects the first player.  C++ linkage: the map row is
  * `get_ControlType__Fl`, the mangling of `mh3_pad.cpp`'s definition. */
 s32 get_ControlType(s32 which);
+/* 0x800438C8 - the Classic Controller buttons of pad `chan` that went down (C++ linkage: `get_rcSwitch_on__Fl`). */
+u16 get_rcSwitch_on(s32 chan);
 
 extern "C" {
 #endif

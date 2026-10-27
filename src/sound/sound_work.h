@@ -324,4 +324,6 @@ void fn_800EEA44(u32 ctx, u32 chunk);
 }
 #endif
 
+#include "sound/snd_work.h" /* SndSeSlot, SndWork (rule 1) */
+
 #endif /* MHTRI_SOUND_WORK_H */

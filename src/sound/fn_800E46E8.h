@@ -28,9 +28,9 @@ void* fn_800E80DC(u32 a, u32 b, u32 c);
 
 /* Player reset / level-table entry points. */
 void fn_800E8294(void);
-void fn_800E84F0(s32 volume);
-void fn_800E85E8(u32 idx);
-void fn_800E8634(u32 idx, u32 entry_idx);
+void snd_se_level_set(s32 volume);
+void snd_reverb_advance(u32 idx);
+void snd_reverb_apply(u32 idx, u32 entry_idx);
 /* The stream stop `bgm_stop_all()` in `sound/fn_800F2A94.cpp` tail-calls. */
 void resumeSoundEngine(void);
 

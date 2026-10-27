@@ -150,13 +150,13 @@ typedef struct SystemWork {
     };
     /* +0x86A */ u8 field_0x86A;
     /* +0x86B */ u8 field_0x86b;      /* hbm_enable: == 1 keeps the menu suppressed */
-    /* +0x86C */ u8 pad_0x86c[0x1];
+    /* +0x86C */ u8 hbm_req_0x86c;    /* GUESS name: a HOME press raises it; the HOME-menu control clears it */
     /* +0x86D */ u8 title_req_0x86d;   /* GUESS name: cleared by `game_mode_flow_task` before it runs the +0x8C4 reset hook */
     /* +0x86E */ u8 unk2158;
     /* +0x86F */ u8 screen_tex_mode_0x86F;   /* non-zero: the frame draw shows only the captured screen */
     /* +0x870 */ u8 hbm_disabled;     /* hbm_disable sets 1; hbm_enable follows +0x86B */
     /* +0x871 */ u8 system_halt_0x871; /* set on a fatal drive error or a handled reset: the main loop stops polling */
-    /* +0x872 */ u8 pad_0x872[0x1];
+    /* +0x872 */ u8 hbm_pause_0x872;  /* GUESS name: the HOME-menu control sets it outside game mode 1 */
     /* +0x873 */ u8 field_0x873;      /* non-zero: the disc-error screen stays off */
     /* +0x874 */ u8 pad_0x874[0x3];
     /* +0x877 */ u8 field_0x877;
@@ -190,10 +190,12 @@ typedef struct SystemWork {
     /* +0x8C1 */ u8 net_result_wait_0x8c1;   /* GUESS name: `arena_task` step 4 skips its network-result wait unless this is 1 */
     /* +0x8C2 */ u8 pad_0x8c2[0x2];
     /* +0x8C4 */ void (*reset_func_0x8c4)(void);   /* GUESS name: the hook `game_mode_flow_task` runs when the lobby is left for the title */
-    /* +0x8C8 */ u8 pad_0x8c8[0xC];
+    /* +0x8C8 */ u8 pad_0x8c8[0x4];
+    /* +0x8CC */ void (*hbm_open_0x8cc)(void);   /* GUESS name: the HOME-menu control's open hook */
+    /* +0x8D0 */ s32 (*hbm_run_0x8d0)(void);     /* GUESS name: the HOME-menu step; 1 while the menu stays open */
     /* +0x8D4 */ void (*field_0x8d4)(void);
     /* +0x8D8 */ u32 (*pad_lock_ck_0x8d8)(void);   /* GUESS name: 1 stops the pad reads (`pad_frame_read`) */
-    /* +0x8DC */ void (*field_0x8dc)(void);
+    /* +0x8DC */ void (*field_0x8dc)(u8 alpha);   /* the HOME-menu fade's draw hook (`ef/system_core.cpp` passes the alpha) */
     /* +0x8E0 */ void (*unk2272)(void);
     /* +0x8E4 */ void (*unk2276)(void);
     /* +0x8E8 */ void (*kbd_init)(u8);
@@ -228,7 +230,7 @@ typedef struct SystemWork {
     /* +0xA51 */ u8 transfer_flag_0xa51;    /* cleared with it (0) */
     /* +0xA52 */ u8 transfer_level_0xa52;   /* the transfer level handed to the mediator (start-up sets 4) */
     /* +0xA53 */ u8 pad_0xa53[0x1];
-    /* +0xA54 */ void (*field_0xa54)(s32, s32);
+    /* +0xA54 */ void (*field_0xa54)(u8 state, s32, s32);   /* the display-state hook `ef/system_core.cpp` calls with the state byte */
     /* +0xA58 */ u8 field_0xa58;      /* pmic_disp_off clears */
     /* +0xA59 */ u8 pad_0xa59[0x3];
 } SystemWork;

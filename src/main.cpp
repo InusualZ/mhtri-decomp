@@ -91,7 +91,7 @@
  *   * `lbl_8079479C` is a **signed** 32-bit global: retail converts it with the `xoris`/`0x4330000080000000`
  *     (signed) idiom, not the `0x4330000000000000` (unsigned) one - MWCC emits them the opposite way round
  *     from the obvious guess, so `u32` there costs 2 instructions and `lfd`s the wrong constant. The same
- *     holds for `lbl_807947A0` and for `fn_8003F524`'s return: the two frame-wait loops compare with `cmpw`
+ *     holds for `lbl_807947A0` and for `GetSystemVcnt`'s return: the two frame-wait loops compare with `cmpw`
  *     (signed), and declaring them `u32` costs `cmplw` + a REPLACE row (`frame_swap_wait` 92.97 -> 100.00 %).
  *   * the TV-standard chains in `fn_8003F730`/`fn_8003F9E4` are `switch`es, not `if`/`else if` chains: MWCC
  *     lays a switch out as all the tests first (`beq` off to each case block) and the blocks after them,
@@ -501,7 +501,7 @@ void SetSystemVcnt(long vcnt)
 }
 
 /* Reads the system VI clock counter back. */
-extern "C" s32 fn_8003F524(void)
+extern "C" s32 GetSystemVcnt(void)
 {
     return lbl_8079479C;
 }
@@ -907,7 +907,7 @@ extern "C" void frame_copy_display(void)
  * waits out the second half of the frame before flipping the framebuffer. */
 extern "C" void frame_swap_wait(void)
 {
-    while (lbl_807947A0 < fn_8003F524() - 1) {
+    while (lbl_807947A0 < GetSystemVcnt() - 1) {
         u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;
         OSSleepTicks(0, ticks);
     }
@@ -926,7 +926,7 @@ extern "C" void frame_swap_wait(void)
     lbl_8079477C ^= 1;
     lbl_80794778 = lbl_80794770[lbl_8079477C];
     PPCSync();
-    while (lbl_807947A0 < fn_8003F524()) {
+    while (lbl_807947A0 < GetSystemVcnt()) {
         u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;
         OSSleepTicks(0, ticks);
     }

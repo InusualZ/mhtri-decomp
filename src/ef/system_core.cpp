@@ -1,13 +1,16 @@
 /*
  * ef/system_core.cpp - the game-system core: the `system_w` interface and its mode/loading accessors, the file
- *   loader, the work heap, the texture loader and the hbm/PMIC block.
+ *   loader, the work heap, the texture loader, the loading display, the HOME-button control and the hbm/PMIC block.
  * RANGE. .text 0x800CE5A8-0x800D2FEC (127 functions); extab 0x8000A5E4-0x8000A77C, extabindex 0x80023C7C-0x80023EE0,
  *   .ctors 0x8056F2EC-0x8056F2F0, .data 0x80595118-0x80595378, .bss 0x80694C68-0x80695610, .sdata
  *   0x80791358-0x80791370, .sbss 0x80794958-0x80794970, .sdata2 0x80796360-0x807963C0.  Left edge: `ef/ef_sphere.cpp` ends at 0x800CE5A8 and
  *   `fn_800CE5A8` (the `system_w` side-table size 0x84D0) is called only from this unit's `memory_layout_init`.  Right edge:
- *   `fn_800D2F88` is the TU's `__sinit` (the `.ctors` word) and `fn_800D2F94` its element constructor; every function
- *   from 0x800D2FEC reads `.sbss` 0x80794970 (the `nw_resource.cpp` resource manager).
- * FLAGS. `cflags_main`.
+ *   `__sinit_\system_core_cpp` is the TU's static initialiser (the `.ctors` word) and `__ct__10SysLoadingFv` the loading
+ *   display's constructor; every function from 0x800D2FEC reads `.sbss` 0x80794970 (the `nw_resource.cpp` resource manager).
+ * FLAGS. `cflags_main` plus a file-wide `#pragma peephole off` (retail keeps every `clrlwi`/`extsh` narrowing and the
+ *   unfused compares: 20 rows rose with it, none fell) and `#pragma optimization_level 4` (the sprite step's switch lowering
+ *   and timer-clear unroll; two more rows rose, none fell); a closing `#pragma dont_inline on` makes the static initialiser
+ *   call the display's constructor out of line, as retail does.
  * NAMES. The unit name is a GUESS (no `__FILE__` string names the range; it is the game-system core).  The runtime
  *   dump names the loader, mode, work-heap, texture and string-table accessors (`file_loading_ck`, `load_file_req`,
  *   `load_file`, `ran_suu`, `system_w_clr`, `all_reset`, `PlayMode_ck`, `GameMode_set`, `PlayMode_set`,
@@ -33,31 +36,41 @@
  *   `work_stack_alloc`, `work_stack_find`, `work_stack_free_index`, `work_stack_free`, `work_stack_reset`,
  *   `tex_palette_bind`, `tex_palette_bind_point`, `tex_slot_free`, `loading_disp_reset`, `system_nop`,
  *   `tex_coord_gen_set`, `sound_volume_mute_set`, `sys_msg_build`.
- * RESIDUALS. 10 rows unwritten: `fn_800D0980` (0x594), `fn_800D104C` (0x1048, the loading display's draw),
- *   `fn_800D21CC` (0x448), `fn_800D2614`, `fn_800D2678`, `fn_800D27AC`, `fn_800D2978` (0x3CC), `fn_800D2D50`, and the
- *   `.ctors` pair `fn_800D2F88`/`fn_800D2F94` (the loading display's four `VEC3` constructions, which need
- *   `SysLoading` to be a class).
- *   Partial rows (`measure.py ef/system_core` lists them), including:
- *  - `rand_lcg_step`, `ran_suu`: retail reduces the 0xB0/0xAD mix with the magic 0x00AD7539, `srwi 15` and
- *    `mulli 0xFF53`; the `u32` spelling here emits the 32-bit magic 0x7AD2208F (the original operand width is open);
- *  - `set_move_work_max`, `GameMode_set`, `PlayMode_set`, `get_move_work_adrs`, `get_move_work_max`: retail narrows
- *    the argument (`clrlwi`) at entry, ours folds it into the store or the `clrlslwi`;
- *  - `fn_800D20B4`: retail `extsh`s both GX-FIFO halfwords before the `sth`;
- *  - `sys_tex_obj_get`, `sys_tex_info_get`, `sys_tex_image_get`: retail hoists `lis`/`addi system_w` above the `index < 0x20`
- *    check, ours materialises the base after the branch;
- *  - `fn_800CFD20`: the branch sense around the `fn_800CFC64` call is inverted;
- *  - `tex_palette_bind`, `fn_800D02C0`, `tex_palette_bind_point`: retail reloads the slot's image fields for `GXInitTexObj`, ours
- *    forwards the stored values;
- *  - `loading_disp_reset`: retail unrolls the sprite copy by 4 with a separate offset for the y column, ours by 8;
- *  - `memory_layout_init`: the layout's size array is kept `volatile` to keep retail's stack stores (580 vs 568 bytes).
+ *   GUESS (from each body and its callers): `loading_sprite_step` (the sprite wave of the loading display, run by the draw
+ *   while `system_w`+0x05 is clear), `loading_disp_draw` (pad_connect's frame draw calls it), `loading_pad_icon_draw` (the
+ *   draw calls it per pad whose `system_w`+0x7DC cell is set), `hbm_control`/`hbm_draw` (a HOME press of either pad,
+ *   `system_w`'s +0x8CC/+0x8D0/+0x8D4 hooks), `hbm_sound_fade_out`/`hbm_sound_fade_in`/`hbm_sound_fade_reset`
+ *   (the four-frame master-volume ramps around the menu), `hbm_work_reset`, `hbm_work` (.bss 0x80695468),
+ *   `pad_disconnect_notice` (Pl's motion code calls it per player; it shows string 47 of table 4 once per disconnect),
+ *   `pad_notice_shown` (.sbss 0x80794960), `loading_sprite_uv`/`loading_frame_uv`/`loading_pad_icon_uv` (.data cells),
+ *   `loading_frame_color` (.sdata 0x80791368).  Foreign GUESS names proposed through the registry: `GetSystemVcnt`
+ *   (main.cpp), `snd_se_level_set`, `snd_fade_level_set`, `snd_reverb_advance`, `snd_reverb_apply`
+ *   (sound/snd_stream_reloc.cpp), `se_volume_table` (sound/snd_bank_loader.cpp).
+ * RESIDUALS. Every row is written; rows below 100 (`unitscore.py ef/system_core --threshold 100`):
+ *  - `memory_layout_init`: the layout's size array is kept `volatile` to keep retail's stack stores; retail interleaves
+ *    the stores with the `system_w` layout words differently (580 vs 568 bytes; a plain array drops the stores);
+ *  - `loading_disp_reset`: register colouring of the sprite copy (the y column reads the table entry a second time, as
+ *    retail does); retail negates one pooled 32.0 for the quad's corners;
+ *  - `loading_disp_draw`: retail's range tests are `addi rX,rY,0xFF`/`0xFC` (u8 wrap-around), ours `subi`; four `fmr`
+ *    copies of the frame's x before its conversions; the bands' float registers;
+ *  - `loading_pad_icon_draw`: retail keeps five non-volatile FPRs (f27-f31), ours four (952 vs 972 bytes);
+ *  - `loading_sprite_step`: the right-to-left pass's start index lands in r5/r0 the other way round (one `mr`);
+ *  - `tex_palette_bind`, `tex_palette_bind_point`, `work_stack_alloc`, `work_stack_find`, `fn_800CE6A0`,
+ *    `enemy_work_release_all`, `stream_ring_reset`, `resident_file_load`, `fn_800D02C0`, `fn_800CFD00`,
+ *    `monster_size_table_get`, `move_work_kind_alloc`: register colouring only.
+ *   SHAPES. `snd_se_level_set_c1`/`movie_playing_ck_c1` are cast views: retail sign-extends the SE level (an `s16`
+ *   parameter; the owner's callers pass `s32`) and compares the movie test's result whole (its owner returns `u8`).
  *   A STOPGAP block declares `enemy_work_release(_ENEMY_WORK*)` (retail passes the record; `unsplit/enemy.h` and
  *   `enemy/fn_80138074.cpp` spell it without one) until its request lands.
- *   flipcheck: `.bss`/`.ctors`/`.data`/`.sbss`/`.sdata` claimed, not emitted; `.sdata2` ours is the literal pool;
- *   row 36: 8 retail force-active functions (`fn_800CF228`, `fn_800CF270`, `fn_800CF3A4`, `fn_800CF3B4`,
- *   `fn_800CF668`, `fn_800CFBE0`, `fn_800D20D8`, `fn_800D2108`) are not exported in ours.
+ *   flipcheck: the functions are not in address order in this file; `.data` emits only the `hbm_control` jump table
+ *   (the cell, path and count tables are declared, not defined); `.bss` defines only `sys_loading` (the side table,
+ *   the work stack, the HOME work and the string table are declared); `.sdata`/`.sbss` are not emitted; `.text` 8 bytes
+ *   short; row 36: 11 retail force-active functions are not exported in ours.
  */
 
 #include "types.h"
+#include "MTX/mtx.h" /* PSMTXIdentity (first: `ef.h` defers its `Vec` to this header) */
+#include "MTX/mtx44.h" /* C_MTXOrtho */
 #include "gx.h"
 #include "Runtime.PPCEABI.H/memset.h" /* memset is owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w (undecided module, rule 2's unsplit gap) */
@@ -100,16 +113,45 @@
 #include "menu/menu_item.h" /* fn_802A0188 */
 #include "stage/get_now_mapno.h" /* get_now_mapno */
 #include "lobby/lobby_w.h" /* lobby_w */
+#include "nw4r/math.h" /* nw4r::math::VEC3, rotVecZ */
+#include "RVLGX/GXBump.h" /* GXSetNumIndStages, GXSetTevDirect */
+#include "RVLGX/GXFrameBuf.h" /* GXSetCopyFilter */
+#include "RVLGX/GXGeometry.h" /* GXBegin, GXSetCullMode */
+#include "RVLGX/GXLight.h" /* GXSetNumChans, GXSetChanCtrl */
+#include "RVLGX/GXPixel.h" /* GXSetBlendMode, GXSetColorUpdate, GXSetZMode */
+#include "RVLGX/GXTev.h" /* GXSetNumTevStages, GXSetTevOp, GXSetTevOrder */
+#include "RVLGX/GXTransform.h" /* GXSetProjection, GXLoadPosMtxImm, GXSetCurrentMtx */
+#include "mh3_pad/Screen_w.h" /* Screen_w */
+#include "main.h" /* ck_WideMode */
+#include "fn_80040598.h" /* kbd_reset_call */
+#include "font/flfntGetSizeX.h" /* dbg_drawgraph_init */
+#include "hud/get_lsp_data.h" /* get_lsp_data */
+#include "g3d/g3d_state.h" /* g3d_state_invalidate */
+#include "draw_shape.h" /* drawshape_tex_obj_get */
+#include "ef/eft052.h" /* hud_msg_push_two_line */
+#include "mh3_pad/Psw.h" /* Psw */
+#include "MSL_C/printf.h" /* sprintf */
+#include "pad_hold_ck.h" /* pad_hold_ck */
+#include "lobby/lb_quest_screen.h" /* quest_clock_reset */
+#include "menu/get_pop_dat_ptr.h" /* get_arena_cfg, event_demo_ck */
+#include "mh3_pad/option_w.h" /* option_w */
+#include "sound/snd_master_volume_set.h" /* snd_master_volume_set, snd_stream_reloc_pause/resume */
+#include "sound/snd_track_pause.h" /* snd_track_pause, snd_track_resume */
+#include "sound/snd_stream_reloc.h" /* snd_se_level_set, snd_fade_level_set, snd_reverb_advance, snd_reverb_apply */
+#include "sound/snd_work.h" /* SndWork */
 
-/* Claimed data (splits.txt): `.data` 0x80595118-0x80595378, `.bss` 0x80694C68-0x80695610 (five objects, each still
- * `extern`-declared below) and `.sbss` 0x80794958-0x80794970 (the words at 0x80794958/0x80794960/com_data_func).  None of it is
- * emitted yet: the `.data` run holds the jump table of the unwritten `fn_800D21CC` (0x80595318, a rule-10 run `vtableaudit`
- * counts until the function is written) and strings/tables of unwritten bodies, and the `.bss`/`.sbss` words need their 8-byte
- * rows reproduced. */
+#pragma peephole off
+#pragma optimization_level 4
+
+/* Claimed data (splits.txt): `.data` 0x80595118-0x80595378, `.bss` 0x80694C68-0x80695610 (five objects; `sys_loading` is
+ * defined, the other four are `extern`-declared below) and `.sbss` 0x80794958-0x80794970 (the words at
+ * 0x80794958/pad_notice_shown/com_data_func).  The `.data` run's only emitted object is `hbm_control`'s jump table
+ * (0x80595318); its cell, path and count tables are declared, and the `.bss`/`.sbss` words need their 8-byte rows
+ * reproduced. */
 
 /* --------------------------------------------------------------------------------------------- */
-/* The unit's own claimed data (.bss 0x80694C68-0x80695610 and the rest of its splits block); declared, never
- * defined (playbook 29). */
+/* The unit's own claimed data (.bss 0x80694C68-0x80695610 and the rest of its splits block); declared, apart from
+ * `sys_loading` (its constructor is the TU's static initialiser). */
 /* --------------------------------------------------------------------------------------------- */
 
 /* The system side table at .bss:0x80694C68: a 0x4C-byte record whose +0x48 word is the 0x84D0-byte
@@ -154,7 +196,7 @@ typedef struct SysSideTable {
 } SysSideTable; /* size: 0x4C */
 
 extern SysSideTable lbl_80694C68; /* .bss:0x80694C68 */
-extern u8 lbl_80794960;           /* .sdata, the debug-BBA flag */
+extern u8 pad_notice_shown;           /* .sdata, the debug-BBA flag */
 extern u8 lbl_806954AC[];         /* .bss, the message-table tail */
 
 /* The command-table dispatch pair the data layer calls through (.sdata:com_data_func). */
@@ -162,18 +204,20 @@ typedef void (*ComDataFunc)(u8, u16);
 typedef void (*ComDataFunc1)(u8);
 extern void* com_data_func[2]; /* [0] and [1], called as the two typedefs above */
 
-/* The 0x44-byte system info/message record at .bss:0x80695468. */
-typedef struct SysInfo {
-    /* +0x00 */ u8 pad_0x00[0x1];
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 pad_0x02[0x4];
-    /* +0x06 */ u16 field_0x06;
+/* The HOME-button work at .bss:0x80695468: the control's state, the sound fade's step and frame, the screen fade's
+ * hold, alpha and alpha step, and whether the fade is drawn.  size: 0x44 */
+typedef struct SysHbmWork {
+    /* +0x00 */ u8 state_0x00;       /* 0 idle, 1-3 the screen fade out/hold/in, 10-13 the menu's sound fade and run */
+    /* +0x01 */ u8 fade_step_0x01;   /* the sound fade's step */
+    /* +0x02 */ u8 pad_0x02[0x2];
+    /* +0x04 */ s16 hold_0x04;       /* the faded screen's hold frames */
+    /* +0x06 */ s16 fade_timer_0x06; /* the sound fade's frame */
     /* +0x08 */ u8 pad_0x08[0x18];
-    /* +0x20 */ u32 field_0x20;
-    /* +0x24 */ u32 field_0x24;
-    /* +0x28 */ u8 field_0x28;
+    /* +0x20 */ s32 alpha_0x20;      /* the screen fade's alpha, 0..0xFF */
+    /* +0x24 */ s32 alpha_step_0x24; /* its step per frame (0x10 after the reset) */
+    /* +0x28 */ u8 fade_on_0x28;     /* the fade is drawn */
     /* +0x29 */ u8 pad_0x29[0x1B];
-} SysInfo; /* size: 0x44 */
+} SysHbmWork; /* size: 0x44 */
 
 /* One work-stack block's name.  size: 0x10 */
 typedef struct SysStackName {
@@ -218,7 +262,8 @@ extern u16 move_work_counts[9][7];
 extern char sys_resident_path[];
 extern char sys_common_tex_path[];
 
-extern SysInfo lbl_80695468;    /* .bss:0x80695468 *//* The message/resource pointer table `get_str_tbl_ptr` returns (.bss:0x806954AC): three of its
+extern SysHbmWork hbm_work;    /* .bss:0x80695468 */
+/* The message/resource pointer table `get_str_tbl_ptr` returns (.bss:0x806954AC): three of its
  * pointer slots are indexed by a u16 id. */
 typedef struct StrTbl {
     /* +0x000 */ u8 pad_0x00[0x90];
@@ -229,18 +274,30 @@ typedef struct StrTbl {
 } StrTbl; /* size: 0x100 (lower bound) */
 
 extern SysStack sys_work_stack;    /* .bss:0x80694CB8 */
-/* The loading display at .bss:0x80695320: shown now and last call, its sprites with their positions and timers, the
- * spinner quad, its style and caption, and its texture.  size: 0x110 */
+/* The loading display at .bss:0x80695320: shown now and last call, the sprite wave's phase and counters, each sprite's
+ * angle, timer and position, the sprite quad, its style and caption, and its textures.  The style-6 backdrop reads a
+ * third texture slot at +0x148, past the map's extent (the bytes of `hbm_work`).  size: 0x148 */
 typedef struct SysLoading {
+    /* 0x800D2F94 (0x58): builds the sprite quad's four corners (run by `__sinit_\system_core_cpp`). */
+    SysLoading() {
+        nw4r::math::VEC3* corner = quad_0x34;
+
+        do {
+            VEC3_ctor(corner);
+            corner++;
+        } while (corner < quad_0x34 + 4);
+    }
+
+
     /* +0x000 */ u8 shown_0x00;
     /* +0x001 */ u8 prev_0x01;
-    /* +0x002 */ u8 field_0x02;
-    /* +0x003 */ u8 field_0x03;
-    /* +0x004 */ u8 field_0x04;
+    /* +0x002 */ u8 phase_0x02;   /* the sprite animation phase: 0 rise, 1 hold, 2 fall, 3 hold */
+    /* +0x003 */ s8 head_0x03;    /* the last sprite the current phase has started */
+    /* +0x004 */ s8 done_0x04;    /* the sprites that finished the current phase */
     /* +0x005 */ u8 pad_0x05;
-    /* +0x006 */ u16 frame_0x06;
-    /* +0x008 */ u32 sprite_0x08[11];
-    /* +0x034 */ Vec quad_0x34[4];
+    /* +0x006 */ s16 frame_0x06;
+    /* +0x008 */ u32 angle_0x08[11]; /* each sprite's rotation (rotVecZ units) */
+    /* +0x034 */ nw4r::math::VEC3 quad_0x34[4]; /* the sprite quad's corners around its centre */
     /* +0x064 */ s16 timer_0x64[11];
     /* +0x07A */ s16 x_0x7A[11];
     /* +0x090 */ s16 y_0x90[11];
@@ -248,9 +305,9 @@ typedef struct SysLoading {
     /* +0x0A7 */ char text_0xA7[0x2B];
     /* +0x0D2 */ u8 pad_0xD2[0x2];
     /* +0x0D4 */ u32 texture_0xD4;  /* the texture file's load address */
-    /* +0x0D8 */ SysTask tex_0xD8;
-} SysLoading;
-extern SysLoading sys_loading;
+    /* +0x0D8 */ SysTask tex_0xD8[2]; /* the display texture and the frame texture */
+} SysLoading; /* size: 0x148 */
+SysLoading sys_loading;
 
 /* One sprite position of the loading display's per-language tables.  size: 0x4 */
 typedef struct SysLoadingPos {
@@ -263,6 +320,29 @@ typedef struct SysLoadingPos {
 extern u16 sys_loading_sprites[12];
 extern SysLoadingPos* sys_loading_pos[6];
 extern u8 sys_loading_counts[8];
+
+/* One texture coordinate pair of the loading display's tables, in texels.  size: 0x4 */
+typedef struct SysLoadingUv {
+    /* +0x0 */ s16 u;
+    /* +0x2 */ s16 v;
+} SysLoadingUv;
+
+/* A screen rectangle the loading display draws: its size, its top-left corner and its depth.  size: 0x14 */
+typedef struct SysLoadingRect {
+    /* +0x00 */ f32 w;
+    /* +0x04 */ f32 h;
+    /* +0x08 */ f32 x;
+    /* +0x0C */ f32 y;
+    /* +0x10 */ f32 z;
+} SysLoadingRect;
+
+/* The loading display's per-language sprite texture cells (`.data` 0x80595228, six tables), the caption frame's
+ * icon and frame cells (`.data` 0x80595308), the pad icon cells (`.data` 0x80595350, u0/v0/u1/v1 per rumble state)
+ * and the caption frame's colour (`.sdata` 0x80791368); in the unit's claims, declared, not defined. */
+extern SysLoadingUv* loading_sprite_uv[6];
+extern SysLoadingUv loading_frame_uv[4];
+extern s16 loading_pad_icon_uv[5][4];
+extern u32 loading_frame_color;
 extern s32 lbl_80791358[2];     /* .sdata, the two stream reserves below the resident file */
 extern u32 lbl_80794958;        /* .sdata, the entry high-water mark */
 
@@ -313,6 +393,24 @@ void all_reset(void);
 void system_w_clr(void);
 
 extern "C" void fn_800CFC64(void);
+extern "C" void loading_sprite_step(void);
+extern "C" void fn_800D2098(f32 s, f32 t);
+extern "C" void fn_800D20A8(u32 color);
+extern "C" void fn_800D20B4(s16 x, s16 y);
+extern "C" void loading_pad_icon_draw(u8 index);
+extern "C" void system_nop(void);
+extern "C" void tex_coord_gen_set(s32 dst, s32 func, s32 src, u32 mtx);
+extern "C" u8 fn_800D06E0(void);
+u8** get_str_tbl(long index);
+extern "C" u32 fn_800CEDBC(void);
+extern "C" void hbm_sound_fade_reset(void);
+extern "C" u32 hbm_sound_fade_out(void);
+extern "C" u32 hbm_sound_fade_in(void);
+extern "C" void sound_volume_mute_set(u32 on);
+/* Cast views of two foreign callees whose owner declarations differ from the call retail makes: the SE level is passed
+ * sign-extended (an `s16` parameter) and the movie test's result is compared whole (an `int` return). */
+#define snd_se_level_set_c1 ((void (*)(s16))snd_se_level_set)
+#define movie_playing_ck_c1 ((s32 (*)(void))movie_playing_ck)
 
 extern "C" s32 fn_800D02C0(TPLPalette* pal, SysTask* slot);
 extern "C" void tsk_start(void* fn, u32 count);
@@ -377,7 +475,7 @@ u16 rand_lcg_step(u16 value) {
     if (v == 0) {
         v = 1;
     }
-    return (u16)((v * 0xB0) % 0xAD);
+    return (u16)((v * 0xB0) % 0xFF53);
 }
 
 /* 0x800CEF60 - clear the 0x4A8-byte command record. */
@@ -596,7 +694,7 @@ void fn_800D0754(u8 value) {
 
 /* 0x800D2D44 - clear the debug-BBA flag the reset path owns. */
 void fn_800D2D44(void) {
-    lbl_80794960 = 0;
+    pad_notice_shown = 0;
 }
 
 /* 0x800D2E68/0x800D2EA4/0x800D2EE0 - the three message-table lookups. */
@@ -781,21 +879,23 @@ u32 fn_800CF61C(void* handle) {
 
 /* 0x800CF73C - rebuild the work heap. */
 void fn_800CF73C(void) {
-    if (system_w.field_0x90) {
-        MEMDestroyExpHeap(system_w.field_0x90);
+    SystemWork* sw = &system_w;
+    if (sw->field_0x90) {
+        MEMDestroyExpHeap(sw->field_0x90);
     }
-    system_w.field_0x90 = MEMCreateExpHeapEx(system_w.field_0x60, system_w.field_0x64, 4);
-    MEMInitAllocatorForExpHeap(&system_w.mem_allocator, system_w.field_0x90, 0x20);
-    system_w.field_0x68 = fn_800CF61C(system_w.field_0x90);
+    sw->field_0x90 = MEMCreateExpHeapEx(sw->field_0x60, sw->field_0x64, 4);
+    MEMInitAllocatorForExpHeap(&sw->mem_allocator, sw->field_0x90, 0x20);
+    sw->field_0x68 = fn_800CF61C(sw->field_0x90);
 }
 
 /* 0x800CF8EC - lazily build the move-work record. */
 void fn_800CF8EC(void) {
-    if (system_w.field_0xa4 == 0) {
-        system_w.field_0xa4 = (MoveWork*)work_mem_alloc(0x2C);
+    SystemWork* sw = &system_w;
+    if (sw->field_0xa4 == 0) {
+        sw->field_0xa4 = (MoveWork*)work_mem_alloc(0x2C);
     }
-    if (system_w.field_0xa4) {
-        memset(system_w.field_0xa4, 0, 0x2C);
+    if (sw->field_0xa4) {
+        memset(sw->field_0xa4, 0, 0x2C);
     }
 }
 
@@ -812,16 +912,19 @@ u32 fn_800CFBE0(void) {
 
 /* 0x800CFD00 - arm the two stream bounds. */
 void fn_800CFD00(void) {
-    system_w.field_0x878 = system_w.field_0x4c;
-    system_w.field_0x87c = system_w.field_0x4c + lbl_80791358[0];
+    SystemWork* sw = &system_w;
+    u32 end;
+
+    sw->field_0x878 = end = sw->field_0x4c;
+    sw->field_0x87c = end += lbl_80791358[0];
 }
 
 /* 0x800CFD20 - pick the stream arm path by the +0x22 mode byte. */
 void fn_800CFD20(void) {
-    if (system_w.field_0x22 < 2) {
-        fn_800CFD00();
-    } else {
+    if (system_w.field_0x22 >= 2) {
         fn_800CFC64();
+    } else {
+        fn_800CFD00();
     }
 }
 
@@ -834,34 +937,40 @@ void fn_800CFDB0(void) {
 
 /* 0x800D0568/0x800D05A4/0x800D05DC - the task table accessors. */
 u8* sys_tex_obj_get(s32 index) {
+    SystemWork* sw = &system_w;
+
     if (index >= 0x20) {
         return 0;
     }
-    if (system_w.tasks[index].active == 0) {
+    if (sw->tasks[index].active == 0) {
         return 0;
     }
-    return system_w.tasks[index].body;
+    return sw->tasks[index].body;
 }
 
 SysTask* sys_tex_info_get(s32 index) {
+    SystemWork* sw = &system_w;
+
     if (index >= 0x20) {
         return 0;
     }
-    if (system_w.tasks[index].active == 0) {
+    if (sw->tasks[index].active == 0) {
         return 0;
     }
-    return &system_w.tasks[index];
+    return &sw->tasks[index];
 }
 
 /* 0x800D05DC - the task's +0x24 word, or NULL. */
 u32 sys_tex_image_get(s32 index) {
+    SystemWork* sw = &system_w;
+
     if (index >= 0x20) {
         return 0;
     }
-    if (system_w.tasks[index].active == 0) {
+    if (sw->tasks[index].active == 0) {
         return 0;
     }
-    return system_w.tasks[index].field_0x24;
+    return sw->tasks[index].field_0x24;
 }
 
 
@@ -886,12 +995,9 @@ void fn_800D20A8(u32 a) {
     GXWGFifo.u32 = a;
 }
 
-void fn_800D20B4(s32 a, s32 b) {
-    s16 lo = a;
-    s16 hi = b;
-
-    GXWGFifo.s16 = lo;
-    GXWGFifo.s16 = hi;
+void fn_800D20B4(s16 x, s16 y) {
+    GXWGFifo.s16 = x;
+    GXWGFifo.s16 = y;
 }
 
 /* 0x800D20D8 - whether the hbm state byte is set. */
@@ -909,16 +1015,259 @@ void fn_800D2108(u32 flag) {
 }
 
 /* 0x800D2178 - clear the system info record and suppress the home menu. */
-void fn_800D2178(void) {
-    memset(&lbl_80695468, 0, 0x44);
-    lbl_80695468.field_0x24 = 0x10;
+void hbm_work_reset(void) {
+    memset(&hbm_work, 0, 0x44);
+    hbm_work.alpha_step_0x24 = 0x10;
     system_w.hbm_disabled = 1;
 }
 
 /* 0x800D2660 - clear the info record's flags. */
-void fn_800D2660(void) {
-    lbl_80695468.field_0x01 = 0;
-    lbl_80695468.field_0x06 = 0;
+void hbm_sound_fade_reset(void) {
+    hbm_work.fade_step_0x01 = 0;
+    hbm_work.fade_timer_0x06 = 0;
+}
+
+/* 0x800D21CC (0x448): Runs the HOME button: latches a press of either pad, then either fades the screen out, holds
+ * and fades it back (when the menu cannot open now), or fades the sound out, runs the menu and fades the sound back. */
+void hbm_control(void) {
+    SysHbmWork* hbm = &hbm_work;
+
+    if (system_w.field_0x31 == 1) {
+        return;
+    }
+    if ((Psw[0].field_0xce & 0x8000) || ((u8)get_ControlType(0) == 2 && (get_rcSwitch_on(0) & 2))) {
+        if (system_w.hbm_req_0x86c == 0) {
+            system_w.hbm_req_0x86c = 1;
+        }
+    }
+    if ((s32)Psw[1].field_0x30 != -1 &&
+        ((Psw[1].field_0xce & 0x8000) || ((u8)get_ControlType(1) == 2 && (get_rcSwitch_on(1) & 2)))) {
+        if (system_w.hbm_req_0x86c == 0) {
+            system_w.hbm_req_0x86c = 1;
+        }
+    }
+    switch (hbm->state_0x00) {
+    case 0:
+        if (system_w.hbm_req_0x86c == 0) {
+            break;
+        }
+        if ((u32)isMoviePlaying() == 1) {
+            system_w.hbm_req_0x86c = 0;
+            break;
+        }
+        if (fn_800CEDBC() == 0 || sys_loading.shown_0x00 == 1 || system_w.hbm_disabled != 0 ||
+            system_w.field_0x865 != 0 || event_demo_ck() == 1) {
+            hbm->state_0x00++;
+            hbm->alpha_0x20 = 0;
+            hbm->fade_on_0x28 = 1;
+            break;
+        }
+        if (system_w.title_req_0x86d != 0) {
+            system_w.hbm_req_0x86c = 0;
+            system_w.field_0x05 = 1;
+            system_w.field_0x873 = 1;
+            if (GameMode_ck() != 1) {
+                system_w.hbm_pause_0x872 = 1;
+            }
+            system_w.hbm_open_0x8cc();
+            hbm_sound_fade_reset();
+            hbm->state_0x00 = 10;
+            pad_motor_stop_all();
+        }
+        break;
+    case 1:
+        if (hbm->alpha_0x20 == 0xFF) {
+            hbm->state_0x00++;
+            hbm->hold_0x04 = 60;
+            break;
+        }
+        if (GetSystemVcnt() == 1 && movie_playing_ck_c1() == 0) {
+            hbm->alpha_0x20 += hbm->alpha_step_0x24;
+        } else {
+            hbm->alpha_0x20 += hbm->alpha_step_0x24 * 2;
+        }
+        if (hbm->alpha_0x20 > 0xFF) {
+            hbm->alpha_0x20 = 0xFF;
+        }
+        break;
+    case 2:
+        if (hbm->hold_0x04 <= 0) {
+            hbm->state_0x00++;
+            break;
+        }
+        if (GetSystemVcnt() == 1 && movie_playing_ck_c1() == 0) {
+            hbm->hold_0x04 -= 1;
+        } else {
+            hbm->hold_0x04 -= 2;
+        }
+        break;
+    case 3:
+        if (hbm->alpha_0x20 == 0) {
+            hbm->state_0x00 = 0;
+            hbm->fade_on_0x28 = 0;
+            system_w.hbm_req_0x86c = 0;
+            break;
+        }
+        if (GetSystemVcnt() == 1 && movie_playing_ck_c1() == 0) {
+            hbm->alpha_0x20 -= hbm->alpha_step_0x24;
+        } else {
+            hbm->alpha_0x20 -= hbm->alpha_step_0x24 * 2;
+        }
+        if (hbm->alpha_0x20 < hbm->alpha_step_0x24) {
+            hbm->alpha_0x20 = 0;
+        }
+        break;
+    case 10:
+        system_w.screen_tex_mode_0x86F = 1;
+        if (hbm_sound_fade_out() == 1) {
+            hbm->state_0x00++;
+        }
+        break;
+    case 11:
+        sound_volume_mute_set(0);
+        snd_track_pause();
+        if (system_w.hbm_run_0x8d0() == 1) {
+            system_w.screen_tex_mode_0x86F = 2;
+            break;
+        }
+        hbm_sound_fade_reset();
+        system_w.screen_tex_mode_0x86F = 1;
+        snd_master_volume_set(0);
+        hbm->state_0x00++;
+        break;
+    case 12:
+        if (hbm_sound_fade_in() == 1) {
+            system_w.field_0x05 = 0;
+            quest_clock_reset();
+            hbm->state_0x00++;
+        }
+        break;
+    case 13:
+        hbm->state_0x00 = 0;
+        hbm->fade_on_0x28 = 0;
+        system_w.hbm_req_0x86c = 0;
+        system_w.field_0x873 = 0;
+        system_w.screen_tex_mode_0x86F = 0;
+        break;
+    }
+}
+
+/* 0x800D2614 (0x4C): Draws the HOME menu while it runs, otherwise the HOME-button fade at its alpha. */
+void hbm_draw(void) {
+    SystemWork* sw;
+    SysHbmWork* hbm;
+
+    hbm = &hbm_work;
+    sw = &system_w;
+    if (sw->screen_tex_mode_0x86F == 2) {
+        sw->field_0x8d4();
+        return;
+    }
+    if (hbm->fade_on_0x28 != 0) {
+        sw->field_0x8dc(hbm->alpha_0x20);
+    }
+}
+
+/* 0x800D2678 (0x134): Fades the sound out over four frames before the HOME menu opens, then mutes and pauses it;
+ * returns 1 once the menu may start. */
+u32 hbm_sound_fade_out(void) {
+    SysHbmWork* hbm = &hbm_work;
+    u8 level;
+
+    switch (hbm->fade_step_0x01) {
+    case 0:
+        if (++hbm->fade_timer_0x06 > 4) {
+            snd_master_volume_set(0);
+            snd_se_level_set_c1(0);
+            sound_volume_mute_set(0);
+            snd_reverb_advance(0);
+            snd_reverb_advance(1);
+            snd_stream_reloc_pause();
+            snd_track_pause();
+            hbm->fade_timer_0x06 = 0;
+            hbm->fade_step_0x01++;
+        } else {
+            snd_master_volume_set(((4 - hbm->fade_timer_0x06) << 15) / 4);
+            if (hbm->fade_timer_0x06 < 4) {
+                level = ((4 - hbm->fade_timer_0x06) * 127) / 4;
+            } else {
+                level = 0;
+            }
+            snd_fade_level_set(level);
+        }
+        break;
+    case 1:
+        sound_volume_mute_set(0);
+        snd_track_pause();
+        if (++hbm->fade_timer_0x06 > 1) {
+            snd_master_volume_set(0x8000);
+            return 1;
+        }
+        break;
+    }
+    return 0;
+}
+
+/* 0x800D27AC (0x150): Restores the sound after the HOME menu (the SE bank's reverbs, the levels, the streams) and
+ * fades the master volume back in over four frames; returns 1 when done. */
+u32 hbm_sound_fade_in(void) {
+    SysHbmWork* hbm = &hbm_work;
+    SndWork* snd;
+
+    switch (hbm->fade_step_0x01) {
+    case 0:
+        snd = (SndWork*)system_w.layout_0x958;
+        snd_reverb_apply(0, snd->se_param_a);
+        snd_reverb_apply(0, snd->se_param_b);
+        snd_fade_level_set(127);
+        if (system_w.vs_mode_0x8b0 == 0) {
+            snd_se_level_set_c1(se_volume_table[(s8)option_w[0x12]]);
+        } else {
+            snd_se_level_set_c1(se_volume_table[get_arena_cfg(0, 0x12)]);
+        }
+        sound_volume_mute_set(1);
+        snd_stream_reloc_resume();
+        snd_track_resume();
+        hbm->fade_timer_0x06 = 0;
+        hbm->fade_step_0x01++;
+        break;
+    case 1:
+        if (++hbm->fade_timer_0x06 > 4) {
+            snd_master_volume_set(0x8000);
+            return 1;
+        }
+        snd_master_volume_set((hbm->fade_timer_0x06 << 15) / 4);
+        break;
+    }
+    return 0;
+}
+
+/* 0x800D2D50 (0xD8): Tells the player once when pad `player`'s remote disconnects (a HUD notice), and re-arms the
+ * notice when it reconnects. */
+void pad_disconnect_notice(u8 player) {
+    char text[0x100];
+    u8** table;
+    s32 number;
+    u8 bit;
+
+    if (pad_hold_ck() == 1) {
+        return;
+    }
+    number = player + 1;
+    bit = number;
+    if ((s32)Psw[player].field_0x30 == -1) {
+        if ((pad_notice_shown & bit) == 0) {
+            pad_notice_shown |= bit;
+            table = get_str_tbl(4);
+            text[0] = 0;
+            sprintf(text, (char*)table[47], number);
+            hud_msg_push_two_line(5, text);
+        }
+    } else if ((s32)Psw[player].field_0x30 == 0) {
+        if ((pad_notice_shown & bit) != 0) {
+            pad_notice_shown &= (u8)~bit;
+        }
+    }
 }
 
 /* 0x800D28FC - step the display state. */
@@ -928,8 +1277,10 @@ void setTransferDisplayState(u8 value) {
 
 /* 0x800D2928 - notify the display-state owner. */
 void fn_800D2928(void) {
-    if (system_w.field_0xa58 != 0) {
-        system_w.field_0xa54(0x14, 0x140);
+    SystemWork* sw = &system_w;
+
+    if (sw->field_0xa58 != 0) {
+        sw->field_0xa54(sw->field_0xa58, 0x14, 0x140);
     }
 }
 
@@ -999,8 +1350,6 @@ void memory_layout_init(void) {
     fn_800CFD20();
 }
 
-#pragma push
-#pragma peephole off
 /* Swaps a big-endian word of an archive header. */
 static inline u32 sys_swap32(s32 v) {
     return ((u32)v >> 24) | ((v & 0xFF0000) >> 8) | (((v & 0xFF) << 24) | ((v & 0xFF00) << 8));
@@ -1020,7 +1369,6 @@ u8* pack_entry_data(SysArchive* arc, s32 index) {
 u32 pack_entry_size(SysArchive* arc, s32 index) {
     return sys_swap32(arc->entries[index].size);
 }
-#pragma pop
 
 /* 0x800CF858 (0x94): Releases every enemy work record and the move work, rebuilds the work heap and resets the player
  * collision. */
@@ -1042,10 +1390,17 @@ void enemy_work_release_all(void) {
 
 /* 0x800CF948 (0x148): Allocates move work `kind` for `count` records (kind 2 is the player array) and records it. */
 void move_work_kind_alloc(u8 kind, u16 count) {
+    SystemWork* sw = &system_w;
     u32 size;
     void* records;
 
-    if (system_w.field_0xa4 == NULL || kind >= 7 || count == 0) {
+    if (sw->field_0xa4 == NULL) {
+        return;
+    }
+    if (kind >= 7) {
+        return;
+    }
+    if (count == 0) {
         return;
     }
     switch (kind) {
@@ -1057,8 +1412,8 @@ void move_work_kind_alloc(u8 kind, u16 count) {
         break;
     case 2:
         records = (void*)player_work_array_get();
-        system_w.field_0xa4->max[kind] = count;
-        system_w.field_0xa4->addr[kind] = records;
+        sw->field_0xa4->max[kind] = count;
+        sw->field_0xa4->addr[kind] = records;
         return;
     case 3:
         size = count * 0xB18;
@@ -1077,8 +1432,8 @@ void move_work_kind_alloc(u8 kind, u16 count) {
     }
     records = work_mem_alloc(size);
     if (records != NULL) {
-        system_w.field_0xa4->max[kind] = count;
-        system_w.field_0xa4->addr[kind] = records;
+        sw->field_0xa4->max[kind] = count;
+        sw->field_0xa4->addr[kind] = records;
         memset(records, 0, size);
     }
 }
@@ -1112,42 +1467,44 @@ void stream_ring_reset(void) {
 /* 0x800CFDD0 (0x108): Takes `size` bytes of the work stack: from the bottom (recorded under `name`, at most 64
  * blocks) or, with `top`, from the top; 0 when it does not fit. */
 u32 work_stack_alloc(u32 size, u8 top, char* name) {
+    SysStack* stack = &sys_work_stack;
     u32 addr;
     u32 end;
 
     if (top == 0) {
-        if (sys_work_stack.count_0x20 >= 64) {
+        if (stack->count_0x20 >= 64) {
             return 0;
         }
-        addr = sys_work_stack.cur_0x0C;
+        addr = stack->cur_0x0C;
         end = addr + size;
-        if (end > sys_work_stack.top_0x18) {
+        if (end > stack->top_0x18) {
             return 0;
         }
-        sys_work_stack.used_0x10 += size;
-        sys_work_stack.cur_0x0C = end;
-        sys_work_stack.live_0x21[sys_work_stack.count_0x20] = 1;
-        sys_work_stack.addr_0x64[sys_work_stack.count_0x20] = addr;
-        sys_work_stack.size_0x164[sys_work_stack.count_0x20] = size;
-        strcpy(sys_work_stack.name_0x264[sys_work_stack.count_0x20].text, name);
-        sys_work_stack.count_0x20++;
+        stack->used_0x10 += size;
+        stack->cur_0x0C = end;
+        stack->live_0x21[stack->count_0x20] = 1;
+        stack->addr_0x64[stack->count_0x20] = addr;
+        stack->size_0x164[stack->count_0x20] = size;
+        strcpy(stack->name_0x264[stack->count_0x20].text, name);
+        stack->count_0x20++;
         return addr;
     }
-    if (sys_work_stack.top_0x18 - size < sys_work_stack.cur_0x0C) {
+    if (stack->top_0x18 - size < stack->cur_0x0C) {
         return 0;
     }
-    sys_work_stack.used_top_0x1C += size;
-    return sys_work_stack.top_0x18 += size;
+    stack->used_top_0x1C += size;
+    return stack->top_0x18 += size;
 }
 
 /* 0x800CFED8 (0x88): Returns the index of the live work-stack block named `name`, -1 when none. */
 s32 work_stack_find(char* name) {
-    s32 i;
-    SysStackName* entry = sys_work_stack.name_0x264;
-    s32 count = sys_work_stack.count_0x20;
+    SysStack* stack = &sys_work_stack;
+    s32 i = 0;
+    SysStackName* entry = stack->name_0x264;
+    s32 count = stack->count_0x20;
 
-    for (i = 0; i < count; i++, entry++) {
-        if (sys_work_stack.live_0x21[i] != 0 && strcmp(entry->text, name) == 0) {
+    for (; i < count; entry++, i++) {
+        if (stack->live_0x21[i] != 0 && strcmp(entry->text, name) == 0) {
             return i;
         }
     }
@@ -1156,42 +1513,44 @@ s32 work_stack_find(char* name) {
 
 /* 0x800CFF60 (0xAC): Frees work-stack block `index` when it is the last one; 1 when it was. */
 s32 work_stack_free_index(s32 index) {
+    SysStack* stack = &sys_work_stack;
     u8 last;
 
-    if (sys_work_stack.live_0x21[index] == 0) {
+    if (stack->live_0x21[index] == 0) {
         return 0;
     }
-    if ((last = sys_work_stack.count_0x20 - 1) != index) {
+    if (stack->count_0x20 - 1 != index) {
         return 0;
     }
-    sys_work_stack.count_0x20 = last;
-    sys_work_stack.used_0x10 -= sys_work_stack.size_0x164[last];
-    sys_work_stack.cur_0x0C -= sys_work_stack.size_0x164[last];
-    sys_work_stack.live_0x21[last] = 0;
-    sys_work_stack.addr_0x64[sys_work_stack.count_0x20] = 0;
-    sys_work_stack.size_0x164[sys_work_stack.count_0x20] = 0;
-    sys_work_stack.name_0x264[sys_work_stack.count_0x20].text[0] = 0;
+    last = --stack->count_0x20;
+    stack->used_0x10 -= stack->size_0x164[last];
+    stack->cur_0x0C -= stack->size_0x164[last];
+    stack->live_0x21[last] = 0;
+    stack->addr_0x64[stack->count_0x20] = 0;
+    stack->size_0x164[stack->count_0x20] = 0;
+    stack->name_0x264[stack->count_0x20].text[0] = 0;
     return 1;
 }
 
 /* 0x800D000C (0xE0): Frees the work-stack block at `addr` when it is the last one; 1 when it was. */
 s32 work_stack_free(u32 addr) {
+    SysStack* stack = &sys_work_stack;
     s32 i;
     u8 last;
 
-    for (i = 0; i < sys_work_stack.count_0x20; i++) {
-        if (sys_work_stack.live_0x21[i] != 0 && addr == sys_work_stack.addr_0x64[i]) {
-            if (i != sys_work_stack.count_0x20 - 1) {
-                return 0;
+    for (i = 0; i < stack->count_0x20; i++) {
+        if (stack->live_0x21[i] != 0 && addr == stack->addr_0x64[i]) {
+            if (i == stack->count_0x20 - 1) {
+                last = --stack->count_0x20;
+                stack->used_0x10 -= stack->size_0x164[last];
+                stack->cur_0x0C -= stack->size_0x164[last];
+                stack->live_0x21[last] = 0;
+                stack->addr_0x64[stack->count_0x20] = 0;
+                stack->size_0x164[stack->count_0x20] = 0;
+                stack->name_0x264[stack->count_0x20].text[0] = 0;
+                return 1;
             }
-            last = --sys_work_stack.count_0x20;
-            sys_work_stack.used_0x10 -= sys_work_stack.size_0x164[last];
-            sys_work_stack.cur_0x0C -= sys_work_stack.size_0x164[last];
-            sys_work_stack.live_0x21[last] = 0;
-            sys_work_stack.addr_0x64[sys_work_stack.count_0x20] = 0;
-            sys_work_stack.size_0x164[sys_work_stack.count_0x20] = 0;
-            sys_work_stack.name_0x264[sys_work_stack.count_0x20].text[0] = 0;
-            return 1;
+            return 0;
         }
     }
     return 0;
@@ -1222,44 +1581,45 @@ static inline void sys_tex_slot_init(SysTask* slot, TPLPalette* pal, u32 id, u32
 /* 0x800D0110 (0x1B0): Binds palette `pal` and builds its textures into the free slots from `index` (the special
  * slots 0xFD..0xFF take one; slot 5's third texture goes to slot 11), linear-filtered; returns the count built. */
 s32 tex_palette_bind(TPLPalette* pal, s32 index) {
-    SysTask* slot;
+    SystemWork* sw = &system_w;
     s32 built;
-    u32 i;
+    SysTask* slot;
+    s32 i;
 
     TPLBind(pal);
     built = 0;
     switch (index) {
     case 0xFF:
-        slot = &system_w.tex_0x96c[0];
+        slot = &sw->tex_0x96c[0];
         break;
     case 0xFE:
-        slot = &system_w.tex_0x96c[1];
+        slot = &sw->tex_0x96c[1];
         break;
     case 0xFD:
-        slot = &system_w.tex_0x96c[2];
+        slot = &sw->tex_0x96c[2];
         break;
     default:
         if (index >= 0x20) {
             return 0;
         }
-        slot = &system_w.tasks[index];
+        slot = &sw->tasks[index];
         break;
     }
     for (i = 0; i < pal->numDescriptors; i++, slot++) {
-        if ((u32)(index - 0xFD) <= 2) {
-            if (slot->active != 0) {
-                break;
-            }
-        } else {
+        if ((u32)(index - 0xFD) > 2) {
             if (index + i >= 0x20) {
                 break;
             }
             if (slot->active != 0) {
                 continue;
             }
+        } else {
+            if (slot->active != 0) {
+                break;
+            }
         }
         if (index == 5 && i == 2) {
-            slot = &system_w.tasks[11];
+            slot = &sw->tasks[11];
         }
         sys_tex_slot_init(slot, pal, i, 1);
         built++;
@@ -1286,37 +1646,38 @@ s32 fn_800D02C0(TPLPalette* pal, SysTask* slot) {
 
 /* 0x800D03C8 (0x1A0): As `tex_palette_bind` with the special slots 0xFE/0xFF only, point-filtered. */
 s32 tex_palette_bind_point(TPLPalette* pal, s32 index) {
-    SysTask* slot;
+    SystemWork* sw = &system_w;
     s32 built;
-    u32 i;
+    SysTask* slot;
+    s32 i;
 
     TPLBind(pal);
     built = 0;
     if (index == 0xFF) {
-        slot = &system_w.tex_0x96c[0];
+        slot = &sw->tex_0x96c[0];
     } else if (index == 0xFE) {
-        slot = &system_w.tex_0x96c[1];
+        slot = &sw->tex_0x96c[1];
     } else {
         if (index >= 0x20) {
             return 0;
         }
-        slot = &system_w.tasks[index];
+        slot = &sw->tasks[index];
     }
     for (i = 0; i < pal->numDescriptors; i++, slot++) {
-        if (index == 0xFF || index == 0xFE) {
-            if (slot->active != 0) {
-                break;
-            }
-        } else {
+        if (index != 0xFF && index != 0xFE) {
             if (index + i >= 0x20) {
                 break;
             }
             if (slot->active != 0) {
                 continue;
             }
+        } else {
+            if (slot->active != 0) {
+                break;
+            }
         }
         if (index == 5 && i == 2) {
-            slot = &system_w.tasks[11];
+            slot = &sw->tasks[11];
         }
         sys_tex_slot_init(slot, pal, i, 0);
         built++;
@@ -1329,13 +1690,14 @@ s32 tex_palette_bind_point(TPLPalette* pal, s32 index) {
 
 /* 0x800D0618 (0xA0): Frees `count` texture slots from `index`. */
 void tex_slot_free(s32 index, s32 count) {
+    SystemWork* sw = &system_w;
     SysTask* slot;
     s32 i;
 
     if (index >= 0x20) {
         return;
     }
-    slot = &system_w.tasks[index];
+    slot = &sw->tasks[index];
     for (i = 0; i < count; i++, slot++) {
         if (index + i >= 0x20) {
             break;
@@ -1387,50 +1749,598 @@ void loading_disp_reset(u8 mode) {
     u8 count;
     s32 i;
     char path[0x80];
+    f32 half;
 
     disp->shown_0x00 = 0;
     disp->prev_0x01 = 0;
-    disp->field_0x02 = 0;
-    disp->field_0x03 = 0;
+    disp->phase_0x02 = 0;
+    disp->head_0x03 = 0;
     disp->frame_0x06 = 1;
-    disp->field_0x04 = 0;
+    disp->done_0x04 = 0;
     disp->mode_0xA6 = mode;
     disp->text_0xA7[0] = 0;
     pos = sys_loading_pos[system_w.field_0x09];
-    count = sys_loading_counts[system_w.field_0x09];
-    for (i = 0; i < count; i++) {
-        disp->sprite_0x08[i] = sys_loading_sprites[i];
+    for (i = 0; i < sys_loading_counts[system_w.field_0x09]; i++) {
+        disp->angle_0x08[i] = sys_loading_sprites[i];
         disp->x_0x7A[i] = pos[i].x;
-        disp->y_0x90[i] = pos[i].y;
+        disp->y_0x90[i] = sys_loading_pos[system_w.field_0x09][i].y;
         disp->timer_0x64[i] = 0;
     }
-    disp->quad_0x34[0].x = -32.0f;
-    disp->quad_0x34[0].y = -32.0f;
+    half = 32.0f;
+    disp->quad_0x34[0].x = -half;
+    disp->quad_0x34[0].y = -half;
     disp->quad_0x34[0].z = 0.0f;
-    disp->quad_0x34[1].x = 32.0f;
-    disp->quad_0x34[1].y = -32.0f;
+    disp->quad_0x34[1].x = half;
+    disp->quad_0x34[1].y = -half;
     disp->quad_0x34[1].z = 0.0f;
-    disp->quad_0x34[2].x = 32.0f;
-    disp->quad_0x34[2].y = 32.0f;
+    disp->quad_0x34[2].x = half;
+    disp->quad_0x34[2].y = half;
     disp->quad_0x34[2].z = 0.0f;
-    disp->quad_0x34[3].x = -32.0f;
-    disp->quad_0x34[3].y = 32.0f;
+    disp->quad_0x34[3].x = -half;
+    disp->quad_0x34[3].y = half;
     disp->quad_0x34[3].z = 0.0f;
     if (disp->mode_0xA6 != 6) {
         disp->texture_0xD4 = 0x90F08000;
         cnvt_eur_fname(path, (char*)sys_tex_file_table[2].name);
         load_file(path, disp->texture_0xD4, sys_tex_file_table[2].size);
-        TPLtexLoad((void*)disp->texture_0xD4, &disp->tex_0xD8);
+        TPLtexLoad((void*)disp->texture_0xD4, &disp->tex_0xD8[0]);
+    }
+}
+
+/* 0x800D0980 (0x594): Steps the loading display's sprite wave: each sprite in turn hops up and spins, then drops back,
+ * first left to right and then right to left, with a hold between the two passes. */
+void loading_sprite_step(void) {
+    SysLoading* disp = &sys_loading;
+    s32 i;
+    s32 last;
+
+    switch (disp->phase_0x02) {
+    case 0:
+        if ((disp->frame_0x06 & 1) == 0) {
+            if (disp->head_0x03 < (s8)(sys_loading_counts[system_w.field_0x09] - 1)) {
+                disp->head_0x03++;
+            }
+            if (disp->done_0x04 == (s8)sys_loading_counts[system_w.field_0x09]) {
+                disp->phase_0x02 = 1;
+                disp->frame_0x06 = 4;
+                return;
+            }
+        }
+        for (i = 0; i < sys_loading_counts[system_w.field_0x09]; i++) {
+            if (i > disp->head_0x03) {
+                break;
+            }
+            if (i == 0) {
+                switch (disp->timer_0x64[i]) {
+                case 0:
+                case 1:
+                    disp->x_0x7A[i] += 8;
+                    disp->y_0x90[i] -= 8;
+                    disp->angle_0x08[i] += 0x71C;
+                    disp->timer_0x64[i]++;
+                    break;
+                case 2:
+                case 3:
+                    disp->y_0x90[i] += 8;
+                    disp->timer_0x64[i]++;
+                    if (disp->timer_0x64[i] == 4) {
+                        disp->done_0x04++;
+                    }
+                    break;
+                }
+            } else {
+                switch (disp->timer_0x64[i]) {
+                case 0:
+                case 1:
+                    disp->x_0x7A[i] += 8;
+                    disp->y_0x90[i] -= 8;
+                    disp->angle_0x08[i] += 0x71C;
+                    disp->timer_0x64[i]++;
+                    break;
+                case 2:
+                case 3:
+                    disp->y_0x90[i] += 8;
+                    disp->angle_0x08[i] -= 0x71C;
+                    disp->timer_0x64[i]++;
+                    if (disp->timer_0x64[i] == 4) {
+                        disp->done_0x04++;
+                    }
+                    break;
+                }
+            }
+        }
+        disp->frame_0x06++;
+        break;
+    case 1:
+        if (disp->frame_0x06 > 0) {
+            disp->frame_0x06--;
+            return;
+        }
+        disp->head_0x03 = sys_loading_counts[system_w.field_0x09] - 1;
+        disp->phase_0x02 = 2;
+        disp->frame_0x06 = 1;
+        disp->done_0x04 = 0;
+        for (i = 0; i < sys_loading_counts[system_w.field_0x09]; i++) {
+            disp->timer_0x64[i] = 0;
+        }
+        disp->angle_0x08[(s32)sys_loading_counts[system_w.field_0x09] - 1] = 0xE37;
+        break;
+    case 2:
+        if ((disp->frame_0x06 & 1) == 0) {
+            if (disp->head_0x03 > 0) {
+                disp->head_0x03--;
+            }
+            if (disp->done_0x04 == (s8)sys_loading_counts[system_w.field_0x09]) {
+                disp->phase_0x02 = 3;
+                disp->frame_0x06 = 4;
+                return;
+            }
+        }
+        i = sys_loading_counts[system_w.field_0x09] - 1;
+        last = i;
+        for (; i >= 0; i--) {
+            if (i < disp->head_0x03) {
+                break;
+            }
+            if (i == last) {
+                switch (disp->timer_0x64[i]) {
+                case 0:
+                case 1:
+                    disp->x_0x7A[i] -= 8;
+                    disp->y_0x90[i] -= 8;
+                    disp->angle_0x08[i] -= 0x71C;
+                    disp->timer_0x64[i]++;
+                    break;
+                case 2:
+                case 3:
+                    disp->y_0x90[i] += 8;
+                    disp->timer_0x64[i]++;
+                    if (disp->timer_0x64[i] == 4) {
+                        disp->done_0x04++;
+                    }
+                    break;
+                }
+            } else {
+                switch (disp->timer_0x64[i]) {
+                case 0:
+                case 1:
+                    disp->x_0x7A[i] -= 8;
+                    disp->y_0x90[i] -= 8;
+                    disp->angle_0x08[i] -= 0x71C;
+                    disp->timer_0x64[i]++;
+                    break;
+                case 2:
+                case 3:
+                    disp->y_0x90[i] += 8;
+                    disp->angle_0x08[i] += 0x71C;
+                    disp->timer_0x64[i]++;
+                    if (disp->timer_0x64[i] == 4) {
+                        disp->done_0x04++;
+                    }
+                    break;
+                }
+            }
+        }
+        disp->frame_0x06++;
+        break;
+    case 3:
+        if (disp->frame_0x06 > 0) {
+            disp->frame_0x06--;
+            return;
+        }
+        disp->head_0x03 = 0;
+        disp->phase_0x02 = 0;
+        disp->frame_0x06 = 1;
+        disp->done_0x04 = 0;
+        for (i = 0; i < sys_loading_counts[system_w.field_0x09]; i++) {
+            disp->timer_0x64[i] = 0;
+        }
+        disp->angle_0x08[0] = 0xF1C7;
+        break;
+    }
+}
+
+/* 0x800D104C (0x1048): Draws the loading display: the backdrop, the caption frame with its three icons (styles 1-4),
+ * the sprite wave, the pad icons and the caption text. */
+void loading_disp_draw(void) {
+    SysLoading* disp = &sys_loading;
+    SysLoadingRect rect;
+    Mtx44 proj;
+    Mtx view;
+    nw4r::math::VEC3 corner[4];
+    _SPR_DATA_* spr;
+    GXTexObj* obj;
+    GXTlutObj* tlut;
+    SysLoadingUv* uv;
+    char* text;
+    f32 tex_w;
+    f32 tex_h;
+    f32 spr_w;
+    f32 spr_h;
+    f32 base_x;
+    f32 cell_u;
+    f32 cell_v;
+    f32 text_y;
+    f32 px;
+    f32 py;
+    f32 u0;
+    f32 v0;
+    f32 u1;
+    f32 v1;
+    s32 i;
+    s32 j;
+    u8 count;
+
+    VEC3_ctor(&corner[0]);
+    VEC3_ctor(&corner[1]);
+    VEC3_ctor(&corner[2]);
+    VEC3_ctor(&corner[3]);
+    if (disp->shown_0x00 == 0) {
+        return;
+    }
+    if (disp->mode_0xA6 == 6 && fn_800D06E0() == 0) {
+        disp->shown_0x00 = 0;
+        return;
+    }
+    kbd_reset_call();
+    if (system_w.field_0x05 == 0) {
+        loading_sprite_step();
+    }
+    dbg_drawgraph_init();
+    GXSetCopyFilter(0, NULL, 0, NULL);
+    GXInvalidateTexAll();
+    GXSetBlendMode(1, 4, 5, 0);
+    GXSetColorUpdate(1);
+    C_MTXOrtho(proj, 0.0f, Screen_w.height_f, 0.0f, Screen_w.width_f, 0.0f, 1.0f);
+    GXSetProjection(proj, 1);
+    PSMTXIdentity(view);
+    GXLoadPosMtxImm(view, 0);
+    GXSetCurrentMtx(0);
+    GXSetCullMode(0);
+    GXSetZMode(1, 7, 0);
+    GXSetNumTexGens(1);
+    tex_coord_gen_set(0, 1, 4, 0x3C);
+    GXSetNumTevStages(1);
+    GXSetTevDirect(0);
+    GXSetTevOp(0, 0);
+    GXSetTevOrder(0, 0, 0, 4);
+    GXSetNumChans(1);
+    GXSetChanCtrl(4, 0, 0, 1, 0, 0, 2);
+    GXClearVtxDesc();
+    GXSetVtxDesc(9, 1);
+    GXSetVtxDesc(11, 1);
+    GXSetVtxDesc(13, 1);
+    GXSetVtxAttrFmt(0, 9, 0, 3, 0);
+    GXSetVtxAttrFmt(0, 11, 1, 5, 0);
+    GXSetVtxAttrFmt(0, 13, 1, 4, 0);
+    rect.w = 854.0f;
+    rect.h = 480.0f;
+    if ((u32)ck_WideMode() == 1) {
+        rect.x = rect.y = rect.z = 0.0f;
+    } else {
+        rect.x = -107.0f;
+        rect.y = rect.z = 0.0f;
+    }
+    do {
+        if (disp->mode_0xA6 != 6) {
+            tex_w = disp->tex_0xD8[0].width_0x28;
+            tex_h = disp->tex_0xD8[0].height_0x2A;
+            GXLoadTexObj((GXTexObj*)disp->tex_0xD8[0].body, 0);
+        } else {
+            spr = get_lsp_data(0x11C6, NULL);
+            if (spr != NULL) {
+                spr_h = spr_w = 256.0f;
+                drawshape_tex_obj_get(spr->tex_flag, &obj, &tlut);
+                GXLoadTlut(tlut, 0);
+                GXLoadTexObj(obj, 0);
+                break;
+            }
+            tex_w = disp->tex_0xD8[2].width_0x28;
+            tex_h = disp->tex_0xD8[2].height_0x2A;
+            GXLoadTexObj((GXTexObj*)disp->tex_0xD8[2].body, 0);
+        }
+        GXBegin(0x80, 0, 4);
+        fn_800D20B4(rect.x, rect.y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(0.0f, 0.0f);
+        fn_800D20B4(rect.x + rect.w, rect.y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(1.0f, 0.0f);
+        fn_800D20B4(rect.x + rect.w, rect.y + rect.h);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(1.0f, 360.0f / tex_h);
+        fn_800D20B4(rect.x, rect.y + rect.h);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(0.0f, 360.0f / tex_h);
+        system_nop();
+        if ((u8)(disp->mode_0xA6 - 1) <= 3) {
+            rect.w = 320.0f;
+            rect.h = 112.0f;
+            rect.x = (640.0f - rect.w) / 2.0f;
+            rect.y = (480.0f - rect.h) / 2.0f;
+            rect.z = 0.0f;
+            if ((u32)ck_WideMode() == 1) {
+                rect.x += 107.0f;
+            }
+            base_x = rect.x;
+            text_y = 240.0f;
+            cell_u = loading_frame_uv[3].u;
+            cell_v = loading_frame_uv[3].v;
+            u0 = cell_u / tex_w;
+            v0 = cell_v / tex_h;
+            u1 = (cell_u + rect.w) / tex_w;
+            v1 = (cell_v + rect.h) / tex_h;
+            GXSetBlendMode(3, 2, 2, 0);
+            GXBegin(0x80, 0, 4);
+            fn_800D20B4(base_x, rect.y);
+            fn_800D20A8(loading_frame_color);
+            fn_800D2098(u0, v0);
+            fn_800D20B4(base_x + rect.w, rect.y);
+            fn_800D20A8(loading_frame_color);
+            fn_800D2098(u1, v0);
+            fn_800D20B4(base_x + rect.w, rect.y + rect.h);
+            fn_800D20A8(loading_frame_color);
+            fn_800D2098(u1, v1);
+            fn_800D20B4(base_x, rect.y + rect.h);
+            fn_800D20A8(loading_frame_color);
+            fn_800D2098(u0, v1);
+            system_nop();
+            GXSetBlendMode(1, 4, 5, 0);
+
+            rect.w = 88.0f;
+            rect.h = 112.0f;
+            rect.x = base_x - 44.0f;
+            cell_u = loading_frame_uv[0].u;
+            cell_v = loading_frame_uv[0].v;
+            u0 = cell_u / tex_w;
+            v0 = cell_v / tex_h;
+            u1 = (cell_u + rect.w) / tex_w;
+            v1 = (cell_v + rect.h) / tex_h;
+            GXBegin(0x80, 0, 4);
+            fn_800D20B4(rect.x, rect.y);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u0, v0);
+            fn_800D20B4(rect.x + rect.w, rect.y);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u1, v0);
+            fn_800D20B4(rect.x + rect.w, rect.y + rect.h);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u1, v1);
+            fn_800D20B4(rect.x, rect.y + rect.h);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u0, v1);
+            system_nop();
+
+            rect.w = 88.0f;
+            rect.h = 112.0f;
+            rect.x = 320.0f + base_x - 44.0f;
+            cell_u = loading_frame_uv[1].u;
+            cell_v = loading_frame_uv[1].v;
+            u0 = cell_u / tex_w;
+            v0 = cell_v / tex_h;
+            u1 = (cell_u + rect.w) / tex_w;
+            v1 = (cell_v + rect.h) / tex_h;
+            GXBegin(0x80, 0, 4);
+            fn_800D20B4(rect.x, rect.y);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u0, v0);
+            fn_800D20B4(rect.x + rect.w, rect.y);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u1, v0);
+            fn_800D20B4(rect.x + rect.w, rect.y + rect.h);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u1, v1);
+            fn_800D20B4(rect.x, rect.y + rect.h);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u0, v1);
+            system_nop();
+
+            rect.w = 88.0f;
+            rect.h = 112.0f;
+            rect.x = 160.0f + base_x - 44.0f;
+            cell_u = loading_frame_uv[2].u;
+            cell_v = loading_frame_uv[2].v;
+            u0 = cell_u / tex_w;
+            v0 = cell_v / tex_h;
+            u1 = (cell_u + rect.w) / tex_w;
+            v1 = (cell_v + rect.h) / tex_h;
+            GXBegin(0x80, 0, 4);
+            fn_800D20B4(rect.x, rect.y);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u0, v0);
+            fn_800D20B4(rect.x + rect.w, rect.y);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u1, v0);
+            fn_800D20B4(rect.x + rect.w, rect.y + rect.h);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u1, v1);
+            fn_800D20B4(rect.x, rect.y + rect.h);
+            fn_800D20A8(0xFFFFFFFF);
+            fn_800D2098(u0, v1);
+            system_nop();
+        }
+        spr_w = disp->tex_0xD8[1].width_0x28;
+        spr_h = disp->tex_0xD8[1].height_0x2A;
+        GXLoadTexObj((GXTexObj*)disp->tex_0xD8[1].body, 0);
+    } while (0);
+
+    count = sys_loading_counts[system_w.field_0x09];
+    GXBegin(0x80, 0, count * 4);
+    for (i = 0; i < count; i++) {
+        px = disp->x_0x7A[i];
+        py = disp->y_0x90[i];
+        if ((u32)ck_WideMode() == 0) {
+            px -= 160.0f;
+        }
+        uv = &loading_sprite_uv[system_w.field_0x09][i];
+        cell_u = uv->u;
+        cell_v = uv->v;
+        u0 = cell_u / spr_w;
+        v0 = cell_v / spr_h;
+        u1 = (64.0f + cell_u) / spr_w;
+        v1 = (64.0f + cell_v) / spr_h;
+        for (j = 0; j < 4; j++) {
+            copyVec3(&corner[j], &disp->quad_0x34[j]);
+            if (disp->angle_0x08[i] != 0) {
+                rotVecZ(&corner[j], disp->angle_0x08[i]);
+            }
+            corner[j].x += px;
+            corner[j].y += py;
+        }
+        fn_800D20B4(corner[0].x, corner[0].y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u0, v0);
+        fn_800D20B4(corner[1].x, corner[1].y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u1, v0);
+        fn_800D20B4(corner[2].x, corner[2].y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u1, v1);
+        fn_800D20B4(corner[3].x, corner[3].y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u0, v1);
+    }
+    system_nop();
+    if (disp->mode_0xA6 == 6) {
+        g3d_state_invalidate(0x7FF);
+        GXSetNumIndStages(0);
+        return;
+    }
+    if (system_w.field_0x7dc[0] != 0xFF) {
+        loading_pad_icon_draw(0);
+    }
+    if ((u8)(disp->mode_0xA6 - 4) <= 1 && system_w.field_0x7dc[1] != 0xFF) {
+        loading_pad_icon_draw(1);
+    }
+    g3d_state_invalidate(0x7FF);
+    GXSetNumIndStages(0);
+    if ((u8)(disp->mode_0xA6 - 1) <= 3) {
+        if ((u32)ck_WideMode() == 1) {
+            rect.w = 854.0f;
+        } else {
+            rect.w = 640.0f;
+        }
+        if (disp->text_0xA7[0] == 0) {
+            u8** table = get_str_tbl(62);
+
+            if (disp->mode_0xA6 == 1 || disp->mode_0xA6 == 4) {
+                text = (char*)table[0];
+            } else if (disp->mode_0xA6 == 3) {
+                text = (char*)table[3];
+            } else {
+                text = (char*)table[2];
+            }
+        } else {
+            text = disp->text_0xA7;
+        }
+        px = (rect.w - (s32)strlen(text) * 11) * 0.5f;
+        text_y -= 11.0f;
+        flfntSetSize(22, 22);
+        flfntSetPos(px, text_y);
+        flfntSetColor(0xC0C0C0FF);
+        flfntPrintf(text);
+        flfntFlush();
+    }
+}
+
+/* 0x800D2978 (0x3CC): Draws pad `index`'s status icon (its rumble state picks the cell) at the top right of the
+ * loading display. */
+void loading_pad_icon_draw(u8 index) {
+    Mtx44 proj;
+    Mtx view;
+    SysTask* tex = &sys_loading.tex_0xD8[0];
+    u8 cell;
+    f32 tex_w;
+    f32 tex_h;
+    f32 cell_u0;
+    f32 cell_v0;
+    f32 cell_u1;
+    f32 cell_v1;
+    f32 u0;
+    f32 v0;
+    f32 u1;
+    f32 v1;
+    s16 x;
+    s16 y;
+
+    if (tex != NULL) {
+        tex_w = tex->width_0x28;
+        tex_h = tex->height_0x2A;
+        dbg_drawgraph_init();
+        GXSetCopyFilter(0, NULL, 0, NULL);
+        GXInvalidateTexAll();
+        GXSetBlendMode(1, 4, 5, 0);
+        GXSetColorUpdate(1);
+        C_MTXOrtho(proj, 0.0f, Screen_w.height_f, 0.0f, Screen_w.width_f, 0.0f, 1.0f);
+        GXSetProjection(proj, 1);
+        PSMTXIdentity(view);
+        GXLoadPosMtxImm(view, 0);
+        GXSetCurrentMtx(0);
+        GXSetCullMode(0);
+        GXSetZMode(1, 7, 0);
+        GXSetNumTexGens(1);
+        tex_coord_gen_set(0, 1, 4, 0x3C);
+        GXSetNumTevStages(1);
+        GXSetTevDirect(0);
+        GXSetTevOp(0, 0);
+        GXSetTevOrder(0, 0, 0, 4);
+        GXSetNumChans(1);
+        GXSetChanCtrl(4, 0, 0, 1, 0, 0, 2);
+        GXClearVtxDesc();
+        GXSetVtxDesc(9, 1);
+        GXSetVtxDesc(11, 1);
+        GXSetVtxDesc(13, 1);
+        GXSetVtxAttrFmt(0, 9, 0, 3, 0);
+        GXSetVtxAttrFmt(0, 11, 1, 5, 0);
+        GXSetVtxAttrFmt(0, 13, 1, 4, 0);
+        GXLoadTexObj((GXTexObj*)tex->body, 0);
+        cell = system_w.field_0x7dc[index];
+        cell_u0 = loading_pad_icon_uv[cell][0];
+        cell_v0 = loading_pad_icon_uv[cell][1];
+        cell_u1 = loading_pad_icon_uv[cell][2];
+        cell_v1 = loading_pad_icon_uv[cell][3];
+        u0 = cell_u0 / tex_w;
+        v0 = cell_v0 / tex_h;
+        u1 = cell_u1 / tex_w;
+        v1 = cell_v1 / tex_h;
+        if ((u32)ck_WideMode() == 1) {
+            x = 770;
+            y = 47;
+        } else {
+            x = 577;
+            y = 47;
+        }
+        if (index == 1) {
+            y += 48;
+        }
+        GXBegin(0x80, 0, 4);
+        fn_800D20B4(x, y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u0, v0);
+        fn_800D20B4(x + 32, y);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u1, v0);
+        fn_800D20B4(x + 32, y + 32);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u1, v1);
+        fn_800D20B4(x, y + 32);
+        fn_800D20A8(0xFFFFFFFF);
+        fn_800D2098(u0, v1);
+        system_nop();
     }
 }
 
 /* 0x800CFC64 (0x9C): Arms the two stream bounds below the resident file, frees texture slots 5..6 and 8, and loads
  * the common texture file into slot 8. */
 void fn_800CFC64(void) {
-    u32 end = system_w.field_0x4c + system_w.field_0x50 - 0xA900;
+    SystemWork* sw = &system_w;
+    u32 end = sw->field_0x4c + sw->field_0x50;
 
-    system_w.field_0x878 = end -= lbl_80791358[0];
-    system_w.field_0x87c = end - lbl_80791358[1];
+    end -= 0xA900;
+    end -= lbl_80791358[0];
+    sw->field_0x878 = end;
+    end -= lbl_80791358[1];
+    sw->field_0x87c = end;
     tex_slot_free(5, 2);
     tex_slot_free(8, 1);
     load_file(sys_common_tex_path, 0x90348000, 0x322C0);
@@ -1456,7 +2366,7 @@ u16 ran_suu(long index) {
     if (v == 0) {
         v = 1;
     }
-    v = (v * 0xB0) % 0xAD;
+    v = (v * 0xB0) % 0xFF53;
     system_w.field_0x18[index] = (u16)v;
     return (u16)v;
 }
@@ -1546,13 +2456,14 @@ void hbm_enable(void) {
 
 /* 0x800CF7A8 - aligned work-heap allocation. */
 void* work_mem_alloc(u32 size) {
+    SystemWork* sw = &system_w;
     void* p;
 
     if (size == 0) {
         return 0;
     }
-    p = MEMAllocFromAllocator(&system_w.mem_allocator, (size + 0x1F) & ~0x1F);
-    system_w.field_0x68 = fn_800CF61C(system_w.field_0x90);
+    p = MEMAllocFromAllocator(&sw->mem_allocator, (size + 0x1F) & ~0x1F);
+    sw->field_0x68 = fn_800CF61C(sw->field_0x90);
     return p;
 }
 
@@ -1618,8 +2529,6 @@ BOOL file_loading_ck(char* path, long* frames) {
     return TRUE;
 }
 
-#pragma push
-#pragma peephole off
 /* 0x800CEAB0 (0x1B4): Queues a background load of `path` into `buffer` (`size` bytes) with the completion callback
  * and up to 16 of its arguments; 0 when the request is invalid or the queue is full. */
 BOOL load_file_req(char* path, unsigned long buffer, long size, unsigned long callback, long argc,
@@ -1659,7 +2568,6 @@ BOOL load_file_req(char* path, unsigned long buffer, long size, unsigned long ca
     }
     return TRUE;
 }
-#pragma pop
 
 /* 0x800CEC64 (0xAC): Loads `path` into `buffer` at once (the buffer must hold the 32-byte-rounded file); returns the
  * bytes read, 0 on failure. */
@@ -1706,8 +2614,6 @@ s32 TPLtexLoad(void* data, _tex_info* info) {
     return fn_800D02C0((TPLPalette*)data, info);
 }
 
-#pragma push
-#pragma peephole off
 /* 0x800D0F14 (0xB8): Shows (`on`) or hides the loading display in style `mode` (rebuilding its sprites when it
  * appears) and re-arms both pad motors. */
 void loading_disp_set(u8 on, u8 mode) {
@@ -1733,9 +2639,11 @@ void loading_disp_set(u8 on, u8 mode) {
     fn_800D2954(0);
     fn_800D2954(1);
 }
-#pragma pop
 
 /* 0x800D2E34 (0x34): Returns string table `index` of the message tables. */
 u8** get_str_tbl(long index) {
     return ((u8***)get_str_tbl_ptr())[index];
 }
+
+/* The static initialiser calls the display's constructor out of line, as retail does. */
+#pragma dont_inline on

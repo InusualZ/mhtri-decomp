@@ -74,6 +74,9 @@ void draw_shape_reset(void);
  * with (added with `menu/menu_infomation.cpp`'s sharpness bar). */
 void drawshape_set_color_array(const u32* colors);
 void drawshape_set_scale_ivec2(const s16* offset, const f32* scale);
+/* 0x80054C74 - initialises the GX texture (and TLUT) object of slot `id` and returns both (added with the
+ * `ef/system_core.cpp` loading display's draw). */
+void drawshape_tex_obj_get(u16 id, struct _GXTexObj** out_tex, struct _GXTlutObj** out_tlut);
 
 /* One map kind's population files: the place file and the free-hunt file.  size: 0x10 */
 typedef struct EmPopResFiles {
