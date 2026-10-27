@@ -68,7 +68,7 @@
  * required and measured: without it the unit is 59/62, because the peephole pass fuses
  * `clrlwi`+`slwi` into `clrlslwi` and `clrlwi`+`srwi` into `extrwi` where retail carries the pairs
  * unfused (`fn_800EFD88` 26.25 -> 100.00, `snd_area_bank_load` 71.00 -> 83.86, `set_SE_volume__FUc`
- * 76.53 -> 81.53, `fn_800F298C` 70.00 -> 83.33, `fn_800F0C74` 75.41 -> 100.00,
+ * 76.53 -> 81.53, `snd_stream_bgm_flag_get` 70.00 -> 83.33, `fn_800F0C74` 75.41 -> 100.00,
  * `get_em_se_bank__FUc` 75.63 -> 82.00, `fn_800F2A1C` 93.65 -> 100.00).  Retail is peephole-off in
  * this band, exactly as `sound/fn_800E46E8.cpp` records, so the pragma is a stand-in for the
  * per-unit `-opt nopeephole` cflags group the outbox requests.
@@ -393,9 +393,9 @@ extern "C" u16 fn_800F284C(u32 arg0);
 extern "C" s32 fn_800F2890(u32 arg0, s32 arg1);
 extern "C" u32 fn_800F2900(void);
 extern "C" u16 fn_800F2924(s32 arg0, s32 arg1);
-extern "C" u8 fn_800F298C(void);
+extern "C" u8 snd_stream_bgm_flag_get(void);
 extern "C" void fn_800F2A1C(u8 volume, u8 is_bgm);
-extern "C" u8 fn_800F2A84(void);
+extern "C" u8 snd_bgm_loading_get(void);
 
 void title_snd_init(void);
 void system_se_load(void);
@@ -1780,7 +1780,7 @@ extern "C" u16 fn_800F2924(s32 arg0, s32 arg1)
     return v->loop_len;
 }
 
-extern "C" u8 fn_800F298C(void)
+extern "C" u8 snd_stream_bgm_flag_get(void)
 {
     return fn_800F2924(0, 0) == 0;
 }
@@ -1809,7 +1809,7 @@ extern "C" void fn_800F2A1C(u8 volume, u8 is_bgm)
     fn_800E4908(is_bgm, v);
 }
 
-extern "C" u8 fn_800F2A84(void)
+extern "C" u8 snd_bgm_loading_get(void)
 {
     return lbl_80794A2C->bgm_loading_2;
 }

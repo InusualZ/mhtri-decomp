@@ -437,7 +437,7 @@ extern "C" s32 fn_8021B8F4(s32 type, s32 value) {
 }
 
 /* Whether the menu-state block's first flag bit is set. */
-extern "C" s32 fn_8021B91C(void) {
+extern "C" s32 lb_special_bgm_ck(void) {
     LbMenuState* work = &lbl_806AA790;
     u8 slot_set;
 

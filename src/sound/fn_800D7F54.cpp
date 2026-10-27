@@ -2595,7 +2595,7 @@ extern "C" f32 lbl_807963F0;
 extern "C" f32 lbl_807963F4;
 extern "C" f32 lbl_807963F8;
 extern "C" f32 lbl_80597260[];
-extern "C" u8* lbl_805971F8[16];
+extern "C" u8* se_volume_curve_tbl[16];
 extern "C" _se_w* lbl_80794978;
 
 /* ---------------------------------------------------------------------------------------------------
@@ -2879,7 +2879,7 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
             params[1] = 15;
         }
         f32 near = lbl_80597260[params[0]];
-        u8* volumes = lbl_805971F8[params[1]] + mode * 100;
+        u8* volumes = se_volume_curve_tbl[params[1]] + mode * 100;
         f32 dist;
 
         if (PlayMode_ck() == 2) {

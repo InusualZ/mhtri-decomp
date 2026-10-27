@@ -102,13 +102,13 @@ void lb_item_list_select(s32 selected)
 }
 
 /* True on the frame the selection changed. */
-s32 fn_8021F27C(void)
+s32 lb_item_list_done_ck(void)
 {
     return lb_item_list_state.changed_0x3C - 1 == 0;
 }
 
 /* Acknowledges the selection change. */
-void fn_8021F298(void)
+void lb_item_list_done_clear(void)
 {
     lb_item_list_state.changed_0x3C = 0;
 }

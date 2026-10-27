@@ -290,7 +290,7 @@ extern "C" void fn_800E4908(u8 is_bgm, f32 vol)
 }
 
 /* The current bgm volume. */
-extern "C" f32 fn_800E492C(void)
+extern "C" f32 snd_bgm_fade_level_get(void)
 {
     return lbl_807949B8.cur;
 }
@@ -453,7 +453,7 @@ void PlayStream(u32 a, u32 b)
 }
 
 /* Stops the stream on the given bank, with interrupts off. */
-extern "C" void fn_800E4D00(u32 a, u32 b)
+extern "C" void stream_cmd_play_locked(u32 a, u32 b)
 {
     u32 level = OSDisableInterrupts();
     stream_play_cmd(stream_mgr_get(), a, b, 0);
