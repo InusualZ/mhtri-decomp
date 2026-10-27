@@ -902,7 +902,8 @@ config.libs = [
             Object(Matching, "Runtime.PPCEABI.H/CPlusLibPPC.cpp"),
             Object(Matching, "Runtime.PPCEABI.H/runtime.cpp"),
             # The MSL C library run recut by file (unit headers of src/MSL_C/*.c carry the evidence).
-            Object(NonMatching, "Runtime.PPCEABI.H/ExceptionPPC.cp"),
+            # Metrowerks' Gecko exception runtime (one TU, .cp resolved as C++): see the unit header.
+            Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
             Object(NonMatching, "MSL_C/GCN_Mem_Alloc.c"),
             Object(NonMatching, "MSL_C/alloc.cpp"),
             Object(Matching, "MSL_C/ansi_files.c"),
@@ -952,8 +953,6 @@ config.libs = [
             Object(Matching, "MSL/s_modf.cpp"),
             Object(Matching, "MSL/s_sin.cpp"),
             Object(Matching, "Runtime.PPCEABI.H/ptmf.c"),
-            # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
-            Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
             Object(Matching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
             # The .init runtime, in the order the retail section lays it out. memcpy.c is the provisional
             # half of MSL's __mem.o (the other half is memset.c, already at 100 %); making them one file

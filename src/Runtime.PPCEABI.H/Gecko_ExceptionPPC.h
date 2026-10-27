@@ -1,6 +1,6 @@
 /*
- * Declarations of `src/Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp` (the Gecko exception-table walkers): the
- * exception-table record layouts, the action records and the two walkers `ExceptionPPC.cp`'s unwinder calls.
+ * Types of `src/Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp` (MSL's Gecko C++ exception runtime): the
+ * exception-table record layouts and the action records its walkers and unwinder read.
  */
 #ifndef MHTRI_RUNTIME_PPCEABI_H_GECKO_EXCEPTIONPPC_H
 #define MHTRI_RUNTIME_PPCEABI_H_GECKO_EXCEPTIONPPC_H
@@ -247,11 +247,5 @@ typedef struct ex_specification {
     s32 cinfo_ref;        /* +0x08 */
     char* spec[];         /* +0x0C */
 } ex_specification;
-
-/* 0x8045759C (0x1B0): finds the exception record and action pointer covering `returnaddr`. */
-void ExPPC_FindExceptionRecord(char* returnaddr, MWExceptionInfo* info);
-
-/* 0x8045774C (0x1B0): steps the action iterator to the next action, unwinding frames as needed. */
-exaction_type ExPPC_NextAction(ActionIterator* iter);
 
 #endif /* MHTRI_RUNTIME_PPCEABI_H_GECKO_EXCEPTIONPPC_H */
