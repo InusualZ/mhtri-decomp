@@ -23,17 +23,16 @@
  *   foreign (registry): `pl_ryugeki_se_req`, `pl_act4_phase_ck`, `se_combo_mix_req`, `se_combo_result_req`,
  *   `menu_combo_list_open`, `menu_combo_list_step`, `pl_weapon_drawn_ck`.
  * RESIDUALS. Every row is written.  The rows short of 100 %, by cause:
- *  - `menu_equip_entries_update`: register allocation of the slot/cell pair (r22/r24) once the level-4 switch matches;
- *  - argument evaluation order: retail computes the count, the `!= 0xFFFF` flag and `focused` in argument order, ours
- *    loads `pos`/`item` first (`menu_sel_pair_draw`; locals for all three measured worse);
- *  - a byte prompt index retail re-extends with `extsb` at its compare and at `get_menu_msg` (`menu_equip_panel_draw`,
- *    `menu_page02_draw`, `menu_page02_step`'s last case), and `li` placement around it (level 4 changes nothing
- *    in the other open rows);
- *  - register allocation only (`menu_item_cell_draw` keeps `pos` in r28, `eft043_start`/`eft043_move` swap the loop
- *    registers, `menu_sel_cursor_confirm_step` r30/r31, `menu_sel_tabs_build` r30/r31, `menu_sel_cursor_status_update`
- *    the `clrlwi` of `userdata_box_capacity`'s result);
- *  - `menu_sel_cursor_result_draw`: retail compares `mode_0x16 == 2` with `cmpwi`, and builds the digit colour as
- *    `-1 & mask`; `menu_sel_cursor_confirm_draw`: one `extsh` ours adds to the window offset.
+ *  - `menu_sel_pair_draw`: retail computes the count, the `!= 0xFFFF` flag and `focused` before `&pos`/`item`; our
+ *    frontend substitutes `focused` into the call and evaluates `&pos`/`item` first (mwcc-debugger dump 03
+ *    after-unreachable-block-deletion already has that order; locals, in-call expressions, statement orders,
+ *    `optimization_level 2/4`, `opt_common_subs`/`opt_code_motion off` all measured equal or worse);
+ *  - `menu_item_cell_draw`: retail evaluates `&spr` before the `count < 10` digit-layout branch (the id substituted
+ *    into the call); ours keeps `id` as a statement (dump 03), and an in-call ternary turns branchless;
+ *  - a byte prompt index retail re-extends with `extsb` at its compare and at `get_menu_msg`, with its `li` scheduled
+ *    after the compare (`menu_equip_panel_draw`, `menu_page02_draw`); our extsb dies in constant propagation (dump
+ *    05) because every def is a constant, and `s32`/`char` prompts and ternaries (branchless) measured worse;
+ *  - `menu_sel_tabs_build`: the hoisted 0/1 constants take r31/r30 where retail has r30/r31.
  *   flipcheck: `.sdata` 0x22 of 0x28 and the eft043 data shifted by the seam padding; `.text` 4 bytes long; foreign
  *   names `pl_ryugeki_se_req`, `pl_act4_phase_ck`, `se_combo_mix_req`, `se_combo_result_req`, `menu_combo_list_step`
  *   wait for the registry batch.
@@ -128,7 +127,7 @@ void menu_sel_cursor_init(MenuSelCursor* cur, u8 kind, MenuSel* owner);
 void menu_sel_cursor_first_set(MenuSelCursor* cur, u16 slot, u16 item);
 u32 menu_sel_cursor_second_set(MenuSelCursor* cur, u16 slot, u16 item);
 u32 menu_sel_cursor_status_update(MenuSelCursor* cur);
-s32 menu_sel_cursor_confirm_step(MenuSelCursor* cur, s32* flag, u16 a, u16 b, u16 c);
+s32 menu_sel_cursor_confirm_step(MenuSelCursor* cur, s32* flag, u16 hold, u16 repeat, u16 trig);
 void menu_sel_cursor_combine_start(MenuSelCursor* cur, u8 which);
 u32 menu_sel_cursor_combine_step(MenuSelCursor* cur, u16 trig, u16 hold);
 void menu_sel_cursor_apply_start(MenuSelCursor* cur);
@@ -188,9 +187,9 @@ extern "C" s32 menu_equip_panel_step(MenuSel* self) {
             break;
         }
         if (keys & 0x10) {
-            slot = self->sel_0x1A2 + self->count_0x1A3 * self->col_0x1A0;
-            if (menu_sel_pair_resolve(self, slot, cur->slot_a_0x08) != 0) {
-                if (menu_sel_cursor_second_set(cur, slot, menu_slot_get(self, slot)[0]) == 1) {
+            u16 second = self->sel_0x1A2 + self->count_0x1A3 * self->col_0x1A0;
+            if (menu_sel_pair_resolve(self, second, cur->slot_a_0x08) != 0) {
+                if (menu_sel_cursor_second_set(cur, second, menu_slot_get(self, second)[0]) == 1) {
                     self->flag_0x18C = 0;
                     if (menu_sel_cursor_status_update(cur) == 0) {
                         self->flag_0x18C = 1;
@@ -343,12 +342,14 @@ extern "C" s32 menu_item_two_page_store(u16 id, IdValue* a, IdValue* b) {
 #pragma optimization_level 4
 /* 0x8031AE38 (0x248): refreshes the colours and availability of the eight visible entries for the panel's state. */
 extern "C" void menu_equip_entries_update(MenuSel* self) {
-    s16 slot = (s8)self->count_0x1A3 * (s8)self->col_0x1A0;
-    s16 index = slot;
     MenuSelEntry* cell;
+    s16 index;
+    s16 slot;
     s32 i;
     u16* rec;
 
+    slot = (s8)self->count_0x1A3 * (s8)self->col_0x1A0;
+    index = slot;
     if (menu_slot_index_is_page_b((MenuSlot*)self, slot) != 0) {
         slot -= 0x18;
     }
@@ -511,12 +512,14 @@ extern "C" void menu_shared_slot_id_clear(s16 idx) {
 extern "C" void menu_sel_window_reset(MenuSel* self) {
     MenuSelEntry* cell = self->entries_b_0x06C;
     s16 slot = (s16)((s8)self->col_0x1A0 * (s8)self->count_0x1A3);
-    for (s32 i = 0; i < (s8)self->count_0x1A3; i++) {
+    s32 i = 0;
+    while (i < (s8)self->count_0x1A3) {
         cell->available_0x02 = 1;
         cell->slot_0x06 = slot;
         cell->color_a_0x0C = 0;
-        slot++;
+        i++;
         cell++;
+        slot++;
     }
 }
 
@@ -792,9 +795,9 @@ extern "C" s32 menu_page02_step(MenuSel* self) {
             }
             sysSE_req(1);
         } else if (keys & 0x10) {
-            if (list->entries_b_0x06C[list->list_row_0x1A7].available_0x02 != 0) {
+            if ((s8)list->entries_b_0x06C[(u8)list->list_row_0x1A7].available_0x02 != 0) {
                 menu_shared_slot_id_set(self->entries_b_0x06C[self->sel_0x1A2].slot_0x06,
-                                        list->entries_b_0x06C[list->list_row_0x1A7].slot_0x06);
+                                        list->entries_b_0x06C[(u8)list->list_row_0x1A7].slot_0x06);
                 self->state_0x001 = 0;
                 sysSE_req(0);
                 menu_sel_window_build(self);
@@ -963,7 +966,7 @@ extern "C" u32 menu_sel_cursor_status_update(MenuSelCursor* cur) {
                 room = menu_item_two_page_store(cur->record_0x00->result_0x02, owner->page_a_0x194, owner->page_b_0x198);
             } else {
                 room = item_slots_room_get(cur->record_0x00->result_0x02, lobby_world_block->box_0x0180,
-                                           userdata_box_capacity((u8*)lobby_world_block));
+                                           (u16)userdata_box_capacity((u8*)lobby_world_block));
             }
             if (cur->kind_0x0E <= 1 && room == 0) {
                 cur->status_0x10 = 0;
@@ -1019,18 +1022,16 @@ extern "C" s32 menu_sel_cursor_repeat_tick(MenuSelCursor* cur, u16 trig, u16 hol
     return 0;
 }
 
-extern "C" s32 menu_sel_cursor_confirm_step(MenuSelCursor* cur, s32* flag, u16 a, u16 b, u16 c) {
-    u32 r = (u32)menu_sel_cursor_hold_tick(cur, a);
-    if (r == 1 || (b & 0x30)) {
-        if ((r != 0 || (b & 0x10)) && *flag == 0) return 1;
-        if ((b & 0x20) || ((b & 0x10) && *flag == 1)) {
+extern "C" s32 menu_sel_cursor_confirm_step(MenuSelCursor* cur, s32* flag, u16 hold, u16 repeat, u16 trig) {
+    u32 r = (u32)menu_sel_cursor_hold_tick(cur, hold);
+    if (r == 1 || (trig & 0x30)) {
+        if ((r != 0 || (trig & 0x10)) && *flag == 0) return 1;
+        if ((trig & 0x20) || ((trig & 0x10) && *flag == 1)) {
             sysSE_req(1);
             return 2;
         }
-        return 0;
-    }
-    if (cur->status_0x10 < 0 && (c & 3)) {
-        *flag = menu_cursor_step(*flag, 2, c, 1, 2);
+    } else if (cur->status_0x10 < 0 && (repeat & 3)) {
+        *flag = menu_cursor_step(*flag, 2, repeat, 1, 2);
     }
     return 0;
 }
@@ -1284,7 +1285,8 @@ extern "C" void menu_sel_cursor_result_draw(MenuSelCursor* cur, const u16* lsp_i
         draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x40), &pos);
         sprite_frame_apply(&spr, 0x3B6, cur->blend_0x21, NULL);
         if (cur->flag_0x11 != 0) {
-            sprintf(text, (char*)strs[0], lb_combo_rate_get((LbComboRecipe*)cur->record_0x00, cur->kind_0x0E == 2 ? 2 : 0,
+            LbComboRecipe* rec = (LbComboRecipe*)cur->record_0x00;
+            sprintf(text, (char*)strs[0], lb_combo_rate_get(rec, cur->kind_0x0E == 2 ? 2 : 0,
                                                             cur->kind_0x0E));
         } else {
             sprintf(text, (char*)strs[1]);
@@ -1306,7 +1308,8 @@ extern "C" void menu_sel_cursor_result_draw(MenuSelCursor* cur, const u16* lsp_i
     if (cur->record_0x00 != NULL) {
         item = cur->record_0x00->result_0x02;
     }
-    if (cur->mode_0x16 == 2) {
+    switch (cur->mode_0x16) {
+    case 2:
         if (cur->value_0x0C != 0x178) {
             if (cur->flag_0x12 != 0) {
                 get_lsp_data(lsp_ids[4], &num);
@@ -1323,6 +1326,7 @@ extern "C" void menu_sel_cursor_result_draw(MenuSelCursor* cur, const u16* lsp_i
         sprintf(text, menu_sel_count_fmt, cur->anim_0x15);
         draw_font_idx(0x394, (s8*)text, 1, &base);
         item = cur->value_0x0C;
+        break;
     }
     if (cur->flag_0x11 != 0) {
         draw_itemicon_item_id_idx(0x3B1, item, &pos);
@@ -1335,18 +1339,21 @@ extern "C" void menu_sel_cursor_result_draw(MenuSelCursor* cur, const u16* lsp_i
     case 0:
     case 1:
         draw_sprite_idx(0x3B9, &num);
+        {
+        MenuSel* owner = cur->owner_0x1C;
         if (cur->flag_0x11 != 0) {
-            count = menu_item_two_page_count(item, cur->owner_0x1C->page_a_0x194, cur->owner_0x1C->page_b_0x198);
+            count = menu_item_two_page_count(item, owner->page_a_0x194, owner->page_b_0x198);
             draw_number_2digit_anim_ary((const u16*)get_menu_lsp_tbl(0x3E), cur->counter_0x22, count, 0, &num);
             max = GetItemData(item)->max_num_0x003;
             draw_number_2digit_ary((const u16*)get_menu_lsp_tbl(0x3F), max, 0, &num);
+        }
         }
         break;
     case 2:
         draw_sprite_idx(0x3BA, &num);
         if (cur->flag_0x11 != 0) {
             get_lsp_data(lsp_ids[7], &num);
-            color = cur->counter_0x22 == 1 ? -1 : 0;
+            color = cur->counter_0x22 == 1 ? 0xFFFFFFFF : 0;
             draw_number_digits_ary(menu_sel_box_digit_ids,
                                    item_slots_count_sum(item, lobby_world_block->box_0x0180,
                                                         userdata_box_capacity((u8*)lobby_world_block)),
@@ -1364,7 +1371,7 @@ extern "C" void menu_sel_cursor_confirm_draw(MenuSelCursor* cur, s32 sel, u16 ls
     _mh_ivec2_ offset;
 
     get_lsp_data(lsp_id, &pos);
-    offset.x = cur->status_0x10 < 0 ? 0 : 10;
+    offset.x = cur->status_0x10 < 0 ? (s16)0 : (s16)10;
     offset.y = 0;
     menu_select_window_draw(sel, 2, (s8*)get_menu_msg_tbl(0x27), &pos, &offset);
 }
@@ -1467,12 +1474,12 @@ extern "C" void eft043_dispatch(_EFT* self) {
 
 /* 0x8031D3B4 (0x280): creates the pool's effects, places type 0 on the player's joint 7 and steps once. */
 extern "C" void eft043_start(_EFT* self) {
+    s32 i;
     Eft043Work* work = (Eft043Work*)self->work_0x38;
     _PLW* plw = (_PLW*)self->source_0x30;
     nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 ofs;
     nw4r::math::VEC3 dir;
-    s32 i;
 
     MTX34_ctor(&mtx);
     VEC3_ctor(&ofs);
@@ -1542,8 +1549,8 @@ extern "C" void eft043_move(_EFT* self) {
     nw4r::math::VEC3 scale;
     _PLW* plw;
     Eft043Work* work;
-    nw4r::ef::EffectSystem* system;
     s32 i;
+    nw4r::ef::EffectSystem* system;
 
     MTX34_ctor(&mtx);
     VEC3_ctor(&ofs);
