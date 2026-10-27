@@ -33,6 +33,12 @@ skip cases, eight 64-quake cases and a 0-quake default sharing one hit-latch tai
 duplicated); `pl_weapon2_alt_act_charge` 91.19 -> 100 % (640 B; the duplicated hold tail was 688 B).
 Also when retail's single copy sits *mid-switch* (reached by branches into a sibling case, idea 213): `lobby/lb_pane_ui`
 `lobby_enter_seq_step` 85.20 -> 89.54 and `lobby_scene_setup_step` 84.88 -> 89.31 with the block moved after the switch.
+`lobby/lb_npc` (Wii/1.3, -O4 by pragma): `lb_player_control` 93.76 -> 99.03 % (1884 -> 1840 B, the target's size;
+the do-while wraps a whole `if`/`else if` chain - the success paths `continue` past the shared
+`lb_act_armed_reenter` call, the failing spot cases `idle = 0; break;` into the post-switch idle test, and the
+`else` arms fall through to the one reenter call; a 3-state flag measured 92.15); `lb_player_remote_follow`
+82.26 -> 98.82 % (a nested case - family 1's act 3 - `break`s into the walk block written once after both
+switches, the other cases `continue`; idea 218 is the rest).
 
 **Example.**
 

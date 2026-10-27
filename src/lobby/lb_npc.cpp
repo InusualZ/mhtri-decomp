@@ -75,9 +75,13 @@
  *   class form needs `_LB_NPC` +0x54 modelled as a `LbNpcChar` member and the `VEC3` constructor calls
  *   (`VEC3_ctor`) as member construction, so the `.ctors` word and both vtables stay unemitted.
  *   18 rows below 100 (`python tools/objdiff/unitscore.py lobby/lb_npc --threshold 100`); the recorded causes:
- *  - `lb_player_control`, `lb_player_remote_follow`, `lb_arm_wrestle_step`: retail jumps from several switch cases
- *    into one shared block (the failed spot cases into the post-switch idle test; family 1's case 3 into family 0's
- *    walk block); without `goto` (rule 8) ours keeps flags or a second copy of the block;
+ *  - `lb_arm_wrestle_step`: the opponent search's found path branches to the post-switch `step == 3` test where ours
+ *    `return`s to the epilogue (one branch target); no goto-free spelling reaches it (playbook 217: MWCC threads no
+ *    flag or inlined return, the flag's `li`/`cmpi` survive every backend pass);
+ *  - `lb_player_control`: `self` and `spot` take r31/r30 the other way round (the allocator colours `self` first,
+ *    57 interferences against `spot`'s 31; declaration orders tried);
+ *  - `lb_player_remote_follow`: the family-0 `return` group leaves a dead `b` to the epilogue after the compare tree
+ *    and a `b` over it (playbook 218; the goto spelling of the function has the same two branches);
  *  - `lb_npc_act_set`, `fn_801FC810`: retail stores a `ran_suu` result into a halfword with no `clrlwi`/`extsh`;
  *    that needs a `u16` return on the declaration, which costs `fn_80203664` and `fn_80203A24` their match;
  *  - `lb_shop_sell_commit`: retail loads the row's price before the count; ours hoists the count load;
@@ -113,7 +117,11 @@
  *   parameter is `u32` narrowed with `(u8)`/`(u16)` at the use where retail keeps the `clrlwi`; `s32 id = (u16)x`
  *   where retail compares signed; a one-case `switch` on a byte where retail keeps `cmpwi`.  The order of the
  *   leading local declarations is chosen per function for retail's saved-register colouring, and the player
- *   rows take the rig's first model (`&rig->models_0x004[0].model`) into a local up front.
+ *   rows take the rig's first model (`&rig->models_0x004[0].model`) into a local up front.  A shared block that some
+ *   switch cases skip is a `do { } while (0)` whose skipping paths `continue` (playbook 183: `lb_player_control`'s
+ *   reenter call, `lb_player_remote_follow`'s walk block); `lb_arm_wrestle_step` reads `lobby_w` through a pointer
+ *   local (retail keeps its address in r31, playbook 214) and narrows its `u16` loop bound in the condition
+ *   (playbook 216); `checkOwnInvite` and `lb_cmd_pressed_ck` results compare as `(u32)` where retail has `cmplwi`.
  */
 #pragma optimization_level 4
 #include "types.h"
@@ -10320,142 +10328,142 @@ void lb_player_control(_PLW* self)
                 lb_npc_act_set(self, 1, 0, 0);
             }
         }
-        if ((lobby_w.state_0x000 == 0 || lobby_w.state_0x000 == 10) && menu_busy_ck() == 0 &&
-            lb_cmd_pressed_ck(0x10) != 0) {
-            _LB_NPC* npc = lb_target_npc_get();
-            struct LbPlSearch* search = lb_plsearch_target_get();
-            LbSpot* spot = lb_spot_cur_get();
-            LbPlaceRec* place = lb_place_rec_get();
-            u8 family = self->field_0x00A;
-            u16 act = self->act_no;
+        do {
+            if ((lobby_w.state_0x000 == 0 || lobby_w.state_0x000 == 10) && menu_busy_ck() == 0 &&
+                lb_cmd_pressed_ck(0x10) != 0) {
+                LbSpot* spot;
+                _LB_NPC* npc = lb_target_npc_get();
+                struct LbPlSearch* search = lb_plsearch_target_get();
+                LbPlaceRec* place;
+                u8 family;
+                u16 act;
 
-            if (npc != 0) {
-                if (family != 0 || act != 0) {
-                    lb_npc_act_req(self, 0, 0, (u16)0x8000);
-                }
-                lb_player_npc_talk_start(self, npc);
-            } else if (search != 0) {
-                lb_plsearch_open(search);
-                lb_act_armed_reenter(self);
-            } else if (spot != 0) {
-                s32 idle = 1;
-                s32 used = 1;
+                spot = lb_spot_cur_get();
+                place = lb_place_rec_get();
+                family = self->field_0x00A;
+                act = self->act_no;
 
-                switch (spot->kind_0x00) {
-                case 11:
-                case 15:
-                    lb_player_latch_release(self);
-                    lb_city_select_open(self, spot->kind_0x00);
-                    break;
-                case 10:
-                    lb_server_select_open(self);
-                    break;
-                case 1:
-                    if (self->field_0xB03 == 0) {
+
+                if (npc != 0) {
+                    if (family != 0 || act != 0) {
+                        lb_npc_act_req(self, 0, 0, (u16)0x8000);
+                    }
+                    lb_player_npc_talk_start(self, npc);
+                    continue;
+                } else if (search != 0) {
+                    lb_plsearch_open(search);
+                } else if (spot != 0) {
+                    s32 idle = 1;
+
+                    switch (spot->kind_0x00) {
+                    case 11:
+                    case 15:
                         lb_player_latch_release(self);
-                        lb_talk_screen_open(self, 0);
+                        lb_city_select_open(self, spot->kind_0x00);
+                        continue;
+                    case 10:
+                        lb_server_select_open(self);
+                        continue;
+                    case 1:
+                        if (self->field_0xB03 == 0) {
+                            lb_player_latch_release(self);
+                            lb_talk_screen_open(self, 0);
+                            continue;
+                        }
+                        idle = 0;
                         break;
-                    }
-                    idle = 0;
-                    used = 0;
-                    break;
-                case 9:
-                    lb_player_latch_release(self);
-                    lb_talk_screen_open(self, 1);
-                    break;
-                case 6:
-                    if (self->field_0xB03 == 0) {
+                    case 9:
                         lb_player_latch_release(self);
-                        lb_spot_screen_open(self, spot);
+                        lb_talk_screen_open(self, 1);
+                        continue;
+                    case 6:
+                        if (self->field_0xB03 == 0) {
+                            lb_player_latch_release(self);
+                            lb_spot_screen_open(self, spot);
+                            continue;
+                        }
+                        idle = 0;
                         break;
-                    }
-                    idle = 0;
-                    used = 0;
-                    break;
-                case 12:
-                    lb_pop_screen_open(self);
-                    break;
-                case 7:
-                    lb_player_latch_release(self);
-                    if (get_hunter_rank_max(lobby_world_block) == 0) {
-                        lb_npc_act_set(self, 0, 46, 0);
-                    } else {
-                        lb_quest_board_open_board(self);
-                    }
-                    break;
-                case 3:
-                    lb_player_latch_release(self);
-                    Pl_chr_set_attr_default(self, 1, -4, 0);
-                    lb_quest_board_open_ready(self);
-                    break;
-                case 4:
-                    if (lobby_w.page_0x052 == 6) {
-                        lb_quest_board_open_notice(self);
+                    case 12:
+                        lb_pop_screen_open(self);
+                        continue;
+                    case 7:
+                        lb_player_latch_release(self);
+                        if (get_hunter_rank_max(lobby_world_block) == 0) {
+                            lb_npc_act_set(self, 0, 46, 0);
+                        } else {
+                            lb_quest_board_open_board(self);
+                        }
+                        continue;
+                    case 3:
+                        lb_player_latch_release(self);
+                        Pl_chr_set_attr_default(self, 1, -4, 0);
+                        lb_quest_board_open_ready(self);
+                        continue;
+                    case 4:
+                        if (lobby_w.page_0x052 == 6) {
+                            lb_quest_board_open_notice(self);
+                            continue;
+                        }
+                        idle = 0;
                         break;
-                    }
-                    idle = 0;
-                    used = 0;
-                    break;
-                case 5:
-                    if (game_ready_ck() == 1) {
+                    case 5:
+                        if (game_ready_ck() == 1) {
+                            self->field_0x0B6 = spot->id_0x02;
+                            lobby_w.invite_0x12E = 0;
+                            if ((u32)NetCtrlWk::checkOwnInvite(spot->id_0x02 + 1, &lobby_w.invite_0x12E) == 1) {
+                                pl_model_set_state(self, 1);
+                                lb_npc_act_set(self, 0, 41, 0x20);
+                            } else {
+                                lb_npc_act_set(self, 0, 42, 0x20);
+                            }
+                        } else {
+                            lb_player_spot_walk(self, spot);
+                        }
+                        continue;
+                    case 8:
+                        lb_player_latch_release(self);
                         self->field_0x0B6 = spot->id_0x02;
-                        lobby_w.invite_0x12E = 0;
-                        if (NetCtrlWk::checkOwnInvite(spot->id_0x02 + 1, &lobby_w.invite_0x12E) == 1) {
-                            pl_model_set_state(self, 1);
-                            lb_npc_act_set(self, 0, 41, 0x20);
+                        lobby_w.invite_0x130 = 0;
+                        if ((u32)NetCtrlWk::checkOwnInvite(spot->id_0x02 + 13, &lobby_w.invite_0x130) == 1) {
+                            lb_npc_act_set(self, 0, 43, 0x20);
                         } else {
                             lb_npc_act_set(self, 0, 42, 0x20);
                         }
-                    } else {
-                        lb_player_spot_walk(self, spot);
+                        continue;
+                    case 13:
+                        if (lb_unlock_cond_ck(22) == 1 && userdata_progress_flag_ck(88) == 0) {
+                            lb_npc_act_set(self, 0, 39, 0);
+                        } else {
+                            lb_npc_act_set(self, 0, 40, 0);
+                        }
+                        continue;
+                    case 14:
+                        lb_city_screen_open(self);
+                        continue;
+                    default:
+                        break;
                     }
-                    break;
-                case 8:
-                    lb_player_latch_release(self);
-                    self->field_0x0B6 = spot->id_0x02;
-                    lobby_w.invite_0x130 = 0;
-                    if (NetCtrlWk::checkOwnInvite(spot->id_0x02 + 13, &lobby_w.invite_0x130) == 1) {
-                        lb_npc_act_set(self, 0, 43, 0x20);
-                    } else {
-                        lb_npc_act_set(self, 0, 42, 0x20);
-                    }
-                    break;
-                case 13:
-                    if (lb_unlock_cond_ck(22) == 1 && userdata_progress_flag_ck(88) == 0) {
-                        lb_npc_act_set(self, 0, 39, 0);
-                    } else {
-                        lb_npc_act_set(self, 0, 40, 0);
-                    }
-                    break;
-                case 14:
-                    lb_city_screen_open(self);
-                    break;
-                default:
-                    used = 0;
-                    break;
-                }
-                if (used == 0) {
                     if (idle != 0 && (family != 0 || act != 0)) {
                         lb_npc_act_set(self, 0, 0, (u16)0x8000);
-                    } else {
-                        lb_act_armed_reenter(self);
+                        continue;
                     }
+                } else if (place != 0) {
+                    if (self->kind_0x015 == 21 && place->area_0x00 == 0) {
+                        em020_false_ck(self);
+                    } else {
+                        lb_player_area_enter(self, place, 0);
+                    }
+                    continue;
+                } else if (fn_80208AC0(self) == 1) {
+                    self->flag_0x30E = 0;
+                    lb_npc_act_set(self, 12, 6, 0);
+                    continue;
                 }
-            } else if (place != 0) {
-                if (self->kind_0x015 == 21 && place->area_0x00 == 0) {
-                    em020_false_ck(self);
-                } else {
-                    lb_player_area_enter(self, place, 0);
-                }
-            } else if (fn_80208AC0(self) == 1) {
-                self->flag_0x30E = 0;
-                lb_npc_act_set(self, 12, 6, 0);
-            } else {
-                lb_act_armed_reenter(self);
             }
-        } else {
             lb_act_armed_reenter(self);
-        }
+        } while (0);
+
         lobby_net_position_send(self, 0);
     }
 }
@@ -10468,41 +10476,71 @@ void lb_player_remote_follow(_PLW* self)
     f32 dist;
 
     VEC3_ctor(&d);
-    if (self->kind_0x09 == 1 || lb_npc_act_busy_ck(self->field_0x00A, self->act_no) == 1) {
-        return;
-    }
-    self->target_pos_0x090.y = self->vec_0x03C.y;
-    dist = calcVecDistXZ(&self->vec_0x03C, &self->target_pos_0x090);
-    d.x = self->target_pos_0x090.x - self->vec_0x03C.x;
-    d.z = self->target_pos_0x090.z - self->vec_0x03C.z;
-    switch (self->field_0x00A) {
-    case 1:
-        switch (self->act_no) {
-        case 1:
-        case 2:
-            if (self->blend_frames_0x0B4 == lobby_state_block.move_frames_0x168C - 1 && dist < 150.0f) {
-                lb_npc_act_set(self, 1, 0, 0);
-            } else if (dist < 6.0f) {
-                self->blend_frames_0x0B4 = 0;
-                copyVec3(&self->vec_0x03C, &self->target_pos_0x090);
-                lb_npc_act_set(self, 1, 3, 0);
-            } else {
-                self->field_0x0A8 = Atan2Idx(d.x, d.z);
+    if (self->kind_0x09 != 1 && lb_npc_act_busy_ck(self->field_0x00A, self->act_no) != 1) {
+        self->target_pos_0x090.y = self->vec_0x03C.y;
+        dist = calcVecDistXZ(&self->vec_0x03C, &self->target_pos_0x090);
+        d.x = self->target_pos_0x090.x - self->vec_0x03C.x;
+        d.z = self->target_pos_0x090.z - self->vec_0x03C.z;
+        do {
+            switch (self->field_0x00A) {
+            case 1:
+                switch (self->act_no) {
+                case 1:
+                case 2:
+                    if (self->blend_frames_0x0B4 == lobby_state_block.move_frames_0x168C - 1 && dist < 150.0f) {
+                        lb_npc_act_set(self, 1, 0, 0);
+                    } else if (dist < 6.0f) {
+                        self->blend_frames_0x0B4 = 0;
+                        copyVec3(&self->vec_0x03C, &self->target_pos_0x090);
+                        lb_npc_act_set(self, 1, 3, 0);
+                    } else {
+                        self->field_0x0A8 = Atan2Idx(d.x, d.z);
+                    }
+                    continue;
+                case 0:
+                    if (dist < 6.0f) {
+                        self->blend_frames_0x0B4 = 0;
+                        copyVec3(&self->vec_0x03C, &self->target_pos_0x090);
+                        fn_8020A70C(self, 0, 4, 0);
+                    } else if (dist > 150.0f) {
+                        self->field_0x0A8 = Atan2Idx(d.x, d.z);
+                        lb_npc_act_set(self, 1, 2, 0);
+                    } else {
+                        self->field_0x0A8 = Atan2Idx(d.x, d.z);
+                    }
+                    continue;
+                case 3:
+                    break;
+                default:
+                    continue;
+                }
+                break;
+            case 0:
+                switch (self->act_no) {
+                case 1:
+                case 2:
+                case 6:
+                case 7:
+                case 12:
+                case 25:
+                case 41:
+                case 42:
+                case 43:
+                case 44:
+                case 45:
+                    continue;
+                case 19:
+                case 20:
+                case 21:
+                case 22:
+                case 23:
+                case 24:
+                    return;
+                }
+                break;
+            default:
+                continue;
             }
-            break;
-        case 0:
-            if (dist < 6.0f) {
-                self->blend_frames_0x0B4 = 0;
-                copyVec3(&self->vec_0x03C, &self->target_pos_0x090);
-                fn_8020A70C(self, 0, 4, 0);
-            } else if (dist > 150.0f) {
-                self->field_0x0A8 = Atan2Idx(d.x, d.z);
-                lb_npc_act_set(self, 1, 2, 0);
-            } else {
-                self->field_0x0A8 = Atan2Idx(d.x, d.z);
-            }
-            break;
-        case 3:
             if (dist > 150.0f) {
                 lb_npc_act_set(self, 1, 2, 0);
                 self->field_0x0A8 = Atan2Idx(d.x, d.z);
@@ -10510,44 +10548,12 @@ void lb_player_remote_follow(_PLW* self)
                 self->field_0x0A8 = Atan2Idx(d.x, d.z);
                 lb_npc_act_set(self, 1, 0, 0);
             }
-            break;
-        }
-        break;
-    case 0:
-        switch (self->act_no) {
-        case 1:
-        case 2:
-        case 6:
-        case 7:
-        case 12:
-        case 25:
-        case 41:
-        case 42:
-        case 43:
-        case 44:
-        case 45:
-            break;
-        case 19:
-        case 20:
-        case 21:
-        case 22:
-        case 23:
-        case 24:
-            return;
-        default:
-            if (dist > 150.0f) {
-                lb_npc_act_set(self, 1, 2, 0);
-                self->field_0x0A8 = Atan2Idx(d.x, d.z);
-            } else if (dist > 20.0f) {
-                self->field_0x0A8 = Atan2Idx(d.x, d.z);
-                lb_npc_act_set(self, 1, 0, 0);
-            }
-            break;
-        }
-        break;
+        } while (0);
+
+        pl_model_set_state(self, 2);
     }
-    pl_model_set_state(self, 2);
 }
+
 
 void lb_player_carry_control(_PLW* self);
 
@@ -10764,7 +10770,8 @@ void lb_arm_wrestle_draw(void);
 /* 0x8020FE18 - the arm-wrestle screen's frame. */
 void lb_arm_wrestle_step(void)
 {
-    LbArmWrestleWork* work = lobby_w.arm_wrestle_0x0AC;
+    LbLobbyWork* lw = &lobby_w;
+    LbArmWrestleWork* work = lw->arm_wrestle_0x0AC;
 
     switch (work->step_0x00) {
     case 0:
@@ -10772,10 +10779,10 @@ void lb_arm_wrestle_step(void)
         break;
     case 1: {
         _PLW* plw = (_PLW*)get_move_work_adrs(2);
+        u32 count = get_move_work_max(2);
         s16 i;
-        u16 count = (u16)get_move_work_max(2);
 
-        for (i = 0; i < count; i++, plw++) {
+        for (i = 0; i < (u16)count; i++, plw++) {
             if (lb_arm_wrestle_lost_ck(work->self_0x10, plw) != 1 && Pl_master_ck(plw) != 1 &&
                 (Pl_act_ck(plw, 0, 19) == 1 || Pl_act_ck(plw, 0, 20) == 1) && Get_motion_no(plw) == 630 &&
                 Pl_frame_check(plw, 1, 200.0f, 0.0f) == 1) {
@@ -10787,8 +10794,8 @@ void lb_arm_wrestle_step(void)
             }
         }
         if (Get_motion_no(work->self_0x10) == 630 && Pl_frame_check(work->self_0x10, 1, 200.0f, 0.0f) == 1 &&
-            lb_cmd_pressed_ck(0x20) == 1) {
-            lobby_w.field_0x145 = 1;
+            (u32)lb_cmd_pressed_ck(0x20) == 1) {
+            lw->field_0x145 = 1;
             lb_arm_wrestle_close();
         }
         break;
@@ -10798,17 +10805,18 @@ void lb_arm_wrestle_step(void)
             work->wait_0x04--;
         }
         if (lb_arm_wrestle_lost_ck(work->self_0x10, work->opponent_0x14) == 1 || work->wait_0x04 <= 0) {
-            lobby_w.field_0x145 = 1;
+            lw->field_0x145 = 1;
             lb_arm_wrestle_close();
-        } else if (lobby_w.field_0x146 != 0) {
-            camera_lobby_mode_req(work->step_0x00++);
+        } else if (lw->field_0x146 != 0) {
+            work->step_0x00++;
             work->count_0x06 = 89;
+            camera_lobby_mode_req();
             sysSE_bank32_req(30);
         }
         break;
     case 3:
         if (lb_arm_wrestle_lost_ck(work->self_0x10, work->opponent_0x14) == 1) {
-            lobby_w.field_0x145 = 1;
+            lw->field_0x145 = 1;
             lb_arm_wrestle_close();
             return;
         }
@@ -10836,7 +10844,7 @@ void lb_arm_wrestle_step(void)
         break;
     case 4:
         if (lb_arm_wrestle_lost_ck(work->self_0x10, work->opponent_0x14) == 1) {
-            lobby_w.field_0x145 = 1;
+            lw->field_0x145 = 1;
             lb_arm_wrestle_close();
             return;
         }
@@ -10854,8 +10862,8 @@ void lb_arm_wrestle_step(void)
         }
         if (work->power_0x0C <= 0) {
             work->step_0x00++;
-            lobby_w.invite_0x132 = 0;
-            if (NetCtrlWk::checkOwnInvite(15, &lobby_w.invite_0x132) == 1) {
+            lw->invite_0x132 = 0;
+            if ((u32)NetCtrlWk::checkOwnInvite(15, &lw->invite_0x132) == 1) {
                 work->step_0x00 = 5;
             } else {
                 work->step_0x00 = 7;
@@ -10863,7 +10871,7 @@ void lb_arm_wrestle_step(void)
                 lb_npc_act_set(work->self_0x10, 0, 23, 0x20);
                 lb_npc_act_set(work->opponent_0x14, 0, 24, 0x22);
             }
-        } else if (lobby_w.field_0x147 != 0) {
+        } else if (lw->field_0x147 != 0) {
             work->step_0x00 = 7;
             work->tick_0x08 = 90;
             lb_npc_act_set(work->self_0x10, 0, 23, 0x20);
@@ -10871,13 +10879,13 @@ void lb_arm_wrestle_step(void)
         }
         break;
     case 5:
-        if (lobby_w.invite_0x132 == 1) {
+        if (lw->invite_0x132 == 1) {
             work->step_0x00 = 6;
             work->tick_0x08 = 90;
             lb_npc_act_set(work->self_0x10, 0, 24, 0x20);
             lb_npc_act_set(work->opponent_0x14, 0, 23, 0x22);
             lobby_net_flag_send(1);
-        } else if (lobby_w.invite_0x132 < 0) {
+        } else if (lw->invite_0x132 < 0) {
             work->step_0x00 = 7;
             work->tick_0x08 = 90;
             lb_npc_act_set(work->self_0x10, 0, 23, 0x20);
@@ -10887,7 +10895,7 @@ void lb_arm_wrestle_step(void)
     case 6:
         if (--work->tick_0x08 <= 0) {
             work->step_0x00 = 8;
-            checkOtherInvite(15, &lobby_w.invite_0x133);
+            checkOtherInvite(15, &lw->invite_0x133);
         }
         break;
     case 7:

@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x802BC7BC - requests camera mode 17 */
-void camera_lobby_mode_req(s8 step);
+void camera_lobby_mode_req(void);
 
 #ifdef __cplusplus
 }

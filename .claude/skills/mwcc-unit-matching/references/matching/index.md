@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (192)
+## Ideas that work (195)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -201,8 +201,11 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 210 | [Under peephole off, a 0/1 byte stored or passed with no clrlwi is a bool](210-under-peephole-off-a.md) | works | source-shape, pragma | A peephole-off unit masks a flag with clrlwi r0,rX,24 before stb (or before passing it) where retail stores or passes the register raw, and no u8/u32/cast spelling removes it |
 | 211 | [A pool literal ordered before its first use comes from a dead initialiser earlier in the function](211-pool-literal-ordered-before.md) | works | data, source-shape | The unit's .sdata2 holds the right literals but one sits earlier in the target than the instruction that first loads it |
 | 212 | [A pool base register that names a mid-section object marks the TU's own section start](212-pool-base-register-that.md) | works | data, sections, measurement | Every `addi rX,rBase,off` that reads a pooled string differs by one constant (ours higher), and retail's `lis`/`addi` base relocation names an object in the middle of the unit's `.data` where ours names the section... |
+| 214 | [A global whose address stays in a saved register all function long is read through a pointer local](214-global-whose-address-stays.md) | works | source-shape, allocator | Retail forms a global's address once (`lis`/`addi` into a saved register) and every later field access goes through it, while ours re-forms `lis`/`addi` before each late access and saves one register fewer. |
+| 215 | [A dead value in r3 at a call to a void(void) callee: declare the callee with the owner's empty parameter list](215-dead-value-in-r3.md) | works | source-shape | Retail calls a function with some value already in r3 and no extension, while ours passes it as an argument (an extra `extsb`/`clrlwi`, the call moved before a store) because a consumer's declaration invented a... |
+| 216 | [A u16 loop bound narrowed after the counter's li: keep the call's raw result and narrow it in the loop condition](216-u16-loop-bound-narrowed.md) | works | source-shape, allocator | Retail sets the loop counter (`li r27,0`) before narrowing the bound (`clrlwi r29,r3,16`), and ours narrows first, so the two instructions swap and the counter, pointer and bound registers rotate. |
 
-## Ruled out - tried and it did not work, do not re-run (12)
+## Ruled out - tried and it did not work, do not re-run (13)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -218,8 +221,9 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 90 | [Absorb `dw` / `CAMELLIA_RL1` IR shape](090-absorb-rl1-ir-shape.md) | ruled-out | source-shape, allocator | With the level-4 pragma the frame is right and only a window in the key-schedule absorb chain differs (register choice plus where `CAMELLIA_RL1` is computed); source rewrites of that chain were the highest-probability... |
 | 91 | [Pragma combination search](091-pragma-combination-search.md) | ruled-out | pragma, flags | With the level-4 pragma the frame is correct and only a short window differs; a per-function pragma (or a combination) that suppresses the level-4 reassociation while keeping the frame would finish the job. |
 | 213 | [A branch into the middle of another case is not an optimisation: MWCC Wii/1.3 has no tail-merge or cross-jump pass](213-branch-into-the-middle.md) | ruled-out | source-shape, tooling | Retail's switch branches into the middle of a sibling case's code (forwards or backwards) and holds one copy of a shared tail; every goto-free spelling either repeats the tail or moves it, and no flag, pragma or pass... |
+| 217 | [A branch from a loop body to the code after the enclosing switch is not reachable goto-free: MWCC threads no flag or inline return](217-branch-from-a-loop.md) | ruled-out | source-shape | Retail's search loop inside a switch case jumps from its found path straight to the code after the switch (skipping the post-loop code), and every goto-free spelling either adds a test or reorders the loop. |
 
-## Not tried yet (7)
+## Not tried yet (8)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -230,6 +234,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 152 | [Same-size stack locals are placed in reverse declaration order, smaller ones first](152-same-size-locals-reverse.md) | todo | allocator | Two stack locals' offsets are swapped against retail (`0x8(r1)` vs `0x10(r1)`), with the instructions otherwise identical. |
 | 153 | [A flag-byte store as rlwinm + ori is a mask-and-or; a 1-bit bitfield gives rlwimi](153-flag-byte-mask-or.md) | todo | source-shape | Retail updates a visibility bit with `rlwinm rX,rX,0,24,30` (+ `ori`) before the `stb`, where a 1-bit bitfield gives ours an `rlwimi`. |
 | 154 | [A zero test wrapped around an error switch folds into the switch's compare tree](154-zero-test-around-switch.md) | todo | source-shape | Retail's error-code switch has no separate `cmpwi r,0 ; beq` ahead of it - the zero test is one node of the compare tree - where ours tests zero first and then runs the tree. |
+| 218 | [A return inside a switch case leaves a dead b-to-epilogue block between the compare tree and the next case body](218-return-inside-a-switch.md) | todo | source-shape | Ours ends a switch's compare tree with `b <next body>` followed by an unreachable `b <epilogue>`; retail falls from the tree straight into the next body, and the goto spelling of the function has the same two extra... |
 
 ## Superseded (2)
 
