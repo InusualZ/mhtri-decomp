@@ -44,16 +44,23 @@
  * RESIDUALS. Every row has a body.
  *   `WUDiUpdateWiiFitSaveData`: the target folds `wudSetWiiFitSaveData`'s NULL and `&local != NULL` tests late and leaves dead
  *   `bl memcpy` calls behind unconditional branches; ours drops the NULL ones and keeps an `addic.` test of the local.
- *   `WUDiLoadWiiFitSaveData`: the step switch is a compare tree in the target and a linear compare chain here (six dense cases
- *   lower to a chain in this compiler; no source shape tried reproduces the tree).
- *   `WUDiSyncFiber`: the target materialises each case's next state as `li; b join` where ours speculates one value, and its
- *   inner switches are compare trees; the `searchTime` countdowns load with `lha` in the target (s16 fields measure lower here).
- *   `WUDiLoadDeviceInfo`: the inner search's exit test is threaded into the found/not-found jumps in the target.
+ *   `WUDiLoadWiiFitSaveData`: the step switch is a compare tree in the target and a linear compare chain here: Wii/1.3 turns a
+ *   switch of up to seven cases into ifs (eight or more stay a tree or a jump table) and only `#pragma global_optimizer off`
+ *   keeps the tree.  GC/3.0a5.2 reproduces this tree and the checksum schedule, but it lowers every switch as a tree, while the
+ *   target's two- and three-case switches (`WUDiShutdownFiber`, `WUDiPatchCallback`) are Wii dispatch chains, so the unit stays
+ *   on Wii/1.3.
+ *   `WUDiSyncFiber`: the target materialises each case's next state as `li; b join` where ours speculates one value (no
+ *   pragma removes the speculation), its inner switches are compare trees, and the `(BOOL)` of `wudIsLinkKeyBusy` is
+ *   materialised and tested; s16 `searchTime` fields give the target's `lha` but measure lower than u16 (the speculated `li` moves).
+ *   `WUDiLoadDeviceInfo`: the inner search's exit test is threaded into the found/not-found jumps in the target (a guard
+ *   `i >= 9` before the loop); no loop spelling tried (while, do-while, `j == 10`, `j > 9`, an inline helper) produces it.
  *   `__wudClearControlBlock`: the target's node cursor starts at `wudCB` with the field offset in the displacement.
- *   `WUDiSearchCallback`, `RemovePatchCallback`, `WUDiPatchWriteCallback`, `__wudAppendRuntimePatch`, `WUDiAddDevice`,
- *   `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiDeleteAllLinkKeys`, `WUDiStoreDeviceInfoToSC`, `WUDiVendorEventCallback`,
- *   `__wudSecurityEventStackCallback`, `WUDiSyncRegisterDevice`: load scheduling and callee-saved register assignment.
- *   `WUDiMove*`, `WUDiSyncCheck*`, `WUDiSyncDone`, `WUDiInsertDeviceNodeTail`: register numbering only.
+ *   `WUDiSearchCallback`, `RemovePatchCallback`, `WUDiPatchWriteCallback`, `__wudAppendRuntimePatch`, `WUDiInsertWbcNode`,
+ *   `WUDiInsertDeviceNode`, `WUDiDeleteAllLinkKeys`, `WUDiStoreDeviceInfoToSC`, `WUDiVendorEventCallback`,
+ *   `__wudSecurityEventStackCallback`, `WUDiSyncRegisterDevice`: load scheduling and callee-saved register assignment (the
+ *   declaration orders of the rows that have a declaration block are measured).
+ *   `WUDiMove*` (the `device` parameter and the index swap r29/r31), `WUDiSyncCheck*`, `WUDiSyncDone`,
+ *   `WUDiInsertDeviceNodeTail`: register numbering only.
  *   .text: the object's linked functions are smaller than the 0x6600 claim by the partial rows' size gaps.
  *   .data: byte-identical to the target; dtk relocates the patch code word at 0x8062DD34 (`@etb_80010134+4`, request wud-slice1#10).
  * SHAPES. The .data head is five initialised arrays in definition order: the HID report descriptor, the controller set-up
@@ -65,7 +72,10 @@
  *   inline helpers; `wudGetDeviceByIndex` takes a u32 index, which keeps the target's `mulli` for the balance board half.  A u32
  *   `level` holds the BOOL of `OSDisableInterrupts` (OS/OSInterrupt.h).  The security event payload is the device manager's
  *   `tBTA_DM_SEC` (BTE/bta_dm_int.h).  A case that only leaves the function is a `return` at the end of its switch, which keeps
- *   it in the compare tree (`WUDiClearFiber` case 7).
+ *   it in the compare tree (`WUDiClearFiber` case 7).  Declaration order is a colouring input: the list moves declare `u32 level;`
+ *   first and assign it after the declarations, and `WUDiAddDevice` declares `device` before the interrupt level.  The patch
+ *   address and length are accumulated a byte per statement (`__wudAppendRuntimePatch`); the link key busy test keeps a `busy`
+ *   local (`wudIsLinkKeyBusy`).
  */
 
 #include "types.h"
@@ -518,9 +528,9 @@ void SyncFlushCallback(s32 result)
  * switching a sniffing device back to active mode, otherwise 0x1D with the search time rearmed. */
 s32 WUDiSyncCheckSearch(void)
 {
-    WUDCB* cb = &wudCB;
     u32 level;
     u8 linkNumber;
+    WUDCB* cb = &wudCB;
     u8 wbcLinkNumber;
 
     wudSetVisibility(0, 0);
@@ -568,8 +578,8 @@ s32 WUDiSyncCheckInquiry(void)
         next = 6;
     }
     if (wudLinkedWbc != 0 && memcmp(wudInquiryResult.name, "Nintendo RVL-WBC", 0x10) == 0) {
-        WUDDevice* wbc = NULL;
         WUDDeviceNode* node;
+        WUDDevice* wbc = NULL;
         u32 level = OSDisableInterrupts();
         WUDCB* cb = &wudCB;
 
@@ -656,8 +666,8 @@ s32 WUDiStoreDeviceInfoToSC(void)
 {
     WUDScDeviceArray* array;
     WUDDeviceNode* node;
-    u8 i;
     s32 next;
+    u8 i;
 
     if (wudScIsBusy()) {
         return 0x16;
@@ -803,10 +813,12 @@ s32 WUDiSyncDone(void)
 /* Whether a stored link key command is still running. */
 static inline BOOL wudIsLinkKeyBusy(void)
 {
+    BOOL busy = FALSE;
+
     if (wudCB.linkKeyState != 0) {
-        return TRUE;
+        busy = TRUE;
     }
-    return FALSE;
+    return busy;
 }
 
 /* The number of balance board links, read with interrupts off. */
@@ -926,7 +938,11 @@ void WUDiSyncFiber(void)
     case 0x11:
         device = &wudStoredDeviceInfo;
         device->linkState = 1;
-        device->type = ((u8)cb->simple == 0) ? 0 : 1;
+        if ((u8)cb->simple == 0) {
+            device->type = 0;
+        } else {
+            device->type = 1;
+        }
         memcpy(device->bdAddr, wudInquiryResult.bdAddr, 6);
         memcpy(device->name, wudInquiryResult.name, 0x40);
         memset(device->linkKey, 0, 0x10);
@@ -1295,10 +1311,10 @@ void WUDiClearAlarmHandler(OSAlarm* alarm, OSContext* context)
  * records whose key is gone; returns 3 when no key is left, 2 while a link key command runs. */
 u8 WUDiDeleteAllLinkKeys(void)
 {
-    WUDCB* cb = &wudCB;
     WUDDevice* device;
     WUDDevice* found;
     u32 level;
+    WUDCB* cb = &wudCB;
     s32 i;
 
     if (cb->linkKeyState == 0) {
@@ -2285,10 +2301,12 @@ void SuperPeekPokeCallback(s32 result)
 void __wudAppendRuntimePatch(void)
 {
     WUDiDebugPrint("__wudAppendRuntimePatch()\n");
-    wudPatchAddress = (((((wudPatchImage[3] << 8) + wudPatchImage[2]) << 8) + wudPatchImage[1]) << 8)
-                      + wudPatchImage[0];
-    wudPatchLength = (((((wudPatchImage[7] << 8) + wudPatchImage[6]) << 8) + wudPatchImage[5]) << 8)
-                     + wudPatchImage[4];
+    wudPatchAddress = ((wudPatchImage[3] << 8) + wudPatchImage[2]);
+    wudPatchAddress = (wudPatchAddress << 8) + wudPatchImage[1];
+    wudPatchAddress = wudPatchImage[0] + (wudPatchAddress << 8);
+    wudPatchLength = ((wudPatchImage[7] << 8) + wudPatchImage[6]);
+    wudPatchLength = (wudPatchLength << 8) + wudPatchImage[5];
+    wudPatchLength = (wudPatchLength << 8) + wudPatchImage[4];
     if (__OSInIPL != 0) {
         WUDiDebugPrint("SuperPeekPoke\n");
         BTM_VendorSpecificCommand(0xFC0A, 9, wudSetupCommand, SuperPeekPokeCallback);
@@ -2338,9 +2356,12 @@ void __wudInitSub(void)
 void WUDiAddDevice(const u8* bdAddr)
 {
     WUDCB* cb = &wudCB;
+    WUDDevice* device;
     u32 level = OSDisableInterrupts();
-    WUDDevice* device = WUDiGetDevInfo(bdAddr);
-    u8 status = BTA_DmAddDevice(device->bdAddr, device->linkKey, 0, 0);
+    u8 status;
+
+    device = WUDiGetDevInfo(bdAddr);
+    status = BTA_DmAddDevice(device->bdAddr, device->linkKey, 0, 0);
 
     WUDiDebugPrint("BTA_DmAddDevice(): %d\n", status);
     if (memcmp(device->name, "Nintendo RVL-CNT", 0x10) == 0 || (memcmp(device->name, "Nintendo RVL-WBC", 0x10) == 0 && wudLinkedWbc != 0)) {
@@ -2419,10 +2440,11 @@ WUDDevice* WUDiGetDevInfo(const u8* bdAddr)
 /* Moves the balance board list entry of `device` to the head of the list. */
 void WUDiMoveWbcToHead(WUDDevice* device)
 {
+    u32 level;
     WUDCB* cb = &wudCB;
-    u32 level = OSDisableInterrupts();
     s32 i;
 
+    level = OSDisableInterrupts();
     for (i = 0; i < 6; i++) {
         if (memcmp(cb->wbcNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
             WUDDeviceNode* node = &cb->wbcNodes[i];
@@ -2447,10 +2469,11 @@ void WUDiMoveWbcToHead(WUDDevice* device)
 /* Moves the balance board list entry of `device` to the tail of the list. */
 void WUDiMoveWbcToTail(WUDDevice* device)
 {
+    u32 level;
     WUDCB* cb = &wudCB;
-    u32 level = OSDisableInterrupts();
     s32 i;
 
+    level = OSDisableInterrupts();
     for (i = 0; i < 6; i++) {
         if (memcmp(cb->wbcNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
             WUDDeviceNode* node = &cb->wbcNodes[i];
@@ -2478,10 +2501,11 @@ void WUDiMoveWbcToTail(WUDDevice* device)
 #pragma opt_common_subs off
 void WUDiInsertWbcNode(WUDDevice* device)
 {
+    u32 level;
     WUDCB* cb = &wudCB;
-    u32 level = OSDisableInterrupts();
     s32 i;
 
+    level = OSDisableInterrupts();
     for (i = 0; i < 6; i++) {
         WUDDeviceNode* node = &cb->wbcNodes[i];
 
@@ -2525,10 +2549,11 @@ void WUDiInsertWbcNode(WUDDevice* device)
 /* Moves the remote list entry of `device` to the head of the list. */
 void WUDiMoveDeviceToHead(WUDDevice* device)
 {
+    u32 level;
     WUDCB* cb = &wudCB;
-    u32 level = OSDisableInterrupts();
     s32 i;
 
+    level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
         if (memcmp(cb->deviceNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
             WUDDeviceNode* node = &cb->deviceNodes[i];
@@ -2553,10 +2578,11 @@ void WUDiMoveDeviceToHead(WUDDevice* device)
 /* Moves the remote list entry of `device` to the tail of the list. */
 void WUDiMoveDeviceToTail(WUDDevice* device)
 {
+    u32 level;
     WUDCB* cb = &wudCB;
-    u32 level = OSDisableInterrupts();
     s32 i;
 
+    level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
         if (memcmp(cb->deviceNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
             WUDDeviceNode* node = &cb->deviceNodes[i];
@@ -2585,10 +2611,11 @@ void WUDiMoveDeviceToTail(WUDDevice* device)
 #pragma opt_common_subs off
 void WUDiInsertDeviceNode(WUDDevice* device)
 {
+    u32 level;
     WUDCB* cb = &wudCB;
-    u32 level = OSDisableInterrupts();
     s32 i;
 
+    level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
         WUDDeviceNode* node = &cb->deviceNodes[i];
 
@@ -2636,9 +2663,10 @@ void WUDiInsertDeviceNode(WUDDevice* device)
 void WUDiInsertDeviceNodeTail(WUDDevice* device)
 {
     WUDCB* cb = &wudCB;
-    u32 level = OSDisableInterrupts();
     s32 i;
+    u32 level;
 
+    level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
         WUDDeviceNode* node = &cb->deviceNodes[i];
         u8* bdAddr = cb->deviceNodes[i].device->bdAddr;
@@ -2899,10 +2927,10 @@ void WUDiSearchCallback(s32 event, const u8* data)
  * pairings or report it), the status byte of event 0x0A and the fatal module error. */
 void WUDiVendorEventCallback(u8 length, u8* data)
 {
-    WUDCB* cb = &wudCB;
     WUDResultCallback callback;
     u32 level;
     s32 result;
+    WUDCB* cb = &wudCB;
 
     switch (data[0]) {
     case 8:
