@@ -622,6 +622,7 @@ config.libs = [
             Object(NonMatching, "menu/menu_infomation.cpp"),
             Object(NonMatching, "menu/fn_8031A6C0.cpp"),
             Object(NonMatching, "menu/menu_item_effect.cpp"),
+            Object(Matching, "ef/eft044.cpp"),
             Object(NonMatching, "menu/menu_effect_slot.cpp"),
             Object(NonMatching, "menu/fn_8031EA8C.cpp"),
             Object(NonMatching, "menu/menu_item_page.cpp"),

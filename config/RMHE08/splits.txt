@@ -1704,21 +1704,28 @@ menu/fn_8031A6C0.cpp:
 	.sdata2     start:0x8079AE50 end:0x8079AE70
 
 menu/menu_item_effect.cpp:
-	extab       start:0x80016034 end:0x80016074
-	extabindex  start:0x80034EB4 end:0x80034F14
-	.text       start:0x8031DAA8 end:0x8031EA8C
-	.data       start:0x805DCF38 end:0x805DD298
+	extab       start:0x80016034 end:0x80016054
+	extabindex  start:0x80034EB4 end:0x80034EE4
+	.text       start:0x8031DAA8 end:0x8031E57C
+	.data       start:0x805DCF38 end:0x805DD248
 	.sdata      start:0x80792C48 end:0x80792C50
-	.sdata2     start:0x8079AE70 end:0x8079AEA8
+	.sdata2     start:0x8079AE70 end:0x8079AE98
+
+ef/eft044.cpp:
+	extab       start:0x80016054 end:0x8001607C
+	extabindex  start:0x80034EE4 end:0x80034F20
+	.text       start:0x8031E57C end:0x8031EB54
+	.data       start:0x805DD248 end:0x805DD298
+	.sdata2     start:0x8079AE98 end:0x8079AEB0
 
 menu/fn_8031EA8C.cpp:
-	extab       start:0x80016074 end:0x8001621C
-	extabindex  start:0x80034F14 end:0x80035190
-	.text       start:0x8031EA8C end:0x80324F7C
+	extab       start:0x8001607C end:0x8001621C
+	extabindex  start:0x80034F20 end:0x80035190
+	.text       start:0x8031EB54 end:0x80324F7C
 	.data       start:0x805DD598 end:0x805DD9C8
 	.bss        start:0x806BE120 end:0x806BE2C8
 	.sdata      start:0x80792C50 end:0x80792CC8
-	.sdata2     start:0x8079AEA8 end:0x8079AF48
+	.sdata2     start:0x8079AEB0 end:0x8079AF48
 
 hud/fn_80324F7C.c:
 	extab       start:0x8001621C end:0x80016224

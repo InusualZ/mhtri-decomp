@@ -1,21 +1,19 @@
 /*
- * menu/fn_8031EA8C.cpp - the menu effect pair and the lobby quest board screens: `menu_eff_reset`/
- *   `menu_eff_model_select` (driven by `menu/menu_item_effect.cpp`), the `eft045` effect family and the menu target
+ * menu/fn_8031EA8C.cpp - the lobby quest board screens and their effects: the `eft045` effect family and the menu target
  *   marker (`_EFT` instances dispatched on `state_0x05`, each with its own `+0x38` work record), the quest list
  *   builders (`quest_list_tbl`, the per-group seed draws), the quest accept/join screens on `lobby_w.menu_0xAC`
  *   (`MenuQuestWork`), their detail and keyboard pages, and the tail's move-work and key-table draws.  C++ callees
  *   (`res_eft_model_create`, `setVector3`, `rotVecZXY`, `ran_suu`, the `draw_*` layout calls), `extern "C"` bodies.
- * RANGE. .text 0x8031EA8C-0x80324F7C (67 functions); extab, extabindex, .data 0x805DD598-0x805DD9C8, .bss
- *   0x806BE120-0x806BE2C8, .sdata 0x80792C50-0x80792CC8, .sdata2 0x8079AEA8-0x8079AF48.  Not one TU: the `.sdata2` pool
- *   restarts twice (0.0f at 0x8079AEA8 only `menu_eff_reset` loads, then a second 1.0f/50.0f/200.0f/0.5f run from
- *   0x8079AF10 that only `move_work_draw`/`lb_npc_move_work_draw`/`draw_lsp_anim_ary` load), and `menu_eff_reset`'s only
- *   caller is `menu/menu_item_effect.cpp` - seam request filed (menu-8031ea8c requests).
+ * RANGE. .text 0x8031EB54-0x80324F7C (65 functions); extab, extabindex, .data 0x805DD598-0x805DD9C8, .bss
+ *   0x806BE120-0x806BE2C8, .sdata 0x80792C50-0x80792CC8, .sdata2 0x8079AEB0-0x8079AF48.  Not one TU: the `.sdata2` pool
+ *   restarts at 0x8079AF10 (a second 1.0f/50.0f/200.0f/0.5f run that only `move_work_draw`/`lb_npc_move_work_draw`/
+ *   `draw_lsp_anim_ary` load).
  * FLAGS. `cflags_menu` (configure.py); `infer.py` on the target: `draw_lsp_anim_ary` keeps 0 record forms with 2
  *   fold-shaped pairs (the peephole off).  file-scope `#pragma fp_contract off` (retail keeps every
  *   multiply and add apart) and `#pragma pool_data off` (each table addressed by its own lis/addi).
  * NAMES. Module `menu` from the menu/HUD 2D callees and the `menu` band below; no `__FILE__` string covers the range
  *   and the dump answers `zz_`, so the file keeps the map's stem; `eft045_set` is the map's own (mangled) name.
- *   GUESS: `quest_party_state_reset`, `quest_detail_label_draw`, `menu_eff_reset`, `menu_eff_model_select`, the
+ *   GUESS: `quest_party_state_reset`, `quest_detail_label_draw`, the
  *   `eft045_*` states, the `menu_target_marker_*` family, `quest_list_unlocked_count`, `quest_group_bonus_pick`,
  *   `quest_seed_walk`, `quest_group_draw`, `quest_event_slot_id_get`, `quest_list_tbl_build`, `quest_list_tbl`,
  *   `lb_quest_join_screen_open`, `lb_quest_accept_screen_open`, `lb_quest_screen_close`, `quest_list_select_step`,
@@ -152,7 +150,6 @@ u32   quest_dual_target_ck(QuestRecord* rec);
 void  lb_quest_accept_screen_draw(void);
 
 /* This unit's own forward declarations (defined below). */
-void menu_eff_model_select(_EFT* self, u32 index);
 void eft045_release(_EFT* self);
 void eft045_dispatch(_EFT* self);
 void eft045_start(_EFT* self);
@@ -194,40 +191,6 @@ u16 quest_list_tbl[8][17];
 /* ---------------------------------------------------------------------------------------------- */
 /* the effect family wrappers                                                                      */
 /* ---------------------------------------------------------------------------------------------- */
-
-/* 0x8031EA8C - reset the effect for `mode`: clear its model's y-scale, clear the timer and set the
- * two flag bytes, then show the `mode`-selected model. */
-extern "C" void menu_eff_reset(_EFT* self, u8 mode) {
-    MenuFxWork* work = (MenuFxWork*)self->work_0x38;
-
-    work->models[0]->scale_0x1C.y = 0.0f;
-    self->timer_0x0C = 0;
-    self->flag_0x01 = 1;
-    self->field_0x06 = 1;
-
-    switch (mode) {
-    case 0:
-        menu_eff_model_select(self, 1);
-        break;
-    case 1:
-        menu_eff_model_select(self, 2);
-        break;
-    }
-}
-
-/* 0x8031EADC - show model `index` and hide the other of the two model slots. */
-extern "C" void menu_eff_model_select(_EFT* self, u32 index) {
-    MenuFxWork* work = (MenuFxWork*)self->work_0x38;
-    s32 i;
-
-    for (i = 1; i <= 2; i++) {
-        if ((u32)i == index) {
-            work->models[0]->setVisibility(i, true);
-        } else {
-            work->models[0]->setVisibility(i, false);
-        }
-    }
-}
 
 /* 0x8031EB54 (0x124): spawns the three-model effect at `pos`/`rot` in area `area` and plays the owner's
  * landing sound when the area is the current one. */

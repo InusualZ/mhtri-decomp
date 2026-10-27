@@ -1,4 +1,4 @@
-/* menu/eft_em_model_fx_spawn.h - the declaration of `eft_em_model_fx_spawn`, which `menu/menu_item_effect.cpp` owns (docs/plan.md 6.5
+/* menu/eft_em_model_fx_spawn.h - the declaration of `eft_em_model_fx_spawn`, which `ef/eft044.cpp` owns (docs/plan.md 6.5
  * rule 2).  GUESS name (the owner's body). */
 #ifndef MHTRI_MENU_EFT_EM_MODEL_FX_SPAWN_H
 #define MHTRI_MENU_EFT_EM_MODEL_FX_SPAWN_H
