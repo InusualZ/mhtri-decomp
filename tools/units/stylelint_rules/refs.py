@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from tools.lib import proc
 from tools.lib.git import Git
 from tools.units.stylelint_rules.common import HEADERS, HEADER_SUFFIXES, LINT_ROOTS, SRC, SUFFIXES, Source
 from tools.units.stylelint_rules.context import Ownership
@@ -185,10 +186,46 @@ def changed_src_files(root: str, ref: str) -> list[tuple[str | None, str]]:
     # checked against the wrong set - and a new unit's violations are all additions, so it is the one file
     # guaranteed to matter. This blind spot refused two units on 2026-09-25 whose own lint run had reported
     # "no new section 6.5 violation" (it had compared two headers main changed and not the unit at all).
-    for path in git(root, "ls-files", "--others", "--exclude-standard", "--", SRC, HEADERS).splitlines():
-        if path and path.endswith(SUFFIXES):
-            out.append((None, path))
+    untracked = [p for p in git(root, "ls-files", "--others", "--exclude-standard", "--", SRC, HEADERS).splitlines()
+                 if p and p.endswith(SUFFIXES)]
+    paired = untracked_renames(root, ref, untracked) if untracked else {}
+    for path in untracked:
+        out.append((paired.get(path), path))
     return out
+
+
+def untracked_renames(root: str, ref: str, untracked: list[str]) -> dict[str, str]:
+    """`{untracked_path: path_at_ref}` for each untracked file `git diff -M` pairs with a file the tree deleted.
+
+    A landing applies a re-homed unit as an untracked new file plus a deletion, which `git diff` alone never
+    pairs, so every finding in it whose prose names its own path read as new.  The pairing stages the whole
+    lint scope into a throwaway copy of the index (the real index is untouched) and asks git for the renames.
+    """
+    gitdir = git(root, "rev-parse", "--absolute-git-dir").strip()
+    index = os.path.join(gitdir, "stylelint-renames-%d.index" % os.getpid())
+    env = dict(os.environ, GIT_INDEX_FILE=index)
+    real = os.path.join(gitdir, "index")
+    try:
+        if os.path.exists(real):
+            with open(real, "rb") as fsrc, open(index, "wb") as fdst:
+                fdst.write(fsrc.read())
+        scope = [d for d in (SRC, HEADERS) if os.path.isdir(os.path.join(root, d))]
+        if proc.run(["git", "add", "-A", "--", *scope], cwd=root, env=env).returncode != 0:
+            return {}
+        p = proc.run(["git", "diff", "--cached", "--name-status", "-M", "--diff-filter=R", ref, "--", SRC, HEADERS],
+                     cwd=root, env=env)
+        if p.returncode != 0:
+            return {}
+        want = set(untracked)
+        pairs = {}
+        for line in p.stdout.splitlines():
+            parts = line.split("\t")
+            if len(parts) == 3 and parts[2] in want:
+                pairs[parts[2]] = parts[1]
+        return pairs
+    finally:
+        if os.path.exists(index):
+            os.remove(index)
 
 
 def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],

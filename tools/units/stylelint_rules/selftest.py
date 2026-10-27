@@ -2159,7 +2159,12 @@ def selftest() -> int:
                     os.remove(os.path.join(tmp, extra_file))
             mput("src/Pl/pl_act.cpp", old_body + "extern u8 unowned_data[];\n")
             os.remove(os.path.join(tmp, "src/Pl/pl_act.cpp"))
+            # an untracked file this close to the deleted one is a rename (delete 0); the absorber of a fold is not
             mput("src/Pl/pl_new.cpp", old_body)
+            rc, out = mrun()
+            check("(delete 0) an untracked copy of a deleted file pairs as a rename: clean, nothing credited",
+                  (rc, moved_lines(out)), (0, []))
+            mput("src/Pl/pl_new.cpp", old_body + "".join("/* absorbed neighbour line %d */\n" % i for i in range(40)))
             rc, out = mrun()
             check("(delete 1) delete-and-absorb is credited and the verdict is clean", rc, 0)
             check("... reported as moved from the deleted file",
