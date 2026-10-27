@@ -62,10 +62,10 @@ typedef struct StageRuntime {
     /* +0xBC5 */ u8 mapno;
     /* +0xBC6 */ u8 areano;
     /* +0xBC7 */ u8 pad_0xBC7[0x04E];
-    /* +0xC15 */ u8 joint_state[0x10];
-    /* +0xC25 */ u8 pad_0xC25[0x1B7];
-    /* +0xDDC */ StageAreaSlot area[16];
-    /* +0x2B9C */ u8 pad_0x2B9C[0x311];
+    /* +0xC15 */ u8 joint_state[0x8];
+    /* +0xC1D */ u8 pad_0xC1D[0x003];
+    /* +0xC20 */ StageAreaSlot area[15];
+    /* +0x2804 */ u8 pad_0x2804[0x6A9];
     /* +0x2EAD */ u8 field_0x2EAD[8]; /* the joint ids the current map wants visible */
     /* +0x2EB5 */ u8 pad_0x2EB5[0x0DC];
     /* +0x2F91 */ u8 field_0x2F91; /* the one-shot flag byte */
@@ -224,7 +224,8 @@ typedef struct StageBlendGroup {
 
 /* size: 0x38 */
 typedef struct StageBlendRec {
-    /* +0x00 */ s32 enabled;
+    /* +0x00 */ u8 enabled;
+    /* +0x01 */ u8 pad_0x01[3];
     /* +0x04 */ f32 se_frame;
     /* +0x08 */ StageBlendGroup group[3];
 } StageBlendRec;
@@ -272,7 +273,7 @@ extern f32 lbl_8079A4E8; /* 55.0f    */
 /* .data - the band's own tables (0x805CF60C-0x805CFBE8; only the jump table is claimed, see the
  * file header) */
 extern StageJointLists* lbl_805CF60C[];
-extern StageJointLists* lbl_805CF644[];
+extern StageJointLists** lbl_805CF644[23]; /* per map, each area's joint lists (null where none) */
 extern StageJointLists* lbl_805CF6A0[]; /* the mapno 1/12 per-area list pair */
 extern u8 lbl_805CF6D4[];
 extern u8 lbl_805CF6E8[];
@@ -291,9 +292,9 @@ extern StageBlendEntry lbl_805CFAE8[];
 extern StageBlendEntry lbl_805CFB68[];
 
 /* .sdata - the band's joint-id lists */
-extern StageJointLists* lbl_80792310;
-extern StageJointLists* lbl_80792330;
-extern StageJointLists* lbl_807923C8[];
+extern StageJointLists lbl_80792310;
+extern StageJointLists lbl_80792330;
+extern StageJointLists* lbl_807923C8[2];
 extern StageJointLists lbl_80792410;
 extern StageJointLists lbl_80792440;
 extern StageJointLists lbl_80792450;
@@ -306,11 +307,11 @@ extern u8 lbl_80792430[0x8];
 extern u8 lbl_80792458[0x8];
 extern u8 lbl_80792460[0x4];
 extern u8 lbl_80792464[0x4];
-extern u8 lbl_80792498[];
-extern u8 lbl_8079249C[];
-extern u8 lbl_807924A0[];
-extern u8 lbl_807924A4[];
-extern u8 lbl_807924A8[];
+extern u8 lbl_80792498[4];
+extern u8 lbl_8079249C[4];
+extern u8 lbl_807924A0[4];
+extern u8 lbl_807924A4[4];
+extern u8 lbl_807924A8[8];
 
 /* ------------------------------------------------------------------------------------------------
  * the callees (C linkage: the map spells every one of these plainly)

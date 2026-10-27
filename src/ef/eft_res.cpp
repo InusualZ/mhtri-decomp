@@ -19,7 +19,7 @@
  *   GUESS (from each body and its callers): `eft_res_pool_reset`.
  * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps every `clrlwi`+`cmpwi` pair and the
  *   narrowing `clrlwi` of the `u8`/`u16` parameters; with the pass on most rows score lower).
- * RESIDUALS. `fn_800F8634` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
+ * RESIDUALS. `eft_res_file_load` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
  *   where retail's epilogue differs); `eft_res_models_spawn` calls `_savegpr_23`/`_restgpr_23` where retail calls
  *   `_savegpr_24`/`_restgpr_24`;
  *   `push_eft_effect_heap_num` lacks retail's call to `RetireParticleAll` (+0x40).
@@ -164,7 +164,7 @@ typedef struct EftLoadCtx {
     /* +0x0C */ u32 param_0x0C;
 } EftLoadCtx; /* size: 0x10 */
 
-/* The context `fn_800F8634` hands the archive load and `fn_800F8358` reads back: the run's proID bytes, the slot
+/* The context `eft_res_file_load` hands the archive load and `fn_800F8358` reads back: the run's proID bytes, the slot
  * ordinal the run starts at, the run's resource names and the load mode. */
 typedef struct EftFileLoadCtx {
     /* +0x00 */ u8* proids_0x00;
@@ -220,7 +220,7 @@ void eft_res_bind(u32);
 void fn_800F7D44(u8*, void*, EftLoadCtx*, EftLoadCtx*);
 void fn_800F7F18(EftResFile*, s32, u32, u8*);
 void fn_800F8358(char*, void*, u32, EftFileLoadCtx*);
-void fn_800F8634(EftResFile*, u32, void*, u8*, u32, u32);
+void eft_res_file_load(EftResFile*, u32, void*, u8*, u32, u32);
 void eft_common_load(void);
 void eft_area_effects_set(void);
 u8 eft_pro_slot_assign(u8, u8, u8, u8, u8);
@@ -378,28 +378,28 @@ extern "C" void eft_common_load(void) {
         for (i = 0; efm_common_proID_tbl_ptr[1][i] != 0xFF; i++) {
             ids[i] = eft_pro_slot_assign(0, 3, 1, 0, i);
         }
-        fn_800F8634(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[1], (u32)lobby_eft_mdl_name_ptr);
+        eft_res_file_load(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[1], (u32)lobby_eft_mdl_name_ptr);
         file = lb_comn_eft_file;
         ids[0] = eft_pro_slot_assign(0, 2, 1, 0, 0);
         for (i = 2; eft_common_proID_tbl_ptr[1][i - 1] != 0xFF; i += 2) {
             ids[i - 1] = eft_pro_slot_assign(0, 1, 1, 0, i - 1);
             ids[i] = eft_pro_slot_assign(0, 1, 1, 1, i);
         }
-        fn_800F8634(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[1], (u32)lb_comn_eft_name_ptr);
+        eft_res_file_load(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[1], (u32)lb_comn_eft_name_ptr);
         break;
     case 1:
         file = q_comn_efm_file;
         for (i = 0; efm_common_proID_tbl_ptr[0][i] != 0xFF; i++) {
             ids[i] = eft_pro_slot_assign(0, 3, 0, 0, i);
         }
-        fn_800F8634(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[0], (u32)q_comn_efm_name_ptr);
+        eft_res_file_load(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[0], (u32)q_comn_efm_name_ptr);
         file = q_comn_eft_file;
         ids[0] = eft_pro_slot_assign(0, 2, 0, 0, 0);
         for (i = 2; eft_common_proID_tbl_ptr[0][i - 1] != 0xFF; i += 2) {
             ids[i - 1] = eft_pro_slot_assign(0, 1, 0, 0, i - 1);
             ids[i] = eft_pro_slot_assign(0, 1, 0, 1, i);
         }
-        fn_800F8634(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[0], (u32)q_comn_eft_name_ptr);
+        eft_res_file_load(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[0], (u32)q_comn_eft_name_ptr);
         break;
     }
 }
@@ -1575,7 +1575,7 @@ extern "C" void fn_800F8358(char* path, void* data, u32 size, EftFileLoadCtx* ct
 
 /* 0x800F8634 - the resource-file request: pull the file into memory and start the async load whose
  * callback is fn_800F8358. */
-extern "C" void fn_800F8634(EftResFile* desc, u32 mode, void* unused, u8* name, u32 a7, u32 a8) {
+extern "C" void eft_res_file_load(EftResFile* desc, u32 mode, void* unused, u8* name, u32 a7, u32 a8) {
     EftControl* ctrl = &eft_control;
     u32 ctx[6];
 

@@ -8,25 +8,31 @@
  *   `StageWork` view below, 0x802B2978.. inside `namespace view_fn_802B2AA0` against `stage/fn_802B2AA0.h`'s
  *   `StageRuntime` view of the same block (extern "C", so the symbols are unchanged).
  * FLAGS. `cflags_main`; `#pragma peephole off` per half (retail keeps the unfused `clrlwi`+`slwi`/`mulli`, the
- *   duplicated `lis`, and the `li`+`psq_lx` epilogue that the peephole pass folds).
+ *   duplicated `lis`, and the `li`+`psq_lx` epilogue that the peephole pass folds); `#pragma fp_contract off` over the
+ *   file (the target object has no fused multiply-add; with contraction on, the colour and scatter rows fuse).
  * NAMES. Module from the range's own entry points (`get_stg_w`, `get_now_mapno`, `get_worldworld_pos`, ...): no
  *   `__FILE__` string covers the range.  GUESS (from each body and its callers): every `stage_*`/`stg_*` function
  *   and data name of the range that is not one of the six mangled retail names, and the record field names; the
- *   foreign callee names proposed in config/RMHE08/name_registry.jsonl by lane stage-stg-w are GUESSes too.
+ *   foreign callee names proposed in config/RMHE08/name_registry.jsonl by lane stage-stg-w (`eft_res_file_load`,
+ *   `map_com_eft_file_tbl`, `map_com_efm_file_tbl`, ...) are GUESSes too.
  * RESIDUALS.
- *   - stage_map_obj_load (0x802B2318, 604 B) is unwritten: it reads `map_com_eft_name_ptr` and
- *     `eft_map_common_mdl_name_ptr` (.sbss 0x80794A88/0x80794A8C), which no registered unit owns (rule 12).
+ *   - stage_map_obj_load reads `map_com_eft_name_ptr`/`eft_map_common_mdl_name_ptr` (.sbss 0x80794A88/0x80794A8C,
+ *     between ef/eft_res.cpp's and enemy/enemy_control.cpp's claims; no registered unit owns them, rule 12); retail
+ *     keeps `mapno * 4` live across the eft block (`_savegpr_24`), ours recomputes it.
  *   - Data: the `.data` tables (weapon work, start points, scatter and part definitions, 3752 B), `.bss` (12320 B),
  *     `.sdata` (464 B) and `.ctors` are declared, not emitted; the float pool is MWCC's own (`.sdata2` 72 of 144 B).
- *   - stage_eft_strips_spawn 36.5 %, stage_colour_cycle_update 43.7 %: loop and blend shapes (sizes differ).
- *   - stage_area_visibility_build 77.6 %, stage_demo_markers_place 78.6 % (retail compares the map number with
- *     `cmpwi` where MWCC emits `cmplwi`), stage_area_model_load_done 79.0 %, stage_area_slot_get 79.3 %: register
- *     allocation and branch order.
- *   - get_worldworld_pos 83.0 %: retail writes the result through the hidden return pointer, ours through a local
- *     copy.
- *   - stage_area_models_seat 84.2 %: retail keeps six zero registers (r19..r31) live across the loop.
- *   - stg_barrel_bomb_place / stg_trap_place / stg_slinger_special_fire ~94 %: retail loads `shell_set_func_ptr`
- *     after the argument registers.
+ *   - The function order differs from retail's (the extabindex records pair different functions), a flip blocker.
+ *   - stage_area_models_seat: retail keeps six zero registers (r19..r31) live across the loop.
+ *   - stage_part_break: retail keeps `index * 4` in r26 across the effect switch, ours re-derives it per case.
+ *   - stage_area_visibility_build: retail branches from the matched-event test straight to the next kept joint;
+ *     the `hit` flag adds its stores.
+ *   - stg_barrel_bomb_place / stg_trap_place / stg_slinger_special_fire / stage_demo_markers_place /
+ *     stg_ground_impact_set: retail loads `shell_set_func_ptr` after the argument registers.
+ *   - stage_colour_cycle_update: the second and third colour lerps colour their float registers in order, the first
+ *     interleaved; one inline helper gives all three the first one's colouring.
+ *   - stage_blend_table_get, stage_area_load, stage_parts_check, stage_part_bodies_set, stage_area_slot_release,
+ *     stage_area_model_load_req, stage_part_joints_hide, stage_area_timer_arm, stage_zone_hit_ck,
+ *     stage_area_colour_update (a 4-byte stack slot): register allocation and branch order.
  *   - The int->float conversions use MWCC's anonymous `.sdata2` magic where the split names `lbl_8079A460`/
  *     `lbl_8079A470` (playbook 29).
  * SHAPES.
@@ -35,6 +41,16 @@
  *     stage_work_init additionally writes its first field through `SW->` (the `stb rN,stage_w@l(rM)` form).
  *   - Loop counters over byte-indexed tables are `u8` (stage_parts_break_all, stage_part_joints_hide): an `s32`
  *     counter is fully unrolled, a `u8` one keeps retail's 4x unroll with the counter live.
+ *   - A two-slot lookup is a two-iteration loop (stage_area_slot_get, stage_area_free_slot_get): the unrolled loop
+ *     hoists the parameter narrowing that two written-out tests repeat.
+ *   - A `u8` compared with `cmpwi` in retail is a switch case or a `(s32)` cast (get_stg_weapon_work,
+ *     stage_water_area_ck, stg_ground_impact_set); a switch whose cases are all `cmplwi` switches on `(u32)`
+ *     (stage_area_effects_start, playbook 207).
+ *   - The scatter definition tables are flat `f32`/`u16` runs indexed `i * 3 + n` (retail's `slwi`/`subf`/`slwi`).
+ *   - A shared tail reached from two branches and skipped from a third is a `do { ... break; ... } while (0)`
+ *     (stage_light_update, stage_area_colour_update).
+ *   - get_worldworld_pos returns a copy-constructible `VEC3` view so the result is built in the return slot
+ *     (playbook 176).
  *   - stage_land_grid_load_done indexes the pack entries as `i * 2` / `i * 2 + 1`, not a second induction variable.
  *   - stage_area_load's effect-slot assignment is the inline helper stage_area_eft_assign (its early returns are
  *     retail's exits; no `goto`).
@@ -173,7 +189,7 @@ typedef struct StagePart {
     /* +0x70 */ u32 joint_rot[3][3];
     /* +0x94 */ s16 joint_time[3];
     /* +0x9A */ u8 field_0x9A;
-    /* +0x9B */ u8 visible;
+    /* +0x9B */ bool visible;
     /* +0x9C */ s16 damage;
     /* +0x9E */ u8 pad_0x9E[2];
 } StagePart; /* size: 0xA0 */
@@ -288,7 +304,7 @@ typedef struct StageGroup {
     /* +0x04 */ StageElem** elems;
     /* +0x08 */ StageMapInfo* map;  /* screen_projection_get hands out its head */
     /* +0x0C */ struct StageZone** zones; /* the warp zone list of each area */
-    /* +0x10 */ u8 pad_0x10[0x04];
+    /* +0x10 */ char** area_files; /* each area's record file */
     /* +0x14 */ StagePartDef** part_defs; /* four per area */
     /* +0x18 */ u32* field_0x18;
     /* +0x1C */ StageStart* start;
@@ -340,6 +356,7 @@ typedef struct ResolverView {
 #include "mh3_pad/system_w.h"
 #include "ef/fn_800CDB2C.h"
 
+#pragma fp_contract off
 #pragma peephole off
 
 /* Returns the stage-work block. */
@@ -434,9 +451,9 @@ extern "C" bool stg_area_flag_ck(u8 index, u8 bit)
 extern "C" u32 stage_map_kind_get(u32 kind)
 {
     u8 mapped = stg_map_kind_table[(u8)kind];
-    if (mapped == 0xFF)
-        return kind;
-    return mapped;
+    if (mapped != 0xFF)
+        return mapped;
+    return kind;
 }
 
 /* Tail-calls stg_area_flag_ck with the byte pair stg_area_event_pairs[2*index], [2*index+1]. */
@@ -455,10 +472,10 @@ extern "C" u32 stage_pos_z_low_ck(void* self)
 /* Returns `base`'s word pointer plus `off`; a zero offset yields NULL. */
 extern "C" void* stage_res_offset_get(void* base, s32 off)
 {
-    u32 p = *(u32*)base;
-    if (off == 0)
-        return 0;
-    return (u8*)(p + off);
+    u8* p = *(u8**)base;
+    if (off != 0)
+        return p + off;
+    return 0;
 }
 
 /* Returns the record at `self` plus the resource size from fn_800700C0(). */
@@ -495,7 +512,9 @@ extern "C" void stage_anim_rate_target_set(f32 f)
 extern "C" u32 stage_map_kind_loadable_ck(void* self)
 {
     s32 mapped = (u8)stage_map_kind_get(((StageWork*)self)->mapno);
-    return mapped == 4 || mapped == 10;
+    if (mapped == 4 || mapped == 10)
+        return 1;
+    return 0;
 }
 
 /* Remaps the stage's current map id and returns the j-th element of the group's 16-byte-stride
@@ -605,7 +624,9 @@ extern "C" void stage_light_reset()
     s32 i;
     SW->light.kind = 0;
     SW->light.intensity = lbl_8079A484;
-    for (i = 0; i < 12; i++)
+    for (i = 3; i >= 0; i--)
+        SW->light.colours[i] = 0xFFFFFF00;
+    for (i = 11; i >= 4; i--)
         SW->light.colours[i] = 0xFFFFFF00;
     setVector3(&SW->light_dir, lbl_8079A498, lbl_8079A498, lbl_8079A498);
 }
@@ -621,18 +642,18 @@ extern "C" void stage_area_slots_reset()
 /* Calls stage_part_bodies_set for each index below the current map's count. */
 extern "C" void stage_part_bodies_set_all(StageWork* self)
 {
-    u8 n = (u8)stage_map_area_count_get(self->mapno);
+    u32 n = stage_map_area_count_get(self->mapno);
     u8 i;
-    for (i = 0; (u8)i < n; i++)
+    for (i = 0; i < (u8)n; i++)
         stage_part_bodies_set(self, i);
 }
 
 /* Calls stage_parts_check for each index below the current map's count. */
 extern "C" void stage_parts_check_all(StageWork* self)
 {
-    u8 n = (u8)stage_map_area_count_get(self->mapno);
+    u32 n = stage_map_area_count_get(self->mapno);
     u8 i;
-    for (i = 0; (u8)i < n; i++)
+    for (i = 0; i < (u8)n; i++)
         stage_parts_check(self, i);
 }
 
@@ -678,9 +699,10 @@ extern "C" u32 pl_act_kind_get(u8 id)
 /* Sets bit (4 + j) of bitmask[id] when the current map's j-th table word is set. */
 extern "C" void stage_area_flag_set(u8 id, u8 j)
 {
-    StagePartDef** p = stage_part_defs_get(SW, id);
+    StageWork* w = SW;
+    StagePartDef** p = stage_part_defs_get(w, id);
     if (p[(u8)j] != 0)
-        SW->bitmask[(u8)id] |= (u8)(0x10 << (u8)j);
+        w->bitmask[(u8)id] |= (u8)(0x10 << (u8)j);
 }
 
 /* Whether at least two of the three map flags (ids 3, 11, 4) are set. */
@@ -798,6 +820,12 @@ void stage_part_update(StageWork* w, StagePart* part, u8* joints, u8* vis_ids, u
 #include "Pl/pl_land_grid_a_load.h"
 #include "vec3_segment_box_ck.h"
 #include "enemy/em_res_node_trans_get.h"
+#include "Runtime.PPCEABI.H/memset.h"
+#include "Runtime.PPCEABI.H/memcpy.h"
+#include "ef/work_mem_free.h"
+#include "ef/eft_res_file_load.h"
+#include "ef/eft_map_com_proID_tbl_ptr.h"
+#include "map_com_eft_file_tbl.h"
 
 /* ---- stage work reset, per-frame driver and area load ---- */
 
@@ -1013,42 +1041,49 @@ extern "C" void stage_area_model_load_done(char* name, u8* data, u32 size, u32* 
     u32 file;
     u32 file2;
     u8 extra[0x4C];
-    s32 count = 1;
-    u8 second = 0;
-    u8 mapno = ctx[0];
-    u8 areano = ctx[1];
-    u8 kind = ctx[3];
-    StageSlot* slot;
-    ResEntry* entry;
     s32 index;
+    StageSlot* slot;
     s32 i;
+    StageWork* w;
+    u8 mapno;
+    u8 areano;
+    u8 kind;
+    ResEntry* entry;
+    s32 count;
+    u8 second;
 
     res_file_ctor(&file, 0);
+    w = SW;
+    count = 1;
+    second = 0;
+    mapno = ctx[0];
+    areano = ctx[1];
+    kind = ctx[3];
     nwAddResource(name, data);
-    slot = &SW->slots[ctx[2]];
+    slot = &w->slots[ctx[2]];
     entry = ckResourceName(name);
     index = res_mem_index_get(name);
     em_res_file_row_copy(extra, (u8*)nw_res_manager + index * 0x4C + 0x3070);
     if (kind == 0 && stage_part_def_ck(mapno, areano) == 1 && (u8)stage_area_alt_model_get(mapno, areano) == 1) {
         count = 2;
         second = 3;
-        SW->alt_model = 1;
+        w->alt_model = 1;
     } else if (kind == 1 && (u8)stage_area_alt_model_get(mapno, areano) == 2) {
         count = 2;
         second = 2;
     }
     if (entry != 0) {
         for (i = 0; i < count; i++) {
-            StageChar* model;
+            MHchar* chr;
             if (i == 1)
                 kind = second;
             res_file_assign(&file, res_file_ctor(&file2, (u32)entry->data));
-            model = &slot->models[kind];
-            mhchar_reset(&model->chr);
-            mhchar_model_create(&model->chr, &file, 0x2F, 2);
-            model->chr.field_0x40 = 0;
-            if (model->chr.g3d_0x10C != 0)
-                ((StageG3dWork*)model->chr.g3d_0x10C)->field_0x3 = 1;
+            chr = &slot->models[kind].chr;
+            mhchar_reset(chr);
+            mhchar_model_create(chr, &file, 0x2F, 2);
+            slot->models[kind].chr.field_0x40 = 0;
+            if (slot->models[kind].chr.g3d_0x10C != 0)
+                ((StageG3dWork*)slot->models[kind].chr.g3d_0x10C)->field_0x3 = 1;
             slot->res_file[kind] = (s32)data;
             slot->res_id[kind] = entry->index;
             slot->mem_index[kind] = index;
@@ -1117,14 +1152,16 @@ StageWeaponWork* get_stg_weapon_work(_PLW* plw, long* count)
         break;
     case 7:
     case 18:
-        if (plw->area_0x16 == 3) {
+        switch (plw->area_0x16) {
+        case 3:
             *count = 3;
             return stg_weapon_work_7_3;
         }
         break;
     case 8:
     case 19:
-        if (plw->area_0x16 == 1) {
+        switch (plw->area_0x16) {
+        case 1:
             *count = 1;
             return stg_weapon_work_8_1;
         }
@@ -1141,7 +1178,8 @@ StageWeaponWork* get_stg_weapon_work(_PLW* plw, long* count)
         break;
     case 11:
     case 20:
-        if (plw->area_0x16 == 1) {
+        switch (plw->area_0x16) {
+        case 1:
             *count = 1;
             return stg_weapon_work_11_1;
         }
@@ -1271,31 +1309,31 @@ extern "C" void stage_light_update(void)
     StageLight* light;
     u8 player;
 
-    if (GameMode_ck() == 2) {
-        if (w->mapno == 21) {
-            stage_colour_cycle_update();
-            return;
+    do {
+        if (GameMode_ck() == 2) {
+            if (w->mapno == 21) {
+                stage_colour_cycle_update();
+                return;
+            }
+            if (getItemListSelection() == 0)
+                light = &w->areas[w->areano].light;
+            else
+                light = &w->areas[w->areano].light_water;
+        } else {
+            if (stage_water_enabled_ck() == 0)
+                break;
+            if (camera_underwater_ck() == 1)
+                light = &w->areas[w->areano].light_water;
+            else
+                light = &w->areas[w->areano].light;
         }
-        if (getItemListSelection() == 0)
-            light = &w->areas[w->areano].light;
-        else
-            light = &w->areas[w->areano].light_water;
-    } else {
-        if (stage_water_enabled_ck() == 0)
-            light = 0;
-        else if (camera_underwater_ck() == 1)
-            light = &w->areas[w->areano].light_water;
-        else
-            light = &w->areas[w->areano].light;
-    }
-    if (light != 0) {
         w->ambient.rgb[0] = light->ambient.rgb[0];
         w->ambient.rgb[1] = light->ambient.rgb[1];
         w->ambient.rgb[2] = light->ambient.rgb[2];
         light_mode_set(w->ambient.rgb[0], w->ambient.rgb[1], w->ambient.rgb[2]);
         light_mode_rgb_set(w->ambient.rgb2[0], w->ambient.rgb2[1], w->ambient.rgb2[2]);
         stage_light_set_copy(set, &light->set);
-    }
+    } while (0);
     player = my_player_no();
     my_player_no_set(0);
     stage_light_blend_set(&w->light, &w->light_dir, 0);
@@ -1328,8 +1366,7 @@ extern "C" void stage_area_light_setup(StageWork* w)
     for (i = 0; i < 3; i++) {
         u8 index = i == 0 ? 0 : i;
         colour = area->rows[0].words[i];
-        light_obj_area_select(index);
-        light_obj_init((VEC3*)&area->rows[0].v.vecs[i], (GXColor*)&colour, 0);
+        light_obj_init(light_obj_area_select(index), (VEC3*)&area->rows[0].v.vecs[i], *(GXColor*)&colour, 0);
     }
 }
 
@@ -1421,7 +1458,7 @@ extern "C" void stage_area_models_seat(void)
 extern "C" void stage_area_enter(u8 mapno, u8 areano)
 {
     StageWork* w = SW;
-    u8 kind;
+    u32 kind;
 
     w->cur_slot = stage_area_slot_get(mapno, areano);
     w->mapno = mapno;
@@ -1437,7 +1474,7 @@ extern "C" void stage_area_enter(u8 mapno, u8 areano)
     stage_area_light_apply();
     light_area_setup();
     kind = stage_entry_eft_kind_get(mapno, areano);
-    if (kind != 0xFF)
+    if ((u8)kind != 0xFF)
         eft004_area_set((s8)kind);
     stage_area_effects_start(mapno, areano);
     stage_parts_seat(w);
@@ -1468,10 +1505,13 @@ extern "C" void stage_area_slot_reset(u8 index)
 /* Returns the free stage area slot (0 or 1), -1 when both are taken. */
 extern "C" s8 stage_area_free_slot_get(void)
 {
-    if (SW->slots[0].state == 0)
-        return 0;
-    if (SW->slots[1].state == 0)
-        return 1;
+    StageWork* w = SW;
+    s32 i;
+
+    for (i = 0; i < 2; i++) {
+        if (w->slots[i].state == 0)
+            return i;
+    }
     return -1;
 }
 
@@ -1479,10 +1519,12 @@ extern "C" s8 stage_area_free_slot_get(void)
 extern "C" s8 stage_area_slot_get(u8 mapno, u8 areano)
 {
     StageWork* w = SW;
-    if (mapno == w->slots[0].mapno && areano == w->slots[0].areano)
-        return 0;
-    if (mapno == w->slots[1].mapno && areano == w->slots[1].areano)
-        return 1;
+    s32 i;
+
+    for (i = 0; i < 2; i++) {
+        if (mapno == w->slots[i].mapno && areano == w->slots[i].areano)
+            return i;
+    }
     return -1;
 }
 
@@ -1490,7 +1532,6 @@ extern "C" s8 stage_area_slot_get(u8 mapno, u8 areano)
 extern "C" void stage_area_slot_release(s8 slot)
 {
     StageWork* w = SW;
-    StageSlot* s;
     s32 i;
 
     if (slot < 0)
@@ -1507,12 +1548,11 @@ extern "C" void stage_area_slot_release(s8 slot)
             w->slots[slot].mem_index[i] = -1;
         }
     }
-    s = &w->slots[slot];
-    s->field_0x598 = 0;
-    s->mapno = 0xFF;
-    s->areano = 0xFF;
-    s->state = 0;
-    s->model_count = 0;
+    w->slots[slot].field_0x598 = 0;
+    w->slots[slot].mapno = 0xFF;
+    w->slots[slot].areano = 0xFF;
+    w->slots[slot].state = 0;
+    w->slots[slot].model_count = 0;
     eft_res_stage_release_all();
 }
 
@@ -1587,23 +1627,31 @@ extern "C" u32 stage_water_area_ck(void)
         switch (SW->mapno) {
         case 1:
         case 12:
-            if ((u8)(SW->areano - 2) <= 4 || SW->areano == 9)
+            if ((u32)(SW->areano - 2) <= 4U || (s32)SW->areano == 9)
                 return 0;
             break;
         case 2:
         case 13:
-            if (SW->areano == 3 || SW->areano == 9)
+            switch (SW->areano) {
+            case 3:
+            case 9:
                 return 0;
+            }
             break;
         case 3:
         case 14:
-            if (SW->areano == 5 || SW->areano == 7)
+            switch (SW->areano) {
+            case 5:
+            case 7:
                 return 0;
+            }
             break;
         case 5:
         case 16:
-            if (SW->areano == 6)
+            switch (SW->areano) {
+            case 6:
                 return 0;
+            }
             break;
         }
         return 1;
@@ -1621,10 +1669,18 @@ extern "C" void get_now_area_pos(VEC3* out, u8 area)
     setVector3(out, a->light.dir.x, a->light.dir.y, a->light.dir.z);
 }
 
+/* The returned-vector view of `VEC3`: the inline copy constructor lets MWCC build the result in the return slot
+ * (playbook 176); the layout and the mangling are VEC3's. */
+/* size: 0xC */
+struct StageRetVec3 : VEC3 {
+    StageRetVec3() {}
+    StageRetVec3(const StageRetVec3& o) { x = o.x; y = o.y; z = o.z; }
+};
+
 /* Returns the world position of the area-local point `pos` in area `area`. */
-VEC3 get_worldworld_pos(VEC3* pos, u8 area)
+StageRetVec3 get_worldworld_pos(VEC3* pos, u8 area)
 {
-    VEC3 out;
+    StageRetVec3 out;
     VEC3 origin;
     StageAreaOrigin* o;
 
@@ -1726,10 +1782,12 @@ extern "C" void stage_area_point_get(u8 area, u8 idx, VEC3* pos, u32* angle)
 /* Writes the start position and facing of area `area` (two fixed points). */
 extern "C" void stage_area_start_get(u8 area, VEC3* pos, u32* angle)
 {
-    StagePoint* p = &stg_area_start_b;
+    StagePoint* p;
 
     if (area == 0)
         p = &stg_area_start_a;
+    else
+        p = &stg_area_start_b;
     pos->x = p->pos.x;
     pos->y = p->pos.y;
     pos->z = p->pos.z;
@@ -1856,6 +1914,68 @@ extern "C" void stage_arena_land_grid_load(u8 mapno, u8 areano)
     load_file_req(f->name, system_work_mem_ptr_get(), f->size, (u32)stage_arena_land_grid_load_done, 1, &ctx);
 }
 
+/* Clears the area records of map `mapno`, reads each area's record file into them, and loads the map's common eft
+ * and efm archives into freshly assigned effect slots. */
+extern "C" void stage_map_obj_load(u8 mapno)
+{
+    StageGroup* g = (StageGroup*)stage_map_group_get(mapno);
+    s32 count = g->kind;
+    StageArea* areas;
+    StageArea* area;
+    u8* buf;
+    s32 i;
+    EftResFile* file;
+    u8* proids;
+    char** names;
+    EftResFile* mfile;
+    u8* mproids;
+    char** mnames;
+    u8 mdl_ids[16];
+    u8 ids[88];
+    s32 j;
+
+    i = 0;
+    areas = SW->areas;
+    area = areas;
+    for (; i < count; i++) {
+        memset(area, 0, sizeof(StageArea));
+        area++;
+    }
+    buf = (u8*)work_mem_alloc(0x1E0);
+    if (buf == 0)
+        return;
+    for (i = 0; i < count; i++) {
+        if (g->area_files[i] != 0 && load_file(g->area_files[i], (u32)buf, 0x1E0) > 0)
+            memcpy(&areas[i], buf, 0x1E0);
+    }
+    work_mem_free(buf);
+
+    file = map_com_eft_file_tbl[mapno];
+    proids = eft_map_com_proID_tbl_ptr[mapno];
+    names = map_com_eft_name_ptr[mapno];
+    if (file != 0 && proids != 0 && names != 0) {
+        ids[0] = eft_pro_slot_assign(0, 2, 2, mapno, 0);
+        for (j = 1, i = 2; proids[i - 1] != 0xFF; j += 2, i += 2) {
+            ids[i - 1] = eft_pro_slot_assign(0, 1, 2, mapno, j);
+            ids[i] = eft_pro_slot_assign(0, 1, 3, mapno, i);
+        }
+        eft_res_file_load(file, 0, 0, ids, proids, names);
+    }
+
+    mfile = map_com_efm_file_tbl[mapno];
+    mproids = efm_map_com_proID_tbl_ptr[mapno];
+    mnames = eft_map_common_mdl_name_ptr[mapno];
+    if (mfile != 0 && mproids != 0 && mnames != 0) {
+        for (j = 0; mproids[j] != 0xFF; j++) {
+            u8 id = eft_pro_slot_assign(0, 3, 2, mapno, j);
+            if (id == 0xFF)
+                break;
+            mdl_ids[j] = id;
+        }
+        eft_res_file_load(mfile, 3, 0, mdl_ids, mproids, mnames);
+    }
+}
+
 /* One warp zone of an area: a cylinder (kind 0) or a box segment (kind 1), and where it warps to. */
 typedef struct StageZone {
     /* +0x00 */ u8 dest;           /* 0xFF ends the list */
@@ -1915,7 +2035,8 @@ extern "C" u32 stage_warp_zone_check(void)
     u8 area;
 
     VEC3_ctor(&pos);
-    plw = &((_PLW*)get_move_work_adrs(2))[(s8)my_player_no()];
+    plw = (_PLW*)get_move_work_adrs(2);
+    plw = &plw[(s8)my_player_no()];
     if (plw == 0)
         return 0;
     if (pl_warp_ready_ck(plw) == 0)
@@ -1998,7 +2119,7 @@ extern "C" void stage_area_effects_start(u8 mapno, u8 areano)
         eft052_set();
     }
     if (mapno == 0x15) {
-        switch (areano) {
+        switch ((u32)areano) {
         case 0:
         case 1:
         case 3:
@@ -2135,8 +2256,8 @@ extern "C" void stage_parts_check(StageWork* w, u8 areano)
 /* Drives part `part` of the current model: arms the break (joint scatter and hidden joints) and steps it. */
 extern "C" void stage_part_update(StageWork* w, StagePart* part, u8* joints, u8* vis_ids, u8 kind)
 {
-    MHchar* chr;
     u32 i;
+    MHchar* chr;
 
     if (w->alt_model == 1)
         chr = &w->chars[3]->chr;
@@ -2171,11 +2292,11 @@ extern "C" void stage_part_update(StageWork* w, StagePart* part, u8* joints, u8*
 /* One breakable part's scatter definition: the joints' start positions, rotations, a random-spin flag and the
  * fall time. */
 typedef struct StageScatterDef {
-    /* +0x00 */ VEC3* pos;        /* the joints' start velocities */
-    /* +0x04 */ VEC3* gravity;
-    /* +0x08 */ VEC3* damp;
-    /* +0x0C */ u16 (*rot)[3];
-    /* +0x10 */ VEC3* rot_damp;
+    /* +0x00 */ f32* pos;         /* the joints' start velocities, three per joint */
+    /* +0x04 */ f32* gravity;     /* three per joint */
+    /* +0x08 */ f32* damp;        /* three per joint */
+    /* +0x0C */ u16* rot;         /* three per joint */
+    /* +0x10 */ f32* rot_damp;    /* three per joint */
     /* +0x14 */ f32 floor_y;      /* the scatter ends below it */
     /* +0x18 */ u8 random_spin;
     /* +0x19 */ u8 time;
@@ -2189,21 +2310,21 @@ extern "C" void stage_part_scatter_start(StageWork* w, StagePart* part, MHchar* 
 {
     nw4r::g3d::ResNode node(0);
     VEC3 v;
-    StageScatterDef* def;
     u8 i;
+    StageScatterDef* def;
 
     VEC3_ctor(&v);
     def = stg_scatter_defs[kind];
     for (i = 0; i < 3; i++) {
         part->joint_done[i] = 0;
-        part->joint_pos[i].x = def->pos[i].x;
-        part->joint_pos[i].y = def->pos[i].y;
-        part->joint_pos[i].z = def->pos[i].z;
-        part->joint_rot[i][0] = def->rot[i][0];
-        part->joint_rot[i][1] = def->rot[i][1];
-        part->joint_rot[i][2] = def->rot[i][2];
+        part->joint_pos[i].x = def->pos[i * 3];
+        part->joint_pos[i].y = def->pos[i * 3 + 1];
+        part->joint_pos[i].z = def->pos[i * 3 + 2];
+        part->joint_rot[i][0] = def->rot[i * 3];
+        part->joint_rot[i][1] = def->rot[i * 3 + 1];
+        part->joint_rot[i][2] = def->rot[i * 3 + 2];
         if (def->random_spin != 0) {
-            s32 spin = ran_suu(1) & 0x5FF;
+            u16 spin = ran_suu(1) & 0x5FF;
             if (ran_suu(1) & 1)
                 part->joint_angle[i][0] = spin;
             else
@@ -2332,15 +2453,20 @@ extern "C" void stage_parts_seat(StageWork* w)
 {
     nw4r::g3d::ResNode node(0);
     VEC3 rot;
-    MHchar* chr = &w->chars[0]->chr;
-    MHchar* water = &w->chars[1]->chr;
-    MHchar* alt = 0;
-    StagePartDef** defs = stage_part_defs_get(w, w->areano);
-    u8 hidden = 0;
+    MHchar* chr;
+    MHchar* water;
+    MHchar* alt;
+    StagePartDef** defs;
+    u8 hidden;
     u8 j;
     u8 k;
 
     VEC3_ctor(&rot);
+    chr = &w->chars[0]->chr;
+    water = &w->chars[1]->chr;
+    alt = 0;
+    defs = stage_part_defs_get(w, w->areano);
+    hidden = 0;
     for (k = 0; k < 8; k++)
         w->event_ids[k] = 0xFF;
     if (w->alt_model == 1) {
@@ -2403,8 +2529,10 @@ extern "C" void stage_parts_seat(StageWork* w)
             } else if (stage_water_enabled_ck() == 1) {
                 water->setVisibility(defs[j]->vis_ids[k], part->visible);
             }
-            if (part->visible == 0)
-                w->event_ids[hidden++] = defs[j]->vis_ids[k];
+            if (part->visible == 0) {
+                w->event_ids[hidden] = defs[j]->vis_ids[k];
+                hidden++;
+            }
         }
     }
 }
@@ -2417,8 +2545,8 @@ extern "C" u8 stg_scatter_jitter_y;
  * writes each joint's position and rotation into the model's nodes. */
 extern "C" void stage_part_scatter_step(StageWork* w, StagePart* part, MHchar* chr, u8* joints, u8 kind)
 {
-    nw4r::g3d::ResNode node(0);
     StageScatterDef* def = stg_scatter_defs[kind];
+    nw4r::g3d::ResNode node(0);
     u8 i;
 
     if (part->joint_base[0].y < def->floor_y)
@@ -2452,16 +2580,16 @@ extern "C" void stage_part_scatter_step(StageWork* w, StagePart* part, MHchar* c
         case 1:
             if (*joints == 0xFF)
                 break;
-            part->joint_pos[i].x *= def->damp[i].x;
-            part->joint_pos[i].y *= def->damp[i].y;
-            part->joint_pos[i].z *= def->damp[i].z;
-            part->joint_pos[i].x += def->gravity[i].x;
-            part->joint_pos[i].y += def->gravity[i].y;
-            part->joint_pos[i].z += def->gravity[i].z;
+            part->joint_pos[i].x *= def->damp[i * 3];
+            part->joint_pos[i].y *= def->damp[i * 3 + 1];
+            part->joint_pos[i].z *= def->damp[i * 3 + 2];
+            part->joint_pos[i].x += def->gravity[i * 3];
+            part->joint_pos[i].y += def->gravity[i * 3 + 1];
+            part->joint_pos[i].z += def->gravity[i * 3 + 2];
             addVec3To(&part->joint_base[i], &part->joint_pos[i]);
-            part->joint_rot[i][0] = (u16)(s32)(part->joint_rot[i][0] * def->rot_damp[i].x);
-            part->joint_rot[i][1] = (u16)(s32)(part->joint_rot[i][1] * def->rot_damp[i].y);
-            part->joint_rot[i][2] = (u16)(s32)(part->joint_rot[i][2] * def->rot_damp[i].z);
+            part->joint_rot[i][0] = (u16)(s32)(part->joint_rot[i][0] * def->rot_damp[i * 3]);
+            part->joint_rot[i][1] = (u16)(s32)(part->joint_rot[i][1] * def->rot_damp[i * 3 + 1]);
+            part->joint_rot[i][2] = (u16)(s32)(part->joint_rot[i][2] * def->rot_damp[i * 3 + 2]);
             part->joint_angle[i][0] = (u16)(part->joint_angle[i][0] + part->joint_rot[i][0]);
             part->joint_angle[i][1] = (u16)(part->joint_angle[i][1] + part->joint_rot[i][1]);
             part->joint_angle[i][2] = (u16)(part->joint_angle[i][2] + part->joint_rot[i][2]);
@@ -2591,31 +2719,33 @@ extern "C" void stage_light_blend_set(StageBlendRec* rec, void* obj, u8 store)
 extern "C" void stage_area_colour_update(void)
 {
     StageRuntime* st = (StageRuntime*)stage_w;
-    StageColourRec rec;
     s32 handle;
+    StageColourRec rec;
+    StageColourRec fog;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetFog(0);
-    stage_fog_copy(&rec, &handle);
-    fn_8007A1B8(&rec, 0, &rec.flags, &rec.b, 0, 0, &rec.a);
+    stage_fog_copy(&fog, &handle);
+    fn_8007A1B8(&fog, 0, &fog.flags, &fog.b, 0, 0, &fog.a);
 
-    if (GameMode_ck() == 2) {
-        if (getItemListSelection() == 0) {
-            stage_colour_rec_copy(&rec, &st->area[st->areano].colour_a);
+    do {
+        if (GameMode_ck() == 2) {
+            if (getItemListSelection() == 0) {
+                stage_colour_rec_copy(&rec, &st->area[st->areano].colour_a);
+            } else {
+                stage_colour_rec_copy(&rec, &st->area[st->areano].colour_b);
+            }
         } else {
-            stage_colour_rec_copy(&rec, &st->area[st->areano].colour_b);
+            if (stage_water_enabled_ck() == 0) {
+                break;
+            }
+            if (camera_underwater_ck() == 1U) {
+                stage_colour_rec_copy(&rec, &st->area[st->areano].colour_b);
+            } else {
+                stage_colour_rec_copy(&rec, &st->area[st->areano].colour_a);
+            }
         }
         stage_fog_apply(&rec);
-        return;
-    }
-    if (stage_water_enabled_ck() == 0) {
-        return;
-    }
-    if (camera_underwater_ck() == 1U) {
-        stage_colour_rec_copy(&rec, &st->area[st->areano].colour_b);
-    } else {
-        stage_colour_rec_copy(&rec, &st->area[st->areano].colour_a);
-    }
-    stage_fog_apply(&rec);
+    } while (0);
 }
 
 /* Copies the 0x10-byte colour record at `src` into `dst`. */
@@ -2627,41 +2757,39 @@ extern "C" void stage_colour_rec_copy(StageColourRec* dst, const StageColourRec*
     dst->flags = src->flags;
 }
 
-/* Builds the current area's visibility set from the map/area tables and hides every joint that is not
- * in it. */
+/* Builds the current area's visibility set from the map/area tables: shows the kept joints that are not
+ * visible-joint events and hides the dropped ones. */
 extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind)
 {
     nw4r::math::VEC3 poly;
-    nw4r::math::VEC3 cam;
-    MHchar* chr;
-    StageJointLists* list;
     u8* keep;
-    u8* drop;
+    StageJointLists* list;
+    MHchar* chr;
     u8 group;
+    u8* drop;
+    u8 player;
     u8 changed;
     u8 found;
-    u8 i;
-    u8 j;
 
     list = NULL;
     group = 0;
+    player = 0;
     changed = 0;
-    found = 0;
     chr = (MHchar*)st->area_char[kind];
     VEC3_ctor(&poly);
 
     if (kind == 1) {
         if (lbl_805CF644[st->mapno] != NULL) {
-            list = lbl_805CF644[st->mapno] + st->areano;
+            list = lbl_805CF644[st->mapno][st->areano];
         }
     } else if (kind == 0) {
         switch (st->mapno) {
         case 1:
         case 12:
             if (st->areano == 7) {
-                list = lbl_80792310;
+                list = &lbl_80792310;
             } else if (st->areano == 0xC) {
-                list = lbl_80792330;
+                list = &lbl_80792330;
             }
             break;
         case 3:
@@ -2673,6 +2801,8 @@ extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind)
             group = 1;
             break;
         }
+    } else {
+        return;
     }
 
     if (list == NULL) {
@@ -2680,7 +2810,7 @@ extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind)
     }
     if (group == 1U && kind == 0) {
         copyVec3(&poly, &::get_camera_pos());
-        group = my_player_no();
+        player = my_player_no();
         if (stage_pos_z_low_ck(&poly) == 1U) {
             keep = list->show;
             drop = list->hide;
@@ -2694,7 +2824,7 @@ extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind)
             changed = 1;
         }
     } else {
-        if (::get_camera_pos().z == lbl_8079A448) {
+        if (::get_camera_pos().y >= lbl_8079A448) {
             keep = list->show;
             drop = list->hide;
             found = 1;
@@ -2711,31 +2841,26 @@ extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind)
     stage_part_defs_get(st, st->areano);
 
     if (changed != 0) {
-        for (;;) {
-            if (*keep == 0xFF) {
-                break;
-            }
+        for (; *keep != 0xFF; keep++) {
+            u8 hit = 0;
+            u8 j;
             for (j = 0; j < 8; j++) {
-                if (st->field_0x2EAD[j] == 0xFF) {
-                    chr->setVisibility(1, 1);
+                if (st->field_0x2EAD[j] == 0xFF)
                     break;
-                }
                 if (*keep == st->field_0x2EAD[j]) {
+                    hit = 1;
                     break;
                 }
             }
-            keep++;
-        }
-        for (;;) {
-            if (*drop == 0xFF) {
-                break;
+            if (hit == 0) {
+                chr->setVisibility(*keep, 1);
             }
-            chr->setVisibility(1, 0);
-            drop++;
+        }
+        for (; *drop != 0xFF; drop++) {
+            chr->setVisibility(*drop, 0);
         }
     }
-    st->joint_state[group * 4 + kind] = found;
-    (void)i;
+    st->joint_state[player * 4 + kind] = found;
 }
 
 /* Tail-calls the colour/visibility driver for the map's area animation set 0. */
@@ -3290,7 +3415,7 @@ extern "C" void stage_area_kind_joints_hide(StageRuntime* st, MHchar* chr)
         return;
     }
     while (*p != 0xFF) {
-        chr->setVisibility(0, 0);
+        chr->setVisibility(*p, 0);
         p++;
     }
 }
@@ -3299,35 +3424,25 @@ extern "C" void stage_area_kind_joints_hide(StageRuntime* st, MHchar* chr)
 extern "C" void stage_eft_strips_spawn(StageRuntime* st)
 {
     nw4r::math::VEC3 pos;
-    f32* strip;
-    u8* slot;
     f32 limit;
     s32 i;
+    f32* strip;
+    u8* slot;
 
     VEC3_ctor(&pos);
-    if (st->mapno != 0xA || st->areano != 1) {
-        return;
-    }
-    strip = lbl_805CF784;
-    slot = lbl_805CF7C0;
-    limit = lbl_8079A448;
-    for (;;) {
-        if (*strip <= limit) {
-            return;
-        }
-        i = 0;
-        for (;;) {
-            if ((f32)i >= strip[2] / strip[1]) {
-                break;
+    if (st->mapno == 0xA && st->areano == 1) {
+        strip = lbl_805CF784;
+        slot = lbl_805CF7C0;
+        limit = lbl_8079A448;
+        for (; strip[0] > limit; strip += 3, slot += 0x0C) {
+            for (i = 0; (f32)i < strip[2] / strip[1]; i++) {
+                f32 frame = strip[0] + (f32)i * strip[1];
+                if (mhchar_frame_check((void*)st->area_char[0], 0, 0, frame, lbl_8079A448) != 0) {
+                    vec_to_mh_vec3(&pos, (struct Vec*)slot);
+                    ::eft028_set_koware(0xB, &pos, st->areano, 0);
+                }
             }
-            if (mhchar_frame_check((void*)st->area_char[0], 0, 0, *strip + (f32)i * strip[1], lbl_8079A448) != 0) {
-                vec_to_mh_vec3(&pos, (struct Vec*)slot);
-                ::eft028_set_koware(0xB, &pos, st->areano, 0);
-            }
-            i++;
         }
-        strip += 3;
-        slot += 0x0C;
     }
 }
 
@@ -3370,10 +3485,9 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
     nw4r::math::VEC3 pos;
     s8 order[3];
     f32* thresholds;
+    u8* joints;
     u8* strip;
     u8** joint_tables;
-    u8* joints;
-    f32 height;
     s32 band;
     u8 index;
     u8 mapno;
@@ -3381,7 +3495,7 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
     VEC3_ctor(&pos);
     strip = NULL;
     mapno = get_now_mapno();
-    if ((mapno == 4 || mapno == 0xF) && kind == 5) {
+    if (((s32)mapno == 4 || (s32)mapno == 0xF) && (s32)kind == 5) {
         strip = lbl_805CF7FC;
         thresholds = lbl_805CF7F0;
         joint_tables = (flags & 1) ? lbl_805CF8E0 : lbl_805CF8F0;
@@ -3389,22 +3503,15 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
     if (strip == NULL) {
         return;
     }
-    band = 0;
-    height = chr->pos_0x04.y;
-    if (!(height < thresholds[0])) {
-        band = 1;
-        if (!(height < thresholds[1])) {
-            band = 2;
-            if (!(height < thresholds[2])) {
-                band = 3;
-            }
+    for (band = 0; band < 3; band++) {
+        if (chr->pos_0x04.y < thresholds[band]) {
+            break;
         }
     }
     joints = joint_tables[band];
-    index = (s8)(u8)(flags % 3);
-    order[0] = index;
+    order[0] = flags % 3;
     if ((flags & 0x10) != 0) {
-        order[1] = index + 1;
+        order[1] = order[0] + 1;
         if (order[1] >= 3) {
             order[1] = 0;
         }
@@ -3413,7 +3520,7 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
             order[2] = 0;
         }
     } else {
-        order[1] = index - 1;
+        order[1] = order[0] - 1;
         if (order[1] < 0) {
             order[1] = 2;
         }
@@ -3422,12 +3529,9 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
             order[2] = 2;
         }
     }
-    index = 0;
-    while ((s8)*joints > 0) {
+    for (index = 0; (s8)*joints > 0; joints++, index++) {
         vec_to_mh_vec3(&pos, (struct Vec*)(strip + (s8)*joints * 0xC));
-        shell_set_func_ptr->method_0x88(&pos, kind, (s16)((s8)order[index] * 0xA), shell_set_func_ptr);
-        joints++;
-        index++;
+        shell_set_func_ptr->method_0x88(&pos, kind, (s16)(order[index] * 0xA), shell_set_func_ptr);
     }
 }
 
@@ -3483,8 +3587,8 @@ extern "C" void stage_area_event_dispatch(void* plw, u8 index)
 extern "C" void stage_area_timers_update(StageRuntime* st)
 {
     s32 now;
-    s32 span;
     u8 index;
+    s32 span;
 
     now = quest_time_limit_get();
     span = now - quest_time_elapsed_get();
@@ -3557,16 +3661,13 @@ extern "C" void stage_demo_start(u8 kind)
 extern "C" void stage_joint_se_update(StageRuntime* st)
 {
     nw4r::math::VEC3 pos;
-    MHchar* chr;
     u8* list;
-    u8* p;
     s32 sound;
     s32 target;
+    u8* p;
 
     VEC3_ctor(&pos);
     list = NULL;
-    sound = 0;
-    target = 0;
     switch (st->mapno) {
     case 21:
         if (getItemListSelection() == 0) {
@@ -3574,9 +3675,12 @@ extern "C" void stage_joint_se_update(StageRuntime* st)
             case 0:
                 list = lbl_80792498;
                 sound = 1;
+                target = 0;
                 break;
             case 7:
                 list = lbl_8079249C;
+                sound = 0;
+                target = 0;
                 break;
             }
         }
@@ -3585,17 +3689,21 @@ extern "C" void stage_joint_se_update(StageRuntime* st)
     case 11:
         if (st->areano == 0) {
             list = lbl_807924A0;
+            sound = 0;
+            target = 0;
         }
         break;
     case 9:
         if (st->areano == 0) {
             list = lbl_807924A4;
+            sound = 0;
+            target = 0;
         }
         break;
     case 10:
         if (st->areano == 1) {
-            list = lbl_807924A8;
             sound = 0;
+            list = lbl_807924A8;
             target = 1;
         }
         break;
@@ -3603,9 +3711,8 @@ extern "C" void stage_joint_se_update(StageRuntime* st)
     if (list == NULL) {
         return;
     }
-    chr = st->area_char[0];
     for (p = list; (s8)*p > 0; p++) {
-        chr->get_joint_wpos((s8)*p, &pos);
+        st->area_char[0]->get_joint_wpos((s8)*p, &pos);
         switch (target) {
         case 0:
             shell_se_req(NULL, &pos, 0x10, sound);
@@ -3641,50 +3748,46 @@ extern "C" void stage_demo_markers_place(StageRuntime* st)
     if (--st->field_0x2FDC > 0) {
         return;
     }
-    if (((now - base) & 0x40) == 0x40) {
-        st->field_0x2FDC = 0;
-        return;
-    }
-    if (((now - base) & 0x30) != 0) {
-        st->field_0x2FDC = 0;
-        return;
-    }
-    if (event_demo_ck() == 1U) {
-        return;
-    }
-    for (p = lbl_805CFA38; p->mapno != 0xFF; p++) {
-        if (p->mapno == get_now_mapno()) {
-            entry = (StageDemoEntry*)p->offsets;
-            break;
+    if (((now - base) & 0x40) != 0x40) {
+        if (((now - base) & 0x30) == 0) {
+            if (event_demo_ck() == 1U) {
+                return;
+            }
+            for (p = lbl_805CFA38; p->mapno != 0xFF; p++) {
+                if (p->mapno == get_now_mapno()) {
+                    entry = (StageDemoEntry*)p->offsets;
+                    break;
+                }
+            }
+            if (entry == NULL) {
+                return;
+            }
+            for (; entry->mapno != 0xFF; entry++) {
+                vec_to_mh_vec3(&pos, (struct Vec*)(entry->offsets + (secs % entry->count) * 0xC));
+                shell_set_func_ptr->method_0x80(&pos, entry->mapno, 0x8C, shell_set_func_ptr);
+            }
+            st->field_0x2FDC = 0x12C;
+        } else {
+            st->field_0x2FDC = 0;
         }
+    } else {
+        st->field_0x2FDC = 0;
     }
-    if (entry == NULL) {
-        return;
-    }
-    for (;;) {
-        if (entry->mapno == 0xFF) {
-            break;
-        }
-        vec_to_mh_vec3(&pos, (struct Vec*)(entry->offsets + (secs % entry->count) * 0xC));
-        shell_set_func_ptr->method_0x80(&pos, entry->mapno, 0x8C, shell_set_func_ptr);
-        entry++;
-    }
-    st->field_0x2FDC = 0x12C;
 }
 
 /* Re-drives every live area object's own per-frame update. */
 extern "C" void stage_area_objects_refresh(void)
 {
     StageRuntime* st = (StageRuntime*)stage_w;
-    u8 index;
+    u32 index;
 
     if (GameMode_ck() == 1) {
         return;
     }
     index = 0;
     do {
-        if (st->area_char[index] != NULL) {
-            stage_area_joint_visibility_set(st, st->area_char[index], index);
+        if (st->area_char[(u8)index] != NULL) {
+            stage_area_joint_visibility_set(st, st->area_char[(u8)index], index);
         }
         index++;
     } while (index < 4U);
@@ -3697,12 +3800,18 @@ extern "C" StageBlendEntry* stage_blend_table_get(void)
     u8 areano;
 
     areano = ::get_now_areano();
-    if ((u32)(areano - 5) <= 2U) {
-        return lbl_805CFAE8;
-    }
-    table = lbl_805CFA68;
-    if (areano == 4) {
+    switch (areano) {
+    case 5:
+    case 6:
+    case 7:
+        table = lbl_805CFAE8;
+        break;
+    case 4:
         table = lbl_805CFB68;
+        break;
+    default:
+        table = lbl_805CFA68;
+        break;
     }
     return table;
 }
@@ -3715,19 +3824,19 @@ extern "C" f32 stage_colour_cycle_weight_get(s16 index, f32 elapsed)
     f32 value;
 
     table = stage_blend_table_get();
-    kind = *(u32*)((u8*)table + index * 0x10);
+    kind = ((u32*)table)[index * 4];
     if (kind < 4U) {
         value = lbl_805CFA58[kind];
     } else if (kind == 5) {
         if (index >= 7) {
             value = lbl_805CFA58[table->kind] - elapsed;
         } else {
-            value = lbl_805CFA58[*(u32*)((u8*)table + (index + 1) * 0x10)] - elapsed;
+            value = lbl_805CFA58[((u32*)table)[(index + 1) * 4]] - elapsed;
         }
     } else if (index == 0) {
         value = elapsed + lbl_805CFA58[table[1].colour_c];
     } else {
-        value = elapsed + lbl_805CFA58[*(u32*)((u8*)table + (index - 1) * 0x10)];
+        value = elapsed + lbl_805CFA58[((u32*)table)[(index - 1) * 4]];
     }
     if (value < lbl_8079A448) {
         return value + lbl_8079A468;
@@ -3738,32 +3847,59 @@ extern "C" f32 stage_colour_cycle_weight_get(s16 index, f32 elapsed)
     return value;
 }
 
+/* Blends colour `from` towards `to` by `t`, channel by channel. */
+static inline u32 stage_colour_lerp(const u32* from, const u32* to, f32 t)
+{
+    f32 tb;
+    f32 fb;
+    f32 tg;
+    f32 fg;
+    f32 tr;
+    f32 fr;
+    f32 ta;
+    f32 fa;
+    s32 a;
+    s32 r;
+    s32 g;
+    s32 b;
+
+    fa = (f32)(*from >> 24);
+    fr = (f32)((*from >> 16) & 0xFF);
+    fg = (f32)((*from >> 8) & 0xFF);
+    fb = (f32)(*from & 0xFF);
+    ta = (f32)(*to >> 24);
+    tr = (f32)((*to >> 16) & 0xFF);
+    tg = (f32)((*to >> 8) & 0xFF);
+    tb = (f32)(*to & 0xFF);
+    fa = fa + t * (ta - fa);
+    fr = fr + t * (tr - fr);
+    fg = fg + t * (tg - fg);
+    fb = fb + t * (tb - fb);
+    a = (s32)fa;
+    r = (s32)fr;
+    g = (s32)fg;
+    b = (s32)fb;
+    return ((u8)b | ((u8)g << 8)) | (((u8)a << 24) | ((u8)r << 16));
+}
+
 /* Interpolates the two areas' colour records by the cycle weight and arms the result. */
 extern "C" void stage_colour_cycle_update(void)
 {
     StageBlendEntry* table;
+    StageBlendEntry* from;
+    StageBlendEntry* to;
     u32 colour[6];
-    u32 from;
-    u32 to;
+    u32 count;
     f32 peak;
+    f32 span;
+    s16 i;
     f32 step;
-    f32 best;
+    s16 high;
+    f32 next;
     f32 prev;
     f32 frac;
-    f32 span;
-    f32 weight;
-    f32 fa;
-    f32 fb;
-    f32 fc;
-    f32 fd;
-    f32 fe;
-    f32 ff;
-    f32 fg;
-    f32 fh;
-    u32 count;
+    f32 t;
     s16 low;
-    s16 high;
-    s16 i;
 
     count = lb_item_list_step_get();
     peak = lb_item_list_depth_get(count);
@@ -3771,68 +3907,41 @@ extern "C" void stage_colour_cycle_update(void)
     step = lbl_8079A4C0 / (f32)count;
     low = 7;
     high = 8;
-    prev = 0.0f;
-    best = 0.0f;
     for (i = 0; i < 8; i++) {
-        best = stage_colour_cycle_weight_get(i, step);
-        if (best > peak) {
+        next = stage_colour_cycle_weight_get(i, step);
+        if (next > peak) {
             high = i;
             break;
         }
         low = i;
-        prev = best;
+        prev = next;
     }
     if (high == 0) {
         prev = stage_colour_cycle_weight_get(low, step);
     }
     if (high >= 8) {
         high = 0;
-        best = stage_colour_cycle_weight_get(0, step);
+        next = stage_colour_cycle_weight_get(0, step);
     }
+    from = (StageBlendEntry*)((u32*)table + low * 4);
+    to = (StageBlendEntry*)((u32*)table + high * 4);
     if (high <= 0) {
-        span = (lbl_8079A468 - prev) + best;
+        span = (lbl_8079A468 - prev) + next;
         frac = peak - prev;
         if (frac < lbl_8079A448) {
             frac += lbl_8079A468;
         }
     } else {
-        span = best - prev;
+        span = next - prev;
         frac = peak - prev;
     }
-    weight = frac / span;
-
-    from = table[low].colour_a;
-    to = table[high].colour_a;
-    fa = (f32)(from >> 24);
-    fb = (f32)(u8)(from >> 16);
-    fc = (f32)(u8)(from >> 8);
-    fd = (f32)(u8)from;
-    colour[0] = (u8)(s32)(fd + weight * ((f32)(u8)to - fd))
-              | ((u8)(s32)(fc + weight * ((f32)(u8)(to >> 8) - fc)) << 8)
-              | ((u8)(s32)(fa + weight * ((f32)(to >> 24) - fa)) << 24)
-              | ((u8)(s32)(fb + weight * ((f32)(u8)(to >> 16) - fb)) << 16);
+    t = frac / span;
+    colour[0] = stage_colour_lerp(&from->colour_a, &to->colour_a, t);
     colour[1] = colour[0];
-
-    from = table[low].colour_b;
-    to = table[high].colour_b;
-    fe = (f32)from;
-    ff = (f32)(u8)(from >> 16);
-    fg = (f32)(u8)(from >> 8);
-    fh = (f32)(u8)from;
-    colour[2] = (u8)(s32)(fh + weight * ((f32)(u8)to - fh))
-              | ((u8)(s32)(fg + weight * ((f32)(u8)(to >> 8) - fg)) << 8)
-              | ((u8)(s32)(fe + weight * ((f32)(to >> 24) - fe)) << 24)
-              | ((u8)(s32)(ff + weight * ((f32)(u8)(to >> 16) - ff)) << 16);
+    colour[2] = stage_colour_lerp(&from->colour_b, &to->colour_b, t);
     colour[3] = colour[2];
-
-    from = table[low].colour_c;
-    to = table[high].colour_c;
-    colour[4] = (u8)(s32)((f32)(u8)from + weight * ((f32)(u8)to - (f32)(u8)from))
-              | ((u8)(s32)((f32)(u8)(from >> 8) + weight * ((f32)(u8)(to >> 8) - (f32)(u8)(from >> 8))) << 8)
-              | ((u8)(s32)((f32)(from >> 24) + weight * ((f32)(to >> 24) - (f32)(from >> 24))) << 24)
-              | ((u8)(s32)((f32)(u8)(from >> 16) + weight * ((f32)(u8)(to >> 16) - (f32)(u8)(from >> 16))) << 16);
+    colour[4] = stage_colour_lerp(&from->colour_c, &to->colour_c, t);
     colour[5] = colour[4];
-
     filter_panel_upper_set(0, 6, colour, lbl_8079A4C4);
 }
 

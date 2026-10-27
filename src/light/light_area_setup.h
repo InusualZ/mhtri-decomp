@@ -7,13 +7,15 @@
 #include "gx.h"
 
 #ifdef __cplusplus
+namespace nw4r { namespace g3d { struct LightObj; } }
+
 extern "C" {
 
-/* 0x802C1D68 - selects light object `index` of the scene. */
-void light_obj_area_select(u8 index);
+/* 0x802C1D68 - returns light object `index` of the scene. */
+nw4r::g3d::LightObj* light_obj_area_select(u8 index);
 
-/* 0x802C1EA0 - initialises the selected light object at `pos` with `colour`. */
-void light_obj_init(nw4r::math::VEC3* pos, GXColor* colour, u32 mode);
+/* 0x802C1EA0 - initialises light object `obj` at `pos` with `colour`. */
+void light_obj_init(nw4r::g3d::LightObj* obj, nw4r::math::VEC3* pos, GXColor colour, s32 mode);
 
 /* 0x802C20DC - seats the current area's light objects. */
 void light_area_setup(void);
