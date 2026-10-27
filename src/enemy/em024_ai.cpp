@@ -10,20 +10,25 @@
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off`, `#pragma pool_data off` and `#pragma fp_contract off`,
  *   each measured on the whole unit: without peephole off 30 rows drop (58 to 38 matched functions), without
  *   pool_data off 2 (`em024_act10_dispatch`), without fp_contract off 4 (`em024_front_ray_hit_ck`,
- *   `em024_act7_sub1`, `em024_act7_sub5`, `em024_act7_scatter_pos`).
+ *   `em024_act7_sub1`, `em024_act7_sub5`, `em024_act7_scatter_pos`).  `#pragma opt_common_subs off` around
+ *   `em024_act4_sub0`, `em024_act7_sub1`, `_sub2`, `_sub5`, `_sub13`, `_sub16`, `_sub25`, `_sub26`,
+ *   `em024_act7_field_burst` and `em024_act13_sub0`: retail loads `shell_set_func_ptr` after the arguments.
  * NAMES. `em024` follows the runtime dump's `em024_prog_tbl` (the caller of `em024_action11_state5_ck` tests enemy
  *   id 0x18); the `_ai` suffix, every function name, the `Em024ProgTbl`/`EmSeRecord`/`EmSePos`/`EmSeEntry` field
  *   names (`EmSePos::channel_0x08`/`angle_0x0A` and `EmSeRecord::length_0x08` are thin), the `em024_0x328` view's
- *   `tev_color_*` roles and the sub-state numbers' meaning are GUESSes.  `ShellSetFuncs::method_0x74`,
+ *   `tev_color_*` roles and the sub-state numbers' meaning are GUESSes.  `ShellSetFuncs::method_0x28`, `method_0x74`,
  *   `method_0x84` and `method_0x8C` (the table behind `stage/stg_w.cpp`'s `shell_set_func_ptr`) take the call
  *   sites' shapes, a GUESS.
- * RESIDUALS. No row unwritten.  11 partial rows:
- *  - `em024_act4_sub0`, `em024_act7_sub1`, `em024_act7_sub2`, `em024_act7_sub5`, `em024_act7_sub13`,
- *    `em024_act7_sub16`, `em024_act7_sub25`, `em024_act7_sub26`, `em024_act7_field_burst`, `em024_act13_sub0`:
- *    ours hoists the `lwz r7` of the `shell_set_func_ptr->slot(...)` call, and register allocation and order differ;
- *  - `em024_tev_color_update`: register allocation and order.
- *   flipcheck: `.sdata2` is 0x274 against the claimed 0x278 (the claim ends at 0x8079B640 because `lbl_8079B638`
- *   is an 8-byte symbol; an end of 0x8079B63C makes `dtk dol split` fail); `.text` differs in 417 of 38124 bytes.
+ * RESIDUALS. No row unwritten.  2 partial rows:
+ *  - `em024_act7_sub2`: `self` and `attack` swap callee-saved registers (r31/r30).  The allocator dump shows
+ *    `self` (r32) with 28 neighbours, below the stall that colours it first (34 in `em024_act7_sub13`), so
+ *    `attack` (r33) is coloured first; parameter copies, `!=` spellings, ternaries and declaration order do not
+ *    add the missing interference;
+ *  - `em024_tev_color_update`: the body alphas (255/220) land in r3 where retail has r9.  The allocator dump
+ *    shows them interfering only with `out_rim` and `rim_*`; passing the scaled body inline makes them r9 but
+ *    schedules the `r3..r8` argument setup above the conversion (47 bytes worse).  Declaration permutations,
+ *    assignment order, u8 types and reusing one variable set do not move it.
+ *   flipcheck: `.text` differs in 60 of 38124 bytes (the two rows above); no data section blocks a flip.
  * SHAPES. `enemy/ENEMY_WORK.h` carries the `em024_0x328` union view of the shared record for this monster's
  *   fields.  `em_turn_seq_*` take `void*`, so the `const` turn tables pass through a `(void*)` cast.
  */
@@ -778,6 +783,7 @@ extern "C" void em024_act3_dispatch(_ENEMY_WORK* self)
 }
 
 /* Action 4 sub-states 0, 6 and 9 (by `kind`): motion 21 to 38 in stages, with a shell job and hit effects for kind 2. */
+#pragma opt_common_subs off
 extern "C" void em024_act4_sub0(_ENEMY_WORK* self, u8 kind)
 {
     nw4r::math::VEC3 origin;
@@ -852,6 +858,7 @@ extern "C" void em024_act4_sub0(_ENEMY_WORK* self, u8 kind)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 4 sub-state 1: plays motion 8 in move mode 3 and finishes through the walk finish once the turn completes. */
 extern "C" void em024_act4_sub1(_ENEMY_WORK* self)
@@ -1347,6 +1354,7 @@ extern "C" void em024_act7_sub0(_ENEMY_WORK* self, u8 attack, u8 turn)
 }
 
 /* Action 7 sub-states 1 and 24: motion 46 with two effect bursts and, for attack 1, a seeded shell job. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_sub1(_ENEMY_WORK* self, u8 attack)
 {
     nw4r::math::VEC3 dir;
@@ -1401,8 +1409,10 @@ extern "C" void em024_act7_sub1(_ENEMY_WORK* self, u8 attack)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 7 sub-states 2 and 33: motion 47 with a shell job and effects at fixed frames; `attack` picks the width. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_sub2(_ENEMY_WORK* self, u8 attack)
 {
     nw4r::math::MTX34 mtx;
@@ -1424,7 +1434,7 @@ extern "C" void em024_act7_sub2(_ENEMY_WORK* self, u8 attack)
         eft052_part_gauge_add(self, -20);
         break;
     case 1:
-        if (em_frame_check(self, 1, 40.0f, 64.0f) == 1 && (system_w.field_0x0c & 3) == 0)
+        if (em_frame_check(self, 3, 40.0f, 64.0f) == 1 && (system_w.field_0x0c & 3) == 0)
             eft007_part_set(self, 40);
         if (em_frame_check(self, 0, 86.0f, 0.0f) == 1) {
             if (attack == 1)
@@ -1462,6 +1472,7 @@ extern "C" void em024_act7_sub2(_ENEMY_WORK* self, u8 attack)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 7 sub-states 3, 4, 7, 8 and 18..21: the motion 57/58 swing; `side` and `lead` pick the joints and turn. */
 extern "C" void em024_act7_sub3(_ENEMY_WORK* self, u8 side, u8 lead)
@@ -1541,6 +1552,7 @@ extern "C" void em024_act7_sub3(_ENEMY_WORK* self, u8 side, u8 lead)
 }
 
 /* Action 7 sub-states 5 and 6: motion 41 with the offset approach and, for attack 1, a seeded shell job. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_sub5(_ENEMY_WORK* self, u8 attack)
 {
     nw4r::math::VEC3 dir;
@@ -1599,6 +1611,7 @@ extern "C" void em024_act7_sub5(_ENEMY_WORK* self, u8 attack)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 7 sub-state 9: plays motion 45 with two hit windows and a mid-motion speed change. */
 extern "C" void em024_act7_sub9(_ENEMY_WORK* self)
@@ -1665,6 +1678,7 @@ extern "C" void em024_act7_sub11(_ENEMY_WORK* self, u8 side)
 }
 
 /* Action 7 sub-states 13, 14 and 37: motions 49..53 by `kind`, with shell jobs and effects. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_sub13(_ENEMY_WORK* self, u8 kind)
 {
     nw4r::math::VEC3 pos;
@@ -1752,6 +1766,7 @@ extern "C" void em024_act7_sub13(_ENEMY_WORK* self, u8 kind)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 7 sub-state 15: motion 48 with the jet effects and area sound, then switches to state 7/25. */
 extern "C" void em024_act7_sub15(_ENEMY_WORK* self)
@@ -1832,11 +1847,14 @@ extern "C" void em024_act7_aim_pos(_ENEMY_WORK* self, u8 kind, nw4r::math::VEC3*
 }
 
 /* Action 7 sub-states 16, 17, 22, 23 and 36: the turn sequences with per-frame effects, sound and shell jobs. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
 {
+    f32 dist;
     nw4r::math::VEC3 aim;
     nw4r::math::VEC3 joint_pos;
     nw4r::math::VEC3 pos;
+    u32 kind_off;
     u32 joint;
     f32 speed_a = 1.0f;
     f32 speed_b = speed_a;
@@ -1929,7 +1947,7 @@ extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
             if ((u32)(kind - 2) > 1) {
                 if (((s32)kind == 1 || (s32)kind == 4) && self->state_0x006 != 0)
                     em_mot_speed_set(self, speed_b);
-                f32 dist = calcVecDistXZ(&self->pos, &self->vec_0x36C) - 2500.0f;
+                dist = calcVecDistXZ(&self->pos, &self->vec_0x36C) - 2500.0f;
                 if (dist > 0.0f)
                     dist = 0.0f;
                 else if (dist < -2100.0f)
@@ -1943,7 +1961,8 @@ extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
         }
         break;
     case 2: {
-        if ((u32)(kind - 2) > 1) {
+        kind_off = kind - 2;
+        if (kind_off > 1) {
             if (em_frame_check(self, 3, 2.0f, 26.0f) == 1)
                 em_move_offset_rot_apply(self, &self->field_0x1BC);
         } else if (em_frame_check(self, 3, 4.0f, 48.0f) == 1) {
@@ -1994,10 +2013,10 @@ extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
             get_joint_wpos_em(self, 9, &joint_pos);
             em_camera_req(self, 9, 9);
             joint_pos.y = self->field_0x20C;
-            shell_set_func_ptr->method_0x28(self, &joint_pos, 5, self->field_0xAEA, shell_set_func_ptr, 0.8f);
+            shell_set_func_ptr->method_0x28(self, &joint_pos, 5, 0.8f, self->field_0xAEA, shell_set_func_ptr);
         }
         if (em_mot_end_ck(self) == 1) {
-            if ((u32)(kind - 2) > 1) {
+            if (kind_off > 1) {
                 if ((s32)kind != 1 && (s32)kind != 4) {
                     self->state = 4;
                     em_mot_set(self, 56, 2, 0);
@@ -2083,8 +2102,6 @@ extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
             em_mot_set(self, 55, 2, 0);
             em_hit_window_set(self, 0, 13, 136);
             if ((u32)(kind - 2) > 1) {
-                f32 dist;
-
                 if ((s32)kind == 1 || (s32)kind == 4)
                     em_mot_speed_set(self, speed_b);
                 dist = calcVecDistXZ(&self->pos, &self->vec_0x36C) - 2500.0f;
@@ -2106,6 +2123,7 @@ extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* Builds a position around `origin` from a 16-bit seed: its low byte the sideways offset, its high byte the depth. */
 extern "C" void em024_act7_scatter_pos(nw4r::math::VEC3* out, nw4r::math::VEC3* origin, s32 angle, u16 seed)
@@ -2123,6 +2141,7 @@ extern "C" void em024_act7_scatter_pos(nw4r::math::VEC3* out, nw4r::math::VEC3* 
 }
 
 /* Action 7 sub-state 25: starts motion 62 and throws three shell jobs at seed-derived positions. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_sub25(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
@@ -2153,6 +2172,7 @@ extern "C" void em024_act7_sub25(_ENEMY_WORK* self)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 nw4r::math::VEC3 em024_pick_offsets[] = {
     {800.0f, 0.0f, 800.0f}, {-800.0f, 0.0f, 800.0f}, {1200.0f, 0.0f, 0.0f},
@@ -2193,6 +2213,7 @@ u8 em024_field_index[4][35] = {
 };
 
 /* Action 7 sub-state 26: plays motion 32 and throws shell jobs at three distinct of six offsets picked from the seed. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_sub26(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
@@ -2246,17 +2267,22 @@ extern "C" void em024_act7_sub26(_ENEMY_WORK* self)
         }
         if (em_frame_check(self, 0, 284.0f, 0.0f) == 1) {
             nw4r::math::VEC3 target;
-            u8 pick = ((s32)self->bits_0x1EC >> 8) % 4;
+            u8 first;
+            u8 second;
+            u8 pick;
+            pick = ((s32)self->bits_0x1EC >> 8) % 4;
+            second = self->state_0x007;
+            first = self->state_0x006;
 
-            if (self->state_0x006 < self->state_0x007) {
-                if (pick >= self->state_0x006)
+            if (first < second) {
+                if (pick >= first)
                     pick += 1;
-                if (pick >= self->state_0x007)
+                if (pick >= second)
                     pick += 1;
             } else {
-                if (pick >= self->state_0x007)
+                if (pick >= second)
                     pick += 1;
-                if (pick >= self->state_0x006)
+                if (pick >= first)
                     pick += 1;
             }
             vec_to_mh_vec3(&pos, reinterpret_cast<struct Vec*>(&em024_pick_offsets[pick]));
@@ -2270,6 +2296,7 @@ extern "C" void em024_act7_sub26(_ENEMY_WORK* self)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 7 sub-states 27 and 28 (by `side`): the turn sequence with joint effects. */
 extern "C" void em024_act7_sub27(_ENEMY_WORK* self, u8 side)
@@ -2504,6 +2531,7 @@ extern "C" void em024_act7_sub31(_ENEMY_WORK* self)
 }
 
 /* Throws one shell job at the table position (or at the target) that `group`, `index` and `seed` select. */
+#pragma opt_common_subs off
 extern "C" void em024_act7_field_burst(_ENEMY_WORK* self, u8 group, u8 index, u16 seed)
 {
     nw4r::math::VEC3 pos;
@@ -2549,6 +2577,7 @@ extern "C" void em024_act7_field_burst(_ENEMY_WORK* self, u8 group, u8 index, u1
         shell_set_func_ptr->method_0x84(self, 1, &pos, 1.4f, 0, shell_set_func_ptr);
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 7 sub-state 32: plays motion 48 and steps the field-burst script over 35 positions. */
 extern "C" void em024_act7_sub32(_ENEMY_WORK* self)
@@ -3150,6 +3179,7 @@ EmKey2 em024_intro_curve_e[] = {
 };
 
 /* Action 13 sub-state 0: the scripted sequence, driven by the demo frame and the curve tables. */
+#pragma opt_common_subs off
 extern "C" void em024_act13_sub0(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
@@ -3310,6 +3340,7 @@ extern "C" void em024_act13_sub0(_ENEMY_WORK* self)
     }
     }
 }
+#pragma opt_common_subs reset
 
 /* Action 13 sub-state 1: plays motion 1 with the demo pose and finishes when it ends. */
 extern "C" void em024_act13_sub1(_ENEMY_WORK* self)

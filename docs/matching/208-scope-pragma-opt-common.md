@@ -24,13 +24,19 @@ these functions with that pass off while the rest of the unit keeps it on, so it
 `#pragma opt_common_subs reset` after it, then re-measure the whole unit. It is narrower than
 `global_optimizer off` (idea 120): propagation, loop-invariant motion and strength reduction stay on. Never apply
 it file-wide. A field that retail reloads after its own store is idea 130 (`volatile`), not this.
+When the pragma fixes the table call but costs the row a value retail *does* keep (a repeated `(u32)(kind - 2)`
+test in one case, two fields read once and compared several times), name that value as a local inside the scoped
+function: the pass no longer merges it, the local does, and its declaration position decides its register.
 
 **Result.** `ai/ai_npc` (Wii/1.3, `-O3` with `optimization_level 4`): `ai_npc_weak_point_pos_get` 88.66 -> 100,
 `fn_802D32B4` 96.32 -> 100, `ai_npc_step57_arm` 94.48 -> 100, `ai_npc_m3_step6_arm` 95.23 -> 100,
 `ai_npc_m3_step19_arm` 98.18 -> 100, `ai_npc_step31_arm` 98.29 -> 100, `ai_npc_step13_arm` 99.29 -> 100, and four
 more rows up; no row moved down. The `shell_set_func_ptr->slot(..., shell_set_func_ptr)` calls of those step arms
 had resisted an inline helper and every argument spelling. File-wide the same pragma took 13 rows up and 23 down
-(-195 bytes of matched code).
+(-195 bytes of matched code). `enemy/em024_ai`: ten shell-job rows bracketed, nine kept (+123 matched bytes); the
+tenth (`em024_act7_sub16`, 99.10 -> 98.06 under the pragma) reached 100 once its case-local `(u32)(kind - 2)` became
+a function-level `kind_off` declared before `joint`, and `em024_act7_sub26` reached 100 with its two field reads
+named (`first`/`second`).
 
 **Example.**
 

@@ -26,8 +26,8 @@ struct ShellSetFuncs {
     /* +0x1C */ void (*method_0x1C)(struct _PLW* self, s32 n, ShellSetFuncs* table);
     /* +0x20 */ void (*method_0x20)(struct _PLW* self, s32 n, ShellSetFuncs* table);
     /* +0x24 */ void (*set_target)(struct _AINPC_W* self, ShellSetFuncs* table);
-    /* +0x28 */ void (*method_0x28)(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, s32 mode, s32 id,
-                                    ShellSetFuncs* table, f32 scale);
+    /* +0x28 */ void (*method_0x28)(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, s32 mode, f32 scale, s32 id,
+                                    ShellSetFuncs* table);
     /* +0x2C */ void (*method_0x2C)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 scale,
                                     u16 flags, ShellSetFuncs* table);
     /* +0x30 */ void (*method_0x30)(struct _ENEMY_WORK* self, u32 a, nw4r::math::VEC3* from,
