@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (183)
+## Ideas that work (184)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -192,6 +192,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 201 | [A guessed narrow parameter type adds a callee-side extsh: read the retail caller for the conversion](201-guessed-narrow-parameter-type.md) | works | source-shape | A member function's row has an `extsh`/`clrlwi` of an incoming parameter before a 32-bit compare that retail does not have, and the map's mangling (our own guess) says the parameter is `s16`/`u8`. |
 | 202 | [A copy member that returns *this keeps r3 and r4 live, so its loop takes fresh registers](202-copy-member-that-returns.md) | works | source-shape, allocator | A small copy member matches except its trailing copy loop, where retail moves the pointers into r5/r6 and ours reuses r3/r4. |
 | 203 | [A case that jumps to another case's head: re-dispatch with state = N; continue in a for (;;)](203-case-that-jumps-to.md) | works | source-shape | One switch case ends in a `b` to another case's first instruction (retail shares that case's whole body), and the goto-free copy of the body makes the function longer by the body's size |
+| 204 | [Out-params each switch case passes by address get their own stack pair: scope them per case](204-out-params-each-switch.md) | works | allocator, source-shape | Retail's frame is larger and every call site that takes `&a, &b` uses its own stack pair (0x24/0x20, 0x1c/0x18, ...), ours reuses one pair (0xc/0x8) for all of them |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

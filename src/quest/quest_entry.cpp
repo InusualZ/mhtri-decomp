@@ -7,11 +7,13 @@
  *   .sdata2 0x8079C510-0x8079C560.  The head 0x803AA4A4-0x803AB3BC is `quest/quest_item_slot.cpp` (the `.data`
  *   emission-order seam of its static initialiser).  `enemy/em_pop.cpp`'s head 0x803B465C-0x803B6F2C reads this
  *   unit's private `.data` tables and pooled `.sdata2` constants, so it is this TU's tail (seam request quest-q1#27).
- * DATA. Emitted: the four picked-pair tables (`.bss`), the chance/reward tables and the "(Quest Name Unavailable)"
- *   strings (`.data`), the `.sdata` rows and the list-block `.sbss` words.  Declared, not yet emitted: `quest_work`,
- *   `quest_text_buffer`, `nora_set_proc`, `quest_work_ptr`, `quest_list_items`, `quest_list_count`, the 20 KB of
- *   monster/variant/spawn tables, and the named `.sdata2` constants (playbook 29).
- * FLAGS. the `menu` lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, Wii/1.3).
+ * DATA. Emitted in retail order and byte-identical: `.data` (the tables above the bodies, then the bodies' literals
+ *   and jump tables), `.bss` (the picked-pair tables, `quest_work`, `quest_text_buffer`, `nora_set_proc`), `.sbss`
+ *   and `.sdata`.  Not emitted: the named `.sdata2` constants (playbook 29; part of the pool is read only by
+ *   `enemy/em_pop.cpp`'s head, the seam above).  `quest_name_unavailable_text` (.data 0x8060E888, unclaimed, between
+ *   `menu/menu_sysmsg.cpp` and `Gecko_ExceptionPPC.cp`) is declared in `unsplit/menu.h` (rule 12, claim request).
+ * FLAGS. the `menu` lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, Wii/1.3), plus
+ *   `#pragma pool_data off` (retail addresses each table through its own symbol although they precede the bodies).
  * NAMES. Module `quest` from the dump's globals (`q_result_msg_adrs`, `em_bui_tbl`, `em_hokaku_rem_l/h`,
  *   `nora_set_proc`) and its one function name `quest_init(unsigned char)`.  GUESS: the file name and every function
  *   and field name derived from a body, among them quest_list_load_hunt/_arena, quest_record_find,
@@ -30,35 +32,33 @@
  *   GUESS: quest_element_supply_state_get, quest_element_item_use, quest_item_deposit, quest_entry_point_warp
  *   GUESS: quest_result_keep_items, quest_result_deliver_items, quest_result_fill, quest_arena_summary_step
  *   GUESS: quest_element_value_set, quest_gallery_cell_step
+ *   GUESS (data, by the table that points at them): quest_area_monsters_NN (quest_area_monster_tbl[NN]),
+ *   quest_monster_variants_NN (quest_monster_variant_tbl[NN]), quest_variant_slots_NN_K (entry K of variant list NN),
+ *   quest_supply_drop_NN (quest_supply_drop_tbl[NN]), quest_supply_drop_empty (its no-drop entries),
+ *   quest_bonus_pick_NN (quest_bonus_pick_tbl[NN], first index), quest_bonus_items_N (the bonus lists' item rows).
  * RESIDUALS. Every row is written.
- *  - quest_start_load 99.6 %, quest_result_fill 99.9 %: instruction-identical (relocation names);
- *    quest_result_deliver_items 97.7 %, quest_arena_summary_step 95.2 %, quest_intruder_step 99.1 %,
- *    quest_successive_step 98.9 %: register numbering.
- *  - quest_main_step 82.3 %: the target shares its fail / clear / area-advance tails between branches (backward and
- *    forward jumps); goto-free inline helpers duplicate them (3164 B against 2832; the single-tail flag form is
- *    2888 B but 69.9 %).  The duplicated tails are the extra quest_work_ptr, isServerSelectState,
- *    quest_result_enter, lb_entry_start_send, lb_entry_start_default, quest_element_404_ck and quest_start_enter
- *    sites the relocation diff lists.
- *  - quest_part_reward_roll 95.8 %, quest_capture_reward_roll 97.2 %: the target keeps `&out[rolls * 3]` as a base
- *    plus a separate byte offset; ours folds it into one pointer (the 2D-row and index-expression forms are worse).
- *  - quest_monsters_spawn 96.5 %, quest_init 95.6 %, quest_enter_load 97.1 %, quest_lot_pick* ~97 %,
- *    quest_pl_skill_slot_set 97.4 %, quest_work_start_reset 97.5 %, quest_grade_set 96.5 %: register colouring
- *    and one kept dead counter.
- *  - quest_arena_data_step 75.4 %, quest_work_word_get 79.3 %, quest_slot_count_get 82.5 %,
- *    quest_element_item_count_get 83.8 %, quest_slot_items_get 84.5 %, quest_players_state_get 85.5 %,
- *    quest_item_count_sum 85.7 %, quest_element_value_set 88.7 %: the allocator's base/offset choices (retail
- *    rereads quest_work_ptr in quest_element_value_set and rebuilds quest_work's address in
- *    quest_arena_data_step; ours keeps the first one).  quest_enter_load rebuilds quest_time_class_tbl's address
- *    where retail reuses it, and recomputes `stage * 8` after `stage_dcm_path_get` where retail keeps it.
- *  - quest_element_copy 85.5 %: instruction-identical, the target pairs its last six word copies load/store.
- *  - quest_arena_time_text_get 97.2 %, quest_clear/elapsed_time_text_get ~98.3 %: scheduling of one subtraction.
- *  - flipcheck: .bss, .data, .sbss, .sdata2, extab/extabindex short of the claim; .text unwritten rows; the bodies
- *    are in definition order, not address order (a reorder is due before a flip).
+ *  - quest_main_step: the target shares its fail and clear tails between branches through backward jumps (a goto
+ *    shape, rule 8); the goto-free inline helpers duplicate them (3168 B against 2832; the single-tail flag form is
+ *    2888 B but scores lower, and a flag-threaded loop keeps its flag tests - MWCC does not thread jumps).
+ *  - quest_lot_pick, quest_lot_pick_first, quest_lot_pick_last: retail sign-extends the payload byte to 16 bits
+ *    (`lbz` + `extsh`) before storing it; no cast of the u8 field reproduces the `extsh`.
+ *  - quest_intruder_step, quest_successive_step: retail re-tests the variant rank after its scan as `clrlwi` of
+ *    the kept byte; ours reloads the byte (`lbz`).  quest_successive_step also loads one argument via r0.
+ *  - quest_part_reward_roll, quest_capture_reward_roll, quest_monsters_spawn, quest_init, quest_enter_load,
+ *    quest_grade_set, quest_work_start_reset, quest_monsters_release, quest_item_count_sum, quest_start_load,
+ *    quest_arena_data_step, quest_arena_summary_step, quest_result_deliver_items: register colouring (callee-saved
+ *    permutations and one hoisted constant) that declaration order does not reach.
+ *  - quest_arena_time_text_get, quest_arena_summary_step: retail subtracts 9000 from the arena id before the
+ *    `system_w` column bool; ours after.
+ *  - quest_element_copy: the two 8-byte runs are copied as u64 halves; retail stores the high word first.
+ *  - quest_enter_load: retail keeps `stage * 8` across `stage_dcm_path_get`; ours recomputes it.
+ *  - flipcheck: .sdata2 short of the claim (the em_pop seam); quest_main_step is not 100 %.
  * SHAPES. Declaration order decides the callee-saved colours (playbook 63): see quest_list_load_*, quest_pair_apply,
- *   quest_monster_setup, quest_item_deposit.  Loop counters the target keeps dead are written as their own variables
- *   (`u16 j` in quest_item_deposit, the threshold scan in quest_init).  `quest_element_clear`'s tables are defined
- *   after the bodies; the `.sdata` rows sit above every function so the `"%s"` object is last; the switch arms of
- *   quest_result_field_text_get follow its jump table's order.
+ *   quest_monster_setup, quest_item_deposit, quest_capture_reward_roll.  Loop counters the target keeps dead are
+ *   written as their own variables (`u16 j` in quest_item_deposit, the threshold scan in quest_init).  The bodies are
+ *   in address order; the `.data` tables sit above them, the `.sdata` rows too so the `"%s"` object is last; the switch
+ *   arms of quest_result_field_text_get follow its jump table's order.  Out-params of `em_get_unique_work` are
+ *   block-scoped per case (retail gives each call site its own stack pair).
  */
 
 #include "quest/quest_entry.h"
@@ -133,6 +133,10 @@
  * offsets, so the two views are cast rather than merged. */
 #define QUEST_WORK ((Q_ItemWork*)quest_work_ptr)
 
+/* Retail addresses every table of this unit's `.data` through its own symbol (lis/addi), never through the
+ * section's pooled base, although the tables are defined above the bodies (playbook 194). */
+#pragma pool_data off
+
 /* This unit's own `.sdata` (`splits.txt` `.sdata 0x807935D0..0x8079367C`, the rows tile it in address order;
  * the twelve `quest_grade_time_*` rows and the two `quest_rank_weight_*` rows are separate objects because
  * `.sdata` only takes objects of at most 8 bytes).
@@ -181,6 +185,900 @@ u8 quest_grade_table[8] = { 0, 1, 1, 3, 1, 6, 5, 3 };
 /* The `"%s"` format `quest_reward_faint_penalty` prints a player name through. */
 char quest_entry_fmt_str[3] = "%s";
 
+/* This unit's own `.data` (`splits.txt` `.data 0x805F2A98..0x805F7C68`), defined in the target's order above every
+ * function so the string literals and jump tables the bodies emit follow it: the quest-id thresholds, the area
+ * monster lists and the per-monster variant lists (each `QuestEntrySlot` row: monster, count, the element block
+ * - its +0x08..+0x10 words are the spawn position's f32 bits, +0x14..+0x1C the rotation - the element index and
+ * the element flags), the two area tables, the enemy-set area tables `enemy/em_pop.cpp` reads, the pair/byte/
+ * time-class tables, the supply-drop and bonus-pick lists and the reward-roll tables. */
+u16 quest_id_threshold_tbl[20] = {
+    1, 100, 1000, 2000, 10000, 14000, 15000, 19000, 20000, 24000, 50000, 55000, 59000, 60000, 61000, 65500, 0, 0, 0, 0,
+};
+QuestEntrySlot quest_area_monsters_01[5] = {
+    { 15, 1, { 0xFF, 0x07, 0, 0, 0, 0, 0, 0, 0xC5561000, 0xC53B8000, 0x4544E000, 0, 0x00002500, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x10, 0x09, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 10, 255, { 0xFF, 0x09, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x09, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_02[5] = {
+    { 1, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x10, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000036E, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43960000, 0x40800000, 0xC3530000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43E50000, 0x3F800000, 0xC465C000, 0, 0x00002400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_03[13] = {
+    { 1, 1, { 0xFF, 0x0A, 0, 0, 0, 0, 0, 0, 0xC4FA0000, 0xC3890000, 0x44C58000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x10, 0x09, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 10, 255, { 0x03, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0xC4DAC000, 0x42600000, 0xC4904000, 0, 0x00002800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x03, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0xC512E000, 0x42AA0000, 0xC4896000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x44948000, 0x41800000, 0x43F98000, 0, 0x00004000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x4481A000, 0x41800000, 0x43978000, 0, 0x0000BC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 17, 255, { 0x06, 0x06, 0x03, 0, 0, 0, 0, 0, 0x43000000, 0xC23C0000, 0x452DB000, 0, 0x0000E000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 17, 255, { 0x06, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC44FC000, 0xC23C0000, 0x44100000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x09, 0x09, 0x03, 0, 0, 0, 0, 0, 0xC3828000, 0x40E00000, 0x4487E000, 0, 0x0000B400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x09, 0x09, 0x03, 0, 0, 0, 0, 0, 0x43C68000, 0x41100000, 0x441E0000, 0, 0x00009800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC4C22000, 0xC33A0000, 0x44BC0000, 0, 0x0000EC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC4A90000, 0xC32F0000, 0x44B44000, 0, 0x00007800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_04[5] = {
+    { 6, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x10, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000036E, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43960000, 0x40800000, 0xC3530000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43E50000, 0x3F800000, 0xC465C000, 0, 0x00002400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_05[13] = {
+    { 2, 1, { 0xFF, 0x0A, 0, 0, 0, 0, 0, 0, 0xC4FA0000, 0xC3890000, 0x44C58000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x10, 0x09, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 10, 255, { 0x03, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0xC4DAC000, 0x42600000, 0xC4904000, 0, 0x00002800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x03, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0xC512E000, 0x42AA0000, 0xC4896000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x44948000, 0x41800000, 0x43F98000, 0, 0x00004000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x4481A000, 0x41800000, 0x43978000, 0, 0x0000BC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 17, 255, { 0x06, 0x06, 0x03, 0, 0, 0, 0, 0, 0x43000000, 0xC23C0000, 0x452DB000, 0, 0x0000E000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 17, 255, { 0x06, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC44FC000, 0xC23C0000, 0x44100000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x09, 0x09, 0x03, 0, 0, 0, 0, 0, 0xC3828000, 0x40E00000, 0x4487E000, 0, 0x0000B400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x09, 0x09, 0x03, 0, 0, 0, 0, 0, 0x43C68000, 0x41100000, 0x441E0000, 0, 0x00009800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC4C22000, 0xC33A0000, 0x44BC0000, 0, 0x0000EC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC4A90000, 0xC32F0000, 0x44B44000, 0, 0x00007800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_06[14] = {
+    { 3, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0x43480000, 0x40800000, 0x43BE0000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC4FA0000, 0xC3890000, 0x44C58000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 10, 255, { 0xFF, 0x02, 0x03, 0x01, 0, 0, 0, 0, 0xC4BB6000, 0xC1E00000, 0xC4D94000, 0, 0x0000F000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x02, 0x03, 0x01, 0, 0, 0, 0, 0xC4900000, 0xC1E00000, 0xC4EF2000, 0, 0x00002C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0xC4FF8000, 0x42920000, 0xC4984000, 0, 0x0000FC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0xC4B66000, 0x42000000, 0xC463C000, 0, 0x00002400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x448E4000, 0x41800000, 0x44050000, 0, 0x0000E000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x44844000, 0x41800000, 0x439C8000, 0, 0x00009C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x09, 0x03, 0, 0, 0, 0, 0, 0x43900000, 0x41C80000, 0x44D36000, 0, 0x00007C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x09, 0x03, 0, 0, 0, 0, 0, 0x429C0000, 0x41C00000, 0x44D36000, 0, 0x00009C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC4BEA000, 0xC3500000, 0x44988000, 0, 0x00008C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC4C44000, 0xC3430000, 0x44AD2000, 0, 0x0000EC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 7, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_07[14] = {
+    { 3, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 8, 1, { 0xFF, 0x03, 0x03, 0, 0, 0, 0, 0, 0xC4484000, 0xC1A00000, 0x44D94000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 31, 255, { 0xFF, 0x02, 0x03, 0, 0, 0, 0, 0, 0xC4A16000, 0xC1700000, 0x43DF8000, 0, 0x00005C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x02, 0x03, 0, 0, 0, 0, 0, 0xC4BE4000, 0x40400000, 0x43B50000, 0, 0x0000D800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0x45095000, 0x42500000, 0xC4A6A000, 0, 0x0000C000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0xFF, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0x44F92000, 0x42AE0000, 0xC4494000, 0, 0x0000E000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0xC38D0000, 0x40000000, 0xC4A66000, 0, 0x0000EC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0x437D0000, 0x40000000, 0xC47F8000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC52FC000, 0xC2B40000, 0x444D8000, 0, 0x00008400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC53DB000, 0xC2CC0000, 0x44504000, 0, 0x0000C800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC34E0000, 0xC2440000, 0x44A90000, 0, 0x00005400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 31, 255, { 0xFF, 0x0A, 0x03, 0, 0, 0, 0, 0, 0xC3DE0000, 0xC1E80000, 0x44B14000, 0, 0x00009400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 12, 1, { 0x10, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000036E, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_08[5] = {
+    { 8, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0xC4484000, 0xC1A00000, 0x44D94000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x10, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000036E, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43960000, 0x40800000, 0xC3530000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 10, 255, { 0x03, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43E50000, 0x3F800000, 0xC465C000, 0, 0x00002400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_09[2] = {
+    { 16, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0xC343999A, 0xC23C0000, 0xC4F00000, 0, 0x0000D000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_13[28] = {
+    { 4, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0x45449333, 0x411B3333, 0x43A7A666, 0, 0x0000B000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 14, 1, { 0x10, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 13, 255, { 0x01, 0x01, 0x03, 0, 0, 0, 0, 0, 0xC4A98000, 0x42000000, 0xC4B74000, 0, 0x0000F000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x01, 0x01, 0x03, 0, 0, 0, 0, 0, 0xC4816000, 0x42300000, 0xC4EDE000, 0, 0x00001C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x02, 0x02, 0x03, 0, 0, 0, 0, 0, 0xC5380000, 0x40C00000, 0xC4104000, 0, 0x00002C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x02, 0x02, 0x03, 0, 0, 0, 0, 0, 0xC5287000, 0x40000000, 0xC48FC000, 0, 0x00005800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x03, 0x03, 0x03, 0, 0, 0, 0, 0, 0x4597E000, 0x40A00000, 0xC427C000, 0, 0x0000E400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x03, 0x03, 0x03, 0, 0, 0, 0, 0, 0x4589B800, 0x40A00000, 0xC4A4C000, 0, 0x0000B000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x04, 0x03, 0, 0, 0, 0, 0, 0x4579A000, 0x80000000, 0xC4A4A000, 0, 0x00004400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x04, 0x03, 0, 0, 0, 0, 0, 0x4579E000, 0x80000000, 0xC48FC000, 0, 0x00002800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x04, 0x03, 0, 0, 0, 0, 0, 0x456D2000, 0, 0xC47CC000, 0, 0x00000800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 35, 255, { 0xFF, 0x04, 0x03, 0x01, 0, 0, 0, 0, 0xC5413000, 0xBF800000, 0x4486E000, 0, 0x0000E400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 35, 255, { 0xFF, 0x04, 0x03, 0x01, 0, 0, 0, 0, 0x456BC000, 0x40A00000, 0xC49F2000, 0, 0x0000E400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x05, 0x05, 0x03, 0, 0, 0, 0, 0, 0x44004000, 0x42000000, 0xC4BAA000, 0, 0x0000AC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x05, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43EA0000, 0x41A80000, 0xC45A0000, 0, 0x0000E800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0xC49E6000, 0x40800000, 0xC53C8000, 0, 0x00001400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x4427C000, 0x42100000, 0xC4C06000, 0, 0x0000A000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0xC4ADC000, 0x421C0000, 0xC3AE8000, 0, 0x0000B000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 35, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0x43CE8000, 0x42140000, 0x4526D000, 0, 0x00009C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 35, 255, { 0xFF, 0x05, 0x03, 0, 0, 0, 0, 0, 0xC40DC000, 0x40400000, 0xC5740000, 0, 0x00001000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x06, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC41E0000, 0xC0400000, 0xC4C2A000, 0, 0x00001400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 13, 255, { 0x06, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC48AC000, 0xC0400000, 0xC48A4000, 0, 0x0000F400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x06, 0x03, 0, 0, 0, 0, 0, 0x44150000, 0x3F800000, 0x44A2C000, 0, 0x00006800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x06, 0x03, 0, 0, 0, 0, 0, 0x42960000, 0x41100000, 0xC492A000, 0, 0x00005000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 26, 255, { 0xFF, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC50EE000, 0xC1200000, 0x43330000, 0, 0x00005000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 35, 255, { 0xFF, 0x06, 0x03, 0, 0, 0, 0, 0, 0xC55BA000, 0x41B00000, 0x4492C000, 0, 0x00008400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 35, 255, { 0xFF, 0x06, 0x03, 0, 0, 0, 0, 0, 0x44DA2000, 0xBF800000, 0x4419C000, 0, 0x00008400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_12[2] = {
+    { 18, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0x452A0000, 0xC47A0000, 0x44D9E000, 0, 0x0000C400, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_10[2] = {
+    { 25, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x45A8C000, 0, 0x4528C000, 0, 0x00008000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_11[2] = {
+    { 1, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x4504C333, 0xC215999A, 0x4438C000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_14[2] = {
+    { 20, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x450FE000, 0xC514CB33, 0xC5936733, 0, 0xFFFFC889, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_15[17] = {
+    { 9, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0xC40D3852, 0x423D3D71, 0x437CCCCD, 0, 0x0000A000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0x4533B000, 0xC1400000, 0x45163000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0x43D80000, 0x42080000, 0x455F8000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0xC4856000, 0x40E00000, 0x44CC0000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0x446DC000, 0x42140000, 0xC41D8000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0xC495E000, 0x41F00000, 0xC4DDE000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x05, 0x03, 0x08, 0, 0, 0, 0, 0xC4778000, 0x42B60000, 0x4457C000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x05, 0x03, 0x08, 0, 0, 0, 0, 0x456BD000, 0x422C0000, 0xC5140000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x05, 0x03, 0x08, 0, 0, 0, 0, 0x445C0000, 0x42700000, 0xC4B74000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x06, 0x03, 0x08, 0, 0, 0, 0, 0xC3180000, 0xC2200000, 0x44D38000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x06, 0x03, 0x08, 0, 0, 0, 0, 0x44E24000, 0x41100000, 0xC28A0000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x06, 0x03, 0x08, 0, 0, 0, 0, 0xC484A000, 0x3F800000, 0xC4FAE000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x07, 0x03, 0x08, 0, 0, 0, 0, 0x44F8A000, 0x41A80000, 0x43520000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x07, 0x03, 0x08, 0, 0, 0, 0, 0x44158000, 0x41600000, 0x44D78000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x07, 0x03, 0x08, 0, 0, 0, 0, 0xC4728000, 0x41E00000, 0xC424C000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_16[55] = {
+    { 19, 1, { 0xFF, 0x07, 0, 0, 0, 0, 0, 0, 0x44926000, 0, 0xC47C0000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 34, 4, { 0xFF, 0x01, 0x01, 0, 0, 0, 0, 0, 0x44826000, 0x42240000, 0xC3930000, 0, 0x0000E400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 34, 2, { 0xFF, 0x01, 0x01, 0x01, 0, 0, 0, 0, 0xC27C0000, 0x41D00000, 0xC2BC0000, 0, 0x00005C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 34, 1, { 0xFF, 0x01, 0x01, 0x01, 0, 0, 0, 0, 0x429C0000, 0x41F00000, 0xC4838000, 0, 0x0000E000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 27, 255, { 0x02, 0x02, 0x01, 0, 0, 0, 0, 0, 0xC488C000, 0x42A80000, 0x45152000, 0, 0x0000A000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 27, 255, { 0x02, 0x02, 0, 0x01, 0, 0, 0, 0, 0xC4FB0000, 0x42C40000, 0x4483E000, 0, 0x00005000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 27, 255, { 0x02, 0x02, 0x01, 0x02, 0, 0, 0, 0, 0xC4B78000, 0x42440000, 0x43F08000, 0, 0x0000BC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 33, 4, { 0xFF, 0x02, 0x01, 0x01, 0, 0, 0, 0, 0x45215000, 0xC28E0000, 0x44CEC000, 0, 0x0000C800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 33, 3, { 0xFF, 0x02, 0x01, 0x01, 0, 0, 0, 0, 0x4534D000, 0xC2DA0000, 0x449AE000, 0, 0x0000A400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 33, 2, { 0xFF, 0x02, 0x01, 0x01, 0, 0, 0, 0, 0x453AF000, 0xC1F80000, 0x44D82000, 0, 0x0000E800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 255, { 0xFF, 0x03, 0x01, 0x01, 0, 0, 0, 0, 0x46078400, 0xC4704000, 0x451A0000, 0x0000C000, 0x00007800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 29, 4, { 0xFF, 0x04, 0x01, 0, 0, 0, 0, 0, 0x44E04000, 0xC0400000, 0x44D84000, 0, 0x0000D000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 29, 2, { 0xFF, 0x04, 0x01, 0, 0, 0, 0, 0, 0x44E0C000, 0x41900000, 0x4555E000, 0, 0x00005000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 29, 1, { 0xFF, 0x04, 0x01, 0, 0, 0, 0, 0, 0xC3F50000, 0x42040000, 0x41F00000, 0, 0x00005C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0x4533B000, 0xC1400000, 0x45163000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0x43D80000, 0x42080000, 0x455F8000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0xC4856000, 0x40E00000, 0x44CC0000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0x446DC000, 0x42140000, 0xC41D8000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x04, 0x03, 0x08, 0, 0, 0, 0, 0xC495E000, 0x41F00000, 0xC4DDE000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 6, { 0xFF, 0x05, 0x01, 0, 0, 0, 0, 0, 0xC42A8000, 0x43520000, 0xC46C4000, 0, 0x0000D400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 2, { 0xFF, 0x05, 0x01, 0, 0, 0, 0, 0, 0xC413C000, 0x43870000, 0xC36F0000, 0, 0x00005400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 2, { 0xFF, 0x05, 0x01, 0x02, 0, 0, 0, 0, 0xC4438000, 0x43D20000, 0xC30E0000, 0, 0x00006C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 1, { 0xFF, 0x05, 0x01, 0, 0, 0, 0, 0, 0xC3800000, 0x43960000, 0xC3FD8000, 0, 0x00009C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 4, { 0xFF, 0x05, 0x01, 0x02, 0, 0, 0, 0, 0xC47D4000, 0x42F00000, 0xC42B4000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 1, { 0xFF, 0x05, 0x01, 0x04, 0, 0, 0, 0, 0xC5358000, 0x42920000, 0xC3FA8000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 1, { 0xFF, 0x05, 0x01, 0x04, 0, 0, 0, 0, 0xC5001000, 0x42A20000, 0xC530E000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 1, { 0xFF, 0x05, 0x01, 0x04, 0, 0, 0, 0, 0x45244000, 0x42900000, 0xC5473000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 1, { 0xFF, 0x05, 0x01, 0x04, 0, 0, 0, 0, 0x45234000, 0x423C0000, 0xC4640000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 1, { 0xFF, 0x05, 0x01, 0x04, 0, 0, 0, 0, 0xC4A58000, 0x42800000, 0xC4B8E000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x05, 0x03, 0x08, 0, 0, 0, 0, 0xC4778000, 0x42B60000, 0x4457C000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x05, 0x03, 0x08, 0, 0, 0, 0, 0x456BD000, 0x422C0000, 0xC5140000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x05, 0x03, 0x08, 0, 0, 0, 0, 0x445C0000, 0x42700000, 0xC4B74000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 29, 2, { 0xFF, 0x06, 0x01, 0, 0, 0, 0, 0, 0xC496E000, 0xC2180000, 0xC3818000, 0, 0x00006000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 29, 1, { 0xFF, 0x06, 0x01, 0, 0, 0, 0, 0, 0xC1500000, 0xC1A00000, 0xC3970000, 0, 0x0000FC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 1, { 0xFF, 0x06, 0x01, 0x04, 0, 0, 0, 0, 0xC4B56000, 0xC1A00000, 0x44B92000, 0, 0x0000EC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 1, { 0xFF, 0x06, 0x01, 0x04, 0, 0, 0, 0, 0xC4DC8000, 0xC1D80000, 0xC493C000, 0, 0x00001800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x06, 0x03, 0x08, 0, 0, 0, 0, 0xC3180000, 0xC2200000, 0x44D38000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x06, 0x03, 0x08, 0, 0, 0, 0, 0x44E24000, 0x41100000, 0xC28A0000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x06, 0x03, 0x08, 0, 0, 0, 0, 0xC484A000, 0x3F800000, 0xC4FAE000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 21, 4, { 0x07, 0x07, 0x01, 0, 0, 0, 0, 0, 0xC39C0000, 0x40000000, 0x43C60000, 0, 0x0000D000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 21, 2, { 0x07, 0x07, 0x01, 0, 0, 0, 0, 0, 0x42D00000, 0xC0E00000, 0xC4074000, 0, 0x00008C00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 21, 2, { 0x07, 0x07, 0x01, 0, 0, 0, 0, 0, 0x441BC000, 0xC1100000, 0x44318000, 0, 0x00000800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 21, 1, { 0x07, 0x07, 0x01, 0, 0, 0, 0, 0, 0x44864000, 0x41500000, 0xC3E78000, 0, 0x00004000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x07, 0x03, 0x08, 0, 0, 0, 0, 0x44F8A000, 0x41A80000, 0x43520000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x07, 0x03, 0x08, 0, 0, 0, 0, 0x44158000, 0x41600000, 0x44D78000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 40, 255, { 0xFF, 0x07, 0x03, 0x08, 0, 0, 0, 0, 0xC4728000, 0x41E00000, 0xC424C000, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 30, 3, { 0xFF, 0x08, 0x01, 0, 0, 0, 0, 0, 0xC3850000, 0x3F800000, 0x4424C000, 0, 0x00002000, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 30, 2, { 0xFF, 0x08, 0x01, 0, 0, 0, 0, 0, 0xC4528000, 0x80000000, 0x44398000, 0, 0x0000E800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 30, 2, { 0xFF, 0x08, 0x01, 0, 0, 0, 0, 0, 0x41A00000, 0x41E00000, 0xC3868000, 0, 0x00005400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 30, 1, { 0xFF, 0x08, 0x01, 0, 0, 0, 0, 0, 0xC4054000, 0x41400000, 0xC3818000, 0, 0x00009800, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 21, 3, { 0x09, 0x09, 0x01, 0, 0, 0, 0, 0, 0xC48E0000, 0x40000000, 0xC44B8000, 0, 0x00008400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 21, 2, { 0x09, 0x09, 0x01, 0, 0, 0, 0, 0, 0x44A0E000, 0x40000000, 0xC2BA0000, 0, 0x0000B400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 4, { 0xFF, 0x09, 0x01, 0, 0, 0, 0, 0, 0x45167000, 0x43B80000, 0x43090000, 0, 0x0000DC00, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 39, 2, { 0xFF, 0x09, 0x01, 0x02, 0, 0, 0, 0, 0x452BC000, 0x438B0000, 0xC2240000, 0, 0x0000B400, 0 }, -1, { 0, 0, 0 }, 0 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_17[2] = {
+    { 24, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x437A0000, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_18[2] = {
+    { 7, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_19[2] = {
+    { 7, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0xC1A00000, 0x40E00000, 0xC3FA0000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_20[2] = {
+    { 7, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0xC4AA8CCD, 0x42320000, 0xC4AFA000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_21[2] = {
+    { 7, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0x44860333, 0x40A00000, 0xC4798CCD, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_area_monsters_22[2] = {
+    { 7, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0x44898000, 0, 0x44098000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot* quest_area_monster_tbl[24] = {
+    NULL,
+    quest_area_monsters_01,
+    quest_area_monsters_02,
+    quest_area_monsters_03,
+    quest_area_monsters_04,
+    quest_area_monsters_05,
+    quest_area_monsters_06,
+    quest_area_monsters_07,
+    quest_area_monsters_08,
+    quest_area_monsters_09,
+    quest_area_monsters_10,
+    quest_area_monsters_11,
+    quest_area_monsters_12,
+    quest_area_monsters_13,
+    quest_area_monsters_14,
+    quest_area_monsters_15,
+    quest_area_monsters_16,
+    quest_area_monsters_17,
+    quest_area_monsters_18,
+    quest_area_monsters_19,
+    quest_area_monsters_20,
+    quest_area_monsters_21,
+    quest_area_monsters_22,
+    NULL,
+};
+QuestEntrySlot quest_variant_slots_01_0[4] = {
+    { 1, 1, { 0xFF, 0x0A, 0, 0, 0, 0, 0, 0, 0xC436D333, 0xC2C20000, 0x451324CD, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0x02, 0, 0, 0x01, 0, 0, 0, 0xC55A2000, 0x41F0CCCD, 0x44B1E000, 0, 0x00007000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0x05, 0, 0, 0x01, 0, 0, 0, 0x44CEB000, 0x40800000, 0xC52C1CCD, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_01_1[3] = {
+    { 1, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0x43730000, 0xC0C00000, 0x4430199A, 0, 0x0000B000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0x08, 0, 0, 0x01, 0, 0, 0, 0xC4786000, 0xC35D3333, 0xC497099A, 0, 0x00002400, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_01_2[3] = {
+    { 1, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0x4567A000, 0x42480000, 0x4586D800, 0, 0x0000C000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0x0A, 0, 0, 0x01, 0, 0, 0, 0xC5053CCD, 0xC21C0000, 0xC4CFF666, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_01_3[3] = {
+    { 1, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0x45EAEE66, 0xC4B38000, 0x4570F99A, 0, 0x0000C400, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0x08, 0, 0, 0x01, 0, 0, 0, 0xC509C000, 0x43160000, 0xC4FAA000, 0, 0x00002800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_01_4[3] = {
+    { 1, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC484D000, 0x404CCCCD, 0x44D5ACCD, 0, 0x00001800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_01_5[3] = {
+    { 1, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0xC484D000, 0x404CCCCD, 0x44D5ACCD, 0, 0x00001800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 1, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_01[7] = {
+    { 0x01, { 0, 0, 0 }, quest_variant_slots_01_0 },
+    { 0x02, { 0, 0, 0 }, quest_variant_slots_01_1 },
+    { 0x03, { 0, 0, 0 }, quest_variant_slots_01_2 },
+    { 0x05, { 0, 0, 0 }, quest_variant_slots_01_3 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_01_4 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_01_5 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_02_0[4] = {
+    { 2, 1, { 0xFF, 0x0A, 0, 0, 0, 0, 0, 0, 0xC436D333, 0xC2C20000, 0x451324CD, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 2, 1, { 0xFF, 0x02, 0, 0, 0x01, 0, 0, 0, 0xC55A2000, 0xC1F0CCCD, 0x44B1E000, 0, 0x00007000, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 2, 1, { 0xFF, 0x05, 0, 0, 0x01, 0, 0, 0, 0x44CEB000, 0x40800000, 0xC52C1CCD, 0, 0x00007000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_02_1[3] = {
+    { 2, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 2, 1, { 0xFF, 0x08, 0, 0, 0x01, 0, 0, 0, 0xC4786000, 0xC35D3333, 0xC497099A, 0, 0x00002400, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_02_2[3] = {
+    { 2, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0x4567A000, 0x42480000, 0x4586D800, 0, 0x0000C000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 2, 1, { 0xFF, 0x0A, 0, 0, 0x01, 0, 0, 0, 0xC5053CCD, 0xC21C0000, 0xC4CFF666, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_02_3[3] = {
+    { 2, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0x45EAEE66, 0xC4B38000, 0x4570F99A, 0, 0x0000C400, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 2, 1, { 0xFF, 0x08, 0, 0, 0x01, 0, 0, 0, 0xC509C000, 0x43160000, 0xC4FAA000, 0, 0x00002800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_02_4[3] = {
+    { 2, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x44C10000, 0x42B00000, 0xC4144000, 0, 0x0000CC00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 2, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_02_5[3] = {
+    { 2, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x44C10000, 0x42B00000, 0xC4144000, 0, 0x0000CC00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 2, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_02[7] = {
+    { 0x01, { 0, 0, 0 }, quest_variant_slots_02_0 },
+    { 0x02, { 0, 0, 0 }, quest_variant_slots_02_1 },
+    { 0x03, { 0, 0, 0 }, quest_variant_slots_02_2 },
+    { 0x05, { 0, 0, 0 }, quest_variant_slots_02_3 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_02_4 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_02_5 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_03_0[4] = {
+    { 3, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0x43480000, 0x40800000, 0x43BE0000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 3, 1, { 0xFF, 0x0A, 0, 0, 0x01, 0, 0, 0, 0xC3C80000, 0x41D80000, 0x45610000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 3, 1, { 0xFF, 0x05, 0, 0, 0x01, 0, 0, 0, 0x44CEB000, 0x40800000, 0xC52C1CCD, 0, 0x00007000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_03_1[3] = {
+    { 3, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0xC3C80000, 0xC28E0000, 0x453B8000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 3, 1, { 0xFF, 0x06, 0, 0, 0x01, 0, 0, 0, 0xC56D8000, 0, 0xC4A28000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_03_2[3] = {
+    { 3, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC502C000, 0x40000000, 0xC5129000, 0, 0x00001000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 3, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_03_3[3] = {
+    { 3, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0xC502C000, 0x40000000, 0xC5129000, 0, 0x00001000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 3, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_03[5] = {
+    { 0x01, { 0, 0, 0 }, quest_variant_slots_03_0 },
+    { 0x02, { 0, 0, 0 }, quest_variant_slots_03_1 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_03_2 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_03_3 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_04_0[2] = {
+    { 4, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0x45449333, 0x411B3333, 0x43A7A666, 0, 0x0000B000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_04_1[3] = {
+    { 4, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x45110000, 0, 0x440CC000, 0, 0x0000CC00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 4, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_04_2[3] = {
+    { 4, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x45110000, 0, 0x440CC000, 0, 0x0000CC00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 4, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_04[4] = {
+    { 0x04, { 0, 0, 0 }, quest_variant_slots_04_0 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_04_1 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_04_2 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_05_0[4] = {
+    { 5, 1, { 0xFF, 0x07, 0, 0, 0, 0, 0, 0, 0x44BB8000, 0x459C4000, 0x44898000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 5, 1, { 0xFF, 0x07, 0, 0, 0x01, 0, 0, 0, 0x44BB8000, 0x459C4000, 0x44898000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 5, 1, { 0xFF, 0x07, 0, 0, 0x02, 0, 0, 0, 0x44E10000, 0x459C4000, 0x44ED8000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_05_1[3] = {
+    { 5, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC51B1000, 0, 0xC3680000, 0, 0x00001800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 5, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_05_2[3] = {
+    { 5, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0xC51B1000, 0, 0xC3680000, 0, 0x00001800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 5, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_05[4] = {
+    { 0x04, { 0, 0, 0 }, quest_variant_slots_05_0 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_05_1 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_05_2 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_06_0[3] = {
+    { 6, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 6, 1, { 0xFF, 0x04, 0, 0, 0x01, 0, 0, 0, 0xC44A0000, 0xC28C0000, 0x44D56000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_06_1[3] = {
+    { 6, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x43290000, 0x420C0000, 0xC5287000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 6, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_06_2[3] = {
+    { 6, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x43290000, 0x420C0000, 0xC5287000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 6, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_06[4] = {
+    { 0x02, { 0, 0, 0 }, quest_variant_slots_06_0 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_06_1 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_06_2 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_07_0[3] = {
+    { 7, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0xC43A7333, 0x41800000, 0x4423B333, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 7, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0x41080000, 0x4211999A, 0x44DF2666, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_07_1[3] = {
+    { 7, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0xC1A00000, 0x40E00000, 0xC3FA0000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 7, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0xC4ED8000, 0, 0x44BB8000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_07_2[3] = {
+    { 7, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0x43FA0000, 0xC1100000, 0xC4390000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 7, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x44D48000, 0xC2480000, 0xC4898000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_07_3[3] = {
+    { 7, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0x44860333, 0x40A00000, 0xC4798CCD, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 7, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0x43FA0000, 0x420C0000, 0xC4BB8000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_07_4[3] = {
+    { 7, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0x44898000, 0, 0x44098000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 7, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0xC3F1C000, 0x4205999A, 0xC2B9999A, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_07_5[3] = {
+    { 7, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x41840000, 0x41940000, 0x451C0B33, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 7, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_07_6[3] = {
+    { 7, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x41840000, 0x41940000, 0x451C0B33, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 7, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_07[8] = {
+    { 0x01, { 0, 0, 0 }, quest_variant_slots_07_0 },
+    { 0x02, { 0, 0, 0 }, quest_variant_slots_07_1 },
+    { 0x03, { 0, 0, 0 }, quest_variant_slots_07_2 },
+    { 0x04, { 0, 0, 0 }, quest_variant_slots_07_3 },
+    { 0x05, { 0, 0, 0 }, quest_variant_slots_07_4 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_07_5 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_07_6 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_08_0[3] = {
+    { 8, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0xC4484000, 0xC1A00000, 0x44D94000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 8, 1, { 0xFF, 0x06, 0, 0, 0x01, 0, 0, 0, 0xC5334E66, 0xC25F3333, 0xC3C3D99A, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_08_1[3] = {
+    { 8, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x44A86000, 0x41C00000, 0x44D38000, 0, 0x0000E000, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 8, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_08_2[3] = {
+    { 8, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x44A86000, 0x41C00000, 0x44D38000, 0, 0x0000E000, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 8, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_08[4] = {
+    { 0x02, { 0, 0, 0 }, quest_variant_slots_08_0 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_08_1 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_08_2 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_09_0[4] = {
+    { 9, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0xC48DA99A, 0xC11FAE14, 0x452D9B33, 0, 0x0000A000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 9, 1, { 0xFF, 0x05, 0, 0, 0x01, 0, 0, 0, 0xC40D3852, 0x423D3D71, 0x437CCCCD, 0, 0x0000A000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 9, 1, { 0xFF, 0x04, 0, 0, 0x02, 0, 0, 0, 0x44F17C7B, 0x418D851F, 0x45410E3D, 0, 0x0000A000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_09_1[3] = {
+    { 9, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x4481C000, 0, 0x443EC000, 0, 0x0000EC00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 9, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_09_2[3] = {
+    { 9, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x4481C000, 0, 0x443EC000, 0, 0x0000EC00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 9, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_09[4] = {
+    { 0x05, { 0, 0, 0 }, quest_variant_slots_09_0 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_09_1 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_09_2 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_12_0[4] = {
+    { 12, 1, { 0x10, 0x09, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x11, 0x02, 0, 0, 0, 0, 0, 0, 0xC5C0D99A, 0x41333333, 0xC433799A, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x12, 0x03, 0, 0, 0, 0, 0, 0, 0xC44AF99A, 0x3F666666, 0xC39A0CCD, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_12_1[4] = {
+    { 12, 1, { 0x10, 0x04, 0, 0, 0, 0, 0, 0, 0xC5194800, 0x4139999A, 0x44299333, 0, 0x0000036E, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x11, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000036E, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x12, 0x05, 0, 0, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x0000036E, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_12_2[3] = {
+    { 12, 1, { 0x10, 0x01, 0, 0, 0, 0, 0, 0, 0x454A1000, 0, 0xC47D8000, 0, 0x0000E000, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x11, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_12_3[3] = {
+    { 12, 1, { 0x10, 0, 0, 0, 0, 0, 0, 0, 0x454A1000, 0, 0xC47D8000, 0, 0x0000E000, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 12, 1, { 0x11, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_12[5] = {
+    { 0x01, { 0, 0, 0 }, quest_variant_slots_12_0 },
+    { 0x02, { 0, 0, 0 }, quest_variant_slots_12_1 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_12_2 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_12_3 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_14_0[3] = {
+    { 14, 1, { 0x10, 0x05, 0, 0, 0, 0, 0, 0, 0xC30C6666, 0xC1733333, 0xC538F19A, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 14, 1, { 0x11, 0x02, 0, 0, 0, 0, 0, 0, 0xC537299A, 0x40333333, 0xC4877666, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_14_1[3] = {
+    { 14, 1, { 0x10, 0x01, 0, 0, 0, 0, 0, 0, 0x450FC000, 0x40400000, 0xC50F6000, 0, 0x0000F000, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 14, 1, { 0x11, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_14_2[3] = {
+    { 14, 1, { 0x10, 0, 0, 0, 0, 0, 0, 0, 0x450FC000, 0x40400000, 0xC50F6000, 0, 0x0000F000, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 14, 1, { 0x11, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 1, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_14[4] = {
+    { 0x04, { 0, 0, 0 }, quest_variant_slots_14_0 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_14_1 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_14_2 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_15_0[4] = {
+    { 15, 1, { 0xFF, 0x07, 0, 0, 0, 0, 0, 0, 0xC5561000, 0xC53B8000, 0x4544E000, 0, 0x00002500, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0x0C, 0, 0, 0, 0, 0, 0, 0xC5392000, 0xC4738000, 0xC5F6C000, 0, 0x00001800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0x05, 0, 0, 0, 0, 0, 0, 0x449F8000, 0x41800000, 0x445D8000, 0, 0x0000CC00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_15_1[3] = {
+    { 15, 1, { 0xFF, 0x08, 0, 0, 0, 0, 0, 0, 0xC40F999A, 0xC42B4666, 0xC52FF19A, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0x04, 0, 0, 0, 0, 0, 0, 0x4595C666, 0xC43CC000, 0xC4B10000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_15_2[3] = {
+    { 15, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC46A8000, 0x3F800000, 0xC4E32000, 0, 0x00001000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_15_3[5] = {
+    { 15, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x43850000, 0xC482E000, 0xC4DBE000, 0, 0x00000C00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC438D333, 0xC4BC1000, 0xC4877000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0xC46A8000, 0x3F800000, 0xC4E32000, 0, 0x00001000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0x00001000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_15_4[3] = {
+    { 15, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x43850000, 0xC482E000, 0xC4DBE000, 0, 0x00000C00, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 15, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC438D333, 0xC4BC1000, 0xC4877000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_15[6] = {
+    { 0x01, { 0, 0, 0 }, quest_variant_slots_15_0 },
+    { 0x03, { 0, 0, 0 }, quest_variant_slots_15_1 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_15_2 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_15_3 },
+    { 0x0B, { 0, 0, 0 }, quest_variant_slots_15_4 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_16_0[3] = {
+    { 16, 1, { 0xFF, 0x06, 0, 0, 0, 0, 0, 0, 0xC343999A, 0xC23C0000, 0xC4F00000, 0, 0x0000D000, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 16, 1, { 0xFF, 0x07, 0, 0, 0x01, 0, 0, 0, 0xC5561000, 0xC53B8000, 0x4544E000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_16_1[3] = {
+    { 16, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0xC52EB000, 0xC1E00000, 0x43E98000, 0, 0x00001600, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 16, 1, { 0xFF, 0x02, 0, 0, 0x01, 0, 0, 0, 0xC4E34CCD, 0xC3FA0000, 0x4426ECCD, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_16_2[3] = {
+    { 16, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC3F90000, 0, 0x44F7C000, 0, 0x00001800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 16, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_16_3[4] = {
+    { 16, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC48B2CCD, 0xC4E55000, 0x44B3DCCD, 0, 0x00001600, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 16, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0xC3F90000, 0, 0x44F7C000, 0, 0x00001800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 16, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_16_4[3] = {
+    { 16, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC48B2CCD, 0xC4E55000, 0x44B3DCCD, 0, 0x00001600, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 16, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC438D333, 0xC4BC1000, 0xC4877000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_16[6] = {
+    { 0x01, { 0, 0, 0 }, quest_variant_slots_16_0 },
+    { 0x03, { 0, 0, 0 }, quest_variant_slots_16_1 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_16_2 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_16_3 },
+    { 0x0B, { 0, 0, 0 }, quest_variant_slots_16_4 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_18_0[3] = {
+    { 18, 1, { 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0x452A0000, 0xC47A0000, 0x44D9E000, 0, 0x0000C400, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 18, 1, { 0xFF, 0x08, 0, 0, 0x01, 0, 0, 0, 0x441C4000, 0xC4BB8000, 0xC2DA0000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_18_1[3] = {
+    { 18, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0x43334CCD, 0xC534A000, 0xC4AE999A, 0, 0x0000C400, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 18, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC4821000, 0xC534A000, 0x447ED333, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_18[4] = {
+    { 0x03, { 0, 0, 0 }, quest_variant_slots_18_0 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_18_1 },
+    { 0x0B, { 0, 0, 0 }, quest_variant_slots_18_1 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_19_0[3] = {
+    { 19, 1, { 0xFF, 0x07, 0, 0, 0, 0, 0, 0, 0x44926000, 0, 0xC47C0000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 19, 1, { 0xFF, 0x08, 0, 0, 0x01, 0, 0, 0, 0x4552A000, 0, 0x442F8000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_19_1[3] = {
+    { 19, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0xC4960000, 0x40A00000, 0xC42FC000, 0, 0x00000800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 19, 1, { 0xFF, 0x01, 0, 0, 0x01, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestEntrySlot quest_variant_slots_19_2[3] = {
+    { 19, 1, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0xC4960000, 0x40A00000, 0xC42FC000, 0, 0x00000800, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 19, 1, { 0xFF, 0, 0, 0, 0x01, 0, 0, 0, 0x42800000, 0x42040000, 0xC2F20000, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_19[4] = {
+    { 0x05, { 0, 0, 0 }, quest_variant_slots_19_0 },
+    { 0x08, { 0, 0, 0 }, quest_variant_slots_19_1 },
+    { 0x09, { 0, 0, 0 }, quest_variant_slots_19_2 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestMonsterVariantList quest_monster_variants_20[2] = {
+    { 0x07, { 0, 0, 0 }, quest_area_monsters_14 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestEntrySlot quest_variant_slots_24_0[3] = {
+    { 24, 1, { 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x437A0000, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 24, 1, { 0xFF, 0x01, 0, 0, 0x01, 0, 0, 0, 0, 0x437A0000, 0, 0, 0, 0 }, 0, { 0, 0, 0 }, 0x101 },
+    { 0, 0, { 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, -1, { 0, 0, 0 }, 0 },
+};
+QuestMonsterVariantList quest_monster_variants_24[2] = {
+    { 0x0A, { 0, 0, 0 }, quest_variant_slots_24_0 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestMonsterVariantList quest_monster_variants_25[2] = {
+    { 0x06, { 0, 0, 0 }, quest_area_monsters_10 },
+    { 0xFF, { 0, 0, 0 }, NULL },
+};
+QuestMonsterVariantList* quest_monster_variant_tbl[41] = {
+    NULL,
+    quest_monster_variants_01,
+    quest_monster_variants_02,
+    quest_monster_variants_03,
+    quest_monster_variants_04,
+    quest_monster_variants_05,
+    quest_monster_variants_06,
+    quest_monster_variants_07,
+    quest_monster_variants_08,
+    quest_monster_variants_09,
+    NULL,
+    NULL,
+    quest_monster_variants_12,
+    NULL,
+    quest_monster_variants_14,
+    quest_monster_variants_15,
+    quest_monster_variants_16,
+    NULL,
+    quest_monster_variants_18,
+    quest_monster_variants_19,
+    quest_monster_variants_20,
+    NULL,
+    NULL,
+    NULL,
+    quest_monster_variants_24,
+    quest_monster_variants_25,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+};
+s16 em_set_quest_area_tbl[5][13] = {
+    { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+    { 301, -1, 301, 301, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+    { 301, -1, 302, 304, 301, 301, -1, -1, -1, 301, -1, -1, -1 },
+    { 301, 301, 303, 302, 302, 302, -1, -1, -1, 302, -1, 301, -1 },
+    { -1, 302, 304, 303, 303, 303, -1, 301, 301, 302, 301, 301, 301 },
+};
+s16 em_set_season_area_tbl[8][13] = {
+    { -1, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101 },
+    { -1, 102, 102, 102, 101, 101, 101, 101, 101, 101, 101, 101, 101 },
+    { -1, 101, 101, 101, 102, 102, 101, 101, 101, 102, 102, 102, 101 },
+    { -1, 101, 101, 101, 103, 103, 101, 101, 101, 103, 103, 103, 101 },
+    { -1, 101, 101, 101, 101, 101, 102, 102, 102, 101, 101, 101, 102 },
+    { -1, 102, 102, 102, 102, 102, 101, 101, 101, 102, 102, 102, 101 },
+    { -1, 102, 102, 102, 101, 101, 102, 102, 102, 101, 101, 101, 102 },
+    { -1, 101, 101, 101, 103, 103, 102, 102, 102, 103, 103, 103, 102 },
+};
+u8 quest_pair_table[0x1C] = {
+    0x00, 0x00, 0x01, 0x0C, 0x02, 0x0D, 0x03, 0x0E, 0x04, 0x0F, 0x05, 0x10, 0x06, 0x11, 0x07, 0x12, 0x08, 0x13, 0x09, 0x09, 0x09, 0x09, 0x0A, 0x0A, 0x0B, 0x14, 0x00, 0x00,
+};
+u8 quest_byte_table[13] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x09, 0x0A, 0x0B,
+};
+s32 quest_time_class_tbl[3] = { 0, 5, 10 };
+u8 quest_supply_drop_03[0xC] = {
+    0x0D, 0x08, 0x0A, 0x20, 0x07, 0x30, 0x04, 0x10, 0x00, 0x00, 0x00, 0x00,
+};
+u8 quest_supply_drop_04[0xC] = {
+    0x12, 0x08, 0x0F, 0x20, 0x0C, 0x20, 0x09, 0x20, 0x06, 0x10, 0x00, 0x00,
+};
+u8 quest_supply_drop_05[0x10] = {
+    0x16, 0x04, 0x13, 0x10, 0x10, 0x20, 0x0D, 0x20, 0x0A, 0x20, 0x07, 0x10, 0x04, 0x08, 0x00, 0x00,
+};
+u8 quest_supply_drop_06[0x14] = {
+    0x1B, 0x02, 0x18, 0x08, 0x15, 0x06, 0x12, 0x20, 0x0F, 0x20, 0x0C, 0x20, 0x09, 0x10, 0x06, 0x08, 0x00, 0x00, 0x00, 0x00,
+};
+u8 quest_supply_drop_07[0x1C] = {
+    0x1F, 0x02, 0x1C, 0x04, 0x19, 0x08, 0x16, 0x10, 0x13, 0x10, 0x10, 0x20, 0x0D, 0x20, 0x0A, 0x20, 0x07, 0x10, 0x04, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+u8 quest_supply_drop_08[0x18] = {
+    0x24, 0x02, 0x21, 0x02, 0x1E, 0x04, 0x1B, 0x08, 0x18, 0x08, 0x15, 0x10, 0x12, 0x20, 0x0F, 0x20, 0x0C, 0x20, 0x09, 0x10, 0x06, 0x08, 0x00, 0x00,
+};
+u8 quest_supply_drop_09[0x20] = {
+    0x2A, 0x02, 0x27, 0x02, 0x24, 0x04, 0x21, 0x04, 0x1E, 0x08, 0x1B, 0x08, 0x18, 0x10, 0x15, 0x20, 0x12, 0x20, 0x0F, 0x20, 0x0C, 0x10, 0x09, 0x10, 0x06, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+u8 quest_supply_drop_10[0x20] = {
+    0x2F, 0x02, 0x2C, 0x02, 0x29, 0x04, 0x26, 0x04, 0x23, 0x08, 0x20, 0x08, 0x1D, 0x10, 0x1A, 0x10, 0x17, 0x20, 0x14, 0x20, 0x11, 0x20, 0x0E, 0x10, 0x0B, 0x10, 0x08, 0x10, 0x05, 0x08, 0x00, 0x00,
+};
+u8 quest_supply_drop_11[0x24] = {
+    0x34, 0x02, 0x31, 0x02, 0x2E, 0x04, 0x2B, 0x04, 0x28, 0x08, 0x25, 0x08, 0x22, 0x10, 0x1F, 0x10, 0x1C, 0x10, 0x19, 0x20, 0x16, 0x20, 0x13, 0x20, 0x10, 0x10, 0x0D, 0x10, 0x0A, 0x10, 0x07, 0x08, 0x04, 0x08, 0x00, 0x00,
+};
+u8* quest_supply_drop_tbl[13] = {
+    quest_supply_drop_empty,
+    quest_supply_drop_empty,
+    quest_sdata_tbl_a,
+    quest_supply_drop_03,
+    quest_supply_drop_04,
+    quest_supply_drop_05,
+    quest_supply_drop_06,
+    quest_supply_drop_07,
+    quest_supply_drop_08,
+    quest_supply_drop_09,
+    quest_supply_drop_10,
+    quest_supply_drop_11,
+    quest_supply_drop_empty,
+};
+u8 quest_bonus_items_0[0x10] = {
+    0x14, 0x00, 0x0F, 0x01, 0x05, 0x04, 0x14, 0x05, 0x0A, 0x07, 0x14, 0x09, 0x0A, 0x0A, 0xFF, 0x00,
+};
+u8 quest_bonus_items_1[0x10] = {
+    0x14, 0x00, 0x0F, 0x03, 0x0A, 0x05, 0x14, 0x06, 0x0A, 0x07, 0x14, 0x09, 0x05, 0x0B, 0xFF, 0x00,
+};
+u8 quest_bonus_items_2[0x10] = {
+    0x14, 0x00, 0x0F, 0x03, 0x14, 0x04, 0x14, 0x06, 0x05, 0x08, 0x14, 0x09, 0xFF, 0x00, 0x00, 0x00,
+};
+u8 quest_bonus_items_3[0x10] = {
+    0x14, 0x00, 0x05, 0x01, 0x14, 0x04, 0x14, 0x05, 0x0F, 0x06, 0x14, 0x07, 0xFF, 0x00, 0x00, 0x00,
+};
+u8 quest_bonus_items_4[0x10] = {
+    0x14, 0x00, 0x0F, 0x03, 0x14, 0x06, 0x14, 0x07, 0x14, 0x09, 0x05, 0x0A, 0xFF, 0x00, 0x00, 0x00,
+};
+u8* quest_bonus_pick_00[3] = { quest_sdata_tbl_b, quest_sdata_tbl_b, quest_sdata_tbl_b };
+u8* quest_bonus_pick_01[3] = { quest_sdata_tbl_b, quest_bonus_items_0, quest_sdata_tbl_b };
+u8* quest_bonus_pick_02[3] = { quest_sdata_tbl_b, quest_bonus_items_1, quest_sdata_tbl_b };
+u8* quest_bonus_pick_03[3] = { quest_sdata_tbl_b, quest_bonus_items_2, quest_sdata_tbl_b };
+u8* quest_bonus_pick_04[3] = { quest_sdata_tbl_b, quest_bonus_items_3, quest_sdata_tbl_b };
+u8* quest_bonus_pick_05[3] = { quest_sdata_tbl_b, quest_bonus_items_4, quest_sdata_tbl_b };
+u8* quest_bonus_pick_11[3] = { quest_sdata_tbl_b, quest_sdata_tbl_c, quest_sdata_tbl_c };
+u8** quest_bonus_pick_tbl[13] = {
+    quest_bonus_pick_00,
+    quest_bonus_pick_01,
+    quest_bonus_pick_02,
+    quest_bonus_pick_03,
+    quest_bonus_pick_04,
+    quest_bonus_pick_05,
+    quest_bonus_pick_00,
+    quest_bonus_pick_00,
+    quest_bonus_pick_00,
+    quest_bonus_pick_00,
+    quest_bonus_pick_00,
+    quest_bonus_pick_11,
+    quest_bonus_pick_00,
+};
+u8 quest_pair_chance_tbl_a[0x10] = {
+    32, 32, 32, 22, 22, 22, 22, 22, 32, 22, 22, 22, 22, 22, 22, 22,
+};
+Q_RewardGroup quest_reward_group_tbl[6] = {
+    { 0, 0, 0 },
+    { 1, 1, 0 },
+    { 2, 1, 1 },
+    { 3, 2, 1 },
+    { 4, 2, 1 },
+    { 5, 3, 0 },
+};
+u8 quest_pair_chance_tbl_b[0x10] = {
+    32, 32, 22, 22, 22, 22, 22, 22, 32, 32, 22, 22, 22, 22, 22, 22,
+};
+u8 quest_pair_chance_tbl_c[0x10] = {
+    32, 32, 22, 22, 22, 22, 22, 22, 32, 32, 22, 22, 22, 22, 22, 22,
+};
+u16* arena_time_table[12] = {
+    quest_grade_time_00,
+    quest_grade_time_01,
+    quest_grade_time_02,
+    quest_grade_time_03,
+    quest_grade_time_04,
+    quest_grade_time_05,
+    quest_grade_time_06,
+    quest_grade_time_07,
+    quest_grade_time_08,
+    quest_grade_time_09,
+    quest_grade_time_0A,
+    quest_grade_time_0B,
+};
+u16 multi_arena_clr_time[20] = {
+    10800, 4500, 18000, 7200, 32400, 10800, 21600, 9000, 21600, 10800, 27000, 10800, 32400, 16200, 36000, 17100, 36000, 18000, 54000, 27000,
+};
+
+/* The dcm archive buffers by stage (`stage_dcm_buffer_tbl`, camera/camera_main.cpp's 50 pointer slots, declared as bytes in the band). */
+static inline u8** quest_dcm_buffers(void) {
+    return (u8**)stage_dcm_buffer_tbl;
+}
+
 /* Copies both of the band's first two picked-pair tables into a result record's own two adjacent
  * 0xC0 buffers, one four-byte pair at a time. */
 void quest_item_pair_tbl_copy(Q_ItemPair* dst_a, Q_ItemPair* dst_b) {
@@ -220,34 +1118,11 @@ void quest_pl_skill_slot_set(_PLW* owner, u8* chance, u8 mode) {
         fill = 8;
     }
     p = chance;
-    n = 2;
-    do {
-        if (p[0] == 0x16) {
-            p[0] = fill;
+    for (n = 0; n < 16; p++, n++) {
+        if (*p == 0x16) {
+            *p = fill;
         }
-        if (p[1] == 0x16) {
-            p[1] = fill;
-        }
-        if (p[2] == 0x16) {
-            p[2] = fill;
-        }
-        if (p[3] == 0x16) {
-            p[3] = fill;
-        }
-        if (p[4] == 0x16) {
-            p[4] = fill;
-        }
-        if (p[5] == 0x16) {
-            p[5] = fill;
-        }
-        if (p[6] == 0x16) {
-            p[6] = fill;
-        }
-        if (p[7] == 0x16) {
-            p[7] = fill;
-        }
-        p += 8;
-    } while (--n != 0);
+    }
     top = 0;
     if (Pl_cat_skill_ck(owner, 0x10) == 1) {
         top = 1;
@@ -269,15 +1144,16 @@ void quest_pl_skill_slot_set(_PLW* owner, u8* chance, u8 mode) {
  * number into the weighted table and appends the entry the roll lands on.  The first row always
  * rolls 0, so it always takes the table's first non-empty entry. */
 s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
-    s32 picked = 0;
+    const Q_LotEntry* entry;
     s32 i;
+    s32 picked = 0;
 
     for (i = 0; i < count; i++, chance++) {
-        const Q_LotEntry* entry = table;
         u16 roll;
         u16 acc;
-        s32 hit;
+        u32 hit;
 
+        entry = table;
         if (entry->id == 0) {
             break;
         }
@@ -292,7 +1168,7 @@ s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s
         acc = 0;
         while (entry->id != 0) {
             acc += entry->weight;
-            if (acc > roll) {
+            if (roll < acc) {
                 hit = 1;
                 break;
             }
@@ -300,7 +1176,7 @@ s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->num = (s8)entry->value;
+            out->num = (s16)entry->value;
             out++;
             picked++;
         }
@@ -310,14 +1186,14 @@ s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s
 
 /* The same walk without the first-roll override: every row rolls its own number. */
 s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
-    s32 picked = 0;
-    s32 i;
     const Q_LotEntry* entry;
+    s32 i;
+    s32 picked = 0;
 
     for (i = 0; i < count; i++) {
         u16 roll;
         u16 acc;
-        s32 hit;
+        u32 hit;
 
         entry = table;
         if (entry->id == 0) {
@@ -336,7 +1212,7 @@ s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 cou
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->num = (s8)entry->value;
+            out->num = (s16)entry->value;
             out++;
             picked++;
         }
@@ -346,15 +1222,16 @@ s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 cou
 
 /* The same walk for the band that gates on the row's own chance byte only. */
 s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
-    s32 picked = 0;
+    const Q_LotEntry* entry;
     s32 i;
+    s32 picked = 0;
 
     for (i = 0; i < count; i++, chance++) {
-        const Q_LotEntry* entry = table;
         u16 roll;
         u16 acc;
-        s32 hit;
+        u32 hit;
 
+        entry = table;
         if (entry->id == 0) {
             break;
         }
@@ -366,7 +1243,7 @@ s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s3
         acc = 0;
         while (entry->id != 0) {
             acc += entry->weight;
-            if (acc > roll) {
+            if (roll < acc) {
                 hit = 1;
                 break;
             }
@@ -374,7 +1251,7 @@ s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s3
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->num = (s8)entry->value;
+            out->num = (s16)entry->value;
             out++;
             picked++;
         }
@@ -542,6 +1419,7 @@ void quest_part_reward_roll(QuestWork* work) {
     u8* entry;
     s32 rolls;
     s32 base;
+    s32 slot;
     s32 progress;
     s32 tier;
     s32 n;
@@ -663,11 +1541,12 @@ void quest_part_reward_roll(QuestWork* work) {
                 } else {
                     table = em_bui_rem_h[tier - 1];
                 }
+                slot = rolls * 3;
                 if (picks > 0) {
-                    n = quest_lot_pick(chance, table, &out[rolls * 3], picks, total);
+                    n = quest_lot_pick(chance, table, &out[slot], picks, total);
                 }
                 if (flagged > 0) {
-                    quest_lot_pick_last(&chance[n], table, &out[n + rolls * 3], flagged, total);
+                    quest_lot_pick_last(&chance[n], table, &out[n + slot], flagged, total);
                 }
                 rolls++;
             }
@@ -727,11 +1606,12 @@ void quest_part_reward_roll(QuestWork* work) {
             } else {
                 table = em_bui_rem_h[tier - 1];
             }
+            slot = rolls * 3;
             if (picks > 0) {
-                n = quest_lot_pick(chance, table, &out[rolls * 3], picks, total);
+                n = quest_lot_pick(chance, table, &out[slot], picks, total);
             }
             if (flagged > 0) {
-                quest_lot_pick_last(&chance[n], table, &out[n + rolls * 3], flagged, total);
+                quest_lot_pick_last(&chance[n], table, &out[n + slot], flagged, total);
             }
             rolls++;
         }
@@ -765,11 +1645,10 @@ void quest_part_reward_roll(QuestWork* work) {
  * are then packed after the part-break rewards in the first two picked-pair tables. */
 void quest_capture_reward_roll(QuestWork* work, _PLW* owner) {
     u8 chance[0xC];
+    s32 picks;
     s32 i;
-    Q_ItemPair* out;
     u8* key;
     s32 count;
-    s32 picks;
     s32 j;
     s32 progress;
     Q_LotEntry* table;
@@ -785,7 +1664,7 @@ void quest_capture_reward_roll(QuestWork* work, _PLW* owner) {
     if (progress == 2) {
         return;
     }
-    for (i = 0, out = quest_item_pair_tbl_c; i < 3; i++, out += 0x10) {
+    for (i = 0; i < 3; i++) {
         if (quest_flag_100_ck(NULL) == 1 && i == 2) {
             break;
         }
@@ -833,10 +1712,10 @@ void quest_capture_reward_roll(QuestWork* work, _PLW* owner) {
             table = em_hokaku_rem_h[*key];
         }
         if (picks > 0) {
-            quest_lot_pick(chance, table, &out[12], picks, total);
+            quest_lot_pick(chance, table, &(quest_item_pair_tbl_c + i * 0x10)[12], picks, total);
         }
     }
-    for (rolls = 0, k = 0, out = quest_item_pair_tbl_d; k < 41; k++) {
+    for (rolls = 0, k = 0; k < 41; k++) {
         if (rolls >= 3) {
             break;
         }
@@ -880,9 +1759,8 @@ void quest_capture_reward_roll(QuestWork* work, _PLW* owner) {
             table = em_hokaku_rem_h[k];
         }
         if (picks > 0) {
-            quest_lot_pick(chance, table, &out[12], picks, total);
+            quest_lot_pick(chance, table, &(quest_item_pair_tbl_d + rolls * 0x10)[12], picks, total);
         }
-        out += 0x10;
         rolls++;
     }
     for (i = 0, src = quest_item_pair_tbl_c, base = 28; i < 2; src += 0x10, base += 0x10, i++) {
@@ -900,6 +1778,57 @@ void quest_capture_reward_roll(QuestWork* work, _PLW* owner) {
             if (src[j + 12].id != 0) {
                 item_pair_copy(&quest_item_pair_tbl_b[n + base], &src[j + 12]);
                 n++;
+            }
+        }
+    }
+}
+
+/* Rolls the two tiers' monster lot tables (the arena's own table under quest flag 0x100) into the second
+ * picked-pair table, 8 picks per roll and two rolls at most, the higher tier first when the move work says
+ * so. */
+void quest_monster_setup(Q_ItemWork* item, _PLW* owner) {
+    u8 chance[0x10];
+    u8 order[2];
+    s32 rolls;
+    s32 tier;
+    s32 i;
+    Q_LotEntry* table;
+    Q_LotEntry* entry;
+    u16 total;
+    Q_MoveWork* work;
+
+    memcpy(chance, quest_pair_chance_tbl_c, sizeof(chance));
+    quest_pl_skill_slot_set(owner, chance, 0);
+    work = (Q_MoveWork*)get_move_work_adrs(0);
+    if (work == NULL) {
+        return;
+    }
+    rolls = 0;
+    order[0] = 0;
+    order[1] = 1;
+    if (item->tier_count_0x6980[0] != 0 && item->tier_count_0x6980[1] != 0 && work->spawn_0x2274[3].monster_0x6 > work->spawn_0x2274[4].monster_0x6) {
+        order[0] = 1;
+        order[1] = 0;
+    }
+    for (tier = 0; tier < 2; tier++) {
+        for (i = 0; i < item->tier_count_0x6980[tier]; i++) {
+            if (quest_flag_100_ck(NULL) == 1) {
+                table = item->lot_e2_0x15C;
+            } else {
+                table = nora_set_proc.lot_table_get(item->tier_monster_0x6984[tier]);
+            }
+            if (table != NULL) {
+                total = 0;
+                for (entry = table; entry->id != 0; entry++) {
+                    total += entry->weight;
+                }
+                if (total != 0) {
+                    quest_lot_pick_last(chance, table, &quest_item_pair_tbl_b[order[rolls] * 8], 8, total);
+                    rolls++;
+                    if (rolls >= 2) {
+                        return;
+                    }
+                }
             }
         }
     }
@@ -1004,57 +1933,6 @@ void quest_element_build(void* owner, u32 kind, Q_ArenaElement* element) {
             return;
         }
         quest_lot_pick_first(chance, item->lot_0x9C, element->payload_0x3F4, rows, total);
-    }
-}
-
-/* Rolls the two tiers' monster lot tables (the arena's own table under quest flag 0x100) into the second
- * picked-pair table, 8 picks per roll and two rolls at most, the higher tier first when the move work says
- * so. */
-void quest_monster_setup(Q_ItemWork* item, _PLW* owner) {
-    u8 chance[0x10];
-    u8 order[2];
-    s32 rolls;
-    s32 tier;
-    s32 i;
-    Q_LotEntry* table;
-    Q_LotEntry* entry;
-    u16 total;
-    Q_MoveWork* work;
-
-    memcpy(chance, quest_pair_chance_tbl_c, sizeof(chance));
-    quest_pl_skill_slot_set(owner, chance, 0);
-    work = (Q_MoveWork*)get_move_work_adrs(0);
-    if (work == NULL) {
-        return;
-    }
-    rolls = 0;
-    order[0] = 0;
-    order[1] = 1;
-    if (item->tier_count_0x6980[0] != 0 && item->tier_count_0x6980[1] != 0 && work->spawn_0x2274[3].monster_0x6 > work->spawn_0x2274[4].monster_0x6) {
-        order[0] = 1;
-        order[1] = 0;
-    }
-    for (tier = 0; tier < 2; tier++) {
-        for (i = 0; i < item->tier_count_0x6980[tier]; i++) {
-            if (quest_flag_100_ck(NULL) == 1) {
-                table = item->lot_e2_0x15C;
-            } else {
-                table = nora_set_proc.lot_table_get(item->tier_monster_0x6984[tier]);
-            }
-            if (table != NULL) {
-                total = 0;
-                for (entry = table; entry->id != 0; entry++) {
-                    total += entry->weight;
-                }
-                if (total != 0) {
-                    quest_lot_pick_last(chance, table, &quest_item_pair_tbl_b[order[rolls] * 8], 8, total);
-                    rolls++;
-                    if (rolls >= 2) {
-                        return;
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -1294,8 +2172,8 @@ void quest_work_pouch_load(void) {
 /* Releases the monsters of every armed element (stopping early when the quest kind says the hunt is over),
  * then loads the lobby area for the hand-off and leaves the quest play mode. */
 void quest_monsters_release(void) {
-    u8 mode;
     Q_MoveWork* work;
+    u8 mode;
     u32 active;
     s32 i;
     s32 released;
@@ -1311,8 +2189,8 @@ void quest_monsters_release(void) {
             if (active == 1) {
                 released = 0;
                 for (i = 0; i < 3; i++) {
-                    if (QUEST_WORK->armed_0x2D4[i] != 0) {
-                        em_kind_release(QUEST_WORK->armed_0x2D4[i]);
+                    if (quest_work_ptr->player_state_0x2D4[i] != 0) {
+                        em_kind_release(quest_work_ptr->player_state_0x2D4[i]);
                         released++;
                         if (quest_flag_4000000_ck(NULL) == 1) {
                             QUEST_WORK->hunt_end_0x6977 = 1;
@@ -1351,8 +2229,8 @@ void quest_monsters_release(void) {
 /* Re-rolls the quest work's clock words, reseeds the quest random source from them and clears the
  * per-quest state. */
 void quest_work_start_reset(void) {
-    s32 i;
     Q_ItemWork* work = QUEST_WORK;
+    s32 i;
 
     if (work == NULL) {
         return;
@@ -1476,21 +2354,6 @@ s32 quest_element_find(u8 kind) {
         }
     }
     return -1;
-}
-
-/* Whether the local slot's item work has its arena item count set. */
-u32 quest_item_work_flag_ck(void) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-    Q_ItemWork* item;
-
-    if (work == NULL) {
-        return 0;
-    }
-    item = work->item_work;
-    if (item == NULL) {
-        return 0;
-    }
-    return (s8)item->count_0x6A2A != 0;
 }
 
 /* Spawns the work block's keyed monsters into the move work's spawn records (stopping after the first under
@@ -1696,56 +2559,65 @@ void quest_monsters_spawn(Q_ItemWork* item) {
             item->result_kind_0x308++;
         }
     }
-    if (quest_work_ptr == NULL) {
+    if (quest_work_ptr == NULL || (list = quest_work_ptr->monsters_0x675C) == NULL) {
         return;
     }
-    list = quest_work_ptr->monsters_0x675C;
-    if (list == NULL) {
-        return;
-    }
-    if (quest_work_ptr->release_0x6760.id_0x00 == 0 || (s8)item->result_kind_0x308 >= 2) {
-        return;
-    }
-    for (k = 0; k < 6; k++) {
-        if (quest_work_ptr->key_rows_0x0319[k].id_0x00 == 0) {
-            break;
+    if (quest_work_ptr->release_0x6760.id_0x00 != 0 && (s8)item->result_kind_0x308 < 2) {
+        for (k = 0; k < 6; k++) {
+            if (quest_work_ptr->key_rows_0x0319[k].id_0x00 == 0) {
+                break;
+            }
         }
-    }
-    if (k >= 3) {
-        return;
-    }
-    for (slot = list; slot->monster_0x00 != 0; slot++) {
-        if (slot->element_index_0x28 == -1 || quest_work_ptr->release_0x6760.id_0x00 != (u8)slot->monster_0x00) {
-            continue;
-        }
-        for (i = 0; i < slot->count_0x04; i++) {
-            em_ground_rec_set(&rec, &slot->element_0x08);
-            if (slot->element_0x08.byte_0x02 == 3) {
-                boss = em_large_spawn(slot->monster_0x00, &rec, (s8)item->result_kind_0x308);
-                if (boss == NULL) {
+        if (k < 3) {
+            for (slot = list; slot->monster_0x00 != 0; slot++) {
+                if (slot->element_index_0x28 == -1 || quest_work_ptr->release_0x6760.id_0x00 != (u8)slot->monster_0x00) {
                     continue;
                 }
-                enemy = boss->enemy_0x30;
-            } else {
-                enemy = em_small_spawn(slot->monster_0x00, &rec, (s8)item->result_kind_0x308);
-                if (enemy == NULL) {
-                    continue;
+                for (i = 0; i < slot->count_0x04; i++) {
+                    em_ground_rec_set(&rec, &slot->element_0x08);
+                    if (slot->element_0x08.byte_0x02 == 3) {
+                        boss = em_large_spawn(slot->monster_0x00, &rec, (s8)item->result_kind_0x308);
+                        if (boss == NULL) {
+                            continue;
+                        }
+                        enemy = boss->enemy_0x30;
+                    } else {
+                        enemy = em_small_spawn(slot->monster_0x00, &rec, (s8)item->result_kind_0x308);
+                        if (enemy == NULL) {
+                            continue;
+                        }
+                    }
+                    item->slot_key_0x46C[(s8)item->result_kind_0x308] = (s8)item->result_kind_0x308;
+                    item->elements_0x94[k].flags = slot->flags_0x2C | 8;
+                    item->elements_0x94[k].id = slot->monster_0x00;
+                    item->elements_0x94[k].value = 1;
+                    if (slot->element_0x08.byte_0x02 == 3) {
+                        em_quest_element_set_large((struct _ENEMY_WORK*)boss, k);
+                    } else {
+                        em_quest_element_set(enemy, k);
+                    }
+                    item->armed_0x2D4[k] = slot->monster_0x00;
+                    item->result_kind_0x308++;
+                    return;
                 }
             }
-            item->slot_key_0x46C[(s8)item->result_kind_0x308] = (s8)item->result_kind_0x308;
-            item->elements_0x94[k].flags = slot->flags_0x2C | 8;
-            item->elements_0x94[k].id = slot->monster_0x00;
-            item->elements_0x94[k].value = 1;
-            if (slot->element_0x08.byte_0x02 == 3) {
-                em_quest_element_set_large((struct _ENEMY_WORK*)boss, k);
-            } else {
-                em_quest_element_set(enemy, k);
-            }
-            item->armed_0x2D4[k] = slot->monster_0x00;
-            item->result_kind_0x308++;
-            return;
         }
     }
+}
+
+/* Whether the local slot's item work has its arena item count set. */
+u32 quest_item_work_flag_ck(void) {
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    Q_ItemWork* item;
+
+    if (work == NULL) {
+        return 0;
+    }
+    item = work->item_work;
+    if (item == NULL) {
+        return 0;
+    }
+    return (s8)item->count_0x6A2A != 0;
 }
 
 /* Fills the work block's monster slots from the current result row's three slot pairs (only two when quest
@@ -1812,9 +2684,25 @@ void quest_pair_apply(void) {
     }
 }
 
-/* Copies the 0x20-byte key block one of those rows carries. */
+/* The +0x08 position and +0x14 rotation runs of a `Q_ElementBlock`, copied as 12-byte units. size: 0xC */
+typedef struct QuestElementVec {
+    /* +0x0 */ u64 x;
+} QuestElementVec;
+
+/* Copies the 0x20-byte key block one of those rows carries, field by field. */
 void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src) {
-    *dst = *src;
+    dst->byte_0x00 = src->byte_0x00;
+    dst->byte_0x01 = src->byte_0x01;
+    dst->byte_0x02 = src->byte_0x02;
+    dst->byte_0x03 = src->byte_0x03;
+    dst->byte_0x04 = src->byte_0x04;
+    dst->byte_0x05 = src->byte_0x05;
+    dst->byte_0x06 = src->byte_0x06;
+    dst->byte_0x07 = src->byte_0x07;
+    *(u64*)&dst->word_0x08 = *(const u64*)&src->word_0x08;
+    dst->word_0x10 = src->word_0x10;
+    *(u64*)&dst->word_0x14 = *(const u64*)&src->word_0x14;
+    dst->word_0x1C = src->word_0x1C;
 }
 
 /* Copies the 8-byte slot pair a result row is built from. */
@@ -1890,62 +2778,6 @@ void quest_area_list_refill(u8 map, u8 kind) {
             }
             QUEST_WORK->area_state_0x6A28 = 2;
         }
-    }
-}
-
-/* Charges one faint of `player` against the quest reward: announces it, and ends the quest when the reward
- * is gone. */
-void quest_reward_faint_penalty(u8 player) {
-    char text[128];
-    s32 amount;
-
-    if (system_w.field_0x7d2 == 1) {
-        return;
-    }
-    if (system_w.field_0x7d1 == 1) {
-        return;
-    }
-    if (QUEST_WORK->record_0x3C == NULL) {
-        return;
-    }
-    if (QUEST_WORK->reward_0x2E8 <= 0) {
-        return;
-    }
-    if (quest_sub_state_end_ck(1) != 0) {
-        return;
-    }
-    amount = QUEST_WORK->penalty_0x2F4;
-    if (QUEST_WORK->reward_0x2E8 < amount) {
-        amount = QUEST_WORK->reward_0x2E8;
-    }
-    QUEST_WORK->reward_0x2E8 = QUEST_WORK->reward_0x2E8 - amount;
-    if (player == (s8)my_player_no()) {
-        QUEST_WORK->my_faint_count_0x92 += 1;
-    }
-    QUEST_WORK->faint_count_0x91 += 1;
-    if (isServerSelectState() == 1) {
-        if (player == (s8)my_player_no()) {
-            hud_item_msg_push(1, 2, 0);
-        } else {
-            sprintf(text, quest_entry_fmt_str, ((_PLW*)get_move_work_adrs(2))[player].user_profile_0x5CA);
-            strcat(text, quest_str_tbl_4_get(0x25));
-            hud_msg_push(0, text);
-        }
-    } else {
-        hud_item_msg_push(1, 2, 0);
-    }
-    sprintf(text, quest_str_tbl_35_get(9), amount);
-    hud_msg_push(0, text);
-    if (QUEST_WORK->reward_0x2E8 <= 0) {
-        QUEST_WORK->reward_0x2E8 = 0;
-        hud_msg_push(0, quest_str_tbl_35_get(10));
-        hud_msg_push(0, quest_str_tbl_35_get(0x13));
-        return;
-    }
-    if (player == (s8)my_player_no()) {
-        snd_quest_scene_set();
-        snd_player_mask_set(player);
-        hud_msg_push(0, quest_str_tbl_35_get(0x12));
     }
 }
 
@@ -2066,13 +2898,14 @@ void quest_start_load(void) {
         } else {
             work->sub_0xEA = work->area_0xEE;
         }
-        if (quest_work_ptr->penalty_0x2F4 > 0) {
-            quest_work_ptr->field_0x090 = quest_work_ptr->field_0x2E8 / quest_work_ptr->penalty_0x2F4;
+        quest = quest_work_ptr;
+        if (quest->penalty_0x2F4 > 0) {
+            quest->field_0x090 = quest->field_0x2E8 / quest->penalty_0x2F4;
             if (quest_work_ptr->field_0x2E8 - quest_work_ptr->field_0x090 * quest_work_ptr->penalty_0x2F4 > 0) {
                 quest_work_ptr->field_0x090++;
             }
         } else {
-            quest_work_ptr->field_0x090 = 0;
+            quest->field_0x090 = 0;
         }
         quest_work_ptr->field_0x091 = 0;
         quest_work_ptr->my_faint_count_0x92 = 0;
@@ -2082,12 +2915,12 @@ void quest_start_load(void) {
             case 19:
                 quest_work_ptr->record_0x03C->area_ofs_0x37C = 0x4C0;
                 load_file("05/st01em0_a001.esp",
-                          (u32)quest_work_ptr->record_0x03C + quest_work_ptr->record_0x03C->area_ofs_0x37C, 0x600);
+                          quest_work_ptr->record_0x03C->area_ofs_0x37C + (u32)quest_work_ptr->record_0x03C, 0x600);
                 break;
             case 20:
                 quest_work_ptr->record_0x03C->area_ofs_0x37C = 0x4C0;
                 load_file("05/st01em0_a003.esp",
-                          (u32)quest_work_ptr->record_0x03C + quest_work_ptr->record_0x03C->area_ofs_0x37C, 0xB00);
+                          quest_work_ptr->record_0x03C->area_ofs_0x37C + (u32)quest_work_ptr->record_0x03C, 0xB00);
                 break;
             }
         }
@@ -2102,11 +2935,6 @@ void quest_start_load(void) {
         work->map_0xED = work->quest_id_0x120;
         work->phase_0xE9 = quest_pair_table[work->quest_id_0x120 * 2];
     }
-}
-
-/* The dcm archive buffers by stage (`stage_dcm_buffer_tbl`, camera/camera_main.cpp's 50 pointer slots, declared as bytes in the band). */
-static inline u8** quest_dcm_buffers(void) {
-    return (u8**)stage_dcm_buffer_tbl;
 }
 
 /* Enters the quest: allocates the result buffer, resets the quest work and spawns its monsters, applies the
@@ -2249,6 +3077,62 @@ void quest_enter_load(void) {
     }
 }
 
+/* Charges one faint of `player` against the quest reward: announces it, and ends the quest when the reward
+ * is gone. */
+void quest_reward_faint_penalty(u8 player) {
+    char text[128];
+    s32 amount;
+
+    if (system_w.field_0x7d2 == 1) {
+        return;
+    }
+    if (system_w.field_0x7d1 == 1) {
+        return;
+    }
+    if (QUEST_WORK->record_0x3C == NULL) {
+        return;
+    }
+    if (QUEST_WORK->reward_0x2E8 <= 0) {
+        return;
+    }
+    if (quest_sub_state_end_ck(1) != 0) {
+        return;
+    }
+    amount = QUEST_WORK->penalty_0x2F4;
+    if (QUEST_WORK->reward_0x2E8 < amount) {
+        amount = QUEST_WORK->reward_0x2E8;
+    }
+    QUEST_WORK->reward_0x2E8 = QUEST_WORK->reward_0x2E8 - amount;
+    if (player == (s8)my_player_no()) {
+        QUEST_WORK->my_faint_count_0x92 += 1;
+    }
+    QUEST_WORK->faint_count_0x91 += 1;
+    if (isServerSelectState() == 1) {
+        if (player == (s8)my_player_no()) {
+            hud_item_msg_push(1, 2, 0);
+        } else {
+            sprintf(text, quest_entry_fmt_str, ((_PLW*)get_move_work_adrs(2))[player].user_profile_0x5CA);
+            strcat(text, quest_str_tbl_4_get(0x25));
+            hud_msg_push(0, text);
+        }
+    } else {
+        hud_item_msg_push(1, 2, 0);
+    }
+    sprintf(text, quest_str_tbl_35_get(9), amount);
+    hud_msg_push(0, text);
+    if (QUEST_WORK->reward_0x2E8 <= 0) {
+        QUEST_WORK->reward_0x2E8 = 0;
+        hud_msg_push(0, quest_str_tbl_35_get(10));
+        hud_msg_push(0, quest_str_tbl_35_get(0x13));
+        return;
+    }
+    if (player == (s8)my_player_no()) {
+        snd_quest_scene_set();
+        snd_player_mask_set(player);
+        hud_msg_push(0, quest_str_tbl_35_get(0x12));
+    }
+}
+
 /* Fails the quest when its time or its reward runs out: the result kind 5, then the result screen (or the
  * lobby's entry start on the server-select screen, with the "no reward" flag when the reward is gone). */
 static inline void quest_main_step_fail(Q_ItemWork* item, Q_MoveWork* work) {
@@ -2282,13 +3166,171 @@ static inline void quest_main_step_area_next(Q_ItemWork* item) {
     quest_area_list_refill(get_now_mapno(), item->count_0x6A2A);
 }
 
+/* Whether the quest work is busy: either of the system block's two pre-quest flags, or a live work
+ * whose record is missing or whose +0x2E8 counter is set. */
+u32 quest_work_busy_ck(void) {
+    if (system_w.field_0x7d2 == 1) {
+        return 1;
+    }
+    if (system_w.field_0x7d1 == 1) {
+        return 1;
+    }
+    if (quest_work_ptr->record_0x03C != 0) {
+        return quest_work_ptr->field_0x2E8 > 0;
+    }
+    return 1;
+}
+
+/* Warps the player to the quest's start position: the local one for a network quest, a fixed spot for the
+ * two arena phases, else the stage's own start. */
+void quest_start_warp(_PLW* plw) {
+    nw4r::math::VEC3 pos;
+    s32 angle;
+    Q_MoveWork* work;
+    u8 saved;
+    u8 phase;
+
+    setVec3(&pos, 0.0f, 0.0f, 0.0f);
+    work = (Q_MoveWork*)get_move_work_adrs(0);
+    if (quest_work_busy_ck() != 0) {
+        if (PlayMode_ck() == 2) {
+            saved = my_player_no();
+            my_player_no_set((s8)plw->chunk_ofs);
+            stage_area_start_get(work->sub_0xEA, &pos, &angle);
+            pl_act_stage_latch_set(my_player_work_get(), 2);
+            pl_warp_start(0xFF, &pos, (u16)angle);
+            my_player_no_set((s8)saved);
+            return;
+        }
+        phase = work->phase_0xE9;
+        if ((phase == 6 || phase == 0x11) && plw->area_0x16 == 2) {
+            pos.x = 9960.0f;
+            pos.y = 230.0f;
+            pos.z = 300.0f;
+            angle = 0xC000;
+            pl_act_stage_latch_set(my_player_work_get(), 2);
+            pl_warp_start(2, &pos, (u16)angle);
+            return;
+        }
+        stage_start_get(phase, &pos, &angle);
+        pl_act_stage_latch_set(my_player_work_get(), 2);
+        pl_warp_start(0, &pos, (u16)angle);
+    }
+}
+
+/* Prepares the item work for a quest entry from its result row: the quest kind, the time-limit rank, the
+ * entry stage, the supply pairs (none without a row, an empty list when the row names no item). */
+void quest_entry_setup(Q_ItemWork* item) {
+    Q_ResultRow* rec = item->record_0x3C;
+
+    item->supply_kind_0x8B = rec->kind_0x374;
+    item->supply_step_0x58 = 0;
+    item->time_rank_0x59 = item->time_limit_0x24 / 9000;
+    item->supply_count_0x8F = 0;
+    item->supply_limit_0x8E = 1;
+    if ((s8)(u8)item->supply_kind_0x8B != 2 && quest_slot_progress_get(NULL) == 1) {
+        item->supply_limit_0x8E = 2;
+    }
+    item->field_0x5E0 = 40;
+    item->bits_0x684[0] = 0;
+    item->bits_0x684[1] = 0;
+    if (rec == NULL) {
+        quest_item_pair_copy_block(item->supply_0x5E2, 1, 0);
+    } else if (rec->item_id_0x372 == 0) {
+        quest_item_pair_copy_block(item->supply_0x5E2, 0xFFFF, 0);
+    } else {
+        quest_item_pair_copy_block(item->supply_0x5E2, rec->item_id_0x372, item->supply_kind_0x8B);
+    }
+}
+
+/* Enters the quest result state (sub-state 5): latches the time limit, clears the AI slots, fills the
+ * result stat and posts the kind's message. */
+void quest_result_enter(Q_ItemWork* item, Q_MoveWork* work, u8 kind) {
+    work->sub_0xFA = 5;
+    item->time_base_0x20 = item->time_limit_0x24;
+    item->step_0x2C = 2;
+    item->field_0x2D = 0;
+    quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
+    ai_slots_clear();
+    quest_result_stat_fill((QuestWork*)item);
+    if (kind == 1) {
+        hud_msg_push(0, quest_str_tbl_35_get(8));
+    }
+    if (kind == 2) {
+        hud_msg_push(0, quest_str_tbl_35_get(0x1E));
+    }
+    if (kind == 3) {
+        hud_msg_push(0, quest_str_tbl_35_get(0x21));
+    }
+    snd_quest_result_bgm_set();
+}
+
+/* Enters the quest start state (sub-state 3): latches the time limit and posts the entry message the
+ * quest's objective and the entry-send header select. */
+void quest_start_enter(Q_ItemWork* item, Q_MoveWork* work) {
+    u8 objective;
+    Q_ResultRow* rec;
+
+    work->sub_0xFA = 3;
+    system_copy_filter_request();
+    item->time_base_0x20 = item->time_limit_0x24;
+    item->step_0x2C = 2;
+    item->field_0x2D = 0;
+    if (work->kind_0xFC != 4) {
+        if (item->entry_send_0x6A3A[0] == 0) {
+            hud_msg_push(0, quest_str_tbl_35_get(0x17));
+        } else {
+            switch (item->entry_send_0x6A3A[1]) {
+            case 0:
+                hud_msg_push(0, quest_str_tbl_35_get(0x17));
+                break;
+            case 1:
+                hud_msg_push(0, quest_str_tbl_35_get(0x1F));
+                break;
+            case 2:
+                hud_msg_push(0, quest_str_tbl_35_get(0x20));
+                break;
+            }
+        }
+    }
+    if (work->kind_0xFC == 4) {
+        quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
+        if (system_w.field_0x7cf == 0x15) {
+            hud_msg_push(0, quest_str_tbl_35_get(0));
+        } else {
+            hud_msg_push(0, quest_str_tbl_35_get(1));
+        }
+    } else {
+        rec = (Q_ResultRow*)quest_record_get();
+        if ((rec != NULL && (rec->flags_0x310 & 0x20000000) != 0) || (objective = quest_objective_get(NULL), objective == 1) ||
+            objective == 4) {
+            quest_time_limit_set((s32)(20.0f * Screen_w.frame_scale));
+            if (PlayMode_ck() == 2) {
+                hud_msg_push(0, quest_str_tbl_35_get(0x27));
+            } else if (system_w.field_0x7cf == 0x15) {
+                hud_msg_push(0, quest_str_tbl_35_get(2));
+            } else {
+                hud_msg_push(0, quest_str_tbl_35_get(3));
+            }
+        } else {
+            quest_time_limit_set((s32)(frames_per_second_60f * Screen_w.frame_scale));
+            if (system_w.field_0x7cf == 0x15) {
+                hud_msg_push(0, quest_str_tbl_35_get(4));
+            } else {
+                hud_msg_push(0, quest_str_tbl_35_get(5));
+            }
+        }
+    }
+    snd_quest_start_bgm_set();
+}
+
 /* The quest's per-frame step on the local move work: the entry (step 0), the hunt (step 1: the clock, the
  * goals the grade asks for, the time and reward checks, the supply drops, the area hand-offs, the extra
  * monsters and the element sync), the result wait (step 2) and the lobby's result hand-off (step 4). */
 void quest_main_step(void) {
     char text[0x100];
-    Q_MoveWork* work;
     Q_ItemWork* item;
+    Q_MoveWork* work;
     s32 goal;
     s32 left;
     s32 i;
@@ -2321,7 +3363,7 @@ void quest_main_step(void) {
         if (quest_work_ptr->entry_send_0x6A3A[2] != 2) {
             break;
         }
-        if (event_demo_running_ck() != 0 || lb_quest_work_active_ck() == 1 || pad_hold_ck() == 1) {
+        if ((u8)event_demo_running_ck() != 0 || (u32)lb_quest_work_active_ck() == 1 || pad_hold_ck() == 1) {
             item->timer_0x6A48 = OSGetTime();
             item->timer_0x6A50 = item->timer_0x6A48;
             break;
@@ -2583,164 +3625,6 @@ void quest_main_step(void) {
     }
 }
 
-/* Whether the quest work is busy: either of the system block's two pre-quest flags, or a live work
- * whose record is missing or whose +0x2E8 counter is set. */
-u32 quest_work_busy_ck(void) {
-    if (system_w.field_0x7d2 == 1) {
-        return 1;
-    }
-    if (system_w.field_0x7d1 == 1) {
-        return 1;
-    }
-    if (quest_work_ptr->record_0x03C != 0) {
-        return quest_work_ptr->field_0x2E8 > 0;
-    }
-    return 1;
-}
-
-/* Warps the player to the quest's start position: the local one for a network quest, a fixed spot for the
- * two arena phases, else the stage's own start. */
-void quest_start_warp(_PLW* plw) {
-    nw4r::math::VEC3 pos;
-    s32 angle;
-    Q_MoveWork* work;
-    u8 saved;
-    u8 phase;
-
-    setVec3(&pos, 0.0f, 0.0f, 0.0f);
-    work = (Q_MoveWork*)get_move_work_adrs(0);
-    if (quest_work_busy_ck() != 0) {
-        if (PlayMode_ck() == 2) {
-            saved = my_player_no();
-            my_player_no_set((s8)plw->chunk_ofs);
-            stage_area_start_get(work->sub_0xEA, &pos, &angle);
-            pl_act_stage_latch_set(my_player_work_get(), 2);
-            pl_warp_start(0xFF, &pos, (u16)angle);
-            my_player_no_set((s8)saved);
-            return;
-        }
-        phase = work->phase_0xE9;
-        if ((phase == 6 || phase == 0x11) && plw->area_0x16 == 2) {
-            pos.x = 9960.0f;
-            pos.y = 230.0f;
-            pos.z = 300.0f;
-            angle = 0xC000;
-            pl_act_stage_latch_set(my_player_work_get(), 2);
-            pl_warp_start(2, &pos, (u16)angle);
-            return;
-        }
-        stage_start_get(phase, &pos, &angle);
-        pl_act_stage_latch_set(my_player_work_get(), 2);
-        pl_warp_start(0, &pos, (u16)angle);
-    }
-}
-
-/* Prepares the item work for a quest entry from its result row: the quest kind, the time-limit rank, the
- * entry stage, the supply pairs (none without a row, an empty list when the row names no item). */
-void quest_entry_setup(Q_ItemWork* item) {
-    Q_ResultRow* rec = item->record_0x3C;
-
-    item->supply_kind_0x8B = rec->kind_0x374;
-    item->supply_step_0x58 = 0;
-    item->time_rank_0x59 = item->time_limit_0x24 / 9000;
-    item->supply_count_0x8F = 0;
-    item->supply_limit_0x8E = 1;
-    if ((s8)(u8)item->supply_kind_0x8B != 2 && quest_slot_progress_get(NULL) == 1) {
-        item->supply_limit_0x8E = 2;
-    }
-    item->field_0x5E0 = 40;
-    item->bits_0x684[0] = 0;
-    item->bits_0x684[1] = 0;
-    if (rec == NULL) {
-        quest_item_pair_copy_block(item->supply_0x5E2, 1, 0);
-    } else if (rec->item_id_0x372 == 0) {
-        quest_item_pair_copy_block(item->supply_0x5E2, 0xFFFF, 0);
-    } else {
-        quest_item_pair_copy_block(item->supply_0x5E2, rec->item_id_0x372, item->supply_kind_0x8B);
-    }
-}
-
-/* Enters the quest result state (sub-state 5): latches the time limit, clears the AI slots, fills the
- * result stat and posts the kind's message. */
-void quest_result_enter(Q_ItemWork* item, Q_MoveWork* work, u8 kind) {
-    work->sub_0xFA = 5;
-    item->time_base_0x20 = item->time_limit_0x24;
-    item->step_0x2C = 2;
-    item->field_0x2D = 0;
-    quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
-    ai_slots_clear();
-    quest_result_stat_fill((QuestWork*)item);
-    if (kind == 1) {
-        hud_msg_push(0, quest_str_tbl_35_get(8));
-    }
-    if (kind == 2) {
-        hud_msg_push(0, quest_str_tbl_35_get(0x1E));
-    }
-    if (kind == 3) {
-        hud_msg_push(0, quest_str_tbl_35_get(0x21));
-    }
-    snd_quest_result_bgm_set();
-}
-
-/* Enters the quest start state (sub-state 3): latches the time limit and posts the entry message the
- * quest's objective and the entry-send header select. */
-void quest_start_enter(Q_ItemWork* item, Q_MoveWork* work) {
-    u8 objective;
-    Q_ResultRow* rec;
-
-    work->sub_0xFA = 3;
-    system_copy_filter_request();
-    item->time_base_0x20 = item->time_limit_0x24;
-    item->step_0x2C = 2;
-    item->field_0x2D = 0;
-    if (work->kind_0xFC != 4) {
-        if (item->entry_send_0x6A3A[0] == 0) {
-            hud_msg_push(0, quest_str_tbl_35_get(0x17));
-        } else {
-            switch (item->entry_send_0x6A3A[1]) {
-            case 0:
-                hud_msg_push(0, quest_str_tbl_35_get(0x17));
-                break;
-            case 1:
-                hud_msg_push(0, quest_str_tbl_35_get(0x1F));
-                break;
-            case 2:
-                hud_msg_push(0, quest_str_tbl_35_get(0x20));
-                break;
-            }
-        }
-    }
-    if (work->kind_0xFC == 4) {
-        quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
-        if (system_w.field_0x7cf == 0x15) {
-            hud_msg_push(0, quest_str_tbl_35_get(0));
-        } else {
-            hud_msg_push(0, quest_str_tbl_35_get(1));
-        }
-    } else {
-        rec = (Q_ResultRow*)quest_record_get();
-        if ((rec != NULL && (rec->flags_0x310 & 0x20000000) != 0) || (objective = quest_objective_get(NULL), objective == 1) ||
-            objective == 4) {
-            quest_time_limit_set((s32)(20.0f * Screen_w.frame_scale));
-            if (PlayMode_ck() == 2) {
-                hud_msg_push(0, quest_str_tbl_35_get(0x27));
-            } else if (system_w.field_0x7cf == 0x15) {
-                hud_msg_push(0, quest_str_tbl_35_get(2));
-            } else {
-                hud_msg_push(0, quest_str_tbl_35_get(3));
-            }
-        } else {
-            quest_time_limit_set((s32)(frames_per_second_60f * Screen_w.frame_scale));
-            if (system_w.field_0x7cf == 0x15) {
-                hud_msg_push(0, quest_str_tbl_35_get(4));
-            } else {
-                hud_msg_push(0, quest_str_tbl_35_get(5));
-            }
-        }
-    }
-    snd_quest_start_bgm_set();
-}
-
 /* Whether the quest work's entry-send header has been started. */
 u32 quest_entry_active_ck(void) {
     if (quest_work_ptr == NULL) {
@@ -2834,19 +3718,18 @@ void quest_finish_step(void) {
  * over), asks the enemy side for the intruder, releases the key row's monster, waits for the load and spawns
  * the next intruder; the server-select screen runs the lobby-synchronised form (phases 10-13). */
 void quest_intruder_step(void) {
-    EmGroundRec rec_b;
     EmGroundRec rec_a;
+    EmGroundRec rec_b;
     Q_MoveWork* work;
     QuestWork* quest;
     u8 kind;
-    struct _ENEMY_WORK* enemy;
-    struct _ENEMY_MINI_WORK* mini;
     s32 live;
     u16 last;
     s32 row;
     Q_SlotPair* key;
     QuestMonsterVariantList* variant;
     QuestSpawnRec* spawn;
+    u8 rank;
 
     work = (Q_MoveWork*)get_move_work_adrs(0);
     if (work == NULL) {
@@ -2888,9 +3771,10 @@ void quest_intruder_step(void) {
                     }
                 }
                 break;
-            case 2:
-                enemy = NULL;
-                mini = NULL;
+            case 2: {
+                struct _ENEMY_WORK* enemy = NULL;
+                struct _ENEMY_MINI_WORK* mini = NULL;
+
                 if (quest->intruder_index_0x6977 != 1 && quest->spawn_count_0x308 == 1 &&
                     (u8)em_get_unique_work(0, &enemy, &mini) != 0 && (u32)em_mot_finished_ck(enemy) != 1) {
                     quest->field_0x697C++;
@@ -2901,9 +3785,11 @@ void quest_intruder_step(void) {
                     }
                 }
                 break;
-            case 3:
-                enemy = NULL;
-                mini = NULL;
+            }
+            case 3: {
+                struct _ENEMY_WORK* enemy = NULL;
+                struct _ENEMY_MINI_WORK* mini = NULL;
+
                 if (quest->intruder_index_0x6977 != 1 && quest->spawn_count_0x308 == 2) {
                     live = 0;
                     if (work->spawn_0x2274[0].count_0x4 > 0) {
@@ -2928,6 +3814,7 @@ void quest_intruder_step(void) {
                     }
                 }
                 break;
+            }
             }
         }
         break;
@@ -2974,8 +3861,8 @@ void quest_intruder_step(void) {
         if (variant == NULL) {
             break;
         }
-        while (variant->rank != 0xFF) {
-            if (variant->rank == stage_map_kind_get(get_now_mapno())) {
+        while ((rank = variant->rank) != 0xFF) {
+            if (rank == stage_map_kind_get(get_now_mapno())) {
                 break;
             }
             variant++;
@@ -2998,15 +3885,17 @@ void quest_intruder_step(void) {
         em_intruder_spawn(key->id_0x00, &rec_a, row);
         quest->field_0x6978++;
         return;
-    case 5:
-        enemy = NULL;
-        mini = NULL;
+    case 5: {
+        struct _ENEMY_WORK* enemy = NULL;
+        struct _ENEMY_MINI_WORK* mini = NULL;
+
         if ((u8)em_get_unique_work(quest->intruder_index_0x6977 + 3, &enemy, &mini) != 0) {
             quest->field_0x6978 = 0;
             quest->intruder_index_0x6977++;
             return;
         }
         break;
+    }
     case 10:
         if (file_loading_ck(NULL, NULL) != 1) {
             lb_sub15_send();
@@ -3033,8 +3922,8 @@ void quest_intruder_step(void) {
         if (variant == NULL) {
             break;
         }
-        while (variant->rank != 0xFF) {
-            if (variant->rank == stage_map_kind_get(get_now_mapno())) {
+        while ((rank = variant->rank) != 0xFF) {
+            if (rank == stage_map_kind_get(get_now_mapno())) {
                 break;
             }
             variant++;
@@ -3060,14 +3949,16 @@ void quest_intruder_step(void) {
             return;
         }
         /* fall through */
-    case 13:
-        enemy = NULL;
-        mini = NULL;
+    case 13: {
+        struct _ENEMY_WORK* enemy = NULL;
+        struct _ENEMY_MINI_WORK* mini = NULL;
+
         if ((u8)em_get_unique_work(quest->intruder_index_0x6977 + 3, &enemy, &mini) != 0) {
             quest->field_0x6978 = 0;
             quest->intruder_index_0x6977++;
         }
         break;
+    }
     }
 }
 
@@ -3076,14 +3967,13 @@ void quest_intruder_step(void) {
  * monster for the current map's kind as the next spawn record; the server-select screen runs the
  * lobby-synchronised form (phases 10-13). */
 void quest_successive_step(Q_MoveWork* work) {
-    EmGroundRec rec_b;
     EmGroundRec rec_a;
+    EmGroundRec rec_b;
     QuestWork* quest;
     Q_SlotPair* key;
     QuestSpawnRec* spawn;
     QuestMonsterVariantList* variant;
-    struct _ENEMY_WORK* enemy;
-    struct _ENEMY_MINI_WORK* mini;
+    u8 rank;
 
     quest = quest_work_ptr;
     if (quest == NULL) {
@@ -3121,8 +4011,8 @@ void quest_successive_step(Q_MoveWork* work) {
         if (variant == NULL) {
             break;
         }
-        while (variant->rank != 0xFF) {
-            if (variant->rank == stage_map_kind_get(get_now_mapno())) {
+        while ((rank = variant->rank) != 0xFF) {
+            if (rank == stage_map_kind_get(get_now_mapno())) {
                 break;
             }
             variant++;
@@ -3152,9 +4042,10 @@ void quest_successive_step(Q_MoveWork* work) {
         em_intruder_spawn(key->id_0x00, &rec_a, quest->spawn_count_0x308);
         quest->field_0x6978++;
         return;
-    case 4:
-        enemy = NULL;
-        mini = NULL;
+    case 4: {
+        struct _ENEMY_WORK* enemy = NULL;
+        struct _ENEMY_MINI_WORK* mini = NULL;
+
         if ((u8)em_get_unique_work(quest->spawn_count_0x308, &enemy, &mini) != 0) {
             em_quest_element_set(enemy, quest->spawn_count_0x308);
             quest->field_0x6978 = 0;
@@ -3163,6 +4054,7 @@ void quest_successive_step(Q_MoveWork* work) {
             return;
         }
         break;
+    }
     case 10:
         if (file_loading_ck(NULL, NULL) != 1) {
             lb_sub1c_send();
@@ -3184,8 +4076,8 @@ void quest_successive_step(Q_MoveWork* work) {
         if (variant == NULL) {
             break;
         }
-        while (variant->rank != 0xFF) {
-            if (variant->rank == stage_map_kind_get(get_now_mapno())) {
+        while ((rank = variant->rank) != 0xFF) {
+            if (rank == stage_map_kind_get(get_now_mapno())) {
                 break;
             }
             variant++;
@@ -3218,9 +4110,10 @@ void quest_successive_step(Q_MoveWork* work) {
             return;
         }
         /* fall through */
-    case 13:
-        enemy = NULL;
-        mini = NULL;
+    case 13: {
+        struct _ENEMY_WORK* enemy = NULL;
+        struct _ENEMY_MINI_WORK* mini = NULL;
+
         if ((u8)em_get_unique_work(quest->spawn_count_0x308, &enemy, &mini) != 0) {
             em_quest_element_set(enemy, quest->spawn_count_0x308);
             quest->field_0x6978 = 0;
@@ -3228,6 +4121,7 @@ void quest_successive_step(Q_MoveWork* work) {
             quest->spawn_count_0x308++;
         }
         break;
+    }
     }
 }
 
@@ -3241,23 +4135,11 @@ Q_ItemPair quest_item_pair_tbl_a[0x30];
 Q_ItemPair quest_item_pair_tbl_b[0x30];
 Q_ItemPair quest_item_pair_tbl_c[0x30];
 Q_ItemPair quest_item_pair_tbl_d[0x30];
-
-/* This unit's own `.data` (`config/RMHE08/splits.txt`, `.data 0x805F7AB0..0x805F7AF8`, the four rows
- * the readers of each table are the only referrers of): the band's reward roll tables.  Each chance
- * table is one byte per pick slot - 32 or 22 - in the shape `quest_element_clear` builds in-line, and
- * the four runs tile the claim exactly (0x10 + 0x18 + 0x10 + 0x10). */
-u8 quest_pair_chance_tbl_a[0x10] = {
-    32, 32, 32, 22, 22, 22, 22, 22, 32, 22, 22, 22, 22, 22, 22, 22,
-};
-Q_RewardGroup quest_reward_group_tbl[6] = {
-    { 0, 0, 0 }, { 1, 1, 0 }, { 2, 1, 1 }, { 3, 2, 1 }, { 4, 2, 1 }, { 5, 3, 0 },
-};
-u8 quest_pair_chance_tbl_b[0x10] = {
-    32, 32, 22, 22, 22, 22, 22, 22, 32, 32, 22, 22, 22, 22, 22, 22,
-};
-u8 quest_pair_chance_tbl_c[0x10] = {
-    32, 32, 22, 22, 22, 22, 22, 22, 32, 32, 22, 22, 22, 22, 22, 22,
-};
+/* The quest work block `quest_init` clears and points `quest_work_ptr` at, the text scratch the text getters
+ * format into, and the element-check callback table the enemy side fills in. */
+QuestWork quest_work;
+char quest_text_buffer[0x100];
+NoraSetProc nora_set_proc;
 
 /* This unit's own `.sbss` (`splits.txt` `.sbss 0x80794C1C..0x80794C3C`, in address order): the quest list
  * block `quest_list_load_hunt`/`_arena` allocate (GUESS names: `quest_list_pool` is the 0x4400-byte
@@ -3266,6 +4148,7 @@ u8 quest_pair_chance_tbl_c[0x10] = {
  * five table pointers the roll functions read - the per-kind entry lists and the two pairs of remaining-lot
  * tables by count (GUESS: the dump names them `em_bui_tbl`, `em_bui_rem_l/h` and `em_hokaku_rem_l/h`).  Set
  * outside this unit. */
+u8 quest_supply_drop_empty[4];
 u8* quest_list_file;
 QuestListBlock* quest_list_pool;
 u16* quest_list_values;
@@ -3274,481 +4157,18 @@ Q_LotEntry** em_bui_rem_l;
 Q_LotEntry** em_bui_rem_h;
 Q_LotEntry** em_hokaku_rem_l;
 Q_LotEntry** em_hokaku_rem_h;
+QuestRecord** quest_list_items;
+QuestWork* quest_work_ptr;
+s32 quest_list_count;
 
 
 extern "C" {
 
-/* The result screen's localized "(Quest Name Unavailable)" rows, indexed by the message-language
- * index `system_w.field_0x09`; the first two entries are the same English row, so `-str reuse`
- * pools one literal for both.  These five strings and the table are this band's `.data`
- * (0x8060E800..0x8060E8A0), UNCLAIMED and left to its auto unit - which is also the second
- * definition of this name, the clash the file header's data paragraph records - emitted here
- * because `quest_result_field_text_get` is their only referencer.  The three accented characters
- * are written as byte escapes: the source has to stay pure ASCII or `sjiswrap` re-encodes it. */
-const char* quest_name_unavailable_text[6] = {
-    "(Quest Name Unavailable)",
-    "(Quest Name Unavailable)",
-    "(Nom de qu\xC3\xAAte indispo.)",
-    "(Questname nicht verf\xC3\xBCgb.)",
-    "(Nome missione non disp.)",
-    "(Misi\xC3\xB3n no disponible)",
-};
 
 /* Prototypes for the definitions below that an earlier function calls (`quest_item_count_sum` is
  * defined at the address its own body lives at, after its two callers). */
 s16 quest_item_count_sum(u16 id, s32 who);
 QuestRecord* quest_record_get(void);
-
-/* The current result row, or NULL when the screen has none. */
-QuestRecord* quest_record_get(void) {
-    QuestRecord* rec = quest_work.record_0x03C;
-
-    if (rec == NULL) {
-        return NULL;
-    }
-    return rec;
-}
-
-/* String table 35's `index`-th entry (the item-summary formats). */
-char* quest_str_tbl_35_get(u32 index) {
-    return (char*)get_str_tbl(35)[index];
-}
-
-/* String table 4's `index`-th entry. */
-char* quest_str_tbl_4_get(u32 index) {
-    return (char*)get_str_tbl(4)[index];
-}
-
-/* The pair table's `[row][col]` byte at +0x805F7898. */
-u8 quest_pair_table_get(u8 row, u8 col) {
-    return *(col + (&quest_pair_table[0] + (row * 2)));
-}
-
-/* The byte table's `index`-th entry at +0x805F78B4. */
-u8 quest_byte_table_get(u8 index) {
-    return *(&quest_byte_table[0] + index);
-}
-
-/* The record's name out of string table 5 (an empty string when there is no record). */
-char* quest_name_text_get(void) {
-    QuestRecord* rec = quest_record_get();
-    u8** tbl = get_str_tbl(5);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        strcpy(quest_text_buffer, (char*)tbl[rec->field_0x08B]);
-    }
-    return quest_text_buffer;
-}
-
-/* The same name for an explicit record. */
-char* quest_name_text_get_of(QuestRecord* rec) {
-    u8** tbl = get_str_tbl(5);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        strcpy(quest_text_buffer, (char*)tbl[rec->field_0x08B]);
-    }
-    return quest_text_buffer;
-}
-
-/* The record's +0x198 entry out of string table 41. */
-char* quest_field198_text_get(void) {
-    QuestRecord* rec = quest_record_get();
-    u8** tbl = get_str_tbl(41);
-
-    quest_text_buffer[0] = 0;
-    if (rec == NULL) {
-        return quest_text_buffer;
-    }
-    strcpy(quest_text_buffer, (char*)tbl[rec->field_0x198]);
-    return quest_text_buffer;
-}
-
-/* The same +0x198 entry for an explicit record. */
-char* quest_field198_text_get_of(QuestRecord* rec) {
-    u8** tbl = get_str_tbl(41);
-
-    quest_text_buffer[0] = 0;
-    strcpy(quest_text_buffer, (char*)tbl[rec->field_0x198]);
-    return quest_text_buffer;
-}
-
-/* The record's +0x13A value formatted with string table 6's first format. */
-char* quest_field13A_text_get(void) {
-    QuestRecord* rec = quest_record_get();
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        sprintf(quest_text_buffer, tbl[0], rec->field_0x13A);
-    }
-    return quest_text_buffer;
-}
-
-/* The same +0x13A value for an explicit record. */
-char* quest_field13A_text_get_of(QuestRecord* rec) {
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        sprintf(quest_text_buffer, tbl[0], rec->field_0x13A);
-    }
-    return quest_text_buffer;
-}
-
-/* The record's +0x34C / +0x350 / +0x354 timers as text: `which` picks which of the three. */
-char* quest_time_text_get(u8 which) {
-    QuestRecord* rec = quest_record_get();
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        switch (which) {
-        case 0:
-            sprintf(quest_text_buffer, tbl[1], rec->field_0x34C);
-            break;
-        case 1:
-            if (rec->field_0x350 == 0) {
-                sprintf(quest_text_buffer, tbl[4]);
-            } else {
-                sprintf(quest_text_buffer, tbl[1]);
-            }
-            break;
-        case 2:
-            if (rec->field_0x354 == 0) {
-                sprintf(quest_text_buffer, tbl[4]);
-            } else {
-                sprintf(quest_text_buffer, tbl[1]);
-            }
-            break;
-        }
-    }
-    return quest_text_buffer;
-}
-
-/* The same three timers for an explicit record. */
-char* quest_time_text_get_of(QuestRecord* rec, u8 which) {
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        switch (which) {
-        case 0:
-            sprintf(quest_text_buffer, tbl[1], rec->field_0x34C);
-            break;
-        case 1:
-            if (rec->field_0x350 == 0) {
-                sprintf(quest_text_buffer, tbl[4]);
-            } else {
-                sprintf(quest_text_buffer, tbl[1]);
-            }
-            break;
-        case 2:
-            if (rec->field_0x354 == 0) {
-                sprintf(quest_text_buffer, tbl[4]);
-            } else {
-                sprintf(quest_text_buffer, tbl[1]);
-            }
-            break;
-        }
-    }
-    return quest_text_buffer;
-}
-
-/* The record's +0x348 value as text. */
-char* quest_field348_text_get(void) {
-    QuestRecord* rec = quest_record_get();
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        sprintf(quest_text_buffer, tbl[1], rec->field_0x348);
-    }
-    return quest_text_buffer;
-}
-
-/* The same +0x348 value for an explicit record. */
-char* quest_field348_text_get_of(QuestRecord* rec) {
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    if (rec != NULL) {
-        sprintf(quest_text_buffer, tbl[1], rec->field_0x348);
-    }
-    return quest_text_buffer;
-}
-
-/* The work block's +0x2E8 value (clamped up to 0) as text. */
-char* quest_field2E8_text_get(void) {
-    char** tbl = (char**)get_str_tbl(6);
-    s32 value;
-
-    quest_text_buffer[0] = 0;
-    value = quest_work.field_0x2E8;
-    if (value < 0) {
-        value = 0;
-    }
-    sprintf(quest_text_buffer, tbl[1], value);
-    return quest_text_buffer;
-}
-
-/* The run's clear time (`quest_work` +0x24 frames) as `mm'ss"ff` text. */
-char* quest_clear_time_text_get(void) {
-    char** tbl = (char**)get_str_tbl(6);
-    s32 time = quest_work.field_0x024;
-    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
-    s32 minutes = time / (s32)frames;
-    s32 seconds = (time - minutes * (s32)frames) / (s32)Screen_w.frame_scale;
-
-    quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[2], minutes, seconds, Screen_w.frame_scale);
-    return quest_text_buffer;
-}
-
-/* The elapsed time (`quest_work` +0x1C minus +0x20 frames) as the same text. */
-char* quest_elapsed_time_text_get(void) {
-    char** tbl = (char**)get_str_tbl(6);
-    s32 time = quest_work.field_0x01C - quest_work.field_0x020;
-    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
-    s32 minutes = time / (s32)frames;
-    s32 seconds = (time - minutes * (s32)frames) / (s32)Screen_w.frame_scale;
-
-    quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[2], minutes, seconds, Screen_w.frame_scale);
-    return quest_text_buffer;
-}
-
-/* The elapsed time in frames. */
-s32 quest_elapsed_time_get(void) {
-    return quest_work.field_0x01C - quest_work.field_0x020;
-}
-
-/* The run's score pair (+0x90/+0x91) as text. */
-char* quest_score_text_get(void) {
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[3], quest_work.field_0x091, quest_work.field_0x090);
-    return quest_text_buffer;
-}
-
-/* The arena item tally as text: the "N of M" string table 35's format 26 carries when the player
- * still holds items and the run is short of them, else the "none" format 27.  `index` 0 sums every
- * arena element, otherwise it reads element `index` alone; the `quest_flag_800000_ck` case reports
- * the whole set at once. */
-char* quest_arena_items_text_get(u8 index) {
-    s32 have;
-    s32 missing;
-    s32 count;
-    s32 i;
-    s32 need;
-    s32 value;
-
-    quest_text_buffer[0] = 0;
-    have = 0;
-    if (index != 0 && quest_flag_800000_ck(NULL) == 1) {
-        sprintf(quest_text_buffer, quest_str_tbl_35_get(27));
-        return quest_text_buffer;
-    }
-    if (quest_flag_80000_ck(NULL) == 1 || quest_flag_2000000_ck(NULL) == 1 ||
-        quest_flag_80000000_ck(NULL) == 1 || quest_flag_4000000_ck(NULL) == 1) {
-        count = (quest_flag_100_ck(NULL) == 1) ? 2 : 3;
-        need = 0;
-        for (i = 0; i < count; i++) {
-            value = quest_arena_count_get(i);
-            if (value >= 0) {
-                have += value;
-            }
-            value = quest_arena_need_get(i);
-            if (value >= 0) {
-                need += value;
-            }
-        }
-        missing = have - need;
-    } else {
-        have = quest_arena_count_get(index);
-        missing = have - quest_arena_need_get(index);
-    }
-    if (missing < 0 || have <= 0) {
-        sprintf(quest_text_buffer, quest_str_tbl_35_get(27));
-    } else {
-        sprintf(quest_text_buffer, quest_str_tbl_35_get(26), missing, have);
-    }
-    return quest_text_buffer;
-}
-
-/* The arena run's time as the same `mm'ss"ff` text `quest_clear_time_text_get` builds, from the
- * record's clear time instead of the work block's.  The clear time is first mapped through the
- * arena's own tables: the fixed `multi_arena_clr_time` pair when the 0x100000 flag is set and the
- * time is below 10000, else `arena_time_table`'s per-rank table scaled by 30 when 0x10 is set. */
-char* quest_arena_time_text_get(QuestRecord* rec, s32 which) {
-    char** tbl = (char**)get_str_tbl(6);
-    s32 time = which;
-    f32 frames;
-    s32 minutes;
-    s32 seconds;
-
-    if (quest_flag_100000_ck(rec) == 1 && rec->field_0x02C < 10000) {
-        time = multi_arena_clr_time[(rec->field_0x02C - 9000) * 2 + (system_w.field_0x8af != 0)];
-    } else if (quest_flag_10_ck(rec) == 1) {
-        time = arena_time_table[rec->field_0x02C - 60000][(u8)which] * 30;
-    }
-    frames = frames_per_second_60f * Screen_w.frame_scale;
-    minutes = time / (s32)frames;
-    seconds = (time - minutes * (s32)frames) / (s32)Screen_w.frame_scale;
-    quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[2], minutes, seconds);
-    return quest_text_buffer;
-}
-
-/* The grade (0 = no record) as text: the grade's own format for 1..4, else the language's
- * "no record" string. */
-char* quest_grade_text_get(u8 grade) {
-    char** tbl = (char**)get_str_tbl(6);
-    u32 slot;
-
-    switch (grade) {
-    case 0:
-        quest_text_buffer[0] = 0;
-        sprintf(quest_text_buffer, quest_grade_none_text_table[system_w.field_0x09]);
-        return quest_text_buffer;
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-        slot = grade + 5;
-        break;
-    }
-    quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[slot]);
-    return quest_text_buffer;
-}
-
-/* The current run's grade as text: the same ratio `quest_grade_get` scores, rendered by
- * `quest_grade_text_get` (1 when no element matches, so the "no record" string comes out). */
-char* quest_grade_text_cur_get(void) {
-    s16 total;
-    f32 ratio;
-    u8 grade = 1;
-
-    quest_text_buffer[0] = 0;
-    if (quest_element_value_get(4, &total) == 0) {
-        return quest_text_buffer;
-    }
-    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
-    if (ratio <= quest_grade_ratio_10f) {
-        grade = 4;
-    } else if (ratio <= quest_grade_ratio_30f) {
-        grade = 3;
-    } else if (ratio <= quest_grade_ratio_50f) {
-        grade = 2;
-    }
-    return quest_grade_text_get(grade);
-}
-
-/* The run's grade: the score as a percentage of the arena element 4 target, banded at the three
- * `quest_grade_ratio_*f` thresholds (0 when the element is not live). */
-s32 quest_grade_get(void) {
-    s16 total;
-    f32 ratio;
-
-    if (quest_element_value_get(4, &total) == 0) {
-        return 0;
-    }
-    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
-    if (ratio <= quest_grade_ratio_10f) {
-        return 4;
-    }
-    if (ratio <= quest_grade_ratio_30f) {
-        return 3;
-    }
-    if (ratio <= quest_grade_ratio_50f) {
-        return 2;
-    }
-    return 1;
-}
-
-/* Whether the same percentage reaches `grade` - the rank the caller's threshold asks for. */
-s32 quest_grade_rank_get(u8 grade) {
-    s16 total;
-    f32 ratio;
-
-    if (quest_element_value_get(4, &total) == 0) {
-        return 0;
-    }
-    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
-    return ratio <= (f32)grade;
-}
-
-/* The record's +0x36C slot progress byte, or 0 while the work state is "moving" and for a missing
- * record. */
-u8 quest_slot_progress_get(QuestRecord* rec) {
-    if (move_work_state_ck() == 1) {
-        return 0;
-    }
-    if (rec == NULL) {
-        rec = quest_record_get();
-        if (rec == NULL) {
-            return 0;
-        }
-    }
-    return rec->field_0x36C;
-}
-
-/* The record's name index (string table 5's key), or 0 for a missing record; 1 while the work
- * state is "moving". */
-u8 quest_name_index_get(QuestRecord* rec) {
-    if (move_work_state_ck() == 1) {
-        return 1;
-    }
-    if (rec == NULL) {
-        rec = quest_record_get();
-        if (rec == NULL) {
-            return 0;
-        }
-    }
-    return rec->field_0x08B;
-}
-
-/* The record's +0x372 word, or the current record's. */
-u16 quest_field372_get(QuestRecord* rec) {
-    if (rec == NULL) {
-        rec = quest_record_get();
-        if (rec == NULL) {
-            return 0;
-        }
-    }
-    return rec->field_0x372;
-}
-
-/* The "no time yet" text (string table 6's fifth format). */
-char* quest_no_time_text_get(void) {
-    char** tbl = (char**)get_str_tbl(6);
-
-    quest_text_buffer[0] = 0;
-    sprintf(quest_text_buffer, tbl[5]);
-    return quest_text_buffer;
-}
-
-/* The record's +0x780 `which`-th monster id rendered through string table 33, the "no time yet"
- * text when the id is 0 or the record is missing, and a lone space for the second slot while both
- * ids are still unset. */
-char* quest_monster_text_get(QuestRecord* rec, u8 which) {
-    if (rec == NULL) {
-        return quest_no_time_text_get();
-    }
-    if (which == 1 && rec->field_0x30C[0] == 0 && rec->field_0x30C[1] == 0) {
-        quest_text_buffer[0] = ' ';
-        quest_text_buffer[1] = 0;
-        return quest_text_buffer;
-    }
-    if (rec->field_0x30C[which] == 0) {
-        return quest_no_time_text_get();
-    }
-    strcpy(quest_text_buffer, (char*)str_tbl_33_get(rec->field_0x30C[which]));
-    return quest_text_buffer;
-}
 
 /* Applies `used` of the arena item `id` to the work block's item table (the entry the table's own
  * count has room for). */
@@ -3766,7 +4186,7 @@ void quest_element_item_apply(u8 id, u16 count, u16 used) {
         return;
     }
     item = &work->arena_items_0x6A2C[index];
-    if (item->id != id) {
+    if (item->id != (u16)id) {
         return;
     }
     if (item->count != count) {
@@ -3786,10 +4206,7 @@ void quest_element_item_apply(u8 id, u16 count, u16 used) {
 s32 quest_slot_count_get(u8 index) {
     QuestWork* work = quest_work_ptr;
 
-    if (work == NULL) {
-        return 0;
-    }
-    if (index >= 8) {
+    if (work == NULL || index >= 8) {
         return 0;
     }
     return work->slot_counts_0x66B8[index];
@@ -3801,15 +4218,12 @@ void quest_slot_items_get(u8 index, u16* out) {
     u16* src;
     s32 i;
 
-    if (work == NULL) {
-        return;
-    }
-    if (index >= 8) {
+    if (work == NULL || index >= 8) {
         return;
     }
     src = work->slot_values_0x6698[index];
     for (i = 0; i < work->slot_counts_0x66B8[index]; i++) {
-        out[i] = src[i];
+        *out++ = *src++;
     }
 }
 
@@ -3842,174 +4256,17 @@ QuestRecord* quest_record_find(u16 quest_id) {
     return NULL;
 }
 
-/* Steps the first quest's intro countdown in the move work: arms a 60-frame timer once element 0 is
- * flagged in phase sub-state 1, holds it while the sub-state differs, and starts lobby event 8 when it
- * runs out. */
-void quest_intro_step(Q_MoveWork* work) {
-    s32 timer;
-
-    if (quest_select_ready_ck() != 0 && (s32)(u16)quest_id_get() == 1) {
-        switch (work->intro_state_0x118) {
-        case 0:
-            if (quest_element_flag20_ck(quest_work_ptr, 0) == 1 && work->sub_0xEA == 1) {
-                work->intro_timer_0x119 = 60;
-                work->intro_state_0x118 = 1;
-            }
-            break;
-        case 1:
-            if (work->sub_0xEA != 1) {
-                work->intro_timer_0x119 = 60;
-            } else {
-                timer = work->intro_timer_0x119;
-                if (timer == 0) {
-                    lb_event_request(8);
-                    work->intro_state_0x118 = 2;
-                } else {
-                    work->intro_timer_0x119--;
-                }
-            }
-            break;
-        }
-    }
-}
-
-/* An element's supply state: 0 while the pad input blocks it or the element has no item, 1 when nothing is
- * left to deliver, 2 otherwise. */
-s32 quest_element_supply_state_get(s32 index) {
-    u16 item;
-    s32 left;
-
-    if (Pl_motion_input_ck(0) == 1) {
-        return 0;
-    }
-    item = em_work_slot_pair_get(index, NULL);
-    if (item == 0) {
-        return 0;
-    }
-    left = quest_element_value_index_get(index);
-    if (left > 0) {
-        left -= quest_item_count_sum(item, 0);
-        if (left < 0) {
-            left = 0;
-        }
-    }
-    return (left == 0) ? 1 : 2;
-}
-
-
-/* Spends up to `count` of item `id` against the three elements that ask for it, then sends the player's new
- * total; returns the count spent. */
-u32 quest_element_item_use(_PLW* owner, u16 id, s32 count) {
-    u16 left;
-    s32 i;
-    s32 used;
-    u16 spent;
-    u16 item;
-
-    spent = 0;
-    used = 0;
-    if (quest_work_ptr != NULL) {
-        for (i = 0; i < 3; i++) {
-            item = quest_element_item_count_get(i, &left);
-            if (item != 0 && left != 0 && item == id) {
-                if (used == 0) {
-                    used++;
-                    spent = quest_item_deposit(owner, id, count);
-                }
-                if (spent != 0) {
-                    quest_element_value_set(i, item, -count);
-                }
-            }
-        }
-        lb_sub13_send(id, quest_item_count_sum(id, 1), 0);
-    }
-    return spent;
-}
-
-/* Deposits up to `count` of item `id` from the player `owner` into its quest item list (a new slot when the
- * player holds none yet, else the slot of that id), capped at the most any element still needs; returns the
- * count moved. */
-u16 quest_item_deposit(_PLW* owner, u16 id, s16 count) {
-    s16 need = 0;
-    s32 i;
-    QuestItemSlot* held;
-    u16 j;
-    s16 rest;
-    QuestItemSlot* slot;
-
-    for (i = 0; i < 3; i++) {
-        rest = quest_element_value_at(id, i);
-        if (rest >= 0) {
-            rest -= quest_all_player_item_count_sum(id);
-            if (need < rest) {
-                need = rest;
-            }
-        }
-    }
-    if (need <= 0) {
-        return 0;
-    }
-    if (quest_item_count_sum(id, 1) == 0) {
-        slot = quest_work.player_items_0x6A6A[owner->chunk_ofs];
-        for (j = 0; j < 3; j++, slot++) {
-            if (slot->id == 0) {
-                slot->id = id;
-                if (count >= need) {
-                    count = need;
-                }
-                slot->count = count;
-                pl_item_add(owner, id, -count);
-                return count;
-            }
-        }
-    } else {
-        held = quest_work.player_items_0x6A6A[owner->chunk_ofs];
-        for (j = 0; j < 3; j++, held++) {
-            if (held->id == id) {
-                if (count >= need) {
-                    count = need;
-                }
-                held->count += count;
-                pl_item_add(owner, id, -count);
-                return count;
-            }
-        }
-    }
-    return count;
-}
-/* Warps the local player to entry point 2 of the current map. */
-void quest_entry_point_warp(void) {
-    nw4r::math::VEC3 pos;
-    u32 angle;
-
-    setVec3(&pos, 0.0f, 0.0f, 0.0f);
-    copyVec3(&pos, stage_entry_pos_get(get_now_mapno(), 2));
-    angle = stage_entry_angle_get(get_now_mapno(), 2);
-    pl_act_stage_latch_set(my_player_work_get(), 4);
-    pl_warp_start(2, &pos, (u16)angle);
-}
-
-/* Clears both halves of every entry of the run's 35-slot item list whose id is not a usable one. */
-void quest_item_list_prune(QuestItemSlot* slots) {
-    s32 i;
-    QuestItemSlot* slot = slots;
-
-    for (i = 0; i < 35; i++, slot++) {
-        if (Pl_item_id_usable_ck(slot->id, 0) == 0) {
-            slot->id = 0;
-            slot->count = 0;
-        }
-    }
-}
-
 /* The u16 the `quest_list_items` entry whose +0x2C key is `key` pairs with (0 when there is none). */
 u16 quest_work_word_get(u16 key) {
-    QuestRecord** items = quest_list_items;
-    s32 count = quest_list_count;
+    s32 count;
+    QuestRecord** items;
     s32 i;
 
-    for (i = 0; i < count; i++) {
-        if (items[i]->field_0x02C == key) {
+    items = quest_list_items;
+    i = 0;
+    count = quest_list_count;
+    for (; i < count; i++) {
+        if ((*items++)->field_0x02C == key) {
             break;
         }
     }
@@ -4065,7 +4322,7 @@ u8 quest_result_deliver_items(Q_ResultWork* result, Q_ItemPair* items) {
     for (i = 0; i < 0x23; i++, items++) {
         if (items->id != 0 && (s16)items->num != 0 && item_category_ck(items->id, 0x10) != 0) {
             dst->id = items->id;
-            dst->num = (s16)items->num;
+            dst->num = items->num;
             dst++;
             result->present_0x3A4++;
             items->id = 0;
@@ -4073,6 +4330,19 @@ u8 quest_result_deliver_items(Q_ResultWork* result, Q_ItemPair* items) {
         }
     }
     return result->present_0x3A4;
+}
+
+/* Clears both halves of every entry of the run's 35-slot item list whose id is not a usable one. */
+void quest_item_list_prune(QuestItemSlot* slots) {
+    s32 i;
+    QuestItemSlot* slot = slots;
+
+    for (i = 0; i < 35; i++, slot++) {
+        if (Pl_item_id_usable_ck(slot->id, 0) == 0) {
+            slot->id = 0;
+            slot->count = 0;
+        }
+    }
 }
 
 /* Fills the quest result for the slot's move work `work`: the quest id and the carried items (the pouch in a
@@ -4173,8 +4443,9 @@ void quest_result_fill(Q_MoveWork* work) {
             quest_capture_reward_roll(quest_work_ptr, me);
         }
         quest_monster_setup((Q_ItemWork*)quest_work_ptr, me);
-        if (((quest_work_ptr->elements_0x0094[0].flags & 1) || (quest_work_ptr->elements_0x0094[0].flags & 0x400)) &&
-            quest_work_ptr->elements_0x0094[0].id == 25) {
+        QuestWork* q = quest_work_ptr;
+
+        if (((q->elements_0x0094[0].flags & 1) || (q->elements_0x0094[0].flags & 0x400)) && q->elements_0x0094[0].id == 25) {
             system_w.field_0x8b2 = 1;
         }
     }
@@ -4203,7 +4474,7 @@ void quest_arena_summary_step(Q_MoveWork* work) {
     result->seconds_0x14C = result->elapsed_0x148 / (frames_per_second_60f * Screen_w.frame_scale);
     result->time_base_0x150 = quest->field_0x020;
     row = result->progress_0x1E0 - 9000;
-    if (multi_arena_clr_time[(system_w.field_0x8af != 0) + row * 2] > result->elapsed_0x148) {
+    if (multi_arena_clr_time[row * 2 + (system_w.field_0x8af != 0)] > result->elapsed_0x148) {
         result->time_medal_0x434 = 1;
     } else {
         result->time_medal_0x434 = 0;
@@ -4245,28 +4516,35 @@ void quest_gallery_cell_step(Q_MoveWork* work) {
     }
 }
 
+/* Steps the first quest's intro countdown in the move work: arms a 60-frame timer once element 0 is
+ * flagged in phase sub-state 1, holds it while the sub-state differs, and starts lobby event 8 when it
+ * runs out. */
+void quest_intro_step(Q_MoveWork* work) {
+    s32 timer;
 
-/* Whether exactly one of the three key bytes of entry 6 is set and all of them are finished (3). */
-s32 quest_players_state_get(void) {
-    QuestWork* work = quest_work_ptr;
-    s32 done = 0;
-    s32 active = 0;
-    s32 i;
-
-    for (i = 0; i < 3; i++) {
-        u8 state = work->player_state_0x2D4[i];
-
-        if (state == 3) {
-            done = 1;
-        }
-        if (state != 0) {
-            active++;
+    if (quest_select_ready_ck() != 0 && (s32)(u16)quest_id_get() == 1) {
+        switch (work->intro_state_0x118) {
+        case 0:
+            if (quest_element_flag20_ck(quest_work_ptr, 0) == 1 && work->sub_0xEA == 1) {
+                work->intro_timer_0x119 = 60;
+                work->intro_state_0x118 = 1;
+            }
+            break;
+        case 1:
+            if (work->sub_0xEA != 1) {
+                work->intro_timer_0x119 = 60;
+            } else {
+                timer = work->intro_timer_0x119;
+                if (timer == 0) {
+                    lb_event_request(8);
+                    work->intro_state_0x118 = 2;
+                } else {
+                    work->intro_timer_0x119--;
+                }
+            }
+            break;
         }
     }
-    if (done == 1 && active <= 1) {
-        return 1;
-    }
-    return 0;
 }
 
 /* Clears element `index` of the work block's element array. */
@@ -4278,20 +4556,22 @@ void quest_element_reset(u8 index) {
 
 /* Sets element `index`'s value to 0 once `id`'s own count has caught up with its target. */
 void quest_element_value_set(s32 index, u16 id, s32 delta) {
-    QuestWork* work = quest_work_ptr;
+    QuestElement* el;
     s32 i;
 
-    if (work == NULL) {
+    if (quest_work_ptr == NULL) {
         return;
     }
-    for (i = index; i < 3; i++) {
-        QuestElement* el = &work->elements_0x0094[i];
-
+    i = index;
+    el = &quest_work_ptr->elements_0x0094[i];
+    for (; i < 3; el++, i++) {
         if ((el->flags & 0x8) != 0 && (el->flags & 0x2) != 0) {
             if (el->id == id) {
-                if (quest_item_count_sum(id, 0) >= el->value) {
-                    quest_element_set(work, (u16)i, 0);
+                s16 have = quest_item_count_sum(id, 0);
+                if (el->target_count > have) {
+                    continue;
                 }
+                quest_element_set(quest_work_ptr, (u16)i, 0);
             }
         }
     }
@@ -4308,25 +4588,50 @@ u16 quest_element_item_count_get(s32 index, u16* out) {
     }
     el = &quest_work_ptr->elements_0x0094[index];
     *out = 0;
-    if ((el->flags & 0x8) == 0) {
-        return 0;
+    if ((el->flags & 0x8) != 0 && (el->flags & 0x2) != 0) {
+        rest = el->target_count - quest_item_count_sum(el->id, 0);
+        if (rest < 0) {
+            rest = 0;
+        }
+        *out = rest;
+        return el->id;
     }
-    if ((el->flags & 0x2) == 0) {
-        return 0;
+    return 0;
+}
+
+/* Spends up to `count` of item `id` against the three elements that ask for it, then sends the player's new
+ * total; returns the count spent. */
+u32 quest_element_item_use(_PLW* owner, u16 id, s32 count) {
+    u16 left;
+    s32 i;
+    s32 used;
+    u16 spent;
+    u16 item;
+
+    spent = 0;
+    used = 0;
+    if (quest_work_ptr != NULL) {
+        for (i = 0; i < 3; i++) {
+            item = quest_element_item_count_get(i, &left);
+            if (item != 0 && left != 0 && item == id) {
+                if (used == 0) {
+                    used++;
+                    spent = quest_item_deposit(owner, id, count);
+                }
+                if (spent != 0) {
+                    quest_element_value_set(i, item, -count);
+                }
+            }
+        }
+        lb_sub13_send(id, quest_item_count_sum(id, 1), 0);
     }
-    rest = el->value - quest_item_count_sum(el->id, 0);
-    if (rest < 0) {
-        rest = 0;
-    }
-    *out = rest;
-    return el->id;
+    return spent;
 }
 
 /* The item `id`'s count: `who` 0 sums every player's slot, 1 the local player's, 2 and up the
  * player whose slot follows. */
 s16 quest_item_count_sum(u16 id, s32 who) {
     QuestWork* work;
-    QuestItemSlot* slots;
     s16 total = 0;
     s32 player;
     s32 i;
@@ -4348,19 +4653,21 @@ s16 quest_item_count_sum(u16 id, s32 who) {
         break;
     case 1:
         player = (s8)my_player_no();
-        slots = &quest_work_ptr->player_items_0x6A6A[player][0];
-        for (i = 0; i < 3; i++) {
-            if (slots[i].id == id) {
-                return slots[i].count;
+        i = 0;
+        work = quest_work_ptr;
+        for (; i < 3; i++) {
+            if (work->player_items_0x6A6A[player][i].id == id) {
+                return work->player_items_0x6A6A[player][i].count;
             }
         }
         break;
     default:
-        player = (s8)(who - 2);
-        slots = &quest_work_ptr->player_items_0x6A6A[player][0];
-        for (i = 0; i < 3; i++) {
-            if (slots[i].id == id) {
-                return slots[i].count;
+        i = 0;
+        work = quest_work_ptr;
+        player = who - 2;
+        for (; i < 3; i++) {
+            if (work->player_items_0x6A6A[player][i].id == id) {
+                return work->player_items_0x6A6A[player][i].count;
             }
         }
         break;
@@ -4368,49 +4675,613 @@ s16 quest_item_count_sum(u16 id, s32 who) {
     return total;
 }
 
+/* Deposits up to `count` of item `id` from the player `owner` into its quest item list (a new slot when the
+ * player holds none yet, else the slot of that id), capped at the most any element still needs; returns the
+ * count moved. */
+u16 quest_item_deposit(_PLW* owner, u16 id, s16 count) {
+    s16 need = 0;
+    s32 i;
+    QuestItemSlot* held;
+    u16 j;
+    s16 rest;
+    QuestItemSlot* slot;
+
+    for (i = 0; i < 3; i++) {
+        rest = quest_element_value_at(id, i);
+        if (rest >= 0) {
+            rest -= quest_all_player_item_count_sum(id);
+            if (need < rest) {
+                need = rest;
+            }
+        }
+    }
+    if (need <= 0) {
+        return 0;
+    }
+    if (quest_item_count_sum(id, 1) == 0) {
+        slot = quest_work.player_items_0x6A6A[owner->chunk_ofs];
+        for (j = 0; j < 3; j++, slot++) {
+            if (slot->id == 0) {
+                slot->id = id;
+                if (count >= need) {
+                    count = need;
+                }
+                slot->count = count;
+                pl_item_add(owner, id, -count);
+                return count;
+            }
+        }
+    } else {
+        held = quest_work.player_items_0x6A6A[owner->chunk_ofs];
+        for (j = 0; j < 3; j++, held++) {
+            if (held->id == id) {
+                if (count >= need) {
+                    count = need;
+                }
+                held->count += count;
+                pl_item_add(owner, id, -count);
+                return count;
+            }
+        }
+    }
+    return count;
+}
+
 /* Stores `value` into player `player`'s slot holding arena item `id` (taking a free slot when none
  * does), then clears every element whose remaining count has run out. */
 void quest_arena_data_step(u8 player, u16 id, s16 value) {
-    QuestItemSlot* slots = quest_work.player_items_0x6A6A[player];
     s16 count = 0;
+    s16 i;
     s16 rest;
-    s32 i;
+    s32 j;
 
-    if (slots[0].id == id) {
-        count = slots[0].count;
-    }
-    if (slots[1].id == id) {
-        count = slots[1].count;
-    }
-    if (slots[2].id == id) {
-        count = slots[2].count;
+    for (i = 0; i < 3; i++) {
+        if (quest_work.player_items_0x6A6A[player][i].id == id) {
+            count = quest_work.player_items_0x6A6A[player][i].count;
+        }
     }
     if (count == 0) {
         for (i = 0; i < 3; i++) {
-            if (slots[i].id == 0) {
-                slots[i].id = id;
-                slots[i].count = value;
+            if (quest_work.player_items_0x6A6A[player][i].id == 0) {
+                quest_work.player_items_0x6A6A[player][i].id = id;
+                quest_work.player_items_0x6A6A[player][i].count = value;
                 break;
             }
         }
     } else {
         for (i = 0; i < 3; i++) {
-            if (slots[i].id == id) {
-                slots[i].count = value;
+            if (quest_work.player_items_0x6A6A[player][i].id == id) {
+                quest_work.player_items_0x6A6A[player][i].count = value;
                 break;
             }
         }
     }
-    for (i = 0; i < 3; i++) {
-        rest = (s16)quest_element_value_at(id, (u16)i);
+    for (j = 0; j < 3; j++) {
+        rest = (s16)quest_element_value_at(id, (u16)j);
         if (rest < 0) {
             continue;
         }
-        rest = rest - (s16)quest_all_player_item_count_sum(id);
+        rest -= (s16)quest_all_player_item_count_sum(id);
         if (rest <= 0) {
-            quest_element_reset((u8)i);
+            quest_element_reset((u8)j);
         }
     }
+}
+
+/* An element's supply state: 0 while the pad input blocks it or the element has no item, 1 when nothing is
+ * left to deliver, 2 otherwise. */
+s32 quest_element_supply_state_get(s32 index) {
+    u16 item;
+    s32 left;
+
+    if (Pl_motion_input_ck(0) == 1) {
+        return 0;
+    }
+    item = em_work_slot_pair_get(index, NULL);
+    if (item == 0) {
+        return 0;
+    }
+    left = quest_element_value_index_get(index);
+    if (left > 0) {
+        left -= quest_item_count_sum(item, 0);
+        if (left < 0) {
+            left = 0;
+        }
+    }
+    return (left == 0) ? 1 : 2;
+}
+
+/* Whether exactly one of the three key bytes of entry 6 is set and all of them are finished (3). */
+u32 quest_players_state_get(void) {
+    s32 active;
+    s32 done;
+    s32 i;
+
+    done = 0;
+    active = 0;
+    for (i = 0; i < 3; i++) {
+        if (quest_work_ptr->player_state_0x2D4[i] == 3) {
+            done = 1;
+        }
+        if (quest_work_ptr->player_state_0x2D4[i] != 0) {
+            active++;
+        }
+    }
+    if (done == 1 && active <= 1) {
+        return 1;
+    }
+    return 0;
+}
+
+/* Warps the local player to entry point 2 of the current map. */
+void quest_entry_point_warp(void) {
+    nw4r::math::VEC3 pos;
+    u32 angle;
+
+    setVec3(&pos, 0.0f, 0.0f, 0.0f);
+    copyVec3(&pos, stage_entry_pos_get(get_now_mapno(), 2));
+    angle = stage_entry_angle_get(get_now_mapno(), 2);
+    pl_act_stage_latch_set(my_player_work_get(), 4);
+    pl_warp_start(2, &pos, (u16)angle);
+}
+
+/* The current result row, or NULL when the screen has none. */
+QuestRecord* quest_record_get(void) {
+    QuestRecord* rec = quest_work.record_0x03C;
+
+    if (rec == NULL) {
+        return NULL;
+    }
+    return rec;
+}
+
+/* String table 35's `index`-th entry (the item-summary formats). */
+char* quest_str_tbl_35_get(u32 index) {
+    return (char*)get_str_tbl(35)[index];
+}
+
+/* String table 4's `index`-th entry. */
+char* quest_str_tbl_4_get(u32 index) {
+    return (char*)get_str_tbl(4)[index];
+}
+
+/* The pair table's `[row][col]` byte at +0x805F7898. */
+u8 quest_pair_table_get(u8 row, u8 col) {
+    return *(col + (&quest_pair_table[0] + (row * 2)));
+}
+
+/* The byte table's `index`-th entry at +0x805F78B4. */
+u8 quest_byte_table_get(u8 index) {
+    return *(&quest_byte_table[0] + index);
+}
+
+/* The record's name out of string table 5 (an empty string when there is no record). */
+char* quest_name_text_get(void) {
+    QuestRecord* rec = quest_record_get();
+    u8** tbl = get_str_tbl(5);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        strcpy(quest_text_buffer, (char*)tbl[rec->field_0x08B]);
+    }
+    return quest_text_buffer;
+}
+
+/* The same name for an explicit record. */
+char* quest_name_text_get_of(QuestRecord* rec) {
+    u8** tbl = get_str_tbl(5);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        strcpy(quest_text_buffer, (char*)tbl[rec->field_0x08B]);
+    }
+    return quest_text_buffer;
+}
+
+/* The record's +0x198 condition row's text out of string table 41. */
+char* quest_field198_text_get(void) {
+    QuestRecord* rec = quest_record_get();
+    u8** tbl = get_str_tbl(41);
+
+    quest_text_buffer[0] = 0;
+    if (rec == NULL) {
+        return quest_text_buffer;
+    }
+    strcpy(quest_text_buffer, (char*)tbl[rec->condition_0x198]);
+    return quest_text_buffer;
+}
+
+/* The same +0x198 condition text for an explicit record. */
+char* quest_field198_text_get_of(QuestRecord* rec) {
+    u8** tbl = get_str_tbl(41);
+
+    quest_text_buffer[0] = 0;
+    strcpy(quest_text_buffer, (char*)tbl[rec->condition_0x198]);
+    return quest_text_buffer;
+}
+
+/* The record's +0x13A value formatted with string table 6's first format. */
+char* quest_field13A_text_get(void) {
+    QuestRecord* rec = quest_record_get();
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        sprintf(quest_text_buffer, tbl[0], rec->field_0x13A);
+    }
+    return quest_text_buffer;
+}
+
+/* The same +0x13A value for an explicit record. */
+char* quest_field13A_text_get_of(QuestRecord* rec) {
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        sprintf(quest_text_buffer, tbl[0], rec->field_0x13A);
+    }
+    return quest_text_buffer;
+}
+
+/* The record's +0x34C / +0x350 / +0x354 timers as text: `which` picks which of the three. */
+char* quest_time_text_get(u8 which) {
+    QuestRecord* rec = quest_record_get();
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        switch (which) {
+        case 0:
+            sprintf(quest_text_buffer, tbl[1], rec->field_0x34C);
+            break;
+        case 1:
+            if (rec->field_0x350 == 0) {
+                sprintf(quest_text_buffer, tbl[4]);
+            } else {
+                sprintf(quest_text_buffer, tbl[1], rec->field_0x350);
+            }
+            break;
+        case 2:
+            if (rec->field_0x354 == 0) {
+                sprintf(quest_text_buffer, tbl[4]);
+            } else {
+                sprintf(quest_text_buffer, tbl[1], rec->field_0x354);
+            }
+            break;
+        }
+    }
+    return quest_text_buffer;
+}
+
+/* The same three timers for an explicit record. */
+char* quest_time_text_get_of(QuestRecord* rec, u8 which) {
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        switch (which) {
+        case 0:
+            sprintf(quest_text_buffer, tbl[1], rec->field_0x34C);
+            break;
+        case 1:
+            if (rec->field_0x350 == 0) {
+                sprintf(quest_text_buffer, tbl[4]);
+            } else {
+                sprintf(quest_text_buffer, tbl[1], rec->field_0x350);
+            }
+            break;
+        case 2:
+            if (rec->field_0x354 == 0) {
+                sprintf(quest_text_buffer, tbl[4]);
+            } else {
+                sprintf(quest_text_buffer, tbl[1], rec->field_0x354);
+            }
+            break;
+        }
+    }
+    return quest_text_buffer;
+}
+
+/* The record's +0x348 value as text. */
+char* quest_field348_text_get(void) {
+    QuestRecord* rec = quest_record_get();
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        sprintf(quest_text_buffer, tbl[1], rec->field_0x348);
+    }
+    return quest_text_buffer;
+}
+
+/* The same +0x348 value for an explicit record. */
+char* quest_field348_text_get_of(QuestRecord* rec) {
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    if (rec != NULL) {
+        sprintf(quest_text_buffer, tbl[1], rec->field_0x348);
+    }
+    return quest_text_buffer;
+}
+
+
+/* The work block's +0x2E8 value (clamped up to 0) as text. */
+char* quest_field2E8_text_get(void) {
+    char** tbl = (char**)get_str_tbl(6);
+    s32 value;
+
+    quest_text_buffer[0] = 0;
+    value = quest_work.field_0x2E8;
+    if (value < 0) {
+        value = 0;
+    }
+    sprintf(quest_text_buffer, tbl[1], value);
+    return quest_text_buffer;
+}
+
+/* The run's clear time (`quest_work` +0x24 frames) as `mm'ss"ff` text. */
+char* quest_clear_time_text_get(void) {
+    char** tbl = (char**)get_str_tbl(6);
+    s32 time = quest_work.field_0x024;
+    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
+    s32 minutes = time / (s32)frames;
+    s32 seconds;
+
+    time -= minutes * (s32)frames;
+    seconds = time / (s32)Screen_w.frame_scale;
+    quest_text_buffer[0] = 0;
+    sprintf(quest_text_buffer, tbl[2], minutes, seconds);
+    return quest_text_buffer;
+}
+/* The elapsed time (`quest_work` +0x1C minus +0x20 frames) as the same text. */
+char* quest_elapsed_time_text_get(void) {
+    char** tbl = (char**)get_str_tbl(6);
+    s32 time = quest_work.field_0x01C - quest_work.field_0x020;
+    f32 frames = frames_per_second_60f * Screen_w.frame_scale;
+    s32 minutes = time / (s32)frames;
+    s32 seconds;
+
+    seconds = time - minutes * (s32)frames;
+    seconds /= (s32)Screen_w.frame_scale;
+    quest_text_buffer[0] = 0;
+    sprintf(quest_text_buffer, tbl[2], minutes, seconds);
+    return quest_text_buffer;
+}
+
+/* The elapsed time in frames. */
+s32 quest_elapsed_time_get(void) {
+    return quest_work.field_0x01C - quest_work.field_0x020;
+}
+
+/* The run's score pair (+0x90/+0x91) as text. */
+char* quest_score_text_get(void) {
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    sprintf(quest_text_buffer, tbl[3], quest_work.field_0x091, quest_work.field_0x090);
+    return quest_text_buffer;
+}
+
+/* The arena item tally as text: the "N of M" string table 35's format 26 carries when the player
+ * still holds items and the run is short of them, else the "none" format 27.  `index` 0 sums every
+ * arena element, otherwise it reads element `index` alone; the `quest_flag_800000_ck` case reports
+ * the whole set at once. */
+char* quest_arena_items_text_get(u8 index) {
+    s32 have;
+    s32 missing;
+    s32 count;
+    s32 i;
+    s32 need;
+    s32 value;
+
+    quest_text_buffer[0] = 0;
+    have = 0;
+    if (index != 0 && quest_flag_800000_ck(NULL) == 1) {
+        sprintf(quest_text_buffer, quest_str_tbl_35_get(27));
+        return quest_text_buffer;
+    }
+    if (quest_flag_80000_ck(NULL) == 1 || quest_flag_2000000_ck(NULL) == 1 ||
+        quest_flag_80000000_ck(NULL) == 1 || quest_flag_4000000_ck(NULL) == 1) {
+        count = (quest_flag_100_ck(NULL) == 1) ? 2 : 3;
+        need = 0;
+        for (i = 0; i < count; i++) {
+            value = quest_arena_count_get(i);
+            if (value >= 0) {
+                have += value;
+            }
+            value = quest_arena_need_get(i);
+            if (value >= 0) {
+                need += value;
+            }
+        }
+        missing = have - need;
+    } else {
+        have = quest_arena_count_get(index);
+        missing = have - quest_arena_need_get(index);
+    }
+    if (missing < 0 || have <= 0) {
+        sprintf(quest_text_buffer, quest_str_tbl_35_get(27));
+    } else {
+        sprintf(quest_text_buffer, quest_str_tbl_35_get(26), missing, have);
+    }
+    return quest_text_buffer;
+}
+
+/* The arena run's time as the same `mm'ss"ff` text `quest_clear_time_text_get` builds, from the
+ * record's clear time instead of the work block's.  The clear time is first mapped through the
+ * arena's own tables: the fixed `multi_arena_clr_time` pair when the 0x100000 flag is set and the
+ * time is below 10000, else `arena_time_table`'s per-rank table scaled by 30 when 0x10 is set. */
+char* quest_arena_time_text_get(QuestRecord* rec, s32 which) {
+    char** tbl = (char**)get_str_tbl(6);
+    s32 time = which;
+    f32 frames;
+    s32 minutes;
+    s32 seconds;
+
+    if (quest_flag_100000_ck(rec) == 1 && rec->field_0x02C < 10000) {
+        s32 arena = rec->field_0x02C - 9000;
+
+        time = multi_arena_clr_time[arena * 2 + (system_w.field_0x8af != 0)];
+    } else if (quest_flag_10_ck(rec) == 1) {
+        time = arena_time_table[rec->field_0x02C - 60000][(u8)which] * 30;
+    }
+    frames = frames_per_second_60f * Screen_w.frame_scale;
+    minutes = time / (s32)frames;
+    seconds = time - minutes * (s32)frames;
+    seconds /= (s32)Screen_w.frame_scale;
+    quest_text_buffer[0] = 0;
+    sprintf(quest_text_buffer, tbl[2], minutes, seconds);
+    return quest_text_buffer;
+}
+
+/* The grade (0 = no record) as text: the grade's own format for 1..4, else the language's
+ * "no record" string. */
+char* quest_grade_text_get(u8 grade) {
+    char** tbl = (char**)get_str_tbl(6);
+    u32 slot;
+
+    switch (grade) {
+    case 0:
+        quest_text_buffer[0] = 0;
+        sprintf(quest_text_buffer, quest_grade_none_text_table[system_w.field_0x09]);
+        return quest_text_buffer;
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+        slot = grade + 5;
+        break;
+    }
+    quest_text_buffer[0] = 0;
+    sprintf(quest_text_buffer, tbl[slot]);
+    return quest_text_buffer;
+}
+
+/* The current run's grade as text: the same ratio `quest_grade_get` scores, rendered by
+ * `quest_grade_text_get` (1 when no element matches, so the "no record" string comes out). */
+char* quest_grade_text_cur_get(void) {
+    s16 total;
+    f32 ratio;
+    u8 grade = 1;
+
+    quest_text_buffer[0] = 0;
+    if (quest_element_value_get(4, &total) == 0) {
+        return quest_text_buffer;
+    }
+    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
+    if (ratio <= quest_grade_ratio_10f) {
+        grade = 4;
+    } else if (ratio <= quest_grade_ratio_30f) {
+        grade = 3;
+    } else if (ratio <= quest_grade_ratio_50f) {
+        grade = 2;
+    }
+    return quest_grade_text_get(grade);
+}
+
+/* The run's grade: the score as a percentage of the arena element 4 target, banded at the three
+ * `quest_grade_ratio_*f` thresholds (0 when the element is not live). */
+s32 quest_grade_get(void) {
+    s16 total;
+    f32 ratio;
+
+    if (quest_element_value_get(4, &total) == 0) {
+        return 0;
+    }
+    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
+    if (ratio <= quest_grade_ratio_10f) {
+        return 4;
+    }
+    if (ratio <= quest_grade_ratio_30f) {
+        return 3;
+    }
+    if (ratio <= quest_grade_ratio_50f) {
+        return 2;
+    }
+    return 1;
+}
+
+
+/* Whether the same percentage reaches `grade` - the rank the caller's threshold asks for. */
+s32 quest_grade_rank_get(u8 grade) {
+    s16 total;
+    f32 ratio;
+
+    if (quest_element_value_get(4, &total) == 0) {
+        return 0;
+    }
+    ratio = percent_scale_100f * ((f32)quest_work.field_0x5D8 / (f32)total);
+    return ratio <= (f32)grade;
+}
+
+/* The record's +0x36C slot progress byte, or 0 while the work state is "moving" and for a missing
+ * record. */
+u8 quest_slot_progress_get(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 0;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    return rec->field_0x36C;
+}
+
+/* The record's name index (string table 5's key), or 0 for a missing record; 1 while the work
+ * state is "moving". */
+u8 quest_name_index_get(QuestRecord* rec) {
+    if (move_work_state_ck() == 1) {
+        return 1;
+    }
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    return rec->field_0x08B;
+}
+
+/* The record's +0x372 word, or the current record's. */
+u16 quest_field372_get(QuestRecord* rec) {
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    return rec->field_0x372;
+}
+
+/* The "no time yet" text (string table 6's fifth format). */
+char* quest_no_time_text_get(void) {
+    char** tbl = (char**)get_str_tbl(6);
+
+    quest_text_buffer[0] = 0;
+    sprintf(quest_text_buffer, tbl[5]);
+    return quest_text_buffer;
+}
+
+/* The record's +0x780 `which`-th monster id rendered through string table 33, the "no time yet"
+ * text when the id is 0 or the record is missing, and a lone space for the second slot while both
+ * ids are still unset. */
+char* quest_monster_text_get(QuestRecord* rec, u8 which) {
+    if (rec == NULL) {
+        return quest_no_time_text_get();
+    }
+    if (which == 1 && rec->field_0x30C[0] == 0 && rec->field_0x30C[1] == 0) {
+        quest_text_buffer[0] = ' ';
+        quest_text_buffer[1] = 0;
+        return quest_text_buffer;
+    }
+    if (rec->field_0x30C[which] == 0) {
+        return quest_no_time_text_get();
+    }
+    strcpy(quest_text_buffer, (char*)str_tbl_33_get(rec->field_0x30C[which]));
+    return quest_text_buffer;
 }
 
 /* The text a result-screen field kind shows: kinds 0..31 pick one of the record's own text runs or

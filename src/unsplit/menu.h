@@ -43,6 +43,12 @@ s32 put_lsp_anchor_offset(u16, void*, void*);     /* 0x802E06B0 */
  * for the same reason - that unit's registered range covers their addresses, and this header
  * includes it above. */
 
+/* ---- unclaimed `.data` ---- */
+/* The result screen's localized "(Quest Name Unavailable)" rows, indexed by the message language
+ * (.data 0x8060E888: six pointers to the strings at 0x8060E800..0x8060E888, between
+ * `menu/menu_sysmsg.cpp`'s and `Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp`'s claims). */
+extern const char* quest_name_unavailable_text[6];
+
 #ifdef __cplusplus
 }
 #endif

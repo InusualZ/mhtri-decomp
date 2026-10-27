@@ -68,7 +68,7 @@ extern const f32 quest_intruder_wait_3f;  /* .sdata2 0x8079C54C: the intruder's 
 extern const f64 quest_timer_zero_d;      /* .sdata2 0x8079C510: 0.0 */
 extern const f64 quest_timer_start_d;     /* .sdata2 0x8079C518: 29970.0 */
 /* The sixteen ascending quest-id thresholds `quest_init` scans per list record (.data 0x805F2A98). */
-extern u16 quest_id_threshold_tbl[16];
+extern u16 quest_id_threshold_tbl[20];
 extern const f32 quest_grade_ratio_50f;   /* .sdata2 0x8079C520 */
 
 /* One 8-byte entry of a monster's variant list: the quest rank it applies to (0xFF ends the list) and the
@@ -99,6 +99,8 @@ extern s32 quest_time_class_tbl[3];
  * of (weight, value) byte pairs ending at 0xFF).  Read by `enemy/em_pop.cpp`'s supply and bonus steps. */
 extern u8* quest_supply_drop_tbl[13];
 extern u8** quest_bonus_pick_tbl[13];
+/* The empty supply-drop list (.sbss 0x80794C18) the table's no-drop ranks point at. */
+extern u8 quest_supply_drop_empty[4];
 
 /* The per-monster variant lists, indexed by monster id (.data 0x805F76A0, 41 entries, NULL for none). */
 extern QuestMonsterVariantList* quest_monster_variant_tbl[41];
@@ -265,7 +267,7 @@ void quest_arena_summary_step(struct Q_MoveWork* work);
 void quest_gallery_cell_step(struct Q_MoveWork* work);
 /* The key the quest list pairs with quest id `key`, and whether exactly one player key is set and all are done. */
 u16 quest_work_word_get(u16 key);
-s32 quest_players_state_get(void);
+u32 quest_players_state_get(void);
 /* The quest's elapsed frames, and the prune of the unusable entries of a 35-slot item list. */
 s32 quest_elapsed_time_get(void);
 void quest_item_list_prune(QuestItemSlot* slots);
