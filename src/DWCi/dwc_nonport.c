@@ -14,7 +14,9 @@
  * SHAPES. `DWCi_Np_CPUCopyFast` is a goto-free dispatch on the copy width (rule 8): the retail jumps share the
  *   `memcpy` tail and the three copy loops (93.82 with gotos, 91.11 without). The `.sbss` objects are defined
  *   last first.
- * RESIDUALS. `DWCi_Np_CPUCopyFast` 91.11 (the shared tails above; `.text` 68 B over).
+ * RESIDUALS. `DWCi_Np_CPUCopyFast`: the shared tails above (`.text` 68 B over); retail's forward jumps from the
+ *   alignment code into the copy loops cross each other, which nested `if (0) { case ... }` blocks cannot express
+ *   (playbook 241).
  *   `DWCi_GetConsoleFriendCode` names `DWCi_consoleFriendCode` where retail names `lbl_807957DC` (the low word).
  */
 

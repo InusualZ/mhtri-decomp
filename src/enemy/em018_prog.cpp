@@ -25,11 +25,6 @@
  *   The callee names this unit asked for (`enemy-em018#N`) are GUESS except where the owner's comment names the
  *   behaviour.
  * RESIDUALS. Partial rows:
- *  - `em018_motion_events`: retail shares the motion 0x55/0x56 water tail (case 0x55 branches into case 0x56's
- *    copy); the source repeats it (160 B long).  Measured: 98.70 with the copy; 99.32 (every instruction paired)
- *    with `case 0x56:` placed inside an `if (0) { ... }` after case 0x55's head, a case label used as a control-flow
- *    device that rule 8 forbids, so it is not used; MWCC neither merges the two copies nor threads a flag, and no
- *    goto-free statement reaches the middle of the next case (playbook 213);
  *  - `em018_mot9_height_step`, `em018_action_select`: retail keeps a `clrlwi` on a two-constant choice passed to a
  *    `u16`/`u8` parameter (`li r4,2; bne; li r4,9; clrlwi r4,r4,16`); MWCC drops it for every spelling tried
  *    (cast, local of each width, ternary, if);
@@ -39,7 +34,9 @@
  *    to s32/u32/s8 measured equal or worse).
  *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` and `.sdata2` not emitted in retail
  *   order (the SE tables, demo keys, turn descriptors and pick records are `extern`).
- * SHAPES. `Em018UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ * SHAPES. `em018_motion_events`: motion 0x55 shares motion 0x56's water tail, so `case 0x56:` sits inside an
+ *   `if (0) { ... }` after case 0x55's head (playbook 241; the repeated tail measured 98.70).
+ *   `Em018UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
  *   `u8 >= 2` in `em018_aim_part_level_ck` compiles to the borrow sequence (`li r3,2; orc; addi; srwi; subf; srwi`):
@@ -4619,31 +4616,23 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
                 em018_effect_spawn(self, 0, 2, 8, 0, 1.0f);
             }
         }
-        if (em_water_check_c1(self) == 1) {
-            if (em_after_frame_check(self, 0, 30.0f, 0.0f) == 1) {
-                setVector3(&vec, 0.0f, 200.0f, 0.0f);
-                eft_em_spawn(self, 0x5C, 3, &vec, 1.1f);
-            }
-            if (em_after_frame_check(self, 0, 100.0f, 0.0f) == 1) {
-                setVector3(&vec, 0.0f, 0.0f, 0.0f);
-                eft_em_spawn(self, 0x42, 0xF, &vec, 0.8f);
-            }
-        }
-        break;
+        /* motion 0x55 skips motion 0x56's head and shares its water tail */
+        if (0) {
     case 0x56:
-        if (em_after_frame_check(self, 0, 98.0f, 0.0f) == 1) {
-            em_camera_req(self, -1, 7);
-        }
-        if (em_water_check_c1(self) == 0) {
-            if (em_after_frame_check(self, 0, 120.0f, 0.0f) == 1) {
-                if ((self->field_0x228 & 6) != 0) {
-                    em018_effect_spawn(self, 0, 0x11, 3, 0, 1.2f);
-                } else {
-                    em018_effect_spawn(self, 1, 6, 3, 0, 2.0f);
-                }
+            if (em_after_frame_check(self, 0, 98.0f, 0.0f) == 1) {
+                em_camera_req(self, -1, 7);
             }
-            if (em_after_frame_check(self, 0, 220.0f, 0.0f) == 1) {
-                em018_effect_spawn(self, 0, 2, 0xD, 0, 1.0f);
+            if (em_water_check_c1(self) == 0) {
+                if (em_after_frame_check(self, 0, 120.0f, 0.0f) == 1) {
+                    if ((self->field_0x228 & 6) != 0) {
+                        em018_effect_spawn(self, 0, 0x11, 3, 0, 1.2f);
+                    } else {
+                        em018_effect_spawn(self, 1, 6, 3, 0, 2.0f);
+                    }
+                }
+                if (em_after_frame_check(self, 0, 220.0f, 0.0f) == 1) {
+                    em018_effect_spawn(self, 0, 2, 0xD, 0, 1.0f);
+                }
             }
         }
         if (em_water_check_c1(self) == 1) {

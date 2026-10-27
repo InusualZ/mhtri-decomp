@@ -47,10 +47,11 @@
  *   em020_profile_send, releaseRemotePlayerParts, sendMemberJoinNotice, handleLobbyNetMessage, dropLobbyMail,
  *   addFriendNotice.  Foreign callees named by this unit are GUESS names too.
  * RESIDUALS.
- *  - `lobby_net_update`: 3132 B vs 3008 B; case 0's roster fetch branches into case 1's copy and the refresh
- *    switch's case 0 error arm into case 2's (ideas 213/218 walls: written twice); the hold tail sits after the
- *    switch where retail keeps it inside case 0.  The sub-error and refresh tails are shared through
- *    `do { switch } while (0)` + `continue` (idea 183).
+ *  - `lobby_net_update`: 3036 B vs 3008 B; case 0 enters case 1's roster fetch through `case 1:` inside an `if (0)`
+ *    (playbook 241), but case 1's test is an if-chain, so its error arm sits before the fetch where retail's switch
+ *    keeps it after (`beq` for `bne`); the refresh switch's hold tail sits after the switch where retail keeps it
+ *    inside case 0 and cases 1/2 branch back to it (a backward jump: wall; case 2 inside an `if (0)` measured
+ *    worse).  The sub-error and refresh tails are shared through `do { switch } while (0)` + `continue` (idea 183).
  *  - `quest_info_sheet_draw`: retail compares cases 4, 5, 6 but lays the bodies out default, 6, 5; our MWCC ties the
  *    compare order to the label order (every label/body permutation, `(u32)` selector and level 4 measured).
  *  - `quest_info_detail_draw`: retail keeps `clrlwi` + `cmpwi` unfused and schedules `li r3,id` after them; peephole
@@ -3674,21 +3675,19 @@ void lobby_net_update(void)
             block->timeout_0x168E[1] = get_server_big_data_timeout_element(4);
             block->timeout_0x168E[2] = get_server_big_data_timeout_element(1);
             block->step_0x0000++;
-            if ((s8)lobby_w.field_0x176 != 2)
-                lb_roster_fetch_start(block);
-            break;
+            if ((s8)lobby_w.field_0x176 == 2)
+                break;
+            /* case 0 skips case 1's roster-state test and starts the roster fetch */
+            if (0) {
         case 1:
-            switch ((s8)lobby_w.field_0x176) {
-            case 2:
-            case 0:
-                break;
-            case 1:
-                lb_roster_fetch_start(block);
-                break;
-            default:
-                setErrorCode(5);
-                break;
+                if ((s8)lobby_w.field_0x176 == 2 || (s8)lobby_w.field_0x176 == 0)
+                    break;
+                if ((s8)lobby_w.field_0x176 != 1) {
+                    setErrorCode(5);
+                    break;
+                }
             }
+            lb_roster_fetch_start(block);
             break;
         case 2:
             if (block->request_0x1696 != 0) {

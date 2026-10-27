@@ -26,9 +26,10 @@
  *    `do { } while (0)` exits return `result` where retail branches to one `mr r3,r29`;
  *  - `lobby_enter_seq_step`/`lobby_scene_setup_step`: retail keeps one "system file done" block (`field_0x865 = 0;
  *    state = 3`) inside case 2, entered from case 0, case 1 and backwards from `case 0x64`, and one
- *    `game_system_file_create_start` test inside case 1 that case 0 enters; ours has the done block once after the
- *    switch (idea 183) and the create test twice (a third exit kind needs a flag).  Retail's flow graph is the
- *    source's own (idea 213: no pass merges the copies); a scratch `goto` spelling measures 98.92 / 744 B;
+ *    `game_system_file_create_start` test inside case 1 that case 0 enters.  Ours reaches both forward through
+ *    `case 1:`/`case 2:` inside `if (0)` blocks (playbook 241), which turns the save-wait switches into if-chains:
+ *    their -1/-2 arm sits inline where retail's switch puts it after the shared code, and `case 0x64` reaches a
+ *    second done block after the switch (a backward jump: wall).  A scratch `goto` spelling measures 98.92 / 744 B;
  *  - an `s16` index retail re-extends at every use where ours extends once at the definition (`lb_pane_draw`'s and
  *    `lb_box_grid_draw`'s grid walks, `fn_801EEDC4`'s slot index), and register colouring / scheduling:
  *    `lb_box_grid_draw` (keeps `reason` on the stack), `lb_dye_inner_draw`, `lb_color_pane_draw`, `lb_dye_pane_draw`,
@@ -8425,40 +8426,38 @@ s32 lobby_enter_seq_step(LbChgSeqWork* self)
                     system_w.field_0x865 = 1;
                     continue;
                 }
-                if (game_system_file_create_start() != 0) {
-                    self->state_0x0B = 2;
-                    continue;
-                }
-            }
-            break;
+                /* no data file to create: on to case 1's system-file test */
+                if (0) {
         case 1:
-            switch (game_save_wait()) {
-            case 1:
+                    v = game_save_wait();
+                    if ((u32)(v + 2) <= 1) {
+                        self->state_0x0B = 0x64;
+                        continue;
+                    }
+                    if (v != 1) {
+                        continue;
+                    }
+                }
                 if (game_system_file_create_start() != 0) {
                     self->state_0x0B = 2;
                     continue;
                 }
-                break;
-            case -2:
-            case -1:
-                self->state_0x0B = 0x64;
-                continue;
-            default:
-                continue;
             }
-            break;
+            /* nothing to create: the system file is done */
+            if (0) {
         case 2:
-            switch (game_system_file_create_wait()) {
-            case 1:
-                break;
-            case -2:
-            case -1:
-                self->state_0x0B = 0x64;
-                continue;
-            default:
-                continue;
+                v = game_system_file_create_wait();
+                if ((u32)(v + 2) <= 1) {
+                    self->state_0x0B = 0x64;
+                    continue;
+                }
+                if (v != 1) {
+                    continue;
+                }
             }
-            break;
+            system_w.field_0x865 = 0;
+            self->state_0x0B = 3;
+            continue;
         case 3:
             fn_801FB2A8(0, lobby_w.field_0x001, lobby_w.field_0x002);
             self->state_0x0B++;
@@ -8541,40 +8540,38 @@ s32 lobby_scene_setup_step(LbChgSeqWork* self)
                     system_w.field_0x865 = 1;
                     continue;
                 }
-                if (game_system_file_create_start() != 0) {
-                    self->state_0x0B = 2;
-                    continue;
-                }
-            }
-            break;
+                /* no data file to create: on to case 1's system-file test */
+                if (0) {
         case 1:
-            switch (game_save_wait()) {
-            case 1:
+                    v = game_save_wait();
+                    if ((u32)(v + 2) <= 1) {
+                        self->state_0x0B = 0x64;
+                        continue;
+                    }
+                    if (v != 1) {
+                        continue;
+                    }
+                }
                 if (game_system_file_create_start() != 0) {
                     self->state_0x0B = 2;
                     continue;
                 }
-                break;
-            case -2:
-            case -1:
-                self->state_0x0B = 0x64;
-                continue;
-            default:
-                continue;
             }
-            break;
+            /* nothing to create: the system file is done */
+            if (0) {
         case 2:
-            switch (game_system_file_create_wait()) {
-            case 1:
-                break;
-            case -2:
-            case -1:
-                self->state_0x0B = 0x64;
-                continue;
-            default:
-                continue;
+                v = game_system_file_create_wait();
+                if ((u32)(v + 2) <= 1) {
+                    self->state_0x0B = 0x64;
+                    continue;
+                }
+                if (v != 1) {
+                    continue;
+                }
             }
-            break;
+            system_w.field_0x865 = 0;
+            self->state_0x0B = 3;
+            continue;
         case 3:
             fn_801FB2A8(1, lobby_w.field_0x001, lobby_w.field_0x002);
             self->state_0x0B++;

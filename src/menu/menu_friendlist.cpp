@@ -18,8 +18,9 @@
  *   `option_cursor_draw`, `arena_value_step`, `terms_progress_draw`, the types `FriendPickWork`, `FriendCardView`,
  *   and every foreign name this file spells from the name registry.
  * RESIDUALS.
- *  - `friend_pick_step`: retail's friend-request step jumps from sub-steps 0 and 2 into the tails of sub-steps 1 and 2;
- *    the source repeats the tails (rule 8), so the function is 0x80 bytes longer.
+ *  - `friend_pick_step`: the friend-request step's sub-steps 0..2 run as one chain with `case 1:` and `case 2:` inside
+ *    `if (0) { ... }` blocks (playbook 241), so retail's forward jumps into the next sub-step's tail are the source's;
+ *    the size matches and the remainder is register colouring (declaration-order hill climb found nothing).
  *  - `movie_page04_draw`: retail reloads `row->page_kind` after each call in the value switch; MWCC keeps it in a
  *    saved register.
  *  - `page17_rows_build` matches only with `#pragma opt_strength_reduction off` (retail indexes the option tables with
@@ -383,42 +384,29 @@ s32 friend_pick_step(FriendPickWork* work) {
                 requestFriendSync(&work->result_0x10AE);
                 break;
             }
-            work->request_step_0x002 = 2;
-            if (menu_work.slot[0].field_0x31E != 0) {
-                resendProfileRecord(&work->result_0x10AE);
-                break;
-            }
-            args = work->id_0x10B2;
-            if (NetCtrlWk::requestCommand18((const s32*)&args, &work->result_0x10AE) == 0) {
-                ret = 3;
-            } else {
-                work->request_step_0x002 = 3;
-            }
-            break;
+            /* no sync needed: on to the profile resend */
+            if (0) {
         case 1:
-            if (work->result_0x10AE == 0) {
-                break;
-            }
-            if (work->result_0x10AE != 1) {
-                set_option_cfg(27, menu_work.slot[0].field_0x31F);
+                if (work->result_0x10AE == 0) {
+                    break;
+                }
+                if (work->result_0x10AE != 1) {
+                    set_option_cfg(27, menu_work.slot[0].field_0x31F);
+                }
             }
             work->request_step_0x002 = 2;
             if (menu_work.slot[0].field_0x31E != 0) {
                 resendProfileRecord(&work->result_0x10AE);
                 break;
             }
-            args = work->id_0x10B2;
-            if (NetCtrlWk::requestCommand18((const s32*)&args, &work->result_0x10AE) == 0) {
-                ret = 3;
-            } else {
-                work->request_step_0x002 = 3;
-            }
-            break;
+            /* nothing to resend: on to the friend request */
+            if (0) {
         case 2:
-            if (work->result_0x10AE == 0) {
-                break;
+                if (work->result_0x10AE == 0) {
+                    break;
+                }
+                menu_work.slot[0].field_0x31E = 0;
             }
-            menu_work.slot[0].field_0x31E = 0;
             args = work->id_0x10B2;
             if (NetCtrlWk::requestCommand18((const s32*)&args, &work->result_0x10AE) == 0) {
                 ret = 3;

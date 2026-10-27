@@ -27,8 +27,9 @@
  *   `placeinfo_server_info_draw`, `placeinfo_layer_info_draw`, `placeinfo_award_icons`, `em003_call_se_frames`,
  *   `em003_call_se_ids`.
  * RESIDUALS.
- *  - `lb_community_select_step`: retail reaches its page-count tail (pages = total / 8, cursor clamp) by jumps from seven
- *    places; the source calls the static helper `lb_community_page_count_set` (rule 8), an extra function in our object.
+ *  - `lb_community_select_step`: retail keeps its page-count tail (pages = total / 8, cursor clamp) in state 8 step 2
+ *    and reaches it by backward jumps from seven later places (no case label can mark it, playbook 241); the source
+ *    calls the static helper `lb_community_page_count_set`, an extra function in our object.
  *    The tail after the switch (idea 183) is 3360 B against 3312 and scores lower; a scratch `goto` spelling 99.24.
  *  - `lb_city_select_screen_step`: state 5 step 3 repeats state 4 step 1's enter-city tail, which retail reaches by a
  *    backward jump (rule 8; idea 213: MWCC has no pass that merges the identical copy). The tail after the switch
