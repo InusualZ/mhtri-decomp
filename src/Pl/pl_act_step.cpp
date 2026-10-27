@@ -70,7 +70,6 @@
  *    the entry offset (row-pointer and pointer-plus-index spellings measured equal);
  *  - `pl_act_stun`: retail sign-extends the doubled shake count (`extsb`) where ours masks it; an `s8` local
  *    re-extends at the load and scores lower;
- *  - `fn_8024676C`: retail clears +0x65A with a halfword store; `Pl/plw.h` has only the byte field (request #5);
  *  - `fn_8025A7FC`: the target schedules `threshold = 15` between the `cmplwi` and the `bne` of the
  *    `field_0x128 == 2` test, ours before the load;
  *  - the other partial rows have no recorded cause.
@@ -86,10 +85,11 @@
  *  - a `u16` field compared with an `(s16)` constant (`act_no < (s16)28`), and a `u8` field or local compared with an
  *    `(s8)` constant (`field_0x002 == (s8)3`), keep retail's signed `cmpwi` where the plain constant gives `cmplwi`;
  *  - callees whose result retail compares with `cmplwi` return `u32` here (`pl_zone_ground_drop`, `fn_8024D5AC`,
- *    `fn_80264EE8`, `fn_80264F78`); another unit's `s32` callee is cast `(u32)` at the compare (request #4);
- *  - retail passes the float arguments of `fn_80277DAC` and `pl_ground_probe_ahead` before the integer/pointer one
- *    (playbook 178): the `pl_ground_band_ck_ff` / `pl_ground_probe_ahead_ff` views reorder them (requests #1, #2);
- *    `pl_health_recover_v3` passes the third word retail does (0 for the actor, 1 for a partner; request #3), and
+ *    `fn_80264EE8`, `fn_80264F78`), and so do their owners' `pl_defense_up_set`, the `_ck` predicates and
+ *    `ai_npc_beside_player_ck`;
+ *  - retail passes the float arguments of `pl_ground_band_ck` and `pl_ground_probe_ahead` before the integer/pointer
+ *    one (playbook 178), the owners' parameter order;
+ *    `pl_health_recover` takes the third word retail passes (0 for the actor, 1 for a partner), and
  *    `pl_facing_turn_set_h` narrows the turn at `pl_act_knockback_enter`'s calls as retail does;
  *  - a redundant `(u8)` cast on the second of two byte stores is what makes MWCC narrow it;
  *  - `if (cond >= 1) { big }` rather than `if (cond < 1) { small }` puts the small block at the function's end;
@@ -256,14 +256,6 @@
 #include "Pl/pl_stick_window_ck.h"
 /* fn_802DE578_view1: the call sites disagree on this callee's parameters; each keeps its own view through a cast (same direct call). */
 #define fn_802DE578_view1 ((void (*)(_PLW*, u16*))cockpit_ticket_acquire)
-/* `pl_health_recover` as its callers here call it: retail passes a third word, 0 for the actor itself and 1 for
- * a partner it heals, which the owner's two-parameter declaration does not name. */
-#define pl_health_recover_v3 ((void (*)(_PLW*, s16, s32))pl_health_recover)
-/* `fn_80277DAC` (the ground-band probe ahead of the actor) as retail's callers call it: the two floats come before
- * the side flag in the argument list, so the flag's `li r4` follows the two `lfs`. */
-#define pl_ground_band_ck_ff ((u32 (*)(_PLW*, f32, f32, s32))fn_80277DAC)
-/* `pl_ground_probe_ahead` as retail's callers call it where the out-vector's `addi r4` follows the two `lfs`. */
-#define pl_ground_probe_ahead_ff ((u32 (*)(_PLW*, f32, f32, nw4r::math::VEC3*))pl_ground_probe_ahead)
 /* `pl_facing_turn_set` as `pl_act_knockback_enter` calls it: retail narrows the turn to a halfword at the call
  * (`clrlwi`) while the definition masks its own word again. */
 #define pl_facing_turn_set_h ((void (*)(_PLW*, u16))pl_facing_turn_set)
@@ -445,7 +437,7 @@ extern u16 pl_shell_act_tbl_b[20];
 #define pl_armed_act_no_get_c1 ((u16 (*)(_PLW*, s16))pl_armed_act_no_get)
 /* pl_act_dash_input_c1: the owner declares no parameter, the step-table walk hands it the actor; the same direct call
  * through a cast. */
-#define pl_act_dash_input_c1 ((s32 (*)(_PLW*))pl_act_dash_input_ck)
+#define pl_act_dash_input_c1 ((u32 (*)(_PLW*))pl_act_dash_input_ck)
 
 #define pl_act_held_ck_c1 ((u32 (*)(_PLW*))pl_act_held_ck)
 
@@ -1950,7 +1942,7 @@ extern "C" void pl_act_step_up(_PLW* self) {
             }
         }
         if (Pl_master_ck(self) != 0) {
-            if (((u32 (*)(_PLW*))pl_act_dash_input_ck)(self) == 1 || pl_part_flag_ck(self, 6) == 1 ||
+            if (pl_act_dash_input_c1(self) == 1 || pl_part_flag_ck(self, 6) == 1 ||
                 (self->field_0x0C8 & 0x2000) != 0) {
                 pl_act_enter(self, 0, 7, 0);
             } else if ((self->field_0x0CC & 0x1000) != 0 && self->field_0x28 == 0) {
@@ -2018,7 +2010,7 @@ extern "C" void pl_act_flinch(_PLW* self, s32 variant) {
                     Pl_act_set_step_table(self, (u32)pl_flinch_steps_kind2, 0);
                     break;
                 case 8:
-                    if ((u32)pl_mode8_free_ck() == 0) {
+                    if (pl_mode8_free_ck() == 0) {
                         Pl_act_set_step_table(self, (u32)pl_flinch_steps_kind8, 0);
                     }
                     break;
@@ -2284,7 +2276,7 @@ extern "C" void pl_act_stroke_forward(_PLW* self, s32 variant, s32 fast) {
         }
         return;
     }
-    if (pl_ground_probe_ahead_ff(self, pl_frame_window_180, pl_frame_window_30, &ledge) == 1) {
+    if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, &ledge) == 1) {
         self->field_0x0A8 = self->rot_0x54.y;
         pl_act_enter(self, 0, 6, 0);
         return;
@@ -2810,7 +2802,7 @@ extern "C" void fn_802498E0(_PLW* self) {
         fn_802771A0(self, 0);
         return;
     case 1:
-        if (self->field_0x28 > 0 || (u32)pl_target_lock_ck(self) == 0) {
+        if (self->field_0x28 > 0 || pl_target_lock_ck(self) == 0) {
             timer = self->field_0x28 - 1;
             self->field_0x28 = timer;
             if (timer <= 0) {
@@ -3106,7 +3098,7 @@ extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
             Pl_act_set_step_table(self, (u32)lbl_805CAD74, 0);
             return;
         case 8:
-            if ((u32)pl_mode8_free_ck() == 0) {
+            if (pl_mode8_free_ck() == 0) {
                 Pl_act_set_step_table(self, (u32)pl_flinch_steps_kind8_guard, 0);
                 return;
             }
@@ -4553,14 +4545,14 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
     }
     switch (self->field_0x306) {
     case 0x168:
-        pl_health_recover_v3(self, 0x32, 0);
+        pl_health_recover(self, 0x32, 0);
         fn_8024D3C8(self);
         ainpc_area_buff_apply(5);
         if (fn_8024D5AC(self, partner) == 1) {
-            pl_health_recover_v3(partner, 0x32, 1);
+            pl_health_recover(partner, 0x32, 1);
             ef_inst_spawn(partner, 0);
         } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-            pl_health_recover_v3(me, 0x32, 1);
+            pl_health_recover(me, 0x32, 1);
             ef_inst_spawn(me, 0);
         }
         ef_inst_spawn(self, 0);
@@ -4571,7 +4563,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
         ef_inst_spawn(self, 5);
         break;
     case 0xD:
-        pl_health_recover_v3(self, 0x1E, 0);
+        pl_health_recover(self, 0x1E, 0);
         fn_8024D3C8(self);
         if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
             if (Pl_Skill_ck(self, 0x5B) == 1) {
@@ -4587,21 +4579,21 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             }
             if (fn_8024D5AC(self, partner) == 1) {
                 ef_inst_spawn(partner, 0);
-                pl_health_recover_v3(partner, level, 1);
+                pl_health_recover(partner, level, 1);
             } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
                 ef_inst_spawn(me, 0);
-                pl_health_recover_v3(me, level, 1);
+                pl_health_recover(me, level, 1);
             }
         }
         ef_inst_spawn(self, 0);
         break;
     case 0x2C:
-        pl_health_recover_v3(self, 0x1E, 0);
+        pl_health_recover(self, 0x1E, 0);
         fn_8024D3C8(self);
         ef_inst_spawn(self, 0);
         break;
     case 0xE:
-        pl_health_recover_v3(self, 0x32, 0);
+        pl_health_recover(self, 0x32, 0);
         fn_8024D3C8(self);
         ef_inst_spawn(self, 0);
         break;
@@ -4620,18 +4612,18 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             }
             if (fn_8024D5AC(self, partner) == 1) {
                 ef_inst_spawn(partner, 0);
-                pl_health_recover_v3(partner, level, 1);
+                pl_health_recover(partner, level, 1);
             } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
                 ef_inst_spawn(me, 0);
-                pl_health_recover_v3(me, level, 1);
+                pl_health_recover(me, level, 1);
             }
         }
-        pl_health_recover_v3(self, 0x14, 0);
+        pl_health_recover(self, 0x14, 0);
         fn_8024D3C8(self);
         ef_inst_spawn(self, 0);
         break;
     case 0x111:
-        pl_health_recover_v3(self, 0xA, 0);
+        pl_health_recover(self, 0xA, 0);
         /* fallthrough */
     case 0x11:
         fn_8024D3C8(self);
@@ -4736,7 +4728,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
         /* fallthrough */
     case 0x33:
         pl_gauge_ceiling_grow(self, 0x96, 0);
-        pl_health_recover_v3(self, 0x96, 0);
+        pl_health_recover(self, 0x96, 0);
         fn_8024D3C8(self);
         ef_inst_spawn(self, 0);
         break;
@@ -4818,18 +4810,18 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             }
             if (fn_8024D5AC(self, partner) == 1) {
                 ef_inst_spawn(partner, 2);
-                if ((u32)pl_defense_up_set(partner, 1, level) == 1) {
+                if (pl_defense_up_set(partner, 1, level) == 1) {
                     partner->field_0x44E = fn_8024CD8C(self, 0x1518);
                 }
             } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
                 ef_inst_spawn(me, 2);
-                if ((u32)pl_defense_up_set(me, 1, level) == 1) {
+                if (pl_defense_up_set(me, 1, level) == 1) {
                     me->field_0x44E = fn_8024CD8C(self, 0x1518);
                 }
             }
         }
         fn_8024D3C8(self);
-        if (Pl_master_ck(self) == 1 && (u32)pl_defense_up_set(self, 1, 0x14) == 1) {
+        if (Pl_master_ck(self) == 1 && pl_defense_up_set(self, 1, 0x14) == 1) {
             self->field_0x44E = fn_8024CD8C(self, 0x1518);
         }
         ef_inst_spawn(self, 2);
@@ -4865,7 +4857,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
         break;
     case 0x17:
         if (Pl_master_ck(self) == 1) {
-            if ((u32)pl_defense_up_set(self, 1, 0x19) == 1) {
+            if (pl_defense_up_set(self, 1, 0x19) == 1) {
                 self->field_0x44E = fn_8024CD8C(self, 0x276);
             }
             self->field_0x45C = self->field_0x44E;
@@ -4991,7 +4983,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
         ef_inst_spawn(self, 5);
         break;
     case 0xD0:
-        pl_health_recover_v3(self, 0x14, 0);
+        pl_health_recover(self, 0x14, 0);
         ef_inst_spawn(self, 0);
         fn_8024D3C8(self);
         if (self->kind_0x09 == 3) {
@@ -5036,7 +5028,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             }
             Pl_chr_set_attr_default(self, 0x134, 4, 0);
         } else {
-            pl_health_recover_v3(self, 0x14, 0);
+            pl_health_recover(self, 0x14, 0);
             ef_inst_spawn(self, 0);
             fn_8024D3C8(self);
             if (self->kind_0x09 == 3) {
@@ -5073,7 +5065,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             }
             if (roll < 20) {
                 pl_gauge_ceiling_grow(self, 0x96, 0);
-                pl_health_recover_v3(self, 0x96, 0);
+                pl_health_recover(self, 0x96, 0);
                 fn_8024D3C8(self);
                 ef_inst_spawn(self, 0);
             } else {
@@ -5087,7 +5079,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             }
         } else if (roll < 70) {
             if (roll < 50) {
-                if ((u32)pl_defense_up_set(self, 1, 0x28) == 1) {
+                if (pl_defense_up_set(self, 1, 0x28) == 1) {
                     self->field_0x44E = fn_8024CD8C(self, 0x1518);
                 }
                 fn_8024D3C8(self);
@@ -5099,7 +5091,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
                 ef_inst_spawn(self, 1);
             }
         } else {
-            pl_health_recover_v3(self, 0x28, 0);
+            pl_health_recover(self, 0x28, 0);
             fn_8024D3C8(self);
             ef_inst_spawn(self, 0);
         }
@@ -5141,11 +5133,11 @@ extern "C" void pl_act_net_hook_d(_PLW* self) {
     }
     switch (self->field_0x306) {
     case 0x16A:
-        pl_health_recover_v3(me, 0x14, 1);
+        pl_health_recover(me, 0x14, 1);
         ef_inst_spawn(me, 0);
         if (fn_8024D5AC(self, partner) == 1) {
             ef_inst_spawn(partner, 0);
-            pl_health_recover_v3(partner, 0x14, 1);
+            pl_health_recover(partner, 0x14, 1);
         } else if (Pl_master_ck(self) == 0) {
             ef_inst_spawn(self, 0);
         }
@@ -5176,12 +5168,12 @@ extern "C" void pl_act_net_hook_d(_PLW* self) {
         ainpc_area_buff_apply(1);
         break;
     case 0x16D:
-        if ((u32)pl_defense_up_set(me, 1, 0x14) == 1) {
+        if (pl_defense_up_set(me, 1, 0x14) == 1) {
             me->field_0x44E = 0x1518;
         }
         ef_inst_spawn(me, 2);
         if (fn_8024D5AC(self, partner) == 1) {
-            if ((u32)pl_defense_up_set(partner, 1, 0x14) == 1) {
+            if (pl_defense_up_set(partner, 1, 0x14) == 1) {
                 partner->field_0x44E = 0x1518;
             }
             ef_inst_spawn(partner, 2);
@@ -6399,7 +6391,7 @@ extern "C" void pl_act_companion_call(_PLW* self) {
     case 1:
         if (--self->field_0x28 <= 0) {
             Pl_act_set_motion_slot(self, 0, 4, 0);
-        } else if ((u32)ai_npc_beside_player_ck() == 1) {
+        } else if (ai_npc_beside_player_ck() == 1) {
             pl_act_enter(self, 0, 0x22, 0);
         }
         break;
@@ -7001,7 +6993,7 @@ extern "C" void pl_act_guard(_PLW* self) {
         if (self->field_0x18 == 1) {
             switch (self->field_0x002) {
             case 8:
-                if ((u32)pl_mode8_free_ck() == 1) {
+                if (pl_mode8_free_ck() == 1) {
                     Pl_chr_set_attr_default(self, 0x3EC, 4, 0);
                 } else {
                     Pl_chr_set_attr_default(self, 0x400, 4, 0);
@@ -7141,7 +7133,7 @@ extern "C" void pl_act_sneak(_PLW* self, s32 variant) {
             pl_act_arm_flags(self, 1);
         } else if (pl_act_param_tier_ck(self, 0) >= 1 && pl_part_flag_ck(self, 0) == 1) {
             pl_act_set_cam_ang(self);
-            if (pl_ground_band_ck_ff(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
+            if (pl_ground_band_ck(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
                 self->field_0x0A8 = self->rot_0x54.y;
                 pl_act_enter(self, 2, 0, 0xC);
             } else {
@@ -7260,7 +7252,7 @@ extern "C" void pl_act_dash(_PLW* self, s32 variant) {
                 run.z = pl_frame_window_5;
                 break;
             case 8:
-                if ((u32)pl_mode8_free_ck() == 1) {
+                if (pl_mode8_free_ck() == 1) {
                     run.z = pl_frame_window_3;
                 }
                 break;
@@ -7536,7 +7528,7 @@ extern "C" void pl_act_tired_walk(_PLW* self, s32 variant) {
         }
         if (pl_act_param_tier_ck(self, 0) >= 1) {
             pl_act_set_cam_ang(self);
-            if (pl_ground_band_ck_ff(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
+            if (pl_ground_band_ck(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
                 self->field_0x0A8 = self->rot_0x54.y;
                 pl_act_enter(self, 2, 0, 0xC);
                 break;
@@ -7614,7 +7606,7 @@ extern "C" void pl_act_tiptoe(_PLW* self, s32 variant) {
             pl_act_enter(self, 0, 0x3E, 4);
         } else if (pl_act_param_tier_ck(self, 0) >= 2) {
             pl_act_set_cam_ang(self);
-            if (pl_ground_band_ck_ff(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
+            if (pl_ground_band_ck(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
                 self->field_0x0A8 = self->rot_0x54.y;
                 pl_act_enter(self, 2, 0, 0xC);
             } else {
@@ -7894,7 +7886,7 @@ extern "C" void pl_act_hidden_walk(_PLW* self) {
                 pl_act_enter(self, 1, 0x27, 0);
             } else if (pl_act_param_tier_ck(self, 0) >= 2) {
                 pl_act_set_cam_ang(self);
-                if (pl_ground_band_ck_ff(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
+                if (pl_ground_band_ck(self, pl_frame_window_85, pl_float_neg60, 0) == 1 && self->field_0x585 == 0) {
                     self->field_0x0A8 = self->rot_0x54.y;
                     pl_act_enter(self, 2, 0, 0xC);
                 }
@@ -8109,8 +8101,8 @@ extern "C" void pl_act_jump(_PLW* self, s32 variant) {
         if (pl_zone_ground_drop(self) == 1 || self->motion_vel_0x7C >= pl_float_zero) {
             break;
         }
-        if (pl_ground_probe_ahead_ff(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&ledge) != 0 &&
-            (u32)pl_hold_gauge_ck(self, 1) == 1 && self->field_0x5C7 <= 20) {
+        if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&ledge) != 0 &&
+            pl_hold_gauge_ck(self, 1) == 1 && self->field_0x5C7 <= 20) {
             self->vec_0x03C.y = ledge;
             self->ground_y_0x060 = ledge;
             self->field_0x01B = 1;
@@ -8243,8 +8235,8 @@ extern "C" void pl_act_climb_down(_PLW* self, s32 variant) {
     case 2:
         pl_motion_integrate(self);
         if (pl_zone_ground_drop(self) != 1 && self->motion_vel_0x7C < pl_float_zero) {
-            if (variant != 2 && pl_ground_probe_ahead_ff(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&ground) != 0 &&
-                (u32)pl_hold_gauge_ck(self, 1) == 1) {
+            if (variant != 2 && pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&ground) != 0 &&
+                pl_hold_gauge_ck(self, 1) == 1) {
                 self->field_0x0A8 = self->rot_0x54.y;
                 self->vec_0x03C.y = ground;
                 self->ground_y_0x060 = ground;
@@ -8846,7 +8838,7 @@ extern "C" void pl_act_side_step(_PLW* self, s32 right) {
         self->act_step_0x05++;
         Pl_act_set_motion(self, 0, 0, 1);
         if (self->field_0x18 == 1) {
-            if (self->field_0x002 == 8 && (u32)pl_mode8_free_ck() == 0) {
+            if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
                 Pl_chr_set_attr_default(self, 0x4B2, 0, 0);
             } else {
                 Pl_chr_set_attr_default(self, 0x4B1, 0, 0);
@@ -10210,7 +10202,7 @@ extern "C" void fn_80259684(_PLW* self, s32 a2)
         if (Pl_master_ck(self) == 0) {
             return;
         }
-        if (pl_ground_band_ck_ff(self, pl_frame_window_85, pl_float_neg60, 0) != 0) {
+        if (pl_ground_band_ck(self, pl_frame_window_85, pl_float_neg60, 0) != 0) {
             self->field_0x0A8 = (u16)self->field_0x058;
             if (a2 == 0) {
                 pl_act_enter(self, 6, 48, 0);
@@ -11802,7 +11794,7 @@ extern "C" void pl_act_carry_walk(_PLW* self) {
         if (Pl_master_ck(self) != 0) {
             if (pl_act_param_tier_ck(self, 0) >= 1) {
                 pl_act_set_cam_ang(self);
-                if ((u32)pl_carry_light_ck(self) == 1) {
+                if (pl_carry_light_ck(self) == 1) {
                     step.z = pl_frame_window_2;
                     step.x = pl_float_zero;
                     step.y = pl_float_zero;
@@ -11845,7 +11837,7 @@ extern "C" void pl_act_carry_run(_PLW* self) {
         if (Pl_master_ck(self) == 0) {
             break;
         }
-        if (pl_ground_band_ck_ff(self, pl_frame_window_85, pl_float_neg60, 0) != 0) {
+        if (pl_ground_band_ck(self, pl_frame_window_85, pl_float_neg60, 0) != 0) {
             self->field_0x0A8 = (u16)self->rot_0x54.y;
             pl_act_enter(self, 0xC, 5, 0);
             break;
@@ -11855,7 +11847,7 @@ extern "C" void pl_act_carry_run(_PLW* self) {
             pl_act_enter(self, 0xC, 4, 0);
         } else if (pl_act_param_tier_ck(self, 0) >= 1) {
             pl_act_set_cam_ang(self);
-            if ((u32)pl_carry_light_ck(self) == 1) {
+            if (pl_carry_light_ck(self) == 1) {
                 step.z = pl_frame_window_5;
                 step.x = pl_float_zero;
                 step.y = pl_float_zero;
@@ -11991,7 +11983,7 @@ extern "C" void pl_act_carry_jump(_PLW* self, s32 variant) {
             if (Pl_cat_skill_ck(self, 0x24) == 1) {
                 breakAt = 50;
                 rollAt = 30;
-            } else if ((u32)pl_carry_light_ck(self) == 1) {
+            } else if (pl_carry_light_ck(self) == 1) {
                 breakAt = 60;
                 rollAt = 40;
             } else {
@@ -12778,7 +12770,7 @@ extern "C" void fn_8025E448(_PLW* self) {
     }
     {
         VEC3 ledge;
-        if (pl_ground_probe_ahead_ff(self, pl_frame_window_60, pl_float_240, &ledge) == 1 &&
+        if (pl_ground_probe_ahead(self, pl_frame_window_60, pl_float_240, &ledge) == 1 &&
             (fn_8025E298(self, 0, 5) == 1 || fn_8025E298(self, 0, 6) == 1 || fn_8025E298(self, 2, 4) == 1)) {
             prompt = 6;
             icon = 6;
@@ -12820,7 +12812,7 @@ extern "C" void fn_8025E448(_PLW* self) {
             }
             break;
         case 8:
-            if ((u32)pl_item_menu_open_ck(self) != 1 &&
+            if (pl_item_menu_open_ck(self) != 1 &&
                 (self->field_0x00A != 0 || ((u32)(self->act_no - 0x54) > 2 && self->act_no != (s16)0x46))) {
                 prompt = 8;
                 if (fn_8025E298(self, 0x80, 0xFE) == 1) {
@@ -12832,7 +12824,7 @@ extern "C" void fn_8025E448(_PLW* self) {
             }
             break;
         case 6:
-            if (PlayMode_ck() != 2 && (u32)pl_item_menu_open_ck(self) != 1 && Pl_act_ck(self, 0, 0x57) != 1) {
+            if (PlayMode_ck() != 2 && pl_item_menu_open_ck(self) != 1 && Pl_act_ck(self, 0, 0x57) != 1) {
                 prompt = 5;
                 if (fn_8025E298(self, 0x80, 0xFE) == 1) {
                     icon = 5;
@@ -12843,7 +12835,7 @@ extern "C" void fn_8025E448(_PLW* self) {
             }
             break;
         case 10:
-            if ((u32)pl_item_menu_open_ck(self) != 1 && Pl_motion_input_ck(0) != 1 && Pl_act_ck(self, 0, 0x58) != 1 &&
+            if (pl_item_menu_open_ck(self) != 1 && Pl_motion_input_ck(0) != 1 && Pl_act_ck(self, 0, 0x58) != 1 &&
                 Pl_act_ck(self, 0xC, 0xA) != 1) {
                 prompt = 9;
                 if (fn_8025E298(self, 0x80, 0xFE) == 1) {
@@ -12945,7 +12937,7 @@ extern "C" void fn_8025ED00(_PLW* self) {
         return;
     }
     if ((u8)(self->field_0x00A + 250) > 2) {
-        if (self->field_0x18 == 1 && pl_item_page2_ck(self) != 0 && (u32)pl_part_flag2_ck(self, 7) == 1) {
+        if (self->field_0x18 == 1 && pl_item_page2_ck(self) != 0 && pl_part_flag2_ck(self, 7) == 1) {
             if (self->field_0x00A == 0) {
                 switch (self->act_no) {
                 case 6:
@@ -13655,7 +13647,7 @@ extern "C" void fn_802602A0(_PLW* self) {
     } else if (Pl_act_ck(self, 1, 4) == 1) {
         yawRate = 0;
     }
-    if (Pl_master_ck(self) == 1 && Pl_act_ck(self, 0, 0x16) == 1 && (u32)pl_target_lock_ck(self) == 1) {
+    if (Pl_master_ck(self) == 1 && Pl_act_ck(self, 0, 0x16) == 1 && pl_target_lock_ck(self) == 1) {
         pitchRate = 0;
     }
     diff = self->field_0x0A8 - self->rot_0x54.y;
@@ -14744,17 +14736,17 @@ u32 pl_scan_row_input_ck(_PLW* self, PlScanEntry* row) {
         }
         break;
     case 25:
-        if ((u32)pl_part_flag2_ck(self, row->cond_a_0x08) == 1) {
+        if (pl_part_flag2_ck(self, row->cond_a_0x08) == 1) {
             return 1;
         }
         break;
     case 26:
-        if ((u32)pl_part_flag2_ck(self, row->cond_a_0x08) == 1 && pl_stick_dir_ck(self, row->cond_c_0x0C) == 1) {
+        if (pl_part_flag2_ck(self, row->cond_a_0x08) == 1 && pl_stick_dir_ck(self, row->cond_c_0x0C) == 1) {
             return 1;
         }
         break;
     case 29:
-        if (pl_act_param_tier_ck(self, 0) >= 1 && (u32)pl_part_flag2_ck(self, row->cond_a_0x08) == 1) {
+        if (pl_act_param_tier_ck(self, 0) >= 1 && pl_part_flag2_ck(self, row->cond_a_0x08) == 1) {
             return 1;
         }
         break;
@@ -15157,17 +15149,17 @@ s32 pl_scan_act_select(_PLW* self) {
                 }
                 break;
             case 5:
-                if (pl_ground_probe_ahead_ff(self, pl_frame_window_60, pl_frame_window_120, (VEC3*)&probe) == 0) {
+                if (pl_ground_probe_ahead(self, pl_frame_window_60, pl_frame_window_120, (VEC3*)&probe) == 0) {
                     continue;
                 }
                 break;
             case 6:
-                if (pl_ground_probe_ahead_ff(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&probe) == 0) {
+                if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&probe) == 0) {
                     continue;
                 }
                 break;
             case 7:
-                if (pl_ground_probe_ahead_ff(self, pl_frame_window_210, pl_frame_window_90, (VEC3*)&probe) == 0) {
+                if (pl_ground_probe_ahead(self, pl_frame_window_210, pl_frame_window_90, (VEC3*)&probe) == 0) {
                     continue;
                 }
                 break;
@@ -15530,7 +15522,7 @@ s32 pl_scan_act_select(_PLW* self) {
                     arg = row->arg_0x04;
                     break;
                 case 8:
-                    if ((u32)(u32)pl_item_menu_open_ck(self) == 1) {
+                    if (pl_item_menu_open_ck(self) == 1) {
                         *fired = 0;
                         continue;
                     }
@@ -15539,7 +15531,7 @@ s32 pl_scan_act_select(_PLW* self) {
                     arg = row->arg_0x04;
                     break;
                 case 6:
-                    if (PlayMode_ck() == 2 || (u32)pl_item_menu_open_ck(self) == 1) {
+                    if (PlayMode_ck() == 2 || pl_item_menu_open_ck(self) == 1) {
                         *fired = 0;
                         continue;
                     }
@@ -15548,7 +15540,7 @@ s32 pl_scan_act_select(_PLW* self) {
                     arg = row->arg_0x04;
                     break;
                 case 10:
-                    if ((u32)pl_item_menu_open_ck(self) == 1 || Pl_motion_input_ck(0) == 1) {
+                    if (pl_item_menu_open_ck(self) == 1 || Pl_motion_input_ck(0) == 1) {
                         *fired = 0;
                         continue;
                     }
@@ -17267,7 +17259,7 @@ void pl_frame_post_step(_PLW* self) {
             pl_model_pos_sync(self);
             mhchar_model_mtx_update(chr);
         }
-        if ((u32)pl_item_menu_open_ck(self) == 1 && pl_now_area_ck(self) == 1) {
+        if (pl_item_menu_open_ck(self) == 1 && pl_now_area_ck(self) == 1) {
             shell_se_req(self->field_0xAF4, &self->vec_0x03C, 4, (u32)self);
         }
         if (Pl_act_ck(self, 0, 20) == 1 || Pl_act_ck(self, 0, 158) == 1) {

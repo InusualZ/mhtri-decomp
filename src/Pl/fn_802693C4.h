@@ -50,7 +50,7 @@ void fn_8026A618(struct _PLW* self, s32 id);
  * `cmplwi r3,1` there (`cmpwi` is the signed form). */
 u32 pl_part_flag_ck(struct _PLW* self, s32 id);
 void fn_8026A678(struct _PLW* self, s32 id);
-s32 pl_part_flag2_ck(struct _PLW* self, s32 id);
+u32 pl_part_flag2_ck(struct _PLW* self, s32 id);
 void pl_id_bit_set(struct _PLW* self, s32 id);
 s32 pl_id_bit_ck(struct _PLW* self, s32 id);
 void pl_id_bit_clear(struct _PLW* self, s32 id);

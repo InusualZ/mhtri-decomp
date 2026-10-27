@@ -7225,7 +7225,7 @@ s16 ai_npc_item_stock_get(u16 item)
 }
 
 /* 0x802D79A4 (0xAC): whether the companion stands by the player in motion 1 step 85 (within 200). */
-s32 ai_npc_beside_player_ck(void)
+u32 ai_npc_beside_player_ck(void)
 {
     _AINPC_W* w = &AINPC_VIEW;
 

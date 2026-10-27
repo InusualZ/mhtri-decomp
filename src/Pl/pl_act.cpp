@@ -36,7 +36,7 @@
  *   GUESS (from each body): pl_id_bit_ck, pl_part_flag2_ck (the +0xDC word and the second 128-id set), pl_act_add_stagger,
  *   pl_act_true_ck, pl_act_no_68_71_ck, pl_chr_set_motion_default, pl_model_set_value, pl_rig_get_motion_frame,
  *   pl_act_gauge_step_unlatched, pl_act_gauge_step_signed, pl_act_held_ck, pl_ground_probe_ahead,
- *   pl_stg_weapon_near_find
+ *   pl_ground_band_ck, pl_stg_weapon_near_find
  *   GUESS (field, from its menu reader `weapon_slot_count_get`): `PlSkillRec::slot_count` (`Pl/fn_8027D684.h`)
  *   GUESS (from each body and its menu/lobby callers): equip_color_rgba_get and equip_color_index_get (the
  *   equipment colour table's RGBA row and the kind row's +0x05 index), item_kind_name_get, skill_name_get (the
@@ -718,7 +718,7 @@ void fn_8026A678(_PLW* self, s32 id)
     self->id_flags_0xF0[id / 32] |= 1 << (id & 31);
 }
 
-s32 pl_part_flag2_ck(_PLW* self, s32 id)
+u32 pl_part_flag2_ck(_PLW* self, s32 id)
 {
     return (self->id_flags_0xF0[id / 32] & (1 << (id & 31))) != 0;
 }
@@ -5795,7 +5795,7 @@ extern "C" s32 pl_stagger_budget_ck(struct _PLW* self, s32 value)
 }
 
 /* True when the given motion value fits inside the act's hold gauge. */
-extern "C" s32 pl_hold_gauge_ck(struct _PLW* plw, s32 value)
+extern "C" u32 pl_hold_gauge_ck(struct _PLW* plw, s32 value)
 {
     return plw->field_0x370 >= (s16)value;
 }
@@ -5891,8 +5891,9 @@ extern "C" s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out)
     return pl_health_damage_apply(plw, value, out);
 }
 
-/* Applies the skill-tier damage bonus and steps the hold gauge. */
-extern "C" void pl_health_recover(struct _PLW* plw, s16 amount)
+/* Applies the skill-tier damage bonus and steps the hold gauge; `from_partner` (0 for the actor itself, 1 for a
+ * partner it heals) is unread. */
+extern "C" void pl_health_recover(struct _PLW* plw, s16 amount, s32 from_partner)
 {
     if (amount > 0) {
         if (Pl_cat_skill_ck(plw, 3) == 1U) {
@@ -6075,7 +6076,7 @@ extern "C" u32 Pl_act_state_ck(_PLW*);
 extern "C" void pl_sub_gauge_add(_PLW*, s16);
 extern "C" void fn_80276CE8(_PLW*, s16);
 extern "C" u8 pl_act_kind_get(u8);
-extern "C" s32 pl_mode8_free_ck(void);
+extern "C" u32 pl_mode8_free_ck(void);
 extern "C" void eft_pl_weapon_follow_spawn(_PLW*);
 extern "C" u32 pl_item_page2_ck(_PLW*);
 extern "C" void mhchar_motion_speed_set(u8*, f32);
@@ -6304,7 +6305,7 @@ extern "C" void pl_area_stamina_drain_step(_PLW* self)
 }
 
 /* 0x802770E0 */
-extern "C" s32 pl_act_dash_input_ck(void)
+extern "C" u32 pl_act_dash_input_ck(void)
 {
     return 0;
 }
@@ -6840,7 +6841,7 @@ extern "C" s32 pl_call_answer_ck(_PLW* self)
 }
 
 /* 0x80279194 */
-extern "C" s32 pl_defense_up_set(_PLW* self, s32 arg1, s8 arg2)
+extern "C" u32 pl_defense_up_set(_PLW* self, s32 arg1, s8 arg2)
 {
     if (arg1 == 0) {
         self->unk422 = 0;
@@ -6890,13 +6891,13 @@ extern "C" void pl_act_clear_mode5c4(_PLW* self)
 }
 
 /* 0x8027AC18 */
-extern "C" s32 pl_item_menu_open_ck(_PLW* self)
+extern "C" u32 pl_item_menu_open_ck(_PLW* self)
 {
     return self->unk5BB != 0;
 }
 
 /* 0x8027BDD4 */
-extern "C" s32 pl_carry_light_ck(_PLW* self)
+extern "C" u32 pl_carry_light_ck(_PLW* self)
 {
     if (Pl_Skill_ck(self, 93) == 1) {
         return 1;
@@ -7475,22 +7476,22 @@ namespace s_80276B58 {
 
 /* 0x80277C94: ground-height probe along the actor's facing, returning whether the probe hit
  * inside the requested band. */
-extern "C" s32 pl_ground_probe_ahead(_PLW* self, nw4r::math::VEC3* out, f32 arg2, f32 arg3)
+extern "C" u32 pl_ground_probe_ahead(_PLW* self, f32 ahead, f32 height, nw4r::math::VEC3* out)
 {
     nw4r::math::VEC3 v;
     u8 hit;
     VEC3_ctor(&v);
     out->x = lbl_8079A084;
     v.x = lbl_8079A084;
-    v.y = arg2 + arg3;
+    v.y = ahead + height;
     v.z = lbl_8079A0C4;
     rotVecY(&v, self->field_0x058);
     v.x = v.x + self->motion_pos_0x3C;
     v.y = v.y + self->motion_pos_0x40;
     v.z = v.z + self->motion_pos_0x44;
     f32 h = GetGroundHit2(&v, -0x1006, self->area_0x16, &hit);
-    f32 c = self->motion_pos_0x40 + arg2;
-    if (h >= c && h <= arg3 + c && hit != 0) {
+    f32 c = self->motion_pos_0x40 + ahead;
+    if (h >= c && h <= height + c && hit != 0) {
         out->x = h;
         return 1;
     }
@@ -8275,7 +8276,7 @@ extern "C" void pl_area_buff_apply(u8 arg0, u8 arg1)
                 ef_inst_spawn((_PLW*)p, 1);
                 break;
             case 2:
-                if ((u32)pl_defense_up_set((_PLW*)p, 1, 0x14) == 1) {
+                if (pl_defense_up_set((_PLW*)p, 1, 0x14) == 1) {
                     p->unk44E = 0x1518;
                 }
                 ef_inst_spawn((_PLW*)p, 2);
@@ -8302,10 +8303,10 @@ extern "C" void pl_area_buff_apply(u8 arg0, u8 arg1)
             case 5:
             case 8:
                 if (arg1 == 5) {
-                    if ((u32)pl_defense_up_set((_PLW*)p, 1, 0xA) == 1) {
+                    if (pl_defense_up_set((_PLW*)p, 1, 0xA) == 1) {
                         p->unk44E = 0x1518;
                     }
-                } else if ((u32)pl_defense_up_set((_PLW*)p, 1, 0x14) == 1) {
+                } else if (pl_defense_up_set((_PLW*)p, 1, 0x14) == 1) {
                     p->unk44E = 0x1518;
                 }
                 ef_inst_spawn((_PLW*)p, 2);
@@ -8622,9 +8623,9 @@ extern "C" s32 pl_shell_class_get(_PLW* self, u8 arg1)
     return r3;
 }
 
-extern "C" s32 pl_part_flag2_ck(_PLW*, s32);
+extern "C" u32 pl_part_flag2_ck(_PLW*, s32);
 extern "C" void pl_aim_motion_set(_PLW*, u16, u16);
-extern "C" s32 pl_target_lock_ck(_PLW*);
+extern "C" u32 pl_target_lock_ck(_PLW*);
 extern "C" u32 pl_act4_phase_ck(_PLW*, s32);
 extern "C" void camera_aim_zoom_get(_PLW*, u8*, u8*, f32*);
 extern "C" u8 get_cfg(u8, s32);
@@ -8887,14 +8888,14 @@ extern "C" { extern u8 lbl_805C6168[]; }
 extern "C" { extern u8 lbl_805C61D4[]; }
 
 /* 0x80277DAC: whether a ground-height probe along the actor's fractional facing clears the band. */
-extern "C" s32 fn_80277DAC(_PLW* self, s32 arg1, f32 arg2, f32 arg3)
+extern "C" u32 pl_ground_band_ck(_PLW* self, f32 ahead, f32 band, s32 above)
 {
     nw4r::math::VEC3 v;
     u8 hit;
     VEC3_ctor(&v);
     v.x = lbl_8079A084;
     v.y = lbl_8079A084;
-    v.z = arg2;
+    v.z = ahead;
     rotVecY(&v, self->field_0x058);
     v.x = v.x + self->motion_pos_0x3C;
     v.y = v.y + self->motion_pos_0x40;
@@ -8903,8 +8904,8 @@ extern "C" s32 fn_80277DAC(_PLW* self, s32 arg1, f32 arg2, f32 arg3)
     if ((s32)hit == 0) {
         return 0;
     }
-    f32 c = self->motion_pos_0x40 + arg3;
-    if (arg1 == 0) {
+    f32 c = self->motion_pos_0x40 + band;
+    if (above == 0) {
         if (h < c) {
             return 1;
         }
@@ -9365,7 +9366,7 @@ extern "C" void pl_aim_motion_set(_PLW* self, u16 arg1, u16 arg2)
 
 /* 0x8027A340: whether the actor may act at all this frame - master/bari state, the stun flag and the
  * per-action-class exceptions. */
-extern "C" s32 pl_target_lock_ck(_PLW* self)
+extern "C" u32 pl_target_lock_ck(_PLW* self)
 {
     s32 ok = 1;
     if (Pl_master_ck(self) == 0) {
@@ -12009,7 +12010,7 @@ void pl_weapon0_act_charge_hold(_PLW* self, s32 kind)
                     self->field_0x007++;
                     eft029_set_half(self, 0);
                 }
-                if (pl_part_flag2_ck(self, 5) == 0 || (u32)pl_part_flag2_ck(self, 13) == 1) {
+                if (pl_part_flag2_ck(self, 5) == 0 || pl_part_flag2_ck(self, 13) == 1) {
                     self->field_0x006 = 1;
                 }
                 if (self->field_0x006 == 0) {
@@ -12197,7 +12198,7 @@ void pl_weapon0_act_charge_hold2(_PLW* self)
                 self->field_0x007++;
                 eft029_set_half(self, 0);
             }
-            if (pl_part_flag2_ck(self, 17) == 0 || (u32)pl_part_flag2_ck(self, 13) == 1) {
+            if (pl_part_flag2_ck(self, 17) == 0 || pl_part_flag2_ck(self, 13) == 1) {
                 self->field_0x006 = 1;
             }
             if (self->field_0x006 == 0) {
@@ -12315,7 +12316,7 @@ void pl_weapon0_act_charge_hold3(_PLW* self, s32 kind)
                 self->field_0x007++;
                 eft029_set_half(self, 0);
             }
-            if (pl_part_flag2_ck(self, 5) == 0 || (u32)pl_part_flag2_ck(self, 13) == 1) {
+            if (pl_part_flag2_ck(self, 5) == 0 || pl_part_flag2_ck(self, 13) == 1) {
                 self->field_0x006 = 1;
             }
             if (self->field_0x006 == 0) {
@@ -12440,7 +12441,7 @@ void pl_weapon0_act_charge_hold4(_PLW* self)
                 self->field_0x007++;
                 eft029_set_half(self, 0);
             }
-            if (pl_part_flag2_ck(self, 17) == 0 || (u32)pl_part_flag2_ck(self, 13) == 1) {
+            if (pl_part_flag2_ck(self, 17) == 0 || pl_part_flag2_ck(self, 13) == 1) {
                 self->field_0x006 = 1;
             }
             if (self->field_0x006 == 0) {

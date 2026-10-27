@@ -831,13 +831,13 @@ extern "C" void hit_damage_pl(_PLW* plw, _HIT_W* hit, nw4r::math::VEC3* contact,
             pl_attack_up_mark(plw, 20, 9000);
             break;
         case 29:
-            if ((u32)pl_defense_up_set(plw, 1, 40) == 1) {
+            if (pl_defense_up_set(plw, 1, 40) == 1) {
                 plw->field_0x44E = 5400;
             }
             pl_defense_up_mark(plw, 1, 5400);
             break;
         case 30:
-            if ((u32)pl_defense_up_set(plw, 1, 20) == 1) {
+            if (pl_defense_up_set(plw, 1, 20) == 1) {
                 plw->field_0x44E = 9000;
             }
             pl_defense_up_mark(plw, 2, 9000);

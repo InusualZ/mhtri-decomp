@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x802D79A4 - whether the AI companion stands beside the player. */
-s32 ai_npc_beside_player_ck(void);
+u32 ai_npc_beside_player_ck(void);
 
 #ifdef __cplusplus
 }

@@ -22,7 +22,7 @@ u16 pl_item_slot_next_get(_PLW* plw, u16 slot, s32 forward);
 /* 0x8027A4EC: whether the player is in an aiming act. */
 u32 pl_aim_act_ck(_PLW* plw);
 /* 0x8027AC18: whether the player's item menu byte (+0x5BB) is set. */
-s32 pl_item_menu_open_ck(_PLW* plw);
+u32 pl_item_menu_open_ck(_PLW* plw);
 /* 0x8027C208: whether `item` can be used in the player's current act. */
 s32 pl_item_now_usable_ck(_PLW* plw, u16 item);
 /* 0x8027CE74: whether the player is in a reload motion on item page 2. */

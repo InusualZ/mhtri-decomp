@@ -16,7 +16,7 @@ struct _EQUIP;
 extern "C" {
 #endif
 
-s32 pl_item_menu_open_ck(struct _PLW* plw);
+u32 pl_item_menu_open_ck(struct _PLW* plw);
 void pl_pos_blend_start(struct _PLW* self, s32 frames); /* 0x8027AE28 - starts the blend of the actor's position to `target_pos_0x090` over `frames` */
 u32 Pl_motion_input_ck(s32 arg);
 
@@ -48,7 +48,9 @@ void pl_act_add_charge(struct _PLW* self, s32 delta);
 void pl_act_clear_flag5bb(struct _PLW* self);
 void fn_8027D4F0(struct _PLW* self);
 void pl_guard_latch_set(struct _PLW* self);
-s32 fn_80277DAC(struct _PLW* self, s32 a, f32 b, f32 c);
+/* 0x80277DAC - the ground-height probe `ahead` along the actor's facing, tested against the actor's height plus
+ * `band`: 1 when it hit and lies below that height (`above` 0) or above it (`above` nonzero). */
+u32 pl_ground_band_ck(struct _PLW* self, f32 ahead, f32 band, s32 above);
 /* 0x80277B44 - arms the actor's `+0x396` gauge/hold word (the field's own `s16`; the sibling
  * `pl_act_set_gauge_arm_skilled` at 0x80277B4C scales it by the cat-skill arms 28/29); `Pl/pl_act_step.cpp`'s
  * act-175/act-89 handlers call them. */
@@ -58,8 +60,8 @@ void pl_camera_lock_clear(struct _PLW* self);
 /* 0x8027A190 - the always-true act predicate (`li r3,1; blr`); its consumer tests the result. */
 s32 pl_act_true_ck(struct _PLW* self);
 /* 0x80277C94 - the ground-height probe along the actor's facing: 1 and the height in `out->x` when it hits inside
- * the band `arg2`..`arg2 + arg3` above the actor. */
-s32 pl_ground_probe_ahead(struct _PLW* self, nw4r::math::VEC3* out, f32 arg2, f32 arg3);
+ * the band `ahead`..`ahead + height` above the actor. */
+u32 pl_ground_probe_ahead(struct _PLW* self, f32 ahead, f32 height, nw4r::math::VEC3* out);
 /* 0x8027D968 - the stage weapon whose reach covers the actor: its kind word, or 0; the position, id and second word
  * of the record go out through the three pointers. */
 s32 pl_stg_weapon_near_find(struct _PLW* self, nw4r::math::VEC3* out_pos, s32* out_id, s32* out_word);
@@ -75,7 +77,7 @@ s32 fn_8027D40C(struct _PLW* self);
 /* The helpers `Pl/pl_act_step.cpp`'s action/handler cluster calls, with their definitions' signatures;
  * `pl_act_set_frame_timer` is declared in the block below. */
 void fn_802771A0(struct _PLW* self, s32 value);
-s32 pl_target_lock_ck(struct _PLW* self);
+u32 pl_target_lock_ck(struct _PLW* self);
 void pl_motion_stick_move(struct _PLW* self, u16 a, u8 b);
 void pl_act_clear_mode5c4(struct _PLW* self);
 void fn_80277BC4(struct _PLW* self, u8 flag);
@@ -191,10 +193,10 @@ void pl_motion_scratch_clear(struct _PLW* self);
 /* 0x8027E220 - whether the player holds an act its hit filter respects; the second parameter is never read. */
 u32 pl_act_held_ck(struct _PLW* self, s32 unused);
 void pl_held_item_refresh(struct _PLW* self);
-s32 pl_act_dash_input_ck(void);
+u32 pl_act_dash_input_ck(void);
 void pl_stun_tick(struct _PLW* self);
 void pl_attack_up_set(struct _PLW* self, s32 arg1, s8 arg2);
-s32 pl_defense_up_set(struct _PLW* self, s32 arg1, s8 arg2);
+u32 pl_defense_up_set(struct _PLW* self, s32 arg1, s8 arg2);
 void pl_stamina_add(struct _PLW* self, s32 arg1);
 void pl_jump_gravity_set(struct _PLW* self, s32 arg);
 void pl_camera_heading_update(struct _PLW* self);
@@ -205,7 +207,7 @@ extern u32 pl_steps_guard_walk_kind0[];
 void pl_act_set_gauge_arm_skilled(struct _PLW* self, s16 arg1);
 void pl_dodge_motion_start(struct _PLW* self, s32 arg1, s32 arg2);
 void pl_motion_request_latch(struct _PLW* self, s16 value);
-s32 pl_carry_light_ck(struct _PLW* self);
+u32 pl_carry_light_ck(struct _PLW* self);
 s32 pl_equip_slot_count_get(struct _PLW* plw, u16 slot);
 /* 0x802829B4: the class-0 weapon act dispatcher */
 void pl_weapon0_act_dispatch(struct _PLW* self);

@@ -30,7 +30,7 @@
  *   A shared tail reached by `b` from switch cases is `do { switch ... continue / break ...; tail } while (0)`
  *   (playbook 183: `pl_weapon2_hit_react`, `pl_weapon2_alt_act_charge`).  Narrow sums: `field_0x0B6 += (u16)3`
  *   keeps the raw `sth`.  Retail compares a `u16` result signed (`(s32)Get_motion_no(...)`, an `s32` local) and a
- *   `s32` flag result unsigned (`(u32)pl_part_flag2_ck(...) == 1`).
+ *   `s32` flag result unsigned (`pl_part_flag2_ck(...) == 1`).
  */
 
 #include "types.h"
@@ -287,7 +287,7 @@ void pl_weapon2_charge_release(_PLW* self, s32 base, s32 mode)
     u8 stage;
 
     if (Pl_master_ck(self) != 0) {
-        if ((u32)pl_part_flag2_ck(self, 5) == 1 || self->field_0x378 <= 0) {
+        if (pl_part_flag2_ck(self, 5) == 1 || self->field_0x378 <= 0) {
             stage = pl_charge_stage2_get(self);
             self->charge_level_0x312 = stage;
             if (stage >= 3) {
@@ -298,7 +298,7 @@ void pl_weapon2_charge_release(_PLW* self, s32 base, s32 mode)
             } else {
                 pl_act_enter(self, 4, pl_weapon2_charge_acts_b[base + stage * 2], 0x18C);
             }
-        } else if ((u32)pl_part_flag2_ck(self, 7) == 1) {
+        } else if (pl_part_flag2_ck(self, 7) == 1) {
             if (self->kind_0x09 == 3) {
                 pl_act_enter(self, 0, 0x1B, 0x8C);
             } else {

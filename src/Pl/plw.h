@@ -1274,8 +1274,7 @@ struct _PLW {
                                 /* +0x657 */ u8 field_0x657;
                                 /* +0x658 */ u8 field_0x658;   /* the 90-frame lockout `fn_80262688` sets */
         /* +0x659 */ u8 field_0x659;
-        /* +0x65A */ u8 field_0x65A;
-        /* +0x65B */ u8 pad_0x65B[0x1];
+        /* +0x65A */ u16 field_0x65A;   /* cleared with a halfword store on the actor's first frame */
                                 /* +0x65C */ u8 field_0x65C;
                                 /* +0x65D */ u8 field_0x65D;
         /* +0x65E */ u8 pad_merge_0x65E[0x2];

@@ -44,7 +44,7 @@ void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
 
 /* 0x80276254 / 0x80276270 - the two gauge-budget predicates. */
 s32 pl_stagger_budget_ck(struct _PLW* self, s32 value);
-s32 pl_hold_gauge_ck(struct _PLW* plw, s32 value);
+u32 pl_hold_gauge_ck(struct _PLW* plw, s32 value);
 
 /* 0x8027628C - adds `delta` to the act's hold gauge, clamped to 0..`+0x372`. */
 void pl_act_add_hold_gauge(struct _PLW* plw, s16 delta);
@@ -55,7 +55,7 @@ s32 pl_act_gauge_step_unlatched(struct _PLW* plw, s16 delta, s8* out);
 s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out);
 
 /* 0x802765B4 / 0x80276690 / 0x80276778 / 0x802767B4 - the gauge and stagger setters. */
-void pl_health_recover(struct _PLW* plw, s16 amount);
+void pl_health_recover(struct _PLW* plw, s16 amount, s32 from_partner);
 void pl_gauge_ceiling_grow(struct _PLW* plw, s16 amount, u8 a);
 void pl_stagger_budget_add(struct _PLW* plw, s16 amount);
 void pl_act_add_stagger(struct _PLW* plw, s16 amount);

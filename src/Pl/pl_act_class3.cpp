@@ -717,7 +717,7 @@ void pl_weapon3_act_hold(_PLW* self, s32 form)
         break;
     case 1:
         if (Pl_master_ck(self) == 1) {
-            if ((u32)pl_part_flag2_ck(self, 11) == 1 && self->field_0x006 == 0) {
+            if (pl_part_flag2_ck(self, 11) == 1 && self->field_0x006 == 0) {
                 self->field_0x006 = 1;
             }
             if (Pl_frame_check(self, 0, 40.0f, 0.0f) == 1 && self->field_0x006 != 0) {
@@ -879,7 +879,7 @@ void pl_weapon3_alt_act_hold(_PLW* self, s32 form)
         break;
     case 1:
         if (Pl_master_ck(self) == 1) {
-            if ((u32)pl_part_flag2_ck(self, 11) == 1 && self->field_0x006 == 0) {
+            if (pl_part_flag2_ck(self, 11) == 1 && self->field_0x006 == 0) {
                 self->field_0x006 = 1;
             }
             if (Pl_frame_check(self, 0, 40.0f, 0.0f) == 1 && self->field_0x006 != 0) {

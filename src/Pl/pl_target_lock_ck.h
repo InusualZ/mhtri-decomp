@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 /* 0x8027A340 (Pl/pl_act): whether the player holds the target lock. */
-s32 pl_target_lock_ck(struct _PLW* self);
+u32 pl_target_lock_ck(struct _PLW* self);
 
 #ifdef __cplusplus
 }
