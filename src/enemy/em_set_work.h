@@ -18,8 +18,6 @@
  * size: 0x20 */
 struct EmSetGround {
     /* +0x00 */ EmGroundRec rec;
-
-    EmSetGround() { em_ground_rec_clear(&rec); }
 };
 
 /* One placement entry: the monster kind and count the default table seeds, its ground record, the enemy it
@@ -139,7 +137,7 @@ struct FqResultWork {
     /* +0x1B4 */ u8 pouch_0x1B4[0x60];        /* the player's item slots, copied whole */
     /* +0x214 */ u8 spare_0x214[0x20];
     /* +0x234 */ u8 unused_0x234[0xC];
-    /* +0x240 */ s8 end_kind_0x240;
+    /* +0x240 */ u8 end_kind_0x240;
     /* +0x241 */ u8 unused_0x241;
     /* +0x242 */ s16 hunt_rank_0x242;
     /* +0x244 */ u16 time_rank_0x244;

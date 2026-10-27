@@ -4,9 +4,15 @@
  * RANGE. .text 0x803B465C-0x803B936C (82 functions); .ctors 0x8056F3B4-0x8056F3B8 (the static initialiser),
  *   .data 0x805F7C68-0x805F8220, .bss 0x806CC420-0x806D2A68, .sdata 0x80793688-0x80793690, .sbss 0x80794C48-0x80794C50,
  *   .sdata2 0x8079C560-0x8079C5B8, extab, extabindex.  `enemy/em_model.cpp` continues the band at 0x803B936C.
- * SEAM. Unproven and probably several TUs (the pool repeats, the `.ctors` thunk and the proposed tiling are in
- *   docs/enemy.md).
- * FLAGS. `cflags_menu`, the address neighbour's group (`cflags_main` + `-opt nopeephole`).
+ * SEAM. Two TUs.  The quest head 0x803B465C-0x803B744C belongs to `quest/quest_entry.cpp`'s TU: quest_score_deduct
+ *   and quest_supply_drop_step load that TU's pooled literals (0.0f 0x8079C530, 60.0f 0x8079C524, the int-to-float
+ *   magic 0x8079C528, 5.0f 0x8079C548) and 9950.0f at 0x8079C560 is its pool's last entry, while the em_set rows
+ *   from em_set_entry_rec_apply on carry their own copies (60.0f 0x8079C568, the magic 0x8079C570) behind the
+ *   `.sdata` hole at 0x80793684; the head's jump table 0x805F7C68 ends quest_entry's run.  The re-cut (exact
+ *   `splits.txt` lines, the proven-only alternative at 0x803B6F2C) is request enemy-em-pop#1.
+ * FLAGS. `cflags_menu`, the address neighbour's group (`cflags_main` + `-opt nopeephole`), and a file-wide
+ *   `#pragma optimization_level 4` as in quest_entry.cpp (idea 108: em_set_kill_record, em_set_work_init,
+ *   em_set_field_setup, em_set_live_count and em_set_entries_spawn rise, nothing falls).
  * NAMES. The module and `em_pop` are a GUESS from what the range does and its callers (nine `src/enemy/*` units);
  *   every function name is a GUESS from its own body (the flag masks, offsets and callers its comment names), none
  *   from the dump - among them quest_special_element_step, quest_grade_goal_step, quest_score_deduct,
@@ -23,32 +29,28 @@
  *   GUESS: quest_clock_real_step, em_set_move_start, em_set_area_enter, quest_warp_hub, em_set_reward_item_add
  *   GUESS: em_set_kill_record, em_set_work_state_get, em_set_userdata_flag_ck, em_set_result_store
  *   GUESS: em_set_result_restore, em_set_enemy_detach
- * SEAM. The quest head 0x803B465C-0x803B6F2C reads `quest/quest_entry.cpp`'s private `.data` (quest_supply_drop_tbl,
- *   quest_bonus_pick_tbl) and its pooled `.sdata2` (0.0f at 0x8079C530, the int-to-float magic at 0x8079C528): it is
- *   that TU's tail (request quest-q1#27).  Its 0.0f/9950.0f/5.0f literals emit this unit's own pool meanwhile.
  * RESIDUALS. Every row is written.
- *  - em_set_work_init 90.5 %: retail keeps the 16-entry area-set clear as a 2x8 unrolled loop, ours unrolls it
- *    fully (every loop shape and index type tried); em_set_field_setup 96.6 % and quest/quest_entry.cpp's
- *    quest_enter_load: retail keeps `stage * 8` in a saved register across `stage_dcm_path_get`, ours recomputes it;
- *    em_set_kill_record 91.1 %, em_set_result_store 96.2 %, em_set_move_start 96.1 %, em_set_rotation_step 98.5 %:
- *    register numbering; em_set_frame_step 99.8 %: pool label names;
- *  - object order: the two constructors are defined out of line at the end of the file, so they precede
- *    `__sinit_\em_pop_cpp` where retail places them after it; bytes per function are identical, the order
- *    matters only for a flip; the EmSetWork and EmSetEntry constructors have empty bodies by design (the compiler
- *    constructs the members), which the stub check reads as unwritten;
- *  - quest_supply_drop_step 98.9 %: `ran_suu`'s u16 declaration re-masks its result (retail masks the word once and
- *    compares unsigned); quest_bonus_pick 98.7 %: one byte reload in the weight sum; quest_special_element_step
- *    99.2 %, quest_grade_goal_step 99.6 % (`quest_element_pick_ck`'s u8 index, request quest-q1#17);
- *    quest_score_deduct 99.8 %: the pool literal's name;
- *  - `em_work_slot_pair_get`: retail reads the +0x98 halfword with `lhz`, ours with `lha`;
- *  - `quest_all_player_item_count_sum`: the `li` of the element index is scheduled before the pool loads in ours;
- *  - `quest_slot_byte_get`, `quest_element_progress_step`, `quest_arena_need_get`, `stepStagingDownloadForVersion`:
- *    register numbering of the loop temporaries (same size).
- *   data: `.bss`/`.ctors`/`.sdata`/`.sbss` emitted; `.data` 1457 of 1464 B; `.sdata2` 92 B against 88 (the quest
- *   head's literals belong to quest_entry's pool); candidate fold with `quest/quest_entry.cpp` (seam quest-q1#27).
- * SHAPES. The work's and the entry's constructors are user-declared and defined last; the
- *   extra-condition tests count their six board rows with an `s16` index (an `s32` one splits the unrolled loop);
- *   the rotation fill walks a byte offset beside the count; the point rows copy field by field through pointers.
+ *  - em_set_work_init: retail clears the 16 area sets as a 2x8 unrolled loop over a byte offset, ours unrolls it
+ *    fully (loop shapes, index types and the opt_* pragmas tried); opt_propagation off is its best;
+ *  - em_set_kill_record: register numbering, the `capped == 1` exit as `bne; b` in retail, a `mr` copy of the first
+ *    reward rate, and `em_mini_kill_kind_get`'s s32 prototype (retail masks a u8 result at each use, request
+ *    enemy-em-pop#2);
+ *  - em_set_move_start: `stage_map_area_count_get` returns u8 and `quest_area_spawn_setup`'s count is not u8 in
+ *    retail (requests enemy-em-pop#3/#4, owners' headers);
+ *  - em_set_field_setup and quest/quest_entry.cpp's quest_enter_load: retail keeps `stage * 8` in a saved
+ *    register across `stage_dcm_path_get` (register colouring; decl permutes and local types tried);
+ *  - quest_supply_drop_step: `kind` and `id` swap colours (decl permutes and block-local copies tried);
+ *  - quest_all_player_item_count_sum: the `li` of the element index is scheduled before the base `addi`;
+ *  - quest_arena_need_get: `flags` and the work base swap colours and the row add takes its operands reversed;
+ *  - quest_slot_byte_get, quest_element_progress_step, quest_special_element_step: register numbering.
+ *   data: `.bss`/`.ctors`/`.sdata`/`.sbss` emitted; `.data` 1457 of 1464 B (trailing alignment); `.sdata2` 100 B
+ *   against 88: the head's 0.0f/9950.0f/60.0f/5.0f/int-to-float literals belong to quest_entry's pool, so the
+ *   section cannot match before the enemy-em-pop#1 re-cut.
+ * SHAPES. The entry's and the work's constructors are inline and defined last under `dont_inline`, so they follow
+ *   `__sinit` as in retail and the entry's ground record is cleared in its body; the extra-condition tests count
+ *   their six board rows with an `s16` index (an `s32` one splits the unrolled loop); the rotation fill walks a
+ *   byte offset beside the count; the point rows copy field by field through pointers; em_set_result_store takes
+ *   the player work before `my_player_no`; quest_bonus_pick is compiled with opt_common_subs off.
  */
 
 #include "types.h"
@@ -129,6 +131,9 @@
 
 
 extern "C" {
+
+/* Retail is scheduled at optimization level 4 (idea 108), like `quest/quest_entry.cpp`. */
+#pragma optimization_level 4
 
 
 /* The text a result-screen field kind shows for the current row: kinds 0..31 pick one of the row's own text
@@ -1039,13 +1044,14 @@ u16 em_work_slot_pair_get(u16 index, s16* out) {
     el = &quest_work.elements_0x0094[index];
     if ((el->flags & 0xA) == 0xA) {
         if (out != NULL) {
+            Q_ItemPair* pair = (Q_ItemPair*)out;
             s16 remaining;
-            out[0] = el->id;
+            pair->id = el->id;
             remaining = el->target_count - quest_item_count_sum(el->id, 0);
             if (remaining < 0) {
                 remaining = 0;
             }
-            out[1] = remaining;
+            pair->num = remaining;
         }
         return el->id;
     }
@@ -1246,9 +1252,8 @@ s32 quest_arena_need_get(s32 index) {
     flags = el->flags;
     if (flags != 0) {
         if (flags & 0x200) {
-            u16 count = el->target_count;
-            if (count != 0) {
-                s32 held = quest_work.part_count_run_0x6803[el->id * 8 + count];
+            if (el->target_count != 0) {
+                s32 held = quest_work.part_counts_0x6803[el->id][el->target_count];
                 if (held > 1) {
                     held = 1;
                 }
@@ -1293,18 +1298,6 @@ s32 quest_arena_count_get(s32 index) {
     return -1;
 }
 
-/* The work block's quest stat (NULL while the block is absent or the move work is in state 1). */
-Q_QuestStat* quest_stat_get(void) {
-    QuestWork* work = quest_work_ptr;
-    if (move_work_state_ck() == 1) {
-        return NULL;
-    }
-    if (work == NULL) {
-        return NULL;
-    }
-    return &work->stat_0x6AA4;
-}
-
 /* Takes `points` off the quest score (clamped at 0) and plays the penalty sound at the area's fixed spot,
  * on enemy `unique_id`'s sound work. */
 void quest_score_deduct(u16 points, u16 unique_id) {
@@ -1339,6 +1332,18 @@ void quest_score_deduct(u16 points, u16 unique_id) {
         }
         se_req_pos_ps(enemy->se_0xB14, 0x44, 2, &pos);
     }
+}
+
+/* The work block's quest stat (NULL while the block is absent or the move work is in state 1). */
+Q_QuestStat* quest_stat_get(void) {
+    QuestWork* work = quest_work_ptr;
+    if (move_work_state_ck() == 1) {
+        return NULL;
+    }
+    if (work == NULL) {
+        return NULL;
+    }
+    return &work->stat_0x6AA4;
 }
 
 #pragma fp_contract off
@@ -1381,7 +1386,7 @@ void quest_supply_drop_step(void) {
             return;
         }
         work->supply_step_0x58++;
-        if ((ran_suu(0) & 0x7F) >= step[1]) {
+        if ((u8)(ran_suu(0) & 0x7F) >= step[1]) {
             return;
         }
         work->supply_count_0x8F++;
@@ -1426,6 +1431,7 @@ void quest_supply_drop_step(void) {
 #pragma fp_contract reset
 /* Picks the quest's bonus byte (`+0x30D`) by weight from the row's bonus list for its name index (the stage
  * hands the pick over when the row's +0x37A word is 1 and a lobby slot holds 0x1A); returns it. */
+#pragma opt_common_subs off
 u8 quest_bonus_pick(void) {
     QuestWork* work;
     u8 name;
@@ -1474,6 +1480,7 @@ u8 quest_bonus_pick(void) {
     work->bonus_0x30D = bonus;
     return bonus;
 }
+#pragma opt_common_subs reset
 
 /* Whether any of the work block's three key rows holds `key`. */
 u32 quest_key_row_ck(u8 key) {
@@ -1603,7 +1610,8 @@ s32 stepStagingDownloadForVersion(u16 version) {
     s32 i;
     if (wk != NULL) {
         for (i = 0; i < 10; i++) {
-            if (((StagingFileHeader*)wk->file_buffers_0xC39C[i])->version_0x2C == version) {
+            StagingFileHeader* hdr = (StagingFileHeader*)wk->file_buffers_0xC39C[i];
+            if (hdr->version_0x2C == version) {
                 file = i;
                 break;
             }
@@ -1698,6 +1706,7 @@ void em_set_entry_rec_apply(EmSetEntry* entry, EmSetSaveRec* rec) {
 /* Builds the free-hunt work: clears it, copies the save block in, seeds the entries from the default table,
  * allocates the 32 set-file buffers, applies the saved live monsters, and takes the lobby's rotation, point rows
  * and options. */
+#pragma opt_propagation off
 void em_set_work_init(void) {
     Q_MoveWork* work;
     EmSetDefault* def;
@@ -1796,6 +1805,7 @@ void em_set_work_init(void) {
         em_set_work_ptr.work->userdata_flag_0x6644 = em_set_work_ptr.work->userdata_0x04E4.em_set_0x3F98.flag_0xD4;
     }
 }
+#pragma opt_propagation reset
 
 /* Loads the monster of every live entry and counts them. */
 void em_set_live_count(void) {
@@ -1882,6 +1892,7 @@ void em_set_rotation_step(Q_MoveWork* work) {
     struct _ENEMY_MINI_WORK* mini;
     EmSetEntry* entry;
     s32 order;
+    s32 limit;
     u8 kind;
 
     switch (em_set_work_ptr.work->rotation_state_0x65CC) {
@@ -1891,9 +1902,9 @@ void em_set_rotation_step(Q_MoveWork* work) {
             if (kind != 0 && kind <= 13) {
                 kind--;
                 em_set_work_ptr.work->rotation_timer_0x65D4++;
-                if (em_set_work_ptr.work->rotation_timer_0x65D4 >=
-                    (s32)(60.0f * Screen_w.frame_scale *
-                          lb_param_w.rotation_0x1E[em_set_work_ptr.work->rotation_index_0x65CD][1])) {
+                limit = 60.0f * Screen_w.frame_scale *
+                        lb_param_w.rotation_0x1E[em_set_work_ptr.work->rotation_index_0x65CD][1];
+                if (em_set_work_ptr.work->rotation_timer_0x65D4 >= limit) {
                     entry = &em_set_work_ptr.work->entries_0x005C[kind];
                     if (entry->kind_0x00 != 0 && em_kind_release_ck(entry->kind_0x00) != 0) {
                         em_set_work_ptr.work->active_0x000C[0] = -1;
@@ -2031,7 +2042,7 @@ void em_set_field_setup(Q_MoveWork* work) {
     quest_time_limit_set(limit);
     dst = em_set_work_ptr.work->points_0x65D8;
     src = lb_param_w.points_0x32;
-    for (i = 0; i < 17; i++, dst++, src++) {
+    for (i = 0; i < 17; i++, src++, dst++) {
         dst->kind_0x0 = src->kind_0x0;
         dst->kill_points_0x2 = src->kill_points_0x2;
         dst->capture_points_0x4 = src->capture_points_0x4;
@@ -2243,9 +2254,9 @@ void em_set_kill_record(struct _ENEMY_WORK* enemy, u8 mini) {
     u8 end_kind;
     QuestSpawnRec* rec;
     EmSetReward* reward;
-    u16 count;
+    s32 count;
     u8 log_kind;
-    s32 capped;
+    u32 capped;
     EmSetPointRow* row;
     s32 i;
     s32 roll;
@@ -2290,7 +2301,7 @@ void em_set_kill_record(struct _ENEMY_WORK* enemy, u8 mini) {
             tries = 2;
             count = em_set_work_ptr.work->hunted_0x0368[monster];
             log_kind = 1;
-            if (count > 99) {
+            if (em_set_work_ptr.work->hunted_0x0368[monster] > 99) {
                 em_set_work_ptr.work->hunted_0x0368[monster] = 99;
             }
             userdata_hunt_count_add(monster, 1);
@@ -2303,7 +2314,7 @@ void em_set_kill_record(struct _ENEMY_WORK* enemy, u8 mini) {
             tries = 4;
             count = em_set_work_ptr.work->captured_0x03BA[monster];
             log_kind = 2;
-            if (count > 99) {
+            if (em_set_work_ptr.work->captured_0x03BA[monster] > 99) {
                 em_set_work_ptr.work->captured_0x03BA[monster] = 99;
             }
             userdata_capture_count_add(monster, 1);
@@ -2328,7 +2339,7 @@ void em_set_kill_record(struct _ENEMY_WORK* enemy, u8 mini) {
         tries = 1;
         count = em_set_work_ptr.work->hunted_0x0368[monster];
         log_kind = 0;
-        if (count > 99) {
+        if (em_set_work_ptr.work->hunted_0x0368[monster] > 99) {
             em_set_work_ptr.work->hunted_0x0368[monster] = 99;
         }
         userdata_hunt_count_add(monster, 1);
@@ -2434,7 +2445,7 @@ s32 quest_pouch_items_settle(Q_ItemPair* pouch, u8* flag) {
 /* Stores the free hunt's result: the counts, the reward box and the points, the settled pouch (announcing the
  * sold and dropped items), the live monsters, the hunt time and the result ranks.  `end_kind` is how the hunt
  * ended. */
-void em_set_result_store(s8 end_kind) {
+void em_set_result_store(u8 end_kind) {
     char text[0x80];
     FqResultWork* result;
     struct _PLW* me;
@@ -2443,7 +2454,8 @@ void em_set_result_store(s8 end_kind) {
     s32 i;
 
     result = get_FqResult_work();
-    me = &((struct _PLW*)get_move_work_adrs(2))[my_player_no()];
+    me = (struct _PLW*)get_move_work_adrs(2);
+    me = &me[(s8)my_player_no()];
     memcpy(result->hunted_0x000, em_set_work_ptr.work->hunted_0x0368, 0x52);
     memcpy(result->captured_0x052, em_set_work_ptr.work->captured_0x03BA, 0x52);
     memcpy(result->counts_c_0x0A4, em_set_work_ptr.work->counts_c_0x040C, 0x52);
@@ -2508,8 +2520,14 @@ void em_set_enemy_detach(struct _ENEMY_WORK* enemy) {
 
 } /* extern "C" */
 
-/* Builds the work's thirteen entries. */
-EmSetWork::EmSetWork() {}
-
 /* Builds an entry's ground record. */
-EmSetEntry::EmSetEntry() {}
+inline EmSetEntry::EmSetEntry() {
+    em_ground_rec_clear(&ground_0x08.rec);
+}
+
+/* The constructors are inline, so they follow the static initialiser; `__sinit` (compiled at the end of the file)
+ * calls the work's constructor out of line. */
+#pragma dont_inline on
+
+/* Builds the work's thirteen entries. */
+inline EmSetWork::EmSetWork() {}

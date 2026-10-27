@@ -364,7 +364,7 @@ void em_set_frame_step(struct Q_MoveWork* work);
 s32 em_set_reward_item_add(u16 item);
 void em_set_kill_record(struct _ENEMY_WORK* enemy, u8 mini);
 s32 em_set_userdata_flag_ck(void);
-void em_set_result_store(s8 end_kind);
+void em_set_result_store(u8 end_kind);
 void em_set_result_restore(void);
 void em_set_enemy_detach(struct _ENEMY_WORK* enemy);
 
