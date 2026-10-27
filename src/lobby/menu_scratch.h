@@ -12,7 +12,8 @@
 typedef struct LbMenuRow {
     /* +0x00 */ u32 table_0x00;    /* the row's table pointer `lb_plsearch_target_get` hands out */
     /* +0x04 */ u32 model_0x04;    /* the row's model pointer `lb_target_npc_get` hands out */
-    /* +0x08 */ u8 unused_0x08[8];
+    /* +0x08 */ f32 dist_0x08;     /* the sort key `lb_menu_row_insert` orders rows of one rank by */
+    /* +0x0C */ s32 rank_0x0C;     /* -1 for an empty row; the primary sort key */
 } LbMenuRow; /* size: 0x10 */
 
 typedef struct LbMenuScratch {

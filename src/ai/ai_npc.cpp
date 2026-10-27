@@ -507,7 +507,7 @@ void fn_802D6A00(struct _AINPC_W* self);
 void fn_802D7464(struct _AINPC_W* self);
 void fn_802D84D0(struct _AINPC_W* self, s16 value);
 void fn_802D9400(struct _AINPC_W* self);
-u8 fn_802D7B5C(u16 value);
+u8 ai_npc_level_get(u16 value);
 u16 fn_802D7BA4(u8 index);
 u16 fn_802D7BC4(u8 index);
 u8 fn_802D7C04(u16 value);
@@ -650,7 +650,7 @@ void ainpc_start(_AINPC_W* self)
     self->area = 0xFF;
     ai_npc_motion_set(self, 1, 0, 0);
     self->field_0x33C = 0;
-    self->field_0x338 = fn_802D7B5C(self->field_0x33E = lb_param_w.sub_0x2C);
+    self->field_0x338 = ai_npc_level_get(self->field_0x33E = lb_param_w.sub_0x2C);
     self->field_0x1FE = fn_802D7BA4(self->field_0x338);
     self->field_0x200 = fn_802D7BC4(self->field_0x338);
     self->field_0x210 = 0;
@@ -7283,7 +7283,7 @@ void ai_npc_status_preview(AINPCSetup* setup, AINPCStatus* status)
     s32 value;
 
     row = fn_802D773C(setup->behaviour)->tuning_0x00;
-    status->attack_rank = fn_802D7B5C(setup->attack_level);
+    status->attack_rank = ai_npc_level_get(setup->attack_level);
     status->gauge_rank = fn_802D7C04(setup->gauge_level);
     status->rate = 100;
     status->gauge_bonus = 0;
@@ -11560,7 +11560,7 @@ s32 fn_802D7B24(struct _AINPC_W* self)
 }
 
 /* 0x802D7B5C - the hold-slot record index the item id falls in. */
-u8 fn_802D7B5C(u16 value)
+u8 ai_npc_level_get(u16 value)
 {
     u8 i = 1;
 

@@ -7682,7 +7682,7 @@ void fn_801FC8C8(void);
 void lb_npc_map_setup(void);
 void fn_801FCA80(u32 index);
 void fn_801FCADC(u8* self, u32 index);
-void fn_8021D9F8(void);
+void lb_menu_scratch_reset(void);
 void menu_item_work_init(void);
 void stage_work_init(void);
 s32 stage_area_load(u32 a, u8 b, u8 c);
@@ -8312,7 +8312,7 @@ void fn_801FB438(void)
     eft_control_init();
     stage_work_init();
     camera_work_init();
-    fn_8021D9F8();
+    lb_menu_scratch_reset();
     menu_item_work_init();
     lobby_hud_reset();
     hud_msg_init();

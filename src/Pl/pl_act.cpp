@@ -2740,7 +2740,7 @@ int pl_weapon_guard_ck(int);
 u32 weapon_class_index(u8);
 int Pl_item_timer_get(_PLW*, u16);
 u32 get_item_species_data(u16);
-u32 fn_8027E290(u8);
+u32 weapon_kind_slot_index(u8);
 void equip_item_id_clamp(_EQUIP*);
 s32 pl_equip_model_id_get(_PLW*, _EQUIP*);
 u32 pl_item_icon_kind_get(u16);
@@ -4129,7 +4129,7 @@ extern "C" int Pl_item_timer_get(_PLW* plw, u16 slot) {
 
 /* Stores one equipment record into the saved set selected by its own slot id and marks it valid. */
 extern "C" void pl_equip_model_set(_PLW* plw, u8* rec) {
-    u8 idx = (u8)fn_8027E290(rec[0]);
+    u8 idx = (u8)weapon_kind_slot_index(rec[0]);
 
     equip_item_id_clamp((_EQUIP*)rec);
     equip_record_copy((_EQUIP*)((u8*)plw + idx * 12 + 0x188), (_EQUIP*)rec);
@@ -9594,7 +9594,7 @@ namespace s_8027D684 {
 
 
 extern "C" s32 equip_kind_table_class(u8 kind);
-extern "C" u8 fn_8027E290(u8 kind);
+extern "C" u8 weapon_kind_slot_index(u8 kind);
 extern "C" u8 weapon_class_index(s32 kind);
 
 /* The 1-based kind's 0x18-byte equipment row (the row stride is the `mulli r0,r0,24` in retail). */
@@ -9603,7 +9603,7 @@ extern "C" void* equip_slot_rec_find(u8 kind, u16 index) {
     if ((u8)equip_kind_table_class(kind) != 0) {
         return 0;
     }
-    u32 slot = fn_8027E290(kind);
+    u32 slot = weapon_kind_slot_index(kind);
     if ((s32)index >= (s32)lbl_805706C0[slot]) {
         index = 0;
     }
@@ -9616,7 +9616,7 @@ extern "C" void* equip_armor_ex_rec_find(u8 kind, u16 index) {
     if ((u8)equip_kind_table_class(kind) != 0) {
         return 0;
     }
-    u32 slot = fn_8027E290(kind);
+    u32 slot = weapon_kind_slot_index(kind);
     if ((s32)index >= (s32)lbl_805706C0[slot]) {
         index = 0;
     }
@@ -9937,7 +9937,7 @@ extern "C" u32 pl_act_held_ck(_PLW* self, s32 unused) {
 }
 
 /* The equipment kind the data tables are indexed by, one-based. */
-extern "C" u8 fn_8027E290(u8 kind) {
+extern "C" u8 weapon_kind_slot_index(u8 kind) {
     return kind - 1;
 }
 
@@ -10096,7 +10096,7 @@ extern "C" s32 equip_kind_item_count(u8 kind) {
     s32 count = 0;
     if ((u32)(kind - 7) > 8U) {
         if ((u32)(kind - 1) <= 5U) {
-            count = lbl_805706C0[fn_8027E290(kind)];
+            count = lbl_805706C0[weapon_kind_slot_index(kind)];
         }
     } else {
         count = lbl_805706D8[weapon_class_index(kind)];
@@ -10328,7 +10328,7 @@ u32 equip_info_text_get(u8 kind, u16 id)
     if ((u32)(kind - 7) > 8) {
         if ((u32)(kind - 1) <= 5) {
             base = lbl_806AB810[3];
-            table = (u32*)base[fn_8027E290(kind)];
+            table = (u32*)base[weapon_kind_slot_index(kind)];
         }
     } else {
         base = lbl_806AB810[6];
@@ -10602,7 +10602,7 @@ u32 GetEquipName(u8 kind, u16 id)
     if ((u32)(kind - 7) > 8) {
         if ((u32)(kind - 1) <= 5) {
             base = lbl_806AB810[2];
-            table = (u32*)base[s_8027D684::fn_8027E290(kind)];
+            table = (u32*)base[s_8027D684::weapon_kind_slot_index(kind)];
         }
     } else {
         base = lbl_806AB810[5];

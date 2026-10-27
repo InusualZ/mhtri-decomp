@@ -339,12 +339,22 @@ typedef struct _LB_NPC {
     /* +0x211 */ u8 pad_0x211[3];
     /* +0x214 */ struct _PLW* field_0x214;   /* the player the NPC talks to (`lb_npc_talk_partner_set`) */
     /* +0x218 */ s32 field_0x218;
-    /* +0x21C */ s16 field_0x21C;
-    /* +0x21E */ s16 field_0x21E;
-    /* +0x220 */ s16 field_0x220;
-    /* +0x222 */ u8 field_0x222;
-    /* +0x223 */ u8 field_0x223;
-    /* +0x224 */ u8 field_0x224;
+    /* +0x21C */ union {   /* size: 0x6 */
+        struct {   /* size: 0x6 */
+            /* +0x21C */ s16 field_0x21C;
+            /* +0x21E */ s16 field_0x21E;
+            /* +0x220 */ s16 field_0x220;
+        };
+        /* +0x21C */ u16 talk_ids_0x21C[3];   /* the three talk entries `lb_npc_talk_select` picks */
+    };
+    /* +0x222 */ union {   /* size: 0x3 */
+        struct {   /* size: 0x3 */
+            /* +0x222 */ u8 field_0x222;
+            /* +0x223 */ u8 field_0x223;
+            /* +0x224 */ u8 field_0x224;
+        };
+        /* +0x222 */ u8 talk_kinds_0x222[3];  /* 1: the entry is an unlock row's, 0: a random row's */
+    };
     /* +0x225 */ u8 field_0x225;
     /* +0x226 */ u8 field_0x226;
     /* +0x227 */ u8 field_0x227;

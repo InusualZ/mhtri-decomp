@@ -11,6 +11,7 @@
 struct LbMenuWork;
 struct LbMenuPanel;
 struct _se_w;
+struct LbNpcTalkData;
 
 /* One interior-model resource buffer of `LbLobbyWork::res_slots_0x0CC`: in use, the model index (or the lowest
  * index of a multi-model load), the interior id (`lb_interior_path_table`'s index), how many users it has, the
@@ -70,7 +71,10 @@ typedef struct LbLobbyWork {
             /* +0x029 */ u8 pad_0x029[7];
             /* +0x030 */ s32 counter_0x030;    /* incremented once per `fn_8021261C` */
             /* +0x034 */ s16 slide_0x034;      /* the cursor slide `fn_8021261C` ramps inside +-0x3C */
-            /* +0x036 */ s16 field_0x036[13];
+            /* +0x036 */ union {   /* size: 0x1A */
+                /* +0x036 */ s16 field_0x036[13];
+                /* +0x036 */ u16 seed_0x036[13];   /* the NPC talk and name-menu random seeds (`lobby/fn_80219260.cpp`) */
+            };
         };
         struct {   /* the day's random seeds the trade counter draws from (`lobby/lb_server_sel_trans.cpp`) */
             /* +0x028 */ u8 pad_0x028[0x14];
@@ -140,6 +144,7 @@ typedef struct LbLobbyWork {
     /* +0x0C0 */ union {
         u8 unused_0x0C0[0x6C];
         u8 talk_0x0C0[0x6C];
+        struct LbNpcTalkData** talk_tbl_0x0C0; /* per NPC kind, its talk data (`lobby/fn_80219260.cpp`) */
         struct {   /* the interior-model resource view (`lobby/lb_quest_screen.cpp`'s `lb_interior_*`) */
             /* +0x0C0 */ u8 unused_0x0C0r[0x4];
             /* +0x0C4 */ s32 res_handle_0x0C4;   /* the resource-memory slot `lobby_res_slots_init` reserves */

@@ -688,7 +688,7 @@ u8 system_lobby_room_get(void) {
     return system_w.field_0x886;
 }
 
-void fn_800D0754(u8 value) {
+void system_weapon_class_set(u8 value) {
     system_w.field_0x886 = value;
 }
 

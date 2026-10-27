@@ -70,6 +70,54 @@ void equip_detail_bowgun_draw(struct _PLW* plw, struct _EQUIP* equip, u16 row, u
 void equip_detail_kind6_draw(struct _PLW* plw, struct _EQUIP* equip, u16 row, u8 sel);
 void equip_detail_slots_draw(struct _PLW* plw, struct _EQUIP* equip, u16 row, u8 sel);
 
+/* The equipment detail panel's per-page entries `lobby/fn_80219260.cpp`'s detail drawer dispatches to: `_zero`
+ * draws one piece, the plain entry a piece against the compared one, `_ex` a bowgun's three parts and `_pair`
+ * three parts against the compared three.  `anchor` is the layout sprite id, `flags` the caller's draw flags. */
+void blade_basis_page_draw(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+u8 gun_basis_entry(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+u8 gun_basis_entry_pair(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                        struct _EQUIP* other_frame, struct _EQUIP* other_barrel, struct _EQUIP* other_stock, u16 anchor,
+                        u8 flags);
+void armor_stats_entry_zero(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, u8 flags);
+void armor_stats_page_draw(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+void deco_skills_page_draw(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+void weapon_desc_entry(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+void ammo_kind_label_draw(u16 anchor, u8 label);
+void ammo_kind_label6_draw(u16 anchor);
+void ammo_kind_label7_draw(u16 anchor);
+void armor_skills_entry_zero(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, u8 flags);
+u8 armor_skills_entry(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+u8 armor_skills_entry_pair(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                           struct _EQUIP* other_frame, struct _EQUIP* other_barrel, struct _EQUIP* other_stock, u16 anchor,
+                           u8 flags);
+void weapon_skills_entry_zero(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, u8 flags);
+u8 weapon_skills_page_draw(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+void deco_page_entry_zero(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, u8 flags);
+u8 deco_page_entry(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+u8 deco_page_entry_pair(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                        struct _EQUIP* other_frame, struct _EQUIP* other_barrel, struct _EQUIP* other_stock, u16 anchor,
+                        u8 flags);
+void active_skills_entry_zero(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, u8 flags);
+u8 active_skills_entry(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags);
+u8 active_skills_entry_ex(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                          u16 anchor, u8 flags);
+void ammo_panel_entry_zero(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, u8 flags, u8 grid);
+void ammo_panel_entry(struct _PLW* plw, struct _EQUIP* equip, struct _EQUIP* other, u16 anchor, u8 flags, u8 grid);
+void ammo_panel_entry_pair(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                           struct _EQUIP* other_frame, struct _EQUIP* other_barrel, struct _EQUIP* other_stock,
+                           u16 anchor, u8 flags, u8 grid);
+void put_equip_panel_row_variant(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                                 u16 anchor, u8 flags, u8 grid);
+void put_equip_panel_row_zero(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, u8 flags);
+void put_equip_panel_kind4(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                           u16 anchor, u8 flags, u8 tab);
+void put_equip_panel_kind5(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock,
+                           u16 anchor, u8 flags, u8 page);
+/* The equipment page's page-count step and the bowgun skill table page (`lobby/fn_80219260.cpp`'s page drawer). */
+void equip_page_count_step(struct _PLW* plw, struct _EQUIP* equip, u16 anchor, s8 page);
+void skill_table_page_draw(struct _PLW* plw, struct _EQUIP* frame, struct _EQUIP* barrel, struct _EQUIP* stock, u16 anchor,
+                           s8 page);
+
 #ifdef __cplusplus
 }
 #endif

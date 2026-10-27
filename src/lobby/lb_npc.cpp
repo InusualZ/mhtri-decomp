@@ -3388,7 +3388,7 @@ void hud_msg_frame(void);
 void ai_npc_reaction_forward(void);
 void ainpc_page_idle(void);
 void menu_work_update(void);
-void fn_8021DC24(void);
+void lb_menu_marker_step(void);
 void lobby_hud_frame_update(void);
 void ainpc_page_update(void);
 void fn_801FD0F8(void);
@@ -3438,7 +3438,7 @@ void lobby_frame_update(void)
         if (lobby_w.field_0x12C != 1 && (lobby_w.field_0x000 == 0 || lobby_w.field_0x000 == 0x24)) {
             menu_work_update();
         }
-        fn_8021DC24();
+        lb_menu_marker_step();
         lobby_hud_frame_update();
         ainpc_page_update();
     }
@@ -6265,7 +6265,7 @@ void fn_80207698(_LB_NPC* self);
 u32 Pl_motion_end_ck(_PLW* self);
 u32 game_ready_ck(void);
 u32 lb_menu_kind_pair_ck(u8 a, u8 b);
-u32 fn_8021B8F4(u8 a, u8 b);
+u32 lb_menu_kind_deco_ck(u8 a, u8 b);
 void fn_801FDEE4(_LB_NPC* self, u32 motion);
 u32 fn_801FDFD0(_LB_NPC* self);
 void fn_801FE0AC(_LB_NPC* self, u16 motion_id, s32 a, s32 b);
@@ -6493,7 +6493,7 @@ u32 fn_80208928(_PLW* self)
     if (Pl_master_ck(self) != 0) {
         return 1;
     }
-    if (fn_8021B8F4(self->kind_0x015, self->area_0x16) == 1) {
+    if (lb_menu_kind_deco_ck(self->kind_0x015, self->area_0x16) == 1) {
         return 0;
     }
     if (lb_menu_kind_pair_ck(self->kind_0x015, self->area_0x16) != 1) {

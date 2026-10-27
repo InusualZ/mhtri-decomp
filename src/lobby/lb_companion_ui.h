@@ -490,7 +490,7 @@ s8 fn_800CF384(void);
  * header declares yet; the sibling units declare it the same way). */
 int memcmp(const void* a, const void* b, u32 n);
 void camera_slot_bit_set(u8 index, u8 value);
-s32 fn_802D7B5C(u16 id);
+s32 ai_npc_level_get(u16 id);
 s32 fn_802D7C6C(u16 id);
 void lb_panel_close(void);
 void userdata_progress_flag_set(u32 a);

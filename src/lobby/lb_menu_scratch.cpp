@@ -10,7 +10,7 @@
  * NAMES. `lb_menu_scratch` is the `.bss` block the unit constructs (`fn_8021EFC8`); the map and the dump give only
  *   placeholders for the functions.
  *   GUESS (from each body and its callers): `lb_fabsf`.
- * RESIDUALS. Unwritten: `fn_8021E538` (0x8021E538-0x8021EBF0), `fn_8021EC98` (0x8021EC98-0x8021EFBC).  `fn_8021EFBC`,
+ * RESIDUALS. Unwritten: `lb_menu_marker_update` (0x8021E538-0x8021EBF0), `lb_menu_marker_draw` (0x8021EC98-0x8021EFBC).  `fn_8021EFBC`,
  *   which the `.ctors` word points at, is written as a plain function, so the object emits no `.ctors`.
  *  - `fn_8021E1EC`: retail copies the fourth integer argument (`mr r30,r6`) after the float one (`fmr f31,f1`), ours
  *    before; the parameter order, local order and `~limit` spellings do not move it;
@@ -47,11 +47,11 @@ static inline LbMenuBigBlock* lb_menu_block(void)
  */
 extern "C" {
 void* fn_8021EFC8(LbMenuScratch* work);
-u32 fn_8021E1B4(LbMenuActor* self, VEC3* pos);
+u32 lb_menu_actor_angle_get(LbMenuActor* self, VEC3* pos);
 f32 fabsf(f32 v);
 
-u32 fn_8021DF50(u32 idx, u32 limit);
-void fn_8021DDA8(LbMenuCandidate* candidate, LbMenuRow* row);
+u32 lb_menu_angle_rank_get(u32 idx, u32 limit);
+void lb_menu_row_insert(LbMenuCandidate* candidate, LbMenuRow* row);
 f32 lb_fabsf(f32 v);
 s32 game_ready_ck(void);
 u8 userdata_rank_band_get(void);
@@ -88,14 +88,14 @@ s32 fn_8021E1EC(LbMenuActor* self, LbMenuActor* rec, LbMenuFallback* work, u32 l
         copyVec3(&pos, &work->pos_0x10);
     }
     if (lb_fabsf(pos.y - self->pos_0x03C.y) < lbl_80799C60) {
-        idx = fn_8021E1B4(self, &pos);
+        idx = lb_menu_actor_angle_get(self, &pos);
         dist_sq = calcDistanceSqXZ(&self->pos_0x03C, &pos);
         if ((idx < limit || idx > (u32)(-1 - (s32)limit)) && dist_sq < radius) {
             candidate.rec_0x00 = rec;
             candidate.work_0x04 = work;
             candidate.dist_sq_0x08 = dist_sq;
-            candidate.slot_0x0C = (s16)fn_8021DF50(idx, limit);
-            fn_8021DDA8(&candidate, &lb_menu_scratch.rows_0x00C[0]);
+            candidate.slot_0x0C = (s16)lb_menu_angle_rank_get(idx, limit);
+            lb_menu_row_insert(&candidate, &lb_menu_scratch.rows_0x00C[0]);
             return 1;
         }
     }

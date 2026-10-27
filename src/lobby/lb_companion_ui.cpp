@@ -1797,9 +1797,9 @@ void lb_entry_publish(void) {
     lb_param_w.sub_0x2E = lobby_world_block->word_0x51A2;
 }
 
-/* Recomputes the block's page flags: ORs `ai_skill_mask_get(fn_802D7B5C(word_0x51A0))` into `flags_0x519C`. */
+/* Recomputes the block's page flags: ORs `ai_skill_mask_get(ai_npc_level_get(word_0x51A0))` into `flags_0x519C`. */
 void lb_page_flags_update(void) {
-    u32 mask = ai_skill_mask_get(fn_802D7B5C(lobby_world_block->word_0x51A0));
+    u32 mask = ai_skill_mask_get(ai_npc_level_get(lobby_world_block->word_0x51A0));
     lobby_world_block->flags_0x519C = lobby_world_block->flags_0x519C | mask;
 }
 
