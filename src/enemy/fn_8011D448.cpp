@@ -18,15 +18,20 @@
  *   `em_seq_*` (the 8-byte {code, argument} action script), and the data names `em_eft_fx_*_tbl`/`_ids`.
  * RESIDUALS. All 101 rows written; partial rows:
  *  - `em_eft_fx_dispatch`: retail lays the stage-0 body after the three tail calls behind its own `b` (95.56).
- *  - `em_eft_fx_start_groups`, `em_damage_eval`, `em_parts_refresh`: register colouring only (the
- *    declaration orders `permdecl`/`hill` found do not reach it).
- *  - `em_seq_move_setup`, `em_seq_move_update`: retail lowers the move-kind switch into `subi`+`cmplwi` range tests
- *    (1-3, 7-8, then 5/4/6); every switch and if spelling tried gives a `cmpwi` tree or the wrong layout.
- *  - `em_seq_exec`: the jitter-mode test keeps the 0-2/4-6/3/7 ranges apart (ours merges them).
- *  - `em_seq_run`: the snore index's `(tick & 0x7F) + group * 31` schedules the tick load later.
+ *  - `em_damage_eval`: register colouring only.  The mwcc-debugger dump plus the colouring model reproduce retail's
+ *    registers when `damage` and the `em_part_limit_get` result (`rec`) are numbered as late webs (above the `@`
+ *    index temporaries) and `second` above `first`; no declaration order, block-local, initialiser or type reaches it.
+ *  - `em_parts_refresh`: retail re-zero-extends the group (`clrlwi r27,r24,24`) before the group loop and keeps
+ *    `all` in r26; every `u8`/`u32`/`s32` group and helper-parameter spelling elides the `clrlwi`.
+ *  - `em_parts_break`: `li r0,1`/`clrlwi r5` take swapped scratch registers (every shift spelling tried).
+ *  - `em_seq_exec`: the jitter-mode test ends `beq body; b skip` (ours `bne skip`) and the three int-to-float slots
+ *    alternate 0x8/0x10 from the other end; the `switch` spellings merge the 0-7 cases.
+ *  - `em_seq_run`: the stage-2 `alpha <= 0.0f` test loads into f0/f1 swapped; the snore index's
+ *    `(tick & 0x7F) + group * 31` adds its operands the other way round.
  *  - data: `.sdata2` lacks the effect family's 0.0f (0x80796C08, declared `extern`; the seam above), `.data` the
  *    4-byte pad at 0x805A0FAC.
- * SHAPES. `#pragma peephole off` (retail keeps the unfused `clrlwi`+`slwi`/`stb` pairs), `fp_contract off` (no fused
+ * SHAPES. `#pragma peephole off` (retail keeps the unfused `clrlwi`+`slwi`/`stb` pairs), `optimization_level 4` (the
+ *   move-kind switches lower to `subi`+`cmplwi` range tests, as in `ef/eft029_fx.cpp`), `fp_contract off` (no fused
  *   multiply-adds in the target) and `pool_data off` (the tables are defined here); the creators take `u32`
  *   type/timer arguments; the reactions' inner `switch (em_hit_dir_get(...))` list `default:` first; the move/flag
  *   checks of `enemy/em_common.cpp` return `u32` (retail compares them `cmplwi`); `em_get_part_limit`,
@@ -78,6 +83,7 @@
 
 /* The unit's codegen pragmas (the unit header's SHAPES line). */
 #pragma peephole off
+#pragma optimization_level 4
 #pragma fp_contract off
 #pragma pool_data off
 
@@ -554,9 +560,9 @@ extern "C" void em_eft_fx_dispatch(_EFT* self)
 extern "C" void em_eft_fx_start_groups(_EFT* self)
 {
     nw4r::math::MTX34 mtx;
-    s32 i;
     EmEftFxGroupWork* work;
     _ENEMY_WORK* owner;
+    s32 i;
     u16* ids;
     u16 group_id;
 
@@ -1100,19 +1106,41 @@ extern "C" void em_parts_break(_ENEMY_WORK* self, u8 group)
     }
 }
 
+/* Whether every other record of `group` has reached its level (or, `inverted`, has not). */
+static inline u32 em_parts_group_done(_ENEMY_WORK* self, EmPartBreakRec* list, EmPartBreakRec* found, u8 group,
+                                      u32 inverted)
+{
+    EmPartBreakRec* rec;
+    u32 all = 1;
+
+    for (rec = list; rec->part != 0xFF; rec++) {
+        if (rec != found && rec->group == group) {
+            if (rec->level > em_parts_damage_level_get(self, rec->part)) {
+                if (inverted == 1) {
+                    all = 0;
+                    break;
+                }
+            } else if (inverted == 0) {
+                all = 0;
+                break;
+            }
+        }
+    }
+    return all;
+}
+
 /* 0x8011EA90 - plays the break record of a part's new level (effect and sound at its joint), and breaks the part's
  * group once every record of the group has reached (or, for a 0x80 group, not reached) its level. */
 extern "C" void em_parts_refresh(_ENEMY_WORK* self, u8 part, s32 flag)
 {
     EmPartBreakRec* list;
+    EmPartBreakRec* rec;
     EmPartBreakRec* found;
     nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 tmp;
     u32 inverted;
-    EmPartBreakRec* rec;
-    u32 group;
-    u32 all;
+    u8 group;
     u32 (*hook)(_ENEMY_WORK*, u8);
 
     list = get_enemy_data(self)->part_breaks_0x88;
@@ -1162,21 +1190,7 @@ extern "C" void em_parts_refresh(_ENEMY_WORK* self, u8 part, s32 flag)
             }
         }
         if (found != NULL) {
-            all = 1;
-            for (rec = list; rec->part != 0xFF; rec++) {
-                if (rec != found && rec->group == (u8)group) {
-                    if (rec->level > em_parts_damage_level_get(self, rec->part)) {
-                        if (inverted == 1) {
-                            all = 0;
-                            break;
-                        }
-                    } else if (inverted == 0) {
-                        all = 0;
-                        break;
-                    }
-                }
-            }
-            if (all == 1) {
+            if (em_parts_group_done(self, list, found, group, inverted) == 1) {
                 em_parts_break(self, group & ~0x80);
             }
         }
@@ -1288,7 +1302,7 @@ extern "C" void em_damage_attr_add(_ENEMY_WORK* self, u8 part, u8 kind, s16 base
         break;
     case 9: case 10: case 11: case 12:
         if (em_eft_active_ck(self) == 1) {
-            value = value * 1.5f;
+            value *= 1.5f;
         }
         self->ailment_0x802[kind - 9] += value;
         break;
@@ -1360,7 +1374,7 @@ extern "C" void em_damage_hate_add(_ENEMY_WORK* self, u8 side, u8 index, s16 dam
         player = &((EmPlayerWork*)get_move_work_adrs(2))[index];
         if (player->active != 0) {
             if (Pl_Skill_ck((_PLW*)player, 12) == 1) {
-                hate = hate * 1.5f;
+                hate *= 1.5f;
             }
             if (hate > 2000) {
                 hate = 2000;
@@ -1854,7 +1868,7 @@ extern "C" u8 em_hit_dir_mode_get(_ENEMY_WORK* self, u8 kind)
 /* 0x801204F0 - whether reaction `kind` turns the enemy toward the hit (data table, second byte). */
 extern "C" u8 em_hit_dir_turn_mode_get(_ENEMY_WORK* self, u8 kind)
 {
-    return get_enemy_data(self)->hit_dirs_0x34[kind * 2 + 1];
+    return (get_enemy_data(self)->hit_dirs_0x34 + kind * 2)[1];
 }
 
 /* 0x80120530 - the side the hit came from for reaction `kind` (0 back, 1 left, 2 front, 3 right; 4 = not
@@ -3586,7 +3600,7 @@ extern "C" u8 em_seq_exec(_ENEMY_WORK* self, EmSeqCmd* seq, u8 reverse)
     s32 speed;
     EmSeqTurn* turn;
     f32* floats;
-    u32 mode;
+    s32 mode;
     f32 jitter_x;
     f32 jitter_y;
     f32 jitter_z;
@@ -3741,24 +3755,30 @@ extern "C" u8 em_seq_exec(_ENEMY_WORK* self, EmSeqCmd* seq, u8 reverse)
             copyVec3(&self->v_0x310, &move->velocity);
             copyVec3(&self->v_0x31C, &move->accel);
             mode = move->mode[0] & ~0xC0;
-            if (mode <= 2 || (u32)(mode - 4) <= 2 || mode == 3 || mode == 7) {
+            if ((mode >= 0 && mode <= 2) || (mode >= 4 && mode <= 6) || mode == 3 || mode == 7) {
                 jitter_x = (f32)(s32)(self->bits_0x1EC & 0xF000) / 65536.0f;
                 jitter_y = (f32)(s32)((self->bits_0x1EC & 0xF00) << 4) / 65536.0f;
                 jitter_z = (f32)(s32)((self->bits_0x1EC & 0xF0) << 8) / 65536.0f;
             }
             if (!(move->mode[0] & 0x80)) {
-                jitter_x = jitter_x * 2.0f - 1.0f;
-                jitter_y = jitter_y * 2.0f - 1.0f;
-                jitter_z = jitter_z * 2.0f - 1.0f;
+                jitter_x *= 2.0f;
+                jitter_x -= 1.0f;
+                jitter_y *= 2.0f;
+                jitter_y -= 1.0f;
+                jitter_z *= 2.0f;
+                jitter_z -= 1.0f;
             }
-            if (mode <= 3) {
+            switch (mode) {
+            case 0: case 1: case 2: case 3:
                 self->v_0x310.x = self->v_0x310.x + move->limit.x * jitter_x;
                 self->v_0x310.y = self->v_0x310.y + move->limit.y * jitter_y;
                 self->v_0x310.z = self->v_0x310.z + move->limit.z * jitter_z;
-            } else if ((s32)mode >= 4 && (s32)mode <= 7) {
+                break;
+            case 4: case 5: case 6: case 7:
                 self->v_0x31C.x = self->v_0x31C.x + move->limit.x * jitter_x;
                 self->v_0x31C.y = self->v_0x31C.y + move->limit.y * jitter_y;
                 self->v_0x31C.z = self->v_0x31C.z + move->limit.z * jitter_z;
+                break;
             }
             if (move->mode[0] & 0x40) {
                 vec3_scale_in_place(&self->v_0x310, get_em_chg_scale(self));
@@ -4101,9 +4121,9 @@ extern "C" u32 em_seq_step_ck(_ENEMY_WORK* self, EmSeqCmd* cmd, u8 moved)
 {
     u32 done = 0;
     u8 released;
-    s32 i;
-    EmCarrySlot* carry;
     u16 wait;
+    EmCarrySlot* carry;
+    s32 i;
     EmSeqMotion* motion;
 
     switch (self->seq_stage_0x8D2) {
