@@ -946,7 +946,10 @@ struct _ENEMY_WORK {
         struct {
         /* +0x454 */ u8 unused_0x454[0x464 - 0x454];
         /* +0x464 */ f32 field_0x464;      /* the motion parameter `em001_act3_4` hands to `em_mot_layer_blend_step` */
-        /* +0x468 */ u16 sync_flag_0x468;   /* cleared by every enemy net send and receive */
+        union {
+            /* +0x468 */ u16 sync_flag_0x468;   /* cleared by every enemy net send and receive */
+            /* +0x468 */ s16 sync_wait_0x468;   /* the same word as the frames `em_owner_slot_update` waits (`lha`) */
+        };
         /* +0x46A */ u8 freeze_0x46A;  /* set, `em_timers_update` runs only the motion and shake timers */
         /* +0x46B */ s8 event_slot_0x46B;  /* the enemy-control event target it was matched to, -1 = none */
         /* +0x46C */ u8 field_0x46C;       /* the area/entry byte `fn_80170804` latches to 0xFF */
@@ -1041,8 +1044,14 @@ struct _ENEMY_WORK {
     /* +0x801 */ u8 field_0x801;        /* cleared when the work is set up (`em_act_advance`) */
     /* +0x802 */ u8 unused_0x802[0x810 - 0x802];
     /* +0x810 */ s16 mark_timer_0x810;  /* the frames the enemy stays marked (`em_net_flag_apply_0`) */
-    /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
-    /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
+    union {
+        /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
+        /* +0x812 */ s16 hit_timer_0x812;   /* the same word as the hit timer `em_hit_timer_tick` runs down (`lha`) */
+    };
+    union {
+        /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
+        /* +0x814 */ s16 hit_bits_0x814;    /* the same word as the hit bits `em_hit_timer_set` ors in (`lha`) */
+    };
     /* +0x816 */ u16 field_0x816;       /* the knock direction of the strongest hit taken (`Pl/pl_hit.cpp`) */
     /* +0x818 */ s16 field_0x818;       /* the motion timer `em_hit_kind_accept_ck` arms before its mode switch */
     /* +0x81A */ s16 field_0x81A;     /* the motion timer `em015_area_follow` gates its arming on
@@ -1144,8 +1153,14 @@ struct _ENEMY_WORK {
     /* +0x944 */ s16 field_0x944;
     /* +0x946 */ s16 exhaust_limit_0x946;  /* the exhaust buildup that exhausts the enemy */
     /* +0x948 */ s16 exhaust_decay_0x948;  /* the frames to the next exhaust decay */
-    /* +0x94A */ u16 field_0x94A;       /* the action-end block clears it */
-    /* +0x94C */ u16 field_0x94C;       /* the action-end block clears it */
+    union {
+        /* +0x94A */ u16 field_0x94A;       /* the action-end block clears it */
+        /* +0x94A */ s16 wait_timer_0x94A;  /* the same word as the timer `em_timer_0x94A_tick` runs down (`lha`) */
+    };
+    union {
+        /* +0x94C */ u16 field_0x94C;       /* the action-end block clears it */
+        /* +0x94C */ s16 break_timer_0x94C; /* the same word as the timer `em_break_timer_tick` runs down (`lha`) */
+    };
     /* +0x94E */ u8 ailment_0x94E;  /* the running ailments: 1 sleep, 2 poison, 4 paralysis (`em_status_ck`) */
     /* +0x94F */ u8 field_0x94F;
     /* +0x950 */ s16 sleep_timer_0x950;  /* the frames the sleep lasts (`em_sleep_start`) */
