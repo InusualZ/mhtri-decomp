@@ -8,7 +8,10 @@
  *   `-O4,p -inline auto` loses 58 rows, `-O3 -inline auto` 13, `-O4,p -inline noauto` 56).  File-scope
  *   `#pragma peephole off`, as in the neighbour (the kept `extsb`/`cmpwi` pairs need it); `#pragma pool_data off` (the
  *   static initialiser loads each `.bss` object by its own symbol, not from one `...bss.0` base); a closing
- *   `#pragma dont_inline on` (the static initialiser calls the implicit `NetworkCommunityPeer` constructor out of line).
+ *   `#pragma dont_inline on` (the static initialiser calls the implicit `NetworkCommunityPeer` constructor out of line);
+ *   file-scope `#pragma optimization_level 4` (the case-29 switch's `subi`/`cmplwi` range tests, and the peer offset
+ *   kept in a callee-saved register across the chat-log calls); `#pragma opt_common_subs off` on
+ *   `communityReflectCallback` (retail recomputes the mail text address at each call).
  * NAMES. No `__FILE__` string covers the range; the file name and the function names are GUESSes from the bodies (the
  *   session command each issues or reads back): `sendProfileHead`, `sendProfileRange7C`, `sendProfileRank`,
  *   `sendProfileRecord`, `resendProfileRecord`, the `NetProfileRec` fields, `NetProfileLabels`,
@@ -29,20 +32,15 @@
  *   `Network/NetworkCommunityPat.cpp` copies); `.data` 0x118 against 0x120 (retail leaves a zero word after each of
  *   the two jump tables).
  *   Partial rows:
- *  - `sessionReflectCallback`: the case-29 message switch lowers to a binary compare tree where retail tests
- *    `(u32)(kind - 1) <= 3` linearly (an if/else chain, `s8`/`u32`/`s32` selectors measured worse or equal); the
- *    chat-record text address (+0x35) is CSE'd into r27; the peer offset (index * 0x120) is recomputed for the chat-log
- *    call in cases 7 and 27; cases 24/25 keep an `extsb` before the server-index `stb` (an `s8` slot pointer is equal,
- *    a `u8` store worse);
- *  - `communityReflectCallback`: the mail text address (+0x35) is CSE'd into a callee-saved register at both mail
- *    sites (`&text[0]`, casts and an inline mediator helper measured equal), which costs the 0x10 B frame;
- *  - `sendProfileHead`, `installCommunityCallback`: retail loads the region byte and shifts it before the count store
- *    and stores it after the first kind; the store orders and the temporary tried measured equal or worse;
- *  - `startRosterFetch`: the four callee-saved registers permuted (retail r31 result / r28 work / r30 profile);
- *  - `onCircleListReceived`: work and the circle cursor swap r30/r31 (the best of 120 declaration orders);
+ *  - `sessionReflectCallback`: case 12 loads the error code through `data`'s parameter register r7 where retail
+ *    uses its saved copy r28 (a typed local, the operand order and a nested test measured equal);
+ *  - `sendProfileHead`, `installCommunityCallback`, `startRosterFetch`: retail computes the first presence value
+ *    into its own register before the constant stores and stores it after the first kind; every store order, a
+ *    temporary, an inline pair setter and `scheduling off`/`optimization_level 2-3` on the function leave our value
+ *    computed at its store (the kind-first order costs `startRosterFetch` a fifth saved register); its four
+ *    callee-saved registers are permuted (retail r31 result / r28 work / r30 profile);
+ *  - `onCircleListReceived`: work and the circle cursor swap r30/r31 (every declaration order measured equal);
  *  - `getProfileMemberCounts`: the three out-parameters take r30/r28/r29 where retail takes r28/r29/r30;
- *  - `requestPeerProfileById`, `buildRosterSync`, `getProfileQuestRecord`: one register permutation each (the quest
- *    record pointer is computed into r3 where retail keeps it in r4).
  * SHAPES. `refreshRosterCache` decrements the server type as `- 1LL` (retail's `li r0,-1` + `addc`, no mask before the
  *   byte store); `copyPeerProfileCard` tests the card's own settings byte after storing it.
  *  - Each session-request completion uses a block-local `req` pointer (an inline helper, or the field spelled
@@ -55,6 +53,13 @@
  *   unit's `NetUserProfile`.  The roster/recent removals declare entry, next, list and index in that order; the
  *   community callback's roster copy indexes the work record directly and its recent copy goes through a block pointer
  *   declared after the result store.
+ *  - A profile picked by index is spelled `p = work->profiles_0x168; p = &p[index];` (the base load first, into the
+ *   pointer's own register); case 16 clears the member through a slot pointer; case 4 tests `data` before taking
+ *   `req`; case 27's chat-log id is `&peers[peer]` while `strcmp` takes the id text, and the session chat's log text
+ *   is the union's `chars_0x035` (each spelling keeps retail's recomputed address); the server-index copy stores
+ *   through a `u8` view of the slot (no `extsb`); the community callback's id text is 0x10 B (its 0x30 B frame);
+ *   the circle-list loop initialises `i` then the cursor and steps the cursor first; `buildRosterSync`'s party flag
+ *   is a `bool`.
  */
 
 #include "Network/net_session_close.h"
@@ -89,6 +94,7 @@
 
 #pragma peephole off
 #pragma pool_data off
+#pragma optimization_level 4
 
 /* The kind-0 move work, seen only as the four per-member link-state bytes `setMoveWorkMemberState` writes.
  * size: 0x22E1 (approximate: the highest byte written here) */
@@ -159,7 +165,7 @@ static inline void copyServerIndexes(NetCtrlWk* work, const u8* slots, s32 count
         if ((s8)*slots == work->selected_server_0x06A) {
             work->field_0x070 = 1;
         }
-        work->server_index_0x074[i] = *slots++;
+        *(u8*)&work->server_index_0x074[i] = *slots++;
     }
     for (; i < 4; i++) {
         work->server_index_0x074[i] = -1;
@@ -181,7 +187,8 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
     s32 i;
 
     if (work->profile_index_0x170 >= 0) {
-        profile = &work->profiles_0x168[work->profile_index_0x170];
+        profile = work->profiles_0x168;
+        profile = &profile[work->profile_index_0x170];
     } else {
         profile = NULL;
     }
@@ -219,19 +226,21 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
             copyCircleToProfile(*(s32*)data, 0);
             lobby_w.item_list_selection_0x162 = getItemListSelection();
         }
-        req = &work->session_request_0x829C;
-        if (data != NULL && req->done_0x08 != NULL) {
-            req->status_0x0C = 2;
-            if (*slot == 1) {
-                req->values_0x10[0] = member;
-                req->values_0x10[1] = *(s32*)data;
-            } else {
-                req->values_0x10[0] = -1;
-                req->values_0x10[1] = -1;
+        if (data != NULL) {
+            req = &work->session_request_0x829C;
+            if (req->done_0x08 != NULL) {
+                req->status_0x0C = 2;
+                if (*slot == 1) {
+                    req->values_0x10[0] = member;
+                    req->values_0x10[1] = *(s32*)data;
+                } else {
+                    req->values_0x10[0] = -1;
+                    req->values_0x10[1] = -1;
+                }
+                req->done_0x08(req->status_0x0C, req->values_0x10);
+                req->busy_0x00 = 0;
+                req->done_0x08 = NULL;
             }
-            req->done_0x08(req->status_0x0C, req->values_0x10);
-            req->busy_0x00 = 0;
-            req->done_0x08 = NULL;
         }
         break;
     case 5:
@@ -269,7 +278,8 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
         break;
     case 7:
         if (work->profile_index_0x170 >= 0) {
-            joined = &work->profiles_0x168[work->profile_index_0x170];
+            joined = work->profiles_0x168;
+            joined = &joined[work->profile_index_0x170];
             if (joined != NULL) {
                 char join_text[0x18];
                 char line[0x80];
@@ -369,10 +379,12 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
         }
         break;
     case 16:
-        joined = &work->profiles_0x168[work->profile_index_0x170];
+        joined = work->profiles_0x168;
+        joined = &joined[work->profile_index_0x170];
         if (joined != NULL) {
-            joined->members_0x090[member].joined_0x00 = 0;
-            joined->members_0x090[member].flag_0x04 = 0;
+            slot_member = &joined->members_0x090[member];
+            slot_member->joined_0x00 = 0;
+            slot_member->flag_0x04 = 0;
             work->flag_0xC379 = 0;
         }
         work->profile_index_0x170 = -1;
@@ -387,7 +399,8 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
         break;
     case 17:
         work->server_slot_state_0x040[member] = 0;
-        joined = &work->profiles_0x168[work->profile_index_0x170];
+        joined = work->profiles_0x168;
+        joined = &joined[work->profile_index_0x170];
         if (joined != NULL) {
             joined->members_0x090[member].joined_0x00 = 0;
             joined->members_0x090[member].flag_0x04 = 0;
@@ -410,7 +423,7 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
             formatNetId(id_text, &((NetSessionChatRecord*)data)->sender_0x000);
             postMediatorRecord(getInstance(), ((NetSessionChatRecord*)data)->text_0x035);
             postChatLogLine(0, member, ((NetSessionChatRecord*)data)->color_0x238,
-                        (const char*)((NetSessionChatRecord*)data)->text_0x035, id_text,
+                        ((NetSessionChatRecord*)data)->chars_0x035, id_text,
                         ((NetSessionChatRecord*)data)->name_0x020);
         }
         entry = work->entries_0x7CD8;
@@ -428,7 +441,7 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
             formatNetId(id_text, &((NetSessionChatRecord*)data)->sender_0x000);
             postMediatorRecord(getInstance(), ((NetSessionChatRecord*)data)->text_0x035);
             postChatLogLine(0, member, ((NetSessionChatRecord*)data)->color_0x238,
-                        (const char*)((NetSessionChatRecord*)data)->text_0x035, id_text,
+                        ((NetSessionChatRecord*)data)->chars_0x035, id_text,
                         ((NetSessionChatRecord*)data)->name_0x020);
         }
         break;
@@ -553,7 +566,7 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
                     } else {
                         sprintf(line, MH3GetErrorString2(36), work->peers_0x7488[peer].id_0x00.text_0x00);
                     }
-                    postChatLogLine(1, 0, 0xFFFFF0, line, work->peers_0x7488[peer].id_0x00.text_0x00,
+                    postChatLogLine(1, 0, 0xFFFFF0, line, (const char*)&work->peers_0x7488[peer],
                                 work->peers_0x7488[peer].name_0x0A.text_0x00);
                 }
             }
@@ -882,12 +895,13 @@ void postQuestBoardRecord(u8* record)
  */
 u16* getProfileQuestRecord(s32 index)
 {
-    NetProfileRec* profiles = net_ctrl_wk->profiles_0x168;
+    NetProfileRec* profile = net_ctrl_wk->profiles_0x168;
 
-    if (profiles[index].active_0x040 == 0) {
+    profile = &profile[index];
+    if (profile->active_0x040 == 0) {
         return NULL;
     }
-    return &profiles[index].quest_id_0x190;
+    return &profile->quest_id_0x190;
 }
 
 /*
@@ -919,8 +933,7 @@ void onCircleListReceived(s32 status, s32* values)
     if (list == NULL) {
         return;
     }
-    circle = list->items_04;
-    for (i = 0; i < work->profile_count_0x164; i++, circle++, profile++) {
+    for (i = 0, circle = list->items_04; i < work->profile_count_0x164; circle++, i++, profile++) {
         profile->index_0x000 = i;
         profile->active_0x040 = 0;
         memset(&profile->quest_id_0x190, 0, 292);
@@ -1908,7 +1921,7 @@ void buildRosterSync(struct NetRosterSync* sync)
 {
     BOOL in_town = lobby_world_block[0x3F0C] == 7;
     BOOL hidden = ck_option_cfg(27) == 0;
-    BOOL in_party = net_ctrl_wk->flag_0xC379 == 1;
+    bool in_party = net_ctrl_wk->flag_0xC379 == 1;
     BOOL away = lobby_w.field_0x0B0 == 3;
 
     if (net_ctrl_wk->layer_state_0x064 == 0) {
@@ -1987,9 +2000,9 @@ void sendProfileHead(s8* result)
         return;
     }
     net_presence_record.pairs_0x04[0].value_0x4 = net_user_profile.region_0x05 << 24;
-    net_presence_record.count_0x00 = 4;
     net_presence_record.pairs_0x04[0].enabled_0x0 = 1;
     net_presence_record.pairs_0x04[1].enabled_0x0 = 1;
+    net_presence_record.count_0x00 = 4;
     net_presence_record.pairs_0x04[1].value_0x4 =
         net_user_profile.rank_0xF2 | ((net_user_profile.id_0x00 << 16) | (net_user_profile.level_0xF3 << 8));
     work->profile_write_0xC148 = 2;
@@ -2426,6 +2439,7 @@ void removeRecentEntry(const NetworkUniqueId* address)
 
 /* The community layer's reflect callback: records the result word (and a failure's error triple), copies what the
  * command delivered (roster, recent players, state, mail, presence) and reports through the caller's result byte. */
+#pragma opt_common_subs off
 /* untyped: caller-owned payload - each community command delivers its own record */
 s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
 {
@@ -2696,7 +2710,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
         } else {
             work->community_results_0xA144[command] = 1;
             if (isRosterMember((const NetworkUniqueId*)data) == 0) {
-                char id_text[0x14];
+                char id_text[0x10];
                 NetRosterRec* presence = (NetRosterRec*)data;
 
                 formatNetId(id_text, &presence->address_0x00);
@@ -2748,6 +2762,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
     }
     return 0;
 }
+#pragma opt_common_subs reset
 
 /*
  * Renders the unique id `id` as its exported text into `out` (ten bytes), printing every `%` as `*`.

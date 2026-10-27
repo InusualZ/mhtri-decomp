@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (209)
+## Ideas that work (211)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -218,6 +218,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 230 | [Retail indexes three bytes with lbzx from precomputed +1/+2 offsets: a second table read with the same index keeps them](230-retail-indexes-three-bytes.md) | works | source-shape | Ours reads tbl[i*3+1]/tbl[i*3+2] as add + lbz 1/2(rX) where retail computes addi rA,rI,1 / addi rB,rI,2 up front and loads lbzx from the table base. |
 | 231 | [A 0xFFFF halfword store built as lis 1 + subi 1 means the field is u16, not s16](231-0xffff-halfword-store-built.md) | works | source-shape | Retail stores 0xFFFF with `lis r3,0x1` + `subi r0,r3,0x1` + `sth`, ours with `li r0,-0x1` + `sth` |
 | 232 | [A switch case's early exit shares the default's return - break on the pass test, fall through into default](232-switch-cases-early-exit.md) | works | source-shape | A case's `if (a \|\| b \|\| c) return; break;` plus `default: return;` leaves one `b <epilogue>` too many (the default's dead body, or the case's own return block) between the case and the next body |
+| 233 | [An element pointer whose base must load first into its own register: assign the base, then index the pointer](233-element-pointer-whose-base.md) | works | source-shape, allocator | Retail loads an array's base pointer first, straight into the element pointer's register (`lwz r29,0x168(r30) ; mulli ; add r29,r29,r0`), where `p = &work->arr[i]` loads the index first or computes into a scratch... |
+| 234 | [Retail recomputes one address at two call sites: spell the two uses differently (union member, element address) to defeat the CSE](234-retail-recomputes-one-address.md) | works | source-shape, allocator | Ours keeps an address used by two calls in a callee-saved register (`addi r27,r28,0x35` + `mr r4,r27` / `mr r6,r27`) where retail recomputes it as each call's argument (`addi r4,r28,0x35` ... `addi r6,r28,0x35`). |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
