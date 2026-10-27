@@ -20,7 +20,7 @@
 #include "g3d/g3d_anmscn.h"            /* fn_8006584C/fn_80066E80, owner g3d/g3d_anmscn.cpp (rule 2) */
 #include "g3d/g3d_rescommon.h"          /* nw4r::g3d::ResDic / ResName (rule 2) */
 #include "g3d/g3d_anmchr.h"             /* fn_8006268C/fn_80062914/fn_80062750 (rule 2) */
-#include "font/flfnt.h"                 /* fn_8005B1E4 (rule 2) */
+#include "nw4r/ut_Color.h"             /* nw4r::ut::Color (weak copies kept in font/dbg_drawgraph.cpp) */
 #include "g3d/g3d_resanmamblight.h"     /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c */
 #include "g3d/g3d_anmshp.h" /* ResDic::GetNumData's owner (rule 2) */
 #include "g3d/g3d_resanmtexsrt.h" /* fn_80092330 (rule 2) */
@@ -52,13 +52,13 @@ typedef struct {
     /* +0x14 */ f32 field_0x14;
     /* +0x18 */ f32 field_0x18;
     /* +0x1C */ f32 field_0x1C;
-    /* +0x20 */ u32 inlineColor;
+    /* +0x20 */ nw4r::ut::Color inlineColor;
     /* +0x24 */ u32 field_0x24;
     /* +0x28 */ f32 field_0x28;
     /* +0x2C */ f32 field_0x2C;
     /* +0x30 */ u32 field_0x30;
     /* +0x34 */ f32 field_0x34;
-    /* +0x38 */ u32 inlineColor2;
+    /* +0x38 */ nw4r::ut::Color inlineColor2;
     /* +0x3C */ f32 field_0x3C;
 } ResAnmLightResult; /* size: 0x40 */
 
@@ -134,8 +134,7 @@ extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pRes
         pResult->nearChannel = res_anm_data_get_result(&res->channel_0x24, frame, (flags & 0x00080000) != 0);
         pResult->midChannel = res_anm_data_get_result(&res->channel_0x28, frame, (flags & 0x00100000) != 0);
         pResult->farChannel = res_anm_data_get_result(&res->channel_0x2C, frame, (flags & 0x00200000) != 0);
-        fn_8005B1E4(&pResult->inlineColor,
-            fn_8008A188(&res->channel_0x30, clamped, (flags & 0x00400000) != 0));
+        pResult->inlineColor = fn_8008A188(&res->channel_0x30, clamped, (flags & 0x00400000) != 0);
         if (useSecond) {
             pResult->field_0x14 = res_anm_data_get_result(&res->channel_0x34, frame, (flags & 0x01000000) != 0);
             pResult->field_0x18 = res_anm_data_get_result(&res->channel_0x38, frame, (flags & 0x02000000) != 0);
@@ -161,8 +160,7 @@ extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pRes
             break;
         }
         if (second) {
-            fn_8005B1E4(&pResult->inlineColor2,
-                fn_8008A188(&res->channel_0x54, clamped, (flags & 0x40000000) != 0));
+            pResult->inlineColor2 = fn_8008A188(&res->channel_0x54, clamped, (flags & 0x40000000) != 0);
             pResult->field_0x3C = res_anm_data_get_result(&res->channel_0x58, frame, (flags & 0x80000000) != 0);
             pResult->typeWord = res->field_0x14;
         }

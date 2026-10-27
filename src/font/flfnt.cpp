@@ -1,35 +1,24 @@
 /*
- * font/flfnt.cpp - the game's debug draw (`disp_beta_tex`, `dbg_drawgraph_init`) and its font/debug-print
- *   console (`flfnt*`, `flKnjMsg*`, `font_*`, `msg_str_gen`, `utf82unicode2`), with the GX pipe helpers.
- * RANGE. .text 0x8005ABD8-0x8005CED0 (59 functions); extab 0x80007328-0x800073C8, extabindex
- *   0x8001F62C-0x8001F71C, .data 0x8058B388-0x8058B410, .bss 0x8066AE60-0x8066AE80, .sdata
- *   0x80791130-0x80791138, .sbss 0x807948D8-0x807948E8, .sdata2 0x80795CF8-0x80795D48.
- * RANGE. Left edge: the registered `g3d/fn_8005AA28.cpp` ends at 0x8005ABD8.  Right edge 0x8005CED0: the
- *   next five functions return the 0x18000-byte `.bss` buffer 0x8066AE80-0x80682E80 that only g3d calc units
- *   call (nw4r g3d work memory, kept in `g3d/g3d_anmchr.cpp`), and from 0x8005CF10 the asserts pass
- *   "g3d_anmchr.cpp".
- * RANGE. Two TUs, not one (seam request filed): `.sdata2` holds 0.0f, 1.0f and 0x4330000000000000 twice each
- *   (0x80795CF8/0x80795D24, 0x80795CFC/0x80795D40, 0x80795D18/0x80795D38) and a TU pools a value once;
- *   0x80795CF8-0x80795D20 is read only by `disp_beta_tex`/`dbg_drawgraph_init`, 0x80795D20-0x80795D48 only by
- *   flfntGlyphPut/`flfntFlush`.  The out-of-line GX helpers also appear twice (0x8005AEC0-0x8005AF1C after
- *   `disp_beta_tex`, 0x8005C4CC-0x8005C50C after `flfntFlush`), and the extab records split after the
- *   ut::Color destructor: the debug draw is 0x8005ABD8-0x8005B26C, the font console 0x8005B26C-0x8005CED0.
+ * font/flfnt.cpp - the game's font/debug-print console (`flfnt*`, `flKnjMsg*`, `font_*`, `msg_str_gen`,
+ *   `utf82unicode2`), with the GX pipe helpers.
+ * RANGE. .text 0x8005B26C-0x8005CED0 (48 functions); extab 0x80007350-0x800073C8, extabindex
+ *   0x8001F668-0x8001F71C, .data 0x8058B388-0x8058B410, .bss 0x8066AE60-0x8066AE80, .sdata
+ *   0x80791130-0x80791138, .sbss 0x807948D8-0x807948E8, .sdata2 0x80795D20-0x80795D48.
+ * RANGE. Left edge 0x8005B26C: `font/dbg_drawgraph.cpp` (the debug draw) ends there - its `.sdata2` pool
+ *   0x80795CF8-0x80795D20 repeats this unit's 0.0f, 1.0f and 0x4330000000000000, and the extabindex records
+ *   split after the `ut::Color` destructor.  Right edge 0x8005CED0: the next five functions return the
+ *   0x18000-byte `.bss` buffer 0x8066AE80-0x80682E80 that only g3d calc units call (nw4r g3d work memory, kept
+ *   in `g3d/g3d_anmchr.cpp`), and from 0x8005CF10 the asserts pass "g3d_anmchr.cpp".
  * FLAGS. the `g3d` lib's `cflags_g3d`, as in the unit this range was cut from.
  * NAMES. The `flfnt*`/`font_*`/`flKnjMsg*` entry points are the map's.  GUESS (from each body and its callers):
  *   `font_buffer_size_get`, `font_color_set`, `flfnt_frame_reset`, `getGlyphWidth`, `gx_tex_obj_copy`,
  *   `flfntSetPaletteColor`, `flfntStrCells`, `flfntSetAttr`, `flfntCacheFind`, `flfntGlyphAlloc`, `flfntCacheLoad`,
  *   `flfntGlyphPut`, `flfntUtf8Decode`, `flfntCodeIndex`, `flfntAsciiCode`, `flfntGlyphAdvance`, `flfntDrawText`,
- *   `flfntColorPuts`, the GX helper copies `dbgGX*`/`fntGX*` (the SDK's inline GXEnd/GXTexCoord2f32/GXColor4u8/
+ *   `flfntColorPuts`, the GX helper copies `fntGX*` (the SDK's inline GXEnd/GXTexCoord2f32/
  *   GXColor1u32/GXPosition3f32/GXSetTexCoordGen, emitted out of line), and the data `flfnt_state`,
  *   `font_typed_count`, `flfnt_frame_work`, `flfnt_default_config`, `flfnt_palette`.  `FlFnt` and its field
  *   names are GUESSES read off the bodies.
- * RESIDUALS. Unwritten: __dt__Q34nw4r2ut5ColorFv (0x44, the weak ut::Color destructor retail emits after
- *   dbg_drawgraph_init).  The data sections cannot match while the range is one object (the duplicated pool
- *   constants above); `.sbss` holds 8 bytes per object in retail (font_typed_count at +0x8), ours packs them.
- * RESIDUALS. dbg_drawgraph_init: retail computes the GXSetFog colour argument's address before the copy
- *   (`addi r4,r1,8` first); writing the argument as a `nw4r::ut::Color(0xFFFFFFFF)` temporary under
- *   `#pragma dont_inline on` reproduces that order and emits the weak destructor, but calls it and renames
- *   fn_8005B1B4/fn_8005B1E4/fn_8005B224 to the class members other g3d units call by C name.
+ * RESIDUALS. `.sbss` holds 8 bytes per object in retail (font_typed_count at +0x8), ours packs them.
  * RESIDUALS. utf82unicode2/flfntUtf8Decode: retail keeps the final continuation-byte test as a branch
  *   (`subi`/`cmplwi 0x3F`/`ble`); every spelling tried either splits the range test or becomes a select.
  *   getGlyphWidth: retail returns without `clrlwi` (an int return), but `Network/network_pat_control.cpp`
@@ -78,6 +67,7 @@
 #include "font/flfnt.h"
 #include "font/flKnjMsgNum.h"
 #include "font/flfntGetSizeX.h"
+#include "font/dbg_drawgraph.h"
 #include "font/flfnt_frame_reset.h"
 #include "font/font_str_char_count.h"
 #include "font/font_print_plain.h"
@@ -194,164 +184,6 @@ FlFnt* flfnt_state;
 s16 font_typed_count[2];
 
 /* --- bodies, in address order ---------------------------------------------------------------------- */
-
-extern "C" void dbgGXEnd(void);
-extern "C" void dbgGXTexCoord2f32(f32 s, f32 t);
-extern "C" void dbgGXColor4u8(u32 r, u32 g, u32 b, u32 a);
-extern "C" void dbgGXPosition3f32(f32 x, f32 y, f32 z);
-extern "C" void dbgGXSetTexCoordGen(u32 coord, u32 func, u32 src, u32 mtx);
-
-/* 0x8005ABD8 (0x2E8): draws `tex` as a quad at `pos` of `size`, tinted `color`, in screen space. */
-void disp_beta_tex(Vec* pos, Vec2* size, GXColor color, GXTexObj* tex)
-{
-    Mtx44 proj;
-    Mtx mv;
-
-    dbg_drawgraph_init();
-    GXSetCopyFilter(0, NULL, 0, NULL);
-    GXInvalidateTexAll();
-    GXSetBlendMode(1, 4, 5, 0);
-    GXSetColorUpdate(1);
-    C_MTXOrtho(proj, 0.0f, Screen_w.height_f, 0.0f, Screen_w.width_f, 0.0f, 1.0f);
-    GXSetProjection(proj, 1);
-    PSMTXIdentity(mv);
-    GXLoadPosMtxImm(mv, 0);
-    GXSetCurrentMtx(0);
-    GXSetCullMode(0);
-    GXSetZMode(1, 7, 0);
-    GXSetNumTexGens(1);
-    dbgGXSetTexCoordGen(0, 1, 4, 60);
-    GXLoadTexObj(tex, 0);
-    GXSetNumTevStages(1);
-    GXSetTevDirect(0);
-    GXSetTevOp(0, 0);
-    GXSetTevOrder(0, 0, 0, 4);
-    GXSetNumChans(1);
-    GXSetChanCtrl(4, 0, 0, 1, 0, 0, 2);
-    GXClearVtxDesc();
-    GXSetVtxDesc(9, 1);
-    GXSetVtxDesc(11, 1);
-    GXSetVtxDesc(13, 1);
-    GXSetVtxAttrFmt(0, 9, 1, 4, 0);
-    GXSetVtxAttrFmt(0, 11, 1, 5, 0);
-    GXSetVtxAttrFmt(0, 13, 1, 4, 0);
-    GXBegin(0x80, 0, 4);
-    dbgGXPosition3f32(pos->x, pos->y, pos->z);
-    dbgGXColor4u8(color.r, color.g, color.b, color.a);
-    dbgGXTexCoord2f32(0.0f, 0.0f);
-    dbgGXPosition3f32(pos->x + size->x, pos->y, pos->z);
-    dbgGXColor4u8(color.r, color.g, color.b, color.a);
-    dbgGXTexCoord2f32(1.0f, 0.0f);
-    dbgGXPosition3f32(pos->x + size->x, pos->y + size->y, pos->z);
-    dbgGXColor4u8(color.r, color.g, color.b, color.a);
-    dbgGXTexCoord2f32(1.0f, 1.0f);
-    dbgGXPosition3f32(pos->x, pos->y + size->y, pos->z);
-    dbgGXColor4u8(color.r, color.g, color.b, color.a);
-    dbgGXTexCoord2f32(0.0f, 1.0f);
-    dbgGXEnd();
-    GXSetCopyFilter(Rmode->aa, Rmode->sample_pattern, 1, Rmode->vfilter);
-}
-
-/* The GX pipe helpers (write-gather-pipe writers; the SDK's own `GXPosition*`/`GXColor*` shapes). */
-extern "C" void dbgGXEnd(void)
-{
-}
-
-extern "C" void dbgGXTexCoord2f32(f32 s, f32 t)
-{
-    GXWGFifo.f32 = s;
-    GXWGFifo.f32 = t;
-}
-
-extern "C" void dbgGXColor4u8(u32 r, u32 g, u32 b, u32 a)
-{
-    GXWGFifo.u8 = (u8)(r & 0xFF);
-    GXWGFifo.u8 = (u8)(g & 0xFF);
-    GXWGFifo.u8 = (u8)(b & 0xFF);
-    GXWGFifo.u8 = (u8)(a & 0xFF);
-}
-
-extern "C" void dbgGXPosition3f32(f32 x, f32 y, f32 z)
-{
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-    GXWGFifo.f32 = z;
-}
-
-/* A one-texcoord wrapper that pins GX's normalize flag (0) and the identity post-matrix (125). */
-extern "C" void dbgGXSetTexCoordGen(u32 coord, u32 func, u32 src, u32 mtx)
-{
-    GXSetTexCoordGen2(coord, func, src, mtx, 0, 125);
-}
-
-extern "C" void* fn_8005B1B4(void* self, u32 value);
-
-/* 0x8005AF1C (0x298): sets GX up for flat untextured screen-space drawing (fog off, vertex colour only). */
-void dbg_drawgraph_init(void)
-{
-    u16 width;
-    u16 height;
-    f32 w;
-    f32 h;
-    GXColor fog_color;
-    Mtx44 proj;
-    Mtx mv;
-
-    width = rmode_fb_width_get();
-    height = rmode_efb_height_get();
-    GXSetMisc(1, 8);
-    fn_8005B1B4(&fog_color, 0xFFFFFFFF);
-    GXSetFog(0, 0.0f, 0.0f, 0.0f, 0.0f, fog_color);
-    GXSetFogRangeAdj(0, 0, NULL);
-    w = 0.9134615f * width;
-    h = height;
-    g3d_state_invalidate(4);
-    GXSetNumIndStages(0);
-    C_MTXOrtho(proj, -0.5f * h, 0.5f * h, -0.5f * w, 0.5f * w, -10.0f, 10.0f);
-    GXSetProjection(proj, 1);
-    PSMTXIdentity(mv);
-    GXLoadPosMtxImm(mv, 0);
-    GXSetCurrentMtx(0);
-    GXClearVtxDesc();
-    GXSetVtxDesc(9, 1);
-    GXSetVtxAttrFmt(0, 9, 0, 4, 0);
-    GXSetNumChans(1);
-    GXSetChanCtrl(4, 0, 0, 0, 0, 0, 2);
-    GXSetChanCtrl(5, 0, 0, 0, 0, 0, 2);
-    GXSetNumTexGens(0);
-    GXSetNumTevStages(1);
-    GXSetTevDirect(0);
-    GXSetTevOrder(0, 255, 255, 255);
-    GXSetTevColorIn(0, 15, 15, 15, 2);
-    GXSetTevColorOp(0, 0, 0, 0, 1, 0);
-    GXSetTevAlphaIn(0, 7, 7, 7, 1);
-    GXSetTevAlphaOp(0, 0, 0, 0, 1, 0);
-    GXSetAlphaCompare(7, 0, 1, 7, 0);
-    GXSetBlendMode(1, 4, 5, 5);
-    GXSetAlphaUpdate(0);
-    GXSetZMode(0, 7, 0);
-    GXSetCullMode(2);
-}
-
-extern "C" void* fn_8005B224(void* self);
-
-/* The ut::Color word constructor / assignment pair (out-of-line copies; other g3d units call them). */
-extern "C" void* fn_8005B1B4(void* self, u32 value)
-{
-    fn_8005B1E4(self, value);
-    return self;
-}
-
-extern "C" void* fn_8005B1E4(void* self, u32 value)
-{
-    *(u32*)fn_8005B224(self) = value;
-    return self;
-}
-
-extern "C" void* fn_8005B224(void* self)
-{
-    return self;
-}
 
 /* 0x8005B26C (0xC): the bytes the system core reserves for the console work block. */
 extern "C" u32 font_buffer_size_get(void)

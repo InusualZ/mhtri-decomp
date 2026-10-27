@@ -12,8 +12,8 @@
  *   forwards them).
  * RESIDUALS. fn_80089C6C calls Color's `operator u32` under the map stem fn_800651BC (`g3d/g3d_anmscn.cpp` defines
  *   it as a C function), so that relocation name differs.  Our object also carries the weak Color copies earlier
- *   link inputs own (`__dt__Q34nw4r2ut5ColorFv`, `operator u32`, `ToU32ref`).  fn_80089C6C's extab record carries
- *   a cleanup range for the Color temporary (0x1F0, length 0x10: action 0x82 destroying sp+8) that retail's 8-byte
+ *   link inputs own (`__dt__Q34nw4r2ut5ColorFv`, `Color(u32)`, `operator=(u32)`, `operator u32`, `ToU32ref`).
+ *   fn_80089C6C's extab record carries a cleanup range for the Color temporary (0x1F0, length 0x10: action 0x82 destroying sp+8) that retail's 8-byte
  *   record lacks; `throw()` on `operator u32` or on the destructor does not remove it.
  * SHAPES. Retail has no record-form instruction and no fused multiply-add, and calls every inline member out of line.
  *   fn_80089F78 is the OS fast cast (`psq_st` through GQR5, then `lha`) in inline asm.  fn_800898B0 passes the
@@ -42,7 +42,6 @@
 extern "C" {
 extern f32 anim_tick_angle(u16 value);
 extern f32 math_reciprocal(f32 value);
-extern void fn_8005B1B4(u32 *self, u32 value);
 extern f32 modff(f32 *out, f32 frame);
 }
 
@@ -155,8 +154,6 @@ f32 fn_80089B88(f32 v0, f32 t0, f32 v1, f32 t1, f32 delta, f32 span)
 u32 fn_80089C6C(u32 *arg0, f32 frame)
 {
     f32 sp14;
-    u32 sp10;
-    u32 spC;
     f32 value;
     int index;
     s16 factor;
@@ -172,8 +169,8 @@ u32 fn_80089C6C(u32 *arg0, f32 frame)
     if (value == 0.0f) {
         return arg0[index];
     }
-    fn_8005B1B4(&sp10, arg0[index]);
-    fn_8005B1B4(&spC, arg0[index + 1]);
+    nw4r::ut::Color sp10(arg0[index]);
+    nw4r::ut::Color spC(arg0[index + 1]);
     factor = fn_80089F14(32768.0f * value);
     return nw4r::ut::Color(
         fn_80089EF0(((ResAnmClr *)&sp10)->b0, ((ResAnmClr *)&spC)->b0, factor),

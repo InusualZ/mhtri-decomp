@@ -10,8 +10,6 @@
 extern "C" {
 #endif
 
-void *fn_8005B1E4(void *self, u32 value);  /* 0x8005B1E4 - stores `value` at +0x0 of `self`, returns `self` */
-
 /* 0x8005BF68 - the display width of the character at `glyph`: 1 for a half-width one, 2 otherwise
  * (GUESS name, from the 1/2 result the network message layout adds to its line width). */
 u16 getGlyphWidth(const char* glyph);

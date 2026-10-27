@@ -82,7 +82,7 @@
 #include "ef/system_lobby_flag_get.h"      /* system_lobby_flag_get (ef/system_core.cpp) */
 #include "mh3_pad/Screen_w.h"              /* Screen_w (mh3_pad.cpp) */
 #include "pad_connect.h"                   /* screen_split_mode_ck */
-#include "font/flfntGetSizeX.h"            /* dbg_drawgraph_init (font/flfnt.cpp) */
+#include "font/dbg_drawgraph.h"           /* dbg_drawgraph_init (font/dbg_drawgraph.cpp) */
 #include "stage/stage_area_colour_update.h"
 #include "sound/fn_800E3CBC.h"             /* sound_free_lists_reset */
 #include "sound/prim_list_exec.h"          /* prim_list_exec (sound/fn_800E3CBC.cpp) */

@@ -15,7 +15,7 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h"          /* IS_VALID_PTR (rule 1) */
 #include "g3d/g3d_anmscn.h"               /* fn_80068634, owner g3d/g3d_anmscn.cpp (rule 2) */
-#include "font/flfnt.h"                    /* fn_8005B1E4, owner font/flfnt.cpp (rule 2) */
+#include "nw4r/ut_Color.h"                /* nw4r::ut::Color (weak copies kept in font/dbg_drawgraph.cpp) */
 #include "g3d/g3d_resanmamblight.h"       /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c (rule 2) */
 #include "g3d/g3d_resanmcamera.h" /* res_anm_data_get_result (rule 2) */
 
@@ -52,11 +52,13 @@ struct ResAnmFogResult {
     /* +0x00 */ u32 typeWord;
     /* +0x04 */ f32 near;
     /* +0x08 */ f32 far;
-    /* +0x0C */ u32 color;
+    /* +0x0C */ nw4r::ut::Color color;
 }; /* size: 0x10 */
 
 /* Forward declarations for the unit's own functions. */
 extern "C" s32 fn_8008F8C8(u32 *self, s32 offset);
+
+#pragma dont_inline on
 
 /* Evaluates the fog animation at `frame` into `pResult`. */
 extern "C" void res_anm_fog_get_anm_result(void *arg0, ResAnmFogResult *pResult, f32 frame)
@@ -76,8 +78,10 @@ extern "C" void res_anm_fog_get_anm_result(void *arg0, ResAnmFogResult *pResult,
     pResult->typeWord = res->typeWord;
     pResult->near = res_anm_data_get_result(&res->nearValue, frame, (flags & 0x20000000) != 0);
     pResult->far = res_anm_data_get_result(&res->farValue, frame, (flags & 0x40000000) != 0);
-    fn_8005B1E4(&pResult->color, fn_8008A188(&res->colorValue, clamped, (flags & 0x80000000) != 0));
+    pResult->color = fn_8008A188(&res->colorValue, clamped, (flags & 0x80000000) != 0);
 }
+
+#pragma dont_inline off
 
 #pragma peephole on
 

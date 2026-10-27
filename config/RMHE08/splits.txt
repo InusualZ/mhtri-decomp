@@ -144,15 +144,21 @@ g3d/fn_8005AA28.cpp:
 	.sdata      start:0x80791124 end:0x80791130
 	.sdata2     start:0x80795CF0 end:0x80795CF8
 
+font/dbg_drawgraph.cpp:
+	extab       start:0x80007328 end:0x80007350
+	extabindex  start:0x8001F62C end:0x8001F668
+	.text       start:0x8005ABD8 end:0x8005B26C
+	.sdata2     start:0x80795CF8 end:0x80795D20
+
 font/flfnt.cpp:
-	extab       start:0x80007328 end:0x800073C8
-	extabindex  start:0x8001F62C end:0x8001F71C
-	.text       start:0x8005ABD8 end:0x8005CED0
+	extab       start:0x80007350 end:0x800073C8
+	extabindex  start:0x8001F668 end:0x8001F71C
+	.text       start:0x8005B26C end:0x8005CED0
 	.data       start:0x8058B388 end:0x8058B410
 	.bss        start:0x8066AE60 end:0x8066AE80
 	.sdata      start:0x80791130 end:0x80791138
 	.sbss       start:0x807948D8 end:0x807948E8
-	.sdata2     start:0x80795CF8 end:0x80795D48
+	.sdata2     start:0x80795D20 end:0x80795D48
 
 g3d/g3d_anmchr.cpp:
 	extab       start:0x800073C8 end:0x8000776C

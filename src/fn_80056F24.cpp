@@ -61,7 +61,7 @@
 #include "gx/GXRenderModeObj.h"
 #include "Rmode.h"
 #include "disp_beta.h"
-#include "font/flfntGetSizeX.h"  /* dbg_drawgraph_init (rule 2) */
+#include "font/dbg_drawgraph.h"  /* dbg_drawgraph_init (rule 2) */
 #include "pad_hold_ck.h"
 #include "screen_split_ck.h"
 #include "color_rgba_copy.h"

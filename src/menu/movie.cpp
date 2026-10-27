@@ -96,6 +96,7 @@
 #include "pmic_stop.h"
 #include "font/flfnt_frame_reset.h"
 #include "font/flfntGetSizeX.h"
+#include "font/dbg_drawgraph.h"
 #include "draw_rect_set.h"
 #include "draw_rect_fill.h"
 #include "ef/dvd_read_wait.h"

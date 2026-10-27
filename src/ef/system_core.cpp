@@ -124,7 +124,7 @@
 #include "mh3_pad/Screen_w.h" /* Screen_w */
 #include "main.h" /* ck_WideMode */
 #include "fn_80040598.h" /* kbd_reset_call */
-#include "font/flfntGetSizeX.h" /* dbg_drawgraph_init */
+#include "font/dbg_drawgraph.h" /* dbg_drawgraph_init */
 #include "hud/get_lsp_data.h" /* get_lsp_data */
 #include "g3d/g3d_state.h" /* g3d_state_invalidate */
 #include "draw_shape.h" /* drawshape_tex_obj_get */

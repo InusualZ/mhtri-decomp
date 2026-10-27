@@ -21,8 +21,7 @@
  *   res_mat_get_id (0x8006405C, ResMat::GetID: the block's index word, read by AnmObjTexSrtRes::Bind) is a GUESS.
  * RESIDUALS. Color() and ToU32ref const are emitted twice (the C stems above and the weak copies apply_clr_anm_result
  *   needs) until anmscn's result constructors become implicit constructors (math::VEC3 needs its constructor).
- *   apply_clr_anm_result's calls to Color::operator=(u32), the GXColor copy and the destructor name the weak copies
- *   (`__as__Q34nw4r2ut5ColorFUl`, `__as__8_GXColorFRC8_GXColor`) that the map holds as fn_8005B1E4 and
+ *   apply_clr_anm_result's GXColor copy names the weak copy `__as__8_GXColorFRC8_GXColor` that the map holds as
  *   color_rgba_copy.
  *   flipcheck: `.text` order, extab and extabindex differ; `.rodata`, `.data` and `.sdata` are claimed and not
  *   emitted (the ResAnmClr/ResMatChan/ResMat `_ac.h` getters are C stems reading the strings by map label).
@@ -84,14 +83,15 @@ extern "C" struct ResHandle *res_mat_copy_ctor(struct ResHandle *pDst, const str
     return pDst;
 }
 
-/* ut::Color::operator=(u32) (0x8005B1E4, the weak copy font/flfnt.cpp's range holds). */
-extern "C" void fn_8005B1E4(void *self, u32 value);
+#pragma dont_inline on
 
 extern "C" u32 *color_ctor_white(u32 *self)
 {
-    fn_8005B1E4(self, 0xFFFFFFFF);
+    *reinterpret_cast<nw4r::ut::Color *>(self) = 0xFFFFFFFF;
     return self;
 }
+
+#pragma dont_inline off
 
 extern "C" const u8 **type_obj_set_name_texsrt_res(const u8 **out, const u8 *v)
 {

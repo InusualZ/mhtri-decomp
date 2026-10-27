@@ -51,7 +51,7 @@
 #include "mh3_pad/Screen_w.h"              /* Screen_w (mh3_pad.cpp) */
 #include "mh3_pad/system_w.h"              /* system_w (mh3_pad.cpp) */
 #include "mh3_pad/disp_beta.h"             /* disp_beta (mh3_pad.cpp) */
-#include "font/flfntGetSizeX.h"            /* dbg_drawgraph_init (font/flfnt.cpp) */
+#include "font/dbg_drawgraph.h"           /* dbg_drawgraph_init (font/dbg_drawgraph.cpp) */
 #include "draw_shape.h"                    /* EftResFile, the face/skin file tables (draw_shape.cpp) */
 #include "face_spr.h"                      /* FaceSprBuf */
 
