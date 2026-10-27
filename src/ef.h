@@ -199,7 +199,11 @@ struct _EFT {
     /* +0x009 */ u8 pad_0x9[0x3];
     /* +0x00C */ s32 timer_0x0C;
     /* +0x010 */ s32 field_0x10;
-    /* +0x014 */ u8 pad_0x14[0x4];
+    /* +0x014 */ u8 color_flags_0x14;   /* the stage-colour mode `ef/effect.cpp`'s `fn_800FA5D4` tests (bit 0: TEV
+                                         * colour, bit 1: channel colour, bit 7 its second variant) */
+    /* +0x015 */ u8 field_0x15;         /* the three bytes beside it the eft042 state-0 body seeds (100, 0, 1) */
+    /* +0x016 */ u8 field_0x16;
+    /* +0x017 */ u8 field_0x17;
     /* +0x018 */ VEC3 pos_0x18;
     /* +0x024 */ _CP_VECTOR rot_0x24;
     /* +0x030 */ void* source_0x30;

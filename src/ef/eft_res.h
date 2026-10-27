@@ -59,7 +59,7 @@ public:
     virtual void unused_0x10();
     virtual void unused_0x14();
     virtual void unused_0x18();
-    virtual void unused_0x1C();
+    virtual void set_frame(f32 frame);
     virtual void unused_0x20();
     virtual void update();
     virtual void set_scalar(f32 value);

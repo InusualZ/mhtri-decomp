@@ -78,7 +78,7 @@ void fn_8005696C(s32 id, s32 kind, s32 mode, f32 x, f32 y, _GXColor color, s32 t
 void fn_80056A20(f32 a, f32 b);
 _EFT* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(_EFT* self);
-void fn_80306D6C(void* self, s32 a, void* b, void* c, u8 d, f32 e);
+void eft042_set_placed(void* self, s32 a, void* b, void* c, u8 d, f32 e);
 u8 pl_frame_eft_color_get(void* self);
 void mhchar_joint_mtx_get(void* chr, u32 joint, nw4r::math::MTX34* out);
 
@@ -460,11 +460,11 @@ void eft019_set_mazule(u8 id, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot, _
         }
         break;
     case 17:
-        fn_80306D6C(plw, 11, pos, rot, plw->area_0x16, lbl_807969FC);
+        eft042_set_placed(plw, 11, pos, rot, plw->area_0x16, lbl_807969FC);
         effect = fn_80114A1C(pos, area, 19);
         break;
     case 18:
-        fn_80306D6C(plw, 12, pos, rot, plw->area_0x16, lbl_80796A00);
+        eft042_set_placed(plw, 12, pos, rot, plw->area_0x16, lbl_80796A00);
         effect = fn_80114A1C(pos, area, 19);
         break;
     case 19:
