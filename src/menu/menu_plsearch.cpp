@@ -8,7 +8,9 @@
  *   0x80794D50-0x80794D64.  The left edge is `quest/arenatask.cpp`'s end, the right one the `.data` vtable-then-string
  *   seam at 0x80607E50 (`menu/menu_sysmsg.cpp`).
  * FLAGS. `cflags_menu` (configure.py); file-scope `#pragma pool_data off` (pooled, MWCC addresses the save code's
- *   three `.bss` objects through one `...bss.0` base, which retail does not).
+ *   three `.bss` objects through one `...bss.0` base, which retail does not) and `#pragma optimization_level 4`
+ *   (`plsearch_draw`, `plsearch_page19_open`, `save_nand_read_step`, `writePatTermsVoice` and
+ *   `gallery_demo_load_step` rise, nothing falls); `plsearch_search_draw` alone stays at level 3 (0 % at level 4).
  * NAMES. Module and file from the `__FILE__` string "menu_plsearch.cpp".  `sPatTerms` (.sbss 0x80794D58) is a GUESS:
  *   the terms object's constructor publishes itself there.
  *   GUESS (from each body and its callers): game_data_file_create_start, game_system_file_create_start,
@@ -20,8 +22,13 @@
  *   GUESS (menus, from the page each steps or draws): `plsearch_search_draw`,
  *   `plsearch_friend_list_draw`, `plsearch_empty_draw`, `mailbox_*`, `plsearch_address_step`,
  *   `plsearch_main_draw`, `plsearch_window_draw`, `plsearch_choice_draw`, `plsearch_mail_body_clear`,
- *   `lobby_card_view_*`, `gallery_demo_running_ck`, `gallery_demo_start_step`; the objects
- *   `plsearch_message_work`, `plsearch_kbd_text`.
+ *   `lobby_card_view_*`, `gallery_demo_running_ck`, `gallery_demo_start_step`, `gallery_demo_load_step`,
+ *   `gallery_demo_run_step`, `gallery_demo_scene_move` (the gallery steps `GalleryDemo_task` dispatches; the load and
+ *   move steps mirror `Pl/pl_motion.cpp`'s quest scene), `pl_gesture_ready_ck` (registry name for `Pl/pl_act.cpp`'s
+ *   0x80274904: the +0x5C9 latch the gesture page needs before `pl_gesture_req`); the objects `plsearch_message_work`,
+ *   `plsearch_kbd_text`, `gallery_demo_volume` (.sbss 0x80794D50: the BGM/SE volumes the demo's fade-out counts down).
+ *   `GalleryDemo_task__FP4_tcb` proves retail's task block tag `_tcb`; the source takes an incomplete `_tcb*` and reads
+ *   it as `mh3_pad/task.h`'s `TaskSlot`.
  *   GUESS (P-Mic): `patTermsPmicCallback`, `setPatTermsResult`, `patTermsEndThread`, `clearPatTerms`,
  *   `resetPatTermsState`.  `plsearch_page11_*`/`plsearch_page19_*`/`plsearch_page22_*` are the map's names (the
  *   page-table entries `menu/menu_item.cpp` calls through their leaf headers).
@@ -32,14 +39,13 @@
  *   0x80793C08), one copy per TU.  0x804513B0-0x804513FC is `menu/menu_sysmsg.cpp`'s (it reads that unit's `.sbss`
  *   0x80794DCC and is called from it; 0x804513F4/0x804513F8 are entries of its table 0x8060E700); `.sbss` 0x80794D60
  *   is `homebutton/hkb_widget_tail.c`'s (its only readers).
- *  - Unwritten: 0x8044F7FC-0x8044FB98 (the gesture page step and draw: they call `Pl/pl_act.cpp`'s unnamed
- *    0x80274584/0x80274624/0x80274904 and `lobby/lb_npc.cpp`'s unnamed 0x8020D624), 0x8044FC2C-0x8044FEF8
- *    (`GalleryDemo_task`) and 0x8044FF18-0x804504A0 (its load and run steps: fourteen unnamed callees), 0x804513B0-0x804513FC.
- *  - `plsearch_page19_step`: retail's step 40 reaches its profile-resend and command-18 tails by jumps from three
- *    sub-states; the source repeats the tails (rule 8), so the function is 0x78 bytes longer.
- *  - `plsearch_draw`, `plsearch_page19_open`, `plsearch_page22_draw`: retail tests its case ranges as `addi`+`cmplwi`
- *    or as two separate compares where MWCC builds the other form from the same switch/if.
- *  - `save_nand_read_step`: retail tests the read's `>= 0` result inside the `-5` dispatch tree.
+ *  - Unwritten: 0x804513B0-0x804513FC (`menu/menu_sysmsg.cpp`'s, above).
+ *  - `plsearch_page19_step`: register colouring only (`lobby` takes r27 where retail has r30).
+ *  - `plsearch_page22_draw`: retail keeps the mailbox sub-step's `> 10 && < 20` / `>= 20 && < 30` tests as separate
+ *    compares; MWCC folds each into `addi`+`clrlwi`+`cmplwi` (opt_common_subs, opt_propagation, opt_lifetimes,
+ *    opt_dead_code, peephole and level 2 tried).
+ *  - `gallery_demo_load_step`: the sub-step 6 switch tests `== 2` with `cmpwi` after a `cmplwi 1` (ours: `cmplwi`
+ *    both, or `cmpwi` both on a plain `u8` operand), and `sub + 1` keeps a `clrlwi`.
  *  - `initPatTerms` (`bne`+`blr` vs `beqlr`), `resetPatTermsState` (the 0 is materialised after the state test),
  *    `writePatTermsVoice` (`getPatTermsFlag`'s `u8` return gets a `clrlwi`), `lb_plsearch_open` (a `clrlwi` on
  *    the server type index), `mailbox_draw`/`mailbox_reply_draw`/`plsearch_search_draw` (register colouring).
@@ -50,6 +56,9 @@
  *   the file checksums walk a `bytes` pointer (`bytes = ctl->buffer; sum = 0; bytes += 8;` then `sum += *bytes;
  *   bytes++`); the file steps reach `save_ctl` through a `ctl` pointer but read `step` directly.  The draws pass the
  *   anchor `pos` by value to `put_lsp_anchor_offset` and index a `rows` table local; their colour flags are `bool`.
+ *   `plsearch_page19_step`'s step 40 shares its profile-resend and command-18 tails by putting sub-steps 1 and 2's case
+ *   labels inside `if (0) { ... }` blocks after sub-step 0's body (playbook 241); `save_nand_read_step` breaks out of
+ *   its result switch into the one failure report after it.
  */
 
 #include "types.h"
@@ -114,9 +123,63 @@
 #include "hud/draw_font_align.h"
 #include "hud/put_lsp_anchor_offset.h"
 #include "lobby/lb_cursor_prompt_draw.h"
+#include "lobby/lb_act_armed_slot_get.h"
+#include "Pl/pl_gesture_ready_ck.h"
+#include "Pl/pl_gesture_req.h"
+#include "Pl/pl_act_class_get.h"
+#include "menu/menu_cursor_seek.h"
+#include "mh3_pad/task.h"
+#include "nw_resource.h"
+#include "rso_overlay_mode1_load.h"
+#include "ef/fn_800CDB2C.h"
+#include "Pl/pl_motion.h"
+#include "sound/fn_800E3CBC.h"
+#include "sound/set_BGM_volume.h"
+#include "sound/set_SE_volume.h"
+#include "sound/fn_800E46E8.h"
+#include "draw_shape_state_clear.h"
+#include "stage/stg_w.h"
+#include "enemy/enemy_control.h"
+#include "ef/eft_res_slots_release.h"
+#include "sound/fn_800F2A94.h"
+#include "mh3_pad.h"
+#include "sound/bgm_quest_clear_frame.h"
+#include "lobby/lb_quest_screen.h"
+#include "sound/snd_bank_loader.h"
+#include "quest/quest_entry.h"
+#include "light/light.h"
+#include "ai/ainpc_init.h"
+#include "ef/eft_res.h"
+#include "stage/shell.h"
+#include "camera/camera_work_init.h"
+#include "stage_map_set.h"
+#include "quest/quest_file_table.h"
+#include "camera/stage_dcm_path_get.h"
+#include "camera/stage_dcm_buffer_tbl.h"
+#include "ef/system_core.h"
+#include "lobby/lb_server_sel_trans.h"
+#include "light/light_point_all_clear.h"
+#include "sound/snd_banks_loaded_ck.h"
+#include "lobby/demo_sound_update.h"
+#include "fn_80056F24.h"
+#include "menu/movie.h"
+#include "mh3_pad/control.h"
+#include "pad_hold_ck.h"
+#include "menu/hit_registry_clear.h"
+#include "ai/ainpc_frame.h"
+#include "menu/hit_lists_init.h"
+#include "ai/ainpc_move.h"
+#include "Pl/pl_yure.h"
+#include "stage/stage_frame_update.h"
+#include "camera/camera_update.h"
+#include "ef/eft_instances_release.h"
+#include "menu/hit_registry_update.h"
+#include "mh3_pad/lb_param_w.h"
+#include "quest/quest_types.h"
 #include "menu/menu_plsearch.h"
 
 #pragma pool_data off
+#pragma optimization_level 4
 
 /* ---------------------------------------------------------------------------------------------------------------- */
 /* The save code. */
@@ -422,9 +485,7 @@ s32 save_nand_read_step(void) {
             switch (task->result) {
             default:
                 if (task->result < 0) {
-                    OSReport("NANDReadAsync() failed. Result code: %d\n", task->result);
-                    NANDClose(&task->info);
-                    return -1;
+                    break;
                 }
                 if (task->result == task->length) {
                     return 1;
@@ -440,6 +501,9 @@ s32 save_nand_read_step(void) {
                 NANDClose(&task->info);
                 return -2;
             }
+            OSReport("NANDReadAsync() failed. Result code: %d\n", task->result);
+            NANDClose(&task->info);
+            return -1;
         }
         break;
     }
@@ -3018,11 +3082,11 @@ s32 plsearch_page19_step(MenuSlot* slot) {
             slot->field_0x001 = 40;
             slot->field_0x002 = 0;
             break;
-        case 3:
-            slot->field_0x001 = 23;
-            break;
         default:
             ret = 4;
+            break;
+        case 3:
+            slot->field_0x001 = 23;
             break;
         }
         break;
@@ -3035,45 +3099,34 @@ s32 plsearch_page19_step(MenuSlot* slot) {
                 requestFriendSync(&slot->net_result_0x320);
                 break;
             }
+            /* The friend sync is not needed: straight on to the profile resend below. */
+            if (0) {
+        case 1:
+                if (slot->net_result_0x320 == 0) {
+                    break;
+                }
+                if (slot->net_result_0x320 != 1) {
+                    set_option_cfg(27, menu_work.slot[0].field_0x31F);
+                }
+            }
             slot->field_0x002 = 2;
             if (menu_work.slot[0].field_0x31E != 0) {
                 resendProfileRecord(&slot->net_result_0x320);
                 break;
             }
-            args = (const s32*)&lobby->block_0x11D4[0x14];
+            /* No profile to resend: straight on to the command 18 request below. */
+            if (0) {
+        case 2:
+                if (slot->net_result_0x320 == 0) {
+                    break;
+                }
+                menu_work.slot[0].field_0x31E = 0;
+            }
+            args = (const s32*)&lobby_state_block.block_0x11D4[0x14];
             if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
                 ret = 3;
             } else {
                 slot->field_0x002 = 3;
-            }
-            break;
-        case 1:
-            if (slot->net_result_0x320 != 0) {
-                if (slot->net_result_0x320 != 1) {
-                    set_option_cfg(27, menu_work.slot[0].field_0x31F);
-                }
-                slot->field_0x002 = 2;
-                if (menu_work.slot[0].field_0x31E != 0) {
-                    resendProfileRecord(&slot->net_result_0x320);
-                    break;
-                }
-                args = (const s32*)&lobby->block_0x11D4[0x14];
-                if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
-                    ret = 3;
-                } else {
-                    slot->field_0x002 = 3;
-                }
-            }
-            break;
-        case 2:
-            if (slot->net_result_0x320 != 0) {
-                menu_work.slot[0].field_0x31E = 0;
-                args = (const s32*)&lobby->block_0x11D4[0x14];
-                if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
-                    ret = 3;
-                } else {
-                    slot->field_0x002 = 3;
-                }
             }
             break;
         case 3:
@@ -3140,6 +3193,8 @@ void plsearch_page19_draw(MenuSlot* slot) {
     }
 }
 
+#pragma push
+#pragma optimization_level 3
 /* 0x8044C88C (0x32C): draws the search entry page (the name or id box, its cursor, the prompt and the help line). */
 void plsearch_search_draw(MenuSlot* slot) {
     _SPR_DATA_ spr;
@@ -3230,6 +3285,7 @@ void plsearch_search_draw(MenuSlot* slot) {
     }
 }
 
+#pragma pop
 /* 0x8044CBB8 (0x3B4): draws the found players / friends list (name, id, area and status per row), the page arrows
  * and the help line. */
 void plsearch_friend_list_draw(MenuSlot* slot) {
@@ -3879,8 +3935,105 @@ extern "C" void plsearch_page11_open(MenuSlot* slot) {
     slot->field_0x1A2 = 0;
 }
 
+/* 0x8044F7FC (0x138): steps the gesture page: A requests the gesture under the cursor (twelve in the lobby,
+ * sixteen elsewhere), B closes the page (2), the pad moves the cursor. */
+extern "C" s32 plsearch_page11_step(MenuSlot* slot) {
+    s32 ret = 0;
+    u16 input;
+    s8 gesture;
+
+    input = slot->buttons_trig | (slot->field_0x008 & 0xF);
+    slot->field_0x19C = input;
+    slot->field_0x19E = 0;
+    if (input & 0x10) {
+        gesture = slot->field_0x1A2 + slot->field_0x1A3 * slot->field_0x1A0 + 1;
+        if ((u32)pl_gesture_ready_ck(slot->worker) == 1) {
+            if (slot->field_0x00F == 1) {
+                if (gesture < 13) {
+                    pl_gesture_req(gesture);
+                    sysSE_req(0);
+                } else {
+                    sysSE_req(2);
+                }
+            } else if (gesture < 17) {
+                pl_gesture_req(gesture);
+                sysSE_req(0);
+            } else {
+                sysSE_req(2);
+            }
+        } else {
+            sysSE_req(2);
+        }
+    } else if (input & 0x20) {
+        ret = 2;
+        sysSE_req(1);
+    } else {
+        menu_cursor_seek((MenuListWork*)&slot->field_0x19C, 16);
+    }
+    menu_slot_entry_b_select(slot, slot->field_0x1A2);
+    return ret;
+}
+
+/* 0x8044F934 (0x264): draws the gesture page: the page arrows, one row per gesture (the running one highlighted,
+ * the ones the lobby does not offer greyed) and the help line. */
+extern "C" void plsearch_page11_draw(MenuSlot* slot) {
+    _SPR_DATA_ spr;
+    _mh_ivec2_ pos;
+    _mh_ivec2_ at;
+    u16* rows;
+    s32 i;
+    s32 gesture;
+    s32 running;
+    bool usable;
+
+    get_lsp_data(0xAFE, &pos);
+    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xEB), &pos);
+    get_lsp_data(0xAFD, &pos);
+    PutPageArrow((u16*)get_menu_lsp_tbl(0), slot->field_0x1A0, slot->field_0x1A1, slot->field_0x19E, &pos, 0);
+    get_lsp_data(0xAFE, &pos);
+    gesture = slot->field_0x1A3 * slot->field_0x1A0;
+    for (i = 0; i < slot->entry_count_b; i++, gesture++) {
+        rows = (u16*)get_menu_lsp_tbl(0xEE);
+        put_lsp_anchor_offset(rows[i], &at, pos);
+        if (gesture < 16) {
+            draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xEC), &at);
+        }
+        spr_data_copy(&spr, get_lsp_data(0xB1F, NULL));
+        if (slot->field_0x00F == 1) {
+            running = pl_act_class_get(slot->worker);
+        } else {
+            running = lb_act_armed_slot_get(slot->worker);
+        }
+        if ((s16)running == gesture + 1) {
+            spr.color = 0xE8A40FFF;
+        } else {
+            usable = 0;
+            if (slot->field_0x00F != 1 || gesture < 12) {
+                usable = 1;
+            }
+            spr.color = GetMenuFontColor(usable, i == slot->field_0x1A2, slot->field_0x001 == 0, 0);
+        }
+        if (gesture < 16) {
+            draw_font(spr, (s8*)get_menu_msg(0x2C, gesture), (i == slot->field_0x1A2) ? 4 : 0, &at);
+        }
+        if (i == slot->field_0x1A2) {
+            put_menu_cursor((u16*)get_menu_lsp_tbl(0xED), 0, &at);
+        }
+    }
+    get_lsp_data(0xB24, &pos);
+    draw_window_frame_preset(pos.x, pos.y, 0);
+    font_set_size(16, 16);
+    font_print_ex(pos.x + 24, pos.y + 16, 0, (s8*)get_menu_msg(0x2D, 0));
+}
+
 /* ---------------------------------------------------------------------------------------------------------------- */
 /* The gallery demo task. */
+
+/* The task block the game-mode table hands its task: retail's tag (`GalleryDemo_task__FP4_tcb`) for `mh3_pad/task.h`'s `TaskSlot`. */
+struct _tcb;
+
+/* .sbss 0x80794D50: the BGM and SE volumes the demo's fade-out counts down. */
+s16 gallery_demo_volume[2];
 
 extern "C" {
 
@@ -3904,11 +4057,313 @@ u32 gallery_demo_running_ck(void) {
     return 0;
 }
 
+void gallery_demo_start_step(Q_MoveWork* work);
+void gallery_demo_load_step(Q_MoveWork* work);
+s32 gallery_demo_run_step(Q_MoveWork* work);
+void gallery_demo_scene_move(Q_MoveWork* work);
+
+} /* extern "C" */
+
+/* 0x8044FC2C (0x2CC): the gallery demo's game-mode task: builds the scene, then starts, loads and runs the demo and
+ * fades the sound out before it hands back to the arena task. */
+void GalleryDemo_task(_tcb* tcb) {
+    TaskSlot* task = (TaskSlot*)tcb;
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    s32 i;
+
+    if (work != NULL) {
+        nwMoveStart();
+    }
+    switch (task->step_0x08) {
+    case 0:
+        rso_overlay_mode1_load();
+        GameMode_set(1);
+        quest_scene_work_init(task, 2);
+        task->step_0x08++;
+        break;
+    case 1:
+        prim_init_all();
+        switch (work->demo_state_0x0000) {
+        case 0:
+            gallery_demo_start_step(work);
+            return;
+        case 1:
+            gallery_demo_load_step(work);
+            break;
+        case 2:
+            if (gallery_demo_run_step(work) == 0) {
+                work->demo_state_0x0000 = 3;
+                work->demo_timer_0x0004 = 90;
+                gallery_demo_volume[0] = get_option_cfg(17);
+                gallery_demo_volume[1] = get_option_cfg(18);
+                return;
+            }
+            break;
+        case 3:
+            work->demo_timer_0x0004--;
+            if (work->demo_timer_0x0004 <= 20) {
+                if (gallery_demo_volume[0] > 0) {
+                    if (--gallery_demo_volume[0] < 0) {
+                        gallery_demo_volume[0] = 0;
+                    }
+                    set_BGM_volume(gallery_demo_volume[0]);
+                }
+                if (gallery_demo_volume[1] > 0) {
+                    if (--gallery_demo_volume[1] < 0) {
+                        gallery_demo_volume[1] = 0;
+                    }
+                    set_SE_volume(gallery_demo_volume[1]);
+                }
+                set_stream_main_vol_flag(0, 1);
+                set_stream_main_vol_flag(1, 0);
+                set_stream_main_vol_flag(2, 0);
+            }
+            if (--work->demo_timer_0x0004 > 0) {
+                return;
+            }
+            if (work->net_session_0x22DA == 0) {
+                system_w.field_0x7d5 = 0;
+            }
+            system_w.leave_flag_0x7d6 = 1;
+            system_w.leave_state_0x7d8 = 0;
+            draw_shape_state_clear();
+            for (i = 0; i < 2; i++) {
+                stage_area_slot_release(i);
+            }
+            em_kind_slot_release_all();
+            em_res_buffers_free();
+            eft_res_slots_release();
+            sound_frame_entry();
+            bgm_stop_all();
+            all_reset();
+            scene_se_handles_release((_PL_ROOT*)work);
+            set_BGM_volume(get_option_cfg(17));
+            set_SE_volume(get_option_cfg(18));
+            set_stream_main_vol_flag(0, 1);
+            set_stream_main_vol_flag(1, 0);
+            set_stream_main_vol_flag(2, 0);
+            work->demo_play_0x22E4 = 0;
+            system_w.field_0x7ce = 4;
+            arena_task_start();
+            return;
+        }
+        break;
+    }
+    nwMoveEnd();
+    if (work != NULL && work->demo_state_0x0000 == 2) {
+        se_frame_step();
+        bgm_quest_clear_frame();
+    }
+}
+
+extern "C" {
+
 /* 0x8044FEF8 (0x20): the demo's start step: moves on to loading once its sub-state is clear. */
 void gallery_demo_start_step(Q_MoveWork* work) {
     if (work->demo_sub_0x0001 == 0) {
         work->demo_state_0x0000 = 1;
         work->demo_sub_0x0001 = 0;
+    }
+}
+
+/* 0x8044FF18 (0x374): the demo's load step: the scene resources, the subsystem inits, the stage, its first area and
+ * the demo camera keys, then the scene start (the glare filter, the fade-in and the demo movie). */
+void gallery_demo_load_step(Q_MoveWork* work) {
+    char path[0x20];
+    LbParamWork* param;
+    s32 sub;
+    Q_ItemWork* item;
+    s32 demo;
+
+    move_work_item_work_get();
+    param = &lb_param_w;
+    loading_disp_set(1, 0);
+    switch (sub = work->demo_sub_0x0001) {
+    case 0:
+        quest_snd_wk_init();
+        quest_start_load();
+        enemy_work_reset();
+        quest_scene_res_load((_PL_ROOT*)work, 1);
+        work->demo_sub_0x0001++;
+        break;
+    case 1:
+        if (file_loading_ck(0, 0) != 1) {
+            work->demo_sub_0x0001++;
+        }
+        break;
+    case 2:
+        light_init();
+        if (work->npc_0xEF != 0) {
+            ainpc_init();
+        }
+        eft_control_init();
+        shell_work_init();
+        camera_work_init();
+        stage_work_init();
+        sound_frame_entry();
+        bgm_stop_all();
+        work->demo_sub_0x0001++;
+        break;
+    case 3:
+        if (PlayMode_ck() == 3 || PlayMode_ck() == 6) {
+            quest_enter_load();
+        } else {
+            work->sub_0xFA = 2;
+        }
+        stage_map_set(work->map_0xED);
+        stage_map_res_load(work->map_0xED);
+        stage_map_obj_load(work->map_0xED);
+        stage_area_load(0, work->map_0xED, work->sub_0xEA);
+        demo = param->demo_quest_0x99;
+        if ((u32)(demo - 19) <= 1 || demo == 14) {
+            if (stage_dcm_file_table[demo].size != 0) {
+                stage_dcm_path_get(path, demo);
+                stage_dcm_buffer_tbl[param->demo_quest_0x99] =
+                    (CamDcmKey*)work_mem_alloc(stage_dcm_file_table[demo].size);
+                load_file(path, (u32)stage_dcm_buffer_tbl[param->demo_quest_0x99],
+                          stage_dcm_file_table[demo].size);
+            }
+        }
+        demo_work_start_ex(param->demo_quest_0x99);
+        work->demo_sub_0x0001++;
+        break;
+    case 4:
+        if (file_loading_ck(0, 0) != 1) {
+            work->demo_timer_0x0004 = 0;
+            work->demo_sub_0x0001++;
+            stage_area_enter(work->map_0xED, work->sub_0xEA);
+            copyVec3(&work->entry_pos_0x128, stage_entry_pos_get(work->map_0xED, work->sub_0xEA));
+            work->entry_angle_0x134 = stage_entry_angle_get(work->map_0xED, work->sub_0xEA);
+            light_point_all_clear();
+            camera_area_reset();
+            quest_screen_enemy_start(work);
+            work->area_slots_0xE0[work->area_slot_index_0xE8] = (s8)stage_area_slot_get(work->map_0xED, work->sub_0xEA);
+            snd_stage_bank_load(work->phase_0xE9, work->sub_0xEA, work->rank_sel_0x22D8);
+            work->demo_kind_0x0002 = 0;
+        }
+        break;
+    case 5:
+        if (work->demo_kind_0x0002 == 0 && file_loading_ck(0, 0) != 1 && snd_banks_loaded_ck() != 0) {
+            work->demo_sub_0x0001++;
+            work->demo_kind_0x0002 = 0;
+        }
+        break;
+    case 6:
+        switch ((u32)work->demo_kind_0x0002) {
+        case 0:
+        case 1:
+            demo_sound_update();
+            work->demo_kind_0x0002++;
+            break;
+        case 2:
+            work->demo_sub_0x0001 = sub + 1;
+            break;
+        }
+        break;
+    case 7:
+        system_w.field_0x7d5 = 1;
+        work->net_session_0x22DA = 0;
+        work->demo_state_0x0000 = 2;
+        work->demo_sub_0x0001 = 0;
+        work->demo_kind_0x0002 = 0;
+        work->demo_scene_0x0003 = 0;
+        GlareFilter_on();
+        filter_panel_on();
+        system_w.hbm_disabled = 0;
+        work->demo_timer_0x0004 = 30;
+        fade_set(0, 2);
+        loading_disp_set(0, 0);
+        movie_change_request();
+        if (param->demo_quest_0x99 == 44) {
+            item = move_work_item_work_get();
+            item->stat_0x6AA4.valid_0x00 = 1;
+            item->stat_0x6AA4.word_0x04 = 1;
+            item->stat_0x6AA4.byte_0x01 |= 2;
+        }
+        enemy_control_move();
+        enemy_control_post_move();
+        break;
+    }
+}
+
+/* 0x8045028C (0x19C): the demo's run step: moves the scene and follows the event demo; a press (or the demo's end)
+ * fades out, and 20 frames later the demo work is reset and 0 returned.  1 while it runs. */
+s32 gallery_demo_run_step(Q_MoveWork* work) {
+    get_rcSwitch_on(1);
+    if (work->demo_timer_0x0004 > 0) {
+        work->demo_timer_0x0004--;
+        pad_input_clear(0);
+    }
+    gallery_demo_scene_move(work);
+    switch (work->demo_scene_0x0003) {
+    case 0:
+        if ((u32)event_demo_ck() == 1) {
+            work->demo_scene_0x0003 = 1;
+            work->demo_skip_0x000A = 0;
+        }
+        break;
+    case 1:
+        if (event_demo_ck() == 0) {
+            work->demo_scene_0x0003 = 2;
+            work->demo_wait_0x0008 = 20;
+        } else if (work->demo_skip_0x000A != 0) {
+            switch (get_fade_stat(0)) {
+            case 2:
+                break;
+            default:
+                fade_set(0, 1);
+            case 1:
+            case 3:
+                work->demo_scene_0x0003 = 2;
+                work->demo_wait_0x0008 = 20;
+                break;
+            }
+        } else if (Psw[0].button_0x2C0.pressed_0x04 & 0x20) {
+            s32 stat = get_fade_stat(0);
+            if (stat == 2) {
+                work->demo_skip_0x000A = 1;
+            } else {
+                if (stat != 1 && stat != 3) {
+                    fade_set(0, 1);
+                }
+                work->demo_scene_0x0003 = 2;
+                work->demo_wait_0x0008 = 20;
+            }
+        }
+        break;
+    case 2:
+        if (--work->demo_wait_0x0008 <= 0) {
+            demo_work_init();
+            work->demo_state_0x0000 = 4;
+            work->demo_sub_0x0001 = 0;
+            return 0;
+        }
+        break;
+    }
+    return 1;
+}
+
+/* 0x80450428 (0x78): moves the demo scene's actors and subsystems for one frame unless the pad is held, then updates
+ * the hit registry. */
+void gallery_demo_scene_move(Q_MoveWork* work) {
+    if (pad_hold_ck() != 1) {
+        demo_sound_update();
+        hit_registry_clear();
+        enemy_control_move();
+        ainpc_frame();
+        shell_area_release(1);
+        hit_lists_init();
+        enemy_control_post_move();
+        ainpc_move();
+        yure_move();
+        stage_frame_update();
+        camera_update();
+        light_move();
+        shell_area_release(0);
+        eft_instances_release();
+    }
+    if (pad_hold_ck() != 1) {
+        hit_registry_update();
     }
 }
 

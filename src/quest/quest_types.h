@@ -250,7 +250,8 @@ struct Q_ItemWork {
     /* +0x6A68 */ u8 lobby_result_0x6A68;  /* the result the lobby hand-off (step 4) repeats */
     /* +0x6A69 */ u8 pad_0x6A69[0x37];
     /* +0x6AA0 */ s32 state_0x6AA0;  /* the state word `quest_work_state_get` returns */
-    /* +0x6AA4 */ u8 pad_0x6AA4[0x14];
+    /* +0x6AA4 */ Q_QuestStat stat_0x6AA4;  /* the quest stat (the gallery demo of quest 44 sets valid, word_0x04, bit 1 of byte_0x01) */
+    /* +0x6AB4 */ u8 pad_0x6AB4[0x4];
 };  /* size: 0x6AB8 */
 
 /* The game's save/user block, seen only as the four count blocks this unit reads.  It is the arena
@@ -538,10 +539,13 @@ typedef struct QuestSpawnRec {
 struct Q_MoveWork {
     /* +0x0000 */ u8 demo_state_0x0000;   /* the gallery demo task's step (0 start, 1 load, 2 run, 3 fade out) */
     /* +0x0001 */ u8 demo_sub_0x0001;     /* the step's sub-state */
-    /* +0x0002 */ u8 pad_0x0002;
+    /* +0x0002 */ u8 demo_kind_0x0002;    /* the load step's own sub-step */
     /* +0x0003 */ u8 demo_scene_0x0003;   /* the demo's scene state (2 once it plays) */
     /* +0x0004 */ s16 demo_timer_0x0004;  /* the fade-out countdown (90 frames) */
-    /* +0x0006 */ u8 pad_0x0006[0xDC - 0x6];
+    /* +0x0006 */ u8 pad_0x0006[0x8 - 0x6];
+    /* +0x0008 */ s16 demo_wait_0x0008;   /* the frames the demo's end waits (20) before it leaves */
+    /* +0x000A */ s16 demo_skip_0x000A;   /* set when a press skips the demo while the fade still runs */
+    /* +0x000C */ u8 pad_0x000C[0xDC - 0xC];
     /* +0x00DC */ Q_ItemWork* item_work;   /* the item work `move_work_item_work_get` returns */
     /* +0x00E0 */ s32 area_slots_0xE0[2];     /* the stage area slot (`stage_area_slot_get`) per index */
     /* +0x00E8 */ u8 area_slot_index_0xE8;
@@ -592,7 +596,7 @@ struct Q_MoveWork {
     /* +0x22D7 */ u8 pad_0x22D7;
     /* +0x22D8 */ u8 rank_sel_0x22D8;       /* the rank byte the quest uses (`LbParamWork::rank_sel_0x09`) */
     /* +0x22D9 */ u8 sub_flag_0x22D9;      /* set to 1 by `quest_move_sub_state_4_set` when its flag argument is 1 */
-    /* +0x22DA */ u8 pad_0x22DA;
+    /* +0x22DA */ u8 net_session_0x22DA; /* 1 while the scene runs as a network session (`_PL_ROOT::field_0x22DA`) */
     /* +0x22DB */ u8 em_level_0x22DB;       /* the enemy level the quest start set */
     /* +0x22DC */ u8 flag_0x22DC;          /* `LbParamWork::hunt_option_0x0A` at the free-hunt start */
     /* +0x22DD */ u8 pad_0x22DD[0x22E2 - 0x22DD];

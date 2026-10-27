@@ -143,9 +143,9 @@ s32 fn_80274174(struct _PLW* plw, s16 base, u8 ranged, s8* out);
 s32 pl_weapon_affinity_get(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 s32 pl_weapon_drawn_ck(struct _PLW* plw);
-void pl_gesture_req(s8 value);
+void pl_gesture_req(u8 value);
 s32 pl_act_class_get(struct _PLW* plw);
-s32 fn_80274904(struct _PLW* plw);
+s32 pl_gesture_ready_ck(struct _PLW* plw);
 s32 fn_80274988(struct _PLW* plw);
 s32 fn_80274A04(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind);
 s32 pl_gun_clip_get(struct _PLW* plw, u8 kind, struct _EQUIP* equip0, struct _EQUIP* equip1,

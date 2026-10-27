@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x80274584 (0x58): stores the gesture request into the player's own move work record */
-void pl_gesture_req(s8 value);
+void pl_gesture_req(u8 value);
 
 #ifdef __cplusplus
 }

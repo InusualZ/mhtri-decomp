@@ -52,6 +52,11 @@ extern "C" {
 /* 0x803C4840 - the demo frame. */
 u32 get_demo_data(void);
 
+/* 0x803C3D74 - restarts the demo work and adds demo `demo`'s record (14, 19 or 20) to the first slot. */
+void demo_work_start_ex(s32 demo);
+/* 0x803C4B74 - initialises the demo work for a fresh play-through. */
+void demo_work_init(void);
+
 /* 0x803C4210 - queues the demos of the current map's area whose progress flags are set. */
 void demo_work_process(DemoWork* work);
 

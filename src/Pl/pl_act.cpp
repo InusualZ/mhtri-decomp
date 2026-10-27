@@ -4803,7 +4803,7 @@ extern "C" s32 pl_weapon_drawn_ck(struct _PLW* plw)
 }
 
 /* Writes the armed byte of the player's own move work record. */
-extern "C" void pl_gesture_req(s8 value)
+extern "C" void pl_gesture_req(u8 value)
 {
     struct _PLW* work = (struct _PLW*)get_move_work_adrs(2);
 
@@ -4965,7 +4965,7 @@ extern "C" s32 pl_stagger_level_get(void* self)
 }
 
 /* True once the armed-slot table has been read for this player. */
-extern "C" s32 fn_80274904(struct _PLW* plw)
+extern "C" s32 pl_gesture_ready_ck(struct _PLW* plw)
 {
     return plw->field_0x5C9 != 0;
 }
