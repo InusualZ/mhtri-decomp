@@ -13,15 +13,14 @@
  *   so plain definitions are `extern "C"`.  GUESS: `eft024_job_start`/`eft024_job_step` (the file-local state-0/1
  *   bodies at 0x80117018/0x80117050).
  * RESIDUALS.
- *  - `fn_80116B00`: the int-to-float conversion is unsigned here (`xoris` magic `0x43300000 00000000`), signed in
- *    retail;
  *  - `fn_80116EEC`: retail unrolls the slot scan with the table base in r3; ours keeps a separate base;
  *  - `fn_80117120`: retail keeps the dead loop counter's increment in both unrolled halves.
  *   `.data` is declared, not emitted.  Relocation names that differ from retail: pool constants.
  * SHAPES. Functions are defined in retail's address order.  `fn_80116FDC` tail-calls two static functions for states 0
  *   and 1 (retail's `b` into the folded bodies after the exit `blr`).  `fn_801168D8` writes area 1/2 for map 6 as
  *   if/else and for map 17 as a ternary.  `fn_80116EEC` nests `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)`.
- *   `fn_80116B00` loads its seven float constants into named locals before the loop.
+ *   `fn_80116B00` uses literal constants (the loop hoists them), converts the shifted angle through `(s32)(u16)`
+ *   (signed int-to-float), declares `i` before `work`, and caches `tables[i]` only across the `sinf` call.
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */
@@ -116,8 +115,6 @@ extern "C" f32 sinf(s16 a, f32 b);
 extern "C" _EFT_MAP_TABLE lbl_805A0380[];
 extern "C" _EFT_MAP_TABLE lbl_805A039C[];
 extern "C" _EFT_MAP_TABLE lbl_805A0428[];
-
-extern "C" f64 lbl_80796A78;
 
 #pragma peephole off
 
@@ -256,27 +253,19 @@ extern "C" void fn_801168D8(_EFT* self)
 /* Advances the eft023 record's per-model joint visibility and rotation. */
 extern "C" void fn_80116B00(_EFT* self)
 {
-    _EFT_JOB_WORK* work = (_EFT_JOB_WORK*)self->work_0x38;
-    _EFT_MAP_TABLE* table;
     s32 i;
+    _EFT_JOB_WORK* work;
+    _EFT_MAP_TABLE* table;
     u32 j;
     u32 joint_num;
     f32 f;
-    s16 t;
     u8 base;
-    f32 f25 = lbl_80796A78;
-    f32 f26 = 6.2831855f;
-    f32 f27 = 65536.0f;
-    f32 f28 = 1.0f;
-    f32 f29 = -1.0f;
-    f32 f30 = 360.0f;
-    f32 f31 = 0.5f;
 
+    work = (_EFT_JOB_WORK*)self->work_0x38;
     for (i = 0; i < work->count; i++) {
-        table = work->tables[i];
-        work->field_0x22[i] = (s16)(work->field_0x22[i] + 1);
-        base = table->field_0x10;
-        if (work->field_0x22[i] >= (s32)(base + table->field_0x11)) {
+        work->field_0x22[i]++;
+        base = work->tables[i]->field_0x10;
+        if (work->field_0x22[i] >= (s32)(base + work->tables[i]->field_0x11)) {
             work->field_0x22[i] = base;
         }
         joint_num = work->models[i]->get_joint_num();
@@ -288,19 +277,21 @@ extern "C" void fn_80116B00(_EFT* self)
             }
         }
         self->field_0x10++;
-        work->field_0x18[i] = (s16)(work->field_0x18[i] + 1);
-        t = work->field_0x18[i];
-        f = sinf(t, (f26 * (f32)(u16)(t << table->field_0x18)) / f27);
-        if ((f >= f28 || f <= f29) && table->field_0x1A > 0) {
-            work->field_0x2C[i] = (s16)(work->field_0x2C[i] + 1);
-            if (work->field_0x2C[i] > table->field_0x1A) {
+        work->field_0x18[i]++;
+        table = work->tables[i];
+        f = sinf(work->field_0x18[i],
+                 (6.2831855f * (f32)(s32)(u16)(work->field_0x18[i] << table->field_0x18)) / 65536.0f);
+        if ((f >= 1.0f || f <= -1.0f) && table->field_0x1A > 0) {
+            work->field_0x2C[i]++;
+            if (work->field_0x2C[i] > work->tables[i]->field_0x1A) {
                 work->field_0x2C[i] = 0;
             } else {
-                work->field_0x18[i] = (s16)(work->field_0x18[i] - 1);
+                work->field_0x18[i]--;
             }
         }
         work->models[i]->field_0x2C =
-            (s32)(u16)(s32)(f31 + ((f27 * (f * table->field_0x14)) / f30)) + table->field_0x12;
+            (s32)(u16)(s32)(0.5f + ((65536.0f * (f * work->tables[i]->field_0x14)) / 360.0f)) +
+            work->tables[i]->field_0x12;
         work->models[i]->move(0);
         eft_res_models_spawn_c1(self, &work->models[i], 2, 1, 0);
     }

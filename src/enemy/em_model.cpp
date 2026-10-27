@@ -40,15 +40,16 @@
  *  - `em_weight_table_pick`: retail reloads the weight halfword in both loop bodies (`lhz`);
  *  - `em_pop_rec_step`: retail tail-merges the three `field_0x008 = 3` exits of step 2 into the first one;
  *  - `em_roster_pop_entry_add`: retail's switch range test is `subi`/`cmplwi` on r3, ours `cmpwi` pairs on r0;
- *  - `em_pop_spring_bubble_spawn`: retail moves `area` after `height`; `em_pop_obj_alpha_set`: the stack slots of the
- *    two handle temporaries and the 8th `mhchar_mat_tev_set` argument (f1) the header declares;
+ *  - `em_pop_spring_bubble_spawn`: retail moves `area` after `height`;
  *  - `em_drop_item_spawn`: the `em_drop_tbl` load is scheduled one instruction later in retail;
  *    `em_roster_slot_effect_set`: `quest_id_get() == 1` is `cmpwi` in retail.
  * SHAPES. `#pragma fp_contract off` and `#pragma pool_data off` file-wide (retail has no fused multiply-adds and
  *   addresses each table by its own symbol); `#pragma dont_inline on` around the callback class's ctor/dtor, the tint
  *   and the entry-add functions makes the inline nw4r handle members out-of-line calls as retail has them, and off
  *   elsewhere (on, the spare copy becomes a call).  A `switch` whose `default:` is listed first gives retail's
- *   branch-free default (`em_roster_record_result_get`, `em_drop_offset_get`).
+ *   branch-free default (`em_roster_record_result_get`, `em_drop_offset_get`).  `em_pop_obj_alpha_set` calls
+ *   `mhchar_mat_tev_set` through the seven-argument view `mhchar_mat_tev_set_c1` (the owner's definition;
+ *   `sound/fn_800DD1F0.h` declares an eighth `f32`, which would load f1).
  */
 
 
@@ -2473,6 +2474,10 @@ void em_kind_res_release(u8 kind) {
     }
 }
 
+/* `mhchar_mat_tev_set` as its owner `sound/mhchar.cpp` defines it (seven arguments, no float); the shared
+ * `sound/fn_800DD1F0.h` declaration carries an eighth `f32`. */
+#define mhchar_mat_tev_set_c1 ((void (*)(MHchar*, u32, _GXCompare, u8, _GXAlphaOp, _GXCompare, u8))mhchar_mat_tev_set)
+
 /* Scales every material's alpha-compare references by `alpha`. */
 void em_pop_obj_alpha_set(EmPopObj* obj, f32 alpha) {
     nw4r::g3d::ResMatPix pix(NULL);
@@ -2481,18 +2486,17 @@ void em_pop_obj_alpha_set(EmPopObj* obj, f32 alpha) {
     u32 i;
     _GXCompare comp0;
     u8 ref0;
-    _GXAlphaOp op;
     _GXCompare comp1;
+    _GXAlphaOp op;
     u8 ref1;
 
     model = &obj->model_0x038;
     num = mhchar_mat_num_get(model);
     for (i = 0; i < num; i++) {
-        nw4r::g3d::ResMat mat = ((nw4r::g3d::ResMdl*)&model->field_0x114)->GetResMat(i);
-        pix = mat.GetResMatPix();
+        pix = ((nw4r::g3d::ResMdl*)&model->field_0x114)->GetResMat(i).GetResMatPix();
         pix.GXGetAlphaCompare(&comp0, &ref0, &op, &comp1, &ref1);
         if (ref0 != 0 || ref1 != 0xFF) {
-            mhchar_mat_tev_set(model, i, comp0, (u8)((f32)ref0 * alpha), op, comp1, (u8)((f32)ref1 * alpha), 0.0f);
+            mhchar_mat_tev_set_c1(model, i, comp0, (u8)((f32)ref0 * alpha), op, comp1, (u8)((f32)ref1 * alpha));
         }
     }
 }

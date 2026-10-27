@@ -35,13 +35,38 @@ Classes found so far, each fixed at its source:
   unsigned one - an `s32` local, not `u32`;
 * an assert in an inline member that retail defines in an accessor header (`g3d_resmat_ac.h`): its `Panic` cites the
   header's name, not the `.cpp`'s (retail even keeps two copies of the string, one per assert);
-* a retail typo in a data table (`"..._Foucus_IN.brlan"`) that the source had corrected.
+* a retail typo in a data table (`"..._Foucus_IN.brlan"`) that the source had corrected;
+* an `[extra]` table address where retail loads a **pointer variable**: ours indexed the array (`lis`/`addi`
+  `lbl_8058A880`), retail reads `eft_name_tbl_ptr` (`lwz @sda21`) and indexes what it holds - declare the owner's
+  pointer and index through it;
+* an `[extra]` `0.0` (or any float) load right before a call: the callee's prototype in a shared header has one
+  float parameter too many, so ours sets f1 that retail never sets - call with the owner definition's arity (a
+  per-call-site view when the shared header cannot change yet);
+* the int-to-float bias's **two** sides: a hit can name both the missing signed and the extra unsigned pool word
+  in one function (`fn_80116B00`), the same fix.
+
+False-hit classes (no value is wrong):
+
+* **equal-size case-body permutation**: the aligned pairing pairs by position when the function's size is equal, so
+  bodies in another order show as rotated constants (`pl_act_weapon_swing`: eight hits, every case's three values
+  identical) - compare per case, then fix the body order (here a `case 3..6` group written first in one level-4
+  switch);
+* **an extern our source names that the map spells differently** (`lbl_80629B90` for the map's `@1841`): ours
+  cannot be read, so the line says `ours none` at the same instruction - same address, nothing to fix;
+* **a one-instruction shift** before the operand (a fused `lbzu` where retail keeps `addi`+`lbz`): the line names
+  ours as missing a jump table ours does emit (`@664`);
+* **an addressing form**: `sym+1@sda21` in retail against ours' `li rX,sym@sda21` + `lbz 1(rX)` reads the same byte.
 
 **Result.** 2026-10-27 census (`relocdiff --values` over 667 units): 122 hits in 22 units; the constfix lane fixed
 `ai/ai_npc` `fn_802CF704` (50.0), `enemy/em022_prog` `em022_act6_rush` (3.0), `g3d/g3d_resmat`
 `ResMat::GetResTexPlttInfo` (`g3d_resmat_ac.h`), `hud/cockpit_quest` `cockpit_item_tag_update` (pi/24),
 `ef/effect` `eft_rand_unit` (signed bias: 94.5 -> 100 %) and `homebutton/hbm_kb_widget`'s animation table (the
-`Foucus` typo); most partial-row hits were shifted pairings.
+`Foucus` typo); most partial-row hits were shifted pairings.  The aligned re-run (24 hits / 12 units): the
+constfix-2 lane fixed `enemy/em022_prog` `em022_act6_wander` (3.0f), `ef/eft023_fx` `fn_80116B00` (signed bias,
+84.2 -> 100 %), `ef/effect` `fn_800F97F0` (`eft_name_tbl_ptr`, 87.0 -> 100 %), `enemy/em_model`
+`em_pop_obj_alpha_set` (seven-argument call, 98.8 -> 100 %) and `Pl/pl_act_step` `pl_act_weapon_swing` (body
+order, 99.9 -> 100 %); `RSO/runtime`, `fn_8004C9A0`, `homebutton/hkb_widget_tail` and `homebutton/hbm_kb_event`
+were false hits.
 
 **Example.**
 

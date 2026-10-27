@@ -5,13 +5,15 @@
  *   0x807965D8-0x80796608.  The name is the range's own `__FILE__` string `effect.cpp` (0x8059B5D0, passed to
  *   `nw4r::db::Panic` by `effect_emitter_alive_ck`).
  * FLAGS. `cflags_main`; `#pragma fp_contract off` and `#pragma peephole off` for the whole file.
+ *   `#pragma opt_common_subs off` (playbook 208) around `fn_800F97F0`: retail re-reads `node->field_0x10` after the
+ *   calls, and indexes the name table through `eft_name_tbl_ptr`.
  * NAMES. `SetRootMtxTrans`, `effect_move`, `change_color_eff`, `change_paramscale_eff`, `change_paramscale_eff_vec3`,
  *   `eftGetKeyRGB` and `eftGetKeyAlpha` are the runtime dump's own names; the map has only `fn_` stems for the rest.
  *   GUESS (from the body): `effect_retire` (0x800F996C) calls the effect's retire slot with the flag as a bool.
  *   GUESS: `change_color_scale_eff` (0x800F99D4), `eft_water_state_ck` (0x800F9D80: the water-flag legality test).
  *   GUESS (from each body and its callers): `effect_layer_reset`, `eft_rand_unit`, `eft_rand_signed_half`,
  *   `eft_shape_init`.
- * RESIDUALS. 21 partial rows, including:
+ * RESIDUALS. 19 partial rows, including:
  *  - `fn_800FA9B8`: ours inverts the name-table walk's test and drops the second record check (`lwz`/`cmpwi`);
  *  - `fn_800FA208`: ours keeps an extra saved register and lays the state compares out 1, 2, 3 where retail
  *    branches on 2, 0, 4;
@@ -19,8 +21,6 @@
  *  - `fn_800FA5D4`: the stack slots and the loop's exit branch differ;
  *  - `eftGetKeyRGB`: ours re-masks each channel with an extra `clrlwi`;
  *  - `fn_800F9A70`: ours advances the key pointer before the load;
- *  - `fn_800F97F0`: retail reads the table through `eft_name_tbl_ptr` (`@sda21`, `.sbss` 0x80794A70); ours indexes
- *    `lbl_8058A880` directly.
  *   The other 13 partial rows have no recorded cause (`symdiff.py -u ef/effect --all`).
  *   flipcheck: `.bss`/`.ctors`/`.data` claimed, not emitted; `.text` (0x168C of 0x1708) and `.sdata2` (0x10 of 0x30)
  *   short of the claim; `.text`, extab and extabindex differing.
@@ -29,6 +29,7 @@
  *     `_savegpr_26`, `_restgpr_26`, `fn_800F6B6C`.
  */
 
+#include "ef/eft_name_tbl_ptr.h" /* eft_name_tbl_ptr (rule 2: the owner's header) */
 #include "ef/eft_scnbox_data_ptr.h" /* eft_scnbox_data_ptr (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
@@ -348,6 +349,7 @@ extern "C" void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     }
 }
 
+#pragma opt_common_subs off
 /* 0x800F97F0 - place one effect handle from the name table. */
 extern "C" s32 fn_800F97F0(s32 idx, EftNameEntry* node, void* out) {
     if (node == NULL) {
@@ -357,10 +359,11 @@ extern "C" s32 fn_800F97F0(s32 idx, EftNameEntry* node, void* out) {
         return 0;
     }
     s32 frame;
-    ef_resource_find_emitter_handle(&frame, (void*)ef_resource_instance(), lbl_8058A880[idx], node->field_0x10);
+    ef_resource_find_emitter_handle(&frame, (void*)ef_resource_instance(), eft_name_tbl_ptr[idx], node->field_0x10);
     ef_word_copy(out, &frame);
     return 1;
 }
+#pragma opt_common_subs reset
 
 /* 0x800F9884 - whether every live emitter of the effect has a frame to move to. */
 extern "C" s32 effect_emitter_alive_ck(nw4r::ef::Effect* effect) {

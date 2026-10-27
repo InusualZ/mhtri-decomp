@@ -103,7 +103,8 @@
  *    `Pl_frame_check` differ only per gesture;
  *  - `#pragma optimization_level 4` (playbook 108) brackets `pl_weapon_record_rearm`, `pl_act_knockback`,
  *    `pl_act_fishing`, `pl_act_paralysis`, `pl_scan_act_select`, `pl_condition_tick`, `pl_hit_react`,
- *    `pl_wide_area_effect_step`, `pl_act_carted`, `pl_act_carted_drawn`, `fn_8025FA00` and `fn_8025FF0C`: their
+ *    `pl_wide_area_effect_step`, `pl_act_carted`, `pl_act_carted_drawn`, `pl_act_weapon_swing`, `fn_8025FA00` and
+ *    `fn_8025FF0C`: their
  *    switches are retail's level-4 linear `subi`/`cmplwi` range chains;
  *  - `#pragma opt_common_subs off` (playbook 208) brackets `pl_act_item_throw`, `pl_act_net_hook_a`/`_b`/`_c`,
  *    `pl_act_slinger_fire`, `pl_act_kill_cut_throw`, `pl_act_carry_break` and `fn_80264A84`: retail loads
@@ -8476,6 +8477,7 @@ extern "C" void pl_act_weapon_thrust(_PLW* self) {
     }
 }
 
+#pragma optimization_level 4
 /* The weapon swing act (`variant` 1 the upswing): steps the swing's forward lunge on the kind's cosine curve and,
  * when the motion ends, returns to the kind's slot or the guard act. */
 extern "C" void pl_act_weapon_swing(_PLW* self, s32 variant) {
@@ -8497,27 +8499,31 @@ extern "C" void pl_act_weapon_swing(_PLW* self, s32 variant) {
         lunge.z = pl_float_zero;
         lunge.x = pl_float_zero;
         lunge.y = pl_float_zero;
-        if ((u32)(self->field_0x002 - 3) > 3) {
-            switch (self->field_0x002) {
-            case 0:
-                if (Pl_frame_check(self, 2, pl_frame_window_104, pl_float_zero) == 1) {
-                    lunge.z = pl_float_neg22 *
-                              cosf((pl_float_6_28319 * (pl_frame_window_90 * (pl_rig_get_motion_frame(self) / pl_frame_window_104))) /
-                                   pl_frame_window_360);
-                }
-                break;
-            case 1:
-                if (Pl_frame_check(self, 2, pl_frame_window_94, pl_float_zero) == 1) {
-                    lunge.z = pl_float_neg18 *
-                              cosf((pl_float_6_28319 * (pl_frame_window_90 * (pl_rig_get_motion_frame(self) / pl_frame_window_94))) /
-                                   pl_frame_window_360);
-                }
-                break;
+        switch (self->field_0x002) {
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+            if (Pl_frame_check(self, 2, pl_frame_window_90, pl_float_zero) == 1) {
+                lunge.z = pl_float_neg10 *
+                          cosf((pl_float_6_28319 * (pl_frame_window_90 * (pl_rig_get_motion_frame(self) / pl_frame_window_104))) /
+                               pl_frame_window_360);
             }
-        } else if (Pl_frame_check(self, 2, pl_frame_window_90, pl_float_zero) == 1) {
-            lunge.z = pl_float_neg10 *
-                      cosf((pl_float_6_28319 * (pl_frame_window_90 * (pl_rig_get_motion_frame(self) / pl_frame_window_104))) /
-                           pl_frame_window_360);
+            break;
+        case 0:
+            if (Pl_frame_check(self, 2, pl_frame_window_104, pl_float_zero) == 1) {
+                lunge.z = pl_float_neg22 *
+                          cosf((pl_float_6_28319 * (pl_frame_window_90 * (pl_rig_get_motion_frame(self) / pl_frame_window_104))) /
+                               pl_frame_window_360);
+            }
+            break;
+        case 1:
+            if (Pl_frame_check(self, 2, pl_frame_window_94, pl_float_zero) == 1) {
+                lunge.z = pl_float_neg18 *
+                          cosf((pl_float_6_28319 * (pl_frame_window_90 * (pl_rig_get_motion_frame(self) / pl_frame_window_94))) /
+                               pl_frame_window_360);
+            }
+            break;
         }
         rotVecY(&lunge, self->rot_0x54.y);
         self->vec_0x03C.x += lunge.x;
@@ -8538,6 +8544,7 @@ extern "C" void pl_act_weapon_swing(_PLW* self, s32 variant) {
         break;
     }
 }
+#pragma optimization_level reset
 
 /* The guard-walk act for `variant` 0-2: walks with the guard raised (the kind's step table) and, for the master,
  * leaves into the walk once the guard has lasted 16 frames without the guard input. */

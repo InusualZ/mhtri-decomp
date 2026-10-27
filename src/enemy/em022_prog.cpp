@@ -1639,7 +1639,7 @@ void em022_act6_wander(_ENEMY_WORK* self, u8 mode) {
         }
         em_data_point_get(self, (self->area_no & 0xF) * 0x100, &point);
         if (calcDistanceSqXZ(&self->pos, &point) < 1690000.0f) {
-            em_act_move_step(self, 1, 32.0);
+            em_act_move_step(self, 1, 3.0f);
         } else {
             em_act_move_step(self, 0, 10.0f);
         }
