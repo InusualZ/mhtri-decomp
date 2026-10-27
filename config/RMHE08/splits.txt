@@ -1502,14 +1502,29 @@ Pl/pl_coll.cpp:
 	.sbss       start:0x80794B58 end:0x80794B60
 	.sdata2     start:0x8079A318 end:0x8079A380
 
+Pl/pl_body_push.cpp:
+	extab       start:0x80013454 end:0x80013524
+	extabindex  start:0x80030CFC end:0x80030E34
+	.text       start:0x80297E34 end:0x80299ED8
+	.sdata2     start:0x8079A380 end:0x8079A398
+
+Pl/pl_hit.cpp:
+	extab       start:0x80013524 end:0x80013624
+	extabindex  start:0x80030E34 end:0x80030FB4
+	.text       start:0x80299ED8 end:0x8029F61C
+	.data       start:0x805CDC88 end:0x805CDE78
+	.bss        start:0x806AC8A8 end:0x806AC8B8
+	.sdata      start:0x80792278 end:0x80792298
+	.sdata2     start:0x8079A398 end:0x8079A3F0
+
 menu/menu_item.cpp:
-	extab       start:0x80013454 end:0x800137D4
-	extabindex  start:0x80030CFC end:0x8003123C
-	.text       start:0x80297E34 end:0x802A6624
-	.data       start:0x805CDC88 end:0x805CE00C
-	.bss        start:0x806AC8A8 end:0x806AD698
-	.sdata      start:0x80792278 end:0x807922A0
-	.sdata2     start:0x8079A380 end:0x8079A3F8
+	extab       start:0x80013624 end:0x800137D4
+	extabindex  start:0x80030FB4 end:0x8003123C
+	.text       start:0x8029F61C end:0x802A6624
+	.data       start:0x805CDE78 end:0x805CE00C
+	.bss        start:0x806AC8B8 end:0x806AD698
+	.sdata      start:0x80792298 end:0x807922A0
+	.sdata2     start:0x8079A3F0 end:0x8079A3F8
 
 menu/menu_message.cpp:
 	extab       start:0x800137D4 end:0x80013984

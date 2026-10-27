@@ -13,6 +13,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "pl.h"
+#include "Pl/em_weak_point.h"
 
 /* One tuning row of a formation: what it adjusts (0 attack, 1 defence, 2 speed, 3 gauge) and the amount per
  * companion level.  size: 0xE */
@@ -62,20 +63,7 @@ struct AINPCStatus {
     /* +0x1B */ u8 pad_0x1B;
 };
 
-/* One weak point of an enemy's list (`_ENEMY_WORK::field_0x8C8`, ended by joint -1): the joint it sits on (1000 for a
- * fixed position), its kind, flags (0x002 hidden, 0x010 disabled, 0x100 broken), the part `em_flags836_ck` tests,
- * the radius the companion keeps and the offset on the joint.  size: 0x2C */
-struct EmWeakPoint {
-    /* +0x00 */ s16 joint;
-    /* +0x02 */ u8 unused_0x02[0x08 - 0x02];
-    /* +0x08 */ u16 kind;
-    /* +0x0A */ u16 flags;
-    /* +0x0C */ u16 part;
-    /* +0x0E */ u8 unused_0x0E[0x10 - 0x0E];
-    /* +0x10 */ f32 radius;
-    /* +0x14 */ nw4r::math::VEC3 offset;
-    /* +0x20 */ u8 unused_0x20[0x2C - 0x20];
-};
+/* One weak point of an enemy's list: `Pl/em_weak_point.h`'s `EmWeakPoint` (rule 1). */
 
 /* One attack entry of the two the AI NPC carries at +0x240 (stride 0x5C).  `hit_flag_set` /
  * `hit_flags_clear` are the shared registry helpers and take this pointer, which is what fixes the

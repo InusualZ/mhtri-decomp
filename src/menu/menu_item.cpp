@@ -1,20 +1,17 @@
 /*
- * menu/menu_item.cpp - the item menu: the hit/land query tail of the Pl band (the hit registry, the id lists, the tile
- *   lookups), the item-name and item-data helpers, the menu work (`menu_work`: the single-screen and split-screen menu
- *   slots, their pad copy, top menu, sub-lists, page dispatchers and draw tasks) and the item page's action lists.
- *   C++; the map's plain names are `extern "C"`.
- * RANGE. .text 0x80297E34-0x802A6624 (170 functions); extab, extabindex, .data 0x805CDC88-0x805CE00C, .bss
- *   0x806AC8A8-0x806AD698, .sdata 0x80792278-0x807922A0, .sdata2 0x8079A380-0x8079A3F8.  The left half
- *   (0x80297E34-0x8029F61C) is the tail of the Pl hit/land band, whose head is `Pl/pl_coll.cpp`; it is not this TU
- *   (seam request menu-item#1: the `__FILE__` string is cited only from 0x802A5444-0x802A64B0, the left half's pool
- *   holds 0.5f/40.0f/0.001f twice and its `.sdata` strings are joint names).
+ * menu/menu_item.cpp - the item menu: the item-name and item-data helpers, the menu work (`menu_work`: the single-screen
+ *   and split-screen menu slots, their pad copy, top menu, sub-lists, page dispatchers and draw tasks) and the item page's
+ *   action lists.  C++; the map's plain names are `extern "C"`.
+ * RANGE. .text 0x8029F61C-0x802A6624 (86 functions); extab 0x80013624-0x800137D4, extabindex 0x80030FB4-0x8003123C,
+ *   .data 0x805CDE78-0x805CE00C, .bss 0x806AC8B8-0x806AD698, .sdata 0x80792298-0x807922A0, .sdata2 0x8079A3F0-0x8079A3F8.
+ *   The left edge: the item table head `.bss` 0x806AC8B8 is read from `get_item_data_ptr` (0x8029F61C) on, the hit
+ *   registry before it only up to 0x8029F60C (`Pl/pl_hit.cpp`, the tail of the Pl hit/land band).
  * FLAGS. `cflags_menu` (configure.py: the lib's `-opt nopeephole`).  The range keeps `bl`s to its tiny same-file helpers
- *   (`GetItemData` from `item_rare_color_get`/`item_category_ck`, `hit_flag_set` from `hit_motion_set`): `-inline noauto`.
+ *   (`GetItemData` from `item_rare_color_get`/`item_category_ck`): `-inline noauto`.
  * NAMES. Module and file from the `__FILE__` string `lbl_805CDFC8` = "menu_item.cpp", passed by every
- *   `nw4r::db::Panic` of the range.  The runtime dump's real names: `body_set`, `hit_flag_set`, `hit_result_check`,
- *   `get_item_data_ptr`, `ItemName`, `ItemExp`, `GetItemData`, `get_menu_tbl_ptr`, `get_menu_lsp_tbl`, `put_menu_cursor`;
- *   the map's own `get_hit_id__Fv`.  Every other named row is a GUESS from its body and callers: `hit_mask_ck`,
- *   `hit_lists_init`, `hit_registry_clear`, `hit_registry_update`, `get_item_species_data`, `get_menu_msg_tbl`,
+ *   `nw4r::db::Panic` of the range.  The runtime dump's real names: `get_item_data_ptr`, `ItemName`, `ItemExp`,
+ *   `GetItemData`, `get_menu_tbl_ptr`, `get_menu_lsp_tbl`, `put_menu_cursor`.  Every other named row is a GUESS from its
+ *   body and callers: `get_item_species_data`, `get_menu_msg_tbl`,
  *   `get_menu_msg`, `menu_row_table_get`, `menu_row_limit_get`, `menu_slot_entry_b_select`, `menu_slot0_lock_set`,
  *   `menu_slot_lock_set`, `menu_item_close`, `menu_work_update`, `menu_slot_anim_update`, `menu_slot_panel_draw`,
  *   `item_species_name_get`, `item_rare_color_get`, `item_is_53_ck`, `item_kind_color_by_kind` and every `menu_*` row
@@ -23,11 +20,7 @@
  *   `menu_item_*` the item page (page 0) and its use/move/drop actions).  The page callees' registry names
  *   (`menu_equip_panel_*`, `menu_page02_*`, `movie_page04_*` ... `note_page_*`) are GUESSes keyed by the page kind
  *   `MenuSlot::field_0x014` and the owner unit.
- * RESIDUALS. 59 rows unwritten (29316 B; objdiff scores them zero), all in the Pl tail: 0x80297E34-0x80299ED8,
- *   0x80299EF8-0x8029A140, 0x8029A19C-0x8029B8F4, 0x8029B918-0x8029D6FC, 0x8029D744-0x8029EFDC, `hit_data_apply`
- *   (0x8029F204); left for the seam re-draw.  The partial rows:
- *  - `fn_8029A140`: the branch sense of one `fcmpo`, and its tail block laid out in the other order;
- *  - `fn_8029F084`: retail keeps an unused accumulator (`li r5,0`, `+9` per outer iteration) MWCC deletes;
+ * RESIDUALS. Every row is written; the partial rows:
  *  - `item_category_ck`: the `and` operands in the other order (both spellings tried);
  *  - `menu_item_frame_update`: retail masks `GameMode_ck`'s result (`clrlwi r3,r30,24`), ours moves it (`mr r3,r30`);
  *  - `menu_item_page_step`, `menu_split_item_page_step`: the move target's `(s8)(u8)` argument is built in r0, retail
@@ -40,10 +33,10 @@
  *  - `menu_split_item_page_draw`, `menu_split_panel_draw`, `menu_split_quit_draw`, `menu_quit_draw`,
  *    `menu_item_move_step`, `menu_slot_panel_draw`, `menu_main_draw`: register permutations and one `mr` scheduled
  *    across a call.
- *  - source order is not address order (the 0x802A5444-0x802A6624 block precedes the 0x8029F3C8 bodies, `fn_8029F084`
- *    precedes the 0x8029A140 rows, the menu-work bodies follow the item helpers), a flip blocker whose fix is a reorder.
+ *  - source order is not address order (the 0x802A5444-0x802A6624 block precedes the 0x8029F61C bodies, the menu-work
+ *    bodies follow the item helpers), a flip blocker whose fix is a reorder.
  *  - data: the `.data` jump tables, `"%s"`/`"%d"` and the 120.0f pool constant are emitted; the item colour table, the
- *    Pl tail's tables, the `.bss` and the remaining `.sdata`/`.sdata2` are not (`datagap.py --unit menu/menu_item`).
+ *    `.bss` and the remaining `.sdata` are not (`datagap.py --unit menu/menu_item`).
  * SHAPES. `MenuSlot` (`menu/menu_item.h`) is the one view of the menu slot at `.bss` 0x806AC8C8.
  *  - an `s8` field read without a cast loads straight into the argument register (`lbz r4` + `extsb r4,r4`); a cast
  *    `u8` field goes through r0, and an `s8` multiply keeps retail's `mullw` operand order;
@@ -58,8 +51,6 @@
 #include "pl.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/system_core.cpp`) */
-#include "menu/hit_attack_list_push.h"
-#include "Pl/pl_coll.h"   /* the owner of the `.bss` arrays `pl_land_data` / `pl_hit_id_list` (rule 2) */
 #include "id_value.h"
 #include "menu/menu_item.h"
 #include "quest/quest_item_slot.h"   /* quest_select_ready_ck (rule 2) */
@@ -191,158 +182,7 @@
 #include "hud/quest_slot_arm_all_a.h"
 #include "lobby/lb_entry_selected_send.h"
 
-/* Whether `id` is *absent* from the two ten-entry halves of a caller's 20-entry id table. */
-extern "C" u32 fn_8029F084(u16* ids, u16 id)
-{
-    s32 checked;   /* the original's running count of tested entries (its increments are +9) */
-    s32 row;
-
-    checked = 0;
-    for (row = 0; row < 2; row++, ids += 10) {
-        s32 j;
-
-        for (j = 0; j < 10; j++) {
-            if (id == ids[j]) {
-                return 0;
-            }
-        }
-        checked += 9;
-    }
-    return 1;
-}
-
-/* Empties a 20-entry id table and clears the count byte that indexes it. */
-extern "C" void hit_id_list_clear(u16* ids, u8* count)
-{
-    s32 i;
-
-    *count = 0;
-    for (i = 0; i < 20; i++) {
-        ids[i] = 0xFFFF;
-    }
-}
-
-/* Appends `id` to the ring, wrapping the count around at 20. */
-extern "C" void fn_8029F1D4(u16* ids, u8* count, u16 id)
-{
-    ids[*count] = id;
-    (*count)++;
-    if ((u8)*count >= 20) {
-        *count = 0;
-    }
-}
-
-/* ------------------------------------------------------------------------------------------------ *
- * The hit registry (`.bss` `lbl_806AC8A8`).
- * ------------------------------------------------------------------------------------------------ */
-
-/* Clears the registry: both list heads, both counts, the id counter and the trailing word. */
-extern "C" void hit_registry_clear(void)
-{
-    lbl_806AC8A8.head_0x00 = 0;
-    lbl_806AC8A8.head_0x04 = 0;
-    lbl_806AC8A8.count_0x08 = 0;
-    lbl_806AC8A8.count_0x0A = 0;
-}
-
-/* Pushes an active hit onto the registry's first list. */
-extern "C" void hit_attack_list_push(_HIT_W* hit)
-{
-    HitRegistry* reg = &lbl_806AC8A8;
-    _HIT_W* prev;
-
-    if (hit->active_0x05 == 0) {
-        return;
-    }
-    prev = reg->head_0x00;
-    reg->head_0x00 = hit;
-    hit->next_0x00 = prev;
-    reg->count_0x08++;
-}
-
-/* The same push onto the registry's second list. */
-extern "C" void hit_body_list_push(_HIT_W* hit)
-{
-    HitRegistry* reg = &lbl_806AC8A8;
-    _HIT_W* prev;
-
-    if (hit->active_0x05 == 0) {
-        return;
-    }
-    prev = reg->head_0x04;
-    reg->head_0x04 = hit;
-    hit->next_0x00 = prev;
-    reg->count_0x0A++;
-}
-
-/* Records one hit's owner and its kind. */
-extern "C" void hit_source_set(_HIT_W* self, u8 kind, void* owner)
-{
-    self->owner_0x10 = owner;
-    self->owner_kind_0x06 = kind;
-}
-
-/* Records the second owner slot of a hit. */
-extern "C" void hit_owner_set(_HIT_W* self, u8 kind, void* owner)
-{
-    self->owner_0x14 = owner;
-    self->kind_0x07 = kind;
-}
-
-/* Hands out the next hit id, wrapping around at 60000. */
-u16 get_hit_id(void)
-{
-    HitRegistry* reg = &lbl_806AC8A8;
-
-    reg->next_id_0x0C++;
-    if (reg->next_id_0x0C >= 0xEA60) {
-        reg->next_id_0x0C = 0;
-    }
-    return reg->next_id_0x0C;
-}
-
-/* ------------------------------------------------------------------------------------------------ *
- * The two id/tile lookups at the tail of the band.
- * ------------------------------------------------------------------------------------------------ */
-
-/* The byte `lbl_805CDC88` holds for a tile id, or 0 for an id past the table. */
-extern "C" u32 fn_8029B8F4(u32 id)
-{
-    if ((u8)id > 0x24) {
-        return 0;
-    }
-    return lbl_805CDC88[(u8)id];
-}
-
-/* Whether two menu/quest ids agree, or the scene is in play mode 3. */
-extern "C" u32 fn_8029D6FC(u8 a, u8 b)
-{
-    if (a == b || PlayMode_ck() != 3) {
-        return 1;
-    }
-    return 0;
-}
-
-/* The four-way kind `hit_data_apply`'s two floats select: 0 when neither value is usable, 1/2 by which
- * slot carries the positive value and 3 when the second slot is the unusable default. */
-extern "C" u32 fn_8029A140(_HIT_W* self)
-{
-    if (self->value_0x50 <= -100.0f) {
-        return 0;
-    }
-    if (self->value_0x50 > 0.0f) {
-        return 1;
-    }
-    if (self->value_0x54 > 0.0f) {
-        return 2;
-    }
-    if (self->value_0x54 <= -100.0f) {
-        return 3;
-    }
-    return 2;
-}
-
-/* ---- the item menu: the item-record helpers, the option and action lists and their draw walk (0x8029F3C8-0x802A6624) ---- */
+/* ---- the item menu: the item-record helpers, the option and action lists and their draw walk (0x8029F61C-0x802A6624) ---- */
 
 /* nw4r's debug panic: the map name `Panic__Q24nw4r2dbFPCciPCce` is the front-end's spelling of this
  * declaration, so it sits at C++ scope (rule 9). */
@@ -1060,128 +900,6 @@ extern "C" u32 menu_item_use_ck(MenuSlot* self) {
     }
 
     return 1;
-}
-
-/* 0x8029F3C8: fills a body slot from a body record (the appearance/hit state the item menu shows); `kind` picks the
- * work byte copied and its sub-code, the second argument is stored, not read. */
-void body_set(_BODY_W* body, _BODY_DATA* data, u8 kind, u32 work, u8 mode)
-{
-    _BODY_DATA* work_rec = (_BODY_DATA*)work;
-
-    body->field_0x005 = 1;
-    body->field_0x006 = 0;
-    body->kind = kind;
-    body->field_0x010 = work;
-    body->field_0x00A = 0;
-    body->data = (u32)data;
-    body->source_kind = 0;
-    body->field_0x014 = 0;
-    body->field_0x03F = mode;
-    switch (kind) {
-    case 0:
-        body->source = work_rec->area;
-        body->source_kind = 1;
-        break;
-    case 1:
-        body->source = work_rec->field_0x1E1;
-        body->source_kind = 2;
-        break;
-    case 2:
-        body->source = work_rec->chunk_ofs;
-        body->source_kind = 8;
-        break;
-    case 3:
-        body->source = work_rec->field_0x1A4;
-        body->source_kind = 4;
-        break;
-    case 4:
-        body->source = get_now_areano();
-        body->source_kind = 16;
-        break;
-    case 5:
-        body->source = get_now_areano();
-        body->source_kind = 32;
-        break;
-    }
-}
-
-/* 0x8029F4C4: flags a hit entry as populated and stores the four values the caller resolved. */
-extern "C" void hit_motion_set(_HIT_W* hit, u16 a, u16 b, u16 c, u16 d)
-{
-    hit_flag_set(hit, 0x100);
-    hit->field_0x018 = a;
-    hit->field_0x01A = b;
-    hit->field_0x01C = c;
-    hit->field_0x01E = d;
-}
-
-/* 0x8029F51C: whether one of the hit entry's +0x05B bits is set. */
-extern "C" u32 hit_mask_ck(_HIT_W* hit, u32 mask)
-{
-    return (hit->field_0x05B & (u8)mask) != 0;
-}
-
-/* 0x8029F538: clears the hit entry's flag word. */
-extern "C" void hit_flags_clear(_HIT_W* hit)
-{
-    hit->flags = 0;
-}
-
-/* 0x8029F544: sets hit flags. */
-void hit_flag_set(_HIT_W* hit, u32 flags)
-{
-    hit->flags |= flags;
-}
-
-/* 0x8029F554: clears hit flags. */
-extern "C" void fn_8029F554(_HIT_W* hit, u32 flags)
-{
-    hit->flags &= ~flags;
-}
-
-/* 0x8029F564: whether any of the requested hit flags is set. */
-extern "C" u32 fn_8029F564(_HIT_W* hit, u32 flags)
-{
-    return (hit->flags & flags) != 0;
-}
-
-/* 0x8029F57C: whether one of the hit entry's +0x031 bits is set. */
-extern "C" u32 fn_8029F57C(_HIT_W* hit, u32 mask)
-{
-    return (hit->field_0x031 & (u8)mask) != 0;
-}
-
-/* 0x8029F598: the hit entry's result id, or 0xFF when the entry carries no result. */
-u8 hit_result_check(_HIT_W* hit)
-{
-    if (hit->result_valid == 0) {
-        return 255;
-    }
-    return hit->result;
-}
-
-/* 0x8029F5B4: stores the attack's damage value as the entry's +0x03C float. */
-extern "C" void hit_knock_set(_HIT_W* hit, s16 value)
-{
-    hit->field_0x03C = (f32)value;
-}
-
-/* 0x8029F5E4: whether the hit entry's +0x00A state run is clear of the 0xD2 bit set. */
-extern "C" u32 fn_8029F5E4(_HIT_W* hit)
-{
-    return (hit->state & 0xD2) == 0;
-}
-
-/* 0x8029F5F8: whether the hit entry's +0x00A state run is clear of the 0xB2 bit set. */
-extern "C" u32 fn_8029F5F8(_HIT_W* hit)
-{
-    return (hit->state & 0xB2) == 0;
-}
-
-/* 0x8029F60C: the item the menu currently has selected. */
-extern "C" u32 fn_8029F60C(void)
-{
-    return lbl_806AC8A8.field_0x004;
 }
 
 /* 0x8029F61C: the item table head, the block every accessor below reads. */

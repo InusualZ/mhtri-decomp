@@ -2890,7 +2890,7 @@ extern "C" void pl_gauge_step_a(_PLW* plw) {
     if (plw->skill_point_0x3B8 >= 700) {
         plw->skill_point_0x3B8 = 700;
     }
-    plw->unk3BC = (f32)plw->skill_point_0x3B8 / lbl_8079A044;
+    plw->skill_rate_0x3BC = (f32)plw->skill_point_0x3B8 / lbl_8079A044;
 }
 
 /* Recomputes the second skill set's point total and its rank. */
@@ -2982,44 +2982,44 @@ extern "C" void pl_gauge_step_b(_PLW* plw) {
 
 /* Recomputes the five weapon-type attack-bonus fields from the player's active skills. */
 extern "C" void fn_802707B4(_PLW* plw) {
-    SKILL_GROUP(unk3C4, 96)
-    SKILL_GROUP(unk3C8, 102)
-    SKILL_GROUP(unk3CC, 108)
-    SKILL_GROUP(unk3D0, 120)
-    SKILL_GROUP(unk3D4, 114)
+    SKILL_GROUP(elem_resist_0x3C4, 96)
+    SKILL_GROUP(elem_resist_0x3C8, 102)
+    SKILL_GROUP(elem_resist_0x3CC, 108)
+    SKILL_GROUP(elem_resist_0x3D0, 120)
+    SKILL_GROUP(elem_resist_0x3D4, 114)
 }
 
 /* Clamps the five attack-bonus fields to the +-99 range the display and the status code use. */
 extern "C" void fn_80270B98(_PLW* plw) {
-    if (plw->unk3C4 < lbl_8079A068) {
-        plw->unk3C4 = lbl_8079A068;
+    if (plw->elem_resist_0x3C4 < lbl_8079A068) {
+        plw->elem_resist_0x3C4 = lbl_8079A068;
     }
-    if (plw->unk3C8 < lbl_8079A068) {
-        plw->unk3C8 = lbl_8079A068;
+    if (plw->elem_resist_0x3C8 < lbl_8079A068) {
+        plw->elem_resist_0x3C8 = lbl_8079A068;
     }
-    if (plw->unk3CC < lbl_8079A068) {
-        plw->unk3CC = lbl_8079A068;
+    if (plw->elem_resist_0x3CC < lbl_8079A068) {
+        plw->elem_resist_0x3CC = lbl_8079A068;
     }
-    if (plw->unk3D0 < lbl_8079A068) {
-        plw->unk3D0 = lbl_8079A068;
+    if (plw->elem_resist_0x3D0 < lbl_8079A068) {
+        plw->elem_resist_0x3D0 = lbl_8079A068;
     }
-    if (plw->unk3D4 < lbl_8079A068) {
-        plw->unk3D4 = lbl_8079A068;
+    if (plw->elem_resist_0x3D4 < lbl_8079A068) {
+        plw->elem_resist_0x3D4 = lbl_8079A068;
     }
-    if (plw->unk3C4 > lbl_8079A06C) {
-        plw->unk3C4 = lbl_8079A06C;
+    if (plw->elem_resist_0x3C4 > lbl_8079A06C) {
+        plw->elem_resist_0x3C4 = lbl_8079A06C;
     }
-    if (plw->unk3C8 > lbl_8079A06C) {
-        plw->unk3C8 = lbl_8079A06C;
+    if (plw->elem_resist_0x3C8 > lbl_8079A06C) {
+        plw->elem_resist_0x3C8 = lbl_8079A06C;
     }
-    if (plw->unk3CC > lbl_8079A06C) {
-        plw->unk3CC = lbl_8079A06C;
+    if (plw->elem_resist_0x3CC > lbl_8079A06C) {
+        plw->elem_resist_0x3CC = lbl_8079A06C;
     }
-    if (plw->unk3D0 > lbl_8079A06C) {
-        plw->unk3D0 = lbl_8079A06C;
+    if (plw->elem_resist_0x3D0 > lbl_8079A06C) {
+        plw->elem_resist_0x3D0 = lbl_8079A06C;
     }
-    if (plw->unk3D4 > lbl_8079A06C) {
-        plw->unk3D4 = lbl_8079A06C;
+    if (plw->elem_resist_0x3D4 > lbl_8079A06C) {
+        plw->elem_resist_0x3D4 = lbl_8079A06C;
     }
 }
 
@@ -3038,19 +3038,19 @@ extern "C" f32 fn_80270C64(s16* table, s16 slot) {
 
 /* Rebuilds the five attack-bonus fields from the player's armour skills and the weapon's own bonuses. */
 extern "C" void pl_condition_step(_PLW* plw) {
-    plw->unk3C4 = (f32)(s16)fn_80273ED8(plw, 1, 0) + fn_80270C64((s16*)plw, 0);
-    plw->unk3C8 = (f32)(s16)fn_80273ED8(plw, 2, 0) + fn_80270C64((s16*)plw, 1);
-    plw->unk3CC = (f32)(s16)fn_80273ED8(plw, 3, 0) + fn_80270C64((s16*)plw, 2);
-    plw->unk3D0 = (f32)(s16)fn_80273ED8(plw, 4, 0) + fn_80270C64((s16*)plw, 4);
-    plw->unk3D4 = (f32)(s16)fn_80273ED8(plw, 5, 0) + fn_80270C64((s16*)plw, 3);
+    plw->elem_resist_0x3C4 = (f32)(s16)fn_80273ED8(plw, 1, 0) + fn_80270C64((s16*)plw, 0);
+    plw->elem_resist_0x3C8 = (f32)(s16)fn_80273ED8(plw, 2, 0) + fn_80270C64((s16*)plw, 1);
+    plw->elem_resist_0x3CC = (f32)(s16)fn_80273ED8(plw, 3, 0) + fn_80270C64((s16*)plw, 2);
+    plw->elem_resist_0x3D0 = (f32)(s16)fn_80273ED8(plw, 4, 0) + fn_80270C64((s16*)plw, 4);
+    plw->elem_resist_0x3D4 = (f32)(s16)fn_80273ED8(plw, 5, 0) + fn_80270C64((s16*)plw, 3);
     fn_802707B4(plw);
-    plw->unk3C4 += (f32)(s16)fn_802753E4(plw, 6);
-    plw->unk3C8 += (f32)(s16)fn_802753E4(plw, 7);
-    plw->unk3CC += (f32)(s16)fn_802753E4(plw, 8);
-    plw->unk3D0 += (f32)(s16)fn_802753E4(plw, 10);
-    plw->unk3D4 += (f32)(s16)fn_802753E4(plw, 9);
+    plw->elem_resist_0x3C4 += (f32)(s16)fn_802753E4(plw, 6);
+    plw->elem_resist_0x3C8 += (f32)(s16)fn_802753E4(plw, 7);
+    plw->elem_resist_0x3CC += (f32)(s16)fn_802753E4(plw, 8);
+    plw->elem_resist_0x3D0 += (f32)(s16)fn_802753E4(plw, 10);
+    plw->elem_resist_0x3D4 += (f32)(s16)fn_802753E4(plw, 9);
     if (Pl_condition_ck(plw, 256) == 1) {
-        plw->unk3D4 -= lbl_8079A070;
+        plw->elem_resist_0x3D4 -= lbl_8079A070;
     }
     fn_80270B98(plw);
 }
@@ -3117,11 +3117,11 @@ extern "C" void pl_status_sheet_get(_PLW* plw, _EQUIP* equip, u8* out) {
     *(s16*)(out + 4) = plw->unk380;
     *(u16*)(out + 6) = plw->skill_point_0x3B8;
     *(u16*)(out + 8) = plw->unk3BA;
-    *(s16*)(out + 16) = (s16)plw->unk3C4;
-    *(s16*)(out + 18) = (s16)plw->unk3C8;
-    *(s16*)(out + 20) = (s16)plw->unk3CC;
-    *(s16*)(out + 24) = (s16)plw->unk3D0;
-    *(s16*)(out + 22) = (s16)plw->unk3D4;
+    *(s16*)(out + 16) = (s16)plw->elem_resist_0x3C4;
+    *(s16*)(out + 18) = (s16)plw->elem_resist_0x3C8;
+    *(s16*)(out + 20) = (s16)plw->elem_resist_0x3CC;
+    *(s16*)(out + 24) = (s16)plw->elem_resist_0x3D0;
+    *(s16*)(out + 22) = (s16)plw->elem_resist_0x3D4;
     for (i = 0; i < 7; i++) {
         out[26 + i] = 0;
     }
@@ -6404,7 +6404,7 @@ extern "C" s32 fn_8027AF80(u8 dir)
 }
 
 /* 0x8027C030 */
-extern "C" s32 fn_8027C030(_PLW* self)
+extern "C" s32 pl_act_kind7_ck(_PLW* self)
 {
     if (self->field_0x00A == 7) {
         s32 id = self->act_no;

@@ -188,6 +188,8 @@ void pl_impact_pos_get(struct _PLW* plw, nw4r::math::VEC3* out);
 
 s32 pl_attack_range_tier_get(struct _PLW* self);
 void pl_motion_scratch_clear(struct _PLW* self);
+/* 0x8027E220 - whether the player holds an act its hit filter respects; the second parameter is never read. */
+u32 pl_act_held_ck(struct _PLW* self, s32 unused);
 void pl_held_item_refresh(struct _PLW* self);
 s32 pl_act_dash_input_ck(void);
 void pl_stun_tick(struct _PLW* self);

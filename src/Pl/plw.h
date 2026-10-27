@@ -732,13 +732,13 @@ struct _PLW {
     /* +0x3B7 */ u8 pad_0x3B7;
     /* +0x3B8 */ u16 skill_point_0x3B8;   /* the skill point total (capped at 700) whose fraction +0x3BC holds */
     /* +0x3BA */ u16 unk3BA;
-    /* +0x3BC */ f32 unk3BC;
+    /* +0x3BC */ f32 skill_rate_0x3BC;   /* the +0x3B8 skill points as a fraction (`Pl/pl_act.cpp`); `hit_owner_rate_get` hands it to a flag-0x20 hit */
     /* +0x3C0 */ f32 unk3C0;
-    /* +0x3C4 */ f32 unk3C4;
-    /* +0x3C8 */ f32 unk3C8;
-    /* +0x3CC */ f32 unk3CC;
-    /* +0x3D0 */ f32 unk3D0;
-    /* +0x3D4 */ f32 unk3D4;
+    /* +0x3C4 */ f32 elem_resist_0x3C4;   /* an element resistance the skills set (`pl_elem_resist_get`) */
+    /* +0x3C8 */ f32 elem_resist_0x3C8;   /* an element resistance the skills set (`pl_elem_resist_get`) */
+    /* +0x3CC */ f32 elem_resist_0x3CC;   /* an element resistance the skills set (`pl_elem_resist_get`) */
+    /* +0x3D0 */ f32 elem_resist_0x3D0;   /* an element resistance the skills set (`pl_elem_resist_get`) */
+    /* +0x3D4 */ f32 elem_resist_0x3D4;   /* an element resistance the skills set (`pl_elem_resist_get`) */
     /* +0x3D8 */ union {   /* one u32, two spellings */
         /* +0x3D8 */ u32 unk3D8;
         /* +0x3D8 */ u32 field_0x3D8;  /* act bitfield; `fn_80258FCC` clears the 0x300 pair */

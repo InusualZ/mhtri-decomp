@@ -1,7 +1,8 @@
 /*
  * menu/menu_item.h - `menu/menu_item.cpp`'s outbound declarations and the records its bodies read: the item-record
- *   accessors (`ItemName`, `ItemExp`, `GetItemData`), the menu tables (`get_menu_tbl_ptr`, `get_menu_lsp_tbl`), the hit
- *   helpers (`body_set`, `hit_flag_set`, `hit_result_check`; `_HIT_W` is `Pl/hit_w.h`'s) and the menu slot `MenuSlot`.
+ *   accessors (`ItemName`, `ItemExp`, `GetItemData`), the menu tables (`get_menu_tbl_ptr`, `get_menu_lsp_tbl`) and the menu
+ *   slot `MenuSlot`; the hit helpers are `Pl/pl_hit.h`'s, included here for the units that reach them
+ *   through this header.
  */
 #ifndef MHTRI_MENU_MENU_ITEM_H
 #define MHTRI_MENU_MENU_ITEM_H
@@ -9,40 +10,9 @@
 #include "types.h"
 #include "pl.h"
 #include "Pl/hit_w.h"
+#include "Pl/pl_hit.h"   /* `body_set` and the hit-entry accessors (rule 2: the owner is `Pl/pl_hit.cpp`) */
 #include "id_value.h"   /* `_HIT_W` / `HitRegistry`, shared with `Pl/pl_coll.cpp` (rule 1) */
 
-
-/* The record `body_set` copies the hunter's armour/appearance bytes out of; only the four bytes
- * this unit reads are named, and the record is at least 0x1E2 bytes (the highest offset touched).
- * size: 0x1E2 (approximate: max touched offset + 1) */
-struct _BODY_DATA {
-    /* +0x000 */ u8 unused_0x000[0x008];
-    /* +0x008 */ u8 chunk_ofs;        /* kind 2's source byte */
-    /* +0x009 */ u8 unused_0x009[0x016 - 0x009];
-    /* +0x016 */ u8 area;             /* kind 0's source byte */
-    /* +0x017 */ u8 unused_0x017[0x1A4 - 0x017];
-    /* +0x1A4 */ u8 field_0x1A4;      /* kind 3's source byte */
-    /* +0x1A5 */ u8 unused_0x1A5[0x1E1 - 0x1A5];
-    /* +0x1E1 */ u8 field_0x1E1;      /* kind 1's source byte */
-};
-
-/* The body slot `body_set` fills in from a `_BODY_DATA`.  Only the bytes this unit writes are
- * named; +0x03F is the last one written, and no function here reads past it.
- * size: 0x40 (approximate: max touched offset + 1) */
-struct _BODY_W {
-    /* +0x000 */ u8 unused_0x000[0x005];
-    /* +0x005 */ u8 field_0x005;      /* set to 1 on every call */
-    /* +0x006 */ u8 field_0x006;      /* cleared on every call */
-    /* +0x007 */ u8 kind;             /* the kind argument, kept */
-    /* +0x008 */ u8 source;           /* the byte the kind's source field supplied */
-    /* +0x009 */ u8 source_kind;      /* the kind's sub-code */
-    /* +0x00A */ u16 field_0x00A;
-    /* +0x00C */ u32 data;            /* the `_BODY_DATA` the slot was filled from */
-    /* +0x010 */ u32 field_0x010;
-    /* +0x014 */ u16 field_0x014;
-    /* +0x016 */ u8 unused_0x016[0x03F - 0x016];
-    /* +0x03F */ u8 field_0x03F;
-};
 
 /* One item record (0x14 bytes): `.data`-backed, 747 of them, behind the pointer at +0x00 of
  * `lbl_806AC8B8`.  Offsets from `GetItemData`'s 0x14 stride and the byte loads the accessors do. */
@@ -269,7 +239,6 @@ struct MenuFrameWork {
 
 /* The `.bss`/`.data` blocks the accessors read: this unit's own sections, declared never defined (playbook 29),
  * so the accessors take their addresses instead of defining them. */
-extern HitRegistry lbl_806AC8A8;
 extern ItemDataHead lbl_806AC8B8;
 extern MenuWork menu_work;
 extern MenuTables lbl_806ACF28;
@@ -298,9 +267,6 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  * (rule 2).  Its third parameter is the 2D vector, whose tag is declared here rather than including a band header. */
 struct _mh_ivec2_;
 
-void body_set(_BODY_W* body, _BODY_DATA* data, u8 kind, u32 work, u8 mode);
-void hit_flag_set(_HIT_W* hit, u32 flags);
-u8 hit_result_check(_HIT_W* hit);
 u32 ItemName(u16 id);
 u32 ItemExp(u16 id);
 ItemDataRecord* GetItemData(u16 id);
@@ -313,16 +279,6 @@ void put_menu_cursor(u16* rows, u16 index, const _mh_ivec2_* pos);
 extern "C" {
 #endif
 
-void hit_motion_set(_HIT_W* hit, u16 a, u16 b, u16 c, u16 d);
-u32 hit_mask_ck(_HIT_W* hit, u32 mask);
-void hit_flags_clear(_HIT_W* hit);
-void fn_8029F554(_HIT_W* hit, u32 flags);
-u32 fn_8029F564(_HIT_W* hit, u32 flags);
-u32 fn_8029F57C(_HIT_W* hit, u32 mask);
-void hit_knock_set(_HIT_W* hit, s16 value);
-u32 fn_8029F5E4(_HIT_W* hit);
-u32 fn_8029F5F8(_HIT_W* hit);
-u32 fn_8029F60C(void);
 void item_species_name_get(u16 id);
 ItemSpeciesRecord* get_item_species_data(u16 id);
 u32 item_rare_color_get(u16 id);

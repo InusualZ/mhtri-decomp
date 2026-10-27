@@ -1031,7 +1031,7 @@ struct _ENEMY_WORK {
     /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
     /* +0x814 */ u16 field_0x814;       /* the action-end block clears it */
     /* +0x816 */ u16 field_0x816;
-    /* +0x818 */ s16 field_0x818;       /* the motion timer `fn_8012F110` arms before its mode switch */
+    /* +0x818 */ s16 field_0x818;       /* the motion timer `em_hit_kind_accept_ck` arms before its mode switch */
     /* +0x81A */ s16 field_0x81A;     /* the motion timer `em015_area_follow` gates its arming on
                                         * (<= 0) */
     /* +0x81C */ s16 timer_0x81C;  /* the two-frame timer `em_timer_0x81C_arm` arms */
@@ -1077,12 +1077,20 @@ struct _ENEMY_WORK {
     /* +0x8B0 */ u8 flag_0x8B0;  /* set by `em_idle_flag2_set` once the enemy is idle */
     /* +0x8B1 */ u8 unused_0x8B1[0x8B3 - 0x8B1];
     /* +0x8B3 */ u8 flags_0x8B3;        /* the action bitmap `fn_801376BC`/`DC`/`04` mask */
-    /* +0x8B4 */ u8 unused_0x8B4[0x8C2 - 0x8B4];
+    /* +0x8B4 */ nw4r::math::VEC3 drift_vel_0x8B4;  /* the push-out drift `Pl/pl_body_push.cpp` sums for the frame */
+    /* +0x8C0 */ u8 drift_on_0x8C0;      /* nonzero applies `drift_vel_0x8B4` (`Pl/pl_body_push.cpp` sets it) */
+    /* +0x8C1 */ u8 unused_0x8C1;
     /* +0x8C2 */ s16 fx_timer_0x8C2;  /* the effect timer `em_fx_flag_set` arms */
     /* +0x8C4 */ s16 fx_timer_0x8C4;  /* the effect timer `em_fx_flag2_set` arms */
     /* +0x8C6 */ s16 fx_timer_0x8C6;  /* the effect timer `em_fx_flag3_set` arms */
-    /* +0x8C8 */ u32 field_0x8C8;       /* `fn_801260BC`'s value `em_static_data_latch` latches */
-    /* +0x8CC */ u32 field_0x8CC;       /* `fn_801260E0`'s value `em_static_data_latch` latches */
+    /* +0x8C8 */ union {
+        u32 field_0x8C8;               /* `fn_801260BC`'s value `em_static_data_latch` latches */
+        struct EmWeakPoint* parts_0x8C8;   /* the same word as the hit-part list it is (`Pl/em_weak_point.h`) */
+    };
+    /* +0x8CC */ union {
+        u32 field_0x8CC;               /* `fn_801260E0`'s value `em_static_data_latch` latches */
+        struct EmWeakPoint* parts_0x8CC;   /* the same word as the second hit-part list (the camera push) */
+    };
     /* +0x8D0 */ u8 unused_0x8D0[0x8D2 - 0x8D0];
     /* +0x8D2 */ u8 field_0x8D2;        /* nonzero, `em_area_entry_store` keeps the record's own timer */
     /* +0x8D3 */ u8 field_0x8D3;        /* `fn_80137614` matches it against 1 */

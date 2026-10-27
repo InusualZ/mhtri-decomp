@@ -6101,7 +6101,7 @@ extern "C" s32 em_damage_area_ok_ck(_ENEMY_WORK* self)
 
 /* The program-mode gate for one of the two window masks (0xa / 0xb); the "die" test is the only path
  * that keeps the record alive. */
-extern "C" s32 fn_8012F110(_ENEMY_WORK* self, u16 mode)
+extern "C" s32 em_hit_kind_accept_ck(_ENEMY_WORK* self, u16 mode)
 {
     if (self->field_0x818 > 0) return 0;
     switch (mode) {

@@ -97,7 +97,7 @@
 #include "enemy/fn_8012BDF4.h"
 #include "stage/stg_w.h"
 #include "enemy/em_tall_ck.h"
-#include "menu/em_part_sphere_get.h"
+#include "Pl/pl_hit.h"   /* em_part_sphere_get (rule 2: the owner's header) */
 #include "lobby/lb_npc_callees.h"
 #include "place_rec_copy.h"
 #include "word_read.h"
@@ -1656,7 +1656,7 @@ u32 ainpc_page_monster_pick(void)
             continue;
         }
         for (; *part != -1; part += 22) {
-            if ((u8)em_part_sphere_get(em, part, &capsule, &sphere.center) == 0 &&
+            if ((u8)em_part_sphere_get(em, (EmWeakPoint*)part, (PlCapsule*)&capsule, (HitSphere*)&sphere.center) == 0 &&
                 hud_ray_sphere_hit_ck(&sphere, &ray, &dist) != 0 && dist < best) {
                 best = dist;
                 st->sel.valid = 1;

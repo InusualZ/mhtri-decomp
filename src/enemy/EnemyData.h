@@ -5,6 +5,7 @@
 #define MHTRI_ENEMY_ENEMYDATA_H
 
 #include "types.h"
+#include "nw4r/math.h"
 
 typedef struct EmDataRecord EmDataRecord;   /* enemy/fn_80138074.c */
 typedef struct UserDataItem UserDataItem;   /* enemy/fn_80138074.c */
@@ -38,7 +39,9 @@ struct EmAilmentFxBlock {
 /* The enemy kind's body size record `EnemyData::size_0x54` points at; `ai/ai_npc.cpp` scales its +0x24 with
  * `get_em_chg_scale`.  size: 0x28 (approximation: evidenced to +0x24) */
 struct EmSizeParams {
-    /* +0x00 */ u8 unused_0x00[0x24];
+    /* +0x00 */ nw4r::math::VEC3 center_0x00;   /* the body sphere's centre offset on the ground (`Pl/pl_body_push.cpp`) */
+    /* +0x0C */ nw4r::math::VEC3 center_0x0C;   /* the same while flying or swimming */
+    /* +0x18 */ nw4r::math::VEC3 center_0x18;   /* the same for the second flying stance */
     /* +0x24 */ f32 radius_0x24;   /* the reach the companion keeps from the enemy */
 };
 

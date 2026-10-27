@@ -42,6 +42,7 @@
 #define fn_800FD29C fn_800FD29C_hidden_eft002_h
 #define fn_800FD2AC fn_800FD2AC_hidden_eft002_h
 #include "ef/eft002.h"
+#include "Pl/pl_hit.h" /* hit_flag_ck (rule 2: the owner's header) */
 #include "ef/eft001.h" /* eft_rot_vec_copy, fn_800FC0F0 */
 #undef fn_800FD2AC
 #undef fn_800FD29C
@@ -165,8 +166,6 @@ void VEC2_ctor(void* p);
 void fn_800DB6CC(nw4r::math::VEC3* pos);
 void fn_800DB714(nw4r::math::VEC3* pos);
 void fn_800DB75C(void* enemy, nw4r::math::VEC3* pos);
-
-u32 fn_8029F564(void* self, u32 flag);
 
 /* untyped: an opaque handle passed through (the pooled slot is only stored) */
 void* eft_res_slot_get(u32 pool);
@@ -430,7 +429,7 @@ extern "C" void fn_800FBE64(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* src, u
         }
         effect->field_0x07 = 4;
     }
-    if (fn_8029F564(src, 0x800) == 1) {
+    if (hit_flag_ck((_HIT_W*)src, 0x800) == 1) {
         work->flag_0x29 = 1;
     } else {
         work->flag_0x29 = 0;
@@ -496,7 +495,7 @@ extern "C" void fn_800FC1DC(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* src)
     _EFT* effect = fn_800FC27C(pos, type, src->param_0x36, src->area_0x0F, 1.0f);
 
     if (effect != NULL) {
-        if (fn_8029F564(src, 2048) == 1) {
+        if (hit_flag_ck((_HIT_W*)src, 2048) == 1) {
             effect->field_0x07 = 1;
         } else {
             effect->field_0x07 = 0;

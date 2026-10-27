@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x80299C14 (menu/menu_item): pushes `pos` out of the collision by `radius`. */
-void coll_push_out(nw4r::math::VEC3* pos, f32 radius, s32 kind, s32 mode);
+void coll_push_out(nw4r::math::VEC3* pos, f32 radius, u8 min_kind, u8 list);
 
 #ifdef __cplusplus
 }

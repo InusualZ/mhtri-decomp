@@ -346,6 +346,7 @@ u16 ai_get_motion_no(struct _AINPC_W* self);
 #include "sound/mhchar.h"                  /* mhchar_reset (rule 2) */
 #include "sound/mhchar_model_create.h"
 #include "sound/mhchar_res_bank_set.h"
+#include "Pl/em_weak_point.h"               /* EmWeakPoint at global scope, before the view namespace re-reads `ai/ai_npc.h` */
 #include "menu/hit_attack_list_push.h"     /* hit_source_set, hit_owner_set, hit_id_list_clear (rule 2) */
 #include "enemy/em_pop.h"                  /* quest_flag_8_ck, quest_key20_flag_ck (rule 2) */
 #include "enemy/em007_model_eft_start.h"
@@ -9654,7 +9655,7 @@ void fn_802D29CC(struct _AINPC_W* self, f32 scale)
 #pragma peephole off
 
 /* 0x802D29DC - the model rotation component the scale setters read back. */
-f32 fn_802D29DC(struct _AINPC_W* self)
+f32 ai_npc_time_scale_get(struct _AINPC_W* self)
 {
     return self->model.field_0x5C;
 }

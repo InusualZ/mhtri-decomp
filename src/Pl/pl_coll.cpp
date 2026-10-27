@@ -137,17 +137,17 @@ s32 findInterSection3(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::
 /* Every bare `fn_XXXXXXXX` is the map's own (unmangled) name, so the definitions carry C linkage. */
 extern "C" {
 s32 pl_sphere_contact(HitSphere* a, HitSphere* b, VEC3* out);
-s32 pl_sphere_push(HitSphere* a, HitSphere* b, VEC3* out);
+u32 pl_sphere_push(HitSphere* a, HitSphere* b, VEC3* out);
 f32 pl_clampf(f32 value, f32 low, f32 high);
 f32 pl_box_point_dist_sq(PlBox* box, const VEC3* point, f32* param);
 f32 pl_segment_closest_point(VEC3* start, VEC3* end, VEC3* point, VEC3* out);
 f32 pl_segment_closest_sq(PlBox* a, PlBox* b, f32* s_out, f32* t_out);
 s32 pl_capsule_capsule_hit(PlCapsuleBox* a, PlCapsuleBox* b, VEC3* on_b, VEC3* on_a, VEC3* normal, f32* depth);
 s32 pl_capsule_capsule_contact(PlCapsuleBox* a, PlCapsuleBox* b, VEC3* out);
-s32 pl_capsule_capsule_push(PlCapsuleBox* a, PlCapsuleBox* b, VEC3* push_a, VEC3* push_b);
+u32 pl_capsule_capsule_push(PlCapsuleBox* a, PlCapsuleBox* b, VEC3* push_a, VEC3* push_b);
 s32 pl_capsule_sphere_hit(PlCapsuleBox* a, HitSphere* sphere, VEC3* on_axis, VEC3* normal, f32* depth);
 s32 pl_capsule_sphere_contact(PlCapsuleBox* a, HitSphere* sphere, VEC3* out);
-s32 pl_capsule_sphere_push(PlCapsuleBox* a, HitSphere* sphere, VEC3* push_a, VEC3* push_sphere);
+u32 pl_capsule_sphere_push(PlCapsuleBox* a, HitSphere* sphere, VEC3* push_a, VEC3* push_sphere);
 s32 pl_sphere_capsule_contact(HitSphere* sphere, PlCapsuleBox* a, VEC3* out);
 void pl_plane_project(VEC3* point, PlPlane* plane, VEC3* out);
 void vec3_scale_to(VEC3* out, f32 scale, const VEC3* in);
@@ -249,7 +249,7 @@ s32 pl_sphere_contact(HitSphere* a, HitSphere* b, VEC3* out) {
 
 /* 0x8028F758 - the same overlap test, but `out` gets the penetration vector: the direction `a - b`
  * scaled by `(radius_a + radius_b - |a - b|) / |a - b|`, or zero when they touch. */
-s32 pl_sphere_push(HitSphere* a, HitSphere* b, VEC3* out) {
+u32 pl_sphere_push(HitSphere* a, HitSphere* b, VEC3* out) {
     VEC3 sep;
     f32 dist;
     f32 reach;
@@ -488,7 +488,7 @@ s32 pl_capsule_capsule_contact(PlCapsuleBox* a, PlCapsuleBox* b, VEC3* out) {
 
 /* 0x80290000 (0xF8): the push-out vectors of two overlapping capsules: `push_a` moves `a` out of `b`, `push_b` moves `b`
  * out of `a`. */
-s32 pl_capsule_capsule_push(PlCapsuleBox* a, PlCapsuleBox* b, VEC3* push_a, VEC3* push_b) {
+u32 pl_capsule_capsule_push(PlCapsuleBox* a, PlCapsuleBox* b, VEC3* push_a, VEC3* push_b) {
     VEC3 normal;
     VEC3 on_b;
     VEC3 on_a;
@@ -590,7 +590,7 @@ s32 pl_capsule_sphere_contact(PlCapsuleBox* a, HitSphere* sphere, VEC3* out) {
 
 /* 0x80290398 (0xE4): the push-out vectors of an overlapping capsule and sphere: `push_a` moves the capsule out,
  * `push_sphere` moves the sphere out. */
-s32 pl_capsule_sphere_push(PlCapsuleBox* a, HitSphere* sphere, VEC3* push_a, VEC3* push_sphere) {
+u32 pl_capsule_sphere_push(PlCapsuleBox* a, HitSphere* sphere, VEC3* push_a, VEC3* push_sphere) {
     VEC3 normal;
     VEC3 on_axis;
     VEC3 unused_a;

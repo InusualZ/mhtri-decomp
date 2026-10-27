@@ -170,6 +170,14 @@ extern "C" {
 #endif
 /* 0x8029708C - resets the player collision work (the system core's move-work reset). */
 void pl_coll_table_clear(void);
+
+/* The body push tests `Pl/pl_body_push.cpp` calls: 1 when the two shapes overlap, with the push that separates them. */
+struct PlCapsuleBox;
+u32 pl_sphere_push(HitSphere* a, HitSphere* b, nw4r::math::VEC3* out);
+u32 pl_capsule_capsule_push(struct PlCapsuleBox* a, struct PlCapsuleBox* b, nw4r::math::VEC3* push_a,
+                            nw4r::math::VEC3* push_b);
+u32 pl_capsule_sphere_push(struct PlCapsuleBox* a, HitSphere* sphere, nw4r::math::VEC3* push_a,
+                           nw4r::math::VEC3* push_sphere);
 #ifdef __cplusplus
 }
 #endif

@@ -85,11 +85,24 @@ struct _AINPC_W {
     /* +0x1EE */ u8 unused_0x1EE[0x1F0 - 0x1EE];
     /* +0x1F0 */ s32 field_0x1F0;
     /* +0x1F4 */ s32 field_0x1F4;
-    /* +0x1F8 */ u8 unused_0x1F8[0x20C - 0x1F8];
+    /* +0x1F8 */ u8 unused_0x1F8[0x204 - 0x1F8];
+    /* +0x204 */ f32 hit_rate_0x204;    /* the hit-strength rate `hit_owner_rate_get` hands a flag-0x20 hit */
+    /* +0x208 */ u8 unused_0x208[0x20C - 0x208];
     /* +0x20C */ u32 field_0x20C;       /* the behaviour flag word `fn_802D6888` assembles */
-    /* +0x210 */ u8 unused_0x210[0x21C - 0x210];
+    /* +0x210 */ u8 unused_0x210[0x212 - 0x210];
+    /* +0x212 */ u16 field_0x212;       /* cleared by `Pl/pl_hit.cpp`'s per-frame target reset */
+    /* +0x214 */ s16 field_0x214;       /* a countdown; the NPC cannot be hit while it runs (`hit_registry_update`) */
+    /* +0x216 */ u8 field_0x216;        /* nonzero shields the NPC from hits; cleared by the target reset */
+    /* +0x217 */ u8 unused_0x217[0x21C - 0x217];
     /* +0x21C */ s16 field_0x21C;       /* non-zero sets the first behaviour bit */
-    /* +0x21E */ u8 unused_0x21E[0x234 - 0x21E];
+    /* +0x21E */ s16 field_0x21E;       /* the four counters the target reset clears */
+    /* +0x220 */ u8 unused_0x220[0x224 - 0x220];
+    /* +0x224 */ s16 field_0x224;
+    /* +0x226 */ u8 unused_0x226[0x22A - 0x226];
+    /* +0x22A */ s16 field_0x22A;
+    /* +0x22C */ u8 unused_0x22C[0x230 - 0x22C];
+    /* +0x230 */ s16 field_0x230;
+    /* +0x232 */ u8 unused_0x232[0x234 - 0x232];
     /* +0x234 */ s8 field_0x234;        /* the two halves of the first held-item counter */
     /* +0x235 */ s8 field_0x235;
     /* +0x236 */ u8 unused_0x236[0x238 - 0x236];
@@ -99,7 +112,9 @@ struct _AINPC_W {
     /* +0x23C */ u8 field_0x23C;
     /* +0x23D */ u8 pad_0x23D;
     /* +0x23E */ s16 field_0x23E;
-    /* +0x240 */ u8 unused_0x240[0x30E - 0x240];
+    /* +0x240 */ u8 unused_0x240[0x2F8 - 0x240];
+    /* +0x2F8 */ u16 hit_ids_0x2F8[(0x30E - 0x2F8) / 2];   /* the head of the 20-entry hit-id list (`ai/ai_npc.h`'s
+                                        * `hit_ids`); this view stops it at the byte it names at +0x30E */
     /* +0x30E */ u8 field_0x30E;
     /* +0x30F */ u8 unused_0x30F[0x326 - 0x30F];
     /* +0x326 */ u8 field_0x326;

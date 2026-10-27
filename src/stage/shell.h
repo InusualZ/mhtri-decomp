@@ -28,13 +28,29 @@ namespace nw4r { namespace ef { struct Effect; } }
 #define SHELL_BODY(shell) ((_HIT_W*)(shell)->body_0xB8)
 
 /* One 0x1A-byte row of an attack table (`shell_attack_set`'s `hit_tbl`): the two values it stores into the
- * shell's hit record and the index of its hit-box size record.  size: 0x1A */
+ * shell's hit record, the index of its hit-box size record, and the bytes `hit_data_apply` (`Pl/pl_hit.cpp`) copies
+ * into a hit entry.  size: 0x1A */
 struct _HIT_DATA {
     /* +0x00 */ s16 power_0x00;
     /* +0x02 */ s16 knock_0x02;
-    /* +0x04 */ u8 pad_0x04[0xB];
+    /* +0x04 */ s16 life_0x04;        /* the hit's `_HIT_W::life_0x40` */
+    /* +0x06 */ u8 kind_0x06;         /* the attack kind the targets filter on */
+    /* +0x07 */ u8 flags_0x07;
+    /* +0x08 */ u8 dir_ofs_0x08;      /* the knock direction's offset, in 256ths of a turn */
+    /* +0x09 */ u8 field_0x09;
+    /* +0x0A */ u16 mask_0x0A;
+    /* +0x0C */ u16 field_0x0C;
+    /* +0x0E */ u8 field_0x0E;
     /* +0x0F */ u8 size_index_0x0F;
-    /* +0x10 */ u8 pad_0x10[0xA];
+    /* +0x10 */ u8 field_0x10;
+    /* +0x11 */ u8 effect_0x11;       /* the hit effect kind */
+    /* +0x12 */ s8 strength_0x12;     /* the signed hit strength; a negative one is stored as 0 */
+    /* +0x13 */ u8 side_a_0x13;       /* the two side values, 0xFF for none */
+    /* +0x14 */ u8 side_b_0x14;
+    /* +0x15 */ u8 reaction_0x15;
+    /* +0x16 */ u8 field_0x16;
+    /* +0x17 */ u8 field_0x17;
+    /* +0x18 */ u8 pad_0x18[0x2];
 };
 
 /* The shell work record (the map's `_SHELL_W`): one projectile or thrown object, live while

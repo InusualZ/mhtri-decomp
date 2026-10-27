@@ -1,5 +1,5 @@
 /*
- * menu/hit_attack_list_push.h - `menu/menu_item.cpp`'s hit-registry record and the two globals it declares; the
+ * menu/hit_attack_list_push.h - the hit-registry list helpers of `Pl/pl_hit.cpp` and the hit-point record; the
  *   array types the band reads are `Pl/pl_coll.h`'s (rule 2).
  */
 #ifndef MHTRI_MENU_HIT_ATTACK_LIST_PUSH_H
@@ -33,14 +33,6 @@ struct PlHitPoint {
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* The remaining globals this unit's functions operate on: the hit registry (`.bss` `lbl_806AC8A8`,
- * 0x10, through the `HitRegistry` type above) and the 0x25-byte tile-id table `lbl_805CDC88`
- * (`.data`), both in `menu/menu_item.cpp`'s own sections, declared never defined (playbook 29); the land table `pl_land_data` and the
- * hit-id list `pl_hit_id_list` moved to their owner's header `Pl/pl_coll.h` (rule 2). */
-/* The 0x25-byte tile-id table `fn_8029B8F4` indexes (`menu/menu_item.cpp`'s own `.data`). */
-extern u8 lbl_805CDC88[];
-extern HitRegistry lbl_806AC8A8;
 
 /* The registry helpers the shell pool (`stage/shell.cpp`) drives.  The owner argument is whatever record the hit belongs to (a shell,
  * a player or an enemy, by kind). */
