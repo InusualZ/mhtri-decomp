@@ -55,7 +55,7 @@
  *    copies of the frame's x before its conversions; the bands' float registers;
  *  - `loading_pad_icon_draw`: retail keeps five non-volatile FPRs (f27-f31), ours four (952 vs 972 bytes);
  *  - `loading_sprite_step`: the right-to-left pass's start index lands in r5/r0 the other way round (one `mr`);
- *  - `tex_palette_bind`, `tex_palette_bind_point`, `work_stack_alloc`, `work_stack_find`, `fn_800CE6A0`,
+ *  - `tex_palette_bind`, `tex_palette_bind_point`, `work_stack_alloc`, `work_stack_find`, `load_queue_task`,
  *    `enemy_work_release_all`, `stream_ring_reset`, `resident_file_load`, `fn_800D02C0`, `fn_800CFD00`,
  *    `monster_size_table_get`, `move_work_kind_alloc`: register colouring only.
  *   SHAPES. `snd_se_level_set_c1`/`movie_playing_ck_c1` are cast views: retail sign-extends the SE level (an `s16`
@@ -155,7 +155,7 @@
 /* --------------------------------------------------------------------------------------------- */
 
 /* The system side table at .bss:0x80694C68: a 0x4C-byte record whose +0x48 word is the 0x84D0-byte
- * work buffer.  `fn_800CE5B4` zeroes it; `fn_800CE680`/`fn_800CEDBC`/`fn_800CE9F0` read the two
+ * work buffer.  `load_queue_reset` zeroes it; `fn_800CE680`/`fn_800CEDBC`/`fn_800CE9F0` read the two
  * leading fields and the buffer pointer. */
 /* A load request's path, copied as one record.  size: 0x100 */
 typedef struct SysPath {
@@ -353,7 +353,7 @@ u8* get_str_tbl_ptr(void);
 
 /* Forward declarations: the bare `fn_` bodies below call each other, and the map's placeholder
  * names must be visible before the definitions (rule 9's spelling still comes from these exact names). */
-extern "C" void fn_800CE6A0(void);
+extern "C" void load_queue_task(void);
 extern "C" void fn_800CE680(void);
 extern "C" void dvd_file_info_copy(DVDFileInfo* dst, DVDFileInfo* src);
 extern "C" void load_queue_pop(void);
@@ -374,7 +374,7 @@ extern "C" void loading_disp_reset(u8 mode);
 extern "C" void fn_800D2954(u8 index);
 extern "C" void fn_800CF73C(void);
 extern "C" void fn_800CF8EC(void);
-extern "C" void fn_800CFD20(void);
+extern "C" void stream_bounds_arm(void);
 extern "C" u32 fn_800CF61C(void* handle);
 extern "C" u32 fn_800CE5A8(void);
 extern "C" void move_work_kind_alloc(u8 kind, u16 count);
@@ -434,7 +434,7 @@ u32 fn_800CE5A8(void) {
 }
 
 /* 0x800CE5B4 - reset the side table and zero the work heap. */
-void fn_800CE5B4(void) {
+void load_queue_reset(void) {
     memset(&lbl_80694C68, 0, 0x4C);
     lbl_80694C68.buf = (SysBuf*)system_w.field_0x948;
     memset(lbl_80694C68.buf, 0, sizeof(SysBuf));
@@ -461,7 +461,7 @@ void monster_size_table_get(u32 a) {
 }
 
 /* 0x800CEE9C - seed the four random-ring cells with one value. */
-void fn_800CEE9C(u8 value) {
+void rand_ring_seed(u8 value) {
     system_w.field_0x18[0] = value;
     system_w.field_0x18[1] = value;
     system_w.field_0x18[2] = value;
@@ -732,7 +732,7 @@ void fn_800CE610(void) {
     memset(&lbl_80694C68, 0, 0x4C);
     lbl_80694C68.buf = buf;
     memset(buf, 0, sizeof(SysBuf));
-    tsk_start((void*)fn_800CE6A0, 0x0F);
+    tsk_start((void*)load_queue_task, 0x0F);
 }
 
 /* 0x800CE9F0 - hand out the next side-table entry. */
@@ -754,7 +754,7 @@ SysEntry* fn_800CE9F0(void) {
 
 /* 0x800CE6A0 (0x168): Steps the background loader: opens the head request, reads it asynchronously, and once the
  * read finishes flushes it, runs its callback and drops it from the queue. */
-void fn_800CE6A0(void) {
+void load_queue_task(void) {
     SysSideTable* table = &lbl_80694C68;
     SysEntry* entry = table->buf->entries;
     DVDFileInfo info;
@@ -920,7 +920,7 @@ void fn_800CFD00(void) {
 }
 
 /* 0x800CFD20 - pick the stream arm path by the +0x22 mode byte. */
-void fn_800CFD20(void) {
+void stream_bounds_arm(void) {
     if (system_w.field_0x22 >= 2) {
         fn_800CFC64();
     } else {
@@ -1347,7 +1347,7 @@ void memory_layout_init(void) {
     system_w.field_0x68 = fn_800CF61C(system_w.field_0x90);
     nw_resource_init();
     pad_module_init();
-    fn_800CFD20();
+    stream_bounds_arm();
 }
 
 /* Swaps a big-endian word of an archive header. */

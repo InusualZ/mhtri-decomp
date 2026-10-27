@@ -63,7 +63,7 @@ typedef struct SystemWork {
     /* +0x018 */ u16 field_0x18[4];   /* ran_suu's u16 ring, cells +0x18/+0x1A/+0x1C/+0x1E */
     /* +0x020 */ u8 field_0x20;
     /* +0x021 */ u8 field_0x21;
-    /* +0x022 */ u8 field_0x22;      /* fn_800CFD20: < 2 selects the C64 path */
+    /* +0x022 */ u8 field_0x22;      /* stream_bounds_arm: < 2 selects the C64 path */
     /* +0x023 */ u8 print_mode_0x23; /* GUESS name: 3 with pause_0x10 set suppresses the font print entry points */
     /* +0x024 */ u8 game_mode;        /* GameMode_set/GameMode_ck (values < 4) */
     /* +0x025 */ u8 play_mode;        /* PlayMode_set/PlayMode_ck (values < 7) */
@@ -72,7 +72,7 @@ typedef struct SystemWork {
     /* +0x028 */ u8 field_0x28;
     /* +0x029 */ u8 field_0x29;
     /* +0x02A */ u8 field_0x2a;     /* non-zero is the system-wide "hold the player" gate `fn_8027E1E4` tests */
-    /* +0x02B */ u8 pad_0x2b[0x1];
+    /* +0x02B */ u8 strap_active_0x2b;   /* GUESS name: 1 while `strap_task` shows the strap screen and checks the save */
     /* +0x02C */ u8 field_0x2c;      /* fn_800D2108: 1 or 2, the hbm state */
     /* +0x02D */ u8 field_0x2d;
     /* +0x02E */ u8 pad_0x2e[0x2];
@@ -135,7 +135,8 @@ typedef struct SystemWork {
     /* +0x850 */ u8 vs_player_pending_0x850[4];   /* GUESS name: per-player flag `arena_result_next` raises through the player's Vs block */
     /* +0x854 */ u8 pad_0x854[0x2];
     /* +0x856 */ u8 sys_file_valid_0x856;   /* GUESS name: non-zero once the system file was read; the system file write then keeps +0x888/+0x910 */
-    /* +0x857 */ u8 pad_0x857[0x2];
+    /* +0x857 */ u8 banner_valid_0x857;   /* GUESS name: `strap_task` sets it once the banner file is written, clears it around the system file read/delete */
+    /* +0x858 */ u8 pad_0x858[0x1];
     /* +0x859 */ u8 save_used_0x859[6];     /* GUESS name: each save file's in-use word (the data file's +0x00), copied by the save read */
     /* +0x85F */ u8 pad_0x85f[0x4];
     /* +0x863 */ u8 unk2147;
@@ -215,7 +216,7 @@ typedef struct SystemWork {
     /* +0x932 */ u8 pad_0x932[0xE];
     /* +0x940 */ u32 layout_0x940;     /* the system core's memory layout: the user data block */
     /* +0x944 */ u32 layout_0x944;     /* the font buffer */
-    /* +0x948 */ void* field_0x948;    /* work-heap base, cleared by fn_800CE5B4 */
+    /* +0x948 */ void* field_0x948;    /* work-heap base, cleared by load_queue_reset */
     /* +0x94C */ u32 layout_0x94c;
     /* +0x950 */ u32 layout_0x950;
     /* +0x954 */ u32 layout_0x954;

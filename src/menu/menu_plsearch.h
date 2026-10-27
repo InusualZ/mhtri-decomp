@@ -70,6 +70,19 @@ s32 account_file_create_init(void);
 s32 account_file_create(void);
 s32 account_file_read_init(void);
 s32 account_file_read(void);
+/* The save steps `strap_task` (`fn_80059550.cpp`) runs at boot: each `_init` arms a step and the step function returns
+ * 1 when it finished, -1/-2 on an error whose code `save_error_get` reports. */
+s32 save_space_check_init(void);
+s32 save_space_check_step(void);
+s32 save_ctl_reset(void);
+s32 banner_file_create(void);
+s32 banner_file_check_init(void);
+s32 banner_file_check(void);
+s32 system_file_read_init(void);
+s32 system_file_read(void);
+s32 system_file_delete_init(void);
+s32 system_file_delete(void);
+s32 save_error_get(void);
 /* 0x8044DFD4 / 0x8044F24C / 0x8044F2BC - the mailbox draft's draw, the message window with text `text` and the
  * choice of kind `kind` with `cursor` on (the chat log's page draws them too). */
 void mailbox_mail_draw(struct LobbyMailRow* mail, u16 msg_row, s8 cursor);

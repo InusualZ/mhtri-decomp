@@ -21,7 +21,9 @@ typedef struct TaskSlot {
     /* +0x0A */ u8 step_0x0A;         /* the sub-state's own step */
     /* +0x0B */ u8 sub_step_0x0B;     /* the step's own sub-step */
     /* +0x0C */ s16 wait_0x0C;        /* the body's frame countdown */
-    /* +0x0E */ u8 pad_0x0E[0x06];
+    /* +0x0E */ s16 page_0x0E;        /* the strap screen's page (`strap_task` flips it every 150 frames) */
+    /* +0x10 */ s16 clear_0x10;       /* cleared by `strap_task` when the strap screen starts */
+    /* +0x12 */ u8 pad_0x12[0x02];
     /* +0x14 */ u8 flag_0x14;         /* cleared when the arena task leaves its first step */
     /* +0x15 */ u8 pad_0x15[0x0B];
 } TaskSlot; /* size: 0x20 */
