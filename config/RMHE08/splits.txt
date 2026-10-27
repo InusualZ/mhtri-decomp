@@ -3898,13 +3898,34 @@ NHTTP/NHTTP_os_RVL.c:
 	.data       start:0x80630AE8 end:0x80630B28
 	.sdata      start:0x807943A0 end:0x807943A8
 
+NHTTP/NHTTP_request.c:
+	.text       start:0x80515774 end:0x80516CA0
+	.rodata     start:0x80574CE8 end:0x80574D00
+	.data       start:0x80630B28 end:0x80630B38
+	.sdata      start:0x807943A8 end:0x807943B0
+
+NHTTP/NHTTP_util.c:
+	.text       start:0x80516CA0 end:0x80517614
+	.rodata     start:0x80574D00 end:0x80574D28
+	.data       start:0x80630B38 end:0x80630B80
+
+NHTTP/NHTTP_thread.c:
+	.text       start:0x80517614 end:0x8051A1B8
+	.rodata     start:0x80574D28 end:0x80574E00
+	.data       start:0x80630B80 end:0x80630C50
+	.sdata      start:0x807943B0 end:0x80794410
+
 NHTTP/d_nhttp.c:
-	.text       start:0x80515774 end:0x8051B7FC
-	.rodata     start:0x80574CE8 end:0x80574E00
-	.data       start:0x80630B28 end:0x80630F88
+	.text       start:0x8051A1B8 end:0x8051B05C
+	.data       start:0x80630C50 end:0x80630F48
+	.sdata      start:0x80794410 end:0x80794420
+	.sbss       start:0x80795878 end:0x80795880
+
+NHTTP/NHTTP_list.c:
+	.text       start:0x8051B05C end:0x8051B7FC
+	.data       start:0x80630F48 end:0x80630F88
 	.bss        start:0x80762C20 end:0x80763900
-	.sdata      start:0x807943A8 end:0x80794420
-	.sbss       start:0x80795878 end:0x80795888
+	.sbss       start:0x80795880 end:0x80795888
 
 SSL/ssl.cpp:
 	.text       start:0x8051B7FC end:0x8051C554

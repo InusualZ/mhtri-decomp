@@ -57,9 +57,9 @@ typedef struct NHTTPRequest {
     /* +0x028 */ char* host;                 /* the host name, its own copy */
     /* +0x02C */ NHTTPResponse* response;
     /* +0x030 */ NHTTPHeaderField* headerList;   /* NHTTP_AddHeaderField's field list */
-    /* +0x034 */ NHTTPHeaderField* postDataList; /* NHTTPAddPostDataRaw's field list */
+    /* +0x034 */ NHTTPHeaderField* postDataList; /* NHTTP_AddPostDataAscii's field list */
     /* +0x038 */ u16 boundaryDashes;         /* the "--" opening the multipart boundary */
-    /* +0x03A */ char code[0x12];            /* the 18-byte code NHTTPAddPostDataRaw walks */
+    /* +0x03A */ char code[0x12];            /* the 18-byte code NHTTP_AddPostDataAscii walks */
     /* +0x04C */ char basicAuth[0x5C];       /* base64 credentials of the `Authorization: Basic` header */
     /* +0x0A8 */ s32 basicAuthLength;
     /* +0x0AC */ s32 sslHandle;              /* the `SSLNew` context once connected, 0 or -1 otherwise */
@@ -109,8 +109,8 @@ s32 NHTTPi_SetHeaderField(NHTTPHeaderField** ppHead, NHTTPInfo* owner, const cha
                           const char* value);
 u32 NHTTP_AddHeaderField(NHTTPRequest* request, NHTTPInfo* owner, const char* token,
                          const char* value);
-s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* token,
-                        const char* value);
+s32 NHTTP_AddPostDataAscii(NHTTPRequest* request, NHTTPInfo* owner, const char* token,
+                           const char* value);
 NHTTPHeaderField* NHTTPi_RemoveNode(NHTTPHeaderField** ppHead);
 NHTTPHeaderField* NHTTPi_RemoveHeaderField(NHTTPHeaderField** ppHead);
 

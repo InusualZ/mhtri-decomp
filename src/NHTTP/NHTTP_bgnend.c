@@ -37,8 +37,9 @@
  *   0x805145B8 -> NHTTPi_InitSystemInfo  zeroes the info block (ref'd by d_nhttp's GetSystemInfoP)
  *   0x80514EA8 -> NHTTPi_InitMutexInfo   clears the mutex-info lazy-init flag (ref'd by d_nhttp)
  * The body pass added the rest, all GUESSes from their own code:
- *   0x80514ACC -> NHTTPAddPostDataRaw    the function's own printf names it (the `(exclusive
- *                                        fucntion)` warning string at `.data` 0x80630AAC)
+ *   0x80514ACC -> NHTTP_AddPostDataAscii  the ascii post-field worker `NHTTPAddPostDataAscii` calls, named
+ *                                        like `NHTTP_AddHeaderField`; its warning (`.data` 0x80630AAC)
+ *                                        refuses when `NHTTPAddPostDataRaw` was called first
  *   0x80514C68 -> NHTTPi_insertRequest   inserts a request node and hands back the list's next id
  *   0x80514D34 -> NHTTPi_cancelRequest   unlinks one id and completes its connection
  *   0x80514E50 -> NHTTPi_cancelConnectionRequests  that, repeated for every node of one connection
@@ -52,7 +53,7 @@
  * `NHTTPi_containsString` in `d_nhttp.h`).
  *
  * BODY.  All 27 functions are reconstructed; 25 are byte-identical and the two open rows are
- *   `NHTTPi_Startup` and `NHTTPAddPostDataRaw` (same sizes as retail; residuals below).
+ *   `NHTTPi_Startup` and `NHTTP_AddPostDataAscii` (same sizes as retail; residuals below).
  *
  * Residuals (each measured with `symdiff.py -u NHTTP/NHTTP_bgnend` on this file):
  *   - NHTTPi_Startup: retail colours the `base`/`info` parameter web r31 and the message-group local
@@ -61,7 +62,7 @@
  *     declaration permutations of the local block (message group first, last, `memory` moved, `base`
  *     dropped in favour of the parameter) were measured: every one keeps `lis r31` for the message
  *     group, so this is the allocator's web priority, not a declaration-order lever.
- *   - NHTTPAddPostDataRaw: the boundary-code search is the `static inline` `NHTTPi_makeUniqueCode`
+ *   - NHTTP_AddPostDataAscii: the boundary-code search is the `static inline` `NHTTPi_makeUniqueCode`
  *     (its `return TRUE` from inside both loops is retail's `li r0,1` / `li r0,0` and one `cmpwi`
  *     after them); the instruction stream pairs, and the residual is colouring: retail keeps `value`
  *     in r21 (the lowest saved register) and the parameters in r27-r29, ours `value` in r29 and the
@@ -83,7 +84,7 @@
  *     (`node->id = list->nextId++`), which is what stops the second `lwz r4,0x4(r29)`.
  *   - `NHTTPi_SetHeaderField` declares `found` before `node`; the `else { found = 1; }` arm (the
  *     negated test) is what puts the first comparison's hit block out of line.
- *   - `NHTTPAddPostDataRaw` walks `request->code[i - 2]` (not a flat byte offset) - that is what makes
+ *   - `NHTTP_AddPostDataAscii` walks `request->code[i - 2]` (not a flat byte offset) - that is what makes
  *     MWCC emit retail's `add r22,r27,r24` + `lbz r25,0x38(r22)` - keeps the digit as a `char` stepped
  *     through an `s32` temporary compared as `(u8)`, declares `result` before `length`, and reads the
  *     field list back through `request->postDataList->next`.
@@ -99,6 +100,10 @@
 #include "NCD/ncdsystem.h"        /* NCDGetCurrentIpConfig (its owner's header, rule 2) */
 #include "unsplit/NHTTP.h"        /* the four literal groups + the code table (rule 2 band) */
 #include "NHTTP/d_nhttp.h"
+#include "NHTTP/NHTTP_request.h"
+#include "NHTTP/NHTTP_util.h"
+#include "NHTTP/NHTTP_thread.h"
+#include "NHTTP/NHTTP_list.h"
 #include "unsplit/Runtime.PPCEABI.H.h" /* printf (rule 2 band) */
 
 
@@ -378,12 +383,11 @@ static inline BOOL NHTTPi_makeUniqueCode(NHTTPRequest* request, const char* valu
     return FALSE;
 }
 
-/* 0x80514ACC (0x18C): the exclusive "post data raw" entry.  It walks the request's 18-byte code
- * (`+0x3A`) up to `NHTTPi_postDataRawCode` one character at a time, re-submitting the code through
- * `NHTTPi_containsString` after every step, and then registers the field.  The name is the one the
- * function's own warning string carries (`.data` 0x80630AAC). */
-s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* token,
-                        const char* value) {
+/* 0x80514ACC (0x18C): adds one ascii post field, refused once a raw body was set.  It walks the request's
+ * 18-byte code (`+0x3A`) up to `NHTTPi_postDataRawCode` one character at a time, re-submitting the code
+ * through `NHTTPi_containsString` after every step, and then registers the field. */
+s32 NHTTP_AddPostDataAscii(NHTTPRequest* request, NHTTPInfo* owner, const char* token,
+                           const char* value) {
     s32 result = 0;
     s32 length = 0;
 

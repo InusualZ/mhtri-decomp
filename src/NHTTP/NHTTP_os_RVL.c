@@ -31,6 +31,9 @@
  */
 #include "types.h"
 #include "NHTTP/NHTTP_os_RVL.h"   /* this unit's own types (rule 1) */
+#include "NHTTP/NHTTP_request.h" /* NHTTPi_SocRecv */
+#include "NHTTP/NHTTP_util.h"    /* NHTTPi_memcpy */
+#include "NHTTP/NHTTP_thread.h"  /* NHTTPi_commThreadLoop */
 
 /* The receive ring's byte reader the walkers below share: `*index` is the ring offset and `*block`
  * is the 512-byte block the offset currently lives in (null while the offset is still inside the

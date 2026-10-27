@@ -1234,13 +1234,9 @@ config.libs = [
     {
         # The Revolution SDK NHTTP (HTTP) library, `.text` 0x805145B8..0x8051B7FC (the SSL library
         # begins at 0x8051B7FC).  Registered as its own SDK lib block because it is a separate
-        # prebuilt library with its own source files: the three units' own `__FILE__` pool strings
-        # are `NHTTP_bgnend.c` (0x80630A28), `NHTTP_os_RVL.c` (0x80630B18) and `d_nhttp.c`
-        # (0x80630F04).  Internal TU boundaries are only weakly pinned by `tudiscover` (the NHTTP
-        # cuts are weak pool signals), so the split follows the real file names + per-TU `.data`
-        # fragment order and is expected to be re-cut when the SDK object list is recovered.
-        # `Wii/1.3` + cflags_nhttp (4-byte packing is instruction-level evidence here; the flags
-        # are otherwise the sibling SDK group's).  Each unit claims .text only.
+        # prebuilt library with its own source files: the `__FILE__` pool strings name
+        # `NHTTP_bgnend.c` (0x80630A28), `NHTTP_os_RVL.c` (0x80630B18) and `d_nhttp.c` (0x80630F04);
+        # the other units' seams and GUESS names are in each unit's header.
         "lib": "NHTTP",
         # Compiler: GC/3.0a5.2 (the library build string 0x4199_60831); measurements in docs/network.md.
         "mw_version": "GC/3.0a5.2",
@@ -1249,7 +1245,11 @@ config.libs = [
         "objects": [
             Object(NonMatching, "NHTTP/NHTTP_bgnend.c"),
             Object(Matching, "NHTTP/NHTTP_os_RVL.c"),
-            Object(NonMatching, "NHTTP/d_nhttp.c"),
+            Object(NonMatching, "NHTTP/NHTTP_request.c"),
+            Object(NonMatching, "NHTTP/NHTTP_util.c"),
+            Object(NonMatching, "NHTTP/NHTTP_thread.c"),
+            Object(Matching, "NHTTP/d_nhttp.c"),
+            Object(NonMatching, "NHTTP/NHTTP_list.c"),
         ],
     },
     {

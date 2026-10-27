@@ -1,13 +1,11 @@
 /*
- * NHTTP/d_nhttp.h - the NHTTP core unit (`src/NHTTP/d_nhttp.c`, `.text`
- * 0x80515774..0x8051B7FC) and the NHTTP system-info block it owns.
+ * NHTTP/d_nhttp.h - the NHTTP library's shared types (the request/response/connection objects, the
+ * system-info block and its sub-records, the comm thread's working state) and the calls and data of the
+ * public-API unit `src/NHTTP/d_nhttp.c` (`.text` 0x8051A1B8..0x8051B05C).
  *
- * Rule 2: this unit owns `NHTTPi_GetSystemInfoP` and the info-block layout, so the consumers
- * (`NHTTP_bgnend.c`, `NHTTP_os_RVL.c`) include this header instead of declaring them.  The two data
- * objects have no registered owner, so they are declared in the band header
- * `unsplit/NHTTP.h`, which this file includes.
- *
- * The block is `NHTTPi_systemInfo` (`.bss`); `NHTTPi_GetSystemInfoP` lazily points `NHTTPi_systemInfoP` at it.
+ * Rule 2: each sibling TU declares its own calls beside its source (`NHTTP_request.h`, `NHTTP_util.h`,
+ * `NHTTP_thread.h`, `NHTTP_list.h`), which include this file for the types.  The info block is
+ * `NHTTPi_systemInfo` (`.bss`, `NHTTP_list.c`); `NHTTPi_GetSystemInfoP` lazily points `NHTTPi_systemInfoP` at it.
  * Only the fields the reconstructed accessors touch are modelled, with `pad_0xNN` filling the gaps;
  * the sub-records sit at the offsets `NHTTPi_Get*InfoP` return (0x800/0x808/0x80C/0x840).
  */
@@ -232,193 +230,24 @@ typedef struct NHTTPCommContext {
     /* +0x33C */ s32 chunked;           /* 1 for a chunked body */
 } NHTTPCommContext;
 
-/* The band header of the NHTTP literal groups (`NHTTPi_systemInfo` itself is declared at the end of this file). */
+/* The band header of the NHTTP literal groups. */
 #include "unsplit/NHTTP.h"
 
-/* The data this unit owns: the `.sbss` run 0x80795878..0x80795888 (the connection list's head plus the
- * three words beside it, `NHTTPi_systemInfoP` included) and the `.bss` completion record 0x80762C20,
- * both claimed in `splits.txt` (rule 12).  `NHTTPi_systemInfoP` used to be declared in the band header
- * `unsplit/NHTTP.h`, which rule 2 forbids once the unit owns its range. */
+/* The data this unit owns: the two version-registration flags of the `.sbss` run 0x80795878..0x80795880,
+ * claimed in `splits.txt` (rule 12). */
 extern u32 NHTTPi_versionRegistered;                 /* 0x80795878: the NHTTP banner was registered */
 extern u32 NHTTPi_createVersionRegistered;           /* 0x8079587C: the NHTTPCREATE one was */
-extern NHTTPConnection* NHTTPi_connectionListHead;   /* 0x80795880: the connection list's head */
-extern NHTTPInfo* NHTTPi_systemInfoP;                /* 0x80795884: the lazily-set info-block slot */
-extern NHTTPiCompletionSync NHTTPi_completionSync;   /* 0x80762C20: the completion mutex/queue */
 
-NHTTPInfo* NHTTPi_GetSystemInfoP(void);
-void* NHTTPi_GetBgnEndInfoP(NHTTPInfo* info); /* untyped: opaque handle */
-void* NHTTPi_GetListInfoP(NHTTPInfo* info); /* untyped: opaque handle */
-void* NHTTPi_GetReqInfoP(NHTTPInfo* info); /* untyped: opaque handle */
-void* NHTTPi_GetThreadInfoP(NHTTPInfo* info); /* untyped: opaque handle */
-void* NHTTPi_GetMutexInfoP(NHTTPInfo* info); /* untyped: opaque handle */
-/* untyped: byte range */
-void* NHTTPi_memcpy(void* dst, const void* src, u32 n);
-/* untyped: byte range */
-void* NHTTPi_memclr(void* dst, u32 n);
-void NHTTPi_InitThreadInfo(NHTTPThreadInfo* info);
-
-/* The library-internal helpers `NHTTP/NHTTP_bgnend.c`'s bodies call.  None of them has a body yet
- * (this unit is registered `.text`-only and most of its range is still unwritten), so their names
- * are derived from their own bodies: a `strlen` tail, a bounded substring search, and the comm
- * thread's ready flag plus the loop it runs. */
-u32 NHTTPi_strlen(const char* s);
-s32 NHTTPi_containsString(const char* haystack, s32 haystackLen, const char* needle, s32 needleLen);
-void NHTTPi_markCommThreadReady(NHTTPThreadInfo* info);
-s32 NHTTPi_isCommThreadReady(NHTTPThreadInfo* info);
-void NHTTPi_commThreadLoop(void);
-int NHTTPi_strcmp(const char* a, const char* b);
-s32 NHTTPi_strnicmp(const char* s1, const char* s2, s32 n);
-s32 NHTTPi_encodeUrlChar(u8* dst, char c);
-s32 NHTTPi_urlEncodedLength(const char* s);
-s32 NHTTPi_urlEncodedLengthN(const char* s, s32 n);
-s32 NHTTPi_compareToken(const char* a, const char* b);
-s32 NHTTPi_GetConnectionListLength(void);
-void NHTTPi_InitConnectionList(void);
-/* The public entry points at 0x8051A300..0x8051A5CC.  `NHTTPDestroy` is the teardown DWCi calls
- * with its own command callback; the two getters answer the library's last error. */
-s32 NHTTPi_StartRequest(NHTTPConnection* connection);
-s32 NHTTPi_GetResponseSize(NHTTPConnection* connection);
-s32 NHTTPi_GetConnectionStatus(NHTTPConnection* connection);
-void NHTTPDestroy(NHTTPCompletionCallback callback);
-s32 NHTTPGetError(void);
-s32 NHTTPGetSSLError(void);
-
-void NHTTPi_cancelAllRequests(NHTTPInfo* info);
-void NHTTPi_CompleteCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-NHTTPConnection* NHTTPi_Request2Connection(NHTTPMutexInfo* mutex, s32 request);
-
-/* The connection-list API (0x8051B0D8..0x8051B79C).  The list is this unit's own: one singly-linked
- * chain of `NHTTPConnection` records, and the five `mode`s below say what an operation does to it.
- *
- * `NHTTPi_ControlConnectionList` is the one body that walks it; every other entry point is a
- * one-call wrapper over it.  The key it looks a record up by is the connection itself in the get,
- * add and omit modes and the request/response record the connection holds in the two lookup modes,
- * so it stays an opaque handle here (`NHTTPi_Request2Connection` is handed the request list's own
- * `s32` handle and the `NHTTPRequestNode.request` field it is read out of).
- */
-#define NHTTPI_LIST_GET         0  /* find the connection `key` is */
-#define NHTTPI_LIST_BY_REQUEST  1  /* find the connection whose request is `key` */
-#define NHTTPI_LIST_BY_RESPONSE 2  /* find the connection whose response is `key` */
-#define NHTTPI_LIST_ADD         3  /* put the connection at the head of the list */
-#define NHTTPI_LIST_OMIT        4  /* take the connection out of the list */
-
-/* untyped: opaque handle - the connection itself, or the request/response it holds */
-NHTTPConnection* NHTTPi_ControlConnectionList(NHTTPMutexInfo* mutex, void* key, s32 mode);
-NHTTPConnection* NHTTPi_GetConnection(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-s32 NHTTPi_AddConnection(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-s32 NHTTPi_OmitConnectionList(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-struct NHTTPRequest* NHTTPi_Connection2Request(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-NHTTPResponse* NHTTPi_Connection2Response(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-NHTTPConnection* NHTTPi_Response2Connection(NHTTPMutexInfo* mutex, s32 response);
-/* The two get modes look the connection up by itself, so both take it typed; only the *return* is
- * untyped - it is the record the connection holds, or that same key handed back when the lookup
- * misses (the miss signal). */
-/* untyped: opaque handle - the record the connection holds, or the key handed back on a miss */
-void* NHTTPi_GetRequest(NHTTPMutexInfo* mutex, NHTTPConnection* key);
-/* untyped: opaque handle - the record the connection holds, or the key handed back on a miss */
-void* NHTTPi_GetResponse(NHTTPMutexInfo* mutex, NHTTPConnection* key);
-void NHTTPi_SetSock(NHTTPConnection* connection, NHTTPSock* sock);
-NHTTPSock* NHTTPi_GetSock(NHTTPConnection* connection);
-
-/* The three request/response callbacks `NHTTPCreateConnection` can install (phases 1, 2/3 and 4).
- * `phase` 3's body is the map's `NHTTPi_RecvCallback` and is named for the receive half it reports. */
-s32 NHTTPi_PostSendCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection, u32 arg1, u32 arg2);
-void NHTTPi_BufferFullCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-void NHTTPi_RecvCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection);
-void NHTTPi_NotifyCompletion(NHTTPConnection* connection);
-
-/* The raw socket receive the RVL wrappers end in.  The sibling `NHTTP_os_RVL.c` declared the six
- * parameters as (handle, conn, flags, ...); the body reads them as the request-list mutex, the
- * REQUEST (its +0xAC SSL handle and +0x00 cancel flag), the socket, the buffer, its length and the
- * receive flags, so `conn` is a request and `handle` a mutex there (a shared-file request). */
-s32 NHTTPi_SocRecv(s32 handle, NHTTPConnection* conn, s32 flags, u8* buf, s32 length, s32 arg);
-s32 NHTTPi_destroyRequestObject(NHTTPMutexInfo* mutex, s32 request);
-
-/* The socket layer (0x805163A4..0x80516C2C) - the raw SO wrappers with the request's SSL handle in
- * front: a send/receive goes through SSL when the request holds a handle, and the error mapping is
- * shared by both directions. */
-s32 NHTTPi_SocClose(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd);
-s32 NHTTPi_SocSSLConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd);
-s32 NHTTPi_SocRecv_sub(NHTTPConnection* connection, s32 fd, u8* buf, s32 length, s32 flags);
-s32 NHTTPi_SocSend(struct NHTTPRequest* request, s32 fd, u8* buf, s32 length, s32 flags);
-s32 NHTTPi_SocSend_sub(s32 fd, u8* buf, s32 length, s32 flags);
-s32 NHTTPi_SocConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd,
-                      u32 address, u32 port);
-void NHTTPi_SocShutdown(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, s32 fd);
-s32 NHTTPi_probeSocket(s32 fd);
-s32 NHTTPi_openSocket(struct NHTTPRequest* request);
-u32 NHTTPi_resolveHostName(struct NHTTPRequest* request, const char* name);
-
-/* The string helpers (0x8051702C..0x80517634) and the connection/request API (0x8051A1B8..0x8051AFEC):
- * the public NHTTP calls take the request handle `NHTTPCreateRequest` answered (a request object) or,
- * for the response-side calls, the response handle. */
-s32 NHTTPi_strToHex(const char* s, s32 n);
-s32 NHTTPi_strToDec(const char* s, s32 n);
-s32 NHTTPi_strtonum(const char* s, s32 n);
-s32 NHTTPi_uintToStr(char* buf, u32 value);
-s32 NHTTPi_isHeaderEnd(const char* window, s32 count);
+/* The connection object and the public calls (0x8051A1B8..0x8051B05C): the public NHTTP calls take the
+ * request handle `NHTTPCreateRequest` answered (a request object) or, for the response-side calls, the
+ * response handle.  `NHTTPDestroy` is the teardown DWCi calls with its own command callback; the two
+ * getters answer the library's last error. */
 NHTTPConnection* NHTTPCreateConnection(const char* url, s32 method, u32 buffer, u32 bufferSize,
                                        NHTTPConnectionCallback callback, u32 userData);
+s32 NHTTPi_StartRequest(NHTTPConnection* connection);
 s32 NHTTPGetBodyBuffer(NHTTPConnection* connection, u32* buffer, u32* size);
-struct NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u32 bufferSize,
-                                            NHTTPCompleteCallback completeCallback, u32 userData,
-                                            NHTTPBufferFullCallback bufferFullCallback,
-                                            NHTTPFreeBufferCallback freeCallback);
-s32 NHTTPi_dispatchConnectionCallback(NHTTPConnection* connection, s32 phase, NHTTPCallbackArgs* args);
-struct NHTTPRequest* NHTTPCreateRequest(const char* url, s32 method, u32 buffer, u32 bufferSize,
-                                        NHTTPCompleteCallback completeCallback, u32 userData);
-s32 NHTTPSendRequestAsync(struct NHTTPRequest* request);
-s32 NHTTPCancelRequest(s32 id);
-void NHTTPDestroyResponse(NHTTPResponse* response);
-s32 NHTTPGetBodyAll(NHTTPResponse* response, u32* buffer);
-s32 NHTTPGetResultCode(NHTTPResponse* response);
-s32 NHTTPSetVerifyOption(struct NHTTPRequest* handle, u32 option);
-s32 NHTTPClearRootCA(struct NHTTPRequest* handle);
-s32 NHTTPClearClientCert(struct NHTTPRequest* handle);
-s32 NHTTPAddHeaderField(struct NHTTPRequest* handle, const char* token, const char* value);
-s32 NHTTPAddPostDataAscii(struct NHTTPRequest* handle, const char* token, const char* value);
-
-/* The request and response objects (0x80515774..0x805161A4) and the public API over them. */
-struct NHTTPRequest* NHTTPi_createRequestObject(NHTTPInfo* info, const char* url, s32 method, u32 buffer,
-                                                u32 bufferSize, u32 userData,
-                                                NHTTPBufferFullCallback bufferFullCallback,
-                                                NHTTPFreeBufferCallback freeCallback);
-void NHTTP_DestroyRequest(NHTTPInfo* info, struct NHTTPRequest* request);
-void NHTTP_DestroyResponse(NHTTPMutexInfo* mutex, NHTTPResponse* response);
-s32 NHTTP_SendRequestAsync(NHTTPInfo* info, struct NHTTPRequest* request);
-s32 NHTTPi_cancelRequestById(NHTTPInfo* info, s32 id);
-
-/* The request writer (0x805176FC..0x80518308) and the rest of the public API. */
-s32 NHTTPi_SaveBuf(struct NHTTPRequest* request, u8* buffer, s32 fd, s32* used, u8* data, s32 length);
-s32 NHTTPi_queryPostFieldSize(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, const char* key, s32* total,
-                              s32 mode);
-s32 NHTTPi_sendPostField(NHTTPMutexInfo* mutex, struct NHTTPRequest* request, u8* buffer, const char* key,
-                         s32 fd, s32* used, s32 mode);
-s32 NHTTPi_ensureRecvSpace(NHTTPMutexInfo* mutex, NHTTPResponse* response);
-s32 NHTTPi_appendSendData(NHTTPCommContext* context, const char* data, s32 length);
-s32 NHTTPi_sendHeaderFields(NHTTPCommContext* context);
-s32 NHTTPSetProxy(struct NHTTPRequest* handle, const char* host, s32 port, const char* user,
-                  const char* password);
-s32 NHTTPSetSystemProxy(struct NHTTPRequest* handle);
-s32 NHTTPi_Base64Encode(char* dst, const char* src);
-
-/* The comm thread's steps (0x80518970..0x80519FB4): each takes the working state the loop keeps. */
-s32 NHTTPi_dequeueRequest(NHTTPCommContext* context);
-void NHTTPi_finishRequest(NHTTPCommContext* context);
-s32 NHTTPi_prepareTarget(NHTTPCommContext* context);
-s32 NHTTPi_connectSocket(NHTTPCommContext* context);
-s32 NHTTPi_negotiateSSL(NHTTPCommContext* context);
-s32 NHTTPi_sendProxyConnect(NHTTPCommContext* context);
-s32 NHTTPi_recvProxyConnectReply(NHTTPCommContext* context);
-s32 NHTTPi_sendRawPostBody(NHTTPCommContext* context);
-s32 NHTTPi_sendMultipartBody(NHTTPCommContext* context);
-s32 NHTTPi_sendUrlEncodedBody(NHTTPCommContext* context);
-s32 NHTTPi_sendRequest(NHTTPCommContext* context);
-s32 NHTTPi_recvResponseHeaders(NHTTPCommContext* context);
-s32 NHTTPi_parseResponseHeaders(NHTTPCommContext* context);
-s32 NHTTPi_recvResponseBody(NHTTPCommContext* context);
-struct NHTTPRecvBuf;
-s32 NHTTPi_findHeaderField(struct NHTTPRecvBuf* ring, const char* name, s32* offset);
+s32 NHTTPi_GetResponseSize(NHTTPConnection* connection);
+s32 NHTTPi_GetConnectionStatus(NHTTPConnection* connection);
 
 /* 0x8051A4E8 - bring the HTTP layer up with the caller's two command callbacks and one command id:
  * the body registers this library's version once and hands all three on to `NHTTPi_Startup`,
@@ -426,22 +255,33 @@ s32 NHTTPi_findHeaderField(struct NHTTPRecvBuf* ring, const char* name, s32* off
  * way (its command callbacks plus command 17), and that call site is where the name came from - a
  * GUESS the NHTTP lane may refine when it writes the body. */
 s32 NHTTPi_RegisterCallbacks(void (*commandCallback)(u32), void (*commandCallbackEx)(u32), u32 command);
-
-#ifdef __cplusplus
-}
-#endif
-
-/* Declarations moved here from `unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* 0x80574CE8 (0x15 B, `.rodata`) - the 19-character code `NHTTPAddPostDataRaw` walks its request's
- * 18-byte code field up to, one character at a time, re-submitting after each step. */
-extern const char NHTTPi_postDataRawCode[];
-
-/* 0x80762C60 - the info block the unit's own `NHTTPi_systemInfoP` slot points at. */
-extern struct NHTTPInfo NHTTPi_systemInfo;
+void NHTTPDestroy(NHTTPCompletionCallback callback);
+s32 NHTTPGetError(void);
+s32 NHTTPGetSSLError(void);
+s32 NHTTPi_dispatchConnectionCallback(NHTTPConnection* connection, s32 phase, NHTTPCallbackArgs* args);
+struct NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u32 bufferSize,
+                                            NHTTPCompleteCallback completeCallback, u32 userData,
+                                            NHTTPBufferFullCallback bufferFullCallback,
+                                            NHTTPFreeBufferCallback freeCallback);
+struct NHTTPRequest* NHTTPCreateRequest(const char* url, s32 method, u32 buffer, u32 bufferSize,
+                                        NHTTPCompleteCallback completeCallback, u32 userData);
+s32 NHTTPAddHeaderField(struct NHTTPRequest* handle, const char* token, const char* value);
+s32 NHTTPAddPostDataAscii(struct NHTTPRequest* handle, const char* token, const char* value);
+s32 NHTTPAddPostDataBinary(struct NHTTPRequest* handle, const char* token, const char* value, u32 length);
+s32 NHTTPAddPostDataRaw(struct NHTTPRequest* handle, char* data, s32 length);
+s32 NHTTPSetPostDataEncoding(struct NHTTPRequest* handle, s32 type);
+s32 NHTTPSendRequestAsync(struct NHTTPRequest* request);
+s32 NHTTPCancelRequest(s32 id);
+void NHTTPDestroyResponse(NHTTPResponse* response);
+s32 NHTTPGetBodyAll(NHTTPResponse* response, u32* buffer);
+s32 NHTTPGetResultCode(NHTTPResponse* response);
+s32 NHTTPSetVerifyOption(struct NHTTPRequest* handle, u32 option);
+s32 NHTTPSetProxy(struct NHTTPRequest* handle, const char* host, s32 port, const char* user,
+                  const char* password);
+s32 NHTTPSetSystemProxy(struct NHTTPRequest* handle);
+s32 NHTTPDisableVerifyOptionForDebug(struct NHTTPRequest* handle, u32 option);
+s32 NHTTPClearRootCA(struct NHTTPRequest* handle);
+s32 NHTTPClearClientCert(struct NHTTPRequest* handle);
 
 #ifdef __cplusplus
 }
