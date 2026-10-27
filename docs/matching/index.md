@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (222)
+## Ideas that work (225)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -231,6 +231,9 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 243 | [MWCC's GPR colouring is a reproducible cascade: simulate it from the dump and renumber the locals](243-mwccs-gpr-colouring-is.md) | works | source-shape, allocator, tooling | A function matches every opcode but whole groups of callee-saved registers are permuted (parameters in r28-r31 where retail has them in r26-r29 under loop state, a counter and a pointer swapped), and declaration hill... |
 | 244 | [Read the colouring order from the mwcc-debugger: reverse declaration numbering, split webs, conversion temps](244-read-the-colouring-order.md) | works | source-shape, allocator | Same-size rows whose only diff is two callee-saved (or volatile) registers swapped, where blind declaration permutes find nothing. |
 | 245 | [A narrow range test that retail emits as addi 0xFE is (u8)(x + 0xFE), not (u8)(x - 2)](245-narrow-range-test-that.md) | works | source-shape | Retail tests a byte range with `addi r0,rX,0xFE` (+254) before the `clrlwi`/`cmplwi`, ours with `subi r0,rX,2` - one OP_MISMATCH that keeps the row below 100. |
+| 246 | [lbz + extsh + sth with no clrlwi: a (u16) byte stored into an s16 field](246-lbz-extsh-sth-with.md) | works | source-shape | Retail stores a u8 field into a halfword as lbz, extsh, sth and no cast of the byte reproduces the extsh |
+| 247 | [An 8-byte run loaded as two words then stored in order is a struct-with-array block copy](247-8-byte-run-loaded.md) | works | source-shape | Retail copies two adjacent words as lwz r5,8 / lwz r0,0xC / stw r5,8 / stw r0,0xC and field or u64 copies reorder it |
+| 248 | [Two early-exit checks that share one tail: a comma-sequenced \|\| condition](248-two-early-exit-checks.md) | works | source-shape | Retail emits one copy of an exit tail for two checks separated by statements; goto-free source duplicates the tail |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

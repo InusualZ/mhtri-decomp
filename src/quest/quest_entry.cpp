@@ -13,7 +13,12 @@
  *   `enemy/em_pop.cpp`'s head, the seam above).  `quest_name_unavailable_text` (.data 0x8060E888, unclaimed, between
  *   `menu/menu_sysmsg.cpp` and `Gecko_ExceptionPPC.cp`) is declared in `unsplit/menu.h` (rule 12, claim request).
  * FLAGS. the `menu` lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, Wii/1.3), plus
- *   `#pragma pool_data off` (retail addresses each table through its own symbol although they precede the bodies).
+ *   `#pragma pool_data off` (retail addresses each table through its own symbol although they precede the bodies)
+ *   and a file-wide `#pragma optimization_level 4` (idea 108: quest_init, quest_enter_load, quest_arena_data_step,
+ *   quest_item_count_sum, quest_monsters_release, quest_monsters_spawn and quest_part_reward_roll rise under it);
+ *   per function `opt_propagation off` (quest_enter_load, quest_arena_summary_step, quest_arena_time_text_get: the
+ *   arena id's `- 9000` is then computed before the `system_w` column bool, as retail does) and `opt_lifetimes off`
+ *   (quest_work_start_reset's callee-saved colours).
  * NAMES. Module `quest` from the dump's globals (`q_result_msg_adrs`, `em_bui_tbl`, `em_hokaku_rem_l/h`,
  *   `nora_set_proc`) and its one function name `quest_init(unsigned char)`.  GUESS: the file name and every function
  *   and field name derived from a body, among them quest_list_load_hunt/_arena, quest_record_find,
@@ -38,20 +43,16 @@
  *   quest_bonus_pick_NN (quest_bonus_pick_tbl[NN], first index), quest_bonus_items_N (the bonus lists' item rows).
  * RESIDUALS. Every row is written.
  *  - quest_main_step: the target shares its fail and clear tails between branches through backward jumps (a goto
- *    shape, rule 8); the goto-free inline helpers duplicate them (3168 B against 2832; the single-tail flag form is
- *    2888 B but scores lower, and a flag-threaded loop keeps its flag tests - MWCC does not thread jumps).  The jumps
- *    run backwards into blocks no loop heads, so only `goto` reaches them (playbook 213).
- *  - quest_lot_pick, quest_lot_pick_first, quest_lot_pick_last: retail sign-extends the payload byte to 16 bits
- *    (`lbz` + `extsh`) before storing it; no cast of the u8 field reproduces the `extsh`.
+ *    shape, rule 8).  The first two fail checks share one tail through one `||` condition (3068 B against 2832); the
+ *    goal fail and the two clear sites still inline their tails (a merged clear condition re-tests `left` and scores
+ *    lower, a flag-threaded loop keeps its flag tests - MWCC does not thread jumps).  Retail jumps backwards into
+ *    blocks no loop heads, so only `goto` reaches them (playbook 213).
  *  - quest_intruder_step, quest_successive_step: retail re-tests the variant rank after its scan as `clrlwi` of
- *    the kept byte; ours reloads the byte (`lbz`).  quest_successive_step also loads one argument via r0.
+ *    the kept byte; ours reloads the byte (`lbz`); a u8/u16/s32/u32 `rank`, a `(u8)` re-test and a separate found
+ *    byte do not reproduce it.
  *  - quest_part_reward_roll, quest_capture_reward_roll, quest_monsters_spawn, quest_init, quest_enter_load,
- *    quest_grade_set, quest_work_start_reset, quest_monsters_release, quest_item_count_sum, quest_start_load,
- *    quest_arena_data_step, quest_arena_summary_step, quest_result_deliver_items: register colouring (callee-saved
- *    permutations and one hoisted constant) that declaration order does not reach.
- *  - quest_arena_time_text_get, quest_arena_summary_step: retail subtracts 9000 from the arena id before the
- *    `system_w` column bool; ours after.
- *  - quest_element_copy: the two 8-byte runs are copied as u64 halves; retail stores the high word first.
+ *    quest_start_load: register colouring (callee-saved permutations) that declaration order, per-function
+ *    `opt_*` pragmas and fresh loop variables do not reach.
  *  - quest_enter_load: retail keeps `stage * 8` across `stage_dcm_path_get`; ours recomputes it.
  *  - flipcheck: .sdata2 short of the claim (the em_pop seam); quest_main_step is not 100 %.
  * SHAPES. Declaration order decides the callee-saved colours (playbook 63): see quest_list_load_*, quest_pair_apply,
@@ -137,6 +138,9 @@
 /* Retail addresses every table of this unit's `.data` through its own symbol (lis/addi), never through the
  * section's pooled base, although the tables are defined above the bodies (playbook 194). */
 #pragma pool_data off
+
+/* Retail is scheduled at optimization level 4: several rows only match under it, and none differs otherwise. */
+#pragma optimization_level 4
 
 /* This unit's own `.sdata` (`splits.txt` `.sdata 0x807935D0..0x8079367C`, the rows tile it in address order;
  * the twelve `quest_grade_time_*` rows and the two `quest_rank_weight_*` rows are separate objects because
@@ -1177,7 +1181,7 @@ s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->num = (s16)entry->value;
+            out->num = (u16)entry->value;
             out++;
             picked++;
         }
@@ -1213,7 +1217,7 @@ s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 cou
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->num = (s16)entry->value;
+            out->num = (u16)entry->value;
             out++;
             picked++;
         }
@@ -1252,7 +1256,7 @@ s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s3
         }
         if (hit == 1 && entry->id != 0) {
             out->id = entry->id;
-            out->num = (s16)entry->value;
+            out->num = (u16)entry->value;
             out++;
             picked++;
         }
@@ -1414,11 +1418,9 @@ void quest_pair_roll_last(_PLW* owner, u8 state) {
  * once per saved stat); the rolls are then packed into the first two picked-pair tables. */
 void quest_part_reward_roll(QuestWork* work) {
     u8 chance[0xC];
-    u8* key;
     s32 i;
     Q_ItemPair* out;
     u8* entry;
-    s32 rolls;
     s32 base;
     s32 slot;
     s32 progress;
@@ -1427,6 +1429,8 @@ void quest_part_reward_roll(QuestWork* work) {
     s32 count;
     Q_RewardGroup* group;
     s32 picks;
+    s32 rolls;
+    u8* key;
     s32 flagged;
     Q_LotEntry* table;
     Q_LotEntry* lot;
@@ -1720,15 +1724,15 @@ void quest_capture_reward_roll(QuestWork* work, _PLW* owner) {
         if (rolls >= 3) {
             break;
         }
-        count = work->capture_counts_0x4E2[k];
-        if (count == 0) {
+        n = work->capture_counts_0x4E2[k];
+        if (n == 0) {
             continue;
         }
         picks = 2;
         if (Pl_Skill_ck(owner, 0xBD) == 1) {
             picks = 3;
         }
-        if (count >= 2) {
+        if (n >= 2) {
             picks++;
         }
         j = 0;
@@ -2229,6 +2233,7 @@ void quest_monsters_release(void) {
 
 /* Re-rolls the quest work's clock words, reseeds the quest random source from them and clears the
  * per-quest state. */
+#pragma opt_lifetimes off
 void quest_work_start_reset(void) {
     Q_ItemWork* work = QUEST_WORK;
     s32 i;
@@ -2261,6 +2266,7 @@ void quest_work_start_reset(void) {
     work->armed_0x2D4[2] = 0;
     work->slot_key_0x46C[2] = 0xFFFF;
 }
+#pragma opt_lifetimes reset
 
 /* Marks every live element as graded and derives the quest grade from which of them the bonus flag
  * covers, then copies each finished element's value into its grade pair. */
@@ -2291,30 +2297,20 @@ void quest_grade_set(void) {
     {
         Q_ItemWork* w = QUEST_WORK;
 
-        if ((w->elements_0x94[0].flags & 2) && w->elements_0x94[0].id == 0) {
-            w->grade_pair_0x68F[0].flag = 0;
-            QUEST_WORK->grade_pair_0x68F[0].value = (s8)w->elements_0x94[0].value;
-        }
-        if ((w->elements_0x94[1].flags & 2) && w->elements_0x94[1].id == 0) {
-            QUEST_WORK->grade_pair_0x68F[1].flag = 0;
-            QUEST_WORK->grade_pair_0x68F[1].value = (s8)w->elements_0x94[1].value;
-        }
-        if ((w->elements_0x94[2].flags & 2) && w->elements_0x94[2].id == 0) {
-            QUEST_WORK->grade_pair_0x68F[2].flag = 0;
-            QUEST_WORK->grade_pair_0x68F[2].value = (s8)w->elements_0x94[2].value;
+        for (i = 0; i < 3; i++) {
+            if ((w->elements_0x94[i].flags & 2) && w->elements_0x94[i].id == 0) {
+                QUEST_WORK->grade_pair_0x68F[i].flag = 0;
+                QUEST_WORK->grade_pair_0x68F[i].value = (s8)w->elements_0x94[i].value;
+            }
         }
     }
     {
         Q_ItemWork* w = QUEST_WORK;
 
-        if ((w->elements_0x94[0].flags & 0x2000) && w->elements_0x94[0].id == 4) {
-            w->score_0x5D8 = w->elements_0x94[0].value;
-        }
-        if ((w->elements_0x94[1].flags & 0x2000) && w->elements_0x94[1].id == 4) {
-            QUEST_WORK->score_0x5D8 = w->elements_0x94[1].value;
-        }
-        if ((w->elements_0x94[2].flags & 0x2000) && w->elements_0x94[2].id == 4) {
-            QUEST_WORK->score_0x5D8 = w->elements_0x94[2].value;
+        for (i = 0; i < 3; i++) {
+            if ((w->elements_0x94[i].flags & 0x2000) && w->elements_0x94[i].id == 4) {
+                QUEST_WORK->score_0x5D8 = w->elements_0x94[i].value;
+            }
         }
     }
 }
@@ -2466,8 +2462,8 @@ void quest_monsters_spawn(Q_ItemWork* item) {
     s32* order;
     QuestSpawnRec* spawn;
     Q_MoveWork* work;
-    s32 k;
     QuestBossSpawn* boss;
+    s32 k;
     QuestEntrySlot* list;
     s32 i;
     QuestEntrySlot* quest_list;
@@ -2685,10 +2681,11 @@ void quest_pair_apply(void) {
     }
 }
 
-/* The +0x08 position and +0x14 rotation runs of a `Q_ElementBlock`, copied as 12-byte units. size: 0xC */
-typedef struct QuestElementVec {
-    /* +0x0 */ u64 x;
-} QuestElementVec;
+/* The two-word runs at +0x08 and +0x14 of a `Q_ElementBlock`, copied as one block each (retail loads both
+ * words, then stores them in order). size: 0x8 */
+typedef struct QuestElementPair {
+    /* +0x0 */ u32 words[2];
+} QuestElementPair;
 
 /* Copies the 0x20-byte key block one of those rows carries, field by field. */
 void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src) {
@@ -2700,9 +2697,9 @@ void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src) {
     dst->byte_0x05 = src->byte_0x05;
     dst->byte_0x06 = src->byte_0x06;
     dst->byte_0x07 = src->byte_0x07;
-    *(u64*)&dst->word_0x08 = *(const u64*)&src->word_0x08;
+    *(QuestElementPair*)&dst->word_0x08 = *(const QuestElementPair*)&src->word_0x08;
     dst->word_0x10 = src->word_0x10;
-    *(u64*)&dst->word_0x14 = *(const u64*)&src->word_0x14;
+    *(QuestElementPair*)&dst->word_0x14 = *(const QuestElementPair*)&src->word_0x14;
     dst->word_0x1C = src->word_0x1C;
 }
 
@@ -2941,6 +2938,7 @@ void quest_start_load(void) {
 /* Enters the quest: allocates the result buffer, resets the quest work and spawns its monsters, applies the
  * saved stat of an arena quest (the part-break counts it already paid), sets the time limit and its class,
  * hands the stage its map and area, and loads the dcm archives the quest's stage and kind need. */
+#pragma opt_propagation off
 void quest_enter_load(void) {
     char path[0x20];
     Q_MoveWork* work;
@@ -3077,6 +3075,7 @@ void quest_enter_load(void) {
         }
     }
 }
+#pragma opt_propagation reset
 
 /* Charges one faint of `player` against the quest reward: announces it, and ends the quest when the reward
  * is gone. */
@@ -3369,15 +3368,10 @@ void quest_main_step(void) {
             item->timer_0x6A50 = item->timer_0x6A48;
             break;
         }
-        if (system_w.field_0x7d2 == 0 && system_w.field_0x7d1 == 0 && quest_work_ptr->record_0x03C != NULL &&
-            quest_work_ptr->field_0x2E8 <= 0) {
-            quest_work_ptr->field_0x2E8 = 0;
-            quest_main_step_fail(item, work);
-            break;
-        }
-        quest_special_element_step((QuestWork*)item);
-        quest_grade_goal_step((QuestWork*)item);
-        if (quest_failed_ck((QuestWork*)item) == 1) {
+        if ((system_w.field_0x7d2 == 0 && system_w.field_0x7d1 == 0 && quest_work_ptr->record_0x03C != NULL &&
+             quest_work_ptr->field_0x2E8 <= 0 && (quest_work_ptr->field_0x2E8 = 0, 1)) ||
+            (quest_special_element_step((QuestWork*)item), quest_grade_goal_step((QuestWork*)item),
+             quest_failed_ck((QuestWork*)item) == 1)) {
             quest_main_step_fail(item, work);
             break;
         }
@@ -4048,7 +4042,7 @@ void quest_successive_step(Q_MoveWork* work) {
         struct _ENEMY_MINI_WORK* mini = NULL;
 
         if ((u8)em_get_unique_work(quest->spawn_count_0x308, &enemy, &mini) != 0) {
-            em_quest_element_set(enemy, quest->spawn_count_0x308);
+            em_quest_element_set(enemy, (u8)quest->spawn_count_0x308);
             quest->field_0x6978 = 0;
             quest->intruder_index_0x6977 = 1;
             quest->spawn_count_0x308++;
@@ -4116,7 +4110,7 @@ void quest_successive_step(Q_MoveWork* work) {
         struct _ENEMY_MINI_WORK* mini = NULL;
 
         if ((u8)em_get_unique_work(quest->spawn_count_0x308, &enemy, &mini) != 0) {
-            em_quest_element_set(enemy, quest->spawn_count_0x308);
+            em_quest_element_set(enemy, (u8)quest->spawn_count_0x308);
             quest->field_0x6978 = 0;
             quest->intruder_index_0x6977 = 1;
             quest->spawn_count_0x308++;
@@ -4312,6 +4306,7 @@ u8 quest_result_deliver_items(Q_ResultWork* result, Q_ItemPair* items) {
     s32 i;
     Q_ItemPair* clear;
     Q_ItemPair* dst;
+    s32 j;
 
     clear = result->delivered_0x304;
     for (i = 0; i < 0x28; i++) {
@@ -4320,7 +4315,7 @@ u8 quest_result_deliver_items(Q_ResultWork* result, Q_ItemPair* items) {
     }
     result->present_0x3A4 = 0;
     dst = result->delivered_0x304;
-    for (i = 0; i < 0x23; i++, items++) {
+    for (j = 0; j < 0x23; j++, items++) {
         if (items->id != 0 && (s16)items->num != 0 && item_category_ck(items->id, 0x10) != 0) {
             dst->id = items->id;
             dst->num = items->num;
@@ -4460,6 +4455,7 @@ void quest_result_fill(Q_MoveWork* work) {
 
 /* The arena form of the result fill: the quest id, the times and the multiplayer arena's clear-time mark, the
  * arena element build for a cleared run, and the result kind. */
+#pragma opt_propagation off
 void quest_arena_summary_step(Q_MoveWork* work) {
     QuestWork* quest = quest_work_ptr;
     Q_ResultWork* result = get_qResult_work();
@@ -4495,6 +4491,7 @@ void quest_arena_summary_step(Q_MoveWork* work) {
         break;
     }
 }
+#pragma opt_propagation reset
 
 /* Standing on the gallery cell (0xFA/0xFF/0xFF) of area 1 with the BGM not held: requests the gallery event and
  * marks the demo running, or holds the BGM when the request is refused. */
@@ -5113,6 +5110,7 @@ char* quest_arena_items_text_get(u8 index) {
  * record's clear time instead of the work block's.  The clear time is first mapped through the
  * arena's own tables: the fixed `multi_arena_clr_time` pair when the 0x100000 flag is set and the
  * time is below 10000, else `arena_time_table`'s per-rank table scaled by 30 when 0x10 is set. */
+#pragma opt_propagation off
 char* quest_arena_time_text_get(QuestRecord* rec, s32 which) {
     char** tbl = (char**)get_str_tbl(6);
     s32 time = which;
@@ -5135,6 +5133,7 @@ char* quest_arena_time_text_get(QuestRecord* rec, s32 which) {
     sprintf(quest_text_buffer, tbl[2], minutes, seconds);
     return quest_text_buffer;
 }
+#pragma opt_propagation reset
 
 /* The grade (0 = no record) as text: the grade's own format for 1..4, else the language's
  * "no record" string. */

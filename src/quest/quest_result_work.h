@@ -11,10 +11,10 @@
 #include "id_value.h"
 
 /* The 4-byte `(item id, count)` slot `item_pair_copy` moves - and the record the lot picks write
- * their output with: a u16 id and a u16 count (the pick stores a sign-extended byte payload). */
+ * their output with: a u16 id and an s16 count (the pick stores its byte payload as `(u16)`, hence the `extsh`). */
 struct Q_ItemPair {
     /* +0x0 */ u16 id;
-    /* +0x2 */ u16 num;
+    /* +0x2 */ s16 num;
 };  /* size: 0x4 */
 
 /* One monster's two size records (the smallest and the largest), as the hunt measured them and as the
