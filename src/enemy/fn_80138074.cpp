@@ -243,7 +243,7 @@ extern f32 vec3_distance(const Vec3* a, const Vec3* b);
 extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
 extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern void MTX33_ctor(Mtx34* mtx);
-extern void mtx34_blend(Mtx34* out, const Mtx34* a, const Mtx34* b, s32 arg3, f32 t, f32 u);
+extern void mtx34_blend(Mtx34* out, const Mtx34* a, const Mtx34* b, f32 wa, f32 wb, u8 keep_unit);
 extern void vec3_scale(Vec3* out, const Vec3* v, f32 scale);
 extern f32 vec3_dot(const Vec3* a, const Vec3* b);
 extern void vec3_move_damp(Vec3* out, const Vec3* a, const Vec3* b, const Vec3* c, f32 t);

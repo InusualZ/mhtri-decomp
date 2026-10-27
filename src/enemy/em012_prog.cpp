@@ -2878,7 +2878,7 @@ void em012_tev_color_update(_ENEMY_WORK *self) {
         }
         out_rim = (s32)((f32)rim * self->field_0x1D4);
         out_body = (s32)((f32)body * self->field_0x1D4);
-        mhchar_mat_tev_set((MHchar *)self->char_0x024, mat, 6, out_rim, 0, 3, out_body, self->field_0x1D4);
+        mhchar_mat_tev_set((MHchar *)self->char_0x024, mat, GX_GEQUAL, out_rim, GX_AOP_AND, GX_LEQUAL, out_body);
     }
 }
 
@@ -3063,7 +3063,7 @@ s32 em012_action_select(_ENEMY_WORK *self, u16 arg) {
         break;
     }
     if (area != 0xFF) {
-        switch (em_area_break_ck(self)) {
+        switch (em_area_break_ck(self, area)) {
         case 1:
             hit = 1;
             break;

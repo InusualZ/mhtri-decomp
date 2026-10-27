@@ -26,8 +26,7 @@
  *   unrolls them and hoists the u8 narrowing); a dead loop counter is a `u8`/`s16` variable (idea 238); a
  *   `get_move_work_max` bound is kept raw and narrowed in the condition (idea 216); search loops start
  *   `for (i = 0, work = works; ...)`; signed reads of the area-slot/element bytes go through the `_s8_` union aliases
- *   of ENEMY_WORK.h/ENEMY_MINI_WORK.h; `anim_key_curve_eval` and `pl_coll_tri_hit_ck` are called through `_c1` views
- *   in their owners' argument order (float second).  The record constructors are `inline` under
+ *   of ENEMY_WORK.h/ENEMY_MINI_WORK.h.  The record constructors are `inline` under
  *   `#pragma dont_inline on` so MWCC emits the implicit `EmcWork` ctor and the member ctors as weak functions after
  *   `__sinit_\enemy_control_cpp`.
  */
@@ -351,11 +350,6 @@ u8 em_sub_buffer_release(u8 kind);
 #pragma peephole off
 #pragma pool_data off
 
-/* `anim_key_curve_eval` in its owner's argument order (`fn_8004CAD8.cpp`): key table, frame, the two outputs. */
-#define anim_key_curve_eval_c1 ((void (*)(f32*, f32, f32*, f32*))anim_key_curve_eval)
-/* `pl_coll_tri_hit_ck` in its owner's argument order (`Pl/pl_coll.cpp`): the radius second. */
-typedef u32 (*PlCollTriHitCk)(nw4r::math::VEC3*, f32, nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32*);
-#define pl_coll_tri_hit_ck_c1 ((PlCollTriHitCk)pl_coll_tri_hit_ck)
 
 extern "C" {
 
@@ -2103,7 +2097,7 @@ s32 em_joint_points_hit_ck(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VE
         u8 i;
         s32 tris = em_joint_points_get(self, set, pts) - 2;
         for (i = 0; i < tris; i++) {
-            if (pl_coll_tri_hit_ck_c1(pos, radius, &pts[i], &pts[i + 1], &pts[i + 2], &h) == 1) {
+            if (pl_coll_tri_hit_ck(pos, radius, &pts[i], &pts[i + 1], &pts[i + 2], &h) == 1) {
                 if (hits != 0) {
                     if (h > *height) {
                         *height = h;
@@ -2869,7 +2863,7 @@ void em_demo_key_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* r
             getKeyData3((f32*)pos_keys_arg, t, &a, &b, &c);
             setVector3(&self->pos, a, b, c);
         } else {
-            anim_key_curve_eval_c1((f32*)pos_keys_arg, t, &a, &b);
+            anim_key_curve_eval((f32*)pos_keys_arg, t, &a, &b);
             switch (pos_axes) {
             case 3:
                 self->pos.x = a;
@@ -2905,7 +2899,7 @@ void em_demo_key_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* r
             getKeyData3((f32*)rot_keys_arg, t, &a, &b, &c);
             em_demo_rot_set(self, a, b, c);
         } else {
-            anim_key_curve_eval_c1((f32*)rot_keys_arg, t, &a, &b);
+            anim_key_curve_eval((f32*)rot_keys_arg, t, &a, &b);
             switch (rot_axes) {
             case 3:
                 self->field_0x1BC = em_demo_angle_get(a);

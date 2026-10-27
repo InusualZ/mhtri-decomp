@@ -131,7 +131,6 @@
 #define em_turn_to_target_h ((u32 (*)(_ENEMY_WORK*, u16))em_turn_to_target)
 #define calcVecAngX_s32 ((s32 (*)(nw4r::math::VEC3*))calcVecAngX)
 #define assignVec3_c1 ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))assignVec3)
-#define em_area_mot_ck_view ((u8 (*)(_ENEMY_WORK*, u8))em_area_break_ck)
 #define em_fall_start_c1 ((void (*)(_ENEMY_WORK*, f32))em_fall_start)
 #define em_water_check_c1 ((u32 (*)(_ENEMY_WORK*))em_water_check)
 #define em_move_offset_step_update_c1 ((u32 (*)(_ENEMY_WORK*, u32*, f32))em_move_offset_step_update)
@@ -5480,7 +5479,7 @@ u32 em015_area_start_ck(_ENEMY_WORK* self, u32 arg) {
         break;
     }
     if (area != 0xFF) {
-        switch (em_area_mot_ck_view(self, area)) {
+        switch (em_area_break_ck(self, area)) {
         case 1:
             armed = 1;
             break;

@@ -25,9 +25,9 @@
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
  *   A `u8` compared through `(s32)` gives retail's `cmpwi`; `switch (self->state) { case 0: self->state++;`
- *   reuses the loaded byte.  Float arguments are evaluated in parameter order, so `em_wave_segment` and
- *   `capsule_box_from_points` are called through `_v` views that list the radius before the trailing integer/pointer
- *   arguments (their owners' prototypes list it last).  `em_fall_start` is called with
+ *   reuses the loaded byte.  Float arguments are evaluated in parameter order, so `em_wave_segment` is
+ *   called through a `_v` view that lists the radius before the trailing integer arguments (its owner's prototype
+ *   lists it last).  `em_fall_start` is called with
  *   the f1 load (`_c1` view) except in the two leaps, where retail leaves f1 holding the compared height.  The
  *   static initializer is a file-scope object whose inline constructor runs `assignVec3(dst, setVec3(&tmp, ..))`
  *   per vector, the temporaries declared in reverse; the vectors themselves are zero in `.data`/`.bss`.
@@ -204,8 +204,6 @@ Em022Zone em022_nest_zone = {1, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, 400.0f};
 #define em_wave_segment_v \
     ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32, u32, u16))em_wave_segment)
 #define anm_chr_result_rot_mul_v ((void (*)(nw4r::g3d::ChrAnmResult*, nw4r::math::MTX33*))anm_chr_result_rot_mul)
-#define capsule_box_from_points_v \
-    ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, f32, PlCapsuleBox*))capsule_box_from_points)
 #define eft_shape_init_v ((PlCapsuleBox* (*)(PlCapsuleBox*))eft_shape_init)
 
 /* The unit's own entry points: the original file's definition order is not the address order, so the
@@ -2420,8 +2418,8 @@ void em022_act7_zone_charge(_ENEMY_WORK* self, u8 mode) {
                 em_move_offset_rot_apply(self, &self->field_0x1BC);
             }
             if (self->field_0x43C != 1) {
-                capsule_box_from_points_v(&em022_nest_zone.start_0x04, &em022_nest_zone.end_0x10, em022_nest_zone.radius_0x1C,
-                            &shape);
+                capsule_box_from_points(&em022_nest_zone.start_0x04, &em022_nest_zone.end_0x10, em022_nest_zone.radius_0x1C,
+                                        (nw4r::math::CAPSULE*)&shape);
                 pl_capsule_box_set((PlCapsule*)&shape, &shape);
                 if (pl_capsule_point_ck(&self->pos, &shape) == 1U) {
                     em_motion_kind_set(self, 0, 1);

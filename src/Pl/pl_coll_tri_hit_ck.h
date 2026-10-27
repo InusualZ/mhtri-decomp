@@ -11,8 +11,7 @@ extern "C" {
 #endif
 
 /* 0x80291114 - tests a point and radius against a triangle; returns 1 and the hit height on a hit. */
-u32 pl_coll_tri_hit_ck(nw4r::math::VEC3* pos, nw4r::math::VEC3* a, nw4r::math::VEC3* b, nw4r::math::VEC3* c, f32* height,
-                       f32 radius);
+u32 pl_coll_tri_hit_ck(VEC3* pos, f32 radius, VEC3* a, VEC3* b, VEC3* c, f32* height);
 
 #ifdef __cplusplus
 }

@@ -125,7 +125,6 @@
 #define em_fall_height_get_c1 ((f32 (*)(struct _ENEMY_WORK*))em_fall_height_get)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
 #define em_move_offset_step_update_c1 ((u32 (*)(struct _ENEMY_WORK*, u32*, f32))em_move_offset_step_update)
-#define em_area_break_ck_c2 ((u8 (*)(struct _ENEMY_WORK*, u8))em_area_break_ck)
 #define em_roll_cooldown_ck_c1 ((s32 (*)(struct _ENEMY_WORK*, u16, u16, s16*))em_roll_cooldown_ck)
 #define anm_chr_result_scale_get_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_scale_get)
 #define anm_chr_result_trans_get_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_trans_get)
@@ -5345,7 +5344,7 @@ u32 em018_action_select(struct _ENEMY_WORK* self, u32 arg) {
         break;
     }
     if (probe != 0xFF) {
-        switch (em_area_break_ck_c2(self, probe)) {
+        switch (em_area_break_ck(self, probe)) {
         case 1:
             hit = 1;
             break;

@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-f32 anim_key_curve_eval(f32* a, f32* b, f32* c, f32 frame);
+void anim_key_curve_eval(f32* keys, f32 frame, f32* out0, f32* out1);
 
 #ifdef __cplusplus
 }

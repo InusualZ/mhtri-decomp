@@ -30,7 +30,7 @@
  *   helpers, not a constructor pair), so the unit cannot flip.
  * SHAPES. The `ShellSetFuncs` +0x14/+0x3C/+0x54/+0x64 calls go through spellings without the trailing table
  *   argument (the shared slot types hoist the table load).  Float arguments are listed where retail loads them:
- *   `em_ground_impact_set`/`em_gauge_period_step`/`em_gauge_tick` are called through `_v` cast views and
+ *   `em_gauge_period_step`/`em_gauge_tick` are called through `_v` cast views and
  *   `em_stamina_regen`/`eft013_spawn_id` are declared with the float before the trailing integers.  A narrowed ternary argument spells each constant with the cast
  *   (`map == 4 ? (u8)5 : (u8)0xFF`), and `em_mot_set`/`get_move_work_max` are called through their `u16`
  *   spellings, which keeps retail's `clrlwi`.  The motion-event switch lists `0xC` beside `0xCF`/`0xE5` and
@@ -111,11 +111,9 @@ typedef void (*ShellEftJobFn)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math
 
 /* Callees whose owner prototypes differ from the spelling retail's call sites were compiled with (the float listed
  * first, a narrowed or extra argument, a signed return): a cast call is the same direct call. */
-#define em_ground_impact_set_v     ((void (*)(struct _ENEMY_WORK*, u8, u8, f32, nw4r::math::VEC3*))em_ground_impact_set)
 #define em_gauge_tick_v ((void (*)(struct _ENEMY_WORK*, f32, s32, s16))em_gauge_tick)
 #define em_gauge_period_step_v ((void (*)(struct _ENEMY_WORK*, f32, s32, s16))em_gauge_period_step)
 #define em_act_arm_unless_act11_v ((void (*)(struct _ENEMY_WORK*, u8, u8))em_act_arm_unless_act11)
-#define em_area_break_ck_v ((u8 (*)(struct _ENEMY_WORK*, u8))em_area_break_ck)
 #define em_pack_area_pick_v ((u32 (*)(struct _ENEMY_WORK*, u8, u8, u16, u8*, u8*))em_pack_area_pick)
 #define em_area_leave_ck_v ((s32 (*)(struct _ENEMY_WORK*))em_area_leave_ck)
 #define em_stamina_add_v ((void (*)(struct _ENEMY_WORK*, s16))em_stamina_add)
@@ -1124,7 +1122,7 @@ void em004_act3_dive_attack(struct _ENEMY_WORK* self) {
     case 1:
         if (em_frame_check(self, 0, 50.0f, 0.0f) == 1) {
             setVector3(&pos, 0.0f, 0.0f, 50.0f);
-            em_ground_impact_set_v(self, 2, 1, 2.5f, &pos);
+            em_ground_impact_set(self, 2, 1, 2.5f, &pos);
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
@@ -1275,7 +1273,7 @@ void em004_act3_ground_pounce(struct _ENEMY_WORK* self) {
         }
         if (em_frame_check(self, 0, 2.0f, 0.0f) == 1) {
             setVector3(&pos, 0.0f, 0.0f, 50.0f);
-            em_ground_impact_set_v(self, 2, 1, 2.5f, &pos);
+            em_ground_impact_set(self, 2, 1, 2.5f, &pos);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1531,7 +1529,7 @@ void em004_act3_jump(struct _ENEMY_WORK* self, u8 mode) {
     case 3:
         if (em_frame_check(self, 0, 6.0f, 0.0f) == 1) {
             setVector3(&pos2, 0.0f, 0.0f, -50.0f);
-            em_ground_impact_set_v(self, 2, 1, 2.5f, &pos2);
+            em_ground_impact_set(self, 2, 1, 2.5f, &pos2);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1795,7 +1793,7 @@ void em004_act3_short_jump(struct _ENEMY_WORK* self, u8 mode) {
     case 3:
         if (em_frame_check(self, 0, 6.0f, 0.0f) == 1) {
             setVector3(&pos2, 0.0f, 0.0f, -50.0f);
-            em_ground_impact_set_v(self, 2, 1, 2.5f, &pos2);
+            em_ground_impact_set(self, 2, 1, 2.5f, &pos2);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -4119,7 +4117,7 @@ s32 em004_area_change_ck(struct _ENEMY_WORK* self, u16 timer) {
         area = 4;
     }
     if (area != 0xFF) {
-        switch (em_area_break_ck_v(self, area)) {
+        switch (em_area_break_ck(self, area)) {
         case 1:
             moved = 1;
             break;

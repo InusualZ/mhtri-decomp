@@ -38,7 +38,7 @@
  *    (the initialiser above).
  *  - Consumer declarations that disagree with the definitions (C linkage, so the code is unaffected): `coll_wall_slide`
  *    (`Pl/coll_wall_slide.h`, `ai/fn_802D0F34.h`: no radius), `pl_ground_probe` (`Pl/pl_segment_sphere_hit.h`: seven
- *    arguments), `pl_coll_tri_hit_ck` (`Pl/pl_coll_tri_hit_ck.h`: radius last), `npc_ground_check`, `pl_coll_shape_set`.
+ *    arguments), `npc_ground_check`, `pl_coll_shape_set`.
  * SHAPES. `pl_tri2d_cross` keeps its two products in a local array (retail stores and reloads them around the
  *   one-ulp test); the grid cell index is `index = (x * dim_y + y) * dim_z` then `cells[index + z]` (the last `add`
  *   keeps the product first); the shape-hit yaw is the call's raw result narrowed in a second statement.

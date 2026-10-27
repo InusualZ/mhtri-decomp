@@ -5,12 +5,11 @@
  *   .sdata2 0x80798C68-0x80798CF8, extab, extabindex.
  * NAMES. `em034_prog` is a GUESS from `em034_prog_tbl` (0x805B17A8), the first object of the unit's `.data`; the
  *   `.bss` record name is a GUESS (a pair of model-space points).
- * RESIDUALS. Every row is written; 5 partial rows.
+ * RESIDUALS. Every row is written; 4 partial rows.
  *  - `fn_801B4694`, `fn_801B4458`: register colouring of the loop index and the narrowed kind (retail compares
  *    `cmplw kind, code`, ours the operands swapped);
  *  - `fn_801B47A4`: retail's frame is 0x50 against our 0x40 and its loops count with `mtctr`/`bdnz` (1200 B against
  *    1180 B);
- *  - `fn_801B45B0`: retail sets r5 (`addi r5,r1,0x20`) after `fmr f1,f31` before `capsule_box_from_points`, ours before;
  *  - `fn_801B63E8`: retail narrows the chosen motion with `clrlwi r4,r4,16` after the select; a `u16`/`u32`/`s32`
  *    local, a `(u16)` cast and the if-form do not reproduce it.
  *   flipcheck: `.ctors`/`.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.data`/`.text` short of the claim.
@@ -141,7 +140,6 @@ u8 stage_map_kind_get(u8 map);
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
 void assignVec3(void* out, void* in);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void capsule_box_from_points(void* a, void* b, void* c, f32 d);
 void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 vec3_distance(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
@@ -335,7 +333,7 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
     if (rec->code == 1) {
         vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
         vec_to_mh_vec3(&b, (Vec*)rec->vec_0x10);
-        capsule_box_from_points(&a, &b, box, radius);
+        capsule_box_from_points(&a, &b, radius, (nw4r::math::CAPSULE*)box);
         pl_capsule_box_set(box, box);
         if ((u32)pl_capsule_point_ck(point, box) == 1) {
             return 1;

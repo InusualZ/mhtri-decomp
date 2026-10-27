@@ -36,8 +36,7 @@
  *   keeps `E` first in the `fmuls`); a negated field is `*= -1.0f`.  The sound-table player lists its cases in
  *   retail's code order; several `switch`es put `default:` first; the rotation record handed to
  *   `em_move_offset_rot_apply` is one function-scope `EmRotWord3`.  Callees whose call sites were compiled against
- *   other spellings than the owner header's are called through `_v` cast views (the float listed before the pointer
- *   for `em_ground_impact_set`/`capsule_box_from_points`, a float argument for `em_ground_ck`).
+ *   other spellings than the owner header's are called through `_v` cast views (a float argument for `em_ground_ck`).
  */
 
 #include "types.h"
@@ -96,11 +95,8 @@
 /* Callees whose owner prototypes differ from the spelling retail's call sites were compiled with: a cast call is the
  * same direct call. */
 #define em_ground_ck_f ((u32 (*)(struct _ENEMY_WORK*, f32))em_ground_ck)
-#define em_ground_impact_set_v ((void (*)(struct _ENEMY_WORK*, u8, u8, f32, nw4r::math::VEC3*))em_ground_impact_set)
-#define em_area_break_ck_v ((u8 (*)(struct _ENEMY_WORK*, u8))em_area_break_ck)
 #define em_pack_area_pick_v ((u32 (*)(struct _ENEMY_WORK*, u8, u8, u16, u8*, u8*))em_pack_area_pick)
 #define em_area_leave_ck_v ((s32 (*)(struct _ENEMY_WORK*))em_area_leave_ck)
-#define capsule_box_from_points_v ((void (*)(void*, void*, f32, void*))capsule_box_from_points)
 #define em_move_offset_step_update_v ((u32 (*)(struct _ENEMY_WORK*, void*))em_move_offset_step_update)
 
 /* The `ShellSetFuncs` slot spelled without its trailing table argument: the shared slot type hoists the table
@@ -5224,7 +5220,7 @@ void em005_motion_events(struct _ENEMY_WORK* self) {
         if (em_after_frame_check(self, 0, 70.0f, 0.0f) == 1) {
             em005_step_eft_set(self, 0, 5, 3, 0, 0.9f);
             setVector3(&spot, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set_v(self, 1, 0, 0.9f, &spot);
+            em_ground_impact_set(self, 1, 0, 0.9f, &spot);
         }
         break;
     case 0x2A:
@@ -5236,7 +5232,7 @@ void em005_motion_events(struct _ENEMY_WORK* self) {
         if (em_after_frame_check(self, 0, 4.0f, 0.0f) == 1) {
             em005_step_eft_set(self, 1, 4, 3, 0, 0.8f);
             setVector3(&spot, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set_v(self, 2, 0, 1.7f, &spot);
+            em_ground_impact_set(self, 2, 0, 1.7f, &spot);
             em_camera_req(self, -1, 7);
         }
         break;
@@ -5500,7 +5496,7 @@ void em005_motion_events(struct _ENEMY_WORK* self) {
         break;
     case 0xED:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-            em_ground_impact_set_v(self, 1, 0, 1.0f, NULL);
+            em_ground_impact_set(self, 1, 0, 1.0f, NULL);
         }
         break;
     case 0xEF:
@@ -5614,7 +5610,7 @@ u32 em005_capsule_point_ck(u8 index, nw4r::math::VEC3* point) {
         return 0;
     }
     Em005Capsule* entry = &em005_capsule_tbl[index];
-    capsule_box_from_points_v(&entry->start.pos, &entry->end.pos, entry->radius, &capsule);
+    capsule_box_from_points(&entry->start.pos, &entry->end.pos, entry->radius, &capsule);
     pl_capsule_box_set((const PlCapsule*)&capsule, &box);
     return pl_capsule_point_ck(point, &box) == 1;
 }
@@ -5805,7 +5801,7 @@ s32 em005_area_change_ck(struct _ENEMY_WORK* self, u16 timer) {
         area = 7;
     }
     if (area != 0xFF) {
-        switch (em_area_break_ck_v(self, area)) {
+        switch (em_area_break_ck(self, area)) {
         case 1:
             moved = 1;
             break;

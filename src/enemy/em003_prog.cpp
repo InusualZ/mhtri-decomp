@@ -48,10 +48,8 @@
  *   The unsigned shift of the swipe angle byte goes through `(u32)(u16)`; the area-table loops count to 128 over
  *   `&em_area_entry_tbl[0][0]`; a `get_move_work_max` count is held as u32 and narrowed at the loop.  Data is
  *   defined between the functions in retail order (the act-7 aim curve before `em003_act7_0`, the act-10 and act-11
- *   sound programs before their players, the demo keys before `em003_act12_0`).
- *   Callees take their owner's parameter order through call-site views where the shared header differs
- *   (`em_ground_impact_set`: the scale ahead of the offset; `em_area_break_ck`: the area reference).  A swipe
- *   angle that depends on `arg1` is an `if`/`else` pair; `get_em_base_scale` goes into a local before
+ *   sound programs before their players, the demo keys before `em003_act12_0`).  A swipe angle that depends on
+ *   `arg1` is an `if`/`else` pair; `get_em_base_scale` goes into a local before
  *   `em_mot_speed_set`, and the blend ratio into a local before `em_motion_blend_step`.
  */
 
@@ -129,10 +127,6 @@
 #define em_fall_start_f ((void (*)(_ENEMY_WORK*, f32))em_fall_start)
 /* the offset step reports whether the move landed */
 #define em_move_offset_step_update_v ((u32 (*)(_ENEMY_WORK*, void*))em_move_offset_step_update)
-/* the area-break test takes the area reference its owner reads (the header spells it with `self` only) */
-#define em_area_break_ck_view1 ((u32 (*)(_ENEMY_WORK*, u8))em_area_break_ck)
-/* the ground impact in its owner's parameter order: the scale ahead of the offset */
-#define em_ground_impact_set_view1 ((void (*)(_ENEMY_WORK*, u8, u8, f32, VEC3*))em_ground_impact_set)
 
 
 /* One entry of the call tables `em003_call_group_pick`/`em003_call_kind_pick` and the call event scan: a group
@@ -4002,7 +3996,7 @@ void em003_ground_impact_fx(_ENEMY_WORK *self, u8 arg1) {
     VEC3_ctor(&vec);
     if (self->em003_0x328.tick == 0) {
         setVector3(&vec, 0.0f, 0.0f, 100.0f);
-        em_ground_impact_set_view1(self, arg1, 1, 0.65f, &vec);
+        em_ground_impact_set(self, arg1, 1, 0.65f, &vec);
     }
 }
 
@@ -4218,7 +4212,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
     case 0x2A:
         if (em_after_frame_check(self, 0, 52.0f, 0.0f) == 1) {
             setVector3(&vec, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set_view1(self, 2, 1, 0.65f, &vec);
+            em_ground_impact_set(self, 2, 1, 0.65f, &vec);
             break;
         }
         break;
@@ -4266,7 +4260,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
             } else {
                 em003_effect_spawn(self, 1, 4, 0xFF, 0, 0.7f);
             }
-            em_ground_impact_set_view1(self, 1, 0, 0.65f, NULL);
+            em_ground_impact_set(self, 1, 0, 0.65f, NULL);
             em_camera_req(self, -1, 7);
             break;
         }
@@ -4284,7 +4278,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
             } else {
                 em003_effect_spawn(self, 0, 5, 0xFF, 0, 0.5f);
             }
-            em_ground_impact_set_view1(self, 1, 1, 0.65f, NULL);
+            em_ground_impact_set(self, 1, 1, 0.65f, NULL);
             break;
         }
         break;
@@ -4484,7 +4478,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
         break;
     case 0xD7:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-            em_ground_impact_set_view1(self, 1, 1, 0.65f, NULL);
+            em_ground_impact_set(self, 1, 1, 0.65f, NULL);
             break;
         }
         break;
@@ -4496,7 +4490,7 @@ void em003_motion_events(_ENEMY_WORK *self) {
         break;
     case 0xD9:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-            em_ground_impact_set_view1(self, 1, 1, 0.65f, NULL);
+            em_ground_impact_set(self, 1, 1, 0.65f, NULL);
         }
         if (em_after_frame_check(self, 0, 8.0f, 0.0f) == 1) {
             em_camera_req(self, -1, 7);
@@ -4805,7 +4799,7 @@ u32 em003_area_start_ck(_ENEMY_WORK* self, u16 arg1) {
         break;
     }
     if (ref != 0xFF) {
-        switch ((u8)em_area_break_ck_view1(self, ref)) {
+        switch (em_area_break_ck(self, ref)) {
         case 1:
             broken = 1;
             break;

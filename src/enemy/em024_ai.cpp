@@ -4005,7 +4005,7 @@ extern "C" void em024_tev_color_update(_ENEMY_WORK* self)
         }
         out_rim = (s32)((f32)rim_a * self->field_0x1D4);
         out_body = (s32)((f32)body_a * self->field_0x1D4);
-        mhchar_mat_tev_set((MHchar*)self->char_0x024, 2, 6, out_rim, 0, 3, out_body, self->field_0x1D4);
+        mhchar_mat_tev_set((MHchar*)self->char_0x024, 2, GX_GEQUAL, out_rim, GX_AOP_AND, GX_LEQUAL, out_body);
         if (em_parts_damage_level_get(self, 3) < 2) {
             rim_b = 100;
             body_b = 255;
@@ -4015,6 +4015,6 @@ extern "C" void em024_tev_color_update(_ENEMY_WORK* self)
         }
         out_rim = (s32)((f32)rim_b * self->field_0x1D4);
         out_body = (s32)((f32)body_b * self->field_0x1D4);
-        mhchar_mat_tev_set((MHchar*)self->char_0x024, 3, 6, out_rim, 0, 3, out_body, self->field_0x1D4);
+        mhchar_mat_tev_set((MHchar*)self->char_0x024, 3, GX_GEQUAL, out_rim, GX_AOP_AND, GX_LEQUAL, out_body);
     }
 }

@@ -70,7 +70,6 @@
 
 /* Call-site views: each macro casts a callee to the signature its call sites use (the same direct call). */
 #define draw_shape_arm_c1 ((void (*)(struct _ENEMY_WORK*, u32, u32))draw_shape_arm)
-#define em_area_break_ck_c2 ((u8 (*)(struct _ENEMY_WORK*, u32))em_area_break_ck)
 #define em_work_die_ck_c1 ((u32 (*)(struct _ENEMY_WORK*))em_work_die_ck)
 #define em_pack_area_pick_c1 ((u32 (*)(struct _ENEMY_WORK*, u32, u8, u16, u8*, u32*))em_pack_area_pick)
 #define em_roll_cooldown_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u16, u16, s16*))em_roll_cooldown_ck)
@@ -3584,7 +3583,7 @@ u32 em009_action_select(_ENEMY_WORK* self, u32 arg) {
     hit = 0;
     probe = (s32)kind == 5 ? 5 : 0xFF;
     if (probe != 0xFF) {
-        switch (em_area_break_ck_c2(self, probe)) {
+        switch (em_area_break_ck(self, probe)) {
         case 1:
             hit = 1;
             break;

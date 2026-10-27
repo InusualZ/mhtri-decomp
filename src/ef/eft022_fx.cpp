@@ -146,7 +146,7 @@ extern "C" void res_node_assign(void* ctx, void* val);
 extern "C" s32 res_node_get_id(void* ctx);
 extern "C" u32 res_node_is_valid(void* ctx);
 extern "C" void fn_8050131C(void* a);
-extern "C" void mtx34_blend(void* a, void* b, void* c, s32 d, f32 e, f32 f);
+extern "C" void mtx34_blend(void* out, void* a, void* b, f32 wa, f32 wb, u8 keep_unit);
 
 extern "C" u32 get_joint_num__6MHcharFv(void* chr);
 extern "C" void setVisibility__6MHcharFUlb(void* chr, u32 joint, u32 visible);
@@ -579,7 +579,7 @@ void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResM
             id1 = (s32)mdl.GetResNode((u32)k).mpData;
             res_node_assign(&h1, &id1);
             dst = &mtx_arr[res_node_mtx_id_get(&h1)];
-            mtx34_blend(&out, &ma, &mb, 1, a->x, a->y);
+            mtx34_blend(&out, &ma, &mb, a->x, a->y, 1);
             out.m[0][3] *= lbl_805A0244[effect->type_0x02];
             out.m[1][3] *= lbl_805A0244[effect->type_0x02];
             out.m[2][3] *= lbl_805A0244[effect->type_0x02];

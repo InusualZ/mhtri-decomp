@@ -205,7 +205,7 @@ typedef void (*EmShellShotFn)(_ENEMY_WORK* self, EmSpawnRec* req, u32 mode);
 #define fn_8012EC3C_view1 ((u32 (*)(EmActWork*))em_eft_active_ck)
 #define fn_8012A204_view1 ((s32 (*)(EmActWork*))em_area_leave_ck)
 #define fn_8012A014_view1 ((u32 (*)(EmActWork*, u32, u32, u16, u32, u8*))em_pack_area_pick)
-#define fn_80129DB8_view1 ((u8 (*)(EmActWork*))em_area_break_ck)
+#define em_area_break_ck_c1 ((u8 (*)(EmActWork*, u8))em_area_break_ck)
 #define fn_80129A70_view1 ((u32 (*)(EmActWork*, u16))em_area_roam_pick)
 #define fn_80126324_view1 ((void (*)(EmActWork*, u8, u8, f32))em_move_target_set)
 #define em_water_check_view1 ((u32 (*)(struct _ENEMY_WORK*))em_water_check)
@@ -7815,7 +7815,7 @@ s32 em016_action_allow_ck(EmActWork* self, u32 arg) {
         break;
     }
     if (probe != 0xFF) {
-        switch (fn_80129DB8_view1(self)) {
+        switch (em_area_break_ck_c1(self, probe)) {
         case 1:
             hit = 1;
             break;

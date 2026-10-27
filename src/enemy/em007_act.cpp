@@ -352,7 +352,7 @@ void em_act_arm_unless_down(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_hit_window_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
-u8 em_area_break_ck(struct _ENEMY_WORK* self);
+u8 em_area_break_ck(struct _ENEMY_WORK* self, u8 area);
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 s32 em_area_leave_ck(struct _ENEMY_WORK* self);
 
@@ -2609,7 +2609,7 @@ u32 em_eft_active_ck(struct _ENEMY_WORK* self);
 void em_data_point_get(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 u32 em_area_stun_move_ck(struct _ENEMY_WORK* self);
 u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
-u8 em_area_break_ck(struct _ENEMY_WORK* self);
+u8 em_area_break_ck(struct _ENEMY_WORK* self, u8 area);
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 s32 em_area_leave_ck(struct _ENEMY_WORK* self);
 
@@ -3828,7 +3828,7 @@ u32 em007_action_select(struct _ENEMY_WORK* self, u16 a) {
         break;
     }
     if (id != 0xff) {
-        switch (em_area_break_ck(self)) {
+        switch (em_area_break_ck(self, id)) {
         case 1:
             found = 1;
             break;

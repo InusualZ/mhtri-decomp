@@ -35,7 +35,6 @@
  *  - `eft_slot_counters_step`: ours sign-extends the incremented resend timer (`extsh`) before its `sth`; an `s16`/`s32`
  *    local, `+= 1`, `++timer` and a cast all keep it;
  *  - `enemy_data_grp`: ours narrows the `flag == 0 ? 6 : 7` result (`clrlwi`) for the `u8` return; retail does not;
- *  - `eft_slot_shape_hit_ck`: retail schedules `addi r5` (the box) after the radius `fadds`, ours before;
  *  - `eft_slot_arena_state_change`: retail stores the u32 `index` raw to +0x36 and narrows for the call, ours narrows
  *    once for both;
  *  - `eft_slot_roam_step`, `eft_slot_linked_step`: retail narrows `state` (`clrlwi`) at the state compares and the
@@ -1946,7 +1945,7 @@ extern "C" u32 eft_slot_shape_hit_ck(EftSlot* slot, u8 index, VEC3* pos, f32 mar
         } else {
             setVector3(&a, block->a_0x04.x, block->a_0x04.y, block->a_0x04.z);
             setVector3(&b, block->b_0x10.x, block->b_0x10.y, block->b_0x10.z);
-            capsule_box_from_points(&a, &b, &box, block->radius_0x1C + margin);
+            capsule_box_from_points(&a, &b, block->radius_0x1C + margin, (nw4r::math::CAPSULE*)&box);
             pl_capsule_box_set((PlCapsule*)&box, &box);
             if (pl_capsule_point_ck(pos, &box) == 1) {
                 return 1;

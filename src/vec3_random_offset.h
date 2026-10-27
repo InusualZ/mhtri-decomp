@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x80051B7C - writes `in` moved by a random polar offset of up to `radius` to `out` (GUESS name). */
-void vec3_random_offset(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 radius, s32 mode);
+void vec3_random_offset(VEC3* out, const VEC3* center, f32 radius, u8 mode);
 
 #ifdef __cplusplus
 }

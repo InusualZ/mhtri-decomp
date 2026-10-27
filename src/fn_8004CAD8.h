@@ -208,7 +208,7 @@ void addVec3(VEC3* out, VEC3* a, VEC3* b);
 void* vec3_normalize_into(void* dst, const void* src);
 /* 0x80052370 - the animation key-frame reader the C++ pair below sits beside (plain `fn_` map name,
  * so it stays at C linkage).  Added with `Pl/fn_80224AC4.cpp`. */
-f32 anim_key_curve_eval(f32* a, f32* b, f32* c, f32 frame);
+void anim_key_curve_eval(f32* keys, f32 frame, f32* out0, f32* out1);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
  * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `vec3_add_ps(out, a, b)`
  * is the paired-single add `out = a + b`, `vec3_copy(out, src)` the field-by-field three-float copy,
@@ -251,7 +251,9 @@ void drawshape_set_tex_offset_f32(const f32* scale, u16 tex_no, const f32* offse
 /* Added by `enemy/em022_prog.cpp` (rule 2: the declaration belongs with the owner TU, which
  * had not declared it yet). */
 s32 calcVecAngX2(void* a, void* b);
-void capsule_box_from_points(void* a, void* b, void* c, f32 d);
+#ifdef __cplusplus
+void capsule_box_from_points(VEC3* start, VEC3* end, f32 radius, nw4r::math::CAPSULE* out);
+#endif
 void MTX33_ctor(void* out);
 /* 0x8004EAF4 - the 16-byte struct copy MWCC emits for a four-word assignment (`dst[0..3] = src[0..3]`)
  * as four separate word moves.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */

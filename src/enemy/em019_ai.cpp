@@ -136,8 +136,6 @@ u32 em019_se_loop[2] = {0x0AE40000, 0};
  * tables point at +0x00 and +0x18). */
 Vec em019_se_shift[4];
 
-/* `em_area_break_ck` with the area argument retail passes in r4 (the owner headers declare `self` only). */
-#define em_area_break_ck_c2 ((u8 (*)(struct _ENEMY_WORK*, u8))em_area_break_ck)
 /* the follow pick and the leave test through the byte/signed views this unit's calls use. */
 #define em_pack_area_pick_c1 ((u32 (*)(struct _ENEMY_WORK*, u8, u8, u16, u8*, u8*))em_pack_area_pick)
 #define em_area_leave_ck_c1 ((s32 (*)(struct _ENEMY_WORK*))em_area_leave_ck)
@@ -4352,7 +4350,7 @@ u32 em019_area_change_ck(_ENEMY_WORK* self, u16 timer)
     if ((s32)map == 5)
         area = 9;
     if (area != 0xFF) {
-        switch (em_area_break_ck_c2(self, area)) {
+        switch (em_area_break_ck(self, area)) {
         case 1:
             moved = 1;
             break;

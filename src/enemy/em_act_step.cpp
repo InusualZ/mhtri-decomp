@@ -88,6 +88,7 @@
 #include "ai/ainpc_w.h"
 #include "ai/ainpc.h"
 #include "ai/ai_torch_ck.h"
+#include "vec3_random_offset.h"
 
 #ifdef __cplusplus
 
@@ -95,7 +96,6 @@ extern "C" {
 #endif
 
 /* The out-of-range callees whose owner's header does not declare them; each spelling is the callee's own body. */
-void vec3_random_offset(void* out, const void* in, f32 scale, s32 a);
 void em_action_finish_fall(struct _ENEMY_WORK* self);
 f32 calcVecDistXZ(const void* a, const void* b);
 void em_attack_done_set(struct _ENEMY_WORK* self);

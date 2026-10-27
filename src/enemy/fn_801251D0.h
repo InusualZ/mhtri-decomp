@@ -80,7 +80,7 @@ void em_se_tbl_play(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
 void em_se_tbl_play(u32 a, u32 b, u32 c);
 #endif
 u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
-u8 em_area_break_ck(struct _ENEMY_WORK* self);
+u8 em_area_break_ck(struct _ENEMY_WORK* self, u8 area);
 u32 em_pack_area_pick(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 u32 em_area_leave_ck(struct _ENEMY_WORK* self);
 void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);

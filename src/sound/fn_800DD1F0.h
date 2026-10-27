@@ -7,6 +7,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "gx.h"
 
 #ifdef __cplusplus
 class MHchar;
@@ -15,11 +16,11 @@ class MHchar;
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* 0x800E2F40 - writes the TEV alpha pair of material `mat` on the character model `self` (nothing when the
- * model has no resource).  `mode` is the stage selector, `a`/`d` the two 8-bit levels; the trailing float
- * is not read by the body.  Added with `enemy/em024_ai.cpp`.  The name is a GUESS from the body. */
+/* 0x800E2F40 - sets material `index`'s alpha compare on the character model `chr` (nothing when the
+ * model has no resource); the signature is the owner `sound/mhchar.cpp`'s definition. */
 #ifdef __cplusplus
-void mhchar_mat_tev_set(MHchar* self, s32 mat, s32 mode, u8 a, s32 b, s32 c, u8 d, f32 e);
+void mhchar_mat_tev_set(MHchar* chr, u32 index, _GXCompare comp0, u8 ref0, _GXAlphaOp op, _GXCompare comp1,
+                        u8 ref1);
 #endif
 
 

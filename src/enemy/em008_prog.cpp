@@ -3987,7 +3987,7 @@ u32 em008_area_start_ck(_ENEMY_WORK* self, u32 arg1) {
     } else {
         sel = 0xFF;
     }
-    if (sel != 0xFF && (s32)em_area_break_ck(self) == 2) {
+    if (sel != 0xFF && (s32)em_area_break_ck(self, sel) == 2) {
         return 1;
     }
     if (em_mot_finished_ck_view1(self) == 0 && self->value_0x452 >= 0x384) {

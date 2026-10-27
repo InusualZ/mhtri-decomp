@@ -47,9 +47,7 @@
  *   addresses each table by its own symbol); `#pragma dont_inline on` around the callback class's ctor/dtor, the tint
  *   and the entry-add functions makes the inline nw4r handle members out-of-line calls as retail has them, and off
  *   elsewhere (on, the spare copy becomes a call).  A `switch` whose `default:` is listed first gives retail's
- *   branch-free default (`em_roster_record_result_get`, `em_drop_offset_get`).  `em_pop_obj_alpha_set` calls
- *   `mhchar_mat_tev_set` through the seven-argument view `mhchar_mat_tev_set_c1` (the owner's definition;
- *   `sound/fn_800DD1F0.h` declares an eighth `f32`, which would load f1).
+ *   branch-free default (`em_roster_record_result_get`, `em_drop_offset_get`).
  */
 
 
@@ -2474,10 +2472,6 @@ void em_kind_res_release(u8 kind) {
     }
 }
 
-/* `mhchar_mat_tev_set` as its owner `sound/mhchar.cpp` defines it (seven arguments, no float); the shared
- * `sound/fn_800DD1F0.h` declaration carries an eighth `f32`. */
-#define mhchar_mat_tev_set_c1 ((void (*)(MHchar*, u32, _GXCompare, u8, _GXAlphaOp, _GXCompare, u8))mhchar_mat_tev_set)
-
 /* Scales every material's alpha-compare references by `alpha`. */
 void em_pop_obj_alpha_set(EmPopObj* obj, f32 alpha) {
     nw4r::g3d::ResMatPix pix(NULL);
@@ -2496,7 +2490,7 @@ void em_pop_obj_alpha_set(EmPopObj* obj, f32 alpha) {
         pix = ((nw4r::g3d::ResMdl*)&model->field_0x114)->GetResMat(i).GetResMatPix();
         pix.GXGetAlphaCompare(&comp0, &ref0, &op, &comp1, &ref1);
         if (ref0 != 0 || ref1 != 0xFF) {
-            mhchar_mat_tev_set_c1(model, i, comp0, (u8)((f32)ref0 * alpha), op, comp1, (u8)((f32)ref1 * alpha));
+            mhchar_mat_tev_set(model, i, comp0, (u8)((f32)ref0 * alpha), op, comp1, (u8)((f32)ref1 * alpha));
         }
     }
 }

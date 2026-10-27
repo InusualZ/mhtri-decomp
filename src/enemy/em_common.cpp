@@ -164,7 +164,6 @@
 #include "ef.h"
 #include "enemy/EnemyData.h"
 #define em_reaction_req em_reaction_req_hidden_owner_h
-#define em_area_break_ck em_area_break_ck_hidden_owner_h
 #define em_pack_area_pick em_pack_area_pick_hidden_owner_h
 #define em_sight2_get em_sight2_get_hidden_owner_h
 #define em_target_refresh em_target_refresh_hidden_owner_h
@@ -172,7 +171,6 @@
 #undef em_target_refresh
 #undef em_sight2_get
 #undef em_pack_area_pick
-#undef em_area_break_ck
 #undef em_reaction_req
 #define em_alt_mode_ck em_alt_mode_ck_hidden_fn_8012E968_h
 #define em_eft_active_ck fn_8012EC3C_hidden_enemy_h
@@ -364,8 +362,6 @@
 #include "sound/em_se_stop_all.h" /* the owner's symbols this unit calls (rule 2) */
 #include "calcMtxAng3.h" /* the owner's symbols this unit calls (rule 2) */
 /* the segment offsets through the floats-first order this unit's calls evaluate in. */
-#define vec3_segment_offset_c1 ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32, f32, u32))vec3_segment_offset)
-#define vec3_segment_offset2_c1 ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32, f32, u32, u32))vec3_segment_offset2)
 #include "Pl/pl_segment_sphere_hit.h" /* the owner's symbols this unit calls (rule 2) */
 #include "ef/pl_segment_box_init.h" /* the owner's symbols this unit calls (rule 2) */
 #include "ef/pl_segment_init.h" /* the owner's symbols this unit calls (rule 2) */
@@ -4305,7 +4301,7 @@ extern "C" u32 em_area_stun_move_ck(_ENEMY_WORK* self)
 
 /* 0x80129DB8 (0x90): once the motion is done: 1 when the enemy is in area `area`, else (its status time up)
  * requests the move there and returns 2. */
-extern "C" u32 em_area_break_ck(_ENEMY_WORK* self, u8 area)
+extern "C" u8 em_area_break_ck(_ENEMY_WORK* self, u8 area)
 {
     if ((u32)em_mot_finished_ck(self) == 1) {
         if (self->area_no == area) {
@@ -9523,10 +9519,10 @@ extern "C" void em_wave_amp(nw4r::math::VEC3* out, nw4r::math::VEC3* in, u8 kind
 
     switch (kind) {
     case 0:
-        vec3_polar_offset(out, in, value & 0xFF00, reach);
+        vec3_polar_offset(out, in, reach, value & 0xFF00);
         break;
     case 1:
-        vec3_polar_offset2(out, in, v & 0xF000, v & 0xF000, reach);
+        vec3_polar_offset2(out, in, reach, v & 0xF000, v & 0xF000);
         break;
     }
 }
@@ -9537,10 +9533,10 @@ extern "C" void em_wave_offset(nw4r::math::VEC3* out, nw4r::math::VEC3* in, u8 k
 {
     switch (kind) {
     case 0:
-        vec3_polar_offset(out, in, (u16)value, reach);
+        vec3_polar_offset(out, in, reach, (u16)value);
         break;
     case 1:
-        vec3_polar_offset2(out, in, value & 0xFF00, (u16)((u8)(u16)value << 8), reach);
+        vec3_polar_offset2(out, in, reach, value & 0xFF00, (u16)((u8)(u16)value << 8));
         break;
     }
 }
@@ -9555,10 +9551,10 @@ extern "C" void em_wave_segment(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r
 
     switch (kind) {
     case 0:
-        vec3_segment_offset_c1(out, a, b, reach, (s32)((v >> 4) & 0xFF) / 255.0f, value & 0xFF00);
+        vec3_segment_offset(out, a, b, reach, (s32)((v >> 4) & 0xFF) / 255.0f, value & 0xFF00);
         break;
     case 1:
-        vec3_segment_offset2_c1(out, a, b, reach, (s32)((v >> 4) & 0xFF) / 255.0f, (v << 8) & 0xFF00, value & 0xFF00);
+        vec3_segment_offset2(out, a, b, reach, (s32)((v >> 4) & 0xFF) / 255.0f, (v << 8) & 0xFF00, value & 0xFF00);
         break;
     }
 }
@@ -10368,7 +10364,7 @@ extern "C" void em_mat_alpha_apply(_ENEMY_WORK* self)
         pix.GXGetAlphaCompare(&comp0, &ref0, &alpha_op, &comp1, &ref1);
         if (ref0 != 0 || ref1 != 0xFF) {
             mhchar_mat_tev_set(model, i, comp0, (u8)((f32)ref0 * self->field_0x1D4), alpha_op, comp1,
-                               (u8)((f32)ref1 * self->field_0x1D4), self->field_0x1D4);
+                               (u8)((f32)ref1 * self->field_0x1D4));
         }
     }
 }

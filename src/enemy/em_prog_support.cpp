@@ -1708,7 +1708,7 @@ extern "C" void note_work_alpha_apply(NoteWork* self) {
         pix.GXGetAlphaCompare(&comp0, &ref0, &op, &comp1, &ref1);
         if (ref0 != 0 || ref1 != 0xFF) {
             mhchar_mat_tev_set(model, i, comp0, (u8)((f32)ref0 * self->field_0x1B0), op, comp1,
-                               (u8)((f32)ref1 * self->field_0x1B0), self->field_0x1B0);
+                               (u8)((f32)ref1 * self->field_0x1B0));
         }
     }
 }

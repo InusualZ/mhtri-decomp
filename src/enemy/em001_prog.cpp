@@ -107,8 +107,6 @@
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 /* the call sites use the argument-less view: a cast call is the same direct call. */
-/* `em_ground_impact_set` with the scale ahead of the position (retail loads f1 before r6). */
-#define em_ground_impact_set_v ((void (*)(struct _ENEMY_WORK*, u8, u8, f32, nw4r::math::VEC3*))em_ground_impact_set)
 /* `anm_chr_result_rot_mul` with the 3x3 rotation retail passes. */
 #define anm_chr_result_rot_mul_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, nw4r::math::MTX33*))anm_chr_result_rot_mul)
 /* `anm_chr_result_trans_set` on the item hook's result. */
@@ -151,7 +149,6 @@ typedef void (*Em001ShellSpawnFn)(_ENEMY_WORK* self, nw4r::math::VEC3* pos, s32 
 #define em001_spawn_rec_fill_c2 ((void (*)(void*, u32, u16, u32))em001_spawn_rec_fill)
 #define vec3_div_c1 ((void (*)(void*, void*, f32))vec3_div)
 #define em_timer_0x81C_arm_c2 ((void (*)(_ENEMY_WORK*))em_timer_0x81C_arm)
-#define mhchar_mat_tev_set_view1 ((void (*)(void*, s32, s32, u8, s32, s32, u8, f32))mhchar_mat_tev_set)
 #define em_ally_find_view1 ((struct _ENEMY_WORK* (*)(struct _ENEMY_WORK*, s32, s32))em_ally_find)
 #define em_height_add_view1 ((void (*)(f32))em_height_add)
 #define em_reaction_req_view1 ((void (*)(_ENEMY_WORK*, u8, u8, u8))em_reaction_req)
@@ -5060,7 +5057,7 @@ void em001_ground_impact_idle(struct _ENEMY_WORK* self, u8 arg1) {
     VEC3_ctor(&pos);
     if (self->field_0x354 == 0) {
         setVector3(&pos, lbl_80796E1C, lbl_80796E1C, lbl_80796F88);
-        em_ground_impact_set_v(self, arg1, 1, lbl_80796E20, &pos);
+        em_ground_impact_set(self, arg1, 1, lbl_80796E20, &pos);
     }
 }
 
@@ -5275,12 +5272,12 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
     case 0x1D:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
             setVector3(&pos, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set_v(self, 2, 1, 1.0f, &pos);
+            em_ground_impact_set(self, 2, 1, 1.0f, &pos);
         }
         break;
     case 0x1E:
         if (em_after_frame_check(self, 0, 46.0f, 0.0f) == 1) {
-            em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+            em_ground_impact_set(self, 1, 1, 1.0f, NULL);
         }
         break;
     case 0x21:
@@ -5299,7 +5296,7 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
     case 0x2A:
         if (em_after_frame_check(self, 0, 52.0f, 0.0f) == 1) {
             setVector3(&pos, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set_v(self, 2, 1, 1.0f, &pos);
+            em_ground_impact_set(self, 2, 1, 1.0f, &pos);
         }
         break;
     case 0x30:
@@ -5472,7 +5469,7 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
             } else {
                 em001_effect_spawn(self, 1, 4, 3, 0, 1.0f);
             }
-            em_ground_impact_set_v(self, 1, 0, 1.0f, NULL);
+            em_ground_impact_set(self, 1, 0, 1.0f, NULL);
             em_camera_req(self, -1, 7);
         }
         break;
@@ -5489,7 +5486,7 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
                 em001_effect_spawn(self, 0, 5, 3, 0, 1.0f);
             }
             if (em_act_ck(self, 0xD, 6) == 0) {
-                em_ground_impact_set_v(self, 1, 0, 1.0f, NULL);
+                em_ground_impact_set(self, 1, 0, 1.0f, NULL);
             }
         }
         break;
@@ -5673,7 +5670,7 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
         break;
     case 0xDC:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-            em_ground_impact_set_v(self, 1, 1, 0.8f, NULL);
+            em_ground_impact_set(self, 1, 1, 0.8f, NULL);
         }
         if (em_after_frame_check(self, 0, 8.0f, 0.0f) == 1) {
             em_camera_req(self, -1, 7);
@@ -5719,18 +5716,18 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
                 break;
             case 0xCF:
                 if (em_after_frame_check(self, 0, 34.0f, 0.0f) == 1) {
-                    em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 1, 1.0f, NULL);
                     em_camera_req(self, -1, 1);
                 }
                 break;
             case 0xD1:
                 if (em_after_frame_check(self, 0, 112.0f, 0.0f) == 1) {
-                    em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 1, 1.0f, NULL);
                 }
                 break;
             case 0xD2:
                 if (em_after_frame_check(self, 0, 28.0f, 0.0f) == 1) {
-                    em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 1, 1.0f, NULL);
                 }
                 if (em_after_frame_check(self, 0, 34.0f, 0.0f) == 1) {
                     em_camera_req(self, -1, 1);
@@ -5769,12 +5766,12 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
                     } else {
                         em001_effect_spawn(self, 0, 5, 3, 0, 0.6f);
                     }
-                    em_ground_impact_set_v(self, 1, 0, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 0, 1.0f, NULL);
                 }
                 break;
             case 0xD9:
                 if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-                    em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 1, 1.0f, NULL);
                 }
                 if (em_after_frame_check(self, 0, 66.0f, 0.0f) == 1) {
                     if ((self->field_0x228 & 6) != 0) {
@@ -5824,7 +5821,7 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
                 break;
             case 0xD7:
                 if ((em_act_ck(self, 7, 0x29) == 0) && (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1)) {
-                    em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 1, 1.0f, NULL);
                 }
                 break;
             case 0xD8:
@@ -5834,7 +5831,7 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
                 break;
             case 0xD9:
                 if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
-                    em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 1, 1.0f, NULL);
                 }
                 if (em_after_frame_check(self, 0, 8.0f, 0.0f) == 1) {
                     em_camera_req(self, -1, 7);
@@ -5883,7 +5880,7 @@ void em001_motion_events(struct _ENEMY_WORK* self) {
                 break;
             case 0xDD:
                 if (em_after_frame_check(self, 0, 112.0f, 0.0f) == 1) {
-                    em_ground_impact_set_v(self, 1, 1, 1.0f, NULL);
+                    em_ground_impact_set(self, 1, 1, 1.0f, NULL);
                 }
                 break;
             }
@@ -5910,7 +5907,7 @@ void em001_tev_color_update(struct _ENEMY_WORK* self) {
     }
     r = (f32)red * self->field_0x1D4;
     g = (f32)green * self->field_0x1D4;
-    mhchar_mat_tev_set_view1(self->char_0x024, 1, 6, r, 0, 3, g, self->field_0x1D4);
+    mhchar_mat_tev_set((MHchar*)self->char_0x024, 1, GX_GEQUAL, r, GX_AOP_AND, GX_LEQUAL, g);
 
     if (em_parts_damage_level_get(self, 2) < 1) {
         red = 0x46;
@@ -5921,7 +5918,7 @@ void em001_tev_color_update(struct _ENEMY_WORK* self) {
     }
     r = (f32)red * self->field_0x1D4;
     g = (f32)green * self->field_0x1D4;
-    mhchar_mat_tev_set_view1(self->char_0x024, 2, 6, r, 0, 3, g, self->field_0x1D4);
+    mhchar_mat_tev_set((MHchar*)self->char_0x024, 2, GX_GEQUAL, r, GX_AOP_AND, GX_LEQUAL, g);
 }
 
 /* 0x801542D0 (0x220) - the attack-eligibility test: the enemy's kind/area pair picks the damage
@@ -5966,7 +5963,7 @@ s32 em001_action_select(struct _ENEMY_WORK* self, u16 arg1) {
         break;
     }
     if (range != 0xFF) {
-        switch (em_area_break_ck(self)) {
+        switch (em_area_break_ck(self, range)) {
         case 1:
             armed = 1;
             break;

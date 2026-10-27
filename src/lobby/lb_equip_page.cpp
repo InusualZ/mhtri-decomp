@@ -1687,7 +1687,7 @@ PlSeVecPair* pl_rig_lobby_pose_get(_PLW* plw, s32 kind, u8 mode);
 PlSeVecPair* pl_rig_pose_get(_PLW* plw, s32 kind, u8 allow);
 void pl_rig_attach_motion_pose(PlSeRig* rig, PlSeAttach* attach, u32 kind);
 f32 pl_rig_key_get(_PLW* self, f32* keys);
-f32 pl_rig_key_pair_get(_PLW* self, f32* keys, f32* a, f32* b);
+void pl_rig_key_pair_get(_PLW* self, f32* keys, f32* a, f32* b);
 void pl_rig_key_triple_get(_PLW* self, f32* keys, f32* a, f32* b, f32* c);
 void pl_rig_kind4_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u16 motion);
 void pl_rig_key_scale_lerp(_PLW* plw, PlRigScaleKey* keys, PlSeJointAdj* adj);
@@ -5164,9 +5164,9 @@ extern "C" f32 pl_rig_key_get(_PLW* self, f32* out)
 /* 0x80229304 */
 
 /* Reads three key-frame channels at the motion layer's current frame. */
-extern "C" f32 pl_rig_key_pair_get(_PLW* self, f32* a, f32* b, f32* c)
+extern "C" void pl_rig_key_pair_get(_PLW* self, f32* keys, f32* a, f32* b)
 {
-    return anim_key_curve_eval(a, b, c, pl_rig_get_motion_frame(self));
+    anim_key_curve_eval(keys, pl_rig_get_motion_frame(self), a, b);
 }
 
 /* ------------------------------------------------------------------------------------------------ */

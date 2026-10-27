@@ -26,9 +26,7 @@
  * * SHAPES. A one-case test retail compares signed (`cmpwi`) is a `switch` with `default:` first (`em006_init`,
  *   `em006_act2_0`, `em006_act7_1`, `em006_act7_3`); `(s32)kind == 2` keeps `em006_action_select`'s `cmpwi`.  The
  *   +0x14 shell-table slot is called without its table argument (`ShellPosJobFn`).  `em_pack_area_pick`,
- *   `em_area_break_ck`, `em_act_ck`, `em_work_die_ck`, `UpdateValue`, `get_move_work_max`, `em_move_rot_ground_step` and
- *   `em_ground_impact_set` are called through
- *   `_c1`/`_c2` views whose widths give retail's masks and unsigned compares.  The data is defined between the
+ *   `em_act_ck`, `em_work_die_ck`, `UpdateValue`, `get_move_work_max` and `em_move_rot_ground_step` are called through `_c1`/`_c2` views whose widths give retail's masks and unsigned compares.  The data is defined between the
  *   functions in retail order (the jump tables fall between the definitions).
  */
 
@@ -85,11 +83,9 @@
 #define draw_shape_arm_c1 ((void (*)(struct _ENEMY_WORK*, u32, u32))draw_shape_arm)
 #define UpdateValue_c1 ((u32 (*)(struct _ENEMY_WORK*, f32))UpdateValue)
 #define em_act_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u8, u8))em_act_ck)
-#define em_area_break_ck_c2 ((u8 (*)(struct _ENEMY_WORK*, u32))em_area_break_ck)
 #define em_work_die_ck_c1 ((u32 (*)(struct _ENEMY_WORK*))em_work_die_ck)
 #define em_pack_area_pick_c1 ((u32 (*)(struct _ENEMY_WORK*, u32, u8, u16, u8*, u8*))em_pack_area_pick)
 #define em_move_rot_ground_step_c1 ((void (*)(struct _ENEMY_WORK*, u32*, f32))em_move_rot_ground_step)
-#define em_ground_impact_set_c1 ((void (*)(struct _ENEMY_WORK*, u8, u8, f32, nw4r::math::VEC3*))em_ground_impact_set)
 #define get_move_work_max_c1 ((u16 (*)(u8))get_move_work_max)
 
 /* The +0x14 shell-table slot spelled without its trailing table argument: the call site passes none, and the
@@ -3011,14 +3007,14 @@ void em006_motion_events(struct _ENEMY_WORK* self)
     case 0x1A:
         if (em_after_frame_check(self, 0, 6.0f, 0.0f) == 1 || (em_after_frame_check(self, 0, 76.0f, 0.0f) == 1)) {
             setVector3(&pos, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set_c1(self, 2, 1, 1.0f, &pos);
+            em_ground_impact_set(self, 2, 1, 1.0f, &pos);
             return;
         }
         break;
     case 0x1D:
         if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
             setVector3(&pos, 0.0f, 0.0f, 100.0f);
-            em_ground_impact_set_c1(self, 2, 1, 1.0f, &pos);
+            em_ground_impact_set(self, 2, 1, 1.0f, &pos);
             return;
         }
         break;
@@ -3106,7 +3102,7 @@ void em006_motion_events(struct _ENEMY_WORK* self)
             } else {
                 em006_effect_spawn(self, 1, 4, 3, self->field_0x1C0, 1.0f);
             }
-            em_ground_impact_set_c1(self, 1, 0, 1.0f, 0);
+            em_ground_impact_set(self, 1, 0, 1.0f, 0);
             em_camera_req(self, -1, 7);
             return;
         }
@@ -3118,7 +3114,7 @@ void em006_motion_events(struct _ENEMY_WORK* self)
             } else {
                 em006_effect_spawn(self, 0, 5, 3, 0, 1.0f);
             }
-            em_ground_impact_set_c1(self, 1, 0, 1.0f, 0);
+            em_ground_impact_set(self, 1, 0, 1.0f, 0);
             return;
         }
         break;
@@ -3551,7 +3547,7 @@ void em006_motion_events(struct _ENEMY_WORK* self)
             }
         }
         if (em_after_frame_check(self, 0, 58.0f, 0.0f) == 1) {
-            em_ground_impact_set_c1(self, 1, 1, 1.0f, 0);
+            em_ground_impact_set(self, 1, 1, 1.0f, 0);
             em_camera_req(self, -1, 4);
         }
         break;
@@ -3643,7 +3639,7 @@ u32 em006_action_select(struct _ENEMY_WORK* self, u32 arg)
     hit = 0;
     probe = (s32)kind == 2 ? 10 : 0xFF;
     if (probe != 0xFF) {
-        switch (em_area_break_ck_c2(self, probe)) {
+        switch (em_area_break_ck(self, probe)) {
         case 1:
             hit = 1;
             break;

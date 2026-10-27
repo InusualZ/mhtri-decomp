@@ -209,8 +209,6 @@ struct Em025MaskView {
 #define em_vec3_copy_c1 ((void* (*)(void*, void*))em_vec3_copy)
 /* `em_ground_ck` with the f1 height its callers here pass. */
 #define em_ground_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, f32))em_ground_ck)
-/* `anim_key_curve_eval` in its argument order: the key table, the curve position, the key cursor and the result. */
-#define curve_key_eval_c1 ((f32 (*)(f32*, f32, f32*, f32*))anim_key_curve_eval)
 /* `em_act_ck` with the unsigned result the `== 1` tests compare (`cmplwi`). */
 #define em_act_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u8, u8))em_act_ck)
 
@@ -4508,7 +4506,7 @@ void em025_sway_update(struct _ENEMY_WORK* self) {
         }
         break;
     }
-    curve_key_eval_c1(em025_sway_keys, self->em025_0x328.blend_0x34C, &self->em025_0x328.scale_0x348, &angle);
+    anim_key_curve_eval(em025_sway_keys, self->em025_0x328.blend_0x34C, &self->em025_0x328.scale_0x348, &angle);
     self->em025_0x328.rot_x_0x344 = (u16)(s32)(0.5f + (65536.0f * angle) / 360.0f);
 }
 

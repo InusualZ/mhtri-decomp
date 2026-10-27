@@ -58,7 +58,7 @@ void em_act_arm_unless_down(struct _ENEMY_WORK* self, u8 a, u8 b);
 u32 em_roll_cooldown_ck(struct _ENEMY_WORK* self, u16 a, u32 b, s16* timer);
 u32 em_area_roam_pick(struct _ENEMY_WORK* self, u16 a);
 u32 em_area_stun_move_ck(struct _ENEMY_WORK* self);
-u8 em_area_break_ck(struct _ENEMY_WORK* self);
+u8 em_area_break_ck(struct _ENEMY_WORK* self, u8 area);
 /* 0x8012A014 - owned by `enemy/fn_801251D0.h`; the spelling here is the owner's (its body
  * forwards r7/r8 to `em_stamina_gate_get` as the pair of table pointers it walks, `cmpwi r4,0`).  The older
  * `u32 d, const void* e` copy was the second declaration that stopped this header and the owner's
