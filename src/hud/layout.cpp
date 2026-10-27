@@ -1,12 +1,11 @@
 /* hud/layout.cpp - the HUD's 2D element library: sprite/font/icon draws, sprite animation steps and window frames.
- * RANGE. .text 0x802E0740-0x802E4978 (88 functions); extab 0x80014DAC-0x80014FFC, extabindex 0x800332E8-0x80033660,
- *   .data 0x805D5798-0x805D5B48 (every table defined here, byte-identical), .sdata 0x807927B0-0x807927C0,
- *   .sdata2 0x8079A8C0-0x8079A8E0.  Name from the one `__FILE__` string "layout.cpp" (0x805D5800), cited by
- *   `knj_msg_str_build` and `str_tbl_utf16_build` only.
- * RANGE. The TU starts at 0x802E0480, not 0x802E0740: `get_lsp_data_ptr`, `get_sub_lsp_data_ptr`, `get_wide_offset`,
- *   `get_lsp_data`, `put_lsp_anchor_offset` and `get_lsp_anim` (0x802E0480-0x802E0740, registered under hud/cockpit)
- *   belong here - `get_wide_offset` loads 0.5f from 0x8079A8C0, the first word of this unit's `.sdata2` claim,
- *   while hud/cockpit pools its own 0.5f at 0x8079A878 (seam request hud-layout#1).
+ * RANGE. .text 0x802E0480-0x802E4978 (94 functions); extab 0x80014D8C-0x80014FFC, extabindex 0x800332B8-0x80033660,
+ *   .data 0x805D5740-0x805D5B48 (every table defined here, byte-identical), .sdata 0x807927B0-0x807927C0,
+ *   .sbss 0x80794B80-0x80794B88, .sdata2 0x8079A8C0-0x8079A8E0.  Name from the one `__FILE__` string "layout.cpp"
+ *   (0x805D5800), cited by `knj_msg_str_build` and `str_tbl_utf16_build` only.
+ * RANGE. The TU starts at 0x802E0480 with `get_lsp_data_ptr` .. `get_lsp_anim`: `get_wide_offset` loads 0.5f from
+ *   0x8079A8C0, the first word of this unit's `.sdata2`, while hud/cockpit pools its own 0.5f at 0x8079A878 (one
+ *   value pooled twice is a TU boundary), and `get_lsp_anim` is called only by this unit's sprite-anim rows.
  * FLAGS. cflags_hud (Wii/1.3 -O3, -inline noauto, -Cpp_exceptions on, -opt nopeephole); `#pragma fp_contract off`
  *   (retail keeps fmuls+fadds) and `#pragma pool_data off` (every table its own lis/addi) for this file.
  * NAMES. GUESS (from each body and its callers): spr_anim_draw, sprite_anim_last_frame, sprite_frame_apply,
@@ -21,7 +20,8 @@
  *   draw_layout_window, draw_window_frame, note_line_draw, note_text_max_len, note_text_draw, note_box_*,
  *   note_box_window_draw, draw_help_window, draw_window_frame_style, draw_window_frame_preset, draw_spin_icon,
  *   get_lsp_anim; every table name (button_icon_uvs, uv_rect_uvs, equip_kind_icon_tex, weapon_type_icon_tex,
- *   monster_icon_cells, window_*, title_*, prompt_frame_*, window_box_uvs, window_frame_presets).
+ *   monster_icon_cells, window_*, title_*, prompt_frame_*, window_box_uvs, window_frame_presets, lsp_arena_id_remap),
+ *   lsp_data_adrs / sub_lsp_data_adrs (after the dump's `arena_lsp_data_adrs`, which the arena branch reads).
  * RESIDUALS. note_box_size: one extra `extsh` after the `neg` (four source shapes reproduce it).
  * RESIDUALS. note_line_draw / note_text_draw: retail narrows the centre into a temporary, ours updates `x` in place.
  * RESIDUALS. draw_spin_icon: `li r4,0x4000` is scheduled before the `fmr f1` (retail after).
@@ -31,7 +31,9 @@
  * RESIDUALS. draw_prompt_frame: retail re-indexes the strip table (`lhax`), ours reuses the element address.
  * RESIDUALS. window_body_draw: three locals swap registers.
  * RESIDUALS. draw_sprite: retail materialises the 0x4330 word twice.
- * RESIDUALS. .sdata2: our pool lacks the 0.5f `get_wide_offset` (the seam above) pools at 0x8079A8C0.
+ * SHAPES. `get_wide_offset` returns an `s32` from an `s32` accumulator (retail adds the narrowed `size.x - 640` with
+ *   no `extsh` after the add); `put_lsp_anchor_offset` returns `get_lsp_data`'s record (retail keeps r3 live, so
+ *   the offset adds use r4); the arena remap is a flat `u16[44]` (0x58 bytes: 14 triples and a 2-halfword end).
  * SHAPES. A parameter changed in place (`y -= 8`, `width &= 0xFFF0`) is narrowed lazily, which is what keeps
  *   retail's raw stores and unextended adds; a fresh `s16` local is narrowed at once.
  * SHAPES. color_lerp / color_scale pack their channels as `(c0 | c1 << 8) | (c3 << 24 | c2 << 16)` - the grouping
@@ -63,9 +65,13 @@
 #include "draw_rect_set.h"
 #include "draw_rect_fill.h"
 #include "draw_shape.h"
+#include "arena_idx_switch_get.h"
+#include "main.h"
+#include "quest/arenatask.h"
+#include "hud/put_lsp_anchor_offset.h"
 
 /* `get_wide_offset` as this TU calls it: retail adds its result to an `s16` with no `extsh`, i.e. an `s16` return,
- * while `hud/layout.h` keeps the `s32` its other includers measure best with. */
+ * while the definition below returns the `s32` its own body computes. */
 #define get_wide_offset_s16 ((s16 (*)(u8))get_wide_offset)
 
 /* Retail keeps every `a*b + c` as its own `fmuls` + `fadds` (the animation-step interpolations). */
@@ -81,6 +87,114 @@
  * is this TU's own - it owns the address - and `extern "C"` is what gives the definition the
  * unmangled name the map and objdiff pair by. */
 extern "C" u32 color_lerp(u32 a, u32 b, f32 t);
+
+/* .sbss 0x80794B80 / 0x80794B84: the loaded common and sub layout-record tables (`get_lsp_data` indexes them by
+ * sprite id; `get_lsp_data_ptr`/`get_sub_lsp_data_ptr` hand their addresses to the loader). */
+_SPR_DATA_* lsp_data_adrs;
+_SPR_DATA_* sub_lsp_data_adrs;
+
+/* .data 0x805D5740: the arena's sprite-id remap, `{first, last, arena_first}` triples ended by 0xFFFF - an id
+ * inside `first..last` is shifted to `arena_first` when the arena swaps its layout set in. */
+u16 lsp_arena_id_remap[44] = {
+    0x07E7, 0x0806, 0x02C6, 0x0807, 0x080D, 0x02E6, 0x080E, 0x0818, 0x02ED, 0x0819, 0x0825, 0x02F8,
+    0x084E, 0x086A, 0x0305, 0x086B, 0x087F, 0x0322, 0x0880, 0x0887, 0x0337, 0x0888, 0x088A, 0x033F,
+    0x0088, 0x00BA, 0x0342, 0x057E, 0x059C, 0x0375, 0x059D, 0x05B1, 0x0394, 0x1043, 0x104B, 0x03A9,
+    0x184C, 0x1856, 0x03B2, 0x08B6, 0x08C3, 0x03BD, 0xFFFF, 0x0000,
+};
+
+/* 0x802E0480 (0x8): returns the address of the common layout-record table pointer. */
+_SPR_DATA_** get_lsp_data_ptr(void)
+{
+    return &lsp_data_adrs;
+}
+
+/* 0x802E0488 (0x8): returns the address of the sub layout-record table pointer. */
+_SPR_DATA_** get_sub_lsp_data_ptr(void)
+{
+    return &sub_lsp_data_adrs;
+}
+
+/* 0x802E0490 (0xC0): returns the x shift a layout anchor of kind `index` takes on a wide screen (0 otherwise). */
+s32 get_wide_offset(u8 index)
+{
+    _MH_VEC2 size;
+    s32 offset = 0;
+
+    get_ScreenSize(&size);
+    if (ck_WideMode() != 0) {
+        switch (index) {
+        case 2:
+            offset = 32;
+            break;
+        case 3:
+            offset = (s16)((s32)(0.5f * size.x) - 320);
+            break;
+        case 4:
+            offset = -32;
+        case 1:
+            offset += (s16)((s32)size.x - 640);
+            break;
+        }
+    }
+    return offset;
+}
+
+/* 0x802E0550 (0x160): returns the layout record of sprite `id` (the arena's own set while one is loaded), and its
+ * widened anchor into `out` when given. */
+_SPR_DATA_* get_lsp_data(u16 id, _mh_ivec2_* out)
+{
+    _SPR_DATA_* rec;
+    const u16* remap;
+
+    if (arena_idx_get() == 0) {
+        if (id < 2959) {
+            rec = lsp_data_adrs + id;
+        } else if (id < 4741) {
+            rec = sub_lsp_data_adrs + (id - 2959);
+        } else if (id < 11084) {
+            rec = sub_lsp_data_adrs + (id - 4741);
+        } else {
+            rec = lsp_data_adrs;
+        }
+        if (out != 0) {
+            out->x = rec->pos.x + get_wide_offset(rec->wide_idx);
+            out->y = rec->pos.y;
+        }
+        return rec;
+    }
+    if (arena_idx_switch_get() != 0) {
+        for (remap = lsp_arena_id_remap; remap[0] != 0xFFFF; remap += 3) {
+            if (id >= remap[0] && id <= remap[1]) {
+                id += (u16)(remap[2] - remap[0]);
+                break;
+            }
+        }
+    }
+    rec = (_SPR_DATA_*)arena_lsp_data_get() + id;
+    if (out != 0) {
+        out->x = rec->pos.x + get_wide_offset(rec->wide_idx);
+        out->y = rec->pos.y;
+    }
+    return rec;
+}
+
+/* 0x802E06B0 (0x64): writes the anchor of sprite `id` shifted by `offset` into `pos`, and returns its record. */
+_SPR_DATA_* put_lsp_anchor_offset(u16 id, _mh_ivec2_* pos, _mh_ivec2_ offset)
+{
+    _SPR_DATA_* rec = get_lsp_data(id, pos);
+
+    if (pos != 0) {
+        pos->x += offset.x;
+        pos->y += offset.y;
+    }
+    return rec;
+}
+
+/* 0x802E0714 (0x2C): returns the animation table of layout sprite `id`. */
+const _SPR_ANIM_* get_lsp_anim(u16 id)
+{
+    return get_lsp_data(id, 0)->anim;
+}
 
 
 /* 0x802E0740 (0x16C) - the 2D blit behind every `draw_*` entry.  The record's own anchor and its

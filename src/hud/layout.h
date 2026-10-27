@@ -183,11 +183,10 @@ void note_box_pos_lower(_mh_ivec2_* pos, s16 lines);
 /* The mangled map names are the compiler's spelling of these declarations (rule 9): the front-end
  * reproduces each map name exactly, and the call site writes the plain function. */
 
-/* The cockpit-side getters this library reads.  Their owners are the `cockpit.cpp` range above
- * (0x802D9EB4..0x802E0740), which `ai/fn_802D44F4.cpp` currently ends at 0x802DDC04 - rule 2 debt
- * until that range is re-cut (see this unit's file header).  They are declared here, at global C++
- * scope, because their map names carry an argument list - a declaration inside the `extern "C"`
- * block above relocates to the bare stem, which no link input defines. */
+/* The layout-record getters this unit opens with (0x802E0480..0x802E0714).  They are declared at global C++ scope
+ * because their map names carry an argument list. */
+_SPR_DATA_** get_lsp_data_ptr(void);                           /* 0x802E0480 */
+_SPR_DATA_** get_sub_lsp_data_ptr(void);                       /* 0x802E0488 */
 _SPR_DATA_* get_lsp_data(u16 id, _mh_ivec2_* out);             /* 0x802E0550 */
 s32 get_wide_offset(u8 index);                                 /* 0x802E0490 */
 u32 get_rare_color(u8 index);                                  /* 0x802DB254 -> get_rare_color__FUc */

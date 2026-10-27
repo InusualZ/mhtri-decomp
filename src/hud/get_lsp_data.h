@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): the `hud/cockpit.cpp` layout getter a lobby screen calls, on the
+/* Leaf header (docs/plan.md 6.5 rule 2): the `hud/layout.cpp` layout getter a lobby screen calls, on the
  * types of `hud/layout_types.h` (the page arrows and the pointer test are `hud/cockpit.h`'s). */
 #ifndef MHTRI_HUD_GET_LSP_DATA_H
 #define MHTRI_HUD_GET_LSP_DATA_H

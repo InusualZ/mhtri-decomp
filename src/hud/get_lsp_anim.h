@@ -1,4 +1,4 @@
-/* hud/get_lsp_anim.h - leaf header for `get_lsp_anim`, which the `hud/cockpit` unit's range holds with C linkage
+/* hud/get_lsp_anim.h - leaf header for `get_lsp_anim`, which `hud/layout.cpp` defines with C linkage
  * (docs/plan.md 6.5 rule 2). */
 #ifndef MHTRI_HUD_GET_LSP_ANIM_H
 #define MHTRI_HUD_GET_LSP_ANIM_H

@@ -1,4 +1,4 @@
-/* `get_lsp_data`, owned by `hud/cockpit.cpp` (0x802E0550).  A leaf header (docs/plan.md 6.5 rule 2): the C
+/* `get_lsp_data`, owned by `hud/layout.cpp` (0x802E0550).  A leaf header (docs/plan.md 6.5 rule 2): the C
  * consumer `hud/fn_80324F7C.c` cannot take the C++ spelling, so it names the map's own symbol; the record it
  * fills is `struct _mh_ivec2_` (two s16).
  */

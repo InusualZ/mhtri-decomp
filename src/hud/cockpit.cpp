@@ -1,15 +1,13 @@
 /* hud/cockpit - the in-game cockpit HUD's shared helpers: the blink clock, the HUD notice pool, the page arrows, the
  *   remote-pointer pick page, the item-message slots, the button guides, the notice band and the player name tags.
- * RANGE. .text 0x802D9EA4-0x802E0740 (132 functions, 126 written: 0x802D9EA4-0x802E0480); .data 0x805D54A0-0x805D5798,
- *   .bss 0x806BD808-0x806BDCC8, .sdata 0x807925A0-0x807927B0, .sbss 0x80794B78-0x80794B88, .sdata2
- *   0x8079A878-0x8079A8C0, extab/extabindex (the unit's block in config/RMHE08/splits.txt).  Every data object up to
- *   0x805D5740 (.data) / 0x80794B80 (.sbss) is defined here, in the target's order and byte-identical; the string pair
- *   at 0x805D55C8 is the one `cockpit.cpp` `__FILE__` literal and its assert message.
- * SEAM. The six functions 0x802E0480-0x802E0740 (`get_lsp_data_ptr`, `get_sub_lsp_data_ptr`, `get_wide_offset`,
- *   `get_lsp_data`, `put_lsp_anchor_offset`, 0x802E0714) are `hud/layout.cpp`'s: `get_wide_offset` loads its 0.5f
- *   from 0x8079A8C0 (the layout pool) while this TU pools 0.5f at 0x8079A878, and no cockpit row references 0x8079A8C0
- *   or layout's pool reaches below it; their data (.sbss 0x80794B80-0x80794B88, .data 0x805D5740-0x805D5798, extab
- *   0x80014D8C-0x80014DAC, extabindex 0x800332B8-0x800332E8) goes with them.  They are left unwritten here.
+ * RANGE. .text 0x802D9EA4-0x802E0480 (126 functions, all written); .data 0x805D54A0-0x805D5740,
+ *   .bss 0x806BD808-0x806BDCC8, .sdata 0x807925A0-0x807927B0, .sbss 0x80794B78-0x80794B80, .sdata2
+ *   0x8079A878-0x8079A8C0, extab/extabindex (the unit's block in config/RMHE08/splits.txt).  Every data object is
+ *   defined here, in the target's order and byte-identical; the string pair at 0x805D55C8 is the one `cockpit.cpp`
+ *   `__FILE__` literal and its assert message.
+ * RANGE. The TU ends at 0x802E0480: the six functions after it (`get_lsp_data_ptr` .. `get_lsp_anim`) and their data
+ *   are `hud/layout.cpp`'s - `get_wide_offset` loads its 0.5f from 0x8079A8C0 (the layout pool) while this TU pools
+ *   0.5f at 0x8079A878.
  * FLAGS. `cflags_main` (the `ai` lib entry in configure.py) plus `#pragma peephole off` (retail keeps the u8/u16
  *   `clrlwi` before narrow stores and calls: 13 notice rows at 65..92 % turn 100 %), `#pragma pool_data off` (each
  *   table gets its own lis/addi: `hud_notice_scroll_update` 82.95 -> 100) and `#pragma fp_contract off` (fmuls+fadds in

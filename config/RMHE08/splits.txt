@@ -1596,21 +1596,22 @@ ai/ai_npc.cpp:
 	.sdata2     start:0x8079A670 end:0x8079A878
 
 hud/cockpit.cpp:
-	extab       start:0x80014AF4 end:0x80014DAC
-	extabindex  start:0x80032ED4 end:0x800332E8
-	.text       start:0x802D9EA4 end:0x802E0740
-	.data       start:0x805D54A0 end:0x805D5798
+	extab       start:0x80014AF4 end:0x80014D8C
+	extabindex  start:0x80032ED4 end:0x800332B8
+	.text       start:0x802D9EA4 end:0x802E0480
+	.data       start:0x805D54A0 end:0x805D5740
 	.bss        start:0x806BD808 end:0x806BDCC8
 	.sdata      start:0x807925A0 end:0x807927B0
-	.sbss       start:0x80794B78 end:0x80794B88
+	.sbss       start:0x80794B78 end:0x80794B80
 	.sdata2     start:0x8079A878 end:0x8079A8C0
 
 hud/layout.cpp:
-	extab       start:0x80014DAC end:0x80014FFC
-	extabindex  start:0x800332E8 end:0x80033660
-	.text       start:0x802E0740 end:0x802E4978 align:16
-	.data       start:0x805D5798 end:0x805D5B48
+	extab       start:0x80014D8C end:0x80014FFC
+	extabindex  start:0x800332B8 end:0x80033660
+	.text       start:0x802E0480 end:0x802E4978 align:16
+	.data       start:0x805D5740 end:0x805D5B48
 	.sdata      start:0x807927B0 end:0x807927C0
+	.sbss       start:0x80794B80 end:0x80794B88
 	.sdata2     start:0x8079A8C0 end:0x8079A8E0
 
 hud/cockpit_quest.cpp:
