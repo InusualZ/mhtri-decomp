@@ -56,13 +56,13 @@ typedef struct SndPool2 {
     /* +0x6820 */ u8 initialised;
 } SndPool2; /* size: 0x6821 */
 
-/* A reference slot and its target: `fn_800E960C` reads `value` of `*slot`. */
+/* A reference slot and its target: `snd_ref_table_count` reads `value` of `*slot`. */
 typedef struct SndRef {
     /* +0x00 */ u32 unused_0x00;
     /* +0x04 */ u32 value;
 } SndRef; /* size: 0x8 */
 
-/* The five reference slots `fn_800E960C` selects between. */
+/* The five reference slots `snd_ref_table_count` selects between. */
 typedef struct SndRefTable {
     /* +0x00 */ SndRef* ref_00;
     /* +0x04 */ u8 pad_0x04[4];
@@ -286,11 +286,11 @@ extern SndPool2 lbl_8069A8E8;     /* the 0x110 pool, constructed by fn_800EDF1C/
 extern u8 g_stream_mgr[0xD8];     /* the stream manager (fn_800E46E8.cpp's StreamWork) */
 extern u16 stream_rand_seed;          /* the 16-bit PRNG seed fn_800E9D00 advances */
 extern u32 lbl_80794A20;          /* the expand heap fn_800EEA2C frees into */
-extern f32 lbl_807964E8;          /* fn_800E8F78's clamp */
+extern f32 lbl_807964E8;          /* snd_distance_atten's clamp */
 extern f32 lbl_807964EC;          /* 1.0f: the ratio denominator */
-extern f32 lbl_80796514;          /* fn_800E9324's scale */
-extern f32 lbl_80796518;          /* fn_800E9390's numerator */
-extern f32 lbl_8079651C;          /* fn_800E9390's scale */
+extern f32 lbl_80796514;          /* snd_distance_volume's scale */
+extern f32 lbl_80796518;          /* snd_distance_priority's numerator */
+extern f32 lbl_8079651C;          /* snd_distance_priority's scale */
 extern u8 lbl_80598020[0xC];      /* a node vtable (fn_800E9C74 installs it) */
 extern u8 lbl_8059802C[0xC];      /* a node base vtable (fn_800E9CB0 installs it) */
 extern u8 lbl_80598090[0xC];      /* the 0x110-node derived vtable (fn_800EDF74 installs it) */

@@ -221,7 +221,7 @@ extern "C" void fn_800E84DC(Sound* p, u32 v, u8 idx)
 /* Sets the global sound object's level word. */
 extern "C" void snd_se_level_set(s32 v)
 {
-    fn_800E8524(fn_800E5714(), (s16)v);
+    fn_800E8524(snd_obj_get(), (s16)v);
 }
 
 /* Stores the sound object's level word. */
@@ -233,7 +233,7 @@ extern "C" void fn_800E8524(Sound* snd, s16 v)
 /* The global sound object's level word. */
 extern "C" s16 fn_800E852C(void)
 {
-    return fn_800E8550(fn_800E5714());
+    return fn_800E8550(snd_obj_get());
 }
 
 /* The sound object's level word. */
@@ -245,7 +245,7 @@ extern "C" s16 fn_800E8550(Sound* snd)
 /* Stores the global sound object's mode byte. */
 extern "C" void snd_fade_level_set(u8 v)
 {
-    fn_800E858C(fn_800E5714(), v);
+    fn_800E858C(snd_obj_get(), v);
 }
 
 /* Stores the sound object's mode byte. */
@@ -335,20 +335,20 @@ extern "C" void fn_800E8E3C(s16* p)
 /* Snapshots the voice state and installs whichever sound bank is pending. */
 extern "C" void fn_800E7D34(void)
 {
-    fn_800E5F40((Sound2*)fn_800E5714());
-    if (snd_bank_pending_ck(fn_800E5714(), 1) != 0) {
+    snd_cmd_list_run((Sound2*)snd_obj_get());
+    if (snd_bank_pending_ck(snd_obj_get(), 1) != 0) {
         snd_bank1_install(snd_bank_table_get(), 1);
-        snd_bank_pending_clear(fn_800E5714(), 1);
+        snd_bank_pending_clear(snd_obj_get(), 1);
         return;
     }
-    if (snd_bank_pending_ck(fn_800E5714(), 2) != 0) {
+    if (snd_bank_pending_ck(snd_obj_get(), 2) != 0) {
         snd_bank2_install(snd_bank_table_get(), 1);
-        snd_bank_pending_clear(fn_800E5714(), 2);
+        snd_bank_pending_clear(snd_obj_get(), 2);
         return;
     }
-    if (snd_bank_pending_ck(fn_800E5714(), 4) != 0) {
+    if (snd_bank_pending_ck(snd_obj_get(), 4) != 0) {
         snd_bank3_install(snd_bank_table_get(), 1);
-        snd_bank_pending_clear(fn_800E5714(), 4);
+        snd_bank_pending_clear(snd_obj_get(), 4);
     }
 }
 
@@ -359,11 +359,11 @@ extern "C" void fn_800E7DE4(u32 idx, RelocDesc* desc)
     RelocTable* t8 = (RelocTable*)(desc->reloc_08 + (u32)desc);
     RelocTable* tC = (RelocTable*)(desc->reloc_0C + (u32)desc);
 
-    fn_800E7EBC(fn_800E7ED0(fn_800E5714(), idx), (RelocTable*)(desc->reloc_00 + (u32)desc));
-    fn_800E7EA4(fn_800E7ED0(fn_800E5714(), idx), t4);
-    fn_800E7E9C(fn_800E7ED0(fn_800E5714(), idx), t8);
-    fn_800E7E94(fn_800E7ED0(fn_800E5714(), idx), tC);
-    fn_800E93E0(fn_800E7ED0(fn_800E5714(), idx));
+    fn_800E7EBC(fn_800E7ED0(snd_obj_get(), idx), (RelocTable*)(desc->reloc_00 + (u32)desc));
+    fn_800E7EA4(fn_800E7ED0(snd_obj_get(), idx), t4);
+    fn_800E7E9C(fn_800E7ED0(snd_obj_get(), idx), t8);
+    fn_800E7E94(fn_800E7ED0(snd_obj_get(), idx), tC);
+    fn_800E93E0(fn_800E7ED0(snd_obj_get(), idx));
 }
 
 /* Installs one line's five relocation tables. */
@@ -374,18 +374,18 @@ extern "C" void fn_800E7EE0(u32 idx, RelocDesc* desc)
     RelocTable* tC = (RelocTable*)(desc->reloc_0C + (u32)desc);
     RelocTable* t10 = (RelocTable*)(desc->reloc_10 + (u32)desc);
 
-    fn_800E7FBC(fn_800E7ED0(fn_800E5714(), idx), (RelocTable*)(desc->reloc_00 + (u32)desc));
-    fn_800E7FB4(fn_800E7ED0(fn_800E5714(), idx), t4);
-    fn_800E7FAC(fn_800E7ED0(fn_800E5714(), idx), t8);
-    fn_800E7FA4(fn_800E7ED0(fn_800E5714(), idx), tC);
-    fn_800E7F9C(fn_800E7ED0(fn_800E5714(), idx), t10);
+    fn_800E7FBC(fn_800E7ED0(snd_obj_get(), idx), (RelocTable*)(desc->reloc_00 + (u32)desc));
+    fn_800E7FB4(fn_800E7ED0(snd_obj_get(), idx), t4);
+    fn_800E7FAC(fn_800E7ED0(snd_obj_get(), idx), t8);
+    fn_800E7FA4(fn_800E7ED0(snd_obj_get(), idx), tC);
+    fn_800E7F9C(fn_800E7ED0(snd_obj_get(), idx), t10);
 }
 
 /* One line's slot for a voice id, with interrupts off. */
 extern "C" void* fn_800E7FC4(u32 idx, u32 key)
 {
     u32 level = OSDisableInterrupts();
-    void* slot = fn_800E6A18(fn_800E7ED0(fn_800E5714(), idx), key);
+    void* slot = snd_line_cue_get(fn_800E7ED0(snd_obj_get(), idx), key);
 
     OSRestoreInterrupts(level);
     return slot;
@@ -395,7 +395,7 @@ extern "C" void* fn_800E7FC4(u32 idx, u32 key)
 extern "C" u32 snd_stream_reloc_busy_ck(u32 key)
 {
     u32 level = OSDisableInterrupts();
-    u32 count = fn_800E7700(fn_800E5714(), key);
+    u32 count = snd_obj_owner_voice_count(snd_obj_get(), key);
 
     OSRestoreInterrupts(level);
     return count;
@@ -406,7 +406,7 @@ extern "C" void fn_800E8080(u32 key, u16 pitch)
 {
     u32 level = OSDisableInterrupts();
 
-    fn_800E7990(fn_800E5714(), key, pitch);
+    snd_obj_owner_lpf_set(snd_obj_get(), key, pitch);
     OSRestoreInterrupts(level);
 }
 
@@ -414,7 +414,7 @@ extern "C" void fn_800E8080(u32 key, u16 pitch)
 extern "C" void* fn_800E80DC(u32 a, u32 b, u32 c)
 {
     u32 level = OSDisableInterrupts();
-    void* r = fn_800E6764(fn_800E5714(), a, b, c);
+    void* r = snd_obj_play_pan(snd_obj_get(), a, b, c);
 
     OSRestoreInterrupts(level);
     return r;
@@ -424,7 +424,7 @@ extern "C" void* fn_800E80DC(u32 a, u32 b, u32 c)
 extern "C" void* fn_800E8150(u32 a, u32 b, u32 c, u32 d)
 {
     u32 level = OSDisableInterrupts();
-    void* r = fn_800E6818(fn_800E5714(), a, b, c, d);
+    void* r = snd_obj_play_pos(snd_obj_get(), a, b, c, d);
 
     OSRestoreInterrupts(level);
     return r;
@@ -434,7 +434,7 @@ extern "C" void* fn_800E8150(u32 a, u32 b, u32 c, u32 d)
 extern "C" void* fn_800E81BC(u32 a, u32 b, u32 c, u32 d)
 {
     u32 level = OSDisableInterrupts();
-    void* r = fn_800E6A58(fn_800E5714(), a, b, c, d);
+    void* r = snd_obj_play_pos_reset(snd_obj_get(), a, b, c, d);
 
     OSRestoreInterrupts(level);
     return r;
@@ -445,7 +445,7 @@ extern "C" void snd_stream_reloc_stop(u32 owner)
 {
     u32 level = OSDisableInterrupts();
 
-    fn_800E66DC(fn_800E5714(), owner, 0, 0, 0, 0, 0, 0, 0);
+    snd_cmd_post(snd_obj_get(), owner, 0, 0, 0, 0, 0, 0, 0);
     OSRestoreInterrupts(level);
 }
 
@@ -454,7 +454,7 @@ extern "C" void snd_stream_bank_reset(void)
 {
     u32 level = OSDisableInterrupts();
 
-    snd_bank_pending_set(fn_800E5714(), 1);
+    snd_bank_pending_set(snd_obj_get(), 1);
     OSRestoreInterrupts(level);
 }
 
@@ -463,7 +463,7 @@ extern "C" void snd_stream_reloc_pause(void)
 {
     u32 level = OSDisableInterrupts();
 
-    snd_bank_pending_set(fn_800E5714(), 2);
+    snd_bank_pending_set(snd_obj_get(), 2);
     OSRestoreInterrupts(level);
 }
 
@@ -472,7 +472,7 @@ extern "C" void snd_stream_reloc_resume(void)
 {
     u32 level = OSDisableInterrupts();
 
-    snd_bank_pending_set(fn_800E5714(), 4);
+    snd_bank_pending_set(snd_obj_get(), 4);
     OSRestoreInterrupts(level);
 }
 
@@ -481,7 +481,7 @@ extern "C" void fn_800E8354(u32 owner, s16 arg)
 {
     u32 level = OSDisableInterrupts();
 
-    fn_800E66DC(fn_800E5714(), owner, 3, 0, 0, 0, 0, arg, 0);
+    snd_cmd_post(snd_obj_get(), owner, 3, 0, 0, 0, 0, arg, 0);
     OSRestoreInterrupts(level);
 }
 
@@ -490,7 +490,7 @@ extern "C" void fn_800E83CC(u32 owner, s16 arg)
 {
     u32 level = OSDisableInterrupts();
 
-    fn_800E66DC(fn_800E5714(), owner, 4, 0, 0, 0, 0, 0, arg);
+    snd_cmd_post(snd_obj_get(), owner, 4, 0, 0, 0, 0, 0, arg);
     OSRestoreInterrupts(level);
 }
 
@@ -498,7 +498,7 @@ extern "C" void fn_800E83CC(u32 owner, s16 arg)
 extern "C" s16 fn_800E8444(u32 key)
 {
     u32 level = OSDisableInterrupts();
-    s16 pitch = fn_800E78F8(fn_800E5714(), key);
+    s16 pitch = snd_obj_owner_pitch_get(snd_obj_get(), key);
 
     OSRestoreInterrupts(level);
     return pitch;
@@ -507,7 +507,7 @@ extern "C" s16 fn_800E8444(u32 key)
 /* Stores one of the global object's level words. */
 extern "C" void fn_800E8498(u32 v, u8 idx)
 {
-    fn_800E84DC(fn_800E5714(), v, idx);
+    fn_800E84DC(snd_obj_get(), v, idx);
 }
 
 /* One of the global object's level words, or 0 for an out-of-range index. */
@@ -516,7 +516,7 @@ extern "C" s16 fn_800E8594(u32 idx)
     if (idx >= 49) {
         return 0;
     }
-    return fn_800E85D8(fn_800E5714(), idx);
+    return fn_800E85D8(snd_obj_get(), idx);
 }
 
 /* Releases one reverb unit, with interrupts off. */
@@ -533,7 +533,7 @@ extern "C" void snd_reverb_apply(u32 idx, u32 entry_idx)
 {
     u32 level = OSDisableInterrupts();
 
-    fn_800E778C(fn_800E5714(), idx, entry_idx);
+    snd_obj_reverb_apply(snd_obj_get(), idx, entry_idx);
     OSRestoreInterrupts(level);
 }
 

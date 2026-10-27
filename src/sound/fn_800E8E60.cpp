@@ -35,7 +35,7 @@
  * `fn_800EB314` (1844 B), `fn_800E9E94` (1456 B, MWCC-vectorised paired-single) and `fn_800EE014`
  * (1268 B).  Two further residual families are below the bar or structurally stuck: `snd_envelope_update`
  * (81.12 %) outlines its loop-machine cases to a helper whose argument move (`mr r4,r5`) the inlined
- * body here does not reproduce, and `fn_800E960C` (93.68 %) differs only in branch displacements.
+ * body here does not reproduce, and `snd_ref_table_count` (93.68 %) differs only in branch displacements.
  *
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit sound/fn_800E8E60.cpp`.
  */
@@ -46,7 +46,7 @@
 /* --- the unit's own functions, declared so each has one signature ---------------------------------- */
 
 extern "C" SndRef* fn_800E9604(SndRef** slot);
-extern "C" u32 fn_800E960C(SndRefTable* self, u32 index);
+extern "C" u32 snd_ref_table_count(SndRefTable* self, u32 index);
 extern "C" SndRef* fn_800E96A4(SndRef** slot);
 extern "C" SndRef* fn_800E96AC(SndRef** slot);
 extern "C" SndRef* fn_800E96B4(SndRef** slot);
@@ -72,9 +72,9 @@ extern "C" SndPool* fn_800E9C1C(SndPool* self);
 extern "C" SndListNode* fn_800E9C74(SndListNode* self);
 extern "C" void fn_800E9CB0(SndListNode* self);
 extern "C" SndPool* fn_800E9CC8(SndPool* self);
-extern "C" void fn_800E8F78(f32* a, f32* b, f32* out);
-extern "C" s32 fn_800E9324(s16 arg, f32 a, f32 b);
-extern "C" s32 fn_800E9390(f32 a, f32 b);
+extern "C" void snd_distance_atten(f32* a, f32* b, f32* out);
+extern "C" s32 snd_distance_volume(s16 arg, f32 a, f32 b);
+extern "C" s32 snd_distance_priority(f32 a, f32 b);
 extern "C" u32 fn_800E95C4(SndLookupHost* self, u32 idx);
 extern "C" void fn_800E9960(SndPool* self);
 extern "C" SndListNode* fn_800E99B0(SndPool* self);
@@ -98,7 +98,7 @@ extern "C" SndRef* fn_800E9604(SndRef** slot)
 }
 
 /* Selects one of five reference slots by index and returns its value. */
-extern "C" u32 fn_800E960C(SndRefTable* self, u32 index)
+extern "C" u32 snd_ref_table_count(SndRefTable* self, u32 index)
 {
     u32 value = 0;
 
@@ -374,7 +374,7 @@ extern "C" SndPool* fn_800E9CC8(SndPool* self)
 /* --- the next batch ---------------------------------------------------------------------------- */
 
 /* Ratio of two levels, clamped to 1.0. */
-extern "C" void fn_800E8F78(f32* a, f32* b, f32* out)
+extern "C" void snd_distance_atten(f32* a, f32* b, f32* out)
 {
     if (lbl_807964E8 == *a || *b > *a) {
         *out = lbl_807964E8;
@@ -384,7 +384,7 @@ extern "C" void fn_800E8F78(f32* a, f32* b, f32* out)
 }
 
 /* Scales a level, converts it to an integer and clamps it to [0, arg]. */
-extern "C" s32 fn_800E9324(s16 arg, f32 a, f32 b)
+extern "C" s32 snd_distance_volume(s16 arg, f32 a, f32 b)
 {
     s32 v = (s32)((f32)arg / (lbl_807964EC + lbl_80796514 * (a * b)));
 
@@ -398,7 +398,7 @@ extern "C" s32 fn_800E9324(s16 arg, f32 a, f32 b)
 }
 
 /* Scales a level and clamps it to [1, 30]. */
-extern "C" s32 fn_800E9390(f32 a, f32 b)
+extern "C" s32 snd_distance_priority(f32 a, f32 b)
 {
     s32 v = (s32)(lbl_80796518 / (lbl_807964EC + lbl_8079651C * (a * b)));
 
