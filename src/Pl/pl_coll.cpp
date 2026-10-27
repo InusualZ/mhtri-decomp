@@ -15,29 +15,33 @@
  *   `pl_*`/`em_coll_*` function name, `vec3_scale_inv`, `vec3_scale_to`, `coll_wall_slide`, `coll_line_check`,
  *   `npc_ground_check`, the data names `pl_coll_hit_count`, `pl_coll_free_count`, `pl_coll_shared_vtx_table`,
  *   `pl_coll_body_shape(_alt)`, and the registry names `floorf_thunk`, `sqrtf_thunk`, `stage_area_bit_get`,
- *   `calc_xz_angle`.
+ *   `calc_xz_angle`; the rows `pl_coll_static_init` (it is MWCC's `__sinit_\pl_coll_cpp` in retail), `pl_land_data_reset`,
+ *   `pl_ground_check_all_layers`.
  * RESIDUALS.
- *  - `fn_80297C30` (0x16C), the static initialiser, is unwritten: it constructs the `.bss` arrays with
- *    `__construct_array` (the element constructors are the C-named `pl_move_entry_ctor`/`pl_hit_box_ctor`/`VEC3_ctor`/
- *    `pl_land_cell_ctor`) and fills the body-shape centres (0,60,0)/(0,40,0) through `setVec3`+`assignVec3`; MWCC only
- *    emits that from classes whose constructors are those functions, so the `.ctors` word and the centres are missing.
+ *  - `pl_coll_static_init` (0x80297C30) is a plain function calling `__construct_array` itself: the element
+ *    constructors it passes are the C-named `pl_move_entry_ctor`/`pl_hit_box_ctor`/`VEC3_ctor`/`pl_land_cell_ctor`,
+ *    and `VEC3_ctor` is another unit's C-named row, so a compiler-generated `__sinit` cannot pass it. The code
+ *    matches; the `.ctors` word that runs it is missing.
  *  - `GetGroundHit2`, `hit_ground_comon`: the five-hit cap leaves both loops with one branch in retail (`goto`-shaped);
- *    the conformant double `break` costs three instructions in each (100 % with a `goto`, refused by rule 8).
+ *    the conformant double `break` costs three instructions in each (100 % with a `goto`, refused by rule 8). An
+ *    inline helper whose `return` leaves both loops measures worse (`blt`+`b` for retail's `bge`, and the count's copy).
  *  - `pl_wall_resolve` (0x802929DC): register colouring and the order of the shared-corner loop's constants; the
- *    resolver spills `pos` to the stack where ours keeps it in a register.
- *  - `pl_coll_shape_hits`, `em_coll_shape_hits`: the yaw `(u16)calc_xz_angle(...) - yaw` loads the yaw before the
- *    mask in retail; `pl_coll_shape_hits` also computes the swap entry's address differently.
- *  - `pl_tri2d_cross`: retail keeps both products in memory (reloaded after each store); ours forwards registers.
- *  - `pl_land_grid_a/b_load`, `pl_land_grid_a/b_cell`: the cell index's final `add` has its operands swapped.
- *  - register colouring only: `coll_wall_slide`, `coll_line_check`, `pl_coll_sweep_ck`, `findInterSection3`,
- *    `pl_wall_slot_push`.
+ *    resolver spills `pos` to the stack where ours keeps it in a register (an unused `&pos` changes nothing).
+ *  - `pl_coll_shape_hits`: retail keeps `count * 0x18` across the floor-kind `if` and recomputes it for `count++`;
+ *    ours does the opposite (`opt_common_subs off` -63 B, `count++` split out -16 B).
+ *  - `pl_wall_slot_push`: retail reuses the edge branch's `slot * 0xC` for `pl_coll_closest_0[slot]`; ours recomputes.
+ *  - register colouring only (declaration orders hill-climbed, no gain): `coll_wall_slide`, `coll_line_check`,
+ *    `pl_coll_sweep_ck`, `findInterSection3`, `em_coll_shape_hits`.
  *  - Data: `.data`, `.sdata` and `.sbss` are defined here; the `.bss` arrays stay declared in `Pl/pl_coll.h` (defined
  *    here, MWCC addresses them from one section base where retail relocates each by name: 4 rows dropped to 61/81);
  *    the `.sdata2` pool differs (the first pool belongs with `Pl/pl_hit_sphere.cpp`, see SEAM); `.ctors` is missing
- *    (the initialiser above), and the body-shape centres stay zero without it.
+ *    (the initialiser above).
  *  - Consumer declarations that disagree with the definitions (C linkage, so the code is unaffected): `coll_wall_slide`
  *    (`Pl/coll_wall_slide.h`, `ai/fn_802D0F34.h`: no radius), `pl_ground_probe` (`Pl/pl_segment_sphere_hit.h`: seven
  *    arguments), `pl_coll_tri_hit_ck` (`Pl/pl_coll_tri_hit_ck.h`: radius last), `npc_ground_check`, `pl_coll_shape_set`.
+ * SHAPES. `pl_tri2d_cross` keeps its two products in a local array (retail stores and reloads them around the
+ *   one-ulp test); the grid cell index is `index = (x * dim_y + y) * dim_z` then `cells[index + z]` (the last `add`
+ *   keeps the product first); the shape-hit yaw is the call's raw result narrowed in a second statement.
  */
 
 /* ==== 0x8028F66C-0x80295EF4: the collision queries ==== */
@@ -53,6 +57,7 @@
 #include "Pl/pl_hit_sphere.h" /* the capsule boxes and `hit_point_sphr` (rule 2) */
 #include "ef/effect.h"    /* `eft_vec_ctor` (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
+#include "Runtime.PPCEABI.H/CPlusLibPPC.h" /* `__construct_array` (rule 2) */
 #include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/system_core.cpp`) */
 #include "menu/hit_attack_list_push.h"
 #include "Pl/pl_coll.h"   /* this unit's `.bss` arrays and record types */
@@ -157,6 +162,8 @@ void pl_push_bound_add(VEC3* move, PlPushBound* bound, f32 limit);
 u32 pl_coll_poly_usable(PlCollPoly* poly, u32* list, s32 list_count, u32 kind, u16 layers, s32 taken_count, u8 area);
 u32 pl_id_list_find(u32 key, u32* list, s32 count);
 PlMoveEntry* pl_move_entry_ctor(PlMoveEntry* self);
+PlLandCell* pl_land_cell_ctor(PlLandCell* self);
+PlCollPoly* pl_hit_box_ctor(PlCollPoly* self);
 void pl_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _PLW* self);
 void em_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY_WORK* self);
 void pl_land_copy(LandData* dst, LandData* src);
@@ -188,7 +195,8 @@ s32 pl_ground_probe(_ENEMY_WORK* self, VEC3* pos, LandData* land, f32* out, f32*
                     _HIT_TENJO_DATA* tenjo, u32 kind);
 s32 npc_ground_check(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
 void pl_ground_select(LandData* land, VEC3* pos, LandData* lands, f32* heights, f32* out, s8 count);
-s32 fn_80291B08(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
+s32 pl_ground_check_all_layers(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
+void pl_land_data_reset(LandData* land);
 s32 stage_water_surface_get(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind);
 void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind);
 void vec3_scale_inv(VEC3* v, f32 divisor);
@@ -1039,7 +1047,8 @@ void pl_land_grid_b_load(PlLandFile* file, s32 index) {
     for (x = 0; x < cell->grid_b.dim_x; x++) {
         for (y = 0; y < cell->grid_b.dim_y; y++) {
             for (z = 0; z < cell->grid_b.dim_z; z++) {
-                poly = (u32*)(cell->grid_b.cells[(y + cell->grid_b.dim_y * x) * cell->grid_b.dim_z + z] += (u32)src);
+                u32 at = (y + cell->grid_b.dim_y * x) * cell->grid_b.dim_z;
+                poly = (u32*)(cell->grid_b.cells[at + z] += (u32)src);
                 while ((word = *poly) != 0xFFFFFFFF) {
                     *poly = word + (u32)cell->grid_b.polys;
                     poly++;
@@ -1080,7 +1089,8 @@ void pl_land_grid_a_load(PlLandFile* file, s32 index) {
     for (x = 0; x < cell->grid_a.dim_x; x++) {
         for (y = 0; y < cell->grid_a.dim_y; y++) {
             for (z = 0; z < cell->grid_a.dim_z; z++) {
-                poly = (u32*)(cell->grid_a.cells[(y + cell->grid_a.dim_y * x) * cell->grid_a.dim_z + z] += (u32)src);
+                u32 at = (y + cell->grid_a.dim_y * x) * cell->grid_a.dim_z;
+                poly = (u32*)(cell->grid_a.cells[at + z] += (u32)src);
                 while ((word = *poly) != 0xFFFFFFFF) {
                     *poly = word + (u32)cell->grid_a.polys;
                     poly++;
@@ -1215,7 +1225,7 @@ f32 GetGroundHit2(nw4r::math::VEC3* pos, u32 mask, u8 area, u8* hit) {
 /* 0x802919FC - the 2-layer ground query: resets the caller's `LandData` and asks for the region
  * byte's layers. */
 s32 pl_ground_check(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
-    fn_802977E4(land);
+    pl_land_data_reset(land);
     return hit_ground_comon(pos, self->area_0x16, land, out, kind, 2, 0, 0, 0);
 }
 
@@ -1223,7 +1233,7 @@ s32 pl_ground_check(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
  * surface, extra and ceiling heights in the enemy's area, skipping layer 4. */
 s32 pl_ground_probe(_ENEMY_WORK* self, VEC3* pos, LandData* land, f32* out, f32* surface, f32* extra,
                     _HIT_TENJO_DATA* tenjo, u32 kind) {
-    fn_802977E4(land);
+    pl_land_data_reset(land);
     if (tenjo != NULL) {
         tenjo->hit = 0;
         tenjo->kind = 0;
@@ -1234,13 +1244,13 @@ s32 pl_ground_probe(_ENEMY_WORK* self, VEC3* pos, LandData* land, f32* out, f32*
 
 /* 0x80291B08 - the fixed-layer ground query: forwards the caller's `LandData`/out/kind and the
  * `_PLW`'s effect key, asking for all 32 layers and no surface data. */
-s32 fn_80291B08(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
+s32 pl_ground_check_all_layers(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
     return hit_ground_comon(pos, self->effect_key_0x1A4, land, out, kind, 32, 0, 0, 0);
 }
 
 /* 0x80291B48 (0x74): the NPC's ground query: resets `land` and asks for the floor in the NPC's area, every layer. */
 s32 npc_ground_check(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind) {
-    fn_802977E4(land);
+    pl_land_data_reset(land);
     return hit_ground_comon(pos, self->field_0x004, land, out, kind, 0, 0, 0, 0);
 }
 
@@ -1251,7 +1261,7 @@ s32 stage_water_surface_get(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 ki
     s32 found;
 
     em_land_data_init(&land);
-    fn_802977E4(&land);
+    pl_land_data_reset(&land);
     *hit_layer = 0;
     found = hit_ground_comon(pos, flag, &land, out, kind, 1, 0, 0, 0);
     *hit_layer = land.field_0x00;
@@ -1262,7 +1272,7 @@ s32 stage_water_surface_get(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 ki
 void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind) {
     f32 out;
 
-    fn_802977E4(land);
+    pl_land_data_reset(land);
     hit_ground_comon(pos, flag, land, &out, kind, 0, 0, 0, 0);
 }
 
@@ -2737,8 +2747,9 @@ void pl_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _PLW* 
         if (pl_coll_free_count != 0) {
             for (i = 0, free_at = pl_coll_slot_free; i < pl_coll_free_count; i++, free_at++) {
                 poly = pl_hit_id_list[*free_at];
-                angle = (u16)((u16)calc_xz_angle(self->vec_0x03C.x, self->vec_0x03C.z, pl_coll_closest_1[*free_at].x,
-                                                 pl_coll_closest_1[*free_at].z) - self->field_0x058);
+                angle = calc_xz_angle(self->vec_0x03C.x, self->vec_0x03C.z, pl_coll_closest_1[*free_at].x,
+                                      pl_coll_closest_1[*free_at].z);
+                angle = (u16)((u16)angle - self->field_0x058);
                 pl_move_work[self->chunk_ofs][count].kind = 1;
                 if (poly->attr & 8) {
                     pl_move_work[self->chunk_ofs][count].kind |= 2;
@@ -2850,10 +2861,11 @@ void em_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY
     coll_wall_slide(&seg->start, &seg->end, radius, &self->pos, kind, layers, mode, self->area_no);
     self->slots_0x244[0].flags = 0;
     if (pl_coll_free_count != 0) {
-        for (i = 0, free_at = pl_coll_slot_free; i < pl_coll_free_count; i++, free_at++) {
+        for (i = 0, free_at = pl_coll_slot_free; i < pl_coll_free_count; free_at++, i++) {
             poly = pl_hit_id_list[*free_at];
-            angle = (u16)((u16)calc_xz_angle(self->pos.x, self->pos.z, pl_coll_closest_1[*free_at].x,
-                                             pl_coll_closest_1[*free_at].z) - self->field_0x1C0);
+            angle = calc_xz_angle(self->pos.x, self->pos.z, pl_coll_closest_1[*free_at].x,
+                                  pl_coll_closest_1[*free_at].z);
+            angle = (u16)((u16)angle - self->field_0x1C0);
             slot = &self->slots_0x244[count];
             slot->flags = poly->attr;
             slot->kind = poly->kind;
@@ -3323,13 +3335,15 @@ extern "C" void pl_land_cell_index(nw4r::math::VEC3* pos, PlLandCell* land, u32*
 /* One cell of the record's second grid, indexed [x][y][z]. */
 extern "C" PlCollPoly** pl_land_grid_b_cell(s32 x, s32 y, s32 z, PlLandCell* land)
 {
-    return (PlCollPoly**)land->grid_b.cells[(x * land->grid_b.dim_y + y) * land->grid_b.dim_z + z];
+    s32 index = (x * land->grid_b.dim_y + y) * land->grid_b.dim_z;
+    return (PlCollPoly**)land->grid_b.cells[index + z];
 }
 
 /* One cell of the record's first grid, indexed [x][y][z]. */
 extern "C" PlCollPoly** pl_land_grid_a_cell(s32 x, s32 y, s32 z, PlLandCell* land)
 {
-    return (PlCollPoly**)land->grid_a.cells[(x * land->grid_a.dim_y + y) * land->grid_a.dim_z + z];
+    s32 index = (x * land->grid_a.dim_y + y) * land->grid_a.dim_z;
+    return (PlCollPoly**)land->grid_a.cells[index + z];
 }
 
 /* 0x802969F8 (0xCC): 1 when the x/y point `point` lies inside the flattened triangle `tri`, whichever way it winds. */
@@ -3366,22 +3380,21 @@ extern "C" u32 pl_tri2d_point_in(nw4r::math::VEC3* tri, nw4r::math::VEC3* point)
  * the last place apart count as equal. */
 extern "C" f32 pl_tri2d_cross(nw4r::math::VEC3* a, nw4r::math::VEC3* b, nw4r::math::VEC3* c)
 {
-    f32 rhs;
-    f32 lhs;
+    f32 products[2]; /* [0] (b - a).x * (c - a).y, [1] (c - a).x * (b - a).y */
     u32 lhs_bits;
     u32 rhs_bits;
 
-    lhs = (b->x - a->x) * (c->y - a->y);
-    rhs = (c->x - a->x) * (b->y - a->y);
-    lhs_bits = *(u32*)&lhs;
-    rhs_bits = *(u32*)&rhs;
+    products[0] = (b->x - a->x) * (c->y - a->y);
+    products[1] = (c->x - a->x) * (b->y - a->y);
+    lhs_bits = *(u32*)&products[0];
+    rhs_bits = *(u32*)&products[1];
     if (lhs_bits == rhs_bits + 1) {
-        lhs = rhs;
+        products[0] = products[1];
     }
     if (lhs_bits == rhs_bits - 1) {
-        lhs = rhs;
+        products[0] = products[1];
     }
-    return lhs - rhs;
+    return products[0] - products[1];
 }
 
 /* 0x80296B40 (0x140): where x/y point `point` lies against triangle `a`/`b`/`c` of winding `cross`: 0 outside (or a
@@ -3723,7 +3736,7 @@ extern "C" void pl_land_grid_b_span(nw4r::math::VEC3* from, nw4r::math::VEC3* to
 }
 
 /* Clears the header fields and points the record's vector up by one. */
-extern "C" void fn_802977E4(LandData* self)
+extern "C" void pl_land_data_reset(LandData* self)
 {
     self->field_0x00 = 0;
     self->field_0x02 = 0;
@@ -3811,6 +3824,26 @@ extern "C" void pl_ground_select(LandData* out, nw4r::math::VEC3* pos, LandData*
 extern "C" void pl_land_copy(LandData* dst, LandData* src)
 {
     *dst = *src;
+}
+
+/* 0x80297C30 (0x16C): constructs the unit's `.bss` arrays and sets the centres of the two body-shape lists. */
+extern "C" void pl_coll_static_init(void)
+{
+    nw4r::math::VEC3 c0;
+    nw4r::math::VEC3 c1;
+    nw4r::math::VEC3 c2;
+    nw4r::math::VEC3 c3;
+
+    __construct_array(pl_move_work, (void*)pl_move_entry_ctor, NULL, sizeof(PlMoveEntry), 44);
+    __construct_array(pl_hit_box, (void*)pl_hit_box_ctor, NULL, sizeof(PlCollPoly), 10);
+    __construct_array(pl_coll_closest_0, (void*)VEC3_ctor, NULL, sizeof(nw4r::math::VEC3), 10);
+    __construct_array(pl_coll_closest_1, (void*)VEC3_ctor, NULL, sizeof(nw4r::math::VEC3), 10);
+    __construct_array(pl_coll_closest_2, (void*)VEC3_ctor, NULL, sizeof(nw4r::math::VEC3), 10);
+    assignVec3((Vec*)&pl_coll_body_shape[0].pos, (Vec*)setVec3(&c0, 0.0f, 60.0f, 0.0f));
+    assignVec3((Vec*)&pl_coll_body_shape[1].pos, (Vec*)setVec3(&c1, 0.0f, 0.0f, 0.0f));
+    assignVec3((Vec*)&pl_coll_body_shape_alt[0].pos, (Vec*)setVec3(&c2, 0.0f, 40.0f, 0.0f));
+    assignVec3((Vec*)&pl_coll_body_shape_alt[1].pos, (Vec*)setVec3(&c3, 0.0f, 0.0f, 0.0f));
+    __construct_array(pl_land_data, (void*)pl_land_cell_ctor, NULL, sizeof(PlLandCell), 15);
 }
 
 /* Zeroes the four vectors of one land record. */

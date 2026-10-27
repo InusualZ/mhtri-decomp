@@ -45,7 +45,7 @@ u32 fn_802D7B24(struct _AINPC_W* self);
 void ai_npc_motion_run(struct _AINPC_W* self);
 u8 ai_npc_in_range_ck(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 limit);
 u32 Pl_motion_input_ck(s32 a);
-s32 fn_80291B08(struct _AINPC_W* self, nw4r::math::VEC3* pos, void* angle, f32* out,
+s32 pl_ground_check_all_layers(struct _AINPC_W* self, nw4r::math::VEC3* pos, void* angle, f32* out,
                s32 mode);
 s32 coll_wall_slide(nw4r::math::VEC3* to, nw4r::math::VEC3* from, f32 radius, nw4r::math::VEC3* pos, u32 kind,
                u16 layers, u8 mode, u8 area);

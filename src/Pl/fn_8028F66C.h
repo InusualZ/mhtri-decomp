@@ -42,11 +42,11 @@ void em_land_data_init(LandData* land);
 void em_pl_box_init(PlBox* box);
 
 /* 0x802977E4 - resets a `LandData` to its default record (all six scalars zero, +0x08 a constant vector). */
-void fn_802977E4(LandData* land);
+void pl_land_data_reset(LandData* land);
 
 /* 0x80291B08 - the fixed-layer ground query: it takes the player work at r3 and forwards the caller's
  * `LandData`/out/kind.  The AI band reads the ground under its own work record, so its call site casts it. */
-s32 fn_80291B08(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
+s32 pl_ground_check_all_layers(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
 
 /* 0x802907BC - 1 when `point` lies inside the capsule box `capsule` (C linkage: the map row is the plain name). */
 u32 pl_capsule_point_ck(nw4r::math::VEC3* point, struct PlCapsuleBox* capsule);

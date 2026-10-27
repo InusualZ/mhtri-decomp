@@ -1,7 +1,7 @@
 /*
  * Pl/pl_coll.h - `Pl/pl_coll.cpp`'s `.bss` collision-work run 0x806AB848..0x806AC8A8 (0x1060 B, 12 arrays, declared,
  *   never defined) and the record types its readers share.  The readers are `Pl/pl_coll.cpp`, `Pl/pl_act_step.cpp`,
- *   `Pl/pl_act.cpp` and `menu/menu_item.cpp`; the static initialiser `fn_80297C30` builds the arrays with
+ *   `Pl/pl_act.cpp` and `menu/menu_item.cpp`; the static initialiser `pl_coll_static_init` builds the arrays with
  *   `__construct_array`, and each member's comment gives its element constructor and stride.
  * `pl_move_work` is `[4][11]`, the shape the motion layer's addressing spells (`pl_move_work[chunk_ofs][i]`): a flat
  *   `[44]` indexed `chunk_ofs * 11 + i` makes MWCC emit a different multiply sequence.
@@ -99,7 +99,7 @@ struct PlLandGrid {
 };
 
 /* One record of the land table (`.bss` `pl_land_data`, 15 records of 0x88 bytes - the count and the stride are
- * the `__construct_array` call `fn_80297C30` makes with `pl_land_cell_ctor` as the element constructor, which constructs
+ * the `__construct_array` call `pl_coll_static_init` makes with `pl_land_cell_ctor` as the element constructor, which constructs
  * the two grids' corner vectors).  `loaded_b`/`loaded_a` are set by the two grid loaders.
  * size: 0x88 */
 struct PlLandCell {
@@ -116,7 +116,7 @@ struct PlLandCell {
 extern "C" {
 #endif
 
-/* The run, in address order: each comment is the construction `fn_80297C30` performs or the read site that
+/* The run, in address order: each comment is the construction `pl_coll_static_init` performs or the read site that
  * fixes the shape. */
 
 extern PlMoveEntry pl_move_work[4][11];       /* 0x806AB848: 4 chunks x 11 x 0x18, element ctor

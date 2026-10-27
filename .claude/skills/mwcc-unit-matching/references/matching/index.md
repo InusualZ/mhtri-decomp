@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (205)
+## Ideas that work (206)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -214,6 +214,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 226 | [Bit-selected float constants: declare them first and set them with if/else statements, not ternary initialisers](226-float-constants-if-else.md) | works | source-shape, allocator | Two float constants chosen by type bits (`c1 = bit2 ? 1.5f : 0.0f`, `c0 = bit3 ? ...`) and a parameter `t` computed before them take each other's volatile FPRs (ours t f7 / c1 f5, retail t f5 / c1 f7) while every... |
 | 227 | [A pointer plus a constant header plus a scaled index: the constant-first spelling sums into a scratch register](227-constant-before-scaled-index.md) | works | source-shape, allocator | Retail computes `p = base + i * n + 4` as `add r4,r4,r0` / `addi rDst,r4,0x4` (the sum in a scratch register), ours as `add rDst,r4,r0` / `addi rDst,rDst,0x4`; same instructions, one register different in each pair. |
 | 228 | [A 100 % row can still load the wrong constant or string: read the values behind renamed operands](228-wrong-constant-behind-renamed-operand.md) | works | measurement, data, relocations | A row reads 100 % (or high) while it loads a different float, int-to-float bias, assert file name or table string than retail - objdiff pairs `@5494` against `lbl_8079A68C` by position and never compares the bytes... |
+| 229 | [Float locals read as bits and reassigned stay in memory when they are one local array](229-float-locals-read-as.md) | works | source-shape, allocator | Retail stores two float results, reads their bits with lwz, then on a match stores one over the other and reloads both with lfs before the final op; ours forwards the floats in registers (fmr/frsp, no reload) |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

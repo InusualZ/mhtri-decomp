@@ -237,7 +237,7 @@ void fn_8010072C(struct _PLW* owner, u8 type, nw4r::math::VEC3* pos, u32 param, 
 /* `fn_8010072C` with its scale fourth: retail loads f1 before r6. */
 #define AINPC_FX_SPAWN ((void (*)(struct _PLW*, u8, nw4r::math::VEC3*, f32, u32))fn_8010072C)
 u32 fn_8027DCE0(struct _PLW* self, u8 arg1);
-s32 fn_80291B08(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
+s32 pl_ground_check_all_layers(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
 void fn_80114CC8(void* actor, u8 key);
 
 #ifdef __cplusplus
@@ -1138,7 +1138,7 @@ void ai_npc_step9_arm(_AINPC_W* self)
                 self->pos_0x178.z = self->pos_0x1B0.z;
             } else {
                 copyVec3(&self->pos_0x178, &self->pos_0x1B0);
-                if (fn_80291B08(self, &self->pos_0x178, &land, &height, -5) == 1) {
+                if (pl_ground_check_all_layers(self, &self->pos_0x178, &land, &height, -5) == 1) {
                     self->pos_0x178.y = self->field_0x19C = height;
                 }
             }
@@ -2058,7 +2058,7 @@ extern "C" void ai_npc_step56_arm(struct _AINPC_W* self) {
         self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x1000);
         if (ai_npc_motion_end_ck(self) == 1) {
             copyVec3(&self->vec_0x178, &self->vec_0x1B0);
-            if (fn_80291B08((struct _PLW*)self, &self->vec_0x178, &land, &ground, -5) == 1) {
+            if (pl_ground_check_all_layers((struct _PLW*)self, &self->vec_0x178, &land, &ground, -5) == 1) {
                 /* One `lfs` and two stores in retail: the traveller's distance and the
                  * height it settles at are the same value. */
                 self->vec_0x178.y = self->field_0x19C = ground;
@@ -2319,7 +2319,7 @@ extern "C" void ai_npc_step85_arm(struct _AINPC_W* self)
         copyVec3(&self->vec_0x178, &self->plw_0x16C->vec_0x03C);
         self->field_0x194 = self->plw_0x16C->field_0x058;
         if (fn_8027DCE0(self->plw_0x16C, 0) == 0) {
-            if (fn_80291B08((struct _PLW*)self, &self->vec_0x178, &land, &height, -5) == 1) {
+            if (pl_ground_check_all_layers((struct _PLW*)self, &self->vec_0x178, &land, &height, -5) == 1) {
                 self->vec_0x178.y = height;
             }
             fn_802D2ABC(self, 1, 86, self->field_0x1EC);
@@ -4904,7 +4904,7 @@ void ai_npc_m5_step2_arm(_AINPC_W* self)
             fn_802D3684(self);
             fn_802D6B98(self);
             copyVec3(&self->pos_0x178, &self->plw_0x16C->vec_0x03C);
-            if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &height, -5) == 1) {
+            if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &height, -5) == 1) {
                 self->pos_0x178.y = self->field_0x19C = height;
             }
             copyVec3(&self->pos_0x184, &self->pos_0x178);
@@ -4951,7 +4951,7 @@ void ai_npc_m5_step3_arm(_AINPC_W* self)
             if (self->gauge_0x1F0 == self->gauge_max_0x1F4) {
                 self->state++;
                 copyVec3(&self->pos_0x178, &self->plw_0x16C->vec_0x03C);
-                if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &height, -5) == 1) {
+                if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &height, -5) == 1) {
                     self->pos_0x178.y = self->field_0x19C = height;
                 }
                 copyVec3(&self->pos_0x184, &self->pos_0x178);
@@ -5098,7 +5098,7 @@ u32 ai_npc_water_landing_ck(_AINPC_W* self)
         return 0;
     }
     if (stage_zone_hit_ck(stage_group_word_get(::get_now_mapno(), area), &zone, &self->pos_0x178) == 1 &&
-        fn_80291B08(self, &self->pos_0x178, &land, &height, 0x4000) == 1) {
+        pl_ground_check_all_layers(self, &self->pos_0x178, &land, &height, 0x4000) == 1) {
         fn_802D31FC(self);
         fn_802D29E4(self, 10);
         fn_802D29B8(self, 10);
@@ -9126,7 +9126,7 @@ void fn_802D1710(struct _AINPC_W* self)
     em_land_data_init(&base);
     self->field_0x3CE = 0;
     if (self->field_0x3D0 <= 0 && ai_npc_flag_ck(self, 2) == 0) {
-        if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &value, -6) == 1) {
+        if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &value, -6) == 1) {
             self->field_0x19C = value;
             switch (self->variant) {
             case 0:
@@ -9144,7 +9144,7 @@ void fn_802D1710(struct _AINPC_W* self)
                 }
                 break;
             }
-        } else if (fn_80291B08(self, &self->pos_0x178, &self->field_0x324, &value, 1) == 1) {
+        } else if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &value, 1) == 1) {
             self->field_0x19C = value;
             switch (self->variant) {
             case 2:
@@ -9163,7 +9163,7 @@ void fn_802D1710(struct _AINPC_W* self)
                 break;
             }
         }
-        if (fn_80291B08(self, &self->pos_0x178, &base, &value, 4) == 1) {
+        if (pl_ground_check_all_layers(self, &self->pos_0x178, &base, &value, 4) == 1) {
             self->field_0x1A0 = value;
         }
     }
