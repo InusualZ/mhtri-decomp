@@ -240,7 +240,7 @@ extern u8 lbl_805B84B0[24];
 /* The `.data`/`.sdata` tables the character-edit (hair/inner colour) screen unit
  * (`src/lobby/fn_801F9CD4.cpp`) addresses; no registered unit owns them yet, so they are declared
  * here rather than in that unit's source (rule 2). */
-extern u8 lbl_80582B30[40];
+extern u8 pl_common_motion_res_ids[40];
 extern u32 ainpc_anim_res_ids[4];
 /* The 0xA-byte colour record the character-edit screen's `lbl_805B8674` table holds, and the two
  * 14-entry selection index tables beside it (`-2`/`-3` are the "no colour" sentinels the callers test).

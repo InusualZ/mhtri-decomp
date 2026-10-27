@@ -8281,7 +8281,7 @@ void fn_801FB364(u8 index)
 
     res_file_ctor(&dst, 0);
     {
-        LbResId* ids = (LbResId*)lbl_80582B30;
+        LbResId* ids = (LbResId*)pl_common_motion_res_ids;
         u32 name = ids[index + 1].b_0x04; /* the row's name pointer, a `u32` in the shared header */
         LbResource* res = (LbResource*)ckResourceName((char*)name);
 

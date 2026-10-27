@@ -311,7 +311,7 @@ extern "C" void scene_se_bank_load(u8 a, u8 b);
 extern "C" void snd_player_banks_load(u8 arg0);
 extern "C" void pl_voice_bank_load(_PLW* work);
 extern "C" s32 fn_800EFD88(u8 id, u32 kind);
-extern "C" void fn_800EFDD8(_PLW* work);
+extern "C" void pl_weapon_se_bank_load(_PLW* work);
 extern "C" void fn_800F0230(void* unused_0, void* unused_1, void* unused_2, u32* args);
 extern "C" void fn_800F02D4(void* unused_0, SndWhdHeader* header);
 extern "C" void fn_800F033C(void* unused_0, void* unused_1, void* unused_2, u32* args);
@@ -622,7 +622,7 @@ extern "C" void snd_player_banks_load(u8 arg0)
         if (GameMode_ck() == 0 || GameMode_ck() == 3) {
             p = work;
             for (i = 0; i < max; i++) {
-                fn_800EFDD8(p);
+                pl_weapon_se_bank_load(p);
                 p++;
             }
         }
@@ -671,7 +671,7 @@ extern "C" s32 fn_800EFD88(u8 id, u32 kind)
 }
 
 /* A player slot's files: the `com` pair plus up to three per-EQUIP `whd`s. */
-extern "C" void fn_800EFDD8(_PLW* work)
+extern "C" void pl_weapon_se_bank_load(_PLW* work)
 {
     char name[0x88];
     u32 args[3];

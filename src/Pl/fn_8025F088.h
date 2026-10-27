@@ -29,7 +29,7 @@ void fn_80260248(struct _PLW* self, s32 mode, s16 delta);
 void fn_802602A0(struct _PLW* self);
 s32 fn_8026077C(u8 a, u8 b);
 void fn_802607C4(struct _PLW* self);
-void fn_8026099C(struct _PLW* self);
+void pl_frame_step(struct _PLW* self);
 s16 fn_80260A18(struct _PLW* self);
 s32 fn_80260A58(struct _PLW* self);
 void pl_act_status_step(struct _PLW* self);

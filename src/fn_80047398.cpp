@@ -16,7 +16,7 @@
  * (the byte arrays at 0x448, 0x456, 0x4B0, 0x4BA, 0x4C4 and the ten-entry pointer runs at 0x460/0x488) and draws the 2D face with an
  * orthographic GX pipeline (face_draw builds C_MTXOrtho/GXSetProjection and pushes TPL quads).
  *
- * Status: partial.  Written, in address order: the accessors and the face animation helpers up to `fn_80047D38` and the GX pipe
+ * Status: partial.  Written, in address order: the accessors and the face animation helpers up to `face_tex_ready_ck` and the GX pipe
  * writers `fn_80048764..userdata_size_get`; the biggest unwritten are `face_draw` (0x9F8), `face_tex_bind` (0x200), `face_tex_load` (0x170).
  *
  * Residual: the four functions that read `Screen_w` (scene_current_camera_get, scene_current_camera_set, face_tex_bind, face_draw) are NOT written:
@@ -26,8 +26,8 @@
  * forbids spelling as identifiers).
  *
  * RESIDUALS. The object emits no `.data` (0x28), `.sdata` (0x8) or `.sdata2` (0x38) for the claimed ranges yet (flip
- *   blockers); `fn_80047884` loads `lbl_80790EE8` where retail folds it, and `fn_80047CAC` saves r27..r31 through
- *   `_savegpr_27`/`_restgpr_27` in retail, ours does not; `fn_80047470`, `face_work_init`, `face_type_next` and `face_type_prev`
+ *   blockers); `fn_80047884` loads `lbl_80790EE8` where retail folds it, and `face_tex_request` saves r27..r31 through
+ *   `_savegpr_27`/`_restgpr_27` in retail, ours does not; `face_tex_image_get`, `face_work_init`, `face_type_next` and `face_type_prev`
  *   carry an `@ha`/`@l` pair on `face_work` that retail's object does not relocate.
  *
  * Inventory / addresses / sizes: `python tools/units/ledger.py unit fn_80047398.cpp`.
@@ -75,7 +75,7 @@ extern u16* lbl_80790EE8[];
 
 /* --- the unit's own functions, declared so each has one signature --------------------------------- */
 
-extern "C" void* fn_80047470(u8 index, u32 which);
+extern "C" void* face_tex_image_get(u8 index, u32 which);
 extern "C" void face_work_init(void);
 extern "C" void fn_80047618(u32 a, u32 b, u32 c, u32* slot);
 extern "C" void face_tex_load(u8 index, u32 faceId, u8 mode);
@@ -91,13 +91,13 @@ extern "C" void face_type_next(u8 index);
 extern "C" void face_type_prev(u8 index);
 extern "C" void face_select_set(u8 index, u8 value);
 extern "C" void face_makeup_set(u8 index, u8 a, u8 b);
-extern "C" void fn_80047CAC(u8 index, u8 a, u8 b, u8 c, u8 d);
-extern "C" u32 fn_80047D38(u8 index);
+extern "C" void face_tex_request(u8 index, u8 a, u8 b, u8 c, u8 d);
+extern "C" u32 face_tex_ready_ck(u8 index);
 
 /* --- bodies, in address order --------------------------------------------------------------------- */
 
 /* The two texture-base words for one player (0x460 / 0x488 runs). */
-extern "C" void* fn_80047470(u8 index, u32 which)
+extern "C" void* face_tex_image_get(u8 index, u32 which)
 {
     if (which == 0) {
         return face_work.ptr460[index];
@@ -247,7 +247,7 @@ extern "C" void face_makeup_set(u8 index, u8 a, u8 b)
 }
 
 /* Loads one player's face set and seeds its animation state (runs the real loads, mode 1). */
-extern "C" void fn_80047CAC(u8 index, u8 a, u8 b, u8 c, u8 d)
+extern "C" void face_tex_request(u8 index, u8 a, u8 b, u8 c, u8 d)
 {
     if (d != 0xFF) {
         face_tex_load(a, b, 1);
@@ -260,7 +260,7 @@ extern "C" void fn_80047CAC(u8 index, u8 a, u8 b, u8 c, u8 d)
 }
 
 /* Ready when the draw is still disabled, otherwise whether the state is clean. */
-extern "C" u32 fn_80047D38(u8 index)
+extern "C" u32 face_tex_ready_ck(u8 index)
 {
     if (face_work.enabled[index] == 0) {
         return 1;

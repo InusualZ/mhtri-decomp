@@ -18,4 +18,7 @@ u32 player_work_array_get(void);
 }
 #endif
 
+/* 0x80794B2C (.sbss) - per network slot: 1 once the slot's player work is bound (`pl_res_loaded_set`). */
+extern u8 pl_res_loaded_flags[4];
+
 #endif /* MHTRI_PL_PLAYER_CONTROL_H */

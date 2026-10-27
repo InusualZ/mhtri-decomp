@@ -98,7 +98,7 @@
  *   lb_npc, lb_npc_func, lb_cat_name, lb_pig_name, lb_tr_flag_data, lb_item_get_data, lobby_hidden_flag and the
  *   `.data` tables other units read are not defined here.
  * SHAPES. `__declspec(noinline)` on the helpers retail keeps out of line (`fn_801FDE3C`, `fn_801FE11C`, `fn_801FE130`,
- *   `fn_801FCAC8`, and the eight rows `fn_80203114` dispatches to).  `fn_801FCB68` computes the value before the range
+ *   `lb_res_rec_copy`, and the eight rows `fn_80203114` dispatches to).  `fn_801FCB68` computes the value before the range
  *   test (`< 0x3E8`).  `fn_801FDE74` writes `if (a <= 0) {clear} else {tick}`.  `fn_801FE1AC`/`lb_npc_motion_play`/
  *   `fn_801FE1DC` take a full-width id narrowed with `(u16)` at the use.  Every `ran_suu` use narrows with `(u16)`.
  *   Negative angles are `(u16)-8192` and the like.  A two-arm chain on one value is a `switch`.  The act handlers step
@@ -603,7 +603,7 @@ namespace s_801FBF78 {
 extern "C" {
 
 /* 0x801FCAC8 - copy the 8-byte sprite record `src` into `dst`. */
-__declspec(noinline) void fn_801FCAC8(u32* dst, const u32* src)
+__declspec(noinline) void lb_res_rec_copy(u32* dst, const u32* src)
 {
     dst[0] = src[0];
     dst[1] = src[1];
@@ -3506,7 +3506,7 @@ void fn_801FCA80(u32 index)
 {
     LbResRec rec;
 
-    fn_801FCAC8((u32*)&rec, (const u32*)&lbl_80582A68[index]);
+    lb_res_rec_copy((u32*)&rec, (const u32*)&lbl_80582A68[index]);
     rec.c_0x08 = 0;
     nw_res_list_load(&rec);
 }

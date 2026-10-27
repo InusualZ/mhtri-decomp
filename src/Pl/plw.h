@@ -44,7 +44,7 @@ typedef struct _SLOTENT {
 typedef struct _PLW _PLW;
 typedef struct _PLW_PHYSICS _PLW_PHYSICS; /* defined in ef/fn_80114E34.cpp; only pointed at here */
 struct _PLW {
-    /* +0x000 */ u8 slot_active;   /* the slot is in use (`fn_800EFAC0`/`fn_800EFDD8`) */
+    /* +0x000 */ u8 slot_active;   /* the slot is in use (`fn_800EFAC0`/`pl_weapon_se_bank_load`) */
     /* +0x001 */ u8 field_0x001;
     /* +0x002 */ u8 field_0x002;
     /* +0x003 */ union { /* the original and later names of the same 2 bytes (rule 5) */

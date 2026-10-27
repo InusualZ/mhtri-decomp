@@ -13749,7 +13749,7 @@ void fn_802607C4(_PLW* self) {
 }
 
 /* 0x8026099C - runs the actor's per-frame body for the current mode byte, when the slot is live. */
-void fn_8026099C(_PLW* self) {
+void pl_frame_step(_PLW* self) {
     if (self->slot_active == 0) {
         return;
     }

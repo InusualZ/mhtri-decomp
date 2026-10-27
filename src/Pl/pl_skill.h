@@ -61,7 +61,18 @@ struct _PLOBJ {
             /* +0x016 */ u8 pad_0x16[0x2];
         };
     };
-    /* +0x018 */ s32 group[7][11];
+    /* +0x018 */ union {   /* the 7 groups of 11 words, whole and by name (same byte total) */
+        /* +0x018 */ s32 group[7][11];
+        struct {
+            /* +0x018 */ s32 req_id[11];    /* per part: the file id requested, -1 none */
+            /* +0x044 */ s32 load_mem[11];  /* per part: the resource-memory slot the file is read into */
+            /* +0x070 */ s32 aux_id[11];    /* per part: cleared (-1) with the request once bound */
+            /* +0x09C */ s32 bound_id[11];  /* per part: the file id bound to the model, -1 none */
+            /* +0x0C8 */ s32 bound_mem[11]; /* per part: the player's resource-memory slot the model uses */
+            /* +0x0F4 */ s32 res_entry[11]; /* per part: the resource entry `nw_res_entry_add` returned */
+            /* +0x120 */ u8* gate[11];      /* per part: the rig gate byte set once the model is shown */
+        };
+    };
 };
 
 /* One 0xB20-byte player work record (`pl_global->objects`, `get_move_work_adrs(2)`).
@@ -86,7 +97,10 @@ struct _PLGLOBAL {
     /* +0x00C */ struct _PLWORK* objects;  /* `count` records */
     /* +0x010 */ struct _PLOBJ* table;    /* one record per player, `pl_obj_ready_ck`/`pl_skill` walk it */
     /* +0x014 */ u8 unk014[0x8];
-    /* +0x01C */ s32 res_0x1C[0x79];      /* the per-player resource word table */
+    /* +0x01C */ union {   /* the per-player resource word table, flat and as [player][part] */
+        /* +0x01C */ s32 res_0x1C[0x79];
+        /* +0x01C */ s32 part_mem[11][11];  /* the resource-memory slot of each player's part */
+    };
     /* +0x200 */ union {   /* two views: `loaded[7]` plus the four gate words, and
                             * the whole 0x2C-byte run as one 11-word array */
         struct {
@@ -100,11 +114,28 @@ struct _PLGLOBAL {
                                              * clears for parts 0..10 (the model parts then the
                                              * control parts) */
     };
-    /* +0x22C */ s8 count22C;
-    /* +0x22D */ u8 unk22D[0x3];
-    /* +0x230 */ u8 slot_state[0x21C];    /* indexed by the player index (a `_PLW` +0x008) */
-    /* +0x44C */ u32 players_0x44C[8];    /* `pl_res_buffer_get` indexes it (one word per player) */
-    /* +0x46C */ u8 unk46C[0xC];
+    /* +0x22C */ union {   /* one word: the byte view and the whole word */
+        struct {
+            /* +0x22C */ s8 count22C;
+            /* +0x22D */ u8 unk22D[0x3];
+        };
+        /* +0x22C */ s32 last_player;   /* the last player record set up (the spare record's index) */
+    };
+    /* +0x230 */ union {   /* the run up to +0x44C, whole and by name (same byte total) */
+        /* +0x230 */ u8 slot_state[0x21C];    /* indexed by the player index (a `_PLW` +0x008) */
+        struct {
+            /* +0x230 */ u8 load_state[0xC];      /* per player: 0 face, 1 voice, 2 parts loading */
+            /* +0x23C */ void* part_adrs[11][11];  /* the address of each `part_mem` slot */
+            /* +0x420 */ s32 player_mem[11];      /* per player: its motion resource-memory slot */
+        };
+    };
+    /* +0x44C */ union {   /* one word per player */
+        struct {
+            /* +0x44C */ u32 players_0x44C[8];    /* `pl_res_buffer_get` indexes it (one word per player) */
+            /* +0x46C */ u8 unk46C[0xC];
+        };
+        /* +0x44C */ void* player_adrs[11];   /* the address of each `player_mem` slot */
+    };
     /* +0x478 */ s8 limit478;
     /* +0x479 */ s8 limit479;
     /* +0x47A */ s8 limit47A;
@@ -115,7 +146,5 @@ struct _PLGLOBAL {
     };
 };
 extern struct _PLGLOBAL* pl_global;
-
-extern u8 lbl_80794B2C[4];
 
 #endif /* MHTRI_PL_PL_SKILL_H */
