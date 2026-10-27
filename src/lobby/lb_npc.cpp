@@ -312,7 +312,7 @@ void lb_progress_unlock(u16);
 u16 lb_unlock_cond_top_get(s32);
 u8 lb_progress_flag_b8_ck(void);
 void lb_ship_marks_set(void);
-void fn_801E9AA8(u8);
+void lb_farm_grow_marks_update(u8);
 s32 mhchar_motion_set(void* self, u8 kind, s32 a3, u16 id, s32 a5, s32 motion, f32 c, s32 a7, f32 k);
 u32 mhchar_frame_check(void* self, u16 a, s32 b, f32 frame, f32 speed);
 u32 mhchar_motion_end_ck(void* self, s32 a);
@@ -426,7 +426,7 @@ void fn_801FC268(void)
 void lb_ship_marks_refresh(void)
 {
     lb_ship_marks_set();
-    fn_801E9AA8(0);
+    lb_farm_grow_marks_update(0);
 }
 
 /* 0x801FC6A0 - show the system message indexed by *value when it is positive. */

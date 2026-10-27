@@ -558,9 +558,9 @@ s32 score_add_clamped(s32 a, void* p);
 s32 userdata_progress_flag_ck(s32 a);
 s32 userdata_flag_ck(s32 a);
 void sysSE_stop(s32 id);
-s32 fn_801EC7AC(LbMenuPanel* self);
-void fn_801EC804(s16* value);
-s32 fn_801EC828(LbMenuPanel* self);
+s32 lb_game_ready_param_set(LbMenuPanel* self);
+void lb_anim_count_step(s16* value);
+s32 lb_cam_manual_begin(LbMenuPanel* self);
 s32 lb_box_cam_input_step(LbMenuPanel* self, u8 flag);
 void lb_box_model_turn_step(LbMenuPanel* self);
 u32 lb_page_record_empty_ck(struct LbPage* page);
@@ -667,7 +667,7 @@ extern "C" s32 fn_801ECB40(void)
     panel = lobby_w.menu_0x0AC;
     result = 0;
     if (lb_cmd_pressed_ck(0x80) == 1U && panel->list_kind_0x02 == 0) {
-        fn_801EC828(panel);
+        lb_cam_manual_begin(panel);
     } else {
         switch (panel->page_0x0A) {
         case 0:
@@ -1167,7 +1167,7 @@ extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
     result = 0;
     db = lobby_world_block;
     self->flags_0x08 = 0;
-    fn_801EC804(&self->anim_0x0E);
+    lb_anim_count_step(&self->anim_0x0E);
     fn_801ECEF0(self);
     switch (self->phase_0x00) {
     case 0:
@@ -1487,7 +1487,7 @@ extern "C" s32 lb_box_combine_step(LbDigitPane* self, MenuSelCursor* cur, LbList
         trig = lobby_w.count_0x084;
     }
     self->flags_0x08 = 0;
-    fn_801EC804(&self->anim_0x0E);
+    lb_anim_count_step(&self->anim_0x0E);
     fn_801ECEF0(self);
     menu_sel_cursor_blend_tick(cur);
     switch (self->phase_0x00) {
@@ -1616,7 +1616,7 @@ extern "C" s32 fn_801EEDC4(LbDigitPane* self, LbListPane* list)
 
     result = 0;
     self->flags_0x08 = 0;
-    fn_801EC804(&self->anim_0x0E);
+    lb_anim_count_step(&self->anim_0x0E);
     fn_801ECEF0(self);
     switch (self->phase_0x00) {
     case 0:
@@ -1681,7 +1681,7 @@ extern "C" s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
     result = 0;
     db = lobby_world_block;
     self->flags_0x08 = 0;
-    fn_801EC804(&self->anim_0x0E);
+    lb_anim_count_step(&self->anim_0x0E);
     fn_801ECEF0(self);
     switch (self->phase_0x00) {
     case 0:
@@ -2867,7 +2867,7 @@ extern "C" void lb_entry_pane_blink_tick(LbEntryPane* self)
 /* Starts the pane's frame: the digit animation, the blink timers, and the pad flag words cleared. */
 extern "C" void lb_entry_pane_frame_begin(LbEntryPane* self)
 {
-    fn_801EC804(&self->anim_0x00E);
+    lb_anim_count_step(&self->anim_0x00E);
     lb_entry_pane_blink_tick(self);
     self->flags_0x008 = 0;
     self->scroll_0x04C.moved_0x06 = 0;
@@ -3007,7 +3007,7 @@ extern "C" s32 lb_equip_box_wear_step(LbEquipBoxWork* self)
                         sysSE_stop(3);
                         lb_equip_entry_apply(id);
                         userdata_pl_look_apply(self->page_0x010, lobby_world_block);
-                        fn_801EC7AC((LbMenuPanel*)self);
+                        lb_game_ready_param_set((LbMenuPanel*)self);
                         lb_entry_pane_list_reset(entry, self);
                         self->changed_0x004 = 1;
                     } else {
@@ -3024,7 +3024,7 @@ extern "C" s32 lb_equip_box_wear_step(LbEquipBoxWork* self)
                             lb_equip_entry_apply(id);
                         }
                         userdata_pl_look_apply(self->page_0x010, lobby_world_block);
-                        fn_801EC7AC((LbMenuPanel*)self);
+                        lb_game_ready_param_set((LbMenuPanel*)self);
                         lb_entry_pane_list_reset(entry, self);
                     } else {
                         sysSE_req(2);
@@ -3057,7 +3057,7 @@ extern "C" s32 lb_equip_box_wear_step(LbEquipBoxWork* self)
                 }
             }
             userdata_pl_look_apply(self->page_0x010, lobby_world_block);
-            fn_801EC7AC((LbMenuPanel*)self);
+            lb_game_ready_param_set((LbMenuPanel*)self);
             lb_entry_pane_list_reset(entry, self);
             self->changed_0x004 = 1;
             break;
@@ -3287,7 +3287,7 @@ extern "C" s32 lb_my_set_load_step(LbEquipBoxWork* owner, LbMySetPane* self)
                 set_slot_none(lobby_world_block, 6);
             }
             equip_worn_records_refresh(self->page_0x14, lobby_world_block);
-            fn_801EC7AC((LbMenuPanel*)owner);
+            lb_game_ready_param_set((LbMenuPanel*)owner);
             owner->changed_0x004 = 1;
             sysSE_stop(3);
             break;
@@ -3523,7 +3523,7 @@ extern "C" s32 lb_gun_set_load_step(LbEquipBoxWork* owner, LbMySetPane* self)
                 }
             }
             userdata_pl_look_apply(self->page_0x14, lobby_world_block);
-            fn_801EC7AC((LbMenuPanel*)owner);
+            lb_game_ready_param_set((LbMenuPanel*)owner);
             owner->changed_0x004 = 1;
             sysSE_stop(3);
             break;
@@ -3941,7 +3941,7 @@ u16 lb_gun_set_cell_lsp[4] = {0x1A3D, 0x1A3E, 0x1A3F, 0xFFFF};
 extern "C" {
 s32 lb_cursor_box_step(s16* x, s16* y, s16 x_min, s16 x_max, s16 y_min, s16 y_max, u16 buttons);
 void lb_color_cursor_default(u32 color, s16* x, s16* y);
-void fn_801EC804(s16* value);
+void lb_anim_count_step(s16* value);
 }
 
 
@@ -3968,7 +3968,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
             break;
         }
         if (lb_cmd_pressed_ck(0x80) == 1) {
-            fn_801EC828(self);
+            lb_cam_manual_begin(self);
             break;
         }
         if (lb_cmd_pressed_ck(0x10) == 1) {
@@ -3995,7 +3995,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                     pl_equip_model_set((struct _PLW*)sub, (u8*)&arg);
                     arg.kind_0x00 = 5;
                     pl_equip_model_set((struct _PLW*)sub, (u8*)&arg);
-                    fn_801EC7AC(self);
+                    lb_game_ready_param_set(self);
                 } else {
                     sysSE_req(2);
                 }
@@ -4006,7 +4006,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                     sysSE_stop(0x28);
                     userdata_hunter_hair_set(world, (u8)req->value_0x004);
                     pl_parts_color_set((struct _PLW*)sub, 5, world->count_0x0002);
-                    fn_801EC7AC(self);
+                    lb_game_ready_param_set(self);
                 } else {
                     sysSE_req(2);
                 }
@@ -4216,7 +4216,7 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
     pad = &Psw[0];
     world = lobby_world_block;
     page = (LbPage*)self->plw_0x24;
-    fn_801EC804(&self->anim_0x0C);
+    lb_anim_count_step(&self->anim_0x0C);
     do {
         switch (self->phase_0x00) {
         case 0:
@@ -4231,7 +4231,7 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
                 continue;
             }
             if (lb_cmd_pressed_ck(0x80) == 1) {
-                fn_801EC828(owner);
+                lb_cam_manual_begin(owner);
                 return 0;
             }
             widths = lb_color_grid_widths;
@@ -4262,7 +4262,7 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
                         break;
                     }
                     userdata_pl_look_apply(page, world);
-                    fn_801EC7AC(owner);
+                    lb_game_ready_param_set(owner);
                     sysSE_req(0);
                     self->done_0x01 = 2;
                     break;
@@ -4433,7 +4433,7 @@ u32 lb_dye_inner_step(LbPageOwner* owner, LbPage* self)
     switch (self->state_0x000) {
     case 0:
         if (lb_cmd_pressed_ck(0x80) == 1) {
-            fn_801EC828(owner);
+            lb_cam_manual_begin(owner);
             return 0;
         }
         if (lb_cmd_pressed_ck(0x10) == 1) {
@@ -4446,7 +4446,7 @@ u32 lb_dye_inner_step(LbPageOwner* owner, LbPage* self)
                     break;
                 case -2:
                     lobby_world_block->field_0x39BA = self->next_0x028->sub_0x262;
-                    fn_801EC7AC(owner);
+                    lb_game_ready_param_set(owner);
                     result = 1;
                     sysSE_req(0);
                     break;
@@ -4721,11 +4721,11 @@ u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
 
     result = 0;
     pad = &Psw[0];
-    fn_801EC804(&self->anim_0x00E);
+    lb_anim_count_step(&self->anim_0x00E);
     switch (self->state_0x000) {
     case 0:
         if (lb_cmd_pressed_ck(0x80) == 1) {
-            fn_801EC828(owner);
+            lb_cam_manual_begin(owner);
             return 0;
         }
         if (lb_cmd_pressed_ck(0x10) == 1) {
@@ -4749,7 +4749,7 @@ u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
         break;
     case 1:
         if (lb_cmd_pressed_ck(0x80) == 1) {
-            fn_801EC828(owner);
+            lb_cam_manual_begin(owner);
             return 0;
         }
         if (self->kind_0x003 == 1) {
@@ -4776,7 +4776,7 @@ u32 lb_dye_pane_step(LbPageOwner* owner, LbPage* self)
             case -2:
                 self->state_0x000--;
                 lb_dye_part_color_commit(self, self->part_0x004);
-                fn_801EC7AC(owner);
+                lb_game_ready_param_set(owner);
                 sysSE_req(0);
                 break;
             case -3:
@@ -7718,7 +7718,7 @@ void mhchar_res_bank_set(u32 kind, u8 arg, void* str);
 void eft_res_pool_reset(void);
 void eft_control_init(void);
 void eft_common_load(void);
-void fn_801E92B0(void);
+void lb_part_recs_reset(void);
 void fn_801F3588(const void* table);
 s32 fn_801F3EDC(LbChgColorWork* self);
 s32 fn_801F3F14(void* table, u8 index);
@@ -8417,7 +8417,7 @@ s32 lobby_enter_seq_step(LbChgSeqWork* self)
             lb_quest_return_apply();
             fn_801FC874();
             fn_801FC8C8();
-            fn_801E92B0();
+            lb_part_recs_reset();
             q = get_qResult_work();
             if (q != NULL && system_w.field_0x2d == 0 &&
                 (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {

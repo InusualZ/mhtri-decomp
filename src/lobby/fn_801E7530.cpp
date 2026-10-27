@@ -1,29 +1,47 @@
-/* lobby/fn_801E7530.cpp - the lobby menu-layer group.
- * RANGE. .text 0x801E7530-0x801EC9E0 (77 functions); .data 0x805B7CB0-0x805B85D8, .sdata 0x80791B70-0x80791C58, extab,
- *   extabindex.
- * NAMES. The map and the dump give only placeholders for the range, so the file keeps the map's stem.  Module `lobby`:
- *   the callees are the lobby UI API (`lobby_w`, `LbStr`, `lb_param_w`, `get_lsp_data`, `GetMenuFontColor`,
- *   `set_blendmode`, `draw_font_idx`, `draw_sprite_ary`).  Four families: the delivery counter (`lb_deli_*`), the free
- *   hunt's day schedule (`lb_hunt_day_*`, `lb_daily_menu_roll`), the farm (lobby screen 5, `lb_farm_*`: plots in the
- *   user data at +0x3F38, seeds, fertilizers, harvest) and the item box screen (lobby screen 6, `lb_box_*`).
+/* lobby/fn_801E7530.cpp - the lobby menu-layer group: the delivery counter, the free hunt's day schedule, the farm and
+ *   the box screen.
+ * RANGE. .text 0x801E7530-0x801EC9E0 (77 functions, defined in address order); .data 0x805B7CB0-0x805B85D8, .sdata
+ *   0x80791B70-0x80791C58, extab, extabindex.
+ * NAMES. The map and the dump give only placeholders for the range, so the file keeps the map's stem (a unit rename to
+ *   `lobby/lb_farm.cpp`, GUESS, is filed).  Module `lobby`: the callees are the lobby UI API (`lobby_w`, `LbStr`,
+ *   `lb_param_w`, `get_lsp_data`, `GetMenuFontColor`, `set_blendmode`, `draw_font_idx`, `draw_sprite_ary`).  Four
+ *   families: the delivery counter (`lb_deli_*`, its goods sale `lb_goods_*`, trade list `lb_trade_*`, schedule panel
+ *   `lb_hunt_info_draw`, item box `lb_deli_box_*`), the free hunt's day schedule (`lb_hunt_day_*`, `lb_daily_menu_roll`),
+ *   the farm (lobby screen 5, `lb_farm_*`: plots in the user data at +0x3F38, seeds, fertilizers, harvest) and the box
+ *   screen (lobby screen 6, `lb_box_*`).
  *   GUESS (from each body, its tables and its callers): `lb_world_submode_get` (the farm plot count),
- *   `lb_deli_screen_draw`, `lb_hunt_day_roll`, `lb_hunt_day_advance`, `lb_rand_pick_take`, every `lb_farm_*` function
- *   and table, `lb_box_cam_input_step`, `lb_box_model_turn`, `lb_box_model_turn_step`.
+ *   `lb_deli_screen_draw`, `lb_hunt_day_roll`, `lb_hunt_day_advance`, `lb_rand_pick_take`, every `lb_farm_*`,
+ *   `lb_trade_*`, `lb_goods_*_draw`, `lb_deli_*` and `lb_part_rec*` function and table, `lb_hunt_info_draw`,
+ *   `lb_hunt_day_copy`, `lb_count_add_cap99`, `lb_id_list_has`, `lb_param_copy`, `lb_hold_window_draw`,
+ *   `lb_game_ready_param_set`, `lb_anim_count_step`, `lb_cam_manual_begin`, `lb_box_cam_input_step`,
+ *   `lb_box_model_turn`, `lb_box_model_turn_step`.
  * FLAGS. `#pragma peephole off` file-wide (retail keeps `clrlwi`/`rlwinm` + `cmpwi` pairs and narrows u8/u16 parameters at
- *   entry), back on for `lb_talk_screen_open` (it measures better with the pass); `#pragma opt_unroll_loops off` around
- *   `lb_daily_menu_roll` (retail keeps its 17-row clear as a `mtctr` loop).
+ *   entry), back on for `lb_talk_screen_open`; `#pragma optimization_level 4` file-wide (range-first switch lowering,
+ *   `lb_rand_pick_take`'s guarded unroll, `lb_farm_panel_draw`), back at 3 for `lb_farm_grow_marks_update` and
+ *   `lb_farm_box_page_draw` (both lose a few bytes at 4); `#pragma opt_unroll_loops off` around `lb_daily_menu_roll`
+ *   (retail keeps its 17-row clear as a `mtctr` loop).
  * RESIDUALS. Every row is written.
- *  - `lb_daily_menu_roll`: retail clears the point rows through three zero copies and indexes them `n * 3 * 2`; ours
- *    stores one zero and multiplies by 6;
- *  - `lb_rand_pick_take`: retail's eight-fold unroll checks `i < 14` where ours checks the 32-bit bound (12 B longer);
- *  - `fn_801E9AA8`: retail unrolls the three plots keeping `li`/`mulli` index products; ours strength-reduces (28 B);
- *  - `fn_801E7530`: retail tests the 0..2 range unsigned and cases 3..5 signed; ours tests all unsigned;
- *  - `fn_801E843C`, `fn_801E80FC`, `fn_801E8D5C`, `lb_farm_seed_list_draw`, `lb_farm_harvest`, `lb_farm_day_pass`,
- *    `lb_farm_plot_info_draw`, `lb_farm_plot_tabs_draw`, `lb_deli_screen_draw`, `fn_801E89B4`: register colouring and
- *    induction-variable order;
- *  - `lb_farm_seed_ck`: ours folds `seed >= 8 && seed < 12` into one range compare;
- *  - `fn_801E936C`: retail returns through `ble` + `clrlwi`, ours through `blelr`.
- *   flipcheck: `.data`/`.sdata` claimed, not emitted (the tables are declared, not defined).
+ *  - `lb_daily_menu_roll`: retail clears the point rows with three zero registers copied from the row offset and adds
+ *    the offset to the base each pass; ours stores one zero through a strength-reduced pointer (struct copy, inline
+ *    setter, chained stores and a flat u16 index measured, none closer);
+ *  - `lb_farm_seed_ck`: ours folds `seed >= 8 && seed < 12` into one `subi`/`cmplwi` range test; retail keeps two
+ *    compares (nested ifs, an else-if chain and `<= 11` measured, none closer);
+ *  - `lb_hunt_day_roll`: retail lowers `roll % 100 < 80` with the two-register signed-less-than idiom where ours folds
+ *    the constant (`andi.`), plus register colouring;
+ *  - `lb_deli_screen_draw`: retail loads the hold count after the panel/string arguments of `lb_help_num_put`;
+ *  - `lb_goods_slots_draw`: retail computes the page arrow's `mode - 1` after the other arguments;
+ *  - `lb_hunt_info_draw`: retail adds the variant row offset before the table base (`add rX, t, base`);
+ *  - `lb_farm_plot_tabs_draw`: retail indexes the tab order with a plain int counter and no strength reduction; a u8
+ *    counter is closest;
+ *  - `lb_count_add_cap99`: retail returns through `ble` + `clrlwi`, ours through `blelr`;
+ *  - `lb_farm_harvest`, `lb_trade_page_draw`, `lb_farm_seed_list_draw`, `lb_farm_seed_info_draw`,
+ *    `lb_farm_box_page_draw`, `lb_farm_box_draw`, `lb_part_recs_reset`, `lb_talk_screen_open`,
+ *    `lb_farm_harvest_roll`, `lb_farm_edit_draw`, `lb_goods_single_cell_draw`, `lb_farm_plot_info_draw`,
+ *    `lb_part_slot_open_ck`, `lb_farm_plot_days_get`, `lb_trade_list_step`, `lb_goods_sale_draw`: register colouring;
+ *  - flipcheck: `.data` (2344 B) and `.sdata` (232 B) are claimed but not emitted (the tables are declared, not
+ *    defined), including `lb_kujira_gift_items`, which `lobby/fn_802FA9A0` references.
+ * SHAPES. The free-hunt point rows are written through a flat u16 index (`n * 3`): retail's `slwi`/`subf`/`slwi` is that
+ *   index, not a 6-byte struct `mulli`.
  */
 #include "types.h"
 
@@ -39,6 +57,7 @@
 #include "hud/cockpit.h"
 #include "lobby/lb_npc.h"
 #include "menu/menu_item.h"   /* `put_menu_cursor` (owner: `menu/menu_item.cpp`, rule 2) */
+#include "userdata_item.h"    /* `item_take`, `userdata_item_count_total` */
 
 /* `sprintf` is a libc intrinsic; `-nosyspath` means it has to be declared here (the owner unit has no
  * publishable header). */
@@ -49,8 +68,7 @@ int sprintf(char* dst, const char* fmt, ...);
 /* Foreign functions whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
 void item_pair_copy(void* dst, const void* src);
-s32 userdata_item_count_total(u16 id, void* out);
-s32 item_take(s16 a, void* b, s32 c, s32 d, s32 e);
+
 void* get_FqResult_work(void);
 s32 userdata_progress_flag_ck(s32 a);
 s32 userdata_zenny_add(s32 a);
@@ -61,27 +79,28 @@ s32 sysSE_stop(s32 id);
 
 /* This unit's own functions that earlier bodies call; C linkage, like their definitions. */
 extern "C" {
-void fn_801E7530(LbMenuWork* self, s16 list_mode);
-void fn_801E78B4(LbMenuWork* self);
-s32 fn_801E790C(LbMenuWork* self);
-void fn_801E80FC(LbMenuWork* self);
-void fn_801E89B4(LbMenuWork* self);
-void fn_801E8C44(void);
-void fn_801E88C4(LbStrBlock* dst, const LbStrBlock* src);
-void fn_801E8CDC(u16 id, s8* str);
-void fn_801E9AA8(u8 flag);
+void lb_trade_list_build(LbMenuWork* self, s16 list_mode);
+void lb_trade_list_open(LbMenuWork* self);
+s32 lb_trade_list_step(LbMenuWork* self);
+void lb_goods_slots_draw(LbMenuWork* self);
+void lb_deli_box_grid_draw(struct LbItemBoxView* box);
+void lb_deli_box_draw(void);
+void lb_hunt_day_copy(LbStrBlock* dst, const LbStrBlock* src);
+void lb_trade_detail_draw(u16 id, s8* str);
+void lb_farm_grow_marks_update(u8 flag);
 void lb_farm_box_draw(void);
-void fn_801EB744(u16 id, _mh_ivec2_* off);
+void lb_farm_page_mark_draw(u16 id, _mh_ivec2_* off);
 void lb_npc_choice_draw(LbList* list);
-void fn_801E843C(LbMenuWork* self);
-void fn_801E8348(LbMenuWork* self);
-void fn_801E8CA0(void);
-void fn_801E8D5C(LbMenuWork* self);
-void fn_801E88E8(u8 mode);
-u16 fn_801E936C(u16 a, u16 b);
-s32 fn_801E9600(u8* list, u8 count, u8 id);
-void fn_801E9FC8(void);
-void fn_801EAC30(LbParam* dst, const LbParam* src);
+void lb_hunt_info_draw(LbMenuWork* self);
+void lb_goods_sale_draw(LbMenuWork* self);
+void lb_deli_box_list_draw(void);
+void lb_trade_page_draw(LbMenuWork* self);
+void lb_deli_header_draw(u8 mode);
+u16 lb_count_add_cap99(u16 a, u16 b);
+s32 lb_id_list_has(u8* list, u8 count, u8 id);
+void lb_farm_panel_close(void);
+void lb_param_copy(LbParam* dst, const LbParam* src);
+void lb_part_rec_copy(LbPartRec* dst, const LbPartRec* src);
 u8 lb_rand_pick_take(u8* pool);
 s8 lb_farm_seed_ck(const struct LbFarmPlot* plot, u8 seed);
 s8 lb_farm_plot_days_get(const struct LbFarmPlot* plot);
@@ -102,6 +121,7 @@ void sysSE_req(s32 id);
 
 /* Retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs (playbook 39). */
 #pragma peephole off
+#pragma optimization_level 4
 
 /* ------------------------------------------------------------------------------------------------ */
 
@@ -157,7 +177,7 @@ typedef struct LbUserDataView {
     /* +0x4068 */ LbHuntToday hunt_today_0x4068;
     /* +0x406E */ u8 pad_0x406E[0x7E2];
     /* +0x4850 */ LbHuntDay hunt_days_0x4850[2];          /* tomorrow and the day after */
-    /* +0x4860 */ u8 item_box_0x4860[0x78];       /* the item box `item_take` stores into */
+    /* +0x4860 */ IdValue item_box_0x4860[30];    /* the item box `item_take` stores into */
     /* +0x48D8 */ u16 hunted_0x48D8[0x80];        /* the hunt counts per monster, capped at 99 */
     /* +0x49D8 */ u16 captured_0x49D8[0x29];      /* the capture counts per monster, capped at 99 */
 } LbUserDataView;
@@ -274,11 +294,11 @@ typedef struct LbBoxWork {
 /* Every map name in this range is a plain `fn_XXXXXXXX`, so the whole batch of definitions takes C
  * linkage (the map does not mangle them). */
 extern "C" {
-void fn_801E7530(LbMenuWork* self, s16 list_mode)
+void lb_trade_list_build(LbMenuWork* self, s16 list_mode)
 {
-    const u16* flag_row;
     const u16* row;
     s16 count;
+    const u16* flag_row;
 
     flag_row = lb_trade_flag_rows;
     row = lb_trade_pair_rows;
@@ -306,7 +326,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
         }
     }
     memset(self->entries_0xD0, 0, 0x30);
-    switch ((u32)self->list_mode_0x0C) {
+    switch (self->list_mode_0x0C) {
     case 0:
     case 1:
     case 2: {
@@ -385,17 +405,17 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
     }
 }
 
-void fn_801E78B4(LbMenuWork* self)
+void lb_trade_list_open(LbMenuWork* self)
 {
     if (lb_unlock_cond_ck(0xA) != 0) {
         self->stage_0x0E = 3;
     } else {
         self->stage_0x0E = 2;
     }
-    fn_801E7530(self, 0);
+    lb_trade_list_build(self, 0);
 }
 
-s32 fn_801E790C(LbMenuWork* self)
+s32 lb_trade_list_step(LbMenuWork* self)
 {
     s16 value;
     s32 result = 0;
@@ -407,7 +427,7 @@ s32 fn_801E790C(LbMenuWork* self)
         /* The string block's first halfword receives the moved mask; the cast emits nothing. */
         value = menu_cursor_step_fixed_tail(self->list_mode_0x0C, self->stage_0x0E, lb_cmd_repeat_get(), 4, 8, (u16*)&self->list_0x24.cursor_0x00);
         self->list_mode_0x0C = value;
-        fn_801E7530(self, value);
+        lb_trade_list_build(self, value);
     } else if (lb_cmd_repeat_ck(3) != 0) {
         self->selected_0x08 = menu_cursor_step(self->selected_0x08, self->count_0x10, lb_cmd_repeat_get(), 1, 2);
     }
@@ -493,7 +513,7 @@ void lb_deli_screen_step(void)
                 break;
             case 3:
                 self->state_0x00 = 7U;
-                fn_801E78B4(self);
+                lb_trade_list_open(self);
                 sysSE_req(5);
                 break;
             case 4:
@@ -513,7 +533,7 @@ void lb_deli_screen_step(void)
         break;
     case 7:
         ainpc_page_hold_set();
-        if ((u32)(fn_801E790C(self) - 1) <= 1U) {
+        if ((u32)(lb_trade_list_step(self) - 1) <= 1U) {
             self->state_0x00 = 1U;
         }
         break;
@@ -578,7 +598,7 @@ void lb_deli_screen_step(void)
     }
 }
 
-void fn_801E7EA8(u16 id, const _mh_ivec2_* pos)
+void lb_goods_pair_cell_draw(u16 id, const _mh_ivec2_* pos)
 {
     LbItemData* data;
     u16 a;
@@ -600,7 +620,7 @@ void fn_801E7EA8(u16 id, const _mh_ivec2_* pos)
     draw_monstericon_idx(0x1DCA, (u8)id, pos);
 }
 
-void fn_801E7FEC(u16 id, const _mh_ivec2_* pos)
+void lb_goods_single_cell_draw(u16 id, const _mh_ivec2_* pos)
 {
     LbItemData* data;
     u16 a;
@@ -618,17 +638,16 @@ void fn_801E7FEC(u16 id, const _mh_ivec2_* pos)
     draw_monstericon_idx(0x1DE6, (u8)id, pos);
 }
 
-void fn_801E80FC(LbMenuWork* self)
+void lb_goods_slots_draw(LbMenuWork* self)
 {
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
     char text[16];
     s16 bound;
-    s32 step;
     s32 mode;
+    s32 step;
     s16 i;
     const u16* idp;
-    const u16* idp2;
 
     get_lsp_data(0x1DB1U, &anchor);
     draw_sprite_ary((const u16*)lbl_805B7CFC, &anchor);
@@ -648,31 +667,30 @@ void fn_801E80FC(LbMenuWork* self)
     sprintf(text, (char*)lbl_80791B88, self->value_0x100);
     draw_font_idx(0x1DB9U, (s8*)text, 2, &anchor);
     draw_font_idx(0x1DBAU, (s8*)LbStr(1, 0x2CU), 0, &anchor);
-    for (i = 0, idp = lbl_80791B80, idp2 = lbl_805B7D0C; i < step; i++) {
+    for (i = 0, idp = lbl_80791B80; i < step; i++) {
         if (mode == 0) {
             get_lsp_data(*idp, &pos);
             pos.x += anchor.x;
             pos.y += anchor.y;
             draw_sprite_ary((const u16*)lbl_805B7D4C, &pos);
             if (self->flags_0x50[bound + i] != 0) {
-                fn_801E7EA8(self->flags_0x50[bound + i], &pos);
+                lb_goods_pair_cell_draw(self->flags_0x50[bound + i], &pos);
             }
         } else {
-            get_lsp_data(*idp2, &pos);
+            get_lsp_data(lbl_805B7D0C[i], &pos);
             pos.x += anchor.x;
             pos.y += anchor.y;
             draw_sprite_ary((const u16*)lbl_805B7D5C, &pos);
             if (self->flags_0x50[bound + i] != 0) {
-                fn_801E7FEC(self->flags_0x50[bound + i], &pos);
+                lb_goods_single_cell_draw(self->flags_0x50[bound + i], &pos);
             }
         }
         idp++;
-        idp2++;
     }
     lb_page_arrow_draw(0x1D93, self->list_mode_0x0C, self->stage_0x0E, self->item_id_0x12,
                 (u32)((self->mode_0x01 - 1) << __cntlzw((self->mode_0x01 - 1) ^ 1)) >> 0x1FU);
 }
-void fn_801E8348(LbMenuWork* self)
+void lb_goods_sale_draw(LbMenuWork* self)
 {
     _mh_ivec2_ pos;
     u16 a = 0xFFFF;
@@ -681,7 +699,7 @@ void fn_801E8348(LbMenuWork* self)
 
     get_lsp_data(0x1D99U, &pos);
     draw_sprite_ary((const u16*)lbl_805B7D70, &pos);
-    fn_801E80FC(self);
+    lb_goods_slots_draw(self);
     mode = self->mode_0x01;
     switch ((s32)mode) {
     case 0:
@@ -706,7 +724,7 @@ void fn_801E8348(LbMenuWork* self)
     }
 }
 
-void fn_801E843C(LbMenuWork* self)
+void lb_hunt_info_draw(LbMenuWork* self)
 {
     LbSprData spr;
     LbHuntDay day;
@@ -729,7 +747,7 @@ void fn_801E843C(LbMenuWork* self)
         get_lsp_data(0x1D8BU, &anchor);
         draw_sprite_ary((const u16*)lbl_80791B90, &anchor);
         draw_sprite_idx(-(get_option_cfg(7) == 0) + 0x1D8D, &anchor);
-        draw_sprite_idx(-(self->open_0x05 == 0) + 0x1D8F, &anchor);
+        draw_sprite_idx(self->open_0x05 == 0 ? 0x1D8E : 0x1D8F, &anchor);
     }
     get_lsp_data(0x1D3EU, &anchor);
     draw_sprite_anim_ary((const u16*)lbl_805B7DA0, (u16)self->timer_0x06, &anchor);
@@ -744,7 +762,7 @@ void fn_801E843C(LbMenuWork* self)
         kind = user->hunt_today_0x4068.flag_0x4;
     } else {
         type = 0x1D71;
-        fn_801E88C4((LbStrBlock*)&day, (const LbStrBlock*)&LB_USER_DATA->hunt_days_0x4850[self->list_mode_0x0C - 1]);
+        lb_hunt_day_copy((LbStrBlock*)&day, (const LbStrBlock*)&LB_USER_DATA->hunt_days_0x4850[self->list_mode_0x0C - 1]);
         variant = day.variant_0x4;
         kind = day.flag_0x6;
     }
@@ -758,11 +776,9 @@ void fn_801E843C(LbMenuWork* self)
     draw_font_idx(0x1D81U, (s8*)LbStr(0, lbl_805B7E18[t + 1] + 0x11F), 0, &anchor);
     draw_font_idx(0x1D80U, (s8*)LbStr(0, lbl_805B7E18[t + 2] + 0x122), 0, &anchor);
     shown = 0;
-    monster = day.monster_0x0;
-    idp = lbl_80791BA8;
-    rows = (const LbHuntMonsterRow*)lbl_805B7A88;
-    for (i = 0; i < 2; i++) {
+    for (i = 0, monster = day.monster_0x0, idp = lbl_80791BA8; i < 2; i++) {
         m = *monster;
+        rows = (const LbHuntMonsterRow*)lbl_805B7A88;
         if (rows[m].kind_0x0 != 0) {
             get_lsp_data(*idp, &pos);
             pos.x += anchor.x;
@@ -794,7 +810,7 @@ void fn_801E843C(LbMenuWork* self)
     put_menu_cursor((u16*)lbl_805B7E00, 0, &pos);
 }
 
-void fn_801E88C4(LbStrBlock* dst, const LbStrBlock* src)
+void lb_hunt_day_copy(LbStrBlock* dst, const LbStrBlock* src)
 {
     dst->code_0x00 = src->code_0x00;
     dst->code_0x02 = src->code_0x02;
@@ -802,7 +818,7 @@ void fn_801E88C4(LbStrBlock* dst, const LbStrBlock* src)
     dst->code_0x06 = src->code_0x06;
 }
 
-void fn_801E88E8(u8 mode)
+void lb_deli_header_draw(u8 mode)
 {
     _mh_ivec2_ pos;
 
@@ -827,79 +843,78 @@ void lb_npc_choice_draw(LbList* list)
     lb_choice_draw(list, 0x1D2D, lbl_805B7E68, lbl_805B7E80, 0x1877, 0);
 }
 
-void fn_801E89B4(LbMenuWork* self)
+/* 0x801E89B4 (0x290): draws the delivery's item box: its thirty cells, their items, the cursor and the marked cell. */
+void lb_deli_box_grid_draw(LbItemBoxView* box)
 {
-    _mh_ivec2_ pos;
-    _mh_ivec2_ p0;
-    _mh_ivec2_ p1;
-    _mh_ivec2_ p2;
-    _mh_ivec2_ m;
-    _mh_ivec2_ a;
+    LbSprData cell_spr;
+    LbSprData icon_spr;
+    LbSprData cursor_spr;
+    _mh_ivec2_ cell;
+    _mh_ivec2_ base;
+    _mh_ivec2_ mark;
+    _mh_ivec2_ anchor;
     s32 i;
-    s32 found;
-    s32 off;
+    s32 marked;
 
-    get_lsp_data(0x1E16U, &pos);
-    draw_sprite_ary((const u16*)lb_ship_box_frames, &pos);
-    found = 0;
-    spr_data_copy((s16*)&p0, (s16*)get_lsp_data(0x1307U, NULL));
-    uv_pair_copy(&a, &p0);
-    off = 0;
-    for (i = 0; i < 0x1E; i++) {
-        lb_ship_cell_pos_get(i, (s16*)&m);
-        spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x12F9U, NULL));
-        uv_pair_copy(&p2, &m);
-        p0.x = m.x + a.x;
-        p0.y = m.y + a.y;
-        draw_sprite((const _SPR_DATA_&)p2, &pos);
-        if (self->stage_0x0E == i) {
-            found = 1;
-            uv_pair_copy(&p1, &m);
+    get_lsp_data(0x1E16U, &anchor);
+    draw_sprite_ary(lb_ship_box_frames, &anchor);
+    marked = 0;
+    spr_data_copy((s16*)&icon_spr, get_lsp_data(0x1307U, NULL));
+    uv_pair_copy(&base, &icon_spr.pos_0x00);
+    for (i = 0; i < 30; i++) {
+        lb_ship_cell_pos_get(i, (s16*)&cell);
+        spr_data_copy((s16*)&cell_spr, get_lsp_data(0x12F9U, NULL));
+        uv_pair_copy(&cell_spr.pos_0x00, &cell);
+        icon_spr.pos_0x00.x = cell.x + base.x;
+        icon_spr.pos_0x00.y = cell.y + base.y;
+        draw_sprite((const _SPR_DATA_&)cell_spr, &anchor);
+        if (box->mark_0x0E == i) {
+            marked = 1;
+            uv_pair_copy(&mark, &cell);
         }
-        if ((u8)(self->state_0x00 + 0xFF) <= 1U && chk_pointer() == 0 && self->count_0x10 == i) {
-            spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1304U, NULL));
-            p2.x += m.x;
-            p2.y += m.y;
+        if ((u8)(box->state_0x00 + 0xFF) <= 1U && chk_pointer() == 0 && box->cursor_0x10 == i) {
+            spr_data_copy((s16*)&cursor_spr, get_lsp_data(0x1304U, NULL));
+            cursor_spr.pos_0x00.x += cell.x;
+            cursor_spr.pos_0x00.y += cell.y;
             set_blendmode(4, 1, 1);
-            spr_anim_draw((s16*)&p2, self->selected_0x08, (s16*)&pos);
+            spr_anim_draw((s16*)&cursor_spr, box->anim_0x08, (s16*)&anchor);
             set_blendmode(4, 5, 1);
         }
-        if (*(s32*)(self->data_0x1C + off) != 0) {
-            draw_itemicon_item_id((const _SPR_DATA_&)p0, self->item_id_0x12, &pos);
+        if (box->items_0x24[i].id != 0) {
+            draw_itemicon_item_id((const _SPR_DATA_&)icon_spr, box->items_0x24[i].id, &anchor);
         }
-        off += 4;
     }
-    if (self->list_mode_0x0C != 0 && found != 0) {
+    if (box->marked_0x0C != 0 && marked != 0) {
         set_blendmode(4, 1, 1);
-        spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1305U, NULL));
-        p2.x += p1.x;
-        p2.y += p1.y;
-        spr_anim_draw((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
+        spr_data_copy((s16*)&cursor_spr, get_lsp_data(0x1305U, NULL));
+        cursor_spr.pos_0x00.x += mark.x;
+        cursor_spr.pos_0x00.y += mark.y;
+        spr_anim_draw((s16*)&cursor_spr, box->mark_anim_0x0A, (s16*)&anchor);
         set_blendmode(4, 5, 1);
-        spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1306U, NULL));
-        p2.x += p1.x;
-        p2.y += p1.y;
-        spr_anim_draw((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
+        spr_data_copy((s16*)&cursor_spr, get_lsp_data(0x1306U, NULL));
+        cursor_spr.pos_0x00.x += mark.x;
+        cursor_spr.pos_0x00.y += mark.y;
+        spr_anim_draw((s16*)&cursor_spr, box->mark_anim_0x0A, (s16*)&anchor);
     }
 }
 
-void fn_801E8C44(void)
+void lb_deli_box_draw(void)
 {
     _mh_ivec2_ pos;
 
     get_lsp_data(0x1DFBU, &pos);
     draw_sprite_ary((const u16*)lbl_805B7E8C, &pos);
-    fn_801E89B4((LbMenuWork*)eft052_item_box);
+    lb_deli_box_grid_draw((LbItemBoxView*)eft052_item_box);
     lb_item_box_count_draw(eft052_item_box, 0x1E17, 0U);
 }
 
-void fn_801E8CA0(void)
+void lb_deli_box_list_draw(void)
 {
-    fn_801E8C44();
+    lb_deli_box_draw();
     eft052_box_list_draw(0x1E26, lbl_805B7EC8, lbl_80791BAC, 0x1DFA, 0);
 }
 
-void fn_801E8CDC(u16 id, s8* str)
+void lb_trade_detail_draw(u16 id, s8* str)
 {
     _mh_ivec2_ pos;
 
@@ -909,7 +924,7 @@ void fn_801E8CDC(u16 id, s8* str)
     draw_font_idx(0x1E38U, str, 0, &pos);
 }
 
-void fn_801E8D5C(LbMenuWork* self)
+void lb_trade_page_draw(LbMenuWork* self)
 {
     LbSprData spr;
     char text[0x20];
@@ -954,14 +969,14 @@ void fn_801E8D5C(LbMenuWork* self)
     } else {
         draw_font_idx(0x1E59U, (s8*)LbStr(0, 0x13AU), 1, &anchor);
     }
-    for (i = 0, idp = lbl_805B7EF4; i < self->count_0x10; i++) {
+    for (i = 0; i < self->count_0x10; i++) {
         if (self->selected_0x08 == i) {
-            fn_801E8CDC(self->entries_0xD0[i].kind_0x00, (s8*)self->entries_0xD0[i].value_0x04);
+            lb_trade_detail_draw(self->entries_0xD0[i].kind_0x00, (s8*)self->entries_0xD0[i].value_0x04);
             selected = 1;
         } else {
             selected = 0;
         }
-        get_lsp_data(*idp, &pos);
+        get_lsp_data(lbl_805B7EF4[i], &pos);
         pos.x += anchor.x;
         pos.y += anchor.y;
         color = GetMenuFontColor(1, selected, 1, 0);
@@ -970,180 +985,14 @@ void fn_801E8D5C(LbMenuWork* self)
         spr_data_copy((s16*)&spr, get_lsp_data(0x1E62U, NULL));
         spr.color_0x1C = color;
         draw_font((const _SPR_DATA_&)spr, (s8*)text, 2, &pos);
-        idp++;
     }
 }
-u16 fn_801E936C(u16 a, u16 b)
-{
-    u32 v = a + b;
-
-    if (v > 0x63U) {
-        v = 0x63;
-    }
-    return v;
-}
-
-s32 fn_801E9600(u8* list, u8 count, u8 id)
-{
-    u8 i;
-
-    for (i = 0; i < count; i++) {
-        if (id == list[i]) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-void fn_801EC804(s16* value)
-{
-    if (++*value >= 0x28) {
-        *value = 0;
-    }
-}
-
-s32 lb_screen_work_busy_ck(void)
-{
-    return lobby_w.menu_0xAC->active_0x04 != 0;
-}
-
-void fn_801EC7AC(void)
-{
-    if (game_ready_ck() == 1U) {
-        lobby_w.param_0x12D = 1;
-    }
-}
-
-void fn_801EC828(u8* self)
-{
-    self[3] = 1;
-    camera_lobby_manual_set(1);
-    sysSE_req(1);
-}
-
-void fn_801EC194(void)
-{
-    eft052_hold_draw(0);
-}
-
-void fn_801E9FC8(void)
-{
-    fn_801E9AA8(1U);
-    lb_panel_close();
-}
-
-void fn_801EB524(void)
-{
-    lb_farm_box_draw();
-    eft052_box_list_draw(0x1718, lbl_805B83F4, lbl_80791BE8, 0x16D6, 0);
-}
-
-void fn_801EAC30(LbParam* dst, const LbParam* src)
-{
-    dst->kind_0x00 = src->kind_0x00;
-    dst->type_0x01 = src->type_0x01;
-    dst->sub_0x02 = src->sub_0x02;
-    dst->flag_0x03 = src->flag_0x03;
-    dst->level_0x04 = src->level_0x04;
-    dst->count_0x05 = src->count_0x05;
-    dst->id_0x06 = src->id_0x06;
-    dst->value_0x08 = src->value_0x08;
-    dst->rate_0x0A = src->rate_0x0A;
-    dst->mode_0x0B = src->mode_0x0B;
-}
-
-void fn_801EB0B8(void)
-{
-    _mh_ivec2_ pos;
-
-    if (ck_WideMode() != 0) {
-        get_lsp_data(0x16BEU, &pos);
-        draw_sprite_ary((const u16*)lbl_805B8354, &pos);
-    } else {
-        get_lsp_data(0x16B9U, &pos);
-        draw_sprite_ary((const u16*)lbl_805B8348, &pos);
-    }
-    get_lsp_data(0x16A8U, &pos);
-    draw_sprite_ary((const u16*)lbl_805B8360, &pos);
-}
-
-void fn_801EB6F4(void)
-{
-    _mh_ivec2_ pos;
-
-    get_lsp_data(0x171BU, &pos);
-    draw_sprite_ary((const u16*)lbl_805B84B0, &pos);
-    fn_801EB744(0x1749U, &pos);
-    fn_801EB744(0x174AU, &pos);
-}
-
-void fn_801EB744(u16 id, _mh_ivec2_* off)
-{
-    _mh_ivec2_ pos;
-
-    get_lsp_data(id, &pos);
-    pos.x += off->x;
-    pos.y += off->y;
-    draw_sprite_ary((const u16*)lbl_80791BF0, &pos);
-}
-
-void fn_801EB138(s32 idx, _mh_ivec2_* out)
-{
-    _mh_ivec2_ pos;
-
-    get_lsp_data(lbl_805B8384[idx % 10], &pos);
-    out->x = pos.x + 4;
-    out->y = pos.y + 3;
-}
-
-void fn_801E9318(LbPartRec* dst, const LbPartRec* src)
-{
-    dst->kind_0x00 = src->kind_0x00;
-    dst->flag_0x01 = src->flag_0x01;
-    dst->sub_0x02 = src->sub_0x02;
-    dst->mode_0x03 = src->mode_0x03;
-    dst->level_0x04 = src->level_0x04;
-    dst->count_0x05 = src->count_0x05;
-    dst->id_0x06 = src->id_0x06;
-    dst->value_0x08 = src->value_0x08;
-    dst->rate_0x0A = src->rate_0x0A;
-    dst->data_0x0C = src->data_0x0C;
-}
-
-void fn_801E92B0(void)
-{
-    LbPartRec* dst;
-    const LbPartRec* src;
-    s32 i;
-
-    dst = (LbPartRec*)(lobby_world_block + 0x3F98);
-    for (i = 0, src = (const LbPartRec*)lbl_805B7F28; i < 0xD; i++) {
-        fn_801E9318(dst, src);
-        src++;
-        dst++;
-    }
-}
-
-void fn_801E9AA8(u8 arg0)
-{
-    LbUserDataView* user = LB_USER_DATA;
-    s32 i;
-
-    for (i = 0; i < 3; i++) {
-        if (user->farm_plots_0x3F38[i].state_0x0 != 2) {
-            lobby_w.slots_0x07D[i] = 0;
-        } else if (lobby_w.slots_0x07D[i] == 0 && arg0 != 0) {
-            lobby_w.slots_0x07D[i] = 1;
-        }
-    }
-}
-
 /* 0x801E9010 (0x1B4): draws the delivery screen for its step. */
 void lb_deli_screen_draw(void)
 {
     LbMenuWork* self;
-    u16 msg;
     s16 sel;
+    u16 msg;
     u16 row;
     s32 count;
 
@@ -1154,10 +1003,10 @@ void lb_deli_screen_draw(void)
     case 0:
         return;
     case 5:
-        fn_801E88E8(1);
+        lb_deli_header_draw(1);
         break;
     default:
-        fn_801E88E8(0);
+        lb_deli_header_draw(0);
         break;
     }
     switch (self->state_0x00) {
@@ -1171,11 +1020,11 @@ void lb_deli_screen_draw(void)
         lb_panel_msg_draw(0x1877, msg);
         break;
     case 2:
-        fn_801E843C(self);
+        lb_hunt_info_draw(self);
         lb_panel_msg_draw(0x1877, 6);
         break;
     case 3:
-        fn_801E8348(self);
+        lb_goods_sale_draw(self);
         break;
     case 4:
         switch (self->mode_0x01) {
@@ -1191,13 +1040,13 @@ void lb_deli_screen_draw(void)
         }
         break;
     case 5:
-        fn_801E8CA0();
+        lb_deli_box_list_draw();
         break;
     case 6:
         lb_deli_menu_draw();
         break;
     case 7:
-        fn_801E8D5C(self);
+        lb_trade_page_draw(self);
         lb_panel_msg_draw(0x1877, 0xE);
         break;
     }
@@ -1207,26 +1056,63 @@ void lb_deli_screen_draw(void)
  * in the item box, clearing the result. */
 void lb_fq_result_items_take(void)
 {
-    LbFqResultView* result;
     IdValue* reward;
+    LbFqResultView* result;
     s32 i;
 
     result = (LbFqResultView*)get_FqResult_work();
     for (i = 0; i < 0x29; i++) {
-        LB_USER_DATA->hunted_0x48D8[i] = fn_801E936C(LB_USER_DATA->hunted_0x48D8[i], result->hunted_0x000[i]);
-        LB_USER_DATA->captured_0x49D8[i] = fn_801E936C(LB_USER_DATA->captured_0x49D8[i], result->captured_0x052[i]);
+        LB_USER_DATA->hunted_0x48D8[i] = lb_count_add_cap99(LB_USER_DATA->hunted_0x48D8[i], result->hunted_0x000[i]);
+        LB_USER_DATA->captured_0x49D8[i] = lb_count_add_cap99(LB_USER_DATA->captured_0x49D8[i], result->captured_0x052[i]);
         result->hunted_0x000[i] = 0;
         result->captured_0x052[i] = 0;
     }
-    reward = result->rewards_0x0F8;
-    for (i = 0; i < 30; i++) {
+    for (i = 0, reward = result->rewards_0x0F8; i < 30; i++) {
         if (reward->id != 0) {
-            item_take(reward->value, LB_USER_DATA->item_box_0x4860, 30, 0, 99);
+            item_take(reward->id, reward->value, LB_USER_DATA->item_box_0x4860, 30, 0, 99);
             reward->id = 0;
             reward->value = 0;
         }
         reward++;
     }
+}
+
+void lb_part_recs_reset(void)
+{
+    const LbPartRec* src;
+    LbPartRec* dst;
+    s32 i;
+
+    dst = (LbPartRec*)(lobby_world_block + 0x3F98);
+    for (i = 0, src = (const LbPartRec*)lbl_805B7F28; i < 0xD; i++) {
+        lb_part_rec_copy(dst, src);
+        dst++;
+        src++;
+    }
+}
+
+void lb_part_rec_copy(LbPartRec* dst, const LbPartRec* src)
+{
+    dst->kind_0x00 = src->kind_0x00;
+    dst->flag_0x01 = src->flag_0x01;
+    dst->sub_0x02 = src->sub_0x02;
+    dst->mode_0x03 = src->mode_0x03;
+    dst->level_0x04 = src->level_0x04;
+    dst->count_0x05 = src->count_0x05;
+    dst->id_0x06 = src->id_0x06;
+    dst->value_0x08 = src->value_0x08;
+    dst->rate_0x0A = src->rate_0x0A;
+    dst->data_0x0C = src->data_0x0C;
+}
+
+u16 lb_count_add_cap99(u16 a, u16 b)
+{
+    u32 v = a + b;
+
+    if (v > 0x63U) {
+        v = 0x63;
+    }
+    return v;
 }
 
 /* 0x801E938C (0x274): draws one day of the free-hunt schedule: its monsters, its area variant and its flag. */
@@ -1245,7 +1131,7 @@ void lb_hunt_day_roll(u8* monsters, u16* variant, u16* flag)
     memset(monsters, 0, 2);
     memset(pool, 0, 14);
     v = (u16)ran_suu(1) % 4;
-    if (lb_unlock_cond_ck(9) == 1 && (u16)ran_suu(1) % 100 > 65) {
+    if ((u32)lb_unlock_cond_ck(9) == 1 && (u16)ran_suu(1) % 100 > 65) {
         v += 4;
     }
     *variant = v;
@@ -1292,6 +1178,18 @@ void lb_hunt_day_roll(u8* monsters, u16* variant, u16* flag)
     }
 }
 
+s32 lb_id_list_has(u8* list, u8 count, u8 id)
+{
+    u8 i;
+
+    for (i = 0; i < count; i++) {
+        if (id == list[i]) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 #pragma opt_unroll_loops off
 /* 0x801E9640 (0x248): rebuilds the free hunt's point rows from the monster tables and draws its four-monster
  * rotation, leaving out the monsters of `today`. */
@@ -1318,7 +1216,7 @@ void lb_daily_menu_roll(u8* today)
     row = lb_trade_flag_rows;
     n = 0;
     while (row[0] != 0) {
-        point = &lb_param_w.points_0x32[n];
+        point = (EmSetPointRow*)(&lb_param_w.points_0x32[0].kind_0x0 + n * 3);
         point->kind_0x0 = row[0];
         point->kill_points_0x2 = row[1];
         point->capture_points_0x4 = 0;
@@ -1327,7 +1225,7 @@ void lb_daily_menu_roll(u8* today)
     }
     row = lb_trade_pair_rows;
     while (row[0] != 0) {
-        point = &lb_param_w.points_0x32[n];
+        point = (EmSetPointRow*)(&lb_param_w.points_0x32[0].kind_0x0 + n * 3);
         point->kind_0x0 = row[0];
         point->kill_points_0x2 = row[1];
         point->capture_points_0x4 = row[2];
@@ -1345,15 +1243,14 @@ void lb_daily_menu_roll(u8* today)
     n = 0;
     idx = 0;
     while (monster->kind_0x0 != 0xFF) {
-        if (monster->level_0x2 != 0xFFFF && monster->level_0x2 <= top && fn_801E9600(today, 2, idx) == 0) {
+        if (monster->level_0x2 != 0xFFFF && monster->level_0x2 <= top && lb_id_list_has(today, 2, idx) == 0) {
             pool[n] = idx;
             n++;
         }
         idx++;
         monster++;
     }
-    pick = picks;
-    for (i = 0; i < count; i++) {
+    for (i = 0, pick = picks; i < count; i++) {
         *pick = lb_rand_pick_take(pool);
         pick++;
     }
@@ -1415,6 +1312,24 @@ void lb_farm_plot_mark_set(u8 plot, u8 mark)
     lobby_w.slots_0x07D[plot] = mark;
 }
 
+#pragma optimization_level 3
+/* 0x801E9AA8 (0xC0): clears the growing marks of the plots not growing and, when `show` is set, sets the unset
+ * ones of the growing plots. */
+void lb_farm_grow_marks_update(u8 show)
+{
+    LbUserDataView* user = LB_USER_DATA;
+    u8 i;
+
+    for (i = 0; i < 3; i++) {
+        if (user->farm_plots_0x3F38[i].state_0x0 != 2) {
+            lobby_w.slots_0x07D[i] = 0;
+        } else if (lobby_w.slots_0x07D[i] == 0 && show != 0) {
+            lobby_w.slots_0x07D[i] = 1;
+        }
+    }
+}
+#pragma optimization_level 4
+
 /* 0x801E9B68 (0xC): returns the number of farm plots open. */
 u8 lb_world_submode_get(void)
 {
@@ -1463,11 +1378,11 @@ u32 userdata_quest_slot_open_ck(u8 id)
 void lb_farm_day_pass(void)
 {
     u8 pool[8];
-    const LbFarmGradeRow* grade;
     LbUserDataView* user;
     LbFarmPlot* plot;
-    s32 i;
+    u8 i;
     s16 k;
+    const LbFarmGradeRow* grade;
     s32 j;
     u8 count;
     u8 n;
@@ -1476,10 +1391,9 @@ void lb_farm_day_pass(void)
     user = LB_USER_DATA;
     count = lb_world_submode_get();
     plot = user->farm_plots_0x3F38;
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < (s32)count; i++) {
         if (plot->days_0x4 != 0) {
-            plot->days_0x4--;
-            if (plot->days_0x4 == 0) {
+            if (--plot->days_0x4 == 0) {
                 plot->state_0x0 = 1;
                 plot->days_0x4 = 0;
             }
@@ -1549,7 +1463,7 @@ s8 lb_farm_seed_ck(const LbFarmPlot* plot, u8 seed)
     }
     if (level < row->level_0x0) {
         result = -1;
-    } else if (seed >= 8 && seed < 12) {
+    } else if ((s32)seed >= 8 && (s32)seed < 12) {
         switch (row->level_0x0) {
         case 1:
             if (lb_unlock_cond_ck(0x10) == 0) {
@@ -1587,6 +1501,12 @@ void lb_screen05_open(struct _PLW* player, struct _LB_NPC* npc)
         self->plot_count_0x0A = 1;
     }
     lb_talk_page_open(0);
+}
+
+void lb_farm_panel_close(void)
+{
+    lb_farm_grow_marks_update(1U);
+    lb_panel_close();
 }
 
 /* 0x801E9FF0 (0xC0): one input step of the plot picker: 2 on cancel, else 0. */
@@ -1678,13 +1598,13 @@ void lb_farm_harvest_roll(IdValue* out, const LbFarmHarvestRow* table, s16 rolls
 void lb_farm_harvest(LbFarmWork* self)
 {
     LbUserDataView* user;
-    LbFarmPlot* plot;
     IdValue* out;
+    LbFarmPlot* plot;
     const LbFarmHarvestRow* table;
     const LbFarmHarvestRow* extra;
     s32 i;
     s32 base;
-    s32 k;
+    u8 k;
     s32 j;
     u32 found;
     u32 tier;
@@ -1696,10 +1616,7 @@ void lb_farm_harvest(LbFarmWork* self)
     user = LB_USER_DATA;
     count = lb_world_submode_get();
     memset(self->harvest_0x54, 0, 0x78);
-    plot = user->farm_plots_0x3F38;
-    out = self->harvest_0x54;
-    base = 0;
-    for (i = 0; i < self->plot_count_0x0A; i++) {
+    for (i = 0, plot = user->farm_plots_0x3F38, out = self->harvest_0x54, base = 0; i < self->plot_count_0x0A; i++) {
         if (plot->state_0x0 == 1) {
             table = lb_farm_harvest_tables[plot->seed_0x3];
             rolls = lb_farm_harvest_rolls_get(plot);
@@ -1728,10 +1645,7 @@ void lb_farm_harvest(LbFarmWork* self)
             if (found == 1) {
                 s32 s = (u8)(plot->seed_0x3 % 4);
 
-                mult = 1;
-                if (tier == lb_goods_tier_get(plot->seed_0x3)) {
-                    mult = 3;
-                }
+                mult = (tier == lb_goods_tier_get(plot->seed_0x3)) ? 3 : 1;
                 extra = NULL;
                 for (; s >= 0; s--) {
                     if (lb_farm_seed_ck(plot, k + s) != -1) {
@@ -1783,8 +1697,7 @@ void lb_farm_fertilizer_menu_open(LbFarmWork* self)
     count = lb_world_submode_get();
     memset(self->fertilizers_0xCC, 0, count * 0x14);
     self->fertilizer_count_0x18 = 0;
-    item = lb_farm_fertilizer_items;
-    for (i = 0; i < 5; i++) {
+    for (i = 0, item = lb_farm_fertilizer_items; i < 5; i++) {
         if (userdata_item_count_total(*item, lobby_world_block) != 0) {
             self->fertilizers_0xCC[self->fertilizer_count_0x18] = *item;
             self->fertilizer_count_0x18++;
@@ -1835,7 +1748,7 @@ s32 lb_farm_plot_menu_step(LbFarmWork* self)
         if (lb_cmd_pressed_ck(0x10) != 0) {
             if (plot->state_0x0 == 0) {
                 self->step_0x01 = 1;
-                fn_801EAC30((LbParam*)&self->edit_0x48, (const LbParam*)&LB_USER_DATA->farm_plots_0x3F38[self->plot_0x08]);
+                lb_param_copy((LbParam*)&self->edit_0x48, (const LbParam*)&LB_USER_DATA->farm_plots_0x3F38[self->plot_0x08]);
                 self->edit_0x48.seed_0x3 = 0xFF;
                 self->action_0x04 = 0;
                 self->seed_menu_0x02 = 1;
@@ -1893,9 +1806,9 @@ s32 lb_farm_plot_menu_step(LbFarmWork* self)
                 sysSE_req(1);
             }
         } else if (lb_cmd_repeat_ck(3) != 0) {
-            s16 rows = (self->seed_menu_0x02 == 0) + 2;
+            s32 rows = (self->seed_menu_0x02 == 0) + 2;
 
-            self->action_0x04 = menu_cursor_step(self->action_0x04, rows, lb_cmd_repeat_get(), 1, 2);
+            self->action_0x04 = menu_cursor_step(self->action_0x04, (s16)rows, lb_cmd_repeat_get(), 1, 2);
         }
         break;
     case 2:
@@ -1968,6 +1881,20 @@ s32 lb_farm_plot_menu_step(LbFarmWork* self)
         break;
     }
     return result;
+}
+
+void lb_param_copy(LbParam* dst, const LbParam* src)
+{
+    dst->kind_0x00 = src->kind_0x00;
+    dst->type_0x01 = src->type_0x01;
+    dst->sub_0x02 = src->sub_0x02;
+    dst->flag_0x03 = src->flag_0x03;
+    dst->level_0x04 = src->level_0x04;
+    dst->count_0x05 = src->count_0x05;
+    dst->id_0x06 = src->id_0x06;
+    dst->value_0x08 = src->value_0x08;
+    dst->rate_0x0A = src->rate_0x0A;
+    dst->mode_0x0B = src->mode_0x0B;
 }
 
 /* 0x801EAC84 (0x2A0): one step of the farm screen: the opening choice, the plot menu, the plot picker and the
@@ -2052,7 +1979,7 @@ void lb_item_get_screen_step(void)
         break;
     case 5:
         if ((u32)(lb_talk_page_mode_reset() - 1) <= 1U) {
-            fn_801E9FC8();
+            lb_farm_panel_close();
         }
         break;
     }
@@ -2114,6 +2041,31 @@ void lb_farm_panel_draw(LbFarmWork* self)
     }
 }
 
+void lb_farm_header_draw(void)
+{
+    _mh_ivec2_ pos;
+
+    if (ck_WideMode() != 0) {
+        get_lsp_data(0x16BEU, &pos);
+        draw_sprite_ary((const u16*)lbl_805B8354, &pos);
+    } else {
+        get_lsp_data(0x16B9U, &pos);
+        draw_sprite_ary((const u16*)lbl_805B8348, &pos);
+    }
+    get_lsp_data(0x16A8U, &pos);
+    draw_sprite_ary((const u16*)lbl_805B8360, &pos);
+}
+
+void lb_farm_box_cell_pos_get(s32 idx, _mh_ivec2_* out)
+{
+    _mh_ivec2_ pos;
+
+    get_lsp_data(lbl_805B8384[idx % 10], &pos);
+    out->x = pos.x + 4;
+    out->y = pos.y + 3;
+}
+
+#pragma optimization_level 3
 /* 0x801EB1B8 (0x2AC): draws page `page` of the farm's item box: its ten cells, their items, the cursor and the
  * marked cell. */
 void lb_farm_box_page_draw(LbItemBoxView* box, u8 page)
@@ -2137,7 +2089,7 @@ void lb_farm_box_page_draw(LbItemBoxView* box, u8 page)
     spr_data_copy((s16*)&icon_spr, get_lsp_data(0x1307, NULL));
     uv_pair_copy(&base, &icon_spr.pos_0x00);
     for (i = 0; i < 10; i++) {
-        fn_801EB138(i, &cell);
+        lb_farm_box_cell_pos_get(i, &cell);
         spr_data_copy((s16*)&cell_spr, get_lsp_data(lb_farm_box_cell_lsp[page], NULL));
         uv_pair_copy(&cell_spr.pos_0x00, &cell);
         icon_spr.pos_0x00.x = cell.x + base.x;
@@ -2173,6 +2125,7 @@ void lb_farm_box_page_draw(LbItemBoxView* box, u8 page)
         spr_anim_draw((s16*)&cursor_spr, box->mark_anim_0x0A, (s16*)&anchor);
     }
 }
+#pragma optimization_level 4
 
 /* 0x801EB464 (0xC0): draws the farm's item box, one page per plot open. */
 void lb_farm_box_draw(void)
@@ -2187,13 +2140,18 @@ void lb_farm_box_draw(void)
     last = lb_world_submode_get() - 1;
     get_lsp_data(0x16D7, &anchor);
     draw_sprite_anim_ary(lb_farm_box_frame, last, &anchor);
-    id = lb_farm_box_page_tabs;
-    for (i = 0; i <= last; i++) {
+    for (i = 0, id = lb_farm_box_page_tabs; i <= last; i++) {
         lb_farm_box_page_draw(box, i);
         draw_sprite_anim_idx(*id, last, &anchor);
         id++;
     }
     lb_item_box_count_draw(box, 0x170A, last);
+}
+
+void lb_farm_box_list_draw(void)
+{
+    lb_farm_box_draw();
+    eft052_box_list_draw(0x1718, lbl_805B83F4, lbl_80791BE8, 0x16D6, 0);
 }
 
 /* 0x801EB560 (0x194): draws the plot tabs, in the order the picked plot sets, with the picked one's cursor and page
@@ -2202,10 +2160,10 @@ void lb_farm_plot_tabs_draw(LbFarmWork* self)
 {
     _mh_ivec2_ anchor;
     const LbFarmTabRow* tab;
-    s32 i;
     u16 frame;
     u16 blink;
     u8 plot;
+    u8 i;
 
     for (i = 0; i < 3; i++) {
         plot = lb_farm_tab_order[self->plot_0x08 * 3 + i];
@@ -2238,6 +2196,26 @@ void lb_farm_plot_tabs_draw(LbFarmWork* self)
     }
 }
 
+void lb_farm_page_marks_draw(void)
+{
+    _mh_ivec2_ pos;
+
+    get_lsp_data(0x171BU, &pos);
+    draw_sprite_ary((const u16*)lbl_805B84B0, &pos);
+    lb_farm_page_mark_draw(0x1749U, &pos);
+    lb_farm_page_mark_draw(0x174AU, &pos);
+}
+
+void lb_farm_page_mark_draw(u16 id, _mh_ivec2_* off)
+{
+    _mh_ivec2_ pos;
+
+    get_lsp_data(id, &pos);
+    pos.x += off->x;
+    pos.y += off->y;
+    draw_sprite_ary((const u16*)lbl_80791BF0, &pos);
+}
+
 /* 0x801EB7A4 (0x68): returns the days `plot` takes to grow: its seed's days, one less on grade 4 and less with a
  * speed fertilizer, at least one. */
 s8 lb_farm_plot_days_get(const LbFarmPlot* plot)
@@ -2267,16 +2245,17 @@ s8 lb_farm_plot_days_get(const LbFarmPlot* plot)
 /* 0x801EB80C (0x4B4): draws the picked plot's info panel: its seed, tier, days, fertilizer, grade stars and state. */
 void lb_farm_plot_info_draw(LbFarmWork* self, u8 active)
 {
-    _mh_ivec2_ star;
     _mh_ivec2_ anchor;
+    _mh_ivec2_ star;
     LbSprData spr;
-    char text[0x40];
+    char text[0x80];
     LbFarmPlot* plot;
     LbSprData* frame;
+    u16 frame_id;
     u32 font;
     u32 i;
-    u8 grade;
     u8 level;
+    u8 grade;
     void* str;
 
     plot = &LB_USER_DATA->farm_plots_0x3F38[self->plot_0x08];
@@ -2284,7 +2263,18 @@ void lb_farm_plot_info_draw(LbFarmWork* self, u8 active)
         get_lsp_data(0x17D6, &anchor);
     } else {
         get_lsp_data(0x171B, &anchor);
-        frame = (LbSprData*)get_lsp_data(self->plot_0x08 == 1 ? 0x17B0 : (self->plot_0x08 == 2 ? 0x17C0 : 0x17A1), NULL);
+        switch (self->plot_0x08) {
+        default:
+            frame_id = 0x17A1;
+            break;
+        case 1:
+            frame_id = 0x17B0;
+            break;
+        case 2:
+            frame_id = 0x17C0;
+            break;
+        }
+        frame = (LbSprData*)get_lsp_data(frame_id, NULL);
         spr_data_copy((s16*)&spr, get_lsp_data(0x172D, NULL));
         spr.color_0x1C = frame->color_0x1C;
         draw_sprite((const _SPR_DATA_&)spr, &anchor);
@@ -2293,13 +2283,9 @@ void lb_farm_plot_info_draw(LbFarmWork* self, u8 active)
     if (plot->state_0x0 == 1) {
         draw_sprite_idx(0x172E, &anchor);
     }
-    fn_801EB744(0x1749, &anchor);
-    fn_801EB744(0x174A, &anchor);
-    if (self->state_0x00 == 3) {
-        draw_sprite_idx(lb_farm_plot_title_ids_pick[self->plot_0x08], &anchor);
-    } else {
-        draw_sprite_idx(lb_farm_plot_title_ids[self->plot_0x08], &anchor);
-    }
+    lb_farm_page_mark_draw(0x1749, &anchor);
+    lb_farm_page_mark_draw(0x174A, &anchor);
+    draw_sprite_idx(self->state_0x00 == 3 ? lb_farm_plot_title_ids_pick[self->plot_0x08] : lb_farm_plot_title_ids[self->plot_0x08], &anchor);
     spr_data_copy((s16*)&spr, get_lsp_data(0x1728, NULL));
     if (active != 0 && self->action_0x04 == 0) {
         spr.color_0x1C = GetMenuFontColor(1, 1, 1, 0);
@@ -2407,6 +2393,7 @@ void lb_farm_edit_draw(LbFarmWork* self)
     u32 open;
     u32 font;
     u8 prompt;
+    s8 days;
 
     edit = &self->edit_0x48;
     get_lsp_data(0x1763, &anchor);
@@ -2456,7 +2443,8 @@ void lb_farm_edit_draw(LbFarmWork* self)
         }
         draw_font((const _SPR_DATA_&)spr, (s8*)LbStr(0, edit->seed_0x3 + 0x15C), font, &anchor);
         draw_font_idx(0x1767, (s8*)LbStr(0, lb_goods_tier_get(edit->seed_0x3) + 0x159), font, &anchor);
-        draw_font_idx(0x1768, (s8*)LbStr(0, lb_farm_plot_days_get(edit) + 0x148), font, &anchor);
+        days = lb_farm_plot_days_get(edit);
+        draw_font_idx(0x1768, (s8*)LbStr(0, days + 0x148), font, &anchor);
     }
     spr_data_copy((s16*)&spr, get_lsp_data(0x1769, NULL));
     if (self->action_0x04 == 1) {
@@ -2477,11 +2465,16 @@ void lb_farm_confirm_blink_draw(LbFarmWork* self)
 {
     _mh_ivec2_ anchor;
 
-    if (chk_pointer() != 1) {
+    if ((u32)chk_pointer() != 1) {
         get_lsp_data(0x1763, &anchor);
         draw_sprite_ary(lb_farm_confirm_frame, &anchor);
         draw_sprite_anim_ary(lb_farm_confirm_blink_frame, self->blink_0x14 % 20, &anchor);
     }
+}
+
+void lb_hold_window_draw(void)
+{
+    eft052_hold_draw(0);
 }
 
 /* 0x801EC19C (0x60): draws the tier icon of seed `seed`. */
@@ -2509,8 +2502,7 @@ void lb_farm_seed_info_draw(u8 seed, u16 fertilizer)
     lb_farm_seed_tier_icon_draw(seed);
     draw_font_idx(0x180C, (s8*)LbStr(0, seed + 0x15C), 4, &anchor);
     row = lb_farm_harvest_tables[seed];
-    id = lb_farm_seed_item_lsp;
-    for (i = 0; i < 2; i++) {
+    for (i = 0, id = lb_farm_seed_item_lsp; i < 2; i++) {
         if (row->item_0x0 != 0) {
             draw_font_idx(*id, (s8*)ItemName(row->item_0x0), 1, &anchor);
             row++;
@@ -2540,8 +2532,7 @@ void lb_farm_seed_list_draw(LbFarmWork* self)
     get_lsp_data(0x17EB, &anchor);
     draw_sprite_ary(lb_farm_seed_list_frame, &anchor);
     lb_page_arrow_draw(0x17D7, self->seed_page_0x10, self->seed_pages_0x12, self->page_moved_0x06, 1);
-    id = lb_farm_seed_cell_lsp;
-    for (i = 0; i < 4; i++) {
+    for (i = 0, id = lb_farm_seed_cell_lsp; i < 4; i++) {
         seed = i + self->seed_page_0x10 * 4;
         ok = lb_farm_seed_ck(&self->edit_0x48, seed);
         if (i == self->seed_cursor_0x0C) {
@@ -2567,14 +2558,14 @@ void lb_farm_plot_menu_draw(LbFarmWork* self)
     switch (self->step_0x01) {
     case 0:
         lb_farm_plot_tabs_draw(self);
-        fn_801EB6F4();
+        lb_farm_page_marks_draw();
         lb_farm_plot_frame_draw(self->plot_0x08);
         lb_farm_plot_info_draw(self, 1);
         break;
     case 1:
     case 5:
         lb_farm_plot_tabs_draw(self);
-        fn_801EB6F4();
+        lb_farm_page_marks_draw();
         lb_farm_edit_draw(self);
         lb_farm_plot_info_draw(self, 1);
         break;
@@ -2582,11 +2573,11 @@ void lb_farm_plot_menu_draw(LbFarmWork* self)
         lb_farm_seed_list_draw(self);
         break;
     case 3:
-        fn_801EC194();
+        lb_hold_window_draw();
         break;
     case 4:
         lb_farm_plot_tabs_draw(self);
-        fn_801EB6F4();
+        lb_farm_page_marks_draw();
         lb_farm_confirm_blink_draw(self);
         lb_farm_edit_draw(self);
         lb_farm_plot_info_draw(self, 1);
@@ -2603,7 +2594,7 @@ void lb_farm_screen_draw(void)
     set_zmode(0, 0, 0);
     set_blendmode(4, 5, 1);
     if (self->state_0x00 != 0 && self->state_0x00 != 5) {
-        fn_801EB0B8();
+        lb_farm_header_draw();
         if (self->state_0x00 == 4) {
             menu_money_draw(0x14FC);
         } else {
@@ -2620,7 +2611,7 @@ void lb_farm_screen_draw(void)
         lb_farm_plot_info_draw(self, 0);
         break;
     case 4:
-        fn_801EB524();
+        lb_farm_box_list_draw();
         break;
     case 2:
         lb_farm_plot_menu_draw(self);
@@ -2672,14 +2663,40 @@ void lb_box_menu_close(LbBoxWork* self)
     }
 }
 
+void lb_game_ready_param_set(void)
+{
+    if (game_ready_ck() == 1U) {
+        lobby_w.param_0x12D = 1;
+    }
+}
+
+s32 lb_screen_work_busy_ck(void)
+{
+    return lobby_w.menu_0xAC->active_0x04 != 0;
+}
+
+void lb_anim_count_step(s16* value)
+{
+    if (++*value >= 0x28) {
+        *value = 0;
+    }
+}
+
+void lb_cam_manual_begin(u8* self)
+{
+    self[3] = 1;
+    camera_lobby_manual_set(1);
+    sysSE_req(1);
+}
+
 /* 0x801EC85C (0x84): the box screen's camera input: the 0xA0 command hands the camera back, 0x40 toggles the help. */
 void lb_box_cam_input_step(LbBoxWork* self, u8 locked)
 {
-    if (locked == 0 && lb_cmd_pressed_ck(0xA0) == 1) {
+    if (locked == 0 && (u32)lb_cmd_pressed_ck(0xA0) == 1) {
         self->manual_cam_0x03 = 0;
         camera_lobby_manual_set(0);
         sysSE_req(5);
-    } else if (lb_cmd_pressed_ck(0x40) == 1) {
+    } else if ((u32)lb_cmd_pressed_ck(0x40) == 1) {
         self->help_0x04 ^= 1;
     }
     lb_box_model_turn_step(self);

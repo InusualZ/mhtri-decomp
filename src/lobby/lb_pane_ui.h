@@ -201,8 +201,8 @@ extern u16 lbl_805B8914[];         /* .data 0x805B8914 */
  * (a C++ declaration would mangle the name objdiff pairs on); each is declared with the argument count
  * and widths the target's call site shows. */
 u32 lb_page_record_empty_ck(LbPage* page);
-void fn_801EC828(LbPageOwner* owner);
-void fn_801EC7AC(LbPageOwner* owner);
+void lb_cam_manual_begin(LbPageOwner* owner);
+void lb_game_ready_param_set(LbPageOwner* owner);
 u32 userdata_flag_ck(s32 id);
 void put_page_count(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 u32 sprite_frame_apply(_SPR_DATA_* spr, u16 id, u16 frame, _mh_ivec2_* pos);
