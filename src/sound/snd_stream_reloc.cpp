@@ -100,7 +100,7 @@ void* fn_800E80DC(u32 a, u32 b, u32 c);
 void* fn_800E8150(u32 a, u32 b, u32 c, u32 d);
 void* fn_800E81BC(u32 a, u32 b, u32 c, u32 d);
 void snd_stream_reloc_stop(u32 owner);
-void fn_800E8294(void);
+void snd_stream_bank_reset(void);
 void snd_stream_reloc_pause(void);
 void snd_stream_reloc_resume(void);
 void fn_800E8354(u32 owner, s16 arg);
@@ -450,7 +450,7 @@ extern "C" void snd_stream_reloc_stop(u32 owner)
 }
 
 /* Marks sound bank 1 pending, with interrupts off. */
-extern "C" void fn_800E8294(void)
+extern "C" void snd_stream_bank_reset(void)
 {
     u32 level = OSDisableInterrupts();
 

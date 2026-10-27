@@ -1073,7 +1073,7 @@ struct _PLW {
             /* +0x597 */ u8 field_0x597;
         };
         struct {
-            /* +0x584 */ u8 field_0x584;   /* set to 1 by the "2" act entry (`fn_80275ADC`) */
+            /* +0x584 */ u8 field_0x584;   /* set to 1 by the "2" act entry (`pl_act_enter_down`) */
             /* +0x585 */ u8 field_0x585;   /* non-zero takes the act's alternate entry path; the
                                             * chase step's re-arm latch `Pl/pl_act_step.cpp`'s
                                             * `fn_80247EF0` clears when it enters the chase */

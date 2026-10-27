@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (163)
+## Ideas that work (164)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -172,6 +172,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 181 | [A retail frsp before a float use is a store-to-load forward: read the value back from the field or the temporary](181-retail-frsp-before-a.md) | works | source-shape | Retail rounds an f32 value it already holds (`frsp f0,f1; fneg f0,f0`, or `frsp` before a pane-translation store) and no cast or f64 spelling reproduces it |
 | 182 | [A flag handed to a bool parameter is a bool local](182-flag-handed-to-a.md) | works | source-shape, allocator | Ours converts a 0/1 local before every call to a `bool` parameter (`cntlzw`/`srwi` twice, hoisted out of a loop) where retail passes the register straight (`mr r4,rN`) |
 | 183 | [A switch case that skips the shared tail, or a case that runs another case's tail: continue inside do { } while (0)](183-switch-case-that-skips.md) | works | source-shape | Retail's switch has one copy of a tail that several cases share (or that some cases skip), reached by a `b` from a case body; duplicating the tail in each case adds a copy (MWCC does not tail-merge) and `break` cannot... |
+| 184 | [A run of identical stores to consecutive slots is a constant-count loop MWCC unrolls](184-unrolled-store-run-loop.md) | works | source-shape | A long run of `stw r3,N(r31)` / `sth r0,N(rX)` with one value is matched by hand-written stores except for the scheduling of the value's `li` and the base register's `addi`, which land in the other order. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

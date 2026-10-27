@@ -72,7 +72,7 @@
 #include "sound/fn_800EF56C.h" /* fn_800EF56C (rule 2: the owner's header) */
 #include "sound/fn_800E8498.h" /* fn_800E8498 (rule 2: the owner's header) */
 #include "enemy/em_area_ck__FP11_ENEMY_WORK.h" /* em_area_ck__FP11_ENEMY_WORK (rule 2: the owner's header) */
-#include "sound/fn_800E8294.h" /* fn_800E8294 (rule 2: the owner's header) */
+#include "sound/snd_stream_bank_reset.h" /* fn_800E8294 (rule 2: the owner's header) */
 #include "sound/fn_800E81BC.h" /* fn_800E81BC (rule 2: the owner's header) */
 #include "sound/fn_800E8444.h" /* fn_800E8444 (rule 2: the owner's header) */
 #include "sound/fn_800E83CC.h" /* fn_800E83CC (rule 2: the owner's header) */
@@ -2947,7 +2947,7 @@ extern "C" s32 get_fade_stat__Fl(s32 which);
 
 /* A one-line trampoline into the fade/sound-system helper. */
 extern "C" void sound_frame_entry(void) {
-    fn_800E8294();
+    snd_stream_bank_reset();
 }
 
 /* Dispatches a slot to its per-kind handler by the slot's `kind` byte. */

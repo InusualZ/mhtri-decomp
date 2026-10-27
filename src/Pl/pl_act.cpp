@@ -359,7 +359,7 @@ s32 pl_parts_set_ck(s32 player, u8 part, s32 value)
 }
 
 /* Returns 0 with no global, otherwise the global's common motion type. */
-u8 fn_802699AC(void)
+u8 pl_motion_bank_no_get(void)
 {
     if (pl_global == NULL) {
         return 0;
@@ -5417,7 +5417,7 @@ extern "C" void pl_act_enter(struct _PLW* plw, s32 a, u16 b, u16 c)
 }
 
 /* The "2" marker's act entry, with the +0x256 timer preset. */
-extern "C" void fn_80275ADC(struct _PLW* plw, s32 a, u16 b, u16 c)
+extern "C" void pl_act_enter_down(struct _PLW* plw, s32 a, u16 b, u16 c)
 {
     plw->field_0x584 = 1;
     plw->field_0x256 = 0x1C2;

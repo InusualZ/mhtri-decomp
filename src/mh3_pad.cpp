@@ -193,9 +193,9 @@ extern char* strrchr(const char* s, int c);
 
 /* task-entry bodies referenced by address from the mode dispatchers (.text, other units) */
 extern s32 task_func;
-extern void fn_8028DDCC(void);
-extern void fn_8028E528(void);
-extern void fn_8028BF1C(void);
+extern void field_game_task(void);
+extern void vs_game_task(void);
+extern void quest_game_task(void);
 extern void game_mode_flow_task(void);
 extern void fn_8021F3A8(void);
 extern PadChanState pad_chan_state[4];
@@ -1048,7 +1048,7 @@ extern "C" void arena_task_start(void)
 
 extern "C" void fn_80041A0C(void)
 {
-    Tsk_Change((void*)&fn_8028DDCC, 4);
+    Tsk_Change((void*)&field_game_task, 4);
 }
 
 extern "C" void fn_80041A30(void)
@@ -1075,7 +1075,7 @@ extern "C" s32 wpad_mem2_free(void* block)
 
 void VsGameModeExec(void)
 {
-    Tsk_Change((void*)&fn_8028E528, 4);
+    Tsk_Change((void*)&vs_game_task, 4);
 }
 
 void TestModeExec(void)
@@ -3358,7 +3358,7 @@ void GameModeExec(void)
     switch (GameMode_ck()) {
     case 1:
         system_w.field_0x868 = 0;
-        Tsk_Change((void*)&fn_8028BF1C, 4);
+        Tsk_Change((void*)&quest_game_task, 4);
         return;
     case 2:
         if (system_w.field_0x7d3 == 1) {

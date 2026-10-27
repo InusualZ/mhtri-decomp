@@ -403,8 +403,8 @@ void fade_reset(s32 slot) {
     lbl_8066AC88.inc[slot] = 0;
 }
 
-/* `fn_8005811C`: idle test for a slot. */
-extern "C" u32 fn_8005811C(u8 slot) {
+/* `fade_done_ck`: idle test for a slot. */
+extern "C" u32 fade_done_ck(u8 slot) {
     return lbl_8066AC88.state[slot] == 0;
 }
 

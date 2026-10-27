@@ -56,7 +56,8 @@ typedef struct LbParamWork {
     /* +0x32 */ EmSetPointRow points_0x32[17]; /* the free hunt's point rows (`em_set_field_setup`) */
     /* +0x98 */ u8 pad_0x98;
     /* +0x99 */ u8 demo_quest_0x99;  /* the demo-play quest whose extra file the quest start loads (19, 20) */
-    /* +0x9A */ u8 pad_0x9A[0x2];
+    /* +0x9A */ u8 start_area_0x9A;   /* the area the field scene starts in (`fn_8028C468` kind 1) */
+    /* +0x9B */ u8 pad_0x9B;
 } LbParamWork; /* size: 0x9C */
 
 

@@ -71,7 +71,7 @@ struct _PLWORK {
     /* +0x001 */ u8 unk001a[0x13C - 0x1];
     /* +0x13C */ u8* model_0x13C;   /* the MHchar/actor model `fn_80223E54` moves */
     /* +0x140 */ u8 unk140[0x267 - 0x140];
-    /* +0x267 */ u8 busy;   /* `fn_802673E8` counts the records whose byte is set */
+    /* +0x267 */ u8 busy;   /* `pl_players_ready_ck` counts the records whose byte is set */
     /* +0x268 */ u8 unk268[0xB20 - 0x268];
 };
 
@@ -111,7 +111,7 @@ struct _PLGLOBAL {
     /* +0x47B */ union {   /* one u8, two spellings: `unk47B` and a name */
         /* +0x47B */ u8 unk47B;
         /* +0x47B */ u8 com_motion_type;   /* the common motion type `set_com_motion_type` stores and
-                                            * `fn_802699AC` returns */
+                                            * `pl_motion_bank_no_get` returns */
     };
 };
 extern struct _PLGLOBAL* pl_global;

@@ -29,7 +29,7 @@
  *    drops it;
  *  - `fn_80384004`, `fn_80384B34`: retail keeps `extsh`/`extsb` + `cmpwi`, ours the record form; `note_page_open`:
  *    retail sign-extends twice more;
- *  - `fn_803852B8`, `em_prog_support_reset`, `fn_8038575C`: the loop's index setup is ordered differently; `fn_803857BC`: ours
+ *  - `fn_803852B8`, `em_prog_support_reset`, `em_prog_entries_update`: the loop's index setup is ordered differently; `fn_803857BC`: ours
  *    compares the narrowed value unsigned where retail compares signed.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.sbss`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
  *   short of the claim.
@@ -297,7 +297,7 @@ extern "C" void fn_80385598(void) {
 }
 
 /* 0x8038575C */
-extern "C" void fn_8038575C(void) {
+extern "C" void em_prog_entries_update(void) {
     for (u32 i = 0; i < 5; i++) {
         if (lbl_806C4A88[i].field_0x000 != 0) {
             fn_803857BC(&lbl_806C4A88[i]);

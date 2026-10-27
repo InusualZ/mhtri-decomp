@@ -50,7 +50,7 @@ struct EftControl {
     /* +0x43C */ s32 id_b_0x43C[0x100];
     /* +0x83C */ s32 id_c_0x83C[0x100];
     /* +0xC3C */ u32 bytes_0xC3C;
-    /* +0xC40 */ u8 frame_ready_0xC40;     /* fn_800F8DA4 clears it before it walks the slots */
+    /* +0xC40 */ u8 frame_ready_0xC40;     /* eft_instances_release clears it before it walks the slots */
     /* +0xC41 */ u8 pad_0xC41[0x3];
 };
 

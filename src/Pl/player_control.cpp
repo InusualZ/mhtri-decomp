@@ -28,7 +28,7 @@
 #include "sound/fn_800D7F54.h"
 
 extern "C" {
-s32 fn_802673B8(void);
+s32 pl_player_count_get(void);
 void pl_res_loaded_set(u8 index);
 u32 pl_res_buffer_get(u8 index);
 u8 fn_80267C84(struct _PLW* self);
@@ -52,7 +52,7 @@ void set_max_player(s32 value) {
 }
 
 /* 0x802673B8 - reads the maximum player count back. */
-s32 fn_802673B8(void) {
+s32 pl_player_count_get(void) {
     if (pl_global == NULL) {
         return 0;
     }

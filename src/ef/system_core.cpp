@@ -365,7 +365,7 @@ extern "C" void enemy_work_release_all(void);
 extern "C" void work_stack_reset(void);
 extern "C" void fn_800CFBA0(u8* color);
 extern "C" void fn_800CFDB0(void);
-extern "C" void fn_800D06D0(u8 value);
+extern "C" void loading_disp_flag_set(u8 value);
 extern "C" void fn_800CEF60(void);
 /* STOPGAP-BEGIN(ef-game4#149) */
 extern "C" void enemy_work_release(_ENEMY_WORK* work);
@@ -527,7 +527,7 @@ void game_reset_to_title(void) {
     task_slot_table_clear();
     fn_800CE610();
     arena_task_start();
-    fn_800D06D0(0);
+    loading_disp_flag_set(0);
 }
 
 /* 0x800CF154 (0x60): Stops the sound, releases both stage area slots and resets the whole system and the loader. */
@@ -544,7 +544,7 @@ void system_full_reset(void) {
     all_reset();
     task_slot_table_clear();
     fn_800CE610();
-    fn_800D06D0(0);
+    loading_disp_flag_set(0);
 }
 
 /* 0x800CF1B4 (0x54): Stops the sound, releases both stage area slots and resets the scene's systems. */
@@ -558,7 +558,7 @@ void system_scene_reset(void) {
         stage_area_slot_release(i);
     }
     all_reset();
-    fn_800D06D0(0);
+    loading_disp_flag_set(0);
 }
 
 /* 0x800CF280 (0x44): Whether the quest move work is in its state 1. */
@@ -667,7 +667,7 @@ u32 fn_800CF668(u32 delta) {
 }
 
 /* 0x800D06D0/0x800D06E0 - the loading-display flag. */
-void fn_800D06D0(u8 value) {
+void loading_disp_flag_set(u8 value) {
     system_w.field_0x867 = value;
 }
 
@@ -693,7 +693,7 @@ void system_weapon_class_set(u8 value) {
 }
 
 /* 0x800D2D44 - clear the debug-BBA flag the reset path owns. */
-void fn_800D2D44(void) {
+void pad_warn_mask_clear(void) {
     pad_notice_shown = 0;
 }
 
@@ -975,7 +975,7 @@ u32 sys_tex_image_get(s32 index) {
 
 
 /* 0x800D06F0 - raise both loader flags. */
-void fn_800D06F0(void) {
+void quest_npc_flags_set(void) {
     system_w.field_0x7cc = 1;
     system_w.field_0x7cd = 1;
 }

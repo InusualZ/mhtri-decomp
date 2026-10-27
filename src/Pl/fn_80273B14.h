@@ -25,7 +25,7 @@ void pl_act_enter_raw(struct _PLW* plw, u8 kind, u16 no, u16 mask);
 
 /* 0x80275AC4 / 0x80275ADC - the two act-state entries that also set a marker byte. */
 void pl_act_enter(struct _PLW* self, s32 a, u16 b, u16 c);
-void fn_80275ADC(struct _PLW* self, s32 a, u16 b, u16 c);
+void pl_act_enter_down(struct _PLW* self, s32 a, u16 b, u16 c);
 
 /* 0x80275B04 - arms the act's three status bits from a packed mask. */
 void Pl_act_set_motion(struct _PLW* self, u16 a, u32 b, u32 c);

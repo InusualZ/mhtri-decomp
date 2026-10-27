@@ -27,7 +27,7 @@ void* fn_800E7FC4(u32 idx, u32 key);
 void* fn_800E80DC(u32 a, u32 b, u32 c);
 
 /* Player reset / level-table entry points. */
-void fn_800E8294(void);
+void snd_stream_bank_reset(void);
 void snd_se_level_set(s32 volume);
 void snd_reverb_advance(u32 idx);
 void snd_reverb_apply(u32 idx, u32 entry_idx);

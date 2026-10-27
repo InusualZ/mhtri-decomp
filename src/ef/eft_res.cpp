@@ -91,7 +91,7 @@ typedef struct EftResSlot {
     /* +0x16 */ u8 field_0x16;
     /* +0x17 */ u8 field_0x17;
     /* +0x18 */ u8 pad_0x18[0x1C];
-    /* +0x34 */ void (*update_0x34)(void*);   /* the per-frame hook fn_800F8DA4 runs */
+    /* +0x34 */ void (*update_0x34)(void*);   /* the per-frame hook eft_instances_release runs */
     /* +0x38 */ void* blocks_0x38;            /* the 0x40-byte block run this slot owns */
     /* +0x3C */ u32 block_count_0x3C;         /* how many of them */
     /* +0x40 */ void (*release_0x40)(void*);  /* the release hook eft_res_slot_release runs first */
@@ -210,7 +210,7 @@ void eft_res_release_all(void);
 void fn_800F6984(u8, u8, EftResFile*, u8*);
 void eft_pro_slot_list_set(u32, EftResFile*, u8*);
 void eft_res_stage_release_all(void);
-void fn_800F6A24(void);
+void eft_res_slots_release(void);
 void fn_800F6A78(u8);
 EftProSlot* fn_800F6AC8(u32);
 u32 eft_res_release(u8);
@@ -232,7 +232,7 @@ void eft_res_models_release(void*, s32);
 void* fn_800F8B44(u32);
 void fn_800F8C78(void*, u32);
 u32 fn_800F8D80(u32);
-void fn_800F8DA4(void);
+void eft_instances_release(void);
 void* res_eft_create_ex(u16, u16, u32, u32);
 void* fn_800F9278(void*, void*, u32, u32);
 void* fn_800F92D4(void*, void*);
@@ -427,7 +427,7 @@ extern "C" void eft_res_stage_release_all(void) {
 }
 
 /* 0x800F6A24 - retire every slot of the table. */
-extern "C" void fn_800F6A24(void) {
+extern "C" void eft_res_slots_release(void) {
     EftProSlot* slot = &eft_pro_slots()[0x100 - 1];
 
     for (s32 i = 0xFF; i >= 0; i--) {
@@ -1809,7 +1809,7 @@ extern "C" u32 fn_800F8D80(u32 size) {
 }
 
 /* 0x800F8DA4 - the per-frame walk: retire the ready effect system, then run every slot's hook. */
-extern "C" void fn_800F8DA4(void) {
+extern "C" void eft_instances_release(void) {
     EftResSlot* slot;
 
     ef_resource_instance();

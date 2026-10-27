@@ -200,7 +200,7 @@ void load_file_req(char* path, u32 dma, s32 size, u32 cb, s32 words, u32* args);
 extern "C" u8  equip_variant_get(void* equip);
 u8  Get_pl_type(_EQUIP* a, _EQUIP* b);
 void cnvt_eur_fname(char* dst, char* src);
-extern "C" u8 fn_8028F288(void);
+extern "C" u8 quest_em_level_get(void);
 extern "C" u8  stage_map_kind_get(u8 a);
 extern "C" u8  quest_pair_table_get(u8 a, u8 b);
 extern "C" u32 demo_play_ck(void);
@@ -337,10 +337,10 @@ extern "C" void snd_npc_voice_bank_load(u8 arg0, u8 arg1);
 extern "C" void fn_800F15B0(void);
 extern "C" void fn_800F1620(s32 arg0);
 extern "C" void se_slot_req(u8 arg0);
-extern "C" void fn_800F1700(u8 arg0, u8 arg1, u8 arg2);
+extern "C" void snd_area_env_bank_load(u8 arg0, u8 arg1, u8 arg2);
 extern "C" s32 demo_bgm_ready_ck(void);
 extern "C" void stage_bgm_reload(void);
-extern "C" void fn_800F2114(void);
+extern "C" void snd_quest_end_stream_load(void);
 extern "C" void lobby_bgm_load(void);
 extern "C" void fn_800F2328(u8 arg0, u8 arg1);
 extern "C" void fn_800F2468(u8 arg0);
@@ -558,7 +558,7 @@ extern "C" void fn_800F0560(u8 a, u8 b)
     if (lbl_80794A2C->se_param_a == a && lbl_80794A2C->se_param_b == b) {
         return;
     }
-    fn_800E8294();
+    snd_stream_bank_reset();
     snd_reverb_advance(0);
     snd_reverb_advance(1);
     lbl_80794A2C->se_param_a = a;
@@ -896,7 +896,7 @@ extern "C" void fn_800F08E8(u8 arg0)
                       (u32)fn_800F0230, 3, args);
     }
     fn_800F15B0();
-    fn_800F1700(arg0, 0, 0);
+    snd_area_env_bank_load(arg0, 0, 0);
 }
 
 /* The `se_w` bank catalogue, with the European file-name fixup on the third entry. */
@@ -1040,7 +1040,7 @@ extern "C" void fn_800F0F9C(u8 id)
     }
     switch (kind) {
     case 1:
-        if (fn_8028F288() == 4) {
+        if (quest_em_level_get() == 4) {
             slot = 5;
             break;
         }
@@ -1058,7 +1058,7 @@ extern "C" void fn_800F0F9C(u8 id)
         }
         break;
     case 2:
-        if (fn_8028F288() == 0 && (want == 0xC || want == 0xE)) {
+        if (quest_em_level_get() == 0 && (want == 0xC || want == 0xE)) {
             slot = 2;
             if (lbl_80794A2C->se_slot_num[2] != 0) {
                 return;
@@ -1213,7 +1213,7 @@ extern "C" void se_slot_req(u8 arg0)
 }
 
 /* The quest map's `whd`/`tsb` pair, or the two demo movie streams. */
-extern "C" void fn_800F1700(u8 arg0, u8 arg1, u8 arg2)
+extern "C" void snd_area_env_bank_load(u8 arg0, u8 arg1, u8 arg2)
 {
     char name[0x88];
     u32 args[3];
@@ -1472,7 +1472,7 @@ extern "C" void stage_bgm_reload(void)
 }
 
 /* The quest-clear jingle. */
-extern "C" void fn_800F2114(void)
+extern "C" void snd_quest_end_stream_load(void)
 {
     u32 args[5];
 

@@ -9,7 +9,7 @@
  * (0x6978 B, 149 functions).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for 144 of this range's 149 symbols (checked by
- * reading config/RMHE08/symbols.txt: `fn_800E8E60` .. `fn_800EF690` are the map's bare `.text` entries);
+ * reading config/RMHE08/symbols.txt: `fn_800E8E60` .. `snd_result_banks_load` are the map's bare `.text` entries);
  * the five named symbols carry the map's own C++ mangling and are defined under their real identifiers.
  *
  * Language: C++.  Five of the range's map names are mangled (`quest_snd_wk_init__Fv`,

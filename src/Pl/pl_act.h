@@ -166,7 +166,7 @@ void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
 
 /* The act-entry section's act/motion request entry point, with `Pl/fn_80273B14.h`'s signature (two C-linkage
  * spellings of one name would be an illegal overload).  The `u16` third parameter is what retail's callers narrow to
- * (`pl_act_enter`/`fn_80275ADC` emit `clrlwi r6,r6,16`). */
+ * (`pl_act_enter`/`pl_act_enter_down` emit `clrlwi r6,r6,16`). */
 void pl_act_enter_raw(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
 /* 0x80274918 - the act-name table row `index` for the player's stance (`force` picks the stance table) (GUESS name). */
