@@ -40,7 +40,8 @@ before the nodes that would release it).
 **How to work it.**
 1. Dump the function (`tools/mwcc-debugger/mwcc_debugger.py ... FUNC OUT`) and read
    `regalloc-gpr-pass-1-all.txt` (node, name, neighbours) and `backend-03-*.txt` (which vreg is which web).
-2. Simulate the cascade on that graph and confirm it reproduces the dump's assignment.
+2. Simulate the cascade on that graph and confirm it reproduces the dump's assignment
+   (`mt.py regsim verify DIR`; `mt.py regsim search DIR -u <unit>` does steps 3 and 4's search).
 3. Map retail's registers to your vregs (the aligned diff), then re-run the simulation with candidate scan orders
    (a permutation of the vreg numbers) until it produces retail's registers - that names the renumbering.
 4. Turn the renumbering into source: move a declaration (earlier = higher), make an inner-block local a

@@ -29,6 +29,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | comment vocabulary: stale-path and narrative markers, the stale judgement | `lib/comments.py` | `spec/lib-comments.md` | stylelint (rule 15), sweepcomments |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
 | a one-function TU from a C/C++ file | `lib/cextract.py` | `spec/lib-cextract.md` | mwcc-debugger (`--extract`, `extract.py`) |
+| MWCC's GPR colouring: the regalloc dump, the replay, the renumbering search | `lib/regsim.py` | `spec/lib-regsim.md` | regsim (`mt.py regsim`) |
 | a function's declaration block (leading run or `--lines A-B`), its orders and one-move neighbours | `lib/declperm.py` | `spec/lib-declperm.md` | tryvar (`--permdecl`, `--hill`, `mt.py permdecl`/`hill`), unittry (`--permute`) |
 | pending map edits (renames, row splits) applied to a copy of a split target | `lib/pendingmap.py` | `spec/lib-pendingmap.md` | measure, tryvar (`--rename-map`) |
 | a function's raw bytes against the target's, relocated bits masked | `lib/rawsame.py` | `spec/lib-rawsame.md` | rawsame |
@@ -56,7 +57,7 @@ Agent plumbing: `claims`, `slots`, `lane`, `rescue`, `wtsafe`, `queue`, `lanecmd
 `tooling`, `mergebranch` (+ the package `merge`: `unionprose`, `unionresolve`, `unionguard`), `recordmerge`, `edit`, `escape`, `profileprobe`, `install`, `doclinks`.
 
 Matching experiments: `infer`, `frame`, `optsweep`, `mwcc_matrix`, `tryvar` (+ `variants`), `unittry`, `shapesearch` (+ `shapes`), `slotmap`,
-`mwcc-debugger`, `mwlink` (+ its CLI shim `mwlink_debugger`).
+`mwcc-debugger` (+ `regsim`), `mwlink` (+ its CLI shim `mwlink_debugger`).
 
 Dormant: `rso`. Template (dtk-template, no spec of ours): `project`, `ninja_syntax`, `download_tool`, `transform_dep`,
 `decompctx`, `changes_fmt`. Retired: `retired.md`.
@@ -146,6 +147,7 @@ relative to `MAIN`; the contract of each tool is its spec.
 | tool | use it when … |
 | --- | --- |
 | `tools/mwcc-debugger/` + `locate/verify_pcode.py` | **a body differs and the source shapes are exhausted**: drive `mwcceppc.exe` under gdb, dump the per-pass PCode, and classify which optimizer pass is responsible. |
+| `tools/mwcc-debugger/regsim.py` (`mt.py regsim`) | **a row differs only in register numbers**: `verify` replays the dump's GPR colouring (stalled nodes marked), `want` reads retail's register per virtual register from the two objects, `search` prints the declaration order (or the one edit: an `@` web or temp made a local, a temp folded into a local) whose colouring gives retail's, and `--tryvar` measures a pure reorder with unittry (`spec/regsim.md`). |
 | `tools/mwlink_debugger.py` | **the DOL hash moved after a flip**: interrogate `mwldeppc.exe` — trace / diagnose / align / phases. **In production** per its six-point gate: health-checked against `main.MAP`/`main.elf`, `main.elf` never written, 260/260 sampled inputs, with its own gaps note. |
 
 **Debugger detail worth knowing.** `mwcc-debugger`: run `verify_pcode.py` on the last dump first (`MATCH` or a

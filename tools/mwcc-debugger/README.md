@@ -286,4 +286,19 @@ make_port.py        regenerates mwcc_debugger.py from upstream/ (reviewable diff
 locate/             how the Wii/1.3 facts were derived + verification tooling
 fetch_gdb.py        installs a native gdb without MSYS2
 extract.py          CLI of lib.cextract, the one-function TU of --extract
+regsim.py           CLI of lib.regsim: replays the GPR colouring, searches declaration orders
 ```
+
+## Register colouring: `regsim.py`
+
+`regalloc-gpr-pass-1-*.txt` is enough to replay the Wii/1.3 GPR allocator (playbook ideas 243/244,
+`docs/tools/spec/regsim.md`):
+
+```
+python tools/mwcc-debugger/regsim.py verify DIR                 # EXACT, or the first divergence; stalled nodes marked
+python tools/mwcc-debugger/regsim.py want   DIR -u WPAD/wpad    # each vreg's register in our object and in retail's
+python tools/mwcc-debugger/regsim.py search DIR -u WPAD/wpad    # the declaration order (or one edit) retail needs
+```
+
+The node record's cost words read 0 at the colouring breakpoint (`+0x08`, `+0x0C`); `+0x16` counts the physical
+neighbours and `+0x18` all of them.
