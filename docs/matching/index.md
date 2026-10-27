@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (216)
+## Ideas that work (217)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -225,6 +225,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 237 | [Put a unit's function definitions in the target's .text order: extab and extabindex pair again](237-put-a-units-function.md) | works | sections, source-shape | Every row scores well, yet flipcheck reports extab/extabindex records pairing other functions and most .text bytes differing - the source defines the functions in another order than retail's .text. |
 | 238 | [A dead counter beside a bdnz loop is a u8 loop variable](238-dead-counter-beside-a.md) | works | source-shape, allocator | Retail keeps `li r4,0` before the loop and `addi r4,r4,1` beside the `bdnz` though nothing reads r4; ours with an `s32 i` drops the counter entirely. |
 | 239 | [An addi+cmplwi test of -1 and 0 is written as one unsigned compare of c + 1](239-addi-cmplwi-test-of.md) | works | source-shape | Retail tests a value against -1 and 0 with `addi r0,c,1; cmplwi r0,1; ble skip`; ours with `c != -1 && c != 0` emits two compares and branches. |
+| 240 | [A subfc/subfe compare feeding an addi is a ternary between consecutive constants](240-ternary-consecutive-constants.md) | works | source-shape | Retail materialises a signed compare as `subfc ; srwi ; srwi ; subfe` and adds a constant, where ours (`K + (a >= b)`) uses `srawi ; srwi ; subfc ; adde` - and the two constants differ by one. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

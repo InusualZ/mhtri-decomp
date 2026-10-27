@@ -6,23 +6,25 @@
  *   .sdata2 0x8079AD98-0x8079ADE0, extab, extabindex.  `.data` and `.sdata` are emitted byte-identical by the tables
  *   defined at the top of the file.
  * FLAGS. `cflags_lobby`; file-scope `#pragma peephole off` and `pool_data off` (each table addressed by its own
- *   `lis`/`addi`, as in `lobby/fn_80212810.cpp`).
+ *   `lis`/`addi`, as in `lobby/fn_80212810.cpp`), `optimization_level 4` (retail's switches test case ranges with
+ *   `subi`+`cmplwi`, playbook 108: `lb_screen11_draw`, `lb_barter_help_draw`, `eft_em_move`) and `fp_contract off`
+ *   (retail keeps `fmuls`+`fadds` in `eft_em_tint_create`).
  * NAMES. No `__FILE__` string and no runtime-dump name covers the range.  GUESS (from each body, its callers and the
  *   effect type it seeds): every `lb_barter_*`/`lb_kujira_*`/`lb_box_*`/`lb_screen11_draw` function (the trader of
  *   `lobby/fn_802FA9A0.cpp`'s `lb_barter_*` family), `eft_em_*`, `eft_em_tint_*` ("tint" from the spawn's colour word;
  *   the pieces are flung debris models), `eft041_*`, and the tables `lb_*_ids`, `lb_barter_count_fmt`, `eft_em_res_*`,
  *   `eft_em_key_rgb_*`, `eft_tint_*`.  Registry names: `se_req_pos_impact`, `eft041_model_create/_move/_end/_kill`.
  * RESIDUALS.
- *   - .sdata2 is 44 bytes against 72: the range is two or more retail TUs (seam request lobby-8030121c#1), whose pools
- *     each hold 0.0f and the int->float double; one source pools each value once.
- *   - `lb_screen11_draw`: retail tests the type range with `cmplwi`/`subi`+`cmplwi` where ours uses signed compares (a
- *     switch subject cast and an if chain measured lower).
- *   - `lb_barter_cart_draw`, `lb_barter_list_draw`, `lb_barter_tabs_draw`, `lb_barter_help_draw`, `lb_kujira_menu_draw`,
- *     `lb_kujira_days_draw`, `lb_barter_gauge_draw`, `lb_barter_cart_frame_draw`, `lb_barter_item_info_draw`,
- *     `lb_kujira_kind_row_draw` (`draw_sprite_blink_idx`'s `s16` parameter loads the u16 field with `lha`),
- *     `lb_kujira_menu_step`, `lb_barter_screen_draw`, `eft_em_tint_create`, `eft_em_tint_model_create`,
- *     `eft_em_tint_release`, `eft_em_move`, `eft_em_model_create`, `eft041_release`, `lb_area_fx_set`: register
- *     colouring, stack-slot order or a kept/dropped `clrlwi`.
+ *   - .sdata2 is 56 bytes against 72: the range is two or more retail TUs (seam request lobby-fn-8030121c#1), whose
+ *     pools each hold 0.0f and the signed int->float double; one source pools each value once.
+ *   - `eft_em_tint_model_create`: the speed table's row pointer is loaded before the `0.0f` arguments in retail, after
+ *     them in ours, and the case-0 visibility loops colour `part`/`end` and the piece pointer differently.
+ *   - `eft_em_move` (`work`/`enemy` registers swapped), `eft_em_model_create` (`group`/`i` swapped), `lb_kujira_menu_draw`,
+ *     `lb_barter_list_draw`, `lb_kujira_menu_step` (the ship-bit toggle's registers): register colouring that no
+ *     declaration order reaches.
+ *   - `lb_barter_cart_draw`: retail keeps a `clrlwi` on the first `get_lsp_data` id (a phi of two constants).
+ *   - `lb_barter_gauge_draw`: the two share computations take one stack temporary in retail, two in ours (frame 0x60
+ *     against 0x70).
  *   - foreign generated names this file cannot respell: none.
  *   flipcheck: .sdata2 (above) and .text short of byte-identical.
  * SHAPES. Tables before their users, all at the top (retail's `.data` holds every table ahead of the jump tables).  A
@@ -30,7 +32,10 @@
  *   `get_camera_pos()` (a named copy costs a frame slot).  The debris pieces are indexed (`work->pieces_0x04[i]`), not
  *   walked by pointer.  `GetMenuFontColor`'s selection flags are `bool` locals.  The item cell drawers are called
  *   through `s32`-parameter cast views (retail passes the raw words).  `lb_screen11_step`'s choice switch has its
- *   `default` body first.
+ *   `default` body first.  A default-then-override assignment is a conditional expression (playbook 119), and a
+ *   `subfc`/`subfe` compare plus `addi` is a ternary between consecutive constants (playbook 240).  The info rows'
+ *   item is a `u16[2]` record (id, count) whose count is zeroed.  `lb_barter_pay_arrow_draw` takes the work it does
+ *   not read (retail's caller passes it).  `eft_em_tint_create` takes its float before the colour and frame count.
  */
 #include "types.h"
 #include "ef.h"
@@ -162,6 +167,8 @@ typedef struct EftTintWork {
 
 #pragma peephole off
 #pragma pool_data off
+#pragma optimization_level 4
+#pragma fp_contract off
 
 extern "C" {
 
@@ -303,8 +310,8 @@ void eft_em_model_create(_EFT* self);
 void eft_em_move(_EFT* self);
 void eft_em_end(_EFT* self);
 void eft_em_kill(_EFT* self);
-_EFT* eft_em_tint_create(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math::VEC3* pos, u32 color, s32 life,
-                         f32 scale);
+_EFT* eft_em_tint_create(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 color,
+                         s32 life);
 void eft_em_tint_release(_EFT* self);
 void eft_em_tint_dispatch(_EFT* self);
 void eft_em_tint_model_create(_EFT* self);
@@ -392,9 +399,9 @@ s32 lb_kujira_menu_step(LbBarterWork* work) {
         } else if (lb_cmd_repeat_ck(0xC) != 0) {
             u8 kind = work->menu_0x009[work->cursor_0x032];
             if (kind <= 2) {
-                u8 bit = 1 << kind;
-                if (work->ship_bits_0x003 & bit) {
-                    work->ship_bits_0x003 &= ~bit;
+                s32 bit = 1 << kind;
+                if (bit & work->ship_bits_0x003) {
+                    work->ship_bits_0x003 = work->ship_bits_0x003 & ~bit;
                 } else {
                     work->ship_bits_0x003 |= bit;
                 }
@@ -618,10 +625,7 @@ void lb_barter_tabs_draw(LbBarterWork* work, u32 active) {
     } else {
         sel = 0;
     }
-    str = 0x189;
-    if (work->mode_0x010 == 0) {
-        str = 0x187;
-    }
+    str = work->mode_0x010 == 0 ? 0x187 : 0x189;
     spr_data_copy(&spr, get_lsp_data(0x2335, NULL));
     spr.color = GetMenuFontColor(1, sel, 1, 0);
     if (work->tab_0x030 == 0 && active == 1) {
@@ -645,10 +649,7 @@ void lb_barter_tabs_draw(LbBarterWork* work, u32 active) {
     } else {
         sel = 0;
     }
-    str = 0x188;
-    if (work->mode_0x010 == 0) {
-        str = 0x186;
-    }
+    str = work->mode_0x010 == 0 ? 0x186 : 0x188;
     spr_data_copy(&spr, get_lsp_data(0x2335, NULL));
     spr.color = GetMenuFontColor(1, sel, 1, 0);
     if (work->tab_0x030 == 1 && active == 1) {
@@ -662,8 +663,12 @@ void lb_barter_tabs_draw(LbBarterWork* work, u32 active) {
     get_lsp_data(0x239E, &pos);
     pos.x += panel.x;
     pos.y += panel.y;
-    lb_cancel_prompt_draw((work->tab_0x030 == 2 && active == 1) ? 1 : (lb_barter_settle_ok_ck(work) == 0 ? 2 : 0),
-                          &pos);
+    if (work->tab_0x030 == 2 && active == 1) {
+        flags = 1;
+    } else {
+        flags = lb_barter_settle_ok_ck(work) == 0 ? 2 : 0;
+    }
+    lb_cancel_prompt_draw(flags, &pos);
 }
 
 /* 0x80301DF0 (0x164): draws one cart cell - its frame, the item icon (or the points icon) and the count. */
@@ -724,7 +729,7 @@ void lb_barter_gauge_draw(LbBarterWork* work, LbBarterCartRow* cart, LbBarterCar
         } else {
             w = 0.001f * (f32)(price * width);
         }
-        if (spr.width >= w) {
+        if (width >= w) {
             spr.pos.x += (s16)(spr.width - w);
             spr.width = w;
             spr.color = 0xC03030FF;
@@ -785,8 +790,12 @@ void lb_barter_cart_frame_draw(LbBarterWork* work, u8 side) {
     }
     get_lsp_data(id, &pos);
     draw_sprite_anim_ary(lb_barter_cart_frame_ids, part, &pos);
-    if (work->step_0x001 == 3 || work->step_0x001 == 5 || work->step_0x001 == 0) {
+    switch (work->step_0x001) {
+    case 3:
+    case 5:
+    case 0:
         draw_sprite_anim_ary(lb_barter_cart_cover_ids, part, &pos);
+        break;
     }
 }
 
@@ -804,11 +813,7 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
     u8 i;
 
     index = work->cart_row_0x038 + work->cart_col_0x03A * 5;
-    id = 0x23D7;
-    if (side == 0) {
-        id = 0x23B6;
-    }
-    get_lsp_data(id, &base);
+    get_lsp_data(side == 0 ? 0x23B6 : 0x23D7, &base);
     if (work->type_0x000 == 2) {
         if (side == 0) {
             part = 0;
@@ -816,23 +821,15 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
             part = 2;
         }
     } else {
-        part = 3;
-        if (side == 0) {
-            part = 1;
-        }
+        part = side == 0 ? 1 : 3;
     }
     get_lsp_data(0x23CB, &origin);
     origin.x += base.x;
     origin.y += base.y;
     draw_sprite_anim_ary(lb_barter_cart_bg_ids, part, &origin);
-    if (side == 0) {
-        cart = work->pay_0x7D4;
-    } else {
-        cart = work->get_0x784;
-    }
+    cart = side == 0 ? work->pay_0x7D4 : work->get_0x784;
     if (work->type_0x000 == 2) {
-        i = 0;
-        do {
+        for (i = 0; i < 10; i++) {
             s32 cursor;
             if (index == i && active != 0) {
                 cursor = 1;
@@ -841,8 +838,7 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
                 cursor = 0;
             }
             lb_barter_cart_cell_draw(&cart[i], i, side, 0, cursor, active, &origin);
-            i++;
-        } while (i < 10);
+        }
     } else if (side == 0) {
         s32 cursor;
         _SPR_DATA_ win;
@@ -857,8 +853,7 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
         win.pos.y += origin.y;
         lb_window_draw(cart->item_0x00, 0, &win.pos, 1, cursor, 1, 0x80);
     } else {
-        i = 0;
-        do {
+        for (i = 0; i < 5; i++) {
             s32 cursor;
             if (index == i && active != 0) {
                 cursor = 1;
@@ -867,8 +862,7 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
                 cursor = 0;
             }
             lb_barter_cart_cell_draw(&cart[i], i, side, 1, cursor, active, &origin);
-            i++;
-        } while (i < 5);
+        }
     }
     if (work->type_0x000 == 2) {
         if (side == 0) {
@@ -899,7 +893,7 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
         gauge.y += origin.y;
         switch (work->step_0x001) {
         case 1:
-            draw_sprite_anim_ary(lb_barter_cart_blink_ids, work->frames_0x054 % 40, &base);
+            draw_sprite_anim_ary(lb_barter_cart_blink_ids, (u32)work->frames_0x054 % 40, &base);
             if (work->tab_0x030 == 1) {
                 if (lb_barter_entry_flags(work, work->get_0x784, work->cursor_0x032) == 0) {
                     lb_button_prompt_draw(work->blink_0x070, &gauge);
@@ -909,7 +903,7 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
             }
             break;
         case 2:
-            draw_sprite_anim_ary(lb_barter_cart_blink2_ids, work->frames_0x054 % 40, &base);
+            draw_sprite_anim_ary(lb_barter_cart_blink2_ids, (u32)work->frames_0x054 % 40, &base);
             if (cart[index].count_0x02 != 0) {
                 lb_button_prompt_draw(work->blink_0x070, &gauge);
             }
@@ -919,7 +913,7 @@ void lb_barter_cart_draw(LbBarterWork* work, u8 side, s32 active) {
 }
 
 /* 0x80302754 (0x3C): draws the paid cart's arrow. */
-void lb_barter_pay_arrow_draw(void) {
+void lb_barter_pay_arrow_draw(LbBarterWork* work) {
     _mh_ivec2_ pos;
 
     get_lsp_data(0x23D8, &pos);
@@ -998,10 +992,7 @@ void lb_barter_row_draw(LbBarterWork* work, LbBarterEntry* row, u8 type, s16 tab
         } else if (row->rate_0x08 < 100) {
             mark = 2;
         } else {
-            mark = 1;
-            if (row->rate_0x08 > 100) {
-                mark = 3;
-            }
+            mark = row->rate_0x08 > 100 ? 3 : 1;
         }
         draw_sprite_anim_ary(lb_barter_row_gauge_ids, 0, &pos);
         spr_data_copy(&spr, get_lsp_data(0x2404, NULL));
@@ -1031,7 +1022,7 @@ void lb_barter_row_draw(LbBarterWork* work, LbBarterEntry* row, u8 type, s16 tab
             spr_data_copy(&spr, get_lsp_data(0x240A, NULL));
         }
         draw_sprite_anim_ary(lb_barter_row_pip_frame_ids, 1, &pos);
-        for (i = 0, ids = lb_barter_row_pip_ids; i < row->price_0x02; i++, ids++) {
+        for (i = 0, ids = lb_barter_row_pip_ids; i < row->price_0x02; ids++, i++) {
             get_lsp_data(*ids, &pip);
             uv_pair_copy(&spr, &pip);
             draw_sprite(spr, &pos);
@@ -1042,10 +1033,10 @@ void lb_barter_row_draw(LbBarterWork* work, LbBarterEntry* row, u8 type, s16 tab
 /* 0x80302C0C (0x398): draws the offer list - its frame, the page arrows, the rows and the button guide. */
 void lb_barter_list_draw(LbBarterWork* work, s32 active) {
     _mh_ivec2_ base;
+    u16* ids;
     _mh_ivec2_ pos;
     LbBarterEntry* row;
-    u16* ids;
-    s16 i;
+    s32 i;
     u32 type;
     u8 tab;
     s32 enabled;
@@ -1067,14 +1058,14 @@ void lb_barter_list_draw(LbBarterWork* work, s32 active) {
         type = work->type_0x000;
         tab = work->tab_0x030;
     } else {
-        type = 3 + (work->page_0x03C >= work->pages_a_0x040);
+        type = work->page_0x03C < work->pages_a_0x040 ? 2 : 3;
         enabled = 1;
         tab = 1;
     }
     if (work->shown_0x04C == 0) {
         lb_text_center_print(0x2426, (s8*)LbStr(3, 0x14C), 2, 0x12, &base, 0);
     } else {
-        for (i = 0, ids = lb_barter_list_row_ids, row = work->page_0x448; i < work->shown_0x04C; i++, ids++, row++) {
+        for (i = 0, ids = lb_barter_list_row_ids, row = work->page_0x448; i < work->shown_0x04C; ids++, row++, i++) {
             get_lsp_data(*ids, &pos);
             pos.x += base.x;
             pos.y += base.y;
@@ -1130,10 +1121,7 @@ void lb_barter_list_draw(LbBarterWork* work, s32 active) {
             }
         } else {
             guide = 0x23F0;
-            tab = 0xC;
-            if (get_option_cfg(7) == 0) {
-                tab = 3;
-            }
+            tab = get_option_cfg(7) == 0 ? 3 : 0xC;
         }
         if (guide != 0xFFFF) {
             put_button_guide_c_idx(guide, tab);
@@ -1158,13 +1146,13 @@ void lb_barter_goods_info_draw(u16 item, _SPR_DATA_* frame, _mh_ivec2_* pos) {
 /* 0x80303090 (0x140): draws the info window of the row or cart cell under the cursor. */
 void lb_barter_item_info_draw(LbBarterWork* work) {
     _SPR_DATA_ spr;
-    u16 item;
+    u16 item[2];
     _mh_ivec2_ pos;
     s32 index = work->cart_row_0x038 + work->cart_col_0x03A * 5;
     s32 goods = 0;
 
     sprite_frame_apply(&spr, 0x2331, work->tab_0x030 != 0, &pos);
-    spr.ofs_y = 0;
+    item[1] = 0;
     if (work->step_0x001 == 1) {
         if (work->cursor_0x032 == work->rows_0x034 - 1) {
             return;
@@ -1172,42 +1160,42 @@ void lb_barter_item_info_draw(LbBarterWork* work) {
         if (work->page_0x448[work->cursor_0x032].flag_0x09 == 1) {
             goods = 1;
         }
-        item = work->page_0x448[work->cursor_0x032].item_0x00;
+        item[0] = work->page_0x448[work->cursor_0x032].item_0x00;
     } else if (work->tab_0x030 == 0) {
         if (work->pay_0x7D4[index].flag_0x06 == 1) {
             goods = 1;
         }
-        item = work->pay_0x7D4[index].item_0x00;
+        item[0] = work->pay_0x7D4[index].item_0x00;
     } else {
         if (work->get_0x784[index].flag_0x06 == 1) {
             goods = 1;
         }
-        item = work->get_0x784[index].item_0x00;
+        item[0] = work->get_0x784[index].item_0x00;
     }
     if (goods == 0) {
-        menu_item_row_draw_pages(&item, &pos);
+        menu_item_row_draw_pages(item, &pos);
     } else {
-        lb_barter_goods_info_draw(item, &spr, &pos);
+        lb_barter_goods_info_draw(item[0], &spr, &pos);
     }
 }
 
 /* 0x803031D0 (0x9C): draws the info window of the whale menu's list row under the cursor. */
 void lb_kujira_item_info_draw(LbBarterWork* work) {
     _SPR_DATA_ spr;
-    u16 item;
+    u16 item[2];
     _mh_ivec2_ pos;
     s32 goods = 0;
 
     sprite_frame_apply(&spr, 0x2331, 1, &pos);
-    spr.ofs_y = 0;
+    item[1] = 0;
     if (work->page_0x448[work->cursor_b_0x042].flag_0x09 == 1) {
         goods = 1;
     }
-    item = work->page_0x448[work->cursor_b_0x042].item_0x00;
+    item[0] = work->page_0x448[work->cursor_b_0x042].item_0x00;
     if (goods == 0) {
-        menu_item_row_draw(&item, &pos);
+        menu_item_row_draw(item, &pos);
     } else {
-        lb_barter_goods_info_draw(item, &spr, &pos);
+        lb_barter_goods_info_draw(item[0], &spr, &pos);
     }
 }
 
@@ -1223,15 +1211,15 @@ void lb_box_cell_pos_get(s32 index, _mh_ivec2_* out) {
 /* 0x803032EC (0x294): draws the ten hold cells of the item box with their icons, the pointed cell's blink and the
  * picked cell's marks. */
 void lb_box_cells_draw(Eft052ItemBox* box) {
-    _mh_ivec2_ base;
-    _mh_ivec2_ picked;
-    _mh_ivec2_ icon;
     _mh_ivec2_ cell;
-    _SPR_DATA_ mark;
-    _SPR_DATA_ item;
+    _mh_ivec2_ icon;
+    _mh_ivec2_ picked;
     _SPR_DATA_ frame;
-    s32 found;
+    _mh_ivec2_ base;
+    _SPR_DATA_ item;
+    _SPR_DATA_ mark;
     s32 i;
+    s32 found;
 
     get_lsp_data(0x248E, &base);
     draw_sprite_anim_ary(lb_box_frame_ids, 0, &base);
@@ -1249,7 +1237,7 @@ void lb_box_cells_draw(Eft052ItemBox* box) {
             found = 1;
             uv_pair_copy(&picked, &cell);
         }
-        if ((u8)(box->state_0x00 - 1) <= 1 && chk_pointer() == 0 && box->hover_0x10 == i) {
+        if ((u8)(box->state_0x00 + 0xFF) <= 1 && chk_pointer() == 0 && box->hover_0x10 == i) {
             spr_data_copy(&mark, get_lsp_data(0x1304, NULL));
             mark.pos.x += cell.x;
             mark.pos.y += cell.y;
@@ -1351,7 +1339,7 @@ void lb_barter_screen_draw(LbBarterWork* work) {
             lb_barter_cart_draw(work, 0, 0);
             lb_barter_ready_draw(work);
         } else {
-            lb_barter_pay_arrow_draw();
+            lb_barter_pay_arrow_draw(work);
             lb_barter_cart_frame_draw(work, 1);
             lb_barter_pay_gauge_draw(work);
             lb_barter_cart_draw(work, 1, 0);
@@ -1368,7 +1356,7 @@ void lb_barter_screen_draw(LbBarterWork* work) {
             lb_barter_cart_draw(work, 0, 1);
             lb_barter_ready_draw(work);
         } else {
-            lb_barter_pay_arrow_draw();
+            lb_barter_pay_arrow_draw(work);
             lb_barter_cart_frame_draw(work, 1);
             lb_barter_pay_gauge_draw(work);
             lb_barter_cart_draw(work, 1, 1);
@@ -1421,10 +1409,7 @@ void lb_kujira_kind_row_draw(LbBarterWork* work, u8 bits, u8 kind, bool sel, boo
     pos.y += base->y;
     draw_sprite_anim_ary(lb_kujira_kind_row_ids, kind, &pos);
     spr.color = GetMenuFontColor(1, sel, enabled, 0);
-    flags = 1;
-    if (sel != 0) {
-        flags = 5;
-    }
+    flags = sel != 0 ? 5 : 1;
     if (bits & (1 << kind)) {
         draw_font(spr, (s8*)LbStr(0, 0x193), flags, &pos);
     } else {
@@ -1506,21 +1491,19 @@ void lb_kujira_menu_draw(LbBarterWork* work) {
     } else {
         sel = 0;
     }
-    flags = 1;
-    if (sel == 1) {
-        flags = 5;
-    }
+    flags = sel == 1 ? 5 : 1;
     if (work->type_0x000 == 4 && sel == 1) {
         put_menu_cursor(lb_barter_tab_cursor_ids, 0, &pos);
     }
     draw_font(spr, (s8*)ItemName(work->item_0x004), flags, &pos);
     if (work->type_0x000 == 4) {
-        u8 on = work->menu_0x009[work->cursor_0x032] == 4;
-        u8 bits = 0;
+        s32 on = work->menu_0x009[work->cursor_0x032] == 4;
+        u8 bits;
         u8 j;
         get_lsp_data(0x23B4, &pos);
         pos.x += panel.x;
         pos.y += panel.y;
+        bits = 0;
         for (j = 0; j < work->menu_count_0x036; j++) {
             if (work->ship_bits_0x003 & (1 << j)) {
                 bits++;
@@ -1546,9 +1529,9 @@ void lb_kujira_days_draw(void) {
     if (days <= 1) {
         sprintf(buf, (char*)LbStr(0, 0x198));
     } else if (days & 1) {
-        sprintf(buf, (char*)LbStr(0, 0x197), (u16)(days / 2));
+        sprintf(buf, (char*)LbStr(0, 0x197), days / 2);
     } else {
-        sprintf(buf, (char*)LbStr(0, 0x196), (u16)(days / 2));
+        sprintf(buf, (char*)LbStr(0, 0x196), days / 2);
     }
     draw_font_idx(0x22EF, (s8*)buf, 1, &pos);
 }
@@ -1835,9 +1818,9 @@ void eft_em_model_create(_EFT* self) {
     nw4r::math::VEC3 ofs;
     nw4r::math::MTX34 mtx;
     EftEmWork* work;
+    u16 group;
     struct _ENEMY_WORK* enemy;
     u16 res;
-    u16 group;
     s32 i;
 
     VEC3_ctor(&ofs);
@@ -1847,9 +1830,13 @@ void eft_em_model_create(_EFT* self) {
     self->state_0x05++;
     res = eft_em_res_ids[self->type_0x02];
     group = eft_em_res_groups[self->type_0x02];
-    if (self->type_0x02 == 2 && enemy->team == 0xF) {
-        res = 0x4DD;
-        group = 0x26;
+    switch (self->type_0x02) {
+    case 2:
+        if (enemy->team == 0xF) {
+            res = 0x4DD;
+            group = 0x26;
+        }
+        break;
     }
     for (i = 0; i < work->count_0x00; i++) {
         work->effect_0x04 = res_eft_create(res + self->demo_flag_0x08, group, 0);
@@ -2044,7 +2031,8 @@ void eft_em_model_create(_EFT* self) {
             get_joint_wpos_em(enemy, work->joint_0x0C, &ofs);
             se_req_pos_ps(enemy->se_0xB14, 0x22, 2, &ofs);
             break;
-        default:
+        case 0x88:
+        case 0x89:
             se_req_pos_ps(enemy->se_0xB14, 4, 2, &self->pos_0x18);
             break;
         case 0xAB:
@@ -2162,17 +2150,22 @@ void eft_em_move(_EFT* self) {
         work->effect_0x04->SetRootMtx(mtx);
     }
     change_paramscale_eff(work->effect_0x04, work->scale_0x08);
-    if (self->type_0x02 == 0x2C) {
+    switch (self->type_0x02) {
+    case 0x2C:
         if (self->timer_0x0C-- <= 0) {
             self->flag_0x01 = 0;
             self->state_0x05++;
             return;
         }
         effect_move(work->effect_0x04);
-    } else if (effect_move(work->effect_0x04) == 0) {
-        self->flag_0x01 = 0;
-        self->state_0x05++;
-        return;
+        break;
+    default:
+        if (effect_move(work->effect_0x04) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        break;
     }
     switch (self->type_0x02) {
     case 0x15: case 0x16: case 0x17: case 0x2D: case 0x2E: case 0x2F:
@@ -2271,8 +2264,8 @@ void eft_em_move(_EFT* self) {
             break;
         }
         col.r = c >> 24;
-        col.g = c >> 16;
-        col.b = c >> 8;
+        col.g = (c >> 16) & 0xFF;
+        col.b = (c >> 8) & 0xFF;
         col.a = c;
         change_color_eff(work->effect_0x04, &self->pos_0x18, col);
         break;
@@ -2303,19 +2296,19 @@ void eft_em_kill(_EFT* self) {
 
 /* 0x80305924 (0xC): spawns the debris effect `id` at joint `joint` of `self`, tinted `color`, for 10 frames. */
 void eft_em_spawn_tinted(struct _ENEMY_WORK* self, u32 id, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 color) {
-    eft_em_tint_create(self, id, joint, pos, color, 10, scale);
+    eft_em_tint_create(self, id, joint, pos, scale, color, 10);
 }
 
 /* 0x80305930 (0x8): the same spawn with the caller's frame count. */
 void eft_em_spawn_tinted_ex(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 color,
                             u32 life) {
-    eft_em_tint_create(self, id, joint, pos, color, life, scale);
+    eft_em_tint_create(self, id, joint, pos, scale, color, life);
 }
 
 /* 0x80305938 (0x21C): pools a debris record for `self`: one model per piece, each sized from the id's table with a
  * random step, then the joint, offset, scale and colour. */
-_EFT* eft_em_tint_create(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math::VEC3* pos, u32 color, s32 life,
-                         f32 scale) {
+_EFT* eft_em_tint_create(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math::VEC3* pos, f32 scale, u32 color,
+                         s32 life) {
     _EFT* rec;
     EftTintWork* work;
     s32 i;
@@ -2362,8 +2355,8 @@ _EFT* eft_em_tint_create(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math:
 
 /* 0x80305B54 (0x78): releases the debris record's piece models and its effect. */
 void eft_em_tint_release(_EFT* self) {
-    EftTintWork* work = (EftTintWork*)self->work_0x38;
     s32 i;
+    EftTintWork* work = (EftTintWork*)self->work_0x38;
 
     for (i = 0; i < work->count_0x00; i++) {
         eft_res_models_release(&work->pieces_0x04[i].model_0x04, 1);
@@ -2398,11 +2391,12 @@ void eft_em_tint_model_create(_EFT* self) {
     nw4r::math::MTX34 mtx;
     EftTintWork* work = (EftTintWork*)self->work_0x38;
     struct _ENEMY_WORK* enemy = (struct _ENEMY_WORK*)self->source_0x30;
-    u8 kind;
     s32 i;
-    s32 part;
-    s32 end;
+    u8 kind;
     u8 pick;
+    s32 end;
+    u8 type;
+    s32 part;
 
     VEC3_ctor(&vel);
     VEC3_ctor(&ofs);
@@ -2413,11 +2407,12 @@ void eft_em_tint_model_create(_EFT* self) {
     mtx34_trans_get(&mtx, &self->pos_0x18);
     mulVecMat(&ofs, &mtx);
     addVec3To(&self->pos_0x18, &ofs);
-    if (self->type_0x02 - 1U > 1) {
-        if (self->type_0x02 == 0) {
+    type = self->type_0x02;
+    if (type - 1U > 1) {
+        if (type == 0) {
             if (enemy->field_0x1E2 != 2 || !(self->pos_0x18.y < enemy->field_0x210)) {
                 work->effect_0xC8 =
-                    res_eft_create(eft_tint_res_ids[self->type_0x02], eft_tint_res_groups[self->type_0x02], 0);
+                    res_eft_create(eft_tint_res_ids[type], eft_tint_res_groups[type], 0);
                 if (work->effect_0xC8 == NULL) {
                     eft_em_tint_kill(self);
                     return;
@@ -2433,7 +2428,7 @@ void eft_em_tint_model_create(_EFT* self) {
             }
         }
     } else {
-        work->effect_0xC8 = res_eft_create(eft_tint_res_ids[self->type_0x02], eft_tint_res_groups[self->type_0x02], 0);
+        work->effect_0xC8 = res_eft_create(eft_tint_res_ids[type], eft_tint_res_groups[type], 0);
         if (work->effect_0xC8 == NULL) {
             eft_em_tint_kill(self);
             return;
@@ -2462,7 +2457,7 @@ void eft_em_tint_model_create(_EFT* self) {
             setVector3(&vel, 0.0f, 0.0f, eft_tint_speed_b[kind][self->type_0x02]);
             work->fall_0xD0 = eft_tint_fall_b[kind][self->type_0x02];
         }
-        rotVecX(&vel, 0xC000 - (u16)(0.5f + 65536.0f * (f32)(ran_suu(0) % 60) / 360.0f));
+        rotVecX(&vel, 0xC000 - (u16)(0.5f + 65536.0f * (f32)(u32)(ran_suu(0) % 60) / 360.0f));
         rotVecY(&vel, ran_suu(0));
         copyVec3((nw4r::math::VEC3*)&work->pieces_0x04[i].vel_0x08, &vel);
     }
@@ -2489,8 +2484,7 @@ void eft_em_tint_model_create(_EFT* self) {
         }
         break;
     case 1:
-        i = 0;
-        do {
+        for (i = 0; i < 2; i++) {
             pick = (ran_suu(0) & 1) + 1;
             for (part = eft_tint_part_first[self->type_0x02]; part < eft_tint_part_end[self->type_0x02]; part++) {
                 if (part == pick) {
@@ -2499,8 +2493,7 @@ void eft_em_tint_model_create(_EFT* self) {
                     work->pieces_0x04[i].model_0x04->setVisibility(part, 0);
                 }
             }
-            i++;
-        } while (i < 2);
+        }
         for (i = 2; i < work->count_0x00; i++) {
             pick = (ran_suu(0) & 1) + 3;
             for (part = eft_tint_part_first[self->type_0x02]; part < eft_tint_part_end[self->type_0x02]; part++) {
@@ -2524,10 +2517,10 @@ void eft_em_tint_model_create(_EFT* self) {
 /* 0x8030627C (0x294): after the record's delay, moves each piece (drag, fall, spin), fades it out over the last 10
  * frames, and runs and tints the effect; the record ends when its timer runs out. */
 void eft_em_tint_move(_EFT* self) {
-    EftTintWork* work = (EftTintWork*)self->work_0x38;
     _GXColor col;
-    u16* mask;
     s32 i;
+    u16* mask;
+    EftTintWork* work = (EftTintWork*)self->work_0x38;
 
     if (--self->field_0x10 < 0) {
         if (--self->timer_0x0C < 0) {
@@ -2588,11 +2581,11 @@ void eft_em_tint_kill(_EFT* self) {
 /* 0x80306524 - builds the effect-41 spawner: pools a 0x20-byte effect record, installs the
  * `eft041_dispatch` dispatcher / `eft041_release` releaser, fills its one model slot and arms it. */
 void lb_area_fx_set(void) {
-    s32 area = get_now_areano();
+    u8 area = get_now_areano();
     u8* res;
+    s32 i;
     _EFT* rec;
     Eft8030Work* w;
-    s32 i;
 
     res = stage_area_word_get(area);
     if (res == NULL) {
@@ -2622,9 +2615,9 @@ void lb_area_fx_set(void) {
 
 /* 0x80306614 - releases the effect-41 spawner's models and pooled handles. */
 void eft041_release(_EFT* self) {
-    Eft8030Work* w = (Eft8030Work*)self->work_0x38;
     s32 i;
     s32 j;
+    Eft8030Work* w = (Eft8030Work*)self->work_0x38;
 
     for (i = 0; i < w->count; i++) {
         for (j = 3; j >= 0; j--) {
