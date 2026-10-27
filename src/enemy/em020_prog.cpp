@@ -13,6 +13,10 @@
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi` + `cmpwi`, `slwi` +
  *   `clrlwi` and `srwi` + `clrlwi` pairs) and `#pragma fp_contract off` (separate `fmuls` + `fadds`); `#pragma
  *   dont_inline on/off` around the three packet constructors so MWCC emits them out of line after their first user.
+ *   Per function: `opt_common_subs off` on the burrow attacks, `em020_demo_burrow` and `em020_motion_events` (retail
+ *   loads the `shell_set_func_ptr` slot after the arguments, idea 208); `optimization_level 4` on
+ *   `em020_walk_approach` and `lobby_net_action_send` (the `cmplwi` range-first switch lowering, idea 108);
+ *   `peephole on` on `quest_info_detail_draw`; `opt_lifetimes off` on `lobby_net_update`.
  * NAMES. The file name follows the runtime dump's `em020_prog_tbl`, which opens the TU's `.data`; `getInstance_`
  *   is the dump's name.  GUESS (from each body, its callers and what it stores):
  *   em020_reset, em020_init, `Em020UserData`, em020_event_notify, em020_turn_back, em020_circle_charge,
@@ -43,21 +47,25 @@
  *   em020_profile_send, releaseRemotePlayerParts, sendMemberJoinNotice, handleLobbyNetMessage, dropLobbyMail,
  *   addFriendNotice.  Foreign callees named by this unit are GUESS names too.
  * RESIDUALS.
- *  - `lobby_net_update`: 3240 B vs 3008 B; retail shares the error-window tails between cases (a tail merge no
- *    goto-free shape reproduced).
- *  - `em020_hp_ratio_ck`, `lobby_net_state_request_recv`, `em020_light_update`: retail exits through a `bne L; b end`
- *    pair the source shapes tried (inline helper, nested if, early return) do not produce.
- *  - `lobby_net_action_send`: retail lowers the kind switch as a compare chain in a different order.
- *  - `em020_burrow_attack_a/b`, `em020_demo_burrow`: the `shell_set_func_ptr` slot loads schedule one slot earlier.
- *  - `quest_info_detail_draw` (+8 B), `quest_info_sheet_draw` (case 5/6 compare order), `quest_info_name_draw`,
- *    `lobby_net_flag_send` (+4 B), `lobby_net_state_send` (-4 B), `assign__12LobbyMailRowFPC12LobbyMailRow`,
- *    `lobby_net_leave_select`, `em020_walk_approach`, `em020_arm_mot1_side_wait80` (`subfic` for retail's
- *    `cntlzw; extrwi; neg; addi`), `em020_motion_events`: register or scheduling residuals.
- *  - Data: `.sdata2` pool order follows first use and differs from retail at +0x454 (16 B short); `.sbss` ends at
- *    5 B where the target object carries a 3-byte tail.  `jump_err_msg_str` (`.sbss` 0x80794B10) is unclaimed and
- *    shared with `menu/menu_placeinfo.cpp` (rule 12 finding in `unsplit/unknown.h`, filed).
+ *  - `lobby_net_update`: 3132 B vs 3008 B; case 0's roster fetch branches into case 1's copy and the refresh
+ *    switch's case 0 error arm into case 2's (ideas 213/218 walls: written twice); the hold tail sits after the
+ *    switch where retail keeps it inside case 0.  The sub-error and refresh tails are shared through
+ *    `do { switch } while (0)` + `continue` (idea 183).
+ *  - `quest_info_sheet_draw`: retail compares cases 4, 5, 6 but lays the bodies out default, 6, 5; our MWCC ties the
+ *    compare order to the label order (every label/body permutation, `(u32)` selector and level 4 measured).
+ *  - `quest_info_detail_draw`: retail keeps `clrlwi` + `cmpwi` unfused and schedules `li r3,id` after them; peephole
+ *    off keeps the pair but schedules the `li` first, peephole on (applied) fuses them to `clrlwi.`.
+ *  - `lobby_net_state_send`: retail re-truncates `kind` (`clrlwi r0,r30,24`) before the final test; every `kind`
+ *    type measured lets MWCC drop it (-4 B).
+ *  - `lobby_net_leave_select` (case 3 swaps r30/r31 for `map`/`angle`), `em020_arm_mot1_side_wait80` (retail builds
+ *    the motion in r4, ours through r0): register residuals no declaration order or type reached.
+ *  - Data: `.sdata2` is 16 B short at +0x454 (the lobby tail's own 0.0f/0.5f/int-to-float pool copies - the lobby
+ *    tail is its own TU) and `.data` places `__vt__13Em020UserData` last where retail has it before the lobby tail's
+ *    data at 0x805EE428 (the same seam); `.sbss` ends at 5 B where the target object carries a 3-byte tail.
+ *    `jump_err_msg_str` (`.sbss` 0x80794B10) is unclaimed and shared with `menu/menu_placeinfo.cpp` (rule 12 finding
+ *    in `unsplit/unknown.h`, filed).
  *  - Signature casts: `em_get_part_limit`, `pl_parts_refresh`, `requestListRefreshAlias`, `userdata_item_slot_count`,
- *    `quest_grade_get` and `calcVecAngX` are called through a function-pointer cast where the owner's declaration
+ *    `quest_grade_get`, `calcVecAngX` and `importLayerPeers` (retail reads an `s32` count) are called through a function-pointer cast where the owner's declaration
  *    differs from the retail call (decl requests filed).
  * SHAPES. `Em020UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
@@ -361,12 +369,13 @@ void quest_info_sheet_draw(s32 mode)
 
 /* 0x8036D6A8 (0x370): draws the quest board's detail block: the target and condition lines, with the reward row
  * hidden for the special modes and the arena quests. */
+#pragma peephole on
 void quest_info_detail_draw(s32 mode)
 {
     _mh_ivec2_ pos;
     s32 arena = 0;
     u16 id;
-    u8 sel;
+    u32 sel;
 
     if (mode == 2) {
         if (quest_flag_2000000_ck(quest_record_find(lb_param_w.field_0x00)) == 1)
@@ -415,6 +424,7 @@ void quest_info_detail_draw(s32 mode)
         draw_font_idx(0xA83, quest_info_text_get(mode, 0xE), 2, &pos);
     }
 }
+#pragma peephole off
 
 /* 0x8036DA18 (0x168): draws the quest board's summary block: the client lines, the two map lines and the two
  * monster lines. */
@@ -564,11 +574,9 @@ void quest_info_page_draw(QuestInfoPage* page)
 /* 0x8036E1D4 (0x98): prints the posted quest's name and message `index` at the window `pos`. */
 void quest_info_name_draw(u8 index, const _mh_ivec2_* pos)
 {
-    s16 y;
-    s16 x;
+    s32 x = pos->x;
+    s32 y = pos->y;
 
-    x = pos->x;
-    y = pos->y;
     font_set_size(0x16, 0x16);
     flfntSetColor(-1);
     font_locate(x + 0x22, y + 0x2A);
@@ -1163,6 +1171,7 @@ void em020_blast(_ENEMY_WORK* self)
 
 /* 0x8036F3C0 (0x524): the walking approach: motion 2 (alternating with 0xD4 for `kind` 1 and 2) with its hit
  * windows and stomps until the approach ends, then the closing motion (`end` 1 the swipe). */
+#pragma optimization_level 4
 void em020_walk_approach(_ENEMY_WORK* self, u8 kind, u8 end, u8 fast)
 {
     u16 mot;
@@ -1200,7 +1209,7 @@ void em020_walk_approach(_ENEMY_WORK* self, u8 kind, u8 end, u8 fast)
                 self->state_0x006 += 1;
                 break;
             case 2:
-                switch ((u32)self->state_0x006) {
+                switch (self->state_0x006) {
                 case 0:
                 case 1:
                     next = 2;
@@ -1274,6 +1283,7 @@ void em020_walk_approach(_ENEMY_WORK* self, u8 kind, u8 end, u8 fast)
         break;
     }
 }
+#pragma optimization_level reset
 
 /* 0x8036F8E4 (0x174): action 5's sub-state handlers. */
 void em020_action5_dispatch(_ENEMY_WORK* self)
@@ -1732,6 +1742,7 @@ void em020_spin(_ENEMY_WORK* self)
 
 /* 0x803708C0 (0x360): the first burrow attack: motion 0xC8 with its dust, the shell pair at frame 344 and the
  * camera shake. */
+#pragma opt_common_subs off
 void em020_burrow_attack_a(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
@@ -1780,9 +1791,11 @@ void em020_burrow_attack_a(_ENEMY_WORK* self)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* 0x80370C20 (0x3A8): the second burrow attack: motion 0xC9, turning back between frames 80 and 240, with its
  * dust, the shell pair at frame 556 and the camera shake. */
+#pragma opt_common_subs off
 void em020_burrow_attack_b(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
@@ -1834,6 +1847,7 @@ void em020_burrow_attack_b(_ENEMY_WORK* self)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* The two-directional 0x50/0x51-frame pose's wake-up: the argument picks the motion (0x51 when set,
  * 0x50 otherwise) and the sign of the 0x4000-step turn `em_turn_in_window` re-arms every frame. */
@@ -2293,6 +2307,7 @@ void em020_demo_hold(_ENEMY_WORK* self)
 
 /* 0x80372470 (0x4C0): the second demo: motion 0xD1 until demo frame 0x11A, then the three 0xD2 passes with their
  * effects and the shell pair at frame 794. */
+#pragma opt_common_subs off
 void em020_demo_burrow(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
@@ -2370,6 +2385,7 @@ void em020_demo_burrow(_ENEMY_WORK* self)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* 0x80372930 (0x28C): the third demo: motion 0x65 with the stage event, two joint effects, the 0xCF turn and the
  * closing 0x2C/0x29 motions. */
@@ -2623,32 +2639,31 @@ void em020_light_update(_ENEMY_WORK* self)
     f32 range;
     f32 falloff;
 
-    if (stage_map_kind_get(self->field_0x1E0) == 7) {
-        if (self->area_no == 0) {
-        } else if (em_area_ck(self) != 0) {
-            if (self->em020_0x328.latch_0x338 == 0) {
+    if (stage_map_kind_get(self->field_0x1E0) != 7 || self->area_no == 0)
+        return;
+    if (em_area_ck(self) != 0) {
+        if (self->em020_0x328.latch_0x338 == 0) {
+            color.r = 0xFF;
+            color.g = 0xFF;
+            color.b = 0xAA;
+            color.a = 0xFF;
+            range = 1210.0f;
+            falloff = 0.97f;
+        } else {
+            if (em_alt_mode_ck(self) == 1) {
+                color.r = 0xD2;
+                color.g = 0x69;
+                color.b = 0x87;
+            } else {
                 color.r = 0xFF;
                 color.g = 0xFF;
                 color.b = 0xAA;
-                color.a = 0xFF;
-                range = 1210.0f;
-                falloff = 0.97f;
-            } else {
-                if (em_alt_mode_ck(self) == 1) {
-                    color.r = 0xD2;
-                    color.g = 0x69;
-                    color.b = 0x87;
-                } else {
-                    color.r = 0xFF;
-                    color.g = 0xFF;
-                    color.b = 0xAA;
-                }
-                color.a = 0xFF;
-                range = 90000.0f;
-                falloff = 1.0f;
             }
-            light_point_set(self->em020_0x328.value_0x336, &self->pos, &color, range, falloff);
+            color.a = 0xFF;
+            range = 90000.0f;
+            falloff = 1.0f;
         }
+        light_point_set(self->em020_0x328.value_0x336, &self->pos, &color, range, falloff);
     }
 }
 
@@ -2681,6 +2696,7 @@ void em020_drool_spawn(_ENEMY_WORK* self)
 
 /* 0x803733BC (0x1CC8): the program's motion-event slot: the drool, then the effects, sounds and camera requests
  * keyed to the frames of the running motion, then the glow and the stage light. */
+#pragma opt_common_subs off
 void em020_motion_events(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
@@ -2992,6 +3008,7 @@ void em020_motion_events(_ENEMY_WORK* self)
     em020_glow_update(self);
     em020_light_update(self);
 }
+#pragma opt_common_subs reset
 
 #ifdef __cplusplus
 }
@@ -3109,12 +3126,10 @@ u32 em020_hp_ratio_ck(struct _ENEMY_WORK* self)
 {
     f32 ratio;
 
-    if (self->area_no != 3) {
-        return 0;
-    }
-    ratio = (f32)self->field_0x7A0 / (f32)self->field_0x7A4;
-    if (ratio <= 0.65f) {
-        return 1;
+    if (self->area_no == 3) {
+        ratio = (f32)(s32)self->field_0x7A0 / (f32)(s32)self->field_0x7A4;
+        if (ratio <= 0.65f)
+            return 1;
     }
     return 0;
 }
@@ -3595,6 +3610,7 @@ inline void lb_net_input_hold(void)
 /* 0x80375D30 (0xBC0): the lobby's network update: steps the lobby state block through the session join (cards,
  * roster, news, big data and notices), raises the lobby notice, then runs the error and sub-error windows and the
  * friend-list refresh. */
+#pragma opt_lifetimes off
 void lobby_net_update(void)
 {
     LobbyTimerBlock* block;
@@ -3625,7 +3641,7 @@ void lobby_net_update(void)
                 if (isLayerReady() == 0) {
                     lb_self_card_set(block);
                 } else {
-                    s32 count = importLayerPeers(peers);
+                    s32 count = ((s32 (*)(NetPeerList*))importLayerPeers)(peers);
                     NetPeerRec* peer;
 
                     i = 0;
@@ -3755,7 +3771,7 @@ void lobby_net_update(void)
                 NetCtrlWk::copyPeerList(peers);
             break;
         }
-        if (block->request_0x155C != 0 && block->busy_0x155D == 0) {
+        if ((s8)block->request_0x155C != 0 && (s8)block->busy_0x155D == 0) {
             lobby_notice_raise(block, 0);
             block->request_0x155C = 0;
         }
@@ -3809,21 +3825,23 @@ void lobby_net_update(void)
                 return;
             }
             if (lobby_w.refresh_step_0x177 == 0) {
-                switch (lobby_w.sub_err_step_0x16E) {
-                case 0:
-                    lobby_w.field_0x16F = NetCtrlWk::hasSubError();
-                    if (lobby_w.field_0x16F == 0)
-                        break;
-                    lobby_w.active_0x008 = 1;
-                    lobby_w.sub_err_wait_0x170 = 0;
-                    lobby_w.sub_err_step_0x16E++;
-                    Psw[0].button_0x2C0.pressed_0x04 = 0;
-                    Psw[0].button_0x2C0.held_0x14 = 0;
-                    fade_reset(0);
-                    kbd_close_call();
-                    menu_work.slot[0].field_0x32D = 0;
-                case 1:
-                    if (lobby_w.field_0x16F != 0) {
+                do {
+                    switch (lobby_w.sub_err_step_0x16E) {
+                    case 0:
+                        lobby_w.field_0x16F = NetCtrlWk::hasSubError();
+                        if (lobby_w.field_0x16F == 0)
+                            continue;
+                        lobby_w.active_0x008 = 1;
+                        lobby_w.sub_err_wait_0x170 = 0;
+                        lobby_w.sub_err_step_0x16E++;
+                        Psw[0].button_0x2C0.pressed_0x04 = 0;
+                        Psw[0].button_0x2C0.held_0x14 = 0;
+                        fade_reset(0);
+                        kbd_close_call();
+                        menu_work.slot[0].field_0x32D = 0;
+                    case 1:
+                        if (lobby_w.field_0x16F == 0)
+                            break;
                         lobby_w.net_err_0x168 = get_network_sub_error_msg();
                         if (lobby_w.net_err_0x168 != NULL)
                             subTransSetPrio(9, (u32)lobby_net_err_draw, 0, NULL);
@@ -3831,7 +3849,7 @@ void lobby_net_update(void)
                         if (get_fade_stat(0) != 2) {
                             if (lobby_w.sub_err_wait_0x170 < 0x3C) {
                                 if (file_loading_ck(0, 0) == 1)
-                                    break;
+                                    continue;
                                 lobby_w.sub_err_wait_0x170++;
                             } else {
                                 em020_unknown_flag_set(1);
@@ -3847,30 +3865,26 @@ void lobby_net_update(void)
                         Psw[0].button_0x2C0.held_0x14 = 0;
                         lb_pad_input_flush(&Psw[0]);
                         return;
-                    }
-                    lobby_w.sub_err_step_0x16E = 0;
-                    NetCtrlWk::clearSubError();
-                    lobby_w.active_0x008 = 0;
-                    Psw[0].button_0x2C0.pressed_0x04 = 0;
-                    Psw[0].button_0x2C0.held_0x14 = 0;
-                    lb_pad_input_flush(&Psw[0]);
-                    return;
-                case 2:
-                    if (lobby_w.sub_err_wait_0x170 > 0) {
-                        if (file_loading_ck(0, 0) != 1)
-                            lobby_w.sub_err_wait_0x170--;
-                        return;
-                    }
-                    if (NetCtrlWk::getLayerModeByte() == 2) {
-                        u8 map;
-                        u16 angle;
+                    case 2:
+                        if (lobby_w.sub_err_wait_0x170 > 0) {
+                            if (file_loading_ck(0, 0) != 1)
+                                lobby_w.sub_err_wait_0x170--;
+                            return;
+                        }
+                        if (NetCtrlWk::getLayerModeByte() == 2) {
+                            u8 map;
+                            u16 angle;
 
-                        lobby_area_change_req();
-                        map = get_now_mapno();
-                        angle = stage_entry_angle_get(map, 0);
-                        lobby_player_place(0, stage_entry_pos_get(map, 0), angle);
-                        lobby_net_leave();
-                        NetCtrlWk::setLayerModeByte(0);
+                            lobby_area_change_req();
+                            map = get_now_mapno();
+                            angle = stage_entry_angle_get(map, 0);
+                            lobby_player_place(0, stage_entry_pos_get(map, 0), angle);
+                            lobby_net_leave();
+                            NetCtrlWk::setLayerModeByte(0);
+                        }
+                        break;
+                    default:
+                        continue;
                     }
                     lobby_w.sub_err_step_0x16E = 0;
                     NetCtrlWk::clearSubError();
@@ -3879,13 +3893,15 @@ void lobby_net_update(void)
                     Psw[0].button_0x2C0.held_0x14 = 0;
                     lb_pad_input_flush(&Psw[0]);
                     return;
-                }
+                } while (0);
             }
-            switch (lobby_w.refresh_step_0x177) {
-            case 0: {
-                _PLW* players = (_PLW*)get_move_work_adrs(2);
+            do {
+                switch (lobby_w.refresh_step_0x177) {
+                case 0: {
+                    _PLW* players = (_PLW*)get_move_work_adrs(2);
 
-                if (isLayerReady() != 0 && NetCtrlWk::getLayerModeByte() == 1) {
+                    if (isLayerReady() == 0 || NetCtrlWk::getLayerModeByte() != 1)
+                        continue;
                     if (lobby_w.state_0x000 == 0 && (players->field_0xB01 & 7) == 0) {
                         if (((s32 (*)(s8*))NetCtrlWk::requestListRefreshAlias)(&lobby_w.refresh_result_0x178) == 0)
                             lobby_w.refresh_step_0x177 = 2;
@@ -3896,13 +3912,11 @@ void lobby_net_update(void)
                         NetCtrlWk::setLayerModeByte(0);
                         lobby_w.refresh_step_0x177 = 0;
                     }
-                    lb_net_input_hold();
-                    return;
+                    break;
                 }
-                break;
-            }
-            case 1:
-                if (lobby_w.refresh_result_0x178 != 0) {
+                case 1:
+                    if (lobby_w.refresh_result_0x178 == 0)
+                        continue;
                     if (lobby_w.refresh_result_0x178 < 0) {
                         lobby_w.refresh_step_0x177 = 2;
                     } else {
@@ -3910,17 +3924,18 @@ void lobby_net_update(void)
                         NetCtrlWk::setLayerModeByte(2);
                         lobby_w.refresh_step_0x177 = 0;
                     }
-                    lb_net_input_hold();
-                    return;
+                    break;
+                case 2:
+                    setErrorCode(4);
+                    NetCtrlWk::setLayerModeByte(0);
+                    lobby_w.refresh_step_0x177 = 0;
+                    break;
+                default:
+                    continue;
                 }
-                break;
-            case 2:
-                setErrorCode(4);
-                NetCtrlWk::setLayerModeByte(0);
-                lobby_w.refresh_step_0x177 = 0;
                 lb_net_input_hold();
                 return;
-            }
+            } while (0);
             if (getTermsCheckDone() == 1) {
                 NetCtrlWk::setSubError(0x1D);
                 acknowledgeTermsCheck();
@@ -3929,6 +3944,7 @@ void lobby_net_update(void)
         }
     }
 }
+#pragma opt_lifetimes reset
 
 /* 0x803768F0 (0x8): the network singleton. */
 PatInterface* getInstance_(void)
@@ -3945,6 +3961,29 @@ u32 lobby_net_busy_ck(void)
     if (lobby_w.field_0x163 == 0 && lobby_w.field_0x16F == 0 && lobby_w.field_0x0B0 == 0)
         return 0;
     return 1;
+}
+
+/* 0x80376964 (0x4): raises the lobby notice the update requests (an empty body). */
+void lobby_notice_raise(LobbyTimerBlock* block, s32 mode)
+{
+}
+
+/* The em020 quest-page pointer: the address of the shared quest-page block's fourth record.
+ * 0x80376968 */
+u8* em020_quest_page_ptr(void)
+{
+    return lobby_hunter_cards[0].key_0x03;
+}
+
+/* Clears the nine quest-page records after the first in the shared quest-page block.
+ * 0x80376978 */
+void em020_quest_pages_clear(void)
+{
+    s32 i;
+
+    for (i = 1; i < 10; i++) {
+        memset(&lobby_hunter_cards[i], 0, sizeof(LbQuestPage));
+    }
 }
 
 /* 0x803769D4 (0x64): whether `plw` is the session master: the game is ready, the layer is up and the master test
@@ -3985,31 +4024,9 @@ void lobby_net_position_send(_PLW* plw, u8 moving)
 }
 #pragma dont_inline off
 
-/* 0x80376964 (0x4): raises the lobby notice the update requests (an empty body). */
-void lobby_notice_raise(LobbyTimerBlock* block, s32 mode)
-{
-}
-
-/* The em020 quest-page pointer: the address of the shared quest-page block's fourth record.
- * 0x80376968 */
-u8* em020_quest_page_ptr(void)
-{
-    return lobby_hunter_cards[0].key_0x03;
-}
-
-/* Clears the nine quest-page records after the first in the shared quest-page block.
- * 0x80376978 */
-void em020_quest_pages_clear(void)
-{
-    s32 i;
-
-    for (i = 1; i < 10; i++) {
-        memset(&lobby_hunter_cards[i], 0, sizeof(LbQuestPage));
-    }
-}
-
 /* 0x80376B6C (0x1F0): sends `plw`'s action and position as profile part 1 (kind 1); unless `force`, only when the
  * action matters to the other players. */
+#pragma optimization_level 4
 void lobby_net_action_send(_PLW* plw, u8 force, u16 flags)
 {
     LbNetActionPacket packet;
@@ -4068,6 +4085,7 @@ void lobby_net_action_send(_PLW* plw, u8 force, u16 flags)
     }
     sendUserProfilePart(0, (const u8*)&packet, sizeof(packet));
 }
+#pragma optimization_level reset
 
 /* 0x80376D5C (0x50): sends `plw`'s action (`lobby_net_action_send`) while the layer is up. */
 void lobby_net_action_update(_PLW* plw, u16 flags)
@@ -4397,11 +4415,9 @@ void lobby_net_state_request_recv(const LbNetPacketHead* packet)
 {
     _PLW* plw = (_PLW*)get_move_work_adrs(2);
 
-    if (plw != NULL && plw->slot_active != 0) {
-        if (plw->field_0x001 == 0)
-            return;
-        lobby_net_state_send(&plw[(s8)my_player_no()], packet, 0);
-    }
+    if (plw == NULL || plw->slot_active == 0 || plw->field_0x001 == 0)
+        return;
+    lobby_net_state_send(&plw[(s8)my_player_no()], packet, 0);
 }
 
 #pragma dont_inline on
@@ -4619,7 +4635,7 @@ void lobby_net_flag_send(u16 on)
 
     if (isNetCityMode() != 0) {
         memset(&packet, 0, sizeof(LbNetPacketHead));
-        packet.head.kind_0x00 = on == 0 ? 0x12 : 0x13;
+        packet.head.kind_0x00 = on == 0 ? (u8)0x12 : (u8)0x13;
         packet.head.valid_0x01 = 1;
         memcpy(packet.head.from_0x04, em020_quest_page_ptr(), 0xA);
         sendUserProfilePart(0, (const u8*)&packet, sizeof(LbNetPacketHead));
@@ -4932,11 +4948,12 @@ u8 dropLobbyMail(s32 index)
 }
 
 /* 0x80378C2C (0x78): copies a mail row field by field. */
-void LobbyMailRow::assign(const LobbyMailRow* src)
+LobbyMailRow* LobbyMailRow::assign(const LobbyMailRow* src)
 {
     name_0x00 = src->name_0x00;
     id_0x14 = src->id_0x14;
     body_0x1F = src->body_0x1F;
+    return this;
 }
 
 /* 0x80378CA4 (0x78): whether the friend list holds the id text `id`. */

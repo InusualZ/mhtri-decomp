@@ -82,7 +82,7 @@ struct LobbyMailRow {
     /* +0x14 */ struct LobbyMailIdText id_0x14;
     /* +0x1F */ struct LobbyMailBody body_0x1F;
 #ifdef __cplusplus
-    void assign(const LobbyMailRow* src);
+    LobbyMailRow* assign(const LobbyMailRow* src);
 #endif
 }; /* size: 0xE0 */
 
