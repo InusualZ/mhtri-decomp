@@ -16,8 +16,8 @@ struct FqResultWork* get_FqResult_work(void);
 /* 0x8004D334 / 0x8004E568 / 0x8004E5A4 / 0x8004E5E0 - the save block's money (clamped to 9999999), a monster's
  * hunt and capture counts (capped at 9999), and its smallest/largest size record.  GUESS names. */
 void userdata_zenny_add(s32 amount);
-void userdata_hunt_count_add(u8 monster, s32 count);
-void userdata_capture_count_add(u8 monster, s32 count);
+void userdata_hunt_count_add(u8 monster, u16 count);
+void userdata_capture_count_add(u8 monster, u16 count);
 void userdata_size_record_set(u8 monster, u16 size);
 
 #ifdef __cplusplus

@@ -344,17 +344,23 @@ struct Q_GunSet {
     /* +0x07 */ u8 unused_0x07[0x1E - 0x07];
 };
 
+/* The ids of an item-menu row record after its kind word; one nested record, so a row copy moves it as words.
+ * size: 0xC */
+struct Q_ItemRowIds {
+    /* +0x00 */ u16 equip_kind_0x00;
+    /* +0x02 */ u16 equip_id_0x02;
+    /* +0x04 */ u16 item_id_0x04;
+    /* +0x06 */ u16 id_0x06;
+    /* +0x08 */ u16 value_0x08;
+    /* +0x0A */ u8 unused_0x0A[0xC - 0xA];
+};
+
 /* One row record of the save block's item-menu log, as the save side reads it (the menu reads the same 16 bytes
  * through `menu/menu_item_page.h`'s `MenuRowData`): the row kind (0 for an empty row) and the ids the kinds use -
  * 3/4 an equipment id at +0x06, 1/2 an item id at +0x08, 6 an id at +0x0A.  size: 0x10 */
 struct Q_ItemRow {
     /* +0x00 */ u32 kind_0x00;
-    /* +0x04 */ u16 equip_kind_0x04;
-    /* +0x06 */ u16 equip_id_0x06;
-    /* +0x08 */ u16 item_id_0x08;
-    /* +0x0A */ u16 id_0x0A;
-    /* +0x0C */ u16 value_0x0C;
-    /* +0x0E */ u8 unused_0x0E[0x10 - 0x0E];
+    /* +0x04 */ Q_ItemRowIds ids_0x04;
 };
 
 /* The text fields of a saved friend, each its own type so a row copy goes field by field (as the retail copy does). */

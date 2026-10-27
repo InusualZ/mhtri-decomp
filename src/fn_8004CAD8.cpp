@@ -6,7 +6,9 @@
  *   One TU: its .sdata2 pool holds no duplicate value (fn_80047398.cpp and userdata_item.cpp each pool their own
  *   0x4330000000000000/1.0f), and every section tiles with its neighbours.
  * FLAGS. `#pragma peephole off` (retail re-extends narrow parameters with clrlwi/extsh and keeps not+and; 30 -> 53 of
- *   86 rows identical when measured) and `#pragma fp_contract off` (retail keeps fmuls+fadds).  The nw4r/SDK inline
+ *   86 rows identical when measured), `#pragma fp_contract off` (retail keeps fmuls+fadds) and `#pragma
+ *   optimization_level 4` for the whole file (retail lowers small switches to subi+cmplwi range tests, playbook 108:
+ *   item_se_ck and four more rows reach the target only at -O4, none drops).  The nw4r/SDK inline
  *   helpers retail emits out of line (MTX34/VEC3 conversions, VEC3Sub/Add/Scale/Dot/LenSq, FSqrt, MTX34RotXYZRad)
  *   are written as the functions they compile to; the fast casts come from OS/OSFastCast.h under `dont_inline`.
  * NAMES. Class 4: no `__FILE__` string (only nw4r's "arithmetic.h") and the dump has `zz_` placeholders.  Module
@@ -14,11 +16,19 @@
  *   GUESS (from each body and its callers): every renamed own row of this range (userdata_*, my_set/gun_set_*,
  *   hunter_rank_*, gallery_*, vs_user_*, wpad_*, mtx34_*, vec3_*, ivec2_*, hermite_interp, calcAngXZ, calcMtxAngX,
  *   rotMatrixXYZ, cpSetRotMatrixYXZ, math_sqrtf, monster_size_table_get (foreign), the three unowned tables.
- * RESIDUALS. write_wpad_memory 70 % / read_wpad_memory 83 %: retail shares the read and verify-retry tails between
- *   steps 3 and 4 (and 0 and 1) - goto-shaped; the goto-free source duplicates them (+204 B / -8 B).
- *   getDirVec 65 %: retail returns the VEC3 by NRVO (VEC3 had a constructor there); nw4r::math::VEC3 here has none.
- *   lobby_friend_list_sort 84 %, item_se_ck 83 %, hunter_rank_tier_get 67 %, the *_count_add pair 78 %:
- *   register/compare-shape residuals not reached by source variants tried.
+ * RESIDUALS. write_wpad_memory: retail keeps one copy of the remote read tail and one of the verify-retry tail inside
+ *   step 3 and branches into both from step 4 (idea 213); the goto-free source shares the verify-retry tail after the
+ *   switch (do/while(0), idea 183) and duplicates the read tail in step 4 (+108 B, the bodies after it shift).
+ *   read_wpad_memory: step 1's error results branch back to step 0's read loop (a backward jump into another case);
+ *   the goto-free source omits those six instructions.
+ *   getDirVec, assignVec3: retail copies VEC3 as words and returns it by NRVO - its VEC3 derives from a base struct
+ *   with a constructor; the shared nw4r::math::VEC3 here is a plain struct of floats (a 399-includer header).
+ *   gun_set_box_used_ck keeps the last test as a branch where ours folds it to cntlzw; hunter_rank_points_get hoists
+ *   the 10000000 return above the loop; set_mydata2vs ORs the tick first (`or r0,r4,r0`); lobby_friend_list_sort,
+ *   userdata_hunter_rank_info_get, userdata_size_records_update, monster_size_crown_get, my_set_equip_id_swap,
+ *   my_set_gun_id_swap, userdata_item_row_push, exportEquipRecord, userdata_worn_refresh: register order.
+ *   exportItemBoxPage writes `(u16)(page * 50)` (the cast keeps retail's two multiplies; retail has no clrlwi).
+ *   userdata_hunter_points_apply reads hunter_points_0x3DE0 as u32 (retail compares it unsigned; the shared field is s32).
  *   Data: .data/.sdata/.sdata2 not yet emitted in retail order (string literals and pool entries compile to @N);
  *   .data 0x80581180..0x805813E8 (event_flag_id_table, hunter_rank_points_table, gallery_unlock_table) is read only
  *   here but lies before userdata_item.cpp's .data, so it stays unclaimed (src/unsplit/userdata_tables.h).
@@ -26,6 +36,7 @@
 
 #pragma peephole off
 #pragma fp_contract off
+#pragma optimization_level 4
 
 #include "types.h"
 #include "nw4r/math.h"               /* nw4r::math::VEC3 / MTX34 + the free-function declarations (rule 9) */
@@ -273,8 +284,8 @@ extern "C" void userdata_worn_refresh(Q_UserData* user)
         user->parts_0x002C[1].kind = 13;
         user->parts_0x002C[1].item_id = user->weapon_0x0020.item_id;
     } else {
-        _EQUIP* part = user->parts_0x002C;
-        for (i = 0; i < 2; i++, part++) {
+        _EQUIP* part;
+        for (i = 0, part = user->parts_0x002C; i < 2; i++, part++) {
             if (user->box_parts_0x008E[i] != 0xFFFF &&
                 (u8)equip_kind_table_class(user->equip_box_0x0E00[user->box_parts_0x008E[i]].kind) == 2) {
                 equip_record_copy(part, &user->equip_box_0x0E00[user->box_parts_0x008E[i]]);
@@ -685,8 +696,8 @@ extern "C" void my_set_equip_id_swap(Q_UserData* user, u16 a, u16 b)
 {
     int i;
     int j;
-    Q_MySet* set = user->my_set_0x3380;
-    for (i = 0; i < 20; i++) {
+    Q_MySet* set;
+    for (i = 0, set = user->my_set_0x3380; i < 20; set++, i++) {
         box_index_swap(&set->weapon_0x00, a, b);
         for (j = 0; j < 2; j++) {
             box_index_swap(&set->parts_0x02[j], a, b);
@@ -697,7 +708,6 @@ extern "C" void my_set_equip_id_swap(Q_UserData* user, u16 a, u16 b)
         box_index_swap(&set->armour_0x06[1], a, b);
         box_index_swap(&set->armour_0x06[2], a, b);
         box_index_swap(&set->armour_0x06[5], a, b);
-        set++;
     }
 }
 
@@ -770,15 +780,14 @@ extern "C" u32 gun_set_record_used_ck(Q_UserData* user, u16 box)
 /* 0x8004DCF0 (0x84): swaps box indices `a` and `b` in every bowgun set. */
 extern "C" void my_set_gun_id_swap(Q_UserData* user, u16 a, u16 b)
 {
+    Q_GunSet* set;
     int i;
     int j;
-    Q_GunSet* set = user->gun_set_0x36C8;
-    for (i = 0; i < 20; i++) {
+    for (i = 0, set = user->gun_set_0x36C8; i < 20; set++, i++) {
         box_index_swap(&set->weapon_0x00, a, b);
         for (j = 0; j < 2; j++) {
             box_index_swap(&set->parts_0x02[j], a, b);
         }
-        set++;
     }
 }
 
@@ -791,7 +800,7 @@ extern "C" u32 userdata_rank_band_get(void)
     if (rank == 0) {
         return 0;
     }
-    return 2 - (rank <= 30);
+    return (rank <= 30) ? 1 : 2;
 }
 
 /* 0x8004DDA4 (0x28): starts the hunter rank at 1; returns 0 when it had already started. */
@@ -927,14 +936,18 @@ extern "C" void userdata_hunter_points_hold(Q_UserData* user, u16 rank)
  * returns 1 when the points fell below the rank, 2 at the cap, 3..7 at a gate, else 0. */
 extern "C" s32 userdata_hunter_points_apply(Q_UserData* user, s32 points)
 {
-    u16 rank = user->hunter_rank_0x3DE4;
-    s32 result = 0;
-    u32 magnitude = points;
+    u32 magnitude;
     u32 start;
-    u16 next;
+    u32 next;
+    u16 rank;
+    s32 result;
 
+    rank = user->hunter_rank_0x3DE4;
+    result = 0;
     if (points < 0) {
         magnitude = -points;
+    } else {
+        magnitude = points;
     }
     if (points < 0 && user->hunter_points_0x3DE0 < magnitude) {
         user->hunter_points_0x3DE0 = 0;
@@ -942,7 +955,7 @@ extern "C" s32 userdata_hunter_points_apply(Q_UserData* user, s32 points)
     } else {
         user->hunter_points_0x3DE0 += points;
     }
-    if (user->hunter_points_0x3DE0 > 9999999) {
+    if ((u32)user->hunter_points_0x3DE0 > 9999999) {
         user->hunter_points_0x3DE0 = 9999999;
     }
     start = hunter_rank_points_get(rank);
@@ -1093,7 +1106,7 @@ extern "C" void userdata_size_records_update(const Q_SizeRecord* sizes, u8 which
 }
 
 /* 0x8004E568 (0x3C): adds `count` hunts of monster `monster`, clamped to 9999. */
-extern "C" void userdata_hunt_count_add(u8 monster, s32 count)
+extern "C" void userdata_hunt_count_add(u8 monster, u16 count)
 {
     userdata_block()->set_a.count[monster] += count;
     if (userdata_block()->set_a.count[monster] > 9999) {
@@ -1102,7 +1115,7 @@ extern "C" void userdata_hunt_count_add(u8 monster, s32 count)
 }
 
 /* 0x8004E5A4 (0x3C): adds `count` captures of monster `monster`, clamped to 9999. */
-extern "C" void userdata_capture_count_add(u8 monster, s32 count)
+extern "C" void userdata_capture_count_add(u8 monster, u16 count)
 {
     userdata_block()->set_b.count[monster] += count;
     if (userdata_block()->set_b.count[monster] > 9999) {
@@ -1134,8 +1147,8 @@ extern "C" u8 monster_size_crown_get(u8 monster, u16 size)
     u16 small;
 
     monster_size_table_get(monster, &table);
-    silver = table[0];
     gold = table[1];
+    silver = table[0];
     small = table[2];
     if (silver == 0 && gold == 0 && small == 0) {
         return 0xFF;
@@ -1292,14 +1305,16 @@ extern "C" Q_ItemRow* userdata_item_rows_get(void)
 extern "C" void userdata_item_row_push(const Q_ItemRow* row)
 {
     int i;
-    Q_ItemRow* rows = get_userdata()->item_rows_0x4078;
-    Q_ItemRow* rec = rows;
+    Q_UserData* user = get_userdata();
+    Q_ItemRow* rows;
+    Q_ItemRow* rec = user->item_rows_0x4078;
     for (i = 0; i < 8; i++, rec++) {
         if (rec->kind_0x00 == 0) {
             place_rec_copy(rec, row);
             return;
         }
     }
+    rows = user->item_rows_0x4078;
     for (i = 0; i < 7; i++, rows++) {
         place_rec_copy(rows, rows + 1);
     }
@@ -1321,18 +1336,18 @@ extern "C" u32 item_se_ck(u16 item)
         switch (row->kind_0x00) {
         case 1:
         case 2:
-            if (row->item_id_0x08 == item) {
+            if (row->ids_0x04.item_id_0x04 == item) {
                 return 1;
             }
             break;
         case 3:
         case 4:
-            if (row->equip_id_0x06 == item) {
+            if (row->ids_0x04.equip_id_0x02 == item) {
                 return 1;
             }
             break;
         case 6:
-            if (row->id_0x0A == item) {
+            if (row->ids_0x04.id_0x06 == item) {
                 return 1;
             }
             break;
@@ -1347,11 +1362,10 @@ extern "C" u32 item_se_ck(u16 item)
 extern "C" void userdata_arena_rows_export(u8* dst)
 {
     int i;
-    Q_ArenaRow* row = get_userdata()->arena_rows_0x4114;
+    Q_UserData* user = get_userdata();
     for (i = 0; i < 12; i++) {
-        memcpy(dst, row->data_0x00, sizeof(row->data_0x00));
-        dst += sizeof(row->data_0x00);
-        row++;
+        memcpy(dst, user->arena_rows_0x4114[i].data_0x00, sizeof(user->arena_rows_0x4114[i].data_0x00));
+        dst += sizeof(user->arena_rows_0x4114[i].data_0x00);
     }
 }
 
@@ -1359,11 +1373,10 @@ extern "C" void userdata_arena_rows_export(u8* dst)
 extern "C" void userdata_arena_rows_import(const u8* src)
 {
     int i;
-    Q_ArenaRow* row = get_userdata()->arena_rows_0x4114;
+    Q_UserData* user = get_userdata();
     for (i = 0; i < 12; i++) {
-        memcpy(row->data_0x00, src, sizeof(row->data_0x00));
-        src += sizeof(row->data_0x00);
-        row++;
+        memcpy(user->arena_rows_0x4114[i].data_0x00, src, sizeof(user->arena_rows_0x4114[i].data_0x00));
+        src += sizeof(user->arena_rows_0x4114[i].data_0x00);
     }
 }
 
@@ -1391,14 +1404,15 @@ extern "C" void lobby_friend_list_sort(LobbyFriendList* list)
     for (i = 0; i < book->count_0x000;) {
         found = 0;
         for (j = 0; j < list->count_0x000 && found == 0; j++) {
-            if (list->rows_0x004[j].id_0x14 != NULL &&
-                strcmp(list->rows_0x004[j].id_0x14, book->rows_0x004[i].id_0x14.text_0x00) == 0) {
+            LobbyTimerRow* lrow = &list->rows_0x004[j];
+            if (lrow->id_0x14 != NULL && strcmp(lrow->id_0x14, book->rows_0x004[i].id_0x14.text_0x00) == 0) {
                 found = 1;
             }
         }
         if (found == 0 && book->count_0x000 > 0) {
-            book->rows_0x004[i].name_0x00.text_0x00[0] = 0;
-            book->rows_0x004[i].id_0x14.text_0x00[0] = 0;
+            row = &book->rows_0x004[i];
+            row->name_0x00.text_0x00[0] = 0;
+            row->id_0x14.text_0x00[0] = 0;
             for (k = i; k + 1 < book->count_0x000; k++) {
                 userdata_friend_row_copy(&book->rows_0x004[k], &book->rows_0x004[k + 1]);
             }
@@ -1408,22 +1422,26 @@ extern "C" void lobby_friend_list_sort(LobbyFriendList* list)
         }
     }
     for (j = 0; j < list->count_0x000; j++) {
+        LobbyTimerRow* lrow = &list->rows_0x004[j];
         index = -1;
         for (k = 0; k < book->count_0x000; k++) {
-            if (strcmp(list->rows_0x004[j].id_0x14, book->rows_0x004[k].id_0x14.text_0x00) == 0) {
+            Q_FriendRow* brow = &book->rows_0x004[k];
+            if (strcmp(lrow->id_0x14, brow->id_0x14.text_0x00) == 0) {
                 index = k;
             }
         }
         if (index == -1 && book->count_0x000 < 50) {
             book->count_0x000++;
             row = &book->rows_0x004[book->count_0x000 - 1];
-            strcpy(row->name_0x00.text_0x00, list->rows_0x004[j].name_0x00);
-            strcpy(row->id_0x14.text_0x00, list->rows_0x004[j].id_0x14);
+            strcpy(row->name_0x00.text_0x00, lrow->name_0x00);
+            strcpy(row->id_0x14.text_0x00, lrow->id_0x14);
         }
     }
     for (i = 0; i < book->count_0x000; i++) {
+        Q_FriendRow* brow = &book->rows_0x004[i];
         for (j = 0; j < list->count_0x000; j++) {
-            if (strcmp(list->rows_0x004[j].id_0x14, book->rows_0x004[i].id_0x14.text_0x00) == 0 && j != i) {
+            LobbyTimerRow* lrow = &list->rows_0x004[j];
+            if (strcmp(lrow->id_0x14, brow->id_0x14.text_0x00) == 0 && j != i) {
                 LobbyTimerRow tmp;
                 lobby_friend_row_copy(&tmp, &list->rows_0x004[i]);
                 lobby_friend_row_copy(&list->rows_0x004[i], &list->rows_0x004[j]);
@@ -1643,144 +1661,144 @@ s32 write_wpad_memory(u8 player, u8 mode)
         pressed = Psw[player].button_0x2C0.pressed_0x04;
     }
     vs = vs_user_slot_get(player);
-    switch (wpad_mem_step) {
-    case 0:
-        if (wpad_game_title_get(wpad_mem_chan, &title) == 0) {
-            for (i = 0; i < 16; i++) {
-                if (title[i] != wpad_game_title[i]) {
-                    break;
+    do {
+        switch (wpad_mem_step) {
+        case 0:
+            if (wpad_game_title_get(wpad_mem_chan, &title) == 0) {
+                for (i = 0; i < 16; i++) {
+                    if (title[i] != wpad_game_title[i]) {
+                        break;
+                    }
                 }
-            }
-            if (i >= 16) {
-                if (mode == 1) {
-                    wpad_mem_step = 2;
-                    break;
+                if (i >= 16) {
+                    if (mode == 1) {
+                        wpad_mem_step = 2;
+                        continue;
+                    }
+                    wpad_mem_result = 100;
+                } else {
+                    wpad_mem_result = 101;
                 }
-                wpad_mem_result = 100;
-            } else {
-                wpad_mem_result = 101;
+                wpad_mem_sel = 1;
+                wpad_mem_step = 1;
+                return wpad_mem_result;
             }
-            wpad_mem_sel = 1;
-            wpad_mem_step = 1;
-            return wpad_mem_result;
-        }
-        wpad_mem_step = 2;
-        break;
-    case 1:
-        if ((pressed & 8) && wpad_mem_sel == 0) {
-            wpad_mem_sel = 1;
-            sysSE_req(3);
-            return wpad_mem_result;
-        }
-        if ((pressed & 4) && wpad_mem_sel == 1) {
-            wpad_mem_sel = 0;
-            sysSE_req(3);
-            return wpad_mem_result;
-        }
-        if (pressed & 0x10) {
-            sysSE_req(0);
-            if (wpad_mem_sel == 1) {
-                return -100;
-            }
-            wpad_mem_result = 0;
             wpad_mem_step = 2;
-            break;
-        }
-        return wpad_mem_result;
-    case 2:
-        wpad_mem_done = 0;
-        wpad_game_title_set(wpad_game_title);
-        ret = wpad_game_data_write(wpad_mem_chan, (u8*)vs, 0x100, 0, wpad_memory_callback);
-        switch (ret) {
-        case -1:
-        case -2:
-            wpad_mem_result = ret;
-            return ret;
-        case 0:
-            wpad_mem_step = 3;
-            break;
-        }
-        break;
-    case 3:
-        if (wpad_mem_done == 0) {
-            break;
-        }
-        switch (wpad_mem_result) {
-        case -1:
-        case -2:
-        case -3:
-            if (++wpad_mem_verify_retry > 3) {
+            continue;
+        case 1:
+            if ((pressed & 8) && wpad_mem_sel == 0) {
+                wpad_mem_sel = 1;
+                sysSE_req(3);
                 return wpad_mem_result;
             }
-            wpad_mem_step = 0;
-            break;
-        case 0:
-            wpad_mem_done = 0;
-            ret = wpad_game_data_read(wpad_mem_chan, wpad_mem_buf, 0x100, 0, wpad_memory_callback);
-            switch (ret) {
-            case -1:
-            case -2:
-            case -5:
-            case -6:
-                if (++wpad_mem_read_retry > 3) {
-                    return wpad_mem_result;
-                }
-                break;
-            case 0:
-                wpad_mem_step = 4;
-                break;
-            }
-            break;
-        }
-        break;
-    case 4:
-        if (wpad_mem_done == 0) {
-            break;
-        }
-        switch (wpad_mem_result) {
-        case -1:
-        case -2:
-        case -3:
-            wpad_mem_done = 0;
-            ret = wpad_game_data_read(wpad_mem_chan, wpad_mem_buf, 0x100, 0, wpad_memory_callback);
-            switch (ret) {
-            case -1:
-            case -2:
-            case -5:
-            case -6:
-                if (++wpad_mem_read_retry > 3) {
-                    return wpad_mem_result;
-                }
-                break;
-            case 0:
-                wpad_mem_step = 4;
-                break;
-            }
-            break;
-        case -5:
-        case -6:
-            if (++wpad_mem_verify_retry > 3) {
+            if ((pressed & 4) && wpad_mem_sel == 1) {
+                wpad_mem_sel = 0;
+                sysSE_req(3);
                 return wpad_mem_result;
             }
-            wpad_mem_step = 0;
+            if (pressed & 0x10) {
+                sysSE_req(0);
+                if (wpad_mem_sel == 1) {
+                    return -100;
+                }
+                wpad_mem_result = 0;
+                wpad_mem_step = 2;
+                continue;
+            }
+            return wpad_mem_result;
+        case 2:
+            wpad_mem_done = 0;
+            wpad_game_title_set(wpad_game_title);
+            ret = wpad_game_data_write(wpad_mem_chan, (u8*)vs, 0x100, 0, wpad_memory_callback);
+            switch (ret) {
+            case 0:
+                wpad_mem_step = 3;
+                continue;
+            case -1:
+            case -2:
+                wpad_mem_result = ret;
+                return ret;
+            }
+            continue;
+        case 3:
+            if (wpad_mem_done == 0) {
+                continue;
+            }
+            switch (wpad_mem_result) {
+            case -1:
+            case -2:
+            case -3:
+                break;
+            case 0:
+                wpad_mem_done = 0;
+                ret = wpad_game_data_read(wpad_mem_chan, wpad_mem_buf, 0x100, 0, wpad_memory_callback);
+                switch (ret) {
+                case 0:
+                    wpad_mem_step = 4;
+                    continue;
+                case -1:
+                case -2:
+                case -5:
+                case -6:
+                    if (++wpad_mem_read_retry > 3) {
+                        return wpad_mem_result;
+                    }
+                    continue;
+                }
+                continue;
+            default:
+                continue;
+            }
             break;
-        case 0:
-            for (i = 0; i < 0x100; i++) {
-                if (*(u8*)vs != *wpad_mem_buf) {
+        case 4:
+            if (wpad_mem_done == 0) {
+                continue;
+            }
+            switch (wpad_mem_result) {
+            case -1:
+            case -2:
+            case -3:
+                wpad_mem_done = 0;
+                ret = wpad_game_data_read(wpad_mem_chan, wpad_mem_buf, 0x100, 0, wpad_memory_callback);
+                switch (ret) {
+                case 0:
+                    wpad_mem_step = 4;
+                    continue;
+                case -1:
+                case -2:
+                case -5:
+                case -6:
+                    if (++wpad_mem_read_retry > 3) {
+                        return wpad_mem_result;
+                    }
+                    continue;
+                }
+                continue;
+            case -5:
+            case -6:
+                break;
+            case 0:
+                for (i = 0; i < 0x100; i++) {
+                    if (*(u8*)vs != *wpad_mem_buf) {
+                        break;
+                    }
+                }
+                if (i < 0x100) {
                     break;
                 }
+                return 1;
+            default:
+                continue;
             }
-            if (i < 0x100) {
-                if (++wpad_mem_verify_retry > 3) {
-                    return wpad_mem_result;
-                }
-                wpad_mem_step = 0;
-                break;
-            }
-            return 1;
+            break;
+        default:
+            continue;
         }
-        break;
-    }
+        if (++wpad_mem_verify_retry > 3) {
+            return wpad_mem_result;
+        }
+        wpad_mem_step = 0;
+    } while (0);
     return 0;
 }
 
@@ -1794,6 +1812,7 @@ s32 read_wpad_memory(_vs_user_data* dst, u8 mode)
     u32 sum;
     int i;
     _vs_user_data* vs;
+    u8* p;
 
     switch (wpad_mem_step) {
     case 0:
@@ -1802,6 +1821,9 @@ s32 read_wpad_memory(_vs_user_data* dst, u8 mode)
             wpad_mem_done = 0;
             ret = wpad_game_data_read(wpad_mem_chan, wpad_mem_buf, 0x100, 0, wpad_memory_callback);
             switch (ret) {
+            case 0:
+                wpad_mem_step = 1;
+                break;
             case -1:
             case -2:
             case -5:
@@ -1810,9 +1832,6 @@ s32 read_wpad_memory(_vs_user_data* dst, u8 mode)
                     return wpad_mem_result;
                 }
                 continue;
-            case 0:
-                wpad_mem_step = 1;
-                break;
             }
             break;
         }
@@ -1824,8 +1843,9 @@ s32 read_wpad_memory(_vs_user_data* dst, u8 mode)
         switch (wpad_mem_result) {
         case 0:
             sum = 0;
+            p = wpad_mem_buf;
             for (i = 0; i < 0xFC; i++) {
-                sum += wpad_mem_buf[i];
+                sum += *p++;
             }
             vs = (_vs_user_data*)wpad_mem_buf;
             if (sum == 0) {
@@ -1891,7 +1911,7 @@ extern "C" void exportItemBoxPage(ItemBoxPageRecord* rec, s32 page)
     for (i = 0; i < 30; i++) {
         rec->item_seen_0x258[i] = user->item_seen_0x4AD8[i];
     }
-    src = &user->equip_box_0x0E00[page * 50];
+    src = &user->equip_box_0x0E00[(u16)(page * 50)];
     dst = rec->equip_0x000;
     for (i = 0; i < 50; i++) {
         equip_record_copy(dst, src);
@@ -1934,12 +1954,12 @@ extern "C" char* findSubstring(const char* haystack, const char* needle);
  * the message's display length (0 for a bad id or no buffer). */
 s32 wii_sysmsg_gen(long id, char* out, long unused)
 {
-    char number[16];
-    char text[512];
     char message[512];
-    char* part;
     char* tag;
     s32 len;
+    char number[16];
+    char* part;
+    char text[512];
 
     if (id >= 24) {
         return 0;
@@ -1991,7 +2011,7 @@ void vec_to_mh_vec3(VEC3* dst, Vec* src)
 }
 
 /* 0x8004FFC8 (0x60): builds the capsule from its two end points and its radius. */
-extern "C" void capsule_box_from_points(VEC3* start, VEC3* end, nw4r::math::CAPSULE* out, f32 radius)
+extern "C" void capsule_box_from_points(VEC3* start, VEC3* end, f32 radius, nw4r::math::CAPSULE* out)
 {
     copyVec3(&out->start, start);
     copyVec3(&out->end, end);
@@ -2702,8 +2722,9 @@ extern "C" VEC3* vec3_cross(VEC3* out, const VEC3* a, const VEC3* b)
 
 /* 0x80051894 (0x2E8): blends `a` and `b` with the weights `wa`/`wb` into `out`: the rotation re-orthonormalised
  * from the blended X and Y columns, the column scales blended unless `keep_unit`, the translation blended. */
-extern "C" void mtx34_blend(MTX34* out, const MTX34* a, const MTX34* b, u8 keep_unit, f32 wa, f32 wb)
+extern "C" void mtx34_blend(MTX34* out, const MTX34* a, const MTX34* b, f32 wa, f32 wb, u8 keep_unit)
 {
+    f32 len_b;
     VEC3 y_dir;
     VEC3 x_dir;
     VEC3 unused;
@@ -2726,21 +2747,24 @@ extern "C" void mtx34_blend(MTX34* out, const MTX34* a, const MTX34* b, u8 keep_
         setVector3(&column, a->m[0][0], a->m[1][0], a->m[2][0]);
         len = vec3_len(&column);
         setVector3(&column, b->m[0][0], b->m[1][0], b->m[2][0]);
-        scale = len * wa + vec3_len(&column) * wb;
+        len_b = vec3_len(&column);
+        scale = len * wa + len_b * wb;
         out->m[0][0] *= scale;
         out->m[1][0] *= scale;
         out->m[2][0] *= scale;
         setVector3(&column, a->m[0][1], a->m[1][1], a->m[2][1]);
         len = vec3_len(&column);
         setVector3(&column, b->m[0][1], b->m[1][1], b->m[2][1]);
-        scale = len * wa + vec3_len(&column) * wb;
+        len_b = vec3_len(&column);
+        scale = len * wa + len_b * wb;
         out->m[0][1] *= scale;
         out->m[1][1] *= scale;
         out->m[2][1] *= scale;
         setVector3(&column, a->m[0][2], a->m[1][2], a->m[2][2]);
         len = vec3_len(&column);
         setVector3(&column, b->m[0][2], b->m[1][2], b->m[2][2]);
-        scale = len * wa + vec3_len(&column) * wb;
+        len_b = vec3_len(&column);
+        scale = len * wa + len_b * wb;
         out->m[0][2] *= scale;
         out->m[1][2] *= scale;
         out->m[2][2] *= scale;
@@ -2750,26 +2774,26 @@ extern "C" void mtx34_blend(MTX34* out, const MTX34* a, const MTX34* b, u8 keep_
     out->m[2][3] = a->m[2][3] * wa + b->m[2][3] * wb;
 }
 
-extern "C" void vec3_polar_offset(VEC3* out, const VEC3* center, u16 yaw, f32 dist);
-extern "C" void vec3_polar_offset2(VEC3* out, const VEC3* center, u16 pitch, u16 yaw, f32 dist);
+extern "C" void vec3_polar_offset(VEC3* out, const VEC3* center, f32 dist, u16 yaw);
+extern "C" void vec3_polar_offset2(VEC3* out, const VEC3* center, f32 dist, u16 pitch, u16 yaw);
 
 /* 0x80051B7C (0xF4): a random point around `center` within `radius`: on the ground plane (`mode` 0) or in any
  * direction (`mode` 1). */
-extern "C" void vec3_random_offset(VEC3* out, const VEC3* center, u8 mode, f32 radius)
+extern "C" void vec3_random_offset(VEC3* out, const VEC3* center, f32 radius, u8 mode)
 {
     radius *= ran_suu(0) / 65535.0f;
     switch (mode) {
     case 0:
-        vec3_polar_offset(out, center, ran_suu(0), radius);
+        vec3_polar_offset(out, center, radius, ran_suu(0));
         break;
     case 1:
-        vec3_polar_offset2(out, center, ran_suu(0), ran_suu(0), radius);
+        vec3_polar_offset2(out, center, radius, ran_suu(0), ran_suu(0));
         break;
     }
 }
 
 /* 0x80051C70 (0xA4): the point `dist` away from `center` in the ground-plane direction `yaw`. */
-extern "C" void vec3_polar_offset(VEC3* out, const VEC3* center, u16 yaw, f32 dist)
+extern "C" void vec3_polar_offset(VEC3* out, const VEC3* center, f32 dist, u16 yaw)
 {
     VEC3 offset;
     VEC3_ctor(&offset);
@@ -2783,7 +2807,7 @@ extern "C" void vec3_polar_offset(VEC3* out, const VEC3* center, u16 yaw, f32 di
 }
 
 /* 0x80051D14 (0xC4): the point `dist` away from `center` in the direction `pitch`/`yaw`. */
-extern "C" void vec3_polar_offset2(VEC3* out, const VEC3* center, u16 pitch, u16 yaw, f32 dist)
+extern "C" void vec3_polar_offset2(VEC3* out, const VEC3* center, f32 dist, u16 pitch, u16 yaw)
 {
     VEC3 offset;
     VEC3_ctor(&offset);
@@ -2801,7 +2825,7 @@ extern "C" void vec3_scale(VEC3* out, const VEC3* in, f32 scale);
 
 /* 0x80051DD8 (0x108): the point `dist` away, in the ground-plane direction `yaw`, from the point at `t` (clamped
  * to 0..1) along the segment from `b` to `a`. */
-extern "C" void vec3_segment_offset(VEC3* out, const VEC3* a, const VEC3* b, u16 yaw, f32 dist, f32 t)
+extern "C" void vec3_segment_offset(VEC3* out, const VEC3* a, const VEC3* b, f32 dist, f32 t, u16 yaw)
 {
     VEC3 dir;
     VEC3 pos;
@@ -2822,7 +2846,7 @@ extern "C" void vec3_segment_offset(VEC3* out, const VEC3* a, const VEC3* b, u16
     vec3_scale(&step, &dir, t);
     addVec3(&sum, b, &step);
     copyVec3(&pos, &sum);
-    vec3_polar_offset(out, &pos, yaw, dist);
+    vec3_polar_offset(out, &pos, dist, yaw);
 }
 
 /* 0x80051EE0 (0x54): `out = in * scale`. */
@@ -2833,7 +2857,7 @@ extern "C" void vec3_scale(VEC3* out, const VEC3* in, f32 scale)
 }
 
 /* 0x80051F34 (0x100): `vec3_segment_offset` in the direction `pitch`/`yaw`. */
-extern "C" void vec3_segment_offset2(VEC3* out, const VEC3* a, const VEC3* b, u16 pitch, u16 yaw, f32 dist, f32 t)
+extern "C" void vec3_segment_offset2(VEC3* out, const VEC3* a, const VEC3* b, f32 dist, f32 t, u16 pitch, u16 yaw)
 {
     VEC3 dir;
     VEC3 pos;
@@ -2854,7 +2878,7 @@ extern "C" void vec3_segment_offset2(VEC3* out, const VEC3* a, const VEC3* b, u1
     vec3_scale(&step, &dir, t);
     addVec3(&sum, b, &step);
     copyVec3(&pos, &sum);
-    vec3_polar_offset2(out, &pos, pitch, yaw, dist);
+    vec3_polar_offset2(out, &pos, dist, pitch, yaw);
 }
 
 extern "C" f32 vec3_dot(const VEC3* a, const VEC3* b);
