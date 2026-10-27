@@ -326,6 +326,8 @@ public:
     void upPerformance(s8 index);
     void moveOutOfBand(s8 index);
     s8 getUsableSlot(s8 index);
+    /* the slot record `index` (inlined; retail's `connect` reads its tests through it) */
+    NetworkSessionSlot* getSlot(s8 index) { return &slots_14828[index]; }
 
     /* +0x0D */ u8 sendBuffer_0D[0x400];
     /* +0x40D */ u8 pad_40D[0x03];

@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (197)
+## Ideas that work (200)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -206,6 +206,9 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 216 | [A u16 loop bound narrowed after the counter's li: keep the call's raw result and narrow it in the loop condition](216-u16-loop-bound-narrowed.md) | works | source-shape, allocator | Retail sets the loop counter (`li r27,0`) before narrowing the bound (`clrlwi r29,r3,16`), and ours narrows first, so the two instructions swap and the counter, pointer and bound registers rotate. |
 | 219 | [Forward jumps into joins at two nesting depths: an inline helper's return for the far one, a do-while(0) break for the near one](219-forward-jumps-two-depths.md) | works | source-shape | Retail jumps forward from one arm past a whole later pass into a shared block, and from another arm past that block too (or from a loop's limit exit past the code after the loop); a flag keeps its test (MWCC does not... |
 | 220 | [An unreachable b after a nested switch is the inner switch's default: return](220-unreachable-b-after-a.md) | works | source-shape | Retail has a second `b <end>` right after the last case of each inner switch (dead code), ours goes straight to the next outer case's dispatch. |
+| 221 | [An element tested before a call and stored after it: read the tests through an inline element accessor](221-inline-accessor-blocks-cse-across-call.md) | works | source-shape, allocator | Ours keeps an array element's address in a saved register across a call (an extra saved register, a bigger frame) where retail keeps only the scaled index and rebuilds the base after the call. |
+| 222 | [Two loops sharing one counter swap two saved registers: give the second loop its own counter](222-second-loop-own-counter.md) | works | source-shape, allocator | A function with two loops over the same counter variable has two saved registers swapped (the counter against a parameter or a result) while every instruction is otherwise identical; declaration orders do not move it. |
+| 223 | [Address-taken one-byte locals in 4-byte stack slots are one-element arrays](223-byte-local-array-stack-slot.md) | works | source-shape, allocator | Several address-taken `s8` locals (passed as `const s8*`) sit at 0x8/0x9/0xA in ours and at 0x8/0xC/0x10 in retail, shifting every stack offset above them. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

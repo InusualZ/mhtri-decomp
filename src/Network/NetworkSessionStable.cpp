@@ -22,28 +22,32 @@
  *   (playbook 58: not their sole referencer, so unclaimable).  Rows:
  *  - `init`: `set` returns `s32` where retail's slot returns an `s8` (`mr` against `extsb`, request net-stream#1:
  *    the `s8` return also needs `NetworkSessionManagerPat::connectPeer`'s local `slot` declared `s8`);
- *  - `move`: retail keeps the constant 3 out of a saved register and spills `sendBuffer_0D`'s address to the stack;
- *    it also destroys the inlined `writeOp7` stream after the `setError` loop that follows it (the `bl` at +0x360);
- *  - `set`: `this` and `isSelf` take r27/r29 against retail's r29/r27 (every local declaration order measured);
+ *  - `move`: the saved-register numbering differs (retail's slot cursor r24, cursor base r20, index r17; the `this`
+ *    stride cursor is copied before the buffer spill), and the congestion `packet` sits at 0x70 against retail's 0x28
+ *    (retail allocates it below the inlined writers' streams; an inline member helper moves it there but turns its
+ *    log string into a weak `@STRING@` at the end of `.data`, a file-static inline helper places both right for
+ *    +0.001 on the row and is not kept);
  *  - `execControlOne`, `getBandwidth`, `setRate`: the `.sdata2` double pairs by address, not by name;
- *  - `connect`: ours keeps the slot address live across the `start` call in r31 (an extra `stw r29`, frame -0x20
- *    against -0x10, the `stw 0x4828` before the slot base is recomputed; a slot reference, an inline helper, a local
- *    connection pointer, `(s32)` index casts and every level/CSE pragma tried);
  *  - `send`: the channel's `(u8)` conversion is hoisted out of the frame loop into r31 (retail converts at the
  *    `enable2` call), and the slot's congestion count is addressed off the slot base instead of `this`+offset;
- *  - `sendStream` swaps r26/r29; `moveOutOfBand` swaps r27/r28 and keeps `size44` in r25 against retail's r28;
+ *  - `moveOutOfBand` swaps r27/r28 and keeps `size44` in r25 against retail's r28;
  *  - `upPerformance`: retail reloads `networkRateFloor` (the `.sdata` word) for the clamp, ours reuses the register;
  *  - `downPerformance`, `upPerformance`: the session base's `addis` is scheduled before the slot's `mulli`, retail
  *    after (both statement orders and a direct `slots_14828[index]` test tried); the lerp product swaps its operands;
- *  - `setNetworkConnectionEvent`: the frame slot pointer and the queue result take r31/r29 against retail's r29/r31
- *    (declaration orders tried);
+ *  - `setNetworkConnectionEvent`: the relay kind byte loads into r0 before its `extsb` into r6 (retail loads r6
+ *    itself; no cast, an `(s32)` cast, a record pointer and an `s8` field tried);
  *  - `.data`: the string/jump-table labels pair by address, not by name (`@NNNN` against `lbl_...`).
  * SHAPES. `NetworkSessionStable : NetworkSessionBase` overrides all 38 base slots; the tables are compiler output
  *   (rule 10): 0x805FA6E8 from `~NetworkSessionStable`, 0x805FA6A8 from `~NetworkUnitPacket`.
  *  - bodies in address order (a callee defined after its caller is not inlined, as in retail);
  *  - `dont_inline` around the nonce pair and the destructors, whose `bl`s retail keeps;
  *  - the slot bounds test is `index < 0 || 4 <= index` with an early return (`index >= 4` merges both compares);
- *  - `slots_14828[index].field` rather than a local slot pointer where retail recomputes the base (`post` included);
+ *  - `slots_14828[index].field` rather than a local slot pointer where retail recomputes the base (`post` and `set` included);
+ *  - `setNetworkConnectionEvent` names the frame's slot `frame` inside the delivery loop and gives the relay loop
+ *    its own counter `j`;
+ *  - `sendStream`'s queueing loop has its own counter `j` (one shared `index` swaps r26/r29);
+ *  - `connect` reads its tests and the `start` call through the inline `getSlot` (its parameter copy keeps the
+ *    slot address from surviving the call), then stores through `slots_14828[index]`;
  *  - `post` tests the channel as `channel >= 0 && (s32)channel < 1`: the cast keeps retail's two compares;
  *  - a slot test written `slots_14828[index].field` schedules the `mulli` before the base's `addis`, one through a
  *    `slot` pointer the other way round: `resetSlot` tests directly, `setNetworkConnectionEvent`'s shutdown case through
@@ -55,6 +59,9 @@
  *  - `init` reaches the queues through a `NetworkSlotQueues` pointer and clears `joined_16D00` (retail stores 0);
  *  - `move` keeps `encoded` (the queued record size) a `u16`, uses an `s32` for the congestion overhead and the
  *    sent length, and names the queue record pointer once; the first-connect failure reports the slot index;
+ *    both slot loops start from one `first` cursor and step `slot++, index++`; `buffer` (the hoisted
+ *    `sendBuffer_0D`, retail's stack spill) feeds the queue copy; `writeOp7` carries the drop loop, so its stream
+ *    dies after it; the inlined writers' terminator is an `s8[1]` (retail gives each a 4-byte slot);
  *  - `send`'s running frame sequence is a `u16` and each message size an `s32` (retail's `mr`/`clrlwi` pairs), and
  *    it reaches the slot's queues through one `NetworkSlotQueues` pointer;
  *  - the packet getters return `u32` and the source casts `(u16)` where retail masks; the `.sdata2` floats are `const`;
@@ -312,20 +319,20 @@ void NetworkSessionStable::resetAllSlots()
 inline void NetworkSessionStable::writeOp5(s8 index)
 {
     NetworkStreamWriter stream;
-    s8 term;
+    s8 term[1];
 
     stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     writeSize(&stream, (u16)writeByte(&stream, 5));
-    term = index;
-    sendStream(&stream, 1, 1, &term, 0xFF);
+    term[0] = index;
+    sendStream(&stream, 1, 1, term, 0xFF);
 }
 
 /* Frames op code 3 with the slot's nonce and sends it to every slot but the own one. */
 inline void NetworkSessionStable::writeOp3(const NetworkSessionSlot* slot)
 {
     NetworkStreamWriter stream;
-    s8 term;
+    s8 term[1];
     u32 n;
 
     stream.attach(sendBuffer_0D, 0x400);
@@ -333,54 +340,61 @@ inline void NetworkSessionStable::writeOp3(const NetworkSessionSlot* slot)
     n = (u16)writeByte(&stream, 3);
     n += (u16)writeUInt(&stream, slot->nonce_50);
     writeSize(&stream, (u16)n);
-    term = -2;
-    sendStream(&stream, 0, 1, &term, 0xFF);
+    term[0] = -2;
+    sendStream(&stream, 0, 1, term, 0xFF);
 }
 
-/* Frames op code 7 and sends it to every slot but the own one on the reliable channel. */
+/* Frames op code 7 for every slot but the own one on the reliable channel, then fails each other connected slot. */
 inline void NetworkSessionStable::writeOp7()
 {
     NetworkStreamWriter stream;
-    s8 term;
+    s8 term[1];
+    s32 i;
 
     stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     writeSize(&stream, (u16)writeByte(&stream, 7));
-    term = -2;
-    sendStream(&stream, 1, 1, &term, 0xFF);
+    term[0] = -2;
+    sendStream(&stream, 1, 1, term, 0xFF);
+    for (i = 0; i < 4; i++) {
+        if (ownIndex_14826 != i && slots_14828[i].connection_2C != 0) {
+            setError(i, NETWORK_ERROR_CONNECT_FAILED, 0, 0x80000000, 3);
+        }
+    }
 }
 
 /* One tick: steps every slot's close, link and session machines and flushes its queue, then measures the usable
    slots' congestion, tunes the rate governor and times out a missing host or subhost. */
 void NetworkSessionStable::move()
 {
-    NetworkSessionSlot* slot;
-    NetworkConnectionStable* connection;
-    s8 index;
     s8 j;
     s32 k;
-    s32 channel;
     s32 queued;
     s32 room;
     s32 consumed;
     s32 sendResult;
     s8 usable;
     s32 connectedCount;
-    s32 hostsOver;
     s32 hostsWarn;
     s32 subhostsOver;
+    s32 hostsOver;
     s32 subhostsWarn;
     s32 sizes[4];
     s32 peers;
     s32 length;
+    s32 overhead;
     u16 recordLength;
     u16 encoded;
-    s32 overhead;
     f32 timeout;
+    u8* buffer;
+    NetworkSessionSlot* first;
+    s32 channel;
+    NetworkConnectionStable* connection;
+    NetworkSessionSlot* slot;
+    s8 index;
 
     time_16CDC = getNetworkLogger()->getTime_60();
-    slot = &slots_14828[0];
-    for (index = 0; index < 4; index++, slot++) {
+    for (index = 0, first = slots_14828, slot = first, buffer = sendBuffer_0D; index < 4; slot++, index++) {
         connection = slot->connection_2C;
         if (connection != NULL) {
             connection->update();
@@ -406,11 +420,6 @@ void NetworkSessionStable::move()
             case 3:
                 if (ownIndex_14826 == index) {
                     writeOp7();
-                    for (j = 0; j < 4; j++) {
-                        if (ownIndex_14826 != j && slots_14828[j].connection_2C != 0) {
-                            setError(j, NETWORK_ERROR_CONNECT_FAILED, 0, 0x80000000, 3);
-                        }
-                    }
                 }
                 slot->shutdown_1C = 0;
                 connection->clearPending();
@@ -585,7 +594,7 @@ void NetworkSessionStable::move()
                     if (encoded == 0 || room < encoded) {
                         break;
                     }
-                    memcpy(sendBuffer_0D, queue + 2, encoded);
+                    memcpy(buffer, queue + 2, encoded);
                     length = encoded;
                     consumed = length + 2;
                 }
@@ -619,7 +628,7 @@ void NetworkSessionStable::move()
     subhostsOver = 0;
     subhostsWarn = 0;
     memset(sizes, 0, sizeof(sizes));
-    for (index = 0, slot = &slots_14828[0]; index < 4; index++, slot++) {
+    for (index = 0, slot = first; index < 4; slot++, index++) {
         if (isConnected(index) != 0) {
             usable = getUsableSlot(index);
             if (usable >= 0) {
@@ -741,7 +750,6 @@ s8 NetworkSessionStable::set(s32 isSelf, const u8* address)
     u8 block[0x80];
     NetworkConnectionOpenInfo info;
     s32 index;
-    NetworkSessionSlot* slot;
 
     connection = new NetworkConnectionStable(isSelf);
     NetworkUnitPacket packet;
@@ -770,10 +778,9 @@ s8 NetworkSessionStable::set(s32 isSelf, const u8* address)
     info.data_00 = ((NetworkByteStream*)&packet)->getData();
     info.size_04 = ((NetworkByteStream*)&packet)->getSize();
     connection->open(onConnectionEvent, this, index, &info);
-    slot = &slots_14828[index];
-    slot->connection_2C = connection;
-    slot->address_30.object_00.copyFrom(address);
-    slot->nonce_50 = 0;
+    slots_14828[index].connection_2C = connection;
+    slots_14828[index].address_30.object_00.copyFrom(address);
+    slots_14828[index].nonce_50 = 0;
     return index;
 }
 
@@ -867,8 +874,8 @@ void NetworkSessionStable::connect(s8 index, u32 a, u32 b)
     if (index < 0 || 4 <= index) {
         return;
     }
-    if (slots_14828[index].connection_2C != NULL && slots_14828[index].linkState_00 == 0) {
-        slots_14828[index].connection_2C->start(a, b);
+    if (getSlot(index)->connection_2C != NULL && getSlot(index)->linkState_00 == 0) {
+        getSlot(index)->connection_2C->start(a, b);
         slots_14828[index].linkState_00 = 1;
         if (slots_14828[index].sessionState_04 == 0) {
             slots_14828[index].sessionState_04 = 5;
@@ -1004,9 +1011,10 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
     u16 sequenceTop;
     u16 sequenceLow;
     u8 channel;
-    s8 i;
+    s8 j;
     s8 usable;
     u32 result;
+    s8 i;
     NetworkConnectionEventRecord record;
 
     {
@@ -1071,26 +1079,26 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
             if (nonce_16CD8 == networkPacket_getSessionNonce(&reader)) {
                 for (i = 0; i < 4; i++) {
                     if (slots_14828[i].nonce_50 == networkPacket_getSourceNonce(&reader)) {
-                        slot = &slots_14828[i];
+                        NetworkSessionSlot* frame = &slots_14828[i];
                         result = 0;
                         if (networkPacket_isHandshake(&reader) != 0) {
-                            if (slot->queues_54.receiveStarted_60 == 0) {
-                                slot->queues_54.receiveStarted_60 = 1;
-                                networkStreamQueue_setSequence(&slot->queues_54.receive_30[0], networkPacket_getSequenceA(&reader));
-                                networkStreamQueue_setSequence(&slot->queues_54.receive_30[1], networkPacket_getSequenceB(&reader));
+                            if (frame->queues_54.receiveStarted_60 == 0) {
+                                frame->queues_54.receiveStarted_60 = 1;
+                                networkStreamQueue_setSequence(&frame->queues_54.receive_30[0], networkPacket_getSequenceA(&reader));
+                                networkStreamQueue_setSequence(&frame->queues_54.receive_30[1], networkPacket_getSequenceB(&reader));
                             }
-                            if (slot->authenticated_19 != 0) {
+                            if (frame->authenticated_19 != 0) {
                                 markLeft(i);
                             }
                             getNetworkLogger()->signal_0C(3, "NetworkSessionStable::setNetworkConnectionEvent: [%d] oob sqn received. sqntop:0x%04x sqnlow:0x%04x\n",
-                                                          i, networkStreamWriter_size(&slot->queues_54.receive_30[0]),
-                                                          networkStreamWriter_size(&slot->queues_54.receive_30[1]));
-                        } else if (slot->queues_54.receiveStarted_60 != 0) {
+                                                          i, networkStreamWriter_size(&frame->queues_54.receive_30[0]),
+                                                          networkStreamWriter_size(&frame->queues_54.receive_30[1]));
+                        } else if (frame->queues_54.receiveStarted_60 != 0) {
                             if (channel == 0) {
-                                result = putTopPacket(&slot->queues_54.receive_30[channel], &reader);
-                                networkStreamQueue_acknowledge(&slot->queues_54.send_00[channel], &reader);
+                                result = putTopPacket(&frame->queues_54.receive_30[channel], &reader);
+                                networkStreamQueue_acknowledge(&frame->queues_54.send_00[channel], &reader);
                             } else if (channel == 1) {
-                                result = networkStreamQueue_putNextPacket(&slot->queues_54.receive_30[channel], &reader);
+                                result = networkStreamQueue_putNextPacket(&frame->queues_54.receive_30[channel], &reader);
                                 if ((s32)result < 0) {
                                     result = 0;
                                 }
@@ -1106,16 +1114,16 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
                             if ((s32)result != 3) {
                                 setError(i, (NetworkPeerErrorSource)result, 0, 0x80000000, 1);
                             } else {
-                                slot->queues_54.resend_68 = 1;
+                                frame->queues_54.resend_68 = 1;
                             }
                         }
                         break;
                     }
                 }
             } else if (networkPacket_getSessionNonce(&reader) != 0) {
-                for (i = 0; i < 4; i++) {
-                    if (slots_14828[i].nonce_50 == networkPacket_getSessionNonce(&reader)) {
-                        usable = getUsableSlot(i);
+                for (j = 0; j < 4; j++) {
+                    if (slots_14828[j].nonce_50 == networkPacket_getSessionNonce(&reader)) {
+                        usable = getUsableSlot(j);
                         if (usable >= 0) {
                             networkStreamWriter_commit(&reader);
                             networkStreamWriter_bytes(&reader);
@@ -1410,8 +1418,8 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
     u16 total;
     s32 congestion;
     s8 usable;
-    f32 rate;
     f32 interval;
+    f32 rate;
     f32 limit;
 
     result = 0;
@@ -1747,6 +1755,7 @@ void NetworkSessionStable::sendStream(NetworkStreamWriter* stream, s32 channel, 
 {
     u8 selected[4];
     s8 index;
+    s8 j;
     s32 n;
     s32 appended;
 
@@ -1776,27 +1785,27 @@ void NetworkSessionStable::sendStream(NetworkStreamWriter* stream, s32 channel, 
             }
         }
     }
-    for (index = 0; index < 4; index++) {
-        if (selected[index] != 0
+    for (j = 0; j < 4; j++) {
+        if (selected[j] != 0
             && (channel != 1 || limit >= 0xFE
                 || !((f32)limit < (networkSessionPriorityScale
-                                   * ((slots_14828[index].congestion_10C - (f32)(u16)networkPacket_getFrameOverhead())
+                                   * ((slots_14828[j].congestion_10C - (f32)(u16)networkPacket_getFrameOverhead())
                                       - (f32)(u16)networkPacket_getMessageOverhead()))
                                       / networkSessionPriorityRange))) {
-            f32 expiry = slots_14828[index].queues_54.expiry_64;
+            f32 expiry = slots_14828[j].queues_54.expiry_64;
 
             if (networkSessionZero < expiry) {
                 networkPacket_setTimestamp(stream, networkSessionNever * (time_16CDC + expiry));
             } else {
                 networkPacket_setTimestamp(stream, networkSessionZero);
             }
-            appended = networkStreamQueue_append(&slots_14828[index].queues_54.send_00[channel], stream, 0xFF);
+            appended = networkStreamQueue_append(&slots_14828[j].queues_54.send_00[channel], stream, 0xFF);
             if (channel == 0) {
                 if (appended < 0) {
-                    getNetworkLogger()->log_14("NetworkSessionStable[%d] put send pool over (0x%x)\n", index, appended);
-                    setError(index, NETWORK_ERROR_PUT_OVERFLOW, appended, 0x80000000, 1);
+                    getNetworkLogger()->log_14("NetworkSessionStable[%d] put send pool over (0x%x)\n", j, appended);
+                    setError(j, NETWORK_ERROR_PUT_OVERFLOW, appended, 0x80000000, 1);
                 } else {
-                    slots_14828[index].measureSend_114 = time_16CDC;
+                    slots_14828[j].measureSend_114 = time_16CDC;
                 }
             }
         }
