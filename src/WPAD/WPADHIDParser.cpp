@@ -27,21 +27,30 @@
  * RESIDUALS. `wpadAccCalibrationReadDone`: the ten-bit pointer coordinates of the four calibration points are loaded and
  *   combined in a different order (register numbering follows).  `wpadExtCalibrationReadDone` adds the block offset to the
  *   buffer in the other operand order.  `wpadDecodeDpd` numbers the rotation loop's array bases and two float temporaries
- *   differently.  `wpadDecodeExtDualStick` and `wpadDecodeExtBoard` differ in register numbering; `wpadDecodeExtBoard`
- *   also builds the middle weight words with rlwimi from the shifted low byte where the original shifts it with srawi
- *   first (no cast spelling found).  `wpadDispatchReport`, `wpadReportReadData`, `wpadReportStatus` and
+ *   differently.  `wpadDecodeExtDualStick` loads the default layout's button high byte into r5 where the original uses
+ *   r7 (no spelling of the button word moves it).  `wpadReportReadData`, `wpadReportStatus` and
  *   `wpadReportButtonsAccelExt16` differ in register numbering (no declaration order moves it); `wpadReportStatus` also
- *   keeps an extsh on the extension bit.  `wpadReportButtonsAccel` and `wpadReportButtons` load the control block one slot
- *   later.  `wpadExtNone` is the map's `wpadExtZero` until request wpad-slice1#23's map half is applied.
+ *   keeps an extsh on the extension bit (the original's rlwinm+srawi pair without it is what `#pragma peephole off`
+ *   emits for a plain `(b & 2) >> 1`, but the pragma costs the rest of the function 8 points).  `wpadReportStatus`,
+ *   `wpadReportReadData` and `wpadReportAck` build the merged button word in the other register of the rlwimi pair.
+ *   `wpadReportButtonsAccel` and `wpadReportButtons` load the control block one slot later, and
+ *   `wpadReportButtonsDpd10Ext9` schedules its `-4` one slot later (no store order, copy or inline moves either).
  *   Flip blockers: .text (the partial rows) and .sdata2 (`wpadDecodeDpd` converts the unsigned pointer size, which needs
  *   the 4330000000000000 constant).
  * SHAPES. A pointer coordinate's low byte is `(s16)(b & 0xFF)` (the mask keeps the extsh a bare cast drops); an extension
- *   axis's low bits are `(s16)((s16)((s32)b >> n) & m)` (retail keeps the dead srawi); stick clamps are two independent
+ *   axis's low bits are `(s16)((s16)((s32)b >> n) & m)` (retail keeps the dead srawi), its high bits `(s16)(b << 2)`
+ *   (`* 4` numbers the registers differently); the board's packed words are `((u16)(hi << n) & mask) | ((s16)(lo >> m) &
+ *   k)` (the u16 truncation gives clrlslwi, the s16 shift keeps srawi + rlwimi 0); stick clamps are two independent
  *   `if`s over a copy.  The accelerometer decode is an inline (`wpadDecodeAccel`, or `wpadDecodeAccelAt` through the
  *   sample pointer; `wpadInterleavedAxis` for the interleaved reports; `wpadDecodeNunchukAt` for the Nunchuk payload): the
  *   original looks the control block up again inside it, which a plain statement sequence CSEs away.  The extension
  *   handlers hand the decoders a copy of the sample pointer (`decoded`); `wpadReportButtonsAccelDpd10Ext6` passes the
- *   copy to its own stores and `&sample` to the Nunchuk and Classic decoders.
+ *   copy to its own stores and `&sample` to the Nunchuk and Classic decoders, and the interleaved reports store through
+ *   the copy `s` (declared before `cb`) and hand `&sample` to the pointer decoder.  The interleaved halves test
+ *   `wpadInterleavedA[chan] && wpadInterleavedB[chan]` after setting their own flag; `wpadReportButtonsAccelExt16`
+ *   stores through such a copy too.  The handshake retry count is a post-increment in the compare.
+ *   `wpadDispatchReport` takes its sample slot through the `wpadCurrentSample` inline and declares `level` between `cb`
+ *   and `result`; the calibration sums are initialised `sumX = sumY = 0.0f`.
  */
 
 #include "types.h"
@@ -193,9 +202,7 @@ void wpadExtInitCallback(s32 chan, s32 result)
     if (result == -1) {
         error = -3;
     } else if (cb->flags.extensionAttached != 0) {
-        u8 tries = wpadExtInitRetries[chan];
-        wpadExtInitRetries[chan] = tries + 1;
-        if (tries < 0x20) {
+        if (wpadExtInitRetries[chan]++ < 0x20) {
             wpadStartExtInit(chan);
             return;
         }
@@ -326,8 +333,7 @@ void wpadAccCalibrationReadDone(s32 chan, s32 result)
     } else {
         WPADiDebugPrint("Old Firmware uses default values because it has no Dpd Setting.\n");
     }
-    sumX = 0.0f;
-    sumY = sumX;
+    sumX = sumY = 0.0f;
     for (i = 0; i < 4; i++) {
         px[i] = cb->calA.dpdPoint[i].x;
         py[i] = cb->calA.dpdPoint[i].y;
@@ -754,10 +760,10 @@ void wpadReportReadData(u8 chan, u8* report, WPADSample* sample)
         cb->status = 0;
     }
     base = cb->replyB;
+    size = ((s32)report[3] >> 4) + 1;
     low = base;
     offset = (report[5] & ~0xFF00) | ((report[4] << 8) & 0xFF00);
     high = base >> 16;
-    size = ((s32)report[3] >> 4) + 1;
     delta = offset - low;
     if (offset >= low && offset <= low + cb->replyD) {
         memcpy((u8*)cb->replyA + delta, report + 6, size);
@@ -843,16 +849,24 @@ void wpadReportAck(u8 chan, u8* report, WPADSample* sample)
     OSRestoreInterrupts(level);
 }
 
+/* Returns the sample slot the control block is filling. */
+static inline WPADSample* wpadCurrentSample(WPADCB* cb)
+{
+    return &cb->samples[cb->sampleIndex];
+}
+
 /* Dispatches an input report to its handler and publishes the decoded sample; returns -1 for an unknown report id. */
 s32 wpadDispatchReport(u8 chan, u8* report)
 {
     WPADCB* cb = wpadCBTable[chan];
+    u32 level;
     s32 result = 0;
 
     if ((u8)(report[0] + 0xE0) <= 0x1F) {
-        u32 level = OSDisableInterrupts();
-        WPADCB* current = wpadCBTable[chan];
-        WPADSample* sample = &current->samples[current->sampleIndex];
+        WPADSample* sample;
+
+        level = OSDisableInterrupts();
+        sample = wpadCurrentSample(wpadCBTable[chan]);
 
         if (report[0] != 0x3E && report[0] != 0x3F) {
             memset(sample, 0, sizeof(WPADSample));
@@ -979,10 +993,10 @@ void wpadDecodeExtDualStick(s32 chan, WPADSample** sample, u8 variant, u8* data,
 
     switch (variant) {
     case 2:
-        (*sample)->classic.leftX = (s16)((s16)(data[0] * 4) & ~3) | (data[4] & 3);
-        (*sample)->classic.rightX = (s16)((s16)(data[1] * 4) & ~3) | (s16)((s16)((s32)data[4] >> 2) & 3);
-        (*sample)->classic.leftY = (s16)((s16)(data[2] * 4) & ~3) | (s16)((s16)((s32)data[4] >> 4) & 3);
-        (*sample)->classic.rightY = (s16)((s16)(data[3] * 4) & ~3) | (s16)((s32)data[4] >> 6);
+        (*sample)->classic.leftX = (s16)((s16)(data[0] << 2) & ~3) | (data[4] & 3);
+        (*sample)->classic.rightX = (s16)((s16)(data[1] << 2) & ~3) | (s16)((s16)((s32)data[4] >> 2) & 3);
+        (*sample)->classic.leftY = (s16)((s16)(data[2] << 2) & ~3) | (s16)((s16)((s32)data[4] >> 4) & 3);
+        (*sample)->classic.rightY = (s16)((s16)(data[3] << 2) & ~3) | (s16)((s32)data[4] >> 6);
         (*sample)->classic.leftTrigger = data[5];
         (*sample)->classic.rightTrigger = (length < 9) ? 0 : data[6];
         (*sample)->classic.buttons = (length < 9) ? 0 : (((data[8] & ~0xFF00) | ((data[7] << 8) & 0xFF00)) ^ 0xFFFF);
@@ -1108,17 +1122,17 @@ void wpadDecodeExtBoard(s32 chan, WPADSample** sample, u8 format, u8* data, u32 
 {
     (*sample)->board.batteryRef = data[0];
     (*sample)->board.weightRef[0] = (data[1] << 2) | (data[6] >> 6);
-    (*sample)->board.weightRef[1] = (data[2] << 2) | ((data[6] >> 4) & 3);
-    (*sample)->board.weightRef[2] = (data[3] << 2) | ((data[6] >> 2) & 3);
-    (*sample)->board.weightRef[3] = (data[4] << 2) | (data[6] & 3);
+    (*sample)->board.weightRef[1] = ((u16)(data[2] << 2) & 0xFFFC) | ((s16)(data[6] >> 4) & 3);
+    (*sample)->board.weightRef[2] = ((u16)(data[3] << 2) & 0xFFFC) | ((s16)(data[6] >> 2) & 3);
+    (*sample)->board.weightRef[3] = ((u16)(data[4] << 2) & 0xFFFC) | (data[6] & 3);
     (*sample)->board.weightRef[4] = (data[5] << 2) | (data[7] >> 6);
     (*sample)->board.temperature = data[8];
     (*sample)->board.weight[0] = (data[9] << 2) | (data[14] >> 6);
-    (*sample)->board.weight[1] = (data[10] << 2) | ((data[14] >> 4) & 3);
-    (*sample)->board.weight[2] = (data[11] << 2) | ((data[14] >> 2) & 3);
-    (*sample)->board.weight[3] = (data[12] << 2) | (data[14] & 3);
+    (*sample)->board.weight[1] = ((u16)(data[10] << 2) & 0xFFFC) | ((s16)(data[14] >> 4) & 3);
+    (*sample)->board.weight[2] = ((u16)(data[11] << 2) & 0xFFFC) | ((s16)(data[14] >> 2) & 3);
+    (*sample)->board.weight[3] = ((u16)(data[12] << 2) & 0xFFFC) | (data[14] & 3);
     (*sample)->board.weight[4] = (data[13] << 2) | (data[15] >> 6);
-    (*sample)->board.refA = ((data[7] << 4) & 0xF3F0) | ((data[15] >> 2) & 0xF);
+    (*sample)->board.refA = ((u16)(data[7] << 4) & 0xF3F0) | ((s16)(data[15] >> 2) & 0xF);
     (*sample)->board.refC = data[15] & 3;
     if (length < 21) {
         (*sample)->board.refB = 0;
@@ -1233,30 +1247,30 @@ void wpadReportExt19(u8 chan, u8* report, WPADSample* sample)
 /* Decodes the 0x35 report: buttons, accelerometer and 16 extension bytes. */
 void wpadReportButtonsAccelExt16(u8 chan, u8* report, WPADSample* sample)
 {
+    WPADSample* s = sample;
     WPADCB* cb = wpadCBTable[chan];
-    WPADSample* decoded = sample;
 
-    sample->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
+    s->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
     if (cb->dataFormat <= 1 || (u32)(cb->dataFormat - 3) <= 1 || (u32)(cb->dataFormat - 6) <= 1 || cb->dataFormat == 13) {
-        sample->extensionError = 0;
+        s->extensionError = 0;
     } else {
-        sample->extensionError = -4;
+        s->extensionError = -4;
     }
-    sample->deviceType = cb->deviceType;
+    s->deviceType = cb->deviceType;
     cb->flags.buttonByteTopBit = (report[1] >> 7) & 1;
-    wpadDecodeAccel(chan, report, sample);
+    wpadDecodeAccel(chan, report, s);
     memcpy(wpadExtRaw, report + 6, 0x10);
     wpadDecryptExtension(chan, report + 6, 0x10, 0);
     if (cb->flags.extensionAttached != 0) {
         if (cb->deviceType == 1) {
-            wpadDecodeNunchukAt(chan, report + 6, &decoded);
+            wpadDecodeNunchukAt(chan, report + 6, &sample);
         } else if (cb->deviceType == 2) {
-            wpadDecodeExtDualStick(chan, &decoded, cb->extensionSubType, report + 6, 0x10);
+            wpadDecodeExtDualStick(chan, &sample, cb->extensionSubType, report + 6, 0x10);
         } else if (cb->deviceType == 4) {
-            wpadDecodeExtBoard(chan, &decoded, cb->dataFormat, report + 6, 0x10);
+            wpadDecodeExtBoard(chan, &sample, cb->dataFormat, report + 6, 0x10);
         }
-        if (memcmp(wpadExtRaw, wpadExtNone, 0x10) == 0 && sample->extensionError == 0) {
-            sample->extensionError = -7;
+        if (memcmp(wpadExtRaw, wpadExtNone, 0x10) == 0 && s->extensionError == 0) {
+            s->extensionError = -7;
         }
     }
 }
@@ -1335,29 +1349,29 @@ void wpadReportExt21(u8 chan, u8* report, WPADSample* sample)
 /* Decodes the first half (slots 0 and 1) of an interleaved pointer report. */
 void wpadReportInterleavedA(u8 chan, u8* report, WPADSample* sample)
 {
+    WPADSample* s = sample;
     WPADCB* cb = wpadCBTable[chan];
-    WPADSample* decoded = sample;
     u32 level;
 
     if (wpadInterleavedA[chan] == 0 && wpadInterleavedB[chan] == 0) {
-        memset(sample, 0, sizeof(WPADSample));
+        memset(s, 0, sizeof(WPADSample));
     }
-    sample->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
+    s->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
     if (cb->dataFormat <= 1 || cb->dataFormat == 9) {
-        sample->extensionError = 0;
+        s->extensionError = 0;
     } else {
-        sample->extensionError = -4;
+        s->extensionError = -4;
     }
-    sample->deviceType = cb->deviceType;
+    s->deviceType = cb->deviceType;
     cb->flags.buttonByteTopBit = 0;
-    sample->accX = wpadInterleavedAxis(chan, report[3], report[1], 0);
-    sample->accZ = sample->accZ | (s16)((s16)((s16)(report[2] << 3) & ~0xFF) | ((report[1] << 1) & 0xC0));
-    wpadDecodeDpdInterleaved(chan, &decoded, 0, report + 4, 0);
-    wpadDecodeDpdInterleaved(chan, &decoded, 1, report + 13, 0);
+    s->accX = wpadInterleavedAxis(chan, report[3], report[1], 0);
+    s->accZ = s->accZ | (s16)((s16)((s16)(report[2] << 3) & ~0xFF) | ((report[1] << 1) & 0xC0));
+    wpadDecodeDpdInterleaved(chan, &sample, 0, report + 4, 0);
+    wpadDecodeDpdInterleaved(chan, &sample, 1, report + 13, 0);
     level = OSDisableInterrupts();
     wpadInterleavedA[chan] = 1;
-    if (wpadInterleavedB[chan] != 0) {
-        sample->accZ = sample->accZ - cb->calA.accZero[2];
+    if (wpadInterleavedA[chan] != 0 && wpadInterleavedB[chan] != 0) {
+        s->accZ = s->accZ - cb->calA.accZero[2];
         cb->sampleIndex = (cb->sampleIndex == 0);
         wpadInterleavedB[chan] = 0;
         wpadInterleavedA[chan] = 0;
@@ -1368,29 +1382,29 @@ void wpadReportInterleavedA(u8 chan, u8* report, WPADSample* sample)
 /* Decodes the second half (slots 2 and 3) of an interleaved pointer report. */
 void wpadReportInterleavedB(u8 chan, u8* report, WPADSample* sample)
 {
+    WPADSample* s = sample;
     WPADCB* cb = wpadCBTable[chan];
-    WPADSample* decoded = sample;
     u32 level;
 
     if (wpadInterleavedA[chan] == 0 && wpadInterleavedB[chan] == 0) {
-        memset(sample, 0, sizeof(WPADSample));
+        memset(s, 0, sizeof(WPADSample));
     }
-    sample->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
+    s->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
     if (cb->dataFormat <= 1 || cb->dataFormat == 9) {
-        sample->extensionError = 0;
+        s->extensionError = 0;
     } else {
-        sample->extensionError = -4;
+        s->extensionError = -4;
     }
-    sample->deviceType = cb->deviceType;
+    s->deviceType = cb->deviceType;
     cb->flags.buttonByteTopBit = 0;
-    sample->accY = wpadInterleavedAxis(chan, report[3], report[1], 1);
-    sample->accZ = sample->accZ | (s16)(((report[1] >> 3) & 0xC) | ((report[2] >> 1) & 0x30));
-    wpadDecodeDpdInterleaved(chan, &decoded, 2, report + 4, 0);
-    wpadDecodeDpdInterleaved(chan, &decoded, 3, report + 13, 0);
+    s->accY = wpadInterleavedAxis(chan, report[3], report[1], 1);
+    s->accZ = s->accZ | (s16)(((report[2] >> 1) & 0x30) | ((report[1] >> 3) & 0xC));
+    wpadDecodeDpdInterleaved(chan, &sample, 2, report + 4, 0);
+    wpadDecodeDpdInterleaved(chan, &sample, 3, report + 13, 0);
     level = OSDisableInterrupts();
     wpadInterleavedB[chan] = 1;
     if (wpadInterleavedA[chan] != 0 && wpadInterleavedB[chan] != 0) {
-        sample->accZ = sample->accZ - cb->calA.accZero[2];
+        s->accZ = s->accZ - cb->calA.accZero[2];
         cb->sampleIndex = (cb->sampleIndex == 0);
         wpadInterleavedB[chan] = 0;
         wpadInterleavedA[chan] = 0;
