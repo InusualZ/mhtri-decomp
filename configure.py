@@ -1015,7 +1015,7 @@ config.libs = [
             Object(NonMatching, "Pl/fn_802840DC.cpp"),
             Object(NonMatching, "Pl/pl_motion.cpp"),
             Object(NonMatching, "Pl/pl_hit_sphere.cpp"),
-            Object(NonMatching, "Pl/pl_act_class3.cpp"),
+            Object(Matching, "Pl/pl_act_class3.cpp"),
             Object(NonMatching, "Pl/pl_yure.cpp"),
         ],
     },
