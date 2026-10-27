@@ -11,10 +11,12 @@ struct _PLW;
 extern "C" {
 #endif
 
-/* 0x8033B6C0 - builds the delivery list for the player `plw` and the NPC record `npc`. */
-void lb_deli_list_build(struct _PLW* plw, u8* npc);
-/* 0x8033B990 - steps the delivery list: 2 once it is closed. */
+/* 0x8033B6C0 - builds the delivery list for the player `plw` and the NPC record `npc`; returns the row count. */
+s16 lb_deli_list_build(struct _PLW* plw, u8* npc);
+/* 0x8033B990 - steps the delivery list: 2 once it is cancelled, 1 once its talk page has closed. */
 s32 lb_deli_menu_step(void);
+/* 0x8033C1AC - draws the delivery list. */
+void lb_deli_menu_draw(void);
 
 #ifdef __cplusplus
 }

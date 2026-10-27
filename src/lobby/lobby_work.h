@@ -130,6 +130,7 @@ typedef struct LbLobbyWork {
         struct LbScreen30Work* screen30_0x0AC;    /* screen 0x1E, the room layout (`menu/get_pop_dat_ptr.cpp`) */
         struct LbScreen34Work* screen34_0x0AC;    /* screen 0x22 (`menu/get_pop_dat_ptr.cpp`) */
         struct LbSpotWork* spot_0x0AC;            /* screen 0x10, the spot departure (`enemy/em_prog_support.cpp`) */
+        struct LbScreen13Work* screen13_0x0AC;    /* screen 0x0D, the companion page (`lobby/lb_companion_ui.cpp`) */
     };
     /* +0x0B0 */ u8 field_0x0B0;
     /* +0x0B1 */ u8 sub_0x0B1;

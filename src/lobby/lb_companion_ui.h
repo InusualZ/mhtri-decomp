@@ -13,9 +13,12 @@
 #include "lobby/lobby_hunter_cards.h" /* LbQuestPage, lobby_hunter_cards - this unit's leaf header */
 #include "id_value.h" /* IdValue, the item box slots */
 #include "hud/layout.h" /* _mh_ivec2_, _SPR_DATA_ and the draw_* family (rule 1, rule 2) */
+#include "lobby/lb_list.h" /* LbList, LbItemCount (rule 1) */
 
 /* `quest_element_pick_ck` (owner `lobby/lb_quest_screen.h`) is declared below with the owner's signature. */
 struct QuestWork;
+struct _PLW;
+struct _LB_NPC;
 
 
 /* ---------------------------------------------------------------------------------------------- *
@@ -323,14 +326,14 @@ typedef struct LbParamWork {
  * block's selected-entry byte at +0x3E03, the two entry tables at +0x5180/+0x51A0 and the per-entry
  * u16 run at +0x51A6.  Everything between them carries its offset.  size: 0x6010 (the neighbour views'
  * extent; this band reads nothing above +0x69A4) */
-/* One 4-byte entry of the block's id table at +0x5180 (`lb_entry_id_get` hands one out, `lb_entry_model_publish`
- * fills it): the page stores a word there and the callers read its bytes.  size: 0x4 */
+/* One 4-byte companion setup of the block's table at +0x5180 (`lb_entry_id_get` hands one out, `lb_entry_model_publish`
+ * fills it): the mask level and the three skills, read as bytes or copied as a word.  size: 0x4 */
 typedef union LbEntryId {
     /* +0x00 */ u32 word_0x00;
-    /* +0x00 */ u8 byte_0x00;
-    /* +0x01 */ u8 byte_0x01;
-    /* +0x02 */ u8 byte_0x02;
-    /* +0x03 */ u8 byte_0x03;
+    struct {
+        /* +0x00 */ u8 level_0x00;       /* the row of the behaviour record's slot counts */
+        /* +0x01 */ u8 skills_0x01[3];   /* the skills set, 0 for an empty slot */
+    };
 } LbEntryId; /* size: 0x4 */
 
 typedef struct LbDataBlock {
@@ -340,31 +343,89 @@ typedef struct LbDataBlock {
     /* +0x3960 */ u8 bits_0x3960[0x8];   /* the per-entry bit field `lb_page_entry_bit_set` sets */
     /* +0x3968 */ u8 unused_0x3968[0x49B];
     /* +0x3E03 */ u8 entry_0x3E03;    /* the selected entry, low 7 bits = index, 0x80 = "changed" */
-    /* +0x3E04 */ u8 unused_0x3E04[0x137C];
-    /* +0x5180 */ LbEntryId ids_0x5180[1];  /* the per-entry id table `lb_entry_id_get`/`lb_entry_model_publish` use */
-    /* +0x5184 */ u8 unused_0x5184[0x18];
-    /* +0x519C */ s32 flags_0x519C;    /* the OR-ed page flags `lb_page_flags_update` sets */
+    /* +0x3E04 */ u8 unused_0x3E04[0x100];
+    /* +0x3F04 */ s32 zenny_0x3F04;   /* the zenny `userdata_zenny_add` credits */
+    /* +0x3F08 */ u8 unused_0x3F08[0x1278];
+    /* +0x5180 */ LbEntryId ids_0x5180[7];  /* the companion setup of each entry */
+    /* +0x519C */ s32 flags_0x519C;    /* the skills unlocked, one bit per skill */
     /* +0x51A0 */ u16 word_0x51A0;
     /* +0x51A2 */ u16 word_0x51A2;
-    /* +0x51A4 */ u8 byte_0x51A4;
+    /* +0x51A4 */ u8 byte_0x51A4;     /* the two dances picked (screen 13's dance page) */
     /* +0x51A5 */ u8 byte_0x51A5;
-    /* +0x51A6 */ u16 ids_0x51A6[0x20];
-    /* +0x51E6 */ u8 unused_0x51E6[0x17BE];
+    /* +0x51A6 */ u16 ids_0x51A6[7];  /* the level of each entry */
+    /* +0x51B4 */ LbItemCount gets_0x51B4[12];  /* the items collected for the player, two runs */
+    /* +0x51E4 */ LbItemCount gets_0x51E4[30];
+    /* +0x525C */ u8 unused_0x525C[0x1748];
 } LbDataBlock; /* size: 0x69A4 */
 
-/* The companion page record `fn_8033CE30`/`lb_page_bits_set`/`fn_8033CFE4`/`fn_8033D104` work on: the
- * entry count at +0x06, the per-entry id bytes at +0x08, the bit field at +0x72 and its mirror at
- * +0x76.  Only what this band reads is named, so the size is its lower bound.  size: >= 0x9C */
-typedef struct LbPageWork {
-    /* +0x00 */ u8 unused_0x00[0x6];
-    /* +0x06 */ s16 count_0x06;   /* the entry count the loops bound themselves with */
-    /* +0x08 */ u8 ids_0x08[0x3C];
-    /* +0x44 */ u8 unused_0x44[0x2E];
-    /* +0x72 */ u16 bits_0x72;    /* the entry the block's selected byte matches */
-    /* +0x74 */ u8 unused_0x74[0x2];
-    /* +0x76 */ s16 saved_0x76;   /* the count mirrored at the head of the update */
-    /* +0x78 */ u8 unused_0x78[0x24];
-} LbPageWork; /* size: 0x9C (>= 0x9C read) */
+/* The companion setup `lb_status_preview_update` hands `ai_npc_status_preview`: the layout of `ai/ai_npc.h`'s
+ * `AINPCSetup`, which cannot be included beside this unit's headers (its `_HIT_W` collides with `Pl/hit_w.h`'s).
+ * size: 0xA */
+typedef struct LbCompanionSetup {
+    /* +0x0 */ u8 entry_0x0;        /* the entry (its behaviour record) */
+    /* +0x1 */ u8 skills_0x1[3];
+    /* +0x4 */ u16 attack_0x4;
+    /* +0x6 */ u16 gauge_0x6;
+    /* +0x8 */ u16 level_0x8;
+} LbCompanionSetup; /* size: 0xA */
+
+/* One 6-byte row of `lb_skill_unlock_items` (ended by `need_0x00` 0xFFFF): once `need_0x00` is set and `done_0x02`
+ * still clear, the skill is unlocked and announced.  size: 0x6 */
+typedef struct LbSkillUnlock {
+    /* +0x00 */ u16 need_0x00;
+    /* +0x02 */ u16 done_0x02;
+    /* +0x04 */ u16 skill_0x04;
+} LbSkillUnlock; /* size: 0x6 */
+
+/* One 4-byte row of `lb_skill_unlock_flags` (ended by 0xFFFF): the progress flag set once the skill is unlocked.
+ * size: 0x4 */
+typedef struct LbSkillFlag {
+    /* +0x00 */ u16 flag_0x00;
+    /* +0x02 */ u16 skill_0x02;
+} LbSkillFlag; /* size: 0x4 */
+
+/* The screen-13 work block (`lobby_w.screen13_0x0AC`, cleared over 0x2000 bytes when the screen opens): the screen's
+ * state, the main choice and the per-page list, the entry and dance rows, the skill page's cursors and rows, the status
+ * preview and the collected items handed to the item box.  size: 0x2000 */
+typedef struct LbScreen13Work {
+    /* +0x000 */ u8 state_0x000;
+    /* +0x001 */ u8 sub_0x001;           /* the page's own state */
+    /* +0x002 */ u8 picking_0x002;       /* the skill list steps only while 0 */
+    /* +0x003 */ u8 help_0x003;          /* the help view the 0x80 command toggles */
+    /* +0x004 */ u8 changed_0x004;       /* a skill was set or removed */
+    /* +0x005 */ u8 unused_0x005;
+    /* +0x006 */ s16 count_0x006;        /* the entries listed in `ids_0x008` */
+    /* +0x008 */ u8 ids_0x008[8];        /* the entries the entry and skill pages list */
+    /* +0x010 */ s16 timer_0x010;        /* the input delay after opening */
+    /* +0x012 */ u8 dances_0x012[4];     /* the dances the dance page lists */
+    /* +0x016 */ u8 dance_0x016[2];     /* the two dances picked (0xFF: none) */
+    /* +0x018 */ u8 skill_rows_0x018[8]; /* the skills of the shown skill page */
+    /* +0x020 */ u8 others_0x020[3];     /* the skills set in the other slots */
+    /* +0x023 */ u8 unused_0x023;
+    /* +0x024 */ u16 skill_flags_0x024[8];  /* per skill row: 1 already set, 2..0x20 a clash */
+    /* +0x034 */ s16 slot_0x034;         /* the skill slot cursor */
+    /* +0x036 */ s16 action_0x036;       /* the slot action cursor: change or remove */
+    /* +0x038 */ s16 cursor_0x038;       /* the skill row cursor */
+    /* +0x03A */ s16 page_0x03A;         /* the skill page shown */
+    /* +0x03C */ s16 pages_0x03C;
+    /* +0x03E */ s16 skill_count_0x03E;  /* the skill rows of the page */
+    /* +0x040 */ u16 moved_0x040;        /* the page step's "moved" word */
+    /* +0x042 */ u8 unused_0x042[0x2];
+    /* +0x044 */ s32 confirm_0x044;      /* the yes/no toggle word */
+    /* +0x048 */ s32 talk_0x048;         /* the talk page `lb_menu_step` runs */
+    /* +0x04C */ s32 talk_arg_0x04C;
+    /* +0x050 */ LbList menu_0x050;      /* the main choice */
+    /* +0x070 */ LbList list_0x070;      /* the page's list */
+    /* +0x090 */ LbEntryId* entry_0x090; /* the setup being edited (`edit_0x098`) */
+    /* +0x094 */ const u8* behaviour_0x094;  /* the entry's behaviour record (+0x04: the skill slots per level) */
+    /* +0x098 */ LbEntryId edit_0x098;
+    /* +0x09C */ u8 status_0x09C[0x1C];  /* the `ai_npc_status_preview` result (`ai/ai_npc.h`'s `AINPCStatus`) */
+    /* +0x0B8 */ LbItemCount gets_0x0B8[20];  /* the collected items handed to the item box */
+    /* +0x108 */ LbItemCount gets_0x108[30];
+    /* +0x180 */ struct _LB_NPC* npc_0x180;
+    /* +0x184 */ struct _PLW* player_0x184;
+    /* +0x188 */ u8 unused_0x188[0x1E78];
+} LbScreen13Work; /* size: 0x2000 */
 
 
 /* One 10-byte row of a tutorial event's entry list (`lb_tutorial_entry_lists[event]`, ended by a negative
@@ -396,16 +457,45 @@ typedef struct LbQuestWork {
     /* +0x0C */ LbTutorialEntry* ptr_0x0C;  /* the entry row shown */
 } LbQuestWork; /* size: 0x10 */
 
-/* The 0xC-byte settings record `lb_settings_copy` copies whole.  size: 0x10 */
-typedef struct LbSettings {
-    /* +0x00 */ u16 first_0x00;
-    /* +0x02 */ u16 second_0x02;
-    /* +0x04 */ u16 third_0x04;
-    /* +0x06 */ s16 fourth_0x06;
-    /* +0x08 */ s32 value_0x08;
-    /* +0x0C */ u8 value_0x0C;
+/* One 0x10-byte row of the delivery list table `lb_deli_list_data` (ended by `cond_0x00` 0xFFFF) and of the list
+ * `lb_deli_list_build` keeps: the row is offered while its unlock condition holds, its two progress flags are set
+ * (or 0xFFFF) and `flag_0x08` is still clear (or -1).  size: 0x10 */
+typedef struct LbDeliEntry {
+    /* +0x00 */ u16 cond_0x00;     /* the `lb_unlock_cond_ck` id */
+    /* +0x02 */ u16 need_0x02;     /* a progress flag that must be set, or 0xFFFF */
+    /* +0x04 */ u16 need_0x04;     /* a second one */
+    /* +0x06 */ s16 order_0x06;    /* the `lb_deli_data` row the delivery asks for */
+    /* +0x08 */ s32 flag_0x08;     /* the progress flag the delivery unlocks (-1: none) */
+    /* +0x0C */ s8 talk_0x0C;      /* the talk page opened once it is delivered */
     /* +0x0D */ u8 unused_0x0D[0x3];
-} LbSettings; /* size: 0x10 */
+} LbDeliEntry; /* size: 0x10 */
+
+/* One 0x1C-byte row of `lb_deli_data` as the delivery menu reads it: four item/count pairs (item 0xFFFF is a zenny
+ * cost, 0 an empty slot) and the three text pointers its window prints.  size: 0x1C */
+typedef struct LbDeliOrder {
+    /* +0x00 */ LbItemCount items_0x00[4];
+    /* +0x10 */ s8* text_0x10;     /* printed at layout 0x1E8E */
+    /* +0x14 */ s8* title_0x14;    /* printed at layout 0x1E8C */
+    /* +0x18 */ s8* client_0x18;   /* printed at layout 0x1E8D */
+} LbDeliOrder; /* size: 0x1C */
+
+/* The delivery menu's work block (`lb_deli_work`): the area-select screen's state, the menu's own state and cursor,
+ * the choice list, the offered rows and the player/NPC it was built for.  size: 0xD8 */
+typedef struct LbDeliWork {
+    /* +0x00 */ u8 state_0x00;       /* `lb_area_select_screen_step`'s state */
+    /* +0x01 */ u8 menu_state_0x01;  /* `lb_deli_menu_step`'s state: 0 the list, 1 the confirm, 2 the talk */
+    /* +0x02 */ u8 anim_0x02;        /* the talk mark's animation (7 is stepped to 8) */
+    /* +0x03 */ u8 unused_0x03;
+    /* +0x04 */ u16 moved_0x04;      /* the cursor step's "moved" word, cleared every step */
+    /* +0x06 */ u8 unused_0x06[0x2];
+    /* +0x08 */ s16 cursor_0x08;
+    /* +0x0A */ s16 count_0x0A;      /* the rows offered */
+    /* +0x0C */ s32 confirm_0x0C;    /* the yes/no toggle word */
+    /* +0x10 */ LbList list_0x10;
+    /* +0x30 */ LbDeliEntry entries_0x30[10];
+    /* +0xD0 */ u8* npc_0xD0;        /* the NPC record; +0x02 is its id */
+    /* +0xD4 */ struct _PLW* plw_0xD4;
+} LbDeliWork; /* size: 0xD8 */
 
 /* One 3-byte row of the per-kind tables `tutorial_page_sets` indexes.  size: 0x3 */
 typedef struct LbTriplet {
@@ -450,7 +540,6 @@ extern LbDataBlock* lobby_world_block;  /* .sbss 0x80794880 */
 extern LbParamWork lb_param_w;     /* .bss 0x806590B4 */
 extern LbSystemView system_w;      /* .bss 0x806585E0 */
 extern LbScreenView Screen_w;      /* .bss 0x8065903C */
-extern u8 lb_deli_data[];          /* .data 0x8060DDB8 */
 extern u8 lbl_80794B90[8];         /* .sbss 0x80794B90 - the per-entry "seen" bit array */
 extern u8 lbl_80794B98[8];         /* .sbss 0x80794B98 - the per-entry "handled" byte array */
 extern const f32 lbl_8079B2B8;     /* .sdata2 - the delay `lb_act_award_handover` scales by Screen_w */
@@ -464,12 +553,8 @@ extern u16 tutorial_end_sprite_ids[4];   /* .sdata 0x80792D40 - the closing page
 extern u16 tutorial_end_sprite_ids_alt[4];  /* .sdata 0x80792D48 - the same with option 7 set */
 extern s8*** tutorial_page_texts[]; /* .data 0x805E6A20 - each tutorial kind's page texts, by page set */
 extern LbTriplet* tutorial_page_sets[];  /* .data 0x805E69E8 - each tutorial kind's page sets */
-extern u16 lbl_805E723C[];         /* .data - the arrow sprite rows `lb_subpage_arrow_draw` draws */
 extern s32* tutorial_quest_name;   /* .sbss - the tutorial quest name pointer */
 extern s32* tutorial_quest_msg;    /* .sbss - the tutorial message table */
-extern u16 lbl_805E7248[];         /* .data - the sprite rows `fn_8033E088` walks */
-extern u16 lbl_805E725C[];         /* .data */
-extern u16 lbl_805E728C[];         /* .data */
 
 /* The unsplit plain-C callees.  A `fn_XXXXXXXX` stem is the map's own placeholder, so these take C
  * linkage; each is declared with the argument count and widths the target's call site shows. */
@@ -492,7 +577,6 @@ int memcmp(const void* a, const void* b, u32 n);
 void camera_slot_bit_set(u8 index, u8 value);
 s32 ai_npc_level_get(u16 id);
 s32 fn_802D7C6C(u16 id);
-void lb_panel_close(void);
 void userdata_progress_flag_set(u32 a);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band

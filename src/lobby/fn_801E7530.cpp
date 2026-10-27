@@ -72,7 +72,7 @@ void fn_801E8CDC(u16 id, s8* str);
 void fn_801E9AA8(u8 flag);
 void lb_farm_box_draw(void);
 void fn_801EB744(u16 id, _mh_ivec2_* off);
-void fn_801E8994(LbList* list);
+void lb_npc_choice_draw(LbList* list);
 void fn_801E843C(LbMenuWork* self);
 void fn_801E8348(LbMenuWork* self);
 void fn_801E8CA0(void);
@@ -822,7 +822,7 @@ void fn_801E88E8(u8 mode)
     draw_sprite_ary((const u16*)lbl_805B7E30, &pos);
 }
 
-void fn_801E8994(LbList* list)
+void lb_npc_choice_draw(LbList* list)
 {
     lb_choice_draw(list, 0x1D2D, lbl_805B7E68, lbl_805B7E80, 0x1877, 0);
 }
@@ -1162,7 +1162,7 @@ void lb_deli_screen_draw(void)
     }
     switch (self->state_0x00) {
     case 1:
-        fn_801E8994(&self->list_0x24);
+        lb_npc_choice_draw(&self->list_0x24);
         sel = self->list_0x24.cursor_0x00;
         msg = sel;
         if ((self->list_0x24.off_mask_0x02 & (1 << sel)) != 0 && sel == 0) {

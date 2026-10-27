@@ -73,7 +73,7 @@
  *   class form needs `_LB_NPC` +0x54 modelled as a `LbNpcChar` member and the `VEC3` constructor calls
  *   (`VEC3_ctor`) as member construction, so the `.ctors` word and both vtables stay unemitted.
  *   57 rows below 100 (`python tools/objdiff/unitscore.py lobby/lb_npc --threshold 100`); the recorded causes:
- *  - `fn_801FDFA4`: retail's first store is `rlwinm r0,r4,0,24,24` and it materialises the `setVector3` pointer before
+ *  - `lb_npc_entry_flag_set`: retail's first store is `rlwinm r0,r4,0,24,24` and it materialises the `setVector3` pointer before
  *    the constant load; `(u8)(flag & 0x80)` matches the mask but MWCC schedules the `lfs` ahead of the `addi`;
  *  - `lb_npc_motion_play`, `fn_801FE1DC`, `fn_801FE1EC`: retail sets up the tail call with `addi r3,r3,0x58` first;
  *  - `fn_801FC8C8`: retail keeps `lbz; extsb; stb`, MWCC forwards the byte and drops the `extsb`; `fn_801FC810`:
@@ -698,7 +698,7 @@ void fn_801FDF70(_LB_NPC* self, s32 ticks)
 }
 
 /* 0x801FDFA4 - flag the NPC and zero its effect vector. */
-void fn_801FDFA4(_LB_NPC* self, u32 flag)
+void lb_npc_entry_flag_set(_LB_NPC* self, u32 flag)
 {
     self->field_0x264 = (u8)(flag & 0x80);
     setVector3(&self->field_0x258, lbl_80799880, lbl_80799880, lbl_80799880);
@@ -3221,7 +3221,7 @@ void lb_npc_motion_table_start(_LB_NPC* self)
     if (entry->motion_0x0C == 5 && entry->count_0x10 == -1) {
         if (self->field_0x002 == 1 && (lb_param_w.entry_0x08 & 0x80) != 0) {
             lb_npc_gate_place(self);
-            fn_801FDFA4(self, lb_param_w.entry_0x08);
+            lb_npc_entry_flag_set(self, lb_param_w.entry_0x08);
             self->field_0x208++;
         } else {
             self->field_0x028 = 0;

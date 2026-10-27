@@ -6,7 +6,7 @@
  *   the map's name (playbook 42).
  * RANGE. .text 0x802C2700-0x802D9EA4 (357 functions, every one with a body); extab, extabindex, .ctors 0x8056F388
  *   (`ainpc_w_sinit`, which runs `ainpc_w_construct`), .data 0x805D3A88-0x805D54A0, .bss 0x806BD360-0x806BD808
- *   (`ainpc_w`), .sdata, .sbss, .sdata2.  `jumptable_805D5428` is the 14-entry table MWCC emits for `fn_802D77A0`.
+ *   (`ainpc_w`), .sdata, .sbss, .sdata2.  `jumptable_805D5428` is the 14-entry table MWCC emits for `ai_npc_level_rank_get`.
  * FLAGS. `cflags_main` (configure.py) with a file-wide `#pragma optimization_level 4` (the switch-range lowering
  *   `subi; cmplwi` of `ai_npc_step20_arm`; no row regresses).  `#pragma peephole off` from 0x802C2700 to the end of
  *   0x802D44F4's band, with `peephole on` wrapped around fn_802D1954, fn_802D2024, fn_802D29B8, fn_802D29CC,
@@ -323,7 +323,7 @@ extern u16 lbl_805D44EC[0x2A];
 void fn_800DCCF8(void* state, nw4r::math::VEC3* pos, s32 enable);
 
 /* The AI-NPC work record's own helpers, all inside this range and defined below. */
-s32 fn_802D77A0(u8 value);
+s32 ai_npc_level_rank_get(u8 value);
 void ai_npc_tutorial_talk(void);
 s32 fn_802D77DC(u8 slot);
 u32 ai_npc_motion_step_ck(struct _AINPC_W* self, u8 motion, u16 step);
@@ -480,7 +480,7 @@ void ai_npc_weak_point_pos_get(struct _AINPC_W* self, struct EmWeakPoint* point,
 extern s16 ai_npc_tuning_tbl[64];          /* 0x805D53A8: rows of {throw chance, tuning 1, tuning 2} by progress (+0x339) */
 extern s16 ai_npc_item_count_tbl[8];       /* 0x805D4640: the stock of each item list of the forest formation */
 extern u16* ai_npc_motion_variant_tbl[6];
-struct AINPCFormation* fn_802D773C(u8 index);
+struct AINPCFormation* ai_npc_behaviour_get(u8 index);
 u32 fn_802D7F10(u8* slots, u8 value);
 void ai_npc_element_report_update(struct _AINPC_W* self);
 void fn_802D9A44(struct _AINPC_W* self);
@@ -5591,7 +5591,7 @@ void ai_npc_buff_item_use(_AINPC_W* self)
         if (self->variant == 2) {
             step = ai_npc_alt_step_get(step);
         }
-        cost = fn_802D77DC(fn_802D77A0(self->field_0x3FC[slot]));
+        cost = fn_802D77DC(ai_npc_level_rank_get(self->field_0x3FC[slot]));
         fn_802D6B2C(self, -cost);
         fn_802D2A00(self, 1, step, 0);
     }
@@ -7282,7 +7282,7 @@ void ai_npc_status_preview(AINPCSetup* setup, AINPCStatus* status)
     u8 i;
     s32 value;
 
-    row = fn_802D773C(setup->behaviour)->tuning_0x00;
+    row = ai_npc_behaviour_get(setup->behaviour)->tuning_0x00;
     status->attack_rank = ai_npc_level_get(setup->attack_level);
     status->gauge_rank = fn_802D7C04(setup->gauge_level);
     status->rate = 100;
@@ -11341,7 +11341,7 @@ void fn_802D6A00(struct _AINPC_W* self)
         self->field_0x3F8[i] = lbl_805D4190[v];
         self->field_0x3FC[i] = lbl_805D41A0[v];
         self->field_0x400[i] = lbl_805D41B0[v];
-        value = (u8)fn_802D77A0(self->field_0x3FC[i]);
+        value = (u8)ai_npc_level_rank_get(self->field_0x3FC[i]);
         if (best <= value) {
             best = value;
         }
@@ -11425,7 +11425,7 @@ void fn_802D7464(struct _AINPC_W* self)
 }
 
 /* 0x802D7688 - which of the four behaviour lists the given id belongs to (3 when in none). */
-s32 fn_802D7688(u8 value)
+s32 ai_npc_skill_group_get(u8 value)
 {
     s32 i;
 
@@ -11454,13 +11454,13 @@ struct AINPCBehaviour {
 extern "C" {
 
 /* 0x802D773C - the behaviour-list record for the given index. */
-struct AINPCBehaviour* fn_802D773C(u8 index)
+struct AINPCBehaviour* ai_npc_behaviour_get(u8 index)
 {
     return lbl_805D4358[index];
 }
 
 /* 0x802D7754 - the four hold-countdown tuning values for the two 0/1 rolls at +0x3F6/+0x3F7. */
-void fn_802D7754(u8 first, u8 second, u16* out)
+void ai_npc_pair_values_get(u8 first, u8 second, u16* out)
 {
     out[0] = lbl_805D41A0[first * 5];
     out[1] = lbl_805D41A0[first * 4 + second];
@@ -11470,7 +11470,7 @@ void fn_802D7754(u8 first, u8 second, u16* out)
 
 /* 0x802D77A0 - the 14-entry level lookup: which of the three level values a slot level index maps
  * to (the table at 0x805D5428 is MWCC's own output for this switch). */
-s32 fn_802D77A0(u8 value)
+s32 ai_npc_level_rank_get(u8 value)
 {
     switch (value) {
     default:
@@ -12001,7 +12001,7 @@ u16 result_time_rank_get(u16 minutes)
 /* 0x802D8D94 (0x60): returns a value scaled by the behaviour record of the given index. */
 u16 ai_behaviour_scaled_get(u16 value, u8 index)
 {
-    struct AINPCBehaviour* record = fn_802D773C(index);
+    struct AINPCBehaviour* record = ai_npc_behaviour_get(index);
 
     return (f32)value * record->scale;
 }

@@ -251,8 +251,8 @@ extern "C" {
 void draw_font_idx_num(u16 id, s32 value, u32 mode, const _mh_ivec2_* pos);
 void addVec3To(VEC3* dst, const VEC3* src);
 u32 calc_xz_angle(f32 a, f32 b, f32 c, f32 d);
-const u8* fn_802D773C(u8 index);
-void fn_802D7754(u8 a, u8 b, u16* out);
+const u8* ai_npc_behaviour_get(u8 index);
+void ai_npc_pair_values_get(u8 a, u8 b, u16* out);
 const u8* lb_entry_id_get(u8 index);
 s8* get_item_name_str(u8 id);
 s8* get_player_name_str(u8 index);
@@ -421,7 +421,7 @@ extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
 {
     draw_sprite_ary(lbl_805E7438, pos);
     u8 sel = lobby_world_block->player_slot_0x3E03 & 0x7F;
-    const u8* rows = fn_802D773C(sel);
+    const u8* rows = ai_npc_behaviour_get(sel);
     const u8* slots = lb_entry_id_get(sel);
     draw_font_idx(0x2043, get_player_name_str(sel), 1, pos);
     draw_font_idx_num(0x2044, self->mode_0x14, 1, pos);
@@ -444,7 +444,7 @@ extern "C" void fn_8033F560(CockpitPanel* self, const _mh_ivec2_* pos)
     draw_font_idx_num(0x205F, self->value_0x16 + self->value_delta_0x18, 1, pos);
     draw_font_idx(0x2060, LbStr(0, (u16)(self->label_0x1A + 0x1C2)), 1, pos);
     u16 digits[4];
-    fn_802D7754(lobby_world_block->clock_hour_0x51A4, lobby_world_block->clock_minute_0x51A5, digits);
+    ai_npc_pair_values_get(lobby_world_block->clock_hour_0x51A4, lobby_world_block->clock_minute_0x51A5, digits);
     for (u16 i = 0; i < 4; i++) {
         draw_font_idx(lbl_80793098[i], get_digit_str((u8)digits[i]), 0, pos);
     }

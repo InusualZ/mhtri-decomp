@@ -10,8 +10,10 @@
  *   `ef/eft035.cpp` read at 0x805E6EF8-0x805E70C8 are not emitted, so the slot and flash id lists sit 0x1F0 bytes
  *   early.  The combine tables (.data 0x80603EA0-0x80604638, .sdata 0x80793A28-0x80793A67) are inside
  *   `menu/menu_placeinfo.cpp`'s claim and are read through `menu/lb_combo_recipe_tbl.h`.
- * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps `clrlwi` + `slwi` and
- *   `lobby_world_block + (i >> 3)` in a register; measured in docs/lobby.md).
+ * FLAGS. `cflags_lobby`, file-scope `#pragma peephole off` (retail keeps `clrlwi` + `slwi` and
+ *   `lobby_world_block + (i >> 3)` in a register; measured in docs/lobby.md) and `#pragma pool_data off` (retail
+ *   addresses each delivery/screen-13 table with its own `lis`/`addi`; pooled, `lb_deli_window_draw` loads them off one
+ *   base).
  * NAMES. The defined functions are named from their bodies.  GUESSes: the link-gated senders whose caller is
  *   unwritten, after the protocol sub-command they build (`lb_sub0a_send`, ...), and the icon tables (`<table>_area<n>`
  *   is entry n).  GUESS: `lb_sub16_send` (builds sub-command 0x16).  GUESS: `lobby_hunter_cards` (.bss 0x806BE340, ten
@@ -28,9 +30,15 @@
  *   `lb_tutorial_work`, `lb_tutorial_entry_lists`, `tutorial_page_texts`, `tutorial_page_sets`,
  *   `tutorial_kind_sprite_ids`, `tutorial_end_sprite_ids`, `tutorial_end_sprite_ids_alt`.  Registry GUESSes for other
  *   units' rows: `pad_hold_set`/`pad_hold_clear`, `pl_my_lock_timer_set`, `pl_skill_have_ck`, the `lb_combo_*` tables.
- * RESIDUALS. Rows unwritten: 0x8033B6C0-0x8033C36C (the delivery menu, 10 rows), 0x8033C4FC-0x8033C570,
- *   0x8033C594-0x8033CEC0, 0x8033CF18-0x8033E050 (with the written `lb_byte_list_has`, which scores zero),
- *   0x8033E088-0x8033F270.
+ *   GUESS (the delivery menu, 0x8033B6C0-0x8033C36C): `lb_deli_entry_copy`, `lb_deli_item_have_ck`,
+ *   `lb_deli_order_ready_ck`, `lb_deli_order_pay`, `lb_deli_cost_draw`, `lb_deli_window_draw`,
+ *   `lb_area_select_screen_draw`, `lb_deli_work`, the `lb_deli_*` tables.  GUESS (screen 13, the companion page):
+ *   `lb_item_gets_*`, `lb_skill_*`, `lb_entry_list_*`, `lb_dance_list_*` (the two "dances" are the pair at
+ *   `LbDataBlock` +0x51A4, which `ef/eft050.cpp` reads as a clock - the reading is not settled), `lb_status_preview_update`,
+ *   the `lb_s13_*` draw helpers and tables.  Registry GUESSes for other units' rows: `place_rec_item_set`,
+ *   `place_rec_zenny_set`, `lb_npc_choice_draw`, `ai_npc_behaviour_get`, `lb_npc_entry_flag_set`, `lb_screen13_draw`,
+ *   `ai_npc_skill_group_get`, `ai_npc_pair_values_get`, `ai_npc_level_rank_get`.
+ * RESIDUALS. Every row is written.
  *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local does not change it);
  *  - `lb_act_value_apply`, `lb_act_limit_set`, `lb_act_slot_write`: retail reads the request's +0x4 (+0x9) where ours
@@ -40,18 +48,31 @@
  *  - `lb_act_announce`: ours adds one `b`; `lb_act_handover`: ours saves one register fewer and its branch targets
  *    shift; `lb_name_tail_copy`: the word copies' load/store order;
  *  - `lb_entry_start_send`, `lb_act_entry_start`: the companion work's parameter bytes and the request's +0x18..+0x1B;
- *  - `lb_entry_publish`, `lb_entry_model_publish`: a record's byte offsets and a byte against a word store;
+ *  - `lb_entry_model_publish`: a byte against a word store;
  *  - `lb_combo_rate_get`: `userdata_item_slot_count`'s `s16` result is sign-extended where retail keeps it (the owner
  *    header's width), and the item box capacity's `clrlwi` is scheduled after the item load;
+ *  - `lb_skill_unlock_announce`: retail walks `lb_skill_unlock_items` with two pointers (one for the `need_0x00` test,
+ *    one for the other fields), ours with one (an indexed loop and `s16`/`s32`/`u8` counters measure the same or worse);
+ *  - `lb_s13_dance_values_draw`: retail keeps the pair index in its own register beside the `lb_s13_value_pairs` base,
+ *    ours strength-reduces it into a pointer (a `[4][2]` table measures worse);
+ *  - `lb_s13_skill_list_draw`, `lb_s13_entry_list_draw`: one argument load scheduled before the flag test, and the
+ *    callee-saved colours (the best declaration orders are applied);
  *  - `lb_seen_pad_ck`, `lb_act_row_update`, `lb_act_best_keep`, `lb_triplet_value2_get`, `lb_triplet_value1_get`,
- *    `lb_page_bits_set`, `lb_tutorial_note_draw`: register colouring only.
- *   flipcheck: `.bss`/`.sbss`/`.sdata2` claimed, not emitted; `.data` 0x4F0 against 0x4C3C; `.sdata` 0x20C against
- *   0x354; `.text`/extab/extabindex short of the claim; the `.sdata`/`.sdata2` pool is shared with
- *   `hud/cockpit_quest.cpp` and `menu/menu_placeinfo.cpp` (a low-confidence fold candidate); the source still spells
- *   `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck` and `eft_slot_spawn` by their old stems `fn_800CF384`,
- *   `fn_803438E4`, `fn_80343B44`, `fn_80343B74`.
- * SHAPES. Declaration order decides the callee-saved colours of `lb_combo_rate_get`/`lb_combo_exec` (playbook 63);
- *   `lb_combo_exec`'s yield roll is a `for (;;)` with the test first (retail does not rotate it).
+ *    `lb_page_bits_set`, `lb_tutorial_note_draw`, `lb_dance_list_step`, `lb_s13_slot_list_draw`: register colouring.
+ *  - `lb_deli_cost_draw`'s `"%d"` (retail `lbl_80793018`) merges with `lb_combo_rate_sprintf`'s (`lbl_80793008`) in
+ *    ours, so `.sdata` carries one copy where retail has two;
+ *  - `lb_status_preview_update` builds `LbCompanionSetup`, the layout of `ai/ai_npc.h`'s `AINPCSetup`, because that
+ *    header's `_HIT_W` collides with `Pl/hit_w.h`'s beside this unit's includes.
+ *   flipcheck: `.bss`/`.sbss`/`.sdata2` claimed, not emitted (only `lb_deli_work`); `.data`/`.sdata` short of the
+ *   claim (the delivery, screen-13 and draw tables are emitted, byte-identical; the act switch tables, the icon lists
+ *   0x805E6EF8-0x805E70C8 and `lbl_805E7180` are not); `.text`/extab/extabindex short of the claim; the
+ *   `.sdata`/`.sdata2` pool is shared with `hud/cockpit_quest.cpp` and `menu/menu_placeinfo.cpp` (a low-confidence fold
+ *   candidate); the source still spells `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck` and `eft_slot_spawn`
+ *   by their old stems `fn_800CF384`, `fn_803438E4`, `fn_80343B44`, `fn_80343B74`.
+ * SHAPES. Declaration order decides the callee-saved colours of `lb_combo_rate_get`/`lb_combo_exec` (playbook 63) and
+ *   of the screen-13 helpers; `lb_combo_exec`'s yield roll is a `for (;;)` with the test first (retail does not rotate
+ *   it); a draw helper declares its layout base before the row position (retail puts the base at +0xC); the two-row
+ *   loops are `for` loops (a `do`/`while` keeps an `extsh`/`clrlwi` on the test).
  */
 
 #include "types.h"
@@ -207,6 +228,120 @@ u16 cockpit_flash_anim_ids[] = { 0x0BCF, 0x0BD0, 0x0BD1, 0x0BD3, 0x0BD4, 0xFFFF 
 #include "Pl/quest_move_idle_ck.h"    /* quest_move_idle_ck (rule 2) */
 #include "lobby/lb_event_request.h"   /* this unit's own leaf header */
 #include "ai/ainpc_move.h"           /* ai_skill_mask_get (rule 2) */
+#include "lobby/lb_deli_list_build.h" /* this unit's own leaf header */
+#include "lobby/lb_list_init.h"       /* lb_choice_init, lb_choice_step, lb_panel_*, lb_page_arrow_draw (rule 2) */
+#include "lobby/lb_cmd_pressed_ck.h"  /* lb_cmd_pressed_ck, lb_cmd_repeat_ck, lobby_cmd_trig_get (rule 2) */
+#include "lobby/lb_talk_page_open.h"  /* lb_talk_page_open, lb_talk_page_mode_reset (rule 2) */
+#include "lobby/lb_unlock_cond_ck.h"  /* lb_unlock_cond_ck (rule 2) */
+#include "lobby/lb_progress_unlock.h" /* lb_progress_unlock (rule 2) */
+#include "lobby/lb_npc_choice_draw.h" /* lb_npc_choice_draw (rule 2) */
+#include "menu/menu_message.h"        /* menu_cursor_step_forward, toggle_word_step (rule 2) */
+#include "menu/menu_row.h"            /* PlaceRec, place_rec_alloc_idx (rule 2) */
+#include "menu/place_rec_item_set.h"  /* place_rec_item_set, place_rec_zenny_set (rule 2) */
+#include "menu/sysmsg_text.h"         /* lb_deli_data, lb_deli_list_data (rule 2) */
+#include "camera/camera.h"            /* camera_talk_lock_set (rule 2) */
+#include "hud/ainpc_page_mark_b_draw.h" /* ainpc_page_mark_b_draw (rule 2) */
+#include "Runtime.PPCEABI.H/memset.h" /* memset */
+#include "Runtime.PPCEABI.H/memcpy.h" /* memcpy */
+#include "lobby/lobby_w.h"            /* lobby_w, LbLobbyWork (rule 2) */
+#include "lobby/lb_screen13_step.h"   /* this unit's own leaf header */
+#include "lobby/lb_screen13_open.h"   /* this unit's own leaf header */
+#include "lobby/lb_menu_step.h"       /* lb_menu_step (rule 2) */
+#include "lobby/lb_npc_entry_flag_set.h" /* lb_npc_entry_flag_set (rule 2) */
+#include "lobby/lb_npc.h"             /* lb_item_get_data (rule 2) */
+#include "ef/eft052_box_open.h"       /* eft052_box_open (rule 2) */
+#include "ef/eft052_item_get_open.h"  /* eft052_item_get_step (rule 2) */
+#include "ef/lb_screen13_draw.h"      /* lb_screen13_draw (rule 2) */
+#include "hud/ainpc_page_hold_set.h"  /* ainpc_page_hold_set (rule 2) */
+#include "ai/ai_npc_status_preview.h" /* ai_npc_status_preview (rule 2) */
+#include "ai/ai_npc_behaviour_get.h"  /* ai_npc_behaviour_get (rule 2) */
+#include "ai/ai_npc_skill_group_get.h" /* ai_npc_skill_group_get (rule 2) */
+#include "ai/ai_npc_pair_values_get.h" /* ai_npc_pair_values_get (rule 2) */
+#include "ai/ai_npc_level_rank_get.h" /* ai_npc_level_rank_get (rule 2) */
+#include "lobby/lb_group_row_draw.h"  /* lb_group_row_draw, lb_group_color_get (rule 2) */
+#include "userdata_item.h"            /* userdata_item_count_total (rule 2) */
+#include "get_FqResult_work.h"        /* userdata_zenny_add (rule 2) */
+#include "sound/fn_800D7F54.h"        /* sysSE_stop (rule 2) */
+
+/* ---- the delivery menu's tables (.data, .sdata) and work block (.bss) ---- */
+LbChoiceTmpl lb_deli_choice_tmpl = { 1, 0, 0, 0x117, 4, NULL, 0, 3 };
+u16 lb_deli_cost_sprite_ids[6] = { 0x1E9B, 0x1E9C, 0x1EA3, 0x1E9A, 0x1EA2, 0xFFFF };
+u16 lb_deli_window_sprite_ids[28] = {
+    0x1E7D, 0x1E7E, 0x1E7F, 0x1E80, 0x1E81, 0x1E82, 0x1E83, 0x1E84, 0x1E85, 0x1E86, 0x1E87, 0x1E88,
+    0x1E89, 0x1E72, 0x1E73, 0x1E74, 0x1E75, 0x1E76, 0x1E77, 0x1E78, 0x1E79, 0x1E7A, 0x1E7B, 0x1E7C, 0xFFFF,
+};
+u16 lb_deli_title_sprite_ids[8] = { 0x1E8B, 0x1E8F, 0x1E90, 0x1E91, 0x1E92, 0x1E93, 0x1E94, 0xFFFF };
+u16 lb_deli_cost_frame_sprite_ids[16] = {
+    0x1EA8, 0x1EA9, 0x1EAA, 0x1EAB, 0x1EAC, 0x1EAD, 0x1EAE, 0x1EAF, 0x1EB0, 0x1EA5, 0x1EA6, 0x1EA7, 0xFFFF,
+};
+u16 lb_deli_cost_layout_ids[4] = { 0x1EB1, 0x1EB2, 0x1EB3, 0x1EB4 };
+LbDeliWork lb_deli_work;
+
+/* ---- screen 13's tables (.data, .sdata) ---- */
+LbSkillFlag lb_skill_unlock_flags[19] = {
+    { 0x115, 0x01 }, { 0x116, 0x06 }, { 0x117, 0x07 }, { 0x118, 0x08 }, { 0x119, 0x09 }, { 0x11A, 0x0A },
+    { 0x11B, 0x0B }, { 0x11C, 0x0C }, { 0x11D, 0x0D }, { 0x11E, 0x0E }, { 0x11F, 0x0F }, { 0x120, 0x10 },
+    { 0x121, 0x11 }, { 0x122, 0x12 }, { 0x127, 0x17 }, { 0x128, 0x18 }, { 0x129, 0x19 }, { 0x12A, 0x1A },
+    { 0xFFFF, 0 },
+};
+LbSkillUnlock lb_skill_unlock_items[6] = {
+    { 0x0B, 0x124, 0x14 }, { 0x09, 0x123, 0x13 }, { 0x0C, 0x126, 0x16 }, { 0x0A, 0x125, 0x15 }, { 0x0D, 0x12B, 0x1B },
+    { 0xFFFF, 0, 0 },
+};
+u16 lb_entry_unlock_flags[8] = { 0xFFFF, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C };
+u8 lb_skill_group_a[12] = { 2, 3, 4, 5, 6, 8, 9, 10 };
+u8 lb_skill_needs_7[8] = { 2, 3, 4, 5, 6 };
+u8 lb_skill_needs_11[4] = { 8, 9, 10 };
+u8 lb_skill_group_b[4] = { 0x13, 0x14 };
+u8 lb_skill_group_c[4] = { 0x15, 0x16 };
+
+/* ---- screen 13's draw tables (.data, .sdata) ---- */
+u16 lb_subpage_arrow_sprite_ids[6] = { 0x1EB7, 0x1EB8, 0x1EBA, 0x1EBB, 0x1EB9, 0xFFFF };
+u16 lb_s13_frame_sprite_ids[10] = { 0x1EFA, 0x1EFB, 0x1EFC, 0x1EF8, 0x1EF9, 0x1EF4, 0x1EF5, 0x1EF6, 0x1EF7, 0xFFFF };
+u16 lb_s13_row_layout_ids[8] = { 0x1F14, 0x1F15, 0x1F16, 0x1F17, 0x1F18, 0x1F19, 0x1F1A };
+u16 lb_s13_slot_frame_sprite_ids[16] = {
+    0x1EFD, 0x1EFE, 0x1EFF, 0x1F00, 0x1F01, 0x1F02, 0x1F03, 0x1F04, 0x1F05, 0x1F06, 0x1F07, 0x1EF9, 0x1EF6, 0x1EF7, 0xFFFF,
+};
+u16 lb_s13_help_sprite_ids[26] = {
+    0x1F2B, 0x1F2C, 0x1F2D, 0x1F2E, 0x1F2F, 0x1F30, 0x1F31, 0x1F32, 0x1F33, 0x1F34, 0x1F35, 0x1F36, 0x1F37,
+    0x1F38, 0x1F39, 0x1F3A, 0x1F3B, 0x1F3C, 0x1F3D, 0x1F3E, 0x1F3F, 0x1F40, 0x1F41, 0x1F42, 0x1F43, 0xFFFF,
+};
+u16 lb_s13_status_sprite_ids[50] = {
+    0x1F57, 0x1F58, 0x1F59, 0x1F5A, 0x1F5B, 0x1F5C, 0x1F5D, 0x1F5E, 0x1F5F, 0x1F60, 0x1F61, 0x1F82, 0x1F83,
+    0x1F84, 0x1F69, 0x1F68, 0x1F62, 0x1F63, 0x1F64, 0x1F65, 0x1F66, 0x1F67, 0x1F6A, 0x1F6B, 0x1F6C, 0x1F6D,
+    0x1F6E, 0x1F6F, 0x1F70, 0x1F71, 0x1F72, 0x1F73, 0x1F74, 0x1F75, 0x1F76, 0x1F77, 0x1F78, 0x1F79, 0x1F7A,
+    0x1F7B, 0x1F7C, 0x1F7D, 0x1F7E, 0x1F7F, 0x1F80, 0x1F81, 0x1F54, 0x1F55, 0xFFFF,
+};
+u16 lb_s13_skill_badge_sprite_ids[6] = { 0x1ED7, 0x1ED8, 0x1EDA, 0x1EDB, 0xFFFF };
+u16 lb_s13_pick_sprite_ids[32] = {
+    0x1FA5, 0x1F90, 0x1F8F, 0x1F91, 0x1F8C, 0x1F8D, 0x1F8E, 0x1F8A, 0x1F8B, 0x1F92, 0x1F93, 0x1F94, 0x1F95,
+    0x1F96, 0x1F97, 0x1F98, 0x1F99, 0x1F9A, 0x1F9B, 0x1F9C, 0x1F9D, 0x1F9E, 0x1F9F, 0x1FA0, 0x1FA1, 0x1FA2,
+    0x1FA4, 0x1FA6, 0x1FA7, 0x1FA8, 0x1F89, 0xFFFF,
+};
+u16 lb_s13_value_sprite_ids[14] = {
+    0x1FC5, 0x1FC6, 0x1FBB, 0x1FBC, 0x1FBD, 0x1FBE, 0x1FBF, 0x1FC0, 0x1FC1, 0x1FC2, 0x1FC3, 0x1FC4, 0xFFFF,
+};
+u16 lb_s13_value_row_sprite_ids[10] = { 0x1FB5, 0x1FB6, 0x1FB7, 0x1FB8, 0x1FB9, 0x1FB2, 0x1FB3, 0x1FB4, 0xFFFF };
+u16 lb_s13_option_sprite_ids[6] = { 0x1EE2, 0x1EE3, 0x1EE4, 0x1EE6, 0xFFFF };
+u16 lb_s13_confirm_sprite_ids[8] = { 0x1F09, 0x1F0A, 0x1F0B, 0x1F0C, 0x1F0D, 0x1F0E, 0xFFFF };
+u16 lb_s13_action_sprite_ids[12] = {
+    0x1F45, 0x1F46, 0x1F47, 0x1F48, 0x1F49, 0x1F4A, 0x1F4B, 0x1F4C, 0x1F4D, 0x1F4E, 0xFFFF,
+};
+u16 lb_s13_info_sprite_ids[22] = {
+    0x1FCD, 0x1FCE, 0x1FCF, 0x1FD0, 0x1FD1, 0x1FD2, 0x1FD3, 0x1FD4, 0x1FD5, 0x1FD6, 0x1FD7, 0x1FD8, 0x1FD9,
+    0x1FDA, 0x1FDB, 0x1FDC, 0x1FDD, 0x1FDE, 0xFFFF,
+};
+u16 lb_s13_skill_layout_ids[8] = { 0x1F1F, 0x1F20, 0x1F21, 0x1F22, 0x1F23, 0x1F24, 0x1F25, 0x1F26 };
+u16 lb_s13_status_slot_layout_ids[3] = { 0x1F85, 0x1F86, 0x1F87 };
+u16 lb_s13_skill_cursor_sprite_ids[4] = { 0x1EDC, 0x1EDD, 0x1EDE, 0xFFFF };
+u16 lb_s13_pick_layout_ids[4] = { 0x1FA9, 0x1FAA };
+u16 lb_s13_value_layout_ids[4] = { 0x1FC7, 0x1FC8, 0x1FC9, 0x1FCA };
+u16 lb_s13_rank_sprite_ids[4] = { 0x1FAF, 0x1FAE, 0x1FAD };
+u8 lb_s13_value_pairs[8] = { 0, 0, 0, 1, 1, 1, 1, 0 };
+u16 lb_s13_option_frame_sprite_ids[4] = { 0x1EE5, 0x1EE7, 0xFFFF };
+u16 lb_s13_option_cursor_sprite_ids[4] = { 0x1EE8, 0x1EE9, 0x1EEA, 0xFFFF };
+u16 lb_s13_slot_layout_ids[4] = { 0x1F21, 0x1F22, 0x1F23 };
+u16 lb_s13_action_layout_ids[2] = { 0x1F4F, 0x1F50 };
 
 extern "C" {
 
@@ -228,9 +363,25 @@ void lb_tutorial_page_draw(void);
 void lb_tutorial_note_draw(void);
 s32 lb_tutorial_entry_find(LbTutorialEntry* entry);
 LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd);
+void lb_deli_entry_copy(LbDeliEntry* dst, LbDeliEntry* src);
+void lb_area_select_screen_draw(void);
+void lb_item_gets_box_open(LbScreen13Work* work);
+void lb_status_preview_update(LbScreen13Work* work);
+void lb_entry_list_init(LbScreen13Work* work);
+s32 lb_entry_list_step(LbScreen13Work* work);
+void lb_dance_list_init(LbScreen13Work* work);
+s32 lb_dance_list_step(LbScreen13Work* work);
+void lb_skill_entry_list_init(LbScreen13Work* work);
+s32 lb_skill_menu_step(LbScreen13Work* work);
+void lb_skill_pick_init(LbScreen13Work* work);
+void lb_skill_clash_remove(LbScreen13Work* work);
+void lb_skill_page_build(LbScreen13Work* work, s16 page);
+s32 lb_skill_pick_step(LbScreen13Work* work);
+void lb_s13_skill_row_draw(u8 skill, bool enabled, bool sel, bool active, bool marked, _mh_ivec2_* pos);
 }
 
 #pragma peephole off
+#pragma pool_data off
 
 extern "C" {
 
@@ -1752,19 +1903,332 @@ void lb_combo_rate_sprintf(char* text, LbComboRecipe* recipe) {
     sprintf(text, "%d-%d", low, high);
 }
 
-/* Copies the 0xC-byte `LbSettings` record from one owner to another, field by field. */
-void lb_settings_copy(LbSettings* dst, LbSettings* src) {
-    dst->first_0x00 = src->first_0x00;
-    dst->second_0x02 = src->second_0x02;
-    dst->third_0x04 = src->third_0x04;
-    dst->fourth_0x06 = src->fourth_0x06;
-    dst->value_0x08 = src->value_0x08;
-    dst->value_0x0C = src->value_0x0C;
+/* Rebuilds the delivery list for `plw` and the NPC record `npc`: every `lb_deli_list_data` row whose unlock condition
+ * and progress flags allow it, at most ten; returns the count. */
+s16 lb_deli_list_build(struct _PLW* plw, u8* npc) {
+    LbDeliWork* work = &lb_deli_work;
+    LbDeliEntry* entry = (LbDeliEntry*)lb_deli_list_data;
+
+    memset(work, 0, sizeof(LbDeliWork));
+    work->plw_0xD4 = plw;
+    work->npc_0xD0 = npc;
+    work->count_0x0A = 0;
+    for (; entry->cond_0x00 != 0xFFFF; entry++) {
+        if (lb_unlock_cond_ck(entry->cond_0x00) == 1
+            && (entry->need_0x02 == 0xFFFF || userdata_progress_flag_ck(entry->need_0x02) == 1)
+            && (entry->need_0x04 == 0xFFFF || userdata_progress_flag_ck(entry->need_0x04) == 1)
+            && (entry->flag_0x08 == -1 || userdata_progress_flag_ck(entry->flag_0x08) == 0)) {
+            lb_deli_entry_copy(&work->entries_0x30[work->count_0x0A], entry);
+            if (++work->count_0x0A >= 10) {
+                break;
+            }
+        }
+    }
+    return work->count_0x0A;
+}
+
+/* Copies one 0x10-byte delivery list row field by field. */
+void lb_deli_entry_copy(LbDeliEntry* dst, LbDeliEntry* src) {
+    dst->cond_0x00 = src->cond_0x00;
+    dst->need_0x02 = src->need_0x02;
+    dst->need_0x04 = src->need_0x04;
+    dst->order_0x06 = src->order_0x06;
+    dst->flag_0x08 = src->flag_0x08;
+    dst->talk_0x0C = src->talk_0x0C;
 }
 
 /* A tail call of `lb_panel_close`, the area-name/quest path helper the tutorial block drives. */
 void lb_area_name_apply(void) {
     lb_panel_close();
+}
+
+/* 1 when the player can pay one cost of a delivery: enough zenny (item 0xFFFF), an empty slot, or enough of the item. */
+s32 lb_deli_item_have_ck(LbItemCount* item) {
+    if (item->item_0x00 == 0xFFFF) {
+        if (item->count_0x02 <= lobby_world_block->zenny_0x3F04) {
+            return 1;
+        }
+    } else if (item->item_0x00 == 0) {
+        return 1;
+    } else if (item->count_0x02 <= userdata_item_count_total(item->item_0x00, (u8*)lobby_world_block)) {
+        return 1;
+    }
+    return 0;
+}
+
+/* 1 when every one of the delivery's four costs can be paid. */
+s32 lb_deli_order_ready_ck(LbDeliOrder* order) {
+    LbItemCount* item;
+    s32 i;
+
+    for (i = 0, item = order->items_0x00; i < 4; item++, i++) {
+        if (lb_deli_item_have_ck(item) == 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Pays the delivery of list row `entry` (zenny and items) and unlocks its progress flag. */
+void lb_deli_order_pay(LbDeliEntry* entry) {
+    LbItemCount* item;
+    s32 i;
+
+    i = 0;
+    item = ((LbDeliOrder*)lb_deli_data)[entry->order_0x06].items_0x00;
+    for (; i < 4; item++, i++) {
+        switch (item->item_0x00) {
+        case 0xFFFF:
+            userdata_zenny_add(-item->count_0x02);
+            break;
+        case 0:
+            break;
+        default:
+            eft052_page_count_add(item->item_0x00, item->count_0x02);
+            break;
+        }
+    }
+    if (entry->flag_0x08 != -1) {
+        lb_progress_unlock(entry->flag_0x08);
+    }
+}
+
+/* One input step of the delivery menu: picks a row, confirms it, pays and opens its talk page; 2 on cancel, 1 once the
+ * talk page has closed. */
+s32 lb_deli_menu_step(void) {
+    LbDeliWork* work = &lb_deli_work;
+    s32 result = 0;
+
+    work->moved_0x04 = 0;
+    if (work->anim_0x02 == 7) {
+        work->anim_0x02 = 8;
+    }
+    switch (work->menu_state_0x01) {
+    case 0:
+        if (lb_cmd_pressed_ck(0x10) != 0) {
+            if (lb_deli_order_ready_ck(&((LbDeliOrder*)lb_deli_data)[work->entries_0x30[work->cursor_0x08].order_0x06])
+                != 0) {
+                work->menu_state_0x01 = 1;
+                work->confirm_0x0C = 0;
+                sysSE_req(0);
+            } else {
+                sysSE_req(2);
+            }
+        } else if (lb_cmd_pressed_ck(0x20) != 0) {
+            result = 2;
+            sysSE_req(1);
+        } else if (lb_cmd_repeat_ck(0xC) != 0) {
+            work->cursor_0x08 = menu_cursor_step_forward(work->cursor_0x08, work->count_0x0A, lb_cmd_repeat_get(), 4, 8,
+                                                         6, &work->moved_0x04);
+        }
+        break;
+    case 1:
+        switch (toggle_word_step(&work->confirm_0x0C, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+        case 1:
+            work->menu_state_0x01 = 2;
+            lb_deli_order_pay(&work->entries_0x30[work->cursor_0x08]);
+            lb_talk_page_open(work->entries_0x30[work->cursor_0x08].talk_0x0C);
+            work->anim_0x02 = 7;
+            sysSE_stop(0x14);
+            break;
+        case 2:
+            work->menu_state_0x01 = 0;
+            break;
+        }
+        break;
+    case 2:
+        if ((u32)(lb_talk_page_mode_reset() - 1) <= 1) {
+            result = 1;
+            lb_area_name_apply();
+        }
+        break;
+    }
+    return result;
+}
+
+/* The area-select screen step: opens the choice, runs the delivery menu or closes, then queues the screen's draw. */
+void lb_area_select_screen_step(void) {
+    LbDeliWork* work = &lb_deli_work;
+
+    switch (work->state_0x00) {
+    case 0:
+        if ((u32)(lb_talk_page_mode_reset() - 1) <= 1) {
+            work->state_0x00++;
+            lb_choice_init(&work->list_0x10, (const LbListTmpl*)&lb_deli_choice_tmpl, 0, 0);
+            sysSE_req(5);
+            camera_talk_lock_set(1);
+        }
+        break;
+    case 1:
+        switch (lb_choice_step(&work->list_0x10)) {
+        case 1:
+            work->state_0x00 = 2;
+            work->menu_state_0x01 = 0;
+            break;
+        case 2:
+            work->state_0x00 = 3;
+            lb_talk_page_open(1);
+            camera_talk_lock_set(0);
+            break;
+        }
+        break;
+    case 2:
+        switch (lb_deli_menu_step()) {
+        case 1:
+            return;
+        case 2:
+            work->state_0x00 = 0;
+            break;
+        }
+        break;
+    case 3:
+        if ((u32)(lb_talk_page_mode_reset() - 1) <= 1) {
+            lb_area_name_apply();
+        }
+        break;
+    }
+    subTransSet((u32)lb_area_select_screen_draw, 0, 0);
+}
+
+/* Draws one cost line of the delivery window at layout `layout` moved by `offset` (zenny or an item, greyed when it
+ * cannot be paid) and files its help record for the NPC `npc`. */
+void lb_deli_cost_draw(LbItemCount* item, u16 layout, _mh_ivec2_* offset, u8 npc) {
+    _mh_ivec2_ pos;
+    PlaceRec rec;
+    s8 text[0x20];
+    _SPR_DATA_ spr;
+    s32 have;
+
+    if (item->item_0x00 != 0) {
+        get_lsp_data(layout, &pos);
+        pos.x += offset->x;
+        pos.y += offset->y;
+        if (item->item_0x00 == 0xFFFF) {
+            draw_sprite_anim_ary(lb_deli_cost_sprite_ids, 1, &pos);
+            sprite_frame_apply(&spr, 0x1E9D, 1, NULL);
+            if (lobby_world_block->zenny_0x3F04 < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, (s8*)LbStr(0, 6), 0, &pos);
+            sprintf((char*)text, "%d", item->count_0x02);
+            sprite_frame_apply(&spr, 0x1E9E, 1, NULL);
+            if (lobby_world_block->zenny_0x3F04 < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, text, 2, &pos);
+            sprite_frame_apply(&spr, 0x1E9F, 1, NULL);
+            if (lobby_world_block->zenny_0x3F04 < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, (s8*)LbStr(1, 0x2C), 0, &pos);
+            sprintf((char*)text, "%d", lobby_world_block->zenny_0x3F04);
+            sprite_frame_apply(&spr, 0x1EA0, 1, NULL);
+            if (lobby_world_block->zenny_0x3F04 < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, text, 2, &pos);
+            sprite_frame_apply(&spr, 0x1EA1, 1, NULL);
+            if (lobby_world_block->zenny_0x3F04 < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, (s8*)LbStr(1, 0x2C), 0, &pos);
+            place_rec_zenny_set(&rec, npc, 0, item->count_0x02);
+        } else {
+            have = userdata_item_count_total(item->item_0x00, (u8*)lobby_world_block);
+            draw_sprite_anim_ary(lb_deli_cost_sprite_ids, 0, &pos);
+            draw_itemicon_item_id_idx(0x1E99, item->item_0x00, &pos);
+            spr_data_copy(&spr, get_lsp_data(0x1E96, NULL));
+            if (have < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, (s8*)ItemName(item->item_0x00), 0, &pos);
+            sprintf((char*)text, "%d", item->count_0x02);
+            spr_data_copy(&spr, get_lsp_data(0x1E97, NULL));
+            if (have < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, text, 2, &pos);
+            sprintf((char*)text, "%d", have);
+            spr_data_copy(&spr, get_lsp_data(0x1E98, NULL));
+            if (have < item->count_0x02) {
+                spr.color = 0x505050FF;
+            }
+            draw_font(spr, text, 2, &pos);
+            place_rec_item_set(&rec, npc, item->item_0x00, item->count_0x02);
+        }
+        place_rec_alloc_idx(&rec, layout, offset, -4, 9);
+    }
+}
+
+/* Draws the delivery window of `lb_deli_data` row `order_index`: its frame, texts, four cost lines and talk mark. */
+void lb_deli_window_draw(LbDeliWork* work, s16 order_index, u8 npc) {
+    _mh_ivec2_ pos;
+    LbDeliOrder* order;
+    u16* layout;
+    LbItemCount* item;
+    s32 i;
+
+    order = &((LbDeliOrder*)lb_deli_data)[order_index];
+    get_lsp_data(0x1E71, &pos);
+    draw_sprite_ary(lb_deli_window_sprite_ids, &pos);
+    get_lsp_data(0x1E8A, &pos);
+    draw_sprite_ary(lb_deli_title_sprite_ids, &pos);
+    draw_font_idx(0x1E8C, order->title_0x14, 1, &pos);
+    draw_font_idx(0x1E8D, order->client_0x18, 0, &pos);
+    draw_font_idx(0x1E8E, order->text_0x10, 0, &pos);
+    get_lsp_data(0x1EA4, &pos);
+    draw_sprite_ary(lb_deli_cost_frame_sprite_ids, &pos);
+    item = order->items_0x00;
+    for (i = 0, layout = lb_deli_cost_layout_ids; i < 4; layout++, item++, i++) {
+        lb_deli_cost_draw(item, *layout, &pos, npc);
+    }
+    if (work->anim_0x02 != 0) {
+        get_lsp_data(0x1570, &pos);
+        draw_sprite_anim_idx(0x1571, work->anim_0x02, &pos);
+    }
+    ainpc_page_mark_b_draw(0x1EB5, NULL);
+}
+
+/* Draws the delivery menu for its state: the list with its arrows and help line, the confirm, or the window alone. */
+void lb_deli_menu_draw(void) {
+    LbDeliWork* work = &lb_deli_work;
+
+    switch (work->menu_state_0x01) {
+    case 0:
+        lb_deli_window_draw(work, work->entries_0x30[work->cursor_0x08].order_0x06, work->npc_0xD0[2]);
+        lb_page_arrow_draw(0x1E70, work->cursor_0x08, work->count_0x0A, work->moved_0x04, 1);
+        lb_panel_msg_draw(0x1877, 0x15D);
+        if (lb_deli_order_ready_ck(&((LbDeliOrder*)lb_deli_data)[work->entries_0x30[work->cursor_0x08].order_0x06])
+            == 0) {
+            lb_panel_str_print(0x1877, 0x15E, 2);
+        }
+        break;
+    case 1:
+        lb_deli_window_draw(work, work->entries_0x30[work->cursor_0x08].order_0x06, work->npc_0xD0[2]);
+        lb_page_arrow_draw(0x1E70, work->cursor_0x08, work->count_0x0A, work->moved_0x04, 0);
+        lb_panel_msg_draw(0x1877, 0x15F);
+        lb_panel_yes_no_draw(0x1879, work->confirm_0x0C);
+        break;
+    case 2:
+        lb_deli_window_draw(work, work->entries_0x30[work->cursor_0x08].order_0x06, work->npc_0xD0[2]);
+        break;
+    }
+}
+
+/* The area-select screen's draw task: the choice list, or the delivery menu. */
+void lb_area_select_screen_draw(void) {
+    LbDeliWork* work = &lb_deli_work;
+
+    set_zmode(false, 0, false);
+    set_blendmode(4, 5, 1);
+    switch (lb_deli_work.state_0x00) {
+    case 1:
+        lb_npc_choice_draw(&work->list_0x10);
+        break;
+    case 2:
+        lb_deli_menu_draw();
+        break;
+    }
 }
 
 /* The page block's id-table row `&lobby_world_block->ids_0x5180[index]` (the entry the companion page binds);
@@ -1788,9 +2252,9 @@ void lb_entry_publish(void) {
     index = lobby_world_block->entry_0x3E03 & 0x7F;
     entry = lb_entry_id_get(index);
     lb_param_w.sub_0x30 = lobby_world_block->ids_0x51A6[index];
-    lb_param_w.sub_0x26 = entry->byte_0x01;
-    lb_param_w.sub_0x27 = entry->byte_0x02;
-    lb_param_w.sub_0x28 = entry->byte_0x03;
+    lb_param_w.sub_0x26 = entry->skills_0x01[0];
+    lb_param_w.sub_0x27 = entry->skills_0x01[1];
+    lb_param_w.sub_0x28 = entry->skills_0x01[2];
     lb_param_w.sub_0x29 = lobby_world_block->byte_0x51A4;
     lb_param_w.sub_0x2A = lobby_world_block->byte_0x51A5;
     lb_param_w.sub_0x2C = lobby_world_block->word_0x51A0;
@@ -1816,46 +2280,1210 @@ void lb_page_refresh(void) {
     lb_entry_model_publish();
 }
 
+/* Opens lobby screen 13 for `player` and the NPC `npc`: clears its work block, runs its first step and sets the input
+ * delay. */
+void lb_screen13_open(struct _PLW* player, struct _LB_NPC* npc) {
+    LbLobbyWork* lobby = &lobby_w;
+    LbScreen13Work* work = lobby->screen13_0x0AC;
+
+    memset(work, 0, sizeof(LbScreen13Work));
+    work->player_0x184 = player;
+    work->npc_0x180 = npc;
+    lobby_w.state_0x000 = 0xD;
+    lobby->active_0x008 = 1;
+    lb_screen13_step();
+    work->timer_0x010 = 0x10;
+}
+
 /* Republishes the entry byte (`lb_entry_publish`) and then the page's name path (`lb_panel_close`). */
 void lb_entry_republish(void) {
     lb_entry_publish();
     lb_panel_close();
 }
 
-/* Sets `page->bits_0x72` for the entry the block has selected and mirrors the count. */
-void lb_page_bits_set(LbPageWork* page) {
+/* 1 when an item is waiting in either of the block's collected-item runs. */
+u32 lb_item_gets_pending_ck(void) {
+    LbDataBlock* block;
+    s16 i;
+
+    i = 0;
+    block = lobby_world_block;
+    for (; i < 12; i++) {
+        if (block->gets_0x51B4[i].item_0x00 != 0 && block->gets_0x51B4[i].count_0x02 != 0) {
+            return 1;
+        }
+    }
+    for (i = 0; i < 30; i++) {
+        if (block->gets_0x51E4[i].item_0x00 != 0 && block->gets_0x51E4[i].count_0x02 != 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Unlocks the skills whose progress flags are now set (`lb_skill_unlock_items`, `lb_skill_unlock_flags`) and the two
+ * dances, announcing each on the message line. */
+void lb_skill_unlock_announce(void) {
+    s8 text[0x40];
+    LbSkillUnlock* unlock;
+    LbSkillFlag* flag;
+
+    for (unlock = lb_skill_unlock_items; unlock->need_0x00 != 0xFFFF; unlock++) {
+        if (userdata_progress_flag_ck(unlock->done_0x02) == 0 && userdata_progress_flag_ck(unlock->need_0x00) != 0) {
+            lobby_world_block->flags_0x519C |= 1 << unlock->skill_0x04;
+            userdata_progress_flag_set(unlock->done_0x02);
+            sprintf((char*)text, (char*)LbStr(0, 0x1C7), get_item_name_str(unlock->skill_0x04));
+            hud_msg_push(0, (char*)text);
+        }
+    }
+    for (flag = lb_skill_unlock_flags; flag->flag_0x00 != 0xFFFF; flag++) {
+        if (userdata_progress_flag_ck(flag->flag_0x00) == 0 && (lobby_world_block->flags_0x519C & (1 << flag->skill_0x02)) != 0) {
+            userdata_progress_flag_set(flag->flag_0x00);
+            sprintf((char*)text, (char*)LbStr(0, 0x1C7), get_item_name_str(flag->skill_0x02));
+            hud_msg_push(0, (char*)text);
+        }
+    }
+    if (userdata_progress_flag_ck(0x113) == 0 && userdata_progress_flag_ck(0x4B) != 0) {
+        sprintf((char*)text, (char*)LbStr(0, 0x1C7), get_group2_name_str(2));
+        hud_msg_push(0, (char*)text);
+        userdata_progress_flag_set(0x113);
+    }
+    if (userdata_progress_flag_ck(0x114) == 0 && userdata_progress_flag_ck(0x4C) != 0) {
+        sprintf((char*)text, (char*)LbStr(0, 0x1C7), get_group2_name_str(3));
+        hud_msg_push(0, (char*)text);
+        userdata_progress_flag_set(0x114);
+    }
+}
+
+/* The screen-13 step: hands collected items over, runs the main choice and the entry, dance, skill and status pages,
+ * then queues the screen's draw. */
+void lb_screen13_step(void) {
+    LbScreen13Work* work = lobby_w.screen13_0x0AC;
+
+    switch (work->state_0x000) {
+    case 0:
+        if (lb_item_gets_pending_ck() == 1) {
+            work->state_0x000 = 7;
+            lb_item_gets_box_open(work);
+        } else {
+            work->state_0x000 = 1;
+            lb_skill_unlock_announce();
+        }
+        memset(&work->menu_0x050, 0, sizeof(LbList));
+        work->menu_0x050.se_ok_0x14 = -1;
+        work->menu_0x050.flags_0x18 = 3;
+        work->menu_0x050.count_0x06 = 5;
+        sysSE_req(5);
+        break;
+    case 1:
+        ainpc_page_hold_set();
+        if (--work->timer_0x010 > 0) {
+            break;
+        }
+        work->timer_0x010 = 0;
+        if (work->help_0x003 == 1) {
+            if (lb_cmd_pressed_ck(0x80) != 0) {
+                work->help_0x003 = 0;
+                sysSE_req(5);
+            }
+        } else if (lb_cmd_pressed_ck(0x80) != 0) {
+            work->help_0x003 = 1;
+            sysSE_req(1);
+        } else {
+            switch (lb_choice_step(&work->menu_0x050)) {
+            case 1:
+                switch (work->menu_0x050.cursor_0x00) {
+                case 0:
+                    work->state_0x000 = 2;
+                    if ((lobby_world_block->entry_0x3E03 & 0x80) != 0) {
+                        lb_talk_page_open(1);
+                        work->talk_0x048 = -0x18;
+                        work->talk_arg_0x04C = 1;
+                    } else {
+                        lb_talk_page_open(0);
+                        work->talk_0x048 = -0x17;
+                        work->talk_arg_0x04C = 1;
+                    }
+                    sysSE_req(0);
+                    break;
+                case 1:
+                    work->state_0x000 = 3;
+                    lb_entry_list_init(work);
+                    sysSE_req(0x1B);
+                    break;
+                case 2:
+                    work->state_0x000 = 4;
+                    lb_dance_list_init(work);
+                    sysSE_req(5);
+                    break;
+                case 3:
+                    work->state_0x000 = 5;
+                    lb_skill_entry_list_init(work);
+                    sysSE_req(0x1B);
+                    break;
+                case 4:
+                    work->state_0x000 = 6;
+                    lb_status_preview_update(work);
+                    sysSE_req(0x1B);
+                    break;
+                }
+                break;
+            case 2:
+                work->state_0x000 = 8;
+                break;
+            }
+        }
+        break;
+    case 7:
+        ainpc_page_hold_set();
+        if ((u32)(eft052_item_get_step() - 1) <= 1) {
+            work->state_0x000 = 1;
+            lb_skill_unlock_announce();
+            memset(lobby_world_block->gets_0x51B4, 0, sizeof(lobby_world_block->gets_0x51B4));
+            memset(lobby_world_block->gets_0x51E4, 0, sizeof(lobby_world_block->gets_0x51E4));
+        }
+        break;
+    case 6:
+        ainpc_page_hold_set();
+        if (lb_cmd_pressed_ck(0x20) != 0) {
+            work->state_0x000 = 1;
+            sysSE_req(1);
+        }
+        break;
+    case 3:
+        ainpc_page_hold_set();
+        if ((u32)(lb_entry_list_step(work) - 1) <= 1) {
+            work->state_0x000 = 1;
+        }
+        break;
+    case 4:
+        ainpc_page_hold_set();
+        if ((u32)(lb_dance_list_step(work) - 1) <= 1) {
+            work->state_0x000 = 1;
+        }
+        break;
+    case 5:
+        ainpc_page_hold_set();
+        if ((u32)(lb_skill_menu_step(work) - 1) <= 1) {
+            work->state_0x000 = 1;
+        }
+        break;
+    case 2:
+        if ((u32)(lb_menu_step(1, 0, work->talk_0x048, work->talk_arg_0x04C) - 1) <= 1) {
+            if (lb_talk_page_value_get() == 0) {
+                if ((lb_param_w.entry_0x08 & 0x80) == 0) {
+                    lb_param_w.entry_0x08 = lobby_world_block->entry_0x3E03 | 0x80;
+                } else {
+                    lb_param_w.entry_0x08 = lb_param_w.entry_0x08 & 0x7F;
+                }
+            } else if ((lb_param_w.entry_0x08 & 0x80) == 0) {
+                lb_param_w.entry_0x08 = lb_param_w.entry_0x08 & 0x7F;
+            } else {
+                lb_param_w.entry_0x08 = lobby_world_block->entry_0x3E03 | 0x80;
+            }
+            lb_npc_entry_flag_set(work->npc_0x180, lb_param_w.entry_0x08);
+            lobby_world_block->entry_0x3E03 = lb_param_w.entry_0x08;
+            lb_entry_republish();
+        }
+        break;
+    case 8:
+        lb_entry_republish();
+        break;
+    }
+    subTransSet((u32)lb_screen13_draw, 0, 0);
+}
+
+/* Copies the collected items into the work block and opens the item box over them. */
+void lb_item_gets_box_open(LbScreen13Work* work) {
+    memset(work->gets_0x0B8, 0, 0xC8);
+    memcpy(work->gets_0x0B8, lobby_world_block->gets_0x51B4, sizeof(lobby_world_block->gets_0x51B4));
+    memcpy(work->gets_0x108, lobby_world_block->gets_0x51E4, sizeof(lobby_world_block->gets_0x51E4));
+    eft052_box_open((Eft052BoxCell*)work->gets_0x0B8, NULL, (Eft052BoxGrid*)(lb_item_get_data + 0xC0));
+}
+
+/* Fills the status preview of the selected entry's setup (its skills, the two levels and the entry's level). */
+void lb_status_preview_update(LbScreen13Work* work) {
+    LbCompanionSetup setup;
+    u8 index;
+    LbEntryId* entry;
+
+    index = lobby_world_block->entry_0x3E03 & 0x7F;
+    setup.entry_0x0 = index;
+    entry = lb_entry_id_get(index);
+    setup.skills_0x1[0] = entry->skills_0x01[0];
+    setup.skills_0x1[1] = entry->skills_0x01[1];
+    setup.skills_0x1[2] = entry->skills_0x01[2];
+    setup.attack_0x4 = lobby_world_block->word_0x51A0;
+    setup.gauge_0x6 = lobby_world_block->word_0x51A2;
+    setup.level_0x8 = lobby_world_block->ids_0x51A6[index];
+    ai_npc_status_preview((struct AINPCSetup*)&setup, (struct AINPCStatus*)work->status_0x09C);
+}
+
+/* Greys out the list row of the entry the block has selected and sets the list's row count. */
+void lb_page_bits_set(LbScreen13Work* work) {
     u8 i;
     u32 selected;
 
     selected = lobby_world_block->entry_0x3E03 & 0x7F;
-    page->saved_0x76 = page->count_0x06;
-    for (i = 0; i < page->count_0x06; i++) {
-        if (selected == page->ids_0x08[i]) {
-            page->bits_0x72 = (u16)(1 << i);
+    work->list_0x070.count_0x06 = work->count_0x006;
+    for (i = 0; i < work->count_0x006; i++) {
+        if (selected == work->ids_0x008[i]) {
+            work->list_0x070.off_mask_0x02 = (u16)(1 << i);
         }
     }
+}
+
+/* Lists the entries whose unlock flag is set (`lb_entry_unlock_flags`) and sets the entry list up. */
+void lb_entry_list_init(LbScreen13Work* work) {
+    u16* flag;
+    s32 i;
+
+    work->sub_0x001 = 0;
+    memset(work->ids_0x008, 0xFF, 7);
+    work->count_0x006 = 0;
+    for (i = 0, flag = lb_entry_unlock_flags; i < 7; flag++, i++) {
+        if (*flag == 0xFFFF || userdata_progress_flag_ck(*flag) == 1) {
+            work->ids_0x008[work->count_0x006] = i;
+            work->count_0x006++;
+        }
+    }
+    memset(&work->list_0x070, 0, sizeof(LbList));
+    work->list_0x070.se_ok_0x14 = -1;
+    work->list_0x070.flags_0x18 = 3;
+    lb_page_bits_set(work);
+}
+
+/* One step of the entry list: picks an entry, confirms it and makes it the selected one; 2 on cancel. */
+s32 lb_entry_list_step(LbScreen13Work* work) {
+    s32 result = 0;
+    u8 entry;
+
+    switch (work->sub_0x001) {
+    case 0:
+        switch (lb_choice_step(&work->list_0x070)) {
+        case 1:
+            work->sub_0x001 = 1;
+            work->confirm_0x044 = 0;
+            sysSE_req(0);
+            break;
+        case 2:
+            result = 2;
+            break;
+        }
+        break;
+    case 1:
+        switch (toggle_word_step(&work->confirm_0x044, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+        case 1:
+            work->sub_0x001 = 0;
+            entry = (lobby_world_block->entry_0x3E03 & 0x80) | work->ids_0x008[work->list_0x070.cursor_0x00];
+            lb_param_w.entry_0x08 = entry;
+            lobby_world_block->entry_0x3E03 = entry;
+            sysSE_stop(0x16);
+            lb_page_bits_set(work);
+            break;
+        case 2:
+            work->sub_0x001 = 0;
+            break;
+        }
+        break;
+    }
+    return result;
+}
+
+/* Lists the dances (the two base ones and those the progress flags 0x4B/0x4C open) with the picked pair marked. */
+void lb_dance_list_init(LbScreen13Work* work) {
+    work->sub_0x001 = 0;
+    work->confirm_0x044 = 0;
+    memset(work->dances_0x012, 0xFF, 4);
+    memset(&work->list_0x070, 0, sizeof(LbList));
+    work->dances_0x012[0] = 0;
+    work->dances_0x012[1] = 1;
+    work->list_0x070.count_0x06 = 2;
+    if (userdata_progress_flag_ck(0x4B) != 0) {
+        work->dances_0x012[work->list_0x070.count_0x06] = 2;
+        work->list_0x070.count_0x06++;
+    }
+    if (userdata_progress_flag_ck(0x4C) != 0) {
+        work->dances_0x012[work->list_0x070.count_0x06] = 3;
+        work->list_0x070.count_0x06++;
+    }
+    work->dance_0x016[0] = lobby_world_block->byte_0x51A4;
+    work->dance_0x016[1] = lobby_world_block->byte_0x51A5;
+    work->list_0x070.off_mask_0x02 = (1 << work->dance_0x016[0]) | (1 << work->dance_0x016[1]);
+}
+
+/* One step of the dance page: with more than two dances, picks two in turn and confirms them; 1 once closed, 2 on
+ * cancel. */
+s32 lb_dance_list_step(LbScreen13Work* work) {
+    s32 result = 0;
+    s16 cursor;
+
+    switch (work->sub_0x001) {
+    case 0:
+        if (work->list_0x070.count_0x06 <= 2) {
+            if (lb_cmd_pressed_ck(0x20) != 0) {
+                result = 2;
+                sysSE_req(1);
+            }
+        } else {
+            switch (toggle_word_step(&work->confirm_0x044, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+            case 1:
+                work->sub_0x001 = 1;
+                work->list_0x070.off_mask_0x02 = 0;
+                work->dance_0x016[0] = 0xFF;
+                work->dance_0x016[1] = 0xFF;
+                sysSE_req(5);
+                break;
+            case 2:
+                result = 2;
+                break;
+            }
+        }
+        break;
+    case 1:
+        if (lb_cmd_pressed_ck(0x10) != 0) {
+            cursor = work->list_0x070.cursor_0x00;
+            if (work->dance_0x016[0] == work->dances_0x012[cursor] || work->dance_0x016[1] == work->dances_0x012[cursor]) {
+                sysSE_req(2);
+            } else if (work->dance_0x016[0] == 0xFF) {
+                work->dance_0x016[0] = work->dances_0x012[cursor];
+                work->list_0x070.off_mask_0x02 |= (u16)(1 << cursor);
+                sysSE_req(0);
+            } else if (work->dance_0x016[1] == 0xFF) {
+                work->sub_0x001 = 2;
+                work->confirm_0x044 = 0;
+                work->dance_0x016[1] = work->dances_0x012[cursor];
+                work->list_0x070.off_mask_0x02 |= (u16)(1 << cursor);
+                sysSE_req(0);
+            }
+        } else if (lb_cmd_pressed_ck(0x20) != 0) {
+            if (work->dance_0x016[0] == 0xFF) {
+                result = 2;
+                sysSE_req(1);
+            } else if (work->dance_0x016[1] == 0xFF) {
+                work->list_0x070.off_mask_0x02 = 0;
+                work->dance_0x016[0] = 0xFF;
+                sysSE_req(1);
+            }
+        } else if (lb_cmd_repeat_ck(3) != 0) {
+            work->list_0x070.cursor_0x00 = menu_cursor_step(work->list_0x070.cursor_0x00, work->list_0x070.count_0x06,
+                                                            lb_cmd_repeat_get(), 1, 2);
+        }
+        break;
+    case 2:
+        switch (toggle_word_step(&work->confirm_0x044, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+        case 1:
+            work->sub_0x001 = 3;
+            lobby_world_block->byte_0x51A4 = work->dance_0x016[0];
+            lobby_world_block->byte_0x51A5 = work->dance_0x016[1];
+            sysSE_stop(0x16);
+            break;
+        case 2:
+            work->sub_0x001 = 1;
+            work->dance_0x016[1] = 0xFF;
+            work->list_0x070.off_mask_0x02 = 1 << work->dance_0x016[0];
+            break;
+        }
+        break;
+    case 3:
+        if (lb_cmd_pressed_ck(0x10) != 0) {
+            result = 1;
+            sysSE_req(0);
+        }
+        break;
+    }
+    return result;
+}
+
+/* Lists the entries for the skill page and greys out those whose level opens no skill slot. */
+void lb_skill_entry_list_init(LbScreen13Work* work) {
+    s16 i;
+    const u8* behaviour;
+    u8* id;
+
+    lb_entry_list_init(work);
+    work->list_0x070.off_mask_0x02 = 0;
+    work->list_0x070.se_ok_0x14 = 5;
+    work->list_0x070.flags_0x18 = 3;
+    for (i = 0; i < work->list_0x070.count_0x06; i++) {
+        id = &work->ids_0x008[i];
+        behaviour = ai_npc_behaviour_get(*id);
+        if (behaviour[lb_entry_id_get(*id)->level_0x00 + 4] == 0) {
+            work->list_0x070.off_mask_0x02 |= (u16)(1 << i);
+        }
+    }
+}
+
+/* One step of the skill page: picks an entry, a slot and an action (change or remove), runs the skill list and
+ * confirms or drops the edit; 2 on cancel. */
+s32 lb_skill_menu_step(LbScreen13Work* work) {
+    s32 result = 0;
+    s16 slots;
+    u8* skill;
+
+    switch (work->sub_0x001) {
+    case 0:
+        switch (lb_choice_step(&work->list_0x070)) {
+        case 1:
+            work->sub_0x001 = 1;
+            work->behaviour_0x094 = ai_npc_behaviour_get(work->ids_0x008[work->list_0x070.cursor_0x00]);
+            work->entry_0x090 = lb_entry_id_get(work->ids_0x008[work->list_0x070.cursor_0x00]);
+            memset(&work->edit_0x098, 0, sizeof(LbEntryId));
+            memcpy(&work->edit_0x098, work->entry_0x090, sizeof(LbEntryId));
+            work->entry_0x090 = &work->edit_0x098;
+            work->slot_0x034 = 0;
+            work->changed_0x004 = 0;
+            break;
+        case 2:
+            result = 2;
+            break;
+        }
+        break;
+    case 1:
+        if (lb_cmd_pressed_ck(0x10) != 0) {
+            if (work->slot_0x034 == (work->behaviour_0x094 + work->entry_0x090->level_0x00)[4]) {
+                work->sub_0x001 = 4;
+                work->confirm_0x044 = 0;
+                sysSE_req(0);
+            } else {
+                work->sub_0x001 = 2;
+                work->action_0x036 = 0;
+                sysSE_req(5);
+            }
+        } else if (lb_cmd_pressed_ck(0x20) != 0) {
+            if (work->changed_0x004 == 0) {
+                work->sub_0x001 = 0;
+            } else {
+                work->sub_0x001 = 5;
+                work->confirm_0x044 = 0;
+            }
+            sysSE_req(1);
+        } else if (lb_cmd_repeat_ck(3) != 0) {
+            slots = (work->behaviour_0x094 + work->entry_0x090->level_0x00)[4];
+            if (work->changed_0x004 != 0) {
+                slots++;
+            }
+            work->slot_0x034 = menu_cursor_step(work->slot_0x034, slots, lb_cmd_repeat_get(), 1, 2);
+        }
+        break;
+    case 2:
+        if (lb_cmd_pressed_ck(0x10) != 0) {
+            switch (work->action_0x036) {
+            case 0:
+                work->sub_0x001 = 3;
+                lb_skill_pick_init(work);
+                sysSE_req(5);
+                break;
+            case 1:
+                skill = &work->entry_0x090->skills_0x01[work->slot_0x034];
+                if (*skill != 0) {
+                    work->sub_0x001 = 1;
+                    *skill = 0;
+                    work->changed_0x004 = 1;
+                    lb_skill_clash_remove(work);
+                    sysSE_stop(0x18);
+                } else {
+                    sysSE_req(2);
+                }
+                break;
+            }
+        } else if (lb_cmd_pressed_ck(0x20) != 0) {
+            work->sub_0x001 = 1;
+            sysSE_req(1);
+        } else if (lb_cmd_repeat_ck(3) != 0) {
+            work->action_0x036 = menu_cursor_step(work->action_0x036, 2, lb_cmd_repeat_get(), 1, 2);
+        }
+        break;
+    case 3:
+        switch (lb_skill_pick_step(work)) {
+        case 1:
+            work->sub_0x001 = 1;
+            work->changed_0x004 = 1;
+            break;
+        case 2:
+            work->sub_0x001 = 1;
+            break;
+        }
+        break;
+    case 4:
+        switch (toggle_word_step(&work->confirm_0x044, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+        case 1:
+            work->sub_0x001 = 0;
+            memcpy(lb_entry_id_get(work->ids_0x008[work->list_0x070.cursor_0x00]), &work->edit_0x098,
+                   sizeof(LbEntryId));
+            sysSE_stop(0x16);
+            break;
+        case 2:
+            work->sub_0x001 = 1;
+            break;
+        }
+        break;
+    case 5:
+        switch (lb_yes_no_step(&work->confirm_0x044)) {
+        case 1:
+            work->sub_0x001 = 0;
+            break;
+        case 2:
+            work->sub_0x001 = 1;
+            break;
+        }
+        break;
+    }
+    return result;
+}
+
+/* Collects the skills of the other slots and builds the first skill page. */
+void lb_skill_pick_init(LbScreen13Work* work) {
+    s16 i;
+    s16 n;
+    u8 skill;
+
+    work->picking_0x002 = 0;
+    work->cursor_0x038 = 0;
+    memset(work->others_0x020, 0, 3);
+    n = 0;
+    for (i = 0; i < work->behaviour_0x094[work->entry_0x090->level_0x00 + 4]; i++) {
+        if (i != work->slot_0x034) {
+            skill = work->entry_0x090->skills_0x01[i];
+            if (skill != 0) {
+                work->others_0x020[n] = skill;
+                n++;
+            }
+        }
+    }
+    lb_skill_page_build(work, 0);
 }
 
 /* Whether the NUL-terminated byte list contains `value`. */
 u32 lb_byte_list_has(u8* list, u8 value) {
-    u8* p;
-
-    for (p = list; ; p++) {
-        if (*p == 0) {
-            return 0;
-        }
-        if (value == *p) {
+    while (*list != 0) {
+        if (value == *list) {
             return 1;
+        }
+        list++;
+    }
+    return 0;
+}
+
+/* The clash flags of `skill` against the skills of the other slots: 2/4/8 when another skill of its exclusive group is
+ * set, 0x10/0x20 when skill 7/11 lacks the skill it builds on. */
+u16 lb_skill_clash_flags_get(LbScreen13Work* work, u8 skill) {
+    u16 flags = 0;
+    s16 i;
+    s32 found;
+
+    if (lb_byte_list_has(lb_skill_group_a, skill) == 1) {
+        for (i = 0; i < 3; i++) {
+            if (lb_byte_list_has(lb_skill_group_a, work->others_0x020[i]) == 1) {
+                flags |= 2;
+            }
+        }
+    }
+    if (lb_byte_list_has(lb_skill_group_b, skill) == 1) {
+        for (i = 0; i < 3; i++) {
+            if (lb_byte_list_has(lb_skill_group_b, work->others_0x020[i]) == 1) {
+                flags |= 4;
+            }
+        }
+    }
+    if (lb_byte_list_has(lb_skill_group_c, skill) == 1) {
+        for (i = 0; i < 3; i++) {
+            if (lb_byte_list_has(lb_skill_group_c, work->others_0x020[i]) == 1) {
+                flags |= 8;
+            }
+        }
+    }
+    switch (skill) {
+    case 7:
+        found = 0;
+        for (i = 0; i < 3; i++) {
+            if (lb_byte_list_has(lb_skill_needs_7, work->others_0x020[i]) == 1) {
+                found = 1;
+            }
+        }
+        if (found == 0) {
+            flags |= 0x10;
+        }
+        break;
+    case 11:
+        found = 0;
+        for (i = 0; i < 3; i++) {
+            if (lb_byte_list_has(lb_skill_needs_11, work->others_0x020[i]) == 1) {
+                found = 1;
+            }
+        }
+        if (found == 0) {
+            flags |= 0x20;
+        }
+        break;
+    }
+    return flags;
+}
+
+/* Clears every set skill that now clashes with the others, announcing each removal. */
+void lb_skill_clash_remove(LbScreen13Work* work) {
+    s8 text[0x80];
+    s16 slot;
+    s16 i;
+    s16 n;
+    u8 skill;
+
+    for (slot = 0; slot < work->behaviour_0x094[work->entry_0x090->level_0x00 + 4]; slot++) {
+        memset(work->others_0x020, 0, 3);
+        n = 0;
+        for (i = 0; i < work->behaviour_0x094[work->entry_0x090->level_0x00 + 4]; i++) {
+            skill = work->entry_0x090->skills_0x01[i];
+            if (skill != 0 && i != slot) {
+                work->others_0x020[n] = skill;
+                n++;
+            }
+        }
+        if (work->entry_0x090->skills_0x01[slot] != 0
+            && lb_skill_clash_flags_get(work, work->entry_0x090->skills_0x01[slot]) != 0) {
+            sprintf((char*)text, (char*)LbStr(3, 0x1A9), get_item_name_str(work->entry_0x090->skills_0x01[slot]));
+            hud_msg_push(0, (char*)text);
+            work->entry_0x090->skills_0x01[slot] = 0;
         }
     }
 }
 
-/* Draws the sub-page's arrow sprites at the layout position (`get_lsp_data(0x1EB6)`, `lbl_805E723C`). */
+/* Builds skill page `page` (eight rows of the unlocked skills) with each row's set/clash flags and the page count. */
+void lb_skill_page_build(LbScreen13Work* work, s16 page) {
+    s16 skill;
+    s16 i;
+    s16 first;
+    s16 last;
+    s16 n;
+
+    memset(work->skill_rows_0x018, 0, 8);
+    first = page * 8;
+    last = first + 7;
+    n = 0;
+    work->skill_count_0x03E = 0;
+    for (skill = 1; skill < 0x1C; skill++) {
+        if ((lobby_world_block->flags_0x519C & (1 << skill)) != 0) {
+            if (first <= n && n <= last) {
+                work->skill_rows_0x018[work->skill_count_0x03E] = skill;
+                work->skill_flags_0x024[work->skill_count_0x03E] = 0;
+                for (i = 0; i < work->behaviour_0x094[work->entry_0x090->level_0x00 + 4]; i++) {
+                    if (work->skill_rows_0x018[work->skill_count_0x03E] == work->entry_0x090->skills_0x01[i]
+                        && i != work->slot_0x034) {
+                        work->skill_flags_0x024[work->skill_count_0x03E] |= 1;
+                    }
+                    work->skill_flags_0x024[work->skill_count_0x03E] |=
+                        lb_skill_clash_flags_get(work, work->skill_rows_0x018[work->skill_count_0x03E]);
+                }
+                work->skill_count_0x03E++;
+            }
+            n++;
+        }
+    }
+    if (work->cursor_0x038 >= work->skill_count_0x03E) {
+        work->cursor_0x038 = work->skill_count_0x03E - 1;
+    }
+    work->page_0x03A = page;
+    work->pages_0x03C = menu_page_count(n, 8);
+}
+
+/* One step of the skill list: sets the picked skill into the slot (refused when it is set or clashes), pages and moves
+ * the cursor; 1 once set, 2 on cancel. */
+s32 lb_skill_pick_step(LbScreen13Work* work) {
+    s32 result = 0;
+    s16 page;
+    u8 skill;
+
+    work->moved_0x040 = 0;
+    if (work->picking_0x002 == 0) {
+        if (lb_cmd_pressed_ck(0x10) != 0) {
+            if (work->skill_flags_0x024[work->cursor_0x038] == 0) {
+                result = 1;
+                skill = work->skill_rows_0x018[work->cursor_0x038];
+                work->entry_0x090->skills_0x01[work->slot_0x034] = skill;
+                lb_skill_clash_remove(work);
+                sysSE_req(0);
+            } else {
+                sysSE_req(2);
+            }
+        } else if (lb_cmd_pressed_ck(0x20) != 0) {
+            result = 2;
+            sysSE_req(1);
+        } else if (lb_cmd_repeat_ck(0xC) != 0) {
+            page = menu_cursor_step_fixed_tail(work->page_0x03A, work->pages_0x03C, lb_cmd_repeat_get(), 4, 8,
+                                               &work->moved_0x040);
+            work->page_0x03A = page;
+            lb_skill_page_build(work, page);
+        } else if (lb_cmd_repeat_ck(3) != 0) {
+            work->cursor_0x038 = menu_cursor_step(work->cursor_0x038, work->skill_count_0x03E, lb_cmd_repeat_get(), 1, 2);
+        }
+    }
+    return result;
+}
+
+/* Draws the sub-page's arrow sprites at the layout position (`get_lsp_data(0x1EB6)`, `lb_subpage_arrow_sprite_ids`). */
 void lb_subpage_arrow_draw(void) {
     _mh_ivec2_ pos;
 
     get_lsp_data(0x1EB6, &pos);
-    draw_sprite_ary(lbl_805E723C, &pos);
+    draw_sprite_ary(lb_subpage_arrow_sprite_ids, &pos);
+}
+
+/* Draws screen 13's main choice: the frame and its rows (the first row's text follows the entry's 0x80 bit). */
+void lb_s13_menu_draw(LbScreen13Work* work) {
+    _mh_ivec2_ pos;
+    u16* layout;
+    bool sel;
+    u32 color;
+    s16 i;
+    u16 str;
+
+    get_lsp_data(0x1EEC, &pos);
+    draw_sprite_anim_ary(lb_s13_frame_sprite_ids, work->menu_0x050.count_0x06, &pos);
+    draw_sprite_idx(0x1EEE, &pos);
+    for (i = 0, layout = lb_s13_row_layout_ids; i < work->menu_0x050.count_0x06; layout++, i++) {
+        sel = i == work->menu_0x050.cursor_0x00;
+        color = GetMenuFontColor(true, sel, true, false);
+        if (i == 0) {
+            if ((lobby_world_block->entry_0x3E03 & 0x80) != 0) {
+                str = 0x1AF;
+            } else {
+                str = 0x1B0;
+            }
+        } else {
+            str = i + 0x1B0;
+        }
+        lb_frame_draw_at(0x1EEC, *layout, (s8*)LbStr(0, str), sel, color, 0);
+    }
+}
+
+/* Draws the help window of the main choice and its on/off mark for the entry's 0x80 bit. */
+void lb_s13_help_draw(void) {
+    _mh_ivec2_ pos;
+
+    get_lsp_data(0x1F27, &pos);
+    draw_sprite_ary(lb_s13_help_sprite_ids, &pos);
+    draw_font_idx(0x1F28, (s8*)LbStr(0, 0x1B7), 1, &pos);
+    if ((lobby_world_block->entry_0x3E03 & 0x80) != 0) {
+        draw_sprite_idx(0x1F29, &pos);
+        return;
+    }
+    draw_sprite_idx(0x1F2A, &pos);
+}
+
+/* Draws the entry list: one name row per listed entry, greyed when its list bit is set; `active` lights the cursor. */
+void lb_s13_entry_list_draw(LbScreen13Work* work, bool active) {
+    _mh_ivec2_ pos;
+    u16* layout;
+    bool sel;
+    s16 i;
+    u32 color;
+    u8 entry;
+
+    get_lsp_data(0x1EEC, &pos);
+    draw_sprite_anim_ary(lb_s13_frame_sprite_ids, work->list_0x070.count_0x06, &pos);
+    draw_sprite_idx(0x1EEF, &pos);
+    for (i = 0, layout = lb_s13_row_layout_ids; i < work->list_0x070.count_0x06; layout++, i++) {
+        sel = i == work->list_0x070.cursor_0x00;
+        entry = work->ids_0x008[i];
+        color = GetMenuFontColor((work->list_0x070.off_mask_0x02 & (1 << i)) == 0, sel, active, false);
+        if (!active) {
+            sel = false;
+        }
+        lb_frame_draw_at(0x1EEC, *layout, get_player_name_str(entry), sel, color, 7);
+    }
+}
+
+/* Draws the status window of entry `entry`: its name, mask, level and the skills of its slots. */
+void lb_s13_entry_status_draw(u8 entry) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    const u8* behaviour;
+    LbEntryId* setup;
+    u16* layout;
+    s8 i;
+
+    get_lsp_data(0x1F51, &base);
+    draw_sprite_ary(lb_s13_status_sprite_ids, &base);
+    draw_font_idx(0x1F52, get_player_name_str(entry), 1, &base);
+    draw_font_idx(0x1F53, (s8*)lb_chacha_mask_name_get(entry), 0, &base);
+    behaviour = ai_npc_behaviour_get(entry);
+    setup = lb_entry_id_get(entry);
+    draw_number_rec_idx(0x1F56, setup->level_0x00, 0, &base);
+    for (i = 0, layout = lb_s13_status_slot_layout_ids; i < behaviour[setup->level_0x00 + 4]; layout++, i++) {
+        get_lsp_data(*layout, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        lb_s13_skill_row_draw(setup->skills_0x01[i], true, false, true, false, &pos);
+    }
+}
+
+/* Draws one skill row: its group badge (blinking when selected under the pointer), its frame (greyed when empty) and
+ * its name in the menu colour of the four flags. */
+void lb_s13_skill_row_draw(u8 skill, bool enabled, bool sel, bool active, bool marked, _mh_ivec2_* pos) {
+    _SPR_DATA_ spr;
+    s32 group;
+
+    group = 0;
+    if (skill != 0) {
+        group = (u8)ai_npc_skill_group_get(skill) + 1;
+    }
+    draw_sprite_anim_ary(lb_s13_skill_badge_sprite_ids, group, pos);
+    if (sel && active && chk_pointer() == 0) {
+        spr_data_copy(&spr, get_lsp_data(0x1EDF, NULL));
+        draw_sprite_blink(&spr, pos);
+    }
+    sprite_frame_apply(&spr, 0x1ED5, group, NULL);
+    if (skill == 0) {
+        spr.color = 0x464646FF;
+    }
+    draw_sprite(spr, pos);
+    draw_sprite_anim_idx(0x1ED9, group, pos);
+    if (sel && active && chk_pointer() == 0) {
+        draw_sprite_ary(lb_s13_skill_cursor_sprite_ids, pos);
+    }
+    spr_data_copy(&spr, get_lsp_data(0x1ED6, NULL));
+    spr.color = GetMenuFontColor(enabled, sel, active, marked);
+    draw_font(spr, get_item_name_str(skill), 4, pos);
+}
+
+/* Draws the dance list: one group row per listed dance, the picked ones marked; `active` lights the cursor. */
+void lb_s13_dance_list_draw(LbScreen13Work* work, bool active) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    u16* layout;
+    bool sel;
+    s16 i;
+    bool marked;
+
+    get_lsp_data(0x1EEC, &base);
+    draw_sprite_anim_ary(lb_s13_frame_sprite_ids, work->list_0x070.count_0x06, &base);
+    draw_sprite_idx(0x1EF1, &base);
+    for (i = 0, layout = lb_s13_row_layout_ids; i < work->list_0x070.count_0x06; layout++, i++) {
+        if (i == work->list_0x070.cursor_0x00 && active) {
+            sel = true;
+        } else {
+            sel = false;
+        }
+        marked = (work->list_0x070.off_mask_0x02 & (1 << i)) != 0;
+        if (sel) {
+            chk_pointer();
+        }
+        get_lsp_data(*layout, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        lb_group_row_draw(work->dances_0x012[i], true, sel, active, marked, 0, &pos);
+    }
+}
+
+/* Draws the two picked dances, the one being picked under the cursor. */
+void lb_s13_dance_pick_draw(LbScreen13Work* work) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    u8 i;
+    bool sel;
+
+    get_lsp_data(0x1F88, &base);
+    draw_sprite_idx(0x1FA3, &base);
+    draw_sprite_ary(lb_s13_pick_sprite_ids, &base);
+    for (i = 0; i < 2; i++) {
+        get_lsp_data(lb_s13_pick_layout_ids[i], &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        sel = false;
+        if (work->sub_0x001 == 1) {
+            if (work->dance_0x016[0] == 0xFF) {
+                if (i == 0) {
+                    sel = true;
+                }
+            } else if (work->dance_0x016[1] != 0 && i == 1) {
+                sel = true;
+            }
+        }
+        lb_group_row_draw(work->dance_0x016[i], true, sel, true, false, 1, &pos);
+    }
+}
+
+/* Draws the dance pair's four values with their ranks and the two group colours of each. */
+void lb_s13_dance_values_draw(LbScreen13Work* work) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    u16 values[4];
+    s32 i;
+    s32 j;
+    u16* layout;
+    u16* value;
+    u8 first;
+    u8 second;
+
+    get_lsp_data(0x1FBA, &base);
+    draw_sprite_ary(lb_s13_value_sprite_ids, &base);
+    ai_npc_pair_values_get(work->dance_0x016[0], work->dance_0x016[1], values);
+    for (i = 0, j = 0, layout = lb_s13_value_layout_ids, value = values; i < 4; j += 2, layout++, value++, i++) {
+        first = work->dance_0x016[lb_s13_value_pairs[j]];
+        second = work->dance_0x016[lb_s13_value_pairs[j + 1]];
+        get_lsp_data(*layout, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        draw_sprite_ary(lb_s13_value_row_sprite_ids, &pos);
+        draw_font_idx(0x1FAC, get_digit_str(*value), 4, &pos);
+        draw_sprite_idx(lb_s13_rank_sprite_ids[(u8)ai_npc_level_rank_get(*value)], &pos);
+        draw_sprite_idx_color(0x1FB0, lb_group_color_get(first), &pos);
+        draw_sprite_idx_color(0x1FB1, lb_group_color_get(second), &pos);
+    }
+}
+
+/* Puts screen 13's help line for its state on panel 0x1877 (and the warning line, or the yes/no choice, when one
+ * applies). */
+void lb_s13_help_line_draw(LbScreen13Work* work) {
+    u16 str;
+    u16 warn;
+    u16 flags;
+
+    str = 0xFFFF;
+    warn = 0xFFFF;
+    switch (work->state_0x000) {
+    case 1:
+        str = work->menu_0x050.cursor_0x00 + 0x189;
+        if (work->menu_0x050.cursor_0x00 == 0 && (lb_param_w.entry_0x08 & 0x80) != 0) {
+            str = 0x188;
+        }
+        break;
+    case 3:
+        switch (work->sub_0x001) {
+        case 0:
+            if (work->count_0x006 > 1) {
+                str = 0x18F;
+                if ((work->list_0x070.off_mask_0x02 & (1 << work->list_0x070.cursor_0x00)) != 0) {
+                    warn = 0x192;
+                }
+            } else {
+                str = 0x190;
+                warn = 0x191;
+            }
+            break;
+        case 1:
+            str = 0x193;
+            lb_panel_yes_no_draw(0x1879, work->confirm_0x044);
+            break;
+        }
+        break;
+    case 4:
+        switch (work->sub_0x001) {
+        case 0:
+            if (work->list_0x070.count_0x06 <= 2) {
+                str = 0x195;
+                warn = 0x196;
+            } else {
+                str = 0x194;
+                lb_panel_yes_no_draw(0x1879, work->confirm_0x044);
+            }
+            break;
+        case 1:
+            if (work->dance_0x016[0] == 0xFF) {
+                str = 0x197;
+            } else {
+                str = 0x198;
+                if (work->dance_0x016[0] == work->dances_0x012[work->list_0x070.cursor_0x00]) {
+                    warn = 0x199;
+                }
+            }
+            break;
+        case 2:
+            str = 0x19A;
+            lb_panel_yes_no_draw(0x1879, work->confirm_0x044);
+            break;
+        case 3:
+            str = 0x19B;
+            break;
+        }
+        break;
+    case 5:
+        switch (work->sub_0x001) {
+        case 0:
+            str = 0x19C;
+            if ((work->list_0x070.off_mask_0x02 & (1 << work->list_0x070.cursor_0x00)) != 0) {
+                warn = 0x19D;
+            }
+            break;
+        case 1:
+            str = 0x19E;
+            break;
+        case 2:
+            str = work->action_0x036 + 0x19F;
+            if (work->action_0x036 == 1 && work->entry_0x090->skills_0x01[work->slot_0x034] == 0) {
+                warn = 0x1A1;
+            }
+            break;
+        case 4:
+            str = 0x1A2;
+            lb_panel_yes_no_draw(0x1879, work->confirm_0x044);
+            break;
+        case 3:
+            if (work->picking_0x002 == 0) {
+                str = 0x1A3;
+                flags = work->skill_flags_0x024[work->cursor_0x038];
+                if ((flags & 1) != 0) {
+                    warn = 0x1A4;
+                } else if ((flags & 2) != 0) {
+                    warn = 0x1A5;
+                } else if ((flags & 0x30) != 0) {
+                    warn = 0x1A6;
+                } else if ((flags & 4) != 0) {
+                    warn = 0x1A7;
+                } else if ((flags & 8) != 0) {
+                    warn = 0x1A8;
+                }
+            }
+            break;
+        case 5:
+            str = 0x1AA;
+            lb_panel_yes_no_draw(0x1879, work->confirm_0x044);
+            break;
+        }
+        break;
+    case 6:
+        str = 0x1AB;
+        break;
+    }
+    if (str != 0xFFFF) {
+        lb_panel_msg_draw(0x1877, str);
+        if (warn != 0xFFFF) {
+            lb_panel_str_print(0x1877, warn, 2);
+        }
+    }
+}
+
+/* Draws one slot action option `text` (a dash when NULL), blinking under the pointer when selected. */
+void lb_s13_option_draw(s8* text, bool sel, bool enabled, _mh_ivec2_* pos) {
+    _SPR_DATA_ spr;
+
+    draw_sprite_ary(lb_s13_option_sprite_ids, pos);
+    if (sel && chk_pointer() == 0) {
+        spr_data_copy(&spr, get_lsp_data(0x1EEB, NULL));
+        draw_sprite_blink(&spr, pos);
+    }
+    draw_sprite_ary(lb_s13_option_frame_sprite_ids, pos);
+    if (sel && chk_pointer() == 0) {
+        draw_sprite_ary(lb_s13_option_cursor_sprite_ids, pos);
+    }
+    if (text == NULL) {
+        draw_sprite_idx(0x1F08, pos);
+        return;
+    }
+    spr_data_copy(&spr, get_lsp_data(0x1EE1, NULL));
+    spr.color = GetMenuFontColor(enabled, sel, true, false);
+    draw_font(spr, text, 5, pos);
+}
+
+/* Draws the skill slots of the setup being edited and the confirm mark (blinking while the cursor is on it). */
+void lb_s13_slot_list_draw(LbScreen13Work* work, u32 active) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    s16 i;
+    u16* layout;
+    u8 slots;
+    bool sel;
+    s32 on_confirm;
+    u16 mark;
+    u16 anim;
+
+    get_lsp_data(0x1EEC, &base);
+    draw_sprite_anim_ary(lb_s13_frame_sprite_ids, 7, &base);
+    draw_sprite_idx(0x1EF0, &base);
+    draw_sprite_idx(0x1EF3, &base);
+    draw_sprite_anim_ary(lb_s13_slot_frame_sprite_ids, 7, &base);
+    draw_font_idx(0x1EED, get_player_name_str(work->ids_0x008[work->list_0x070.cursor_0x00]), 1, &base);
+    for (i = 0, layout = lb_s13_slot_layout_ids;
+         i < (slots = work->behaviour_0x094[work->entry_0x090->level_0x00 + 4]); layout++, i++) {
+        get_lsp_data(*layout, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        if (active == 1 && i == work->slot_0x034) {
+            sel = true;
+        } else {
+            sel = false;
+        }
+        lb_s13_skill_row_draw(work->entry_0x090->skills_0x01[i], true, sel, true, false, &pos);
+    }
+    if (work->slot_0x034 == slots && work->sub_0x001 == 1) {
+        on_confirm = 1;
+    } else {
+        on_confirm = 0;
+    }
+    mark = work->changed_0x004 != 0 ? 2 : 0;
+    if (on_confirm != 0) {
+        mark = 1;
+        anim = (u32)lobby_w.counter_0x030 % 40 + 10;
+    } else {
+        anim = mark;
+    }
+    draw_sprite_anim_ary(lb_s13_confirm_sprite_ids, mark, &base);
+    draw_sprite_anim_idx(0x1F08, anim, &base);
+}
+
+/* Draws the slot action options (change, remove), remove greyed for an empty slot. */
+void lb_s13_slot_action_draw(LbScreen13Work* work) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    u16* layout;
+    s16 i;
+    bool sel;
+    bool enabled;
+
+    get_lsp_data(0x1F44, &base);
+    draw_sprite_ary(lb_s13_action_sprite_ids, &base);
+    for (i = 0, layout = lb_s13_action_layout_ids; i < 2; layout++, i++) {
+        sel = work->action_0x036 == i;
+        if (work->entry_0x090->skills_0x01[work->slot_0x034] == 0 && i == 1) {
+            enabled = false;
+        } else {
+            enabled = true;
+        }
+        get_lsp_data(*layout, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        lb_s13_option_draw((s8*)LbStr(0, i + 0x1B5), sel, enabled, &pos);
+    }
+}
+
+/* Draws the description window of skill `skill`: its row and its text. */
+void lb_s13_skill_info_draw(u8 skill) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+
+    get_lsp_data(0x1FCB, &base);
+    draw_sprite_ary(lb_s13_info_sprite_ids, &base);
+    get_lsp_data(0x1FDF, &pos);
+    pos.x += base.x;
+    pos.y += base.y;
+    lb_s13_skill_row_draw(skill, true, false, true, false, &pos);
+    draw_font_idx(0x1FCC, (s8*)lb_chacha_skill_name_get(skill), 0, &base);
+}
+
+/* Draws the skill list page: its rows with their set/clash flags, the page arrows and the cursor row's description. */
+void lb_s13_skill_list_draw(LbScreen13Work* work, bool active) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    u16* layout;
+    bool sel;
+    s16 i;
+
+    get_lsp_data(0x1EEC, &base);
+    draw_sprite_anim_ary(lb_s13_frame_sprite_ids, 8, &base);
+    draw_sprite_idx(0x1EF2, &base);
+    lb_page_arrow_draw(0x1EBC, work->page_0x03A, work->pages_0x03C, work->moved_0x040, active);
+    for (i = 0, layout = lb_s13_skill_layout_ids; i < work->skill_count_0x03E; layout++, i++) {
+        if (i == work->cursor_0x038) {
+            sel = true;
+            lb_s13_skill_info_draw(work->skill_rows_0x018[i]);
+        } else {
+            sel = false;
+        }
+        get_lsp_data(*layout, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        lb_s13_skill_row_draw(work->skill_rows_0x018[i], work->skill_flags_0x024[i] == 0, sel, active,
+                              (work->skill_flags_0x024[i] & 1) != 0, &pos);
+    }
 }
 }
 
