@@ -88,7 +88,7 @@ extern "C" {
 #endif
 
 void sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out); /* 0x802E0AD4, hud/layout.cpp */
-void fn_802E1A7C(u16 id, u16 part, u16 arg2, const _mh_ivec2_* pos);
+void draw_monstericon_anim_idx(u16 id, u16 part, u16 arg2, const _mh_ivec2_* pos);
 void draw_font_anim_idx(u32 id, u32 part, s8* text, u8 flag, const _mh_ivec2_* pos);
 u32 color_lerp(u32 value, u32 mask);
 void menu_select_window_draw(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);

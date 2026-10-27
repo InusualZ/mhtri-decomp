@@ -524,7 +524,7 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
             u8 res_b = monster_size_crown_get(data->kind, id_b);
             draw_font_anim_idx(0x493, id, (s8*)entry->field_0x08, 4, &pos);
             draw_font_anim_idx(0x4A9, id, str_tbl_34_get(data->field_0x02), 0, &pos);
-            fn_802E1A7C(0x48E, data->kind, id, &pos);
+            draw_monstericon_anim_idx(0x48E, data->kind, id, &pos);
             item_page_draw_wrapped_text(0x483, id, (s8*)get_menu_msg(0, entry->field_0x06), &pos);
             switch (data->mode) {
             case 1:

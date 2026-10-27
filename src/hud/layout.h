@@ -82,16 +82,15 @@ void atlas_cell28_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x8005
 void atlas_cell64_uv_get(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055DC8 */
 void spr_data_copy(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, the record copy */
 
-const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */
 
 /* This unit's own bodies, in address order. */
 void draw_sprite_idx_color(u16 id, u32 color, const _mh_ivec2_* pos);
-u32 fn_802E099C(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame);
+u32 anim_step_apply(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame);
 u32 spr_anim_frame_set(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* out);
 u32 sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out);
 u16 sprite_anim_last_frame(u16 id);
 u16 sprite_ary_last_frame(const u16* ids);
-u32 fn_802E0CE4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 part, const _mh_ivec2_* pos);
+u32 spr_anim_frame_draw(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 part, const _mh_ivec2_* pos);
 u32 spr_anim_draw(_SPR_DATA_* rec, u16 part, const _mh_ivec2_* pos);
 void draw_uv_rect(s16 x, s16 y, s16 w, s16 h, u32 color, u8 wide_idx);
 void draw_tex_icon(_SPR_DATA_* rec, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
@@ -102,7 +101,7 @@ u32 draw_itemicon_frame_idx(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_i
 void draw_itemicon_anim_idx(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos);
 void draw_equipicon_rare(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, u8 rare);
 void draw_equipicon_idx(u16 id, _EQUIP* equip, const _mh_ivec2_* pos);
-void fn_802E1518(_SPR_DATA_* spr, u8 kind, u32 color, const _mh_ivec2_* pos);
+void draw_weaponicon_rec(_SPR_DATA_* spr, u8 kind, u32 color, const _mh_ivec2_* pos);
 void draw_sprite_uv_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void draw_sprite_uv_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos);
 /* 0x802E23D0 - `draw_font` over layout `id` posed at animation frame `part`.  GUESS name. */
@@ -114,9 +113,26 @@ void draw_window_frame_style(s16 x, s16 y, u16 width, u16 height, u8 style);
 /* 0x802E4828 - the preset window frame at (`x`, `y`).  Added with `menu/menu_plsearch.cpp` (rule 2; the signature
  * is its call sites'). */
 void draw_window_frame_preset(s16 x, s16 y, s32 flag);
+/* The window-drawing family, in address order (0x802E33B4..0x802E4850). */
+void window_frame_tex_draw(s16 x, s16 y, u16 width, u16 height, u8 style, u8 shade, u32 color, u32 fill,
+                           u16 edge_x_tex, u16 edge_y_tex, u16 corner_tex);
+void draw_layout_window_style(s16 x, s16 y, u16 width, u16 height, u8 style, u8 shade, u32 color, u32 fill);
+void draw_title_window(s16 x, s16 y, u16 width, u16 height, u8 kind, u8 title, u32 color, u32 fill);
+void draw_prompt_frame(s16 x, s16 y, u16 width, u8 mode, u8 kind);
+void draw_window_box(s16 x, s16 y, u16 width, u16 height, s32 color, s32 fill);
+void window_body_draw(s16 x, s16 y, u16 width, u16 height, u8 kind, u32 fill, u8 title);
+void draw_layout_window(s16 x, s16 y, u16 w, u16 h);
+void note_line_draw(s16 x, s16 y, s16 size, char* text);
+void note_text_draw(s16 x, s16 y, s16 size, char* text);
+void draw_help_window(u8 kind);
+void note_box_window_draw(u8 kind, s16 lines);
+void draw_spin_icon(s16 x, s16 y, s32 color);
 /* 0x802E2374 - `draw_font` over layout `id`, aligned by `flags`; 0x802E2440 - lays the kanji message `src` out into
  * `dst`, `columns` wide and at most `lines` lines.  Added with `menu/menu_plsearch.cpp` (rule 2). */
 void draw_font_align_idx(u16 id, s8* str, u32 flags, const _mh_ivec2_* pos);
+/* 0x802E21C0 - `draw_font_order` with its shadow through the plain printer. */
+void draw_font_align_at(const _mh_ivec2_* anchor, s16 width, s16 height, u32 color, s8* str, u32 flags,
+                        const _mh_ivec2_* pos);
 void knj_msg_str_build(s8* src, s8* dst, s32 columns, s32 lines);
 /* 0x802E2524 - the first `count` characters of the string table text `src` as UTF-16 into `dst`.  Added with
  * `menu/menu_plsearch.cpp` (rule 2). */
@@ -125,22 +141,22 @@ void draw_sprite_cell_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_*
 void draw_tex_icon_square(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void draw_tex_icon_square_arena(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void draw_award_icon_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos);
-s8 fn_802E1978(u8 index);
+u8 monster_icon_cell_get(u8 index);
 void draw_monstericon_rec(_SPR_DATA_* rec, u8 tex_idx, const _mh_ivec2_* pos);
-u32 fn_802E1A7C(u16 id, u16 part, u8 tex_idx, const _mh_ivec2_* pos);
-void fn_802E1AEC(_SPR_DATA_* rec, u8 frame, u32 color, const _mh_ivec2_* pos);
+u32 draw_monstericon_anim_idx(u16 id, u16 part, u8 tex_idx, const _mh_ivec2_* pos);
+void draw_number_digit_rec(_SPR_DATA_* rec, u8 frame, u32 color, const _mh_ivec2_* pos);
 u32 draw_number_anim(u16 id, u16 part, u8 frame, u32 color, const _mh_ivec2_* pos);
-void fn_802E1C74(_SPR_DATA_* rec, u8 frame, u32 color, const _mh_ivec2_* pos);
-void fn_802E1D30(u16 id, u8 frame, u32 color, const _mh_ivec2_* pos);
+void draw_number_rec(_SPR_DATA_* rec, u32 number, u32 color, const _mh_ivec2_* pos);
+void draw_number_rec_idx(u16 id, u32 number, u32 color, const _mh_ivec2_* pos);
 void draw_number_digits_ary(const u16* ids, s32 number, u32 color, const _mh_ivec2_* pos);
 void draw_number_anim_ary(const u16* ids, u16 part, s32 number, u32 color, const _mh_ivec2_* pos);
 void draw_number_2digit_ary(const u16* ids, u8 value, u32 color, const _mh_ivec2_* pos);
 u32 draw_number_2digit_anim_ary(const u16* ids, u16 part, u8 value, u32 color, const _mh_ivec2_* pos);
 u16 anim_frame_wrap(u16 period, u16 frame);
 u32 color_scale(u32 color, f32 scale, f32 low_scale);
-u32 fn_802E29F4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame);
+u32 anim_step_pos(_mh_ivec2_* out, const _SPR_ANIM_* anim, u16 frame);
 u32 anim_step_tex_id(u16* out, const _SPR_ANIM_* anim, u16 frame);
-u32 fn_802E2D84(u16* out, const _SPR_ANIM_* anim, u16 frame);
+u32 anim_step_scale(u16* out, const _SPR_ANIM_* anim, u16 frame);
 u32 anim_step_uv(_mh_tex_uv_* uv0, _mh_tex_uv_* uv1, const _SPR_ANIM_* anim, u16 frame);
 u32 anim_step_color(u32* out, const _SPR_ANIM_* anim, u16 frame);
 
@@ -188,6 +204,9 @@ u32 draw_sprite_anim_ary(const u16* ids, u16 anim, const _mh_ivec2_* pos);
 void put_button_icon_tex(s16 x, s16 y, s16 size, u32 color, u8 tex_idx, u8 wide_idx, u16 tex_flag);
 void put_button_icon(s16 x, s16 y, s16 size, u32 color, u8 tex_idx, u8 wide_idx);
 void put_itemicon_tex(s16 x, s16 y, s16 size, u32 color, u8 tex_idx, u16 tex_flag);
+/* 0x802E4158 - `put_frame_sub_tex__FssUsUsUlUsUsUs`. */
+void put_frame_sub_tex(s16 x, s16 y, u16 width, u16 height, u32 fill, u16 edge_x_tex, u16 edge_y_tex,
+                       u16 corner_tex);
 void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos);
 void draw_equipicon(const _SPR_DATA_& spr, _EQUIP* equip, const _mh_ivec2_* pos);
 void draw_weaponicon_idx(u16 id, u8 kind, u32 color, const _mh_ivec2_* pos);
