@@ -23,26 +23,22 @@
  *   `cockpit_menu_0x5C0`, and `_AINPC_W::digit_state_0x3C4`.  The registry names this unit proposed for
  *   foreign rows are GUESS too (the `pl_item_*`, `pl_*_ck`, `ai_npc_*_ck`, `draw_*`, `cockpit_*_ids` rows in
  *   config/RMHE08/name_registry.jsonl under lane hud-cockpit-quest).
- * RESIDUALS. register colouring or scheduling only (same instructions): `quest_marker_ring_draw`,
- *   `quest_marker_draw_at`, `quest_marker_icon_draw`, `quest_marker_draw_with_master`,
- *   `quest_marker_draw_all_non_master`, `quest_player_marker_draw`, `quest_target_marker_draw`, `quest_mark_draw`,
- *   `cockpit_icon_cursors_update`, `cockpit_party_list_draw` (the loop's `max`/`plw` pair),
- *   `cockpit_ammo_gauge_draw`/`cockpit_split_ammo_gauge_draw` (`icons` against `step`), `cockpit_supply_box_draw`,
- *   `cockpit_item_tag_update` (the second search loop's counters), `cockpit_split_item_ring_draw`,
- *   `cockpit_hunt_log_draw`, `cockpit_prompt_draw`, `quest_gauge_bar_draw`, `quest_marker_pie_draw`,
- *   `quest_icon_rect_draw`, `quest_map_icon_sprites_draw`, `cockpit_cursor_step`.
+ * RESIDUALS. register colouring or scheduling only (same instructions): `quest_mark_draw` (the hoisted alpha,
+ *   rgb and 1/255 magic: retail numbers the alpha below the magic), `cockpit_ammo_gauge_draw`/
+ *   `cockpit_split_ammo_gauge_draw` (`icons` is a backend temporary of the table address and colours before
+ *   `step`), `cockpit_supply_box_draw`, `cockpit_item_tag_update` (the second search loop's counters),
+ *   `cockpit_split_item_ring_draw`, `cockpit_prompt_draw` (the string index `slwi` lands before the `li r3,0xC10`),
+ *   `quest_gauge_bar_draw` (the `origin.x`/`origin.y` volatile temporaries r7/r6 swapped).
  *   `quest_gauge_draw`, `cockpit_split_gauge_draw`: the `health_max / 10` dividend is loaded into r4 and the magic
  *   constant into r0 in retail, the other way round in ours.
  *   `cockpit_name_tags_draw`: the first `Pl_area_flag_get` result lives in r26 in retail, r25 in ours.
- *   `quest_marker_draw`, `quest_marker_draw_sub`: the window record's colour word is loaded before the two `fmr`s
- *   where retail loads it after.
- *   `quest_marker_draw_faded`: retail rounds the ring radius with `frsp f2,f31` at the pie call (an `f64` local
- *   there; `f64 scale` loads its constants as doubles and measures worse).
- *   `cockpit_take_menu_draw`: the `li r3,0xE7B` of the count-label id is scheduled before the compare.
- *   `cockpit_item_list_entry_draw`, `quest_gauge_update`, `quest_targets_update_a`/`_b`: the `li` of the
- *   `x = A; if (c) x = B;` default is scheduled before the compare (or kept in a callee-saved register) where
- *   retail emits it between the compare and the branch.
- *   `cockpit_npc_digit_draw`: the z reload of the projected point is scheduled earlier than retail.
+ *   `cockpit_take_menu_draw`, `cockpit_hunt_log_draw`, `cockpit_item_list_entry_draw`, `quest_gauge_update`,
+ *   `quest_targets_update_a`/`_b`: retail emits the default `li` of a two-constant choice between the compare and
+ *   the branch (the lowering of a `?:`), ours before the compare; a `?:` of two constants one apart (or 0 and 4) is
+ *   lowered branchless by initpcode (`subfc`/`subfe`), there is no such sequence anywhere in the target, and
+ *   `#pragma scheduling on` / `peephole on` around the function move other instructions.
+ *   `cockpit_npc_digit_draw`: the z reload of the projected point is scheduled earlier than retail (the `HudPos3`
+ *   constructor in `hud/cockpit.h` evaluates its three arguments before storing).
  *   `quest_bar_a_next_id`/`quest_bar_b_next_id`: they reference compiler-local panic strings where the target
  *   references `quest_source_file_name`/`quest_assert_fail_msg`; `quest_bar_b_next_id` keeps a `clrlwi` on the
  *   return (a `u16 id` parameter costs more).
@@ -59,7 +55,12 @@
  *   `(u8)(x + 166) <= 9` range checks; `for (;;) { if (*p == 0) break; ... }` for the 0-terminated mask walks;
  *   `(s32)(u8)b == 3` where retail compares a byte with `cmpwi`; `x.f += a;` where retail stores an `s16` sum
  *   without the `extsh` a plain `x.f = x.f + a` keeps; `u8` field stores of an `s8` parameter for retail's `clrlwi`;
- *   a single `res` exit for `quest_mark_fade_value`; the split gauge's sparkle anchors land in `flash_pos`.
+ *   a single `res` exit for `quest_mark_fade_value`; the split gauge's sparkle anchors land in `flash_pos`;
+ *   parameter orders read from retail's prologue copies and call-site moves (`quest_marker_ring_draw`,
+ *   `quest_marker_icon_draw`, `quest_marker_draw_at`, `quest_marker_pie_draw` and the `drawshape_*_uniform` callees
+ *   take their floats where retail moves them); `s32` loop bounds where retail narrows the `u16` count at the call;
+ *   `x = c ? v : K;` with a non-constant arm where retail emits `cmp; li K; b; mr`; `(f64)scale` at the pie call
+ *   for retail's `frsp`.
  */
 
 #include "types.h"
@@ -1771,7 +1772,7 @@ void quest_gauge_bar_draw(u16 id, s32 shown, s32 ghost, s32 capacity, s32 units,
     f32 scale[2];
     _mh_ivec2_ verts[12];
     u32 cols[12];
-    s16 bottom;
+    s32 bottom;
     u8 count;
 
     if (width <= 0) {
@@ -2361,8 +2362,8 @@ u32 quest_mark_fade_value(CockpitWork* work, u32 color, f32 dist) {
 
 /* 0x802E919C.  Blits one cell of the marker sheet (`index` picks the column and row of a ten-wide sheet) as a
  * 4096-unit rectangle centred on `pos`, with an optional second texture pass at `pos2`. */
-void quest_marker_icon_draw(CockpitWork* work, const f32* pos, u8 index, u16 tex_no, u32 color, const f32* pos2,
-                            u16 tex_no2, f32 scale, f32 scale2) {
+void quest_marker_icon_draw(CockpitWork* work, const f32* pos, u8 index, f32 scale, u16 tex_no, u32 color,
+                            const f32* pos2, f32 scale2, u16 tex_no2) {
     _SPR_DATA_* rec = get_lsp_data(work->draw_id_0x0BA, NULL);
     s16 cell_u = rec->uv1.u - rec->uv0.u;
     s16 cell_v = rec->uv1.v - rec->uv0.v;
@@ -2377,9 +2378,9 @@ void quest_marker_icon_draw(CockpitWork* work, const f32* pos, u8 index, u16 tex
     drawshape_set_vertex_rect(pos[0] - 2048.0f, pos[1] - 2048.0f, 4096.0f, 4096.0f);
     drawshape_set_flat_color(color);
     drawshape_set_texture_rect(rec->tex_flag, &lo, &hi);
-    drawshape_set_tex_scale_uniform(pos, tex_no, 0.000244140625f * scale);
+    drawshape_set_tex_scale_uniform(pos, 0.000244140625f * scale, tex_no);
     if (pos2 != 0) {
-        drawshape_set_tex_scale_uniform(pos2, tex_no2, scale2);
+        drawshape_set_tex_scale_uniform(pos2, scale2, tex_no2);
     }
     drawshape_exec();
 }
@@ -2388,7 +2389,7 @@ void quest_marker_icon_draw(CockpitWork* work, const f32* pos, u8 index, u16 tex
  * 0, otherwise at the marker ring's position when it lies inside the screen; returns the squared screen distance. */
 #pragma fp_contract off
 
-f32 quest_marker_draw_at(CockpitWork* work, const f32* pos, u8 index, u16 tex_no, u32 color, s32 clip, f32 scale) {
+f32 quest_marker_draw_at(CockpitWork* work, const f32* pos, u8 index, f32 scale, u16 tex_no, u32 color, s32 clip) {
     f32 proj[2];
     f32 dist;
     f32 dx;
@@ -2404,14 +2405,14 @@ f32 quest_marker_draw_at(CockpitWork* work, const f32* pos, u8 index, u16 tex_no
             out[0] = work->marker_ofs_x_0x090 + 384.0f * dx;
             out[1] = work->marker_ofs_y_0x094 + 384.0f * dy;
             scale = scale / work->ring_scale_0x0A0;
-            quest_marker_icon_draw(work, out, index, tex_no, quest_mark_fade_value(work, color, dist),
-                                   &work->marker_ofs_x_0x090, work->ring_angle_0x0B8, scale, work->ring_scale_0x0A0);
+            quest_marker_icon_draw(work, out, index, scale, tex_no, quest_mark_fade_value(work, color, dist),
+                                   &work->marker_ofs_x_0x090, work->ring_scale_0x0A0, work->ring_angle_0x0B8);
         }
     } else {
         f32 out[2];
         out[0] = (f32)work->window_x_0x084 + work->window_scale_0x088 * proj[0];
         out[1] = (f32)work->window_y_0x086 + work->window_scale_0x088 * proj[1];
-        quest_marker_icon_draw(work, out, index, tex_no, color, 0, 0, scale, 1.0f);
+        quest_marker_icon_draw(work, out, index, scale, tex_no, color, 0, 1.0f, 0);
         dist = 0.0f;
     }
     return dist;
@@ -2456,9 +2457,8 @@ f32 quest_marker_pie_verts[52] = {
 
 /* 0x802E94D0.  Draws the marker ring: an outline pass in the flat colour, then the filled pass whose colours
  * alternate between the colour with and without its alpha byte. */
-void quest_marker_ring_draw(const f32* offset, const f32* tex_offset, u32 color, f32 scale, f32 tex_scale) {
+void quest_marker_ring_draw(const f32* offset, const f32* tex_offset, f32 scale, f32 tex_scale, u32 color) {
     u32 cols[18];
-    f32 size;
 
     cols[0] = color & 0xFFFFFF00;
     cols[1] = color;
@@ -2478,37 +2478,37 @@ void quest_marker_ring_draw(const f32* offset, const f32* tex_offset, u32 color,
     cols[15] = color;
     cols[16] = color & 0xFFFFFF00;
     cols[17] = color;
-    size = scale * (384.0f * tex_scale);
+    scale = scale * (384.0f * tex_scale);
     drawshape_init(6, 10);
     drawshape_set_vertex_array_f32(quest_marker_ring_outline_verts);
     drawshape_set_flat_color(color);
     drawshape_set_texture_array_f32(0x13, quest_marker_ring_outline_verts);
-    drawshape_set_offset_uniform(offset, size);
-    drawshape_set_tex_offset_uniform(tex_offset, tex_scale);
+    drawshape_set_offset_uniform(scale, offset);
+    drawshape_set_tex_offset_uniform(tex_scale, tex_offset);
     drawshape_exec();
     drawshape_init(5, 18);
     drawshape_set_vertex_array_f32(quest_marker_ring_fill_verts);
     drawshape_set_color_array(cols);
     drawshape_set_texture_array_f32(0x13, quest_marker_ring_fill_verts);
-    drawshape_set_offset_uniform(offset, size);
-    drawshape_set_tex_offset_uniform(tex_offset, tex_scale);
+    drawshape_set_offset_uniform(scale, offset);
+    drawshape_set_tex_offset_uniform(tex_scale, tex_offset);
     drawshape_exec();
 }
 
 /* 0x802E962C.  Draws the marker's pie: one flat-coloured fan, then the same 25 rim points scaled by the inverse of
  * `tex_scale` as a textured strip. */
-void quest_marker_pie_draw(const f32* offset, const f32* tex_offset, const f32* extent, u32 color, u16 tex_no,
-                           f32 scale, f32 tex_scale) {
+void quest_marker_pie_draw(const f32* offset, f32 scale, const f32* tex_offset, const f32* extent, f32 tex_scale,
+                           u32 color, u16 tex_no) {
     f32 strip[100];
     u32 cols[50];
-    f32 tex_ext[2];
     f32 ofs[2];
+    f32 tex_ext[2];
     f32 inverse = 1.0f / tex_scale;
     const f32* src;
     f32* dst;
     u32* col;
-    s32 n;
     u32 faded;
+    s32 n;
 
     tex_ext[0] = tex_scale * extent[0];
     tex_ext[1] = tex_scale * extent[1];
@@ -2598,7 +2598,7 @@ void quest_player_marker_draw(CockpitWork* work, _PLW* plw, s32 clip) {
         scale = 0.846153855f * (25.0f * work->window_icon_scale_0x08C);
     }
     slot_color = player_color_get(plw->chunk_ofs);
-    dist = quest_marker_draw_at(work, &pos.x, icon, (u16)(f32)(u16)(0x18000 - plw->field_0x058), slot_color, clip, scale);
+    dist = quest_marker_draw_at(work, &pos.x, icon, scale, (u16)(f32)(u16)(0x18000 - plw->field_0x058), slot_color, clip);
     if (work->slot_timer_0x0C0[plw->chunk_ofs] >= 0) {
         quest_screen_project(proj, &pos.x);
         slot_val = work->slot_timer_0x0C0[plw->chunk_ofs];
@@ -2636,7 +2636,8 @@ void quest_marker_draw_all_non_master(CockpitWork* work, s32 clip) {
         plw++;
     }
     plw = (_PLW*)get_move_work_adrs(2);
-    quest_player_marker_draw(work, plw + (s8)my_player_no(), clip);
+    plw += (s8)my_player_no();
+    quest_player_marker_draw(work, plw, clip);
 }
 
 /* 0x802E9C0C.  Draws the markers of every live player but the cockpit's own, then the cockpit's own. */
@@ -2677,16 +2678,16 @@ void quest_marker_draw_with_master(CockpitWork* work, _PLW* plw) {
         const VEC3& world = get_worldworld_pos(&plw->vec_0x03C, plw->area_0x16);
         copyVec3(&pos, &world);
         scale = 25.0769234f;
-        quest_marker_draw_at(work, &pos.x, 0, (u16)(f32)(u16)(0x18000 - plw->field_0x058),
-                             color_mult(player_color_get(plw->chunk_ofs), 0x999999FF), 0, scale);
+        quest_marker_draw_at(work, &pos.x, 0, scale, (u16)(f32)(u16)(0x18000 - plw->field_0x058),
+                             color_mult(player_color_get(plw->chunk_ofs), 0x999999FF), 0);
     }
     root = (_PL_ROOT*)get_move_work_adrs(0);
     {
         const VEC3& world = get_worldworld_pos(&root->pos_0x128, root->area_no_0xEB);
         copyVec3(&pos, &world);
         scale = 31.3461533f;
-        quest_marker_draw_at(work, &pos.x, 0, (u16)(f32)(u16)(0x18000 - root->rot_y_0x134),
-                             player_color_get(plw->chunk_ofs), 0, scale);
+        quest_marker_draw_at(work, &pos.x, 0, scale, (u16)(f32)(u16)(0x18000 - root->rot_y_0x134),
+                             player_color_get(plw->chunk_ofs), 0);
     }
 }
 
@@ -2838,7 +2839,7 @@ void quest_mark_draw(const _mh_ivec2_* pos, u8 mode, u32 color, u16 frame) {
     while (*ids != 0xFFFF) {
         spr_data_copy(&rec, get_lsp_data(*ids, 0));
         sprite_frame_apply(&rec, *ids, frame, 0);
-        rec.color = (color & 0xFFFFFF00) + (u8)(((u32)(u8)rec.color * (u8)color) / 255);
+        rec.color = (color & 0xFFFFFF00) + (u8)(((u8)color * (u32)(u8)rec.color) / 255);
         draw_sprite(rec, pos);
         ids++;
     }
@@ -2880,14 +2881,16 @@ static inline void quest_npc_marker_draw_at(const VEC3& world, CockpitWork* work
     } else {
         color = 0xC8E52EFF;
     }
-    dist = quest_marker_draw_at(work, &world.x, 0xB, (u16)(0x18000 - npc->field_0x194), color, clip, scale);
+    dist = quest_marker_draw_at(work, &world.x, 0xB, scale, (u16)(0x18000 - npc->field_0x194), color, clip);
     if (work->view_timer_0x0BE >= 0) {
         quest_screen_project(proj, &world.x);
         if (clip != 0) {
             if (dist <= 1.0f) {
-                f32 fx = 384.0f * (proj[0] - work->marker_ref_x_0x098);
-                f32 fy = 384.0f * (proj[1] - work->marker_ref_y_0x09C);
+                f32 fy;
+                f32 fx;
 
+                fx = 384.0f * (proj[0] - work->marker_ref_x_0x098);
+                fy = 384.0f * (proj[1] - work->marker_ref_y_0x09C);
                 mark.x = work->marker_ofs_x_0x090 + work->ring_scale_0x0A0 * fx;
                 mark.y = work->marker_ofs_y_0x094 + work->ring_scale_0x0A0 * fy;
                 quest_mark_append(work, &mark, 1, quest_mark_fade_value(work, 0xC8E52EFF, dist),
@@ -3120,7 +3123,7 @@ void quest_target_marker_draw(CockpitWork* work, _ENEMY_WORK* target, s32 clip) 
         if (clip == 0) {
             scale *= 0.846153855f * work->window_icon_scale_0x08C;
         }
-        quest_marker_draw_at(work, &pos.x, icon, (u16)(0x18000 - target->field_0x1C0), color, clip, scale);
+        quest_marker_draw_at(work, &pos.x, icon, scale, (u16)(0x18000 - target->field_0x1C0), color, clip);
     }
 }
 #pragma fp_contract on
@@ -3201,6 +3204,7 @@ void quest_target_icons_anim_draw(void) {
 
 void quest_icon_rect_draw(CockpitWork* work, u16 id, u16 size, u32 color, s32 clip) {
     _SPR_DATA_* rec = get_lsp_data(id, NULL);
+    f32 ring;
     f32 pos[2];
     f32 x;
     f32 y;
@@ -3214,7 +3218,6 @@ void quest_icon_rect_draw(CockpitWork* work, u16 id, u16 size, u32 color, s32 cl
     f32 dist;
     f32 side;
     f32 half;
-    f32 ring;
 
     pos[0] = 0.00260416674f * (f32)rec->pos.x;
     pos[1] = 0.00260416674f * (f32)rec->pos.y;
@@ -3435,10 +3438,7 @@ void quest_map_icon_sprites_draw(CockpitWork* work, u16 size, u8 frame, s32 clip
                 break;
             }
             if (*ids != 0) {
-                color = 0xF0F0F0C8;
-                if (i == area) {
-                    color = own_color;
-                }
+                color = (i == area) ? own_color : 0xF0F0F0C8;
                 if (i == 0) {
                     if (skip_first == 0) {
                         quest_icon_rect_draw(work, *ids, size, color, clip);
@@ -3501,7 +3501,7 @@ f32 quest_pit_trap_marker_draw(CockpitWork* work, PitTrap* trap, s32 clip) {
     } else {
         tex_no = 0;
     }
-    return quest_marker_draw_at(work, &trap->pos.x, 0xE, tex_no, color, clip, scale);
+    return quest_marker_draw_at(work, &trap->pos.x, 0xE, scale, tex_no, color, clip);
 }
 #pragma fp_contract on
 
@@ -3534,15 +3534,16 @@ void PitTrapSet(const VEC3* pos, u8 kind) {
 /* 0x802EBBD0.  Draws the quest cockpit's marker ring and everything on it: the ring's pie at the window spot (rotated
  * by the camera when the option is on), then the map icons, the quest targets, the players and the pit traps. */
 void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos) {
-    _PLW* plw = work->plw;
-    u32 angle_on;
+    _PLW* plw;
     u16 angle;
     _SPR_DATA_* rec;
     VEC3 local;
+    u32 angle_on;
     f32 proj[2];
     f32 scale;
     u32 prev_player;
 
+    plw = work->plw;
     work->window_x_0x084 = pos.x;
     work->window_y_0x086 = pos.y;
     angle_on = 0;
@@ -3584,8 +3585,8 @@ void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos
     work->ring_inv_y_0x0B0 = 1.0f / work->ring_extent_y_0x0A8;
     work->ring_angle_0x0B8 = angle;
     work->ring_radius_0x0B4 = scale;
-    quest_marker_pie_draw(&work->marker_ofs_x_0x090, &work->marker_ref_x_0x098, &work->ring_extent_x_0x0A4, rec->color,
-                          0x10000 - angle, work->ring_scale_0x0A0, scale);
+    quest_marker_pie_draw(&work->marker_ofs_x_0x090, work->ring_scale_0x0A0, &work->marker_ref_x_0x098,
+                          &work->ring_extent_x_0x0A4, (f64)scale, rec->color, 0x10000 - angle);
     if (mode == 0) {
         quest_map_icons_draw(work, 0x28);
     } else {
@@ -3672,7 +3673,7 @@ void quest_marker_draw(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos) {
             tex_scale = 0.219999999f;
         }
         scale = 0.00260416674f * work->window_scale_0x088;
-        quest_marker_ring_draw(spot, proj, rec.spr.color, scale, tex_scale);
+        quest_marker_ring_draw(spot, proj, scale, tex_scale, rec.spr.color);
         work->marker_ofs_x_0x090 = spot[0];
         work->marker_ofs_y_0x094 = spot[1];
         drawshape_copy_vec2(&work->marker_ref_x_0x098, proj);
@@ -3746,7 +3747,7 @@ void quest_marker_draw_sub(void) {
             tex_scale = 0.219999999f;
         }
         scale = 0.00260416674f * work->window_scale_0x088;
-        quest_marker_ring_draw(spot, proj, rec.spr.color, scale, tex_scale);
+        quest_marker_ring_draw(spot, proj, scale, tex_scale, rec.spr.color);
         work->marker_ofs_x_0x090 = spot[0];
         work->marker_ofs_y_0x094 = spot[1];
         drawshape_copy_vec2(&work->marker_ref_x_0x098, proj);
@@ -4141,7 +4142,7 @@ void cockpit_npc_plate_draw(void) {
  * player's plate once the game is ready - before that, the AI NPC's plate while the quest move shows one. */
 void cockpit_party_list_draw(void) {
     _PLW* plw;
-    u16 max;
+    s32 max;
     u16 index;
     s32 i;
 
@@ -4198,12 +4199,13 @@ s32 cockpit_npc_icon_mask_get(_AINPC_W* npc, u8 kind) {
 
 /* 0x802ED88C (0xE4): Steps the status-icon cursors: both of every live player's, then the AI NPC's two. */
 void cockpit_icon_cursors_update(void) {
+    CockpitWork* work;
     _PLW* plw;
-    CockpitWork* work = cockpit_work;
-    u16 max;
+    s32 max;
     s32 i;
     _AINPC_W* npc;
 
+    work = cockpit_work;
     plw = (_PLW*)get_move_work_adrs(2);
     if (plw != NULL) {
         max = get_move_work_max(2);
@@ -6105,7 +6107,7 @@ void cockpit_cursor_step(u32 mask, s32 count, Cursor2* cur)
     }
     cur->timer = -1;
     for (s32 i = 0; i < count; i++) {
-        cur->index = cur->index + 1;
+        cur->index++;
         if (cur->index >= count) {
             cur->index = 0;
         }

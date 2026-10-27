@@ -89,13 +89,13 @@ void quest_rot_pair(f32* a, f32* b, u16 t);                                 /* 0
 f32 quest_mark_dist(CockpitWork* work, const f32* pos);                     /* 0x802E90C0 */
 s32 quest_mark_on_screen_ck(CockpitWork* work, const f32* pos);             /* 0x802E90FC */
 u32 quest_mark_fade_value(CockpitWork* work, u32 color, f32 dist);          /* 0x802E9130 */
-void quest_marker_icon_draw(CockpitWork* work, const f32* pos, u8 index, u16 tex_no, u32 color, const f32* pos2,
-                            u16 tex_no2, f32 scale, f32 scale2);            /* 0x802E919C */
-f32 quest_marker_draw_at(CockpitWork* work, const f32* pos, u8 index, u16 tex_no, u32 color, s32 clip,
-                         f32 scale);                                        /* 0x802E932C */
-void quest_marker_ring_draw(const f32* offset, const f32* tex_offset, u32 color, f32 scale, f32 tex_scale); /* 0x802E94D0 */
-void quest_marker_pie_draw(const f32* offset, const f32* tex_offset, const f32* extent, u32 color, u16 tex_no,
-                           f32 scale, f32 tex_scale);                       /* 0x802E962C */
+void quest_marker_icon_draw(CockpitWork* work, const f32* pos, u8 index, f32 scale, u16 tex_no, u32 color,
+                            const f32* pos2, f32 scale2, u16 tex_no2);      /* 0x802E919C */
+f32 quest_marker_draw_at(CockpitWork* work, const f32* pos, u8 index, f32 scale, u16 tex_no, u32 color,
+                         s32 clip);                                         /* 0x802E932C */
+void quest_marker_ring_draw(const f32* offset, const f32* tex_offset, f32 scale, f32 tex_scale, u32 color); /* 0x802E94D0 */
+void quest_marker_pie_draw(const f32* offset, f32 scale, const f32* tex_offset, const f32* extent, f32 tex_scale,
+                           u32 color, u16 tex_no);                          /* 0x802E962C */
 void quest_player_marker_pos(_PLW* plw, VEC3* out);                         /* 0x802E97A8 */
 void quest_player_marker_draw(CockpitWork* work, _PLW* plw, s32 clip);      /* 0x802E98A8 */
 void quest_marker_draw_all_non_master(CockpitWork* work, s32 clip);         /* 0x802E9B48 */

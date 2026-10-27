@@ -801,7 +801,7 @@ extern "C" void drawshape_set_rot_scale(const f32* pos, const f32* scale, u16 an
 }
 
 /* 0x80053FC0 (0x34): rotates by `angle` and scales uniformly about `pos`. */
-extern "C" void drawshape_set_tex_scale_uniform(const f32* pos, u16 angle, f32 scale) {
+extern "C" void drawshape_set_tex_scale_uniform(const f32* pos, f32 scale, u16 angle) {
     f32 s[2];
 
     s[0] = s[1] = scale;
@@ -846,7 +846,7 @@ extern "C" void drawshape_set_offset_ivec2(s16* pos) {
 }
 
 /* 0x800541DC (0x30): scales uniformly, then moves to `offset`. */
-extern "C" void drawshape_set_offset_uniform(const f32* offset, f32 scale) {
+extern "C" void drawshape_set_offset_uniform(f32 scale, const f32* offset) {
     f32 s[2];
 
     s[0] = s[1] = scale;
@@ -882,7 +882,7 @@ extern "C" void drawshape_set_tex_scale(const f32* scale, const f32* offset) {
 }
 
 /* 0x8005442C (0x30): scales the texture coordinates uniformly, then moves them by `offset`. */
-extern "C" void drawshape_set_tex_offset_uniform(const f32* offset, f32 scale) {
+extern "C" void drawshape_set_tex_offset_uniform(f32 scale, const f32* offset) {
     f32 s[2];
 
     s[0] = s[1] = scale;

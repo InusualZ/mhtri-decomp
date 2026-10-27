@@ -242,11 +242,11 @@ void drawshape_set_vertex_array_f32(const f32* verts);                     /* 0x
 void drawshape_set_color_array(const u32* colors);                         /* 0x80053994 */
 void drawshape_copy_vec2(f32* dst, const f32* src);                        /* 0x80053CF8 */
 void drawshape_set_texture_array_f32(u16 tex_no, const f32* uvs);          /* 0x80053D0C */
-void drawshape_set_tex_scale_uniform(const f32* offset, u16 tex_no, f32 scale); /* 0x80053FC0 */
+void drawshape_set_tex_scale_uniform(const f32* offset, f32 scale, u16 angle); /* 0x80053FC0 */
 void drawshape_set_scale_ivec2(const s16* offset, const f32* scale);       /* 0x80053FF4 */
-void drawshape_set_offset_uniform(const f32* offset, f32 scale);           /* 0x800541DC */
+void drawshape_set_offset_uniform(f32 scale, const f32* offset);           /* 0x800541DC */
 void drawshape_set_offset_f32(const f32* scale, const f32* offset);        /* 0x8005420C */
-void drawshape_set_tex_offset_uniform(const f32* offset, f32 scale);       /* 0x8005442C */
+void drawshape_set_tex_offset_uniform(f32 scale, const f32* offset);       /* 0x8005442C */
 void drawshape_set_tex_offset_f32(const f32* scale, u16 tex_no, const f32* offset); /* 0x8005445C */
 /* Added by `enemy/em022_prog.cpp` (rule 2: the declaration belongs with the owner TU, which
  * had not declared it yet). */

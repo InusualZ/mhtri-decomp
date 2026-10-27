@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (234)
+## Ideas that work (235)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -243,6 +243,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 254 | [A binary tree of signed range compares on one value is a switch whose case labels spell out each run](254-binary-tree-of-signed.md) | works | source-shape | Retail tests one value with a `cmpwi K; bge` tree (`0x17`, `0xE`, `5`, then `0x13`/`0x32`/`0x1A`) and lays the arms out after the tree, where a hand-written nested `if` interleaves the tests and the arm bodies |
 | 255 | [An early exit tested with bne over a b to the epilogue is the second operand of an \|\| condition](255-early-exit-tested-with.md) | works | source-shape | Retail has `cmpwi r3,0 ; bne next ; b epilogue` for an early return where ours has one `beq epilogue` (4 bytes short, every later branch shifted) |
 | 256 | [Two record tests that keep an unfolded li/cmplwi on the starting constant are a two-iteration loop](256-two-record-tests-that.md) | works | source-shape | Retail repeats the same test on two records at a fixed stride and keeps `li r0,0xff ; cmplwi r0,0xff` (or `li r0,0 ; cmplw r0,rX`) on the accumulator's starting value, which ours folds away |
+| 257 | [A u16 loop bound narrowed right after its call: hold it in an s32 local](257-u16-loop-bound-narrowed.md) | works | source-shape, allocator | Retail narrows a u16 loop bound (`clrlwi r30,r3,16`) straight after the count call, ours emits it after the counter's `li`s in the preheader, so the bound and the walking pointer swap callee-saved registers. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
