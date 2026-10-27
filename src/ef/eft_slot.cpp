@@ -1,15 +1,12 @@
 /*
  * ef/eft_slot.cpp - the `_EFT` family's 10-entry slot pool (`eft_slot_pool`, one 0x3C-byte `EftSlot` per entry), the
  *   enemy-record scan that drives it, the `EftDef` definition table and the slot predicates and state setters.
- * RANGE. .text 0x803432B4-0x80348A48 (76 functions, 75 written); extab 0x80016DB4-0x80016F74, extabindex
- *   0x800362F4-0x80036594, .ctors 0x8056F3A4-0x8056F3A8, .data 0x805E7B70-0x805E91E8, .bss 0x806BF0A0-0x806BF310,
- *   .sdata 0x807930F0-0x807932F0, .sdata2 0x8079B320-0x8079B368.  The tail from 0x80348A48 is
- *   `menu/menu_effect_slot.cpp`.  The left edge is false (a seam request): `eft050_set_move` (0x803432B4) is the
- *   `eft050_set` record's move state (`ef/eft050.cpp`'s create and dispatcher call it, it reads `Eft050SetWork` and
- *   `lbl_805E7B50` in that unit's `.data`), `eft_state_advance`/`eft_instance_release` are that dispatcher's other
- *   arms, and `.sdata2` 0x8079B320-0x8079B350 is `eft050_set_move`'s own pool: it holds 0.0f at 0x8079B320 while
- *   this unit's pool holds its own 0.0f at 0x8079B350 (one value twice = two TUs), so this unit starts at
- *   0x80343758 (`eft_slot_clear`).  The `.data` program tables are `{setup, step, state change, NULL}` quadruples.
+ * RANGE. .text 0x80343758-0x80348A48 (73 functions, all written); extab 0x80016DBC-0x80016F74, extabindex
+ *   0x80036300-0x80036594, .ctors 0x8056F3A4-0x8056F3A8, .data 0x805E7B70-0x805E91E8, .bss 0x806BF0A0-0x806BF310,
+ *   .sdata 0x807930F0-0x807932F0, .sdata2 0x8079B350-0x8079B368.  The tail from 0x80348A48 is
+ *   `menu/menu_effect_slot.cpp`; the head before 0x80343758 (`eft050_set_move`, `eft_state_advance`,
+ *   `eft_instance_release` and their `.sdata2` pool 0x8079B320-0x8079B350, whose 0.0f repeats at this unit's
+ *   0x8079B350) is `ef/eft050.cpp`.  The `.data` program tables are `{setup, step, state change, NULL}` quadruples.
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps the unfused `clrlwi` + `cmpwi` of
  *   `eft_slot_live_ck` and the `cntlzw`/`srwi` of `eft_slot_persist_ck`; playbook 39); `#pragma optimization_level 4`
  *   around the slot programs whose switches retail lowers to range tests (`eft_slot_track_step`, `eft_slot_mode_rearm`,
@@ -22,8 +19,7 @@
  *   `eft_slot_effect_key`, `eft_slot_state_set`, `eft_slot_state_request`), the match tests (`eft_work_match_ck`,
  *   `eft_target_match_ck`, `eft_work_wide_ck`, `eft_target_wide_ck`, `eft_slot_match_count`), the (mode, value) pair
  *   at +0x0F/+0x10 (`eft_slot_mode_set`, `eft_slot_mode_set_sync`, `eft_slot_mode_set_local`, `eft_slot_mode_set_map`,
- *   `eft_slot_mode_set_work`), the marks (`eft_slot_marks_set`, `eft_slot_marks_set_sync`), the two instance arms
- *   `eft_state_advance`/`eft_instance_release`, the definition walkers (`eft_slot_effect_kind_get`,
+ *   `eft_slot_mode_set_work`), the marks (`eft_slot_marks_set`, `eft_slot_marks_set_sync`), the definition walkers (`eft_slot_effect_kind_get`,
  *   `eft_slot_shape_block_get`, `eft_slot_entry3_get`, `eft_slot_entry4_get`, `eft_slot_area_entry_get`), the shape
  *   helpers (`eft_shape_block_center`, `eft_slot_shape_move`, `eft_slot_kind_shape_move`, `eft_slot_shape_hit_ck`,
  *   `eft_slot_enemy_near_ck`), the enemy binding and rating (`eft_slot_enemy_rank`, `eft_slot_track_recount`,
@@ -35,8 +31,7 @@
  *   group, `_a<A>`/`_k<K>` an area or key, `_programs` its program table; `eft_slot_roam_tables_g<G>_m<M>_r<R>_k<K>`
  *   likewise (`_m` mode, `_r` row).  `enemy_data_find`/`enemy_data_grp` are named for the enemy band's callers.
  *   `__sinit_\eft_slot_cpp` and `__ct__7EftSlotFv` are the compiler's.
- * RESIDUALS. 1 row unwritten: `eft050_set_move` (0x490, the seam above; it cannot be written here without copying
- *   `Eft050SetWork` out of `ef/eft050.cpp`).  Partial rows (register assignment unless noted):
+ * RESIDUALS. Partial rows (register assignment unless noted):
  *  - `eft_slot_counters_step`: ours sign-extends the incremented resend timer (`extsh`) before its `sth`; an `s16`/`s32`
  *    local, `+= 1`, `++timer` and a cast all keep it;
  *  - `enemy_data_grp`: ours narrows the `flag == 0 ? 6 : 7` result (`clrlwi`) for the `u8` return; retail does not;
@@ -47,8 +42,9 @@
  *    request call, ours keeps it narrow; `eft_slot_roam_step` also narrows the +0x36 sum before its store;
  *  - `eft_slot_unbound_step`, `eft_slot_enemy_rank`, `eft_slot_linked_state_change`, `eft_slot_track_step`,
  *    `eft_slot_track_recount`, `eft_slot_work_update`, `eft_slot_spawn`: register assignment only.
- *   Data: `.data`/`.sdata` byte-identical; `.sdata2` is short by `eft050_set_move`'s pool (0x8079B320-0x8079B350), and
- *   `extab`/`extabindex` by its unwind entry - both close with the seam.
+ *   Data: `.data`/`.sdata`/`.sdata2` byte-identical (the object's `.sdata` reads 0x1FE against the claim's 0x200).
+ *   flipcheck also names `.text` 0x52F4 against the claim's 0x52F0 and two `extabindex`
+ *   records in swapped order (0x80344658 `eft_slot_enemy_rank` / 0x80344DA4).
  * SHAPES. A `get_move_work_max` count is held in a `u32` and narrowed at the loop compare (`(u16)max`), which keeps the
  *   retail late `clrlwi` (playbook 168); `(u32)` on `em_work_die_ck`/`em_action_mid_ck` results gives retail's
  *   `cmplwi`; the two-value tests `x == 1 || x == 2` are `(u32)(x - 1) <= 1`.
@@ -906,8 +902,6 @@ EftDef* eft_def_table[9] = {
     &eft_def8,
 };
 }
-extern "C" void eft_state_advance(_EFT* self);  /* `_EFT::state_0x05++` - the dispatcher's advance arm */
-extern "C" void eft_instance_release(_EFT* self);  /* hands the instance to `eft_res_slot_release`, the shared release path */
 extern "C" void eft_slot_clear(u8 index);  /* zeroes one pool entry's key byte and stamps its +0x14 byte 255 */
 extern "C" void eft_slot_pool_clear(void);  /* the 10-iteration loop over `eft_slot_clear` */
 extern "C" u8 eft_slot_find_free(void);  /* first entry whose `key_0x00` is zero, 255 when the pool is full */
@@ -948,16 +942,6 @@ extern "C" void eft_slot_enemy_rank(EftSlot* slot, _ENEMY_WORK** works, s32 n);
 extern "C" void eft_slot_enemy_bind(EftSlot* slot);
 
 #pragma peephole off
-
-/* Advances the family's step counter. */
-extern "C" void eft_state_advance(_EFT* self) {
-    self->state_0x05++;
-}
-
-/* Hands the instance to the shared effect release path. */
-extern "C" void eft_instance_release(_EFT* self) {
-    eft_res_slot_release(self);
-}
 
 /* Resets one slot of the 0x3C-byte slot pool: cleared, with its +0x14 byte stamped 255. */
 extern "C" void eft_slot_clear(u8 index) {

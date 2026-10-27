@@ -1,12 +1,13 @@
 /* ef/eft050.cpp - the eft050 fish family, the eft051 decoration, the eft050_set record, and the lobby screen-13
  *   status page and item box draws that precede them.
- * RANGE. .text 0x8033F270-0x803432B4 (46 functions, all written, in address order); extab 0x80016CA4-0x80016DB4,
- *   extabindex 0x8003615C-0x800362F4, .data 0x805E7410-0x805E7B70, .sdata 0x8079308C-0x807930F0, .sdata2
- *   0x8079B2C0-0x8079B320.  Seam candidates (filed as requests, not acted on): `eft050_set_move` (0x803432B4, 0x490,
- *   registered in `ef/eft_slot.cpp`) is the `eft050_set` record's state 1 and reads `lbl_805E7B50` inside this unit's
- *   `.data`; `.sdata2` holds 1.0f twice (0x8079B2EC read up to `eft050_interior_fx_spawn`, 0x8079B318 from
- *   `eft050_set_create`) and `.data` puts `eft051_spots_m21` after the jump tables behind 4 pad bytes, so
- *   0x80342B70 (`eft051_spawn`) .. 0x80343758 reads as a second TU; 0x8033F270-0x8033FDA8 is lobby screen-13 code
+ * RANGE. .text 0x8033F270-0x80343758 (49 functions, in address order); extab 0x80016CA4-0x80016DBC,
+ *   extabindex 0x8003615C-0x80036300, .data 0x805E7410-0x805E7B70, .sdata 0x8079308C-0x807930F0, .sdata2
+ *   0x8079B2C0-0x8079B350.  `eft050_set_move` (0x803432B4, 0x490) is the `eft050_set` record's state 1 and reads
+ *   `eft050_set_spin_steps` inside this unit's `.data`; its pool is 0x8079B320-0x8079B350.  Seam candidates (filed as
+ *   requests, not acted on): `.sdata2` holds 1.0f three times (0x8079B2EC read up to `eft050_interior_fx_spawn`,
+ *   0x8079B310 by `eft051_create`, padded to 8, and 0x8079B318 from `eft050_set_create`) and `.data` puts
+ *   `eft051_spots_m21` after the jump tables behind 4 pad bytes, so 0x80342B70 (`eft051_spawn`) .. 0x80342F34 and
+ *   0x80342F34 (`eft050_set`) .. 0x80343758 read as two more TUs; 0x8033F270-0x8033FDA8 is lobby screen-13 code
  *   (`lb_screen13_draw` is the draw task `lobby/lb_companion_ui.cpp` queues).
  * FLAGS. `cflags_main`; `#pragma peephole off`, `optimization_level 4` and `fp_contract off` for the file (the target
  *   has no fused multiply-add anywhere), `peephole on` only around `eft050_catch_limit_get`..`eft050_act_table_ck`.
@@ -15,11 +16,13 @@
  *   `lb_item_box_cell_pos_get`, `lb_item_box_grid_draw`, `lb_item_box_page_draw`, `eft050_fish_spawn`/`_release`/
  *   `_dispatch`/`_create`/`_alive`/`_state_next`/`_retire`/`_kind_get`/`_kind_set`/`_school_spawn`, `eft050_xz_angle_get`,
  *   `eft050_angle_step`, `eft050_hold_item_ck`, `eft050_model_joint_show`, `eft050_catch_limit_get`,
- *   `eft051_release`/`_dispatch`/`_create`/`_alive`/`_state_next`/`_retire`, `eft050_set_release`/`_dispatch`/`_create`,
+ *   `eft051_release`/`_dispatch`/`_create`/`_alive`/`_state_next`/`_retire`, `eft050_set_release`/`_dispatch`/`_create`/
+ *   `_move`, `eft050_set_spin_steps` (the four per-model Z spin steps `eft050_set_move` adds each frame),
+ *   `eft_state_advance`, `eft_instance_release`,
  *   `eft050_bite_strength_get`, `eft050_float_find`, `eft050_fish_appear`/`_swim`/`_bite`/`_hooked`/`_respawn`/`_flee`,
  *   `eft050_kind_roll`, `eft050_act_table_ck`, `eft050_interior_fx_spawn`, `eft051_spawn`, the data tables
- *   `lb_s13_status_*_ids`, `lb_item_box_*_ids`, `eft050_fish_kinds`, `eft050_rolls_school_0`/`_12`, and the registry
- *   proposals `eft050_set_move`, `lb_s13_status_icon_ids`.  `CockpitSharedDb` +0x51A4/+0x51A5 are the two dances
+ *   `lb_s13_status_*_ids`, `lb_item_box_*_ids`, `lb_s13_status_icon_ids`, `eft050_fish_kinds`,
+ *   `eft050_rolls_school_0`/`_12`.  `CockpitSharedDb` +0x51A4/+0x51A5 are the two dances
  *   picked on screen 13 (`lobby/lb_companion_ui.cpp` copies them to and from `LbScreen13Work::dance_0x016` and hands
  *   the same pair to `ai_npc_pair_values_get`).
  * RESIDUALS. 4 partial rows:
@@ -31,10 +34,12 @@
  *    condition's load; `optimization_level` 2/3 and `while`/index forms do not reproduce it;
  *  - `lb_item_box_grid_draw`: retail narrows the sprite-id ternary with a `clrlwi r3, r3, 16`; u16/s32 locals and a cast
  *    do not reproduce it.
- *   Data: `.data`/`.sdata`/`.sdata2` claimed but not emitted (the tables are `extern`, the pool is ours), blocked on
- *   the seam above (the `.sdata2` duplicate and the `.data` pad cannot come from one TU).  flipcheck also names
- *   `eft050_set_move`/`lb_s13_status_icon_ids` (registry names not yet in the map) and `lbl_805E7B50` (read by
- *   `ef/eft_slot.cpp`, not defined here).
+ *   Data: `.data`/`.sdata` claimed but not emitted (the tables are `extern`), `.sdata2` is the compiler's one pool
+ *   (0x70 against the claim's 0x90: one TU folds the three 1.0f, the two 0.0f and the two int-to-float magics the
+ *   claim carries) - blocked on the seam above; flipcheck names `.text` 0x44D8 against 0x44E8, `.data`, `.sdata2`,
+ *   `extab`/`extabindex` and the pool relocations.
+ * SHAPES. `eft050_set_move`: `&eft_control` held in a local taken before the switch, the 20.0f camera distance in a
+ *   local set before `get_camera_pos`, the first alpha in a `u8` local set on both arms, `i` declared first.
  */
 
 #include "types.h"
@@ -66,7 +71,13 @@
 #include "hud/draw_lsp_sprite_variant.h" /* draw_lsp_sprite_variant (rule 2) */
 #include "sound/set_zmode.h" /* set_zmode (rule 2) */
 #include "lobby/lb_s13_status_icon_ids.h" /* lb_s13_status_icon_ids (rule 2) */
-#include "ef/eft050_set_move.h" /* eft050_set_move (rule 2) */
+#include "camera/camera.h" /* get_camera_pos / get_camera_direction / get_current_view_mtx (rule 2) */
+#include "camera/camera_angle_x_get.h" /* camera_angle_x_get / camera_angle_y_get / camera_underwater_ck (rule 2) */
+#include "rotLocalMatX.h" /* rotLocalMatZ (rule 2) */
+#include "sound/mhchar_mat_alpha_set.h" /* mhchar_mat_alpha_set (rule 2) */
+#include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
+#include "draw_shape/mtx34_copy.h" /* mtx34_copy (rule 2) */
+#include "ef/eft001.h" /* mtx34_set_trans (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the records this unit reads
@@ -313,6 +324,7 @@ void eft050_fish_kind_set(_EFT* self, MHchar* model);
 void eft051_create(_EFT* self);
 void eft050_set_release(_EFT* self);
 void eft050_set_create(_EFT* self);
+void eft050_set_move(_EFT* self);
 void eft_instance_release(_EFT* self);
 void eft_state_advance(_EFT* self);
 void eft_instance_release(_EFT* self);
@@ -355,6 +367,7 @@ extern EftFishRoll* eft050_rolls_m4_0[2];
 extern EftFishRoll* eft050_rolls_m5_6[2];
 extern EftSpot eft051_spots_m22[];
 extern EftSpot eft051_spots_m21[];
+extern s32 eft050_set_spin_steps[4];
 extern f32 eft050_set_scales[];
 
 extern const u16 lb_s13_status_dance_value_ids[4];
@@ -2283,4 +2296,115 @@ extern "C" void eft050_set_create(_EFT* self)
         work->models_0x04[i]->ready = 1;
     }
     eft050_set_move(self);
+}
+
+/* Steps the eft050_set fade, then places the UV model in front of a near camera, or spreads and spins the four
+ * models along the view axis. */
+extern "C" void eft050_set_move(_EFT* self)
+{
+    VEC3 ofs;
+    VEC3 cam;
+    MTX34 view;
+    MTX34 mtx;
+    VEC3 dir;
+    u32 i;
+    Eft050SetWork* work;
+    EftControl* control;
+    s32 fade;
+    f32 dist;
+    u8 alpha;
+
+    work = (Eft050SetWork*)self->work_0x38;
+    VEC3_ctor(&ofs);
+    VEC3_ctor(&cam);
+    MTX34_ctor(&view);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&dir);
+    control = &eft_control;
+    switch (self->field_0x06) {
+    case 0:
+        fade = 0;
+        if (++self->timer_0x0C >= 120) {
+            self->field_0x06++;
+            self->timer_0x0C = 0;
+            fade = 1;
+        }
+        break;
+    case 1:
+        fade = 1;
+        if (++self->timer_0x0C >= 450) {
+            self->field_0x06++;
+            self->timer_0x0C = 120;
+            fade = 0;
+        }
+        break;
+    case 2:
+        fade = 0;
+        if (--self->timer_0x0C <= 0) {
+            self->state_0x05++;
+            self->flag_0x01 = 0;
+        }
+        break;
+    }
+    if (self->area_0x44 != get_now_areano()) {
+        return;
+    }
+    if (camera_underwater_ck() == 1) {
+        return;
+    }
+    copyVec3(&dir, &get_camera_direction());
+    vec3_normalize_into(&dir, &dir);
+    dist = 20.0f;
+    copyVec3(&cam, &get_camera_pos());
+    copyVec3(&((MHchar*)work->extra_0x14)->pos_0x04, &VEC3_ADD(&cam, &VEC3_SCALE(&dir, dist)));
+    ((MHchar*)work->extra_0x14)->field_0x28 = camera_angle_x_get();
+    ((MHchar*)work->extra_0x14)->field_0x2C = camera_angle_y_get();
+    ((MHchar*)work->extra_0x14)->field_0x30 = 0;
+    if (hit_point_sphr(&cam, &self->pos_0x18, 1900.0f) == 1) {
+        if (control->frame_ready_0xC40 == 0) {
+            ((MHchar*)work->extra_0x14)->move(0);
+            ((EftUvModelObject*)work->created_0x18)->update();
+            if (fade == 0) {
+                alpha = 2.125f * self->timer_0x0C;
+            } else {
+                alpha = 255;
+            }
+            mhchar_mat_alpha_set((MHchar*)work->extra_0x14, 4, alpha, 0);
+            eft_res_models_spawn(self, &work->extra_0x14, 2, 1, 0);
+            control->frame_ready_0xC40 = 1;
+        }
+    } else {
+        mtx34_copy(&view, &get_current_view_mtx());
+        mtx34_inverse(&view, &view);
+        for (i = 0; i < (u32)work->count_0x00; i++) {
+            work->models_0x04[i]->field_0x30 += eft050_set_spin_steps[i];
+            ofs.x = 0.0f;
+            ofs.y = 0.0f;
+            ofs.z = 400.0f * i;
+            mulVecMat(&ofs, &view);
+            if (fade == 0) {
+                work->scale_0x28 = self->timer_0x0C / 150.0f;
+            } else {
+                work->scale_0x28 = 0.625f;
+            }
+            mhchar_mat_alpha_set(work->models_0x04[i], 4, (u8)(255.0f * work->scale_0x28), 0);
+            copyVec3(&work->models_0x04[i]->pos_0x04, &VEC3_ADD(&self->pos_0x18, &ofs));
+            mtx34_identity(&mtx);
+            mtx34_set_trans(&mtx, &work->models_0x04[i]->pos_0x04);
+            mtx34_concat_assign(&mtx, &view);
+            rotLocalMatZ(work->models_0x04[i]->field_0x30, &mtx);
+            work->models_0x04[i]->move2(&mtx, 0);
+            eft_res_models_spawn(self, (void**)&work->models_0x04[i], 2, 1, 0);
+        }
+    }
+}
+
+/* Advances the family's step counter. */
+extern "C" void eft_state_advance(_EFT* self) {
+    self->state_0x05++;
+}
+
+/* Hands the instance to the shared effect release path. */
+extern "C" void eft_instance_release(_EFT* self) {
+    eft_res_slot_release(self);
 }
