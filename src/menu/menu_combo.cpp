@@ -1,27 +1,24 @@
 /*
- * menu/fn_8031A6C0.cpp - the item combination screens and the eft043 hand-glow effect.  `MenuSel` (this unit's view
- *   of the 0x330-byte working record `menu/menu_item.h` names `MenuSlot`) is the screen state: the input bits at
- *   +0x4/+0x8, the 3+8 0x18-byte entry arrays at +0x24/+0x6C, the slot pairs at +0x210 and the embedded
- *   `MenuSelCursor` at +0x1EC that picks, confirms and runs one combination (`lb_combo_*`); `self[1]` is the second
- *   record the recipe list runs on.  `menu_equip_panel_step`/`menu_equip_panel_draw` are menu page 1 (combine from
- *   the pouch), `menu_page02_*` page 2 (combine from the eight recipe slots).  The tail 0x8031D294.. is the eft043
- *   player effect (`_EFT` records, `eft043_*`).  C++ callees, `extern "C"` bodies.
- * RANGE. .text 0x8031A6C0-0x8031DAA8 (45 functions); extab, extabindex, .ctors 0x8056F398, .data 0x805DCE98-0x805DCF38,
- *   .bss 0x806BE108-0x806BE120, .sdata 0x80792C20-0x80792C48, .sdata2 0x8079AE50-0x8079AE70.  Not one TU: the eft043
- *   tail's data starts on fresh 8-byte boundaries (`.data` 0x805DCED4-0x805DCED8 and `.sdata` 0x80792C3A-0x80792C40 are
- *   padding), it owns every `.sdata2` word, the `.bss` and the `.ctors` word, and its only outside caller is
- *   `Pl/fn_802840DC.cpp` - seam request filed (menu-8031a6c0 requests).  The left edge continues
- *   `menu/menu_infomation.cpp`'s extab run.
+ * menu/menu_combo.cpp - the item combination screens.  `MenuSel` (this unit's view of the 0x330-byte working record
+ *   `menu/menu_item.h` names `MenuSlot`) is the screen state: the input bits at +0x4/+0x8, the 3+8 0x18-byte entry
+ *   arrays at +0x24/+0x6C, the slot pairs at +0x210 and the embedded `MenuSelCursor` at +0x1EC that picks, confirms
+ *   and runs one combination (`lb_combo_*`); `self[1]` is the second record the recipe list runs on.
+ *   `menu_equip_panel_step`/`menu_equip_panel_draw` are menu page 1 (combine from the pouch), `menu_page02_*` page 2
+ *   (combine from the eight recipe slots).  C++ callees, `extern "C"` bodies.
+ * RANGE. .text 0x8031A6C0-0x8031D294 (37 functions); extab 0x80015F3C-0x80016004, extabindex 0x80034D40-0x80034E6C,
+ *   .data 0x805DCE98-0x805DCED8, .sdata 0x80792C20-0x80792C40.  The left edge continues `menu/menu_infomation.cpp`'s
+ *   extab run; the right edge is `ef/eft043.cpp`, whose data starts on fresh 8-byte boundaries after this unit's
+ *   (`.data` 0x805DCED4-0x805DCED8 and `.sdata` 0x80792C3A-0x80792C40 are padding).
  * FLAGS. `cflags_menu` (configure.py: `-opt nopeephole`); `#pragma optimization_level 4` around
  *   `menu_equip_entries_update` and `menu_page02_draw` (playbook 108: retail's subi+cmplwi switch range tests).
- * NAMES. Module `menu` from the callees (`get_menu_lsp_tbl`, `GetMenuFontColor`, `ItemName`, `draw_font`, `lb_combo_*`)
- *   and the bracketing menu units; no `__FILE__` string covers the range and the dump answers `zz_`, so the file keeps
- *   the map's stem (a rename to `menu/menu_combo.cpp` plus `ef/eft043.cpp` is in the seam request).  `eft043` from the
- *   record's type byte (0x2B), as `menu/fn_8031EA8C.cpp`'s `eft045`.
+ * NAMES. The file name `menu_combo` is a GUESS from the bodies (the combination screens, `lb_combo_*` callees) in the
+ *   sibling scheme `menu_<subject>`; module `menu` from the callees (`get_menu_lsp_tbl`, `GetMenuFontColor`,
+ *   `ItemName`, `draw_font`) and the bracketing menu units; no `__FILE__` string covers the range and the dump answers
+ *   `zz_`.  The record header keeps the old stem (`menu/fn_8031A6C0.h`, included by `lobby/lb_pane_ui.cpp`).
  *   GUESS (from each body and its callers): every `menu_sel_*`, `menu_equip_*`, `menu_item_cell_draw`,
- *   `menu_item_two_page_*`, `menu_shared_slot_id_*`, `menu_page02_*` name, the `eft043_*` family and the data names;
- *   foreign (registry): `pl_ryugeki_se_req`, `pl_act4_phase_ck`, `se_combo_mix_req`, `se_combo_result_req`,
- *   `menu_combo_list_open`, `menu_combo_list_step`, `pl_weapon_drawn_ck`.
+ *   `menu_item_two_page_*`, `menu_shared_slot_id_*`, `menu_page02_*` name and the data names;
+ *   foreign (registry): `se_combo_mix_req`, `se_combo_result_req`, `menu_combo_list_open`, `menu_combo_list_step`,
+ *   `pl_weapon_drawn_ck`.
  * RESIDUALS. Every row is written.  The rows short of 100 %, by cause:
  *  - `menu_sel_pair_draw`: retail computes the count, the `!= 0xFFFF` flag and `focused` before `&pos`/`item`; our
  *    frontend substitutes `focused` into the call and evaluates `&pos`/`item` first (mwcc-debugger dump 03
@@ -32,10 +29,8 @@
  *  - a byte prompt index retail re-extends with `extsb` at its compare and at `get_menu_msg`, with its `li` scheduled
  *    after the compare (`menu_equip_panel_draw`, `menu_page02_draw`); our extsb dies in constant propagation (dump
  *    05) because every def is a constant, and `s32`/`char` prompts and ternaries (branchless) measured worse;
- *  - `menu_sel_tabs_build`: the hoisted 0/1 constants take r31/r30 where retail has r30/r31.
- *   flipcheck: `.sdata` 0x22 of 0x28 and the eft043 data shifted by the seam padding; `.text` 4 bytes long; foreign
- *   names `pl_ryugeki_se_req`, `pl_act4_phase_ck`, `se_combo_mix_req`, `se_combo_result_req`, `menu_combo_list_step`
- *   wait for the registry batch.
+ *   flipcheck: the four rows above (`menu_equip_panel_draw` 4 bytes short); foreign names `se_combo_mix_req`,
+ *   `se_combo_result_req`, `menu_combo_list_step` wait for the registry batch.
  */
 
 #include "types.h"
@@ -593,16 +588,14 @@ extern "C" void menu_sel_second_reset(MenuSel* self) {
 /* 0x8031B624 (0xAC): fills the three tab entries with their labels and marks tab `sel` selected. */
 extern "C" void menu_sel_tabs_build(MenuSel* self, s16 sel) {
     MenuSelEntry* tab = self->entries_a_0x024;
-    s32 i = 0;
+    s32 i;
 
-    do {
+    for (i = 0; i < 3; i++, tab++) {
         tab->selected_0x01 = 0;
         tab->available_0x02 = 1;
         tab->data_0x08 = get_menu_msg(0x28, i);
         tab->color_a_0x0C = 0;
-        i++;
-        tab++;
-    } while (i < 3);
+    }
     if (self->cursor_0x1EC.status_0x10 >= 0) {
         self->entries_a_0x024[0].available_0x02 = 0;
     }
@@ -1375,283 +1368,3 @@ extern "C" void menu_sel_cursor_confirm_draw(MenuSelCursor* cur, s32 sel, u16 ls
     offset.y = 0;
     menu_select_window_draw(sel, 2, (s8*)get_menu_msg_tbl(0x27), &pos, &offset);
 }
-
-/* ============================================================================================== */
-/* 0x8031D294..0x8031DAA8 - eft043, the player's hand glow (effect pool +0x38 `Eft043Work`)       */
-/* ============================================================================================== */
-
-/* The eft043 effect pool.  size: 0x14 */
-struct Eft043Work {
-    /* +0x00 */ s32 count;
-    /* +0x04 */ nw4r::ef::Effect* effects[2];
-    /* +0x0C */ _GXColor color;
-    /* +0x10 */ f32 scale;
-};
-
-/* The joint holder `_PLW::physics_0x13C` points at: the player's `MHchar` at +0x04 (a view of
- * `ef/fn_80114E34_types.h`'s `_PLW_PHYSICS`, whose header redefines `_EFT`).  size: 0x144 - lower bound */
-struct Eft043PlwJoints {
-    /* +0x000 */ u8 unused_0x000[0x04];
-    /* +0x004 */ MHchar joint_0x004;
-};
-
-/* A vector built through `setVec3`, so a file-scope one is constructed by `__sinit`.  size: 0xC */
-struct Eft043Offset : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    Eft043Offset(f32 x, f32 y, f32 z) { setVec3(this, x, y, z); }
-};
-
-extern "C" {
-/* The effect ids type 0 creates, and the pool size of each type. */
-u16 eft043_effect_ids[2] = { 0x019F, 0x01A0 };
-u8 eft043_effect_counts[2] = { 2, 1 };
-/* The colour key strip and the scale key table type 0 runs. */
-u8 eft043_color_keys[16] = { 0x00, 0x64, 0x64, 0x64, 0x19, 0x1E, 0x32, 0x96, 0xFF, 0x1E, 0x32, 0x96, 0, 0, 0, 0 };
-f32 eft043_scale_keys[20] = {
-    0.0f, 0.0f, 0.0f, 0.0f,
-    2.0f, 3.2f, 0.3f, 1.5f,
-    6.0f, 1.2f, 1.2f, 1.5f,
-    25.0f, 1.0f, 1.0f, 1.0f,
-    -1.0f, 1.0f, 1.0f, 1.0f,
-};
-}
-
-/* The joint-7 offset of each type; MWCC's `__sinit` builds them. */
-Eft043Offset eft043_offsets[2] = {
-    Eft043Offset(-10.0f, -17.0f, 87.0f),
-    Eft043Offset(-10.0f, -17.0f, 45.0f),
-};
-
-extern "C" void eft043_release(_EFT* self);
-extern "C" void eft043_dispatch(_EFT* self);
-extern "C" void eft043_start(_EFT* self);
-extern "C" void eft043_move(_EFT* self);
-extern "C" void eft043_end(_EFT* self);
-extern "C" void eft043_retire(_EFT* self);
-
-/* 0x8031D294 (0xA8): spawns the glow effect of `type` on the player `plw`. */
-extern "C" void eft043_set(_PLW* plw, u8 type) {
-    _EFT* self = (_EFT*)eft_res_slot_get(0x14);
-
-    if (self != NULL) {
-        ((Eft043Work*)self->work_0x38)->count = eft043_effect_counts[type];
-        self->field_0x03 = 0x2B;
-        self->area_0x44 = plw->area_0x16;
-        self->type_0x02 = type;
-        self->source_0x30 = plw;
-        self->timer_0x0C = 0;
-        eft_state_flags_set(self, 1, 0);
-        self->release_0x40 = eft043_release;
-        self->dispatch_0x34 = eft043_dispatch;
-    }
-}
-
-/* 0x8031D33C (0x3C): returns the pool's effects to the heap. */
-extern "C" void eft043_release(_EFT* self) {
-    Eft043Work* work = (Eft043Work*)self->work_0x38;
-
-    push_eft_effect_heap_num(work->effects, work->count);
-    work->count = 0;
-}
-
-/* 0x8031D378 (0x3C): runs the effect's state. */
-extern "C" void eft043_dispatch(_EFT* self) {
-    switch (self->state_0x05) {
-    case 0:
-        eft043_start(self);
-        return;
-    case 1:
-        eft043_move(self);
-        return;
-    case 2:
-        eft043_end(self);
-        return;
-    case 3:
-        eft043_retire(self);
-        return;
-    }
-}
-
-/* 0x8031D3B4 (0x280): creates the pool's effects, places type 0 on the player's joint 7 and steps once. */
-extern "C" void eft043_start(_EFT* self) {
-    s32 i;
-    Eft043Work* work = (Eft043Work*)self->work_0x38;
-    _PLW* plw = (_PLW*)self->source_0x30;
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 dir;
-
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&dir);
-    switch (self->type_0x02) {
-    case 0:
-        for (i = 0; i < work->count; i++) {
-            work->effects[i] = res_eft_create(eft043_effect_ids[i], 21, 0);
-            if (work->effects[i] == NULL) {
-                eft043_retire(self);
-                return;
-            }
-        }
-        if (eft_res_spawn_gate_ck(self, 0) == 0) {
-            self->flag_0x01 = 0;
-            self->state_0x05 = 3;
-            return;
-        }
-        mhchar_joint_mtx_get(&((Eft043PlwJoints*)plw->physics_0x13C)->joint_0x004, 7, &mtx);
-        mtx34_trans_get(&mtx, &self->pos_0x18);
-        dir.x = -mtx.m[0][2];
-        dir.y = -mtx.m[1][2];
-        dir.z = -mtx.m[2][2];
-        calcVecAngXY(&dir, &self->rot_0x24.x, &self->rot_0x24.y);
-        self->rot_0x24.z = 0;
-        copyVec3(&ofs, &eft043_offsets[self->type_0x02]);
-        rotVecX(&ofs, self->rot_0x24.x);
-        rotVecY(&ofs, self->rot_0x24.y);
-        addVec3To(&self->pos_0x18, &ofs);
-        cpSetRotMatrix(&self->rot_0x24, &mtx);
-        mtx34_set_trans(&mtx, &self->pos_0x18);
-        if (self->area_0x44 == (u8)get_now_areano()) {
-            if (plw->kind_0x09 != 3) {
-                pl_ryugeki_se_req(plw, &self->pos_0x18, 0);
-            } else {
-                pl_ryugeki_se_req(plw, &self->pos_0x18, 1);
-            }
-        }
-        work->color.r = eft043_color_keys[1];
-        work->color.g = eft043_color_keys[2];
-        work->color.b = eft043_color_keys[3];
-        work->color.a = 0xFF;
-        break;
-    case 1:
-        for (i = 0; i < work->count; i++) {
-            work->effects[i] = res_eft_create(0x1CE, 21, 0);
-            if (work->effects[i] == NULL) {
-                eft043_retire(self);
-                return;
-            }
-        }
-        break;
-    }
-    self->state_0x05++;
-    self->field_0x06 = 0;
-    work->scale = 1.0f;
-    self->flag_0x01 = 1;
-    eft043_move(self);
-}
-
-/* 0x8031D634 (0x35C): follows the player's joint 7, runs the colour and scale keys, and ends the effect when the
- * player leaves the glowing act. */
-extern "C" void eft043_move(_EFT* self) {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 scale;
-    _PLW* plw;
-    Eft043Work* work;
-    s32 i;
-    nw4r::ef::EffectSystem* system;
-
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&scale);
-    plw = (_PLW*)self->source_0x30;
-    work = (Eft043Work*)self->work_0x38;
-    system = eft_control.effect_system_0x04;
-    if (eft_res_spawn_gate_ck(self, 0) == 0) {
-        self->timer_0x0C = 0;
-        self->flag_0x01 = 0;
-        self->state_0x05++;
-        return;
-    }
-    if (self->type_0x02 == 0) {
-        if (pl_act4_phase_ck(plw, 0) == 0) {
-            if (pl_act4_phase_ck(plw, 1) == 1) {
-                self->timer_0x0C = 6;
-            } else {
-                self->timer_0x0C = 0;
-            }
-            self->state_0x05++;
-            RetireParticleAll(work->effects[1]);
-            work->effects[1]->RetireEmitterAll();
-            if (system != NULL) {
-                system->RetireEffect(work->effects[1]);
-                work->count--;
-            }
-            eft043_end(self);
-            return;
-        }
-    } else if (pl_act4_phase_ck(plw, 0) == 0) {
-        self->state_0x05++;
-        self->flag_0x01 = 0;
-        return;
-    }
-    mhchar_joint_mtx_get(&((Eft043PlwJoints*)plw->physics_0x13C)->joint_0x004, 7, &mtx);
-    mtx34_trans_get(&mtx, &self->pos_0x18);
-    dir.x = -mtx.m[0][2];
-    dir.y = -mtx.m[1][2];
-    dir.z = -mtx.m[2][2];
-    calcVecAngXY(&dir, &self->rot_0x24.x, &self->rot_0x24.y);
-    self->rot_0x24.z = 0;
-    copyVec3(&ofs, &eft043_offsets[self->type_0x02]);
-    rotVecX(&ofs, self->rot_0x24.x);
-    rotVecY(&ofs, self->rot_0x24.y);
-    addVec3To(&self->pos_0x18, &ofs);
-    cpSetRotMatrix(&self->rot_0x24, &mtx);
-    mtx34_set_trans(&mtx, &self->pos_0x18);
-    switch (self->type_0x02) {
-    case 0:
-        self->timer_0x0C++;
-        eftGetKeyRGB(eft043_color_keys, self->timer_0x0C, &work->color.r, &work->color.g, &work->color.b);
-        getKeyData3(eft043_scale_keys, (f32)self->timer_0x0C, &scale.x, &scale.y, &scale.z);
-        for (i = 0; i < work->count; i++) {
-            work->effects[i]->SetRootMtx(mtx);
-            change_paramscale_eff_vec3(work->effects[0], &scale);
-            effect_move(work->effects[i]);
-        }
-        change_color_eff(work->effects[0], &self->pos_0x18, work->color);
-        break;
-    case 1:
-        work->effects[0]->SetRootMtx(mtx);
-        change_paramscale_eff(work->effects[0], 0.8f);
-        if (effect_move(work->effects[0]) == 0) {
-            self->state_0x05++;
-            self->flag_0x01 = 0;
-            return;
-        }
-        break;
-    }
-    if (Pl_master_ck(plw) == 1) {
-        eft_res_models_spawn(self, (void**)work->effects, eft_stage_spawn_flag(plw) | 1, work->count, NULL);
-    } else {
-        eft_res_models_spawn(self, (void**)work->effects, 1, work->count, NULL);
-    }
-}
-
-/* 0x8031D990 (0xC0): fades type 0 out over its timer, then lets the record retire. */
-extern "C" void eft043_end(_EFT* self) {
-    Eft043Work* work = (Eft043Work*)self->work_0x38;
-
-    switch (self->type_0x02) {
-    case 0:
-        if (--self->timer_0x0C >= 0) {
-            effect_move(work->effects[0]);
-            change_color_eff(work->effects[0], &self->pos_0x18, work->color);
-            eft_res_models_spawn(self, (void**)work->effects, 1, 1, NULL);
-        } else {
-            self->flag_0x01 = 0;
-            self->state_0x05++;
-        }
-        break;
-    case 1:
-        self->state_0x05++;
-        break;
-    }
-}
-
-/* 0x8031DA50 (0x4): retires the record. */
-extern "C" void eft043_retire(_EFT* self) {
-    eft_res_slot_release(self);
-}
-

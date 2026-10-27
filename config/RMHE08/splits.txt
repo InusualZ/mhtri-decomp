@@ -1712,14 +1712,21 @@ menu/menu_infomation.cpp:
 	.sdata      start:0x80792BB8 end:0x80792C20
 	.sdata2     start:0x8079AE30 end:0x8079AE50
 
-menu/fn_8031A6C0.cpp:
-	extab       start:0x80015F3C end:0x80016034
-	extabindex  start:0x80034D40 end:0x80034EB4
-	.text       start:0x8031A6C0 end:0x8031DAA8 align:16
+menu/menu_combo.cpp:
+	extab       start:0x80015F3C end:0x80016004
+	extabindex  start:0x80034D40 end:0x80034E6C
+	.text       start:0x8031A6C0 end:0x8031D294 align:16
+	.data       start:0x805DCE98 end:0x805DCED8
+	.sdata      start:0x80792C20 end:0x80792C40
+
+ef/eft043.cpp:
+	extab       start:0x80016004 end:0x80016034
+	extabindex  start:0x80034E6C end:0x80034EB4
+	.text       start:0x8031D294 end:0x8031DAA8
 	.ctors      start:0x8056F398 end:0x8056F39C
-	.data       start:0x805DCE98 end:0x805DCF38
+	.data       start:0x805DCED8 end:0x805DCF38
 	.bss        start:0x806BE108 end:0x806BE120
-	.sdata      start:0x80792C20 end:0x80792C48
+	.sdata      start:0x80792C40 end:0x80792C48
 	.sdata2     start:0x8079AE50 end:0x8079AE70
 
 menu/menu_item_effect.cpp:

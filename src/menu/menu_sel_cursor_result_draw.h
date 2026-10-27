@@ -1,4 +1,4 @@
-/* `menu_sel_cursor_result_draw`, defined by `menu/fn_8031A6C0.cpp` (leaf header, rule 2). */
+/* `menu_sel_cursor_result_draw`, defined by `menu/menu_combo.cpp` (leaf header, rule 2). */
 #ifndef MHTRI_MENU_MENU_SEL_CURSOR_RESULT_DRAW_H
 #define MHTRI_MENU_MENU_SEL_CURSOR_RESULT_DRAW_H
 

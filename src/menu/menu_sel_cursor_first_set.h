@@ -1,4 +1,4 @@
-/* `menu_sel_cursor_first_set`, defined by menu/fn_8031A6C0.cpp (leaf header, rule 2). */
+/* `menu_sel_cursor_first_set`, defined by menu/menu_combo.cpp (leaf header, rule 2). */
 #ifndef MHTRI_MENU_MENU_SEL_CURSOR_FIRST_SET_H
 #define MHTRI_MENU_MENU_SEL_CURSOR_FIRST_SET_H
 

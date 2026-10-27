@@ -2,7 +2,7 @@
  * menu/fn_8031A6C0.h - the selection screen's records, traced from the target: `MenuSel` is the units' view of the
  *   0x330-byte working record `menu/menu_item.h` names `MenuSlot` (with the +0x1EC cursor `MenuSelCursor` and the +0x210
  *   slot pairs the item layer leaves unnamed), `MenuSelEntry` the 0x18-byte entries at +0x24 (3) and +0x6C (8);
- *   `self[1]` is the second record (+0x330).  Read by `menu/fn_8031A6C0.cpp` and `menu/menu_item_effect.cpp`.
+ *   `self[1]` is the second record (+0x330).  Read by `menu/menu_combo.cpp` and `menu/menu_item_effect.cpp`.
  */
 #ifndef MHTRI_MENU_FN_8031A6C0_H
 #define MHTRI_MENU_FN_8031A6C0_H

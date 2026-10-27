@@ -1,4 +1,4 @@
-/* `menu_sel_cursor_blend_tick`, defined by menu/fn_8031A6C0.cpp (leaf header, rule 2). */
+/* `menu_sel_cursor_blend_tick`, defined by menu/menu_combo.cpp (leaf header, rule 2). */
 #ifndef MHTRI_MENU_MENU_SEL_CURSOR_BLEND_TICK_H
 #define MHTRI_MENU_MENU_SEL_CURSOR_BLEND_TICK_H
 

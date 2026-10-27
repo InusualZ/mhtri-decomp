@@ -1,4 +1,4 @@
-/* `menu_item_cell_draw`, defined by `menu/fn_8031A6C0.cpp` (leaf header, rule 2). */
+/* `menu_item_cell_draw`, defined by `menu/menu_combo.cpp` (leaf header, rule 2). */
 #ifndef MHTRI_MENU_MENU_ITEM_CELL_DRAW_H
 #define MHTRI_MENU_MENU_ITEM_CELL_DRAW_H
 

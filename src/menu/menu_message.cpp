@@ -37,8 +37,8 @@
  *  - `.data` is 0x190 against 0x18C and `.sdata` 7 against 16 B: one object cannot reproduce the two TUs above (the
  *    second `"%s"` copy and the 4-mod-8 start of the first `.data` object).
  *  - `menu_select_window_draw` is defined with the types its body uses (`s8** texts`, `s16* flags`); its leaf
- *    `menu/menu_select_window_draw.h` still carries `menu/fn_8031A6C0.cpp`'s call-site view and is not included here.
- *   `menu/menu_item.cpp` and `menu/fn_8031A6C0.cpp` still declare `menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`,
+ *    `menu/menu_select_window_draw.h` still carries `menu/menu_combo.cpp`'s call-site view and is not included here.
+ *   `menu/menu_item.cpp` and `menu/menu_combo.cpp` still declare `menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`,
  *   `menu_cursor_column_step`, `menu_choice_window_draw` and `fn_802A9BCC` (`menu_item_pages_resort`) themselves.
  * SHAPES. `++x`/`x--` instead of `x = x + 1` keeps a narrow local in place (`menu_cursor_move`,
  *   `menu_frame_entries_build`, `menu_cursor_page_move`).

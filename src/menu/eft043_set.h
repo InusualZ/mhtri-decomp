@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): `menu/fn_8031A6C0.cpp`'s `eft043_set`, which `Pl/fn_802840DC.cpp` calls. */
+/* Leaf header (docs/plan.md 6.5 rule 2): `ef/eft043.cpp`'s `eft043_set`, which `Pl/fn_802840DC.cpp` calls. */
 #ifndef MHTRI_MENU_EFT043_SET_H
 #define MHTRI_MENU_EFT043_SET_H
 

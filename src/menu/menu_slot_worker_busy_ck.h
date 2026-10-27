@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): the `menu/fn_8031A6C0` unit's symbol `menu/menu_item.cpp` calls, for a
+/* Leaf header (docs/plan.md 6.5 rule 2): the `menu/menu_combo` unit's symbol `menu/menu_item.cpp` calls, for a
  * consumer that cannot include the owner's full header.  C linkage (the map row is a plain name). */
 #ifndef MHTRI_MENU_MENU_SLOT_WORKER_BUSY_CK_H
 #define MHTRI_MENU_MENU_SLOT_WORKER_BUSY_CK_H
