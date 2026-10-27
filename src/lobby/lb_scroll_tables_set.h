@@ -21,7 +21,7 @@ s32 lb_seisan_row_next(u8 kind, u8 order, s32 idx, struct LbSmithRecipe* table);
 /* 0x802130BC - the same walk over a gun-part table (0x24-byte rows). */
 s32 lb_seisan_gun_row_next(u8 kind, u8 order, s32 idx, struct LbSmithRecipe* table);
 /* 0x80213870 - the refusal bits of make row `idx` of kind `kind` (2 materials, 4 money, 0x10 locked). */
-u8 lb_seisan_row_flags_get(u16 kind, u16 idx, u8 level);
+u16 lb_seisan_row_flags_get(u16 kind, u16 idx, u8 level);
 /* 0x80217DA0 - the make price of item `item` of kind `kind`. */
 s32 lb_seisan_price_get(u8 kind, u16 item);
 /* 0x802180D8 - the group of equipment kind `kind`: 1 blade, 2 gun, 3 gun part, 4 other, 0 none. */
@@ -36,8 +36,8 @@ u32 lb_deco_class_ck(u8 filter, u16 species);
 void lb_kakou_materials_get(u8 kind, u16 item, u8 level, LbItemCount* out);
 /* 0x80213FB4 - the refusal bits of upgrading gun part `item` of kind `kind` at level `level`. */
 u16 lb_kakou_gun_flags_get(u8 kind, u16 item, u8 level);
-/* 0x80214134 - the refusal bits of upgrade path `kind` of the box piece `equip`. */
-u16 lb_kakou_weapon_flags_get(u8 kind, struct _EQUIP* equip);
+/* 0x80214134 - the refusal bits of upgrading the box piece `equip` (item `item` of kind `kind`). */
+u16 lb_kakou_weapon_flags_get(u8 kind, u16 item, struct _EQUIP* equip);
 /* 0x80213CA0 - the refusal bits of upgrading armour `item` of kind `kind` at level `level`. */
 u16 lb_kakou_armor_flags_get(u8 kind, u16 item, u8 level);
 /* 0x802190FC - copies the compared and previewed equipment records into the scroll list. */

@@ -6,32 +6,38 @@
  *   `.data`/`.sdata`/`.bss` contents are emitted here (the templates first, the jump tables, then each draw's static
  *   sprite tables) and are byte-identical to the target's.
  * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps the narrowing `clrlwi`s of `u8`/`u16`
- *   arguments, e.g. `lb_smith_records_copy`'s mode).  `#pragma optimization_level 4` around `lb_screen15_step` and
- *   `lb_smith_make_draw` (playbook 108: their switches test case ranges first with one unsigned compare; file-wide the
- *   level costs `lb_smith_kakou_apply` 99.95 -> 98.91).
+ *   arguments, e.g. `lb_smith_records_copy`'s mode).  `#pragma optimization_level 4` around `lb_smith_make_step`,
+ *   `lb_screen15_step` and `lb_smith_make_draw` (playbook 108: their switches test case ranges first with one unsigned
+ *   compare); file-wide the level costs `lb_smith_kakou_apply` one row, and `opt_common_subs off` helps no row.
  * NAMES. The file stem is a GUESS kept from the registration; no `__FILE__` string covers it.  `seisan_data`,
  *   `kakou_data` and `deco_sei_tbl_ptr` are the map's names (make, upgrade and decoration recipe tables), and
  *   `lb_screen15_step` was named by the hub pass.  GUESS (from each body and its callers): every `lb_smith_*` function,
  *   `lb_smith_menu_tmpls` and every `LbSmith*` type; the foreign callees this unit named are in the name registry.
  * RESIDUALS. Register colouring or instruction scheduling only, unless noted:
- *  - `lb_smith_attach_goods_draw`: the saved registers of the loop are coloured one slot apart, and the centred text's
- *    x is summed in another order (one instruction more);
- *  - `lb_smith_box_pane_open`: retail loads -1 after the third compare and re-extends the picked entry (`extsh`) at
- *    the join (4 bytes);
- *  - `lb_smith_make_page_build`, `lb_smith_deco_page_build`, `lb_smith_attach_page_build`, `lb_smith_detach_list_build`:
- *    the loop's saved registers (the declaration orders are the best a hill climb found);
+ *  - `lb_smith_make_page_build`, `lb_smith_deco_page_build`, `lb_smith_attach_page_build`, `lb_smith_detach_list_build`,
+ *    `lb_smith_deco_goods_draw`: the loop's saved registers (the declaration orders are the best a hill climb found);
  *  - `lb_smith_deco_draw`, `lb_smith_attach_draw`, `lb_smith_detach_draw`, `lb_smith_kakou_draw`: retail computes the
- *    page-draw mode before the scroll address;
- *  - `lb_smith_make_draw`: retail tests the step with `addi 0xFE`, ours `subi 2`;
- *  - `lb_smith_pl_turn_step`: retail returns from the busy test through `bne`/`b` (4 bytes);
+ *    page-draw mode before the scroll address (`addi r3,0x154` after the branch); ours has it at initpcode, before the
+ *    branch, because the frontend folds the mode statement back into the call argument (a separate `mode`, a scroll
+ *    variable, an inline helper, a `u8`/`bool` view and per-function pragmas leave it there);
+ *  - `lb_smith_kakou_preview_set`: the same argument order for `lb_scroll_materials_set`'s recipe address (8 bytes);
+ *  - `lb_smith_make_preview_set`: the three gun-part records' stack slots (retail ascending, a 4-byte gap after the
+ *    first);
+ *  - `lb_smith_kakou_open`, `lb_smith_sort_labels_draw`, `lb_smith_deco_info_draw`: retail narrows the argument in its
+ *    own register (`clrlwi r4,r4`/`extsb r4,r4`), ours through r0;
+ *  - `lb_smith_pl_turn_step`: retail returns from the busy test through `bne`/`b` (4 bytes; nested, else-return and
+ *    inline-helper shapes all give `beq`);
  *  - `lb_smith_make_step`, `lb_smith_kakou_step`: the previous tab byte sits in r26 (the set pane's slot register) in
- *    retail, in r29 here; `lb_smith_make_step` also orders the box-mask argument's registers differently.
- *   Data: `.sbss` is 4 bytes short of the claimed 8 (only `deco_sei_tbl_ptr` is referenced; 0x80794BEC is not).
+ *    retail, in r29 here.
+ *   Data: `.sbss` is 4 bytes short of the claimed 8 (only `deco_sei_tbl_ptr` is referenced; 0x80794BEC is not), and
+ *   `.sdata` ends 4 zero bytes short of the target's 104 (alignment fill).
  *   flipcheck: 39 foreign callees carry registry names the map does not have yet.
  * SHAPES. A callee whose retail argument is wider or narrower than its owner's declaration is called through a `_c1`
  *   view (`lb_cmd_pressed_ck(...) == 1` is an unsigned compare in retail); a `bool` parameter passes a flag on to
  *   `GetMenu*Color` unnormalised.  A page-build loop keeps its `last` bound and an `s32` count; refusal bits start at 0
- *   and are ORed in.  The goods-window loops index the rows and the layout table by the loop counter.
+ *   and are ORed in.  The goods-window loops index the rows and the layout table by the loop counter.  A centred text
+ *   sums `base + spr.pos + (size >> 1)` and subtracts the line offset in a second statement.  Retail's `addi 0xFE`
+ *   range tests are `(u8)(x + 0xFE) <= 1`.  The upgrade recipe is `kakou_data[kind]` then `+= item`.
  */
 #include "types.h"
 
@@ -40,6 +46,7 @@
 
 #include "Pl/plw.h"
 #include "lobby/lobby_w.h"
+#include "lobby/lb_scroll_work.h"
 #include "fn_80047398/lobby_world_block.h"
 #include "fn_80047398/userdata_gunner_ck.h"
 #include "hud/layout.h"
@@ -171,23 +178,6 @@ typedef struct LbSmithSort {
     /* +0x83 */ u8 kind_0x83;
 } LbSmithSort;
 
-/* This unit's view of the 0x80-byte scroll list (`LbScrollWork` in `lobby/fn_80212810.cpp`): the kind, the moved bits,
- * the cursor, the flags and the two equipment records the page compares.  size: 0x80 */
-typedef struct LbSmithScroll {
-    /* +0x00 */ u8 kind_0x00;
-    /* +0x01 */ u8 unused_0x01[5];
-    /* +0x06 */ u16 moved_0x06;
-    /* +0x08 */ s16 cursor_0x08;
-    /* +0x0A */ s16 count_0x0A;
-    /* +0x0C */ u8 unused_0x0C[4];
-    /* +0x10 */ u8 flags_0x10;
-    /* +0x11 */ u8 unused_0x11[0x27];
-    /* +0x38 */ _EQUIP compare_0x38;
-    /* +0x44 */ u8 unused_0x44[0x18];
-    /* +0x5C */ _EQUIP base_0x5C;
-    /* +0x68 */ u8 unused_0x68[0x18];
-} LbSmithScroll;
-
 /* This unit's view of the 0x234-byte equipment box pane (`LbEntryPane` in `lobby/lb_pane_ui.cpp`): the redraw flag and
  * the box entry the digit input picked.  size: 0x234 */
 typedef struct LbSmithPane {
@@ -236,7 +226,7 @@ typedef struct LbSmithWork {
     /* +0x12A */ s16 kakou_count_0x12A;
     /* +0x12C */ u8 tab_kinds_0x12C[8];
     /* +0x134 */ LbList tab_list_0x134;
-    /* +0x154 */ LbSmithScroll scroll_0x154;
+    /* +0x154 */ LbScrollWork scroll_0x154;
     /* +0x1D4 */ _EQUIP row_0x1D4;
     /* +0x1E0 */ u8 unused_0x1E0[0x18];
     /* +0x1F8 */ u16 box_0x1F8[3];        /* the box entries the bought pieces went to */
@@ -390,16 +380,16 @@ void lb_smith_rows_clear(LbSmithWork* self, s16 page)
 /* 0x8035FE04 (0x24C): builds page `page` of the make goods of the current kind. */
 void lb_smith_make_page_build(LbSmithWork* self, s16 page)
 {
-    s32 n;
-    s32 idx;
     LbSmithRecipe* table;
+    s32 n;
     LbSmithRecipe* gun_table;
-    s32 first;
+    s32 idx;
     s32 gun;
     s32 last;
     s32 plain;
     u16 item;
     u8 flags;
+    s32 first;
     LbSmithGoods* goods;
 
     userdata_equip_box_free_count();
@@ -542,7 +532,7 @@ void lb_smith_tabs_init(LbSmithWork* self, u8 mode)
         break;
     }
     lb_list_init(&self->tab_list_0x134, count, 0, 0, -1, 0, 0, 3, 0);
-    lb_scroll_init(self->plw_0x204, (struct LbScrollWork*)&self->scroll_0x154,
+    lb_scroll_init(self->plw_0x204, &self->scroll_0x154,
                    self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00], mode);
     self->scroll_0x154.flags_0x10 |= 2;
 }
@@ -552,10 +542,10 @@ void lb_smith_tabs_init(LbSmithWork* self, u8 mode)
 void lb_smith_make_preview_set(LbSmithWork* self)
 {
     _PLW* plw = self->plw_0x204;
-    _EQUIP part_a;
     _EQUIP part_b;
     _EQUIP part_c;
     s32 gun_split;
+    _EQUIP part_a;
     LbSmithGoods* goods;
 
     if (self->count_0x018 == 0) {
@@ -563,59 +553,59 @@ void lb_smith_make_preview_set(LbSmithWork* self)
     }
     lb_row_init(&self->row_0x1D4, self->goods_0x264[self->cursor_0x00C].kind_0x00,
                 self->goods_0x264[self->cursor_0x00C].item_0x04);
-    if ((u32)(self->scroll_0x154.kind_0x00 - 5) <= 1 || self->scroll_0x154.kind_0x00 == 10) {
+    if ((u32)(self->scroll_0x154.kind_0x00 - 5) <= 1 || (s32)self->scroll_0x154.kind_0x00 == 10) {
         gun_split = 0;
         if (plw->equipB.kind == 11) {
             if (Gunner_opt_ok_ck(&plw->equipB) == 0) {
-                lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154, &plw->equipB, &plw->equipC, NULL, NULL);
+                lb_scroll_tables_set(&self->scroll_0x154, &plw->equipB, &plw->equipC, NULL, NULL);
                 gun_split = 1;
             } else {
-                lb_equip_compare_set((struct LbScrollWork*)&self->scroll_0x154, &self->row_0x1D4);
+                lb_equip_compare_set(&self->scroll_0x154, &self->row_0x1D4);
             }
         } else {
-            lb_equip_compare_set((struct LbScrollWork*)&self->scroll_0x154, &self->row_0x1D4);
+            lb_equip_compare_set(&self->scroll_0x154, &self->row_0x1D4);
         }
         if (self->row_0x1D4.kind == 11) {
             if (Gunner_opt_ok_ck(&self->row_0x1D4) == 0) {
                 lb_row_init(&part_b, 12, self->row_0x1D4.item_id);
                 lb_row_init(&part_c, 13, self->row_0x1D4.item_id);
-                lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154, NULL, NULL, &self->row_0x1D4, &part_b);
+                lb_scroll_tables_set(&self->scroll_0x154, NULL, NULL, &self->row_0x1D4, &part_b);
             } else if (gun_split != 0) {
                 lb_row_init(&part_b, 12, 0);
                 lb_row_init(&part_c, 13, 0);
-                lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154, NULL, NULL, &self->row_0x1D4, &part_b);
+                lb_scroll_tables_set(&self->scroll_0x154, NULL, NULL, &self->row_0x1D4, &part_b);
             } else {
-                lb_equip_base_set((struct LbScrollWork*)&self->scroll_0x154, &self->row_0x1D4);
+                lb_equip_base_set(&self->scroll_0x154, &self->row_0x1D4);
             }
         } else if (gun_split != 0) {
             if (self->row_0x1D4.kind == 12) {
                 lb_row_init(&part_a, 11, 0);
                 lb_row_init(&part_b, 12, self->row_0x1D4.item_id);
                 lb_row_init(&part_c, 13, 0);
-                lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154, NULL, NULL, &part_a, &part_b);
+                lb_scroll_tables_set(&self->scroll_0x154, NULL, NULL, &part_a, &part_b);
             } else if (self->row_0x1D4.kind == 13) {
                 lb_row_init(&part_a, 11, 0);
                 lb_row_init(&part_b, 12, 0);
                 lb_row_init(&part_c, 13, self->row_0x1D4.item_id);
-                lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154, NULL, NULL, &part_a, &part_b);
+                lb_scroll_tables_set(&self->scroll_0x154, NULL, NULL, &part_a, &part_b);
             } else {
-                lb_equip_base_set((struct LbScrollWork*)&self->scroll_0x154, &self->row_0x1D4);
+                lb_equip_base_set(&self->scroll_0x154, &self->row_0x1D4);
             }
         } else {
-            lb_equip_base_set((struct LbScrollWork*)&self->scroll_0x154, &self->row_0x1D4);
+            lb_equip_base_set(&self->scroll_0x154, &self->row_0x1D4);
         }
     } else {
-        lb_equip_compare_set((struct LbScrollWork*)&self->scroll_0x154, &self->row_0x1D4);
-        lb_equip_base_set((struct LbScrollWork*)&self->scroll_0x154, &self->row_0x1D4);
+        lb_equip_compare_set(&self->scroll_0x154, &self->row_0x1D4);
+        lb_equip_base_set(&self->scroll_0x154, &self->row_0x1D4);
     }
     goods = &self->goods_0x264[self->cursor_0x00C];
     if (goods->recipe_0x0C != NULL) {
-        lb_scroll_materials_set((struct LbScrollWork*)&self->scroll_0x154, goods->recipe_0x0C->materials_0x04, 4);
+        lb_scroll_materials_set(&self->scroll_0x154, goods->recipe_0x0C->materials_0x04, 4);
     } else if (goods->gun_recipe_0x10 != NULL) {
         lb_seisan_materials_get(goods->kind_0x00, goods->item_0x04, 0, self->materials_0x254);
-        lb_scroll_materials_set((struct LbScrollWork*)&self->scroll_0x154, self->materials_0x254, 4);
+        lb_scroll_materials_set(&self->scroll_0x154, self->materials_0x254, 4);
     }
-    lb_scroll_flag_set((struct LbScrollWork*)&self->scroll_0x154, self->goods_0x264[self->cursor_0x00C].kind_0x00);
+    lb_scroll_flag_set(&self->scroll_0x154, self->goods_0x264[self->cursor_0x00C].kind_0x00);
 }
 
 /* 0x80360584 (0xBC): opens the make goods of the picked kind on the first page. */
@@ -677,7 +667,7 @@ void lb_smith_make_buy(LbSmithWork* self)
         }
     }
     self->tab_list_0x134.cursor_0x00 = 0;
-    lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154, self->tab_kinds_0x12C[0]);
+    lb_scroll_kind_set(&self->scroll_0x154, self->tab_kinds_0x12C[0]);
     lb_smith_pl_model_reset(self);
     pl_model_refresh_req(self->plw_0x204);
 }
@@ -723,7 +713,7 @@ void lb_smith_pl_view_step(LbSmithWork* self)
     if (self->scroll_0x154.kind_0x00 != 3) {
         return;
     }
-    if ((u8)(lobby_w.field_0x0B0 - 1) <= 1) {
+    if ((u8)(lobby_w.field_0x0B0 + 0xFF) <= 1) {
         system_lobby_flag_set(0);
         pl_model_refresh_req(self->plw_0x204);
         return;
@@ -763,10 +753,7 @@ void lb_smith_box_pane_open(LbSmithWork* self)
     } else if (self->box_0x1F8[1] != 0xFFFF) {
         box = self->box_0x1F8[1];
     } else {
-        box = -1;
-        if (self->box_0x1F8[2] != 0xFFFF) {
-            box = self->box_0x1F8[2];
-        }
+        box = self->box_0x1F8[2] != 0xFFFF ? (s16)self->box_0x1F8[2] : (s16)-1;
     }
     lb_list_pane_pos_set((struct LbEntryPane*)&self->pane_0x3A4, box, -1, -1);
     sysSE_req(8);
@@ -780,6 +767,7 @@ void lb_smith_preview_wait_set(LbSmithWork* self)
     }
 }
 
+#pragma optimization_level 4
 /* 0x80360A58 (0xA08): steps the make page: the goods list and its tabs, the confirm, the box pane and the gun-part
  * set pane; returns 2 when the page closes. */
 s32 lb_smith_make_step(LbSmithWork* self)
@@ -819,7 +807,7 @@ s32 lb_smith_make_step(LbSmithWork* self)
                 self->tab_list_0x134.cursor_0x00 = menu_cursor_step(self->tab_list_0x134.cursor_0x00,
                                                                     self->tab_list_0x134.count_0x06,
                                                                     lb_cmd_repeat_get(), 1, 2);
-                lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154,
+                lb_scroll_kind_set(&self->scroll_0x154,
                                    self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00]);
                 lb_smith_make_preview_set(self);
                 if (prev_tab != self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00] &&
@@ -1083,12 +1071,14 @@ s32 lb_smith_make_step(LbSmithWork* self)
     return ret;
 }
 
+#pragma optimization_level reset
+
 /* 0x80361460 (0x60): feeds the selected decoration recipe's materials and item to the stats page. */
 void lb_smith_deco_preview_set(LbSmithWork* self)
 {
-    lb_scroll_materials_set((struct LbScrollWork*)&self->scroll_0x154,
+    lb_scroll_materials_set(&self->scroll_0x154,
                             self->goods_0x264[self->cursor_0x00C].recipe_0x0C->materials_0x04, 4);
-    lb_scroll_item_set((struct LbScrollWork*)&self->scroll_0x154, self->goods_0x264[self->cursor_0x00C].item_0x04);
+    lb_scroll_item_set(&self->scroll_0x154, self->goods_0x264[self->cursor_0x00C].item_0x04);
 }
 
 /* 0x803614C0 (0x17C): builds page `page` of the decoration recipes the slot filter passes. */
@@ -1373,8 +1363,8 @@ void lb_smith_attach_preview_set(LbSmithWork* self)
             break;
         }
     }
-    lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154, &rec, NULL, &self->row_0x1D4, NULL);
-    lb_scroll_item_set((struct LbScrollWork*)&self->scroll_0x154, self->decos_0x324[self->cursor_0x00C].item_0x08);
+    lb_scroll_tables_set(&self->scroll_0x154, &rec, NULL, &self->row_0x1D4, NULL);
+    lb_scroll_item_set(&self->scroll_0x154, self->decos_0x324[self->cursor_0x00C].item_0x08);
 }
 
 /* 0x80361DD0 (0x24): opens the box pane for the attach page. */
@@ -1486,7 +1476,7 @@ s32 lb_smith_attach_step(LbSmithWork* self)
                 } else {
                     sysSE_req(2);
                 }
-                lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154,
+                lb_scroll_kind_set(&self->scroll_0x154,
                                    self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00]);
             } else if (lb_cmd_pressed_ck_c1(0x20) == 1) {
                 sysSE_req(1);
@@ -1506,7 +1496,7 @@ s32 lb_smith_attach_step(LbSmithWork* self)
                 self->tab_list_0x134.cursor_0x00 = menu_cursor_step(self->tab_list_0x134.cursor_0x00,
                                                                     self->tab_list_0x134.count_0x06,
                                                                     lb_cmd_repeat_get(), 1, 2);
-                lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154,
+                lb_scroll_kind_set(&self->scroll_0x154,
                                    self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00]);
                 lb_smith_attach_preview_set(self);
             }
@@ -1671,7 +1661,7 @@ s32 lb_smith_detach_step(LbSmithWork* self)
                 } else {
                     sysSE_req(2);
                 }
-                lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154,
+                lb_scroll_kind_set(&self->scroll_0x154,
                                    self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00]);
             } else if (lb_cmd_pressed_ck_c1(0x20) == 1) {
                 sysSE_req(1);
@@ -1691,7 +1681,7 @@ s32 lb_smith_detach_step(LbSmithWork* self)
                 self->tab_list_0x134.cursor_0x00 = menu_cursor_step(self->tab_list_0x134.cursor_0x00,
                                                                     self->tab_list_0x134.count_0x06,
                                                                     lb_cmd_repeat_get(), 1, 2);
-                lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154,
+                lb_scroll_kind_set(&self->scroll_0x154,
                                    self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00]);
                 lb_smith_attach_preview_set(self);
             }
@@ -1750,10 +1740,10 @@ s32 lb_smith_detach_step(LbSmithWork* self)
  * (a gun's three parts side by side) and the materials. */
 void lb_smith_kakou_preview_set(LbSmithWork* self)
 {
-    _EQUIP compare;
     _EQUIP base;
-    _EQUIP compare_sub[2];
+    _EQUIP compare;
     _EQUIP base_sub[2];
+    _EQUIP compare_sub[2];
     s32 gun_split;
     _EQUIP* row;
 
@@ -1761,7 +1751,7 @@ void lb_smith_kakou_preview_set(LbSmithWork* self)
         return;
     }
     if (lb_equip_kind_group_get(self->kind_0x007) == 2 && userdata_gunner_ck(lobby_world_block) == 1 &&
-        (u8)(self->scroll_0x154.kind_0x00 - 5) <= 1) {
+        (u8)(self->scroll_0x154.kind_0x00 + 0xFB) <= 1) {
         self->scroll_0x154.flags_0x10 |= 2;
         gun_split = 0;
         memcpy(&base, &self->plw_0x204->equipB, sizeof(_EQUIP));
@@ -1791,12 +1781,12 @@ void lb_smith_kakou_preview_set(LbSmithWork* self)
             }
             break;
         }
-        lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154, &compare, compare_sub, &base, base_sub);
-        lb_scroll_flag_set((struct LbScrollWork*)&self->scroll_0x154,
+        lb_scroll_tables_set(&self->scroll_0x154, &compare, compare_sub, &base, base_sub);
+        lb_scroll_flag_set(&self->scroll_0x154,
                            self->kakou_rows_0x20C[self->kakou_cursor_0x128].kind);
     } else {
         self->scroll_0x154.flags_0x10 &= ~2;
-        lb_scroll_tables_set((struct LbScrollWork*)&self->scroll_0x154,
+        lb_scroll_tables_set(&self->scroll_0x154,
                              &SMITH_USER->box_0x0E00[self->pane_0x3A4.box_0x01E], NULL,
                              &self->kakou_rows_0x20C[self->kakou_cursor_0x128], NULL);
     }
@@ -1804,18 +1794,18 @@ void lb_smith_kakou_preview_set(LbSmithWork* self)
         if (lb_smith_gun_part_ck(self->kind_0x007) == 1) {
             row = &self->kakou_rows_0x20C[self->kakou_cursor_0x128];
             lb_seisan_materials_get(row->kind, row->item_id, row->deco_count, self->materials_0x254);
-            lb_scroll_materials_set((struct LbScrollWork*)&self->scroll_0x154, self->materials_0x254, 4);
+            lb_scroll_materials_set(&self->scroll_0x154, self->materials_0x254, 4);
             return;
         }
         row = &self->kakou_rows_0x20C[self->kakou_cursor_0x128];
-        lb_scroll_materials_set((struct LbScrollWork*)&self->scroll_0x154,
+        lb_scroll_materials_set(&self->scroll_0x154,
                                 kakou_data[row->kind][row->item_id].materials_0x00, 3);
         return;
     }
     row = &self->kakou_rows_0x20C[self->kakou_cursor_0x128];
     if (row->kind != 0 && row->item_id != 0) {
         lb_kakou_materials_get(row->kind, row->item_id, row->deco_count, self->materials_0x254);
-        lb_scroll_materials_set((struct LbScrollWork*)&self->scroll_0x154, self->materials_0x254, 4);
+        lb_scroll_materials_set(&self->scroll_0x154, self->materials_0x254, 4);
     }
 }
 
@@ -1839,7 +1829,6 @@ u32 lb_smith_gun_part_ck(u8 kind)
 void lb_smith_kakou_rows_set(LbSmithWork* self, _EQUIP* equip)
 {
     s32 i;
-    _EQUIP* row;
 
     self->kakou_cursor_0x128 = 0;
     lb_smith_tabs_init(self, 2);
@@ -1854,13 +1843,14 @@ void lb_smith_kakou_rows_set(LbSmithWork* self, _EQUIP* equip)
         } else {
             self->kakou_count_0x12A = 0;
             for (i = 0; i < 4; i++) {
-                row = &self->kakou_rows_0x20C[i];
-                if (row->item_id != 0) {
-                    self->kakou_flags_0x24C[i] = lb_kakou_weapon_flags_get(row->kind, equip);
+                if (self->kakou_rows_0x20C[i].item_id != 0) {
+                    self->kakou_flags_0x24C[i] = lb_kakou_weapon_flags_get(self->kakou_rows_0x20C[i].kind,
+                                                                           self->kakou_rows_0x20C[i].item_id, equip);
                     self->kakou_count_0x12A++;
-                    if (userdata_equip_flag_ck(row->kind, row->item_id, 1) == 0) {
-                        userdata_equip_flag_set(row->kind, row->item_id, 1);
-                        userdata_equip_flag_set(row->kind, row->item_id, 2);
+                    if (userdata_equip_flag_ck(self->kakou_rows_0x20C[i].kind, self->kakou_rows_0x20C[i].item_id,
+                                               1) == 0) {
+                        userdata_equip_flag_set(self->kakou_rows_0x20C[i].kind, self->kakou_rows_0x20C[i].item_id, 1);
+                        userdata_equip_flag_set(self->kakou_rows_0x20C[i].kind, self->kakou_rows_0x20C[i].item_id, 2);
                     }
                 }
             }
@@ -1905,7 +1895,8 @@ void lb_smith_kakou_apply(LbSmithWork* self)
                 item_box_store(get_item_species_data(ids[i])->item_id, 1, &stored);
             }
             rec = &self->kakou_rows_0x20C[self->kakou_cursor_0x128];
-            recipe = &kakou_data[rec->kind][rec->item_id];
+            recipe = kakou_data[rec->kind];
+            recipe += rec->item_id;
             for (j = 0; j < 3; j++) {
                 if (recipe->materials_0x00[j].item_0x00 != 0 && recipe->materials_0x00[j].count_0x02 > 0) {
                     eft052_page_count_add(recipe->materials_0x00[j].item_0x00, recipe->materials_0x00[j].count_0x02);
@@ -1945,7 +1936,7 @@ void lb_smith_kakou_apply(LbSmithWork* self)
         self->box_0x1F8[0] = 0xFFFF;
     }
     self->tab_list_0x134.cursor_0x00 = 0;
-    lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154, self->tab_kinds_0x12C[0]);
+    lb_scroll_kind_set(&self->scroll_0x154, self->tab_kinds_0x12C[0]);
     lb_smith_pl_model_reset(self);
     pl_model_refresh_req(self->plw_0x204);
 }
@@ -1989,7 +1980,7 @@ s32 lb_smith_kakou_step(LbSmithWork* self)
                                                self->kakou_price_0x23C) == 0) {
                         self->step_0x001 = 1;
                         lb_smith_kakou_rows_set(self, box);
-                        lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154,
+                        lb_scroll_kind_set(&self->scroll_0x154,
                                            self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00]);
                         lb_smith_kakou_preview_set(self);
                         sysSE_req(0);
@@ -2022,7 +2013,7 @@ s32 lb_smith_kakou_step(LbSmithWork* self)
                 self->tab_list_0x134.cursor_0x00 = menu_cursor_step(self->tab_list_0x134.cursor_0x00,
                                                                     self->tab_list_0x134.count_0x06,
                                                                     lb_cmd_repeat_get(), 1, 2);
-                lb_scroll_kind_set((struct LbScrollWork*)&self->scroll_0x154,
+                lb_scroll_kind_set(&self->scroll_0x154,
                                    self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00]);
                 lb_smith_kakou_preview_set(self);
                 if (prev_tab != self->tab_kinds_0x12C[self->tab_list_0x134.cursor_0x00] &&
@@ -2401,8 +2392,8 @@ void lb_smith_make_goods_draw(LbSmithWork* self, s32 active)
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
     _EQUIP row;
-    _SPR_DATA_ value;
     _SPR_DATA_ label;
+    _SPR_DATA_ value;
     _SPR_DATA_* lsp;
     s32 i;
     s32 enabled;
@@ -2472,7 +2463,7 @@ void lb_smith_make_draw(LbSmithWork* self)
     u8 tab;
     _mh_ivec2_ pos;
 
-    if ((u8)(self->step_0x001 - 2) <= 1) {
+    if ((u8)(self->step_0x001 + 0xFE) <= 1) {
         return;
     }
     lb_smith_make_preview_set(self);
@@ -2485,10 +2476,10 @@ void lb_smith_make_draw(LbSmithWork* self)
         }
         if (self->count_0x018 == 0 && (kind = self->scroll_0x154.kind_0x00) == 3) {
             self->scroll_0x154.kind_0x00 = 9;
-            lb_equip_page_draw_c1((struct LbScrollWork*)&self->scroll_0x154, mode);
+            lb_equip_page_draw_c1(&self->scroll_0x154, mode);
             self->scroll_0x154.kind_0x00 = kind;
         } else {
-            lb_equip_page_draw_c1((struct LbScrollWork*)&self->scroll_0x154, mode);
+            lb_equip_page_draw_c1(&self->scroll_0x154, mode);
         }
     }
     switch (self->step_0x001) {
@@ -2579,8 +2570,8 @@ void lb_smith_part_list_draw(LbSmithWork* self)
 /* 0x803645E4 (0x1AC): draws the decoration sort labels: the slot filter and the order. */
 void lb_smith_sort_labels_draw(LbSmithWork* self, _mh_ivec2_* base)
 {
-    _SPR_DATA_ value;
     _SPR_DATA_ label;
+    _SPR_DATA_ value;
     u16 filter;
 
     font_set_size(0x10, 0x10);
@@ -2705,7 +2696,7 @@ void lb_smith_deco_info_draw(_PLW* plw, u16 item)
 void lb_smith_deco_draw(LbSmithWork* self)
 {
     if (self->count_0x018 != 0) {
-        lb_equip_page_draw_c1((struct LbScrollWork*)&self->scroll_0x154,
+        lb_equip_page_draw_c1(&self->scroll_0x154,
                               self->held_0x005 != 0 ? 0 : self->step_0x001 == 0);
     }
     switch (self->step_0x001) {
@@ -2740,8 +2731,8 @@ void lb_smith_attach_goods_draw(LbSmithWork* self, s32 active)
     s32 mode;
     s32 enabled;
     s32 picked;
-    s32 i;
     LbSmithDeco* deco;
+    s32 i;
     s8* text;
 
     get_lsp_data(0x1915, &base);
@@ -2775,8 +2766,9 @@ void lb_smith_attach_goods_draw(LbSmithWork* self, s32 active)
             text = (s8*)LbStr(3, 0x6E);
         }
         spr_data_copy(&spr, get_lsp_data(0x1938, NULL));
-        pos.x = menu_text_block_center_x_c1((char*)text, spr.pos.x + ((spr.width >> 1) + base.x), 0x12, &lines);
-        pos.y = (s16)(spr.pos.y + ((spr.height >> 1) + base.y)) - (s16)(lines * 9);
+        pos.x = menu_text_block_center_x_c1((char*)text, base.x + spr.pos.x + (spr.width >> 1), 0x12, &lines);
+        pos.y = base.y + spr.pos.y + (spr.height >> 1);
+        pos.y -= (s16)(lines * 9);
         font_set_size(0x12, 0x12);
         font_print_ex(pos.x, pos.y, 2, text);
     }
@@ -2796,18 +2788,18 @@ void lb_smith_attach_draw(LbSmithWork* self)
     _mh_ivec2_ pos;
 
     if ((u32)(self->step_0x001 - 1) <= 2 && self->count_0x018 != 0) {
-        equip_record_copy(&self->scroll_0x154.compare_0x38, &SMITH_USER->box_0x0E00[self->pane_0x3A4.box_0x01E]);
-        equip_record_copy(&self->scroll_0x154.base_0x5C, &self->scroll_0x154.compare_0x38);
+        equip_record_copy(&self->scroll_0x154.cmp_0x38[0], &SMITH_USER->box_0x0E00[self->pane_0x3A4.box_0x01E]);
+        equip_record_copy(&self->scroll_0x154.base_0x5C[0], &self->scroll_0x154.cmp_0x38[0]);
         deco = &self->decos_0x324[self->cursor_0x00C];
         if ((deco->flags_0x0E & 0x20) == 0) {
-            equip_deco_attach(&self->scroll_0x154.base_0x5C, deco->species_id_0x0A);
+            equip_deco_attach(&self->scroll_0x154.base_0x5C[0], deco->species_id_0x0A);
         }
         if (self->held_0x005 != 0) {
             mode = 0;
         } else {
             mode = self->step_0x001 - 1 == 0;
         }
-        lb_equip_page_draw_c1((struct LbScrollWork*)&self->scroll_0x154, mode);
+        lb_equip_page_draw_c1(&self->scroll_0x154, mode);
     }
     switch (self->step_0x001) {
     case 0:
@@ -2889,13 +2881,13 @@ void lb_smith_detach_goods_draw(LbSmithWork* self, bool active)
     _mh_ivec2_ window;
     _SPR_DATA_ spr;
     s8 text[16];
-    s32 i;
     bool enabled;
     s32 picked;
     u32 rare;
     ItemDataRecord* data;
     LbSmithDeco* deco;
     u16* row_lsp;
+    s32 i;
 
     get_lsp_data(0x19FD, &base);
     draw_sprite_anim_ary(frame, 1, &base);
@@ -2946,12 +2938,12 @@ void lb_smith_detach_draw(LbSmithWork* self)
     _mh_ivec2_ pos;
 
     if ((u32)(self->step_0x001 - 1) <= 1 && self->count_0x018 != 0) {
-        equip_record_copy(&self->scroll_0x154.compare_0x38, &SMITH_USER->box_0x0E00[self->pane_0x3A4.box_0x01E]);
-        equip_record_copy(&self->scroll_0x154.base_0x5C, &self->scroll_0x154.compare_0x38);
-        if (equip_deco_count(&self->scroll_0x154.base_0x5C) != 0) {
+        equip_record_copy(&self->scroll_0x154.cmp_0x38[0], &SMITH_USER->box_0x0E00[self->pane_0x3A4.box_0x01E]);
+        equip_record_copy(&self->scroll_0x154.base_0x5C[0], &self->scroll_0x154.cmp_0x38[0]);
+        if (equip_deco_count(&self->scroll_0x154.base_0x5C[0]) != 0) {
             deco = &self->decos_0x324[self->cursor_0x00C];
             if ((deco->flags_0x0E & 0x20) == 0) {
-                equip_deco_detach(&self->scroll_0x154.base_0x5C, deco->slot_0x0C);
+                equip_deco_detach(&self->scroll_0x154.base_0x5C[0], deco->slot_0x0C);
             }
         }
         if (self->held_0x005 != 0) {
@@ -2959,7 +2951,7 @@ void lb_smith_detach_draw(LbSmithWork* self)
         } else {
             mode = self->step_0x001 - 1 == 0;
         }
-        lb_equip_page_draw_c1((struct LbScrollWork*)&self->scroll_0x154, mode);
+        lb_equip_page_draw_c1(&self->scroll_0x154, mode);
     }
     switch (self->step_0x001) {
     case 0:
@@ -3115,7 +3107,7 @@ void lb_smith_kakou_draw(LbSmithWork* self)
         } else {
             mode = self->step_0x001 - 1 == 0;
         }
-        lb_equip_page_draw_c1((struct LbScrollWork*)&self->scroll_0x154, mode);
+        lb_equip_page_draw_c1(&self->scroll_0x154, mode);
     }
     switch (self->step_0x001) {
     case 0:
