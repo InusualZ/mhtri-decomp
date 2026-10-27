@@ -101,7 +101,10 @@ struct EmcStatus {
     /* +0x3 */ u8 step;
     /* +0x4 */ u8 kind;
     /* +0x5 */ u8 value_0x05;
-    /* +0x6 */ u8 value_0x06;
+    union {
+        /* +0x6 */ u8 value_0x06;
+        /* +0x6 */ s8 area_slot_0x06; /* the same byte, the reporting record's area slot (`emc_status_report`) */
+    };
     /* +0x7 */ u8 value_0x07;
 };
 
@@ -267,7 +270,7 @@ u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 
 u32 em_area_entry_make(u8* area, u8 kind, u8 index);
 
 /* 0x80143BF8 - 1 for the frame the ready count turned to one. */
-u8 emc_host_ck(void);
+u32 emc_host_ck(void);
 
 void em_ground_rec_set(struct EmGroundRec* rec, const struct Q_ElementBlock* element);
 struct _ENEMY_WORK* em_small_spawn(u8 monster, struct EmGroundRec* rec, u16 order);

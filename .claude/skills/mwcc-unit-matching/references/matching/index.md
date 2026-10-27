@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (214)
+## Ideas that work (216)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -223,6 +223,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 235 | [Under peephole off, a redundant (s16) cast on a stored s16 parameter keeps retail's extsh](235-under-peephole-off-a.md) | works | source-shape, pragma | Retail stores an s16 parameter through `extsh r0,rN ; sth r0,..` where ours stores the saved register directly (`sth rN,..`), one instruction short. |
 | 236 | [A call result folded into a later call's argument: hold it in a local so the outer call's self move follows the inner call](236-call-result-folded-into.md) | works | source-shape, allocator | Retail moves self into r3 right after an inner call returns (before the float math on its result); ours moves it just before the outer bl, or the reverse |
 | 237 | [Put a unit's function definitions in the target's .text order: extab and extabindex pair again](237-put-a-units-function.md) | works | sections, source-shape | Every row scores well, yet flipcheck reports extab/extabindex records pairing other functions and most .text bytes differing - the source defines the functions in another order than retail's .text. |
+| 238 | [A dead counter beside a bdnz loop is a u8 loop variable](238-dead-counter-beside-a.md) | works | source-shape, allocator | Retail keeps `li r4,0` before the loop and `addi r4,r4,1` beside the `bdnz` though nothing reads r4; ours with an `s32 i` drops the counter entirely. |
+| 239 | [An addi+cmplwi test of -1 and 0 is written as one unsigned compare of c + 1](239-addi-cmplwi-test-of.md) | works | source-shape | Retail tests a value against -1 and 0 with `addi r0,c,1; cmplwi r0,1; ble skip`; ours with `c != -1 && c != 0` emits two compares and branches. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

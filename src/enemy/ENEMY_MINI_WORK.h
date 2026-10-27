@@ -38,7 +38,10 @@ struct _ENEMY_MINI_WORK {
                                           * `enemy/em010_prog.cpp`'s mini step roams only in mode 3 */
         /* +0x0C */ u8 field_0x0C;       /* the same byte as `EmAreaEntry::field_0x0C` */
     };
-    /* +0x0D */ u8 element_0x0D;         /* the quest element it belongs to (above 2: none) */
+    union {
+        /* +0x0D */ u8 element_0x0D;     /* the quest element it belongs to (above 2: none) */
+        /* +0x0D */ s8 element_s8_0x0D;  /* the same byte read signed (`enemy/enemy_control.cpp`: -1 for none) */
+    };
     /* +0x0E */ u8 spawn_kind_0x0E;      /* how the work it turns back into is entered (1, 2, 3 or 4) */
     /* +0x0F */ u8 field_0x0F;           /* the work's +0x10 byte */
     /* +0x10 */ u8 field_0x10;           /* set by `em_area_entry_restore` once the work was rebuilt from it */
@@ -51,7 +54,10 @@ struct _ENEMY_MINI_WORK {
     /* +0x18 */ u16 link_order_0x18;     /* the work's `link_order_0x01C` */
     /* +0x1A */ s16 timer_0x1A;          /* the frames left in a timed state (3 and 4) */
     /* +0x1C */ u8 phase_0x1C;           /* the phase counter the net events compare against */
-    /* +0x1D */ u8 area_slot_0x1D;       /* the area list its spawn record was filed under */
+    union {
+        /* +0x1D */ u8 area_slot_0x1D;   /* the area list its spawn record was filed under */
+        /* +0x1D */ s8 area_slot_s8_0x1D; /* the same byte read signed (`enemy/enemy_control.cpp`) */
+    };
     /* +0x1E */ u8 field_0x1E;
     /* +0x1F */ u8 stat_level_0x1F;      /* the stat level `em_stat_level_roll` picked */
     /* +0x20 */ u8 roam_state_0x20;      /* `enemy/em010_prog.cpp`'s mini step: 0 idle, 1 move timer armed */

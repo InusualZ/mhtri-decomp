@@ -11,17 +11,25 @@
  *   proposed in the registry (em_act_update, em_static_data_latch, em_post_update, light_em_slot_alloc,
  *   light_em_slot_free, nw_res_entry_get, mhchar_model_create, mhchar_draw_mode_set, mhchar_model_release,
  *   snd_em_bank_level_load, eft_res_release, pl_ride_down_set, pl_coll_tri_hit_ck, anim_key_curve_eval, em_file_name_tbl).
- * RESIDUALS. Every function is written; 46 of 154 rows are short of 100 %, all register allocation or a kept loop
- *   counter except: em_sub_buffer_claim (where `&emc_work` is materialised), emc_joint_cache_fill (the "found" exit of
- *   the joint search goes straight to the next set in retail - a goto shape), em_demo_key_apply (retail `getKeyData`
- *   returns a double: `frsp` before the stores), emc_host_ck (the header's `u8` return adds a `clrlwi`), em_level_set
- *   (base re-read from `res_mem_base`; the `size_class` -1/0 test is one `addi`/`cmplwi` range check in retail).
- *  - flipcheck: the 16 callees named through the registry are not map names yet (undefined at link); `.bss`/`.sdata2`
- *    are 2/4 tail-padding bytes short of the claim; `.text` 16 bytes short (the rows above).
+ * RESIDUALS. Every function is written; 24 of 154 rows are short of 100 %, register allocation or scheduling except:
+ *   emc_joint_cache_fill (the "found" exit of the joint search goes straight to the next set: a jump out of the inner
+ *   loop no goto-free shape reaches - the inline-helper form measured 90.0 against 90.9), em_sub_buffer_claim (the
+ *   retry `c = 2` jumps into the else branch's `li r30,2`: a cross-jump into another branch, idea 213),
+ *   em_stat_level_pick (retail reloads `weight` in both roll loops and keeps a dead counter in the arena scan;
+ *   `opt_common_subs off` gives the reloads but loses the hoisted `variant * 4`: 89.7 against 91.4),
+ *   em_size_scale_pick (`mr r4,r29` before `li r3,0` for the roll walk), emc_status_report (`clrlwi r4,r7` /
+ *   `extsb r4,r4` where ours narrows through r0).
+ *  - flipcheck: `.bss` 2 and `.sdata2` 4 tail-padding bytes short of the claim; `.text` 16 bytes long (the rows above).
  *  - `EmUserDataObj` is `enemy/fn_80138074.cpp`'s `ResUserDataAc` (two definitions until that unit exports it).
- * SHAPES. `#pragma peephole off` and `#pragma pool_data off` over the bodies.  Small scans are loops (MWCC unrolls
- *   them and hoists the u8 narrowing); the record constructors are `inline` under `#pragma dont_inline on` so MWCC
- *   emits the implicit `EmcWork` ctor and the member ctors as weak functions after `__sinit_\enemy_control_cpp`.
+ * SHAPES. `#pragma peephole off` and `#pragma pool_data off` over the bodies; `optimization_level 4` on
+ *   emc_event_spawn and em_level_set, `opt_lifetimes off` on em_sub_buffer_release.  Small scans are loops (MWCC
+ *   unrolls them and hoists the u8 narrowing); a dead loop counter is a `u8`/`s16` variable (idea 238); a
+ *   `get_move_work_max` bound is kept raw and narrowed in the condition (idea 216); search loops start
+ *   `for (i = 0, work = works; ...)`; signed reads of the area-slot/element bytes go through the `_s8_` union aliases
+ *   of ENEMY_WORK.h/ENEMY_MINI_WORK.h; `anim_key_curve_eval` and `pl_coll_tri_hit_ck` are called through `_c1` views
+ *   in their owners' argument order (float second).  The record constructors are `inline` under
+ *   `#pragma dont_inline on` so MWCC emits the implicit `EmcWork` ctor and the member ctors as weak functions after
+ *   `__sinit_\enemy_control_cpp`.
  */
 
 #include "types.h"
@@ -306,8 +314,8 @@ void emc_joint_cache_clear_all(void);
 void emc_joint_cache_fill(_ENEMY_WORK* self, u8 index);
 u32 emc_joint_cache_mtx_get(u8 index, u32 joint, nw4r::math::MTX34* out);
 void pl_ride_local_pos_get(_PLW* pl, nw4r::math::MTX34* mtx, nw4r::math::VEC3* out);
-s32 em_joint_points_hit_ck(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VEC3* pos, u32* joint, f32* height,
-                           f32 radius);
+s32 em_joint_points_hit_ck(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VEC3* pos, f32 radius, u32* joint,
+                           f32* height);
 void pl_ride_move(_PLW* pl);
 void emc_event_size_reset(_ENEMY_WORK* self, u8 event);
 EmcEvent* emc_event_tbl_get(u8 event);
@@ -342,6 +350,12 @@ u8 em_sub_buffer_release(u8 kind);
 
 #pragma peephole off
 #pragma pool_data off
+
+/* `anim_key_curve_eval` in its owner's argument order (`fn_8004CAD8.cpp`): key table, frame, the two outputs. */
+#define anim_key_curve_eval_c1 ((void (*)(f32*, f32, f32*, f32*))anim_key_curve_eval)
+/* `pl_coll_tri_hit_ck` in its owner's argument order (`Pl/pl_coll.cpp`): the radius second. */
+typedef u32 (*PlCollTriHitCk)(nw4r::math::VEC3*, f32, nw4r::math::VEC3*, nw4r::math::VEC3*, nw4r::math::VEC3*, f32*);
+#define pl_coll_tri_hit_ck_c1 ((PlCollTriHitCk)pl_coll_tri_hit_ck)
 
 extern "C" {
 
@@ -451,7 +465,8 @@ void em_kind_slot_ready_set(EmcSlot* slot) {
 u8 em_kind_slot_find(u8 kind) {
     s32 i;
     for (i = 0; i < 6; i++) {
-        if (emc_work.slot_0x000[i].state != 0 && emc_work.slot_0x000[i].kind == kind) {
+        EmcSlot* slot = &emc_work.slot_0x000[i];
+        if (slot->state != 0 && slot->kind == kind) {
             return i;
         }
     }
@@ -676,12 +691,16 @@ void emc_spawn_req_clear_all(void) {
  * free request and is matched to a waiting area record of that kind; returns 1 when all were filed. */
 u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 count, u8 flags, u8 request,
                      nw4r::math::VEC3* pos, s32 rot_arg) {
-    _CP_VECTOR* rot = (_CP_VECTOR*)rot_arg;
-    s32 e = 0;
-    EmAreaEntry* entries = &em_area_entry_tbl[0][0];
-    u8 req_flags = flags;
+    EmAreaEntry* entries;
+    u8 req_flags;
     s32 left;
+    _CP_VECTOR* rot;
     u16 i;
+    s32 e;
+    rot = (_CP_VECTOR*)rot_arg;
+    e = 0;
+    entries = &em_area_entry_tbl[0][0];
+    req_flags = flags;
     Marker2Rec* req;
 
     if (pos != NULL) {
@@ -748,14 +767,18 @@ u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 
 /* The records (live works and waiting area records) of spawn order `order` and placement mode 3 that a request
  * would count: `flags` bit 0 asks for area `area` only, `large` selects the large kinds. */
 s32 em_spawn_count_get(u16 order, u8 area, u8 flags, u8 large) {
-    u16 max = get_move_work_max(3);
-    _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    s32 count = 0;
+    u32 max;
+    _ENEMY_WORK* work;
+    s32 by_area;
     EmAreaEntry* entry;
-    s32 by_area = flags & 1;
+    s32 count;
     s32 i;
+    max = get_move_work_max(3);
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    count = 0;
+    by_area = flags & 1;
 
-    for (i = 0; i < max; i++, work++) {
+    for (i = 0; i < (u16)max; i++, work++) {
         if (work->active != 0 && (by_area == 0 || area == work->area_no) && (large != 0 || !(work->field_0x1C8 & 1)) &&
             (large != 1 || (work->field_0x1C8 & 1)) && work->field_0x00C == 3 && order == work->link_order_0x01C) {
             count++;
@@ -825,8 +848,10 @@ void emc_marker_replay(_ENEMY_MINI_WORK* mini, u8 team, u8 entry, u16 order, u8 
 
 /* Replays every matched spawn request whose area record is still waiting. */
 void emc_spawn_req_move(void) {
-    s32 i = 0;
-    Marker2Rec* req = &emc_work.marker2_0x1F8[0];
+    Marker2Rec* req;
+    s32 i;
+    i = 0;
+    req = &emc_work.marker2_0x1F8[0];
     do {
         if (req->field_0x09 == 1) {
             _ENEMY_MINI_WORK* mini;
@@ -883,10 +908,10 @@ void enemy_work_index_clear(u8 index) {
 
 /* Clears every live enemy work, the effect slot pool and the area records. */
 void enemy_work_reset(void) {
-    u16 max = get_move_work_max(3);
+    u32 max = get_move_work_max(3);
     u8 i;
     i = 0;
-    while (i < max) {
+    while (i < (u16)max) {
         enemy_work_index_clear(i);
         i++;
     }
@@ -897,9 +922,9 @@ void enemy_work_reset(void) {
 /* The first free live enemy work (stamped with its index), NULL when all are taken. */
 _ENEMY_WORK* enemy_work_free_get(void) {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    u16 max = get_move_work_max(3);
+    u32 max = get_move_work_max(3);
     u16 i;
-    for (i = 0; i < max; i++, work++) {
+    for (i = 0; i < (u16)max; i++, work++) {
         if (work->active == 0 && work->field_0x008 == 0) {
             work->group = i;
             return work;
@@ -993,9 +1018,9 @@ u8 em_stat_level_pick(u8 base, u8 variant, u16 seed) {
         }
     }
     if (roll != NULL && roll->weight != 0xFFFF) {
-        EmStatRoll* r;
+        EmStatRoll* r = roll;
         s16 total = 0;
-        for (r = roll; r->weight != -1; r++) {
+        for (; r->weight != -1; r++) {
             total += r->weight;
         }
         if (total != 0) {
@@ -1049,8 +1074,8 @@ f32 em_size_scale_pick(u8 size, u8 variant, u16 seed) {
             for (; roll->weight != 0xFFFF; roll++) {
                 sum += (s16)roll->weight;
                 if (pick < sum) {
-                    u16 min = roll->min;
-                    pct = min + (u16)rand_lcg_step(seed) % (roll->max - min + 1);
+                    u16 draw = rand_lcg_step(seed);
+                    pct = roll->min + draw % (roll->max - roll->min + 1);
                     break;
                 }
             }
@@ -1099,14 +1124,14 @@ void enemy_work_setup(_ENEMY_WORK* self, u8 kind) {
         self->frames_index_0x015 = 0;
         self->field_0x016 = 0;
         self->state_0x017 = 0;
-        self->area_slot_0x013 = (s8)quest_arena_item_count_get();
+        self->area_slot_s8_0x013 = (s8)quest_arena_item_count_get();
         self->field_0x014 = 0;
         self->link_order_0x01C = 0xFFFF;
         self->field_0x7C8 = 0;
         self->field_0x1D0 = 1.0f;
         self->event_slot_0x46B = -1;
         self->field_0x888 = -1;
-        self->field_0x00D = -1;
+        self->element_s8_0x00D = -1;
         self->field_0x00E = 0;
         self->team = kind;
         self->field_0x00A = 0;
@@ -1251,14 +1276,14 @@ _ENEMY_WORK* em_area_entry_restore(_ENEMY_MINI_WORK* mini) {
     if (work != NULL) {
         enemy_work_ground_set(work, &rec);
         work->field_0x01A = mini->order_0x16;
-        work->field_0x00D = mini->element_0x0D;
+        work->element_s8_0x00D = mini->element_s8_0x0D;
         work->field_0x9F6 = mini->area_prev_0x0B;
         work->link_order_0x01C = mini->link_order_0x18;
         work->field_0x7A0 = mini->field_0x28;
         work->field_0x7AC = mini->field_0x2C;
         work->field_0x016 = mini->phase_0x1C;
         work->field_0x012 = mini->step_0x12;
-        work->area_slot_0x013 = mini->area_slot_0x1D;
+        work->area_slot_s8_0x013 = mini->area_slot_s8_0x1D;
         work->field_0x014 = mini->field_0x1E;
         work->field_0x7C8 = mini->stat_level_0x1F;
         work->field_0x1D0 = mini->size_scale_0x24;
@@ -1304,10 +1329,8 @@ void enemy_work_release(_ENEMY_WORK* self) {
         }
         team = self->team;
         light_em_slot_free(self);
-        if (em_res_user_data_ck(self) == 1) {
-            if (self->user_data_0x484 != NULL) {
-                delete self->user_data_0x484;
-            }
+        if ((u32)em_res_user_data_ck(self) == 1) {
+            delete self->user_data_0x484;
         }
         em_roster_records_release(self);
         if (self->se_0xB14 != NULL) {
@@ -1317,8 +1340,8 @@ void enemy_work_release(_ENEMY_WORK* self) {
         if ((self->field_0x1C8 & 9) == 9) {
             _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
             s32 n;
-            EmAreaEntry* entry;
             s32 i;
+            EmAreaEntry* entry;
             for (n = 0; n < (u16)max; n++) {
                 if (work->active != 0 && self->field_0x00B == work->field_0x00B) {
                     if (em_res_class_tbl[team] > 0) {
@@ -1413,7 +1436,7 @@ void em_area_entry_setup(_ENEMY_MINI_WORK* mini, u8 kind, u8 area) {
     mini->field_0x11 = 0;
     mini->step_0x12 = 0;
     mini->link_order_0x18 = 0xFFFF;
-    mini->element_0x0D = -1;
+    mini->element_s8_0x0D = -1;
     mini->spawn_kind_0x0E = 0;
     mini->monster_0x02 = kind;
     mini->team_0x03 = 0;
@@ -1421,7 +1444,7 @@ void em_area_entry_setup(_ENEMY_MINI_WORK* mini, u8 kind, u8 area) {
     mini->field_0x0F = 0;
     mini->field_0x13 = 0;
     mini->busy_0x15 = 0;
-    mini->area_slot_0x1D = (s8)quest_arena_item_count_get();
+    mini->area_slot_s8_0x1D = (s8)quest_arena_item_count_get();
     mini->field_0x1E = 0;
     mini->stat_level_0x1F = 0;
     mini->size_scale_0x24 = 1.0f;
@@ -1442,8 +1465,9 @@ EmAreaEntry* em_area_entry_new(u8 kind, u8 area) {
 /* Spawns large monster `kind` at ground record `rec` with spawn order `order`: as an area record (linked to a new
  * live work for a placement-mode-3 large kind). */
 _ENEMY_MINI_WORK* em_large_spawn(u8 kind, EmGroundRec* rec, u16 order) {
-    _ENEMY_WORK* work = NULL;
     _ENEMY_MINI_WORK* mini;
+    _ENEMY_WORK* work;
+    work = NULL;
     if (rec->mode_0x02 == 3) {
         if (enemy_data_by_team_get(kind, rec->field_0x03)->flags_0x00 & 1) {
             work = enemy_work_free_get();
@@ -1497,7 +1521,7 @@ _ENEMY_MINI_WORK* em_area_entry_store(_ENEMY_WORK* self) {
     if (mini != NULL) {
         em_area_entry_ground_set(mini, &rec);
         mini->order_0x16 = self->field_0x01A;
-        mini->element_0x0D = self->field_0x00D;
+        mini->element_s8_0x0D = self->element_s8_0x00D;
         mini->area_prev_0x0B = self->field_0x9F6;
         mini->link_order_0x18 = self->link_order_0x01C;
         mini->field_0x28 = self->field_0x7A0;
@@ -1506,7 +1530,7 @@ _ENEMY_MINI_WORK* em_area_entry_store(_ENEMY_WORK* self) {
         mini->field_0x13 = self->frames_index_0x015;
         mini->phase_0x1C = self->field_0x016;
         mini->step_0x12 = self->field_0x012;
-        mini->area_slot_0x1D = self->area_slot_0x013;
+        mini->area_slot_s8_0x1D = self->area_slot_s8_0x013;
         mini->field_0x1E = self->field_0x014;
         mini->stat_level_0x1F = self->field_0x7C8;
         mini->size_scale_0x24 = self->field_0x1D0;
@@ -1518,9 +1542,11 @@ _ENEMY_MINI_WORK* em_area_entry_store(_ENEMY_WORK* self) {
                 if (self->field_0x8D2 >= 1) {
                     mini->timer_0x1A = self->field_0x018;
                 } else {
-                    s16 wait = self->field_0x914;
-                    if (wait > 300) {
+                    s16 wait;
+                    if (self->field_0x914 > 300) {
                         wait = 300;
+                    } else {
+                        wait = self->field_0x914;
                     }
                     mini->timer_0x1A = em_kind_frames_get((_ENEMY_WORK*)mini) - wait;
                 }
@@ -1528,7 +1554,7 @@ _ENEMY_MINI_WORK* em_area_entry_store(_ENEMY_WORK* self) {
                 em_area_entry_release(mini);
                 mini = NULL;
             }
-        } else if (em_act_ck(self, 12, 0xFF) == 1) {
+        } else if ((u32)em_act_ck(self, 12, 0xFF) == 1) {
             mini->state_0x08 = 3;
             mini->timer_0x1A = self->field_0x018;
         } else if (self->field_0x011 != 0) {
@@ -1577,10 +1603,12 @@ void em_area_entries_release(void) {
 
 /* Stores every live non-boss enemy work into an area record and releases the works. */
 void enemy_work_store_all(void) {
-    u32 i = 0;
-    _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    u16 max = get_move_work_max(3);
-    for (; i < max; i++, work++) {
+    u32 max;
+    _ENEMY_WORK* work;
+    u32 i;
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
+    for (i = 0; i < (u16)max; i++, work++) {
         if (work->active != 0 && !(work->field_0x1C8 & 8)) {
             if (em_work_die_ck(work) == 0) {
                 em_area_entry_store(work);
@@ -1604,15 +1632,15 @@ void em_area_spawn_clear(void) {
 }
 
 /* 1 for the frame the ready count turned to one. */
-u8 emc_host_ck(void) {
+u32 emc_host_ck(void) {
     return emc_work.field_0x36B == 1;
 }
 
 /* The per-frame enemy control: the ready count, the event, the spawn requests, the area records, the joint caches
  * and every live enemy's motion. */
 void enemy_control_move(void) {
-    u16 max = get_move_work_max(3);
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    u32 max = get_move_work_max(3);
     u32 i;
     u8 cache;
 
@@ -1633,7 +1661,7 @@ void enemy_control_move(void) {
     emc_joint_cache_clear_all();
     cache = 0;
     emc_event_act_move();
-    for (i = 0; i < max; i++, work++) {
+    for (i = 0; i < (u16)max; i++, work++) {
         if (work->active != 0) {
             if (em_data_word_get(work) != 0) {
                 emc_joint_cache_fill(work, cache);
@@ -1663,15 +1691,15 @@ void enemy_control_move(void) {
 void enemy_control_post_move(void) {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
     _PLW* pl = (_PLW*)get_move_work_adrs(2);
-    u16 max = get_move_work_max(3);
+    u32 max = get_move_work_max(3);
     u32 i;
-    for (i = 0; i < max; i++, work++) {
+    for (i = 0; i < (u16)max; i++, work++) {
         if (work->active != 0) {
             em_post_update(work);
         }
     }
     max = get_move_work_max(2);
-    for (i = 0; i < max; i++, pl++) {
+    for (i = 0; i < (u16)max; i++, pl++) {
         if (pl->slot_active != 0) {
             pl_ride_move(pl);
         }
@@ -1843,21 +1871,21 @@ void emc_mini_event_b(_ENEMY_MINI_WORK* mini, u8 remote) {
     if (mini->field_0x0C == 3 && state != 4) {
         if (em_spawn_rec_live_ck2((_ENEMY_WORK*)mini) == 1) {
             u16 order = mini->order_0x16;
-            u8 element = mini->element_0x0D;
+            s8 element = mini->element_s8_0x0D;
             u8 level = mini->stat_level_0x1F;
             f32 scale = mini->size_scale_0x24;
-            u8 area_slot = mini->area_slot_0x1D;
+            s8 area_slot = mini->area_slot_s8_0x1D;
             em_area_entry_setup(mini, mini->monster_0x02, spawn->slot_0x8->element_0x08.byte_0x01);
             em_ground_rec_set(&rec, &spawn->slot_0x8->element_0x08);
             em_area_entry_ground_set(mini, &rec);
             mini->order_0x16 = order;
-            mini->element_0x0D = element;
+            mini->element_s8_0x0D = element;
             mini->state_0x08 = 1;
             mini->phase_0x1C = phase;
             mini->step_0x12 = step;
             mini->stat_level_0x1F = level;
             mini->size_scale_0x24 = scale;
-            mini->area_slot_0x1D = area_slot;
+            mini->area_slot_s8_0x1D = area_slot;
             if (report == 1) {
                 emc_entry_report(mini, 2);
             }
@@ -1920,8 +1948,8 @@ void emc_status_report(u16 enemy_id, u8 phase, u8 step, u8 kind, s8 area_slot) {
     emc_work.status_0xD9C.phase = phase;
     emc_work.status_0xD9C.step = step;
     emc_work.status_0xD9C.kind = kind;
-    emc_work.status_0xD9C.value_0x06 = area_slot;
-    rec = quest_spawn_rec_find_in(enemy_id, area_slot);
+    emc_work.status_0xD9C.area_slot_0x06 = area_slot;
+    rec = quest_spawn_rec_find_in(enemy_id, (s8)(u8)area_slot);
     if (rec != NULL) {
         emc_work.status_0xD9C.value_0x07 = rec->count_0x4;
     }
@@ -1931,13 +1959,13 @@ void emc_status_report(u16 enemy_id, u8 phase, u8 step, u8 kind, s8 area_slot) {
 /* Reports event `kind` of live enemy `self` (a non-boss). */
 void emc_kill_report(_ENEMY_WORK* self, u8 kind) {
     if (!(self->field_0x1C8 & 8)) {
-        emc_status_report(self->field_0x01A, self->field_0x016, self->field_0x012, kind, self->area_slot_0x013);
+        emc_status_report(self->field_0x01A, self->field_0x016, self->field_0x012, kind, self->area_slot_s8_0x013);
     }
 }
 
 /* Reports event `kind` of area record `mini`. */
 void emc_entry_report(_ENEMY_MINI_WORK* mini, u8 kind) {
-    emc_status_report(mini->order_0x16, mini->phase_0x1C, mini->step_0x12, kind, mini->area_slot_0x1D);
+    emc_status_report(mini->order_0x16, mini->phase_0x1C, mini->step_0x12, kind, mini->area_slot_s8_0x1D);
 }
 
 }
@@ -1954,9 +1982,9 @@ u8 em_get_unique_work(u16 id, _ENEMY_WORK** out, _ENEMY_MINI_WORK** mini) {
     if (out != NULL) {
         _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
         if (work != NULL) {
-            u16 max = get_move_work_max(3);
+            u32 max = get_move_work_max(3);
             u16 i;
-            for (i = 0; i < max; i++, work++) {
+            for (i = 0; i < (u16)max; i++, work++) {
                 if (work->active != 0 && work->field_0x01A == id) {
                     *out = work;
                     return 1;
@@ -2059,8 +2087,8 @@ void pl_ride_local_pos_get(_PLW* pl, nw4r::math::MTX34* mtx, nw4r::math::VEC3* o
 
 /* Tests `pos` with radius `radius` against every triangle of live enemy `self`'s joint point sets `set`; the highest
  * hit's height goes to `*height` and its joint to `*joint`.  Returns the number of hits. */
-s32 em_joint_points_hit_ck(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VEC3* pos, u32* joint, f32* height,
-                           f32 radius) {
+s32 em_joint_points_hit_ck(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VEC3* pos, f32 radius, u32* joint,
+                           f32* height) {
     nw4r::math::VEC3 pts[6];
     f32 h;
     s32 hits;
@@ -2072,10 +2100,10 @@ s32 em_joint_points_hit_ck(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VE
     VEC3_ctor(&pts[5]);
     hits = 0;
     while (set->joint != 0xFFFFFFFF) {
-        s32 tris = em_joint_points_get(self, set, pts) - 2;
         u8 i;
+        s32 tris = em_joint_points_get(self, set, pts) - 2;
         for (i = 0; i < tris; i++) {
-            if (pl_coll_tri_hit_ck(pos, &pts[i], &pts[i + 1], &pts[i + 2], &h, radius) == 1) {
+            if (pl_coll_tri_hit_ck_c1(pos, radius, &pts[i], &pts[i + 1], &pts[i + 2], &h) == 1) {
                 if (hits != 0) {
                     if (h > *height) {
                         *height = h;
@@ -2104,7 +2132,7 @@ void pl_ride_move(_PLW* pl) {
     f32 height;
     u32 joint;
     s32 hit;
-    u8 i;
+    u32 i;
     f32 lift;
     f32 radius;
     VEC3_ctor(&probe);
@@ -2133,7 +2161,7 @@ void pl_ride_move(_PLW* pl) {
                 }
                 copyVec3(&probe, &pl->vec_0x03C);
                 probe.y += lift;
-                if (em_joint_points_hit_ck(work, set, &probe, &joint, &height, radius) != 0) {
+                if (em_joint_points_hit_ck(work, set, &probe, radius, &joint, &height) != 0) {
                     hit = 1;
                     pl->field_0x040 = height;
                     pl->ride_joint_0x594 = joint;
@@ -2186,7 +2214,7 @@ u32 em_ride_hit_check(nw4r::math::VEC3* pos, u8 area, _ENEMY_WORK** out, u32* jo
                 if (set != NULL) {
                     copyVec3(&probe, pos);
                     probe.y += lift;
-                    if (em_joint_points_hit_ck(work, set, &probe, &hit_joint, &hit_height, radius) != 0) {
+                    if (em_joint_points_hit_ck(work, set, &probe, radius, &hit_joint, &hit_height) != 0) {
                         *height = hit_height;
                         *joint = hit_joint;
                         *out = work;
@@ -2299,12 +2327,15 @@ void emc_event_move(void) {
 /* Matches event `event`'s targets to the live enemies in the player's area: 1 when every target has one, 0 when
  * some has none, -1 when a matched enemy is not entered yet. */
 s32 emc_event_targets_ready_ck(u8 event) {
-    s16 t;
+    s16 max;
     u32 waiting;
-    _ENEMY_WORK* works = (_ENEMY_WORK*)get_move_work_adrs(3);
-    s16 max = get_move_work_max(3);
-    EmcEvent* ev = emc_event_tbl_get(event);
+    s16 t;
+    _ENEMY_WORK* works;
+    EmcEvent* ev;
     s32 all;
+    works = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
+    ev = emc_event_tbl_get(event);
     EmcEventTarget* target;
 
     if (ev == NULL) {
@@ -2320,8 +2351,8 @@ s32 emc_event_targets_ready_ck(u8 event) {
     for (; target->kind != 0; target++, t++) {
         s32 found = 0;
         s16 i;
-        _ENEMY_WORK* work = works;
-        for (i = 0; i < max; i++, work++) {
+        _ENEMY_WORK* work;
+        for (i = 0, work = works; i < max; i++, work++) {
             if (work->active != 0 && (work->event_slot_0x46B == -1 || work->event_slot_0x46B == t) &&
                 work->team == target->kind && (target->area_match == 0 || work->field_0x00A == target->area) &&
                 work->area_no == get_now_areano()) {
@@ -2401,11 +2432,11 @@ void emc_highlight_set(u8 kind, u8 area, u8 area_match, u8 event) {
         }
     }
     if (found == 0 && entry != NULL) {
-        s32 n;
+        u8 n;
         for (n = 0; n < 128; n++, entry++) {
             if (entry->active != 0 && entry->monster_0x02 == kind && (area_match == 0 || entry->team_0x03 == area)) {
-                _ENEMY_DATA* data =
-                    (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(kind, entry->team_0x03), entry->entry_0x09);
+                _ENEMY_DATA* data = (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(entry->monster_0x02, entry->team_0x03),
+                                                                  entry->entry_0x09);
                 if (data != NULL) {
                     data->highlight_0x16 = 1;
                     emc_highlight.active = 1;
@@ -2477,8 +2508,7 @@ void emc_event_hold_set(u8 event) {
                 if (n >= 5) {
                     return;
                 }
-                work = works;
-                for (i = 0; i < max; i++, work++) {
+                for (i = 0, work = works; i < max; i++, work++) {
                     s32 bit;
                     if (work->active != 0 && ((bit = 1 << i), (taken & bit) == 0) && work->team == target->kind &&
                         (target->area_match == 0 || work->field_0x00A == target->area)) {
@@ -2570,13 +2600,19 @@ void emc_event_area_move(u8 event) {
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Issues event `event`'s spawn requests: one per spawn row, from the first live enemy (else area record) of the
  * row's kind. */
 void emc_event_spawn(u8 event) {
-    _ENEMY_WORK* works = (_ENEMY_WORK*)get_move_work_adrs(3);
-    s16 max = get_move_work_max(3);
-    EmAreaEntry* entries = &em_area_entry_tbl[0][0];
-    EmcEvent* ev = emc_event_tbl_get(event);
+    EmAreaEntry* entries;
+    _ENEMY_WORK* works;
+    s16 max;
+    EmcEvent* ev;
+    works = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
+    entries = &em_area_entry_tbl[0][0];
+    ev = emc_event_tbl_get(event);
     if (ev != NULL) {
         EmcEventSpawn* spawn = ev->spawns;
         if (spawn != NULL) {
@@ -2584,8 +2620,8 @@ void emc_event_spawn(u8 event) {
             while ((kind = spawn->kind) != 0) {
                 s32 found = 0;
                 s16 i;
-                _ENEMY_WORK* work = works;
-                for (i = 0; i < max; i++, work++) {
+                _ENEMY_WORK* work;
+                for (i = 0, work = works; i < max; i++, work++) {
                     if (work->active != 0 && work->team == kind) {
                         u8 entry;
                         u8 count;
@@ -2602,13 +2638,12 @@ void emc_event_spawn(u8 event) {
                     }
                 }
                 if (found == 0) {
-                    s32 n;
+                    u8 n;
                     EmAreaEntry* e;
                     if (entries == NULL) {
                         return;
                     }
-                    e = entries;
-                    for (n = 0; n < 128; n++, e++) {
+                    for (n = 0, e = entries; n < 128; n++, e++) {
                         if (e->active != 0 && e->monster_0x02 == spawn->kind) {
                             u8 entry;
                             u8 count;
@@ -2629,6 +2664,7 @@ void emc_event_spawn(u8 event) {
         }
     }
 }
+#pragma pop
 
 /* Clears the event action records. */
 void emc_event_act_init(void) {
@@ -2651,17 +2687,18 @@ void emc_event_act_request(u8 event) {
 
 /* Starts event `event`'s actions: every matched target in the player's area gets action 13. */
 void emc_event_act_start(u8 event) {
+    s16 i;
+    u8 slot;
+    s16 t;
+    _ENEMY_WORK* work;
+    EmcEventTarget* target;
     _ENEMY_WORK* works = (_ENEMY_WORK*)get_move_work_adrs(3);
     s16 max = get_move_work_max(3);
     EmcEvent* ev = emc_event_tbl_get(event);
     if (ev != NULL) {
-        EmcEventTarget* target = ev->targets;
+        target = ev->targets;
         if (target != NULL) {
-            s16 n;
-            _ENEMY_WORK* work = works;
-            u8 slot;
-            s16 t;
-            for (n = max; n > 0; n--, work++) {
+            for (i = 0, work = works; i < max; i++, work++) {
                 if (work->active != 0) {
                     work->visible_0x001 = 0;
                 }
@@ -2669,9 +2706,7 @@ void emc_event_act_start(u8 event) {
             slot = 0;
             t = 0;
             for (; target->kind != 0; target++, t++) {
-                s16 i;
-                work = works;
-                for (i = 0; i < max; i++, work++) {
+                for (i = 0, work = works; i < max; i++, work++) {
                     if (work->active != 0 && (work->event_slot_0x46B == -1 || work->event_slot_0x46B == t) &&
                         work->team == target->kind && (target->area_match == 0 || work->field_0x00A == target->area) &&
                         work->area_no == get_now_areano()) {
@@ -2706,22 +2741,23 @@ void emc_event_act_end_request(void) {
 /* Ends the event's actions: every enemy given one gets its end action and is handed back to the demo control. */
 void emc_event_act_end(void) {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    s16 n;
-    u8 i;
-    for (n = get_move_work_max(3); n > 0; n--, work++) {
+    s16 max = get_move_work_max(3);
+    s16 j;
+    u32 i;
+    for (j = 0; j < max; j++, work++) {
         if (work->active != 0) {
             work->visible_0x001 = 1;
         }
     }
     i = 0;
     do {
-        EmcEventAct* act = &emc_event_act_tbl[i];
+        EmcEventAct* act = &emc_event_act_tbl[(u8)i];
         if (act->active != 0) {
             _ENEMY_WORK* target;
             act->active = 0;
             target = act->work;
             if (target != NULL) {
-                if (em_act_ck(target, act->act, act->sub) == 1) {
+                if ((u32)em_act_ck(target, act->act, act->sub) == 1) {
                     em_act_arm_unless_down(target, act->end_act, act->end_sub);
                 }
                 target->event_slot_0x46B = -1;
@@ -2811,15 +2847,13 @@ void em_demo_key3_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* 
 /* untyped: caller-owned payload - each enemy program passes its key tables in its own type */
 void em_demo_key_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* rot_keys_arg, u8 pos_axes,
                        u8 rot_axes) {
-    f32* pos_keys = (f32*)pos_keys_arg;
-    f32* rot_keys = (f32*)rot_keys_arg;
     f32 a;
     f32 b;
     f32 c;
     f32 t = frame * 2;
-    if (pos_keys != NULL && pos_axes != 0) {
+    if (pos_keys_arg != NULL && pos_axes != 0) {
         if (pos_axes == 1 || pos_axes == 2 || pos_axes == 4) {
-            a = getKeyData(pos_keys, t);
+            a = getKeyData((f32*)pos_keys_arg, t);
             switch (pos_axes) {
             case 1:
                 self->pos.x = a;
@@ -2832,10 +2866,10 @@ void em_demo_key_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* r
                 break;
             }
         } else if (pos_axes == 7) {
-            getKeyData3(pos_keys, t, &a, &b, &c);
+            getKeyData3((f32*)pos_keys_arg, t, &a, &b, &c);
             setVector3(&self->pos, a, b, c);
         } else {
-            anim_key_curve_eval(pos_keys, &a, &b, t);
+            anim_key_curve_eval_c1((f32*)pos_keys_arg, t, &a, &b);
             switch (pos_axes) {
             case 3:
                 self->pos.x = a;
@@ -2853,9 +2887,9 @@ void em_demo_key_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* r
         }
         copyVec3(&self->vec_0x194, &self->pos);
     }
-    if (rot_keys != NULL && rot_axes != 0) {
+    if (rot_keys_arg != NULL && rot_axes != 0) {
         if (rot_axes == 1 || rot_axes == 2 || rot_axes == 4) {
-            a = getKeyData(rot_keys, t);
+            a = getKeyData((f32*)rot_keys_arg, t);
             switch (rot_axes) {
             case 1:
                 self->field_0x1BC = em_demo_angle_get(a);
@@ -2868,10 +2902,10 @@ void em_demo_key_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* r
                 break;
             }
         } else if (rot_axes == 7) {
-            getKeyData3(rot_keys, t, &a, &b, &c);
+            getKeyData3((f32*)rot_keys_arg, t, &a, &b, &c);
             em_demo_rot_set(self, a, b, c);
         } else {
-            anim_key_curve_eval(rot_keys, &a, &b, t);
+            anim_key_curve_eval_c1((f32*)rot_keys_arg, t, &a, &b);
             switch (rot_axes) {
             case 3:
                 self->field_0x1BC = em_demo_angle_get(a);
@@ -2901,13 +2935,15 @@ s8 em_level_res_tbl[5][6] = {
     {2, 2, 1, 0, 0, 0}, {2, 2, 0, 0, 0, 0}, {2, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {3, 0, 0, 0, 0, 0},
 };
 
+#pragma push
+#pragma optimization_level 4
 /* Carves level `level`'s resource buffers out of one resource-memory block: the six main buffers of its size
  * classes, a sub-buffer for each of the first six main buffers' classes, and clears the effect sets. */
 void em_level_set(s8 level) {
     EmcWork* work = &emc_work;
     s32 i;
-    u8* base;
     s8* cls;
+    u8* base;
     EmResBuffer* main;
     EmResBuffer* sub;
 
@@ -2925,22 +2961,12 @@ void em_level_set(s8 level) {
     }
     work->res_mem_handle = pull_res_mem(NULL, work->res_mem_size, 1);
     work->res_mem_base = (u8*)getResMemAdrs(work->res_mem_handle);
-    work->peer_count[0][0] = 0;
-    work->peer_count[0][1] = 0;
-    work->peer_count[0][2] = 0;
-    work->peer_count[0][3] = 0;
-    work->peer_count[1][0] = 0;
-    work->peer_count[1][1] = 0;
-    work->peer_count[1][2] = 0;
-    work->peer_count[1][3] = 0;
-    work->peer_count[2][0] = 0;
-    work->peer_count[2][1] = 0;
-    work->peer_count[2][2] = 0;
-    work->peer_count[2][3] = 0;
-    work->peer_count[3][0] = 0;
-    work->peer_count[3][1] = 0;
-    work->peer_count[3][2] = 0;
-    work->peer_count[3][3] = 0;
+    for (i = 0; i < 4; i++) {
+        s32 j;
+        for (j = 0; j < 4; j++) {
+            work->peer_count[i][j] = 0;
+        }
+    }
     cls = em_level_res_tbl[level];
     main = work->res_buf;
     base = work->res_mem_base;
@@ -2963,7 +2989,7 @@ void em_level_set(s8 level) {
     sub = work->sub_buf;
     for (i = 0; i < 6; i++, main++, sub++) {
         s32 c = main->size_class;
-        if (c != -1 && c != 0) {
+        if ((u32)(c + 1) > 1) {
             switch (c) {
             case 1:
                 sub->size_class = 1;
@@ -3002,6 +3028,7 @@ void em_level_set(s8 level) {
         }
     }
 }
+#pragma pop
 
 /* Gives the level's resource-memory block back and clears the buffers. */
 void em_res_buffers_free(void) {
@@ -3029,10 +3056,10 @@ u32 em_res_peers_ready_ck(s8 size_class) {
     _PLW* pl = (_PLW*)get_move_work_adrs(2);
     s16 max = get_move_work_max(2);
     if (PlayMode_ck() != 2) {
-        s32 i = 0;
-        u8* count = emc_work.peer_count[size_class];
-        for (; i < max; i++, count++, pl++) {
-            if (pl->slot_active != 0 && em_pl_slot_leaving_ck(pl->chunk_ofs) == 0 && *count == 0) {
+        s32 i;
+        for (i = 0; i < max; i++, pl++) {
+            if (pl->slot_active != 0 && em_pl_slot_leaving_ck(pl->chunk_ofs) == 0 &&
+                emc_work.peer_count[size_class][i] == 0) {
                 return 0;
             }
         }
@@ -3082,7 +3109,7 @@ EmResBuffer* em_res_buffer_find(u8 kind) {
     EmcWork* work = &emc_work;
     s8 cls = em_res_class_tbl[kind];
     EmResBuffer* buf;
-    s32 i;
+    u8 i;
     if (cls == -1) {
         return NULL;
     }
@@ -3198,11 +3225,12 @@ EmResBuffer* em_sub_buffer_free_get(u8 size_class) {
  * file name; a buffer that id already holds is shared (and NULL returned). */
 EmResBuffer* em_sub_buffer_claim(u8 kind) {
     EmResBuffer* buf;
-    u8 id;
-    u8 c;
+    s32 id;
+    s32 c;
     s8 cls;
+    EmcWork* work = &emc_work;
     char name[256];
-    s32 slot;
+    u8 slot;
 
     if (kind == 0xFF) {
         buf = em_sub_buffer_free_get(0);
@@ -3225,7 +3253,7 @@ EmResBuffer* em_sub_buffer_claim(u8 kind) {
     id = atoi(&name[2]);
     slot = em_kind_slot_find(kind);
     if (slot != 0xFF) {
-        emc_work.slot_0x000[slot].field_0x04 = id;
+        work->slot_0x000[slot].field_0x04 = id;
     }
     buf = em_sub_buffer_find(id);
     if (buf != NULL) {
@@ -3255,29 +3283,31 @@ EmResBuffer* em_sub_buffer_claim(u8 kind) {
     return buf;
 }
 
+#pragma push
+#pragma opt_lifetimes off
 /* Drops one reference of monster kind `kind`'s sub-buffer; the last one releases its effect resources and clears it.
  * Returns the references left. */
 u8 em_sub_buffer_release(u8 kind) {
-    u8 id = kind;
+    EmcWork* work = &emc_work;
     s32 slot = em_kind_slot_find(kind);
     EmResBuffer* buf;
     s32 n;
     if (slot != 0xFF) {
-        id = emc_work.slot_0x000[slot].field_0x04;
-        if (id == 0) {
+        kind = work->slot_0x000[slot].field_0x04;
+        if (kind == 0) {
             return 0;
         }
     }
-    buf = emc_work.sub_buf;
+    buf = work->sub_buf;
     for (n = 6; n != 0; n--, buf++) {
-        if (buf->used != 0 && buf->owner == id) {
+        if (buf->used != 0 && buf->owner == kind) {
             s32 index;
             EmcEftSet* set;
             buf->refs--;
             if (buf->refs != 0) {
                 return buf->refs;
             }
-            index = em_sub_buffer_index_get(id, 1);
+            index = em_sub_buffer_index_get(kind, 1);
             if (index >= 0) {
                 s32 i;
                 set = &emc_work.eft_set[index];
@@ -3311,6 +3341,7 @@ u8 em_sub_buffer_release(u8 kind) {
     }
     return 0;
 }
+#pragma pop
 
 /* `size` bytes (rounded up to 32) of monster kind `kind`'s sub-buffer; NULL when it is full. */
 u8* em_kind_mem_alloc(u8 kind, u32 size) {
@@ -3367,20 +3398,20 @@ u8 em_sub_buffer_refs_get(u8 kind) {
 
 /* The index of monster kind `kind`'s sub-buffer (`raw`: `kind` is already the owner id); -1 when none. */
 s32 em_sub_buffer_index_get(u8 kind, u8 raw) {
-    u8 id = kind;
     EmcWork* work = &emc_work;
     s32 i;
     if (raw == 0) {
         s32 slot = em_kind_slot_find(kind);
         if (slot != 0xFF) {
-            id = work->slot_0x000[slot].field_0x04;
-            if (id == 0) {
+            kind = work->slot_0x000[slot].field_0x04;
+            if (kind == 0) {
                 return -1;
             }
         }
     }
     for (i = 0; i < 6; i++) {
-        if (work->sub_buf[i].used != 0 && work->sub_buf[i].owner == id) {
+        EmResBuffer* buf = &work->sub_buf[i];
+        if (buf->used != 0 && buf->owner == kind) {
             return i;
         }
     }

@@ -329,14 +329,20 @@ struct _ENEMY_WORK {
     /* +0x00B */ u8 field_0x00B;        /* the byte `em_mot_set_blend` hands the effect queue as its flag */
     /* +0x00C */ u8 field_0x00C;        /* the mode `fn_80166DF8` gates its case-0/case-3 blocks on
                                         * (3 = the "entry seated" state) */
-    /* +0x00D */ u8 field_0x00D;        /* the byte `em_quest_element_set`/`em_quest_element_set_large` latch */
+    union {
+        /* +0x00D */ u8 field_0x00D;    /* the byte `em_quest_element_set`/`em_quest_element_set_large` latch */
+        /* +0x00D */ s8 element_s8_0x00D; /* the same byte read signed (`enemy/enemy_control.cpp`) */
+    };
     /* +0x00E */ u8 field_0x00E;        /* `fn_80137C94` hands it to `em_act_advance` */
     /* +0x00F */ u8 field_0x00F;        /* `enemy/em034_prog.cpp`'s `fn_801B4D14` gates its
                                         * seat re-test on it being zero */
     /* +0x010 */ u8 field_0x010;       /* the value `fn_80140244`'s command reports */
     /* +0x011 */ u8 field_0x011;        /* the attack timer  arms */
     /* +0x012 */ u8 field_0x012;        /* the second counter `em_act_update`'s states run */
-    /* +0x013 */ u8 area_slot_0x013;     /* the area list its spawn record was filed under */
+    union {
+        /* +0x013 */ u8 area_slot_0x013; /* the area list its spawn record was filed under */
+        /* +0x013 */ s8 area_slot_s8_0x013; /* the same byte read signed (`enemy/enemy_control.cpp`) */
+    };
     /* +0x014 */ u8 field_0x014;        /* the mode  maps to a two-state mask */
     /* +0x015 */ u8 frames_index_0x015;  /* the frame-table index `em_frames_get` reads */
     /* +0x016 */ u8 field_0x016;        /* the first counter `em_act_update`'s states run */
