@@ -88,4 +88,10 @@ typedef struct PlHitSlot {
     /* +0x0F */ u8 pad_0x0F[0x4D];
 } PlHitSlot; /* size: 0x5C */
 
+/* The two attack entries viewed as an array inside `_PLW`.  size: 0x53C */
+typedef struct PlwHitSlots {
+    /* +0x000 */ u8 pad_0x000[0x484];
+    /* +0x484 */ PlHitSlot slot_0x484[2];
+} PlwHitSlots; /* size: 0x53C */
+
 #endif /* MHTRI_PL_ACT_STEP_H */
