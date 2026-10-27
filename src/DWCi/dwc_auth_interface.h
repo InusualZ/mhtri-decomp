@@ -75,18 +75,23 @@ typedef struct DWCiListNode {
     /* +0x18 */ struct DWCiListNode* next;
 } DWCiListNode;
 
-/* 0x80761260 - the auth-data file image the auth task reads and writes (0x20 bytes of I/O): the saved user id
- * first.  GUESS on the name; the rest of the record is not read by the written bodies. */
+/* 0x80761260 - the auth-data file image the auth task reads and writes (0x20 bytes of NAND I/O, 32-byte
+ * aligned): the saved user id first.  GUESS on the name; the rest of the record is not read by the written
+ * bodies. */
 typedef struct DWCiAuthSaveData {
     /* +0x00 */ u64 userId;
     /* +0x08 */ u8 pad_0x08[0x18];
-    /* +0x20 */ char profileWords[0x34]; /* the "prwords" answer */
-    /* +0x54 */ s32 requestFailed;       /* set by the request callback on an NHTTP error */
-} DWCiAuthSaveData; /* size: 0x58 */
+} DWCiAuthSaveData; /* size: 0x20 */
 
-/* The DWCi state block: the request status and the NAS answer fields (token, challenge, locator, user id, the
- * login kind, the server time offset, the response), then the work buffer behind it (+0x1D0, the
- * service-locator result) and the auth-data image (+0x360) - one run of the unit's `.bss`. */
+/* 0x80761280 - the request callback's own record behind the save image: the profile words the server answered
+ * and the NHTTP failure flag.  GUESS on the names. */
+typedef struct DWCiAuthProfile {
+    /* +0x00 */ char profileWords[0x34]; /* the "prwords" answer */
+    /* +0x34 */ s32 requestFailed;       /* set by the request callback on an NHTTP error */
+} DWCiAuthProfile; /* size: 0x38 */
+
+/* 0x80760F00 - the DWCi state block: the request status and the NAS answer fields (token, challenge, locator,
+ * user id, the login kind, the server time offset, the response). */
 typedef struct DWCiStateBlock {
     /* +0x000 */ s32 status;
     /* +0x004 */ char token[0x12D];
@@ -98,10 +103,7 @@ typedef struct DWCiStateBlock {
     /* +0x1C0 */ s64 serverTimeOffset;   /* the server's datetime minus OSGetTime */
     /* +0x1C8 */ NHTTPResponse* response; /* the answer the callback keeps and the auth task destroys */
     /* +0x1CC */ u8 pad_0x1CC[0x04];
-    /* +0x1D0 */ DWCSvlResult svl;
-    /* +0x344 */ u8 pad_0x344[0x1C];
-    /* +0x360 */ DWCiAuthSaveData saveImage;
-} DWCiStateBlock; /* size: 0x3B8 */
+} DWCiStateBlock; /* size: 0x1D0 */
 
 /* The request list head; the second word is never touched by the written bodies (the target object's row is 8
  * bytes and the next object starts 8 bytes on - an approximation of the original's record). */
@@ -110,12 +112,10 @@ typedef struct DWCiFreeList {
     /* +0x04 */ u8 unused_0x04[4];
 } DWCiFreeList; /* size: 0x08 */
 
-/* The `.sbss` run 0x807957D0..0x807957F8: the one-shot flag and value of the console friend code, the request
+/* The `.sbss` run 0x807957E0..0x807957F8: the request
  * list, the flag that sends the runtime block's stored user id instead of the saved one, the argument
  * `DWCi_npStart` remembers (the server environment index), the runtime block and the auth state (retail reloads
  * it, hence volatile). */
-extern s32 DWCi_friendCodeReady;
-extern u64 DWCi_consoleFriendCode;
 extern DWCiFreeList DWCi_freeList;
 extern u32 DWCi_useStoredConfig;
 extern u32 DWCi_initArgument;
@@ -126,12 +126,13 @@ extern volatile s32 DWCi_state;
 extern char* DWCi_authDataPathPtr;
 
 
-/* The `.bss` run 0x80760F00..0x807613B8: the state block (0x1D0 B, first word the request status), the 0x190-byte
- * work buffer, the auth-data image and the host name the request copies out of its URL. GUESS on the names. */
+/* The `.bss` run 0x80760F00..0x807613B8: the state block (first word the request status), the service-locator
+ * result, the auth-data image and the profile record (the request's host name behind them is a static of
+ * `DWCi_Auth_StartRequest`).  GUESS on the names. */
 extern u32 DWCi_stateBlock[0x1D0 / 4];
-extern u8 DWCi_workBuffer[0x190];
+extern DWCSvlResult DWCi_authSvlResult;
 extern DWCiAuthSaveData DWCi_authSaveData;
-extern char DWCi_authHostName[0x100];
+extern DWCiAuthProfile DWCi_authProfile;
 
 /* 0x80508830 - brings the runtime block up for a NAS request (player name, friend code, stored user id, the two
  * host callbacks); 0x805089F0 - the service-locator form (the service tag). Both answer 1 on success. */
@@ -139,18 +140,14 @@ u32 DWCi_initRuntime(char* playerName, char* friendCode, u64 storedUserId, DWCiA
                      DWCiCommandCallback commandCallback);
 u32 DWCi_npSetup(char* tag, DWCiAllocCallback allocCallback, DWCiCommandCallback commandCallback);
 /* 0x80509180 - non-zero once the request finished; 0x805091D0 - it finished successfully; 0x805091F0 - its status
- * word; 0x80509200 - the work buffer the answer is parsed into. */
+ * word; 0x80509200 - the service-locator result the answer is parsed into. */
 u32 DWCi_AdvanceStatus(void);
 u32 DWCi_IsStatusReady(void);
 u32 DWCi_GetStatus(void);
-u8* DWCi_GetWorkBuffer(void);
+DWCSvlResult* DWCi_GetWorkBuffer(void);
 
-/* 0x80507C40 - copies `len` bytes by the widest unit both pointers allow. */
-void DWCi_Np_CPUCopyFast(u8* dst, const u8* src, u32 len);
 /* 0x80508A70 - one step of the auth state machine (called by `DWC_NASLoginProcess`/`DWC_SVLProcess`). */
 void DWCi_authDataTask(void);
-/* 0x80508630 - the console friend code, fetched once. */
-u64 DWCi_GetConsoleFriendCode(void);
 /* 0x80508750 - drains the request list; 0x805087A0 - resets the state block and starts the auth layer
  * (`DWC_Init` treats 0 as failure). */
 u32 DWCi_FreeList(void);
@@ -159,9 +156,7 @@ u32 DWCi_npStart(u32 arg);
  * GUESS on the name. */
 void DWCi_Auth_RequestCallback(s32 result, NHTTPResponse* response, s32 size);
 
-/* The `.data` run 0x8062FF90..0x806302C8, defined by the unit in address order. */
-extern char DWCi_reportFriendCodeFormat[];
-extern char DWCi_reportFriendCodeFailedFormat[];
+/* The `.data` run 0x80630020..0x806302C8, defined by the unit in address order. */
 extern char DWCi_authDataPath[];
 extern char DWCi_acUrlTest[];
 extern char DWCi_acUrlProd[];

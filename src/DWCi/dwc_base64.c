@@ -19,7 +19,7 @@
  */
 
 #include "DWCi/dwc_base64.h"
-#include "DWCi/dwc_auth_interface.h"     /* DWCi_Np_CPUCopyFast */
+#include "DWCi/dwc_nonport.h"            /* DWCi_Np_CPUCopyFast */
 #include "Runtime.PPCEABI.H/memset.h"    /* memset */
 
 static char DWCi_base64Alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-";

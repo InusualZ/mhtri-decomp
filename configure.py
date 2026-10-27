@@ -1194,13 +1194,14 @@ config.libs = [
         "cflags": cflags_dwc,
         "host": False,
         "objects": [
-            # The DWC auth interface (.text 0x80507C40..0x8050A710, 16 functions); its seam evidence is
-            # the RANGE line of src/DWCi/dwc_auth_interface.c.
+            # The DWC platform layer (.text 0x80507C40..0x80508750) and the auth interface (..0x8050A710);
+            # their seam evidence is the RANGE line of src/DWCi/dwc_nonport.c.
             # dwc_error / dwc_auth_interface / dwc_nasfunc: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
             Object(Matching, "DWCi/dwc_base64.c", cflags=cflags_base),  # src/DWCi/dwc_base64.c header
             Object(Matching, "DWCi/dwc_error.cpp", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_init.cpp", cflags=cflags_base),
             Object(Matching, "DWCi/dwc_report.cpp", cflags=cflags_base),
+            Object(NonMatching, "DWCi/dwc_nonport.c", cflags=cflags_base),  # src/DWCi/dwc_nonport.c header
             Object(NonMatching, "DWCi/dwc_auth_interface.c", cflags=cflags_base),
             Object(Matching, "DWCi/dwc_nasfunc.c", cflags=cflags_base),
             Object(Matching, "DWCi/dwc_svl.c", cflags=cflags_base),  # src/DWCi/dwc_svl.c header

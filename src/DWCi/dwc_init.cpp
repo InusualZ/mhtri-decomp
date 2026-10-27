@@ -20,6 +20,7 @@
  */
 #include "DWCi/dwc_init.h"
 #include "DWCi/dwc_report.h"
+#include "DWCi/dwc_nonport.h"           /* DWCi_Np_CPUCopyFast, DWCi_GetConsoleFriendCode */
 #include "DWCi/dwc_nasfunc.h"
 #include "DWCi/natneg.h"
 #include "DWCi/gt2Utility.h"

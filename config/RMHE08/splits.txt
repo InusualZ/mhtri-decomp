@@ -3808,12 +3808,17 @@ DWCi/dwc_report.cpp:
 	.data       start:0x8062FE10 end:0x8062FF90
 	.sbss       start:0x807957C8 end:0x807957D0
 
+DWCi/dwc_nonport.c:
+	.text       start:0x80507C40 end:0x80508750 align:16
+	.data       start:0x8062FF90 end:0x80630020
+	.sbss       start:0x807957D0 end:0x807957E0
+
 DWCi/dwc_auth_interface.c:
-	.text       start:0x80507C40 end:0x8050A710 align:16
-	.data       start:0x8062FF90 end:0x806307F0
+	.text       start:0x80508750 end:0x8050A710 align:16
+	.data       start:0x80630020 end:0x806307F0
 	.bss        start:0x80760F00 end:0x807613B8
 	.sdata      start:0x80794200 end:0x80794330
-	.sbss       start:0x807957D0 end:0x807957F8
+	.sbss       start:0x807957E0 end:0x807957F8
 
 DWCi/dwc_nasfunc.c:
 	.text       start:0x8050A710 end:0x8050A990 align:16
