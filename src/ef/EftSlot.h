@@ -5,8 +5,9 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "mh3_pad/vec3.h" /* VEC3_ctor (rule 2: the owner's header) */
 
-/* The 0x3C-byte slot pool `lbl_806BF0A0` (10 entries) the family's spawn/reset pair walks: `key_0x00`
+/* The 0x3C-byte slot pool `eft_slot_pool` (10 entries) the family's spawn/reset pair walks: `key_0x00`
  * is the definition-table index (`eft_def_get`..`eft_def_handler`), `field_0x14` is stamped 255 by the
  * pool reset, and the +0x18 block holds the slot's per-instance state. size: 0x3C */
 struct EftSlot {
@@ -16,7 +17,7 @@ struct EftSlot {
     /* +0x03 */ s8 work_0x03;   /* the move-work index, -1 = none */
     /* +0x04 */ u8 field_0x04;
     /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u16 field_0x06;
+    /* +0x06 */ s16 field_0x06;  /* the frames an unarmed slot has waited for the ready count (`eft_slot_work_update`) */
     /* +0x08 */ u8 field_0x08;  /* the state byte `eft_slot_state_set` writes */
     /* +0x09 */ u8 field_0x09;  /* the pending state `eft_slot_state_request` records when the slot is idle */
     /* +0x0A */ u8 field_0x0A;
@@ -54,6 +55,11 @@ struct EftSlot {
     /* +0x39 */ u8 field_0x39;
     /* +0x3A */ u8 field_0x3A;
     /* +0x3B */ u8 field_0x3B;
+
+#ifdef __cplusplus
+    /* Constructs the position vector; `ef/eft_slot.cpp`'s `__sinit` runs it over the pool (`__construct_array`). */
+    EftSlot() { VEC3_ctor(&pos_0x24); }
+#endif
 };
 
 #endif /* MHTRI_EF_EFTSLOT_H */
