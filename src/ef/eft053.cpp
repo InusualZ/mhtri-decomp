@@ -23,27 +23,30 @@
  *   Data GUESSes from their readers: `eft053_models_map<M>_area<A>` (the model list `eft053_model_list_get` picks for
  *   map M, area A), `eft053_model_lists`, `eft053_lever_offset` (the lever head offset), `eft053_place_table` (the rank
  *   gimmicks' stations).
- * RESIDUALS. Every row is written; 11 of 18 match.  The open rows:
- *  - `eft053_slot_move_step`: in states 1 and 4 retail keeps `0.5f` and the conversion constant in `f2`/`f3` across
- *    the position store where ours reloads them, and converts the counter before dividing the distance by the step;
- *  - `eft053_slot_lever_step`, `eft053_slot_gimmick_step`, `eft053_init`: register colouring; part of it is
- *    `ef/get_move_work_adrs.h` declaring `get_move_work_max` as returning `u32` where its owner returns `u16` (with a
- *    `u16` view the three rows measure 96.71 / 97.82 / 99.57 instead of 96.28 / 96.57 / 99.01; request filed);
- *  - `eft053_shell_pos_project`: frame 0x70 against retail's 0x80 (retail gives each arm of the angle test its own
- *    conversion temporaries) and `mr r3,r31` scheduled before the first float argument;
- *  - `eft053_slot_swing_step`: retail evaluates `eft028_set_scaled`'s `variant` before its `scale` (the
- *    `lobby/lb_quest_ui.cpp` call sites show the same), which the owner header's parameter order (scale, variant)
- *    does not reproduce; one `fmuls` operand order in state 2;
- *  - `eft053_get_shell_data`: the `vec3_scale_in_place` pointer argument is copied before the scale, retail after.
+ * RESIDUALS. Every row is written; 13 of 18 match.  The open rows, all register colouring or scheduling:
+ *  - `eft053_slot_swing_step`: at its three `eft028_set_scaled` calls retail loads `variant` (`lbz r6`) before the
+ *    `scale` literal (`lfs f1`), ours after; a `(u8)` cast, a double or an int literal changes nothing;
+ *  - `eft053_slot_gimmick_step`: `work` is r27 and `enemy` shares r28 with `p` in retail, ours r28 and r30/r27
+ *    (declaration orders and moving `work`'s declaration do not reach it);
+ *  - `eft053_get_shell_data`: the `vec3_scale_in_place` pointer argument is copied before the scale, retail after
+ *    (`ang /= 4.0f` first moves the copy but adds an `fmr`);
+ *  - `eft053_init`: `stg_place_timers`'s base and the loop counter `i` swap r23/r20 (splitting `gate`'s
+ *    initialiser or reordering it is neutral, indexing the global directly loses 2 points);
+ *  - `eft053_slot_lever_step`: `moved` and `tilt` swap r30/r29.
  *   Data: `.data` is emitted and matches (the 7 model lists, their pointer table, the two `Vec` tables, the six jump
  *   tables in retail order; the claim's last 4 bytes are dtk's trailing gap); `.rodata` is the shot angle initialiser
- *   (12 of 16 B, retail pads the section); the `.sdata2` pool is declared `extern` (`lbl_8079B740`..), not emitted, so
- *   the object carries its own 0x30-byte pool and is short of the claim there; extab/extabindex follow the function
- *   sizes.  Not flippable until the open rows and the pool close.
- * SHAPES. `eft053_shell_pos_project` keeps both arms of the angle test: with one shared arm MWCC if-converts them.
+ *   (12 of 16 B, retail pads the section); `.sdata2` is emitted from the literals and is byte-identical to the
+ *   claim (224 B, both int-conversion doubles included); extab/extabindex are byte-identical.
+ * SHAPES. The angle conversion is one expression, `0.5f + 65536.0f * (0.01f * (45.0f * a)) / 360.0f`: its literal
+ *   order is the pool's order, and `eft053_shell_pos_project` keeps both arms of the angle test (with one shared arm
+ *   MWCC if-converts them).  Retail's `x * 0.5f`/`x * 0.25f` with the variable first is `x / 2.0f`/`x / 4.0f` (a
+ *   literal on the right of `*` is commuted to the left).  `get_move_work_max`'s count is held in a `u32` and
+ *   narrowed at each compare (`(u16)max`), as `ef/eft_slot.cpp` does.  `eft053_slot_move_step` stores the XZ distance
+ *   in a local before dividing and pre-decrements its counters in the compare.
  *   `eft053_slot_swing_step`'s state 4 falls into state 5 and `eft053_slot_rot_step`'s state 5 into state 6 once their
  *   waits end (retail has no branch between); the slot programs reload `work->models[index]` at every use (a local
- *   copy costs 6-8 points); `eft053_slot_gimmick_step` declares its shot angles after the matrix constructor call.
+ *   copy costs 6-8 points), except `eft053_slot_gimmick_step`'s sinking arm, which takes the slot once per arm;
+ *   `eft053_slot_gimmick_step` declares its shot angles after the matrix constructor call.
  */
 #include "types.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -104,62 +107,6 @@
  *   0x8079B7F0 500.0f     0x8079B7F4 20.0f      0x8079B7F8 176.0f     0x8079B7FC 0.0f
  *   0x8079B800 -0.1f      0x8079B804 0.1f       0x8079B808 270400.0f  0x8079B80C -30.0f
  *   0x8079B810 80.0f      0x8079B814 -60.0f     0x8079B818 -1500.0f   0x8079B81C -400.0f */
-extern "C" f32 lbl_8079B740; /* 0.0f */
-extern "C" f32 lbl_8079B744; /* 0.5f */
-extern "C" f32 lbl_8079B748; /* 65536.0f */
-extern "C" f32 lbl_8079B74C; /* 0.01f */
-extern "C" f32 lbl_8079B750; /* 45.0f */
-extern "C" f32 lbl_8079B754; /* 360.0f */
-extern "C" f32 lbl_8079B758; /* 35.0f */
-extern "C" f32 lbl_8079B75C; /* 50.0f */
-extern "C" f32 lbl_8079B760; /* 75.0f */
-extern "C" f32 lbl_8079B764; /* 3000.0f */
-extern "C" f32 lbl_8079B768; /* 130.0f */
-extern "C" f32 lbl_8079B76C; /* 2000.0f */
-extern "C" f32 lbl_8079B770; /* 176.0f */
-extern "C" f32 lbl_8079B774; /* -0.0f */
-extern "C" f32 lbl_8079B778; /* -2600.0f */
-extern "C" f32 lbl_8079B77C; /* -4800.0f */
-extern "C" f32 lbl_8079B780; /* -1600.0f */
-extern "C" f32 lbl_8079B784; /* 1000.0f */
-extern "C" f32 lbl_8079B788; /* 300.0f */
-extern "C" f32 lbl_8079B78C; /* 800.0f */
-extern "C" f32 lbl_8079B790; /* 1.0f */
-extern "C" f32 lbl_8079B794; /* -1400.0f */
-extern "C" f32 lbl_8079B798; /* -2675.0f */
-extern "C" f32 lbl_8079B79C; /* -2275.0f */
-extern "C" f32 lbl_8079B7A0; /* -1300.0f */
-extern "C" f32 lbl_8079B7A4; /* -1200.0f */
-extern "C" f32 lbl_8079B7A8; /* -200.0f */
-extern "C" f32 lbl_8079B7AC; /* 0.25f */
-extern "C" f32 lbl_8079B7B0; /* 5.0f */
-extern "C" f32 lbl_8079B7B4; /* -3200.0f */
-extern "C" f32 lbl_8079B7B8; /* 10.0f */
-extern "C" f32 lbl_8079B7BC; /* -980.0f */
-extern "C" f32 lbl_8079B7C0; /* -1240.0f */
-extern "C" f32 lbl_8079B7C4; /* -50.0f */
-extern "C" f32 lbl_8079B7C8; /* 150.0f */
-extern "C" f32 lbl_8079B7CC; /* -500.0f */
-extern "C" f32 lbl_8079B7D0; /* 60.0f */
-extern "C" f32 lbl_8079B7D4; /* 0.001f */
-extern "C" f32 lbl_8079B7D8; /* 40000.0f */
-extern "C" f32 lbl_8079B7DC; /* 850.0f */
-extern "C" f32 lbl_8079B7E0; /* 1250.0f */
-extern "C" f32 lbl_8079B7E4; /* 9973.0f */
-extern "C" f32 lbl_8079B7E8; /* 1320.0f */
-extern "C" f32 lbl_8079B7EC; /* 0.9f */
-extern "C" f32 lbl_8079B7F0; /* 500.0f */
-extern "C" f32 lbl_8079B7F4; /* 20.0f */
-extern "C" f32 lbl_8079B7F8; /* 176.0f */
-extern "C" f32 lbl_8079B7FC; /* 0.0f */
-extern "C" f32 lbl_8079B800; /* -0.1f */
-extern "C" f32 lbl_8079B804; /* 0.1f */
-extern "C" f32 lbl_8079B808; /* 270400.0f */
-extern "C" f32 lbl_8079B80C; /* -30.0f */
-extern "C" f32 lbl_8079B810; /* 80.0f */
-extern "C" f32 lbl_8079B814; /* -60.0f */
-extern "C" f32 lbl_8079B818; /* -1500.0f */
-extern "C" f32 lbl_8079B81C; /* -400.0f */
 
 /* The `eft053` family's per-slot work record, the object `_EFT::work_0x38` points at.  It is three
  * parallel arrays behind one header: the pooled model handles at +0x04 (stride 4), the per-slot frame
@@ -332,44 +279,37 @@ extern "C" void eft053_shell_pos_project(_PLW* plw, VEC3* out)
     MTX34 mtx;
     _CP_VECTOR rot;
     f32 scale;
-    f32 t;
+    f32 zero;
     s32 a;
     s16 v;
 
     MTX34_ctor(&mtx);
-    setVector3(out, lbl_8079B740, lbl_8079B740, lbl_8079B740);
+    zero = 0.0f;
+    setVector3(out, zero, zero, zero);
     eft_rot_vec_copy(&rot, (_CP_VECTOR*)&plw->param_0x54); /* +0x54 is the actor's 3-word rotation */
     a = (s8)plw->shell_ang_0x583;
     if (a >= 0) {
-        t = lbl_8079B750 * (f32)a;
-        t = t * lbl_8079B74C;
-        t = t * lbl_8079B748;
-        t = t / lbl_8079B754;
-        v = (s16) -(u16)(s32)(lbl_8079B744 + t);
+        v = (s16) -(u16)(s32)(0.5f + 65536.0f * (0.01f * (45.0f * (f32)a)) / 360.0f);
     } else {
-        t = lbl_8079B758 * (f32)a;
-        t = t * lbl_8079B74C;
-        t = t * lbl_8079B748;
-        t = t / lbl_8079B754;
-        v = (s16) -(u16)(s32)(lbl_8079B744 + t);
+        v = (s16) -(u16)(s32)(0.5f + 65536.0f * (0.01f * (35.0f * (f32)a)) / 360.0f);
     }
     rot.x = v;
     cpSetRotMatrixZXY(&rot, &mtx);
     if (plw->kind_0x09 == 3) {
-        out->y = lbl_8079B75C;
-        out->z = lbl_8079B760;
-        scale = lbl_8079B764;
+        out->y = 50.0f;
+        out->z = 75.0f;
+        scale = 3000.0f;
     } else {
-        out->y = lbl_8079B768;
-        out->z = lbl_8079B760;
-        scale = lbl_8079B76C;
+        out->y = 130.0f;
+        out->z = 75.0f;
+        scale = 2000.0f;
     }
     rotVecY(out, plw->field_0x058);
     addVec3To(out, &plw->vec_0x03C);
     mtx.m[0][3] = out->x;
     mtx.m[1][3] = out->y;
     mtx.m[2][3] = out->z;
-    setVector3(out, lbl_8079B740, lbl_8079B740, scale);
+    setVector3(out, 0.0f, 0.0f, scale);
     mulVecMatAddTrans(out, &mtx);
 }
 
@@ -467,18 +407,18 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
 
     kind = 0;
     count = 0;
-    ang = lbl_8079B740;
+    ang = 0.0f;
     scale_off = ang;
     off_a = ang;
-    c28 = lbl_8079B778;
-    c27 = lbl_8079B77C;
-    c26 = lbl_8079B780;
-    c25 = lbl_8079B784;
-    c24 = lbl_8079B788;
-    c23 = lbl_8079B78C;
+    c28 = -2600.0f;
+    c27 = -4800.0f;
+    c26 = -1600.0f;
+    c25 = 1000.0f;
+    c24 = 300.0f;
+    c23 = 800.0f;
     setVector3(a, ang, ang, ang);
-    setVector3(b, lbl_8079B740, lbl_8079B740, lbl_8079B740);
-    setVector3(c, lbl_8079B740, lbl_8079B740, lbl_8079B790);
+    setVector3(b, 0.0f, 0.0f, 0.0f);
+    setVector3(c, 0.0f, 0.0f, 1.0f);
     if (eft053_model_list_get(&kind, &count) == 0) {
         return 0;
     }
@@ -495,7 +435,7 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
                 switch (list[i].field_0x02) {
                 case 1:
                     found = 1;
-                    ang = lbl_8079B794;
+                    ang = -1400.0f;
                     break;
                 case 6:
                     vec_to_mh_vec3(a, &list[i].pos_0x04);
@@ -506,7 +446,7 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
                 switch (list[i].field_0x02) {
                 case 1:
                     found = 1;
-                    ang = lbl_8079B794;
+                    ang = -1400.0f;
                     break;
                 case 6:
                     vec_to_mh_vec3(a, &list[i].pos_0x04);
@@ -524,15 +464,15 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
                 switch (list[i].field_0x02) {
                 case 1:
                     found = 1;
-                    ang = lbl_8079B798;
+                    ang = -2675.0f;
                     break;
                 case 2:
                     found = 1;
-                    ang = lbl_8079B79C;
+                    ang = -2275.0f;
                     break;
                 case 3:
                     found = 1;
-                    ang = lbl_8079B798;
+                    ang = -2675.0f;
                     break;
                 }
             }
@@ -545,19 +485,19 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
                 switch (list[i].field_0x02) {
                 case 1:
                     found = 1;
-                    ang = lbl_8079B7A0;
+                    ang = -1300.0f;
                     break;
                 case 2:
                     found = 1;
-                    ang = lbl_8079B7A4;
+                    ang = -1200.0f;
                     break;
                 case 3:
                     found = 1;
-                    ang = lbl_8079B794;
+                    ang = -1400.0f;
                     break;
                 case 4:
                     found = 1;
-                    ang = lbl_8079B7A4;
+                    ang = -1200.0f;
                     break;
                 }
             }
@@ -569,19 +509,19 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
                 switch (list[i].field_0x02) {
                 case 1:
                     found = 1;
-                    ang = lbl_8079B7A0;
+                    ang = -1300.0f;
                     break;
                 case 2:
                     found = 1;
-                    ang = lbl_8079B7A4;
+                    ang = -1200.0f;
                     break;
                 case 3:
                     found = 1;
-                    ang = lbl_8079B794;
+                    ang = -1400.0f;
                     break;
                 case 4:
                     found = 1;
-                    ang = lbl_8079B7A4;
+                    ang = -1200.0f;
                     break;
                 }
             }
@@ -595,26 +535,26 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
                 switch (list[i].field_0x02) {
                 case 1:
                     found = 1;
-                    ang = lbl_8079B7A0;
+                    ang = -1300.0f;
                     break;
                 case 2:
                     found = 1;
-                    ang = lbl_8079B7A4;
+                    ang = -1200.0f;
                     break;
                 case 3:
                     found = 1;
-                    ang = lbl_8079B794;
+                    ang = -1400.0f;
                     break;
                 case 4:
                     found = 1;
-                    ang = lbl_8079B7A4;
+                    ang = -1200.0f;
                     break;
                 }
             }
             break;
         }
         if (found == 1 && index == list[i].field_0x02) {
-            ang += lbl_8079B7A8;
+            ang += -200.0f;
             rotVecZ(c, list[i].rot_z);
             rotVecX(c, list[i].rot_x);
             rotVecY(c, list[i].rot_y);
@@ -625,7 +565,7 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
             vec3_scale(&tmp_b, c, off_a);
             addVec3(&tmp_c, b, &tmp_b);
             copyVec3(a, &tmp_c);
-            vec3_scale_in_place(c, ang * lbl_8079B7AC);
+            vec3_scale_in_place(c, ang / 4.0f);
             return 1;
         }
     }
@@ -728,9 +668,9 @@ extern "C" void eft053_init(_EFT* self)
     u16 id;
     s32 i;
     s32 j;
-    s32 found;
     _ENEMY_WORK* enemy;
-    u16 max;
+    s32 found;
+    u32 max;
 
     VEC3_ctor(&offset);
     self->state_0x05++;
@@ -874,8 +814,8 @@ extern "C" void eft053_init(_EFT* self)
         found = 0;
         enemy = (_ENEMY_WORK*)get_move_work_adrs(3);
         max = get_move_work_max(3);
-        for (i = 0; i < max; i++, enemy++) {
-            if (enemy->team == 25 && enemy->area_no == self->area_0x44 && em_work_die_ck(enemy) != 1) {
+        for (i = 0; i < (u16)max; i++, enemy++) {
+            if (enemy->team == 25 && enemy->area_no == self->area_0x44 && em_work_die_ck(enemy) != 1U) {
                 found = 1;
                 break;
             }
@@ -961,31 +901,31 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
     PlSlotGate* gate;
 
     speed = 0;
-    setVec3(&dir, lbl_8079B740, lbl_8079B740, lbl_8079B790);
-    dist = lbl_8079B740;
+    setVec3(&dir, 0.0f, 0.0f, 1.0f);
+    dist = 0.0f;
     work = (Eft053Work*)self->work_0x38;
     setVec3(&jitter, dist, dist, dist);
     gate = stg_place_timers;
-    setVec3(&se_pos, lbl_8079B740, lbl_8079B740, lbl_8079B740);
+    setVec3(&se_pos, 0.0f, 0.0f, 0.0f);
     switch (work->kind_0x24) {
     default:
         kind = 0;
-        reach = lbl_8079B794;
+        reach = -1400.0f;
         speed = 0x2000;
         break;
     case 2:
         switch (work->sub_0x25[index]) {
         case 1:
             kind = 1;
-            reach = lbl_8079B798;
+            reach = -2675.0f;
             break;
         case 2:
             kind = 2;
-            reach = lbl_8079B79C;
+            reach = -2275.0f;
             break;
         default:
             kind = 3;
-            reach = lbl_8079B798;
+            reach = -2675.0f;
             break;
         }
         break;
@@ -996,22 +936,22 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         switch (work->sub_0x25[index]) {
         case 1:
             kind = 4;
-            reach = lbl_8079B7A0;
+            reach = -1300.0f;
             speed = 0x1500;
             break;
         case 2:
             kind = 5;
-            reach = lbl_8079B7A4;
+            reach = -1200.0f;
             speed = 0x1000;
             break;
         case 3:
             kind = 6;
-            reach = lbl_8079B794;
+            reach = -1400.0f;
             speed = 0x1A00;
             break;
         default:
             kind = 7;
-            reach = lbl_8079B7A4;
+            reach = -1200.0f;
             speed = 0x2000;
             break;
         }
@@ -1053,15 +993,15 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
     case 1:
         if (work->counters[index] >= 15 && kind == 0) {
             if (work->counters[index] == 15 && self->area_0x44 == get_now_areano()) {
-                setVector3(&se_pos, lbl_8079B740, lbl_8079B740, reach);
+                setVector3(&se_pos, 0.0f, 0.0f, reach);
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
                 addVec3To(&se_pos, &work->models[index]->pos_0x04);
                 map_se_req(14, &se_pos);
             }
             jitter.y = (f32)(ran_suu(1) % 16 - 8);
             work->models[index]->field_0x30 -=
-                (u16)(s32)(lbl_8079B744 +
-                           lbl_8079B748 * (lbl_8079B7B0 + (f32)(work->counters[index] - 15)) / lbl_8079B754);
+                (u16)(s32)(0.5f +
+                           65536.0f * (5.0f + (f32)(work->counters[index] - 15)) / 360.0f);
         }
         if (work->counters[index] >= 45) {
             work->states[index] += 1;
@@ -1069,24 +1009,24 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
             if (work->kind_0x24 == 2) {
                 eft026_ramp_place_set(7, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28,
                                       self->area_0x44, reach);
-                copyVec3(&se_pos, setVec3(&tmp_a, lbl_8079B740, lbl_8079B740, lbl_8079B7B4));
+                copyVec3(&se_pos, setVec3(&tmp_a, 0.0f, 0.0f, -3200.0f));
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
                 addVec3To(&se_pos, &work->models[index]->pos_0x04);
                 eft_rot_vec_copy(&rot, &work->models[index]->rot_0x28);
                 rot.y += 0x8000;
-                eft028_set_scaled(8, &se_pos, &rot, lbl_8079B7B8, self->area_0x44, 0);
+                eft028_set_scaled(8, &se_pos, &rot, 10.0f, self->area_0x44, 0);
             } else if (work->kind_0x24 == 5 || work->kind_0x24 == 6) {
                 eft026_ramp_place_set(10, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28,
                                       self->area_0x44, reach);
-                copyVec3(&se_pos, setVec3(&tmp_b, lbl_8079B740, lbl_8079B740, lbl_8079B7BC));
+                copyVec3(&se_pos, setVec3(&tmp_b, 0.0f, 0.0f, -980.0f));
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
                 addVec3To(&se_pos, &work->models[index]->pos_0x04);
                 eft_rot_vec_copy(&rot, &work->models[index]->rot_0x28);
                 rot.y += 0x8000;
-                eft028_set_scaled(13, &se_pos, &rot, lbl_8079B7B0, self->area_0x44, 0);
+                eft028_set_scaled(13, &se_pos, &rot, 5.0f, self->area_0x44, 0);
             }
             if (self->area_0x44 == get_now_areano()) {
-                setVector3(&se_pos, lbl_8079B740, lbl_8079B740, reach * lbl_8079B744);
+                setVector3(&se_pos, 0.0f, 0.0f, reach / 2.0f);
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
                 addVec3To(&se_pos, &work->models[index]->pos_0x04);
                 map_se_req(2, &se_pos);
@@ -1099,16 +1039,16 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         } else if (kind >= 4 && kind <= 7) {
             work->models[index]->field_0x30 += speed;
         }
-        dist = (lbl_8079B7A8 + reach) * ((f32)work->counters[index] * lbl_8079B7AC);
+        dist = (-200.0f + reach) * ((f32)work->counters[index] / 4.0f);
         if (work->counters[index] == 1 && (work->kind_0x24 == 5 || work->kind_0x24 == 6)) {
             eft026_ramp_place_set(10, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28,
                                   self->area_0x44, reach);
-            copyVec3(&se_pos, setVec3(&tmp_c, lbl_8079B740, lbl_8079B740, lbl_8079B7C0));
+            copyVec3(&se_pos, setVec3(&tmp_c, 0.0f, 0.0f, -1240.0f));
             rotVecY(&se_pos, work->models[index]->field_0x2C);
             addVec3To(&se_pos, &work->models[index]->pos_0x04);
             eft_rot_vec_copy(&rot, &work->models[index]->rot_0x28);
             rot.y += 0x8000;
-            eft028_set_scaled(13, &se_pos, &rot, lbl_8079B7B0, self->area_0x44, 0);
+            eft028_set_scaled(13, &se_pos, &rot, 5.0f, self->area_0x44, 0);
         }
         if (work->counters[index] >= 4) {
             work->states[index] += 1;
@@ -1125,7 +1065,7 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
             }
         }
         if (work->counters[index] < 4) {
-            dist = (lbl_8079B7A8 + reach) - lbl_8079B7C4 * (f32)work->counters[index];
+            dist = (-200.0f + reach) - -50.0f * (f32)work->counters[index];
         } else {
             dist = reach;
         }
@@ -1177,7 +1117,7 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         work->states[index] += 1;
         work->counters[index] = 0;
         if (self->area_0x44 == get_now_areano()) {
-            setVector3(&se_pos, lbl_8079B740, lbl_8079B740, reach * lbl_8079B744);
+            setVector3(&se_pos, 0.0f, 0.0f, reach / 2.0f);
             rotVecY(&se_pos, work->models[index]->field_0x2C);
             addVec3To(&se_pos, &work->models[index]->pos_0x04);
             map_se_req(3, &se_pos);
@@ -1195,13 +1135,13 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
             } else {
                 work->models[index]->field_0x30 -= d;
             }
-            dist = reach - reach * ((f32)work->counters[index] / lbl_8079B7C8);
+            dist = reach - reach * ((f32)work->counters[index] / 150.0f);
             if (work->counters[index] >= 150) {
                 work->states[index] = 8;
                 work->counters[index] = gate[0].length_0x04;
             }
         } else {
-            dist = reach - (reach - lbl_8079B7CC) * ((f32)work->counters[index] / lbl_8079B7C8);
+            dist = reach - (reach - -500.0f) * ((f32)work->counters[index] / 150.0f);
             if (work->counters[index] >= 150) {
                 work->states[index] += 1;
                 work->counters[index] = 0;
@@ -1209,14 +1149,14 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         }
         break;
     case 6:
-        dist = lbl_8079B7CC;
+        dist = -500.0f;
         if (work->counters[index] >= 10) {
             work->states[index] += 1;
             work->counters[index] = 0;
         }
         break;
     case 7:
-        dist = lbl_8079B7CC - lbl_8079B7CC * ((f32)work->counters[index] / lbl_8079B7D0);
+        dist = -500.0f - -500.0f * ((f32)work->counters[index] / 60.0f);
         jitter.y = (f32)(ran_suu(1) % 16 - 8);
         if (work->counters[index] >= 60) {
             work->states[index] = 8;
@@ -1262,10 +1202,10 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         break;
     }
     rotVecZXY(&dir, &work->models[index]->rot_0x28);
-    if (vec3_length_sq(&dir.x) > lbl_8079B7D4) {
+    if (vec3_length_sq(&dir.x) > 0.001f) {
         vec3_normalize_into(&dir, &dir);
     } else {
-        setVector3(&dir, lbl_8079B740, lbl_8079B740, lbl_8079B790);
+        setVector3(&dir, 0.0f, 0.0f, 1.0f);
     }
     vec_to_mh_vec3(&work->models[index]->pos_0x04, &eft053_model_lists[work->kind_0x24][index].pos_0x04);
     vec3_scale(&step, &dir, dist);
@@ -1279,24 +1219,30 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
  * follows the player's facing and shell angle; untouched, it returns to its list placement. */
 extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
 {
-    Eft053Work* work = (Eft053Work*)self->work_0x38;
+    Eft053Work* work;
     VEC3 pos;
-    VEC3_ctor(&pos);
-    u32 moved = 0;
-    s32 master = 0;
-    s32 tilt = 0;
-    _PLW* plw = (_PLW*)get_move_work_adrs(2);
-    u16 max = get_move_work_max(2);
+    s32 tilt;
+    _PLW* plw;
+    u32 max;
     u8 kind;
     s32 count;
     u8 on[4];
     s32 i;
+    s32 master;
+    u32 moved;
     EftModelRec* recs;
 
-    for (i = 0; i < max; i++, plw++) {
+    work = (Eft053Work*)self->work_0x38;
+    VEC3_ctor(&pos);
+    moved = 0;
+    master = 0;
+    tilt = 0;
+    plw = (_PLW*)get_move_work_adrs(2);
+    max = get_move_work_max(2);
+    for (i = 0; i < (u16)max; i++, plw++) {
         on[i] = 0;
         if (plw->slot_active != 0 && plw->field_0x001 != 0 && plw->area_0x16 == self->area_0x44 &&
-            Pl_bari_ck(plw, 2) == 1 && (u8)plw->field_0x0B6 == work->field_0x35[index]) {
+            Pl_bari_ck(plw, 2) == 1 && (s32)(u8)plw->field_0x0B6 == (s32)work->field_0x35[index]) {
             on[i] = 1;
             if (Pl_master_ck(plw) != 0) {
                 master = 1;
@@ -1304,7 +1250,8 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
         }
     }
     if (master != 0) {
-        plw = (_PLW*)get_move_work_adrs(2) + (s8)my_player_no();
+        plw = (_PLW*)get_move_work_adrs(2);
+        plw += (s8)my_player_no();
         pos.x = work->models[index]->pos_0x04.x;
         pos.y = plw->motion_pos_0x40;
         pos.z = work->models[index]->pos_0x04.z;
@@ -1325,7 +1272,7 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
         }
     } else {
         plw = (_PLW*)get_move_work_adrs(2);
-        for (i = 0; i < max; i++, plw++) {
+        for (i = 0; i < (u16)max; i++, plw++) {
             if (plw->slot_active == 0 || plw->field_0x001 == 0 || plw->area_0x16 != self->area_0x44 ||
                 Pl_master_ck(plw) != 0 || on[i] == 0) {
                 continue;
@@ -1333,7 +1280,7 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
             pos.x = work->models[index]->pos_0x04.x;
             pos.y = plw->motion_pos_0x40;
             pos.z = work->models[index]->pos_0x04.z;
-            if (vec3_dist_sq(&plw->vec_0x03C, &pos) > 40000.0f) {
+            if (!(vec3_dist_sq(&plw->vec_0x03C, &pos) <= 40000.0f)) {
                 continue;
             }
             if ((u16)plw->field_0x058 != (u16)work->counters[index] && work->states[index] == 1 &&
@@ -1353,7 +1300,7 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
         }
     }
     if (moved == 1) {
-        if (eft053_model_list_get(&kind, &count) == 1) {
+        if ((u32)eft053_model_list_get(&kind, &count) == 1) {
             recs = eft053_model_lists[kind];
             for (i = 0; i < count; i++) {
                 if (recs[i].kind == work->rec_kind_0x2D[index] && recs[i].index == work->field_0x35[index]) {
@@ -1376,7 +1323,7 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
         work->models[index + 1]->field_0x2C = (u16)work->counters[index];
         return;
     }
-    if (eft053_model_list_get(&kind, &count) == 1) {
+    if ((u32)eft053_model_list_get(&kind, &count) == 1) {
         recs = eft053_model_lists[kind];
         for (i = 0; i < count; i++) {
             if (recs[i].kind == work->rec_kind_0x2D[index] && recs[i].index == work->field_0x35[index]) {
@@ -1410,10 +1357,10 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
     work->counters[index] += 1;
     switch (self->area_0x44) {
     case 1:
-        setVector3(&pos, lbl_8079B740, lbl_8079B7DC, lbl_8079B7E0);
+        setVector3(&pos, 0.0f, 850.0f, 1250.0f);
         break;
     case 2:
-        setVector3(&pos, lbl_8079B7E4, lbl_8079B78C, lbl_8079B7E8);
+        setVector3(&pos, 9973.0f, 800.0f, 1320.0f);
         break;
     default:
         work->states[index] = 6;
@@ -1437,7 +1384,7 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
         if (work->counters[index] >= 3) {
             work->states[index] += 1;
             work->counters[index] = 0;
-            eft019_set_core(&pos, self->area_0x44, 111, lbl_8079B7EC, lbl_8079B7EC);
+            eft019_set_core(&pos, self->area_0x44, 111, 0.9f, 0.9f);
             draw_shape_arm_pos(&pos, 10, self->area_0x44);
             if (get_now_areano() == self->area_0x44) {
                 map_se_req(9, &pos);
@@ -1460,7 +1407,7 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
             work->counters[index] = 0;
         }
         if (work->counters[index] == 4) {
-            eft019_set_core(&pos, self->area_0x44, 111, lbl_8079B7EC, lbl_8079B7EC);
+            eft019_set_core(&pos, self->area_0x44, 111, 0.9f, 0.9f);
         }
         break;
     case 4:
@@ -1501,6 +1448,7 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
     s32 ret;
     s32 seed;
     s32 start;
+    f32 dist;
 
     work = (Eft053Work*)self->work_0x38;
     ret = 0;
@@ -1508,67 +1456,65 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
     VEC3_ctor(&pos);
     if (randomize != 0) {
         seed = ran_suu(1) % 5;
-        start = ran_suu(1) % (s32)(lbl_8079B7F0 / step);
+        start = ran_suu(1) % (s32)(500.0f / step);
     } else {
         seed = 0;
-        start = (s32)(lbl_8079B7F0 / step);
+        start = (s32)(500.0f / step);
     }
     switch (work->states[index]) {
     case 0:
         work->states[index] += 1;
-        work->field_0x6E[work->field_0x35[index]] = lbl_8079B7F4 + (f32)seed;
+        work->field_0x6E[work->field_0x35[index]] = 20.0f + (f32)seed;
         break;
     case 1:
         work->counters[index] += 1;
-        work->models[index]->pos_0x04.z -= lbl_8079B744 * (f32)work->counters[index];
-        if (lbl_8079B744 * (f32)work->counters[index] >= step) {
+        work->models[index]->pos_0x04.z -= 0.5f * (f32)work->counters[index];
+        if (0.5f * (f32)work->counters[index] >= step) {
             work->states[index] += 1;
             work->counters[index] = start;
             vec_to_mh_vec3(&pos, &eft053_place_table[table_off + work->field_0x35[index]]);
-            work->counters[index] =
-                (s32)((f32)work->counters[index] + calcVecDistXZ(&work->models[index]->pos_0x04, &pos) / step);
+            dist = calcVecDistXZ(&work->models[index]->pos_0x04, &pos);
+            work->counters[index] = (s32)((f32)work->counters[index] + dist / step);
         }
         break;
     case 2:
         work->models[index]->pos_0x04.z -= step;
-        work->counters[index] -= 1;
-        if (work->counters[index] <= 0) {
+        if (--work->counters[index] <= 0) {
             work->states[index] += 1;
             work->counters[index] = 0;
         }
         break;
     case 3:
         work->counters[index] += 1;
-        work->models[index]->pos_0x04.z -= step - lbl_8079B744 * (f32)work->counters[index];
-        if (step - lbl_8079B744 * (f32)work->counters[index] <= lbl_8079B740) {
+        work->models[index]->pos_0x04.z -= step - 0.5f * (f32)work->counters[index];
+        if (step - 0.5f * (f32)work->counters[index] <= 0.0f) {
             work->states[index] += 1;
             work->counters[index] = 0;
-            work->field_0x6E[work->field_0x35[index]] = lbl_8079B7F4 + (f32)seed;
+            work->field_0x6E[work->field_0x35[index]] = 20.0f + (f32)seed;
         }
         break;
     case 4:
         work->counters[index] += 1;
-        work->models[index]->pos_0x04.z += lbl_8079B744 * (f32)work->counters[index];
-        if (lbl_8079B744 * (f32)work->counters[index] >= step) {
+        work->models[index]->pos_0x04.z += 0.5f * (f32)work->counters[index];
+        if (0.5f * (f32)work->counters[index] >= step) {
             work->states[index] += 1;
             work->counters[index] = start;
             vec_to_mh_vec3(&pos, &eft053_place_table[table_off + work->field_0x35[index]]);
-            work->counters[index] =
-                (s32)((f32)work->counters[index] + calcVecDistXZ(&work->models[index]->pos_0x04, &pos) / step);
+            dist = calcVecDistXZ(&work->models[index]->pos_0x04, &pos);
+            work->counters[index] = (s32)((f32)work->counters[index] + dist / step);
         }
         break;
     case 5:
         work->models[index]->pos_0x04.z += step;
-        work->counters[index] -= 1;
-        if (work->counters[index] <= 0) {
+        if (--work->counters[index] <= 0) {
             work->states[index] += 1;
             work->counters[index] = 0;
         }
         break;
     case 6:
         work->counters[index] += 1;
-        work->models[index]->pos_0x04.z += step - lbl_8079B744 * (f32)work->counters[index];
-        if (step - lbl_8079B744 * (f32)work->counters[index] <= lbl_8079B740) {
+        work->models[index]->pos_0x04.z += step - 0.5f * (f32)work->counters[index];
+        if (step - 0.5f * (f32)work->counters[index] <= 0.0f) {
             work->states[index] = 0;
             work->counters[index] = 0;
             ret = 1;
@@ -1600,15 +1546,15 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
         work->counters[index] += 1;
         vec_to_mh_vec3(&target, &eft053_place_table[(u8)table_off + work->field_0x35[index]]);
         ang = calcVecAng2(&work->models[index]->pos_0x04, &target);
-        setVector3(&dir, lbl_8079B740, lbl_8079B740, lbl_8079B790);
+        setVector3(&dir, 0.0f, 0.0f, 1.0f);
         rotVecY(&dir, ang);
-        vec3_scale(&step_a, &dir, lbl_8079B744 * (f32)work->counters[index]);
+        vec3_scale(&step_a, &dir, 0.5f * (f32)work->counters[index]);
         addVec3To(&work->models[index]->pos_0x04, &step_a);
-        if (lbl_8079B744 * (f32)work->counters[index] >= lbl_8079B7F4) {
+        if (0.5f * (f32)work->counters[index] >= 20.0f) {
             work->states[index] += 1;
             work->counters[index] = 0;
         }
-        if (dir.x < lbl_8079B800) {
+        if (dir.x < -0.1f) {
             if ((u32)work->models[index]->field_0x2C < 0x71C) {
                 work->field_0x6A[work->field_0x35[index]] += 9;
                 work->models[index]->field_0x2C =
@@ -1633,7 +1579,7 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
                 work->models[index]->field_0x30 =
                     (u16)(work->models[index]->field_0x30 + work->field_0x6E[work->field_0x35[index]]);
             }
-        } else if (dir.x > lbl_8079B804) {
+        } else if (dir.x > 0.1f) {
             if (work->models[index]->field_0x2C == 0 || (u32)work->models[index]->field_0x2C > 0xF8E4) {
                 work->field_0x6A[work->field_0x35[index]] += 9;
                 work->models[index]->field_0x2C =
@@ -1666,15 +1612,15 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
     case 1:
         vec_to_mh_vec3(&target, &eft053_place_table[(u8)table_off + work->field_0x35[index]]);
         ang = calcVecAng2(&work->models[index]->pos_0x04, &target);
-        setVector3(&dir, lbl_8079B740, lbl_8079B740, lbl_8079B790);
+        setVector3(&dir, 0.0f, 0.0f, 1.0f);
         rotVecY(&dir, ang);
-        vec3_scale(&step_b, &dir, lbl_8079B7F4);
+        vec3_scale(&step_b, &dir, 20.0f);
         addVec3To(&work->models[index]->pos_0x04, &step_b);
-        if (vec3_dist_sq(&work->models[index]->pos_0x04, &target) <= lbl_8079B808) {
+        if (vec3_dist_sq(&work->models[index]->pos_0x04, &target) <= 270400.0f) {
             work->states[index] += 1;
             work->counters[index] = 0;
         }
-        if (dir.x < lbl_8079B800) {
+        if (dir.x < -0.1f) {
             if ((u32)work->models[index]->field_0x2C < 0x71C) {
                 work->field_0x6A[work->field_0x35[index]] += 9;
                 work->models[index]->field_0x2C =
@@ -1699,7 +1645,7 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
                 work->models[index]->field_0x30 =
                     (u16)(work->models[index]->field_0x30 + work->field_0x6E[work->field_0x35[index]]);
             }
-        } else if (dir.x > lbl_8079B804) {
+        } else if (dir.x > 0.1f) {
             if (work->models[index]->field_0x2C == 0 || (u32)work->models[index]->field_0x2C > 0xF8E4) {
                 work->field_0x6A[work->field_0x35[index]] += 9;
                 work->models[index]->field_0x2C =
@@ -1733,17 +1679,17 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
         work->counters[index] += 1;
         vec_to_mh_vec3(&target, &eft053_place_table[(u8)table_off + work->field_0x35[index]]);
         ang = calcVecAng2(&work->models[index]->pos_0x04, &target);
-        setVector3(&dir, lbl_8079B740, lbl_8079B740, lbl_8079B790);
+        setVector3(&dir, 0.0f, 0.0f, 1.0f);
         rotVecY(&dir, ang);
-        vec3_scale(&step_c, &dir, lbl_8079B7F4 - lbl_8079B744 * (f32)work->counters[index]);
+        vec3_scale(&step_c, &dir, 20.0f - 0.5f * (f32)work->counters[index]);
         addVec3To(&work->models[index]->pos_0x04, &step_c);
-        if (lbl_8079B7F4 - lbl_8079B744 * (f32)work->counters[index] <= lbl_8079B740) {
+        if (20.0f - 0.5f * (f32)work->counters[index] <= 0.0f) {
             work->states[index] = 0;
             work->models[index]->field_0x30 = 0;
             work->counters[index] = 0;
             ret = 1;
         }
-        if (dir.x < lbl_8079B800) {
+        if (dir.x < -0.1f) {
             work->models[index]->field_0x2C = (u16)(work->models[index]->field_0x2C - 91);
             if ((u32)work->models[index]->field_0x2C > 0x8000) {
                 work->models[index]->field_0x2C = 0;
@@ -1752,7 +1698,7 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
             if ((u32)work->models[index]->field_0x30 > 0x8000) {
                 work->models[index]->field_0x30 = 0;
             }
-        } else if (dir.x > lbl_8079B804) {
+        } else if (dir.x > 0.1f) {
             work->models[index]->field_0x2C = (u16)(work->models[index]->field_0x2C + 91);
             if ((u32)work->models[index]->field_0x2C < 0x8000) {
                 work->models[index]->field_0x2C = 0;
@@ -1788,11 +1734,11 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
     VEC3 diff;
     _ENEMY_WORK* enemy;
     _ENEMY_WORK* target;
-    _PLW* plw;
     MHchar** model;
-    u16 max;
+    u32 max;
     s32 i;
     s32 p;
+    _PLW* plw;
     s32 e;
     u8 phase;
 
@@ -1803,12 +1749,12 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
     VEC3_ctor(&offset);
     enemy = (_ENEMY_WORK*)get_move_work_adrs(3);
     max = get_move_work_max(3);
-    for (i = 0; i < max; i++, enemy++) {
+    for (i = 0; i < (u16)max; i++, enemy++) {
         if (enemy->team == 25 && enemy->area_no == self->area_0x44 && em_work_die_ck(enemy) != 1U) {
             break;
         }
     }
-    if (i < 0 || i >= max) {
+    if (i < 0 || i >= (u16)max) {
         return;
     }
     if (self->area_0x44 == 1) {
@@ -1886,19 +1832,20 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
         eft053_slot_move_step(self, index, 8, 1);
         break;
     case 10:
-        model = &work->models[index];
         if (self->area_0x44 == 1) {
-            (*model)->pos_0x04.y += lbl_8079B80C;
-            (*model)->pos_0x04.z += lbl_8079B810;
+            model = &work->models[index];
+            (*model)->pos_0x04.y += -30.0f;
+            (*model)->pos_0x04.z += 80.0f;
             (*model)->field_0x28 += 364;
         } else {
-            (*model)->pos_0x04.y += lbl_8079B814;
+            model = &work->models[index];
+            (*model)->pos_0x04.y += -60.0f;
             (*model)->field_0x28 += 728;
         }
         if ((u32)(*model)->field_0x28 > 10923) {
             (*model)->field_0x28 = 10923;
         }
-        if ((*model)->pos_0x04.y < lbl_8079B818) {
+        if ((*model)->pos_0x04.y < -1500.0f) {
             work->field_0x68[work->field_0x35[index]] += 1;
             (*model)->field_0x34 = 0;
         }
@@ -1916,14 +1863,14 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
         break;
     }
     if (self->area_0x44 == 1 && work->models[index]->field_0x34 != 0 && system_w.field_0x0c % 10 == 0) {
-        eft028_set_scaled(10, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28, lbl_8079B790,
+        eft028_set_scaled(10, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28, 1.0f,
                           self->area_0x44, 0);
     }
     model = &work->models[index];
     if ((*model)->field_0x34 != 0) {
         plw = (_PLW*)get_move_work_adrs(2);
         max = get_move_work_max(2);
-        for (p = 0; p < max; p++, plw++) {
+        for (p = 0; p < (u16)max; p++, plw++) {
             if (plw->slot_active == 0 || plw->field_0x001 == 0 || plw->area_0x16 != self->area_0x44) {
                 work->field_0x72[work->field_0x35[index]][p] = 0;
                 continue;
@@ -1941,13 +1888,13 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
             }
             target = (_ENEMY_WORK*)get_move_work_adrs(3);
             max = get_move_work_max(3);
-            for (e = 0; e < max; e++, target++) {
+            for (e = 0; e < (u16)max; e++, target++) {
                 if (target->team == 25 && target->area_no == self->area_0x44 && em_work_die_ck(target) != 1U) {
                     get_joint_wmat_em(target, 5, &mtx);
                     joint.x = mtx.m[0][3];
                     joint.y = mtx.m[1][3];
                     joint.z = mtx.m[2][3];
-                    setVector3(&offset, lbl_8079B740, lbl_8079B7C8, lbl_8079B81C);
+                    setVector3(&offset, 0.0f, 150.0f, -400.0f);
                     rotVecY(&offset, (*model)->field_0x2C);
                     addVec3(&sum, &(*model)->pos_0x04, &offset);
                     copyVec3(&shot, &sum);
