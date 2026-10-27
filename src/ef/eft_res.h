@@ -88,6 +88,9 @@ extern "C" {
 #endif
 /* 0x800F6520 - resets the effect resource pool (the system core's resets). */
 void eft_res_pool_reset(void);
+/* 0x80794A88 / 0x80794A8C - the per-map common eft and efm resource name tables `stage_map_obj_load` reads. */
+extern char*** map_com_eft_name_ptr;
+extern char*** eft_map_common_mdl_name_ptr;
 #ifdef __cplusplus
 }
 #endif

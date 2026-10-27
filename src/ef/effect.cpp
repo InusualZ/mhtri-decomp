@@ -218,7 +218,7 @@ void res_mat_tev_color_copy_ctor(void* out, void* handle);
 void res_mat_chan_copy_ctor(void* out, void* handle);
 
 /* the emitter data helpers */
-s32 fn_800F6984(u32 a, u32 b, void* table, void* names);
+s32 eft_pro_slot_list_set_area(u32 a, u32 b, void* table, void* names);
 
 void* stage_effect_block_get(void);
 u32 stage_water_area_ck(void);
@@ -843,7 +843,7 @@ extern "C" void fn_800FA9B8(EftNameSet* out, u8 area) {
             }
             node++;
         }
-        fn_800F6984(area, 0, lbl_8058A880[area], names);
+        eft_pro_slot_list_set_area(area, 0, lbl_8058A880[area], names);
     }
     out->count_0x01 = 0;
     node = (EftNameNode*)lbl_8058A924[area];
@@ -860,7 +860,7 @@ extern "C" void fn_800FA9B8(EftNameSet* out, u8 area) {
             }
             node++;
         }
-        fn_800F6984(area, 3, lbl_8058A924[area], names);
+        eft_pro_slot_list_set_area(area, 3, lbl_8058A924[area], names);
     }
 }
 

@@ -1,13 +1,20 @@
 /* ef/eft_res.cpp - the game's effect-resource manager: `eft_control` and its slot pools, the 256-entry proID slot
  *   table, the resource load/create path and the effect-heap push.
  * RANGE. .text 0x800F6520-0x800F95A4 (43 functions); extab 0x8000BB6C-0x8000BC5C, extabindex 0x8002580C-0x80025974,
- *   .data 0x8059B3B0-0x8059B5D0, .sbss 0x80794A40-0x80794A88, .sdata2 0x807965D0-0x807965D8.  The seam is unproven:
+ *   .data 0x8059B3B0-0x8059B5D0, .sbss 0x80794A40-0x80794A90, .sdata2 0x807965D0-0x807965D8.  The seam is unproven:
  *   the range's last function drives the same `_EFT` state machine as `ef/effect.cpp`'s first.
  * NAMES. The unit name is a GUESS in the siblings' scheme (no `__FILE__` string is reachable; the runtime dump's
  *   `res_eft_*`, `get_eft_res_name` and `push_eft_effect_heap_num` name the `eft` resource layer).  The dump names
  *   seven functions; `eft_res_slot_get`, `eft_res_slot_release`, `eft_res_model_get`, `eft_res_spawn_gate_ck`, `eft_res_models_release` and
  *   `eft_res_models_spawn` are GUESSes from their bodies, `eft_stage_spawn_flag` (0x800F9380: stage size class to spawn
- *   flag) too; the map has only `fn_` stems for the rest.
+ *   flag) too.
+ *   GUESS (from each body and its callers): eft_pro_slot_list_set_area (0x800F6984: the area-tagged file run),
+ *   eft_pro_slot_clear (0x800F6A78), eft_pro_slot_find_kind (0x800F6AC8), eft_pro_slot_find_proid (0x800F7AA4),
+ *   eft_pro_slot_resource_add (0x800F7BF0), eft_res_load_callback (0x800F7D44), eft_res_files_load (0x800F7F18),
+ *   eft_res_archive_load_callback (0x800F8358), eft_res_model_release (0x800F89A4), eft_res_blocks_get /
+ *   eft_res_blocks_release / eft_res_block_count (0x800F8B44 / 0x800F8C78 / 0x800F8D80: the 0x40-byte block heap),
+ *   eft_res_effect_spawn (0x800F9278), eft_res_handle_copy / eft_res_handle_valid (0x800F92D4 / 0x800F92E0), and
+ *   the inline helper eft_res_slot_find.
  *   GUESS (from each body and its callers): eft_control_init
  *   GUESS (from each body and its callers): eft_res_release_all
  *   GUESS (from each body and its callers): eft_pro_slot_assign (0x800F6B6C: files a table entry under a free proID
@@ -19,30 +26,34 @@
  *   GUESS (from each body and its callers): `eft_res_pool_reset`.
  * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps every `clrlwi`+`cmpwi` pair and the
  *   narrowing `clrlwi` of the `u8`/`u16` parameters; with the pass on most rows score lower).
- * RESIDUALS. `eft_res_file_load` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
- *   where retail's epilogue differs); `eft_res_models_spawn` calls `_savegpr_23`/`_restgpr_23` where retail calls
- *   `_savegpr_24`/`_restgpr_24`;
- *   `push_eft_effect_heap_num` lacks retail's call to `RetireParticleAll` (+0x40).
+ * RESIDUALS.
+ *  - `eft_res_file_load`: retail tests the descriptor's size word in r4, ours in r0 (both branches);
+ *  - `eft_res_models_spawn`: the texture loop loads the model's +0x118 before its +0x10C link in retail; ours loads
+ *    the link first (the operand order that puts the model pointer in retail's r4);
  *  - `eft_common_load`: retail carries the `eft` run's `j - 1` as its own induction register (three for the loop),
  *    ours derives it with `addi` from `j`;
- *  - `eft_area_effects_set`: retail keeps an unreachable `b` (the outer `break`) after each of its 20 inner switches;
- *    `default: break;`, `return` in the inner or the outer cases all leave it out;
- *  - `fn_800F7F18`: retail keeps `id * 0x18` and not `id` across the calls (one register fewer, `0` hoisted into
- *    r14); `fn_800F8358`: retail hoists the 128-entry `mtctr` count into r18 (one saved register more);
- *  - `fn_800F6A78`/`eft_res_release`: the table base and the record pointer swap registers (r4/r5, r4/r31).
- *  - `res_eft_create`, `res_eft_model_create`, `get_eft_res_name`, `fn_800F6AC8`: retail narrows the `u16`/`u8`
- *    arguments (`clrlwi`) at entry, ours does not (or folds it into a `clrlslwi`);
- *  - `fn_800F6AC8`: retail unrolls the 0x18-byte record search three-wide (`li r0,0x33`), ours one-wide with `lbzu`;
- *  - `fn_800F8B44`: retail loads `eft_control`'s pool fields before the loop and walks the flag bytes with a
- *    pointer, ours re-indexes (`lbzx`) and runs a different loop shape.
+ *  - `eft_res_files_load`: retail keeps `id * 0x18` and not `id` across the calls (one register fewer, `0` hoisted into
+ *    r14); `eft_res_archive_load_callback`: retail hoists the 128-entry `mtctr` count into r18 (one saved register more);
+ *  - `eft_pro_slot_find_kind`: retail walks 0xCC records unrolled four-wide (`li r0,0x33`); ours unrolls the same count
+ *    six-wide (`li r0,0x22`) for the pointer walk, the `while` form and the counter widths tried (u8/u16/s32/u32);
+ *  - `eft_res_slot_get`: the search loop's natural exit runs the caller's NULL test (`li r31,0`; `cmpwi`) where
+ *    retail returns at once (a jump past the tail); the inline `eft_res_slot_find` scores best of the goto-free
+ *    forms (a `found` flag, a `break` plus an index test and the tail moved into the loop all score lower);
+ *  - `eft_res_blocks_get`: retail shares one `return NULL` block between its two bound tests and places the run-found
+ *    tail after the scan loop (`beq` out of the loop); ours returns inline after the skip loop, keeps the tail in the
+ *    loop (`bne` around it) and colours the registers differently;
  *   The other partial rows have no recorded cause (`symdiff.py -u ef/eft_res --all`).
  * SHAPES. `EftControl* ctrl = &eft_control;` opens every function that touches it, so the address lives in one
- *   callee-saved register (the unhoisted form loses the register on `eft_res_slot_release` and `fn_800F89A4`).
- *   The slot table is addressed two ways, both needed: `lbl_806A2D34 + i*0x18` with the fields at +0x04 (`fn_800F6A78`,
- *   whose `EftProHdrSlot` pads the 4-byte header) and `(lbl_806A2D34 + 4) + i*0x18` with the fields at +0x00 (the
- *   searchers `fn_800F6AC8`/`fn_800F7AA4` and the loaders `fn_800F8358`/`fn_800F7D44`).
+ *   callee-saved register (the unhoisted form loses the register on `eft_res_slot_release` and `eft_res_model_release`).
+ *   A record reached by ordinal is `&((EftProTable*)lbl_806A2D34)->slots_0x04[id]` (`eft_pro_slot_clear`, `eft_res_release`:
+ *   the base and the record land in two registers); a walk starts at `eft_pro_slots()` and steps the counter before
+ *   the pointer (`i++, slot++` in the `for` header).  Counters compared against `eft_control`'s pool counts are
+ *   signed (`(s32)` on the `u32` fields gives retail's `cmpw`).
+ *   `eft_area_effects_set`'s jump-table inner switches end in `default: return;` (it keeps retail's unreachable
+ *   `b` of the outer `break`); the compare-tree inner switch of map 10 has none.
  *   `load_file_req`'s arguments are (name, data, size, callback, 4, ctx): the callback is the fourth.
- *   `fn_800F8C78`'s difference is unsigned (`(u32)(ptr - heap) >> 6`): the signed form emits `srawi` and a `clrrwi`.
+ *   `eft_res_blocks_release` assigns the pointer difference to its `u32` index and shifts it in place (`index >>= 6`): the signed
+ *   form emits `srawi` and a `clrrwi`, the one-expression form moves the index to another register.
  */
 
 #include "types.h"
@@ -67,6 +78,8 @@
 #include "ef/system_core.h"   /* pack_entry_count, pack_entry_data */
 #include "enemy/enemy_control.h"   /* em_kind_mem_alloc */
 #include "ef/eft026_fx.h"   /* eft028_set, eft028_set_capsule */
+#include "ef/RetireParticleAll.h"
+#include "ef/eft_res_file_load.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the control block, the slot table and the model records
@@ -101,6 +114,15 @@ typedef struct EftResSlot {
 /* The manager's control block `eft_control` (`EftControl`, 0xC44 B of `.bss`) is the band's one record (`unsplit/ef_control.h`); this unit is its main reader. */
 #include "unsplit/ef_control.h"
 
+/* The effect system's allocator `ef_system_memory_manager` returns (`nw4r::ef::MemoryManagerBase` in
+ * `nw_resource.cpp`), reached through its +0x0C slot, the pools' garbage collection.  Declared only, so this unit
+ * emits no table of its own.  size: 0x04 - lower bound, an approximation (the vtable word) */
+class EftResEffectAllocator {
+public:
+    virtual void destroy();
+    virtual void garbage_collection();
+};
+
 /* The record eft_res_spawn_gate_ck gates a spawn on: a pointer at +0x30 whose byte 0 must be clear when one is
  * pending.  Only that pointer is touched by this unit. */
 typedef struct EftSpawnRecord {
@@ -109,26 +131,26 @@ typedef struct EftSpawnRecord {
 } EftSpawnRecord; /* size: 0x34 (lower bound: only +0x30 is read by this unit) */
 
 /* The 256-entry slot table that follows `eft_control` in `.bss`: a 4-byte header, then 0x18-byte records
- * whose proID byte `fn_800F6AC8` looks up (`fn_800F6A78` builds one, `eft_res_release` releases it).
+ * whose proID byte `eft_pro_slot_find_kind` looks up (`eft_pro_slot_clear` builds one, `eft_res_release` releases it).
  * Every function reaches it through the map's own absolute label, never as an offset of `eft_control`. */
 #include "unsplit/ef_tables.h" /* lbl_806A2D34 (rule 2: the band) */
 
 typedef struct EftProSlot {
-    /* +0x00 */ u8 kind_0x00;    /* fn_800F6AC8's key; 2 = a registered effect (eft_res_release) */
-    /* +0x01 */ u8 field_0x01;   /* 0xff; the "handed out" flag fn_800F7AA4 tests for 1 */
+    /* +0x00 */ u8 kind_0x00;    /* eft_pro_slot_find_kind's key; 2 = a registered effect (eft_res_release) */
+    /* +0x01 */ u8 field_0x01;   /* 0xff; the "handed out" flag eft_pro_slot_find_proid tests for 1 */
     /* +0x02 */ u8 state_0x02;   /* 0xff; 1 while the resource is live */
     /* +0x03 */ u8 id_0x03;      /* the slot ordinal the effect's resources are filed under */
-    /* +0x04 */ u8 field_0x04;   /* the proID fn_800F7AA4 matches */
+    /* +0x04 */ u8 field_0x04;   /* the proID eft_pro_slot_find_proid matches */
     /* +0x05 */ u8 field_0x05;   /* 0xff, or the 1-based ordinal of the resource in its file */
     /* +0x06 */ s16 field_0x06;  /* -1, or the loaded resource's size */
-    /* +0x08 */ s32 field_0x08;  /* -1 from fn_800F6A78, 0x7FFFFFFF from fn_800F8358 */
+    /* +0x08 */ s32 field_0x08;  /* -1 from eft_pro_slot_clear, 0x7FFFFFFF from eft_res_archive_load_callback */
     /* +0x0C */ s32 field_0x0C;  /* the loaded resource id */
     /* +0x10 */ s32 field_0x10;
     /* +0x14 */ s32 field_0x14;
 } EftProSlot; /* size: 0x18 */
 
 /* The whole slot table as one record: the header's four live counts (all records, then the `efm`, `eft` and `efx`
- * records `fn_800F7D44`/`fn_800F8358` number), then the 256 records. */
+ * records `eft_res_load_callback`/`eft_res_archive_load_callback` number), then the 256 records. */
 typedef struct EftProTable {
     /* +0x0000 */ u8 used_0x00;
     /* +0x0001 */ u8 models_0x01;
@@ -145,7 +167,8 @@ typedef struct EftProTable {
 typedef struct EftResModelSlot {
     /* +0x000 */ u8 used_0x00;
     /* +0x004 */ EftModel model_0x04;
-} EftResModelSlot; /* size: 0x168 (the remainder past +0x120 is untouched by this unit) */
+    /* +0x120 */ u8 unused_0x120[0x48];
+} EftResModelSlot; /* size: 0x168 */
 
 /* The node `EftModel.field_0x10C` points at; only +0x04 is read here.  `ef.h` leaves the type
  * incomplete, so this unit names the field it needs. */
@@ -164,7 +187,7 @@ typedef struct EftLoadCtx {
     /* +0x0C */ u32 param_0x0C;
 } EftLoadCtx; /* size: 0x10 */
 
-/* The context `eft_res_file_load` hands the archive load and `fn_800F8358` reads back: the run's proID bytes, the slot
+/* The context `eft_res_file_load` hands the archive load and `eft_res_archive_load_callback` reads back: the run's proID bytes, the slot
  * ordinal the run starts at, the run's resource names and the load mode. */
 typedef struct EftFileLoadCtx {
     /* +0x00 */ u8* proids_0x00;
@@ -172,23 +195,6 @@ typedef struct EftFileLoadCtx {
     /* +0x08 */ char** names_0x08;
     /* +0x0C */ s32 mode_0x0C;
 } EftFileLoadCtx; /* size: 0x10 */
-
-/* The same 0x18-byte record as the two functions that take the table's 4-byte header as part of the
- * record's address (fn_800F6A78's stores land on `+0x4..+0x18` of the header-based record). */
-typedef struct EftProHdrSlot {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u8 kind_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 state_0x06;
-    /* +0x07 */ u8 id_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ s16 field_0x0A;
-    /* +0x0C */ s32 field_0x0C;
-    /* +0x10 */ s32 field_0x10;
-    /* +0x14 */ s32 field_0x14;
-    /* +0x18 */ s32 field_0x18;
-} EftProHdrSlot; /* size: 0x1C (the last field is the next record's +0x00) */
 
 /* The records start 4 bytes into the table (its 4-byte header is zeroed by eft_res_pool_reset and counted down
  * by eft_res_release). */
@@ -207,36 +213,35 @@ extern "C" {
 void eft_res_pool_reset(void);
 void eft_control_init(void);
 void eft_res_release_all(void);
-void fn_800F6984(u8, u8, EftResFile*, u8*);
+void eft_pro_slot_list_set_area(u8, u8, EftResFile*, u8*);
 void eft_pro_slot_list_set(u32, EftResFile*, u8*);
 void eft_res_stage_release_all(void);
 void eft_res_slots_release(void);
-void fn_800F6A78(u8);
-EftProSlot* fn_800F6AC8(u32);
+void eft_pro_slot_clear(u8);
+EftProSlot* eft_pro_slot_find_kind(u8);
 u32 eft_res_release(u8);
-EftProSlot* fn_800F7AA4(u32);
-void fn_800F7BF0(EftProSlot*);
+EftProSlot* eft_pro_slot_find_proid(u8);
+void eft_pro_slot_resource_add(EftProSlot*);
 void eft_res_bind(u32);
-void fn_800F7D44(u8*, void*, EftLoadCtx*, EftLoadCtx*);
-void fn_800F7F18(EftResFile*, s32, u32, u8*);
-void fn_800F8358(char*, void*, u32, EftFileLoadCtx*);
-void eft_res_file_load(EftResFile*, u32, void*, u8*, u32, u32);
+void eft_res_load_callback(u8*, void*, EftLoadCtx*, EftLoadCtx*);
+void eft_res_files_load(EftResFile*, s32, u32, u8*);
+void eft_res_archive_load_callback(char*, void*, u32, EftFileLoadCtx*);
 void eft_common_load(void);
 void eft_area_effects_set(void);
 u8 eft_pro_slot_assign(u8, u8, u8, u8, u8);
 EftResSlot* eft_res_slot_get(u32);
 void eft_res_slot_release(void*);
 u8* eft_res_model_get(void);
-void fn_800F89A4(void*);
+void eft_res_model_release(void*);
 void eft_res_models_release(void*, s32);
-void* fn_800F8B44(u32);
-void fn_800F8C78(void*, u32);
-u32 fn_800F8D80(u32);
+void* eft_res_blocks_get(u32);
+void eft_res_blocks_release(void*, u32);
+u32 eft_res_block_count(u32);
 void eft_instances_release(void);
 void* res_eft_create_ex(u16, u16, u32, u32);
-void* fn_800F9278(void*, void*, u32, u32);
-void* fn_800F92D4(void*, void*);
-u32 fn_800F92E0(void*);
+void* eft_res_effect_spawn(void*, void*, u32, u32);
+void* eft_res_handle_copy(void*, void*);
+u32 eft_res_handle_valid(void*);
 u32 eft_res_spawn_gate_ck(void*, u32);
 u32 eft_stage_spawn_flag(void);
 void eft_res_models_spawn(_EFT*, void**, s32, s32, void*);
@@ -258,9 +263,10 @@ extern void* fn_800A5A90(void*, void*, void*, u32);
 }
 #endif
 
-/* The resource tables the scene loaders install (`.sbss` 0x80794A40-0x80794A88): the per-group proID byte tables
+/* The resource tables the scene loaders install (`.sbss` 0x80794A40-0x80794A90): the per-group proID byte tables
  * `eft_pro_slot_assign` resolves an effect through (0xFF ends each run), the model-name table `get_eft_res_name` reads, the
- * area box table `ef/effect.cpp` reads, and the four common-file name tables `eft_common_load` hands the loader. */
+ * area box table `ef/effect.cpp` reads, the four common-file name tables `eft_common_load` hands the loader, and the two per-map common eft/efm
+ * name tables `stage_map_obj_load` reads. */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -282,6 +288,8 @@ char** q_comn_eft_name_ptr;
 char** lb_comn_eft_name_ptr;
 char** q_comn_efm_name_ptr;
 char** lobby_eft_mdl_name_ptr;
+char*** map_com_eft_name_ptr;
+char*** eft_map_common_mdl_name_ptr;
 #ifdef __cplusplus
 }
 #endif
@@ -317,20 +325,17 @@ extern "C" void eft_res_pool_reset(void) {
     lbl_806A2D34[2] = 0;
     lbl_806A2D34[3] = 0;
 
-    for (u32 i = 0; i < 0x100; i++) {
+    for (s32 i = 0; i < 0x100; i++) {
         eft_control.id_a_0x3C[i] = -1;
         eft_control.id_b_0x43C[i] = -1;
         eft_control.id_c_0x83C[i] = -1;
-        fn_800F6A78((u8)i);
+        eft_pro_slot_clear((u8)i);
     }
 }
 
 /* 0x800F65B4 - allocate the three work pools (0x48-byte effect slots, 0x168-byte model records and the
  * 0x40-byte block heap with its trailing flag run) and mark the manager initialised. */
 extern "C" void eft_control_init(void) {
-    u8* heap;
-    u32 count;
-
     eft_res_bind(0);
 
     eft_control.slots_0x10 = (EftResSlot*)get_move_work_adrs(4);
@@ -341,12 +346,10 @@ extern "C" void eft_control_init(void) {
     eft_control.model_count_0x18 = get_move_work_max(5);
     memset(eft_control.models_0x1C, 0, eft_control.model_count_0x18 * 0x168);
 
-    heap = (u8*)get_move_work_adrs(6);
-    eft_control.heap_0x28 = heap;
-    count = get_move_work_max(6);
-    eft_control.heap_count_0x24 = count;
-    eft_control.heap_flags_0x2C = heap + count * 0x40;
-    memset(heap, 0, count + count * 0x40);
+    eft_control.heap_0x28 = (u8*)get_move_work_adrs(6);
+    eft_control.heap_count_0x24 = get_move_work_max(6);
+    eft_control.heap_flags_0x2C = eft_control.heap_0x28 + eft_control.heap_count_0x24 * 0x40;
+    memset(eft_control.heap_0x28, 0, eft_control.heap_count_0x24 + eft_control.heap_count_0x24 * 0x40);
 
     eft_control.initialised_0x00 = 1;
 }
@@ -358,9 +361,9 @@ extern "C" void eft_res_release_all(void) {
     if (slot == NULL) {
         return;
     }
-    for (u32 i = 0; i < eft_control.slot_count_0x0C; i++) {
-        if (slot[i].active_0x00 != 0 && (slot[i].field_0x04 & 1) == 0) {
-            eft_res_slot_release(&slot[i]);
+    for (s32 i = 0; i < (s32)eft_control.slot_count_0x0C; i++, slot++) {
+        if (slot->active_0x00 != 0 && (slot->field_0x04 & 1) == 0) {
+            eft_res_slot_release(slot);
         }
     }
 }
@@ -371,6 +374,7 @@ extern "C" void eft_common_load(void) {
     EftResFile* file;
     u8 ids[0x50];
     u32 i;
+    u32 j;
 
     switch (GameMode_ck()) {
     case 2:
@@ -378,51 +382,50 @@ extern "C" void eft_common_load(void) {
         for (i = 0; efm_common_proID_tbl_ptr[1][i] != 0xFF; i++) {
             ids[i] = eft_pro_slot_assign(0, 3, 1, 0, i);
         }
-        eft_res_file_load(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[1], (u32)lobby_eft_mdl_name_ptr);
+        eft_res_file_load(file, 3, 0, ids, efm_common_proID_tbl_ptr[1], lobby_eft_mdl_name_ptr);
         file = lb_comn_eft_file;
         ids[0] = eft_pro_slot_assign(0, 2, 1, 0, 0);
-        for (i = 2; eft_common_proID_tbl_ptr[1][i - 1] != 0xFF; i += 2) {
-            ids[i - 1] = eft_pro_slot_assign(0, 1, 1, 0, i - 1);
-            ids[i] = eft_pro_slot_assign(0, 1, 1, 1, i);
+        for (i = 1, j = 2; eft_common_proID_tbl_ptr[1][j - 1] != 0xFF; i += 2, j += 2) {
+            ids[j - 1] = eft_pro_slot_assign(0, 1, 1, 0, i);
+            ids[j] = eft_pro_slot_assign(0, 1, 1, 1, j);
         }
-        eft_res_file_load(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[1], (u32)lb_comn_eft_name_ptr);
+        eft_res_file_load(file, 0, 0, ids, eft_common_proID_tbl_ptr[1], lb_comn_eft_name_ptr);
         break;
     case 1:
         file = q_comn_efm_file;
         for (i = 0; efm_common_proID_tbl_ptr[0][i] != 0xFF; i++) {
             ids[i] = eft_pro_slot_assign(0, 3, 0, 0, i);
         }
-        eft_res_file_load(file, 3, 0, ids, (u32)efm_common_proID_tbl_ptr[0], (u32)q_comn_efm_name_ptr);
+        eft_res_file_load(file, 3, 0, ids, efm_common_proID_tbl_ptr[0], q_comn_efm_name_ptr);
         file = q_comn_eft_file;
         ids[0] = eft_pro_slot_assign(0, 2, 0, 0, 0);
-        for (i = 2; eft_common_proID_tbl_ptr[0][i - 1] != 0xFF; i += 2) {
-            ids[i - 1] = eft_pro_slot_assign(0, 1, 0, 0, i - 1);
-            ids[i] = eft_pro_slot_assign(0, 1, 0, 1, i);
+        for (i = 1, j = 2; eft_common_proID_tbl_ptr[0][j - 1] != 0xFF; i += 2, j += 2) {
+            ids[j - 1] = eft_pro_slot_assign(0, 1, 0, 0, i);
+            ids[j] = eft_pro_slot_assign(0, 1, 0, 1, j);
         }
-        eft_res_file_load(file, 0, 0, ids, (u32)eft_common_proID_tbl_ptr[0], (u32)q_comn_eft_name_ptr);
+        eft_res_file_load(file, 0, 0, ids, eft_common_proID_tbl_ptr[0], q_comn_eft_name_ptr);
         break;
     }
 }
 
 /* 0x800F6984 - load one resource set with the 0x20000 flag family. */
-extern "C" void fn_800F6984(u8 a, u8 b, EftResFile* desc, u8* table) {
-    fn_800F7F18(desc, b, (a << 16) | 2, table);
+extern "C" void eft_pro_slot_list_set_area(u8 a, u8 b, EftResFile* desc, u8* table) {
+    eft_res_files_load(desc, b, (a << 16) | 2, table);
 }
 
 /* 0x800F69A0 - load one resource set with flag word 1. */
 extern "C" void eft_pro_slot_list_set(u32 a, EftResFile* desc, u8* table) {
-    fn_800F7F18(desc, (u8)a, 1, table);
+    eft_res_files_load(desc, (u8)a, 1, table);
 }
 
 /* 0x800F69B8 - retire every slot whose kind/state pair says its resource list is live. */
 extern "C" void eft_res_stage_release_all(void) {
     EftProSlot* slot = &eft_pro_slots()[0x100 - 1];
 
-    for (s32 i = 0xFF; i >= 0; i--) {
+    for (s32 i = 0xFF; i >= 0; i--, slot--) {
         if (slot->kind_0x00 == 2 && slot->state_0x02 == 1) {
             eft_res_release(slot->id_0x03);
         }
-        slot--;
     }
 }
 
@@ -430,41 +433,36 @@ extern "C" void eft_res_stage_release_all(void) {
 extern "C" void eft_res_slots_release(void) {
     EftProSlot* slot = &eft_pro_slots()[0x100 - 1];
 
-    for (s32 i = 0xFF; i >= 0; i--) {
+    for (s32 i = 0xFF; i >= 0; i--, slot--) {
         eft_res_release(slot->id_0x03);
-        slot--;
     }
 }
 
 /* 0x800F6A78 - build one slot-table record (the id eft_res_pool_reset files it under). */
-extern "C" void fn_800F6A78(u8 id) {
-    u8* p = lbl_806A2D34;
-    EftProHdrSlot* slot;
-    p += id * 0x18;
-    slot = (EftProHdrSlot*)p;
+extern "C" void eft_pro_slot_clear(u8 id) {
+    EftProSlot* slot = &((EftProTable*)lbl_806A2D34)->slots_0x04[id];
 
-    slot->kind_0x04 = 0;
+    slot->kind_0x00 = 0;
+    slot->field_0x01 = 0xFF;
+    slot->state_0x02 = 0xFF;
+    slot->id_0x03 = id;
+    slot->field_0x04 = 0xFF;
     slot->field_0x05 = 0xFF;
-    slot->state_0x06 = 0xFF;
-    slot->id_0x07 = id;
-    slot->field_0x08 = 0xFF;
-    slot->field_0x09 = 0xFF;
-    slot->field_0x0A = -1;
+    slot->field_0x06 = -1;
+    slot->field_0x08 = -1;
     slot->field_0x0C = -1;
-    slot->field_0x10 = -1;
+    slot->field_0x10 = 0;
     slot->field_0x14 = 0;
-    slot->field_0x18 = 0;
 }
 
 /* 0x800F6AC8 - find the first of the table's 0x33 records whose key byte is `key`. */
-extern "C" EftProSlot* fn_800F6AC8(u32 key) {
+extern "C" EftProSlot* eft_pro_slot_find_kind(u8 key) {
     EftProSlot* slot = eft_pro_slots();
 
-    for (u32 i = 0; i < 0x33; i++) {
+    for (s32 i = 0; i < 0xCC; i++, slot++) {
         if (slot->kind_0x00 == key) {
             return slot;
         }
-        slot++;
     }
     return NULL;
 }
@@ -475,7 +473,7 @@ extern "C" u8 eft_pro_slot_assign(u8 group, u8 kind, u8 set, u8 sub, u8 index) {
     EftProSlot* slot;
     u8* table;
 
-    slot = fn_800F6AC8(0);
+    slot = eft_pro_slot_find_kind(0);
     if (slot != NULL) {
         switch (group) {
         case 0:
@@ -603,6 +601,8 @@ extern "C" void eft_area_effects_set(void) {
             fn_800FD864();
             eft028_set(0, 0, area);
             break;
+        default:
+            return;
         }
         break;
     case 2:
@@ -643,6 +643,8 @@ extern "C" void eft_area_effects_set(void) {
         case 11:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 3:
@@ -686,6 +688,8 @@ extern "C" void eft_area_effects_set(void) {
             fn_800FD864();
             eft028_set(5, 1, area);
             break;
+        default:
+            return;
         }
         break;
     case 4:
@@ -720,6 +724,8 @@ extern "C" void eft_area_effects_set(void) {
         case 9:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 5:
@@ -757,6 +763,8 @@ extern "C" void eft_area_effects_set(void) {
         case 10:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 6:
@@ -770,6 +778,8 @@ extern "C" void eft_area_effects_set(void) {
         case 2:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 7:
@@ -788,6 +798,8 @@ extern "C" void eft_area_effects_set(void) {
             fn_800FD864();
             eft028_set(4, 1, area);
             break;
+        default:
+            return;
         }
         break;
     case 8:
@@ -798,6 +810,8 @@ extern "C" void eft_area_effects_set(void) {
         case 2:
             eft028_set(0, 0, area);
             break;
+        default:
+            return;
         }
         break;
     case 9:
@@ -808,6 +822,8 @@ extern "C" void eft_area_effects_set(void) {
         case 1:
             eft028_set(0, 0, area);
             break;
+        default:
+            return;
         }
         break;
     case 10:
@@ -825,6 +841,8 @@ extern "C" void eft_area_effects_set(void) {
         case 1:
             eft028_set(0, 0, area);
             break;
+        default:
+            return;
         }
         break;
     case 12:
@@ -871,6 +889,8 @@ extern "C" void eft_area_effects_set(void) {
             fn_800FD864();
             eft028_set(7, 0, area);
             break;
+        default:
+            return;
         }
         break;
     case 13:
@@ -911,6 +931,8 @@ extern "C" void eft_area_effects_set(void) {
         case 11:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 14:
@@ -953,6 +975,8 @@ extern "C" void eft_area_effects_set(void) {
         case 10:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 15:
@@ -987,6 +1011,8 @@ extern "C" void eft_area_effects_set(void) {
         case 9:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 16:
@@ -1024,6 +1050,8 @@ extern "C" void eft_area_effects_set(void) {
         case 10:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 17:
@@ -1037,6 +1065,8 @@ extern "C" void eft_area_effects_set(void) {
         case 2:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 18:
@@ -1055,6 +1085,8 @@ extern "C" void eft_area_effects_set(void) {
             fn_800FD864();
             eft028_set(4, 1, area);
             break;
+        default:
+            return;
         }
         break;
     case 19:
@@ -1062,6 +1094,8 @@ extern "C" void eft_area_effects_set(void) {
         case 1:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 20:
@@ -1069,6 +1103,8 @@ extern "C" void eft_area_effects_set(void) {
         case 1:
             eft028_set(7, 0, area);
             break;
+        default:
+            return;
         }
         break;
     case 21:
@@ -1095,6 +1131,8 @@ extern "C" void eft_area_effects_set(void) {
         case 7:
             fn_800FD864();
             break;
+        default:
+            return;
         }
         break;
     case 22:
@@ -1116,40 +1154,38 @@ extern "C" void eft_area_effects_set(void) {
 /* 0x800F7778 (0x32C): releases one slot-table record - its registered project, its filed id and its resource
  * memory - and rebuilds it empty; returns whether the resource itself was deleted. */
 extern "C" u32 eft_res_release(u8 id) {
-    u8* p = lbl_806A2D34;
-    EftProHdrSlot* slot;
+    EftProSlot* slot;
     EftControl* ctrl;
     u32 deleted;
     EfResourceManager* resource;
     u32 size;
     u8 shared;
 
-    p += id * 0x18;
-    slot = (EftProHdrSlot*)p;
+    slot = &((EftProTable*)lbl_806A2D34)->slots_0x04[id];
     ctrl = &eft_control;
     deleted = 0;
     resource = ef_resource_instance();
-    if (slot->kind_0x04 == 0) {
+    if (slot->kind_0x00 == 0) {
         return 0;
     }
-    if (slot->kind_0x04 == 2) {
-        shared = slot->field_0x09 == 0xEE;
-        switch (slot->field_0x05) {
+    if (slot->kind_0x00 == 2) {
+        shared = slot->field_0x05 == 0xEE;
+        switch (slot->field_0x01) {
         case 1:
-            if (slot->field_0x10 != -1 && nwDelResource(slot->field_0x10) == 0) {
-                if (slot->field_0x14 != 0) {
-                    ef_resource_remove_effect_project(resource, (void*)slot->field_0x14);
+            if (slot->field_0x0C != -1 && nwDelResource(slot->field_0x0C) == 0) {
+                if (slot->field_0x10 != 0) {
+                    ef_resource_remove_effect_project(resource, (void*)slot->field_0x10);
                 }
-                if (slot->field_0x09 != 0xFF && slot->field_0x10 == ctrl->id_a_0x3C[slot->field_0x09]) {
-                    ctrl->id_a_0x3C[slot->field_0x09] = -1;
+                if (slot->field_0x05 != 0xFF && slot->field_0x0C == ctrl->id_a_0x3C[slot->field_0x05]) {
+                    ctrl->id_a_0x3C[slot->field_0x05] = -1;
                     ctrl->loaded_a_0x30--;
                 }
                 deleted = 1;
             }
             if (shared == 0) {
-                if (slot->field_0x0C != -1) {
-                    size = nw_res_mem_size(slot->field_0x0C);
-                    if (push_res_mem(slot->field_0x0C) == 0) {
+                if (slot->field_0x08 != -1) {
+                    size = nw_res_mem_size(slot->field_0x08);
+                    if (push_res_mem(slot->field_0x08) == 0) {
                         ctrl->bytes_0xC3C -= size;
                     }
                 }
@@ -1159,20 +1195,20 @@ extern "C" u32 eft_res_release(u8 id) {
             lbl_806A2D34[2]--;
             break;
         case 2:
-            if (slot->field_0x10 != -1 && nwDelResource(slot->field_0x10) == 0) {
-                if (slot->field_0x18 != 0) {
-                    ef_resource_remove_texture_project(resource, (void*)slot->field_0x18);
+            if (slot->field_0x0C != -1 && nwDelResource(slot->field_0x0C) == 0) {
+                if (slot->field_0x14 != 0) {
+                    ef_resource_remove_texture_project(resource, (void*)slot->field_0x14);
                 }
-                if (slot->field_0x09 != 0xFF && slot->field_0x10 == ctrl->id_b_0x43C[slot->field_0x09]) {
-                    ctrl->id_b_0x43C[slot->field_0x09] = -1;
+                if (slot->field_0x05 != 0xFF && slot->field_0x0C == ctrl->id_b_0x43C[slot->field_0x05]) {
+                    ctrl->id_b_0x43C[slot->field_0x05] = -1;
                     ctrl->loaded_b_0x34--;
                 }
                 deleted = 1;
             }
             if (shared == 0) {
-                if (slot->field_0x0C != -1) {
-                    size = nw_res_mem_size(slot->field_0x0C);
-                    if (push_res_mem(slot->field_0x0C) == 0) {
+                if (slot->field_0x08 != -1) {
+                    size = nw_res_mem_size(slot->field_0x08);
+                    if (push_res_mem(slot->field_0x08) == 0) {
                         ctrl->bytes_0xC3C -= size;
                     }
                 }
@@ -1182,18 +1218,18 @@ extern "C" u32 eft_res_release(u8 id) {
             lbl_806A2D34[3]--;
             break;
         case 3:
-            if (slot->field_0x10 != -1) {
-                nw_res_entry_clear(slot->field_0x10);
-                if (slot->field_0x09 != 0xFF && slot->field_0x10 == ctrl->id_c_0x83C[slot->field_0x09]) {
-                    ctrl->id_c_0x83C[slot->field_0x09] = -1;
+            if (slot->field_0x0C != -1) {
+                nw_res_entry_clear(slot->field_0x0C);
+                if (slot->field_0x05 != 0xFF && slot->field_0x0C == ctrl->id_c_0x83C[slot->field_0x05]) {
+                    ctrl->id_c_0x83C[slot->field_0x05] = -1;
                     ctrl->loaded_c_0x38--;
                 }
                 deleted = 1;
             }
             if (shared == 0) {
-                if (slot->field_0x0C != -1) {
-                    size = nw_res_mem_size(slot->field_0x0C);
-                    if (push_res_mem(slot->field_0x0C) == 0) {
+                if (slot->field_0x08 != -1) {
+                    size = nw_res_mem_size(slot->field_0x08);
+                    if (push_res_mem(slot->field_0x08) == 0) {
                         ctrl->bytes_0xC3C -= size;
                     }
                 }
@@ -1204,68 +1240,71 @@ extern "C" u32 eft_res_release(u8 id) {
             break;
         }
     }
-    slot->kind_0x04 = 0;
+    slot->kind_0x00 = 0;
+    slot->field_0x01 = 0xFF;
+    slot->state_0x02 = 0xFF;
+    slot->id_0x03 = id;
+    slot->field_0x04 = 0xFF;
     slot->field_0x05 = 0xFF;
-    slot->state_0x06 = 0xFF;
-    slot->id_0x07 = id;
-    slot->field_0x08 = 0xFF;
-    slot->field_0x09 = 0xFF;
-    slot->field_0x0A = -1;
+    slot->field_0x06 = -1;
+    slot->field_0x08 = -1;
     slot->field_0x0C = -1;
-    slot->field_0x10 = -1;
+    slot->field_0x10 = 0;
     slot->field_0x14 = 0;
-    slot->field_0x18 = 0;
     lbl_806A2D34[0]--;
     return deleted;
 }
 
 /* 0x800F7AA4 - find the handed-out record whose proID is `key`. */
-extern "C" EftProSlot* fn_800F7AA4(u32 key) {
+extern "C" EftProSlot* eft_pro_slot_find_proid(u8 key) {
     EftProSlot* slot = eft_pro_slots();
 
-    for (u32 i = 0; i < 0x100; i++) {
+    for (u32 i = 0; i < 0x100; i++, slot++) {
         if (slot->field_0x04 == key && slot->field_0x01 == 1) {
             return slot;
         }
-        slot++;
     }
     return NULL;
 }
 
 /* 0x800F7BF0 - add the record's resource file to the resource system. */
-extern "C" void fn_800F7BF0(EftProSlot* slot) {
+extern "C" void eft_pro_slot_resource_add(EftProSlot* slot) {
     s32 res = slot->field_0x08;
+    char* name;
 
-    if (res == 0x7FFFFFFF || res < 0 || slot->field_0x05 == 0xFF) {
-        return;
-    }
-    if (res_mem_name_get(res) == 0) {
-        return;
-    }
-    if (slot->field_0x01 == 3) {
-        slot->field_0x0C = nw_res_entry_add(NULL, NULL);
-    } else {
-        slot->field_0x0C = nwAddResource(NULL, NULL);
+    if (res != 0x7FFFFFFF && res >= 0 && slot->field_0x05 != 0xFF) {
+        name = res_mem_name_get(res);
+        if (name != NULL) {
+            switch (slot->field_0x01) {
+            case 3:
+                slot->field_0x0C = nw_res_entry_add(name, NULL);
+                break;
+            default:
+                slot->field_0x0C = nwAddResource(name, NULL);
+                break;
+            }
+        }
     }
 }
 
-/* 0x800F7C74 - rebuild the resource walker and (in mode 0) hand every armed slot to fn_800F7BF0. */
+/* 0x800F7C74 - rebuild the resource walker and (in mode 0) hand every armed slot to eft_pro_slot_resource_add. */
 extern "C" void eft_res_bind(u32 mode) {
+    s32 i;
     EftControl* ctrl = &eft_control;
+    EftProSlot* slot = eft_pro_slots();
+    u32 count;
 
     if ((u8)mode == 0) {
-        EftProSlot* slot = eft_pro_slots();
-        for (int i = 0; i < 0x100; i++) {
+        for (i = 0; i < 0x100; i++, slot++) {
             if (slot->kind_0x00 == 2 && slot->field_0x06 == -1) {
-                fn_800F7BF0(slot);
+                eft_pro_slot_resource_add(slot);
             }
-            slot++;
         }
     }
     ctrl->system_0x04 = (void*)nw_res_ef_system_get();
     ctrl->resource_0x08 = ef_resource_instance();
-    u16 count = (u16)ef_resource_num_texture_projects((EfResourceManager*)ctrl->resource_0x08);
-    for (int i = 0; i < count; i++) {
+    count = (u16)ef_resource_num_texture_projects((EfResourceManager*)ctrl->resource_0x08);
+    for (i = 0; i < count; i++) {
         ef_resource_texture_project_at((EfResourceManager*)ctrl->resource_0x08, (u16)i);
     }
     if (ctrl->resource_0x08 != NULL) {
@@ -1274,13 +1313,18 @@ extern "C" void eft_res_bind(u32 mode) {
 }
 
 /* 0x800F7D44 - the resource-loader callback: file the loaded handle into the mode's id array and update
- * the record's ordinal/flag bytes, then re-arm the resource walker. */
-extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx* ctx) {
+ * the record's ordinal/flag bytes; a texture project also re-arms the resource walker. */
+extern "C" void eft_res_load_callback(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx* ctx) {
     EftControl* ctrl = &eft_control;
-    u8* table = lbl_806A2D34;
-    void* work = ef_resource_instance();
-    EftProSlot* slot = ctx->slot;
-    u32 unshared = ctx->unshared_0x08;
+    void* work;
+    u32 unshared;
+    EftProSlot* slot;
+    u8* table;
+
+    table = lbl_806A2D34;
+    work = ef_resource_instance();
+    slot = ctx->slot;
+    unshared = ctx->unshared_0x08;
 
     slot->field_0x10 = 0;
     slot->field_0x14 = 0;
@@ -1288,49 +1332,43 @@ extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx
     case 3:
         slot->field_0x06 = (s16)ctrl->loaded_c_0x38;
         slot->field_0x0C = nw_res_entry_add((char*)name, data);
-        ctrl->id_c_0x83C[ctrl->loaded_c_0x38] = slot->field_0x0C;
-        ctrl->loaded_c_0x38++;
+        ctrl->id_c_0x83C[ctrl->loaded_c_0x38++] = slot->field_0x0C;
         if (unshared == 1) {
             table[1]++;
         } else {
-            slot->field_0x05 = table[1];
-            table[1]++;
+            slot->field_0x05 = table[1]++;
         }
         break;
     case 1:
         slot->field_0x06 = (s16)ctrl->loaded_a_0x30;
         slot->field_0x0C = nwAddResource((char*)name, data);
-        ctrl->id_a_0x3C[ctrl->loaded_a_0x30] = slot->field_0x0C;
-        ctrl->loaded_a_0x30++;
+        ctrl->id_a_0x3C[ctrl->loaded_a_0x30++] = slot->field_0x0C;
         slot->field_0x10 = ef_resource_add_effect_project(work, data);
         if (unshared == 1) {
             table[2]++;
         } else {
-            slot->field_0x05 = table[2];
-            table[2]++;
+            slot->field_0x05 = table[2]++;
         }
         break;
     case 2:
         slot->field_0x06 = (s16)ctrl->loaded_b_0x34;
         slot->field_0x0C = nwAddResource((char*)name, data);
-        ctrl->id_b_0x43C[ctrl->loaded_b_0x34] = slot->field_0x0C;
-        ctrl->loaded_b_0x34++;
+        ctrl->id_b_0x43C[ctrl->loaded_b_0x34++] = slot->field_0x0C;
         if (unshared == 1) {
             table[3]++;
         } else {
-            slot->field_0x05 = table[3];
-            table[3]++;
+            slot->field_0x05 = table[3]++;
         }
         slot->field_0x14 = ef_resource_add_texture_project(work, data);
+        eft_res_bind(1);
         break;
     }
-    eft_res_bind(1);
 }
 
 /* 0x800F7F18 (0x440): requests the load of every file of a descriptor run into the proID slots `ids` names: mode
  * 3 the `efm` models, mode 1 the effect projects, mode 2 the texture projects (mode 0 both of the last two, one
  * descriptor each); an area-tagged request (`flags` low half 2) loads into the area's enemy memory. */
-extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
+extern "C" void eft_res_files_load(EftResFile* file, s32 mode, u32 flags, u8* ids) {
     EftControl* ctrl = &eft_control;
     u32 count = 0;
     EftProTable* table = (EftProTable*)lbl_806A2D34;
@@ -1367,7 +1405,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                         ctx.mode = 3;
                         ctx.slot = &table->slots_0x04[id];
                         ctx.unshared_0x08 = 1;
-                        load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)fn_800F7D44, 3, (u32*)&ctx);
+                        load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)eft_res_load_callback, 3, (u32*)&ctx);
                         table->slots_0x04[id].field_0x05 = 0xEE;
                         table->slots_0x04[id].kind_0x00 = 2;
                         table->slots_0x04[id].field_0x01 = 3;
@@ -1382,7 +1420,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                             ctx.mode = 3;
                             ctx.slot = &table->slots_0x04[id];
                             ctx.unshared_0x08 = 0;
-                            load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)fn_800F7D44,
+                            load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)eft_res_load_callback,
                                           3, (u32*)&ctx);
                             ctrl->bytes_0xC3C += file->size_0x00;
                         }
@@ -1415,7 +1453,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                             ctx.mode = 1;
                             ctx.slot = &table->slots_0x04[id];
                             ctx.unshared_0x08 = 1;
-                            load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)fn_800F7D44, 3, (u32*)&ctx);
+                            load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)eft_res_load_callback, 3, (u32*)&ctx);
                             table->slots_0x04[id].field_0x05 = 0xEE;
                             table->slots_0x04[id].kind_0x00 = 2;
                             table->slots_0x04[id].field_0x01 = 1;
@@ -1430,7 +1468,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                                 ctx.mode = 1;
                                 ctx.slot = &table->slots_0x04[id];
                                 ctx.unshared_0x08 = 0;
-                                load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)fn_800F7D44,
+                                load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)eft_res_load_callback,
                                               3, (u32*)&ctx);
                                 ctrl->bytes_0xC3C += file->size_0x00;
                             }
@@ -1463,7 +1501,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                             ctx.mode = 2;
                             ctx.slot = &table->slots_0x04[id];
                             ctx.unshared_0x08 = 1;
-                            load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)fn_800F7D44, 3, (u32*)&ctx);
+                            load_file_req(file->name_0x04, (u32)data, file->size_0x00, (u32)eft_res_load_callback, 3, (u32*)&ctx);
                             table->slots_0x04[id].field_0x05 = 0xEE;
                             table->slots_0x04[id].kind_0x00 = 2;
                             table->slots_0x04[id].field_0x01 = 2;
@@ -1478,7 +1516,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
                                 ctx.mode = 2;
                                 ctx.slot = &table->slots_0x04[id];
                                 ctx.unshared_0x08 = 0;
-                                load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)fn_800F7D44,
+                                load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), file->size_0x00, (u32)eft_res_load_callback,
                                               3, (u32*)&ctx);
                                 ctrl->bytes_0xC3C += file->size_0x00;
                             }
@@ -1498,7 +1536,7 @@ extern "C" void fn_800F7F18(EftResFile* file, s32 mode, u32 flags, u8* ids) {
 
 /* 0x800F8358 (0x2DC): the archive-load callback: files every member of the loaded archive under the proID
  * slot `eft_common_load`'s run reserved for it (searched from the run's first ordinal) and registers it. */
-extern "C" void fn_800F8358(char* path, void* data, u32 size, EftFileLoadCtx* ctx) {
+extern "C" void eft_res_archive_load_callback(char* path, void* data, u32 size, EftFileLoadCtx* ctx) {
     EftControl* ctrl = &eft_control;
     u8* table = lbl_806A2D34;
     u8* proids = ctx->proids_0x00;
@@ -1544,23 +1582,20 @@ extern "C" void fn_800F8358(char* path, void* data, u32 size, EftFileLoadCtx* ct
         case 3:
             slot->field_0x06 = (s16)ctrl->loaded_c_0x38;
             slot->field_0x0C = nw_res_entry_add(*names, file);
-            ctrl->id_c_0x83C[ctrl->loaded_c_0x38] = slot->field_0x0C;
-            ctrl->loaded_c_0x38++;
+            ctrl->id_c_0x83C[ctrl->loaded_c_0x38++] = slot->field_0x0C;
             slot->field_0x05 = table[1]++;
             break;
         case 1:
             slot->field_0x06 = (s16)ctrl->loaded_a_0x30;
             slot->field_0x0C = nwAddResource(*names, file);
-            ctrl->id_a_0x3C[ctrl->loaded_a_0x30] = slot->field_0x0C;
-            ctrl->loaded_a_0x30++;
+            ctrl->id_a_0x3C[ctrl->loaded_a_0x30++] = slot->field_0x0C;
             slot->field_0x10 = ef_resource_add_effect_project(resource, file);
             slot->field_0x05 = table[2]++;
             break;
         case 2:
             slot->field_0x06 = (s16)ctrl->loaded_b_0x34;
             slot->field_0x0C = nwAddResource(*names, file);
-            ctrl->id_b_0x43C[ctrl->loaded_b_0x34] = slot->field_0x0C;
-            ctrl->loaded_b_0x34++;
+            ctrl->id_b_0x43C[ctrl->loaded_b_0x34++] = slot->field_0x0C;
             slot->field_0x14 = ef_resource_add_texture_project(resource, file);
             slot->field_0x05 = table[3]++;
             eft_res_bind(1);
@@ -1574,88 +1609,96 @@ extern "C" void fn_800F8358(char* path, void* data, u32 size, EftFileLoadCtx* ct
 }
 
 /* 0x800F8634 - the resource-file request: pull the file into memory and start the async load whose
- * callback is fn_800F8358. */
-extern "C" void eft_res_file_load(EftResFile* desc, u32 mode, void* unused, u8* name, u32 a7, u32 a8) {
+ * callback is eft_res_archive_load_callback. */
+extern "C" void eft_res_file_load(EftResFile* file, u32 mode, u32 reserved, u8* ids, u8* proids, char** names) {
     EftControl* ctrl = &eft_control;
-    u32 ctx[6];
+    EftFileLoadCtx ctx;
+    s32 handle;
 
-    if (mode == 3) {
-        if (desc->size_0x00 == 0) {
+    if ((s32)mode == 3) {
+        if (file->size_0x00 == 0) {
             return;
         }
-        if (res_mem_index_ref(desc->name_0x04) >= 0) {
+        if (res_mem_index_ref(file->name_0x04) >= 0) {
             return;
         }
-        s32 handle = pull_res_mem(desc->name_0x04, desc->size_0x00, 0);
+        handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
         if (handle < 0) {
             return;
         }
-        ctx[0] = a7;
-        ctx[1] = *name;
-        ctx[2] = a8;
-        ctx[3] = mode;
-        load_file_req(desc->name_0x04, (u32)getResMemAdrs(handle), (s32)desc->size_0x00, (u32)fn_800F8358, 4, ctx);
-        eft_control.bytes_0xC3C += *(u32*)desc;
+        ctx.first_0x04 = *ids;
+        ctx.proids_0x00 = proids;
+        ctx.names_0x08 = names;
+        ctx.mode_0x0C = mode;
+        load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), (s32)file->size_0x00, (u32)eft_res_archive_load_callback, 4,
+                      (u32*)&ctx);
+        ctrl->bytes_0xC3C += file->size_0x00;
         return;
     }
-    if (mode > 1) {
-        return;
+    if (mode == 0 || mode == 1) {
+        if (file->size_0x00 == 0) {
+            return;
+        }
+        if (res_mem_index_ref(file->name_0x04) >= 0) {
+            return;
+        }
+        handle = pull_res_mem(file->name_0x04, file->size_0x00, 0);
+        if (handle < 0) {
+            return;
+        }
+        ctx.first_0x04 = *ids;
+        ctx.proids_0x00 = proids;
+        ctx.names_0x08 = names;
+        ctx.mode_0x0C = mode;
+        load_file_req(file->name_0x04, (u32)getResMemAdrs(handle), (s32)file->size_0x00, (u32)eft_res_archive_load_callback, 4,
+                      (u32*)&ctx);
+        ctrl->bytes_0xC3C += file->size_0x00;
     }
-    if (desc->size_0x00 == 0) {
-        return;
+}
+
+/* Takes the first free effect slot and counts it used; NULL when every slot is taken. */
+inline EftResSlot* eft_res_slot_find(EftControl* ctrl) {
+    EftResSlot* slot = ctrl->slots_0x10;
+
+    for (s32 i = 0; i < (s32)ctrl->slot_count_0x0C; i++, slot++) {
+        if (slot->active_0x00 == 0) {
+            ctrl->slot_used_0x14++;
+            return slot;
+        }
     }
-    if (res_mem_index_ref(desc->name_0x04) >= 0) {
-        return;
-    }
-    s32 handle = pull_res_mem(desc->name_0x04, desc->size_0x00, 0);
-    if (handle < 0) {
-        return;
-    }
-    ctx[0] = a7;
-    ctx[1] = *name;
-    ctx[2] = a8;
-    ctx[3] = mode;
-    load_file_req(desc->name_0x04, (u32)getResMemAdrs(handle), (s32)desc->size_0x00, (u32)fn_800F8358, 4, ctx);
-    eft_control.bytes_0xC3C += *(u32*)desc;
+    return NULL;
 }
 
 /* 0x800F8788 - hand out one of the 0x48-byte effect slots plus its block run. */
 extern "C" EftResSlot* eft_res_slot_get(u32 size) {
-    EftResSlot* found;
+    EftControl* ctrl = &eft_control;
+    EftResSlot* slot;
 
-    if (eft_control.slot_used_0x14 >= eft_control.slot_count_0x0C) {
+    if ((s32)ctrl->slot_used_0x14 >= (s32)ctrl->slot_count_0x0C) {
         return NULL;
     }
-    EftResSlot* slot = eft_control.slots_0x10;
-    for (u32 i = 0; i < eft_control.slot_count_0x0C; i++) {
-        if (slot->active_0x00 == 0) {
-            eft_control.slot_used_0x14++;
-            found = slot;
-            break;
-        }
-        slot++;
-    }
-    if (slot->active_0x00 != 0) {
+    slot = eft_res_slot_find(ctrl);
+    if (slot == NULL) {
         return NULL;
     }
-    found->active_0x00 = 1;
-    found->field_0x04 = 0;
-    found->field_0x05 = 0;
-    found->field_0x06 = 0;
-    found->field_0x07 = 0;
-    found->field_0x08 = 0;
-    found->field_0x14 = 0;
-    found->field_0x15 = 0;
-    found->field_0x16 = 0;
-    found->field_0x17 = 0;
+    slot->active_0x00 = 1;
+    slot->field_0x04 = 0;
+    slot->field_0x05 = 0;
+    slot->field_0x06 = 0;
+    slot->field_0x07 = 0;
+    slot->field_0x08 = 0;
+    slot->field_0x14 = 0;
+    slot->field_0x15 = 0;
+    slot->field_0x16 = 0;
+    slot->field_0x17 = 0;
     if (size != 0) {
-        found->block_count_0x3C = fn_800F8D80(size);
-        found->blocks_0x38 = (void*)fn_800F8B44(found->block_count_0x3C);
-        if (found->blocks_0x38 == NULL) {
+        slot->block_count_0x3C = eft_res_block_count(size);
+        slot->blocks_0x38 = (void*)eft_res_blocks_get(slot->block_count_0x3C);
+        if (slot->blocks_0x38 == NULL) {
             return NULL;
         }
     }
-    return found;
+    return slot;
 }
 
 /* 0x800F886C - release one effect slot: run its hooks, retire the effect system's emitter and clear it. */
@@ -1667,12 +1710,10 @@ extern "C" void eft_res_slot_release(void* self_) {
         if (self->release_0x40 != NULL) {
             self->release_0x40(self);
         }
-        fn_800F8C78(self->blocks_0x38, self->block_count_0x3C);
+        eft_res_blocks_release(self->blocks_0x38, self->block_count_0x3C);
     }
     if (ctrl->system_0x04 != NULL) {
-        void* obj = (void*)ef_system_memory_manager(ctrl->system_0x04);
-        void** vt = (void**)obj;
-        ((void (*)(void*))vt[3])(obj);
+        ((EftResEffectAllocator*)ef_system_memory_manager(ctrl->system_0x04))->garbage_collection();
     }
     memset(self, 0, 0x48);
     if ((s32)ctrl->slot_used_0x14 > 0) {
@@ -1684,11 +1725,11 @@ extern "C" void eft_res_slot_release(void* self_) {
 extern "C" u8* eft_res_model_get(void) {
     EftControl* ctrl = &eft_control;
 
-    if (ctrl->model_used_0x20 >= ctrl->model_count_0x18) {
+    if ((s32)ctrl->model_used_0x20 >= (s32)ctrl->model_count_0x18) {
         return NULL;
     }
     EftResModelSlot* slot = (EftResModelSlot*)ctrl->models_0x1C;
-    for (int i = 0; i < ctrl->model_count_0x18; i++) {
+    for (int i = 0; i < (s32)ctrl->model_count_0x18; i++) {
         if (slot->used_0x00 == 0) {
             slot->used_0x00 = 1;
             ctrl->model_used_0x20++;
@@ -1701,7 +1742,7 @@ extern "C" u8* eft_res_model_get(void) {
 }
 
 /* 0x800F89A4 - release one model record and the g3d work slot it carries. */
-extern "C" void fn_800F89A4(void* self_) {
+extern "C" void eft_res_model_release(void* self_) {
     EftModel* self = (EftModel*)self_;
     EftControl* ctrl = &eft_control;
 
@@ -1711,7 +1752,7 @@ extern "C" void fn_800F89A4(void* self_) {
         self->field_0x10C = NULL;
     }
     EftResModelSlot* slot = (EftResModelSlot*)ctrl->models_0x1C;
-    for (int i = 0; i < ctrl->model_count_0x18; i++) {
+    for (int i = 0; i < (s32)ctrl->model_count_0x18; i++) {
         if ((void*)&slot->model_0x04 == self_) {
             slot->used_0x00 = 0;
             if ((s32)ctrl->model_used_0x20 > 0) {
@@ -1728,78 +1769,97 @@ extern "C" void eft_res_models_release(void* list, s32 count) {
     void** items = (void**)list;
 
     for (s32 i = 0; i < count; i++) {
-        if (items[0] != NULL) {
-            fn_800F89A4(items[0]);
+        if (items[i] != NULL) {
+            eft_res_model_release(items[i]);
         }
-        items[0] = NULL;
-        items++;
+        items[i] = NULL;
     }
 }
 
 /* 0x800F8AB8 - retire a run of pooled effects and hand their storage back. */
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count) {
+    long i;
     nw4r::ef::EffectSystem* system = (nw4r::ef::EffectSystem*)eft_control.system_0x04;
 
-    for (long i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (effects[i] != NULL) {
+            RetireParticleAll(effects[i]);
             effects[i]->RetireEmitterAll();
             if (system != NULL) {
                 system->RetireEffect(effects[i]);
             }
-            effects[i] = NULL;
         }
+        effects[i] = NULL;
     }
 }
 
 /* 0x800F8B44 - hand out a run of `count` 0x40-byte blocks from the block heap. */
-extern "C" void* fn_800F8B44(u32 count) {
-    u8* flags;
+extern "C" void* eft_res_blocks_get(u32 count) {
+    EftControl* ctrl = &eft_control;
+    u8* flags = ctrl->heap_flags_0x2C;
     u8* start;
-    u32 pos;
-    u32 run;
+    s32 first;
+    s32 run;
+    s32 i;
+    s32 k;
+    s32 max;
 
     if ((s32)count <= 0) {
         return NULL;
     }
-    flags = eft_control.heap_flags_0x2C;
-    pos = 0;
-    while (pos < eft_control.heap_count_0x24) {
-        if (flags[pos] != 0) {
-            pos++;
-            continue;
-        }
-        start = flags + pos;
+    i = 0;
+    max = ctrl->heap_count_0x24;
+    for (;;) {
         run = 0;
-        while (pos < eft_control.heap_count_0x24 && flags[pos] == 0) {
-            run++;
-            if (run == count) {
-                u8* mark = start;
-                for (u32 k = 0; k < run; k++) {
-                    *mark = 1;
-                    mark++;
-                }
-                return eft_control.heap_0x28 + ((u32)(start - flags) << 6);
+        while (*flags != 0) {
+            flags++;
+            i++;
+            if (i >= max) {
+                return NULL;
             }
-            pos++;
+        }
+        start = flags;
+        first = i;
+        for (;;) {
+            run++;
+            if (*flags != 0) {
+                break;
+            }
+            if (run == (s32)count) {
+                for (k = 0; k < run; k++) {
+                    *start = 1;
+                    start++;
+                }
+                return ctrl->heap_0x28 + (first << 6);
+            }
+            flags++;
+            i++;
+            if (i >= max) {
+                return NULL;
+            }
         }
     }
-    return NULL;
 }
 
 /* 0x800F8C78 - release `count` blocks of the run that starts at `ptr`. */
-extern "C" void fn_800F8C78(void* ptr, u32 count) {
-    u32 index = (u32)((u8*)ptr - eft_control.heap_0x28) >> 6;
+extern "C" void eft_res_blocks_release(void* ptr, u32 count) {
+    EftControl* ctrl = &eft_control;
+    u32 index;
+    s32 i;
+    u8* flags;
 
-    memset(eft_control.heap_0x28 + index * 0x40, 0, count * 0x40);
-    u8* flags = eft_control.heap_flags_0x2C + index;
-    for (u32 i = 0; i < count; i++) {
+    index = (u8*)ptr - ctrl->heap_0x28;
+    index >>= 6;
+    memset(ctrl->heap_0x28 + index * 0x40, 0, count * 0x40);
+    flags = ctrl->heap_flags_0x2C + index;
+    for (i = 0; i < (s32)count; i++) {
         *flags = 0;
         flags++;
     }
 }
 
 /* 0x800F8D80 - the block count a byte size needs (0x40 bytes per block). */
-extern "C" u32 fn_800F8D80(u32 size) {
+extern "C" u32 eft_res_block_count(u32 size) {
     u32 blocks = size >> 6;
 
     if ((size - (blocks << 6)) & 0x3F) {
@@ -1810,24 +1870,25 @@ extern "C" u32 fn_800F8D80(u32 size) {
 
 /* 0x800F8DA4 - the per-frame walk: retire the ready effect system, then run every slot's hook. */
 extern "C" void eft_instances_release(void) {
+    EftControl* ctrl = &eft_control;
+    void* system;
+    s32 i;
     EftResSlot* slot;
 
     ef_resource_instance();
-    void* system = eft_control.system_0x04;
+    system = ctrl->system_0x04;
     if (system == NULL) {
         return;
     }
     fn_800F95A4(system);
-    slot = eft_control.slots_0x10;
-    eft_control.frame_ready_0xC40 = 0;
-    for (u32 i = 0; i < eft_control.slot_count_0x0C; i++) {
-        if (slot[i].active_0x00 != 0) {
-            slot[i].update_0x34(&slot[i]);
+    slot = ctrl->slots_0x10;
+    ctrl->frame_ready_0xC40 = 0;
+    for (i = 0; i < (s32)ctrl->slot_count_0x0C; i++, slot++) {
+        if (slot->active_0x00 != 0) {
+            slot->update_0x34(slot);
         }
     }
-    void* obj = (void*)ef_system_memory_manager(system);
-    void** vt = (void**)obj;
-    ((void (*)(void*))vt[3])(obj);
+    ((EftResEffectAllocator*)ef_system_memory_manager(system))->garbage_collection();
 }
 
 /* 0x800F8E5C - create a model on an actor (no light argument). */
@@ -1942,34 +2003,34 @@ nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, unsigned long arg) {
 
 /* 0x800F91C4 - resolve one resource and hand it to the effect spawner. */
 extern "C" void* res_eft_create_ex(u16 id, u16 kind, u32 arg, u32 count) {
-    u8 rec[8];
+    u8 rec[4];
     u8 copy[4];
     void* system;
 
     ef_store_word(rec, 0);
     system = eft_control.system_0x04;
-    if (fn_800F97F0(id, fn_800F7AA4((u8)kind), rec) == 0) {
+    if (fn_800F97F0(id, eft_pro_slot_find_proid((u8)kind), rec) == 0) {
         return NULL;
     }
-    if (fn_800F92E0(rec) == 0) {
+    if (eft_res_handle_valid(rec) == 0) {
         return NULL;
     }
-    return fn_800F9278(system, fn_800F92D4(copy, rec), arg, count & 0xFFFF);
+    return eft_res_effect_spawn(system, eft_res_handle_copy(copy, rec), arg, count & 0xFFFF);
 }
 
 /* 0x800F9278 - hand the resolved resource to the effect spawner. */
-extern "C" void* fn_800F9278(void* system, void* res, u32 a, u32 b) {
+extern "C" void* eft_res_effect_spawn(void* system, void* res, u32 a, u32 b) {
     return fn_800A5A90(system, fn_800A5484(res), (void*)a, (u16)b);
 }
 
 /* 0x800F92D4 - the one-word copy of the resolved handle. */
-extern "C" void* fn_800F92D4(void* dst, void* src) {
+extern "C" void* eft_res_handle_copy(void* dst, void* src) {
     *(u32*)dst = *(u32*)src;
     return dst;
 }
 
 /* 0x800F92E0 - is the resolved handle non-NULL. */
-extern "C" u32 fn_800F92E0(void* self) {
+extern "C" u32 eft_res_handle_valid(void* self) {
     u32 v = *(u32*)self;
 
     return (u32)(-v | v) >> 31;
@@ -1981,25 +2042,25 @@ extern "C" u32 eft_res_spawn_gate_ck(void* self_, u32 mode) {
 
     switch (mode) {
     case 0:
-        if (self->pending_0x30[0] != 0) {
-            return 1;
+        if (self->pending_0x30[0] == 0) {
+            return 0;
         }
-        return 0;
+        break;
     case 1:
-        if (self->pending_0x30[0] != 0) {
-            return 1;
+        if (self->pending_0x30[0] == 0) {
+            return 0;
         }
-        return 0;
+        break;
     case 2:
-        if (self->pending_0x30[0] != 0) {
-            return 1;
+        if (self->pending_0x30[0] == 0) {
+            return 0;
         }
-        return 0;
+        break;
     case 3:
-        if (self->pending_0x30[0] != 0) {
-            return 1;
+        if (self->pending_0x30[0] == 0) {
+            return 0;
         }
-        return 0;
+        break;
     }
     return 1;
 }
@@ -2023,21 +2084,24 @@ extern "C" u32 eft_stage_spawn_flag(void) {
 /* 0x800F93D8 - spawn or release the effect's models for the current area and mode bits. */
 extern "C" void eft_res_models_spawn(_EFT* self, void** models, s32 mode, s32 count, void* arg) {
     VEC3 pos;
-    u16 flags = 0;
+    u16 flags;
+    s32 i;
 
     VEC3_ctor(&pos);
-    if (self->area_0x44 != get_now_areano() || self->flag_0x01 != 0) {
+    flags = 0;
+    if (self->area_0x44 != get_now_areano() || self->flag_0x01 == 0) {
         if ((mode & 2) == 0) {
             return;
         }
-        for (s32 i = 0; i < count; i++) {
-            EftModel* model = (EftModel*)models[i];
-            if (model != NULL
-                && model->field_0x118 == ((EftResModelLink*)model->field_0x10C)->field_0x04) {
-                g3d_root_model_bind(pRoot, model->field_0x118);
+        for (i = 0; i < count; i++) {
+            if (((EftModel**)models)[i] != NULL
+                && ((EftModel**)models)[i]->field_0x118
+                       == ((EftResModelLink*)((EftModel**)models)[i]->field_0x10C)->field_0x04) {
+                g3d_root_model_bind(pRoot, ((EftModel**)models)[i]->field_0x118);
             }
         }
-        return;    }
+        return;
+    }
     if (mode & 4) {
         flags |= 8;
     }
@@ -2048,22 +2112,22 @@ extern "C" void eft_res_models_spawn(_EFT* self, void** models, s32 mode, s32 co
         flags |= 0x800;
     }
     if (mode & 1) {
-        for (s32 i = 0; i < count; i++) {
-            EftModel* model = (EftModel*)models[i];
-            if (model != NULL) {
-                fn_800FA450(model);
-                sound_job_request(1, 1, (s32)model, 2, flags, arg, 0);
+        for (i = 0; i < count; i++) {
+            if (((EftModel**)models)[i] != NULL) {
+                fn_800FA450(((EftModel**)models)[i]);
+                sound_job_request(1, 1, (s32)((EftModel**)models)[i], 2, flags, arg, 0);
             }
         }
     }
     if (mode & 2) {
-        for (s32 i = 0; i < count; i++) {
-            EftModel* model = (EftModel*)models[i];
-            if (model != NULL
-                && model->field_0x118 == ((EftResModelLink*)model->field_0x10C)->field_0x04) {
+        for (i = 0; i < count; i++) {
+            if (((EftModel**)models)[i] != NULL
+                && ((EftResModelLink*)((EftModel**)models)[i]->field_0x10C)->field_0x04
+                       == ((EftModel**)models)[i]->field_0x118) {
                 fn_800FA5D4(self);
-                sound_job_request(1, model->field_0x35, (s32)model->field_0x118, 0, flags, arg, 0);
-                g3d_root_model_bind(pRoot, model->field_0x118);
+                sound_job_request(1, ((EftModel**)models)[i]->field_0x35, (s32)((EftModel**)models)[i]->field_0x118, 0,
+                                  flags, arg, 0);
+                g3d_root_model_bind(pRoot, ((EftModel**)models)[i]->field_0x118);
             }
         }
     }

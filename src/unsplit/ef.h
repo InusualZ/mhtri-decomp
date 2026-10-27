@@ -34,10 +34,7 @@ struct _EFT;
 
 /* `eft_net_send` (0x803386C4) is `hud/pl_frame_sync.cpp`'s, declared in `hud/eft_net_send.h`. */
 
-/* 0x80794A88 / 0x80794A8C - the per-map common eft and efm resource name tables (`.sbss` between `ef/eft_res.cpp`'s
- * and `enemy/enemy_control.cpp`'s claims); `stage_map_obj_load` reads them. */
-extern char*** map_com_eft_name_ptr;
-extern char*** eft_map_common_mdl_name_ptr;
+/* `map_com_eft_name_ptr` / `eft_map_common_mdl_name_ptr` are `ef/eft_res.cpp`'s, declared in `ef/eft_res.h`. */
 
 #ifdef __cplusplus
 }

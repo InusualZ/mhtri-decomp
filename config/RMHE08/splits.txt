@@ -878,7 +878,7 @@ ef/eft_res.cpp:
 	extabindex  start:0x8002580C end:0x80025974
 	.text       start:0x800F6520 end:0x800F95A4 align:16
 	.data       start:0x8059B3B0 end:0x8059B5D0
-	.sbss       start:0x80794A40 end:0x80794A88
+	.sbss       start:0x80794A40 end:0x80794A90
 	.sdata2     start:0x807965D0 end:0x807965D8
 
 ef/effect.cpp:
