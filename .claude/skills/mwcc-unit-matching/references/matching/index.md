@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (200)
+## Ideas that work (201)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -209,6 +209,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 221 | [An element tested before a call and stored after it: read the tests through an inline element accessor](221-inline-accessor-blocks-cse-across-call.md) | works | source-shape, allocator | Ours keeps an array element's address in a saved register across a call (an extra saved register, a bigger frame) where retail keeps only the scaled index and rebuilds the base after the call. |
 | 222 | [Two loops sharing one counter swap two saved registers: give the second loop its own counter](222-second-loop-own-counter.md) | works | source-shape, allocator | A function with two loops over the same counter variable has two saved registers swapped (the counter against a parameter or a result) while every instruction is otherwise identical; declaration orders do not move it. |
 | 223 | [Address-taken one-byte locals in 4-byte stack slots are one-element arrays](223-byte-local-array-stack-slot.md) | works | source-shape, allocator | Several address-taken `s8` locals (passed as `const s8*`) sit at 0x8/0x9/0xA in ours and at 0x8/0xC/0x10 in retail, shifting every stack offset above them. |
+| 224 | [An -O4-unrolled loop's register order follows the declarations and its for-header increment order](224-o4-unrolled-loops-register.md) | works | source-shape, allocator | Under `#pragma optimization_level 4` a hand-unrolled loop (or a short indexed loop) matches every opcode but the counter and the walking pointer sit in each other's registers, and the per-iteration `addi`s come in... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

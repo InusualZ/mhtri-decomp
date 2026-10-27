@@ -13,7 +13,9 @@
  *   no `.data`, `.rodata`, `.sdata` or `.sdata2` word, and its extab/extabindex records continue this run without a gap;
  *   the right edge is where `enemy/em029_prog.cpp` opens its own pool and tables.
  * FLAGS. `cflags_menu` (configure.py); `#pragma pool_data off` (retail reaches every table by its own `lis`/`addi`:
- *   `q_result_grid_draw` 90.3 -> 91.5, `q_result_reward_page_draw` 96.2 -> 98.3).
+ *   `q_result_grid_draw` 90.3 -> 91.5, `q_result_reward_page_draw` 96.2 -> 98.3); file-scope
+ *   `#pragma optimization_level 4` (retail's switch range compares and loop register use: `q_result_equip_detail_draw`
+ *   90.5 -> 100, `q_result_unlock_next` 91.1 -> 98.1, six rows up and none down).
  * NAMES. Module `menu`: its tables sit between `menu_note.cpp` (0x805E91F8) and `menu_placeinfo.cpp` (0x80604780) in
  *   `.data`, and every callee is the menu library's.  No `__FILE__` string reaches the range and the dump answers `zz_`,
  *   so the file name and every function and table name (the `q_result_*` scheme, the `QResult*` records) are GUESSes
@@ -46,35 +48,39 @@
  *   GUESS (the box band, from each body and its callers): `multi_box_phase_apply`, `multi_box_cursor_index`,
  *   GUESS: `multi_box_grid_clear`, `multi_box_cursor_clamp`, `multi_box_grid_step`, `multi_box_phase_ck`,
  *   GUESS: `multi_box_phase_step`, `multi_box_result_step`, `multi_box_phase_input`; `multi_box_rem_exist_ck` and `multi_box_cursor_item_get` carry the dump's manglings
- * RESIDUALS. Partial rows, all register-allocation or
- *   scheduling residue: `q_result_unlock_next` (the target keeps one more value live and saves r31, so it
- *   also carries the extab/extabindex record ours lacks - the flipcheck's extab -8/extabindex -12; a `mask` local
- *   measured lower),
- *   `q_result_equip_detail_draw` (retail tests the kind with range compares, our `switch` with a compare tree;
- *   an `if` chain measured lower),
- *   `q_result_hunt_recs_build`, `q_result_box_list_draw`, `q_result_equip_sel_count`, `q_result_phase_enter`,
- *   `q_result_owned_count_get` (retail returns the sum without the final `extsh` and moves the box capacity
- *   straight into r5), `q_result_item_page_init` (retail sign-extends the constant slot count before
- *   `menu_page_count`; `s16`/`s32`/`u16` locals all fold it), `q_result_msg_frame_rect` (ours sign-extends
- *   `get_wide_offset`'s result before the add; `+=` and `= +` measured the same).
- *   Every row written.
- *   Partial rows of the box band:
- *  - `multi_box_rem_exist_ck`: 2 instructions short, the target keeps a dead loop counter;
- *  - `multi_box_phase_ck`: the ready mask in r31 against retail's r30 (playbook 22);
- *  - `multi_box_grid_clear`: `items`/`i` mirrored and a `mullw` operand order (both spellings measured).
+ * RESIDUALS. Every row written; the partial rows, each with what was measured:
+ *  - `q_result_task`: the set-up pointers colour differently (`&system_w`, the user record, the player work and the
+ *    reward row sit in retail's r24/r23/r25/r31, ours r25/r24/r23/r29; a 150-order declaration hill and block-scoped
+ *    spellings found nothing better); `faint_count` is stored with an `extsb` retail lacks (the `u8`
+ *    `my_faint_count_0x92` into the `s8` field; a cast measured the same); the `field_0x1E8` sum and the
+ *    `item_value_total` update load their operands in another order (four spellings measured equal).
+ *  - `q_result_points_page_draw`, `q_result_page_set`, `q_result_reward_page_draw` (cases 1 and 2 swap the row index
+ *    and the value): register colouring only; declaration hills of 80-100 orders took what they found.
  *  - `multi_box_phase_input`: phase 1's "any record still choosing" loop keeps its flag in r3 and the pointer in r4
- *    where ours swaps them, and the last save step computes `Psw[box_player]` with the `mulli` ahead of the base
- *    (index, inline-helper and separate-pointer spellings measured lower or equal).
- *   flipcheck: `.text`, extab and extabindex differ (the partial rows above); `.sbss` emits `multi_box_save_keep`'s 2 bytes
- *   of the claimed 0x8 (the body reads only bytes 0 and 1).
+ *    where ours swaps them (a separate flag, the declaration order and the walking-pointer form measured equal), and
+ *    the last save step computes `Psw[box_player]` with the `mulli` ahead of the base (three spellings equal).
+ *  - `q_result_phase_next`: retail leaves the loop by `bne exit; b top`, ours by `beq top`; `for (;;)`, `while`,
+ *    `do-while`, `continue` and a return inside the loop all compile the same.
+ *  - `q_result_owned_count_get`: retail returns the sum without the final `extsh` (an `s32` return matches the row
+ *    but costs its caller `q_result_item_counts_draw` 7 B; `+=` and a local measured the same).
+ *  - `q_result_time_page_draw`: the row pointer and the rank-kind walk swap r28/r27 (loop-header orders measured).
+ *  - `multi_box_grid_clear`: one `mullw` operand order (both operand orders and casts measured equal).
+ *   flipcheck: `.text` (the rows above, +4 B) and extabindex differ; `.sbss` emits `multi_box_save_keep`'s 2 bytes of
+ *   the claimed 0x8 (the body reads only bytes 0 and 1); `.sdata`/`.sdata2` differ only by their trailing alignment.
  * SHAPES. A two-way test on a `u8` mode is a `switch` in retail (`cmpwi`, the default body first); a mode tested
  *   for `<= 2` then `== 3` is `case 0: case 1: case 2:` / `case 3:`; the `GetMenuFontColor` flags are `bool` locals;
  *   the per-frame `frame` arguments are `u8` locals (the `u16` parameter then takes a `clrlwi`);
  *   `multi_box_phase_ck` declares the mask, index and count at function scope and leaves its loop with a `break` (a
- *   second constant return makes MWCC if-convert the mask test into a branchless `srwi`).
+ *   second constant return makes MWCC if-convert the mask test into a branchless `srwi`); at -O4 MWCC unrolls the
+ *   short loops itself, so `q_result_box_list_draw`, `multi_box_rem_exist_ck` and `q_result_equip_sel_count` are
+ *   plain loops (a walking pointer with the counter declared first; retail's increment order is the for-header's);
+ *   a range of cases tested as `cmplwi`/`ble` then `cmpwi`/`beq` is a `switch` (`q_result_points_page_draw`);
+ *   `q_result_phase_input` runs case 4's body for every phase it does not name (`case 4: default:` last, `case 0:`
+ *   empty); `seconds` is `elapsed - minutes * per_minute`, not a second division.
  */
 
 #pragma pool_data off
+#pragma optimization_level 4
 
 #include "types.h"
 #include "menu/menu_result.h"
@@ -118,6 +124,17 @@
 #include "ef/monster_size_value_get.h"
 #include "menu/menu_infomation.h"
 #include "MSL_C/alloc.h"
+
+/* Call views (the `_c1` convention): callees whose header declaration differs from the type retail's calls use.
+ * `userdata_flag_ck`, `item_slots_room_get`, `item_slots_count_sum` and `item_box_store` take their owners'
+ * definitions (`fn_8004CAD8.cpp`, `userdata_item.cpp`); `Pl_cat_skill_ck` is read as returning a byte (stored
+ * without a `clrlwi`) and `get_wide_offset` as returning a halfword (added without an `extsh`). */
+#define userdata_flag_ck_c1 ((u32 (*)(u16))userdata_flag_ck)
+#define Pl_cat_skill_ck_c1 ((u8 (*)(struct _PLW*, u16))Pl_cat_skill_ck)
+#define item_slots_room_get_c1 ((s32 (*)(u16, IdValue*, s32))item_slots_room_get)
+#define item_box_store_c1 ((u32 (*)(u16, u32, u16*))item_box_store)
+#define item_slots_count_sum_c1 ((s32 (*)(u16, IdValue*, s32))item_slots_count_sum)
+#define get_wide_offset_c1 ((s16 (*)(u8))get_wide_offset)
 
 
 /* One 4-byte record of the menu row table `menu_row_table_get` returns, as the size rows read it (`menu/menu_item_page.h`
@@ -332,7 +349,6 @@ void q_result_hunt_recs_build(QResultScreen* self, Q_ResultWork* result)
     u8 i;
     s8 row;
     QResultHuntRec* rec;
-    Q_SizeRecord* best;
 
     self->hunt_rec_count = 0;
     rows = (QResultMenuRow*)menu_row_table_get();
@@ -341,15 +357,15 @@ void q_result_hunt_recs_build(QResultScreen* self, Q_ResultWork* result)
             row = menu_row_monster_index_get(i);
             if (row >= 0 && rows[row].mode == 1) {
                 rec = &self->hunt_recs[self->hunt_rec_count];
-                best = &user->sizes_0x3BC0[i];
-                if (best->size_min == 0 || result->sizes_0x0A4[i].size_min < best->size_min) {
+                if (user->sizes_0x3BC0[i].size_min == 0 ||
+                    result->sizes_0x0A4[i].size_min < user->sizes_0x3BC0[i].size_min) {
                     rec->new_flags = 1;
                 } else {
                     rec->new_flags = 0;
                 }
                 rec->monster = i;
                 rec->size_min = result->sizes_0x0A4[i].size_min;
-                if (result->sizes_0x0A4[i].size_max > best->size_max) {
+                if (result->sizes_0x0A4[i].size_max > user->sizes_0x3BC0[i].size_max) {
                     rec->new_flags |= 2;
                 }
                 rec->monster = i;
@@ -406,10 +422,10 @@ u8 q_result_unlock_next(QResultScreen* self)
 {
     s32 word;
     s32 bit;
-    QResultUnlockBit* entry;
-    QResultUnlockEvent* event;
     u16 event_mask;
     u8 id;
+    QResultUnlockBit* entry;
+    QResultUnlockEvent* event;
 
     for (word = 0; word < 2; word++) {
         for (bit = 0; bit < 32; bit++) {
@@ -576,7 +592,7 @@ void q_result_item_page_init(QResultScreen* self)
 {
     Q_UserData* user = get_userdata();
     Q_ResultWork* q = get_qResult_work();
-    s16 slots;
+    u8 slots;
 
     self->open_frame = 0;
     self->cursor_count = 0;
@@ -701,12 +717,12 @@ void q_result_phase_init(QResultScreen* self, s32 phase)
  * frame (rewards, kept items, size rows, unlocks), then runs the phase it is in; 1 once the screen has closed. */
 BOOL q_result_task(Q_MoveWork* move)
 {
-    u32* seen = system_w.unlock_seen_0x888;
-    Q_UserData* user = get_userdata();
-    QResultScreen* self = (QResultScreen*)move->result_buffer_0x150;
-    Q_ResultWork* q = get_qResult_work();
-    Q_ItemWork* work = move_work_item_work_get();
+    QResultScreen* self;
+    Q_ItemWork* work;
+    Q_ResultWork* q;
     struct _PLW* plw;
+    SystemWork* sys;
+    Q_UserData* user;
     Q_ResultRow* row;
     s32 i;
     f32 scale;
@@ -716,6 +732,11 @@ BOOL q_result_task(Q_MoveWork* move)
     u16 events;
     QResultUnlockEvent* event;
 
+    sys = &system_w;
+    user = get_userdata();
+    self = (QResultScreen*)move->result_buffer_0x150;
+    q = get_qResult_work();
+    work = move_work_item_work_get();
     q_result_noop(self);
     switch (self->state) {
     case 0:
@@ -757,8 +778,8 @@ BOOL q_result_task(Q_MoveWork* move)
         self->hunt_count[0] = 0;
         self->hunt_count[1] = 0;
         if (q_result_phase_is_3(self) == 0) {
-            self->skill_points = Pl_cat_skill_ck(plw, 0x1B);
-            self->skill_zenny = Pl_cat_skill_ck(plw, 0x29);
+            self->skill_points = Pl_cat_skill_ck_c1(plw, 0x1B);
+            self->skill_zenny = Pl_cat_skill_ck_c1(plw, 0x29);
             row = work->record_0x3C;
             if (row->objective_0x34C[0] > 0) {
                 self->reward_shown[0] = 1;
@@ -849,7 +870,7 @@ BOOL q_result_task(Q_MoveWork* move)
                         }
                     }
                 }
-                if (q->progress_0x1E0 == 14002 && userdata_flag_ck(14002) == 1) {
+                if (q->progress_0x1E0 == 14002 && userdata_flag_ck_c1(14002) == 1) {
                     unlock_bit_raise(6);
                 }
             } else if (quest_flag_2000000_ck(NULL) == 1 || quest_flag_80000000_ck(NULL) == 1) {
@@ -883,8 +904,8 @@ BOOL q_result_task(Q_MoveWork* move)
                 self->hunt_points_total += self->hunt_points[1] * self->hunt_count[1];
             }
             self->faint_count = work->my_faint_count_0x92;
-            q->field_0x1E8 = self->faint_count * -20 + (self->point_rows[0] + self->point_rows[1]) +
-                             (self->hunt_points_total + self->point_rows[2]);
+            q->field_0x1E8 = self->faint_count * -20 + ((self->hunt_points_total + self->point_rows[2]) +
+                                                         (self->point_rows[0] + self->point_rows[1]));
             quest_item_pair_tbl_copy((Q_ItemPair*)self->grid_items, (Q_ItemPair*)self->grid_kept);
             if (q_result_items_left_ck(self, 1) == 1) {
                 self->ready_flag = 1;
@@ -907,7 +928,7 @@ BOOL q_result_task(Q_MoveWork* move)
         }
         self->swap_counter = 0;
         for (word = 0; word < 2; word++) {
-            self->unlock_bits[word] = move->unlock_bits_0x148[word] & ~seen[word];
+            self->unlock_bits[word] = move->unlock_bits_0x148[word] & ~sys->unlock_seen_0x888[word];
             for (bit = 0; bit < 32; bit++) {
                 if ((1 << bit) & self->unlock_bits[word]) {
                     self->swap_counter++;
@@ -917,7 +938,7 @@ BOOL q_result_task(Q_MoveWork* move)
         unlock_seen_mark(move->unlock_bits_0x148);
         events = user->event_bits_0x52E2;
         for (event = q_result_unlock_event_tbl; event->key != 0; event++) {
-            if (userdata_flag_ck(event->key) == 1 && userdata_event_bit_ck(event->event) == 0) {
+            if (userdata_flag_ck_c1(event->key) == 1 && userdata_event_bit_ck(event->event) == 0) {
                 userdata_event_bit_set(event->event);
                 self->swap_counter++;
             }
@@ -1345,9 +1366,9 @@ IdValue* q_result_list_entry(QResultScreen* self)
 /* 0x80398C88 (0x118): How many equipment cells are marked. */
 s16 q_result_equip_sel_count(QResultScreen* self)
 {
-    s16 count = 0;
     s32 word;
     s32 bit;
+    s16 count = 0;
 
     for (word = 0; word < 3; word++) {
         for (bit = 0; bit < 16; bit++) {
@@ -1378,10 +1399,10 @@ u32 q_result_equip_sel_toggle(QResultScreen* self, u16 index)
  * anything was filed. */
 u32 q_result_equip_take(QResultScreen* self)
 {
-    Q_UserData* user = get_userdata();
-    u32 taken = 0;
     u16 i;
     _EQUIP* cell;
+    Q_UserData* user = get_userdata();
+    u32 taken = 0;
 
     for (i = 0; i < 0x28; i++) {
         if ((1 << (i & 0xF)) & self->equip_sel_bits[i >> 4]) {
@@ -1419,13 +1440,13 @@ s32 q_result_phase_input(QResultScreen* self)
     IdValue* cell;
     IdValue held;
     s16 fit;
-    s16 room;
-    u16 index;
+    s32 room;
+    s16 index;
     ItemDataRecord* data;
     _EQUIP* equip;
-    u16 keys;
+    u32 keys;
     u8 anim;
-    u8 box_out[4];
+    u16 stored;
 
     if (--self->phase_timer <= 0) {
         switch (self->phase) {
@@ -1545,14 +1566,14 @@ s32 q_result_phase_input(QResultScreen* self)
                             break;
                         }
                     } else {
-                        room = item_slots_room_get(cell->id, ((Q_UserData*)lobby_world_block)->box_0x180,
+                        room = item_slots_room_get_c1(cell->id, ((Q_UserData*)lobby_world_block)->box_0x180,
                                                    userdata_box_capacity(lobby_world_block));
                         if (room > 0) {
                             if (room > cell->value) {
                                 room = cell->value;
                             }
                             q_result_row_init(self, cell, self->grid_cursor_col, self->grid_cursor_row);
-                            item_box_store(cell->id, room, box_out);
+                            item_box_store_c1(cell->id, room, &stored);
                             cell->value -= room;
                             if (cell->value == 0) {
                                 cell->id = 0;
@@ -1588,23 +1609,22 @@ s32 q_result_phase_input(QResultScreen* self)
             }
             break;
         case 3:
-            keys = pad->pressed_0x04;
-            if (keys & 0x10) {
+            if (pad->pressed_0x04 & 0x10) {
                 cell = q_result_grid_entry(self, which);
                 data = GetItemData(cell->id);
                 index = q_result_list_cursor_index(self);
-                if ((s16)index < 0x18 || data->kind_0x00 == 1) {
+                if (index < 0x18 || data->kind_0x00 == 1) {
                     item_pair_copy(&held, cell);
                     item_pair_copy(cell, q_result_list_entry(self));
                     q_result_box_slot_set(held.id, held.value, index);
                     self->select_mode = 1;
                     sysSE_req(0);
                 }
-            } else if (keys & 0x20) {
+            } else if (pad->pressed_0x04 & 0x20) {
                 self->select_mode = 1;
                 sysSE_req(1);
             } else {
-                keys |= pad->held_0x14;
+                keys = pad->pressed_0x04 | pad->held_0x14;
                 if (keys & 3) {
                     self->list_cursor_col = menu_cursor_step(self->list_cursor_col, 8, keys, 1, 2);
                 } else if (keys & 0xC) {
@@ -1712,12 +1732,6 @@ s32 q_result_phase_input(QResultScreen* self)
             break;
         }
         break;
-    case 4:
-        if (pad->pressed_0x04 & 0x10) {
-            sysSE_req(0);
-            return 1;
-        }
-        break;
     case 5:
         self->page_moved = 0;
         self->cursor = menu_cursor_step_fixed_tail(self->cursor, self->cursor_count, pad->pressed_0x04 | pad->held_0x14, 4,
@@ -1775,6 +1789,15 @@ s32 q_result_phase_input(QResultScreen* self)
             self->unlock_text = q_result_unlock_next(self);
         }
         break;
+    case 0:
+        break;
+    case 4:
+    default:
+        if (pad->pressed_0x04 & 0x10) {
+            sysSE_req(0);
+            return 1;
+        }
+        break;
     }
     return 0;
 }
@@ -1825,7 +1848,7 @@ void q_result_msg_frame_rect(u8 frame_kind, s16* x, s16* y, u16* width, u16* hei
 {
     *x = 12;
     *y = 368;
-    *x += get_wide_offset(2);
+    *x += get_wide_offset_c1(2);
     if (width != NULL) {
         if (frame_kind == 0) {
             *width = 304;
@@ -1886,7 +1909,7 @@ void q_result_font_print_line(s16 row, s16 color, s16 line)
     if (row > 0) {
         q_result_msg_frame_rect(0, &x, &y, NULL, NULL);
         text_x = x + 20;
-        text_y = y + line * 20 + 16;
+        text_y = y + 16 + line * 20;
         font_set_size(18, 18);
         font_print_ex(text_x, text_y, color, (s8*)q_result_msg_string_alt(row));
     }
@@ -2017,14 +2040,13 @@ void q_result_box_list_draw(QResultScreen* self, u8 which)
     IdValue* cell;
     ItemDataRecord* data;
     s16 index;
-    s32 flags;
     u32 extra;
     IdValue* box;
+    s32 flags;
     u8 enabled;
     MenuListEntry entries[8];
-    MenuListEntry* entry;
     s16 col;
-    s32 i;
+    MenuListEntry* entry;
     _mh_ivec2_ pos;
 
     cell = q_result_grid_entry(self, which);
@@ -2049,49 +2071,15 @@ void q_result_box_list_draw(QResultScreen* self, u8 which)
     }
     memset(entries, 0, sizeof(entries));
     entry = entries;
-    col = 0;
-    for (i = 0; i < 2; i++) {
-        entry[0].present_0x02 = enabled;
-        entry[0].field_0x01 = 0;
+    for (col = 0; col < 8; col++, entry++, index++) {
+        entry->present_0x02 = enabled;
+        entry->field_0x01 = 0;
         if (col == self->list_cursor_col) {
-            entry[0].field_0x01 = 1;
+            entry->field_0x01 = 1;
         } else {
-            entry[0].field_0x01 = 0;
+            entry->field_0x01 = 0;
         }
-        entry[0].index_0x06 = index;
-        col++;
-        index++;
-        entry[1].present_0x02 = enabled;
-        entry[1].field_0x01 = 0;
-        if (col == self->list_cursor_col) {
-            entry[1].field_0x01 = 1;
-        } else {
-            entry[1].field_0x01 = 0;
-        }
-        entry[1].index_0x06 = index;
-        col++;
-        index++;
-        entry[2].present_0x02 = enabled;
-        entry[2].field_0x01 = 0;
-        if (col == self->list_cursor_col) {
-            entry[2].field_0x01 = 1;
-        } else {
-            entry[2].field_0x01 = 0;
-        }
-        entry[2].index_0x06 = index;
-        col++;
-        index++;
-        entry[3].present_0x02 = enabled;
-        entry[3].field_0x01 = 0;
-        if (col == self->list_cursor_col) {
-            entry[3].field_0x01 = 1;
-        } else {
-            entry[3].field_0x01 = 0;
-        }
-        entry[3].index_0x06 = index;
-        col++;
-        entry += 4;
-        index++;
+        entry->index_0x06 = index;
     }
     if (self->page_moved & 4) {
         flags |= 8;
@@ -2270,20 +2258,20 @@ void q_result_grid_draw(QResultScreen* self, u8 which, u32 active)
     _mh_ivec2_ anchor;
     _mh_ivec2_ row_pos;
     _mh_ivec2_ pos;
+    u16* row_lsp;
+    u16 index;
     IdValue* items = NULL;
     _EQUIP* equip = NULL;
-    u32 waiting = 0;
-    s32 mode = 0;
-    u16* row_lsp;
-    u8 rows;
-    u32 moved_live;
-    u16 index;
     u8 row;
     u8 col;
     u32 cursor;
     u32 marked;
     u32 moved;
     IdValue* item;
+    u8 rows;
+    u32 waiting = 0;
+    s32 mode = 0;
+    u32 moved_live;
 
     sprite_frame_apply(&spr, 0x120B, self->open_frame, &anchor);
     rows = self->grid_rows;
@@ -2366,12 +2354,11 @@ void q_result_grid_draw(QResultScreen* self, u8 which, u32 active)
  * the grid, and the help line the state calls for. */
 void q_result_page_set(QResultScreen* self, u8 mode)
 {
-    char** lines;
-    s32 show_cmds;
-    s32 help;
-    s32 note;
     u8 note_line;
+    s32 note;
     s32 with_value;
+    s32 help;
+    s32 show_cmds;
     s32 value;
     u32 list_mode;
     u32 left;
@@ -2383,6 +2370,7 @@ void q_result_page_set(QResultScreen* self, u8 mode)
     s32 i;
     bool enabled;
     bool selected;
+    char** lines;
     bool active;
     IdValue* cell;
     ItemDataRecord* data;
@@ -2484,7 +2472,7 @@ void q_result_page_set(QResultScreen* self, u8 mode)
                 rows = q_result_cmd_rows_1;
                 break;
             }
-            for (i = 0; i < self->cursor_count; i++, rows++, lines++) {
+            for (i = 0; i < self->cursor_count; rows++, lines++, i++) {
                 enabled = TRUE;
                 get_lsp_data(*rows, &pos);
                 pos.x += anchor.x;
@@ -2626,8 +2614,8 @@ void q_result_page_set(QResultScreen* self, u8 mode)
                         note = 0xF;
                         break;
                     }
-                } else if (item_slots_room_get(cell->id, ((Q_UserData*)lobby_world_block)->box_0x180,
-                                               userdata_box_capacity(lobby_world_block)) <= 0) {
+                } else if (item_slots_room_get_c1(cell->id, ((Q_UserData*)lobby_world_block)->box_0x180,
+                                                  userdata_box_capacity(lobby_world_block)) <= 0) {
                     note = 0x10;
                 }
             }
@@ -2666,8 +2654,6 @@ void q_result_page_set(QResultScreen* self, u8 mode)
 /* 0x8039B730 (0x280): Draws the arena time page (the record rows and the clear time), then the item page over it. */
 void q_result_time_page_draw(QResultScreen* self)
 {
-    QuestRecord* rec = quest_record_get();
-    Q_ResultWork* q = get_qResult_work();
     _SPR_DATA_ spr;
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
@@ -2675,6 +2661,8 @@ void q_result_time_page_draw(QResultScreen* self)
     static u8 q_result_time_rank_kind[3] = {0, 1, 2};
     QResultTextBox* box;
     s32 i;
+    QuestRecord* rec = quest_record_get();
+    Q_ResultWork* q = get_qResult_work();
     s16 minutes;
     s16 seconds;
     s32 elapsed;
@@ -2701,7 +2689,7 @@ void q_result_time_page_draw(QResultScreen* self)
                         &anchor);
         elapsed = q->elapsed_0x148;
         minutes = elapsed / (s32)(60.0f * Screen_w.frame_scale);
-        seconds = (s16)(elapsed % (s32)(60.0f * Screen_w.frame_scale)) / (s32)Screen_w.frame_scale;
+        seconds = (s16)(elapsed - minutes * (s32)(60.0f * Screen_w.frame_scale)) / (s32)Screen_w.frame_scale;
         pos.x = q_result_time_total_row.pos.x + 0x96;
         pos.y = q_result_time_total_row.pos.y;
         sprintf(text, q_result_msg_string(14), minutes, seconds);
@@ -2733,18 +2721,17 @@ void q_result_reward_page_draw(QResultScreen* self)
 {
     s32 total = 0;
     Q_UserData* user = get_userdata();
-    _mh_ivec2_ row_pos;
-    _mh_ivec2_ anchor;
+    _SPR_DATA_ value_spr;
+    _SPR_DATA_ count_spr;
+    _SPR_DATA_ label;
     char count_text[0x10];
     char text[0x40];
-    _SPR_DATA_ label;
-    _SPR_DATA_ count_spr;
-    _SPR_DATA_ value_spr;
+    _mh_ivec2_ anchor;
+    _mh_ivec2_ row_pos;
     s32 i;
     u16* lsp;
     s32 value;
     u32 bonus;
-    s32* zenny;
     IdValue* item;
     ItemDataRecord* data;
 
@@ -2756,7 +2743,7 @@ void q_result_reward_page_draw(QResultScreen* self)
     spr_data_copy(&count_spr, get_lsp_data(0x124F, NULL));
     switch (self->cursor) {
     case 0:
-        for (i = 0, lsp = q_result_reward_row_lsp; i < 4; i++, lsp++) {
+        for (i = 0, lsp = q_result_reward_row_lsp; i < 4; lsp++, i++) {
             switch (i) {
             case 0:
                 value = self->zenny_total;
@@ -2838,11 +2825,11 @@ void q_result_reward_page_draw(QResultScreen* self)
         }
         break;
     case 2:
-        for (i = 0, zenny = self->hunt_count, lsp = q_result_hunt_row_lsp; i < 2; i++, zenny++) {
-            if (zenny[0] != 0) {
+        for (i = 0, lsp = q_result_hunt_row_lsp; i < 2; i++) {
+            if (self->hunt_count[i] != 0) {
                 sprintf(text, q_result_fmt_str, str_tbl_33_get(self->hunt_monster[i]));
-                sprintf(count_text, q_result_msg_string(9), zenny[0]);
-                value = zenny[2] * zenny[0];
+                sprintf(count_text, q_result_msg_string(9), self->hunt_count[i]);
+                value = self->hunt_zenny[i] * self->hunt_count[i];
                 total += value;
                 spr_data_copy(&label, get_lsp_data(*lsp, &row_pos));
                 label.pos.x -= 34;
@@ -2858,7 +2845,7 @@ void q_result_reward_page_draw(QResultScreen* self)
         break;
     case 3:
         for (i = 0, item = self->kept_items, lsp = q_result_item_row_lsp; i < self->kept_item_count;
-             i++, item++, lsp++) {
+             item++, lsp++, i++) {
             data = GetItemData(item->id);
             sprintf(text, q_result_fmt_str, (char*)ItemName(item->id));
             sprintf(count_text, q_result_msg_string(9), item->value);
@@ -2896,26 +2883,25 @@ void q_result_points_page_draw(QResultScreen* self)
 {
     s32 total = 0;
     Q_UserData* user = get_userdata();
-    s32 skill_shown = 0;
     s32 faint_shown = 0;
     u8 hunt = 0;
+    s32 skill_shown = 0;
     u32 normal;
-    _mh_ivec2_ anchor;
-    _mh_ivec2_ row_pos;
     _mh_ivec2_ frame_pos;
-    _SPR_DATA_ label;
-    _SPR_DATA_ count_spr;
+    _mh_ivec2_ row_pos;
+    _mh_ivec2_ anchor;
     _SPR_DATA_ value_spr;
+    _SPR_DATA_ count_spr;
+    _SPR_DATA_ label;
     char count_text[0x10];
     char text[0x40];
     u8 hunt_done[2];
-    u8 i;
+    s32 i;
     s32 draw_values;
     s32 have;
     u8 count;
     s32 value;
     u16* lsp;
-    s32* points;
     u16* total_lsp;
     u16 rank;
     u16 frame;
@@ -2931,13 +2917,19 @@ void q_result_points_page_draw(QResultScreen* self)
     hunt_done[0] = 0;
     hunt_done[1] = 0;
     lsp = q_result_item_row_lsp;
-    points = self->point_rows;
     total_lsp = q_result_item_row_lsp;
-    for (i = 0; i < 8; i++, points++, total_lsp++) {
+    for (i = 0; i < 8; i++, total_lsp++) {
         draw_values = 1;
         have = 0;
         count = 0;
-        if (i <= 6) {
+        switch (i) {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
             spr_data_copy(&label, get_lsp_data(*lsp, &row_pos));
             label.pos.x -= 20;
             if (normal == 0) {
@@ -2950,7 +2942,7 @@ void q_result_points_page_draw(QResultScreen* self)
                     total += value;
                     have = 1;
                 }
-            } else if (i <= 2) {
+            } else if ((u32)i <= 2) {
                 if (self->reward_shown[i] != 1) {
                     continue;
                 }
@@ -2958,7 +2950,7 @@ void q_result_points_page_draw(QResultScreen* self)
                 if (self->reward_cut == 1) {
                     strcat(text, q_result_msg_string(0));
                 }
-                value = points[0];
+                value = self->point_rows[i];
                 total += value;
                 have = 1;
             }
@@ -2984,12 +2976,14 @@ void q_result_points_page_draw(QResultScreen* self)
                     continue;
                 }
             }
-        } else if (i == 7) {
+            break;
+        case 7:
             spr_data_copy(&label, get_lsp_data(*total_lsp, &row_pos));
             label.pos.x -= 20;
             sprintf(text, q_result_fmt_str, q_result_msg_string(8));
             value = total;
-        } else {
+            break;
+        default:
             continue;
         }
         draw_font(label, (s8*)text, 0, &anchor);
@@ -3059,7 +3053,7 @@ void q_result_points_page_draw(QResultScreen* self)
  * "none" text) with their crown marks, and the row's record label. */
 void q_result_size_row_draw(QResultScreen* self, u8 which, u8 monster, u16 size_max, u16 size_min, _mh_ivec2_* pos)
 {
-    char text[0x40];
+    char text[0x20];
     f32 size;
 
     draw_sprite_ary(q_result_size_row_ids, pos);
@@ -3091,8 +3085,10 @@ void q_result_size_row_draw(QResultScreen* self, u8 which, u8 monster, u16 size_
     }
     strcat(text, q_result_msg_string(19));
     draw_font_idx(0x1278, (s8*)text, 0, pos);
-    if (monster_size_crown_get(monster, size_min) == 3) {
+    switch (monster_size_crown_get(monster, size_min)) {
+    case 3:
         draw_sprite_uv_idx(0x1271, 27, pos);
+        break;
     }
     if (which == 0) {
         draw_sprite_idx(0x1272, pos);
@@ -3284,7 +3280,7 @@ s16 q_result_owned_count_get(u16 item)
         size = userdata_pouch_size(1);
         count = item_count_find(item, userdata_pouch_get(lobby_world_block, 1), size);
     }
-    return count + (s16)item_slots_count_sum(item, ((Q_UserData*)lobby_world_block)->box_0x180,
+    return count + (s16)item_slots_count_sum_c1(item, ((Q_UserData*)lobby_world_block)->box_0x180,
                                              userdata_box_capacity(lobby_world_block));
 }
 
@@ -3321,10 +3317,10 @@ void q_result_box_record_init(_multi_result_work* rec, u8 player_no)
  * files the quest time into the VS records it beats, 8 arms the swap timer, 9 parks the box cursor. */
 void q_result_phase_enter(QResultScreen* self, s32 phase)
 {
+    s32 i;
     u32 updated = 0;
     Q_ResultWork* q = get_qResult_work();
     MultiResultRecordArray* recs = (MultiResultRecordArray*)self;
-    s32 i;
     s32 slot;
     u32* times;
 
@@ -3398,6 +3394,39 @@ void multi_box_phase_apply(QResultScreen* self) {
     }
 }
 
+/* Whether the player's box still has anything in it: 1 as soon as one of the 16 slots carries an
+ * item with a positive count. */
+u32 multi_box_rem_exist_ck(_multi_result_work* box) {
+    s32 i;
+    MultiResultBoxGrids* work = box->work;
+    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
+
+    if (items != NULL) {
+        for (i = 0; i < 16; i++, items++) {
+            if (items->item_id != 0 && items->count > 0) return 1;
+        }
+    }
+    return 0;
+}
+
+/* Credits every item the player's box still holds into the VS user block's point counter, then
+ * empties the 16 slots.  The `items != NULL` guard is retail's own (the grids hang off `work`). */
+void multi_box_grid_clear(_multi_result_work* box, _vs_user_data* user) {
+    s32 i;
+    MultiResultBoxGrids* work = box->work;
+    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
+
+    if (items != NULL) {
+        for (i = 0; i < 16; i++, items++) {
+            if (items->item_id != 0 && items->count > 0) {
+                score_add_clamped(GetItemData(items->item_id)->field_0x010 * items->count, &user->point_0x18);
+                items->item_id = 0;
+                items->count = 0;
+            }
+        }
+    }
+}
+
 /* Returns the box grid slot the cursor is on: `x + y * width` of the record's own cursor. */
 u16 multi_box_cursor_index(_multi_result_work* box) {
     return (u16)(box->cursor_x + box->cursor_y * box->box_w);
@@ -3410,56 +3439,6 @@ MultiResultBoxItem* multi_box_cursor_item_get(_multi_result_work* box) {
     MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
 
     return &items[multi_box_cursor_index(box)];
-}
-
-/* Whether the player's box still has anything in it: 1 as soon as one of the 16 slots carries an
- * item with a positive count. */
-u32 multi_box_rem_exist_ck(_multi_result_work* box) {
-    MultiResultBoxGrids* work = box->work;
-    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
-    u32 i;
-
-    if (items != NULL) {
-        /* Two groups of eight slots, the eight checks written out: retail keeps one pointer walking
-         * 0x20 B per group with fixed offsets 0..0x1C (an inner `for` over eight slots makes MWCC index
-         * the second group through a second pointer and costs the function 4 B).  RESIDUAL: the
-         * target also keeps a *dead* loop counter - `li r3, 0` plus `addi r3, r3, 7` per group, which
-         * also puts the walking pointer in r4 - and MWCC eliminates it from every spelling tried
-         * (for-increment, body increment, hoisted init), so this function is 2 instructions short
-         * (316 B vs 324 B, 96.27 %). */
-        for (i = 0; i < 14; i += 7) {
-            if (items[0].item_id != 0 && items[0].count > 0) return 1;
-            if (items[1].item_id != 0 && items[1].count > 0) return 1;
-            if (items[2].item_id != 0 && items[2].count > 0) return 1;
-            if (items[3].item_id != 0 && items[3].count > 0) return 1;
-            if (items[4].item_id != 0 && items[4].count > 0) return 1;
-            if (items[5].item_id != 0 && items[5].count > 0) return 1;
-            if (items[6].item_id != 0 && items[6].count > 0) return 1;
-            if (items[7].item_id != 0 && items[7].count > 0) return 1;
-            items += 8;
-        }
-    }
-    return 0;
-}
-
-/* Credits every item the player's box still holds into the VS user block's point counter, then
- * empties the 16 slots.  The `items != NULL` guard is retail's own (the grids hang off `work`). */
-void multi_box_grid_clear(_multi_result_work* box, _vs_user_data* user) {
-    MultiResultBoxGrids* work = box->work;
-    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
-
-    if (items != NULL) {
-        u32 i;
-
-        for (i = 0; i < 16; i++) {
-            if (items[i].item_id != 0 && items[i].count > 0) {
-                score_add_clamped(GetItemData(items[i].item_id)->field_0x010 * items[i].count,
-                                  &user->point_0x18);
-                items[i].item_id = 0;
-                items[i].count = 0;
-            }
-        }
-    }
 }
 
 /* 0x8039D5B0 (0x8C): steps the box record's grid cursor with the pad's pressed and auto-repeat words (columns on
@@ -3564,9 +3543,9 @@ extern "C" void multi_box_grid_step(_multi_result_work* box) {
 /* Whether the screen may enter the phase `mode` names: 1 is refused while the quest result is still
  * showing, and 8 waits until every player has seven of the eight slots settled. */
 u32 multi_box_phase_ck(QResultScreen* self, u8 mode) {
+    s32 i;
     u16 mask = 0;
     u8 n = 0;
-    s32 i;
 
     switch (mode) {
     case 0:
@@ -3577,8 +3556,6 @@ u32 multi_box_phase_ck(QResultScreen* self, u8 mode) {
         }
         break;
     case 8: {
-        s32 i;
-
         for (i = 0; i < self->field_0x0007; i++) {
             _vs_user_data* user = get_vsUser_work(i);
 
@@ -3662,8 +3639,8 @@ s32 multi_box_phase_input(QResultScreen* self)
         for (i = 0; i < self->field_0x0007; i++, rec++) {
             multi_box_grid_step(rec);
         }
-        result = 0;
         rec = (_multi_result_work*)self->box_records;
+        result = 0;
         for (i = 0; i < self->field_0x0007; i++) {
             if (rec->state != 0xFF) {
                 result = 1;
