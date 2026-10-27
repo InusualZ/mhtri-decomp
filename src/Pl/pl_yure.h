@@ -10,6 +10,8 @@
 
 #ifdef __cplusplus
 
+struct PlSeRig;
+
 /* The number of joints one sway record chains (the record keeps `count_0x08` of them, at most this). */
 #define YURE_JOINT_MAX 2
 
@@ -33,10 +35,16 @@ struct YureRec {
     /* +0x3C */ nw4r::math::VEC3 vel_0x3C[YURE_JOINT_MAX];       /* each point's velocity */
     /* +0x54 */ nw4r::math::VEC3 rest_0x54[YURE_JOINT_MAX];      /* each point's rest offset from its joint */
     /* +0x6C */ nw4r::math::VEC3 anchor_0x6C;                    /* the root's previous world position */
-    /* +0x78 */ u32 pitch_0x78;            /* the angle words `yure_joint_apply` hands `rotMatrixX`/`rotMatrixZ` */
-    /* +0x7C */ u32 pad_0x7C;
-    /* +0x80 */ u32 roll_0x80;
-    /* +0x84 */ f32 length_0x84[YURE_JOINT_MAX + 1];             /* each segment's length */
+    /* +0x78 */ union {   /* the angle words `yure_joint_apply` hands `rotMatrixX`/`rotMatrixZ`, one per chain point;
+                          * the lobby rig names the first */
+        /* +0x78 */ u32 pitch_0x78;
+        /* +0x78 */ u32 pitches_0x78[YURE_JOINT_MAX];
+    };
+    /* +0x80 */ union {
+        /* +0x80 */ u32 roll_0x80;
+        /* +0x80 */ u32 rolls_0x80[YURE_JOINT_MAX];
+    };
+    /* +0x88 */ f32 length_0x88[YURE_JOINT_MAX];   /* each segment's rest length, measured when the chain is seated */
 };
 
 /* The part of the enemy work record (`get_move_work_adrs(3)`, stride 0xB18) the sway unit reads: the
@@ -47,7 +55,9 @@ struct YureEnemyWork {
     /* +0x000 */ u8 active_0x000;
     /* +0x001 */ u8 pad_0x001[2];
     /* +0x003 */ u8 type_0x003;            /* the row of the sway table */
-    /* +0x004 */ u8 pad_0x004[0x590 - 0x004];
+    /* +0x004 */ u8 pad_0x004[0x1E2 - 0x004];
+    /* +0x1E2 */ u8 sway_mode_0x1E2;       /* 2 picks the alternate spring constants (`_ENEMY_WORK::field_0x1E2`) */
+    /* +0x1E3 */ u8 pad_0x1E3[0x590 - 0x1E3];
     /* +0x590 */ YureRec yure_0x590[3];
     /* +0x740 */ u8 pad_0x740[0xB18 - 0x740];
 };
@@ -57,7 +67,13 @@ struct YureEnemyWork {
  * size: 0xB20 */
 struct YurePlayerWork {
     /* +0x000 */ u8 active_0x000;
-    /* +0x001 */ u8 pad_0x001[0x674 - 0x001];
+    /* +0x001 */ u8 pad_0x001[0x009 - 0x001];
+    /* +0x009 */ u8 kind_0x009;            /* `_PLW::kind_0x09`; 3 doubles the cloth damping and halves its stiffness */
+    /* +0x00A */ u8 pad_0x00A[0x014 - 0x00A];
+    /* +0x014 */ u8 style_set_0x014;       /* `_PLW::se_name_set`, the hair-style set `pl_rig_style_byte_get` reads */
+    /* +0x015 */ u8 pad_0x015[0x13C - 0x015];
+    /* +0x13C */ struct PlSeRig* rig_0x13C;   /* the player's model rig (`Pl/pl_se_rig.h`) */
+    /* +0x140 */ u8 pad_0x140[0x674 - 0x140];
     /* +0x674 */ YureRec yure_0x674[8];
     /* +0xAF4 */ u8 pad_0xAF4[0xB20 - 0xAF4];
 };
@@ -82,6 +98,8 @@ extern "C" void yure_player_move(YurePlayerWork* plw);
 /* 0x802AD7CC - computes the sway record's pitch and roll words for the joint matrix `mtx` (`index` picks its chain
  * point). */
 extern "C" void yure_angles_calc(YureRec* rec, nw4r::math::MTX34* mtx, u32* pitch, u32* roll, u32 index);
+/* 0x802AD8F4 - computes the sway record's roll word for the joint matrix `mtx` (`index` picks its chain point). */
+extern "C" void yure_roll_calc(YureRec* rec, nw4r::math::MTX34* mtx, u32* out, u32 index);
 extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureEnemyWork or a YurePlayerWork, by `is_enemy` */, u8 is_player, s32 index, s32 kind);
 void yure_move(void);
 

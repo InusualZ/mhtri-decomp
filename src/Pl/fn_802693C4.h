@@ -19,7 +19,7 @@ extern "C" {
 
 u32 fn_802693C4(s32 player, u8 part, s32 value);
 u32 pl_parts_set(s32 player, u8 part, s32 value);
-s32 fn_80269508(struct _PLW* self, s32 part);
+s32 pl_parts_value_get(struct _PLW* self, s32 part);
 s32 pl_parts_set_ck(s32 player, u8 part, s32 value);
 u32 pl_weapon_parts_refresh(s32 player, struct _EQUIP* weapon, struct _EQUIP* parts);
 u8 pl_motion_bank_no_get(void);

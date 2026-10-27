@@ -9,7 +9,7 @@
  *   declared with different signatures); `extern "C"` names stay unmangled, and the C++-linkage callees and the types
  *   the manglings name stay at global scope.  Uniting the declarations is open work.
  *   The left seam is unproven by extabindex: 0x8002F6DC -> 0x8026910C is `Pl/player_control.cpp`'s last record and
- *   0x8002F6E8 -> 0x802695A4 this unit's first; `pl_obj_ready_ck` and `fn_802693C4`..`fn_80269508` are frameless, so
+ *   0x8002F6E8 -> 0x802695A4 this unit's first; `pl_obj_ready_ck` and `fn_802693C4`..`pl_parts_value_get` are frameless, so
  *   extab cannot place the 0x802693C4 seam.
  *   The right part is several TUs (seam re-draw candidate): `.sdata2` holds 0.0f twice back to back (0x8079A11C, read
  *   by the equipment section; 0x8079A120, read only by 0x80280050-0x80282BDC) and 52.0f at 0x8079A19C/0x8079A1B0, the
@@ -82,7 +82,7 @@
  *  - `fn_80278674`: a `clrlwi` before the `stb` of `m` into +0x56B (peephole is off; a `u8` local is worse);
  *  - `fn_80278D1C`: retail branches every id range test forward to its block (8, then 2, then 4) with a fall-through
  *    `b`; the nested if, the else-if chain and a `switch` all lay the blocks out differently;
- *  - `fn_802693C4`/`fn_80269508`: retail adds the record offset into the base register (`add r4,r4,r0` /
+ *  - `fn_802693C4`/`pl_parts_value_get`: retail adds the record offset into the base register (`add r4,r4,r0` /
  *    `add r5,r5,r0`), ours into a fresh one; `fn_8027AF88`: one `extsb` target register (r4 against r0);
  *  - `pl_status_sheet_get`: the implicit int->float conversion constant rows (compiler-synthesised, playbook 29);
  *  - `equip_skill_points_get`/`equip_skill_tree_has_ck`: MWCC's `switch` decision tree against retail's three linear `subi`/`cmplwi` range
@@ -331,7 +331,7 @@ u32 pl_parts_set(s32 player, u8 part, s32 value)
 
 /* The value stored for one part of the player the work record names, or -1 with no global or no
  * work record. */
-s32 fn_80269508(_PLW* self, s32 part)
+s32 pl_parts_value_get(_PLW* self, s32 part)
 {
     if (self == NULL) {
         return -1;

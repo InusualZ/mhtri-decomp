@@ -74,12 +74,6 @@
 #include "enemy/ENEMY_WORK.h" /* the enemy work `pl_ground_probe` reads the area of */
 
 
-/* A plane: the unit normal and the distance from the origin along it (`pl_plane_project` subtracts `dist` from the
- * point's dot product with the normal). size: 0x10 */
-struct PlPlane {
-    /* +0x0 */ nw4r::math::VEC3 normal;
-    /* +0xC */ f32 dist;
-};
 
 
 /* The push bounds `pl_push_bound_add` accumulates: per axis, the largest push each way and the excess over the

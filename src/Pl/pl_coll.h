@@ -42,6 +42,13 @@ struct HitSphere {
     /* +0xC */ f32 radius;
 };
 
+/* A plane: the unit normal and the distance from the origin along it (`pl_plane_project` subtracts `dist` from the
+ * point's dot product with the normal). size: 0x10 */
+struct PlPlane {
+    /* +0x0 */ nw4r::math::VEC3 normal;
+    /* +0xC */ f32 dist;
+};
+
 /* One collision polygon of the stage's land file: the cells of a `PlLandGrid` list pointers to these, ended by
  * 0xFFFFFFFF.  The ground query reads the attribute bits against its mask, the area byte against the stage's area
  * bit, the three vertices' x/z for the footprint test and the plane (`normal`, `dist`) for the height.  The wall
@@ -151,6 +158,9 @@ extern HitSphere pl_coll_body_shape_alt[2];     /* 0x805CDC68 */
 
 /* 0x80293A7C - scales `v` by the coll unit's constant over `len`.  GUESS name. */
 void vec3_scale_inv(VEC3* v, f32 len);
+
+/* 0x80290524 - projects `point` onto `plane` into `out`. */
+void pl_plane_project(nw4r::math::VEC3* point, PlPlane* plane, nw4r::math::VEC3* out);
 
 #ifdef __cplusplus
 }
