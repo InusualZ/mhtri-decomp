@@ -35,26 +35,27 @@
  *   `eft013_target_set` (0x80107914), `eft020_actor_spawn` (0x80114D28), `pl_sharpness_add` (0x80278674),
  *   `pl_class7_meter_add` (0x8027CA48).
  * RESIDUALS. Every row is written; the partial rows:
- *  - `hit_side_kind_get`: the branch sense of one `fcmpo`, and its tail block laid out in the other order;
- *  - `hit_id_list_absent_ck`: retail keeps an unused accumulator (`li r5,0`, `+9` per outer iteration) MWCC deletes;
- *  - `hit_registry_update`: register permutation, and the enemy kind test's 0x10 branch is laid out after the busy test;
- *  - `pl_elem_resist_get`: retail places the default case right after the compare chain;
- *  - `hit_owner_reaction_set`, `hit_dir_y_get`: register permutations; `hit_life_update`: retail reads the second motion
- *    pair through a `+4` base register;
- *  - `hit_level_se_req`, `hit_pl_effect_se_req`: retail computes the sound level into `r4` before it moves `pos` into
- *    `r3` (ours moves `pos` first; a level local, an if/else and an inline helper measure the same); the second also
- *    allocates its `pos`/`damage`/`guarded` registers in another order;
+ *  - `hit_side_kind_get`: retail lays the three tail returns out as 2, 1, 3 (ours 2, 3, 1; an else chain, a ternary, a
+ *    negated test and split tests measure the same or worse);
+ *  - `hit_id_list_absent_ck`: retail bumps the dead `+9` accumulator before the list pointer, ours after;
+ *  - `hit_registry_update`: register permutation (retail keeps the hit in r29 and the NPC record in r31);
+ *  - `hit_life_update`: retail reads the second motion pair through a `+4` base register (an unrolled four-entry loop
+ *    over a `u16[4]` view, inline or not, measures worse);
  *  - `hit_damage_pl`, `hit_damage_npc`: retail loads the 80.0 pool constant before the defence field in
- *    `damage * def / (def + 80)` (four spellings measure the same); `hit_damage_pl`'s element-hit block keeps one
- *    `extsh` retail lacks;
- *  - `hit_damage_em`: register permutation across its 14 callee-saved locals;
- *  - data: `.data`/`.bss` byte-identical; `.sdata`/`.sdata2` differ only by the target's tail padding; 21 callees carry
- *    registry names the map does not have yet, so a flip waits for those renames.
+ *    `damage * def / (def + 80)` (six spellings, an inline helper included, measure the same); `hit_damage_pl`'s
+ *    element-hit level keeps two `extsh` retail lacks (an `s16` level keeps one, and scores lower);
+ *  - `hit_damage_em`: register permutation across its 14 callee-saved locals, and the two `u8` rate conversions take
+ *    each other's stack slot;
+ *  - data: `.data`/`.bss` byte-identical; `.sdata`/`.sdata2` differ only by the target's tail padding.
  * SHAPES. A hit whose owner kind is not 0/1/3 skips the motion check through `continue` in a `do { } while (0)`, as does
  *   `hit_damage_pl`'s status case that skips the build-up; the attack-kind tests take the kind into an `s32` (retail
  *   compares the single kinds with `cmpwi`, the pairs with `subi`+`cmplwi`); `hit_data_apply` copies the signed strength
  *   through a local before the sign test.  The midpoints are `(a + b) / 2.0f` (a `* 0.5f` swaps the `fmuls` operands).
  *   The 16-bit masks of `hit_damage_em` are cleared with 16-bit constants (`0xFFF7`), which keeps retail's `andi.`.
+ *   `hit_registry_update`'s enemy kind test is a `switch` (its 0xA/0xB case becomes the `subi`+`cmplwi` range test) and
+ *   reads the NPC through a local pointer; the sound levels go through an `if`/`else if` chain into an `s32` local;
+ *   `pl_elem_resist_get` lists `default:` first; `hit_id_list_absent_ck` is one 20-entry loop reading each entry into a
+ *   local; `hit_owner_reaction_set` takes the reaction into an `s16`; the defence cut is the inline `hit_defense_apply`.
  */
 
 #pragma optimization_level 4
@@ -288,22 +289,19 @@ extern "C" s32 hit_life_update(_HIT_W* hit)
 }
 
 /* 0x8029A140 (0x5C): the four-way kind the entry's two side values select: 0 when the first is the unusable
- * default, 1/2 by which side carries a positive value and 3 when the second is the unusable default. */
+ * default, 1 when it is positive, 2 when the second is positive or the unusable default, and 3 otherwise. */
 extern "C" u32 hit_side_kind_get(_HIT_W* self)
 {
     if (self->value_0x50 <= -100.0f) {
         return 0;
     }
-    if (self->value_0x50 > 0.0f) {
-        return 1;
-    }
-    if (self->value_0x54 > 0.0f) {
-        return 2;
-    }
-    if (self->value_0x54 <= -100.0f) {
+    if (self->value_0x50 <= 0.0f) {
+        if (self->value_0x54 > 0.0f || self->value_0x54 <= -100.0f) {
+            return 2;
+        }
         return 3;
     }
-    return 2;
+    return 1;
 }
 
 /* 0x8029A19C (0xD8): clears every player's, enemy's and the NPC's per-frame hit state before the pass. */
@@ -424,29 +422,34 @@ extern "C" void hit_registry_update(void)
                     && hit_attack_flag_ck(hit, 2) != 0) {
                     s32 kind = hit->kind_0x42;
 
-                    if ((u32)(kind - 0xA) > 1) {
-                        if (kind == 0x10) {
-                            if (em->team != 0x19) {
-                                continue;
-                            }
+                    switch (kind) {
+                    case 0xA:
+                    case 0xB:
+                        if (em_busy_ck(em) == 0) {
+                            continue;
                         }
-                    } else if (em_busy_ck(em) == 0) {
-                        continue;
+                        break;
+                    case 0x10:
+                        if (em->team != 0x19) {
+                            continue;
+                        }
+                        break;
                     }
                     hit_apply_em(hit, em);
                 }
             }
             if ((u32)(hit->kind_0x42 - 0xA) > 1) {
                 _BODY_W* target;
+                _AINPC_W* npc = &ainpc_w;
 
-                if (ainpc_w.active != 0 && ainpc_w.field_0x216 == 0
-                    && hit_area_match_ck(hit->area_0x0F, ainpc_w.area) != 0
-                    && hit_id_list_absent_ck(ainpc_w.hit_ids, hit->hit_id_0x0C) != 0 && ainpc_w.field_0x214 <= 0
-                    && (((hit->owner_kind_0x06 != 3 || hit->owner_0x10 != &ainpc_w)
-                            && (hit->kind_0x07 != 3 || hit->owner_0x14 != &ainpc_w))
+                if (npc->active != 0 && npc->field_0x216 == 0
+                    && hit_area_match_ck(hit->area_0x0F, npc->area) != 0
+                    && hit_id_list_absent_ck(npc->hit_ids, hit->hit_id_0x0C) != 0 && npc->field_0x214 <= 0
+                    && (((hit->owner_kind_0x06 != 3 || hit->owner_0x10 != npc)
+                            && (hit->kind_0x07 != 3 || hit->owner_0x14 != npc))
                         || hit_flag_ck(hit, 0x40) != 0)
                     && hit_attack_flag_ck(hit, 4) != 0) {
-                    hit_apply_npc(hit, &ainpc_w);
+                    hit_apply_npc(hit, npc);
                 }
                 for (target = reg->body_head_0x04; target != NULL; target = target->next_0x00) {
                     if ((u32)(hit->kind_0x42 - 0xA) > 1 && target->field_0x005 != 0
@@ -554,8 +557,10 @@ extern "C" void hit_level_se_req(_HIT_W* hit, nw4r::math::VEC3* pos)
     if (hit->area_0x0F == get_now_areano() && (effect = hit->field_0x04D) != 0xFF) {
         if (hit->life_0x40 > 60) {
             level = 2;
+        } else if (hit->life_0x40 > 30) {
+            level = 1;
         } else {
-            level = hit->life_0x40 > 30;
+            level = 0;
         }
         se_req_pos_id113_level(pos, level);
     }
@@ -567,6 +572,7 @@ extern "C" void hit_pl_effect_se_req(_PLW* plw, _PLW* attacker, _HIT_W* hit, nw4
                                      s32 guarded)
 {
     s32 effect;
+    s32 level;
 
     if (hit->area_0x0F == get_now_areano() && (effect = hit->field_0x04D) != 0xFF) {
         switch (effect) {
@@ -580,7 +586,14 @@ extern "C" void hit_pl_effect_se_req(_PLW* plw, _PLW* attacker, _HIT_W* hit, nw4
                 se_req_pos_id99(pos);
                 break;
             }
-            se_req_pos_id110_level(pos, damage > 60 ? 2 : damage > 30);
+            if (damage > 60) {
+                level = 2;
+            } else if (damage > 30) {
+                level = 1;
+            } else {
+                level = 0;
+            }
+            se_req_pos_id110_level(pos, level);
             break;
         case 2:
             if (guarded == 1) {
@@ -654,7 +667,8 @@ extern "C" u16 hit_dir_y_get(_HIT_W* hit, nw4r::math::VEC3* from, nw4r::math::VE
             break;
         }
     }
-    return angle + (hit->dir_ofs_0x44 << 8);
+    angle += hit->dir_ofs_0x44 << 8;
+    return angle;
 }
 
 /* 0x8029AD64 (0x94): the knock direction's x angle: from `from` towards `to` for a positional hit, else the owner's
@@ -688,10 +702,9 @@ extern "C" u16 hit_dir_x_get(_HIT_W* hit, nw4r::math::VEC3* from, nw4r::math::VE
  * sideways (3) or doubled backwards (4) value, else nothing. */
 extern "C" void hit_owner_reaction_set(_HIT_W* hit)
 {
-    _PLW* plw;
-
-    if (hit->kind_0x07 == 0 && hit_flag_ck(hit, 8) == 1 && (plw = (_PLW*)hit->owner_0x14) != NULL) {
-        u8 value;
+    if (hit->kind_0x07 == 0 && hit_flag_ck(hit, 8) == 1 && hit->owner_0x14 != NULL) {
+        _PLW* plw = (_PLW*)hit->owner_0x14;
+        s16 value;
 
         plw->field_0x3A2 = 0;
         plw->field_0x3A3 = 0;
@@ -749,6 +762,9 @@ extern "C" s16 pl_elem_resist_get(_PLW* plw, u16 elem)
     s16 resist;
 
     switch (elem) {
+    default:
+        resist = 0;
+        break;
     case 0:
         resist = plw->elem_resist_0x3C4;
         break;
@@ -764,11 +780,14 @@ extern "C" s16 pl_elem_resist_get(_PLW* plw, u16 elem)
     case 3:
         resist = plw->elem_resist_0x3D4;
         break;
-    default:
-        resist = 0;
-        break;
     }
     return resist;
+}
+
+/* Returns `damage` less the share `defense` absorbs, `defense / (defense + 80)`. */
+static inline f32 hit_defense_apply(f32 damage, f32 defense)
+{
+    return damage - (damage * defense) / (defense + 80.0f);
 }
 
 /* 0x8029AFF8 (0x7D0): applies a hit to a player: marks the hit's target and the knock directions, guards it (a spark)
@@ -784,9 +803,9 @@ extern "C" void hit_damage_pl(_PLW* plw, _HIT_W* hit, nw4r::math::VEC3* contact,
     f32 damage;
     f32 status;
     u16 guard_angle;
-    u16 elem;
     s16 resist;
     s16 amount;
+    u16 elem;
 
     hit->result = 2;
     hit->target_0x2C = plw;
@@ -845,7 +864,7 @@ extern "C" void hit_damage_pl(_PLW* plw, _HIT_W* hit, nw4r::math::VEC3* contact,
         }
     }
     damage = scale * (hit->life_0x40 * rate);
-    damage = damage - (damage * plw->defense_0x3C0) / (plw->defense_0x3C0 + 80.0f);
+    damage = hit_defense_apply(damage, plw->defense_0x3C0);
     scale = 1.0f;
     elem = 0xFFFF;
     if ((hit->mask_0x46 & 4) != 0) {
@@ -878,11 +897,11 @@ extern "C" void hit_damage_pl(_PLW* plw, _HIT_W* hit, nw4r::math::VEC3* contact,
     }
     if (hit->attack_kind_0x32 != 1 || hit_flag_ck(hit, 0x80) != 0 || hit->kind_0x42 == 31) {
         if (elem != 0xFFFF) {
-            s16 level;
+            s32 level;
 
             level = (hit->field_0x05A != 0 ? hit->field_0x05A : 10) - resist;
             if ((plw->elem_hit_0x38C[elem] < 0 ? -plw->elem_hit_0x38C[elem] : plw->elem_hit_0x38C[elem])
-                < (level < 0 ? -level : level)) {
+                < ((s16)level < 0 ? -(s16)level : (s16)level)) {
                 plw->elem_hit_0x38C[elem] = level;
             }
         }
@@ -1008,10 +1027,10 @@ extern "C" void hit_damage_em(_ENEMY_WORK* em, _HIT_W* hit, EmWeakPoint* part, _
     f32 cut;
     f32 elem_rate;
     f32 status_rate;
-    f32 elem;
     f32 elem_a;
     f32 elem_b;
     f32 elem_c;
+    f32 elem;
     f32 elem_d;
     f32 elem_e;
     EmPartRates* rates;
@@ -1383,7 +1402,7 @@ extern "C" void hit_damage_npc(_AINPC_W* npc, _HIT_W* hit, nw4r::math::VEC3* con
     }
     npc->field_0x216 = 1;
     damage = hit->life_0x40;
-    damage = damage - (damage * npc->field_0x208) / (npc->field_0x208 + 80.0f);
+    damage = hit_defense_apply(damage, npc->field_0x208);
     if (hit->attack_kind_0x32 == 1) {
         damage = 0.0f;
         blocked = 1;
@@ -2447,22 +2466,16 @@ u16 get_hit_id(void)
     return reg->next_id_0x0C;
 }
 
-/* 0x8029F084 (0xEC): whether `id` is absent from the two ten-entry halves of a 20-entry id list. */
+/* 0x8029F084 (0xEC): whether `id` is absent from a 20-entry id list. */
 extern "C" u32 hit_id_list_absent_ck(u16* ids, u16 id)
 {
-    s32 checked;   /* the original's running count of tested entries (its increments are +9) */
-    s32 row;
+    s32 i;
 
-    checked = 0;
-    for (row = 0; row < 2; row++, ids += 10) {
-        s32 j;
-
-        for (j = 0; j < 10; j++) {
-            if (id == ids[j]) {
-                return 0;
-            }
+    for (i = 0; i < 20; i++) {
+        u16 entry = ids[i];
+        if (entry == id) {
+            return 0;
         }
-        checked += 9;
     }
     return 1;
 }
