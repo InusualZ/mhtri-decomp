@@ -216,6 +216,7 @@ tools/objdiff/symdiff.py -u <X>
 tools/objdiff/pairgap.py
 tools/m2c/m2c.py -t ppc-mwcc-c ...
 tools/flags/tryvar.py -u <X> [--variants <X>] [--permute <X>] [--symbol <X>] [--json]
+tools/units/unittry.py <X> --spec <X> [--replace <X> <X>] [--count <X>] [--all] [--sites <X> <X>] [--guard <X>] [--permute <X>] [--split-init] [--hill] [--restore] [--sdata2] [--json]
 tools/flags/optsweep.py -u <X>
 tools/agents/ideas.py where|find|check|new|demo-check [--all]
 tools/units/worktreehook.py arm

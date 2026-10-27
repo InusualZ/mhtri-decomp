@@ -17,6 +17,8 @@ and rewrites the shared files (`splits.txt`, `configure.py`) all-or-nothing with
 * `find_matches(data, old)`, `replace_bytes(data, old, new, count=1) -> (bytes, lines)`; `MatchCountError(expected, lines)`.
 * `atomic_write(path, data, append=False)`.
 * `c_escape(text) -> str` (a C string-literal body), `c_unescape(text) -> bytes` (`\n \t \r \a \b \f \v \\ \" \' \0`, `\xHH`, `\NNN`; an unknown escape and a bare `\x` stay literal) - `escape.encode/decode`, now also what `edit.py replace --old/--new` reads.
+* `marker_blocks(text, marker="//@@") -> [(kind, argument, body)]`: the blocks of a variants file (a body verbatim, less
+  its one trailing newline; `ValueError` on a bare marker) - read by `flags/tryvar.py` and `units/unittry.py`.
 * `Transaction(rename=None)`: `write(path, text|bytes)`, `rollback()`, `cleanup()`; `TMP_SUFFIX`.
 * `insert_after_anchor(text, anchor, insertion, present=None)`, `append_blocks(text, blocks)`, `missing_anchors(text, anchors)`;
   `AnchorError`.

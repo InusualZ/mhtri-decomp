@@ -42,5 +42,11 @@ def test_hill_argv(c):
     c.check("hill forwards to tryvar", mt.ALIASES["hill"][0], "variants")
 
 
+def test_tryvar_command(c):
+    mt = load_mt()
+    c.check("mt.py tryvar runs the keep-or-restore trial tool", mt.TOOLS.get("tryvar"), "tools/units/unittry.py")
+    c.check("... which exists", (testing.LIVE_ROOT / mt.TOOLS["tryvar"]).is_file(), True)
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

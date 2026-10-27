@@ -69,6 +69,10 @@ python scripts/mt.py variants -u <unit> [--variants f.py|f.txt|f.json] [--symbol
 python scripts/mt.py permdecl <unit> <fn> [--lines A-B]   # every order of a declaration block
 python scripts/mt.py hill <unit> <fn> [--lines A-B] [--max-evals N] [--apply]   # hill-climb a long block
 #   variants/permdecl/hill take --rename-map pending.txt; so does tools/units/measure.py (score as if the renames landed)
+python scripts/mt.py tryvar <unit> --spec trials.txt [--restore] [--sdata2]   # edit the REAL files: keep a win, restore a loss
+python scripts/mt.py tryvar <unit> --replace OLD NEW --count 2 | --all          # an OLD that occurs twice
+python scripts/mt.py tryvar <unit> --sites 'return;' 'break;' --literal --guard return-break   # site by site
+python scripts/mt.py tryvar <unit> --permute FN [--split-init] [--hill]         # statement / T x; x = f(); orders
 python scripts/mt.py shapes -u <unit> [-f <function>] [--scan N] [--gens ...] [--depth N]  # source shapes
 python scripts/mt.py diff   -u <unit> <symbol> [n] [--all]
 python scripts/mt.py slots  -u <unit> <symbol> [--map] [--slot 0x64]
@@ -78,6 +82,13 @@ python scripts/mt.py ideas find <words> [--tag T] [--status S] [--applies V]   #
 python scripts/mt.py ideas show|where N | new --title T --tags a,b [--kind codegen] | check [--demos]
 python scripts/mt.py ideas demo-check [N ...|--all|--changed REF] [--dump]      # compile demos, test EXPECT lines
 ```
+
+`variants`/`permdecl`/`hill` rank alternatives as probes and never touch the source; `tryvar` is the
+keep-or-restore loop on the real files: trials accumulate in order, a candidate stays only when the unit's
+matched bytes rise and no row falls, everything else (and Ctrl-C) is restored byte for byte. Its spec file is
+verbatim `//@@ trial` / `//@@ replace count=N|all [file=P]` / `//@@ sites guard=return-break` /
+`//@@ permute function=FN split-init` blocks with `//@@ with` bodies - no escaping (or JSON); `--restore`
+measures without keeping anything. Spec: `docs/tools/spec/unittry.md`.
 
 ## External oracles: the shared memory dump (names, signatures, structs, data)
 

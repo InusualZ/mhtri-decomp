@@ -28,7 +28,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | the runtime dump's symbol map, by address | `lib/dumpsyms.py` | `spec/lib-dumpsyms.md` | dumpmap, lanecheck |
 | comment vocabulary: stale-path and narrative markers, the stale judgement | `lib/comments.py` | `spec/lib-comments.md` | stylelint (rule 15), sweepcomments |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
-| a function's declaration block (leading run or `--lines A-B`), its orders and one-move neighbours | `lib/declperm.py` | `spec/lib-declperm.md` | tryvar (`--permdecl`, `--hill`, `mt.py permdecl`/`hill`) |
+| a function's declaration block (leading run or `--lines A-B`), its orders and one-move neighbours | `lib/declperm.py` | `spec/lib-declperm.md` | tryvar (`--permdecl`, `--hill`, `mt.py permdecl`/`hill`), unittry (`--permute`) |
 | pending map edits (renames, row splits) applied to a copy of a split target | `lib/pendingmap.py` | `spec/lib-pendingmap.md` | measure, tryvar (`--rename-map`) |
 | a function's raw bytes against the target's, relocated bits masked | `lib/rawsame.py` | `spec/lib-rawsame.md` | rawsame |
 | findings, rows, verdicts, add-only diff | `lib/findings.py` | `spec/lib-findings.md` | land, stylelint, vtableaudit, undefrefs, datagap, splitcheck, flipcheck, verifyunit, dataclaim, symbolpreflight, handoff |
@@ -54,7 +54,7 @@ Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `name
 Agent plumbing: `claims`, `slots`, `lane`, `rescue`, `wtsafe`, `queue`, `lanecmd`, `worktreehook`, `landlog`, `brief` (+ `briefing`), `backlog`, `integrate`,
 `tooling`, `mergebranch` (+ the package `merge`: `unionprose`, `unionresolve`, `unionguard`), `recordmerge`, `edit`, `escape`, `profileprobe`, `install`, `doclinks`.
 
-Matching experiments: `infer`, `frame`, `optsweep`, `mwcc_matrix`, `tryvar` (+ `variants`), `shapesearch` (+ `shapes`), `slotmap`,
+Matching experiments: `infer`, `frame`, `optsweep`, `mwcc_matrix`, `tryvar` (+ `variants`), `unittry`, `shapesearch` (+ `shapes`), `slotmap`,
 `mwcc-debugger`, `mwlink` (+ its CLI shim `mwlink_debugger`).
 
 Dormant: `rso`. Template (dtk-template, no spec of ours): `project`, `ninja_syntax`, `download_tool`, `transform_dep`,
@@ -98,6 +98,7 @@ relative to `MAIN`; the contract of each tool is its spec.
 | `tools/units/measure.py` | **you are searching**: score a whole unit in one compile and one `objdiff report`, printed as a per-symbol table. |
 | `tools/units/measure.py --rename-map F` | **your source defines names the map does not have yet**: score as if the pending `old new` / `split` lines had landed - a renamed copy of the target, `symbols.txt` untouched (`lib.pendingmap`; `g3d/g3d_state` 73.06 on the map -> 99.30 with its 29 renames). `tryvar.py` takes the same flag. |
 | `tools/flags/tryvar.py` (`mt.py variants`/`permdecl`/`hill`) | **you have source rewrites to try**: each variant (a list of exact `old -> new` replacements, an `old` that occurs twice is refused) is compiled as a probe beside the source - the real file is never written - scored with the report metric and ranked; `--apply NAME` / `--apply-best` writes the winner (CRLF kept). `--permdecl FN` enumerates a declaration block's orders, `--hill FN [--lines A-B]` hill-climbs a block too long to enumerate (one line moved per step). Do not write a `vary.py`/`perm.py`. |
+| `tools/units/unittry.py` (`mt.py tryvar`) | **your edits accumulate, span a header, or must be measured from the real files**: each candidate is written to the unit's source (and its own headers), scored from a fresh object and report under `build/tmp/unittry/`, kept only when the unit's matched bytes rise and no row falls, else restored byte for byte (mtime too, also on Ctrl-C). Counted replaces (`count=N`/`all`), a site sweep (`--sites RE REPL`, `--guard return-break`), statement permutations (`--permute FN`, `--split-init`, `--hill`); specs are `//@@` blocks or JSON, no escaping (`spec/unittry.md`). |
 | `tools/units/recompile.py --measure` | **you are proving one symbol**: one symbol per run, usable from any worktree; resolution is invocation-first and prints the path it used with its kind (`[worktree-split]` / `[registered]` / `[auto-fallback]`). Together with `measure.py` it is the **one** implementation of the official metric (§7). |
 | `tools/units/sectiongap.py` | **a flip is doubtful**: it prints each differing section **with its relocations**, not just a size — the `extab`/`extabindex` gaps `datagap.py` skips, and the right-size/wrong-offset record no size check can see (F39/F41; being built). |
 | `tools/units/datagap.py` | **a unit reads 100 % but may not be the target**: it compares the *data* sections' sizes, so you see the extra `.sdata2`/string pool objdiff does not count. |

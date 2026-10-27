@@ -38,22 +38,11 @@ def load_variants(path):
 
 
 def marker_blocks(text_: str) -> list[tuple[str, str, str]]:
-    """`[(kind, argument, body)]` of the `//@@ <kind> [argument]` blocks; a body loses its one trailing newline."""
-    blocks: list[list] = []
-    for line in text_.split("\n"):
-        stripped = line.strip()
-        if stripped.startswith(MARKER):
-            head = stripped[len(MARKER):].split(None, 1)
-            if not head:
-                raise SystemExit("tryvar: a bare %s marker (want `old`, `variant <name>`, `permute` or `item`)" % MARKER)
-            blocks.append([head[0], head[1].strip() if len(head) > 1 else "", []])
-        elif blocks:
-            blocks[-1][2].append(line)
-    out = []
-    for kind, arg, lines in blocks:
-        body = "\n".join(lines)
-        out.append((kind, arg, body[:-1] if body.endswith("\n") else body))
-    return out
+    """`[(kind, argument, body)]` of the `//@@ <kind> [argument]` blocks (`lib.text.marker_blocks`)."""
+    try:
+        return text.marker_blocks(text_, MARKER)
+    except ValueError:
+        raise SystemExit("tryvar: a bare %s marker (want `old`, `variant <name>`, `permute` or `item`)" % MARKER) from None
 
 
 def parse_marker_variants(text_: str) -> list:

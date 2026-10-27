@@ -248,6 +248,27 @@ _UNSHORT = {"n": b"\n", "t": b"\t", "r": b"\r", "a": b"\a", "b": b"\b", "f": b"\
 _OCTAL = "01234567"
 
 
+def marker_blocks(text: str, marker: str = "//@@") -> list[tuple[str, str, str]]:
+    """`[(kind, argument, body)]` of the `<marker> <kind> [argument]` blocks of a variants file: a line whose stripped
+    text starts with `marker` opens a block, the lines up to the next marker are its body, verbatim, less its one
+    trailing newline; lines before the first marker are ignored. `ValueError` on a bare marker."""
+    blocks: list[list] = []
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith(marker):
+            head = stripped[len(marker):].split(None, 1)
+            if not head:
+                raise ValueError("a bare %s marker" % marker)
+            blocks.append([head[0], head[1].strip() if len(head) > 1 else "", []])
+        elif blocks:
+            blocks[-1][2].append(line)
+    out = []
+    for kind, arg, lines in blocks:
+        body = "\n".join(lines)
+        out.append((kind, arg, body[:-1] if body.endswith("\n") else body))
+    return out
+
+
 def c_escape(text: str) -> str:
     """`raw text` -> a C string literal body (no quotes); a character outside printable ASCII becomes
     `\\xHH` of its code point, everything `c_unescape` reads back byte for byte."""

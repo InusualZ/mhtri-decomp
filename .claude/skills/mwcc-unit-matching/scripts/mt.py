@@ -14,6 +14,7 @@ Usage:
     python scripts/mt.py variants [-u <unit>] [--variants f.py] [names...]
     python scripts/mt.py permdecl <unit> <fn[,fn...]> [--lines A-B] [--max-perms N] [--plain-only] [--apply]   (tryvar --permdecl: declaration orders)
     python scripts/mt.py hill <unit> <fn> [--lines A-B] [--max-evals N] [--apply]   (tryvar --hill: climb a long declaration block)
+    python scripts/mt.py tryvar <unit> --spec F | --replace OLD NEW [--count N|--all] | --sites RE REPL [--guard return-break] | --permute FN [--split-init] [--hill]   (units/unittry: edit the real files, keep a win, restore a loss)
     python scripts/mt.py rawsame <unit>... [--report [R]] [--min-percent P]   (every 100 % row, raw bytes + reloc types)
     python scripts/mt.py shapes [-u <unit>] [-f <function>] [--scan N] [--gens ...] [--depth N]
     python scripts/mt.py diff   [-u <unit>] <symbol> [n] [--all]        (symdiff: side by side)
@@ -38,6 +39,7 @@ TOOLS = {
     "matrix":   "tools/flags/mwcc_matrix.py",
     "sweep":    "tools/flags/optsweep.py",
     "variants": "tools/flags/tryvar.py",
+    "tryvar":   "tools/units/unittry.py",
     "shapes":   "tools/flags/shapesearch.py",
     "diff":     "tools/objdiff/symdiff.py",
     "rawsame":  "tools/objdiff/rawsame.py",

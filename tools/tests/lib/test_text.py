@@ -120,5 +120,14 @@ def test_anchors(c):
     c.check("append_blocks appends once", (n, n2, out2.count("auto/a.c:")), (1, 0, 1))
 
 
+
+def test_marker_blocks(c):
+    src = "ignored\n//@@ old\n  int a;\n\n//@@ variant  swap it \nint b;\n//@@ with\n"
+    c.check("kind, stripped argument and the verbatim body less its one trailing newline (the blank line)",
+            text.marker_blocks(src), [("old", "", "  int a;"), ("variant", "swap it", "int b;"), ("with", "", "")])
+    c.check("another marker", text.marker_blocks("@@ a\nx\n", "@@"), [("a", "", "x")])
+    c.raises("a bare marker is refused", ValueError, text.marker_blocks, "//@@\nx\n")
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))
