@@ -2411,7 +2411,7 @@ quest/arenatask.cpp:
 menu/menu_plsearch.cpp:
 	extab       start:0x8001DF24 end:0x8001E18C
 	extabindex  start:0x8003EBEC end:0x8003EF88
-	.text       start:0x80448404 end:0x804513FC
+	.text       start:0x80448404 end:0x804513B0
 	.data       start:0x806073F0 end:0x80607E50
 	.bss        start:0x806E40C0 end:0x806F4658
 	.sdata      start:0x80793B88 end:0x80793C10
@@ -2424,7 +2424,7 @@ menu/sysmsg_text.cpp:
 menu/menu_sysmsg.cpp:
 	extab       start:0x8001E18C end:0x8001E3B0
 	extabindex  start:0x8003EF88 end:0x8003F144
-	.text       start:0x804513FC end:0x804565C0
+	.text       start:0x804513B0 end:0x804565C0
 	.ctors      start:0x8056F3D4 end:0x8056F3D8
 	.rodata     start:0x80572240 end:0x80572418
 	.data       start:0x8060E0B8 end:0x8060E7FC

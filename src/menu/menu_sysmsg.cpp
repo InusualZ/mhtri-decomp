@@ -2,14 +2,15 @@
  * menu/menu_sysmsg.cpp - the game's software keyboard driver (the `kbd_*` hooks `system_w` carries: create the
  *   homebutton band's keyboard object, open it for a text kind, step it from the pad and the USB keyboard, close
  *   it).  The system message text before its `.data` is the data-only `menu/sysmsg_text.cpp`.
- * RANGE. .text 0x804513FC-0x804565C0 (87 functions); extab 0x8001E18C-0x8001E3B0, extabindex 0x8003EF88-0x8003F144,
+ * RANGE. .text 0x804513B0-0x804565C0 (90 functions); extab 0x8001E18C-0x8001E3B0, extabindex 0x8003EF88-0x8003F144,
  *   .ctors 0x8056F3D4, .rodata 0x80572240-0x80572418, .data 0x8060E0B8-0x8060E7FC, .bss 0x806F4658-0x806F4B48,
- *   .sdata 0x80793C80-0x80793CB8, .sbss 0x80794D64-0x80794DF8, .sdata2 0x8079C998-0x8079C9A8.  0x804513B0-0x804513FC (`kbd_modifier_bits` and the listener's two empty slots) is this
- *   TU's too (request menu-sysmsg#1).
+ *   .sdata 0x80793C80-0x80793CB8, .sbss 0x80794D64-0x80794DF8, .sdata2 0x8079C998-0x8079C9A8.  The `.data` after it (0x8060E800-0x8060E8A0, the
+ *   `quest_name_unavailable_text` table) starts 8-aligned after 4 bytes of fill, so it is another object's.
  * FLAGS. `cflags_menu`; `#pragma dont_inline on` after the includes: retail calls the inline helpers out of line
  *   (the MEM heap wrappers, `Layout::SetAllocator`, the HKB manager accessors, the generated constructors), each
  *   copy after its first caller, while header inline bodies inline their own callees.  `no_static_dtors on`,
- *   `pool_data off`, `explicit_zero_data on` (the zero `.sdata` title).
+ *   `pool_data off`, `explicit_zero_data on` (the zero `.sdata` title);
+ *   `opt_common_subs off` over `onKey` (retail reloads `kbd_request` for the function-key range test).
  * NAMES. GUESS: the file name (no `__FILE__` string; request menu-sysmsg#3 proposes sys_keyboard).  The hooks are
  *   `sys_kbd_*` after the `system_w` fields `kbd_hooks_set` fills (main.cpp owns the `kbd_*` wrappers).  GUESS:
  *   every other function, class, global and view-slot name (from what each stores, tests and passes on), and the
@@ -18,9 +19,10 @@
  *   `kbd_modifier_bits`, `sys_font_code_table`.
  * RESIDUALS. `kbd_key_input`: retail's key switch is a `cmplwi` tree with another pivot (no case order reproduces
  *   it).  `kbd_command_step`, `kbd_step`: loop register colouring in the cursor searches.  `kbd_layout_load`: an
- *   `extsh` on the two 512 arguments.  `onKey`: r3/r4 colouring and a `kbd_request` reload.  `.sbss`: retail keeps
- *   the 8-byte `kbd_setting` 4-aligned (ours is 8-aligned, +4 B).  onConnect/onDisconnect sit in menu_plsearch's
- *   registered range (#1).  The inline band copies follow their first callers.
+ *   `extsh` on the two 512 arguments (an `s16` local, a cast, a `static const s16` and `peephole off` do not keep
+ *   it).  `kbd_command_step`: retail saves r24-r31 (frame 0x50, ours r27-r31 and 0x40) and reloads `kbd_request`
+ *   after the chat test.  `onKey`: the mode switch value in r0 (retail r3) and the modifiers in r5 (retail r0).  `.sbss`: retail keeps
+ *   the 8-byte `kbd_setting` 4-aligned (ours is 8-aligned, +4 B).  The inline band copies follow their first callers.
  * SHAPES. The keyboard object is reached through view classes with inline slots; its list is the band's
  *   `HbmAnimPanel`, whose base slot 0x40 (`getPage`) is defined inline here (its retail copy is this TU's);
  *   one-case `cmpwi` tests are one-case `switch`es; `(s8)(u8)++var` gives retail's clrlwi+extsb; the cursor searches step the globals in place.
@@ -74,7 +76,6 @@
 #include "homebutton/hbmKbdIsTextEmpty.h"
 #include "homebutton/hkbNodeAppend.h"
 #include "homebutton/hkbNodeRemove.h"
-#include "menu/kbd_modifier_bits.h"
 #include "sys_font_code_table.h"
 #include "menu/menu_sysmsg.h"
 
@@ -157,9 +158,7 @@ public:
 /* Returns the title hook; the build compiled its body out, so it returns whatever r3 holds. */
 inline SysKbdTitleHook* sysKbdTitleHook(void) {}
 
-/* The callees retail calls with another argument or return type than their declaration: the gesture request with an
- * unsigned byte, the screen mode read back as a byte. */
-#define pl_gesture_req_c1 ((void (*)(u8))pl_gesture_req)
+/* The callee retail calls with another return type than its declaration: the screen mode read back as a byte. */
 #define ck_WideMode_c1 ((u8 (*)(void))ck_WideMode)
 
 #pragma dont_inline on
@@ -472,10 +471,26 @@ const KbdKeyPos kbd_list_pos[4][4] = {
 };
 }
 
-/* Ignores a keyboard connection (retail's copy is the row 0x804513F4, in the range registered to menu/menu_plsearch). */
+/* 0x804513B0 (0x44): Returns the Ctrl (1), Shift (2) and Alt (3) bits of the held modifier counters. */
+extern "C" u32 kbd_modifier_bits(void)
+{
+    u32 bits = 0;
+    if (kbd_ctrl_count > 0) {
+        bits |= 1;
+    }
+    if (kbd_shift_count > 0) {
+        bits |= 2;
+    }
+    if (kbd_alt_count > 0) {
+        bits |= 3;
+    }
+    return bits;
+}
+
+/* 0x804513F4 (0x4): Ignores a keyboard connection. */
 void SysKbdListener::onConnect(SysKbdKeyEvent* event) {}
 
-/* Ignores a keyboard disconnection (retail's copy is the row 0x804513F8). */
+/* 0x804513F8 (0x4): Ignores a keyboard disconnection. */
 void SysKbdListener::onDisconnect(SysKbdKeyEvent* event) {}
 
 /* Forward declarations of the driver's functions (in address order below). */
@@ -494,6 +509,7 @@ void kbd_draw(void);
 /* The HKB keyboard listener. */
 /* 0x804513FC (0x434): Counts the modifier keys, then turns the key into the request's key, modifier and command
  * bytes. */
+#pragma opt_common_subs off
 void SysKbdListener::onKey(SysKbdKeyEvent* event)
 {
     resetIdleFrames();
@@ -550,11 +566,12 @@ void SysKbdListener::onKey(SysKbdKeyEvent* event)
     if (event->type == 1) {
         u8 key = event->usage;
         kbd_request_buf.key = key;
-        kbd_request_buf.modifiers = event->modifiers;
+        u8 modifiers = event->modifiers;
+        kbd_request_buf.modifiers = modifiers;
         switch ((u32)kbd_request->mode) {
         case 0:
-            if ((kbd_request_buf.modifiers & 0x2F) == 2 && key >= 0x3A && key <= 0x45) {
-                pl_gesture_req_c1(kbd_gesture_table[(u8)(key - 0x3A)] + 1);
+            if ((modifiers & 0x2F) == 2 && key >= 0x3A && key <= 0x45) {
+                pl_gesture_req(kbd_gesture_table[(u8)(key - 0x3A)] + 1);
                 sysSE_req(0x37);
             }
         case 4:
@@ -575,8 +592,8 @@ void SysKbdListener::onKey(SysKbdKeyEvent* event)
             }
             req = kbd_request;
             if (req->modifiers == 0) {
-                key = req->key;
-                switch (key) {
+                u8 command_key = req->key;
+                switch (command_key) {
                 case 61:
                     if (kbd_cursor_mode != 2) {
                         if (!kbd_object->getPanel()->getModeView()->isHalfWidth()) {
@@ -591,7 +608,7 @@ void SysKbdListener::onKey(SysKbdKeyEvent* event)
                 case 80:
                 case 81:
                 case 82:
-                    req->command = key;
+                    req->command = command_key;
                     break;
                 case 88:
                 case 40:
@@ -628,6 +645,7 @@ void SysKbdListener::onKey(SysKbdKeyEvent* event)
     }
 }
 
+#pragma opt_common_subs reset
 /* Destroys the listener. */
 SysKbdListener::~SysKbdListener() {}
 
@@ -1695,7 +1713,7 @@ void kbd_command_step(void)
     if (command != 0 && kbd_cursor_mode != 0) {
         switch (kbd_request->command_kind) {
         case 1:
-            if (command >= 58 && command <= 69 &&
+            if (kbd_request->command >= 58 && kbd_request->command <= 69 &&
                 !kbd_object->getPanel()->getModeView()->isHalfWidth()) {
                 s32 index = kbd_request->command - 58;
                 if (index < 12) {
@@ -1767,11 +1785,11 @@ void kbd_command_step(void)
         }
         if (kbd_pad_skip == 0 && kbd_object->getSoftKeyboard()->isHalfWidth() == 0 && (kbd_pad[1] & 0x20000) &&
             chat == 1) {
-            u8 layout = (kbd_object->getSoftKeyboard()->getKanaMode() & 3) + 1;
-            if (layout >= 4) {
+            s32 layout = (kbd_object->getSoftKeyboard()->getKanaMode() & 3) + 1;
+            if ((u8)layout >= 4) {
                 layout = 1;
             }
-            switch (layout) {
+            switch ((u8)layout) {
             case 0:
                 point.x = kbd_key_pos[0][0].x;
                 point.y = kbd_key_pos[0][0].y - kbd_offset_y;
@@ -2107,7 +2125,7 @@ int kbd_key_input(void)
     if (modifiers == 2) {
         u8 key = kbd_request->key;
         if (key >= 0x3A && key <= 0x45) {
-            pl_gesture_req_c1(kbd_gesture_table[(u8)(key - 0x3A)] + 1);
+            pl_gesture_req(kbd_gesture_table[(u8)(key - 0x3A)] + 1);
             sysSE_req(0x37);
             kbd_request->key = 0;
             return 0;
@@ -2284,7 +2302,7 @@ inline void SysKbdHandler::onGesture(s32 index)
     if (index >= 12) {
         index -= 12;
     }
-    pl_gesture_req_c1(kbd_gesture_table[index] + 1);
+    pl_gesture_req(kbd_gesture_table[index] + 1);
     sysSE_req(0x37);
 }
 
