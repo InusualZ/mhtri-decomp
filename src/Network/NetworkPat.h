@@ -1,6 +1,6 @@
 /*
  * Network/NetworkPat.h - the four-slot "*Pat" holder and its accessor family (owner `Network/NetworkPat.cpp`).
- * SHAPES. The record is 0x14 B: `constructNetworkPat` writes `+0x10 = -1` and `updateNetworkPat` reads it as the
+ * SHAPES. The record is 0x14 B: the constructor writes `+0x10 = -1` and `updateNetworkPat` reads it as the
  *   per-slot enable mask before calling each slot's `+0x18` driver.  The slots hold unrelated classes (their
  *   constructors share no base call) that share the deleting destructor at vtable `+0x08` and the release hook at
  *   `+0x14`; they are declared, never defined, here (their tables belong to the bands that construct them).
@@ -28,6 +28,11 @@ class NetworkLayerPat;
 struct sNetworkLibraryInitParam;
 
 typedef struct NetworkPat {
+    /* 0x80419AD4 / 0x80419B54 - the constructor publishes the holder as `sNetworkPatInstance`, clears the four
+     * slots and enables all of them; the destructor resets the holder and clears the instance. */
+    NetworkPat();
+    ~NetworkPat();
+
     /* +0x00 */ NetworkSessionManagerPat* sessionManager_00;
     /* +0x04 */ void* slot04_04;   /* never installed in this build - see `clearNetworkPatSlot04` */
     /* +0x08 */ NetworkCommunityPat* community_08;
@@ -38,11 +43,6 @@ typedef struct NetworkPat {
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x80419AD4 / 0x80419B54 - the Pat holder's constructor (publishes it as `sNetworkPatInstance`, clears the
- * four slots, enables all of them) and its deleting destructor. */
-struct NetworkPat* constructNetworkPat(struct NetworkPat* holder);
-struct NetworkPat* destroyNetworkPat(struct NetworkPat* holder, s16 flags);
 
 /* 0x80419BB4 - creates the library, runs its `init` and seeds the C random generator from its clock. */
 s32 initNetworkLibrary(struct NetworkPat* holder, struct sNetworkLibraryInitParam* param);

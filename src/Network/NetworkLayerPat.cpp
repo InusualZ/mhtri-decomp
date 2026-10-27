@@ -6230,7 +6230,7 @@ BOOL NetworkLayerPat::isFriendTransferReady_E8(s8 slot)
 }
 
 /* Friend slot `slot`'s +0xC084 flag, 0 for an empty or invalid slot. */
-u8 NetworkLayerPat::getFriendFlagC084_EC(s8 slot)
+bool NetworkLayerPat::getFriendFlagC084_EC(s8 slot)
 {
     if ((u8)slot > 99) {
         return 0;

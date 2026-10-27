@@ -1,7 +1,9 @@
 /*
  * Network/NetworkPat.cpp - the four-slot Pat holder: its constructor, destructor and drive functions, then the "*Pat"
  *   accessor family (each slot +0x00/+0x04/+0x08/+0x0C has an install setter, an uninstall, a delete helper and, for
- *   three slots, a getter).  C++, every symbol unmangled (`extern "C"`); the types live in `Network/NetworkPat.h`.
+ *   three slots, a getter).  C++: the holder's constructor and destructor are `NetworkPat` members
+ *   (`Network/network_pat_control.cpp`'s `__sinit` builds `net_pats_object` with them and registers the destructor),
+ *   every other symbol is unmangled (`extern "C"`); the types live in `Network/NetworkPat.h`.
  * RANGE. .text 0x80419AD4-0x8041A194 (19 functions, 1728 B); extab, extabindex.  Left seam: the holder block sits right
  *   after `sNetworkLibraryWii`'s last table slot (0x80419AD0) and `.data` order bounds the next TU start in
  *   0x80418A60..0x8041A1C4.  Right seam: the map's `clearNetworkLayerPat` starts at 0x8041A170 (+0x24), so the unit
@@ -61,28 +63,21 @@ public:
 
 #pragma peephole off
 
-NetworkPat* constructNetworkPat(NetworkPat* holder)
+NetworkPat::NetworkPat()
 {
-    sNetworkPatInstance = holder;
-    holder->installed_10 = -1;
-    registerNetworkObject(holder, 1);
-    memset(&holder->sessionManager_00, 0, sizeof(holder->sessionManager_00));
-    memset(&holder->slot04_04, 0, sizeof(holder->slot04_04));
-    memset(&holder->community_08, 0, sizeof(holder->community_08));
-    memset(&holder->layer_0C, 0, sizeof(holder->layer_0C));
-    return holder;
+    sNetworkPatInstance = this;
+    installed_10 = -1;
+    registerNetworkObject(this, 1);
+    memset(&sessionManager_00, 0, sizeof(sessionManager_00));
+    memset(&slot04_04, 0, sizeof(slot04_04));
+    memset(&community_08, 0, sizeof(community_08));
+    memset(&layer_0C, 0, sizeof(layer_0C));
 }
 
-NetworkPat* destroyNetworkPat(NetworkPat* holder, s16 flags)
+NetworkPat::~NetworkPat()
 {
-    if (holder != NULL) {
-        clearNetworkPat(holder);
-        sNetworkPatInstance = NULL;
-        if (flags > 0) {
-            operator delete(holder);
-        }
-    }
-    return holder;
+    clearNetworkPat(this);
+    sNetworkPatInstance = NULL;
 }
 
 s32 initNetworkLibrary(NetworkPat* holder, sNetworkLibraryInitParam* param)

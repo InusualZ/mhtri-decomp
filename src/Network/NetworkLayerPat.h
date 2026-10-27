@@ -533,7 +533,7 @@ public:
     virtual void setFriendTransferMode_E0(s8 slot, bool mode);                /* +0x0E0 */
     virtual BOOL isFriendTransferActive_E4(s8 slot);                          /* +0x0E4 */
     virtual BOOL isFriendTransferReady_E8(s8 slot);                           /* +0x0E8 */
-    virtual u8 getFriendFlagC084_EC(s8 slot);                                 /* +0x0EC */
+    virtual bool getFriendFlagC084_EC(s8 slot);                               /* +0x0EC */
     virtual BOOL getFriendTransferFlag_F0(s8 slot);                           /* +0x0F0 */
     virtual s32 handleConnect(NetworkLayerRequest* request);                  /* +0x0F4 */
     virtual s32 handleDisconnect(NetworkLayerRequest* request);               /* +0x0F8 */

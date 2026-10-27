@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (228)
+## Ideas that work (231)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -142,6 +142,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 145 | [A two-exit loop without goto: retail's own inline helpers, or the tail moved into the loop](145-goto-free-two-exit-loop.md) | works | source-shape | Retail's control flow was written with `goto` (a jump out of a nested loop, a shared round-up or cleanup tail), rule 8 forbids it, and the goto-free spellings duplicate the tail or add a compare. |
 | 146 | [An initialised array whose size is a multiple of 8 is 8-aligned, so a 4-aligned target object is not one array](146-initialised-array-8-align.md) | works | data, sections | A `.data` run that the map calls one array is not byte-identical when emitted as one array - ours is padded to an 8-byte boundary where the target continues 4-aligned. |
 | 147 | [Pool and string offsets shifted by a missing function: write the functions the linker strips](147-stripped-functions-pool-offsets.md) | works | data, sections | Every string or literal row of a unit relocates against the right section but the wrong offset, or the literal pool is in another order, while the functions that use them are correct. |
+| 148 | [A dense switch lowered to a linear compare chain where retail has a compare tree](148-dense-switch-compare-chain.md) | works | source-shape, pragma | A switch of about six dense cases compiles in ours to a linear `cmpwi`/`beq` chain, while retail tests it with a binary compare tree (pivot compares with `bge`/`blt`). |
 | 151 | [x / 2.0f gives retail's fmuls x,0.5 operand order](151-halve-by-division.md) | works | source-shape | Retail halves a float with `fmuls fD,fX,f0.5` and ours has the operands the other way round (`fmuls fD,f0.5,fX`). |
 | 155 | [A member cleanup record retail lacks: define the callee before its caller (MWCC's nothrow knowledge)](155-nothrow-callee-before-caller.md) | works | source-shape, sections | Our constructor or destructor carries an extab cleanup record (a member's destructor, an array's destroy, a base destructor) that retail's lacks, with byte-identical code - the call it guards is one MWCC could not yet... |
 | 156 | [A redundant same-type cast on the base pointer is a codegen input: it decides whether a field address is shared with its load](156-redundant-same-type-cast.md) | works | source-shape | Retail loads a field off the base (`lwz r6,0x654c(r3)`) and materialises the field's address last (`addi r8,r3,0x654c`), while ours computes the address first and loads through it (`addi r8,r3,0x654c` ... `lwz... |
@@ -237,6 +238,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 249 | [A struct returned in r3:r4 and stored twice is a named copy of a temporary](249-struct-returned-in-r3.md) | works | source-shape, allocator | Retail stores a small struct's r3/r4 return to two stack slots and reads only one; ours stores it once, so the frame and every later stack offset shift by 8 |
 | 250 | [Range tests that all branch forward to their bodies and end in b skip are a switch of case runs](250-range-tests-that-all.md) | works | source-shape | Retail tests `cmplwi x,3; ble A; cmpwi x,4; blt skip; cmpwi x,7; ble B; b skip` and lays A then B after the tests; our `if (x <= 3) A else if (x >= 4 && x <= 7) B` branches past A with `bgt` and folds the second test... |
 | 251 | [A loop that hoists only its 0/1 stores (each zero its own register) wants #pragma opt_strength_reduction off](251-loop-that-hoists-only.md) | works | pragma, allocator | Retail's loop preheader copies one zero into a dozen registers and stack slots (`mr r22,r16` ..., `stw r16,0x130(r1)` ...) while ours hoists colour bytes, timer values and table addresses and shares one zero; the row is... |
+| 252 | [A backward branch into another case's code: a for (;;) headed by that code, with the jumping case's label inside the loop](252-backward-branch-into-another.md) | works | source-shape | Retail places a case after other cases and ends it with a `b` back to the start of an earlier case's code (or a step's `state = 0` re-entry lands on step 0's code, not on the dispatch); the fall-through or re-dispatch... |
+| 253 | [Split early-return tests if-converted to subfc/subfe/andc: scope #pragma opt_rebuildconditionals off](253-split-early-return-tests.md) | works | pragma, source-shape | Retail tests a value twice with separate early returns (`cmpwi 0; bne; li r3,0; blr`, then a range test), while ours folds the pair into a branchless `subfc`/`subfe`/`andc` sequence, or the `\|\|` spelling that avoids... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
@@ -256,12 +259,11 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 213 | [A branch into the middle of another case is not an optimisation: MWCC Wii/1.3 has no tail-merge or cross-jump pass](213-branch-into-the-middle.md) | ruled-out | source-shape, tooling | Retail's switch branches into the middle of a sibling case's code (forwards or backwards) and holds one copy of a shared tail; every goto-free spelling either repeats the tail or moves it, and no flag, pragma or pass... |
 | 217 | [A branch from a loop body to the code after the enclosing switch is not reachable goto-free: MWCC threads no flag or inline return](217-branch-from-a-loop.md) | ruled-out | source-shape | Retail's search loop inside a switch case jumps from its found path straight to the code after the switch (skipping the post-loop code), and every goto-free spelling either adds a test or reorders the loop. |
 
-## Not tried yet (8)
+## Not tried yet (7)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
 | 93 | [A Type_name(Type* self) free function is a member: define Type::name and rename the map row to the mangling](093-type-name-type-self.md) | todo | source-shape, symbols | A function is spelled Type_name(Type* self, ...) and its map row is the unmangled Type_name - the compiler will mangle the real member (name__<len>Type...), so the retail symbol reads as a member the source never... |
-| 148 | [A dense switch lowered to a linear compare chain where retail has a compare tree](148-dense-switch-compare-chain.md) | todo | source-shape, pragma | A switch of about six dense cases compiles in ours to a linear `cmpwi`/`beq` chain, while retail tests it with a binary compare tree (pivot compares with `bge`/`blt`). |
 | 149 | [Adjustor thunks sit at the end of their TU, so thunks ahead of other code mark a TU boundary](149-adjustor-thunks-end-of-tu.md) | todo | sections, vtable | A unit's adjustor thunks (`addi r3,r3,-N ; b <method>`) sit in the middle of its claimed `.text`, ahead of functions ours emits before them, and the unit cannot be laid out as one object. |
 | 150 | [Under -RTTI off a secondary base's vtable part has a zero header too, and its overrides append to the primary part](150-secondary-base-vtable-layout.md) | todo | vtable | A multiply-inherited class's vtable does not pair with ours - an expected `-offset` word in the secondary part is 0 in retail, and some slots sit after the secondary part instead of inside the primary one. |
 | 152 | [Same-size stack locals are placed in reverse declaration order, smaller ones first](152-same-size-locals-reverse.md) | todo | allocator | Two stack locals' offsets are swapped against retail (`0x8(r1)` vs `0x10(r1)`), with the instructions otherwise identical. |
