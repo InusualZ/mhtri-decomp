@@ -3836,7 +3836,7 @@ void ai_npc_m3_step6_arm(_AINPC_W* self, u8 arg)
                 self->vec_0x190.x = fn_802D30F8(pitch, self->vec_0x190.x, 0x200);
                 if (ai_npc_frame_ck(self, 0, 88.0f, 0.0f) == 1) {
                     setVector3(&offset, 0.0f, 0.0f, 0.0f);
-                    fn_801075AC(self, &offset, 8, 0.5f, 0x22);
+                    eft013_npc_place(self, &offset, 8, 0.5f, 0x22);
                 }
                 break;
             }
@@ -3914,7 +3914,7 @@ void ai_npc_m3_step7_arm(_AINPC_W* self, u8 arg)
     case 2:
         if (arg == 1 && ai_npc_frame_ck(self, 0, 88.0f, 0.0f) == 1) {
             setVector3(&offset, 0.0f, 0.0f, 0.0f);
-            fn_801075AC(self, &offset, 8, 0.5f, 0x22);
+            eft013_npc_place(self, &offset, 8, 0.5f, 0x22);
         }
         if (ai_npc_frame_ck(self, 0, 94.0f, 0.0f) == 1) {
             switch (self->field_0x420) {
@@ -4667,7 +4667,7 @@ void ai_npc_m4_step10_arm(_AINPC_W* self, u8 arg)
                 ai_npc_motion_set(self, 0x72, 2, 0);
             }
         } else if (self->field_0x226 % 30 == 0) {
-            fn_801075AC(self, &offset, 0xE, 0.75f, 0xA);
+            eft013_npc_place(self, &offset, 0xE, 0.75f, 0xA);
         }
         break;
     case 2:
@@ -4679,7 +4679,7 @@ void ai_npc_m4_step10_arm(_AINPC_W* self, u8 arg)
                 ai_npc_motion_set(self, 0x73, 0, 0);
             }
         } else if (self->field_0x226 % 30 == 0) {
-            fn_801075AC(self, &offset, 0xE, 0.75f, 0xA);
+            eft013_npc_place(self, &offset, 0xE, 0.75f, 0xA);
         }
         break;
     case 3:
@@ -9439,7 +9439,7 @@ void fn_802D214C(struct _AINPC_W* self)
             if (--self->field_0x220 <= 0) {
                 self->field_0x21C--;
                 self->field_0x220 = 0x1E;
-                fn_801075AC(self, &offset, 0x0E, lbl_8079A674, 2);
+                eft013_npc_place(self, &offset, 0x0E, lbl_8079A674, 2);
                 if (fn_802D35EC(self, -1) == 1) {
                     return;
                 }
@@ -9794,7 +9794,7 @@ u32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step)
 }
 
 /* 0x802D2B68 - copies the world matrix of the model's joint `joint` to `out`. */
-void fn_802D2B68(struct _AINPC_W* self, u32 joint, nw4r::math::MTX34* out)
+void ai_npc_joint_mtx_get(struct _AINPC_W* self, u32 joint, nw4r::math::MTX34* out)
 {
     mhchar_joint_mtx_get(&self->model, joint, out);
 }
@@ -10720,7 +10720,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
     if (self->in_area != 0) {
         if ((fn_802CCE04(self) == 1) && ((self->field_0x352 % 45) == 0)) {
             setVector3(&offset, -20.0f, 30.0f, 0.0f);
-            fn_801075AC(self, &offset, 0xE, 1.0f, 0x21);
+            eft013_npc_place(self, &offset, 0xE, 1.0f, 0x21);
         }
         switch (::ai_get_motion_no((::_AINPC_W*)self)) {
         case 0x2:
@@ -11123,7 +11123,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
                 if (ai_npc_frame_ck(self, 0, 38.0f, 0.0f) == 1) {
                     if (self->pos_0x178.y <= (self->field_0x1A0 - 50.0f)) {
                         setVector3(&offset, 0.0f, 0.0f, 0.0f);
-                        fn_801075AC(self, &offset, 0xE, 1.0f, 3);
+                        eft013_npc_place(self, &offset, 0xE, 1.0f, 3);
                     }
                 }
                 break;
@@ -11166,7 +11166,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
                 if (self->pos_0x178.y <= (50.0f + self->field_0x1A0)) {
                     if (system_w.field_0x0c % 90 == 0) {
                         setVector3(&offset, 0.0f, -5.0f, 20.0f);
-                        fn_801075AC(self, &offset, 0xE, 1.0f, 0);
+                        eft013_npc_place(self, &offset, 0xE, 1.0f, 0);
                     }
                 }
             }

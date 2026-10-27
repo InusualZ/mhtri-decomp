@@ -144,7 +144,7 @@ void mhchar_draw_mode_set(MHchar* model, s32 value);
 void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
 void pl_joint_mtx_get(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
 u32 ai_npc_motion_step_ck(_ENEMY_WORK* enemy, u8 a, u16 b);
-void fn_802D2B68(_ENEMY_WORK* enemy, u32 id, nw4r::math::MTX34* mtx);
+void ai_npc_joint_mtx_get(_ENEMY_WORK* enemy, u32 id, nw4r::math::MTX34* mtx);
 }
 
 /* The unit's own functions, forward-declared (extern "C" keeps the map's plain spelling). */
@@ -460,7 +460,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
         if (em->active != 0 &&
             ai_npc_motion_step_ck((_ENEMY_WORK*)self->source_0x30, work->field_0x49, work->field_0x4a) != 0 &&
             em->field_0x232 > 0) {
-            fn_802D2B68((_ENEMY_WORK*)self->source_0x30, work->id_0x34, &mtxA);
+            ai_npc_joint_mtx_get((_ENEMY_WORK*)self->source_0x30, work->id_0x34, &mtxA);
             f31 = 1.0f;
             self->area_0x44 = em->field_0x1a4;
             break;

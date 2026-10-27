@@ -1006,7 +1006,7 @@ extern "C" void eft013_em_place(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a,
 }
 
 /* 0x801075AC - the player variant of eft013_em_place (state 2, area from the player record). */
-extern "C" void fn_801075AC(_EFT013_PL* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b) {
+extern "C" void eft013_npc_place(_EFT013_PL* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b) {
     u32 areano = self->field_0x1A4;
     if (areano != get_now_areano()) {
         return;

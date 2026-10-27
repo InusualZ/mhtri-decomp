@@ -6,29 +6,30 @@
  *   0x80799814, its `.data` with `__vt__14Em007ModelCopy` at 0x805B76B8), eft033 0x801E2A9C-0x801E3EE0 (pool from
  *   0x80799818, `.data` from 0x805B76D0), the shop 0x801E3EE0- (`.data` from 0x805B7A88, read by lobby/fn_801E7530).
  * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps `em007_model_colors_get`'s unfused `clrlwi` +
- *   `slwi` index scale and the unfused narrow compares).
+ *   `slwi` index scale and the unfused narrow compares); `#pragma opt_strength_reduction off` around
+ *   em007_model_eft_update (playbook 251: retail's loop hoists only its 0/1 stores; 88.81 -> 98.33 at 3312 of 3316 B).
  * NAMES. No `__FILE__` string covers the range; the map's real names are `eft033_set`/`eft033_set_ofs`.  The file keeps
  *   the map's stem until the seam re-draw (request lobby-801e0adc#3 proposes enemy/em007_model_eft, ef/eft033 and
  *   lobby/lb_equip_shop).  GUESS (from each body and its callers): the em007_model_eft_* steps (after
  *   enemy/em007_act.cpp's em007_model_eft_* scheme), em007_model_colors_get, em007_model_copy_bind, eft033_set_gun,
  *   eft033_alloc/_release/_step/_create/_move/_move_joint/_move_gun/_fade/_retire, the lb_eqshop_* shop rows,
  *   lb_shop_row_unlocked_ck, lb_weapon_price_get, lb_pl_model_turn_reset/_step, the lb_goods_* sale rows, item_price_get,
- *   lb_title_frame_draw, spr_data_copy; the data em007_model_colors_a/b, em007_model_job_busy, the eft033_* tables, the
- *   lb_eqshop_* tables, lb_title_frame_sprites/_rows.  Foreign names this unit proposed are in the name registry.
- * RESIDUALS. 4 rows unwritten: 0x801E0D38-0x801E1A2C (`em007_model_eft_update`, 0xCF4), 0x801E2260-0x801E2674
- *   (`em007_model_eft_job_draw`, 0x414), 0x801E2864-0x801E2A9C (`em007_model_copy_bind` 0x90 and
- *   `Em007ModelCopy::ExecCallbackB` 0x1A8: the class and its 0x60 work are defined in enemy/em007_act.cpp, request
- *   lobby-801e0adc#4; MaskEftView is this unit's view of that work until then).
- *   - `toggle_word_step`'s fifth argument is a u16 in retail (`clrlwi r7` after the constant; request #5):
- *     lb_eqshop_weapon_step, lb_eqshop_armor_step, lb_goods_sale_step, lb_goods_hold_step.
+ *   lb_title_frame_draw, spr_data_copy; the data em007_model_colors_a/b, em007_model_job_busy,
+ *   em007_model_npc_positions, the eft033_* tables, the lb_eqshop_* tables, lb_title_frame_sprites/_rows.  Foreign
+ *   names this unit proposed are in the name registry (GUESS: ai_npc_joint_mtx_get, eft013_npc_place, eft025_npc_set,
+ *   chacha_mask_se00/01/16/17_req).
+ * RESIDUALS. Every row is written.  `Em007ModelCopy` is declared in enemy/em007_act.h; MaskEftView is this unit's view
+ *   of `Em007EftWork` (enemy/em007_act.cpp, request lobby-801e0adc#4).
+ *   - em007_model_eft_update: register colouring only - retail gives the hoisted zero copies r21-r31/r14 and the
+ *     effect, work, NPC and counter r16-r20, ours the reverse.  Declaration permutes of its scalars do not move it.
+ *   - em007_model_eft_job_draw: register colouring only (the hold angle of the second pose).
+ *   - Em007ModelCopy::ExecCallbackB: retail moves `pManip` into r3 before the node index load (scheduling).
  *   - `eft052_page_count_add`'s delta is s32 in retail (no `extsh`; request #6): lb_goods_hold_give.
- *   - an early `return` retail compiles `bne next; b exit`, ours `beq exit`: lb_pl_model_turn_step, eft033_move_gun.
  *   - register colouring only: lb_eqshop_weapon_page_build, lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
  *     lb_title_frame_draw, lb_eqshop_help_draw, eft033_create, eft033_move_joint (the second loop counter), and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
  *   - lb_eqshop_weapon_step: retail recomputes the goods row after `userdata_equip_mask_get`, ours keeps it in r29.
  *   - eft_em_spawn_joint: retail compares id 0x21 signed (`cmpwi`); the switch spelling of the test loses more (95.3).
- *   - em007_model_colors_get: retail indexes each colour byte off the scaled index (`lbzx`), ours adds displacements.
  *   - em007_model_eft_draw: one register.
  *   flipcheck: `.data`/`.sdata`/`.sbss` claimed, not emitted, `.sdata2` emitted in source order (not retail's); `.text`/
  *   extab/extabindex short of the claim.  The trade tables (0x805BA660-0x805BA750) are an unclaimed hole read by this
@@ -38,6 +39,9 @@
  *   eft033_create, lb_goods_sale_all, the armour-set test of the shop steps).  A u8 counter decremented in place is
  *   `field--` (a `field = tmp - 1` adds a `clrlwi`, em007_model_eft_dance).  A helper whose count reaches the caller in r3
  *   returns it (lb_goods_price_group_get).  The shop draws' `if`/`else` keep retail's block order (the shared tail last).
+ *   Two early-exit tests are one `||` return (`beq exit; bne body; b exit`: lb_pl_model_turn_step, eft033_move_gun).
+ *   A table index written in place (`a[idx * 3 + 1]`) keeps retail's `addi` beside its `lbzx` (em007_model_colors_get).
+ *   The two locals that open lb_goods_hold_step are declared `ret` first.
  */
 
 #include "types.h"
@@ -84,6 +88,29 @@
 #include "ef/fn_800CDB2C.h"
 #include "ef/system_lobby_flag_get.h"
 #include "lobby/lb_cmd_pressed_ck.h"
+#include "ai/get_joint_wpos_ai.h"
+#include "ai/ai_npc_joint_mtx_get.h"
+#include "ef/eft013_npc_place.h"
+#include "ef/eft025_npc_set.h"
+#include "ef/eft019.h"
+#include "light/light_point_scale_set.h"
+#include "g3d/mtx34_inverse.h"
+#include "nw4r/math_types.h"
+#include "vec3_clamp_distance.h"
+#include "MSL/atan2f.h"
+#include "enemy/em007_act.h"
+#include "enemy/joint_mtx_store.h"
+#include "g3d/g3d_scnmdlsmpl.h"
+#include "sound/mhchar_wld_mtx_array_get.h"
+#include "g3d/g3d_resnode.h"
+#include "g3d/g3d_resmat.h"
+#include "lobby/lb_npc.h"
+#include "mh3_pad/lb_param_w.h"
+#include "lobby/lb_entry_unlock_flags.h"
+#include "sound/chacha_mask_se00_req.h"
+#include "sound/chacha_mask_se01_req.h"
+#include "sound/chacha_mask_se16_req.h"
+#include "sound/chacha_mask_se17_req.h"
 #include "lobby/lb_scroll_kind_set.h"
 
 /* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
@@ -138,7 +165,7 @@ s32 lb_panel_close(void);
 #include "ef/cockpit_hold_block.h"
 #include "ef/eft052_hold_cursor_step.h"
 #include "Pl/item_bonus_class_get.h"
-#include "ai/ainpc.h"
+#include "ai/ai_npc.h"
 #include "Pl/fn_802693C4.h"
 #include "sound/chacha_mask_se13_req.h"
 #include "sound/fn_800E3CBC.h"
@@ -365,7 +392,7 @@ extern nw4r::math::VEC3 eft033_gun_angles;
 typedef struct MaskEftView {
     /* +0x00 */ s32 model_count_0x00;
     /* +0x04 */ s32 effect_count_0x04;
-    /* +0x08 */ MHchar* model_0x08;
+    /* +0x08 */ MHchar* models_0x08[1];
     /* +0x0C */ nw4r::ef::Effect* effect_0x0C;
     /* +0x10 */ nw4r::ef::Effect* effects_0x10[5];
     /* +0x24 */ class Em007ModelCopy* copy_0x24;
@@ -378,7 +405,7 @@ typedef struct MaskEftView {
     /* +0x44 */ nw4r::math::VEC3 vel_0x44;
     /* +0x50 */ s32 angle_0x50;
     /* +0x54 */ s32 hold_timer_0x54;
-    /* +0x58 */ u8 unused_0x58[2];
+    /* +0x58 */ u16 light_0x58;
     /* +0x5A */ s8 se_timer_a_0x5A;
     /* +0x5B */ s8 se_timer_b_0x5B;
     /* +0x5C */ u8 flag_0x5C;
@@ -401,6 +428,9 @@ typedef struct MaskJobRec {
 } MaskJobRec; /* size: 0x34 */
 
 extern u8 em007_model_job_busy;
+
+/* The lobby NPC's mask spot for each mask kind (engine vectors). */
+extern struct Vec em007_model_npc_positions[7];
 
 /* One 0x14-byte list template of `lb_eqshop_list_tmpls` (the layout `lb_choice_init` reads). */
 typedef struct LbShopListTmpl {
@@ -446,6 +476,9 @@ void eft033_move_joint(_EFT* eft);
 void eft033_move_gun(_EFT* eft);
 void eft033_fade(_EFT* eft);
 void eft033_retire(_EFT* eft);
+void em007_model_eft_dance(_EFT* eft);
+void em007_model_eft_hold(_EFT* eft);
+void em007_model_eft_draw(_EFT* eft, MHchar* model);
 void em007_model_eft_job_draw(PrimRec* job);
 void lb_eqshop_draw(void);
 void lb_eqshop_scroll_frame_draw(u8 kind);
@@ -479,10 +512,10 @@ void em007_model_eft_sparks(_EFT* eft)
         if (eft->field_0x10 < 0) {
             switch (eft->field_0x07) {
             case 3:
-                cpSetRotMatrix((_CP_VECTOR*)&npc->field_0x190, &mtx);
-                copyVec3(&pos, &npc->vec_0x178);
+                cpSetRotMatrix(&npc->vec_0x190, &mtx);
+                copyVec3(&pos, &npc->pos_0x178);
                 setVector3(&ofs, 0.0f, -30.0f, 40.0f);
-                rotVecY(&ofs, npc->field_0x194);
+                rotVecY(&ofs, npc->vec_0x190.y);
                 break;
             default:
                 cpSetRotMatrix((_CP_VECTOR*)&plw->rot_0x54, &mtx);
@@ -522,6 +555,348 @@ void em007_model_eft_sparks(_EFT* eft)
     work->area_0x5D = eft->area_0x44;
 }
 
+#pragma opt_strength_reduction off
+/* Steps the Cha-Cha mask models: follows the companion (its kind's glow, steam, fire and spark effects and sounds, the
+ * dance and hold poses) or the lobby NPC (its unlocked mask placed at the kind's spot), moves and draws each model, and
+ * springs the mask on the companion's head. */
+void em007_model_eft_update(_EFT* eft)
+{
+    MaskEftView* work = (MaskEftView*)eft->work_0x38;
+    nw4r::math::MTX34 joint_mtx;
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 joint;
+    nw4r::math::VEC3 dir;
+    nw4r::math::VEC3 ofs;
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 fwd;
+    nw4r::math::VEC3 rest;
+    nw4r::math::VEC3 pull;
+    nw4r::math::VEC3 head;
+    nw4r::math::VEC3 target;
+    nw4r::math::VEC3 lean;
+    nw4r::math::VEC3 seat;
+    nw4r::math::VEC3 reach;
+    nw4r::math::VEC3 spring;
+    nw4r::math::VEC3 gap;
+    nw4r::math::VEC3 back;
+    f32 scale;
+    f32 scale_b;
+    u32 i;
+    _AINPC_W* npc;
+    _LB_NPC* lb_npc;
+    s32 se_arg;
+    _GXColor col;
+
+    MTX34_ctor(&joint_mtx);
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&joint);
+    VEC3_ctor(&dir);
+    VEC3_ctor(&ofs);
+    VEC3_ctor(&pos);
+    VEC3_ctor(&fwd);
+    scale = 1.0f;
+    scale_b = 0.0f;
+    for (i = 0; i < work->model_count_0x00; i++) {
+        switch (work->mode_0x28) {
+        case 0:
+            npc = (_AINPC_W*)eft->source_0x30;
+            if (npc->active == 0) {
+                return;
+            }
+            if (ai_npc_flag_ck(npc, 2) != 0) {
+                switch (npc->field_0x420) {
+                case 4:
+                    work->state_0x2B = 0;
+                    eft->field_0x06 = 0;
+                    eft->field_0x07 = 0;
+                    eft->demo_flag_0x08 = 0;
+                    em007_model_eft_sparks(eft);
+                    break;
+                }
+                return;
+            }
+            eft->area_0x44 = npc->area;
+            copyVec3(&eft->pos_0x18, &npc->pos_0x178);
+            eft->flag_0x01 = npc->in_area;
+            switch (npc->field_0x420) {
+            case 0:
+                if (npc->motion == 3 &&
+                    ((u16)(npc->motion_step + 0xFFFE) <= 2 || npc->motion_step == 18 || npc->motion_step == 14) &&
+                    work->effect_0x0C != NULL) {
+                    change_paramscale_eff(work->effect_0x0C, 0.7f);
+                    ai_npc_joint_mtx_get(npc, 12, &mtx);
+                    setVector3(&fwd, 0.0f, 0.0f, 80.0f);
+                    mulVecMat(&fwd, &mtx);
+                    mtx34_trans_get(&mtx, &pos);
+                    addVec3To(&pos, &fwd);
+                    SetRootMtxTrans(work->effect_0x0C, &pos);
+                    effect_move(work->effect_0x0C);
+                    col.r = 0xFF;
+                    col.g = 0x3F;
+                    col.b = 0x1F;
+                    col.a = 0xFF;
+                    change_color_eff(work->effect_0x0C, &pos, col);
+                    eft_res_models_spawn(eft, (void**)&work->effect_0x0C, 1, 1, NULL);
+                }
+                break;
+            case 1:
+                if (npc->variant != 2 && npc->field_0x422 > 0) {
+                    se_arg = 0;
+                    if (npc->field_0x422 < 900) {
+                        scale = 0.5f;
+                        se_arg = 1;
+                    }
+                    if (npc->motion == 3) {
+                        scale_b = scale;
+                    }
+                    if (--eft->timer_0x0C < 0) {
+                        eft025_npc_set(npc, 0.85f * (scale + scale_b));
+                        eft->timer_0x0C = 5;
+                    }
+                    get_joint_wpos_ai(npc, 16, &pos);
+                    pos.y += 70.0f;
+                    light_point_scale_set(work->light_0x58, &pos, scale, 0);
+                    if (eft->area_0x44 == get_now_areano()) {
+                        shell_se_req((struct _se_w*)npc->sound_handle_0x498, &npc->pos_0x178, 25, se_arg);
+                    }
+                }
+                break;
+            case 2:
+                if (npc->variant == 2 && npc->pos_0x178.y < npc->field_0x1A0 - 50.0f && npc->field_0x422 > 0) {
+                    setVector3(&pos, 0.0f, 50.0f, 0.0f);
+                    if (--eft->timer_0x0C < 0) {
+                        eft013_npc_place(npc, &pos, 16, 1.0f, 24);
+                        if (eft->area_0x44 == get_now_areano()) {
+                            chacha_mask_se01_req((struct _se_w*)npc->sound_handle_0x498, &npc->pos_0x178);
+                        }
+                        eft->timer_0x0C = 30;
+                    }
+                    if (eft->area_0x44 == get_now_areano()) {
+                        shell_se_req((struct _se_w*)npc->sound_handle_0x498, &npc->pos_0x178, 26, 0);
+                    }
+                }
+                break;
+            case 3:
+                if ((npc->motion != 3 || npc->motion_step != 5) && npc->field_0x422 > 0) {
+                    setVector3(&pos, 0.0f, 65.0f, 0.0f);
+                    if (--eft->timer_0x0C < 0) {
+                        mhchar_joint_mtx_get(&npc->model, 16, &mtx);
+                        mulVecMat(&pos, &mtx);
+                        pos.x += mtx.m[0][3];
+                        pos.y += mtx.m[1][3];
+                        pos.z += mtx.m[2][3];
+                        eft019_set_subtype(0x84, npc->field_0x426, &pos, npc->area, &npc->vec_0x190, 0, 1.0f);
+                        eft->timer_0x0C = 16;
+                    }
+                }
+                break;
+            case 4:
+                if (npc->motion == 1) {
+                    switch (npc->motion_step) {
+                    case 0x55:
+                        if (npc->in_area != 0) {
+                            work->state_0x2B = 1;
+                            work->hold_timer_0x54 = 0;
+                            work->flag_0x5C = 1;
+                            work->models_0x08[i]->setVisibility(6, true);
+                            work->models_0x08[i]->setVisibility(7, true);
+                            em007_model_eft_dance(eft);
+                        } else {
+                            work->state_0x2B = 0;
+                            work->hold_timer_0x54 = 0;
+                            if (work->flag_0x5C == 1) {
+                                chacha_mask_se16_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                                chacha_mask_se17_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                            }
+                            work->flag_0x5C = 0;
+                            work->models_0x08[i]->setVisibility(6, false);
+                            work->models_0x08[i]->setVisibility(7, false);
+                        }
+                        break;
+                    case 0x53:
+                        if (npc->in_area != 0) {
+                            work->state_0x2B = 2;
+                            work->flag_0x5C = 1;
+                            work->models_0x08[i]->setVisibility(6, false);
+                            work->models_0x08[i]->setVisibility(7, true);
+                            em007_model_eft_hold(eft);
+                        } else {
+                            work->state_0x2B = 0;
+                            work->hold_timer_0x54 = 0;
+                            if (work->flag_0x5C == 1) {
+                                chacha_mask_se16_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                                chacha_mask_se17_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                            }
+                            work->flag_0x5C = 0;
+                            work->models_0x08[i]->setVisibility(6, false);
+                            work->models_0x08[i]->setVisibility(7, false);
+                        }
+                        break;
+                    default:
+                        work->state_0x2B = 0;
+                        work->hold_timer_0x54 = 0;
+                        work->se_timer_a_0x5A = 0;
+                        work->se_timer_b_0x5B = 0;
+                        eft->field_0x06 = 0;
+                        eft->field_0x07 = 0;
+                        eft->demo_flag_0x08 = 0;
+                        if (work->flag_0x5C == 1) {
+                            chacha_mask_se16_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                            chacha_mask_se17_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                        }
+                        work->flag_0x5C = 0;
+                        work->models_0x08[i]->setVisibility(6, false);
+                        work->models_0x08[i]->setVisibility(7, false);
+                        break;
+                    }
+                } else {
+                    work->state_0x2B = 0;
+                    work->se_timer_a_0x5A = 0;
+                    work->se_timer_b_0x5B = 0;
+                    eft->field_0x06 = 0;
+                    eft->field_0x07 = 0;
+                    eft->demo_flag_0x08 = 0;
+                    if (work->flag_0x5C == 1) {
+                        chacha_mask_se16_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                        chacha_mask_se17_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+                    }
+                    work->flag_0x5C = 0;
+                    work->models_0x08[i]->setVisibility(6, false);
+                    work->models_0x08[i]->setVisibility(7, false);
+                }
+                if (work->state_0x2B == 0) {
+                    work->models_0x08[0]->setVisibility(8, false);
+                    work->models_0x08[0]->setVisibility(9, false);
+                }
+                em007_model_eft_sparks(eft);
+                break;
+            }
+            break;
+        case 1:
+            lb_npc = (_LB_NPC*)eft->source_0x30;
+            if (lb_npc != NULL) {
+                copyVec3(&eft->pos_0x18, &lb_npc->pos_0x10);
+                if ((lb_param_w.entry_0x08 & 0x7F) != work->kind_0x2A) {
+                    if (lb_entry_unlock_flags[work->kind_0x2A] != 0xFFFF &&
+                        userdata_progress_flag_ck(lb_entry_unlock_flags[work->kind_0x2A]) == 0) {
+                        return;
+                    }
+                    if (get_now_mapno() == 0x16 && eft->area_0x44 != 1) {
+                        return;
+                    }
+                    vec_to_mh_vec3(&eft->pos_0x18, &em007_model_npc_positions[work->kind_0x2A]);
+                    work->models_0x08[i]->field_0x28 = 0;
+                    work->models_0x08[i]->field_0x2C = 0xE71D;
+                    work->models_0x08[i]->field_0x30 = 0;
+                    eft->field_0x07 = 1;
+                    eft->flag_0x01 = 1;
+                } else {
+                    eft->field_0x07 = 0;
+                    eft->flag_0x01 = lb_npc->field_0x001;
+                }
+            } else {
+                if (lb_entry_unlock_flags[work->kind_0x2A] != 0xFFFF &&
+                    userdata_progress_flag_ck(lb_entry_unlock_flags[work->kind_0x2A]) == 0) {
+                    return;
+                }
+                vec_to_mh_vec3(&eft->pos_0x18, &em007_model_npc_positions[work->kind_0x2A]);
+                work->models_0x08[i]->field_0x28 = 0;
+                work->models_0x08[i]->field_0x2C = 0xE71D;
+                work->models_0x08[i]->field_0x30 = 0;
+                if ((lb_param_w.entry_0x08 & 0x7F) == work->kind_0x2A) {
+                    eft->flag_0x01 = 0;
+                } else {
+                    eft->flag_0x01 = 1;
+                }
+            }
+            break;
+        }
+        copyVec3(&work->models_0x08[i]->pos_0x04, &eft->pos_0x18);
+        work->models_0x08[i]->move(0);
+        if (work->mode_0x28 == 0 && npc->field_0x420 == 4) {
+            em007_model_eft_draw(eft, work->models_0x08[i]);
+        } else {
+            eft_res_models_spawn(eft, (void**)&work->models_0x08[i], 2, 1, NULL);
+        }
+    }
+    if (work->mode_0x28 != 0) {
+        return;
+    }
+    switch (npc->field_0x420) {
+    case 0:
+    case 5:
+        if (npc->model.field_0x34 == 0 || work->models_0x08[0]->field_0x34 == 0) {
+            eft->demo_flag_0x08 = 0;
+            return;
+        }
+        switch (eft->demo_flag_0x08) {
+        case 0:
+            eft->demo_flag_0x08++;
+            break;
+        case 1:
+            switch (npc->field_0x420) {
+            case 0:
+                work->models_0x08[0]->get_joint_wpos(4, &work->joint_0x38);
+                break;
+            case 5:
+                work->models_0x08[0]->get_joint_wpos(2, &work->joint_0x38);
+                break;
+            }
+            setVector3(&ofs, 0.0f, 60.0f, 0.0f);
+            setVector3(&work->vel_0x44, 0.0f, 0.0f, 0.0f);
+            addVec3(&rest, &work->joint_0x38, &ofs);
+            copyVec3(&work->pos_0x2C, &rest);
+            work->angle_0x50 = 0;
+            eft->demo_flag_0x08++;
+            break;
+        case 2:
+            switch (npc->field_0x420) {
+            case 0:
+                mhchar_joint_mtx_get(work->models_0x08[0], 3, &joint_mtx);
+                work->models_0x08[0]->get_joint_wpos(4, &joint);
+                break;
+            case 5:
+                mhchar_joint_mtx_get(work->models_0x08[0], 1, &joint_mtx);
+                work->models_0x08[0]->get_joint_wpos(2, &joint);
+                break;
+            }
+            addVec3To(&work->pos_0x2C, &work->vel_0x44);
+            subVec3(&pull, &work->joint_0x38, &joint);
+            copyVec3(&dir, &pull);
+            vec3_scale_in_place(&dir, 0.5f);
+            addVec3To(&work->pos_0x2C, &dir);
+            setVector3(&ofs, 0.0f, 1.0f, 0.0f);
+            mulVecMat(&ofs, &joint_mtx);
+            vec3_scale(&head, &ofs, 60.0f);
+            copyVec3(&pos, &head);
+            addVec3(&target, &joint, &pos);
+            copyVec3(&pos, &target);
+            vec3_clamp_distance(&pos, &work->pos_0x2C, 42.0f);
+            subVec3(&lean, &work->pos_0x2C, &joint);
+            copyVec3(&dir, &lean);
+            if (vec3_length_sq((f32*)&dir) > 0.0005f) {
+                vec3_normalize_into(&dir, &dir);
+            }
+            vec3_scale(&reach, &dir, 60.0f);
+            addVec3(&seat, &joint, &reach);
+            copyVec3(&work->pos_0x2C, &seat);
+            subVec3(&gap, &pos, &work->pos_0x2C);
+            vec3_scale(&spring, &gap, 0.25f);
+            copyVec3(&work->vel_0x44, &spring);
+            copyVec3(&work->joint_0x38, &joint);
+            subVec3(&back, &joint, &work->pos_0x2C);
+            copyVec3(&dir, &back);
+            mtx34_inverse(&mtx, &joint_mtx);
+            mtx34_rotate_vec3(&dir, &mtx, &dir);
+            work->angle_0x50 = (u16)(0.5f + 65536.0f * atan2f(dir.z, dir.y) / 6.2831855f);
+            work->angle_0x50 -= 0x8000;
+            break;
+        }
+        break;
+    }
+}
+#pragma opt_strength_reduction reset
+
 /* Bumps the counter byte at +0x5 of the record the caller passes. */
 void em007_model_eft_next(u8* rec)
 {
@@ -538,10 +913,6 @@ void em007_model_eft_retire(void* obj)
  * second, or the other way round for kind 1. */
 void em007_model_colors_get(u8 kind, u8 idx, u8* out0, u8* out1, u8* out2, u8* out3)
 {
-    s32 i;
-    s32 j;
-    s32 k;
-
     switch (kind) {
     case 0:
         out0[0] = em007_model_colors_a[0];
@@ -550,15 +921,12 @@ void em007_model_colors_get(u8 kind, u8 idx, u8* out0, u8* out1, u8* out2, u8* o
         out1[0] = em007_model_colors_b[0];
         out1[1] = em007_model_colors_b[1];
         out1[2] = em007_model_colors_b[2];
-        i = idx * 3;
-        j = i + 1;
-        k = i + 2;
-        out2[0] = em007_model_colors_a[i];
-        out2[1] = em007_model_colors_a[j];
-        out2[2] = em007_model_colors_a[k];
-        out3[0] = em007_model_colors_b[i];
-        out3[1] = em007_model_colors_b[j];
-        out3[2] = em007_model_colors_b[k];
+        out2[0] = em007_model_colors_a[idx * 3];
+        out2[1] = em007_model_colors_a[idx * 3 + 1];
+        out2[2] = em007_model_colors_a[idx * 3 + 2];
+        out3[0] = em007_model_colors_b[idx * 3];
+        out3[1] = em007_model_colors_b[idx * 3 + 1];
+        out3[2] = em007_model_colors_b[idx * 3 + 2];
         break;
     case 1:
         out2[0] = em007_model_colors_a[0];
@@ -567,15 +935,12 @@ void em007_model_colors_get(u8 kind, u8 idx, u8* out0, u8* out1, u8* out2, u8* o
         out3[0] = em007_model_colors_b[0];
         out3[1] = em007_model_colors_b[1];
         out3[2] = em007_model_colors_b[2];
-        i = idx * 3;
-        j = i + 1;
-        k = i + 2;
-        out0[0] = em007_model_colors_a[i];
-        out0[1] = em007_model_colors_a[j];
-        out0[2] = em007_model_colors_a[k];
-        out1[0] = em007_model_colors_b[i];
-        out1[1] = em007_model_colors_b[j];
-        out1[2] = em007_model_colors_b[k];
+        out0[0] = em007_model_colors_a[idx * 3];
+        out0[1] = em007_model_colors_a[idx * 3 + 1];
+        out0[2] = em007_model_colors_a[idx * 3 + 2];
+        out1[0] = em007_model_colors_b[idx * 3];
+        out1[1] = em007_model_colors_b[idx * 3 + 1];
+        out1[2] = em007_model_colors_b[idx * 3 + 2];
         break;
     }
 }
@@ -687,7 +1052,7 @@ void em007_model_eft_dance(_EFT* eft)
         break;
     }
     if (work->se_timer_b_0x5B % 30 == 0 && eft->area_0x44 == get_now_areano()) {
-        chacha_mask_se13_req(npc->sound_0x498, &eft->pos_0x18);
+        chacha_mask_se13_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
     }
     work->se_timer_b_0x5B++;
     col_a.a = 0xFF;
@@ -707,17 +1072,17 @@ void em007_model_eft_dance(_EFT* eft)
     } else {
         em007_model_colors_get(0, plw->field_0x5BA, &col_a.r, &col_b.r, &col_c.r, &col_d.r);
     }
-    work->model_0x08->setVisibility(8, false);
-    work->model_0x08->setVisibility(9, false);
+    work->models_0x08[0]->setVisibility(8, false);
+    work->models_0x08[0]->setVisibility(9, false);
     if (eft->demo_flag_0x08 & 1) {
-        work->model_0x08->setVisibility(8, true);
-        work->model_0x08->setMatColor(1, (_GXChannelID)4, col_c, false);
-        work->model_0x08->setMatColor(2, (_GXChannelID)4, col_d, false);
+        work->models_0x08[0]->setVisibility(8, true);
+        work->models_0x08[0]->setMatColor(1, (_GXChannelID)4, col_c, false);
+        work->models_0x08[0]->setMatColor(2, (_GXChannelID)4, col_d, false);
     }
     if (eft->demo_flag_0x08 & 2) {
-        work->model_0x08->setVisibility(9, true);
-        work->model_0x08->setMatColor(3, (_GXChannelID)4, col_a, false);
-        work->model_0x08->setMatColor(4, (_GXChannelID)4, col_b, false);
+        work->models_0x08[0]->setVisibility(9, true);
+        work->models_0x08[0]->setMatColor(3, (_GXChannelID)4, col_a, false);
+        work->models_0x08[0]->setMatColor(4, (_GXChannelID)4, col_b, false);
     }
 }
 
@@ -741,7 +1106,7 @@ void em007_model_eft_hold(_EFT* eft)
     work->hold_timer_0x54++;
     eft->field_0x07 = 3;
     if (work->se_timer_b_0x5B % 30 == 0 && eft->area_0x44 == get_now_areano()) {
-        chacha_mask_se13_req(npc->sound_0x498, &eft->pos_0x18);
+        chacha_mask_se13_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
     }
     work->se_timer_b_0x5B++;
     col_a.a = 0xFF;
@@ -749,10 +1114,124 @@ void em007_model_eft_hold(_EFT* eft)
     col_c.a = 0xFF;
     col_d.a = 0xFF;
     em007_model_colors_get(0, npc->field_0x444, &col_a.r, &col_b.r, &col_c.r, &col_d.r);
-    work->model_0x08->setVisibility(8, true);
-    work->model_0x08->setMatColor(1, (_GXChannelID)4, col_c, false);
-    work->model_0x08->setMatColor(2, (_GXChannelID)4, col_d, false);
-    work->model_0x08->setVisibility(9, false);
+    work->models_0x08[0]->setVisibility(8, true);
+    work->models_0x08[0]->setMatColor(1, (_GXChannelID)4, col_c, false);
+    work->models_0x08[0]->setMatColor(2, (_GXChannelID)4, col_d, false);
+    work->models_0x08[0]->setVisibility(9, false);
+}
+
+/* Poses the raised masks from the player's side towards the held joint: the mask-pose job callback
+ * `em007_model_eft_draw` queues; plays the mask sound every 40 frames. */
+void em007_model_eft_job_draw(PrimRec* job)
+{
+    _EFT* eft;
+    MaskEftView* work;
+    _AINPC_W* npc;
+    _PLW* plw;
+    MTX34 mask_mtx;
+    MTX34 back_mtx;
+    VEC3 dir;
+    VEC3 unused;
+    VEC3 base;
+    VEC3 pivot;
+    u32 angle;
+    f32 y;
+    f32 x;
+    f32 z;
+    MTX34* world;
+
+    eft = ((MaskJobRec*)job)->eft_0x2C;
+    work = (MaskEftView*)eft->work_0x38;
+    MTX34_ctor(&mask_mtx);
+    MTX34_ctor(&back_mtx);
+    VEC3_ctor(&dir);
+    VEC3_ctor(&unused);
+    VEC3_ctor(&base);
+    VEC3_ctor(&pivot);
+    npc = (_AINPC_W*)eft->source_0x30;
+    plw = npc->plw_0x16C;
+    dir.x = 0.0f;
+    dir.y = 0.0f;
+    dir.z = 128.0f;
+    rotVecY(&dir, plw->field_0x058);
+    base.x = plw->motion_pos_0x3C + dir.x;
+    base.y = 77.0f + plw->ground_y_0x060;
+    base.z = plw->motion_pos_0x44 + dir.z;
+    dir.x = -52.0f;
+    dir.y = 0.0f;
+    dir.z = 0.0f;
+    angle = plw->field_0x058 + 0xC000;
+    angle &= 0xFFFF;
+    rotVecY(&dir, angle);
+    pivot.x = base.x + dir.x;
+    pivot.y = base.y + dir.y;
+    pivot.z = base.z + dir.z;
+    switch (Get_motion_no(plw)) {
+    case 0x15E:
+        if (Pl_frame_check(plw, 3, 6.0f, 54.0f) != 0) {
+            dir.x = -12.0f;
+            dir.y = 0.0f;
+            dir.z = 9.0f;
+            mhchar_joint_mtx_get(&((Eft033Physics*)plw->physics_0x13C)->chr_0x04, 11, &mask_mtx);
+        } else {
+            dir.x = 12.0f;
+            dir.y = 0.0f;
+            dir.z = 9.0f;
+            mhchar_joint_mtx_get(&((Eft033Physics*)plw->physics_0x13C)->chr_0x04, 7, &mask_mtx);
+        }
+        break;
+    default:
+        dir.x = 12.0f;
+        dir.y = 0.0f;
+        dir.z = 9.0f;
+        mhchar_joint_mtx_get(&((Eft033Physics*)plw->physics_0x13C)->chr_0x04, 7, &mask_mtx);
+        break;
+    }
+    mulVecMat(&dir, &mask_mtx);
+    x = dir.x + mask_mtx.m[0][3];
+    y = dir.y + mask_mtx.m[1][3];
+    z = dir.z + mask_mtx.m[2][3];
+    dir.x = x - pivot.x;
+    dir.y = y - pivot.y;
+    dir.z = z - pivot.z;
+    switch (work->state_0x2B) {
+    case 1:
+        rotVecY(&dir, 0x10000 - angle);
+        angle = (u16)(0.5f + (65536.0f * atan2f(dir.z, dir.y)) / 6.2831855f);
+        mtx34_identity(&mask_mtx);
+        mtx34_identity(&back_mtx);
+        rotMatrixY(plw->field_0x058, &mask_mtx);
+        rotLocalMatZ(angle, &mask_mtx);
+        rotMatrixY(plw->field_0x058, &back_mtx);
+        rotLocalMatZ(0x10000 - angle, &back_mtx);
+        break;
+    case 2:
+        angle = work->hold_timer_0x54 * 0x222;
+        mtx34_identity(&mask_mtx);
+        mtx34_identity(&back_mtx);
+        rotMatrixY(npc->vec_0x190.y, &mask_mtx);
+        rotLocalMatZ(angle, &mask_mtx);
+        rotMatrixY(npc->vec_0x190.y, &back_mtx);
+        rotLocalMatZ(0x10000 - angle, &back_mtx);
+        break;
+    }
+    if (work->se_timer_a_0x5A % 40 == 0 && eft->area_0x44 == get_now_areano()) {
+        chacha_mask_se00_req((struct _se_w*)npc->sound_handle_0x498, &eft->pos_0x18);
+    }
+    work->se_timer_a_0x5A++;
+    world = mhchar_wld_mtx_array_get((nw4r::g3d::ScnMdlSimple*)work->models_0x08[0]->field_0x118);
+    {
+        nw4r::g3d::ResNode node = ((nw4r::g3d::ResMdl*)&work->models_0x08[0]->field_0x114)->GetResNode(5);
+        copyMat33(&world[res_node_mtx_id_get(&node)], &mask_mtx);
+    }
+    {
+        nw4r::g3d::ResNode node = ((nw4r::g3d::ResMdl*)&work->models_0x08[0]->field_0x114)->GetResNode(3);
+        copyMat33(&world[res_node_mtx_id_get(&node)], &back_mtx);
+    }
+    if (work->state_0x2B == 1) {
+        nw4r::g3d::ResNode node = ((nw4r::g3d::ResMdl*)&work->models_0x08[0]->field_0x114)->GetResNode(4);
+        copyMat33(&world[res_node_mtx_id_get(&node)], &back_mtx);
+    }
 }
 
 /* Draws the mask model `model`: while a mask is raised and the dance motion runs (in the current area, visible),
@@ -784,7 +1263,7 @@ void em007_model_eft_draw(_EFT* eft, MHchar* model)
             }
             break;
         }
-        eft_res_models_spawn(eft, (void**)&work->model_0x08, 2, 1, NULL);
+        eft_res_models_spawn(eft, (void**)work->models_0x08, 2, 1, NULL);
         break;
     case 2:
         if (eft->area_0x44 != get_now_areano() || eft->flag_0x01 == 0) {
@@ -801,10 +1280,87 @@ void em007_model_eft_draw(_EFT* eft, MHchar* model)
         }
         break;
     default:
-        eft_res_models_spawn(eft, (void**)&work->model_0x08, 2, 1, NULL);
+        eft_res_models_spawn(eft, (void**)work->models_0x08, 2, 1, NULL);
         break;
     }
 }
+
+} /* extern "C" */
+
+/* Hooks the model copy into each mask model's world-matrix pass (after the world matrices, from node 0). */
+extern "C" void em007_model_copy_bind(Em007ModelCopy* copy)
+{
+    s32 i;
+    MaskEftView* work = (MaskEftView*)copy->eft_0x04->work_0x38;
+
+    for (i = 0; i < work->model_count_0x00; i++) {
+        nw4r::g3d::ScnMdlSimple* mdl = (nw4r::g3d::ScnMdlSimple*)work->models_0x08[i]->field_0x118;
+
+        mdl->SetCalcWorldCallback(work->copy_0x24);
+        mdl->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)2);
+        mdl->SetCalcWorldNodeID(0);
+    }
+}
+
+/* After each node's world matrix: takes the source model's matched node matrix, and on the companion's mask head
+ * node turns it by the mask's spring angle about X; moves the walk to the next node. */
+void Em007ModelCopy::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
+                                   nw4r::g3d::FuncObjCalcWorld* pFuncObj)
+{
+    u32 node = pFuncObj->GetCallbackNodeID();
+    nw4r::math::MTX34 mtx;
+    nw4r::math::MTX34 turn;
+    MaskEftView* work;
+    _AINPC_W* npc;
+    u32 joint;
+
+    MTX34_ctor(&mtx);
+    MTX34_ctor(&turn);
+    work = (MaskEftView*)eft_0x04->work_0x38;
+    npc = (_AINPC_W*)eft_0x04->source_0x30;
+    if (work->mode_0x28 == 0 && npc->field_0x420 == 4) {
+        if (nodes_0x0C[node] != 0xFF) {
+            joint_mtx_store((MtxHolder*)pManip,
+                            &mhchar_wld_mtx_array_get((nw4r::g3d::ScnMdlSimple*)model_0x08->field_0x118)[nodes_0x0C[node]]);
+        }
+        pFuncObj->SetCallbackNodeID(node + 1);
+        return;
+    }
+    if (eft_0x04->field_0x07 != 0) {
+        return;
+    }
+    if (nodes_0x0C[node] != 0xFF) {
+        joint_mtx_store((MtxHolder*)pManip,
+                        &mhchar_wld_mtx_array_get((nw4r::g3d::ScnMdlSimple*)model_0x08->field_0x118)[nodes_0x0C[node]]);
+    }
+    if (work->mode_0x28 == 0) {
+        switch (npc->field_0x420) {
+        case 0:
+            joint = 4;
+            break;
+        case 5:
+            joint = 2;
+            break;
+        default:
+            joint = -1;
+            break;
+        }
+        if (eft_0x04->demo_flag_0x08 == 0) {
+            pFuncObj->SetCallbackNodeID(node + 1);
+            return;
+        }
+        if (node == joint) {
+            joint_mtx_load((MtxHolder*)pManip, &mtx);
+            mtx34_identity(&turn);
+            rotMatrixX(work->angle_0x50, &turn);
+            mtx34_concat_assign(&mtx, &turn);
+            joint_mtx_store((MtxHolder*)pManip, &mtx);
+        }
+    }
+    pFuncObj->SetCallbackNodeID(node + 1);
+}
+
+extern "C" {
 
 } /* extern "C" */
 
@@ -1382,10 +1938,7 @@ void eft033_move_gun(_EFT* eft)
         return;
     }
     eft->area_0x44 = plw->area_0x16;
-    if (plw->field_0x002 != 7) {
-        return;
-    }
-    if (plw->field_0x018 == 0) {
+    if (plw->field_0x002 != 7 || plw->field_0x018 == 0) {
         return;
     }
     if (event_demo_ck() == 1) {
@@ -1961,17 +2514,16 @@ void lb_pl_model_turn_step(_PLW* plw)
 {
     u16 flags;
 
-    if ((u32)chk_pointer() != 1) {
-        if (lobby_net_busy_ck() != 1) {
-            flags = Psw.press_0x2C8;
-            if (flags & 0x0C00) {
-                if (flags & 0x0800) {
-                    plw->field_0x032 -= 0x400;
-                }
-                if (flags & 0x0400) {
-                    plw->field_0x032 += 0x400;
-                }
-            }
+    if ((u32)chk_pointer() == 1 || lobby_net_busy_ck() == 1) {
+        return;
+    }
+    flags = Psw.press_0x2C8;
+    if (flags & 0x0C00) {
+        if (flags & 0x0800) {
+            plw->field_0x032 -= 0x400;
+        }
+        if (flags & 0x0400) {
+            plw->field_0x032 += 0x400;
         }
     }
 }
@@ -3102,8 +3654,8 @@ void lb_goods_hold_give(LbTradeWork* self)
 /* One frame of the item hand-over: the hold strip, then the hand-over question.  Returns 2 when left. */
 s32 lb_goods_hold_step(LbTradeWork* self)
 {
-    u8* hold = cockpit_hold_block;
     s32 ret = 0;
+    u8* hold = cockpit_hold_block;
 
     switch (self->step_0x001) {
     case 0:

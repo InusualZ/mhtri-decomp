@@ -2569,17 +2569,6 @@ void* operator new(unsigned long size);
 void operator delete(void* ptr) throw();
 
 
-/* The model copy the effect clones its model into: a world-matrix callback (its table, `.data` 0x805B76B8, and its
- * constructor `em007_model_copy_ctor` are `lobby/fn_801E0ADC.cpp`'s) deleted through its virtual destructor.
- * ExecCallbackB (0x801E28F4, that unit's) is declared first so the table is emitted with it, not with the
- * destructor here.  size: 0x54 */
-class Em007ModelCopy : public nw4r::g3d::ICalcWorldCallback {
-public:
-    virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
-                               nw4r::g3d::FuncObjCalcWorld* pFuncObj);
-    virtual ~Em007ModelCopy();
-};
-
 /* The 0x60-byte work block `em007_model_eft_alloc` asks `eft_res_slot_get` for, hung off the effect's +0x38.
  * size: 0x60 */
 struct Em007EftWork {

@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (227)
+## Ideas that work (228)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -236,6 +236,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 248 | [Two early-exit checks that share one tail: a comma-sequenced \|\| condition](248-two-early-exit-checks.md) | works | source-shape | Retail emits one copy of an exit tail for two checks separated by statements; goto-free source duplicates the tail |
 | 249 | [A struct returned in r3:r4 and stored twice is a named copy of a temporary](249-struct-returned-in-r3.md) | works | source-shape, allocator | Retail stores a small struct's r3/r4 return to two stack slots and reads only one; ours stores it once, so the frame and every later stack offset shift by 8 |
 | 250 | [Range tests that all branch forward to their bodies and end in b skip are a switch of case runs](250-range-tests-that-all.md) | works | source-shape | Retail tests `cmplwi x,3; ble A; cmpwi x,4; blt skip; cmpwi x,7; ble B; b skip` and lays A then B after the tests; our `if (x <= 3) A else if (x >= 4 && x <= 7) B` branches past A with `bgt` and folds the second test... |
+| 251 | [A loop that hoists only its 0/1 stores (each zero its own register) wants #pragma opt_strength_reduction off](251-loop-that-hoists-only.md) | works | pragma, allocator | Retail's loop preheader copies one zero into a dozen registers and stack slots (`mr r22,r16` ..., `stw r16,0x130(r1)` ...) while ours hoists colour bytes, timer values and table addresses and shares one zero; the row is... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

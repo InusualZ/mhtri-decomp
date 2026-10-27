@@ -295,7 +295,8 @@ struct _AINPC_W {
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ s16 field_0x43E;      /* a countdown `fn_802D36B8` runs down */
     /* +0x440 */ u8 field_0x440;
-    /* +0x441 */ u8 unused_0x441[0x445 - 0x441];
+    /* +0x441 */ u8 unused_0x441[0x444 - 0x441];
+    /* +0x444 */ u8 field_0x444;       /* the mask colour index the Cha-Cha mask effect's hold pose reads */
     /* +0x445 */ u8 field_0x445;
     /* +0x446 */ u8 field_0x446;
     /* +0x447 */ u8 field_0x447;       /* the roll `fn_802D1710` stores */

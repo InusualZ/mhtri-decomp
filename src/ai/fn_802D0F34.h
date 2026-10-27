@@ -54,7 +54,7 @@ void hit_data_apply(struct _HIT_W* hit, struct _HIT_DATA* data);
 void hit_flags_clear(struct _HIT_W* hit);
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void eft004_key_spawn(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
-void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b);
+void eft013_npc_place(struct _AINPC_W* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b);
 void em_land_data_init(::LandData* land);
 void vec3_move_damp(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::VEC3* dir, f32 k,
                   nw4r::math::VEC3* out);
@@ -155,7 +155,7 @@ void fn_802D2A00(struct _AINPC_W* self, u8 motion, u16 step, u16 gauge);
 void fn_802D2ABC(struct _AINPC_W* self, s32 motion, s32 step, s32 gauge);
 void ai_npc_base_state_set(struct _AINPC_W* self, u32 variant);
 u32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step);
-void fn_802D2B68(struct _AINPC_W* self, u32 joint, nw4r::math::MTX34* out);
+void ai_npc_joint_mtx_get(struct _AINPC_W* self, u32 joint, nw4r::math::MTX34* out);
 s32 ai_npc_flag_ck(struct _AINPC_W* self, s32 mask);
 void fn_802D2B88(struct _AINPC_W* self, u16 flags);
 void fn_802D2B98(struct _AINPC_W* self, u16 flags);

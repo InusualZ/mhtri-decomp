@@ -1828,17 +1828,17 @@ extern "C" void fn_800DCCF8(_se_w* work, nw4r::math::VEC3* pos, u8 flag) {
 }
 
 /* The six fixed-id Chacha mask sound requests. */
-extern "C" void fn_800DCD68(_se_w* work, nw4r::math::VEC3* pos) {
+extern "C" void chacha_mask_se01_req(_se_w* work, nw4r::math::VEC3* pos) {
     s32 bank = get_chacha_kamen_bank();
     se_req_pos_ps(work, 1, (bank << 24) | 2, pos);
 }
 
-extern "C" void fn_800DCDBC(_se_w* work, nw4r::math::VEC3* pos) {
+extern "C" void chacha_mask_se00_req(_se_w* work, nw4r::math::VEC3* pos) {
     s32 bank = get_chacha_kamen_bank();
     se_req_pos_ps(work, 0, (bank << 24) | 2, pos);
 }
 
-extern "C" void fn_800DCE10(_se_w* work, nw4r::math::VEC3* pos) {
+extern "C" void chacha_mask_se16_req(_se_w* work, nw4r::math::VEC3* pos) {
     s32 bank = get_chacha_kamen_bank();
     se_req_pos_ps(work, 16, (bank << 24) | 2, pos);
 }
@@ -1848,7 +1848,7 @@ extern "C" void chacha_mask_se13_req(_se_w* work, nw4r::math::VEC3* pos) {
     se_req_pos_ps(work, 13, (bank << 24) | 2, pos);
 }
 
-extern "C" void fn_800DCEB8(_se_w* work, nw4r::math::VEC3* pos) {
+extern "C" void chacha_mask_se17_req(_se_w* work, nw4r::math::VEC3* pos) {
     s32 bank = get_chacha_kamen_bank();
     se_req_pos_ps(work, 17, (bank << 24) | 2, pos);
 }

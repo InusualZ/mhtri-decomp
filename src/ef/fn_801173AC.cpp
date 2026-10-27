@@ -68,14 +68,14 @@ typedef struct _EFT25_WORK {
     /* +0x00 */ s32 count;        /* pooled models, always 1 */
     /* +0x04 */ void* models[1];  /* the pooled `nw4r::ef::Effect` handles */
     /* +0x08 */ u32 motion;       /* the source's motion number latched in state 0, type 2 */
-    /* +0x0C */ f32 scale;        /* the per-record scale fn_801176F0 carries */
+    /* +0x0C */ f32 scale;        /* the per-record scale eft025_npc_set carries */
 } _EFT25_WORK;
 
 extern "C" {
 /* this unit's own symbols (definitions below; the map's plain stems) */
 void fn_801173AC(_EFT* self);
 void eft025_pl_set(_PLW* plw, u32 kind);
-void fn_801176F0(_PLW* plw, f32 value);
+void eft025_npc_set(_PLW* plw, f32 value);
 _EFT* fn_80117760(u32 kind, u8 area);
 void fn_8011781C(_EFT* self);
 void fn_80117858(_EFT* self);
@@ -175,7 +175,7 @@ extern "C" void eft025_pl_set(_PLW* plw, u32 kind)
     }
 }
 
-extern "C" void fn_801176F0(_PLW* plw, f32 value)
+extern "C" void eft025_npc_set(_PLW* plw, f32 value)
 {
     u8 area = plw->effect_key_0x1A4;
     _EFT* rec;
