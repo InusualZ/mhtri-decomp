@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (201)
+## Ideas that work (204)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -210,6 +210,9 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 222 | [Two loops sharing one counter swap two saved registers: give the second loop its own counter](222-second-loop-own-counter.md) | works | source-shape, allocator | A function with two loops over the same counter variable has two saved registers swapped (the counter against a parameter or a result) while every instruction is otherwise identical; declaration orders do not move it. |
 | 223 | [Address-taken one-byte locals in 4-byte stack slots are one-element arrays](223-byte-local-array-stack-slot.md) | works | source-shape, allocator | Several address-taken `s8` locals (passed as `const s8*`) sit at 0x8/0x9/0xA in ours and at 0x8/0xC/0x10 in retail, shifting every stack offset above them. |
 | 224 | [An -O4-unrolled loop's register order follows the declarations and its for-header increment order](224-o4-unrolled-loops-register.md) | works | source-shape, allocator | Under `#pragma optimization_level 4` a hand-unrolled loop (or a short indexed loop) matches every opcode but the counter and the walking pointer sit in each other's registers, and the per-iteration `addi`s come in... |
+| 225 | [A field read at a negative offset from a walked data pointer is read through that pointer (container-of), not through the record](225-field-through-data-pointer.md) | works | source-shape, allocator | Retail reads a record's header field as `lbz rX,-0xA(rData)` off the pointer its loop walks, while ours keeps the record pointer live beside the data pointer and reads `lbz rX,0x2(rRec)` - one callee-saved register more... |
+| 226 | [Bit-selected float constants: declare them first and set them with if/else statements, not ternary initialisers](226-float-constants-if-else.md) | works | source-shape, allocator | Two float constants chosen by type bits (`c1 = bit2 ? 1.5f : 0.0f`, `c0 = bit3 ? ...`) and a parameter `t` computed before them take each other's volatile FPRs (ours t f7 / c1 f5, retail t f5 / c1 f7) while every... |
+| 227 | [A pointer plus a constant header plus a scaled index: the constant-first spelling sums into a scratch register](227-constant-before-scaled-index.md) | works | source-shape, allocator | Retail computes `p = base + i * n + 4` as `add r4,r4,r0` / `addi rDst,r4,0x4` (the sum in a scratch register), ours as `add rDst,r4,r0` / `addi rDst,rDst,0x4`; same instructions, one register different in each pair. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

@@ -31,21 +31,22 @@
  *   and the pattern ramp.
  *   GUESS: `ef_anim_rand_next` (0x8009EEDC): the random generator's LCG step.
  *   GUESS: `ef_anim_name_hash` (0x8009EEF4): hashes the seed, the curve's id, the key and the division.
- * RESIDUALS. 8 partial rows, every one written:
- *  - `ef_anim_latch_tex_type`: retail stores the masked byte, keeps it in a register and reloads `arg->mChannel`; at
- *    level 3 ours drops the first store, at the scoped level 1 it keeps the store but reloads the byte (a
- *    volatile store, a pointer local, a named intermediate and `opt_dead_assignments`/`opt_common_subs off`
- *    score lower);
- *  - `ef_anim_curve_rotate`, `ef_anim_curve_f32`, `ef_anim_curve_u8`: register colouring only (the mask, the two record strides and
- *    the key pointer take other callee-saved registers; retail reuses one pointer for the key data and the
- *    random range, flags read at -0xA);
- *  - `ef_anim_interp_u8`: the cubic's `t` takes f7 and the 0x4 bit's constant f5, retail the other way round
- *    (declaration placement of `t`/`c0`/`c1` does not move it);
- *  - `ef_anim_resolve_key_index`, `ef_anim_resolve_tick`, `ef_anim_tex_ramp`: register colours only (widening the narrow
- *    locals one at a time does not move them);
- *  - `ef_anim_curve_rotate` keeps the key record pointers beside their data pointers, one callee-saved register more than
- *    retail: `_savegpr_20`/`_restgpr_20` where retail calls `_savegpr_21`/`_restgpr_21`.
- *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` is 0x6280 of 0x6288 (the rows above), and the
+ * RESIDUALS. 5 partial rows, every one written:
+ *  - `ef_anim_latch_tex_type`: one register: the final `or` writes r6 (the local's register) where retail writes
+ *    r0 (`self->mKeyTypeBits = b | ...` writes r0 but adds a `clrlwi`; level 2-4 drop the first store);
+ *  - `ef_anim_curve_u8`: `seed`/`mode` swap callee-saved registers (r22/r21) and the index load takes r3 where
+ *    retail takes r4 (hoisting any other top-level declaration, or a u8/u16 `count`, scores lower);
+ *  - `ef_anim_curve_f32`, `ef_anim_curve_rotate`: the hoisted `(f32)(hash >> 16)` conversion constant takes f31
+ *    and `t` f30 (retail the other way round), the index load takes r3 where retail takes r4, and `rotate`'s
+ *    sign-byte `lbzx` lists `pairBytes` first (`[pairBytes]`, `pairBytes + range` and `range + count` do not
+ *    move it). The FPR pair is the register allocator's order (mwcc-debugger, `regalloc-fpr-pass-1`): locals are
+ *    numbered in reverse declaration order, the conversion constants are temporaries numbered above every local,
+ *    and colouring runs from the highest number, so every constant takes f31 before the named `t` (inlining `t`
+ *    duplicates its division, +0x98 B);
+ *  - `ef_anim_resolve_key_index`: volatile colours only: `flags` takes r4 and the tick count r3 where retail has
+ *    r3/r4 (widening `flags`/`bit5`/`count`, dropping `flags` or `bit5` for re-reads, inlining a `count`, `span`,
+ *    `pos` or `div` and hoisting the declarations do not move it);
+ *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` differs only in the rows above, and the
  *   `.sdata2` layout reads as different because the map names the pool words (`ef_anim_f32_*`) where our
  *   literals are anonymous `@` constants of the same bytes at the same offsets.
  * SHAPES. `ef_anim_name_hash` sums `d*K + c*K + (a*K + b*K) + 0x4BF53` in that grouping (retail's add order).
@@ -59,6 +60,15 @@
  *   their u16 keys `stride` bytes apart; the exact-key flag is a `bool` stored through a `bool*` (no `clrlwi` before
  *   its stores); a random record's u16 index is read into a `u32` local (the u16 one takes another register).
  *   `ef_creation_queue_reset` walks the queue entries with a bottom-tested loop.
+ * SHAPES. The three curve evaluators read a key's flags through its data pointer (`EF_ANIM_KEY_OF(src)`, retail's
+ *   `lbz -0xA(data)`) rather than through the record pointer, declare `rstride` uninitialised ahead of a `u32`
+ *   `mask` (both pin retail's callee-saved order), add the random block's 4-byte header before the scaled index
+ *   (`random + 4 + r * rstride`), and declare a random pair's `scale` before its `base` (the f2/f1 load order).
+ *   `ef_anim_tex_ramp` holds its slot in a `u16` (the `s32` one is narrowed into a scratch register first).
+ *   `ef_anim_interp_u8` declares `c0` then `c1` and sets them with if/else statements (the ternaries colour
+ *   `t`/`c1` f7/f5); `ef_anim_latch_tex_type` (level 1) keeps the value of the `&=` in a `u8` local and `|=`s it.
+ *   `ef_anim_resolve_tick` spells `mode - 1` at both uses (a named `last` takes r5 and pushes the tick count and
+ *   flags one register up).
  */
 
 #include "types.h"
@@ -318,6 +328,10 @@ struct EfAnimRamp {
 /* The key searches walk a table of records `stride` bytes apart whose leading u16 is the key. */
 #define EF_ANIM_KEY_AT(base, stride, i) (*(const u16*)((const u8*)(base) + (i) * (stride)))
 
+/* The key record a curve key's data pointer lies in (`data` points at the record's `mData`). */
+#define EF_ANIM_KEY_OF(data)                                                                       \
+    ((const EfAnimCurveKey*)((const u8*)(data) - (u32) & ((const EfAnimCurveKey*)0)->mData))
+
 /* Fires one child-creation key of ef_anim_curve_child's curve. */
 #define EF_ANIM_FIRE(entry)                                                                        \
     ef_anim_fire_child_key((entry), seed, header, (const EfAnimNameTable*)nameTable,                          \
@@ -434,8 +448,7 @@ void ef_anim_resolve_tick(u32 mode, const EfAnimHeader* header, u32 step, u16* t
         return;
     }
 
-    u32 last = mode - 1;
-    if (step >= last) {
+    if (step >= mode - 1) {
         if ((flags & 0x40) == 0 || header->mDivCount % 2 != 0) {
             *tick = count - 1;
         } else {
@@ -447,7 +460,7 @@ void ef_anim_resolve_tick(u32 mode, const EfAnimHeader* header, u32 step, u16* t
     }
 
     s32 span = count - 1;
-    f32 rate = (f32)header->mDivCount * ((f32)span / (f32)last);
+    f32 rate = (f32)header->mDivCount * ((f32)span / (f32)(mode - 1));
     u32 div = (u32)((f32)step * rate / (f32)span);
     *resDiv = div;
     s32 span2 = header->mTickCount - 1;
@@ -571,7 +584,8 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
         return;
     }
 
-    u8 mask = mCmdList[3];
+    u32 rstride;
+    u32 mask = mCmdList[3];
     const EfAnimHeader* header;
     const u8* key;
     const u8* random;
@@ -594,7 +608,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
 
     u32 stride = (count + 0xD) & ~1;
     ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
-    u32 rstride = count * 2;
+    rstride = count * 2;
     ef_anim_resolve_tick(mode, header, step, &tick, &tickF32, &divL);
     divH = divL;
 
@@ -603,9 +617,8 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
                 ((const EfAnimKeyRange*)key)->mKeyCount - 1);
 
     if (exact) {
-        const EfAnimCurveKey* rec = (const EfAnimCurveKey*)(keys + idx * stride);
-        const u8* src = rec->mData.mByte;
-        if (rec->mFlags == 0) {
+        const u8* src = ((const EfAnimCurveKey*)(keys + idx * stride))->mData.mByte;
+        if (EF_ANIM_KEY_OF(src)->mFlags == 0) {
             for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
                 if ((mask & bit) != 0) {
                     *target = *src++;
@@ -618,11 +631,11 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
         u16 r = *(const u16*)src;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, divL);
         const EfAnimRandomByte* range;
-        if ((rec->mFlags & 2) == 0) {
-            range = (const EfAnimRandomByte*)(random + r * rstride + 4);
+        if ((EF_ANIM_KEY_OF(src)->mFlags & 2) == 0) {
+            range = (const EfAnimRandomByte*)(random + 4 + r * rstride);
         } else {
-            range = (const EfAnimRandomByte*)(randomTable +
-                                              rstride * ((hash >> 16) % *(const u16*)randomTable) + 4);
+            range = (const EfAnimRandomByte*)(randomTable + 4 +
+                                              rstride * ((hash >> 16) % *(const u16*)randomTable));
             hash = ef_anim_rand_next(hash);
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
@@ -654,8 +667,8 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
     const EfAnimCurveKey* recB = (const EfAnimCurveKey*)(keys + (idx + 1) * stride);
     const u8* srcB = recB->mData.mByte;
     const u8* type = recA->mType;
-    BOOL randA = recA->mFlags != 0;
-    BOOL randB = recB->mFlags != 0;
+    BOOL randA = EF_ANIM_KEY_OF(srcA)->mFlags != 0;
+    BOOL randB = EF_ANIM_KEY_OF(srcB)->mFlags != 0;
 
     if (!randA && !randB) {
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
@@ -674,11 +687,11 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
         u16 rA = *(const u16*)srcA;
         u32 hashA = ef_anim_name_hash(seed, header->mNameId, rA, divL);
         const EfAnimRandomByte* rangeA;
-        if ((recA->mFlags & 2) == 0) {
-            rangeA = (const EfAnimRandomByte*)(random + rA * rstride + 4);
+        if ((EF_ANIM_KEY_OF(srcA)->mFlags & 2) == 0) {
+            rangeA = (const EfAnimRandomByte*)(random + 4 + rA * rstride);
         } else {
-            rangeA = (const EfAnimRandomByte*)(randomTable +
-                                              rstride * ((hashA >> 16) % *(const u16*)randomTable) + 4);
+            rangeA = (const EfAnimRandomByte*)(randomTable + 4 +
+                                              rstride * ((hashA >> 16) % *(const u16*)randomTable));
             hashA = ef_anim_rand_next(hashA);
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
@@ -709,11 +722,11 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
         u16 rB = *(const u16*)srcB;
         u32 hashB = ef_anim_name_hash(seed, header->mNameId, rB, divH);
         const EfAnimRandomByte* rangeB;
-        if ((recB->mFlags & 2) == 0) {
-            rangeB = (const EfAnimRandomByte*)(random + rB * rstride + 4);
+        if ((EF_ANIM_KEY_OF(srcB)->mFlags & 2) == 0) {
+            rangeB = (const EfAnimRandomByte*)(random + 4 + rB * rstride);
         } else {
-            rangeB = (const EfAnimRandomByte*)(randomTable +
-                                              rstride * ((hashB >> 16) % *(const u16*)randomTable) + 4);
+            rangeB = (const EfAnimRandomByte*)(randomTable + 4 +
+                                              rstride * ((hashB >> 16) % *(const u16*)randomTable));
             hashB = ef_anim_rand_next(hashB);
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
@@ -743,21 +756,21 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
     u16 rA = *(const u16*)srcA;
     u32 hashA = ef_anim_name_hash(seed, header->mNameId, rA, divL);
     const EfAnimRandomByte* rangeA;
-    if ((recA->mFlags & 2) == 0) {
-        rangeA = (const EfAnimRandomByte*)(random + rA * rstride + 4);
+    if ((EF_ANIM_KEY_OF(srcA)->mFlags & 2) == 0) {
+        rangeA = (const EfAnimRandomByte*)(random + 4 + rA * rstride);
     } else {
-        rangeA = (const EfAnimRandomByte*)(randomTable +
-                                          rstride * ((hashA >> 16) % *(const u16*)randomTable) + 4);
+        rangeA = (const EfAnimRandomByte*)(randomTable + 4 +
+                                          rstride * ((hashA >> 16) % *(const u16*)randomTable));
         hashA = ef_anim_rand_next(hashA);
     }
-    u16 rB = *(const u16*)srcB;
+    u32 rB = *(const u16*)srcB;
     u32 hashB = ef_anim_name_hash(seed, header->mNameId, rB, divH);
     const EfAnimRandomByte* rangeB;
-    if ((recB->mFlags & 2) == 0) {
-        rangeB = (const EfAnimRandomByte*)(random + rB * rstride + 4);
+    if ((EF_ANIM_KEY_OF(srcB)->mFlags & 2) == 0) {
+        rangeB = (const EfAnimRandomByte*)(random + 4 + rB * rstride);
     } else {
-        rangeB = (const EfAnimRandomByte*)(randomTable +
-                                          rstride * ((hashB >> 16) % *(const u16*)randomTable) + 4);
+        rangeB = (const EfAnimRandomByte*)(randomTable + 4 +
+                                          rstride * ((hashB >> 16) % *(const u16*)randomTable));
         hashB = ef_anim_rand_next(hashB);
     }
     for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
@@ -815,8 +828,18 @@ u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type) {
         if (type == 1) {
             return (f32)s + t * (t * ((3.0f - 2.0f * t) * (f32)(int)(e - s)));
         } else {
-            f32 c1 = ((type >> 2) & 1) == 0 ? 0.0f : 1.5f;
-            f32 c0 = ((type >> 3) & 1) == 0 ? 0.0f : 1.5f;
+            f32 c0;
+            f32 c1;
+            if (((type >> 2) & 1) == 0) {
+                c1 = 0.0f;
+            } else {
+                c1 = 1.5f;
+            }
+            if (((type >> 3) & 1) == 0) {
+                c0 = 0.0f;
+            } else {
+                c0 = 1.5f;
+            }
             f32 r = (f32)s + t * (f32)(int)(e - s) * (c0 + (t * (t * (c0 + c1 - 2.0f)) + t * (3.0f + (-2.0f * c0 - c1))));
             if (r < 0.0f) {
                 return 0;
@@ -984,7 +1007,8 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
         return;
     }
 
-    u8 mask = mCmdList[3];
+    u32 rstride;
+    u32 mask = mCmdList[3];
     const EfAnimHeader* header;
     const u8* key;
     const u8* random;
@@ -1010,15 +1034,14 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
     }
 
     u32 stride = count * 4 + 0xC;
-    u32 rstride = count * 8;
+    rstride = count * 8;
     const u8* keys = key + 4;
     ef_anim_find_bracket_keys(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
                 ((const EfAnimKeyRange*)key)->mKeyCount - 1);
 
     if (exact) {
-        const EfAnimCurveKey* rec = (const EfAnimCurveKey*)(keys + idx * stride);
-        const f32* src = rec->mData.mValue;
-        if (rec->mFlags == 0) {
+        const f32* src = ((const EfAnimCurveKey*)(keys + idx * stride))->mData.mValue;
+        if (EF_ANIM_KEY_OF(src)->mFlags == 0) {
             for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
                 if ((mask & bit) != 0) {
                     *target = *src++;
@@ -1031,17 +1054,18 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
         u32 r = *(const u16*)src;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, divL);
         const EfAnimRandomRange* range;
-        if ((rec->mFlags & 2) == 0) {
-            range = (const EfAnimRandomRange*)(random + r * rstride + 4);
+        if ((EF_ANIM_KEY_OF(src)->mFlags & 2) == 0) {
+            range = (const EfAnimRandomRange*)(random + 4 + r * rstride);
         } else {
-            range = (const EfAnimRandomRange*)(randomTable +
-                                               rstride * ((hash >> 16) % *(const u16*)randomTable) + 4);
+            range = (const EfAnimRandomRange*)(randomTable + 4 +
+                                               rstride * ((hash >> 16) % *(const u16*)randomTable));
             hash = ef_anim_rand_next(hash);
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
+                f32 scale;
                 f32 base = range->mBase;
-                f32 scale = range->mRange;
+                scale = range->mRange;
                 range++;
                 *target = base + scale * (f32)(hash >> 16);
                 if ((header->mFlags & 4) == 0) {
@@ -1060,8 +1084,8 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
     const EfAnimCurveKey* recB = (const EfAnimCurveKey*)(keys + (idx + 1) * stride);
     const f32* srcB = recB->mData.mValue;
     const u8* type = recA->mType;
-    BOOL randA = recA->mFlags != 0;
-    BOOL randB = recB->mFlags != 0;
+    BOOL randA = EF_ANIM_KEY_OF(srcA)->mFlags != 0;
+    BOOL randB = EF_ANIM_KEY_OF(srcB)->mFlags != 0;
 
     if (!randA && !randB) {
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
@@ -1080,17 +1104,18 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
         u16 r = *(const u16*)srcA;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, divL);
         const EfAnimRandomRange* range;
-        if ((recA->mFlags & 2) == 0) {
-            range = (const EfAnimRandomRange*)(random + r * rstride + 4);
+        if ((EF_ANIM_KEY_OF(srcA)->mFlags & 2) == 0) {
+            range = (const EfAnimRandomRange*)(random + 4 + r * rstride);
         } else {
-            range = (const EfAnimRandomRange*)(randomTable +
-                                               rstride * ((hash >> 16) % *(const u16*)randomTable) + 4);
+            range = (const EfAnimRandomRange*)(randomTable + 4 +
+                                               rstride * ((hash >> 16) % *(const u16*)randomTable));
             hash = ef_anim_rand_next(hash);
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
+                f32 scale;
                 f32 base = range->mBase;
-                f32 scale = range->mRange;
+                scale = range->mRange;
                 range++;
                 f32 a = base + scale * (f32)(hash >> 16);
                 if ((header->mFlags & 4) == 0) {
@@ -1109,17 +1134,18 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
         u16 r = *(const u16*)srcB;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, divH);
         const EfAnimRandomRange* range;
-        if ((recB->mFlags & 2) == 0) {
-            range = (const EfAnimRandomRange*)(random + r * rstride + 4);
+        if ((EF_ANIM_KEY_OF(srcB)->mFlags & 2) == 0) {
+            range = (const EfAnimRandomRange*)(random + 4 + r * rstride);
         } else {
-            range = (const EfAnimRandomRange*)(randomTable +
-                                               rstride * ((hash >> 16) % *(const u16*)randomTable) + 4);
+            range = (const EfAnimRandomRange*)(randomTable + 4 +
+                                               rstride * ((hash >> 16) % *(const u16*)randomTable));
             hash = ef_anim_rand_next(hash);
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
+                f32 scale;
                 f32 base = range->mBase;
-                f32 scale = range->mRange;
+                scale = range->mRange;
                 range++;
                 f32 b = base + scale * (f32)(hash >> 16);
                 if ((header->mFlags & 4) == 0) {
@@ -1137,34 +1163,36 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
     u16 rA = *(const u16*)srcA;
     u32 hashA = ef_anim_name_hash(seed, header->mNameId, rA, divL);
     const EfAnimRandomRange* rangeA;
-    if ((recA->mFlags & 2) == 0) {
-        rangeA = (const EfAnimRandomRange*)(random + rA * rstride + 4);
+    if ((EF_ANIM_KEY_OF(srcA)->mFlags & 2) == 0) {
+        rangeA = (const EfAnimRandomRange*)(random + 4 + rA * rstride);
     } else {
-        rangeA = (const EfAnimRandomRange*)(randomTable +
-                                            rstride * ((hashA >> 16) % *(const u16*)randomTable) + 4);
+        rangeA = (const EfAnimRandomRange*)(randomTable + 4 +
+                                            rstride * ((hashA >> 16) % *(const u16*)randomTable));
         hashA = ef_anim_rand_next(hashA);
     }
     u16 rB = *(const u16*)srcB;
     u32 hashB = ef_anim_name_hash(seed, header->mNameId, rB, divH);
     const EfAnimRandomRange* rangeB;
-    if ((recB->mFlags & 2) == 0) {
-        rangeB = (const EfAnimRandomRange*)(random + rB * rstride + 4);
+    if ((EF_ANIM_KEY_OF(srcB)->mFlags & 2) == 0) {
+        rangeB = (const EfAnimRandomRange*)(random + 4 + rB * rstride);
     } else {
-        rangeB = (const EfAnimRandomRange*)(randomTable +
-                                            rstride * ((hashB >> 16) % *(const u16*)randomTable) + 4);
+        rangeB = (const EfAnimRandomRange*)(randomTable + 4 +
+                                            rstride * ((hashB >> 16) % *(const u16*)randomTable));
         hashB = ef_anim_rand_next(hashB);
     }
     for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
         if ((mask & bit) != 0) {
+            f32 scaleA;
             f32 baseA = rangeA->mBase;
-            f32 scaleA = rangeA->mRange;
+            scaleA = rangeA->mRange;
             rangeA++;
             f32 a = baseA + scaleA * (f32)(hashA >> 16);
             if ((header->mFlags & 4) == 0) {
                 hashA = ef_anim_rand_next(hashA);
             }
+            f32 scaleB;
             f32 baseB = rangeB->mBase;
-            f32 scaleB = rangeB->mRange;
+            scaleB = rangeB->mRange;
             rangeB++;
             f32 b = baseB + scaleB * (f32)(hashB >> 16);
             if ((header->mFlags & 4) == 0) {
@@ -1209,7 +1237,8 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     NW4R_POINTER_ASSERT(mCmdList, 0x51A, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
     NW4R_POINTER_ASSERT(target, 0x51B, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
-    u8 mask = mCmdList[3];
+    u32 rstride;
+    u32 mask = mCmdList[3];
     const EfAnimHeader* header;
     const u8* key;
     const u8* random;
@@ -1236,15 +1265,14 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
 
     u32 stride = count * 4 + 0xC;
     u32 pairBytes = count * 8;
-    u32 rstride = pairBytes + 4;
+    rstride = pairBytes + 4;
     const u8* keys = key + 4;
     ef_anim_find_bracket_keys(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
                 ((const EfAnimKeyRange*)key)->mKeyCount - 1);
 
     if (exact) {
-        const EfAnimCurveKey* rec = (const EfAnimCurveKey*)(keys + idx * stride);
-        const f32* src = rec->mData.mValue;
-        if (rec->mFlags == 0) {
+        const f32* src = ((const EfAnimCurveKey*)(keys + idx * stride))->mData.mValue;
+        if (EF_ANIM_KEY_OF(src)->mFlags == 0) {
             for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
                 if ((mask & bit) != 0) {
                     *target = *src++;
@@ -1257,11 +1285,11 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
         u32 r = *(const u16*)src;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, divL);
         const EfAnimRandomRange* range;
-        if ((rec->mFlags & 2) == 0) {
-            range = (const EfAnimRandomRange*)(random + r * rstride + 4);
+        if ((EF_ANIM_KEY_OF(src)->mFlags & 2) == 0) {
+            range = (const EfAnimRandomRange*)(random + 4 + r * rstride);
         } else {
-            range = (const EfAnimRandomRange*)(randomTable +
-                                               rstride * ((hash >> 16) % *(const u16*)randomTable) + 4);
+            range = (const EfAnimRandomRange*)(randomTable + 4 +
+                                               rstride * ((hash >> 16) % *(const u16*)randomTable));
             hash = ef_anim_rand_next(hash);
         }
         BOOL negate = FALSE;
@@ -1273,8 +1301,9 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
+                f32 scale;
                 f32 base = range->mBase;
-                f32 scale = range->mRange;
+                scale = range->mRange;
                 range++;
                 f32 v = base + scale * (f32)(hash >> 16);
                 if (negate) {
@@ -1297,8 +1326,8 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     const EfAnimCurveKey* recB = (const EfAnimCurveKey*)(keys + (idx + 1) * stride);
     const f32* srcB = recB->mData.mValue;
     const u8* type = recA->mType;
-    BOOL randA = recA->mFlags != 0;
-    BOOL randB = recB->mFlags != 0;
+    BOOL randA = EF_ANIM_KEY_OF(srcA)->mFlags != 0;
+    BOOL randB = EF_ANIM_KEY_OF(srcB)->mFlags != 0;
 
     if (!randA && !randB) {
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
@@ -1317,11 +1346,11 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
         u16 rA = *(const u16*)srcA;
         u32 hashA = ef_anim_name_hash(seed, header->mNameId, rA, divL);
         const EfAnimRandomRange* rangeA;
-        if ((recA->mFlags & 2) == 0) {
-            rangeA = (const EfAnimRandomRange*)(random + rA * rstride + 4);
+        if ((EF_ANIM_KEY_OF(srcA)->mFlags & 2) == 0) {
+            rangeA = (const EfAnimRandomRange*)(random + 4 + rA * rstride);
         } else {
-            rangeA = (const EfAnimRandomRange*)(randomTable +
-                                               rstride * ((hashA >> 16) % *(const u16*)randomTable) + 4);
+            rangeA = (const EfAnimRandomRange*)(randomTable + 4 +
+                                               rstride * ((hashA >> 16) % *(const u16*)randomTable));
             hashA = ef_anim_rand_next(hashA);
         }
         BOOL negateA = FALSE;
@@ -1333,8 +1362,9 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
+                f32 scaleA;
                 f32 baseA = rangeA->mBase;
-                f32 scaleA = rangeA->mRange;
+                scaleA = rangeA->mRange;
                 rangeA++;
                 f32 vA = baseA + scaleA * (f32)(hashA >> 16);
                 if (negateA) {
@@ -1356,11 +1386,11 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
         u16 rB = *(const u16*)srcB;
         u32 hashB = ef_anim_name_hash(seed, header->mNameId, rB, divH);
         const EfAnimRandomRange* rangeB;
-        if ((recB->mFlags & 2) == 0) {
-            rangeB = (const EfAnimRandomRange*)(random + rB * rstride + 4);
+        if ((EF_ANIM_KEY_OF(srcB)->mFlags & 2) == 0) {
+            rangeB = (const EfAnimRandomRange*)(random + 4 + rB * rstride);
         } else {
-            rangeB = (const EfAnimRandomRange*)(randomTable +
-                                               rstride * ((hashB >> 16) % *(const u16*)randomTable) + 4);
+            rangeB = (const EfAnimRandomRange*)(randomTable + 4 +
+                                               rstride * ((hashB >> 16) % *(const u16*)randomTable));
             hashB = ef_anim_rand_next(hashB);
         }
         BOOL negateB = FALSE;
@@ -1372,8 +1402,9 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
         }
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
+                f32 scaleB;
                 f32 baseB = rangeB->mBase;
-                f32 scaleB = rangeB->mRange;
+                scaleB = rangeB->mRange;
                 rangeB++;
                 f32 vB = baseB + scaleB * (f32)(hashB >> 16);
                 if (negateB) {
@@ -1394,21 +1425,21 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     u16 rA = *(const u16*)srcA;
     u32 hashA = ef_anim_name_hash(seed, header->mNameId, rA, divL);
     const EfAnimRandomRange* rangeA;
-    if ((recA->mFlags & 2) == 0) {
-        rangeA = (const EfAnimRandomRange*)(random + rA * rstride + 4);
+    if ((EF_ANIM_KEY_OF(srcA)->mFlags & 2) == 0) {
+        rangeA = (const EfAnimRandomRange*)(random + 4 + rA * rstride);
     } else {
-        rangeA = (const EfAnimRandomRange*)(randomTable +
-                                           rstride * ((hashA >> 16) % *(const u16*)randomTable) + 4);
+        rangeA = (const EfAnimRandomRange*)(randomTable + 4 +
+                                           rstride * ((hashA >> 16) % *(const u16*)randomTable));
         hashA = ef_anim_rand_next(hashA);
     }
     u16 rB = *(const u16*)srcB;
     u32 hashB = ef_anim_name_hash(seed, header->mNameId, rB, divH);
     const EfAnimRandomRange* rangeB;
-    if ((recB->mFlags & 2) == 0) {
-        rangeB = (const EfAnimRandomRange*)(random + rB * rstride + 4);
+    if ((EF_ANIM_KEY_OF(srcB)->mFlags & 2) == 0) {
+        rangeB = (const EfAnimRandomRange*)(random + 4 + rB * rstride);
     } else {
-        rangeB = (const EfAnimRandomRange*)(randomTable +
-                                           rstride * ((hashB >> 16) % *(const u16*)randomTable) + 4);
+        rangeB = (const EfAnimRandomRange*)(randomTable + 4 +
+                                           rstride * ((hashB >> 16) % *(const u16*)randomTable));
         hashB = ef_anim_rand_next(hashB);
     }
     BOOL negateA = FALSE;
@@ -1427,15 +1458,17 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     }
     for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
         if ((mask & bit) != 0) {
+            f32 scaleA;
             f32 baseA = rangeA->mBase;
-            f32 scaleA = rangeA->mRange;
+            scaleA = rangeA->mRange;
             rangeA++;
             f32 vA = baseA + scaleA * (f32)(hashA >> 16);
             if (negateA) {
                 vA = -vA;
             }
+            f32 scaleB;
             f32 baseB = rangeB->mBase;
-            f32 scaleB = rangeB->mRange;
+            scaleB = rangeB->mRange;
             rangeB++;
             f32 vB = baseB + scaleB * (f32)(hashB >> 16);
             if (negateB) {
@@ -1587,8 +1620,9 @@ inline void ef_anim_key_search(s32* out, s32 target, const u16* ptrBase, u32 str
 #pragma optimization_level 1
 void ef_anim_latch_tex_type(EfAnimParticle* self, const EfAnimDivider* arg) {
     if (self->mLatched == 0) {
-        self->mKeyTypeBits &= (u8)~(3 << (arg->mChannel * 2));
-        self->mKeyTypeBits |= (u8)((arg->mType & 3) << (arg->mChannel * 2));
+        u8 b = (u8)(self->mKeyTypeBits &= (u8)~(3 << (arg->mChannel * 2)));
+        b |= (u8)((arg->mType & 3) << (arg->mChannel * 2));
+        self->mKeyTypeBits = b;
     }
     self->mLatched = 1;
 }
@@ -1599,18 +1633,18 @@ void ef_anim_latch_tex_type(EfAnimParticle* self, const EfAnimDivider* arg) {
 void ef_anim_tex_ramp(EfAnimParticle* self, const EfAnimDivider* divider, const EfAnimRamp* ramp,
                  struct EfPmManager* manager, const EfAnimNameTable* nameTable, u32* target) {
     s32 span = ramp->mEnd - ramp->mStart;
-    s32 idx = (u16)(divider->mSlotBase + self->mPhase % span);
+    u16 idx = (u16)(divider->mSlotBase + self->mPhase % span);
     idx += ramp->mStart;
 
     if ((ramp->mFlags & 4) != 0) {
-        if ((u16)idx == divider->mKeyCount - 1) {
+        if (idx == divider->mKeyCount - 1) {
             ef_pm_retire_particle(manager, (struct EfPmParticle*)self);
         }
-    } else if ((u16)idx >= divider->mKeyCount - 1) {
-        idx = (u16)(idx - (u16)(divider->mKeyCount - 1));
+    } else if (idx >= divider->mKeyCount - 1) {
+        idx -= (u16)(divider->mKeyCount - 1);
     }
 
-    *target = nameTable->mName[(u16)idx];
+    *target = nameTable->mName[idx];
     NW4R_POINTER_ASSERT(target, 0x70D, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 }
 
