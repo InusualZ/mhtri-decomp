@@ -2581,10 +2581,10 @@ extern "C" void stage_light_blend_set(StageBlendRec* rec, void* obj, u8 store)
         colour[5] = 0;
     }
     if (store == 0) {
-        fn_80057DE0(0, 6, colour, rec->se_frame);
+        filter_panel_upper_set(0, 6, colour, rec->se_frame);
         return;
     }
-    fn_80057EF4(0, 6, colour, rec->se_frame);
+    filter_panel_lower_set(0, 6, colour, rec->se_frame);
 }
 
 /* Copies the current area's staged colour record out of the stage block and drives it. */
@@ -3833,7 +3833,7 @@ extern "C" void stage_colour_cycle_update(void)
               | ((u8)(s32)((f32)(u8)(from >> 16) + weight * ((f32)(u8)(to >> 16) - (f32)(u8)(from >> 16))) << 16);
     colour[5] = colour[4];
 
-    fn_80057DE0(0, 6, colour, lbl_8079A4C4);
+    filter_panel_upper_set(0, 6, colour, lbl_8079A4C4);
 }
 
 /* Seeds the three per-area effect seats and the stage block's first area record. */

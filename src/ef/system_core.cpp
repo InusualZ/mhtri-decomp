@@ -400,7 +400,7 @@ extern "C" void fn_800D20B4(s16 x, s16 y);
 extern "C" void loading_pad_icon_draw(u8 index);
 extern "C" void system_nop(void);
 extern "C" void tex_coord_gen_set(s32 dst, s32 func, s32 src, u32 mtx);
-extern "C" u8 fn_800D06E0(void);
+extern "C" u8 loading_disp_flag_get(void);
 u8** get_str_tbl(long index);
 extern "C" u32 fn_800CEDBC(void);
 extern "C" void hbm_sound_fade_reset(void);
@@ -671,7 +671,7 @@ void loading_disp_flag_set(u8 value) {
     system_w.field_0x867 = value;
 }
 
-u8 fn_800D06E0(void) {
+u8 loading_disp_flag_get(void) {
     return system_w.field_0x867;
 }
 
@@ -1978,7 +1978,7 @@ void loading_disp_draw(void) {
     if (disp->shown_0x00 == 0) {
         return;
     }
-    if (disp->mode_0xA6 == 6 && fn_800D06E0() == 0) {
+    if (disp->mode_0xA6 == 6 && loading_disp_flag_get() == 0) {
         disp->shown_0x00 = 0;
         return;
     }

@@ -320,8 +320,8 @@ extern "C" s32 screen_split_mode_ck(void);
  * `camera/fn_802B5C58.cpp` a `void**`, hence the erased types). */
 extern "C" void* word_copy_return_dst(void* out, const void* src);
 extern "C" void scene_current_camera_set(u8 value);
-extern "C" void fn_80057DE0(s32 a, s32 count, u32* colours, f32 param);
-extern "C" void fn_80057EF4(s32 a, s32 count, u32* colours, f32 param);
+extern "C" void filter_panel_upper_set(s32 a, s32 count, u32* colours, f32 param);
+extern "C" void filter_panel_lower_set(s32 a, s32 count, u32* colours, f32 param);
 extern "C" void camera_posture_info_ctor(s32* out);
 extern "C" s32 fn_8007A1B8(const void* a, s32 b, void* c, void* d, s32 e, s32 f, void* g);
 extern "C" void my_player_no_set(s8 value);  /* s8 is the owner's spelling (the argument

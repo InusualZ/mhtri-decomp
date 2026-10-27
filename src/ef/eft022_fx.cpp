@@ -140,8 +140,8 @@ extern "C" void fn_8011676C(_EFT*);
 
 extern "C" void mtx34_copy(void* dst, void* src);
 
-extern "C" void fn_80059374(s32 a);
-extern "C" void fn_80059420(void);
+extern "C" void screen_fade_start(s32 a);
+extern "C" void screen_fade_ease(void);
 extern "C" void res_node_assign(void* ctx, void* val);
 extern "C" s32 res_node_get_id(void* ctx);
 extern "C" u32 res_node_is_valid(void* ctx);
@@ -714,7 +714,7 @@ extern "C" void fn_8011661C(_EFT* self)
     case 0:
         if (++self->timer_0x0C >= 0x18) {
             self->timer_0x0C = 5;
-            fn_80059374(1);
+            screen_fade_start(1);
             self->field_0x07++;
             self->field_0x07++;
         }
@@ -725,10 +725,10 @@ extern "C" void fn_8011661C(_EFT* self)
     case 2:
         if (--self->timer_0x0C <= 0) {
             self->timer_0x0C = 0x5A;
-            fn_80059374(2);
+            screen_fade_start(2);
             self->field_0x07++;
         } else {
-            fn_80059420();
+            screen_fade_ease();
         }
         break;
     case 3:
@@ -738,7 +738,7 @@ extern "C" void fn_8011661C(_EFT* self)
             self->field_0x06 = 0;
             self->field_0x07 = 0;
         } else {
-            fn_80059420();
+            screen_fade_ease();
         }
         break;
     }
