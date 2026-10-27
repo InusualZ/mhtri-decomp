@@ -59,7 +59,7 @@
  * RESIDUALS. hbmTextWriterDrawLine / hbmTextWriterDraw: retail loads the cursor x before caretEndX for the caret-moved
  *            test and compares in the other operand order; hbmTextWriterMeasureGlyph: the width, scale and font-scale
  *            floats take f31/f30/f29 in another order (register colouring only).
- * RESIDUALS. Unwritten, store a vtable whose class this unit would have to emit (rule 10): fn_80558F38, fn_8055B710,
+ * RESIDUALS. Unwritten, store a vtable whose class this unit would have to emit (rule 10): __dt__19HbmKbTextBufferBaseFv, fn_8055B710,
  *            fn_8055CAD0, fn_8055CB34 (the Vu object's constructor and destructor, table 0x80651950), createRoot (the gui
  *            manager's tables 0x80658358/0x806582FC) and the eight part factories in 0x8055DFCC..0x8055E778.
  * RESIDUALS. Unwritten: fn_8055EAA8, the unit's static initialiser (its .ctors entry), which constructs the Vu

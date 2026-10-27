@@ -240,6 +240,94 @@ public:
     /* +0x24 */ u8 unused_0x24[8];
     /* +0x2C */ s32 mState;
 }; /* size: 0x30 */
+
+/* The fixed part of the keyboard's text buffer: its capacity, length, text storage, pending dead key and allocator.
+ * size: 0x1C */
+class HbmKbTextBufferBase {
+public:
+    HbmKbTextBufferBase(u16 bufferCapacity)
+        : capacity(bufferCapacity), length(0), text(NULL), workText(NULL), deadKey(0), bufferAllocator(NULL) {}
+
+    /* slot +0x008 */ virtual ~HbmKbTextBufferBase();
+
+    /* +0x04 */ u16 capacity;
+    /* +0x06 */ u16 length;
+    /* +0x08 */ u16 unused_0x08[2];
+    /* +0x0C */ u16* text;
+    /* +0x10 */ u16* workText;
+    /* +0x14 */ u16 deadKey;
+    /* +0x16 */ u8 pad_0x16[2];
+    /* +0x18 */ MEMAllocator* bufferAllocator;
+}; /* size: 0x1C */
+
+/* The keyboard's text buffer (class table 0x806515D0 in this unit's .data; the same object as
+ * homebutton/hbm_text_panel.cpp's HbmPanelItemView): the cursor, the selection's anchor and the input mode.  Its
+ * constructor takes the character capacity (0x40 for the prediction widget, 0x200 for the text panel's buffers) and
+ * resets it through slot 0xC4; the owner then creates it (slot 0x0C).  `create` is declared first so it stays the
+ * class's key function; the destructor is homebutton/hbm_text_panel.cpp's (0x805426D8).  size: 0x50 */
+class HbmKbTextBuffer : public HbmKbTextBufferBase {
+public:
+    HbmKbTextBuffer(u16 bufferCapacity = 0x40)
+        : HbmKbTextBufferBase(bufferCapacity), cursor(0), anchor(0), selecting(0), inputMode(0) {
+        reset();
+    }
+
+    /* slot +0x00C */ virtual void create(MEMAllocator* allocator);
+    /* slot +0x008 */ virtual ~HbmKbTextBuffer();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual void v_0x05C();
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual void v_0x064();
+    /* slot +0x068 */ virtual void v_0x068();
+    /* slot +0x06C */ virtual void v_0x06C();
+    /* slot +0x070 */ virtual void v_0x070();
+    /* slot +0x074 */ virtual void v_0x074();
+    /* slot +0x078 */ virtual void v_0x078();
+    /* slot +0x07C */ virtual void v_0x07C();
+    /* slot +0x080 */ virtual void v_0x080();
+    /* slot +0x084 */ virtual void v_0x084();
+    /* slot +0x088 */ virtual void v_0x088();
+    /* slot +0x08C */ virtual void v_0x08C();
+    /* slot +0x090 */ virtual void v_0x090();
+    /* slot +0x094 */ virtual void v_0x094();
+    /* slot +0x098 */ virtual void v_0x098();
+    /* slot +0x09C */ virtual void v_0x09C();
+    /* slot +0x0A0 */ virtual void v_0x0A0();
+    /* slot +0x0A4 */ virtual void v_0x0A4();
+    /* slot +0x0A8 */ virtual void v_0x0A8();
+    /* slot +0x0AC */ virtual void v_0x0AC();
+    /* slot +0x0B0 */ virtual void v_0x0B0();
+    /* slot +0x0B4 */ virtual void v_0x0B4();
+    /* slot +0x0B8 */ virtual void v_0x0B8();
+    /* slot +0x0BC */ virtual void v_0x0BC();
+    /* slot +0x0C0 */ virtual void v_0x0C0();
+    /* slot +0x0C4 */ virtual void reset();
+
+    /* +0x1C */ u32 cursor;
+    /* +0x20 */ u32 anchor;
+    /* +0x24 */ u8 selecting;
+    /* +0x25 */ u8 pad_0x25[3];
+    /* +0x28 */ s32 inputMode;
+    /* +0x2C */ u8 unused_0x2C[0x24];
+}; /* size: 0x50 */
 #endif
 
 #endif

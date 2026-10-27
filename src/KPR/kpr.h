@@ -26,6 +26,8 @@ typedef struct KPRQueue {
 /* untyped: opaque band object, typed by the callers' views */
 u32 KPRLookAhead(void* queue, u32 outAddress, u32 max);
 
+/* Installs the dead-key converter as the compose hook. */
+void kpr_install_converter(void);
 /* Empties the queue and clears its mode. */
 void KPRInitQueue(KPRQueue* queue);
 /* Empties the queue. */

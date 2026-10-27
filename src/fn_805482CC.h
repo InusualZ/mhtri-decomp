@@ -4,7 +4,7 @@
  * include this header rather than copying the layout).
  *
  * Layout evidence: the panel's constructor `fn_80542D8C` (0x80542D8C, one band below) writes +0x000
- * (vtable `lbl_80657678`), +0x05C (`lbl_80651708`, the sub-object's table), +0x118, and then the run
+ * (vtable `__vt__16HbmKbEventSource`), +0x05C (`__vt__15HbmPanelSubView`, the sub-object's table), +0x118, and then the run
  * +0x18F8..+0x1A00; its sub-object is built by `fn_80503314` at +0x10.  The functions of this unit
  * read +0x193C / +0x1940 / +0x1944 as pointers to heap objects sharing one dispatch table, +0x1964 as
  * an embedded scroll record (table `__vt__17HbmKbScrollerView`) and +0x19F0 as a pointer to a record whose +0x04 is
@@ -233,7 +233,7 @@ typedef struct Panel805482CC_Scroll {
 } Panel805482CC_Scroll; /* size: 0x24 */
 
 /* The sub-object at +0x10; its dispatch table pointer sits at its own +0x4C (i.e. +0x5C of the panel),
- * which is the offset `fn_80542D8C` stores `lbl_80651708` into.  Its tail is not touched by this
+ * which is the offset `fn_80542D8C` stores `__vt__15HbmPanelSubView` into.  Its tail is not touched by this
  * band's functions, so the size is a lower bound. */
 typedef struct Panel805482CC_SubVtbl Panel805482CC_SubVtbl;
 struct Panel805482CC_SubVtbl {

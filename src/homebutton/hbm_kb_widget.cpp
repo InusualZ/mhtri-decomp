@@ -84,6 +84,7 @@
 #include "homebutton/hbm_kb_child.h"
 #include "homebutton/hkb_keyboard.h"
 #include "homebutton/hbm_text_panel.h"
+#include "homebutton/hbm_kb_scroller.h"
 #include "homebutton/tiHKBManager.h"
 #include "homebutton/gui_manager.h"
 #include "homebutton/hkb_textbox.h"
@@ -461,22 +462,6 @@ public:
     /* slot +0x008 */ virtual void onScrolled(s32 kind, s32 delta);
 }; /* size: 0x04 */
 
-/* The scroller of the candidate list (+0x18 of the list, its table at 0x8064F338 is homebutton/hbm_text_panel.cpp's):
- * slot 0x08 starts a scroll, 0x0C steps it, 0x10 reads its offset, 0x14 whether it moves, 0x20 resets it.
- * size: 0x10 (approximation: only the vptr is touched) */
-class HbmKbScrollerView {
-public:
-    /* slot +0x008 */ virtual void start(HbmKbScrollListener* listener, f32 from, f32 to, s32 words, f32 frames);
-    /* slot +0x00C */ virtual void step();
-    /* slot +0x010 */ virtual f32 getOffset();
-    /* slot +0x014 */ virtual bool isMoving();
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void reset();
-
-    /* +0x04 */ u8 unused_0x04[0xC];
-}; /* size: 0x10 */
-
 /* The prediction-candidate list embedded in the keyboard widget (+0x18B8): twenty word slots (a text pane, its
  * frame and its highlight each), the window it scrolls through the dictionary and the scroller that moves it.
  * Its members are defined below as C functions, so its table (0x80650038) is not emitted here.
@@ -516,87 +501,6 @@ public:
     /* +0x1F9 */ u8 unused_0x1F9[3];
     /* +0x1FC */ HbmKbCandidateSet* words;
 }; /* size: 0x200 */
-
-/* The fixed part of the keyboard's text buffer: its capacity, length, text storage, pending dead key and allocator.
- * size: 0x1C */
-class HbmKbTextBufferBase {
-public:
-    HbmKbTextBufferBase() : capacity(0x40), length(0), text(NULL), workText(NULL), deadKey(0), bufferAllocator(NULL) {}
-
-    /* slot +0x008 */ virtual ~HbmKbTextBufferBase();
-
-    /* +0x04 */ u16 capacity;
-    /* +0x06 */ u16 length;
-    /* +0x08 */ u16 unused_0x08[2];
-    /* +0x0C */ u16* text;
-    /* +0x10 */ u16* workText;
-    /* +0x14 */ u16 deadKey;
-    /* +0x16 */ u8 pad_0x16[2];
-    /* +0x18 */ MEMAllocator* bufferAllocator;
-}; /* size: 0x1C */
-
-/* The keyboard's text buffer (class table 0x806515D0, homebutton/hbm_value.cpp's .data; the same object as
- * homebutton/hbm_text_panel.cpp's HbmPanelItemView): the cursor, the selection's anchor and the input mode.  Its
- * constructor resets it through slot 0xC4; the widget then creates it (slot 0x0C).  size: 0x50 */
-class HbmKbTextBuffer : public HbmKbTextBufferBase {
-public:
-    HbmKbTextBuffer() : cursor(0), anchor(0), selecting(0), inputMode(0) { reset(); }
-
-    /* slot +0x00C */ virtual void create(MEMAllocator* allocator);
-    /* slot +0x010 */ virtual void v_0x010();
-    /* slot +0x014 */ virtual void v_0x014();
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void v_0x020();
-    /* slot +0x024 */ virtual void v_0x024();
-    /* slot +0x028 */ virtual void v_0x028();
-    /* slot +0x02C */ virtual void v_0x02C();
-    /* slot +0x030 */ virtual void v_0x030();
-    /* slot +0x034 */ virtual void v_0x034();
-    /* slot +0x038 */ virtual void v_0x038();
-    /* slot +0x03C */ virtual void v_0x03C();
-    /* slot +0x040 */ virtual void v_0x040();
-    /* slot +0x044 */ virtual void v_0x044();
-    /* slot +0x048 */ virtual void v_0x048();
-    /* slot +0x04C */ virtual void v_0x04C();
-    /* slot +0x050 */ virtual void v_0x050();
-    /* slot +0x054 */ virtual void v_0x054();
-    /* slot +0x058 */ virtual void v_0x058();
-    /* slot +0x05C */ virtual void v_0x05C();
-    /* slot +0x060 */ virtual void v_0x060();
-    /* slot +0x064 */ virtual void v_0x064();
-    /* slot +0x068 */ virtual void v_0x068();
-    /* slot +0x06C */ virtual void v_0x06C();
-    /* slot +0x070 */ virtual void v_0x070();
-    /* slot +0x074 */ virtual void v_0x074();
-    /* slot +0x078 */ virtual void v_0x078();
-    /* slot +0x07C */ virtual void v_0x07C();
-    /* slot +0x080 */ virtual void v_0x080();
-    /* slot +0x084 */ virtual void v_0x084();
-    /* slot +0x088 */ virtual void v_0x088();
-    /* slot +0x08C */ virtual void v_0x08C();
-    /* slot +0x090 */ virtual void v_0x090();
-    /* slot +0x094 */ virtual void v_0x094();
-    /* slot +0x098 */ virtual void v_0x098();
-    /* slot +0x09C */ virtual void v_0x09C();
-    /* slot +0x0A0 */ virtual void v_0x0A0();
-    /* slot +0x0A4 */ virtual void v_0x0A4();
-    /* slot +0x0A8 */ virtual void v_0x0A8();
-    /* slot +0x0AC */ virtual void v_0x0AC();
-    /* slot +0x0B0 */ virtual void v_0x0B0();
-    /* slot +0x0B4 */ virtual void v_0x0B4();
-    /* slot +0x0B8 */ virtual void v_0x0B8();
-    /* slot +0x0BC */ virtual void v_0x0BC();
-    /* slot +0x0C0 */ virtual void v_0x0C0();
-    /* slot +0x0C4 */ virtual void reset();
-
-    /* +0x1C */ u32 cursor;
-    /* +0x20 */ u32 anchor;
-    /* +0x24 */ u8 selecting;
-    /* +0x25 */ u8 pad_0x25[3];
-    /* +0x28 */ s32 inputMode;
-    /* +0x2C */ u8 unused_0x2C[0x24];
-}; /* size: 0x50 */
 
 /* The widget's primary base as the conversion to its pane manager base sees it: 0x17F4 bytes.
  * size: 0x17F4 (approximation: only the size is used) */
