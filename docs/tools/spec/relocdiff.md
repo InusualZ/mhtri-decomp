@@ -22,16 +22,21 @@ python tools/objdiff/relocdiff.py Network/network_state --by-owner   # compact, 
 python tools/objdiff/relocdiff.py --callees enemy/em001_prog ef/ef_particle   # wrong callee / mangling / linkage per function
 python tools/objdiff/relocdiff.py --callees --json -     # every registered unit with both objects, the record on stdout
 python tools/objdiff/relocdiff.py --values ai/ai_npc g3d/g3d_resmat   # a renamed pool word / string whose BYTES differ
-python tools/objdiff/relocdiff.py --values --json F      # every registered unit with both objects (about 7 s)
+python tools/objdiff/relocdiff.py --values --json F      # every registered unit with both objects (about 6 s)
+python tools/objdiff/relocdiff.py --values --pairing offset ai/ai_npc   # the same-offset, same-instruction pairing only
 python tools/objdiff/relocdiff.py --selftest
 ```
-Flags: `--all`, `--by-owner`, `--callees`, `--check`, `--json`, `--rows`, `--section`, `--selftest`, `--unit`, `--values`.
-`--values` prints `<unit>  <owner>+0xOFF  <type>  ours NAME = VALUE vs target NAME = VALUE` per value mismatch, with
-`[address, differs at +0xN]` when the instruction takes the address (`addi`, a table word) and `[bytes equal]` when the
-owner's two bodies are otherwise byte-identical, then `relocdiff --values: N value mismatch(es) in U of M unit(s); P
-renamed pair(s) read, E equal; not read: ...`; exit 0 none, 1 some, 2 an object missing or unreadable. `--json F` (or
-`-`) writes `[{unit, stem, pairs, same, differ: [{owner, section, offset, type, ours, ours_addend, target,
-target_addend, ours_value, target_value, width, kind, first_difference, owner_equal}], skipped, error}]`.
+Flags: `--all`, `--by-owner`, `--callees`, `--check`, `--json`, `--pairing`, `--rows`, `--section`, `--selftest`, `--unit`,
+`--values`.
+`--values` prints `<unit>  <owner>+0xOFF  <type>  ours NAME = VALUE vs target NAME = VALUE` per value mismatch (a
+shifted pair `+0xT (ours +0xO)`, an absent side `none`), then its class tag - none for `wrong`, `[shifted]`,
+`[missing: ours never loads it here]`, `[extra: retail never loads it here]` - `[address, differs at +0xN]` when the
+instruction takes the address (`addi`, a table word) and `[bytes equal]` when the owner's two bodies are otherwise
+byte-identical, then `relocdiff --values: N value mismatch(es) in U of M unit(s); P renamed pair(s) read, E equal; not
+read: ...; pairing align (n class, ...)`; exit 0 none, 1 some, 2 an object missing or unreadable. `--json F` (or `-`)
+writes `[{unit, stem, pairs, same, differ: [{owner, section, class, offset, target_offset, ours_offset, type, ours,
+ours_addend, target, target_addend, ours_value, target_value, width, kind, first_difference, owner_equal}], reordered,
+skipped, error}]` (`--pairing offset`: no `class`, `*_offset` or `reordered`).
 `--callees` prints `<unit>  <function>  <kind>: ours X vs target Y @+0xOFF; ...` (one line per function with a
 difference; `extra: ours X`, `missing: target Y` when unpaired) and a count line; exit 0 none, 1 some, 2 an object
 missing or unreadable. `--json F` (or `-` for stdout) writes `[{unit, stem, functions: [{function, diffs: [{kind,
@@ -62,23 +67,47 @@ Inputs -> outputs: obj/ + src/ objects -> tables, exit.
 * **`--values`** is `lib.objcompare.value_diffs`: objdiff and `rawsame` score `lfs f1, @123@sda21(r2)` against
   `lfs f1, lbl_80796EE0@sda21(r2)` as equal whatever the two pool words hold, and `--callees` cancels the pair as pool
   noise. Per owner (function or data object) both objects define - a stub ours has not written and `extab`/`extabindex`
-  excepted - a relocation pairs with the target's at the **same offset in the owner, of the same type, patching the same
-  instruction word** (a pair across two different instructions is a diverged body, counted `other-instruction`; on
-  the tree below an aligner on the type sequence read 303 mismatches and offset pairing without the instruction test
-  474, mostly diverged bodies, where this reads 102).
+  excepted - the two sides' value relocations are compared one of two ways (`--pairing`):
+  * **`align` (the default, `aligned_value_diffs`)**: each side's value relocations, in offset order, are read on
+    their own side and aligned by a heaviest common subsequence (`align_values`): a pair weighs 10 for one value at
+    one place (same offset, type and instruction word: `same_place`), 6 for one value elsewhere (`same_value`: one
+    name and addend whatever the relocation type, or one type, kind and bytes - an address-taken datum only as far as
+    the shorter symbol runs, `compared_bytes`) and 5 for one place holding two values, so a code shift aligns the
+    constants by value while unshifted code keeps its places. Classes: an aligned pair at one place with two values is
+    **`wrong`**; an unaligned value the other side never loads in this owner is **`missing`** (retail's) or
+    **`extra`** (ours); a missing and an extra of one type and kind between the same two aligned pairs are
+    **`different`** (`[shifted]`); an unaligned value the other side loads elsewhere is `reordered` - listed in the
+    JSON, counted under `not read`, never reported. An owner past `ALIGN_MAX_CELLS` (4M cells) falls back to `difflib`.
+  * **`offset` (`offset_value_diffs`, the original rule)**: a relocation pairs with the target's at the **same offset
+    in the owner, of the same type, patching the same instruction word**, and only name-differing pairs are read (a
+    pair across two different instructions is counted `other-instruction`; an aligner on the type sequence read 303
+    mismatches and offset pairing without the instruction test 474). In a function below 100 % every constant after
+    a code shift can read as a wrong value.
+  Census at `14ddf33b` (667 units): offset pairing 122 mismatches in 22 units (32612 renamed pairs, 32490 equal);
+  aligned 59 in 17 units (33954 pairs, 33906 equal; 46 wrong, 2 different, 6 missing, 5 extra; 142 reordered). Of
+  the 122, 76 aligned away, each with the same values in the same order on both sides (`lobby/lb_equip_page` 17,
+  `enemy/em018_prog` 23, `ef/eft018` 11, `ef/eft053` 7, `fn_80059550` 6, `enemy/fn_802F5138` 3,
+  `Pl/pl_act_step` 2 of 10, `enemy/fn_80138074` 2, `MSL/e_pow`, `SC/SCSystemConfig`, `enemy/em_common`,
+  `fn_80047398`, `lobby/lb_pane_ui` 1 each), and 46 stayed, the four `[bytes equal]` rows among them
+  (`pl_act_weapon_swing` and `eft033_move_joint` are rotations in unshifted code). The 13 new rows are shifted or
+  one-sided values offset pairing cannot pair (`em022_act6_wander` loads the same 32.0-for-3.0 as `em022_act6_rush`;
+  `eft_em_tint_model_create` and `eft023_fx` the signed for the unsigned int-to-float magic; `RSO/runtime` never loads
+  a warning string). Two constants swapped where the code also shifted read `reordered`, not reported.
   Only `ADDR32`, `ADDR16`, `ADDR16_LO` and `EMB_SDA21` are read (`@ha`/`@hi` carry the high half, their `@l` partner is
-  compared; a branch is `--callees`' question) and only when the two symbol names differ. Each side reads the datum
+  compared; a branch is `--callees`' question); offset pairing reads only a pair whose two symbol names differ. Each side reads the datum
   from its own object's section bytes, or - for an undefined name (another unit's `lbl_`) - from the retail DOL
   (`orig/RMHE08/sys/main.dol`, read-only) at the `symbols.txt` address, plus the addend. The width is the
   instruction's access width (`ppc.WIDTH`: `lfs` 4, `lfd` 8, `lhz` 2 ...; FP accesses print as numbers) or, for an
-  address taken, the smaller of the two symbols' sizes (capped at 256 bytes). A word inside the datum that a
-  relocation fills on either side is masked on both (a split jump table carries linked addresses where ours carries
+  address taken, the smaller of the two symbols' sizes (capped at 256 bytes; aligned pairing reads each side's own
+  symbol and compares the shorter run). A word inside the datum that a relocation fills is masked (on both sides in
+  offset pairing, on its own side when aligned: a split jump table carries linked addresses where ours carries
   zero); a datum made only of such words is `relocated`, a `.bss` target `bss`, a code target `code`, a name the map
   does not carry `unresolved` - all counted, none compared. Whole tree at `58e3e191` (665 units, 7 s): 32383 renamed
-  pairs read, 32281 equal, 102 value mismatches in 32 functions of 22 units, four of them in 100 % functions
+  pairs read, 32281 equal, 102 value mismatches (offset pairing) in 32 functions of 22 units, four of them in 100 % functions
   (`ai/ai_npc` `fn_802CF704`+0x6c 30.0 vs 50.0, `enemy/em022_prog` `em022_act6_rush`+0x13c 32.0 vs 3.0,
   `g3d/g3d_resmat` `GetResTexPlttInfo` `"g3d_resmat.cpp"` vs `"g3d_resmat_ac.h"` twice, `mh3_pad` `sdk_link_refs`).
-  `flipcheck` carries the same pass as an advisory note (it never refuses).
+  `flipcheck` carries the same pass (aligned, one `objcompare.value_brief` per row) as an advisory note (it never
+  refuses).
 * **What it prints,** for each section that either side relocates:
 * both sides' relocations - section offset, target symbol name, relocation type, addend - merged on the offset so the two sides read across;
 * the diff, in the four classes a lane acts on: (a) relocations **only the target** has; (b) relocations **only ours** has; (c) the **same offset pointing at a different symbol** (the objdiff-invisible class); (d) the **same symbol with a different type or addend**;
@@ -106,7 +135,15 @@ another offset does not pair; a stub is not judged; `.sbss` is `bss`; an undefin
 right word) and `unresolved` without it; an address-taken string (smaller size, quoted, first differing byte); a split
 jump table of relocated words is `relocated`; the CLI line, summary, exit 1/0 and `--json -`; `flipcheck`'s advisory
 note. Mutations: no instruction check, no relocated mask, the first size instead of the smallest, no stub skip and no
-DOL read each fail one check.
+DOL read each fail one check. The two offset-only cases (another instruction, another offset) pin `mode="offset"`.
+Aligned pairing: `tools/tests/objdiff/test_relocdiff_align.py` (18 checks): a shift of three loads is two false values
+under offset pairing and none aligned (also through the `difflib` fallback); a wrong value inside a shift is one
+`different` row with both offsets; a wrong value in place is `wrong` with `owner_equal`; a rotation of four constants
+in unshifted code is four `wrong`; `missing`, `extra` and `reordered`; one name reached by `@sda21` and by `lis`/`addi`
+is one datum; an address-taken datum compares the shorter symbol's bytes and names the first differing byte; the CLI
+exit codes for both pairings, the shifted line and the class summary; `flipcheck`'s note for a pure shift (none) and a
+shifted wrong value. Mutations: place weight 0 fails 3, place weight below a crossing value pair fails 1, a type-bound
+name match fails 1, no prefix compare fails 1, offset pairing as the default fails 12.
 Target: `tools/tests/objdiff/test_relocdiff.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

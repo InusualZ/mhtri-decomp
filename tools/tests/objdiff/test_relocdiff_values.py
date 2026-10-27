@@ -1,7 +1,8 @@
 """relocdiff --values (`lib.objcompare.value_diffs`) on ElfBuilder objects: a relocation pair whose two targets differ
 only by name (`@N` vs `lbl_X`) is read on both sides - the object's own section bytes, or the DOL at the map's address
 for an undefined name - and reported when the BYTES differ, which no instruction score can see. Also: the access width
-and the datum size, masked relocated words, a diverged instruction, a stub, and flipcheck's advisory row."""
+and the datum size, masked relocated words, a diverged instruction (offset pairing), a stub, and flipcheck's advisory
+row. The shifted-code cases of the default aligned pairing are test_relocdiff_align.py."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import contextlib
 import io
@@ -98,12 +99,13 @@ def test_same_name_and_instruction(c):
             objcompare.value_diffs(target, ours)["pairs"], 0)
     target = obj([LFS, BLR], f32(1.0), [("lbl_80796EE0", 0, 4)], [(0x0, "lbl_80796EE0", "R_PPC_EMB_SDA21")])
     ours = obj([0xC0420000, BLR], f32(2.0), [("@12", 0, 4)], [(0x0, "@12", "R_PPC_EMB_SDA21")])
-    rec = objcompare.value_diffs(target, ours)
-    c.check("another instruction at the offset (lfs f2 vs f1) is a diverged body, not a value: skipped",
+    rec = objcompare.value_diffs(target, ours, mode="offset")
+    c.check("offset pairing: another instruction at the offset (lfs f2 vs f1) is a diverged body: skipped",
             (rec["differ"], rec["skipped"]), ([], {"other-instruction": 1}))
     target = obj([0, LFS, BLR], f32(1.0), [("lbl_80796EE0", 0, 4)], [(0x4, "lbl_80796EE0", "R_PPC_EMB_SDA21")])
     ours = obj([LFS, 0, BLR], f32(2.0), [("@12", 0, 4)], [(0x0, "@12", "R_PPC_EMB_SDA21")])
-    c.check("a relocation at another offset does not pair", objcompare.value_diffs(target, ours)["pairs"], 0)
+    c.check("offset pairing: a relocation at another offset does not pair",
+            objcompare.value_diffs(target, ours, mode="offset")["pairs"], 0)
 
 
 def test_stub_and_bss(c):

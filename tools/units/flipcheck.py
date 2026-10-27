@@ -360,9 +360,9 @@ def retail_dol():
 
 
 def relocation_value_notes(src_path: str, obj_path: str) -> list[str]:
-    """The advisory value row (`relocdiff --values`, `lib.objcompare.value_diffs`): relocations at the same offset,
-    of the same type, in the same instruction, whose targets differ only by name (`@N` vs `lbl_X`) but whose BYTES
-    differ - a pool word or string no score sees. One `advisory:` line, or none; it never refuses (yet)."""
+    """The advisory value row (`relocdiff --values`, `lib.objcompare.value_diffs`, aligned per owner): a value
+    relocation whose datum's BYTES differ from the target's - a pool word or string no score sees - at one place,
+    shifted, or loaded on one side only. One `advisory:` line, or none; it never refuses (yet)."""
     if not (os.path.exists(src_path) and os.path.exists(obj_path)):
         return []
     try:
@@ -371,12 +371,10 @@ def relocation_value_notes(src_path: str, obj_path: str) -> list[str]:
         return []
     if not rec["differ"]:
         return []
-    shown = ["%s+0x%x ours %s = %s, target %s = %s" % (d["owner"], d["offset"], d["ours"], d["ours_value"],
-                                                        d["target"], d["target_value"])
-             for d in rec["differ"][:VALUE_FIRST]]
+    shown = [objcompare.value_brief(d) for d in rec["differ"][:VALUE_FIRST]]
     more = " (... %d more)" % (len(rec["differ"]) - VALUE_FIRST) if len(rec["differ"]) > VALUE_FIRST else ""
-    return ["%s%d relocation(s) name a different datum than the target's under another name, and the bytes differ "
-            "(relocdiff --values) - %s%s" % (ADVISORY, len(rec["differ"]), "; ".join(shown), more)]
+    return ["%s%d relocation(s) name a datum whose bytes differ from the target's (relocdiff --values) - %s%s"
+            % (ADVISORY, len(rec["differ"]), "; ".join(shown), more)]
 
 
 def unit_name_for(path: str) -> str:

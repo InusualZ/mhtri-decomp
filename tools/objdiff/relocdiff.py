@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Relocation-level diff of one unit: the target object's relocations against ours, on both sides.
 Spec: docs/tools/spec/relocdiff.md. CLI: relocdiff.py <unit>... [--unit U] [--section S] [--rows N | --all] [--json F]
-[--check] [--by-owner] | --callees [unit...] [--json F|-] | --values [unit...] [--json F|-] | --selftest."""
+[--check] [--by-owner] | --callees|--values [unit...] [--json F|-] [--pairing align|offset] | --selftest."""
 from __future__ import annotations
 
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -176,9 +176,10 @@ def value_context(root: str) -> tuple[object | None, dict]:
     return dol, addresses
 
 
-def value_record(spec: str, root: str | None = None, ctx: tuple | None = None, exact: bool = False) -> dict:
-    """`{unit, stem, pairs, same, differ, skipped, error}` for one unit (`--values`, `lib.objcompare.value_diffs`);
-    `exact` takes `spec` as a registered stem as it stands (the sweep's: `Unit.resolve` lists every unit per call)."""
+def value_record(spec: str, root: str | None = None, ctx: tuple | None = None, exact: bool = False,
+                 mode: str = "align") -> dict:
+    """`{unit, stem, pairs, same, differ, skipped, error}` for one unit (`--values`, `lib.objcompare.value_diffs` in
+    `mode`); `exact` takes `spec` as a registered stem as it stands (the sweep's: `Unit.resolve` lists every unit)."""
     root = root or _repo.repo_root()
     unit = _units.Unit.make(spec, root) if exact else _units.Unit.resolve(spec, root)
     rec = {"unit": unit.report_name, "stem": spec, "pairs": 0, "same": 0, "differ": [], "skipped": {}, "error": None}
@@ -188,36 +189,49 @@ def value_record(spec: str, root: str | None = None, ctx: tuple | None = None, e
         return rec
     dol, addresses = ctx if ctx is not None else value_context(root)
     try:
-        rec.update(objcompare.value_diffs(unit.obj_target, unit.obj_ours, dol, addresses))
+        rec.update(objcompare.value_diffs(unit.obj_target, unit.obj_ours, dol, addresses, mode))
     except (ValueError, OSError) as exc:
         rec["error"] = "unreadable object (%s)" % exc
     return rec
 
 
+#: The tag `value_line` puts on an aligned row that is not a same-offset pair.
+VALUE_CLASS_TAGS = {"different": "[shifted]", "missing": "[missing: ours never loads it here]",
+                    "extra": "[extra: retail never loads it here]"}
+
+
 def value_line(d: dict) -> str:
-    """One value mismatch: `owner+0xOFF  TYPE  ours NAME = VALUE vs target NAME = VALUE`, then `[address, differs at +0xN]` when the
-    instruction takes the address (`addi`, a table word: the datum behind it is compared, and a base pointer the
-    code offsets from can differ without a wrong value) and `[bytes equal]` when the owner's two bodies are
-    otherwise byte-identical (the mismatch no score sees)."""
-    def side(name: str, addend: int, value: str) -> str:
-        return "%s%s = %s" % (name, "%+#x" % addend if addend else "", value)
-    return "%s+0x%x  %s  ours %s vs target %s%s" % (
-        d["owner"], d["offset"], d["type"], side(d["ours"], d["ours_addend"], d["ours_value"]),
+    """One value mismatch: `owner+0xOFF  TYPE  ours NAME = VALUE vs target NAME = VALUE` (an absent side `none`, a
+    shifted pair `+0xT (ours +0xO)`), then the class tag (`VALUE_CLASS_TAGS`; a same-offset `wrong` row has none),
+    `[address, differs at +0xN]` when the instruction takes the address (`addi`, a table word: the datum behind it
+    is compared, and a base pointer the code offsets from can differ without a wrong value) and `[bytes equal]` when
+    the owner's two bodies are otherwise byte-identical (the mismatch no score sees)."""
+    def side(name: str | None, addend: int | None, value: str | None) -> str:
+        return "none" if name is None else "%s%s = %s" % (name, "%+#x" % addend if addend else "", value)
+    where = "%s+0x%x" % (d["owner"], d["offset"])
+    if d.get("target_offset") is not None and d.get("ours_offset") not in (None, d["target_offset"]):
+        where += " (ours +0x%x)" % d["ours_offset"]
+    tag = VALUE_CLASS_TAGS.get(d.get("class"))
+    return "%s  %s  ours %s vs target %s%s" % (
+        where, d["type"], side(d["ours"], d["ours_addend"], d["ours_value"]),
         side(d["target"], d["target_addend"], d["target_value"]),
-        ("  [address, differs at +0x%x]" % (d.get("first_difference") or 0) if d.get("kind") == "bytes" else "")
+        ("  " + tag if tag else "")
+        + ("  [address, differs at +0x%x]" % (d.get("first_difference") or 0)
+           if d.get("kind") == "bytes" and d.get("first_difference") is not None else "")
         + ("  [bytes equal]" if d.get("owner_equal") else ""))
 
 
-def run_values(units: list[str], json_path: str | None = None) -> int:
-    """`--values`: every relocation pair whose two targets differ by name and whose bytes differ, one line each.
-    0 none, 1 some, 2 an object missing or unreadable."""
+def run_values(units: list[str], json_path: str | None = None, mode: str = "align") -> int:
+    """`--values`: every value relocation whose datum differs from the target's (`mode` `align`: per owner by
+    sequence; `offset`: same offset and instruction only), one line each. 0 none, 1 some, 2 an object missing or
+    unreadable."""
     root = _repo.repo_root()
     specs = units or registered_with_objects(root)
     ctx = value_context(root)
     if ctx[0] is None:
         print("relocdiff --values: no retail DOL at orig/%s/sys/main.dol - undefined targets are not read"
               % _repo.VERSION)
-    recs = [value_record(spec, root, ctx, exact=not units) for spec in specs]
+    recs = [value_record(spec, root, ctx, exact=not units, mode=mode) for spec in specs]
     status = 0
     for rec in recs:
         if rec["error"]:
@@ -232,10 +246,15 @@ def run_values(units: list[str], json_path: str | None = None) -> int:
     for r in recs:
         for k, v in r["skipped"].items():
             skipped[k] = skipped.get(k, 0) + v
+    classes: dict = {}
+    for r in recs:
+        for d in r["differ"]:
+            classes[d.get("class", "wrong")] = classes.get(d.get("class", "wrong"), 0) + 1
     print("relocdiff --values: %d value mismatch(es) in %d of %d unit(s); %d renamed pair(s) read, %d equal; "
-          "not read: %s" % (n, sum(1 for r in recs if r["differ"]), len(recs), sum(r["pairs"] for r in recs),
-                            sum(r["same"] for r in recs),
-                            ", ".join("%d %s" % (v, k) for k, v in sorted(skipped.items())) or "none"))
+          "not read: %s; pairing %s%s" % (
+              n, sum(1 for r in recs if r["differ"]), len(recs), sum(r["pairs"] for r in recs),
+              sum(r["same"] for r in recs), ", ".join("%d %s" % (v, k) for k, v in sorted(skipped.items())) or "none",
+              mode, " (%s)" % ", ".join("%d %s" % (classes[k], k) for k in sorted(classes)) if classes else ""))
     if json_path:
         payload = json.dumps(recs, indent=1)
         if json_path == "-":
@@ -402,6 +421,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="every relocation pair whose two targets differ only by name (`@N` vs `lbl_X`), read on "
                          "both sides (access width, or the symbol's size) and reported when the BYTES differ; no "
                          "unit = every registered unit with both objects; exit 1 on a mismatch; --json F (or -)")
+    ap.add_argument("--pairing", choices=objcompare.VALUE_MODES, default="align",
+                    help="--values: `align` (default) aligns each owner's value sequence so a code shift is not a "
+                         "wrong value; `offset` pairs the same offset and instruction only")
     ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     args = ap.parse_args(argv)
 
@@ -411,7 +433,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.callees:
         return run_callees(units, args.json)
     if args.values:
-        return run_values(units, args.json)
+        return run_values(units, args.json, args.pairing)
     if not units:
         ap.error("a unit is required (or --selftest)")
     if args.all and args.rows != 60:

@@ -1163,7 +1163,19 @@ def _datum_size(sym, addend: int) -> int:
     return 0 if sym.type == STT_SECTION or not sym.size else max(sym.size - addend, 0)
 
 
-def value_diffs(target, ours, dol=None, addresses: dict | None = None) -> dict:
+#: `value_diffs` pairing modes: `align` (the default) aligns each owner's value sequence, `offset` pairs one offset.
+VALUE_MODES = ("align", "offset")
+
+
+def value_diffs(target, ours, dol=None, addresses: dict | None = None, mode: str = "align") -> dict:
+    """The renamed relocation targets whose BYTES differ: `aligned_value_diffs` (`mode="align"`) or
+    `offset_value_diffs` (`mode="offset"`, same offset and instruction only)."""
+    if mode not in VALUE_MODES:
+        raise ValueError("unknown value mode %r (one of %s)" % (mode, ", ".join(VALUE_MODES)))
+    return (aligned_value_diffs if mode == "align" else offset_value_diffs)(target, ours, dol, addresses)
+
+
+def offset_value_diffs(target, ours, dol=None, addresses: dict | None = None) -> dict:
     """The relocation pairs whose targets differ by NAME, judged by the bytes each target holds.
 
     objdiff and `rawsame` score `lfs f1, @123@sda21(r2)` against `lfs f1, lbl_80796EE0@sda21(r2)` as equal whatever
@@ -1230,6 +1242,233 @@ def value_diffs(target, ours, dol=None, addresses: dict | None = None) -> dict:
                                   "owner_equal": a_body[key] == b_body[key]})
     out["skipped"] = dict(out["skipped"])
     return out
+
+
+#: The largest alignment matrix (target x ours value relocations of one owner, after the common prefix and suffix)
+#: `align_values` fills; a larger owner falls back to `difflib` on value tokens (no offset tiebreak).
+ALIGN_MAX_CELLS = 4_000_000
+
+
+@dataclass(frozen=True)
+class ValueRef:
+    """One value relocation of one owner, read: `status` is `bytes` (then `data` holds the datum, its relocated
+    words zeroed) or why it has no value (`code`, `bss`, `unresolved`, `relocated`)."""
+    offset: int
+    type: int
+    name: str
+    addend: int
+    word: int | None
+    status: str
+    data: bytes | None
+    kind: str
+    width: int
+
+
+def value_refs(elf: Elf, rows: list, dol, addresses: dict, relocated: dict) -> list[ValueRef]:
+    """The `VALUE_RELOCS` rows of one owner (`_owned_relocs`' tuples) in offset order, each read on its own side:
+    `value_width` with the symbol's own datum size, a relocated word masked, a datum made only of them `relocated`."""
+    out = []
+    for off, typ, sym, add, word in rows:
+        if typ not in VALUE_RELOCS:
+            continue
+        width, kind = value_width(word, [_datum_size(sym, add)])
+        status, data, hit = _value_at(elf, sym, add, width, dol, addresses, relocated)
+        if status == "bytes" and hit:
+            data = _masked(data, hit)
+            if not any(data) and len(hit) * 4 >= width:
+                status, data = "relocated", None
+        out.append(ValueRef(off, typ, sym.name or "<%s>" % sym.section, add, word, status, data, kind, width))
+    return out
+
+
+def compared_bytes(t: ValueRef, o: ValueRef) -> tuple[bytes, bytes]:
+    """The two data `same_value` compares: an access's whole width, an address-taken datum (`bytes`) only as far as
+    the shorter of the two symbols runs (`offset_value_diffs`' smaller size: a section symbol or a split label
+    spanning its neighbours is not a longer value). Pure."""
+    if t.kind == "bytes":
+        n = min(len(t.data), len(o.data))
+        return t.data[:n], o.data[:n]
+    return t.data, o.data
+
+
+def same_value(t: ValueRef, o: ValueRef) -> bool:
+    """True when two value relocations name the same datum: one name and addend (whatever the relocation type: an
+    `@sda21` load and a `lis`/`addi` of one symbol are a placement question, not a value), or one type, one kind and
+    (both read) equal `compared_bytes`. Pure."""
+    if t.name == o.name and t.addend == o.addend:
+        return True
+    if t.type != o.type or t.status != "bytes" or o.status != "bytes" or t.kind != o.kind:
+        return False
+    tb, ob = compared_bytes(t, o)
+    return tb == ob
+
+
+def same_place(t: ValueRef, o: ValueRef) -> bool:
+    """True when two value relocations sit at one offset in the owner, of one type, patching one instruction word:
+    the code there has not shifted, whatever the two targets hold. Pure."""
+    return t.offset == o.offset and t.word == o.word and t.type == o.type
+
+
+#: `align_values`' pair weights: one value at one place, one value elsewhere, one place with another value. `k`
+#: same-place pairs beat `j` value pairs crossing them when `5k > 6j`: a rotation of constants in unshifted code
+#: stays paired by place (and reads `wrong`), a coincidental same-place pair in shifted code loses to the values.
+ALIGN_WEIGHTS = {"both": 10, "value": 6, "place": 5}
+
+
+def pair_weight(t: ValueRef, o: ValueRef) -> int:
+    """`ALIGN_WEIGHTS` of one candidate pair (0: not a pair). Pure."""
+    value, place = same_value(t, o), same_place(t, o)
+    if value:
+        return ALIGN_WEIGHTS["both" if place else "value"]
+    return ALIGN_WEIGHTS["place"] if place else 0
+
+
+def align_values(t: list[ValueRef], o: list[ValueRef]) -> list[tuple[int, int]]:
+    """The `(target index, ours index)` pairs of a heaviest common subsequence of two value sequences under
+    `pair_weight`: equal values (`same_value`) align across a code shift, a pair at one place (`same_place`) holds
+    where the code did not shift. Pure."""
+    n, m = len(t), len(o)
+    lo = 0
+    while lo < n and lo < m and pair_weight(t[lo], o[lo]) == ALIGN_WEIGHTS["both"]:
+        lo += 1
+    hn, hm = n, m
+    while hn > lo and hm > lo and same_value(t[hn - 1], o[hm - 1]):
+        hn, hm = hn - 1, hm - 1
+    pairs = [(i, i) for i in range(lo)]
+    a, b = hn - lo, hm - lo
+    if a and b and a * b > ALIGN_MAX_CELLS:
+        def token(r: ValueRef):
+            return (r.type, r.kind, r.data) if r.status == "bytes" else (r.type, r.name, r.addend)
+        sm = difflib.SequenceMatcher(None, [token(r) for r in t[lo:hn]], [token(r) for r in o[lo:hm]],
+                                     autojunk=False)
+        for blk in sm.get_matching_blocks():
+            pairs += [(lo + blk.a + k, lo + blk.b + k) for k in range(blk.size)]
+    elif a and b:
+        w = [[pair_weight(t[lo + i], o[lo + j]) for j in range(b)] for i in range(a)]
+        score = [[0] * (b + 1) for _ in range(a + 1)]
+        for i in range(a - 1, -1, -1):
+            row, below, wi = score[i], score[i + 1], w[i]
+            for j in range(b - 1, -1, -1):
+                best = below[j] if below[j] >= row[j + 1] else row[j + 1]
+                if wi[j] and below[j + 1] + wi[j] > best:
+                    best = below[j + 1] + wi[j]
+                row[j] = best
+        i = j = 0
+        while i < a and j < b:
+            if w[i][j] and score[i][j] == score[i + 1][j + 1] + w[i][j]:
+                pairs.append((lo + i, lo + j))
+                i, j = i + 1, j + 1
+            elif score[i + 1][j] >= score[i][j + 1]:
+                i += 1
+            else:
+                j += 1
+    pairs += [(hn + k, hm + k) for k in range(n - hn)]
+    return pairs
+
+
+def _value_entry(owner: str, sec: str, cls: str, t: ValueRef | None, o: ValueRef | None, owner_equal: bool) -> dict:
+    """One reported value relocation (`aligned_value_diffs`' `differ` row); the absent side's fields are None."""
+    ref = t or o
+    tb, ob = compared_bytes(t, o) if t and o else (t.data if t else None, o.data if o else None)
+    return {"owner": owner, "section": sec, "class": cls, "offset": ref.offset,
+            "target_offset": t.offset if t else None, "ours_offset": o.offset if o else None,
+            "type": reloc_name(ref.type),
+            "ours": o.name if o else None, "ours_addend": o.addend if o else None,
+            "target": t.name if t else None, "target_addend": t.addend if t else None,
+            "ours_value": format_value(ob, o.kind) if o else None,
+            "target_value": format_value(tb, t.kind) if t else None,
+            "width": len(tb if t else ob), "kind": ref.kind,
+            "first_difference": first_difference(ob, tb) if t and o else None, "owner_equal": owner_equal}
+
+
+def owner_value_diffs(owner: str, sec: str, t: list[ValueRef], o: list[ValueRef], owner_equal: bool,
+                      out: dict) -> None:
+    """Classify one owner's two value sequences into `out` (`aligned_value_diffs`' record): of the `align_values`
+    pairs, one value is equal and one place with two values is `wrong`; an unaligned value the other side never
+    loads in this owner is `missing` (retail's) or `extra` (ours), a missing and an extra of one type and kind in
+    one gap pair up as `different`, and an unaligned value the other side loads elsewhere is `reordered` (listed,
+    not reported). A target without a value (`code`, `bss`, ...) is counted under its reason, never compared."""
+    pairs = align_values(t, o)
+    rows: list[tuple[int, str, ValueRef | None, ValueRef | None]] = []
+    for ti, oi in pairs:
+        tr, orf = t[ti], o[oi]
+        if tr.status != "bytes" or orf.status != "bytes":
+            if not same_value(tr, orf):
+                out["skipped"][tr.status if tr.status != "bytes" else orf.status] += 1
+            continue
+        if same_value(tr, orf):
+            if tr.name != orf.name:
+                out["pairs"] += 1
+                out["same"] += 1
+            continue
+        out["pairs"] += 1
+        rows.append((tr.offset, "wrong", tr, orf))
+    bounds = [(-1, -1)] + pairs + [(len(t), len(o))]
+    for (t0, o0), (t1, o1) in zip(bounds, bounds[1:]):
+        missing, extra = [], []
+        for ti in range(t0 + 1, t1):
+            if t[ti].status != "bytes":
+                out["skipped"][t[ti].status] += 1
+            elif any(same_value(t[ti], x) for x in o):
+                out["skipped"]["reordered"] += 1
+                out["reordered"].append(_value_entry(owner, sec, "reordered", t[ti], None, owner_equal))
+            else:
+                missing.append(t[ti])
+        for oi in range(o0 + 1, o1):
+            if o[oi].status != "bytes":
+                out["skipped"][o[oi].status] += 1
+            elif any(same_value(x, o[oi]) for x in t):
+                out["skipped"]["reordered"] += 1
+                out["reordered"].append(_value_entry(owner, sec, "reordered", None, o[oi], owner_equal))
+            else:
+                extra.append(o[oi])
+        for tr in missing:
+            mate = next((x for x in extra if x.type == tr.type and x.kind == tr.kind), None)
+            if mate is not None:
+                extra.remove(mate)
+                out["pairs"] += 1
+            rows.append((tr.offset, "missing" if mate is None else "different", tr, mate))
+        rows += [(x.offset, "extra", None, x) for x in extra]
+    for _off, cls, tr, orf in sorted(rows, key=lambda r: r[0]):
+        out["differ"].append(_value_entry(owner, sec, cls, tr, orf, owner_equal))
+
+
+def aligned_value_diffs(target, ours, dol=None, addresses: dict | None = None) -> dict:
+    """The value relocations whose datum differs, judged by sequence: per owner both objects define (a stub ours
+    has not written and `extab`/`extabindex` excepted), each side's `VALUE_RELOCS` relocations in offset order are
+    read on their own side (`value_refs`) and aligned (`align_values`), so a code shift does not pair a constant
+    with its neighbour's; `owner_value_diffs` names what is left. Returns `offset_value_diffs`' record, each
+    `differ` row with a `class` (`wrong`, `different`, `missing`, `extra`) and `target_offset`/`ours_offset`;
+    `pairs`/`same` count the renamed pairs read and the equal ones; `skipped` adds `reordered`, whose rows (one side
+    each) are listed under `reordered`."""
+    addresses = addresses or {}
+    o_elf, t_elf = load(ours), load(target)
+    (a, a_body), (b, b_body) = _owned_relocs(o_elf), _owned_relocs(t_elf)
+    o_rel, t_rel = _relocated_words(o_elf), _relocated_words(t_elf)
+    o_funcs = _functions(o_elf)
+    out = {"pairs": 0, "same": 0, "differ": [], "reordered": [], "skipped": Counter()}
+    for key in sorted(set(a) & set(b), key=lambda k: (k[0] or "", k[1] or "")):
+        sec, owner = key
+        if sec == ".text" and owner in o_funcs and o_funcs[owner][1] <= STUB_MAX_BYTES:
+            continue
+        if sec.startswith(BOOKKEEPING_SECTIONS):
+            continue
+        t_refs = value_refs(t_elf, b[key], dol, addresses, t_rel)
+        o_refs = value_refs(o_elf, a[key], dol, addresses, o_rel)
+        owner_value_diffs(owner, sec, t_refs, o_refs, a_body[key] == b_body[key], out)
+    out["skipped"] = dict(out["skipped"])
+    return out
+
+
+def value_brief(d: dict) -> str:
+    """One `differ` row in a line: `owner+0xOFF ours NAME = VALUE, target NAME = VALUE`, an absent side `none`,
+    a shifted pair `owner+0xT (ours +0xO)`. Pure."""
+    def side(name, value):
+        return "none" if name is None else "%s = %s" % (name, value)
+    where = "%s+0x%x" % (d["owner"], d["offset"])
+    if d.get("target_offset") is not None and d.get("ours_offset") not in (None, d["target_offset"]):
+        where += " (ours +0x%x)" % d["ours_offset"]
+    return "%s ours %s, target %s" % (where, side(d["ours"], d["ours_value"]), side(d["target"], d["target_value"]))
 
 
 # --- undefined names: what a flip would leave unresolved --------------------------------------------------------

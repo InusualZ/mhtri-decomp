@@ -236,13 +236,14 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   `.text` relocations at +0x4C0/+0x550 swapped (bytes unchanged) reads READY on main and `.text: 2 relocation(s) ...
   +0x4BC ours 0x80791258, target 0x8079125C; ...` here.
 * **Advisory: renamed relocation targets whose values differ** (`relocation_value_notes`, `lib.objcompare.value_diffs`,
-  the same pass as `relocdiff --values`): a relocation at the same offset, of the same type, in the same instruction,
-  whose target is `@N` in ours and `lbl_X` in the target (or another unit's `lbl_`, read from the retail DOL at its map
-  address) but whose bytes differ - a pool word or string that objdiff, `rawsame` and every byte check here score equal.
-  One note `advisory: N relocation(s) name a different datum than the target's under another name, and the bytes differ
-  (relocdiff --values) - <owner>+0xOFF ours NAME = VALUE, target NAME = VALUE; ...` (the first `VALUE_FIRST` spelled).
+  the same pass as `relocdiff --values`, aligned per owner): a value relocation whose datum (own section, or another
+  unit's `lbl_` read from the retail DOL at its map address) differs from the target's - in place, shifted, or loaded on
+  one side only - a pool word or string that objdiff, `rawsame` and every byte check here score equal; a code shift
+  that keeps the values in order is no note. One note `advisory: N relocation(s) name a datum whose bytes differ from
+  the target's (relocdiff --values) - <owner>+0xOFF [(ours +0xO)] ours NAME = VALUE, target NAME = VALUE; ...` (an
+  absent side `none`; the first `VALUE_FIRST` spelled by `objcompare.value_brief`).
   It is a note, never a problem, and an `advisory:` note prints under NOT READY too. A refusing row is a later decision
-  once the census (`relocdiff --values`, 102 mismatches in 22 units at `58e3e191`) is worked down.
+  once the census (`relocdiff --values`, 59 mismatches in 17 units at `14ddf33b`) is worked down.
 * Exit status is non-zero when any unit is not flip-ready.
 
 ## Lib dependencies

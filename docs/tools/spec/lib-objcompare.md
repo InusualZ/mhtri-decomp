@@ -52,9 +52,13 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   offset}]}]` (per `.text` function both define and ours wrote - more than `STUB_MAX_BYTES` - the relocation symbol names
   that differ: sequences aligned, moved rows cancelled by name, our `LOCAL_LABEL_RE` labels cancelling the target's
   `TARGET_LABEL_RE` pool/jump-table labels of the same type, the rest paired in order), `value_diffs(target, ours, dol,
-  addresses) -> {pairs, same, differ, skipped}` (`relocdiff --values`: a same-offset, same-type, same-instruction pair
-  whose symbol names differ, read on both sides - own section bytes or the DOL at the map address - at `value_width`
-  bytes with relocated words masked; spec `relocdiff.md`), `value_width(word, sizes)`, `format_value(data, kind)`,
+  addresses, mode="align") -> {pairs, same, differ, [reordered], skipped}` (`relocdiff --values`; `align`:
+  `aligned_value_diffs` reads each owner's value relocations on their own side (`value_refs` -> `ValueRef`) and aligns
+  them (`align_values`, weights `ALIGN_WEIGHTS` over `same_value`/`same_place`, `compared_bytes`), `owner_value_diffs`
+  classing `wrong`/`different`/`missing`/`extra`; `offset`: `offset_value_diffs`, a same-offset, same-type,
+  same-instruction pair whose symbol names differ; both read own section bytes or the DOL at the map address at
+  `value_width` bytes with relocated words masked; spec `relocdiff.md`), `value_brief(row)`, `value_width(word, sizes)`,
+  `format_value(data, kind)`,
   `callee_kind(ours, target)`
   (`callee`/`mangling`/`linkage`/`extra`/`missing`, by `lib.names.owner_stem`).
 * Undefined names: `reloc_facts(obj) -> {relocs, defined, refs} | None`, `provides_global(entry)`, `link_inputs(ninja)`,
