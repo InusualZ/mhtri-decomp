@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): the `menu/movie` unit's symbol `menu/menu_item.cpp` calls, for a
+/* Leaf header (docs/plan.md 6.5 rule 2): the `menu/menu_friendlist` unit's symbol `menu/menu_item.cpp` calls, for a
  * consumer that cannot include the owner's full header.  C linkage (the map row is a plain name). */
 #ifndef MHTRI_MENU_MOVIE_PAGE04_SPLIT_OPEN_H
 #define MHTRI_MENU_MOVIE_PAGE04_SPLIT_OPEN_H

@@ -679,6 +679,8 @@ config.libs = [
             Object(NonMatching, "quest/arenatask.cpp"),
             Object(NonMatching, "menu/menu_placeinfo.cpp"),
             Object(NonMatching, "menu/movie.cpp"),
+            Object(NonMatching, "menu/menu_friendlist.cpp"),
+            Object(NonMatching, "menu/charmake.cpp"),
             Object(NonMatching, "menu/menu_plsearch.cpp"),
             Object(Matching, "menu/sysmsg_text.cpp"),
             Object(NonMatching, "menu/menu_sysmsg.cpp"),

@@ -2369,15 +2369,33 @@ menu/menu_placeinfo.cpp:
 	.sdata2     start:0x8079C8A8 end:0x8079C8D0
 
 menu/movie.cpp:
-	extab       start:0x8001DBEC end:0x8001DE9C
-	extabindex  start:0x8003E718 end:0x8003EB20
-	.text       start:0x8043D524 end:0x804459DC
+	extab       start:0x8001DBEC end:0x8001DCC4
+	extabindex  start:0x8003E718 end:0x8003E85C
+	.text       start:0x8043D524 end:0x8043F2FC
+	.data       start:0x806047D0 end:0x806048B0
+	.bss        start:0x806E26E0 end:0x806E28B0
+	.sdata      start:0x80793A80 end:0x80793AF0
+	.sdata2     start:0x8079C8D0 end:0x8079C900
+
+menu/menu_friendlist.cpp:
+	extab       start:0x8001DCC4 end:0x8001DE04
+	extabindex  start:0x8003E85C end:0x8003EA3C
+	.text       start:0x8043F2FC end:0x80443554
+	.data       start:0x806048B0 end:0x806049D8
+	.bss        start:0x806E28B0 end:0x806E3AC8
+	.sdata      start:0x80793AF0 end:0x80793B08
+	.sdata2     start:0x8079C900 end:0x8079C930
+
+menu/charmake.cpp:
+	extab       start:0x8001DE04 end:0x8001DE9C
+	extabindex  start:0x8003EA3C end:0x8003EB20
+	.text       start:0x80443554 end:0x804459DC
 	.ctors      start:0x8056F3CC end:0x8056F3D0
-	.data       start:0x806047D0 end:0x80604D2C
-	.bss        start:0x806E26E0 end:0x806E3E10
-	.sdata      start:0x80793A80 end:0x80793B28
+	.data       start:0x806049D8 end:0x80604D2C
+	.bss        start:0x806E3AC8 end:0x806E3E10
+	.sdata      start:0x80793B08 end:0x80793B28
 	.sbss       start:0x80794D08 end:0x80794D18
-	.sdata2     start:0x8079C8D0 end:0x8079C960
+	.sdata2     start:0x8079C930 end:0x8079C960
 
 quest/arenatask.cpp:
 	extab       start:0x8001DE9C end:0x8001DF24

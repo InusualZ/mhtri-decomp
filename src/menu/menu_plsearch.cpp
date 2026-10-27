@@ -87,7 +87,7 @@
 #include "ef/system_core.h"
 #include "enemy/lobby_state_block.h"
 #include "enemy/em020_prog.h"
-#include "menu/movie.h" /* the friend picker (rule 2: its owner) */
+#include "menu/menu_friendlist.h" /* the friend picker (rule 2: its owner) */
 #include "menu/menu_friend_list_init.h"
 #include "menu/friend_card_view.h"
 #include "lobby/lb_npc.h"

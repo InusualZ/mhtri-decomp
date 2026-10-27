@@ -1,4 +1,4 @@
-/* menu/card_equip_ids_build.h - leaf header (docs/plan.md 6.5 rule 2): `menu/movie.cpp`'s `card_equip_ids_build`, for
+/* menu/card_equip_ids_build.h - leaf header (docs/plan.md 6.5 rule 2): `menu/menu_friendlist.cpp`'s `card_equip_ids_build`, for
  *   `menu/menu_plsearch.cpp`.  C linkage (the map row is a plain name).  GUESS name (the registry carries it). */
 #ifndef MHTRI_MENU_CARD_EQUIP_IDS_BUILD_H
 #define MHTRI_MENU_CARD_EQUIP_IDS_BUILD_H
