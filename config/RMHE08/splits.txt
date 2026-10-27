@@ -1797,12 +1797,26 @@ lobby/lb_companion_ui.cpp:
 	.sdata2     start:0x8079B2B8 end:0x8079B2C0
 
 ef/eft050.cpp:
-	extab       start:0x80016CA4 end:0x80016DBC
-	extabindex  start:0x8003615C end:0x80036300
-	.text       start:0x8033F270 end:0x80343758 align:16
-	.data       start:0x805E7410 end:0x805E7B70
+	extab       start:0x80016CA4 end:0x80016D84
+	extabindex  start:0x8003615C end:0x800362AC
+	.text       start:0x8033F270 end:0x80342B70 align:16
+	.data       start:0x805E7410 end:0x805E7A80
 	.sdata      start:0x8079308C end:0x807930F0
-	.sdata2     start:0x8079B2C0 end:0x8079B350
+	.sdata2     start:0x8079B2C0 end:0x8079B310
+
+ef/eft051.cpp:
+	extab       start:0x80016D84 end:0x80016D9C
+	extabindex  start:0x800362AC end:0x800362D0
+	.text       start:0x80342B70 end:0x80342F34
+	.data       start:0x805E7A80 end:0x805E7B50
+	.sdata2     start:0x8079B310 end:0x8079B318
+
+ef/eft050_set.cpp:
+	extab       start:0x80016D9C end:0x80016DBC
+	extabindex  start:0x800362D0 end:0x80036300
+	.text       start:0x80342F34 end:0x80343758
+	.data       start:0x805E7B50 end:0x805E7B70
+	.sdata2     start:0x8079B318 end:0x8079B350
 
 ef/eft_slot.cpp:
 	extab       start:0x80016DBC end:0x80016F74

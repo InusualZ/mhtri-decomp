@@ -1,26 +1,19 @@
-/* ef/eft050.cpp - the eft050 fish family, the eft051 decoration, the eft050_set record, and the lobby screen-13
- *   status page and item box draws that precede them.
- * RANGE. .text 0x8033F270-0x80343758 (49 functions, in address order); extab 0x80016CA4-0x80016DBC,
- *   extabindex 0x8003615C-0x80036300, .data 0x805E7410-0x805E7B70, .sdata 0x8079308C-0x807930F0, .sdata2
- *   0x8079B2C0-0x8079B350.  `eft050_set_move` (0x803432B4, 0x490) is the `eft050_set` record's state 1 and reads
- *   `eft050_set_spin_steps` inside this unit's `.data`; its pool is 0x8079B320-0x8079B350.  Seam candidates (filed as
- *   requests, not acted on): `.sdata2` holds 1.0f three times (0x8079B2EC read up to `eft050_interior_fx_spawn`,
- *   0x8079B310 by `eft051_create`, padded to 8, and 0x8079B318 from `eft050_set_create`) and `.data` puts
- *   `eft051_spots_m21` after the jump tables behind 4 pad bytes, so 0x80342B70 (`eft051_spawn`) .. 0x80342F34 and
- *   0x80342F34 (`eft050_set`) .. 0x80343758 read as two more TUs; 0x8033F270-0x8033FDA8 is lobby screen-13 code
+/* ef/eft050.cpp - the eft050 fish family and the lobby screen-13 status page and item box draws that precede it.
+ * RANGE. .text 0x8033F270-0x80342B70 (35 functions, in address order); extab 0x80016CA4-0x80016D84,
+ *   extabindex 0x8003615C-0x800362AC, .data 0x805E7410-0x805E7A80, .sdata 0x8079308C-0x807930F0, .sdata2
+ *   0x8079B2C0-0x8079B310.  The right edge is the seam to `ef/eft051.cpp`: the `.sdata2` 1.0f repeats at 0x8079B310
+ *   (`eft051_create`) and 0x8079B318 (`ef/eft050_set.cpp`), `.data` pads 4 bytes after the last jump table, and the
+ *   extabindex record at 0x800362AC names `eft051_spawn`.  0x8033F270-0x8033FDA8 is lobby screen-13 code
  *   (`lb_screen13_draw` is the draw task `lobby/lb_companion_ui.cpp` queues).
  * FLAGS. `cflags_main`; `#pragma peephole off`, `optimization_level 4` and `fp_contract off` for the file (the target
  *   has no fused multiply-add anywhere), `peephole on` only around `eft050_catch_limit_get`..`eft050_act_table_ck`.
- * NAMES. `eft050_set` is the runtime dump's name.  GUESS (from each body, its callers and its data):
+ * NAMES. GUESS (from each body, its callers and its data):
  *   `lb_s13_status_values_draw`, `lb_s13_status_skills_draw`, `lb_s13_status_dance_draw`, `lb_s13_status_page_draw`,
  *   `lb_item_box_cell_pos_get`, `lb_item_box_grid_draw`, `lb_item_box_page_draw`, `eft050_fish_spawn`/`_release`/
  *   `_dispatch`/`_create`/`_alive`/`_state_next`/`_retire`/`_kind_get`/`_kind_set`/`_school_spawn`, `eft050_xz_angle_get`,
  *   `eft050_angle_step`, `eft050_hold_item_ck`, `eft050_model_joint_show`, `eft050_catch_limit_get`,
- *   `eft051_release`/`_dispatch`/`_create`/`_alive`/`_state_next`/`_retire`, `eft050_set_release`/`_dispatch`/`_create`/
- *   `_move`, `eft050_set_spin_steps` (the four per-model Z spin steps `eft050_set_move` adds each frame),
- *   `eft_state_advance`, `eft_instance_release`,
  *   `eft050_bite_strength_get`, `eft050_float_find`, `eft050_fish_appear`/`_swim`/`_bite`/`_hooked`/`_respawn`/`_flee`,
- *   `eft050_kind_roll`, `eft050_act_table_ck`, `eft050_interior_fx_spawn`, `eft051_spawn`, the data tables
+ *   `eft050_kind_roll`, `eft050_act_table_ck`, `eft050_interior_fx_spawn`, the data tables
  *   `lb_s13_status_*_ids`, `lb_item_box_*_ids`, `lb_s13_status_icon_ids`, `eft050_fish_kinds`,
  *   `eft050_rolls_school_0`/`_12`.  `CockpitSharedDb` +0x51A4/+0x51A5 are the two dances
  *   picked on screen 13 (`lobby/lb_companion_ui.cpp` copies them to and from `LbScreen13Work::dance_0x016` and hands
@@ -34,12 +27,11 @@
  *    condition's load; `optimization_level` 2/3 and `while`/index forms do not reproduce it;
  *  - `lb_item_box_grid_draw`: retail narrows the sprite-id ternary with a `clrlwi r3, r3, 16`; u16/s32 locals and a cast
  *    do not reproduce it.
- *   Data: `.data`/`.sdata` claimed but not emitted (the tables are `extern`), `.sdata2` is the compiler's one pool
- *   (0x70 against the claim's 0x90: one TU folds the three 1.0f, the two 0.0f and the two int-to-float magics the
- *   claim carries) - blocked on the seam above; flipcheck names `.text` 0x44D8 against 0x44E8, `.data`, `.sdata2`,
- *   `extab`/`extabindex` and the pool relocations.
- * SHAPES. `eft050_set_move`: `&eft_control` held in a local taken before the switch, the 20.0f camera distance in a
- *   local set before `get_camera_pos`, the first alpha in a `u8` local set on both arms, `i` declared first.
+ *   Data: `.sdata2` (0x50) is byte-identical to the claim; `.data` (0x670: the sprite-id and layout tables, the fish
+ *   kinds, the roll tables and two jump tables) and `.sdata` (0x64: the roll pointer pairs and small id tables) are
+ *   claimed but not emitted (the tables are `extern`; the object emits only the two jump tables, 0x90).  flipcheck
+ *   names `.text` 0x38F0 against 0x3900, `.data`, `.sdata`, `extab`/`extabindex` (the partial rows) and the `.text`
+ *   relocations into the unemitted tables.
  */
 
 #include "types.h"
@@ -178,29 +170,6 @@ typedef struct Eft050Work {
     /* +0x60 */ u8 flag_0x60;           /* the kind came from the fishing act's own table */
 } Eft050Work;
 
-/* The family `eft051_dispatch` drives (`eft051_spawn` pools 0x0C bytes): the pooled models, the spot and kind the source
- * picked and its countdown.  size: 0x0C */
-typedef struct Eft051Work {
-    /* +0x00 */ s32 count_0x00;         /* the pooled handle list's used length */
-    /* +0x04 */ MHchar* models_0x04[1]; /* the pooled handle list `eft051_release` releases */
-    /* +0x08 */ u8 spot_0x08;           /* the spot record of the map's table */
-    /* +0x09 */ u8 kind_0x09;           /* the joint the model shows (kind + 1) */
-    /* +0x0A */ s16 timer_0x0A;         /* the countdown `eft051_alive` runs to 0xB4 */
-} Eft051Work;
-
-/* The block `eft050_set` pools for the family `eft050_set_dispatch` drives: a word count at +0x00, the four
- * pooled handles at +0x04, the extra record the fourth `eft_res_model_get` hands back at +0x14 and the
- * eight-byte run the spawner zeroes at +0x1C. size: 0x24 (the bytes this spawner writes) */
-typedef struct Eft050SetWork {
-    /* +0x00 */ s32 count_0x00;
-    /* +0x04 */ MHchar* models_0x04[4];
-    /* +0x14 */ void* extra_0x14;   /* the record the model create fills; NULL retires the effect */
-    /* +0x18 */ void* created_0x18; /* what `res_eft_UV_model_create` returned */
-    /* +0x1C */ struct _g3d_work* works_0x1C[2]; /* the create's handle list, pushed back in reverse */
-    /* +0x24 */ u8 unused_0x24[0x04];
-    /* +0x28 */ f32 scale_0x28;     /* the UV model's scale */
-} Eft050SetWork;
-
 /* The item record `eft050_hold_item_ck` tests (a flag byte that disables the gauge and the item id).
  * size: 0x10 (approximation: only the bytes this band reads are named) */
 typedef struct EftHoldItem {
@@ -230,13 +199,6 @@ typedef struct EftFishRoll {
     /* +0x00 */ u32 weight;
     /* +0x04 */ u32 kind;
 } EftFishRoll;
-
-/* One decoration spot of the eft051 tables: the position and the yaw. size: 0x10 */
-typedef struct EftSpot {
-    /* +0x00 */ Vec pos;
-    /* +0x0C */ u16 yaw;
-    /* +0x0E */ u16 pad_0x0E;
-} EftSpot;
 
 /* The fishing bytes of the player work `Pl/plw.h` keeps inside a padding run: the line is taut while the player reels,
  * and the catch count.  size: 0x5A2 - lower bound, an approximation (a view of `_PLW`) */
@@ -301,7 +263,6 @@ s32 eft050_hold_item_ck(EftHoldItem* self);
 void eft050_model_joint_show(MHchar* model, u32 index);
 s32 eft050_catch_limit_get(HoldOwner* state, HoldOwner* owner);
 void eft050_fish_school_spawn(u32 kind, VEC3* pos, f32 scale, u8 flag);
-void eft051_release(_EFT* self);
 s32 eft050_bite_strength_get(_PLW* plw, s8 kind, _EFT* fish);
 _EFT* eft050_float_find(_EFT* self, s32 mode);
 void eft050_fish_appear(_EFT* self);
@@ -312,22 +273,9 @@ void eft050_fish_respawn(_EFT* self);
 void eft050_fish_flee(_EFT* self);
 u32 eft050_kind_roll(_EFT* self);
 u32 eft050_act_table_ck(_EFT* self);
-void eft051_spawn(_PLW* src, u8 kind);
-void eft051_dispatch(_EFT* self);
-void eft051_alive(_EFT* self);
-void eft051_state_next(_EFT* self);
-void eft051_retire(_EFT* self);
-void eft050_set_dispatch(_EFT* self);
 void eft050_fish_state_next(_EFT* self);
 void eft050_fish_retire(_EFT* self);
 void eft050_fish_kind_set(_EFT* self, MHchar* model);
-void eft051_create(_EFT* self);
-void eft050_set_release(_EFT* self);
-void eft050_set_create(_EFT* self);
-void eft050_set_move(_EFT* self);
-void eft_instance_release(_EFT* self);
-void eft_state_advance(_EFT* self);
-void eft_instance_release(_EFT* self);
 
 /* This unit's own `.data` run (0x805E7400..0x805E7A70), its `.sdata` tables and its `.sdata2` pool -
  * referenced by name, never defined (playbook 29). */
@@ -365,10 +313,6 @@ extern EftFishRoll* eft050_rolls_m3_0[2];
 extern EftFishRoll* eft050_rolls_m3_3[2];
 extern EftFishRoll* eft050_rolls_m4_0[2];
 extern EftFishRoll* eft050_rolls_m5_6[2];
-extern EftSpot eft051_spots_m22[];
-extern EftSpot eft051_spots_m21[];
-extern s32 eft050_set_spin_steps[4];
-extern f32 eft050_set_scales[];
 
 extern const u16 lb_s13_status_dance_value_ids[4];
 extern const u16 lb_item_box_list_ids[4];
@@ -2056,355 +2000,4 @@ extern "C" void eft050_fish_school_spawn(u32 kind, VEC3* pos, f32 scale, u8 flag
     for (i = 5; i > 0; i--) {
         eft050_fish_spawn(1, pos, scale, scale, (u32)ids, kind);
     }
-}
-
-/* Spawns the eft051 decoration of a lobby object `src` (kinds 0-2): one pooled model, the source's spot index. */
-extern "C" void eft051_spawn(_PLW* src, u8 kind)
-{
-    _EFT* rec;
-    Eft051Work* work;
-    s32 i;
-
-    if (kind > 2) {
-        return;
-    }
-    rec = (_EFT*)eft_res_slot_get(0xC);
-    if (rec == NULL) {
-        return;
-    }
-    rec->release_0x40 = eft051_release;
-    work = (Eft051Work*)rec->work_0x38;
-    work->count_0x00 = 1;
-    rec->area_0x44 = get_now_areano();
-    for (i = 0; i < work->count_0x00; i++) {
-        work->models_0x04[i] = (MHchar*)eft_res_model_get();
-        if (work->models_0x04[i] == NULL) {
-            eft_res_slot_release(rec);
-            return;
-        }
-    }
-    rec->source_0x30 = NULL;
-    rec->dispatch_0x34 = eft051_dispatch;
-    rec->field_0x03 = 49;
-    eft_state_flags_set(rec, 8, 0);
-    work->spot_0x08 = src->field_0x0B6;
-    work->kind_0x09 = kind;
-}
-
-
-/* Releases a second family's pooled handle list, from its word behind the count. */
-extern "C" void eft051_release(_EFT* self)
-{
-    Eft051Work* work = (Eft051Work*)self->work_0x38;
-    eft_res_models_release(work->models_0x04, work->count_0x00);
-}
-
-/* The second family's state machine: 0 the model-create pass, 1 the alive body, 2 the state advance
- * and 3 the pool release. */
-extern "C" void eft051_dispatch(_EFT* self)
-{
-    switch (self->state_0x05) {
-    case 0: return eft051_create(self);
-    case 1: return eft051_alive(self);
-    case 2: return eft051_state_next(self);
-    case 3: return eft051_retire(self);
-    }
-}
-
-/* Builds the eft051 models at the spot of the map's table (map 22 area 0, map 21 area 2), each showing the kind's
- * joint; no table ends the record. */
-extern "C" void eft051_create(_EFT* self)
-{
-    Eft051Work* work = (Eft051Work*)self->work_0x38;
-    EftSpot* spots = NULL;
-    s32 i;
-    s32 j;
-    u32 joints;
-
-    self->state_0x05++;
-    for (i = 0; i < work->count_0x00; i++) {
-        if (res_eft_model_create(work->models_0x04[i], 71, 8) == NULL) {
-            eft051_retire(self);
-            return;
-        }
-    }
-    self->flag_0x01 = 1;
-    self->field_0x10 = 0;
-    switch (get_now_mapno()) {
-    case 22:
-        if ((s32)self->area_0x44 == 0) {
-            spots = eft051_spots_m22;
-        }
-        break;
-    case 21:
-        if (self->area_0x44 == 2) {
-            spots = eft051_spots_m21;
-        }
-        break;
-    }
-    if (spots == NULL) {
-        eft051_retire(self);
-        return;
-    }
-    for (i = 0; i < work->count_0x00; i++) {
-        vec_to_mh_vec3(&work->models_0x04[i]->pos_0x04, &spots[work->spot_0x08].pos);
-        setVector3(&work->models_0x04[i]->scale_0x1C, 1.0f, 1.0f, 1.0f);
-        work->models_0x04[i]->field_0x28 = 0;
-        work->models_0x04[i]->field_0x2C = spots[work->spot_0x08].yaw;
-        work->models_0x04[i]->field_0x28 = 0;
-        work->models_0x04[i]->ready = 0;
-        joints = work->models_0x04[i]->get_joint_num();
-        for (j = 0; j < joints; j++) {
-            if (j == work->kind_0x09 + 1) {
-                work->models_0x04[i]->setVisibility(j, 1);
-            } else {
-                work->models_0x04[i]->setVisibility(j, 0);
-            }
-        }
-    }
-    eft051_alive(self);
-}
-
-
-/* State 1 of the second family: retires the effect once its timer runs past 0xB4, otherwise moves
- * every pooled model to its idle state and updates it. */
-extern "C" void eft051_alive(_EFT* self)
-{
-    s32 i;
-    Eft051Work* work = (Eft051Work*)self->work_0x38;
-    if (++work->timer_0x0A > 0xB4) {
-        eft051_retire(self);
-        return;
-    }
-    for (i = 0; i < work->count_0x00; i++) {
-        work->models_0x04[i]->move(0);
-        eft_res_models_spawn(self, (void**)&work->models_0x04[i], 2, 1, NULL);
-    }
-}
-
-/* State 2 of the second family's state machine: advances to the next body. */
-extern "C" void eft051_state_next(_EFT* self)
-{
-    self->state_0x05++;
-}
-
-/* State 3 of the second family's state machine: releases the pooled effect record. */
-extern "C" void eft051_retire(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
-
-/* Pools the `eft050` record: the effect, its work block, four pooled model handles, the extra record
- * the fourth pool call hands back, and the position/source/area seeds. */
-void eft050_set(_PLW* plw, nw4r::math::VEC3* pos, u8 flag)
-{
-    s32 i;
-    _EFT* eft;
-    Eft050SetWork* work;
-
-    eft = (_EFT*)eft_res_slot_get(0x2C);
-    if (eft == NULL) {
-        return;
-    }
-    eft->type_0x02 = 0;
-    eft->dispatch_0x34 = eft050_set_dispatch;
-    eft->release_0x40 = eft050_set_release;
-    work = (Eft050SetWork*)eft->work_0x38;
-    work->count_0x00 = 4;
-    for (i = 0; i < work->count_0x00; i++) {
-        work->models_0x04[i] = (MHchar*)eft_res_model_get();
-        if (work->models_0x04[i] == NULL) {
-            eft_res_slot_release(eft);
-            return;
-        }
-    }
-    work->extra_0x14 = eft_res_model_get();
-    if (work->extra_0x14 == NULL) {
-        eft_res_slot_release(eft);
-        return;
-    }
-    memset(work->works_0x1C, 0, 8);
-    eft->field_0x03 = 0x32;
-    eft_state_flags_set(eft, 1, 0);
-    copyVec3(&eft->pos_0x18, pos);
-    eft->area_0x44 = flag;
-    eft->source_0x30 = plw;
-    eft->flag_0x01 = 1;
-    eft->timer_0x0C = 0;
-    eft->field_0x10 = 0;
-}
-
-/* Releases the `eft050` family's pools: every model handle one at a time, the two `_g3d_work`
- * handles in reverse order, then the record the create filled. */
-extern "C" void eft050_set_release(_EFT* self)
-{
-    s32 i;
-    Eft050SetWork* work = (Eft050SetWork*)self->work_0x38;
-
-    for (i = 0; i < work->count_0x00; i++) {
-        eft_res_models_release(&work->models_0x04[i], 1);
-    }
-    for (i = 1; i >= 0; i--) {
-        if (work->works_0x1C[i] != NULL) {
-            push_g3d_wk(work->works_0x1C[i]);
-        }
-    }
-    eft_res_models_release(&work->extra_0x14, 1);
-}
-
-/* The `eft050` family's own state machine (its three bodies sit in the band above this one). */
-extern "C" void eft050_set_dispatch(_EFT* self)
-{
-    switch (self->state_0x05) {
-    case 0: return eft050_set_create(self);
-    case 1: return eft050_set_move(self);
-    case 2: return eft_state_advance(self);
-    case 3: return eft_instance_release(self);
-    }
-}
-
-/* Builds the eft050_set record's models: the UV model of the pool and the four plain models with their scales and a
- * random roll. */
-extern "C" void eft050_set_create(_EFT* self)
-{
-    Eft050SetWork* work = (Eft050SetWork*)self->work_0x38;
-    u32 i;
-
-    self->state_0x05++;
-    work->created_0x18 = res_eft_UV_model_create((MHchar*)work->extra_0x14, 73, 332, 0, work->works_0x1C, 1, 0);
-    if (work->created_0x18 == NULL) {
-        eft_instance_release(self);
-        return;
-    }
-    for (i = 0; i < (u32)work->count_0x00; i++) {
-        if (res_eft_model_create(work->models_0x04[i], 74, 76) == NULL) {
-            eft_instance_release(self);
-            return;
-        }
-    }
-    work->scale_0x28 = 1.0f;
-    setVector3(&((MHchar*)work->extra_0x14)->scale_0x1C, 1.5f, 1.5f, 1.5f);
-    ((MHchar*)work->extra_0x14)->field_0x28 = 0;
-    ((MHchar*)work->extra_0x14)->field_0x2C = 0;
-    ((MHchar*)work->extra_0x14)->field_0x30 = 0;
-    ((MHchar*)work->extra_0x14)->ready = 3;
-    for (i = 0; i < (u32)work->count_0x00; i++) {
-        setVector3(&work->models_0x04[i]->scale_0x1C, eft050_set_scales[i], eft050_set_scales[i], eft050_set_scales[i]);
-        work->models_0x04[i]->field_0x28 = 0;
-        work->models_0x04[i]->field_0x2C = 0;
-        work->models_0x04[i]->field_0x30 = ran_suu(0);
-        work->models_0x04[i]->ready = 1;
-    }
-    eft050_set_move(self);
-}
-
-/* Steps the eft050_set fade, then places the UV model in front of a near camera, or spreads and spins the four
- * models along the view axis. */
-extern "C" void eft050_set_move(_EFT* self)
-{
-    VEC3 ofs;
-    VEC3 cam;
-    MTX34 view;
-    MTX34 mtx;
-    VEC3 dir;
-    u32 i;
-    Eft050SetWork* work;
-    EftControl* control;
-    s32 fade;
-    f32 dist;
-    u8 alpha;
-
-    work = (Eft050SetWork*)self->work_0x38;
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&cam);
-    MTX34_ctor(&view);
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&dir);
-    control = &eft_control;
-    switch (self->field_0x06) {
-    case 0:
-        fade = 0;
-        if (++self->timer_0x0C >= 120) {
-            self->field_0x06++;
-            self->timer_0x0C = 0;
-            fade = 1;
-        }
-        break;
-    case 1:
-        fade = 1;
-        if (++self->timer_0x0C >= 450) {
-            self->field_0x06++;
-            self->timer_0x0C = 120;
-            fade = 0;
-        }
-        break;
-    case 2:
-        fade = 0;
-        if (--self->timer_0x0C <= 0) {
-            self->state_0x05++;
-            self->flag_0x01 = 0;
-        }
-        break;
-    }
-    if (self->area_0x44 != get_now_areano()) {
-        return;
-    }
-    if (camera_underwater_ck() == 1) {
-        return;
-    }
-    copyVec3(&dir, &get_camera_direction());
-    vec3_normalize_into(&dir, &dir);
-    dist = 20.0f;
-    copyVec3(&cam, &get_camera_pos());
-    copyVec3(&((MHchar*)work->extra_0x14)->pos_0x04, &VEC3_ADD(&cam, &VEC3_SCALE(&dir, dist)));
-    ((MHchar*)work->extra_0x14)->field_0x28 = camera_angle_x_get();
-    ((MHchar*)work->extra_0x14)->field_0x2C = camera_angle_y_get();
-    ((MHchar*)work->extra_0x14)->field_0x30 = 0;
-    if (hit_point_sphr(&cam, &self->pos_0x18, 1900.0f) == 1) {
-        if (control->frame_ready_0xC40 == 0) {
-            ((MHchar*)work->extra_0x14)->move(0);
-            ((EftUvModelObject*)work->created_0x18)->update();
-            if (fade == 0) {
-                alpha = 2.125f * self->timer_0x0C;
-            } else {
-                alpha = 255;
-            }
-            mhchar_mat_alpha_set((MHchar*)work->extra_0x14, 4, alpha, 0);
-            eft_res_models_spawn(self, &work->extra_0x14, 2, 1, 0);
-            control->frame_ready_0xC40 = 1;
-        }
-    } else {
-        mtx34_copy(&view, &get_current_view_mtx());
-        mtx34_inverse(&view, &view);
-        for (i = 0; i < (u32)work->count_0x00; i++) {
-            work->models_0x04[i]->field_0x30 += eft050_set_spin_steps[i];
-            ofs.x = 0.0f;
-            ofs.y = 0.0f;
-            ofs.z = 400.0f * i;
-            mulVecMat(&ofs, &view);
-            if (fade == 0) {
-                work->scale_0x28 = self->timer_0x0C / 150.0f;
-            } else {
-                work->scale_0x28 = 0.625f;
-            }
-            mhchar_mat_alpha_set(work->models_0x04[i], 4, (u8)(255.0f * work->scale_0x28), 0);
-            copyVec3(&work->models_0x04[i]->pos_0x04, &VEC3_ADD(&self->pos_0x18, &ofs));
-            mtx34_identity(&mtx);
-            mtx34_set_trans(&mtx, &work->models_0x04[i]->pos_0x04);
-            mtx34_concat_assign(&mtx, &view);
-            rotLocalMatZ(work->models_0x04[i]->field_0x30, &mtx);
-            work->models_0x04[i]->move2(&mtx, 0);
-            eft_res_models_spawn(self, (void**)&work->models_0x04[i], 2, 1, 0);
-        }
-    }
-}
-
-/* Advances the family's step counter. */
-extern "C" void eft_state_advance(_EFT* self) {
-    self->state_0x05++;
-}
-
-/* Hands the instance to the shared effect release path. */
-extern "C" void eft_instance_release(_EFT* self) {
-    eft_res_slot_release(self);
 }
