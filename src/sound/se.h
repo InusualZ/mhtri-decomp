@@ -56,7 +56,10 @@ struct _se_w {
     };
     /* +0x008 */ s32 field_0x08;
     /* +0x00C */ s32 field_0x0C;
-    /* +0x010 */ u8 pad_0x010[0x2C];
+    /* +0x010 */ u8 pad_0x010[8];
+    /* +0x018 */ nw4r::math::VEC3 listener_pos;      /* the pool's camera position, copied in each frame (`sound/se_req.cpp`) */
+    /* +0x024 */ nw4r::math::VEC3 listener_target;   /* the pool's camera target, copied beside it */
+    /* +0x030 */ u8 pad_0x030[0xC];
     /* +0x03C */ SeSlot slots[32];
     /* +0x0A3C */ union {
         u8 pad_0x0A3C[0x287FC];

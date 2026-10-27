@@ -94,7 +94,7 @@ void sysSE_stop(u32 id);
 /* 0x800DBACC - points the SE pool's talk voice at `pos` (mode 3/2, kinds 21/16).  GUESS name. */
 void se_talk_point_set(nw4r::math::VEC3* pos);
 
-/* 0x800DACA8 - plays the "item could not be used" sound for the local hunter (the `fn_800F0C14` voice of its
+/* 0x800DACA8 - plays the "item could not be used" sound for the local hunter (the `snd_chunk_handle_get` voice of its
  * move work's +0x13C record).  GUESS name from its two callers, which raise the "cannot use" message first. */
 void snd_item_fail_play(void);
 

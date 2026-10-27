@@ -275,7 +275,7 @@ extern "C" void eft041_move(_EFT* self)
         case 25:
         case 30:
         case 35:
-            fn_800DD514(&model->model->pos_0x04);
+            se_bank46_id13_req(&model->model->pos_0x04);
             break;
         }
 

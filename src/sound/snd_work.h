@@ -43,7 +43,7 @@ typedef struct SndWork {
     /* +0x97AC */ u8   pad_97AC[0x02];
     /* +0x97AE */ u8   bgm_loading_1;
     /* +0x97AF */ u8   bgm_loading_2;
-    /* +0x97B0 */ u32  stream_dma;       /* the address `fn_800F2900` hands out */
+    /* +0x97B0 */ u32  stream_dma;       /* the address `snd_stream_dma_get` hands out */
     /* +0x97B4 */ u32  stream_ok;
 } SndWork; /* size: 0x97B8 */
 

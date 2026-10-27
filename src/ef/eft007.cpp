@@ -494,7 +494,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
         mtx34_trans_get(&mtx, &self->pos_0x18);
-        fn_800DD7E0((MHchar*)model, &self->pos_0x18, 0);
+        pl_se_req_flag((MHchar*)model, &self->pos_0x18, 0);
         break;
     case 10:
         if (pl_gauge_level_get((MHchar*)model) >= 2) {
@@ -508,7 +508,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
         mtx34_trans_get(&mtx, &self->pos_0x18);
-        fn_800DD7E0((MHchar*)model, &self->pos_0x18, 0);
+        pl_se_req_flag((MHchar*)model, &self->pos_0x18, 0);
         break;
     case 16:
     case 17:
@@ -748,7 +748,7 @@ extern "C" s32 fn_801036C0(_EFT007* self)
         case 55:
             if (self->step_0x06 == 0) {
                 self->step_0x06++;
-                fn_800DD7E0((MHchar*)model, &self->pos_0x18, 1);
+                pl_se_req_flag((MHchar*)model, &self->pos_0x18, 1);
             }
             return 1;
         case 10:
@@ -758,14 +758,14 @@ extern "C" s32 fn_801036C0(_EFT007* self)
             }
             if (self->step_0x06 == 1) {
                 self->step_0x06 = 2;
-                fn_800DD7E0((MHchar*)model, &self->pos_0x18, -1);
+                pl_se_req_flag((MHchar*)model, &self->pos_0x18, -1);
             }
             return 0;
         }
     }
     if (self->step_0x06 == 1) {
         self->step_0x06 = 2;
-        fn_800DD7E0((MHchar*)model, &self->pos_0x18, -1);
+        pl_se_req_flag((MHchar*)model, &self->pos_0x18, -1);
     }
     return 0;
 }

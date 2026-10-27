@@ -12,11 +12,11 @@
  * 141 functions. This is the game's sound-effect request layer: a request names a sound id plus a world
  * position, lands in a free slot of the `_se_w` work object, and the per-frame drivers (`fn_800D84E8` /
  * `fn_800D85B0` / `fn_800D8678` / `fn_800D8730`) walk the slots and turn each live one into playback
- * calls (`fn_800F0C14` bank lookup, `fn_800F2890`/`fn_800F27C4` id resolve, `fn_800E80DC`/`fn_800E81BC`
+ * calls (`snd_chunk_handle_get` bank lookup, `fn_800F2890`/`fn_800F27C4` id resolve, `fn_800E80DC`/`fn_800E81BC`
  * open, `fn_800E8354` volume, `fn_800E83CC` pitch, `snd_stream_reloc_busy_ck`/`snd_stream_reloc_stop` stop).
  *
  * The core shapes, all read off the disassembly:
- *   - `_se_w` is the work object; `fn_800D843C()` is the "SE disabled" predicate (1 = skip), and
+ *   - `_se_w` is the work object; `se_disabled_ck()` is the "SE disabled" predicate (1 = skip), and
  *     `fn_800D8E58(_se_w*, s32)` returns the first free slot (byte +0 is the in-use flag, 32 slots of
  *     0x50 bytes at +0x3C).
  *   - `se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos)` is the common "start a positional sound"
@@ -40,7 +40,7 @@
  *     register colouring, one range-test encoding, or a pool name, never a missing operation.
  *   - `se_fishing_cast` (73.3 %): the two-voice crossfade. Every operation is present, but the callee-saved
  *     colouring puts `work` in r31 where retail has r30 (~10 declaration orders and source shapes tried).
- *   - `fn_800D8404` (81.9 %): the switch's 3/4 range test is two compares where retail uses
+ *   - `se_slot_kind_dispatch` (81.9 %): the switch's 3/4 range test is two compares where retail uses
  *     `addi r,r,-3; cmplwi r,1`.
  *   - `fn_800D87B8` (89.6 %): retail reaches the stop body by a direct jump from case 4; the `goto`-free
  *     shape (a `stop` flag with the body written twice) costs 15 instructions.
@@ -50,7 +50,7 @@
  * Data runs in this range are recorded in `splits.txt` as comments and not claimed (playbook 23,
  * docs/plan.md 8.4); the `extab`/`extabindex` fragments travel with the code unit.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `snd_stream_reloc_stop`,
- *     `lbl_807963E0`, `lbl_80794978`, `lbl_807963F8`, `fn_800F2680`.
+ *     `lbl_807963E0`, `se_pool`, `lbl_807963F8`, `fn_800F2680`.
  *   flipcheck: `.data` size gap.
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: force-active in retail .comment, not in ours: `fn_800DB684`.
@@ -374,22 +374,22 @@ extern "C" void sysSE_window_open_play(void) { sysSE_req(12); }
 
 /* --- the non-positional path: `se_bank_req` plus its `sysSE_req`/`titleSE_req` family ------------- */
 
-extern "C" s32 fn_800F0C14(s32 bank);
+extern "C" s32 snd_chunk_handle_get(s32 bank);
 extern "C" s32 fn_800F04FC(s32 id);
 extern "C" u8 event_demo_running_ck(void);
-extern "C" u32 fn_800D843C(void);
+extern "C" u32 se_disabled_ck(void);
 extern "C" u8 system_w[];
 extern "C" u8 lbl_80597A20[];
 
 /* Resolves the bank to a sound handle and hands it to the playback helper; `-1` and the disabled
  * states short-circuit to 0. */
 extern "C" s32 se_bank_req(s32 bank, s32 id) {
-    s32 handle = fn_800F0C14(bank);
+    s32 handle = snd_chunk_handle_get(bank);
     if (handle == -1) {
         return 0;
     }
     if (system_w[0x30] == 0 || handle != 0) {
-        if (fn_800D843C() == 1) {
+        if (se_disabled_ck() == 1) {
             return 0;
         }
     }
@@ -584,9 +584,9 @@ struct _UserData {
 
 extern "C" void* memset(void* dst, s32 c, u32 n);
 extern "C" u32 stage_water_area_ck(void);
-extern "C" u32 fn_800D843C(void);
+extern "C" u32 se_disabled_ck(void);
 extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot);
-extern "C" s32 fn_800F0C14(s32 owner);
+extern "C" s32 snd_chunk_handle_get(s32 owner);
 extern "C" s32 fn_800F2890(s32 bank, s32 id);
 extern "C" u8 fn_800F0C74(s32 owner);
 extern "C" u32 fn_802D29A0(_PLW* plw, s32 zero, f32 a, f32 b);
@@ -718,7 +718,7 @@ extern "C" void se_frame_req(_se_w* work, s32 id, u32 param, s32 value) {
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     SeSlot* s = fn_800D8E58(work, id);
@@ -755,7 +755,7 @@ extern "C" void fn_800D9DB4(_se_w* work, s32 id, u32 param, s32 id2, s32 id3) {
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     SeSlot* s = fn_800D8E58(work, id);
@@ -794,10 +794,10 @@ void se_req_pos_ps(_se_w* work, s32 id, s32 param, nw4r::math::VEC3* pos) {
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
-    s32 bank = fn_800F0C14(work->field_0x0C);
+    s32 bank = snd_chunk_handle_get(work->field_0x0C);
     if (bank == -1) {
         return;
     }
@@ -841,7 +841,7 @@ extern "C" void se_req_frame_set_bank(_se_w* work, s32 a, u32 param, s32 d, s32 
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     if (work->field_0x08 != 2) {
@@ -870,7 +870,7 @@ void se_req_frame_set_aifs(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     if (work->field_0x08 != 11) {
@@ -901,7 +901,7 @@ void se_req_frame_set_npc(_se_w* work, _LB_NPC* npc, s32 a, s32 param, s32 e) {
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     if (npc->field_0x002 == 1) {
@@ -927,7 +927,7 @@ void se_req_frame_set(_se_w* work, s32 a, s32 param, s32 d, s32 e) {
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     switch (w->field_0x008) {
@@ -1001,7 +1001,7 @@ void se_req_frame_set_sp(_se_w* work, s32 a, s32 param, s32 d, s32 e, s32 f) {
     if (work == NULL) {
         return;
     }
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     switch (w->field_0x008) {
@@ -1054,7 +1054,7 @@ void se_req_frame_set_sp(_se_w* work, s32 a, s32 param, s32 d, s32 e, s32 f) {
  */
 extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos) {
     LbLobbyWork* lw = &lobby_w;
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return NULL;
     }
     _se_w* work = lw->field_0x0B8;
@@ -1092,7 +1092,7 @@ extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  */
 extern "C" SeSlot* fn_800DBFAC(s32 kind, s32 id, nw4r::math::VEC3* pos) {
     LbLobbyWork* lw = &lobby_w;
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return NULL;
     }
     _se_w* work = lw->field_0x0BC;
@@ -1183,7 +1183,7 @@ extern "C" void fn_800DB974(_se_w* work, nw4r::math::VEC3* pos) {
  * stripped off and recorded as "no owner".
  */
 extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return NULL;
     }
     s32 loud = 0;
@@ -1269,7 +1269,7 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  *   copyVec3 call. Same instruction count either way, so it is the allocator's tie-break between
  *   "keep the pointer, rematerialise the bias" and "keep the bias" - not source-shaped. Tried: the
  *   target's statement order and the ascending order, the store duplicated, `if (self != NULL)` vs the
- *   early return, a second/`void*`/`u32` local, `lbl_80794978` declared `SeSysWork*`/`void*`/`_se_w*`,
+ *   early return, a second/`void*`/`u32` local, `se_pool` declared `SeSysWork*`/`void*`/`_se_w*`,
  *   a reference, a separate assignment, a const pointer, nested-scope assignment. All give r31 = base.
  *
  * fn_800F2680 must return u32 here: with u8 the u8->f32 narrowing loses its `mr r0,r3` copy and both
@@ -1284,7 +1284,7 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
 
 /* --- local types ------------------------------------------------------------------------------- */
 
-/* The sound-system work object `lbl_80794978` points at: `fn_800D7F54` memsets 0x2966C bytes of it,
+/* The sound-system work object `se_pool` points at: `fn_800D7F54` memsets 0x2966C bytes of it,
  * and the offsets below are the ones this part touches.
  * size: 0x2966C */
 struct SeSysWork {
@@ -1321,15 +1321,15 @@ struct SeSysWork {
 /* --- declarations ------------------------------------------------------------------------------ */
 
 extern "C" u8 GameMode_ck(void);
-extern "C" u32 fn_800D843C(void);
+extern "C" u32 se_disabled_ck(void);
 extern "C" void fn_800D9DB4(_se_w* se, s32 a, u32 b, s32 c, s32 d);
 extern "C" u32 fn_800DAE48(void);
 extern "C" void fn_800DB2DC(void);
-extern "C" s32 fn_800F0C14(s32 owner);
+extern "C" s32 snd_chunk_handle_get(s32 owner);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 void se_req_pos_ps(_se_w* se, s32 id, s32 kind, nw4r::math::VEC3* pos);
 
-extern "C" _se_w* lbl_80794978;
+extern "C" _se_w* se_pool;
 extern "C" s16 lbl_80597A00[];
 extern "C" f32 lbl_807963E4;
 extern "C" f64 lbl_80796400;
@@ -1338,7 +1338,7 @@ extern "C" f64 lbl_80796400;
 
 /* Releases the two sound handles the system work keeps in its pointer table. */
 extern "C" void fn_800DB2DC(void) {
-    SeSysWork* self = (SeSysWork*)lbl_80794978;
+    SeSysWork* self = (SeSysWork*)se_pool;
 
     if (self->field_0x295F0 != NULL && fn_800E802C_c1((s32)self->field_0x295F0) != 0) {
         fn_800E8228_c1((s32)self->field_0x295F0);
@@ -1353,7 +1353,7 @@ extern "C" void fn_800DB2DC(void) {
 
 /* Maps a trap kind and its sub-kind onto a handle slot, then applies a volume. */
 extern "C" void se_fishing_result(u8 kind, u32 unused, u8 sub) {
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return;
     }
     fn_800DB2DC();
@@ -1455,7 +1455,7 @@ extern "C" void pl_charge_se_play(_PLW* plw) {
     if (se == NULL) {
         return;
     }
-    s32 motion = fn_800F0C14(se->field_0x0C);
+    s32 motion = snd_chunk_handle_get(se->field_0x0C);
     if (motion == -1) {
         return;
     }
@@ -1471,7 +1471,7 @@ extern "C" void pl_charge_se_play(_PLW* plw) {
 
 /* Resets the sound-system work object and seeds its default position. */
 extern "C" void se_talk_point_set(nw4r::math::VEC3* pos) {
-    SeSysWork* self = (SeSysWork*)lbl_80794978;
+    SeSysWork* self = (SeSysWork*)se_pool;
 
     if (self == NULL) {
         return;
@@ -1649,11 +1649,11 @@ extern "C" void fn_800DCB74(_se_w* se, s32 kind, nw4r::math::VEC3* pos) {
  * and `fn_800F2680` returns `u8` so its callers narrow at the use.
  *
  * Names declared here that a sibling part may also declare (dedupe on merge): `_PLW`, `SeMgrState`,
- * `lbl_80794978`, `lbl_807963E4`, `lbl_80791440`, `lbl_80791444`, `ran_suu`, `get_chacha_*_bank`,
+ * `se_pool`, `lbl_807963E4`, `lbl_80791440`, `lbl_80791444`, `ran_suu`, `get_chacha_*_bank`,
  * `se_req_pos_ps`, `shell_se_req`.
  */
 
-extern "C" u32 fn_800D843C(void);
+extern "C" u32 se_disabled_ck(void);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 extern "C" void se_frame_req(_se_w* work, s32 id, u32 param, s32 value);
 
@@ -1671,7 +1671,7 @@ extern f32 lbl_807963E4;   /* 127.0f - the volume scale */
 extern u8 lbl_80791440[4]; /* { 43, 30, 234, 236 } */
 extern u8 lbl_80791444[4]; /* { 44, 31, 235, 237 } - the same table, one id louder */
 
-/* The object the two `fn_800DAE*` starters reset: `lbl_80794978` is an `.sbss` pointer to it and the
+/* The object the two `fn_800DAE*` starters reset: `se_pool` is an `.sbss` pointer to it and the
  * 16-byte state block they clear sits at +0x295E4. Only that block and the handle at +0x295F0 are
  * reached from this unit, so the rest is padding.
  * size: 0x295F4 (lower bound) */
@@ -1686,14 +1686,14 @@ struct SeMgrState {
     /* +0x295F0 */ s32 field_0x295F0;
 };
 
-extern "C" _se_w* lbl_80794978;
+extern "C" _se_w* se_pool;
 
 /* A player work object; the SE work pointer is the only field this unit reaches.
  * size: 0xB00 (lower bound) */
 
 /* The id of the SE work object slot 1 is holding, or 0 while SE is disabled or the work is missing. */
 extern "C" u32 fn_800DAE48(void) {
-    if (fn_800D843C() == 1) {
+    if (se_disabled_ck() == 1) {
         return 0;
     }
     SeWork* work = get_move_work_adrs__FUc(0);
@@ -1705,7 +1705,7 @@ extern "C" u32 fn_800DAE48(void) {
 
 /* Resets the manager's effect state and starts the effect `kind` 15 on the current id. */
 extern "C" void se_fishing_bite_small(void) {
-    SeMgrState* mgr = (SeMgrState*)lbl_80794978;
+    SeMgrState* mgr = (SeMgrState*)se_pool;
     mgr->field_0x295E4 = 0;
     mgr->field_0x295E8 = 0;
     mgr->field_0x295EC = 0;
@@ -1724,7 +1724,7 @@ extern "C" void se_fishing_bite_small(void) {
 
 /* Same as se_fishing_bite_small for effect `kind` 10. */
 extern "C" void se_fishing_bite_big(void) {
-    SeMgrState* mgr = (SeMgrState*)lbl_80794978;
+    SeMgrState* mgr = (SeMgrState*)se_pool;
     mgr->field_0x295E4 = 0;
     mgr->field_0x295E8 = 0;
     mgr->field_0x295EC = 0;
@@ -1873,7 +1873,7 @@ extern "C" void fn_800DCF0C(_se_w* work, nw4r::math::VEC3* pos) {
  *
  * Shared-type notes for the orchestrator:
  *   - the prelude's `_se_w` models the *pool entry* (0xA48, 32 `SeSlot` at +0x3C); the *container*
- *     `lbl_80794978` points at is `SePool` here (64 `SeEntry` at +0x34, view matrices at +0x29280, one
+ *     `se_pool` points at is `SePool` here (64 `SeEntry` at +0x34, view matrices at +0x29280, one
  *     trailing `SeSlot` at +0x2961C).
  *   - `em_area_ck` must return a *signed* value (`cmpwi r3,0`); e.cpp/manual.cpp declare it `u32`.
  *   - the camera helpers return their `VEC3`/`Mtx` by value (`get_camera_pos__Fv` has no parameters),
@@ -1922,7 +1922,7 @@ struct SeEntry {
     /* +0xA44 */ void (*callback)(_ENEMY_WORK*, s32);
 };
 
-/* The SE pool object `lbl_80794978` points at: the camera state the driver refreshes, the 64 enemy-work
+/* The SE pool object `se_pool` points at: the camera state the driver refreshes, the 64 enemy-work
  * records, the two view matrices, and one extra `SeSlot` at the very end (the record `fn_800D7F54`
  * clears 0x2966C bytes of).
  * size: 0x2966C */
@@ -1975,7 +1975,7 @@ struct SeMoveWork {
 
 /* --- declarations ------------------------------------------------------------------------------ */
 
-extern "C" _se_w* lbl_80794978;
+extern "C" _se_w* se_pool;
 
 extern "C" u8 GameMode_ck(void);
 /* Owned by `ef/system_core.cpp` (rule 2).  The declaration stays here, in the block form, because this
@@ -1994,8 +1994,8 @@ extern "C" void fn_800D84E8(_se_w* work);
 extern "C" void fn_800D8678(_se_w* work);
 extern "C" void fn_800D8730(_se_w* work);
 extern "C" void fn_800D85B0(_se_w* work, s32 mode);
-extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot);
-extern "C" void fn_800D8404(SeSlot* slot);
+extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot);
+extern "C" void se_slot_kind_dispatch(SeSlot* slot);
 extern "C" s32 pl_root_lock_ck(void);
 extern "C" u8* fn_800D8DDC(u8* base);
 extern "C" s32 fn_800F1398(_ENEMY_WORK* enemy, s32 index);
@@ -2019,7 +2019,7 @@ Mtx34 get_current_view_mtx(void);
  * position into the pool and dispatch to its kind's slot walker, then runs the pool's trailing slot.
  */
 extern "C" void se_frame_step(void) {
-    SePool* self = (SePool*)lbl_80794978;
+    SePool* self = (SePool*)se_pool;
     s32 i;
     SeEntry* entry;
 
@@ -2114,11 +2114,11 @@ extern "C" void se_frame_step(void) {
 
         SeSlot* slot = &self->field_0x2961C;
         if (slot->in_use == 1) {
-            fn_800D92E4(NULL, slot);
-            fn_800D8404(slot);
+            se_slot_level_calc(NULL, slot);
+            se_slot_kind_dispatch(slot);
         }
         if (pl_root_lock_ck() == 0) {
-            fn_800DFDCC(self, 0);
+            se_point_frame(self, 0);
         }
     }
 }
@@ -2132,7 +2132,7 @@ extern "C" void se_frame_step(void) {
 extern "C" SeEntry* se_entry_request(s32 kind, _ENEMY_WORK* enemy,
                                 void (*callback)(_ENEMY_WORK*, s32)) {
     SeEntry* entry;
-    _se_w* pool = lbl_80794978;
+    _se_w* pool = se_pool;
     EnemyWorkView* enemy_view = (EnemyWorkView*)enemy;
     s32 value;
 
@@ -2426,13 +2426,13 @@ extern "C" void fn_800DC0A8(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView*
 }
 
 
-/* part e - the per-slot joint lookup (`fn_800D8EA8`), the per-slot sound-state update (`fn_800D92E4`)
+/* part e - the per-slot joint lookup (`fn_800D8EA8`), the per-slot sound-state update (`se_slot_level_calc`)
  * and the paralyze-trap request (`paralyzeTrap_SE_req__FUcUcPQ34nw4r4math4VEC3`).
  *
  * Measured with `.pi/scratch/measure_part.py` (fuzzy_match_percent):
  *   fn_800D8EA8                                   100.000  byte-exact (1084 B)
  *   paralyzeTrap_SE_req__FUcUcPQ34nw4r4math4VEC3  100.000  byte-exact (220 B)
- *   fn_800D92E4                                    86.552  1268 B vs 1312 B: the bodies are
+ *   se_slot_level_calc                                    86.552  1268 B vs 1312 B: the bodies are
  *        instruction-for-instruction equal, but the allocator keeps 5 FPRs where retail keeps 8
  *        (f24/f25/f26): `(f32)` conversions pool their 2^52 double locally (`@410`) where retail
  *        references `lbl_80796400`/`lbl_80796408`, so one double web never exists for us, and the
@@ -2444,7 +2444,7 @@ extern "C" void fn_800DC0A8(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView*
  * At level 3 a switch whose case labels form a contiguous run is lowered to two compares
  * (`cmpwi rX,3; blt; cmpwi rX,4; ble`); retail has the fused unsigned form (`addi r0,rX,-3; cmplwi r0,1;
  * ble`). With the pragma the same source reproduces retail's dispatch byte-for-byte - calibrated on
- * `fn_800D8404` (16 target instructions reproduced exactly at level 4, not at level 3, and unchanged by
+ * `se_slot_kind_dispatch` (16 target instructions reproduced exactly at level 4, not at level 3, and unchanged by
  * `#pragma peephole on`). This also explains part a's `fn_800D9B6C` residual (96.667 %): its 9/10 range
  * test is the same symptom. The unit is most likely a `-O4,p` object (`-O4,p` also implies
  * `-func_align 16`, which the per-function pragma cannot give) - worth a `cflags` change by the
@@ -2546,7 +2546,7 @@ struct Case10View {
 extern "C" void pl_impact_pos_get(_PLW* plw, nw4r::math::VEC3* pos);
 extern "C" void fn_80385B20(_PLW* plw, u32 joint, nw4r::math::VEC3* pos);
 
-/* The sound-system work object `lbl_80794978` points at, as `fn_800D92E4` reads it (b.cpp calls the same
+/* The sound-system work object `se_pool` points at, as `se_slot_level_calc` reads it (b.cpp calls the same
  * object `SeSysWork`): the two distance vectors `vec3_distance` is handed and the byte at +0x2927D.
  * size: 0x2927E (at least) */
 struct SeSysWorkVol {
@@ -2558,7 +2558,7 @@ struct SeSysWorkVol {
     /* +0x2927D */ u8 field_0x2927D;
 };
 
-/* The `_se_w` work object as `fn_800D92E4` reads it: the owner-kind word at +0x08 of the prelude's
+/* The `_se_w` work object as `se_slot_level_calc` reads it: the owner-kind word at +0x08 of the prelude's
  * `SeWorkHead`, plus the two volume vectors at +0x18 and +0x24.
  * size: 0x30 (at least) */
 struct SeWorkVol {
@@ -2596,7 +2596,7 @@ extern "C" f32 lbl_807963F4;
 extern "C" f32 lbl_807963F8;
 extern "C" f32 lbl_80597260[];
 extern "C" u8* se_volume_curve_tbl[16];
-extern "C" _se_w* lbl_80794978;
+extern "C" _se_w* se_pool;
 
 /* ---------------------------------------------------------------------------------------------------
  * 0x800D8EA8  the per-slot joint lookup: dispatches on the work object's owner kind and then on the
@@ -2812,10 +2812,10 @@ void paralyzeTrap_SE_req(u8 kind, u8 trap, nw4r::math::VEC3* pos) {
  * distance.
  */
 #pragma optimization_level 4
-extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
+extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
     SeWorkVol* w = (SeWorkVol*)work;
     SeSlotView* s = (SeSlotView*)slot;
-    SeSysWorkVol* sys = (SeSysWorkVol*)lbl_80794978;
+    SeSysWorkVol* sys = (SeSysWorkVol*)se_pool;
     s32 ids[2];
     u8 levels[2];
     u16 params[2];
@@ -2859,7 +2859,7 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
                 }
             }
         } else {
-            b = fn_800E0428(lbl_80794978, &s->pos);
+            b = se_point_zone_level_get(se_pool, &s->pos);
             mode = (sys->field_0x2927D == 1);
         }
         fn_800F2714(s->owner, ids[i], 0, (u8)a);
@@ -2951,7 +2951,7 @@ extern "C" void sound_frame_entry(void) {
 }
 
 /* Dispatches a slot to its per-kind handler by the slot's `kind` byte. */
-extern "C" void fn_800D8404(SeSlot* slot) {
+extern "C" void se_slot_kind_dispatch(SeSlot* slot) {
     switch (slot->kind) {
     case 1:
         fn_800D87B8(slot);
@@ -2970,7 +2970,7 @@ extern "C" void fn_800D8404(SeSlot* slot) {
 
 /* Non-zero while sound effects must stay silent: no work object, the work object's disable byte set, a
  * `GameMode_ck` state of 3, the system's demo flag, or a fade state of 2. */
-extern "C" u32 fn_800D843C(void) {
+extern "C" u32 se_disabled_ck(void) {
     SeWork* work = get_move_work_adrs__FUc(0);
     if (work != NULL) {
         if (work->field_0x112 != 0) {
@@ -2992,7 +2992,7 @@ extern "C" u32 fn_800D843C(void) {
 /* --- the per-frame slot walkers ------------------------------------------------------------------- */
 
 extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot);
-extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot);
+extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot);
 
 /* The frame driver: refreshes the shared scratch vector, then walks the 32 slots and lets each active
  * one advance. */
@@ -3015,8 +3015,8 @@ extern "C" void fn_800D84E8(_se_w* work) {
             if ((u8)(slot->kind - 3) <= 1) {
                 fn_800D8EA8(work, slot);
             }
-            fn_800D92E4(work, slot);
-            fn_800D8404(slot);
+            se_slot_level_calc(work, slot);
+            se_slot_kind_dispatch(slot);
             break;
         default:
             break;
@@ -3046,8 +3046,8 @@ extern "C" void fn_800D85B0(_se_w* work, s32 mode) {
             if ((u8)(slot->kind - 3) <= 1) {
                 fn_800D8EA8(work, slot);
             }
-            fn_800D92E4(work, slot);
-            fn_800D8404(slot);
+            se_slot_level_calc(work, slot);
+            se_slot_kind_dispatch(slot);
             break;
         default:
             break;
@@ -3063,8 +3063,8 @@ extern "C" void fn_800D8730(_se_w* work) {
     SeSlot* slot = work->slots;
     for (i = 0; i < 32; i++, slot++) {
         if (slot->in_use != 0 && (u32)(slot->state - 3) <= 1) {
-            fn_800D92E4(work, slot);
-            fn_800D8404(slot);
+            se_slot_level_calc(work, slot);
+            se_slot_kind_dispatch(slot);
         }
     }
 }
@@ -3087,8 +3087,8 @@ extern "C" void fn_800D8678(_se_w* work) {
             if (slot->kind == 3) {
                 fn_800D8EA8(work, slot);
             }
-            fn_800D92E4(work, slot);
-            fn_800D8404(slot);
+            se_slot_level_calc(work, slot);
+            se_slot_kind_dispatch(slot);
             break;
         default:
             break;
@@ -3113,7 +3113,7 @@ s32 SE_Code_Make(s32 low_code, s16 low, s32 mid_code, s16 span) {
 /* --- the two "get a handle and set its rate" helpers ---------------------------------------------- */
 
 extern "C" f32 lbl_807963E4;
-extern "C" s32 fn_800F0C14(s32 owner);
+extern "C" s32 snd_chunk_handle_get(s32 owner);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 
 /* Looks the per-frame bank up, opens a handle and scales its rate by the `lbl_807963E4` factor. */
@@ -3123,7 +3123,7 @@ extern "C" void se_item_get_play(void) {
         return;
     }
     _se_w* se = work->se[1];
-    s32 handle = fn_800F0C14(se->field_0x0C);
+    s32 handle = snd_chunk_handle_get(se->field_0x0C);
     if (handle == -1) {
         return;
     }
@@ -3141,7 +3141,7 @@ extern "C" void snd_item_fail_play(void) {
         return;
     }
     _se_w* se = work->se[1];
-    s32 handle = fn_800F0C14(se->field_0x0C);
+    s32 handle = snd_chunk_handle_get(se->field_0x0C);
     if (handle == -1) {
         return;
     }
@@ -3159,7 +3159,7 @@ extern "C" f32 lbl_807963DC;
 extern "C" f32 lbl_807963E0;
 extern "C" void fn_800F0EA0(void);
 extern "C" void* memset(void* dst, s32 c, u32 n);
-extern "C" _se_w* lbl_80794978;
+extern "C" _se_w* se_pool;
 
 /* The `system_w` offsets this unit reads. `system_w` is owned by `fn_80040598.cpp`; its
  * type belongs there, so this is a local view of the two fields this unit touches.
@@ -3174,15 +3174,15 @@ struct SystemWorkView {
 /* Clears the work area and lays a 16-step ramp into it. */
 extern "C" void se_work_init(void) {
     SystemWorkView* sys = (SystemWorkView*)system_w;
-    lbl_80794978 = sys->se_work;
-    memset(lbl_80794978, 0, 0x2966C);
+    se_pool = sys->se_work;
+    memset(se_pool, 0, 0x2966C);
     f32 value = lbl_807963D8;
     f32 step = lbl_807963DC;
     for (s32 i = 0; i < 16; i++) {
-        lbl_80794978->ramp[i] = value;
+        se_pool->ramp[i] = value;
         value -= step;
     }
-    lbl_80794978->field_0x29278 = lbl_807963E0;
+    se_pool->field_0x29278 = lbl_807963E0;
     fn_800F0EA0();
 }
 
@@ -3215,7 +3215,7 @@ extern "C" void se_item_pickup_play(u16 code) {
         return;
     }
     _se_w* se = work->se[1];
-    s32 handle = fn_800F0C14(se->field_0x0C);
+    s32 handle = snd_chunk_handle_get(se->field_0x0C);
     if (handle == -1) {
         return;
     }
@@ -3234,7 +3234,7 @@ extern "C" u32 fn_800DAE48(void);
  * starts the other one (or retunes it) so the two crossfade. */
 extern "C" void se_fishing_cast(s32 unused, u32 mode) {
     s32 id;
-    _se_w* work = lbl_80794978;
+    _se_w* work = se_pool;
     u8 handle;
     work->field_0x295F0 = 0;
     handle = fn_800DAE48();
@@ -3289,7 +3289,7 @@ extern "C" void fn_800D87B8(SeSlot* slot) {
             slot->param = (u32)((s32)slot->param - 1);
             return;
         }
-        s32 handle = fn_800F0C14(slot->owner);
+        s32 handle = snd_chunk_handle_get(slot->owner);
         if (handle == -1) {
             slot->in_use = 0;
             return;
@@ -3339,7 +3339,7 @@ extern "C" void fn_800D87B8(SeSlot* slot) {
         u32 stop = 0;
         if (fn_800E802C_c1(slot->field_0x3C) == 0) {
             slot->in_use = 0;
-        } else if (slot->field_0x4F != 193 && fn_800F0C14(slot->owner) != -1) {
+        } else if (slot->field_0x4F != 193 && snd_chunk_handle_get(slot->owner) != -1) {
             fn_800E8354_c1(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
         } else {
             stop = 1;
@@ -3377,7 +3377,7 @@ extern "C" void fn_800D8AB0(SeSlot* slot) {
             slot->param = (u32)((s32)slot->param - 1);
             return;
         }
-        s32 handle = fn_800F0C14(slot->owner);
+        s32 handle = snd_chunk_handle_get(slot->owner);
         if (handle == -1) {
             slot->state = 7;
             slot->in_use = 0;
@@ -3424,7 +3424,7 @@ extern "C" void fn_800D8AB0(SeSlot* slot) {
             slot->state = 7;
             slot->in_use = 0;
         } else {
-            if (fn_800F0C14(slot->owner) == -1) {
+            if (snd_chunk_handle_get(slot->owner) == -1) {
                 fn_800E8228_c1(slot->field_0x3C);
                 if (slot->field_0x24 != 0) {
                     fn_800E8228_c1(slot->field_0x40);

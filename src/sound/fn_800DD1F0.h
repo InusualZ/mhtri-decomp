@@ -38,7 +38,7 @@ void mhchar_mat_blend_set(MHchar* chr, u32 index, f32 value);
 void mhchar_joint_mtx_get(void* chr, u32 joint, Mtx34* out);
 /* 0x800DD514 - the fixed SE request the effect step makes when its joint window is hit (the body
  * loads 46/13 and tail-calls the SE request path).  Added with `ef/fn_8030681C.cpp`. */
-void fn_800DD514(nw4r::math::VEC3* pos);
+void se_bank46_id13_req(nw4r::math::VEC3* pos);
 /* 0x800E26C4 - releases the model/SE handle the caller's record holds.  Added with
  * `lobby/lb_quest_ui.cpp`: its per-row effect step hands the record's pointer here and then flags
  * the record through `ef/eft_res.cpp`'s `eft_res_models_release`, so the declaration belongs with this unit

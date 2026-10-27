@@ -325,7 +325,7 @@ extern "C" void fn_800F06AC(u8 kind, u8 arg1);
 extern "C" u32 fn_800F08E0(void);
 extern "C" void fn_800F08E8(u8 arg0);
 extern "C" void fn_800F0AD0(u8 arg0);
-extern "C" s8 fn_800F0C14(s32 chunk);
+extern "C" s8 snd_chunk_handle_get(s32 chunk);
 extern "C" u8 fn_800F0C74(u8 id);
 extern "C" void snd_em_bank_level_load(u8 kind);
 extern "C" void fn_800F0EA0(void);
@@ -352,7 +352,7 @@ extern "C" s32 fn_800F2714(u32 arg0, s32 arg1, u8 arg2, s32 arg3);
 extern "C" s32 fn_800F27C4(u32 arg0, s32 arg1, s8 arg2);
 extern "C" u16 fn_800F284C(u32 arg0);
 extern "C" s32 fn_800F2890(u32 arg0, s32 arg1);
-extern "C" u32 fn_800F2900(void);
+extern "C" u32 snd_stream_dma_get(void);
 extern "C" u16 fn_800F2924(s32 arg0, s32 arg1);
 extern "C" u8 snd_stream_bgm_flag_get(void);
 extern "C" void fn_800F2A1C(u8 volume, u8 is_bgm);
@@ -930,7 +930,7 @@ extern "C" void fn_800F0AD0(u8 arg0)
     fn_800F15B0();
 }
 
-extern "C" s8 fn_800F0C14(s32 chunk)
+extern "C" s8 snd_chunk_handle_get(s32 chunk)
 {
     s8 handle = (s8)lbl_80794A2C->chunk_handle[chunk];
 
@@ -1719,7 +1719,7 @@ extern "C" s32 fn_800F2890(u32 arg0, s32 arg1)
     return fn_800E7FC4(arg0, arg1) != NULL;
 }
 
-extern "C" u32 fn_800F2900(void)
+extern "C" u32 snd_stream_dma_get(void)
 {
     if (lbl_80794A2C->stream_ok == 1) {
         return lbl_80794A2C->stream_dma;
