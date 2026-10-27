@@ -11,8 +11,7 @@
  *   `pad_connect.cpp` from 0x80046C80.
  * FLAGS. The unit's own `#pragma peephole off` (retail keeps `cmpwi` after `rlwinm`/`and`, `li r0,N` before
  *   `psq_l`, and the unfused `subi`+`cmpwi`; turning it on loses 1262 B of matched code) with `peephole on`
- *   around `kpad_obj_copy` and `pad_motor_info_cb`, and `#pragma fp_contract off` (retail keeps `fmuls`+`fadds`;
- *   +393 B).
+ *   around `kpad_obj_copy`, and `#pragma fp_contract off` (retail keeps `fmuls`+`fadds`; +393 B).
  * NAMES. GUESS (from each body, its callers and the data it touches): every name this unit gave its own rows -
  *   the RSO loaders (`rso_overlay_*`, `rso_sel_load`, `rso_pool_reset`), `lz16_decode`, `sys_font_decode`,
  *   `lang_index_set`, `strap_tpl_load`, `str_rfind`, `sdk_link_refs` (a never-called block of SDK calls with
@@ -24,27 +23,45 @@
  *   calc_dpd_variable, read_kpad_acc/dpd, reset_kpad, calc_dpd2pos_scale), and the data rows
  *   (`lang_select_table`, `lang_suffix_table`, `strap_tpl_name_table`, `pad_btn_*`, `pad_map_*`,
  *   `stick_dir8_table`, `mem2_lz_image_a/b`, `sys_font_lz_image`, `kpad_i*`, `pad_motor_level_table`,
- *   `pad_rm_acc_max`, `pad_kp_dist_init`, `wpad_*`, `pointer_*`, `pad_probe_*`).  Registry proposals for the
+ *   `pad_rm_acc_max`, `pad_kp_dist_init`, `wpad_*`, `pointer_*`, `pad_probe_*`, the RSO loader state
+ *   `rso_sel_image`/`rso_boot_module`/`rso_overlay_module0..3`, `rso_slot_pool_index`, `rso_sel_path`,
+ *   `rso_path_table`, `stage_map_rso_table`, `rso_boot_name`) and `game_mode_nop` (an empty game-mode entry
+ *   between `field_game_task_start` and `ArenaSelExec`).  Registry proposals for the
  *   foreign callees: `face_buf_reset` (0x8004882C), `rc_record_init` (0x804A4E40), `rc_record_read`
  *   (0x804A4D70).  `SystemWork.language_0x01`, `pause_0x10` and `pad_lock_ck_0x8d8` are GUESS field names.
  * RESIDUALS. `pad_records_construct`/`player_pad_construct`/`pad_fs_block_construct` are byte-identical plain
  *   functions standing for MWCC's static initialiser and the PlayerPad / Nunchuk-block constructors (a class
  *   `PlayerPad` whose +0xFC block holds 32 constructed VEC3s cannot be expressed in the flat header layout its 150
  *   consumers use), so the `.ctors` word (0x8056F2C4) that points at the initialiser is not emitted.
- *   Register allocation or scheduling only: `rso_overlay_mode1/3/4_load` (the name-table load is scheduled
- *   before the slot index), `kpad_read_acc`, `pad_acc_y_delta`/`pad_fs_acc_y_delta` (the previous-sample
- *   pointer is formed first), `stage_map_set` (the flush size's constant is formed before `lbl_807947C0`
- *   loads).  `pad_wpad_read` re-forms `&Psw[chan]` where ours keeps it.  `pad_wpad_init`'s button-table copies
- *   form the source address first.  `pointer_smooth`: `vec3_distance` (owner `fn_8004CAD8.h`) is declared `f32`
- *   where retail rounds its result with `frsp`.  `kpad_obj_copy` differs under either peephole setting.
+ *   Register allocation or scheduling only: `kpad_read_acc` (`&kpad_work` is formed before the first sample
+ *   load), `pad_acc_y_delta`/`pad_fs_acc_y_delta` (r3/r4 swapped for the two sample pointers),
+ *   `stage_map_set` (the flush size's constant is formed before `lbl_807947C0` loads), `pad_wpad_init`,
+ *   `pad_menu_merge`, `kpad_pointer_read` and `kpad_read_dpd` (colouring), `lang_index_set` (`add` operand
+ *   order), `pad_wait_table_set` (the unrolled loop's source-pointer bump is scheduled early).
+ *   `pad_wpad_read`: retail re-forms `Psw + chan*0x350` for the second (core/Nunchuk) half and reads
+ *   `pad_probe_type` through a copy of the pad pointer; ours keeps the base (`opt_common_subs off` re-forms
+ *   both the multiply and the base: worse).  `pad_fs_stick_read`: retail keeps the two s16 stick values in
+ *   saved registers and re-extends them at every use; ours spills the one-element arrays to the stack.
+ *   `pad_gc_stick_read`: retail stores the `rc_get_*` results without `extsb` (a `u8` getter into the `s8`
+ *   arrays).  `pad_motor_start`: retail stores `time` without the `clrlwi` (`SystemWork.field_0x33` is `u8` in
+ *   the shared `system_work.h`; `s8` would match, 95 includers).  `pointer_smooth`: `vec3_distance` (owner
+ *   `fn_8004CAD8.h`) is declared `f32` where retail rounds its result with `frsp`.  `kpad_obj_copy`: retail
+ *   copies `center` as two words (`lwz`/`stw`); a `Vec2` assignment gives `lfs`/`stfs` under either peephole
+ *   setting.
  *   Data: the unit's `.data`/`.sdata`/`.sbss`/`.sdata2` are claimed but not emitted (the bodies `extern` them),
- *   so `datagap.py` reports target-extra for them; `lbl_807947B4..lbl_807947E4` (the RSO loader state) and
- *   `lbl_8057C9D8`/`lbl_8057CA28`/`lbl_8057CA40`/`lbl_80790E28`/`lbl_80790E30` keep their generated names.
+ *   so `datagap.py` reports target-extra for them (flipcheck: 22 symbols other units reference are not defined
+ *   by our object, and 8 force-active functions need `__declspec(export)`); `lbl_807947B4..lbl_807947C8`
+ *   (`fn_80040598.cpp`'s pool state) keep their generated names.
  *   `config.yml` `block_relocations` covers `sys_font_lz_image` (0x8057CED0..0x80580058): its packed bytes read
  *   as addresses to dtk.
  * SHAPES. The Classic Controller (+0xD6) and Nunchuk (+0xFC) blocks of `PlayerPad` are read through the
  *   `PadStickBlock`/`PadFsBlock` views (retail addresses them from one block pointer); a one-stick loop for the
- *   Nunchuk stick; the button-map tables are hoisted into locals before the frame's first test.
+ *   Nunchuk stick; the button-map tables are hoisted into locals before the frame's first test.  The RSO
+ *   loaders read each later overlay's name into one reused `name` local before the slot store; the screen
+ *   centre is `width / 2.0f` (playbook 151); `kpad_sec_update` divides by the stored `sec_dist` (playbook 181);
+ *   the accelerometer deltas are `prev - cur` (the magnitude is taken); `pad_menu_merge` seeds `dirbtn` from
+ *   the masked hold it tests; `pad_motor_start` tests `get_cfg(...) ^ 1` (retail's `xori`: the getter's result
+ *   is used as a bool).
  */
 
 #pragma peephole off
@@ -156,23 +173,23 @@ extern u32 lbl_807947B4; /* load base */
 extern u32 lbl_807947B8;
 extern u32 lbl_807947BC;
 extern u32 lbl_807947C0;
-extern u8 lbl_807947C8[8]; /* [0] state, [1] sub-state */
-extern u32 lbl_807947D0;
-extern RSOModule* lbl_807947D4;
-extern RSOModule* lbl_807947D8;
-extern RSOModule* lbl_807947DC;
-extern RSOModule* lbl_807947E0;
-extern RSOModule* lbl_807947E4;
+extern s8 lbl_807947C8[8]; /* [0] state, [1] sub-state */
+extern u32 rso_sel_image;
+extern RSOModule* rso_boot_module;
+extern RSOModule* rso_overlay_module0;
+extern RSOModule* rso_overlay_module1;
+extern RSOModule* rso_overlay_module2;
+extern RSOModule* rso_overlay_module3;
 extern u8 pad_kpad_ready; /* KPAD initialised flag */
 
 /* --- .sdata --- */
-extern u8 lbl_80790E28[8];   /* per-slot RSO pool index */
-extern char lbl_80790E30[8]; /* "mh3.sel" */
+extern u8 rso_slot_pool_index[8];   /* per-slot RSO pool index */
+extern char rso_sel_path[8]; /* "mh3.sel" */
 
 /* --- .data string / table pool --- */
-extern char* lbl_8057C9D8[]; /* RSO path pointers */
-extern u8 lbl_8057CA28[];
-extern char lbl_8057CA40[];
+extern char* rso_path_table[]; /* RSO path pointers */
+extern u8 stage_map_rso_table[];
+extern char rso_boot_name[];
 
 /* --- .bss --- */
 extern u32 rso_slot_load_base[5];
@@ -184,9 +201,6 @@ extern MEMAllocator wpad_mem2_allocator; /* MEM2 allocator record */
 extern RcRecord lbl_807419C8[];
 
 /* --- .sdata2 --- */
-extern f32 lbl_80795AE8; /* 0.0f */
-extern f32 lbl_80795AE0;
-extern f32 lbl_80795AE4;
 
 /* --- helpers owned by other units (rule 2 headers included above) --- */
 extern char* strrchr(const char* s, int c);
@@ -274,7 +288,7 @@ void gx_position3f32(f32 x, f32 y, f32 z);
 void* wpad_mem2_alloc(u32 size); /* untyped: a byte range for WPAD */
 s32 wpad_mem2_free(void* block);
 MEMiHeapHead* exp_heap_create(void* base, u32 size);
-void pad_motor_info_cb(u8 chan, s32 on);
+void pad_motor_info_cb(s32 chan, s32 on);
 void pad_wpad_read(s32 chan);
 void pad_wpad_clear(s32 chan);
 void pad_input_clear(s32 chan);
@@ -437,8 +451,8 @@ static inline void pad_btn_table_copy(PadBtnTable* dst, const PadBtnTable* src)
 /* Maps the bits of `raw` set in `from[i]` onto `to[i]`. */
 static inline u16 pad_btn_remap(u16 raw, const u16* from, const u16* to)
 {
-    u16 out;
     s32 i;
+    u16 out;
 
     out = 0;
     for (i = 0; i < 16; i++) {
@@ -462,31 +476,31 @@ extern "C" void rso_overlay_boot(void)
     for (i = 0; i < 5; i++) {
         lbl_807947C8[i] = 0xFF;
     }
-    lbl_807947D0 = (u32)CntSdRsoTerminate(lbl_80790E30, (void*)0x80810000);
+    rso_sel_image = (u32)CntSdRsoTerminate(rso_sel_path, (void*)0x80810000);
     lbl_807947B8 = lbl_807947B4;
     lbl_807947BC = lbl_807947B4 + 0x170000;
-    lbl_807947D4 = (RSOModule*)fn_80040598(lbl_8057CA40, (void*)lbl_807947B4, 0xFF);
-    fn_804DA7E4(lbl_807947D4);
-    lbl_807947D4->prolog(lbl_807947D4);
+    rso_boot_module = (RSOModule*)fn_80040598(rso_boot_name, (void*)lbl_807947B4, 0xFF);
+    fn_804DA7E4(rso_boot_module);
+    rso_boot_module->prolog(rso_boot_module);
 }
 
 extern "C" void rso_sel_load(void)
 {
-    lbl_807947D0 = (u32)CntSdRsoTerminate(lbl_80790E30, (void*)0x80810000);
+    rso_sel_image = (u32)CntSdRsoTerminate(rso_sel_path, (void*)0x80810000);
 }
 
 /* Release every loaded sub-overlay and reset the loader state. */
 extern "C" void rso_overlay_release_all(void)
 {
-    s32 loadedD8;
-    s32 loadedDC;
-    s32 loadedE0;
     s32 loadedE4;
+    s32 loadedE0;
+    s32 loadedDC;
+    s32 loadedD8;
 
-    loadedD8 = 0;
-    loadedDC = 0;
-    loadedE0 = 0;
     loadedE4 = 0;
+    loadedE0 = 0;
+    loadedDC = 0;
+    loadedD8 = 0;
     lbl_807947C0 = lbl_807947BC;
     rso_slot_load_base[0] = 0;
     rso_slot_unused_words[0] = 0;
@@ -498,37 +512,37 @@ extern "C" void rso_overlay_release_all(void)
     rso_slot_unused_words[3] = 0;
     rso_slot_load_base[4] = 0;
     rso_slot_unused_words[4] = 0;
-    if (lbl_807947D8 != NULL) {
-        lbl_807947D8->epilog(lbl_807947D8);
+    if (rso_overlay_module0 != NULL) {
+        rso_overlay_module0->epilog(rso_overlay_module0);
         loadedD8 = 1;
     }
-    if (lbl_807947DC != NULL) {
-        lbl_807947DC->epilog(lbl_807947DC);
+    if (rso_overlay_module1 != NULL) {
+        rso_overlay_module1->epilog(rso_overlay_module1);
         loadedDC = 1;
     }
-    if (lbl_807947E0 != NULL) {
-        lbl_807947E0->epilog(lbl_807947E0);
+    if (rso_overlay_module2 != NULL) {
+        rso_overlay_module2->epilog(rso_overlay_module2);
         loadedE0 = 1;
     }
-    if (lbl_807947E4 != NULL) {
-        lbl_807947E4->epilog(lbl_807947E4);
+    if (rso_overlay_module3 != NULL) {
+        rso_overlay_module3->epilog(rso_overlay_module3);
         loadedE4 = 1;
     }
     if (loadedD8 != 0) {
-        RSOUnLinkList(lbl_807947D8);
-        lbl_807947D8 = NULL;
+        RSOUnLinkList(rso_overlay_module0);
+        rso_overlay_module0 = NULL;
     }
     if (loadedDC != 0) {
-        RSOUnLinkList(lbl_807947DC);
-        lbl_807947DC = NULL;
+        RSOUnLinkList(rso_overlay_module1);
+        rso_overlay_module1 = NULL;
     }
     if (loadedE0 != 0) {
-        RSOUnLinkList(lbl_807947E0);
-        lbl_807947E0 = NULL;
+        RSOUnLinkList(rso_overlay_module2);
+        rso_overlay_module2 = NULL;
     }
     if (loadedE4 != 0) {
-        RSOUnLinkList(lbl_807947E4);
-        lbl_807947E4 = NULL;
+        RSOUnLinkList(rso_overlay_module3);
+        rso_overlay_module3 = NULL;
     }
     lbl_807947C8[0] = 0xFF;
     lbl_807947C8[1] = 0xFF;
@@ -541,19 +555,19 @@ extern "C" void rso_overlay_mode2_load(void)
     char** names;
     u8* idx;
 
-    if ((s8)lbl_807947C8[0] != 2 && (s8)lbl_807947C8[0] != 4) {
+    if (lbl_807947C8[0] != 2 && lbl_807947C8[0] != 4) {
         rso_overlay_release_all();
         pools = rso_slot_load_base;
-        names = lbl_8057C9D8;
-        idx = lbl_80790E28;
+        names = rso_path_table;
+        idx = rso_slot_pool_index;
         pools[idx[0]] = lbl_807947C0;
-        lbl_807947D8 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
+        rso_overlay_module0 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
         pools[idx[1]] = lbl_807947C0;
-        lbl_807947DC = (RSOModule*)fn_80040598(names[1], (void*)pools[idx[1]], idx[1]);
-        fn_804DA7E4(lbl_807947D8);
-        fn_804DA7E4(lbl_807947DC);
-        lbl_807947D8->prolog(lbl_807947D8);
-        lbl_807947DC->prolog(lbl_807947DC);
+        rso_overlay_module1 = (RSOModule*)fn_80040598(names[1], (void*)pools[idx[1]], idx[1]);
+        fn_804DA7E4(rso_overlay_module0);
+        fn_804DA7E4(rso_overlay_module1);
+        rso_overlay_module0->prolog(rso_overlay_module0);
+        rso_overlay_module1->prolog(rso_overlay_module1);
         lbl_807947C8[0] = 2;
     }
 }
@@ -564,25 +578,28 @@ extern "C" void rso_overlay_mode1_load(void)
     u32* pools;
     char** names;
     u8* idx;
+    char* name;
 
-    if ((s8)lbl_807947C8[0] != 1) {
+    if (lbl_807947C8[0] != 1) {
         rso_overlay_release_all();
         pools = rso_slot_load_base;
-        names = lbl_8057C9D8;
-        idx = lbl_80790E28;
+        names = rso_path_table;
+        idx = rso_slot_pool_index;
         pools[idx[0]] = lbl_807947C0;
-        lbl_807947D8 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
+        rso_overlay_module0 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
+        name = names[2];
         pools[idx[2]] = lbl_807947C0;
-        lbl_807947DC = (RSOModule*)fn_80040598(names[2], (void*)pools[idx[2]], idx[2]);
+        rso_overlay_module1 = (RSOModule*)fn_80040598(name, (void*)pools[idx[2]], idx[2]);
+        name = names[3];
         pools[idx[3]] = lbl_807947C0;
-        lbl_807947E0 = (RSOModule*)fn_80040598(names[3], (void*)pools[idx[3]], idx[3]);
-        fn_804DA7E4(lbl_807947D8);
-        fn_804DA7E4(lbl_807947DC);
-        fn_804DA7E4(lbl_807947E0);
+        rso_overlay_module2 = (RSOModule*)fn_80040598(name, (void*)pools[idx[3]], idx[3]);
+        fn_804DA7E4(rso_overlay_module0);
+        fn_804DA7E4(rso_overlay_module1);
+        fn_804DA7E4(rso_overlay_module2);
         lbl_807947C8[0] = 1;
-        lbl_807947D8->prolog(lbl_807947D8);
-        lbl_807947DC->prolog(lbl_807947DC);
-        lbl_807947E0->prolog(lbl_807947E0);
+        rso_overlay_module0->prolog(rso_overlay_module0);
+        rso_overlay_module1->prolog(rso_overlay_module1);
+        rso_overlay_module2->prolog(rso_overlay_module2);
         lbl_807947C8[0] = 1;
     }
 }
@@ -593,29 +610,33 @@ extern "C" void rso_overlay_mode3_load(void)
     u32* pools;
     char** names;
     u8* idx;
+    char* name;
 
-    if ((s8)lbl_807947C8[0] != 3) {
+    if (lbl_807947C8[0] != 3) {
         rso_overlay_release_all();
         pools = rso_slot_load_base;
-        names = lbl_8057C9D8;
-        idx = lbl_80790E28;
+        names = rso_path_table;
+        idx = rso_slot_pool_index;
         pools[idx[0]] = lbl_807947C0;
-        lbl_807947D8 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
+        rso_overlay_module0 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
+        name = names[1];
         pools[idx[1]] = lbl_807947C0;
-        lbl_807947DC = (RSOModule*)fn_80040598(names[1], (void*)pools[idx[1]], idx[1]);
+        rso_overlay_module1 = (RSOModule*)fn_80040598(name, (void*)pools[idx[1]], idx[1]);
+        name = names[4];
         pools[idx[3]] = lbl_807947C0;
-        lbl_807947E0 = (RSOModule*)fn_80040598(names[4], (void*)pools[idx[3]], idx[3]);
+        rso_overlay_module2 = (RSOModule*)fn_80040598(name, (void*)pools[idx[3]], idx[3]);
+        name = names[2];
         pools[3] = lbl_807947C0;
-        lbl_807947E4 = (RSOModule*)fn_80040598(names[2], (void*)lbl_807947C0, 3);
-        fn_804DA7E4(lbl_807947D8);
-        fn_804DA7E4(lbl_807947DC);
-        fn_804DA7E4(lbl_807947E0);
-        fn_804DA7E4(lbl_807947E4);
+        rso_overlay_module3 = (RSOModule*)fn_80040598(name, (void*)lbl_807947C0, 3);
+        fn_804DA7E4(rso_overlay_module0);
+        fn_804DA7E4(rso_overlay_module1);
+        fn_804DA7E4(rso_overlay_module2);
+        fn_804DA7E4(rso_overlay_module3);
         lbl_807947C8[0] = 3;
-        lbl_807947D8->prolog(lbl_807947D8);
-        lbl_807947DC->prolog(lbl_807947DC);
-        lbl_807947E0->prolog(lbl_807947E0);
-        lbl_807947E4->prolog(lbl_807947E4);
+        rso_overlay_module0->prolog(rso_overlay_module0);
+        rso_overlay_module1->prolog(rso_overlay_module1);
+        rso_overlay_module2->prolog(rso_overlay_module2);
+        rso_overlay_module3->prolog(rso_overlay_module3);
         lbl_807947C8[0] = 3;
     }
 }
@@ -625,19 +646,19 @@ extern "C" void stage_map_set(u8 which)
 {
     u8 sel;
 
-    sel = lbl_8057CA28[which];
-    if ((s8)lbl_807947C8[1] == -1 || (s8)lbl_807947C8[1] != (s8)sel) {
-        if (lbl_807947E4 != NULL) {
-            lbl_807947E4->epilog(lbl_807947E4);
-            RSOUnLinkList(lbl_807947E4);
-            lbl_807947E4 = NULL;
+    sel = stage_map_rso_table[which];
+    if (lbl_807947C8[1] == -1 || lbl_807947C8[1] != (s8)sel) {
+        if (rso_overlay_module3 != NULL) {
+            rso_overlay_module3->epilog(rso_overlay_module3);
+            RSOUnLinkList(rso_overlay_module3);
+            rso_overlay_module3 = NULL;
         }
         DCFlushRange((void*)lbl_807947C0, (u32)(0x80C4CE00 - lbl_807947C0));
-        rso_slot_load_base[lbl_80790E28[4]] = lbl_807947C0;
-        lbl_807947E4 = (RSOModule*)fn_80040598(lbl_8057C9D8[sel], (void*)rso_slot_load_base[lbl_80790E28[4]],
-                                                lbl_80790E28[4]);
-        fn_804DA7E4(lbl_807947E4);
-        lbl_807947E4->prolog(lbl_807947E4);
+        rso_slot_load_base[rso_slot_pool_index[4]] = lbl_807947C0;
+        rso_overlay_module3 = (RSOModule*)fn_80040598(rso_path_table[sel], (void*)rso_slot_load_base[rso_slot_pool_index[4]],
+                                                rso_slot_pool_index[4]);
+        fn_804DA7E4(rso_overlay_module3);
+        rso_overlay_module3->prolog(rso_overlay_module3);
         lbl_807947C8[1] = sel;
     }
 }
@@ -648,24 +669,27 @@ extern "C" void rso_overlay_mode4_load(void)
     u32* pools;
     char** names;
     u8* idx;
+    char* name;
 
-    if ((s8)lbl_807947C8[0] != 4) {
+    if (lbl_807947C8[0] != 4) {
         rso_overlay_release_all();
         pools = rso_slot_load_base;
-        names = lbl_8057C9D8;
-        idx = lbl_80790E28;
+        names = rso_path_table;
+        idx = rso_slot_pool_index;
         pools[idx[0]] = lbl_807947C0;
-        lbl_807947D8 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
+        rso_overlay_module0 = (RSOModule*)fn_80040598(names[0], (void*)pools[idx[0]], idx[0]);
+        name = names[1];
         pools[idx[1]] = lbl_807947C0;
-        lbl_807947DC = (RSOModule*)fn_80040598(names[1], (void*)pools[idx[1]], idx[1]);
+        rso_overlay_module1 = (RSOModule*)fn_80040598(name, (void*)pools[idx[1]], idx[1]);
+        name = names[0x13];
         pools[idx[5]] = lbl_807947C0;
-        lbl_807947E0 = (RSOModule*)fn_80040598(names[0x13], (void*)pools[idx[5]], idx[5]);
-        fn_804DA7E4(lbl_807947D8);
-        fn_804DA7E4(lbl_807947DC);
-        fn_804DA7E4(lbl_807947E0);
-        lbl_807947D8->prolog(lbl_807947D8);
-        lbl_807947DC->prolog(lbl_807947DC);
-        lbl_807947E0->prolog(lbl_807947E0);
+        rso_overlay_module2 = (RSOModule*)fn_80040598(name, (void*)pools[idx[5]], idx[5]);
+        fn_804DA7E4(rso_overlay_module0);
+        fn_804DA7E4(rso_overlay_module1);
+        fn_804DA7E4(rso_overlay_module2);
+        rso_overlay_module0->prolog(rso_overlay_module0);
+        rso_overlay_module1->prolog(rso_overlay_module1);
+        rso_overlay_module2->prolog(rso_overlay_module2);
         lbl_807947C8[0] = 4;
     }
 }
@@ -681,12 +705,12 @@ extern "C" void rso_pool_reset(void)
  * returns the number of bytes written. */
 extern "C" u32 lz16_decode(u16* src, u16* dst)
 {
-    u16* start;
-    s32 mask;
     u16 flags;
-    u32 word;
+    s32 mask;
     u32 count;
+    u16* start;
     u16* from;
+    u32 word;
 
     start = dst;
     mask = 0;
@@ -776,7 +800,7 @@ extern "C" void sdk_link_refs(void)
     PSMTXScale(m, x, y, z);
     PSMTXRotRad(m, axis, x);
     PSMTXTrans(m, x, y, z);
-    log10(17.90625);
+    log10(65536000.0);
     vswprintf(text, 0, format, args);
     wcslen(text);
     stricmp(0, 0);
@@ -874,8 +898,8 @@ extern "C" void pmic_stop(void)
 void disp_beta(Vec* pos, Vec2* size, _GXColor color)
 {
     _MH_VEC2 screen;
-    Mtx mv;
     Mtx44 proj;
+    Mtx mv;
 
     get_ScreenSize(&screen);
     GXSetBlendMode(1, 4, 5, 0);
@@ -939,10 +963,10 @@ extern "C" void task_slot_table_clear(void)
 /* Runs one frame of the task slot table: starts, ticks and calls every slot by its state. */
 extern "C" void task_slot_table_run(void)
 {
+    TaskSlot* task;
+    s32 i;
     SystemWork* sys;
     s32 hold;
-    s32 i;
-    TaskSlot* task;
 
     sys = &system_w;
     if (sys->field_0x05 == 0 || (GameMode_ck() != 1 && isMoviePlaying() == 0)) {
@@ -1051,7 +1075,7 @@ extern "C" void field_game_task_start(void)
     Tsk_Change((void*)&field_game_task, 4);
 }
 
-extern "C" void fn_80041A30(void)
+extern "C" void game_mode_nop(void)
 {
 }
 
@@ -1086,11 +1110,11 @@ void TestModeExec(void)
  * channel's pad records. */
 extern "C" void pad_wpad_init(void)
 {
-    s32 chan;
-    s32 i;
     PlayerPad* pad;
     PlayerPad* prev;
     PadChanState* state;
+    s32 chan;
+    s32 i;
 
     rc_record_init();
     if (wpad_mem2_heap == NULL) {
@@ -1112,10 +1136,7 @@ extern "C" void pad_wpad_init(void)
     pad_btn_table_copy(&pad_btn_table_0, &pad_btn_default_0);
     pad_btn_table_copy(&pad_btn_table_1, &pad_btn_default_1);
     pad_btn_table_copy(&pad_btn_table_2, &pad_btn_default_2);
-    pad = Psw;
-    prev = Psw_prev;
-    state = pad_chan_state;
-    for (chan = 0; chan < 4; chan++) {
+    for (chan = 0, pad = Psw, prev = Psw_prev, state = pad_chan_state; chan < 4; chan++) {
         memset(pad, 0, sizeof(PlayerPad));
         memset(prev, 0, sizeof(PlayerPad));
         memset(state, 0, sizeof(PadChanState));
@@ -1138,9 +1159,9 @@ extern "C" void pad_wpad_init(void)
 /* Reads every pad of this frame: the GameCube pads, then each channel's remote and GameCube records. */
 extern "C" void pad_frame_read(void)
 {
-    s32 chan;
-    PlayerPad* pad;
     PlayerPad* prev;
+    PlayerPad* pad;
+    s32 chan;
 
     wpad_latest_index_prev = wpad_latest_index;
     wpad_latest_index = WPADGetLatestIndexInBuf(0);
@@ -1152,7 +1173,7 @@ extern "C" void pad_frame_read(void)
     if (system_w.pad_lock_ck_0x8d8() == 0) {
         rc_record_read();
     }
-    for (chan = 0, prev = Psw_prev, pad = Psw; chan < 4; chan++, prev++, pad++) {
+    for (chan = 0, prev = Psw_prev, pad = Psw; chan < 4; prev++, pad++, chan++) {
         pad_wpad_read(chan);
         pad_gc_read(chan);
         memcpy(pad, prev, 0x2E);
@@ -1194,17 +1215,16 @@ extern "C" void pad_wpad_read(s32 chan)
         pad_wpad_clear(chan);
         return;
     }
-    probe = pad;
-    probe->field_0x30 = WPADProbe(chan, &pad->mode);
+    Psw[chan].field_0x30 = WPADProbe(chan, &pad->mode);
     if (chan == 0) {
-        pad_probe_result = probe->field_0x30;
-        pad_probe_type = pad->mode;
+        pad_probe_result = Psw[chan].field_0x30;
+        pad_probe_type = Psw[chan].mode;
     }
-    if ((s32)probe->field_0x30 == -2 || (u32)isMoviePlaying() == 1) {
+    if ((s32)Psw[chan].field_0x30 == -2 || (u32)isMoviePlaying() == 1) {
         pad_wpad_busy(chan);
         return;
     }
-    if (probe->field_0x30 == 0) {
+    if (Psw[chan].field_0x30 == 0) {
         switch (Psw[chan].mode) {
         case 1:
             sample = &fs->core;
@@ -1220,7 +1240,7 @@ extern "C" void pad_wpad_read(s32 chan)
         WPADClampStick(chan, sample, 2);
         WPADClampAcc(chan, sample, 1);
     }
-    if (probe->field_0x30 == 0 && Psw[chan].mode == 2) {
+    if (Psw[chan].field_0x30 == 0 && Psw[chan].mode == 2) {
         clb->hold = pad_btn_remap(cl->clButton, from, to);
         pad_cl_stick_read(chan, pad);
     } else {
@@ -1258,7 +1278,7 @@ extern "C" void pad_wpad_read(s32 chan)
         u16 raw;
 
         if (system_w.field_0x7e4[chan] == 1 && (s8)system_w.field_0x7e0[chan] == 120) {
-            WPADGetInfoAsync(chan, &pad_chan_state[chan], (WPADCallback)pad_motor_info_cb);
+            WPADGetInfoAsync(chan, &pad_chan_state[chan], pad_motor_info_cb);
             system_w.field_0x7e4[chan] = 0;
         }
         if ((s8)system_w.field_0x7e0[chan] > 0) {
@@ -1530,8 +1550,8 @@ extern "C" u8 stick_dir8_get(u16 deg)
 /* Derives the GameCube pad's triggers, stick angles, distances and direction buttons from the RcRecord. */
 extern "C" void pad_gc_stick_read(s32 chan, PlayerPad* pad)
 {
-    s8 y[2];
     s8 x[2];
+    s8 y[2];
     s32 i;
     f32 ang;
     u16 bits;
@@ -1644,11 +1664,11 @@ extern "C" u8 rc_get_trigger_l(s32 idx)
 /* Derives the Classic Controller's stick angles, distances and direction buttons (cleared for another device). */
 extern "C" void pad_cl_stick_read(s32 chan, PlayerPad* pad)
 {
-    PadStickBlock* blk;
     WPADCLStatus* cl;
-    s16 y[2];
     s16 x[2];
+    s16 y[2];
     s32 i;
+    PadStickBlock* blk;
     f32 ang;
     u16 bits;
     u8 dir;
@@ -1761,8 +1781,8 @@ extern "C" void pad_fs_stick_read(s32 chan, PlayerPad* pad)
 {
     PadFsBlock* fsb;
     WPADFSStatus* fs;
-    s16 x;
-    s16 y;
+    s16 y[1];
+    s16 x[1];
     s32 i;
     u16 bits;
     u8 dir;
@@ -1773,10 +1793,10 @@ extern "C" void pad_fs_stick_read(s32 chan, PlayerPad* pad)
         return;
     }
     fs = (WPADFSStatus*)pad->fs_status_0x98;
-    x = fs->fsStickX << 1;
-    y = fs->fsStickY << 1;
+    x[0] = fs->fsStickX << 1;
+    y[0] = fs->fsStickY << 1;
     for (i = 0; i < 1; i++) {
-        pad_stick_calc(&fsb->btn, i, x, y);
+        pad_stick_calc(&fsb->btn, i, x[i], y[i]);
     }
     bits = 0;
     dir = fsb->btn.dir[0];
@@ -1953,8 +1973,8 @@ extern "C" void vec3_float_copy(f32* dst, f32* src)
 extern "C" void pad_acc_hist_get(s32 chan, VEC3* out, u8 count)
 {
     PadFsBlock* fsb;
-    u8 idx;
     u8 i;
+    u8 idx;
 
     fsb = (PadFsBlock*)&Psw[chan].control_0x0FC;
     if (out != NULL) {
@@ -1970,8 +1990,8 @@ extern "C" void pad_acc_hist_get(s32 chan, VEC3* out, u8 count)
 extern "C" void pad_fs_acc_hist_get(s32 chan, VEC3* out, u8 count)
 {
     PadFsBlock* fsb;
-    u8 idx;
     u8 i;
+    u8 idx;
 
     fsb = (PadFsBlock*)&Psw[chan].control_0x0FC;
     if (out != NULL) {
@@ -1996,7 +2016,7 @@ extern "C" s32 pad_acc_y_delta(s32 chan)
     idx = fsb->index;
     cur = fsb->acc[idx];
     prev = fsb->acc[(idx - 1) & 0xF];
-    delta = cur[1] - prev[1];
+    delta = prev[1] - cur[1];
     if (delta < 0.0f) {
         delta = -delta;
     }
@@ -2016,7 +2036,7 @@ extern "C" s32 pad_fs_acc_y_delta(s32 chan)
     idx = fsb->index;
     cur = fsb->fs_acc[idx];
     prev = fsb->fs_acc[(idx - 1) & 0xF];
-    delta = cur[1] - prev[1];
+    delta = prev[1] - cur[1];
     if (delta < 0.0f) {
         delta = -delta;
     }
@@ -2037,7 +2057,7 @@ extern "C" void kpad_pointer_read(void)
             kp = &kpad_work;
             WPADAccGravityUnit grav = { 1, 1, 1 };
             WPADGetAccGravityUnit(0, 0, &grav);
-            if (grav.x * grav.z * grav.y != 0) {
+            if (grav.x * grav.y * grav.z != 0) {
                 kp->acc_scale.x = 1.0f / grav.x;
                 kp->acc_scale.y = 1.0f / grav.y;
                 kp->acc_scale.z = 1.0f / grav.z;
@@ -2342,8 +2362,8 @@ extern "C" void kpad_obj_frame_check(KpadWork* kp, KPADObj* objs)
 /* Flags (bit 1) every object sample that repeats an earlier one's position. */
 extern "C" void kpad_obj_dup_check(KPADObj* objs)
 {
-    KPADObj* op1;
     KPADObj* op2;
+    KPADObj* op1;
 
     op2 = objs;
     do {
@@ -2577,8 +2597,8 @@ extern "C" s8 kpad_select_2obj_first(KpadWork* kp)
 extern "C" s8 kpad_select_1obj_first(KpadWork* kp)
 {
     KPADObj* op1;
-    Vec2 p2;
     Vec2 p1;
+    Vec2 p2;
     f32 vx;
     f32 vy;
 
@@ -2628,9 +2648,8 @@ extern "C" void kpad_sec_update(KpadWork* kp)
 
     vx = kp->kobj_regular[1].center.x - kp->kobj_regular[0].center.x;
     vy = kp->kobj_regular[1].center.y - kp->kobj_regular[0].center.y;
-    f1 = sqrtf(vx * vx + vy * vy);
-    kp->sec_dist = f1;
-    f1 = 1.0f / f1;
+    kp->sec_dist = sqrtf(vx * vx + vy * vy);
+    f1 = 1.0f / kp->sec_dist;
     kp->dist_last = kp->dist_scale * f1;
     kp->sec_nrm.x = vx *= f1;
     kp->sec_nrm.y = vy *= f1;
@@ -2874,8 +2893,13 @@ extern "C" void kpad_read_dpd(WPADStatus* s)
     if (kp->status.pos.y < -1.0f || kp->status.pos.y > 1.0f) {
         pointer_dpd_state = 0;
     }
-    pointer_norm_x = kp->status.pos.x < -1.0f ? -1.0f : (kp->status.pos.x > 1.0f ? 1.0f : kp->status.pos.x);
-    pointer_norm_y = kp->status.pos.y < -1.0f ? -1.0f : (kp->status.pos.y > 1.0f ? 1.0f : kp->status.pos.y);
+    {
+        f32 x = kp->status.pos.x;
+        f32 y = kp->status.pos.y;
+
+        pointer_norm_x = x < -1.0f ? -1.0f : (x > 1.0f ? 1.0f : x);
+        pointer_norm_y = y < -1.0f ? -1.0f : (y > 1.0f ? 1.0f : y);
+    }
 }
 
 u16 get_rcSwitch_on(s32 chan)
@@ -2947,8 +2971,8 @@ extern "C" void pointer_reset(void)
     pointer_last_a[1] = 0;
     pointer_last_b[1] = 0;
     pointer_hist_count = 0;
-    pointer_center[0] = Screen_w.width_f * 0.5f;
-    pointer_center[1] = Screen_w.height_f * 0.5f;
+    pointer_center[0] = Screen_w.width_f / 2.0f;
+    pointer_center[1] = Screen_w.height_f / 2.0f;
     pointer_offset[0] = 0.0f;
     pointer_offset[1] = 0.0f;
     pointer_dist = 0.0f;
@@ -3053,8 +3077,8 @@ extern "C" void pointer_calib_reset(void)
 {
     pointer_dpd_state = 0;
     pointer_valid = 0;
-    pointer_half_x = Screen_w.width_f * 0.5f;
-    pointer_half_y = Screen_w.height_f * 0.5f;
+    pointer_half_x = Screen_w.width_f / 2.0f;
+    pointer_half_y = Screen_w.height_f / 2.0f;
     pointer_prev_x = pointer_half_x;
     pointer_prev_y = pointer_half_y;
     pointer_norm_x = 0.0f;
@@ -3066,7 +3090,7 @@ void set_menu_key_ad_flag(u8 chan, bool flag)
     PlayerPad* pad;
 
     pad = &Psw[chan];
-    if (flag) {
+    if (flag == true) {
         pad->button_0x2C0.menu_key_ad_0x75 = 1;
     } else {
         pad->button_0x2C0.menu_key_ad_0x75 = 0;
@@ -3146,8 +3170,8 @@ extern "C" void pad_menu_merge(u8 chan)
         btn->edge_count_0x20 = 0;
         return;
     }
-    m = map;
     o = pad_map_out;
+    m = map;
     for (i = 0; i < 17; i++) {
         kind = m->kind;
         mask = m->mask;
@@ -3228,8 +3252,7 @@ extern "C" void pad_menu_merge(u8 chan)
     } else {
         btn->edge_count_0x20 = 0;
     }
-    if (btn->menu_key_ad_0x75 == 1 && (btn->hold_0x00 & 0xF) == 0) {
-        dirbtn = 0;
+    if (btn->menu_key_ad_0x75 == 1 && (dirbtn = btn->hold_0x00 & 0xF) == 0) {
         dir = btn->edge_0x1D & 0xF;
         if (dir & 1) {
             dirbtn |= 0x2000;
@@ -3336,13 +3359,13 @@ void shutdownKPAD(void)
 
 void setWpadCallback(void)
 {
-    s32 chan;
     PlayerPad* pad;
+    s32 chan;
 
     chan = 0;
     pad = Psw;
     do {
-        if (pad->field_0x30 != (u32)-1) {
+        if ((s32)pad->field_0x30 != -1) {
             WPADSetExtensionCallback(chan, pad_extension_cb);
             WPADSetSamplingCallback(chan, pad_sampling_cb);
         }
@@ -3375,7 +3398,7 @@ extern "C" void pad_motor_stop(u8 chan);
 /* Starts channel `chan`'s rumble for `time` frames when rumble is enabled for the remote and in the options. */
 extern "C" void pad_motor_start(u8 chan, s8 time)
 {
-    if (system_w.field_0x32 != 0 && option_cfg_eq_ck(chan, 7, 0) != 0 && !get_cfg(chan, 20)) {
+    if (system_w.field_0x32 != 0 && option_cfg_eq_ck(chan, 7, 0) != 0 && (u8)(get_cfg(chan, 20) ^ 1)) {
         system_w.field_0x33[chan] = time;
         system_w.field_0x37[chan] = 1;
         WPADControlMotor(chan, 1);
@@ -3392,13 +3415,11 @@ extern "C" void pad_motor_stop(u8 chan)
 
 extern "C" void pad_motor_stop_all(void)
 {
-    u8 chan;
+    s32 chan;
 
-    chan = 0;
-    do {
+    for (chan = 0; chan < 4; chan++) {
         pad_motor_stop(chan);
-        chan++;
-    } while (chan < 4);
+    }
 }
 
 /* Tick the per-channel motor timers. */
@@ -3409,7 +3430,7 @@ extern "C" void pad_motor_tick(void)
     chan = 0;
     do {
         if ((s8)system_w.field_0x33[chan] > 0) {
-            system_w.field_0x33[chan] = system_w.field_0x33[chan] - 1;
+            system_w.field_0x33[chan]--;
         }
         if (system_w.field_0x37[chan] == 1 && (s8)system_w.field_0x33[chan] <= 0) {
             pad_motor_stop((u8)chan);
@@ -3418,9 +3439,8 @@ extern "C" void pad_motor_tick(void)
     } while (chan < 4);
 }
 
-#pragma peephole on
 /* Per-channel motor / LED state (pad_motor_info_cb in the map). */
-extern "C" void pad_motor_info_cb(u8 chan, s32 on)
+extern "C" void pad_motor_info_cb(s32 chan, s32 on)
 {
     if (on != 0) {
         system_w.field_0x7e4[chan] = 1;
@@ -3432,7 +3452,6 @@ extern "C" void pad_motor_info_cb(u8 chan, s32 on)
         system_w.field_0x7dc[chan] = pad_chan_state[chan].motor_level_0x14;
     }
 }
-#pragma peephole off
 
 /* ------------------------------------------------------------------ *
  * 0x80044180  (acceleration clamp)
@@ -3493,7 +3512,7 @@ extern "C" f32 clamp_acc(f32 value, f32 limit)
 {
     f32 neg;
 
-    if (value < lbl_80795AE8) {
+    if (value < 0.0f) {
         neg = -limit;
         if (value < neg) {
             return neg;
