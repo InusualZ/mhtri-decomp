@@ -340,8 +340,8 @@ extern "C" void rso_overlay_boot(void);
 extern "C" void rso_pool_reset(void);
 extern "C" void lang_index_set(void);
 extern "C" void pad_motor_stop_all(void);
-extern "C" void fn_80046C80(void);
-extern "C" void fn_80046D34(void);
+extern "C" void game_system_init(void);
+extern "C" void game_frame_run(void);
 extern "C" int fn_804ED620(void);
 extern "C" void VIInit(void);
 extern "C" void OSSetResetCallback(void* arg);
@@ -424,11 +424,11 @@ int main(void)
     lang_index_set();
     rso_overlay_boot();
     rso_pool_reset();
-    fn_80046C80();
+    game_system_init();
 
     while (1) {
         fn_8003FEBC();
-        fn_80046D34();
+        game_frame_run();
         frame_copy_display();
         frame_swap_wait();
         if (system_w.system_halt_0x871 != 0) {

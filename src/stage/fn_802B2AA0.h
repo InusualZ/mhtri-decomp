@@ -71,7 +71,8 @@ typedef struct StageRuntime {
     /* +0x2F91 */ u8 field_0x2F91; /* the one-shot flag byte */
     /* +0x2F92 */ u16 field_0x2F92; /* the 16-bit area mask */
     /* +0x2F94 */ u32 field_0x2F94[16]; /* one 4-second timer per area */
-    /* +0x2FD4 */ u8 pad_0x2FD4[0x008];
+    /* +0x2FD4 */ void* map_group_direct;   /* the record group `stage_map_group_get` returns for an id the kind table keeps */
+    /* +0x2FD8 */ void* map_group_remapped; /* the record group it returns for a remapped id */
     /* +0x2FDC */ s16 field_0x2FDC; /* the demo-placement countdown */
     /* +0x2FDE */ u8 pad_0x2FDE[0x002];
 } StageRuntime;

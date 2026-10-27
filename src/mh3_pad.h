@@ -123,4 +123,24 @@ void pad_module_init(void);
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80041694 / 0x80041AA4 / 0x80041F08 / 0x80044A90 - the task table's frame, the WPAD boot setup, the frame's pad
+ * read and the motor countdown; `pad_connect.cpp`'s boot init and main-loop frame run them. */
+void task_slot_table_run(void);
+void pad_wpad_init(void);
+void pad_frame_read(void);
+void pad_motor_tick(void);
+/* .sbss 0x807947E8 (0x8) - the arena task hook `arena_task_start` starts; `pad_connect.cpp`'s boot clears both words. */
+extern s32 task_func[2];
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+/* 0x800441F8 - sets channel `chan`'s menu direction-key mapping flag (C++ scope: `set_menu_key_ad_flag__FUcb`). */
+void set_menu_key_ad_flag(u8 chan, bool flag);
+#endif
+
 #endif /* MHTRI_MH3_PAD_H */

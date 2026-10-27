@@ -61,4 +61,20 @@ void fade_reset(long slot);
 s32 get_fade_stat(long slot);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80058030 / 0x80058140 / 0x80058288 - clear, step and draw the fade work; 0x800584F8 / 0x8005863C - the game draw
+ * setup and its per-frame calc; 0x80058F20 - captures the screen into the copy texture.  `pad_connect.cpp`'s boot init
+ * and main-loop frame run them. */
+void fade_work_clear(void);
+void fade_update(void);
+void fade_draw_screen(void);
+void game_draw_init(void);
+void game_draw_calc(void);
+void screen_copy_tex_capture(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_FN_80056F24_H */

@@ -187,12 +187,7 @@ UserStartEquip userdata_start_equip_table[4] = {
 /* .data 0x80581538: the bits of the save's +0x3960 set a new game raises, ended by 0xFF. */
 u8 userdata_default_flag_bits[12] = {0x31, 0x09, 0x32, 0x17, 0x2C, 0x5C, 0x38, 0x48, 0x72, 0x3A, 0xFF};
 
-/* The hook `bg_tex_disp_func` holds: `mh3_pad.cpp` stores the function, the frame draw calls it.  The map gives the
- * object 8 bytes; only the first word is referenced (GUESS: the second is the hook's argument).  size: 0x8 */
-struct BgTexDispHook {
-    /* +0x00 */ void (*func)(void);
-    /* +0x04 */ u32 unused_0x04;
-};
+#include "userdata_item/bg_tex_disp_hook.h" /* BgTexDispHook (rule 1) */
 
 extern u8* lobby_world_block;
 extern SubTrans sub_trans_buf[0x20];

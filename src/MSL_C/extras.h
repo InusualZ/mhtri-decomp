@@ -16,6 +16,9 @@ int stricmp(const char* a, const char* b);
 /* Compares at most `n` wide characters ignoring case; returns <0, 0 or >0. */
 int wcsnicmp(const u16* a, const u16* b, u32 n);
 
+/* 0x8046826C (0x54): converts `s` to upper case in place and returns it. */
+char* strupr(char* s);
+
 #ifdef __cplusplus
 }
 #endif

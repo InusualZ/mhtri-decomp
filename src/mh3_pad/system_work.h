@@ -33,7 +33,7 @@ typedef struct _tex_info {
     /* +0x34 */ u32 wrap_t_0x34;
 } SysTask; /* size: 0x38 */
 
-/* The four-byte record at +0x7BC: fn_800CFBE0 reads it whole, fn_800CFBA0 sets its top byte. */
+/* The four-byte record at +0x7BC: fn_800CFBE0 reads it whole, system_clear_color_set sets its top byte. */
 typedef union SysWord {
     u32 value;
     u8 bytes[4];

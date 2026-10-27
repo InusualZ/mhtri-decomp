@@ -91,5 +91,17 @@ u32 face_buf_size_get(void);
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80047840 / 0x80047884 / 0x800487D0 - select face `face` for slot `slot`, reload face `index` of sex `sex`, and
+ * set the face-sprite buffers up (`pad_connect.cpp`'s boot calls them). */
+void face_select_on(u8 slot, u8 face);
+void face_tex_reload(u8 sex, u8 index);
+void face_buf_init(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_FN_80047398_H */
 

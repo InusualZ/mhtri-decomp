@@ -76,4 +76,19 @@ void subTransReset(void);
 void subTransSet(u32 func, s32 prio, u32* handle);
 #endif
 
+#include "userdata_item/bg_tex_disp_hook.h" /* BgTexDispHook (rule 1) */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800492A4 / 0x800497B4 - draws one frame and caches/seeds the save block; `pad_connect.cpp`'s boot init and
+ * main-loop frame call them. */
+void frame_draw(void);
+void userdata_init(void);
+#ifdef __cplusplus
+}
+#endif
+/* .sbss 0x80794878 (0x8) - the background-texture draw hook the frame draw calls. */
+extern struct BgTexDispHook bg_tex_disp_func;
+
 #endif /* MHTRI_USERDATA_ITEM_H */

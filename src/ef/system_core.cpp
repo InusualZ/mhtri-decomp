@@ -363,7 +363,7 @@ extern "C" SysEntry* fn_800CE9F0(void);
 extern "C" s32 dvd_read_wait(DVDFileInfo* info, void* buffer, s32 length, s32 offset);
 extern "C" void enemy_work_release_all(void);
 extern "C" void work_stack_reset(void);
-extern "C" void fn_800CFBA0(u8* color);
+extern "C" void system_clear_color_set(u8* color);
 extern "C" void fn_800CFDB0(void);
 extern "C" void loading_disp_flag_set(u8 value);
 extern "C" void fn_800CEF60(void);
@@ -497,7 +497,7 @@ void quest_system_reset(void) {
     filter_reset();
     fn_800CEF60();
     color = 0;
-    fn_800CFBA0((u8*)&color);
+    system_clear_color_set((u8*)&color);
     fade_reset(0);
     filter_flag_clear();
     subTransReset();
@@ -900,7 +900,7 @@ void fn_800CF8EC(void) {
 }
 
 /* 0x800CFBA0 - reset the stream record and stamp its top byte. */
-void fn_800CFBA0(u8* color) {
+void system_clear_color_set(u8* color) {
     color_rgba_copy((u8*)&system_w.field_0x7bc, color);
     system_w.field_0x7bc.bytes[3] = 0xFF;
 }
@@ -1276,7 +1276,7 @@ void setTransferDisplayState(u8 value) {
 }
 
 /* 0x800D2928 - notify the display-state owner. */
-void fn_800D2928(void) {
+void display_state_hook_call(void) {
     SystemWork* sw = &system_w;
 
     if (sw->field_0xa58 != 0) {
@@ -2403,7 +2403,7 @@ void all_reset(void) {
     work_stack_reset();
     nwWorkInitialize();
     color = 0;
-    fn_800CFBA0((u8*)&color);
+    system_clear_color_set((u8*)&color);
     fade_reset(0);
     filter_flag_clear();
     subTransReset();

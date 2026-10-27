@@ -61,4 +61,18 @@ void hbm_disable(void);
 u8** get_str_tbl(s32 idx);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800CF05C / 0x800D2178 / 0x800D21CC / 0x800D2614 / 0x800D104C - the quest system reset, the HOME-menu work reset,
+ * control and draw, and the loading display draw; `pad_connect.cpp`'s boot init and main-loop frame run them. */
+void quest_system_reset(void);
+void hbm_work_reset(void);
+void hbm_control(void);
+void hbm_draw(void);
+void loading_disp_draw(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_EF_SYSTEM_CORE_H */
