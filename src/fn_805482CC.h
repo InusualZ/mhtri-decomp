@@ -7,7 +7,7 @@
  * (vtable `lbl_80657678`), +0x05C (`lbl_80651708`, the sub-object's table), +0x118, and then the run
  * +0x18F8..+0x1A00; its sub-object is built by `fn_80503314` at +0x10.  The functions of this unit
  * read +0x193C / +0x1940 / +0x1944 as pointers to heap objects sharing one dispatch table, +0x1964 as
- * an embedded scroll record (table `lbl_8064F338`) and +0x19F0 as a pointer to a record whose +0x04 is
+ * an embedded scroll record (table `__vt__17HbmKbScrollerView`) and +0x19F0 as a pointer to a record whose +0x04 is
  * a u16 cursor.
  */
 #ifndef MHTRI_FN_805482CC_H
@@ -209,7 +209,7 @@ struct Panel805482CC_Vtbl {
     /* +0x190 */ void* slot_0x190;
 }; /* size: 0x194 - a lower bound (retail's table is longer) */
 
-/* The scroll record embedded at +0x1964 (table `lbl_8064F338`). */
+/* The scroll record embedded at +0x1964 (table `__vt__17HbmKbScrollerView`). */
 typedef struct Panel805482CC_ScrollVtbl Panel805482CC_ScrollVtbl;
 struct Panel805482CC_ScrollVtbl {
     /* +0x00 */ void* slot_0x00;

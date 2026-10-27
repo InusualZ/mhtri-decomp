@@ -24,6 +24,12 @@
  *            view, the root layout and the sound player, and the slot names follow that lane's view.
  * SHAPES.    The views are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch; no
  *            method is defined and nothing is constructed here, so no table is emitted (rule 10).
+ * SHAPES.    The handlers, the candidate list and the text buffer are constructed here, but their virtual members are
+ *            the C functions below (or other units'), so their tables are referenced by name and not emitted.
+ * SHAPES.    hbmKbManagerOf converts through HbmKbWidgetBases (the widget's primary base and its pane manager), so the
+ *            null-preserving base conversion is the compiler's; the attach helpers are inline so their name arguments
+ *            stay in saved registers as retail's inlined members do; the candidate pane-name tables are globals
+ *            defined at the end of the file (retail emits them after every function's strings) and copied whole.
  * SHAPES.    Signed compares (`cmpwi`, `ble`) read the widget's words as `s32`: fn_80551E5C switches on `(s32)state`,
  *            fn_80553F84 takes its selector as `s32`; the handlers test `event == 1` unsigned and `(s32)event == 0`.
  * SHAPES.    A call result stored through (`owner->getPanel()->flag = 0`) is split into a local first: written in one
@@ -39,19 +45,34 @@
  * RESIDUALS. hbmKbCandDraw: retail's frame is 0x80 with the scissor rectangle above the transformed corners; ours 0x70.
  * RESIDUALS. The `.sdata2` constants (0.0f, 640.0f, 1.0f, 20.0f, 0.01f, 0.5f, 15.0f, the int->float magics) are this
  *            unit's own pool (0x8079D6A0..0x8079D6D0) but load from MWCC's anonymous entries (`@NN`): an ARG row each.
- * RESIDUALS. The pane-name strings are retail's `.data` string pool (0x8064F360..); ours sit at other offsets of our
- *            pool, an ARG row per use.
- * RESIDUALS. Unwritten, store this unit's own `.data` class tables and need their classes (and the base class's
- *            members, named differently by two other lanes) reconstructed (rule 10): 0x8054F90C (widget destructor),
- *            0x8054FBB4 (widget build), 0x80550128 (key-part construction), 0x80551F4C, 0x80553F50, 0x80553FC8,
- *            0x80554278 (constructors).
- * RESIDUALS. Unwritten, read the static key table 0x8064F388 (26 0x40-byte entries pointing at `.rodata`) the unit's
- *            static initialiser 0x80554600 patches: 0x805514E0, 0x80554600.
- * RESIDUALS. datagap: the claimed `.data` 0x8064F360..0x80650160 spans at least 7 TUs (emission-order seams at
- *            0x8064FFC4, 0x8064FFF0, 0x8065001C, 0x80650038, 0x80650080, 0x806500A0) - a seam question for the
- *            registration.
+ * RESIDUALS. The pane-name strings and the `.sdata` names load from MWCC's anonymous pool (`...data.0`, `@NN`) at
+ *            retail's offsets, where retail names the map's `lbl_` rows.
+ * RESIDUALS. Unwritten: 0x8054F90C (0xE8, the widget's destructor).  It stores the widget's three tables
+ *            (0x8064FEA0, +0x4C, +0xC0), so it needs HbmKbWidget as a real class with its three bases (rule 10), and
+ *            homebutton/hbm_value.cpp calls it by its C name, so a mangled destructor needs that caller re-spelled.
+ * RESIDUALS. hbmKbWidgetCreate: retail keeps the widget, the allocator and the text buffer in r29/r24/r23, ours in
+ *            r30/r23/r29, and retail converts the first pane manager straight into r30.
+ * RESIDUALS. The constructors make MWCC emit a weak copy of HbmEventHandler's inline destructor
+ *            (homebutton/hkb_keyboard.h), which retail keeps once (0x80538738).
+ * RESIDUALS. __vt__15HbmKbTextBuffer (0x806515D0, homebutton/hbm_value.cpp's row) and __vt__17HbmKbScrollerView
+ *            (0x8064F338, homebutton/hbm_text_panel.cpp's row) are other units' map rows still named `lbl_`.
+ * RESIDUALS. hbmKbWidgetCreateParts: retail keeps the kind-1 constant in a saved register and recomputes the component
+ *            list address per key; ours hoists the list address instead.  HbmKey's (pane, listener) constructor in
+ *            homebutton/hbm_value.h stores mState itself, so ours stores it before the part's class pointer, not after.
+ * RESIDUALS. datagap reads emission-order seams in the claimed `.data` (0x8064FFC4 .. 0x806500A0); they are not TU
+ *            edges: every class table there holds only this unit's functions and the shared bases' members, and this
+ *            unit's constructors store 0x8064FFC4/0x8064FFF0/0x8065001C/0x80650038.
  * NAMES.     GUESS classes HbmKbWidgetPart and its kinds HbmKbWidgetPartA/B/C (band keys with a state word; members
- *            reset, setAnim, setState, getState, getResource).
+ *            reset, setAnim, setState, getState, getType).
+ * NAMES.     GUESS data names hbmKbWidgetAnimDefs, hbmKbWidgetKeyDefs, hbmKbWidgetTextGroup, hbmKbWidgetScrollGroup,
+ *            hbmKbWidgetTextNames, hbmKbWidgetFrameNames; GUESS function names hbmKbWidgetCreate,
+ *            hbmKbWidgetCreateParts, hbmKbWidgetUnfocusParts.
+ * NAMES.     GUESS classes HbmKbWindowHandler, HbmKbTextBuffer and HbmKbTextBufferBase, HbmKbWidgetPrimary,
+ *            HbmKbWidgetBases, HbmKbPaneNames; the class-table rows of HbmKbWindowHandler, HbmKbSwitchHandler,
+ *            HbmKbButtonHandler, HbmKbCandidateList and HbmKbHandlerBase are named from the constructors' stores and
+ *            the shared slots (onEvent 0x805544CC in every handler table).
+ * SHAPES.    The key table's group words are pointer variables, so the unit's static initialiser (0x80554600) patches
+ *            them, as homebutton/hbm_anim_record.cpp's table does.
  */
 
 #include "types.h"
@@ -60,6 +81,7 @@
 #include "homebutton/hbm_kb_event.h"
 #include "homebutton/hbm_kb_widget.h"
 #include "homebutton/hbm_value.h"
+#include "homebutton/hbm_kb_child.h"
 #include "homebutton/hkb_keyboard.h"
 #include "homebutton/hbm_text_panel.h"
 #include "homebutton/tiHKBManager.h"
@@ -69,45 +91,57 @@
 #include "MTX/mtxvec.h"
 #include "RVLGX/GXTransform.h"
 
-/* A widget part: a band key with its state word; its class table (0x8064FE74) and the out-of-line copy of its inline destructor (0x80550494) are
- * this unit's.  size: 0x34 */
+/* A widget part: a band key with its state word and its kind; its class table (0x8064FE74) and the out-of-line copy of
+ * its inline destructor (0x80550494) are this unit's.  size: 0x34 */
 class HbmKbWidgetPart : public HbmKey {
 public:
+    HbmKbWidgetPart(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmKey(pane, listener) { reset(); }
+    HbmKbWidgetPart(nw4r::lyt::Pane* pane, HbmKeyListener* listener, u32 type) : HbmKey(pane, listener) {
+        reset();
+        mType = type;
+    }
+
     virtual void reset();
     virtual void setAnim(s32 anim);
     virtual void setState(u32 state);
     virtual ~HbmKbWidgetPart() {}
     virtual u32 getState();
-    /* untyped: opaque handle passed through */
-    virtual void* getResource();
+    virtual u32 getType();
 
-    /* +0x30 */ void* mpResource;
+    /* +0x30 */ u32 mType;
 }; /* size: 0x34 */
 
-/* A HbmKbWidgetPart kind (class table 0x8064FE48): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+/* A prediction scroll button (kind 0; class table 0x8064FE48): steps a seven-state selector.  size: 0x34 */
 class HbmKbWidgetPartA : public HbmKbWidgetPart {
 public:
+    HbmKbWidgetPartA(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmKbWidgetPart(pane, listener) { mType = 0; }
+
     virtual void setAnim(s32 anim);
     virtual ~HbmKbWidgetPartA();
-};
+}; /* size: 0x34 */
 
-/* A HbmKbWidgetPart kind (class table 0x8064FE1C): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+/* A prediction on/off button (kind 2; class table 0x8064FE1C): steps a four-state selector.  size: 0x34 */
 class HbmKbWidgetPartB : public HbmKbWidgetPart {
 public:
+    HbmKbWidgetPartB(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmKbWidgetPart(pane, listener) { mType = 2; }
+
     virtual void setAnim(s32 anim);
     virtual ~HbmKbWidgetPartB();
-};
+}; /* size: 0x34 */
 
-/* A HbmKbWidgetPart kind (class table 0x8064FDF0): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+/* The prediction window (kind 3; class table 0x8064FDF0): plays its open and close animations.  size: 0x34 */
 class HbmKbWidgetPartC : public HbmKbWidgetPart {
 public:
+    HbmKbWidgetPartC(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmKbWidgetPart(pane, listener) { mType = 3; }
+
     virtual void setAnim(s32 anim);
     virtual ~HbmKbWidgetPartC();
-};
-
+}; /* size: 0x34 */
 
 /* The retail object has no extab/extabindex: exceptions are off for this band. */
 #pragma exceptions off
+
+class HbmKbHandlerBase;
 
 /* A text pane of the candidate list: the box the candidate words and their buttons are drawn in. */
 typedef nw4r::lyt::TextBox HbmKbTextPane;
@@ -142,7 +176,8 @@ public:
     /* slot +0x058 */ virtual bool isPaged();
     /* slot +0x05C */ virtual u16 getKeyAt(s32 position);
 
-    /* +0x04 */ u8 unused_0x04[0x98];
+    /* +0x04 */ u8 unused_0x04[0x94];
+    /* +0x98 */ HbmKbHandlerBase* handler;
     /* +0x9C */ HbmKbTextPane* pane;
 }; /* size: 0xA0 */
 
@@ -171,7 +206,8 @@ public:
     /* slot +0x050 */ virtual void v_0x050();
     /* slot +0x054 */ virtual void setEnabled(s32 enable);
 
-    /* +0x04 */ u8 unused_0x04[0x98];
+    /* +0x04 */ u8 unused_0x04[0x94];
+    /* +0x98 */ HbmKbHandlerBase* handler;
     /* +0x9C */ HbmKbTextPane* pane;
 }; /* size: 0xA0 */
 
@@ -183,8 +219,25 @@ public:
     /* slot +0x00C */ virtual void v_0x00C();
     /* slot +0x010 */ virtual void replay();
     /* slot +0x014 */ virtual void play(s32 anim);
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void setEnabled(s32 enable);
 
-    /* +0x04 */ u8 unused_0x04[0x98];
+    /* +0x04 */ u8 unused_0x04[0x94];
+    /* +0x98 */ HbmKbHandlerBase* handler;
     /* +0x9C */ nw4r::lyt::Pane* pane;
 }; /* size: 0xA0 */
 
@@ -321,15 +374,23 @@ struct HbmKbCandidateSet {
     /* +0x04 */ wchar_t words[1][0x3D];
 }; /* size: 0x7E (approximation: the word array runs to `count`) */
 
-/* The primary base of the prediction window's input handlers and of the candidate list (tables 0x8064FFC4,
- * 0x8064FFF0, 0x8065001C, 0x80650038): the handler's id at +0x08, the keyboard widget it belongs to at +0x0C and
- * the listener its events go to at +0x10.  Declared only; the tables are the constructors'.
- * size: 0x14 */
-class HbmKbHandlerBase {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
+struct HbmKbInputEvent;
 
-    /* +0x04 */ u32 unused_0x04;
+/* The primary base of the prediction window's input handlers and of the candidate list (class table 0x80650064): an
+ * event handler with the handler's id at +0x08, the keyboard widget it belongs to at +0x0C and the listener its
+ * events go to at +0x10.  Its members are defined below as C functions (0x8054FA34, 0x805544CC, 0x805544DC), so
+ * its table is not emitted here.
+ * size: 0x14 */
+class HbmKbHandlerBase : public HbmEventHandler {
+public:
+    HbmKbHandlerBase(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener)
+        : id(handlerId), widget(pWidget), listener(pListener) {}
+
+    /* slot +0x008 */ virtual ~HbmKbHandlerBase();
+    /* untyped: caller-owned payload - the argument record of the event */
+    /* slot +0x00C */ virtual void onEvent(u32 eventId, u32 event, void* data);
+    /* slot +0x018 */ virtual void handleInput(HbmKbPartView* sender, u32 event, const HbmKbInputEvent* input);
+
     /* +0x08 */ u32 id;
     /* +0x0C */ HbmKbWidget* widget;
     /* +0x10 */ HkbWidget* listener;
@@ -345,31 +406,53 @@ struct HbmKbInputEvent {
     /* +0x10 */ u32 state;
 }; /* size: 0x14 */
 
-/* The event-listener base of the prediction-switch handler (+0x14, table 0x8064FFF0 + 0x1C).  size: 0x04 */
-class HbmKbPartListener {
-public:
-    /* slot +0x008 */ virtual void onPartEvent(s32 kind, HbmKbPartView* sender, const HbmKbInputEvent* input);
-}; /* size: 0x04 */
-
-/* The handler of one prediction-window button (table 0x8065001C, constructor fn_80553FC8): the button's part at
- * +0x1C.  size: 0x20 */
+/* The handler of one prediction-window scroll button (class table 0x8065001C): the button's key and base
+ * components and its part.  Its members are defined below as C functions, so its table is not emitted here.
+ * size: 0x20 */
 class HbmKbButtonHandler : public HbmKbHandlerBase {
 public:
-    /* +0x14 */ u32 unused_0x14;
-    /* +0x18 */ u32 unused_0x18;
+    HbmKbButtonHandler(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener);
+
+    /* slot +0x008 */ virtual ~HbmKbButtonHandler();
+    /* slot +0x018 */ virtual void handleInput(HbmKbPartView* sender, u32 event, const HbmKbInputEvent* input);
+
+    /* +0x14 */ HbmKbButtonView* keyComponent;
+    /* +0x18 */ HbmKbButtonView* baseComponent;
     /* +0x1C */ HbmKbPartView* part;
 }; /* size: 0x20 */
 
-/* The handler of the prediction on/off switch (table 0x8064FFF0, constructor fn_80554278): the part whose events it
- * takes at +0x1C and its two buttons at +0x28/+0x2C.  size: 0x30 */
-class HbmKbSwitchHandler : public HbmKbHandlerBase, public HbmKbPartListener {
+/* The handler of the prediction on/off switch (class table 0x8064FFF0): the on and off buttons' key and base
+ * components and their parts, and the listener of the parts' animations at +0x14.  Its members are defined below
+ * as C functions, so its table is not emitted here.  size: 0x30 */
+class HbmKbSwitchHandler : public HbmKbHandlerBase, public HbmKeyListener {
 public:
-    /* +0x18 */ u32 unused_0x18;
+    HbmKbSwitchHandler(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener);
+
+    /* slot +0x008 */ virtual ~HbmKbSwitchHandler();
+    /* slot +0x018 */ virtual void handleInput(HbmKbPartView* sender, u32 event, const HbmKbInputEvent* input);
+    /* slot +0x008 */ virtual void onAnimEvent(u32 event, HbmKey* key, HbmKeyAnim* anim);
+
+    /* +0x18 */ HbmKbButtonView* onKey;
     /* +0x1C */ HbmKbPartView* source;
-    /* +0x20 */ u8 unused_0x20[8];
+    /* +0x20 */ HbmKbButtonView* offKey;
+    /* +0x24 */ HbmKbButtonView* offBase;
     /* +0x28 */ HbmKbPartView* onButton;
     /* +0x2C */ HbmKbPartView* offButton;
 }; /* size: 0x30 */
+
+/* The handler of the prediction window (class table 0x8064FFC4): its key component and its part, and the listener
+ * of the part's animations at +0x14.  Its members are defined below as C functions, so its table is not emitted
+ * here.  size: 0x20 */
+class HbmKbWindowHandler : public HbmKbHandlerBase, public HbmKeyListener {
+public:
+    HbmKbWindowHandler(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener);
+
+    /* slot +0x008 */ virtual ~HbmKbWindowHandler();
+    /* slot +0x008 */ virtual void onAnimEvent(u32 event, HbmKey* key, HbmKeyAnim* anim);
+
+    /* +0x18 */ HbmKbButtonView* keyComponent;
+    /* +0x1C */ HbmKbPartView* part;
+}; /* size: 0x20 */
 
 /* The scroll-listener base of the candidate list (+0x14, its table 0x80650054): the scroller reports the end of a
  * scroll through it.  size: 0x04 */
@@ -396,10 +479,16 @@ public:
 
 /* The prediction-candidate list embedded in the keyboard widget (+0x18B8): twenty word slots (a text pane, its
  * frame and its highlight each), the window it scrolls through the dictionary and the scroller that moves it.
- * Its tables (0x80650038, 0x80650054) are stored by its constructor fn_80551F4C; nothing is constructed here.
+ * Its members are defined below as C functions, so its table (0x80650038) is not emitted here.
  * size: 0x200 */
 class HbmKbCandidateList : public HbmKbHandlerBase, public HbmKbScrollListener {
 public:
+    HbmKbCandidateList(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener);
+
+    /* slot +0x008 */ virtual ~HbmKbCandidateList();
+    /* slot +0x018 */ virtual void handleInput(HbmKbPartView* sender, u32 event, const HbmKbInputEvent* input);
+    /* slot +0x008 */ virtual void onScrolled(s32 kind, s32 delta);
+
     /* +0x018 */ HbmKbScrollerView scroller;
     /* +0x028 */ f32 value_028;
     /* +0x02C */ u8 flag_02C;
@@ -427,6 +516,100 @@ public:
     /* +0x1F9 */ u8 unused_0x1F9[3];
     /* +0x1FC */ HbmKbCandidateSet* words;
 }; /* size: 0x200 */
+
+/* The fixed part of the keyboard's text buffer: its capacity, length, text storage, pending dead key and allocator.
+ * size: 0x1C */
+class HbmKbTextBufferBase {
+public:
+    HbmKbTextBufferBase() : capacity(0x40), length(0), text(NULL), workText(NULL), deadKey(0), bufferAllocator(NULL) {}
+
+    /* slot +0x008 */ virtual ~HbmKbTextBufferBase();
+
+    /* +0x04 */ u16 capacity;
+    /* +0x06 */ u16 length;
+    /* +0x08 */ u16 unused_0x08[2];
+    /* +0x0C */ u16* text;
+    /* +0x10 */ u16* workText;
+    /* +0x14 */ u16 deadKey;
+    /* +0x16 */ u8 pad_0x16[2];
+    /* +0x18 */ MEMAllocator* bufferAllocator;
+}; /* size: 0x1C */
+
+/* The keyboard's text buffer (class table 0x806515D0, homebutton/hbm_value.cpp's .data; the same object as
+ * homebutton/hbm_text_panel.cpp's HbmPanelItemView): the cursor, the selection's anchor and the input mode.  Its
+ * constructor resets it through slot 0xC4; the widget then creates it (slot 0x0C).  size: 0x50 */
+class HbmKbTextBuffer : public HbmKbTextBufferBase {
+public:
+    HbmKbTextBuffer() : cursor(0), anchor(0), selecting(0), inputMode(0) { reset(); }
+
+    /* slot +0x00C */ virtual void create(MEMAllocator* allocator);
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual void v_0x05C();
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual void v_0x064();
+    /* slot +0x068 */ virtual void v_0x068();
+    /* slot +0x06C */ virtual void v_0x06C();
+    /* slot +0x070 */ virtual void v_0x070();
+    /* slot +0x074 */ virtual void v_0x074();
+    /* slot +0x078 */ virtual void v_0x078();
+    /* slot +0x07C */ virtual void v_0x07C();
+    /* slot +0x080 */ virtual void v_0x080();
+    /* slot +0x084 */ virtual void v_0x084();
+    /* slot +0x088 */ virtual void v_0x088();
+    /* slot +0x08C */ virtual void v_0x08C();
+    /* slot +0x090 */ virtual void v_0x090();
+    /* slot +0x094 */ virtual void v_0x094();
+    /* slot +0x098 */ virtual void v_0x098();
+    /* slot +0x09C */ virtual void v_0x09C();
+    /* slot +0x0A0 */ virtual void v_0x0A0();
+    /* slot +0x0A4 */ virtual void v_0x0A4();
+    /* slot +0x0A8 */ virtual void v_0x0A8();
+    /* slot +0x0AC */ virtual void v_0x0AC();
+    /* slot +0x0B0 */ virtual void v_0x0B0();
+    /* slot +0x0B4 */ virtual void v_0x0B4();
+    /* slot +0x0B8 */ virtual void v_0x0B8();
+    /* slot +0x0BC */ virtual void v_0x0BC();
+    /* slot +0x0C0 */ virtual void v_0x0C0();
+    /* slot +0x0C4 */ virtual void reset();
+
+    /* +0x1C */ u32 cursor;
+    /* +0x20 */ u32 anchor;
+    /* +0x24 */ u8 selecting;
+    /* +0x25 */ u8 pad_0x25[3];
+    /* +0x28 */ s32 inputMode;
+    /* +0x2C */ u8 unused_0x2C[0x24];
+}; /* size: 0x50 */
+
+/* The widget's primary base as the conversion to its pane manager base sees it: 0x17F4 bytes.
+ * size: 0x17F4 (approximation: only the size is used) */
+class HbmKbWidgetPrimary {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+
+    /* +0x0004 */ u8 unused_0x0004[0x17F0];
+}; /* size: 0x17F4 */
+
+/* The widget's first two bases, its primary base and its pane manager at +0x17F4: the conversion between them is
+ * the compiler's.  size: 0x189C (approximation: only the bases' layout is used) */
+class HbmKbWidgetBases : public HbmKbWidgetPrimary, public HbmPaneManager {};
 
 /* The keyboard widget the band's handlers run on, as the handlers of this unit see it: its own slots (named by
  * offset), the layout base at +0x17F4, the DrawInfo its layout is drawn with, the prediction-candidate list and
@@ -502,7 +685,7 @@ public:
     /* slot +0x100 */ virtual void v_0x100();
     /* slot +0x104 */ virtual void setFocus(s32 index);
     /* slot +0x108 */ virtual void setCursor(s32 index);
-    /* slot +0x10C */ virtual u16 getCandidateCode();
+    /* slot +0x10C */ virtual s32 getCandidateCode();
 
     /* +0x0004 */ u8 unused_0x0004[0xC];
     /* +0x0010 */ u8 layoutBlock[0x17D8];
@@ -523,17 +706,22 @@ public:
     /* +0x1874 */ f32 areaRight;
     /* +0x1878 */ u8 unused_0x1878[4];
     /* +0x187C */ u8 layoutShown;
-    /* +0x187D */ u8 unused_0x187D[0x3B];
+    /* +0x187D */ u8 unused_0x187D[0x23];
+    /* +0x18A0 */ HbmPaneHandler paneHandler;
+    /* +0x18AC */ u32 unused_0x18AC;
+    /* +0x18B0 */ HbmKbTextBuffer* textBuffer;
+    /* +0x18B4 */ MEMAllocator* allocator;
     /* +0x18B8 */ HbmKbCandidateList candidates;
-    /* +0x1AB8 */ u8 unused_0x1AB8[0x14];
+    /* +0x1AB8 */ HbmKbHandlerBase leftHandler;
     /* +0x1ACC */ HbmKbButtonView* leftArrow;
     /* +0x1AD0 */ HbmKbButtonView* leftButton;
     /* +0x1AD4 */ HbmKbButtonView* leftAnim;
-    /* +0x1AD8 */ u8 unused_0x1AD8[0x14];
+    /* +0x1AD8 */ HbmKbHandlerBase rightHandler;
     /* +0x1AEC */ HbmKbButtonView* rightArrow;
     /* +0x1AF0 */ HbmKbButtonView* rightButton;
     /* +0x1AF4 */ HbmKbButtonView* rightAnim;
-    /* +0x1AF8 */ u8 unused_0x1AF8[0x18];
+    /* +0x1AF8 */ HbmKbHandlerBase switchHandler;
+    /* +0x1B0C */ HbmKeyListener switchListener;
     /* +0x1B10 */ HbmKbButtonView* onButton;
     /* +0x1B14 */ HbmKbButtonView* onButtonFrame;
     /* +0x1B18 */ HbmKbButtonView* offButton;
@@ -542,7 +730,8 @@ public:
     /* +0x1B24 */ HbmKbButtonView* offLabel;
     /* +0x1B28 */ GXTexObj textureOn;
     /* +0x1B48 */ GXTexObj textureOff;
-    /* +0x1B68 */ u8 unused_0x1B68[0x18];
+    /* +0x1B68 */ HbmKbHandlerBase windowHandler;
+    /* +0x1B7C */ HbmKeyListener windowListener;
     /* +0x1B80 */ HbmKbButtonView* switchButton;
     /* +0x1B84 */ HbmKbPartView* switchPart;
     /* +0x1B88 */ u8 flag_1B88;
@@ -558,7 +747,13 @@ static inline HbmPaneManager* hbmKbPaneManager(HbmKbWidget* self) {
     return (HbmPaneManager*)&self->vtable_17F4;
 }
 
+/* The widget converted to its pane manager base: a null widget stays null. */
+static inline HbmPaneManager* hbmKbManagerOf(HbmKbWidget* self) {
+    return (HbmKbWidgetBases*)self;
+}
+
 extern "C" {
+void hbmKbWidgetCreateParts(HbmKbWidget* self, MEMAllocator* allocator);
 void hbmKbCandLayout(HbmKbCandidateList* self);
 void hbmKbCandSetWords(HbmKbCandidateList* self);
 void hbmKbCandDraw(HbmKbCandidateList* self, const nw4r::lyt::DrawInfo* drawInfo);
@@ -653,6 +848,71 @@ static inline void hbmKbResetHighlights(HbmKbCandidateList* list) {
         hbmAnimRestoreState((HbmWidgetNodeView*)list->highlights[i], &empty);
     }
 }
+
+/* The prediction window's key animations (.rodata 0x8057B2F0). */
+const HkbAnimDef hbmKbWidgetAnimDefs[13] = {
+    {0, "fs_VK_predictInput_a_normal.brlan"},
+    {1, "fs_VK_predictInput_a_Focus_IN.brlan"},
+    {2, "fs_VK_predictInput_a_Focus_OUT.brlan"},
+    {4, "fs_VK_predictInput_a_Pushed.brlan"},
+    {5, "fs_VK_predictInput_a_Fade_IN.brlan"},
+    {6, "fs_VK_predictInput_a_Fade_OUT.brlan"},
+    {3, "fs_VK_predictInput_a_Roll_over.brlan"},
+    {7, "fs_VK_predictInput_a_OnOffButton_Pushed.brlan"},
+    {8, "fs_VK_predictInput_a_predict_ON.brlan"},
+    {9, "fs_VK_predictInput_a_predict_OFF.brlan"},
+    {11, "fs_VK_predictInput_a_invalidMode_ON.brlan"},
+    {10, "fs_VK_predictInput_a_invalidMode_normal.brlan"},
+    {12, "fs_VK_predictInput_a_invalidMode_OFF.brlan"},
+};
+
+/* The keys whose animations the candidate texts and the right scroll button share. */
+const char* hbmKbWidgetTextGroup = "T_prdc_Text_00";
+const char* hbmKbWidgetScrollGroup = "P_prdc_scrl_Left";
+
+#define HBM_KB_WIDGET_TEXT_ANIMS                                                                                       \
+    {&hbmKbWidgetAnimDefs[0], &hbmKbWidgetAnimDefs[1], &hbmKbWidgetAnimDefs[2], &hbmKbWidgetAnimDefs[3],               \
+     &hbmKbWidgetAnimDefs[6]}
+#define HBM_KB_WIDGET_SCROLL_ANIMS                                                                                     \
+    {&hbmKbWidgetAnimDefs[0], &hbmKbWidgetAnimDefs[1], &hbmKbWidgetAnimDefs[2], &hbmKbWidgetAnimDefs[3],               \
+     &hbmKbWidgetAnimDefs[4], &hbmKbWidgetAnimDefs[5], &hbmKbWidgetAnimDefs[6]}
+#define HBM_KB_WIDGET_SWITCH_ANIMS                                                                                     \
+    {&hbmKbWidgetAnimDefs[0], &hbmKbWidgetAnimDefs[1], &hbmKbWidgetAnimDefs[2], &hbmKbWidgetAnimDefs[3],               \
+     &hbmKbWidgetAnimDefs[4], &hbmKbWidgetAnimDefs[5], &hbmKbWidgetAnimDefs[6], &hbmKbWidgetAnimDefs[7]}
+#define HBM_KB_WIDGET_TEXT(name) {1, name, 5, hbmKbWidgetTextGroup, HBM_KB_WIDGET_TEXT_ANIMS}
+
+/* The prediction input, its scroll buttons, the twenty candidate texts, the on/off buttons and the window
+ * (.data 0x8064F388). */
+HbmKbChildKeyDef hbmKbWidgetKeyDefs[26] = {
+    {1, "N_predictInput", 1, NULL, {&hbmKbWidgetAnimDefs[0]}},
+    {0, "P_prdc_scrl_Left", 7, NULL, HBM_KB_WIDGET_SCROLL_ANIMS},
+    {0, "P_prdc_scrl_Rght", 7, hbmKbWidgetScrollGroup, HBM_KB_WIDGET_SCROLL_ANIMS},
+    {1, "T_prdc_Text_00", 5, NULL, HBM_KB_WIDGET_TEXT_ANIMS},
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_01"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_02"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_03"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_04"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_05"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_06"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_07"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_08"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_09"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_10"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_11"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_12"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_13"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_14"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_15"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_16"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_17"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_18"),
+    HBM_KB_WIDGET_TEXT("T_prdc_Text_19"),
+    {2, "P_OnBtn", 8, NULL, HBM_KB_WIDGET_SWITCH_ANIMS},
+    {2, "P_OffBtn", 8, NULL, HBM_KB_WIDGET_SWITCH_ANIMS},
+    {3, "W_predictWindow", 6, NULL,
+     {&hbmKbWidgetAnimDefs[0], &hbmKbWidgetAnimDefs[8], &hbmKbWidgetAnimDefs[9], &hbmKbWidgetAnimDefs[10],
+      &hbmKbWidgetAnimDefs[11], &hbmKbWidgetAnimDefs[12]}},
+};
 
 /* Empty virtual slot. */
 extern "C" void fn_8054F7BC(void) {
@@ -782,6 +1042,140 @@ extern "C" void* fn_8054FB74(void* self, int flag) {
 
 /* Empty virtual slot. */
 extern "C" void fn_80550124(void) {
+}
+
+/* The pane names of the twenty candidate words.  size: 0x50 */
+struct HbmKbPaneNames {
+    /* +0x00 */ const char* names[20];
+}; /* size: 0x50 */
+
+extern HbmKbPaneNames hbmKbWidgetTextNames;
+extern HbmKbPaneNames hbmKbWidgetFrameNames;
+
+/* Binds the candidate list's word texts, frames and highlights, its text area and its window to their panes, and
+ * the frames' and the area's presses to the list. */
+static inline void hbmKbAttachCandidates(HbmPaneManager* pManager, HbmKbCandidateList* pList) {
+    HbmKbPaneNames textNames = hbmKbWidgetTextNames;
+    HbmKbPaneNames frameNames = hbmKbWidgetFrameNames;
+    PaneManager* pRoot = (PaneManager*)pManager->getRoot();
+    for (u32 i = 0; i < 20; i++) {
+        pList->texts[i] = (HbmKbWordPartView*)hkbGetPaneComponentByName(pRoot, textNames.names[i]);
+        pList->frames[i] = (HbmKbWordPartView*)hkbGetPaneComponentByName(pRoot, frameNames.names[i]);
+        pList->highlights[i] = (HbmKbHighlightView*)pManager->getPaneAnim(textNames.names[i]);
+        pList->frames[i]->handler = pList;
+    }
+    pList->area = (HbmKbPartView*)hkbGetPaneComponentByName(pRoot, "N_prdcTextArea");
+    pList->window = (HbmKbPartView*)hkbGetPaneComponentByName(pRoot, "N_prdc_Texts");
+    pList->area->handler = pList;
+}
+
+/* Binds the prediction window's button and animation to their pane. */
+static inline void hbmKbAttachWindow(HbmPaneManager* pManager, HbmKbButtonView** pKey, HbmKbPartView** pAnim,
+                                     const char* name) {
+    PaneManager* pRoot = (PaneManager*)pManager->getRoot();
+    *pKey = (HbmKbButtonView*)hkbGetPaneComponentByName(pRoot, name);
+    *pAnim = (HbmKbPartView*)pManager->getPaneAnim(name);
+}
+
+/* Binds a scroll button's key, base and animation to their panes and the button's presses to its handler. */
+static inline void hbmKbAttachButton(HbmPaneManager* pManager, HbmKbButtonView** pKey, HbmKbButtonView** pBase,
+                                     HbmKbButtonView** pAnim, HbmKbHandlerBase* pHandler, const char* keyName,
+                                     const char* baseName) {
+    PaneManager* pRoot = (PaneManager*)pManager->getRoot();
+    *pKey = (HbmKbButtonView*)hkbGetPaneComponentByName(pRoot, keyName);
+    *pBase = (HbmKbButtonView*)hkbGetPaneComponentByName(pRoot, baseName);
+    *pAnim = (HbmKbButtonView*)pManager->getPaneAnim(keyName);
+    (*pBase)->handler = pHandler;
+}
+
+/* 0x8054FBB4 (0x570): Creates the pane manager, the text buffer and the parts, binds the candidate words, the on/off
+ * switch, the scroll buttons and the window to their panes, then initialises the widget. */
+extern "C" void hbmKbWidgetCreate(HbmKbWidget* self, MEMAllocator* allocator) {
+    self->allocator = allocator;
+    hbmKbPaneManager(self)->HbmPaneManager::create(allocator, &self->paneHandler);
+    HbmKbTextBuffer* pBuffer = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbTextBuffer))) HbmKbTextBuffer();
+    self->textBuffer = pBuffer;
+    pBuffer->create(allocator);
+    hbmKbPaneManager(self)->mpRoot->setVisible(0);
+    hbmKbPaneManager(self)->mpRoot->v_0x00C();
+    hbmKbWidgetCreateParts(self, allocator);
+
+    hbmKbAttachCandidates(hbmKbManagerOf(self), &self->candidates);
+    self->candidates.words = (HbmKbCandidateSet*)self->layoutBlock;
+    for (u32 i = 0; i < 20; i++) {
+        self->candidates.texts[i]->pane->SetString(L"", 0);
+        self->candidates.frames[i]->setEnabled(1);
+    }
+    self->candidates.tailOffset = 0.0f;
+
+    HbmPaneManager* pManager = hbmKbManagerOf(self);
+    PaneManager* pRoot = (PaneManager*)pManager->getRoot();
+    self->onButton = (HbmKbButtonView*)hkbGetPaneComponentByName(pRoot, "P_OnBtn");
+    self->onButtonFrame = (HbmKbButtonView*)hkbGetPaneComponentByName(pRoot, "B_OnBtn");
+    self->onLabel = (HbmKbButtonView*)pManager->getPaneAnim("P_OnBtn");
+    self->offButton = (HbmKbButtonView*)hkbGetPaneComponentByName(pRoot, "P_OffBtn");
+    self->offButtonFrame = (HbmKbButtonView*)hkbGetPaneComponentByName(pRoot, "B_OffBtn");
+    self->offLabel = (HbmKbButtonView*)pManager->getPaneAnim("P_OffBtn");
+    const nw4r::lyt::Material* pMaterial =
+        pManager->getLayout()->mpRootPane->FindPaneByName("P_OffBtn", true)->GetMaterial();
+    pMaterial->GetTexMapAry()->Get(&self->textureOn);
+    pMaterial = pManager->getLayout()->mpRootPane->FindPaneByName("P_JPOffBtn", true)->GetMaterial();
+    pMaterial->GetTexMapAry()->Get(&self->textureOff);
+    self->offButtonFrame->handler = self->onButtonFrame->handler = &self->switchHandler;
+    self->onButtonFrame->setEnabled(1);
+    self->offButtonFrame->setEnabled(1);
+
+    hbmKbAttachButton(hbmKbManagerOf(self), &self->leftArrow, &self->leftButton, &self->leftAnim, &self->leftHandler,
+                      "P_prdc_scrl_Left", "B_prdc_scrl_Left");
+    hbmKbAttachButton(hbmKbManagerOf(self), &self->rightArrow, &self->rightButton, &self->rightAnim,
+                      &self->rightHandler, "P_prdc_scrl_Rght", "B_prdc_scrl_Rght");
+    self->leftButton->setEnabled(1);
+    self->rightButton->setEnabled(1);
+
+    hbmKbAttachWindow(hbmKbManagerOf(self), &self->switchButton, &self->switchPart, "W_predictWindow");
+    self->v_0x010();
+}
+
+/* 0x80550128 (0x360): Creates one part per key of the prediction window and gives it its animations. */
+extern "C" void hbmKbWidgetCreateParts(HbmKbWidget* self, MEMAllocator* allocator) {
+    const char* group;
+
+    for (u16 i = 0; i < 26; i++) {
+        const HbmKbChildKeyDef* def = &hbmKbWidgetKeyDefs[i];
+        HbmKbWidgetPart* pPart = NULL;
+        switch (def->type) {
+        case 0:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbWidgetPartA)))
+                HbmKbWidgetPartA(hbmKbPaneManager(self)->findTextBox(def->name), NULL);
+            break;
+        case 1:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbWidgetPart)))
+                HbmKbWidgetPart(hbmKbPaneManager(self)->findTextBox(def->name), NULL, 1);
+            break;
+        case 2:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbWidgetPartB)))
+                HbmKbWidgetPartB(hbmKbPaneManager(self)->findTextBox(def->name), &self->switchListener);
+            break;
+        case 3:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbWidgetPartC)))
+                HbmKbWidgetPartC(hbmKbPaneManager(self)->findTextBox(def->name), &self->windowListener);
+            break;
+        }
+        nw4r::ut::List_Append(&hbmKbPaneManager(self)->mComponents, pPart);
+        group = def->group;
+        u16 j = 0;
+        u32 numAnims = def->numAnims;
+        for (; j < numAnims; j++) {
+            const void* res = hbmKbPaneManager(self)->mpResAccessor->GetResource(0, def->anims[j]->name, NULL);
+            nw4r::lyt::AnimTransform* anim =
+                hbmKbPaneManager(self)->getLayout()->CreateAnimTransform(res, hbmKbPaneManager(self)->mpResAccessor);
+            if (group == NULL) {
+                pPart->addAnim(allocator, def->anims[j]->kind, anim, 0, 1);
+            } else {
+                pPart->addGroupAnim(allocator, def->anims[j]->kind, anim, group, 0, 1);
+            }
+        }
+    }
 }
 
 /* Clears the part's state. */
@@ -1078,10 +1472,45 @@ extern "C" void fn_8055148C(HkbWidget* self) {
 extern "C" void fn_805514DC(void) {
 }
 
-/* Returns the part's resource word. */
-/* untyped: opaque handle passed through */
-void* HbmKbWidgetPart::getResource() {
-    return mpResource;
+/* 0x805514E0 (0x1A0): Takes the focus off every focused or pressed part of the prediction window. */
+extern "C" void hbmKbWidgetUnfocusParts(HbmKbWidget* self) {
+    for (u32 i = 0; i < 26; i++) {
+        HbmKey* pPart = hbmKbPaneManager(self)->getPaneAnim(hbmKbWidgetKeyDefs[i].name);
+        if (pPart != NULL) {
+            switch (((HbmKbWidgetPart*)pPart)->getType()) {
+            case 1:
+                switch (((HbmKbWidgetPart*)pPart)->getState()) {
+                case 1:
+                case 3:
+                case 4:
+                    pPart->setState(2);
+                    break;
+                }
+                break;
+            case 0:
+                switch (((HbmKbWidgetPart*)pPart)->getState()) {
+                case 1:
+                case 3:
+                    pPart->setState(2);
+                    break;
+                }
+                break;
+            case 2:
+                switch (((HbmKbWidgetPart*)pPart)->getState()) {
+                case 1:
+                case 3:
+                    pPart->setState(2);
+                    break;
+                }
+                break;
+            }
+        }
+    }
+}
+
+/* Returns the part's kind. */
+u32 HbmKbWidgetPart::getType() {
+    return mType;
 }
 
 
@@ -1125,8 +1554,8 @@ extern "C" void hbmKbWidgetHandleEvent(HbmKbWidget* self, u32 sender, s32 event,
         if (self->getCandidateCode() != 0xFFFF) {
             u32 code;
             HbmKbPanelState* panel = self->owner->getPanel();
-    panel->candidatePending = 0;
-            code = self->getCandidateCode();
+            panel->candidatePending = 0;
+            code = (u16)self->getCandidateCode();
             self->sound->play(9);
             self->setProperty(0x15, &code);
         }
@@ -1340,6 +1769,20 @@ extern "C" void fn_80551EF4(HkbWidget* self) {
 extern "C" void fn_80551F08(HkbWidget* self) {
     ((HbmPaneManager*)&self->vtable_17F4)->HbmPaneManager::v_0x040();
     self->v_0x110();
+}
+
+/* 0x80551F4C (0x17C): Builds an empty candidate list: no words, no selection, the full area width. */
+HbmKbCandidateList::HbmKbCandidateList(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener)
+    : HbmKbHandlerBase(handlerId, pWidget, pListener), value_028(0.0f), flag_02C(0), flag_02D(0), value_030(0),
+      selected(-1), pressed(-1), first(0), scroll(0.0f), count(0), shownFirst(0), shownLast(0), lastWhole(0),
+      tailOffset(0.0f), areaWidth(640.0f), touched(0), words(NULL) {
+    for (int i = 0; i < 20; i++) {
+        texts[i] = NULL;
+        frames[i] = NULL;
+        highlights[i] = NULL;
+    }
+    area = NULL;
+    window = NULL;
 }
 
 /* Lays the candidate words out around the scroll offset: the words before the window's first word fill leftwards,
@@ -1757,6 +2200,10 @@ extern "C" void hbmKbCandHandleInput(HbmKbCandidateList* self, HbmKbPartView* se
     }
 }
 
+/* 0x80553F50 (0x34): Builds the prediction window's handler with no pane bound. */
+HbmKbWindowHandler::HbmKbWindowHandler(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener)
+    : HbmKbHandlerBase(handlerId, pWidget, pListener), keyComponent(NULL), part(NULL) {}
+
 /* Whether the sub-object's +0x10 child is set, then its +0x08 slot. */
 extern "C" void fn_80553F84(void* self, s32 arg1, u32 arg2, HkbFlagRecord* rec) {
     HkbWidget* child;
@@ -1773,6 +2220,10 @@ extern "C" void fn_80553F84(void* self, s32 arg1, u32 arg2, HkbFlagRecord* rec) 
     }
     child->v_0x008(self, 1024, 0);
 }
+
+/* 0x80553FC8 (0x30): Builds a scroll button's handler with no pane bound. */
+HbmKbButtonHandler::HbmKbButtonHandler(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener)
+    : HbmKbHandlerBase(handlerId, pWidget, pListener), keyComponent(NULL), baseComponent(NULL), part(NULL) {}
 
 /* Input handler of a prediction-window button: a release or a key press on it pages the candidates, a touch and a
  * release replay its part, while the widget takes input. */
@@ -1818,6 +2269,11 @@ extern "C" void hbmKbButtonHandleInput(HbmKbButtonHandler* self, HbmKbPartView* 
 extern "C" u16 fn_80554268(HkbU16Array* self, u32 index) {
     return self->values_80[index];
 }
+
+/* 0x80554278 (0x44): Builds the on/off switch's handler with no pane bound. */
+HbmKbSwitchHandler::HbmKbSwitchHandler(u32 handlerId, HbmKbWidget* pWidget, HkbWidget* pListener)
+    : HbmKbHandlerBase(handlerId, pWidget, pListener), onKey(NULL), source(NULL), offKey(NULL), offBase(NULL),
+      onButton(NULL), offButton(NULL) {}
 
 /* Event slot of the prediction switch (listener base): a trigger-7 release on the on or the off button reports
  * 0x301 or 0x300 to the listener. */
@@ -1947,3 +2403,17 @@ extern "C" void fn_805546A4(HkbWidget* self) {
 extern "C" void fn_805546AC(HkbWidget* self, u32 sender, s32 event, s32 arg) {
     hbmKbWidgetHandleEvent((HbmKbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_189C)), sender, event, arg);
 }
+
+/* The candidate words' text panes (.data 0x8064FC10) and frame buttons (.data 0x8064FDA0). */
+HbmKbPaneNames hbmKbWidgetTextNames = {{
+    "T_prdc_Text_00", "T_prdc_Text_01", "T_prdc_Text_02", "T_prdc_Text_03", "T_prdc_Text_04",
+    "T_prdc_Text_05", "T_prdc_Text_06", "T_prdc_Text_07", "T_prdc_Text_08", "T_prdc_Text_09",
+    "T_prdc_Text_10", "T_prdc_Text_11", "T_prdc_Text_12", "T_prdc_Text_13", "T_prdc_Text_14",
+    "T_prdc_Text_15", "T_prdc_Text_16", "T_prdc_Text_17", "T_prdc_Text_18", "T_prdc_Text_19",
+}};
+HbmKbPaneNames hbmKbWidgetFrameNames = {{
+    "B_prdc_Text_00", "B_prdc_Text_01", "B_prdc_Text_02", "B_prdc_Text_03", "B_prdc_Text_04",
+    "B_prdc_Text_05", "B_prdc_Text_06", "B_prdc_Text_07", "B_prdc_Text_08", "B_prdc_Text_09",
+    "B_prdc_Text_10", "B_prdc_Text_11", "B_prdc_Text_12", "B_prdc_Text_13", "B_prdc_Text_14",
+    "B_prdc_Text_15", "B_prdc_Text_16", "B_prdc_Text_17", "B_prdc_Text_18", "B_prdc_Text_19",
+}};
