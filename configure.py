@@ -753,7 +753,7 @@ config.libs = [
             Object(NonMatching, "sound/fn_800E46E8.cpp"),
             Object(NonMatching, "sound/sound_obj.cpp"),
             Object(NonMatching, "sound/snd_stream_reloc.cpp"),
-            Object(NonMatching, "sound/snd_level_tbl.cpp"),
+            Object(Matching, "sound/snd_level_tbl.cpp"),
             # Registered (a 0x800E8E60 run discovery proposed).
             # The quest/challenge sound work system: 149 functions / 0x6978 bytes.  C++ from the range's
             # own mangled symbols; no `__FILE__` string survives, so the map's stem is the file name.
@@ -1281,7 +1281,7 @@ config.libs = [
             # `__FILE__` string for the range and the runtime dump answers only zz_/fn_ placeholders.
             # The seam between them, the cut evidence and the 18 fn_XXXXXXXX symbols renamed to real
             # names are documented in the two headers and in .pi/notes/net-nwc24.md.
-            Object(NonMatching, "NWC24/nwc24_msg.c"),  # 0x8051D710-0x8051E068
+            Object(Matching, "NWC24/nwc24_msg.c"),  # 0x8051D710-0x8051E068
             Object(NonMatching, "NWC24/nwc24_io.c"),   # 0x8051E068-0x8051E864
             # SO/soi: same SDK build (0x4199_60831); GC/3.0a5.2 measured 19 better / 0 worse (docs/network.md).
             Object(Matching, "SO/soi.cpp"),
@@ -1596,7 +1596,7 @@ config.libs = [
             Object(Matching, "nw4r/ut_ResFont.cpp"),
             Object(Matching, "nw4r/ut_CharWriter.cpp"),
             Object(NonMatching, "nw4r/ut_TextWriterBase.cpp"),
-            Object(NonMatching, "nw4r/fn_8050661C.cpp"),
+            Object(Matching, "nw4r/fn_8050661C.cpp"),
         ],
     },
     {

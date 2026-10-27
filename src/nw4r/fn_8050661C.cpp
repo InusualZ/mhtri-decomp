@@ -17,6 +17,7 @@
  * SHAPES. FindCodeIndex returns int and the callers keep the index as that int, narrowing it at each use (retail's
  *   `clrlwi` per use); the code table is read as u16 pairs and walked with a pointer.  HasGlyph's Shift-JIS case is
  *   one `||` of the half-width and full-width tests (an if-chain or a flag local hoists `li r3,1`).
+ *   `.bss` follows declaration order: the glyph cache is declared before the font header (retail +0x0 / +0x200).
  */
 
 #include "nw4r/RomFont.h"
@@ -42,10 +43,10 @@ static s32 sCacheMax;
 /* 0 = CP1252 codes, 1 = Shift-JIS codes; 0xFFFF before Load. */
 static u16 sEncoding = 0xFFFF;
 
-/* The font header Load fills in. */
-static OSFontHeader sFontHeader;
 /* Per-glyph cache flags, cleared by Load and ClearGlyphCache. */
 static u16 sGlyphCache[256];
+/* The font header Load fills in. */
+static OSFontHeader sFontHeader;
 
 static int FindCodeIndex(u16 code);
 

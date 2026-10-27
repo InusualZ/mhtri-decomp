@@ -9,6 +9,9 @@
  *   table, the second one scaled by 256 into a u16); `math_sincos_idx` keeps the map's C name for nw4r's
  *   `SinCosFIdx`, which its callers in `hud/` and `g3d/` declare so.  The tables are nw4r's `sSinCosTbl`/`sArcTanTbl`.
  * RESIDUALS. Every row matches.  `.sdata2`: retail pools 192.0f before 256.0f (ours 256 then 192) and the claim ends on a 4-byte pad.
+ *   A dead `192.0f` initialiser inside Atan2Idx fixes the pool but swaps f3/f4 there (98.96 %); an unreferenced
+ *   function between Atan2FIdx and Atan2Idx whose first new literal is 192.0f gives Atan2Idx 100 % and a
+ *   byte-identical pool, so retail likely had one more link-dropped function there (its body is unknown).
  * SHAPES. `math_sincos_idx` is C with one inline-asm block over `register` locals; `work` carries the circle size,
  *   the fraction and the swapped pair (retail's f2).  `AtanFIdx` is unreferenced: it puts 32.0f third in the pool,
  *   where retail has it, and the link drops it.  AtanFIdx_ calls the OS casts directly so its stack temporaries are

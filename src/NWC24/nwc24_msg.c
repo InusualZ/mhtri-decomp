@@ -110,10 +110,8 @@
  *   - `.data`: `Nwc24RequestPath` is declared `__attribute__((aligned(8)))`, which reproduces retail's six
  *     zero bytes after the version string; what the original declared there is not known.
  *   - `.bss` 0x80766A00-0x80766B00 (0x100 B) is addressed by nothing in the image; it is emitted as the
- *     unreferenced `sNwc24ReservedWork` (GUESS), which mwld keeps.
- *   - the relocations name the `.bss` anchor where the map names `sNwc24Work` (0x180 B over the four
- *     statics and the reserve), and `sVersionTag` names `sNwc24Version` where the map has `lbl_80631128`;
- *     the addresses are identical (map requests filed).
+ *     unreferenced `sNwc24ReservedWork` (GUESS), which mwld keeps.  The map carries one row per `.bss`
+ *     static (the two mutexes, the two buffers and the reserve) and `sNwc24Version` for the version string.
  */
 
 #include "types.h"

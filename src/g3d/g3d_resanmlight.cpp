@@ -6,8 +6,9 @@
  *   read that TU's `ResName` records (0x80590660) and `_ac.h` strings, and extabindex 0x80021D8C opens it.
  * NAMES. Map stems, defined `extern "C"` (the dump answers `zz_` placeholders).
  * RESIDUALS. flipcheck: `.data` byte-identical to the 0x208 bytes the object emits; the 0x18-byte tail of the claim
- *   is fill before `g3d/g3d_resanmscn.cpp`'s 32-aligned name records, which the link reproduces only once that
- *   unit's `.data` split carries `align:32` (request g3d-res2#6; trial flip with it: main.dol unchanged).
+ *   is fill before `g3d/g3d_resanmscn.cpp`'s 32-aligned name records (its `.data` split carries `align:32`; a trial
+ *   flip leaves main.dol unchanged).  flipcheck still refuses it: it excuses link padding only up to a 16-byte
+ *   successor alignment (`objcompare.LINKED_PAD_MAX_ALIGN`).
  * SHAPES. fn_8008F8E4 types the second-colour flag `bool` (retail colours it r27).
  *   fn_8008FE88/fn_8008FD04 are `inline` under `#pragma dont_inline on`, defined in that order: their asserts'
  *   strings are the inline tail (weak `@STRING@` copies, reversed), and their weak copies follow fn_8008F8E4.
