@@ -35,7 +35,10 @@ walked the pointer in the source; here it indexed.
 99.30 -> 100, `lb_kitchen_special_pick_draw` 99.13 -> 100 (header form), `lb_trade_cost_draw` 99.15 -> 100,
 `lb_trade_list_draw` 96.65 -> 98.62, `lb_kitchen_pick_draw` 98.05 -> 99.92; `lb_scene_eft_spawn` and
 `lb_quest_board_model_spawn` (`work->models[i]` in place of a stepped `MHchar**`) -> 100. In most of these the
-index form alone left a register rename that only the re-tried declaration order closed.
+index form alone left a register rename that only the re-tried declaration order closed. `menu/menu_placeinfo`:
+`placeinfo_page12_draw` 98.19 -> 100 (`placeinfo_award_icons[i]`, `cells[offset + i]`), `lb_city_member_page_set`
+93.86 -> 100 (`&work->members[index]` per iteration), `placeinfo_world_draw` 99.10 -> 99.78 (`rows[i]`); the
+same rewrite measured *worse* on `lb_city_list_draw`/`_ex_draw` (96.7 -> 95.7), whose target walks the pointer.
 
 **Example.**
 

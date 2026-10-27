@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (182)
+## Ideas that work (183)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -191,6 +191,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 200 | [A compound assignment keeps a float product's operand order: x *= c is fmuls x,c](200-compound-assignment-keeps-a.md) | works | source-shape, allocator | Retail's `fmuls fD,fX,fC` (value first, constant or factor second) comes out as `fmuls fD,fC,fX` from both `x = x * c` and `x = c * x`, or the two loads of an `fadds` swap registers, and no operand order in the... |
 | 201 | [A guessed narrow parameter type adds a callee-side extsh: read the retail caller for the conversion](201-guessed-narrow-parameter-type.md) | works | source-shape | A member function's row has an `extsh`/`clrlwi` of an incoming parameter before a 32-bit compare that retail does not have, and the map's mangling (our own guess) says the parameter is `s16`/`u8`. |
 | 202 | [A copy member that returns *this keeps r3 and r4 live, so its loop takes fresh registers](202-copy-member-that-returns.md) | works | source-shape, allocator | A small copy member matches except its trailing copy loop, where retail moves the pointers into r5/r6 and ours reuses r3/r4. |
+| 203 | [A case that jumps to another case's head: re-dispatch with state = N; continue in a for (;;)](203-case-that-jumps-to.md) | works | source-shape | One switch case ends in a `b` to another case's first instruction (retail shares that case's whole body), and the goto-free copy of the body makes the function longer by the body's size |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

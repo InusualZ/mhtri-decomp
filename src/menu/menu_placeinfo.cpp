@@ -29,10 +29,20 @@
  * RESIDUALS.
  *  - `lb_community_select_step`: retail reaches its page-count tail (pages = total / 8, cursor clamp) by jumps from seven
  *    places; the source calls the static helper `lb_community_page_count_set` (rule 8), an extra function in our object.
- *  - `lb_city_select_screen_step` (state 5 step 3 repeats state 4 step 1's enter-city tail) and `lb_city_select_draw`
- *    (state 8 repeats state 5's search-dialog body): retail jumps into the other state's code (rule 8).
- *  - `place_model_release`, `place_model_load`: retail keeps `index * 0x174` in a saved register across the calls.
- *  - The draws (`lb_city_*_draw`, `lb_community_*_draw`, `draw_search_city_dialog`, `placeinfo_page12_draw`) and
+ *  - `lb_city_select_screen_step`: state 5 step 3 repeats state 4 step 1's enter-city tail, which retail reaches by a
+ *    jump (rule 8; MWCC does not merge the identical copy).
+ *  - `lb_city_select_draw`: state 8 re-enters state 5's search-dialog body through a `for (;;)` re-dispatch (playbook
+ *    203); retail branches straight to case 5, ours loops back to the compare chain (`li r3,5 ; b`), hoists the
+ *    `lobby_w.state_0x000` load and colours `work` in r29 where retail has r31.
+ *  - `place_model_release`, `place_model_load`: retail keeps `index * 0x174` in a saved register across the calls and
+ *    stores through `work + offset`, plus a `mr r6,r30` copy of the slot pointer; not reproduced by an inline
+ *    member, a byte-offset pointer or a global-based `model`.
+ *  - `lb_city_member_list_draw`, `lb_city_list_draw`, `lb_city_list_ex_draw`: retail updates the `s32` icon/name x in
+ *    place (`addi r25,r25,0xa`); ours folds the `+= 10` into its later uses (`+0x3a`) and recolours the loop.
+ *  - `lb_city_timer_draw`: retail extends both `font_locate` coordinates after the second `fctiwz`; ours extends the
+ *    first at once.
+ *  - `lb_city_filter_list_draw`: retail clears the title id with `clrlwi r4,r4,16` after the ternary; ours omits it.
+ *  - The other draws (`lb_community_*_draw`, `draw_search_city_dialog`, `placeinfo_world_draw`) and
  *    `lb_community_select_step`: register colouring and the odd `li` placement.
  *  - Data: `.data` 0x80603EA0-0x80604638 (the six combo tables `lobby/lb_companion_ui.cpp` reads: 0x80603EA0,
  *    0x806042B8, 0x806043E8, 0x806045F8, 0x8060461C, 0x80604628) and `.sdata` 0x80793A28-0x80793A67 (the small tables
@@ -273,7 +283,7 @@ struct LbCityMoveWork {
 extern "C" {
 
 void lb_city_select_close(void);
-s16 lb_city_filters_collect(u8 kind);
+s32 lb_city_filters_collect(u8 kind);
 void lb_community_select_step(LbCitySelectWork* work);
 void lb_city_select_draw(void);
 void lb_city_move_close(void);
@@ -396,7 +406,7 @@ void lb_city_select_screen_step(void) {
     NetSettingsWords settings;
     const char* peer_id;
     u8 map;
-    u16 angle;
+    s16 city_id;
 
     switch (lobby_w.state_0x000) {
     case 33:
@@ -554,7 +564,7 @@ void lb_city_select_screen_step(void) {
                             scroll->row = scroll->row_limit - 1;
                             work->member_row_0x54A = scroll->row;
                         } else if (scroll->row == scroll->row_limit - 1 && scroll->row != 0) {
-                            scroll->row = scroll->row - 1;
+                            scroll->row--;
                             work->member_row_0x54A = scroll->row;
                         }
                     } else if (scroll->move_flags & 3) {
@@ -680,8 +690,7 @@ void lb_city_select_screen_step(void) {
                 lb_city_select_close();
                 lobby_area_change_net_req();
                 map = get_now_mapno();
-                angle = stage_entry_angle_get(map, 1);
-                lobby_player_place_ex(1, stage_entry_pos_get(map, 1), angle, 5);
+                lobby_player_place_ex(1, stage_entry_pos_get(map, 1), stage_entry_angle_get(map, 1), 5);
                 return;
             }
             break;
@@ -726,6 +735,7 @@ void lb_city_select_screen_step(void) {
                 if (lb_cmd_pressed_ck(0x10) != 0) {
                     if (work->tab_cursor_0x130C == work->tab_count_0x130E - 1) {
                         sysSE_req(0);
+                        city_id = work->cities_0x024[work->cursor_0x00A].id_0x08;
                         if (work->server_type_0x003 == 3) {
                             settings.word_0x00 = -1;
                             settings.word_0x04 = work->tab_values_0x12FC[0];
@@ -737,9 +747,7 @@ void lb_city_select_screen_step(void) {
                             settings.word_0x08 = -1;
                             settings.word_0x0C = work->tab_values_0x12FC[0];
                         }
-                        NetCtrlWk::requestSettingsCommand(&work->result_0x004,
-                                                          work->cities_0x024[work->cursor_0x00A].id_0x08,
-                                                          &settings);
+                        NetCtrlWk::requestSettingsCommand(&work->result_0x004, city_id, &settings);
                         work->step_0x001 = 3;
                     } else if ((u32)(work->tab_kinds_0x12EC[work->tab_cursor_0x130C] - 1) <= 1) {
                         work->state_0x000 = 6;
@@ -779,8 +787,7 @@ void lb_city_select_screen_step(void) {
                 lb_city_select_close();
                 lobby_area_change_net_req();
                 map = get_now_mapno();
-                angle = stage_entry_angle_get(map, 1);
-                lobby_player_place_ex(1, stage_entry_pos_get(map, 1), angle, 5);
+                lobby_player_place_ex(1, stage_entry_pos_get(map, 1), stage_entry_angle_get(map, 1), 5);
                 return;
             }
             break;
@@ -826,9 +833,9 @@ void lb_city_select_screen_step(void) {
 /* 0x804382C4 (0x1D8): builds the page of the selected tab's filter list (kind 0 events, 1 second filters, 2 first
  * filters) that the list dialog shows. */
 void lb_city_filter_list_build(LbCitySelectWork* work, s32 kind, s16 page) {
-    s16 count;
-    s32 i;
+    s32 count;
     s32 index;
+    s32 i;
     s8 id;
 
     memset(work->list_0x1320, 0, sizeof(work->list_0x1320));
@@ -884,14 +891,17 @@ void lb_city_tabs_init(LbCitySelectWork* work) {
     work->tab_values_0x12FC[2] = 0;
     work->tab_kinds_0x12EC[3] = -1;
     work->tab_values_0x12FC[3] = 0;
-    if (work->server_type_0x003 == 3) {
+    switch (work->server_type_0x003) {
+    case 3:
         work->tab_kinds_0x12EC[0] = 0;
         work->tab_kinds_0x12EC[1] = 1;
         work->tab_kinds_0x12EC[2] = 2;
         work->tab_count_0x130E = 4;
-    } else {
+        break;
+    default:
         work->tab_kinds_0x12EC[0] = 2;
         work->tab_count_0x130E = 2;
+        break;
     }
 }
 
@@ -906,17 +916,16 @@ void lb_city_member_page_set(LbCitySelectWork* work, s16 page) {
     work->member_count_0x546 = 0;
     index = page * 5;
     row = 0;
-    card = &work->members_0x560[index];
     for (i = 0; i < 5; i++) {
         if (index >= work->member_total_0x544) {
             return;
         }
+        card = &work->members_0x560[index];
         card->valid_0x000 = 1;
         work->member_status_0x551[row] = card->status_0x029;
         work->member_busy_0x54C[row] = card->status_low_0x11D != 0;
         work->member_area_0x556[i] = card->area_0x024;
         work->member_count_0x546++;
-        card++;
         index++;
         row++;
     }
@@ -925,7 +934,7 @@ void lb_city_member_page_set(LbCitySelectWork* work, s16 page) {
 /* 0x804385B4 (0xF4): loads city page `page` (eight cities) and its page counts. */
 void lb_city_page_load(LbCitySelectWork* work, s16 page) {
     s32 i;
-    s16 last;
+    s32 last;
 
     for (i = 0; i < 8; i++) {
         work->marks_0x014[i] = 0;
@@ -1215,33 +1224,33 @@ void lb_city_member_list_draw(LbCitySelectWork* work, bool active) {
 /* 0x80439158 (0x138): the selected community's panel: its name and its leader. */
 void lb_community_info_draw(LbCitySelectWork* work) {
     NetCommunityView* view = &work->communities_0x1A4[work->cursor_0x00A];
-    s32 x = get_wide_offset(3) + 0x10;
-    s32 label_x;
     s32 bar_x;
+    s32 label_x;
+    s32 x = get_wide_offset(3) + 0x10;
+    s32 text_x;
 
     put_frame_dialog(x, 0x154, 0x13C, 0x50, 0, 0);
     label_x = (s16)x + 0xC;
     put_frame_label(label_x, 0x164, 0x6E, 0, 0, (s8*)LbStr(0, 0x26D));
     bar_x = (s16)x + 0x7C;
     put_frame_separator(bar_x, 0x161, 0xB4, 0x1A, 0);
-    x = (s16)x + 0x80;
-    lb_font_print(x, 0x164, (s8*)view->name_0x01, -1, 2);
+    text_x = (s16)x + 0x80;
+    lb_font_print(text_x, 0x164, (s8*)view->name_0x01, -1, 2);
     put_frame_separator(bar_x, 0x17B, 0xB4, 0x1A, 0);
     put_frame_label(label_x, 0x17E, 0x6E, 0, 0, (s8*)LbStr(0, 0x26F));
-    lb_font_print(x, 0x17E, (s8*)view->leader_0x21, -1, 2);
+    lb_font_print(text_x, 0x17E, (s8*)view->leader_0x21, -1, 2);
 }
 
 /* 0x80439290 (0x2D8): the community list dialog: comment, event and population of each community of the page. */
 void lb_community_list_draw(LbCitySelectWork* work, bool active) {
     s32 x;
     s32 name_x;
+    s16 free_x;
     s16 event_x;
     s16 count_x;
-    s16 free_x;
-    s32 bar_x;
-    s32 y;
     s32 text_y;
     s16 i;
+    s32 y;
     bool cursor;
     u32 flags;
     s32 color;
@@ -1264,21 +1273,20 @@ void lb_community_list_draw(LbCitySelectWork* work, bool active) {
     count_x += 8;
     y = 0x74;
     font_set_size(18, 18);
-    view = work->communities_0x1A4;
-    bar_x = (s16)name_x - 10;
     for (i = 0; i < work->count_0x00C; i++) {
-        put_frame_separator(bar_x, y, 0x238, 0x1A, 0);
+        view = &work->communities_0x1A4[i];
+        put_frame_separator((s16)name_x - 10, y, 0x238, 0x1A, 0);
         if (i == work->cursor_0x00A) {
             cursor = 1;
             flags = 6;
-            put_frame_cursor_bar(bar_x, y, 0x238, 0x1A, 0, 0);
+            put_frame_cursor_bar((s16)name_x - 10, y, 0x238, 0x1A, 0, 0);
         } else {
             cursor = 0;
             flags = 2;
         }
         GetMenuFontColor(1, cursor, active, 0);
         color = -1;
-        if (view->value_0x54 == view->value_0x5C) {
+        if ((u32)view->value_0x54 == (u32)view->value_0x5C) {
             color = 0x646464FF;
         }
         text_y = (s16)y + 3;
@@ -1289,7 +1297,6 @@ void lb_community_list_draw(LbCitySelectWork* work, bool active) {
         sprintf(text, "(%2d)", view->value_0x54 - view->value_0x58);
         lb_font_print(free_x, text_y, (s8*)text, color, flags);
         y += 0x1A;
-        view++;
     }
     flfntFlush();
     flfntStackReset();
@@ -1305,15 +1312,14 @@ void lb_community_list_draw(LbCitySelectWork* work, bool active) {
  * population. */
 void lb_community_list_ex_draw(LbCitySelectWork* work, bool active) {
     s32 x;
+    s16 event_x;
     s16 first_x;
     s16 second_x;
-    s16 event_x;
-    s16 count_x;
     s32 name_x;
-    s32 bar_x;
-    s32 y;
+    s16 count_x;
     s32 text_y;
     s16 i;
+    s32 y;
     bool cursor;
     u32 flags;
     s32 color;
@@ -1339,21 +1345,20 @@ void lb_community_list_ex_draw(LbCitySelectWork* work, bool active) {
     count_x += 0x16;
     y = 0x74;
     font_set_size(18, 18);
-    view = work->communities_0x1A4;
-    bar_x = (s16)name_x - 10;
     for (i = 0; i < work->count_0x00C; i++) {
-        put_frame_separator(bar_x, y, 0x248, 0x1A, 0);
+        view = &work->communities_0x1A4[i];
+        put_frame_separator((s16)name_x - 10, y, 0x248, 0x1A, 0);
         if (i == work->cursor_0x00A) {
             cursor = 1;
             flags = 6;
-            put_frame_cursor_bar(bar_x, y, 0x248, 0x1A, 0, 0);
+            put_frame_cursor_bar((s16)name_x - 10, y, 0x248, 0x1A, 0, 0);
         } else {
             cursor = 0;
             flags = 2;
         }
         GetMenuFontColor(1, cursor, active, 0);
         color = -1;
-        if (view->value_0x54 == view->value_0x5C) {
+        if ((u32)view->value_0x54 == (u32)view->value_0x5C) {
             color = 0x646464FF;
         }
         text_y = (s16)y + 3;
@@ -1364,7 +1369,6 @@ void lb_community_list_ex_draw(LbCitySelectWork* work, bool active) {
         sprintf(text, "%2d/%2d (%2d)", view->value_0x54, view->value_0x5C, view->value_0x54 - view->value_0x58);
         lb_font_print(count_x, text_y, (s8*)text, color, flags);
         y += 0x1A;
-        view++;
     }
     flfntFlush();
     flfntStackReset();
@@ -1482,46 +1486,37 @@ void draw_search_city_dialog(LbCitySelectWork* work, bool active) {
 
 /* 0x80439BF0 (0x1A8): the value list dialog of the selected tab (events or second filters). */
 void lb_city_filter_list_draw(LbCitySelectWork* work, bool active) {
-    u8 kind = work->tab_kinds_0x12EC[work->tab_cursor_0x130C];
-    s32 title;
     s32 x;
     s32 text_x;
-    s32 bar_x;
     s16 y;
+    u8 kind = work->tab_kinds_0x12EC[work->tab_cursor_0x130C];
     s16 i;
     bool cursor;
     u32 flags;
     s32 color;
     s8* text;
-    s16* entry;
 
-    title = 0x271;
-    if (kind == 1) {
-        title = 0x278;
-    }
-    x = put_frame_dialog_title(0x14, 0x68, 0x12C, 0x114, 0x505070FF, 0, 0, (s8*)LbStr(0, title), 4);
+    x = put_frame_dialog_title(0x14, 0x68, 0x12C, 0x114, 0x505070FF, 0, 0, (s8*)LbStr(0, kind == 1 ? 0x278 : 0x271), 4);
     lb_page_arrow_put((s16)(x + 0xAA), 0x5E, work->list_page_0x1318, work->list_pages_0x131A,
                       work->arrow_moved_0x008, active);
     text_x = x + 0x1E;
     y = 0x80;
     font_set_size(18, 18);
-    entry = work->list_0x1320;
-    bar_x = (s16)text_x - 10;
-    for (i = 0; i < work->list_count_0x131E; i++, entry++) {
-        put_frame_separator(bar_x, y, 0x104, 0x1A, 0);
+    for (i = 0; i < work->list_count_0x131E; i++) {
+        put_frame_separator((s16)text_x - 10, y, 0x104, 0x1A, 0);
         if (i == work->list_cursor_0x131C) {
             cursor = 1;
             flags = 6;
-            put_frame_cursor_bar(bar_x, y, 0x104, 0x1A, 0, 0);
+            put_frame_cursor_bar((s16)text_x - 10, y, 0x104, 0x1A, 0, 0);
         } else {
             cursor = 0;
             flags = 2;
         }
         color = GetMenuFontColor(1, cursor, active, 0);
         if (kind == 1) {
-            text = lb_city_second_filter_name_get(*entry);
+            text = lb_city_second_filter_name_get(work->list_0x1320[i]);
         } else {
-            text = lb_city_event_name_get(*entry);
+            text = lb_city_event_name_get(work->list_0x1320[i]);
         }
         lb_font_print(text_x, y + 3, text, color, flags);
         y += 0x1A;
@@ -1557,106 +1552,100 @@ void lb_city_timer_draw(LbCitySelectWork* work) {
 /* 0x80439EF8 (0x414): draws the city select's current state. */
 void lb_city_select_draw(void) {
     LbCitySelectWork* work = (LbCitySelectWork*)lobby_w.menu_0xAC;
+    s32 state = work->state_0x000;
 
-    switch (work->state_0x000) {
-    case 2:
-        put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x264), 0);
-        if (work->server_type_0x003 == 3) {
-            lb_city_list_ex_draw(work, 1);
-        } else {
-            lb_city_list_draw(work, 1);
-        }
-        break;
-    case 3:
-        put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
-        switch (work->step_0x001) {
-        case 0:
-            lb_city_member_list_draw(work, 1);
-            break;
-        case 1:
-            lb_city_member_list_draw(work, 1);
-            if (work->sub_0x002 == 1) {
-                put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
-            }
-            break;
+    for (;;) {
+        switch (state) {
         case 2:
-            lb_city_member_list_draw(work, 1);
+            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x264), 0);
+            if (work->server_type_0x003 == 3) {
+                lb_city_list_ex_draw(work, 1);
+            } else {
+                lb_city_list_draw(work, 1);
+            }
             break;
         case 3:
-        case 4:
-            menu_friend_list_draw((FriendCardView*)work->card_view_0x114C);
-            if (work->step_0x001 == 4 && work->sub_0x002 == 1) {
-                put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
-            }
-            break;
-        }
-        break;
-    case 4:
-        switch (work->step_0x001) {
-        case 0:
             put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
-            lb_city_member_list_draw(work, 0);
-            put_message_window((s8*)LbStr(0, 0x27F), (s8*)LbStr(1, 0x2D), (s8*)LbStr(1, 0x2E), work->yes_no_0x1340, 0,
-                               -1);
-            break;
-        case 1:
-            if (work->sub_0x002 == 1) {
-                put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
-            }
-            break;
-        }
-        break;
-    case 5:
-        if (lobby_w.state_0x000 == 33) {
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
-        } else {
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x266), 0);
-        }
-        draw_search_city_dialog(work, 1);
-        switch (work->step_0x001) {
-        case 1:
-            lb_city_timer_draw(work);
-            break;
-        }
-        break;
-    case 6:
-        if (lobby_w.state_0x000 == 33) {
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
-        } else {
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x266), 0);
-        }
-        draw_search_city_dialog(work, 0);
-        lb_city_filter_list_draw(work, 1);
-        lb_city_timer_draw(work);
-        break;
-    case 8:
-        if (work->step_0x001 == 0 || work->step_0x001 >= 3 || lobby_w.state_0x000 == 37) {
-            if (work->step_0x001 == 3) {
-                if (work->server_type_0x003 == 3) {
-                    lb_community_list_ex_draw(work, 1);
-                } else {
-                    lb_community_list_draw(work, 1);
+            switch (work->step_0x001) {
+            case 0:
+                lb_city_member_list_draw(work, 1);
+                break;
+            case 1:
+                lb_city_member_list_draw(work, 1);
+                if (work->sub_0x002 == 1) {
+                    put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
                 }
-            }
-            if (work->server_type_0x003 == 3 && work->step_0x001 == 3 && work->sub_0x002 == 1) {
-                put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
+                break;
+            case 2:
+                lb_city_member_list_draw(work, 1);
+                break;
+            case 3:
+            case 4:
+                menu_friend_list_draw((FriendCardView*)work->card_view_0x114C);
+                if (work->step_0x001 == 4 && work->sub_0x002 == 1) {
+                    put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
+                }
+                break;
             }
             break;
-        }
-        if (lobby_w.state_0x000 == 33) {
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
-        } else {
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x266), 0);
-        }
-        draw_search_city_dialog(work, 1);
-        switch (work->step_0x001) {
-        case 1:
+        case 4:
+            switch (work->step_0x001) {
+            case 0:
+                put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
+                lb_city_member_list_draw(work, 0);
+                put_message_window((s8*)LbStr(0, 0x27F), (s8*)LbStr(1, 0x2D), (s8*)LbStr(1, 0x2E), work->yes_no_0x1340, 0,
+                                   -1);
+                break;
+            case 1:
+                if (work->sub_0x002 == 1) {
+                    put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
+                }
+                break;
+            }
+            break;
+        case 5:
+            if (lobby_w.state_0x000 == 33) {
+                put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
+            } else {
+                put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x266), 0);
+            }
+            draw_search_city_dialog(work, 1);
+            switch (work->step_0x001) {
+            case 1:
+                lb_city_timer_draw(work);
+                break;
+            }
+            break;
+        case 6:
+            if (lobby_w.state_0x000 == 33) {
+                put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
+            } else {
+                put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x266), 0);
+            }
+            draw_search_city_dialog(work, 0);
+            lb_city_filter_list_draw(work, 1);
             lb_city_timer_draw(work);
             break;
+        case 8:
+            if (work->step_0x001 == 0 || work->step_0x001 >= 3 || lobby_w.state_0x000 == 37) {
+                if (work->step_0x001 == 3) {
+                    if (work->server_type_0x003 == 3) {
+                        lb_community_list_ex_draw(work, 1);
+                    } else {
+                        lb_community_list_draw(work, 1);
+                    }
+                }
+                if (work->server_type_0x003 == 3 && work->step_0x001 == 3 && work->sub_0x002 == 1) {
+                    put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
+                }
+                break;
+            }
+            state = 5;
+            continue;
+        case 13:
+            put_message((s8*)LbStr(3, 0x1F6), 18, -1);
+            break;
         }
-        break;
-    case 13:
-        put_message((s8*)LbStr(3, 0x1F6), 18, -1);
         break;
     }
 }
@@ -1681,9 +1670,9 @@ void lb_city_move_confirm_draw(void) {
 
 /* 0x8043A3E0 (0x188): the city move confirm step (lb_yes_no_step, lobby_player_place), screen 32 */
 void lb_city_move_confirm_step(void) {
-    LbCityMoveWork* work = (LbCityMoveWork*)lobby_w.menu_0xAC;
     u8 map;
-    u16 angle;
+    LbCityMoveWork* work = (LbCityMoveWork*)lobby_w.menu_0xAC;
+    s8* result = &work->result_0x00C;
 
     switch (work->step_0x000) {
     case 0:
@@ -1707,14 +1696,14 @@ void lb_city_move_confirm_step(void) {
         }
         break;
     case 2:
-        if (((s32 (*)(s8*))NetCtrlWk::requestListRefreshAlias)(&work->result_0x00C) == 0) {
+        if (((s32 (*)(s8*))NetCtrlWk::requestListRefreshAlias)(result) == 0) {
             lb_city_move_close();
         } else {
             work->step_0x000++;
         }
         break;
     case 3:
-        switch (work->result_0x00C) {
+        switch (*result) {
         case 1:
             releaseRemotePlayerParts();
             work->step_0x000++;
@@ -1727,8 +1716,7 @@ void lb_city_move_confirm_step(void) {
     case 4:
         lb_city_move_close();
         map = get_now_mapno();
-        angle = stage_entry_angle_get(map, 0);
-        lobby_player_place(0, stage_entry_pos_get(map, 0), angle);
+        lobby_player_place(0, stage_entry_pos_get(map, 0), stage_entry_angle_get(map, 0));
         return;
     }
     subTransSet((u32)lb_city_move_confirm_draw, 0, NULL);
@@ -1736,7 +1724,7 @@ void lb_city_move_confirm_step(void) {
 
 /* 0x8043A568 (0x1B8): collects the selectable values of list `kind` (0 events, 1 second filters, 2 first filters) for
  * the selected server type and this hunter's rank; returns the count. */
-s16 lb_city_filters_collect(u8 kind) {
+s32 lb_city_filters_collect(u8 kind) {
     LbCitySelectWork* work = (LbCitySelectWork*)lobby_w.menu_0xAC;
     PlaceUserData* user;
     s32 i;
@@ -1794,7 +1782,6 @@ void lb_community_select_step(LbCitySelectWork* work) {
     NetSlotIds ids;
     const char* peer_id;
     NetCommunityView* view;
-    s32 kind;
     s32 cards;
 
     work->arrow_moved_0x008 = 0;
@@ -1846,11 +1833,10 @@ void lb_community_select_step(LbCitySelectWork* work) {
                         work->step_0x001 = 2;
                     }
                 } else {
-                    kind = work->tab_kinds_0x12EC[work->tab_cursor_0x130C];
-                    if ((u32)(kind - 1) <= 1) {
+                    if ((u32)(work->tab_kinds_0x12EC[work->tab_cursor_0x130C] - 1) <= 1) {
                         work->state_0x000 = 6;
                         work->list_cursor_0x131C = 0;
-                        lb_city_filter_list_build(work, kind, 0);
+                        lb_city_filter_list_build(work, work->tab_kinds_0x12EC[work->tab_cursor_0x130C], 0);
                         sysSE_req(5);
                     }
                 }
@@ -2079,7 +2065,7 @@ void lb_community_select_step(LbCitySelectWork* work) {
                         scroll->row = scroll->row_limit - 1;
                         work->member_row_0x54A = scroll->row;
                     } else if (scroll->row == scroll->row_limit - 1 && scroll->row != 0) {
-                        scroll->row = scroll->row - 1;
+                        scroll->row--;
                         work->member_row_0x54A = scroll->row;
                     }
                 } else if (scroll->move_flags & 3) {
@@ -2251,8 +2237,9 @@ void em003_call_se_step(_ENEMY_WORK* self, u8 call_kind, u8 variant) {
         row = 6;
         break;
     }
-    frames = em003_call_se_frames[row + variant];
-    ids = em003_call_se_ids[row + variant];
+    row += variant;
+    frames = em003_call_se_frames[row];
+    ids = em003_call_se_ids[row];
     if (frames[se->call_se_step_0x003] != -1) {
         se->call_se_timer_0xA42++;
         if (se->call_se_timer_0xA42 >= frames[se->call_se_step_0x003]) {
@@ -2294,9 +2281,9 @@ s32 placeinfo_page12_step(MenuSlot* slot) {
     s32 ret = 0;
     u16 input = slot->buttons_trig | (slot->field_0x008 & 0xF);
     s8 rows = slot->field_0x1A3 / 6;
+    s32 cursor;
     s8 col = slot->field_0x1A2 % 6;
     s8 row = slot->field_0x1A2 / 6;
-    s32 cursor;
 
     if (input & 0x20) {
         ret = 2;
@@ -2339,9 +2326,7 @@ void placeinfo_page12_draw(MenuSlot* slot) {
     _mh_ivec2_ pos;
     u8** names;
     u16* cells;
-    const u8* icon;
     s32 offset;
-    s32 cell;
     s32 i;
 
     get_lsp_data(0xB49, &base);
@@ -2355,15 +2340,15 @@ void placeinfo_page12_draw(MenuSlot* slot) {
         draw_font_idx(0xB62, (s8*)names[24], 1, &base);
     }
     offset = ((PlaceUserData*)lobby_world_block)->award_bits_0x40F8[1] != 0 ? 0 : 6;
-    for (i = 0, cell = 0, icon = placeinfo_award_icons; i < slot->field_0x1A3; cell++, icon++, i++) {
+    for (i = 0; i < slot->field_0x1A3; i++) {
         cells = (u16*)get_menu_lsp_tbl(0x146);
-        put_lsp_anchor_offset(cells[offset + cell], &pos, base);
+        put_lsp_anchor_offset(cells[offset + i], &pos, base);
         draw_sprite_idx(0xB5D, &pos);
         if (cursor == i && chk_pointer() == 0) {
             draw_sprite_idx(0xB5F, &pos);
         }
         if (placeinfo_award_ck(i) == 1) {
-            draw_award_icon_idx(0xB5C, *icon - 1, &pos);
+            draw_award_icon_idx(0xB5C, placeinfo_award_icons[i] - 1, &pos);
         }
         if (cursor == i && chk_pointer() == 0) {
             draw_sprite_idx(0xB5E, &pos);
@@ -2417,7 +2402,6 @@ void placeinfo_world_draw(MenuSlot* slot) {
     u32 ships_open = userdata_progress_flag_ck(0x19);
     u16* frames;
     u16* rows;
-    u16* row_ids;
     PlaceUserData* ud;
     PlaceFarmPlot* plot;
     PlaceShip* ship;
@@ -2468,9 +2452,9 @@ void placeinfo_world_draw(MenuSlot* slot) {
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0x150), &frame);
             draw_sprite_idx(0x2915, &frame);
             draw_sprite_idx(0x2910, &frame);
-            for (i = 0, row_ids = rows; i < plots; row_ids++, i++) {
+            for (i = 0; i < plots; i++) {
                 plot = &((PlaceUserData*)lobby_world_block)->farm_plots_0x3F38[i];
-                put_lsp_anchor_offset(*row_ids, &row, frame);
+                put_lsp_anchor_offset(rows[i], &row, frame);
                 draw_sprite_ary((u16*)get_menu_lsp_tbl(0x152), &row);
                 draw_font_idx(0x291A, (s8*)LbStr(0, i + 0x141), 0, &row);
                 switch (plot->state_0x0) {
@@ -2503,8 +2487,9 @@ void placeinfo_world_draw(MenuSlot* slot) {
         draw_sprite_idx(0x2915, &frame);
         draw_sprite_idx(0x2911, &frame);
         ud = (PlaceUserData*)lobby_world_block;
-        for (i = 0, ship = ud->ships_0x4658; i < ud->ship_count_0x4670; ship++, rows++, i++) {
-            put_lsp_anchor_offset(*rows, &row, frame);
+        for (i = 0; i < ud->ship_count_0x4670; i++) {
+            ship = &ud->ships_0x4658[i];
+            put_lsp_anchor_offset(rows[i], &row, frame);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0x152), &row);
             draw_font_idx(0x291A, (s8*)lb_speaker_name_get(i + 20), 0, &row);
             if (ship->item_0x0 != 0) {
