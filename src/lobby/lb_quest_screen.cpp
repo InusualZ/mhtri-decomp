@@ -48,16 +48,20 @@
  *   GUESS: note_pane_state_2, note_pane_state_3, note_pane_state_4, note_pane_state_5, note_pane_state_6
  *   GUESS: note_pane_state_9
  * RESIDUALS. Every row is written (95).  Partial:
- *   `note_pane_angle_step`, `note_pane_state_1` (`calcVecAng2`'s second argument: retail passes r4 unset),
- *   `note_pane_pos_step`, `note_value_to_slot`/`note_slot_to_value` (retail reaches
- *   `note_slot_flat_table` through `r13`, ours through `lis`/`addi`), `note_trade_open` (the loop counters' `li` pair
- *   sits before the table base), `note_trade_offers_roll`/`note_trade_slots_draw`/`note_trade_route_draw`/
- *   `note_trade_select_step`/`note_itembox_row_draw`/`note_trade_voyage_draw`/
- *   `note_trade_offer_draw` (register choice); in the tail `quest_area_spawn_apply` (the two six-kind membership
- *   tests are written out; retail reloads each `need` word for the free-slot search where ours keeps them in r3-r7), the kill bookkeeping and spawn-list rows (`quest_enemy_kill_record`
- *   saves one register more, `_savegpr_20`/`_restgpr_20` against `_savegpr_21`/`_restgpr_21`), `quest_net_kill_apply`
- *   (retail tests the element against 3 with two branches), `quest_arena_key_set`, `quest_arena_need_add` (operand
- *   order of the shift and the index add).
+ *   `note_slot_to_value` (volatile register choice: retail keeps the index in r10 and the hoisted `slot` in r5),
+ *   `note_value_to_slot` (the same: table walk in r5/r6, value in r4), `note_trade_open` (the `li` pair of `sum`/`i`
+ *   is scheduled after the `slot_count != 1` test), `note_trade_route_draw` (retail tests case 2 with `cmpwi`, ours
+ *   `cmplwi` from the `(u32)` switch; a plain or `(s32)` switch loses more), `note_trade_slots_draw` (the row and
+ *   blink induction pointers swap r28/r30), `note_trade_offers_roll` (retail sign-extends `i` before
+ *   `goods_count - i` and loads `slot_0x24` before the bonus-slot modulo), `note_trade_offer_draw` (one temp register);
+ *   in the tail `quest_area_spawn_apply` (backend CSE after loop unrolling, `after-common-subexpression-elimination`
+ *   following `after-loop-transforms`, keeps the six `need` words and the kind in registers for the free-slot search
+ *   and the store; retail reloads them - `#pragma opt_common_subs off` only restores the kind reload),
+ *   `quest_enemy_kill_record` (retail keeps `em_mini_kill_kind_get`'s result unmasked: its prototype returns u8,
+ *   request lobby-lb-quest-screen#1; and masks `area` at the `quest_spawn_rec_find_in` call, which constant
+ *   propagation drops in ours), `quest_net_kill_apply` (retail tests the element with `cmplwi 3; bgt; beq`, ours
+ *   folds it to `cmplwi 2; bgt`), `quest_arena_key_set`, `quest_arena_need_add` (operand order of the shift and the
+ *   index add).
  *   Data: the note trade's tables are defined after the bodies (the target relocates each by name, which MWCC only
  *   does for an object not yet defined); `.data`/`.sdata` emission order is not checked against the target.
  *   flipcheck: `.text`/extab/extabindex short of the claim (partial rows); the `.sdata`/`.sdata2` pool is shared with
@@ -68,7 +72,10 @@
  *   (`em_area_entry_tbl`) are one 0x44-byte record (`quest_area_spawn_apply` hands the first to
  *   `em_area_entry_release`).  `quest_element_pick_ck`'s `use_alt` test is a conditional expression (an `if` drops a
  *   branch).  `quest_record_copy` is a plain struct assignment: MWCC copies `QuestRecord` member by member, which is
- *   what fixes that record's layout (`quest/quest_types.h`).
+ *   what fixes that record's layout (`quest/quest_types.h`).  `quest_area_spawn_setup`'s `count` is an s32 (its
+ *   loop compares it unmasked, and `enemy/em_pop.cpp`'s caller passes the s32 field unmasked); `note_trade_full_draw`'s
+ *   frame is an s16 (the caller loads it with `lha`).  The `quest_enemy_kill_record`/`quest_area_spawn_setup` locals
+ *   are declared in the order of the retail register assignment (the first declared colours first).
  */
 
 #include "types.h"
@@ -193,13 +200,16 @@ void note_pane_state_9(NoteWork* self);
  * The note-pane band (0x803A3A50..0x803A52A4).
  * ------------------------------------------------------------------------------------------------- */
 
-/* 0x803A4170 - steps the pane's eased position towards its target (4004 units while its animation pair is (0,4), else
- * 1820), snapping on within one step. */
+/* 0x803A4170 - steps the pane's eased position towards its target (1820 units while its animation pair is (0,4), else
+ * 4004), snapping on within one step. */
 extern "C" void note_pane_pos_step(NoteWork* self) {
-    u32 step = (note_pane_anim_pair_ck(self, 0, 4) != 0) ? 4004 : 1820;
-    u32 target = self->field_0x1A8;
-    u32 cur = (u16)self->field_0x18C;
-    u16 avail = (u16)(target - cur);
+    u32 step = (note_pane_anim_pair_ck(self, 0, 4) != 0) ? 1820 : 4004;
+    u32 target;
+    u32 cur = self->field_0x18C;
+    u16 avail;
+
+    target = self->field_0x1A8;
+    avail = (u16)(target - (u16)cur);
     if ((u16)(avail + step) < (u32)(step * 2)) {
         self->field_0x18C = target;
     } else if (avail < 0x8000) {
@@ -267,15 +277,13 @@ extern "C" s32 note_timer_ready_ck(NoteTimer* timer) {
 extern "C" u32 note_value_to_slot(u16 value) {
     s8 t;
     u32 index;
-    const u16* p;
     u32 j;
     const u16* q;
 
     index = 0;
     for (t = 0; t < 4; t++) {
-        p = note_slot_table[t];
         for (j = 0; j < 6; j++) {
-            if (value == p[j]) {
+            if (value == note_slot_table[t][j]) {
                 return index;
             }
             index++;
@@ -603,15 +611,15 @@ extern "C" u32 quest_arena_item_count_get(void) {
 
 /* 0x803A7E68 (0x210): files the monster slots of `count` area lists into spawn list `index` of the move work
  * (continuing the previous list's spawn order), spawns each, and keeps the area's main monster in `main_0x2258`. */
-extern "C" void quest_area_spawn_setup(Q_MoveWork* work, u32* area, u8 count, u8 index) {
+extern "C" void quest_area_spawn_setup(Q_MoveWork* work, u32* area, s32 count, u8 index) {
     EmGroundRec ground;
     u32* num;
+    QuestEntrySlot* slot;
+    QuestBossSpawn* boss;
+    QuestSpawnRec* rec;
     QuestSpawnRec* main;
     s32 i;
-    QuestSpawnRec* rec;
-    QuestEntrySlot* slot;
     u32 order;
-    QuestBossSpawn* boss;
     s32 element;
 
     em_ground_rec_clear(&ground);
@@ -701,19 +709,20 @@ extern "C" s32 quest_area_entry_collect(Q_MoveWork* work, QuestBossSpawn** out) 
  * the kinds the live area entries near the area and the live small monsters still need, releases the others (their
  * resources, control slot and SE slot), loads the new ones, and respawns the large monsters whose count ran out. */
 extern "C" void quest_area_spawn_apply(Q_MoveWork* work, u8 index, u8 sub) {
-    s8 keep[6];
     s32 need[6];
     s32 add[6];
-    EmAreaEntry* entry = &em_area_entry_tbl[0][0];
+    EmAreaEntry* entry;
     s32 i;
-    s32 j;
-    s32 n;
     QuestBossSpawn** list;
     QuestSpawnRec* rec;
-    QuestEntrySlot* slot;
     _ENEMY_WORK* enemy;
-    u16 max;
+    s32 n;
+    QuestEntrySlot* slot;
+    s8 keep[6];
+    s32 j;
     u8 slot_index;
+    u16 max;
+    entry = &em_area_entry_tbl[0][0];
 
     for (i = 0; i < 6; i++) {
         add[i] = 0;
@@ -762,7 +771,8 @@ extern "C" void quest_area_spawn_apply(Q_MoveWork* work, u8 index, u8 sub) {
         need[j] = slot->monster_0x00;
     }
     enemy = (_ENEMY_WORK*)get_move_work_adrs(3);
-    for (max = get_move_work_max(3); max > 0; max--, enemy++) {
+    max = get_move_work_max(3);
+    for (i = 0; i < max; i++, enemy++) {
         if (enemy->active == 0 || (enemy->field_0x1C8 & 1) != 0 || enemy->field_0x00C != 0) {
             continue;
         }
@@ -1156,20 +1166,22 @@ static inline void quest_kill_cut_start(_ENEMY_WORK* enemy) {
  * per-kind counts and sizes, its spawn entry's count, the tracked-kind kills or the quest element's progress, and
  * the kill cut-in unless that finished the quest. */
 extern "C" void quest_enemy_kill_record(Q_MoveWork* work, _ENEMY_WORK* enemy, u8 from_net) {
-    _ENEMY_WORK* target = NULL;
-    Q_ItemWork* item = move_work_item_work_get();
-    s32 done;
-    s32 size;
-    u32 big;
+    Q_ItemWork* item;
+    s32 need;
+    s32 i;
+    _ENEMY_WORK* target;
     u16 key;
-    u8 element;
+    u16 size;
     u8 kind;
     u8 how;
-    u8 area;
+    u32 big;
+    u32 area;
+    u32 element;
+    s32 done;
     QuestSpawnRec* entry;
-    s32 i;
-    s32 need;
     s8 first;
+    target = NULL;
+    item = move_work_item_work_get();
 
     if (item == NULL) {
         return;
@@ -1217,15 +1229,15 @@ extern "C" void quest_enemy_kill_record(Q_MoveWork* work, _ENEMY_WORK* enemy, u8
             item->size_0x534[kind].max = size;
         }
     }
-    entry = quest_spawn_rec_find_in(key, area);
+    entry = quest_spawn_rec_find_in(key, (u8)area);
     if (entry != NULL && entry->count_0x4 > 0) {
         entry->count_0x4--;
     }
     if (element > 2) {
         if (big == 1 && Pl_motion_input_ck(0) == 0) {
-            for (i = 0; i < 3; i++) {
-                if (kind == work->spawn_0x2274[i + 3].monster_0x6) {
-                    ((QuestWork*)item)->slot_kills_0x6980[i]++;
+            for (i = 3; i < 6; i++) {
+                if (kind == work->spawn_0x2274[i].monster_0x6) {
+                    ((QuestWork*)item)->slot_kills_0x6980[i - 3]++;
                     break;
                 }
             }
@@ -1279,15 +1291,15 @@ extern "C" void quest_enemy_kill_record(Q_MoveWork* work, _ENEMY_WORK* enemy, u8
             quest_kill_cut_start(target);
         }
     } else {
-        done = 0;
+        s32 total = 0;
         for (i = 0; i < 3; i++) {
             quest_arena_count_get(i);
             need = quest_arena_need_get(i);
             if (need >= 0) {
-                done += need;
+                total += need;
             }
         }
-        if (done == 0) {
+        if (total == 0) {
             if (target != NULL) {
                 quest_kill_cut_start(target);
             }
@@ -1307,6 +1319,7 @@ extern "C" void quest_net_kill_apply(u8 area, u16 key, u16 count, s32 how, u8 el
     QuestSpawnRec* entry;
     s32 i;
     s8 first;
+    s32 done;
 
     if (work != NULL && work->state_0x113 != 1 && (item = move_work_item_work_get()) != NULL) {
         taken = 0;
@@ -1340,6 +1353,9 @@ extern "C" void quest_net_kill_apply(u8 area, u16 key, u16 count, s32 how, u8 el
                 if (quest_element_progress_step(kind, how, &first) == 1 && quest_flag_8_ck(NULL) != 1 &&
                     quest_flag_80000_ck(NULL) == 0) {
                     if (quest_flag_4000000_ck(NULL) == 1) {
+                        if ((u8)(element - 1) <= 1) {
+                            done = 1;
+                        }
                     } else if (quest_flag_2000000_ck(NULL) == 1 || quest_flag_80000000_ck(NULL) == 1) {
                         if (element == 0) {
                             quest_element_pick_ck((QuestWork*)item, 1, 0);
@@ -1750,16 +1766,15 @@ extern "C" s32 npc_talk_step(NoteWork* self) {
 /* 0x803A40E4 (0x8C): steps angle `cur` towards `target` by `step`, snapping on within one step. */
 extern "C" u16 note_pane_angle_step(u16 target, u16 cur, u16 step) {
     u16 diff = target - cur;
-    u16 result;
 
     if (abs((s16)diff) < step) {
-        result = target;
+        cur = target;
     } else if (diff < 0x8000) {
-        result = cur + step;
+        cur += step;
     } else {
-        result = cur - step;
+        cur -= step;
     }
-    return result;
+    return cur;
 }
 
 /* 0x803A4214 (0xC4): puts the pane at its map's home spot, facing its current heading, idle, and starts its voice
@@ -1823,6 +1838,7 @@ extern "C" void note_pane_state_0(NoteWork* self) {
 
 /* 0x803A4448 (0xF0): pane state 1, looking around: turns towards its home for 100..163 frames. */
 extern "C" void note_pane_state_1(NoteWork* self) {
+    NoteRestBlock* rest = &self->rest_0x1B4;
     u16 angle;
 
     switch (self->field_0x169) {
@@ -1836,7 +1852,7 @@ extern "C" void note_pane_state_1(NoteWork* self) {
         if (--self->field_0x16C <= 0) {
             note_pane_set_anim_pair(self, 0, 3);
         } else {
-            angle = note_pane_angle_step(calcVecAng2(&self->vec_0x170, &self->vec_0x17C), self->field_0x18C, 0x100);
+            angle = note_pane_angle_step(calcVecAng2(&self->vec_0x170, &rest->pos_0x00), self->field_0x18C, 0x100);
             self->field_0x18C = angle;
             self->field_0x1A8 = angle;
         }
@@ -2455,8 +2471,8 @@ extern "C" void note_trade_offers_roll(LbNoteTradeWork* w, s16 slot) {
     s32 j;
     s8* dice;
     s8 delta;
-    u16 roll;
     s8 sum;
+    u16 roll;
     s16 k;
     s32 boost;
 
@@ -2471,7 +2487,7 @@ extern "C" void note_trade_offers_roll(LbNoteTradeWork* w, s16 slot) {
     table = note_goods_tbl[0];
     w->offer_count_0x38 = 6;
     w->offer_cursor_0x3A = 0;
-    for (i = 0, offer = w->offers_0x70; i < w->offer_count_0x38; i++, offer++) {
+    for (offer = w->offers_0x70, i = 0; i < w->offer_count_0x38; i++, offer++) {
         memset(offer, 0, sizeof(NoteOffer));
         seed = rand_lcg_step(seed);
         if (w->slot_count_0x36 == 1) {
@@ -2528,7 +2544,7 @@ extern "C" void note_trade_offers_roll(LbNoteTradeWork* w, s16 slot) {
                         offer->bonus_0x07 += delta;
                         seed = rand_lcg_step(seed);
                         offer->bonus_slot_0x08 =
-                            (w->slot_0x24 + seed % (w->slot_count_0x36 - 1) + 1) % w->slot_count_0x36;
+                            (w->slot_0x24 + (seed % (w->slot_count_0x36 - 1) + 1)) % w->slot_count_0x36;
                     }
                 } else {
                     offer->points_0x06 += delta;
@@ -2692,7 +2708,7 @@ extern "C" void note_trade_help_draw(LbNoteTradeWork* w) {
 }
 
 /* 0x803A64C8 (0x9C): draws a full route's blinking "complete" mark at `ofs`, at frame `frame`. */
-extern "C" void note_trade_full_draw(u16 frame, _mh_ivec2_* ofs) {
+extern "C" void note_trade_full_draw(s16 frame, _mh_ivec2_* ofs) {
     _mh_ivec2_ pos;
 
     draw_sprite_ary(note_full_back_tbl, ofs);
@@ -2892,11 +2908,11 @@ extern "C" void note_itembox_row_draw(Eft052ItemBox* box) {
     _mh_ivec2_ base;
     _mh_ivec2_ sel;
     _mh_ivec2_ pos;
-    _SPR_DATA_ mark;
-    _SPR_DATA_ icon;
     _SPR_DATA_ frame;
-    BOOL found;
+    _SPR_DATA_ icon;
+    _SPR_DATA_ mark;
     s32 i;
+    BOOL found;
 
     get_lsp_data(10099, &pos);
     draw_sprite_anim_ary(note_itembox_back_tbl, 0, &pos);
@@ -2915,7 +2931,7 @@ extern "C" void note_itembox_row_draw(Eft052ItemBox* box) {
             found = TRUE;
             uv_pair_copy(&sel, &cell);
         }
-        if ((u8)(box->state_0x00 - 1) <= 1 && chk_pointer() == 0 && box->hover_0x10 == i) {
+        if ((u8)(box->state_0x00 + 0xFF) <= 1 && chk_pointer() == 0 && box->hover_0x10 == i) {
             spr_data_copy(&mark, get_lsp_data(4868, NULL));
             mark.pos.x += cell.x;
             mark.pos.y += cell.y;
@@ -3013,7 +3029,7 @@ extern "C" void note_trade_reward_draw(LbNoteTradeWork* w) {
 /* 0x803A73FC (0xF4): draws the voyage line while the ship is out: the route and the voyages left. */
 extern "C" void note_trade_voyage_draw(LbNoteTradeWork* w) {
     _mh_ivec2_ pos;
-    s8 text[32];
+    s8 text[16];
     s8* tail;
 
     if (w->timer_0xD0->voyage_0x06 != 0) {

@@ -60,7 +60,7 @@ u32 quest_rand_next(void);
 
 /* 0x803A7E68 - files the monster slots of `count` area lists (the quest work's +0x69A8 handles) into spawn list
  * `index` of the move work and spawns them.  GUESS name. */
-void quest_area_spawn_setup(struct Q_MoveWork* work, u32* area, u8 count, u8 index);
+void quest_area_spawn_setup(struct Q_MoveWork* work, u32* area, s32 count, u8 index);
 /* 0x803A8128 - applies the area `index`'s spawn for sub-state `sub` to the slot's move work.  GUESS name. */
 void quest_area_spawn_apply(struct Q_MoveWork* work, u8 index, u8 sub);
 
@@ -184,7 +184,7 @@ void note_trade_accept(LbNoteTradeWork* w);
 s32 note_trade_select_step(LbNoteTradeWork* w);
 void note_trade_frame_draw(void);
 void note_trade_help_draw(LbNoteTradeWork* w);
-void note_trade_full_draw(u16 frame, struct _mh_ivec2_* ofs);
+void note_trade_full_draw(s16 frame, struct _mh_ivec2_* ofs);
 void note_trade_slot_draw(LbNoteTradeWork* w, s16 slot, s32 open, s32 active, u32 arrow, struct _mh_ivec2_* pos);
 void note_trade_slots_draw(LbNoteTradeWork* w, s32 active);
 void note_trade_bonus_draw(u16 panel, LbNoteTradeWork* w);
