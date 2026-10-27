@@ -8,8 +8,8 @@
 #ifdef __cplusplus
 extern "C" {
 
-/* 0x801067F4 - starts a part-break effect of `kind` at `pos`. */
-void eft_area_part_break_set(u8 kind, nw4r::math::VEC3* pos, u8 area, s16 param, f32 scale);
+/* 0x801067F4 - starts a part-break effect of `kind` at `pos` (the owner's parameter order). */
+void eft_area_part_break_set(u8 kind, nw4r::math::VEC3* pos, f32 scale, u8 area, u32 timer);
 
 }
 #endif

@@ -4,10 +4,13 @@
  * cycle and the area effect starts.
  *
  * RANGE. `.text` 0x802AD9C0..0x802B5640 (131 functions); data, bss, sdata, sdata2, extab and extabindex as the unit's
- *   block in config/RMHE08/splits.txt.  Functions are written in two halves: 0x802AD9C0..0x802B2978 against the
- *   `StageWork` view below, 0x802B2978.. inside `namespace view_fn_802B2AA0` against `stage/fn_802B2AA0.h`'s
- *   `StageRuntime` view of the same block (extern "C", so the symbols are unchanged).
- * FLAGS. `cflags_main`; `#pragma peephole off` per half (retail keeps the unfused `clrlwi`+`slwi`/`mulli`, the
+ *   block in config/RMHE08/splits.txt.  The functions follow retail's address order (the extabindex records pair);
+ *   most are written against the `StageWork` view below, the rest inside `namespace view_fn_802B2AA0` blocks
+ *   against `stage/fn_802B2AA0.h`'s `StageRuntime` view of the same block (extern "C", so the symbols are
+ *   unchanged).  Functions called above their definition are declared once after the type and data declarations.
+ * FLAGS. `cflags_main`; `#pragma optimization_level 4` over the file (playbook 108: stage_part_break, the scatter
+ *   step, stage_parts_seat, stage_parts_check, stage_part_joints_hide and three more rows rise, none falls);
+ *   `#pragma peephole off` over the file (retail keeps the unfused `clrlwi`+`slwi`/`mulli`, the
  *   duplicated `lis`, and the `li`+`psq_lx` epilogue that the peephole pass folds); `#pragma fp_contract off` over the
  *   file (the target object has no fused multiply-add; with contraction on, the colour and scatter rows fuse).
  * NAMES. Module from the range's own entry points (`get_stg_w`, `get_now_mapno`, `get_worldworld_pos`, ...): no
@@ -21,18 +24,26 @@
  *     keeps `mapno * 4` live across the eft block (`_savegpr_24`), ours recomputes it.
  *   - Data: the `.data` tables (weapon work, start points, scatter and part definitions, 3752 B), `.bss` (12320 B),
  *     `.sdata` (464 B) and `.ctors` are declared, not emitted; the float pool is MWCC's own (`.sdata2` 72 of 144 B).
- *   - The function order differs from retail's (the extabindex records pair different functions), a flip blocker.
- *   - stage_area_models_seat: retail keeps six zero registers (r19..r31) live across the loop.
- *   - stage_part_break: retail keeps `index * 4` in r26 across the effect switch, ours re-derives it per case.
+ *     The `.ctors` entry is stage_effect_seats_init, and the six `*_construct`/`*_clear` rows after it are in the
+ *     order an implicit `StageWork` constructor's member constructors would be emitted (a global `stage_w` object
+ *     with a constructor plus three constructed `VEC3` globals); the hand-written bodies stand in for them.
+ *   - stage_area_models_seat: retail keeps six zero registers (r19..r31) live across the loop and `i * 4` as an
+ *     offset (ours strength-reduces it to a pointer); `opt_common_subs off` separates the zeros but costs more.
+ *   - stage_part_break: retail loads the koware degrees before the argument registers and indexes the koware table
+ *     with two `slwi 2`; a `f32*` table view gives the shifts but not the schedule.
  *   - stage_area_visibility_build: retail branches from the matched-event test straight to the next kept joint;
- *     the `hit` flag adds its stores.
- *   - stg_barrel_bomb_place / stg_trap_place / stg_slinger_special_fire / stage_demo_markers_place /
- *     stg_ground_impact_set: retail loads `shell_set_func_ptr` after the argument registers.
+ *     the `hit` flag adds its stores (an inline match helper is worse; the jump needs a `goto`).
+ *   - stage_demo_markers_place: retail computes the marker point (offsets, count, mod) before `&pos`; every argument
+ *     spelling and an inline helper give `&pos` first.
  *   - stage_colour_cycle_update: the second and third colour lerps colour their float registers in order, the first
  *     interleaved; one inline helper gives all three the first one's colouring.
- *   - stage_blend_table_get, stage_area_load, stage_parts_check, stage_part_bodies_set, stage_area_slot_release,
- *     stage_area_model_load_req, stage_part_joints_hide, stage_area_timer_arm, stage_zone_hit_ck,
- *     stage_area_colour_update (a 4-byte stack slot): register allocation and branch order.
+ *   - stage_area_load: retail narrows `areano` after the stage_map_group_get call and reuses it as the r7 argument;
+ *     its id buffer size (0x28) is read from the frame.
+ *   - stage_parts_seat / stage_part_scatter_step: retail keeps `part + k * 12` live across mhchar_res_node_get, ours
+ *     re-derives it after the call.
+ *   - stage_eft_strips_spawn (the two hoisted float constants swap f30/f31), stage_part_bodies_set (r27..r29
+ *     permuted), stage_area_model_load_req, stage_part_joints_hide, stage_parts_check, stage_area_timer_arm,
+ *     stage_area_colour_update (a 4-byte stack slot): register allocation and scheduling.
  *   - The int->float conversions use MWCC's anonymous `.sdata2` magic where the split names `lbl_8079A460`/
  *     `lbl_8079A470` (playbook 29).
  * SHAPES.
@@ -52,20 +63,37 @@
  *   - get_worldworld_pos returns a copy-constructible `VEC3` view so the result is built in the return slot
  *     (playbook 176).
  *   - stage_land_grid_load_done indexes the pack entries as `i * 2` / `i * 2 + 1`, not a second induction variable.
+ *   - The `shell_set_func_ptr` job-table callers (stg_barrel_bomb_place, stg_trap_place, stg_slinger_special_fire,
+ *     stg_ground_impact_set, stage_demo_markers_place) are bracketed by `#pragma opt_common_subs off` (playbook 208):
+ *     retail loads the table pointer after the arguments.
+ *   - stg_ground_impact_set's joint order is two 2-iteration loops (the hoisted `li r0,0`/`li r0,2`) and its joint
+ *     byte is a `u8` local cast to `s8` at each use; stage_blend_table_get returns from each case, default first.
+ *   - stage_parts_check and stage_part_bodies_set index `w->bodies[b]` with a `u8 b` read before the calls (retail
+ *     keeps `b * 64`, not a body pointer); StageChar's animation count is a `u32` (`lwz` + `cmplw`).
+ *   - A float argument retail loads before the integer ones is either a local read first (stage_light_blend_set's
+ *     `frame`) or a float-third parameter in the owner's prototype (eft_area_part_break_set).
  *   - stage_area_load's effect-slot assignment is the inline helper stage_area_eft_assign (its early returns are
  *     retail's exits; no `goto`).
  */
 
 #include "types.h"
+
 #include "pl.h"
+
 #include "g3d/g3d_obj.h"
+
 #include "nw4r/math.h"
+
 #include "gx.h"
+
 #include "g3d/g3d_resmat.h"             /* nw4r::g3d::ResMdl (rule 2) */
+
 #include "quest/quest_item_slot.h"   /* quest_id_head_ck, quest_id_tail_ck (rule 2) */
+
 #include "lobby/lb_quest_screen.h"   /* the quest-work time and clock accessors (rule 2) */
 
 #include "ef.h"
+
 #include "g3d/g3d_calcview.h"
 
 /* The stage-work block (map symbol, 0x806B87C0).  Never defined here (playbook 29): the object
@@ -74,10 +102,15 @@ extern u8 stage_w[];
 
 /* The unit's pooled data the map already names (playbook 29). */
 extern const u8 stg_map_kind_table[];  /* id remap table, 0x18 B */
+
 extern const u8 stg_area_event_pairs[][2];  /* the area event (index, bit) pairs, 0x18 B */
+
 extern const f32 lbl_8079A480;
+
 extern const f32 lbl_8079A47C;
+
 extern const f32 lbl_8079A484;
+
 extern const f32 lbl_8079A498;
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -141,8 +174,8 @@ typedef struct StageArea {
 typedef struct StageChar {
     /* +0x000 */ MHchar chr;
     /* +0x140 */ u8 pad_0x140[0x1C];
-    /* +0x15C */ u16 anim_count;
-    /* +0x15E */ u8 pad_0x15E[6];
+    /* +0x15C */ u32 anim_count;
+    /* +0x160 */ u8 pad_0x160[4];
 } StageChar; /* size: 0x164 */
 
 /* One of the two area load slots: the four models of a loaded area and their resources. */
@@ -315,15 +348,25 @@ typedef struct StageGroup {
 /* ------------------------------------------------------------------------------------------------ */
 
 extern "C" void* stage_map_group_get(u8 id);
+
 extern "C" u32 stage_map_kind_get(u32 kind);
+
 extern "C" bool stg_area_flag_ck(u8 index, u8 bit);
+
 extern "C" u32 stage_map_area_count_get(u8 id);
+
 extern "C" void stage_part_bodies_set(StageWork* w, u8 areano);
+
 extern "C" void stage_parts_check(StageWork* w, u8 areano);
+
 extern "C" void stage_area_slot_reset(u8 index);
+
 extern "C" void stage_arena_land_grid_load(u8 a, u8 b);
+
 extern "C" void stage_part_break(StageWork* w, u8 index);
+
 extern "C" void* stage_res_offset_get(void* base, s32 off);
+
 extern "C" void* stage_res_body_get(void* self);
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -341,385 +384,38 @@ typedef struct ResolverView {
     /* +0x00 */ u8 pad_0x00[0x48];
     /* +0x48 */ s32 size;
 } ResolverView; /* size: 0x4C */
+
 #include "mh3_pad.h" /* the owner header (rule 2) */
+
 #include "sound/mhchar.h"
+
 #include "sound/fn_800D7F54.h"
+
 #include "unsplit/ef.h"
+
 #include "unsplit/g3d.h"
+
 #include "unsplit/Pl.h"
+
 #include "unsplit/unknown.h"
+
 #include "Pl/Pl_master_ck.h"
+
 #include "fn_8004CAD8.h"
+
 #include "menu/menu_item.h"
+
 #include "ef/eft028_set_koware.h"
+
 #include "g3d/g3d_resnode.h"
+
 #include "mh3_pad/system_w.h"
+
 #include "ef/fn_800CDB2C.h"
 
 #pragma fp_contract off
 #pragma peephole off
-
-/* Returns the stage-work block. */
-void* get_stg_w()
-{
-    return stage_w;
-}
-
-/* Returns the current map number. */
-u8 get_now_mapno()
-{
-    return SW->mapno;
-}
-
-/* Returns the current area number. */
-u8 get_now_areano()
-{
-    return SW->areano;
-}
-
-/* Copies the 4-byte word at `src` over the one at `dst`. */
-extern "C" void stage_word_copy(void* dst, const void* src)
-{
-    *(u32*)dst = *(const u32*)src;
-}
-
-/* Copies `src`'s 4-byte word over `dst` and returns `dst`. */
-extern "C" void* stage_fog_copy(void* dst, const void* src)
-{
-    stage_word_copy(dst, src);
-    return dst;
-}
-
-/* Narrows both arguments to a byte and forwards to stage_arena_land_grid_load. */
-extern "C" void stage_arena_land_grid_load_req(u32 a, u32 b)
-{
-    stage_arena_land_grid_load((u8)a, (u8)b);
-}
-
-/* Returns the stage's secondary block at stage_w + 0x2EC0. */
-extern "C" void* stage_effect_block_get()
-{
-    return stage_w + 0x2EC0;
-}
-
-/* Tail-calls stage_part_break(stage_w, 1). */
-extern "C" void stage_demo_event_set()
-{
-    stage_part_break(SW, 1);
-}
-
-/* Copies six bytes. */
-extern "C" void stage_ambient_copy(StageAmbient* dst, const StageAmbient* src)
-{
-    dst->rgb[0] = src->rgb[0];
-    dst->rgb[1] = src->rgb[1];
-    dst->rgb[2] = src->rgb[2];
-    dst->rgb2[0] = src->rgb2[0];
-    dst->rgb2[1] = src->rgb2[1];
-    dst->rgb2[2] = src->rgb2[2];
-}
-
-/* Returns the id-remapped byte at stage_w.bitmask[index]. */
-extern "C" u8 stage_area_bit_get(u8 index)
-{
-    const u8* p = &SW->bitmask[0];
-    return p[(u8)index];
-}
-
-/* Tests bit 0 of the stage flag byte. */
-extern "C" bool stage_water_enabled_ck()
-{
-    return SW->flags & 1;
-}
-
-/* Tests bit 1 of the stage flag byte. */
-extern "C" bool stage_water_b_enabled_ck()
-{
-    return SW->flags & 2;
-}
-
-/* Tests bit (4 + bit) of stage_w.bitmask[index]. */
-extern "C" bool stg_area_flag_ck(u8 index, u8 bit)
-{
-    StageWork* w = SW;
-    return w->bitmask[(u8)index] & (0x10 << (u8)bit);
-}
-
-/* Remaps an id through stg_map_kind_table; an unmapped id (0xFF) is returned unchanged.  The parameter is
- * wider than a byte: retail masks it (`clrlwi`) before the table index, so the original signature
- * was not the byte one `unsplit/unknown.h` guessed. */
-extern "C" u32 stage_map_kind_get(u32 kind)
-{
-    u8 mapped = stg_map_kind_table[(u8)kind];
-    if (mapped != 0xFF)
-        return mapped;
-    return kind;
-}
-
-/* Tail-calls stg_area_flag_ck with the byte pair stg_area_event_pairs[2*index], [2*index+1]. */
-extern "C" u32 stg_area_flag_index_ck(u8 index)
-{
-    const u8* p = &stg_area_event_pairs[0][(u8)index * 2];
-    return stg_area_flag_ck(p[0], p[1]);
-}
-
-/* Whether the float at `self`+8 is below the pooled constant. */
-extern "C" u32 stage_pos_z_low_ck(void* self)
-{
-    return ((f32*)self)[2] < lbl_8079A480;
-}
-
-/* Returns `base`'s word pointer plus `off`; a zero offset yields NULL. */
-extern "C" void* stage_res_offset_get(void* base, s32 off)
-{
-    u8* p = *(u8**)base;
-    if (off != 0)
-        return p + off;
-    return 0;
-}
-
-/* Returns the record at `self` plus the resource size from fn_800700C0(). */
-extern "C" void* stage_res_body_get(void* self)
-{
-    return stage_res_offset_get(self, ((const ResolverView*)&reinterpret_cast<const nw4r::g3d::ResMdl*>(self)->ref())->size);
-}
-
-/* Returns the entry `index` points at, biased by its 0x114-byte header, or NULL. */
-extern "C" void* stage_char_res_body_get(u8 index)
-{
-    StageChar** chars = &SW->chars[0];
-    StageObject* p = (StageObject*)chars[(u8)index];
-    if (p == 0)
-        return 0;
-    return stage_res_body_get(p->body);
-}
-
-/* Returns the word at +8 of the current map/area group. */
-extern "C" u32 screen_projection_get()
-{
-    return (u32)((StageGroup*)stage_map_group_get((u8)get_now_mapno()))->map;
-}
-
-/* Stores `f` into the current area's record when the map/area pair matches. */
-extern "C" void stage_anim_rate_target_set(f32 f)
-{
-    StageWork* w = SW;
-    if ((w->mapno == 6 || w->mapno == 17) && w->areano == 1)
-        w->anim_rate_target = f;
-}
-
-/* Whether `self`'s map id remaps to a "loadable" category. */
-extern "C" u32 stage_map_kind_loadable_ck(void* self)
-{
-    s32 mapped = (u8)stage_map_kind_get(((StageWork*)self)->mapno);
-    if (mapped == 4 || mapped == 10)
-        return 1;
-    return 0;
-}
-
-/* Remaps the stage's current map id and returns the j-th element of the group's 16-byte-stride
- * table. */
-extern "C" StagePartDef** stage_part_defs_get(StageWork* work, u8 j)
-{
-    StageGroup* g = (StageGroup*)stage_map_group_get(work->mapno);
-    return &g->part_defs[(u8)j * 4];
-}
-
-/* Whether the j-th element of the group's 16-byte-stride table is non-zero. */
-extern "C" bool stage_part_def_ck(u8 id, u8 j)
-{
-    StageGroup* g = (StageGroup*)stage_map_group_get((u8)id);
-    return g->part_defs[(u8)j * 4];
-}
-
-/* Returns the j-th word of the group's inline table, or NULL for the unmapped id. */
-extern "C" struct StageZone* stage_group_word_get(u8 id, u8 j)
-{
-    StageGroup* g;
-    if ((u8)id == 0xFF)
-        return 0;
-    g = (StageGroup*)stage_map_group_get((u8)id);
-    return g->zones[(u8)j];
-}
-
-/* Returns the record's +0x24 word, or 0 for the unmapped id. */
-extern "C" u32 stage_entry_angle_get(u8 id, u8 j)
-{
-    StageGroup* g;
-    if ((u8)id == 0xFF)
-        return 0;
-    g = (StageGroup*)stage_map_group_get((u8)id);
-    return g->elems[(u8)j]->field_0x24;
-}
-
-/* Returns the record's +0x28 byte, or 0xFF for the unmapped id. */
-extern "C" u32 stage_entry_eft_kind_get(u8 id, u8 j)
-{
-    StageGroup* g;
-    if ((u8)id == 0xFF)
-        return 0xFF;
-    g = (StageGroup*)stage_map_group_get((u8)id);
-    return g->elems[(u8)j]->field_0x28;
-}
-
-/* Selects one of the two record groups by whether the id was remapped. */
-extern "C" void* stage_map_group_get(u8 id)
-{
-    u8 mapped = stage_map_kind_get((u8)id);
-    return mapped == (u8)id ? SW->field_0x2FD4 : SW->field_0x2FD8;
-}
-
-/* Returns the selected group's head byte, or 0 for the unmapped id. */
-extern "C" u32 stage_map_area_count_get(u8 id)
-{
-    StageGroup* g;
-    if ((u8)id == 0xFF)
-        return 0;
-    g = (StageGroup*)stage_map_group_get((u8)id);
-    return g->kind;
-}
-
-/* Returns the current area's word [i][j] lookup. */
-extern "C" u32 stage_cell_get(u8 i, u8 j)
-{
-    StageWork* w = SW;
-    return w->areas[w->areano].rows[(u8)i].words[(u8)j];
-}
-
-/* Same lookup, but the area is an argument. */
-extern "C" u32 stage_area_cell_get(u8 i, u8 j, u8 area)
-{
-    StageArea* a = &SW->areas[(u8)area];
-    StageAreaRow* r = &a->rows[(u8)i];
-    return r->words[(u8)j];
-}
-
-/* Copies the current area's row [i] 12-byte element [k] into `out`. */
-extern "C" void stage_cell_vec_get(void* out, u8 i, u8 k)
-{
-    assignVec3((Vec*)out, (Vec*)&SW->areas[SW->areano].rows[(u8)i].v.vecs[(u8)k]);
-}
-
-/* Classifies the current map number into a load category. */
-extern "C" u32 stage_climate_kind_get()
-{
-    s32 m = SW->mapno;
-    switch (m) {
-    case 2:
-    case 5:
-    case 16:
-    case 10:
-        return 1;
-    case 13:
-    case 4:
-    case 15:
-        return 2;
-    }
-    return 0;
-}
-
-/* Resets the stage's per-area cursor block and re-seats the world vector. */
-extern "C" void stage_light_reset()
-{
-    s32 i;
-    SW->light.kind = 0;
-    SW->light.intensity = lbl_8079A484;
-    for (i = 3; i >= 0; i--)
-        SW->light.colours[i] = 0xFFFFFF00;
-    for (i = 11; i >= 4; i--)
-        SW->light.colours[i] = 0xFFFFFF00;
-    setVector3(&SW->light_dir, lbl_8079A498, lbl_8079A498, lbl_8079A498);
-}
-
-/* Calls stage_area_slot_reset for the two side indices. */
-extern "C" void stage_area_slots_reset()
-{
-    u32 i;
-    for (i = 0; i < 2; i++)
-        stage_area_slot_reset((u8)i);
-}
-
-/* Calls stage_part_bodies_set for each index below the current map's count. */
-extern "C" void stage_part_bodies_set_all(StageWork* self)
-{
-    u32 n = stage_map_area_count_get(self->mapno);
-    u8 i;
-    for (i = 0; i < (u8)n; i++)
-        stage_part_bodies_set(self, i);
-}
-
-/* Calls stage_parts_check for each index below the current map's count. */
-extern "C" void stage_parts_check_all(StageWork* self)
-{
-    u32 n = stage_map_area_count_get(self->mapno);
-    u8 i;
-    for (i = 0; i < (u8)n; i++)
-        stage_parts_check(self, i);
-}
-
-/* Returns the current map's descriptor field +0x34 for `id`, or a default float. */
-extern "C" f32 stg_area_ceiling_get(u8 id)
-{
-    StageWork* w = SW;
-    StageElem* e;
-    if ((u8)id == 0xFF)
-        return lbl_8079A47C;
-    e = ((StageGroup*)stage_map_group_get(w->mapno))->elems[(u8)id];
-    if (e == 0)
-        return lbl_8079A47C;
-    return e->field_0x34;
-}
-
-/* Returns the current map's +0x18 word array entry for `id`, or 0. */
-extern "C" u32 stage_area_word_get(u8 id)
-{
-    StageWork* w = SW;
-    u32* arr;
-    if ((u8)id == 0xFF)
-        return 0;
-    arr = ((StageGroup*)stage_map_group_get(w->mapno))->field_0x18;
-    if (arr == 0)
-        return 0;
-    return arr[(u8)id];
-}
-
-/* Returns the current map's descriptor field +0x38 for `id`, or 0. */
-extern "C" u32 pl_act_kind_get(u8 id)
-{
-    StageWork* w = SW;
-    StageElem* e;
-    if ((u8)id == 0xFF)
-        return 0;
-    e = ((StageGroup*)stage_map_group_get(w->mapno))->elems[(u8)id];
-    if (e == 0)
-        return 0;
-    return e->field_0x38;
-}
-
-/* Sets bit (4 + j) of bitmask[id] when the current map's j-th table word is set. */
-extern "C" void stage_area_flag_set(u8 id, u8 j)
-{
-    StageWork* w = SW;
-    StagePartDef** p = stage_part_defs_get(w, id);
-    if (p[(u8)j] != 0)
-        w->bitmask[(u8)id] |= (u8)(0x10 << (u8)j);
-}
-
-/* Whether at least two of the three map flags (ids 3, 11, 4) are set. */
-extern "C" u32 stage_gate_a_ck()
-{
-    u8 count = 0;
-    if (stg_area_flag_index_ck(3) == 1)
-        count = 1;
-    if (stg_area_flag_index_ck(11) == 1)
-        count++;
-    if (stg_area_flag_index_ck(4) == 1)
-        count++;
-    if (count >= 2)
-        return 1;
-    return 0;
-}
-
+#pragma optimization_level 4
 
 /* ---- this unit's later functions, declared ahead of their callers ---- */
 extern "C" {
@@ -748,6 +444,7 @@ void stage_light_set_copy(StageLightSet* dst, const StageLightSet* src);
 u32 stage_area_model_load_req(char* name, u32 size, u8 slot, u8 mapno, u8 areano, u8 kind);
 void stage_area_ambient_apply(void);
 }
+
 extern "C" {
 void stage_part_scatter_step(StageWork* w, StagePart* part, MHchar* chr, u8* joints, u8 kind);
 void stage_part_scatter_start(StageWork* w, StagePart* part, MHchar* chr, u8* joints, u8 kind);
@@ -757,74 +454,143 @@ void stage_part_update(StageWork* w, StagePart* part, u8* joints, u8* vis_ids, u
 
 /* ---- the callees' owner headers (rule 2) ---- */
 #include "mh3_pad.h"
+
 #include "ef/system_core.h"
+
 #include "sqrtf_thunk.h"
+
 #include "fn_8004CAD8.h"
+
 #include "ef/eft_res.h"
+
 #include "ef/eft_res_release.h"
+
 #include "Pl/pl_coll.h"
+
 #include "light/light.h"
+
 #include "lobby/lb_menu_pos_tbl.h"
+
 #include "camera/camera_angle_x_get.h"
+
 #include "g3d/g3d_obj.h"
+
 #include "g3d/g3d_scnroot.h"
+
 #include "nw_resource.h"
+
 #include "res_mem_index_get.h"
+
 #include "draw_shape.h"
+
 #include "ef/load_file_req.h"
+
 #include "ef/nw_res_manager.h"
+
 #include "ef/pRoot.h"
+
 #include "mh3_pad/Screen_w.h"
+
 #include "camera/camera_mode_cur_get.h"
+
 #include "stage/shell_set_func_ptr.h"
+
 #include "menu/hit_attack_list_push.h"
+
 #include "ef/get_move_work_adrs.h"
+
 #include "ef/eft052.h"
+
 #include "g3d/g3d_root_model_bind.h"
+
 #include "sound/mhchar_model_release.h"
+
 #include "sound/mhchar_model_create.h"
+
 #include "Pl/pl_act_stage_latch_set.h"
+
 #include "Pl/fn_80288CEC.h"
+
 #include "g3d/g3d_calcworld.h"
+
 #include "lobby/lb_quest_ui.h"
+
 #include "screen_split_ck.h"
+
 #include "light_mode_set.h"
+
 #include "g3d/fog_set_color.h"
+
 #include "g3d/fog_type_set.h"
+
 #include "g3d/res_node_trans_set.h"
+
 #include "ef/system_work_mem_reset.h"
+
 #include "nw_res_stage_free.h"
+
 #include "sound/se_area_part_play.h"
+
 #include "sound/mhchar_draw_callback_set.h"
+
 #include "sound/mhchar_motion_speed_set.h"
+
 #include "ef/eft_area_effects_set.h"
+
 #include "ef/eft_res_bind.h"
+
 #include "ef/eft_scnbox_load.h"
+
 #include "ef/eft004_area_set.h"
+
 #include "ef/eft_area_part_break_set.h"
+
 #include "ef/eft023_area_fx_set.h"
+
 #include "enemy/em_res_file_row_copy.h"
+
 #include "Pl/pl_warp_ready_ck.h"
+
 #include "light/light_area_setup.h"
+
 #include "enemy/em_sub_area_fx_set.h"
+
 #include "lobby/lb_area_fx_set.h"
+
 #include "menu/menu_area_fx_set.h"
+
 #include "map_area_eft_list_tbl.h"
+
 #include "menu/place_model_step.h"
+
 #include "camera/camera_quake_req.h"
+
 #include "lobby/lb_interior_fx_spawn.h"
+
 #include "ef/eft030_set.h"
+
 #include "ef/eft052_set.h"
+
 #include "ef/eft053_set.h"
+
 #include "lobby/lb_sub11_send.h"
+
 #include "Pl/pl_land_grid_a_load.h"
+
 #include "vec3_segment_box_ck.h"
+
 #include "enemy/em_res_node_trans_get.h"
+
 #include "Runtime.PPCEABI.H/memset.h"
+
 #include "Runtime.PPCEABI.H/memcpy.h"
+
 #include "ef/work_mem_free.h"
+
 #include "ef/eft_res_file_load.h"
+
 #include "ef/eft_map_com_proID_tbl_ptr.h"
+
 #include "map_com_eft_file_tbl.h"
 
 /* ---- stage work reset, per-frame driver and area load ---- */
@@ -846,6 +612,229 @@ typedef struct StageMoveView {
     /* +0x08 */ u8 pad_0x08[0xF2];
     /* +0xFA */ u8 state;
 } StageMoveView; /* size: 0xFB (approximate: the touched byte) */
+
+#include "stage/get_stg_weapon_work.h" /* StageWeaponWork, the placed-weapon record (rule 1) */
+
+extern "C" StageWeaponWork stg_weapon_work_6_1[6];
+
+extern "C" StageWeaponWork stg_weapon_work_6_2[4];
+
+extern "C" StageWeaponWork stg_weapon_work_7_3[3];
+
+extern "C" StageWeaponWork stg_weapon_work_8_1[1];
+
+extern "C" StageWeaponWork stg_weapon_work_9_0[1];
+
+extern "C" StageWeaponWork stg_weapon_work_9_1[1];
+
+extern "C" StageWeaponWork stg_weapon_work_11_1[1];
+
+/* One entry of an area effect list: a terminator/limit word and an enable word. */
+typedef struct StageEftEntry {
+    /* +0x0 */ u32 limit;
+    /* +0x4 */ u32 enabled;
+} StageEftEntry; /* size: 0x8 */
+
+/* Assigns the effect slots of area list `list` (the 1-based pro effects) into the caller's `ids` and hands them to
+ * the effect resources; a failed assignment releases the slots taken so far. */
+static inline void stage_area_eft_assign(StageEftEntry** list_tbl, u8 mapno, u8 areano, u8* ids)
+{
+    StageEftEntry* list;
+    s32 count;
+    s32 i;
+    u8 id;
+
+    if (list_tbl == 0)
+        return;
+    list = list_tbl[areano];
+    if (list == 0 || list[0].limit == 0)
+        return;
+    count = 0;
+    if (list[1].limit == 0)
+        return;
+    if (list[1].enabled != 0) {
+        id = eft_pro_slot_assign(1, 2, mapno, areano, 1);
+        if (id == 0xFF)
+            return;
+        count = 1;
+        ids[0] = id;
+    }
+    for (i = 2; i < list[i].limit; i++) {
+        if (list[i].enabled != 0) {
+            id = eft_pro_slot_assign(1, 1, mapno, areano, i);
+            if (id == 0xFF) {
+                for (i = 0; i < count; i++)
+                    eft_res_release(ids[i]);
+                return;
+            }
+            ids[count++] = id;
+        }
+    }
+    ids[count] = 0xFF;
+    eft_pro_slot_list_set(0, list_tbl[areano], ids);
+}
+
+extern "C" VEC3 stg_entry_pos_none;
+
+extern "C" VEC3 stg_entry_pos_menu;
+
+extern "C" VEC3 stg_entry_pos_work;
+
+/* The returned-vector view of `VEC3`: the inline copy constructor lets MWCC build the result in the return slot
+ * (playbook 176); the layout and the mangling are VEC3's. */
+/* size: 0xC */
+struct StageRetVec3 : VEC3 {
+    StageRetVec3() {}
+    StageRetVec3(const StageRetVec3& o) { x = o.x; y = o.y; z = o.z; }
+};
+
+/* A fixed start point: its position and its facing in degrees. */
+typedef struct StagePoint {
+    /* +0x00 */ VEC3 pos;
+    /* +0x0C */ f32 degrees;
+} StagePoint; /* size: 0x10 */
+
+extern "C" StagePoint stg_pit_point_a;
+
+extern "C" StagePoint stg_pit_point_b;
+
+extern "C" StagePoint stg_area_start_a;
+
+extern "C" StagePoint stg_area_start_b;
+
+extern "C" f32 stg_anim_rate_blend;
+
+/* One map resource file: its size and name. */
+typedef struct StageResFile {
+    /* +0x0 */ u32 size;
+    /* +0x4 */ char* name;
+} StageResFile; /* size: 0x8 */
+
+/* One warp zone of an area: a cylinder (kind 0) or a box segment (kind 1), and where it warps to. */
+typedef struct StageZone {
+    /* +0x00 */ u8 dest;           /* 0xFF ends the list */
+    /* +0x01 */ u8 pad_0x01;
+    /* +0x02 */ s16 kind;
+    /* +0x04 */ VEC3 pos;
+    /* +0x10 */ f32 radius;
+    /* +0x14 */ f32 height;
+    /* +0x18 */ VEC3 pos2;
+    /* +0x24 */ VEC3 warp_pos;
+    /* +0x30 */ u32 warp_angle;
+} StageZone; /* size: 0x34 */
+
+/* One breakable part's scatter definition: the joints' start positions, rotations, a random-spin flag and the
+ * fall time. */
+typedef struct StageScatterDef {
+    /* +0x00 */ f32* pos;         /* the joints' start velocities, three per joint */
+    /* +0x04 */ f32* gravity;     /* three per joint */
+    /* +0x08 */ f32* damp;        /* three per joint */
+    /* +0x0C */ u16* rot;         /* three per joint */
+    /* +0x10 */ f32* rot_damp;    /* three per joint */
+    /* +0x14 */ f32 floor_y;      /* the scatter ends below it */
+    /* +0x18 */ u8 random_spin;
+    /* +0x19 */ u8 time;
+    /* +0x1A */ u8 pad_0x1A[2];
+} StageScatterDef; /* size: 0x1C */
+
+extern "C" StageScatterDef* stg_scatter_defs[];
+
+extern "C" StagePoint stg_koware_points[];
+
+extern "C" u8 stg_scatter_jitter_xz;
+
+extern "C" u8 stg_scatter_jitter_y;
+
+/* The C++-linkage callees the view below calls: declared at global scope so the calls resolve to the map's
+ * manglings (a declaration inside the view namespace would mangle the namespace in). */
+nw4r::math::VEC3 get_camera_pos(void);
+
+u32 LbCheckKujiraEvent(void);
+
+void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 area, long param);
+
+namespace view_fn_802B2AA0 {
+
+namespace nw4r = ::nw4r;  /* the view headers below reopen it */
+
+/* data keeps its map name (a view namespace would mangle it): the header is read with C linkage */
+extern "C" {
+#include "stage/fn_802B2AA0.h"
+}
+
+#include "stage/stg_w.h"
+
+#include "g3d/g3d_scnroot.h" /* nw4r::g3d::ScnRoot::GetFog (rule 2) */
+
+extern "C" {
+/* The shell-set job table pointer (`.sbss` 0x80794B60); an RSO stores it, nothing in the DOL does. */
+ShellSetFuncs* shell_set_func_ptr;
+}
+
+/* Blends colour `from` towards `to` by `t`, channel by channel. */
+static inline u32 stage_colour_lerp(const u32* from, const u32* to, f32 t)
+{
+    f32 tb;
+    f32 fb;
+    f32 tg;
+    f32 fg;
+    f32 tr;
+    f32 fr;
+    f32 ta;
+    f32 fa;
+    s32 a;
+    s32 r;
+    s32 g;
+    s32 b;
+
+    fa = (f32)(*from >> 24);
+    fr = (f32)((*from >> 16) & 0xFF);
+    fg = (f32)((*from >> 8) & 0xFF);
+    fb = (f32)(*from & 0xFF);
+    ta = (f32)(*to >> 24);
+    tr = (f32)((*to >> 16) & 0xFF);
+    tg = (f32)((*to >> 8) & 0xFF);
+    tb = (f32)(*to & 0xFF);
+    fa = fa + t * (ta - fa);
+    fr = fr + t * (tr - fr);
+    fg = fg + t * (tg - fg);
+    fb = fb + t * (tb - fb);
+    a = (s32)fa;
+    r = (s32)fr;
+    g = (s32)fg;
+    b = (s32)fb;
+    return ((u8)b | ((u8)g << 8)) | (((u8)a << 24) | ((u8)r << 16));
+}
+
+}  /* namespace view_fn_802B2AA0 */
+
+/* Forward declarations of the unit's functions that are called above their definition. */
+extern "C" void* stage_fog_copy(void* dst, const void* src);
+extern "C" void stage_word_copy(void* dst, const void* src);
+extern "C" void stage_ambient_copy(StageAmbient* dst, const StageAmbient* src);
+extern "C" u32 stage_entry_eft_kind_get(u8 id, u8 j);
+extern "C" bool stage_water_enabled_ck();
+extern "C" u32 stage_pos_z_low_ck(void* self);
+extern "C" StagePartDef** stage_part_defs_get(StageWork* work, u8 j);
+extern "C" bool stage_part_def_ck(u8 id, u8 j);
+extern "C" void stage_part_bodies_set_all(StageWork* self);
+extern "C" void stage_parts_check_all(StageWork* self);
+extern "C" void stage_res_node_trans_set(nw4r::g3d::ResNode* node, VEC3* pos);
+extern "C" void stage_arena_land_grid_load_req(u32 a, u32 b);
+extern "C" void stage_light_reset();
+namespace view_fn_802B2AA0 { extern "C" void stage_colour_rec_copy(StageColourRec* dst, const StageColourRec* src); }
+namespace view_fn_802B2AA0 { extern "C" u32 stage_work_construct(u32 base); }
+namespace view_fn_802B2AA0 { extern "C" u32 stage_sub34_clear(u32 block); }
+namespace view_fn_802B2AA0 { extern "C" u32 stage_part_construct(u32 block); }
+namespace view_fn_802B2AA0 { extern "C" u32 stage_area_construct(u32 rec); }
+namespace view_fn_802B2AA0 { extern "C" u32 stage_area_row_construct(u32 slot); }
+namespace view_fn_802B2AA0 { extern "C" u32 stage_slot_construct(u32 block); }
+
+/* Returns the stage-work block. */
+void* get_stg_w()
+{
+    return stage_w;
+}
 
 /* Resets the stage work block, its bodies, events, timers and the place-act cooldowns. */
 extern "C" void stage_work_init(void)
@@ -952,6 +941,7 @@ extern "C" void stage_frame_update(void)
     place_model_step();
 }
 
+#pragma opt_common_subs off
 /* Arms the barrel-bomb cooldown and places the actor's barrel bomb (the place act's variant 0). */
 extern "C" void stg_barrel_bomb_place(_PLW* self)
 {
@@ -966,7 +956,9 @@ extern "C" void stg_barrel_bomb_place(_PLW* self)
             camera_arena_mode_req();
     }
 }
+#pragma opt_common_subs reset
 
+#pragma opt_common_subs off
 /* Arms the trap cooldown and places the actor's trap (the place act's variant 1). */
 extern "C" void stg_trap_place(_PLW* self)
 {
@@ -979,7 +971,9 @@ extern "C" void stg_trap_place(_PLW* self)
         shell_set_func_ptr->method_0x78(self, 1, shell_set_func_ptr);
     }
 }
+#pragma opt_common_subs reset
 
+#pragma opt_common_subs off
 /* Arms the slinger cooldown and fires the slinger's special shell. */
 extern "C" void stg_slinger_special_fire(_PLW* self)
 {
@@ -992,6 +986,7 @@ extern "C" void stg_slinger_special_fire(_PLW* self)
         shell_set_func_ptr->slinger_special_fire(self, shell_set_func_ptr);
     }
 }
+#pragma opt_common_subs reset
 
 /* Expires the place-act cooldowns (10 s, 5 s and 3 s) and posts each one's ready message. */
 extern "C" void stg_place_timers_update(void)
@@ -1020,6 +1015,60 @@ extern "C" void stg_place_timers_update(void)
     }
 }
 
+/* Returns the placed-weapon table of the actor's map and area, and its entry count in `count`. */
+StageWeaponWork* get_stg_weapon_work(_PLW* plw, long* count)
+{
+    *count = 0;
+    switch (plw->kind_0x015) {
+    case 6:
+    case 17:
+        switch (plw->area_0x16) {
+        case 1:
+            *count = 6;
+            return stg_weapon_work_6_1;
+        case 2:
+            *count = 4;
+            return stg_weapon_work_6_2;
+        }
+        break;
+    case 7:
+    case 18:
+        switch (plw->area_0x16) {
+        case 3:
+            *count = 3;
+            return stg_weapon_work_7_3;
+        }
+        break;
+    case 8:
+    case 19:
+        switch (plw->area_0x16) {
+        case 1:
+            *count = 1;
+            return stg_weapon_work_8_1;
+        }
+        break;
+    case 9:
+        switch (plw->area_0x16) {
+        case 0:
+            *count = 1;
+            return stg_weapon_work_9_0;
+        case 1:
+            *count = 1;
+            return stg_weapon_work_9_1;
+        }
+        break;
+    case 11:
+    case 20:
+        switch (plw->area_0x16) {
+        case 1:
+            *count = 1;
+            return stg_weapon_work_11_1;
+        }
+        break;
+    }
+    return 0;
+}
+
 /* Applies the fog record `rec` to the scene root's fog 0: type, range and colour. */
 extern "C" void stage_fog_apply(StageFogRec* rec)
 {
@@ -1033,6 +1082,19 @@ extern "C" void stage_fog_apply(StageFogRec* rec)
     fog_range_set(&fog, rec->start, rec->end);
     colour = rec->colour;
     fog_set_color(&fog, (GXColor*)&colour);
+}
+
+/* Copies `src`'s 4-byte word over `dst` and returns `dst`. */
+extern "C" void* stage_fog_copy(void* dst, const void* src)
+{
+    stage_word_copy(dst, src);
+    return dst;
+}
+
+/* Copies the 4-byte word at `src` over the one at `dst`. */
+extern "C" void stage_word_copy(void* dst, const void* src)
+{
+    *(u32*)dst = *(const u32*)src;
 }
 
 /* Completes an area model file load: registers the file and builds the slot's model(s) from it. */
@@ -1120,118 +1182,11 @@ extern "C" u32 stage_area_model_load_req(char* name, u32 size, u8 slot, u8 mapno
     return buf;
 }
 
-
-/* One weapon-work record of a map's placed-weapon table (the cannons and ballistae). */
-typedef struct StageWeaponWork {
-    /* +0x00 */ u8 unused_0x00[0x20];
-} StageWeaponWork; /* size: 0x20 */
-
-extern "C" StageWeaponWork stg_weapon_work_6_1[6];
-extern "C" StageWeaponWork stg_weapon_work_6_2[4];
-extern "C" StageWeaponWork stg_weapon_work_7_3[3];
-extern "C" StageWeaponWork stg_weapon_work_8_1[1];
-extern "C" StageWeaponWork stg_weapon_work_9_0[1];
-extern "C" StageWeaponWork stg_weapon_work_9_1[1];
-extern "C" StageWeaponWork stg_weapon_work_11_1[1];
-
-/* Returns the placed-weapon table of the actor's map and area, and its entry count in `count`. */
-StageWeaponWork* get_stg_weapon_work(_PLW* plw, long* count)
+/* Selects one of the two record groups by whether the id was remapped. */
+extern "C" void* stage_map_group_get(u8 id)
 {
-    *count = 0;
-    switch (plw->kind_0x015) {
-    case 6:
-    case 17:
-        switch (plw->area_0x16) {
-        case 1:
-            *count = 6;
-            return stg_weapon_work_6_1;
-        case 2:
-            *count = 4;
-            return stg_weapon_work_6_2;
-        }
-        break;
-    case 7:
-    case 18:
-        switch (plw->area_0x16) {
-        case 3:
-            *count = 3;
-            return stg_weapon_work_7_3;
-        }
-        break;
-    case 8:
-    case 19:
-        switch (plw->area_0x16) {
-        case 1:
-            *count = 1;
-            return stg_weapon_work_8_1;
-        }
-        break;
-    case 9:
-        switch (plw->area_0x16) {
-        case 0:
-            *count = 1;
-            return stg_weapon_work_9_0;
-        case 1:
-            *count = 1;
-            return stg_weapon_work_9_1;
-        }
-        break;
-    case 11:
-    case 20:
-        switch (plw->area_0x16) {
-        case 1:
-            *count = 1;
-            return stg_weapon_work_11_1;
-        }
-        break;
-    }
-    return 0;
-}
-
-/* One entry of an area effect list: a terminator/limit word and an enable word. */
-typedef struct StageEftEntry {
-    /* +0x0 */ u32 limit;
-    /* +0x4 */ u32 enabled;
-} StageEftEntry; /* size: 0x8 */
-
-/* Assigns the effect slots of area list `list` (the 1-based pro effects) and hands them to the effect
- * resources; a failed assignment releases the slots taken so far. */
-static inline void stage_area_eft_assign(StageEftEntry** list_tbl, u8 mapno, u8 areano)
-{
-    StageEftEntry* list;
-    u8 ids[8];
-    s32 count;
-    s32 i;
-    u8 id;
-
-    if (list_tbl == 0)
-        return;
-    list = list_tbl[areano];
-    if (list == 0 || list[0].limit == 0)
-        return;
-    count = 0;
-    if (list[1].limit == 0)
-        return;
-    if (list[1].enabled != 0) {
-        id = eft_pro_slot_assign(1, 2, mapno, areano, 1);
-        if (id == 0xFF)
-            return;
-        count = 1;
-        ids[0] = id;
-    }
-    for (i = 2; i < list[i].limit; i++) {
-        if (list[i].enabled != 0) {
-            id = eft_pro_slot_assign(1, 1, mapno, areano, i);
-            if (id == 0xFF) {
-                for (i = 0; i < count; i++)
-                    eft_res_release(ids[i]);
-                return;
-            }
-            ids[count++] = id;
-        }
-    }
-    ids[count] = 0xFF;
-    eft_pro_slot_list_set(0, list_tbl[areano], ids);
+    u8 mapped = stage_map_kind_get((u8)id);
+    return mapped == (u8)id ? SW->field_0x2FD4 : SW->field_0x2FD8;
 }
 
 /* Loads area `areano` of map `mapno` into slot `slot`: its model files, the play-mode tables and its effect slots. */
@@ -1240,7 +1195,7 @@ extern "C" void stage_area_load(u8 slot, u8 mapno, u8 areano)
     StageElem* files = ((StageGroup*)stage_map_group_get(mapno))->elems[areano];
     StageEftEntry** list_tbl;
     StageEftEntry* list;
-    u8 ids[8];
+    u8 ids[0x28];  /* size from retail's 0x60-byte frame (approximate) */
     s32 i;
 
     if (files->size != 0)
@@ -1253,7 +1208,7 @@ extern "C" void stage_area_load(u8 slot, u8 mapno, u8 areano)
         stage_arena_land_grid_load_req(mapno, areano);
     }
     place_model_area_load(mapno, areano);
-    stage_area_eft_assign(map_area_eft_list_tbl[mapno], mapno, areano);
+    stage_area_eft_assign(map_area_eft_list_tbl[mapno], mapno, areano, ids);
     list_tbl = map_area_eft_list2_tbl[mapno];
     if (list_tbl != 0) {
         list = list_tbl[areano];
@@ -1298,6 +1253,17 @@ extern "C" void stage_light_set_copy(StageLightSet* dst, const StageLightSet* sr
     dst->intensity = src->intensity;
     for (i = 0; i < 12; i++)
         dst->colours[i] = src->colours[i];
+}
+
+/* Copies six bytes. */
+extern "C" void stage_ambient_copy(StageAmbient* dst, const StageAmbient* src)
+{
+    dst->rgb[0] = src->rgb[0];
+    dst->rgb[1] = src->rgb[1];
+    dst->rgb[2] = src->rgb[2];
+    dst->rgb2[0] = src->rgb2[0];
+    dst->rgb2[1] = src->rgb2[1];
+    dst->rgb2[2] = src->rgb2[2];
 }
 
 /* Re-applies the area light each frame (the blend driver on map 21) and arms the light colours for each view. */
@@ -1382,7 +1348,7 @@ extern "C" void stage_area_models_seat(void)
 {
     StageWork* w = SW;
     s32 i;
-    u16 frame;
+    u32 frame;
     EftResFileHandle mdl;
     EftResFileHandle res;
     EftResFileHandle mdl2;
@@ -1434,8 +1400,13 @@ extern "C" void stage_area_models_seat(void)
             w->anims[i] = 0;
             if (i == 1) {
                 if (w->mapno == 7 || w->mapno == 18) {
-                    if ((u8)(w->areano - 1) <= 2)
+                    switch (w->areano) {
+                    case 1:
+                    case 2:
+                    case 3:
                         w->flags = 1;
+                        break;
+                    }
                 } else {
                     w->flags = 0;
                 }
@@ -1482,6 +1453,92 @@ extern "C" void stage_area_enter(u8 mapno, u8 areano)
     lb_interior_fx_spawn(mapno, areano);
 }
 
+/* Starts the area effects and placed models of area `areano` of map `mapno`. */
+extern "C" void stage_area_effects_start(u8 mapno, u8 areano)
+{
+    if (((mapno == 1) && (areano == 1)) || ((mapno == 0xC) && (areano == 1)) || ((mapno == 6) && (areano == 1)) || ((mapno == 0x11) && (areano == 1)) || ((mapno == 6) && (areano == 2)) || ((mapno == 0x11) && (areano == 2))) {
+        eft023_area_fx_set();
+    }
+    if (((mapno == 1) && (areano == 2)) || ((mapno == 0xC) && (areano == 2))) {
+        eft023_area_fx2_set();
+    }
+    if (((mapno == 1) && (areano == 2)) || ((mapno == 0xC) && (areano == 2)) || ((mapno == 1) && (areano == 9)) || ((mapno == 0xC) && (areano == 9)) || ((mapno == 1) && (areano == 0xA)) || ((mapno == 0xC) && (areano == 0xA)) || ((mapno == 1) && (areano == 0xB)) || ((mapno == 0xC) && (areano == 0xB)) || ((mapno == 2) && (areano == 9)) || ((mapno == 0xD) && (areano == 9)) || ((mapno == 2) && (areano == 0xB)) || ((mapno == 0xD) && (areano == 0xB)) || ((mapno == 5) && (areano == 2)) || ((mapno == 6) && (areano == 2)) || ((mapno == 0x11) && (areano == 2)) || ((mapno == 7) && (areano == 1)) || ((mapno == 0x12) && (areano == 1)) || ((mapno == 7) && (areano == 2)) || ((mapno == 0x12) && (areano == 2)) || ((mapno == 7) && (areano == 3)) || ((mapno == 0x12) && (areano == 3)) || ((mapno == 0xA) && (areano == 0)) || ((mapno == 0x15) && (areano == 5)) || ((mapno == 0x15) && (areano == 6)) || ((mapno == 0x15) && (areano == 7)) || ((mapno == 0x16) && (areano == 1)) || ((mapno == 0x16) && (areano == 2))) {
+        em_sub_area_fx_set(0);
+    }
+    if (((mapno == 1) && (areano == 0)) || ((mapno == 0xC) && (areano == 0)) || ((mapno == 1) && (areano == 2)) || ((mapno == 0xC) && (areano == 2)) || ((mapno == 1) && (areano == 3)) || ((mapno == 0xC) && (areano == 3)) || ((mapno == 1) && (areano == 4)) || ((mapno == 0xC) && (areano == 4)) || ((mapno == 1) && (areano == 5)) || ((mapno == 0xC) && (areano == 5)) || ((mapno == 1) && (areano == 6)) || ((mapno == 0xC) && (areano == 6)) || ((mapno == 1) && (areano == 7)) || ((mapno == 0xC) && (areano == 7)) || ((mapno == 1) && (areano == 8)) || ((mapno == 0xC) && (areano == 8)) || ((mapno == 1) && (areano == 0xC)) || ((mapno == 0xC) && (areano == 0xC)) || ((mapno == 3) && (areano == 0)) || ((mapno == 0xE) && (areano == 0)) || ((mapno == 3) && (areano == 2)) || ((mapno == 0xE) && (areano == 2)) || ((mapno == 3) && (areano == 3)) || ((mapno == 0xE) && (areano == 3)) || ((mapno == 3) && (areano == 4)) || ((mapno == 0xE) && (areano == 4)) || ((mapno == 3) && (areano == 6)) || ((mapno == 0xE) && (areano == 6)) || ((mapno == 3) && (areano == 7)) || ((mapno == 0xE) && (areano == 7)) || ((mapno == 3) && (areano == 8)) || ((mapno == 0xE) && (areano == 8)) || ((mapno == 3) && (areano == 0xA)) || ((mapno == 5) && (areano == 6)) || ((mapno == 0x10) && (areano == 6))) {
+        em_sub_area_fx_set(1);
+    }
+    if (((mapno == 7) && (areano == 3)) || ((mapno == 0x12) && (areano == 3))) {
+        em_sub_area_fx_set(2);
+        eft053_set();
+    }
+    if (((mapno == 1) && (areano == 0xC)) || ((mapno == 0xC) && (areano == 0xC)) || ((mapno == 3) && (areano == 2)) || ((mapno == 0xE) && (areano == 2)) || ((mapno == 3) && (areano == 3)) || ((mapno == 0xE) && (areano == 3)) || ((mapno == 3) && (areano == 4)) || ((mapno == 0xE) && (areano == 4)) || ((mapno == 3) && (areano == 6)) || ((mapno == 0xE) && (areano == 6)) || ((mapno == 3) && (areano == 8)) || ((mapno == 0xE) && (areano == 8))) {
+        menu_area_fx_set();
+    }
+    if ((mapno == 3) && ((areano <= 5U) || ((u8) (areano + 0xF9) <= 3U))) {
+        em_sub_area_fx2_set(0);
+    }
+    if ((mapno == 3) && ((u8) (areano + 0xFE) <= 1U)) {
+        eft052_set();
+    }
+    if (mapno == 0x15) {
+        switch ((u32)areano) {
+        case 0:
+        case 1:
+        case 3:
+            em_sub_area_fx2_set(1);
+            break;
+        case 5:
+            place_model_create_pending();
+            break;
+        case 6:
+            place_model_create_pending();
+            break;
+        case 7:
+            place_model_create_pending();
+            break;
+        }
+    }
+    if (mapno == 0x16) {
+        if (areano == 0) {
+            em_sub_area_fx_set(3);
+            lb_scene_eft_spawn();
+        } else if (areano == 1) {
+            place_model_create_pending();
+        }
+    }
+    if (((mapno == 5) && (areano == 0)) || ((mapno == 5) && (areano == 1)) || ((mapno == 5) && (areano == 3)) || ((mapno == 5) && (areano == 6))) {
+        eft030_set();
+    }
+    if (((mapno == 2) && (areano == 0xA)) || ((mapno == 0xD) && (areano == 0xA))) {
+        lb_area_fx_set();
+    }
+    if ((mapno == 6) || (mapno == 0x11)) {
+        if (areano == 1) {
+            eft053_set();
+        } else if (areano == 2) {
+            eft053_set();
+            em_sub_area_fx2_set(2);
+        }
+    }
+    if (((mapno == 8) || (mapno == 0x13)) && (areano == 1)) {
+        eft053_set();
+    }
+    if ((mapno == 9) && (areano <= 1U)) {
+        eft053_set();
+    }
+    if (((mapno == 0xB) || (mapno == 0x14)) && (areano == 1)) {
+        eft053_set();
+    }
+}
+
+/* Calls stage_area_slot_reset for the two side indices. */
+extern "C" void stage_area_slots_reset()
+{
+    u32 i;
+    for (i = 0; i < 2; i++)
+        stage_area_slot_reset((u8)i);
+}
 
 /* Frees slot `index`: marks it unused, clears its map/area and resets its four models. */
 extern "C" void stage_area_slot_reset(u8 index)
@@ -1531,8 +1588,8 @@ extern "C" s8 stage_area_slot_get(u8 mapno, u8 areano)
 /* Releases stage area slot `slot`: its models and their resources. */
 extern "C" void stage_area_slot_release(s8 slot)
 {
-    StageWork* w = SW;
     s32 i;
+    StageWork* w = SW;
 
     if (slot < 0)
         return;
@@ -1556,9 +1613,17 @@ extern "C" void stage_area_slot_release(s8 slot)
     eft_res_stage_release_all();
 }
 
-extern "C" VEC3 stg_entry_pos_none;
-extern "C" VEC3 stg_entry_pos_menu;
-extern "C" VEC3 stg_entry_pos_work;
+/* Returns the current map number. */
+u8 get_now_mapno()
+{
+    return SW->mapno;
+}
+
+/* Returns the current area number. */
+u8 get_now_areano()
+{
+    return SW->areano;
+}
 
 /* Returns the position of entry point `entry` of map `mapno` (a static vector). */
 extern "C" VEC3* stage_entry_pos_get(u8 mapno, u8 entry)
@@ -1594,6 +1659,58 @@ extern "C" void stage_start_get(u8 phase, VEC3* pos, s32* angle)
     }
     copyVec3(pos, setVec3(&tmp, start->pos.x, start->pos.y, start->pos.z));
     *angle = start->angle;
+}
+
+/* Returns the record's +0x24 word, or 0 for the unmapped id. */
+extern "C" u32 stage_entry_angle_get(u8 id, u8 j)
+{
+    StageGroup* g;
+    if ((u8)id == 0xFF)
+        return 0;
+    g = (StageGroup*)stage_map_group_get((u8)id);
+    return g->elems[(u8)j]->field_0x24;
+}
+
+/* Returns the j-th word of the group's inline table, or NULL for the unmapped id. */
+extern "C" struct StageZone* stage_group_word_get(u8 id, u8 j)
+{
+    StageGroup* g;
+    if ((u8)id == 0xFF)
+        return 0;
+    g = (StageGroup*)stage_map_group_get((u8)id);
+    return g->zones[(u8)j];
+}
+
+/* Returns the record's +0x28 byte, or 0xFF for the unmapped id. */
+extern "C" u32 stage_entry_eft_kind_get(u8 id, u8 j)
+{
+    StageGroup* g;
+    if ((u8)id == 0xFF)
+        return 0xFF;
+    g = (StageGroup*)stage_map_group_get((u8)id);
+    return g->elems[(u8)j]->field_0x28;
+}
+
+/* Returns the selected group's head byte, or 0 for the unmapped id. */
+extern "C" u32 stage_map_area_count_get(u8 id)
+{
+    StageGroup* g;
+    if ((u8)id == 0xFF)
+        return 0;
+    g = (StageGroup*)stage_map_group_get((u8)id);
+    return g->kind;
+}
+
+/* Tests bit 0 of the stage flag byte. */
+extern "C" bool stage_water_enabled_ck()
+{
+    return SW->flags & 1;
+}
+
+/* Tests bit 1 of the stage flag byte. */
+extern "C" bool stage_water_b_enabled_ck()
+{
+    return SW->flags & 2;
 }
 
 /* Returns which alternative model area `areano` of map `mapno` uses: 2 on the map-1 water area, 1 on the
@@ -1669,14 +1786,6 @@ extern "C" void get_now_area_pos(VEC3* out, u8 area)
     setVector3(out, a->light.dir.x, a->light.dir.y, a->light.dir.z);
 }
 
-/* The returned-vector view of `VEC3`: the inline copy constructor lets MWCC build the result in the return slot
- * (playbook 176); the layout and the mangling are VEC3's. */
-/* size: 0xC */
-struct StageRetVec3 : VEC3 {
-    StageRetVec3() {}
-    StageRetVec3(const StageRetVec3& o) { x = o.x; y = o.y; z = o.z; }
-};
-
 /* Returns the world position of the area-local point `pos` in area `area`. */
 StageRetVec3 get_worldworld_pos(VEC3* pos, u8 area)
 {
@@ -1705,6 +1814,32 @@ extern "C" void get_worldlocal_pos(VEC3* out, VEC3* pos, u8 area)
     subVec3(out, pos, &origin);
 }
 
+/* Returns the word at +8 of the current map/area group. */
+extern "C" u32 screen_projection_get()
+{
+    return (u32)((StageGroup*)stage_map_group_get((u8)get_now_mapno()))->map;
+}
+
+/* Returns the current area's word [i][j] lookup. */
+extern "C" u32 stage_cell_get(u8 i, u8 j)
+{
+    StageWork* w = SW;
+    return w->areas[w->areano].rows[(u8)i].words[(u8)j];
+}
+
+/* Same lookup, but the area is an argument. */
+extern "C" u32 stage_area_cell_get(u8 i, u8 j, u8 area)
+{
+    StageArea* a = &SW->areas[(u8)area];
+    StageAreaRow* r = &a->rows[(u8)i];
+    return r->words[(u8)j];
+}
+
+/* Copies the current area's row [i] 12-byte element [k] into `out`. */
+extern "C" void stage_cell_vec_get(void* out, u8 i, u8 k)
+{
+    assignVec3((Vec*)out, (Vec*)&SW->areas[SW->areano].rows[(u8)i].v.vecs[(u8)k]);
+}
 
 /* Returns effect colour `which` (0 or 1) of the current map's record `index`, -1 when there is none. */
 u32 get_stg_eft_col(u8 index, u8 which)
@@ -1742,16 +1877,110 @@ extern "C" u32 get_stg_eft_col_pos(u8 index, VEC3* pos)
     return e->eft_col[0];
 }
 
-/* A fixed start point: its position and its facing in degrees. */
-typedef struct StagePoint {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ f32 degrees;
-} StagePoint; /* size: 0x10 */
+/* Returns the stage's secondary block at stage_w + 0x2EC0. */
+extern "C" void* stage_effect_block_get()
+{
+    return stage_w + 0x2EC0;
+}
 
-extern "C" StagePoint stg_pit_point_a;
-extern "C" StagePoint stg_pit_point_b;
-extern "C" StagePoint stg_area_start_a;
-extern "C" StagePoint stg_area_start_b;
+/* Returns the current map's descriptor field +0x34 for `id`, or a default float. */
+extern "C" f32 stg_area_ceiling_get(u8 id)
+{
+    StageWork* w = SW;
+    StageElem* e;
+    if ((u8)id == 0xFF)
+        return lbl_8079A47C;
+    e = ((StageGroup*)stage_map_group_get(w->mapno))->elems[(u8)id];
+    if (e == 0)
+        return lbl_8079A47C;
+    return e->field_0x34;
+}
+
+/* Returns the current map's +0x18 word array entry for `id`, or 0. */
+extern "C" u32 stage_area_word_get(u8 id)
+{
+    StageWork* w = SW;
+    u32* arr;
+    if ((u8)id == 0xFF)
+        return 0;
+    arr = ((StageGroup*)stage_map_group_get(w->mapno))->field_0x18;
+    if (arr == 0)
+        return 0;
+    return arr[(u8)id];
+}
+
+/* Returns the entry `index` points at, biased by its 0x114-byte header, or NULL. */
+extern "C" void* stage_char_res_body_get(u8 index)
+{
+    StageChar** chars = &SW->chars[0];
+    StageObject* p = (StageObject*)chars[(u8)index];
+    if (p == 0)
+        return 0;
+    return stage_res_body_get(p->body);
+}
+
+/* Returns the record at `self` plus the resource size from fn_800700C0(). */
+extern "C" void* stage_res_body_get(void* self)
+{
+    return stage_res_offset_get(self, ((const ResolverView*)&reinterpret_cast<const nw4r::g3d::ResMdl*>(self)->ref())->size);
+}
+
+/* Returns `base`'s word pointer plus `off`; a zero offset yields NULL. */
+extern "C" void* stage_res_offset_get(void* base, s32 off)
+{
+    u8* p = *(u8**)base;
+    if (off != 0)
+        return p + off;
+    return 0;
+}
+
+/* Returns the current map's descriptor field +0x38 for `id`, or 0. */
+extern "C" u32 pl_act_kind_get(u8 id)
+{
+    StageWork* w = SW;
+    StageElem* e;
+    if ((u8)id == 0xFF)
+        return 0;
+    e = ((StageGroup*)stage_map_group_get(w->mapno))->elems[(u8)id];
+    if (e == 0)
+        return 0;
+    return e->field_0x38;
+}
+
+/* Classifies the current map number into a load category. */
+extern "C" u32 stage_climate_kind_get()
+{
+    s32 m = SW->mapno;
+    switch (m) {
+    case 2:
+    case 5:
+    case 16:
+    case 10:
+        return 1;
+    case 13:
+    case 4:
+    case 15:
+        return 2;
+    }
+    return 0;
+}
+
+/* Remaps an id through stg_map_kind_table; an unmapped id (0xFF) is returned unchanged.  The parameter is
+ * wider than a byte: retail masks it (`clrlwi`) before the table index, so the original signature
+ * was not the byte one `unsplit/unknown.h` guessed. */
+extern "C" u32 stage_map_kind_get(u32 kind)
+{
+    u8 mapped = stg_map_kind_table[(u8)kind];
+    if (mapped != 0xFF)
+        return mapped;
+    return kind;
+}
+
+/* Whether the float at `self`+8 is below the pooled constant. */
+extern "C" u32 stage_pos_z_low_ck(void* self)
+{
+    return ((f32*)self)[2] < lbl_8079A480;
+}
 
 /* Writes entry point `idx` of area `area`: the pit map's entry for `idx` 0, a fixed point otherwise. */
 extern "C" void stage_area_point_get(u8 area, u8 idx, VEC3* pos, u32* angle)
@@ -1813,7 +2042,13 @@ extern "C" u8 stage_bonus_pick(u8 name)
     }
 }
 
-extern "C" f32 stg_anim_rate_blend;
+/* Stores `f` into the current area's record when the map/area pair matches. */
+extern "C" void stage_anim_rate_target_set(f32 f)
+{
+    StageWork* w = SW;
+    if ((w->mapno == 6 || w->mapno == 17) && w->areano == 1)
+        w->anim_rate_target = f;
+}
 
 /* Eases the area model's animation rate toward its target on the map-6 area 1 and applies it. */
 extern "C" void stage_anim_rate_update(StageWork* w)
@@ -1825,6 +2060,22 @@ extern "C" void stage_anim_rate_update(StageWork* w)
     }
 }
 
+/* Tail-calls stg_area_flag_ck with the byte pair stg_area_event_pairs[2*index], [2*index+1]. */
+extern "C" u32 stg_area_flag_index_ck(u8 index)
+{
+    const u8* p = &stg_area_event_pairs[0][(u8)index * 2];
+    return stg_area_flag_ck(p[0], p[1]);
+}
+
+/* Sets bit (4 + j) of bitmask[id] when the current map's j-th table word is set. */
+extern "C" void stage_area_flag_set(u8 id, u8 j)
+{
+    StageWork* w = SW;
+    StagePartDef** p = stage_part_defs_get(w, id);
+    if (p[(u8)j] != 0)
+        w->bitmask[(u8)id] |= (u8)(0x10 << (u8)j);
+}
+
 /* Raises area event `index`/`bit`: marks it pending, sets its area flag and sends it to the partner. */
 extern "C" void stage_area_event_raise(u8 index, u8 bit)
 {
@@ -1832,7 +2083,6 @@ extern "C" void stage_area_event_raise(u8 index, u8 bit)
     stage_area_flag_set(index, bit);
     lb_sub11_send(index, bit);
 }
-
 
 /* Raises the area event of pair `idx` and stores `value` as the pending byte. */
 extern "C" void stage_area_event_pair_raise(u8 idx, u8 value)
@@ -1842,10 +2092,482 @@ extern "C" void stage_area_event_pair_raise(u8 idx, u8 value)
     SW->event_pending = value;
 }
 
+/* Returns the id-remapped byte at stage_w.bitmask[index]. */
+extern "C" u8 stage_area_bit_get(u8 index)
+{
+    const u8* p = &SW->bitmask[0];
+    return p[(u8)index];
+}
+
+/* Tests bit (4 + bit) of stage_w.bitmask[index]. */
+extern "C" bool stg_area_flag_ck(u8 index, u8 bit)
+{
+    StageWork* w = SW;
+    return w->bitmask[(u8)index] & (0x10 << (u8)bit);
+}
+
+/* Whether `self`'s map id remaps to a "loadable" category. */
+extern "C" u32 stage_map_kind_loadable_ck(void* self)
+{
+    s32 mapped = (u8)stage_map_kind_get(((StageWork*)self)->mapno);
+    if (mapped == 4 || mapped == 10)
+        return 1;
+    return 0;
+}
+
+/* Remaps the stage's current map id and returns the j-th element of the group's 16-byte-stride
+ * table. */
+extern "C" StagePartDef** stage_part_defs_get(StageWork* work, u8 j)
+{
+    StageGroup* g = (StageGroup*)stage_map_group_get(work->mapno);
+    return &g->part_defs[(u8)j * 4];
+}
+
+/* Whether the j-th element of the group's 16-byte-stride table is non-zero. */
+extern "C" bool stage_part_def_ck(u8 id, u8 j)
+{
+    StageGroup* g = (StageGroup*)stage_map_group_get((u8)id);
+    return g->part_defs[(u8)j * 4];
+}
+
+/* Seats the current area's breakable parts on the area model: resets each part's joints from the model's
+ * nodes, shows or hides them by the area flags and queues the hidden ones. */
+extern "C" void stage_parts_seat(StageWork* w)
+{
+    nw4r::g3d::ResNode node(0);
+    VEC3 rot;
+    MHchar* chr;
+    MHchar* water;
+    MHchar* alt;
+    StagePartDef** defs;
+    u8 hidden;
+    u8 j;
+    u8 k;
+
+    VEC3_ctor(&rot);
+    chr = &w->chars[0]->chr;
+    water = &w->chars[1]->chr;
+    alt = 0;
+    defs = stage_part_defs_get(w, w->areano);
+    hidden = 0;
+    for (k = 0; k < 8; k++)
+        w->event_ids[k] = 0xFF;
+    if (w->alt_model == 1) {
+        s32 count;
+        alt = &w->chars[3]->chr;
+        if (alt == 0)
+            return;
+        count = mhchar_node_count(alt);
+        for (k = 0; k < count; k++)
+            alt->setVisibility(k, 0);
+    }
+    for (j = 0; j < 4; j++) {
+        StagePart* part;
+        if (defs[j] == 0)
+            continue;
+        if (w->alt_model == 1) {
+            for (k = 0; k < 3; k++) {
+                if (defs[j]->joints[k] == 0xFF)
+                    break;
+                chr->setVisibility(defs[j]->joints[k], 0);
+            }
+            for (k = 0; k < 2; k++) {
+                if (defs[j]->vis_ids[k] == 0xFF)
+                    break;
+                chr->setVisibility(defs[j]->vis_ids[k], 0);
+            }
+        }
+        part = &w->parts[j];
+        part->state = 0;
+        part->field_0x9A = 0;
+        if (stg_area_flag_ck(w->areano, j) != 0)
+            part->visible = 0;
+        else
+            part->visible = 1;
+        if (w->alt_model == 1)
+            chr = alt;
+        for (k = 0; k < 3; k++) {
+            setVector3(&part->joint_pos[k], 0.0f, 0.0f, 0.0f);
+            part->joint_rot[k][0] = 0;
+            part->joint_rot[k][1] = 0;
+            part->joint_rot[k][2] = 0;
+            part->joint_done[k] = 0;
+            part->joint_time[k] = 0;
+            if (defs[j]->joints[k] == 0xFF)
+                break;
+            mhchar_res_node_get(chr, &node, defs[j]->joints[k]);
+            copyVec3(&part->joint_base[k], (VEC3*)em_res_node_trans_get(&node));
+            copyVec3(&rot, (VEC3*)em_res_node_rot_get(&node));
+            part->joint_angle[k][0] = (u16)(0.5f + (65536.0f * rot.x) / 360.0f);
+            part->joint_angle[k][1] = (u16)(0.5f + (65536.0f * rot.y) / 360.0f);
+            part->joint_angle[k][2] = (u16)(0.5f + (65536.0f * rot.z) / 360.0f);
+            chr->setVisibility(defs[j]->joints[k], part->visible);
+        }
+        for (k = 0; k < 2; k++) {
+            if (defs[j]->vis_ids[k] == 0xFF)
+                break;
+            if ((w->mapno == 3 || w->mapno == 14) && w->areano == 5) {
+                chr = &w->chars[0]->chr;
+                chr->setVisibility(defs[j]->vis_ids[k], part->visible);
+            } else if (stage_water_enabled_ck() == 1) {
+                water->setVisibility(defs[j]->vis_ids[k], part->visible);
+            }
+            if (part->visible == 0) {
+                w->event_ids[hidden] = defs[j]->vis_ids[k];
+                hidden++;
+            }
+        }
+    }
+}
+
+/* Arms the four breakable-part bodies of area `areano` and raises the events their maps start with. */
+extern "C" void stage_part_bodies_set(StageWork* w, u8 areano)
+{
+    StagePartDef** defs = stage_part_defs_get(w, areano);
+    s32 kind = (stage_map_kind_loadable_ck(w) == 1) + 4;
+    u8 j;
+
+    for (j = 0; j < 4; j++) {
+        StagePartDef* def = defs[j];
+        if (def != 0) {
+            u8 body = def->body;
+            body_set((_BODY_W*)&w->bodies[body], def->body_data, kind, (u32)w, 0);
+            w->bodies[body].area = areano;
+            switch (w->mapno) {
+            case 1:
+            case 12:
+                if (areano == 1 && quest_id_tail_ck() == 0)
+                    stage_area_event_raise(areano, j);
+                break;
+            case 8:
+            case 19:
+                if (areano == 0 && j == 0)
+                    stage_area_event_raise(areano, j);
+                break;
+            case 11:
+            case 20:
+                if (areano == 0 && j == 1)
+                    stage_area_event_raise(areano, j);
+                break;
+            }
+        }
+    }
+}
+
+/* Calls stage_part_bodies_set for each index below the current map's count. */
+extern "C" void stage_part_bodies_set_all(StageWork* self)
+{
+    u32 n = stage_map_area_count_get(self->mapno);
+    u8 i;
+    for (i = 0; i < (u8)n; i++)
+        stage_part_bodies_set(self, i);
+}
+
+/* Checks the four breakable parts of area `areano` for a break (damage past the part's limit, or the area flag
+ * already set) and drives each part's state. */
+extern "C" void stage_parts_check(StageWork* w, u8 areano)
+{
+    StagePartDef** defs = stage_part_defs_get(w, areano);
+    u8 j;
+
+    for (j = 0; j < 4; j++) {
+        if (defs[j] != 0) {
+            u8 b = defs[j]->body;
+            u32 forced;
+
+            if (stg_area_flag_ck(areano, j) == 1 && w->bodies[b].active == 1)
+                forced = 1;
+            else
+                forced = 0;
+            if (w->areano == w->bodies[b].area) {
+                if ((w->bodies[b].hit != 0 && w->bodies[b].active == 1) || forced == 1) {
+                    s16 prev = w->parts[j].damage;
+                    if (w->bodies[b].damage >= defs[j]->hp || forced == 1) {
+                        w->bodies[b].active = 0;
+                        if (forced == 0)
+                            stage_area_event_raise(areano, j);
+                        stage_part_break(w, j);
+                    } else {
+                        w->bodies[b].hit = 0;
+                        if ((s16)(w->bodies[b].damage - prev) > 0)
+                            camera_quake_req(0x42);
+                    }
+                }
+                stage_part_update(w, &w->parts[j], defs[j]->joints, defs[j]->vis_ids, defs[j]->kind);
+            } else if (w->bodies[b].hit != 0 || forced == 1) {
+                if (w->bodies[b].damage >= defs[j]->hp || forced == 1) {
+                    if (w->bodies[b].active == 1) {
+                        w->bodies[b].active = 0;
+                        stage_area_event_raise(areano, j);
+                    } else if ((system_w.field_0x0c & 0x7FF) == 0) {
+                        stage_area_event_raise(areano, j);
+                    }
+                } else {
+                    w->bodies[b].hit = 0;
+                }
+            }
+            if (w->bodies[b].data != 0)
+                hit_body_list_push((_HIT_W*)&w->bodies[b]);
+        }
+    }
+}
+
+/* Calls stage_parts_check for each index below the current map's count. */
+extern "C" void stage_parts_check_all(StageWork* self)
+{
+    u32 n = stage_map_area_count_get(self->mapno);
+    u8 i;
+    for (i = 0; i < (u8)n; i++)
+        stage_parts_check(self, i);
+}
+
+/* Drives part `part` of the current model: arms the break (joint scatter and hidden joints) and steps it. */
+extern "C" void stage_part_update(StageWork* w, StagePart* part, u8* joints, u8* vis_ids, u8 kind)
+{
+    u32 i;
+    MHchar* chr;
+
+    if (w->alt_model == 1)
+        chr = &w->chars[3]->chr;
+    else
+        chr = &w->chars[0]->chr;
+    if (chr == 0)
+        return;
+    switch (part->state) {
+    case 1:
+        part->state++;
+        stage_part_scatter_start(w, part, chr, joints, kind);
+        if ((w->mapno == 3 || w->mapno == 14) && w->areano == 5) {
+            chr = &w->chars[0]->chr;
+            stage_part_joints_hide(w, chr, vis_ids);
+        } else if (stage_water_enabled_ck() == 1) {
+            stage_part_joints_hide(w, &w->chars[1]->chr, vis_ids);
+        }
+    case 2:
+        stage_part_scatter_step(w, part, chr, joints, kind);
+        break;
+    case 3:
+        for (i = 0; i < 3; i++, joints++) {
+            if (*joints == 0xFF)
+                break;
+            chr->setVisibility(*joints, 0);
+        }
+        part->state++;
+        break;
+    }
+}
+
+/* Breaks part `index` of the current area: starts its fall, shakes the camera, spawns its break effect and
+ * plays its sound. */
+extern "C" void stage_part_break(StageWork* w, u8 index)
+{
+    VEC3 kpos;
+    VEC3 ppos;
+    VEC3 epos;
+    VEC3 tmp0;
+    VEC3 tmp1;
+    VEC3 tmp2;
+    StagePartDef** defs;
+    s32 quake = 0;
+
+    VEC3_ctor(&kpos);
+    VEC3_ctor(&ppos);
+    VEC3_ctor(&epos);
+    defs = stage_part_defs_get(w, w->areano);
+    if (defs[index] == 0)
+        return;
+    if (w->parts[index].state != 0)
+        return;
+    if (defs[index]->kind == 7)
+        w->parts[index].state = 4;
+    else
+        w->parts[index].state = 1;
+    switch (defs[index]->kind) {
+    case 0:
+        quake = 4;
+        break;
+    case 2:
+    case 3:
+    case 6:
+        quake = 2;
+        break;
+    case 4:
+        quake = 5;
+        break;
+    case 5:
+        quake = 6;
+        break;
+    case 1:
+        quake = 6;
+        break;
+    case 7:
+        quake = 0;
+        break;
+    }
+    if (quake != 0 && w->event_pending == 1)
+        camera_quake_req(quake | 0x40);
+    switch (defs[index]->eft_kind) {
+    case 0:
+        copyVec3(&epos, setVec3(&tmp0, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
+        eft_area_part_break_set(0, &epos, defs[index]->eft_scale, w->areano, defs[index]->eft_param);
+        break;
+    case 1:
+        copyVec3(&epos, setVec3(&tmp1, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
+        eft028_set_koware(1, &epos, w->areano, defs[index]->eft_param);
+        break;
+    case 2:
+        copyVec3(&epos, setVec3(&tmp2, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
+        eft_area_part_break_set(6, &epos, defs[index]->eft_scale, w->areano, defs[index]->eft_param);
+        break;
+    }
+    if ((w->mapno == 7 || w->mapno == 18) && w->areano == 2 && index == 0) {
+        StagePoint* p = &stg_koware_points[index];
+        kpos.x = p[0].pos.x;
+        kpos.y = p[0].pos.y;
+        kpos.z = p[0].pos.z;
+        eft028_set_koware(1, &kpos, w->areano, p[0].degrees);
+        kpos.x = p[1].pos.x;
+        kpos.y = p[1].pos.y;
+        kpos.z = p[1].pos.z;
+        eft028_set_koware(1, &kpos, w->areano, p[1].degrees);
+    }
+    copyVec3(&ppos, &w->parts[index].joint_base[0]);
+    se_area_part_play(index, &ppos);
+}
+
+/* Steps part `part`'s joint scatter: jitters the joints while they shake, then flies and spins them, and
+ * writes each joint's position and rotation into the model's nodes. */
+extern "C" void stage_part_scatter_step(StageWork* w, StagePart* part, MHchar* chr, u8* joints, u8 kind)
+{
+    StageScatterDef* def = stg_scatter_defs[kind];
+    nw4r::g3d::ResNode node(0);
+    u8 i;
+
+    if (part->joint_base[0].y < def->floor_y)
+        part->state++;
+    for (i = 0; i < 3; i++, joints++) {
+        f32 d;
+        switch (part->joint_done[i]) {
+        case 0:
+            if (*joints == 0xFF)
+                break;
+            d = (s32)(ran_suu(0) % stg_scatter_jitter_xz);
+            if (ran_suu(0) & 1)
+                d *= -1.0f;
+            part->joint_base[i].x += d;
+            d = (s32)(ran_suu(0) % stg_scatter_jitter_xz);
+            if (ran_suu(0) & 1)
+                d *= -1.0f;
+            part->joint_base[i].z += d;
+            d = (s32)(ran_suu(0) % stg_scatter_jitter_y);
+            if (ran_suu(0) & 1)
+                d *= -1.0f;
+            part->joint_base[i].y += d;
+            if (--part->joint_time[i] < 0)
+                part->joint_done[i]++;
+            mhchar_res_node_get(chr, &node, *joints);
+            stage_res_node_trans_set(&node, &part->joint_base[i]);
+            res_node_rot_set(&node, (360.0f * part->joint_angle[i][0]) / 65536.0f,
+                             (360.0f * part->joint_angle[i][1]) / 65536.0f,
+                             (360.0f * part->joint_angle[i][2]) / 65536.0f);
+            break;
+        case 1:
+            if (*joints == 0xFF)
+                break;
+            part->joint_pos[i].x *= def->damp[i * 3];
+            part->joint_pos[i].y *= def->damp[i * 3 + 1];
+            part->joint_pos[i].z *= def->damp[i * 3 + 2];
+            part->joint_pos[i].x += def->gravity[i * 3];
+            part->joint_pos[i].y += def->gravity[i * 3 + 1];
+            part->joint_pos[i].z += def->gravity[i * 3 + 2];
+            addVec3To(&part->joint_base[i], &part->joint_pos[i]);
+            part->joint_rot[i][0] = (u16)(s32)(part->joint_rot[i][0] * def->rot_damp[i * 3]);
+            part->joint_rot[i][1] = (u16)(s32)(part->joint_rot[i][1] * def->rot_damp[i * 3 + 1]);
+            part->joint_rot[i][2] = (u16)(s32)(part->joint_rot[i][2] * def->rot_damp[i * 3 + 2]);
+            part->joint_angle[i][0] = (u16)(part->joint_angle[i][0] + part->joint_rot[i][0]);
+            part->joint_angle[i][1] = (u16)(part->joint_angle[i][1] + part->joint_rot[i][1]);
+            part->joint_angle[i][2] = (u16)(part->joint_angle[i][2] + part->joint_rot[i][2]);
+            mhchar_res_node_get(chr, &node, *joints);
+            stage_res_node_trans_set(&node, &part->joint_base[i]);
+            res_node_rot_set(&node, (360.0f * part->joint_angle[i][0]) / 65536.0f,
+                             (360.0f * part->joint_angle[i][1]) / 65536.0f,
+                             (360.0f * part->joint_angle[i][2]) / 65536.0f);
+            break;
+        }
+    }
+}
+
 /* Writes `pos` as the translation of the resource node `node`. */
 extern "C" void stage_res_node_trans_set(nw4r::g3d::ResNode* node, VEC3* pos)
 {
     res_node_trans_set(node, pos->x, pos->y, pos->z);
+}
+
+/* Arms the scatter of part `part`'s three joints from the scatter definition of `kind`. */
+extern "C" void stage_part_scatter_start(StageWork* w, StagePart* part, MHchar* chr, u8* joints, u8 kind)
+{
+    nw4r::g3d::ResNode node(0);
+    VEC3 v;
+    u8 i;
+    StageScatterDef* def;
+
+    VEC3_ctor(&v);
+    def = stg_scatter_defs[kind];
+    for (i = 0; i < 3; i++) {
+        part->joint_done[i] = 0;
+        part->joint_pos[i].x = def->pos[i * 3];
+        part->joint_pos[i].y = def->pos[i * 3 + 1];
+        part->joint_pos[i].z = def->pos[i * 3 + 2];
+        part->joint_rot[i][0] = def->rot[i * 3];
+        part->joint_rot[i][1] = def->rot[i * 3 + 1];
+        part->joint_rot[i][2] = def->rot[i * 3 + 2];
+        if (def->random_spin != 0) {
+            u16 spin = ran_suu(1) & 0x5FF;
+            if (ran_suu(1) & 1)
+                part->joint_angle[i][0] = spin;
+            else
+                part->joint_angle[i][0] = -spin;
+            spin = ran_suu(1) & 0x5FF;
+            if (ran_suu(1) & 1)
+                part->joint_angle[i][2] = spin;
+            else
+                part->joint_angle[i][2] = -spin;
+        }
+        part->joint_time[i] = def->time;
+    }
+}
+
+/* Hides the joints `ids` (two, 0xFF unused) of `chr` and queues them as the map's visible-joint events. */
+extern "C" void stage_part_joints_hide(StageWork* w, MHchar* chr, u8* ids)
+{
+    nw4r::g3d::ResNode node(0);
+    VEC3 v;
+    u8 k;
+    u32 i;
+    u8 j;
+
+    VEC3_ctor(&v);
+    k = 0;
+    for (i = 0; i < 2; i++, ids++) {
+        if (*ids == 0xFF)
+            continue;
+        chr->setVisibility(*ids, 0);
+        for (j = 0; j < 8; j++) {
+            if (w->event_ids[k] != 0xFF) {
+                k++;
+            } else {
+                w->event_ids[k] = *ids;
+                w->event_ids[k + 1] = 0xFF;
+                break;
+            }
+        }
+    }
+}
+
+/* Tail-calls stage_part_break(stage_w, 1). */
+extern "C" void stage_demo_event_set()
+{
+    stage_part_break(SW, 1);
 }
 
 /* Breaks every live part at once (the map's demo event 12/1). */
@@ -1862,6 +2584,21 @@ extern "C" void stage_parts_break_all(void)
     }
 }
 
+/* Whether at least two of the three map flags (ids 3, 11, 4) are set. */
+extern "C" u32 stage_gate_a_ck()
+{
+    u8 count = 0;
+    if (stg_area_flag_index_ck(3) == 1)
+        count = 1;
+    if (stg_area_flag_index_ck(11) == 1)
+        count++;
+    if (stg_area_flag_index_ck(4) == 1)
+        count++;
+    if (count >= 2)
+        return 1;
+    return 0;
+}
+
 /* Completes the map's land-grid file: loads each pair of pack entries into the two land grids. */
 extern "C" void stage_land_grid_load_done(char* name, u8* data)
 {
@@ -1874,12 +2611,6 @@ extern "C" void stage_land_grid_load_done(char* name, u8* data)
         pl_land_grid_b_load((u8*)pack_entry_data(data, i * 2 + 1), i);
     }
 }
-
-/* One map resource file: its size and name. */
-typedef struct StageResFile {
-    /* +0x0 */ u32 size;
-    /* +0x4 */ char* name;
-} StageResFile; /* size: 0x8 */
 
 /* Requests the land-grid file of map `mapno`'s kind. */
 extern "C" void stage_map_res_load(u8 mapno)
@@ -1912,6 +2643,12 @@ extern "C" void stage_arena_land_grid_load(u8 mapno, u8 areano)
     }
     system_work_mem_free_get();
     load_file_req(f->name, system_work_mem_ptr_get(), f->size, (u32)stage_arena_land_grid_load_done, 1, &ctx);
+}
+
+/* Narrows both arguments to a byte and forwards to stage_arena_land_grid_load. */
+extern "C" void stage_arena_land_grid_load_req(u32 a, u32 b)
+{
+    stage_arena_land_grid_load((u8)a, (u8)b);
 }
 
 /* Clears the area records of map `mapno`, reads each area's record file into them, and loads the map's common eft
@@ -1976,23 +2713,10 @@ extern "C" void stage_map_obj_load(u8 mapno)
     }
 }
 
-/* One warp zone of an area: a cylinder (kind 0) or a box segment (kind 1), and where it warps to. */
-typedef struct StageZone {
-    /* +0x00 */ u8 dest;           /* 0xFF ends the list */
-    /* +0x01 */ u8 pad_0x01;
-    /* +0x02 */ s16 kind;
-    /* +0x04 */ VEC3 pos;
-    /* +0x10 */ f32 radius;
-    /* +0x14 */ f32 height;
-    /* +0x18 */ VEC3 pos2;
-    /* +0x24 */ VEC3 warp_pos;
-    /* +0x30 */ u32 warp_angle;
-} StageZone; /* size: 0x34 */
-
 /* Whether `pos` lies in one of the zones of list `zone`; `out` receives the zone hit. */
 extern "C" u32 stage_zone_hit_ck(StageZone* zone, StageZone** out, VEC3* pos)
 {
-    u8 hit = 0;
+    s32 hit = 0;
     VEC3 a;
     VEC3 b;
 
@@ -2089,524 +2813,18 @@ extern "C" void stage_warp_zone_check_split(void)
     my_player_no_set(player);
 }
 
-
-/* Starts the area effects and placed models of area `areano` of map `mapno`. */
-extern "C" void stage_area_effects_start(u8 mapno, u8 areano)
+/* Resets the stage's per-area cursor block and re-seats the world vector. */
+extern "C" void stage_light_reset()
 {
-    if (((mapno == 1) && (areano == 1)) || ((mapno == 0xC) && (areano == 1)) || ((mapno == 6) && (areano == 1)) || ((mapno == 0x11) && (areano == 1)) || ((mapno == 6) && (areano == 2)) || ((mapno == 0x11) && (areano == 2))) {
-        eft023_area_fx_set();
-    }
-    if (((mapno == 1) && (areano == 2)) || ((mapno == 0xC) && (areano == 2))) {
-        eft023_area_fx2_set();
-    }
-    if (((mapno == 1) && (areano == 2)) || ((mapno == 0xC) && (areano == 2)) || ((mapno == 1) && (areano == 9)) || ((mapno == 0xC) && (areano == 9)) || ((mapno == 1) && (areano == 0xA)) || ((mapno == 0xC) && (areano == 0xA)) || ((mapno == 1) && (areano == 0xB)) || ((mapno == 0xC) && (areano == 0xB)) || ((mapno == 2) && (areano == 9)) || ((mapno == 0xD) && (areano == 9)) || ((mapno == 2) && (areano == 0xB)) || ((mapno == 0xD) && (areano == 0xB)) || ((mapno == 5) && (areano == 2)) || ((mapno == 6) && (areano == 2)) || ((mapno == 0x11) && (areano == 2)) || ((mapno == 7) && (areano == 1)) || ((mapno == 0x12) && (areano == 1)) || ((mapno == 7) && (areano == 2)) || ((mapno == 0x12) && (areano == 2)) || ((mapno == 7) && (areano == 3)) || ((mapno == 0x12) && (areano == 3)) || ((mapno == 0xA) && (areano == 0)) || ((mapno == 0x15) && (areano == 5)) || ((mapno == 0x15) && (areano == 6)) || ((mapno == 0x15) && (areano == 7)) || ((mapno == 0x16) && (areano == 1)) || ((mapno == 0x16) && (areano == 2))) {
-        em_sub_area_fx_set(0);
-    }
-    if (((mapno == 1) && (areano == 0)) || ((mapno == 0xC) && (areano == 0)) || ((mapno == 1) && (areano == 2)) || ((mapno == 0xC) && (areano == 2)) || ((mapno == 1) && (areano == 3)) || ((mapno == 0xC) && (areano == 3)) || ((mapno == 1) && (areano == 4)) || ((mapno == 0xC) && (areano == 4)) || ((mapno == 1) && (areano == 5)) || ((mapno == 0xC) && (areano == 5)) || ((mapno == 1) && (areano == 6)) || ((mapno == 0xC) && (areano == 6)) || ((mapno == 1) && (areano == 7)) || ((mapno == 0xC) && (areano == 7)) || ((mapno == 1) && (areano == 8)) || ((mapno == 0xC) && (areano == 8)) || ((mapno == 1) && (areano == 0xC)) || ((mapno == 0xC) && (areano == 0xC)) || ((mapno == 3) && (areano == 0)) || ((mapno == 0xE) && (areano == 0)) || ((mapno == 3) && (areano == 2)) || ((mapno == 0xE) && (areano == 2)) || ((mapno == 3) && (areano == 3)) || ((mapno == 0xE) && (areano == 3)) || ((mapno == 3) && (areano == 4)) || ((mapno == 0xE) && (areano == 4)) || ((mapno == 3) && (areano == 6)) || ((mapno == 0xE) && (areano == 6)) || ((mapno == 3) && (areano == 7)) || ((mapno == 0xE) && (areano == 7)) || ((mapno == 3) && (areano == 8)) || ((mapno == 0xE) && (areano == 8)) || ((mapno == 3) && (areano == 0xA)) || ((mapno == 5) && (areano == 6)) || ((mapno == 0x10) && (areano == 6))) {
-        em_sub_area_fx_set(1);
-    }
-    if (((mapno == 7) && (areano == 3)) || ((mapno == 0x12) && (areano == 3))) {
-        em_sub_area_fx_set(2);
-        eft053_set();
-    }
-    if (((mapno == 1) && (areano == 0xC)) || ((mapno == 0xC) && (areano == 0xC)) || ((mapno == 3) && (areano == 2)) || ((mapno == 0xE) && (areano == 2)) || ((mapno == 3) && (areano == 3)) || ((mapno == 0xE) && (areano == 3)) || ((mapno == 3) && (areano == 4)) || ((mapno == 0xE) && (areano == 4)) || ((mapno == 3) && (areano == 6)) || ((mapno == 0xE) && (areano == 6)) || ((mapno == 3) && (areano == 8)) || ((mapno == 0xE) && (areano == 8))) {
-        menu_area_fx_set();
-    }
-    if ((mapno == 3) && ((areano <= 5U) || ((u8) (areano + 0xF9) <= 3U))) {
-        em_sub_area_fx2_set(0);
-    }
-    if ((mapno == 3) && ((u8) (areano + 0xFE) <= 1U)) {
-        eft052_set();
-    }
-    if (mapno == 0x15) {
-        switch ((u32)areano) {
-        case 0:
-        case 1:
-        case 3:
-            em_sub_area_fx2_set(1);
-            break;
-        case 5:
-            place_model_create_pending();
-            break;
-        case 6:
-            place_model_create_pending();
-            break;
-        case 7:
-            place_model_create_pending();
-            break;
-        }
-    }
-    if (mapno == 0x16) {
-        if (areano == 0) {
-            em_sub_area_fx_set(3);
-            lb_scene_eft_spawn();
-        } else if (areano == 1) {
-            place_model_create_pending();
-        }
-    }
-    if (((mapno == 5) && (areano == 0)) || ((mapno == 5) && (areano == 1)) || ((mapno == 5) && (areano == 3)) || ((mapno == 5) && (areano == 6))) {
-        eft030_set();
-    }
-    if (((mapno == 2) && (areano == 0xA)) || ((mapno == 0xD) && (areano == 0xA))) {
-        lb_area_fx_set();
-    }
-    if ((mapno == 6) || (mapno == 0x11)) {
-        if (areano == 1) {
-            eft053_set();
-        } else if (areano == 2) {
-            eft053_set();
-            em_sub_area_fx2_set(2);
-        }
-    }
-    if (((mapno == 8) || (mapno == 0x13)) && (areano == 1)) {
-        eft053_set();
-    }
-    if ((mapno == 9) && (areano <= 1U)) {
-        eft053_set();
-    }
-    if (((mapno == 0xB) || (mapno == 0x14)) && (areano == 1)) {
-        eft053_set();
-    }
+    s32 i;
+    SW->light.kind = 0;
+    SW->light.intensity = lbl_8079A484;
+    for (i = 3; i >= 0; i--)
+        SW->light.colours[i] = 0xFFFFFF00;
+    for (i = 11; i >= 4; i--)
+        SW->light.colours[i] = 0xFFFFFF00;
+    setVector3(&SW->light_dir, lbl_8079A498, lbl_8079A498, lbl_8079A498);
 }
-
-/* Arms the four breakable-part bodies of area `areano` and raises the events their maps start with. */
-extern "C" void stage_part_bodies_set(StageWork* w, u8 areano)
-{
-    StagePartDef** defs = stage_part_defs_get(w, areano);
-    u8 kind = (stage_map_kind_loadable_ck(w) == 1) + 4;
-    u8 j;
-
-    for (j = 0; j < 4; j++) {
-        StagePartDef* def = defs[j];
-        if (def != 0) {
-            body_set((_BODY_W*)&w->bodies[def->body], def->body_data, kind, (u32)w, 0);
-            w->bodies[def->body].area = areano;
-            switch (w->mapno) {
-            case 1:
-            case 12:
-                if (areano == 1 && quest_id_tail_ck() == 0)
-                    stage_area_event_raise(areano, j);
-                break;
-            case 8:
-            case 19:
-                if (areano == 0 && j == 0)
-                    stage_area_event_raise(areano, j);
-                break;
-            case 11:
-            case 20:
-                if (areano == 0 && j == 1)
-                    stage_area_event_raise(areano, j);
-                break;
-            }
-        }
-    }
-}
-
-/* Checks the four breakable parts of area `areano` for a break (damage past the part's limit, or the area flag
- * already set) and drives each part's state. */
-extern "C" void stage_parts_check(StageWork* w, u8 areano)
-{
-    StagePartDef** defs = stage_part_defs_get(w, areano);
-    u8 j;
-
-    for (j = 0; j < 4; j++) {
-        if (defs[j] != 0) {
-            u8 b = defs[j]->body;
-            u32 forced;
-            StageBody* body;
-
-            if (stg_area_flag_ck(areano, j) == 1 && w->bodies[b].active == 1)
-                forced = 1;
-            else
-                forced = 0;
-            body = &w->bodies[b];
-            if (w->areano == body->area) {
-                if ((body->hit != 0 && body->active == 1) || forced == 1) {
-                    s16 prev = w->parts[j].damage;
-                    if (body->damage >= defs[j]->hp || forced == 1) {
-                        body->active = 0;
-                        if (forced == 0)
-                            stage_area_event_raise(areano, j);
-                        stage_part_break(w, j);
-                    } else {
-                        body->hit = 0;
-                        if ((s16)(body->damage - prev) > 0)
-                            camera_quake_req(0x42);
-                    }
-                }
-                stage_part_update(w, &w->parts[j], defs[j]->joints, defs[j]->vis_ids, defs[j]->kind);
-            } else if (body->hit != 0 || forced == 1) {
-                if (body->damage >= defs[j]->hp || forced == 1) {
-                    if (body->active == 1) {
-                        body->active = 0;
-                        stage_area_event_raise(areano, j);
-                    } else if ((system_w.field_0x0c & 0x7FF) == 0) {
-                        stage_area_event_raise(areano, j);
-                    }
-                } else {
-                    body->hit = 0;
-                }
-            }
-            if (body->data != 0)
-                hit_body_list_push((_HIT_W*)&w->bodies[b]);
-        }
-    }
-}
-
-/* Drives part `part` of the current model: arms the break (joint scatter and hidden joints) and steps it. */
-extern "C" void stage_part_update(StageWork* w, StagePart* part, u8* joints, u8* vis_ids, u8 kind)
-{
-    u32 i;
-    MHchar* chr;
-
-    if (w->alt_model == 1)
-        chr = &w->chars[3]->chr;
-    else
-        chr = &w->chars[0]->chr;
-    if (chr == 0)
-        return;
-    switch (part->state) {
-    case 1:
-        part->state++;
-        stage_part_scatter_start(w, part, chr, joints, kind);
-        if ((w->mapno == 3 || w->mapno == 14) && w->areano == 5) {
-            chr = &w->chars[0]->chr;
-            stage_part_joints_hide(w, chr, vis_ids);
-        } else if (stage_water_enabled_ck() == 1) {
-            stage_part_joints_hide(w, &w->chars[1]->chr, vis_ids);
-        }
-    case 2:
-        stage_part_scatter_step(w, part, chr, joints, kind);
-        break;
-    case 3:
-        for (i = 0; i < 3; i++, joints++) {
-            if (*joints == 0xFF)
-                break;
-            chr->setVisibility(*joints, 0);
-        }
-        part->state++;
-        break;
-    }
-}
-
-/* One breakable part's scatter definition: the joints' start positions, rotations, a random-spin flag and the
- * fall time. */
-typedef struct StageScatterDef {
-    /* +0x00 */ f32* pos;         /* the joints' start velocities, three per joint */
-    /* +0x04 */ f32* gravity;     /* three per joint */
-    /* +0x08 */ f32* damp;        /* three per joint */
-    /* +0x0C */ u16* rot;         /* three per joint */
-    /* +0x10 */ f32* rot_damp;    /* three per joint */
-    /* +0x14 */ f32 floor_y;      /* the scatter ends below it */
-    /* +0x18 */ u8 random_spin;
-    /* +0x19 */ u8 time;
-    /* +0x1A */ u8 pad_0x1A[2];
-} StageScatterDef; /* size: 0x1C */
-
-extern "C" StageScatterDef* stg_scatter_defs[];
-
-/* Arms the scatter of part `part`'s three joints from the scatter definition of `kind`. */
-extern "C" void stage_part_scatter_start(StageWork* w, StagePart* part, MHchar* chr, u8* joints, u8 kind)
-{
-    nw4r::g3d::ResNode node(0);
-    VEC3 v;
-    u8 i;
-    StageScatterDef* def;
-
-    VEC3_ctor(&v);
-    def = stg_scatter_defs[kind];
-    for (i = 0; i < 3; i++) {
-        part->joint_done[i] = 0;
-        part->joint_pos[i].x = def->pos[i * 3];
-        part->joint_pos[i].y = def->pos[i * 3 + 1];
-        part->joint_pos[i].z = def->pos[i * 3 + 2];
-        part->joint_rot[i][0] = def->rot[i * 3];
-        part->joint_rot[i][1] = def->rot[i * 3 + 1];
-        part->joint_rot[i][2] = def->rot[i * 3 + 2];
-        if (def->random_spin != 0) {
-            u16 spin = ran_suu(1) & 0x5FF;
-            if (ran_suu(1) & 1)
-                part->joint_angle[i][0] = spin;
-            else
-                part->joint_angle[i][0] = -spin;
-            spin = ran_suu(1) & 0x5FF;
-            if (ran_suu(1) & 1)
-                part->joint_angle[i][2] = spin;
-            else
-                part->joint_angle[i][2] = -spin;
-        }
-        part->joint_time[i] = def->time;
-    }
-}
-
-/* Hides the joints `ids` (two, 0xFF unused) of `chr` and queues them as the map's visible-joint events. */
-extern "C" void stage_part_joints_hide(StageWork* w, MHchar* chr, u8* ids)
-{
-    nw4r::g3d::ResNode node(0);
-    VEC3 v;
-    u8 k;
-    u32 i;
-    u8 j;
-
-    VEC3_ctor(&v);
-    k = 0;
-    for (i = 0; i < 2; i++, ids++) {
-        if (*ids == 0xFF)
-            continue;
-        chr->setVisibility(*ids, 0);
-        for (j = 0; j < 8; j++) {
-            if (w->event_ids[k] != 0xFF) {
-                k++;
-            } else {
-                w->event_ids[k] = *ids;
-                w->event_ids[k + 1] = 0xFF;
-                break;
-            }
-        }
-    }
-}
-
-extern "C" StagePoint stg_koware_points[];
-
-/* Breaks part `index` of the current area: starts its fall, shakes the camera, spawns its break effect and
- * plays its sound. */
-extern "C" void stage_part_break(StageWork* w, u8 index)
-{
-    VEC3 kpos;
-    VEC3 ppos;
-    VEC3 epos;
-    VEC3 tmp0;
-    VEC3 tmp1;
-    VEC3 tmp2;
-    StagePartDef** defs;
-    s32 quake = 0;
-
-    VEC3_ctor(&kpos);
-    VEC3_ctor(&ppos);
-    VEC3_ctor(&epos);
-    defs = stage_part_defs_get(w, w->areano);
-    if (defs[index] == 0)
-        return;
-    if (w->parts[index].state != 0)
-        return;
-    if (defs[index]->kind == 7)
-        w->parts[index].state = 4;
-    else
-        w->parts[index].state = 1;
-    switch (defs[index]->kind) {
-    case 0:
-        quake = 4;
-        break;
-    case 2:
-    case 3:
-    case 6:
-        quake = 2;
-        break;
-    case 4:
-        quake = 5;
-        break;
-    case 5:
-        quake = 6;
-        break;
-    case 1:
-        quake = 6;
-        break;
-    case 7:
-        quake = 0;
-        break;
-    }
-    if (quake != 0 && w->event_pending == 1)
-        camera_quake_req(quake | 0x40);
-    switch (defs[index]->eft_kind) {
-    case 0:
-        copyVec3(&epos, setVec3(&tmp0, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
-        eft_area_part_break_set(0, &epos, w->areano, defs[index]->eft_param, defs[index]->eft_scale);
-        break;
-    case 1:
-        copyVec3(&epos, setVec3(&tmp1, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
-        eft028_set_koware(1, &epos, w->areano, defs[index]->eft_param);
-        break;
-    case 2:
-        copyVec3(&epos, setVec3(&tmp2, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
-        eft_area_part_break_set(6, &epos, w->areano, defs[index]->eft_param, defs[index]->eft_scale);
-        break;
-    }
-    if ((w->mapno == 7 || w->mapno == 18) && w->areano == 2 && index == 0) {
-        StagePoint* p = &stg_koware_points[index];
-        kpos.x = p[0].pos.x;
-        kpos.y = p[0].pos.y;
-        kpos.z = p[0].pos.z;
-        eft028_set_koware(1, &kpos, w->areano, p[0].degrees);
-        kpos.x = p[1].pos.x;
-        kpos.y = p[1].pos.y;
-        kpos.z = p[1].pos.z;
-        eft028_set_koware(1, &kpos, w->areano, p[1].degrees);
-    }
-    copyVec3(&ppos, &w->parts[index].joint_base[0]);
-    se_area_part_play(index, &ppos);
-}
-
-
-/* Seats the current area's breakable parts on the area model: resets each part's joints from the model's
- * nodes, shows or hides them by the area flags and queues the hidden ones. */
-extern "C" void stage_parts_seat(StageWork* w)
-{
-    nw4r::g3d::ResNode node(0);
-    VEC3 rot;
-    MHchar* chr;
-    MHchar* water;
-    MHchar* alt;
-    StagePartDef** defs;
-    u8 hidden;
-    u8 j;
-    u8 k;
-
-    VEC3_ctor(&rot);
-    chr = &w->chars[0]->chr;
-    water = &w->chars[1]->chr;
-    alt = 0;
-    defs = stage_part_defs_get(w, w->areano);
-    hidden = 0;
-    for (k = 0; k < 8; k++)
-        w->event_ids[k] = 0xFF;
-    if (w->alt_model == 1) {
-        s32 count;
-        alt = &w->chars[3]->chr;
-        if (alt == 0)
-            return;
-        count = mhchar_node_count(alt);
-        for (k = 0; k < count; k++)
-            alt->setVisibility(k, 0);
-    }
-    for (j = 0; j < 4; j++) {
-        StagePart* part;
-        if (defs[j] == 0)
-            continue;
-        if (w->alt_model == 1) {
-            for (k = 0; k < 3; k++) {
-                if (defs[j]->joints[k] == 0xFF)
-                    break;
-                chr->setVisibility(defs[j]->joints[k], 0);
-            }
-            for (k = 0; k < 2; k++) {
-                if (defs[j]->vis_ids[k] == 0xFF)
-                    break;
-                chr->setVisibility(defs[j]->vis_ids[k], 0);
-            }
-        }
-        part = &w->parts[j];
-        part->state = 0;
-        part->field_0x9A = 0;
-        if (stg_area_flag_ck(w->areano, j) != 0)
-            part->visible = 0;
-        else
-            part->visible = 1;
-        if (w->alt_model == 1)
-            chr = alt;
-        for (k = 0; k < 3; k++) {
-            setVector3(&part->joint_pos[k], 0.0f, 0.0f, 0.0f);
-            part->joint_rot[k][0] = 0;
-            part->joint_rot[k][1] = 0;
-            part->joint_rot[k][2] = 0;
-            part->joint_done[k] = 0;
-            part->joint_time[k] = 0;
-            if (defs[j]->joints[k] == 0xFF)
-                break;
-            mhchar_res_node_get(chr, &node, defs[j]->joints[k]);
-            copyVec3(&part->joint_base[k], (VEC3*)em_res_node_trans_get(&node));
-            copyVec3(&rot, (VEC3*)em_res_node_rot_get(&node));
-            part->joint_angle[k][0] = (u16)(0.5f + (65536.0f * rot.x) / 360.0f);
-            part->joint_angle[k][1] = (u16)(0.5f + (65536.0f * rot.y) / 360.0f);
-            part->joint_angle[k][2] = (u16)(0.5f + (65536.0f * rot.z) / 360.0f);
-            chr->setVisibility(defs[j]->joints[k], part->visible);
-        }
-        for (k = 0; k < 2; k++) {
-            if (defs[j]->vis_ids[k] == 0xFF)
-                break;
-            if ((w->mapno == 3 || w->mapno == 14) && w->areano == 5) {
-                chr = &w->chars[0]->chr;
-                chr->setVisibility(defs[j]->vis_ids[k], part->visible);
-            } else if (stage_water_enabled_ck() == 1) {
-                water->setVisibility(defs[j]->vis_ids[k], part->visible);
-            }
-            if (part->visible == 0) {
-                w->event_ids[hidden] = defs[j]->vis_ids[k];
-                hidden++;
-            }
-        }
-    }
-}
-
-
-extern "C" u8 stg_scatter_jitter_xz;
-extern "C" u8 stg_scatter_jitter_y;
-
-/* Steps part `part`'s joint scatter: jitters the joints while they shake, then flies and spins them, and
- * writes each joint's position and rotation into the model's nodes. */
-extern "C" void stage_part_scatter_step(StageWork* w, StagePart* part, MHchar* chr, u8* joints, u8 kind)
-{
-    StageScatterDef* def = stg_scatter_defs[kind];
-    nw4r::g3d::ResNode node(0);
-    u8 i;
-
-    if (part->joint_base[0].y < def->floor_y)
-        part->state++;
-    for (i = 0; i < 3; i++, joints++) {
-        f32 d;
-        switch (part->joint_done[i]) {
-        case 0:
-            if (*joints == 0xFF)
-                break;
-            d = (s32)(ran_suu(0) % stg_scatter_jitter_xz);
-            if (ran_suu(0) & 1)
-                d *= -1.0f;
-            part->joint_base[i].x += d;
-            d = (s32)(ran_suu(0) % stg_scatter_jitter_xz);
-            if (ran_suu(0) & 1)
-                d *= -1.0f;
-            part->joint_base[i].z += d;
-            d = (s32)(ran_suu(0) % stg_scatter_jitter_y);
-            if (ran_suu(0) & 1)
-                d *= -1.0f;
-            part->joint_base[i].y += d;
-            if (--part->joint_time[i] < 0)
-                part->joint_done[i]++;
-            mhchar_res_node_get(chr, &node, *joints);
-            stage_res_node_trans_set(&node, &part->joint_base[i]);
-            res_node_rot_set(&node, (360.0f * part->joint_angle[i][0]) / 65536.0f,
-                             (360.0f * part->joint_angle[i][1]) / 65536.0f,
-                             (360.0f * part->joint_angle[i][2]) / 65536.0f);
-            break;
-        case 1:
-            if (*joints == 0xFF)
-                break;
-            part->joint_pos[i].x *= def->damp[i * 3];
-            part->joint_pos[i].y *= def->damp[i * 3 + 1];
-            part->joint_pos[i].z *= def->damp[i * 3 + 2];
-            part->joint_pos[i].x += def->gravity[i * 3];
-            part->joint_pos[i].y += def->gravity[i * 3 + 1];
-            part->joint_pos[i].z += def->gravity[i * 3 + 2];
-            addVec3To(&part->joint_base[i], &part->joint_pos[i]);
-            part->joint_rot[i][0] = (u16)(s32)(part->joint_rot[i][0] * def->rot_damp[i * 3]);
-            part->joint_rot[i][1] = (u16)(s32)(part->joint_rot[i][1] * def->rot_damp[i * 3 + 1]);
-            part->joint_rot[i][2] = (u16)(s32)(part->joint_rot[i][2] * def->rot_damp[i * 3 + 2]);
-            part->joint_angle[i][0] = (u16)(part->joint_angle[i][0] + part->joint_rot[i][0]);
-            part->joint_angle[i][1] = (u16)(part->joint_angle[i][1] + part->joint_rot[i][1]);
-            part->joint_angle[i][2] = (u16)(part->joint_angle[i][2] + part->joint_rot[i][2]);
-            mhchar_res_node_get(chr, &node, *joints);
-            stage_res_node_trans_set(&node, &part->joint_base[i]);
-            res_node_rot_set(&node, (360.0f * part->joint_angle[i][0]) / 65536.0f,
-                             (360.0f * part->joint_angle[i][1]) / 65536.0f,
-                             (360.0f * part->joint_angle[i][2]) / 65536.0f);
-            break;
-        }
-    }
-}
-
-#pragma peephole reset
-
-
-#pragma peephole off
 
 /* Blends the two packed colours channel by channel and returns the packed result. */
 extern "C" u32 stage_colour_blend(u32 from, u32 to, f32 t)
@@ -2622,32 +2840,7 @@ extern "C" u32 stage_colour_blend(u32 from, u32 to, f32 t)
     return (r0 << 24) | (r1 << 16) | (r2 << 8) | r3;
 }
 
-#pragma peephole reset
-
-
-#pragma peephole off
-
-/* The C++-linkage callees the view below calls: declared at global scope so the calls resolve to the map's
- * manglings (a declaration inside the view namespace would mangle the namespace in). */
-nw4r::math::VEC3 get_camera_pos(void);
-u32 LbCheckKujiraEvent(void);
-void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 area, long param);
-
 namespace view_fn_802B2AA0 {
-
-namespace nw4r = ::nw4r;  /* the view headers below reopen it */
-
-/* data keeps its map name (a view namespace would mangle it): the header is read with C linkage */
-extern "C" {
-#include "stage/fn_802B2AA0.h"
-}
-#include "stage/stg_w.h"
-#include "g3d/g3d_scnroot.h" /* nw4r::g3d::ScnRoot::GetFog (rule 2) */
-
-extern "C" {
-/* The shell-set job table pointer (`.sbss` 0x80794B60); an RSO stores it, nothing in the DOL does. */
-ShellSetFuncs* shell_set_func_ptr;
-}
 
 /* Blends the area's three colour groups by the camera/area angle and arms the six results as one
  * sound/effect frame set. */
@@ -2709,10 +2902,14 @@ extern "C" void stage_light_blend_set(StageBlendRec* rec, void* obj, u8 store)
         colour[5] = 0;
     }
     if (store == 0) {
-        filter_panel_upper_set(0, 6, colour, rec->se_frame);
+        f32 frame = rec->se_frame;
+        filter_panel_upper_set(0, 6, colour, frame);
         return;
     }
-    filter_panel_lower_set(0, 6, colour, rec->se_frame);
+    {
+        f32 frame = rec->se_frame;
+        filter_panel_lower_set(0, 6, colour, frame);
+    }
 }
 
 /* Copies the current area's staged colour record out of the stage block and drives it. */
@@ -2860,7 +3057,7 @@ extern "C" void stage_area_visibility_build(StageRuntime* st, u8 kind)
             chr->setVisibility(*drop, 0);
         }
     }
-    st->joint_state[player * 4 + kind] = found;
+    (st->joint_state + player * 4)[kind] = found;
 }
 
 /* Tail-calls the colour/visibility driver for the map's area animation set 0. */
@@ -3479,6 +3676,7 @@ extern "C" void stage_area_break_effects_spawn(StageRuntime* st)
     }
 }
 
+#pragma opt_common_subs off
 /* Seats the map/area's joint effects on the `shell_set_func_ptr` job table. */
 extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
 {
@@ -3489,6 +3687,8 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
     u8* strip;
     u8** joint_tables;
     s32 band;
+    u8 joint;
+    s32 i;
     u8 index;
     u8 mapno;
 
@@ -3511,29 +3711,26 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
     joints = joint_tables[band];
     order[0] = flags % 3;
     if ((flags & 0x10) != 0) {
-        order[1] = order[0] + 1;
-        if (order[1] >= 3) {
-            order[1] = 0;
-        }
-        order[2] = order[1] + 1;
-        if (order[2] >= 3) {
-            order[2] = 0;
+        for (i = 1; i < 3; i++) {
+            order[i] = order[i - 1] + 1;
+            if (order[i] >= 3) {
+                order[i] = 0;
+            }
         }
     } else {
-        order[1] = order[0] - 1;
-        if (order[1] < 0) {
-            order[1] = 2;
-        }
-        order[2] = order[1] - 1;
-        if (order[2] < 0) {
-            order[2] = 2;
+        for (i = 1; i < 3; i++) {
+            order[i] = order[i - 1] - 1;
+            if (order[i] < 0) {
+                order[i] = 2;
+            }
         }
     }
-    for (index = 0; (s8)*joints > 0; joints++, index++) {
-        vec_to_mh_vec3(&pos, (struct Vec*)(strip + (s8)*joints * 0xC));
+    for (index = 0; (s8)(joint = *joints) > 0; joints++, index++) {
+        vec_to_mh_vec3(&pos, (struct Vec*)(strip + (s8)joint * 0xC));
         shell_set_func_ptr->method_0x88(&pos, kind, (s16)(order[index] * 0xA), shell_set_func_ptr);
     }
 }
+#pragma opt_common_subs reset
 
 /* Raises the stage block's one-shot flag byte. */
 extern "C" void stage_demo_flags_set(void)
@@ -3562,12 +3759,6 @@ extern "C" void stage_area_timer_arm(u8 index)
     st->field_0x2F94[index] = now - quest_time_elapsed_get();
 }
 
-/* Tests area bit `index` of the stage block's 16-bit mask and reports whether it is clear. */
-extern "C" s32 stage_torch_unlit_ck(u8 index)
-{
-    return (((StageRuntime*)stage_w)->field_0x2F92 & (1 << index)) == 0;
-}
-
 /* Dispatches an area-index event to either the local stage or the caller's own handler. */
 extern "C" void stage_area_event_dispatch(void* plw, u8 index)
 {
@@ -3581,6 +3772,12 @@ extern "C" void stage_area_event_dispatch(void* plw, u8 index)
     if (Pl_master_ck((struct _PLW*)plw) == 1U) {
         lb_sub12_send(index);
     }
+}
+
+/* Tests area bit `index` of the stage block's 16-bit mask and reports whether it is clear. */
+extern "C" s32 stage_torch_unlit_ck(u8 index)
+{
+    return (((StageRuntime*)stage_w)->field_0x2F92 & (1 << index)) == 0;
 }
 
 /* Ages the stage block's per-area timers and clears the bits whose 4-second window has lapsed. */
@@ -3724,6 +3921,7 @@ extern "C" void stage_joint_se_update(StageRuntime* st)
     }
 }
 
+#pragma opt_common_subs off
 /* Places the map's demo marker objects on their scripted offsets. */
 extern "C" void stage_demo_markers_place(StageRuntime* st)
 {
@@ -3743,13 +3941,14 @@ extern "C" void stage_demo_markers_place(StageRuntime* st)
     }
     now = quest_time_limit_get();
     base = quest_time_elapsed_get();
-    secs = (u16)((now - base) / 300);
+    now = now - base;
+    secs = (u16)(now / 300);
     secs += quest_clock_byte_get(0);
     if (--st->field_0x2FDC > 0) {
         return;
     }
-    if (((now - base) & 0x40) != 0x40) {
-        if (((now - base) & 0x30) == 0) {
+    if ((now & 0x40) != 0x40) {
+        if ((now & 0x30) == 0) {
             if (event_demo_ck() == 1U) {
                 return;
             }
@@ -3774,6 +3973,7 @@ extern "C" void stage_demo_markers_place(StageRuntime* st)
         st->field_0x2FDC = 0;
     }
 }
+#pragma opt_common_subs reset
 
 /* Re-drives every live area object's own per-frame update. */
 extern "C" void stage_area_objects_refresh(void)
@@ -3796,24 +3996,19 @@ extern "C" void stage_area_objects_refresh(void)
 /* Returns the blend table for the map's current area group. */
 extern "C" StageBlendEntry* stage_blend_table_get(void)
 {
-    StageBlendEntry* table;
     u8 areano;
 
     areano = ::get_now_areano();
     switch (areano) {
+    default:
+        return lbl_805CFA68;
+    case 4:
+        return lbl_805CFB68;
     case 5:
     case 6:
     case 7:
-        table = lbl_805CFAE8;
-        break;
-    case 4:
-        table = lbl_805CFB68;
-        break;
-    default:
-        table = lbl_805CFA68;
-        break;
+        return lbl_805CFAE8;
     }
-    return table;
 }
 
 /* Blends the two areas the 30-second colour cycle straddles into a wrapped 0..1 value. */
@@ -3845,41 +4040,6 @@ extern "C" f32 stage_colour_cycle_weight_get(s16 index, f32 elapsed)
         value -= lbl_8079A468;
     }
     return value;
-}
-
-/* Blends colour `from` towards `to` by `t`, channel by channel. */
-static inline u32 stage_colour_lerp(const u32* from, const u32* to, f32 t)
-{
-    f32 tb;
-    f32 fb;
-    f32 tg;
-    f32 fg;
-    f32 tr;
-    f32 fr;
-    f32 ta;
-    f32 fa;
-    s32 a;
-    s32 r;
-    s32 g;
-    s32 b;
-
-    fa = (f32)(*from >> 24);
-    fr = (f32)((*from >> 16) & 0xFF);
-    fg = (f32)((*from >> 8) & 0xFF);
-    fb = (f32)(*from & 0xFF);
-    ta = (f32)(*to >> 24);
-    tr = (f32)((*to >> 16) & 0xFF);
-    tg = (f32)((*to >> 8) & 0xFF);
-    tb = (f32)(*to & 0xFF);
-    fa = fa + t * (ta - fa);
-    fr = fr + t * (tr - fr);
-    fg = fg + t * (tg - fg);
-    fb = fb + t * (tb - fb);
-    a = (s32)fa;
-    r = (s32)fr;
-    g = (s32)fg;
-    b = (s32)fb;
-    return ((u8)b | ((u8)g << 8)) | (((u8)a << 24) | ((u8)r << 16));
 }
 
 /* Interpolates the two areas' colour records by the cycle weight and arms the result. */
@@ -4056,4 +4216,5 @@ extern "C" u32 stage_slot_construct(u32 block)
     } while (p < block + 0x594);
     return block;
 }
+
 }  /* namespace view_fn_802B2AA0 */
