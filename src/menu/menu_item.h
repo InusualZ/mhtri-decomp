@@ -15,7 +15,7 @@
 
 
 /* One item record (0x14 bytes): `.data`-backed, 747 of them, behind the pointer at +0x00 of
- * `lbl_806AC8B8`.  Offsets from `GetItemData`'s 0x14 stride and the byte loads the accessors do. */
+ * `item_data_head`.  Offsets from `GetItemData`'s 0x14 stride and the byte loads the accessors do. */
 struct ItemDataRecord {
     /* +0x000 */ union { /* the record's first pair: the pre-merge `u16` view and the two bytes the
                           * option list's pick test reads, at the same offset (rule 5: one member
@@ -190,7 +190,7 @@ struct MenuSlot {
     /* +0x1D2 */ char name_0x1D2[0x14];  /* the panel's name text */
     /* +0x1E6 */ s8 field_0x1E6;
     /* +0x1E7 */ u8 field_0x1E7;
-    /* +0x1E8 */ s16 ticket;          /* the cockpit message ticket (`cockpit_ticket_acquire`) */
+    /* +0x1E8 */ u16 ticket;          /* the cockpit message ticket (`cockpit_ticket_acquire`) */
     /* +0x1EA */ u8 unused_0x1EA[0x1EC - 0x1EA];
     /* +0x1EC */ u8 field_0x1EC[0x1F0 - 0x1EC];  /* the embedded selection cursor */
     /* +0x1F0 */ u16 field_0x1F0;    /* the cursor's two item ids */
@@ -239,9 +239,9 @@ struct MenuFrameWork {
 
 /* The `.bss`/`.data` blocks the accessors read: this unit's own sections, declared never defined (playbook 29),
  * so the accessors take their addresses instead of defining them. */
-extern ItemDataHead lbl_806AC8B8;
+extern ItemDataHead item_data_head;
 extern MenuWork menu_work;
-extern MenuTables lbl_806ACF28;
+extern MenuTables menu_tables;
 extern u32 item_kind_color_tbl[];              /* .data:0x805CDE78 - 0x30 B, indexed by `ItemDataRecord::kind` */
 extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
 

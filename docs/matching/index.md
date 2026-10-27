@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (207)
+## Ideas that work (209)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -216,6 +216,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 228 | [A 100 % row can still load the wrong constant or string: read the values behind renamed operands](228-wrong-constant-behind-renamed-operand.md) | works | measurement, data, relocations | A row reads 100 % (or high) while it loads a different float, int-to-float bias, assert file name or table string than retail - objdiff pairs `@5494` against `lbl_8079A68C` by position and never compares the bytes... |
 | 229 | [Float locals read as bits and reassigned stay in memory when they are one local array](229-float-locals-read-as.md) | works | source-shape, allocator | Retail stores two float results, reads their bits with lwz, then on a match stores one over the other and reloads both with lfs before the final op; ours forwards the floats in registers (fmr/frsp, no reload) |
 | 230 | [Retail indexes three bytes with lbzx from precomputed +1/+2 offsets: a second table read with the same index keeps them](230-retail-indexes-three-bytes.md) | works | source-shape | Ours reads tbl[i*3+1]/tbl[i*3+2] as add + lbz 1/2(rX) where retail computes addi rA,rI,1 / addi rB,rI,2 up front and loads lbzx from the table base. |
+| 231 | [A 0xFFFF halfword store built as lis 1 + subi 1 means the field is u16, not s16](231-0xffff-halfword-store-built.md) | works | source-shape | Retail stores 0xFFFF with `lis r3,0x1` + `subi r0,r3,0x1` + `sth`, ours with `li r0,-0x1` + `sth` |
+| 232 | [A switch case's early exit shares the default's return - break on the pass test, fall through into default](232-switch-cases-early-exit.md) | works | source-shape | A case's `if (a \|\| b \|\| c) return; break;` plus `default: return;` leaves one `b <epilogue>` too many (the default's dead body, or the case's own return block) between the case and the next body |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
