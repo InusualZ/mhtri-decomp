@@ -11,10 +11,12 @@
  * FLAGS. `cflags_main`; C++ (every callee it reaches is a C++ mangling - `MHchar` members, nw4r functions,
  *   `Pl_frame_check` - and the target carries extab/extabindex for its functions).  The unit's own definitions are
  *   `extern "C"`: the map has only plain names for them.
- *   `#pragma peephole off` around `eft_area_effect_create`, `eft_light_trail_update`, `eft_light_lantern_update`,
+ *   `#pragma peephole off` around `eft_spawn_pos_in_area`, `eft_area_effect_create`, `eft_light_spawn`,
+ *   `eft_light_release`, `eft_light_drop_init`, `eft_light_trail_update`, `eft_light_lantern_update`,
  *   `eft_light_drop_update`, `eft_light_npc_update`, `eft_light_lobby_update` and `eft_light_ring_colors_get` (retail
- *   keeps the unfused `clrlwi`/`extsb` + `cmpwi` pairs and the reloads after a store); `#pragma fp_contract off`
- *   around `eft_light_drop_update` (retail keeps `fmuls` + `fadds`); `#pragma optimization_level 4` around
+ *   keeps the unfused `clrlwi`/`extsb` + `cmpwi` pairs, `rlwinm` + `srawi`, function addresses staged in `r0`, the
+ *   loop counter stepped last and the reloads after a store); `#pragma fp_contract off` around
+ *   `eft_light_drop_update` (retail keeps `fmuls` + `fadds`); `#pragma optimization_level 4` around
  *   `eft_light_drop_init`, `eft_light_lantern_update` and `eft_light_drop_update` (retail's `subi`/`cmplwi` switch
  *   ranges and prologue-hoisted int-to-float magic, playbook 108).
  * NAMES. GUESS, from each body and its callers: the unit's file name, every `eft_area_effect_*` and `eft_light_*`
@@ -22,22 +24,28 @@
  *   `eft_light_colors_a`/`_b`, `eft_light_tint_color`, `eft_light_fade_keys`, `eft_light_model_ids`.  Registry: `se_req_pos_id27`, `se_req_pos_id59`, `eft025_pl_set`,
  *   `lb_pl_act_off_ck` (foreign rows, GUESS for the last two).
  * RESIDUALS. Every row is written.
- *  - `eft_light_lantern_update`: the target shares one `eft_light_trail_update` tail between every early exit of its
- *    motion switch; written without `goto`, each exit repeats the call (+0x194 bytes); two colour loads add the base
- *    where retail indexes `lbzx` from precomputed offsets (a `u8` or `s32` offset local does not reach it);
- *  - `eft_light_dispatch`: case 0 is written last; ours still compares 1, 2, 3, 0 against retail's 0, 1, 2, 3;
- *  - `ef_pl_effects_init`: ours drops two `cmpwi`/`bne` null tests retail keeps;
- *  - `eft_light_beam_aim_job`: the three joint sums are kept in `f3`/`f2`/`f1` in retail, ours in `f2`/`f3`;
- *  - register colouring only: `eft_light_drop_init`, `eft_light_lantern_init`, `eft_light_lobby_init`.
- *   The other partial rows have no recorded cause (`symdiff.py -u ef/eft018 --all`).
+ *  - `eft_light_lantern_update`: the 40/47 case's yaw (`angle`) and pitch (`beam`) take `r29`/`r30` swapped against
+ *    retail (a separate pitch local, a `u32` yaw, the declaration orders and an early `angle` declaration do not
+ *    reach it);
+ *  - `eft_light_beam_aim_job`: `angle = (u16)(yaw + 0xC000)` builds its `addis`/`subi` in `r3`/`r0` where retail
+ *    builds it in `r30` (peephole off, `- 0x4000` and a `(u16)` constant do not reach it);
+ *  - `eft_light_dispatch`: retail keeps a `b` stub as case 0's body (the compare branches to it, it jumps to the
+ *    type switch after the outer exit); ours branches straight to the type switch (the type switch inside case 0,
+ *    an inline init helper and `break` exits measure worse).
  *   flipcheck: `.text` differs (the rows above).
  * SHAPES. `eft_area_effect_create`'s colour split uses explicit `(color & mask) >> shift` terms: `(color >> shift) &
  *   0xFF` folds into one `rlwinm`.  A one-case compare on a `u8`/`u16` value is a `switch` with the other path as
  *   `default` (retail's `cmpwi`); a colour index is a `u8` local (retail's `lbzx` from precomputed offsets).
- *   `eft_spawn_pos_in_area`'s area parameter is `s8` compared as `(u8)arg1`, and `eft_light_spawn`'s last two
- *   parameters are `s32` narrowed with `(u8)`: the masks come from the casts.
+ *   `eft_spawn_pos_in_area`'s area and kind parameters are `u8`, as are `eft_light_spawn`'s variant; its last two
+ *   parameters are `s32` narrowed with `(u8)`: the masks come from the casts.  `eft_light_beam_bind`'s motion is
+ *   an `s32` narrowed with `(u16)` (retail's `clrlwi` + `cmpwi`) and its source is loaded first.
+ *   `eft_light_motion_part_get` stores its answer in a local through `if`/`else if` chains (the `return` form is
+ *   if-converted to `neg`/`or`/`srawi`); `ef_pl_effects_init`'s spawn tests `return` (retail keeps the
+ *   `cmpwi`/`bne`); `eft_light_beam_aim_job`'s angle is a `u32` holding `(u16)` values (masked once at the store).
  *   `EftWorkHead`, `EftWorkSlots` and `EftWorkBody` are unions: the variants reuse the same bytes for different
- *   payloads.
+ *   payloads.  `eft_light_lantern_update`'s early exits are `continue` inside one `do { } while (0)` whose end is
+ *   the shared `eft_light_trail_update` call; the light-kind blocks fill both `color_a` and `color_b` (the dead
+ *   `color_a` stores go, the shared `+1`/`+2` offsets keep retail's `lbzx`).
  */
 
 #include "types.h"
@@ -217,7 +225,7 @@ u16 eft_light_model_ids[4] = {7, 4, 0, 0};
 
 extern "C" {
 
-_EFT* eft_light_spawn(_PLW* source, s32 arg1, s32 arg2, s32 arg3);
+_EFT* eft_light_spawn(_PLW* source, u8 arg1, s32 arg2, s32 arg3);
 void eft_area_effect_release(_EFT* self);
 void eft_area_effect_dispatch(_EFT* self);
 void eft_area_effect_create(_EFT* self);
@@ -242,18 +250,19 @@ void eft_light_sub_part_show(_EFT* self, u32 arg1);
 void eft_light_npc_part_show(_EFT* self, u32 arg1);
 void eft_light_lobby_part_show(_EFT* self, u32 arg1);
 void eft_light_beam_aim_job(struct PrimRec* job);
-void eft_light_beam_bind(_EFT* self, MHchar* model, u16 arg2);
+void eft_light_beam_bind(_EFT* self, MHchar* model, s32 arg2);
 void eft_light_ring_colors_get(u8 arg0, s32 arg1, _GXColor* arg2, _GXColor* arg3, _GXColor* arg4, _GXColor* arg5);
 s32 eft_light_motion_part_get(_PLW* self);
 void eft_light_trail_update(_EFT* self, u8 active);
 void eft_light_blade_place(_EFT* self);
 
-void eft_spawn_pos_in_area(VEC3* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
+#pragma peephole off
+void eft_spawn_pos_in_area(VEC3* arg0, u8 arg1, u8 arg2, u32 arg3, f32 farg0)
 {
     _EFT* eft;
     EftWork* work;
 
-    if ((u8)arg1 == get_now_areano()) {
+    if (arg1 == get_now_areano()) {
         eft = (_EFT*)eft_res_slot_get(0x10);
         if (eft != NULL) {
             work = EFT_WORK(eft);
@@ -273,6 +282,7 @@ void eft_spawn_pos_in_area(VEC3* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
         }
     }
 }
+#pragma peephole reset
 
 void eft_area_effect_release(_EFT* self)
 {
@@ -370,10 +380,12 @@ void eft_area_effect_retire(_EFT* self)
 void ef_pl_effects_init(_PLW* source)
 {
     if (GameMode_ck() == 2) {
-        if (eft_light_spawn(source, 4, 0, 1) == 0) {
+        if (eft_light_spawn(source, 4, 0, 1) == NULL) {
+            return;
         }
     } else {
-        if (eft_light_spawn(source, 0, 0, 2) == 0) {
+        if (eft_light_spawn(source, 0, 0, 2) == NULL) {
+            return;
         }
     }
 }
@@ -401,7 +413,8 @@ void eft_pl_weapon_follow_spawn(_PLW* self)
 }
 
 /* Allocates the sub-effect record and its per-variant handles. */
-_EFT* eft_light_spawn(_PLW* source, s32 arg1, s32 arg2, s32 arg3)
+#pragma peephole off
+_EFT* eft_light_spawn(_PLW* source, u8 arg1, s32 arg2, s32 arg3)
 {
     _EFT* eft;
     EftWork* work;
@@ -438,8 +451,10 @@ _EFT* eft_light_spawn(_PLW* source, s32 arg1, s32 arg2, s32 arg3)
     eft->dispatch_0x34 = eft_light_dispatch;
     return eft;
 }
+#pragma peephole reset
 
 /* Releases the sub-effect's handles and clears its count. */
+#pragma peephole off
 void eft_light_release(_EFT* self)
 {
     EftWork* work;
@@ -454,11 +469,14 @@ void eft_light_release(_EFT* self)
     }
     work->count = 0;
 }
+#pragma peephole reset
 
 /* Advances the state: a per-variant handler while the state is 0, then the generic ones. */
 void eft_light_dispatch(_EFT* self)
 {
     switch (self->state_0x05) {
+    case 0:
+        break;
     case 1:
         eft_light_update(self);
         return;
@@ -468,48 +486,42 @@ void eft_light_dispatch(_EFT* self)
     case 3:
         eft_light_retire(self);
         return;
+    default:
+        return;
+    }
+    switch (self->type_0x02) {
     case 0:
-        switch (self->type_0x02) {
-        case 0:
-            eft_light_lantern_init(self);
-            return;
-        case 2:
-            eft_light_drop_init(self);
-            return;
-        case 3:
-            eft_light_npc_init(self);
-            return;
-        case 4:
-            eft_light_lobby_init(self);
-            return;
-        }
-        break;
+        eft_light_lantern_init(self);
+        return;
+    case 2:
+        eft_light_drop_init(self);
+        return;
+    case 3:
+        eft_light_npc_init(self);
+        return;
+    case 4:
+        eft_light_lobby_init(self);
+        return;
     }
 }
 
 /* Creates the light per item and seeds the day-cycle state. */
 void eft_light_lantern_init(_EFT* self)
 {
-    _PLW* source;
-    EftWork* work;
-    MHchar** item;
-    u16* id;
     s32 i;
     s32 joint;
+    _PLW* source;
+    EftWork* work;
 
     source = (_PLW*)self->source_0x30;
     work = EFT_WORK(self);
     self->state_0x05++;
     joint = source->chunk_ofs + 3;
-    item = &work->slots_0x10.items.items_0x10[0];
-    id = eft_light_model_ids;
     for (i = 0; i < work->count; i++) {
-        if (res_eft_model_create_light(*item, *id, 0x12C, joint) == 0) {
+        if (res_eft_model_create_light(work->slots_0x10.items.items_0x10[i], eft_light_model_ids[i], 0x12C, joint) == 0) {
             eft_light_retire(self);
             return;
         }
-        id++;
-        item++;
     }
     eft_light_main_part_show(self, 0);
     eft_light_sub_part_show(self, 0);
@@ -525,18 +537,19 @@ void eft_light_lantern_init(_EFT* self)
 
 /* Creates the light per item for the weapon-follow variant, then picks its shape from the player's weapon state
  * and places it on the weapon joint. */
+#pragma peephole off
 #pragma optimization_level 4
 void eft_light_drop_init(_EFT* self)
 {
-    _PLW* source;
     EftWork* work;
     VEC3 offset;
     MTX34 unused;
     MTX34 local;
     MTX34 tex_mtx;
-    u16 id;
-    s32 joint;
     s32 i;
+    s32 joint;
+    u16 id;
+    _PLW* source;
     _GXColor color;
 
     source = (_PLW*)self->source_0x30;
@@ -633,6 +646,7 @@ void eft_light_drop_init(_EFT* self)
     eft_light_update(self);
 }
 #pragma optimization_level reset
+#pragma peephole reset
 
 /* Creates one light per item at the fixed joint and seeds the vectors. */
 void eft_light_npc_init(_EFT* self)
@@ -661,8 +675,8 @@ void eft_light_npc_init(_EFT* self)
 /* Creates the single light at the named joint and seeds the vectors. */
 void eft_light_lobby_init(_EFT* self)
 {
-    EftWork* work;
     s32 i;
+    EftWork* work;
 
     work = EFT_WORK(self);
     self->state_0x05++;
@@ -797,8 +811,8 @@ void eft_light_lantern_update(_EFT* self)
     _PLW* source;
     EftWork* work;
     u16 angle;
-    f32 x;
     f32 y;
+    f32 x;
     f32 z;
     VEC3 diff;
     _GXColor color_a;
@@ -836,1071 +850,1052 @@ void eft_light_lantern_update(_EFT* self)
         self->demo_flag_0x08 = 0;
         work->field_0x2F = -1;
     }
-    if ((source->field_0x5C4 & 0xF) != 0) {
-        if (Pl_act_ck(source, 12, 9) != 0 && motion == 51 && EFT_PL_CHR(source)->field_0x44 > 0.0f) {
-            eft_light_trail_update(self, trail);
-            return;
-        }
-        switch ((s32)(source->field_0x5C4 & 0xF0) >> 4) {
-        case 1:
-        case 2:
-            eft_light_main_part_show(self, 6);
-            eft_light_sub_part_show(self, 0xFF);
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.3f;
-            work->head.scale_0x04.z = 1.0f;
-            self->rot_0x24.x = 0xD99B;
-            self->rot_0x24.y = 0x7A51;
-            self->rot_0x24.z = 0x53E9;
-            setVector3(&offset, 5.5f, -28.0f, 12.0f);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-            start = 0;
-            break;
-        case 3:
-            eft_light_main_part_show(self, 6);
-            eft_light_sub_part_show(self, 0xFF);
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            {
-                nw4r::g3d::ScnMdl::CopiedMatAccess access(
-                    (nw4r::g3d::ScnMdl*)work->slots_0x10.items.items_0x10[0]->field_0x118, 6);
-                if (copied_mat_access_valid_ck(&access) != 0) {
-                    nw4r::g3d::ResTexSrt srt;
-                    res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false));
-                    srt.GetEffectMtx(0, &pose);
-                    pose.m[0][3] = 0.123f;
-                    srt.SetEffectMtx(0, &pose);
-                }
+    do {
+        if ((source->field_0x5C4 & 0xF) != 0) {
+            if (Pl_act_ck(source, 12, 9) != 0 && motion == 51 && EFT_PL_CHR(source)->field_0x44 > 0.0f) {
+                continue;
             }
-            self->rot_0x24.x = 0xD99B;
-            self->rot_0x24.y = 0x7A51;
-            self->rot_0x24.z = 0x53E9;
-            setVector3(&offset, 8.9f, -25.0f, 4.6f);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-            start = 0;
-            break;
-        case 4:
-            eft_light_main_part_show(self, 14);
-            eft_light_sub_part_show(self, 0xFF);
-            work->head.scale_0x04.x = 2.5f;
-            work->head.scale_0x04.y = 3.0f;
-            work->head.scale_0x04.z = 2.0f;
-            self->rot_0x24.x = 0xF60C;
-            self->rot_0x24.y = 0x749F;
-            self->rot_0x24.z = 0x3333;
-            setVector3(&offset, 3.3f, -24.0f, 4.0f);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-            color_a.r = eft_light_tint_color[0];
-            color_a.g = eft_light_tint_color[1];
-            color_a.b = eft_light_tint_color[2];
-            color_a.a = 0xFF;
-            work->slots_0x10.items.items_0x10[0]->setMatColor(9, GX_COLOR0A0, color_a, false);
-            start = 0;
-            break;
-        default:
-            eft_light_trail_update(self, trail);
-            return;
-        }
-    } else {
-        switch (motion) {
-        case 315:
-        case 352:
-            if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
-                eft_light_blade_place(self);
-            }
-            eft_light_main_part_show(self, 1);
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-            setVector3(&offset, 17.0f, 0.9f, 22.0f);
-            self->rot_0x24.x = 0x0EEF;
-            self->rot_0x24.y = 0x071C;
-            self->rot_0x24.z = 0x3777;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            break;
-        case 316:
-            if ((EFT_PL_CHR(source)->field_0x44 > 0.0f && source->field_0x007 == 1)
-                || (Pl_frame_check(source, 1, 16.0f, 0.0f) != 0 && Pl_frame_check(source, 1, 164.0f, 0.0f) == 0)) {
-                switch (source->field_0x306) {
-                case 208:
-                case 214:
-                    eft_light_main_part_show(self, 0xFF);
-                    eft_light_sub_part_show(self, 3);
-                    setVector3(&offset, -8.0f, -3.0f, 0.0f);
-                    self->rot_0x24.x = 0xCE3A;
-                    self->rot_0x24.y = 0x038E;
-                    self->rot_0x24.z = 0xF05C;
-                    break;
-                case 26:
-                    if (Pl_frame_check(source, 0, 26.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 15.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&self->pos_0x18);
-                        }
-                    }
-                case 27:
-                case 28:
-                case 166:
-                case 167:
-                    eft_light_main_part_show(self, 0xFF);
-                    eft_light_sub_part_show(self, 1);
-                    setVector3(&offset, -17.0f, -30.0f, 1.0f);
-                    self->rot_0x24.x = 0xF05C;
-                    self->rot_0x24.y = 0x0C17;
-                    self->rot_0x24.z = 0xAFA6;
-                    break;
-                }
+            switch ((s32)(source->field_0x5C4 & 0xF0) >> 4) {
+            case 1:
+            case 2:
+                eft_light_main_part_show(self, 6);
+                eft_light_sub_part_show(self, 0xFF);
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.3f;
+                work->head.scale_0x04.z = 1.0f;
+                self->rot_0x24.x = 0xD99B;
+                self->rot_0x24.y = 0x7A51;
+                self->rot_0x24.z = 0x53E9;
+                setVector3(&offset, 5.5f, -28.0f, 12.0f);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                start = 0;
+                break;
+            case 3:
+                eft_light_main_part_show(self, 6);
+                eft_light_sub_part_show(self, 0xFF);
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = 1.0f;
                 {
-                    u8 index;
-
-                    switch (source->field_0x306) {
-                    case 27:
-                        index = 1;
-                        break;
-                    case 26:
-                    case 166:
-                    case 167:
-                        index = 2;
-                        break;
-                    case 28:
-                        index = 4;
-                        break;
-                    default:
-                        index = 0;
-                        break;
+                    nw4r::g3d::ScnMdl::CopiedMatAccess access(
+                        (nw4r::g3d::ScnMdl*)work->slots_0x10.items.items_0x10[0]->field_0x118, 6);
+                    if (copied_mat_access_valid_ck(&access) != 0) {
+                        nw4r::g3d::ResTexSrt srt;
+                        res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false));
+                        srt.GetEffectMtx(0, &pose);
+                        pose.m[0][3] = 0.123f;
+                        srt.SetEffectMtx(0, &pose);
                     }
-                    color_a.r = eft_light_colors_a[index * 3];
-                    color_a.g = eft_light_colors_a[index * 3 + 1];
-                    color_a.b = eft_light_colors_a[index * 3 + 2];
-                    color_b.r = eft_light_colors_b[index * 3];
-                    color_b.g = eft_light_colors_b[index * 3 + 1];
-                    color_b.b = eft_light_colors_b[index * 3 + 2];
-                    color_a.a = 0xFF;
-                    color_b.a = 0xFF;
                 }
-                work->slots_0x10.items.items_0x10[1]->setMatColor(3, GX_COLOR0A0, color_a, false);
-                work->slots_0x10.items.items_0x10[1]->setMatColor(4, GX_COLOR0A0, color_b, false);
-                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                self->rot_0x24.x = 0xD99B;
+                self->rot_0x24.y = 0x7A51;
+                self->rot_0x24.z = 0x53E9;
+                setVector3(&offset, 8.9f, -25.0f, 4.6f);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                start = 0;
+                break;
+            case 4:
+                eft_light_main_part_show(self, 14);
+                eft_light_sub_part_show(self, 0xFF);
+                work->head.scale_0x04.x = 2.5f;
+                work->head.scale_0x04.y = 3.0f;
+                work->head.scale_0x04.z = 2.0f;
+                self->rot_0x24.x = 0xF60C;
+                self->rot_0x24.y = 0x749F;
+                self->rot_0x24.z = 0x3333;
+                setVector3(&offset, 3.3f, -24.0f, 4.0f);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                color_a.r = eft_light_tint_color[0];
+                color_a.g = eft_light_tint_color[1];
+                color_a.b = eft_light_tint_color[2];
+                color_a.a = 0xFF;
+                work->slots_0x10.items.items_0x10[0]->setMatColor(9, GX_COLOR0A0, color_a, false);
+                start = 0;
+                break;
+            default:
+                continue;
+            }
+        } else {
+            switch (motion) {
+            case 315:
+            case 352:
+                if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
+                    eft_light_blade_place(self);
+                }
+                eft_light_main_part_show(self, 1);
+                eft_light_sub_part_show(self, 0xFF);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                setVector3(&offset, 17.0f, 0.9f, 22.0f);
+                self->rot_0x24.x = 0x0EEF;
+                self->rot_0x24.y = 0x071C;
+                self->rot_0x24.z = 0x3777;
                 work->head.scale_0x04.x = 1.0f;
                 work->head.scale_0x04.y = 1.0f;
                 work->head.scale_0x04.z = 1.0f;
                 start = 0;
                 break;
-            }
-            eft_light_trail_update(self, trail);
-            return;
-        case 318:
-            if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
-                eft_light_blade_place(self);
-            }
-            if (Pl_frame_check(source, 1, 118.0f, 0.0f) != 0) {
-                eft_light_trail_update(self, trail);
-                return;
-            }
-            eft_light_main_part_show(self, 2);
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-            setVector3(&offset, -9.0f, -1.0f, 65.0f);
-            self->rot_0x24.x = 0;
-            self->rot_0x24.y = 0x8000;
-            self->rot_0x24.z = 0x8000;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            break;
-        case 319:
-        case 322:
-        case 358:
-            if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
-                eft_light_blade_place(self);
-            }
-            switch (motion) {
-            case 319:
-                if (Pl_frame_check(source, 3, 26.0f, 248.0f) == 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            case 322:
-                if (Pl_frame_check(source, 2, 26.0f, 0.0f) != 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            case 358:
-                if (Pl_frame_check(source, 3, 16.0f, 250.0f) == 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            }
-            eft_light_main_part_show(self, 3);
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-            setVector3(&offset, 8.0f, 0.0f, -6.0f);
-            self->rot_0x24.x = 0;
-            self->rot_0x24.y = 0;
-            self->rot_0x24.z = 0;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            break;
-        case 320:
-        case 321:
-            switch (motion) {
-            case 320:
-                if (Pl_frame_check(source, 2, 6.0f, 0.0f) != 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            case 321:
-                if (Pl_frame_check(source, 1, 34.0f, 0.0f) != 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            }
-            eft_light_main_part_show(self, 10);
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-            setVector3(&offset, -8.4f, -3.8f, -5.2f);
-            self->rot_0x24.x = 0xD3EA;
-            self->rot_0x24.y = 0x871D;
-            self->rot_0x24.z = 0x1C72;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            break;
-        case 324:
-        case 325:
-            switch (motion) {
-            case 324:
-                if (EFT_PL_CHR(source)->field_0x44 > 0.0f) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            case 325:
-                if (Pl_frame_check(source, 1, 58.0f, 0.0f) != 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            }
-            eft_light_main_part_show(self, 11);
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-            setVector3(&offset, -12.0f, -7.0f, -3.0f);
-            self->rot_0x24.x = 0x749F;
-            self->rot_0x24.y = 0xEEF0;
-            self->rot_0x24.z = 0xD4A0;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            break;
-        case 333:
-        case 334:
-        case 335:
-        case 336:
-        case 346:
-        case 347:
-        case 348:
-        case 349:
-        case 350:
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            switch (source->field_0x306) {
-            case 265:
-                trail = 1;
-                beam = 1;
-                self->timer_0x0C++;
-                {
-                    u8 kind = source->field_0x5BA;
+            case 316:
+                if ((EFT_PL_CHR(source)->field_0x44 > 0.0f && source->field_0x007 == 1)
+                    || (Pl_frame_check(source, 1, 16.0f, 0.0f) != 0 && Pl_frame_check(source, 1, 164.0f, 0.0f) == 0)) {
+                    switch (source->field_0x306) {
+                    case 208:
+                    case 214:
+                        eft_light_main_part_show(self, 0xFF);
+                        eft_light_sub_part_show(self, 3);
+                        setVector3(&offset, -8.0f, -3.0f, 0.0f);
+                        self->rot_0x24.x = 0xCE3A;
+                        self->rot_0x24.y = 0x038E;
+                        self->rot_0x24.z = 0xF05C;
+                        break;
+                    case 26:
+                        if (Pl_frame_check(source, 0, 26.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 15.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&self->pos_0x18);
+                            }
+                        }
+                    case 27:
+                    case 28:
+                    case 166:
+                    case 167:
+                        eft_light_main_part_show(self, 0xFF);
+                        eft_light_sub_part_show(self, 1);
+                        setVector3(&offset, -17.0f, -30.0f, 1.0f);
+                        self->rot_0x24.x = 0xF05C;
+                        self->rot_0x24.y = 0x0C17;
+                        self->rot_0x24.z = 0xAFA6;
+                        break;
+                    }
+                    {
+                        u8 index;
 
-                    color_b.r = eft_light_colors_b[kind * 3];
-                    color_b.g = eft_light_colors_b[kind * 3 + 1];
-                    color_b.b = eft_light_colors_b[kind * 3 + 2];
-                }
-                color_a.a = 0xFF;
-                color_b.a = 0xFF;
-                switch (motion) {
-                case 333:
-                    if (Pl_frame_check(source, 1, 26.0f, 0.0f) == 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
-                    self->demo_flag_0x08 |= 1;
-                    self->field_0x07 = 1;
-                    self->field_0x06 = 0;
-                    show = 0;
-                    start = 0;
-                    break;
-                case 334:
-                    if (Pl_frame_check(source, 1, 106.0f, 0.0f) != 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
-                    if (Pl_frame_check(source, 1, 96.0f, 0.0f) != 0) {
-                        beam = 2;
-                    }
-                    if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 20.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&pos);
+                        switch (source->field_0x306) {
+                        case 27:
+                            index = 1;
+                            break;
+                        case 26:
+                        case 166:
+                        case 167:
+                            index = 2;
+                            break;
+                        case 28:
+                            index = 4;
+                            break;
+                        default:
+                            index = 0;
+                            break;
                         }
+                        color_a.r = eft_light_colors_a[index * 3];
+                        color_a.g = eft_light_colors_a[index * 3 + 1];
+                        color_a.b = eft_light_colors_a[index * 3 + 2];
+                        color_b.r = eft_light_colors_b[index * 3];
+                        color_b.g = eft_light_colors_b[index * 3 + 1];
+                        color_b.b = eft_light_colors_b[index * 3 + 2];
+                        color_a.a = 0xFF;
+                        color_b.a = 0xFF;
                     }
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        self->demo_flag_0x08 = 0;
-                        self->field_0x07 = 0;
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    show = 1;
-                    start = 1;
-                    break;
-                case 335:
-                    if (Pl_frame_check(source, 1, 100.0f, 0.0f) != 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
-                    if (Pl_frame_check(source, 0, 78.0f, 0.0f) != 0) {
-                        self->field_0x06 = 1;
-                        self->timer_0x0C = 0;
-                    }
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        work->field_0x65 = 0;
-                        if (self->field_0x07 == 1) {
-                            self->demo_flag_0x08 = 0;
-                            self->field_0x07 = 0;
-                        } else {
-                            self->field_0x07--;
-                            self->demo_flag_0x08 &= ~1;
-                        }
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (self->field_0x07 == 0 && Pl_frame_check(source, 1, 70.0f, 0.0f) != 0) {
-                        beam = 2;
-                    }
-                    show = 1;
-                    start = 1;
-                    break;
-                case 346:
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        self->field_0x07--;
-                        self->demo_flag_0x08 &= ~2;
-                        work->field_0x65 = 0;
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 20.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&pos);
-                        }
-                    }
-                    if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
-                        self->field_0x06 = 0;
-                        self->timer_0x0C = 0;
-                    }
-                    show = 2;
-                    start = 1;
-                    break;
-                case 347:
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        self->field_0x07--;
-                        self->demo_flag_0x08 &= ~1;
-                        work->field_0x65 = 0;
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 20.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&pos);
-                        }
-                    }
-                    if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
-                        self->field_0x06 = 1;
-                        self->timer_0x0C = 0;
-                    }
-                    show = 1;
-                    start = 1;
-                    break;
-                case 348:
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        work->field_0x65 = 0;
-                        if (self->field_0x07 == 1) {
-                            self->demo_flag_0x08 = 0;
-                            self->field_0x07 = 0;
-                        } else {
-                            self->field_0x07--;
-                            self->demo_flag_0x08 &= ~2;
-                        }
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (Pl_frame_check(source, 1, 60.0f, 0.0f) != 0) {
-                        self->field_0x06 = 0;
-                        self->timer_0x0C = 0;
-                    }
-                    show = 2;
-                    start = 1;
-                    break;
-                case 349:
-                    if (Pl_frame_check(source, 0, 42.0f, 0.0f) != 0) {
-                        self->demo_flag_0x08 |= 2;
-                        self->field_0x07++;
-                    }
-                    if (Pl_frame_check(source, 3, 10.0f, 40.0f) != 0) {
-                        show = 2;
-                        work->color_index_0x66 = 0;
-                    }
-                    start = 1;
-                    break;
-                case 350:
-                    if (Pl_frame_check(source, 0, 46.0f, 0.0f) != 0) {
-                        self->demo_flag_0x08 |= 1;
-                        self->field_0x07++;
-                    }
-                    if (Pl_frame_check(source, 3, 20.0f, 44.0f) != 0) {
-                        show = 1;
-                        work->color_index_0x66 = 0;
-                    }
-                    start = 1;
-                    break;
-                default:
-                    show = 0;
-                    start = 0;
-                    break;
-                }
-                if (show != 0) {
-                    color_a.r = eft_light_colors_a[work->color_index_0x66 * 3];
-                    color_a.g = eft_light_colors_a[work->color_index_0x66 * 3 + 1];
-                    color_a.b = eft_light_colors_a[work->color_index_0x66 * 3 + 2];
-                    color_b.r = eft_light_colors_b[work->color_index_0x66 * 3];
-                    color_b.g = eft_light_colors_b[work->color_index_0x66 * 3 + 1];
-                    color_b.b = eft_light_colors_b[work->color_index_0x66 * 3 + 2];
                     work->slots_0x10.items.items_0x10[1]->setMatColor(3, GX_COLOR0A0, color_a, false);
                     work->slots_0x10.items.items_0x10[1]->setMatColor(4, GX_COLOR0A0, color_b, false);
+                    mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                    work->head.scale_0x04.x = 1.0f;
+                    work->head.scale_0x04.y = 1.0f;
+                    work->head.scale_0x04.z = 1.0f;
+                    start = 0;
+                    break;
                 }
-                ring_a.a = 0xFF;
-                ring_b.a = 0xFF;
-                core_a.a = 0xFF;
-                core_b.a = 0xFF;
-                if (source->field_0x00A == 0 && (u16)(source->act_no + 0xFF5E) <= 3) {
-                    eft_light_ring_colors_get(0, 0, &ring_a, &ring_b, &core_a, &core_b);
-                } else if (self->timer_0x0C >= 4) {
-                    if (self->field_0x06 == 0) {
-                        eft_light_ring_colors_get(0, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
-                    } else {
-                        eft_light_ring_colors_get(1, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
-                    }
-                } else if (self->field_0x06 == 0) {
-                    eft_light_ring_colors_get(1, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
-                } else {
-                    eft_light_ring_colors_get(0, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
+                continue;
+            case 318:
+                if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
+                    eft_light_blade_place(self);
                 }
-                if (beam != 0) {
-                    eft_light_main_part_show(self, 12);
-                    work->slots_0x10.items.items_0x10[0]->setVisibility(17, true);
-                    eft_light_sub_part_show(self, 0xFF);
-                    if ((self->demo_flag_0x08 & 1) != 0) {
-                        work->slots_0x10.items.items_0x10[0]->setVisibility(19, true);
-                        work->slots_0x10.items.items_0x10[0]->setMatColor(12, GX_COLOR0A0, core_a, false);
-                        work->slots_0x10.items.items_0x10[0]->setMatColor(13, GX_COLOR0A0, core_b, false);
-                    }
-                    if ((self->demo_flag_0x08 & 2) != 0) {
-                        work->slots_0x10.items.items_0x10[0]->setVisibility(18, true);
-                        work->slots_0x10.items.items_0x10[0]->setMatColor(16, GX_COLOR0A0, ring_a, false);
-                        work->slots_0x10.items.items_0x10[0]->setMatColor(17, GX_COLOR0A0, ring_b, false);
-                    }
-                    mtx34_identity(&pose);
-                    pose.m[0][3] = source->motion_pos_0x3C;
-                    pose.m[1][3] = source->ground_y_0x060;
-                    pose.m[2][3] = source->motion_pos_0x44;
-                    rotMatrixY(source->field_0x058, &pose);
-                    work->slots_0x10.items.items_0x10[0]->move2(&pose, 0);
-                    setVector3(&offset, 0.0f, 30.0f, 145.0f);
-                    rotVecY(&offset, source->field_0x058);
-                    mtx34_trans_add(&pose, &offset);
-                    eft_light_beam_bind(self, work->slots_0x10.items.items_0x10[0], motion);
-                    if (beam == 2) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
+                if (Pl_frame_check(source, 1, 118.0f, 0.0f) != 0) {
+                    continue;
                 }
-                if (show != 0) {
-                    eft_light_sub_part_show(self, 1);
-                    switch ((s32)show) {
-                    case 1:
-                        mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-                        self->rot_0x24.x = 0x2AAB;
-                        self->rot_0x24.y = 0xE223;
-                        self->rot_0x24.z = 0x1111;
-                        offset.x = 41.0f;
-                        offset.y = 14.0f;
-                        offset.z = 32.0f;
-                        break;
-                    case 2:
-                        mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-                        self->rot_0x24.x = 0xC001;
-                        self->rot_0x24.y = 0xAE3A;
-                        self->rot_0x24.z = 0xF1C8;
-                        offset.x = -30.0f;
-                        offset.y = 6.0f;
-                        offset.z = 45.0f;
-                        break;
-                    }
-                } else {
-                    placed = 1;
-                }
-                if (self->field_0x07 != 0) {
-                    work->field_0x67--;
-                    if ((s8)work->field_0x67 < 0) {
-                        work->field_0x67 = 12;
-                        mtx34_trans_get(&pose, &sound_pos);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id27(&sound_pos);
-                        }
-                    }
-                }
-                break;
-            case 40:
-            case 47:
-                trail = 1;
-                self->field_0x07 = 0;
-                self->demo_flag_0x08 = 0;
-                show = 1;
+                eft_light_main_part_show(self, 2);
+                eft_light_sub_part_show(self, 0xFF);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                setVector3(&offset, -9.0f, -1.0f, 65.0f);
+                self->rot_0x24.x = 0;
+                self->rot_0x24.y = 0x8000;
+                self->rot_0x24.z = 0x8000;
                 work->head.scale_0x04.x = 1.0f;
                 work->head.scale_0x04.y = 1.0f;
                 work->head.scale_0x04.z = 1.0f;
+                start = 0;
+                break;
+            case 319:
+            case 322:
+            case 358:
+                if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
+                    eft_light_blade_place(self);
+                }
                 switch (motion) {
-                case 333:
-                    if (Pl_frame_check(source, 1, 26.0f, 0.0f) == 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
+                case 319:
+                    if (Pl_frame_check(source, 3, 26.0f, 248.0f) == 0) {
+                        continue;
                     }
-                    beam = 0;
-                    start = 0;
                     break;
-                case 334:
-                    if (Pl_frame_check(source, 1, 106.0f, 0.0f) != 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
+                case 322:
+                    if (Pl_frame_check(source, 2, 26.0f, 0.0f) != 0) {
+                        continue;
                     }
-                    if (Pl_frame_check(source, 1, 96.0f, 0.0f) != 0) {
-                        show = 2;
-                    }
-                    if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 20.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&pos);
-                        }
-                    }
-                    beam = 1;
-                    start = 1;
                     break;
-                case 335:
-                    if (Pl_frame_check(source, 1, 100.0f, 0.0f) != 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
+                case 358:
+                    if (Pl_frame_check(source, 3, 16.0f, 250.0f) == 0) {
+                        continue;
                     }
-                    if (Pl_frame_check(source, 1, 70.0f, 0.0f) != 0) {
-                        show = 2;
-                    }
-                    beam = 1;
-                    start = 1;
-                    break;
-                default:
-                    beam = 0;
-                    start = 0;
                     break;
                 }
-                if (show != 0) {
-                    eft_light_main_part_show(self, 4);
-                    eft_light_sub_part_show(self, 0xFF);
-                    mtx34_identity(&pose);
-                    pose.m[0][3] = source->motion_pos_0x3C;
-                    pose.m[1][3] = source->ground_y_0x060;
-                    pose.m[2][3] = source->motion_pos_0x44;
-                    rotMatrixY(source->field_0x058, &pose);
-                    work->slots_0x10.items.items_0x10[0]->move2(&pose, 0);
-                    eft_res_models_spawn(self, (void**)&work->slots_0x10.items.items_0x10[0], 2, 1, 0);
-                    if (show == 2) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
-                }
-                color_a.r = eft_light_colors_a[source->field_0x5BA * 3];
-                color_a.g = eft_light_colors_a[source->field_0x5BA * 3 + 1];
-                color_a.b = eft_light_colors_a[source->field_0x5BA * 3 + 2];
-                color_b.r = eft_light_colors_b[source->field_0x5BA * 3];
-                color_b.g = eft_light_colors_b[source->field_0x5BA * 3 + 1];
-                color_b.b = eft_light_colors_b[source->field_0x5BA * 3 + 2];
-                color_a.a = 0xFF;
-                color_b.a = 0xFF;
-                work->slots_0x10.items.items_0x10[1]->setMatColor(3, GX_COLOR0A0, color_a, false);
-                work->slots_0x10.items.items_0x10[1]->setMatColor(4, GX_COLOR0A0, color_b, false);
-                if (beam != 0) {
-                    eft_light_main_part_show(self, 4);
-                    eft_light_sub_part_show(self, 1);
-                    self->rot_0x24.x = 0x2AAB;
-                    self->rot_0x24.y = 0xE223;
-                    self->rot_0x24.z = 0x1111;
-                    offset.x = 41.0f;
-                    offset.y = 14.0f;
-                    offset.z = 32.0f;
-                    mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-                    break;
-                }
-                eft_light_main_part_show(self, 4);
-                eft_light_sub_part_show(self, 2);
-                offset.x = 0.0f;
-                offset.y = 0.0f;
-                offset.z = 128.0f;
-                rotVecY(&offset, source->field_0x058);
-                pos.x = source->motion_pos_0x3C + offset.x;
-                pos.y = 77.0f + source->ground_y_0x060;
-                pos.z = source->motion_pos_0x44 + offset.z;
-                offset.x = -52.0f;
-                offset.y = 0.0f;
-                offset.z = 0.0f;
-                angle = source->field_0x058 + 0xC000;
-                rotVecY(&offset, angle);
-                pivot.x = pos.x + offset.x;
-                pivot.y = pos.y + offset.y;
-                pivot.z = pos.z + offset.z;
-                if (motion == 336) {
-                    offset.x = 12.0f;
-                    offset.y = 0.0f;
-                    offset.z = 9.0f;
-                    mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-                    mulVecMat(&offset, &mtx);
-                    x = offset.x + mtx.m[0][3];
-                    y = offset.y + mtx.m[1][3];
-                    z = offset.z + mtx.m[2][3];
-                    offset.x = x - pivot.x;
-                    offset.y = y - pivot.y;
-                    offset.z = z - pivot.z;
-                    rotVecY(&offset, 0x10000 - angle);
-                    beam = (u16)(0.5f + (65536.0f * atan2f(offset.z, offset.y)) / 6.2831855f);
-                    setVector3(&offset, 0.0f, 0.0f, 130.0f);
-                    rotVecY(&offset, source->field_0x058);
-                    mtx34_trans_add(&pose, &offset);
-                    self->field_0x07 = 3;
-                    work->field_0x67--;
-                    if ((s8)work->field_0x67 < 0) {
-                        work->field_0x67 = 12;
-                        mtx34_trans_get(&pose, &sound_pos);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id27(&sound_pos);
-                        }
-                    }
-                } else {
-                    beam = 0;
-                }
-                placed = 1;
-                mtx34_identity(&mtx);
-                rotMatrixX(beam, &mtx);
-                rotMatrixY(angle, &mtx);
-                mtx.m[0][3] = pos.x;
-                mtx.m[1][3] = pos.y;
-                mtx.m[2][3] = pos.z;
-                work->slots_0x10.items.items_0x10[1]->move2(&mtx, 0);
-                eft_res_models_spawn(self, (void**)&work->slots_0x10.items.items_0x10[1], 2, 1, 0);
-                break;
-            case 438:
-                self->timer_0x0C++;
-                {
-                    u8 kind = source->field_0x5BA;
-
-                    color_b.r = eft_light_colors_b[kind * 3];
-                    color_b.g = eft_light_colors_b[kind * 3 + 1];
-                    color_b.b = eft_light_colors_b[kind * 3 + 2];
-                }
-                color_a.a = 0xFF;
-                color_b.a = 0xFF;
-                switch (motion) {
-                case 333:
-                    if (Pl_frame_check(source, 1, 26.0f, 0.0f) == 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
-                    self->demo_flag_0x08 |= 1;
-                    self->field_0x07 = 1;
-                    self->field_0x06 = 0;
-                    show = 0;
-                    start = 1;
-                    break;
-                case 334:
-                    if (Pl_frame_check(source, 1, 106.0f, 0.0f) != 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
-                    Pl_frame_check(source, 1, 96.0f, 0.0f);
-                    if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 20.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&pos);
-                        }
-                    }
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        self->demo_flag_0x08 = 0;
-                        self->field_0x07 = 0;
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    show = 1;
-                    start = 1;
-                    break;
-                case 335:
-                    if (Pl_frame_check(source, 1, 100.0f, 0.0f) != 0) {
-                        eft_light_trail_update(self, trail);
-                        return;
-                    }
-                    if (Pl_frame_check(source, 0, 78.0f, 0.0f) != 0) {
-                        self->field_0x06 = 1;
-                        self->timer_0x0C = 0;
-                    }
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        work->field_0x65 = 0;
-                        if (self->field_0x07 == 1) {
-                            self->demo_flag_0x08 = 0;
-                            self->field_0x07 = 0;
-                        } else {
-                            self->field_0x07--;
-                            self->demo_flag_0x08 &= ~1;
-                        }
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (self->field_0x07 == 0) {
-                        Pl_frame_check(source, 1, 70.0f, 0.0f);
-                    }
-                    show = 1;
-                    start = 1;
-                    break;
-                case 346:
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        self->field_0x07--;
-                        self->demo_flag_0x08 &= ~2;
-                        work->field_0x65 = 0;
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 20.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&pos);
-                        }
-                    }
-                    if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
-                        self->field_0x06 = 0;
-                        self->timer_0x0C = 0;
-                    }
-                    show = 2;
-                    start = 1;
-                    break;
-                case 347:
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        self->field_0x07--;
-                        self->demo_flag_0x08 &= ~1;
-                        work->field_0x65 = 0;
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                        copyVec3(&pos, &self->pos_0x18);
-                        pos.y += 20.0f;
-                        eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
-                        if (self->area_0x44 == get_now_areano()) {
-                            se_req_pos_id63(&pos);
-                        }
-                    }
-                    if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
-                        self->field_0x06 = 1;
-                        self->timer_0x0C = 0;
-                    }
-                    show = 1;
-                    start = 1;
-                    break;
-                case 348:
-                    if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
-                        work->field_0x65 = 0;
-                        if (self->field_0x07 == 1) {
-                            self->demo_flag_0x08 = 0;
-                            self->field_0x07 = 0;
-                        } else {
-                            self->field_0x07--;
-                            self->demo_flag_0x08 &= ~2;
-                        }
-                        work->color_index_0x66 = source->field_0x5BA;
-                    }
-                    if (Pl_frame_check(source, 1, 60.0f, 0.0f) != 0) {
-                        self->field_0x06 = 0;
-                        self->timer_0x0C = 0;
-                    }
-                    show = 2;
-                    start = 1;
-                    break;
-                case 349:
-                    if (Pl_frame_check(source, 0, 42.0f, 0.0f) != 0) {
-                        self->demo_flag_0x08 |= 2;
-                        self->field_0x07++;
-                    }
-                    if (Pl_frame_check(source, 3, 10.0f, 40.0f) != 0) {
-                        show = 2;
-                        work->color_index_0x66 = 0;
-                    }
-                    start = 1;
-                    break;
-                case 350:
-                    if (Pl_frame_check(source, 0, 46.0f, 0.0f) != 0) {
-                        self->demo_flag_0x08 |= 1;
-                        self->field_0x07++;
-                    }
-                    if (Pl_frame_check(source, 3, 20.0f, 44.0f) != 0) {
-                        show = 1;
-                        work->color_index_0x66 = 0;
-                    }
-                    start = 1;
-                    break;
-                default:
-                    show = 0;
-                    start = 1;
-                    break;
-                }
-                if (show != 0) {
-                    color_a.r = eft_light_colors_a[work->color_index_0x66 * 3];
-                    color_a.g = eft_light_colors_a[work->color_index_0x66 * 3 + 1];
-                    color_a.b = eft_light_colors_a[work->color_index_0x66 * 3 + 2];
-                    color_b.r = eft_light_colors_b[work->color_index_0x66 * 3];
-                    color_b.g = eft_light_colors_b[work->color_index_0x66 * 3 + 1];
-                    color_b.b = eft_light_colors_b[work->color_index_0x66 * 3 + 2];
-                    work->slots_0x10.items.items_0x10[1]->setMatColor(3, GX_COLOR0A0, color_a, false);
-                    work->slots_0x10.items.items_0x10[1]->setMatColor(4, GX_COLOR0A0, color_b, false);
-                }
-                if (show != 0) {
-                    eft_light_sub_part_show(self, 1);
-                    switch ((s32)show) {
-                    case 1:
-                        mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
-                        self->rot_0x24.x = 0x2AAB;
-                        self->rot_0x24.y = 0xE223;
-                        self->rot_0x24.z = 0x1111;
-                        offset.x = 41.0f;
-                        offset.y = 14.0f;
-                        offset.z = 32.0f;
-                        break;
-                    case 2:
-                        mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-                        self->rot_0x24.x = 0xC001;
-                        self->rot_0x24.y = 0xAE3A;
-                        self->rot_0x24.z = 0xF1C8;
-                        offset.x = -30.0f;
-                        offset.y = 6.0f;
-                        offset.z = 45.0f;
-                        break;
-                    }
-                } else {
-                    placed = 1;
-                }
-                break;
-            default:
-                eft_light_trail_update(self, trail);
-                return;
-            }
-            break;
-        case 338:
-        case 339:
-        case 340:
-        case 341:
-        case 342:
-        case 343:
-            eft_light_main_part_show(self, eft_light_motion_part_get(source));
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-            setVector3(&offset, -9.2f, -1.7f, 12.0f);
-            self->rot_0x24.x = 0;
-            self->rot_0x24.y = 0;
-            self->rot_0x24.z = 0xC001;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            break;
-        case 359:
-            if (Pl_frame_check(source, 3, 6.0f, 68.0f) == 0) {
-                eft_light_trail_update(self, trail);
-                return;
-            }
-            eft_light_main_part_show(self, 13);
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-            setVector3(&offset, -7.6f, -0.75f, 1.07f);
-            self->rot_0x24.x = 0xF778;
-            self->rot_0x24.y = 0xDA51;
-            self->rot_0x24.z = 0x0333;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            break;
-        case 420:
-        case 421:
-        case 422:
-        case 423:
-            switch (motion) {
-            case 420:
-                if (Pl_frame_check(source, 2, 20.0f, 0.0f) != 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            case 423:
-                if (Pl_frame_check(source, 1, 90.0f, 0.0f) != 0) {
-                    eft_light_trail_update(self, trail);
-                    return;
-                }
-                break;
-            }
-            eft_light_main_part_show(self, 15);
-            eft_light_sub_part_show(self, 0xFF);
-            switch (source->chunk_ofs) {
-            case 1:
-            case 3:
-                setVector3(&pos, 137.0f, 80.0f, 1983.0f);
-                break;
-            default:
-                setVector3(&pos, -137.0f, 80.0f, 1983.0f);
-                break;
-            }
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 1, &mtx);
-            mtx34_trans_get(&mtx, &self->pos_0x18);
-            subVec3(&diff, &pos, &self->pos_0x18);
-            copyVec3(&offset, &diff);
-            x = vec3_len(&offset.x);
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = x / 1000.0f;
-            calcVecAngXY(&offset, &self->rot_0x24.x, &self->rot_0x24.y);
-            self->rot_0x24.y += 0x10000 - (u16)source->field_0x058;
-            self->rot_0x24.z = 0;
-            setVector3(&offset, 0.0f, 0.0f, 0.0f);
-            start = 0;
-            break;
-        case 403:
-        case 404:
-        case 408:
-        case 409:
-            if (work->motion_0x30 != motion) {
-                eft025_pl_set(source, 2);
-            }
-            beam = 1;
-        default:
-            if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
-                eft_light_main_part_show(self, 5);
+                eft_light_main_part_show(self, 3);
                 eft_light_sub_part_show(self, 0xFF);
-                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-                setVector3(&offset, -10.0f, 0.0f, 5.0f);
-                self->rot_0x24.x = 0xFC73;
-                self->rot_0x24.y = 0xFB07;
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                setVector3(&offset, 8.0f, 0.0f, -6.0f);
+                self->rot_0x24.x = 0;
+                self->rot_0x24.y = 0;
                 self->rot_0x24.z = 0;
                 work->head.scale_0x04.x = 1.0f;
                 work->head.scale_0x04.y = 1.0f;
                 work->head.scale_0x04.z = 1.0f;
-                mtx34_trans_get(&mtx, &self->pos_0x18);
-                setVector3(&pos, 0.0f, 0.0f, 55.0f);
-                addVec3To(&pos, &offset);
-                mulVecMat(&pos, &mtx);
-                addVec3To(&pos, &self->pos_0x18);
-                self->field_0x10--;
-                if (motion != 401 || Pl_frame_check(source, 2, 26.0f, 0.0f) == 0) {
-                    if (self->field_0x10 < 0) {
-                        eft025_pl_set(source, beam);
-                        if (beam == 1) {
-                            self->field_0x10 = 1;
-                        } else {
-                            self->field_0x10 = 4;
-                        }
-                    }
-                    if (self->area_0x44 == get_now_areano()) {
-                        setVector3(&pivot, 0.0f, 0.0f, -20.0f);
-                        mhchar_joint_mtx_get(EFT_PL_CHR(source), 13, &local);
-                        mulVecMat(&pivot, &local);
-                        pivot.x += local.m[0][3];
-                        pivot.y += local.m[1][3];
-                        pivot.z += local.m[2][3];
-                        copyVec3(&light_pos, &pos);
-                        coll_wall_slide_c1(&pivot, &pos, 40.0f, &light_pos, 0xFFFF, 0, 1, self->area_0x44);
-                        light_point_scale_set(work->light_id_0x2C, &light_pos, 1.0f, 0);
-                    }
-                }
                 start = 0;
                 break;
-            }
-            if (motion != 402 || Pl_frame_check(source, 2, 50.0f, 0.0f) == 0) {
-                eft_light_trail_update(self, trail);
-                return;
-            }
-            eft_light_main_part_show(self, 5);
-            eft_light_sub_part_show(self, 0xFF);
-            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
-            setVector3(&offset, -10.0f, 0.0f, 5.0f);
-            self->rot_0x24.x = 0;
-            self->rot_0x24.y = 0;
-            self->rot_0x24.z = 0;
-            work->head.scale_0x04.x = 1.0f;
-            work->head.scale_0x04.y = 1.0f;
-            work->head.scale_0x04.z = 1.0f;
-            start = 0;
-            if (Pl_frame_check(source, 2, 20.0f, 0.0f) != 0) {
-                if (--self->field_0x10 < 0) {
-                    eft025_pl_set(source, beam);
-                    self->field_0x10 = 4;
+            case 320:
+            case 321:
+                switch (motion) {
+                case 320:
+                    if (Pl_frame_check(source, 2, 6.0f, 0.0f) != 0) {
+                        continue;
+                    }
+                    break;
+                case 321:
+                    if (Pl_frame_check(source, 1, 34.0f, 0.0f) != 0) {
+                        continue;
+                    }
+                    break;
                 }
+                eft_light_main_part_show(self, 10);
+                eft_light_sub_part_show(self, 0xFF);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                setVector3(&offset, -8.4f, -3.8f, -5.2f);
+                self->rot_0x24.x = 0xD3EA;
+                self->rot_0x24.y = 0x871D;
+                self->rot_0x24.z = 0x1C72;
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = 1.0f;
+                start = 0;
+                break;
+            case 324:
+            case 325:
+                switch (motion) {
+                case 324:
+                    if (EFT_PL_CHR(source)->field_0x44 > 0.0f) {
+                        continue;
+                    }
+                    break;
+                case 325:
+                    if (Pl_frame_check(source, 1, 58.0f, 0.0f) != 0) {
+                        continue;
+                    }
+                    break;
+                }
+                eft_light_main_part_show(self, 11);
+                eft_light_sub_part_show(self, 0xFF);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                setVector3(&offset, -12.0f, -7.0f, -3.0f);
+                self->rot_0x24.x = 0x749F;
+                self->rot_0x24.y = 0xEEF0;
+                self->rot_0x24.z = 0xD4A0;
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = 1.0f;
+                start = 0;
+                break;
+            case 333:
+            case 334:
+            case 335:
+            case 336:
+            case 346:
+            case 347:
+            case 348:
+            case 349:
+            case 350:
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = 1.0f;
+                switch (source->field_0x306) {
+                case 265:
+                    trail = 1;
+                    beam = 1;
+                    self->timer_0x0C++;
+                    {
+                        u8 kind = source->field_0x5BA;
+
+                        color_a.r = eft_light_colors_a[kind * 3];
+                        color_a.g = eft_light_colors_a[kind * 3 + 1];
+                        color_a.b = eft_light_colors_a[kind * 3 + 2];
+                        color_b.r = eft_light_colors_b[kind * 3];
+                        color_b.g = eft_light_colors_b[kind * 3 + 1];
+                        color_b.b = eft_light_colors_b[kind * 3 + 2];
+                    }
+                    color_a.a = 0xFF;
+                    color_b.a = 0xFF;
+                    switch (motion) {
+                    case 333:
+                        if (Pl_frame_check(source, 1, 26.0f, 0.0f) == 0) {
+                            continue;
+                        }
+                        self->demo_flag_0x08 |= 1;
+                        self->field_0x07 = 1;
+                        self->field_0x06 = 0;
+                        show = 0;
+                        start = 0;
+                        break;
+                    case 334:
+                        if (Pl_frame_check(source, 1, 106.0f, 0.0f) != 0) {
+                            continue;
+                        }
+                        if (Pl_frame_check(source, 1, 96.0f, 0.0f) != 0) {
+                            beam = 2;
+                        }
+                        if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 20.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&pos);
+                            }
+                        }
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            self->demo_flag_0x08 = 0;
+                            self->field_0x07 = 0;
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        show = 1;
+                        start = 1;
+                        break;
+                    case 335:
+                        if (Pl_frame_check(source, 1, 100.0f, 0.0f) != 0) {
+                            continue;
+                        }
+                        if (Pl_frame_check(source, 0, 78.0f, 0.0f) != 0) {
+                            self->field_0x06 = 1;
+                            self->timer_0x0C = 0;
+                        }
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            work->field_0x65 = 0;
+                            if (self->field_0x07 == 1) {
+                                self->demo_flag_0x08 = 0;
+                                self->field_0x07 = 0;
+                            } else {
+                                self->field_0x07--;
+                                self->demo_flag_0x08 &= ~1;
+                            }
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (self->field_0x07 == 0 && Pl_frame_check(source, 1, 70.0f, 0.0f) != 0) {
+                            beam = 2;
+                        }
+                        show = 1;
+                        start = 1;
+                        break;
+                    case 346:
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            self->field_0x07--;
+                            self->demo_flag_0x08 &= ~2;
+                            work->field_0x65 = 0;
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 20.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&pos);
+                            }
+                        }
+                        if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
+                            self->field_0x06 = 0;
+                            self->timer_0x0C = 0;
+                        }
+                        show = 2;
+                        start = 1;
+                        break;
+                    case 347:
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            self->field_0x07--;
+                            self->demo_flag_0x08 &= ~1;
+                            work->field_0x65 = 0;
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 20.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&pos);
+                            }
+                        }
+                        if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
+                            self->field_0x06 = 1;
+                            self->timer_0x0C = 0;
+                        }
+                        show = 1;
+                        start = 1;
+                        break;
+                    case 348:
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            work->field_0x65 = 0;
+                            if (self->field_0x07 == 1) {
+                                self->demo_flag_0x08 = 0;
+                                self->field_0x07 = 0;
+                            } else {
+                                self->field_0x07--;
+                                self->demo_flag_0x08 &= ~2;
+                            }
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (Pl_frame_check(source, 1, 60.0f, 0.0f) != 0) {
+                            self->field_0x06 = 0;
+                            self->timer_0x0C = 0;
+                        }
+                        show = 2;
+                        start = 1;
+                        break;
+                    case 349:
+                        if (Pl_frame_check(source, 0, 42.0f, 0.0f) != 0) {
+                            self->demo_flag_0x08 |= 2;
+                            self->field_0x07++;
+                        }
+                        if (Pl_frame_check(source, 3, 10.0f, 40.0f) != 0) {
+                            show = 2;
+                            work->color_index_0x66 = 0;
+                        }
+                        start = 1;
+                        break;
+                    case 350:
+                        if (Pl_frame_check(source, 0, 46.0f, 0.0f) != 0) {
+                            self->demo_flag_0x08 |= 1;
+                            self->field_0x07++;
+                        }
+                        if (Pl_frame_check(source, 3, 20.0f, 44.0f) != 0) {
+                            show = 1;
+                            work->color_index_0x66 = 0;
+                        }
+                        start = 1;
+                        break;
+                    default:
+                        show = 0;
+                        start = 0;
+                        break;
+                    }
+                    if (show != 0) {
+                        color_a.r = eft_light_colors_a[work->color_index_0x66 * 3];
+                        color_a.g = eft_light_colors_a[work->color_index_0x66 * 3 + 1];
+                        color_a.b = eft_light_colors_a[work->color_index_0x66 * 3 + 2];
+                        color_b.r = eft_light_colors_b[work->color_index_0x66 * 3];
+                        color_b.g = eft_light_colors_b[work->color_index_0x66 * 3 + 1];
+                        color_b.b = eft_light_colors_b[work->color_index_0x66 * 3 + 2];
+                        work->slots_0x10.items.items_0x10[1]->setMatColor(3, GX_COLOR0A0, color_a, false);
+                        work->slots_0x10.items.items_0x10[1]->setMatColor(4, GX_COLOR0A0, color_b, false);
+                    }
+                    ring_a.a = 0xFF;
+                    ring_b.a = 0xFF;
+                    core_a.a = 0xFF;
+                    core_b.a = 0xFF;
+                    if (source->field_0x00A == 0 && (u16)(source->act_no + 0xFF5E) <= 3) {
+                        eft_light_ring_colors_get(0, 0, &ring_a, &ring_b, &core_a, &core_b);
+                    } else if (self->timer_0x0C >= 4) {
+                        if (self->field_0x06 == 0) {
+                            eft_light_ring_colors_get(0, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
+                        } else {
+                            eft_light_ring_colors_get(1, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
+                        }
+                    } else if (self->field_0x06 == 0) {
+                        eft_light_ring_colors_get(1, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
+                    } else {
+                        eft_light_ring_colors_get(0, source->field_0x5BA, &ring_a, &ring_b, &core_a, &core_b);
+                    }
+                    if (beam != 0) {
+                        eft_light_main_part_show(self, 12);
+                        work->slots_0x10.items.items_0x10[0]->setVisibility(17, true);
+                        eft_light_sub_part_show(self, 0xFF);
+                        if ((self->demo_flag_0x08 & 1) != 0) {
+                            work->slots_0x10.items.items_0x10[0]->setVisibility(19, true);
+                            work->slots_0x10.items.items_0x10[0]->setMatColor(12, GX_COLOR0A0, core_a, false);
+                            work->slots_0x10.items.items_0x10[0]->setMatColor(13, GX_COLOR0A0, core_b, false);
+                        }
+                        if ((self->demo_flag_0x08 & 2) != 0) {
+                            work->slots_0x10.items.items_0x10[0]->setVisibility(18, true);
+                            work->slots_0x10.items.items_0x10[0]->setMatColor(16, GX_COLOR0A0, ring_a, false);
+                            work->slots_0x10.items.items_0x10[0]->setMatColor(17, GX_COLOR0A0, ring_b, false);
+                        }
+                        mtx34_identity(&pose);
+                        pose.m[0][3] = source->motion_pos_0x3C;
+                        pose.m[1][3] = source->ground_y_0x060;
+                        pose.m[2][3] = source->motion_pos_0x44;
+                        rotMatrixY(source->field_0x058, &pose);
+                        work->slots_0x10.items.items_0x10[0]->move2(&pose, 0);
+                        setVector3(&offset, 0.0f, 30.0f, 145.0f);
+                        rotVecY(&offset, source->field_0x058);
+                        mtx34_trans_add(&pose, &offset);
+                        eft_light_beam_bind(self, work->slots_0x10.items.items_0x10[0], motion);
+                        if (beam == 2) {
+                            continue;
+                        }
+                    }
+                    if (show != 0) {
+                        eft_light_sub_part_show(self, 1);
+                        switch ((s32)show) {
+                        case 1:
+                            mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                            self->rot_0x24.x = 0x2AAB;
+                            self->rot_0x24.y = 0xE223;
+                            self->rot_0x24.z = 0x1111;
+                            offset.x = 41.0f;
+                            offset.y = 14.0f;
+                            offset.z = 32.0f;
+                            break;
+                        case 2:
+                            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                            self->rot_0x24.x = 0xC001;
+                            self->rot_0x24.y = 0xAE3A;
+                            self->rot_0x24.z = 0xF1C8;
+                            offset.x = -30.0f;
+                            offset.y = 6.0f;
+                            offset.z = 45.0f;
+                            break;
+                        }
+                    } else {
+                        placed = 1;
+                    }
+                    if (self->field_0x07 != 0) {
+                        work->field_0x67--;
+                        if ((s8)work->field_0x67 < 0) {
+                            work->field_0x67 = 12;
+                            mtx34_trans_get(&pose, &sound_pos);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id27(&sound_pos);
+                            }
+                        }
+                    }
+                    break;
+                case 40:
+                case 47:
+                    trail = 1;
+                    self->field_0x07 = 0;
+                    self->demo_flag_0x08 = 0;
+                    show = 1;
+                    work->head.scale_0x04.x = 1.0f;
+                    work->head.scale_0x04.y = 1.0f;
+                    work->head.scale_0x04.z = 1.0f;
+                    switch (motion) {
+                    case 333:
+                        if (Pl_frame_check(source, 1, 26.0f, 0.0f) == 0) {
+                            continue;
+                        }
+                        beam = 0;
+                        start = 0;
+                        break;
+                    case 334:
+                        if (Pl_frame_check(source, 1, 106.0f, 0.0f) != 0) {
+                            continue;
+                        }
+                        if (Pl_frame_check(source, 1, 96.0f, 0.0f) != 0) {
+                            show = 2;
+                        }
+                        if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 20.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&pos);
+                            }
+                        }
+                        beam = 1;
+                        start = 1;
+                        break;
+                    case 335:
+                        if (Pl_frame_check(source, 1, 100.0f, 0.0f) != 0) {
+                            continue;
+                        }
+                        if (Pl_frame_check(source, 1, 70.0f, 0.0f) != 0) {
+                            show = 2;
+                        }
+                        beam = 1;
+                        start = 1;
+                        break;
+                    default:
+                        beam = 0;
+                        start = 0;
+                        break;
+                    }
+                    if (show != 0) {
+                        eft_light_main_part_show(self, 4);
+                        eft_light_sub_part_show(self, 0xFF);
+                        mtx34_identity(&pose);
+                        pose.m[0][3] = source->motion_pos_0x3C;
+                        pose.m[1][3] = source->ground_y_0x060;
+                        pose.m[2][3] = source->motion_pos_0x44;
+                        rotMatrixY(source->field_0x058, &pose);
+                        work->slots_0x10.items.items_0x10[0]->move2(&pose, 0);
+                        eft_res_models_spawn(self, (void**)&work->slots_0x10.items.items_0x10[0], 2, 1, 0);
+                        if (show == 2) {
+                            continue;
+                        }
+                    }
+                    color_a.r = eft_light_colors_a[source->field_0x5BA * 3];
+                    color_a.g = eft_light_colors_a[source->field_0x5BA * 3 + 1];
+                    color_a.b = eft_light_colors_a[source->field_0x5BA * 3 + 2];
+                    color_b.r = eft_light_colors_b[source->field_0x5BA * 3];
+                    color_b.g = eft_light_colors_b[source->field_0x5BA * 3 + 1];
+                    color_b.b = eft_light_colors_b[source->field_0x5BA * 3 + 2];
+                    color_a.a = 0xFF;
+                    color_b.a = 0xFF;
+                    work->slots_0x10.items.items_0x10[1]->setMatColor(3, GX_COLOR0A0, color_a, false);
+                    work->slots_0x10.items.items_0x10[1]->setMatColor(4, GX_COLOR0A0, color_b, false);
+                    if (beam != 0) {
+                        eft_light_main_part_show(self, 4);
+                        eft_light_sub_part_show(self, 1);
+                        self->rot_0x24.x = 0x2AAB;
+                        self->rot_0x24.y = 0xE223;
+                        self->rot_0x24.z = 0x1111;
+                        offset.x = 41.0f;
+                        offset.y = 14.0f;
+                        offset.z = 32.0f;
+                        mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                        break;
+                    }
+                    eft_light_main_part_show(self, 4);
+                    eft_light_sub_part_show(self, 2);
+                    offset.x = 0.0f;
+                    offset.y = 0.0f;
+                    offset.z = 128.0f;
+                    rotVecY(&offset, source->field_0x058);
+                    pos.x = source->motion_pos_0x3C + offset.x;
+                    pos.y = 77.0f + source->ground_y_0x060;
+                    pos.z = source->motion_pos_0x44 + offset.z;
+                    offset.x = -52.0f;
+                    offset.y = 0.0f;
+                    offset.z = 0.0f;
+                    angle = source->field_0x058 + 0xC000;
+                    rotVecY(&offset, angle);
+                    pivot.x = pos.x + offset.x;
+                    pivot.y = pos.y + offset.y;
+                    pivot.z = pos.z + offset.z;
+                    if (motion == 336) {
+                        offset.x = 12.0f;
+                        offset.y = 0.0f;
+                        offset.z = 9.0f;
+                        mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                        mulVecMat(&offset, &mtx);
+                        x = offset.x + mtx.m[0][3];
+                        y = offset.y + mtx.m[1][3];
+                        z = offset.z + mtx.m[2][3];
+                        offset.x = x - pivot.x;
+                        offset.y = y - pivot.y;
+                        offset.z = z - pivot.z;
+                        rotVecY(&offset, 0x10000 - angle);
+                        beam = (u16)(0.5f + (65536.0f * atan2f(offset.z, offset.y)) / 6.2831855f);
+                        setVector3(&offset, 0.0f, 0.0f, 130.0f);
+                        rotVecY(&offset, source->field_0x058);
+                        mtx34_trans_add(&pose, &offset);
+                        self->field_0x07 = 3;
+                        work->field_0x67--;
+                        if ((s8)work->field_0x67 < 0) {
+                            work->field_0x67 = 12;
+                            mtx34_trans_get(&pose, &sound_pos);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id27(&sound_pos);
+                            }
+                        }
+                    } else {
+                        beam = 0;
+                    }
+                    placed = 1;
+                    mtx34_identity(&mtx);
+                    rotMatrixX(beam, &mtx);
+                    rotMatrixY(angle, &mtx);
+                    mtx.m[0][3] = pos.x;
+                    mtx.m[1][3] = pos.y;
+                    mtx.m[2][3] = pos.z;
+                    work->slots_0x10.items.items_0x10[1]->move2(&mtx, 0);
+                    eft_res_models_spawn(self, (void**)&work->slots_0x10.items.items_0x10[1], 2, 1, 0);
+                    break;
+                case 438:
+                    self->timer_0x0C++;
+                    {
+                        u8 kind = source->field_0x5BA;
+
+                        color_a.r = eft_light_colors_a[kind * 3];
+                        color_a.g = eft_light_colors_a[kind * 3 + 1];
+                        color_a.b = eft_light_colors_a[kind * 3 + 2];
+                        color_b.r = eft_light_colors_b[kind * 3];
+                        color_b.g = eft_light_colors_b[kind * 3 + 1];
+                        color_b.b = eft_light_colors_b[kind * 3 + 2];
+                    }
+                    color_a.a = 0xFF;
+                    color_b.a = 0xFF;
+                    switch (motion) {
+                    case 333:
+                        if (Pl_frame_check(source, 1, 26.0f, 0.0f) == 0) {
+                            continue;
+                        }
+                        self->demo_flag_0x08 |= 1;
+                        self->field_0x07 = 1;
+                        self->field_0x06 = 0;
+                        show = 0;
+                        start = 1;
+                        break;
+                    case 334:
+                        if (Pl_frame_check(source, 1, 106.0f, 0.0f) != 0) {
+                            continue;
+                        }
+                        Pl_frame_check(source, 1, 96.0f, 0.0f);
+                        if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 20.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&pos);
+                            }
+                        }
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            self->demo_flag_0x08 = 0;
+                            self->field_0x07 = 0;
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        show = 1;
+                        start = 1;
+                        break;
+                    case 335:
+                        if (Pl_frame_check(source, 1, 100.0f, 0.0f) != 0) {
+                            continue;
+                        }
+                        if (Pl_frame_check(source, 0, 78.0f, 0.0f) != 0) {
+                            self->field_0x06 = 1;
+                            self->timer_0x0C = 0;
+                        }
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            work->field_0x65 = 0;
+                            if (self->field_0x07 == 1) {
+                                self->demo_flag_0x08 = 0;
+                                self->field_0x07 = 0;
+                            } else {
+                                self->field_0x07--;
+                                self->demo_flag_0x08 &= ~1;
+                            }
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (self->field_0x07 == 0) {
+                            Pl_frame_check(source, 1, 70.0f, 0.0f);
+                        }
+                        show = 1;
+                        start = 1;
+                        break;
+                    case 346:
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            self->field_0x07--;
+                            self->demo_flag_0x08 &= ~2;
+                            work->field_0x65 = 0;
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 20.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&pos);
+                            }
+                        }
+                        if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
+                            self->field_0x06 = 0;
+                            self->timer_0x0C = 0;
+                        }
+                        show = 2;
+                        start = 1;
+                        break;
+                    case 347:
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            self->field_0x07--;
+                            self->demo_flag_0x08 &= ~1;
+                            work->field_0x65 = 0;
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
+                            copyVec3(&pos, &self->pos_0x18);
+                            pos.y += 20.0f;
+                            eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
+                            if (self->area_0x44 == get_now_areano()) {
+                                se_req_pos_id63(&pos);
+                            }
+                        }
+                        if (Pl_frame_check(source, 1, 64.0f, 0.0f) != 0) {
+                            self->field_0x06 = 1;
+                            self->timer_0x0C = 0;
+                        }
+                        show = 1;
+                        start = 1;
+                        break;
+                    case 348:
+                        if (Pl_frame_check(source, 0, 2.0f, 0.0f) != 0) {
+                            work->field_0x65 = 0;
+                            if (self->field_0x07 == 1) {
+                                self->demo_flag_0x08 = 0;
+                                self->field_0x07 = 0;
+                            } else {
+                                self->field_0x07--;
+                                self->demo_flag_0x08 &= ~2;
+                            }
+                            work->color_index_0x66 = source->field_0x5BA;
+                        }
+                        if (Pl_frame_check(source, 1, 60.0f, 0.0f) != 0) {
+                            self->field_0x06 = 0;
+                            self->timer_0x0C = 0;
+                        }
+                        show = 2;
+                        start = 1;
+                        break;
+                    case 349:
+                        if (Pl_frame_check(source, 0, 42.0f, 0.0f) != 0) {
+                            self->demo_flag_0x08 |= 2;
+                            self->field_0x07++;
+                        }
+                        if (Pl_frame_check(source, 3, 10.0f, 40.0f) != 0) {
+                            show = 2;
+                            work->color_index_0x66 = 0;
+                        }
+                        start = 1;
+                        break;
+                    case 350:
+                        if (Pl_frame_check(source, 0, 46.0f, 0.0f) != 0) {
+                            self->demo_flag_0x08 |= 1;
+                            self->field_0x07++;
+                        }
+                        if (Pl_frame_check(source, 3, 20.0f, 44.0f) != 0) {
+                            show = 1;
+                            work->color_index_0x66 = 0;
+                        }
+                        start = 1;
+                        break;
+                    default:
+                        show = 0;
+                        start = 1;
+                        break;
+                    }
+                    if (show != 0) {
+                        color_a.r = eft_light_colors_a[work->color_index_0x66 * 3];
+                        color_a.g = eft_light_colors_a[work->color_index_0x66 * 3 + 1];
+                        color_a.b = eft_light_colors_a[work->color_index_0x66 * 3 + 2];
+                        color_b.r = eft_light_colors_b[work->color_index_0x66 * 3];
+                        color_b.g = eft_light_colors_b[work->color_index_0x66 * 3 + 1];
+                        color_b.b = eft_light_colors_b[work->color_index_0x66 * 3 + 2];
+                        work->slots_0x10.items.items_0x10[1]->setMatColor(3, GX_COLOR0A0, color_a, false);
+                        work->slots_0x10.items.items_0x10[1]->setMatColor(4, GX_COLOR0A0, color_b, false);
+                    }
+                    if (show != 0) {
+                        eft_light_sub_part_show(self, 1);
+                        switch ((s32)show) {
+                        case 1:
+                            mhchar_joint_mtx_get(EFT_PL_CHR(source), 7, &mtx);
+                            self->rot_0x24.x = 0x2AAB;
+                            self->rot_0x24.y = 0xE223;
+                            self->rot_0x24.z = 0x1111;
+                            offset.x = 41.0f;
+                            offset.y = 14.0f;
+                            offset.z = 32.0f;
+                            break;
+                        case 2:
+                            mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                            self->rot_0x24.x = 0xC001;
+                            self->rot_0x24.y = 0xAE3A;
+                            self->rot_0x24.z = 0xF1C8;
+                            offset.x = -30.0f;
+                            offset.y = 6.0f;
+                            offset.z = 45.0f;
+                            break;
+                        }
+                    } else {
+                        placed = 1;
+                    }
+                    break;
+                default:
+                    continue;
+                }
+                break;
+            case 338:
+            case 339:
+            case 340:
+            case 341:
+            case 342:
+            case 343:
+                eft_light_main_part_show(self, eft_light_motion_part_get(source));
+                eft_light_sub_part_show(self, 0xFF);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                setVector3(&offset, -9.2f, -1.7f, 12.0f);
+                self->rot_0x24.x = 0;
+                self->rot_0x24.y = 0;
+                self->rot_0x24.z = 0xC001;
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = 1.0f;
+                start = 0;
+                break;
+            case 359:
+                if (Pl_frame_check(source, 3, 6.0f, 68.0f) == 0) {
+                    continue;
+                }
+                eft_light_main_part_show(self, 13);
+                eft_light_sub_part_show(self, 0xFF);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                setVector3(&offset, -7.6f, -0.75f, 1.07f);
+                self->rot_0x24.x = 0xF778;
+                self->rot_0x24.y = 0xDA51;
+                self->rot_0x24.z = 0x0333;
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = 1.0f;
+                start = 0;
+                break;
+            case 420:
+            case 421:
+            case 422:
+            case 423:
+                switch (motion) {
+                case 420:
+                    if (Pl_frame_check(source, 2, 20.0f, 0.0f) != 0) {
+                        continue;
+                    }
+                    break;
+                case 423:
+                    if (Pl_frame_check(source, 1, 90.0f, 0.0f) != 0) {
+                        continue;
+                    }
+                    break;
+                }
+                eft_light_main_part_show(self, 15);
+                eft_light_sub_part_show(self, 0xFF);
+                switch (source->chunk_ofs) {
+                case 1:
+                case 3:
+                    setVector3(&pos, 137.0f, 80.0f, 1983.0f);
+                    break;
+                default:
+                    setVector3(&pos, -137.0f, 80.0f, 1983.0f);
+                    break;
+                }
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 1, &mtx);
+                mtx34_trans_get(&mtx, &self->pos_0x18);
+                subVec3(&diff, &pos, &self->pos_0x18);
+                copyVec3(&offset, &diff);
+                x = vec3_len(&offset.x);
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = x / 1000.0f;
+                calcVecAngXY(&offset, &self->rot_0x24.x, &self->rot_0x24.y);
+                self->rot_0x24.y += 0x10000 - (u16)source->field_0x058;
+                self->rot_0x24.z = 0;
+                setVector3(&offset, 0.0f, 0.0f, 0.0f);
+                start = 0;
+                break;
+            case 403:
+            case 404:
+            case 408:
+            case 409:
+                if (work->motion_0x30 != motion) {
+                    eft025_pl_set(source, 2);
+                }
+                beam = 1;
+            default:
+                if (EFT_PL_MENU(source)->item_menu_0x5BB != 0) {
+                    eft_light_main_part_show(self, 5);
+                    eft_light_sub_part_show(self, 0xFF);
+                    mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                    setVector3(&offset, -10.0f, 0.0f, 5.0f);
+                    self->rot_0x24.x = 0xFC73;
+                    self->rot_0x24.y = 0xFB07;
+                    self->rot_0x24.z = 0;
+                    work->head.scale_0x04.x = 1.0f;
+                    work->head.scale_0x04.y = 1.0f;
+                    work->head.scale_0x04.z = 1.0f;
+                    mtx34_trans_get(&mtx, &self->pos_0x18);
+                    setVector3(&pos, 0.0f, 0.0f, 55.0f);
+                    addVec3To(&pos, &offset);
+                    mulVecMat(&pos, &mtx);
+                    addVec3To(&pos, &self->pos_0x18);
+                    self->field_0x10--;
+                    if (motion != 401 || Pl_frame_check(source, 2, 26.0f, 0.0f) == 0) {
+                        if (self->field_0x10 < 0) {
+                            eft025_pl_set(source, beam);
+                            if (beam == 1) {
+                                self->field_0x10 = 1;
+                            } else {
+                                self->field_0x10 = 4;
+                            }
+                        }
+                        if (self->area_0x44 == get_now_areano()) {
+                            setVector3(&pivot, 0.0f, 0.0f, -20.0f);
+                            mhchar_joint_mtx_get(EFT_PL_CHR(source), 13, &local);
+                            mulVecMat(&pivot, &local);
+                            pivot.x += local.m[0][3];
+                            pivot.y += local.m[1][3];
+                            pivot.z += local.m[2][3];
+                            copyVec3(&light_pos, &pos);
+                            coll_wall_slide_c1(&pivot, &pos, 40.0f, &light_pos, 0xFFFF, 0, 1, self->area_0x44);
+                            light_point_scale_set(work->light_id_0x2C, &light_pos, 1.0f, 0);
+                        }
+                    }
+                    start = 0;
+                    break;
+                }
+                if (motion != 402 || Pl_frame_check(source, 2, 50.0f, 0.0f) == 0) {
+                    continue;
+                }
+                eft_light_main_part_show(self, 5);
+                eft_light_sub_part_show(self, 0xFF);
+                mhchar_joint_mtx_get(EFT_PL_CHR(source), 11, &mtx);
+                setVector3(&offset, -10.0f, 0.0f, 5.0f);
+                self->rot_0x24.x = 0;
+                self->rot_0x24.y = 0;
+                self->rot_0x24.z = 0;
+                work->head.scale_0x04.x = 1.0f;
+                work->head.scale_0x04.y = 1.0f;
+                work->head.scale_0x04.z = 1.0f;
+                start = 0;
+                if (Pl_frame_check(source, 2, 20.0f, 0.0f) != 0) {
+                    if (--self->field_0x10 < 0) {
+                        eft025_pl_set(source, beam);
+                        self->field_0x10 = 4;
+                    }
+                }
+                break;
             }
-            break;
         }
-    }
-    work->motion_0x30 = motion;
-    if (placed == 0) {
-        mulVecMat(&offset, &mtx);
-        mtx34_trans_get(&mtx, &self->pos_0x18);
-        self->pos_0x18.x += offset.x;
-        self->pos_0x18.y += offset.y;
-        self->pos_0x18.z += offset.z;
-        mtx34_identity(&local);
-        scaleMat34W(&local, &work->head.scale_0x04);
-        rotMatrixXYZ(&self->rot_0x24, &local);
-        mtx34_concat_assign(&mtx, &local);
-        mtx.m[0][3] = self->pos_0x18.x;
-        mtx.m[1][3] = self->pos_0x18.y;
-        mtx.m[2][3] = self->pos_0x18.z;
-        mode = 2;
-        if (Pl_master_ck(source) == 1) {
-            mode = eft_stage_spawn_flag(source) | 2;
+        work->motion_0x30 = motion;
+        if (placed == 0) {
+            mulVecMat(&offset, &mtx);
+            mtx34_trans_get(&mtx, &self->pos_0x18);
+            self->pos_0x18.x += offset.x;
+            self->pos_0x18.y += offset.y;
+            self->pos_0x18.z += offset.z;
+            mtx34_identity(&local);
+            scaleMat34W(&local, &work->head.scale_0x04);
+            rotMatrixXYZ(&self->rot_0x24, &local);
+            mtx34_concat_assign(&mtx, &local);
+            mtx.m[0][3] = self->pos_0x18.x;
+            mtx.m[1][3] = self->pos_0x18.y;
+            mtx.m[2][3] = self->pos_0x18.z;
+            mode = 2;
+            if (Pl_master_ck(source) == 1) {
+                mode = eft_stage_spawn_flag(source) | 2;
+            }
+            for (i = start; i < work->count; i++) {
+                work->slots_0x10.items.items_0x10[i]->move2(&mtx, 0);
+                eft_res_models_spawn(self, (void**)&work->slots_0x10.items.items_0x10[i], mode, 1, 0);
+            }
         }
-        for (i = start; i < work->count; i++) {
-            work->slots_0x10.items.items_0x10[i]->move2(&mtx, 0);
-            eft_res_models_spawn(self, (void**)&work->slots_0x10.items.items_0x10[i], mode, 1, 0);
-        }
-    }
+    } while (0);
     eft_light_trail_update(self, trail);
 }
 #pragma optimization_level reset
@@ -2293,8 +2288,8 @@ void eft_light_retire(_EFT* self)
 /* Shows only the numbered light of the first item. */
 void eft_light_main_part_show(_EFT* self, u32 arg1)
 {
+    s32 i;
     EftWork* work;
-    u32 i;
 
     work = EFT_WORK(self);
     for (i = 1; i <= 0x13; i++) {
@@ -2353,8 +2348,8 @@ void eft_light_npc_part_show(_EFT* self, u32 arg1)
 /* Shows only the numbered light of the first item. */
 void eft_light_lobby_part_show(_EFT* self, u32 arg1)
 {
-    EftWork* work;
     s32 i;
+    EftWork* work;
 
     work = EFT_WORK(self);
     for (i = 1; i <= 3; i++) {
@@ -2370,8 +2365,8 @@ void eft_light_lobby_part_show(_EFT* self, u32 arg1)
  * `eft_light_beam_bind` installs. */
 void eft_light_beam_aim_job(struct PrimRec* job)
 {
-    _EFT* self;
     EftWork* work;
+    _EFT* self;
     _PLW* source;
     MTX34 beam_mtx;
     MTX34 back_mtx;
@@ -2379,9 +2374,9 @@ void eft_light_beam_aim_job(struct PrimRec* job)
     VEC3 unused;
     VEC3 base;
     VEC3 pivot;
-    u16 angle;
-    f32 x;
+    u32 angle;
     f32 y;
+    f32 x;
     f32 z;
     MTX34* world;
 
@@ -2404,7 +2399,7 @@ void eft_light_beam_aim_job(struct PrimRec* job)
     dir.x = -52.0f;
     dir.y = 0.0f;
     dir.z = 0.0f;
-    angle = source->field_0x058 + 0xC000;
+    angle = (u16)(source->field_0x058 + 0xC000);
     rotVecY(&dir, angle);
     pivot.x = base.x + dir.x;
     pivot.y = base.y + dir.y;
@@ -2438,7 +2433,7 @@ void eft_light_beam_aim_job(struct PrimRec* job)
     dir.y = y - pivot.y;
     dir.z = z - pivot.z;
     rotVecY(&dir, 0x10000 - angle);
-    angle = 0.5f + (65536.0f * atan2f(dir.z, dir.y)) / 6.2831855f;
+    angle = (u16)(0.5f + (65536.0f * atan2f(dir.z, dir.y)) / 6.2831855f);
     mtx34_identity(&beam_mtx);
     mtx34_identity(&back_mtx);
     rotMatrixY(source->field_0x058, &beam_mtx);
@@ -2461,14 +2456,16 @@ void eft_light_beam_aim_job(struct PrimRec* job)
 }
 
 /* Attaches a light effect to the model for the named motion. */
-void eft_light_beam_bind(_EFT* self, MHchar* model, u16 arg2)
+void eft_light_beam_bind(_EFT* self, MHchar* model, s32 arg2)
 {
     EftWork* work;
     EftLightJob* job;
+    _PLW* source;
 
     work = EFT_WORK(self);
-    if ((u32)(arg2 - 0x15D) <= 1
-        || (arg2 == 0x150 && Pl_frame_check_alt((_PLW*)self->source_0x30, 1, 0.0f, 0.0f) != 0)) {
+    source = (_PLW*)self->source_0x30;
+    if ((u32)((u16)arg2 - 0x15D) <= 1
+        || ((s32)(u16)arg2 == 0x150 && Pl_frame_check_alt(source, 1, 0.0f, 0.0f) != 0)) {
         if (self->area_0x44 != get_now_areano() || self->flag_0x01 == 0) {
             g3d_root_model_bind(pRoot, model->field_0x118);
             return;
@@ -2524,51 +2521,56 @@ void eft_light_ring_colors_get(u8 arg0, s32 arg1, _GXColor* arg2, _GXColor* arg3
 /* Picks the frame-range index for the player's current motion. */
 s32 eft_light_motion_part_get(_PLW* self)
 {
+    s32 part;
+
     switch (Get_motion_no(self)) {
     case 0x154:
         if (Pl_frame_check(self, 2, 20.0f, 0.0f) != 0) {
-            return 7;
+            part = 7;
+        } else if (Pl_frame_check(self, 2, 30.0f, 0.0f) != 0) {
+            part = 8;
+        } else {
+            part = 9;
         }
-        if (Pl_frame_check(self, 2, 30.0f, 0.0f) != 0) {
-            return 8;
-        }
-        return 9;
+        break;
     case 0x155:
         if (Pl_frame_check(self, 2, 20.0f, 0.0f) != 0) {
-            return 8;
+            part = 8;
+        } else if (Pl_frame_check(self, 2, 26.0f, 0.0f) != 0) {
+            part = 9;
+        } else if (Pl_frame_check(self, 2, 28.0f, 0.0f) != 0) {
+            part = 8;
+        } else {
+            part = 7;
         }
-        if (Pl_frame_check(self, 2, 26.0f, 0.0f) != 0) {
-            return 9;
-        }
-        if (Pl_frame_check(self, 2, 28.0f, 0.0f) != 0) {
-            return 8;
-        }
-        return 7;
+        break;
     case 0x156:
         if (Pl_frame_check(self, 2, 36.0f, 0.0f) != 0) {
-            return 8;
+            part = 8;
+        } else if (Pl_frame_check(self, 2, 40.0f, 0.0f) != 0) {
+            part = 9;
+        } else if (Pl_frame_check(self, 2, 42.0f, 0.0f) != 0) {
+            part = 8;
+        } else {
+            part = 7;
         }
-        if (Pl_frame_check(self, 2, 40.0f, 0.0f) != 0) {
-            return 9;
-        }
-        if (Pl_frame_check(self, 2, 42.0f, 0.0f) != 0) {
-            return 8;
-        }
-        return 7;
+        break;
     case 0x157:
         if (Pl_frame_check(self, 2, 20.0f, 0.0f) != 0) {
-            return 8;
+            part = 8;
+        } else if (Pl_frame_check(self, 2, 22.0f, 0.0f) != 0) {
+            part = 9;
+        } else if (Pl_frame_check(self, 2, 24.0f, 0.0f) != 0) {
+            part = 8;
+        } else {
+            part = 7;
         }
-        if (Pl_frame_check(self, 2, 22.0f, 0.0f) != 0) {
-            return 9;
-        }
-        if (Pl_frame_check(self, 2, 24.0f, 0.0f) != 0) {
-            return 8;
-        }
-        return 7;
+        break;
     default:
-        return 7;
+        part = 7;
+        break;
     }
+    return part;
 }
 
 /* Places the effect at the weapon tip and the point light at the blade, slid along the walls and kept above the

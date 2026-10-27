@@ -9,8 +9,8 @@
 extern "C" {
 #endif
 
-/* 0x8010D2B0 - the joint-effect spawner: r3 the work record, r4/r5 two selectors the callers zero-extend (`clrlwi`,
- * so `u8` here; the owner's C body spells them `s8`), r6 a scalar and f1 the scale. */
+/* 0x8010D2B0 - the joint-effect spawner: r3 the work record, r4/r5 two `u8` selectors the callers zero-extend
+ * (`clrlwi`), r6 a scalar and f1 the scale. */
 void eft_spawn_pos_in_area(void* self, u8 a, u8 b, s32 c, f32 scale);
 
 void eft_pl_weapon_follow_spawn(struct Plw* self);
