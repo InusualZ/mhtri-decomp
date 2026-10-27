@@ -5,12 +5,14 @@
  *   (`MenuQuestWork`), their detail and keyboard pages, and the tail's move-work and key-table draws.  C++ callees
  *   (`res_eft_model_create`, `setVector3`, `rotVecZXY`, `ran_suu`, the `draw_*` layout calls), `extern "C"` bodies.
  * RANGE. .text 0x8031EB54-0x80324F7C (65 functions); extab, extabindex, .data 0x805DD598-0x805DD9C8, .bss
- *   0x806BE120-0x806BE2C8, .sdata 0x80792C50-0x80792CC8, .sdata2 0x8079AEB0-0x8079AF48.  Not one TU: the `.sdata2` pool
- *   restarts at 0x8079AF10 (a second 1.0f/50.0f/200.0f/0.5f run that only `move_work_draw`/`lb_npc_move_work_draw`/
- *   `draw_lsp_anim_ary` load).
+ *   0x806BE120-0x806BE2C8, .sdata 0x80792C50-0x80792CC8, .sdata2 0x8079AEB0-0x8079AF48.  Not one TU: the `.sdata2`
+ *   range holds four pools - 0x8079AEB0 (`eft045_start`/`eft045_grow`), 0x8079AED8 (the `menu_target_marker_*` family),
+ *   0x8079AEF8 (the quest detail draws) and 0x8079AF10 (`move_work_draw`, `lb_npc_move_work_draw`,
+ *   `draw_lsp_anim_ary`) - each with its own 0x4330000080000000 conversion constant and repeated 1.0f/50.0f/200.0f/0.5f.
  * FLAGS. `cflags_menu` (configure.py); `infer.py` on the target: `draw_lsp_anim_ary` keeps 0 record forms with 2
  *   fold-shaped pairs (the peephole off).  file-scope `#pragma fp_contract off` (retail keeps every
- *   multiply and add apart) and `#pragma pool_data off` (each table addressed by its own lis/addi).
+ *   multiply and add apart), `#pragma pool_data off` (each table addressed by its own lis/addi) and
+ *   `#pragma optimization_level 4` (retail's switches test case ranges first with subi + cmplwi, idea 108).
  * NAMES. Module `menu` from the menu/HUD 2D callees and the `menu` band below; no `__FILE__` string covers the range
  *   and the dump answers `zz_`, so the file keeps the map's stem; `eft045_set` is the map's own (mangled) name.
  *   GUESS: `quest_party_state_reset`, `quest_detail_label_draw`, the
@@ -20,15 +22,13 @@
  *   `lb_quest_join_screen_draw`, the quest screen pages and draws, the table names, `lobby_hud_frame_update`,
  *   `lobby_hud_reset`; foreign (registry): `pl_se_pos_req`, `lb_talk_page_value_set`, `lobby_kujira_level_get`,
  *   `draw_tex_icon`, `mhchar_node_id_get`, `lb_npc_mark_state_get`, `hud_info_toggle_step`.
- * RESIDUALS. Every row is written.  Register/stack allocation residuals: `quest_group_bonus_pick`/`quest_group_draw`
- *   (the unrolled shift loops take other registers and one pointer copy `mr` retail has); `quest_list_tbl_build`
- *   (retail hoists the 30-row bound into r22 and saves r21); `quest_group_menu_init` (retail extends the tab bound at
- *   each use); `quest_list_draw`, `quest_comment_wrap`, `hud_key_table_draw`, `draw_lsp_anim_ary` (register
- *   permutations); `quest_detail_draw` (`cmpwi` where ours has `cmplwi` for state 7); `quest_group_id_ck` (retail
- *   tests 1000 and 9000 apart and shares the final `return 0`); `lb_quest_accept_screen_draw`/
- *   `lb_quest_join_screen_draw` (retail tests the 4..5 / 2..3 case range first).
- *   flipcheck: `.data` (0x430), `.sdata` (0x78) and `.sdata2` (0xA0) not byte-identical yet (the float literals build
- *   one deduplicated pool where retail has three; the jump table and string literal placement are unmeasured).
+ * RESIDUALS. Every row is written.  Register allocation residuals: `quest_group_bonus_pick` (two volatile backend
+ *   temporaries of the shift loop swap r10/r11), `hud_key_table_draw` (the `ids` walker and the strength-reduced
+ *   `cockpit_state` pointer swap r27/r28), `quest_comment_wrap` and `draw_lsp_anim_ary` (callee-saved permutations no
+ *   declaration order reaches); `quest_group_id_ck` (retail tests 1000 and 9000 apart and branches to the final
+ *   `return 0`; the nested or `&&` spelling is folded into one `addis`/`subi`/`cmplwi` range test at level 4).
+ *   flipcheck: `.data` and `.sdata` byte-identical; `.sdata2` is not (0x68 of the claimed 0x98: the float literals
+ *   build one deduplicated pool where retail has four - a seam re-draw, not a source fix).
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
@@ -77,7 +77,7 @@
 #include "MSL_C/string.h" /* strcpy */
 #include "fn_80040598.h" /* kbd_open / kbd_move / set_kbd_param */
 #include "menu/menu_item.h" /* menu_work */
-#include "hud/cockpit.h" /* chk_pointer / PutPageArrow / ainpc_page_hold_set */
+#include "hud/cockpit.h" /* chk_pointer / PutPageArrow / ainpc_page_hold_set / setCockpitTransferMode */
 #include "lobby/LbStr.h"
 #include "lobby/spr_data_copy.h"
 #include "MSL_C/printf.h" /* sprintf */
@@ -92,7 +92,8 @@
 #include "lobby/lb_eqshop_menu_frame.h"
 #include "font/flKnjMsgNum.h"
 #include "hud/draw_tex_icon.h"
-#include "hud/cockpit_notice_update.h"
+#include "hud/cockpit_notice_update.h" /* cockpit_notice_init / cockpit_notice_update */
+#include "lobby/lb_panel_close.h"
 #include "hud/move_work_update.h"
 #include "hud/cockpit_state.h"
 #include "lobby/lb_item_list_depth_get.h"
@@ -129,14 +130,12 @@
  * apart (fmuls + fadds, no fmadds) */
 #pragma pool_data off
 #pragma fp_contract off
+#pragma optimization_level 4
 
 /* Callees other units own (`eft_res_slot_get` `ef/eft_res.cpp`, ...); their owners' headers do not declare them
  * yet. */
 extern "C" {
 
-s32   lb_panel_close(void);
-void  setCockpitTransferMode(u8 index, s32 value);
-void  cockpit_notice_init(void);
 void* memset(void* dst, int value, u32 size);
 void  sysSE_stop(s32 value);
 void  quest_list_draw(MenuQuestWork* self, u8 mode);
@@ -639,18 +638,17 @@ extern "C" void quest_group_draw(s16 group, u16* ids, s16 count) {
     u16 picks[10];
     u16 unlocked[30];
     u16 locked[30];
-    s32 i;
-    u16 total;
-    u16 n_unlocked;
+    s16 i;
     u16 n_locked;
     u16* p;
     s32 seed;
     s16 k;
     s16 j;
     s16 m;
+    u16 total;
+    u16 n_unlocked;
     u16 index;
     s16 dup;
-    u16 valid;
     u16 swap_in;
     u16 swap_out;
 
@@ -687,10 +685,11 @@ extern "C" void quest_group_draw(s16 group, u16* ids, s16 count) {
         }
         total--;
     }
+    p = ids;
     dup = 0;
-    for (p = ids; *p != 0; p++) {
-        for (j = 0; j < n_locked; j++) {
-            if (*p == locked[j]) {
+    for (; *p != 0; p++) {
+        for (k = 0; k < n_locked; k++) {
+            if (*p == locked[k]) {
                 dup++;
             }
         }
@@ -709,24 +708,26 @@ extern "C" void quest_group_draw(s16 group, u16* ids, s16 count) {
             }
         }
         for (p = ids; *p != 0; p++) {
-            for (j = 0; j < n_locked; j++) {
-                if (*p == locked[j]) {
-                    locked[j] = 0;
+            for (k = 0; k < n_locked; k++) {
+                if (*p == locked[k]) {
+                    locked[k] = 0;
                 }
             }
         }
-        valid = 0;
+        index = 0;
         for (i = 0; i < 29; i++) {
             if (locked[i] == 0) {
-                for (m = i; m < 29; m++) {
-                    locked[m] = locked[m + 1];
+                s16 n;
+
+                for (n = i; n < 29; n++) {
+                    locked[n] = locked[n + 1];
                 }
             } else {
-                valid++;
+                index++;
             }
         }
         seed = rand_lcg_step_c1((u16)seed);
-        swap_in = locked[(u16)seed % valid];
+        swap_in = locked[(u16)seed % index];
         swap_out = unlocked[(u16)seed % n_unlocked];
         for (m = 0; m < total; m++) {
             if (ids[m] == swap_out) {
@@ -767,8 +768,8 @@ extern "C" void quest_list_tbl_build(void) {
     s32 i;
     s16 g;
     u16 n;
-    u16 first;
     u16* buf;
+    u16 first;
     s32 count;
     u16* top;
     s16 k;
@@ -829,9 +830,11 @@ extern "C" void quest_list_tbl_build(void) {
         }
         for (i = 0; i < 2; i++) {
             if (bonus[i] != 0) {
-                for (k = 0; k < 30; k++) {
-                    if (list[k] == 0) {
-                        list[k] = bonus[i];
+                s16 j;
+
+                for (j = 0; j < 30; j++) {
+                    if (list[j] == 0) {
+                        list[j] = bonus[i];
                         break;
                     }
                 }
@@ -1023,7 +1026,11 @@ extern "C" void quest_group_menu_init(MenuQuestWork* w) {
     for (w->group_count_0x00E = 0; w->group_count_0x00E <= last; w->group_count_0x00E++) {
         w->groups_0x010[w->group_count_0x00E] = w->group_count_0x00E;
     }
-    tabs = game_ready_ck() == 0 ? 4 : 5;
+    if (game_ready_ck() == 0) {
+        tabs = 4;
+    } else {
+        tabs = 5;
+    }
     for (tab = 0; tab <= tabs; tab++) {
         w->tabs_0x018[tab] = tab;
     }
@@ -1747,7 +1754,11 @@ extern "C" void quest_list_draw(MenuQuestWork* w, u8 mode) {
 
             row_pos.x = pos.x + lsp->pos.x;
             row_pos.y = pos.y + lsp->pos.y;
-            sel = i == w->value_0x022 ? 1 : 0;
+            if (i == w->value_0x022) {
+                sel = 1;
+            } else {
+                sel = 0;
+            }
             lb_list_row_draw((s8*)quest_result_field_text_get(rec, 22), sel, &row_pos, 0, 1);
             if (userdata_flag_ck(rec->field_0x02C) != 0) {
                 get_lsp_data(5485, &mark_pos);
@@ -2018,8 +2029,17 @@ extern "C" void quest_detail_draw(MenuQuestWork* w, u16 quest_id, s16 tab) {
     }
     quest_detail_header_draw(rec);
     active = w->state_0x001 == 1;
-    if ((u32)(w->state_0x000 - 4) > 1 && (w->state_0x000 != 7 || w->talking_0x009 != 0)) {
+    switch (w->state_0x000) {
+    case 4:
+    case 5:
+        break;
+    case 7:
+        if (w->talking_0x009 == 0) {
+            break;
+        }
+    default:
         lb_page_arrow_draw(5487, w->field_0x03C, w->tab_count_0x03E, w->field_0x00A, active);
+        break;
     }
     switch (tab) {
     case 0:
@@ -2056,8 +2076,8 @@ extern "C" void quest_list_page_draw(MenuQuestWork* self, u8 arg) {
 }
 
 /* The quest screens' backdrop: the wide and the 4:3 frame, and the accept screen's title. */
-u16 lb_quest_accept_title_spr[16] = {0x1503, 0x1504, 0x1505, 0x1506, 0x1500, 0x1501, 0x1502, 0x1507,
-                                     0x1508, 0x1509, 0x150A, 0x150B, 0x14FE, 0x14FF, 0xFFFF, 0x0};
+u16 lb_quest_accept_title_spr[15] = {0x1503, 0x1504, 0x1505, 0x1506, 0x1500, 0x1501, 0x1502, 0x1507,
+                                     0x1508, 0x1509, 0x150A, 0x150B, 0x14FE, 0x14FF, 0xFFFF};
 u16 lb_quest_backdrop_spr[6] = {0x150F, 0x1510, 0x150D, 0x150E, 0xFFFF, 0x0};
 u16 lb_quest_backdrop_wide_spr[6] = {0x1514, 0x1515, 0x1512, 0x1513, 0xFFFF, 0x0};
 
@@ -2075,6 +2095,18 @@ extern "C" void lb_quest_accept_backdrop_draw(void) {
     get_lsp_data(0x14FD, &pos);
     draw_sprite_ary(lb_quest_accept_title_spr, &pos);
 }
+
+/* The join settings page's sprites. */
+u16 quest_join_comment_spr[19] = {0x162C, 0x1624, 0x1625, 0x1626, 0x1627, 0x1628, 0x1629, 0x162D, 0x162E, 0x162F,
+                                  0x1630, 0x1631, 0x1632, 0x1633, 0x1634, 0x1635, 0x1636, 0x1623, 0xFFFF};
+u16 quest_join_frame_spr[14] = {0x1619, 0x161A, 0x161B, 0x1618, 0x161C, 0x1611, 0x1610,
+                                0x1612, 0x1613, 0x1614, 0x1615, 0x1616, 0x1617, 0xFFFF};
+u16 quest_join_cursor_spr[6] = {0x1600, 0x15FD, 0x15FE, 0x15FF, 0xFFFF, 0x0};
+u16 quest_join_comment_cursor_spr[10] = {0x160D, 0x1605, 0x1606, 0x1607, 0x1608, 0x1609, 0x160A, 0x160B, 0x160C,
+                                         0xFFFF};
+
+/* The join settings page's value frame (.sdata). */
+u16 quest_join_value_spr[4] = {0x1601, 0x1602, 0x1603, 0xFFFF};
 
 /* 0x80323428 (0xC4): wraps `text` into `out`, 24 characters a line. */
 extern "C" void quest_comment_wrap(char* text, char* out) {
@@ -2101,18 +2133,6 @@ extern "C" void quest_comment_wrap(char* text, char* out) {
         n -= 24;
     }
 }
-
-/* The join settings page's sprites. */
-u16 quest_join_comment_spr[20] = {0x162C, 0x1624, 0x1625, 0x1626, 0x1627, 0x1628, 0x1629, 0x162D, 0x162E, 0x162F,
-                                  0x1630, 0x1631, 0x1632, 0x1633, 0x1634, 0x1635, 0x1636, 0x1623, 0xFFFF, 0x0};
-u16 quest_join_frame_spr[14] = {0x1619, 0x161A, 0x161B, 0x1618, 0x161C, 0x1611, 0x1610,
-                                0x1612, 0x1613, 0x1614, 0x1615, 0x1616, 0x1617, 0xFFFF};
-u16 quest_join_cursor_spr[6] = {0x1600, 0x15FD, 0x15FE, 0x15FF, 0xFFFF, 0x0};
-u16 quest_join_comment_cursor_spr[10] = {0x160D, 0x1605, 0x1606, 0x1607, 0x1608, 0x1609, 0x160A, 0x160B, 0x160C,
-                                         0xFFFF};
-
-/* The join settings page's value frame (.sdata). */
-u16 quest_join_value_spr[4] = {0x1601, 0x1602, 0x1603, 0xFFFF};
 
 /* 0x803234EC (0x388): draws the join settings page: the comment, the party size with its arrows, the session name,
  * the cursor on row `field_0x164` while `active`, and the join prompt. */
@@ -2863,8 +2883,8 @@ extern "C" void draw_lsp_anim_ary(void) {
     u16* page;
     u16* main_spr;
     s32 sel;
-    s16 bar;
     u16* bar_id;
+    s16 bar;
     s16 frame;
     u32 rot;
     s32 i;
