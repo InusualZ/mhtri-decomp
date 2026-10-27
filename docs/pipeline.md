@@ -1434,13 +1434,11 @@ The 2026-10-21 game-module wave showed where landing time goes; this section is 
 * **Further `landlane.py` options** (2026-10-23 to 10-27):
   * `--registers`: the branch carries registry names, so the manifest's `read_only` is cleared and the export's foreign-row edits are owned by the batch.
   * `--allow-rule12` / `--allow-orphan` pass through to `land.py` (section 11, 2026-10-26).
-  * The unit named in `--message` is listed first, because `land.py` composes its own subject from the first unit.
   * The fork point also searches `refs/rescue/pre-msgfix-*`, so a branch cut before the 2026-10-26 message rewrite still finds its merge base.
   * `.pi/tmp/landmany.py "BRANCH|MANIFEST|MESSAGE[|EXTRA]" ...` lands several branches in a row and stops at the first refusal.
 * **Clashes after the registry rewrite.** Two lanes can declare the same registry name in different leaf headers. `.pi/tmp/fixleaves.py` folds the later leaf into the owner header, or the fold is done by hand; then `--resume`.
 * **Playbook id collisions.** Two lanes can each add the next free `docs/matching/NNN-*.md`. `.pi/tmp/ideas_renumber.py` keeps main's index, moves the batch's new ideas to the next free ids, respells their citations in the batch's sources, and regenerates the index and the skill copy; then `--resume`.
 * **A seam lane** follows `.pi/briefs/seam-prompt.txt`: re-verify the filed evidence, re-draw every section range and move the bodies verbatim, then emit data and flip. It lands with `--registers`. Its manifest must not list the retired unit (the gate refuses a unit that has no `Object` line and no `splits.txt` block).
-* **A root-level unit** (`src/pad_connect.cpp`) has no `game/<module>` member. Until `commitlint` accepts root stems, name a directory unit of the batch in the subject so it sorts first, or land the root unit's flip under `config/flags`.
 
 ### 16.5 Status of the tooling
 * 2026-10-27 (aa5868dd): `stylelint --diff` pairs an untracked file with the file it renames (git rename detection on a throwaway index). Before, a landing that re-homed a unit (`ef/fn_8010D1A8.c` -> `ef/eft018.cpp`) read every finding naming the old path as new.

@@ -1,4 +1,4 @@
-"""The subject row: the gate composes the landing's subject and `commitlint.py` checks it.
+"""The subject row: `commitlint.py` checks the caller's `--message`, or the subject the gate composes without one.
 Spec: docs/tools/spec/landing.md. CLI: none (a module of the `land.py` gate)."""
 from __future__ import annotations
 
@@ -51,9 +51,10 @@ def land_subject(units):
 
 
 def subject_lint(main: str, subject: str, runner=None, tool: str | None = None) -> tuple:
-    """Lint the gate's own composed subject with `tools/git/commitlint.py` - the convention's own checker.
+    """Lint a landing's message (the caller's `--message`, or the composed subject) with `tools/git/commitlint.py`
+    - the convention's own checker.
 
-    Every landing is written under a subject `land_subject` composes, so a regression there (an invented
+    A landing without `--message` is written under the subject `land_subject` composes, so a regression there (an invented
     category, a message past the limit) would land a message CLAUDE.md's convention forbids and nothing would
     notice. The row calls the tool rather than re-deriving the rules: CLAUDE.md is the convention,
     commitlint.py is its mechanical checker, and a second copy here would drift from both.
@@ -77,11 +78,29 @@ def subject_lint(main: str, subject: str, runner=None, tool: str | None = None) 
     return False, detail
 
 
+MESSAGE_ROW = "the landing's --message follows the convention"
+COMPOSED_ROW = "the gate's own subject follows the convention"
+
+
 def subject_row(b: Batch) -> None:
-    """9. the gate's own composed subject follows the convention (`commitlint.py`, exit 2 a failure)."""
+    """9. the message the landing commits follows the convention (`commitlint.py`, exit 2 a failure).
+
+    With a `--message` (`b.message`) the row lints that text - subject and any body it carries - because it is
+    what `land` commits; the composed subject is then only a placeholder first line `land` replaces, and linting
+    it judged a message nobody commits (a root-level or first-sorted unit could refuse a valid `--message`).
+    Without one, the composed subject is the commit's subject, and the row lints it."""
     b.subject = land_subject(b.units)
+    if b.message is not None:
+        ok_message, message_detail = subject_lint(b.main, b.message)
+        first = b.message.replace("\r\n", "\n").split("\n", 1)[0]
+        b.check(MESSAGE_ROW, ok_message, message_detail, info=first,
+                remedy="the --message `%s` is a commitlint violation, so the batch would land a message "
+                       "CLAUDE.md's convention forbids; fix the message (a known `<category>` member, an "
+                       "imperative message of at most 120 characters, a blank line before any body) and re-run - "
+                       "`python tools/git/commitlint.py --message \"<subject>\"` reproduces it" % first)
+        return
     ok_subject, subject_detail = subject_lint(b.main, b.subject)
-    b.check("the gate's own subject follows the convention", ok_subject, subject_detail, info=b.subject,
+    b.check(COMPOSED_ROW, ok_subject, subject_detail, info=b.subject,
             remedy="the composed subject `%s` is a commitlint violation, so the batch would land a message "
                    "CLAUDE.md's convention forbids; fix `land_subject` (or the batch's unit names) so the "
                    "category is a known member and the message is at most 120 characters, then re-run - "

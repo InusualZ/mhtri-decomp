@@ -8,7 +8,7 @@ Lint commit messages against the convention CLAUDE.md defines ("Commit messages 
 
 ## Users
 
-the landing gate (10); profiles (`.claude/agents`) (1)
+the landing gate (10; row 9 lints the caller's `--message`, or the composed subject without one - `docs/tools/spec/land.md`); profiles (`.claude/agents`) (1)
 
 ## CLI
 
@@ -38,7 +38,7 @@ Inputs -> outputs: message -> findings, exit 0/1/2.
 | 5 | subject line, not a wall | the first line is not empty or all whitespace, and a body is separated from it by a blank line |
 * **What it deliberately does not check.** The long description's *content* is a review matter, not a mechanical one. The convention bans *why* (reasoning, alternatives considered, an account of the work) from the description, but "no why" cannot be decided by a regular expression, and a heuristic that guessed wrong would flag messages a reviewer would accept - which is how a lint becomes hated and gets switched off. So the description's content is left to review; only its *shape* is checked here (check 5).
 * **The membership sets are derived from the tree, never hard-coded** (`derive_members`), so the lint cannot drift from the tree it describes:
-* `game/<module>` - the directories under `src/`. A member is matched **case-insensitively**: the convention's own examples lower-case the prose (`game/network`), while the tree directory is `src/Network`, and a lint that rejected the spec's example would be a false positive.
+* `game/<module>` - the directories under `src/`, plus the stem of every source file (`.c`, `.cpp`, `.cc`, `.cp`, `.cxx`) directly in `src/`: a root-level unit (`src/pad_connect.cpp`) has no directory, so its stem is its module (`game/pad_connect`). A root-level header (`src/types.h`) is not a unit and adds nothing. A member is matched **case-insensitively**: the convention's own examples lower-case the prose (`game/network`), while the tree directory is `src/Network`, and a lint that rejected the spec's example would be a false positive.
 * `tools/<area>` - a directory under `tools/` (the grouping: `tools/units`, `tools/git`, `tools/flags`), or the **stem of any script at any depth** (`tools/units/land.py` -> `tools/land`, `tools/units/stylelint.py` -> `tools/stylelint`).
 * `agents/<name>` - the profiles in `.claude/agents/*.md`, plus `policy` for CLAUDE.md.
 * `config/{flags,symbols,splits}` - the three inputs the convention names (configure.py -> `flags`, symbols.txt -> `symbols`, splits.txt -> `splits`).
@@ -57,7 +57,7 @@ git, repo.
 
 Tier: fixture (fixture tree + fixture history).
 Today's selftest (`tools/git/commitlint_selftest.py`): Every check runs against a **fixture tree** and a **fixture git history** built in a temp directory, never against this repository's working tree or HEAD, so the result cannot move when the tree does. The two mechanisms that decide the lint - the derived member sets and the message checks - are exercised both as pure functions and through the CLI, so the exit codes (0/1/2) are pinned too.
-Now: `tools/tests/git/test_commitlint.py` (83 checks, re-homed). The tool's git calls go through `lib.git` (`toplevel`, `log`, `rev-parse`, `config`).
+Now: `tools/tests/git/test_commitlint.py` (90 checks, re-homed). The tool's git calls go through `lib.git` (`toplevel`, `log`, `rev-parse`, `config`).
 
 ## Known gaps
 

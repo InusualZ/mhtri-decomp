@@ -42,7 +42,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
            allow_regression: list[str] | None = None, check_outbox: bool = True,
            release_claims: bool = True, problems: list[str] | None = None,
            branch: str | None = None, no_selftests: bool = False, warnings: list[str] | None = None,
-           seam_moves: list[str] | None = None) -> int:
+           seam_moves: list[str] | None = None, message: str | None = None) -> int:
     """Run every row; 0 when every row passed, 1 otherwise.
 
     `problems` is the out-parameter an automated caller (`land`) reads: `"<failing check> [<KIND>]: <what it
@@ -51,13 +51,15 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     unit-shaped rows (`unit_rows`). `--dry-run` runs the pre-build rows only and touches nothing; a pre-build
     failure refuses before the build. Only an all-green run writes the commit message (`.git/land_msg.txt`).
     `warnings`, the second out-parameter, receives every WARNING row's findings (`Batch.warn`) whatever the verdict;
-    `seam_moves` the pure seam moves the regression row credited (`"A -> B (N functions)"`)."""
+    `seam_moves` the pure seam moves the regression row credited (`"A -> B (N functions)"`). `message` is the
+    caller's `--message`: when given, the subject row lints it (the text the landing commits) instead of the
+    subject the gate composes from the batch."""
     units = [naming.norm_unit(u.strip("/")) for u in units]
     recorded = read_base(main)
     b = Batch(main=main, units=units, unit_units=unit_rows(main, units, base or recorded.get("base")),
               base=base or recorded.get("base"), recorded=recorded, dry_run=dry_run, no_build=no_build,
               branch=branch, check_outbox=check_outbox, release_claims=release_claims, no_selftests=no_selftests,
-              allow_regression=[a.strip() for a in (allow_regression or []) if a.strip()])
+              allow_regression=[a.strip() for a in (allow_regression or []) if a.strip()], message=message)
     try:
         return _verify(b, main, recorded, dry_run, no_build, problems)
     finally:

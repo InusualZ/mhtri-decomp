@@ -26,7 +26,8 @@ def build_tree(root: str) -> None:
                 "tools/units", "tools/__pycache__", "tools/agents", "tools/git",   # grouping dirs, a private dir
                 ".claude/agents", "docs"):
         os.makedirs(os.path.join(root, rel), exist_ok=True)
-    for rel in ("src/draw_shape.cpp",                                # a top-level src file is not a module
+    for rel in ("src/draw_shape.cpp", "src/pad_connect.c",           # root-level units: each stem is a module
+                "src/types.h",                                       # a root-level header is not a unit
                 "README.md", "LICENSE", ".github.example", ".gitignore",
                 "tools/selftest.py", "tools/__init__.py", "tools/units/land.py",
                 "tools/units/stylelint.py", "tools/git/commitlint.py",
@@ -69,8 +70,17 @@ def test_commitlint(c):
 
         # --- 1. the member sets are derived from the tree, not hard-coded -----------------------------------
         members = cl.derive_members(root)
-        c.check("game members are the src/ directories", members["game"], {"Network", "quest"})
-        c.check("game does not take a top-level src file as a module", "draw_shape" in members["game"], False)
+        # The rule changed deliberately (2026-10-27): a root-level unit (`src/pad_connect.cpp`) has no directory,
+        # so its stem is its `game/<module>` member; before, `game/draw_shape` was refused and the gate's composed
+        # subject for a root-level unit could not pass.
+        c.check("game members are the src/ directories plus the root-level source stems",
+              members["game"], {"Network", "quest", "draw_shape", "pad_connect"})
+        c.check("game takes a root-level .cpp unit's stem as a module", "draw_shape" in members["game"], True)
+        c.check("game takes a root-level .c unit's stem as a module", "pad_connect" in members["game"], True)
+        c.check("game does not take a root-level header as a module", "types" in members["game"], False)
+        c.check("a root-level unit's subject lints clean", _errors("game/draw_shape: land it", members), [])
+        c.check("a root-level stem near miss is still an error",
+              len(_errors("game/draw_shapes: land it", members)), 1)
         c.check("tools members are the groupings plus every script's stem at any depth",
               members["tools"], {"units", "git", "agents", "selftest", "land", "stylelint", "commitlint"})
         c.check("tools does not take __pycache__", "__pycache__" in members["tools"], False)
@@ -87,6 +97,12 @@ def test_commitlint(c):
         c.check("a new src/ directory joins the game family",
               "enemy" in cl.derive_members(root)["game"], True)
         os.rmdir(os.path.join(root, "src", "enemy"))
+        # ... and so does a new root-level unit, the moment its source exists
+        with open(os.path.join(root, "src", "sys_mem.cpp"), "w", encoding="utf-8") as handle:
+            handle.write("\n")
+        c.check("a new root-level src/ source joins the game family",
+              "sys_mem" in cl.derive_members(root)["game"], True)
+        os.remove(os.path.join(root, "src", "sys_mem.cpp"))
         # a new script at ANY depth joins the tools family (`tools/units/newtool.py` -> `tools/newtool`)
         with open(os.path.join(root, "tools", "units", "newtool.py"), "w", encoding="utf-8") as handle:
             handle.write("\n")

@@ -49,6 +49,25 @@ def _subdirs(path: str) -> set:
     return out
 
 
+SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cp", ".cxx")
+
+
+def _root_source_stems(path: str) -> set:
+    """The stems of the translation-unit sources directly under `path` (a missing path is an empty set)."""
+    out = set()
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return out
+    for name in names:
+        if name.startswith(".") or name.startswith("_"):
+            continue
+        stem, ext = os.path.splitext(name)
+        if ext.lower() in SOURCE_SUFFIXES and stem and os.path.isfile(os.path.join(path, name)):
+            out.add(stem)
+    return out
+
+
 def derive_members(root: str) -> dict:
     """The valid members of every known family, read from the tree at `root`.
 
@@ -58,7 +77,10 @@ def derive_members(root: str) -> dict:
     root = os.path.abspath(root)
     members: dict = {}
 
-    members["game"] = _subdirs(os.path.join(root, "src"))
+    # game/<module>: the directories under src/, plus the stem of every source file directly in src/ - a
+    # root-level unit (`src/pad_connect.cpp`) has no directory, so its stem is its module (`game/pad_connect`).
+    # Headers are not units, so a root-level `.h` adds nothing.
+    members["game"] = _subdirs(os.path.join(root, "src")) | _root_source_stems(os.path.join(root, "src"))
 
     # tools/<area>: the directories directly under tools/ (`tools/units`, `tools/git`, ...) plus the stem of
     # every script **at any depth** (`tools/units/land.py` -> `tools/land`, `tools/units/stylelint.py` ->

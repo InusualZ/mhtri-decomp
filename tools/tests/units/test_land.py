@@ -48,7 +48,7 @@ def fake_verify_with(write, gate_code=0, gate_problems=()):
     """A `verify` stand-in: `write(main)` is "the build", then the gate's verdict and its problems."""
 
     def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None, seam_moves=None):
+                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None, seam_moves=None, message=None):
         write(main)
         if problems is not None:
             problems.extend(gate_problems)
@@ -198,7 +198,7 @@ def _conflicted_worktree(tmp, branch="worker/x", name="scratch"):
 
 def _land_verify_ok(main, units, base, dry_run, no_build, allow_regression=None,
                     check_outbox=True, release_claims=True, problems=None, branch=None,
-                    no_selftests=False, warnings=None, seam_moves=None):
+                    no_selftests=False, warnings=None, seam_moves=None, message=None):
     L.write_land_message(main, "land: %s\n\nledger: (fixture)\n" % ",".join(units))
     return 0
 
@@ -456,6 +456,42 @@ def test_batch_paths_stage_and_subject(c):
                                             runner=lambda args: _NothingChecked())
         check("the row treats exit 2 (nothing checked) as a failure", stub_ok, False)
         check("... and says the lint did not run", "nothing was checked" in stub_detail, True)
+
+        # 4e. the row lints the message the landing COMMITS: the caller's `--message` when there is one, the
+        # composed subject only without one. The real tool again, pinned to the fixture by wrapping the row's
+        # `subject_lint` (the fixture's own tools/git/commitlint.py is an empty placeholder).
+        from tools.units.landing.rows import subject as subject_rows
+        os.makedirs(os.path.join(lint_root, "src", "Network"))
+        open(os.path.join(lint_root, "src", "pad_connect.cpp"), "w", encoding="utf-8").close()
+        real_lint = subject_rows.subject_lint
+
+        def row(units, message=None):
+            b = L.Batch(main=lint_root, units=units, unit_units=units, base=None, recorded={}, message=message)
+            with mock.patch.object(subject_rows, "subject_lint",
+                                   lambda main, text: real_lint(main, text, tool=cl_tool)):
+                subject_rows.subject_row(b)
+            return [(r.name, r.status) for r in b.checks], b
+
+        rows, b = row(["pad_connect"])
+        check("without --message a root-level unit's composed subject passes (its stem is a game member)",
+              rows, [(subject_rows.COMPOSED_ROW, "PASS")])
+        check("... and the composed subject is game/<stem>", b.subject, "game/pad_connect: land pad_connect")
+        rows, _ = row(["tools/land2/tool.py"])
+        check("without --message a bad composed subject still refuses", rows, [(subject_rows.COMPOSED_ROW, "FAIL")])
+        rows, b = row(["tools/land2/tool.py"], message="game/network: land the transport")
+        check("with --message the row lints the message, not the (bad) composed subject",
+              rows, [(subject_rows.MESSAGE_ROW, "PASS")])
+        check("... and the composed subject is still the body's placeholder first line",
+              b.subject, "tools/land2: land tools/land2/tool.py")
+        rows, b = row(["Network/network_transport"], message="game/nosuchmodule: land it")
+        check("a bad --message refuses even when the composed subject would pass",
+              rows, [(subject_rows.MESSAGE_ROW, "FAIL")])
+        check("... and the refusal carries commitlint's finding",
+              "not a known `game` member" in b.checks[0].detail, True)
+        rows, _ = row(["Network/network_transport"], message="game/network: land it\nbody with no blank line")
+        check("the --message body is linted too (no blank line refuses)", rows, [(subject_rows.MESSAGE_ROW, "FAIL")])
+        rows, _ = row(["Network/network_transport"], message="game/network: land it\n\nthe body")
+        check("a --message with a separated body passes", rows, [(subject_rows.MESSAGE_ROW, "PASS")])
 
     # the warning that keeps a foreign staged edit visible: `land` leaves it alone and names it
     check("the foreign-index warning names the path",
@@ -1325,11 +1361,21 @@ def test_already_applied_commits_every_measured_path(c):
         check("split: the base snapshot holds only part of the batch (the heuristic is false)",
               L.looks_already_applied(L.changed_status(tmp), L.base_dirty_paths(tmp)), False)
         buf = io.StringIO()
-        with mock.patch.object(L.gate, "verify", fake_verify_with(lambda main: None)), \
+        seen_message = []
+        inner_verify = fake_verify_with(lambda main: None)
+
+        def recording_verify(*args, **kwargs):
+            seen_message.append(kwargs.get("message"))
+            return inner_verify(*args, **kwargs)
+
+        with mock.patch.object(L.gate, "verify", recording_verify), \
                 contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
             code = L.land(tmp, units, None, no_build=True, check_outbox=False, release_claims=False,
                           subject="game/nw4r: split", already_applied=True)
         check("split: --already-applied lands", (code, L.answer_line(buf.getvalue())[:6]), (0, "LANDED"))
+        check("land hands its --message to the gate, so the subject row lints the committed text",
+              seen_message, ["game/nw4r: split"])
+        check("... and the commit carries that subject", repo_git(tmp, "log", "-1", "--format=%s"), "game/nw4r: split")
         committed = sorted(repo_git(tmp, "diff", "--name-status", base_sha, "HEAD").splitlines())
         check("split: the commit carries the registration, the new headers, the deletion, the doc and the rename",
               committed, sorted(["M\tconfigure.py", "M\tconfig/RMHE08/splits.txt", "M\tconfig/RMHE08/symbols.txt",

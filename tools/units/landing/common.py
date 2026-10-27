@@ -311,6 +311,7 @@ class Batch:
     seam_moves: list[str] = field(default_factory=list)  # the regression row's credited seam moves (the land log)
     warnings: list[str] = field(default_factory=list)   # `warn` rows' findings: the gate log, the message, the land log
     subject: str = ""
+    message: str | None = None            # the caller's `--message` (the text the landing commits), or None
     extra: dict = field(default_factory=dict)
 
     def check(self, name: str, good: bool, detail: str = "", info: str = "", kind: str = KIND_GATE,

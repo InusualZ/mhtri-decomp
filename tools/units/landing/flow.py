@@ -271,7 +271,7 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
                               allow_regression=allow_regression, check_outbox=check_outbox,
                               release_claims=False, problems=gate_failures, branch=branch,
                               no_selftests=no_selftests, warnings=rec.setdefault("warnings", []),
-                              seam_moves=rec.setdefault("seam_moves", [])) == 0
+                              seam_moves=rec.setdefault("seam_moves", []), message=subject) == 0
     rows = changed_status(main)
     outside = outside_batch([path for _code, path in rows], main=main)
     scratch = scratch_paths(outside)

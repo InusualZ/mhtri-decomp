@@ -64,7 +64,11 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
    generated component OLD lacked (a rename to a named stem, a move that keeps one). It protects new registrations
    only and is reported only when a new registration or a declared rename spells a generated component, so a batch
    registering named units shows the same table as before (`objects.new_unit_name_row`, pre-build).
-9. the gate's own subject follows the convention (`commitlint`) (GATE).
+9. the landing's message follows the convention (`commitlint`) (GATE). With `--message` the row ("the landing's
+   --message follows the convention") lints that text, subject and body, because it is what `land` commits; the
+   subject the gate composes from the batch's first unit is then only the placeholder first line `land` replaces, and
+   is not linted. Without `--message` the row ("the gate's own subject follows the convention") lints the composed
+   subject (`game/<first unit's directory or root-level stem>: land ...`).
 10. `configure.py`, then `ninja -k 0` scoped to the batch's objects (the compile gate; a foreign dirty object that fails is named and tolerated), then `ninja build/RMHE08/ok` - each command's exit code is a row (GATE).
 11. every batch unit is registered on three axes: `Object(...)` line, `splits.txt` block, build-graph target (`verifyunit`) (GATE).
 12. every batch unit's relocations resolve against the link - no *new* undefined reference against the base snapshot (`undefrefs`) (GATE); the base must carry the snapshot (BOOKKEEPING).
