@@ -15,6 +15,7 @@
 
 #include "types.h"
 #include "lobby/lb_npc.h"
+#include "lobby/lb_list.h"   /* LbList, the menu screen's choice list record (rule 1) */
 
 /* Owner headers (rule 2).  The menu range's list/cursor entry points and the camera range's
  * `camera_talk_lock_set` group were declared in this band header before their ranges were registered; both
@@ -69,19 +70,17 @@ typedef struct LbMenuWork {
     /* +0x0E */ s16 stage_0x0E;
     /* +0x10 */ s16 count_0x10;
     /* +0x12 */ u16 item_id_0x12;
-    /* +0x14 */ u8 unused_0x14[8];
+    /* +0x14 */ u8 unused_0x14[4];
+    /* +0x18 */ s32 yes_no_0x18;   /* the yes/no answer the hold step's confirm window shows */
     /* +0x1C */ s32 data_0x1C;
     /* +0x20 */ s32 data_0x20;
-    /* +0x24 */ u8 str_0x24[0x14];
-    /* +0x38 */ s32 value_0x38;
-    /* +0x3C */ s32 value_0x3C;
-    /* +0x40 */ u8 unused_0x40[4];
+    /* +0x24 */ LbList list_0x24;   /* the screen's choice list (`lb_choice_init`/`lb_choice_step`) */
     /* +0x44 */ u16 slots_0x44[4];
     /* +0x4C */ s16 bound_0x4C;
     /* +0x4E */ s16 bound_0x4E;
     /* +0x50 */ u16 flags_0x50[0x40];
     /* +0xD0 */ LbMenuEntry entries_0xD0[6];
-    /* +0x100 */ u16 value_0x100;
+    /* +0x100 */ s32 value_0x100;
 } LbMenuWork; /* size: 0x104 */
 
 #include "lobby/lobby_w.h" /* `LbLobbyWork`/`lobby_w`, owned by lobby/fn_8021E1EC.cpp (rule 1/2) */
@@ -180,8 +179,8 @@ typedef struct LbSeParam {
     /* +0x08 */ s16 limit_0x08;
     /* +0x0A */ s16 max_0x0A;
     /* +0x0C */ s16 cur_0x0C;
-    /* +0x0E */ s16 unused_0x0E;
-    /* +0x10 */ s16 time_0x10;
+    /* +0x0E */ s16 title_0x0E;   /* the window's title string */
+    /* +0x10 */ u16 time_0x10;
     /* +0x12 */ s16 count_0x12;
     /* +0x14 */ void* data_0x14;
     /* +0x18 */ s8 flag_0x18;
@@ -203,8 +202,9 @@ extern "C" {
 #include "mh3_pad/lb_param_w.h" /* `LbParamWork`/`lb_param_w`, owned by src/mh3_pad.cpp (rule 1/2) */
 #include "mh3_pad/Psw.h"        /* `PlayerPad`/`Psw[4]`, owned by src/mh3_pad.cpp (rule 1/2) */
 
-extern u8 lbex_main_str[];
-extern u8 lbex_zaco_str[];
+/* .sbss 0x80794B08 / 0x80794B0C: the pointers to the trade rows' two string tables (only `lobby/fn_801E7530.cpp` reads them). */
+extern s32* lbex_main_str;
+extern s32* lbex_zaco_str;
 extern u8 lbl_805B7A88[64];
 extern u8 lbl_805B7CB0[40];
 extern const u16 lbl_805B7CFC[8];
@@ -230,32 +230,12 @@ extern const u16 lbl_805B7EE0[10];
 extern u16 lbl_805B7EF4[6];
 extern const u16 lbl_805B7F00[20];
 extern u8 lbl_805B7F28[208];
-extern u8 lbl_805B82C8[16];
-extern u8 lbl_805B82D8[48];
-extern u8 lbl_805B8308[48];
-extern u8 lbl_805B8338[16];
 extern u8 lbl_805B8348[12];
 extern u8 lbl_805B8354[12];
 extern u8 lbl_805B8360[36];
 extern u16 lbl_805B8384[10];
-extern u8 lbl_805B8398[20];
-extern u8 lbl_805B83AC[72];
 extern u8 lbl_805B83F4[28];
-extern u8 lbl_805B8470[48];
-extern u8 lbl_805B84A0[16];
 extern u8 lbl_805B84B0[24];
-extern u8 lbl_805B84C8[32];
-extern u8 lbl_805B84E8[12];
-extern u8 lbl_805B84F4[12];
-extern u8 lbl_805B8500[12];
-extern u8 lbl_805B850C[16];
-extern u8 lbl_805B851C[44];
-extern u8 lbl_805B8548[12];
-extern u8 lbl_805B8554[12];
-extern u8 lbl_805B8560[20];
-extern u8 lbl_805B8574[12];
-extern u8 lbl_805B8580[56];
-extern u8 lbl_805B85B8[32];
 
 /* The `.data`/`.sdata` tables the character-edit (hair/inner colour) screen unit
  * (`src/lobby/fn_801F9CD4.cpp`) addresses; no registered unit owns them yet, so they are declared
@@ -312,26 +292,11 @@ extern u8 lbl_80791B90[8];
 extern u16 lbl_80791B98[4];
 extern u16 lbl_80791BA0[4];
 extern u16 lbl_80791BA8[1];
-extern u8 lbl_80791BAC[12];
+extern u16 lbl_80791BAC[4];
 extern u16 lbl_80791BB8[4];
 extern u8 lbl_80791BC0[5];
-extern u8 lbl_80791BD0[8];
-extern u8 lbl_80791BD8[8];
-extern u8 lbl_80791BE0[8];
 extern u8 lbl_80791BE8[8];
 extern u8 lbl_80791BF0[8];
-extern u8 lbl_80791BF8[8];
-extern u8 lbl_80791C00[8];
-extern u8 lbl_80791C08[8];
-extern u8 lbl_80791C10[8];
-extern u8 lbl_80791C18[8];
-extern u8 lbl_80791C20[8];
-extern u8 lbl_80791C28[8];
-extern u8 lbl_80791C30[3];
-extern u8 lbl_80791C38[8];
-extern u8 lbl_80791C40[2];
-extern u8 lbl_80791C44[5];
-extern u8 lbl_80791C50[8];
 /* The lobby NPC band's own `.sdata2` pool (`src/lobby/fn_802029B4.cpp`'s state machines hand these to
  * `lb_npc_motion_play` as its motion speed/base pair).  The run is unclaimed, so the band header is their
  * home; the names are the map's own. */
@@ -413,19 +378,26 @@ void* lb_goods_pair_row_get(u16 id);
 void* lb_goods_flag_row_get(u16 id);
 s32 spr_data_copy(s16 *, void *);
 s32 lb_goods_sale_close(void);
-u16 lb_goods_count_get(u16, s32);
+s32 lb_goods_count_get(u16, u8);
 s32 lb_goods_sale_list_build(void *);
 s32 lb_goods_sale_step(void *);
 u16 item_price_get(u16);
 s32 lb_goods_hold_step(void *);
 s16 lb_goods_price_group_get(void *, s16);
 u16 fn_802089F4(s32);
+/* The owner header `lobby/lb_cmd_pressed_ck.h` (`lobby/lb_npc.cpp`) declares these with their real types; a TU that
+ * includes it first takes those, and these older views stand aside. */
+#ifndef MHTRI_LOBBY_LB_CMD_PRESSED_CK_H
 s32 lb_cmd_pressed_ck(s32, s16);
 s32 lb_cmd_repeat_ck(s32);
 u16 lb_cmd_repeat_get(s32);
 u16 lobby_cmd_trig_get(void);
 s32 lb_yes_no_step(void *);
 u8 weight_table_index(s32, s16, s32);
+#endif
+/* The owner's leaf header `lobby/lb_list_init.h` (`lobby/fn_80212810.cpp`) declares these with their real
+ * types; a TU that includes it first takes those, and these older views stand aside. */
+#ifndef MHTRI_LOBBY_LB_LIST_INIT_H
 s32 lb_choice_init(void *, void*, u16, s32);
 s32 lb_choice_step(void *);
 s32 lb_choice_draw(u8 *, const void*, const void*, void*, s32);
@@ -434,14 +406,21 @@ s32 lb_help_num_put(s32, s32, u16);
 s32 lb_panel_str_print(s32, s16, s32);
 s32 lb_panel_line_draw(s32, s16, s32, s32);
 s32 lb_panel_yes_no_draw(s32, s32);
+#endif
 s32 lb_cursor_prompt_draw(u8, s16 *);
 s32 lb_button_prompt_draw(s32, s16 *);
+#ifndef MHTRI_LOBBY_LB_LIST_INIT_H
 s32 lb_page_arrow_draw(s32, s16, s16, u16, u32);
+#endif
 s32 lb_points_draw(s32);
+#ifndef MHTRI_LOBBY_LB_LIST_INIT_H
 s32 lb_list_row_draw(s32, s16 *, s32, s32);
+#endif
 s32 lb_item_cell_draw_layout1(u16, u16, s16 *, s32, s32, s32, s32);
 s32 lb_item_cell_draw_layout10(u16, s32, s16 *, s32, s32, s32, s32);
+#ifndef MHTRI_LOBBY_LB_LIST_INIT_H
 s32 lb_panel_close(void);
+#endif
 s32 lb_talk_page_open(s32);
 s32 lb_talk_page_mode_reset(void);
 s32 getItemListSelection(void);

@@ -547,8 +547,8 @@ void sysSE_req(s32 id);
 s32 fn_801EC7AC(LbMenuPanel* self);
 void fn_801EC804(s16* value);
 s32 fn_801EC828(LbMenuPanel* self);
-s32 fn_801EC85C(LbMenuPanel* self, u8 flag);
-void fn_801EC95C(LbMenuPanel* self);
+s32 lb_box_cam_input_step(LbMenuPanel* self, u8 flag);
+void lb_box_model_turn_step(LbMenuPanel* self);
 u32 lb_page_record_empty_ck(struct LbPage* page);
 s32 lb_cmd_pressed_ck(u32 mask);
 s32 lb_cmd_repeat_ck(u32 mask);
@@ -691,7 +691,7 @@ extern "C" s32 fn_801ECB40(void)
             break;
         }
     }
-    fn_801EC95C(panel);
+    lb_box_model_turn_step(panel);
     return result;
 }
 
@@ -2494,7 +2494,7 @@ extern "C" s32 lb_entry_pane_menu_step(LbEntryPane* self, LbEquipBoxWork* owner,
             u8 kind = lb_entry_pane_scroll_kind_get(self);
 
             if (owner != NULL && kind == 7) {
-                fn_801EC85C((LbMenuPanel*)owner, 1);
+                lb_box_cam_input_step((LbMenuPanel*)owner, 1);
                 return 1;
             }
             if (kind != 4 && kind != 10 && lb_cmd_pressed_ck(0x40) == 1U) {
@@ -3805,7 +3805,7 @@ typedef struct LbBoxMenu {
 
 extern "C" {
 /* The panes band's entry points the box menu runs (defined above, in `s_801EC9F8`). */
-s32 fn_801EC85C(::LbMenuPanel* self, u8 flag);
+s32 lb_box_cam_input_step(::LbMenuPanel* self, u8 flag);
 s32 fn_801ECB40(void);
 void fn_801ECD50(::LbDigitPane* self);
 void fn_801ED284(::LbListPane* self);
@@ -4821,7 +4821,7 @@ void lb_box_menu_step(void)
         ainpc_page_hold_set();
         if (self->state_0x000 == 6 || (u32)chk_pointer() != 1) {
             if (self->leave_0x003 == 1) {
-                fn_801EC85C((::LbMenuPanel*)self, 0);
+                lb_box_cam_input_step((::LbMenuPanel*)self, 0);
             } else {
                 switch (self->state_0x000) {
                 case 1:

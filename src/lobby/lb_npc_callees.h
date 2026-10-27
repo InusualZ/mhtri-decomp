@@ -15,8 +15,8 @@ extern "C" {
 extern LbNpcUserData* lobby_world_block;
 
 u32 game_ready_ck(void);
-void fn_801E9888(void);
-void fn_801E9C58(void);
+void lb_hunt_day_advance(void);
+void lb_farm_day_pass(void);
 void lb_kujira_day_step(void);
 u32 lobby_net_busy_ck(void);
 

@@ -3705,7 +3705,7 @@ void fn_80202570(_LB_NPC* self);
 void fn_80202728(_LB_NPC* self);
 void fn_802027CC(_LB_NPC* self, s32 action);
 void fn_801FFE44(_LB_NPC* self);
-void fn_801E9A90(u8 a, u8 b);
+void lb_farm_plot_mark_set(u8 a, u8 b);
 s32 fn_80207EAC(_LB_NPC* self);
 LbNpcMotionEntry* fn_80207DC4(_LB_NPC* self, u8* kind);
 void fn_80207FD0(_LB_NPC* self, u8 kind, s32 flag);
@@ -4438,7 +4438,7 @@ void fn_802043D4(_LB_NPC* self, u8 kind)
             s32 slot = fn_802080C0(self);
 
             self->field_0x234[0] = 2;
-            fn_801E9A90((u8)slot, 2);
+            lb_farm_plot_mark_set((u8)slot, 2);
             self->field_0x001 = 0;
         }
         break;
@@ -12102,9 +12102,9 @@ extern "C" void lb_item_db_toggle(void) {
     if (game_ready_ck() == 0) {
         lobby_world_block->field_0x3E00 ^= 1;
         if (getItemListSelection() == 1) {
-            fn_801E9888();
+            lb_hunt_day_advance();
         }
-        fn_801E9C58();
+        lb_farm_day_pass();
         lb_kujira_day_step();
         lb_ship_voyage_tick();
     }
