@@ -461,7 +461,7 @@ extern "C" void eft_rot_vec_copy(_CP_VECTOR* dst, _CP_VECTOR* src)
 
 /* Builds a model effect with a full parameter set: the area gate, the model builder, the effect's
  * `field_0x08`/`field_0x06` seed bytes, the rotation triple and the parameter scale. */
-extern "C" void fn_800FC0F0(nw4r::math::VEC3* pos, u32 type, u8 field_08, u8 area, _CP_VECTOR* rot, f32 scale)
+extern "C" void eft_model_effect_spawn(nw4r::math::VEC3* pos, u32 type, u8 field_08, u8 area, _CP_VECTOR* rot, f32 scale)
 {
     if ((u8)area != (u8)get_now_areano()) {
         return;

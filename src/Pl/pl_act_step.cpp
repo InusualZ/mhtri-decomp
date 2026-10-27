@@ -25,16 +25,30 @@
  *   From the callers: `pl_area_entry_set` (`enemy/em_pop.cpp` places the player at an area entry with it),
  *   `pl_act_step_arm_table` (the step table it arms, `Pl/pl_act_step_data.h`), `pl_act_net_hook_a`/`_b`/`_c` (the
  *   three receivers `hud/pl_frame_sync.cpp` replays, declared in `Pl/fn_802489D4.h`).
- * RESIDUALS. 7 functions unwritten (objdiff scores them 0): `pl_act_status_step` 0x80260B38 (0xC38), 0x80261770
- *   (0xA40), 0x802621B0 (0x4D8), 0x80262940 (0x1934), 0x802642D0 (0x670), 0x802657F8 (0x1300) and 0x80266F30 (0x340).
- *   `GetItemData` keeps the local `u8*` view: `menu/menu_item.h` and `ai/ai_npc.h` both define `_HIT_W`.
- *   103 functions partial; the lowest are `fn_80265748`, `pl_weapon_record_rearm`, `pl_gather_item_take`,
+ *   GUESS (from each body): `pl_frame_post_step` (the per-frame tail: drift, wide-area effects, lobby events and the
+ *   net report), `pl_condition_tick` (poison, the second damage timer and the hot/cold area drain),
+ *   `pl_scan_row_input_ck` (a step-table row's input condition), `pl_item_use_act_pick` (the act a pouch item enters),
+ *   `pl_hit_react` (applies the pending hit), `pl_scan_act_select` (enters the first step-table row that fires); the
+ *   data `pl_shell_act_tbl_a`/`_b` (the key 252/251 act tables), `pl_float_0_7`, `pl_frame_window_999`; the `_PLW`
+ *   names `hit_pending_0x39E`, `area_drain_timer_0x462`, `req_bits_b_0x0BC`, `window_start/lead/end_0x31C..0x320`,
+ *   `buff_b_level_0x44D`, `buff_timer_0x46A`, `hold_timer_0x66A`, `frame_b_0x024`, `entry_hold_0x012`.
+ * RESIDUALS. Every function is written.  `GetItemData` keeps the local `u8*` view: `menu/menu_item.h` and
+ *   `ai/ai_npc.h` both define `_HIT_W`.  About 100 functions partial; the lowest are `pl_gather_item_take`,
  *   `pl_act_fishing`, `pl_act_net_hook_a`/`_b`/`_main`, `pl_act_item_throw`.  Recorded causes:
+ *  - `pl_frame_post_step`: retail tests the master check with `bne` over a `b` to the epilogue; every `if`, `switch`
+ *    and inline-helper spelling of the early return folds it into one `beq`;
+ *  - `pl_condition_tick`: the act-kind 8/9 return keeps `bgt` over a `b` (the same fold);
+ *  - `pl_item_use_act_pick`: items 380/384 and 583 share one tail (`li r24,1; b` / `li r24,5`); the `goto`-free
+ *    spelling writes the tail twice (152 B);
+ *  - `pl_act_status_step`: one extra `clrlwi` before the `+0x5C4` nibble store, and the cap/health compare takes
+ *    r0/r3 the other way round;
+ *  - `pl_scan_act_select`: rows 3/24 jump into row 16's body and keys 247/248 share one tail (the `goto`-free
+ *    spellings repeat the test or re-test the key); the ground-probe calls load `&probe` before the two floats; the
+ *    allocator colours the loop's saved registers differently (declaration order searched);
+ *  - `pl_gather_item_take`, `pl_act_fishing`: retail places the shared tail between two switch bodies (the 0-2 and 3
+ *    results; the 2/3 grade before the 4 grade); a switch's bodies are emitted in source order;
  *  - `pl_act_net_hook_main`: retail shares its arms' tails through jumps; a `goto`-free spelling repeats them;
  *  - `pl_guard_ck`: the allocator gives the scan-row pointer and the weapon kind other registers;
- *  - `pl_wide_area_effect_step`: retail tests the act with `subi`/`cmplwi`/`ble` straight into the 57/58 body and
- *    places the 138 body last; the `switch` spelling lowers 57/58 as `cmpwi`/`blt`/`cmpwi`/`bge` and the `if` spelling
- *    places the bodies in source order;
  *  - `pl_act_step_offhand_gesture`: `.text`, extab and extabindex are byte-identical; the target's extabindex
  *    `R_PPC_ADDR32` names dtk's `@etb_80011EFC` where MWCC writes its own local, which no source reaches;
  *  - `pl_act_step_pitfall_arm`: one extra `clrlwi r0,r0,24` on the case-0 store, the `u8` local's own conversion; the
@@ -45,8 +59,6 @@
  *  - `fn_8025E0C8`: retail branches straight from each blocked test to one shared `field_0x308` clear; the inline
  *    `pl_item_window_blocked` returns a flag the caller tests (`li r0,1` + `cmpwi`), and an un-inlined chain repeats
  *    the clear at every test;
- *  - `fn_80265748`: MWCC folds the two returns into a branchless `subfc`/`subfe` sequence for every spelling tried
- *    (either branch order, `u16` locals, an inline step helper); retail keeps `cmplwi`+`bgt`;
  *  - `fn_8025FF0C`: kind 3 tests `act == 27` with `beq` past a `b` to the 0xC0 arm, ours inverts it to `bne`; the
  *    `pl_move_work` scan keeps a dead loop counter and adds the row base before the entry offset;
  *  - `fn_8025FA00`: the surface clamp is one block that the `field_0x00A` switch reaches from case 0, case 1 and
@@ -57,11 +69,10 @@
  *  - `fn_8025A7FC`: the target schedules `threshold = 15` between the `cmplwi` and the `bne` of the
  *    `field_0x128 == 2` test, ours before the load;
  *  - the other partial rows have no recorded cause.
- *  - flipcheck: the unwritten 0x80266F30 and `pl_act_status_step` are referenced from `lb_npc.o` and
- *    `player_control.o`; the eight registry names this source spells resolve when the registry is exported.
- *  - flipcheck: the object emits no `.bss` (0x30 claimed), `.ctors` (0x4), `.sbss` (0x8) or `.sdata` (0x28); `.text`
- *    0x1F48C, `.data` 0xB84, `.sdata2` 0x8, extab 0x7C0 and extabindex 0xBA0 against the claims 0x242BC, 0x1D24,
- *    0x200, 0x7F8 and 0xBF4; the own `.data`/`.sdata2` tables are still declared `extern`.
+ *  - flipcheck: the registry names this source spells resolve when the registry is exported.
+ *  - flipcheck: the object emits no `.bss` (0x30 claimed), `.ctors` (0x4) or `.sdata` (0x28), one `.sbss` word
+ *    (`pl_eft_func`; 0x8 claimed, the second word has no reader), and its own switch tables in `.data`; the own
+ *    `.data`/`.sdata2` tables are still declared `extern`.
  * SHAPES. The per-part argument is `s32`: retail compares it with `cmpwi r4,0` and never masks it, which a `u8`
  *   declaration does (`clrlwi`); `pl_act_charge_repeat_step`'s range test is still `(u32)part <= 2` (`cmplwi r30,2`).
  *  - `++`/`--` on a byte field stores raw; `+= 1`, `= x + 1` and `x = x - 1` add a `clrlwi`/`extsb`; `*timer -= 10` on
@@ -76,7 +87,15 @@
  *    the same direct call), and the header declarations of `fn_8025E298`, `get_move_work_adrs` and
  *    `get_move_work_max` that disagree with a view are renamed away around their `#include`;
  *  - `pl_act_step_offhand_gesture` writes each follow-up arm out in full: the two constants each arm hands
- *    `Pl_frame_check` differ only per gesture.
+ *    `Pl_frame_check` differ only per gesture;
+ *  - `#pragma optimization_level 4` (playbook 108) brackets `pl_weapon_record_rearm`, `pl_act_knockback`,
+ *    `pl_act_fishing`, `pl_act_paralysis`, `pl_scan_act_select`, `pl_condition_tick`, `pl_hit_react` and
+ *    `pl_wide_area_effect_step`: their switches are retail's level-4 linear `subi`/`cmplwi` range chains;
+ *  - `do { switch ... } while (0)` with `continue` (playbook 183) gives `pl_hit_react`'s cases that skip the hold
+ *    notify, and `pl_act_status_step`'s area gate that skips the regeneration;
+ *  - `(u8)(x + 250) > 2` is retail's `addi r0,r3,0xFA; clrlwi; cmplwi` range test (`(u8)(x - 6)` emits `subi`);
+ *  - `fn_80265748` returns 0, then 2 below 0x8001, else 1: the one-expression return folds into `subfc`/`subfe`;
+ *  - `pl_hit_react` reuses its `hp` local for the knockback motion, as retail's register reuse shows.
  */
 
 #include "types.h"
@@ -178,6 +197,39 @@
 #include "Pl/pl_yure.h"
 #include "lobby/lb_event_request.h"
 #include "menu/get_pop_dat_ptr.h"
+#include "mh3_pad/system_w.h" /* `system_w` (rule 2) */
+#include "hud/Pl_net_send_hit_kind5.h"
+#include "Pl/pl_camera_close_ck.h"
+#include "enemy/em_pop.h"
+#include "quest/quest_element_item_use.h"
+#include "quest/quest_element_supply_state_get.h"
+#include "hud/pl_gauge_level_get.h"
+#include "ef/sys_quest_move.h"
+#include "Pl/pl_model_blend_positive_ck.h"
+#include "Pl/pl_armed_act_no_get.h"
+#include "Pl/pl_call_answer_ck.h"
+#include "Pl/pl_shell_class_get.h"
+#include "Pl/pl_reload_needed_ck.h"
+#include "Pl/pl_alt_form_free_ck.h"
+#include "Pl/pl_daze_level_ck.h"
+#include "Pl/pl_health_out_ck.h"
+#include "Pl/pl_kind_item_slot_find.h"
+#include "Pl/pl_kind_item_equip_find.h"
+#include "ef/eft_model_effect_spawn.h"
+#include "sound/se_slot0_pos_req.h"
+#include "Pl/pl_health_damage_apply.h"
+#include "Pl/pl_status_duration_map.h"
+#include "Pl/pl_area_stamina_drain_step.h"
+#include "Pl/pl_act_status_step.h"
+#include "Pl/pl_motion_interruptible_ck.h"
+#include "Pl/pl_item_use_free_ck.h"
+#include "Pl/pl_spot_use_a_ck.h"
+#include "Pl/pl_spot_use_b_ck.h"
+#include "Pl/pl_stance_low_ck.h"
+#include "ai/ai_npc_player_near_ck.h"
+#include "Pl/pl_stick_window_gated_ck.h"
+#include "Pl/pl_stick_window_level_ck.h"
+#include "Pl/pl_stick_window_ck.h"
 /* fn_802DE578_view1: the call sites disagree on this callee's parameters; each keeps its own view through a cast (same direct call). */
 #define fn_802DE578_view1 ((void (*)(_PLW*, u16*))cockpit_ticket_acquire)
 /* fn_8025E298_view3: the call sites disagree on this callee's parameters; each keeps its own view through a cast (same direct call). */
@@ -217,11 +269,15 @@ typedef struct PlScanEntry {
     /* +0x00 */ u8 id_0x00;
     /* +0x01 */ u8 pad_0x01[0x1];
     /* +0x02 */ u16 key_0x02;
-    /* +0x04 */ u8 pad_0x04[0x2];
-    /* +0x06 */ u16 flags_0x06;
-    /* +0x08 */ u8 pad_0x08[0x6];
+    /* +0x04 */ u16 arg_0x04;         /* the act argument the row enters with */
+    /* +0x06 */ u16 flags_0x06;       /* the low 14 bits pick the input condition `pl_scan_row_input_ck` tests */
+    /* +0x08 */ u16 cond_a_0x08;      /* the condition's first operand (an input mask, a part flag, a window bound) */
+    /* +0x0A */ u16 cond_b_0x0A;      /* its second operand */
+    /* +0x0C */ u16 cond_c_0x0C;      /* its third operand */
     /* +0x0E */ u16 flags_0x0E;
-    /* +0x10 */ u8 pad_0x10[0x6];
+    /* +0x10 */ s16 frame_start_0x10; /* the row's frame window start (999 and above: the motion end) */
+    /* +0x12 */ s16 frame_end_0x12;   /* the window end */
+    /* +0x14 */ s16 frame_lead_0x14;  /* the frames the window opens early (999 and above: no window test) */
 } PlScanEntry; /* size: 0x16 */
 
 /* One entry of `pl_move_work` is `PlMoveEntry`, declared by its owner's header (rule 1/2). */
@@ -346,8 +402,29 @@ extern u16 pl_companion_talk_odds[8];
 extern u16* pl_scan_kind_remap[10];
 }
 
+/* The shell act tables: per shell class, the act number and the one the kind-3 actor enters instead. */
+extern "C" {
+extern u16 pl_shell_act_tbl_a[20];
+extern u16 pl_shell_act_tbl_b[20];
+}
+
 /* pl_weapon_alt_form_ck_c1: the owner declares `pl_weapon_alt_form_ck` `void`, while its body returns the
  * alternate-form byte the draw/sheathe acts test; the same direct call through a cast. */
+/* pl_act_held_ck_c1: the owner declares a second, unused parameter its callers here never load; the same direct call
+ * through a cast. */
+/* pl_hit_face_motion_c1: `fn_80278674` as the hit reaction calls it - the owner declares its motion `s16`, the caller
+ * hands the unextended face angle; the same direct call through a cast. */
+#define pl_hit_face_motion_c1 ((void (*)(_PLW*, s32, u8))fn_80278674)
+
+/* pl_armed_act_no_get_c1: the owner declares the act number `u32`; the step-table walk stores it as the `u16` it is,
+ * the same direct call through a cast. */
+#define pl_armed_act_no_get_c1 ((u16 (*)(_PLW*, s16))pl_armed_act_no_get)
+/* pl_act_dash_input_c1: the owner declares no parameter, the step-table walk hands it the actor; the same direct call
+ * through a cast. */
+#define pl_act_dash_input_c1 ((s32 (*)(_PLW*))pl_act_dash_input_ck)
+
+#define pl_act_held_ck_c1 ((u32 (*)(_PLW*))pl_act_held_ck)
+
 #define pl_weapon_alt_form_ck_c1 ((u8 (*)(_PLW*))pl_weapon_alt_form_ck)
 
 /* The fishing SE requests of `sound/fn_800D7F54.cpp` as the fishing act calls them: the owner's bodies ignore the
@@ -387,6 +464,15 @@ u32 fn_802657AC(struct _PLW* self);
 void pl_model_state_set(struct _PLW* self, u32 action, s32 a, u16 b);
 s32 fn_80264B4C(struct _PLW* self);
 void fn_80266EB8(struct _PLW* self);
+s32 pl_scan_act_select(struct _PLW* self);
+s32 pl_hit_react(struct _PLW* self);
+s32 pl_item_use_act_pick(struct _PLW* self, u8* kind, u16* act, u16* arg, s32* word, u16 slot, u16* point);
+void pl_frame_post_step(struct _PLW* self);
+void pl_condition_tick(struct _PLW* self);
+u32 pl_scan_row_input_ck(struct _PLW* self, struct PlScanEntry* row);
+
+/* The player effect hook `pl_frame_post_step` calls every frame (this unit's `.sbss`). */
+void (*pl_eft_func)(struct _PLW* self);
 }
 
 s32 fn_80260198(_PLW* self);
@@ -1145,6 +1231,7 @@ extern "C" s32 pl_zone_ground_drop(_PLW* self) {
 
 /* Re-arms the weapon record: its level from the second equipment for the blade kinds, a fixed 150 for the
  * gunner kinds, then the attack values and the affinity. */
+#pragma optimization_level 4
 extern "C" void pl_weapon_record_rearm(_PLW* self) {
     switch (self->field_0x002) {
     case 0:
@@ -1167,6 +1254,7 @@ extern "C" void pl_weapon_record_rearm(_PLW* self) {
     pl_shell_ids_set(self, 0xFF, 0xFF);
     pl_weapon_class_refresh(self);
 }
+#pragma optimization_level reset
 
 /* Resets the actor's act state: the latches, both attack entries, the hit-id list and the skill state. */
 extern "C" void pl_act_state_reset(_PLW* self) {
@@ -2283,6 +2371,7 @@ extern "C" void fn_802488D4(_PLW* self, u32 a) {
 /* The knockback act for `variant` 0-4 (`level` picks the bow kind's attribute pair, `alt` the bow's alternate step
  * table): resets the act's latches and arms the knockback motion and step table, then steps the motion and the
  * per-kind slides the 0xB6 skill grants. */
+#pragma optimization_level 4
 extern "C" void pl_act_knockback(_PLW* self, s32 variant, s32 level, u8 alt) {
     VEC3 slide;
     s32 part;
@@ -2452,6 +2541,7 @@ extern "C" void pl_act_knockback(_PLW* self, s32 variant, s32 level, u8 alt) {
         break;
     }
 }
+#pragma optimization_level reset
 
 /* The item-use act for `kind` 0-5: arms the use motion from the item act table, fires the item's shell at the
  * use frame (spending one unless the infinite-item cheat input is held) and, for the return items, warps the
@@ -3193,6 +3283,7 @@ extern "C" s32 fn_8024AA04(u16 motion) {
 /* The fishing act for `variant` 0-4: casts (or re-casts) the line and starts its SE, then counts the frames the
  * bait sits and grades the pull against the bite window of the row `pl_act_name_row_get` picks; a pull (or the
  * time limit) lands the catch the grade gives and chains into the result act. */
+#pragma optimization_level 4
 extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
     u8* row;
     s16 count;
@@ -3270,10 +3361,14 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
                     self->field_0x006++;
                     if (fn_8024AA04(self->field_0x306) == 2 && pl_part_flag_ck(self, 0x15) == 1 &&
                         Pl_item_timer_get(self, 0x1D) > 1) {
-                        if ((u32)variant <= 1) {
+                        switch (variant) {
+                        case 0:
+                        case 1:
                             pl_act_enter(self, 0, 0x6F, 0);
-                        } else if (variant == 2) {
+                            break;
+                        case 2:
                             pl_act_enter(self, 0, 0x70, 0);
+                            break;
                         }
                         return;
                     }
@@ -3321,76 +3416,51 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
         if (pl_part_flag_ck(self, 9) != 1 && self->field_0x5B8 < limit) {
             break;
         }
-        if ((u32)(self->field_0x5BA - 2) > 1) {
-            switch (self->field_0x5BA) {
-            case 0:
-                pl_model_state_set(self, 1, 0xD, 0);
-                pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, 0);
-                if (self->field_0x007 == 0) {
-                    pl_act_enter(self, 0, 0x25, 0);
-                } else if (variant == 1 || variant == 3) {
+        switch (self->field_0x5BA) {
+        case 0:
+            pl_model_state_set(self, 1, 0xD, 0);
+            pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, 0);
+            if (self->field_0x007 == 0) {
+                pl_act_enter(self, 0, 0x25, 0);
+            } else if (variant == 1 || variant == 3) {
+                pl_act_enter(self, 0, 0x75, 0);
+            } else {
+                pl_act_enter(self, 0, 0x76, 0);
+            }
+            return;
+        case 1:
+            pl_item_add(self, 0x1D, -1);
+            if (Pl_Skill_ck(self, 0xB5) == 1) {
+                self->field_0x5BA = 2;
+                item = 0x1A;
+            } else {
+                item = 0x1B;
+            }
+            if ((u32)item_get_with_msg(self, item, self->field_0x598, 9, 1) > 1) {
+                if (self->field_0x007 != 0) {
+                    self->field_0x007++;
+                }
+            }
+            if (item == 0x1A) {
+                break;
+            }
+            pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, 0);
+            if (self->field_0x007 == 0) {
+                pl_act_enter(self, 0, 0x25, 0);
+            } else if (variant == 1 || variant == 3) {
+                if (self->field_0x007 == 1) {
                     pl_act_enter(self, 0, 0x75, 0);
                 } else {
-                    pl_act_enter(self, 0, 0x76, 0);
+                    pl_act_enter(self, 0, 0xA4, 0);
                 }
-                return;
-            case 1:
-                pl_item_add(self, 0x1D, -1);
-                if (Pl_Skill_ck(self, 0xB5) == 1) {
-                    self->field_0x5BA = 2;
-                    item = 0x1A;
-                } else {
-                    item = 0x1B;
-                }
-                if ((u32)item_get_with_msg(self, item, self->field_0x598, 9, 1) > 1) {
-                    if (self->field_0x007 != 0) {
-                        self->field_0x007++;
-                    }
-                }
-                if (item == 0x1A) {
-                    break;
-                }
-                pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, 0);
-                if (self->field_0x007 == 0) {
-                    pl_act_enter(self, 0, 0x25, 0);
-                } else if (variant == 1 || variant == 3) {
-                    if (self->field_0x007 == 1) {
-                        pl_act_enter(self, 0, 0x75, 0);
-                    } else {
-                        pl_act_enter(self, 0, 0xA4, 0);
-                    }
-                } else if (self->field_0x007 == 1) {
-                    pl_act_enter(self, 0, 0x76, 0);
-                } else {
-                    pl_act_enter(self, 0, 0xA5, 0);
-                }
-                return;
-            case 4:
-                pl_item_add(self, 0x1D, -1);
-                pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, 0);
-                if ((u32)item_get_with_msg(self, 0x1C, self->field_0x598, 0x11, 1) > 1) {
-                    if (self->field_0x007 != 0) {
-                        self->field_0x007++;
-                    }
-                }
-                if (self->field_0x007 == 0) {
-                    pl_act_enter(self, 0, 0x25, 0);
-                } else if (variant == 1 || variant == 3) {
-                    if (self->field_0x007 == 1) {
-                        pl_act_enter(self, 0, 0x75, 0);
-                    } else {
-                        pl_act_enter(self, 0, 0xA4, 0);
-                    }
-                } else if (self->field_0x007 == 1) {
-                    pl_act_enter(self, 0, 0x76, 0);
-                } else {
-                    pl_act_enter(self, 0, 0xA5, 0);
-                }
-                return;
-            default:
-                return;
+            } else if (self->field_0x007 == 1) {
+                pl_act_enter(self, 0, 0x76, 0);
+            } else {
+                pl_act_enter(self, 0, 0xA5, 0);
             }
-        } else {
+            return;
+        case 2:
+        case 3:
             pl_item_add(self, 0x1D, -1);
             if (Pl_master_ck(self) == 1) {
                 lb_event_request(7);
@@ -3400,6 +3470,31 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
                     self->field_0x007++;
                 }
             }
+            break;
+        case 4:
+            pl_item_add(self, 0x1D, -1);
+            pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, 0);
+            if ((u32)item_get_with_msg(self, 0x1C, self->field_0x598, 0x11, 1) > 1) {
+                if (self->field_0x007 != 0) {
+                    self->field_0x007++;
+                }
+            }
+            if (self->field_0x007 == 0) {
+                pl_act_enter(self, 0, 0x25, 0);
+            } else if (variant == 1 || variant == 3) {
+                if (self->field_0x007 == 1) {
+                    pl_act_enter(self, 0, 0x75, 0);
+                } else {
+                    pl_act_enter(self, 0, 0xA4, 0);
+                }
+            } else if (self->field_0x007 == 1) {
+                pl_act_enter(self, 0, 0x76, 0);
+            } else {
+                pl_act_enter(self, 0, 0xA5, 0);
+            }
+            return;
+        default:
+            return;
         }
         big = fn_8024AA04(self->field_0x306) == 2;
         if (self->field_0x007 == 0) {
@@ -3422,6 +3517,7 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
         break;
     }
 }
+#pragma optimization_level reset
 
 /* 0x8024B35C - the two-step "fall" handler: arms the motion row for `arg1`, then ends the act
  * through the `Pl_act_set_motion_slot` or `pl_act_enter` code that `arg1` selects. */
@@ -9549,6 +9645,7 @@ extern "C" void pl_act_sleep_fall(_PLW* self) {
 /* The paralysis act for `variant` 0-3 (2 and 3 the drawn ones; 1 and 3 continue a running paralysis): trembles
  * with the paralysis spark every 32 frames for 150 frames (300 with skill 4), each input shake cutting a frame,
  * then recovers into the kind's slot. */
+#pragma optimization_level 4
 extern "C" void pl_act_paralysis(_PLW* self, u32 variant) {
     self->field_0x006++;
     switch (self->act_step_0x05) {
@@ -9666,6 +9763,7 @@ extern "C" void pl_act_paralysis(_PLW* self, u32 variant) {
         break;
     }
 }
+#pragma optimization_level reset
 
 /* The heavy flinch act of the drawn weapon (`variant` 1 from behind): plays the flinch, then re-enters the kind's
  * slot and re-arms the gauge. */
@@ -12785,7 +12883,7 @@ extern "C" void fn_8025ED00(_PLW* self) {
     if (Pl_master_ck(self) == 0) {
         return;
     }
-    if ((u8)(self->field_0x00A - 6) > 2) {
+    if ((u8)(self->field_0x00A + 250) > 2) {
         if (self->field_0x18 == 1 && pl_item_page2_ck(self) != 0 && pl_part_flag2_ck(self, 7) == 1) {
             if (self->field_0x00A == 0) {
                 switch (self->act_no) {
@@ -12950,13 +13048,13 @@ void fn_8025F088(_PLW* self) {
     self->field_0x3B4 = 0;
     self->field_0x3B5 = 0;
     self->field_0x5C9 = 0;
-    if (fn_802657F8(self) == 0) {
-        fn_80262940(self);
+    if (pl_hit_react(self) == 0) {
+        pl_scan_act_select(self);
     }
     pl_gauge_step_a(self);
     pl_gauge_step_b(self);
     pl_condition_step(self);
-    fn_802642D0(self);
+    pl_condition_tick(self);
     self->field_0x3B0 = self->field_0x3AC;
     self->field_0x3AC = 0;
     self->act_state_0x00E[0] = 0;
@@ -13714,6 +13812,888 @@ s32 fn_80260A58(_PLW* self) {
     return fn_80260A18(self) <= 0;
 }
 
+/* 0x80260B38 (0xC38): the actor's per-frame status step - runs down every act, item and status timer, and for the
+ * master the stamina, condition, buff and regeneration timers with their expiry messages. */
+void pl_act_status_step(_PLW* self) {
+    s32 period;
+    s32 step;
+    u32 carry;
+    u8 latch;
+    u8 count;
+    s16 diff;
+
+    self->frame_0x020++;
+    self->frame_b_0x024++;
+    if (++self->field_0x030 > 1000) {
+        self->field_0x030 = 1000;
+    }
+    if (self->field_0x19 > 0) {
+        self->field_0x19--;
+    }
+    if (self->field_0x580 > 0) {
+        self->field_0x580--;
+    }
+    if (self->field_0x3A2 > 0) {
+        self->field_0x3A2--;
+    } else if (self->field_0x3A3 > 0) {
+        self->field_0x3A3--;
+    }
+    if (self->field_0x266 > 0) {
+        self->field_0x266--;
+    }
+    if (self->field_0x396 > 0) {
+        self->field_0x396--;
+    }
+    if (self->field_0x45A > 0) {
+        self->field_0x45A--;
+    }
+    if (self->field_0x45C > 0) {
+        self->field_0x45C--;
+    }
+    if (self->field_0x264 < 30000) {
+        self->field_0x264 += (s16)((s16)self->field_0x354 * 2);
+        if (self->field_0x264 >= 30000) {
+            self->field_0x264 = 30000;
+        }
+    }
+    if (self->field_0x662 > 0) {
+        self->field_0x662--;
+    }
+    if (self->wide_area_hold_0x660 > 0) {
+        self->wide_area_hold_0x660--;
+    }
+    if ((s16)self->field_0x442 > 0) {
+        self->field_0x442--;
+    }
+    if (Pl_master_ck(self) == 0) {
+        if (self->field_0x584 != 0 && --self->field_0x256 <= 0) {
+            self->slot_active = 0;
+            self->field_0x001 = 0;
+        }
+        return;
+    }
+    if (self->daze_timer_0x468 > 0) {
+        self->daze_timer_0x468--;
+    }
+    if (self->entry_hold_0x012 > 0) {
+        self->entry_hold_0x012--;
+    }
+    if (self->field_0x313 > 0) {
+        self->field_0x313--;
+    }
+    if ((s8)self->field_0x314 > 0) {
+        self->field_0x314--;
+    }
+    if (self->field_0x658 != 0) {
+        self->field_0x658--;
+    }
+    if ((s8)self->field_0x36A > 0) {
+        self->field_0x36A--;
+    }
+    if (self->field_0x352 > 0) {
+        self->field_0x352--;
+    }
+    if (self->field_0x59A != 0) {
+        self->field_0x59A--;
+    }
+    if (self->talk_wait_0x668 != 0) {
+        self->talk_wait_0x668--;
+    }
+    if (self->hold_timer_0x66A > 0) {
+        self->hold_timer_0x66A--;
+    }
+    if (self->field_0x470 > 0) {
+        self->field_0x470--;
+    }
+    if (self->field_0x460 > 0) {
+        self->field_0x460--;
+    }
+    if (pl_mode8_alive_ck(self) == 1 && --self->guard_timer_0x36E <= 0) {
+        self->guard_timer_0x36E = 150;
+        pl_act_add_charge(self, 5);
+    }
+    latch = self->field_0x5C4;
+    count = latch & 0xF;
+    if (count != 0 && self->field_0x00A == 12) {
+        self->field_0x5C4 = (u8)(count - 1) | (u8)(latch & 0xF0);
+    } else if (self->field_0x00A != 0 ||
+               ((u32)(self->act_no - 49) > 3 && (u32)(self->act_no - 97) > 2 &&
+                (self->act_no < (s16)44 || self->act_no > (s16)45))) {
+        carry = pl_carry_item_get(self);
+        if ((u16)carry != 0xFFFF) {
+            if (Pl_master_ck(self) == 1 && Pl_motion_input_ck(1) == 0) {
+                pl_model_state_set(self, 2, 18, (u16)carry);
+            }
+            pl_equip_slot_count_get(self, (u16)carry);
+        }
+    }
+    if (fn_80278578(self, 1) == 1 || Pl_act_state_ck(self) == 1) {
+        if (Pl_dm_condition_ck(self, 12) == 1) {
+            if (Pl_act_state_ck(self) == 1) {
+                if (self->field_0x412 > 1) {
+                    self->field_0x412--;
+                }
+                pl_sub_gauge_add(self, 4);
+            } else {
+                pl_sub_gauge_add(self, 1);
+            }
+        } else {
+            pl_sub_gauge_add(self, 4);
+        }
+    }
+    if (self->field_0x412 > 0 && --self->field_0x412 == 0 && Pl_motion_input_ck(1) == 0) {
+        pl_model_state_set(self, 1, 24, 0);
+    }
+    if (self->kind_0x09 == 3 && self->field_0x00A != 8) {
+        if (Pl_suimen_ck(self) == 0) {
+            if (self->field_0x382 >= 90) {
+                period = 128;
+                if (Pl_Skill_ck(self, 193) == 1) {
+                    period = 256;
+                } else if (Pl_Skill_ck(self, 194) == 1) {
+                    period = 103;
+                }
+                if ((s32)self->frame_0x020 % period == 0) {
+                    pl_act_add_stagger(self, -1);
+                    if (self->field_0x37E == 25) {
+                        eft013_set(self, 3);
+                    }
+                }
+            } else {
+                self->field_0x382++;
+            }
+        }
+        if (fn_80276800(self, 0) == 1) {
+            self->field_0x3DC |= 0x100000;
+            if ((self->frame_0x020 & 0xF) == 0) {
+                pl_act_gauge_step_unlatched(self, -1, NULL);
+            }
+        }
+    } else if (self->field_0x00A != 8) {
+        pl_act_add_stagger(self, 150);
+    }
+    if (self->field_0x44A > 0 && --self->field_0x44A == 0) {
+        self->field_0x449 = 0;
+    }
+    if (self->field_0x44E > 0 && --self->field_0x44E == 0) {
+        self->buff_b_level_0x44D = 0;
+    }
+    if ((s16)self->field_0x406 > 0 && (s16)--self->field_0x406 <= 0) {
+        self->field_0x3DC &= ~0xC;
+    }
+    if ((s16)self->field_0x408 > 0 && (s16)--self->field_0x408 <= 0) {
+        self->field_0x3DC &= ~0x30;
+    }
+    if ((s16)self->field_0x40A > 0 && (s16)--self->field_0x40A <= 0) {
+        self->field_0x3DC &= ~0xC0;
+    }
+    if ((s16)self->field_0x40C > 0 && (s16)--self->field_0x40C <= 0) {
+        self->field_0x3DC &= ~0x300;
+    }
+    if (self->field_0x418 > 0) {
+        self->field_0x418--;
+    }
+    if (self->field_0x41E > 0) {
+        self->field_0x41E--;
+    }
+    if (self->field_0x454 > 0 && --self->field_0x454 <= 0) {
+        self->field_0x454 = 0;
+        self->field_0x450 = 0;
+    }
+    if (self->field_0x456 > 0 && --self->field_0x456 <= 0) {
+        self->field_0x456 = 0;
+        self->field_0x451 = 0;
+    }
+    if (self->field_0x458 > 0 && --self->field_0x458 <= 0) {
+        self->field_0x458 = 0;
+        self->field_0x452 = 0;
+    }
+    if (self->field_0x002 == 7) {
+        if (self->daze_timer_0x468 == 0 && self->field_0x384 > 0 && (s32)self->frame_0x020 % 10 == 0) {
+            self->field_0x384--;
+        }
+        if ((u8)pl_stagger_level_get(self) >= 3 && self->buff_timer_0x46A > 0 && --self->buff_timer_0x46A <= 0) {
+            self->field_0x386 = 0;
+        }
+    }
+    if (self->field_0x45E > 0 && --self->field_0x45E == 0 && Pl_master_ck(self) == 1 &&
+        Pl_motion_input_ck(1) == 0) {
+        pl_model_state_set(self, 1, 31, 0);
+    }
+    if (self->field_0x464 != 0) {
+        if (pl_act_kind_get(self->area_0x16) == 3) {
+            if (self->frame_0x020 & 1) {
+                self->field_0x464 -= (s16)2;
+            } else {
+                self->field_0x464--;
+            }
+            if (self->field_0x464 < 0) {
+                self->field_0x464 = 0;
+            }
+        } else {
+            self->field_0x464--;
+        }
+        if (self->field_0x464 == 0 && Pl_master_ck(self) == 1 && Pl_motion_input_ck(1) == 0) {
+            pl_model_state_set(self, 1, 35, 0);
+        }
+    }
+    if (self->field_0x466 != 0) {
+        if (pl_act_kind_get(self->area_0x16) == 4) {
+            if (self->frame_0x020 & 1) {
+                self->field_0x466 -= (s16)2;
+            } else {
+                self->field_0x466--;
+            }
+            if (self->field_0x466 < 0) {
+                self->field_0x466 = 0;
+            }
+        } else {
+            self->field_0x466--;
+        }
+        if (self->field_0x466 == 0 && Pl_master_ck(self) == 1 && Pl_motion_input_ck(1) == 0) {
+            pl_model_state_set(self, 1, 36, 0);
+        }
+    }
+    if ((s16)self->field_0x410 != 0) {
+        self->field_0x410--;
+    }
+    if ((s16)self->status_timer_0x42E[0] > 0) {
+        self->status_timer_0x42E[0]--;
+    }
+    if (self->field_0x438 > 0) {
+        self->field_0x438--;
+    }
+    if ((s16)self->field_0x430 > 0) {
+        self->field_0x430--;
+    }
+    if (self->field_0x43A > 0) {
+        self->field_0x43A--;
+    }
+    if ((s16)self->field_0x432 > 0) {
+        self->field_0x432--;
+    }
+    if (self->field_0x43C > 0) {
+        self->field_0x43C--;
+    }
+    if ((s16)self->field_0x434 > 0) {
+        self->field_0x434--;
+    }
+    if (self->field_0x43E > 0) {
+        self->field_0x43E--;
+    }
+    if ((s16)self->field_0x436 > 0) {
+        self->field_0x436--;
+    }
+    if (self->field_0x440 > 0) {
+        self->field_0x440--;
+    }
+    if ((s16)self->field_0x422 > 0) {
+        self->field_0x422--;
+    }
+    pl_area_stamina_drain_step(self);
+    if ((u8)(self->field_0x00A + 250) > 2) {
+        do {
+            if (self->field_0x464 == 0) {
+                switch (pl_act_kind_get(self->area_0x16)) {
+                case 1:
+                    if (Pl_Skill_ck(self, 124) == 0 && Pl_Skill_ck(self, 125) == 0) {
+                        continue;
+                    }
+                    break;
+                case 3:
+                    if (Pl_Skill_ck(self, 125) == 0) {
+                        continue;
+                    }
+                    break;
+                }
+            }
+            if ((u32)fn_80260A58(self) != 1) {
+                continue;
+            }
+            period = 60;
+            if (Pl_Skill_ck(self, 17) == 1) {
+                period = 30;
+            }
+            if (Pl_Skill_ck(self, 18) == 1) {
+                period = 15;
+            }
+            if (Pl_Skill_ck(self, 19) == 1) {
+                period = 120;
+            }
+            if (Pl_Skill_ck(self, 20) == 1) {
+                period = 240;
+            }
+            step = 1;
+            if (self->field_0x45E != 0) {
+                step = 2;
+            }
+            if ((s32)self->frame_0x020 % period == 0 && self->field_0x376 > self->health) {
+                diff = self->field_0x376 - self->health;
+                if (diff >= step) {
+                    pl_act_add_hold_gauge(self, step);
+                } else {
+                    pl_act_add_hold_gauge(self, diff);
+                }
+            }
+        } while (0);
+        if (self->field_0x400 > 0) {
+            self->field_0x400--;
+        }
+        if (self->field_0x400 <= 0) {
+            self->field_0x400 = 0;
+            if (self->field_0x3FC > 0) {
+                self->field_0x3FC--;
+            }
+        }
+    }
+}
+
+/* 0x80261770 (0xA40): picks the act the item in pouch slot `slot` enters - its kind, act number and argument, and the
+ * aim word or gathering point some items hand back; returns whether the item can be used here. */
+s32 pl_item_use_act_pick(_PLW* self, u8* kind, u16* act, u16* arg, s32* word, u16 slot, u16* point) {
+    VEC3 pos;
+    _CP_VECTOR rot;
+    s32 near_id;
+    s32 near_word;
+    s16 hit_kind;
+    s32 want;
+
+    VEC3_ctor(&pos);
+    *kind = 0xFF;
+    *act = 0xFF;
+    self->field_0x309 |= 1;
+    if (slot & 0x80) {
+        return 0;
+    }
+    if (pl_item_now_usable_ck(self, self->slot_id[slot].item_id) == 0) {
+        *kind = 0xFF;
+        *act = 0xFF;
+        return 0;
+    }
+    switch (self->slot_id[slot].item_id) {
+    case 361:
+        *kind = 0;
+        *act = 135;
+        break;
+    case 362:
+    case 363:
+    case 364:
+    case 365:
+        *kind = 0;
+        *act = 137;
+        break;
+    case 347:
+        if (self->field_0x00A == 7) {
+            *kind = 7;
+            *act = 5;
+            *arg = 0;
+            break;
+        }
+    case 5:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 11:
+    case 12:
+    case 33:
+    case 50:
+    case 96:
+    case 97:
+        *kind = 0;
+        if (self->kind_0x09 != 3) {
+            *act = 17;
+        } else {
+            *act = 108;
+            *arg = 140;
+        }
+        break;
+    case 366:
+        *kind = 0;
+        if (self->kind_0x09 != 3) {
+            *act = 19;
+        } else {
+            *act = 110;
+            *arg = 12;
+        }
+        break;
+    case 345:
+    case 346:
+        *kind = 0;
+        if (self->kind_0x09 != 3) {
+            *act = 18;
+        } else {
+            *act = 109;
+            *arg = 140;
+        }
+        break;
+    case 1:
+    case 264:
+    case 567:
+    case 600:
+    case 601:
+        if ((u32)pl_item_use_free_ck(self) == 1) {
+            *arg = 12;
+            switch (self->kind_0x09) {
+            case 0:
+                *kind = 0;
+                *act = 40;
+                break;
+            case 1:
+                *kind = 0;
+                *act = 155;
+                break;
+            case 3:
+                *kind = 0;
+                *act = 152;
+                if ((u32)(self->slot_id[slot].item_id - 600) <= 1) {
+                    *arg |= 0x80;
+                }
+                break;
+            }
+        }
+        break;
+    case 29:
+    case 30:
+    case 31:
+    case 32:
+        if ((u32)pl_stance_low_ck(self) == 1) {
+            switch (self->kind_0x09) {
+            case 0:
+                *kind = 0;
+                *act = 40;
+                break;
+            case 1:
+                *kind = 0;
+                *act = 155;
+                break;
+            }
+        }
+        break;
+    case 383:
+        if (self->field_0x585 != 0) {
+            *kind = 0;
+            *act = 59;
+        }
+        break;
+    case 2:
+    case 52:
+    case 582:
+        if ((u32)pl_motion_interruptible_ck(self) == 1) {
+            *kind = 0;
+            if (self->kind_0x09 != 3) {
+                *act = 59;
+            } else {
+                *act = 79;
+            }
+        }
+        break;
+    case 43:
+        if (self->kind_0x09 != 3) {
+            *kind = 10;
+            *act = 1;
+        }
+        break;
+    case 48:
+    case 98:
+    case 207:
+        if (pl_item_page2_ck(self) == 0) {
+            *kind = 0;
+            if (self->kind_0x09 != 3) {
+                *act = 61;
+            } else {
+                *act = 72;
+            }
+        }
+        break;
+    case 3:
+        if ((u32)pl_spot_use_a_ck(self) == 1 && self->kind_0x09 != 3) {
+            *kind = 0;
+            *act = 47;
+        }
+        break;
+    case 4:
+    case 49:
+        if ((u32)pl_spot_use_b_ck(self) == 1) {
+            if (self->kind_0x09 != 3) {
+                *kind = 0;
+                *act = 47;
+            } else {
+                *kind = 0;
+                *act = 125;
+            }
+        }
+        break;
+    case 6:
+    case 13:
+    case 14:
+    case 15:
+    case 16:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
+    case 21:
+    case 22:
+    case 23:
+    case 24:
+    case 25:
+    case 44:
+    case 45:
+    case 46:
+    case 51:
+    case 116:
+    case 123:
+    case 124:
+    case 134:
+    case 135:
+    case 138:
+    case 145:
+    case 273:
+    case 331:
+    case 332:
+    case 334:
+    case 344:
+    case 360:
+    case 368:
+    case 374:
+    case 377:
+    case 378:
+    case 391:
+    case 392:
+    case 393:
+    case 394:
+    case 398:
+    case 399:
+        *kind = 0;
+        if (self->kind_0x09 != 3) {
+            *act = 53;
+        } else {
+            *act = 55;
+        }
+        break;
+    case 375:
+        *kind = 0;
+        if (self->kind_0x09 != 3) {
+            *act = 57;
+        } else {
+            *act = 58;
+        }
+        break;
+    case 26:
+    case 27:
+    case 28:
+    case 166:
+    case 167:
+    case 208:
+    case 214:
+        *kind = 0;
+        if (self->kind_0x09 != 3) {
+            *act = 54;
+        } else {
+            *act = 56;
+        }
+        break;
+    case 40:
+    case 47:
+    case 265:
+        if (Pl_item_timer_get(self, 29) > 0 && self->kind_0x09 != 3) {
+            *kind = 0;
+            *act = 34;
+        }
+        break;
+    case 438:
+        if (Pl_item_timer_get(self, 29) > 0 && (u32)ai_npc_player_near_ck(4, pl_float_1000) == 1 &&
+            self->kind_0x09 != 3) {
+            *kind = 0;
+            *act = 176;
+        }
+        break;
+    case 34:
+    case 35:
+    case 36:
+        if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &hit_kind, &pos, &rot,
+                                    (s32*)&self->field_0x474) != 0xFFFF &&
+            hit_kind == 3) {
+            *word = (u16)calcVecAng2(&self->vec_0x03C, &pos);
+            *kind = 0;
+            self->field_0x478 = hit_kind;
+            if (self->kind_0x09 != 3) {
+                *act = 49;
+            } else {
+                *act = 99;
+            }
+        }
+        break;
+    case 37:
+    case 38:
+    case 39:
+        if (self->kind_0x09 != 3 &&
+            em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &hit_kind, &pos, &rot,
+                                    (s32*)&self->field_0x474) != 0xFFFF &&
+            hit_kind == 4) {
+            *kind = 0;
+            *act = 50;
+            self->field_0x478 = hit_kind;
+        }
+        break;
+    case 202:
+    case 203:
+    case 204:
+    case 205:
+    case 206:
+    case 351:
+    case 353:
+    case 355:
+    case 389:
+    case 390:
+        if (self->kind_0x09 != 3 &&
+            em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &hit_kind, &pos, &rot,
+                                    (s32*)&self->field_0x474) != 0xFFFF &&
+            hit_kind == 5) {
+            *kind = 0;
+            *act = 63;
+            *word = rot.y;
+            self->field_0x478 = hit_kind;
+        }
+        break;
+    case 95:
+        if ((u32)pl_act_true_ck(self) == 1) {
+            *kind = 0;
+            if (self->kind_0x09 == 3) {
+                *act = 71;
+            } else if (self->kind_0x09 == 1) {
+                *act = 69;
+            } else {
+                *act = 68;
+            }
+        }
+        break;
+    case 194:
+    case 388:
+        if (self->kind_0x09 == 3) {
+            *kind = 0;
+            *act = 93;
+            *arg = 140;
+        }
+        break;
+    case 380:
+    case 384:
+        want = 1;
+        if (want == pl_stg_weapon_near_find(self, &pos, &near_id, &near_word)) {
+            *word = near_id;
+            self->target_pos_0x090 = pos;
+            pl_pos_blend_start(self, 20);
+            if (self->kind_0x09 == 3) {
+                *kind = 0;
+                *act = 172;
+                *arg = 12;
+                *point = near_word;
+            } else {
+                *kind = 0;
+                *act = 169;
+                *arg = 12;
+                *point = near_word;
+            }
+        }
+        break;
+    case 583:
+        want = 5;
+        if (want == pl_stg_weapon_near_find(self, &pos, &near_id, &near_word)) {
+            *word = near_id;
+            self->target_pos_0x090 = pos;
+            pl_pos_blend_start(self, 20);
+            if (self->kind_0x09 == 3) {
+                *kind = 0;
+                *act = 172;
+                *arg = 12;
+                *point = near_word;
+            } else {
+                *kind = 0;
+                *act = 169;
+                *arg = 12;
+                *point = near_word;
+            }
+        }
+        break;
+    case 352:
+    case 367:
+    case 376:
+    case 379:
+    default:
+        *kind = 0xFF;
+        *act = 0xFF;
+        break;
+    }
+    return *kind != 0xFF;
+}
+
+/* 0x802621B0 (0x4D8): tests the input condition a step-table row names (its `+0x06` low bits) against the actor's
+ * request words, part flags, attack levels and stick windows. */
+u32 pl_scan_row_input_ck(_PLW* self, PlScanEntry* row) {
+    switch (row->flags_0x06 & 0x3FFF) {
+    case 0:
+        return 1;
+    case 31:
+        return 0;
+    case 1:
+        if (pl_stick_window_gated_ck(self, 1, row->cond_a_0x08, row->cond_b_0x0A) == 1) {
+            return 1;
+        }
+        break;
+    case 19:
+        if (pl_stick_window_gated_ck(self, 1, row->cond_a_0x08, row->cond_b_0x0A) == 1 &&
+            (self->field_0x0C8 & row->cond_c_0x0C) != 0) {
+            return 1;
+        }
+        break;
+    case 2:
+        if (pl_stick_window_gated_ck(self, 0, row->cond_a_0x08, row->cond_b_0x0A) == 1) {
+            return 1;
+        }
+        break;
+    case 3:
+        if ((self->req_bits_b_0x0BC & row->cond_a_0x08) != 0) {
+            return 1;
+        }
+        break;
+    case 18:
+        if ((self->field_0x0B8 & row->cond_a_0x08) != 0) {
+            return 1;
+        }
+        break;
+    case 4:
+        if (pl_act_param_tier_ck(self, 0) >= 1 && (self->req_bits_b_0x0BC & row->cond_a_0x08) != 0) {
+            return 1;
+        }
+        break;
+    case 5:
+        if ((self->field_0x0CC & row->cond_a_0x08) != 0) {
+            return 1;
+        }
+        break;
+    case 6:
+        if (pl_act_param_tier_ck(self, 0) == 0 && (self->req_bits_b_0x0BC & row->cond_a_0x08) != 0) {
+            return 1;
+        }
+        break;
+    case 7:
+        if (pl_act_param_tier_ck(self, 0) >= 1 && (self->field_0x0B8 & row->cond_a_0x08) != 0) {
+            return 1;
+        }
+        break;
+    case 8:
+        if (pl_act_param_tier_ck(self, 0) >= 1) {
+            return 1;
+        }
+        break;
+    case 9:
+        if (pl_act_param_tier_ck(self, 0) >= 3) {
+            return 1;
+        }
+        break;
+    case 20:
+        if (pl_act_param_tier_ck(self, 1) >= 1) {
+            return 1;
+        }
+        break;
+    case 21:
+        if (pl_act_param_tier_ck(self, 1) >= 3) {
+            return 1;
+        }
+        break;
+    case 10:
+        if ((self->field_0x0B8 & row->cond_a_0x08) != 0 && (self->req_bits_b_0x0BC & row->cond_b_0x0A) != 0) {
+            return 1;
+        }
+        break;
+    case 11:
+        if (pl_stick_window_level_ck(self, 0, row->cond_a_0x08, row->cond_b_0x0A) == 1 &&
+            (self->req_bits_b_0x0BC & row->cond_c_0x0C) != 0) {
+            return 1;
+        }
+        break;
+    case 12:
+        if (pl_act_param_tier_ck(self, 0) == 0) {
+            return 1;
+        }
+        break;
+    case 13:
+        if (pl_act_param_tier_ck(self, 1) == 0) {
+            return 1;
+        }
+        break;
+    case 14:
+        if (pl_stick_window_level_ck(self, 1, row->cond_a_0x08, row->cond_b_0x0A) == 1) {
+            return 1;
+        }
+        break;
+    case 15:
+        if (pl_stick_window_level_ck(self, 0, row->cond_a_0x08, row->cond_b_0x0A) == 1) {
+            return 1;
+        }
+        break;
+    case 16:
+        if (pl_stick_window_level_ck(self, 1, row->cond_a_0x08, row->cond_b_0x0A) == 0) {
+            return 1;
+        }
+        break;
+    case 17:
+        if (pl_stick_window_level_ck(self, 0, row->cond_a_0x08, row->cond_b_0x0A) == 0) {
+            return 1;
+        }
+        break;
+    case 22:
+        if (pl_part_flag_ck(self, row->cond_a_0x08) == 1) {
+            return 1;
+        }
+        break;
+    case 23:
+        if (pl_act_param_tier_ck(self, 0) >= 1 && pl_part_flag_ck(self, row->cond_a_0x08) == 1) {
+            return 1;
+        }
+        break;
+    case 24:
+        if (pl_act_param_tier_ck(self, 0) >= 1 && pl_part_flag_ck(self, row->cond_a_0x08) == 0) {
+            return 1;
+        }
+        break;
+    case 25:
+        if ((u32)pl_part_flag2_ck(self, row->cond_a_0x08) == 1) {
+            return 1;
+        }
+        break;
+    case 26:
+        if ((u32)pl_part_flag2_ck(self, row->cond_a_0x08) == 1 && pl_stick_dir_ck(self, row->cond_c_0x0C) == 1) {
+            return 1;
+        }
+        break;
+    case 29:
+        if (pl_act_param_tier_ck(self, 0) >= 1 && (u32)pl_part_flag2_ck(self, row->cond_a_0x08) == 1) {
+            return 1;
+        }
+        break;
+    case 27:
+        if (pl_part_flag_ck(self, row->cond_a_0x08) == 1 &&
+            pl_stick_window_level_ck(self, 0, row->cond_b_0x0A, row->cond_c_0x0C) == 1) {
+            return 1;
+        }
+        break;
+    case 30:
+        if (pl_part_flag_ck(self, row->cond_a_0x08) == 1 &&
+            pl_stick_window_ck(self, 0, row->cond_b_0x0A, row->cond_c_0x0C) == 1) {
+            return 1;
+        }
+        break;
+    case 28:
+        if (pl_part_flag_ck(self, row->cond_a_0x08) == 1 && pl_act_param_tier_ck(self, 0) == 0) {
+            return 1;
+        }
+        break;
+    }
+    return 0;
+}
+
 /* 0x80262688 - adopts the nearest live player work as the actor's held item when the item-data kind
  * allows it, and reports whether one was adopted. */
 s32 fn_80262688(_PLW* self) {
@@ -13770,6 +14750,1011 @@ s32 fn_80262688(_PLW* self) {
     return 0;
 }
 
+/* 0x80262940 (0x1934): walks the actor's step table and enters the act of the first row whose frame window, input
+ * condition and row gate hold; returns 1 once a row fired. */
+#pragma optimization_level 4
+s32 pl_scan_act_select(_PLW* self) {
+    VEC3 pos;
+    _CP_VECTOR rot;
+    f32 probe;
+    s32 aim;
+    s32 near_word;
+    s32 near_id;
+    u16 pair[2];
+    u16 act;
+    u16 arg;
+    u16 point;
+    s16 hit_kind;
+    u8 kind;
+    SysQuestMove* quest;
+    PlScanEntry* row;
+    u16* remap;
+    s32 shell;
+    u8* fired;
+    s32 j;
+    s32 at_end;
+    s32 no_act;
+    s32 i;
+    u16 slot_item;
+    u16 slot;
+    f32 end;
+    f32 start;
+    f32 stop;
+    f32 lead;
+
+    VEC3_ctor(&pos);
+    quest = (SysQuestMove*)get_move_work_adrs(0);
+    if (self->field_0x318 == 0) {
+        return 0;
+    }
+    if (self->field_0x313 > 0) {
+        return 0;
+    }
+    if (Pl_master_ck(self) == 0) {
+        return 0;
+    }
+    row = (PlScanEntry*)self->field_0x318;
+    end = pl_rig_get_float_a4(self);
+    aim = self->field_0x0A8;
+    for (i = 0; row->id_0x00 != 0xFF; i++, row++) {
+        if (i >= 48) {
+            break;
+        }
+        at_end = 0;
+        point = 0;
+        if (self->window_start_0x31C != 0) {
+            start = self->window_start_0x31C;
+        } else if (row->frame_start_0x10 >= 999) {
+            if (pl_model_blend_positive_ck(self) == 1) {
+                start = end;
+            } else {
+                start = end - pl_frame_window_1;
+            }
+            at_end = 1;
+        } else if (row->frame_start_0x10 < 0) {
+            start = end + row->frame_start_0x10;
+        } else {
+            start = row->frame_start_0x10;
+        }
+        if (self->window_end_0x320 != 0) {
+            stop = self->window_end_0x320;
+            if (stop > end) {
+                stop = end;
+            }
+        } else if (row->frame_end_0x12 >= 999) {
+            if (pl_model_blend_positive_ck(self) == 0) {
+                stop = end - pl_frame_window_1;
+            } else {
+                stop = end;
+            }
+        } else if (row->frame_end_0x12 < 0) {
+            stop = end + row->frame_end_0x12;
+        } else {
+            stop = row->frame_end_0x12;
+        }
+        if (self->window_lead_0x31E != 0) {
+            lead = self->window_lead_0x31E;
+        } else {
+            lead = row->frame_lead_0x14;
+        }
+        if (lead < pl_frame_window_999) {
+            if (stop < pl_frame_window_1) {
+                if (at_end == 0 || Pl_motion_end_ck(self) != 1) {
+                    if (Pl_frame_check(self, 6, start - lead, stop) == 0) {
+                        continue;
+                    }
+                }
+            } else if (Pl_frame_check(self, 7, start - lead, stop) == 0) {
+                continue;
+            }
+        }
+        no_act = 0;
+        slot_item = 0xFFFF;
+        if (Pl_master_ck(self) == 1) {
+            if (lead < pl_frame_window_1) {
+                self->field_0x322[i] = 0;
+            }
+            if (pl_scan_row_input_ck(self, row) == 1) {
+                self->field_0x322[i] = 1;
+            }
+        }
+        fired = &self->field_0x322[i];
+        if (*fired == 0) {
+            continue;
+        }
+        if (row->flags_0x06 & 0x8000) {
+            if ((row->flags_0x0E & 0x8000) &&
+                ((u32)fn_80264EA4(self) == 1 || (u32)fn_80264EC0(self) == 1 || (u32)fn_80264ED4(self) == 1)) {
+                *fired = 0;
+                continue;
+            }
+            if ((row->flags_0x06 & 0x8000) && (row->flags_0x0E & 0x4000) && (s8)self->field_0x314 > 0) {
+                *fired = 0;
+                continue;
+            }
+            switch (row->flags_0x0E & 0xFFF) {
+            default:
+                *fired = 0;
+                continue;
+            case 1:
+                if (pl_stagger_budget_ck(self, 150) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 22:
+                if (Pl_suimen_ck(self) == 1) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 23:
+                if (pl_stagger_budget_ck(self, 150) == 0 || Pl_suimen_ck(self) == 1) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 2:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (Pl_act_ck(self, row->id_0x00, row->key_0x02) == 1) {
+                    no_act = 1;
+                }
+                break;
+            case 8:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (self->field_0x00A == 1) {
+                    switch (self->act_no) {
+                    case 24:
+                    case 25:
+                    case 1:
+                    case 5:
+                    case 15:
+                    case 39:
+                    case 3:
+                        no_act = 1;
+                        break;
+                    }
+                }
+                if (self->field_0x00A == 12 && self->act_no == (s16)1) {
+                    no_act = 1;
+                }
+                break;
+            case 9:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                switch (self->field_0x00A) {
+                case 1:
+                    switch (self->act_no) {
+                    case 14:
+                    case 15:
+                    case 16:
+                    case 17:
+                    case 2:
+                    case 3:
+                    case 39:
+                    case 35:
+                    case 27:
+                        no_act = 1;
+                        break;
+                    }
+                    break;
+                case 12:
+                    if (self->act_no == (s16)2) {
+                        no_act = 1;
+                    }
+                    break;
+                }
+                break;
+            case 28:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (self->field_0x00A == 1) {
+                    switch (self->act_no) {
+                    case 6:
+                    case 7:
+                    case 9:
+                    case 27:
+                    case 29:
+                    case 33:
+                    case 34:
+                    case 36:
+                        no_act = 1;
+                        break;
+                    }
+                }
+                if (pl_alt_form_free_ck(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 27:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (self->field_0x00A == 1) {
+                    switch (self->act_no) {
+                    case 33:
+                    case 34:
+                    case 6:
+                    case 7:
+                    case 9:
+                    case 27:
+                    case 36:
+                        no_act = 1;
+                        break;
+                    }
+                }
+                break;
+            case 11:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (self->field_0x00A == 1) {
+                    switch (self->act_no) {
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 5:
+                    case 10:
+                    case 11:
+                    case 13:
+                    case 14:
+                    case 15:
+                    case 16:
+                    case 17:
+                    case 37:
+                    case 39:
+                        no_act = 1;
+                        break;
+                    }
+                }
+                break;
+            case 31:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (self->field_0x00A == 1) {
+                    switch (self->act_no) {
+                    case 6:
+                    case 7:
+                    case 9:
+                    case 27:
+                    case 29:
+                    case 33:
+                    case 34:
+                    case 36:
+                        no_act = 1;
+                        break;
+                    }
+                }
+                break;
+            case 3:
+            case 24:
+                if (pl_status_bit_ck((_ENEMY_WORK*)self, 0x180) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                if (row->flags_0x0E == 24 && pl_item_page2_ck(self) != 0 && pl_reload_needed_ck(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 37:
+                if (pl_status_bit_ck((_ENEMY_WORK*)self, 0x180) != 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 4:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (pl_stagger_budget_ck(self, 150) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                if (Pl_act_ck(self, row->id_0x00, row->key_0x02) == 1) {
+                    no_act = 1;
+                }
+                break;
+            case 5:
+                if (pl_ground_probe_ahead(self, (VEC3*)&probe, pl_frame_window_60, pl_frame_window_120) == 0) {
+                    continue;
+                }
+                break;
+            case 6:
+                if (pl_ground_probe_ahead(self, (VEC3*)&probe, pl_frame_window_180, pl_frame_window_30) == 0) {
+                    continue;
+                }
+                break;
+            case 7:
+                if (pl_ground_probe_ahead(self, (VEC3*)&probe, pl_frame_window_210, pl_frame_window_90) == 0) {
+                    continue;
+                }
+                break;
+            case 10:
+                if (self->field_0x369 != 1) {
+                    continue;
+                }
+                break;
+            case 12:
+                if (pl_call_answer_ck(self) == 0) {
+                    continue;
+                }
+                break;
+            case 13:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (pl_stagger_budget_ck(self, 150) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                if (self->field_0x00A == 1) {
+                    if ((u32)(self->act_no - 16) <= 1) {
+                        break;
+                    }
+                    *fired = 0;
+                    continue;
+                }
+                *fired = 0;
+                continue;
+            case 14:
+            case 26:
+                if (self->field_0x269 == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 15:
+                if (self->field_0x269 != 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 16:
+                if (pl_item_page2_ck(self) != 0 && pl_reload_needed_ck(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 17:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (Pl_act_ck(self, row->id_0x00, row->key_0x02) == 1) {
+                    no_act = 1;
+                }
+                if (pl_alt_form_free_ck(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 18:
+                if (fn_80264EA4(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 42:
+                if (fn_80264EC0(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 43:
+                if (fn_80264ED4(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 25:
+                if ((u16)pl_carry_item_get(self) != 0xFFFF) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 29:
+                *fired = 0;
+                continue;
+            case 30:
+                if (Pl_item_timer_get(self, 43) <= 0) {
+                    *fired = 0;
+                    continue;
+                }
+                if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &hit_kind, &pos, &rot,
+                                            (s32*)&self->field_0x474) != 0xFFFF) {
+                    if (hit_kind != 17) {
+                        *fired = 0;
+                        continue;
+                    }
+                    self->field_0x47A = em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C,
+                                                                &hit_kind, &pos, &rot, NULL);
+                    self->field_0x478 = hit_kind;
+                    break;
+                }
+                *fired = 0;
+                continue;
+            case 32:
+                if (pl_daze_level_ck(self, 15) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 33:
+                if (pl_daze_level_ck(self, 20) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 34:
+                if (pl_daze_level_ck(self, 25) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 35:
+                if (pl_daze_level_ck(self, 10) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 36:
+                if (pl_camera_close_ck(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 38:
+                if (pl_item_menu_open_ck(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 39:
+                if (self->field_0x654 == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 40:
+                if (fn_80262688(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                return 1;
+            case 55:
+                if (ai_npc_hand_reach_ck() == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 44:
+                if (pl_health_out_ck(self) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 45:
+                if ((u32)pl_health_out_ck(self) == 1) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 46:
+                self->field_0x5C9 = 1;
+                if (self->field_0x5C8 == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 47:
+                if (Pl_motion_input_ck(1) == 0 || self->field_0x077 != 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 48:
+                if (pl_camera_close_ck(self) == 1) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 49:
+                if (fn_8027D8A0(self, 0) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 50:
+                if (fn_8027D8A0(self, 1) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 51:
+                if (pl_item_menu_open_ck(self) == 0 || Pl_item_timer_get(self, 43) > 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 52:
+                if ((u16)pl_carry_item_get(self) != 381 || pl_stg_weapon_near_find(self, &pos, &near_id, &near_word) != 3) {
+                    *fired = 0;
+                    continue;
+                }
+                point = near_word;
+                break;
+            case 56:
+                if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &hit_kind, &pos, &rot,
+                                            (s32*)&self->field_0x474) != 0xFFFF &&
+                    Pl_motion_input_ck(0) == 0 && hit_kind == 10 && Pl_motion_input_ck(0) != 1 && quest != NULL &&
+                    quest->quest_0x0DC != NULL) {
+                    for (j = 0; j < 3; j++) {
+                        em_work_slot_pair_get(j, (s16*)pair);
+                        if (pair[0] != 0 && quest_element_supply_state_get((s16)j) == 2 &&
+                            pair[0] == (u16)pl_carry_item_get(self)) {
+                            quest_element_item_use(self, pair[0], 1);
+                        }
+                    }
+                    if ((u16)pl_carry_item_get(self) == 0xFFFF) {
+                        break;
+                    }
+                }
+                *fired = 0;
+                continue;
+            case 53:
+                if (pl_gauge_level_get(self) <= 1) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 54:
+                if (quest_move_sub_flag_get() == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 57:
+                if (self->field_0x565 != 0) {
+                    *fired = 0;
+                    continue;
+                }
+                switch (pl_hit_result_best_get(self)) {
+                case 0:
+                case 1:
+                case 5:
+                    break;
+                default:
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 0:
+                break;
+            }
+        }
+        if (*fired == 0) {
+            continue;
+        }
+        if (row->id_0x00 & 0x80) {
+            switch (row->key_0x02) {
+            case 255:
+                arg = row->arg_0x04;
+                point = 0xFFFF;
+                if (pl_item_use_act_pick(self, &kind, &act, &arg, &aim, self->field_0x304, &point) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                slot_item = self->slot_id[self->field_0x304].item_id;
+                if (point != 0xFFFF) {
+                    arg |= 0x20;
+                }
+                self->field_0x309 |= 0x20;
+                break;
+            case 246:
+                switch (pl_stg_weapon_near_find(self, &pos, &near_id, &near_word)) {
+                case 0:
+                case 1:
+                case 3:
+                case 5:
+                    *fired = 0;
+                    continue;
+                case 2:
+                    if ((u32)pl_work_flag0_clear_ck() == 1) {
+                        kind = 0;
+                        act = self->kind_0x09 == 3 ? 178 : 167;
+                        arg = row->arg_0x04;
+                        aim = (u16)calcVecAng2(&self->vec_0x03C, &pos);
+                        break;
+                    }
+                    *fired = 0;
+                    continue;
+                case 4:
+                    if ((u32)pl_work_flag8_clear_ck() == 1) {
+                        kind = 0;
+                        act = 168;
+                        arg = row->arg_0x04;
+                        aim = (u16)calcVecAng2(&self->vec_0x03C, &pos);
+                        break;
+                    }
+                    *fired = 0;
+                    continue;
+                default:
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 254:
+                if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &hit_kind, &pos, &rot,
+                                            (s32*)&self->field_0x474) != 0xFFFF) {
+                self->field_0x478 = hit_kind;
+                switch (hit_kind) {
+                case 0:
+                case 16:
+                    kind = 0;
+                    switch (self->kind_0x09) {
+                    case 1:
+                        act = 45;
+                        break;
+                    case 3:
+                        act = 98;
+                        break;
+                    default:
+                        act = 44;
+                        break;
+                    }
+                    arg = row->arg_0x04;
+                    break;
+                case 7:
+                    if (self->kind_0x09 != 3) {
+                        kind = 0;
+                        act = 127;
+                        arg = row->arg_0x04;
+                        break;
+                    }
+                    *fired = 0;
+                    continue;
+                case 2:
+                    kind = 0;
+                    switch (self->kind_0x09) {
+                    case 1:
+                        act = 52;
+                        break;
+                    case 3:
+                        act = 97;
+                        break;
+                    default:
+                        act = 51;
+                        break;
+                    }
+                    arg = row->arg_0x04;
+                    break;
+                case 8:
+                    if ((u32)(u32)pl_item_menu_open_ck(self) == 1) {
+                        *fired = 0;
+                        continue;
+                    }
+                    kind = 0;
+                    act = 70;
+                    arg = row->arg_0x04;
+                    break;
+                case 6:
+                    if (PlayMode_ck() == 2 || (u32)pl_item_menu_open_ck(self) == 1) {
+                        *fired = 0;
+                        continue;
+                    }
+                    kind = 0;
+                    act = 87;
+                    arg = row->arg_0x04;
+                    break;
+                case 10:
+                    if ((u32)pl_item_menu_open_ck(self) == 1 || Pl_motion_input_ck(0) == 1) {
+                        *fired = 0;
+                        continue;
+                    }
+                    kind = 0;
+                    act = 88;
+                    arg = row->arg_0x04;
+                    break;
+                default:
+                    *fired = 0;
+                    continue;
+                }
+                self->field_0x309 |= 0x20;
+                break;
+                }
+                *fired = 0;
+                continue;
+            case 253:
+                if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &hit_kind, &pos, &rot,
+                                            (s32*)&self->field_0x474) != 0xFFFF) {
+                slot = 0xFFFF;
+                self->field_0x478 = hit_kind;
+                switch (hit_kind) {
+                case 3:
+                    slot = pl_kind_item_equip_find(self, 0);
+                    if (slot == 0xFFFF) {
+                        slot = pl_kind_item_slot_find(self, 0);
+                    }
+                    break;
+                case 4:
+                    slot = pl_kind_item_equip_find(self, 1);
+                    if (slot == 0xFFFF) {
+                        slot = pl_kind_item_slot_find(self, 1);
+                    }
+                    break;
+                case 5:
+                    slot = pl_kind_item_equip_find(self, 2);
+                    if (slot == 0xFFFF) {
+                        slot = pl_kind_item_slot_find(self, 2);
+                    }
+                    break;
+                }
+                if (slot != 0xFFFF && !(slot & 0x80)) {
+                    arg = row->arg_0x04;
+                    if (pl_item_use_act_pick(self, &kind, &act, &arg, &aim, slot, &point) == 0) {
+                        *fired = 0;
+                        continue;
+                    }
+                    slot_item = self->slot_id[slot].item_id;
+                    self->field_0x309 |= 0x20;
+                    break;
+                }
+                *fired = 0;
+                continue;
+                }
+                *fired = 0;
+                continue;
+            case 0:
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+            case 9:
+                remap = pl_scan_kind_remap[row->key_0x02];
+                remap += self->field_0x002 * 3;
+                if (remap[0] == 0 && (remap[1] == 0 || remap[1] == 22)) {
+                    *fired = 0;
+                    continue;
+                }
+                kind = remap[0];
+                act = remap[1];
+                arg = remap[2];
+                switch (self->field_0x002) {
+                case 7:
+                    if (kind == 4) {
+                        switch (act) {
+                        case 20:
+                            if (pl_daze_level_ck(self, 15) == 0) {
+                                act = 21;
+                            }
+                            break;
+                        case 37:
+                            if (pl_daze_level_ck(self, 15) == 0) {
+                                act = 38;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                case 8:
+                    if (kind == 4) {
+                        switch (act) {
+                        case 15:
+                        case 80:
+                            if (pl_gauge_level_get(self) >= 2) {
+                                act = 70;
+                            }
+                            break;
+                        case 60:
+                        case 81:
+                            if (pl_gauge_level_get(self) >= 2) {
+                                act = 71;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+                break;
+            case 252:
+                kind = 4;
+                shell = pl_shell_class_get(self, self->held_item_kind_0x26C);
+                if (self->kind_0x09 == 3) {
+                    act = pl_shell_act_tbl_a[(s16)shell * 2 + 1];
+                } else {
+                    act = pl_shell_act_tbl_a[(s16)shell * 2];
+                }
+                arg = row->arg_0x04;
+                break;
+            case 251:
+                kind = 4;
+                shell = pl_shell_class_get(self, self->held_item_kind_0x26C);
+                if (self->kind_0x09 == 3) {
+                    act = pl_shell_act_tbl_b[(s16)shell * 2 + 1];
+                } else {
+                    act = pl_shell_act_tbl_b[(s16)shell * 2];
+                }
+                arg = row->arg_0x04;
+                break;
+            case 249:
+            case 250:
+                if (self->field_0x5C8 != 0) {
+                    kind = 11;
+                    if (row->key_0x02 == 250) {
+                        act = pl_armed_act_no_get_c1(self, 0);
+                    } else {
+                        act = pl_armed_act_no_get_c1(self, 1);
+                    }
+                    arg = row->arg_0x04;
+                } else {
+                    *fired = 0;
+                }
+                break;
+            case 248:
+            case 247:
+                if (row->key_0x02 == 248) {
+                    probe = pl_float_zero;
+                } else {
+                    probe = pl_frame_window_1;
+                }
+                if (quest == NULL) {
+                    *fired = 0;
+                } else {
+                    kind = 9;
+                    arg = row->arg_0x04;
+                    switch (quest->result_0x0FA) {
+                    case 5:
+                    case 6:
+                        if (pl_float_zero == probe) {
+                            act = 3;
+                        } else {
+                            act = 7;
+                        }
+                        break;
+                    case 4:
+                        if (pl_float_zero == probe) {
+                            act = 2;
+                        } else {
+                            act = 6;
+                        }
+                        break;
+                    case 7:
+                        if (self->field_0x585 == 0) {
+                            if (pl_float_zero == probe) {
+                                act = 4;
+                            } else {
+                                act = 8;
+                            }
+                        } else {
+                            *fired = 0;
+                        }
+                        break;
+                    case 8:
+                        if (pl_float_zero == probe) {
+                            act = 5;
+                        } else {
+                            act = 9;
+                        }
+                        break;
+                    }
+                }
+                break;
+            default:
+                *fired = 0;
+                continue;
+            }
+        } else {
+            kind = row->id_0x00 & 0x7F;
+            act = row->key_0x02;
+            arg = row->arg_0x04;
+        }
+        if (stop < pl_frame_window_1) {
+            if (at_end != 0) {
+                if (*fired == 0 || Pl_motion_end_ck(self) == 0) {
+                    continue;
+                }
+            } else if (*fired == 0 || Pl_frame_check(self, 6, start, stop) == 0) {
+                continue;
+            }
+        } else if (*fired == 0 || Pl_frame_check(self, 7, start, stop) == 0) {
+            continue;
+        }
+        if (no_act == 0) {
+            if (kind == 0 && act == 0) {
+                Pl_act_set_motion_slot(self, 0, 10, 0);
+            } else {
+                if (kind == 1) {
+                    switch (act) {
+                    case 1:
+                    case 2:
+                    case 14:
+                        if (pl_act_param_tier_ck(self, 0) >= 1) {
+                            pl_act_set_cam_ang(self);
+                            if ((u32)((u16)(self->field_0x0A8 + 0x10000 - self->field_0x058) - 0x6000) <= 0x4000) {
+                                kind = 1;
+                                act = 4;
+                                arg = 0;
+                            }
+                        }
+                        break;
+                    case 0:
+                    case 10:
+                    case 11:
+                    case 13:
+                    case 16:
+                    case 17:
+                    case 24:
+                    case 28:
+                    case 29:
+                    case 35:
+                    case 37:
+                    case 39:
+                        if (pl_act_param_tier_ck(self, 0) >= 1) {
+                            pl_act_set_cam_ang(self);
+                        }
+                        break;
+                    case 6:
+                    case 7:
+                        if (pl_act_dash_input_c1(self) == 0 && self->field_0x018 == 0 &&
+                            pl_act_param_tier_ck(self, 0) >= 1) {
+                            pl_act_set_cam_ang(self);
+                            if ((u32)((u16)(self->field_0x0A8 + 0x10000 - self->field_0x058) - 0x6000) <= 0x4000) {
+                                kind = 1;
+                                act = 23;
+                                arg = 0;
+                            }
+                        }
+                        break;
+                    }
+                }
+                if (slot_item != 0xFFFF) {
+                    self->field_0x0A8 = aim;
+                    self->field_0x306 = slot_item;
+                } else if (kind == 0 && (u32)(act - 167) <= 1) {
+                    self->field_0x0A8 = aim;
+                }
+                if (row->flags_0x06 & 0x4000) {
+                    if (pl_act_param_tier_ck(self, 0) >= 1) {
+                        pl_act_set_cam_ang(self);
+                    }
+                } else if (kind == 5) {
+                    switch (act) {
+                    case 0:
+                    case 6:
+                    case 12:
+                        if (pl_act_param_tier_ck(self, 0) >= 1) {
+                            pl_act_set_cam_ang(self);
+                        }
+                        break;
+                    }
+                }
+                if ((kind == 0 && act == 20) || (kind == 0 && act == 158)) {
+                    self->act_handler_entered = 1;
+                }
+                if (arg & 0x20) {
+                    self->field_0x0B6 = point;
+                }
+                pl_act_enter_raw(self, kind, act, arg);
+            }
+        }
+        return 1;
+    }
+    return 0;
+}
+#pragma optimization_level reset
+
 /* 0x80264274 - adds `value` to the actor's hit-stop timer unless the skill overrides it. */
 void fn_80264274(_PLW* self, s16 value) {
     if (Pl_Skill_ck(self, 1) == 0) {
@@ -13778,6 +15763,170 @@ void fn_80264274(_PLW* self, s16 value) {
     }
     self->field_0x3EA = 0;
 }
+
+/* 0x802642D0 (0x670): ticks the master actor's poison, the second damage-over-time timer and the hot/cold area
+ * drain, each stepping the health gauge on its own period. */
+#pragma optimization_level 4
+void pl_condition_tick(_PLW* self) {
+    s16 delta;
+    s32 drain;
+    s16 kind;
+    u8 act_kind;
+
+    if (self->field_0x00A == 8) {
+        return;
+    }
+    self->field_0x389 = 0;
+    if (Pl_master_ck(self) == 1) {
+        if (self->field_0x3EA > 0 && --self->field_0x3EE <= 0) {
+            self->field_0x3EA--;
+            delta = -1;
+            self->field_0x3DC |= 0x100000;
+            if (Pl_Skill_ck(self, 2) == 1) {
+                delta = -2;
+            }
+            self->field_0x3EE = 30;
+            eft013_set(self, 2);
+            if ((u32)pl_act_gauge_step_unlatched(self, delta, NULL) == 1) {
+                return;
+            }
+        }
+        if (self->kind_0x09 == 3) {
+            if (self->field_0x404 > 1) {
+                self->field_0x404 = 1;
+            }
+        } else if ((self->field_0x5A4 & 6) != 0) {
+            switch (self->field_0x00A) {
+            case 0:
+                switch (self->act_no) {
+                case 15:
+                case 16:
+                    switch (self->field_0x002) {
+                    case 3:
+                    case 6:
+                    case 8:
+                        break;
+                    default:
+                        if (self->field_0x404 > 1) {
+                            self->field_0x404 = 1;
+                        }
+                        break;
+                    }
+                    break;
+                case 8:
+                case 9:
+                case 62:
+                case 181:
+                    if (self->field_0x404 > 1) {
+                        self->field_0x404 = 1;
+                    }
+                    break;
+                }
+                break;
+            case 6:
+                if ((u32)(self->act_no - 72) <= 1 && self->field_0x404 > 1) {
+                    self->field_0x404 = 1;
+                }
+                break;
+            }
+        }
+        if (self->field_0x404 > 0) {
+            self->field_0x3DC |= 0x100000;
+            if (pl_act_held_ck_c1(self) == 0) {
+                self->field_0x404--;
+                delta = Pl_dm_condition_ck(self, 2) == 1 ? -4 : -2;
+                if (self->field_0x404 <= 0) {
+                    self->field_0x3DC &= ~3;
+                }
+                if (self->field_0x404 % 90 == 0 && fn_8027E1E4(self) == 0 &&
+                    (u32)pl_act_gauge_step_signed(self, delta, NULL) == 1) {
+                    return;
+                }
+            }
+        }
+    } else if (Pl_condition_ck(self, 1) == 1 && (s32)self->frame_0x020 % 30 == 0) {
+        eft013_set(self, 2);
+    }
+    if (Pl_master_ck(self) == 1) {
+        s32 heat = fn_8027D40C(self);
+
+        if (heat > 0) {
+            self->field_0x3DC |= 0x100000;
+            if ((s32)self->frame_0x020 % 32 == 0 && (u32)pl_act_gauge_step_unlatched(self, -heat, NULL) == 1) {
+                return;
+            }
+        }
+        drain = fn_80260A18(self);
+        if (drain > 0) {
+            self->field_0x3DC |= 0x100000;
+            if ((s32)self->frame_0x020 % 60 == 0 && (u32)pl_act_gauge_step_unlatched(self, -drain, NULL) == 1) {
+                return;
+            }
+        }
+    }
+    if (Pl_master_ck(self) != 1) {
+        return;
+    }
+    kind = pl_act_kind_get(self->area_0x16);
+    if ((kind == 1 || kind == 3) && self->field_0x464 == 0 &&
+        (kind != 1 || (Pl_Skill_ck(self, 124) != 1 && Pl_Skill_ck(self, 125) != 1)) &&
+        (kind != 3 || Pl_Skill_ck(self, 125) != 1)) {
+        self->field_0x3DC |= 0x100000;
+        if (--self->area_drain_timer_0x462 <= 0) {
+            if (kind == 1) {
+                self->area_drain_timer_0x462 = 90;
+                if (Pl_Skill_ck(self, 126) == 1) {
+                    self->area_drain_timer_0x462 = 60;
+                } else if (Pl_Skill_ck(self, 127) == 1) {
+                    self->area_drain_timer_0x462 = 45;
+                }
+            } else {
+                self->area_drain_timer_0x462 = 60;
+                if (Pl_Skill_ck(self, 126) == 1) {
+                    self->area_drain_timer_0x462 = 40;
+                } else if (Pl_Skill_ck(self, 127) == 1) {
+                    self->area_drain_timer_0x462 = 30;
+                } else if (Pl_Skill_ck(self, 124) == 1) {
+                    self->area_drain_timer_0x462 = 180;
+                }
+            }
+            if ((u32)pl_act_gauge_step_unlatched(self, -1, NULL) == 1) {
+                return;
+            }
+        }
+    }
+    if (Pl_Skill_ck(self, 125) == 1) {
+        return;
+    }
+    if ((self->field_0x5A4 & 0x200) != 0) {
+        if (Pl_cat_skill_ck(self, 47) == 0) {
+            self->field_0x3DC |= 0x100000;
+        }
+        act_kind = self->field_0x00A;
+        if (act_kind != 6) {
+            if ((u8)(act_kind + 248) <= 1) {
+                return;
+            }
+            if (self->kind_0x09 != 2 && pl_act_held_ck_c1(self) != 1) {
+                self->field_0x389 = 1;
+                if ((s32)self->frame_0x020 % 8 == 0 && Pl_cat_skill_ck(self, 47) == 0 &&
+                    (u32)pl_act_gauge_step_unlatched(self, -1, NULL) == 1) {
+                    return;
+                }
+                if (self->frame_0x020 % 16 == 0) {
+                    eft004_set_pl2(self, 39, 255, pl_frame_window_1, pl_float_zero, pl_float_zero, 0);
+                }
+            }
+        }
+    } else if ((self->field_0x5A4 & 0x400) != 0 && Pl_Skill_ck(self, 1) == 0) {
+        self->field_0x389 = 1;
+        if (self->field_0x3EA < 10) {
+            self->field_0x3EA = 10;
+        }
+    }
+}
+
+#pragma optimization_level reset
 
 /* 0x80264940 - accumulates a u16 into the two damage counters it feeds. */
 void fn_80264940(_PLW* self, u32 value) {
@@ -14218,10 +16367,13 @@ s32 fn_802656FC(_PLW* self) {
 u32 fn_80265748(_PLW* self) {
     u16 gauge = self->field_0x39C;
 
-    if ((u16)(gauge + 0x1555) > 0x2AAB) {
-        return (((u32)(gauge - (u16)0x8001) >> 31) + 1);
+    if ((u16)(gauge + 0x1555) <= 0x2AAB) {
+        return 0;
     }
-    return 0;
+    if (gauge < 0x8001) {
+        return 2;
+    }
+    return 1;
 }
 
 /* 0x80265780 - fires the "draw the weapon" action request. */
@@ -14241,8 +16393,618 @@ u32 fn_802657AC(_PLW* self) {
     return Pl_act_ck(self, 1, 0x15) != 0;
 }
 
+/* 0x802657F8 (0x1300): applies the actor's pending hit - the guard reaction, the damage with its critical-hit
+ * skills and the red health, the status the hit carries, and the knockback act its kind selects. */
+#pragma optimization_level 4
+s32 pl_hit_react(_PLW* self) {
+    VEC3 pos;
+    u8 guts;
+    s16 dmg;
+    s16 hp;
+    u8 power;
+    u8 kind;
+    s32 pending;
+    u16 guard_face;
+    s32 crit;
+    s32 mod;
+    s32 face;
+    s32 no_se;
+    s16 now;
+
+    no_se = 0;
+    VEC3_ctor(&pos);
+    if (self->hit_pending_0x39E == 0) {
+        return 0;
+    }
+    if (self->field_0x00A == 8) {
+        return 0;
+    }
+    pending = 0;
+    kind = self->field_0x39F;
+    dmg = self->field_0x38A;
+    power = self->field_0x3A1;
+    hp = self->health;
+    guts = 0;
+    face = (u16)(self->field_0x058 - self->field_0x398 + 0x4000);
+    guard_face = self->field_0x0A8 - self->field_0x398 + 0x4000;
+    do {
+        if (pl_status_bit_ck((_ENEMY_WORK*)self, 0x10) != 0 && kind == 6) {
+            continue;
+        }
+        switch (self->field_0x39F) {
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 18:
+        case 19:
+            if ((u32)fn_802656FC(self) == 1) {
+                continue;
+            }
+            break;
+        }
+        if ((u32)pl_guard_ck(self, guard_face) == 1 && Pl_master_ck(self) == 1) {
+            switch ((u8)fn_80264A84(self)) {
+            case 0:
+                face = -1;
+                if (fn_802657AC(self) == 1) {
+                    if (self->field_0x002 == 3 && Pl_act_ck(self, 4, 44) == 1) {
+                        pl_act_enter(self, 4, 47, 140);
+                    } else if (self->field_0x002 != 3 || Pl_act_ck(self, 4, 49) != 1) {
+                        pl_act_enter(self, 5, 9, 128);
+                    }
+                } else if (self->field_0x002 == 3 && Pl_act_ck(self, 4, 34) == 1) {
+                    pl_act_enter(self, 4, 37, 12);
+                } else if (self->field_0x002 != 3 || Pl_act_ck(self, 4, 39) != 1) {
+                    pl_act_enter(self, 5, 3, 0);
+                }
+                break;
+            case 1:
+                face = -2;
+                if (fn_802657AC(self) == 1) {
+                    if (self->field_0x002 == 3) {
+                        if (Pl_act_ck(self, 4, 44) == 1) {
+                            pl_act_enter(self, 4, 48, 140);
+                        } else {
+                            pl_act_enter(self, 5, 10, 128);
+                        }
+                    } else {
+                        pl_act_enter(self, 5, 10, 128);
+                    }
+                } else if (self->field_0x002 == 3) {
+                    if (Pl_act_ck(self, 4, 34) == 1) {
+                        pl_act_enter(self, 4, 38, 12);
+                    } else {
+                        pl_act_enter(self, 5, 4, 0);
+                    }
+                } else {
+                    pl_act_enter(self, 5, 4, 0);
+                }
+                break;
+            case 2:
+                face = -10;
+                if (self->field_0x3A0 & 0x20) {
+                    dmg = dmg / 2;
+                } else {
+                    dmg = dmg / 4;
+                }
+                if ((u32)pl_health_damage_apply(self, -dmg, (s8*)&guts) == 1) {
+                    pl_ride_down_set(self);
+                    return 1;
+                }
+                now = self->health;
+                if (now < hp) {
+                    if (guts != 0) {
+                        self->field_0x376 = 1;
+                    } else {
+                        self->field_0x376 = now + (hp - now) / 2;
+                    }
+                } else {
+                    self->field_0x376 = now;
+                }
+                if (fn_802657AC(self) == 1) {
+                    if (self->field_0x002 == 3 && Pl_act_ck(self, 4, 44) == 1) {
+                        pl_act_enter(self, 5, 17, 128);
+                    } else {
+                        pl_act_enter(self, 5, 11, 128);
+                    }
+                } else if (self->field_0x002 == 3 && Pl_act_ck(self, 4, 34) == 1) {
+                    pl_act_enter(self, 5, 16, 0);
+                } else {
+                    pl_act_enter(self, 5, 5, 0);
+                }
+                break;
+            }
+            if (self->field_0x002 == 0 && dmg > 0) {
+                pl_hit_face_motion_c1(self, face, 0);
+            }
+            continue;
+        }
+        if (Pl_master_ck(self) != 1) {
+            continue;
+        }
+        pl_status_duration_map(self);
+        if (dmg != 0) {
+            if (dmg > 0 && self->health > 0) {
+                crit = 0;
+                if ((ran_suu(1) & 3) == 0) {
+                    if (Pl_Skill_ck(self, 86) == 1) {
+                        dmg = pl_float_0_7 * dmg;
+                        if (dmg == 0) {
+                            dmg = 1;
+                        }
+                        crit |= 1;
+                    } else if (Pl_Skill_ck(self, 87) == 1) {
+                        dmg = pl_float_1_3 * dmg;
+                        crit |= 2;
+                    }
+                }
+                mod = 0;
+                if (Pl_cat_skill_ck(self, 7) == 1) {
+                    mod = 4;
+                } else if (Pl_cat_skill_ck(self, 8) == 1) {
+                    mod = 8;
+                }
+                if (mod != 0 && ran_suu(1) % mod == 0) {
+                    dmg = pl_float_0_7 * dmg;
+                    if (dmg == 0) {
+                        dmg = 1;
+                    }
+                    crit |= 4;
+                }
+                if (((u8)crit & 1) || ((u8)crit & 4)) {
+                    eft013_set(self, 32);
+                } else if ((u8)crit & 2) {
+                    ((PlBodyWork*)self->physics_0x13C)->chr_0x04.get_joint_wpos(3, &pos);
+                    eft_model_effect_spawn(&pos, 0, 0, self->area_0x16, &self->rot_0x54, pl_frame_window_1);
+                }
+            }
+            if ((u32)pl_health_damage_apply(self, -dmg, (s8*)&guts) == 1) {
+                return 1;
+            }
+            now = self->health;
+            if (now < hp) {
+                if (guts != 0) {
+                    self->field_0x376 = 1;
+                } else {
+                    self->field_0x376 = now + (hp - now) / 2;
+                }
+            } else if (self->field_0x376 < now) {
+                self->field_0x376 = now;
+            }
+        }
+        if ((u32)pl_status_pending_apply(self) == 1) {
+            pending = 1;
+        }
+        switch (kind) {
+        case 23:
+            if (fn_802657AC(self) == 0 && Pl_Skill_ck(self, 10) == 0) {
+                self->field_0x416 = 10;
+            }
+            break;
+        case 24:
+            if (fn_802657AC(self) == 0 && Pl_Skill_ck(self, 10) == 0) {
+                self->field_0x41C = 10;
+            }
+            break;
+        case 17:
+            fn_8027D4F0(self);
+            break;
+        }
+        if (pending != 0) {
+            continue;
+        }
+        if ((u32)fn_802650EC(self, kind) == 1) {
+            no_se = 1;
+            if ((u32)fn_80264EA4(self) == 1) {
+                no_se = 0;
+                if (fn_802657AC(self) == 1) {
+                    pl_act_enter(self, 6, 35, 0);
+                } else {
+                    pl_act_enter(self, 6, 27, 0);
+                }
+            } else {
+                if ((u32)fn_80264EC0(self) == 1 && fn_802657AC(self) == 0) {
+                    no_se = 0;
+                    pl_act_enter(self, 6, 43, 0);
+                }
+                if ((u32)fn_80264ED4(self) == 1 && fn_802657AC(self) == 0) {
+                    no_se = 0;
+                    pl_act_enter(self, 6, 63, 0);
+                }
+            }
+            continue;
+        }
+        now = self->health;
+        if (now > 0 || self->kind_0x09 == 2) {
+            switch (self->kind_0x09) {
+            case 2:
+                switch (kind) {
+                case 27:
+                case 28:
+                case 29:
+                case 30:
+                case 31:
+                case 2:
+                case 15:
+                    break;
+                case 32:
+                case 33:
+                case 3:
+                    power = 40;
+                    kind = 2;
+                    break;
+                default:
+                    power = 40;
+                    kind = 2;
+                    break;
+                }
+                break;
+            }
+            if (now <= 0) {
+                power = 40;
+                kind = 2;
+            }
+            switch (kind) {
+            default:
+            case 0:
+            case 1:
+            case 10:
+            case 16:
+            case 17:
+            case 22:
+            case 23:
+            case 24:
+            case 34:
+            case 35:
+                if ((u32)fn_80265348(self) == 1) {
+                    fn_80265780(self);
+                } else {
+                    fn_802656EC(self);
+                    if (fn_802657AC(self) == 1) {
+                        fn_80265748(self);
+                        if (power > 10) {
+                            pl_act_knockback_enter(self, face, 8, 9, 1, 1);
+                        } else {
+                            pl_act_knockback_enter(self, face, 10, 11, 1, 1);
+                        }
+                    } else {
+                        if (kind == 24) {
+                            self->field_0x41E = 450;
+                        } else if (kind == 23) {
+                            self->field_0x418 = 900;
+                        }
+                        if (power > 10) {
+                            pl_act_knockback_enter(self, face, 2, 3, 1, 0);
+                        } else {
+                            pl_act_knockback_enter(self, face, 0, 1, 1, 0);
+                        }
+                    }
+                }
+                break;
+            case 2:
+            case 15:
+            case 33:
+                fn_802656EC(self);
+                if (fn_802657AC(self) == 1) {
+                    if (power > 30 && kind != 33) {
+                        switch ((u8)fn_80265748(self)) {
+                        case 0:
+                            pl_act_knockback_enter(self, face, 12, 13, 5, 1);
+                            break;
+                        case 1:
+                            pl_act_knockback_enter(self, face, 55, 57, 5, 1);
+                            break;
+                        case 2:
+                            pl_act_knockback_enter(self, face, 56, 58, 5, 1);
+                            break;
+                        }
+                    } else {
+                        fn_80265748(self);
+                        pl_act_knockback_enter(self, face, 39, 40, 5, 1);
+                    }
+                } else {
+                    if (power > 30 && kind != 33) {
+                        pl_act_knockback_enter(self, face, 4, 5, 1, 0);
+                    } else {
+                        pl_act_knockback_enter(self, face, 26, 38, 1, 0);
+                    }
+                    self->field_0x585 = 0;
+                }
+                break;
+            case 3:
+            case 32:
+                fn_802656EC(self);
+                if (fn_802657AC(self) == 1) {
+                    switch ((u8)fn_80265748(self)) {
+                    case 0:
+                        pl_act_knockback_enter(self, face, 12, 13, 5, 1);
+                        break;
+                    case 1:
+                        pl_act_knockback_enter(self, face, 55, 57, 5, 1);
+                        break;
+                    case 2:
+                        pl_act_knockback_enter(self, face, 56, 58, 5, 1);
+                        break;
+                    }
+                } else {
+                    pl_act_knockback_enter(self, face, 6, 7, 1, 0);
+                }
+                self->field_0x585 = 0;
+                break;
+            case 4:
+            case 5:
+            case 36:
+                if ((u32)fn_80265348(self) == 1) {
+                    fn_80265780(self);
+                    break;
+                }
+                switch (kind) {
+                case 4:
+                    if (Pl_Skill_ck(self, 88) == 1 || Pl_Skill_ck(self, 89) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    if (fn_802657AC(self) == 1) {
+                        hp = 36;
+                    } else {
+                        hp = 14;
+                    }
+                    break;
+                case 36:
+                    if (Pl_Skill_ck(self, 89) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    if (fn_802657AC(self) == 1) {
+                        hp = 60;
+                    } else {
+                        hp = 59;
+                    }
+                    break;
+                case 5:
+                    if (Pl_Skill_ck(self, 89) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    hp = fn_802657AC(self) == 1 ? 37 : 15;
+                    break;
+                }
+                fn_802656EC(self);
+                pl_act_knockback_enter(self, face, hp, hp, 0, 0);
+                break;
+            case 6:
+            case 7:
+            case 8:
+            case 9:
+                if (fn_802657AC(self) == 1) {
+                    no_se = 1;
+                    continue;
+                }
+                if ((u32)fn_80265348(self) == 1) {
+                    fn_80265780(self);
+                    break;
+                }
+                switch (kind) {
+                case 8:
+                    if (Pl_Skill_ck(self, 133) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    if (self->field_0x450 >= 2) {
+                        no_se = 1;
+                        continue;
+                    }
+                    break;
+                case 6:
+                case 7:
+                    if (Pl_Skill_ck(self, 133) == 1 || Pl_Skill_ck(self, 132) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    if (self->field_0x450 >= 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    break;
+                }
+                switch (self->field_0x00A) {
+                case 0:
+                case 1:
+                case 4:
+                    if (kind != 9) {
+                        if (self->kind_0x09 == 1) {
+                            no_se = 1;
+                            continue;
+                        }
+                        switch (self->field_0x002) {
+                        case 2:
+                            if (self->charge_gauge_0x310 > 0) {
+                                no_se = 1;
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                case 5:
+                    if (kind == 6) {
+                        no_se = 1;
+                        continue;
+                    }
+                    if (kind != 9 && (u32)fn_802656FC(self) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    break;
+                case 6:
+                    if ((u32)(self->act_no - 16) <= 2 || (u32)(self->act_no - 2) <= 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    break;
+                case 8:
+                case 9:
+                    no_se = 1;
+                    continue;
+                }
+                fn_802656EC(self);
+                switch (kind) {
+                default:
+                    pl_act_knockback_enter(self, face, 2, 3, 2, 0);
+                    break;
+                case 7:
+                    pl_act_knockback_enter(self, face, 16, 16, 2, 0);
+                    break;
+                case 8:
+                    pl_act_knockback_enter(self, face, 17, 17, 2, 0);
+                    break;
+                case 9:
+                    if (Pl_Skill_ck(self, 133) == 1) {
+                        pl_act_knockback_enter(self, face, 17, 17, 2, 0);
+                    } else {
+                        pl_act_knockback_enter(self, face, 18, 18, 2, 0);
+                    }
+                    break;
+                }
+                break;
+            case 11:
+            case 12:
+                fn_802656EC(self);
+                if (fn_802657AC(self) == 1) {
+                    pl_act_knockback_enter(self, face, 10, 11, 0, 0);
+                } else {
+                    pl_act_knockback_enter(self, face, 0, 1, 0, 0);
+                }
+                break;
+            case 13:
+                fn_802656EC(self);
+                if (fn_802657AC(self) == 1) {
+                    pl_act_knockback_enter(self, face, 10, 11, 0, 0);
+                } else {
+                    fn_8025A7E0(self, 0);
+                    pl_act_knockback_enter(self, face, 0, 0, 4, 0);
+                }
+                break;
+            case 14:
+                fn_802656EC(self);
+                pl_act_enter(self, 7, 6, 12);
+                break;
+            case 18:
+            case 19:
+                if (fn_802657AC(self) == 0) {
+                    no_se = 1;
+                    continue;
+                }
+                if ((u32)fn_80265348(self) == 1) {
+                    fn_80265780(self);
+                    break;
+                }
+                switch (kind) {
+                case 19:
+                    if (Pl_Skill_ck(self, 196) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    if (self->field_0x451 >= 2) {
+                        no_se = 1;
+                        continue;
+                    }
+                    break;
+                case 18:
+                    if (Pl_Skill_ck(self, 196) == 1 || Pl_Skill_ck(self, 195) == 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    if (self->field_0x451 >= 1) {
+                        no_se = 1;
+                        continue;
+                    }
+                    break;
+                }
+                switch (self->field_0x00A) {
+                case 0:
+                case 1:
+                case 4:
+                    if (kind == 18) {
+                        switch (self->field_0x002) {
+                        case 2:
+                            if (self->charge_gauge_0x310 > 0) {
+                                no_se = 1;
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                case 5:
+                case 6:
+                case 8:
+                case 9:
+                    no_se = 1;
+                    continue;
+                }
+                fn_802656EC(self);
+                fn_80265748(self);
+                switch (kind) {
+                default:
+                    pl_act_knockback_enter(self, face, 19, 19, 2, 1);
+                    break;
+                case 19:
+                    pl_act_knockback_enter(self, face, 20, 20, 2, 1);
+                    break;
+                }
+                break;
+            case 20:
+            case 21:
+                if (fn_802657AC(self) == 1) {
+                    no_se = 1;
+                    continue;
+                }
+                if ((u32)fn_80265348(self) == 1) {
+                    fn_80265780(self);
+                    break;
+                }
+                if (Pl_Skill_ck(self, 180) == 1) {
+                    no_se = 1;
+                    continue;
+                }
+                fn_802656EC(self);
+                if (kind == 21) {
+                    pl_act_knockback_enter(self, face, 22, 22, 0, 0);
+                } else {
+                    pl_act_knockback_enter(self, face, 21, 21, 0, 0);
+                }
+                break;
+            case 25:
+                pl_act_knockback_enter(self, face, 41, 41, 2, 1);
+                break;
+            case 26:
+                pl_act_knockback_enter(self, face, 42, 42, 2, 0);
+                break;
+            case 27:
+            case 28:
+            case 29:
+            case 30:
+            case 31:
+                no_se = 1;
+                continue;
+            }
+            pl_act_hold_notify(self, 2);
+        } else {
+            pl_ride_down_set(self);
+        }
+    } while (0);
+    if (no_se == 0) {
+        se_slot0_pos_req(&self->vec_0x03C);
+    }
+    return 1;
+}
+#pragma optimization_level reset
+
 /* 0x80266AF8 (0x3C0): takes the wide-area item effects the other players in the area aimed at this player
  * (their +0x65F bit for this player) and spawns the matching effect, at most once per 60 frames. */
+#pragma optimization_level 4
 extern "C" void pl_wide_area_effect_step(_PLW* self)
 {
     s32 i;
@@ -14344,6 +17106,7 @@ extern "C" void pl_wide_area_effect_step(_PLW* self)
         }
     }
 }
+#pragma optimization_level reset
 
 /* 0x80266EB8 - tells the SE layer the actor's action has finished (or was superseded). */
 void fn_80266EB8(_PLW* self) {
@@ -14359,6 +17122,92 @@ void fn_80266EB8(_PLW* self) {
         }
         if (settled == 0) {
             fn_800DB2DC();
+        }
+    }
+}
+
+/* 0x80266F30 (0x340): runs the actor's per-frame tail: the drift, the wide-area effects, the lobby events the
+ * area and roster hits raise, and the network position report. */
+void pl_frame_post_step(_PLW* self) {
+    MHchar* chr = &((PlBodyWork*)self->physics_0x13C)->chr_0x04;
+    VEC3 pos;
+    _CP_VECTOR rot;
+    s32 word;
+    s16 kind;
+    u8 act_kind;
+
+    VEC3_ctor(&pos);
+    self->field_0x268 = 0;
+    if (event_demo_ck() != 1) {
+        if (self->drift_on_0x582 != 0) {
+            addVec3To(&self->vec_0x03C, (VEC3*)self->drift_vel_0x574);
+            fn_8025FF0C(self, 1);
+            fn_8025FA00(self);
+            pl_model_pos_sync(self);
+            mhchar_model_mtx_update(chr);
+        }
+        if ((u32)pl_item_menu_open_ck(self) == 1 && pl_now_area_ck(self) == 1) {
+            shell_se_req(self->field_0xAF4, &self->vec_0x03C, 4, (u32)self);
+        }
+        if (Pl_act_ck(self, 0, 20) == 1 || Pl_act_ck(self, 0, 158) == 1) {
+            self->field_0x268 = 1;
+        }
+        if (self->field_0x018 == 0) {
+            self->charge_gauge_0x310 = 0;
+        } else {
+            act_kind = self->field_0x00A;
+            if (act_kind > 1 && (u32)(act_kind - 4) > 1) {
+                self->charge_gauge_0x310 = 0;
+            }
+        }
+        self->dm_condition_prev_0x3E0 = self->field_0x3DC;
+        pl_wide_area_effect_step(self);
+        pl_eft_func(self);
+        fn_80266EB8(self);
+        if (Pl_master_ck(self) == 1) {
+            if ((self->kind_0x015 == 1 || self->kind_0x015 == 12) && (self->area_0x16 == 7 || self->area_0x16 == 12) &&
+                self->kind_0x09 == 3) {
+                lb_event_request(9);
+            }
+            if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &kind, &pos, &rot, &word) !=
+                0xFFFF) {
+                switch (kind) {
+                case 8:
+                    lb_event_request(12);
+                    break;
+                case 6:
+                    lb_event_request(10);
+                    break;
+                case 10:
+                    lb_event_request(11);
+                    break;
+                case 3:
+                    lb_event_request(23);
+                    break;
+                case 16:
+                    lb_event_request(22);
+                    break;
+                }
+            }
+            if (self->field_0x380 - self->field_0x37E >= self->field_0x380 / 20) {
+                lb_event_request(24);
+            }
+            if (quest_move_sub_flag_get() != 0) {
+                lb_event_request(16);
+            }
+        }
+        if (isServerSelectState()) {
+            if (Pl_master_ck(self) == 0) {
+                return;
+            }
+            if ((u32)fn_80245E20(self) == 1) {
+                if (self->field_0x00A != 8 && self->field_0x00A != 9 && pl_act_stage_get(self) == 0 &&
+                    (s16)self->field_0x012 == 0 && system_w.field_0x0c % 15 == 0) {
+                    Pl_net_send(self, 2, 0);
+                }
+            } else {
+                Pl_net_send_hit_kind5(self->area_0x16, &self->vec_0x03C, self->field_0x058);
+            }
         }
     }
 }

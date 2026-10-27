@@ -50,7 +50,7 @@ s32 pl_hold_gauge_ck(struct _PLW* plw, s32 value);
 void pl_act_add_hold_gauge(struct _PLW* plw, s16 delta);
 
 /* 0x8027633C and its two wrappers - the act's frame step. */
-s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out);
+s32 pl_health_damage_apply(struct _PLW* plw, s16 delta, s8* out);
 s32 pl_act_gauge_step_unlatched(struct _PLW* plw, s16 delta, s8* out);
 s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out);
 
@@ -70,9 +70,9 @@ void pl_act_gauge_gate(struct _PLW* plw, s16 amount);
 void pl_guard_break_apply(struct _PLW* plw);
 
 /* 0x802745DC / 0x802748C8 / 0x80274AB8 / 0x80274AEC - the armed-slot and act-kind predicates.
- * `fn_802745DC` returns `u32`: its own body is byte-identical either way, and its caller `pl_motion_request_latch` reproduces
+ * `pl_armed_act_no_get` returns `u32`: its own body is byte-identical either way, and its caller `pl_motion_request_latch` reproduces
  * retail's `mr r0,r3` result copy only with the wider return.  The `s16` parameter is narrowed by retail's `extsh`. */
-u32 fn_802745DC(struct _PLW* plw, s16 kind);
+u32 pl_armed_act_no_get(struct _PLW* plw, s16 kind);
 s32 pl_stagger_level_get(void* self);
 s32 pl_weapon_guard_ck(struct _PLW* plw);
 s32 fn_80274AEC(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind);

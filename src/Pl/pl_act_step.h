@@ -66,6 +66,8 @@ extern const f32 pl_frame_window_130; /* 0x80799EA4: 130 */
 extern const f32 pl_frame_window_62; /* 0x80799EB8: 62 */
 extern const f32 pl_frame_window_38; /* 0x80799EBC: 38 */
 extern const f32 pl_frame_window_70; /* 0x80799EC8: 70 */
+extern const f32 pl_frame_window_999; /* 0x80799FDC: 999 */
+extern const f32 pl_float_0_7; /* 0x80799FE8: 0.7 */
 extern const f32 pl_float_neg152; /* 0x80799FEC: -152 */
 extern const f32 pl_frame_window_2048; /* 0x80799FF0: 2048 */
 extern const f32 pl_frame_window_181; /* 0x80799FF4: 181 */

@@ -39,7 +39,7 @@ extern const f32 pl_float_0_01;	/* 0x80799FCC: 0.01 - scale on the u32->f32 conv
                                  * (`fn_802602A0`) */
 extern const f32 pl_float_2250000;	/* 0x80799FD0: 2250000 - initial nearest-distance sentinel
                                      * (`fn_802607C4`) */
-extern const f32 pl_float_1000;	/* 0x80799FD4: 1000 - second argument of the `fn_802D7804` call
+extern const f32 pl_float_1000;	/* 0x80799FD4: 1000 - second argument of the `ai_npc_player_near_ck` call
                                  * (`fn_80261770`) */
 extern const f32 pl_float_300;	/* 0x80799FD8: 300 - distance test on `vec3_distance`'s result
                                  * (`fn_80262688`) */

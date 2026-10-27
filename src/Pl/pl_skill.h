@@ -40,7 +40,7 @@ u8 Pl_Skill_slot_item_get(struct _PLW* plw, u32 slot);
 /* 0x802731B4 - the item/skill timer lookup the equipment section's `fn_8027D76C` and other consumers call;
  * `int`, like the definition. */
 int Pl_item_timer_get(struct _PLW* plw, u16 item);
-/* 0x80273044 - the item-id -> slot lookup `fn_8027DE88` walks its id tables with; `u16`, like the definition. */
+/* 0x80273044 - the item-id -> slot lookup `pl_kind_item_slot_find` walks its id tables with; `u16`, like the definition. */
 u16 pl_item_slot_find(struct _PLW* plw, u16 item);
 #ifdef __cplusplus
 }

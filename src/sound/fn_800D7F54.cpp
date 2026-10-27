@@ -344,7 +344,7 @@ void ana_eff_se_req(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 5, pos); }
 
 extern "C" void se_req_eft019_tick(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 78, pos); }
 
-extern "C" void fn_800DC868(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 0, pos); }
+extern "C" void se_slot0_pos_req(nw4r::math::VEC3* pos) { se_slot_req_pos(0, 0, pos); }
 
 extern "C" void fn_800DC878(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 187 : 87;

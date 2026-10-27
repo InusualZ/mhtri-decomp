@@ -24,12 +24,12 @@ s32 pl_stagger_level_get(void* a);
  * `fn_8025FA00`/`fn_80260A18`/`fn_80261770`/`fn_802621B0`/`fn_80262688` declarations that stood here
  * are owned by `Pl/fn_8025F088.cpp` (proposal 8025F088, `.text` 0x8025F088-0x80262940) and live in
  * `Pl/fn_8025F088.h` - that unit's range, not `Pl/pl_act_step.h`, covers their addresses.) */
-/* `fn_802745DC`'s return is the owner's `u32` (`Pl/fn_80273B14.cpp`), not the pre-merge `u16`: the
+/* `pl_armed_act_no_get`'s return is the owner's `u32` (`Pl/fn_80273B14.cpp`), not the pre-merge `u16`: the
  * callee's own body is byte-identical either way (every path ends in an `lhzx`/`li`), while the
  * landed caller `Pl/fn_8027D684.cpp`'s measured row needs the `u32` - retail materialises the
  * result with `mr r0,r3` before the caller's `(u16)` cast, which only a `u32` return produces.  The
  * `s16` parameter is the owner's too (retail's callee narrows it with `extsh`). */
-u32 fn_802745DC(struct _PLW* self, s16 kind);
+u32 pl_armed_act_no_get(struct _PLW* self, s16 kind);
 s32 pl_weapon_guard_ck(struct _PLW* self);  /* the owner's own definition (fn_80273B14.cpp) */
 s32 pl_stagger_budget_ck(struct _PLW* self, s32 v);
 s32 pl_act_gauge_step_unlatched(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
@@ -241,7 +241,7 @@ extern u8** lbl_806AB810[8];
 extern u32 lbl_805706C0[];  /* the per-kind row counts the two lookups clamp against */
 extern u32 lbl_805706D8[];  /* the sibling counts `equip_kind_item_count` reads for kinds 7-15 */
 
-/* The three per-kind item-id tables `fn_8027DE88`/`fn_8027DF38` walk until the 0xFFFF sentinel
+/* The three per-kind item-id tables `pl_kind_item_slot_find`/`pl_kind_item_equip_find` walk until the 0xFFFF sentinel
  * (`.sdata` 0x80792030/0x80792038 at 0x8 B each, `.data` 0x805BFFE0 at 0x18 B - the map's sizes). */
 extern u16 pl_act_kind2_item_ids[];
 extern u16 pl_act_kind3_item_ids[];

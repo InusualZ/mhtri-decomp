@@ -102,7 +102,7 @@ typedef struct MHchar {
     /* +0x078 */ u8 pad_0x78[0x2C];
     /* +0x0A4 */ f32 field_0xA4;   /* read by `pl_rig_get_float_a4` (0x8026A358) */
     /* +0x0A8 */ u8 pad_0xA8[0x14];
-    /* +0x0BC */ f32 field_0xBC;   /* the value `fn_8026A364` tests against 0 */
+    /* +0x0BC */ f32 field_0xBC;   /* the value `pl_model_blend_positive_ck` tests against 0 */
     /* +0x0C0 */ u8 pad_0xC0[0x14];
     /* +0x0D4 */ f32 field_0xD4[6];
     /* +0x0EC */ s32 field_0xEC;

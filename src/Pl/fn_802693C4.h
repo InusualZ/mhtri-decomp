@@ -37,7 +37,7 @@ u32 Pl_frame_check_alt(struct _PLW* self, u16 frame, f32 a, f32 b);
 u32 Pl_motion_end_ck(struct _PLW* self);
 f32 pl_rig_get_motion_frame(struct _PLW* self);
 f32 pl_rig_get_float_a4(struct _PLW* self);
-u32 fn_8026A364(struct _PLW* self);
+u32 pl_model_blend_positive_ck(struct _PLW* self);
 void pl_joint_mtx_get(struct _PLW* self, s32 joint, nw4r::math::MTX34* out);
 u8 fn_8026A3A0(struct _PLW* self);
 void pl_act_set_cam_ang(struct _PLW* self);

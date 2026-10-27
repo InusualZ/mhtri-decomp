@@ -11763,7 +11763,7 @@ s32 ai_npc_call_ck(struct _AINPC_W* self)
 }
 
 /* 0x802D7804 - whether the AI NPC is close enough to the player to act on it. */
-s32 fn_802D7804(u8 index, f32 distance)
+s32 ai_npc_player_near_ck(u8 index, f32 distance)
 {
     _PLW* plw;
 
