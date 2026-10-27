@@ -28,7 +28,8 @@ typedef struct SndWork {
     /* +0x00D4 */ u32  whd_size[0x31];  /*               ... and its size */
     /* +0x0198 */ u32  tsb_ofs[0x31];   /* per chunk: the `tsb` half's offset */
     /* +0x025C */ u32  tsb_size[0x31];  /*               ... and its size */
-    /* +0x0320 */ u8   pad_0320[0x62];
+    /* +0x0320 */ u8   whd_installed[0x31]; /* `snd_chunk_install` sets it (GUESS name: the `whd` half is installed) */
+    /* +0x0351 */ u8   tsb_installed[0x31]; /* `snd_chunk_install` sets it (GUESS name: the `tsb` half is installed) */
     /* +0x0382 */ u8   chunk_id_1[0x31][0x100]; /* fn_800F25DC/2680 write and read it */
     /* +0x3482 */ u8   chunk_id_2[0x31][0x100]; /* the `fn_800F26B8` sibling (arg2 != 0) */
     /* +0x6582 */ u8   chunk_id_3[0x31][0x100]; /* the `fn_800F26B8` sibling (arg2 == 0) */

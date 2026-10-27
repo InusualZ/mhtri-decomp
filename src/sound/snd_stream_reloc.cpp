@@ -91,8 +91,8 @@ void AXFXSetHooks(void* alloc, void* free);
 
 
 void fn_800E7D34(void);
-void fn_800E7DE4(u32 idx, RelocDesc* desc);
-void fn_800E7EE0(u32 idx, RelocDesc* desc);
+void snd_whd_install(u32 idx, RelocDesc* desc);
+void snd_tsb_install(u32 idx, RelocDesc* desc);
 void* fn_800E7FC4(u32 idx, u32 key);
 u32 snd_stream_reloc_busy_ck(u32 key);
 void fn_800E8080(u32 key, u16 pitch);
@@ -353,7 +353,7 @@ extern "C" void fn_800E7D34(void)
 }
 
 /* Installs one line's four relocation tables. */
-extern "C" void fn_800E7DE4(u32 idx, RelocDesc* desc)
+extern "C" void snd_whd_install(u32 idx, RelocDesc* desc)
 {
     RelocTable* t4 = (RelocTable*)(desc->reloc_04 + (u32)desc);
     RelocTable* t8 = (RelocTable*)(desc->reloc_08 + (u32)desc);
@@ -367,7 +367,7 @@ extern "C" void fn_800E7DE4(u32 idx, RelocDesc* desc)
 }
 
 /* Installs one line's five relocation tables. */
-extern "C" void fn_800E7EE0(u32 idx, RelocDesc* desc)
+extern "C" void snd_tsb_install(u32 idx, RelocDesc* desc)
 {
     RelocTable* t4 = (RelocTable*)(desc->reloc_04 + (u32)desc);
     RelocTable* t8 = (RelocTable*)(desc->reloc_08 + (u32)desc);

@@ -825,7 +825,7 @@ extern "C" void snd_obj_start(void* unused, SoundSlot* slot)
 {
     AxVoiceBlock* ax = snd_slot_state_get(slot);
 
-    fn_800EE014(ax->wave, (AxVoice*)ax->voice, ax->pitch, ax->lpf_freq);
+    snd_voice_prepare(ax->wave, (AxVoice*)ax->voice, ax->pitch, ax->lpf_freq);
     MIXInitChannel(ax->voice, snd_reverb_flags_get(snd_reverb_mgr_get()), snd_level_to_db(ax->out_volume),
                    snd_level_to_db(ax->aux_a), snd_level_to_db(ax->aux_b), snd_level_to_db(ax->aux_c), ax->pan, ax->span,
                    snd_level_to_db(ax->fader));

@@ -114,7 +114,7 @@ typedef struct SndVoiceMix {
 typedef struct SndVoice {
     /* +0x00 */ u8  unused_00[0x0B];
     /* +0x0B */ s8  detune;      /* fn_800F27C4 */
-    /* +0x0C */ u8  field_0C;    /* fn_800F25DC copies it out */
+    /* +0x0C */ u8  field_0C;    /* snd_chunk_ids_snapshot copies it out */
     /* +0x0D */ u8  unused_0D[0x0D];
     /* +0x1A */ u16 pitch;       /* fn_800F284C */
     /* +0x1C */ u8  unused_1C[0x04];
@@ -246,7 +246,7 @@ extern "C" void lobby_bgm_load(void);
 extern "C" void fn_800F2328(u8 arg0, u8 arg1);
 extern "C" void fn_800F2468(u8 arg0);
 extern "C" void fn_800F2540(u32 arg0, s32 arg1, SndVoiceMix* out);
-extern "C" void fn_800F25DC(u32 arg0);
+extern "C" void snd_chunk_ids_snapshot(u32 arg0);
 extern "C" u8 fn_800F2680(u32 arg0, u32 arg1);
 extern "C" u8 fn_800F26B8(u32 arg0, u32 arg1, u8 arg2);
 extern "C" s32 fn_800F2714(u32 arg0, s32 arg1, u8 arg2, s32 arg3);
@@ -2152,7 +2152,7 @@ extern "C" void fn_800F2540(u32 arg0, s32 arg1, SndVoiceMix* out)
 }
 
 /* Snapshots one bank's 256 ids into the three lookup tables. */
-extern "C" void fn_800F25DC(u32 arg0)
+extern "C" void snd_chunk_ids_snapshot(u32 arg0)
 {
     u8* t1;
     u8* t2;
