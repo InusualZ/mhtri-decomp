@@ -42,15 +42,26 @@
  *   - the send steps keep `u8* sendBuffer = thread->sendBuffer;` as a local (retail hoists the `addi`);
  *     `NHTTPi_encodeUrlChar` computes the nibbles as `s32` from `(u8)c`; `NHTTPSetProxy` spells the password's
  *     address `&credentials[userLength + 1]` (no CSE with the `":"` store).
+ *   - `NHTTPAddHeaderField`/`NHTTPAddPostDataAscii` report through `__FUNCTION__`: retail's pool holds each
+ *     name ahead of the shared message, the order a function-local name object gives (a literal argument
+ *     pools after the format).
  *   - `NHTTPi_createRequestObject` is a `do { ... } while (0)` whose `break`s reach the shared cleanup (rule 8).
  *   - the four 4-12 byte shims (`NHTTPi_memcpy`/`strlen`/`strcmp`/`memclr`) are `asm` (MWCC would inline a C
  *     tail-call shim); a range test keeps the constant on the left (`'0' <= c`) to keep retail's two compares;
  *     `NHTTPi_GetSystemInfoP` sits in `#pragma dont_inline on`.
  * RESIDUALS.
- *   - `.data`/`.rodata`/`.sdata` literals: retail's pool also holds the messages of four public calls the linker
- *     dropped (`NHTTPAddPostDataBinary`, `NHTTPAddPostDataRaw`, `NHTTPSetPostDataEncoding`,
- *     `NHTTPDisableVerifyOptionForDebug`, from 0x80630DA8), so ours is 905 of 1120 B and every string row
- *     relocates against our `@NN`/section symbol plus another offset where retail names `lbl_8063xxxx`.
+ *   - SEAM: the range is several retail TUs.  MWCC addresses a TU's pooled data off the section anchor (the
+ *     object's own section start), and retail's anchors sit inside our sections: `.data` +0x58 ("CONNECT ",
+ *     used by `sendProxyConnect`/`sendRequest`/`parseResponseHeaders`) and +0x128 (the first banner, used by
+ *     `NHTTPSetProxy`/`NHTTPSetSystemProxy`), `.rodata` +0x40 ("Content-Disposition", `sendMultipartBody`);
+ *     `.sdata` holds `":"` twice (+0x08 `sendProxyConnect`, +0x70 `NHTTPSetProxy`, one copy per TU under
+ *     `-str reuse`); 4-byte fill opens `.data` +0x10 (the alphabet), +0x58 and +0x420.  So every pooled
+ *     string row keeps its displacement off by the anchor until the unit is cut at those seams.
+ *   - `.data`: retail's pool also holds the messages of four public calls the linker strips
+ *     (`NHTTPAddPostDataBinary`, `NHTTPAddPostDataRaw` with its "(exclusive fucntion)" warning,
+ *     `NHTTPSetPostDataEncoding`, `NHTTPDisableVerifyOptionForDebug`, 0x80630DA8..0x80630E48 and
+ *     0x80630F20..0x80630F41); not written while `NHTTP_bgnend.c` defines 0x80514ACC under the name
+ *     `NHTTPAddPostDataRaw` (its own message names that call as the other one).
  *   - `NHTTPi_AddConnection`/`NHTTPi_OmitConnectionList`: retail's `neg`/`nor`/`srawi` for `r ? 0 : -1`; no
  *     spelling tried (ternary, `-(r == 0)`, `(r != 0) - 1`, casts) gives it.
  *   - `NHTTPi_Base64Encode`: retail divides by 3 with `li r0,3; divwu` and multiplies with `mulli` (no
@@ -62,7 +73,8 @@
  *     `NHTTPi_RecvCallback` (the connection's register), `NHTTPi_sendPostField`, `NHTTPi_recvResponseBody`,
  *     `NHTTPi_compareToken`, `NHTTPi_strtonum`, `NHTTPCreateConnection`, `NHTTPi_PostSendCallback`: register
  *     colouring or scheduling; a declaration-order search over each function's locals found nothing better.
- *   - flip blockers: the map row `lbl_8076317A` (the tail of `NHTTPi_systemInfo`), the literal pool above.
+ *   - flip blockers: the seam above, the stripped calls' messages, the map row `lbl_8076317A` (the tail of
+ *     `NHTTPi_systemInfo`).
  */
 
 #include "NHTTP/d_nhttp.h"
@@ -96,21 +108,6 @@ u32 NHTTPi_versionRegistered;                 /* 0x80795878 */
 NHTTPInfo NHTTPi_systemInfo;                  /* 0x80762C60 */
 NHTTPiCompletionSync NHTTPi_completionSync;   /* 0x80762C20 */
 
-/* The library's version banners (`.sdata` 0x80794410/0x80794414 and the `.data` 0x80630C50..0x80630D48
- * run behind them, rule 12 - claimed 2026-09-28).  `NHTTPi_RegisterCallbacks` and `NHTTPCreateRequest` each
- * hand one of them to `OSRegisterVersion`, once, behind the two lazy-init flags of the `.sbss` run.
- * The retail `.data` run holds the two NHTTP banners *and* an unreferenced `UNOFFICIAL` variant between
- * them, so all three are written here, in this order - the order is what makes MWCC's pool emit the
- * bytes at the offsets the target object has (A at +0x00, the variant at +0x4C, NHTTPCREATE at +0xA8).
- * The `UNOFFICIAL` object is dead in the retail image too (no relocation points into it), which is why
- * nothing in this unit reads it. */
-const char* NHTTPi_versionString =
-    "<< RVL_SDK - NHTTP \trelease build: May 12 2009 11:01:00 (0x4199_60831) >>";
-char NHTTPi_unofficialVersionString[] =
-    "<< RVL_SDK - NHTTP \trelease build: May 12 2009 11:01:00 (0x4199_60831) UNOFFICIAL >>";
-const char* NHTTPi_createVersionString =
-    "<< RVL_SDK - NHTTPCREATE \trelease build: May 12 2009 11:01:00 (0x4199_60831) >>";
-
 /* Free every node of a circular header-field list (the head's own `next` is the node after the
  * head; the head goes last).  MWCC inlines it at the four sites that empty a request's lists. */
 static inline void NHTTPi_freeFieldList(NHTTPHeaderField* head) {
@@ -127,6 +124,247 @@ static inline void NHTTPi_freeFieldList(NHTTPHeaderField* head) {
             head = NULL;
         }
     }
+}
+
+/* The multipart boundary every new request starts from (`.rodata` 0x80574CE8); `NHTTP_bgnend.c` steps a
+ * request's copy until no posted value contains it. */
+const char NHTTPi_postDataRawCode[] = "--t9Sf4yfjf1RtvDu3AA";
+
+/* Build the request object for `url`: validate the method, copy the URL (decoding %XX escapes, except
+ * inside the path), read out the scheme (http / https), host and port, and set up the response record
+ * that hangs off it.  Answers the request, or null with the info block's error set (11 bad method, 1 no
+ * memory, 4 bad URL). */
+NHTTPRequest* NHTTPi_createRequestObject(NHTTPInfo* info, const char* url, s32 method, u32 buffer,
+                                         u32 bufferSize, u32 userData,
+                                         NHTTPBufferFullCallback bufferFullCallback,
+                                         NHTTPFreeBufferCallback freeCallback) {
+    char urlBuffer[0x100];
+    char* urlCopy = urlBuffer;
+    s32 out;
+    s32 sawSlash;
+    s32 rest;
+    char* restPtr;
+    s32 i;
+    s32 escapes;
+    NHTTPRequest* request = NULL;
+    s32 prefix;
+    char* p;
+    s32 state;
+    s32 urlLength;
+    s32 hostLength;
+    s32 size;
+    s32 number;
+    s8 decoded;
+    u8 c;
+    u32 escaped;
+    char* hostStart;
+
+    do {
+        if (3 <= method || method < 0) {
+            NHTTPi_SetError(info, 11);
+            break;
+        }
+        request = NHTTPi_alloc(0x258, 4);
+        if (request == NULL) {
+            NHTTPi_SetError(info, 1);
+            break;
+        }
+        NHTTPi_memclr(request, 0x258);
+        request->response = NHTTPi_alloc(0x43C, 4);
+        if (request->response == NULL) {
+            NHTTPi_SetError(info, 1);
+            break;
+        }
+        NHTTPi_memclr(request->response, 0x43C);
+        request->response->userBuffer = buffer;
+        request->response->bufferSize = bufferSize;
+        request->response->bufferFullCallback = bufferFullCallback;
+        request->response->freeCallback = freeCallback;
+        urlLength = NHTTPi_strlen(url);
+        if (urlLength <= 7) {
+            NHTTPi_SetError(info, 4);
+            break;
+        }
+        if (urlLength + 1 > 0x100) {
+            urlCopy = NHTTPi_alloc(urlLength + 1, 4);
+            if (urlCopy == NULL) {
+                NHTTPi_SetError(info, 4);
+                break;
+            }
+        }
+        NHTTPi_memclr(urlCopy, urlLength);
+        NHTTPi_memcpy(urlCopy, url, urlLength);
+        request->port = 80;
+        prefix = 7;
+        if (NHTTPi_strnicmp(urlCopy, "http://", 7) != 0) {
+            if (NHTTPi_strnicmp(urlCopy, "https://", 8) != 0) {
+                NHTTPi_SetError(info, 4);
+                break;
+            }
+            request->useSSL = 1;
+            prefix = 8;
+            request->port = 443;
+        }
+        rest = urlLength - prefix;
+        restPtr = urlCopy + prefix;
+        if (rest <= 0) {
+            NHTTPi_SetError(info, 4);
+            break;
+        }
+        p = restPtr;
+        i = 0;
+        escapes = 0;
+        state = 0;
+        decoded = 0;
+        while (i < rest && *p != '/') {
+            if (state == 2) {
+                state -= 1;
+            } else if (state == 1) {
+                decoded = NHTTPi_strToHex(restPtr + i - 1, 2);
+                state -= 1;
+                if (decoded < 0) {
+                    break;
+                }
+                if (decoded == '/') {
+                    escapes -= 1;
+                    break;
+                }
+            } else if ((s8)*p == '%') {
+                state = 2;
+                escapes += 1;
+            }
+            i++;
+            p++;
+        }
+        if (decoded < 0 || state != 0) {
+            NHTTPi_SetError(info, 4);
+            break;
+        }
+        size = prefix + rest - escapes * 2 + 1;
+        request->url = NHTTPi_alloc(size, 4);
+        if (request->url == NULL) {
+            NHTTPi_SetError(info, 1);
+            break;
+        }
+        NHTTPi_memclr(request->url, size);
+        NHTTPi_memcpy(request->url, urlCopy, prefix);
+        p = restPtr;
+        i = 0;
+        out = 0;
+        state = 0;
+        sawSlash = 0;
+        while (i < rest) {
+            if (state == 2) {
+                state -= 1;
+            } else if (state == 1) {
+                decoded = NHTTPi_strToHex(restPtr + i - 1, 2);
+                state -= 1;
+                request->url[out + prefix - 1] = decoded;
+                if (decoded == '/') {
+                    sawSlash = 1;
+                }
+            } else {
+                c = *p;
+                if ((s8)c == '/') {
+                    sawSlash = 1;
+                }
+                escaped = (sawSlash == 0) & ((s8)c == '%');
+                if (escaped != 0) {
+                    state = 2;
+                } else {
+                    request->url[out + prefix] = c;
+                }
+                out += 1;
+            }
+            i++;
+            p++;
+        }
+        request->url[prefix + out] = 0;
+        hostStart = request->url + prefix;
+        p = hostStart;
+        i = 0;
+        for (size = out; size > 0; size--) {
+            if (*p == '/' || *p == ':') {
+                request->hostEnd = i + prefix;
+                break;
+            }
+            i++;
+            p++;
+        }
+        if (i == out) {
+            request->hostEnd = i + prefix;
+            request->pathStart = request->hostEnd;
+        } else if ((s8)hostStart[i] == '/') {
+            request->pathStart = request->hostEnd;
+        } else if ((s8)hostStart[i] == ':') {
+            p = hostStart + i;
+            for (size = out - i; size > 0; size--) {
+                if (*p == '/') {
+                    request->pathStart = i + prefix;
+                    break;
+                }
+                i++;
+                p++;
+            }
+            if (i == out) {
+                request->pathStart = i + prefix;
+            } else {
+                number = NHTTPi_strtonum(request->url + request->hostEnd + 1,
+                                         request->pathStart - (request->hostEnd + 1));
+                if (number < 0) {
+                    number = request->port;
+                } else if (number > 0xFFFF) {
+                    NHTTPi_SetError(info, 4);
+                    break;
+                }
+                request->port = (u16)number;
+            }
+        }
+        hostLength = request->hostEnd - ((request->useSSL != 0) + 7);
+        request->host = NHTTPi_alloc(hostLength + 1, 4);
+        if (request->host == NULL) {
+            NHTTPi_SetError(info, 1);
+            break;
+        }
+        NHTTPi_memclr(request->host, hostLength + 1);
+        NHTTPi_memcpy(request->host, request->url + ((request->useSSL != 0) + 7), hostLength);
+        NHTTPi_memcpy(&request->boundaryDashes, NHTTPi_postDataRawCode, 0x14);
+        request->method = method;
+        request->sslHandle = 0;
+        request->clientCert = 0;
+        request->clientCertLength = 0;
+        request->clientKey = 0;
+        request->clientKeyLength = 0;
+        request->rootCA = 0;
+        request->rootCALength = 0;
+        request->builtinClientCert = 0;
+        request->verifyOption = 0;
+        request->sslCallbackArg = 0;
+        request->response->userData = userData;
+        request->useProxy = 0;
+        request->recvBufferSize = 0;
+        request->sendBufferSize = 0;
+        if (urlCopy != NULL && urlCopy != urlBuffer) {
+            NHTTPi_free(urlCopy);
+        }
+        return request;
+    } while (0);
+    if (request != NULL) {
+        if (request->url != NULL) {
+            NHTTPi_free(request->url);
+        }
+        if (request->host != NULL) {
+            NHTTPi_free(request->host);
+        }
+        if (request->response != NULL) {
+            NHTTPi_free(request->response);
+        }
+        NHTTPi_free(request);
+    }
+    if (urlCopy != NULL && urlCopy != urlBuffer) {
+        NHTTPi_free(urlCopy);
+    }
+    return NULL;
 }
 
 /* Take the request object apart: its response, both field lists, the URL copies and the record. */
@@ -346,6 +584,30 @@ s32 NHTTPi_SocClose(NHTTPMutexInfo* mutex, NHTTPRequest* request, s32 fd) {
     return SOClose(fd);
 }
 
+/* Connect the socket to `address`:`port` and, for an https request that is not going through a proxy,
+ * run the SSL handshake.  Answers 0, -1002 for a cancelled request or -1001 when the connect failed. */
+s32 NHTTPi_SocConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, NHTTPRequest* request, s32 fd, u32 address,
+                      u32 port) {
+    SOSockAddrIn addr;
+
+    addr.len = 8;
+    addr.family = 2;
+    addr.port = SOHtoNs(port);
+    addr.addr = address;
+    if (SOConnect(fd, &addr) < 0) {
+        s32 error = -1001;
+
+        if (request->cancelled != 0) {
+            error = -1002;
+        }
+        return error;
+    }
+    if (request->useSSL != 0 && request->useProxy == 0) {
+        return NHTTPi_SocSSLConnect(info, mutex, request, fd);
+    }
+    return 0;
+}
+
 /* Set the request's SSL context up (client certificate, root CA) and run the handshake to its end.
  * Answers 0 once it completed, -1005/-1004 when a certificate/CA is refused and -1001 on a
  * handshake failure. */
@@ -563,30 +825,6 @@ void NHTTPi_SocShutdown(NHTTPMutexInfo* mutex, NHTTPRequest* request, s32 fd) {
         SOShutdown(fd, 2);
     }
     NHTTPi_unlockReqList(mutex);
-}
-
-/* Connect the socket to `address`:`port` and, for an https request that is not going through a proxy,
- * run the SSL handshake.  Answers 0, -1002 for a cancelled request or -1001 when the connect failed. */
-s32 NHTTPi_SocConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, NHTTPRequest* request, s32 fd, u32 address,
-                      u32 port) {
-    SOSockAddrIn addr;
-
-    addr.len = 8;
-    addr.family = 2;
-    addr.port = SOHtoNs(port);
-    addr.addr = address;
-    if (SOConnect(fd, &addr) < 0) {
-        s32 error = -1001;
-
-        if (request->cancelled != 0) {
-            error = -1002;
-        }
-        return error;
-    }
-    if (request->useSSL != 0 && request->useProxy == 0) {
-        return NHTTPi_SocSSLConnect(info, mutex, request, fd);
-    }
-    return 0;
 }
 
 /* Resolve a host name to its first IPv4 address, or 0 when it does not resolve. */
@@ -2404,58 +2642,18 @@ void NHTTPi_commThreadLoop(void) {
  * these names are GUESSes derived from their bodies and their callers - the file header writes the
  * evidence for each). */
 
-/* 0x8051A300 (0x8C): start the connection's request, answering -1 when the connection or its
- * request is missing and 0 once the send was accepted. */
-s32 NHTTPi_StartRequest(NHTTPConnection* connection) {
-    NHTTPInfo* info = NHTTPi_GetSystemInfoP();
-    NHTTPMutexInfo* mutex = NHTTPi_GetMutexInfoP(info);
-    NHTTPConnection* conn = NHTTPi_GetConnection(mutex, connection);
-
-    if (conn == NULL) {
-        return -1;
-    }
-    if (conn->request == NULL) {
-        return -1;
-    }
-    conn->requestId = NHTTP_SendRequestAsync(info, conn->request);
-    if (conn->requestId >= 0) {
-        conn->state = 1;
-    }
-    return 0;
-}
-
-/* Answers the request handle the send hook of `NHTTPCreateRequest` was given, or null when the
- * connection or its request could not be made. */
-NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u32 bufferSize,
-                                     NHTTPCompleteCallback completeCallback, u32 userData,
-                                     NHTTPBufferFullCallback bufferFullCallback,
-                                     NHTTPFreeBufferCallback freeCallback) {
-    NHTTPConnection* connection = NHTTPCreateConnection(url, method, buffer, bufferSize,
-                                                        NHTTPi_dispatchConnectionCallback, userData);
-    NHTTPInfo* info;
-    NHTTPMutexInfo* mutex;
-    NHTTPRequest* request = NULL;
-
-    if (connection != NULL) {
-        info = NHTTPi_GetSystemInfoP();
-        mutex = NHTTPi_GetMutexInfoP(info);
-        connection = NHTTPi_GetConnection(mutex, connection);
-        request = NHTTPi_Connection2Request(mutex, connection);
-        if (request != NULL) {
-            if (request->response != NULL) {
-                connection->completeCallback = completeCallback;
-                request->response->bufferFullCallback = bufferFullCallback;
-                request->response->freeCallback = freeCallback;
-                return request;
-            }
-            NHTTP_DestroyRequest(info, request);
-            NHTTPi_OmitConnectionList(mutex, connection);
-            NHTTPi_free(connection);
-            request = NULL;
-        }
-    }
-    return request;
-}
+/* The library's version banners (`.sdata` 0x80794410/0x80794414 and the `.data` 0x80630C50..0x80630D48
+ * run behind them).  `NHTTPi_RegisterCallbacks` and `NHTTPCreateRequest` each hand one of them to
+ * `OSRegisterVersion`, once, behind the two lazy-init flags of the `.sbss` run.  They sit here, after the
+ * comm-thread steps' strings (`"Transfer-Encoding"`, `"chunked"`) and before the public calls' messages,
+ * which is their place in the retail pools.  The `.data` run also holds an unreferenced `UNOFFICIAL` variant
+ * between the two banners (no relocation points into it), so all three are written, in this order. */
+const char* NHTTPi_versionString =
+    "<< RVL_SDK - NHTTP \trelease build: May 12 2009 11:01:00 (0x4199_60831) >>";
+char NHTTPi_unofficialVersionString[] =
+    "<< RVL_SDK - NHTTP \trelease build: May 12 2009 11:01:00 (0x4199_60831) UNOFFICIAL >>";
+const char* NHTTPi_createVersionString =
+    "<< RVL_SDK - NHTTPCREATE \trelease build: May 12 2009 11:01:00 (0x4199_60831) >>";
 
 /* Allocate a connection and its request, register the connection in the list and set it up in the
  * "created" state (status 0xF, pending). */
@@ -2493,6 +2691,26 @@ NHTTPConnection* NHTTPCreateConnection(const char* url, s32 method, u32 buffer, 
     connection->recvUnread = 0;
     NHTTPi_memclr(connection->recvBuffer, 0x8000);
     return connection;
+}
+
+/* 0x8051A300 (0x8C): start the connection's request, answering -1 when the connection or its
+ * request is missing and 0 once the send was accepted. */
+s32 NHTTPi_StartRequest(NHTTPConnection* connection) {
+    NHTTPInfo* info = NHTTPi_GetSystemInfoP();
+    NHTTPMutexInfo* mutex = NHTTPi_GetMutexInfoP(info);
+    NHTTPConnection* conn = NHTTPi_GetConnection(mutex, connection);
+
+    if (conn == NULL) {
+        return -1;
+    }
+    if (conn->request == NULL) {
+        return -1;
+    }
+    conn->requestId = NHTTP_SendRequestAsync(info, conn->request);
+    if (conn->requestId >= 0) {
+        conn->state = 1;
+    }
+    return 0;
 }
 
 /* Answers the body window of the response's connection: the buffer and its size go out through
@@ -2660,6 +2878,50 @@ s32 NHTTPi_dispatchConnectionCallback(NHTTPConnection* connection, s32 phase, NH
     return result;
 }
 
+/* Answers the request handle the send hook of `NHTTPCreateRequest` was given, or null when the
+ * connection or its request could not be made. */
+NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u32 bufferSize,
+                                     NHTTPCompleteCallback completeCallback, u32 userData,
+                                     NHTTPBufferFullCallback bufferFullCallback,
+                                     NHTTPFreeBufferCallback freeCallback) {
+    NHTTPConnection* connection = NHTTPCreateConnection(url, method, buffer, bufferSize,
+                                                        NHTTPi_dispatchConnectionCallback, userData);
+    NHTTPInfo* info;
+    NHTTPMutexInfo* mutex;
+    NHTTPRequest* request = NULL;
+
+    if (connection != NULL) {
+        info = NHTTPi_GetSystemInfoP();
+        mutex = NHTTPi_GetMutexInfoP(info);
+        connection = NHTTPi_GetConnection(mutex, connection);
+        request = NHTTPi_Connection2Request(mutex, connection);
+        if (request != NULL) {
+            if (request->response != NULL) {
+                connection->completeCallback = completeCallback;
+                request->response->bufferFullCallback = bufferFullCallback;
+                request->response->freeCallback = freeCallback;
+                return request;
+            }
+            NHTTP_DestroyRequest(info, request);
+            NHTTPi_OmitConnectionList(mutex, connection);
+            NHTTPi_free(connection);
+            request = NULL;
+        }
+    }
+    return request;
+}
+
+/* Create a request for `url`, wrapped as a connection: the caller's completion hook is stored, and the
+ * NHTTPCREATE version is registered once. */
+NHTTPRequest* NHTTPCreateRequest(const char* url, s32 method, u32 buffer, u32 bufferSize,
+                                 NHTTPCompleteCallback completeCallback, u32 userData) {
+    if (NHTTPi_createVersionRegistered == 0) {
+        OSRegisterVersion(NHTTPi_createVersionString);
+        NHTTPi_createVersionRegistered = 1;
+    }
+    return __NHTTPCreateRequestEx(url, method, buffer, bufferSize, completeCallback, userData, NULL, NULL);
+}
+
 /* Append a header field to the request before it is sent; -1 (after a report) once it was. */
 s32 NHTTPAddHeaderField(NHTTPRequest* handle, const char* token, const char* value) {
     NHTTPInfo* info = NHTTPi_GetSystemInfoP();
@@ -2671,7 +2933,7 @@ s32 NHTTPAddHeaderField(NHTTPRequest* handle, const char* token, const char* val
         return -1;
     }
     if (request->field_0x04 != 0) {
-        printf("%s can be called before NHTTPStartConnection()\n", "NHTTPAddHeaderField");
+        printf("%s can be called before NHTTPStartConnection()\n", __FUNCTION__);
         return -1;
     }
     return NHTTP_AddHeaderField(request, bgnend, token, value) ? 0 : -1;
@@ -2688,7 +2950,7 @@ s32 NHTTPAddPostDataAscii(NHTTPRequest* handle, const char* token, const char* v
         return -1;
     }
     if (request->field_0x04 != 0) {
-        printf("%s can be called before NHTTPStartConnection()\n", "NHTTPAddPostDataAscii");
+        printf("%s can be called before NHTTPStartConnection()\n", __FUNCTION__);
         return -1;
     }
     return NHTTPAddPostDataRaw(request, bgnend, token, value) ? 0 : -1;
@@ -2703,17 +2965,6 @@ s32 NHTTPSendRequestAsync(NHTTPRequest* request) {
         return connection->requestId;
     }
     return -1;
-}
-
-/* Create a request for `url`, wrapped as a connection: the caller's completion hook is stored, and the
- * NHTTPCREATE version is registered once. */
-NHTTPRequest* NHTTPCreateRequest(const char* url, s32 method, u32 buffer, u32 bufferSize,
-                                 NHTTPCompleteCallback completeCallback, u32 userData) {
-    if (NHTTPi_createVersionRegistered == 0) {
-        OSRegisterVersion(NHTTPi_createVersionString);
-        NHTTPi_createVersionRegistered = 1;
-    }
-    return __NHTTPCreateRequestEx(url, method, buffer, bufferSize, completeCallback, userData, NULL, NULL);
 }
 
 /* Cancel request `id`; answers 0 when it was found and -1 when not. */
@@ -2841,7 +3092,7 @@ s32 NHTTPSetSystemProxy(NHTTPRequest* handle) {
             user = proxy->user;
             password = proxy->password;
         }
-        OSReport("Using proxy server %s:%d (%s/%s)\n", proxy->host, proxy->port,
+        OSReport("Using proxy server %s:%d (%s/%s).\n", proxy->host, proxy->port,
                  user != NULL ? user : "[no-auth]", password != NULL ? password : "[no-auth]");
         result = NHTTPSetProxy(request, proxy->host, proxy->port, user, password);
         if (result < 0) {
@@ -3221,241 +3472,4 @@ void NHTTPi_InitConnectionList(void) {
         }
     }
     NHTTPi_connectionListHead = NULL;
-}
-
-/* Build the request object for `url`: validate the method, copy the URL (decoding %XX escapes, except
- * inside the path), read out the scheme (http / https), host and port, and set up the response record
- * that hangs off it.  Answers the request, or null with the info block's error set (11 bad method, 1 no
- * memory, 4 bad URL). */
-NHTTPRequest* NHTTPi_createRequestObject(NHTTPInfo* info, const char* url, s32 method, u32 buffer,
-                                         u32 bufferSize, u32 userData,
-                                         NHTTPBufferFullCallback bufferFullCallback,
-                                         NHTTPFreeBufferCallback freeCallback) {
-    char urlBuffer[0x100];
-    char* urlCopy = urlBuffer;
-    s32 out;
-    s32 sawSlash;
-    s32 rest;
-    char* restPtr;
-    s32 i;
-    s32 escapes;
-    NHTTPRequest* request = NULL;
-    s32 prefix;
-    char* p;
-    s32 state;
-    s32 urlLength;
-    s32 hostLength;
-    s32 size;
-    s32 number;
-    s8 decoded;
-    u8 c;
-    u32 escaped;
-    char* hostStart;
-
-    do {
-        if (3 <= method || method < 0) {
-            NHTTPi_SetError(info, 11);
-            break;
-        }
-        request = NHTTPi_alloc(0x258, 4);
-        if (request == NULL) {
-            NHTTPi_SetError(info, 1);
-            break;
-        }
-        NHTTPi_memclr(request, 0x258);
-        request->response = NHTTPi_alloc(0x43C, 4);
-        if (request->response == NULL) {
-            NHTTPi_SetError(info, 1);
-            break;
-        }
-        NHTTPi_memclr(request->response, 0x43C);
-        request->response->userBuffer = buffer;
-        request->response->bufferSize = bufferSize;
-        request->response->bufferFullCallback = bufferFullCallback;
-        request->response->freeCallback = freeCallback;
-        urlLength = NHTTPi_strlen(url);
-        if (urlLength <= 7) {
-            NHTTPi_SetError(info, 4);
-            break;
-        }
-        if (urlLength + 1 > 0x100) {
-            urlCopy = NHTTPi_alloc(urlLength + 1, 4);
-            if (urlCopy == NULL) {
-                NHTTPi_SetError(info, 4);
-                break;
-            }
-        }
-        NHTTPi_memclr(urlCopy, urlLength);
-        NHTTPi_memcpy(urlCopy, url, urlLength);
-        request->port = 80;
-        prefix = 7;
-        if (NHTTPi_strnicmp(urlCopy, "http://", 7) != 0) {
-            if (NHTTPi_strnicmp(urlCopy, "https://", 8) != 0) {
-                NHTTPi_SetError(info, 4);
-                break;
-            }
-            request->useSSL = 1;
-            prefix = 8;
-            request->port = 443;
-        }
-        rest = urlLength - prefix;
-        restPtr = urlCopy + prefix;
-        if (rest <= 0) {
-            NHTTPi_SetError(info, 4);
-            break;
-        }
-        p = restPtr;
-        i = 0;
-        escapes = 0;
-        state = 0;
-        decoded = 0;
-        while (i < rest && *p != '/') {
-            if (state == 2) {
-                state -= 1;
-            } else if (state == 1) {
-                decoded = NHTTPi_strToHex(restPtr + i - 1, 2);
-                state -= 1;
-                if (decoded < 0) {
-                    break;
-                }
-                if (decoded == '/') {
-                    escapes -= 1;
-                    break;
-                }
-            } else if ((s8)*p == '%') {
-                state = 2;
-                escapes += 1;
-            }
-            i++;
-            p++;
-        }
-        if (decoded < 0 || state != 0) {
-            NHTTPi_SetError(info, 4);
-            break;
-        }
-        size = prefix + rest - escapes * 2 + 1;
-        request->url = NHTTPi_alloc(size, 4);
-        if (request->url == NULL) {
-            NHTTPi_SetError(info, 1);
-            break;
-        }
-        NHTTPi_memclr(request->url, size);
-        NHTTPi_memcpy(request->url, urlCopy, prefix);
-        p = restPtr;
-        i = 0;
-        out = 0;
-        state = 0;
-        sawSlash = 0;
-        while (i < rest) {
-            if (state == 2) {
-                state -= 1;
-            } else if (state == 1) {
-                decoded = NHTTPi_strToHex(restPtr + i - 1, 2);
-                state -= 1;
-                request->url[out + prefix - 1] = decoded;
-                if (decoded == '/') {
-                    sawSlash = 1;
-                }
-            } else {
-                c = *p;
-                if ((s8)c == '/') {
-                    sawSlash = 1;
-                }
-                escaped = (sawSlash == 0) & ((s8)c == '%');
-                if (escaped != 0) {
-                    state = 2;
-                } else {
-                    request->url[out + prefix] = c;
-                }
-                out += 1;
-            }
-            i++;
-            p++;
-        }
-        request->url[prefix + out] = 0;
-        hostStart = request->url + prefix;
-        p = hostStart;
-        i = 0;
-        for (size = out; size > 0; size--) {
-            if (*p == '/' || *p == ':') {
-                request->hostEnd = i + prefix;
-                break;
-            }
-            i++;
-            p++;
-        }
-        if (i == out) {
-            request->hostEnd = i + prefix;
-            request->pathStart = request->hostEnd;
-        } else if ((s8)hostStart[i] == '/') {
-            request->pathStart = request->hostEnd;
-        } else if ((s8)hostStart[i] == ':') {
-            p = hostStart + i;
-            for (size = out - i; size > 0; size--) {
-                if (*p == '/') {
-                    request->pathStart = i + prefix;
-                    break;
-                }
-                i++;
-                p++;
-            }
-            if (i == out) {
-                request->pathStart = i + prefix;
-            } else {
-                number = NHTTPi_strtonum(request->url + request->hostEnd + 1,
-                                         request->pathStart - (request->hostEnd + 1));
-                if (number < 0) {
-                    number = request->port;
-                } else if (number > 0xFFFF) {
-                    NHTTPi_SetError(info, 4);
-                    break;
-                }
-                request->port = (u16)number;
-            }
-        }
-        hostLength = request->hostEnd - ((request->useSSL != 0) + 7);
-        request->host = NHTTPi_alloc(hostLength + 1, 4);
-        if (request->host == NULL) {
-            NHTTPi_SetError(info, 1);
-            break;
-        }
-        NHTTPi_memclr(request->host, hostLength + 1);
-        NHTTPi_memcpy(request->host, request->url + ((request->useSSL != 0) + 7), hostLength);
-        NHTTPi_memcpy(&request->boundaryDashes, NHTTPi_postDataRawCode, 0x14);
-        request->method = method;
-        request->sslHandle = 0;
-        request->clientCert = 0;
-        request->clientCertLength = 0;
-        request->clientKey = 0;
-        request->clientKeyLength = 0;
-        request->rootCA = 0;
-        request->rootCALength = 0;
-        request->builtinClientCert = 0;
-        request->verifyOption = 0;
-        request->sslCallbackArg = 0;
-        request->response->userData = userData;
-        request->useProxy = 0;
-        request->recvBufferSize = 0;
-        request->sendBufferSize = 0;
-        if (urlCopy != NULL && urlCopy != urlBuffer) {
-            NHTTPi_free(urlCopy);
-        }
-        return request;
-    } while (0);
-    if (request != NULL) {
-        if (request->url != NULL) {
-            NHTTPi_free(request->url);
-        }
-        if (request->host != NULL) {
-            NHTTPi_free(request->host);
-        }
-        if (request->response != NULL) {
-            NHTTPi_free(request->response);
-        }
-        NHTTPi_free(request);
-    }
-    if (urlCopy != NULL && urlCopy != urlBuffer) {
-        NHTTPi_free(urlCopy);
-    }
-    return NULL;
 }

@@ -352,7 +352,9 @@ u32 NHTTPi_resolveHostName(struct NHTTPRequest* request, const char* name);
 /* The string helpers (0x8051702C..0x80517634) and the connection/request API (0x8051A1B8..0x8051AFEC):
  * the public NHTTP calls take the request handle `NHTTPCreateRequest` answered (a request object) or,
  * for the response-side calls, the response handle. */
+s32 NHTTPi_strToHex(const char* s, s32 n);
 s32 NHTTPi_strToDec(const char* s, s32 n);
+s32 NHTTPi_strtonum(const char* s, s32 n);
 s32 NHTTPi_uintToStr(char* buf, u32 value);
 s32 NHTTPi_isHeaderEnd(const char* window, s32 count);
 NHTTPConnection* NHTTPCreateConnection(const char* url, s32 method, u32 buffer, u32 bufferSize,
