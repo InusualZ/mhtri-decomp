@@ -34,6 +34,12 @@ extern EftResFile lobby_eft_mdl_file[2];
 extern EftResFile lb_comn_eft_file[2];
 extern EftResFile q_comn_eft_file[2];
 
+/* 0x80582D38 / 0x80582E58 / 0x80582EE0 - the face files `fn_80047398.cpp`'s loaders read: the nine male and the
+ * nine female `08/skin/*_faceNNN.tpl` records, and the skin files (`m_skin`, `f_skin`, `facemake`). */
+extern EftResFile m_face_file_tbl[9];
+extern EftResFile f_face_file_tbl[9];
+extern EftResFile skin_file_tbl[3];
+
 /* 0x80055E30 - selects the resource arena index the loaders draw from (and clears the switch byte);
  * `arena_resource_load` picks index 1 for the arena texture pack.  `res_file_ctor` (0x80054FE8) builds a
  * `ResFile` handle from a 32-byte-aligned file address (asserting the alignment) and `res_file_assign`

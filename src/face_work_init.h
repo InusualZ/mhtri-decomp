@@ -11,10 +11,10 @@ extern "C" {
 /* 0x800474A8 - clears the face work. */
 void face_work_init(void);
 /* 0x80047634 / 0x80047780 - queue model `sex`'s face textures (face `face`) / its face-part textures. */
-void face_tex_load(u8 sex, u16 face, s32 flag);
-void face_parts_tex_load(u8 sex, s32 a, s32 b);
+void face_tex_load(u8 sex, u32 face, u8 mode);
+void face_parts_tex_load(u8 sex, s32 part, u8 mode);
 /* 0x800478F0 - builds model `sex`'s face texture objects once loaded. */
-void face_tex_bind(u8 sex);
+void face_tex_bind(u32 sex);
 /* 0x80047AF0 / 0x80047B0C - show / hide model `sex`'s face. */
 void face_draw_on(u8 sex);
 void face_draw_off(u8 sex);

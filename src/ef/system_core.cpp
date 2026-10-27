@@ -1301,7 +1301,7 @@ void memory_layout_init(void) {
     sizes[0] = 0;
     addr = 0x90048000;
     system_w.layout_0x940 = addr;
-    addr += (sizes[1] = userdata_size_get()) * 2;
+    addr += (sizes[1] = face_buf_size_get()) * 2;
     system_w.layout_0x944 = addr;
     addr += (sizes[2] = font_buffer_size_get());
     system_w.field_0x948 = (void*)addr;

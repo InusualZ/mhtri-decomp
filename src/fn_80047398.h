@@ -85,8 +85,8 @@ void subTransSetPrio(u8 slot, u32 func, s32 arg, u32* out);
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* 0x800487C8 - the size of the user data block the system core lays out first (half of its arena). */
-u32 userdata_size_get(void);
+/* 0x800487C8 - the size of one face-sprite buffer (the system core lays out two). */
+u32 face_buf_size_get(void);
 #ifdef __cplusplus
 }
 #endif

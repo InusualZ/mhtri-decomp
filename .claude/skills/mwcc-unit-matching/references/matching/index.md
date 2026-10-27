@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (169)
+## Ideas that work (171)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -178,6 +178,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 187 | [An extab range or an 8-aligned vtable that only a merged object reproduces names a false TU seam](187-extab-range-or-an.md) | works | sections, linker | Every function of a unit is instruction-identical, yet one extab range starts a call too early and a vtable lands 4 bytes late in .data, so the unit can never flip. |
 | 188 | [A u16 local cleared with a 16-bit constant keeps retail's andi. and its use-site clrlwi](188-u16-local-cleared-with.md) | works | source-shape | Retail clears bits of a u16 local with `andi. rN,rN,0xFFF7` / `rlwinm rN,rN,0,16,30` and masks it with `clrlwi r0,rN,16` at each test, where ours clears with `rlwinm r0,rN,0,29,27` + `clrlwi rN,r0,16` and folds the... |
 | 189 | [A function's schedule depends on the previously compiled function: anchor it with a dead-stripped predecessor](189-functions-schedule-depends-on.md) | works | source-shape, linker, process | The first function of a unit has two independent instructions in the wrong order (same size, same relocations) and no source shape, flag, pragma or compiler version moves them. |
+| 190 | [A run of conditional stores from a stepping address is a short loop: written out, the constants fold](190-run-of-conditional-stores.md) | works | source-shape | Retail keeps an address in a saved register and steps it with addis/subi between stores; ours folds every store to its own lis/addi constant and saves one more register |
+| 191 | [Float locals keep a quad's UV fadds that literal arguments fold away](191-float-locals-keep-a.md) | works | source-shape | Retail computes 0.0f + 1.0f at run time (fadds f1,f30,f28 from two hoisted registers); ours loads a folded 1.0f from the pool per vertex |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 
