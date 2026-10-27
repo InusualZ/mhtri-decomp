@@ -316,17 +316,6 @@ typedef struct PlItemData {
     /* +0x02 */ u8 field_0x002;  /* the category mask; bit 3 marks a usable item */
 } PlItemData; /* size: 0x03 */
 
-/* The player's two attack entries at `_PLW`+0x484 and +0x4E0 sit 0x5C apart: each is the head of a `_HIT_W`
- * (`Pl/hit_w.h`) whose last four bytes the next entry overlaps.  This view names the two bytes the act reset
- * writes in each.  size: 0x5C */
-typedef struct PlHitSlot {
-    /* +0x00 */ u8 pad_0x00[0x5];
-    /* +0x05 */ u8 active_0x05;    /* `_HIT_W::active_0x05` */
-    /* +0x06 */ u8 pad_0x06[0x8];
-    /* +0x0E */ u8 result_0x0E;    /* `_HIT_W::result`; 0xFF is "no result" */
-    /* +0x0F */ u8 pad_0x0F[0x4D];
-} PlHitSlot; /* size: 0x5C */
-
 /* One row of the item-use act table: the motion, the attribute and its part the use step arms, and the slot the
  * act returns to.  size: 0x8 */
 typedef struct PlItemAct {
@@ -443,7 +432,7 @@ extern "C" {
 void fn_80264274(struct _PLW* self, s16 value);
 void fn_80264940(struct _PLW* self, u32 value);
 u8 fn_8026495C(struct _PLW* self);
-void fn_80264A28(struct _PLW* self);
+void pl_sub_gauge_level_cost(struct _PLW* self);
 s32 fn_80264A84(struct _PLW* self);
 s32 fn_80264EA4(struct _PLW* self);
 s32 fn_80264EC0(struct _PLW* self);
@@ -1970,7 +1959,7 @@ extern "C" void pl_act_flinch(_PLW* self, s32 variant) {
             fn_80277BC4(self, 0);
         }
         pl_act_set_motion_gate(self, 0);
-        fn_80276B58(self, -150);
+        pl_sub_gauge_skill_add(self, -150);
         pl_act_set_flag(self, 0x1000);
         pl_act_arm_flags(self, 1);
         pl_stun_tick(self);
@@ -2390,7 +2379,7 @@ extern "C" void pl_act_knockback(_PLW* self, s32 variant, s32 level, u8 alt) {
         Pl_act_set_motion(self, 0, 0, 0);
         pl_camera_lock_clear(self);
         pl_act_set_motion_gate(self, 0);
-        fn_80276B58(self, -150);
+        pl_sub_gauge_skill_add(self, -150);
         pl_guard_latch_set(self);
         if (self->field_0x002 <= 2 || self->field_0x002 == 5 || self->field_0x002 == 7) {
             pl_stun_tick(self);
@@ -2829,7 +2818,7 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
         pl_act_set_motion_gate(self, 0);
         if (variant != 4 && variant != 5) {
             fn_80277BC4(self, 0);
-            fn_80276B58(self, -150);
+            pl_sub_gauge_skill_add(self, -150);
         }
         pl_camera_lock_clear(self);
         pl_act_set_flag(self, 0x1000);
@@ -3056,7 +3045,7 @@ extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
             fn_80277BC4(self, 1);
         }
         pl_act_set_motion_gate(self, 0);
-        fn_80276B58(self, -0x96);
+        pl_sub_gauge_skill_add(self, -0x96);
         pl_camera_lock_clear(self);
         pl_act_set_flag(self, 0x1000);
         pl_act_arm_flags(self, 1);
@@ -8348,7 +8337,7 @@ extern "C" void pl_act_weapon_sheathe_attack(_PLW* self) {
         self->act_step_0x05++;
         Pl_chr_set_attr_default(self, 0x4BB, 0, 0);
         pl_act_set_frame_timer(self);
-        fn_80264A28(self);
+        pl_sub_gauge_level_cost(self);
         pl_act_arm_motion_and_flag(self, 0, 0, 0);
         break;
     case 1:
@@ -8374,7 +8363,7 @@ extern "C" void pl_act_weapon_thrust(_PLW* self) {
         self->act_step_0x05++;
         self->field_0x006 = 0;
         self->field_0x007 = 0;
-        fn_80264A28(self);
+        pl_sub_gauge_level_cost(self);
         if ((u32)(self->field_0x002 - 3) <= 3) {
             Pl_chr_set_attr_default(self, 0x4BC, 0, 0);
         } else {
@@ -8450,7 +8439,7 @@ extern "C" void pl_act_weapon_swing(_PLW* self, s32 variant) {
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
-        fn_80264A28(self);
+        pl_sub_gauge_level_cost(self);
         if (variant == 0) {
             Pl_chr_set_attr_default(self, 0x4BC, 0, 0);
         } else {
@@ -8599,7 +8588,7 @@ extern "C" void pl_act_weapon_follow_up(_PLW* self, s32 variant) {
             Pl_chr_set_attr_default(self, 0x4EE, 0, 0);
             break;
         }
-        fn_80264A28(self);
+        pl_sub_gauge_level_cost(self);
         pl_act_arm_motion_and_flag(self, 3, 0, 0);
         break;
     case 1:
@@ -10454,7 +10443,7 @@ extern "C" void pl_act_roar_flinch(_PLW* self, s32 drawn) {
         self->field_0x28 = 0;
         fn_80277BC4(self, 0);
         pl_act_set_motion_gate(self, 0);
-        fn_80276B58(self, -150);
+        pl_sub_gauge_skill_add(self, -150);
         pl_act_set_flag(self, 0x1000);
         pl_act_arm_flags(self, 1);
         pl_stun_tick(self);
@@ -15959,7 +15948,7 @@ u8 fn_8026495C(_PLW* self) {
 }
 
 /* 0x80264A28 - converts the ball-spin charge level into the motion's knock-back distance. */
-void fn_80264A28(_PLW* self) {
+void pl_sub_gauge_level_cost(_PLW* self) {
     u8 level = fn_8026495C(self);
     s16 distance = -0x96;
 
@@ -15968,7 +15957,7 @@ void fn_80264A28(_PLW* self) {
     } else if (level >= 0xF) {
         distance = -0xC8;
     }
-    fn_80276B58(self, distance);
+    pl_sub_gauge_skill_add(self, distance);
 }
 
 /* 0x80264A84 - the motion's charge tier for the actor's current state. */

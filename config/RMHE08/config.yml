@@ -62,6 +62,9 @@ fill_gaps: true
 # addresses and relocates them against extabindex labels; they are plain constants.
 # Measured (network pilot, L1): 21 functions up, 0 down, main.dol unchanged.
 block_relocations:
+# The weapon-3 act step tables (.data 0x805E9BE8..0x805EBBE0, Pl/pl_act_class3.cpp) are byte-coded records, not pointers.
+- source: .data:0x805E9BE8
+  end: .data:0x805EBBE0
 # The WPADEncrypt S-boxes (.data 0x8062C8F8..0x8062DB28) are byte tables, not pointers.
 - source: .data:0x8062C99C
   end: .data:0x8062C9A0

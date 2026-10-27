@@ -6021,7 +6021,7 @@ extern "C" { extern u32 pl_steps_kind8_guard[]; }
 extern "C" { extern u32 pl_steps_kind8_slot3_guard[]; }
 
 /* 0x80276B58: the attack-scale multiplier the actor's active skills grant for a signed modifier. */
-extern "C" void fn_80276B58(_PLW* self, s32 arg1)
+extern "C" void pl_sub_gauge_skill_add(_PLW* self, s32 arg1)
 {
     if (Pl_master_ck(self) != 0) {
         f32 f = (f32)(s16)arg1;

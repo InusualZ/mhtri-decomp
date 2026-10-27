@@ -77,4 +77,15 @@ extern const f32 pl_frame_window_2051; /* 0x80799FF8: 2051 */
 }
 #endif
 
+/* The player's two attack entries at `_PLW`+0x484 and +0x4E0 sit 0x5C apart: each is the head of a `_HIT_W`
+ * (`Pl/hit_w.h`) whose last four bytes the next entry overlaps.  This view names the two bytes the act reset
+ * writes in each.  size: 0x5C */
+typedef struct PlHitSlot {
+    /* +0x00 */ u8 pad_0x00[0x5];
+    /* +0x05 */ u8 active_0x05;    /* `_HIT_W::active_0x05` */
+    /* +0x06 */ u8 pad_0x06[0x8];
+    /* +0x0E */ u8 result_0x0E;    /* `_HIT_W::result`; 0xFF is "no result" */
+    /* +0x0F */ u8 pad_0x0F[0x4D];
+} PlHitSlot; /* size: 0x5C */
+
 #endif /* MHTRI_PL_ACT_STEP_H */

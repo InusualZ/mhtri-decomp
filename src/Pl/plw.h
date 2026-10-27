@@ -142,7 +142,11 @@ struct _PLW {
     /* +0x024 */ u32 frame_b_0x024;   /* a second frame counter, stepped with +0x020 by the status step */
     /* +0x028 */ s32 field_0x28;  /* the act handlers' own frame/step timer; non-zero also
                                   * suppresses the `a2 == 1` act tail (`fn_80258FCC`) */
-    /* +0x02C */ struct _SHELL_W* equip_0x2C;
+    /* +0x02C */ union {   /* one word, two views (rule 5) */
+        /* +0x02C */ struct _SHELL_W* equip_0x2C;
+        /* +0x02C */ f32 rehit_timer_0x2C;   /* the weapon-3 charge's countdown to its next re-armed attack,
+                                             * run down by the +0x354 speed (`Pl/pl_act_class3.cpp`) */
+    };
     /* +0x030 */ union {   /* 0x030-0x03B: one 12-byte, 2-aligned run with three views - the
                             * `flag_0x30` byte view (a split of the same bytes kept whole
                             * inside it) and the act unit's two 16-bit fields.  Every member is 12

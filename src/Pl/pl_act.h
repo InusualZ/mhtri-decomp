@@ -39,7 +39,7 @@ void* equip_armor_ex_rec_find(u8 kind, u16 index);
 void pl_act_enter(struct _PLW* plw, s32 a, u16 b, u16 c);
 
 /* The four action helpers `Pl/pl_act_step.cpp`'s main/control cluster (0x80262940-0x802673A4) calls. */
-void fn_80276B58(struct _PLW* self, s32 value);
+void pl_sub_gauge_skill_add(struct _PLW* self, s32 value);
 void Pl_act_set_step_table(struct _PLW* self, u32 table, s32 arg2);   /* the owner's own `void` definition */
 void fn_8027AC00(struct _PLW* self);
 /* 0x8027D5A4 - applies a signed charge delta to the actor's stored charge, scaled by the two charge skills, and
