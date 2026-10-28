@@ -44,13 +44,13 @@
  * RESIDUALS. `WPADControlDpd`: the zero byte and the report id swap r12/r31 in two of its queued reports.
  *   `WPADControlSpeaker` (the first two one-byte writes of the "off" path) and `WPADControlDpd` (its three one-byte
  *   writes): the value/size bytes and the command and its by-value copy take each other's stack slots (alternate
- *   builder orders and a wrapper builder move the whole frame instead).
+ *   builder orders and a wrapper builder move the whole frame instead; every declaration order of a per-site one-byte
+ *   builder, with the push inline or written out, leaves them).
  *   Register numbering only (the colouring order is read with tools/mwcc-debugger, playbook idea 244):
- *   `wpadSendReadMemory`, `WPADiSendWriteData` and `WPADiSendSetReportType` keep `queue` in r31 where the original has
- *   r30 (the `queue` parameter is the node left when simplification stalls, so it is coloured before the push's
- *   `level`); `__wpadIsBusyStream` (`deviceType` is the stalled node and takes r31, the original gives r31 to `level`);
- *   `wpadHidOpenCallback` (the inlined push's `level`/`used` take r28/r27 for the original's r30/r31,
- *   the inlined peek's swap r27/r28); `wpadCountIdleReports` (`format` is a local or frontend temporary numbered below the
+ *   `WPADiSendWriteData` (the push written out: `address` and `count` take each other's stack slots; every declaration
+ *   order and a function-scope `item`/`level` leave it or move the frame);
+ *   `wpadHidOpenCallback` (the push's `used` takes r28 for the original's r31, and the inlined pop's and peek's
+ *   `level`/`used` swap r27/r28; a named `used`, split declarations and a caller-written push leave them); `wpadCountIdleReports` (`format` is a local or frontend temporary numbered below the
  *   backend `chan * 4`, which takes r3; the original gives r3 to `format`); `wpadFilterButtons` (the back-sample
  *   pointer takes r5 before the extension-code loads, the original r6); `wpadUpdateRadioSensitivity` (`average`
  *   takes r3, the original r5).
@@ -58,10 +58,8 @@
  *   `wpadSampleChanged`: five callee-saved registers where the original uses four, and the original truncates `changed`
  *   after every debounce.  `changed = changed | wpadDebounceMove(...)` at all four sites reproduces the size and every
  *   instruction but colours `changed` r7 instead of r10 and scores lower; `=` at the first site and `|=` at the others
- *   scores best (8 bytes short).
- *   `wpadInitSequence`: its 0x1A report is built in the body, so the command lies above its copy where the original
- *   has it below; through `wpadQueueDpdEnable2` the frame becomes identical but the last two pushes' `level`/`used`
- *   swap r26/r27, which scores lower.
+ *   scores best (8 bytes short); in the four-site form most of the macro's frontend temporaries colour differently
+ *   (tools/mwcc-debugger/regsim.py search reaches 3 of 11 callee-saved targets with one edit).
  *   Flip blocker: .text (the partial rows).
  *   The data sections otherwise differ only in their aligned tails.
  * SHAPES. A command is a local `WPADCommand` passed by value to an inline push (`wpadQueuePush`): the 0x30-byte stack copy
@@ -69,7 +67,12 @@
  *   built in the function's own body lies above its copy, one built inside an inline builder (`wpadQueueLed`,
  *   `wpadQueueInfoRequest`, `wpadQueueStreamData`, `wpadQueueWriteByte`) usually lies below it (the residuals list the
  *   exceptions).  The one-byte builders store the report id first.  `wpadSendWriteByte` forwards to `wpadQueueWriteByte`;
- *   `wpadSendReadMemory` carries its own copy of the read body.  `wpadQueueCount` (an `s8` count, re-truncated after the
+ *   `wpadSendReadMemory` carries its own copy of the read body.  `wpadSendReadMemory`, `WPADiSendWriteData` and
+ *   `WPADiSendSetReportType` (and the inline builders `wpadQueueReadMemoryCopy`/`wpadQueueDpdEnableCopy`, which
+ *   `wpadHidOpenCallback` and `wpadInitSequence` use) write the push out in a block (`WPADCommand item = cmd;` is the by-value copy) so that
+ *   `level` is a named local of the caller: the inline's `level` is a frontend temporary that colours after the stalled
+ *   `queue` parameter.  `__wpadIsBusyStream` reads the queued and not-acked sizes through the inline
+ *   `wpadGetQueuedSize`/`wpadGetNotAckedSize` (the first result is unused) and declares `level` before `cb`.  `wpadQueueCount` (an `s8` count, re-truncated after the
  *   wrap) is the shape the push, peek and pop share.  `wpadApplyDpdFormat` is queued as a completion callback, so its
  *   one-parameter prototype is cast to `WPADCallback`.  `u32 level = OSDisableInterrupts(); ... OSRestoreInterrupts(level);`
  *   brackets every field read; `-1 & ~((-a | a) >> 31)` is `a != 0 ? 0 : -1`.  `WPADDisconnect` re-reads the status
@@ -415,6 +418,62 @@ static inline s32 wpadQueueReadMemory(WPADCmdQueue* queue, void* dest, u16 size,
     cmd.argA = (u32)dest;
     cmd.argC = address;
     return wpadQueuePush(queue, cmd);
+}
+
+/* Queues the same read as `wpadQueueReadMemory`, pushing a block-local copy of the command. */
+static inline s32 wpadQueueReadMemoryCopy(WPADCmdQueue* queue, void* dest, u16 size, u32 addr, WPADCallback callback) /* untyped: caller-owned byte buffer */
+{
+    WPADCommand cmd;
+    u32 address = addr;
+    u16 length = size;
+
+    cmd.reportId = 0x17;
+    cmd.length = 6;
+    cmd.callback = callback;
+    memcpy(&cmd.data[0], &address, 4);
+    memcpy(&cmd.data[4], &length, 2);
+    cmd.argB = length;
+    cmd.argA = (u32)dest;
+    cmd.argC = address;
+    {
+        WPADCommand item = cmd;
+        u32 level = OSDisableInterrupts();
+
+        if (queue->capacity - 1 == (u32)wpadQueueCount(queue)) {
+            OSRestoreInterrupts(level);
+            return FALSE;
+        }
+        memset(&queue->items[queue->tail], 0, sizeof(WPADCommand));
+        memcpy(&queue->items[queue->tail], &item, sizeof(WPADCommand));
+        queue->tail = (queue->tail == queue->capacity - 1) ? 0 : queue->tail + 1;
+        OSRestoreInterrupts(level);
+        return TRUE;
+    }
+}
+
+/* Queues the 0x1A dpd-enable report, pushing a block-local copy of the command. */
+static inline BOOL wpadQueueDpdEnableCopy(WPADCmdQueue* queue, u8 value, WPADCallback callback)
+{
+    WPADCommand cmd;
+
+    cmd.reportId = 0x1A;
+    cmd.length = 1;
+    cmd.data[0] = value;
+    cmd.callback = callback;
+    {
+        WPADCommand item = cmd;
+        u32 level = OSDisableInterrupts();
+
+        if (queue->capacity - 1 == (u32)wpadQueueCount(queue)) {
+            OSRestoreInterrupts(level);
+            return FALSE;
+        }
+        memset(&queue->items[queue->tail], 0, sizeof(WPADCommand));
+        memcpy(&queue->items[queue->tail], &item, sizeof(WPADCommand));
+        queue->tail = (queue->tail == queue->capacity - 1) ? 0 : queue->tail + 1;
+        OSRestoreInterrupts(level);
+        return TRUE;
+    }
 }
 
 /* Reads the status word of channel `chan` with interrupts off. */
@@ -1312,14 +1371,7 @@ void wpadInitSequence(s32 chan, s32 result)
     WPADiDebugPrint(" ==>this error means that the firmware is for NDEV %s\n", cb->calibrationPhase != 0 ? "2.0" : "2.1 or later");
     leds = (cb->deviceType == 3) ? 1 : (1 << chan);
     WPADiSendSetReportType(&cb->cmdQueue, 0, cb->reportOnChange, wpadAbortCallback);
-    {
-        WPADCommand cmd;
-        cmd.reportId = 0x1A;
-        cmd.length = 1;
-        cmd.data[0] = 0;
-        cmd.callback = wpadAbortCallback;
-        wpadQueuePush(&cb->cmdQueue, cmd);
-    }
+    wpadQueueDpdEnableCopy(&cb->cmdQueue, 0, wpadAbortCallback);
     wpadQueueLed(&cb->cmdQueue, leds, wpadAbortCallback);
     wpadQueueReadMemory(&cb->cmdQueue, cb->extId, 0x38, 0x2A, wpadAbortCallback);
     wpadQueueReadMemory(&cb->cmdQueue, cb->extId, 0x38, 0x62, wpadAbortCallback);
@@ -1391,7 +1443,7 @@ void wpadHidOpenCallback(WPADDeviceInfo* info, s32 connected)
             cb->disconnecting = 0;
             cb->extInitState = 0;
             cb->extensionResult = cb->deviceType;
-            wpadQueueReadMemory(&cb->cmdQueue, cb->extId, 1, 0x1770, wpadInitSequence);
+            wpadQueueReadMemoryCopy(&cb->cmdQueue, cb->extId, 1, 0x1770, wpadInitSequence);
             __VIResetDimmingControlA();
         }
     } else {
@@ -2069,47 +2121,52 @@ void WPADSetSpeakerVolume(u8 volume)
 }
 
 /* Whether the audio stream cannot take another packet right now. */
-BOOL __wpadIsBusyStream(s32 chan)
+static inline u16 wpadGetQueuedSize(s32 chan)
 {
     WPADCB* cb = wpadCBTable[chan];
     u32 level = OSDisableInterrupts();
-    u8 weakRadio = cb->weakRadio;
-    u8 deviceType = cb->deviceType;
-    u8 bufferStatus = WUDGetBufferStatus();
+    s32 status = cb->status;
+    s8 handle = cb->devHandle;
+    OSRestoreInterrupts(level);
+    if (status == -1) {
+        return 0;
+    }
+    return _WUDGetQueuedSize(handle);
+}
+
+static inline u16 wpadGetNotAckedSize(s32 chan)
+{
+    WPADCB* cb = wpadCBTable[chan];
+    u32 level = OSDisableInterrupts();
+    s32 status = cb->status;
+    s8 handle = cb->devHandle;
+    OSRestoreInterrupts(level);
+    if (status == -1) {
+        return 0;
+    }
+    return _WUDGetNotAckedSize(handle);
+}
+
+BOOL __wpadIsBusyStream(s32 chan)
+{
+    u32 level;
+    WPADCB* cb = wpadCBTable[chan];
+    u8 weakRadio;
     s8 queued;
+    u8 bufferStatus;
+    u8 deviceType;
+    u16 queuedSize;
     u16 notAcked;
     u8 pending;
     u8 links;
-    {
-        u32 inner = OSDisableInterrupts();
-        queued = cb->cmdQueue.tail - cb->cmdQueue.head;
-        if (queued < 0) {
-            queued = queued + cb->cmdQueue.capacity;
-        }
-        OSRestoreInterrupts(inner);
-    }
-    {
-        WPADCB* again = wpadCBTable[chan];
-        u32 inner = OSDisableInterrupts();
-        s32 status = again->status;
-        s8 handle = again->devHandle;
-        OSRestoreInterrupts(inner);
-        if (status != -1) {
-            _WUDGetQueuedSize(handle);
-        }
-    }
-    {
-        WPADCB* again = wpadCBTable[chan];
-        u32 inner = OSDisableInterrupts();
-        s32 status = again->status;
-        s8 handle = again->devHandle;
-        OSRestoreInterrupts(inner);
-        if (status == -1) {
-            notAcked = 0;
-        } else {
-            notAcked = _WUDGetNotAckedSize(handle);
-        }
-    }
+
+    level = OSDisableInterrupts();
+    weakRadio = cb->weakRadio;
+    deviceType = cb->deviceType;
+    bufferStatus = WUDGetBufferStatus();
+    queued = wpadQueueCount(&cb->cmdQueue);
+    queuedSize = wpadGetQueuedSize(chan);
+    notAcked = wpadGetNotAckedSize(chan);
     pending = cb->pendingStreamPackets;
     links = _WUDGetLinkNumber();
     OSRestoreInterrupts(level);
@@ -2341,7 +2398,20 @@ s32 WPADiSendSetReportType(WPADCmdQueue* queue, u32 type, s32 onChangeOnly, WPAD
         cmd.data[1] = 0x3D;
         break;
     }
-    return wpadQueuePush(queue, cmd);
+    {
+        WPADCommand item = cmd;
+        u32 level = OSDisableInterrupts();
+
+        if (queue->capacity - 1 == (u32)wpadQueueCount(queue)) {
+            OSRestoreInterrupts(level);
+            return FALSE;
+        }
+        memset(&queue->items[queue->tail], 0, sizeof(WPADCommand));
+        memcpy(&queue->items[queue->tail], &item, sizeof(WPADCommand));
+        queue->tail = (queue->tail == queue->capacity - 1) ? 0 : queue->tail + 1;
+        OSRestoreInterrupts(level);
+        return TRUE;
+    }
 }
 
 /* Queues a one-byte write of `value` to the remote address `addr`. */
@@ -2363,7 +2433,20 @@ s32 WPADiSendWriteData(WPADCmdQueue* queue, const void* src, s32 size, u32 addr,
     memcpy(&cmd.data[0], &address, 4);
     memcpy(&cmd.data[4], &count, 1);
     memcpy(&cmd.data[5], src, size);
-    return wpadQueuePush(queue, cmd);
+    {
+        WPADCommand item = cmd;
+        u32 level = OSDisableInterrupts();
+
+        if (queue->capacity - 1 == (u32)wpadQueueCount(queue)) {
+            OSRestoreInterrupts(level);
+            return FALSE;
+        }
+        memset(&queue->items[queue->tail], 0, sizeof(WPADCommand));
+        memcpy(&queue->items[queue->tail], &item, sizeof(WPADCommand));
+        queue->tail = (queue->tail == queue->capacity - 1) ? 0 : queue->tail + 1;
+        OSRestoreInterrupts(level);
+        return TRUE;
+    }
 }
 
 /* Queues a read of `size` bytes from the remote address `addr` into `dest`. */
@@ -2381,7 +2464,20 @@ s32 wpadSendReadMemory(WPADCmdQueue* queue, void* dest, u16 size, u32 addr, WPAD
     cmd.argB = length;
     cmd.argA = (u32)dest;
     cmd.argC = address;
-    return wpadQueuePush(queue, cmd);
+    {
+        WPADCommand item = cmd;
+        u32 level = OSDisableInterrupts();
+
+        if (queue->capacity - 1 == (u32)wpadQueueCount(queue)) {
+            OSRestoreInterrupts(level);
+            return FALSE;
+        }
+        memset(&queue->items[queue->tail], 0, sizeof(WPADCommand));
+        memcpy(&queue->items[queue->tail], &item, sizeof(WPADCommand));
+        queue->tail = (queue->tail == queue->capacity - 1) ? 0 : queue->tail + 1;
+        OSRestoreInterrupts(level);
+        return TRUE;
+    }
 }
 
 /* Whether `count` more commands fit in the queue. */
