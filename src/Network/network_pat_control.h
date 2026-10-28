@@ -1000,7 +1000,7 @@ typedef struct NetCtrlWk {
     static BOOL submitTextSelect(const char* text, s8* result);
     static BOOL submitIdSelect(const NetId* id, s8* result);
     static BOOL startLayerRefresh(s8* result);
-    static BOOL submitSlotRequest(const NetSlotIds* ids, s8* result);
+    static BOOL submitSlotRequest(NetSlotIds* ids, s8* result);
     static void copyFriendList(NetFriendListView* out, u8 use_own);
     static s32 copyCommunityViews(NetCommunityView* views, s32 first, s32 max, s16* total);
     static BOOL hasFriendDetail(const NetId* id);
@@ -1028,7 +1028,7 @@ extern MEMiHeapHead* net_exp_heap;
 /* The band's entry points that keep C linkage in the map (`can_enter_server` and its siblings are the
  * retail names; `updateNetworkPatControl` is the per-frame update). */
 void updateNetworkPatControl(void);
-BOOL can_enter_server(s32 index, u32 value);
+BOOL can_enter_server(s32 index, u16 value);
 char* get_server_type_name(s32 index);
 char* get_server_type_desc(s32 index);
 u16 get_server_big_data_timeout_element(s32 index);
