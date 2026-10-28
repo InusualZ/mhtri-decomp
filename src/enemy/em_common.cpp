@@ -89,8 +89,7 @@
  *   em_break_part_data_get, mhchar_mat_hide_set, ef_inst_spawn_joint, em_user_data_items_get, em_char_pose_sync,
  *   eft_em_slot_attach, eft_em_model_fx_spawn (registry proposals)
  * RESIDUALS. Every row is written.
- *  - `em_area_buff_apply`: the loop index and the work pointer take each other's register (r29/r31);
- *    `em_act_advance`: the recover-band pointer and the stat level take each other's register (r3/r4);
+ *  - `em_act_advance`: the recover-band pointer and the stat level take each other's register (r3/r4);
  *    `em_ambient_color_update`: the point-light blend converts the channel before the half difference (the
  *    scheduler; an `s16` step local moves the `fctiwz` the other way);
  *  - the definitions in 0x80128308..0x80128BF8 are not in address order (`em_delay_act_fire`, `fn_80128590`,
@@ -98,15 +97,16 @@
  *    from 0x80026F34 on;
  *  - the data this unit reads from `em_snd_proc_tbl` (.bss 0x806A7734, `em_hook_get` slot 7) is shared with
  *    `enemy/em_kind.cpp` and left unclaimed;
- *  - 64 written rows short of 100 %, most of them register allocation or instruction scheduling only; the
+ *  - 52 written rows short of 100 %, most of them register allocation or instruction scheduling only; the
  *    shapes known not to reach retail: `em_delay_act_set`/`em_delay_act_tick` (retail's `li r0,0` + `mulli`
- *    index; a one-slot `for` loop recovers it in `em_delay_act_set` but not the `add` base), `em_patrol_prev_get`
- *    (retail masks the post-decremented index at once),
- *    `em_break_part_active_ck` (retail adds the 0x488 base before the loop);
- *  - switch lowering: `em_height_limit_update`, `em_reaction_req` and `em_act_sleep_side_get`'s 0xE6..0xE9/0xEC..0xEF
- *    runs: retail lowers a case range with `subi` + `cmplwi` (or a bare `cmplwi` from 0), ours with
- *    `cmpwi lo; blt; cmpwi hi; ble` or a binary tree; selector casts (`u32`/`s32`/`u16`/`s16`/`s8`), GNU case ranges and
- *    label order do not change it;
+ *    index; a one-slot `for` loop recovers it in `em_delay_act_set` but not the `add` base; `optimization_level 4`
+ *    does not change it), `em_break_part_active_ck` (retail adds the 0x488 base before the loop), `em_mot_speed_set`
+ *    (retail rounds `speed` with `frsp` before the multiply, as for an `f64` parameter; an `(f32)(f64)` cast is worse);
+ *  - `em_target_pos_set`: retail's `get_worldworld_pos` temporaries sit above `t7`/`t6`/`t8` on the stack (ours
+ *    below); block-scoped declarations do not move them and named `VEC3 w = get_worldworld_pos(...)` copies cost a
+ *    struct copy each;
+ *  - `em_reaction_req`: retail keeps the spot index masked at the store (`clrlwi` + `stb`); the remaining registers
+ *    follow from it;
  *  - `em_target_pos_set`: retail keeps one dead `b` to the exit after each case per early `return` it holds;
  *    `em_target_select`: retail keeps `picked` in r14 and spills `result` (ours the opposite); `fn_8012BDF4`: the
  *    `table` default tests branch `beq default; b join` in retail; `em_area_decide`: retail's hook arm branches to the
@@ -115,11 +115,15 @@
  *    sits at a different point (hoisted to the loop preheader in retail);
  *  - `em_pl_hate_get`: the branch polarity and one reload differ;
  *  - `fn_8012B86C`, `em_team_member_claim`, `em_attack_start`, `em_area_vacant_wait_ck`, `em_nearest_area_get`,
- *    `em_part_spot_nearest_get`, `em_hit_window_set`, `em_owner_slot_update`, `em_patrol_step`: register allocation
- *    only.
+ *    `em_part_spot_nearest_get`, `em_hit_window_set`, `em_owner_slot_update`, `em_patrol_step`: register allocation;
+ *    `regsim search` (the mwcc-debugger dumps) finds no declaration order for them, or a plan that needs a
+ *    frontend temporary named at a declaration position (`em_nearest_area_get`, `em_area_roam_pick`, `em_act_pick`).
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.rodata`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
  *   differ from the target (the rows above, and `.sdata2` pooled per literal rather than at the map's addresses).
- * SHAPES. `#pragma peephole off` from the first body to the end (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi`
+ * SHAPES. `#pragma optimization_level 4` around `em_reaction_req`, `em_act_sleep_side_get` and
+ *   `em_height_limit_update` (retail's range-first `subi` + `cmplwi` switch lowering, playbook 108); the local
+ *   declaration orders follow `regsim search` over the mwcc-debugger dumps (playbook 242-245);
+ *   `#pragma peephole off` from the first body to the end (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi`
  *   + `slwi` unfused) and `#pragma fp_contract off` around `fn_8012BA00` (retail keeps `fmuls` + `fadds`); the
  *   `em_act_ck__FP11_ENEMY_WORKUcUc`-style map names are declared `extern "C"` under the map's spelling, so the
  *   parameter widths come from the codegen (retail masks them; a C++ declaration loses the `clrlwi`);
@@ -637,7 +641,7 @@ extern "C" f32 calcVecDistXZ(void* ref, nw4r::math::VEC3* pos);
 extern "C" s32 quest_time_limit_get(void);
 extern "C" s32 quest_time_elapsed_get(void);
 
-extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind);
+extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u8 kind);
 extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot);
 extern "C" void* em_kill_cut_target_get(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 pl_torch_ck(void* arg);
@@ -669,7 +673,7 @@ extern "C" void em_attack_start(_ENEMY_WORK* enemy);
 extern "C" void em_attack_done_set(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E6A0(u32 kind, u16 id);
 extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy);
-extern "C" s32 em_mini_kill_kind_get(_ENEMY_WORK* enemy);
+extern "C" u8 em_mini_kill_kind_get(_ENEMY_WORK* enemy);
 extern "C" void em_attack_finished_clear(_ENEMY_WORK* record);
 extern "C" s32 fn_8012E8F4(f32 seconds);
 
@@ -1705,8 +1709,9 @@ struct EmSpecialPartBlock {
 /* 0x80126900 (0x74): the special-part payload of the current map; NULL when it has none. */
 extern "C" u8* em_special_part_map_get(EnemyData* data)
 {
-    EmMapEntry* entry = data->special_parts_0x4C->maps;
     u8 kind;
+    EmMapEntry* entry;
+    entry = data->special_parts_0x4C->maps;
 
     if (entry != NULL) {
         for (; (kind = entry->map_kind) != 0xFF; entry++) {
@@ -2004,21 +2009,22 @@ struct EmPartSpots {
 extern "C" u8 em_nearest_area_get(EnemyData* data, nw4r::math::VEC3* pos, u8 area)
 {
     f32 best = 0.0f;
-    u8 code = 0xFF;
-    nw4r::math::VEC3 spot;
     EmSpecialPartSet* set;
-    EmPartSpots* part;
-    s32 i;
     s32 count;
+    u32 area_key;
+    EmPartSpots* part;
+    u8 code = 0xFF;
+    s32 i;
+    nw4r::math::VEC3 spot;
     f32 dist;
 
     VEC3_ctor(&spot);
     set = em_special_part_set_get(data, area);
     if (set != NULL) {
         part = (EmPartSpots*)set->parts;
-        for (i = 0, count = set->count; i < count; i++, part++) {
+        for (i = 0, area_key = (area & 0xF) << 8, count = set->count; i < count; i++, part++) {
             if (part->code != 0xFE && part->code != 0xFC) {
-                em_route_point_get(data, ((area & 0xF) << 8) | (u8)part->spots->key, &spot);
+                em_route_point_get(data, area_key | (u8)part->spots->key, &spot);
                 dist = calcDistanceSqXZ(pos, &spot);
                 if (i == 0) {
                     best = dist;
@@ -2042,27 +2048,30 @@ extern "C" u8 em_special_part_nearest(_ENEMY_WORK* self, nw4r::math::VEC3* pos, 
 /* 0x80127308 (0x158): copies the nearest spot of kind `kind` among the enemy area's special parts into `out`. */
 extern "C" void em_part_spot_nearest_get(_ENEMY_WORK* self, nw4r::math::VEC3* pos, nw4r::math::VEC3* out, u8 kind)
 {
-    EnemyData* data = get_enemy_data(self);
-    EmSpecialPartSet* set = em_special_part_set_get(data, self->area_no);
-    nw4r::math::VEC3 spot;
-    nw4r::math::VEC3 best_spot;
-    f32 best;
-    f32 none;
+    EmSpecialPartSet* set;
+    s32 count;
+    u32 want;
+    EnemyData* data;
     EmPartSpots* part;
     EmPartSpot* s;
     s32 i;
-    s32 count;
+    nw4r::math::VEC3 spot;
+    nw4r::math::VEC3 best_spot;
+    f32 none;
+    f32 best;
     f32 dist;
 
+    data = get_enemy_data(self);
+    set = em_special_part_set_get(data, self->area_no);
     VEC3_ctor(&spot);
     VEC3_ctor(&best_spot);
     best = -1.0f;
     if (set != NULL) {
         part = (EmPartSpots*)set->parts;
         none = best;
-        for (i = 0, count = set->count; i < count; i++, part++) {
+        for (i = 0, want = kind, count = set->count; i < count; i++, part++) {
             for (s = part->spots; s->key != 0xFFFF; s++) {
-                if (s->kind == kind) {
+                if (s->kind == want) {
                     em_route_point_get(data, ((self->area_no & 0xF) << 8) | (u8)s->key, &spot);
                     dist = calcDistanceSqXZ(pos, &spot);
                     if (best <= none) {
@@ -2149,8 +2158,8 @@ extern "C" u8 em_patrol_nearest_get(_ENEMY_WORK* self, u16 mask)
 {
     nw4r::math::VEC3 point;
     f32 best;
-    u8 found;
     u8 i;
+    u8 found;
     struct _EM_REC4* points;
     u8 count;
     f32 dist;
@@ -2190,8 +2199,10 @@ extern "C" u8 em_patrol_next_get(_ENEMY_WORK* self, struct _EM_REC4* points, u8 
 extern "C" u8 em_patrol_prev_get(_ENEMY_WORK* self, struct _EM_REC4* points, u8 count, u8 index)
 {
     do {
-        if (index-- == 0) {
+        if (index == 0) {
             index = count - 1;
+        } else {
+            index = index - 1;
         }
     } while ((fn_80127568(self, points, index) & 1) == 0);
     return index;
@@ -2204,16 +2215,18 @@ extern "C" u32 em_patrol_step(_ENEMY_WORK* self, u8 flags)
 {
     u8 pick;
     s32 diff;
+    u8 seen;
     u8 next;
     u8 prev;
-    u8 seen;
-    nw4r::math::VEC3 a;
-    u32 prev_only = 0;
+    u32 prev_only;
     u8 i;
     s32 best;
-    u32 next_only = 0;
-    struct _EM_REC4* points;
+    u32 next_only;
     u8 count;
+    nw4r::math::VEC3 a;
+    prev_only = 0;
+    next_only = 0;
+    struct _EM_REC4* points;
     nw4r::math::VEC3 b;
 
     VEC3_ctor(&a);
@@ -3145,10 +3158,13 @@ u16 em_get_mot_no(_ENEMY_WORK* self);
  * window shifted by the motion frame), the guard kind by the flags and the rank, and the shared hit id. */
 extern "C" void em_hit_window_set(_ENEMY_WORK* self, u8 slot, u32 attack, u32 flags)
 {
-    _HIT_DATA* attacks = get_enemy_data(self)->extra->attacks;
-    _HIT_W* hit = (_HIT_W*)&self->hit_slots_0xA08[slot];
-    _HIT_SIZE_DATA** sizes = get_enemy_data(self)->extra->attack_sizes;
+    _HIT_DATA* attacks;
+    _HIT_SIZE_DATA** sizes;
     _HIT_DATA* data;
+    _HIT_W* hit;
+    attacks = get_enemy_data(self)->extra->attacks;
+    hit = (_HIT_W*)&self->hit_slots_0xA08[slot];
+    sizes = get_enemy_data(self)->extra->attack_sizes;
     f32 shift;
 
     if (attacks == NULL || sizes == NULL) {
@@ -3259,10 +3275,10 @@ extern "C" void em_hit_window_clear(_ENEMY_WORK* self, u32 slot)
 /* 0x80129744 (0x4C): switches both hit records off. */
 extern "C" void em_hit_window_clear_all(_ENEMY_WORK* self)
 {
-    u8 i = 0;
+    u32 i = 0;
 
     do {
-        em_hit_window_clear(self, i);
+        em_hit_window_clear(self, (u8)i);
         i++;
     } while (i < 2);
 }
@@ -3928,6 +3944,7 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
 
 extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sub, u8* index);
 
+#pragma optimization_level 4
 /* 0x8012B380 (0x244): sets the target kind triple and resolves it: kinds 0..4 pick a target, kind 5 (a route
  * direction) falls back to kind 6, kind 8 latches the special part and picks its first spot in line of sight. */
 extern "C" void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index)
@@ -3935,10 +3952,10 @@ extern "C" void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index)
     nw4r::math::VEC3 eye;
     nw4r::math::VEC3 spot_pos;
     nw4r::math::VEC3 hit;
-    EmPartSpot* spot;
-    f32 lift;
-    u8 i;
     u8 mode;
+    f32 lift;
+    s32 i;
+    EmPartSpot* spot;
 
     VEC3_ctor(&eye);
     VEC3_ctor(&spot_pos);
@@ -3998,6 +4015,7 @@ extern "C" void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index)
     }
     self->timer_0x424 = 0;
 }
+#pragma optimization_level reset
 
 /* 0x8012B608 (0x44): adds `amount` to player `player`'s hate, clamped to [0, 20000]. */
 extern "C" void em_hate_add(_ENEMY_WORK* self, u8 player, s32 amount)
@@ -4029,20 +4047,27 @@ static const EmHateBands em_hate_bands_default = {300, 15, 10, 5};
  * a loss out of range or out of sight and a bonus for a seen player in status 2. */
 extern "C" void em_hate_update(_ENEMY_WORK* self)
 {
-    s32 g1 = em_hate_bands_default.band[1];
-    s32 g0 = em_hate_bands_default.band[0];
+    s32 g0;
+    s32 g1;
     s32 add;
-    s32 out = -2;
-    s32 g3 = em_hate_bands_default.band[3];
-    f32 d;
-    s32 lost = -5;
-    f32* dist;
-    s32* gains;
     u16 i;
+    s32 g3;
     _PLW* plw;
-    s32 bonus = 100;
+    f32* dist;
+    s32 out;
+    s32 lost;
+    s32* gains;
+    s32 bonus;
     u16 max;
-    s32 g2 = em_hate_bands_default.band[2];
+    s32 g2;
+    g1 = em_hate_bands_default.band[1];
+    g0 = em_hate_bands_default.band[0];
+    out = -2;
+    g3 = em_hate_bands_default.band[3];
+    f32 d;
+    lost = -5;
+    bonus = 100;
+    g2 = em_hate_bands_default.band[2];
 
     if (self->field_0x95C == 3) {
         return;
@@ -4622,16 +4647,16 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
  * `em_hate_pl_add`; then, when the global state allows it, picks the enemy's target for `em_hate_em_add`. */
 extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
 {
-    EnemyActionSet* set;
     EnemyActionTable* table;
-    _PLW* work;
     _ENEMY_WORK* target;
-    struct _AINPC_W* npc;
     u16 max;
     u16 i;
+    struct _AINPC_W* npc;
+    s32 value;
+    EnemyActionSet* set;
+    _PLW* work;
     u16 enemy_max;
     u16 j;
-    s32 value;
 
     set = get_enemy_data(enemy)->extra->action_set;
     if (set == NULL || (table = set->table_0x000) == NULL) {
@@ -4761,9 +4786,9 @@ extern "C" s32 em_team_area_alert_set(u32 team, u32 state_sub)
 {
     _ENEMY_WORK* work;
     u16 max;
+    u8 team_no;
     u16 i;
     u32 found;
-    u8 team_no;
     u8 area_no;
 
     work = (_ENEMY_WORK*)get_move_work_adrs(3);
@@ -5294,7 +5319,7 @@ extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot)
 
 
 /* The first attacker slot whose per-kind predicate `em_team_mate_state_ck` accepts the enemy. */
-extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind)
+extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u8 kind)
 {
     u16 max;
     s32 i;
@@ -5371,8 +5396,8 @@ extern "C" void* em_kill_cut_target_get(u32 selector, _PLW* player, s8* out_flag
 extern "C" void em_area_buff_apply(_ENEMY_WORK* self, u8 area_no, u8 mode)
 {
     s32 i;
-    _ENEMY_WORK* work;
     s32 max;
+    _ENEMY_WORK* work;
     EnemyData* data;
 
     work = get_move_work_adrs_view3(3);
@@ -5617,21 +5642,24 @@ extern "C" s32 em_act_stun_ck(_ENEMY_WORK* enemy)
     return 0;
 }
 
+#pragma optimization_level 4
 /* Three-way action-state query: 0/1 for the two states it knows, 0xFF otherwise. */
 extern "C" s32 em_act_sleep_side_get(_ENEMY_WORK* enemy)
 {
     switch (enemy->action) {
     case 0x0A:
-        if ((u32)(enemy->state_sub - 0xE6) <= 3) {
-            return 0;
-        }
-        if ((u32)(enemy->state_sub - 0xEC) <= 3) {
-            return 1;
-        }
         switch (enemy->state_sub) {
         case 0xE4:
+        case 0xE6:
+        case 0xE7:
+        case 0xE8:
+        case 0xE9:
             return 0;
         case 0xEA:
+        case 0xEC:
+        case 0xED:
+        case 0xEE:
+        case 0xEF:
             return 1;
         }
         break;
@@ -5648,6 +5676,7 @@ extern "C" s32 em_act_sleep_side_get(_ENEMY_WORK* enemy)
     }
     return 0xFF;
 }
+#pragma optimization_level reset
 
 /* The per-state action id tests. */
 
@@ -5943,7 +5972,7 @@ extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy)
 }
 
 /* The two-state mask the record's mode byte selects. */
-extern "C" s32 em_mini_kill_kind_get(_ENEMY_WORK* enemy)
+extern "C" u8 em_mini_kill_kind_get(_ENEMY_WORK* enemy)
 {
     return (enemy->field_0x014 == 2) ? 2 : 0;
 }
@@ -6667,6 +6696,7 @@ extern "C" f32 em_dive_depth_get(_ENEMY_WORK* self);
 extern "C" f32 em_ceiling_depth_get(_ENEMY_WORK* self);
 extern "C" u32 em_ground_snap(_ENEMY_WORK* self);
 
+#pragma optimization_level 4
 /* 0x8012FF38 (0xD0): applies the height limits of the current move mode. */
 extern "C" void em_height_limit_update(_ENEMY_WORK* self)
 {
@@ -6695,6 +6725,7 @@ extern "C" void em_height_limit_update(_ENEMY_WORK* self)
         break;
     }
 }
+#pragma optimization_level reset
 
 /* 0x80130008 (0x80): whether the position is on the floor (lifted by the scaled `lift` in ground mode 1). */
 extern "C" u32 em_ground_ck(_ENEMY_WORK* self, f32 lift)
@@ -7180,8 +7211,8 @@ extern "C" ShellNikuEntry* em_niku_search(_ENEMY_WORK* self)
     nw4r::math::VEC3 to;
     nw4r::math::VEC3 hit;
     f32 lift;
-    u32 i;
     ShellNikuEntry* niku;
+    u32 i;
 
     VEC3_ctor(&from);
     VEC3_ctor(&to);
@@ -7498,13 +7529,19 @@ extern "C" u32 em_sight_player_ck2(_ENEMY_WORK* self, u8 player)
  * away from the first such enemy. */
 extern "C" u32 em_player_spotted_set(u8 player)
 {
-    _ENEMY_WORK* work = get_move_work_adrs_view3(3);
-    _PLW* plws = get_move_work_adrs(2);
-    u16 max = get_move_work_max(3);
-    u8 bit = 1 << player;
-    u32 result = 0;
-    _PLW* plw = &plws[player];
+    _ENEMY_WORK* work;
+    _PLW* plws;
+    u16 max;
+    _PLW* plw;
     u16 i;
+    u8 bit;
+    u32 result;
+    work = get_move_work_adrs_view3(3);
+    plws = get_move_work_adrs(2);
+    max = get_move_work_max(3);
+    bit = 1 << player;
+    result = 0;
+    plw = &plws[player];
 
     if (plw->slot_active == 0 || em_pl_slot_leaving_ck(plw->chunk_ofs) != 0) {
         return 0;
@@ -7527,11 +7564,14 @@ extern "C" u32 em_player_spotted_set(u8 player)
 /* 0x80131A98 (0x13C): whether a status-1 enemy that sees player `player` lies in front of the player. */
 extern "C" u32 em_player_watched_ck(u8 player)
 {
-    _PLW* plws = get_move_work_adrs(2);
-    u16 max = get_move_work_max(3);
-    _PLW* plw = &plws[player];
+    _PLW* plws;
+    u16 max;
     _ENEMY_WORK* work;
+    _PLW* plw;
     u16 i;
+    plws = get_move_work_adrs(2);
+    max = get_move_work_max(3);
+    plw = &plws[player];
 
     if (plw->slot_active == 0 || em_pl_slot_leaving_ck(plw->chunk_ofs) != 0) {
         return 0;
@@ -8680,10 +8720,10 @@ extern "C" void em_break_fx_set(_ENEMY_WORK* self)
     nw4r::math::VEC3 a;
     nw4r::math::VEC3 b;
     nw4r::math::VEC3 c;
-    u32 kind;
-    u32 joint;
-    f32 scale;
     EmAilmentFx* fx;
+    u32 kind;
+    f32 scale;
+    u32 joint;
 
     VEC3_ctor(&offset);
     if (self->team != 0x28 && (u32)em_die_ck(self) != 1) {
@@ -9028,9 +9068,9 @@ extern "C" s32 em_turn_rate_get(_ENEMY_WORK* self, EmTurnMotions* table)
 extern "C" s32 em_turn_step_get(_ENEMY_WORK* self, EmTurnMotions* table, u16 angle, u8 flags)
 {
     f32 end;
-    s32 step;
-    f32 left;
     s32 cap;
+    f32 left;
+    s32 step;
 
     if (self->field_0x482 != 0) {
         if (table->straight_end <= 0) {
