@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (245)
+## Ideas that work (246)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -254,6 +254,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 265 | [Two vtables sharing slot functions with no middle store: the second class derives from the first](265-two-vtables-sharing-slot.md) | works | vtable, data | Two of a TU's class tables point at the same function in several slots, yet the static initialiser stores only the root's and each class's own table, so neither a common parent nor two siblings seems to fit. |
 | 266 | [A clrlwi/subfic/stwux prologue means a 32-aligned local; a scalar kept in memory lives in a struct](266-clrlwi-subfic-stwux-prologue.md) | works | source-shape, allocator | Retail opens with `clrlwi r11,r1,27; subfic r11,r11,-N; mr r12,r1; stwux r1,r1,r11` and keeps one scalar in a stack slot (`stw`/`lwz` around every join) where ours has a static `stwu` frame and the scalar in a register,... |
 | 267 | [A two-valued constant is an if/else: retail schedules the default li between the compare and its branch](267-two-valued-constant-is.md) | works | source-shape | Retail's `li rX,default` sits between a `cmplwi`/`cmpwi` and its branch; ours loads it before the compared field. |
+| 268 | [A sum computed before a branch and reduced after it: initialise the local with the sum, apply the reduction later](268-sum-computed-before-a.md) | works | source-shape, allocator | Retail computes `addi rX, rBit, 12` before a conditional mask and the `clrlwi rY, rX, 29` after it, while ours computes both after the branch, so the loop body is shifted by one slot. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
