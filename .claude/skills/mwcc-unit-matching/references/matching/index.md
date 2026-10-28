@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (243)
+## Ideas that work (244)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -252,6 +252,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 263 | [A cmplwi range test with cmpwi case tests and no clrlwi is a switch on a u16 parameter under peephole on](263-cmplwi-range-test-with.md) | works | source-shape, pragma | A switch dispatch tests its 0..N case run with one `cmplwi` and its single cases with `cmpwi`, on the raw parameter register; a u32 switch gives `cmplwi` everywhere and an s32 one `cmpwi 0; blt; cmpwi N; ble` |
 | 264 | [A function that opens with a b to its own next instruction is a tail call into an unsplit neighbour: split the map row](264-function-that-opens-with.md) | works | source-shape, symbols | A target row reads `addi r3,r3,8; b .+4; stw ...; blr` (or starts with `b .+4`), a branch with no relocation into its own body; folding the offset into the stores scores 66-80 % and no inline or pragma reproduces the... |
 | 265 | [Two vtables sharing slot functions with no middle store: the second class derives from the first](265-two-vtables-sharing-slot.md) | works | vtable, data | Two of a TU's class tables point at the same function in several slots, yet the static initialiser stores only the root's and each class's own table, so neither a common parent nor two siblings seems to fit. |
+| 266 | [A clrlwi/subfic/stwux prologue means a 32-aligned local; a scalar kept in memory lives in a struct](266-clrlwi-subfic-stwux-prologue.md) | works | source-shape, allocator | Retail opens with `clrlwi r11,r1,27; subfic r11,r11,-N; mr r12,r1; stwux r1,r1,r11` and keeps one scalar in a stack slot (`stw`/`lwz` around every join) where ours has a static `stwu` frame and the scalar in a register,... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

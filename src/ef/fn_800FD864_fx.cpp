@@ -6,30 +6,44 @@
  *   `fn_800FE93C` (the four-state dispatcher: `fn_800FE978`, `fn_800FF8D4`, `fn_800FFC98`, `fn_800FFCA8`) and
  *   `fn_800FE8E8` (the release hook); `fn_800FE978` loads the family's effect file per map and area and seeds or
  *   drives the pre-placed slots.  The setters from 0x80100448 are `ef/eft004_fx.cpp`.
- * FLAGS. `cflags_main`; `#pragma peephole off` for `fn_800FD864`, `fn_800FE8E8`, `fn_800FE93C` and from `fn_800FF8D4`
- *   to the end (retail keeps the hook address in `r0` and the unfused `rlwinm` + `cmpwi`; playbook 39).
+ * FLAGS. `cflags_main`; file-scope `#pragma peephole off` (retail keeps the hook address in `r0` and the unfused
+ *   `extsb`/`clrlwi`/`rlwinm` + `cmpwi` pairs, `fn_800FE978` included; playbook 39).
  * NAMES. The map has only `fn_` stems here (the dump has placeholders), so the definitions are `extern "C"`; the
  *   unit is C++ because the mangled callees are called through their real signatures.
  *   GUESS (from what they hold, their bodies and their callers): `eft004_spawn_ids_map*`, `eft004_flag_emitter_name`,
  *   the callees `lb_event_state_ck`, `stg_area_flag_ck`, `ef_effect_emitter_*`, `ef_emitter_pm_*`, `ef_word_copy`
  *   and the `ef_res_*` accessors.
- * RESIDUALS. 5 partial rows:
- *  - `fn_800FF8D4`, `fn_80100088`: the callee-saved registers are assigned in another order (structure identical);
- *  - `fn_800FE978`: retail's frame is 0x840 with the dynamic `stwux` prologue saving r22-r31, ours a static 0x8F0
- *    frame saving r21-r31, so `self` and every stack slot move; the `mapno` 21/22 area switches and the
- *    `lb_world_upgrade_get` sub-switches are compare chains in retail and local jump tables in ours;
- *  - `fn_800FFF08`: `self->work_0x38` and `&eft_control` swap `r3`/`r5`;
- *  - `fn_80100330`: the `IsValidPointer` inline tests the value in `r4` where retail uses `r6`.
- *   Ours emits the eight `fn_800FD864` switch tables and three `fn_800FE978` tables locally (`@523`-`@533`, `@837`)
- *   where retail relocates against the `.data` run's `jumptable_` entries.
- *   flipcheck: `.sdata` claimed, not emitted; `.sdata2` (0x10 of 0x28), `.text` (0x2A6C of 0x2BE4) and `.data`
- *   (0x2C4 of 0xB80) short of the claim and differing; extab and extabindex differ in 1 and 2 bytes.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_21`,
- *     `_savegpr_22`, `_restgpr_21`, `jumptable_8059C3E0`, `jumptable_8059C3C0`, `_restgpr_22`.
+ * RESIDUALS. 5 partial rows (registers only; `mt.py regsim` reproduces every dump exactly):
+ *  - `fn_800FF8D4`: the slot walk needs a named pointer to colour first (regsim's plan), but a named
+ *    `EftSpawnWorkSlot* slot` starts at `work + 0xD8` (`addi r31,r29,0xd8`) where retail's induction temp starts at
+ *    `work` (`mr r31,r29`) and folds 0xD8 into each displacement;
+ *  - `fn_80100088`: the last `name[5]` compare's sign-extend lands in `r3` where retail keeps `r4` (regsim: the one
+ *    volatile node no declaration order reaches);
+ *  - `fn_800FE978`: retail holds the untruncated `get_now_mapno()` result (`mr r26,r3`) in a node regsim wants
+ *    declared between `slot_num` and `i` (r26/r27 swap with the constant 3), and the name copy's `src`/`dst` take
+ *    `r5`/`r4` where ours take `r4`/`r5`;
+ *  - `fn_800FFF08`: the `self->work_0x38` load takes `r3` where retail schedules it first into `r5` (regsim: no
+ *    declaration order reaches it);
+ *  - `fn_80100330`: the pointer guard holds the value in `r4` where retail uses `r6` (regsim: no order reaches it).
+ *   Ours emits the unit's fifteen switch tables locally (`@`-named `.data`)
+ *   where retail relocates against the `.data` run's `jumptable_` entries, and the `fn_800FF8D4`/`fn_80100088`
+ *   float constants as `@` pool entries where retail names `lbl_807966A8`-`lbl_807966B4`.
+ *   flipcheck: `.sdata` claimed, not emitted; `.sdata2` (0x10 of 0x28) and `.data` (0x310 of 0xB80) short of the
+ *   claim and differing; `.text` differs in 473 of 11236 bytes.
  * SHAPES. `fn_800FD864`'s `areano` is `u32` (the small area switches then compare `cmplwi`), assigned through a `(u8)`
  *   cast (retail's `clrlwi r3,24`); each case assigns its three parameters in retail's order (`a`, `b`, `c`; `b`, `a`,
  *   `c` for maps 21/22) and the tail stores them as `+0x00 = b`, `+0x0D0 = a`, `+0x0D4 = c`.
  *   `_EFT_MAP_WORK` is the 0x8F4-byte family block at `+0x38`.
+ *   `fn_800FE978`: the file stat and the spawn set are `aligned(32)` (retail's `clrlwi`/`subfic`/`stwux` frame), the
+ *   byte count lives in `EftFileLoad` beside the path (retail keeps it in memory at +0x128), `mapno` is `u8`, the
+ *   map/type/area/upgrade selections are `switch`es (retail's compare trees; the upgrade switches carry an empty
+ *   `case 0`), the copy loop counts with `i`, the map-21/22 section is a `do { } while (0)` whose `default` leaves
+ *   with `continue`, and `res_eft_create_ex`'s last parameter is `u16` (the owner truncates it with `clrlwi 16`);
+ *   its scalars are declared at function scope in regsim's order (`mapno` ... `work`), the second `memcpy`'s source
+ *   goes through `src` first, and two spawn loops add `i + work->id_base`.
+ *   `fn_800FF8D4` walks the slots through `slot` (declared first) and compares `(s32)get_now_mapno()`;
+ *   `fn_80100088`'s counts are `u32` (the `u16` call results convert once, right after each call).
+ *   `fn_80100330` spells the six-flag pointer guard out in place (its `Panic` takes no pointer argument).
  *   `fn_800FF8D4` narrows `lb_event_state_ck()` (the owner's `u32`) with `(u8)`: retail's `clrlwi` after the call.
  */
 
@@ -140,7 +154,7 @@ extern f32 lbl_807966A4;
 
 /* The nw4r::ef / engine helpers, reached through their real signatures (rule 9). */
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, u32 arg);
-extern "C" nw4r::ef::Effect* res_eft_create_ex(u16 id, u16 kind, s32 a, s32 b);
+extern "C" nw4r::ef::Effect* res_eft_create_ex(u16 id, u16 kind, s32 a, u16 b);
 extern "C" void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 /* C++ callees: the target object references their manglings (cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34,
  * work_mem_alloc__FUl, work_mem_free__FPv, load_file__FPcUll, ran_suu__Fl), so no extern "C"
@@ -177,6 +191,12 @@ struct EftFileHeader {
     /* +0x14 */ u32 slot_offset;
     /* +0x18 */ u8 pad_0x18[0x80];
 }; /* size: 0x98 */
+
+/* The effect file's load request: the rounded byte count and the path built from the per-map table. size: 0x104 */
+struct EftFileLoad {
+    /* +0x000 */ u32 size;
+    /* +0x004 */ char name[0x100];
+}; /* size: 0x104 */
 
 /* One 0x2C-byte slot of the spawn set: a type byte, a flag byte, two 16-bit weights, the slot's
  * vector and its rotation triple. */
@@ -1407,22 +1427,24 @@ void fn_800FE93C(_EFT* self)
     }
 }
 
-#pragma peephole on
-
 /* The family's spawn/init state machine. */
 extern "C" void fn_800FE978(_EFT* self)
 {
-    EftFileStat info;
     nw4r::math::MTX34 mtx;
+    EftFileStat info __attribute__((aligned(32)));
     EftFileHeader header;
-    u32 size;
-    char name[0x200];
-    EftSpawnSet set;
-    EftSpawnWork* work;
+    EftFileLoad file;
+    EftSpawnSet set __attribute__((aligned(32)));
     char* src;
-    void* mem;
-    s32 mapno;
+    u8 mapno;
+    u8 slot_num;
     s32 i;
+    char* dst;
+    u16 base;
+    u16 kind;
+    s32 count;
+    void* mem;
+    EftSpawnWork* work;
 
     MTX34_ctor(&mtx);
     fn_800FF840(&set);
@@ -1447,43 +1469,45 @@ extern "C" void fn_800FE978(_EFT* self)
     }
 
     if (src != NULL) {
-        char* dst = name;
-        s32 n = 0;
+        i = 0;
+        dst = file.name;
 
         while ((s8)*src != 0) {
             *dst = *src;
-            n++;
+            i++;
             dst++;
             src++;
         }
-        *(dst + n) = 0;
-        size = 0x1000;
+        file.name[i] = 0;
+        file.size = 0x1000;
     } else {
-        size = 0;
+        file.size = 0;
     }
 
-    if (size != 0) {
-        if (dvd_open_wait(name, &info) != 0) {
-            size = (info.length + 0x1F) & ~0x1FU;
+    if (file.size != 0) {
+        if (dvd_open_wait(file.name, &info) != 0) {
+            file.size = info.length;
             DVDClose((DVDFileInfo*)&info);
-            mem = work_mem_alloc(size);
-            load_file(name, (u32)mem, (s32)size);
+            file.size = (file.size + 0x1F) & ~0x1FU;
+            mem = work_mem_alloc(file.size);
+            load_file(file.name, (u32)mem, (s32)file.size);
             memcpy(&header, mem, 0x98);
-            memcpy(set.slots_0x90, (u8*)mem + header.slot_offset, header.slot_count * 0x2C);
+            src = (char*)mem + header.slot_offset;
+            memcpy(set.slots_0x90, src, header.slot_count * 0x2C);
             set.field_0x00 = 1;
-            set.field_0x02 = header.slot_count;
+            set.field_0x02 = slot_num = header.slot_count;
             set.field_0x01 = header.field_0x00;
 
-            if (self->type_0x02 == 0) {
+            switch (self->type_0x02) {
+            case 0:
                 i = 0;
-                while (i < header.slot_count) {
+                while (i < slot_num) {
                     if (set.slots_0x90[i].flags_0x03 & 1) {
-                        EftSpawnWorkSlot* slot = &work->slots[work->slot_count];
-
-                        slot->value_a = set.slots_0x90[i].value_0x04;
-                        slot->value_b = set.slots_0x90[i].value_0x06;
-                        slot->value_c = (s32)(u16)ran_suu(0) % slot->value_b;
-                        slot->slot_index = (u8)i;
+                        work->slots[work->slot_count].value_a = set.slots_0x90[i].value_0x04;
+                        work->slots[work->slot_count].value_b = set.slots_0x90[i].value_0x06;
+                        work->slots[work->slot_count].value_c =
+                            (s32)(u16)ran_suu(0) % work->slots[work->slot_count].value_b;
+                        work->slots[work->slot_count].slot_index = (u8)i;
                         work->slot_count++;
                     }
                     i++;
@@ -1491,7 +1515,7 @@ extern "C" void fn_800FE978(_EFT* self)
 
                 i = 0;
                 while (i < work->count) {
-                    work->effects[i] = res_eft_create((u16)(work->id_base + i), work->kind, 1);
+                    work->effects[i] = res_eft_create((u16)(i + work->id_base), work->kind, 1);
                     if (work->effects[i] == NULL) {
                         work_mem_free(mem);
                         fn_800FFCA8(self);
@@ -1500,18 +1524,18 @@ extern "C" void fn_800FE978(_EFT* self)
                     effect_retire(work->effects[i], 0);
                     i++;
                 }
-            } else if (self->type_0x02 == 1) {
-                work->count = header.slot_count;
+                break;
+            case 1:
+                work->count = slot_num;
 
                 i = 0;
                 while (i < work->count) {
                     if (set.slots_0x90[i].flags_0x03 & 1) {
-                        EftSpawnWorkSlot* slot = &work->slots[work->slot_count];
-
-                        slot->value_a = set.slots_0x90[i].value_0x04;
-                        slot->value_b = set.slots_0x90[i].value_0x06;
-                        slot->value_c = (s32)(u16)ran_suu(0) % slot->value_b;
-                        slot->slot_index = (u8)i;
+                        work->slots[work->slot_count].value_a = set.slots_0x90[i].value_0x04;
+                        work->slots[work->slot_count].value_b = set.slots_0x90[i].value_0x06;
+                        work->slots[work->slot_count].value_c =
+                            (s32)(u16)ran_suu(0) % work->slots[work->slot_count].value_b;
+                        work->slots[work->slot_count].slot_index = (u8)i;
                         work->slot_count++;
                     }
                     i++;
@@ -1531,7 +1555,7 @@ extern "C" void fn_800FE978(_EFT* self)
                             work->effects[i]->SetRootMtx(work->matrices[i]);
                             effect_retire(work->effects[i], 0);
                         }
-                    } else if ((ran_suu(0) & 3) == 0) {
+                    } else if (((u16)ran_suu(0) & 3) == 0) {
                         work->effects[i] = res_eft_create_ex((u16)(work->id_base + work->types_0x8D5[i]),
                                                        work->kind, 1, ran_suu(0) & 0xF);
                         if (work->effects[i] != NULL) {
@@ -1543,6 +1567,7 @@ extern "C" void fn_800FE978(_EFT* self)
                     }
                     i++;
                 }
+                break;
             }
 
             work_mem_free(mem);
@@ -1551,18 +1576,17 @@ extern "C" void fn_800FE978(_EFT* self)
             return;
         }
     } else {
-        s32 base = 0;
-        s32 kind = 0;
-        s32 count = 0;
 
         i = 0;
         while (i < work->count) {
-            work->effects[i] = res_eft_create_ex((u16)(work->id_base + i), work->kind, 1, 200);
+            work->effects[i] = res_eft_create_ex((u16)(i + work->id_base), work->kind, 1, 200);
             if (work->effects[i] == NULL) {
                 fn_800FFCA8(self);
                 return;
             }
-            if (mapno == 16 || mapno == 5) {
+            switch (mapno) {
+            case 5:
+            case 16:
                 switch (self->area_0x44) {
                 case 0: case 1: case 2: case 3: case 6: case 8:
                     work->effects[i]->owner_0x44 = self;
@@ -1579,12 +1603,14 @@ extern "C" void fn_800FE978(_EFT* self)
                     setVector3(&self->pos_0x18, lbl_8079669C, lbl_807966A0, lbl_807966A4);
                     break;
                 }
+                break;
             }
             i++;
         }
 
-        if (mapno == 22 || mapno == 21) {
-            if (mapno == 22) {
+        do {
+            switch (mapno) {
+            case 22:
                 switch (self->area_0x44) {
                 case 0:
                     count = 15;
@@ -1598,16 +1624,19 @@ extern "C" void fn_800FE978(_EFT* self)
                     break;
                 case 2:
                     switch (lb_world_upgrade_get(3)) {
+                    case 0: break;
                     case 1: work->effects[i] = res_eft_create_ex(0x401, work->kind, 1, 200); i++; work->count++; break;
                     case 2: work->effects[i] = res_eft_create_ex(0x402, work->kind, 1, 200); i++; work->count++; break;
                     case 3: work->effects[i] = res_eft_create_ex(0x403, work->kind, 1, 200); i++; work->count++; break;
                     }
                     switch (lb_world_upgrade_get(0)) {
+                    case 0: break;
                     case 1: work->effects[i] = res_eft_create_ex(0x404, work->kind, 1, 200); i++; work->count++; break;
                     case 2: work->effects[i] = res_eft_create_ex(0x405, work->kind, 1, 200); i++; work->count++; break;
                     case 3: work->effects[i] = res_eft_create_ex(0x406, work->kind, 1, 200); i++; work->count++; break;
                     }
                     switch (lb_world_upgrade_get(2)) {
+                    case 0: break;
                     case 1: work->effects[i] = res_eft_create_ex(0x407, work->kind, 1, 200); work->count++; break;
                     case 2: work->effects[i] = res_eft_create_ex(0x408, work->kind, 1, 200); work->count++; break;
                     case 3: work->effects[i] = res_eft_create_ex(0x409, work->kind, 1, 200); work->count++; break;
@@ -1620,7 +1649,8 @@ extern "C" void fn_800FE978(_EFT* self)
                     eft_res_slot_release(self);
                     return;
                 }
-            } else {
+                break;
+            case 21:
                 switch (self->area_0x44) {
                 case 0: count = 8;  base = 0x26B; kind = 0xE;  break;
                 case 1: count = 12; base = 0x1A;  kind = 6;    break;
@@ -1633,12 +1663,15 @@ extern "C" void fn_800FE978(_EFT* self)
                     eft_res_slot_release(self);
                     return;
                 }
+                break;
+            default:
+                continue;
             }
 
             work->count2 = count;
             i = 0;
             while (i < work->count2) {
-                work->effects2[i] = res_eft_create_ex((u16)(base + i), (u16)kind, 1, 200);
+                work->effects2[i] = res_eft_create_ex((u16)(base + i), kind, 1, 200);
                 if (work->effects2[i] == NULL) {
                     fn_800FFCA8(self);
                     return;
@@ -1649,52 +1682,59 @@ extern "C" void fn_800FE978(_EFT* self)
             if (mapno == 22) {
                 if (self->area_0x44 == 2) {
                     switch (lb_world_upgrade_get(3)) {
-                    case 1: work->effects2[i] = res_eft_create_ex(0x67C, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 2: work->effects2[i] = res_eft_create_ex(0x67D, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 3: work->effects2[i] = res_eft_create_ex(0x67E, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 0: break;
+                    case 1: work->effects2[i] = res_eft_create_ex(0x67C, kind, 1, 200); i++; work->count2++; break;
+                    case 2: work->effects2[i] = res_eft_create_ex(0x67D, kind, 1, 200); i++; work->count2++; break;
+                    case 3: work->effects2[i] = res_eft_create_ex(0x67E, kind, 1, 200); i++; work->count2++; break;
                     }
                     switch (lb_world_upgrade_get(0)) {
-                    case 1: work->effects2[i] = res_eft_create_ex(0x67F, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 2: work->effects2[i] = res_eft_create_ex(0x680, (u16)kind, 1, 200); i++; work->count2++; break;
-                    case 3: work->effects2[i] = res_eft_create_ex(0x681, (u16)kind, 1, 200); i++; work->count2++; break;
+                    case 0: break;
+                    case 1: work->effects2[i] = res_eft_create_ex(0x67F, kind, 1, 200); i++; work->count2++; break;
+                    case 2: work->effects2[i] = res_eft_create_ex(0x680, kind, 1, 200); i++; work->count2++; break;
+                    case 3: work->effects2[i] = res_eft_create_ex(0x681, kind, 1, 200); i++; work->count2++; break;
                     }
                     switch (lb_world_upgrade_get(2)) {
-                    case 1: work->effects2[i] = res_eft_create_ex(0x682, (u16)kind, 1, 200); work->count2++; break;
-                    case 2: work->effects2[i] = res_eft_create_ex(0x683, (u16)kind, 1, 200); work->count2++; break;
-                    case 3: work->effects2[i] = res_eft_create_ex(0x684, (u16)kind, 1, 200); work->count2++; break;
+                    case 0: break;
+                    case 1: work->effects2[i] = res_eft_create_ex(0x682, kind, 1, 200); work->count2++; break;
+                    case 2: work->effects2[i] = res_eft_create_ex(0x683, kind, 1, 200); work->count2++; break;
+                    case 3: work->effects2[i] = res_eft_create_ex(0x684, kind, 1, 200); work->count2++; break;
                     }
                 }
-            } else if (LbCheckKujiraEvent() == 1 && self->area_0x44 < 4) {
-                i = 0;
-                while (i < work->count) {
-                    fn_80100088(work->effects[i], 0);
-                    i++;
-                }
-                i = 0;
-                while (i < work->count) {
-                    work->effects[i] = res_eft_create_ex((u16)(work->id_base + i), work->kind, 1, 200);
-                    if (work->effects[i] == NULL) {
-                        fn_800FFCA8(self);
-                        return;
+            } else if (mapno == 21 && LbCheckKujiraEvent() == 1) {
+                switch (self->area_0x44) {
+                case 0: case 1: case 2: case 3:
+                    i = 0;
+                    while (i < work->count) {
+                        fn_80100088(work->effects[i], 0);
+                        i++;
                     }
-                    i++;
-                }
-                i = 0;
-                while (i < work->count2) {
-                    fn_80100088(work->effects2[i], 1);
-                    i++;
-                }
-                i = 0;
-                while (i < work->count2) {
-                    work->effects2[i] = res_eft_create_ex((u16)(base + i), (u16)kind, 1, 200);
-                    if (work->effects2[i] == NULL) {
-                        fn_800FFCA8(self);
-                        return;
+                    i = 0;
+                    while (i < work->count) {
+                        work->effects[i] = res_eft_create_ex((u16)(work->id_base + i), work->kind, 1, 200);
+                        if (work->effects[i] == NULL) {
+                            fn_800FFCA8(self);
+                            return;
+                        }
+                        i++;
                     }
-                    i++;
+                    i = 0;
+                    while (i < work->count2) {
+                        fn_80100088(work->effects2[i], 1);
+                        i++;
+                    }
+                    i = 0;
+                    while (i < work->count2) {
+                        work->effects2[i] = res_eft_create_ex((u16)(base + i), kind, 1, 200);
+                        if (work->effects2[i] == NULL) {
+                            fn_800FFCA8(self);
+                            return;
+                        }
+                        i++;
+                    }
+                    break;
                 }
             }
-        }
+        } while (0);
     }
 
     self->flag_0x01 = 1;
@@ -1725,8 +1765,6 @@ extern "C" EftSpawnSlot* fn_800FF8A0(EftSpawnSlot* self)
 }
 
 
-#pragma peephole off
-
 /* State 1: while the effect system is up and the area is current, re-spawns the timed slots whose effect has
  * ended and retires the ones that stopped, then hands every live effect (or, on the map-22 event, the second run)
  * to the model spawner at its emitter's position. */
@@ -1734,8 +1772,9 @@ extern "C" void fn_800FF8D4(_EFT* self)
 {
     nw4r::math::VEC3 pos;
     nw4r::math::MTX34 mtx;
-    EftSpawnWork* work;
+    EftSpawnWorkSlot* slot;
     s32 i;
+    EftSpawnWork* work;
     s32 count2;
     s32 count;
     s32 idx;
@@ -1751,17 +1790,17 @@ extern "C" void fn_800FF8D4(_EFT* self)
         return;
     }
     if ((s32)self->field_0x07 != 1) {
-        for (i = 0; i < work->slot_count; i++) {
-            idx = work->slots[i].slot_index;
+        for (i = 0, slot = work->slots; i < work->slot_count; i++, slot++) {
+            idx = slot->slot_index;
             if (idx == 0xFF) {
                 continue;
             }
             if (work->effects[idx] == NULL) {
-                work->slots[i].timer++;
-                if (work->slots[i].timer > work->slots[i].value_a + work->slots[i].value_c) {
+                slot->timer++;
+                if (slot->timer > slot->value_a + slot->value_c) {
                     eft004_slot_spawn(self, idx);
-                    work->slots[i].timer = 0;
-                    work->slots[i].value_c = ran_suu(0) % work->slots[i].value_b;
+                    slot->timer = 0;
+                    slot->value_c = ran_suu(0) % slot->value_b;
                 }
             } else if (effect_emitter_alive_ck(work->effects[idx]) == 0) {
                 fn_800FFF08((Eft004*)self, idx);
@@ -1793,7 +1832,7 @@ extern "C" void fn_800FF8D4(_EFT* self)
             }
         }
     } else {
-        if (get_now_mapno() == 22) {
+        if ((s32)get_now_mapno() == 22) {
             if ((u8)lb_event_state_ck() == 1) {
                 count = work->count - 3;
                 count2 = work->count2 - 3;
@@ -1972,12 +2011,12 @@ extern "C" void fn_80100088(void* effect, s32 flag)
     EftResHandle pm;
     EftResHandle desc;
     EftResHandle params;
-    u16 emitter_count;
     u32 i;
     u32 j;
-    const char* key;
+    u32 emitter_count;
+    u32 pm_count;
     EfEmitterObj* emitter;
-    u16 pm_count;
+    const char* key;
     f32 scale;
     const char* name;
 
@@ -1987,8 +2026,7 @@ extern "C" void fn_80100088(void* effect, s32 flag)
     ef_res_slot_set_params(&draw, NULL);
     effect_retire((nw4r::ef::Effect*)effect, 0);
     emitter_count = ef_effect_emitter_count((EfEff*)effect);
-    key = eft004_flag_emitter_name;
-    for (i = 0; i < emitter_count; i++) {
+    for (i = 0, key = eft004_flag_emitter_name; i < emitter_count; i++) {
         emitter = ef_effect_emitter_get((EfEff*)effect, i);
         pm_count = ef_emitter_pm_count(emitter);
         for (j = 0; j < pm_count; j++) {
@@ -2034,7 +2072,22 @@ extern "C" void* fn_8010030C(void* p)
 /* Asserts that the value is a valid console pointer and returns it. */
 extern "C" u32 fn_80100330(u32* p)
 {
-    if (!IsValidPointer(*p)) {
+    BOOL ok1 = TRUE, ok2 = TRUE, ok3 = TRUE, ok4 = TRUE, ok5 = TRUE, ok6 = TRUE;
+    u32 top = *p & 0xFF000000u;
+
+    if (!(top == 0x80000000u) && !((*p & 0xFF800000u) == 0x81000000u))
+        ok6 = FALSE;
+    if (!ok6 && !((*p & 0xF8000000u) == 0x90000000u))
+        ok5 = FALSE;
+    if (!ok5 && !(top == 0xC0000000u))
+        ok4 = FALSE;
+    if (!ok4 && !((*p & 0xFF800000u) == 0xC1000000u))
+        ok3 = FALSE;
+    if (!ok3 && !((*p & 0xF8000000u) == 0xD0000000u))
+        ok2 = FALSE;
+    if (!ok2 && !((*p & 0xFFFFC000u) == 0xE0000000u))
+        ok1 = FALSE;
+    if (!ok1) {
         nw4r::db::Panic(lbl_8059C510, 102, lbl_8059C4DC);
     }
     return *p;
