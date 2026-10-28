@@ -203,7 +203,7 @@ struct _AINPC_W {
     /* +0x429 */ u8 field_0x429;
     /* +0x42A */ u8 field_0x42A;
     /* +0x42B */ u8 field_0x42B;
-    /* +0x42C */ s16 field_0x42C;       /* the motion the finish-out arms the target with */
+    /* +0x42C */ u16 field_0x42C;       /* the motion the finish-out arms the target with */
     /* +0x42E */ u8 skill_0x42E[3];     /* the three skill slots `ai_skill_ck` compares against */
     /* +0x431 */ u8 field_0x431;        /* set once any of the mobility skills is unlocked */
     /* +0x432 */ u8 unused_0x432[0x434 - 0x432];

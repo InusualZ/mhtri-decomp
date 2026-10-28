@@ -10,13 +10,14 @@
  * FLAGS. `cflags_main` (configure.py) with a file-wide `#pragma optimization_level 4` (the switch-range lowering
  *   `subi; cmplwi` of `ai_npc_step20_arm`; no row regresses).  `#pragma peephole off` from 0x802C2700 to the end of
  *   0x802D44F4's band, with `peephole on` wrapped around fn_802D1954, fn_802D2024, fn_802D29B8, fn_802D29CC,
- *   fn_802D29E4, fn_802D3A34, fn_802D40A4 and ai_npc_skill_group_get; `fp_contract off` around
+ *   fn_802D29E4, fn_802D3A34 and fn_802D40A4; `fp_contract off` around
  *   `ai_npc_move_target_set` (retail's separate `fmuls`/`fadds`).  Per function (each measured, playbook 120's
  *   narrower forms): `opt_common_subs off` (playbook 208) where retail reloads a value MWCC would keep (a field
  *   across a call, a loop test, the `shell_set_func_ptr` table loaded after the arguments) - ai_npc_step13/31/57_arm,
- *   ai_npc_m2_step0/2_arm, ai_npc_m3_step6/7/19_arm, ai_npc_move_target_set, ai_npc_weak_point_pos_get,
- *   fn_802D32B4 (file-wide it loses 195 bytes); `opt_propagation off` where retail keeps a folded constant or a
- *   re-mask - ai_npc_step4_arm, ai_npc_counter_target_ck (with `opt_lifetimes off`), fn_802D3F1C, fn_802D6690.
+ *   ai_npc_step82_arm, ai_npc_m2_step0/2_arm, ai_npc_m3_step6/7/19_arm, ai_npc_move_target_set,
+ *   ai_npc_weak_point_pos_get, fn_802D32B4 (file-wide it loses 195 bytes); `opt_propagation off` where retail keeps a
+ *   folded constant or a re-mask - ai_npc_step4_arm, ai_npc_counter_target_ck (with `opt_lifetimes off`),
+ *   fn_802D3F1C, fn_802D6690.
  * NAMES. Module `ai` from the record every function takes (`ai_skill_ck__FP8_AINPC_WUc`, `ai_area_ck__FP8_AINPC_W`,
  *   `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`); no `__FILE__` string covers the range and the runtime dump
  *   answers `zz_` for the `fn_` rows.  `ainpc_entry_tbl`/`ainpc_page_state` (`hud/cockpit.cpp`'s `.bss`) are GUESSes
@@ -44,25 +45,26 @@
  *   ai_npc_spawn_pos_tbl, ai_npc_hand_reach_dist_sq, ai_npc_f32_0_7; the record types AINPCBehaviour, AINPCTuning,
  *   AINPCSetup, AINPCStatus, EmWeakPoint, AINPCTimeChance, AINPCSpawnPos, ResultRankPoints; the view's fields
  *   `drift_vel`/`drift_active`, `phase`, `timer_0x1AC`, `hold_kind_0x492`/`hold_time_0x4C0` (`_PLW`).
- * RESIDUALS. 40 rows partial (objdiff); the measured ones:
- *  - `ai_npc_status_preview`, `ai_npc_move_target_set`, `ai_npc_enemy_scan`, `ai_npc_m2_step11_arm`,
- *    `ai_npc_enemy_engage`, `ai_npc_step25_arm`, `ai_npc_item_stock_get`, `fn_802D6A00`, `fn_802D3F1C`,
- *    `fn_802D67F8`/`fn_802D675C`, `fn_802D7F10`: callee-saved or scratch register colouring (declaration orders tried);
- *  - `ai_npc_skill_group_get`: retail loads the list base after masking the id, ours (peephole on) uses `lwzu`;
- *  - `fn_802D30F8`: the `else` arm masks `target` before the subtract; retail writes the result to `target`'s register;
- *  - `ai_npc_step4_arm`/`ai_npc_m4_step5_arm`: retail loads the motion `lha` and masks it (`clrlwi 16`) for the `u16`
- *    parameter; every spelling folds it into `lhz`;
- *  - `ai_npc_m2_step2/5/7_arm`: retail masks the constant ternary it passes as `fn_802D30F8`'s limit
- *    (`li r5,..; clrlwi r5,r5,16`); every spelling folds the constant;
- *  - `ai_npc_m3_step5_arm`: retail masks `spin` (`u16`) at each assignment, ours at the call;
+ * RESIDUALS. 17 rows partial (objdiff); the measured ones:
+ *  - `ai_npc_enemy_scan`, `ai_npc_item_stock_get`, `fn_802D7F10`: scratch/callee-saved register colouring
+ *    (declaration orders and the `u32` parameter re-mask of `ai_npc_skill_group_get` tried);
+ *  - `ai_npc_m2_step11_arm`: retail colours `arg` (r30) before `armed` (r29); `armed` is the only local and outnumbers
+ *    the parameter (regsim: no declaration order reaches it, a `limit` copy coalesces into `arg`);
+ *  - `fn_802D6A00`: retail colours `i`, `best`, `self` as the stalled nodes and the `w` base last; ours stalls the
+ *    base first (regsim plan 2/7), and the closing `mask` keeps a `clrlwi` retail lacks;
+ *  - `fn_802D3F1C`: the second `hit[].result` load is a split web (r3) where retail reuses `value`'s r4; a loop
+ *    over the two entries is worse;
+ *  - `ai_npc_step4_arm`: the closing row read is `lhax` where retail adds the offset and loads `lha 0` (needs the
+ *    function's `opt_propagation off`);
+ *  - `ai_npc_m2_step0_arm`: the state-0 `switch` compares `cmplwi 1; cmpwi 2` in retail; `flag & 0xFF` gives both
+ *    unsigned, `(u8)flag` changes the lowering;
+ *  - `ai_npc_m3_step5_arm`: the formation-3 `spin` is `clrlwi; rlwinm` in retail, `(s16)` gives `extsh; rlwinm`;
+ *  - `ai_npc_demo_frame_ck`: retail converts in r3 (`lwz r3; extsh r3,r3`), ours through r0;
+ *  - `fn_802D66B8`, `fn_802D6690`: `add` operand order of the tuning row address (`offset, base`);
  *  - `fn_802D1AFC`: retail moves `fn_802D89D4`'s result to r0 before masking it for the call;
- *  - `fn_802CD20C`: retail's definition returns a full word (`srawi r3`), its callers want the `s16`;
  *  - `fn_802D77DC`: retail's `li r3,30; bnelr` default (a `switch` gives the signed compares, not the layout);
- *  - `ai_npc_pair_values_get`: retail's `lbzx` operand order (`index, base`); a `[4][4]` table view moves other rows;
- *  - `fn_802D2264`: the final `return 0`/`return 1` blocks are laid out in the other order;
  *  - `fn_802D3398`: retail re-reads `*row` at the top of the second loop's body;
  *  - `fn_802D2F7C`: retail adds the row offset to the table base (`addi; mulli; add`), ours multiplies first;
- *  - `ai_npc_step82_arm`: retail re-masks `flag` for the second test (`opt_common_subs off` does not reach it);
  *  - `ai_taru_move_ck`: retail loads +0x450 into r0 before `extsb r3,r0`;
  *  - data: `.data` 0x9D4 of 0x1A18 and `.sdata2` 0x1DC of 0x208 emitted (the tables are declared, never defined),
  *    `.ctors` (0x4), `.sdata` (0x98) and `.sbss` (0x8) claimed but not emitted; the jump tables are emitted
@@ -75,7 +77,7 @@
  *   C linkage keeps one symbol.  `AINPC_VIEW` names `ainpc_w` through the view; the setup functions read it directly
  *   where retail addresses `ainpc_w@l` and through a local pointer elsewhere.  Unifying the views removes the namespace.
  *  - A callee whose retail caller passes a wider or narrower type than its declaration is called through a `_c1`/`_u16`
- *    cast view (`quest_move_state_get_c1`, `em_roster_area_use_take_c1`, `ai_npc_motion_set_u16`,
+ *    cast view (`quest_move_state_get_c1`, `em_roster_area_use_take_c1`,
  *    `AINPC_SELECTOR_SET`, `AINPC_ITEM_ID_GET`); one whose retail caller loads the float argument earlier is called
  *    with the float moved forward (`AINPC_KEY_SPAWN`, `AINPC_FX_SPAWN`, playbook 178), and the view header spells
  *    `coll_wall_slide`, `vec3_move_damp`, `mhchar_motion_set` and `hit_data_apply` in their owners' parameter order.
@@ -225,7 +227,7 @@ void fn_802D6690(struct _AINPC_W* self);
 void fn_802D9400(struct _AINPC_W* self);
 void fn_802D29CC(struct _AINPC_W* self, f32 a);
 u32 fn_802D3B34(struct _AINPC_W* self, s32 a, s32 b);
-u16 fn_802D30F8(u16 a, u16 b, u32 c);
+u16 fn_802D30F8(u16 a, u16 b, u16 c);
 void fn_802D3210(struct _AINPC_W* self, u32* out);
 
 /* `pl.h` pulls `ef.h` in, which declares `setVec3`/`VEC3_ctor` with their owner's type
@@ -334,7 +336,7 @@ void fn_800DCCF8(void* state, nw4r::math::VEC3* pos, s32 enable);
 /* The AI-NPC work record's own helpers, all inside this range and defined below. */
 s32 ai_npc_level_rank_get(u8 value);
 void ai_npc_tutorial_talk(void);
-s32 fn_802D77DC(u8 slot);
+s16 fn_802D77DC(u8 slot);
 u32 ai_npc_motion_step_ck(struct _AINPC_W* self, u8 motion, u16 step);
 s32 fn_802D66B8(struct _AINPC_W* self);
 void fn_802D84D0(struct _AINPC_W* self, s16 value);
@@ -533,8 +535,6 @@ namespace view_fn_802D0F34 {
 #define AINPC_VIEW (*(_AINPC_W*)&::ainpc_w)
 /* `quest_move_state_get` hands back a byte (its callers store r3 as is). */
 #define quest_move_state_get_c1 ((u8 (*)(void))quest_move_state_get)
-/* `ai_npc_motion_set` is called with the motion as a `u16` from the motion tables. */
-#define ai_npc_motion_set_u16 ((void (*)(_AINPC_W*, u16, s32, s32))ai_npc_motion_set)
 /* `em_roster_area_use_take` answers a byte (its callers test it with `clrlwi`). */
 #define em_roster_area_use_take_c1 ((u8 (*)(u8, nw4r::math::VEC3*, u32))em_roster_area_use_take)
 
@@ -932,7 +932,7 @@ void ai_npc_step4_arm(_AINPC_W* self, u8 arg)
         row = &ai_npc_gather_motion_tbl[arg * 4];
         self->state++;
         ai_npc_variant_set(self, row[0]);
-        ai_npc_motion_set_u16(self, row[1], row[2], 0);
+        ai_npc_motion_set(self, row[1] & 0xFFFF, row[2], 0);
         self->timer_0x1AC = 60;
         break;
     case 1:
@@ -1612,10 +1612,11 @@ extern "C" void ai_npc_step24_arm(struct _AINPC_W* self, u8 arg) {
 /* The ranged action's arm: reads the enemy's own motion out of the player work it targets and leaves
  * the record in the matching motion before the target's frame pass runs. */
 extern "C" void ai_npc_step25_arm(struct _AINPC_W* self, u8 arg) {
+    struct _PLW* plw;
     u8 state = self->state;
     switch (state) {
     case 0: {
-        struct _PLW* plw;
+        struct _PLW* player;
         self->state++;
         if (arg == 0) {
             ai_npc_variant_set(self, 0);
@@ -1624,8 +1625,8 @@ extern "C" void ai_npc_step25_arm(struct _AINPC_W* self, u8 arg) {
             ai_npc_variant_set(self, 2);
             ai_npc_motion_set(self, 0x39, 4, 0);
         }
-        plw = self->plw_0x16C;
-        switch (plw->field_0x650) {
+        player = self->plw_0x16C;
+        switch (player->field_0x650) {
         case 0x1c:
             self->field_0x3C2 = 0x1c;
             break;
@@ -1649,10 +1650,10 @@ extern "C" void ai_npc_step25_arm(struct _AINPC_W* self, u8 arg) {
             break;
         default:
             self->field_0x3C2 = 0;
-            fn_802D40EC(self, plw->field_0x650, plw->field_0x652);
+            fn_802D40EC(self, player->field_0x650, player->field_0x652);
             if (self->field_0x420 == 3) {
                 self->field_0x422 = 0x708;
-                self->field_0x42C = plw->field_0x650;
+                self->field_0x42C = player->field_0x650;
                 self->field_0x427 = 0;
                 self->field_0x428 = 0;
                 self->field_0x429 = 0;
@@ -1661,11 +1662,11 @@ extern "C" void ai_npc_step25_arm(struct _AINPC_W* self, u8 arg) {
             }
             break;
         }
-        fn_8027D76C(plw);
+        fn_8027D76C(player);
         break;
     }
     case 1: {
-        struct _PLW* plw = self->plw_0x16C;
+        plw = self->plw_0x16C;
         if (ai_npc_motion_end_ck(self) != 1) {
             break;
         }
@@ -2147,6 +2148,7 @@ extern "C" void ai_npc_step57_arm(struct _AINPC_W* self, u8 arg) {
 
 /* The per-motion step dispatcher: it arms the motion and its scale once, then steps the armed
  * sub-state until the motion ends. */
+#pragma opt_common_subs off
 extern "C" void ai_npc_step82_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 vec;
@@ -2176,16 +2178,14 @@ extern "C" void ai_npc_step82_arm(struct _AINPC_W* self, u32 flag)
             }
             break;
         }
-        if ((flag & 0xFF) == 0) {
-            if (ai_npc_frame_ck(self, 1, lbl_8079A6BC, lbl_8079A670) == 1) {
-                fn_802D2B88(self, 2);
-                f32 y = self->vec_0x178.y;
-                f32 height = lbl_8079A6C0 + self->field_0x19C;
+        if ((flag & 0xFF) == 0 && ai_npc_frame_ck(self, 1, lbl_8079A6BC, lbl_8079A670) == 1) {
+            fn_802D2B88(self, 2);
+            f32 y = self->vec_0x178.y;
+            f32 height = lbl_8079A6C0 + self->field_0x19C;
 
-                if (y < height) {
-                    self->vec_0x178.y = height;
-                    fn_802D2ABC(self, 1, 83, 0);
-                }
+            if (y < height) {
+                self->vec_0x178.y = height;
+                fn_802D2ABC(self, 1, 83, 0);
             }
         } else if ((flag & 0xFF) == 1) {
             if (ai_npc_frame_ck(self, 1, lbl_8079A6BC, lbl_8079A670) == 1) {
@@ -2195,6 +2195,7 @@ extern "C" void ai_npc_step82_arm(struct _AINPC_W* self, u32 flag)
         break;
     }
 }
+#pragma opt_common_subs reset
 
 /* The four-step variant: it arms a 248-frame motion and a 20-frame ramp, then re-aims the motion
  * through the `+0x005` frame table until the ramp is exhausted. */
@@ -2856,7 +2857,7 @@ extern "C" void ai_npc_m2_step0_arm(struct _AINPC_W* self, u32 flag)
         s32 limit;
         f32 distance;
 
-        switch (flag & 0xFF) {
+        switch ((u8)flag) {
         case 0:
             near_limit = lbl_8079A6CC;
             far_limit = lbl_8079A6D0;
@@ -2947,7 +2948,7 @@ extern "C" void ai_npc_m2_step2_arm(struct _AINPC_W* self, u32 flag)
         copyVec3(&start, &diff);
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194,
-                                        distance > lbl_8079A6E0 ? 1536 : 2560);
+                                        distance > lbl_8079A6E0 ? (u16)1536 : (u16)2560);
         break;
     }
     }
@@ -2990,7 +2991,7 @@ extern "C" void ai_npc_m2_step5_arm(struct _AINPC_W* self, u32 flag)
             f32 distance = calcDistanceSqXZ(&self->vec_0x178, &self->vec_0x1B0);
 
             self->field_0x194 =
-                fn_802D30F8((u16)ang_b, (u16)self->field_0x194, distance > lbl_8079A6E0 ? 2048 : 6656);
+                fn_802D30F8((u16)ang_b, (u16)self->field_0x194, distance > lbl_8079A6E0 ? (u16)2048 : (u16)6656);
             fn_802D3210(self, &self->field_0x190);
             self->field_0x190 = fn_802D30F8((u16)ang_a, (u16)self->field_0x190, 1536);
         } else {
@@ -3050,7 +3051,7 @@ extern "C" void ai_npc_m2_step7_arm(struct _AINPC_W* self, u32 flag)
         copyVec3(&start, &diff);
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194,
-                                        distance > lbl_8079A6E0 ? 2048 : 4096);
+                                        distance > lbl_8079A6E0 ? (u16)2048 : (u16)4096);
         break;
     }
     }
@@ -3740,12 +3741,12 @@ void ai_npc_m3_step5_arm(_AINPC_W* self, u8 arg)
                 pos.y += mtx.m[1][3];
                 pos.z += mtx.m[2][3];
                 ::eft019_set_subtype(0x84, 5, &pos, self->area, &self->vec_0x190, 0, 1.5f);
-                spin = ::ran_suu(0) & 0x4000;
+                spin = (s16)::ran_suu(0) & 0x4000;
                 shell_set_func_ptr->method_0x90((::_AINPC_W*)self, 1, ::ran_suu(0) % 3, spin, angle,
                                                 shell_set_func_ptr);
                 break;
             case 4:
-                spin = ::ran_suu(0);
+                spin = ::ran_suu(0) & 0xFFFF;
                 shell_set_func_ptr->method_0x90((::_AINPC_W*)self, 0, ::ran_suu(0) % 3, spin, angle,
                                                 shell_set_func_ptr);
                 break;
@@ -3926,11 +3927,13 @@ void ai_npc_m3_step7_arm(_AINPC_W* self, u8 arg)
                 break;
             }
         }
-        if (ai_npc_frame_ck(self, 0, 124.0f, 0.0f) == 1 && --self->sub_step != 0) {
-            if (arg == 0) {
-                ai_npc_motion_set(self, 0x2A, 4, 0x44);
-            } else {
-                ai_npc_motion_set(self, 0x4E, 4, 0x44);
+        if (ai_npc_frame_ck(self, 0, 124.0f, 0.0f) == 1) {
+            if (--self->sub_step != 0) {
+                if (arg == 0) {
+                    ai_npc_motion_set(self, 0x2A, 4, 0x44);
+                } else {
+                    ai_npc_motion_set(self, 0x4E, 4, 0x44);
+                }
             }
         } else if (ai_npc_motion_end_ck(self) == 1) {
             if (arg == 0) {
@@ -4495,7 +4498,7 @@ void ai_npc_m4_step5_arm(_AINPC_W* self, u8 arg)
         row = &ai_npc_status_motion_tbl2[arg * 6];
         self->state++;
         ai_npc_variant_set(self, row[0]);
-        ai_npc_motion_set_u16(self, row[1], row[2], 0);
+        ai_npc_motion_set(self, row[1] & 0xFFFF, row[2], 0);
         self->sub_step = row[3];
         break;
     case 1:
@@ -4504,7 +4507,7 @@ void ai_npc_m4_step5_arm(_AINPC_W* self, u8 arg)
                 if (arg < 2) {
                     row = &ai_npc_status_motion_tbl2[arg * 6 + 4];
                     self->state++;
-                    ai_npc_motion_set_u16(self, row[0], row[1], 0);
+                    ai_npc_motion_set(self, row[0] & 0xFFFF, row[1], 0);
                 } else {
                     ai_npc_base_state_set(self, 2);
                 }
@@ -5613,7 +5616,7 @@ void ai_npc_buff_item_use(_AINPC_W* self)
     u8 i;
     u8 slot;
     u16 step;
-    s32 cost;
+    s16 cost;
 
     for (i = 0; i < 4; i++) {
         if (self->field_0x3F2 & self->field_0x400[i]) {
@@ -5722,7 +5725,6 @@ u32 ai_npc_enemy_target_pick(_AINPC_W* self)
     u8 found_list[32];
     u8 found;
     f32 dist;
-    f32 range;
 
     if (self->motion == 5) {
         return 0;
@@ -5747,8 +5749,8 @@ u32 ai_npc_enemy_target_pick(_AINPC_W* self)
     }
     enemy = &enemies[found_list[0]];
     dist = vec3_dist_sq(&self->pos_0x178, &enemy->pos);
-    range = ai_npc_engage_range_get(self);
-    if ((dist <= ai_npc_engage_range_get(self) * range || self->field_0x38A > 0) && self->field_0x38E == 0) {
+    if ((dist <= ai_npc_engage_range_get(self) * ai_npc_engage_range_get(self) || self->field_0x38A > 0) &&
+        self->field_0x38E == 0) {
         self->enemy_index = enemy->group;
         self->field_0x1CC = 4;
         self->field_0x38A = 300;
@@ -5850,14 +5852,15 @@ void ai_npc_move_target_set(_AINPC_W* self)
         if (self->field_0x378 == 0) {
             self->field_0x37C = ::ran_suu(1) % 200U;
             scale = ::get_em_chg_scale(enemy);
-            self->field_0x37C += ::get_enemy_data(enemy)->size_0x54->radius_0x24 * scale;
-            spread = 45;
-            switch (self->field_0x420) {
-            case 1:
-            case 2:
-            case 3:
+            {
+                f32 radius = ::get_enemy_data(enemy)->size_0x54->radius_0x24;
+
+                self->field_0x37C += radius * scale;
+            }
+            if ((u32)(self->field_0x420 - 1) <= 2) {
                 spread = -45;
-                break;
+            } else {
+                spread = 45;
             }
             if (ai_npc_item_throw_roll(self) == 1) {
                 self->field_0x34F = 1;
@@ -5895,7 +5898,11 @@ void ai_npc_move_target_set(_AINPC_W* self)
     if (self->variant == 2) {
         if (self->field_0x1CC == 4) {
             scale = ::get_em_chg_scale(enemy);
-            reach = ::get_enemy_data(enemy)->size_0x54->radius_0x24 * scale;
+            {
+                f32 radius = ::get_enemy_data(enemy)->size_0x54->radius_0x24;
+
+                reach = radius * scale;
+            }
             if (enemy->pos.y < self->plw_0x16C->vec_0x03C.y) {
                 reach = -reach;
             }
@@ -5937,6 +5944,7 @@ extern "C" {
 u32 ai_npc_enemy_engage(_AINPC_W* self, u8 flags)
 {
     _ENEMY_WORK* enemies = (_ENEMY_WORK*)::get_move_work_adrs(3);
+    _ENEMY_WORK* enemy;
     u8 found_list[32];
     u8 scan = 5;
 
@@ -5949,7 +5957,8 @@ u32 ai_npc_enemy_engage(_AINPC_W* self, u8 flags)
         return 0;
     }
     self->enemy_index = found_list[0];
-    if (enemies[found_list[0]].area_no != self->area) {
+    enemy = &enemies[self->enemy_index];
+    if (enemy->area_no != self->area) {
         self->enemy_index = 0xFF;
         self->field_0x1C8 = 0;
         return 0;
@@ -6996,7 +7005,8 @@ void ai_npc_behaviour_apply(_AINPC_W* self)
             break;
         }
     }
-    self->field_0x3DC = self->field_0x3DA = (f32)(s32)(300.0f * (20.0f / speed)) / (self->field_0x3D6 / 50.0f);
+    self->field_0x3DA = (f32)(s32)(300.0f * (20.0f / speed)) / (self->field_0x3D6 / 50.0f);
+    self->field_0x3DC = self->field_0x3DA;
 }
 
 /* 0x802D6D4C (0xA8): recomputes the attack (+0x1FA) from the base, the two bonuses and the percentage (+0x434),
@@ -7034,7 +7044,7 @@ void ai_npc_defense_update(_AINPC_W* self)
         defense = 1;
     }
     self->field_0x1FC = defense;
-    self->field_0x208 = 0.5f * (u16)defense;
+    self->field_0x208 = (u16)defense / 2.0f;
 }
 
 /* 0x802D6E74 (0x1A0): picks the engaged enemy's nearest open weak point (skipping hidden, broken and disabled
@@ -7413,8 +7423,10 @@ void ai_npc_status_preview(AINPCSetup* setup, AINPCStatus* status)
     } else if (fn_802D7F10(setup->skills, 11) == 1) {
         status->status_bonus = status->status_attack * 130 / 100 - status->status_attack;
     }
-    status->defense_bonus = defense * defense_rate / 100 - status->defense;
-    status->gauge_add = gauge * gauge_rate / 100 - status->gauge;
+    defense = defense * defense_rate / 100;
+    status->defense_bonus = defense - status->defense;
+    gauge = gauge * gauge_rate / 100;
+    status->gauge_add = gauge - status->gauge;
     if (speed < -6) {
         status->speed_rank = 4;
     } else if (speed < -2) {
@@ -8509,7 +8521,7 @@ s16 fn_802CD20C(struct _AINPC_W* self)
     if (pl_act6_class_ck(plw, 0) == 1) {
         return 0;
     }
-    return pl_act6_class_ck(plw, 1) == 1 ? 0 : -1;
+    return pl_act6_class_ck(plw, 1) == 1 ? (s16)0 : (s16)-1;
 }
 
 /* 0x802CD2E0 - latch the +0x34D gate once the predicate chain answers non-negative. */
@@ -9206,11 +9218,11 @@ void fn_802D1954(struct _AINPC_W* self)
         addVec3(&position, &plw->vec_0x03C, &offset);
         copyVec3(&self->pos_0x178, copyVec3(&self->pos_0x184, &position));
         switch (plw->kind_0x09) {
-        case 3:
-            ai_npc_variant_set(self, 2);
-            break;
         default:
             ai_npc_variant_set(self, 0);
+            break;
+        case 3:
+            ai_npc_variant_set(self, 2);
             break;
         }
         if (self->motion == 5) {
@@ -9624,9 +9636,10 @@ s32 fn_802D2264(struct _AINPC_W* self)
             fn_800DCC24(self->sound_handle_0x498, 7, 0);
             ai_npc_talk(self, (s8)self->field_0x482, 9, 0, 2);
         }
-        return 1;
+    } else {
+        return 0;
     }
-    return 0;
+    return 1;
 }
 }
 
@@ -9937,14 +9950,15 @@ void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row)
 }
 
 /* 0x802D30F8 - clamps the angle difference to `limit` degrees, taking the short way round. */
-u16 fn_802D30F8(u16 angle, u16 target, u32 limit)
+u16 fn_802D30F8(u16 angle, u16 target, u16 limit)
 {
     u16 diff = angle - target;
 
     if (abs((s16)diff) < (u16)limit) {
         target = angle;
     } else {
-        target = (diff < 0x8000) ? target + limit : target - limit;
+        u16 t = (diff < 0x8000) ? (u16)(target + limit) : (u16)(target - limit);
+        target = t;
     }
     return target;
 }
@@ -10071,11 +10085,11 @@ void fn_802D348C(struct _AINPC_W* self)
             return;
         }
         switch (self->variant) {
-        case 2:
-            fn_802D3474(self, 4, 0);
-            break;
         default:
             fn_802D3474(self, 0, 0);
+            break;
+        case 2:
+            fn_802D3474(self, 4, 0);
             break;
         }
         if (::ai_skill_ck((::_AINPC_W*)self, 0x15) == 1) {
@@ -10277,7 +10291,7 @@ void fn_802D3A34(struct _AINPC_W* self, s32 delta)
     s16 limit;
 
     if (::ai_skill_ck((::_AINPC_W*)self, 0x17) == 1) {
-        self->field_0x350 += delta;
+        self->field_0x350 = self->field_0x350 + delta;
     } else {
         self->field_0x350 += (s16)((s16)delta / 2);
     }
@@ -10486,9 +10500,11 @@ u32 fn_802D3F08(struct _AINPC_W* self)
 #pragma opt_propagation off
 u8 fn_802D3F1C(struct _AINPC_W* self)
 {
-    u8 highest = 0xFF;
-    u8 value = self->hit[0].result;
+    u8 value;
+    u8 highest;
 
+    highest = 0xFF;
+    value = self->hit[0].result;
     if (value != 0xFF && (highest == 0xFF || highest < value)) {
         highest = value;
     }
@@ -11286,12 +11302,11 @@ void fn_802D675C(struct _AINPC_W* self)
         if (self->field_0x422 == 0) {
             ai_npc_talk(self, (s8)self->field_0x482, 0x11, 0, 2);
         }
-    } else {
-        s16 first = (s16)(lbl_805D5378[self->field_0x33A * 2] * 0x1E);
-        self->field_0x422 = first;
-        self->field_0x424 = (s16)(first + lbl_805D5378[self->field_0x33A * 2 + 1] * 0x1E);
-        ai_npc_talk(self, (s8)self->field_0x482, 0x12, 0, 2);
+        return;
     }
+    self->field_0x422 = (s16)(lbl_805D5378[self->field_0x33A * 2] * 0x1E);
+    self->field_0x424 = (s16)(self->field_0x422 + lbl_805D5378[self->field_0x33A * 2 + 1] * 0x1E);
+    ai_npc_talk(self, (s8)self->field_0x482, 0x12, 0, 2);
 }
 
 /* 0x802D67F8 - the same hold/ re-arm pair as `fn_802D675C` but from the third tuning table. */
@@ -11301,12 +11316,11 @@ void fn_802D67F8(struct _AINPC_W* self)
         if (self->field_0x422 == 0) {
             ai_npc_talk(self, (s8)self->field_0x482, 0x11, 0, 2);
         }
-    } else {
-        s16 first = (s16)(lbl_805D5390[self->field_0x33A * 2] * 0x1E);
-        self->field_0x422 = first;
-        self->field_0x424 = (s16)(first + lbl_805D5390[self->field_0x33A * 2 + 1] * 0x1E);
-        ai_npc_talk(self, (s8)self->field_0x482, 0x12, 0, 2);
+        return;
     }
+    self->field_0x422 = (s16)(lbl_805D5390[self->field_0x33A * 2] * 0x1E);
+    self->field_0x424 = (s16)(self->field_0x422 + lbl_805D5390[self->field_0x33A * 2 + 1] * 0x1E);
+    ai_npc_talk(self, (s8)self->field_0x482, 0x12, 0, 2);
 }
 
 /* 0x802D6888 - rebuilds the behaviour flag word at +0x20C from the hold counters and the sub-state
@@ -11393,12 +11407,11 @@ void fn_802D6A00(struct _AINPC_W* self)
     w[2] = (u16)(self->field_0x3F7 * 4 + self->field_0x3F7);
     w[3] = (u16)(self->field_0x3F7 * 4 + self->field_0x3F6);
     for (i = 0; i < 4; i++) {
-        u16 v = w[i];
         s16 value;
 
-        self->field_0x3F8[i] = lbl_805D4190[v];
-        self->field_0x3FC[i] = lbl_805D41A0[v];
-        self->field_0x400[i] = lbl_805D41B0[v];
+        self->field_0x3F8[i] = lbl_805D4190[w[i]];
+        self->field_0x3FC[i] = lbl_805D41A0[w[i]];
+        self->field_0x400[i] = lbl_805D41B0[w[i]];
         value = (u8)ai_npc_level_rank_get(self->field_0x3FC[i]);
         if (best <= value) {
             best = value;
@@ -11485,11 +11498,11 @@ void fn_802D7464(struct _AINPC_W* self)
 }
 
 /* 0x802D7688 - which of the four behaviour lists the given id belongs to (3 when in none). */
-#pragma peephole on
-s32 ai_npc_skill_group_get(u8 value)
+s32 ai_npc_skill_group_get(u32 value)
 {
     s32 i;
 
+    value = (u8)value;
     for (i = 0; i < 4; i++) {
         u8* p = (u8*)lbl_805D4390[i];
 
@@ -11502,7 +11515,6 @@ s32 ai_npc_skill_group_get(u8 value)
     }
     return 3;
 }
-#pragma peephole reset
 
 }
 
@@ -11524,9 +11536,9 @@ struct AINPCBehaviour* ai_npc_behaviour_get(u8 index)
 /* 0x802D7754 - the four hold-countdown tuning values for the two 0/1 rolls at +0x3F6/+0x3F7. */
 void ai_npc_pair_values_get(u8 first, u8 second, u16* out)
 {
-    out[0] = lbl_805D41A0[first * 5];
+    out[0] = lbl_805D41A0[first * 4 + first];
     out[1] = lbl_805D41A0[first * 4 + second];
-    out[2] = lbl_805D41A0[second * 5];
+    out[2] = lbl_805D41A0[second * 4 + second];
     out[3] = lbl_805D41A0[second * 4 + first];
 }
 
@@ -11554,7 +11566,7 @@ s32 ai_npc_level_rank_get(u8 value)
 }
 
 /* 0x802D77DC - the +0x414 timer for the best slot level, in frames. */
-s32 fn_802D77DC(u8 slot)
+s16 fn_802D77DC(u8 slot)
 {
     switch (slot) {
     case 1:

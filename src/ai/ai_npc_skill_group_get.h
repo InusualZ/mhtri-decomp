@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x802D7688 (0xB4): the behaviour list (0..2) skill `skill` belongs to, 3 when in none.  GUESS name. */
-s32 ai_npc_skill_group_get(u8 skill);
+s32 ai_npc_skill_group_get(u32 skill);
 
 #ifdef __cplusplus
 }

@@ -161,7 +161,7 @@ void fn_802D2B88(struct _AINPC_W* self, u16 flags);
 void fn_802D2B98(struct _AINPC_W* self, u16 flags);
 void fn_802D2BB0(struct _AINPC_W* self, struct _HIT_W* hit);
 void fn_802D2F7C(struct _AINPC_W* self, u8 index, s32 row);
-u16 fn_802D30F8(u16 angle, u16 target, u32 limit);
+u16 fn_802D30F8(u16 angle, u16 target, u16 limit);
 s32 fn_802D3184(struct _AINPC_W* self, u32 limit);
 void fn_802D31FC(struct _AINPC_W* self);
 void fn_802D3210(struct _AINPC_W* self, u32* angles);
