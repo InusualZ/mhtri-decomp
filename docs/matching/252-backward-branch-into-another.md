@@ -32,7 +32,12 @@ comment above each such loop.
 
 **Result.** `Network/network_pat_control` (Wii/1.3, -O4 by pragma, nopeephole): `updateNetworkPatControl`
 92.69 -> 96.77 % (+464 B) with case 0x1F moved after 0x3/0xD inside a loop headed by the 0x19..0x1E body, then
-96.77 -> 97.00 % (+26 B) with case 0x7's step 0 heading its step loop.
+96.77 -> 97.00 % (+26 B) with case 0x7's step 0 heading its step loop. `menu/menu_placeinfo` (Wii/1.3 -O3):
+`lb_city_select_draw` 95.48 -> 99.08 % (case 5's search body heads the loop, cases 6 and 8 inside it, case 8's
+fall-through is the back edge); `lb_community_select_step` 96.31 -> 97.75 % with the head deep inside nested `if`s
+of an inner switch's case 2 and the next case label inside the loop, the jumping site a `continue;` from a third,
+nested switch. **Limit:** the loop lives inside the switch that owns the head, so a jump from a case of an
+*outer* switch (both `menu_placeinfo` step machines' remaining sites) cannot reach it.
 
 **Example.**
 

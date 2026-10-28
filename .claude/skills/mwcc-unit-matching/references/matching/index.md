@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (237)
+## Ideas that work (238)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -246,6 +246,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 257 | [A u16 loop bound narrowed right after its call: hold it in an s32 local](257-u16-loop-bound-narrowed.md) | works | source-shape, allocator | Retail narrows a u16 loop bound (`clrlwi r30,r3,16`) straight after the count call, ours emits it after the counter's `li`s in the preheader, so the bound and the walking pointer swap callee-saved registers. |
 | 258 | [Duplicated index-0/1 blocks whose cmplw operands come out reversed are a two-trip loop MWCC unrolled](258-duplicated-index-0-1.md) | works | source-shape | Two copies of the same test against element 0 and element 1 match except that each `cmplw` has its operands in the other order, and swapping the source operands or casting them changes nothing. |
 | 259 | [A field retail reloads (or an address it recomputes per iteration) is read inside an inline helper: the inline is a CSE boundary](259-field-retail-reloads-or.md) | works | source-shape, allocator | Retail reloads a field after a test (or recomputes `addi rX,self,OFF` per iteration) where ours reuses the register, or a loop's counter and induction pointer swap saved registers |
+| 260 | [x += c after the last use of x: a fresh local keeps the add in place where MWCC's frontend propagates x + c into every later use](260-x-c-after-the.md) | works | source-shape, allocator | Retail updates a coordinate in place (`addi r22,r22,0xa`) right after its last plain use; ours has no add there and recomputes `x + 10` (or a folded `x + 0x3a`) at each later use or hoists it late, recolouring the loop. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

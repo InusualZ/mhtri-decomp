@@ -28,32 +28,42 @@
  *   `em003_call_se_ids`.
  * RESIDUALS.
  *  - `lb_community_select_step`: retail keeps its page-count tail (pages = total / 8, cursor clamp) in state 8 step 2
- *    and reaches it by backward jumps from seven later places (no case label can mark it, playbook 241); the source
- *    calls the static helper `lb_community_page_count_set`, an extra function in our object.
- *    The tail after the switch (idea 183) is 3360 B against 3312 and scores lower; a scratch `goto` spelling 99.24.
+ *    and reaches it by backward jumps from step 3 and from six places in states 4 and 3.  Step 3's jump is the back
+ *    edge of a `for (;;)` the tail heads (playbook 252); the other six sit in other cases of the OUTER switch, which
+ *    no loop inside the step switch can contain, so they call the static helper `lb_community_page_count_set` (an
+ *    extra function in our object, `mr r3,r30 ; bl` before each `b`).  A scratch `goto` spelling 99.24.
  *  - `lb_city_select_screen_step`: state 5 step 3 repeats state 4 step 1's enter-city tail, which retail reaches by a
- *    backward jump (rule 8; idea 213: MWCC has no pass that merges the identical copy). The tail after the switch
- *    (idea 183) is retail's 3704 B but scores 96.30; a scratch `goto` spelling 100.
- *  - `lb_city_select_draw`: state 8 re-enters state 5's search-dialog body through a `for (;;)` re-dispatch (playbook
- *    203); retail branches straight to case 5, ours loops back to the compare chain (`li r3,5 ; b`), hoists the
- *    `lobby_w.state_0x000` load and colours `work` in r29 where retail has r31.
+ *    backward jump from another case of the outer switch (rule 8; idea 252 cannot reach across the nesting; idea 213:
+ *    MWCC has no pass that merges the identical copy).  The tail after the switch (idea 183) scores 96.30.
+ *  - `lb_city_select_draw`: case 3's steps 3/4 range test is `subi`+`cmplwi` in retail, `cmpwi 3 ; blt ; cmpwi 4`
+ *    in ours (one instruction); `case 4: case 3:`, a `default:` range test and `(u8)`/`(s32)`/`(u32)` switch
+ *    operands do not move it.
  *  - `place_model_release`, `place_model_load`: retail keeps `index * 0x174` in a saved register across the calls and
- *    stores through `work + offset`, plus a `mr r6,r30` copy of the slot pointer; not reproduced by an inline
- *    member, a byte-offset pointer or a global-based `model`.
- *  - `lb_city_member_list_draw`, `lb_city_list_draw`, `lb_city_list_ex_draw`: retail updates the `s32` icon/name x in
- *    place (`addi r25,r25,0xa`); ours folds the `+= 10` into its later uses (`+0x3a`) and recolours the loop.
+ *    stores through `work + offset` (`stwx`), plus a `mr r6,r30` copy of the slot pointer; not reproduced by an
+ *    inline member (no change), a block-local slot pointer, a byte-offset pointer or a global-based store.
+ *  - The list draws (`lb_city_list_draw`, `lb_city_list_ex_draw`, `lb_city_member_list_draw`, `lb_community_*_draw`):
+ *    retail updates the label x in place (`addi r22,r22,0xa`); MWCC's frontend propagates `x += 10` into the later
+ *    uses (the first backend dump already has `x + 10` at each use), so the source keeps the text x in its own local,
+ *    which puts the add in place but gives it its own register (the residual colouring).
+ *  - `lb_city_member_list_draw`: retail computes `work + (s16)i` (`extsh ; add r17`) after the icon colour call; ours
+ *    before it (regsim: best declaration order 12 of 19 saved registers).
+ *  - `pig_name_set`: the second loop's `i`/`entry` swap r27/r28 (regsim reproduces the colouring; the two webs are
+ *    split differently from the first loop's).
+ *  - `placeinfo_model_create`: retail loads the 1.0f rate of `nw_res_anm_create` before the integer arguments.
  *  - `lb_city_timer_draw`: retail extends both `font_locate` coordinates after the second `fctiwz`; ours extends the
- *    first at once.
- *  - `lb_city_filter_list_draw`: retail clears the title id with `clrlwi r4,r4,16` after the ternary; ours omits it.
- *  - The other draws (`lb_community_*_draw`, `draw_search_city_dialog`, `placeinfo_world_draw`) and
- *    `lb_community_select_step`: register colouring and the odd `li` placement.
+ *    first at once (`(s32)` casts: worse).
+ *  - `lb_city_filter_list_draw`: retail clears the title id with `clrlwi r4,r4,16` after the ternary; ours omits it
+ *    (`(u16)` cast, an `s32`/`u16` local: no change).
+ *  - `draw_search_city_dialog`, `lb_community_*_draw`, `placeinfo_world_draw`: register colouring.
  *  - Data: `.data` 0x80603EA0-0x80604638 (the six combo tables `lobby/lb_companion_ui.cpp` reads: 0x80603EA0,
  *    0x806042B8, 0x806043E8, 0x806045F8, 0x8060461C, 0x80604628) and `.sdata` 0x80793A28-0x80793A67 (the small tables
  *    0x806045F8 points at) are not emitted: `lobby/lb_companion_ui.h` declares two of them under their map names.
  *    `.sdata2`: retail keeps a second 0.0f (0x8079C8CC) for `placeinfo_model_create`; ours shares the first.
  *  - `lb_area_view_pos_tbl` (0x805BA540) and `jump_err_msg_str` (0x80794B10) are unclaimed shared data (band headers).
  * SHAPES. The select screens' coordinates are `s32` locals read through `(s16)` views where retail extends before the
- *   arithmetic, `s16` locals where retail stores them extended; the colour flags are `bool`.  The NetCtrlWk calls whose
+ *   arithmetic, `s16` locals where retail stores them extended; the colour flags are `bool`.  Loop-invariant x values
+ *   (separator bar, count column) are written at their uses inside the loop, where MWCC hoists them as retail does;
+ *   `placeinfo_model_create` frees its works in a one-iteration loop (retail's hoisted zero in r26).  The NetCtrlWk calls whose
  *   header spells a `void`/`s32` return retail tests or stores as a byte go through signature casts
  *   (`requestListRefreshAlias`, `requestCommand17`, `getSelectedServerTypeIndex`).  The asserts sit on retail's lines
  *   288 and 292 (`#line`).
@@ -990,17 +1000,16 @@ void lb_city_list_draw(LbCitySelectWork* work, bool active) {
     s32 x;
     s32 name_x;
     s16 count_x;
-    s32 bar_x;
-    s16 free_x;
-    s32 count_text_x;
-    s32 y;
-    s32 text_y;
-    s16 i;
     s16 event_x;
+    s32 text_y;
     bool cursor;
-    u32 flags;
     s32 color;
+    u32 flags;
+    s16 i;
+    s32 text_x;
     NetCityView* city;
+    s16 free_x;
+    s32 y;
     char text[0x20];
 
     flfntFlush();
@@ -1014,19 +1023,16 @@ void lb_city_list_draw(LbCitySelectWork* work, bool active) {
     put_frame_label(name_x, 0x5C, 0x56, 0, 0, (s8*)LbStr(0, 0x270));
     put_frame_label(event_x, 0x5C, 0x162, 0, 0, (s8*)LbStr(0, 0x271));
     put_frame_label(count_x, 0x5C, 0x7A, 0, 0, (s8*)LbStr(0, 0x272));
-    name_x += 10;
+    text_x = name_x + 10;
     event_x += 8;
     y = 0x74;
     font_set_size(18, 18);
-    city = work->cities_0x024;
-    bar_x = (s16)name_x - 10;
-    count_text_x = count_x + 8;
-    for (i = 0; i < work->count_0x00C; i++) {
-        put_frame_separator(bar_x, y, 0x238, 0x1A, 0);
+    for (i = 0, city = work->cities_0x024; i < work->count_0x00C; i++) {
+        put_frame_separator((s16)text_x - 10, y, 0x238, 0x1A, 0);
         if (i == work->cursor_0x00A) {
             cursor = 1;
             flags = 6;
-            put_frame_cursor_bar(bar_x, y, 0x238, 0x1A, 0, 0);
+            put_frame_cursor_bar((s16)text_x - 10, y, 0x238, 0x1A, 0, 0);
         } else {
             cursor = 0;
             flags = 2;
@@ -1042,14 +1048,14 @@ void lb_city_list_draw(LbCitySelectWork* work, bool active) {
             break;
         }
         text_y = (s16)y + 3;
-        lb_font_print(name_x, text_y, (s8*)city->name_0x10, color, flags);
+        lb_font_print(text_x, text_y, (s8*)city->name_0x10, color, flags);
         if (city->state_0x0C == 0) {
             lb_font_print(event_x, text_y, (s8*)LbStr(0, 0x27C), color, flags);
         } else {
             lb_font_print(event_x, text_y, lb_city_event_name_get(city->values_0x20[3]), color, flags);
         }
         sprintf(text, "%2d/%2d", city->population_0x00, city->capacity_0x04);
-        lb_font_print(count_text_x, text_y, (s8*)text, color, flags);
+        lb_font_print(count_x + 8, text_y, (s8*)text, color, flags);
         sprintf(text, "(%2d)", city->population_0x00 - city->order_0x0A);
         lb_font_print(free_x, text_y, (s8*)text, color, flags);
         y += 0x1A;
@@ -1065,17 +1071,16 @@ void lb_city_list_ex_draw(LbCitySelectWork* work, bool active) {
     s32 x;
     s16 count_x;
     s32 name_x;
-    s32 bar_x;
-    s16 event_x;
-    s32 count_text_x;
-    s32 y;
+    s32 text_x;
     s32 text_y;
-    s16 first_x;
-    s16 i;
-    bool cursor;
-    u32 flags;
-    s16 second_x;
     s32 color;
+    u32 flags;
+    s16 i;
+    s32 y;
+    s16 first_x;
+    bool cursor;
+    s16 second_x;
+    s16 event_x;
     NetCityView* city;
     char text[0x30];
 
@@ -1093,19 +1098,16 @@ void lb_city_list_ex_draw(LbCitySelectWork* work, bool active) {
     put_frame_label(second_x, 0x5C, 0x9C, 0, 0, (s8*)LbStr(0, 0x278));
     put_frame_label(event_x, 0x5C, 0xA6, 0, 0, (s8*)LbStr(0, 0x271));
     put_frame_label(count_x, 0x5C, 0x78, 0, 0, (s8*)LbStr(0, 0x272));
-    name_x += 10;
+    text_x = name_x + 10;
     first_x += 8;
     y = 0x74;
     font_set_size(18, 18);
-    city = work->cities_0x024;
-    bar_x = (s16)name_x - 10;
-    count_text_x = count_x + 0x16;
-    for (i = 0; i < work->count_0x00C; i++) {
-        put_frame_separator(bar_x, y, 0x248, 0x1A, 0);
+    for (i = 0, city = work->cities_0x024; i < work->count_0x00C; i++) {
+        put_frame_separator((s16)text_x - 10, y, 0x248, 0x1A, 0);
         if (i == work->cursor_0x00A) {
             cursor = 1;
             flags = 6;
-            put_frame_cursor_bar(bar_x, y, 0x248, 0x1A, 0, 0);
+            put_frame_cursor_bar((s16)text_x - 10, y, 0x248, 0x1A, 0, 0);
         } else {
             cursor = 0;
             flags = 2;
@@ -1121,7 +1123,7 @@ void lb_city_list_ex_draw(LbCitySelectWork* work, bool active) {
             break;
         }
         text_y = (s16)y + 3;
-        lb_font_print(name_x, text_y, (s8*)city->name_0x10, color, flags);
+        lb_font_print(text_x, text_y, (s8*)city->name_0x10, color, flags);
         if (city->state_0x0C == 0) {
             lb_font_print(first_x, text_y, (s8*)LbStr(0, 0x27C), color, flags);
         } else {
@@ -1131,7 +1133,7 @@ void lb_city_list_ex_draw(LbCitySelectWork* work, bool active) {
         }
         sprintf(text, "%2d/%2d (%2d)", city->population_0x00, city->capacity_0x04,
                 city->population_0x00 - city->order_0x0A);
-        lb_font_print(count_text_x, text_y, (s8*)text, color, flags);
+        lb_font_print(count_x + 0x16, text_y, (s8*)text, color, flags);
         y += 0x1A;
         city++;
     }
@@ -1144,17 +1146,17 @@ void lb_city_list_ex_draw(LbCitySelectWork* work, bool active) {
  * members of the page, and the cursor prompt. */
 void lb_city_member_list_draw(LbCitySelectWork* work, bool active) {
     s32 x;
-    s16 name_x;
-    s16 area_x;
-    s16 state_x;
     s32 icon_x;
-    s32 bar_x;
-    s16 y;
-    s32 text_y;
-    s16 first;
     s32 i;
     bool cursor;
     s32 color;
+    s16 y;
+    s32 text_x;
+    s16 name_x;
+    s16 area_x;
+    s16 state_x;
+    s32 text_y;
+    s16 first;
     s8* name;
     NetFriendCard* card;
     _SPR_DATA_ spr;
@@ -1172,21 +1174,19 @@ void lb_city_member_list_draw(LbCitySelectWork* work, bool active) {
     put_frame_label(name_x, 0x54, 0x6C, 0, 0, (s8*)LbStr(0, 0x274));
     put_frame_label(area_x, 0x54, 0x3A, 0, 0, (s8*)LbStr(0, 0x275));
     put_frame_label(state_x, 0x54, 0x58, 0, 0, (s8*)LbStr(0, 0x276));
-    icon_x += 10;
+    text_x = icon_x + 10;
     name_x += 8;
     area_x += 4;
     state_x += 8;
     y = 0x6C;
     first = work->scroll_0x1140.col * 5;
     font_set_size(18, 18);
-    card = &work->members_0x560[first];
-    bar_x = (s16)icon_x - 10;
-    for (i = 0; i < 5; i++) {
+    for (i = 0, card = &work->members_0x560[first]; i < 5; i++, card++) {
         if ((s16)i < work->member_count_0x546) {
-            put_frame_separator(bar_x, y, 0x140, 0x1A, 0);
+            put_frame_separator((s16)text_x - 10, y, 0x140, 0x1A, 0);
             cursor = (s16)i == work->scroll_0x1140.row;
             spr_data_copy(&spr, get_lsp_data(0x18B6, NULL));
-            pos.x = bar_x;
+            pos.x = (s16)text_x - 10;
             pos.y = y;
             draw_sprite_uv_color_idx(0x18B6, work->member_status_0x551[(s16)i], GetMenuIconColor(1, cursor, active, 0),
                                      &pos);
@@ -1204,13 +1204,12 @@ void lb_city_member_list_draw(LbCitySelectWork* work, bool active) {
             font_set_size(18, 18);
             lb_font_print(state_x, text_y, (s8*)LbStr(0, work->member_busy_0x54C[(s16)i] + 0x27D), color, 2);
             if (cursor == 1) {
-                put_frame_cursor_bar(bar_x, y, 0x140, 0x1A, 0, 0);
+                put_frame_cursor_bar((s16)text_x - 10, y, 0x140, 0x1A, 0, 0);
             }
         }
         y += 0x1A;
-        card++;
     }
-    pos.x = icon_x + 0x30;
+    pos.x = text_x + 0x30;
     pos.y = y + 2;
     if (active != 0) {
         if (work->scroll_0x1140.row + 1 == work->scroll_0x1140.row_limit) {
@@ -1248,11 +1247,12 @@ void lb_community_info_draw(LbCitySelectWork* work) {
 void lb_community_list_draw(LbCitySelectWork* work, bool active) {
     s32 x;
     s32 name_x;
+    s16 i;
     s16 free_x;
     s16 event_x;
     s16 count_x;
+    s32 text_x;
     s32 text_y;
-    s16 i;
     s32 y;
     bool cursor;
     u32 flags;
@@ -1271,18 +1271,18 @@ void lb_community_list_draw(LbCitySelectWork* work, bool active) {
     put_frame_label(name_x, 0x5C, 0x56, 0, 0, (s8*)LbStr(0, 0x270));
     put_frame_label(event_x, 0x5C, 0x162, 0, 0, (s8*)LbStr(0, 0x271));
     put_frame_label(count_x, 0x5C, 0x7A, 0, 0, (s8*)LbStr(0, 0x272));
-    name_x += 10;
+    text_x = name_x + 10;
     event_x += 8;
     count_x += 8;
     y = 0x74;
     font_set_size(18, 18);
     for (i = 0; i < work->count_0x00C; i++) {
         view = &work->communities_0x1A4[i];
-        put_frame_separator((s16)name_x - 10, y, 0x238, 0x1A, 0);
+        put_frame_separator((s16)text_x - 10, y, 0x238, 0x1A, 0);
         if (i == work->cursor_0x00A) {
             cursor = 1;
             flags = 6;
-            put_frame_cursor_bar((s16)name_x - 10, y, 0x238, 0x1A, 0, 0);
+            put_frame_cursor_bar((s16)text_x - 10, y, 0x238, 0x1A, 0, 0);
         } else {
             cursor = 0;
             flags = 2;
@@ -1293,7 +1293,7 @@ void lb_community_list_draw(LbCitySelectWork* work, bool active) {
             color = 0x646464FF;
         }
         text_y = (s16)y + 3;
-        lb_font_print(name_x, text_y, (s8*)view->comment_0x41, color, flags);
+        lb_font_print(text_x, text_y, (s8*)view->comment_0x41, color, flags);
         lb_font_print(event_x, text_y, lb_city_event_name_get(view->slots_0x64[3]), color, flags);
         sprintf(text, "%2d/%2d", view->value_0x54, view->value_0x5C);
         lb_font_print(count_x, text_y, (s8*)text, color, flags);
@@ -1315,13 +1315,14 @@ void lb_community_list_draw(LbCitySelectWork* work, bool active) {
  * population. */
 void lb_community_list_ex_draw(LbCitySelectWork* work, bool active) {
     s32 x;
-    s16 event_x;
+    s16 i;
+    s32 text_x;
     s16 first_x;
     s16 second_x;
+    s16 event_x;
     s32 name_x;
     s16 count_x;
     s32 text_y;
-    s16 i;
     s32 y;
     bool cursor;
     u32 flags;
@@ -1343,18 +1344,18 @@ void lb_community_list_ex_draw(LbCitySelectWork* work, bool active) {
     put_frame_label(second_x, 0x5C, 0x9C, 0, 0, (s8*)LbStr(0, 0x278));
     put_frame_label(event_x, 0x5C, 0xA6, 0, 0, (s8*)LbStr(0, 0x271));
     put_frame_label(count_x, 0x5C, 0x78, 0, 0, (s8*)LbStr(0, 0x272));
-    name_x += 10;
+    text_x = name_x + 10;
     first_x += 8;
     count_x += 0x16;
     y = 0x74;
     font_set_size(18, 18);
     for (i = 0; i < work->count_0x00C; i++) {
         view = &work->communities_0x1A4[i];
-        put_frame_separator((s16)name_x - 10, y, 0x248, 0x1A, 0);
+        put_frame_separator((s16)text_x - 10, y, 0x248, 0x1A, 0);
         if (i == work->cursor_0x00A) {
             cursor = 1;
             flags = 6;
-            put_frame_cursor_bar((s16)name_x - 10, y, 0x248, 0x1A, 0, 0);
+            put_frame_cursor_bar((s16)text_x - 10, y, 0x248, 0x1A, 0, 0);
         } else {
             cursor = 0;
             flags = 2;
@@ -1365,7 +1366,7 @@ void lb_community_list_ex_draw(LbCitySelectWork* work, bool active) {
             color = 0x646464FF;
         }
         text_y = (s16)y + 3;
-        lb_font_print(name_x, text_y, (s8*)view->comment_0x41, color, flags);
+        lb_font_print(text_x, text_y, (s8*)view->comment_0x41, color, flags);
         lb_font_print(first_x, text_y, lb_city_first_filter_name_get(view->slots_0x64[1]), color, flags);
         lb_font_print(second_x, text_y, lb_city_second_filter_name_get(view->slots_0x64[2]), color, flags);
         lb_font_print(event_x, text_y, lb_city_event_name_get(view->slots_0x64[3]), color, flags);
@@ -1382,20 +1383,22 @@ void lb_community_list_ex_draw(LbCitySelectWork* work, bool active) {
 /* 0x80439894 (0x35C): the city search dialog: one row per filter tab with its current value, the confirm row and
  * the help text of the selected tab. */
 void draw_search_city_dialog(LbCitySelectWork* work, bool active) {
-    char title[0x60];
+    char title[0x30];
     _mh_ivec2_ pos;
-    s16 height = (work->tab_count_0x130E - 1) * 0x44 + 0x46;
     s32 x;
-    s16 center_x;
-    s16 prompt_y;
-    s16 bar_x;
-    s16 y;
     s16 i;
+    s32 label_x;
+    s16 center_x;
+    s32 flags;
+    s16 bar_x;
+    s16 height;
+    s16 y;
+    s16 prompt_y;
     s32 width;
     s32 arrows;
-    s32 flags;
     bool cursor;
     s8* text;
+    height = (work->tab_count_0x130E - 1) * 0x44 + 0x46;
     u16 label;
     s32 help;
 
@@ -1407,23 +1410,25 @@ void draw_search_city_dialog(LbCitySelectWork* work, bool active) {
     x = put_frame_dialog_title(0x140, 0x40, 0x12C, height, 0, 0, 0, (s8*)title, 4);
     center_x = x + 0x96;
     prompt_y = height + 0xA;
-    x += 0x14;
+    label_x = x + 0x14;
     y = 0x54;
     for (i = 0; i < work->tab_count_0x130E - 1; i++) {
         width = 0x104;
         arrows = 0;
-        if (work->tab_kinds_0x12EC[i] != 1) {
-            if (work->tab_kinds_0x12EC[i] != 0) {
-                label = 0x271;
-            } else {
-                label = 0x279;
-                width = 0x64;
-                arrows = 1;
-            }
-        } else {
+        switch (work->tab_kinds_0x12EC[i]) {
+        default:
+            label = 0x271;
+            break;
+        case 1:
             label = 0x278;
+            break;
+        case 0:
+            label = 0x279;
+            width = 0x64;
+            arrows = 1;
+            break;
         }
-        put_frame_label(x, y, 0x6E, 0, 0, (s8*)LbStr(0, label));
+        put_frame_label(label_x, y, 0x6E, 0, 0, (s8*)LbStr(0, label));
         bar_x = center_x - (width >> 1);
         y += 0x1A;
         put_frame_separator(bar_x, y, width, 0x1A, 0);
@@ -1440,19 +1445,21 @@ void draw_search_city_dialog(LbCitySelectWork* work, bool active) {
             flags = 0;
             cursor = 0;
         }
-        if (work->tab_kinds_0x12EC[i] != 0) {
-            if (work->tab_kinds_0x12EC[i] != 1) {
-                text = lb_city_event_name_get(work->tab_values_0x12FC[i]);
-            } else {
-                text = lb_city_second_filter_name_get(work->tab_values_0x12FC[i]);
-            }
-        } else {
+        switch (work->tab_kinds_0x12EC[i]) {
+        default:
+            text = lb_city_event_name_get(work->tab_values_0x12FC[i]);
+            break;
+        case 0:
             text = lb_city_first_filter_name_get(work->tab_values_0x12FC[i]);
+            break;
+        case 1:
+            text = lb_city_second_filter_name_get(work->tab_values_0x12FC[i]);
+            break;
         }
         lb_font_center_print(center_x, y + 0xD, text, 18, GetMenuFontColor(1, cursor, active, 0), flags);
         y += 0x24;
     }
-    pos.x = x + 0x1E;
+    pos.x = label_x + 0x1E;
     pos.y = prompt_y;
     lb_cursor_prompt_draw(work->tab_kinds_0x12EC[work->tab_cursor_0x130C] == -1, (s16*)&pos);
     switch (work->tab_kinds_0x12EC[work->tab_cursor_0x130C]) {
@@ -1555,58 +1562,58 @@ void lb_city_timer_draw(LbCitySelectWork* work) {
 /* 0x80439EF8 (0x414): draws the city select's current state. */
 void lb_city_select_draw(void) {
     LbCitySelectWork* work = (LbCitySelectWork*)lobby_w.menu_0xAC;
-    s32 state = work->state_0x000;
 
-    for (;;) {
-        switch (state) {
-        case 2:
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x264), 0);
-            if (work->server_type_0x003 == 3) {
-                lb_city_list_ex_draw(work, 1);
-            } else {
-                lb_city_list_draw(work, 1);
+    switch (work->state_0x000) {
+    case 2:
+        put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x264), 0);
+        if (work->server_type_0x003 == 3) {
+            lb_city_list_ex_draw(work, 1);
+        } else {
+            lb_city_list_draw(work, 1);
+        }
+        break;
+    case 3:
+        put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
+        switch (work->step_0x001) {
+        case 0:
+            lb_city_member_list_draw(work, 1);
+            break;
+        case 1:
+            lb_city_member_list_draw(work, 1);
+            if (work->sub_0x002 == 1) {
+                put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
             }
+            break;
+        case 2:
+            lb_city_member_list_draw(work, 1);
             break;
         case 3:
-            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
-            switch (work->step_0x001) {
-            case 0:
-                lb_city_member_list_draw(work, 1);
-                break;
-            case 1:
-                lb_city_member_list_draw(work, 1);
-                if (work->sub_0x002 == 1) {
-                    put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
-                }
-                break;
-            case 2:
-                lb_city_member_list_draw(work, 1);
-                break;
-            case 3:
-            case 4:
-                menu_friend_list_draw((FriendCardView*)work->card_view_0x114C);
-                if (work->step_0x001 == 4 && work->sub_0x002 == 1) {
-                    put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
-                }
-                break;
-            }
-            break;
         case 4:
-            switch (work->step_0x001) {
-            case 0:
-                put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
-                lb_city_member_list_draw(work, 0);
-                put_message_window((s8*)LbStr(0, 0x27F), (s8*)LbStr(1, 0x2D), (s8*)LbStr(1, 0x2E), work->yes_no_0x1340, 0,
-                                   -1);
-                break;
-            case 1:
-                if (work->sub_0x002 == 1) {
-                    put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
-                }
-                break;
+            menu_friend_list_draw((FriendCardView*)work->card_view_0x114C);
+            if (work->step_0x001 == 4 && work->sub_0x002 == 1) {
+                put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
             }
             break;
-        case 5:
+        }
+        break;
+    case 4:
+        switch (work->step_0x001) {
+        case 0:
+            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
+            lb_city_member_list_draw(work, 0);
+            put_message_window((s8*)LbStr(0, 0x27F), (s8*)LbStr(1, 0x2D), (s8*)LbStr(1, 0x2E), work->yes_no_0x1340, 0,
+                               -1);
+            break;
+        case 1:
+            if (work->sub_0x002 == 1) {
+                put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
+            }
+            break;
+        }
+        break;
+    case 5:
+        /* The search dialog heads a loop: state 8's search steps branch back to it. */
+        for (;;) {
             if (lobby_w.state_0x000 == 33) {
                 put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
             } else {
@@ -1619,7 +1626,7 @@ void lb_city_select_draw(void) {
                 break;
             }
             break;
-        case 6:
+    case 6:
             if (lobby_w.state_0x000 == 33) {
                 put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
             } else {
@@ -1629,7 +1636,7 @@ void lb_city_select_draw(void) {
             lb_city_filter_list_draw(work, 1);
             lb_city_timer_draw(work);
             break;
-        case 8:
+    case 8:
             if (work->step_0x001 == 0 || work->step_0x001 >= 3 || lobby_w.state_0x000 == 37) {
                 if (work->step_0x001 == 3) {
                     if (work->server_type_0x003 == 3) {
@@ -1643,16 +1650,13 @@ void lb_city_select_draw(void) {
                 }
                 break;
             }
-            state = 5;
-            continue;
-        case 13:
-            put_message((s8*)LbStr(3, 0x1F6), 18, -1);
-            break;
         }
+        break;
+    case 13:
+        put_message((s8*)LbStr(3, 0x1F6), 18, -1);
         break;
     }
 }
-
 /* 0x8043A30C (0x54): clears the lobby screen work and opens the city screen for player `self` */
 void lb_city_screen_open(struct _PLW* self) {
     memset(lobby_w.menu_0xAC, 0, sizeof(LbCitySelectWork));
@@ -1769,8 +1773,8 @@ s32 lb_city_filters_collect(u8 kind) {
 /* Recomputes the community page count after a page load and keeps the cursor inside the page. */
 static void lb_community_page_count_set(LbCitySelectWork* work) {
     work->pages_0x010 = work->total_0x012 / 8;
-    if (work->total_0x012 % 8 > 0) {
-        work->pages_0x010 = work->total_0x012 / 8 + 1;
+    if (work->total_0x012 - work->pages_0x010 * 8 > 0) {
+        work->pages_0x010++;
     }
     if (work->cursor_0x00A >= work->count_0x00C) {
         work->cursor_0x00A = 0;
@@ -1877,10 +1881,16 @@ void lb_community_select_step(LbCitySelectWork* work) {
                     work->page_0x00E = 0;
                     work->cursor_0x00A = 0;
                     sysSE_stop(0x20);
-                    lb_community_page_count_set(work);
-                }
-            }
-            break;
+                    /* The page count heads a loop: step 3's page turn (inside the loop) branches back to it. */
+                    for (;;) {
+                        work->pages_0x010 = work->total_0x012 / 8;
+                        if (work->total_0x012 - work->pages_0x010 * 8 > 0) {
+                            work->pages_0x010++;
+                        }
+                        if (work->cursor_0x00A >= work->count_0x00C) {
+                            work->cursor_0x00A = 0;
+                        }
+                        break;
         case 3:
             switch (work->sub_0x002) {
             case 0:
@@ -1920,7 +1930,7 @@ void lb_community_select_step(LbCitySelectWork* work) {
                                                         6, &work->arrow_moved_0x008);
                     work->count_0x00C = NetCtrlWk::copyCommunityViews(work->communities_0x1A4, work->page_0x00E * 8, 8,
                                                                       &work->total_0x012);
-                    lb_community_page_count_set(work);
+                    continue;
                 }
                 break;
             case 1:
@@ -1931,6 +1941,10 @@ void lb_community_select_step(LbCitySelectWork* work) {
                     work->sub_0x002 = 0;
                 }
                 break;
+            }
+            break;
+                    }
+                }
             }
             break;
         }
@@ -2765,8 +2779,8 @@ void place_model_area_load(u8 map, u8 area) {
         place_model_release_all();
     }
     for (i = 0, lobby = &lobby_w; i < count; i++) {
-        if (lobby->place_ids_0x134[i + first] != 0xFF) {
-            place_model_load(0, i, lobby->place_ids_0x134[i + first], map, area);
+        if (lobby->place_ids_0x134[first + i] != 0xFF) {
+            place_model_load(0, i, lobby->place_ids_0x134[first + i], map, area);
         }
     }
     if (work->map == 0xFF) {
@@ -2823,8 +2837,8 @@ void pig_name_set(const char* name) {
     default:
         return;
     }
-    for (i = 0, entry = changed; i < count; i++, entry++) {
-        if (lobby_w.place_ids_0x134[i + first] != ids[first + (i)]) {
+    for (i = 0, entry = changed; i < count; entry++, i++) {
+        if (lobby_w.place_ids_0x134[first + i] != ids[first + (i)]) {
             place_model_release(i);
             *entry = ids[first + (i)];
         }
@@ -3002,16 +3016,16 @@ void place_model_step(void) {
  * when the interior asks for one; 1 on success. */
 s32 placeinfo_model_create(u8 index, char* name) {
     EftResFileHandle res;
-    s32 base;
     PlaceModel* model;
+    s32 base;
     MHchar* chr;
     struct _g3d_work** works;
     u8 flags;
     u8 map;
     u8 area;
     ResEntry* entry;
-    u32 file;
     nw4r::g3d::AnmObj* anm;
+    s32 i;
 
     res_file_ctor(&res.data_0x00, 0);
     nw4r::g3d::ResMdl mdl((void*)0);
@@ -3030,7 +3044,10 @@ s32 placeinfo_model_create(u8 index, char* name) {
         return 0;
     }
     place_model_work.models[index].res_index = entry->index;
-    res_file_assign(&res.data_0x00, res_file_ctor(&file, (u32)entry->data));
+    {
+        u32 file;
+        res_file_assign(&res.data_0x00, res_file_ctor(&file, (u32)entry->data));
+    }
     mhchar_reset(chr);
     chr->g3d_0x10C = NULL;
     mhchar_model_create(chr, &res.data_0x00, 3, 2);
@@ -3080,10 +3097,12 @@ s32 placeinfo_model_create(u8 index, char* name) {
             return 1;
         }
     }
-    if (*works != NULL) {
-        push_g3d_wk(*works);
+    for (i = 0; i < 1; i++) {
+        if (works[i] != NULL) {
+            push_g3d_wk(works[i]);
+        }
+        works[i] = NULL;
     }
-    *works = NULL;
     return 0;
 }
 
