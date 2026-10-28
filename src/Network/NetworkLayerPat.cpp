@@ -51,18 +51,15 @@
  *   pair by address only (the compiler names them `@NNNN`, the map `jumptable_`/`lbl_`).  The range's V->S seam at
  *   0x805FC324 is the two `getArgument` strings, not a TU boundary.
  * RESIDUALS. Partial rows:
- *  - `readSelectedServer_88`, `sendUserPosition_60`: retail's early return is a `bge`/`ble` + `b` pair around the call
- *    (ours one inverted branch; if/else-return, empty if, `!`, do/while/for/switch, a scoped object, an inline helper
- *    and an empty inline call in the return block all give the single branch or a longer row);
- *  - `downsampleVoice`: retail tests the count with `cmplwi`+`blelr`; `(s32)i > 0` gives `cmpwi`+`blelr` (99.06, not
- *    kept), `i != 0`, `i > 0u`, `i >= 1u`, `while (i--)` and up-counting loops differ more;
- *  - `move`: retail stores `getNegotiationResult` into `pairState_C7F0` unextended and narrows the third call's result
- *    lazily (`mr r0,r3` ... `extsb r6,r0`), i.e. the caller sees an `s8` return (an `s8` declaration takes `move` to
- *    99.71) while the callee is `lbz` + `blr` with no `extsb` (47.5 with `s8`/`char`); the last negotiation block's
- *    `peer` pointer is r26 where retail has r27 (declaration place and a local-free spelling measured);
- *  - `reflect`: the callee-saved registers are coloured one apart in places (the answer pointer r25 vs retail r26);
- *    the city-list rows reload `layerId`/`value_076` after each store in retail (a non-const row pointer and one
- *    shared `layer` local change nothing).
+ *  - `move`: the last negotiation block's `peer` pointer is r26 where retail has r27 (regalloc dump: `peer` is the
+ *    named-local web r33, its only callee-saved neighbour `this`/r25; declaring it at the block head, before or between
+ *    `a`/`b`, a block-local `b`, a block-local second-loop `a` and a local-free spelling all leave it r26);
+ *  - `reflect`: the city-list rows reload `layerId`/`value_076` after each store in retail (12 B); ours has the loads in
+ *    the IR and the backend CSE pass (`after-common-subexpression-elimination`, the first) drops them (a non-const row,
+ *    `u8` closed/hidden flags, a shared `layer` local and `opt_pointer_analysis`/`opt_load_deletion` off change
+ *    nothing). The callee-saved colouring is one apart (`data` r25/retail r26, `count` r26/r27): `regsim search`
+ *    reaches 19/23 webs only by naming the community loop's copied counter and reordering ~50 case locals, and a
+ *    block-local counter alone costs 7.8 B.
  * SHAPES. The definitions follow the retail `.text` order.  Retail emits the request records' members right after
  *   their first caller: `NetworkLayerRequest`'s and most of `NetworkLayerPatRequest`'s are plain definitions at those
  *   places; `reset`/`clear` are inline and defined before the record's destructor (MWCC then knows the destructor's
@@ -70,6 +67,10 @@
  *   `handleLayerReserve` (an inline function's literal gets its own copy, retail's second `getArgument` string).
  *   `networkLayerPatRequestDescReserve` is defined before `requestLayerCreate`, so it follows `moveRequests`' table in
  *   `.data` as in retail.
+ * SHAPES. A `bge`/`ble` + `b` early exit is the last operand of one `||` guard (playbook 255: `readSelectedServer_88`,
+ *   `sendUserPosition_60`); `downsampleVoice` counts up with an `s32` index against `(u32)size / 2` (`cmplwi`+`blelr`).
+ *   `move` stores `getNegotiationResult`'s `u8` into `pairState_C7F0` through a `u8` view of the row (retail's `stb` has no
+ *   `extsb`; an `s8` store keeps one with peephole off) and passes the third result through a `u8` local (`mr`+`extsb`).
  * SHAPES. The constructor calls `NetworkLayer::NetworkLayer` and stores 0x805FC1E0 (79 slots); the table is emitted here
  *   (key function `stepRequest`, declared first; rule 10) and every override's map row carries the compiler's mangling.
  *  - every handler is the state machine over `NetworkLayerRequest::state_00` (0 start, waits, 100 cancelled, 110
@@ -603,12 +604,12 @@ void NetworkLayerPat::release()
 s32 NetworkLayerPat::downsampleVoice(s16* out, s32 outSize, const s16* in, s32 inSize)
 {
     s32 size = inSize / 2;
-    u32 i;
+    s32 i;
 
     if (outSize < size) {
         return 0;
     }
-    for (i = (u32)size / 2; i > 0; i--) {
+    for (i = 0; i < (u32)size / 2; i++) {
         *out = (in[0] + in[1]) / 2;
         in += 2;
         out++;
@@ -756,12 +757,12 @@ void NetworkLayerPat::move()
                 s8 slot = findFriendByPeerId(this->negotiateFrom_438);
 
                 if (slot >= 0 && this->transferSlot_C07C >= 0) {
-                    this->pairState_C7F0[slot][this->transferSlot_C07C] =
+                    ((u8*)this->pairState_C7F0[slot])[this->transferSlot_C07C] =
                         GameSpyInterfaceThread::getInstance()->getNegotiationResult();
-                    this->pairState_C7F0[this->transferSlot_C07C][slot] =
+                    ((u8*)this->pairState_C7F0[this->transferSlot_C07C])[slot] =
                         GameSpyInterfaceThread::getInstance()->getNegotiationResult();
-                    sendPairState(this->negotiateFrom_438, this->negotiateTo_43C,
-                                  GameSpyInterfaceThread::getInstance()->getNegotiationResult());
+                    u8 result = GameSpyInterfaceThread::getInstance()->getNegotiationResult();
+                    sendPairState(this->negotiateFrom_438, this->negotiateTo_43C, result);
                     this->negotiated_440 = 1;
                 } else {
                     sendPairState(this->negotiateFrom_438, this->negotiateTo_43C, 3);
@@ -1085,21 +1086,20 @@ void NetworkLayerPat::sendUserPosition_60(const NetUserPosition* position)
 {
     NetUserPosition notice;
 
-    if (this->memberCount_4C8 >= 0 && this->memberUsed_F02C > 1 && position != NULL &&
-        memcmp(&this->lastPosition_414, position, sizeof(NetUserPosition)) != 0 && layerPositionInterval != 0.0f) {
-        if (this->timers_3C4[0] + layerPositionInterval > getNetworkLogger()->getTime_60()) {
-            return;
-        }
-        this->timers_3C4[0] = getNetworkLogger()->getTime_60();
-        memcpy(&this->lastPosition_414, position, sizeof(NetUserPosition));
-        notice.position_00[0] = position->position_00[0];
-        notice.position_00[1] = position->position_00[1];
-        notice.position_00[2] = position->position_00[2];
-        notice.value_0C[0] = position->value_0C[0];
-        notice.value_0C[1] = position->value_0C[1];
-        notice.value_0C[2] = position->value_0C[2];
-        sendNtcLayerUserPosition(getInstance_(), &notice);
+    if (this->memberCount_4C8 < 0 || this->memberUsed_F02C <= 1 || position == NULL ||
+        memcmp(&this->lastPosition_414, position, sizeof(NetUserPosition)) == 0 || !layerPositionInterval ||
+        this->timers_3C4[0] + layerPositionInterval > getNetworkLogger()->getTime_60()) {
+        return;
     }
+    this->timers_3C4[0] = getNetworkLogger()->getTime_60();
+    memcpy(&this->lastPosition_414, position, sizeof(NetUserPosition));
+    notice.position_00[0] = position->position_00[0];
+    notice.position_00[1] = position->position_00[1];
+    notice.position_00[2] = position->position_00[2];
+    notice.value_0C[0] = position->value_0C[0];
+    notice.value_0C[1] = position->value_0C[1];
+    notice.value_0C[2] = position->value_0C[2];
+    sendNtcLayerUserPosition(getInstance_(), &notice);
 }
 
 /* Logs the layer in (event 1): the account check, the reflect callback, the server's login, FMP and binary stages
@@ -5954,13 +5954,11 @@ void NetworkLayerPat::readSelectedServer_88(NetServerRec* out)
 
     if (out != NULL) {
         getFmpSelection(getInstance_(), &kind, &index);
-        if (kind == 1) {
-            if (index < 0) {
-                return;
-            }
-            copyFmpSlot(getInstance_(), &slot, index);
-            exportServerRec(out, &slot);
+        if (kind != 1 || index < 0) {
+            return;
         }
+        copyFmpSlot(getInstance_(), &slot, index);
+        exportServerRec(out, &slot);
     }
 }
 
