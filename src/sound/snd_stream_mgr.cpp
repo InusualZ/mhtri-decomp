@@ -5,33 +5,35 @@
  *   float pool (literals, byte-identical); `.ctors` the static initialiser.
  * FLAGS. lib `sound` (`cflags_main`, Wii/1.3). `#pragma peephole off` and `#pragma fp_contract off` over the file;
  *   `#pragma optimization_level 4` around `cmd_start` (its channel switch is the level-4 `subi`/`cmplwi` range
- *   lowering, playbook 108); `#pragma dont_inline on` at the foot keeps `__sinit` calling the manager's constructor.
+ *   lowering, playbook 108); the manager's constructor is `inline` and `never_inline` (idea 242), so `__sinit` calls it,
+ *   it follows `__sinit` and the base constructor is inlined into it.
  * NAMES. GUESS (from the bodies, the AX/DVD/MIX calls and the callers), every name in the unit: the manager streams
  *   ADPCM/PCM files from the disc into a buffer split in thirds (`DVDReadAsyncPrio`, `stream_read_*_cb`), plays them
  *   through one or two AX voices, and runs the commands of three stream banks (`StreamRelocSet`: format, group,
  *   command and track tables plus a path list). The callees of other units carry registry names (lane
  *   sound-stream-mgr); the record type names (`StreamVoice`, `StreamCmd`, `StreamTrack`, ...) are GUESSes.
- * RESIDUALS. `stream_read_cb` keeps `file_pos` live across `stream_round_up` where retail reloads it (one register
- *   pair); `stream_read_loop_cb` adds the destination operands in the other order. `run_chain`: retail narrows the
- *   chained index with `clrlwi r4,r0,16` (a u16 local in r0) that ours drops. `voice_limit`: the weaker/excess
- *   counters and the second walk's node take r28/r29 where retail uses r30/r29 (declaration orders tried, best +4 B).
- *   `stream_voice_setup`: the pitch sum and the pan add keep swapped operands. `queue_read`/`stream_voice_rewind`:
- *   one register pair swapped.
- * RESIDUALS. The base class: `SndPlayerBase` stands for sound/sound_obj's player base, whose constructor
- *   (`snd_player_base_construct`) and destructor (`snd_player_base_destruct`) are C-linkage map rows; its inline
- *   constructor is emitted out of line (`__ct__13SndPlayerBaseFv`, an extra 0x30-byte function and extab entry) because
- *   the foot's `dont_inline` also covers the deferred manager constructor. The destructor slot is the plain virtual
- *   `destroy` (retail's array and base cleanup records are missing from `extab`).
- * RESIDUALS. Data: `.sdata` is 2 of the claimed 8 bytes (the rest is link fill); `extab` lacks retail's three cleanup
- *   records (the destructor's array, the constructor's base and `cmd_start`'s record copy).
- * RESIDUALS. flipcheck: `.text` +0x2C (the out-of-line base constructor, the rows above); `extab` -0x38 (the three
- *   records); `extabindex` +0xC (the base constructor's entry); `.ctors` and the extab index relocations follow the
- *   shifted layout.
+ * RESIDUALS. `voice_limit`: the key and the counters take r30/r28 where retail uses r28/r30 (declaration orders and
+ *   variable reuse tried). `stream_voice_setup`: the pitch sum's first load is r5 where retail loads it into r26, and
+ *   the pan add keeps swapped operands (a one-expression pan reassociates). `queue_read`: the per-channel limit and
+ *   `read_pos` swap r4/r5. `stream_voice_rewind`: the `addis` lands in r0 where retail reuses r4.
+ * RESIDUALS. The class shape (blocks the flip): retail's slot 0 is a real destructor (`__destroy_arr` over the
+ *   records, then the base destructor `snd_player_base_destruct(this, 0)`), the records are a class (constructor
+ *   `stream_rec_init`, copy constructor `stream_rec_copy` over `stream_reloc_copy`, destructor `stream_rec_destroy`)
+ *   and `cmd_start` passes `*rec` by value to `stream_rec_format` (copy, call, destroy). Those three compiler-managed
+ *   objects are retail's three `extab` cleanup records (0x40 bytes, relocations to `stream_rec_destroy` x2 and
+ *   `snd_player_base_destruct`), which the explicit calls here cannot emit. Writing them needs sound/sound_obj's
+ *   player base constructor/destructor as mangled C++ members (a foreign rename), and `stream_play`'s record copy has
+ *   no destructor call in retail, which the single class model does not yet explain.
+ * RESIDUALS. Data: `.sdata` is 2 of the claimed 8 bytes (the rest is link fill). flipcheck: `extab` -0x40 (the three
+ *   records) and the extab index relocations that follow it; `.text` is the target's size.
  * SHAPES. The DVD read callbacks test the result with three separate early returns (a `&&`/`||` chain, nested ifs or a
  *   switch fold to one `addi`/`cmplwi` range test). The bank table getters are separate functions right after their
  *   wrappers (retail's `addi`/`b`), every index widened to u32 at the call; the id key is
  *   `owner = global ? 0xFF : slot` then one expression; the `MIXInitChannel` calls take their five `snd_level_to_db`
- *   arguments inline (evaluated right to left).
+ *   arguments inline (evaluated right to left). `run_chain` reads the chained index through a `u16` inline getter
+ *   (retail's `clrlwi` at the call); `stream_read_cb` rounds the read size in its own statement (retail reloads
+ *   `file_pos` after the call); `stream_read_loop_cb` sums buffer, slot offset and result left to right; the pitch is
+ *   one left-to-right sum.
  */
 
 #include "types.h"
@@ -214,7 +216,7 @@ struct SndPlayerBase {
 /* The stream manager. */
 class StreamMgr : public SndPlayerBase {
 public:
-    StreamMgr();
+    StreamMgr() __attribute__((never_inline));
     virtual StreamMgr* destroy(s16 flags);
     virtual void update(StreamNode* node);
     virtual BOOL release(StreamNode** link);
@@ -427,8 +429,7 @@ void stream_voice_setup(StreamVoice* voice, StreamCmd* cmd, StreamTrack* track, 
     }
     voice->ramp_base = voice->level;
 
-    pitch = cmd->pitch + track->pitch_fine;
-    pitch = track->pitch_coarse * 100 + pitch;
+    pitch = cmd->pitch + track->pitch_fine + track->pitch_coarse * 100;
     pitch_range = cmd->pitch_random;
     if (pitch_range > 0) {
         pitch += ((stream_rand() << 5) % (pitch_range * 2)) - pitch_range;
@@ -606,8 +607,9 @@ void stream_read_cb(s32 result, DVDFileInfo* file)
             if (voice->file_pos + size > voice->file.length) {
                 size = voice->file.length - voice->file_pos;
             }
+            size = stream_round_up(size, 32);
             DVDReadAsyncPrio(&voice->file, voice->buffer + stream_half_size + voice->read_buf * stream_chunk_size,
-                             stream_round_up(size, 32), voice->file_pos, stream_read_loop_cb, 0);
+                             size, voice->file_pos, stream_read_loop_cb, 0);
         }
     }
 }
@@ -661,7 +663,7 @@ void stream_read_loop_cb(s32 result, DVDFileInfo* file)
                 } else {
                     pos = snd_format_samples_to_bytes(voice->format, voice->format->loop_start);
                 }
-                dst = voice->read_buf * stream_chunk_size + (voice->buffer + result);
+                dst = voice->buffer + voice->read_buf * stream_chunk_size + result;
                 voice->read_pos = pos & ~7;
                 DVDReadAsyncPrio(&voice->file, dst, size, voice->read_pos, stream_read_wrap_cb, 0);
                 return;
@@ -1227,12 +1229,18 @@ void stream_cmd_copy(StreamCmd* dst, StreamCmd* src)
     dst->user = src->user;
 }
 
+/* Returns the index of the command chained after `cmd` (0xFF ends the chain). */
+inline u16 stream_cmd_next(StreamCmd* cmd)
+{
+    return cmd->next;
+}
+
 /* Runs the commands chained after `cmd`. */
 void StreamMgr::run_chain(StreamRelocSet* rec, StreamCmd* cmd, s32 slot, u32 paused)
 {
     StreamCmd* next;
     const char* path;
-    u16 idx = cmd->next;
+    u16 idx = stream_cmd_next(cmd);
 
     if (idx != 0xFF) {
         do {
@@ -1248,7 +1256,7 @@ void StreamMgr::run_chain(StreamRelocSet* rec, StreamCmd* cmd, s32 slot, u32 pau
                 }
             }
             run_cmd(rec, next, slot, path, paused);
-            idx = next->next;
+            idx = stream_cmd_next(next);
         } while (idx != 0xFF);
     }
 }
@@ -1425,7 +1433,6 @@ BOOL StreamMgr::voice_limit(StreamCmd* cmd, s32 slot)
     u32 key;
     s32 count;
     s32 weaker;
-    s32 excess;
     u32 hold;
 
     node = snd_voice_last(snd_bank_table_get_c1());
@@ -1455,12 +1462,12 @@ BOOL StreamMgr::voice_limit(StreamCmd* cmd, s32 slot)
     if (weaker == 0) {
         return FALSE;
     }
-    excess = count - (cmd->max_voices - 1);
+    weaker = count - (cmd->max_voices - 1);
     for (victim = snd_voice_last(snd_bank_table_get_c1()); snd_voice_list_head_ck(snd_bank_table_get_c1(), victim) != 1;
          victim = snd_voice_prev(victim)) {
         if (victim->kind == 2 && cmd->id_lo != 0xFF && key == victim->key && cmd->priority >= victim->priority) {
             snd_envelope_release(this, (AxVoiceBlock*)&stream_node_voice(victim)->level);
-            if (--excess <= 0) {
+            if (--weaker <= 0) {
                 return TRUE;
             }
         }
@@ -1877,7 +1884,5 @@ inline StreamMgr::StreamMgr() : buffer_count(0), buffer_used(0), active(0), mast
     bank_volume[1] = 127;
     bank_volume[2] = 127;
 }
-
-#pragma dont_inline on
 
 StreamMgr g_stream_mgr;
