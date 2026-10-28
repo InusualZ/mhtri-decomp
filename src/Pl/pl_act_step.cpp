@@ -20,8 +20,7 @@
  *   and counts down the act's 15-frame `+0x028` timer), `pl_act_gauge_gate_by_skill` (picks the guard gauge band from
  *   cat skill 20); the runtime dump answers placeholders for both.
  *   GUESS (from each body): pl_item_usable_ck (any of the 26 pouch slots holds a usable item), pl_item_slot_cycle (the
- *   next or previous such slot), pl_act_stagger_fill (raises the stagger flag and refills the stagger value),
- *   `pl_item_window_blocked` (an inline helper: the actor kinds and acts that keep the item window shut).
+ *   next or previous such slot), pl_act_stagger_fill (raises the stagger flag and refills the stagger value).
  *   From the callers: `pl_area_entry_set` (`enemy/em_pop.cpp` places the player at an area entry with it),
  *   `pl_act_step_arm_table` (the step table it arms, `Pl/pl_act_step_data.h`), `pl_act_net_hook_a`/`_b`/`_c` (the
  *   three receivers `hud/pl_frame_sync.cpp` replays, declared in `Pl/fn_802489D4.h`).
@@ -35,24 +34,21 @@
  *   GUESS (from the body): `pl_facing_turn_set` (sets both facing words +0x058/+0x0A8 to the +0x398 base turned by
  *   its argument; `pl_act_knockback_enter` turns the actor by 0 or 0x8000 with it).
  * RESIDUALS. Every function is written.  `GetItemData` keeps the local `u8*` view: `menu/menu_item.h` and
- *   `ai/ai_npc.h` both define `_HIT_W`.  About 55 functions partial; the lowest is `pl_act_net_hook_main`.
+ *   `ai/ai_npc.h` both define `_HIT_W`.  22 functions partial; the lowest is `pl_act_net_hook_main`.
  *   Recorded causes:
  *  - `pl_frame_post_step`: retail tests the master check with `bne` over a `b` to the epilogue; every `if`, `switch`
  *    and inline-helper spelling of the early return folds it into one `beq`;
  *  - `pl_condition_tick`: the act-kind 8/9 return keeps `bgt` over a `b` (the same fold);
  *  - `pl_act_status_step`: one extra `clrlwi` before the `+0x5C4` nibble store, and the cap/health compare takes
- *    r0/r3 the other way round;
+ *    r0/r3 the other way round (`health < cap` measured lower);
  *  - `pl_scan_act_select`: row 3/24's `flags == 24` test branches into row 16's body (`beq`) where ours leaves
  *    with `bne` (an empty then-arm `if (== 24) {} else break;` measured +0.6 B, not used); the allocator colours the
- *    loop's saved registers differently (declaration order searched);
- *  - `pl_act_fishing`: the grade compare's registers and the `limit` load order;
+ *    loop's saved registers differently (declaration order searched), which also lets ours reuse a row word retail
+ *    reloads (`lhz r0,0(r5)`, 4 B short);
+ *  - `pl_act_fishing`: `count` and `bite` take each other's registers (declaration order searched);
  *  - `pl_act_net_hook_main`: retail keeps the after-switch motion tail (`0x162`/`0x133` + `fn_8024CA50`) inside the
  *    switch after item 0x2C, and the 0x162/0x12E tail after item 0x1A; the later cases branch back to them (backward
  *    jumps: walls, playbook 213), so ours writes them after the switch and per case (6092 B vs 5600);
- *  - `pl_act_net_hook_b`: retail places the 0x17F arm between case 2 and the 0x246/0x34 arm case 2 falls into; ours
- *    keeps the fallthrough adjacent;
- *  - `fn_8025E448`: cases 6/8/10 of the roster switch branch into the default arm's `prompt = icon = 0` on a failed
- *    test; ours writes the clear in each else;
  *  - `pl_guard_ck`: the allocator gives the scan-row pointer and the weapon kind other registers;
  *  - `pl_act_step_offhand_gesture`: `.text`, extab and extabindex are byte-identical; the target's extabindex
  *    `R_PPC_ADDR32` names dtk's `@etb_80011EFC` where MWCC writes its own local, which no source reaches;
@@ -60,16 +56,25 @@
  *    local is what gives retail's three-instruction range test (`addi r0,r3,-1; cmplwi r0,1; ble`);
  *  - `pl_act_step_pitfall_hold`: 8 B short - MWCC removes the loop counter retail keeps (`li r4,0`/`addi r4,r4,1`);
  *    the shape that keeps it (`u16*` plus `i`) re-bases the address and scores lower;
- *  - `fn_8025E0C8`: retail branches straight from each blocked test to one shared `field_0x308` clear; the inline
- *    `pl_item_window_blocked` returns a flag the caller tests (`li r0,1` + `cmpwi`), and an un-inlined chain repeats
- *    the clear at every test;
  *  - `fn_8025FF0C`, `fn_80260198`: the `pl_move_work` scan keeps a dead loop counter and adds the row base before
  *    the entry offset (row-pointer and pointer-plus-index spellings measured equal);
  *  - `pl_act_stun`: retail sign-extends the doubled shake count (`extsb`) where ours masks it; an `s8` local
  *    re-extends at the load and scores lower;
- *  - `fn_8025A7FC`: the target schedules `threshold = 15` between the `cmplwi` and the `bne` of the
- *    `field_0x128 == 2` test, ours before the load;
- *  - the other partial rows have no recorded cause.
+ *  - `fn_8025A7FC`: one `clrlwi r3,r3,24` on the incremented `+0x3A6` before the compare that ours folds;
+ *  - `fn_802602A0`, `fn_8024676C`: register colouring only (the actor, the turn rates and the shared 0/1 constant
+ *    take other saved registers; declaration order searched);
+ *  - `fn_802607C4`: the bearing's `addis` is scheduled after the `+0x058` load in retail, and `diff` lives in r4
+ *    where ours uses r0;
+ *  - `fn_8026495C`: retail returns the level without the `u8` narrowing (`mr r3,r31`); a `u32` return makes
+ *    `fn_80264A84` re-narrow and scores lower;
+ *  - `pl_act_weapon_follow_up`: retail scales `variant` before the row (`slwi r4,r30,1` first, `lhax r5,row,idx`);
+ *  - `pl_act_paralysis`: the step switch compares `variant` signed (`cmpwi`); a `(s32)` switch scores lower;
+ *  - `pl_act_walk`, `pl_act_weapon_thrust`: `fmuls` takes the motion frame first; the division spelling (playbook
+ *    151) would pool its own constant instead of the band's `pl_float_0_5`/`pl_float_0_03125`.
+ *  - `pl_carry_item_get` returns a halfword in retail (`clrlwi r0,r3,16` before every `0xFFFF` test) where
+ *    `Pl/pl_act.h` declares `u32`: the call sites cast `(u16)` (request pl-act-step-3#2); `pl_mode8_free_ck` is
+ *    called through `pl_mode8_free_ck_actor` because `unsplit/unknown.h` declares it `(void)` (request
+ *    pl-act-step-3#1).
  *  - flipcheck: the registry names this source spells resolve when the registry is exported.
  *  - flipcheck: the object emits no `.bss` (0x30 claimed), `.ctors` (0x4) or `.sdata` (0x28), one `.sbss` word
  *    (`pl_eft_func`; 0x8 claimed, the second word has no reader), and its own switch tables in `.data`; the own
@@ -120,6 +125,20 @@
  *    `self` (`fn_8025FA00`, `fn_8025F588`); `(u32)` table indices (`pl_act_item_throw`) keep retail's unfolded
  *    `slwi`/`addi`/`slwi` index; an `(s32)` read of an `s16` table entry keeps retail's `lha`+`clrlwi` for a `u16`
  *    parameter.
+ *  - a two-valued constant is an `if`/`else` (`fn_8025A7FC`, `pl_act_fishing`, `pl_act_slinger_aim`, `fn_802602A0`):
+ *    retail schedules the default `li` between the compare and its branch, which `x = a; if (c) x = b;` hoists above
+ *    the load;
+ *  - a stepped field takes a typed constant through a compound assignment (`field -= (u16)0x300`), which stores the
+ *    value raw where `field = local - 0x300` adds a `clrlwi` (playbook 38);
+ *  - blocked tests that share one clear leave a `do { } while (0)` with `continue` from inside the switch
+ *    (`fn_8025E0C8`, playbook 183); roster cases 8/6/10 of `fn_8025E448` and arm 0x17F of `pl_act_net_hook_b` sit in
+ *    nested `if (0)` blocks so a failed test falls into the default clear or the shared arm (playbook 241); the small
+ *    `field_0x00A` dispatch of `fn_8025ED00` is an `if` chain (each compare sits before its body);
+ *  - the ground probe's out word is an `f32` (`pl_ground_probe_ahead` writes only `out->x`) and the land record is
+ *    `LandData`: both set the frame retail allocates (`pl_act_stroke_forward`, `fn_8025E448`,
+ *    `pl_ground_height_probe`, `fn_8025F478`);
+ *  - `!(vel < 0)` keeps retail's `bge` where `vel >= 0` emits `cror` (`pl_act_jump`, `pl_act_carry_jump`,
+ *    `pl_act_wind_launched`).
  */
 
 #include "types.h"
@@ -136,6 +155,7 @@
 #define fn_8025E298 fn_8025E298_hidden_fn_8025F088_h
 #define fn_8025E298 fn_8025E298_hidden_fn_8025F088_h
 #include "Pl/fn_8025F088.h"
+#include "vec3_move_damp.h"   /* the owner's leaf header (rule 2) */
 #undef fn_8025E298
 #undef fn_8025E298
 #undef get_move_work_max
@@ -262,6 +282,9 @@
 /* `pl_facing_turn_set` as `pl_act_knockback_enter` calls it: retail narrows the turn to a halfword at the call
  * (`clrlwi`) while the definition masks its own word again. */
 #define pl_facing_turn_set_h ((void (*)(_PLW*, u16))pl_facing_turn_set)
+/* `pl_mode8_free_ck` as its owner `hud/pl_frame_sync.cpp` defines it, taking the actor: `unsplit/unknown.h` still
+ * declares it `(void)` (request pl-act-step-3#1). */
+#define pl_mode8_free_ck_actor ((u32 (*)(_PLW*))pl_mode8_free_ck)
 /* fn_8025E298_view3: the call sites disagree on this callee's parameters; each keeps its own view through a cast (same direct call). */
 #define fn_8025E298_view3 ((u32 (*)(struct _PLW*, s32, s32))fn_8025E298)
 /* fn_8025E298_view1: the call sites disagree on this callee's parameters; each keeps its own view through a cast (same direct call). */
@@ -320,8 +343,8 @@ typedef struct PlMoveWork {
     /* +0x002 */ u8 pad_0x002[0x1];
     /* +0x003 */ u8 kind_0x003;       /* the enemy kind the grab act looks for (0x12, 4) */
     /* +0x004 */ u8 pad_0x004[0x16];
-    /* +0x01A */ u8 sub_area_0x01A;   /* compared with the actor's `sub_area_0x3B6` */
-    /* +0x01B */ u8 pad_0x01B[0x16D];
+    /* +0x01A */ u16 sub_area_0x01A;  /* its low byte is compared with the actor's `sub_area_0x3B6` */
+    /* +0x01C */ u8 pad_0x01C[0x16C];
     /* +0x188 */ VEC3 pos_0x188;
     /* +0x194 */ u8 pad_0x194[0x4D];
     /* +0x1E1 */ u8 field_0x1E1;
@@ -396,8 +419,8 @@ extern u32 pl_evade_steps_right[];
 extern u32 pl_evade_bow_steps[6];
 extern u8 pl_gather_tool_limits[3];
 extern s16 pl_weapon_follow_up_slots[][4];
-extern s16 pl_knockback_flight_attr[];
-extern s16 pl_knockback_getup_attr[];
+extern u16 pl_knockback_flight_attr[];
+extern u16 pl_knockback_getup_attr[];
 extern s16 pl_knockback_land_attr[4];
 extern u8 pl_stun_shake_needs[6];
 extern u32 pl_sleep_steps[];
@@ -537,28 +560,6 @@ extern "C" void pl_act_guard_gauge_adjust(_PLW* self, u16 neg_limit, u16 pos_lim
 
 
 
-/* Answers 1 while the actor's kind or act keeps the item window shut. */
-inline BOOL pl_item_window_blocked(_PLW* self) {
-    u8 kind = self->field_0x00A;
-    if ((u32)(kind - 8) <= 1) {
-        return TRUE;
-    }
-    switch (kind) {
-    case 0:
-        if (Pl_bari_ck(self, 1) == 1) {
-            return TRUE;
-        }
-        break;
-    case 6:
-        switch (self->act_no) {
-        case 27:
-        case 35:
-            return TRUE;
-        }
-        break;
-    }
-    return FALSE;
-}
 
 
 extern "C" void fn_802430E8(_PLW* work, u8 part) {
@@ -1381,11 +1382,11 @@ extern "C" void pl_pos_place(_PLW* self, VEC3* pos, u16 angle, u8 kind, u8 area,
 /* 0x802462FC: Places the actor at an area entry and resets its act state; a downed or carted actor re-enters
  * its rest act, any other the act its latches pick.  The master's arrival raises the area's lobby events. */
 extern "C" void pl_hit_effect_spawn(_PLW* self, VEC3* pos, u16 angle, u8 kind, u8 area, u8 keepChase) {
-    PlBodyWork* body;
+    MHchar* chr;
     u8 stage;
     u8 latch;
 
-    body = (PlBodyWork*)self->physics_0x13C;
+    chr = &((PlBodyWork*)self->physics_0x13C)->chr_0x04;
     pl_pos_place(self, pos, angle, kind, area, keepChase);
     self->field_0x352 = 10;
     pl_act_set_gauge_arm(self, 30);
@@ -1446,7 +1447,7 @@ extern "C" void pl_hit_effect_spawn(_PLW* self, VEC3* pos, u16 angle, u8 kind, u
         }
     }
     pl_model_pos_sync(self);
-    mhchar_model_mtx_update(&body->chr_0x04);
+    mhchar_model_mtx_update(chr);
     yure_player_clear_flags((YurePlayerWork*)self);
     if (Pl_master_ck(self) == 1) {
         if (stage != 0) {
@@ -1553,7 +1554,7 @@ extern "C" void fn_8024676C(_PLW* self) {
     self->field_0x453 = 0;
     slot = pl_item_slot_next_get(self, 0, 2);
     self->item_slot_sel = slot;
-    self->magazine_0x270 = pl_item_slot_count_get(self, slot);
+    self->magazine_0x270 = pl_item_slot_count_get(self, (u16)slot);
     pl_held_item_refresh(self);
     self->field_0x30C = 0;
     self->field_0x30D = 0;
@@ -1614,7 +1615,7 @@ extern "C" void fn_8024676C(_PLW* self) {
  * 2 when only the upper one does): the lower ground wins when both hit, and the actor's own height stands in when
  * neither does. */
 extern "C" s32 pl_ground_height_probe(_PLW* self, f32* height) {
-    VEC3 land;
+    LandData land;
     f32 below;
     s32 hit;
 
@@ -2013,7 +2014,7 @@ extern "C" void pl_act_flinch(_PLW* self, s32 variant) {
                     Pl_act_set_step_table(self, (u32)pl_flinch_steps_kind2, 0);
                     break;
                 case 8:
-                    if (pl_mode8_free_ck() == 0) {
+                    if (pl_mode8_free_ck_actor(self) == 0) {
                         Pl_act_set_step_table(self, (u32)pl_flinch_steps_kind8, 0);
                     }
                     break;
@@ -2086,7 +2087,7 @@ extern "C" void fn_80247CC4(_PLW* self) {
 /* The swim/ladder input check: without the hold latch the actor drops (or holds on, below its ground mark);
  * with a direction input it enters the stroke act `variant` and the held part flag pick.  Returns 1 when an act
  * was entered. */
-extern "C" s32 pl_act_stroke_input_ck(_PLW* self, s32 variant) {
+extern "C" u8 pl_act_stroke_input_ck(_PLW* self, s32 variant) {
     u16 actHeld;
     u16 actFree;
 
@@ -2219,7 +2220,7 @@ extern "C" void pl_act_stroke_hold(_PLW* self, s32 variant) {
 /* The forward stroke act (`fast` doubles as the dash): arms the stroke motion, re-enters the hold act at the
  * stroke's frame windows, drops the actor when its stamina runs out and climbs out at a ledge ahead. */
 extern "C" void pl_act_stroke_forward(_PLW* self, s32 variant, s32 fast) {
-    VEC3 ledge;
+    f32 ledge;
 
     pl_act_set_step_time(self, 2);
     if (fast == 0) {
@@ -2279,7 +2280,7 @@ extern "C" void pl_act_stroke_forward(_PLW* self, s32 variant, s32 fast) {
         }
         return;
     }
-    if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, &ledge) == 1) {
+    if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&ledge) == 1) {
         self->field_0x0A8 = self->rot_0x54.y;
         pl_act_enter(self, 0, 6, 0);
         return;
@@ -2972,7 +2973,7 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
             case 0:
             case 1:
                 Pl_act_set_motion_slot(self, 3, 8, 0);
-                break;
+                /* fallthrough: retail arms the slot a second time */
             case 6:
             case 7:
             case 8:
@@ -3101,7 +3102,7 @@ extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
             Pl_act_set_step_table(self, (u32)lbl_805CAD74, 0);
             return;
         case 8:
-            if (pl_mode8_free_ck() == 0) {
+            if (pl_mode8_free_ck_actor(self) == 0) {
                 Pl_act_set_step_table(self, (u32)pl_flinch_steps_kind8_guard, 0);
                 return;
             }
@@ -3313,6 +3314,7 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
     s16 count;
     s16 bite;
     s16 hold;
+    s16 window;
     s16 limit;
     u32 item;
     u8 big;
@@ -3409,10 +3411,11 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
         count = ++self->field_0x5B8;
         bite = ((s16*)row)[1];
         hold = ((s16*)row)[3];
+        window = ((s16*)row)[4];
         if (count >= bite + ((s16*)row)[2]) {
             self->field_0x5BA = 4;
         } else if (count >= bite) {
-            if (hold > 0 && count >= bite + hold && count < ((s16*)row)[4] + (bite + hold)) {
+            if (hold > 0 && count >= bite + hold && count < window + (bite + hold)) {
                 self->field_0x5BA = 3;
             } else {
                 self->field_0x5BA = 2;
@@ -3424,11 +3427,10 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
         }
         if (variant == 0) {
             limit = 0x14A;
+        } else if (self->field_0x5B8 >= 0xA0) {
+            limit = 0x14A;
         } else {
             limit = 0x96;
-            if (self->field_0x5B8 >= 0xA0) {
-                limit = 0x14A;
-            }
         }
         if (Pl_master_ck(self) != 1) {
             break;
@@ -3815,10 +3817,10 @@ extern "C" void pl_gather_tool_wear(_PLW* self) {
     if (*uses > limit) {
         *uses = limit + 1;
         if (Pl_Skill_ck(self, 0x8F) == 1 && (ran_suu(1) & 3) == 0) {
-            odds = (odds >> 1) + 1;
+            odds = ((u32)odds >> 1) + 1;
         }
         if (Pl_Skill_ck(self, 0x90) == 1 && (ran_suu(1) & 1) == 0) {
-            odds = (odds >> 1) + 1;
+            odds = ((u32)odds >> 1) + 1;
         }
         if (ran_suu(1) % odds == 0 && (Pl_Skill_ck(self, 0x8D) != 1 || (ran_suu(1) & 3) != 0) &&
             (Pl_Skill_ck(self, 0x8E) != 1 || (ran_suu(1) & 1) != 0) &&
@@ -4330,6 +4332,12 @@ extern "C" void pl_act_net_hook_b(_PLW* self) {
             }
             break;
         }
+        /* a cat-skill actor ends in the 0x246/0x34 arm, past the 0x17F one */
+        if (0) {
+    case 0x17F:
+            shell_set_func_ptr->method_0x34(self, 0x10, shell_set_func_ptr);
+            break;
+        }
         /* fallthrough */
     case 0x246:
     case 0x34:
@@ -4338,9 +4346,6 @@ extern "C" void pl_act_net_hook_b(_PLW* self) {
         } else {
             shell_set_func_ptr->method_0x34(self, 6, shell_set_func_ptr);
         }
-        break;
-    case 0x17F:
-        shell_set_func_ptr->method_0x34(self, 0x10, shell_set_func_ptr);
         break;
     case 0x1:
         if (Pl_cat_skill_ck(self, 5) != 1) {
@@ -5129,7 +5134,7 @@ extern "C" void pl_act_net_hook_d(_PLW* self) {
     }
     switch (self->field_0x306) {
     case 0x16A:
-        pl_health_recover(me, 0x14, 1);
+        pl_health_recover(me, 0x14, 0);
         ef_inst_spawn(me, 0);
         if (fn_8024D5AC(self, partner) == 1) {
             ef_inst_spawn(partner, 0);
@@ -5396,7 +5401,6 @@ extern "C" void pl_act_step_offhand_gesture(_PLW* self, s32 part)
  * the ground (a quake and the landing motion) and, when that ends, enters the get-up act. */
 extern "C" void pl_act_launched(_PLW* self) {
     VEC3 launch;
-    f32 ground;
 
     VEC3_ctor(&launch);
     switch (self->act_step_0x05) {
@@ -5431,10 +5435,9 @@ extern "C" void pl_act_launched(_PLW* self) {
         pl_motion_integrate(self);
         pl_act_set_gauge_arm(self, 2);
         if (pl_zone_ground_drop(self) != 1 && self->motion_vel_0x7C <= pl_float_zero) {
-            ground = self->ground_y_0x060;
-            if (self->vec_0x03C.y <= ground) {
+            if (self->vec_0x03C.y <= self->ground_y_0x060) {
                 self->act_step_0x05++;
-                self->vec_0x03C.y = ground;
+                self->vec_0x03C.y = self->ground_y_0x060;
                 self->field_0x01B = 1;
                 self->kind_0x09 = 0;
                 Pl_chr_set_attr_default(self, 0x30, 0, 0);
@@ -5768,11 +5771,13 @@ extern "C" void pl_act_rest_spot(_PLW* self) {
                 if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &kind, &spot, &rot,
                                             &index) != 0xFFFF) {
                     if (kind == 8) {
-                        self->field_0x0A8 = rot.y;
+                        u32 yaw = rot.y;
+
+                        self->field_0x0A8 = yaw;
                         ahead.x = pl_frame_window_120 * pl_rest_spot_offset[self->chunk_ofs];
                         ahead.y = pl_float_zero;
                         ahead.z = pl_float_zero;
-                        rotVecY(&ahead, rot.y);
+                        rotVecY(&ahead, yaw);
                         self->target_pos_0x090.x = spot.x + ahead.x;
                         self->target_pos_0x090.y = spot.y + ahead.y;
                         self->target_pos_0x090.z = spot.z + ahead.z;
@@ -6230,9 +6235,10 @@ extern "C" void pl_act_slinger_aim(_PLW* self, s32 variant, s32 kneel) {
     u16 attr;
 
     pl_act_set_step_time(self, 2);
-    attr = 0x16D;
     if (kneel == 0) {
         attr = 0x13A;
+    } else {
+        attr = 0x16D;
     }
     switch (self->act_step_0x05) {
     case 0:
@@ -6989,7 +6995,7 @@ extern "C" void pl_act_guard(_PLW* self) {
         if (self->field_0x18 == 1) {
             switch (self->field_0x002) {
             case 8:
-                if (pl_mode8_free_ck() == 1) {
+                if (pl_mode8_free_ck_actor(self) == 1) {
                     Pl_chr_set_attr_default(self, 0x3EC, 4, 0);
                 } else {
                     Pl_chr_set_attr_default(self, 0x400, 4, 0);
@@ -7248,7 +7254,7 @@ extern "C" void pl_act_dash(_PLW* self, s32 variant) {
                 run.z = pl_frame_window_5;
                 break;
             case 8:
-                if (pl_mode8_free_ck() == 1) {
+                if (pl_mode8_free_ck_actor(self) == 1) {
                     run.z = pl_frame_window_3;
                 }
                 break;
@@ -8094,7 +8100,7 @@ extern "C" void pl_act_jump(_PLW* self, s32 variant) {
         self->vec_0x03C.x += move.x;
         self->vec_0x03C.y += move.y;
         self->vec_0x03C.z += move.z;
-        if (pl_zone_ground_drop(self) == 1 || self->motion_vel_0x7C >= pl_float_zero) {
+        if (pl_zone_ground_drop(self) == 1 || !(self->motion_vel_0x7C < pl_float_zero)) {
             break;
         }
         if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&ledge) != 0 &&
@@ -8840,7 +8846,7 @@ extern "C" void pl_act_side_step(_PLW* self, s32 right) {
         self->act_step_0x05++;
         Pl_act_set_motion(self, 0, 0, 1);
         if (self->field_0x18 == 1) {
-            if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
+            if (self->field_0x002 == 8 && pl_mode8_free_ck_actor(self) == 0) {
                 Pl_chr_set_attr_default(self, 0x4B2, 0, 0);
             } else {
                 Pl_chr_set_attr_default(self, 0x4B1, 0, 0);
@@ -9834,9 +9840,9 @@ extern "C" void pl_act_grabbed(_PLW* self, s32 variant) {
     VEC3 dir;
     VEC3 diff;
     PlMoveWork* work;
-    s32 found;
     s32 i;
     u16 count;
+    s32 found;
     u16 angle;
 
     VEC3_ctor(&target);
@@ -9867,7 +9873,7 @@ extern "C" void pl_act_grabbed(_PLW* self, s32 variant) {
         count = get_move_work_max(3);
         for (i = 0; i < count; i++, work++) {
             if (work->field_0x000 != 0 && work->field_0x001 != 0 && work->field_0x1E1 == get_now_areano()) {
-                if (variant == 0 && work->kind_0x003 == 0x12 && work->sub_area_0x01A == self->sub_area_0x3B6) {
+                if (variant == 0 && work->kind_0x003 == 0x12 && (u8)work->sub_area_0x01A == self->sub_area_0x3B6) {
                     found = 1;
                     get_joint_wpos_em((struct _ENEMY_WORK*)work, 0xF, &target);
                     subVec3(&diff, &target, &self->vec_0x03C);
@@ -9877,7 +9883,7 @@ extern "C" void pl_act_grabbed(_PLW* self, s32 variant) {
                     self->field_0x0A8 = self->rot_0x54.y;
                     break;
                 }
-                if (variant == 1 && work->kind_0x003 == 4 && work->sub_area_0x01A == self->sub_area_0x3B6) {
+                if (variant == 1 && work->kind_0x003 == 4 && (u8)work->sub_area_0x01A == self->sub_area_0x3B6) {
                     found = 1;
                     copyVec3(&target, &work->pos_0x188);
                     self->rot_0x54.y = calcVecAng2(&self->vec_0x03C, &target);
@@ -10282,7 +10288,7 @@ extern "C" void pl_act_wind_launched(_PLW* self, s32 variant, s32 drawn) {
         self->vec_0x03C.x += move.x;
         self->vec_0x03C.y += move.y;
         self->vec_0x03C.z += move.z;
-        if (pl_zone_ground_drop(self) == 1 || self->motion_vel_0x7C >= pl_float_zero) {
+        if (pl_zone_ground_drop(self) == 1 || !(self->motion_vel_0x7C < pl_float_zero)) {
             break;
         }
         frames = ++self->field_0x28;
@@ -10779,11 +10785,10 @@ extern "C" void fn_8025A7FC(_PLW* self)
         } else {
             threshold = 8;
         }
+    } else if (self->field_0x128 == 2) {
+        threshold = 12;
     } else {
         threshold = 15;
-        if (self->field_0x128 == 2) {
-            threshold = 12;
-        }
     }
     if (self->field_0x3A8 > 0) {
         if (self->field_0x378 <= 0) {
@@ -10803,7 +10808,7 @@ extern "C" void fn_8025A7FC(_PLW* self)
         self->field_0x3A6 = 0;
         self->field_0x309 |= 0x40;
         if (self->field_0x3A4 != 0) {
-            self->field_0x3A4 = self->field_0x3A4 - 1;
+            self->field_0x3A4--;
         }
         fn_8025A7D4(self);
     } else {
@@ -10896,7 +10901,7 @@ extern "C" void pl_act_kill_cut_wait(_PLW* self, s32 variant) {
                     cut = 0xF;
                     break;
                 }
-                fn_8025A7E0(self, cut + (ran_suu(1) & 3));
+                fn_8025A7E0(self, cut + (u8)(ran_suu(1) & 3));
                 pl_act_enter(self, 7, 2, 0);
                 break;
             }
@@ -11973,7 +11978,7 @@ extern "C" void pl_act_carry_jump(_PLW* self, s32 variant) {
         self->vec_0x03C.x += move.x;
         self->vec_0x03C.y += move.y;
         self->vec_0x03C.z += move.z;
-        if (pl_zone_ground_drop(self) == 1 || self->motion_vel_0x7C >= pl_float_zero) {
+        if (pl_zone_ground_drop(self) == 1 || !(self->motion_vel_0x7C < pl_float_zero)) {
             break;
         }
         self->field_0x28++;
@@ -12046,7 +12051,7 @@ extern "C" void pl_act_carry_hand_over(_PLW* self) {
         break;
     case 1:
         pl_carry_latch_refresh(self);
-        if (pl_carry_item_get(self) == 0xFFFF) {
+        if ((u16)pl_carry_item_get(self) == 0xFFFF) {
             self->act_step_0x05++;
             Pl_chr_set_attr_default(self, 0x36, 4, 0);
         }
@@ -12198,8 +12203,6 @@ extern "C" void pl_act_cart_away(_PLW* self) {
 /* The cart-arrival act: drops the actor from the cart onto the camp ground, plays the wake-up and returns to the idle
  * slot. */
 extern "C" void pl_act_cart_arrive(_PLW* self) {
-    f32 ground;
-
     pl_act_set_step_time(self, 10);
     pl_act_set_gauge_arm(self, 10);
     switch (self->act_step_0x05) {
@@ -12214,9 +12217,8 @@ extern "C" void pl_act_cart_arrive(_PLW* self) {
         if (Pl_frame_check(self, 1, pl_frame_window_28, pl_float_zero) != 0) {
             self->vec_0x03C.y -= pl_frame_window_4;
         }
-        ground = self->ground_y_0x060;
-        if (self->vec_0x03C.y <= ground) {
-            self->vec_0x03C.y = ground;
+        if (self->vec_0x03C.y <= self->ground_y_0x060) {
+            self->vec_0x03C.y = self->ground_y_0x060;
         }
         if (Pl_motion_end_ck(self) == 1) {
             self->act_step_0x05++;
@@ -12558,7 +12560,31 @@ extern "C" void fn_8025E0C8(_PLW* self) {
     if (Pl_master_ck(self) == 0) {
         return;
     }
-    if (Pl_motion_input_ck(1) != 1 && !pl_item_window_blocked(self)) {
+    /* every blocked test leaves the loop for the one window clear below it */
+    do {
+        u8 kind;
+
+        if (Pl_motion_input_ck(1) == 1) {
+            break;
+        }
+        kind = self->field_0x00A;
+        if ((u32)(kind - 8) <= 1) {
+            break;
+        }
+        switch (kind) {
+        case 0:
+            if (Pl_bari_ck(self, 1) == 1) {
+                continue;
+            }
+            break;
+        case 6:
+            switch (self->act_no) {
+            case 27:
+            case 35:
+                continue;
+            }
+            break;
+        }
         if ((u32)pl_id_bit_ck(self, 11) == 1) {
             if (self->field_0x308 == 0) {
                 sysSE_req(5);
@@ -12579,9 +12605,9 @@ extern "C" void fn_8025E0C8(_PLW* self) {
             sysSE_req(1);
             self->field_0x308 = 0;
         }
-    } else {
-        self->field_0x308 = 0;
-    }
+        return;
+    } while (0);
+    self->field_0x308 = 0;
 }
 
 /* Tests the actor's action number against the handful of actions the held-item window accepts. */
@@ -12656,6 +12682,7 @@ extern "C" void fn_8025E448(_PLW* self) {
     VEC3 spot;
     _CP_VECTOR rot;
     s32 area_index;
+    f32 ledge;
     s32 found;
     s32 index;
     s16 kind;
@@ -12770,13 +12797,10 @@ extern "C" void fn_8025E448(_PLW* self) {
         prompt = 6;
         icon = 6;
     }
-    {
-        VEC3 ledge;
-        if (pl_ground_probe_ahead(self, pl_frame_window_60, pl_float_240, &ledge) == 1 &&
-            (fn_8025E298(self, 0, 5) == 1 || fn_8025E298(self, 0, 6) == 1 || fn_8025E298(self, 2, 4) == 1)) {
-            prompt = 6;
-            icon = 6;
-        }
+    if (pl_ground_probe_ahead(self, pl_frame_window_60, pl_float_240, (VEC3*)&ledge) == 1 &&
+        (fn_8025E298(self, 0, 5) == 1 || fn_8025E298(self, 0, 6) == 1 || fn_8025E298(self, 2, 4) == 1)) {
+        prompt = 6;
+        icon = 6;
     }
     if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &kind, &spot, &rot, &area_index) != 0xFFFF) {
         switch (kind) {
@@ -12814,55 +12838,54 @@ extern "C" void fn_8025E448(_PLW* self) {
             }
             break;
         case 8:
+            /* a failed test of the roster cases 8, 6 and 10 ends in the default arm's clear */
             if (pl_item_menu_open_ck(self) != 1 &&
                 (self->field_0x00A != 0 || ((u32)(self->act_no - 0x54) > 2 && self->act_no != (s16)0x46))) {
                 prompt = 8;
                 if (fn_8025E298(self, 0x80, 0xFE) == 1) {
                     icon = 8;
                 }
-            } else {
-                prompt = 0;
-                icon = 0;
+                break;
             }
-            break;
+            if (0) {
         case 6:
-            if (PlayMode_ck() != 2 && pl_item_menu_open_ck(self) != 1 && Pl_act_ck(self, 0, 0x57) != 1) {
-                prompt = 5;
-                if (fn_8025E298(self, 0x80, 0xFE) == 1) {
-                    icon = 5;
+                if (PlayMode_ck() != 2 && pl_item_menu_open_ck(self) != 1 && Pl_act_ck(self, 0, 0x57) != 1) {
+                    prompt = 5;
+                    if (fn_8025E298(self, 0x80, 0xFE) == 1) {
+                        icon = 5;
+                    }
+                    break;
                 }
-            } else {
-                prompt = 0;
-                icon = 0;
-            }
-            break;
+                if (0) {
         case 10:
-            if (pl_item_menu_open_ck(self) != 1 && Pl_motion_input_ck(0) != 1 && Pl_act_ck(self, 0, 0x58) != 1 &&
-                Pl_act_ck(self, 0xC, 0xA) != 1) {
-                prompt = 9;
-                if (fn_8025E298(self, 0x80, 0xFE) == 1) {
-                    icon = 9;
-                }
-                if (fn_8025E298(self, 0xC, 0xA) == 1) {
-                    icon = 9;
-                }
-            } else {
-                prompt = 0;
-                icon = 0;
-            }
-            break;
+                    if (pl_item_menu_open_ck(self) != 1 && Pl_motion_input_ck(0) != 1 &&
+                        Pl_act_ck(self, 0, 0x58) != 1 && Pl_act_ck(self, 0xC, 0xA) != 1) {
+                        prompt = 9;
+                        if (fn_8025E298(self, 0x80, 0xFE) == 1) {
+                            icon = 9;
+                        }
+                        if (fn_8025E298(self, 0xC, 0xA) == 1) {
+                            icon = 9;
+                        }
+                        break;
+                    }
+                    if (0) {
         case 16:
-            prompt = 0xB;
-            icon = 0xB;
-            break;
+                        prompt = 0xB;
+                        icon = 0xB;
+                        break;
         case 17:
-            prompt = 0xC;
-            icon = 0xC;
-            break;
+                        prompt = 0xC;
+                        icon = 0xC;
+                        break;
         case 7:
-            prompt = 0xD;
-            icon = 0xD;
-            break;
+                        prompt = 0xD;
+                        icon = 0xD;
+                        break;
+                    }
+                }
+            }
+            /* fallthrough */
         case 1:
         case 9:
         case 11:
@@ -12985,24 +13008,20 @@ extern "C" void fn_8025ED00(_PLW* self) {
                     break;
                 }
             } else {
-                switch ((u32)self->field_0x00A) {
-                case 11:
-                    break;
-                case 4:
-                    if ((u32)(self->act_no - 0x10) > 2 && (u32)(self->act_no - 2) > 1 && self->act_no != 0) {
-                        fn_8025ECF0(self);
-                    }
-                    break;
-                case 1:
-                    if ((u32)(self->act_no - 0x14) <= 1) {
-                        self->field_0x5E6 = 0;
+                if (self->field_0x00A != 11) {
+                    if (self->field_0x00A == 4) {
+                        if ((u32)(self->act_no - 0x10) > 2 && (u32)(self->act_no - 2) > 1 && self->act_no != 0) {
+                            fn_8025ECF0(self);
+                        }
+                    } else if (self->field_0x00A == 1) {
+                        if ((u32)(self->act_no - 0x14) <= 1) {
+                            self->field_0x5E6 = 0;
+                        } else {
+                            fn_8025ECF0(self);
+                        }
                     } else {
                         fn_8025ECF0(self);
                     }
-                    break;
-                default:
-                    fn_8025ECF0(self);
-                    break;
                 }
             }
             if (self->kind_0x09 == 2) {
@@ -13142,16 +13161,16 @@ void fn_8025F088(_PLW* self) {
     switch (self->kind_0x09) {
     default:
         if (self->field_0x01B == 0) {
-            vec3_move_damp(pl_float_0_3, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
-                        &self->vec_0x03C);
+            vec3_move_damp(&self->vec_0x048, &self->vec_0x03C, &self->damp_dir_0x5AC, pl_float_0_3,
+                           &self->vec_0x03C);
         }
         break;
     case 2:
         break;
     case 3:
-        if (self->vec_0x03C.y < pl_float_110 + self->ground_y_0x060) {
-            vec3_move_damp(pl_float_0_6, &self->vec_0x048, &self->vec_0x03C, &self->field_0x5AC,
-                        &self->vec_0x03C);
+        if (self->vec_0x048.y < pl_float_110 + self->ground_y_0x060) {
+            vec3_move_damp(&self->vec_0x048, &self->vec_0x03C, &self->damp_dir_0x5AC, pl_float_0_6,
+                           &self->vec_0x03C);
         }
         break;
     }
@@ -13172,7 +13191,7 @@ void fn_8025F088(_PLW* self) {
 /* 0x8025F478 - enters the water-surface (swim) state: reads three motion slots and latches the
  * resulting depth, state byte and the two water flags. */
 void fn_8025F478(_PLW* self) {
-    VEC3 work;
+    LandData work;
     f32 value;
 
     em_land_data_init(&work);
@@ -13185,10 +13204,12 @@ void fn_8025F478(_PLW* self) {
         self->ground_y_0x060 = value;
         self->kind_0x09 = 3;
         if (pl_ground_check(self, &self->vec_0x03C, &work, &value, 4) == 1) {
-            self->field_0x064 = value;
+            f32 surface = value;
+
+            self->field_0x064 = surface;
             self->field_0x074 = 1;
-            if (self->vec_0x03C.y >= value - pl_frame_window_30) {
-                self->vec_0x03C.y = value - pl_frame_window_30;
+            if (self->vec_0x03C.y >= surface - pl_frame_window_30) {
+                self->vec_0x03C.y = surface - pl_frame_window_30;
             }
             if (Pl_suimen_ck(self) == 1) {
                 self->field_0x075 = 1;
@@ -13619,18 +13640,22 @@ void fn_80260248(_PLW* self, s32 mode, s16 delta) {
  * guarding or locked on), leaning the body (`_PLW`+0x0B0) into the turn, and blends the run motions' lean pose. */
 extern "C" void fn_802602A0(_PLW* self) {
     f32 lean;
-    s32 yawRate;
     s32 pitchRate;
-    s32 bank;
+    s32 yawRate;
+    u16 bank;
     u16 diff;
     u16 motion;
     u16 body;
     u16 pitch;
     u16 pose;
+    u8 sub;
+    u16 act;
 
     yawRate = 0xFA4;
     pitchRate = 0x71C;
-    if (self->field_0x18 == 1 && self->field_0x00A == 1 && self->act_no <= 1) {
+    sub = self->field_0x00A;
+    act = self->act_no;
+    if (self->field_0x18 == 1 && sub == 1 && act <= 1) {
         yawRate = 0x9F4;
     } else if (Pl_act_ck(self, 1, 1) == 1 || Pl_act_ck(self, 1, 5) == 1) {
         yawRate = 0x71C;
@@ -13638,9 +13663,10 @@ extern "C" void fn_802602A0(_PLW* self) {
         yawRate = 0x5B0;
     } else if (self->kind_0x09 == 3) {
         if (pl_status_bit_ck((struct _ENEMY_WORK*)self, 0xC0) != 0) {
-            yawRate = 0x444;
             if (self->field_0x18 == 1) {
                 yawRate = 0x71C;
+            } else {
+                yawRate = 0x444;
             }
             pitchRate = 0x16C;
         } else {
@@ -13671,9 +13697,9 @@ extern "C" void fn_802602A0(_PLW* self) {
         if ((s32)(body + 0x300) <= 0x600) {
             self->field_0x0B0 = 0;
         } else if (body < 0x8000) {
-            self->field_0x0B0 = body - 0x300;
+            self->field_0x0B0 -= (u16)0x300;
         } else {
-            self->field_0x0B0 = body + 0x300;
+            self->field_0x0B0 += (u16)0x300;
         }
         if ((u16)(diff + 0x100) < 0x200) {
             if (self->field_0x648 > 0) {
@@ -13766,16 +13792,20 @@ s32 fn_8026077C(u8 a, u8 b) {
 
 /* 0x802607C4 - steers the actor's stored angle toward the nearest armed move-work slot's bearing. */
 void fn_802607C4(_PLW* self) {
+    s32 i;
+    u16 count;
+    s32 found;
+    f32 best;
+    PlMoveWork* work;
     PlMoveWork* best_work;
-    s32 found = 0;
 
+    found = 0;
     if ((u16)Get_motion_no(self) == 38) {
-        f32 best = pl_float_2250000;
-        PlMoveWork* work = (PlMoveWork*)get_move_work_adrs(3);
-        u16 count = (u16)get_move_work_max(3);
-        s32 i;
+        best = pl_float_2250000;
+        work = (PlMoveWork*)get_move_work_adrs(3);
+        count = (u16)get_move_work_max(3);
 
-        for (i = 0; i < count; i++) {
+        for (i = 0; i < count; i++, work++) {
             if (work->field_0x000 != 0 && work->field_0x001 != 0 &&
                 fn_8026077C(self->area_0x16, work->field_0x1E1) != 0) {
                 f32 distance = vec3_dist_sq(&self->vec_0x03C, &work->pos_0x188);
@@ -13786,7 +13816,6 @@ void fn_802607C4(_PLW* self) {
                     found = 1;
                 }
             }
-            work++;
         }
     }
     if (found == 0) {
@@ -13798,22 +13827,22 @@ void fn_802607C4(_PLW* self) {
         if ((u32)(value + 1024) <= 2048) {
             self->field_0x0B2 = 0;
         } else if ((s16)value >= 0) {
-            self->field_0x0B2 = value - 1024;
+            self->field_0x0B2 -= (u16)1024;
         } else {
-            self->field_0x0B2 = value + 1024;
+            self->field_0x0B2 += (u16)1024;
         }
         return;
     }
     {
-        u16 diff = ((s32)(u16)calcVecAng2(&self->vec_0x03C, &best_work->pos_0x188) + 0x10000) -
-                   (s32)self->field_0x058;
+        u32 diff = (u16)(((s32)(u16)calcVecAng2(&self->vec_0x03C, &best_work->pos_0x188) + 0x10000) -
+                   (s32)self->field_0x058);
 
         if (diff >= 32768) {
             if (diff < 54614) {
                 diff = 54614;
             }
             if (self->field_0x0B2 >= 32768) {
-                if (self->field_0x0B2 - 2048 <= diff) {
+                if (self->field_0x0B2 - 2048 <= (u16)diff) {
                     self->field_0x0B2 = diff;
                 } else {
                     self->field_0x0B2 -= (u16)2048;
@@ -13826,7 +13855,7 @@ void fn_802607C4(_PLW* self) {
                 diff = 10923;
             }
             if (self->field_0x0B2 < 32768) {
-                if (self->field_0x0B2 + 2048 >= diff) {
+                if (self->field_0x0B2 + 2048 >= (u16)diff) {
                     self->field_0x0B2 = diff;
                 } else {
                     self->field_0x0B2 += (u16)2048;
@@ -16049,11 +16078,12 @@ void pl_sub_gauge_level_cost(_PLW* self) {
 
 /* 0x80264A84 - the motion's charge tier for the actor's current state. */
 #pragma opt_common_subs off
+#pragma optimization_level 4
 s32 fn_80264A84(_PLW* self) {
     u8 level = fn_8026495C(self);
     s32 tier = 0;
 
-    switch ((u32)(self->field_0x002 - 4) <= 2 ? 1 : self->field_0x002) {
+    switch (self->field_0x002) {
     case 0:
         if (level >= 0x28) {
             tier = 2;
@@ -16061,6 +16091,9 @@ s32 fn_80264A84(_PLW* self) {
             tier = 1;
         }
         break;
+    case 4:
+    case 5:
+    case 6:
     case 1:
         if (level >= 0x15) {
             tier = 2;
@@ -16078,6 +16111,7 @@ s32 fn_80264A84(_PLW* self) {
     }
     return tier;
 }
+#pragma optimization_level reset
 #pragma opt_common_subs reset
 
 /* 0x80264B4C - the motion belongs to the "uncontrollable" set for the actor's current state. */
@@ -16233,7 +16267,7 @@ u32 fn_80264F78(_PLW* self) {
 
 /* 0x80264FF0 - the sleeping/paralysed state predicate. */
 s32 fn_80264FF0(_PLW* self) {
-    if ((Pl_cat_skill_ck(self, 0x17) == 1 || Pl_cat_skill_ck(self, 0x18) == 1) && pl_carry_item_get(self) != 0xFFFF) {
+    if ((Pl_cat_skill_ck(self, 0x17) == 1 || Pl_cat_skill_ck(self, 0x18) == 1) && (u16)pl_carry_item_get(self) != 0xFFFF) {
         return 1;
     }
     return 0;

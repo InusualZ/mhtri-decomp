@@ -1128,8 +1128,7 @@ struct _PLW {
         struct {   /* the later names, padded to the same byte total */
         /* +0x5A8 */ u8 pad_merge_0x5A8[0x3];
         /* +0x5AB */ u8 area_cell_0x5AB;   /* the cell row `stage_cell_get` reads for the player's spot */
-                                /* +0x5AC */ u8 field_0x5AC;
-        /* +0x5AD */ u8 pad_merge_0x5AD[0xB];
+        /* +0x5AC */ VEC3 damp_dir_0x5AC;   /* the direction `fn_8025F088` damps the drawn move against */
         };
     };
     /* +0x5B8 */ s16 field_0x5B8;  /* the guard timer `pl_act_name_row_get` gates the table row on (>= 0xA0) */
@@ -1257,14 +1256,8 @@ struct _PLW {
                 };
             };
             /* +0x65E */ u8 field_0x65E;
-            /* +0x65F */ union {   /* the 3-byte run; the action/handler cluster split it at +0x660 */
-                /* +0x65F */ u8 unk65F[0x662 - 0x65F];
-                struct {
-                    /* +0x65F */ u8 field_0x65F;
-                    /* +0x660 */ u8 field_0x660;   /* cleared on the first frame */
-                    /* +0x661 */ u8 pad_0x661[0x1];
-                };
-            };
+            /* +0x65F */ u8 field_0x65F;
+            /* +0x660 */ u16 field_0x660;   /* cleared (halfword store) on the first frame */
             /* +0x662 */ s16 field_0x662;
         };
         struct {   /* the later names, padded to the same byte total */
