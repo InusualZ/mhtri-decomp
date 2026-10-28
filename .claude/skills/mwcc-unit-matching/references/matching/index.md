@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (242)
+## Ideas that work (243)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -251,6 +251,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 262 | [A step's early path that runs a later case's tail: wrap the rest of the case (and the cases between) in its else, so it falls into that case](262-steps-early-path-that.md) | works | source-shape | Retail's `case 0` (or `case 1`) sets the state and branches straight to a later case's body (`li r0,2; stb; b <case 2>`) and every other exit branches to one shared `mr r3,rN` return; ours repeats the later case's test... |
 | 263 | [A cmplwi range test with cmpwi case tests and no clrlwi is a switch on a u16 parameter under peephole on](263-cmplwi-range-test-with.md) | works | source-shape, pragma | A switch dispatch tests its 0..N case run with one `cmplwi` and its single cases with `cmpwi`, on the raw parameter register; a u32 switch gives `cmplwi` everywhere and an s32 one `cmpwi 0; blt; cmpwi N; ble` |
 | 264 | [A function that opens with a b to its own next instruction is a tail call into an unsplit neighbour: split the map row](264-function-that-opens-with.md) | works | source-shape, symbols | A target row reads `addi r3,r3,8; b .+4; stw ...; blr` (or starts with `b .+4`), a branch with no relocation into its own body; folding the offset into the stores scores 66-80 % and no inline or pragma reproduces the... |
+| 265 | [Two vtables sharing slot functions with no middle store: the second class derives from the first](265-two-vtables-sharing-slot.md) | works | vtable, data | Two of a TU's class tables point at the same function in several slots, yet the static initialiser stores only the root's and each class's own table, so neither a common parent nor two siblings seems to fit. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

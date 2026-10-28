@@ -17,6 +17,13 @@ struct MEMAllocator;
 class HkbKeyboardBase;
 class HbmAnimPanel;
 class SysKbdHandlerBase;
+class SysKbdPart;
+class SysKbdLayoutPart;
+class SysKbdSlidePart;
+class SysKbdTextPart;
+class SysKbdPredictPart;
+class SysKbdCursorPart;
+class HbmGuiPaneWidget;
 namespace nw4r {
 namespace lyt {
 class ResourceAccessor;
@@ -387,16 +394,17 @@ public:
 class SysKbdVuObject {
 public:
     SysKbdVuObject(MEMAllocator* allocator, nw4r::lyt::ResourceAccessor* resources, SysKbdHandlerBase* handler);
-    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x008 */ virtual ~SysKbdVuObject();
 
-    /* +0x04 */ u8 unused_0x04[0xC];
+    /* +0x04 */ MEMAllocator* mAllocator;
+    /* +0x08 */ u8 unused_0x08[0x8];
     /* +0x10 */ SysKbdInputView* mInput;
     /* +0x14 */ HkbKeyboardBase* mSoftKeyboard;
-    /* +0x18 */ u8 unused_0x18[0x4];
+    /* +0x18 */ SysKbdSlidePart* mSlidePart;
     /* +0x1C */ SysKbdPanelView* mPanel;
-    /* +0x20 */ u8 unused_0x20[0x4];
+    /* +0x20 */ SysKbdPredictPart* mPredictPart;
     /* +0x24 */ SysKbdCancelView* mCanceller;
-    /* +0x28 */ u8 unused_0x28[0x4];
+    /* +0x28 */ SysKbdPart* mAuxPart;
     /* +0x2C */ HbmAnimPanel* mList;
     /* +0x30 */ u8 unused_0x30[0x10];
 };
@@ -424,7 +432,6 @@ public:
         field_0x78 = 0;
     }
 
-    /* slot +0x008 */ virtual void v_0x008();
     /* slot +0x00C */ virtual void setVisible(s32 visible);
     /* slot +0x010 */ virtual void v_0x010();
     /* slot +0x014 */ virtual void calc();
@@ -504,21 +511,24 @@ public:
     /* slot +0x100 */ virtual void v_0x100();
     /* slot +0x104 */ virtual void setNameEntry(s32 on);
     /* slot +0x108 */ virtual void setGestureEntry(s32 on);
+    /* slot +0x008, SysKbdVuObject's: declared last so that it is not the class's first non-inline virtual (the
+     * destructor is homebutton/hbm_kb_event.cpp's, the class table 0x80657A20 is not emitted from it) */
+    virtual ~SysKbdView();
 
     /* +0x40 */ SysKbdStateView* mStateView;
     /* +0x44 */ s32 mStateFlag;
     /* +0x48 */ SysKbdSetting mSetting;
-    /* +0x50 */ s32 field_0x50;
-    /* +0x54 */ s32 field_0x54;
-    /* +0x58 */ s32 field_0x58;
-    /* +0x5C */ s32 field_0x5C;
-    /* +0x60 */ s32 field_0x60;
-    /* +0x64 */ s32 field_0x64;
-    /* +0x68 */ s32 field_0x68;
-    /* +0x6C */ s32 field_0x6C;
-    /* +0x70 */ s32 field_0x70;
-    /* +0x74 */ s32 field_0x74;
-    /* +0x78 */ s32 field_0x78;
+    /* +0x50 */ SysKbdPart* field_0x50;
+    /* +0x54 */ SysKbdPart* field_0x54;
+    /* +0x58 */ SysKbdTextPart* field_0x58;
+    /* +0x5C */ SysKbdLayoutPart* field_0x5C;
+    /* +0x60 */ SysKbdSlidePart* field_0x60;
+    /* +0x64 */ SysKbdTextPart* field_0x64;
+    /* +0x68 */ SysKbdPredictPart* field_0x68;
+    /* +0x6C */ SysKbdCursorPart* field_0x6C;
+    /* +0x70 */ SysKbdPart* field_0x70;
+    /* +0x74 */ SysKbdPart* field_0x74;
+    /* +0x78 */ HbmGuiPaneWidget* field_0x78;
 };
 
 #endif /* __cplusplus */

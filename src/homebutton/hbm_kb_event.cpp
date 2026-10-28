@@ -1,7 +1,7 @@
 /*
  * homebutton/hbm_kb_event.cpp - software-keyboard code of the tiHKBManager band: the event forwarders, state setters
- * and state dispatchers of the keyboard objects, the keyboard's mode states and saved keys, the panel animations, plus
- * the deleting destructors of the animation-widget classes.
+ * and state dispatchers of the keyboard objects, the keyboard object's destructor, part setup and open/close states,
+ * the keyboard's mode states and saved keys, the panel animations, and the four state objects.
  *
  * RANGE.     .text 0x8056083C..0x80566440 (97 functions; the ones not defined below keep the target object's bytes).
  * FLAGS.     GC/3.0a5.2 + cflags_hkb (cflags_nw4r with -inline noauto) for the whole band; the retail object has no
@@ -23,12 +23,28 @@
  *            hkbKbAnimFinishPanes / hkbKbAnimApplyHide / hkbKbAnimRewindCursor0/3 (the panel animations over 30 frames),
  *            hkbKbSetSlideEnd, hkbKbPreDrawZAlways / hkbKbPreDrawZLequal, hkbKbForward148WhileActiveB/C,
  *            hkbKbRefreshParts, hkbKbDispatchInput and hkbKbDispatchPointer.
+ * NAMES.     GUESS hkbVuCreateKeyboard / hkbVuInitState / hkbVuSetOpenImmediate (slots 0x0C, 0x10 and 0xEC of the keyboard
+ *            object's table 0x80657A20: they build the parts, enter the first state and switch open/closed with sound
+ *            28/29), the part views SysKbdPart..SysKbdGuiPart (named for the factory slot and the pane manager offset
+ *            the bodies use) and the state classes HkbKbState / HkbKbStateClosed / HkbKbStateOpening / HkbKbStateOpen /
+ *            HkbKbStateClosing (slot 0x0C returns 0..3; the opening/closing ones carry the animation frame at +0x08)
+ *            with their objects hkbKbStateClosed (.sbss 0x80795A90), hkbKbStateOpen (0x80795A98), hkbKbStateOpening
+ *            (.bss 0x80790D34) and hkbKbStateClosing (0x80790D4C).
+ * NAMES.     GUESS hkbVuCreateGuiPart (slot 0x14C: the HbmGuiPaneWidget on fs_VK_bg_a.brlyt at +0x78).
+ * SHAPES.    The gui part is built with homebutton/gui.h's inline constructor, so MWCC emits HbmGuiAttachable's table
+ *            (0x80657858) and its empty inline create/init (0x805661D0 / 0x805661CC) here, as retail does.
  * NAMES.     GUESS data names hkbKbSlideY / hkbKbPanelY / hkbKbAlpha (.sdata 0x807946D8 / 0x807946E8 / 0x807946E0: the
  *            animations' start and end values).
  * NAMES.     GUESS HkbInputWidget::setEventSink and HbmGuiPaneWidget's destructor and calcComponents (their
  *            classes are homebutton/hkb_keyboard.h's and homebutton/gui.h's).
  * SHAPES.    The view classes are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch;
- *            no method is defined and nothing is constructed, so no table is emitted here (rule 10).
+ *            their methods are not defined here, so no table of theirs is emitted (rule 10).
+ * SHAPES.    SysKbdView::~SysKbdView (menu/menu_sysmsg.h's class) is declared after the class's other virtuals, so it is
+ *            not the first non-inline virtual and the class table (0x80657A20) is referenced, not emitted: emitted, it
+ *            would name the placeholder slots, which no unit defines (an undefined reference per slot). The part views
+ *            declare their destructors so no weak copy of an implicit one is emitted.
+ * SHAPES.    The four state objects are MWCC's: their inline constructors build the static initialiser and their
+ *            implicit destructors the weak deleting destructors 0x805661EC..0x80566340.
  * SHAPES.    fn_80563740 and hkbKbAnimApplyShow declare their case-block locals at function scope: inside the case block
  *            they cost a frame pointer (`mr r31,r1`) under `global_optimizer off`.
  * SHAPES.    The animations build each pane translation from an HkbPoint constructed at the call (a VEC2 returned by value
@@ -46,10 +62,17 @@
  *            them in retail's pool.
  * RESIDUALS. The functions are free `extern "C"` functions taking the band's views (VuObject, KbObject) as `self`; the
  *            members they are need their map rows renamed to the mangled names before they can become methods.
- * RESIDUALS. 10 functions (3432 bytes) are unwritten: 0x805608F8-0x80560B68 (a destructor storing table 0x80657A20),
- *            0x80560BC4-0x80560FB4 and 0x80561074-0x80561148 (they use the unit's `.sbss` global objects 0x80795A90 /
- *            0x80795A98, whose classes and tables need modelling first), 0x80561148-0x8056167C (five part factories
- *            storing tables) and 0x80566340-0x80566440 (the static initialiser registering those globals).
+ * NAMES.     GUESS table names __vt__10HkbKbState (0x806579C8) and __vt__16HkbKbStateClosed / __vt__14HkbKbStateOpen /
+ *            __vt__17HkbKbStateOpening / __vt__17HkbKbStateClosing (0x80657970 / 0x806578C0 / 0x80657918 / 0x80657868),
+ *            the tables the static initialiser stores; HkbKbStateClosing's shares its parent's slots, so retail's
+ *            closing state derives from the opening one (the initialiser drops the middle table store).
+ * RESIDUALS. __sinit_\hbm_kb_event_cpp: retail emits the state classes' tables here (0x80657868..0x80657A20) and
+ *            addresses them from one `.data` base (`addi r0,r29,0x2D8`); ours references them by name (`lis/addi
+ *            __vt__...`), because their key functions are this unit's free `extern "C"` functions (0x805636A4,
+ *            0x80563610, 0x805647F4, hkbKbAnimApplyShow/Hide), which would have to become the classes' members first.
+ * RESIDUALS. 4 functions (1200 bytes) are unwritten: 0x80561148-0x805615F8, the text part factories (slots 0x140,
+ *            0x144, 0xB8, 0x148). They build homebutton/hbm_text_panel.cpp's HbmKbTextWidget (and a derived panel with
+ *            table 0x80657F10) through its inline constructor, and that class is defined in that unit's .cpp.
  */
 
 #include "types.h"
@@ -72,6 +95,232 @@
 #include "nw4r/fn_805012C4.h"
 #include "RVLGX/GXPixel.h"
 #include "homebutton/hkb_layout.h"
+#include "menu/menu_sysmsg.h"
+
+/* The parts the keyboard object (menu/menu_sysmsg.h's SysKbdView) builds through its factory slots and destroys in
+ * its destructor: slot 0x08 is the destructor and slot 0x0C creates the part from the band allocator.
+ * size: 0x4 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class SysKbdPart {
+public:
+    /* slot +0x008 */ virtual ~SysKbdPart();
+    /* slot +0x00C */ virtual void create(MEMAllocator* allocator);
+}; /* size: 0x4 */
+
+/* The layout part at +0x5C: a pane manager embedded at +0x4C.  size: 0xF4 (approximation: the vptr and the
+ * embedded pane manager) */
+class SysKbdLayoutPart : public SysKbdPart {
+public:
+    /* slot +0x008 */ virtual ~SysKbdLayoutPart();
+
+    /* +0x04 */ u8 unused_0x04[0x48];
+    /* +0x4C */ HbmPaneManager mPaneManager;
+}; /* size: 0xF4 */
+
+/* The sliding part at +0x60: a pane manager embedded at +0x34.  size: 0xDC (approximation) */
+class SysKbdSlidePart : public SysKbdPart {
+public:
+    /* slot +0x008 */ virtual ~SysKbdSlidePart();
+
+    /* +0x04 */ u8 unused_0x04[0x30];
+    /* +0x34 */ HbmPaneManager mPaneManager;
+}; /* size: 0xDC */
+
+/* The text parts at +0x58 and +0x64 (the keyboard widgets of homebutton/hbm_text_panel.cpp): slot 0xD4 creates
+ * one with the keyboard object's text buffers; the pane manager is embedded at +0x1A04.
+ * size: 0x1AAC (approximation: the vptr and the embedded pane manager) */
+class SysKbdTextPart : public SysKbdPart {
+public:
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual void v_0x05C();
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual void v_0x064();
+    /* slot +0x068 */ virtual void v_0x068();
+    /* slot +0x06C */ virtual void v_0x06C();
+    /* slot +0x070 */ virtual void v_0x070();
+    /* slot +0x074 */ virtual void v_0x074();
+    /* slot +0x078 */ virtual void v_0x078();
+    /* slot +0x07C */ virtual void v_0x07C();
+    /* slot +0x080 */ virtual void v_0x080();
+    /* slot +0x084 */ virtual void v_0x084();
+    /* slot +0x088 */ virtual void v_0x088();
+    /* slot +0x08C */ virtual void v_0x08C();
+    /* slot +0x090 */ virtual void v_0x090();
+    /* slot +0x094 */ virtual void v_0x094();
+    /* slot +0x098 */ virtual void v_0x098();
+    /* slot +0x09C */ virtual void v_0x09C();
+    /* slot +0x0A0 */ virtual void v_0x0A0();
+    /* slot +0x0A4 */ virtual void v_0x0A4();
+    /* slot +0x0A8 */ virtual void v_0x0A8();
+    /* slot +0x0AC */ virtual void v_0x0AC();
+    /* slot +0x0B0 */ virtual void v_0x0B0();
+    /* slot +0x0B4 */ virtual void v_0x0B4();
+    /* slot +0x0B8 */ virtual void v_0x0B8();
+    /* slot +0x0BC */ virtual void v_0x0BC();
+    /* slot +0x0C0 */ virtual void v_0x0C0();
+    /* slot +0x0C4 */ virtual void v_0x0C4();
+    /* slot +0x0C8 */ virtual void v_0x0C8();
+    /* slot +0x0CC */ virtual void v_0x0CC();
+    /* slot +0x0D0 */ virtual void v_0x0D0();
+    /* slot +0x008 */ virtual ~SysKbdTextPart();
+    /* slot +0x0D4 */ virtual void createWithBuffers(MEMAllocator* allocator, HbmTextBufferSet* buffers);
+
+    /* +0x0004 */ u8 unused_0x0004[0x1A00];
+    /* +0x1A04 */ HbmPaneManager mPaneManager;
+}; /* size: 0x1AAC */
+
+/* The prediction part at +0x68 (homebutton/hbm_kb_widget.cpp's widget): the pane manager is embedded at +0x17F4.
+ * size: 0x189C (approximation) */
+class SysKbdPredictPart : public SysKbdPart {
+public:
+    /* slot +0x008 */ virtual ~SysKbdPredictPart();
+
+    /* +0x0004 */ u8 unused_0x0004[0x17F0];
+    /* +0x17F4 */ HbmPaneManager mPaneManager;
+}; /* size: 0x189C */
+
+/* The cursor part at +0x6C: slot 0x08 creates it, its destructor is slot 0x94; the pane manager is embedded at +0x14.
+ * size: 0xBC (approximation) */
+class SysKbdCursorPart {
+public:
+    /* slot +0x008 */ virtual void create(MEMAllocator* allocator);
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual void v_0x05C();
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual void v_0x064();
+    /* slot +0x068 */ virtual void v_0x068();
+    /* slot +0x06C */ virtual void v_0x06C();
+    /* slot +0x070 */ virtual void v_0x070();
+    /* slot +0x074 */ virtual void v_0x074();
+    /* slot +0x078 */ virtual void v_0x078();
+    /* slot +0x07C */ virtual void v_0x07C();
+    /* slot +0x080 */ virtual void v_0x080();
+    /* slot +0x084 */ virtual void v_0x084();
+    /* slot +0x088 */ virtual void v_0x088();
+    /* slot +0x08C */ virtual void v_0x08C();
+    /* slot +0x090 */ virtual void v_0x090();
+    /* slot +0x094 */ virtual ~SysKbdCursorPart();
+
+    /* +0x04 */ u8 unused_0x04[0x10];
+    /* +0x14 */ HbmPaneManager mPaneManager;
+}; /* size: 0xBC */
+
+struct HkbVuKeyboard;
+
+/* The keyboard object's states (its +0x40): the closed, opening, open and closing panel.  Slot 0x0C returns the state
+ * number, slot 0x2C enters the state and slot 0x30 leaves it; the base's own slots 0x34..0x54 are shared by all four.
+ * size: 0x8 */
+class HkbKbState {
+public:
+    HkbKbState() : owner(NULL) {}
+    /* slot +0x008 */ virtual ~HkbKbState() {}
+    /* slot +0x00C */ virtual s32 getState() = 0;
+    /* slot +0x010 */ virtual void reset() = 0;
+    /* slot +0x014 */ virtual void calc() = 0;
+    /* slot +0x018 */ virtual void v_0x018() = 0;
+    /* slot +0x01C */ virtual void v_0x01C() = 0;
+    /* slot +0x020 */ virtual void v_0x020() = 0;
+    /* slot +0x024 */ virtual void v_0x024() = 0;
+    /* slot +0x028 */ virtual void v_0x028() = 0;
+    /* slot +0x02C */ virtual void enter() = 0;
+    /* slot +0x030 */ virtual void leave() = 0;
+    /* slot +0x034 */ virtual void v_0x034();
+
+    /* +0x04 */ HkbVuKeyboard* owner;
+}; /* size: 0x8 */
+
+/* State 0: the panel is closed. size: 0x8 */
+class HkbKbStateClosed : public HkbKbState {
+public:
+    /* slot +0x00C */ virtual s32 getState() { return 0; }
+    /* slot +0x010 */ virtual void reset();
+    /* slot +0x014 */ virtual void calc();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void enter();
+    /* slot +0x030 */ virtual void leave() {}
+}; /* size: 0x8 */
+
+/* State 2: the panel is open and takes the input. size: 0x8 */
+class HkbKbStateOpen : public HkbKbState {
+public:
+    /* slot +0x00C */ virtual s32 getState() { return 2; }
+    /* slot +0x010 */ virtual void reset();
+    /* slot +0x014 */ virtual void calc();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void enter();
+    /* slot +0x030 */ virtual void leave() {}
+}; /* size: 0x8 */
+
+/* State 1: the panel slides in over 30 frames. size: 0xC */
+class HkbKbStateOpening : public HkbKbState {
+public:
+    HkbKbStateOpening() : frame(0.0f) {}
+    /* slot +0x00C */ virtual s32 getState() { return 1; }
+    /* slot +0x010 */ virtual void reset();
+    /* slot +0x014 */ virtual void calc();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void enter();
+    /* slot +0x030 */ virtual void leave() {}
+
+    /* +0x08 */ f32 frame;
+}; /* size: 0xC */
+
+/* State 3: the panel slides out over 30 frames: the opening state with the hide animation and the closing cursor
+ * (its table shares the opening state's other slots). size: 0xC */
+class HkbKbStateClosing : public HkbKbStateOpening {
+public:
+    /* slot +0x00C */ virtual s32 getState() { return 3; }
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x02C */ virtual void enter();
+}; /* size: 0xC */
 
 /* The saved keyboard state at the keyboard Vu object's +0x4C: the shift flag, the layout, the caps flag and whether
  * the modifier was off.  size: 0x1 */
@@ -94,10 +343,10 @@ struct HkbVuSavedPanel {
  * +0x14..+0x2C.  size: 0x7C */
 struct HkbVuKeyboard {
     /* +0x00 */ VuVTable* vt;
-    /* +0x04 */ void* list_0x04;
-    /* +0x08 */ void* list_0x08;
-    /* +0x0C */ void* field_0x0C;
-    /* +0x10 */ void* field_0x10;
+    /* +0x04 */ MEMAllocator* allocator;
+    /* +0x08 */ nw4r::lyt::ResourceAccessor* resources;
+    /* +0x0C */ HbmTextBufferSet* textBuffers;
+    /* +0x10 */ SysKbdInputView* input;
     /* +0x14 */ void* field_0x14;
     /* +0x18 */ void* field_0x18;
     /* +0x1C */ VuSub* sub_0x1C;
@@ -105,23 +354,29 @@ struct HkbVuKeyboard {
     /* +0x24 */ void* field_0x24;
     /* +0x28 */ void* field_0x28;
     /* +0x2C */ void* field_0x2C;
-    /* +0x30 */ u8 unused_0x30[4];
+    /* +0x30 */ HbmSoundPlayer* sound;
     /* +0x34 */ s32 layoutType;
     /* +0x38 */ s32 language;
     /* +0x3C */ u8 field_0x3C;
     /* +0x3D */ u8 unused_0x3D[3];
-    /* +0x40 */ VuSub* sub_0x40;
+    /* +0x40 */ HkbKbState* state;
     /* +0x44 */ s32 field_0x44;
     /* +0x48 */ u8 savedMode;
     /* +0x49 */ u8 savedCursor;
     /* +0x4A */ u8 savedPanelShown;
     /* +0x4B */ u8 savedListState;
-    /* +0x4C */ HkbVuSavedKeys savedKeys;
-    /* +0x4D */ HkbVuSavedPanel savedPanel;
+    union {
+        /* +0x4C */ HkbVuSavedKeys savedKeys;
+        /* +0x4C */ u8 savedKeysByte;
+    };
+    union {
+        /* +0x4D */ HkbVuSavedPanel savedPanel;
+        /* +0x4D */ u8 savedPanelByte;
+    };
     /* +0x4E */ u8 savedPad[2];
     /* +0x50 */ void* altWrapped[3];
     /* +0x5C */ void* defaultParts[7];
-    /* +0x78 */ void* unused_0x78;
+    /* +0x78 */ HbmGuiPaneWidget* guiPart;
 }; /* size: 0x7C */
 extern "C" void hkbVuRestoreKeys(HkbVuKeyboard* self);
 extern "C" void hkbVuResetKeys(HkbVuKeyboard* self);
@@ -133,6 +388,12 @@ struct HkbKbAnimView {
     /* +0x04 */ HkbKbWrapped* wrapped;
     /* +0x08 */ f32 frame;
 }; /* size: 0xC */
+
+/* The four states of the keyboard object (.sbss 0x80795A90 / 0x80795A98, .bss 0x80790D34 / 0x80790D4C). */
+HkbKbStateClosed hkbKbStateClosed;
+HkbKbStateOpen hkbKbStateOpen;
+HkbKbStateOpening hkbKbStateOpening;
+HkbKbStateClosing hkbKbStateClosing;
 
 extern "C" {
 
@@ -158,9 +419,146 @@ void hbmKbEventBroadcast(VuObject* self, u32 id, u32* arg)
 
 void fn_805608EC(VuObject* self) { nw4r::ut::List_Init((nw4r::ut::List*)&self->list_0x04, 4); }
 
+/* 0x805608F8 (0x270): Destroys the keyboard object's parts into its allocator, clears the parts it handed out and
+ * destroys the Vu object. */
+SysKbdView::~SysKbdView()
+{
+    if (field_0x5C != NULL) {
+        field_0x5C->~SysKbdLayoutPart();
+        MEMFreeToAllocator(mAllocator, field_0x5C);
+    }
+    if (field_0x60 != NULL) {
+        field_0x60->~SysKbdSlidePart();
+        MEMFreeToAllocator(mAllocator, field_0x60);
+    }
+    if (field_0x64 != NULL) {
+        field_0x64->~SysKbdTextPart();
+        MEMFreeToAllocator(mAllocator, field_0x64);
+    }
+    if (field_0x68 != NULL) {
+        field_0x68->~SysKbdPredictPart();
+        MEMFreeToAllocator(mAllocator, field_0x68);
+    }
+    if (field_0x6C != NULL) {
+        field_0x6C->~SysKbdCursorPart();
+        MEMFreeToAllocator(mAllocator, field_0x6C);
+    }
+    if (field_0x70 != NULL) {
+        field_0x70->~SysKbdPart();
+        MEMFreeToAllocator(mAllocator, field_0x70);
+    }
+    if (field_0x74 != NULL) {
+        field_0x74->~SysKbdPart();
+        MEMFreeToAllocator(mAllocator, field_0x74);
+    }
+    if (field_0x50 != NULL) {
+        field_0x50->~SysKbdPart();
+        MEMFreeToAllocator(mAllocator, field_0x50);
+    }
+    if (field_0x54 != NULL) {
+        field_0x54->~SysKbdPart();
+        MEMFreeToAllocator(mAllocator, field_0x54);
+    }
+    if (field_0x58 != NULL) {
+        field_0x58->~SysKbdTextPart();
+        MEMFreeToAllocator(mAllocator, field_0x58);
+    }
+    if (field_0x78 != NULL) {
+        field_0x78->~HbmGuiPaneWidget();
+        MEMFreeToAllocator(mAllocator, field_0x78);
+    }
+    mSoftKeyboard = NULL;
+    mSlidePart = NULL;
+    mPanel = NULL;
+    mPredictPart = NULL;
+    mCanceller = NULL;
+    mAuxPart = NULL;
+    mList = NULL;
+}
+
 /* Destroys the pane widget's pane manager (at +4). */
 HbmGuiPaneWidget::~HbmGuiPaneWidget()
 {
+}
+
+/* 0x80560BC4 (0x280): Builds the keyboard object's text buffers, its input object and its parts, gives the four states
+ * their owner, enters state 0 and resets the saved keys before the first state. */
+void hkbVuCreateKeyboard(HkbVuKeyboard* self)
+{
+    HkbVuWidget* widget = (HkbVuWidget*)self;
+
+    self->textBuffers = widget->createTextBuffers();
+    hbmTextBuffersInit(self->textBuffers, self->allocator);
+    self->input = widget->createInput();
+
+    SysKbdLayoutPart* layout = widget->createLayoutPart();
+    self->defaultParts[0] = layout;
+    layout->create(self->allocator);
+
+    SysKbdSlidePart* slide = widget->createSlidePart();
+    self->defaultParts[1] = slide;
+    slide->create(self->allocator);
+
+    SysKbdTextPart* text = widget->createTextPart();
+    self->defaultParts[2] = text;
+    text->createWithBuffers(self->allocator, self->textBuffers);
+
+    SysKbdPredictPart* predict = widget->createPredictPart();
+    self->defaultParts[3] = predict;
+    predict->create(self->allocator);
+
+    SysKbdCursorPart* cursor = widget->createCursorPart();
+    self->defaultParts[4] = cursor;
+    cursor->create(self->allocator);
+
+    SysKbdPart* part70 = widget->createPart70();
+    self->defaultParts[5] = part70;
+    part70->create(self->allocator);
+
+    SysKbdPart* part74 = widget->createPart74();
+    self->defaultParts[6] = part74;
+    part74->create(self->allocator);
+
+    SysKbdTextPart* altText = widget->createAltTextPart();
+    self->altWrapped[2] = altText;
+    altText->createWithBuffers(self->allocator, self->textBuffers);
+
+    HbmGuiPaneWidget* gui = widget->createGuiPart();
+    self->guiPart = gui;
+    gui->create(self->allocator);
+
+    widget->v_0x100();
+    hkbKbStateClosed.owner = self;
+    hkbKbStateOpen.owner = self;
+    hkbKbStateOpening.owner = self;
+    hkbKbStateClosing.owner = self;
+    HkbKbState* closing = &hkbKbStateClosing;
+    closing->reset();
+    hbmVuApplyAspectRatio((VuObject*)self);
+    self->savedMode = 0xF0;
+    self->savedCursor = 0;
+    self->savedPanelShown = 0;
+    self->savedListState = 0;
+    self->savedKeysByte = 0;
+    self->savedPanelByte = 0;
+    self->savedPad[0] = 0;
+    self->savedPad[1] = 0;
+    widget->v_0x010();
+}
+
+/* 0x80560E44 (0x170): Enters the closed state and lets every part's root pane take its parent's alpha. */
+void hkbVuInitState(HkbVuKeyboard* self)
+{
+    self->state = &hkbKbStateClosed;
+    self->state->enter();
+    self->state->calc();
+    ((SysKbdLayoutPart*)self->defaultParts[0])->mPaneManager.getLayout()->GetRootPane()->SetInfluencedAlpha(true);
+    ((SysKbdSlidePart*)self->defaultParts[1])->mPaneManager.getLayout()->GetRootPane()->SetInfluencedAlpha(true);
+    ((SysKbdTextPart*)self->defaultParts[2])->mPaneManager.getLayout()->GetRootPane()->SetInfluencedAlpha(true);
+    ((SysKbdTextPart*)self->altWrapped[2])->mPaneManager.getLayout()->GetRootPane()->SetInfluencedAlpha(true);
+    ((SysKbdPredictPart*)self->defaultParts[3])->mPaneManager.getLayout()->GetRootPane()->SetInfluencedAlpha(true);
+    ((SysKbdCursorPart*)self->defaultParts[4])->mPaneManager.getLayout()->GetRootPane()->SetInfluencedAlpha(true);
+    self->guiPart->getLayout()->GetRootPane()->SetInfluencedAlpha(true);
 }
 
 void fn_80560FB4(VuObject* self) { ((HkbVuContent*)self->sub_0x40)->v_0x020(); }
@@ -182,9 +580,41 @@ void fn_80561018(VuObject* self, s32 state)
     ((HkbVuWidget*)self)->v_0x0EC(value);
 }
 
+#pragma push
+#pragma global_optimizer off
+/* 0x80561074 (0xD4): Opens (modes 0 and 1) or closes (modes 2 and 3) the panel at once: plays the sound, leaves the
+ * current state and enters the open or the closed one. */
+void hkbVuSetOpenImmediate(HkbVuKeyboard* self, s32 mode)
+{
+    switch (mode) {
+    case 0:
+    case 1:
+        self->sound->play(28);
+        self->state->leave();
+        self->state = &hkbKbStateOpen;
+        self->state->enter();
+        break;
+    case 2:
+    case 3:
+        self->sound->play(29);
+        self->state->leave();
+        self->state = &hkbKbStateClosed;
+        self->state->enter();
+        break;
+    }
+}
+#pragma pop
+
 /* ---------------------------------------------------------------------------------------------------
  * stores into the unit's small-data globals and the float pools
  * ------------------------------------------------------------------------------------------------ */
+/* 0x805615F8 (0x84): Builds the keyboard object's gui part, a pane widget on the background layout. */
+HbmGuiPaneWidget* hkbVuCreateGuiPart(HkbVuKeyboard* self)
+{
+    return new (MEMAllocFromAllocator(self->allocator, sizeof(HbmGuiPaneWidget)))
+        HbmGuiPaneWidget(self->resources, "fs_VK_bg_a.brlyt", self->sound);
+}
+
 /* 0x8056167C (0xC): Sets where the sliding parts end. */
 void hkbKbSetSlideEnd(f32 value) { hkbKbSlideY[1] = value; }
 
@@ -1225,10 +1655,6 @@ void hkbKbAnimRewindCursor3(HkbKbAnimView* self)
 
 void fn_805661C8(KbObject* self) { (void)self; }
 
-void fn_805661CC(KbObject* self) { (void)self; }
-
-void fn_805661D0(KbObject* self) { (void)self; }
-
 void fn_805661D4(KbObject* self) { (void)self; }
 
 s32 fn_805661D8(KbObject* self) { (void)self; return 3; }
@@ -1237,48 +1663,12 @@ void fn_805661E0(KbObject* self) { (void)self; }
 
 s32 fn_805661E4(KbObject* self) { (void)self; return 2; }
 
-/* ---------------------------------------------------------------------------------------------------
- * the five deleting destructors of the animation-widget classes: `if (self && flag > 0) delete self;`
- * returns the object (the retail body is the compiler's own deleting-destructor shape)
- * ------------------------------------------------------------------------------------------------ */
-void* fn_805661EC(void* self, s32 flag)
-{
-    if (self != 0 && flag > 0)
-        operator delete(self);
-    return self;
-}
-
-void* fn_8056622C(void* self, s32 flag)
-{
-    if (self != 0 && flag > 0)
-        operator delete(self);
-    return self;
-}
-
+/* The five deleting destructors of the state classes (0x805661EC, 0x8056622C, 0x80566280, 0x805662C0, 0x80566300) and
+ * the static initialiser (0x80566340) are the compiler's: HkbKbState's inline destructors and the four state objects. */
 s32 fn_8056626C(KbObject* self) { (void)self; return 1; }
 
 void fn_80566274(KbObject* self) { (void)self; }
 
 s32 fn_80566278(KbObject* self) { (void)self; return 0; }
 
-void* fn_80566280(void* self, s32 flag)
-{
-    if (self != 0 && flag > 0)
-        operator delete(self);
-    return self;
-}
-
-void* fn_805662C0(void* self, s32 flag)
-{
-    if (self != 0 && flag > 0)
-        operator delete(self);
-    return self;
-}
-
-void* fn_80566300(void* self, s32 flag)
-{
-    if (self != 0 && flag > 0)
-        operator delete(self);
-    return self;
-}
 }

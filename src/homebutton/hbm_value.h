@@ -48,6 +48,9 @@ void hbmTextSetInputMode(HbmTextBuffer* self, s32 mode);
 /* Links the Vu object's parts to each other, hands them the layout and the language and initialises them. */
 void hbmVuInitParts(VuObject* self);
 
+/* Runs slot 0xCC on a 16:9 screen and slot 0xD0 otherwise, recording which in +0x3C. */
+void hbmVuApplyAspectRatio(VuObject* self);
+
 /* Reads the animation's current node out as an (id, frame) pair, or the empty pair. */
 void hbmAnimSaveState(HbmWidgetNodeView* anim, HbmIdValue* out);
 
@@ -143,6 +146,8 @@ public:
  * named v_0xNNN are not understood yet.  size: 0xA8 */
 class HbmPaneManager {
 public:
+    HbmPaneManager() {}
+    HbmPaneManager(nw4r::lyt::ResourceAccessor* resAccessor, const char* layoutName, HbmSoundPlayer* sound);
     /* slot +0x008 */ virtual ~HbmPaneManager();
     /* slot +0x00C */ virtual void create(MEMAllocator* allocator, HbmEventHandler* handler);
     /* slot +0x010 */ virtual void init();

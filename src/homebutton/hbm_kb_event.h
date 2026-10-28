@@ -45,6 +45,15 @@ class Layout;
 class HkbKbPart44;
 class HkbKbPart48;
 class HkbKbPart50;
+class HbmTextBufferSet;
+class SysKbdInputView;
+class SysKbdPart;
+class SysKbdLayoutPart;
+class SysKbdSlidePart;
+class SysKbdTextPart;
+class SysKbdPredictPart;
+class SysKbdCursorPart;
+class HbmGuiPaneWidget;
 
 /* The wrapped object's sub-object at its +0x118: slot 0x10 links the cursor part.
  * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
@@ -139,15 +148,15 @@ public:
     /* slot +0x09C */ virtual void v_0x09C();
     /* slot +0x0A0 */ virtual void v_0x0A0();
     /* slot +0x0A4 */ virtual void v_0x0A4();
-    /* slot +0x0A8 */ virtual void v_0x0A8();
-    /* slot +0x0AC */ virtual void v_0x0AC();
-    /* slot +0x0B0 */ virtual void v_0x0B0();
-    /* slot +0x0B4 */ virtual void v_0x0B4();
-    /* slot +0x0B8 */ virtual void v_0x0B8();
-    /* slot +0x0BC */ virtual void v_0x0BC();
-    /* slot +0x0C0 */ virtual void v_0x0C0();
-    /* slot +0x0C4 */ virtual void v_0x0C4();
-    /* slot +0x0C8 */ virtual void v_0x0C8();
+    /* slot +0x0A8 */ virtual HbmTextBufferSet* createTextBuffers();
+    /* slot +0x0AC */ virtual SysKbdInputView* createInput();
+    /* slot +0x0B0 */ virtual SysKbdLayoutPart* createLayoutPart();
+    /* slot +0x0B4 */ virtual SysKbdSlidePart* createSlidePart();
+    /* slot +0x0B8 */ virtual SysKbdTextPart* createTextPart();
+    /* slot +0x0BC */ virtual SysKbdPredictPart* createPredictPart();
+    /* slot +0x0C0 */ virtual SysKbdCursorPart* createCursorPart();
+    /* slot +0x0C4 */ virtual SysKbdPart* createPart70();
+    /* slot +0x0C8 */ virtual SysKbdPart* createPart74();
     /* slot +0x0CC */ virtual void v_0x0CC();
     /* slot +0x0D0 */ virtual void v_0x0D0();
     /* slot +0x0D4 */ virtual void v_0x0D4();
@@ -172,6 +181,15 @@ public:
     /* slot +0x120 */ virtual void v_0x120();
     /* slot +0x124 */ virtual void v_0x124();
     /* slot +0x128 */ virtual void v_0x128();
+    /* slot +0x12C */ virtual void v_0x12C();
+    /* slot +0x130 */ virtual void v_0x130();
+    /* slot +0x134 */ virtual void v_0x134();
+    /* slot +0x138 */ virtual void v_0x138();
+    /* slot +0x13C */ virtual void v_0x13C();
+    /* slot +0x140 */ virtual void v_0x140();
+    /* slot +0x144 */ virtual void v_0x144();
+    /* slot +0x148 */ virtual SysKbdTextPart* createAltTextPart();
+    /* slot +0x14C */ virtual HbmGuiPaneWidget* createGuiPart();
 };
 
 /* A part the state setters switch (the widget's +0x14/+0x18/+0x1C/+0x20 members): the slots take an on/off flag.

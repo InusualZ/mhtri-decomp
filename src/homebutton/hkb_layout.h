@@ -158,6 +158,7 @@ public:
     const char* GetName() const { return mName; }
     void SetSRTElement(u32 idx, f32 value) { reinterpret_cast<f32*>(&mTranslate)[idx] = value; }
     void SetVisible(bool bVisible) { mFlag = (u8)((mFlag & (u8)~1) | (bVisible ? 1 : 0)); }
+    void SetInfluencedAlpha(bool bAlpha) { mFlag = (u8)((mFlag & (u8)~2) | (bAlpha ? 2 : 0)); }
 
     Pane* GetParent() const { return mpParent; }
     const Size& GetSize() const { return mSize; }
@@ -355,6 +356,8 @@ public:
             FreeMemory(objAry);
         }
     }
+
+    Pane* GetRootPane() const { return mpRootPane; }
 
     /* The allocator every layout object comes from (0x80795A20). */
     static MEMAllocator* mspAllocator;
