@@ -14,26 +14,29 @@
  *    body), encodeAdpcmFrames, encodeAdpcmFrame, computeAdpcmCoefs, refineAdpcmCodebook, levinsonDurbin2,
  *    adpcmReflection2, adpcmCovariance2, adpcmLuDecompose2, adpcmLuSolve2 (from what each body computes);
  *    the library name `DSPADPCM` and the file name `dspadpcm.c` are GUESSES.
- * RESIDUALS. encodeAdpcmFrame: retail reloads the coefficient pair inside the 14-sample loops and indexes
- *    `pcm[i + 1]`/`out[i + 1]` as `(i + 1) * 2` (ours hoists the pair and strength-reduces to pointers), and
- *    spills the best-vector index to 0xD8(r1) (frame 0x130 against our 0x120); a scoped `opt_loop_invariants off`
- *    reproduces the coefficient reloads but keeps the pointer walks, and `opt_strength_reduction off` (scoped or
- *    file-wide) loses every loop, so neither is applied.  refineAdpcmCodebook: register
- *    numbering and an 8-byte shorter body (retail saves r18..r31, ours r19..r31; the step-up reuses one
- *    `&a[1]` base).
- *    computeAdpcmCoefs: the codebook split indexes `(3 * i + 1) * 8` per element where ours strength-reduces to
- *    pointer offsets, the final coefficient loop keeps `coefs + 4 * i` in a scratch register, and the prologue
- *    copies `work` before `src`.  adpcmLuDecompose2: the row swap indexes each element (`(3 * m + y) * 8`) where
- *    ours strength-reduces to `lfdux`.
- *    .text 0x3290 against the claimed 0x3310: encodeAdpcmFrame -0x44, computeAdpcmCoefs -0x1C, refineAdpcmCodebook
- *    -0x8; the in-object 16-byte alignment gaps shrink by 0x18.
+ * RESIDUALS. encodeAdpcmFrame: same size and instruction stream, GPR colouring only (retail keeps the vector
+ *    index in r11 and `4 * v` in r31, ours r19/r9; declaration orders and block-local orders hill-climbed with no
+ *    gain); bestScale/bestVec are left uninitialised as retail does (no store before the vector loop, so a
+ *    `vecCount <= 0` call packs stack garbage).  refineAdpcmCodebook: register numbering and an 8-byte shorter
+ *    body (retail saves r18..r31, ours r19..r31; the inlined step-up keeps one hoisted `&a[1]` base for both
+ *    pointer walks), and the two inlined `autocorrFromPredictor` matrices take swapped stack slots.
+ *    computeAdpcmCoefs: the codebook split indexes `(3 * i + 1) * 8` per element and adds `book + step` where ours
+ *    strength-reduces to `lfdux` and adds `step + book`; the coefficient export walks `book` by pointer where
+ *    ours indexes it from the base, and the prologue copies `work` before `src`.  adpcmLuDecompose2: the row swap
+ *    indexes each element (`(3 * m + y) * 8`) where ours strength-reduces to `lfdux` (hand-unrolled, a reversed
+ *    or offset `y` loop, all measured worse).
+ *    .text 0x32E0 against the claimed 0x3310: computeAdpcmCoefs -0xC, refineAdpcmCodebook -0x8, adpcmLuDecompose2
+ *    -0x10; the in-object 16-byte alignment gaps shrink by 0xC.
  * SHAPES. the 3x3 matrices are flat `f64` arrays used 1-based (row and column 0 unused) with stride 3, walked by
  *    explicit running indices (`row`, `k`, `idx`) where retail's code keeps integer index registers; the order-2
  *    step-down in adpcmReflection2 is the generic loop `for (i = 1; i > 0; i--)`, which keeps retail's counted
  *    loops; adpcmCovariance2 takes a plain `s16*` (a `const` pointer lets the loads move above the stores).
  *    encodeAdpcmSamples builds each loop nibble address in its own variable (`= n / 14 * 16; += 2; += n % 14`,
  *    which keeps the products in the result registers) and takes the remainder of the total nibble count into a
- *    block local before the quotient (the remainder's divide is the first one emitted).
+ *    block local before the quotient (the remainder's divide is the first one emitted).  encodeAdpcmFrame's
+ *    predictions are an order loop `pred += x[i + 1 - k] * coef[v * 2 + k]` over a flat coefficient table: the
+ *    unrolled `i + 1` index and the per-vector `coef + 4 * v` row are what retail's loads show (the closed form
+ *    strength-reduces both to pointer walks and hoists the pair).
  */
 
 #pragma function_align 16
@@ -133,7 +136,7 @@ static inline void autocorrFromPredictor(f64* src, f64* dst)
 
 s32 encodeAdpcmFrames(DspAdpcmInfo* info, s32 vecCount, const s16* src, s32 samples, s16 looped, s32 loopStart,
                       u8* dst, AdpcmLoopState* loopState);
-void encodeAdpcmFrame(s16 (*coef)[2], s32 vecCount, s16* pcm, s32 loopIdx, u8* dst, AdpcmLoopState* loopState);
+void encodeAdpcmFrame(s16* coef, s32 vecCount, s16* pcm, s32 loopIdx, u8* dst, AdpcmLoopState* loopState);
 s32 computeAdpcmCoefs(const s16* src, s32 samples, DspAdpcmInfo* info, f64* work);
 void refineAdpcmCodebook(f64* codebook, s32 count, f64* frames, s32 frameCount);
 void levinsonDurbin2(f64* r, f64* k, f64* a);
@@ -224,7 +227,7 @@ s32 encodeAdpcmFrames(DspAdpcmInfo* info, s32 vecCount, const s16* src, s32 samp
                       u8* dst, AdpcmLoopState* loopState)
 {
     s32 pos;
-    s16 (*coef)[2] = info->coef;
+    s16* coef = info->coef[0];
     s16 pcm[16];
     s32 n;
     s32 i;
@@ -259,20 +262,19 @@ s32 encodeAdpcmFrames(DspAdpcmInfo* info, s32 vecCount, const s16* src, s32 samp
 }
 
 /* Quantises one frame against every coefficient pair and keeps the encoding with the least squared error. */
-void encodeAdpcmFrame(s16 (*coef)[2], s32 vecCount, s16* pcm, s32 loopIdx, u8* dst, AdpcmLoopState* loopState)
+void encodeAdpcmFrame(s16* coef, s32 vecCount, s16* pcm, s32 loopIdx, u8* dst, AdpcmLoopState* loopState)
 {
     s16 out[16];
     s16 bestOut[16];
     s32 nib[14];
     s32 bestNib[14];
-    s32 bestScale;
     s32 bestVec;
+    s32 bestScale;
     f64 minErr;
-    s32 v;
+    s32 k;
     s32 i;
+    s32 v;
 
-    bestScale = 0;
-    bestVec = 0;
     out[0] = pcm[0];
     out[1] = pcm[1];
     minErr = 1e30;
@@ -284,7 +286,13 @@ void encodeAdpcmFrame(s16 (*coef)[2], s32 vecCount, s16* pcm, s32 loopIdx, u8* d
         s32 limit;
 
         for (i = 0; i < 14; i++) {
-            s32 r = ((pcm[i + 2] << 11) - (pcm[i + 1] * coef[v][0] + pcm[i] * coef[v][1])) / 2048;
+            s32 pred = 0;
+            s32 r;
+
+            for (k = 0; k < 2; k++) {
+                pred += pcm[i + 1 - k] * coef[v * 2 + k];
+            }
+            r = ((pcm[i + 2] << 11) - pred) / 2048;
 
             if (r > 32767) {
                 r = 32767;
@@ -316,12 +324,18 @@ void encodeAdpcmFrame(s16 (*coef)[2], s32 vecCount, s16* pcm, s32 loopIdx, u8* d
             err = 0.0;
             for (i = 0; i < 14; i++) {
                 s32 sample = pcm[i + 2];
-                s32 pred = out[i + 1] * coef[v][0] + out[i] * coef[v][1];
-                s32 diff = (sample << 11) - pred;
-                f64 q = (f64)diff / (f64)(factor << 11);
+                s32 pred = 0;
+                s32 diff;
+                f64 q;
                 s32 q4;
                 s32 recon;
                 s32 e;
+
+                for (k = 0; k < 2; k++) {
+                    pred += out[i + 1 - k] * coef[v * 2 + k];
+                }
+                diff = (sample << 11) - pred;
+                q = (f64)diff / (f64)(factor << 11);
 
                 q4 = (s32)(q - 0.4999999f);
                 if (diff > 0) {
@@ -376,7 +390,7 @@ void encodeAdpcmFrame(s16 (*coef)[2], s32 vecCount, s16* pcm, s32 loopIdx, u8* d
     pcm[15] = bestOut[15];
     dst[0] = (bestVec << 4) | (bestScale & 0xF);
     for (i = 0; i < 7; i++) {
-        dst[1 + i] = (bestNib[2 * i] << 4) | (bestNib[2 * i + 1] & 0xF);
+        dst[1 + i] = ((bestNib[2 * i] & 0xF) << 4) | (bestNib[2 * i + 1] & 0xF);
     }
     if (loopState != 0) {
         loopState->scale = dst[0];
@@ -396,7 +410,7 @@ s32 computeAdpcmCoefs(const s16* src, s32 samples, DspAdpcmInfo* info, f64* work
     f64 book[24];
     f64* frame;
     s32 frames;
-    s16 (*coefs)[2] = info->coef;
+    s16* coefs = info->coef[0];
     s32 i;
     s32 j;
     s32 n;
@@ -465,30 +479,20 @@ s32 computeAdpcmCoefs(const s16* src, s32 samples, DspAdpcmInfo* info, f64* work
         refineAdpcmCodebook(book, 1 << round, work, frames);
     }
     for (i = 0; i < (1 << round); i++) {
-        f64 v = 2048.0 * (-1.0 * book[3 * i + 1]);
+        for (j = 1; j <= 2; j++) {
+            f64 v = 2048.0 * (-1.0 * book[3 * i + j]);
 
-        if (v > 0.0) {
-            if (v > 32767.0) {
-                coefs[i][0] = 0x7FFF;
+            if (v > 0.0) {
+                if (v > 32767.0) {
+                    coefs[i * 2 + j - 1] = 0x7FFF;
+                } else {
+                    coefs[i * 2 + j - 1] = (s16)(0.5 + v);
+                }
+            } else if (v < -32768.0) {
+                coefs[i * 2 + j - 1] = -0x8000;
             } else {
-                coefs[i][0] = (s16)(0.5 + v);
+                coefs[i * 2 + j - 1] = (s16)(v - 0.5);
             }
-        } else if (v < -32768.0) {
-            coefs[i][0] = -0x8000;
-        } else {
-            coefs[i][0] = (s16)(v - 0.5);
-        }
-        v = 2048.0 * (-1.0 * book[3 * i + 2]);
-        if (v > 0.0) {
-            if (v > 32767.0) {
-                coefs[i][1] = 0x7FFF;
-            } else {
-                coefs[i][1] = (s16)(0.5 + v);
-            }
-        } else if (v < -32768.0) {
-            coefs[i][1] = -0x8000;
-        } else {
-            coefs[i][1] = (s16)(v - 0.5);
         }
     }
     return 1 << round;
