@@ -1751,14 +1751,34 @@ ef/eft044.cpp:
 	.data       start:0x805DD248 end:0x805DD298
 	.sdata2     start:0x8079AE98 end:0x8079AEB0
 
-menu/fn_8031EA8C.cpp:
-	extab       start:0x8001607C end:0x8001621C
-	extabindex  start:0x80034F20 end:0x80035190
-	.text       start:0x8031EB54 end:0x80324F7C
-	.data       start:0x805DD598 end:0x805DD9C8
+ef/eft045.cpp:
+	extab       start:0x8001607C end:0x8001609C
+	extabindex  start:0x80034F20 end:0x80034F50
+	.text       start:0x8031EB54 end:0x8031F304
+	.sdata2     start:0x8079AEB0 end:0x8079AED8
+
+ef/eft046.cpp:
+	extab       start:0x8001609C end:0x800160BC
+	extabindex  start:0x80034F50 end:0x80034F80
+	.text       start:0x8031F304 end:0x8031F77C
+	.sdata2     start:0x8079AED8 end:0x8079AEF8
+
+menu/menu_quest.cpp:
+	extab       start:0x800160BC end:0x800161EC
+	extabindex  start:0x80034F80 end:0x80035148
+	.text       start:0x8031F77C end:0x8032422C
+	.data       start:0x805DD598 end:0x805DD8D0
 	.bss        start:0x806BE120 end:0x806BE2C8
-	.sdata      start:0x80792C50 end:0x80792CC8
-	.sdata2     start:0x8079AEB0 end:0x8079AF48
+	.sdata      start:0x80792C50 end:0x80792C78
+	.sdata2     start:0x8079AEF8 end:0x8079AF10
+
+hud/lobby_hud.cpp:
+	extab       start:0x800161EC end:0x8001621C
+	extabindex  start:0x80035148 end:0x80035190
+	.text       start:0x8032422C end:0x80324F7C
+	.data       start:0x805DD8D0 end:0x805DD9C8
+	.sdata      start:0x80792C78 end:0x80792CC8
+	.sdata2     start:0x8079AF10 end:0x8079AF48
 
 hud/fn_80324F7C.c:
 	extab       start:0x8001621C end:0x80016224

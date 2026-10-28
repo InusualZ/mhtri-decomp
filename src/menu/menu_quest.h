@@ -1,43 +1,14 @@
 /*
- * menu/fn_8031EA8C.h - `menu/fn_8031EA8C.cpp`'s views, traced from the target: `MenuFxWork`/`MenuFxWorkB`, the effect
- *   instance's +0x38 work records (cast from `_EFT::work_0x38`), `MenuPlJoints`, and `MenuQuestWork`, the 0x2000-byte
- *   quest screen work block at `lobby_w.menu_0xAC`.
+ * menu/menu_quest.h - `menu/menu_quest.cpp`'s views, traced from the target: `MenuQuestWork`, the 0x2000-byte quest
+ *   screen work block at `lobby_w.menu_0xAC`, and `MenuWorldBlockView`, and the quest board's entry points.
  */
-#ifndef MHTRI_MENU_FN_8031EA8C_H
-#define MHTRI_MENU_FN_8031EA8C_H
+#ifndef MHTRI_MENU_MENU_QUEST_H
+#define MHTRI_MENU_MENU_QUEST_H
 
 #include "types.h"
 #include "ef.h"
 #include "pl.h"
 #include "lobby/lb_list.h"
-
-/* The effect instance's `+0x38` work record, in the family view these updaters use: a model count, the
- * `MHchar` model pointers the count covers, the per-model s16 the state machine seeds, and a counter.
- * size: 0x18 lower bound (the highest offset the band touches is +0x16). */
-struct MenuFxWork {
-    /* +0x00 */ s32 count;
-    /* +0x04 */ MHchar* models[3];
-    /* +0x10 */ s16 value_0x10[3];
-    /* +0x16 */ s16 counter_0x16;
-};
-/* size: 0x18 (approximate) */
-
-/* The second effect family's `+0x38` view: a single model and the s16 byte `menu_target_marker_set` seats beside
- * it (the same bytes `MenuFxWork` reads as `models[0]`/`models[1]`; the family spawns one model). */
-struct MenuFxWorkB {
-    /* +0x00 */ s32 count;
-    /* +0x04 */ MHchar* model_0x04;
-    /* +0x08 */ u16 bob_phase_0x08;   /* the bob angle, +0x200 a frame (`menu_target_marker_follow`) */
-    /* +0x0A */ u8  pad_0x0A[0x06];
-};
-/* size: 0x10 (approximate) */
-
-/* The joint holder `_PLW::physics_0x13C` points at, in the view the menu effect reads: the player's `MHchar` sits
- * at +0x04.  size: 0x144 (approximate: the model record's end) */
-struct MenuPlJoints {
-    /* +0x000 */ u8 pad_0x000[0x4];
-    /* +0x004 */ MHchar joint_0x004;
-};
 
 /* The quest screens' work block at `lobby_w.menu_0xAC` (0x2000 bytes; the open functions memset it whole): the
  * screen state, the join request (`NetJoinParams`'s layout at +0x40: quest, party size, the 4-character session
@@ -121,4 +92,4 @@ void quest_comment_wrap(char* text, char* out);
 }
 #endif
 
-#endif /* MHTRI_MENU_FN_8031EA8C_H */
+#endif /* MHTRI_MENU_MENU_QUEST_H */

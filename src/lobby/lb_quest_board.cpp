@@ -55,7 +55,7 @@
 #include "font/flfnt.h"
 #include "menu/menu_message.h"
 #include "menu/menu_item.h"
-#include "menu/fn_8031EA8C.h"
+#include "menu/menu_quest.h"
 #include "menu/get_pop_dat_ptr.h"
 #include "hud/cockpit.h"
 #include "camera/camera.h"

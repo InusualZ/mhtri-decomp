@@ -1,4 +1,4 @@
-/* `quest_group_clear_count`, defined by `menu/fn_8031EA8C.cpp` (leaf header, rule 2). */
+/* `quest_group_clear_count`, defined by `menu/menu_quest.cpp` (leaf header, rule 2). */
 #ifndef MHTRI_MENU_QUEST_GROUP_CLEAR_COUNT_H
 #define MHTRI_MENU_QUEST_GROUP_CLEAR_COUNT_H
 

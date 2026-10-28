@@ -118,7 +118,7 @@
 #include "menu/menu_item.h"                /* ItemName, menu_busy_ck, game_ready_ck */
 #include "menu/menu_pad_map_set.h"
 #include "menu/get_option_pair.h"
-#include "menu/menu_target_marker_set.h"
+#include "ef/menu_target_marker_set.h"
 #include "menu/eft_em_model_ring_attach.h"
 #include "camera/camera_lobby_npc_set.h"
 #include "unsplit/lobby_area_view.h"       /* lb_area_view_pos_tbl */

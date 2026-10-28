@@ -1,4 +1,4 @@
-/* `lb_quest_accept_screen_open`, defined by `menu/fn_8031EA8C.cpp` (leaf header, rule 2). */
+/* `lb_quest_accept_screen_open`, defined by `menu/menu_quest.cpp` (leaf header, rule 2). */
 #ifndef MHTRI_MENU_LB_QUEST_ACCEPT_SCREEN_OPEN_H
 #define MHTRI_MENU_LB_QUEST_ACCEPT_SCREEN_OPEN_H
 

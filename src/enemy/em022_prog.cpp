@@ -17,10 +17,10 @@
  * RESIDUALS. All 85 rows written.
  *  - `em022_act6_wander`: retail converts the spread width 20 to float at run time (`li r0,20; xoris; lfd; fsubs`)
  *    after the modulo part; every source spelling folds it (literal, inline, macro) or hoists it (local `s32`).
- *  - `.sdata2`: the claim starts at 0x8079AF48 (2.0f), which only menu/fn_8031EA8C's `draw_lsp_anim_ary` loads;
+ *  - `.sdata2`: the claim starts at 0x8079AF48 (2.0f), which only hud/lobby_hud's `draw_lsp_anim_ary` loads;
  *    our pool starts at the 1300.0f word, so the double 0.0 lands 4 bytes later than retail's (seam request).
  *  - `.sbss`: ours is 5 bytes (the 4-byte sound parameter and the 1-byte static-init object), retail's claim 8.
- *   flipcheck: the sdata2 seam and `lbl_8079AF48` (referenced from fn_8031EA8C.o).
+ *   flipcheck: the sdata2 seam and `lbl_8079AF48` (referenced from lobby_hud.o).
  * SHAPES. `Em022UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).

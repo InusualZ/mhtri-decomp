@@ -128,7 +128,7 @@ typedef struct LbLobbyWork {
         struct LbShopWork* shop_0x0AC;            /* screen 0x02, the NPC shop (`lobby/lb_npc.cpp`) */
         struct LbScreen26Work* screen26_0x0AC;    /* screen 0x1A, the combine/trade counter (`lobby/lb_server_sel_trans.cpp`) */
         struct LbServerSelWork* server_sel_0x0AC; /* screen 0x1B, the server select (`lobby/lb_server_sel_trans.cpp`) */
-        struct MenuQuestWork* quest_0x0AC;        /* screens 0x0C/0x1D, the quest accept and join screens (`menu/fn_8031EA8C.cpp`) */
+        struct MenuQuestWork* quest_0x0AC;        /* screens 0x0C/0x1D, the quest accept and join screens (`menu/menu_quest.cpp`) */
         struct LbPopWork* pop_0x0AC;              /* screen 0x1F, the room visit (`menu/get_pop_dat_ptr.cpp`) */
         struct LbRoomWork* room_0x0AC;            /* screen 0x18, the room (`menu/get_pop_dat_ptr.cpp`) */
         struct LbScreen30Work* screen30_0x0AC;    /* screen 0x1E, the room layout (`menu/get_pop_dat_ptr.cpp`) */

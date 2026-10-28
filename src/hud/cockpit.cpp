@@ -22,7 +22,7 @@
  *   `em_part_sphere_get`, `place_list_highlight_draw`, `pl_root_lock_ck`, `item_bonus_class_get`, `chara_icon_tex_tbl`.
  * RESIDUALS. `setCockpitTransferMode` 82.5: retail stores the s32 `mode` raw after narrowing only `slot`; peephole off
  *   adds an `extsb`, the scoped `peephole on` drops both (an s8 parameter matches but clashes with the s32 declaration
- *   `unsplit/menu.h` and `menu/fn_8031EA8C.cpp` carry).
+ *   `unsplit/menu.h` and `hud/lobby_hud.cpp` carry).
  *   `cockpit_notice_show` 89.8: the `1 << kind` mask is shifted into r0 and narrowed into r5; retail shifts and
  *   narrows in r5.
  *   `cockpit_notice_update` 97.8: retail sets `ofs` after the loop's pointer induction (`li r8` after `mr r7`).

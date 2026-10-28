@@ -1,6 +1,6 @@
-/* `menu_target_marker_set`, defined by `menu/fn_8031EA8C.cpp` (leaf header, rule 2). */
-#ifndef MHTRI_MENU_MENU_TARGET_MARKER_SET_H
-#define MHTRI_MENU_MENU_TARGET_MARKER_SET_H
+/* `menu_target_marker_set`, defined by `ef/eft046.cpp` (leaf header, rule 2). */
+#ifndef MHTRI_EF_MENU_TARGET_MARKER_SET_H
+#define MHTRI_EF_MENU_TARGET_MARKER_SET_H
 
 #include "types.h"
 
@@ -15,4 +15,4 @@ void menu_target_marker_set(void* arg /* untyped: opaque handle - the owner the 
 }
 #endif
 
-#endif /* MHTRI_MENU_MENU_TARGET_MARKER_SET_H */
+#endif /* MHTRI_EF_MENU_TARGET_MARKER_SET_H */
