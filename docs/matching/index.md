@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (240)
+## Ideas that work (242)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -249,6 +249,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 260 | [x += c after the last use of x: a fresh local keeps the add in place where MWCC's frontend propagates x + c into every later use](260-x-c-after-the.md) | works | source-shape, allocator | Retail updates a coordinate in place (`addi r22,r22,0xa`) right after its last plain use; ours has no add there and recomputes `x + 10` (or a folded `x + 0x3a`) at each later use or hoists it late, recolouring the loop. |
 | 261 | [Ternary operands typed like the target keep or drop the conversion after the merge](261-ternary-operands-typed-like.md) | works | source-shape | A constant ternary passed to a u16 parameter shows retail's `li; b; li; clrlwi` (or an s16 return lacks our `extsh`) and every cast spelling of the whole ternary folds or adds it. |
 | 262 | [A step's early path that runs a later case's tail: wrap the rest of the case (and the cases between) in its else, so it falls into that case](262-steps-early-path-that.md) | works | source-shape | Retail's `case 0` (or `case 1`) sets the state and branches straight to a later case's body (`li r0,2; stb; b <case 2>`) and every other exit branches to one shared `mr r3,rN` return; ours repeats the later case's test... |
+| 263 | [A cmplwi range test with cmpwi case tests and no clrlwi is a switch on a u16 parameter under peephole on](263-cmplwi-range-test-with.md) | works | source-shape, pragma | A switch dispatch tests its 0..N case run with one `cmplwi` and its single cases with `cmpwi`, on the raw parameter register; a u32 switch gives `cmplwi` everywhere and an s32 one `cmpwi 0; blt; cmpwi N; ble` |
+| 264 | [A function that opens with a b to its own next instruction is a tail call into an unsplit neighbour: split the map row](264-function-that-opens-with.md) | works | source-shape, symbols | A target row reads `addi r3,r3,8; b .+4; stw ...; blr` (or starts with `b .+4`), a branch with no relocation into its own body; folding the offset into the stores scores 66-80 % and no inline or pragma reproduces the... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

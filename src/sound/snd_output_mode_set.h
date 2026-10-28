@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 /* 0x800E87E4 (0x74): selects the AX/MIX output mode. */
-void snd_output_mode_set(u32 mode);
+void snd_output_mode_set(u16 mode);
 
 #ifdef __cplusplus
 }
