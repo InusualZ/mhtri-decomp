@@ -1,7 +1,7 @@
 /*
  * g3d/g3d_resanmcamera.cpp - nw4r g3d camera-animation channel evaluator (fn_8008A28C) and its accessors.
  * RANGE. .text 0x8008A220-0x8008A664 (4 functions); extab, extabindex, .data 0x8058FF20-0x80590010.  fn_8008A28C
- *   passes "g3d_resanmcamera.cpp"; fn_8008A220's two strings close the fragment.
+ *   passes "g3d_resanmcamera.cpp"; res_user_data_ctor's two strings close the fragment.
  * FLAGS. `cflags_g3d`; file-scope `#pragma pool_data off` (each string its own `lis`/`addi`), `#pragma peephole
  *   off` and `#pragma fp_contract off`.
  * NAMES. Map stems.  res_user_data_init is a GUESS (the dead-stripped caller of the `_ac.h` constructor).
@@ -85,7 +85,7 @@ typedef struct {
 
 /* Forward declarations for the unit's own functions (C linkage: the map spells them `fn_XXXXXXXX`). */
 extern "C" {
-    void *fn_8008A220(void *self, u32 value);
+    void *res_user_data_ctor(void *self, u32 value);
     void fn_8008A284(u32 *self, u32 value);
     void res_anm_camera_get_anm_result(void *self, ResAnmCamAnmResult *pResult, f32 frame);
     f32 res_anm_data_get_result(ResAnmCamValue *self, f32 frame, u32 flag);
@@ -96,11 +96,11 @@ extern "C" {
  * below at the head of the unit. */
 extern "C" void* res_user_data_init(void* self, u32 value) /* untyped: opaque handle - the resource word */
 {
-    return fn_8008A220(self, value);
+    return res_user_data_ctor(self, value);
 }
 
 /* `g3d_resuser_ac.h`'s offset constructor: stores the word, then asserts it is 4-byte aligned. */
-extern "C" inline void *fn_8008A220(void *self, u32 value)
+extern "C" inline void *res_user_data_ctor(void *self, u32 value)
 {
     fn_8008A284((u32 *)self, value);
     if (value & 3) {

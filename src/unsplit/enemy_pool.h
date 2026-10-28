@@ -11,7 +11,6 @@
 extern "C" {
 #endif
 extern u8 lbl_805A1078[];
-extern const char* const lbl_805A1358[];
 extern const char lbl_805A1398[];
 extern const char lbl_805A13A4[];
 extern const char lbl_805A13C0[];

@@ -3,7 +3,7 @@
  * RANGE. .text 0x80098D5C-0x80099400 (7 functions); extab, extabindex, .data 0x805915C0-0x80591618 (the three
  *   assert strings), .sdata2 0x80795F48-0x80795F50.  Right seam by class: fn_800993B4 calls `ResNode::ref`
  *   (fn_8005D218), fn_80099400 calls `ResShp::ref` (fn_80077674).
- * NAMES. Map stems; `mSubResOfs` is a GUESS (its target class is evidenced only by fn_8008A220's
+ * NAMES. Map stems; `mSubResOfs` is a GUESS (its target class is evidenced only by res_user_data_ctor's
  *   `g3d_resuser_ac.h`).
  * RESIDUALS. none; flipcheck: `.data` and `.sdata2` byte-identical.
  * SHAPES. File-scope `#pragma peephole off`: every `rlwinm` flag extract keeps retail's `cmpwi` (fn_80099134).
@@ -41,7 +41,7 @@ ResNodeData* res_node_ptr(const ResHandle* pSelf);            /* owner: src/g3d/
 ResNodeData* res_node_ref_nonconst(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 VEC3* vec3_copy_construct(VEC3* pOut, const VEC3* pIn);              /* owner: src/g3d/g3d_anmscn.cpp */
 void mtx34_rot_xyz_deg(f32* pOut, f32 x, f32 y, f32 z);            /* owner: src/g3d/g3d_resanmchr.cpp */
-void* fn_8008A220(void* pOut, u32 value);                    /* owner: src/g3d/g3d_resanmcamera.cpp */
+void* res_user_data_ctor(void* pOut, u32 value);                    /* owner: src/g3d/g3d_resanmcamera.cpp */
 }
 
 /* The unit's own functions, in address order (the forward declarations keep the source order
@@ -53,7 +53,7 @@ void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult);
 void fn_80099134(ResNodeData* pSelf);
 void res_node_trans_set(ResHandle* pSelf, f32 x, f32 y, f32 z);
 void res_node_rot_set(ResHandle* pSelf, f32 x, f32 y, f32 z);
-u32 fn_80099378(ResHandle* pSelf);
+u32 res_node_user_data_get(ResHandle* pSelf);
 u32 fn_800993B4(ResHandle* pSelf, u32 ofs);
 
 /* -------------------------------------------------------------------------------------------------- */
@@ -231,7 +231,7 @@ void res_node_rot_set(ResHandle* pSelf, f32 x, f32 y, f32 z) {
 }
 
 /* Resolve the node's sub-resource: the offset at +0x6C, from the node's own base. */
-u32 fn_80099378(ResHandle* pSelf) {
+u32 res_node_user_data_get(ResHandle* pSelf) {
     ResNodeData* pData = res_node_ref_nonconst(pSelf);
     return fn_800993B4(pSelf, pData->mSubResOfs);
 }
@@ -241,10 +241,10 @@ u32 fn_800993B4(ResHandle* pSelf, u32 ofs) {
     u32 base = (u32)pSelf->mpData;
     if (ofs != 0) {
         u32 present;
-        return *(u32*)fn_8008A220(&present, base + ofs);
+        return *(u32*)res_user_data_ctor(&present, base + ofs);
     }
     u32 absent;
-    return *(u32*)fn_8008A220(&absent, 0);
+    return *(u32*)res_user_data_ctor(&absent, 0);
 }
 
 }  /* extern "C" */

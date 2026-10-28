@@ -198,7 +198,7 @@ void fn_8008D528(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeDat
 f32 fn_8008B75C(u32 addr);
 void anm_chr_result_scale_get(ResAnmChrObj* self, f32* out);
 s32 anm_chr_result_rot_get(ResAnmChrObj* self, f32* out);
-void fn_8008DF8C(ResAnmChrObj* self, f32* out);
+void anm_chr_result_rot_mtx_get(ResAnmChrObj* self, f32* out);
 void anm_chr_result_trans_get(ResAnmChrObj* self, f32* out);
 void anm_chr_result_mtx_get(ResAnmChrObj* self, f32* out);
 void anm_chr_result_rot_set(ResAnmChrObj* self, const f32* out);
@@ -1497,7 +1497,7 @@ f32 fn_8008DF64(f32 a, f32 b)
     return 1.40625f * nw4r::math::Atan2FIdx(a, b);
 }
 
-void fn_8008DF8C(ResAnmChrObj* self, f32* out)
+void anm_chr_result_rot_mtx_get(ResAnmChrObj* self, f32* out)
 {
     u32 valid;
 

@@ -4,48 +4,56 @@
  *   (0x801394B8-0x8013AC08).
  * RANGE. .text 0x80138074-0x8013ACC4 (73 functions); .data 0x805A1358-0x805A1530, .sdata 0x807919F0-0x80791A20,
  *   .sdata2 0x80796D40-0x80796D90, extab, extabindex.
- * NAMES. MTX33_ctor is a GUESS (the 3x3 matrix constructor, the MTX34_ctor scheme).
+ * NAMES. MTX33_ctor is a GUESS (the 3x3 matrix constructor, the MTX34_ctor scheme).  user_data_type_names is a GUESS
+ *   (the TYPE strings ExecCallbackC compares).  Registry names (foreign rows): res_user_data_ctor (0x8008A220, the
+ *   `g3d_resuser_ac.h` handle constructor) and res_node_user_data_get (0x80099378, `ResNode::GetResUserData`).
  *   The map stem; the `ResUserData`/`ResUserDataItem` panics name the NW4R accessor header `g3d_resuser_ac.h`,
  *   not this file.  `em_res_user_data_set` is a GUESS (it installs a callback).
  *   From their bodies: em_userdata_motion_head_load is a GUESS (0x8013817C); em_userdata_state_exit is a GUESS
  *   (0x8013AACC); em_userdata_state_reenter_alt is a GUESS (0x8013AB6C); em_userdata_roll is a GUESS (0x8013AC00);
  *   em_userdata_record_find_back is a GUESS (0x8013AC08); em_res_user_data_ck is a GUESS (0x801391E8);
  *   joint_mtx_store is a GUESS (0x80139A64); joint_mtx_load is a GUESS (0x80139A7C).
+ *   From their bodies, GUESS: em_motion_settle (0x801381F4), em_fx_slot_step (0x80138EC8), em_pl_distance_update
+ *   (0x80138F3C), em_turn_joint_update (0x801391FC), joint_mtx_set (0x80139A98), joint_local_mtx_get (0x80139AA4),
+ *   em_user_data_timing_flags_get (0x8013A6F4), em_user_data_next_node_set (0x8013A770), em_userdata_state_reset
+ *   (0x8013A954), em_userdata_state_select (0x8013AA1C).  The `res_user_data_*` / `res_user_data_item_*` accessors
+ *   (0x8013A218..0x8013A648) are named from their `ResUserData` / `ResUserDataItem` panics; the `_const` pair of
+ *   ref/ptr/ofs_to_ptr and `res_user_data_item_tail_assign` are GUESS spellings.  Registry names (foreign rows):
+ *   anm_chr_result_rot_mtx_get (0x8008DF8C, `ChrAnmResult::GetRotMtx`).
  *   `ResUserDataAc` (`enemy/res_user_data_ac.h`) is the owner's spelling; it derives from nw4r's
  *   `ICalcWorldCallback` (the base constructor stores that class's table first) and overrides ExecCallbackA/B/C.
  *   Its six hooks are GUESS names from the dispatch: Attach (+0x18, run by `em_res_user_data_set`), CalcAnmItem /
  *   CalcAnmItemEx (+0x1C/+0x20, ExecCallbackA's items), CalcMtxItem / CalcMtxItemEx (+0x24/+0x28, ExecCallbackB's),
  *   CalcWorldEnd (+0x2C, run at the end of ExecCallbackC).
- * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`ResUserDataAc::ExecCallbackC`, the per-item matrix
- *   builder).
- *  - `fn_80138074`, `fn_8013823C`, `em_post_update`, `fn_801391FC`, `ExecCallbackA`, `em_userdata_record_find_back`,
- *    `em_userdata_state_kind_get`, `ExecCallbackB`: register colouring, a narrowing mask or a fused compare still
- *    differs with the scoped `#pragma peephole off` (see SHAPES);
- *  - `fn_801391FC`, `CalcAnmItem`: ours converts int to float through the object's own `.sdata2` magic where retail
- *    references `lbl_80796D78`/`lbl_80796D80`, and `fn_801391FC` lacks retail's `__cvt_fp2unsigned` call; `fn_801391FC` and `fn_80138F3C` also differ in the `psq_st` f31 spill;
- *  - `fn_8013A29C`, `fn_8013A338`, `fn_8013A4E8`: ours forms the `lbl_807919F0`/`F4`/`F8` addresses with `lis` +
- *    `addi`, retail with one instruction;
- *  - `fn_8013A494`, `fn_8013A560`: ours passes a stack temporary (`addi r3,r1,0x8`); `fn_8013A43C`: ours passes the
- *    record where retail passes its +0x4;
- *  - `fn_80139024`, `CalcMtxItem`, `fn_8013A6F4`, `fn_8013A770`: the branch layout differs
- *    (an extra or a missing `b`/`beq`);
- *  - `fn_8013823C`, `ExecCallbackA`, `CalcAnmItem`: the frame differs (0x100/0x40/0xC0 against our 0xE0/0x30/0xD0);
- *    `em_userdata_motion_head_load`: ours saves r30.
- *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `__cvt_fp2unsigned`,
- *     `fn_805012E8`, `MTX34ToMTX33__Q24nw4r4mathFPQ34nw4r4math5MTX33PCQ34nw4r4math5MTX34`, `lbl_807919F4`,
- *     `lbl_807919F0`, `lbl_807919F8`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_805012E8`.
- *  - The class table `__vt__13ResUserDataAc` is emitted at `.data` +0x0; retail's sits at +0x10 (0x805A1368).
- *  - The destructor calls ICalcWorldCallback's destructor out of line (`g3d/g3d_scnmdlsmpl`'s kept copy), so the
- *    object carries that inline destructor's weak copy, which retail's link folded into the g3d unit's.
- * SHAPES. `#pragma peephole off` is scoped to the 18 bodies whose retail keeps the unfused `clrlwi`/`rlwinm` +
- *   `cmpwi`, `clrlwi` + `slwi` and narrowing masks (a per-function sweep, no row lower).  `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
- *   `fn_801391FC`'s `total` are 32-bit accumulators narrowed at the use (`u16` locals re-mask every iteration);
- *   `em_userdata_state_kind_get` is a `switch` inside `for (;;)`, not three `if`s.  The unit's own symbols are plain C names, so its
- *   definitions and its callees' map spellings sit in one `extern "C"` block; the nw4r members are called as C++.
- *   `ResUserDataAc`'s members sit between closes of that block.  The destructor is compiled under `#pragma
- *   dont_inline on`: retail calls the base destructor out of line (`li r4,0; bl`), `-inline noauto` inlines it away.
+ * RESIDUALS. Every row is written; 70 of 73 rows match.
+ *  - `ExecCallbackC`: the TYPE-name loop reuses the test's `lwz r4,0(name)` in the body where retail reloads it
+ *    (`lwz r0` in the test, `lwz r4` in the body; `opt_common_subs`, `opt_propagation`, `opt_loop_invariants` off
+ *    and a `while` form do not change it), and `kind`/`type` swap r21/r23;
+ *  - `em_turn_joint_update`: `best` takes r28 where retail gives it r26 (every declaration order measured);
+ *  - `fn_8013823C`: the `field_0x88C` slot test loads into r0 where retail loads r3.
+ *  - flipcheck: `.data` and `.sdata` claimed, not emitted as retail's: the accessor strings (0x805A1398..0x805A1530)
+ *    the panics name through `lbl_805A13xx` externs, and the `.sdata` literals merge under `-str reuse` (one `"ref"`
+ *    where retail keeps three, so the order and size differ);
+ *  - flipcheck: the destructor calls ICalcWorldCallback's destructor out of line (`g3d/g3d_scnmdlsmpl`'s kept
+ *    copy), so the object carries that inline destructor's weak copy (`.text` 0x2C8C against 0x2C50 before the
+ *    link dead-strips it); extabindex differs in one byte;
+ *  - flipcheck: `anm_chr_result_rot_mtx_get`, `res_node_user_data_get` and `res_user_data_ctor` are registry names
+ *    the map does not carry yet.
+ * SHAPES. `#pragma peephole off` is scoped to the bodies whose retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi`,
+ *   `clrlwi` + `slwi`, narrowing masks and the `li r0,N; psq_lx` FPR epilogue (ExecCallbackB/C and em_post_update
+ *   among them).  Early exits: `if (item == NULL) return;` ahead of the item loops (ExecCallbackA/B,
+ *   em_user_data_next_node_set); fn_80138074's two guards are one `||` condition (playbook 255).  Type tests read
+ *   from the compare chain: a `switch` gives `cmpwi` (ExecCallbackC's 0/3 test, the 0x1E2 and 0x1E5 tests),
+ *   em_user_data_timing_flags_get is `(u32)(type - 1) > 1` around a `switch`, em_userdata_state_kind_get puts
+ *   `default:` first.  Counters use `++`/`--` (a cast assignment keeps a mask retail does not have);
+ *   em_turn_joint_update's up/down steps are `u32` temporaries stored as `(s16)`, its `total` a 32-bit accumulator.
+ *   Loops walk a pointer beside the index where retail increments one (em_pl_distance_update's `move++`,
+ *   fn_8013823C's `record`).  The float pool comes from literals (first-use order is retail's); compound `-=`/`+=`/
+ *   `*=` keep fn_8013823C's operand order.  fn_8013823C's add/scale results are their own temporaries (its two
+ *   unused constructed VEC3s stay).  The unit's own symbols are plain C names in one `extern "C"` block; the nw4r
+ *   members are called as C++.  ExecCallbackC calls `calcMtxAngX` through a `u32` view (retail converts its
+ *   result unmasked).  The destructor is compiled under `#pragma dont_inline on`: retail calls the base destructor
+ *   out of line (`li r4,0; bl`), `-inline noauto` inlines it away.
  */
 
 struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */
@@ -73,12 +81,19 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "enemy/fn_8012BDF4.h"
 #include "Pl/yure_joint_apply.h"
 #include "g3d/g3d_calcworld.h"
-#include "g3d/g3d_resanmcamera.h"
 #include "sys_mem.h"
 #include "ef/ef_torus.h" /* fn_800C9DCC (rule 2) */
 #include "unsplit/enemy.h"
 #include "g3d/g3d_rescommon.h" /* nw4r::g3d::ResDic (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "g3d/anm_chr_result_rot_mtx_get.h" /* anm_chr_result_rot_mtx_get (rule 2: the owner's leaf header) */
+#include "nw4r/math_types.h" /* nw4r::math::MTX34ToMTX33 (rule 2) */
+#include "g3d/res_user_data_ctor.h" /* res_user_data_ctor (rule 2: the owner's leaf header) */
+#include "g3d/res_node_user_data_get.h" /* res_node_user_data_get (rule 2: the owner's leaf header) */
+#include "rotMatrixX.h" /* rotMatrixX / rotMatrixY (rule 9: the owner's C++ declarations) */
+#include "vec3_move_damp.h" /* vec3_move_damp (rule 2: the owner's leaf header) */
+#include "calcMtxAngX.h" /* calcMtxAngX (rule 2: the owner's leaf header) */
+#include "calcMtxAng3.h" /* calcMtxAng3 (rule 2: the owner's header) */
 #include "sound/mhchar.h" /* MHchar::move (rule 2) */
 #include "enemy/fn_8013ACC4.h" /* em_userdata_script_run (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8006FDCC/mtx34_copy_ps (rule 2) */
@@ -91,11 +106,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "unsplit/enemy_pool.h" /* the enemy band's .data pool labels, declared in the band header */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
-#define fn_80126098_c1 ((s32 (*)(void))fn_80126098)
-#define fn_801281EC_c1 ((void (*)(EnemyWork*))fn_801281EC)
-#define fn_801281F8_c1 ((void (*)(EnemyWork*))fn_801281F8)
-#define fn_80128204_c1 ((u32 (*)(EnemyWork*))fn_80128204)
-#define em_busy_set_c1 ((void (*)(EnemyWork*))em_busy_set)
+#define calcMtxAngX_c1 ((u32 (*)(Mtx34*))calcMtxAngX)
 
 /* The unit's own symbols and its callees' map spellings are plain C names. */
 extern "C" {
@@ -104,32 +115,7 @@ extern "C" {
 /* shared pool symbols (another unit owns the bytes)                                              */
 /* --------------------------------------------------------------------------------------------- */
 
-extern const char lbl_807919F0[];
-extern const char lbl_807919F4[];
-extern const char lbl_807919F8[];
-extern const char lbl_80791A08[];
-extern const char lbl_80791A10[];
-extern const char lbl_80791A14[];
-extern const char lbl_80791A18[];
 
-extern const f32 lbl_80796D40;
-extern const f32 lbl_80796D44;
-extern const f32 lbl_80796D48;
-extern const f32 lbl_80796D4C;
-extern const f32 lbl_80796D50;
-extern const f32 lbl_80796D54;
-extern const f32 lbl_80796D58;
-extern const f32 lbl_80796D5C;
-extern const f32 lbl_80796D60;
-extern const f32 lbl_80796D64;
-extern const f32 lbl_80796D68;
-extern const f32 lbl_80796D6C;
-extern const f32 lbl_80796D70;
-extern const f32 lbl_80796D74;
-extern const f64 lbl_80796D78;
-extern const f64 lbl_80796D80;
-extern const f32 lbl_80796D88;
-extern const f32 lbl_80796D8C;
 
 /* --------------------------------------------------------------------------------------------- */
 /* math types (the mangled callees take nw4r::math spellings)                                     */
@@ -161,7 +147,6 @@ typedef struct ResUserDataItemData ResUserDataItemData;
 typedef struct MtxHolder MtxHolder;
 typedef struct MHchar MHchar;
 typedef struct EmCharBase EmCharBase;
-#define fn_80126278_c1 ((void (*)(u16, Vec3*))em_data_point_get)
 #define EM_CHAR(self) ((MHchar*)&(self)->char_0x024)
 typedef struct WorkSlot WorkSlot;
 typedef struct EffectArea EffectArea;
@@ -171,59 +156,59 @@ typedef struct MoveWork MoveWork;
 
 void fn_80138074(EnemyWork* self, u8 arg1);
 void em_userdata_motion_head_load(EnemyWork* self);
-void fn_801381F4(EnemyWork* self);
+void em_motion_settle(EnemyWork* self);
 void fn_8013823C(EnemyWork* self);
 void em_post_update(EnemyWork* self);
 void fn_80138E18(EnemyWork* self);
 void fn_80138E28(EnemyWork* self);
 void em_char_pose_sync(EnemyWork* self);
-void fn_80138EC8(EnemyWork* self, u32 arg1);
-void fn_80138F3C(EnemyWork* self);
+void em_fx_slot_step(EnemyWork* self, u32 arg1);
+void em_pl_distance_update(EnemyWork* self);
 void fn_80139024(EnemyWork* self);
 void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1);
 s32 em_res_user_data_ck(EnemyWork* self);
-void fn_801391FC(EnemyWork* self);
+void em_turn_joint_update(EnemyWork* self);
 void joint_mtx_store(MtxHolder* dst, void* src);
 void joint_mtx_load(MtxHolder* holder, void* mtx);
-void fn_80139A98(MtxHolder* holder, void* src);
-void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2);
-ResUserDataItemData* fn_8013A218(ResUserData* self);
-void* fn_8013A280(ResUserData* self, s32 arg1);
-ResUserDataItemData* fn_8013A29C(ResUserData* self);
-ResUserDataItemData* fn_8013A300(ResUserData* self);
-const char* fn_8013A308(void);
-s32 fn_8013A314(ResUserData* self);
-ResUserDataItemData* fn_8013A338(ResUserData* self);
-ResUserDataItemData* fn_8013A39C(ResUserData* self);
-ResUserDataItemData* fn_8013A3A4(ResUserData* self);
-void* fn_8013A40C(ResUserData* self, s32 arg1);
-s32 fn_8013A428(ResUserData* self);
-ResUserData* fn_8013A43C(ResUserData* dst, ResUserData* src);
-void fn_8013A484(ResUserData* dst, ResUserData* src);
-void fn_8013A488(ResUserData* dst, ResUserData* src);
-ResUserDataItemData* fn_8013A494(ResUserData* self, const char* key);
-ResUserDataItemData* fn_8013A4E8(ResUserData* self);
-ResUserDataItemData* fn_8013A54C(ResUserData* self);
-const char* fn_8013A554(void);
-void fn_8013A560(ResUserData* self);
-s32 fn_8013A594(ResUserData* self);
-ResUserData* fn_8013A5A8(ResUserData* self, ResUserData* src);
-void fn_8013A5D8(ResUserData* dst, ResUserData* src);
-ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data);
-void fn_8013A648(ResUserData* self, ResUserDataItemData* data);
+void joint_mtx_set(MtxHolder* holder, void* src);
+void joint_local_mtx_get(Mtx34* out, void* arg1, Mtx34* arg2);
+ResUserDataItemData* res_user_data_item_s32_get(ResUserData* self);
+void* res_user_data_item_ofs_to_ptr(ResUserData* self, s32 arg1);
+ResUserDataItemData* res_user_data_item_ref(ResUserData* self);
+ResUserDataItemData* res_user_data_item_ptr(ResUserData* self);
+const char* res_user_data_item_class_name(void);
+s32 res_user_data_item_value_type_get(ResUserData* self);
+ResUserDataItemData* res_user_data_item_ref_const(ResUserData* self);
+ResUserDataItemData* res_user_data_item_ptr_const(ResUserData* self);
+ResUserDataItemData* res_user_data_item_string_get(ResUserData* self);
+void* res_user_data_item_ofs_to_ptr_const(ResUserData* self, s32 arg1);
+s32 res_user_data_item_valid_ck(ResUserData* self);
+ResUserData* res_user_data_item_assign(ResUserData* dst, ResUserData* src);
+void res_user_data_item_tail_assign(ResUserData* dst, ResUserData* src);
+void res_user_data_item_ptr_assign(ResUserData* dst, ResUserData* src);
+ResUserDataItemData* res_user_data_item_find(ResUserData* self, const char* key);
+ResUserDataItemData* res_user_data_ref(ResUserData* self);
+ResUserDataItemData* res_user_data_ptr(ResUserData* self);
+const char* res_user_data_class_name(void);
+u32 res_user_data_entry_num_get(ResUserData* self);
+s32 res_user_data_valid_ck(ResUserData* self);
+ResUserData* res_user_data_assign(ResUserData* self, ResUserData* src);
+void res_user_data_ptr_assign(ResUserData* dst, ResUserData* src);
+ResUserData* res_user_data_item_ctor(ResUserData* self, ResUserDataItemData* data);
+void res_user_data_item_ptr_set(ResUserData* self, ResUserDataItemData* data);
 void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1);
 UserDataItem* em_user_data_items_get(EnemyWork* work);
-s32 fn_8013A6F4(EnemyWork* work);
-void fn_8013A770(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work);
+s32 em_user_data_timing_flags_get(EnemyWork* work);
+void em_user_data_next_node_set(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work);
 s32 em_break_part_data_get(EnemyWork* work, u8 arg1);
 u32 fn_8013A884(EnemyWork* work, u8 arg1);
 s32 fn_8013A8B4(EnemyWork* work, u8 arg1, u8 arg2);
 s32 em_userdata_state_kind_get(EnemyWork* work);
-void fn_8013A954(EnemyWork* work, u8 arg1);
+void em_userdata_state_reset(EnemyWork* work, u8 arg1);
 void fn_8013A978(EnemyWork* work);
 void fn_8013A9F4(EnemyWork* work);
 void fn_8013AA00(EnemyWork* work);
-void fn_8013AA1C(EnemyWork* work, u8 arg1);
+void em_userdata_state_select(EnemyWork* work, u8 arg1);
 void em_user_data_reenter(EnemyWork* work);
 void em_userdata_state_exit(EnemyWork* work, u8 arg1);
 void em_userdata_state_reenter_alt(EnemyWork* work);
@@ -242,16 +227,14 @@ extern void subVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern f32 vec3_distance(const Vec3* a, const Vec3* b);
 extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
 extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
-extern void MTX33_ctor(Mtx34* mtx);
+extern void MTX33_ctor(nw4r::math::MTX33* mtx);
 extern void mtx34_blend(Mtx34* out, const Mtx34* a, const Mtx34* b, f32 wa, f32 wb, u8 keep_unit);
 extern void vec3_scale(Vec3* out, const Vec3* v, f32 scale);
 extern f32 vec3_dot(const Vec3* a, const Vec3* b);
-extern void vec3_move_damp(Vec3* out, const Vec3* a, const Vec3* b, const Vec3* c, f32 t);
 extern void mtx34_copy(Mtx34* out, const Mtx34* src);
 extern void res_node_assign(void* out, const void* src);
 extern s32 res_node_get_parent(void* arg0);
-extern void fn_8008DF8C(void* arg0, Mtx34* out);
-extern void anm_chr_result_rot_mul(void* arg0, Mtx34* mtx);
+extern void anm_chr_result_rot_mul(void* arg0, const nw4r::math::MTX33* mtx);
 extern void anm_chr_result_trans_set(void* arg0, const Vec3* v);
 extern f32 getKeyData__FPff(s32 key, f32 t);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPVector* angles, Mtx34* mtx);
@@ -279,7 +262,6 @@ extern u8 stage_map_kind_get(u8 arg0);
 extern void em_roster_record_release(s32 arg0);
 extern s32 em_roster_record_slot_id_get(s32 arg0);
 extern s32 em_roster_record_alive_ck(void);
-extern void fn_805012E8(Mtx34* out, const Mtx34* src);
 
 /* --------------------------------------------------------------------------------------------- */
 /* reconstructed types                                                                            */
@@ -385,9 +367,8 @@ struct ResUserDataItemData { /* size: 0x10 */
     /* +0x0C */ u32 field_0x0C;      /* value type */
 };
 
-struct ResUserData { /* size: 0x08 */
+struct ResUserData { /* size: 0x04 */
     /* +0x00 */ ResUserDataItemData* data;
-    /* +0x04 */ u32 field_0x04;
 };
 
 /* The enemy work block.  Only the fields this unit touches are named; the rest are padding that
@@ -485,8 +466,8 @@ struct _ENEMY_WORK { /* size: 0xB00 */
     /* +0x76A */ u8 pad_0x76A[0x02];
     /* +0x76C */ Vec3 field_0x76C;
     /* +0x778 */ Vec3 field_0x778;
-    /* +0x784 */ u32 field_0x784;
-    /* +0x788 */ u8 pad_0x788[0x12];
+    /* +0x784 */ u8 field_0x784;
+    /* +0x785 */ u8 pad_0x785[0x15];
     /* +0x79A */ u8 field_0x79A;
     /* +0x79B */ u8 pad_0x79B[0x75];
     /* +0x810 */ u16 field_0x810;
@@ -554,22 +535,20 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
 
     VEC3_ctor(&saved);
     VEC3_ctor(&offset);
-    if (self->field_0x30C != 1) {
-        if ((self->flags_0x1C8 & 0x400) != 0) {
-            return;
+    if (self->field_0x30C == 1 || (self->flags_0x1C8 & 0x400) != 0) {
+        return;
+    }
+    if (self->field_0x1E2 == 1 && self->field_0x1E3 == 1) {
+        copyVec3(&saved, &self->field_0x188);
+        setVector3__FPQ34nw4r4math4VEC3fff(&offset, 0.0f, 0.0f, 50.0f);
+        rotVecY__FPQ34nw4r4math4VEC3Ul(&offset, self->field_0x1C0);
+        addVec3To(&self->field_0x188, &offset);
+        em_coll_shape_set(self, arg1, em_hit_mask_get(self));
+        if (self->field_0x218 == 0) {
+            copyVec3(&self->field_0x188, &saved);
         }
-        if (self->field_0x1E2 == 1 && self->field_0x1E3 == 1) {
-            copyVec3(&saved, &self->field_0x188);
-            setVector3__FPQ34nw4r4math4VEC3fff(&offset, lbl_80796D40, lbl_80796D40, lbl_80796D44);
-            rotVecY__FPQ34nw4r4math4VEC3Ul(&offset, self->field_0x1C0);
-            addVec3To(&self->field_0x188, &offset);
-            em_coll_shape_set(self, arg1, em_hit_mask_get(self));
-            if (self->field_0x218 == 0) {
-                copyVec3(&self->field_0x188, &saved);
-            }
-        } else {
-            em_coll_shape_set(self, arg1, em_hit_mask_get(self));
-        }
+    } else {
+        em_coll_shape_set(self, arg1, em_hit_mask_get(self));
     }
 }
 
@@ -581,15 +560,15 @@ void em_userdata_motion_head_load(EnemyWork* self) {
     if (data->field_0x00 == 0xFE || data->field_0x00 == 0xFC) {
         self->field_0x1F9 = 0;
     } else {
-        fn_80126278_c1(data->field_0x08, &self->field_0x188);
-        self->field_0x1C0 = data->field_0x0A;
+        em_data_point_get(self, data->field_0x08, &self->field_0x188);
+        self->field_0x1C0 = self->field_0x9A4->field_0x0A;
         em_area_change(self, 0);
     }
     fn_801408B4(self);
 }
 
 /* Steps the motion sequence until it settles on state 2. */
-void fn_801381F4(EnemyWork* self) {
+void em_motion_settle(EnemyWork* self) {
     while (self->field_0x95C != 2) {
         if (fn_801408B4(self) == 0) {
             break;
@@ -613,12 +592,13 @@ void fn_8013823C(EnemyWork* self) {
     Vec3 v5C;
     Vec3 v50;
     Vec3 v44;
+    Vec3 v38;
     Vec3 v2C;
     Vec3 v20;
     Vec3 v14;
     Vec3 v8;
-    u32 flag;
     u8 i;
+    u32 flag;
     u8 was_special;
 
     VEC3_ctor(&vD4);
@@ -634,21 +614,24 @@ void fn_8013823C(EnemyWork* self) {
     for (i = 0; i < 3; i++) {
         if (event_demo_ck__Fv() == 0 && self->field_0x46A == 0) {
             if (self->field_0x898[i] > 0) {
-                self->field_0x898[i] = (s16)(self->field_0x898[i] - 1);
+                self->field_0x898[i]--;
             }
         }
-        if (self->field_0x88C[i] != -1) {
-            if (em_roster_record_alive_ck() == 0) {
-                if (em_roster_record_slot_id_get(self->field_0x88C[i]) > 0) {
-                    self->field_0x89E = (u8)(self->field_0x89E + 1);
+        {
+            s32* record = &self->field_0x88C[i];
+            if (*record != -1) {
+                if (em_roster_record_alive_ck() == 0) {
+                    if (em_roster_record_slot_id_get(*record) > 0) {
+                        self->field_0x89E++;
+                    }
+                    *record = -1;
+                } else if (self->field_0x898[i] <= 0) {
+                    if (em_roster_record_slot_id_get(*record) > 0) {
+                        self->field_0x89E++;
+                    }
+                    em_roster_record_release(*record);
+                    *record = -1;
                 }
-                self->field_0x88C[i] = -1;
-            } else if (self->field_0x898[i] <= 0) {
-                if (em_roster_record_slot_id_get(self->field_0x88C[i]) > 0) {
-                    self->field_0x89E = (u8)(self->field_0x89E + 1);
-                }
-                em_roster_record_release(self->field_0x88C[i]);
-                self->field_0x88C[i] = -1;
             }
         }
     }
@@ -659,36 +642,36 @@ void fn_8013823C(EnemyWork* self) {
                 self->field_0x382 == 0) {
                 if (calcVecDistXZ(&self->field_0x188, &self->field_0x36C) <=
                     self->field_0x9A4->records->field_0x04) {
-                    fn_801381F4(self);
+                    em_motion_settle(self);
                     em_userdata_motion_head_load(self);
                     em_finish_flag_set(self);
                 }
             }
         } else if (self->field_0x1FA == 1 && self->field_0x1FB == 1) {
             if (stage_map_kind_get(self->field_0x1E0) == 5 && self->field_0x1E1 == 3) {
-                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D48, lbl_80796D40, lbl_80796D4C);
+                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, 7000.0f, 0.0f, 5000.0f);
             } else {
-                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D40, lbl_80796D40, lbl_80796D40);
+                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, 0.0f, 0.0f, 0.0f);
             }
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v68, &v8C, self->field_0x1E1);
             copyVec3(&vC8, &v68);
             if (stage_map_kind_get(self->field_0x1E0) == 5 && self->field_0x9F7 == 3) {
-                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D48, lbl_80796D40, lbl_80796D4C);
+                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, 7000.0f, 0.0f, 5000.0f);
             } else {
-                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, lbl_80796D40, lbl_80796D40, lbl_80796D40);
+                setVector3__FPQ34nw4r4math4VEC3fff(&v8C, 0.0f, 0.0f, 0.0f);
             }
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v5C, &v8C, self->field_0x9F7);
             copyVec3(&vBC, &v5C);
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v50, &self->field_0x188, self->field_0x1E1);
             copyVec3(&vD4, &v50);
-            addVec3(&v74, &vC8, &vBC);
-            vec3_scale(&v80, &v74, lbl_80796D50);
-            copyVec3(&vB0, &v80);
+            addVec3(&v38, &vC8, &vBC);
+            vec3_scale(&v44, &v38, 0.5f);
+            copyVec3(&vB0, &v44);
             subVec3(&v2C, &vBC, &vB0);
             copyVec3(&vA4, &v2C);
             subVec3(&v20, &vD4, &vB0);
             copyVec3(&v98, &v20);
-            if (vec3_dot(&vA4, &v98) >= lbl_80796D40) {
+            if (vec3_dot(&vA4, &v98) >= 0.0f) {
                 get_worldlocal_pos(&v14, &vD4, self->field_0x9F7);
                 copyVec3(&self->field_0x188, &v14);
                 self->field_0x188.y = stg_area_ceiling_get(self->field_0x9F7);
@@ -710,7 +693,7 @@ void fn_8013823C(EnemyWork* self) {
         }
     }
     em_delay_act_tick(self);
-    setVector3__FPQ34nw4r4math4VEC3fff(&self->field_0x1A0, lbl_80796D40, lbl_80796D40, lbl_80796D40);
+    setVector3__FPQ34nw4r4math4VEC3fff(&self->field_0x1A0, 0.0f, 0.0f, 0.0f);
     self->field_0x1DF = 0;
     self->field_0x79A = 0;
     self->field_0x784 = 0;
@@ -729,7 +712,7 @@ void fn_8013823C(EnemyWork* self) {
     self->field_0x43F = 0;
     em_timers_update(self);
     if (event_demo_ck__Fv() == 0 && self->field_0x46A == 0) {
-        fn_80138F3C(self);
+        em_pl_distance_update(self);
         em_motion_param_step(self);
         em_sight_update(self);
         em_hate_update(self);
@@ -756,13 +739,15 @@ void fn_8013823C(EnemyWork* self) {
         em_target_pos_set(self, 0);
     }
     if ((u32)(self->field_0x1E5 - 8) > 1) {
-        if (self->field_0x1E5 == 0xB) {
+        switch (self->field_0x1E5) {
+        case 0xB:
             if ((self->flags_0x1C8 & 1) == 0) {
                 em_motion_timer_arm(self);
             }
             if ((self->flags_0x1C8 & 0x10000) == 0) {
                 em_fx_flag_set(self);
             }
+            break;
         }
     } else {
         em_fx_flag3_set(self);
@@ -770,23 +755,22 @@ void fn_8013823C(EnemyWork* self) {
     {
         void (*cb)(EnemyWork*) = em_hook_get(self, 3);
         if (cb != NULL) {
-            if (fn_80137C9C(self, cb) != 0) {
-                if (em_idle_flag_get(self) == 1 && self->field_0x46A == 0 && em_userdata_script_run((struct EmWork*)self) == 1) {
-                    fn_801281EC_c1(self);
-                }
-                if (fn_80128204_c1(self) == 1) {
-                    fn_801281F8_c1(self);
-                    if (fn_80137C9C(self, cb) == 0) {
-                        return;
-                    }
-                }
-            } else {
+            if (fn_80137C9C(self, cb) == 0) {
                 return;
+            }
+            if (em_idle_flag_get(self) == 1 && self->field_0x46A == 0 && em_userdata_script_run((struct EmWork*)self) == 1) {
+                fn_801281EC(self);
+            }
+            if (fn_80128204(self) == 1) {
+                fn_801281F8(self);
+                if (fn_80137C9C(self, cb) == 0) {
+                    return;
+                }
             }
         }
         if (self->field_0x784 != 0) {
             em_busy_timer_reset(self);
-            em_busy_set_c1(self);
+            em_busy_set(self);
             em_ceiling_latch(self);
         }
         em_char_pose_sync(self);
@@ -794,16 +778,16 @@ void fn_8013823C(EnemyWork* self) {
             em_fall_step(self);
         }
         if (self->field_0x1E2 != 4 && self->field_0x1DF == 0) {
-            if (ef_fabsf(self->field_0x1AC) <= lbl_80796D54) {
-                if (self->field_0x1AC > lbl_80796D58) {
-                    self->field_0x1AC = self->field_0x1AC - lbl_80796D58;
-                } else if (self->field_0x1AC < lbl_80796D5C) {
-                    self->field_0x1AC = self->field_0x1AC + lbl_80796D58;
+            if (ef_fabsf(self->field_0x1AC) <= 100.0f) {
+                if (self->field_0x1AC > 10.0f) {
+                    self->field_0x1AC -= 10.0f;
+                } else if (self->field_0x1AC < -10.0f) {
+                    self->field_0x1AC += 10.0f;
                 } else {
-                    self->field_0x1AC = lbl_80796D40;
+                    self->field_0x1AC = 0.0f;
                 }
             } else {
-                self->field_0x1AC = self->field_0x1AC * lbl_80796D60;
+                self->field_0x1AC *= 0.9f;
             }
         }
         {
@@ -819,9 +803,9 @@ void fn_8013823C(EnemyWork* self) {
             self->char_0x024.field_0x34 = 0;
         }
         em_mat_alpha_apply(self);
-        if (lbl_80796D40 == self->field_0x1D4) {
+        if (0.0f == self->field_0x1D4) {
             self->char_0x024.field_0x34 = 0;
-        } else if (lbl_80796D64 != self->field_0x1D4) {
+        } else if (1.0f != self->field_0x1D4) {
             self->char_0x024.field_0x35 = 1;
         } else {
             self->char_0x024.field_0x35 = 0;
@@ -830,7 +814,11 @@ void fn_8013823C(EnemyWork* self) {
             u32 bits = self->flags_0x1C8;
             u16 move_arg;
             if ((bits & 1) == 0 && (bits & 0x400) == 0) {
-                move_arg = 0x180;
+                if ((self->flags_0x1C8 & 0x400) != 0) {
+                    move_arg = 0x80;
+                } else {
+                    move_arg = 0x180;
+                }
             } else {
                 move_arg = 0;
             }
@@ -840,14 +828,14 @@ void fn_8013823C(EnemyWork* self) {
         switch (self->field_0x1E2) {
         case 0:
             if (was_special != 1) {
-                vec3_move_damp(&self->field_0x194, &self->field_0x188, &self->field_0x230,
-                            &self->field_0x188, lbl_80796D68);
+                vec3_move_damp(&self->field_0x194, &self->field_0x188, &self->field_0x230, 0.3f,
+                               &self->field_0x188);
             }
             break;
         case 2:
-            if (self->field_0x194.z < lbl_80796D58 + (self->field_0x20C + em_dive_depth_get(self))) {
-                vec3_move_damp(&self->field_0x194, &self->field_0x188, &self->field_0x230,
-                            &self->field_0x188, lbl_80796D6C);
+            if (self->field_0x194.y < 10.0f + (self->field_0x20C + em_dive_depth_get(self))) {
+                vec3_move_damp(&self->field_0x194, &self->field_0x188, &self->field_0x230, 0.6f,
+                               &self->field_0x188);
             }
             break;
         }
@@ -862,13 +850,12 @@ void fn_8013823C(EnemyWork* self) {
         {
             u8 slot;
             for (slot = 0; slot < 2; slot++) {
-                fn_80138EC8(self, slot);
+                em_fx_slot_step(self, slot);
             }
         }
     }
 }
 
-#pragma peephole on
 /* The sleep/death half of the per-frame update. */
 void em_post_update(EnemyWork* self) {
     s32 found;
@@ -894,27 +881,25 @@ void em_post_update(EnemyWork* self) {
         em_cell_span_update(self);
         if (self->field_0x766 == 0) {
             if (self->field_0x767 == 1) {
-                self->field_0x766 = (u8)(self->field_0x766 + 1);
+                self->field_0x766++;
                 copyVec3(&self->field_0x778, &self->field_0x76C);
             }
             if (self->field_0x768 > 0) {
-                self->field_0x768 = (s16)(self->field_0x768 - 1);
+                self->field_0x768--;
             }
         }
-        fn_801391FC(self);
+        em_turn_joint_update(self);
         em_break_parts_update(self);
         if (self->field_0x764 >= 0) {
             if (em_sleep_ck__FP11_ENEMY_WORKUc(self, 0) == 1) {
                 self->field_0x762 = 1;
             } else if (self->field_0x762 == 0) {
-                self->field_0x764 = (s16)(self->field_0x764 - 1);
-                if (self->field_0x764 <= 0) {
+                if (--self->field_0x764 <= 0) {
                     self->field_0x762 = 1;
                     self->field_0x764 = 2;
                 }
             } else {
-                self->field_0x764 = (s16)(self->field_0x764 - 1);
-                if (self->field_0x764 <= 0) {
+                if (--self->field_0x764 <= 0) {
                     em_latch_0x762_roll(self);
                 }
             }
@@ -948,11 +933,14 @@ void em_post_update(EnemyWork* self) {
             }
         }
         em_joint_visibility_update_all(self);
-        if (self->field_0x1E2 == 4) {
+        switch (self->field_0x1E2) {
+        case 4:
             em_shake_req_set(self);
+            break;
         }
     }
 }
+#pragma peephole on
 
 /* Ages the work's per-entity tick counter. */
 void fn_80138E18(EnemyWork* self) {
@@ -980,7 +968,7 @@ void em_char_pose_sync(EnemyWork* self) {
 
 #pragma peephole off
 /* Advances one of the two per-entity effect slots. */
-void fn_80138EC8(EnemyWork* self, u32 arg1) {
+void em_fx_slot_step(EnemyWork* self, u32 arg1) {
     u8 index = (u8)arg1;
 
     if (self->field_0xA08[index].field_0x05 != 0 && (self->field_0xAEC[index] & 1) != 0) {
@@ -990,23 +978,26 @@ void fn_80138EC8(EnemyWork* self, u32 arg1) {
 }
 
 /* Marks every move the work cannot currently reach with the -1 sentinel. */
-void fn_80138F3C(EnemyWork* self) {
-    MoveWork* move = (MoveWork*)get_move_work_adrs__FUc(2);
-    u16 max = get_move_work_max__FUc(2);
-    u32 all_blocked = 1;
+void em_pl_distance_update(EnemyWork* self) {
+    MoveWork* move;
     s32 i;
-    f32 sentinel = lbl_80796D70;
+    s32 max;
+    u32 all_blocked;
 
-    for (i = 0; i < (s32)max; i++) {
-        if (move[i].field_0x00 != 0 && em_pl_slot_leaving_ck(move[i].field_0x08) == 0) {
-            if (em_pl_target_ck(self, &move[i]) == 0) {
-                self->field_0x454[i] = sentinel;
+    move = (MoveWork*)get_move_work_adrs__FUc(2);
+    max = get_move_work_max__FUc(2);
+    all_blocked = 1;
+
+    for (i = 0; i < max; i++, move++) {
+        if (move->field_0x00 != 0 && em_pl_slot_leaving_ck(move->field_0x08) == 0) {
+            if (em_pl_target_ck(self, move) == 0) {
+                self->field_0x454[i] = (-1.0f);
             } else {
-                self->field_0x454[i] = vec3_distance(&self->field_0x188, &move[i].field_0x3C);
+                self->field_0x454[i] = vec3_distance(&self->field_0x188, &move->field_0x3C);
                 all_blocked = 0;
             }
         } else {
-            self->field_0x454[i] = sentinel;
+            self->field_0x454[i] = (-1.0f);
         }
     }
     if (all_blocked == 1) {
@@ -1025,7 +1016,7 @@ void fn_80139024(EnemyWork* self) {
     switch (state) {
     case 0:
         self->field_0x005 = (u8)(state + 1);
-        em_motion_param_set(self, lbl_80796D40, 0);
+        em_motion_param_set(self, 0.0f, 0);
         em_mot_set(self, 1, 0, 0);
         self->field_0x001 = 0;
         return;
@@ -1036,15 +1027,15 @@ void fn_80139024(EnemyWork* self) {
         if (em_busy_ck(self) != 1) {
             return;
         }
-        if (self->field_0x1E7 != 0) {
+        if (self->field_0x1E7 == 0) {
+            if (self->field_0x00C == 3) {
+                self->field_0x017 = 4;
+            } else {
+                self->field_0x017 = 1;
+            }
+        } else {
             self->field_0x017 = 2;
-            return;
         }
-        if (self->field_0x00C == 3) {
-            self->field_0x017 = 4;
-            return;
-        }
-        self->field_0x017 = 1;
         return;
     }
 }
@@ -1084,29 +1075,30 @@ s32 em_res_user_data_ck(EnemyWork* self) {
 
 #pragma peephole off
 /* Re-aims the work toward the nearest user-data joint, clamped to the joint's key span. */
-void fn_801391FC(EnemyWork* self) {
+void em_turn_joint_update(EnemyWork* self) {
     f32 v;
     Vec3 pos;
     u32 best;
     u32 total;
-    u16 i;
     UserDataItem* item;
 
     VEC3_ctor(&pos);
     best = (u32)-1;
-    total = 0;
     if (self->field_0x740 == 0) {
-        v = lbl_80796D40;
+        v = 0.0f;
     } else {
+        total = 0;
         item = em_user_data_items_get(self);
-        while (item != NULL && item->field_0x00 != (u32)-1) {
-            if (item->field_0x04 == 1) {
-                if (best == (u32)-1 || best > item->field_0x00) {
-                    best = item->field_0x00;
+        if (item != NULL) {
+            while (item->field_0x00 != (u32)-1) {
+                if (item->field_0x04 == 1) {
+                    if (best == (u32)-1 || best > item->field_0x00) {
+                        best = item->field_0x00;
+                    }
+                    total = total + (u16)item->field_0x0C;
                 }
-                total = total + (u16)item->field_0x0C;
+                item++;
             }
-            item++;
         }
         if (best != (u32)-1) {
             get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(self, best, &pos);
@@ -1125,30 +1117,29 @@ void fn_801391FC(EnemyWork* self) {
     if (item != NULL) {
         while (item->field_0x00 != (u32)-1) {
             if (item->field_0x04 == 1) {
-                s16 target = (s16)(s32)(v * ((f32)item->field_0x0C / (f32)(u16)total));
+                u16 current;
+                u16 target = (s32)(v * ((f32)item->field_0x0C / (f32)(u16)total));
                 u16* slot = &self->field_0x742[item->field_0x08];
-                s16 current = (s16)*slot;
-                s16 delta = (s16)(u32)(lbl_80796D74 * (f32)item->field_0x0C);
+                current = *slot;
                 if ((s16)(target - current) < 0) {
-                    s16 down = (s16)(current - delta);
+                    u32 down = current - (u32)(0.03f * (f32)item->field_0x0C);
                     if ((s16)(target - down) < 0) {
-                        *slot = (u16)down;
+                        *slot = (s16)down;
                     } else {
-                        *slot = (u16)target;
+                        *slot = target;
                     }
                 } else {
-                    s16 up = (s16)(current + delta);
-                    if ((s16)(up - target) > 0) {
-                        *slot = (u16)target;
+                    u32 up = (u32)(0.03f * (f32)item->field_0x0C) + current;
+                    if ((s16)(target - up) > 0) {
+                        *slot = (s16)up;
                     } else {
-                        *slot = (u16)up;
+                        *slot = target;
                     }
                 }
             }
             item++;
         }
     }
-    (void)i;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1185,15 +1176,18 @@ void ResUserDataAc::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::R
     if (index == work->field_0x110) {
         Vec3 pos;
         VEC3_ctor(&pos);
-        pos.x = lbl_80796D40;
-        pos.y = lbl_80796D40;
-        pos.z = lbl_80796D40;
+        pos.x = 0.0f;
+        pos.y = 0.0f;
+        pos.z = 0.0f;
         anm_chr_result_trans_set(pResult, &pos);
     }
     item = em_user_data_items_get(work);
-    while (item != NULL && item->field_0x00 != (u32)-1) {
+    if (item == NULL) {
+        return;
+    }
+    while (item->field_0x00 != (u32)-1) {
         if (item->field_0x00 == index) {
-            if (item->field_0x04 == 0 || (u32)(item->field_0x04 - 3) <= 1) {
+            if ((u32)(item->field_0x04 - 3) <= 1 || item->field_0x04 == 0) {
                 CalcAnmItem(pResult, mdl, pFuncObj, index, item);
             } else {
                 CalcAnmItemEx(pResult, mdl, pFuncObj, index, item);
@@ -1202,7 +1196,7 @@ void ResUserDataAc::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::R
         item++;
     }
     if ((flags & 2) == 0) {
-        fn_8013A770(pFuncObj, work);
+        em_user_data_next_node_set(pFuncObj, work);
     }
 }
 
@@ -1215,7 +1209,7 @@ extern "C" {
 void ResUserDataAc::CalcAnmItem(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
     Vec3 angles;
     Mtx34 mtx;
-    Mtx34 dst;
+    nw4r::math::MTX33 dst;
     KeyFrameSet* frames;
 
     VEC3_ctor(&angles);
@@ -1225,18 +1219,22 @@ void ResUserDataAc::CalcAnmItem(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::Res
     case 0:
     case 3: {
         u8 area = item->field_0x10;
-        if (area != (u8)-1) {
+        if (area != -1) {
             EffectArea* rec = &work->field_0x488[area];
             if (rec->field_0x00 >= 2) {
                 frames = item->frames;
                 if (frames != NULL) {
-                    s32 x = 0;
-                    s32 y = 0;
-                    s32 z = 0;
+                    s32 x;
+                    s32 y;
+                    s32 z;
                     if (rec->field_0x07 == 1) {
                         x = (s32)frames->field_0x0C;
                         y = (s32)frames->field_0x10;
                         z = (s32)frames->field_0x14;
+                    } else {
+                        x = 0;
+                        y = 0;
+                        z = 0;
                     }
                     if (x == 0) {
                         x = (s32)frames->field_0x00;
@@ -1252,12 +1250,12 @@ void ResUserDataAc::CalcAnmItem(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::Res
                     angles.z = getKeyData__FPff(z, (f32)rec->field_0x0A);
                     {
                         CPVector cp;
-                        cp.x = (u32)(u16)(s32)(lbl_80796D50 + ((lbl_80796D88 * angles.x) / lbl_80796D8C));
-                        cp.y = (u32)(u16)(s32)(lbl_80796D50 + ((lbl_80796D88 * angles.y) / lbl_80796D8C));
-                        cp.z = (u32)(u16)(s32)(lbl_80796D50 + ((lbl_80796D88 * angles.z) / lbl_80796D8C));
+                        cp.x = (u32)(u16)(s32)(0.5f + ((65536.0f * angles.x) / 360.0f));
+                        cp.y = (u32)(u16)(s32)(0.5f + ((65536.0f * angles.y) / 360.0f));
+                        cp.z = (u32)(u16)(s32)(0.5f + ((65536.0f * angles.z) / 360.0f));
                         cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(&cp, &mtx);
                     }
-                    fn_805012E8(&dst, &mtx);
+                    nw4r::math::MTX34ToMTX33(&dst, &mtx);
                     anm_chr_result_rot_mul(pResult, &dst);
                 }
             }
@@ -1265,10 +1263,10 @@ void ResUserDataAc::CalcAnmItem(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::Res
         return;
     }
     case 4:
-        fn_8008DF8C(pResult, &dst);
-        work->field_0x76C.x = dst.m[1][0];
-        work->field_0x76C.y = dst.m[1][1];
-        work->field_0x76C.z = dst.m[1][2];
+        anm_chr_result_rot_mtx_get((struct ResAnmChrObj*)pResult, &dst.m[0][0]);
+        work->field_0x76C.x = dst.m[0][2];
+        work->field_0x76C.y = dst.m[1][2];
+        work->field_0x76C.z = dst.m[2][2];
         break;
     }
 }
@@ -1277,12 +1275,16 @@ void ResUserDataAc::CalcAnmItem(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::Res
 void ResUserDataAc::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
 }
 
+#pragma peephole off
 /* Dispatches every user-data item of the cursor's index to the accessor's second virtual pair. */
 void ResUserDataAc::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
     u32 index = pFuncObj->GetCallbackNodeID();
     UserDataItem* item = em_user_data_items_get(work);
 
-    while (item != NULL && item->field_0x00 != (u32)-1) {
+    if (item == NULL) {
+        return;
+    }
+    while (item->field_0x00 != (u32)-1) {
         if (item->field_0x00 == index) {
             if (item->field_0x04 <= 3) {
                 CalcMtxItem(pManip, mdl, pFuncObj, index, item);
@@ -1292,8 +1294,9 @@ void ResUserDataAc::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::R
         }
         item++;
     }
-    fn_8013A770(pFuncObj, work);
+    em_user_data_next_node_set(pFuncObj, work);
 }
+#pragma peephole on
 
 /* Applies one user-data item's transform to the caller's matrix. */
 void ResUserDataAc::CalcMtxItem(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
@@ -1307,18 +1310,16 @@ void ResUserDataAc::CalcMtxItem(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::Res
         if (area < 2) {
             EffectArea* rec = &work->field_0x488[area];
             if (item->field_0x08 == 0 && rec->field_0x00 >= 2) {
-                fn_80139A98((MtxHolder*)pManip, &rec->matrix);
-                return;
+                joint_mtx_set((MtxHolder*)pManip, &rec->matrix);
             }
         }
-        return;
+        break;
     }
     case 1:
         if (item->field_0x08 < 6) {
             joint_mtx_load((MtxHolder*)pManip, &mtx);
-            rotMatrixY__FUlPQ34nw4r4math5MTX34(work->field_0x742[item->field_0x08], &mtx);
+            rotMatrixY(work->field_0x742[item->field_0x08], &mtx);
             joint_mtx_store((MtxHolder*)pManip, &mtx);
-            return;
         }
         break;
     case 2:
@@ -1347,7 +1348,7 @@ void joint_mtx_load(MtxHolder* holder, void* mtx) {
 }
 
 /* Copies the holder's matrix into the destination, unconditionally. */
-void fn_80139A98(MtxHolder* holder, void* src) {
+void joint_mtx_set(MtxHolder* holder, void* src) {
     mtx34_copy_ps((Mtx34*)holder->mtx, (const Mtx34*)src);
 }
 
@@ -1359,8 +1360,8 @@ void ResUserDataAc::CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::R
 
 extern "C" {
 
-/* Builds one bone matrix from a keyframed scale/rotation/translation triple. */
-void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
+/* Writes the node's matrix relative to its parent's (the parent's inverse times the node's) into out. */
+void joint_local_mtx_get(Mtx34* out, void* arg1, Mtx34* arg2) {
     Mtx34 m1;
     Mtx34 m2;
     Mtx34 m3;
@@ -1378,20 +1379,212 @@ void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
     mtx34_concat(out, &m3, &m1);
 }
 
+} /* extern "C" */
+
+/* The node user data's TYPE values: a twist about X, a twist about Y, a blend of two joints. */
+const char* user_data_type_names[] = {"T-X", "T-Y", "DBL", NULL};
+
+#pragma peephole off
+/* Rebuilds the matrix of every node whose user data names a twist or a blend of two joints, then copies the
+ * matrices the work's linked user-data items name. */
+void ResUserDataAc::ExecCallbackC(nw4r::math::MTX34* pMtxArray, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
+    Mtx34 parentMtx;
+    Mtx34 parentInv;
+    Mtx34 localMtx;
+    Mtx34 nodeMtx;
+    Mtx34 joint0Mtx;
+    Mtx34 joint1Mtx;
+    Mtx34 resultMtx;
+
+    MTX34_ctor(&parentMtx);
+    MTX34_ctor(&parentInv);
+    MTX34_ctor(&localMtx);
+    MTX34_ctor(&nodeMtx);
+    MTX34_ctor(&joint0Mtx);
+    MTX34_ctor(&joint1Mtx);
+    MTX34_ctor(&resultMtx);
+    nw4r::g3d::ResNode node((void*)0);
+    nw4r::g3d::ResNode link((void*)0);
+    ResUserData userData;
+    ResUserData value;
+    u32 count;
+    u32 i;
+    UserDataItem* item;
+
+    res_user_data_ctor(&userData, 0);
+    res_user_data_item_ctor(&value, NULL);
+    item = em_user_data_items_get(work);
+    count = mdl.GetResNodeNumEntries();
+    for (i = 0; i < count; i++) {
+        const char* joint0;
+        const char* joint1;
+        f32 weight;
+        u8 kind;
+        u32 k;
+        {
+            nw4r::g3d::ResNode found = mdl.GetResNode(i);
+            res_node_assign(&node, &found);
+        }
+        {
+            ResUserData found;
+            found.data = (ResUserDataItemData*)res_node_user_data_get((struct ResHandle*)&node);
+            res_user_data_assign(&userData, &found);
+        }
+        if (res_user_data_valid_ck(&userData) == 0) {
+            continue;
+        }
+        if (res_user_data_entry_num_get(&userData) == 0) {
+            continue;
+        }
+        {
+            ResUserData found;
+            found.data = res_user_data_item_find(&userData, "TYPE");
+            res_user_data_item_assign(&value, &found);
+        }
+        if (res_user_data_item_valid_ck(&value) == 0) {
+            continue;
+        }
+        {
+            const char* type = (const char*)res_user_data_item_string_get(&value);
+            const char** name = user_data_type_names;
+            kind = 255;
+            for (k = 0; *name != NULL; name++, k++) {
+                if (strcmp(type, *name) == 0) {
+                    kind = k;
+                }
+            }
+        }
+        if (kind == 255) {
+            break;
+        }
+        {
+            ResUserData found;
+            found.data = res_user_data_item_find(&userData, "J0");
+            res_user_data_item_assign(&value, &found);
+        }
+        if (res_user_data_item_valid_ck(&value) == 0) {
+            continue;
+        }
+        joint0 = (const char*)res_user_data_item_string_get(&value);
+        {
+            ResUserData found;
+            found.data = res_user_data_item_find(&userData, "J1");
+            res_user_data_item_assign(&value, &found);
+        }
+        if (res_user_data_item_valid_ck(&value) == 0) {
+            continue;
+        }
+        joint1 = (const char*)res_user_data_item_string_get(&value);
+        {
+            ResUserData found;
+            found.data = res_user_data_item_find(&userData, "WEIGHT");
+            res_user_data_item_assign(&value, &found);
+        }
+        if (res_user_data_item_valid_ck(&value) == 0) {
+            continue;
+        }
+        weight = (f32)*(s32*)res_user_data_item_s32_get(&value) / 100.0f;
+        mtx34_copy(&nodeMtx, &pMtxArray[res_node_mtx_id_get(&node)]);
+        switch (kind) {
+        case 0:
+        case 1: {
+            f32 angle0;
+            {
+                s32 parent = res_node_get_parent(&node);
+                res_node_assign(&link, &parent);
+            }
+            mtx34_copy(&parentMtx, &pMtxArray[res_node_mtx_id_get(&link)]);
+            mtx34_inverse(&parentInv, &parentMtx);
+            mtx34_concat(&localMtx, &parentInv, &nodeMtx);
+            {
+                nw4r::g3d::ResNode found = mdl.GetResNode(joint0);
+                res_node_assign(&link, &found);
+            }
+            joint_local_mtx_get(&joint0Mtx, &link, pMtxArray);
+            {
+                nw4r::g3d::ResNode found = mdl.GetResNode(joint1);
+                res_node_assign(&link, &found);
+            }
+            joint_local_mtx_get(&joint1Mtx, &link, pMtxArray);
+            if (kind == 0) {
+                angle0 = (360.0f * (f32)calcMtxAngX_c1(&joint0Mtx)) / 65536.0f;
+                rotMatrixX(
+                    (u16)(0.5f + (65536.0f * (weight * ((360.0f * (f32)calcMtxAngX_c1(&joint1Mtx)) / 65536.0f - angle0))) / 360.0f),
+                    &localMtx);
+            } else {
+                angle0 = (360.0f * (f32)calcMtxAng3(&joint0Mtx)) / 65536.0f;
+                rotMatrixY(
+                    (u16)(0.5f + (65536.0f * (weight * ((360.0f * (f32)calcMtxAng3(&joint1Mtx)) / 65536.0f - angle0))) / 360.0f),
+                    &localMtx);
+            }
+            mtx34_concat(&resultMtx, &parentMtx, &localMtx);
+            copyMat33(&pMtxArray[res_node_mtx_id_get(&node)], &resultMtx);
+            break;
+        }
+        case 2:
+            {
+                nw4r::g3d::ResNode found = mdl.GetResNode(joint0);
+                res_node_assign(&link, &found);
+            }
+            mtx34_copy(&joint0Mtx, &pMtxArray[res_node_mtx_id_get(&link)]);
+            {
+                nw4r::g3d::ResNode found = mdl.GetResNode(joint1);
+                res_node_assign(&link, &found);
+            }
+            mtx34_copy(&joint1Mtx, &pMtxArray[res_node_mtx_id_get(&link)]);
+            mtx34_blend(&resultMtx, &joint0Mtx, &joint1Mtx, weight, 1.0f - weight, 0);
+            copyMat33(&pMtxArray[res_node_mtx_id_get(&node)], &resultMtx);
+            break;
+        }
+    }
+    if (item != NULL) {
+        while (item->field_0x00 != (u32)-1) {
+            switch (item->field_0x04) {
+            case 0:
+            case 3:
+                if ((u32)(item->field_0x08 - 1) <= 1) {
+                u8 area = item->field_0x10;
+                if (area < 2 && work->field_0x488[area].field_0x00 <= 1 && item->field_0x0C != (u32)-1) {
+                    u32 dst;
+                    u32 src;
+                    {
+                        nw4r::g3d::ResNode found = mdl.GetResNode(item->field_0x00);
+                        res_node_assign(&node, &found);
+                    }
+                    dst = res_node_mtx_id_get(&node);
+                    {
+                        nw4r::g3d::ResNode found = mdl.GetResNode(item->field_0x0C);
+                        res_node_assign(&node, &found);
+                    }
+                    src = res_node_mtx_id_get(&node);
+                    mtx34_copy(&pMtxArray[dst], &pMtxArray[src]);
+                }
+                }
+                break;
+            }
+            item++;
+        }
+    }
+    CalcWorldEnd(pMtxArray, mdl, pFuncObj);
+}
+#pragma peephole on
+
+extern "C" {
+
 /* --------------------------------------------------------------------------------------------- */
 /* 0x8013A218..0x8013AC08 - the ResUserData value accessors                                       */
 /* --------------------------------------------------------------------------------------------- */
 
 /* Reads the item's S32 value. */
-ResUserDataItemData* fn_8013A218(ResUserData* self) {
-    if (fn_8013A314(self) != 0) {
+ResUserDataItemData* res_user_data_item_s32_get(ResUserData* self) {
+    if (res_user_data_item_value_type_get(self) != 0) {
         nw4r::db::Panic(lbl_805A14C4, 54, lbl_805A1480);
     }
-    return (ResUserDataItemData*)fn_8013A280(self, (s32)fn_8013A29C(self)->field_0x04);
+    return (ResUserDataItemData*)res_user_data_item_ofs_to_ptr(self, (s32)res_user_data_item_ref(self)->field_0x04);
 }
 
 /* Returns the blob-relative pointer for a value offset, or NULL when the offset is zero. */
-void* fn_8013A280(ResUserData* self, s32 arg1) {
+void* res_user_data_item_ofs_to_ptr(ResUserData* self, s32 arg1) {
     ResUserDataItemData* data = self->data;
     if (arg1 != 0) {
         return (u8*)data + arg1;
@@ -1400,51 +1593,51 @@ void* fn_8013A280(ResUserData* self, s32 arg1) {
 }
 
 /* Returns the item's value header, asserting the item is valid. */
-ResUserDataItemData* fn_8013A29C(ResUserData* self) {
-    if (fn_8013A428(self) == 0) {
-        nw4r::db::Panic(lbl_805A143C, 38, lbl_805A1420, fn_8013A308(), lbl_807919F4);
+ResUserDataItemData* res_user_data_item_ref(ResUserData* self) {
+    if (res_user_data_item_valid_ck(self) == 0) {
+        nw4r::db::Panic(lbl_805A143C, 38, lbl_805A1420, res_user_data_item_class_name(), "ref");
     }
-    return fn_8013A300(self);
+    return res_user_data_item_ptr(self);
 }
 
 /* Returns the item's value header. */
-ResUserDataItemData* fn_8013A300(ResUserData* self) {
+ResUserDataItemData* res_user_data_item_ptr(ResUserData* self) {
     return self->data;
 }
 
 /* The class name the "Object not valid." panic reports for an item. */
-const char* fn_8013A308(void) {
+const char* res_user_data_item_class_name(void) {
     return lbl_805A1410;
 }
 
 /* Returns the item's value type. */
-s32 fn_8013A314(ResUserData* self) {
-    return (s32)fn_8013A338(self)->field_0x0C;
+s32 res_user_data_item_value_type_get(ResUserData* self) {
+    return (s32)res_user_data_item_ref_const(self)->field_0x0C;
 }
 
 /* Returns the item's value header, asserting the item is valid. */
-ResUserDataItemData* fn_8013A338(ResUserData* self) {
-    if (fn_8013A428(self) == 0) {
-        nw4r::db::Panic(lbl_805A146C, 38, lbl_805A1450, fn_8013A308(), lbl_807919F0);
+ResUserDataItemData* res_user_data_item_ref_const(ResUserData* self) {
+    if (res_user_data_item_valid_ck(self) == 0) {
+        nw4r::db::Panic(lbl_805A146C, 38, lbl_805A1450, res_user_data_item_class_name(), "ref");
     }
-    return fn_8013A39C(self);
+    return res_user_data_item_ptr_const(self);
 }
 
 /* Returns the item's value header. */
-ResUserDataItemData* fn_8013A39C(ResUserData* self) {
+ResUserDataItemData* res_user_data_item_ptr_const(ResUserData* self) {
     return self->data;
 }
 
 /* Reads the item's string value. */
-ResUserDataItemData* fn_8013A3A4(ResUserData* self) {
-    if (fn_8013A314(self) != 2) {
+ResUserDataItemData* res_user_data_item_string_get(ResUserData* self) {
+    if (res_user_data_item_value_type_get(self) != 2) {
         nw4r::db::Panic(lbl_805A151C, 68, lbl_805A14D8);
     }
-    return (ResUserDataItemData*)fn_8013A40C(self, (s32)fn_8013A338(self)->field_0x04);
+    return (ResUserDataItemData*)res_user_data_item_ofs_to_ptr_const(self, (s32)res_user_data_item_ref_const(self)->field_0x04);
 }
 
 /* Returns the blob-relative pointer for a value offset, or NULL when the offset is zero. */
-void* fn_8013A40C(ResUserData* self, s32 arg1) {
+void* res_user_data_item_ofs_to_ptr_const(ResUserData* self, s32 arg1) {
     ResUserDataItemData* data = self->data;
     if (arg1 != 0) {
         return (u8*)data + arg1;
@@ -1453,79 +1646,80 @@ void* fn_8013A40C(ResUserData* self, s32 arg1) {
 }
 
 /* Reports whether the item holds a value. */
-s32 fn_8013A428(ResUserData* self) {
+s32 res_user_data_item_valid_ck(ResUserData* self) {
     return self->data != NULL;
 }
 
-/* Copy-assigns one item wrapper onto another. */
-ResUserData* fn_8013A43C(ResUserData* dst, ResUserData* src) {
-    fn_8013A488(dst, src);
-    fn_8013A484(dst, src);
+/* Copy-assigns one item wrapper onto another; the empty trailing member's copy is handed the words after the
+ * two handles. */
+ResUserData* res_user_data_item_assign(ResUserData* dst, ResUserData* src) {
+    res_user_data_item_ptr_assign(dst, src);
+    res_user_data_item_tail_assign(dst + 1, src + 1);
     return dst;
 }
 
 /* Trivial member copy the retail object keeps as an empty body. */
-void fn_8013A484(ResUserData* dst, ResUserData* src) {
+void res_user_data_item_tail_assign(ResUserData* dst, ResUserData* src) {
     (void)dst;
     (void)src;
 }
 
 /* Copies the item's value header pointer. */
-void fn_8013A488(ResUserData* dst, ResUserData* src) {
+void res_user_data_item_ptr_assign(ResUserData* dst, ResUserData* src) {
     dst->data = src->data;
 }
 
 /* Looks a key up in the item's name table and returns the matching value header. */
-ResUserDataItemData* fn_8013A494(ResUserData* self, const char* key) {
-    ResUserDataItemData* data = fn_8013A4E8(self);
+ResUserDataItemData* res_user_data_item_find(ResUserData* self, const char* key) {
+    ResUserDataItemData* data = res_user_data_ref(self);
     ResUserData found;
 
-    return fn_8013A5E4(&found, (ResUserDataItemData*)nw4r::g3d::ResDic(&data->field_0x04)[key])->data;
+    return res_user_data_item_ctor(&found, (ResUserDataItemData*)nw4r::g3d::ResDic(&data->field_0x04)[key])->data;
 }
 
 /* Returns the item's value header, asserting the item is valid. */
-ResUserDataItemData* fn_8013A4E8(ResUserData* self) {
-    if (fn_8013A594(self) == 0) {
-        nw4r::db::Panic(lbl_805A13C0, 87, lbl_805A13A4, fn_8013A554(), lbl_807919F8);
+ResUserDataItemData* res_user_data_ref(ResUserData* self) {
+    if (res_user_data_valid_ck(self) == 0) {
+        nw4r::db::Panic(lbl_805A13C0, 87, lbl_805A13A4, res_user_data_class_name(), "ref");
     }
-    return fn_8013A54C(self);
+    return res_user_data_ptr(self);
 }
 
 /* Returns the item's value header. */
-ResUserDataItemData* fn_8013A54C(ResUserData* self) {
+ResUserDataItemData* res_user_data_ptr(ResUserData* self) {
     return self->data;
 }
 
 /* The class name the "Object not valid." panic reports for the collection. */
-const char* fn_8013A554(void) {
+const char* res_user_data_class_name(void) {
     return lbl_805A1398;
 }
 
 /* Reports whether the item's name table holds any entries. */
-void fn_8013A560(ResUserData* self) {
-    nw4r::g3d::ResDic(&fn_8013A4E8(self)->field_0x04).GetNumData();
+u32 res_user_data_entry_num_get(ResUserData* self) {
+    return nw4r::g3d::ResDic(&res_user_data_ref(self)->field_0x04).GetNumData();
 }
 
 /* Reports whether the item holds a value. */
-s32 fn_8013A594(ResUserData* self) {
+s32 res_user_data_valid_ck(ResUserData* self) {
     return self->data != NULL;
 }
 
 /* Copy-constructs one item wrapper from another. */
-ResUserData* fn_8013A5A8(ResUserData* self, ResUserData* src) {
-    fn_8013A5D8(self, src);
+ResUserData* res_user_data_assign(ResUserData* self, ResUserData* src) {
+    res_user_data_ptr_assign(self, src);
     return self;
 }
 
 /* Copies the item's value header pointer. */
-void fn_8013A5D8(ResUserData* dst, ResUserData* src) {
+void res_user_data_ptr_assign(ResUserData* dst, ResUserData* src) {
     dst->data = src->data;
 }
 
 #pragma peephole off
 /* Stores the value header, asserting it is 4-byte aligned. */
-ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data) {
-    fn_8013A648(self, data);
+ResUserData* res_user_data_item_ctor(ResUserData* self, ResUserDataItemData* data) {
+    res_user_data_item_ptr_set(self, data);
     if (((u32)data & 3) != 0) {
         nw4r::db::Panic(lbl_805A13FC, 38, lbl_805A13D4);
     }
@@ -1534,7 +1728,7 @@ ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data) {
 
 #pragma peephole on
 /* Stores the value header pointer. */
-void fn_8013A648(ResUserData* self, ResUserDataItemData* data) {
+void res_user_data_item_ptr_set(ResUserData* self, ResUserDataItemData* data) {
     self->data = data;
 }
 
@@ -1552,7 +1746,7 @@ void em_res_user_data_flag_set(ResUserDataAc* self, u32 arg1) {
     u32 handle = work->field_0x13C;
 
     self->flags = arg1;
-    self->flags = self->flags | (u32)fn_8013A6F4(work);
+    self->flags = self->flags | (u32)em_user_data_timing_flags_get(work);
     ((nw4r::g3d::ScnMdlSimple*)handle)->EnableScnMdlCallbackTiming((nw4r::g3d::ScnObj::Timing)self->flags);
     ((nw4r::g3d::ScnMdlSimple*)handle)->SetCalcWorldNodeID(work->field_0x110);
 }
@@ -1568,17 +1762,22 @@ UserDataItem* em_user_data_items_get(EnemyWork* work) {
 }
 
 /* Builds the accessor's per-type flag word from the work's user-data list. */
-s32 fn_8013A6F4(EnemyWork* work) {
+s32 em_user_data_timing_flags_get(EnemyWork* work) {
     s32 flags = 1;
     UserDataItem* item = em_user_data_items_get(work);
 
     if (item != NULL) {
         while (item->field_0x00 != (u32)-1) {
             u8 type = item->field_0x04;
-            if ((u32)(type - 1) <= 1) {
+            if ((u32)(type - 1) > 1) {
+                switch (type) {
+                case 0:
+                case 3:
+                    flags |= 6;
+                    break;
+                }
+            } else {
                 flags |= 2;
-            } else if (type == 0 || type == 3) {
-                flags |= 6;
             }
             item++;
         }
@@ -1587,22 +1786,23 @@ s32 fn_8013A6F4(EnemyWork* work) {
 }
 
 /* Advances the cursor to the next user-data index the work can still reach. */
-void fn_8013A770(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work) {
+void em_user_data_next_node_set(nw4r::g3d::FuncObjCalcWorld* cursor, EnemyWork* work) {
     u32 current = cursor->GetCallbackNodeID();
     u32 best = current;
     UserDataItem* item = em_user_data_items_get(work);
 
-    if (item != NULL) {
-        while (item->field_0x00 != (u32)-1) {
-            if (item->field_0x00 > current) {
-                if (item->field_0x00 < best) {
-                    best = item->field_0x00;
-                } else if (best == current) {
-                    best = item->field_0x00;
-                }
+    if (item == NULL) {
+        return;
+    }
+    while (item->field_0x00 != (u32)-1) {
+        if (item->field_0x00 > current) {
+            if (item->field_0x00 < best) {
+                best = item->field_0x00;
+            } else if (best == current) {
+                best = item->field_0x00;
             }
-            item++;
         }
+        item++;
     }
     if (best > current && best != (u32)-1) {
         cursor->SetCallbackNodeID(best);
@@ -1649,6 +1849,8 @@ s32 em_userdata_state_kind_get(EnemyWork* work) {
 
     for (;;) {
         switch (state) {
+        default:
+            return state;
         case 2:
             state = work->field_0x99C;
             break;
@@ -1659,14 +1861,12 @@ s32 em_userdata_state_kind_get(EnemyWork* work) {
         case 0xA:
             state = work->field_0x9E8;
             break;
-        default:
-            return state;
         }
     }
 }
 
 /* Clears the work's user-data state and re-enters the given mode. */
-void fn_8013A954(EnemyWork* work, u8 arg1) {
+void em_userdata_state_reset(EnemyWork* work, u8 arg1) {
     work->field_0x962 = 0;
     work->field_0x9A8 = 0;
     work->field_0x43E = 0;
@@ -1679,7 +1879,7 @@ void fn_8013A954(EnemyWork* work, u8 arg1) {
 #pragma peephole on
 /* Installs the work's user-data state table and re-enters the default state. */
 void fn_8013A978(EnemyWork* work) {
-    work->field_0x954 = (u32**)fn_80126098_c1();
+    work->field_0x954 = (u32**)fn_80126098(work);
     if (fn_8013A884(work, 0) == 1) {
         fn_8013AB74(work, 0, 0);
     } else {
@@ -1688,7 +1888,7 @@ void fn_8013A978(EnemyWork* work) {
         work->field_0x958 = 0;
     }
     fn_8013A9F4(work);
-    fn_8013A954(work, 1);
+    em_userdata_state_reset(work, 1);
 }
 
 /* Clears the work's user-data pending flag. */
@@ -1707,7 +1907,7 @@ void fn_8013AA00(EnemyWork* work) {
 
 #pragma peephole off
 /* Re-enters the work's user-data state, preferring the special index when the work is in state 3. */
-void fn_8013AA1C(EnemyWork* work, u8 arg1) {
+void em_userdata_state_select(EnemyWork* work, u8 arg1) {
     if (work->field_0x89F == 3 && fn_8013A884(work, 9) == 1) {
         fn_8013AB74(work, 9, 0);
     } else if (fn_8013A884(work, 0) == 1) {
@@ -1717,13 +1917,13 @@ void fn_8013AA1C(EnemyWork* work, u8 arg1) {
         work->field_0x95D = 0;
         work->field_0x958 = 0;
     }
-    fn_8013A954(work, arg1);
+    em_userdata_state_reset(work, arg1);
 }
 
 #pragma peephole on
 /* Re-enters the work's user-data state in the default mode. */
 void em_user_data_reenter(EnemyWork* work) {
-    fn_8013AA1C(work, 1);
+    em_userdata_state_select(work, 1);
 }
 
 #pragma peephole off
@@ -1746,7 +1946,7 @@ void em_userdata_state_exit(EnemyWork* work, u8 arg1) {
 #pragma peephole on
 /* Re-enters the work's user-data state in the non-default mode. */
 void em_userdata_state_reenter_alt(EnemyWork* work) {
-    fn_8013AA1C(work, 0);
+    em_userdata_state_select(work, 0);
 }
 
 #pragma peephole off
@@ -1771,12 +1971,13 @@ void em_userdata_roll(void) {
 #pragma peephole off
 /* Walks the work's per-motion records backwards to the first one matching the current state. */
 u8 em_userdata_record_find_back(EnemyWork* work, u8 arg1, u8 arg2) {
-    u8 index = arg1;
+    EmDataRecord* rec;
+    s16 index = arg1;
     EnemyData* data = work->field_0x9A4;
 
     if (data != NULL) {
-        EmDataRecord* rec = &data->records[(s16)index];
-        while ((s16)index >= 0) {
+        rec = &data->records[index];
+        while (index >= 0) {
             if (rec->field_0x0B == 0 || arg2 == rec->field_0x0B) {
                 if (rec->field_0x09 != em_phase_get(work)) {
                     return index;
