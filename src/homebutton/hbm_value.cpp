@@ -2315,7 +2315,7 @@ HbmCellphoneKeypad::~HbmCellphoneKeypad()
 void* fn_8055E8F0(void* self, s32 flag)
 {
     if (self != 0) {
-        fn_8054F90C(self, 0);
+        hbmKbWidgetDestroy(self, 0);
         if (flag > 0)
             operator delete(self);
     }

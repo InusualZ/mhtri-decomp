@@ -17,8 +17,8 @@ struct HbmKbInputEvent;
 extern "C" {
 #endif
 
-/* untyped: opaque band object, typed by the callers' views */
-void fn_8054F90C(void* self, s32 flag);
+/* untyped: opaque band object - the widget or a class derived from it */
+void* hbmKbWidgetDestroy(void* self, s32 flag);
 
 void hbmKbWidgetShowPredictInput(HbmKbWidget* self);
 

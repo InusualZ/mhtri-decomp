@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (236)
+## Ideas that work (237)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -245,6 +245,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 256 | [Two record tests that keep an unfolded li/cmplwi on the starting constant are a two-iteration loop](256-two-record-tests-that.md) | works | source-shape | Retail repeats the same test on two records at a fixed stride and keeps `li r0,0xff ; cmplwi r0,0xff` (or `li r0,0 ; cmplw r0,rX`) on the accumulator's starting value, which ours folds away |
 | 257 | [A u16 loop bound narrowed right after its call: hold it in an s32 local](257-u16-loop-bound-narrowed.md) | works | source-shape, allocator | Retail narrows a u16 loop bound (`clrlwi r30,r3,16`) straight after the count call, ours emits it after the counter's `li`s in the preheader, so the bound and the walking pointer swap callee-saved registers. |
 | 258 | [Duplicated index-0/1 blocks whose cmplw operands come out reversed are a two-trip loop MWCC unrolled](258-duplicated-index-0-1.md) | works | source-shape | Two copies of the same test against element 0 and element 1 match except that each `cmplw` has its operands in the other order, and swapping the source operands or casting them changes nothing. |
+| 259 | [A field retail reloads (or an address it recomputes per iteration) is read inside an inline helper: the inline is a CSE boundary](259-field-retail-reloads-or.md) | works | source-shape, allocator | Retail reloads a field after a test (or recomputes `addi rX,self,OFF` per iteration) where ours reuses the register, or a loop's counter and induction pointer swap saved registers |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
