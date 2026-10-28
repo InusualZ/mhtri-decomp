@@ -22,7 +22,7 @@
  *   `menu/menu_item.h`, `menu/menu_row.h`, `draw_shape.h`) or in the leaf headers `Pl/pl_status_sheet_get.h`,
  *   `hud/draw_font_align.h` and `userdata_hunter_rank_info_get.h`.  Ten `Pl/fn_80273B14.h` getters are called
  *   through `_c1` views: their owner declarations return `s32`/`void*` where this screen reads `s16`/`u8` and typed rows.
- * RESIDUALS. Every row has a body; 139 of 149 are byte-identical.  The 10 open rows, largest first:
+ * RESIDUALS. Every row has a body; 141 of 149 are byte-identical.  The 8 open rows, largest first:
  *  - `ammo_grid_draw`: `rows` is spilled to the stack where retail keeps it in r14 and instead spills `total` (0x68,
  *    0x6C) and one `state` (0x70) inside the grid 1/2 cases; the spill choice is not modelled by `mt.py regsim`
  *    (its replay diverges on this graph), and declaration hill climbs find nothing.
@@ -40,16 +40,14 @@
  *    volatile register; the load is a higher backend temporary than the mask in every spelling tried.
  *  - `Put_equip_dtl_basis_sword_colorX`: retail masks the tier into r0 for the zero test and keeps the raw r3 for
  *    `n - 1`; ours masks in place (four spellings of the local measured the same).
- *  - `equip_list_draw`: retail's slot order of the position copies is the caller temporary of a by-value
- *    `_mh_ivec2_` third argument of `put_lsp_anchor_offset` (measured: 100 % with that declaration); the band header
- *    `unsplit/menu.h` declares it `(u16, void*, void*)` for this unit and `hud/cockpit_quest.cpp`, so the by-value leaf
- *    header `hud/put_lsp_anchor_offset.h` cannot be included here until that declaration leaves the band.
- *  - `gun_stats_column_draw`: two stack slots of the anchor-offset copies (the same by-value argument).
  *  - Data: `.data`, `.sdata` and `.sdata2` are byte-identical to retail's up to the target's tail padding (0x244 of
  *    0x248, 0x63 of 0x68, 0x1C of 0x20); `.text` is in retail's function order.
  * SHAPES. `ammo_kind_label_draw`'s `d.x = d.x - pos.x` stores through the `extsh` retail has; `d.x -= pos.x` drops it
  *   (playbook 38).
  *  - Locals are declared in descending stack-slot order: MWCC gives the first-declared local the highest slot.
+ *  - A screen position handed on is a by-value `_mh_ivec2_` (`put_lsp_anchor_offset`'s offset and this unit's
+ *    `*_draw` helpers' `pos`): the stack copies retail makes before each call are MWCC's argument temporaries, and a
+ *    named copy passed by pointer takes a different slot.
  *  - A `_SPR_DATA_` copied by initialisation (`_SPR_DATA_ spr = *get_lsp_data(...)`) is copied word by word; an
  *    assignment copies it field by field.
  *  - `w += e < 0 ? -e : e;` keeps retail's `extsh` on both paths; `if (e < 0) e = -e;` puts it inside the branch.
@@ -112,6 +110,7 @@
 #include "ef/fn_800CDB2C.h"
 #include "ai/fn_802D44F4.h"
 #include "unsplit/menu.h"
+#include "hud/put_lsp_anchor_offset.h"
 #include "userdata_item.h"
 #include "nw4r/db_assert.h"
 
@@ -171,7 +170,7 @@ s32  menu_equip_page_count(_PLW*, _EQUIP*);
 s32 skill_table_page_count(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* stock);
 void equip_page_count_step(_PLW*, _EQUIP*, u16, s8);
 void skill_table_page_draw(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* stock, u16 anchor, s8 page);
-void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8* active_trees, u16* active_ids, s8* active_levels, s8 page, const _mh_ivec2_* pos);
+void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8* active_trees, u16* active_ids, s8* active_levels, s8 page, _mh_ivec2_ pos);
 void equip_detail_page_refresh(_PLW* plw, u16 anchor, s16 page, s16 count, u16 input);
 u16  weapon_attack_display(u8 kind, u16 raw);
 void equip_detail_screen_reset(StatusScreenWork*);
@@ -197,14 +196,14 @@ void put_equip_panel_row_ex(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags,
 void put_equip_panel_row_variant(_PLW*, _EQUIP*, _EQUIP*, _EQUIP*, u16, u8, u8);
 void put_equip_panel_row_zero(_PLW*, _EQUIP*, u16, u8);
 void put_equip_panel_row(_PLW*, _EQUIP*, _EQUIP*, _EQUIP*, u16, u8);
-void put_lsp_sprite_at_anchor(u32*, u8);
-void put_lsp_sprite_runs(u32*);
+void put_lsp_sprite_at_anchor(_mh_ivec2_, u8);
+void put_lsp_sprite_runs(_mh_ivec2_);
 void put_equip_panel_row_base(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags);
 void weapon_desc_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags);
 void put_lsp_sprite_offset(u16);
 u8 armor_skills_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags);
 u8 deco_page_panel_draw(_PLW*, _EQUIP_INDEX*, u16, u8);
-u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos);
+u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, _mh_ivec2_ pos);
 u8 deco_skill_id_get(u16 id, s8 index);
 s8 deco_skill_points_get(u16 id, s8 index);
 u32 deco_rare_color_get(u16 id);
@@ -221,11 +220,11 @@ void weapon_skills_entry_zero(_PLW*, _EQUIP*, u16, u8);
 void deco_page_entry_zero(_PLW*, _EQUIP*, u16, u8);
 void active_skills_entry_zero(_PLW*, _EQUIP*, u16, u8);
 void ammo_panel_entry_zero(_PLW*, _EQUIP*, u16, u8, u8);
-void gun_stats_footer_draw(u32*);
-void ammo_table_draw(_PLW*, _EQUIP_INDEX*, u8, u8, const _mh_ivec2_*);
-void ammo_table_row_frame_draw(u8, u8, const _mh_ivec2_*, u8, u8);
-void ammo_table_row_label_draw(u8 kind, u8 idx, const _mh_ivec2_* pos, u8 state, u8 mode);
-void ammo_table_cell_draw(u8 row, u8 col, u8 icon, const _mh_ivec2_* pos, u8 value, u8 state, u32 selected, u8 mode);
+void gun_stats_footer_draw(_mh_ivec2_);
+void ammo_table_draw(_PLW*, _EQUIP_INDEX*, u8, u8, _mh_ivec2_);
+void ammo_table_row_frame_draw(u8, u8, _mh_ivec2_, u8, u8);
+void ammo_table_row_label_draw(u8 kind, u8 idx, _mh_ivec2_ pos, u8 state, u8 mode);
+void ammo_table_cell_draw(u8 row, u8 col, u8 icon, _mh_ivec2_ pos, u8 value, u8 state, u32 selected, u8 mode);
 u8   sharpness_reach_get(_PLW*, s8, u32);
 void sharpness_gauge_draw(_PLW* plw, _EQUIP* equip, const _mh_ivec2_* pos, u8 flags);
 u8   deco_slots_view_draw(u16, _EQUIP_INDEX*, u8, const _mh_ivec2_*);
@@ -278,17 +277,17 @@ void equip_detail_armor_page_draw(_PLW* plw, _EQUIP* equip, s8 page);
 void equip_detail_kind6_page_draw(_PLW* plw, _EQUIP* equip, s8 page);
 void equip_detail_blade_page_draw(_PLW* plw, _EQUIP* equip, s8 page);
 void put_equip_category_panel(_PLW* plw, _EQUIP* equip, s8 page);
-void gun_parts_names_draw(const _mh_ivec2_* pos, _EQUIP_INDEX* view);
-void ammo_panel_frame_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 page, const _mh_ivec2_* pos);
-void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos);
-void gun_stats_tabs_draw(const _mh_ivec2_* pos, u8 tab);
-void value_badge_draw(u16 id, s32 value, _mh_ivec2_* pos);
-void ammo_grid_draw(_PLW* plw, const _mh_ivec2_* pos, _EQUIP_INDEX* view, u8 flags, u8 grid, u8 mode);
-void ammo_level_gauges_draw(const _mh_ivec2_* pos, u8 id, u8 level);
+void gun_parts_names_draw(_mh_ivec2_ pos, _EQUIP_INDEX* view);
+void ammo_panel_frame_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 page, _mh_ivec2_ pos);
+void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, _mh_ivec2_ pos);
+void gun_stats_tabs_draw(_mh_ivec2_ pos, u8 tab);
+void value_badge_draw(u16 id, s32 value, _mh_ivec2_ pos);
+void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 grid, u8 mode);
+void ammo_level_gauges_draw(_mh_ivec2_ pos, u8 id, u8 level);
 void gun_stats_columns_draw(_PLW* plw, _EQUIP* columns, u16 anchor);
 void ammo_panel_entry_pair(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* stock, _EQUIP* other_frame, _EQUIP* other_barrel, _EQUIP* other_stock, u16 anchor, u8 flags, u8 grid);
 void column_skills_page_draw(_PLW* plw, _EQUIP* columns, u16 anchor);
-u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, const _mh_ivec2_* pos);
+u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, _mh_ivec2_ pos);
 void deco_skills_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags, const _mh_ivec2_* pos);
 void armor_resist_block_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags, const _mh_ivec2_* off);
 void gun_part_tabs_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos);
@@ -298,14 +297,15 @@ void equip_list_draw(_EQUIP* columns, s8 cursor, u8 color, u16 anchor, u16 grey_
 s32 equip_detail_screen_step(StatusScreenWork* self);
 void equip_detail_screen_draw(StatusScreenWork* self);
 void skill_name_row_draw(u16 anchor, u16 skill, u32 color, const _mh_ivec2_* off);
-u32 skill_table_row_draw(_PLW* plw, _EQUIP* columns, u16 anchor, u8 tree, u8 mode, const _mh_ivec2_* pos);
+u32 skill_table_row_draw(_PLW* plw, _EQUIP* columns, u16 anchor, u8 tree, u8 mode, _mh_ivec2_ pos);
 s32 skill_table_trees_list(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8* active_trees, u16* active_ids, s8* active_levels);
 void info_gun_parts_draw(u16 id, _EQUIP* frame, _EQUIP* barrel, _EQUIP* stock);
 
 /* Callees other units own.  Most are declared in their owner's header and included above
  * (the equipment getters in `Pl/pl_status_sheet_get.h` and `Pl/fn_8027D684.h`; `Pl_Skill_slot_item_get`
  * and `pl_item_add` in `Pl/pl_skill.h`; `menu_slot_entry_b_select` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
- * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `unsplit/menu.h`).
+ * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` in the leaf header `hud/put_lsp_anchor_offset.h`;
+ * `get_str_tbl` in `unsplit/menu.h`).
  * The two below cannot: `fn_8031AE38`/`menu_sel_cursor_init` are owned by `menu/fn_8031A6C0.cpp`, whose header
  * declares neither and `unsplit/menu.h` may not.  Declared here as this unit's view. */
 void menu_equip_entries_update(MenuSlot* self);
@@ -421,7 +421,6 @@ void put_equip_info_upper_page(StatusScreenWork* self) {
     _mh_ivec2_ cell;
     s32 rank_points;
     s32 next_points;
-    u32 in;
     u16 rank;
     u16* rows;
     _PLW* plw;
@@ -514,8 +513,7 @@ void put_equip_info_upper_page(StatusScreenWork* self) {
     rows = (u16*)get_menu_lsp_tbl(0x6C);
     for (i = 0; i < 4; i++) {
         if (plw->deco_skill_id[i] != 0) {
-            in = *(u32*)&pos;
-            put_lsp_anchor_offset(*rows, &cell, &in);
+            put_lsp_anchor_offset(*rows, &cell, pos);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0x6A), &cell);
             spr_data_copy(&spr, get_lsp_data(0x52C, NULL));
             if (pl_bonus_skill_valid_ck(plw, plw->deco_skill_id[i]) == 0) {
@@ -554,7 +552,6 @@ void Put_status_equip_status_block(_PLW* plw, _EQUIP* columns, u16 anchor, _mh_i
     s8 text[32];
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
 
     if (anchor != 0) {
         if (anchor != 0x57E) {
@@ -566,8 +563,7 @@ void Put_status_equip_status_block(_PLW* plw, _EQUIP* columns, u16 anchor, _mh_i
             off.x = 0;
             off.y = 0;
         }
-        in = *(u32*)&off;
-        put_lsp_anchor_offset(0x57E, &pos, &in);
+        put_lsp_anchor_offset(0x57E, &pos, off);
     } else if (at != NULL) {
         pos.x = at->x;
         pos.y = at->y;
@@ -627,7 +623,6 @@ void Put_status_equip_element_block(_PLW* plw, _EQUIP* columns, u16 anchor, _mh_
     s8 text[32];
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
 
     if (anchor != 0) {
         if (anchor != 0x57E) {
@@ -639,8 +634,7 @@ void Put_status_equip_element_block(_PLW* plw, _EQUIP* columns, u16 anchor, _mh_
             off.x = 0;
             off.y = 0;
         }
-        in = *(u32*)&off;
-        put_lsp_anchor_offset(0x57E, &pos, &in);
+        put_lsp_anchor_offset(0x57E, &pos, off);
     } else if (at != NULL) {
         pos.x = at->x;
         pos.y = at->y;
@@ -767,7 +761,6 @@ void put_equip_info_piece_page(StatusScreenWork* self) {
 void info_gun_parts_draw(u16 id, _EQUIP* frame, _EQUIP* barrel, _EQUIP* stock) {
     _mh_ivec2_ pos;
     _mh_ivec2_ at;
-    u32 in;
     s32 i;
     u16* rows;
     u32 color;
@@ -779,8 +772,7 @@ void info_gun_parts_draw(u16 id, _EQUIP* frame, _EQUIP* barrel, _EQUIP* stock) {
         draw_sprite_ary((u16*)get_menu_lsp_tbl(0x72), &pos);
         rows = (u16*)get_menu_lsp_tbl(0x73);
         for (i = 0; i < 3; i++) {
-            in = *(u32*)&pos;
-            put_lsp_anchor_offset(rows[i], &at, &in);
+            put_lsp_anchor_offset(rows[i], &at, pos);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0x70), &at);
             icon = 0xFF;
             piece = NULL;
@@ -871,8 +863,6 @@ void skill_table_page_draw(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
     _mh_ivec2_ pos;
     _mh_ivec2_ mark;
     _mh_ivec2_ off;
-    u32 table_at;
-    u32 in;
     u8 flags;
     s32 column;
 
@@ -903,9 +893,8 @@ void skill_table_page_draw(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
         Set_equip_column_arrangement(plw, NULL, columns);
     }
     skill_table_trees_list(plw, columns, trees, points, active_trees, active_ids, active_levels);
-    table_at = *(u32*)&off;
     skill_table_body_draw(plw, columns, trees, points, active_trees, active_ids, active_levels, page,
-                (const _mh_ivec2_*)&table_at);
+                off);
     if (frame != NULL) {
         column = -1;
         switch (frame->kind) {
@@ -943,8 +932,7 @@ void skill_table_page_draw(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
             break;
         }
         if (column >= 0) {
-            in = *(u32*)&off;
-            put_lsp_anchor_offset(0x619, &pos, &in);
+            put_lsp_anchor_offset(0x619, &pos, off);
             get_lsp_data(((u16*)get_menu_lsp_tbl(0x7C))[column], &mark);
             mark.x += pos.x;
             mark.y += pos.y;
@@ -958,7 +946,6 @@ void skill_table_page_draw(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
 void equip_detail_page_refresh(_PLW* plw, u16 anchor, s16 page, s16 count, u16 input) {
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
 
     if (anchor != 0) {
         get_lsp_data(0x609, &pos);
@@ -969,8 +956,7 @@ void equip_detail_page_refresh(_PLW* plw, u16 anchor, s16 page, s16 count, u16 i
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x52A, &pos, &in);
+    put_lsp_anchor_offset(0x52A, &pos, off);
     PutPageArrow((u16*)get_menu_lsp_tbl(0), page, count, input, &pos, 0);
 }
 
@@ -1051,22 +1037,11 @@ s32 skill_table_trees_list(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8
  * on the first page, the activated skills with their animated markers (red for a negative skill, grey for one the
  * class cannot use). */
 void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8* active_trees, u16* active_ids,
-                 s8* active_levels, s8 page, const _mh_ivec2_* pos) {
+                 s8* active_levels, s8 page, _mh_ivec2_ pos) {
     _SPR_DATA_ spr;
     _mh_ivec2_ table;
     _mh_ivec2_ header;
     _mh_ivec2_ mark;
-    u32 table_in;
-    u32 header_in;
-    u32 active_in;
-    u32 empty_in;
-    u32 row_in;
-    u32 none_in;
-    u32 torso_in;
-    u32 torso_mark_in;
-    u32 frame_in;
-    u32 weapon_in;
-    u32 last_in;
     s32 shown;
     s32 drawn;
     s32 i;
@@ -1082,19 +1057,16 @@ void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8
     u16 frame;
 
     shown = 0;
-    table_in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x609, &table, &table_in);
+    put_lsp_anchor_offset(0x609, &table, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x74), &table);
-    header_in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x619, &header, &header_in);
+    put_lsp_anchor_offset(0x619, &header, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x76), &header);
     drawn = 0;
     if (page == 0) {
         rows = (u16*)get_menu_lsp_tbl(0x197);
         for (i = 0; i < 8; i++) {
             if (active_trees[i] != 0) {
-                active_in = *(const u32*)pos;
-                skill_table_row_draw(plw, columns, rows[i], active_trees[i], 1, (const _mh_ivec2_*)&active_in);
+                skill_table_row_draw(plw, columns, rows[i], active_trees[i], 1, pos);
                 shown++;
                 drawn++;
             }
@@ -1114,12 +1086,10 @@ void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8
     for (i = drawn; i < 10; i++) {
         rows = (u16*)get_menu_lsp_tbl(0x197);
         if (*tree == 0) {
-            empty_in = *(const u32*)pos;
-            put_lsp_anchor_offset(rows[i], &header, &empty_in);
+            put_lsp_anchor_offset(rows[i], &header, pos);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0x7D), &header);
         } else {
-            row_in = *(const u32*)pos;
-            skill_table_row_draw(plw, columns, rows[i], *tree, 0, (const _mh_ivec2_*)&row_in);
+            skill_table_row_draw(plw, columns, rows[i], *tree, 0, pos);
         }
         tree++;
     }
@@ -1143,23 +1113,19 @@ void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8
     }
     if (total == 0) {
         rows = (u16*)get_menu_lsp_tbl(0x197);
-        none_in = *(const u32*)pos;
-        skill_table_row_draw(plw, columns, rows[0], 0, 0, (const _mh_ivec2_*)&none_in);
+        skill_table_row_draw(plw, columns, rows[0], 0, 0, pos);
     }
     if (torso != 0) {
-        torso_in = *(const u32*)pos;
-        put_lsp_anchor_offset(0x619, &header, &torso_in);
+        put_lsp_anchor_offset(0x619, &header, pos);
         draw_sprite_idx(((u16*)get_menu_lsp_tbl(0x7B))[2], &header);
         rows = (u16*)get_menu_lsp_tbl(0x7C);
-        torso_mark_in = *(const u32*)pos;
-        put_lsp_anchor_offset(rows[2], &mark, &torso_mark_in);
+        put_lsp_anchor_offset(rows[2], &mark, pos);
         mark.x += header.x;
         mark.y += header.y;
         draw_sprite_idx(0x608, &mark);
     }
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x75), &table);
-    frame_in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x619, &header, &frame_in);
+    put_lsp_anchor_offset(0x619, &header, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x77), &header);
     switch (columns[6].kind) {
     case 11:
@@ -1182,13 +1148,11 @@ void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8
         draw_weaponicon_idx(0x61C, Get_pl_type(&columns[6], &columns[7]), 0xDFDFDFFF, &header);
         break;
     }
-    weapon_in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x668, &header, &weapon_in);
+    put_lsp_anchor_offset(0x668, &header, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x78), &header);
     if (page == 0 && drawn != 0) {
         rows = (u16*)get_menu_lsp_tbl(0x198);
-        last_in = *(const u32*)pos;
-        put_lsp_anchor_offset(rows[drawn - 1], &header, &last_in);
+        put_lsp_anchor_offset(rows[drawn - 1], &header, pos);
         draw_sprite_ary((u16*)get_menu_lsp_tbl(0x7F), &header);
     }
     if (page == 0 && shown != 0) {
@@ -1237,21 +1201,19 @@ void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8
 /* 0x8030B234 (0x3B4): Draws one skill tree's row of the skill table at sprite `anchor`: the tree name (filed as a help
  * record, "none" for tree 0), then per column (weapon, head, torso, arms, waist, legs, ... and the total) the points
  * its pieces add, "torso up" marks for tree 1; returns 1 when a torso-up column was drawn. */
-u32 skill_table_row_draw(_PLW* plw, _EQUIP* columns, u16 anchor, u8 tree, u8 mode, const _mh_ivec2_* pos) {
+u32 skill_table_row_draw(_PLW* plw, _EQUIP* columns, u16 anchor, u8 tree, u8 mode, _mh_ivec2_ pos) {
     _SPR_DATA_ spr;
     PlaceRec rec;
     s8 points[8];
     s8 text[8];
     _mh_ivec2_ at;
-    u32 in;
     u8 has;
     u32 torso;
     s32 i;
 
     has = 0;
     torso = 0;
-    in = *(const u32*)pos;
-    put_lsp_anchor_offset(anchor, &at, &in);
+    put_lsp_anchor_offset(anchor, &at, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x7D), &at);
     spr_data_copy(&spr, get_lsp_data(0x64A, NULL));
     if (tree == 0) {
@@ -1323,7 +1285,6 @@ u32 skill_table_row_draw(_PLW* plw, _EQUIP* columns, u16 anchor, u8 tree, u8 mod
 void skill_name_row_draw(u16 anchor, u16 skill, u32 color, const _mh_ivec2_* off) {
     PlaceRec rec;
     _mh_ivec2_ at;
-    u32 in;
     s16 x;
     s16 y;
     s16 width;
@@ -1331,8 +1292,7 @@ void skill_name_row_draw(u16 anchor, u16 skill, u32 color, const _mh_ivec2_* off
     s16 extra;
 
     if (off != NULL) {
-        in = *(const u32*)off;
-        put_lsp_anchor_offset(anchor, &at, &in);
+        put_lsp_anchor_offset(anchor, &at, *off);
     } else {
         get_lsp_data(anchor, &at);
     }
@@ -1736,7 +1696,6 @@ void equip_list_draw(_EQUIP* columns, s8 cursor, u8 color, u16 anchor, u16 grey_
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
     PlRgba rgba;
-    u32 in;
     s32 dyeable;
     s32 i;
     u16* ids;
@@ -1753,8 +1712,7 @@ void equip_list_draw(_EQUIP* columns, s8 cursor, u8 color, u16 anchor, u16 grey_
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x795, &pos, &in);
+    put_lsp_anchor_offset(0x795, &pos, off);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x82), &pos);
     ids = (u16*)get_menu_lsp_tbl(0x87);
     for (i = 0; i < 7; i++) {
@@ -1816,10 +1774,7 @@ void equip_list_draw(_EQUIP* columns, s8 cursor, u8 color, u16 anchor, u16 grey_
         }
     }
     if (dyeable == 0 && (userdata_flag_ck(0x7D4) != 0 || userdata_flag_ck(0x36B1) != 0)) {
-        u32 dye_in;
-
-        dye_in = *(u32*)&off;
-        put_lsp_anchor_offset(0x7B7, &pos, &dye_in);
+        put_lsp_anchor_offset(0x7B7, &pos, off);
         draw_sprite_ary((u16*)get_menu_lsp_tbl(0x83), &pos);
         if (color != 0) {
             rgba.word = equip_color_rgba_get(color);
@@ -1839,12 +1794,10 @@ void Put_equip_dtl_syo_item1(_EQUIP* piece, _EQUIP* sub, bool selected, bool gre
     _mh_ivec2_ pos;
     PlRgba rgba;
     PlRgba custom;
-    u32 in;
     u16* frame;
     u8 type;
 
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(id, &pos, &in);
+    put_lsp_anchor_offset(id, &pos, off);
     if (selected == 0) {
         frame = (u16*)get_menu_lsp_tbl(0x84);
     } else {
@@ -1892,7 +1845,6 @@ void blade_basis_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
     _EQUIP_INDEX view;
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
 
     if (equip_variant_resolve(plw, equip, other, &flags, &view) == 1) {
         return;
@@ -1906,8 +1858,7 @@ void blade_basis_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x7E7, &pos, &in);
+    put_lsp_anchor_offset(0x7E7, &pos, off);
     switch (equip_wear_check(plw, &view, flags)) {
     case 1:
         return;
@@ -1929,7 +1880,6 @@ void Put_equip_dtl_basis_sword_ken1(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, _
     _SPR_DATA_ spr;
     s8 text[16];
     _mh_ivec2_ pos;
-    u32 in;
     u16 attack;
     s16 element_value;
     s16 status_value;
@@ -1942,8 +1892,7 @@ void Put_equip_dtl_basis_sword_ken1(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, _
     s8** strs;
 
     if (anchor == 0) {
-        in = *(u32*)off;
-        put_lsp_anchor_offset(0x7E7, &pos, &in);
+        put_lsp_anchor_offset(0x7E7, &pos, *off);
     } else if (off == NULL) {
         get_lsp_data(anchor, &pos);
     } else {
@@ -2061,13 +2010,10 @@ void Put_equip_dtl_basis_sword_ken1(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, _
  * the 0x807 anchor or at sprite `anchor`. */
 void Put_equip_dtl_basis_sword_ken2(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, _mh_ivec2_* off, u8 flags) {
     _mh_ivec2_ pos;
-    u32 in;
-    u32 badge_at;
     u8 slots;
 
     if (anchor == 0) {
-        in = *(u32*)off;
-        put_lsp_anchor_offset(0x807, &pos, &in);
+        put_lsp_anchor_offset(0x807, &pos, *off);
     } else if (off == NULL) {
         get_lsp_data(anchor, &pos);
     } else {
@@ -2080,8 +2026,7 @@ void Put_equip_dtl_basis_sword_ken2(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, _
     sharpness_gauge_draw(plw, view->shown[0], &pos, flags);
     slots = 0;
     if (weapon_slot_count_get(plw, view, flags, &slots) & 1) {
-        badge_at = *(u32*)&pos;
-        value_badge_draw(0x80D, slots, (_mh_ivec2_*)&badge_at);
+        value_badge_draw(0x80D, slots, pos);
     }
 }
 
@@ -2099,15 +2044,12 @@ void Put_equip_dtl_basis_sword_colorX(_PLW* plw, _EQUIP_INDEX* idx, u16 a, u16 b
     u32 color = sword_color_table[(u8)sel];
     u16* tbl;
     _mh_ivec2_ vec;
-    u32 srcA;
-    u32 srcB;
     s8 buf[8];
     _SPR_DATA_ spr;
     if ((u8)sel < 3) {
         tbl = (u16*)get_menu_lsp_tbl(0x8E);
         if (a == 0) {
-            srcA = *(u32*)pos;
-            put_lsp_anchor_offset(0x80E, &vec, &srcA);
+            put_lsp_anchor_offset(0x80E, &vec, *pos);
         } else if (pos == NULL) {
             get_lsp_data(a, &vec);
         } else {
@@ -2116,8 +2058,7 @@ void Put_equip_dtl_basis_sword_colorX(_PLW* plw, _EQUIP_INDEX* idx, u16 a, u16 b
     } else {
         tbl = (u16*)get_menu_lsp_tbl(0x8F);
         if (b == 0) {
-            srcB = *(u32*)pos;
-            put_lsp_anchor_offset(0x819, &vec, &srcB);
+            put_lsp_anchor_offset(0x819, &vec, *pos);
         } else if (pos == NULL) {
             get_lsp_data(b, &vec);
         } else {
@@ -2219,8 +2160,7 @@ u8 gun_basis_panel_draw(_PLW* s0, _EQUIP_INDEX* s1, u16 a, u8 b) {
         off.x = 0;
         off.y = 0;
     }
-    u32 src = *(u32*)&off;
-    put_lsp_anchor_offset(0x84E, &pos, &src);
+    put_lsp_anchor_offset(0x84E, &pos, off);
     u8 r = equip_wear_check(s0, s1, b);
     switch (r) {
     case 1:
@@ -2243,14 +2183,12 @@ void Put_equip_dtl_basis_bowgun_gan1(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, 
     _SPR_DATA_ spr;
     s8 text[8];
     _mh_ivec2_ pos;
-    u32 in;
     u16 attack;
     s16 affinity;
     u8 state;
 
     if (anchor == 0) {
-        in = *(u32*)off;
-        put_lsp_anchor_offset(0x84E, &pos, &in);
+        put_lsp_anchor_offset(0x84E, &pos, *off);
     } else if (off == NULL) {
         get_lsp_data(anchor, &pos);
     } else {
@@ -2321,8 +2259,6 @@ void Put_equip_dtl_basis_bowgun_gan2(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, 
     _mh_ivec2_ pos;
     u32 defense;
     f32 deviation;
-    u32 in;
-    u32 bonus_at;
     s16 recoil;
     u8 size;
     u8 reload;
@@ -2336,8 +2272,7 @@ void Put_equip_dtl_basis_bowgun_gan2(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, 
     u8** strs;
 
     if (anchor == 0) {
-        in = *(u32*)off;
-        put_lsp_anchor_offset(0x86B, &pos, &in);
+        put_lsp_anchor_offset(0x86B, &pos, *off);
     } else if (off == NULL) {
         get_lsp_data(anchor, &pos);
     } else {
@@ -2496,8 +2431,7 @@ void Put_equip_dtl_basis_bowgun_gan2(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, 
     }
     bonus = 0;
     if (gun_slot_bonus_get(plw, view, flags, &bonus) & 1) {
-        bonus_at = *(u32*)&pos;
-        value_badge_draw(0x87F, bonus, (_mh_ivec2_*)&bonus_at);
+        value_badge_draw(0x87F, bonus, pos);
     }
 }
 
@@ -2507,13 +2441,11 @@ void Put_equip_dtl_basis_bowgun_gan_lv(_PLW* plw, _EQUIP_INDEX* view, u16 anchor
     _SPR_DATA_ spr;
     s8 text[8];
     _mh_ivec2_ pos;
-    u32 in;
     u8 level;
     u8 state;
 
     if (anchor == 0) {
-        in = *(u32*)off;
-        put_lsp_anchor_offset(0x880, &pos, &in);
+        put_lsp_anchor_offset(0x880, &pos, *off);
     } else if (off == NULL) {
         get_lsp_data(anchor, &pos);
     } else {
@@ -2585,16 +2517,16 @@ void gun_part_tabs_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2
 
 /* 0x8030E6E4 (0xA0): Draws a value badge: the 0x889 frame at `pos` moved by sprite `id`'s anchor, and the value
  * printed with its sign in it. */
-void value_badge_draw(u16 id, s32 value, _mh_ivec2_* pos) {
+void value_badge_draw(u16 id, s32 value, _mh_ivec2_ pos) {
     s8 text[8];
     _SPR_DATA_ spr;
 
     spr_data_copy(&spr, get_lsp_data(id, NULL));
-    pos->x += spr.pos.x;
-    pos->y += spr.pos.y;
-    draw_sprite_idx(0x889, pos);
+    pos.x += spr.pos.x;
+    pos.y += spr.pos.y;
+    draw_sprite_idx(0x889, &pos);
     sprintf(text, "%+d", value);
-    draw_font_idx(0x88A, text, 0, pos);
+    draw_font_idx(0x88A, text, 0, &pos);
 }
 
 /* 0x8030E784 - the `armor_stats_page_draw` band's zero-sub-index entry. */
@@ -2609,9 +2541,6 @@ void armor_stats_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
     _EQUIP_INDEX view;
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in_a;
-    u32 in_b;
-    u32 in_c;
 
     if (anchor != 0) {
         get_lsp_data(0x826, &pos);
@@ -2628,8 +2557,7 @@ void armor_stats_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
     switch (equip_wear_check(plw, &view, flags)) {
     case 6:
         if (!(flags & 0x40)) {
-            in_a = *(u32*)&off;
-            put_lsp_anchor_offset(0x826, &pos, &in_a);
+            put_lsp_anchor_offset(0x826, &pos, off);
             spr_data_copy(&spr, get_lsp_data(0x8D2, NULL));
             spr.color = 0xE63737FF;
             draw_font(spr, (s8*)get_str_tbl(0x2E)[10], 0, &pos);
@@ -2638,8 +2566,7 @@ void armor_stats_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
         break;
     case 7:
         if (!(flags & 0x40)) {
-            in_b = *(u32*)&off;
-            put_lsp_anchor_offset(0x826, &pos, &in_b);
+            put_lsp_anchor_offset(0x826, &pos, off);
             spr_data_copy(&spr, get_lsp_data(0x8D2, NULL));
             spr.color = 0xE63737FF;
             draw_font(spr, (s8*)get_str_tbl(0x2E)[9], 0, &pos);
@@ -2647,8 +2574,7 @@ void armor_stats_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
         }
         break;
     case 2:
-        in_c = *(u32*)&off;
-        put_lsp_anchor_offset(0x826, &pos, &in_c);
+        put_lsp_anchor_offset(0x826, &pos, off);
         draw_font_idx(0x8D2, (s8*)get_str_tbl(0x2E)[1], 0, &pos);
         return;
     case 1:
@@ -2666,7 +2592,6 @@ void armor_defense_block_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flag
     _SPR_DATA_ spr;
     s8 text[8];
     _mh_ivec2_ pos;
-    u32 in;
     u16 defense;
     u8 level;
     u8 state;
@@ -2675,8 +2600,7 @@ void armor_defense_block_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flag
     PlSlotRec* rec;
 
     if (anchor == 0) {
-        in = *(const u32*)off;
-        put_lsp_anchor_offset(0x826, &pos, &in);
+        put_lsp_anchor_offset(0x826, &pos, *off);
     } else if (off == NULL) {
         get_lsp_data(anchor, &pos);
     } else {
@@ -2743,15 +2667,13 @@ void armor_resist_block_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags
     _SPR_DATA_ spr;
     s8 text[8];
     _mh_ivec2_ pos;
-    u32 in;
     s16 value;
     u8 state;
 
     equip_slot_rec_get_c1(view->shown[0]);
     value = 0;
     if (anchor == 0) {
-        in = *(const u32*)off;
-        put_lsp_anchor_offset(0x83E, &pos, &in);
+        put_lsp_anchor_offset(0x83E, &pos, *off);
     } else if (off == NULL) {
         get_lsp_data(anchor, &pos);
     } else {
@@ -2901,7 +2823,6 @@ void deco_skills_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
     _EQUIP_INDEX view;
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
 
     if (anchor != 0) {
         get_lsp_data(0x88B, &pos);
@@ -2917,8 +2838,7 @@ void deco_skills_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
     }
     switch (equip_wear_check(plw, &view, flags)) {
     case 2:
-        in = *(u32*)&off;
-        put_lsp_anchor_offset(0x88B, &pos, &in);
+        put_lsp_anchor_offset(0x88B, &pos, off);
         draw_font_idx(0x8D2, (s8*)get_str_tbl(0x2E)[1], 0, &pos);
         return;
     case 1:
@@ -2936,15 +2856,13 @@ void deco_skills_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags, 
     s8 text[8];
     _mh_ivec2_ at;
     u16 ids[2];
-    u32 in;
     s8 levels[2];
     u8 marks[2];
     u8 count;
     s32 i;
     u16** frames;
 
-    in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x88B, &at, &in);
+    put_lsp_anchor_offset(0x88B, &at, *pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xA1), &at);
     ainpc_page_mark_a_draw(0x8A6, &at);
     count = equip_deco_skills_compare(plw, view, flags, ids, levels, marks);
@@ -3029,7 +2947,6 @@ void weapon_desc_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) 
     _SPR_DATA_ spr;
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
     _EQUIP* shown = view->shown[0];
     PlSkillRec* rec;
 
@@ -3042,8 +2959,7 @@ void weapon_desc_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) 
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x8A7, &pos, &in);
+    put_lsp_anchor_offset(0x8A7, &pos, off);
     switch (equip_wear_check(plw, view, flags)) {
     case 6:
         if (!(flags & 0x40)) {
@@ -3094,8 +3010,7 @@ void put_lsp_sprite_offset(u16 id) {
         d.x = 0;
         d.y = 0;
     }
-    u32 tmp = *(u32*)&d;
-    put_lsp_anchor_offset(0x914, &pos, &tmp);
+    put_lsp_anchor_offset(0x914, &pos, d);
     draw_sprite_idx(0x915, &pos);
 }
 
@@ -3122,8 +3037,7 @@ void ammo_kind_label_draw(u16 a, u8 b) {
         d.x = 0;
         d.y = 0;
     }
-    u32 tmp = *(u32*)&d;
-    put_lsp_anchor_offset(0x8A7, &pos, &tmp);
+    put_lsp_anchor_offset(0x8A7, &pos, d);
     draw_font_idx(0x8A8, (s8*)((u8**)get_str_tbl(0x2E))[b], 0, &pos);
 }
 
@@ -3169,8 +3083,6 @@ u8 armor_skills_entry_pair(_PLW* s0, _EQUIP* p1, _EQUIP* p2, _EQUIP* p3, _EQUIP*
 u8 armor_skills_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) {
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
-    u32 rows_at;
     u8 r;
 
     if (anchor != 0) {
@@ -3182,8 +3094,7 @@ u8 armor_skills_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) {
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x8C4, &pos, &in);
+    put_lsp_anchor_offset(0x8C4, &pos, off);
     draw_sprite_idx(0x8C5, &pos);
     ainpc_page_mark_a_draw(0x8CF, &pos);
     r = equip_wear_check(plw, view, flags);
@@ -3194,8 +3105,7 @@ u8 armor_skills_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) {
         draw_font_idx(0x8D2, (s8*)get_str_tbl(0x2E)[1], 0, &pos);
         return r;
     }
-    rows_at = *(u32*)&pos;
-    return skill_rows_draw(plw, view, flags, (u16*)get_menu_lsp_tbl(0xB6), 0, (const _mh_ivec2_*)&rows_at);
+    return skill_rows_draw(plw, view, flags, (u16*)get_menu_lsp_tbl(0xB6), 0, pos);
 }
 
 /* 0x8030FEF4 - the `weapon_skills_page_draw` band's zero-sub-index entry. */
@@ -3210,8 +3120,6 @@ u8 weapon_skills_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
     _EQUIP_INDEX view;
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
-    u32 rows_at;
     u8 r;
 
     r = equip_variant_resolve(plw, equip, other, &flags, &view);
@@ -3227,8 +3135,7 @@ u8 weapon_skills_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x8D0, &pos, &in);
+    put_lsp_anchor_offset(0x8D0, &pos, off);
     draw_sprite_idx(0x8D1, &pos);
     ainpc_page_mark_a_draw(0x8DF, &pos);
     r = equip_wear_check(plw, &view, flags);
@@ -3255,14 +3162,13 @@ u8 weapon_skills_page_draw(_PLW* plw, _EQUIP* equip, _EQUIP* other, u16 anchor, 
     case 1:
         return r;
     }
-    rows_at = *(u32*)&pos;
-    return skill_rows_draw(plw, &view, flags, (u16*)get_menu_lsp_tbl(0xB7), 1, (const _mh_ivec2_*)&rows_at);
+    return skill_rows_draw(plw, &view, flags, (u16*)get_menu_lsp_tbl(0xB7), 1, pos);
 }
 
 /* 0x80310130 (0x418): Draws the skill rows of the shown piece (six or ten by `page`): each skill's tree name filed as a
  * help record, its points and its decorations' points, gold for a new skill and grey for one the class cannot use,
  * and the decoration markers of the two columns. */
-u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, const _mh_ivec2_* pos) {
+u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, _mh_ivec2_ pos) {
     _SPR_DATA_ spr;
     u8 skills[10];
     s8 points[10];
@@ -3271,7 +3177,6 @@ u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, 
     PlaceRec rec;
     s8 text[8];
     _mh_ivec2_ at;
-    u32 in;
     _EQUIP* frame = view->shown[0];
     _EQUIP* barrel = view->shown[1];
     _EQUIP* stock = view->shown[2];
@@ -3289,7 +3194,7 @@ u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, 
         return 2;
     }
     if (equip_skill_trees_list(plw, view, flags, skills, points, deco_points, marks) == 0) {
-        draw_font_idx(0x8D2, (s8*)get_str_tbl(0x2E)[2], 0, pos);
+        draw_font_idx(0x8D2, (s8*)get_str_tbl(0x2E)[2], 0, &pos);
         return 4;
     }
     if (page == 0) {
@@ -3299,8 +3204,7 @@ u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, 
         count = 10;
     }
     for (i = 0; i < count; i++) {
-        in = *(const u32*)pos;
-        put_lsp_anchor_offset(rows[i], &at, &in);
+        put_lsp_anchor_offset(rows[i], &at, pos);
         if (i & 2) {
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0xB9), &at);
             cells = (u16*)get_menu_lsp_tbl(0xBB);
@@ -3347,19 +3251,19 @@ u8 skill_rows_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u16* rows, u8 page, 
                     if (right_marked == 0) {
                         right_marked = 1;
                         if (page == 0) {
-                            draw_sprite_idx(0x8C8, pos);
+                            draw_sprite_idx(0x8C8, &pos);
                         }
                         if (page == 1) {
-                            draw_sprite_idx(0x8D4, pos);
+                            draw_sprite_idx(0x8D4, &pos);
                         }
                     }
                 } else if (left_marked == 0) {
                     left_marked = 1;
                     if (page == 0) {
-                        draw_sprite_idx(0x8C7, pos);
+                        draw_sprite_idx(0x8C7, &pos);
                     }
                     if (page == 1) {
-                        draw_sprite_idx(0x8D3, pos);
+                        draw_sprite_idx(0x8D3, &pos);
                     }
                 }
             }
@@ -3420,16 +3324,14 @@ u8 deco_page_panel_draw(_PLW* s0, _EQUIP_INDEX* s1, u16 a, u8 b) {
         off.x = 0;
         off.y = 0;
     }
-    u32 src = *(u32*)&off;
-    put_lsp_anchor_offset(0x8F0, &pos, &src);
-    u32 copy = *(u32*)&pos;
-    return deco_page_draw(s0, s1, b, (_mh_ivec2_*)&copy);
+    put_lsp_anchor_offset(0x8F0, &pos, off);
+    return deco_page_draw(s0, s1, b, pos);
 }
 
 /* 0x8031077C (0x57C): Draws the decorations page at `pos`: the class warnings (red, unless flag bit 6), "empty",
  * else the slot frames and, per set decoration, its name (cut to six characters) and the two skills it adds,
  * each filed as a help record; with no decoration the slot count text.  Returns 0, 1, 2/6/7 (warnings), 4 or 5. */
-u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos) {
+u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, _mh_ivec2_ pos) {
     _SPR_DATA_ warn;
     _SPR_DATA_ spr;
     s8 text[16];
@@ -3437,8 +3339,6 @@ u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos
     PlaceRec rec;
     u8 marks[5];
     _mh_ivec2_ at;
-    u32 frame_in;
-    u32 row_in;
     u8 r;
     u8 slots;
     u8 filled;
@@ -3449,15 +3349,15 @@ u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos
     u8 skill;
     s32 points;
 
-    draw_sprite_ary((u16*)get_menu_lsp_tbl(0xB3), pos);
-    ainpc_page_mark_a_draw(0x905, pos);
+    draw_sprite_ary((u16*)get_menu_lsp_tbl(0xB3), &pos);
+    ainpc_page_mark_a_draw(0x905, &pos);
     r = equip_wear_check(plw, view, flags);
     switch (r) {
     case 6:
         if (!(flags & 0x40)) {
             spr_data_copy(&warn, get_lsp_data(0x901, NULL));
             warn.color = 0xE63737FF;
-            draw_font(warn, (s8*)get_str_tbl(0x2E)[10], 0, pos);
+            draw_font(warn, (s8*)get_str_tbl(0x2E)[10], 0, &pos);
             return r;
         }
         break;
@@ -3465,19 +3365,19 @@ u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos
         if (!(flags & 0x40)) {
             spr_data_copy(&warn, get_lsp_data(0x901, NULL));
             warn.color = 0xE63737FF;
-            draw_font(warn, (s8*)get_str_tbl(0x2E)[9], 0, pos);
+            draw_font(warn, (s8*)get_str_tbl(0x2E)[9], 0, &pos);
             return r;
         }
         break;
     case 2:
-        draw_font_idx(0x901, (s8*)get_str_tbl(0x2E)[1], 0, pos);
+        draw_font_idx(0x901, (s8*)get_str_tbl(0x2E)[1], 0, &pos);
         return r;
     case 1:
         return r;
     }
-    slots = deco_slots_view_draw(0x8F0, view, flags, pos);
+    slots = deco_slots_view_draw(0x8F0, view, flags, &pos);
     if (slots == 0) {
-        draw_font_idx(0x901, (s8*)get_str_tbl(0x2E)[3], 0, pos);
+        draw_font_idx(0x901, (s8*)get_str_tbl(0x2E)[3], 0, &pos);
         return 4;
     }
     filled = equip_decos_compare(plw, view, flags, ids, marks);
@@ -3488,8 +3388,7 @@ u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos
                 for (k = 0; k < slots; k++) {
                     if (((filled & 8) == 0 || k != 1) && ((filled & 0x10) == 0 || (k != 1 && k != 2))) {
                         u16* frames = (u16*)get_menu_lsp_tbl(0xB4);
-                        frame_in = *(const u32*)pos;
-                        put_lsp_anchor_offset(frames[k], &at, &frame_in);
+                        put_lsp_anchor_offset(frames[k], &at, pos);
                         draw_sprite_ary((u16*)get_menu_lsp_tbl(0xB5), &at);
                     }
                 }
@@ -3497,8 +3396,7 @@ u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos
             drawn = 1;
             {
                 u16* frames = (u16*)get_menu_lsp_tbl(0xB4);
-                row_in = *(const u32*)pos;
-                put_lsp_anchor_offset(frames[j], &at, &row_in);
+                put_lsp_anchor_offset(frames[j], &at, pos);
             }
             strcpy((char*)text, (const char*)ItemName(get_item_species_data(ids[j])->item_id));
             if (flfntStrLen((char*)text) >= 9) {
@@ -3540,11 +3438,11 @@ u8 deco_page_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos
     font_flush();
     if (drawn == 0) {
         if (slots == 0) {
-            draw_font_idx(0x901, (s8*)get_str_tbl(0x2E)[3], 0, pos);
+            draw_font_idx(0x901, (s8*)get_str_tbl(0x2E)[3], 0, &pos);
             return 4;
         }
         sprintf(text, "%s%d", get_str_tbl(0x2E)[4], slots);
-        draw_font_idx(0x901, text, 0, pos);
+        draw_font_idx(0x901, text, 0, &pos);
         return 5;
     }
     return 0;
@@ -3633,8 +3531,6 @@ u8 active_skills_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) 
     _mh_ivec2_ pos;
     _mh_ivec2_ at;
     _mh_ivec2_ off;
-    u32 in;
-    u32 row_in;
     u8 r;
     u8 count;
     s32 i;
@@ -3654,8 +3550,7 @@ u8 active_skills_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) 
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(1, &pos, &in);
+    put_lsp_anchor_offset(1, &pos, off);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xBC), &pos);
     r = equip_wear_check(plw, view, flags);
     if ((s32)r == 1) {
@@ -3669,8 +3564,7 @@ u8 active_skills_page_draw(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) 
     ainpc_page_mark_a_draw(12, &pos);
     rows = (u16*)get_menu_lsp_tbl(0xBD);
     for (i = 0; i < 8; i++) {
-        row_in = *(u32*)&pos;
-        put_lsp_anchor_offset(rows[i], &at, &row_in);
+        put_lsp_anchor_offset(rows[i], &at, pos);
         draw_sprite_ary((u16*)get_menu_lsp_tbl(0xBE), &at);
         if (i < count && ids[i] != 0) {
             spr_data_copy(&spr, get_lsp_data(14, NULL));
@@ -3713,8 +3607,6 @@ void column_skills_page_draw(_PLW* plw, _EQUIP* columns, u16 anchor) {
     _mh_ivec2_ pos;
     _mh_ivec2_ at;
     _mh_ivec2_ off;
-    u32 in;
-    u32 row_in;
     s32 count;
     s32 i;
     u16* rows;
@@ -3734,8 +3626,7 @@ void column_skills_page_draw(_PLW* plw, _EQUIP* columns, u16 anchor) {
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(1, &pos, &in);
+    put_lsp_anchor_offset(1, &pos, off);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xBC), &pos);
     ainpc_page_mark_a_draw(12, &pos);
     equip_columns_skills_get(columns, ids, levels, trees);
@@ -3751,8 +3642,7 @@ void column_skills_page_draw(_PLW* plw, _EQUIP* columns, u16 anchor) {
     }
     rows = (u16*)get_menu_lsp_tbl(0xBD);
     for (i = 0; i < 8; i++) {
-        row_in = *(u32*)&pos;
-        put_lsp_anchor_offset(rows[i], &at, &row_in);
+        put_lsp_anchor_offset(rows[i], &at, pos);
         draw_sprite_ary((u16*)get_menu_lsp_tbl(0xBE), &at);
         if (ids[i] != 0) {
             mark = 0;
@@ -3829,10 +3719,6 @@ void ammo_panel_entry_pair(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
 void put_equip_panel_row_ex(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags, u8 grid) {
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
-    u32 frame_at;
-    u32 gauge_at;
-    u32 grid_at;
 
     if (anchor != 0) {
         get_lsp_data(0x917, &pos);
@@ -3843,8 +3729,7 @@ void put_equip_panel_row_ex(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags,
         off.x = 0;
         off.y = 0;
     }
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x917, &pos, &in);
+    put_lsp_anchor_offset(0x917, &pos, off);
     switch (equip_wear_check(plw, view, flags)) {
     case 1:
         return;
@@ -3853,12 +3738,9 @@ void put_equip_panel_row_ex(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags,
         return;
     default:
         shown_skills_set(plw, view, flags);
-        frame_at = *(u32*)&off;
-        put_lsp_sprite_at_anchor(&frame_at, 0);
-        gauge_at = *(u32*)&off;
-        ammo_level_gauges_draw((const _mh_ivec2_*)&gauge_at, 0, grid);
-        grid_at = *(u32*)&off;
-        ammo_grid_draw(plw, (const _mh_ivec2_*)&grid_at, view, flags, grid, 0);
+        put_lsp_sprite_at_anchor(off, 0);
+        ammo_level_gauges_draw(off, 0, grid);
+        ammo_grid_draw(plw, off, view, flags, grid, 0);
         shown_skills_clear(plw, flags);
         break;
     }
@@ -3892,11 +3774,6 @@ void put_equip_panel_row(_PLW* s0, _EQUIP* s1, _EQUIP* s2, _EQUIP* s3, u16 a, u8
 void put_equip_panel_row_base(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flags) {
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 frame_at;
-    u32 gauge_at;
-    u32 single_at;
-    u32 double_at;
-    u32 triple_at;
 
     switch (equip_wear_check(plw, view, flags)) {
     case 1:
@@ -3912,28 +3789,21 @@ void put_equip_panel_row_base(_PLW* plw, _EQUIP_INDEX* view, u16 anchor, u8 flag
         off.y = 0;
     }
     shown_skills_set(plw, view, flags);
-    frame_at = *(u32*)&off;
-    put_lsp_sprite_at_anchor(&frame_at, 0);
-    gauge_at = *(u32*)&off;
-    ammo_level_gauges_draw((const _mh_ivec2_*)&gauge_at, 0, 2);
-    single_at = *(u32*)&off;
-    ammo_grid_draw(plw, (const _mh_ivec2_*)&single_at, view, flags, 0, 8);
-    double_at = *(u32*)&off;
-    ammo_grid_draw(plw, (const _mh_ivec2_*)&double_at, view, flags, 1, 8);
-    triple_at = *(u32*)&off;
-    ammo_grid_draw(plw, (const _mh_ivec2_*)&triple_at, view, flags, 2, 8);
+    put_lsp_sprite_at_anchor(off, 0);
+    ammo_level_gauges_draw(off, 0, 2);
+    ammo_grid_draw(plw, off, view, flags, 0, 8);
+    ammo_grid_draw(plw, off, view, flags, 1, 8);
+    ammo_grid_draw(plw, off, view, flags, 2, 8);
     shown_skills_clear(plw, flags);
 }
 
-/* 0x80311A88 - draw the sprite row `id` at the 0x917 anchor's offset when the id is set, or the
- * caller's packed position otherwise. */
-void put_lsp_sprite_at_anchor(u32* p, u8 id) {
+/* 0x80311A88 - draw sprite 0x918 at the 0x917 anchor shifted by `offset` when `id` is 0, or at sprite `id`'s
+ * position otherwise. */
+void put_lsp_sprite_at_anchor(_mh_ivec2_ offset, u8 id) {
     _mh_ivec2_ pos;
-    u32 v;
 
     if (id == 0) {
-        v = *p;
-        put_lsp_anchor_offset(0x917, &pos, &v);
+        put_lsp_anchor_offset(0x917, &pos, offset);
     } else {
         get_lsp_data(id, &pos);
     }
@@ -3943,14 +3813,11 @@ void put_lsp_sprite_at_anchor(u32* p, u8 id) {
 
 /* 0x80311AE8 (0x154): Draws the two level gauges (0x919 and 0x921 anchors, or sprite `id`'s position) filled to
  * `level` (0..2). */
-void ammo_level_gauges_draw(const _mh_ivec2_* pos, u8 id, u8 level) {
+void ammo_level_gauges_draw(_mh_ivec2_ pos, u8 id, u8 level) {
     _mh_ivec2_ at;
-    u32 in_a;
-    u32 in_b;
 
     if (id == 0) {
-        in_a = *(const u32*)pos;
-        put_lsp_anchor_offset(0x919, &at, &in_a);
+        put_lsp_anchor_offset(0x919, &at, pos);
     } else {
         get_lsp_data(id, &at);
     }
@@ -3964,8 +3831,7 @@ void ammo_level_gauges_draw(const _mh_ivec2_* pos, u8 id, u8 level) {
         draw_sprite_idx(0x91B, &at);
     }
     if (id == 0) {
-        in_b = *(const u32*)pos;
-        put_lsp_anchor_offset(0x921, &at, &in_b);
+        put_lsp_anchor_offset(0x921, &at, pos);
     } else {
         get_lsp_data(id, &at);
     }
@@ -3983,19 +3849,12 @@ void ammo_level_gauges_draw(const _mh_ivec2_* pos, u8 id, u8 level) {
 /* 0x80311C3C (0xC64): Draws the bowgun's ammo grid (`grid` 0: the single-column kinds, 1: the two-level kinds, 2: the
  * three-level kinds; `mode` bits 1/2 halve it, bit 2 picks the second half): per row the loadable mark and clip size
  * of each level, tinted by its comparison with the worn gun, and the ammo name. */
-void ammo_grid_draw(_PLW* plw, const _mh_ivec2_* pos, _EQUIP_INDEX* view, u8 flags, u8 grid, u8 mode) {
+void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 grid, u8 mode) {
     s32 rows;
     _mh_ivec2_ cell;
     _mh_ivec2_ base;
-    u32 in_a;
-    u32 in_b;
-    u32 in_c;
-    u32 in_d;
     s8 text[16];
     _SPR_DATA_ spr;
-    u32 cell_in0;
-    u32 cell_in1;
-    u32 cell_in2;
     u8 count;
     s32 i;
     s32 row;
@@ -4007,21 +3866,17 @@ void ammo_grid_draw(_PLW* plw, const _mh_ivec2_* pos, _EQUIP_INDEX* view, u8 fla
     if (mode & 8) {
         switch (grid) {
         case 2:
-            in_a = *(const u32*)pos;
-            put_lsp_anchor_offset(0x93C, &base, &in_a);
+            put_lsp_anchor_offset(0x93C, &base, pos);
             break;
         case 1:
-            in_b = *(const u32*)pos;
-            put_lsp_anchor_offset(0x943, &base, &in_b);
+            put_lsp_anchor_offset(0x943, &base, pos);
             break;
         case 0:
-            in_c = *(const u32*)pos;
-            put_lsp_anchor_offset(0x94C, &base, &in_c);
+            put_lsp_anchor_offset(0x94C, &base, pos);
             break;
         }
     } else {
-        in_d = *(const u32*)pos;
-        put_lsp_anchor_offset(0x922, &base, &in_d);
+        put_lsp_anchor_offset(0x922, &base, pos);
     }
     rows = 0;
     switch (grid) {
@@ -4048,8 +3903,7 @@ void ammo_grid_draw(_PLW* plw, const _mh_ivec2_* pos, _EQUIP_INDEX* view, u8 fla
         switch (grid) {
         case 0:
             ids = (u16*)get_menu_lsp_tbl(0xC5);
-            cell_in0 = *(u32*)&base;
-            put_lsp_anchor_offset(ids[i], &cell, &cell_in0);
+            put_lsp_anchor_offset(ids[i], &cell, base);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC2), &cell);
             state = gun_ammo_usable_ck(plw, view, ammo_grid_single[row], flags);
             spr_data_copy(&spr, get_lsp_data(0x93B, NULL));
@@ -4089,8 +3943,7 @@ void ammo_grid_draw(_PLW* plw, const _mh_ivec2_* pos, _EQUIP_INDEX* view, u8 fla
             break;
         case 1:
             ids = (u16*)get_menu_lsp_tbl(0xC4);
-            cell_in1 = *(u32*)&base;
-            put_lsp_anchor_offset(ids[i], &cell, &cell_in1);
+            put_lsp_anchor_offset(ids[i], &cell, base);
             if (row == 7) {
                 draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC2), &cell);
                 state = gun_ammo_usable_ck(plw, view, ammo_grid_double[0][row], flags);
@@ -4192,8 +4045,7 @@ void ammo_grid_draw(_PLW* plw, const _mh_ivec2_* pos, _EQUIP_INDEX* view, u8 fla
             break;
         case 2:
             ids = (u16*)get_menu_lsp_tbl(0xC3);
-            cell_in2 = *(u32*)&base;
-            put_lsp_anchor_offset(ids[i], &cell, &cell_in2);
+            put_lsp_anchor_offset(ids[i], &cell, base);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC0), &cell);
             ammo = &ammo_grid_triple[0][row];
             state = gun_ammo_usable_ck(plw, view, ammo[0], flags);
@@ -4301,14 +4153,6 @@ void put_equip_panel_kind4(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
     _EQUIP_INDEX view;
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 tabs_at;
-    u32 frame_at;
-    u32 barrel_at;
-    u32 stock_at;
-    u32 gun_at;
-    u32 runs_at;
-    u32 parts_at;
-    u32 footer_at;
 
     if (equip_variant_resolve_ex(plw, frame, barrel, stock, flags_base, &view) == 1) {
         return;
@@ -4327,34 +4171,26 @@ void put_equip_panel_kind4(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
         off.y = 0;
     }
     shown_skills_set(plw, &view, flags);
-    tabs_at = *(u32*)&off;
-    gun_stats_tabs_draw((const _mh_ivec2_*)&tabs_at, tab);
+    gun_stats_tabs_draw(off, tab);
     flags = flags_base;
     if (equip_variant_resolve(plw, frame, NULL, &flags, &view) != 1) {
-        frame_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&frame_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
     flags = flags_base;
     if (equip_variant_resolve(plw, barrel, NULL, &flags, &view) != 1) {
-        barrel_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&barrel_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
     flags = flags_base;
     if (equip_variant_resolve(plw, stock, NULL, &flags, &view) != 1) {
-        stock_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&stock_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
     flags = flags_base;
     if (equip_variant_resolve_ex(plw, frame, barrel, stock, flags_base, &view) != 1) {
-        gun_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&gun_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
-    runs_at = *(u32*)&off;
-    put_lsp_sprite_runs(&runs_at);
-    parts_at = *(u32*)&off;
-    gun_parts_names_draw((const _mh_ivec2_*)&parts_at, &view);
-    footer_at = *(u32*)&off;
-    gun_stats_footer_draw(&footer_at);
+    put_lsp_sprite_runs(off);
+    gun_parts_names_draw(off, &view);
+    gun_stats_footer_draw(off);
     shown_skills_clear(plw, flags);
     flfntFlush();
     flfntStackReset();
@@ -4370,13 +4206,6 @@ void gun_stats_columns_draw(_PLW* plw, _EQUIP* columns, u16 anchor) {
     u8 skill_trees[8];
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 tabs_at;
-    u32 frame_at;
-    u32 barrel_at;
-    u32 stock_at;
-    u32 gun_at;
-    u32 runs_at;
-    u32 parts_at;
     u8 flags;
     s32 i;
     s32 count;
@@ -4399,55 +4228,45 @@ void gun_stats_columns_draw(_PLW* plw, _EQUIP* columns, u16 anchor) {
             count++;
         }
     }
-    tabs_at = *(u32*)&off;
-    gun_stats_tabs_draw((const _mh_ivec2_*)&tabs_at, 0xFF);
+    gun_stats_tabs_draw(off, 0xFF);
     flags = 7;
     if (equip_variant_resolve(plw, &columns[6], NULL, &flags, &view) != 1) {
-        frame_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&frame_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
     flags = 7;
     if (equip_variant_resolve(plw, &columns[7], NULL, &flags, &view) != 1) {
-        barrel_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&barrel_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
     flags = 7;
     if (equip_variant_resolve(plw, &columns[8], NULL, &flags, &view) != 1) {
-        stock_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&stock_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
     flags = 7;
     if (equip_variant_resolve_ex(plw, &columns[6], &columns[7], &columns[8], 7, &view) != 1) {
-        gun_at = *(u32*)&off;
-        gun_stats_column_draw(plw, &view, flags, (const _mh_ivec2_*)&gun_at);
+        gun_stats_column_draw(plw, &view, flags, off);
     }
-    runs_at = *(u32*)&off;
-    put_lsp_sprite_runs(&runs_at);
-    parts_at = *(u32*)&off;
-    gun_parts_names_draw((const _mh_ivec2_*)&parts_at, &view);
+    put_lsp_sprite_runs(off);
+    gun_parts_names_draw(off, &view);
     shown_skills_clear(plw, flags);
 }
 
 /* 0x80312DF0 - draw the sprite run `get_menu_lsp_tbl(0xCD)` names at the row `put_lsp_anchor_offset`
  * positions from the caller's value. */
-void gun_stats_footer_draw(u32* p) {
+void gun_stats_footer_draw(_mh_ivec2_ offset) {
     _mh_ivec2_ pos;
-    u32 v = *p;
-    put_lsp_anchor_offset(0x9A5, &pos, &v);
+    put_lsp_anchor_offset(0x9A5, &pos, offset);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xCD), &pos);
 }
 
 /* 0x80312E34 (0xE4): Draws the stats panel's three tabs at `pos`, the selected one animated (held still while the
  * pad hold gate is up or the game is paused), and the tab bar's cap. */
-void gun_stats_tabs_draw(const _mh_ivec2_* pos, u8 tab) {
+void gun_stats_tabs_draw(_mh_ivec2_ pos, u8 tab) {
     _mh_ivec2_ at;
-    u32 in;
     u16* ids;
     s32 i;
     u16 frame;
 
-    in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x955, &at, &in);
+    put_lsp_anchor_offset(0x955, &at, pos);
     ids = (u16*)get_menu_lsp_tbl(0xC6);
     for (i = 0; i < 3; i++) {
         if (tab == i) {
@@ -4465,23 +4284,20 @@ void gun_stats_tabs_draw(const _mh_ivec2_* pos, u8 tab) {
 
 /* 0x80312F18 - draw the 0xC7 and 0x89 sprite runs at the 0x955 and 0x966 anchors, each offset by the
  * caller's position. */
-void put_lsp_sprite_runs(u32* p) {
+void put_lsp_sprite_runs(_mh_ivec2_ offset) {
     _mh_ivec2_ pos;
     _mh_ivec2_ pos2;
-    u32 v = *p;
-    u32 v2;
 
-    put_lsp_anchor_offset(0x955, &pos, &v);
+    put_lsp_anchor_offset(0x955, &pos, offset);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC7), &pos);
-    v2 = *(u32*)&pos;
-    put_lsp_anchor_offset(0x966, &pos2, &v2);
+    put_lsp_anchor_offset(0x966, &pos2, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x89), &pos2);
 }
 
 /* 0x80312F84 (0xBB8): Draws one column of the bowgun stats panel (a frame, barrel or stock, or the whole gun): its
  * nine rows - attack, affinity, slots, defence (and the gun's size), deviation, reload, recoil, ammo text and the
  * slot-bonus mark - each tinted by its comparison with the worn gun, and the row labels. */
-void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_ivec2_* pos) {
+void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, _mh_ivec2_ pos) {
     _EQUIP* barrel = view->shown[1];
     _EQUIP* stock = view->shown[2];
     _EQUIP* frame = view->shown[0];
@@ -4491,11 +4307,6 @@ void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_iv
     _mh_ivec2_ column;
     _mh_ivec2_ label_base;
     _mh_ivec2_ cell;
-    u32 column_in;
-    u32 label_in;
-    u32 cell_in;
-    u32 bonus_at;
-    u32 label_at;
     s32 kind;
     u8 state;
     s32 i;
@@ -4517,14 +4328,11 @@ void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_iv
         }
     }
     ids = (u16*)get_menu_lsp_tbl(0xCB);
-    column_in = *(const u32*)pos;
-    put_lsp_anchor_offset(ids[kind], &column, &column_in);
-    label_in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x955, &label_base, &label_in);
+    put_lsp_anchor_offset(ids[kind], &column, pos);
+    put_lsp_anchor_offset(0x955, &label_base, pos);
     for (i = 0; i < 9; i++) {
         ids = (u16*)get_menu_lsp_tbl(0xCA);
-        cell_in = *(u32*)&column;
-        put_lsp_anchor_offset(ids[i], &cell, &cell_in);
+        put_lsp_anchor_offset(ids[i], &cell, column);
         draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC9), &cell);
         state = 0;
         switch (i) {
@@ -4746,8 +4554,7 @@ void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_iv
                         u8 bonus = 0;
                         state = gun_slot_bonus_get(plw, view, flags, &bonus);
                         if (state & 1) {
-                            bonus_at = *(u32*)&cell;
-                            value_badge_draw(0x97A, bonus, (_mh_ivec2_*)&bonus_at);
+                            value_badge_draw(0x97A, bonus, cell);
                         }
                     }
                 }
@@ -4760,8 +4567,7 @@ void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_iv
         }
         if (!(flags & 0x20)) {
             ids = (u16*)get_menu_lsp_tbl(0xC8);
-            label_at = *(u32*)&label_base;
-            put_lsp_anchor_offset(ids[i], &cell, &label_at);
+            put_lsp_anchor_offset(ids[i], &cell, label_base);
             draw_sprite_idx(0x971, &cell);
             spr_data_copy(&label, get_lsp_data(0x970, NULL));
             if ((flags & 4) && (state & 0x18)) {
@@ -4776,15 +4582,13 @@ void gun_stats_column_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, const _mh_iv
 }
 
 /* 0x80313B3C (0xC8): Draws the bowgun parts panel at `pos`: its frame and the frame, barrel and stock names. */
-void gun_parts_names_draw(const _mh_ivec2_* pos, _EQUIP_INDEX* view) {
+void gun_parts_names_draw(_mh_ivec2_ pos, _EQUIP_INDEX* view) {
     _EQUIP* frame = view->shown[0];
     _EQUIP* barrel = view->shown[1];
     _EQUIP* stock = view->shown[2];
     _mh_ivec2_ at;
-    u32 in;
 
-    in = *(const u32*)pos;
-    put_lsp_anchor_offset(0x98B, &at, &in);
+    put_lsp_anchor_offset(0x98B, &at, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xCC), &at);
     draw_font_idx(0x997, (s8*)GetEquipName(frame->kind, frame->item_id), 5, &at);
     draw_font_idx(0x990, (s8*)GetEquipName(barrel->kind, barrel->item_id), 5, &at);
@@ -4797,9 +4601,6 @@ void put_equip_panel_kind5(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
     _EQUIP_INDEX view;
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
-    u32 in;
-    u32 rows_at;
-    u32 frame_at;
 
     if (equip_variant_resolve_ex(plw, frame, barrel, stock, flags, &view) == 1) {
         return;
@@ -4818,36 +4619,25 @@ void put_equip_panel_kind5(_PLW* plw, _EQUIP* frame, _EQUIP* barrel, _EQUIP* sto
         off.y = 0;
     }
     shown_skills_set(plw, &view, flags);
-    in = *(u32*)&off;
-    put_lsp_anchor_offset(0x9AA, &pos, &in);
+    put_lsp_anchor_offset(0x9AA, &pos, off);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xCE), &pos);
-    rows_at = *(u32*)&off;
-    ammo_table_draw(plw, &view, flags, page, (const _mh_ivec2_*)&rows_at);
-    frame_at = *(u32*)&off;
-    ammo_panel_frame_draw(plw, &view, flags, page, (const _mh_ivec2_*)&frame_at);
+    ammo_table_draw(plw, &view, flags, page, off);
+    ammo_panel_frame_draw(plw, &view, flags, page, off);
     shown_skills_clear(plw, flags);
 }
 
 /* 0x80313D5C (0xC8): Draws the ammo panel's frame pieces (0xD1, 0xCF, the 0x89 run and 0xCD) at `pos`. */
-void ammo_panel_frame_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 page, const _mh_ivec2_* pos) {
+void ammo_panel_frame_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 page, _mh_ivec2_ pos) {
     _mh_ivec2_ at;
     _mh_ivec2_ inner;
-    u32 in_a;
-    u32 in_b;
-    u32 in_c;
-    u32 in_d;
 
-    in_a = *(const u32*)pos;
-    put_lsp_anchor_offset(0x9C8, &at, &in_a);
+    put_lsp_anchor_offset(0x9C8, &at, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xD1), &at);
-    in_b = *(const u32*)pos;
-    put_lsp_anchor_offset(0x9AA, &at, &in_b);
+    put_lsp_anchor_offset(0x9AA, &at, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xCF), &at);
-    in_c = *(u32*)&at;
-    put_lsp_anchor_offset(0x9BC, &inner, &in_c);
+    put_lsp_anchor_offset(0x9BC, &inner, at);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0x89), &inner);
-    in_d = *(const u32*)pos;
-    put_lsp_anchor_offset(0x9A5, &at, &in_d);
+    put_lsp_anchor_offset(0x9A5, &at, pos);
     draw_sprite_ary((u16*)get_menu_lsp_tbl(0xCD), &at);
 }
 
@@ -4856,7 +4646,7 @@ void ammo_panel_frame_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 page, con
 #pragma pool_data off
 /* 0x80313E24 (0x4A4): Draws the equipment panel of one kind: for each of its eleven rows the row frame, every
  * column cell of each of the three shown pieces (resolved one by one), then the totals cell and the row label. */
-void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, const _mh_ivec2_* pos) {
+void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, _mh_ivec2_ pos) {
     _EQUIP_INDEX resolved;
     u8 count;
     u8 piece_flags;
@@ -4866,8 +4656,7 @@ void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, const _mh
 
     count = 0;
     for (row = 0; row < 11; row++) {
-        u32 frame_pos = *(const u32*)pos;
-        ammo_table_row_frame_draw(kind, row, (const _mh_ivec2_*)&frame_pos, 0, flags);
+        ammo_table_row_frame_draw(kind, row, pos, 0, flags);
         u8* cols = equip_panel_row_layout[(u8)(row + kind * 11)];
         for (piece = 0; piece < 3; piece++) {
             piece_flags = flags & ~6;
@@ -4890,22 +4679,19 @@ void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, const _mh
                 if (col != 0xFF) {
                     u32 better = (gun_ammo_usable_ck(plw, &resolved, col, piece_flags) & 1) != 0;
                     u8 state = gun_clip_compare(plw, &resolved, col, piece_flags, &count);
-                    u32 at = *(const u32*)pos;
-                    ammo_table_cell_draw(piece, row, 0, (const _mh_ivec2_*)&at, count, state, better, piece_flags);
+                    ammo_table_cell_draw(piece, row, 0, pos, count, state, better, piece_flags);
                 }
                 col = cols[1];
                 if (col != 0xFF) {
                     u32 better = (gun_ammo_usable_ck(plw, &resolved, col, piece_flags) & 1) != 0;
                     u8 state = gun_clip_compare(plw, &resolved, col, piece_flags, &count);
-                    u32 at = *(const u32*)pos;
-                    ammo_table_cell_draw(piece, row, 1, (const _mh_ivec2_*)&at, count, state, better, piece_flags);
+                    ammo_table_cell_draw(piece, row, 1, pos, count, state, better, piece_flags);
                 }
                 col = cols[2];
                 if (col != 0xFF) {
                     u32 better = (gun_ammo_usable_ck(plw, &resolved, col, piece_flags) & 1) != 0;
                     u8 state = gun_clip_compare(plw, &resolved, col, piece_flags, &count);
-                    u32 at = *(const u32*)pos;
-                    ammo_table_cell_draw(piece, row, 2, (const _mh_ivec2_*)&at, count, state, better, piece_flags);
+                    ammo_table_cell_draw(piece, row, 2, pos, count, state, better, piece_flags);
                 }
             }
         }
@@ -4915,16 +4701,14 @@ void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, const _mh
         if (col != 0xFF) {
             u32 better = (gun_ammo_usable_ck(plw, view, col, flags) & 1) != 0;
             total_state = gun_clip_compare(plw, view, col, flags, &count);
-            u32 at = *(const u32*)pos;
-            ammo_table_cell_draw(piece, row, 0, (const _mh_ivec2_*)&at, count, total_state, better, flags);
+            ammo_table_cell_draw(piece, row, 0, pos, count, total_state, better, flags);
             total = count;
         }
         col = cols[1];
         if (col != 0xFF) {
             u32 better = (gun_ammo_usable_ck(plw, view, col, flags) & 1) != 0;
             u8 state = gun_clip_compare(plw, view, col, flags, &count);
-            u32 at = *(const u32*)pos;
-            ammo_table_cell_draw(piece, row, 1, (const _mh_ivec2_*)&at, count, state, better, flags);
+            ammo_table_cell_draw(piece, row, 1, pos, count, state, better, flags);
             total_state |= state;
             total += count;
         }
@@ -4932,49 +4716,41 @@ void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, const _mh
         if (col != 0xFF) {
             u32 better = (gun_ammo_usable_ck(plw, view, col, flags) & 1) != 0;
             u8 state = gun_clip_compare(plw, view, col, flags, &count);
-            u32 at = *(const u32*)pos;
-            ammo_table_cell_draw(piece, row, 2, (const _mh_ivec2_*)&at, count, state, better, flags);
+            ammo_table_cell_draw(piece, row, 2, pos, count, state, better, flags);
             total_state |= state;
             total += count;
         }
         if (total == 0) {
             total_state |= 0x20;
         }
-        u32 label_pos = *(const u32*)pos;
-        ammo_table_row_label_draw(kind, row, (const _mh_ivec2_*)&label_pos, total_state, flags);
+        ammo_table_row_label_draw(kind, row, pos, total_state, flags);
     }
 }
 #pragma pool_data reset
 
 /* 0x803142C8 - draw the base/selected run for one slot: resolve the `0x9AA` anchor against the
  * caller's position, then the `0xD0`/`0xD2` sprite lists at it. */
-void ammo_table_row_frame_draw(u8 kind, u8 idx, const _mh_ivec2_* pos, u8 state, u8 mode) {
-    u32 out1;
-    u32 out2;
-    u32 in = *(const u32*)pos;   /* the 4-byte `_mh_ivec2_` block, copied whole as the target does */
-    u32 tmp;
-    put_lsp_anchor_offset(0x9AA, &out1, &in);
+void ammo_table_row_frame_draw(u8 kind, u8 idx, _mh_ivec2_ pos, u8 state, u8 mode) {
+    _mh_ivec2_ out1;
+    _mh_ivec2_ out2;
+    put_lsp_anchor_offset(0x9AA, &out1, pos);
     u16* tbl = (u16*)get_menu_lsp_tbl(0xD0);
-    tmp = out1;
-    put_lsp_anchor_offset(tbl[idx], &out2, &tmp);
+    put_lsp_anchor_offset(tbl[idx], &out2, out1);
     u16* tbl2 = (u16*)get_menu_lsp_tbl(0xD2);
-    draw_sprite_ary(tbl2, (const _mh_ivec2_*)&out2);
+    draw_sprite_ary(tbl2, &out2);
 }
 
 /* 0x80314340 (0x160): Draws the slot's label from string table 0x3B or 0x3C at the `0xD0` row of the 0x9AA anchor,
  * green while the mode's bit 2 and a 0x18 state bit are set and grey for state bit 0x20. */
-void ammo_table_row_label_draw(u8 kind, u8 idx, const _mh_ivec2_* pos, u8 state, u8 mode) {
-    u32 base;
-    u32 at;
-    u32 in = *(const u32*)pos;
-    u32 tmp;
+void ammo_table_row_label_draw(u8 kind, u8 idx, _mh_ivec2_ pos, u8 state, u8 mode) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ at;
     _SPR_DATA_ spr;
     u8** strs;
 
-    put_lsp_anchor_offset(0x9AA, &base, &in);
+    put_lsp_anchor_offset(0x9AA, &base, pos);
     u16* tbl = (u16*)get_menu_lsp_tbl(0xD0);
-    tmp = base;
-    put_lsp_anchor_offset(tbl[idx], &at, &tmp);
+    put_lsp_anchor_offset(tbl[idx], &at, base);
     switch (kind) {
     case 0:
         strs = get_str_tbl(0x3B);
@@ -4994,38 +4770,34 @@ void ammo_table_row_label_draw(u8 kind, u8 idx, const _mh_ivec2_* pos, u8 state,
     if (state & 0x20) {
         spr.color = 0x878787FF;
     }
-    draw_font(spr, (s8*)strs[idx], 4, (const _mh_ivec2_*)&at);
+    draw_font(spr, (s8*)strs[idx], 4, &at);
 }
 
 /* 0x803144A0 (0x164): Draws one slot cell: the `0xD3` icon at the `0xD6`/`0xD5` row and column anchors (tinted when
  * selected) and, for a non-zero value, the `0xD4` number sprite with the value printed in it. */
-void ammo_table_cell_draw(u8 row, u8 col, u8 icon, const _mh_ivec2_* pos, u8 value, u8 state, u32 selected, u8 mode) {
-    u32 base;
-    u32 at;
-    u32 in;
-    u32 tmp;
+void ammo_table_cell_draw(u8 row, u8 col, u8 icon, _mh_ivec2_ pos, u8 value, u8 state, u32 selected, u8 mode) {
+    _mh_ivec2_ base;
+    _mh_ivec2_ at;
     s8 buf[16];
     _SPR_DATA_ spr;
 
     u16* rows = (u16*)get_menu_lsp_tbl(0xD6);
-    in = *(const u32*)pos;
-    put_lsp_anchor_offset(rows[row], &base, &in);
+    put_lsp_anchor_offset(rows[row], &base, pos);
     u16* cols = (u16*)get_menu_lsp_tbl(0xD5);
-    tmp = base;
-    put_lsp_anchor_offset(cols[col], &at, &tmp);
+    put_lsp_anchor_offset(cols[col], &at, base);
     u16* icons = (u16*)get_menu_lsp_tbl(0xD3);
     spr_data_copy(&spr, get_lsp_data(icons[icon], NULL));
     if (selected == 1) {
         spr.color = 0xAA825A7D;
     }
-    draw_sprite(spr, (const _mh_ivec2_*)&at);
+    draw_sprite(spr, &at);
     if (value != 0) {
         spr_data_copy(&spr, get_lsp_data(((u16*)get_menu_lsp_tbl(0xD4))[icon], NULL));
         if ((mode & 4) && (state & 0x18)) {
             spr.color = 0x50CD46FF;
         }
         sprintf(buf, "%d", value);
-        draw_font(spr, buf, 5, (const _mh_ivec2_*)&at);
+        draw_font(spr, buf, 5, &at);
     }
 }
 
@@ -5160,7 +4932,6 @@ u8 deco_slots_view_draw(u16 anchor, _EQUIP_INDEX* view, u8 sel, const _mh_ivec2_
  * slot count. */
 u8 deco_slots_draw(u16 anchor, _EQUIP* equip, _EQUIP* sub, const _mh_ivec2_* pos) {
     _mh_ivec2_ at;
-    u32 in;
     u16 decos[5];
     _SPR_DATA_ spr;
     u8 slots;
@@ -5173,8 +4944,7 @@ u8 deco_slots_draw(u16 anchor, _EQUIP* equip, _EQUIP* sub, const _mh_ivec2_* pos
         return 0;
     }
     if (anchor != 0x8F0) {
-        in = *(const u32*)pos;
-        put_lsp_anchor_offset(anchor, &at, &in);
+        put_lsp_anchor_offset(anchor, &at, *pos);
     } else {
         at.x = pos->x;
         at.y = pos->y;

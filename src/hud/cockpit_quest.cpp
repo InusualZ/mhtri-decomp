@@ -97,6 +97,7 @@
 #include "Pl/fn_80273B14.h"
 #include "ai/ainpc.h"
 #include "unsplit/menu.h"
+#include "hud/put_lsp_anchor_offset.h"
 #include "hud/cockpit.h"
 #include "sound/fn_800D7F54.h"
 #include "menu/cockpit_hud_hidden_ck.h"
@@ -1349,12 +1350,8 @@ void cockpit_take_menu_draw(void) {
  * row frame, then by the menu state the row's help window or the yes/no confirmation. */
 void cockpit_quest_menu_draw(void) {
     _SPR_DATA_ spr;
-    union {
-        _mh_ivec2_ pos;
-        s32 word;
-    } base;
+    _mh_ivec2_ base;
     _mh_ivec2_ pos;
-    s32 anchor;
     const u16* ids;
     CockpitWork* work = cockpit_work;
     SysQuestMove* move;
@@ -1371,13 +1368,12 @@ void cockpit_quest_menu_draw(void) {
         if (quest != NULL) {
             plw = work->plw;
             if (plw != NULL) {
-                get_lsp_data(0xEA0, &base.pos);
-                draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x112), &base.pos);
+                get_lsp_data(0xEA0, &base);
+                draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x112), &base);
                 row = 0;
                 do {
                     ids = (const u16*)get_menu_lsp_tbl(0x113);
-                    anchor = base.word;
-                    put_lsp_anchor_offset(ids[row], &pos, &anchor);
+                    put_lsp_anchor_offset(ids[row], &pos, base);
                     draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x114), &pos);
                     enabled = 0;
                     if (row == 1) {
@@ -1404,40 +1400,40 @@ void cockpit_quest_menu_draw(void) {
                 strs = get_str_tbl(65);
                 switch (plw->cockpit_menu_0x5C0) {
                 case 1:
-                    spr_data_copy(&spr, get_lsp_data(0xEBD, &base.pos));
-                    draw_window_frame_style(base.pos.x, base.pos.y, spr.width, spr.height, 0);
-                    get_lsp_data(0xEBE, &base.pos);
+                    spr_data_copy(&spr, get_lsp_data(0xEBD, &base));
+                    draw_window_frame_style(base.x, base.y, spr.width, spr.height, 0);
+                    get_lsp_data(0xEBE, &base);
                     spr_data_copy(&spr, get_lsp_data(0xEBF, NULL));
-                    draw_font(spr, (s8*)strs[plw->cockpit_menu_row_0x5BF], 0, &base.pos);
+                    draw_font(spr, (s8*)strs[plw->cockpit_menu_row_0x5BF], 0, &base);
                     break;
                 case 2:
                     if (plw->cockpit_menu_row_0x5BF == 1) {
-                        spr_data_copy(&spr, get_lsp_data(0xEC0, &base.pos));
-                        draw_window_frame_style(base.pos.x, base.pos.y, spr.width, spr.height, 0);
-                        get_lsp_data(0xEC1, &base.pos);
-                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x116), &base.pos);
+                        spr_data_copy(&spr, get_lsp_data(0xEC0, &base));
+                        draw_window_frame_style(base.x, base.y, spr.width, spr.height, 0);
+                        get_lsp_data(0xEC1, &base);
+                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0x116), &base);
                         spr_data_copy(&spr, get_lsp_data(0xEC6, &pos));
-                        draw_font(spr, (s8*)strs[2], 0, &base.pos);
+                        draw_font(spr, (s8*)strs[2], 0, &base);
                     }
                     break;
                 }
                 if (plw->cockpit_menu_0x5C0 == 2) {
-                    spr_data_copy(&spr, get_lsp_data(0xEC7, &base.pos));
-                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xA), &base.pos);
-                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xB), &base.pos);
+                    spr_data_copy(&spr, get_lsp_data(0xEC7, &base));
+                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xA), &base);
+                    draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xB), &base);
                     if (quest->take_confirm_0x68D == 0) {
-                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xD), &base.pos);
+                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xD), &base);
                     }
                     if (quest->take_confirm_0x68D == 1) {
-                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xC), &base.pos);
+                        draw_sprite_ary((const u16*)get_menu_lsp_tbl(0xC), &base);
                     }
                     strs = get_str_tbl(67);
                     spr_data_copy(&spr, get_lsp_data(0x1AE, NULL));
                     spr.color = GetMenuFontColor(1, quest->take_confirm_0x68D == 0, 1, 0);
-                    draw_font(spr, (s8*)strs[0], 1, &base.pos);
+                    draw_font(spr, (s8*)strs[0], 1, &base);
                     spr_data_copy(&spr, get_lsp_data(0x1B6, NULL));
                     spr.color = GetMenuFontColor(1, quest->take_confirm_0x68D == 1, 1, 0);
-                    draw_font(spr, (s8*)strs[1], 1, &base.pos);
+                    draw_font(spr, (s8*)strs[1], 1, &base);
                 }
             }
         }
@@ -1912,10 +1908,8 @@ void quest_gauge_draw(void) {
     _mh_ivec2_ flash_pos;
     _mh_ivec2_ corner;
     _mh_ivec2_ pos;
-    s32 copy;
+    _mh_ivec2_ copy;
     _mh_tex_uv_ uv_a;
-    s32 anchor_a;
-    s32 anchor_b;
     _SPR_DATA_* rec;
     s16 cell;
     u32 cells;
@@ -1959,8 +1953,7 @@ void quest_gauge_draw(void) {
     if (plw->field_0x37A >= 0x384) {
         if (work->sparkle_b_frame_0x18E < 0x60) {
             work->sparkle_b_frame_0x18E++;
-            anchor_a = copy;
-            put_lsp_anchor_offset(0xBA4, &spot, &anchor_a);
+            put_lsp_anchor_offset(0xBA4, &spot, copy);
             draw_sprite_anim_idx(0xBA5, work->sparkle_b_frame_0x18E, &spot);
         }
     } else {
@@ -2004,8 +1997,7 @@ void quest_gauge_draw(void) {
     if (plw->health_max >= 0x96) {
         if (work->sparkle_a_frame_0x18C < 0x60) {
             work->sparkle_a_frame_0x18C++;
-            anchor_b = copy;
-            put_lsp_anchor_offset(0xBA2, &spot, &anchor_b);
+            put_lsp_anchor_offset(0xBA2, &spot, copy);
             draw_sprite_anim_idx(0xBA3, work->sparkle_a_frame_0x18C, &spot);
         }
     } else {
@@ -5461,10 +5453,8 @@ void cockpit_split_gauge_draw(CockpitWork* work, u8 player) {
     _mh_ivec2_ flash_pos;
     _mh_ivec2_ corner;
     _mh_ivec2_ pos;
-    s32 copy;
+    _mh_ivec2_ copy;
     _mh_tex_uv_ uv_a;
-    s32 anchor_a;
-    s32 anchor_b;
     _SPR_DATA_* rec;
     s16 cell;
     u32 cells;
@@ -5509,8 +5499,7 @@ void cockpit_split_gauge_draw(CockpitWork* work, u8 player) {
     if (plw->field_0x37A >= 0x384) {
         if (work->sparkle_b_frame_0x18E < 0x60) {
             work->sparkle_b_frame_0x18E++;
-            anchor_a = copy;
-            put_lsp_anchor_offset(0xCEF, &flash_pos, &anchor_a);
+            put_lsp_anchor_offset(0xCEF, &flash_pos, copy);
             draw_sprite_anim_idx(0xCF0, work->sparkle_b_frame_0x18E, &flash_pos);
         }
     } else {
@@ -5553,8 +5542,7 @@ void cockpit_split_gauge_draw(CockpitWork* work, u8 player) {
     if (plw->health_max >= 0x96) {
         if (work->sparkle_a_frame_0x18C < 0x60) {
             work->sparkle_a_frame_0x18C++;
-            anchor_b = copy;
-            put_lsp_anchor_offset(0xCED, &flash_pos, &anchor_b);
+            put_lsp_anchor_offset(0xCED, &flash_pos, copy);
             draw_sprite_anim_idx(0xCEE, work->sparkle_a_frame_0x18C, &flash_pos);
         }
     } else {
