@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (235)
+## Ideas that work (236)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -244,6 +244,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 255 | [An early exit tested with bne over a b to the epilogue is the second operand of an \|\| condition](255-early-exit-tested-with.md) | works | source-shape | Retail has `cmpwi r3,0 ; bne next ; b epilogue` for an early return where ours has one `beq epilogue` (4 bytes short, every later branch shifted) |
 | 256 | [Two record tests that keep an unfolded li/cmplwi on the starting constant are a two-iteration loop](256-two-record-tests-that.md) | works | source-shape | Retail repeats the same test on two records at a fixed stride and keeps `li r0,0xff ; cmplwi r0,0xff` (or `li r0,0 ; cmplw r0,rX`) on the accumulator's starting value, which ours folds away |
 | 257 | [A u16 loop bound narrowed right after its call: hold it in an s32 local](257-u16-loop-bound-narrowed.md) | works | source-shape, allocator | Retail narrows a u16 loop bound (`clrlwi r30,r3,16`) straight after the count call, ours emits it after the counter's `li`s in the preheader, so the bound and the walking pointer swap callee-saved registers. |
+| 258 | [Duplicated index-0/1 blocks whose cmplw operands come out reversed are a two-trip loop MWCC unrolled](258-duplicated-index-0-1.md) | works | source-shape | Two copies of the same test against element 0 and element 1 match except that each `cmplw` has its operands in the other order, and swapping the source operands or casting them changes nothing. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
