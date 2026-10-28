@@ -44,13 +44,20 @@
  * SHAPES.    hbmTextAppendChar's character buffer is `u16[12]` (retail's 0x30-byte frame).
  * RESIDUALS. HbmTextBuffer duplicates the HbmU16Array and HbmTextValue views of homebutton/hbm_widget.h (same object; only
  *            this unit uses them); the merge is a header change outside this unit.
- * RESIDUALS. HbmPaneCursor (the manager's +0x8C) is the five-entry container homebutton/hkb_keyboard.h models as the
- *            non-virtual HkbRecentKeys; retail's is polymorphic with all-inline methods (table 0x80651814 here), so the
- *            manager's constructor (0x8055B710) and calcComponents (its local copy) wait for that class (request
- *            hb-value-event#12).
- * RESIDUALS. getPaneVisible: retail loads mpLyt before the prologue's saves; calcDrawMtx: retail sets r3 for the final
- *            PSMTXCopy at the end of each branch; v_0x03C: retail's 4:3 rectangle sits above the 16:9 one on the stack;
- *            hbmTextPutChar: retail keeps the `(u16)count` mask the u32 count drops.
+ * SHAPES.    HbmPaneCursor (the manager's +0x8C) declares `reset` first with no body, so its table 0x80651814 is
+ *            referenced, not emitted; its inline constructor runs slot 0x08 through the table (the manager's
+ *            constructor and calcComponents' local copy), and the local copy pushes through the inline `push`.
+ * RESIDUALS. HbmPaneCursor is the object homebutton/hkb_keyboard.h models as the non-virtual HkbRecentKeys (its
+ *            clear/push/getLast are the table's slots 0x08/0x0C/0x14); retail's class is all-inline, so this unit would
+ *            emit the table and hkb_keyboard the slot bodies after their callers (request hb-value-event#12). The
+ *            inline constructor also adds the reset call to hbm_kb_list.cpp's linker-stripped HbmKbList constructor.
+ * SHAPES.    calcDrawMtx points a result local at the flipped matrix in each branch (retail sets r3 for the final
+ *            PSMTXCopy at the end of each branch); one shared `&flipped` operand is computed after the join.
+ * SHAPES.    HbmKbTextBufferBase's destructor is its class's only virtual, so MWCC emits a one-slot
+ *            __vt__19HbmKbTextBufferBase here; retail's table (0x806516A8) has 22 slots, the free hbmText* functions.
+ * RESIDUALS. getPaneVisible: retail loads mpLyt before the prologue's saves (scheduling on/off, accessor and local
+ *            spellings leave it after); v_0x03C: retail's 4:3 rectangle sits above the 16:9 one on the stack;
+ *            hbmTextPutChar: retail keeps the `(u16)count` mask the u32 count drops (a u8/u16/s32 count is worse).
  * RESIDUALS. The text writer's width cache (.bss 0x80790250, 0x580 bytes; hbmTextCharWidths, registry name) is used
  *            only here, but its link slot (between hbm_text_panel's and hbm_anim_record's .bss) puts its definition in
  *            hbm_text_panel, hbm_kb_widget, hbm_kb_list or hbm_kb_child; it is declared in unsplit/homebutton.h.
@@ -59,17 +66,21 @@
  * RESIDUALS. hbmTextWriterDrawLine / hbmTextWriterDraw: retail loads the cursor x before caretEndX for the caret-moved
  *            test and compares in the other operand order; hbmTextWriterMeasureGlyph: the width, scale and font-scale
  *            floats take f31/f30/f29 in another order (register colouring only).
- * RESIDUALS. Unwritten, store a vtable whose class this unit would have to emit (rule 10): __dt__19HbmKbTextBufferBaseFv, fn_8055B710,
- *            fn_8055CAD0, fn_8055CB34 (the Vu object's constructor and destructor, table 0x80651950), createRoot (the gui
- *            manager's tables 0x80658358/0x806582FC) and the eight part factories in 0x8055DFCC..0x8055E778.
+ * RESIDUALS. Unwritten: SysKbdVuObject's constructor (0x8055CAD0) needs menu/menu_sysmsg.h's class to name its
+ *            +0x08 (resources), +0x0C, +0x30 (handler) .. +0x3C fields and the default handler below; its destructor
+ *            (0x8055CB34) frees the parts at +0x14..+0x2C, +0x10 and +0x0C through their virtual destructors (slot 0x08,
+ *            +0x24's slot 0x94), and three part classes are hbm_kb_event.cpp's file-local models while the
+ *            menu_sysmsg.h views at +0x10/+0x1C/+0x24 declare no destructor (requests hbm-value-2#1..#3).
  * RESIDUALS. Unwritten: fn_8055EAA8, the unit's static initialiser (its .ctors entry), which constructs the Vu
  *            object's default handler (.sbss lbl_80795A70, a SysKbdHandlerBase: its vptr __vt__17SysKbdHandlerBase);
  *            the class is menu/menu_sysmsg.cpp's file-local model, so it needs a shared header first.
+ * RESIDUALS. Unwritten: createRoot (the gui manager's tables 0x80658358/0x806582FC) and the seven part factories
+ *            0x8055DFCC..0x8055E694 (rule 10: their classes' inline constructors are not modelled).
  * RESIDUALS. The factories construct their parts inline (HbmKbToolbar over HbmKbList, whose constructor
  *            hbm_kb_list.cpp defines out of line; HbmKeyboard / the text panel's class over intermediate tables) and
  *            createRoot builds tiHKBManager's component manager, whose tables that unit stores by hand: each needs
  *            its owner's class model first.
- * RESIDUALS. 14 functions (3304 bytes) are unwritten, the largest calcComponents (668) and fn_8055CB34 (492); the list
+ * RESIDUALS. 11 functions (2436 bytes) are unwritten, the largest __dt__14SysKbdVuObjectFv (492); the list
  *            is `python tools/units/sweepcomments.py --unit homebutton/hbm_value`.
  * SHAPES.    The text writer: hbmTextWriterDrawLine / hbmTextWriterDraw take a typed HbmTextCaret* (a cast local puts
  *            the caret and the writer in swapped registers); a newline is compared as L'\n' (cmplwi); BeginDraw halves
@@ -421,6 +432,12 @@ extern "C" void hbmTextInit(HbmTextBuffer* self, MEMAllocator* allocator) {
     self->byteLength = 0;
     self->workText = (u16*)MEMAllocFromAllocator(allocator, self->capacity * 2);
     wmemset(self->workText, 0, self->capacity);
+}
+
+/* 0x80558F38 (0x74): Frees the text and the work text. */
+HbmKbTextBufferBase::~HbmKbTextBufferBase() {
+    MEMFreeToAllocator(bufferAllocator, text);
+    MEMFreeToAllocator(bufferAllocator, workText);
 }
 
 /* 0x80558FAC (0x6C): Appends one character and refreshes the buffer. */
@@ -1540,6 +1557,15 @@ extern "C" void hbmVuNodesNotify(VuObject* self, u32 event) {
     }
 }
 
+/* 0x8055B710 (0xC4): Takes the layout's resource and name and the sound player; the layout and its component
+ * manager are built later by create. */
+HbmPaneManager::HbmPaneManager(nw4r::lyt::ResourceAccessor* resAccessor, const char* layoutName, HbmSoundPlayer* sound)
+    : mpLyt(NULL), mpLayoutName(layoutName), mpResAccessor(resAccessor), mpRoot(NULL), mpSound(sound),
+      mbInputActive(1), mbStandardAspect(1), mpPaneAllocator(NULL) {
+    nw4r::ut::List_Init(&mComponents, 0x1C);
+    mCursor.reset();
+}
+
 /* 0x8055B7D4 (0xC4): Destroys the layout and the component manager. */
 HbmPaneManager::~HbmPaneManager() {
     if (mpLyt != NULL) {
@@ -1597,12 +1623,41 @@ void HbmPaneManager::v_0x014() {
 }
 
 /* The widget's collection entry at an index. */
-extern "C" void* fn_8055BE48(HbmWidget* self, u32 index) {
-    return self->items[index];
+/* 0x8055BBAC (0x29C): Runs the layout's frame and draws it with the visible panes the cursor remembers on top. */
+void HbmPaneManager::calcComponents() {
+    v_0x044();
+    if (mbInputActive) {
+        mpLyt->Animate(0);
+        mpLyt->CalculateMtx(mDrawInfo);
+    }
+    HbmPaneCursor front;
+    for (s32 i = 0; i < mCursor.getCapacity(); i++) {
+        if (mCursor.getKey(i) != 0 && ((nw4r::lyt::Pane*)mCursor.getKey(i))->IsVisible()) {
+            front.push(mCursor.getKey(i));
+        }
+    }
+    for (s32 i = 0; i < 5; i++) {
+        nw4r::lyt::Pane* pane = (nw4r::lyt::Pane*)front.mKeys[i];
+        if (pane != NULL) {
+            pane->SetVisible(false);
+        }
+    }
+    mpLyt->Draw(mDrawInfo);
+    for (s32 i = 0; i < 5; i++) {
+        if (front.mKeys[i] != 0) {
+            ((nw4r::lyt::Pane*)front.mKeys[i])->SetVisible(true);
+            ((nw4r::lyt::Pane*)front.mKeys[i])->Draw(mDrawInfo);
+        }
+    }
 }
 
-/* The widget's type tag. */
-extern "C" u32 fn_8055BE58(void) {
+/* 0x8055BE48 (0x10): Returns the remembered pane at `index`. */
+u32 HbmPaneCursor::getKey(u32 index) {
+    return mKeys[index];
+}
+
+/* 0x8055BE58 (0x8): Returns how many panes the cursor remembers. */
+s32 HbmPaneCursor::getCapacity() {
     return 5;
 }
 
@@ -1728,18 +1783,21 @@ void HbmPaneManager::v_0x044() {
 void HbmPaneManager::calcDrawMtx(nw4r::math::MTX34* out, const nw4r::lyt::DrawInfo& drawInfo,
                                  const nw4r::math::MTX34* mtx) {
     nw4r::math::MTX34 flipped;
+    nw4r::math::MTX34* result;
     if (drawInfo.mFlag.mulViewDraw) {
         PSMTXConcat(drawInfo.mViewMtx.m, mtx->m, flipped.m);
         flipped.m[0][1] = -flipped.m[0][1];
         flipped.m[1][1] = -flipped.m[1][1];
         flipped.m[2][1] = -flipped.m[2][1];
+        result = &flipped;
     } else {
         PSMTXCopy(mtx->m, flipped.m);
         flipped.m[0][1] = -flipped.m[0][1];
         flipped.m[1][1] = -flipped.m[1][1];
         flipped.m[2][1] = -flipped.m[2][1];
+        result = &flipped;
     }
-    PSMTXCopy(flipped.m, out->m);
+    PSMTXCopy(result->m, out->m);
 }
 
 /* Destroys the band key (its animations are released by destroy). */

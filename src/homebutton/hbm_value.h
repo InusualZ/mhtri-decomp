@@ -129,16 +129,42 @@ public:
     /* slot +0x058 */ virtual void setEnable(s32 enable);
 }; /* size: 0x4 */
 
-/* The pane manager's cursor (embedded at its +0x8C): the slots the band calls.
+/* The pane manager's cursor (embedded at its +0x8C): the last five panes it was pointed at, oldest first (the same
+ * object as homebutton/hkb_keyboard.h's HkbRecentKeys, whose clear/push/getLast fill slots 0x08/0x0C/0x14 of its
+ * table 0x80651814).  `reset` is declared first and defined nowhere, so the table is referenced, not emitted.
  * size: 0x18 (the vptr and five entries; the manager's allocator follows at +0xA4) */
 class HbmPaneCursor {
 public:
+    HbmPaneCursor() { reset(); }
+
     /* slot +0x008 */ virtual void reset();
     /* slot +0x00C */ virtual void setTarget(u32 target);
-    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x010 */ virtual u32 getKey(u32 index);
     /* slot +0x014 */ virtual u32 getTarget();
+    /* slot +0x018 */ virtual s32 getCapacity();
 
-    /* +0x04 */ u32 unused_0x04[5];
+    /* Remembers `target` in the first free entry, or shifts the oldest out (slot 0x0C's body, inlined where the
+     * cursor is a local object). */
+    void push(u32 target) {
+        if (mKeys[4] == 0) {
+            for (s32 i = 0; i < 5; i++) {
+                if (mKeys[i] == 0) {
+                    mKeys[i] = target;
+                    return;
+                }
+            }
+        } else {
+            for (s32 i = 0; i < 4; i++) {
+                mKeys[i] = mKeys[i + 1];
+                if (target == mKeys[i]) {
+                    mKeys[i] = 0;
+                }
+            }
+            mKeys[4] = target;
+        }
+    }
+
+    /* +0x04 */ u32 mKeys[5];
 }; /* size: 0x18 */
 
 /* The band's pane manager (class table 0x806517A0 in this unit's .data): a layout, its root, its sound player, its
