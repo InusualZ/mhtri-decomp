@@ -19,6 +19,7 @@ struct MHchar;
  * first so the table is emitted with it.  size: 0x54 */
 class Em007ModelCopy : public nw4r::g3d::ICalcWorldCallback {
 public:
+    Em007ModelCopy();
     virtual void ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
                                nw4r::g3d::FuncObjCalcWorld* pFuncObj);
     virtual ~Em007ModelCopy();

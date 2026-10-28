@@ -9,12 +9,15 @@
  *   Left edge: `enemy/em005_act.cpp`'s static initializer ends at 0x801D71C4 and this pool opens at 0x807994F8.
  *   Right edge: the pool's last entry (176.0f, 0x80799780) is followed by a zero alignment word, and the 0.75f at
  *   0x80799788 that `em007_model_eft_create` reads is the first entry of `lobby/fn_801E0ADC.cpp`'s pool, as are the
- *   `.data` tables `em007_model_eft_create`/`em007_model_copy_ctor` read (0x805B7608, the 0x805B76B8 table): the
- *   functions from 0x801E0574 on belong to that unit's TU (seam request enemy-em007#1); the model effect from
- *   0x801E0240 (its lobby-NPC entry point, its `_EFT` hooks) is a candidate for the same TU.
+ *   `.data` objects `em007_model_eft_create`/`Em007ModelCopy`'s constructor read (`em007_model_res_ids` 0x805B7608,
+ *   the 0x805B76B8 table): the functions from 0x801E0574 on belong to that unit's TU (seam request enemy-em007#1);
+ *   the model effect from 0x801E0240 (its lobby-NPC entry point, its `_EFT` hooks) is a candidate for the same TU.
+ *   Until the seam moves they are written here against the split as it stands: the two data rows are read through
+ *   `lobby/em007_model_copy_bind.h`.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi`+`cmpwi`/`cmplwi` forms),
  *   `#pragma fp_contract off` (the target has no fused multiply-add) and `#pragma pool_data off` (each table is
- *   addressed with its own `lis`/`addi`).
+ *   addressed with its own `lis`/`addi`).  `em007_model_eft_create` is `#pragma optimization_level 0` (retail keeps
+ *   every local on the stack and reloads each `work->models_0x08[i]`; levels 1/2 measure lower).
  * NAMES. The file name follows the runtime dump's `em007_prog_tbl`, which opens the TU's `.data`; the `_act` suffix
  *   is a GUESS.  GUESS (the `Em024ProgTbl` slot each fills): em007_init, em007_frame_update, em007_action_dispatch,
  *   em007_noop, em007_event_notify, em007_motion_events, em007_tev_color_update, em007_part_damage_ck,
@@ -23,32 +26,33 @@
  *   GUESS (from the bodies): em007_partner_front_ck, em007_alt_parts_update, em007_alt_mode_effect,
  *   em007_effect_spawn, em007_alt_scale_step, em007_aim_point_get, em007_ally_wait_near_ck, em007_act13_early_ck,
  *   `Em007UserData` (Attach/CalcAnmItemEx/CalcWorldEnd), `Em007ModelCopy`, em007_model_eft_start/_alloc/_release/
- *   _step/_create, em007_npc_model_eft_start, em007_model_copy_ctor/_bind_nodes, em007_res_node_name,
- *   em007_res_name_at.
+ *   _step/_create, em007_npc_model_eft_start, em007_model_copy_bind_nodes, em007_res_node_name, em007_res_name_at.
+ *   GUESS (lobby/fn_801E0ADC.cpp's data rows, registry): em007_model_res_ids, em007_model_eft_scale.
  *   GUESS (data): em007_turn_seq_0..6, em007_pick_tbl_0/1, em007_se_seq_<sub-state>, em007_se_alt_seq_<sub-state>
  *   and their em007_se_rec/pos records; the types Em007ProgTbl, Em007UserData, Em007EftWork, Em007ModelCopy,
  *   EmUserDataItemView.
- * RESIDUALS. 4 rows unwritten, all on `lobby/fn_801E0ADC.cpp`'s side of the seam: 0x801E0574-0x801E0AC0
- *   (`em007_model_eft_create` 0x3C4, `em007_model_copy_ctor` 0x3C, `em007_model_copy_bind_nodes` 0x110,
- *   `em007_res_node_name` 0x3C, which `lobby/lb_equip_page.cpp`'s object also references).
- *   Partial rows (register colouring or scheduling only): `em007_act7_8` (the `em_hit_mask_get` result is ORed with
- *   0xC0 before the argument loads, retail after them; the frame is 0x10 smaller), `em007_act9_1` (retail loads the
- *   1.0f gauge argument before the step expression), `em007_act7_3` (retail counts `state_0x006` in r3, ours r4),
- *   `em007_frame_update` (the two loop increments swap), `em007_action_select` (retail keeps the first switch's
- *   answer in r4), `em007_act2_10`/`em007_act7_1` (the scale product's `fmuls` operands swap), `em007_act2_14`/
- *   `em007_act7_6` (the motion-choice sum lands in r0, retail r4), `em007_act7_10` (the `fn_8012D3E0` answer is
- *   narrowed into r0, retail r6), `em007_act7_11`.
+ * RESIDUALS. Partial rows (register colouring, scheduling or stack slots only): `em007_act7_8` (the angle's
+ *   u16 result is coloured r3, retail keeps it in r27 with the s32 term; the shell call loads its table before the
+ *   arguments, retail after), `em007_act9_1` (retail loads the 1.0f gauge argument after `mr r3,r30`, ours before),
+ *   `em007_model_eft_create` (two extra `clrlwi`: the res-id argument and the made-flag store; its extab record is
+ *   0x18, retail 0x8 - the new-expression's landing pad), `em007_model_copy_bind_nodes` (the two node temporaries'
+ *   stack slots swap), `em007_action_select` (retail keeps the first switch's answer in r28, ours r30),
+ *   `em007_act2_14`/`em007_act7_6` (the motion-choice sum lands in r0, retail r4), `em007_act7_10` (the
+ *   `fn_8012D3E0` answer is narrowed into r0, retail r6).
  *   Data: `Em007UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table
  *   (0x805B75B8); it is built with placement `new` over `operator new` (a new-expression adds a landing pad).
  *   `.sdata2` stops at 0x28C: the trailing alignment word is the link's.
- *   flipcheck: `.text`/extab/extabindex short of the claim (the four rows above), `em007_res_node_name` undefined.
+ *   flipcheck: `em007_model_res_ids`/`em007_model_eft_scale` resolve only once their registry names are in the map;
+ *   extab/extabindex differ by `em007_model_eft_create`'s landing pad.
  * SHAPES. A one-case test retail compares signed (`cmpwi`) is a `switch` with `default:` first (`em007_init`,
  *   `em007_event_notify`, `em007_act1_4`, `Em007UserData::CalcAnmItemEx`); a two-value area test is a nested `switch`
  *   with shared cases (`em007_tev_color_update`).  The hit-window id choices are `cond ? a : b` arguments, the step
  *   counters `self->state++`.  The shell-table slots +0x14/+0x2C/+0x54 are called without the table argument
  *   (`Em007ShellPosJobFn`, `Em007ShellSpawnFn`, `Em007ShellPointFn`).  `em_act_ck` is read unsigned through
  *   `em_act_ck_u`.  The pool's order follows the source text: `em007_act2_11`'s turn angle is one expression and
- *   `em007_act7_8` computes the XZ distance before the angle.  The data is defined between the functions in retail
+ *   `em007_act7_8` computes the XZ distance before the angle.  A value retail computes before an argument list is a
+ *   local assigned first (`em007_act7_8`'s hit mask, `em007_act7_3`'s speed, `em007_act9_1`'s gauge scale) and a
+ *   product whose operands retail swaps takes its call result through a local (`em007_act2_10`/`7_1`/`7_11`).  The data is defined between the functions in retail
  *   order (the jump tables fall between the definitions).
  */
 
@@ -78,6 +82,12 @@
 #include "enemy/fn_80138074.h"
 #include "MSL/new.h" /* the placement `operator new` */
 #include "draw_shape/mtx34_copy.h"
+#include "g3d/g3d_anmchr.h" /* res_node_ref (rule 2) */
+#include "g3d/fn_8005AA28.h" /* res_node_is_valid (rule 2) */
+#include "enemy/em007_res_node_name.h"
+#include "lobby/em007_model_copy_bind.h"
+#include "light/light.h" /* light_id_next (rule 2) */
+#include "ai/ai_npc.h" /* _AINPC_W (rule 1) */
 #include "enemy/fn_80147CE0.h"
 #include "enemy/em_hit_mask_get.h"
 #include "enemy/fn_80137604.h"
@@ -555,7 +565,7 @@ void em007_frame_update(struct _ENEMY_WORK* self) {
     max = get_move_work_max(3);
     other = (struct _ENEMY_WORK*)get_move_work_adrs(3);
     if (em_die_ck(self) == 0) {
-        for (i = 0; i < max; i++) {
+        for (i = 0; i < max; i++, other++) {
             if (other->active != 0 && (other->field_0x1C8 & 1) != 0 && self != other &&
                 self->area_no == other->area_no &&
                 em_phase_get(self) == em_phase_get(other) && other->action == 0xB) {
@@ -564,7 +574,6 @@ void em007_frame_update(struct _ENEMY_WORK* self) {
                 found = 1;
                 break;
             }
-            other++;
         }
     }
     if (found == 0) {
@@ -987,6 +996,7 @@ extern "C" void em007_act2_9(struct _ENEMY_WORK* self) {
 }
 
 extern "C" void em007_act2_10(struct _ENEMY_WORK* self) {
+    f32 temp_f1;
     f32 temp_f31;
     s32 temp_r3;
 
@@ -997,7 +1007,8 @@ extern "C" void em007_act2_10(struct _ENEMY_WORK* self) {
         em_turn_seq_start(self, (void*)em007_turn_seq_2, 0, 1, 0);
         em_move_vec2_clr(self);
         temp_f31 = get_em_chg_scale(self);
-        self->field_0x318 = -6.481132f * get_em_base_scale(self) * temp_f31;
+        temp_f1 = get_em_base_scale(self);
+        self->field_0x318 = -6.481132f * temp_f1 * temp_f31;
         self->field_0x324 = 0.0f;
         temp_r3 = calcVecAng2(&self->pos, &self->vec_0x36C);
         rotVecY(&self->offset_0x30C.vec_0x310, temp_r3);
@@ -1283,6 +1294,7 @@ extern "C" void em007_act7_0(struct _ENEMY_WORK* self) {
 }
 
 extern "C" void em007_act7_1(struct _ENEMY_WORK* self) {
+    f32 temp_f1;
     f32 temp_f31;
 
     switch (self->state) {
@@ -1296,7 +1308,8 @@ extern "C" void em007_act7_1(struct _ENEMY_WORK* self) {
         em_stamina_add(self, (u32)-0x14);
         em_move_vec2_clr(self);
         temp_f31 = get_em_chg_scale(self);
-        self->field_0x318 = -2.631579f * get_em_base_scale(self) * temp_f31;
+        temp_f1 = get_em_base_scale(self);
+        self->field_0x318 = -2.631579f * temp_f1 * temp_f31;
         self->field_0x324 = 0.0f;
         rotVecY(&self->offset_0x30C.vec_0x310, self->field_0x1C0);
         rotVecY(&self->vec_0x31C, self->field_0x1C0);
@@ -1379,7 +1392,8 @@ extern "C" void em007_act7_3(struct _ENEMY_WORK* self, u8 arg1) {
         if ((em_frame_check(self, 0, 92.0f, 0.0f) == 1) ||
             (em_frame_check(self, 0, 158.0f, 0.0f) == 1)) {
             if (self->state_0x006 < 5) {
-                em_mot_speed_set(self, 1.0f + (0.05f * (f32)++self->state_0x006));
+                f32 speed = 1.0f + (0.05f * (f32)++self->state_0x006);
+                em_mot_speed_set(self, speed);
             }
         }
         temp_r3_2 = self->timer_0x020;
@@ -1516,7 +1530,7 @@ extern "C" void em007_act7_6(struct _ENEMY_WORK* self, u8 arg1) {
     }
 }
 
-extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
+extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u32 arg2) {
     nw4r::math::MTX34 sp60;
     EmSpawnRec rec;
     nw4r::math::VEC3 sp38;
@@ -1530,8 +1544,9 @@ extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
     u16 var_r27;
     f32 temp_f1;
     s32 temp_r27;
-    u8 var_r31;
+    u32 var_r31;
     s32 temp_r29;
+    u16 mask;
 
     var_r31 = arg2;
     VEC3_ctor(&sp38);
@@ -1589,8 +1604,8 @@ extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
             addVec3To(&sp2C, &sp38);
             copyVec3(&sp14, &self->pos);
             sp14.y += 50.0f;
-            temp_r29 = findInterSection(&sp14, &sp2C, &sp20, 1, 0xFFFF, self->area_no,
-                                        em_hit_mask_get(self) | 0xC0, 0);
+            mask = em_hit_mask_get(self);
+            temp_r29 = findInterSection(&sp14, &sp2C, &sp20, 1, 0xFFFF, self->area_no, mask | 0xC0, 0);
             temp_r27 = -(s32)(48.0f * ((65.0f + (self->vec_0x36C.y - sp2C.y)) / 10.0f));
             temp_f1 = calcVecDistXZ(&self->vec_0x36C, &sp2C) - 2100.0f;
             var_r27 = (u16)(temp_r27 - (s32)(96.0f * (temp_f1 / 50.0f)));
@@ -1605,7 +1620,7 @@ extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
             rec.field_0x12 = (u16)var_r27;
             rec.field_0x14 = 0;
             eft007_part_spawn(self, 0x24, var_r27, 0);
-            switch (var_r31) {
+            switch ((u8)var_r31) {
             case 0:
                 var_r31 = 0xD;
                 break;
@@ -1678,6 +1693,7 @@ extern "C" void em007_act7_10(struct _ENEMY_WORK* self) {
 
 extern "C" void em007_act7_11(struct _ENEMY_WORK* self, u8 arg1) {
     u32 var_r5;
+    f32 temp_f1;
     f32 temp_f31;
 
     switch (self->state) {
@@ -1688,7 +1704,8 @@ extern "C" void em007_act7_11(struct _ENEMY_WORK* self, u8 arg1) {
         em_hit_window_set(self, 0, arg1 == 1 ? 0x2A : 0x11, 0x80);
         em_move_vec_clr(self);
         temp_f31 = get_em_chg_scale(self);
-        self->field_0x318 = -13.703704f * get_em_base_scale(self) * temp_f31;
+        temp_f1 = get_em_base_scale(self);
+        self->field_0x318 = -13.703704f * temp_f1 * temp_f31;
         break;
     case 1:
         if (em_frame_check(self, 3, 0.0f, 54.0f) == 1) {
@@ -1956,7 +1973,8 @@ extern "C" void em007_act9_1(struct _ENEMY_WORK* self, u8 arg1) {
         switch (self->state_0x006) {
         case 0:
             if (em_frame_check(self, 0, 20.0f, 0.0f) == 1) {
-                em_gauge_period_step(self, (s32)(0.005f * (f32)(s32)self->field_0x7A4), 1, 1.0f);
+                f32 scale = 1.0f;
+                em_gauge_period_step(self, (s32)(0.005f * (f32)(s32)self->field_0x7A4), 1, scale);
                 em_stamina_regen(self, 1.0f, 0x32, 1);
             }
             if (em_frame_check(self, 0, 22.0f, 0.0f) == 1) {
@@ -2574,17 +2592,22 @@ void operator delete(void* ptr) throw();
 struct Em007EftWork {
     /* +0x00 */ s32 model_count_0x00;            /* always 1 */
     /* +0x04 */ u8 pad_0x04[0x4];
-    /* +0x08 */ EftModel* models_0x08[1];        /* the pooled models */
+    /* +0x08 */ struct MHchar* models_0x08[1];   /* the pooled models */
     /* +0x0C */ nw4r::ef::Effect* effect_0x0C;   /* the main effect */
     /* +0x10 */ nw4r::ef::Effect* effects_0x10[5];
     /* +0x24 */ Em007ModelCopy* copy_0x24;       /* the model copy */
     /* +0x28 */ u8 mode_0x28;                    /* 0: an enemy's effect, 1: the lobby NPC's */
     /* +0x29 */ u8 node_count_0x29;
     /* +0x2A */ u8 kind_0x2A;                    /* the model kind (the enemy's +0x420 byte) */
-    /* +0x2B */ u8 pad_0x2B[0x5A - 0x2B];
+    /* +0x2B */ u8 pad_0x2B[0x50 - 0x2B];
+    /* +0x50 */ s32 angle_0x50;                  /* cleared on creation for the kind-0/5 companions */
+    /* +0x54 */ u8 pad_0x54[0x58 - 0x54];
+    /* +0x58 */ u16 light_0x58;                  /* the light id (`light_id_next` for the kind-1 companion, else 0xFFFF) */
     /* +0x5A */ u8 field_0x5A;                   /* cleared on creation */
     /* +0x5B */ u8 field_0x5B;                   /* cleared on creation */
-    /* +0x5C */ u8 pad_0x5C[0x60 - 0x5C];
+    /* +0x5C */ u8 pad_0x5C;
+    /* +0x5D */ u8 area_0x5D;                    /* the kind-4 companion's area */
+    /* +0x5E */ u8 pad_0x5E[0x60 - 0x5E];
 };
 
 #ifdef __cplusplus
@@ -2612,7 +2635,7 @@ void em_res_user_data_flag_set(struct _ENEMY_WORK* self, u32 a);
 
 /* `enemy/fn_80138074.c` */
 
-/* The model effect's step functions: `em007_model_eft_create` (unwritten) and three of
+/* The model effect's step functions: `em007_model_eft_create` and three of
  * `lobby/fn_801E0ADC.cpp`. */
 void em007_model_eft_create(_EFT* self);
 void em007_model_eft_step(_EFT* self);
@@ -2630,6 +2653,8 @@ void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 /* Runtime helpers. */
 f32 vec3_distance(void* a, void* b);
 void res_node_assign(void* out, void* src);
+void* em007_res_name_at(void** base, u32 offset);
+void em007_model_copy_bind_nodes(struct Em007EftWork* work, u8 index);
 
 /* `stage_map_kind_get` and `get_now_areano` come from `stage/stg_w.h`, `get_now_mapno` from
  * `unsplit/unknown.h`. */
@@ -4118,7 +4143,7 @@ _EFT* em007_model_eft_alloc(void) {
     work = (struct Em007EftWork*)eft->work_0x38;
     work->model_count_0x00 = 1;
     for (i = 0; i < work->model_count_0x00; i++) {
-        work->models_0x08[i] = (EftModel*)eft_res_model_get();
+        work->models_0x08[i] = (struct MHchar*)eft_res_model_get();
         if (work->models_0x08[i] == NULL) {
             eft_res_slot_release(eft);
             return NULL;
@@ -4173,6 +4198,139 @@ void em007_model_eft_step(_EFT* self) {
         em007_model_eft_retire(self);
         break;
     }
+}
+
+/* 0x801E0574 (0x3C4): Builds the effect's models and model copy, binds the copy to its source (the companion's or the
+ * lobby NPC's model) and enters the update state; retires the effect when a model or the copy cannot be made. */
+#pragma push
+#pragma optimization_level 0
+void em007_model_eft_create(_EFT* self) {
+    nw4r::math::VEC3 scratch_a;
+    nw4r::math::VEC3 scratch_b;
+    u32 light;
+    _AINPC_W* npc;
+    struct _LB_NPC* lb_npc;
+    u8 made;
+    struct Em007EftWork* work;
+    u32 i;
+
+    work = (struct Em007EftWork*)self->work_0x38;
+    VEC3_ctor(&scratch_a);
+    VEC3_ctor(&scratch_b);
+    for (i = 0; i < work->model_count_0x00; i++) {
+        if (work->mode_0x28 == 0) {
+            light = 6;
+        } else {
+            light = 0;
+        }
+        made = (u32)res_eft_model_create_light(work->models_0x08[i], em007_model_res_ids[work->kind_0x2A], 0x2C, light);
+        if (made == 0) {
+            em007_model_eft_retire(self);
+            return;
+        }
+    }
+    work->copy_0x24 = new Em007ModelCopy;
+    if (work->copy_0x24 == NULL) {
+        em007_model_eft_retire(self);
+        return;
+    }
+    work->copy_0x24->eft_0x04 = self;
+    em007_model_copy_bind(work->copy_0x24);
+    for (i = 0; i < 18; i++) {
+        work->copy_0x24->nodes_0x0C[i] = 0xFF;
+    }
+    self->state_0x05++;
+    self->flag_0x01 = 1;
+    self->timer_0x0C = 0;
+    self->field_0x10 = 0;
+    for (i = 0; i < work->model_count_0x00; i++) {
+        setVector3(&work->models_0x08[i]->scale_0x1C, em007_model_eft_scale, em007_model_eft_scale,
+                   em007_model_eft_scale);
+        work->models_0x08[i]->field_0x28 = 0;
+        work->models_0x08[i]->field_0x2C = 0;
+        work->models_0x08[i]->field_0x28 = 0;
+        work->models_0x08[i]->ready = 0;
+        work->node_count_0x29 = ((nw4r::g3d::ResMdl*)&work->models_0x08[i]->field_0x114)->GetResNodeNumEntries();
+        switch (work->mode_0x28) {
+        case 0:
+            npc = (_AINPC_W*)self->source_0x30;
+            work->copy_0x24->model_0x08 = &npc->model;
+            if (npc->field_0x420 == 1) {
+                work->light_0x58 = light_id_next();
+            } else {
+                work->light_0x58 = 0xFFFF;
+            }
+            em007_model_copy_bind_nodes(work, i);
+            switch (npc->field_0x420) {
+            case 0:
+                work->effect_0x0C = res_eft_create(0x314, 0x1E, 0);
+                break;
+            case 4:
+                work->area_0x5D = npc->area;
+                break;
+            default:
+                work->effect_0x0C = NULL;
+                break;
+            }
+            break;
+        case 1:
+            lb_npc = (struct _LB_NPC*)self->source_0x30;
+            work->effect_0x0C = NULL;
+            if (lb_npc == NULL) {
+                self->area_0x44 = get_now_areano();
+            } else {
+                self->area_0x44 = lb_npc->field_0x004;
+                work->copy_0x24->model_0x08 = (struct MHchar*)lb_npc->body_0x058;
+                em007_model_copy_bind_nodes(work, i);
+            }
+            break;
+        }
+        if (work->kind_0x2A == 4) {
+            work->models_0x08[i]->setVisibility(6, false);
+            work->models_0x08[i]->setVisibility(7, false);
+            work->models_0x08[i]->setVisibility(8, false);
+            work->models_0x08[i]->setVisibility(9, false);
+        }
+    }
+    if (work->mode_0x28 == 0) {
+        switch (npc->field_0x420) {
+        case 0:
+        case 5:
+            work->angle_0x50 = 0;
+            break;
+        }
+    }
+    em007_model_eft_update(self);
+}
+#pragma pop
+
+/* 0x801E0938 (0x3C): Builds the model copy over the world-callback base. */
+Em007ModelCopy::Em007ModelCopy() {
+}
+
+/* 0x801E0974 (0x110): Binds each node of the model copy to the matrix of the node of the same name in pooled model
+ * `index`. */
+void em007_model_copy_bind_nodes(struct Em007EftWork* work, u8 index) {
+    nw4r::g3d::ResNode node((void*)0);
+    u32 i;
+
+    for (i = 0; i < work->node_count_0x29; i++) {
+        nw4r::g3d::ResNode src = ((nw4r::g3d::ResMdl*)&work->models_0x08[index]->field_0x114)->GetResNode(i);
+        nw4r::g3d::ResNode found = ((nw4r::g3d::ResMdl*)&work->copy_0x24->model_0x08->field_0x114)
+                                       ->GetResNode(em007_res_node_name((ResHandle*)&src));
+        res_node_assign(&node, &found);
+        nw4r::g3d::ResNode src2 = ((nw4r::g3d::ResMdl*)&work->models_0x08[index]->field_0x114)->GetResNode(i);
+        ((nw4r::g3d::ResMdl*)&work->copy_0x24->model_0x08->field_0x114)
+            ->GetResNode(em007_res_node_name((ResHandle*)&src2));
+        if (res_node_is_valid((ResHandle*)&node)) {
+            work->copy_0x24->nodes_0x0C[i] = res_node_mtx_id_get(&node);
+        }
+    }
+}
+
+/* 0x801E0A84 (0x3C): Returns the name of resource node `node`. */
+const char* em007_res_node_name(const struct ResHandle* node) {
+    return (const char*)em007_res_name_at((void**)node, res_node_ref(node)->mToResName);
 }
 
 /* 0x801E0AC0 (0x1C): `base + offset`, or NULL when the offset is 0. */
