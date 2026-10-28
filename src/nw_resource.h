@@ -53,12 +53,15 @@ struct _g3d_work {
 }; /* size: 0xC */
 
 extern "C" {
-/* 0x800D3874 - the number of g3d works the model's animation `kind` needs. */
+/* 0x800D3874 - builds the texture-SRT override work of lifetime `kind` into `*list`; returns the file's texture-SRT
+ * animation count. */
 s32 nw_res_anm_work_num(EftResFileHandle res, EftResFileHandle mdl, s32 kind, struct _g3d_work** list);
-/* 0x800D38F8 - the animation built over those works (NULL on failure). */
+/* 0x800D38F8 - attaches a looping texture-SRT animation per animation of the file, played at twice `strength`, to the
+ * override in `first` and sets the override on `scn`; returns the override (NULL on failure).  The rate comes second:
+ * every caller evaluates it before the handles. */
 /* untyped: opaque handle - the animation record the caller hands on */
-void* nw_res_anm_create(EftResFileHandle res, EftResFileHandle mdl, nw4r::g3d::ScnMdlSimple* scn, s32 kind,
-                        struct _g3d_work* first, struct _g3d_work** rest, f32 strength);
+void* nw_res_anm_create(EftResFileHandle res, f32 strength, EftResFileHandle mdl, nw4r::g3d::ScnMdlSimple* scn, s32 kind,
+                        struct _g3d_work* first, struct _g3d_work** rest);
 }
 
 /* 0x800D5864 - deletes a loaded resource's entry (0 when it was freed). */

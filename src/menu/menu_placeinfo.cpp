@@ -49,7 +49,6 @@
  *    before it (regsim: best declaration order 12 of 19 saved registers).
  *  - `pig_name_set`: the second loop's `i`/`entry` swap r27/r28 (regsim reproduces the colouring; the two webs are
  *    split differently from the first loop's).
- *  - `placeinfo_model_create`: retail loads the 1.0f rate of `nw_res_anm_create` before the integer arguments.
  *  - `lb_city_timer_draw`: retail extends both `font_locate` coordinates after the second `fctiwz`; ours extends the
  *    first at once (`(s32)` casts: worse).
  *  - `lb_city_filter_list_draw`: retail clears the title id with `clrlwi r4,r4,16` after the ternary; ours omits it
@@ -3089,9 +3088,8 @@ s32 placeinfo_model_create(u8 index, char* name) {
     nw4r::g3d::ResMdl scn_mdl = ((nw4r::g3d::ScnMdlSimple*)chr->field_0x118)->GetResMdl();
     res_mdl_copy_ctor((ResHandle*)&mdl, (ResHandle*)&scn_mdl);
     if (nw_res_anm_work_num(res, *(EftResFileHandle*)&mdl, 5, works) <= 1) {
-        anm = (nw4r::g3d::AnmObj*)nw_res_anm_create(res, *(EftResFileHandle*)&mdl,
-                                                    (nw4r::g3d::ScnMdlSimple*)chr->field_0x118, 5, works[0], &works[1],
-                                                    1.0f);
+        anm = (nw4r::g3d::AnmObj*)nw_res_anm_create(res, 1.0f, *(EftResFileHandle*)&mdl,
+                                                    (nw4r::g3d::ScnMdlSimple*)chr->field_0x118, 5, works[0], &works[1]);
         if (anm != NULL) {
             model->anm = anm;
             return 1;

@@ -521,10 +521,10 @@ extern "C" u32 fn_800932D8(void* self, u32 arg) {
 }
 
 /* `ResFile::GetResAnmTexSrt(u32)`. */
-extern "C" void* fn_80093390(void* self, u32 arg) { return (void*)fn_800932D8(self, arg); }
+extern "C" void* res_file_get_res_anm_tex_srt(void* self, u32 arg) { return (void*)fn_800932D8(self, arg); }
 
 /* `ResFile::GetResAnmTexSrtNumEntries()`. */
-extern "C" u32 fn_80093394(void* self) {
+extern "C" u32 res_file_get_res_anm_tex_srt_num(void* self) {
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_tex_srt)];
     if (entry != 0) {
         return nw4r::g3d::ResDic((void*)entry).GetNumData();
@@ -601,7 +601,7 @@ extern "C" u32 res_file_has_anm_chr(void* self) {
 }
 
 /* Whether the file has an `AnmTexSrt` category. */
-extern "C" u32 fn_80093794(void* self) {
+extern "C" u32 res_file_has_anm_tex_srt(void* self) {
     return (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_tex_srt)] != 0;
 }
 
@@ -787,10 +787,10 @@ extern "C" u32 fn_80093B0C(ResHandle* pSelf) {
         }
     }
 
-    count = fn_80093394(pSelf);
+    count = res_file_get_res_anm_tex_srt_num(pSelf);
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
-        item.mpData = fn_80093390(pSelf, i);
+        item.mpData = res_file_get_res_anm_tex_srt(pSelf, i);
         if (fn_80093EB4(&item) == 0) {
             return 0;
         }

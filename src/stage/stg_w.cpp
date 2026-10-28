@@ -1266,8 +1266,8 @@ extern "C" void stage_area_models_seat(void)
             } else {
                 res2.data_0x00 = w->chars[i]->chr.field_0x114;
                 mdl2.data_0x00 = w->chars[i]->chr.field_0x110;
-                w->anims[i] = (nw4r::g3d::AnmObj*)nw_res_anm_create(mdl2, res2,
-                    (nw4r::g3d::ScnMdlSimple*)w->chars[i]->chr.field_0x118, 1, work, 0, 1.0f);
+                w->anims[i] = (nw4r::g3d::AnmObj*)nw_res_anm_create(mdl2, 1.0f, res2,
+                    (nw4r::g3d::ScnMdlSimple*)w->chars[i]->chr.field_0x118, 1, work, 0);
             }
         } else {
             w->chars[i] = 0;

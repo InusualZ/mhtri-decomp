@@ -76,7 +76,7 @@ nw4r::g3d::ResTexSrtData* nw4r::g3d::ResTexSrt::ptr()
     return static_cast<ResTexSrtData *>(mpData);
 }
 
-extern "C" u32 fn_8006CE34(void *p)
+extern "C" u32 res_anm_tex_srt_is_valid(void *p)
 {
     return *(u32 *)p != 0;
 }
@@ -159,7 +159,7 @@ extern "C" u32 anmtexsrt_round_up(u32 offset, unsigned int align)
 
 extern "C" void fn_8006D030(u32 *dst, const u32 *src);
 
-extern "C" void *fn_8006D000(void *self, void *src)
+extern "C" void *res_anm_tex_srt_copy(void *self, void *src)
 {
     fn_8006D030((u32 *)self, (const u32 *)src);
     return self;
@@ -225,7 +225,7 @@ extern u8 lbl_8058D604[];
 
 extern "C" u32 fn_8006CDBC(void *p)
 {
-    if (fn_8006CE34(p) == 0)
+    if (res_anm_tex_srt_is_valid(p) == 0)
         nw4r::db::Panic((const char *)lbl_8058D6A4, 38, (const char *)lbl_8058D688,
                         (const char *)fn_8006CE28(), "ref");
     return res_anm_tex_srt_ptr(p);
@@ -714,7 +714,7 @@ const nw4r::g3d::TexSrtAnmResult* nw4r::g3d::AnmObjTexSrtOverride::GetResult(Tex
 nw4r::g3d::AnmObjTexSrtRes* nw4r::g3d::AnmObjTexSrtRes::Construct(MEMAllocator* pHeap, u32* pSize, ResAnmTexSrt res,
                                                                   ResMdl mdl, bool bHasCache)
 {
-    if (!fn_8006CE34(&res) || !mdl.IsValid()) {
+    if (!res_anm_tex_srt_is_valid(&res) || !mdl.IsValid()) {
         return NULL;
     }
     int numMat = res.GetNumMaterial();
@@ -763,7 +763,7 @@ nw4r::g3d::AnmObjTexSrtRes::AnmObjTexSrtRes(MEMAllocator* pHeap, ResAnmTexSrt re
     : AnmObjTexSrt(pHeap, pBindingBuf, numBinding),
       FrameCtrl(0.0f, fn_8006D060(&res), GetAnmPlayPolicy((AnmPolicy)fn_8006D03C(&res)))
 {
-    fn_8006D000(&mRes, &res);
+    res_anm_tex_srt_copy(&mRes, &res);
     mpResultCache = pCacheBuf;
     TEXSRT_POINTER_ASSERT(this, 0x25E, TEXSRT_THIS_MSG);
     if (mpResultCache) {

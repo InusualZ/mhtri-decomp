@@ -26,23 +26,30 @@
  *   `NwResPlLoadWork`, `nw_res_em_mdl_handle_set`/`_mot_` over the views `NwResKindWork`/`NwResKindSlots`;
  *   lane sound-mhchar's registry names `nw_scn_mdl_create`, `nw_anm_chr_blend_create`,
  *   `nw_anm_chr_res_create`; registry GUESS `ef_system_get_instance`, `ef_system_initialize`, `ef_system_retire_group`,
- *   `pl_res_buffer_get`, `pl_res_loaded_set`, `ef_particle_manager_ctor`, `ef_particle_manager_delete`.
- * RESIDUALS. Not written: the animation builders `nw_res_anm_work_num` (0x800D3874, 0x84) and `nw_res_anm_create`
- *   (0x800D38F8, 0x1CC) with their inline helpers 0x800D3AC4 (0x8, the texture-SRT animation's play-policy
- *   setter) and 0x800D3ACC (0x124, FrameCtrl's play-policy setter with `g3d_anmobj.h`'s pointer assert): they
- *   test a PTMF to `g3d/g3d_resfile.cpp`'s 0x80093794 and call its unnamed ResFile accessors, so their two
- *   `.data` PTMF words (0x80595378/0x80595384), the `g3d_anmobj.h` strings and `.sdata2` 0x807963C0 are not
- *   emitted either (`datagap`: target-extra `.data` 1048 B against ours 959 B, `.sdata2` 8 B).
+ *   `pl_res_buffer_get`, `pl_res_loaded_set`, `ef_particle_manager_ctor`, `ef_particle_manager_delete`,
+ *   `res_file_has_anm_tex_srt`, `res_file_get_res_anm_tex_srt_num`, `res_file_get_res_anm_tex_srt`,
+ *   `res_anm_tex_srt_copy`, `res_anm_tex_srt_is_valid`; GUESS `nw_res_anm_work_num_has_tex_srt`/
+ *   `nw_res_anm_create_has_tex_srt` (the two member-pointer records).
+ * SHAPES. The animation builders test `ResFile`'s `AnmTexSrt` category test as a member pointer, never called: retail
+ *   tests a constant `{0, -1, 0x80093794}` record with `__ptmf_test` (always true).  The owner defines the test with C
+ *   linkage, so the records are spelled as `__ptmf` statics.  `nw_res_anm_create` takes its rate second (every caller
+ *   evaluates it before the handles; float-last was 91.30 %, float-second 100 %).  The Particle pool's
+ *   `GarbageCollection` is declared, never defined (the manager collects particles itself): the declaration
+ *   instantiates the pool class before the manager's, which puts the manager's vtable first in `.data`, as retail.
+ * RESIDUALS. `.sdata2`: retail's 2.0f entry is 8 B (0x807963C0), ours 4 B.
  *   The pooled ef classes are views in `nw_resource.h` (`nw4r::ef::Effect`/`Emitter`/`ParticleManager`/
  *   `Particle`/`DrawInfo`); their full classes live in their own units, so the type is defined twice.
  *   The pool array constructors reach only symbols that exist: the Emitter and Particle views declare no destructor
- *   (retail passes `fn_800A630C`/`ef_particle_delete`, ours 0), and the particle-manager array is spelled out with
- *   `__construct_new_array` over `ef_particle_manager_ctor`/`_delete` without the new-expression's landing pad (a
- *   written try/catch needs `__end__catch`, which no unit defines); the manager's constructor is 1340 B against 1384.
- *   `nw_res_effect_init` copies the pool sizes field by field; retail copies the struct through its address
- *   (`li r3,sizes@sda21` + four `lhz`/`sth`), which under `dont_inline` becomes an `__as__` call.
- *   `nw_res_list_load`: retail tests the entry's size word in r4, ours in r0.
- *   `.data` order: ours emits the Particle pool's vtable before the manager's; retail the manager's first.
+ *   (retail passes the owners' C-linkage deleting destructors 0x800A630C/`ef_particle_delete`, ours 0: two
+ *   `lis`/`addi` against one `li`), and the particle-manager array is spelled out with `__construct_new_array` over
+ *   `ef_particle_manager_ctor`/`_delete`; its new-expression cleanup pad is written as a `catch (...)` that frees the
+ *   block and rethrows, which adds the handler's `__end__catch` tail (6 instructions) retail's pad does not have, and
+ *   the count is reloaded where retail keeps it in r30 (a cached local measured worse): 1404 B against 1384.
+ *   `nw_res_effect_init` copies the pool sizes field by field; retail materialises the struct's address first
+ *   (`li r3,sizes@sda21` + four `lhz`/`sth`), ours folds the first load into `lhz r0,sizes@sda21` (a pointer local
+ *   and a `dst`/`src` pair: no gain; the struct assignment becomes an `__as__` call under `dont_inline`, and
+ *   `dont_inline off` inlines the bind helper).
+ *   `nw_res_list_load`: retail tests the entry's size word in r4, ours in r0 (a `size` local, a `for` loop: no change).
  *   `ResEntry.flag` is compared signed by `nwDelResource` (a cast; the shared header types it `u32`).
  */
 
@@ -74,6 +81,10 @@
 #include "nw4r/g3d/scnmdl.h"
 #include "g3d/g3d_anmchr.h"
 #include "g3d/g3d_anmtexsrt.h"
+#include "g3d/res_file_has_anm_tex_srt.h"
+#include "g3d/res_anm_tex_srt_copy.h"
+#include "g3d/PlayPolicy_Loop.h"
+#include "Runtime.PPCEABI.H/ptmf.h"
 #include "g3d/G3dInit.h"
 #include "g3d/g3d_state_set_render_mode.h"
 #include "camera/camera_work_init.h"
@@ -193,6 +204,7 @@ void nw_res_effect_init(void);
 _g3d_work* nw_scn_mdl_create(nw4r::g3d::ResMdl mdl, u32 bufferOption, int numView);
 nw4r::g3d::AnmObjChrBlend* nw_anm_chr_blend_create(nw4r::g3d::ResMdl mdl, int numChildren);
 nw4r::g3d::AnmObjChrRes* nw_anm_chr_res_create(nw4r::g3d::ResAnmChr res, nw4r::g3d::ResMdl mdl, bool bHasCache);
+void frame_ctrl_set_play_policy(nw4r::g3d::FrameCtrl* self, nw4r::g3d::PlayPolicyFunc policy);
 }
 
 /* The C++-linkage entry points (defined below with their real signature, never the mangled spelling -
@@ -451,6 +463,84 @@ _g3d_work* pull_g3d_wk_anm_scn_at(ResHandle res, bool bHasCache, u8 stage) {
     return work;
 }
 
+/* The member-function pointer records to the file's `AnmTexSrt` category test that the two animation builders test
+ * (a constant record, so the test always passes); one record per builder, as retail. */
+static __ptmf nw_res_anm_work_num_has_tex_srt = {0, -1, (long)res_file_has_anm_tex_srt};
+static __ptmf nw_res_anm_create_has_tex_srt = {0, -1, (long)res_file_has_anm_tex_srt};
+
+/* 0x800D3874 (0x84): builds the texture-SRT override work sized by the file's texture-SRT animations; returns
+ * their count. */
+s32 nw_res_anm_work_num(EftResFileHandle res, EftResFileHandle mdl, s32 kind, _g3d_work** list) {
+    _g3d_work* work = NULL;
+    s32 num;
+    if (__ptmf_test(&nw_res_anm_work_num_has_tex_srt)) {
+        num = res_file_get_res_anm_tex_srt_num(&res);
+        work = pull_g3d_wk_anm_tex_srt_override_at(reinterpret_cast<nw4r::g3d::ResMdl&>(mdl), num, kind);
+    }
+    *list = work;
+    return num;
+}
+
+/* 0x800D38F8 (0x1CC): builds a looping texture-SRT animation work per animation of the file, attaches each to the
+ * override in `first` and sets the override on the model; returns the override, or NULL. */
+/* untyped: opaque handle - the override the callers hand on, as `nw_resource.h` declares it */
+void* nw_res_anm_create(EftResFileHandle res, f32 strength, EftResFileHandle mdl, nw4r::g3d::ScnMdlSimple* scn, s32 kind,
+                        _g3d_work* first, _g3d_work** rest) {
+    if (first == NULL) {
+        return NULL;
+    }
+    if (__ptmf_test(&nw_res_anm_create_has_tex_srt)) {
+        u32 i;
+        u32 num = res_file_get_res_anm_tex_srt_num(&res);
+        bool bHasCache;
+        nw4r::g3d::AnmObjTexSrtOverride* override = static_cast<nw4r::g3d::AnmObjTexSrtOverride*>(first->obj);
+        bHasCache = (u8)kind == 5;
+        for (i = 0; i < num; i++) {
+            nw4r::g3d::ResAnmTexSrt anm;
+            void* data = res_file_get_res_anm_tex_srt(&res, i);
+            res_anm_tex_srt_copy(&anm, &data);
+            if (override != NULL && res_anm_tex_srt_is_valid(&anm)) {
+                _g3d_work* work = pull_g3d_wk_anm_tex_srt_at(anm, reinterpret_cast<nw4r::g3d::ResMdl&>(mdl),
+                                                             bHasCache, kind);
+                if (rest != NULL) {
+                    *rest++ = work;
+                }
+                if (work != NULL) {
+                    nw4r::g3d::AnmObjTexSrtRes* obj = static_cast<nw4r::g3d::AnmObjTexSrtRes*>(work->obj);
+                    obj->Bind(reinterpret_cast<nw4r::g3d::ResMdl&>(mdl));
+                    obj->SetUpdateRate(2.0f * strength);
+                    obj->SetPlayPolicy(nw4r::g3d::PlayPolicy_Loop);
+                    override->Attach(i, obj);
+                }
+            }
+        }
+        scn->SetAnmObj(override, nw4r::g3d::ScnMdlSimple::ANMOBJTYPE_NOT_SPECIFIED);
+        return override;
+    }
+    return NULL;
+}
+
+/* 0x800D3AC4 (0x8): sets the play policy of the animation's frame counter. */
+inline void nw4r::g3d::AnmObjTexSrtRes::SetPlayPolicy(PlayPolicyFunc policy) {
+    FrameCtrl& frame = *this;
+    frame_ctrl_set_play_policy(&frame, policy);
+}
+
+/* The RVL address windows nw4r's pointer assert accepts. */
+#define NW_RES_VALID_PTR(p)                                                                                         \
+    (((u32)(p) & 0xFF000000) == 0x80000000 || ((u32)(p) & 0xFF800000) == 0x81000000 ||                              \
+     ((u32)(p) & 0xF8000000) == 0x90000000 || ((u32)(p) & 0xFF000000) == 0xC0000000 ||                              \
+     ((u32)(p) & 0xFF800000) == 0xC1000000 || ((u32)(p) & 0xF8000000) == 0xD0000000 ||                              \
+     ((u32)(p) & 0xFFFFC000) == 0xE0000000)
+
+/* 0x800D3ACC (0x124): asserts the play policy is a valid pointer and stores it in the frame counter. */
+inline void frame_ctrl_set_play_policy(nw4r::g3d::FrameCtrl* self, nw4r::g3d::PlayPolicyFunc policy) {
+    NW_RES_VALID_PTR(policy) ? (void)0
+                             : nw4r::db::Panic("g3d_anmobj.h", 95, "NW4R:Pointer Error\nfunc(=%p) is not valid pointer.",
+                                               policy);
+    self->mpPlayPolicy = policy;
+}
+
 /* 0x800D3BF0 (0x1C): the scene root, or NULL before the manager exists. */
 nw4r::g3d::ScnRoot* nw_res_scn_root_get(void) {
     if (nw_res_manager == NULL) {
@@ -650,6 +740,10 @@ inline void NwResObjectPool<nw4r::ef::ParticleManager>::GarbageCollection() {
     }
 }
 
+/* The particle pool is collected by the manager itself (its particles leave their manager's list first). */
+template <>
+void NwResObjectPool<nw4r::ef::Particle>::GarbageCollection();
+
 /* One block of the manager's heap: the free/used list links, the address-order neighbours, the payload size and
  * the in-use flag; the payload starts one rounded header past it. */
 struct NwResHeapBlock {
@@ -736,10 +830,15 @@ public:
             managers = (nw4r::ef::ParticleManager*)operator new[](
                 mNumParticleManager * sizeof(nw4r::ef::ParticleManager) + 16, block);
             if (managers != NULL) {
-                managers = (nw4r::ef::ParticleManager*)__construct_new_array(
-                    managers, (ConstructorDestructor)ef_particle_manager_ctor,
-                    (ConstructorDestructor)ef_particle_manager_delete, sizeof(nw4r::ef::ParticleManager),
-                    mNumParticleManager);
+                try {
+                    managers = (nw4r::ef::ParticleManager*)__construct_new_array(
+                        managers, (ConstructorDestructor)ef_particle_manager_ctor,
+                        (ConstructorDestructor)ef_particle_manager_delete, sizeof(nw4r::ef::ParticleManager),
+                        mNumParticleManager);
+                } catch (...) {
+                    operator delete[](managers, block);
+                    throw;
+                }
             }
         }
         mParticleManagerPool = new (AllocHeap(sizeof(NwResObjectPool<nw4r::ef::ParticleManager>)))

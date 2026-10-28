@@ -1974,7 +1974,7 @@ void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long ligh
         } else {
             strength = 0.5f;
         }
-        uv = nw_res_anm_create(res, *(EftResFileHandle*)&mdl, (nw4r::g3d::ScnMdlSimple*)model->field_0x118, 5, list[0], &list[1], strength);
+        uv = nw_res_anm_create(res, strength, *(EftResFileHandle*)&mdl, (nw4r::g3d::ScnMdlSimple*)model->field_0x118, 5, list[0], &list[1]);
         if (uv != NULL) {
             return uv;
         }

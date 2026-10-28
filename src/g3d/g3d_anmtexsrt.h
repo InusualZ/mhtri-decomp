@@ -178,6 +178,7 @@ public:
 
     static const TypeObj GetTypeObjStatic();
     void UpdateCache();
+    void SetPlayPolicy(PlayPolicyFunc policy);
 
     /* +0x18 */ /* FrameCtrl base (0x14 bytes) */
     /* +0x2C */ ResAnmTexSrt mRes;
