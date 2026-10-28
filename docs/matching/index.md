@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (239)
+## Ideas that work (240)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -248,6 +248,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 259 | [A field retail reloads (or an address it recomputes per iteration) is read inside an inline helper: the inline is a CSE boundary](259-field-retail-reloads-or.md) | works | source-shape, allocator | Retail reloads a field after a test (or recomputes `addi rX,self,OFF` per iteration) where ours reuses the register, or a loop's counter and induction pointer swap saved registers |
 | 260 | [x += c after the last use of x: a fresh local keeps the add in place where MWCC's frontend propagates x + c into every later use](260-x-c-after-the.md) | works | source-shape, allocator | Retail updates a coordinate in place (`addi r22,r22,0xa`) right after its last plain use; ours has no add there and recomputes `x + 10` (or a folded `x + 0x3a`) at each later use or hoists it late, recolouring the loop. |
 | 261 | [Ternary operands typed like the target keep or drop the conversion after the merge](261-ternary-operands-typed-like.md) | works | source-shape | A constant ternary passed to a u16 parameter shows retail's `li; b; li; clrlwi` (or an s16 return lacks our `extsh`) and every cast spelling of the whole ternary folds or adds it. |
+| 262 | [A step's early path that runs a later case's tail: wrap the rest of the case (and the cases between) in its else, so it falls into that case](262-steps-early-path-that.md) | works | source-shape | Retail's `case 0` (or `case 1`) sets the state and branches straight to a later case's body (`li r0,2; stb; b <case 2>`) and every other exit branches to one shared `mr r3,rN` return; ours repeats the later case's test... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
