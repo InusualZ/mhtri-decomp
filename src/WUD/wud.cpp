@@ -13,8 +13,12 @@
  *   Scoped pragmas, each measured on its own row: `opt_strength_reduction off` keeps the `i * 12` / `i * 0x60` index
  *   arithmetic (`__wudClearControlBlock`, `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiUpdateWiiFitSaveData`,
  *   `WUDiSyncRegisterDevice`); `opt_common_subs off` (`WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiLoadWiiFitSaveData`,
- *   `WUDiSyncRegisterDevice`); `opt_propagation off` (`WUDiSyncRegisterDevice`); `optimization_level 3` (`WUDiSyncFiber`,
- *   `WUDiLoadDeviceInfo`).
+ *   `WUDiSyncRegisterDevice`); `opt_propagation off` (`WUDiSyncRegisterDevice`); `optimization_level 3`
+ *   (`WUDiLoadDeviceInfo`); `global_optimizer off` (`WUDiSyncFiber`: it keeps the target's inner switches as compare trees
+ *   and its if/else values unspeculated, `li; b join`, where the optimizer turns a small switch into ifs and speculates;
+ *   `opt_optimizecontrolflow off` instead measured -191 B on the row); `opt_optimizecontrolflow off`
+ *   (`WUDiLoadWiiFitSaveData`: the step switch stays the target's compare tree with the rest of the optimizer on, the
+ *   checksum loops unrolled; `global_optimizer off` there measured -243 B).
  * NAMES. the map's names (`WUDGetBufferStatus`, `WUDSetSniffMode`, `WUDSetVisibility`, `WUDiGetDevInfo`,
  *   `WUDDeviceStatusCallback`, `WUDSetDeviceHistory`, `_WUDGetDevAddr`, `_WUDGetQueuedSize`, `_WUDGetNotAckedSize`,
  *   `_WUDGetLinkNumber`, `App_MEMalloc`, `App_MEMfree`, ...);
@@ -44,16 +48,16 @@
  * RESIDUALS. Every row has a body.
  *   `WUDiUpdateWiiFitSaveData`: the target folds `wudSetWiiFitSaveData`'s NULL and `&local != NULL` tests late and leaves dead
  *   `bl memcpy` calls behind unconditional branches; ours drops the NULL ones and keeps an `addic.` test of the local.
- *   `WUDiLoadWiiFitSaveData`: the step switch is a compare tree in the target and a linear compare chain here: Wii/1.3 turns a
- *   switch of up to seven cases into ifs (eight or more stay a tree or a jump table) and only `#pragma global_optimizer off`
- *   keeps the tree.  GC/3.0a5.2 reproduces this tree and the checksum schedule, but it lowers every switch as a tree, while the
- *   target's two- and three-case switches (`WUDiShutdownFiber`, `WUDiPatchCallback`) are Wii dispatch chains, so the unit stays
- *   on Wii/1.3.
- *   `WUDiSyncFiber`: the target materialises each case's next state as `li; b join` where ours speculates one value (no
- *   pragma removes the speculation), its inner switches are compare trees, and the `(BOOL)` of `wudIsLinkKeyBusy` is
- *   materialised and tested; s16 `searchTime` fields give the target's `lha` but measure lower than u16 (the speculated `li` moves).
- *   `WUDiLoadDeviceInfo`: the inner search's exit test is threaded into the found/not-found jumps in the target (a guard
- *   `i >= 9` before the loop); no loop spelling tried (while, do-while, `j == 10`, `j > 9`, an inline helper) produces it.
+ *   `WUDiLoadWiiFitSaveData`: case 0's `?:` is speculated (`li r0,0xFF; bne; li r0,1`) where the target branches to two
+ *   `li`s (if/else, a both-arms local and every opt_* pragma tried keep it), and the checksum loops' cursor and sums take
+ *   other registers.  GC/3.0a5.2 lowers every switch as a tree, while the target's two- and three-case switches
+ *   (`WUDiShutdownFiber`, `WUDiPatchCallback`) are Wii dispatch chains, so the unit stays on Wii/1.3.
+ *   `WUDiSyncFiber`: register colouring only - the target keeps `device` of cases 0x10/0x11 in r29 (ours r25), the inlined
+ *   new-record search's counter and cursor swap, and the duration temporary of case 2 is r3 there (ours r29).
+ *   `WUDiLoadDeviceInfo`: the inner search's exit test is threaded into the found/not-found jumps in the target (the
+ *   `i >= 9` guard is source); no goto-free spelling tried (while, do-while, `j == 10`, `j > 9`, a found flag, an inline
+ *   helper returning the result, a `switch` on the address compare with `default:` in the loop, O2/O4, `global_optimizer off`)
+ *   produces it: a jump out of a loop past its exit code (idea 217).
  *   `__wudClearControlBlock`: the target's node cursor starts at `wudCB` with the field offset in the displacement.
  *   `WUDiSearchCallback`, `RemovePatchCallback`, `WUDiPatchWriteCallback`, `__wudAppendRuntimePatch`, `WUDiInsertWbcNode`,
  *   `WUDiInsertDeviceNode`, `WUDiDeleteAllLinkKeys`, `WUDiStoreDeviceInfoToSC`, `WUDiVendorEventCallback`,
@@ -75,7 +79,13 @@
  *   it in the compare tree (`WUDiClearFiber` case 7).  Declaration order is a colouring input: the list moves declare `u32 level;`
  *   first and assign it after the declarations, and `WUDiAddDevice` declares `device` before the interrupt level.  The patch
  *   address and length are accumulated a byte per statement (`__wudAppendRuntimePatch`); the link key busy test keeps a `busy`
- *   local (`wudIsLinkKeyBusy`).
+ *   local assigned on both arms (`wudIsLinkKeyBusy`).  Under `global_optimizer off` (`WUDiSyncFiber`): a block-scope local
+ *   makes the function keep a frame pointer, so every local is at function scope; a value the target joins (`li; b join;
+ *   stb`) is a named local assigned on both arms, never `?:` or two stores; the call-free cases use `state` and `duration`
+ *   apart from `next`, which lives across calls; the interrupt-guarded counts are read through u32-returning inlines
+ *   (a u8 return is zero-extended again at each compare).  `wudCalcCrc` declares its two sums and assigns the high one first.
+ *   The `if (0) { case 1: case 3: ... }` block in `WUDiSyncFiber` case 0x10 lets a simple-mode remote's else arm fall into
+ *   `default`'s state, as the target's branch does (idea 241).
  */
 
 #include "types.h"
@@ -314,11 +324,11 @@ static inline u8 wudGetDeviceCount(void)
 }
 
 /* The number of paired balance boards, read with interrupts off. */
-static inline u8 wudGetWbcCount(void)
+static inline u32 wudGetWbcCount(void)
 {
     WUDCB* cb = &wudCB;
     u32 level = OSDisableInterrupts();
-    u8 count = cb->wbcCount;
+    u32 count = cb->wbcCount;
 
     OSRestoreInterrupts(level);
     return count;
@@ -393,11 +403,11 @@ static inline s32 wudStartClearDevice(void)
 }
 
 /* The number of open links, read with interrupts off. */
-static inline u8 wudGetLinkNumber(void)
+static inline u32 wudGetLinkNumber(void)
 {
     WUDCB* cb = &wudCB;
     u32 level = OSDisableInterrupts();
-    u8 count = cb->linkNumber;
+    u32 count = cb->linkNumber;
 
     OSRestoreInterrupts(level);
     return count;
@@ -449,9 +459,12 @@ static inline WUDDevice* wudFindLinkedWbc(void)
  * half and the sum of their complements in the low half. */
 static inline u32 wudCalcCrc(u32 seed, const u16* data, u32 size)
 {
-    u16 inverseSum = seed;
-    u32 sum = seed >> 16;
+    u16 inverseSum;
+    u32 sum;
     s32 i;
+
+    sum = seed >> 16;
+    inverseSum = seed;
 
     for (i = 0; i < size / 2; i++) {
         u16 value = *data++;
@@ -813,20 +826,22 @@ s32 WUDiSyncDone(void)
 /* Whether a stored link key command is still running. */
 static inline BOOL wudIsLinkKeyBusy(void)
 {
-    BOOL busy = FALSE;
+    BOOL busy;
 
     if (wudCB.linkKeyState != 0) {
         busy = TRUE;
+    } else {
+        busy = FALSE;
     }
     return busy;
 }
 
 /* The number of balance board links, read with interrupts off. */
-static inline u8 wudGetWbcLinkNumber(void)
+static inline u32 wudGetWbcLinkNumber(void)
 {
     WUDCB* cb = &wudCB;
     u32 level = OSDisableInterrupts();
-    u8 count = cb->wbcLinkNumber;
+    u32 count = cb->wbcLinkNumber;
 
     OSRestoreInterrupts(level);
     return count;
@@ -836,14 +851,19 @@ static inline u8 wudGetWbcLinkNumber(void)
  * link, registers it and its link key, stores the table in the console settings and the Wii Fit save file, and ends the
  * search. */
 #pragma push
-#pragma optimization_level 3
+#pragma global_optimizer off
 void WUDiSyncFiber(void)
 {
-    WUDCB* cb = &wudCB;
     WUDDevice* device;
     BtaDmInq inquiry;
     const char* path;
-    u8 next;
+    u32 next;
+    WUDCB* cb = &wudCB;
+    u32 state;
+    u8 duration;
+    WUDDevice* stored;
+    u32 level;
+    u16 time;
 
     switch (cb->syncState) {
     case 1:
@@ -851,15 +871,15 @@ void WUDiSyncFiber(void)
         break;
     case 0x1D:
         if (cb->searching == 0) {
-            next = 0xE;
+            state = 0xE;
         } else if (wudGetLinkNumber() == 4 && wudGetWbcLinkNumber() == 4) {
-            next = 0xE;
-        } else if ((s16)--cb->searchTime < 0) {
-            next = 2;
+            state = 0xE;
+        } else if (--cb->searchTime < 0) {
+            state = 2;
         } else {
-            next = 0x1D;
+            state = 0x1D;
         }
-        cb->syncState = next;
+        cb->syncState = state;
         break;
     case 2:
         inquiry.mode = 1;
@@ -868,9 +888,19 @@ void WUDiSyncFiber(void)
         if ((u8)cb->quickSearch != 0) {
             inquiry.duration = 3;
         } else if ((u8)cb->simple == 0) {
-            inquiry.duration = ((wudGetLinkNumber() == 3) ? 10 : 5) - (u8)cb->searching;
+            if (wudGetLinkNumber() == 3) {
+                duration = 10;
+            } else {
+                duration = 5;
+            }
+            inquiry.duration = duration - (u8)cb->searching;
         } else {
-            inquiry.duration = (wudGetLinkNumber() == 3) ? 8 : 3;
+            if (wudGetLinkNumber() == 3) {
+                duration = 8;
+            } else {
+                duration = 3;
+            }
+            inquiry.duration = duration;
         }
         wudInquiryCount = 0;
         memset(&wudInquiryResult, 0, sizeof(wudInquiryResult));
@@ -892,16 +922,21 @@ void WUDiSyncFiber(void)
         }
         if ((u8)wudCB.simple == 0 && next == 1) {
             next = 0x18;
-            wudCB.searchTimeMax = (wudGetLinkNumber() == 3) ? 200 : 100;
+            if (wudGetLinkNumber() == 3) {
+                time = 200;
+            } else {
+                time = 100;
+            }
+            wudCB.searchTimeMax = time;
             wudSetVisibility(0, 1);
         }
         cb->syncState = next;
         break;
     case 5:
         next = 0x11;
-        device = WUDiGetDevInfo(wudInquiryResult.bdAddr);
-        if (device != NULL) {
-            memcpy(&wudStoredDeviceInfo, device, sizeof(WUDDevice));
+        stored = WUDiGetDevInfo(wudInquiryResult.bdAddr);
+        if (stored != NULL) {
+            memcpy(&wudStoredDeviceInfo, stored, sizeof(WUDDevice));
             next = 0x10;
         }
         cb->syncState = next;
@@ -917,32 +952,34 @@ void WUDiSyncFiber(void)
             if ((u8)wudCB.simple == 0) {
                 WUDiMoveDeviceToTail(device);
                 WUDiRemoveDevice(device->bdAddr);
-                next = 0x11;
-            } else {
-                device->type = 4;
-                next = 0xF;
+                state = 0x11;
+                break;
             }
-            break;
+            device->type = 4;
+            /* A remote seen again in simple mode is re-registered as a guest: the balance boards skip this. */
+            if (0) {
         case 1:
         case 3:
-            WUDiMoveWbcToTail(device);
-            WUDiRemoveDevice(wudCB.wbcTail->device->bdAddr);
-            next = 0x11;
-            break;
+                WUDiMoveWbcToTail(device);
+                WUDiRemoveDevice(wudCB.wbcTail->device->bdAddr);
+                state = 0x11;
+                break;
+            }
         default:
-            next = 0xF;
+            state = 0xF;
             break;
         }
-        cb->syncState = next;
+        cb->syncState = state;
         break;
     case 0x11:
         device = &wudStoredDeviceInfo;
         device->linkState = 1;
         if ((u8)cb->simple == 0) {
-            device->type = 0;
+            state = 0;
         } else {
-            device->type = 1;
+            state = 1;
         }
+        device->type = state;
         memcpy(device->bdAddr, wudInquiryResult.bdAddr, 6);
         memcpy(device->name, wudInquiryResult.name, 0x40);
         memset(device->linkKey, 0, 0x10);
@@ -952,28 +989,28 @@ void WUDiSyncFiber(void)
         cb->syncState = WUDiSyncCheckInquiry();
         break;
     case 0x12:
-        next = wudStoredDeviceInfo.type;
-        switch (next) {
+        state = wudStoredDeviceInfo.type;
+        switch (state) {
         case 1:
-            next = 0x13;
+            state = 0x13;
             break;
         case 0:
-            next = 0x14;
+            state = 0x14;
             break;
         case 5:
-            next = 0x15;
+            state = 0x15;
             break;
         case 3:
-            next = 0x17;
+            state = 0x17;
             break;
         case 4:
-            next = 7;
+            state = 7;
             break;
         case 2:
-            next = 7;
+            state = 7;
             break;
         }
-        cb->syncState = next;
+        cb->syncState = state;
         break;
     case 0x13:
         if (wudGetWbcCount() == 6) {
@@ -1003,9 +1040,9 @@ void WUDiSyncFiber(void)
         break;
     case 7:
         if (wudIsLinkKeyBusy()) {
-            next = 7;
+            state = 7;
         } else if (wudLinkedWbc != 0 && memcmp(wudStoredDeviceInfo.name, "Nintendo RVL-WBC", 0x10) == 0) {
-            next = 0x16;
+            state = 0x16;
         } else {
             device = WUDiGetDevInfo(wudStoredDeviceInfo.bdAddr);
             WUDiDebugPrint("write stored link key\n");
@@ -1018,29 +1055,27 @@ void WUDiSyncFiber(void)
                            device->linkKey[12], device->linkKey[13], device->linkKey[14], device->linkKey[15]);
             cb->linkKeyState = 2;
             BTM_WriteStoredLinkKey(1, device->bdAddr, device->linkKey, __wudLinkKeyEventStackCallback);
-            next = 8;
+            state = 8;
         }
-        cb->syncState = next;
+        cb->syncState = state;
         break;
     case 8:
         if (!wudIsLinkKeyBusy()) {
-            next = 0x16;
+            state = 0x16;
         } else {
-            next = 8;
+            state = 8;
         }
-        cb->syncState = next;
+        cb->syncState = state;
         break;
     case 0x16:
         cb->syncState = WUDiStoreDeviceInfoToSC();
         break;
-    case 0x19: {
-        u32 level = OSDisableInterrupts();
-
+    case 0x19:
+        level = OSDisableInterrupts();
         cb->syncState = 0xD;
         OSRestoreInterrupts(level);
         SCFlushAsync(SyncFlushCallback);
         break;
-    }
     case 0xA:
         next = 0xA;
         if (!wudIsLinkKeyBusy()) {
@@ -1052,11 +1087,21 @@ void WUDiSyncFiber(void)
     case 0x17:
         cb->syncRetries++;
         memset(&wudStoredDeviceInfo, 0, sizeof(WUDDevice));
-        cb->syncState = ((u8)cb->simple == 0) ? 0xE : 1;
+        if ((u8)cb->simple == 0) {
+            state = 0xE;
+        } else {
+            state = 1;
+        }
+        cb->syncState = state;
         break;
     case 0xFF:
         memset(&wudStoredDeviceInfo, 0, sizeof(WUDDevice));
-        cb->syncState = ((u8)cb->simple == 0) ? 0xE : 1;
+        if ((u8)cb->simple == 0) {
+            state = 0xE;
+        } else {
+            state = 1;
+        }
+        cb->syncState = state;
         break;
     case 0xE:
         cb->syncState = WUDiSyncDone();
@@ -1076,7 +1121,7 @@ void WUDiSyncFiber(void)
         if (wudGetLinkNumber() == 4 && wudGetWbcLinkNumber() == 4) {
             next = 0xE;
         }
-        if ((s16)--wudCB.searchTimeMax < 0) {
+        if (--wudCB.searchTimeMax < 0) {
             next = 1;
         }
         cb->syncState = next;
@@ -1426,12 +1471,12 @@ static inline void wudPrintDevice(WUDDevice* device)
 #pragma optimization_level 3
 u8 WUDiLoadDeviceInfo(void)
 {
+    u8 registered;
     WUDCB* cb;
     WUDScDeviceArray* array;
     WUDDevice* device;
     u8 zero[6];
     s32 remaining;
-    u8 registered;
     s32 i;
     s32 j;
 
@@ -1453,6 +1498,9 @@ u8 WUDiLoadDeviceInfo(void)
             memset(&array->devices[i], 0, sizeof(WUDScDevice));
         }
         if (memcmp(array->devices[i].bdAddr, zero, 6) == 0) {
+            if (i >= 9) {
+                continue;
+            }
             for (j = i + 1; j < 10; j++) {
                 if (memcmp(array->devices[j].name, "Nintendo RVL-CNT", 0x10) == 0) {
                     memcpy(&array->devices[i], &array->devices[j], sizeof(WUDScDevice));
@@ -1570,6 +1618,7 @@ void WUDiPatchStepDone(s32 result)
  * bring-up step (2 while it runs, 3 when it is done). */
 #pragma push
 #pragma opt_common_subs off
+#pragma opt_optimizecontrolflow off
 u8 WUDiLoadWiiFitSaveData(void)
 {
     const char* path = "/title/00010004/52464e4a/data/RPHealth.dat";

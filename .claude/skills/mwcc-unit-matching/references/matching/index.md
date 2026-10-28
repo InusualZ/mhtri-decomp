@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (247)
+## Ideas that work (248)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -256,6 +256,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 267 | [A two-valued constant is an if/else: retail schedules the default li between the compare and its branch](267-two-valued-constant-is.md) | works | source-shape | Retail's `li rX,default` sits between a `cmplwi`/`cmpwi` and its branch; ours loads it before the compared field. |
 | 268 | [A sum computed before a branch and reduced after it: initialise the local with the sum, apply the reduction later](268-sum-computed-before-a.md) | works | source-shape, allocator | Retail computes `addi rX, rBit, 12` before a conditional mask and the `clrlwi rY, rX, 29` after it, while ours computes both after the branch, so the loop body is shifted by one slot. |
 | 269 | [A per-element (i + 1) * 2 index beside a strength-reduced i * 2 is an unrolled inner loop over x[i + 1 - k]](269-per-element-i-1.md) | works | source-shape | Retail recomputes `addi rX,i,1; slwi rX,rX,1; lhax` for x[i+1] each iteration while x[i] rides a strength-reduced offset and x[i+2] a pointer, and reloads the invariant coefficients inside the loop; ours walks one... |
+| 270 | [Under global_optimizer off a block-scope local forces a frame pointer: declare every local at function scope](270-under-global-optimizer-off.md) | works | pragma, source-shape | A function scoped under `#pragma global_optimizer off` gains `mr r31,r1` after the register saves and a `mr r10,r31` / `lwz r10,0(r1)` epilogue, and every stack local is addressed through r31; retail has the plain `addi... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

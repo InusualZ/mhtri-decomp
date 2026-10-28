@@ -211,8 +211,8 @@ typedef struct WUDCB {
     /* +0x740 */ u32 enabledProfiles; /* GUESS: bit 0 set by the HID host enable event */
     /* +0x744 */ u16 bufferHead;
     /* +0x746 */ u16 bufferTail;
-    /* +0x748 */ u16 searchTime;
-    /* +0x74A */ u16 searchTimeMax;
+    /* +0x748 */ s16 searchTime;
+    /* +0x74A */ s16 searchTimeMax;
     /* +0x74C */ u8 pad_0x74C[4];
 } WUDCB; /* size: 0x750 */
 
