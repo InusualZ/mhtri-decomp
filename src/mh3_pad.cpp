@@ -17,7 +17,7 @@
  *   `lang_index_set`, `strap_tpl_load`, `str_rfind`, `sdk_link_refs` (a never-called block of SDK calls with
  *   uninitialised arguments), `sdk_link_text_ptr`/`sdk_link_text`, the `gx_*` immediate helpers, `task_slot_table_run` and the
  *   `tsk_*` slot setters, `wpad_mem2_alloc/free`, `pad_*` (init, frame read, device reads, menu merge, rumble,
- *   accelerometer history, callbacks), `rc_get_*` (the RcRecord = PADStatus fields), `stick_dir8_get`,
+ *   accelerometer history, callbacks), `rc_get_*` (the `DemoPad` PADStatus fields), `stick_dir8_get`,
  *   `pointer_*` (the pointer ring and smoothing), `kpad_*` (named after the SDK KPAD routines each one copies:
  *   calc_acc, calc_acc_horizon/vertical, select_2obj_first/continue, select_1obj_first/continue,
  *   calc_dpd_variable, read_kpad_acc/dpd, reset_kpad, calc_dpd2pos_scale), and the data rows
@@ -26,9 +26,8 @@
  *   `pad_rm_acc_max`, `pad_kp_dist_init`, `wpad_*`, `pointer_*`, `pad_probe_*`, the RSO loader state
  *   `rso_sel_image`/`rso_boot_module`/`rso_overlay_module0..3`, `rso_slot_pool_index`, `rso_sel_path`,
  *   `rso_path_table`, `stage_map_rso_table`, `rso_boot_name`) and `game_mode_nop` (an empty game-mode entry
- *   between `field_game_task_start` and `ArenaSelExec`).  Registry proposals for the
- *   foreign callees: `face_buf_reset` (0x8004882C), `rc_record_init` (0x804A4E40), `rc_record_read`
- *   (0x804A4D70).  `SystemWork.language_0x01`, `pause_0x10` and `pad_lock_ck_0x8d8` are GUESS field names.
+ *   between `field_game_task_start` and `ArenaSelExec`).  Registry proposal for the
+ *   foreign callee `face_buf_reset` (0x8004882C).  `SystemWork.language_0x01`, `pause_0x10` and `pad_lock_ck_0x8d8` are GUESS field names.
  * RESIDUALS. `pad_records_construct`/`player_pad_construct`/`pad_fs_block_construct` are byte-identical plain
  *   functions standing for MWCC's static initialiser and the PlayerPad / Nunchuk-block constructors (a class
  *   `PlayerPad` whose +0xFC block holds 32 constructed VEC3s cannot be expressed in the flat header layout its 150
@@ -148,21 +147,6 @@ typedef struct PadChanState {
     /* +0x15 */ u8 pad_0x15[3];
 } PadChanState; /* size: 0x18 */
 
-/* The 0x1E-byte record table at `lbl_807419C8` (rc_get_button and the rc_get_substick_y..rc_get_trigger_l
- * accessors read single bytes out of it). */
-typedef struct RcRecord {
-    /* +0x00 */ u16 field_0x00;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 pad_0x08[0x2];
-    /* +0x0A */ u8 field_0x0a;
-    /* +0x0B */ u8 pad_0x0b[0x13];
-} RcRecord; /* size: 0x1E */
-
 /* ------------------------------------------------------------------ *
  * Extern declarations (all unsplit addresses - rule 2's named gap; see config_requests)
  * ------------------------------------------------------------------ */
@@ -196,9 +180,6 @@ extern u32 rso_slot_load_base[5];
 extern u32 rso_slot_unused_words[5];
 extern TaskSlot task_slot_table[16];
 extern MEMAllocator wpad_mem2_allocator; /* MEM2 allocator record */
-
-/* --- .sbss table --- */
-extern RcRecord lbl_807419C8[];
 
 /* --- .sdata2 --- */
 
@@ -1116,7 +1097,7 @@ extern "C" void pad_wpad_init(void)
     s32 chan;
     s32 i;
 
-    rc_record_init();
+    DEMOPadInit();
     if (wpad_mem2_heap == NULL) {
         wpad_mem2_heap = exp_heap_create((void*)0x90308000, 0x40000);
         if (wpad_mem2_heap == NULL) {
@@ -1171,7 +1152,7 @@ extern "C" void pad_frame_read(void)
         system_w.field_0x32 = 1;
     }
     if (system_w.pad_lock_ck_0x8d8() == 0) {
-        rc_record_read();
+        DEMOPadRead();
     }
     for (chan = 0, prev = Psw_prev, pad = Psw; chan < 4; prev++, pad++, chan++) {
         pad_wpad_read(chan);
@@ -1395,7 +1376,7 @@ extern "C" MEMiHeapHead* exp_heap_create(void* base, u32 size)
 }
 
 /* ------------------------------------------------------------------ *
- * 0x80042B34 - 0x80042F60  (RcRecord accessors)
+ * 0x80042B34 - 0x80042F60  (DemoPad accessors)
  * ------------------------------------------------------------------ */
 
 
@@ -1490,7 +1471,7 @@ extern "C" void pad_wpad_busy(s32 chan)
     pad->button_0x2C0.hold_0x00 = 0;
 }
 
-/* Reads channel `chan`'s GameCube pad from the RcRecord table into its `Psw_prev` record. */
+/* Reads channel `chan`'s GameCube pad from the DemoPad table into its `Psw_prev` record. */
 extern "C" void pad_gc_read(s32 chan)
 {
     PlayerPad* pad;
@@ -1533,12 +1514,12 @@ extern "C" void pad_gc_read(s32 chan)
 
 extern "C" u16 rc_get_button(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x00;
+    return DemoPad[idx].pst.button;
 }
 
 extern "C" u8 rc_get_err(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x0a;
+    return DemoPad[idx].pst.err;
 }
 
 /* Returns the 8-way direction bits of a stick angle `deg` (degrees). */
@@ -1547,7 +1528,7 @@ extern "C" u8 stick_dir8_get(u16 deg)
     return stick_dir8_table[(s32)(deg / 22.5f)];
 }
 
-/* Derives the GameCube pad's triggers, stick angles, distances and direction buttons from the RcRecord. */
+/* Derives the GameCube pad's triggers, stick angles, distances and direction buttons from its DemoPad record. */
 extern "C" void pad_gc_stick_read(s32 chan, PlayerPad* pad)
 {
     s8 x[2];
@@ -1633,32 +1614,32 @@ extern "C" f64 pad_atan2_s8(s8 y, s8 x)
 
 extern "C" u8 rc_get_substick_y(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x05;
+    return DemoPad[idx].pst.substickY;
 }
 
 extern "C" u8 rc_get_substick_x(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x04;
+    return DemoPad[idx].pst.substickX;
 }
 
 extern "C" u8 rc_get_stick_y(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x03;
+    return DemoPad[idx].pst.stickY;
 }
 
 extern "C" u8 rc_get_stick_x(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x02;
+    return DemoPad[idx].pst.stickX;
 }
 
 extern "C" u8 rc_get_trigger_r(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x07;
+    return DemoPad[idx].pst.triggerR;
 }
 
 extern "C" u8 rc_get_trigger_l(s32 idx)
 {
-    return lbl_807419C8[idx].field_0x06;
+    return DemoPad[idx].pst.triggerL;
 }
 
 /* Derives the Classic Controller's stick angles, distances and direction buttons (cleared for another device). */
