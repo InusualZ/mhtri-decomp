@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* 0x800E2228 - builds the MHchar model from a res file, flags and light slot. */
-void mhchar_model_create(MHchar* chr, u32* file, u32 flags, u8 light);
+void mhchar_model_create(MHchar* chr, u32* file, u32 flags, s32 light);
 
 #ifdef __cplusplus
 }

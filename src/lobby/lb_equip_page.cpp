@@ -10,7 +10,9 @@
  *   `#pragma optimization_level 4` around `pl_rig_face_parts_map`, `pl_rig_weapon_kind_set`/`_load`,
  *   `pl_rig_attach_pose_set` and `pl_rig_pose_get` (idea 108: retail tests the weapon-type range cases 4-6 with
  *   `subi`/`cmplwi` and keeps `index * 0x110` across the calls; file-wide it costs `LbEquipModelCallbackB::ExecCallbackB`
- *   92.22 -> 87.95 and `pl_rig_hair_parts_map` 95.58 -> 95.29).
+ *   92.22 -> 87.95 and `pl_rig_hair_parts_map` 95.58 -> 95.29); `#pragma optimization_level 2` around
+ *   `LbEquipModelCallbackA::ExecCallbackB` (a per-function sweep of -O2/-O4/`opt_common_subs off`/`scheduling off`
+ *   over every open row kept only this one).
  * NAMES. `lb_equip_page` is a GUESS kept from the registration.  GUESS (from each body, its tables and its callers):
  *   every `lb_ship_*` and `pl_rig_*` name (the screen sends three ships out on voyages that bring goods back; the
  *   `pl_rig_kindN_*` rows are named by the attachment kind `pl_rig_attach_kind_tbl` gives, the `pl_rig_kN_*` key tables
@@ -23,23 +25,36 @@
  *   `mhchar_wld_mtx_array_get`, `pl_rig_hair_style_tbls`, `pl_rig_face_style_tbls`.
  * RESIDUALS.
  *  - `pl_rig_kind2/4_pose` reach their shared pose blocks goto-free (idea 183's `do { switch } while (0)`, kind4's
- *    keyed-pose exit as an inline helper's `return`, idea 219).  `pl_rig_kind8_pose` (90.29; the pose-flag form read
- *    79.15): retail branches into case 0x463's body from case 0x462 (lowered grip) and case 0x464 (into its middle,
- *    the turned-back head), a wall (idea 213) - both copies are inlined there; the default's stage test sits before the
- *    resting pose instead of after it.  `pl_rig_kind0_pose` (95.97; flag form 88.36, the block after the switch
- *    94.04): retail's charge-stretch block is the body of case 0x44D, entered by branches from cases 0x468/0x46F/0x48E;
- *    ours re-dispatches those to case 0x44D (idea 203), which costs a `li`/`b` per case and keeps `leaning` in a saved
- *    register across the back-edge (`_savegpr_27` instead of four `stw`);
+ *    keyed-pose exit as an inline helper's `return`, idea 219).  `pl_rig_kind8_pose`: cases 0x462 (leaning) and 0x465
+ *    reach case 0x463's lowered grip through an `if (0)` block holding cases 0x464/0x465 (idea 241); case 0x464's
+ *    branch into the middle of case 0x463 (the turned-back head) crosses that interval, so its copy stays inlined
+ *    (9 instructions, and case 0x463 reuses `0.0f` in a register where retail reloads it at the join); the default's
+ *    stage test sits before the resting pose instead of after it (the resting pose is the switch's break target).
+ *    `pl_rig_kind0_pose` reaches case 0x44D's charge stretch from cases 0x468/0x46F/0x48E through nested `if (0)`
+ *    blocks (idea 241);
  *  - `lb_ship_holds_fill`: retail reloads the seed for the second roll test as well as recomputing `% 100` (the
  *    `(s32)` cast on the first test stops only the `% 100` reuse), and colours its counters one register apart;
+ *    retail does not sign-extend `weight_table_index`'s result (an `s32` return in the declaration measures +4 B
+ *    here, but the owner `lobby/lb_npc` defines it `s16`);
  *  - `LbEquipModelCallbackB::ExecCallbackB`: the sway search loop is bottom-tested in retail with its exhausted exit
- *    branching past the found block (idea 217; the top-tested `return` measures best, a post-loop `i >= end` test
- *    91.12);
- *  - `pl_rig_model_setup`/`pl_rig_weapon_load`: retail computes the light index as an `int` and passes it unextended,
- *    which suggests `mhchar_model_create`'s last parameter is wider than the leaf header's `u8` (sound/mhchar's to
- *    settle); our `s32 light` keeps the `clrlwi` at the call, so `pl_rig_weapon_load` is 4 B short;
- *  - `res_ofs_ptr_get`: retail branches over the add (`beq`), ours returns early (`bnelr`);
- *  - `pl_rig_model_move` and the remaining rows: register colouring only.
+ *    branching past the found block (idea 217; the top-tested `return` measures best, a post-loop `i < end` test
+ *    loses 3 B); no `switch` to host an `if (0)` label;
+ *  - `LbEquipModelCallbackA::ExecCallbackB` is compiled at `optimization_level 2` (+6 B over -O3; -O4 and
+ *    `opt_common_subs off` measure lower);
+ *  - `pl_rig_model_setup`/`pl_rig_weapon_load`: retail folds the model's member offsets into one displacement
+ *    (`rig + slot * 0x164 + 0x118`), so those reads are written in place rather than through `pl_rig_res_mdl`/
+ *    `pl_rig_scn_mdl`, and `pl_rig_model_setup` sets `i = 0` before taking the model's `ResMdl`; the rest is register
+ *    colouring;
+ *  - `res_ofs_ptr_get`: retail branches over the add (`beq`), ours returns early (`bnelr`; `!=`-first and ternary
+ *    spellings reverse the blocks, -O1/-O2 and `opt_dead_code`/`opt_lifetimes`/`opt_propagation off` do not help);
+ *  - `pl_rig_hair_parts_map`/`pl_rig_face_parts_map`: the part loops are `for` loops (a `do`/`while` keeps a
+ *    `clrlwi` before the bottom test); the hair map's counters are coloured apart (-O4 and the face map's declaration
+ *    order measure lower);
+ *  - `pl_rig_kind0_allow_get`/`pl_rig_kind3_allow_get`: retail adds 1 to the `fn_8026A3A0` test with no `clrlwi`
+ *    after it; kind0's `u32 allow` moves the narrowing to the return (every u8 spelling, `!`, the ternary and the
+ *    `bool` cast keep it, and a wider return type costs `pl_slot_motion_allow_get`), kind3's `u32` measures lower;
+ *  - `pl_rig_model_move` (the colouring order is `flag`, `rig`, the zero, `v` where retail's is `v`, `flag`, `rig`;
+ *    declaration orders and the `v` spellings do not move it) and the remaining rows: register colouring only.
  *   flipcheck: `.data`/`.sdata` claimed, not emitted (only the two class tables and the switch tables are); the
  *   `.data` run is not in one TU's emission order (the class tables at 0x805BAB58 sit between the rig's tables), so
  *   it is left declared.  The inline base destructor `__dt__Q34nw4r3g3d18ICalcWorldCallbackFv` is emitted here (the
@@ -1328,9 +1343,7 @@ void lb_ship_levels_draw(LbShipWork* work)
 
     get_lsp_data(0x1422, &pos);
     draw_sprite_ary(lb_ship_levels_frame, &pos);
-    i = 0;
-    layout = lb_ship_level_layouts;
-    for (; i < 4; i++) {
+    for (i = 0, layout = lb_ship_level_layouts; i < 4; i++) {
         if (ship->grade_0x00[i] != 0) {
             get_lsp_data(*layout, &pos);
             draw_sprite_anim_ary(lb_ship_level_rows, i, &pos);
@@ -1413,8 +1426,7 @@ void lb_ship_box_grid_draw(Eft052ItemBox* box, u8 ship)
     } else {
         cells = box->cells_0x24;
     }
-    cells += first;
-    for (i = 0; i < 30; i++) {
+    for (i = 0, cells += first; i < 30; i++) {
         s32 index;
 
         lb_ship_cell_pos_get(i, &cell_pos);
@@ -2001,10 +2013,10 @@ void pl_equip_color_apply(_PLW* self, u32 slot)
 void pl_rig_model_setup(PlSeRig* rig, u32* file, u32 slot, u32 flags)
 {
     MHchar* model;
-    nw4r::g3d::ResMdl* mdl;
     s32 light;
-    u8 n;
     u8 i;
+    u8 n;
+    nw4r::g3d::ResMdl* mdl;
 
     if ((u8)PlayMode_ck() != 4) {
         switch ((u8)GameMode_ck()) {
@@ -2033,8 +2045,8 @@ void pl_rig_model_setup(PlSeRig* rig, u32* file, u32 slot, u32 flags)
     rig->color_mat_0x9CD[slot][1] = 0xFF;
     rig->skin_mat_0x9DB[slot] = 0xFF;
     n = 0;
-    mdl = pl_rig_res_mdl(&rig->models_0x004[slot].model);
-    for (i = 0; i < mhchar_mat_num_get(model); i++) {
+    for (i = 0, mdl = (nw4r::g3d::ResMdl*)&rig->models_0x004[slot].model.field_0x114; i < mhchar_mat_num_get(model);
+         i++) {
         nw4r::g3d::ResMat mat = mdl->GetResMat(i);
 
         if (memcmp(res_mat_name_get(&mat), pl_rig_mat_sym, 3) == 0) {
@@ -2174,16 +2186,14 @@ void pl_rig_hair_parts_map(PlSeRig* rig)
         count = 0x15;
     }
     for (node = 0; node < count; node++) {
-        part = 0;
-        do {
+        for (part = 0; part < 9; part++) {
             nw4r::g3d::ResNode res = pl_rig_res_mdl(model)->GetResNode(node);
             s32 len = strlen(pl_rig_hair_part_names[part]);
 
             if (memcmp(pl_rig_hair_part_names[part], em007_res_node_name((ResHandle*)&res), len) == 0) {
                 rig->hair_part_0x9E3[node] = part;
             }
-            part++;
-        } while (part < 9);
+        }
     }
 }
 
@@ -2204,16 +2214,14 @@ void pl_rig_face_parts_map(PlSeRig* rig)
         count = 7;
     }
     for (node = 0; node < count; node++) {
-        part = 0;
-        do {
+        for (part = 0; part < 5; part++) {
             nw4r::g3d::ResNode res = pl_rig_res_mdl(model)->GetResNode(node);
             s32 len = strlen(pl_rig_face_part_names[part]);
 
             if (memcmp(pl_rig_face_part_names[part], em007_res_node_name((ResHandle*)&res), len - 1) == 0) {
                 rig->face_part_0x9F9[node] = part;
             }
-            part++;
-        } while (part < 5);
+        }
     }
 }
 #pragma optimization_level reset
@@ -2403,10 +2411,10 @@ void pl_rig_weapon_load(PlSeRig* rig, u8 slot, u8 file_id)
 {
     u32 res;
     u32 arg;
-    u32 flags;
-    s32 light;
     u8 kind;
     MHchar* model;
+    s32 light;
+    u32 flags;
     PlSeAttach* attach;
     u8 i;
 
@@ -2483,13 +2491,13 @@ void pl_rig_weapon_load(PlSeRig* rig, u8 slot, u8 file_id)
     mhchar_model_create(model, &res, flags, light);
     rig->sub_0x0A14[slot].model.field_0x40 = 0;
     attach = &rig->attachments_0x1230[slot];
-    pl_rig_scn_mdl(&rig->sub_0x0A14[slot].model)->SetCalcWorldCallback(pl_rig_attach_cb(attach));
+    ((nw4r::g3d::ScnMdlSimple*)rig->sub_0x0A14[slot].model.field_0x118)->SetCalcWorldCallback(pl_rig_attach_cb(attach));
     pl_rig_attach_bind(rig, attach, rig->sub_kind_0x9CA[slot], model);
-    pl_rig_attach_cb(attach)->ApplyTiming(pl_rig_scn_mdl(&rig->sub_0x0A14[slot].model), 1, 0);
-    pl_rig_attach_cb(attach)->ApplyTiming(pl_rig_scn_mdl(&rig->sub_0x0A14[slot].model), 2, 0);
+    pl_rig_attach_cb(attach)->ApplyTiming((nw4r::g3d::ScnMdlSimple*)rig->sub_0x0A14[slot].model.field_0x118, 1, 0);
+    pl_rig_attach_cb(attach)->ApplyTiming((nw4r::g3d::ScnMdlSimple*)rig->sub_0x0A14[slot].model.field_0x118, 2, 0);
     rig->sub_mat_0xA01[slot] = 0xFF;
     for (i = 0; i < mhchar_mat_num_get(model); i++) {
-        nw4r::g3d::ResMat mat = pl_rig_res_mdl(&rig->sub_0x0A14[slot].model)->GetResMat(i);
+        nw4r::g3d::ResMat mat = ((nw4r::g3d::ResMdl*)&rig->sub_0x0A14[slot].model.field_0x114)->GetResMat(i);
 
         if (memcmp(res_mat_name_get(&mat), pl_rig_mat_sym, 3) == 0) {
             rig->sub_mat_0xA01[slot] = i;
@@ -3083,7 +3091,6 @@ extern "C" PlSeVecPair* pl_rig_guard_pose_get(_PLW* plw, u16 motion, u8 kind, Pl
  * weapon state; returns the attachment's scale. */
 extern "C" f32 pl_rig_attach_pose_set(PlSeRig* rig, u32 index, u32 kind)
 {
-    _PLW* plw = rig->plw;
     nw4r::math::MTX34 mtx;
     PlSeVecPair keyed;
     nw4r::math::VEC3 unused_a;
@@ -3091,6 +3098,7 @@ extern "C" f32 pl_rig_attach_pose_set(PlSeRig* rig, u32 index, u32 kind)
     nw4r::math::VEC3 unused_b;
     nw4r::math::VEC3 trans;
     PlSeJointAdj* adj;
+    _PLW* plw = rig->plw;
     s32 i;
     u16 motion;
     u8 allow;
@@ -3101,8 +3109,7 @@ extern "C" f32 pl_rig_attach_pose_set(PlSeRig* rig, u32 index, u32 kind)
     MTX34_ctor(&mtx);
     VEC3_ctor(&unused_a);
     VEC3_ctor(&unused_b);
-    adj = rig->attachments_0x1230[index].adj_0x014;
-    for (i = 0; i < 7; i++) {
+    for (i = 0, adj = rig->attachments_0x1230[index].adj_0x014; i < 7; i++) {
         pl_rig_joint_adj_reset(rig, &adj[i]);
     }
     motion = Get_motion_no(plw);
@@ -3206,7 +3213,7 @@ extern "C" f32 pl_rig_attach_pose_set(PlSeRig* rig, u32 index, u32 kind)
  * (from the motion frame windows and whether the body leans forward). */
 extern "C" u8 pl_rig_kind0_allow_get(_PLW* self, u16 motion)
 {
-    u8 allow = 2;
+    u32 allow = 2;
     u8 leaning = ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0x44 > 0.0f;
 
     switch (motion) {
@@ -3935,14 +3942,14 @@ extern "C" PlSeVecPair* pl_rig_pose_get(_PLW* plw, s32 kind, u8 allow)
         }
     default:
         switch (allow) {
-        case 3:
-            return &pl_rig_pose_special[kind];
         default:
             return &pl_rig_pose_sheathed[kind];
         case 1:
             return &pl_rig_pose_drawn[kind];
         case 2:
             return &pl_rig_pose_carried[kind];
+        case 3:
+            return &pl_rig_pose_special[kind];
         }
     }
 }
@@ -4224,139 +4231,135 @@ extern "C" void pl_rig_kind0_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
             scale->z = 2.5f;
         }
         leaning = ((PlSeRig*)plw->physics_0x13C)->models_0x004[0].model.field_0x44 > 0.0f;
-        /* Cases 0x468/0x46F/0x48E re-dispatch to case 0x44D for the charge stretch. */
-        for (;;) {
-            switch (motion) {
-            case 0x164:
-            case 0x139:
-                if (leaning == 0) {
-                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_139_roll);
-                    pl_rig_key_pair_get(plw, pl_rig_k0_139_scale, &scale->x, &scale->z);
+        switch (motion) {
+        case 0x164:
+        case 0x139:
+            if (leaning == 0) {
+                attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_139_roll);
+                pl_rig_key_pair_get(plw, pl_rig_k0_139_scale, &scale->x, &scale->z);
+            } else {
+                attach->adj_0x014[2].trans_0x0C.z = 100.0f;
+                scale->x = 1.0f;
+                scale->y = 1.0f;
+                scale->z = 1.0f;
+            }
+            break;
+        case 0x41B:
+        case 0x3EA:
+            if (leaning == 0) {
+                if (motion == 0x3EA) {
+                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3ea_roll);
+                    pl_rig_key_pair_get(plw, pl_rig_k0_3ea_scale, &scale->x, &scale->z);
                 } else {
-                    attach->adj_0x014[2].trans_0x0C.z = 100.0f;
-                    scale->x = 1.0f;
-                    scale->y = 1.0f;
-                    scale->z = 1.0f;
+                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3ea_roll);
+                    pl_rig_key_pair_get(plw, pl_rig_k0_41b_scale, &scale->x, &scale->z);
                 }
-                break;
-            case 0x41B:
-            case 0x3EA:
-                if (leaning == 0) {
-                    if (motion == 0x3EA) {
-                        attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3ea_roll);
-                        pl_rig_key_pair_get(plw, pl_rig_k0_3ea_scale, &scale->x, &scale->z);
-                    } else {
-                        attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3ea_roll);
-                        pl_rig_key_pair_get(plw, pl_rig_k0_41b_scale, &scale->x, &scale->z);
-                    }
-                } else {
-                    attach->adj_0x014[2].trans_0x0C.z = 100.0f;
-                    scale->x = 1.0f;
-                    scale->y = 1.0f;
-                    scale->z = 1.0f;
-                }
-                break;
-            case 0x46B:
-            case 0x450:
-                if (leaning == 0) {
-                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_450_roll);
-                    pl_rig_key_pair_get(plw, pl_rig_k0_450_scale, &scale->x, &scale->z);
-                } else {
-                    attach->adj_0x014[2].trans_0x0C.z = 100.0f;
-                    scale->x = 1.0f;
-                    scale->y = 1.0f;
-                    scale->z = 1.0f;
-                }
-                break;
-            case 0x482:
-            case 0x48F:
-                if (leaning == 0) {
-                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_450_roll);
-                    pl_rig_key_pair_get(plw, pl_rig_k0_482_scale, &scale->x, &scale->z);
-                } else {
-                    attach->adj_0x014[2].trans_0x0C.z = 100.0f;
-                    scale->x = 1.0f;
-                    scale->y = 1.0f;
-                    scale->z = 1.0f;
-                }
-                break;
-            case 0x421:
-            case 0x41C:
-            case 0x3F1:
-            case 0x3EB:
-                if (leaning == 0) {
-                    switch (motion) {
-                    case 0x3EB:
-                        attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3eb_roll);
-                        pl_rig_key_pair_get(plw, pl_rig_k0_3eb_scale, &scale->x, &scale->z);
-                        break;
-                    case 0x3F1:
-                        attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3f1_roll);
-                        pl_rig_key_pair_get(plw, pl_rig_k0_3f1_scale, &scale->x, &scale->z);
-                        break;
-                    case 0x41C:
-                        attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_41c_roll);
-                        pl_rig_key_pair_get(plw, pl_rig_k0_41c_scale, &scale->x, &scale->z);
-                        break;
-                    case 0x421:
-                        attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_421_roll);
-                        pl_rig_key_pair_get(plw, pl_rig_k0_421_scale, &scale->x, &scale->z);
-                        break;
-                    }
-                } else {
-                    attach->adj_0x014[2].trans_0x0C.z = 0.0f;
-                    scale->x = 2.6f;
-                    scale->y = 1.0f;
-                    scale->z = 2.5f;
-                }
-                break;
-            case 0x468:
-                if (leaning == 0 && Pl_frame_check_alt(plw, 2, 50.0f, 0.0f) != 1) {
+            } else {
+                attach->adj_0x014[2].trans_0x0C.z = 100.0f;
+                scale->x = 1.0f;
+                scale->y = 1.0f;
+                scale->z = 1.0f;
+            }
+            break;
+        case 0x46B:
+        case 0x450:
+            if (leaning == 0) {
+                attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_450_roll);
+                pl_rig_key_pair_get(plw, pl_rig_k0_450_scale, &scale->x, &scale->z);
+            } else {
+                attach->adj_0x014[2].trans_0x0C.z = 100.0f;
+                scale->x = 1.0f;
+                scale->y = 1.0f;
+                scale->z = 1.0f;
+            }
+            break;
+        case 0x482:
+        case 0x48F:
+            if (leaning == 0) {
+                attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_450_roll);
+                pl_rig_key_pair_get(plw, pl_rig_k0_482_scale, &scale->x, &scale->z);
+            } else {
+                attach->adj_0x014[2].trans_0x0C.z = 100.0f;
+                scale->x = 1.0f;
+                scale->y = 1.0f;
+                scale->z = 1.0f;
+            }
+            break;
+        case 0x421:
+        case 0x41C:
+        case 0x3F1:
+        case 0x3EB:
+            if (leaning == 0) {
+                switch (motion) {
+                case 0x3EB:
+                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3eb_roll);
+                    pl_rig_key_pair_get(plw, pl_rig_k0_3eb_scale, &scale->x, &scale->z);
+                    break;
+                case 0x3F1:
+                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_3f1_roll);
+                    pl_rig_key_pair_get(plw, pl_rig_k0_3f1_scale, &scale->x, &scale->z);
+                    break;
+                case 0x41C:
+                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_41c_roll);
+                    pl_rig_key_pair_get(plw, pl_rig_k0_41c_scale, &scale->x, &scale->z);
+                    break;
+                case 0x421:
+                    attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k0_421_roll);
+                    pl_rig_key_pair_get(plw, pl_rig_k0_421_scale, &scale->x, &scale->z);
                     break;
                 }
-                motion = 0x44D;
-                continue;
-            case 0x46F:
+            } else {
+                attach->adj_0x014[2].trans_0x0C.z = 0.0f;
+                scale->x = 2.6f;
+                scale->y = 1.0f;
+                scale->z = 2.5f;
+            }
+            break;
+        case 0x468:
+            if (leaning == 0 && Pl_frame_check_alt(plw, 2, 50.0f, 0.0f) != 1) {
+                break;
+            }
+            /* each frame-checked motion below skips the later checks to the charge stretch */
+            if (0) {
+        case 0x46F:
                 if (leaning == 0 && Pl_frame_check_alt(plw, 2, 56.0f, 0.0f) != 1) {
                     break;
                 }
-                motion = 0x44D;
-                continue;
-            case 0x48E:
-                if (leaning == 0 && Pl_frame_check_alt(plw, 2, 54.0f, 0.0f) != 1) {
-                    break;
+                if (0) {
+        case 0x48E:
+                    if (leaning == 0 && Pl_frame_check_alt(plw, 2, 54.0f, 0.0f) != 1) {
+                        break;
+                    }
+                    if (0) {
+        case 0x494:
+                        if (leaning == 0 && Pl_frame_check_alt(plw, 2, 70.0f, 0.0f) != 1) {
+                            break;
+                        }
+                    }
                 }
-                motion = 0x44D;
-                continue;
-            case 0x494:
-                if (leaning == 0 && Pl_frame_check_alt(plw, 2, 70.0f, 0.0f) != 1) {
-                    break;
-                }
-                /* fall through */
-            case 0x492:
-            case 0x47E:
-            case 0x46D:
-            case 0x44D:
-                switch (pl_charge_stage_get(plw)) {
-                case 0:
-                    attach->adj_0x014[5].scale_0x00.x = 1.0f;
-                    break;
-                case 1:
-                    attach->adj_0x014[5].scale_0x00.x = 1.5f;
-                    break;
-                case 2:
-                    attach->adj_0x014[5].scale_0x00.x = 2.2f;
-                    break;
-                default:
-                    attach->adj_0x014[5].scale_0x00.x = 3.0f;
-                    break;
-                }
+            }
+        case 0x492:
+        case 0x47E:
+        case 0x46D:
+        case 0x44D:
+            switch (pl_charge_stage_get(plw)) {
+            case 0:
+                attach->adj_0x014[5].scale_0x00.x = 1.0f;
+                break;
+            case 1:
+                attach->adj_0x014[5].scale_0x00.x = 1.5f;
+                break;
+            case 2:
+                attach->adj_0x014[5].scale_0x00.x = 2.2f;
                 break;
             default:
-                if (fn_8026A3A0(plw) == 0 || attach->allow_0x11 == 2) {
-                    attach->adj_0x014[2].trans_0x0C.z = 100.0f;
-                }
+                attach->adj_0x014[5].scale_0x00.x = 3.0f;
                 break;
+            }
+            break;
+        default:
+            if (fn_8026A3A0(plw) == 0 || attach->allow_0x11 == 2) {
+                attach->adj_0x014[2].trans_0x0C.z = 100.0f;
             }
             break;
         }
@@ -4795,26 +4798,26 @@ extern "C" void pl_rig_kind8_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
                     if (Pl_act_ck(plw, 4, 25) != 1 && Pl_act_ck(plw, 4, 75) != 1) {
                         continue;
                     }
-                    pl_rig_grip_lowered_set(grip);
+                } else {
+                    pl_rig_key_scale_lerp(plw, pl_rig_k8_462_grip, grip);
                     pl_rig_head_back_set(attach, head);
                     return;
                 }
-                pl_rig_key_scale_lerp(plw, pl_rig_k8_462_grip, grip);
-                pl_rig_head_back_set(attach, head);
-                return;
+                /* the leaning, grip-checked pose skips the next two motions to the lowered grip */
+                if (0) {
             case 0x496:
             case 0x464:
-                pl_rig_key_scale_lerp(plw, pl_rig_k8_464_grip, grip);
-                pl_rig_head_back_set(attach, head);
-                return;
+                    pl_rig_key_scale_lerp(plw, pl_rig_k8_464_grip, grip);
+                    pl_rig_head_back_set(attach, head);
+                    return;
             case 0x497:
             case 0x465:
-                if (leaning == 0) {
-                    pl_rig_key_scale_lerp(plw, pl_rig_k8_465_grip, grip);
-                    pl_rig_key_tilt_lerp(plw, pl_rig_k8_465_head, head);
-                    return;
+                    if (leaning == 0) {
+                        pl_rig_key_scale_lerp(plw, pl_rig_k8_465_grip, grip);
+                        pl_rig_key_tilt_lerp(plw, pl_rig_k8_465_head, head);
+                        return;
+                    }
                 }
-                /* fall through */
             case 0x495:
             case 0x463:
                 pl_rig_grip_lowered_set(grip);
@@ -5280,8 +5283,8 @@ void LbEquipModelCallbackB::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
     MTX34_ctor(&turn);
     MTX34_ctor(&mtx);
     if (node_map_0x10[node] != 0xFFFFFFFF) {
-        joint_mtx_store((MtxHolder*)pManip,
-                        &mhchar_wld_mtx_array_get((nw4r::g3d::ScnMdlSimple*)body_0x08->field_0x118)[node_map_0x10[node]]);
+        nw4r::math::MTX34* arr = mhchar_wld_mtx_array_get((nw4r::g3d::ScnMdlSimple*)body_0x08->field_0x118);
+        joint_mtx_store((MtxHolder*)pManip, &arr[node_map_0x10[node]]);
     }
     pFuncObj->SetCallbackNodeID(pFuncObj->GetCallbackNodeID() + 1);
     if ((index_0x0C == 5 || index_0x0C == 4) && node != 0) {
@@ -5390,6 +5393,7 @@ void LbEquipModelCallbackA::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r
 
 /* After a node's matrix: rebuilds a joint-ruled node's matrix from its adjustment and its body joint (the lobby uses
  * the body root and unit scale) and moves the walk to the next ruled node. */
+#pragma optimization_level 2
 void LbEquipModelCallbackA::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
                                           nw4r::g3d::FuncObjCalcWorld* pFuncObj)
 {
@@ -5445,6 +5449,7 @@ void LbEquipModelCallbackA::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
     }
     pl_rig_node_next_set(node, rules, pFuncObj);
 }
+#pragma optimization_level reset
 
 /* ------------------------------------------------------------------------------------------------ */
 /* 0x80229CB4 */
