@@ -7,7 +7,6 @@
 
 #ifdef __cplusplus
 class StreamMgr;
-struct SndPlayerBase;
 struct StreamNode;
 struct StreamRelocState;
 struct StreamGroup;
@@ -17,8 +16,6 @@ struct ReverbMgr;
 extern "C" {
 #endif
 
-SndPlayerBase* snd_player_base_construct(SndPlayerBase* base);
-StreamMgr* snd_player_base_destruct(StreamMgr* obj, s32 flags);
 StreamRelocState* snd_reloc_state_release(StreamRelocState* state, s32 flags);
 StreamRelocState* snd_reloc_state_clear(StreamRelocState* state);
 StreamGroup* snd_reloc_state_entry(StreamRelocState* state, u32 idx);

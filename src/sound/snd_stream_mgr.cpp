@@ -5,35 +5,35 @@
  *   float pool (literals, byte-identical); `.ctors` the static initialiser.
  * FLAGS. lib `sound` (`cflags_main`, Wii/1.3). `#pragma peephole off` and `#pragma fp_contract off` over the file;
  *   `#pragma optimization_level 4` around `cmd_start` (its channel switch is the level-4 `subi`/`cmplwi` range
- *   lowering, playbook 108); the manager's constructor is `inline` and `never_inline` (idea 242), so `__sinit` calls it,
- *   it follows `__sinit` and the base constructor is inlined into it.
+ *   lowering, playbook 108); `#pragma no_static_dtors on` (`__sinit` registers no destructor); the manager's and the
+ *   bank's constructors are `inline` and `never_inline` (idea 242), so they follow `__sinit`.
  * NAMES. GUESS (from the bodies, the AX/DVD/MIX calls and the callers), every name in the unit: the manager streams
  *   ADPCM/PCM files from the disc into a buffer split in thirds (`DVDReadAsyncPrio`, `stream_read_*_cb`), plays them
  *   through one or two AX voices, and runs the commands of three stream banks (`StreamRelocSet`: format, group,
  *   command and track tables plus a path list). The callees of other units carry registry names (lane
- *   sound-stream-mgr); the record type names (`StreamVoice`, `StreamCmd`, `StreamTrack`, ...) are GUESSes.
- * RESIDUALS. `voice_limit`: the key and the counters take r30/r28 where retail uses r28/r30 (declaration orders and
- *   variable reuse tried). `stream_voice_setup`: the pitch sum's first load is r5 where retail loads it into r26, and
- *   the pan add keeps swapped operands (a one-expression pan reassociates). `queue_read`: the per-channel limit and
- *   `read_pos` swap r4/r5. `stream_voice_rewind`: the `addis` lands in r0 where retail reuses r4.
- * RESIDUALS. The class shape (blocks the flip): retail's slot 0 is a real destructor (`__destroy_arr` over the
- *   records, then the base destructor `snd_player_base_destruct(this, 0)`), the records are a class (constructor
- *   `stream_rec_init`, copy constructor `stream_rec_copy` over `stream_reloc_copy`, destructor `stream_rec_destroy`)
- *   and `cmd_start` passes `*rec` by value to `stream_rec_format` (copy, call, destroy). Those three compiler-managed
- *   objects are retail's three `extab` cleanup records (0x40 bytes, relocations to `stream_rec_destroy` x2 and
- *   `snd_player_base_destruct`), which the explicit calls here cannot emit. Writing them needs sound/sound_obj's
- *   player base constructor/destructor as mangled C++ members (a foreign rename), and `stream_play`'s record copy has
- *   no destructor call in retail, which the single class model does not yet explain.
- * RESIDUALS. Data: `.sdata` is 2 of the claimed 8 bytes (the rest is link fill). flipcheck: `extab` -0x40 (the three
- *   records) and the extab index relocations that follow it; `.text` is the target's size.
+ *   sound-stream-mgr); the record type names (`StreamVoice`, `StreamCmd`, `StreamTrack`, ...) are GUESSes, and so are
+ *   the classes behind the manglings: `StreamBank` (the manager's three records: constructor, destructor),
+ *   `StreamRelocSet` (its destructor-less base, copy constructor) and `StreamRelocState` (copy constructor). The
+ *   evidence for the shape: retail's extab names the bank destructor for the manager's member array and for
+ *   `cmd_start`'s by-value temporary, and the base destructor for the constructor; `stream_play` and
+ *   `stream_play_cmd` copy a record and never destroy it (a copy into the destructor-less base).
+ * RESIDUALS. `stream_voice_setup`: the pan add is `add r3,r3,r0` where retail has `add r3,r0,r3` - the front end
+ *   already emits `pan = track->pan + pan` as `pan += track->pan` (the first PCode dump has the order), and every
+ *   one-expression or single-use form reassociates to an add-then-`subi` (-9 B; an inline clamp, a separate offset
+ *   or track local tried). `stream_voice_rewind`: the mono branch's `addis` result colours r0 where retail reuses r4
+ *   (regalloc: the node is coloured first with r0 free; in-place, comma, cast and split-statement forms tried).
+ * RESIDUALS. Data: `.sdata` is 2 of the claimed 8 bytes (the rest is link fill). flipcheck: `.text` bytes in the four
+ *   rows above; `extab`/`extabindex` are byte-identical to the target's.
  * SHAPES. The DVD read callbacks test the result with three separate early returns (a `&&`/`||` chain, nested ifs or a
  *   switch fold to one `addi`/`cmplwi` range test). The bank table getters are separate functions right after their
  *   wrappers (retail's `addi`/`b`), every index widened to u32 at the call; the id key is
  *   `owner = global ? 0xFF : slot` then one expression; the `MIXInitChannel` calls take their five `snd_level_to_db`
  *   arguments inline (evaluated right to left). `run_chain` reads the chained index through a `u16` inline getter
  *   (retail's `clrlwi` at the call); `stream_read_cb` rounds the read size in its own statement (retail reloads
- *   `file_pos` after the call); `stream_read_loop_cb` sums buffer, slot offset and result left to right; the pitch is
- *   one left-to-right sum.
+ *   `file_pos` after the call); `stream_read_loop_cb` sums buffer, slot offset and result left to right; the pitch
+ *   starts from the command's and adds the track's in one `+=`. `voice_limit` declares its counters before the key
+ *   (named locals colour in declaration order) and counts the excess in a block-local; `queue_read` reads `read_pos`
+ *   into a local declared after `limit`.
  */
 
 #include "types.h"
@@ -63,19 +63,32 @@ struct StreamFormat;
 
 /* A relocation state of a stream bank: a table and its resolved entry array. */
 struct StreamRelocState {
+    StreamRelocState() {}
+    StreamRelocState(const StreamRelocState& other);
+
     /* +0x00 */ u32* table;
     /* +0x04 */ void** entries;
 }; /* size: 0x8 */
 
-/* One stream bank record (three live in the manager): the format, group, command and track tables, and the
- * file path list. */
+/* The tables of a stream bank: the format, group, command and track tables, and the file path list.  It has no
+ * destructor, so a copy of it (`stream_play`, `stream_play_cmd`) is never destroyed. */
 struct StreamRelocSet {
+    StreamRelocSet() {}
+    StreamRelocSet(const StreamRelocSet& other);
+
     /* +0x00 */ StreamRelocState formats;
     /* +0x08 */ StreamRelocState groups;
     /* +0x10 */ StreamRelocState cmds;
     /* +0x18 */ StreamRelocState tracks;
     /* +0x20 */ const char** paths;
     /* +0x24 */ u32 path_count;
+}; /* size: 0x28 */
+
+/* One stream bank (three live in the manager): the tables, cleared on construction and released on destruction. */
+struct StreamBank : public StreamRelocSet {
+    StreamBank();
+    StreamBank(const StreamRelocSet& other) : StreamRelocSet(other) {}
+    ~StreamBank();
 }; /* size: 0x28 */
 
 /* One weighted choice of a random command. */
@@ -205,19 +218,11 @@ struct ReverbMgr;
 #define snd_voice_first_c1 ((StreamNode* (*)(SndPool2*))snd_voice_first)
 #define snd_level_volume_get_c1 ((s16 (*)(void))snd_level_volume_get)
 
-/* The sound player base (sound/sound_obj): its constructor is that unit's C-linkage function. */
-struct SndPlayerBase {
-    SndPlayerBase()
-    {
-        snd_player_base_construct(this);
-    }
-}; /* size: 0x0 (the base's vtable and flag word are laid out in StreamMgr) */
-
 /* The stream manager. */
 class StreamMgr : public SndPlayerBase {
 public:
     StreamMgr() __attribute__((never_inline));
-    virtual StreamMgr* destroy(s16 flags);
+    virtual ~StreamMgr();
     virtual void update(StreamNode* node);
     virtual BOOL release(StreamNode** link);
     virtual void voice_dropped(AXVPB* vpb);
@@ -251,7 +256,6 @@ public:
     void ramp_up_set(StreamNode* node, StreamCmd* cmd);
     void ramp_down_set(StreamNode* node, StreamCmd* cmd);
 
-    /* +0x04 */ u32 flags;
     /* +0x08 */ u32 buffer_count;
     /* +0x0C */ u32 buffer_used;
     /* +0x10 */ s32 active;
@@ -259,14 +263,13 @@ public:
     /* +0x24 */ s16 master_volume;
     /* +0x26 */ s16 bank_volume[3];
     /* +0x2C */ StreamCmd cmd;
-    /* +0x5C */ StreamRelocSet recs[3];
+    /* +0x5C */ StreamBank recs[3];
     /* +0xD4 */ u32 unused_0xD4;
 }; /* size: 0xD8 */
 
 
 extern "C" {
 u8 stream_rand(void);
-void* stream_rec_destroy(StreamRelocSet* rec, s16 flags);
 void stream_voice_drop_cb(AXVPB* vpb);
 void stream_voice_setup(StreamVoice* voice, StreamCmd* cmd, StreamTrack* track, u32 id);
 void stream_voice_loop_set(StreamVoice* voice, AXVPB* vpb, u8* buffer);
@@ -283,20 +286,18 @@ void stream_play(StreamMgr* mgr, s32 slot, u32 cmd_id, u32 paused);
 const char* stream_rec_path(StreamRelocSet* rec, u32 idx);
 StreamCmd* stream_rec_cmd(StreamRelocSet* rec, u32 idx);
 StreamCmd* stream_cmd_table_get(StreamRelocState* state, u32 idx);
-StreamRelocSet* stream_rec_copy(StreamRelocSet* dst, StreamRelocSet* src);
-void stream_reloc_copy(StreamRelocState* dst, StreamRelocState* src);
 void stream_play_cmd(StreamMgr* mgr, s32 slot, StreamCmd* cmd, u32 paused);
 void stream_cmd_copy(StreamCmd* dst, StreamCmd* src);
-StreamFormat* stream_rec_format(StreamRelocSet* rec, u32 idx);
+StreamFormat* stream_rec_format(StreamBank rec, u32 idx);
 StreamFormat* stream_format_table_get(StreamRelocState* state, u32 idx);
 StreamTrack* stream_rec_track(StreamRelocSet* rec, u32 idx);
 StreamTrack* stream_track_table_get(StreamRelocState* state, u32 idx);
 StreamGroup* stream_rec_group(StreamRelocSet* rec, u32 idx);
 u32 stream_status(StreamMgr* mgr, u32 id);
-StreamRelocSet* stream_rec_init(StreamRelocSet* rec);
 }
 
 #pragma peephole off
+#pragma no_static_dtors on
 #pragma fp_contract off
 
 static u16 stream_rand_seed = 0x0D37;
@@ -326,31 +327,15 @@ u8 stream_rand(void)
 }
 
 /* Destroys the manager's three records, then the base. */
-StreamMgr* StreamMgr::destroy(s16 flags)
-{
-    if (this != 0) {
-        __destroy_arr(recs, (void*)stream_rec_destroy, sizeof(StreamRelocSet), 3);
-        snd_player_base_destruct(this, 0);
-        if (flags > 0) {
-            operator delete(this);
-        }
-    }
-    return this;
-}
+StreamMgr::~StreamMgr() {}
 
-/* Destroys the four relocation states of a record. */
-void* stream_rec_destroy(StreamRelocSet* rec, s16 flags)
+/* Releases the four relocation states of a record. */
+StreamBank::~StreamBank()
 {
-    if (rec != 0) {
-        snd_reloc_state_release(&rec->tracks, -1);
-        snd_reloc_state_release(&rec->cmds, -1);
-        snd_reloc_state_release(&rec->groups, -1);
-        snd_reloc_state_release(&rec->formats, -1);
-        if (flags > 0) {
-            operator delete(rec);
-        }
-    }
-    return rec;
+    snd_reloc_state_release(&tracks, -1);
+    snd_reloc_state_release(&cmds, -1);
+    snd_reloc_state_release(&groups, -1);
+    snd_reloc_state_release(&formats, -1);
 }
 
 /* The AX voice-drop callback: hands the voice to the stream manager. */
@@ -429,7 +414,8 @@ void stream_voice_setup(StreamVoice* voice, StreamCmd* cmd, StreamTrack* track, 
     }
     voice->ramp_base = voice->level;
 
-    pitch = cmd->pitch + track->pitch_fine + track->pitch_coarse * 100;
+    pitch = cmd->pitch;
+    pitch += track->pitch_fine + track->pitch_coarse * 100;
     pitch_range = cmd->pitch_random;
     if (pitch_range > 0) {
         pitch += ((stream_rand() << 5) % (pitch_range * 2)) - pitch_range;
@@ -1121,11 +1107,10 @@ void stream_buffers_setup(StreamMgr* mgr, u8* base, u32 size, u32 count)
 /* Runs command `cmd_id` of bank `slot` and its chain. */
 void stream_play(StreamMgr* mgr, s32 slot, u32 cmd_id, u32 paused)
 {
-    StreamRelocSet rec;
+    StreamRelocSet rec(mgr->recs[slot]);
     StreamCmd* cmd;
     const char* path;
 
-    stream_rec_copy(&rec, &mgr->recs[slot]);
     cmd = stream_rec_cmd(&rec, cmd_id);
     if (cmd != 0) {
         path = 0;
@@ -1168,31 +1153,21 @@ StreamCmd* stream_cmd_table_get(StreamRelocState* state, u32 idx)
 }
 
 /* Copies a record. */
-StreamRelocSet* stream_rec_copy(StreamRelocSet* dst, StreamRelocSet* src)
+StreamRelocSet::StreamRelocSet(const StreamRelocSet& other)
+    : formats(other.formats), groups(other.groups), cmds(other.cmds), tracks(other.tracks), paths(other.paths),
+      path_count(other.path_count)
 {
-    stream_reloc_copy(&dst->formats, &src->formats);
-    stream_reloc_copy(&dst->groups, &src->groups);
-    stream_reloc_copy(&dst->cmds, &src->cmds);
-    stream_reloc_copy(&dst->tracks, &src->tracks);
-    dst->paths = src->paths;
-    dst->path_count = src->path_count;
-    return dst;
 }
 
 /* Copies a relocation state. */
-void stream_reloc_copy(StreamRelocState* dst, StreamRelocState* src)
-{
-    dst->table = src->table;
-    dst->entries = src->entries;
-}
+StreamRelocState::StreamRelocState(const StreamRelocState& other) : table(other.table), entries(other.entries) {}
 
 /* Runs an immediate command on bank `slot`. */
 void stream_play_cmd(StreamMgr* mgr, s32 slot, StreamCmd* cmd, u32 paused)
 {
-    StreamRelocSet rec;
+    StreamRelocSet rec(mgr->recs[slot]);
     StreamCmd* copy;
 
-    stream_rec_copy(&rec, &mgr->recs[slot]);
     copy = &mgr->cmd;
     stream_cmd_copy(copy, cmd);
     if (copy != 0) {
@@ -1306,7 +1281,6 @@ void StreamMgr::cmd_start(StreamRelocSet* rec, StreamCmd* cmd, s32 slot, const c
     StreamTrack* track;
     StreamNode* node;
     StreamVoice* voice;
-    StreamRelocSet copy;
     u32 key;
 
     if (voice_limit(cmd, slot) == 0) {
@@ -1340,9 +1314,7 @@ void StreamMgr::cmd_start(StreamRelocSet* rec, StreamCmd* cmd, s32 slot, const c
         key = cmd->id_lo | (slot << 24);
         node->key = key | (cmd->id_hi << 8);
     }
-    stream_rec_copy(&copy, rec);
-    voice->format = stream_rec_format(&copy, track->format);
-    stream_rec_destroy(&copy, -1);
+    voice->format = stream_rec_format(*rec, track->format);
     if (voice->format == 0) {
         snd_voice_free_c1(snd_bank_table_get_c1(), node);
         return;
@@ -1388,9 +1360,9 @@ void StreamMgr::cmd_start(StreamRelocSet* rec, StreamCmd* cmd, s32 slot, const c
 #pragma optimization_level reset
 
 /* The format `idx` of a record, or zero. */
-StreamFormat* stream_rec_format(StreamRelocSet* rec, u32 idx)
+StreamFormat* stream_rec_format(StreamBank rec, u32 idx)
 {
-    return stream_format_table_get(&rec->formats, idx);
+    return stream_format_table_get(&rec.formats, idx);
 }
 
 /* Entry `idx` of a format table, or zero when the table is missing or `idx` is out of range. */
@@ -1430,9 +1402,9 @@ BOOL StreamMgr::voice_limit(StreamCmd* cmd, s32 slot)
     StreamNode* victim;
     u32 global;
     u32 owner;
-    u32 key;
-    s32 count;
     s32 weaker;
+    s32 count;
+    u32 key;
     u32 hold;
 
     node = snd_voice_last(snd_bank_table_get_c1());
@@ -1462,13 +1434,16 @@ BOOL StreamMgr::voice_limit(StreamCmd* cmd, s32 slot)
     if (weaker == 0) {
         return FALSE;
     }
-    weaker = count - (cmd->max_voices - 1);
-    for (victim = snd_voice_last(snd_bank_table_get_c1()); snd_voice_list_head_ck(snd_bank_table_get_c1(), victim) != 1;
-         victim = snd_voice_prev(victim)) {
-        if (victim->kind == 2 && cmd->id_lo != 0xFF && key == victim->key && cmd->priority >= victim->priority) {
-            snd_envelope_release(this, (AxVoiceBlock*)&stream_node_voice(victim)->level);
-            if (--weaker <= 0) {
-                return TRUE;
+    {
+        s32 excess = count - (cmd->max_voices - 1);
+
+        for (victim = snd_voice_last(snd_bank_table_get_c1()); snd_voice_list_head_ck(snd_bank_table_get_c1(), victim) != 1;
+             victim = snd_voice_prev(victim)) {
+            if (victim->kind == 2 && cmd->id_lo != 0xFF && key == victim->key && cmd->priority >= victim->priority) {
+                snd_envelope_release(this, (AxVoiceBlock*)&stream_node_voice(victim)->level);
+                if (--excess <= 0) {
+                    return TRUE;
+                }
             }
         }
     }
@@ -1645,6 +1620,7 @@ void StreamMgr::queue_read(StreamNode* node)
     u32 per_channel;
     u32 end;
     u32 limit;
+    u32 pos;
     u32 rounded;
 
     if (voice->queued_buf != buf && buf != voice->play_buf) {
@@ -1673,8 +1649,9 @@ void StreamMgr::queue_read(StreamNode* node)
                 }
             }
             limit = voice->file.length / voice->channels;
-            if (voice->read_pos + size > limit) {
-                size = limit - voice->read_pos;
+            pos = voice->read_pos;
+            if (pos + size > limit) {
+                size = limit - pos;
             }
             rounded = stream_round_up(size, 32);
             buf = voice->read_buf;
@@ -1865,21 +1842,19 @@ u32 stream_status(StreamMgr* mgr, u32 id)
 }
 
 /* Constructs the four relocation states of a record and clears its path list. */
-inline StreamRelocSet* stream_rec_init(StreamRelocSet* rec)
+inline StreamBank::StreamBank()
 {
-    snd_reloc_state_clear(&rec->formats);
-    snd_reloc_state_clear(&rec->groups);
-    snd_reloc_state_clear(&rec->cmds);
-    snd_reloc_state_clear(&rec->tracks);
-    rec->paths = 0;
-    rec->path_count = 0;
-    return rec;
+    snd_reloc_state_clear(&formats);
+    snd_reloc_state_clear(&groups);
+    snd_reloc_state_clear(&cmds);
+    snd_reloc_state_clear(&tracks);
+    paths = 0;
+    path_count = 0;
 }
 
 /* Clears the buffer set, the volumes and the three records. */
 inline StreamMgr::StreamMgr() : buffer_count(0), buffer_used(0), active(0), master_volume(127)
 {
-    __construct_array(recs, (void*)stream_rec_init, (void*)stream_rec_destroy, sizeof(StreamRelocSet), 3);
     bank_volume[0] = 127;
     bank_volume[1] = 127;
     bank_volume[2] = 127;

@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (250)
+## Ideas that work (251)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -259,6 +259,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 270 | [Under global_optimizer off a block-scope local forces a frame pointer: declare every local at function scope](270-under-global-optimizer-off.md) | works | pragma, source-shape | A function scoped under `#pragma global_optimizer off` gains `mr r31,r1` after the register saves and a `mr r10,r31` / `lwz r10,0(r1)` epilogue, and every stack local is addressed through r31; retail has the plain `addi... |
 | 271 | [A pointer walk over a local's array keeps its struct copy-outs as load/store pairs](271-pointer-walk-over-a.md) | works | source-shape, allocator | Retail copies a local struct out as `lwz;lwz;stw;stw` pairs, ours hoists every load above the stores |
 | 272 | [Fields stored before the table pointer belong to a polymorphic base: its constructor's own table store is dropped](272-base-fields-before-vtable-store.md) | works | vtable, source-shape | An inlined constructor stores two fields BEFORE the class's table pointer, while one class with a constructor always stores the table pointer first. |
+| 273 | [A record copied but never destroyed is a copy into a destructor-less base of the class whose destructor extab names](273-record-copied-but-never.md) | works | source-shape, sections | Retail calls a record's copy constructor in some functions and never destroys the copy, while elsewhere the same copy constructor's object gets a cleanup record and a destructor call. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

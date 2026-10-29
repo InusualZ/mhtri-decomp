@@ -4,6 +4,7 @@
 #define MHTRI_SOUND_SOUND_OBJ_H
 
 #include "types.h"
+#include "sound/sound_obj_types.h" /* SndBase, SndPlayerBase (rule 1) */
 
 struct ReverbMgr;
 struct Sound;

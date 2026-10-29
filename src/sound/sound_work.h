@@ -305,7 +305,6 @@ void* snd_reloc_state_entry(RelocState* state, u32 idx);
 void* snd_voice_next(void* node);
 void* snd_voice_prev(void* node);
 void* snd_reloc_state_clear(void* state);
-void* snd_player_base_destruct(void* obj, s32 flags);
 void* snd_reloc_state_release(void* obj, s32 flags);
 void MEMGetAllocatableSizeForExpHeapEx(void* p, s32 kind);
 void* MEMAllocFromAllocator(void* allocator, u32 size);

@@ -1,11 +1,17 @@
 /* sound/sound_obj.cpp - the global sound object: its voice setup, 3D positioning and the reverb delay lines
  *
  * RANGE. `.text` 0x800E5430..0x800E7D34, every function written, in address order.
- * FLAGS. lib `sound` (`cflags_main`, Wii/1.3); `#pragma peephole off` over the file.
+ * FLAGS. lib `sound` (`cflags_main`, Wii/1.3); `#pragma peephole off` and `#pragma no_static_dtors on` (`__sinit`
+ *   registers no destructor) over the file. The constructors after `__sinit` (the sound object's, the delay line's,
+ *   the three part clears, snd_deg_to_rad and the two base constructors) are `inline` and `never_inline` (idea 242):
+ *   MWCC emits them after `__sinit`, each callee after its caller's later callees, which is retail's order.
  * NAMES. GUESS, every name in the unit (no `__FILE__` string, no dump name): the module and file name from the 0xE60 B
  *   global sound object `g_snd_obj`; the function names from the bodies and the object's vtable at 0x80597DA8, whose
- *   slots are snd_obj_destroy, update, release, voice_dropped, stop, pause, resume and start (the same interface as
- *   StreamMgr's table at 0x80598068); `snd_obj_static_init` is the `.ctors` entry; the record names `SndPlayParam`,
+ *   slots are its destructor, update, release, voice_dropped, stop, pause, resume and start (the same interface as
+ *   StreamMgr's table at 0x80598068); the classes `SoundObj` <- `SndPlayerBase` <- `SndBase` (the three tables at
+ *   0x80597DA8/DD0/DF8, the constructor chain and retail's extab: the destructor's member-array record names the
+ *   delay line's destructor, the constructor's base record the player base destructor) and `SndLine` (the delay
+ *   line: constructor, destructor); the field names of `SoundObj`; the record names `SndPlayParam`,
  *   `SndRegion`, `SndArtic`, `SndSample`, `VoiceCfg`, `AxVoiceBlock` and their fields (traced from the loads in
  *   snd_voice_setup, snd_obj_play_regions and snd_obj_voice_limit); the registry names of the sound/fn_800E8E60 callees
  *   (`snd_listener_polar`, `snd_distance_atten`, `snd_pan_calc`, `snd_span_calc`, `snd_distance_volume`,
@@ -16,15 +22,16 @@
  *   return the play counter (u32); `sound/sound_obj.h` keeps the `void*` its snd_stream_reloc callers store it into.
  * RESIDUALS. snd_voice_setup: the three aux-level products colour their float temporaries differently (f3/f4 vs
  *   f0/f2; the master level and the 127.0f constant).
- * RESIDUALS. Data: the vtables at 0x80597DA8/DD0/DF8 are stored by hand (snd_obj_construct, snd_player_base_construct,
- *   snd_base_construct) - the class hierarchy SndBase <- SndPlayerBase <- SoundObj/StreamMgr is not modelled yet, so
- *   `.data`, the `.bss` object, the `.ctors` entry and the destructor extab records are not emitted; `.sdata2` and
- *   `.rodata` are byte-identical up to the trailing link fill.
+ * RESIDUALS. Data: the three vtables are one slot long (0xC of 0x28 bytes each): the seven interface slots are this
+ *   unit's C rows (snd_obj_update .. snd_obj_start), not yet `SoundObj` members, so `SndBase` declares only its
+ *   destructor. `.bss` is 0xE58 of the 0xE60 the map gives `g_snd_obj`; `.sdata2` and `.rodata` are byte-identical up
+ *   to the trailing link fill.
  * SHAPES. The tail-called table lookups (snd_line_*_get) are 4/8-byte wrappers over separate 0x38-byte helpers; the
  *   voice keys are `key = global ? 255 : line` then one expression; snd_voice_volume_calc returns an s16 assigned
  *   from the float product without a cast.
  */
 
+#include "sound/sound_obj_types.h" /* SndBase, SndPlayerBase (rule 1) */
 #include "sound/fn_800E8E60.h" /* fn_800E8E60 (rule 2: the owner's header) */
 #include "sound/snd_reverb_mgr.h" /* snd_reverb_mgr (rule 2: the owner's header) */
 #include "sound/snd_stream_reloc.h" /* snd_stream_reloc (rule 2: the owner's header) */
@@ -48,11 +55,39 @@
 #define fn_800EDA88_c1 ((void* (*)(void*, void*))snd_voice_free)
 #define snd_envelope_update_c1 ((void (*)(Sound2*, SoundSlot*, AxVoiceBlock*))snd_envelope_update)
 
-/* The 49-line bank `snd_obj_destroy` destroys at +0x90. */
-typedef struct ReverbBank {
-    /* +0x000 */ u8 unused_000[0x90];
-    /* +0x090 */ ReverbLine lines[49];
-} ReverbBank; /* size: 0xE58 */
+/* One delay line of the sound object: nine relocation parts (articulations, regions, then seven tables). */
+class SndLine {
+public:
+    SndLine() __attribute__((never_inline));
+    ~SndLine();
+
+    /* +0x00 */ ReverbPart part[9];
+}; /* size: 0x48 */
+
+/* The global sound object: the player base, its levels, the listener and the 49 delay lines (the other units read it
+ * through the `Sound` view of `sound/fn_800E46E8_types.h`). */
+class SoundObj : public SndPlayerBase {
+public:
+    SoundObj() __attribute__((never_inline));
+    virtual ~SoundObj();
+
+    /* +0x008 */ s16 master_volume;    /* 127 */
+    /* +0x00A */ s16 line_volumes[49]; /* 127 each */
+    /* +0x06C */ u8 unused_06C[2];
+    /* +0x06E */ u8 aux_a_level;       /* snd_voice_setup's aux A level */
+    /* +0x06F */ u8 aux_b_level;
+    /* +0x070 */ u8 aux_c_level;
+    /* +0x071 */ u8 aux_master;        /* scales the three aux levels */
+    /* +0x072 */ u8 unused_072[2];
+    /* +0x074 */ u32 pan_width;        /* snd_obj_play_pan divides a pan by it */
+    /* +0x078 */ u32 play_counter;     /* the play functions return it */
+    /* +0x07C */ u32 listeners[3];     /* the listener matrices snd_listener_polar reads */
+    /* +0x088 */ f32 max_distance;     /* 100.0 */
+    /* +0x08C */ f32 pan_angle;        /* 45 degrees in radians */
+    /* +0x090 */ SndLine lines[49];
+}; /* size: 0xE58 */
+
+extern SoundObj g_snd_obj;
 
 /* One slot-list entry's info block (snd_cmd_entry_info returns entry+12). */
 typedef struct SlotEntry {
@@ -256,16 +291,8 @@ typedef struct SndPlayParam {
     /* +0x18 */ Vec* pos;           /* the followed world position, or 0 */
 } SndPlayParam; /* size: 0x1C */
 
-extern u8 lbl_80597DF8[0x28]; /* the base vtable snd_base_construct installs */
-extern u8 lbl_80597DA8[0x28]; /* the sound object's vtable (snd_obj_construct) */
-extern u8 lbl_80597DD0[0x28]; /* the player base vtable (snd_player_base_construct) */
-extern u8 g_snd_obj[0xE60];             /* the global sound object (snd_obj_get) */
 
 extern "C" {
-ReverbBank* snd_obj_destroy(ReverbBank* bank, s32 flags);
-void* snd_player_base_destruct(void* obj, s32 flags);
-void* snd_base_destruct(void* obj, s32 flags);
-void* snd_line_destruct(void* obj, s32 flags);
 void* snd_artic_table_release(void* obj, s32 flags);
 void* snd_region_table_release(void* obj, s32 flags);
 void* snd_reloc_state_release(void* obj, s32 flags);
@@ -311,12 +338,10 @@ void snd_obj_cue_stop(Sound2* self, VoiceCfg* cfg, u32 arg);
 void snd_obj_cue_random(Sound2* self, ReverbLine* line, VoiceCfg* cfg, u32 line_idx, SndPlayParam* param);
 void* snd_line_slot_table_get(void* p, u32 idx);
 void* snd_reloc_state_entry(RelocState* state, u32 idx);
-Sound* snd_obj_static_init(void);
-void snd_reloc_state_clear(Pair32* p);
-void snd_region_table_clear(Pair32* p);
-void snd_artic_table_clear(Pair32* p);
-f32 snd_deg_to_rad(f32 v);
-void snd_base_construct(VtblHolder* p);
+void snd_reloc_state_clear(Pair32* p) __attribute__((never_inline));
+void snd_region_table_clear(Pair32* p) __attribute__((never_inline));
+void snd_artic_table_clear(Pair32* p) __attribute__((never_inline));
+f32 snd_deg_to_rad(f32 v) __attribute__((never_inline));
 
 void* snd_cmd_pool_alloc(u8* list);
 
@@ -330,9 +355,6 @@ void snd_obj_cue_volume_set(void* unused, SoundSlot* slot, s16 volume);
 void snd_obj_pitch_set(void* unused, SoundSlot* slot, s16 pitch);
 s16 snd_obj_owner_pitch_get(void* unused, u32 key);
 void snd_obj_owner_lpf_set(void* unused, u32 key, u16 pitch);
-Sound* snd_obj_construct(Sound* snd);
-ReverbLine* snd_line_construct(ReverbLine* line);
-Sound* snd_player_base_construct(Sound* snd);
 
 void snd_voice_pitch_set(AxVoice* voice, u32 a, s16 b);
 
@@ -360,61 +382,29 @@ u32 snd_obj_play_chain(Sound* snd, u32 line_idx, u32 id, SndPlayParam* param);
 
 
 #pragma peephole off
+#pragma no_static_dtors on
 
-/* Destroys a reverb bank's 49 lines, then the bank itself. */
-extern "C" ReverbBank* snd_obj_destroy(ReverbBank* bank, s32 flags)
+/* Destroys the sound object's 49 delay lines, then its player base. */
+SoundObj::~SoundObj() {}
+
+/* Destroys the player base: its root, then the object if the delete flag asks for it. */
+SndPlayerBase::~SndPlayerBase() {}
+
+/* Frees the root object if the delete flag asks for it. */
+SndBase::~SndBase() {}
+
+/* Releases the nine parts of one delay line. */
+SndLine::~SndLine()
 {
-    if (bank != 0) {
-        __destroy_arr(&bank->lines, (void*)snd_line_destruct, sizeof(ReverbLine), 49);
-        snd_player_base_destruct(bank, 0);
-        if ((s16)flags > 0) {
-            __dl__FPv(bank);
-        }
-    }
-    return bank;
-}
-
-/* Destroys one delay line's own members, then frees it. */
-extern "C" void* snd_player_base_destruct(void* obj, s32 flags)
-{
-    if (obj != 0) {
-        snd_base_destruct(obj, 0);
-        if ((s16)flags > 0) {
-            __dl__FPv(obj);
-        }
-    }
-    return obj;
-}
-
-/* Frees an object if the delete flag asks for it. */
-extern "C" void* snd_base_destruct(void* obj, s32 flags)
-{
-    if (obj != 0 && (s16)flags > 0) {
-        __dl__FPv(obj);
-    }
-    return obj;
-}
-
-/* Destroys the nine parts of one delay line, then frees the line. */
-extern "C" void* snd_line_destruct(void* obj, s32 flags)
-{
-    ReverbLine* line = (ReverbLine*)obj;
-
-    if (line != 0) {
-        snd_reloc_state_release(&line->part[8], -1);
-        snd_reloc_state_release(&line->part[7], -1);
-        snd_reloc_state_release(&line->part[6], -1);
-        snd_reloc_state_release(&line->part[5], -1);
-        snd_reloc_state_release(&line->part[4], -1);
-        snd_reloc_state_release(&line->part[3], -1);
-        snd_reloc_state_release(&line->part[2], -1);
-        snd_region_table_release(&line->part[1], -1);
-        snd_artic_table_release(&line->part[0], -1);
-        if ((s16)flags > 0) {
-            __dl__FPv(line);
-        }
-    }
-    return line;
+    snd_reloc_state_release(&part[8], -1);
+    snd_reloc_state_release(&part[7], -1);
+    snd_reloc_state_release(&part[6], -1);
+    snd_reloc_state_release(&part[5], -1);
+    snd_reloc_state_release(&part[4], -1);
+    snd_reloc_state_release(&part[3], -1);
+    snd_reloc_state_release(&part[2], -1);
+    snd_region_table_release(&part[1], -1);
+    snd_artic_table_release(&part[0], -1);
 }
 
 /* Frees an object if the delete flag asks for it. */
@@ -455,7 +445,7 @@ extern "C" void snd_voice_drop_cb(AXVPB* vpb)
 /* The global sound object. */
 extern "C" Sound* snd_obj_get(void)
 {
-    return (Sound*)g_snd_obj;
+    return (Sound*)&g_snd_obj;
 }
 
 /* Initialises a new voice's state block from its articulation, region, sample, cue and play parameters. */
@@ -1472,91 +1462,67 @@ extern "C" void snd_obj_owner_lpf_set(void* unused, u32 key, u16 pitch)
     }
 }
 
-/* Constructs the global sound object. */
-extern "C" Sound* snd_obj_static_init(void)
-{
-    return snd_obj_construct((Sound*)g_snd_obj);
-}
+/* The global sound object (snd_obj_get); `__sinit` constructs it and registers no destructor. */
+SoundObj g_snd_obj;
 
-/* Constructs the global sound object. */
-extern "C" Sound* snd_obj_construct(Sound* snd)
+/* Constructs the sound object: full levels, the default pan width, distance and angle, and its 49 delay lines. */
+inline SoundObj::SoundObj()
+    : master_volume(127), aux_a_level(127), aux_b_level(127), aux_c_level(127), aux_master(127), pan_width(512),
+      play_counter(0), max_distance(100.0f), pan_angle(snd_deg_to_rad(45.0f))
 {
     u32 i;
 
-    snd_player_base_construct(snd);
-    snd->vtable = (const SoundVtbl*)lbl_80597DA8;
-    snd->field_08 = 127;
-    snd->field_6E = 127;
-    snd->field_6F = 127;
-    snd->field_70 = 127;
-    snd->field_71 = 127;
-    snd->field_74 = 512;
-    snd->field_78 = 0;
-    snd->field_88 = 100.0f;
-    snd->field_8C = snd_deg_to_rad(45.0f);
-    __construct_array(&snd->lines[0], (void*)snd_line_construct, (void*)snd_line_destruct, sizeof(ReverbLine), 49);
     for (i = 0; i < 49; i++) {
-        snd->levels[i] = 127;
+        line_volumes[i] = 127;
     }
-    snd->levels2[0] = 0;
-    snd->levels2[1] = 0;
-    snd->levels2[2] = 0;
-    return snd;
+    listeners[0] = 0;
+    listeners[1] = 0;
+    listeners[2] = 0;
 }
 
-/* Constructs one delay line. */
-extern "C" ReverbLine* snd_line_construct(ReverbLine* line)
+/* Constructs one delay line: clears its nine parts. */
+inline SndLine::SndLine()
 {
-    snd_artic_table_clear((Pair32*)&line->part[0]);
-    snd_region_table_clear((Pair32*)&line->part[1]);
-    snd_reloc_state_clear((Pair32*)&line->part[2]);
-    snd_reloc_state_clear((Pair32*)&line->part[3]);
-    snd_reloc_state_clear((Pair32*)&line->part[4]);
-    snd_reloc_state_clear((Pair32*)&line->part[5]);
-    snd_reloc_state_clear((Pair32*)&line->part[6]);
-    snd_reloc_state_clear((Pair32*)&line->part[7]);
-    snd_reloc_state_clear((Pair32*)&line->part[8]);
-    return line;
+    snd_artic_table_clear((Pair32*)&part[0]);
+    snd_region_table_clear((Pair32*)&part[1]);
+    snd_reloc_state_clear((Pair32*)&part[2]);
+    snd_reloc_state_clear((Pair32*)&part[3]);
+    snd_reloc_state_clear((Pair32*)&part[4]);
+    snd_reloc_state_clear((Pair32*)&part[5]);
+    snd_reloc_state_clear((Pair32*)&part[6]);
+    snd_reloc_state_clear((Pair32*)&part[7]);
+    snd_reloc_state_clear((Pair32*)&part[8]);
 }
 
 /* Clears a two-word block. */
-extern "C" void snd_reloc_state_clear(Pair32* p)
+inline void snd_reloc_state_clear(Pair32* p)
 {
     p->a = 0;
     p->b = 0;
 }
 
 /* Clears a two-word block. */
-extern "C" void snd_region_table_clear(Pair32* p)
+inline void snd_region_table_clear(Pair32* p)
 {
     p->a = 0;
     p->b = 0;
 }
 
 /* Clears a two-word block. */
-extern "C" void snd_artic_table_clear(Pair32* p)
+inline void snd_artic_table_clear(Pair32* p)
 {
     p->a = 0;
     p->b = 0;
 }
 
 /* Scales a level by the unit's factor. */
-extern "C" f32 snd_deg_to_rad(f32 v)
+inline f32 snd_deg_to_rad(f32 v)
 {
     return v * 0.017453292f;
 }
 
-/* The base constructor of the sound object. */
-extern "C" Sound* snd_player_base_construct(Sound* snd)
-{
-    snd_base_construct((VtblHolder*)snd);
-    snd->vtable = (const SoundVtbl*)lbl_80597DD0;
-    snd->unused_04 = 0;
-    return snd;
-}
+/* Constructs the player base: its root, then a cleared flag word. */
+inline SndPlayerBase::SndPlayerBase() : flags(0) {}
 
-/* Installs a vtable. */
-extern "C" void snd_base_construct(VtblHolder* p)
-{
-    p->vtable = lbl_80597DF8;
-}
+/* Constructs the root: installs its table. */
+inline SndBase::SndBase() {}
