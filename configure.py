@@ -927,7 +927,7 @@ config.libs = [
             Object(Matching, "MSL_C/misc_io.c"),
             Object(Matching, "MSL_C/printf.c"),
             Object(Matching, "MSL_C/rand.c"),
-            Object(NonMatching, "MSL_C/scanf.c"),
+            Object(Matching, "MSL_C/scanf.c"),
             Object(Matching, "MSL_C/signal.c"),
             Object(NonMatching, "MSL_C/string.c"),
             Object(Matching, "MSL_C/float.c"),
