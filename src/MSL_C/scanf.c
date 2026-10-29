@@ -11,14 +11,14 @@
  * EVIDENCE. jump tables `.data` 0x8060F028 / 0x8060F108 / 0x8060F128 / 0x8060F148 and the default record `.rodata`
  *    0x80572B50 are read only here; the string reader is also called by `strtol` / `atoi` through a function
  *    pointer.
- * RESIDUALS. `parse_scan_format` 88: the struct copy-out keeps all ten words in registers where the target copies
- *    pairwise, and the float option test is laid out conversion-first in the target; `__sformatter` 89.0: the
- *    callee-saved assignment differs (the target holds `read` in r26 and the format character in r22, ours r29 and
- *    r15), the `d`/`i` and `o`/`u`/`x` base selection is a ternary where the target jumps into shared code after a
- *    `li` per case, and the unget argument is `(char)(u8)c` in the target; `__StringRead` 99.1: cursor and
- *    character swap r4/r5.
- * SHAPES. the format record is built in a local and copied out; the character class tests are the inline table
- *    reads of `MSL_C/ctype.h`.
+ * RESIDUALS. none: every row and the three data sections match the target.
+ * SHAPES. the format record is built in a local and copied out; the `%s` set is filled through a pointer, which marks
+ *    the record address-taken, so its later copy-outs stay load/store pairs as in the target. `%n` is a valid
+ *    conversion. The base of `d`/`i` and `o`/`u`/`x` is set per case and shared through `if (0) { case ...: }`
+ *    blocks; an empty `%[` scan with no destination ungets and goes on to the next directive. The formatter's
+ *    declaration order (with `terminate` last and the zero stores in `terminate`-first order) and the uninitialised
+ *    `c_buf_ok`/`buf_len` give retail's register order. The character class tests are the inline table reads of
+ *    `MSL_C/ctype.h`.
  */
 #include "MSL_C/ctype.h"
 #include "MSL_C/float.h"
@@ -142,13 +142,14 @@ static const char* parse_scan_format(const char* format_string, scan_format* for
     case 'F':
     case 'g':
     case 'G':
-        if (!(f.argument_options >= 4 && f.argument_options <= 7) && !(f.argument_options >= 1 && f.argument_options <= 2)) {
-            if (f.argument_options != ARG_LONG) {
-            } else {
-                f.argument_options = ARG_DOUBLE;
-            }
-        } else {
+        if (f.argument_options == ARG_CHAR || f.argument_options == ARG_SHORT || f.argument_options == ARG_INTMAX
+            || f.argument_options == ARG_SIZE_T || f.argument_options == ARG_PTRDIFF_T
+            || f.argument_options == ARG_LONG_LONG) {
             f.conversion_char = 0xFF;
+            break;
+        }
+        if (f.argument_options == ARG_LONG) {
+            f.argument_options = ARG_DOUBLE;
         }
         break;
     case 'p':
@@ -170,8 +171,9 @@ static const char* parse_scan_format(const char* format_string, scan_format* for
         }
         {
             int i;
-            for (i = 0; i < 32; i++) {
-                f.scan_set[i] = 0xFF;
+            u8* p;
+            for (i = sizeof(f.scan_set), p = f.scan_set; i; --i) {
+                *p++ = 0xFF;
             }
             f.scan_set[1] = 0xC1;
             f.scan_set[4] = 0xFE;
@@ -194,9 +196,9 @@ static const char* parse_scan_format(const char* format_string, scan_format* for
             f.scan_set[']' >> 3] |= 1 << (']' & 7);
         }
         while (c != 0 && c != ']') {
+            int last;
             f.scan_set[(c >> 3) & 0x1F] |= 1 << (c & 7);
-            if (s[1] == '-' && s[2] != 0 && s[2] != ']') {
-                int last = s[2];
+            if (s[1] == '-' && (last = s[2]) != 0 && last != ']') {
                 while (++c <= last) {
                     f.scan_set[(c >> 3) & 0x1F] |= 1 << (c & 7);
                 }
@@ -210,11 +212,13 @@ static const char* parse_scan_format(const char* format_string, scan_format* for
             f.conversion_char = 0xFF;
         } else if (invert) {
             int i;
-            u8* set = f.scan_set;
-            for (i = 0; i < 32; i++) {
-                set[i] = ~set[i];
+            u8* p;
+            for (i = sizeof(f.scan_set), p = f.scan_set; i; --i, ++p) {
+                *p = ~*p;
             }
         }
+        break;
+    case 'n':
         break;
     default:
         f.conversion_char = 0xFF;
@@ -228,39 +232,39 @@ static const char* parse_scan_format(const char* format_string, scan_format* for
 /* 0x8045E65C (0xC98): scans `format_str` against the characters supplied by `read`, storing through the variadic list; returns the item count. */
 static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str, va_list arg, int is_secure)
 {
-    scan_format fmt;
-    const char* format = format_str;
-    int conversions = 0;
-    int terminate = 0;
-    int items_assigned = 0;
-    int chars_read = 0;
-    int scanned;
-    int negative;
-    int overflow;
+    char fc;
+    int chars_read;
+    int items_assigned;
+    int conversions;
     int ch;
-    int c_buf_ok = 0;
-    u32 buf_len = 0;
-    char c;
+    const char* format = format_str;
     long value;
     unsigned long u_value;
+    int scanned;
+    int base;
+    int negative;
+    int overflow;
+    char c;
+    scan_format fmt;
     long long ll_value = 0;
     unsigned long long u_ll_value;
-    char fc;
     char* arg_ptr;
-    char* start;
-    int base;
+    int c_buf_ok;
+    u32 buf_len;
+    int terminate;
+
+    terminate = 0;
+    chars_read = 0;
+    items_assigned = 0;
+    conversions = 0;
 
     while ((fc = *format) != 0) {
         if (ctype_class(fc, CTYPE_SPACE)) {
             do {
-                format++;
-            } while (ctype_class(*format, CTYPE_SPACE));
+                fc = *++format;
+            } while (ctype_class(fc, CTYPE_SPACE));
             if (!terminate) {
-                for (;;) {
-                    c = read(read_arg, 0, 0);
-                    if (!ctype_class(c, CTYPE_SPACE)) {
-                        break;
-                    }
+                while (ctype_class(c = read(read_arg, 0, 0), CTYPE_SPACE)) {
                     chars_read++;
                 }
                 read(read_arg, c, 1);
@@ -268,8 +272,7 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
             continue;
         }
         if (fc != '%' && !terminate) {
-            c = read(read_arg, 0, 0);
-            if ((u8)fc != c) {
+            if ((c = read(read_arg, 0, 0)) != (u8)fc) {
                 read(read_arg, c, 1);
                 if (!is_secure) {
                     break;
@@ -298,8 +301,11 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
 
         switch (fmt.conversion_char) {
         case 'd':
-        case 'i':
-            base = (fmt.conversion_char == 'd') ? 10 : 0;
+            base = 10;
+            if (0) {
+            case 'i':
+                base = 0;
+            }
             if (terminate) {
                 ll_value = 0;
                 value = 0;
@@ -359,10 +365,16 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
             conversions++;
             continue;
         case 'o':
-        case 'u':
-        case 'x':
-        case 'X':
-            base = (fmt.conversion_char == 'o') ? 8 : (fmt.conversion_char == 'u') ? 10 : 16;
+            base = 8;
+            if (0) {
+            case 'u':
+                base = 10;
+            }
+            if (0) {
+            case 'x':
+            case 'X':
+                base = 16;
+            }
             if (terminate) {
                 u_ll_value = 0;
                 u_value = 0;
@@ -384,8 +396,7 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
                     if (negative) {
                         if (fmt.argument_options == ARG_INTMAX) {
                             u_ll_value = -u_ll_value;
-                        }
-                        if (fmt.argument_options != ARG_INTMAX) {
+                        } else {
                             u_value = -u_value;
                         }
                     }
@@ -481,32 +492,33 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
                         *arg_ptr = 0;
                     }
                     continue;
-                }
-                start = arg_ptr;
-                while (fmt.field_width-- != 0 && (!is_secure || (c_buf_ok = buf_len > (u32)scanned))
-                       && (ch = read(read_arg, 0, 0)) != -1) {
+                } else {
+                    char* start = arg_ptr;
+                    while (fmt.field_width-- != 0 && (!is_secure || (c_buf_ok = buf_len > (u32)scanned) != 0)
+                           && (ch = read(read_arg, 0, 0)) != -1) {
+                        c = ch;
+                        if (fmt.argument_options == ARG_WIDE) {
+                            mbtowc((u16*)arg_ptr, &c, 1);
+                            arg_ptr += 2;
+                        } else {
+                            *arg_ptr++ = c;
+                        }
+                        scanned++;
+                    }
                     c = ch;
-                    if (fmt.argument_options == ARG_WIDE) {
-                        mbtowc((u16*)arg_ptr, &c, 1);
-                        arg_ptr += 2;
-                    } else {
-                        *arg_ptr++ = ch;
+                    if (scanned == 0 || (is_secure && !c_buf_ok)) {
+                        if (!is_secure) {
+                            break;
+                        }
+                        terminate = 1;
+                        if (buf_len) {
+                            *start = 0;
+                        }
+                        continue;
                     }
-                    scanned++;
+                    chars_read += scanned;
+                    items_assigned++;
                 }
-                c = ch;
-                if (scanned == 0 || (is_secure && !c_buf_ok)) {
-                    if (!is_secure) {
-                        break;
-                    }
-                    terminate = 1;
-                    if (buf_len) {
-                        *start = 0;
-                    }
-                    continue;
-                }
-                chars_read += scanned;
-                items_assigned++;
             } else {
                 scanned = 0;
                 while (fmt.field_width-- != 0 && (ch = read(read_arg, 0, 0)) != -1) {
@@ -524,14 +536,10 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
             if (terminate) {
                 continue;
             }
-            for (;;) {
-                c = read(read_arg, 0, 0);
-                if (!ctype_class(c, CTYPE_SPACE)) {
-                    break;
-                }
+            while (ctype_class(c = read(read_arg, 0, 0), CTYPE_SPACE)) {
                 chars_read++;
             }
-            if ((u8)c != '%') {
+            if (c != '%') {
                 read(read_arg, c, 1);
                 if (!is_secure) {
                     break;
@@ -562,47 +570,55 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
                         *arg_ptr = 0;
                     }
                     continue;
-                }
-                start = arg_ptr;
-                while (fmt.field_width-- != 0 && (!is_secure || (c_buf_ok = (int)buf_len > scanned))
-                       && (ch = read(read_arg, 0, 0)) != -1 && (c = ch, (1 << (c & 7)) & fmt.scan_set[(c >> 3) & 0x1F])) {
-                    if (fmt.argument_options == ARG_WIDE) {
-                        mbtowc((u16*)arg_ptr, &c, 1);
-                        arg_ptr += 2;
-                    } else {
-                        *arg_ptr++ = ch;
-                    }
-                    scanned++;
-                }
-                c = ch;
-                if (scanned == 0 || (is_secure && !c_buf_ok)) {
-                    read(read_arg, ch, 1);
-                    if (!is_secure) {
-                        break;
-                    }
-                    terminate = 1;
-                    if (buf_len) {
-                        *start = 0;
-                    }
-                    continue;
-                }
-                chars_read += scanned;
-                if (fmt.argument_options == ARG_WIDE) {
-                    *(u16*)arg_ptr = 0;
                 } else {
-                    *arg_ptr = 0;
+                    char* start = arg_ptr;
+                    while (fmt.field_width-- != 0 && (!is_secure || (c_buf_ok = buf_len >= (u32)scanned) != 0)
+                           && (ch = read(read_arg, 0, 0)) != -1) {
+                        c = ch;
+                        if (!((1 << (c & 7)) & fmt.scan_set[(c >> 3) & 0x1F])) {
+                            break;
+                        }
+                        if (fmt.argument_options == ARG_WIDE) {
+                            mbtowc((u16*)arg_ptr, &c, 1);
+                            arg_ptr += 2;
+                        } else {
+                            *arg_ptr++ = c;
+                        }
+                        scanned++;
+                    }
+                    c = ch;
+                    if (scanned == 0 || (is_secure && !c_buf_ok)) {
+                        read(read_arg, c, 1);
+                        if (!is_secure) {
+                            break;
+                        }
+                        terminate = 1;
+                        if (buf_len) {
+                            *start = 0;
+                        }
+                        continue;
+                    }
+                    chars_read += scanned;
+                    if (fmt.argument_options == ARG_WIDE) {
+                        *(u16*)arg_ptr = 0;
+                    } else {
+                        *arg_ptr = 0;
+                    }
+                    items_assigned++;
                 }
-                items_assigned++;
             } else {
                 scanned = 0;
-                while (fmt.field_width-- != 0 && (ch = read(read_arg, 0, 0)) != -1
-                       && (c = ch, (1 << (c & 7)) & fmt.scan_set[(c >> 3) & 0x1F])) {
+                while (fmt.field_width-- != 0 && (ch = read(read_arg, 0, 0)) != -1) {
+                    c = ch;
+                    if (!((1 << (c & 7)) & fmt.scan_set[(c >> 3) & 0x1F])) {
+                        break;
+                    }
                     scanned++;
                 }
                 c = ch;
                 if (scanned == 0) {
-                    read(read_arg, ch, 1);
-                    break;
+                    read(read_arg, c, 1);
+                    continue;
                 }
                 chars_read += scanned;
             }
@@ -648,7 +664,7 @@ int __StringRead(StringReadState* state, int ch, int action)
     switch (action) {
     case 0: {
         const char* cursor = state->cursor;
-        u8 next = *cursor;
+        int next = (u8)*cursor;
         if ((char)next == 0) {
             state->hit_nul = 1;
             return -1;
