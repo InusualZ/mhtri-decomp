@@ -1498,7 +1498,7 @@ config.libs = [
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
             # Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
             Object(Matching, "DB/db.c", cflags=cflags_base),
-            Object(NonMatching, "mh3_pad/rc_record.c", cflags=cflags_base),
+            Object(Matching, "mh3_pad/rc_record.c", cflags=cflags_base),
             Object(Matching, "DSP/dsp.c", cflags=cflags_base),
             Object(Matching, "DSP/dsp_debug.c", cflags=cflags_base),
             Object(Matching, "DSP/dsp_task.c", cflags=cflags_base),
