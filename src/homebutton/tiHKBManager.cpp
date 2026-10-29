@@ -9,10 +9,14 @@
  * FLAGS.     GC/3.0a5.2 + cflags_hkb (see src/homebutton/hbm_kb_event.cpp); no extab/extabindex in the target, so
  *            `#pragma exceptions off`; `#pragma auto_inline on` around hkbGuiPaneManagerCreateLayoutScene/WalkInChildren
  *            (retail inlines the recursive walk three levels deep).
- * NAMES.     File name from the `__FILE__` string "tiHKBManager.cpp" (lbl_80658408) that hkbNodeRemove's OSPanic cites.
- * NAMES.     GUESS view classes HkbGuiComponent, HkbGuiManagerView, HkbGuiEventTarget and HkbListener (slots named by
- *            offset where no body names them) and the types HkbManager, HkbChannel, HkbNode, HkbRecord, HkbArg,
- *            HkbSlotMsg, HkbKeyIter, HkbStageEventArgs: named from the bodies that use them.
+ * NAMES.     File name from the `__FILE__` string "tiHKBManager.cpp" (0x80658408) that hkbNodeRemove's OSPanic cites; the
+ *            source spells it as a literal (the same bytes; our command line's `__FILE__` carries the directory).
+ * NAMES.     GUESS classes HkbGuiComponent/HkbGuiPaneComponent (the HBM gui Component/PaneComponent: fields from the
+ *            constructor hkbGuiPaneManagerAddPane inlines, slots init/setTriggerTarget/setPane from their callers;
+ *            map rows of their tables renamed), the views HkbGuiManagerView and HkbGuiEventTarget (slots named by
+ *            offset where no body names them), the classes HkbNode (observer base) and HkbManagerNode (the manager's sentinel; map
+ *            rows renamed to their manglings) and the types HkbManager, HkbChannel, HkbRecord, HkbArg, HkbSlotMsg,
+ *            HkbKeyIter, HkbStageEventArgs: named from the bodies that use them.
  * NAMES.     GUESS function names (map rows renamed): hkbGuiDrawLine, hkbGuiManagerUpdate, hkbGuiUpdateStageFromArgs,
  *            hkbGuiPaneManagerCreateLayoutScene/WalkInChildren/AddPane, hkbGuiSetBoundingTriggerTargets,
  *            hkbGuiPaneComponentContains/Draw (the HBM gui manager's drawLine_, Manager::update, the PaneManager scene
@@ -21,15 +25,22 @@
  *            hkbLedRequestDone, hkbExtraLedRequestDone, hkbNotifyConnect/Disconnect/Key (the KBD callbacks),
  *            hkbHidDone, hkbManagerStartDriver/Init/Shutdown/SetMap/Update, hkbChannelKeyEvent/Update/UpdateModifiers,
  *            hkbKeyIterSeek/Valid/GetUsage/GetCode/GetChar/GetCharForUsage, hkbKeyIterBeginWord0/1/3,
- *            hkbManagerDelete, hkbSetModifierOverride (channel 0's override value and mask).
- * SHAPES.    The view classes are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)` dispatch;
- *            nothing is defined or constructed through them, so no table is emitted here.
+ *            hkbSetModifierOverride (channel 0's override value and mask).
+ * SHAPES.    The gui classes are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)` dispatch;
+ *            hkbGuiPaneManagerAddPane constructs a PaneComponent through the inline constructors (table stores, the
+ *            virtual init call), the non-allocator node through a temporary assigned after its stores (a
+ *            new-expression's order).
+ * SHAPES.    hkbManager is a global with a constructor and an inline destructor, so MWCC emits the static initializer
+ *            (`__sinit_	iHKBManager_cpp`), its .ctors word and the destructor-chain record ahead of hkbManager in
+ *            .bss; the destructor is emitted after the initializer, as retail.
+ * SHAPES.    The sentinel's class derives from the observer base HkbNode: retail stores prev/next before the table
+ *            pointer, the order a base constructor gives (the base's own table store is dead and dropped).
  * SHAPES.    hkbNotifyConnect/Disconnect/Key compare against `&hkbManager.sentinel` itself: a named sentinel local is
  *            coloured r4 where retail keeps it in r0.
  * SHAPES.    Local declaration order decides the callee-saved colouring (the first declared takes the highest
- *            register): fn_8056A638 declares `idx` before `result`, fn_8056BD38 declares `mgr` first,
+ *            register): fn_8056A638 declares `idx` before `result`, HkbManagerNode::onConnect declares `mgr` first,
  *            hkbManagerUpdate declares `saved`, `msg`, `bit`, `index` in that order.
- * SHAPES.    The one-channel loops: a `u8` counter keeps retail's `mulli` by the zero index (fn_8056C090,
+ * SHAPES.    The one-channel loops: a `u8` counter keeps retail's `mulli` by the zero index (the HkbManager constructor,
  *            hkbManagerInit/SetMap/Update, hkbSetModifierState); an `int` counter folds it (hkbManagerShutdown).
  * SHAPES.    The key iterator's validity, usage and lookup are inline members (HkbKeyIter::isValid/getUsage/lookupCode)
  *            inlined into the C entry points; hkbKeyIterGetCode is written out, not wrapped (a wrapper adds a copy).
@@ -37,29 +48,33 @@
  *            reloads `start->manager` after the stores).
  * SHAPES.    hkbChannelUpdateModifiers tests the HID modifier usages in an if/else chain (a switch becomes a jump
  *            table, which also loses the CTR loop); the LED bits come from the inline hkbLedBits.
- * SHAPES.    hkbGuiManagerUpdate funnels the two contained cases through a `bContained` flag (retail shares one block);
- *            hkbGuiPaneComponentDraw halves the size with `/ 2.0f` (retail's fmuls operand order).
+ * SHAPES.    hkbGuiManagerUpdate: cases 1 and 3 reach the shared contained block through case labels inside `if (0)`
+ *            blocks (the block sits after case 5, as retail lays it out); `c` is declared before the other locals.
+ * SHAPES.    hkbSetModifierState materialises the lock change as `((old - locks) | (locks - old)) >> 31` (retail's
+ *            subf/subf/or/srwi.; both words are masked to 0x700, so it is `old != locks`).
+ * SHAPES.    HkbManager::filterAllowed tests the allow-list pointer through the inline getAllowedChars: that keeps the
+ *            pointer out of a register, so the loop reloads it and indexes with `lhzx` as retail.
+ * SHAPES.    hkbGuiPaneComponentDraw halves the size with `/ 2.0f` (retail's fmuls operand order).
  * RESIDUALS. fn_8056A638: retail schedules `lfs f31,4(r4)` before `mr r28,r4`; every declaration order tried keeps the
  *            move first.
- * RESIDUALS. fn_8056BE2C: retail holds the manager in r0 and the scaled index in r6 (ours r6/r0).
- * RESIDUALS. hkbSetModifierState: retail materialises `old != locks` as `(a-b | b-a) >> 31` with a record-form test;
- *            ours (bool, u8, u32, an inline member) compares with `cmplw`.
+ * RESIDUALS. HkbManagerNode::onDisconnect: retail holds the manager in r0 and the scaled index in r6 (ours r6/r0).
+ * RESIDUALS. hkbSetModifierState: the first statement's and/andc/or and the channel pointer take other registers
+ *            (retail r0/r4/r7, ours r4/r5/r0).
  * RESIDUALS. hkbManagerSetMap: the channel pointer is r27 in retail (r29 ours); an inline setMap member scores lower.
  * RESIDUALS. hkbChannelUpdate: register numbering of the bit/index/usage-pointer triple in the edge loops.
- * RESIDUALS. hkbKeyIterGetChar/GetCharForUsage: retail reloads `allowedChars` inside the allow-list loop (indexed
- *            `lhzx`); ours hoists it into a walking pointer (index type and member/free helper tried).
  * RESIDUALS. hkbGuiDrawLine: retail reloads the colour word before each FIFO write (also hbm_gui_draw's residual).
- * RESIDUALS. hkbGuiManagerUpdate: the contained flag is materialised (`li r27,0`); retail jumps straight to the shared
- *            block.  hkbGuiSetBoundingTriggerTargets: ours guards the loop entry (`lhz; cmpwi; beq`), retail does not.
+ * RESIDUALS. hkbGuiSetBoundingTriggerTargets: ours guards the loop entry (`lhz; cmpwi; beq`), retail does not (an int
+ *            or u16 index, a named pane or cast local measured no better).
  * RESIDUALS. hkbGuiPaneComponentContains: stack slots of the point, the rectangle and the local point.
  * RESIDUALS. hkbGuiPaneManagerWalkInChildren: retail stops inlining the iterator at the third level and calls
- *            hkbPaneListGetBeginIter / hkbPaneIterNotEqual; ours inlines all three levels.
- * RESIDUALS. Unwritten: hkbGuiPaneManagerAddPane 0x8056B440 (0x288) builds a PaneComponent in place (stores the
- *            Component and PaneComponent tables lbl_806583A0/lbl_80658290), and the static initialiser 0x8056D78C (0x48)
- *            constructs and registers hkbManager - both need the gui and listener classes reconstructed with
- *            MWCC-emitted tables (rule 10).
- * RESIDUALS. The unit's own `.data` (the vtables lbl_806582FC/lbl_80658358/lbl_80658440, the strings lbl_80658408/
- *            lbl_8065841C) and `.bss` (hkbManager) are referenced as externs: their classes are not reconstructed.
+ *            hkbPaneListGetBeginIter / hkbPaneIterNotEqual; ours inlines all three levels (inline_depth,
+ *            inline_max_size and inline_max_total_size pragmas change nothing; spelling the levels out loses
+ *            hkbGuiPaneManagerCreateLayoutScene's inlining).
+ * RESIDUALS. The gui vtables __vt__19HkbGuiPaneComponent, lbl_806582FC, lbl_80658358 and __vt__15HkbGuiComponent
+ *            are not emitted (their slots name other units' folded inline functions, so the classes keep their key
+ *            functions undefined); our .data is the two strings and __vt__14HkbManagerNode.
+ * RESIDUALS. HkbNode's table is not emitted here (an unrelocated `__vt__7HkbNode` symbol entry remains) and its
+ *            inline destructor is emitted as a weak 0x40-byte copy retail's object does not carry.
  * RESIDUALS. datagap: the claimed `.data` 0x80658290..0x80658458 spans at least 3 TUs (emission-order seams at
  *            0x806583A0 and in [0x80658408, 0x80658440)) - a seam question for the registration.
  */
@@ -82,6 +97,7 @@
 #include "HID/hid.h"
 #include "homebutton/hkb_layout.h"
 #include "homebutton/hkb_bounding.h"
+#include "homebutton/hkb_window.h"
 #include "MTX/mtx.h"
 #include "MTX/mtxvec.h"
 #include "RVLGX/GXAttr.h"
@@ -105,13 +121,34 @@ extern char lbl_80658358[];
 
 struct HkbManager;
 
-/* A node on the manager's circular observer list: vtable, prev, next and the manager it reports to (the
- * manager's own sentinel node points back at the manager, fn_8056C090). */
-/* size: 0x10 */
-struct HkbNode {
-    /* +0x00 */ void** vtable;
+struct HkbArg;
+
+/* An observer on the manager's circular list: prev and next, and the handlers the KBD callbacks run for every
+ * node (connect, disconnect, key).  Its table is not emitted here (onConnect is the key function and is
+ * not defined here); the constructor's base table store folds into the derived one.
+ * size: 0x0C */
+class HkbNode {
+public:
+    HkbNode() : prev(0), next(0) {}
+    /* slot +0x008 */ virtual ~HkbNode() {}
+    /* slot +0x00C */ virtual void onConnect(HkbArg* arg);
+    /* slot +0x010 */ virtual void onDisconnect(HkbArg* arg);
+    /* slot +0x014 */ virtual void onKey(HkbArg* arg);
+
     /* +0x04 */ HkbNode* prev;
     /* +0x08 */ HkbNode* next;
+};
+
+/* The manager's own observer, the sentinel of the list: it points back at the manager and its handlers keep the
+ * channels' connected state.  Its first handler is defined here, so MWCC emits its table (0x80658440).
+ * size: 0x10 */
+class HkbManagerNode : public HkbNode {
+public:
+    HkbManagerNode(HkbManager* owner) : manager(owner) {}
+    /* slot +0x00C */ virtual void onConnect(HkbArg* arg);
+    /* slot +0x010 */ virtual void onDisconnect(HkbArg* arg);
+    /* slot +0x014 */ virtual void onKey(HkbArg* arg);
+
     /* +0x0C */ HkbManager* manager;
 };
 
@@ -214,6 +251,9 @@ struct HkbRecord {
  * observer list and the driver work area (KBD's 0xCC0-byte state followed by HID's). */
 /* size: 0x94 */
 struct HkbManager {
+    HkbManager();
+    ~HkbManager() {}
+
     /* Returns channel 0's modifier word with the override bits replaced. */
     inline u32 getModifierState() {
         u32 v = channels[0].modifiers;
@@ -223,9 +263,12 @@ struct HkbManager {
         return v;
     }
 
+    /* Returns the character allow-list (NULL when every character is allowed). */
+    inline const u16* getAllowedChars() const { return allowedChars; }
+
     /* Returns `c` when no allow-list is set or the list holds it, 0 otherwise. */
     inline u16 filterAllowed(u16 c) {
-        if (allowedChars == 0) {
+        if (getAllowedChars() == 0) {
             return c;
         }
         if (allowedCount == 0) {
@@ -247,7 +290,7 @@ struct HkbManager {
     /* +0x0C */ const u16* allowedChars;
     /* +0x10 */ u32 allowedCount;
     /* +0x14 */ HkbChannel channels[1];
-    /* +0x80 */ HkbNode sentinel; /* circular observer list header */
+    /* +0x80 */ HkbManagerNode sentinel; /* circular observer list header */
     /* +0x90 */ u8* workArea;
 };
 
@@ -332,38 +375,32 @@ inline u16 HkbKeyIter::lookupCode(u8 usage)
 }
 
 
-/* The polymorphic view of an observer on the manager's list (an HkbNode): slots +0x0C/+0x10/+0x14 receive the
- * notification argument, so MWCC emits the canonical dispatch; nothing is defined here, so no table is emitted.
- * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
-class HkbListener {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void onConnect(HkbArg* arg);
-    /* slot +0x010 */ virtual void onDisconnect(HkbArg* arg);
-    /* slot +0x014 */ virtual void onKey(HkbArg* arg);
-};
-
 void operator delete(void* ptr) throw();
 
-/* The unit's own `.data` strings and vtable and its `.bss` singleton (see RESIDUALS). */
-extern "C" char lbl_80658408[]; /* "tiHKBManager.cpp" */
+/* The keyboard manager singleton, constructed and registered for destruction by the unit's static initializer. */
+HkbManager hkbManager;
 
-extern "C" char lbl_8065841C[]; /* "specified listener not found!" */
+class HkbGuiManagerView;
+class HkbGuiEventTarget;
 
-extern "C" void* lbl_80658440[]; /* .data vtable */
-
-extern "C" HkbManager hkbManager;
-
-/* The polymorphic view of a gui component the manager bodies call through: the slots are named by their offset
- * in the table (+0x08 is the deleting destructor), so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)`
- * dispatch. Nothing is defined or constructed here, so no table is emitted (rule 10).
- * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+/* A gui component (the HBM gui manager's Component): the slots are named by their offset in the table where no
+ * body names them (+0x08 is the deleting destructor), so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)`
+ * dispatch.  Its first slot is the key function and is not defined here, so the table (0x806583A0) is stored by
+ * the constructor and not emitted.  The fields are the ones the constructor sets; init clears the per-pointer state.
+ * size: 0x9C */
 class HkbGuiComponent {
 public:
+    HkbGuiComponent(u32 id)
+        : mbDragging(false), mDragButtonMask(0xFFFF), mID(id), mbTriggerTarget(false), mpManager(NULL),
+          mpEventTarget(NULL)
+    {
+        init();
+    }
+
     /* slot +0x008 */ virtual void v_0x008(int flag);
     /* untyped: opaque handles passed through */
     /* slot +0x00C */ virtual void v_0x00C(void* a, void* b, void* c);
-    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x010 */ virtual void init();
     /* slot +0x014 */ virtual void v_0x014();
     /* slot +0x018 */ virtual void v_0x018();
     /* slot +0x01C */ virtual void v_0x01C();
@@ -381,12 +418,32 @@ public:
     /* slot +0x048 */ virtual void v_0x048();
     /* slot +0x04C */ virtual u32 v_0x04C(u32 idx, f32 x, f32 y, u32 trigger, u32 hold, u32 release);
     /* slot +0x050 */ virtual u32 v_0x050(); /* whether the component takes the trigger */
-    /* untyped: opaque handle passed through */
-    /* slot +0x054 */ virtual void v_0x054(void* arg);
+    /* slot +0x054 */ virtual void setTriggerTarget(u32 bTarget);
     /* slot +0x058 */ virtual u32 v_0x058(StageEvent* event);
     /* slot +0x05C */ virtual void v_0x05C();
     /* slot +0x060 */ virtual void v_0x060();
     /* slot +0x064 */ virtual u32 v_0x064(f32 x, f32 y);
+
+    /* +0x04 */ bool mbDragging;
+    /* +0x05 */ u8 pad_0x05[0x78 - 0x05];
+    /* +0x78 */ u32 mDragButtonMask;
+    /* +0x7C */ u32 mID;
+    /* +0x80 */ u8 pad_0x80[0x90 - 0x80];
+    /* +0x90 */ bool mbTriggerTarget;
+    /* +0x94 */ HkbGuiManagerView* mpManager;
+    /* +0x98 */ HkbGuiEventTarget* mpEventTarget;
+};
+
+/* A component bound to a layout pane (the HBM gui manager's PaneComponent).  setPane is its key function and is
+ * not defined here, so the table (0x80658290) is stored by the constructor and not emitted.
+ * size: 0xA0 */
+class HkbGuiPaneComponent : public HkbGuiComponent {
+public:
+    HkbGuiPaneComponent(u32 id) : HkbGuiComponent(id), mpPane(NULL) {}
+
+    /* slot +0x068 */ virtual void setPane(nw4r::lyt::Pane* pane);
+
+    /* +0x9C */ nw4r::lyt::Pane* mpPane;
 };
 
 /* The event target a component forwards to (its +0x04 and +0x98 members): slot +0x10 takes the event's third
@@ -551,7 +608,7 @@ extern "C" void fn_8056A944(Manager* self) {
     Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
     while (n != 0) {
         HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
-        c->v_0x010();
+        c->init();
         n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n);
     }
 }
@@ -595,36 +652,35 @@ extern "C" Component* fn_8056AA98(Manager* self, u32 index) {
 extern "C" u32 hkbGuiManagerUpdate(Manager* self, u32 idx, f32 x, f32 y, u32 trigger, u32 hold, u32 release,
                                    void* data) {
     HkbGuiManagerView* view = (HkbGuiManagerView*)self;
+    HkbGuiComponent* c;
     u32 bTouched = 0;
     HkbGuiComponent* pLast = NULL;
     for (Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0); n != NULL;
          n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n)) {
-        HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
-        bool bContained = false;
+        c = (HkbGuiComponent*)n->mValue;
         switch (c->v_0x04C(idx, x, y, trigger, hold, release)) {
         case 1:
             view->onEvent((Component*)c, 0, idx, data);
-            bContained = true;
-            break;
-        case 2:
-            view->onEvent((Component*)c, 1, idx, data);
-            break;
-        case 3:
-            view->onEvent((Component*)c, 2, idx, data);
-            bContained = true;
-            break;
-        case 4:
-            view->onEvent((Component*)c, 4, idx, data);
-            break;
-        case 5:
-            view->onEvent((Component*)c, 5, idx, data);
-            break;
-        }
-        if (bContained) {
+            if (0) {
+            case 2:
+                view->onEvent((Component*)c, 1, idx, data);
+                break;
+            case 3:
+                view->onEvent((Component*)c, 2, idx, data);
+                if (0) {
+                case 4:
+                    view->onEvent((Component*)c, 4, idx, data);
+                    break;
+                case 5:
+                    view->onEvent((Component*)c, 5, idx, data);
+                    break;
+                }
+            }
             bTouched = 1;
             if (c->v_0x050()) {
                 pLast = c;
             }
+            break;
         }
         if (c->v_0x028(idx)) {
             view->onEvent((Component*)c, 3, idx, data);
@@ -711,11 +767,11 @@ extern "C" void fn_8056AF34(Manager* self) {
 }
 
 /* --- 0x8056AFA4: forward an argument to virtual slot 21 of every component. --- */
-extern "C" void fn_8056AFA4(Manager* self, void* arg) {
+extern "C" void fn_8056AFA4(Manager* self, u32 bTarget) {
     Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
     while (n != 0) {
         HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
-        c->v_0x054(arg);
+        c->setTriggerTarget(bTarget);
         n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n);
     }
 }
@@ -814,6 +870,40 @@ extern "C" bool hkbPaneIterNotEqual(HkbPaneList::Iterator it1, HkbPaneList::Iter
     return it1 != it2;
 }
 
+/* 0x8056B440 (0x288): Adds a component for `pane`, numbered by the running pane count, to the pane list and the
+ * manager; a picture or window pane's component takes the trigger. */
+extern "C" void hkbGuiPaneManagerAddPane(PaneManager* self, nw4r::lyt::Pane* pane) {
+    HkbGuiPaneComponent* component;
+    Node* node;
+    if (self->allocator != NULL) {
+        void* componentBlock = MEMAllocFromAllocator((MEMAllocator*)self->allocator, sizeof(HkbGuiPaneComponent));
+        node = (Node*)MEMAllocFromAllocator((MEMAllocator*)self->allocator, sizeof(Node));
+        component = new (componentBlock) HkbGuiPaneComponent(self->field_0x20);
+        if (node != NULL) {
+            node->mKey = pane;
+            node->mValue = component;
+        }
+    } else {
+        component = new HkbGuiPaneComponent(self->field_0x20);
+        Node* block = (Node*)operator new(sizeof(Node));
+        if (block != NULL) {
+            block->mKey = pane;
+            block->mValue = component;
+        }
+        node = block;
+    }
+    nw4r::ut::List_Append((nw4r::ut::List*)&self->list_0x24, node);
+    self->field_0x20++;
+    component->setPane(pane);
+    if (nw4r::ut::DynamicCast<nw4r::lyt::Picture>(pane) != NULL) {
+        component->setTriggerTarget(true);
+    }
+    if (nw4r::ut::DynamicCast<nw4r::lyt::Window>(pane) != NULL) {
+        component->setTriggerTarget(true);
+    }
+    ((HkbGuiManagerView*)self)->addComponent((Component*)component);
+}
+
 /* --- 0x8056B6C8: PaneComponent::setPane. --- */
 extern "C" void fn_8056B6C8(Component* self, void* pane) { self->field_0x9C = pane; }
 
@@ -845,7 +935,7 @@ extern "C" void hkbGuiSetBoundingTriggerTargets(PaneManager* self, u32 bTarget) 
     for (u32 i = 0; i < self->list_0x24.mSize; i++) {
         Node* n = (Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x24, (u16)i);
         if (nw4r::ut::DynamicCast<nw4r::lyt::Bounding>((nw4r::lyt::Pane*)n->mKey) != NULL) {
-            ((HkbGuiComponent*)n->mValue)->v_0x054((void*)bTarget);
+            ((HkbGuiComponent*)n->mValue)->setTriggerTarget(bTarget);
         }
     }
 }
@@ -959,7 +1049,7 @@ void hkbNodeRemove(HkbNode* list, HkbNode* node)
         }
         p = p->next;
     }
-    OSPanic(lbl_80658408, 0xB3, lbl_8065841C);
+    OSPanic("tiHKBManager.cpp", 0xB3, "specified listener not found!");
 }
 
 /* 0x8056BC5C: mark the channel of a busy LED request as pending. */
@@ -999,7 +1089,7 @@ void hkbExtraLedRequestDone(HkbRecord* rec)
 }
 
 /* 0x8056BD38: (de)activate a channel; channels past the first issue an LED request instead. */
-void fn_8056BD38(HkbNode* self, HkbArg* arg)
+void HkbManagerNode::onConnect(HkbArg* arg)
 {
     if (arg->index >= 1) {
         HkbManager* mgr;
@@ -1012,7 +1102,7 @@ void fn_8056BD38(HkbNode* self, HkbArg* arg)
         KBDSetChannelValue(arg->index, 0);
         index = arg->index;
         msg.value = 0;
-        mgr = self->manager;
+        mgr = manager;
         msg.index = index;
         saved = OSDisableInterrupts();
         bit = 1u << index;
@@ -1023,14 +1113,14 @@ void fn_8056BD38(HkbNode* self, HkbArg* arg)
         }
         OSRestoreInterrupts(saved);
     } else {
-        self->manager->active[arg->index] = 1;
+        manager->active[arg->index] = 1;
         KBDSetChannelValue(arg->index, 0);
-        self->manager->channels[arg->index].ledRetry = 1;
+        manager->channels[arg->index].ledRetry = 1;
     }
 }
 
 /* 0x8056BE2C: reset one channel's state. */
-void fn_8056BE2C(HkbNode* self, HkbArg* arg)
+void HkbManagerNode::onDisconnect(HkbArg* arg)
 {
     u32 index = arg->index;
     HkbManager* mgr;
@@ -1038,7 +1128,7 @@ void fn_8056BE2C(HkbNode* self, HkbArg* arg)
     if (index >= 1) {
         return;
     }
-    mgr = self->manager;
+    mgr = manager;
     mgr->active[index] = 0;
     ch = &mgr->channels[index];
     ch->held = 0;
@@ -1056,7 +1146,7 @@ void fn_8056BE2C(HkbNode* self, HkbArg* arg)
 /* 0x8056BE84: forward a channel update. */
 void hkbChannelKeyEvent(HkbChannel* ch, u32 down, u8 usage);
 
-void fn_8056BE84(HkbNode* self, HkbArg* arg)
+void HkbManagerNode::onKey(HkbArg* arg)
 {
     u32 index = arg->index;
     u32 flags;
@@ -1067,7 +1157,7 @@ void fn_8056BE84(HkbNode* self, HkbArg* arg)
     if (flags & 2) {
         return;
     }
-    hkbChannelKeyEvent(&self->manager->channels[index], flags & 1, arg->value);
+    hkbChannelKeyEvent(&manager->channels[index], flags & 1, arg->value);
 }
 
 /* 0x8056BEBC / 0x8056BF58 / 0x8056BFF4: notify every observer on the global manager's list by calling
@@ -1083,7 +1173,7 @@ void fn_8056BE84(HkbNode* self, HkbArg* arg)
     }                                                                          \
     first = n;                                                                 \
     while (n != 0) {                                                           \
-        ((HkbListener*)n)->method(arg);                                        \
+        n->method(arg);                                                        \
         n = n->next;                                                           \
         if (n == first) {                                                      \
             break;                                                             \
@@ -1105,24 +1195,15 @@ void hkbNotifyKey(HkbArg* arg)
     HKB_NOTIFY(onKey)
 }
 
-/* 0x8056C090: constructor of the manager singleton. */
-void fn_8056C090(HkbManager* self)
+/* 0x8056C090 (0x78): Clears the manager and its channel and makes the sentinel point back at it. */
+HkbManager::HkbManager()
+    : initialized(0), lockModifiers(0), pendingMask(0), allowedChars(0), allowedCount(0), sentinel(this), workArea(0)
 {
     u8 i;
-    self->initialized = 0;
-    self->lockModifiers = 0;
-    self->pendingMask = 0;
-    self->allowedChars = 0;
-    self->allowedCount = 0;
-    self->sentinel.prev = 0;
-    self->sentinel.next = 0;
-    self->sentinel.vtable = lbl_80658440;
-    self->sentinel.manager = self;
-    self->workArea = 0;
     for (i = 0; i < 1; i++) {
         HkbChannel* ch;
-        self->active[i] = 0;
-        ch = &self->channels[i];
+        active[i] = 0;
+        ch = &channels[i];
         ch->held = 0;
         ch->pressed = 0;
         ch->released = 0;
@@ -1136,16 +1217,6 @@ void fn_8056C090(HkbManager* self)
         ch->mapIndex = 9;
         ch->modifiers = 0;
     }
-}
-
-/* 0x8056C108: operator delete wrapper. */
-void* fn_8056C108(void* ptr, int count)
-{
-    void* result = ptr;
-    if (ptr != 0 && count > 0) {
-        operator delete(ptr);
-    }
-    return result;
 }
 
 /* 0x8056C148 (0x1C): Stores a HID completion result, or 1 for a zero result, into the caller's flag. */
@@ -1271,7 +1342,7 @@ void hkbSetModifierState(HkbManager* self, u32 value, u32 mask)
         u32 locks = self->lockModifiers & 0x700;
         u32 old = ch->modifiers & 0x700;
         ch->modifiers &= ~0x700;
-        bool changed = old != locks;
+        u32 changed = ((old - locks) | (locks - old)) >> 31;
         ch->modifiers |= self->lockModifiers;
         if (changed && self->active[i]) {
             ch->sendLeds();
@@ -1580,12 +1651,4 @@ HkbKeyIter hkbKeyIterSeek(HkbKeyIter* start)
     return it;
 }
 
-/* 0x8056D7D4: deleting destructor of the manager singleton (registered by the unit's static initializer). */
-HkbManager* hkbManagerDelete(HkbManager* self, int flag)
-{
-    if (self != 0 && flag > 0) {
-        operator delete(self);
-    }
-    return self;
-}
 }
