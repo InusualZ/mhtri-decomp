@@ -4,28 +4,41 @@
  * RANGE. .text 0x80099400-0x8009A748 (58 functions); extab, extabindex, .rodata 0x8056F730-0x8056F770, .data
  *   0x80591618-0x80591860, .sdata 0x807912B8-0x807912D8.  Left seam: fn_80099400 calls `ResShp::ref`
  *   (fn_80077674) on its own `this` where fn_800993B4 calls `ResNode::ref` (fn_8005D218), and the `.data`
- *   fragment opens with "g3d_resshp.cpp"; the right edge is `g3d/g3d_cpu.cpp`.
+ *   fragment opens with "g3d_resshp.cpp"; the right edge is `g3d/g3d_cpu.cpp`.  The range is three TUs
+ *   (seam request flip-resshp#1): the `.sdata` "ref" statics sit in three linker-aligned fragments
+ *   ([0x807912B8..0x807912C4] resshp, 0x807912C8 ResTev, 0x807912D0 ResTex) and the `.data` tail's ResTev and
+ *   ResTex strings each start 8-aligned after the resshp strings; the cuts are 0x8009A174 (`ResTev::ref`,
+ *   extabindex 0x800229F8, extab 0x80009968, the `.rodata` table) and 0x8009A360 (the ResPltt helpers and
+ *   `ResTex::ref`, extabindex 0x80022A34, extab 0x80009990).
  * NAMES. res_shp_get_vtx_clr is a GUESS; res_shp_get_vtx_nrm is a GUESS (the evidence follows).
  *   res_shp_get_vtx_pos/nrm/clr, res_tev_copy_to and res_tev_dc_store are GUESSES (nw4r's ResShp::GetResVtx*,
  *   ResTev::CopyTo/DCStore, by the asserts and the ScnMdl buffer refill).  Map stems (the dump answers `zz_`
  *   placeholders) except the nw4r members ResShp::Init/Terminate,
  *   ResShp::CallPrePrimitiveDisplayList/CallPrimitiveDisplayList and
- *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
- *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes; the `ResShpData` `id*` fields are
- *   spelled by res_shp_get_vtx_pos's assert (`ref().idVtxPosition >= 0`).
- * RESIDUALS. res_tev_copy_to: the final `subf`'s destination register (r0 in retail, r4 here).
- *   flipcheck: `.rodata` is the defined `tev_display_list_size` (a GUESS name for the
- *   map's lbl_8056F730); `.data`/
- *   `.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
- *   instance, after the TU's own strings, playbook 80).
+ *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).
+ *   fn_8009A174 is the non-const `ResTev::ref` instance (request flip-resshp#2: the shared header declares
+ *   only the const one, and adding the overload re-binds `g3d/g3d_state`'s call sites).  The `ResTagDLData`
+ *   fields (`mPrePrimOfs` at +0x08, `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes;
+ *   the `ResShpData` `id*` fields are spelled by res_shp_get_vtx_pos's assert (`ref().idVtxPosition >= 0`).
+ * RESIDUALS. `.sdata`: one object packs the five "ref" statics (0x14 B, definition order ResTex, ResTev,
+ *   fn_80099514, fn_80099740, fn_80099640) where the target has 0x20 B in three 8-aligned fragments; the
+ *   five `@sda21` loads then resolve 4..0x18 bytes off.  The weak strings need ResTex/ResTev defined first
+ *   and the statics need them last, and both are created at the definition, so no single-TU spelling
+ *   reaches it - the seam cut does.  The six one-call stubs (res_shp_pre_prim_class_name/_ptr/_ref,
+ *   res_tag_dl_ref, res_tev_ref, res_tex_ref) are 24 B of `.text` the linker dead-strips.
  * SHAPES. File-scope `#pragma peephole off`: the `rlwinm` flag extracts keep retail's `cmpwi`, and fn_800997E0/
  *   fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` + `cmpwi`).
- *   `#pragma pool_data off`; the strings are literals ("ref", 4 bytes, goes to `.sdata` and loads with
- *   `li r7, @sda21`).  fn_80099724 is compiled with `#pragma peephole on` (base word in r0); fn_800997E0 adds the
+ *   `#pragma pool_data off`; the TU's own strings are literals.  The `_ac.h` accessor instances are
+ *   `__declspec(noinline) inline` weak copies: MWCC emits a copy after the first function that references it
+ *   (several in one function: reverse reference order), creates its string literals at its definition (weak
+ *   `@STRING@` copies in reverse definition order after the TU's pool, `static char` member names forward in
+ *   `.sdata`), so the definitions stand in the `.data` tail's order and a stub before each retail address
+ *   places the code.  fn_80099724 is compiled with `#pragma peephole on` (base word in r0); fn_800997E0 adds the
  *   record's index before its +0x32 offset.  ResTev::CallDisplayList indexes the size table with the stage count
  *   read inline in the call's argument (a `prim` local lets MWCC defer the table address past `ref()`).
  *   ResShp::Init builds each vertex resource's handle as a `ResHandleTemp` class temporary (retail's return-value
- *   temporaries, allocated after the named locals).
+ *   temporaries, allocated after the named locals).  res_tev_copy_to's rebased size is a cast sum,
+ *   `size = (u32)(size - delta)`, so the result lands in r0.
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -86,15 +99,6 @@ struct ResTexBlock {
     /* +0x2C */ f32 mLodMax;    /* fn_8009A490's fifth out                             */
 }; /* size: 0x30 (a lower bound: only the words above are reached) */
 
-/* The `"ref"` member-name strings of the accessor asserts (`.sdata`).  Declared as *sized*
- * 4-byte arrays so MWCC's small-data heuristic emits the target's `li rN, @sda21` address form (an
- * unsized `extern const char[]` is assumed large and gets `lis`/`addi` - the same lever as
- * `g3d/g3d_resfile.cpp`'s `lbl_80791290`). */
-
-/* The neighbours this unit calls (plain map stems), each owner named beside it. */
-extern "C" {
-}
-
 /* The unit's own functions, in address order (the forward declarations keep the source order free).
  * They are C linkage: the map spells every one `fn_XXXXXXXX`. */
 extern "C" {
@@ -120,8 +124,126 @@ u32 fn_80099724(const ResHandle* pSelf, u32 ofs);
 ResTagDLData* fn_80099740(ResHandle* pSelf);
 ResTagDLData* fn_800997A4(const ResHandle* pSelf);
 u32 fn_800997AC(ResHandle* pSelf);
+u32 fn_8009A174(ResHandle* pSelf);
+u32 fn_8009A1D8(ResHandle* pSelf);
+
+}
 
 /* -------------------------------------------------------------------------------------------------- */
+/* The `_ac.h` accessor instances the target keeps as weak out-of-line copies.  MWCC emits such a copy  */
+/* after the first function that references it (several in one function: in reverse reference order)  */
+/* and creates its string literals where it is defined: the weak `@STRING@` copies come out in reverse */
+/* definition order and the `static` member names forward, so the definitions stand in the order the   */
+/* `.data` tail needs, and a one-call stub at each retail address places the code (the linker strips   */
+/* the stubs).                                                                                        */
+/* -------------------------------------------------------------------------------------------------- */
+
+/* 0x8009A42C (0x64): `ResTex::ref` with the `g3d_restex_ac.h` validity assert. */
+__declspec(noinline) inline nw4r::g3d::ResTexData& nw4r::g3d::ResTex::ref() {
+    if (!IsValid()) {
+        nw4r::db::Panic("g3d_restex_ac.h", 0x26, "%s::%s: Object not valid.", GetClassName(), __FUNCTION__);
+    }
+    return *ptr();
+}
+
+/* 0x8009A174 (0x64): `ResTev::ref` with the `g3d_restev_ac.h` validity assert (the non-const instance; the
+ * shared header declares only the const one, so it keeps the map's stem). */
+extern "C" __declspec(noinline) inline u32 fn_8009A174(ResHandle* pSelf) {
+    static char sMember[] = "ref";
+
+    if (!reinterpret_cast<const nw4r::g3d::ResTev*>(pSelf)->IsValid()) {
+        nw4r::db::Panic("g3d_restev_ac.h", 0x25, "%s::%s: Object not valid.", nw4r::g3d::ResTev::GetClassName(), sMember);
+    }
+    return fn_8009A1D8(pSelf);
+}
+
+/* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert. */
+extern "C" __declspec(noinline) inline ResTagDLData* fn_80099514(ResHandle* pSelf) {
+    static char sMember[] = "ref";
+
+    if (fn_8009958C(pSelf) == 0) {
+        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "%s::%s: Object not valid.", (const char*)fn_80099580(), sMember);
+    }
+    return fn_80099578(pSelf);
+}
+
+/* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert (the const instance). */
+extern "C" __declspec(noinline) inline ResTagDLData* fn_80099740(ResHandle* pSelf) {
+    static char sMember[] = "ref";
+
+    if (fn_8009958C(pSelf) == 0) {
+        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "%s::%s: Object not valid.", (const char*)fn_80099580(), sMember);
+    }
+    return fn_800997A4(pSelf);
+}
+
+/* The class-name string the `%s::%s: Object not valid.` assert passes for ResTagDL. */
+extern "C" __declspec(noinline) inline u32 fn_80099580(void) {
+    return (u32)"ResTagDL";
+}
+
+/* Box a pointer and assert it is 4-byte aligned (the `g3d_rescommon_ac.h` `Ptr` setter). */
+extern "C" __declspec(noinline) inline ResHandle* fn_800995D4(ResHandle* pSelf, u32 value) {
+    fn_80099638(pSelf, value);
+    if ((value & 0x3) != 0) {
+        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return pSelf;
+}
+
+/* Assert ResShpPrePrim validity, then hand back the pointer (the `g3d_resshp_ac.h` ref form). */
+extern "C" __declspec(noinline) inline u32 fn_80099640(ResHandle* pSelf) {
+    static char sMember[] = "ref";
+
+    if (fn_80099494(pSelf) == 0) {
+        nw4r::db::Panic("g3d_resshp_ac.h", 0x2C, "%s::%s: Object not valid.", (const char*)fn_80099488(), sMember);
+    }
+    return fn_800996A4(pSelf);
+}
+
+/* The class-name string the `%s::%s: Object not valid.` assert passes for ResShpPrePrim. */
+extern "C" __declspec(noinline) inline u32 fn_80099488(void) {
+    return (u32)"ResShpPrePrim";
+}
+
+/* Box a ResShpPrePrim pointer and assert it is 4-byte aligned (the `g3d_resshp_ac.h` `Ptr` setter). */
+extern "C" __declspec(noinline) inline ResHandle* fn_800994A8(ResHandle* pSelf, u32 value) {
+    fn_8009950C(pSelf, value);
+    if ((value & 0x3) != 0) {
+        nw4r::db::Panic("g3d_resshp_ac.h", 0x2C, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return pSelf;
+}
+
+/* The string-free instances whose place comes from the same rule: `ResTagDL::ref`'s callees follow it
+ * in reverse reference order (ptr, class name, validity), and `fn_80099724` precedes the const `ref`
+ * instance that fn_800996E8 references after it. */
+
+/* The raw ref getter. */
+extern "C" __declspec(noinline) inline ResTagDLData* fn_80099578(const ResHandle* pSelf) {
+    return (ResTagDLData*)pSelf->mpData;
+}
+
+/* ResTagDL's validity word. */
+extern "C" __declspec(noinline) inline s32 fn_8009958C(const ResHandle* pSelf) {
+    return (u32)pSelf->mpData != 0;
+}
+
+#pragma peephole on
+/* `base + ofs` for a boxed base, 0 for a null offset. */
+extern "C" __declspec(noinline) inline u32 fn_80099724(const ResHandle* pSelf, u32 ofs) {
+    u32 base = (u32)pSelf->mpData;
+    if (ofs) {
+        base += ofs;
+        return base;
+    }
+    return 0;
+}
+#pragma peephole off
+
+/* -------------------------------------------------------------------------------------------------- */
+
+extern "C" {
 
 /* The `ResShp` body before the range's ResShpPrePrim cluster: build the model handle from the shape's
  * +0x04 offset. */
@@ -139,9 +261,9 @@ u32 fn_8009943C(ResHandle* pSelf, u32 ofs) {
     return *(u32*)&nw4r::g3d::ResMdl((void*)0);
 }
 
-/* The class-name string the `%s::%s: Object not valid.` assert passes for ResShpPrePrim. */
-u32 fn_80099488(void) {
-    return (u32)"ResShpPrePrim";
+/* ResShpPrePrim's class name; dead-stripped, it places the weak copy of fn_80099488 here. */
+u32 res_shp_pre_prim_class_name(void) {
+    return fn_80099488();
 }
 
 /* ResShpPrePrim's validity word. */
@@ -149,13 +271,9 @@ s32 fn_80099494(const ResHandle* pSelf) {
     return (u32)pSelf->mpData != 0;
 }
 
-/* Box a ResShpPrePrim pointer and assert it is 4-byte aligned (the `g3d_resshp_ac.h` `Ptr` setter). */
-ResHandle* fn_800994A8(ResHandle* pSelf, u32 value) {
-    fn_8009950C(pSelf, value);
-    if ((value & 0x3) != 0) {
-        nw4r::db::Panic("g3d_resshp_ac.h", 0x2C, "NW4R:Failed assertion !((u32)p & 0x3)");
-    }
-    return pSelf;
+/* A ResShpPrePrim handle's boxing; dead-stripped, it places the weak copy of fn_800994A8 here. */
+ResHandle* res_shp_pre_prim_ptr(ResHandle* pSelf, u32 value) {
+    return fn_800994A8(pSelf, value);
 }
 
 /* The raw handle store the Ptr setter expands to. */
@@ -163,27 +281,10 @@ void fn_8009950C(ResHandle* pSelf, u32 value) {
     pSelf->mpData = (void*)value;
 }
 
-/* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert. */
-ResTagDLData* fn_80099514(ResHandle* pSelf) {
-    if (fn_8009958C(pSelf) == 0) {
-        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "%s::%s: Object not valid.", (const char*)fn_80099580(), "ref");
-    }
-    return fn_80099578(pSelf);
-}
-
-/* The raw ref getter. */
-ResTagDLData* fn_80099578(const ResHandle* pSelf) {
-    return (ResTagDLData*)pSelf->mpData;
-}
-
-/* The class-name string the `%s::%s: Object not valid.` assert passes for ResTagDL. */
-u32 fn_80099580(void) {
-    return (u32)"ResTagDL";
-}
-
-/* ResTagDL's validity word. */
-s32 fn_8009958C(const ResHandle* pSelf) {
-    return (u32)pSelf->mpData != 0;
+/* A ResTagDL handle's checked block; dead-stripped, it places the weak copy of fn_80099514 here (and
+ * its three callees after it). */
+ResTagDLData* res_tag_dl_ref(ResHandle* pSelf) {
+    return fn_80099514(pSelf);
 }
 
 /* Box the ResShp data's embedded tag (its +0x18 block). */
@@ -193,26 +294,14 @@ u32 fn_800995A0(ResHandle* pSelf) {
     return (u32)fn_800995D4(&tag, (u32)&pData->mTag)->mpData;
 }
 
-/* Box a pointer and assert it is 4-byte aligned (the `g3d_rescommon_ac.h` `Ptr` setter). */
-ResHandle* fn_800995D4(ResHandle* pSelf, u32 value) {
-    fn_80099638(pSelf, value);
-    if ((value & 0x3) != 0) {
-        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "NW4R:Failed assertion !((u32)p & 0x3)");
-    }
-    return pSelf;
-}
-
 /* The raw handle store the ResTagDL Ptr setter expands to. */
 void fn_80099638(ResHandle* pSelf, u32 value) {
     pSelf->mpData = (void*)value;
 }
 
-/* Assert ResShpPrePrim validity, then hand back the pointer (the `g3d_resshp_ac.h` ref form). */
-u32 fn_80099640(ResHandle* pSelf) {
-    if (fn_80099494(pSelf) == 0) {
-        nw4r::db::Panic("g3d_resshp_ac.h", 0x2C, "%s::%s: Object not valid.", (const char*)fn_80099488(), "ref");
-    }
-    return fn_800996A4(pSelf);
+/* A ResShpPrePrim handle's checked pointer; dead-stripped, it places the weak copy of fn_80099640 here. */
+u32 res_shp_pre_prim_ref(ResHandle* pSelf) {
+    return fn_80099640(pSelf);
 }
 
 /* The raw pre-prim-array pointer getter. */
@@ -234,27 +323,7 @@ u32 fn_800996E8(ResHandle* pSelf) {
     return fn_80099724(pSelf, pTag->mPrePrimOfs);
 }
 
-#pragma peephole on
-/* `base + ofs` for a boxed base, 0 for a null offset. */
-u32 fn_80099724(const ResHandle* pSelf, u32 ofs) {
-    u32 base = (u32)pSelf->mpData;
-    if (ofs) {
-        base += ofs;
-        return base;
-    }
-    return 0;
-}
-#pragma peephole off
-
-/* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert (the second out-of-line copy). */
-ResTagDLData* fn_80099740(ResHandle* pSelf) {
-    if (fn_8009958C(pSelf) == 0) {
-        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "%s::%s: Object not valid.", (const char*)fn_80099580(), "ref");
-    }
-    return fn_800997A4(pSelf);
-}
-
-/* The raw ref getter (the second out-of-line copy). */
+/* The raw ref getter (the const instance). */
 ResTagDLData* fn_800997A4(const ResHandle* pSelf) {
     return (ResTagDLData*)pSelf->mpData;
 }
@@ -272,9 +341,6 @@ u32 fn_800997AC(ResHandle* pSelf) {
 /* The tail: 0x800997E0-0x8009A748 (37 functions) - the `ResShp`/`ResShpPrePrim` attribute and draw  */
 /* half plus the `ResTev`/`ResTex` cache helpers.  Same TU, same section claim (widened below).      */
 /* ================================================================================================== */
-
-/* The `"ref"` member-name strings of the `ResTev`/`ResTex` asserts, declared as *sized* 4-byte arrays
- * so MWCC's small-data heuristic emits the target's `li rN, @sda21` form (the lever the head records). */
 
 /* The tev display-list sizes `ResTev::CallDisplayList` indexes by the block's stage count less one
  * (`.rodata`, 16 words). */
@@ -311,7 +377,6 @@ ResHandle* fn_8009A03C(ResHandle* pSelf, const ResHandle* pRhs);
 void fn_8009A06C(ResHandle* pSelf, const ResHandle* pRhs);
 u32 fn_8009A0F8(ResHandle* pSelf);
 void fn_8009A12C(ResHandle* pSelf, s32 flag);
-u32 fn_8009A174(ResHandle* pSelf);
 u32 fn_8009A1D8(ResHandle* pSelf);
 u8 fn_8009A254(ResHandle* pSelf);
 u32 res_tev_copy_to(ResHandle* pSelf, void* pDst);
@@ -613,12 +678,9 @@ extern "C" void fn_8009A12C(ResHandle* pSelf, s32 flag) {
 /* The `ResTev` block: its checked handle, its primitive-count and the display-list call it drives.     */
 /* -------------------------------------------------------------------------------------------------- */
 
-/* 0x8009A174 - `ResTev::ref` with the `g3d_restev_ac.h` validity assert. */
-extern "C" u32 fn_8009A174(ResHandle* pSelf) {
-    if (!reinterpret_cast<const nw4r::g3d::ResTev*>(pSelf)->IsValid()) {
-        nw4r::db::Panic("g3d_restev_ac.h", 0x25, "%s::%s: Object not valid.", nw4r::g3d::ResTev::GetClassName(), "ref");
-    }
-    return fn_8009A1D8(pSelf);
+/* The tev block's checked handle; dead-stripped, it places the weak copy of fn_8009A174 here. */
+extern "C" u32 res_tev_ref(ResHandle* pSelf) {
+    return fn_8009A174(pSelf);
 }
 
 /* 0x8009A1D8 - the raw `ref()` word. */
@@ -651,7 +713,7 @@ extern "C" u32 res_tev_copy_to(ResHandle* pSelf, void* pDst) {
 
     ResTevData* pData = (ResTevData*)fn_8009A174((ResHandle*)&copy);
     u32 size = pData->mDlSize;
-    size -= (u32)pDst - src;
+    size = (u32)(size - ((u32)pDst - src));
     pData->mDlSize = size;
 
     res_tev_dc_store((ResHandle*)&copy, 0);
@@ -699,12 +761,9 @@ extern "C" u32 fn_8009A408(ResHandle* pSelf) {
     return *(u32*)((u32)&reinterpret_cast<const nw4r::g3d::ResPltt*>(pSelf)->ref() + 0x8);
 }
 
-/* 0x8009A42C - `ResTex::ref` with the `g3d_restex_ac.h` validity assert. */
-nw4r::g3d::ResTexData& nw4r::g3d::ResTex::ref() {
-    if (!IsValid()) {
-        nw4r::db::Panic("g3d_restex_ac.h", 0x26, "%s::%s: Object not valid.", GetClassName(), "ref");
-    }
-    return *ptr();
+/* The texture block's checked handle; dead-stripped, it places the weak copy of `ResTex::ref` here. */
+extern "C" nw4r::g3d::ResTexData* res_tex_ref(ResHandle* pSelf) {
+    return &reinterpret_cast<nw4r::g3d::ResTex*>(pSelf)->ref();
 }
 
 /* 0x8009A490 - the block's resource description: its flags must say the description is readable, and
