@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (266)
+## Ideas that work (268)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -275,6 +275,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 286 | [One b-exit block per return statement: an early if-return is a direct branch, a trailing return after the guarded break keeps its block](286-one-b-exit-block.md) | works | source-shape | Retail has one or two dead `b exit` after a switch case's `b join` that ours lacks (the row is 4 or 8 bytes short per case), while every conditional branch of the case already targets the epilogue directly in both. |
 | 287 | [A float field compared against a constant colours the constant second: read the field through a local assigned inside the condition](287-float-field-compared-against.md) | works | source-shape, allocator | In `if (0.0f != em->field)` retail loads the constant into f0 and the field into f1 (`fcmpu cr0, f0, f1`), ours the other way round; operand order, a `zero` local and inverted tests do not move it. |
 | 288 | [A block-local reference to a global numbers the inlined copy above the @ temporaries and colours it first](288-block-local-reference-to.md) | works | source-shape, allocator | An inline helper called on a global (`Scroll(sConsole)`) keeps its copy of the global in r30 and a field it reads in r31 where retail has them swapped, and the same helper matches at another call site of the same unit |
+| 289 | [A hoisted sum's loads come out in reverse operand order: name the sum and the shared load, sum declared first](289-hoisted-sums-loads-come.md) | works | source-shape, allocator | One `add rA,rA,r0` where ours has `add rA,r0,rA` after the same two loads; every operand order of the two field reads either swaps the loads or the add's operands, and a named local for the sum moves it one register up |
+| 290 | [One inlined by-value wrapper inside a dont_inline TU: open the window for that function, close it after a declaration, never_inline the record ctors](290-one-inlined-by-value.md) | works | pragma, source-shape | Two by-value argument copies sit in the wrong frame slots (ours interleaves each copy with the record it copies, retail puts both copies below both records) in a TU compiled under `#pragma dont_inline on` |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

@@ -8,7 +8,11 @@
  * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md).  File-scope
  *   `#pragma dont_inline on` (retail calls every inline member out of line, the generated record ctors/dtors included)
  *   and `#pragma peephole off` above the includes (the `__ptmf_null` copy keeps its unfused lis/addi/lwz, and
- *   `menu/movie.h`'s inline `~NetworkFriendInfo` keeps retail's `extsh r0,r4`).
+ *   `menu/movie.h`'s inline `~NetworkFriendInfo` keeps retail's `extsh r0,r4`).  `onPatEvent` alone compiles under
+ *   `#pragma dont_inline off` (retail inlines the by-value `postError` wrapper there, so its two argument copies are
+ *   temporaries below the named records); the window closes after the data record's ctor/dtor definitions, because the
+ *   compiler reads the pragma state one declaration ahead, and the records' ctors/dtors are `never_inline` so the window
+ *   inlines nothing else.
  * NAMES. The class name is its own "NetworkCommunityPat::deleteRequest" string's; every other name is a GUESS from what
  *   the bodies store, compare and pass (the `setCollectionLog*` helpers by analogy with `NetworkLayerPat`'s).  The
  *   senders are `Network/PatInterface.cpp`'s, named from their Pat op-codes and the `recvAns*` trace strings (request N,
@@ -17,16 +21,10 @@
  *   `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287; hence `blockPlayer`/`unblockPlayer`
  *   (BlackAdd/BlackDelete); `inviteFriend` (sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the
  *   consumer's names.  `NetworkFriendInfo` is `menu/movie.cpp`'s (`menu/movie.h`), `strtok` MSL's.
- * RESIDUALS. `extab`: the constructor's call to `getInstance_` is a may-throw range (pc 0x7C) retail does not record;
- *   `__attribute__((nothrow))` on its declaration (`enemy/em020_ai.h`, not this unit's) clears it (requested).
+ * RESIDUALS. None: every row, the data sections, `extab` and `extabindex` are the target's bytes (`getInstance_` is
+ *   declared `nothrow` in `enemy/em020_ai.h`, so the constructor records no may-throw range around it).
  * RESIDUALS. Not unwritten: the empty inline constructor/destructor bodies of `NetworkCommunityFriendList` and
  *   `NetworkCommunityBlockList` are complete (MWCC emits the element construction; declared so other units call them).
- * RESIDUALS. `writeProfileRange_50`: the last window-end sum loads 0x3F8/0x3FC into r7/r0 in retail; every operand order
- *   and local spelling measured either swaps the two loads or the `add` operands (scheduling off changes nothing).
- * RESIDUALS. `onPatEvent`: the two by-value error copies (cases 0x807B/0x807E) sit in named locals, so the frame
- *   holds them in source order (0x20/0x08) where retail's inlined `postError(NetworkErrorInfo)` puts both copies below
- *   both records (0x14/0x08); `dont_inline off` around it inlines the copy right but also inlines the generated record
- *   constructors retail calls (wrong callees), and function-scope copies land above the frame's other records.
  * SHAPES. `setFriendTransferModeById` (NetworkLayerPat) takes a `u32 mode`: its callers here pass the flag unmasked.
  * SHAPES. The request record's `reset` and `clear` are defined before its destructor: MWCC then knows the destructor's
  *   call cannot throw and records no cleanup for the `NetworkMutex` member (retail's empty `extab` record).
@@ -38,7 +36,10 @@
  * SHAPES. `onPatEvent`'s profile-name loop indexes with a block-scope `nameIndex` and the block list loop counts with
  *   `j` (retail's register choice for both).
  * SHAPES. `NetworkCommunityProfile` and `NetworkCommunityPeer` declare their constructor and destructor, defined inline
- *   here beside the friend and block lists' (implicit ones are emitted ahead of the lists', not in retail's order).
+ *   here beside the friend and block lists' (implicit ones are emitted ahead of the lists', not in retail's order); the
+ *   mail, message, invite and data records declare theirs too, `never_inline` (the `onPatEvent` window above).
+ * SHAPES. `writeProfileRange_50` names the window end and the sent offset as locals, the sum declared first: the hoisted
+ *   sum emits its loads in reverse operand order, and the named sum must colour before the shared load (idea 289).
  */
 /* Retail keeps the unfused lis/addi/lwz forms of the null member pointer copy and the deleting destructors' extsh;
  * stated before the includes so the header-inline destructors compile under it too. */
@@ -133,6 +134,21 @@ inline NetworkCommunityProfile::~NetworkCommunityProfile()
 {
 }
 
+/* Destroys a mail record (its sender id). */
+inline NetworkCommunityMail::~NetworkCommunityMail()
+{
+}
+
+/* Destroys a message record (its sender id). */
+inline NetworkCommunityMessage::~NetworkCommunityMessage()
+{
+}
+
+/* Destroys an invite record (its friend id). */
+inline NetworkCommunityInvite::~NetworkCommunityInvite()
+{
+}
+
 /* Builds the block list's entries. */
 inline NetworkCommunityBlockList::NetworkCommunityBlockList()
 {
@@ -150,6 +166,21 @@ inline NetworkCommunityPeer::NetworkCommunityPeer()
 
 /* Builds a profile block (its owner id). */
 inline NetworkCommunityProfile::NetworkCommunityProfile()
+{
+}
+
+/* Builds a mail record (its sender id). */
+inline NetworkCommunityMail::NetworkCommunityMail()
+{
+}
+
+/* Builds a message record (its sender id). */
+inline NetworkCommunityMessage::NetworkCommunityMessage()
+{
+}
+
+/* Builds an invite record (its friend id). */
+inline NetworkCommunityInvite::NetworkCommunityInvite()
 {
 }
 
@@ -2077,7 +2108,10 @@ struct NetworkCommunityBlockedPayload {      /* 0x807E, one per blocked player *
 };   /* size: 0x2C (the stride) */
 
 /* The Pat server's community messages: each code sets the reply bits the waiting request handlers poll, or delivers a
- * received record (mail, data, profile notice, invite, message) or the friend and block lists. */
+ * received record (mail, data, profile notice, invite, message) or the friend and block lists.  Retail inlines the
+ * by-value `postError` wrapper here (its argument copies sit below the named records), so inlining is on for this one
+ * function; the records' constructors and destructors are `never_inline` and stay out of line. */
+#pragma dont_inline off
 void NetworkCommunityPat::onPatEvent(s32 code, s32 requestId, s32 flag, s32 count, const u8* data)
 {
     char* token;
@@ -2343,8 +2377,7 @@ void NetworkCommunityPat::onPatEvent(s32 code, s32 requestId, s32 flag, s32 coun
             error.code_00 = 0x80000000;
             error.param1_04 = 0;
             error.param2_08 = 0;
-            NetworkPostedError posted(*(NetworkPostedError*)&error);
-            ((NetworkInstanceDispatch*)getInstance_())->postError((NetworkErrorInfo*)&posted);
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
             break;
         }
         this->friends_89C.count_00 = count < 50 ? count : 50;
@@ -2375,8 +2408,7 @@ void NetworkCommunityPat::onPatEvent(s32 code, s32 requestId, s32 flag, s32 coun
             error.code_00 = 0x80000000;
             error.param1_04 = 0;
             error.param2_08 = 0;
-            NetworkPostedError posted(*(NetworkPostedError*)&error);
-            ((NetworkInstanceDispatch*)getInstance_())->postError((NetworkErrorInfo*)&posted);
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
             break;
         }
         this->blocked_2268.count_00 = count < 16 ? count : 16;
@@ -2400,6 +2432,18 @@ void NetworkCommunityPat::onPatEvent(s32 code, s32 requestId, s32 flag, s32 coun
         break;
     }
 }
+
+/* Destroys a data record (its sender id); the definition also ends the inlining window above (the compiler reads the
+ * pragma state when it reaches the next declaration). */
+inline NetworkCommunityData::~NetworkCommunityData()
+{
+}
+
+/* Builds a data record (its sender id). */
+inline NetworkCommunityData::NetworkCommunityData()
+{
+}
+#pragma dont_inline on
 
 /* Reports the unsupported-request code for command 7. */
 void NetworkCommunityPat::rejectRequest_40()
@@ -2439,6 +2483,8 @@ void NetworkCommunityPat::writeProfile_4C(const u8* data, u32 size)
 void NetworkCommunityPat::writeProfileRange_50(const u8* data, u32 size, u32 offset)
 {
     u32 end;
+    u32 windowEnd;
+    u32 sentOffset;
 
     end = offset + size;
     if (end > 0x100) {
@@ -2465,8 +2511,10 @@ void NetworkCommunityPat::writeProfileRange_50(const u8* data, u32 size, u32 off
             this->sentOffset_500 = this->profile_3D8.windowOffset_020;
         }
     }
-    if (this->sentOffset_500 + this->sentSize_504 < this->profile_3D8.windowSize_024 + this->profile_3D8.windowOffset_020) {
-        this->sentSize_504 = this->profile_3D8.windowOffset_020 + this->profile_3D8.windowSize_024 - this->sentOffset_500;
+    windowEnd = this->profile_3D8.windowOffset_020 + this->profile_3D8.windowSize_024;
+    sentOffset = this->sentOffset_500;
+    if (sentOffset + this->sentSize_504 < windowEnd) {
+        this->sentSize_504 = windowEnd - sentOffset;
     }
     memcpy(&this->profile_3D8.data_028[offset], &data[offset], size);
 }

@@ -73,8 +73,8 @@ struct NetworkCommunityProfile {
     /* +0x024 */ u32 windowSize_024;      /* how many bytes from it */
     /* +0x028 */ u8 data_028[0x100];
 
-    NetworkCommunityProfile();    /* 0x803F0760 - inline, emitted by Network/NetworkCommunityPat.cpp */
-    ~NetworkCommunityProfile();   /* 0x803F05D4 */
+    NetworkCommunityProfile() __attribute__((never_inline));    /* 0x803F0760 - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityProfile() __attribute__((never_inline));   /* 0x803F05D4 */
 };   /* size: 0x128 (the length `clear` zeroes) */
 
 /* Who a profile write is announced to: `kind_00` 0..4 (1 = one player, named by `id_04`). */
@@ -93,6 +93,9 @@ struct NetworkCommunityMail {
     /* +0x236 */ u8 pad_236[2];
     /* +0x238 */ u32 value_238;
     /* +0x23C */ s32 time_23C;
+
+    NetworkCommunityMail() __attribute__((never_inline));    /* 0x803F27E4 - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityMail() __attribute__((never_inline));   /* 0x803F2788 */
 };   /* size: 0x240 (the handler's frame) */
 
 /* The invite record the invite handler delivers (command 21): the friend, an empty name and tag, and the invite type
@@ -103,6 +106,9 @@ struct NetworkCommunityInvite {
     /* +0x34 */ char tag_034[1];
     /* +0x35 */ u8 type_035;
     /* +0x36 */ u8 pad_036[0x02];
+
+    NetworkCommunityInvite() __attribute__((never_inline));    /* 0x803F413C - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityInvite() __attribute__((never_inline));   /* 0x803F40E0 */
 };   /* size: 0x38 (approximation: the fields the handler writes, rounded to a word) */
 
 /* The message record the friend-message handler delivers (command 19). */
@@ -112,6 +118,9 @@ struct NetworkCommunityMessage {
     /* +0x034 */ char tag_034[1];
     /* +0x035 */ char text_035[513];
     /* +0x236 */ u8 pad_236[0x02];
+
+    NetworkCommunityMessage() __attribute__((never_inline));    /* 0x803F3D84 - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityMessage() __attribute__((never_inline));   /* 0x803F3D28 */
 };   /* size: 0x238 (the frame slots of `onPatEvent` and the message handler) */
 
 /* A peer's profile as the peer-profile reply (Pat message 0x8073) fills it: the profile block, the peer's layer id, up
@@ -143,6 +152,9 @@ struct NetworkCommunityData {
     /* +0x038 */ u32 value_038;
     /* +0x03C */ u32 size_03C;
     /* +0x040 */ u8 data_040[0x100];
+
+    NetworkCommunityData() __attribute__((never_inline));    /* 0x803F5FB8 - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityData() __attribute__((never_inline));   /* 0x803F5F5C */
 };   /* size: 0x140 (the frame slot of `onPatEvent`) */
 
 /* One entry of the friend list. */
