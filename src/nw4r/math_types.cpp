@@ -9,11 +9,16 @@
  *   bodies: MTX33Identity, MTX34ToMTX33, MTX34Zero, MTX34Scale, MTX34Trans, MTX34RotAxisFIdx, MTX34RotXYZFIdx,
  *   MTX33ToMTX34, MTX44Identity, MTX44Copy and the pair sFIdxCirclePair; `mtx34_rotate_vec3` keeps the map's C name
  *   for nw4r's VEC3TransformNormal.
- * RESIDUALS. MTX34RotXYZFIdx: retail colours the circle pair's address r0, ours r7 (the `li` and the `psq_lx` index);
- *   pCircle as `register` u32, non-const or declared before tbl/pIdx does not move it.
+ * RESIDUALS. none.
  * SHAPES. The paired-single bodies are C with one inline-asm block over `register` locals.
  * SHAPES. MTX34RotXYZFIdx sits under a scoped `#pragma optimizewithasm off` (retail does not schedule its asm block
  *   into the C prologue) and declares tbl before pCircle (tbl r4).
+ * SHAPES. MTX34RotXYZFIdx names every GPR its asm block uses as a `register` local (idxBits, pSampleXZ, pSampleY; playbook 104):
+ *   a hard-coded r0 in the block reserves r0 across it and pushes pCircle to r7, while r0 is the allocator's
+ *   first pick for a local the instructions allow there (pCircle, then idxBits); pSampleXZ is declared before
+ *   pSampleY (r5 before r6).
+ * SHAPES. sFIdxCirclePair is defined after MTX34RotAxisFIdx so the pool holds 0.0f, 1.0f and the radian factor
+ *   before it (.sdata2 order).
  */
 
 #include "nw4r/math.h"
@@ -24,9 +29,6 @@
 
 namespace nw4r {
 namespace math {
-
-/* The circle size in index units, as the paired-single pair the rotation code compares against. */
-static const f32 sFIdxCirclePair[2] = {65536.0f, 65536.0f};
 
 /* 0x805012C4 (0x24): sets a 3x3 matrix to identity. */
 MTX33* MTX33Identity(register MTX33* pOut) {
@@ -173,6 +175,9 @@ MTX34* MTX34RotAxisFIdx(MTX34* pOut, const VEC3* pAxis, f32 fIdx) {
     return pOut;
 }
 
+/* The circle size in index units, as the paired-single pair the rotation code compares against. */
+static const f32 sFIdxCirclePair[2] = {65536.0f, 65536.0f};
+
 /* 0x80501434 (0x160): builds the rotation Rz * Ry * Rx from three angle indices with paired-single table
  * lookups. */
 #pragma push
@@ -182,6 +187,9 @@ MTX34* MTX34RotXYZFIdx(register MTX34* pOut, register f32 fx, register f32 fy, r
     register u32* pIdx = &idx;
     register const SinCosSample* tbl = sSinCosTbl;
     register const f32* pCircle = sFIdxCirclePair;
+    register u32 idxBits;
+    register const SinCosSample* pSampleXZ;
+    register const SinCosSample* pSampleY;
 
     asm {
         psq_lx f0, 0, pCircle, 0, 0
@@ -209,7 +217,7 @@ MTX34* MTX34RotXYZFIdx(register MTX34* pOut, register f32 fx, register f32 fy, r
         psq_st f4, 0(pIdx), 0, OS_FASTCAST_U16
         psq_l f7, 0(pIdx), 0, OS_FASTCAST_U16
         fabs f5, fz
-        lwz r0, 0(pIdx)
+        lwz idxBits, 0(pIdx)
         fcmpu cr0, f5, f0
         ble _convertZ
     _loopZ:
@@ -218,30 +226,30 @@ MTX34* MTX34RotXYZFIdx(register MTX34* pOut, register f32 fx, register f32 fy, r
         bgt _loopZ
     _convertZ:
         psq_st f5, 0(pIdx), 1, OS_FASTCAST_U16
-        rlwinm r5, r0, 20, 20, 27
-        add r5, tbl, r5
+        rlwinm pSampleXZ, idxBits, 20, 20, 27
+        add pSampleXZ, tbl, pSampleXZ
         ps_sub f7, f4, f7
-        psq_l f4, 0(r5), 0, 0
-        rlwinm r6, r0, 4, 20, 27
-        psq_l f8, 8(r5), 0, 0
+        psq_l f4, 0(pSampleXZ), 0, 0
+        rlwinm pSampleY, idxBits, 4, 20, 27
+        psq_l f8, 8(pSampleXZ), 0, 0
         ps_cmpu0 cr0, f6, f2
-        add r6, tbl, r6
+        add pSampleY, tbl, pSampleY
         ps_madds0 f0, f8, f7, f4
-        psq_l f4, 0(r6), 0, 0
-        psq_l f8, 8(r6), 0, 0
-        lhz r0, 0(pIdx)
+        psq_l f4, 0(pSampleY), 0, 0
+        psq_l f8, 8(pSampleY), 0, 0
+        lhz idxBits, 0(pIdx)
         bge _signY
         ps_neg f9, f0
         ps_merge01 f0, f9, f0
     _signY:
         ps_madds1 f1, f8, f7, f4
         psq_l f7, 0(pIdx), 1, OS_FASTCAST_U16
-        rlwinm r0, r0, 4, 20, 27
+        rlwinm idxBits, idxBits, 4, 20, 27
         ps_cmpu1 cr0, f6, f2
-        add r5, tbl, r0
+        add pSampleXZ, tbl, idxBits
         fsubs f7, f5, f7
-        psq_l f4, 0(r5), 0, 0
-        psq_l f8, 8(r5), 0, 0
+        psq_l f4, 0(pSampleXZ), 0, 0
+        psq_l f8, 8(pSampleXZ), 0, 0
         bge _signZ
         ps_neg f9, f1
         ps_merge01 f1, f9, f1
