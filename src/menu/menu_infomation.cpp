@@ -22,18 +22,13 @@
  *   `menu/menu_item.h`, `menu/menu_row.h`, `draw_shape.h`) or in the leaf headers `Pl/pl_status_sheet_get.h`,
  *   `hud/draw_font_align.h` and `userdata_hunter_rank_info_get.h`.  Ten `Pl/fn_80273B14.h` getters are called
  *   through `_c1` views: their owner declarations return `s32`/`void*` where this screen reads `s16`/`u8` and typed rows.
- * RESIDUALS. Every row has a body; 141 of 149 are byte-identical.  The 8 open rows, largest first:
- *  - `ammo_grid_draw`: `rows` is spilled to the stack where retail keeps it in r14 and instead spills `total` (0x68,
- *    0x6C) and one `state` (0x70) inside the grid 1/2 cases; the spill choice is not modelled by `mt.py regsim`
- *    (its replay diverges on this graph), and declaration hill climbs find nothing.
- *  - `ammo_table_draw`: the five arguments live one register window higher than retail's r16-r20: one more value is
- *    live across the row loop; regsim's best plan reaches 9 of 30 saved registers.
+ * RESIDUALS. Every row has a body; 144 of 149 are byte-identical.  The 5 open rows, largest first:
+ *  - `ammo_table_draw`: the resolve/column web takes r15 (the last register) where retail colours it r23 inside the
+ *    final cascade and leaves r15 to the cells' `better`; the exact stall-pick simulation reaches retail's registers
+ *    only with an interference ours lacks (the web live through the totals row's first two cells), and no spelling of
+ *    the totals cells (a second local, function-scope `better`/`state`, block-local `col`) produces it.
  *  - `skill_table_body_draw`: register colouring of `tree`/`torso` and a loop web (regsim's best plan 27 of 30, with
  *    a walking-pointer local that measures worse).
- *  - `gun_recoil_text_get`: one `lbz`+`slwi` pair (the `level` index of the barrel text) is scheduled two
- *    instructions earlier than retail's; registers match.
- *  - `put_equip_info_upper_page`: the `mr` of the bonus-skill `rows` pointer is scheduled before `li i,0` where
- *    retail puts it after `mr r31,r29`; registers match.
  *  - `equip_skill_trees_list`: register colouring (`plw`/`flags`/the output pointers r14-r20 vs retail's r17-r21);
  *    regsim's model diverges on this graph; a two-trip loop over the decoration slots loses 150 B.
  *  - `weapon_affinity_compare`: the masked class (r3 in retail) and the `worn->kind` load (r4) take each other's
@@ -44,6 +39,22 @@
  *    0x248, 0x63 of 0x68, 0x1C of 0x20); `.text` is in retail's function order.
  * SHAPES. `ammo_kind_label_draw`'s `d.x = d.x - pos.x` stores through the `extsh` retail has; `d.x -= pos.x` drops it
  *   (playbook 38).
+ *  - `ammo_grid_draw` (playbook 281): the spill set is Chaitin's cost/degree pick, so the source decides which webs
+ *    are cheap: `total` and the first cell's `first_count` are `s32` (no `clrlwi` before the zero test, `stw` spills);
+ *    `first_count = count & 0xFF` makes its web a backend temp numbered after the hoisted `mode & 4` (the spill slots
+ *    go out in vreg order: 0x64 `mode & 4`, 0x68/0x6C the two counts, 0x70 a `state`); `row` and `rows` are `?:`
+ *    expressions (a parse-time temp coloured right after `grid`); the two-cell paths index the tables directly and
+ *    MWCC's CSE forms `tbl + row` once (a named `u8* ammo` is a renaming web coloured one register too low);
+ *    `skilled` is a function-scope local declared before `i`; the string table is held in `strs` before `draw_font`.
+ *  - `ammo_table_draw`: `col` is one function-scope `u8` that holds the resolve result and then each column id: the
+ *    `switch` has no default, so the web runs round the piece loop's back edge into the `== 1` test and needs a
+ *    callee-saved register, while the per-cell ranges reuse dead registers; `cols` is assigned inside the piece loop
+ *    (hoisted after `piece = 0`); declared `cols, piece, row, col` (coloured r26, r25, r24 in that order).
+ *  - A string-table element passed to a call is read through a local (`strs = get_str_tbl(n); f(.., strs[i])`):
+ *    with the call inside the argument list MWCC evaluates the index before the other arguments
+ *    (`ammo_grid_draw`'s `draw_font`, `gun_recoil_text_get`'s `sprintf`).
+ *  - `put_equip_info_upper_page` indexes the bonus-skill row table by the drawn count (`rows[count]`): a walked
+ *    pointer (`*rows; rows++`) is copied from the call result before the loop's `i = 0`, retail's after it.
  *  - Locals are declared in descending stack-slot order: MWCC gives the first-declared local the highest slot.
  *  - A screen position handed on is a by-value `_mh_ivec2_` (`put_lsp_anchor_offset`'s offset and this unit's
  *    `*_draw` helpers' `pos`): the stack copies retail makes before each call are MWCC's argument temporaries, and a
@@ -513,7 +524,7 @@ void put_equip_info_upper_page(StatusScreenWork* self) {
     rows = (u16*)get_menu_lsp_tbl(0x6C);
     for (i = 0; i < 4; i++) {
         if (plw->deco_skill_id[i] != 0) {
-            put_lsp_anchor_offset(*rows, &cell, pos);
+            put_lsp_anchor_offset(rows[count], &cell, pos);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0x6A), &cell);
             spr_data_copy(&spr, get_lsp_data(0x52C, NULL));
             if (pl_bonus_skill_valid_ck(plw, plw->deco_skill_id[i]) == 0) {
@@ -533,7 +544,6 @@ void put_equip_info_upper_page(StatusScreenWork* self) {
             extra = spr.width;
             width += extra < 0 ? -extra : extra;
             place_rec_alloc(&rec, x, y, width, height, 4, 11);
-            rows++;
             count++;
         }
     }
@@ -3856,12 +3866,14 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
     s8 text[16];
     _SPR_DATA_ spr;
     u8 count;
+    u32 skilled;
     s32 i;
     s32 row;
     u8 state;
-    u8 total;
-    u8* ammo;
+    s32 total;
+    s32 first_count;
     u16* ids;
+    u8** strs;
 
     if (mode & 8) {
         switch (grid) {
@@ -3881,25 +3893,16 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
     rows = 0;
     switch (grid) {
     case 2:
-        rows = 6;
-        if (mode & 6) {
-            rows = 3;
-        }
+        rows = (mode & 6) ? 3 : 6;
         break;
     case 0:
     case 1:
-        rows = 8;
-        if (mode & 6) {
-            rows = 4;
-        }
+        rows = (mode & 6) ? 4 : 8;
         break;
     }
     for (i = 0; i < rows; i++) {
-        u32 skilled = 0;
-        row = i;
-        if (mode & 4) {
-            row = rows + i;
-        }
+        skilled = 0;
+        row = (mode & 4) ? rows + i : i;
         switch (grid) {
         case 0:
             ids = (u16*)get_menu_lsp_tbl(0xC5);
@@ -3939,7 +3942,8 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
             if (count == 0) {
                 spr.color = 0x878787FF;
             }
-            draw_font(spr, (s8*)get_str_tbl(0x3A)[row], 0, &cell);
+            strs = get_str_tbl(0x3A);
+            draw_font(spr, (s8*)strs[row], 0, &cell);
             break;
         case 1:
             ids = (u16*)get_menu_lsp_tbl(0xC4);
@@ -3976,14 +3980,13 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
                 total = count;
             } else {
                 draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC1), &cell);
-                ammo = &ammo_grid_double[0][row];
-                state = gun_ammo_usable_ck(plw, view, ammo[0], flags);
+                state = gun_ammo_usable_ck(plw, view, ammo_grid_double[0][row], flags);
                 spr_data_copy(&spr, get_lsp_data(0x933, NULL));
                 if (state & 1) {
                     spr.color = 0xAA825A7D;
                 }
                 draw_sprite(spr, &cell);
-                state = gun_clip_compare(plw, view, ammo[0], flags, &count);
+                state = gun_clip_compare(plw, view, ammo_grid_double[0][row], flags, &count);
                 if (count != 0 && (state & 1)) {
                     spr_data_copy(&spr, get_lsp_data(0x92E, NULL));
                     if ((flags & 4) && (state & 0x18)) {
@@ -4004,14 +4007,14 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
                     sprintf(text, "%d", count);
                     draw_font(spr, text, 1, &cell);
                 }
-                total = count;
-                state = gun_ammo_usable_ck(plw, view, ammo[8], flags);
+                first_count = count & 0xFF;
+                state = gun_ammo_usable_ck(plw, view, ammo_grid_double[0][row + 8], flags);
                 spr_data_copy(&spr, get_lsp_data(0x934, NULL));
                 if (state & 1) {
                     spr.color = 0xAA825A7D;
                 }
                 draw_sprite(spr, &cell);
-                state = gun_clip_compare(plw, view, ammo[8], flags, &count);
+                state = gun_clip_compare(plw, view, ammo_grid_double[0][row + 8], flags, &count);
                 if (count != 0 && (state & 1)) {
                     spr_data_copy(&spr, get_lsp_data(0x92F, NULL));
                     if ((flags & 4) && (state & 0x18)) {
@@ -4032,7 +4035,7 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
                     sprintf(text, "%d", count);
                     draw_font(spr, text, 1, &cell);
                 }
-                total += count;
+                total = first_count + count;
             }
             spr_data_copy(&spr, get_lsp_data(0x92D, NULL));
             if (skilled == 1) {
@@ -4041,20 +4044,20 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
             if (total == 0) {
                 spr.color = 0x878787FF;
             }
-            draw_font(spr, (s8*)get_str_tbl(0x39)[row], 0, &cell);
+            strs = get_str_tbl(0x39);
+            draw_font(spr, (s8*)strs[row], 0, &cell);
             break;
         case 2:
             ids = (u16*)get_menu_lsp_tbl(0xC3);
             put_lsp_anchor_offset(ids[i], &cell, base);
             draw_sprite_ary((u16*)get_menu_lsp_tbl(0xC0), &cell);
-            ammo = &ammo_grid_triple[0][row];
-            state = gun_ammo_usable_ck(plw, view, ammo[0], flags);
+            state = gun_ammo_usable_ck(plw, view, ammo_grid_triple[0][row], flags);
             spr_data_copy(&spr, get_lsp_data(0x929, NULL));
             if (state & 1) {
                 spr.color = 0xAA825A7D;
             }
             draw_sprite(spr, &cell);
-            state = gun_clip_compare(plw, view, ammo[0], flags, &count);
+            state = gun_clip_compare(plw, view, ammo_grid_triple[0][row], flags, &count);
             if (count != 0 && (state & 1)) {
                 spr_data_copy(&spr, get_lsp_data(0x924, NULL));
                 if ((flags & 4) && (state & 0x18)) {
@@ -4075,14 +4078,14 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
                 sprintf(text, "%d", count);
                 draw_font(spr, text, 1, &cell);
             }
-            total = count;
-            state = gun_ammo_usable_ck(plw, view, ammo[6], flags);
+            first_count = count & 0xFF;
+            state = gun_ammo_usable_ck(plw, view, ammo_grid_triple[0][row + 6], flags);
             spr_data_copy(&spr, get_lsp_data(0x92A, NULL));
             if (state & 1) {
                 spr.color = 0xAA825A7D;
             }
             draw_sprite(spr, &cell);
-            state = gun_clip_compare(plw, view, ammo[6], flags, &count);
+            state = gun_clip_compare(plw, view, ammo_grid_triple[0][row + 6], flags, &count);
             if (count != 0 && (state & 1)) {
                 spr_data_copy(&spr, get_lsp_data(0x925, NULL));
                 if ((flags & 4) && (state & 0x18)) {
@@ -4103,14 +4106,14 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
                 sprintf(text, "%d", count);
                 draw_font(spr, text, 1, &cell);
             }
-            total += count;
-            state = gun_ammo_usable_ck(plw, view, ammo[12], flags);
+            total = first_count + count;
+            state = gun_ammo_usable_ck(plw, view, ammo_grid_triple[0][row + 12], flags);
             spr_data_copy(&spr, get_lsp_data(0x92B, NULL));
             if (state & 1) {
                 spr.color = 0xAA825A7D;
             }
             draw_sprite(spr, &cell);
-            state = gun_clip_compare(plw, view, ammo[12], flags, &count);
+            state = gun_clip_compare(plw, view, ammo_grid_triple[0][row + 12], flags, &count);
             if (count != 0 && (state & 1)) {
                 spr_data_copy(&spr, get_lsp_data(0x926, NULL));
                 if ((flags & 4) && (state & 0x18)) {
@@ -4139,7 +4142,8 @@ void ammo_grid_draw(_PLW* plw, _mh_ivec2_ pos, _EQUIP_INDEX* view, u8 flags, u8 
             if (total == 0) {
                 spr.color = 0x878787FF;
             }
-            draw_font(spr, (s8*)get_str_tbl(0x38)[row], 0, &cell);
+            strs = get_str_tbl(0x38);
+            draw_font(spr, (s8*)strs[row], 0, &cell);
             break;
         }
     }
@@ -4650,32 +4654,33 @@ void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, _mh_ivec2
     _EQUIP_INDEX resolved;
     u8 count;
     u8 piece_flags;
-    u8 ok;
-    u8 row;
+    u8* cols;
     u8 piece;
+    u8 row;
+    u8 col;
 
     count = 0;
     for (row = 0; row < 11; row++) {
         ammo_table_row_frame_draw(kind, row, pos, 0, flags);
-        u8* cols = equip_panel_row_layout[(u8)(row + kind * 11)];
         for (piece = 0; piece < 3; piece++) {
+            cols = equip_panel_row_layout[(u8)(row + kind * 11)];
             piece_flags = flags & ~6;
             switch (piece) {
             case 0:
-                ok = equip_variant_resolve(plw, view->shown[0], NULL, &piece_flags, &resolved);
+                col = equip_variant_resolve(plw, view->shown[0], NULL, &piece_flags, &resolved);
                 break;
             case 1:
-                ok = equip_variant_resolve(plw, view->shown[1], NULL, &piece_flags, &resolved);
+                col = equip_variant_resolve(plw, view->shown[1], NULL, &piece_flags, &resolved);
                 break;
             case 2:
-                ok = equip_variant_resolve(plw, view->shown[2], NULL, &piece_flags, &resolved);
+                col = equip_variant_resolve(plw, view->shown[2], NULL, &piece_flags, &resolved);
                 break;
             }
-            if (ok == 1) {
+            if (col == 1) {
 #line 6824
                 nw4r::db::Panic("menu_infomation.cpp", __LINE__, "NW4R:Failed assertion 0");
             } else {
-                u8 col = cols[0];
+                col = cols[0];
                 if (col != 0xFF) {
                     u32 better = (gun_ammo_usable_ck(plw, &resolved, col, piece_flags) & 1) != 0;
                     u8 state = gun_clip_compare(plw, &resolved, col, piece_flags, &count);
@@ -4697,7 +4702,7 @@ void ammo_table_draw(_PLW* plw, _EQUIP_INDEX* view, u8 flags, u8 kind, _mh_ivec2
         }
         u8 total_state = 0;
         u8 total = 0;
-        u8 col = cols[0];
+        col = cols[0];
         if (col != 0xFF) {
             u32 better = (gun_ammo_usable_ck(plw, view, col, flags) & 1) != 0;
             total_state = gun_clip_compare(plw, view, col, flags, &count);
@@ -6848,7 +6853,8 @@ u8 gun_recoil_text_get(_PLW* plw, _EQUIP_INDEX* view, u8 flags, s8* out_text) {
     }
     if (ret & 1) {
         if (barrel_text == 1) {
-            sprintf(out_text, "%s", get_str_tbl(0x37)[level]);
+            levels = get_str_tbl(0x37);
+            sprintf(out_text, "%s", levels[level]);
         } else {
             levels = get_str_tbl(0x35);
             icons = get_str_tbl(0x36);
