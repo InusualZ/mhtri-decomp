@@ -11,14 +11,18 @@
  * NAMES. GUESS: the unit name (SDK spelling), `WPADiCreateKey`, `WPADiCreateKeyFor3rd` (SDK names: the extension key
  *   generators), `wpadDecryptExtension`; data `wpadRandModulus/Increment/Multiplier/Seed` (the LCG), `wpadKeyAnsTable`,
  *   `wpadKeySBox`, `wpadKey3rdAnsTable`, `wpadKey3rdSBox` (the generators' tables), `wpadRor8`/`wpadRol8`.
- * RESIDUALS. `WPADiCreateKey`/`WPADiCreateKeyFor3rd`: the six key bytes are scheduled and spilled differently (ours
- *   needs a 0xB0 frame against 0xA0); everything before and after them matches.  .data differs only by the four false
+ * RESIDUALS. `WPADiCreateKey`: the six key bytes are scheduled and spilled differently (same size and 0xA0 frame; the
+ *   key1 tail and the answer byte 4 are spilled where ours spills other temporaries); everything before and after them
+ *   matches.  `WPADiCreateKeyFor3rd`: register colouring in the key block only (retail loads answer byte 0 into r14,
+ *   ours into r10).  .data differs only by the four false
  *   relocations (#14): its bytes are identical, but the target object carries four relocations dtk reads into the S-box
- *   bytes (.data 0x8062C99C, 0x8062CBE4, 0x8062CE10, 0x8062CF90: config request wpad-slice1#14).  Flip blockers: .text
+ *   bytes (.data 0x8062C99C, 0x8062CBE4, 0x8062CE10, 0x8062CF90: config requests wpad-slice1#14, wpad-encrypt#1).  Flip blockers: .text
  *   (the two key generators) and the four false .data relocations.
  * SHAPES. The S-boxes are one-dimensional and indexed `(idx + n) * 0x100 + byte` (the original adds the row offset to the
  *   byte before the load); the answer row is a `u8` offset into a flat table; the LCG step is an unsigned modulo; the
- *   decryption index is a `u8`.
+ *   decryption index is a `u8`.  The rotate helpers take the shift first: inline arguments are evaluated right to
+ *   left (playbook 161), and retail evaluates the rotated value before the shift.  `WPADiCreateKey` computes its key
+ *   bytes in the order 0, 2, 3, 4, 1, 5 (the best-scoring of the 720 orders; the natural order scores lower).
  */
 
 #include "types.h"
@@ -356,14 +360,14 @@ static u8 wpadKey3rdSBox[9 * 0x100] = {
     0x45, 0xEE, 0x51, 0x8D, 0xCC, 0x6C, 0xCA, 0xEB, 0x7F, 0x68, 0x07, 0xAE, 0x5E, 0x57, 0x08, 0xE7,
 };
 
-/* Rotates the byte `value` left by `shift` bits. */
-static inline u8 wpadRol8(u8 value, u8 shift)
+/* Rotates the byte `value` left by `shift` bits (the shift is the first parameter). */
+static inline u8 wpadRol8(u8 shift, u8 value)
 {
     return (value << shift) | (value >> (8 - shift));
 }
 
-/* Rotates the byte `value` right by `shift` bits. */
-static inline u8 wpadRor8(u8 value, u8 shift)
+/* Rotates the byte `value` right by `shift` bits (the shift is the first parameter). */
+static inline u8 wpadRor8(u8 shift, u8 value)
 {
     return (value >> shift) | (value << (8 - shift));
 }
@@ -402,17 +406,17 @@ void WPADiCreateKey(s32 chan)
                     wpadKeySBox[rand[2]], wpadKeySBox[rand[3]], wpadKeySBox[rand[4]], wpadKeySBox[rand[5]],
                     wpadKeySBox[rand[6]], wpadKeySBox[rand[7]], wpadKeySBox[rand[8]], wpadKeySBox[rand[9]]);
     level = OSDisableInterrupts();
-    key[0] = (wpadRor8(wpadKeyAnsTable[ansOffset + 0] ^ wpadKeySBox[rand[5]], wpadKeySBox[rand[2]] % 8)
+    key[0] = (wpadRor8(wpadKeySBox[rand[2]] % 8, wpadKeyAnsTable[ansOffset + 0] ^ wpadKeySBox[rand[5]])
               - wpadKeySBox[rand[9]]) ^ wpadKeySBox[rand[4]];
-    key[1] = (wpadRor8(wpadKeyAnsTable[ansOffset + 1] ^ wpadKeySBox[rand[1]], wpadKeySBox[rand[0]] % 8)
-              - wpadKeySBox[rand[5]]) ^ wpadKeySBox[rand[7]];
-    key[2] = (wpadRor8(wpadKeyAnsTable[ansOffset + 2] ^ wpadKeySBox[rand[6]], wpadKeySBox[rand[8]] % 8)
+    key[2] = (wpadRor8(wpadKeySBox[rand[8]] % 8, wpadKeyAnsTable[ansOffset + 2] ^ wpadKeySBox[rand[6]])
               - wpadKeySBox[rand[2]]) ^ wpadKeySBox[rand[8]];
-    key[3] = (wpadRor8(wpadKeyAnsTable[ansOffset + 3] ^ wpadKeySBox[rand[4]], wpadKeySBox[rand[7]] % 8)
+    key[3] = (wpadRor8(wpadKeySBox[rand[7]] % 8, wpadKeyAnsTable[ansOffset + 3] ^ wpadKeySBox[rand[4]])
               - wpadKeySBox[rand[3]]) ^ wpadKeySBox[rand[2]];
-    key[4] = (wpadRor8(wpadKeyAnsTable[ansOffset + 4] ^ wpadKeySBox[rand[1]], wpadKeySBox[rand[6]] % 8)
+    key[4] = (wpadRor8(wpadKeySBox[rand[6]] % 8, wpadKeyAnsTable[ansOffset + 4] ^ wpadKeySBox[rand[1]])
               - wpadKeySBox[rand[0]]) ^ wpadKeySBox[rand[3]];
-    key[5] = (wpadRor8(wpadKeyAnsTable[ansOffset + 5] ^ wpadKeySBox[rand[7]], wpadKeySBox[rand[8]] % 8)
+    key[1] = (wpadRor8(wpadKeySBox[rand[0]] % 8, wpadKeyAnsTable[ansOffset + 1] ^ wpadKeySBox[rand[1]])
+              - wpadKeySBox[rand[5]]) ^ wpadKeySBox[rand[7]];
+    key[5] = (wpadRor8(wpadKeySBox[rand[8]] % 8, wpadKeyAnsTable[ansOffset + 5] ^ wpadKeySBox[rand[7]])
               - wpadKeySBox[rand[5]]) ^ wpadKeySBox[rand[9]];
     WPADiDebugPrint("key : %d %d %d %d %d %d \n", key[0], key[1], key[2], key[3], key[4], key[5]);
     ft[0] = wpadKeySBox[(idx + 1) * 0x100 + key[4]] ^ wpadKeySBox[(idx + 2) * 0x100 + rand[3]];
@@ -478,17 +482,17 @@ void WPADiCreateKeyFor3rd(s32 chan)
                     wpadKey3rdSBox[rand[2]], wpadKey3rdSBox[rand[3]], wpadKey3rdSBox[rand[4]], wpadKey3rdSBox[rand[5]],
                     wpadKey3rdSBox[rand[6]], wpadKey3rdSBox[rand[7]], wpadKey3rdSBox[rand[8]], wpadKey3rdSBox[rand[9]]);
     level = OSDisableInterrupts();
-    key[0] = (wpadRol8(wpadKey3rdAnsTable[ansOffset + 0] ^ wpadKey3rdSBox[rand[0]], wpadKey3rdSBox[rand[1]] % 8)
+    key[0] = (wpadRol8(wpadKey3rdSBox[rand[1]] % 8, wpadKey3rdAnsTable[ansOffset + 0] ^ wpadKey3rdSBox[rand[0]])
               + wpadKey3rdSBox[rand[6]]) ^ wpadKey3rdSBox[rand[7]];
-    key[1] = (wpadRol8(wpadKey3rdAnsTable[ansOffset + 1] ^ wpadKey3rdSBox[rand[4]], wpadKey3rdSBox[rand[2]] % 8)
+    key[1] = (wpadRol8(wpadKey3rdSBox[rand[2]] % 8, wpadKey3rdAnsTable[ansOffset + 1] ^ wpadKey3rdSBox[rand[4]])
               + wpadKey3rdSBox[rand[3]]) ^ wpadKey3rdSBox[rand[1]];
-    key[2] = (wpadRol8(wpadKey3rdAnsTable[ansOffset + 2] ^ wpadKey3rdSBox[rand[2]], wpadKey3rdSBox[rand[8]] % 8)
+    key[2] = (wpadRol8(wpadKey3rdSBox[rand[8]] % 8, wpadKey3rdAnsTable[ansOffset + 2] ^ wpadKey3rdSBox[rand[2]])
               + wpadKey3rdSBox[rand[4]]) ^ wpadKey3rdSBox[rand[5]];
-    key[3] = (wpadRol8(wpadKey3rdAnsTable[ansOffset + 3] ^ wpadKey3rdSBox[rand[6]], wpadKey3rdSBox[rand[9]] % 8)
+    key[3] = (wpadRol8(wpadKey3rdSBox[rand[9]] % 8, wpadKey3rdAnsTable[ansOffset + 3] ^ wpadKey3rdSBox[rand[6]])
               + wpadKey3rdSBox[rand[7]]) ^ wpadKey3rdSBox[rand[0]];
-    key[4] = (wpadRol8(wpadKey3rdAnsTable[ansOffset + 4] ^ wpadKey3rdSBox[rand[5]], wpadKey3rdSBox[rand[4]] % 8)
+    key[4] = (wpadRol8(wpadKey3rdSBox[rand[4]] % 8, wpadKey3rdAnsTable[ansOffset + 4] ^ wpadKey3rdSBox[rand[5]])
               + wpadKey3rdSBox[rand[8]]) ^ wpadKey3rdSBox[rand[1]];
-    key[5] = (wpadRol8(wpadKey3rdAnsTable[ansOffset + 5] ^ wpadKey3rdSBox[rand[9]], wpadKey3rdSBox[rand[3]] % 8)
+    key[5] = (wpadRol8(wpadKey3rdSBox[rand[3]] % 8, wpadKey3rdAnsTable[ansOffset + 5] ^ wpadKey3rdSBox[rand[9]])
               + wpadKey3rdSBox[rand[8]]) ^ wpadKey3rdSBox[rand[5]];
     WPADiDebugPrint("key : %d %d %d %d %d %d \n", key[0], key[1], key[2], key[3], key[4], key[5]);
     ft[0] = wpadKey3rdSBox[(idx + 1) * 0x100 + key[4]] ^ wpadKey3rdSBox[(idx + 2) * 0x100 + rand[3]];
