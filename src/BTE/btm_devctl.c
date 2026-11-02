@@ -18,12 +18,13 @@
  *   btm_cb device class, at its BTE source position). BTM_WriteVoiceSettings and BTM_EnableTestMode are GUESS bodies
  *   around their trace strings (the link strips both; their strings stay in .data because the multi-string
  *   functions address the pool section-relative).
- * RESIDUALS. BTM_SetLocalDeviceName: p_buf and the name pointer take r31/r30 swapped; the other declaration order
- *   fixes it and costs its two inlined copies (btm_reset_complete, btm_dev_timeout), which want this order. Measured
- *   without a win: the name pointer assigned at the top/after either test/inside the branch, memset/strncpy through
- *   `p`, either compare spelling, an early return, a char* `p`, the helper moved anywhere in the file, an argument
- *   local in the caller, and scoped scheduling/optimization_level/global_optimizer/peephole/opt_* pragmas.
- * SHAPES. plain C; the device control block is flattened into btm_cb (BTE/btm_main.h). Each reset-sequence step
+ * RESIDUALS. none.
+ * SHAPES. plain C; the device control block is flattened into btm_cb (BTE/btm_main.h). The HCI command buffer is taken
+ *   through the static btm_get_cmd_buf (inlined): in BTM_SetLocalDeviceName its return node gives p_buf r31 over the
+ *   name pointer's r30 while the two inlined copies (btm_reset_complete, btm_dev_timeout) keep the reverse; a direct
+ *   GKI_getpoolbuf call follows the declaration order in both contexts, and no declaration order, block scope,
+ *   `register`, dead initialiser, caller-side local, parameter reassignment or scoped pragma separates the two
+ *   (the helper is codegen-neutral at the unit's other five p_buf sites). Each reset-sequence step
  *   decrements the retry count itself, so a caller that starts a step stores one more than the target's folded value.
  *   btm_vsc_complete copies `p` and the param_buf address into locals before the callback test (retail's mr r7 and
  *   hoisted addi). btm_read_local_features_complete reads p_cb from btm_cb before it declares p_devcb (idea 124: the
@@ -135,6 +136,11 @@
 /* The size of a vendor specific command buffer beyond its parameters: the buffer header and the command preamble. */
 #define BTM_VSC_BUF_OVERHEAD 11
 
+/* Takes an HCI command buffer from the command pool. */
+static BT_HDR* btm_get_cmd_buf(void) {
+    return (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID);
+}
+
 /* Resets the controller: restarts the reset sequence and its timer. */
 static void btm_dev_reset(void) {
     btm_cb.devcb_state = BTM_DEV_STATE_WAIT_RESET_CMPLT;
@@ -151,7 +157,7 @@ static void btm_get_hci_buf_size(void) {
         btm_dev_reset();
     } else {
         btu_start_timer(&btm_cb.reset_timer, BTU_TTYPE_BTM_DEV_CTL, BTM_DEV_REPLY_TIMEOUT);
-        if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+        if ((p_buf = btm_get_cmd_buf()) != NULL) {
             btsnd_hcic_read_buffer_size(p_buf);
         }
     }
@@ -567,7 +573,7 @@ u8 BTM_SetLocalDeviceName(char* p_name) {
         return BTM_DEV_RESET;
     }
 
-    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+    if ((p_buf = btm_get_cmd_buf()) != NULL) {
         p = (u8*)btm_cb.bd_name;
         if (p != (u8*)p_name) {
             memset(btm_cb.bd_name, 0, sizeof(btm_cb.bd_name));
@@ -640,7 +646,7 @@ u8 BTM_SetDeviceClass(const u8* dev_class) {
         return BTM_DEV_RESET;
     }
 
-    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+    if ((p_buf = btm_get_cmd_buf()) != NULL) {
         btsnd_hcic_write_dev_class(p_buf, (u8*)dev_class);
         return BTM_SUCCESS;
     }
@@ -745,7 +751,7 @@ u8 BTM_WritePageTimeout(u16 timeout) {
 
     btm_cb.page_timeout = (timeout * 625) / 1000;
 
-    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+    if ((p_buf = btm_get_cmd_buf()) != NULL) {
         btsnd_hcic_write_page_tout(p_buf, timeout);
         return BTM_SUCCESS;
     }
@@ -790,7 +796,7 @@ u8 BTM_ReadStoredLinkKey(const u8* bd_addr, BtmCompleteCallback p_cb) {
 
     BTM_TRACE_EVENT1("BTM: BTM_ReadStoredLinkKey: Read_All: %s", read_all_flag ? "TRUE" : "FALSE");
 
-    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+    if ((p_buf = btm_get_cmd_buf()) != NULL) {
         btm_cb.p_stored_link_key_cmpl_cb = p_cb;
         btsnd_hcic_read_stored_key(p_buf, (u8*)bd_addr, read_all_flag);
         return BTM_SUCCESS;
@@ -812,7 +818,7 @@ u8 BTM_WriteStoredLinkKey(u8 num_keys, const u8* bd_addr, const u8* link_key, Bt
         num_keys = BTM_MAX_WRITE_LINK_KEYS;
     }
 
-    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+    if ((p_buf = btm_get_cmd_buf()) != NULL) {
         btm_cb.p_stored_link_key_cmpl_cb = p_cb;
         btsnd_hcic_write_stored_key(p_buf, num_keys, (u8 (*)[6])bd_addr, (u8 (*)[16])link_key);
         return BTM_SUCCESS;
