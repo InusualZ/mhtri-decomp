@@ -13,10 +13,19 @@
  *   and on the file name (the SDK's `dwc_init.c`; no `__FILE__` string).
  * SHAPES. `DWC_Alloc`, `DWCi_GsMalloc`, `DWCi_GsMemalign` and `DWCi_GsRealloc` carry the tagged-block
  *   allocation inline (the `DWCi_AllocBlock` helper); `DWC_AllocEx` is the same code written out, which is what
- *   gives its different register choice.
- * RESIDUALS. `DWCi_GsRealloc` swaps r30/r31 between the new block and the old size (no source order of the
- *   locals moved it; a direct body without the inline helper is 12 bytes longer). Flip blocker: the target names the
- *   `.sdata` "clear" string `DWCi_clearCommand` where ours emits an anonymous literal (same bytes).
+ *   gives its different register choice. `DWCi_ReallocBlock` keeps `header` as a named local (its `block - 1` is
+ *   what the inlined `DWC_Free` reuses before the copy call; an accessor or an in-place load recomputes it after the
+ *   call) and reassigns the old size to itself, which is what puts the new block in r31.
+ * RESIDUALS. `DWCi_GsRealloc` swaps r29/r30 between the block header and the old size (six operand rows). The
+ *   allocator colours the inline helper's temporaries in descending number and the frontend numbers them at the
+ *   statement that creates them (first PCode, dump 03): the new block is the nested `DWC_AllocEx` result (@967,
+ *   r31 as retail), `header`'s temporary is created at its own statement (@979) and the old size's web at the
+ *   reassignment after it (@981), so `header` colours before the size. No spelling creates the size's node between
+ *   the two: a parameter or a local of the helper is numbered at inline entry (above the new block), a dead
+ *   pre-assignment, a cast or arithmetic on the load, an accessor's result, a block-local, a renamed local, a direct
+ *   body (named locals sit below every temporary, and `header` is always one), `DWC_Free` outside the test and the
+ *   free written through `header` all measure equal or worse; `opt_lifetimes off` moves nothing. Flip blocker: the
+ *   target names the `.sdata` "clear" string `DWCi_clearCommand` where ours emits an anonymous literal (same bytes).
  */
 #include "DWCi/dwc_init.h"
 #include "DWCi/dwc_report.h"
@@ -139,8 +148,9 @@ void* DWCi_GsMalloc(u32 size) {
 
 /* Moves a block into a new allocation of `size` bytes, copying what fits and freeing the old block. */
 /* untyped: caller-owned payload - a raw block */
-static inline void* DWCi_ReallocBlock(u32 name, void* block, u32 oldSize, u32 size, u32 align) {
+static inline void* DWCi_ReallocBlock(u32 name, void* block, u32 size, u32 align) {
     void* newBlock;
+    u32 oldSize;
     DWCMemHeader* header;
     newBlock = DWC_AllocEx(name, size, align);
     if (newBlock == NULL) {
@@ -149,6 +159,7 @@ static inline void* DWCi_ReallocBlock(u32 name, void* block, u32 oldSize, u32 si
     if (block != NULL) {
         header = (DWCMemHeader*)block - 1;
         oldSize = header->size;
+        oldSize = (u32)oldSize; /* the reassignment gives the size its own web, coloured after the new block */
         DWCi_Np_CPUCopyFast((u8*)newBlock, (const u8*)block, oldSize > size ? size : oldSize);
         DWC_Free(name, block, oldSize);
     }
@@ -158,7 +169,7 @@ static inline void* DWCi_ReallocBlock(u32 name, void* block, u32 oldSize, u32 si
 /* 0x80507780 (0xD0): the GameSpy `realloc` callback: a new block, the old contents copied, the old block freed. */
 /* untyped: caller-owned payload - a raw block */
 void* DWCi_GsRealloc(void* block, u32 size) {
-    return DWCi_ReallocBlock(DWC_ALLOCTYPE_GS, block, 0, size, 32);
+    return DWCi_ReallocBlock(DWC_ALLOCTYPE_GS, block, size, 32);
 }
 
 /* 0x80507850 (0x24): the GameSpy `free` callback. */
