@@ -12,15 +12,17 @@
  * NAMES. GUESSes from the bodies (`DWCi_htons` = gt2HostToNetworkShort, `DWCi_formatAddress` = gt2AddressToString,
  *   `DWCi_parseAddress` = gt2StringToAddress); GUESS on `DWCi_addressRingIndex` and `DWCi_statsServerHostname`. The
  *   file name is the GameSpy SDK's `gt2Utility.c` (no `__FILE__` string).
- * RESIDUALS. `DWCi_parseAddress` keeps the port in r26 where retail shares r27 with the colon pointer (no
- *   declaration order or `int` spelling of the atoi result moved it). `DWCi_statsServerHostname` is the GameSpy stats buffer (gstats); its
+ * RESIDUALS. none in `.text`. `DWCi_statsServerHostname` is the GameSpy stats buffer (gstats); its
  *   `.data` word sits between gt2's and natneg's, and its `.bss` partner (`DWCi_gameName`, 0x807625F0) follows the
  *   address ring, so it may be a third, text-less TU - it is placed here until that is decided.
- *   Flip blocker: the target names the three `.sdata` formats (`DWCi_addressFormat*`) where ours emits anonymous
- *   literals (same bytes).
+ *   The target names the three `.sdata` formats (`DWCi_addressFormat*`) where ours emits anonymous literals (same
+ *   bytes at the same offsets, no other link input references them; the trial flip links byte-identical).
  * SHAPES. `DWCi_formatAddress` writes through a separate output pointer picked by an if/else (retail lays the
- *   caller's-buffer arm first); `DWCi_parseAddress` initialises the address at its declaration and tests each port
- *   digit with an MSL-style `isdigit` (an out-of-range helper whose result is materialised, then the class table).
+ *   caller's-buffer arm first); `DWCi_parseAddress` initialises the address at its declaration, names the host
+ *   length as its last-declared local (`len`, so the port is coloured before it and shares r27 with the colon
+ *   pointer; the unnamed `colon - str` temporary took r26 and the port followed it) and stores the terminator
+ *   through `str` after `str = buf`; it tests each port digit with an MSL-style `isdigit` (an out-of-range helper
+ *   whose result is materialised, then the class table).
  */
 
 #include "types.h"
@@ -122,6 +124,7 @@ u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort)
     u32 addr = 0;
     u16 port;
     u32 value;
+    u32 len;
 
     if (str == 0 || *str == 0) {
         addr = 0;
@@ -135,9 +138,10 @@ u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort)
                 str = 0;
                 addr = 0;
             } else {
-                memcpy(buf, str, colon - str);
-                buf[colon - str] = 0;
+                len = colon - str;
+                memcpy(buf, str, len);
                 str = buf;
+                str[len] = 0;
             }
             p = colon + 1;
             while (*p != 0) {

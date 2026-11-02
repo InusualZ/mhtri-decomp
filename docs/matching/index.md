@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (257)
+## Ideas that work (258)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -266,6 +266,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 277 | [A loop whose last test leaves: if (c) break; else continue; keeps retail's bne exit; b head](277-loop-whose-last-test.md) | works | source-shape | A for (;;) that ends with a conditional exit compiles to `beq head; b exit` where retail has `bne exit; b head` - one opcode and the back edge differ, and every row after shifts by nothing but still mismatches the... |
 | 278 | [opt_lifetimes off keeps a reassigned local on one node: a cast sum reads the loaded operand first and colours beside it](278-opt-lifetimes-off-keeps.md) | works | source-shape, allocator, pragma | A local summed with a fresh load is `add r3,r3,r0` (variable first) where retail has `add r3,r0,r3`, and every spelling that keeps the source's operand order moves the sum into r0 instead |
 | 279 | [A virtual-to-physical offset on a scaled index: subtract the constant outside the pointer sum so addis reuses the product's register](279-virtual-to-physical-offset.md) | works | source-shape, allocator | Retail's `mullw r4,r4,r0; addis r4,r4,0x8000; add r4,r6,r4` comes out as `addis r0,r4,0x8000; add r4,r6,r0` - the addis result takes r0 where retail reuses the product's r4 |
+| 280 | [A repeated expression is a CSE temporary coloured ahead of the locals: name it as the last-declared local](280-repeated-expression-is-a.md) | works | source-shape, allocator | A same-size row whose only diff is one callee-saved register on a local (`li r26,0` / `clrlwi r26,r3,16` / `sth r26` where retail has r27), while a repeated expression such as `colon - str` holds that r26 and the local... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
