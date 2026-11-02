@@ -14,13 +14,16 @@
  *   save_sys_file_read, save_data_file_index, save_msg_blink_count, save_msg_blink_spare, save_msg_tex_rect,
  *   save_msg_size, save_msg_button_pos, save_msg_text_pos, save_error_enter, return_to_data_manager.
  *   The file keeps the map's stem; a unit-rename to `strap_task.cpp` is requested.
- * RESIDUALS. strap_task: retail jumps from every failing save step into one shared save-error block that falls into
- *   sub-state 2's body; written with `goto` (rule 8 forbids it) the function measures 100.00, while this source
- *   re-dispatches through `for (;;)` + `continue` and measures 83.38 - the loop makes MWCC hoist its constants into
- *   r22-r31 (`_savegpr_22`, 0xDF0 B against 0xD88 B) and each failing step keeps its own copy of the entry stores.
- *   save_msg_text_draw: retail's button switch leaves a dead `b` after each case (an inlined return threaded into
- *   the caller) and keeps `scr.x` in f3; this source keeps the plain switch.
- *   save_msg_window_draw: retail sign-extends each `base + offset` (`add` + `extsh`) where MWCC folds the `extsh`.
+ * RESIDUALS. strap_task (0xD7C B against 0xD88 B; the `goto` spelling measures 100.00, rule 8 refuses it): sub-states
+ *   1-7 sit in one `for (;;)` whose head is the shared save-error entry (case labels inside the loop, sub-state 1 in
+ *   an `if (0)` before the head), so every failing step is `continue` and the entry runs into sub-state 2 as retail
+ *   does (a `for (;;)` around the whole switch measured 83.38: MWCC hoists the loop's constants into r22-r31);
+ *   sub-states 3-6 sit in an `if (0)` so sub-state 2's button exit falls into sub-state 7.  Two crossing jumps stay
+ *   walls: sub-state 1's draw sits before the error entry (retail: after it, the entry jumping over it to sub-state
+ *   2); sub-state 5 step 1's error arm is a separate `if` before the success arm (retail: after it, branching back
+ *   into it on -15/-4; the duplicated-arm `switch` measures 17 B worse).
+ *   save_msg_text_draw: retail loads the int-to-float constant before `scr.x` and keeps `scr.x` in f3 and 0.5 in f2
+ *   (this source: f2/f3, the constant after); `/ 2.0f`, declaration order and an unnamed 0.5 all measure worse.
  *   fn_8005A63C keeps its stem: `ef/ef_util.cpp` (Matching) spells it.
  *   Data: `.sdata2`/`.sbss` are byte-identical; `.data` is 0x11A against 0x130 and `.sdata` 0x10 against 0x14 because
  *   retail emits the accessors' strings as the weak inline tail (ref's then the constructor's, "g3d_resmat_ac.h"
@@ -31,7 +34,9 @@
  *   0x8005AA44.
  * SHAPES. The s16 tables are file-scope globals defined after strap_task (their `.data` follows its jump tables);
  *   "%s" and "ref" are `.sdata` literals; each failing save step's result is a `switch` (`case 1` first, `-2`/`-1`
- *   after: the `addi`/`cmplwi 1` range test).
+ *   after: the `addi`/`cmplwi 1` range test); `x / 2.0f` and `c *= -1.0f` keep retail's `fmuls` operand order
+ *   (`* 0.5f` and `c * -1.0f` put the constant first); `16 <= id` keeps two signed compares where `id >= 16` fuses
+ *   into a range test; the text's button `switch` puts `case 19: return;` between its two cases (retail's dead `b`).
  */
 
 #include "types.h"
@@ -247,16 +252,20 @@ void strap_task(TaskSlot* task) {
     case 5: {
         u16 trig = Psw[0].button_0x2C0.pressed_0x04;
         save_msg_blink_count = (save_msg_blink_count + 410) & 0x7FFF;
+        switch (task->sub_0x09) {
+        case 0:
+            system_w.field_0x865 = 1;
+            save_error_code = 0;
+            banner_file_check_init();
+            task->sub_0x09 = 1;
+            task->step_0x0A = 0;
+            task->page_0x0E = 0;
+            break;
+        /* Sub-states 1-7 share one loop: a failing save step `continue`s to the error entry at its head, which runs
+         * into sub-state 2; a `break` leaves the loop for the message draw after the switch. */
         for (;;) {
-            switch (task->sub_0x09) {
-            case 0:
-                system_w.field_0x865 = 1;
-                save_error_code = 0;
-                banner_file_check_init();
-                task->sub_0x09 = 1;
-                task->step_0x0A = 0;
-                task->page_0x0E = 0;
-                break;
+            /* sub-state 1 sits before the loop head: the loop entry skips it */
+            if (0) {
             case 1:
                 save_error_code = 0;
                 save_msg_blink_count = 0;
@@ -277,13 +286,15 @@ void strap_task(TaskSlot* task) {
                         task->step_0x0A = 0;
                         break;
                     }
-                    save_error_enter(task);
                     continue;
                 }
                 save_msg_window_draw(0, 0);
                 args[0] = -200;
                 subTransSet((u32)save_msg_text_draw, 1, args);
                 break;
+            }
+            save_error_enter(task);
+            /* the error entry runs on into sub-state 2 */
             case 2:
                 if (task->wait_0x0C > 0) {
                     task->wait_0x0C--;
@@ -297,18 +308,20 @@ void strap_task(TaskSlot* task) {
                         args[0] = 7;
                         args[1] = 0;
                     }
-                } else {
-                    args[0] = chg_nand_err2msgcode();
-                    args[1] = 0;
-                    if (args[0] - 16 <= 1) {
-                        args[1] = 0;
-                        if (trig & 0x10) {
-                            return_to_data_manager();
-                            return;
-                        }
-                    }
+                    break;
                 }
-                break;
+                args[0] = chg_nand_err2msgcode();
+                args[1] = 0;
+                if (args[0] - 16 > 1) {
+                    break;
+                }
+                args[1] = 0;
+                /* button 0x10 skips sub-states 3-6 into sub-state 7's return to the data manager */
+                if (trig & 0x10) {
+                } else {
+                    break;
+                }
+                if (0) {
             case 3:
                 switch (task->step_0x0A) {
                 case 0:
@@ -324,7 +337,6 @@ void strap_task(TaskSlot* task) {
                     case -2:
                     case -1:
                         system_w.field_0x865 = 0;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -344,7 +356,6 @@ void strap_task(TaskSlot* task) {
                     case -2:
                     case -1:
                         system_w.field_0x865 = 0;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -366,7 +377,6 @@ void strap_task(TaskSlot* task) {
                     case -2:
                     case -1:
                         system_w.field_0x865 = 0;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -385,7 +395,6 @@ void strap_task(TaskSlot* task) {
                     case -2:
                     case -1:
                         system_w.field_0x865 = 0;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -407,7 +416,6 @@ void strap_task(TaskSlot* task) {
                     case -2:
                     case -1:
                         system_w.field_0x865 = 0;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -459,7 +467,6 @@ void strap_task(TaskSlot* task) {
                         }
                         system_w.field_0x865 = 0;
                         task->page_0x0E = 1;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -475,7 +482,6 @@ void strap_task(TaskSlot* task) {
                     case -2:
                     case -1:
                         system_w.field_0x865 = 0;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -499,7 +505,6 @@ void strap_task(TaskSlot* task) {
                             break;
                         }
                         task->page_0x0E = 1;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -515,7 +520,6 @@ void strap_task(TaskSlot* task) {
                     case -2:
                     case -1:
                         system_w.field_0x865 = 0;
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -540,7 +544,6 @@ void strap_task(TaskSlot* task) {
                         result = save_error_get();
                         if (result != -15 && result != -4) {
                             task->page_0x0E = 1;
-                            save_error_enter(task);
                             continue;
                         }
                     } else if (result != 1) {
@@ -581,7 +584,6 @@ void strap_task(TaskSlot* task) {
                         break;
                     case -2:
                     case -1:
-                        save_error_enter(task);
                         continue;
                     }
                     break;
@@ -601,11 +603,11 @@ void strap_task(TaskSlot* task) {
                 }
                 args[1] = 0;
                 break;
+                }
             case 7:
                 return_to_data_manager();
                 return;
             }
-            break;
         }
         if ((task->sub_0x09 == 2 && save_error_code != 0) || task->sub_0x09 == 6) {
             save_msg_window_draw(args[0], args[1]);
@@ -657,8 +659,8 @@ void save_msg_window_draw(s32 id, s32 flag) {
 
     spr.w = save_msg_size[0];
     spr.h = save_msg_size[1];
-    spr.x = (s16)((scr.x - (f32)save_msg_size[0]) * 0.5f);
-    spr.y = (s16)((scr.y - (f32)save_msg_size[1]) * 0.5f);
+    spr.x = (s16)((scr.x - (f32)save_msg_size[0]) / 2.0f);
+    spr.y = (s16)((scr.y - (f32)save_msg_size[1]) / 2.0f);
     spr.angle = 0;
     spr.r = save_msg_tex_rect[0];
     spr.g = save_msg_tex_rect[1];
@@ -670,7 +672,7 @@ void save_msg_window_draw(s32 id, s32 flag) {
     s16 x = spr.x;
     s16 y = spr.y;
 
-    if ((id >= 16 && id <= 17) || id == 1) {
+    if ((16 <= id && id <= 17) || id == 1) {
         spr.w = save_msg_size[6];
         spr.h = save_msg_size[7];
         spr.x = (s16)(x + save_msg_button_pos[4]);
@@ -680,7 +682,11 @@ void save_msg_window_draw(s32 id, s32 flag) {
         spr.g = save_msg_tex_rect[13];
         spr.b = save_msg_tex_rect[14];
         spr.a = save_msg_tex_rect[15];
-        spr.color = (flag == 0) ? 0xFFFFFFFF : 0xC0C0C0FF;
+        if (flag == 0) {
+            spr.color = 0xFFFFFFFF;
+        } else {
+            spr.color = 0xC0C0C0FF;
+        }
         drawSpr2TF(12, &spr, 0);
 
         spr.w = save_msg_size[4];
@@ -694,7 +700,7 @@ void save_msg_window_draw(s32 id, s32 flag) {
         spr.a = save_msg_tex_rect[11];
         f32 c = fn_8005A63C((f32)(save_msg_blink_count & 0xFFFF) * 6.2831855f / 65536.0f);
         if (c < 0.0f) {
-            c = c * -1.0f;
+            c *= -1.0f;
         }
         u8 a8 = (u8)((u32)(c * 95.0f) + 160);
         spr.color = ((u32)a8 << 24) | ((u32)a8 << 16) | ((u32)a8 << 8) | 0xFF;
@@ -754,13 +760,13 @@ void save_msg_text_draw(u32 count, s32* args) {
         pos = 3;
         kind = 1;
         break;
+    case 19:
+        return;
     case 16:
     case 17:
         pos = 2;
         kind = 2;
         break;
-    case 19:
-        return;
     default:
         return;
     }

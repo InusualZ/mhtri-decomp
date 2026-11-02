@@ -36,7 +36,11 @@ comment above each such loop.
 `lb_city_select_draw` 95.48 -> 99.08 % (case 5's search body heads the loop, cases 6 and 8 inside it, case 8's
 fall-through is the back edge); `lb_community_select_step` 96.31 -> 97.75 % with the head deep inside nested `if`s
 of an inner switch's case 2 and the next case label inside the loop, the jumping site a `continue;` from a third,
-nested switch. **Limit:** the loop lives inside the switch that owns the head, so a jump from a case of an
+nested switch. `fn_80059550` `strap_task` (Wii/1.3 -O3, nopeephole): 83.38 -> 95.40 % (3568 -> 3472 B of 3464)
+with a head that is *not* a case's first code - the save-error entry retail lays out inside case 1, after its
+prefix: the loop opens with `if (0) { case 1: ... }` (the loop entry's skip of it is dead, and `continue` chains
+past it to the entry), the entry then runs into `case 2:`, and eleven failing steps in cases 1-6 `continue`; the
+`for (;;)` around the whole switch it replaced hoisted the loop's constants into r22-r31. **Limit:** the loop lives inside the switch that owns the head, so a jump from a case of an
 *outer* switch (both `menu_placeinfo` step machines' remaining sites) cannot reach it.
 
 **Example.**
