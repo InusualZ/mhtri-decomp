@@ -26,11 +26,7 @@
  *   the low-memory macros `DVD_DEVICE_CODE` (0x800030E6), `DVD_BOOT_PARTITION_TYPE/OFFSET` (0x80003194/8); the inlined
  *   sequences `issueCommand`, `DVDPause`, `SetCoverAlarm`, `CoverClosed`, `CheckCancel`, `stateGettingError`,
  *   `StampIntType`, `FinishCommand`, `IsDmaCommand`, `IsImmCommandWithResult`.
- * RESIDUALS. `__DVDPrepareReset` swaps r29/r30 between the outer interrupt level and `DVDResume`'s in the
- *   inlined `__DVDPrepareResetAsync` (6 bytes); local declaration order and a `DVDCancelAllAsync` inline helper were
- *   measured and fix only the standalone copy or break it; so were a block-scoped `level`, an SDK-shaped global
- *   `DVDCancelAllAsync` (the standalone copy drops to a callback/level swap) and a scoped `inline_bottom_up on`.
- *   `__ErrorInfo` (.bss 0x80746880) sits in `DVD/dvderror.c`'s run.
+ * RESIDUALS. none in `.text`. `__ErrorInfo` (.bss 0x80746880) sits in `DVD/dvderror.c`'s run.
  *   Relocation names only (bytes identical): the jump tables, the two strings and the `.bss` base (`...bss.0` for
  *   `__DVDTicketViewBuffer`) are anonymous in our object.
  * SHAPES. `.sbss` matches the target's layout (0x98 B, section alignment 32) through the `aligned(32)`
@@ -44,8 +40,15 @@
  *   error-code tail `stateGettingError` keeps `bl StampCommand` while a direct `StampCommand` call auto-inlines, and
  *   why `cbForStateCheckID2`'s inlined `stateReadingFST` keeps its `bl`; code the target inlines one level deeper
  *   (the cover-closed re-read in `ResetAlarmHandler`/`cbForStateDownRotation`, the partition open) is written out.
- *   `__DVDPrepareResetAsync` (with `cbForPrepareReset` and `DVDResume`) inlines whole into `__DVDPrepareReset` only
- *   under `#pragma inline_max_auto_size(512)`. `__DVDTmdBuffer` is aligned 64, which puts the `.bss` block at the
+ *   `__DVDPrepareReset` carries its own copy of the reset preparation rather than a call to `__DVDPrepareResetAsync`:
+ *   the GPR colouring (mwcc-debugger, regsim EXACT) needs its outer `enabled` numbered below the cancel loop's level
+ *   and `DVDResume`'s level (r31, r30, r29), which an inlined callee's local never is (the inliner numbers the callee's
+ *   locals before the webs of the functions inlined inside it, so `enabled` coloured first and took r30). The cancel
+ *   loop is the inline `CancelAllForReset(callback, level)` with the interrupt level passed in, so `level` is a
+ *   parameter web in `__DVDPrepareReset` (numbered above `DVDResume`'s) while `__DVDPrepareResetAsync` keeps `level`
+ *   as its own local (as a helper web it colours before the resume level and the standalone copy loses its match);
+ *   the SDK-shaped `DVDCancelAllAsync` with a `retVal` loses it the same way. `__DVDTmdBuffer` is
+ *   aligned 64, which puts the `.bss` block at the
  *   target offsets the base-relative accesses use. `.sbss` is emitted in reverse definition order, `.bss` in first-use
  *   order. Volatile flags follow the reloads (`CommandInfoCounter`, `CurrCommand`, `ResumeFromHere`, ...);
  *   `MotorState` is plain. `DVDGetCommandBlockStatus` and `DVDCancelAsync` read `state` through a volatile view (the
@@ -1903,14 +1906,29 @@ void DVDResetDriveSync(void)
     }
 }
 
-#pragma push
-#pragma inline_max_auto_size(512)
+/* Cancels every queued and running command with interrupts held at `level`; `callback` runs when the drive is idle. */
+static inline void CancelAllForReset(DVDCBCallback callback, BOOL level)
+{
+    DVDCommandBlock* block;
+
+    DVDPause();
+    while ((block = __DVDPopWaitingQueue()) != NULL) {
+        DVDCancelAsync(block, NULL);
+    }
+    if (executing) {
+        DVDCancelAsync(executing, callback);
+    } else if (callback) {
+        callback(0, NULL);
+    }
+    DVDResume();
+    OSRestoreInterrupts(level);
+}
+
 /* 0x804AAD90 (0x11C): cancels every queued and running command and calls `callback` when the drive is idle. */
 void __DVDPrepareResetAsync(DVDCBCallback callback)
 {
     BOOL level;
     BOOL enabled;
-    DVDCommandBlock* block;
 
     enabled = OSDisableInterrupts();
     __DVDClearWaitingQueue();
@@ -1921,17 +1939,7 @@ void __DVDPrepareResetAsync(DVDCBCallback callback)
             executing->callback = NULL;
         }
         level = OSDisableInterrupts();
-        DVDPause();
-        while ((block = __DVDPopWaitingQueue()) != NULL) {
-            DVDCancelAsync(block, NULL);
-        }
-        if (executing) {
-            DVDCancelAsync(executing, callback);
-        } else if (callback) {
-            callback(0, NULL);
-        }
-        DVDResume();
-        OSRestoreInterrupts(level);
+        CancelAllForReset(callback, level);
     }
     OSRestoreInterrupts(enabled);
 }
@@ -1945,15 +1953,25 @@ void cbForPrepareReset(s32 result, DVDCommandBlock* block)
 /* 0x804AAEC0 (0x138): quiesces the drive ahead of a reset and waits until it is idle. */
 void __DVDPrepareReset(void)
 {
+    BOOL enabled;
+
     OSDisableInterrupts();
     PrepareResetDone = FALSE;
-    __DVDPrepareResetAsync(cbForPrepareReset);
+    enabled = OSDisableInterrupts();
+    __DVDClearWaitingQueue();
+    if (Canceling) {
+        CancelCallback = cbForPrepareReset;
+    } else {
+        if (executing) {
+            executing->callback = NULL;
+        }
+        CancelAllForReset(cbForPrepareReset, OSDisableInterrupts());
+    }
+    OSRestoreInterrupts(enabled);
     OSEnableInterrupts();
     while (PrepareResetDone != TRUE) {
     }
 }
-
-#pragma pop
 
 /* 0x804AB000 (0x20): nonzero when `alarm` is one of the DVD driver's own alarms. */
 BOOL __DVDTestAlarm(OSAlarm* alarm)

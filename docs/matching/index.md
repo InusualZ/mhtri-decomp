@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (259)
+## Ideas that work (260)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -268,6 +268,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 279 | [A virtual-to-physical offset on a scaled index: subtract the constant outside the pointer sum so addis reuses the product's register](279-virtual-to-physical-offset.md) | works | source-shape, allocator | Retail's `mullw r4,r4,r0; addis r4,r4,0x8000; add r4,r6,r4` comes out as `addis r0,r4,0x8000; add r4,r6,r0` - the addis result takes r0 where retail reuses the product's r4 |
 | 280 | [A repeated expression is a CSE temporary coloured ahead of the locals: name it as the last-declared local](280-repeated-expression-is-a.md) | works | source-shape, allocator | A same-size row whose only diff is one callee-saved register on a local (`li r26,0` / `clrlwi r26,r3,16` / `sth r26` where retail has r27), while a repeated expression such as `colon - str` holds that r26 and the local... |
 | 281 | [The spill set is Chaitin's cost/degree pick: make retail's spilled webs cheap and the kept ones dear](281-spill-set-is-chaitins.md) | works | source-shape, allocator | Every opcode matches but ours spills a different value than retail (a loop bound in a stack slot where retail keeps it in r14 and spills two short-lived counts instead), so the row carries a size gap and a register... |
+| 282 | [An inlined callee's locals are numbered before the webs of the functions inlined inside it: an outer local that must colour last needs the caller's own body](282-inlined-callees-locals-are.md) | works | source-shape, allocator, pragma | A function that inlines a callee (and the callee's own inlined calls) matches every opcode but two or three callee-saved registers are permuted, the callee's outer local (an interrupt level) sits one register too high,... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
