@@ -35,8 +35,8 @@
  *   GUESS: `updateMessagePool` (0x80425790, the per-frame message and command pump).
  *   GUESS: `updatePeerCardBlock` (0x80427868, a peer's card update).
  *   GUESS: `importLayerPeers` (0x80427C00, the peer table rebuilt from the layer's members).
- *   GUESS: `getCommunityRecord` (0x804281C4), `NetCommandPool`, `NetServerRows`, the helpers `stepLayerEntryCheck`/
- *   `finishLayerEntry` (inline pieces of `updateMessagePool`), `NetPeerCardMessage`.
+ *   GUESS: `getCommunityRecord` (0x804281C4), `NetCommandPool`, `NetServerRows`, the helpers `stepLayerEntryCheck`
+ *   and `sendFirstChatEntry` (inline pieces of `updateMessagePool`), `NetPeerCardMessage`.
  *   GUESS from the bodies and callers: `resetArenaVectors` (0x80424308, `resetSlotTable`'s arena re-point),
  *   `freeArenaBlock` (0x8042448C, the inverse of `allocArenaBlock`), `resetIdleFrames` (0x80426D10, zeroes the idle
  *   counter; `menu/menu_sysmsg.cpp` calls it), `submitUserProfile` (0x80427630, a `blr` stub `enemy/em020_prog.cpp`
@@ -53,11 +53,14 @@
  *   `Network/NetworkCommunityPat.h`, defined inline by `Network/NetworkCommunityPat.cpp`); the empty constructor and
  *   destructor bodies are complete (MWCC emits the member work).
  *  - `updateMessagePool`: retail's control flow is irreducible (a layer entry's steps 3 and 4 jump back into step 1's
- *    `checkLayerEntry` dispatch, step 6 into step 2's success block); without `goto` (rule 8) those two blocks are
- *    inline helpers, so the dispatch is emitted three times and the success block twice (0x3FC B larger, the whole
- *    .text excess); merging them through flags measured lower.  MWCC does not tail-merge identical blocks (measured on
- *    a demo), so only a `goto` reaches retail's shape (backward entries into blocks no loop heads, playbook 213).
- *    Also the chat-entry scan keeps its `i >= 16` test where retail branches past the send loop.
+ *    `checkLayerEntry` dispatch, step 6 into step 2's success block; the two loops cross), so step 1's dispatch is a
+ *    second copy of the `stepLayerEntryCheck` inline (42 instructions), and step 2's two failure paths that retail
+ *    joins at the shared `freePoolEntry` free the record themselves (2 instructions each); the rest is colouring:
+ *    retail colours `i`/`work`/`entry`/`command` into r31..r28 before the ten loop-hoisted constants, ours colours
+ *    the constants first (the mwcc-debugger dump: the eighteen callee-saved candidates form a clique at degree 29 = K,
+ *    the allocator force-pushes the cheapest node (the constant 5, r14 in both) and colours the rest in descending
+ *    virtual-register order, so retail's four locals were numbered above the loop-code-motion temporaries, which no
+ *    declaration order of a named local reaches; `register` changes nothing).
  *  - `updateNetworkPatControl`: retail saves r24..r31 (ours r26..r31) and keeps constants and loop bases in the two
  *    extra registers, so most of the remaining rows are colouring.
  *  - `layerReflectCallback`: a joining peer's id address is shared between `formatNetId` and `importNetId`, and its
@@ -122,6 +125,16 @@
  *    `stepFileDownloads` adds `(group * 15 + 6)` to the fetch index as one term (retail loads the index first);
  *  - `can_enter_server` takes the hunter rank as `u16` (the caller narrows it at the call, after the type's copy);
  *    `updateNetworkPatControl`'s case 0xC walks the server list through a pointer formed at the case's entry;
+ *  - `updateMessagePool`: step 2's success block heads a `for (;;)` inside a one-case `switch ((u32)state)` whose
+ *    `default:` (the step 3..6 chain) sits inside the loop, step 6 re-entering with `if (sub_error != 0) break; else
+ *    continue;` (retail's `bne exit; b head`: `if (c) break;` alone is inverted into `beq head; b exit`); inside it
+ *    step 3's check heads a second `for (;;)` with step 4 as the `default:` of a one-case `switch ((u32)state)`,
+ *    whose exits fall to the step 5 test (inert there: `state` is 3 or 4 and the record is then at step 2 or freed);
+ *    the chat scan and send live in the inline `sendFirstChatEntry` (its `return` is retail's branch past the send
+ *    loop; `command` is passed by reference so the dead `command = 0xF/0x12` stores stay, `command` being live into
+ *    the pool loop through step 6's re-entry); the row copy of command 1 counts with the pool's own `i` and walks a
+ *    `NetSrvRec*` (retail's `b` to the pool loop's bottom test and the hoisted 4/5); the city/room `strcpy` sources
+ *    index a list pointer taken first; `entry` is initialised before `i` in the pool loop header;
  *  - `updateMessagePool` compares `isMoviePlaying()` through `(u32)` (retail's `cmplwi`); `submitSlotRequest` takes
  *    its ids non-`const` (the item stores may alias them, so each id is reloaded for its store, retail's shape);
  *  - `copyCommunityViews` takes `first` as `s32` (the lobby passes `page * 8` with no `extsh`, and an `s16`
@@ -1068,89 +1081,48 @@ static inline void stepLayerEntryCheck(NetCtrlWk* work, NetCommandEntry* entry, 
     }
 }
 
-/* Takes a finished layer change: re-reads the layer address, drops the old peers, re-selects the server row, sets
- * the depth, the mode and the settings, the account and nickname texts, and frees the record. */
-static inline void finishLayerEntry(NetCtrlWk* work, NetCommandEntry* entry, s32 command)
+/* Sends the first queued chat entry (a room message, a session request or a friend message) and marks it sending,
+ * unless one is already in flight. */
+static inline void sendFirstChatEntry(NetCtrlWk* work, s32& command)
 {
-    u32 i;
-    s32 depth;
+    NetCtrlEntry* chat;
+    s32 index;
+    s32 i;
 
-    *entry->result_0x04 = 1;
-    readLayerIdChange(&work->msg_state_0xC300, (u32*)&work->view_key_0xC304, &work->view_key_0xC308,
-                      &work->view_key_0xC30C);
-    releaseRemotePlayerParts();
-    resetPeerTable();
-    work->flag_0x068 = 0;
-    work->flag_0x069 = 0;
-    if (work->msg_state_0xC300 != 0) {
-        for (i = 0; i < work->server_list_0x660.count_0x000; i++) {
-            if (work->view_key_0xC304 == work->server_list_0x660.entries_0x008[i].id_0x00) {
-                work->selected_server_index_0xA114 = i;
-                break;
-            }
-        }
-        if (i >= work->server_list_0x660.count_0x000) {
-            *entry->result_0x04 = 0;
-            work->layer_results_0x6244[command] = -1;
-            work->sub_error_0xC259 = 0;
-            work->error_0x058 = work->layer_results_0x6244[command];
-            setErrorCode(5);
+    for (chat = work->entries_0x7CD8, i = 0; i < 16; i++, chat++) {
+        if (chat->in_use_0x00 == 2) {
             return;
         }
-        sendCheckRequest(3);
     }
-    work->flag_0x82C4 = 0;
-    work->flag_0x82C5 = 0;
-    work->flag_0x82C7 = 0;
-    depth = 0;
-    if (work->view_key_0xC30C != 0) {
-        depth = 2;
-    } else if (work->view_key_0xC308 != 0) {
-        depth = 1;
-    }
-    work->settings_0x6210[0] = -1;
-    work->settings_0x6210[1] = -1;
-    work->settings_0x6210[2] = -1;
-    work->settings_0x6210[3] = -1;
-    switch (depth) {
-    case 0:
-        *entry->result_0x04 = 1;
-        work->layer_depth_0x6240 = 1;
-        work->layer_state_0x064 = 0;
-        break;
-    case 1:
-        *entry->result_0x04 = 2;
-        work->layer_depth_0x6240 = 2;
-        work->layer_state_0x064 = 1;
-        break;
-    case 2:
-        *entry->result_0x04 = 3;
-        work->layer_depth_0x6240 = 3;
-        work->layer_state_0x064 = 2;
-        work->settings_0x6210[0] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[0].value_0x4;
-        work->settings_0x6210[1] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[1].value_0x4;
-        work->settings_0x6210[2] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[2].value_0x4;
-        work->settings_0x6210[3] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[3].value_0x4;
-        break;
-    }
-    if (entry->command_0x01 == 0x17) {
-        strcpy(work->account_name_0xC0C4, getNetworkLayerPat(getPatsObject(), 0)->layerRecord_6E024.texts_044[1]);
-        if (entry->state_0x00 == 6) {
-            memset(work->nickname_0xC104, 0, sizeof(work->nickname_0xC104));
-        } else {
-            strcpy(work->nickname_0xC104, getNetworkLayerPat(getPatsObject(), 0)->layerRecord_6E024.texts_044[2]);
+    for (chat = work->entries_0x7CD8, i = 0; i < 16; i++, chat++) {
+        if (chat->in_use_0x00 != 1) {
+            continue;
         }
-    } else {
-        strcpy(work->account_name_0xC0C4, (const char*)getCommunityMemberRecord(1));
-        if (entry->state_0x00 == 6) {
-            memset(work->nickname_0xC104, 0, sizeof(work->nickname_0xC104));
+        if (chat->kind_0x02 == 0) {
+            command = 0xF;
+            work->layer_results_0x6244[command] = 0;
+            getNetworkLayerPat(getPatsObject(), 0)->sendMessage_64(chat->name_0x04, chat->value_0x4C, 2, 0);
+        } else if (chat->kind_0x02 == 1) {
+            command = 0x12;
+            clearPhaseSlot(0x12);
+            getNetworkSessionManagerPat(getPatsObject(), 0)->request412((u32)chat->name_0x04, chat->value_0x4C, -1);
+        } else if ((s8)chat->text_0x50[0] != 0) {
+            index = findFriendIndex((const NetId*)chat->text_0x50);
+            if (index >= 0) {
+                command = 0xF;
+                work->layer_results_0x6244[command] = 0;
+                getNetworkLayerPat(getPatsObject(), 0)->sendMessage_64(chat->name_0x04, chat->value_0x4C, 1, index);
+            } else {
+                chat->in_use_0x00 = 0;
+                continue;
+            }
         } else {
-            strcpy(work->nickname_0xC104, (const char*)getCommunityMemberRecord(2));
+            chat->in_use_0x00 = 0;
+            continue;
         }
+        chat->in_use_0x00 = 2;
+        break;
     }
-    refreshRosterCache();
-    clearRefreshTimeoutOnChange();
-    freePoolEntry(entry);
 }
 
 /* 0x80425790 (0x1580): the per-frame message pump: posts the member join/leave notices, sends the first queued chat
@@ -1160,11 +1132,10 @@ void updateMessagePool(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     struct NetLobbyMessage message;
-    NetCtrlEntry* chat;
     const NetworkLayerId* target;
+    const NetUserProfile* profile;
     s32 command;
     NetCommandEntry* entry;
-    s32 index;
     s32 i;
     u8 slot;
     u8 state;
@@ -1200,48 +1171,14 @@ void updateMessagePool(void)
             memset(&work->events_0x7996[i], 0, sizeof(work->events_0x7996[i]));
         }
     }
-    for (i = 0; i < 16; i++) {
-        if (work->entries_0x7CD8[i].in_use_0x00 == 2) {
-            break;
-        }
-    }
-    if (i >= 16) {
-        for (i = 0, chat = work->entries_0x7CD8; i < 16; i++, chat++) {
-            if (chat->in_use_0x00 != 1) {
-                continue;
-            }
-            if (chat->kind_0x02 == 0) {
-                command = 0xF;
-                work->layer_results_0x6244[command] = 0;
-                getNetworkLayerPat(getPatsObject(), 0)->sendMessage_64(chat->name_0x04, chat->value_0x4C, 2, 0);
-            } else if (chat->kind_0x02 == 1) {
-                command = 0x12;
-                clearPhaseSlot(0x12);
-                getNetworkSessionManagerPat(getPatsObject(), 0)->request412((u32)chat->name_0x04, chat->value_0x4C, -1);
-            } else if ((s8)chat->text_0x50[0] != 0) {
-                index = findFriendIndex((const NetId*)chat->text_0x50);
-                if (index < 0) {
-                    chat->in_use_0x00 = 0;
-                    continue;
-                }
-                command = 0xF;
-                work->layer_results_0x6244[command] = 0;
-                getNetworkLayerPat(getPatsObject(), 0)->sendMessage_64(chat->name_0x04, chat->value_0x4C, 1, index);
-            } else {
-                chat->in_use_0x00 = 0;
-                continue;
-            }
-            chat->in_use_0x00 = 2;
-            break;
-        }
-    }
+    sendFirstChatEntry(work, command);
     for (i = 0; i < 0x40; i++) {
         if (work->arrC_0x7C98[i] != 0) {
             handleLobbyNetMessage((struct NetLobbyMessage*)work->arrA_0x7A98[i]);
             freeArenaBlock((u32)work->arrA_0x7A98[i]);
         }
     }
-    for (i = 0, entry = work->command_pool_0x6320.entries_0x008; i < 0x80; i++, entry++) {
+    for (entry = work->command_pool_0x6320.entries_0x008, i = 0; i < 0x80; i++, entry++) {
         if (entry->state_0x00 == 0) {
             continue;
         }
@@ -1261,16 +1198,17 @@ void updateMessagePool(void)
                         *entry->result_0x04 = -1;
                     } else {
                         NetServerRows* rows = (NetServerRows*)entry->data_0x08;
-                        u32 row;
+                        NetSrvRec* server;
 
+                        /* the row copy counts with the pool's own `i` (retail steps the pool by the rows copied) */
                         rows->count_0x00 = work->server_list_0x660.count_0x000;
-                        for (row = 0; row < work->server_list_0x660.count_0x000; row++) {
-                            rows->rows_0x04[row].id_0x00 = work->server_list_0x660.entries_0x008[row].id_0x00;
-                            memcpy(rows->rows_0x04[row].name_0x04, work->server_list_0x660.entries_0x008[row].name_0x04,
-                                   sizeof(rows->rows_0x04[row].name_0x04));
-                            rows->rows_0x04[row].population_0x24 = work->server_list_0x660.entries_0x008[row].population_0x28;
-                            rows->rows_0x04[row].capacity_0x28 = work->server_list_0x660.entries_0x008[row].capacity_0x2C;
-                            rows->rows_0x04[row].value_0x2C = work->server_list_0x660.entries_0x008[row].value_0x30;
+                        for (i = 0, server = work->server_list_0x660.entries_0x008; i < work->server_list_0x660.count_0x000;
+                             i++, server++) {
+                            rows->rows_0x04[i].id_0x00 = server->id_0x00;
+                            memcpy(rows->rows_0x04[i].name_0x04, server->name_0x04, sizeof(rows->rows_0x04[i].name_0x04));
+                            rows->rows_0x04[i].population_0x24 = server->population_0x28;
+                            rows->rows_0x04[i].capacity_0x28 = server->capacity_0x2C;
+                            rows->rows_0x04[i].value_0x2C = server->value_0x30;
                         }
                         *entry->result_0x04 = 1;
                     }
@@ -1355,9 +1293,11 @@ void updateMessagePool(void)
                         work->settings_0x6210[2] = -1;
                         work->settings_0x6210[3] = -1;
                     } else {
+                        NetCityList* cities;
+
                         *entry->result_0x04 = 1;
-                        strcpy(work->nickname_0xC104,
-                               getNetworkLayerPat(getPatsObject(), 0)->cities_540.entries_0x004[entry->args_0x10[0]].name_0x04);
+                        cities = &getNetworkLayerPat(getPatsObject(), 0)->cities_540;
+                        strcpy(work->nickname_0xC104, cities->entries_0x004[entry->args_0x10[0]].name_0x04);
                         refreshRosterCache();
                     }
                     freePoolEntry(entry);
@@ -1393,9 +1333,11 @@ void updateMessagePool(void)
                         work->settings_0x6210[2] = -1;
                         work->settings_0x6210[3] = -1;
                     } else {
+                        NetCityList* cities;
+
                         *entry->result_0x04 = 1;
-                        strcpy(work->nickname_0xC104,
-                               getNetworkLayerPat(getPatsObject(), 0)->cities_540.entries_0x004[entry->args_0x10[0]].name_0x04);
+                        cities = &getNetworkLayerPat(getPatsObject(), 0)->cities_540;
+                        strcpy(work->nickname_0xC104, cities->entries_0x004[entry->args_0x10[0]].name_0x04);
                         refreshRosterCache();
                     }
                     freePoolEntry(entry);
@@ -1483,12 +1425,14 @@ void updateMessagePool(void)
                     if (work->layer_results_0x6244[command] < 0) {
                         *entry->result_0x04 = -1;
                     } else {
+                        NetRoomList* rooms;
+
                         *entry->result_0x04 = 1;
                         readLayerIdChange(&work->msg_state_0xC300, (u32*)&work->view_key_0xC304, &work->view_key_0xC308,
                                           &work->view_key_0xC30C);
                         clearRefreshTimeoutOnChange();
-                        strcpy(work->account_name_0xC0C4,
-                               getNetworkLayerPat(getPatsObject(), 0)->rooms_18A4.entries_0x004[entry->args_0x10[0]].name_0x44);
+                        rooms = &getNetworkLayerPat(getPatsObject(), 0)->rooms_18A4;
+                        strcpy(work->account_name_0xC0C4, rooms->entries_0x004[entry->args_0x10[0]].name_0x44);
                         work->nickname_0xC104[0] = 0;
                         work->flag_0x068 = 0;
                         work->flag_0x069 = 0;
@@ -1515,13 +1459,17 @@ void updateMessagePool(void)
                     entry->state_0x00 = 4;
                     break;
                 } else if (entry->command_0x01 == 0x18) {
+                    const char* id = (const char*)entry->args_0x10[0];
+
                     work->profile_result_0xC3F1 = 0;
-                    requestPeerProfileById((const char*)entry->args_0x10[0], &work->profile_result_0xC3F1, 0, 0);
+                    requestPeerProfileById(id, &work->profile_result_0xC3F1, 0, 0);
                     entry->state_0x00 = 3;
                     break;
                 }
             }
-            if (state == 2) {
+            /* step 2's success block heads the loop step 6 re-enters; the other steps sit inside it */
+            switch ((u32)state) {
+            case 2:
                 command = 0x1B;
                 if (work->layer_results_0x6244[command] == 0) {
                     break;
@@ -1532,6 +1480,8 @@ void updateMessagePool(void)
                     if (change == 1) {
                         work->sub_error_0xC259 = -1;
                         *entry->result_0x04 = -1;
+                        freePoolEntry(entry);
+                        break;
                     } else if ((u32)(change - 2) <= 1) {
                         sendCheckRequest(3);
                         work->sub_error_0xC259 = -1;
@@ -1545,65 +1495,166 @@ void updateMessagePool(void)
                     } else {
                         work->error_0x058 = work->layer_results_0x6244[command];
                         setErrorCode(5);
+                        freePoolEntry(entry);
+                        break;
                     }
-                    freePoolEntry(entry);
-                } else {
-                    finishLayerEntry(work, entry, command);
                 }
-            }
-            state = entry->state_0x00;
-            if (state == 3) {
-                if (work->profile_result_0xC3F1 == 0) {
+                for (;;) {
+                    {
+                        u32 server;
+                        s32 depth;
+
+                        *entry->result_0x04 = 1;
+                        readLayerIdChange(&work->msg_state_0xC300, (u32*)&work->view_key_0xC304, &work->view_key_0xC308,
+                                          &work->view_key_0xC30C);
+                        releaseRemotePlayerParts();
+                        resetPeerTable();
+                        work->flag_0x068 = 0;
+                        work->flag_0x069 = 0;
+                        if (work->msg_state_0xC300 != 0) {
+                            NetSrvList* servers = &work->server_list_0x660;
+
+                            for (server = 0; server < servers->count_0x000; server++) {
+                                if (work->view_key_0xC304 == servers->entries_0x008[server].id_0x00) {
+                                    work->selected_server_index_0xA114 = server;
+                                    break;
+                                }
+                            }
+                            if (server >= servers->count_0x000) {
+                                *entry->result_0x04 = 0;
+                                work->layer_results_0x6244[command] = -1;
+                                work->sub_error_0xC259 = 0;
+                                work->error_0x058 = work->layer_results_0x6244[command];
+                                setErrorCode(5);
+                                break;
+                            }
+                            sendCheckRequest(3);
+                        }
+                        work->flag_0x82C4 = 0;
+                        work->flag_0x82C5 = 0;
+                        work->flag_0x82C7 = 0;
+                        depth = 0;
+                        if (work->view_key_0xC30C != 0) {
+                            depth = 2;
+                        } else if (work->view_key_0xC308 != 0) {
+                            depth = 1;
+                        }
+                        work->settings_0x6210[0] = -1;
+                        work->settings_0x6210[1] = -1;
+                        work->settings_0x6210[2] = -1;
+                        work->settings_0x6210[3] = -1;
+                        switch (depth) {
+                        case 0:
+                            *entry->result_0x04 = 1;
+                            work->layer_depth_0x6240 = 1;
+                            work->layer_state_0x064 = 0;
+                            break;
+                        case 1:
+                            *entry->result_0x04 = 2;
+                            work->layer_depth_0x6240 = 2;
+                            work->layer_state_0x064 = 1;
+                            break;
+                        case 2:
+                            *entry->result_0x04 = 3;
+                            work->layer_depth_0x6240 = 3;
+                            work->layer_state_0x064 = 2;
+                            work->settings_0x6210[0] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[0].value_0x4;
+                            work->settings_0x6210[1] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[1].value_0x4;
+                            work->settings_0x6210[2] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[2].value_0x4;
+                            work->settings_0x6210[3] = getNetworkLayerPat(getPatsObject(), 0)->layerSettings_F03C.pairs_0x04[3].value_0x4;
+                            break;
+                        }
+                        if (entry->command_0x01 == 0x17) {
+                            strcpy(work->account_name_0xC0C4, getNetworkLayerPat(getPatsObject(), 0)->layerRecord_6E024.texts_044[1]);
+                            if (entry->state_0x00 == 6) {
+                                memset(work->nickname_0xC104, 0, sizeof(work->nickname_0xC104));
+                            } else {
+                                strcpy(work->nickname_0xC104, getNetworkLayerPat(getPatsObject(), 0)->layerRecord_6E024.texts_044[2]);
+                            }
+                        } else {
+                            strcpy(work->account_name_0xC0C4, (const char*)getCommunityMemberRecord(1));
+                            if (entry->state_0x00 == 6) {
+                                memset(work->nickname_0xC104, 0, sizeof(work->nickname_0xC104));
+                            } else {
+                                strcpy(work->nickname_0xC104, (const char*)getCommunityMemberRecord(2));
+                            }
+                        }
+                        refreshRosterCache();
+                        clearRefreshTimeoutOnChange();
+                        freePoolEntry(entry);
+                    }
+            default:
+                    state = entry->state_0x00;
+                    switch ((u32)state) {
+                    case 3:
+                        if (work->profile_result_0xC3F1 == 0) {
+                            break;
+                        }
+                        if (work->profile_result_0xC3F1 < 0) {
+                            work->sub_error_0xC259 = -1;
+                            *entry->result_0x04 = -1;
+                            freePoolEntry(entry);
+                            break;
+                        }
+                        target = (const NetworkLayerId*)getCommunityStateBlock();
+                        profile = getCommunityUserProfile();
+                        /* step 3's check heads the loop step 4 re-enters with its own target; every exit of the
+                         * check falls to the step 5 test, which neither step passes */
+                        for (;;) {
+                            stepLayerEntryCheck(work, entry, target, profile, &command);
+                            break;
+                    default:
+                            if (state != 4) {
+                                break;
+                            }
+                            command = 0x1C;
+                            if (work->layer_results_0x6244[command] == 0) {
+                                break;
+                            }
+                            if (work->layer_results_0x6244[command] < 0) {
+                                work->sub_error_0xC259 = -1;
+                                *entry->result_0x04 = -1;
+                                freePoolEntry(entry);
+                                break;
+                            }
+                            target = (const NetworkLayerId*)getCommunityRecord(entry->args_0x10[0]);
+                            profile = NULL;
+                        }
+                        if (state == 5) {
+                            if (work->sub_error_0xC259 != 0) {
+                                break;
+                            }
+                            releaseRemotePlayerParts();
+                            resetPeerTable();
+                            work->flag_0x068 = 0;
+                            work->flag_0x069 = 0;
+                            work->flag_0x82C4 = 0;
+                            work->flag_0x82C5 = 0;
+                            work->flag_0x82C7 = 0;
+                            *entry->result_0x04 = 1;
+                            work->layer_depth_0x6240 = 1;
+                            work->layer_state_0x064 = 0;
+                            work->settings_0x6210[0] = -1;
+                            work->settings_0x6210[1] = -1;
+                            work->settings_0x6210[2] = -1;
+                            work->settings_0x6210[3] = -1;
+                            work->account_name_0xC0C4[0] = 0;
+                            work->nickname_0xC104[0] = 0;
+                            refreshRosterCache();
+                            freePoolEntry(entry);
+                        }
+                        if (entry->state_0x00 != 6) {
+                            break;
+                        }
+                        if (work->sub_error_0xC259 != 0) {
+                            break;
+                        } else {
+                            continue;
+                        }
+                    }
                     break;
                 }
-                if (work->profile_result_0xC3F1 < 0) {
-                    work->sub_error_0xC259 = -1;
-                    *entry->result_0x04 = -1;
-                    freePoolEntry(entry);
-                    break;
-                }
-                stepLayerEntryCheck(work, entry, (const NetworkLayerId*)getCommunityStateBlock(),
-                                    getCommunityUserProfile(), &command);
                 break;
-            } else if (state == 4) {
-                command = 0x1C;
-                if (work->layer_results_0x6244[command] == 0) {
-                    break;
-                }
-                if (work->layer_results_0x6244[command] < 0) {
-                    work->sub_error_0xC259 = -1;
-                    *entry->result_0x04 = -1;
-                    freePoolEntry(entry);
-                    break;
-                }
-                stepLayerEntryCheck(work, entry, (const NetworkLayerId*)getCommunityRecord(entry->args_0x10[0]), NULL,
-                                    &command);
-                break;
-            } else if (state == 5) {
-                if (work->sub_error_0xC259 != 0) {
-                    break;
-                }
-                releaseRemotePlayerParts();
-                resetPeerTable();
-                work->flag_0x068 = 0;
-                work->flag_0x069 = 0;
-                work->flag_0x82C4 = 0;
-                work->flag_0x82C5 = 0;
-                work->flag_0x82C7 = 0;
-                *entry->result_0x04 = 1;
-                work->layer_depth_0x6240 = 1;
-                work->layer_state_0x064 = 0;
-                work->settings_0x6210[0] = -1;
-                work->settings_0x6210[1] = -1;
-                work->settings_0x6210[2] = -1;
-                work->settings_0x6210[3] = -1;
-                work->account_name_0xC0C4[0] = 0;
-                work->nickname_0xC104[0] = 0;
-                refreshRosterCache();
-                freePoolEntry(entry);
-            }
-            if (entry->state_0x00 == 6 && work->sub_error_0xC259 == 0) {
-                finishLayerEntry(work, entry, command);
             }
             break;
         case 9:

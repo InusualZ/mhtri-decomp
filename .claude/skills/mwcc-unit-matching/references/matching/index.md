@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (253)
+## Ideas that work (255)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -262,6 +262,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 273 | [A record copied but never destroyed is a copy into a destructor-less base of the class whose destructor extab names](273-record-copied-but-never.md) | works | source-shape, sections | Retail calls a record's copy constructor in some functions and never destroys the copy, while elsewhere the same copy constructor's object gets a cleanup record and a destructor call. |
 | 274 | [A backward branch into an if-body: a one-case switch on the tested value, its default inside the loop the body heads](274-backward-branch-into-an.md) | works | source-shape | Retail tests `x == K`, falls into a tail that leaves, and later code jumps backwards to the tail's first instruction; with no switch around it there is no case label for idea 252's loop, so the goto-free source repeats... |
 | 275 | [Two backward heads from one case: nest the 252 loops, break re-enters the outer head, and a case lands past a head's prefix with if (0) { case X: } else { prefix }](275-two-backward-heads-from.md) | works | source-shape | Retail's switch has two shared tails each sitting after a case's own code and each entered backwards from many later cases (some cases jump to one, some to the other, one case to both); idea 252's single loop re-enters... |
+| 276 | [Crossing backward branches: head the later target's loop, duplicate the earlier one once, and let a nested re-entry loop's exits fall to an inert test](276-crossing-backward-branches-head.md) | works | source-shape | Retail has two backward branches into two different blocks of one case (steps 3/4 back into step 1's check, step 6 back into step 2's success block) whose loop intervals cross; the goto-free source repeats both blocks... |
+| 277 | [A loop whose last test leaves: if (c) break; else continue; keeps retail's bne exit; b head](277-loop-whose-last-test.md) | works | source-shape | A for (;;) that ends with a conditional exit compiles to `beq head; b exit` where retail has `bne exit; b head` - one opcode and the back edge differ, and every row after shifts by nothing but still mismatches the... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
