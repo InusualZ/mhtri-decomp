@@ -1135,7 +1135,7 @@ config.libs = [
             Object(NonMatching, "Network/NetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/sNetworkLibrary.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/sNetworkLibrary.cpp",
+            Object(Matching, "Network/sNetworkLibrary.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/sNetworkLibraryWii.cpp; measurements in docs/network.md.
             Object(Matching, "Network/sNetworkLibraryWii.cpp",
@@ -1223,7 +1223,7 @@ config.libs = [
             Object(NonMatching, "DWCi/gt2Main.c", cflags=cflags_base),  # src/DWCi/gt2Main.c header
             Object(NonMatching, "DWCi/gt2Message.c", cflags=cflags_base),  # src/DWCi/gt2Message.c header
             Object(Matching, "DWCi/gt2Socket.c", cflags=cflags_base),
-            Object(NonMatching, "DWCi/gt2Utility.c", cflags=cflags_base),
+            Object(Matching, "DWCi/gt2Utility.c", cflags=cflags_base),
             # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
             # edge is the seam the recon resolved: `tudiscover.py at 0x80512490` pins `strong x2`
             # at 0x80512490, so the registered `DWCi/gt2Utility.c` right edge was moved down from
@@ -1256,7 +1256,7 @@ config.libs = [
             Object(NonMatching, "NHTTP/NHTTP_util.c"),
             Object(NonMatching, "NHTTP/NHTTP_thread.c"),
             Object(Matching, "NHTTP/d_nhttp.c"),
-            Object(NonMatching, "NHTTP/NHTTP_list.c"),
+            Object(Matching, "NHTTP/NHTTP_list.c"),
         ],
     },
     {
@@ -1381,7 +1381,7 @@ config.libs = [
             # The tan / libm wrapper / MetroTRK / AI run recut by file (unit headers carry the evidence).
             Object(Matching, "MSL/s_tan.cpp"),
             Object(Matching, "MSL/w_math.cpp"),
-            Object(NonMatching, "MSL_C/extras.c"),
+            Object(Matching, "MSL_C/extras.c"),
             Object(Matching, "TRK/TRKAccessFile.c"),
             Object(NonMatching, "TRK/gdev_cc.c"),
             Object(Matching, "TRK/CircleBuffer.c"),
@@ -1393,7 +1393,7 @@ config.libs = [
             Object(Matching, "TRK/nubevent.c"),
             Object(Matching, "TRK/nubinit.c"),
             Object(Matching, "TRK/serpoll.c"),
-            Object(NonMatching, "TRK/support.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
+            Object(Matching, "TRK/support.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/targcont.c"),
             Object(Matching, "TRK/msg.c"),
             Object(Matching, "TRK/msgbuf.c"),
@@ -1448,7 +1448,7 @@ config.libs = [
             # GC/3.0a5.2 + cflags_nw4r for btm_acl/dev/devctl/discovery: evidence on the FLAGS line of src/BTE/btm_dev.c
             Object(NonMatching, "BTE/btm_acl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_dev.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_devctl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_devctl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # GC/3.0a5.2 + cflags_nw4r for btm_inq/main/pm/sco/sec: evidence on the FLAGS line of src/BTE/btm_pm.c
             Object(NonMatching, "BTE/btm_inq.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
@@ -1503,7 +1503,7 @@ config.libs = [
             Object(Matching, "DSP/dsp_debug.c", cflags=cflags_base),
             Object(Matching, "DSP/dsp_task.c", cflags=cflags_base),
             Object(Matching, "DVD/dvdfs.c", cflags=cflags_base),
-            Object(NonMatching, "DVD/dvd.c", cflags=cflags_base),
+            Object(Matching, "DVD/dvd.c", cflags=cflags_base),
             Object(Matching, "DVD/dvdqueue.c", cflags=cflags_base),
             Object(Matching, "DVD/dvderror.c", cflags=cflags_base),
             Object(Matching, "DVD/dvdidutils.c", cflags=cflags_base),
