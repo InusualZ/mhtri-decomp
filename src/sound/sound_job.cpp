@@ -6,9 +6,12 @@
  * FLAGS. The `sound` lib's cflags_main (Wii/1.3); `#pragma peephole off` for the whole file.
  * NAMES. No `__FILE__` string names the TU; `sound_job` follows the map's `sound_job_request`.
  *   `split_screen_size_class`, `prim_rec_alloc` and `prim_rec_init` are GUESS names (from the bodies).
- * RESIDUALS. prim_rec_alloc: `list*4` and the loaded count swap r5/r6 (target `slwi r6` / `lwzx r5`); the same in
- *   every measured shape (local order, index local, pointer-typed pool, `peephole`/`scheduling` scoped).
+ * RESIDUALS. None: every row and every section is byte-identical to the target object.
  * SHAPES. `unsplit/sound.h`'s foreign `sound_job_request` is renamed away around its include.
+ *   prim_rec_alloc reads the live count through the inline accessor `prim_rec_count_get`: the accessor's return
+ *   value is a codegen temporary numbered above the frontend's `@` CSE temporary for `list*4`, so the count is
+ *   coloured first (r5) and the index second (r6); a named local or a direct load is numbered below the index
+ *   temporary and swaps the two (the mwcc-debugger's regalloc-gpr-pass-1-assigned order).
  *   split_screen_size_class tests `== 0 ? 0x400 : 0x800` (`li 0x800` before the branch); the `!= 0` spelling
  *   or an if/return pair inverts the branch.
  *   prim_rec_alloc indexes the pool as a `PrimRec` array (`mulli 0x34` + `add`).
@@ -59,10 +62,16 @@ extern "C" PrimRec* sound_job_request(u8 list, u8 layer, s32 handle, u8 kind, u1
     return rec;
 }
 
+/* Reads list `list`'s live record count (inline: its return value is the temporary prim_rec_alloc colours). */
+static inline u32 prim_rec_count_get(u8 list)
+{
+    return prim_rec_count[list];
+}
+
 /* 0x800E3C1C (0x74): Takes the next free record of list `list` and clears it; returns null when the list is full. */
 extern "C" PrimRec* prim_rec_alloc(u8 list)
 {
-    u32 count = prim_rec_count[list];
+    u32 count = prim_rec_count_get(list);
     PrimRec* rec;
     if (count >= prim_rec_capacity[list]) {
         return 0;

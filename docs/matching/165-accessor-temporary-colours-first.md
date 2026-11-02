@@ -23,6 +23,12 @@ call's float arguments as locals in retail's load order (`f32 max_lod = ...; f32
 
 **Result.** `ef/ef_drawstrategyimpl` (Wii/1.3) `SetupGPTexture`: the LOD locals 97.31 -> 98.87, the accessor
 98.87 -> 99.50 (`tex` r23 -> r28, the other saved registers to retail's numbers). Residual 99.50 (`tex` r28 vs r30).
+`sound/sound_job` (Wii/1.3, -O3) `prim_rec_alloc` 98.62 -> 100: the accessor's temporary is numbered above the
+frontend's `@` CSE temporaries as well (mwcc-debugger: `u32 count = prim_rec_count[list]` is `r34 count` below the
+`list*4` CSE node `r37 @721`, so the index is coloured first and takes r5; through `prim_rec_count_get(list)` the count
+is a codegen temporary above `@721`, coloured first, r5, and the index r6 - retail's order). Fifteen other spellings
+(no local, casts, `+ 0`, post-increment, dead first web, operand order, `opt_lifetimes off`) left the node a local or a
+later-created `@` and changed nothing.
 
 **Example.**
 
