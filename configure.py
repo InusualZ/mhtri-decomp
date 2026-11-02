@@ -1060,9 +1060,9 @@ config.libs = [
             Object(Matching, "g3d/g3d_resfile.cpp"),
             Object(NonMatching, "g3d/g3d_resmat.cpp"),
             Object(Matching, "g3d/g3d_resnode.cpp"),
-            Object(NonMatching, "g3d/g3d_resshp.cpp"),
-            Object(NonMatching, "g3d/g3d_restev.cpp"),
-            Object(NonMatching, "g3d/g3d_restex.cpp"),
+            Object(Matching, "g3d/g3d_resshp.cpp"),
+            Object(Matching, "g3d/g3d_restev.cpp"),
+            Object(Matching, "g3d/g3d_restex.cpp"),
             Object(Matching, "g3d/g3d_resanmchr.cpp"),
             Object(NonMatching, "g3d/g3d_resanmtexsrt.cpp"),
             Object(Matching, "g3d/g3d_xsi.cpp"),
@@ -1101,7 +1101,7 @@ config.libs = [
             Object(Matching, "Network/NetworkCommunity.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkCommunityPat.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkCommunityPat.cpp",
+            Object(Matching, "Network/NetworkCommunityPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkFetcherBase.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkFetcherBase.cpp",
@@ -1589,7 +1589,7 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "nw4r/db_console.cpp"),
-            Object(NonMatching, "nw4r/db_assert.cpp"),
+            Object(Matching, "nw4r/db_assert.cpp"),
             Object(Matching, "nw4r/math_arithmetic.cpp"),
             Object(NonMatching, "nw4r/math_triangular.cpp"),
             Object(Matching, "nw4r/math_types.cpp"),
