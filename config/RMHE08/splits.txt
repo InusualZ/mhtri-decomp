@@ -454,12 +454,26 @@ g3d/g3d_resnode.cpp:
 	.sdata2     start:0x80795F48 end:0x80795F50
 
 g3d/g3d_resshp.cpp:
-	extab       start:0x80009880 end:0x800099E0
-	extabindex  start:0x8002289C end:0x80022AAC
-	.text       start:0x80099400 end:0x8009A748 align:16
+	extab       start:0x80009880 end:0x80009968
+	extabindex  start:0x8002289C end:0x800229F8
+	.text       start:0x80099400 end:0x8009A174 align:16
+	.data       start:0x80591618 end:0x80591800
+	.sdata      start:0x807912B8 end:0x807912C8
+
+g3d/g3d_restev.cpp:
+	extab       start:0x80009968 end:0x80009990
+	extabindex  start:0x800229F8 end:0x80022A34
+	.text       start:0x8009A174 end:0x8009A360
 	.rodata     start:0x8056F730 end:0x8056F770
-	.data       start:0x80591618 end:0x80591860
-	.sdata      start:0x807912B8 end:0x807912D8
+	.data       start:0x80591800 end:0x80591830
+	.sdata      start:0x807912C8 end:0x807912D0
+
+g3d/g3d_restex.cpp:
+	extab       start:0x80009990 end:0x800099E0
+	extabindex  start:0x80022A34 end:0x80022AAC
+	.text       start:0x8009A360 end:0x8009A748
+	.data       start:0x80591830 end:0x80591860
+	.sdata      start:0x807912D0 end:0x807912D8
 
 g3d/g3d_cpu.cpp:
 	extab       start:0x800099E0 end:0x800099F0

@@ -96,13 +96,10 @@ extern char lbl_807912A8[4];
 extern char lbl_807912AC[4];
 
 /* ------------------------------------------------------------------------------------------------ */
-/* The `ResFile` release helpers (fn_8009A360 is `g3d/g3d_resshp.cpp`'s; declared here) and the SDK's
- * `GXCallDisplayList`. */
-extern "C" u32 fn_8009A360(void* p, u32 value);
-extern "C" u32 fn_8009A3CC(void* p);
-extern "C" u32 fn_8009A6C0(void* p);
-extern "C" void fn_8009A720(void* p);
-extern "C" void GXCallDisplayList(void* pList, u32 size);
+/* The `ResFile` release helpers are `g3d/g3d_restex.cpp`'s (`g3d/g3d_restex.h`); `GXCallDisplayList` is the
+ * SDK's (`RVLGX/GXPixel.h`). */
+#include "g3d/g3d_restex.h"
+#include "RVLGX/GXPixel.h"
 
 /* ------------------------------------------------------------------------------------------------ */
 /* The types this unit names.                                                                         */
@@ -645,7 +642,7 @@ extern "C" void CleanUpTracks(void* self) {
 /* ------------------------------------------------------------------------------------------------ */
 
 extern "C" u32 fn_80093B0C(ResHandle* pSelf);
-extern "C" u32 fn_80093A98(void* p);
+extern "C" void fn_80093A98(void* p);
 extern "C" u32 fn_80093E14(ResHandle* p);
 extern "C" u32 fn_80093E40(ResHandle* p);
 extern "C" u32 fn_80093E64(ResHandle* p);
@@ -695,7 +692,7 @@ extern "C" void res_file_init(ResHandle* pSelf) {
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
         item.mpData = fn_80092B0C(pSelf, i);
-        fn_8009A720(&item);
+        res_tex_dc_flush(&item);
     }
 
     count = fn_8009284C(pSelf);
@@ -707,8 +704,8 @@ extern "C" void res_file_init(ResHandle* pSelf) {
 }
 
 /* 0x80093A98 - release one entry of the third category (tail call). */
-extern "C" u32 fn_80093A98(void* p) {
-    return fn_8009A360(p, 0);
+extern "C" void fn_80093A98(void* p) {
+    res_pltt_dc_store((ResHandle*)p, 0);
 }
 
 /* 0x80093AA0 - release every entry of the first category through `ResMdl::Terminate`. */
@@ -737,7 +734,7 @@ extern "C" u32 fn_80093B0C(ResHandle* pSelf) {
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
         item.mpData = fn_80092B0C(pSelf, i);
-        if (fn_8009A6C0(&item) == 0) {
+        if (res_tex_check_revision(&item) == 0) {
             return 0;
         }
     }
@@ -746,7 +743,7 @@ extern "C" u32 fn_80093B0C(ResHandle* pSelf) {
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
         item.mpData = fn_80092848(pSelf, i);
-        if (fn_8009A3CC(&item) == 0) {
+        if (res_pltt_check_revision(&item) == 0) {
             return 0;
         }
     }

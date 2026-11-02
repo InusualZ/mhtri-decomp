@@ -1061,6 +1061,8 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_resmat.cpp"),
             Object(Matching, "g3d/g3d_resnode.cpp"),
             Object(NonMatching, "g3d/g3d_resshp.cpp"),
+            Object(NonMatching, "g3d/g3d_restev.cpp"),
+            Object(NonMatching, "g3d/g3d_restex.cpp"),
             Object(Matching, "g3d/g3d_resanmchr.cpp"),
             Object(NonMatching, "g3d/g3d_resanmtexsrt.cpp"),
             Object(Matching, "g3d/g3d_xsi.cpp"),

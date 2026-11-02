@@ -1,5 +1,6 @@
-/* g3d/g3d_resshp.h - nw4r g3d's shape, tev, texture and palette resource handles whose members the
- *   `g3d/g3d_resshp.cpp` range defines (`ResShp::Init`/`Terminate`, the `ResTev`/`ResTex` helpers). */
+/* g3d/g3d_resshp.h - nw4r g3d's shape, tev, texture and palette resource handles whose members
+ *   `g3d/g3d_resshp.cpp` (`ResShp::Init`/`Terminate`), `g3d/g3d_restev.cpp` (`ResTev::CallDisplayList`) and
+ *   `g3d/g3d_restex.cpp` (the `ResTex` accessors) define; the tev C helpers come from `g3d/g3d_restev.h`. */
 #ifndef MHTRI_G3D_G3D_RESSHP_H
 #define MHTRI_G3D_G3D_RESSHP_H
 
@@ -127,14 +128,14 @@ public:
 }  // namespace nw4r
 
 extern "C" {
-/* The shape's vertex resources (a null handle when the shape has none) and the tev block's copy and range
- * store; each takes the resource's one-word handle. */
+/* The shape's vertex resources (a null handle when the shape has none); each takes the resource's one-word
+ * handle. */
 u32 res_shp_get_vtx_pos(struct ResHandle* pSelf);
 u32 res_shp_get_vtx_fur_pos(struct ResHandle* pSelf); /* 0x80099BB0 */
 u32 res_shp_get_vtx_nrm(struct ResHandle* pSelf);
 u32 res_shp_get_vtx_clr(struct ResHandle* pSelf, u32 idx);
-u32 res_tev_copy_to(struct ResHandle* pSelf, void* pDst); /* untyped: byte range */
-void res_tev_dc_store(struct ResHandle* pSelf, s32 flag);
 }
+
+#include "g3d/g3d_restev.h" /* res_tev_copy_to / res_tev_dc_store, for the consumers that include this header */
 
 #endif /* MHTRI_G3D_G3D_RESSHP_H */

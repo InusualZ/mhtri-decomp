@@ -1,31 +1,23 @@
 /*
  * g3d/g3d_resshp.cpp - nw4r g3d `ResShp`/`ResShpPrePrim`/`ResTagDL` resources (sub-resource lookups, the
- *   pre-prim attribute records, the two display-list draw paths) and the `ResTev`/`ResTex` cache helpers.
- * RANGE. .text 0x80099400-0x8009A748 (58 functions); extab, extabindex, .rodata 0x8056F730-0x8056F770, .data
- *   0x80591618-0x80591860, .sdata 0x807912B8-0x807912D8.  Left seam: fn_80099400 calls `ResShp::ref`
- *   (fn_80077674) on its own `this` where fn_800993B4 calls `ResNode::ref` (fn_8005D218), and the `.data`
- *   fragment opens with "g3d_resshp.cpp"; the right edge is `g3d/g3d_cpu.cpp`.  The range is three TUs
- *   (seam request flip-resshp#1): the `.sdata` "ref" statics sit in three linker-aligned fragments
- *   ([0x807912B8..0x807912C4] resshp, 0x807912C8 ResTev, 0x807912D0 ResTex) and the `.data` tail's ResTev and
- *   ResTex strings each start 8-aligned after the resshp strings; the cuts are 0x8009A174 (`ResTev::ref`,
- *   extabindex 0x800229F8, extab 0x80009968, the `.rodata` table) and 0x8009A360 (the ResPltt helpers and
- *   `ResTex::ref`, extabindex 0x80022A34, extab 0x80009990).
+ *   pre-prim attribute records, the two display-list draw paths).
+ * RANGE. .text 0x80099400-0x8009A174 (42 functions); extab 0x80009880-0x80009968, extabindex
+ *   0x8002289C-0x800229F8, .data 0x80591618-0x80591800, .sdata 0x807912B8-0x807912C8.  Left seam:
+ *   fn_80099400 calls `ResShp::ref` (fn_80077674) on its own `this` where fn_800993B4 calls `ResNode::ref`
+ *   (fn_8005D218), and the `.data` fragment opens with "g3d_resshp.cpp"; the right edge is
+ *   `g3d/g3d_restev.cpp` (seam request flip-resshp#1: the extabindex record at 0x800229F8 names 0x8009A174
+ *   with extab 0x80009968, the ResTev strings start 8-aligned at 0x80591800 after this unit's last string at
+ *   0x805917FF, and the `.sdata` "ref" statics of this unit end at 0x807912C4 with the next fragment
+ *   8-aligned at 0x807912C8).
  * NAMES. res_shp_get_vtx_clr is a GUESS; res_shp_get_vtx_nrm is a GUESS (the evidence follows).
- *   res_shp_get_vtx_pos/nrm/clr, res_tev_copy_to and res_tev_dc_store are GUESSES (nw4r's ResShp::GetResVtx*,
- *   ResTev::CopyTo/DCStore, by the asserts and the ScnMdl buffer refill).  Map stems (the dump answers `zz_`
- *   placeholders) except the nw4r members ResShp::Init/Terminate,
- *   ResShp::CallPrePrimitiveDisplayList/CallPrimitiveDisplayList and
- *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).
- *   fn_8009A174 is the non-const `ResTev::ref` instance (request flip-resshp#2: the shared header declares
- *   only the const one, and adding the overload re-binds `g3d/g3d_state`'s call sites).  The `ResTagDLData`
- *   fields (`mPrePrimOfs` at +0x08, `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes;
- *   the `ResShpData` `id*` fields are spelled by res_shp_get_vtx_pos's assert (`ref().idVtxPosition >= 0`).
- * RESIDUALS. `.sdata`: one object packs the five "ref" statics (0x14 B, definition order ResTex, ResTev,
- *   fn_80099514, fn_80099740, fn_80099640) where the target has 0x20 B in three 8-aligned fragments; the
- *   five `@sda21` loads then resolve 4..0x18 bytes off.  The weak strings need ResTex/ResTev defined first
- *   and the statics need them last, and both are created at the definition, so no single-TU spelling
- *   reaches it - the seam cut does.  The six one-call stubs (res_shp_pre_prim_class_name/_ptr/_ref,
- *   res_tag_dl_ref, res_tev_ref, res_tex_ref) are 24 B of `.text` the linker dead-strips.
+ *   res_shp_get_vtx_pos/nrm/clr are GUESSES (nw4r's ResShp::GetResVtx*, by the asserts and the ScnMdl buffer
+ *   refill).  Map stems (the dump answers `zz_` placeholders) except the nw4r members ResShp::Init/Terminate
+ *   and ResShp::CallPrePrimitiveDisplayList/CallPrimitiveDisplayList.  The `ResTagDLData` fields
+ *   (`mPrePrimOfs` at +0x08, `mSize`/`mDlSize`) are GUESSes; the `ResShpData` `id*` fields are spelled by
+ *   res_shp_get_vtx_pos's assert (`ref().idVtxPosition >= 0`).
+ * RESIDUALS. The four one-call stubs (res_shp_pre_prim_class_name/_ptr/_ref, res_tag_dl_ref) are 16 B of
+ *   `.text` the linker dead-strips.  The `.sdata` fragment is 0xC B of statics where the claim is 0x10 B:
+ *   the last word is the linker's 8-byte alignment pad before `g3d/g3d_restev.cpp`'s fragment.
  * SHAPES. File-scope `#pragma peephole off`: the `rlwinm` flag extracts keep retail's `cmpwi`, and fn_800997E0/
  *   fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` + `cmpwi`).
  *   `#pragma pool_data off`; the TU's own strings are literals.  The `_ac.h` accessor instances are
@@ -34,11 +26,8 @@
  *   `@STRING@` copies in reverse definition order after the TU's pool, `static char` member names forward in
  *   `.sdata`), so the definitions stand in the `.data` tail's order and a stub before each retail address
  *   places the code.  fn_80099724 is compiled with `#pragma peephole on` (base word in r0); fn_800997E0 adds the
- *   record's index before its +0x32 offset.  ResTev::CallDisplayList indexes the size table with the stage count
- *   read inline in the call's argument (a `prim` local lets MWCC defer the table address past `ref()`).
- *   ResShp::Init builds each vertex resource's handle as a `ResHandleTemp` class temporary (retail's return-value
- *   temporaries, allocated after the named locals).  res_tev_copy_to's rebased size is a cast sum,
- *   `size = (u32)(size - delta)`, so the result lands in r0.
+ *   record's index before its +0x32 offset.  ResShp::Init builds each vertex resource's handle as a
+ *   `ResHandleTemp` class temporary (retail's return-value temporaries, allocated after the named locals).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -71,34 +60,6 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 using nw4r::g3d::ResShpData;
 using nw4r::g3d::ResTagDLData;
 
-/* The `ResTev`/`ResTex` resource blocks the tail half caches (`g3d_restev_ac.h` /
- * `g3d_restex_ac.h`, the file names of their asserts).  Only the words the tail's bodies reach are
- * named; the names are the best the offsets support (the offsets are the facts). */
-struct ResTevData {
-    /* +0x00 */ u32 mSize;     /* the block's size, the DC range res_tev_dc_store stores/flushes */
-    /* +0x04 */ u32 mDlSize;   /* the display-list size res_tev_copy_to rebases by the copy     */
-    /* +0x08 */ u8 pad_0x08[0x4];
-    /* +0x0C */ u8 mPrimCount; /* the primitive count fn_8009A1E0 indexes the size table by */
-    /* +0x0D */ u8 pad_0x0D[0x13];
-    /* +0x20 */ u8 mDl[];      /* the embedded display list (fn_8009A1E0 calls it at +0x20) */
-}; /* size: 0x20+ (a lower bound: only the words above are reached) */
-
-struct ResTexBlock {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u32 mSize;      /* the block's size: the DCFlushRangeNoSync range        */
-    /* +0x08 */ u32 mFmt;       /* compared against 1 and 3 (fn_8009A3CC)                */
-    /* +0x0C */ u8 pad_0x0C[0x4];
-    /* +0x10 */ u32 mToImage;   /* offset from the block to the image data              */
-    /* +0x14 */ u8 pad_0x14[0x4];
-    /* +0x18 */ u32 mFlags;     /* bit 0 gates fn_8009A490/fn_8009A5C4                  */
-    /* +0x1C */ u16 mWidth;     /* fn_8005348C                                         */
-    /* +0x1E */ u16 mHeight;    /* fn_80053468                                         */
-    /* +0x20 */ u32 mImageSize; /* fn_8009A490's third out                             */
-    /* +0x24 */ u32 mParam;     /* `>= 2` becomes fn_8009A490's last out                */
-    /* +0x28 */ f32 mLodMin;    /* fn_8009A490's fourth out                            */
-    /* +0x2C */ f32 mLodMax;    /* fn_8009A490's fifth out                             */
-}; /* size: 0x30 (a lower bound: only the words above are reached) */
-
 /* The unit's own functions, in address order (the forward declarations keep the source order free).
  * They are C linkage: the map spells every one `fn_XXXXXXXX`. */
 extern "C" {
@@ -124,8 +85,6 @@ u32 fn_80099724(const ResHandle* pSelf, u32 ofs);
 ResTagDLData* fn_80099740(ResHandle* pSelf);
 ResTagDLData* fn_800997A4(const ResHandle* pSelf);
 u32 fn_800997AC(ResHandle* pSelf);
-u32 fn_8009A174(ResHandle* pSelf);
-u32 fn_8009A1D8(ResHandle* pSelf);
 
 }
 
@@ -137,25 +96,6 @@ u32 fn_8009A1D8(ResHandle* pSelf);
 /* `.data` tail needs, and a one-call stub at each retail address places the code (the linker strips   */
 /* the stubs).                                                                                        */
 /* -------------------------------------------------------------------------------------------------- */
-
-/* 0x8009A42C (0x64): `ResTex::ref` with the `g3d_restex_ac.h` validity assert. */
-__declspec(noinline) inline nw4r::g3d::ResTexData& nw4r::g3d::ResTex::ref() {
-    if (!IsValid()) {
-        nw4r::db::Panic("g3d_restex_ac.h", 0x26, "%s::%s: Object not valid.", GetClassName(), __FUNCTION__);
-    }
-    return *ptr();
-}
-
-/* 0x8009A174 (0x64): `ResTev::ref` with the `g3d_restev_ac.h` validity assert (the non-const instance; the
- * shared header declares only the const one, so it keeps the map's stem). */
-extern "C" __declspec(noinline) inline u32 fn_8009A174(ResHandle* pSelf) {
-    static char sMember[] = "ref";
-
-    if (!reinterpret_cast<const nw4r::g3d::ResTev*>(pSelf)->IsValid()) {
-        nw4r::db::Panic("g3d_restev_ac.h", 0x25, "%s::%s: Object not valid.", nw4r::g3d::ResTev::GetClassName(), sMember);
-    }
-    return fn_8009A1D8(pSelf);
-}
 
 /* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert. */
 extern "C" __declspec(noinline) inline ResTagDLData* fn_80099514(ResHandle* pSelf) {
@@ -338,22 +278,14 @@ u32 fn_800997AC(ResHandle* pSelf) {
 }  /* extern "C" */
 
 /* ================================================================================================== */
-/* The tail: 0x800997E0-0x8009A748 (37 functions) - the `ResShp`/`ResShpPrePrim` attribute and draw  */
-/* half plus the `ResTev`/`ResTex` cache helpers.  Same TU, same section claim (widened below).      */
+/* The tail: 0x800997E0-0x8009A174 (21 functions) - the `ResShp`/`ResShpPrePrim` attribute and draw  */
+/* half.  Same TU, same section claim.                                                               */
 /* ================================================================================================== */
-
-/* The tev display-list sizes `ResTev::CallDisplayList` indexes by the block's stage count less one
- * (`.rodata`, 16 words). */
-static const u32 tev_display_list_size[16] = {
-    0xA0, 0xA0, 0xC0, 0xC0, 0x100, 0x100, 0x120, 0x120, 0x160, 0x160, 0x180, 0x180, 0x1C0, 0x1C0, 0x1E0, 0x1E0,
-};
 
 /* The neighbours this half calls (plain map stems), each owner named beside it. */
 extern "C" {
 void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* owner: g3d/g3d_resanmtexsrt.cpp       */
-void g3d_dc_flush_range_nosync(void* pBase, u32 size);          /* owner: g3d/g3d_calcview.cpp           */
 void GXCallDisplayList(void* pList, u32 size);    /* the SDK's own symbol                  */
-void PPCSync(void);                               /* the SDK's own symbol                  */
 void* memset(void* pDst, int value, u32 size);    /* the runtime's own symbol              */
 }
 
@@ -377,16 +309,6 @@ ResHandle* fn_8009A03C(ResHandle* pSelf, const ResHandle* pRhs);
 void fn_8009A06C(ResHandle* pSelf, const ResHandle* pRhs);
 u32 fn_8009A0F8(ResHandle* pSelf);
 void fn_8009A12C(ResHandle* pSelf, s32 flag);
-u32 fn_8009A1D8(ResHandle* pSelf);
-u8 fn_8009A254(ResHandle* pSelf);
-u32 res_tev_copy_to(ResHandle* pSelf, void* pDst);
-void res_tev_dc_store(ResHandle* pSelf, s32 flag);
-void fn_8009A360(ResHandle* pSelf, s32 flag);
-u32 fn_8009A3CC(ResHandle* pSelf);
-u32 fn_8009A408(ResHandle* pSelf);
-u32 fn_8009A6C0(ResHandle* pSelf);
-u32 fn_8009A6FC(ResHandle* pSelf);
-void fn_8009A720(ResHandle* pSelf);
 }
 
 /* -------------------------------------------------------------------------------------------------- */
@@ -672,201 +594,4 @@ extern "C" void fn_8009A12C(ResHandle* pSelf, s32 flag) {
     } else {
         nw4r::g3d::DC::StoreRangeNoSync((void*)data, 0xE0);
     }
-}
-
-/* -------------------------------------------------------------------------------------------------- */
-/* The `ResTev` block: its checked handle, its primitive-count and the display-list call it drives.     */
-/* -------------------------------------------------------------------------------------------------- */
-
-/* The tev block's checked handle; dead-stripped, it places the weak copy of fn_8009A174 here. */
-extern "C" u32 res_tev_ref(ResHandle* pSelf) {
-    return fn_8009A174(pSelf);
-}
-
-/* 0x8009A1D8 - the raw `ref()` word. */
-extern "C" u32 fn_8009A1D8(ResHandle* pSelf) {
-    return (u32)pSelf->mpData;
-}
-
-/* 0x8009A1E0 - call the block's display list with the size its primitive count names: `PPCSync` first
- * when the caller asks for it, then `tev_display_list_size[count - 1]` bytes at the block's +0x20. */
-void nw4r::g3d::ResTev::CallDisplayList(bool flag) const {
-    if (flag) {
-        PPCSync();
-    }
-
-    GXCallDisplayList((void*)((u32)&ref() + 0x20), tev_display_list_size[(u8)fn_8009A254((ResHandle*)this) - 1]);
-}
-
-/* 0x8009A254 - the block's primitive count (its +0x0C byte). */
-extern "C" u8 fn_8009A254(ResHandle* pSelf) {
-    return *(u8*)((u32)&reinterpret_cast<const nw4r::g3d::ResTev*>(pSelf)->ref() + 0xC);
-}
-
-/* 0x8009A278 - copy the block to a 0x20-aligned destination, rebase its recorded size by the amount
- * the copy moved it by, and store the copy back to the cache. */
-extern "C" u32 res_tev_copy_to(ResHandle* pSelf, void* pDst) {
-    u32 src = fn_8009A174(pSelf);
-    nw4r::g3d::detail::Copy32ByteBlocks(pDst, (const void*)src, 0x200);
-
-    nw4r::g3d::ResTev copy(pDst);
-
-    ResTevData* pData = (ResTevData*)fn_8009A174((ResHandle*)&copy);
-    u32 size = pData->mDlSize;
-    size = (u32)(size - ((u32)pDst - src));
-    pData->mDlSize = size;
-
-    res_tev_dc_store((ResHandle*)&copy, 0);
-    return (u32)copy.mpData;
-}
-
-/* 0x8009A2F4 - store or invalidate the block's own `mSize` bytes. */
-extern "C" void res_tev_dc_store(ResHandle* pSelf, s32 flag) {
-    u32 base = fn_8009A174(pSelf);
-    u32 size = *(u32*)fn_8009A174(pSelf);
-
-    if (flag != 0) {
-        nw4r::g3d::DC::StoreRange((void*)base, size);
-    } else {
-        nw4r::g3d::DC::StoreRangeNoSync((void*)base, size);
-    }
-}
-
-/* -------------------------------------------------------------------------------------------------- */
-/* The `ResTex` block: its checked handle, its format test and the two resource-info shapes.           */
-/* -------------------------------------------------------------------------------------------------- */
-
-/* 0x8009A360 - store or invalidate the block's `mSize` bytes (the second `ref` copy's twin of
- * res_tev_dc_store). */
-extern "C" void fn_8009A360(ResHandle* pSelf, s32 flag) {
-    u32 base = (u32)&reinterpret_cast<nw4r::g3d::ResPltt*>(pSelf)->ref();
-    u32 size = *(u32*)((u32)&reinterpret_cast<nw4r::g3d::ResPltt*>(pSelf)->ref() + 0x4);
-
-    if (flag != 0) {
-        nw4r::g3d::DC::StoreRange((void*)base, size);
-    } else {
-        nw4r::g3d::DC::StoreRangeNoSync((void*)base, size);
-    }
-}
-
-/* 0x8009A3CC - whether the block's format is one of the two the caller treats specially. */
-extern "C" u32 fn_8009A3CC(ResHandle* pSelf) {
-    u32 fmt = fn_8009A408(pSelf);
-    bool result = (fmt == 3 || fmt == 1);
-    return result;
-}
-
-/* 0x8009A408 - the block's format word (its +0x08). */
-extern "C" u32 fn_8009A408(ResHandle* pSelf) {
-    return *(u32*)((u32)&reinterpret_cast<const nw4r::g3d::ResPltt*>(pSelf)->ref() + 0x8);
-}
-
-/* The texture block's checked handle; dead-stripped, it places the weak copy of `ResTex::ref` here. */
-extern "C" nw4r::g3d::ResTexData* res_tex_ref(ResHandle* pSelf) {
-    return &reinterpret_cast<nw4r::g3d::ResTex*>(pSelf)->ref();
-}
-
-/* 0x8009A490 - the block's resource description: its flags must say the description is readable, and
- * each non-null out-parameter takes one field.  `0` is the refusal, `1` the success. */
-/* untyped: byte range - the image the texture block points at */
-bool nw4r::g3d::ResTex::GetTexObjParam(void** pOutVtxData, u16* pOutWidth, u16* pOutHeight, u32* pOutImageSize,
-                                       f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag) const {
-    const ResTexBlock* pData = reinterpret_cast<const ResTexBlock*>(&ref());
-
-    if ((pData->mFlags & 1) != 0) {
-        return 0;
-    }
-
-    if (pOutVtxData != NULL) {
-        *pOutVtxData = const_cast<void*>(GetTexData());
-    }
-    if (pOutWidth != NULL) {
-        *pOutWidth = GetWidth();
-    }
-    if (pOutHeight != NULL) {
-        *pOutHeight = GetHeight();
-    }
-    if (pOutImageSize != NULL) {
-        *pOutImageSize = pData->mImageSize;
-    }
-    if (pOutLodMin != NULL) {
-        *pOutLodMin = pData->mLodMin;
-    }
-    if (pOutLodMax != NULL) {
-        *pOutLodMax = pData->mLodMax;
-    }
-    if (pOutFlag != NULL) {
-        *pOutFlag = pData->mParam > 1;
-    }
-
-    return 1;
-}
-
-/* 0x8009A58C - the block's image address: its own base plus the +0x10 offset, or 0 when it has none. */
-/* untyped: byte range - the image the texture block points at */
-const void* nw4r::g3d::ResTex::GetTexData() const {
-    const ResTexBlock* pData = reinterpret_cast<const ResTexBlock*>(&ref());
-    s32 ofs = pData->mToImage;
-
-    if (ofs != 0) {
-        pData = (const ResTexBlock*)((const u8*)pData + ofs);
-    } else {
-        pData = NULL;
-    }
-    return pData;
-}
-
-/* 0x8009A5C4 - fn_8009A490's twin with the flag test inverted (the second `_ac.h` copy: same body,
- * `ref` reached through the other instantiation). */
-/* untyped: byte range - the image the texture block points at */
-bool nw4r::g3d::ResTex::GetTexObjCIParam(void** pOutVtxData, u16* pOutWidth, u16* pOutHeight, u32* pOutImageSize,
-                                       f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag) const {
-    const ResTexBlock* pData = reinterpret_cast<const ResTexBlock*>(&ref());
-
-    if ((pData->mFlags & 1) == 0) {
-        return 0;
-    }
-
-    if (pOutVtxData != NULL) {
-        *pOutVtxData = const_cast<void*>(GetTexData());
-    }
-    if (pOutWidth != NULL) {
-        *pOutWidth = GetWidth();
-    }
-    if (pOutHeight != NULL) {
-        *pOutHeight = GetHeight();
-    }
-    if (pOutImageSize != NULL) {
-        *pOutImageSize = pData->mImageSize;
-    }
-    if (pOutLodMin != NULL) {
-        *pOutLodMin = pData->mLodMin;
-    }
-    if (pOutLodMax != NULL) {
-        *pOutLodMax = pData->mLodMax;
-    }
-    if (pOutFlag != NULL) {
-        *pOutFlag = pData->mParam > 1;
-    }
-
-    return 1;
-}
-
-/* 0x8009A6C0 - fn_8009A3CC's twin through the +0x08 reader's other instantiation. */
-extern "C" u32 fn_8009A6C0(ResHandle* pSelf) {
-    u32 fmt = fn_8009A6FC(pSelf);
-    bool result = (fmt == 3 || fmt == 1);
-    return result;
-}
-
-/* 0x8009A6FC - the block's format word through the `fn_80052910` instantiation. */
-extern "C" u32 fn_8009A6FC(ResHandle* pSelf) {
-    return *(u32*)((u32)&reinterpret_cast<const nw4r::g3d::ResTex*>(pSelf)->ref() + 0x8);
-}
-
-/* 0x8009A720 - write the block's `mSize` bytes at its own address out to main memory (the `ResTex`
- * store the loader ends with; fn_80071008 is the SDK's `DCFlushRangeNoSync`). */
-extern "C" void fn_8009A720(ResHandle* pSelf) {
-    ResTexBlock* pData = reinterpret_cast<ResTexBlock*>(&reinterpret_cast<nw4r::g3d::ResTex*>(pSelf)->ref());
-    g3d_dc_flush_range_nosync(pData, pData->mSize);
 }
