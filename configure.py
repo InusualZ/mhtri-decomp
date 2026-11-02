@@ -752,7 +752,7 @@ config.libs = [
             # `sound` module (src/unsplit/sound.h is the band) and C++ (the `* __FP...` / `move__6MHcharFUs` manglings).
             Object(NonMatching, "sound/se_req.cpp"),
             Object(NonMatching, "sound/mhchar.cpp"),
-            Object(NonMatching, "sound/sound_job.cpp"),
+            Object(Matching, "sound/sound_job.cpp"),
             # Registered (the 0x800E3CBC run discovery
             # proposed).  Module from the placed link-neighbour sound/fn_800E46E8.cpp; the dump's
             # prim_init_all/set_blendmode/set_zmode name the functions, not the TU (see the file header).
@@ -812,7 +812,7 @@ config.libs = [
             Object(Matching, "ef/ef_cylinder.cpp", extra_cflags=["-pool off"]),
             # Flags: unit header of src/ef/ef_disc.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(Matching, "ef/ef_disc.cpp", extra_cflags=["-pool off"]),
-            Object(NonMatching, "ef/ef_emitterform.cpp"),
+            Object(Matching, "ef/ef_emitterform.cpp"),
             Object(Matching, "ef/ef_emitter.cpp"),
             Object(Matching, "ef/ef_particle.cpp"),
             # Flags: unit header of src/ef/ef_emform.cpp (`-pool off`: one `lis`/`addi` per string).
@@ -915,7 +915,7 @@ config.libs = [
             # The MSL C library run recut by file (unit headers of src/MSL_C/*.c carry the evidence).
             # Metrowerks' Gecko exception runtime (one TU, .cp resolved as C++): see the unit header.
             Object(Matching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
-            Object(NonMatching, "MSL_C/GCN_Mem_Alloc.c"),
+            Object(Matching, "MSL_C/GCN_Mem_Alloc.c"),
             Object(NonMatching, "MSL_C/alloc.cpp"),
             Object(Matching, "MSL_C/ansi_files.c"),
             Object(Matching, "MSL_C/ansi_fp.c"),
