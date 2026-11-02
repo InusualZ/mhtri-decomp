@@ -10,13 +10,15 @@
  * NAMES. The class is nw4r's (`nw4r::ef::EmitterForm`, declared in `ef/ef_emform.h`); the two members are GUESSES.
  *   GUESS: `CalcVelocity` (0x800A99B4): nw4r's spawn-velocity helper, from what it builds.
  *   GUESS: `CalcLife` (0x800A9FB0): nw4r's per-instance life helper, from what it returns.
- * RESIDUALS. 1 partial row, `CalcVelocity`: the two `0.0f != weight` tests load the constant into f1 where retail
- *   loads it into f0 (the operands of `fcmpu` and the three stores of the zeroing branch follow); tried: either
- *   operand order, `if (w)`, a chained or reversed zeroing, a `zero` local for one or both tests, an inverted test.
- *   flipcheck: `.text` only (`.data` and `.sdata2` are byte-identical).
+ * RESIDUALS. none: both rows are byte-identical, `.data`/`.sdata2`/extab/extabindex match the claim (flipcheck READY,
+ *   trial flip keeps `main.dol: OK`).
  * NAMES. GUESS: `ef_emitterform_life_max` (0x80796058, map `lbl_80796058`): `CalcLife`'s upper clamp, 65535.0f.
  * SHAPES. The five stages of `CalcVelocity` are in retail's evaluation order.  The second axis-angle matrix is a
  *   full `Mtx34` (retail's 0x120 frame), and the spread's `z` term and the axis-angle adds keep retail's operand order.
+ * SHAPES. The first two weight tests read the field through a named local assigned inside the condition
+ *   (`if (0.0f != (dir_weight = em->dir_weight))`): the local is numbered below the constant's backend temporary, so
+ *   the allocator colours the constant first (f0) and the field second (f1) as retail does, while the in-condition
+ *   assignment keeps the constant load ahead of the field load; the later tests read the field directly.
  * SHAPES. The strings and float constants are literals under `#pragma pool_data off` (each string its own
  *   `lis`/`addi`), pooled in creation order; `ef_emitterform_life_max` is a named constant defined after `CalcLife`,
  *   so it pools after the `(f32)u16` conversion constant as in retail.
@@ -80,6 +82,8 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
     f32 a2;
     f32 a3;
     f32 jitter;
+    f32 dir_weight;
+    f32 rot_weight;
     int ok;
 
     ok = IS_VALID_PTR(out);
@@ -93,7 +97,7 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
 
     VEC3_ctor(&tmp);
 
-    if (0.0f != em->dir_weight) {
+    if (0.0f != (dir_weight = em->dir_weight)) {
         vec3_scale_by(out, rot);
     } else {
         out->x = 0.0f;
@@ -101,7 +105,7 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
         out->z = 0.0f;
     }
 
-    if (0.0f != em->rot_weight) {
+    if (0.0f != (rot_weight = em->rot_weight)) {
         vec3_scale_by(&tmp, rot2);
         vec3_add_ps(out, out, &tmp);
     }

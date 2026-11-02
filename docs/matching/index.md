@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (264)
+## Ideas that work (265)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -273,6 +273,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 284 | [An early-return \|\| chain whose last term branches around a b-exit block is the inverse guard of the rest of the function](284-early-return-chain-whose.md) | works | source-shape | Every term of an early-return `\|\|` chain branches straight to the epilogue except the last, which ours emits as `bne next; b exit` where retail has one `beq exit`, so the row is 4 bytes long and every later branch is... |
 | 285 | [Frame slots in textual order: a vector helper retail calls with a hidden result pointer is a by-value callee whose results are temporaries](285-frame-slots-in-textual.md) | works | source-shape, allocator | A function's VEC3 locals all match except their stack offsets, which are permuted against retail; named locals, block-scoped or not, keep their order and the by-value call temporaries always land below them. |
 | 286 | [One b-exit block per return statement: an early if-return is a direct branch, a trailing return after the guarded break keeps its block](286-one-b-exit-block.md) | works | source-shape | Retail has one or two dead `b exit` after a switch case's `b join` that ours lacks (the row is 4 or 8 bytes short per case), while every conditional branch of the case already targets the epilogue directly in both. |
+| 287 | [A float field compared against a constant colours the constant second: read the field through a local assigned inside the condition](287-float-field-compared-against.md) | works | source-shape, allocator | In `if (0.0f != em->field)` retail loads the constant into f0 and the field into f1 (`fcmpu cr0, f0, f1`), ours the other way round; operand order, a `zero` local and inverted tests do not move it. |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
