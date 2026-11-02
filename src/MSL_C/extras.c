@@ -7,9 +7,10 @@
  *    lower table).
  * EVIDENCE. family only; all three read the locale class table `.data` 0x8060EDB0; no data of their own; the TRK
  *    access stubs follow.
- * RESIDUALS. COARSE; `strupr` 98: the target keeps the character, the range flag and the table byte in r0/r4 where ours takes r7.
+ * RESIDUALS. none.
  * SHAPES. the case maps are read through `_current_locale.ctype`; the inline `tolower`/`toupper` return the
- *    character unchanged outside 0..255.
+ *    character unchanged outside 0..255; `strupr` dereferences `*p` twice (`*p = toupper(*p); p++;`) - a `char`
+ *    local for the character colours the converted value r7 and the range flag r0 where the target has r0/r4.
  */
 #include "MSL_C/locale.h"
 
@@ -54,12 +55,10 @@ int stricmp(const char* a, const char* b)
 char* strupr(char* s)
 {
     char* p = s;
-    char c;
 
-    while ((c = *p) != 0) {
-        int ic = c;
-
-        *p++ = toupper_c(ic);
+    while (*p) {
+        *p = toupper_c(*p);
+        p++;
     }
     return s;
 }
