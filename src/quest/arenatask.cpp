@@ -3,9 +3,10 @@
  * acdata -> `_arena_eq_data` conversion, the task `ArenaSelExec` (0x80041A34) installs, and the
  * per-player arena setup the task drives.
  *
- * `.text` 0x804459DC..0x80448404 (20 functions, 10792 B; the object emits 11024 B, `arena_task` being 244 B
- * over), extab 0x8001DE9C..0x8001DF24, extabindex 0x8003EB20..0x8003EBEC.  Definitions follow `.text`
- * address order (the object is a permutation of the target once the unit flips).  Module `quest` and file
+ * `.text` 0x804459DC..0x80448404 (20 functions, 10792 B; the object emits 10796 B, `arena_task` being 4 B
+ * over), extab 0x8001DE9C..0x8001DF24, extabindex 0x8003EB20..0x8003EBEC.
+ * Definitions follow `.text` address order (the object is a permutation of the target once the unit flips).
+ * Module `quest` and file
  * name `arenatask.cpp` are class-1 evidence: `.data` 0x80607390 is the bare `__FILE__` string
  * "arenatask.cpp", and its only referrer is `arena_resource_load` (0x804459E4).
  *
@@ -33,8 +34,8 @@
  *     is a static initialiser; the flip needs its file-scope object) are not emitted.
  *   - the orphan census lists `stage_w` (0x806B87C0, shared by four units, so not claimable here) and
  *     `multi_arena_clr_time` (shared with `quest/quest_entry`); `dataclaim.py --fixpoint` has nothing to claim.
- *   `flipcheck.py` answers NOT READY: `.text` 11024 of 10784 B, `.sbss`, `.sdata` (one pad byte), `.sdata2`,
- *     `.ctors`, one extab byte and three extabindex bytes (`arena_result_next` saves r24-r31, retail r23-r31).
+ *   `flipcheck.py` answers NOT READY: `.text` bytes, `.sbss`, `.sdata` (one pad byte), `.sdata2`,
+ *     `.ctors` and one extabindex byte (`arena_task`'s size, 4 B over); extab is byte-identical.
  *
  * NAMES: real names from the map/dump where they exist; the rest are GUESSES from the bodies -
  *   `arena_camera_vec`, `arena_light_vec`, `arena_user_data_buf` (0x100-byte records selected by
@@ -68,9 +69,11 @@
  *   - `arena_game_task`: the player count is an `s32` narrowed by `(s16)` at each use (retail keeps the raw
  *     value in a register and re-extends it per loop; an `s16` local scores 95.50 -> 96.90 % lower), the
  *     early exits are `break` (a `return 0` adds a branch), `buttons` is a `u32` (a `u16` narrows on the
- *     assignment), the stage index is computed in two statements (`row * cols`, then `+= col`), the copy
- *     loop indexes `work->slot_0x14[i]` (a slot pointer is folded into the `slot` variable, 96.49 %), and
- *     `lb_sub1d_send` takes a `u8` flag.
+ *     assignment), the stage index is computed in two statements (`cols * row`, then `+= col`), the copy
+ *     loop of phase 0's case 1 takes a per-iteration `slot_i = &work->slot_0x14[i]` (indexing folds the
+ *     +0x14 into the displacements), the equip picker loop of state 0's phase 2 counts with its own
+ *     `player` (with `i` the counter is a frontend temporary that colours first and `work` loses r31),
+ *     `moved_col` is declared before `moved_row`, and `lb_sub1d_send` takes a `u8` flag.
  *   - the stage table is indexed through `((const ArenaStageRecord*)arena_stage_config)[stage]` at the
  *     point of use; hoisting it to a local of `arena_vs_mode_enter` moves `arena_task` to 79.89 %.
  *
@@ -79,25 +82,23 @@
  * an extab record (all but the two leaf setters); C++ because `dl_acdata_to_ar_eqdata` is a mangled name.
  *
  * RESIDUALS:
- *   - `arena_game_task` 98.24 % (3996 of 4000 B): every row that differs is a register number.  Retail keeps
- *     `work` in r31 and the player count / ready count in r23 / r18 below the hoisted loop constants; ours
- *     gives the count and the ready count r31 / r30 and `work` r29, so the whole function shifts.  Declaration
- *     order, `register`, pointer-walking and `work->slot_0x14[i]` spellings of the loops, and a `const` count
- *     all score the same or lower.  The other differing rows are the copy loop at the start of state 0's
- *     phase 0 (retail forms `work + 0x14` as a pointer, ours folds the offset into the displacements; two
- *     rows) and the compiler's debugger crashing on this file (`mwcc_debugger.py` dies on the first dump
- *     with a gdb memory error), so the allocator's order could not be read.
- *   - `arena_task` 83.50 %: the Vs start (`arena_vs_mode_enter`) is one shared block in retail that steps 0
- *     and 1 both jump into.  Two goto-free shapes are measured: inlined twice (committed, 83.50 %, 1728 B
- *     against the target's 1484 B) and a `vs_enter` flag shape (65.33 %, 1516 B).  A `goto` into the else branch scores
- *     99.70 % and rule 8 forbids landing it.  Also `NetCtrlWk::getSelectedServer()`'s `extsb` lands in r0 here
- *     (in place in r3 in retail).  The duplicated block is what the relocation diff shows: extra sites of
- *     arena_sub_mode_set, lb_param_w, arena_user_data_buf, memcpy, PlayMode_set, VsGameModeExec,
- *     arena_stage_config and get_vsUser_work.
- *   - `arena_result_next` 96.32 %: register allocation only - retail keeps the constants 1 and 2 in
- *     r23/r25 across the item-mask loops (ours hoists only the 1, and `li r0, 2` stays at the `mtctr`), so it
- *     saves r23-r31 where ours saves r24-r31 (_savegpr_24/_restgpr_24 against _savegpr_23/_restgpr_23).
- *     `pool_data off` does not change it.
+ *   - `arena_game_task` (4000 of 4000 B): every row that differs is a register number.  `mwcc_debugger.py`
+ *     plus `regsim.py` (model EXACT against the dump) show the player count and the picker's `player`
+ *     swapped (r19/r23 against retail's r23/r19) and the network picker loop's counter, slot and pad
+ *     pointers one register off; no declaration order reaches more (`regsim search --no-edits`: the current
+ *     order is best, 12/23 callee-saved), and the stage index loads its operands into r3/r0 swapped.
+ *   - `arena_task`: the Vs start (`arena_vs_mode_enter`) is one block in retail that step 0's online re-entry
+ *     jumps forward into and step 1's won result falls into, and step 1's other results (-1, 2) are laid out
+ *     after it.  Goto-free, steps 0 and 1 share one `do { } while (0)` (step 1's label inside it) whose
+ *     `break` reaches the Vs start after the loop; the result -1/2 chain then sits inside the loop ahead of
+ *     the Vs start (44 B moved; no goto-free construct jumps from inside the loop past the code after it).
+ *     The other residual: `player_count_set`'s owner parameter is `u8`, so ours narrows the `s8` count
+ *     (`clrlwi`) and tests it in r0 where retail passes the `extsb` result in r3 (u8/s32 locals score the same).
+ *   - `arena_result_next`: compiled at `optimization_level 4` (the unroller's `li 2` for the item loop's
+ *     `mtctr` is hoisted out of the slot loop only there, and the prologue saves r23 like retail's).  Left:
+ *     the slot loop's `&system_w + i` walker is a frontend temporary numbered above `slot`, so the two swap
+ *     r30/r31 (regsim: retail needs it numbered between `slot` and `slots`; a `SystemWork*` local changes
+ *     the code, -19.7 / -40 B), and the item pointer and bit counter swap r4/r5.
  *   - `arena_light_init` 99.88 % (one extra arena_light_colors site): the first colour load is `lwz r0, 0(r30)` in retail and
  *     `lwz r0, arena_light_colors@l(r3)` here (one instruction); `*colors`, a walking pointer and
  *     `pool_data off` leave it unchanged.
@@ -773,13 +774,16 @@ extern "C" void arena_task(TaskSlot* task) {
 
     switch (task->step_0x08) {
     case 0:
-        if (file_loading_ck(NULL, NULL) != 1) {
+        if (file_loading_ck(NULL, NULL) == 1) {
+            break;
+        }
+        /* the online Vs re-entry and a won result both leave through the Vs start after the loop */
+        do {
             if (system_w.net_session_0x90f == 0) {
                 system_w.vs_mode_0x8b0 = 1;
                 if (system_w.online_0x8ae == 1 && work->sub_mode_0x4E == 3) {
                     arena_cfg_apply(0);
-                    arena_vs_mode_enter(work);
-                    return;
+                    break;
                 }
             } else {
                 s8 server = (s8)NetCtrlWk::getSelectedServer();
@@ -820,47 +824,49 @@ extern "C" void arena_task(TaskSlot* task) {
             }
             set_com_motion_type(3);
             title_se_load();
-        }
-        break;
+            return;
     case 1:
-        nwMoveStart();
-        prim_init_all();
-        ai_npc_reaction_forward();
-        result = arena_game_task(work);
-        if (arena_draw_func[0] != 0) {
-            subTransSetPrio(3, arena_draw_func[0], 0, 0);
-        }
-        if (arena_draw_func[1] != 0) {
-            subTransSetPrio(6, arena_draw_func[1], 0, 0);
-        }
-        nwMoveEnd();
-        if (result == 1) {
-            system_w.field_0x7ce = 0;
-            system_w.field_0x866 = 0;
-            all_reset();
-            setSoftresetFlag(1);
-            clear_FqResult_work();
-            clear_qResult_work();
-            if (work->mode_0x04 == 2) {
-                s32 other = (s8)my_player_no() != 0;
-                _arena_eq_data eq;
-
-                dl_acdata_to_ar_eqdata(&eq, work->slot_0x14[other != 0].player_0x00);
-                memcpy(arena_user_data_buf + 0x14, &eq, 0xEC);
-                dl_acdata_to_ar_eqdata(&eq, work->slot_0x14[(other == 0) & 0xFF].player_0x00);
-                memcpy(arena_user_data_buf + 0x114, &eq, 0xEC);
-                PlayMode_set(6);
-                GameMode_set(1);
-                GameModeExec();
-            } else {
-                arena_vs_mode_enter(work);
+            nwMoveStart();
+            prim_init_all();
+            ai_npc_reaction_forward();
+            result = arena_game_task(work);
+            if (arena_draw_func[0] != 0) {
+                subTransSetPrio(3, arena_draw_func[0], 0, 0);
             }
-        } else if (result == -1) {
-            task->step_0x08 = 3;
-            bgm_stop_all();
-        } else if (result == 2) {
-            task->step_0x08 = 2;
-        }
+            if (arena_draw_func[1] != 0) {
+                subTransSetPrio(6, arena_draw_func[1], 0, 0);
+            }
+            nwMoveEnd();
+            if (result == 1) {
+                system_w.field_0x7ce = 0;
+                system_w.field_0x866 = 0;
+                all_reset();
+                setSoftresetFlag(1);
+                clear_FqResult_work();
+                clear_qResult_work();
+                if (work->mode_0x04 == 2) {
+                    s32 other = (s8)my_player_no() != 0;
+                    _arena_eq_data eq;
+
+                    dl_acdata_to_ar_eqdata(&eq, work->slot_0x14[other != 0].player_0x00);
+                    memcpy(arena_user_data_buf + 0x14, &eq, 0xEC);
+                    dl_acdata_to_ar_eqdata(&eq, work->slot_0x14[(other == 0) & 0xFF].player_0x00);
+                    memcpy(arena_user_data_buf + 0x114, &eq, 0xEC);
+                    PlayMode_set(6);
+                    GameMode_set(1);
+                    GameModeExec();
+                    return;
+                }
+                break;
+            } else if (result == -1) {
+                task->step_0x08 = 3;
+                bgm_stop_all();
+            } else if (result == 2) {
+                task->step_0x08 = 2;
+            }
+            return;
+        } while (0);
+        arena_vs_mode_enter(work);
         break;
     case 2:
         prim_init_all();
@@ -1117,6 +1123,7 @@ extern "C" void arena_eqdata_setup(ArenaWork* params, u8 mode) {
     }
 }
 
+#pragma optimization_level 4
 /* Resets the arena work for the next round and builds its local (one- or two-player) or network setup,
  * then picks the stage's equip data. */
 extern "C" void arena_result_next(ArenaWork* work) {
@@ -1216,18 +1223,20 @@ extern "C" void arena_result_next(ArenaWork* work) {
     memset(arena_user_data_buf, 0, 0x100);
     memset(arena_user_data_buf + 0x100, 0, 0x100);
 }
+#pragma optimization_level reset
 
 /* Steps the arena's state machine one frame (equip picker, stage picker and start-up, network picker and
  * match); returns 1 when the round ends, 2 to leave and -1 after a network drop. */
 extern "C" s32 arena_game_task(ArenaWork* work) {
     const PadButtons* pads[2];
-    u16 moved_row;
     u16 moved_col;
+    u16 moved_row;
     _arena_eq_data eq;
     s32 n;
     s32 ready;
     s32 i;
     ArenaEqSlot* slot;
+    s32 player;
 
     if (isServerSelectState() == 1) {
         NetCtrlWk::flushSession();
@@ -1260,9 +1269,11 @@ extern "C" s32 arena_game_task(ArenaWork* work) {
                     case 1:
                         work->phase_0x01 = 2;
                         for (i = 0; i < (s16)n; i++) {
-                            work->slot_0x14[i].page_0x02 = work->slot_0x14[i].mirror_0x0D;
-                            work->slot_0x14[i].page_limit_0x03 = 3;
-                            work->slot_0x14[i].ready_0x0B = 0;
+                            ArenaEqSlot* slot_i = &work->slot_0x14[i];
+
+                            slot_i->page_0x02 = slot_i->mirror_0x0D;
+                            slot_i->page_limit_0x03 = 3;
+                            slot_i->ready_0x0B = 0;
                         }
                         sysSE_req(5);
                         break;
@@ -1298,12 +1309,12 @@ extern "C" s32 arena_game_task(ArenaWork* work) {
             }
             break;
         case 2:
-            for (i = 0, slot = work->slot_0x14; i < (s16)n; i++) {
-                ArenaEqSlot* slot_i = &work->slot_0x14[i];
+            for (player = 0, slot = work->slot_0x14; player < (s16)n; player++) {
+                ArenaEqSlot* slot_i = &work->slot_0x14[player];
                 const PadButtons* pad;
 
                 slot_i->moved_0x12 = 0;
-                pad = pads[i];
+                pad = pads[player];
                 if (slot_i->ready_0x0B == 0) {
                     u16 buttons = pad->pressed_0x04;
 
@@ -1311,7 +1322,7 @@ extern "C" s32 arena_game_task(ArenaWork* work) {
                         slot_i->ready_0x0B = 1;
                         slot_i->mirror_0x0D = slot_i->page_0x02;
                         sysSE_req(0);
-                        arena_cfg_set(i, 7, slot_i->mirror_0x0D);
+                        arena_cfg_set(player, 7, slot_i->mirror_0x0D);
                     } else if ((buttons & 0x20) != 0) {
                         slot_i->ready_0x0B = 1;
                         sysSE_req(1);
@@ -1349,7 +1360,7 @@ extern "C" s32 arena_game_task(ArenaWork* work) {
             switch (work->step_0x02) {
             case 0:
                 if ((pads[0]->pressed_0x04 & 0x10) != 0) {
-                    s32 stage = work->slot_0x14[0].stage_row_0x05 * work->slot_0x14[0].stage_cols_0x06;
+                    s32 stage = work->slot_0x14[0].stage_cols_0x06 * work->slot_0x14[0].stage_row_0x05;
 
                     stage += work->slot_0x14[0].stage_col_0x04;
 
