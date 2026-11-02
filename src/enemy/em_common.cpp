@@ -97,27 +97,32 @@
  *    from 0x80026F34 on;
  *  - the data this unit reads from `em_snd_proc_tbl` (.bss 0x806A7734, `em_hook_get` slot 7) is shared with
  *    `enemy/em_kind.cpp` and left unclaimed;
- *  - 52 written rows short of 100 %, most of them register allocation or instruction scheduling only; the
- *    shapes known not to reach retail: `em_delay_act_set`/`em_delay_act_tick` (retail's `li r0,0` + `mulli`
- *    index; a one-slot `for` loop recovers it in `em_delay_act_set` but not the `add` base; `optimization_level 4`
- *    does not change it), `em_break_part_active_ck` (retail adds the 0x488 base before the loop), `em_mot_speed_set`
- *    (retail rounds `speed` with `frsp` before the multiply, as for an `f64` parameter; an `(f32)(f64)` cast is worse);
- *  - `em_target_pos_set`: retail's `get_worldworld_pos` temporaries sit above `t7`/`t6`/`t8` on the stack (ours
- *    below); block-scoped declarations do not move them and named `VEC3 w = get_worldworld_pos(...)` copies cost a
- *    struct copy each;
- *  - `em_reaction_req`: retail keeps the spot index masked at the store (`clrlwi` + `stb`); the remaining registers
- *    follow from it;
- *  - `em_target_pos_set`: retail keeps one dead `b` to the exit after each case per early `return` it holds;
- *    `em_target_select`: retail keeps `picked` in r14 and spills `result` (ours the opposite); `fn_8012BDF4`: the
- *    `table` default tests branch `beq default; b join` in retail; `em_area_decide`: retail's hook arm branches to the
- *    final `fn_80129984` call;
- *  - `em_team_area_alert_set`, `fn_8012C600`, `fn_8012C6F4`, `fn_8012C870`, `fn_8012D3E0`: the `clrlwi` narrowing
- *    sits at a different point (hoisted to the loop preheader in retail);
- *  - `em_pl_hate_get`: the branch polarity and one reload differ;
- *  - `fn_8012B86C`, `em_team_member_claim`, `em_attack_start`, `em_area_vacant_wait_ck`, `em_nearest_area_get`,
- *    `em_part_spot_nearest_get`, `em_hit_window_set`, `em_owner_slot_update`, `em_patrol_step`: register allocation;
- *    `regsim search` (the mwcc-debugger dumps) finds no declaration order for them, or a plan that needs a
- *    frontend temporary named at a declaration position (`em_nearest_area_get`, `em_area_roam_pick`, `em_act_pick`).
+ *  - 28 written rows short of 100 %, register allocation or instruction scheduling only; the shapes known not to
+ *    reach retail: `em_delay_act_set`/`em_delay_act_tick` (retail's `li r0,0` + `mulli` index; a one-slot `for`
+ *    loop recovers it in `em_delay_act_set` but not the `add` base; `optimization_level 4` does not change it),
+ *    `em_break_part_active_ck` (retail adds the 0x488 base before the loop; a sub-struct pointer local is worse),
+ *    `em_mot_speed_set` (retail rounds `speed` with `frsp` before the multiply, as for an `f64` parameter; an
+ *    `(f32)(f64)` cast is worse);
+ *  - `em_fx_scale_get`, `em_hit_fx_scale_get`, `em_paralysis_fx_scale_get`, `em_key_curve_eval`, `em_max_hp_set`,
+ *    `em_stamina_add_capped`, `fn_8012BDF4`: one `fmuls` whose operands retail orders with the callee-saved (or
+ *    long-lived) register second where ours puts it first; swapping the source operands, a named `f32` copy,
+ *    `opt_common_subs off`, `optimization_level 4` and `scheduling off` all leave the object unchanged;
+ *  - `em_ambient_color_update`: the point-light blend converts the channel before the half difference (retail
+ *    after it) and multiplies `step * ratio` (ours `ratio * step`); `+=`, operand orders, the ratio inlined and the
+ *    three pragmas above do not reach it;
+ *  - `em_level_raise`/`em_approach_start`: retail stores the `kind`/`flags` parameter unmasked (`stb r31`/`sth r31`),
+ *    so its parameters are `u8`/`u16`; ours keeps the `u32` the 29 calling units' prototype carries (a `clrlwi`
+ *    before the store);
+ *  - `em_team_member_claim`: retail stores `state_sub` raw (`stb r30`) where ours reuses the compare's masked copy;
+ *    `em_area_decide`: retail's hook arm branches to the final `fn_80129984` call (a ternary or `||` condition
+ *    sharing the call is worse); `em_hate_update`: retail loads the four default bands through one base in index
+ *    order (a `const` pointer or the statement order is worse);
+ *  - `em_nearest_area_get`, `em_part_spot_nearest_get`: retail loads `set->count` first, into a temporary, and
+ *    sign-extends it later (reading it before `part` is worse); `em_team_area_alert_set`, `fn_8012D3E0`,
+ *    `em_area_next_get`, `em_hit_mask_get`: a load or `li` hoisted to a different point;
+ *  - `em_area_vacant_wait_ck`: `entry` has exactly K = 29 neighbours in the colouring graph, so it stalls and is
+ *    coloured before the loop's temporaries (r3 where retail has r5); `em_patrol_step`, `em_owner_slot_update`,
+ *    `em_part_slot_get`: register allocation `regsim search` finds no order for (`em_patrol_step`: `best` stalls).
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.rodata`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
  *   differ from the target (the rows above, and `.sdata2` pooled per literal rather than at the map's addresses).
  * SHAPES. `#pragma optimization_level 4` around `em_reaction_req`, `em_act_sleep_side_get` and
@@ -137,7 +142,14 @@
  *   called through `eft_stun_set_c1`, its scale ahead of the kind (playbook 178: retail loads the scale before
  *   `li r6`); the resource model is reached as `res_mdl_0x138` (through the `MHchar` base MWCC keeps one `addi` in
  *   a saved register instead of retail's per-call `addi`); the stack order of the locals follows the declarations
- *   (the last declared lowest), so they are declared highest-first; `em_motion_param_set` takes its target first
+ *   (the last declared lowest), so they are declared highest-first, and named locals of every scope precede the
+ *   compiler's temporaries, so `em_target_pos_set` calls `addVec3`/`subVec3`/`vec3_scale` through by-value views
+ *   (`<name>_byval`: retail passes the hidden result pointer in r3) and its results are temporaries in textual
+ *   order (playbook 285); an early-return `||` chain's `return` body is its own block laid out after the last
+ *   term, so `em_act_pick`'s chain is the inverse `&&` guard of the rest of the body (playbook 284) and
+ *   `em_target_pos_set`'s cases keep one `b exit` block per `return;` statement (an early `if (c) return;` is a
+ *   direct branch, so each is written `if (!c) { ...; break; } return;`, playbook 286); `em_target_select`'s npc
+ *   block sits in a `for (;;)` whose `break`s skip the `pick_npc` check; `em_motion_param_set` takes its target first
  *   and stores it once through an `f64` cast (retail's second store is `frsp` + `stfs`). A mangled map name gives
  *   the true parameter order (`ana_em_ck__FUcPQ34nw4r4math4VEC3fUc`: the radius ahead of the flag); a float parameter
  *   saved before an integer one in the prologue is declared first (`em_target_reach_ck`'s `limit`); the weave helpers,
@@ -402,6 +414,13 @@
 /* Callees the folded sources declared with different parameters: each call keeps its own view through a cast
  * (the same direct call). */
 #define stage_map_kind_get_view1 ((u32 (*)(u32))stage_map_kind_get)
+/* The turn step takes its angle as the signed difference the callers hold (retail passes it unmasked). */
+#define em_turn_step_get_s16 ((s32 (*)(_ENEMY_WORK*, EmTurnMotions*, s16, u8))em_turn_step_get)
+/* The vector helpers return their result by value (retail passes the hidden result pointer in r3 and the
+ * temporaries take their frame slots in textual order); the owners declare the out-pointer form. */
+#define addVec3_byval ((nw4r::math::VEC3 (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))addVec3)
+#define subVec3_byval ((nw4r::math::VEC3 (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))subVec3)
+#define vec3_scale_byval ((nw4r::math::VEC3 (*)(nw4r::math::VEC3*, f32))vec3_scale)
 #define get_move_work_adrs_view5 ((void* (*)(u8))get_move_work_adrs)
 #define get_move_work_adrs_view3 ((_ENEMY_WORK* (*)(u8))get_move_work_adrs)
 #define get_move_work_adrs_view1 ((_ENEMY_WORK* (*)(u8))get_move_work_adrs)
@@ -854,10 +873,11 @@ extern "C" void em_owner_slot_set(struct _ENEMY_WORK* self, u8 a);
 extern "C" void em_owner_slot_update(struct _ENEMY_WORK* self)
 {
     s8 me;
+    _PLW* rec;
     u8 n;
     u32 found;
-    _PLW* rec;
     _PLW* work;
+    u8 slot;
     u16 max;
     u8 i;
 
@@ -896,14 +916,14 @@ extern "C" void em_owner_slot_update(struct _ENEMY_WORK* self)
             self->field_0x1F5 = 1;
             em_net_send(self, 2, 0);
         } else if (em_die_ck(self) == 0 && self->area_no != work[self->owner_slot_0x1F6].area_0x16) {
-            i = self->owner_slot_0x1F6 + 1;
-            for (n = 0; n < max - 1; n++, i++) {
-                if (i >= max) {
-                    i = 0;
+            slot = self->owner_slot_0x1F6 + 1;
+            for (n = 0; n < max - 1; n++, slot++) {
+                if (slot >= max) {
+                    slot = 0;
                 }
-                rec = &work[i];
-                if (rec->slot_active != 0 && em_pl_slot_leaving_ck(i) == 0 && self->area_no == rec->area_0x16) {
-                    em_owner_slot_set(self, i);
+                rec = &work[slot];
+                if (rec->slot_active != 0 && em_pl_slot_leaving_ck(slot) == 0 && self->area_no == rec->area_0x16) {
+                    em_owner_slot_set(self, slot);
                     em_user_data_reenter(self);
                     return;
                 }
@@ -986,6 +1006,7 @@ extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
     s32 i;
     u8 act;
     u8 sub;
+    u8 level;
 
     VEC3_ctor(&offset);
     em_ground_rec_clear(&rec);
@@ -1136,8 +1157,9 @@ extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
     } else if (timers != NULL) {
         frames = 1000;
         band = timers->recover;
+        level = self->field_0x7C8;
         do {
-            if (self->field_0x7C8 <= band->max_level) {
+            if (level <= band->max_level) {
                 choice = band->choices;
                 it = choice;
                 total = 0;
@@ -2297,7 +2319,7 @@ extern "C" u32 em_patrol_prev_closer_ck(_ENEMY_WORK* self, u8 index)
     struct _EM_REC4* points;
     u8 count;
     s32 dir;
-    s16 to_prev;
+    s32 to_prev;
 
     VEC3_ctor(&at);
     VEC3_ctor(&prev);
@@ -2308,7 +2330,7 @@ extern "C" u32 em_patrol_prev_closer_ck(_ENEMY_WORK* self, u8 index)
     em_patrol_point_get(self, points, em_patrol_next_get(self, points, count, index), &next);
     dir = calcVecAng2(&self->pos, &at);
     to_prev = calcVecAng2(&at, &prev) - dir;
-    return abs(to_prev) < abs((s16)(calcVecAng2(&at, &next) - dir));
+    return abs((s16)to_prev) < abs((s16)(calcVecAng2(&at, &next) - dir));
 }
 
 /* 0x80127BA8 (0x74): the waypoint table of the enemy's map; NULL when it has none. */
@@ -2738,8 +2760,6 @@ extern "C" void em_hit_window_clear_all(_ENEMY_WORK* self);
  * ends the ailments the new action does not keep. */
 extern "C" void em_act_step_arm(_ENEMY_WORK* self, u8 act, u8 sub, u32 mode)
 {
-    u8 a = act;
-    u8 b = sub;
     void (*hook)(_ENEMY_WORK*, u8*, u8*);
     u16 seed;
     u8 old_a;
@@ -2767,10 +2787,10 @@ extern "C" void em_act_step_arm(_ENEMY_WORK* self, u8 act, u8 sub, u32 mode)
         hook = (void (*)(_ENEMY_WORK*, u8*, u8*))em_hook_get(self, 4);
         if (hook != NULL) {
             do {
-                old_a = a;
-                old_b = b;
-                hook(self, &a, &b);
-            } while (old_a != a || old_b != b);
+                old_a = act;
+                old_b = sub;
+                hook(self, &act, &sub);
+            } while (old_a != act || old_b != sub);
         }
     }
     if ((u8)(mode + 254) > 2) {
@@ -2782,10 +2802,10 @@ extern "C" void em_act_step_arm(_ENEMY_WORK* self, u8 act, u8 sub, u32 mode)
         seed = ran_suu(1);
     }
     if (((u8)mode == 0 || (u8)mode == 5) && (self->field_0x1C8 & 8)) {
-        fn_80128590(self, a, b, seed);
+        fn_80128590(self, act, sub, seed);
         em_net_send(self, 1, 0);
         if ((u8)mode != 5 && emc_delay_frames_get() > 0) {
-            em_delay_act_set(self, a, b);
+            em_delay_act_set(self, act, sub);
             return;
         }
     }
@@ -2798,16 +2818,16 @@ extern "C" void em_act_step_arm(_ENEMY_WORK* self, u8 act, u8 sub, u32 mode)
     self->field_0x1FB = 0;
     if ((u8)mode != 2) {
         fn_801376DC(self, 2);
-        if (fn_8012E0D8(a, b) == 0 && em_status_ck(self, 4) != 0) {
+        if (fn_8012E0D8(act, sub) == 0 && em_status_ck(self, 4) != 0) {
             em_paralysis_end(self);
         }
-        if (fn_8012E158(a, b) == 0 && em_status_ck(self, 1) != 0) {
+        if (fn_8012E158(act, sub) == 0 && em_status_ck(self, 1) != 0) {
             em_sleep_end(self);
         }
-        if (em_act_kind6_ck(a, b) == 0 && em_status_ck(self, 8) != 0) {
+        if (em_act_kind6_ck(act, sub) == 0 && em_status_ck(self, 8) != 0) {
             em_ailment8_end(self);
         }
-        if (em_act_leap_ck(a, b) == 0 && em_status_ck(self, 0x10) != 0) {
+        if (em_act_leap_ck(act, sub) == 0 && em_status_ck(self, 0x10) != 0) {
             em_stun_end(self);
         }
         if ((u8)mode == 4) {
@@ -2824,8 +2844,8 @@ extern "C" void em_act_step_arm(_ENEMY_WORK* self, u8 act, u8 sub, u32 mode)
     } else {
         self->field_0x1E8 = 1;
     }
-    fn_801285A0(self, a, b, seed);
-    em_act_change_notify(self, a, b);
+    fn_801285A0(self, act, sub, seed);
+    em_act_change_notify(self, act, sub);
 }
 
 /* 0x80128998 (0x7C): arms action `act`/`sub` at once when the enemy is idle, else queues it. */
@@ -2921,13 +2941,6 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
     ShellNikuEntry* niku;
     u8 area;
     struct _AINPC_W* npc;
-    nw4r::math::VEC3 t0;
-    nw4r::math::VEC3 t2;
-    nw4r::math::VEC3 t1;
-    nw4r::math::VEC3 t3;
-    nw4r::math::VEC3 t7;
-    nw4r::math::VEC3 t6;
-    nw4r::math::VEC3 t8;
     u8 kind;
 
     VEC3_ctor(&dir);
@@ -2942,29 +2955,33 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
     } else {
         switch (self->field_0x380) {
         case 1:
-            if (self->field_0x382 == 0xFF) {
+            if (self->field_0x382 != 0xFF) {
+                rec = em_move_work_pick(self->state_0x381, self->field_0x382);
+                if (rec[0] != 0 && (u32)em_pl_target_ck(self, (_PLW*)rec) == 1) {
+                    copyVec3(&self->vec_0x36C, &((_PLW*)rec)->vec_0x03C);
+                    break;
+                }
                 return;
-            }
-            rec = em_move_work_pick(self->state_0x381, self->field_0x382);
-            if (rec[0] != 0 && (u32)em_pl_target_ck(self, (_PLW*)rec) == 1) {
-                copyVec3(&self->vec_0x36C, &((_PLW*)rec)->vec_0x03C);
-                break;
             }
             return;
         case 2:
-            if (self->field_0x382 != 0xFF && (npc = &ainpc_w)->active != 0 && self->area_no == npc->field_0x1A4) {
-                copyVec3(&self->vec_0x36C, &npc->vec_0x178);
-                break;
+            if (self->field_0x382 != 0xFF) {
+                npc = &ainpc_w;
+                if (ainpc_w.active != 0 && self->area_no == npc->field_0x1A4) {
+                    copyVec3(&self->vec_0x36C, &npc->vec_0x178);
+                    break;
+                }
+                return;
             }
             return;
         case 3:
-            if (self->field_0x382 == 0xFF) {
+            if (self->field_0x382 != 0xFF) {
+                work = &get_move_work_adrs_view3(3)[self->field_0x382];
+                if (work->active != 0 && self->area_no == work->area_no) {
+                    copyVec3(&self->vec_0x36C, &work->pos);
+                    break;
+                }
                 return;
-            }
-            work = &get_move_work_adrs_view3(3)[self->field_0x382];
-            if (work->active != 0 && self->area_no == work->area_no) {
-                copyVec3(&self->vec_0x36C, &work->pos);
-                break;
             }
             return;
         case 5:
@@ -2989,8 +3006,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
                     break;
                 }
                 rotVecY(&dir, angle);
-                addVec3(&t0, &self->pos, &dir);
-                copyVec3(&self->vec_0x36C, &t0);
+                copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &dir));
                 break;
             case 6:
                 copyVec3(&self->vec_0x36C, &self->aim);
@@ -2998,24 +3014,25 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
             case 7:
                 data = (struct _ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A),
                                                             self->field_0x46C);
-                if (data != NULL && self->area_no == data->field_0x14) {
-                    if (data->field_0x36 != 0xFF) {
-                        blk = (EmModelBlockView*)eft_def_model_block((struct EftSlot*)data, data->field_0x36);
-                        if (blk != NULL && blk->live == 1) {
-                            use_segment = 1;
-                            setVector3(&seg_a, blk->a[0], blk->a[1], blk->a[2]);
-                            setVector3(&seg_b, blk->b[0], blk->b[1], blk->b[2]);
-                            self->field_0x384 = blk->reach;
-                            addVec3(&t1, &seg_a, &seg_b);
-                            vec3_scale(&t2, &t1, 0.5f);
-                            copyVec3(&self->vec_0x36C, &t2);
+                if (data != NULL) {
+                    if (self->area_no == data->field_0x14) {
+                        if (data->field_0x36 != 0xFF) {
+                            blk = (EmModelBlockView*)eft_def_model_block((struct EftSlot*)data, data->field_0x36);
+                            if (blk != NULL && blk->live == 1) {
+                                use_segment = 1;
+                                setVector3(&seg_a, blk->a[0], blk->a[1], blk->a[2]);
+                                setVector3(&seg_b, blk->b[0], blk->b[1], blk->b[2]);
+                                self->field_0x384 = blk->reach;
+                                copyVec3(&self->vec_0x36C, &vec3_scale_byval(&addVec3_byval(&seg_a, &seg_b), 0.5f));
+                            }
                         }
+                        if (use_segment == 0) {
+                            self->field_0x384 = data->speed_0x30;
+                            copyVec3(&self->vec_0x36C, &data->vec_0x24);
+                        }
+                        break;
                     }
-                    if (use_segment == 0) {
-                        self->field_0x384 = data->speed_0x30;
-                        copyVec3(&self->vec_0x36C, &data->vec_0x24);
-                    }
-                    break;
+                    return;
                 }
                 return;
             case 8:
@@ -3038,8 +3055,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
                     break;
                 }
                 rotVecY(&dir, angle);
-                addVec3(&t3, &self->pos, &dir);
-                copyVec3(&self->vec_0x36C, &t3);
+                copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &dir));
                 break;
             case 12:
             case 13:
@@ -3057,20 +3073,20 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
             return;
         case 7:
             niku = niku_find(self->state_0x381, self->field_0x382);
-            if (niku == NULL) {
-                return;
+            if (niku != NULL) {
+                copyVec3(&self->vec_0x36C, &niku->shell_0x00->pos_0x18);
+                break;
             }
-            copyVec3(&self->vec_0x36C, &niku->shell_0x00->pos_0x18);
-            break;
+            return;
         case 8:
             em_special_part_apply(self, self->state_0x381);
-            if (self->recs_0x9A4 == NULL) {
-                return;
+            if (self->recs_0x9A4 != NULL) {
+                em_data_point_get(self, ((self->area_no & 0xF) << 8) |
+                                                  (u8)((EmPartSpots*)self->recs_0x9A4)->spots[self->field_0x382].key,
+                                        &self->vec_0x36C);
+                break;
             }
-            em_data_point_get(self, ((self->area_no & 0xF) << 8) |
-                                              (u8)((EmPartSpots*)self->recs_0x9A4)->spots[self->field_0x382].key,
-                                    &self->vec_0x36C);
-            break;
+            return;
         case 9:
             area = self->area_no;
             if (self->field_0x382 == 0xFF || self->state_0x381 != self->field_0x9F8) {
@@ -3083,9 +3099,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
             if (area != self->state_0x381) {
                 copyVec3(&here, &get_worldworld_pos(&self->pos, self->area_no));
                 copyVec3(&there, &get_worldworld_pos(&self->vec_0x36C, self->state_0x381));
-                subVec3(&t6, &there, &here);
-                addVec3(&t7, &self->pos, &t6);
-                copyVec3(&self->vec_0x36C, &t7);
+                copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &subVec3_byval(&there, &here)));
                 self->vec_0x36C.y = 2000.0f + stg_area_ceiling_get(self->area_no);
                 self->field_0x1FA = 1;
             } else {
@@ -3102,16 +3116,15 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
             dir.y = 0.0f;
             dir.z = 1000.0f;
             rotVecY(&dir, self->field_0x1C0);
-            addVec3(&t8, &self->pos, &dir);
-            copyVec3(&self->vec_0x36C, &t8);
+            copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &dir));
             break;
         default:
             rec = (u8*)get_move_work_adrs(2);
-            if (rec[0] == 0) {
-                return;
+            if (rec[0] != 0) {
+                copyVec3(&self->vec_0x36C, &((_PLW*)rec)->vec_0x03C);
+                break;
             }
-            copyVec3(&self->vec_0x36C, &((_PLW*)rec)->vec_0x03C);
-            break;
+            return;
         }
     }
     switch (self->field_0x383 & ~0x80) {
@@ -3166,6 +3179,7 @@ extern "C" void em_hit_window_set(_ENEMY_WORK* self, u8 slot, u32 attack, u32 fl
     hit = (_HIT_W*)&self->hit_slots_0xA08[slot];
     sizes = get_enemy_data(self)->extra->attack_sizes;
     f32 shift;
+    f32 base;
 
     if (attacks == NULL || sizes == NULL) {
         return;
@@ -3189,9 +3203,10 @@ extern "C" void em_hit_window_set(_ENEMY_WORK* self, u8 slot, u32 attack, u32 fl
         if (shift < 0.0f || (self->mot_flags_0x070 & 1)) {
             shift = 0.0f;
         }
+        base = self->mot_frame_0x098;
         hit->power_0x38 = data->power_0x00;
         hit->knock_0x3C = data->knock_0x02;
-        hit->power_0x38 += shift - self->mot_frame_0x098;
+        hit->power_0x38 += shift - base;
         if (hit->power_0x38 < 0.0f) {
             hit->knock_0x3C += hit->power_0x38;
             hit->power_0x38 = 0.0f;
@@ -3256,7 +3271,7 @@ extern "C" void em_hit_buff_apply(_ENEMY_WORK* self, _HIT_W* hit)
             cur = hit->field_0x05A;
             if (cur != 0 && (hit->mask_0x46 & buff->mask)) {
                 if (cur + add < 0xFF) {
-                    hit->field_0x05A = cur + (u8)add;
+                    hit->field_0x05A += (u8)add;
                 } else {
                     hit->field_0x05A = 0xFF;
                 }
@@ -3297,7 +3312,7 @@ struct EmAreaStatusRec {
  * +0x1F2 seed. */
 extern "C" void em_area_status_init(_ENEMY_WORK* self)
 {
-    EmAreaStatusRec* rec = (EmAreaStatusRec*)em_area_rec_get(self);
+    EmAreaStatusRec* rec = (EmAreaStatusRec*)((u8* (*)(_ENEMY_WORK*, u8))em_area_rec_get)(self, self->area_no);
 
     if (rec != NULL) {
         self->value_0x44E = rec->frames_a;
@@ -3451,8 +3466,8 @@ extern "C" void em_ground_probe(_ENEMY_WORK* self)
 {
     f32 floor;
 
-    self->ground_mode_0x208 = pl_ground_probe(&self->pos, &self->field_0x228, &floor, &self->field_0x210,
-                                              &self->field_0x214, &self->field_0x23C, 0xFFFF);
+    self->ground_mode_0x208 = ((s32 (*)(_ENEMY_WORK*, nw4r::math::VEC3*, u16*, f32*, f32*, f32*, u8*, u32))pl_ground_probe)(
+        self, &self->pos, &self->field_0x228, &floor, &self->field_0x210, &self->field_0x214, &self->field_0x23C, 0xFFFF);
     if (self->ground_mode_0x208 == 1) {
         self->field_0x20C = floor;
     }
@@ -3632,6 +3647,7 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
 {
     nw4r::math::VEC3 from;
     nw4r::math::VEC3 to;
+    u8 i;
     u8 pick_player;
     u8 pick_enemy;
     u8 pick_npc;
@@ -3648,12 +3664,11 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
     u32 water;
     s32 nearest;
     s32 shape;
+    _PLW* plw;
     u8 reach_mode;
     f32 reach;
     EmModelBlockView* blk;
     u16 max;
-    _PLW* plw;
-    u8 i;
     s32 hate;
     _ENEMY_WORK* work;
     struct _AINPC_W* npc;
@@ -3847,36 +3862,43 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
         picked = pick_player;
     }
     if (*kind == 0 || *kind == 2 || *kind == 4) {
-        npc = &ainpc_w;
-        if (npc->active != 0 && (torch == 0 || ai_torch_ck(npc) == 1) && hidden == 0 &&
-            self->area_no == npc->field_0x1A4 && em_area_exit_ck(self, npc->field_0x326) == 1 &&
-            npc->field_0x171 != 5 && self->field_0x38F != 0) {
-            hate = fn_8012C204(self);
-            if ((ground == 0 || npc->variant != 2) && (water == 0 || npc->variant == 2) &&
-                (nearest != 0 || hate >= (s32)self->timer_0x424) &&
-                (((u32)nearest != 1 && shape == 0) ||
-                 em_target_reach_ck(self, reach_mode, &from, &to, &npc->vec_0x178, reach, &dist) != 0)) {
-                if (pick_player == 0xFF) {
-                    pick_npc = 0;
-                    if (nearest == 1) {
-                        best_dist = dist;
-                    } else {
-                        best = hate;
+        for (;;) {
+            npc = &ainpc_w;
+            if (npc->active != 0 && (torch == 0 || ai_torch_ck(npc) == 1) && hidden == 0 &&
+                self->area_no == npc->field_0x1A4 && em_area_exit_ck(self, npc->field_0x326) == 1 &&
+                npc->field_0x171 != 5 && self->field_0x38F != 0) {
+                hate = fn_8012C204(self);
+                if ((ground == 0 || npc->variant != 2) && (water == 0 || npc->variant == 2)) {
+                    if (nearest == 0 && hate < (s32)self->timer_0x424) {
+                        break;
                     }
-                } else if (nearest != 1) {
-                    if (best < hate) {
+                    if (((u32)nearest == 1 || shape != 0) &&
+                        em_target_reach_ck(self, reach_mode, &from, &to, &npc->vec_0x178, reach, &dist) == 0) {
+                        break;
+                    }
+                    if (pick_player == 0xFF) {
                         pick_npc = 0;
-                        best = hate;
+                        if (nearest == 1) {
+                            best_dist = dist;
+                        } else {
+                            best = hate;
+                        }
+                    } else if (nearest != 1) {
+                        if (best < hate) {
+                            pick_npc = 0;
+                            best = hate;
+                        }
+                    } else if (dist < best_dist) {
+                        pick_npc = 0;
+                        best_dist = dist;
                     }
-                } else if (dist < best_dist) {
-                    pick_npc = 0;
-                    best_dist = dist;
                 }
             }
-        }
-        if (pick_npc != 0xFF) {
-            result = 2;
-            picked = pick_npc;
+            if (pick_npc != 0xFF) {
+                result = 2;
+                picked = pick_npc;
+            }
+            break;
         }
     }
     if ((u8)(*kind + 253) <= 1) {
@@ -3994,10 +4016,7 @@ extern "C" void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index)
             eye.y += lift;
             for (i = 0; spot->key != 0xFFFF; i++, spot++) {
                 if (spot->kind == em_phase_get(self) && spot->sight_mode != 1) {
-                    mode = 1;
-                    if (spot->sight_mode == 2) {
-                        mode = 3;
-                    }
+                    mode = (spot->sight_mode == 2) ? 3 : 1;
                     em_data_point_get(self, ((self->area_no & 0xF) << 8) | (u8)spot->key, &spot_pos);
                     spot_pos.y += lift;
                     if (findInterSection(&eye, &spot_pos, &hit, mode, 0xFFFF, self->area_no, em_hit_mask_get(self),
@@ -4050,7 +4069,7 @@ extern "C" void em_hate_update(_ENEMY_WORK* self)
     s32 g0;
     s32 g1;
     s32 add;
-    u16 i;
+    s32 g2;
     s32 g3;
     _PLW* plw;
     f32* dist;
@@ -4058,8 +4077,8 @@ extern "C" void em_hate_update(_ENEMY_WORK* self)
     s32 lost;
     s32* gains;
     s32 bonus;
+    u16 i;
     u16 max;
-    s32 g2;
     g1 = em_hate_bands_default.band[1];
     g0 = em_hate_bands_default.band[0];
     out = -2;
@@ -4218,13 +4237,14 @@ extern "C" u32 em_area_roam_pick(_ENEMY_WORK* self, u16 seed)
 {
     _ENEMY_WORK* work = get_move_work_adrs_view3(3);
     u16 max = get_move_work_max(3);
-    u8 rolls = 0;
-    u32 hit;
+    u16 i;
     u16 chance;
     s32 rival;
+    u8 rolls = 0;
+    u16 roll;
+    u32 hit;
     u32 rank;
     u32 other;
-    u16 i;
 
     if (self->field_0x202 <= 0) {
         if (em_hit_timer_ck(self) == 1) {
@@ -4265,7 +4285,7 @@ extern "C" u32 em_area_roam_pick(_ENEMY_WORK* self, u16 seed)
                 }
             }
         }
-        for (i = 0; i < rolls; i++) {
+        for (roll = 0; roll < rolls; roll++) {
             switch (rival) {
             default:
                 if (hit == 1) {
@@ -4280,9 +4300,10 @@ extern "C" u32 em_area_roam_pick(_ENEMY_WORK* self, u16 seed)
                 }
                 break;
             case 2:
-                chance = 40;
                 if (hit == 1) {
                     chance = 80;
+                } else {
+                    chance = 40;
                 }
                 break;
             }
@@ -4412,43 +4433,42 @@ extern "C" u32 em_pack_area_pick(_ENEMY_WORK* self, u8 team, u8 area, u16 rate, 
 {
     u16 mate_rate;
     u16 area_rate;
-    u32 blocked;
-    u16 max;
     _ENEMY_WORK* work;
     u16 i;
+    u32 blocked;
+    u16 max;
 
-    if (self->value_0x452 < self->field_0x450 && self->field_0x43D == 1) {
-        return 0;
-    }
-    mate_rate = em_stamina_gate_get(self, mate_gates);
-    area_rate = em_stamina_gate_get(self, area_gates);
-    if (mate_rate != 0 && team != 0) {
-        blocked = 0;
-        max = get_move_work_max(3);
-        work = get_move_work_adrs_view3(3);
-        for (i = 0; i < max; i++, work++) {
-            if (self->group != i && work->active != 0 && work->team == team && (work->field_0x1C8 & 8)) {
-                if (work->action != 0xB && work->action != 0xC && self->area_no != work->area_no &&
-                    em_area_enter_ck(self, self->field_0x1E0, work->area_no) == 1 &&
-                    em_roll_cooldown_ck(self, rate, mate_rate, &self->field_0x200) == 1) {
-                    self->field_0x1FC = 1;
-                    self->field_0x1FE = 4;
-                    self->field_0x1FF = work->area_no;
-                    return 1;
+    if (self->value_0x452 >= self->field_0x450 || self->field_0x43D != 1) {
+        mate_rate = em_stamina_gate_get(self, mate_gates);
+        area_rate = em_stamina_gate_get(self, area_gates);
+        if (mate_rate != 0 && team != 0) {
+            blocked = 0;
+            max = get_move_work_max(3);
+            work = get_move_work_adrs_view3(3);
+            for (i = 0; i < max; i++, work++) {
+                if (self->group != i && work->active != 0 && work->team == team && (work->field_0x1C8 & 8)) {
+                    if (work->action != 0xB && work->action != 0xC && self->area_no != work->area_no &&
+                        em_area_enter_ck(self, self->field_0x1E0, work->area_no) == 1 &&
+                        em_roll_cooldown_ck(self, rate, mate_rate, &self->field_0x200) == 1) {
+                        self->field_0x1FC = 1;
+                        self->field_0x1FE = 4;
+                        self->field_0x1FF = work->area_no;
+                        return 1;
+                    }
+                    blocked = 1;
                 }
-                blocked = 1;
+            }
+            if (blocked == 1) {
+                return 0;
             }
         }
-        if (blocked == 1) {
-            return 0;
+        if (area_rate != 0 && area != 0xFF && self->area_no != area &&
+            em_roll_cooldown_ck(self, rate, area_rate, &self->field_0x200) == 1) {
+            self->field_0x1FC = 1;
+            self->field_0x1FE = 3;
+            self->field_0x1FF = area;
+            return 1;
         }
-    }
-    if (area_rate != 0 && area != 0xFF && self->area_no != area &&
-        em_roll_cooldown_ck(self, rate, area_rate, &self->field_0x200) == 1) {
-        self->field_0x1FC = 1;
-        self->field_0x1FE = 3;
-        self->field_0x1FF = area;
-        return 1;
     }
     return 0;
 }
@@ -4465,10 +4485,11 @@ extern "C" u32 em_area_leave_ck(struct _ENEMY_WORK* self)
     return 0;
 }
 
-extern "C" u32 fn_8012B86C(struct _ENEMY_WORK* self)
+extern "C" u8 fn_8012B86C(struct _ENEMY_WORK* self)
 {
+    u32 i;
     u8 mask = 0;
-    for (u32 i = 0; i < 4; i++) {
+    for (i = 0; i < 4; i++) {
         if (self->values_0x3A4[33 + i] >= 20000) {
             mask |= 1 << i;
         }
@@ -4647,19 +4668,21 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
  * `em_hate_pl_add`; then, when the global state allows it, picks the enemy's target for `em_hate_em_add`. */
 extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
 {
-    EnemyActionTable* table;
+    u16 j;
     _ENEMY_WORK* target;
     u16 max;
-    u16 i;
-    struct _AINPC_W* npc;
-    s32 value;
-    EnemyActionSet* set;
     _PLW* work;
+    s32 value;
+    u16 i;
+    EnemyActionSet* set;
+    EnemyActionTable* table;
     u16 enemy_max;
-    u16 j;
+    struct _AINPC_W* npc;
 
     set = get_enemy_data(enemy)->extra->action_set;
-    if (set == NULL || (table = set->table_0x000) == NULL) {
+    if (set != NULL && set->table_0x000 != NULL) {
+        table = set->table_0x000;
+    } else {
         table = &lbl_805A0FF8;
     }
     max = get_move_work_max(2);
@@ -4684,7 +4707,9 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
     npc = &ainpc_w;
     if (npc->active != 0) {
         if (npc->field_0x171 != 5) {
-            if (set == NULL || (table = set->table_0x004) == NULL) {
+            if (set != NULL && set->table_0x004 != NULL) {
+                table = set->table_0x004;
+            } else {
                 table = &lbl_805A1034;
             }
             value = fn_8012BA00_view1(enemy, table, npc, 2, 0);
@@ -4693,7 +4718,9 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
         }
         em_hate_misc_add(enemy, value);
     }
-    if (set == NULL || (table = set->table_0x008) == NULL) {
+    if (set != NULL && set->table_0x008 != NULL) {
+        table = set->table_0x008;
+    } else {
         table = &lbl_805A106C;
     }
     enemy_max = get_move_work_max(3);
@@ -4722,11 +4749,13 @@ extern "C" s32 em_pl_hate_get(_ENEMY_WORK* enemy, u32 index)
     work = get_move_work_adrs(2);
     set = get_enemy_data(enemy)->extra->action_set;
     value = enemy->values_0x390[(u8)index];
-    if (set == NULL || (table = set->table_0x000) == NULL) {
+    if (set != NULL && set->table_0x000 != NULL) {
+        table = set->table_0x000;
+    } else {
         table = &lbl_805A0FF8;
     }
     work += (u8)index;
-    if (work->slot_active != 0 && em_pl_slot_leaving_ck(work->chunk_ofs) == 0 && em_pl_target_ck(enemy, work) == 1) {
+    if (work->slot_active != 0 && em_pl_slot_leaving_ck(work->chunk_ofs) == 0 && (u32)em_pl_target_ck(enemy, work) == 1) {
         entry = table->entry;
         if (entry->condition_0x00C != 0 && Pl_condition_ck(work, entry->condition_0x00C) == 1) {
             value += entry->value_0x010;
@@ -4872,7 +4901,7 @@ extern "C" void fn_8012C600(_ENEMY_WORK* enemy)
         }
         if ((enemy->flags_0xA04 & 1) != 0) {
             if (enemy->field_0xA06 == 0) {
-                enemy->field_0xA06 = enemy->field_0xA06 + 1;
+                enemy->field_0xA06++;
                 fn_8012CE8C(enemy, 8);
             } else if (enemy->area_no == enemy->field_0xA05) {
                 enemy->flags_0xA04 &= 0xFE;
@@ -4902,9 +4931,9 @@ extern "C" void em_hit_latch_set(_ENEMY_WORK* enemy)
  * any live attacker, picks the last one whose bit is set, then runs the hit state machine. */
 extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2)
 {
-    u16 max;
-    u8 i;
     _PLW* work;
+    s32 max;
+    u8 i;
 
     if ((enemy->field_0x1C8 & 0x80) != 0) {
         return 0;
@@ -4943,9 +4972,9 @@ extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2)
  * out of `mask` and enters the knock-down state. */
 extern "C" u32 fn_8012C870(_ENEMY_WORK* enemy, u32 mask)
 {
-    u16 max;
-    u8 i;
     _PLW* work;
+    s32 max;
+    u8 i;
 
     if (enemy->field_0x95C == 4) {
         return 0;
@@ -4981,12 +5010,12 @@ extern "C" u32 fn_8012C870(_ENEMY_WORK* enemy, u32 mask)
 extern "C" void em_act_pick(_ENEMY_WORK* self)
 {
     u32 rest = fn_8012CF2C(self);
-    u8 seen;
     s32 force;
     s32 found;
-    u16 max;
+    u8 seen;
     _PLW* plw;
     s32 i;
+    s32 max;
     u8 bit;
     u8 mask;
     u8 kind;
@@ -5018,76 +5047,75 @@ extern "C" void em_act_pick(_ENEMY_WORK* self)
         }
         return;
     }
-    if (em_busy_ck(self) == 0 || self->field_0x784 == 1 || em_status_ck(self, 0xFD) == 1 ||
-        (u8)(self->action + 248) <= 5 || em_sleep_ck(self, 0) == 1 || self->field_0x1F8 != 0 ||
-        em_userdata_state_kind_get(self) == 12) {
-        return;
-    }
-    mask = fn_8012B86C(self);
-    if (self->field_0x43D == 1) {
-        if (found != 0 && (self->field_0x1E2 != 1 || self->field_0x1E3 == 1) && self->action != 7 &&
-            self->field_0x916 <= 0) {
-            force = 1;
+    if (em_busy_ck(self) != 0 && self->field_0x784 != 1 && em_status_ck(self, 0xFD) != 1 &&
+        (u8)(self->action + 248) > 5 && em_sleep_ck(self, 0) != 1 && self->field_0x1F8 == 0 &&
+        em_userdata_state_kind_get(self) != 12) {
+        mask = fn_8012B86C(self);
+        if (self->field_0x43D == 1) {
+            if (found != 0 && (self->field_0x1E2 != 1 || self->field_0x1E3 == 1) && self->action != 7 &&
+                self->field_0x916 <= 0) {
+                force = 1;
+            } else {
+                seen = 0;
+            }
         } else {
-            seen = 0;
+            seen = self->field_0x38F & mask;
         }
-    } else {
-        seen = self->field_0x38F & mask;
-    }
-    if (seen != 0 && fn_8012C6F4(self, seen, force) == 1) {
-        if (force == 0) {
-            self->field_0x43E = 1;
+        if (seen != 0 && fn_8012C6F4(self, seen, force) == 1) {
+            if (force == 0) {
+                self->field_0x43E = 1;
+            }
+            return;
         }
-        return;
-    }
-    if (self->field_0x43D == 0) {
-        if (self->field_0x38F != 0) {
-            if (self->field_0x1C8 & 1) {
-                if (fn_8012C870(self, self->field_0x38F) == 1) {
+        if (self->field_0x43D == 0) {
+            if (self->field_0x38F != 0) {
+                if (self->field_0x1C8 & 1) {
+                    if (fn_8012C870(self, self->field_0x38F) == 1) {
+                        return;
+                    }
+                } else if (fn_8012C6F4(self, self->field_0x38F, 0) == 1) {
                     return;
                 }
-            } else if (fn_8012C6F4(self, self->field_0x38F, 0) == 1) {
+            } else if (self->field_0x43A != 0 && fn_8012C6F4(self, 0xFF, 0) == 1) {
                 return;
             }
-        } else if (self->field_0x43A != 0 && fn_8012C6F4(self, 0xFF, 0) == 1) {
-            return;
         }
-    }
-    if (self->field_0x43D == 0 && self->field_0x95C != 3 && mask != 0) {
-        for (i = 0; i < 4; i++) {
-            if (mask & (1 << i)) {
-                self->field_0x798 = i;
-                break;
+        if (self->field_0x43D == 0 && self->field_0x95C != 3 && mask != 0) {
+            for (i = 0; i < 4; i++) {
+                if (mask & (1 << i)) {
+                    self->field_0x798 = i;
+                    break;
+                }
+            }
+            fn_8012B8F8(self);
+            if (fn_8013A884(self, 3) == 1) {
+                fn_8012CDF4(self, 3, 0);
+                return;
             }
         }
-        fn_8012B8F8(self);
-        if (fn_8013A884(self, 3) == 1) {
-            fn_8012CDF4(self, 3, 0);
+        kind = em_userdata_state_kind_get(self);
+        if ((u32)(kind - 6) <= 1 || (u32)(kind - 11) <= 1) {
             return;
         }
-    }
-    kind = em_userdata_state_kind_get(self);
-    if ((u32)(kind - 6) <= 1 || (u32)(kind - 11) <= 1) {
-        return;
-    }
-    if (fn_8012CF04(self, 4) == 1 && fn_8013A884(self, 6) == 1) {
-        fn_8012CDF4(self, 6, 0);
-        em_alt_mode_set(self, 1);
-        return;
-    }
-    if (fn_8012CF04(self, 8) == 1 && fn_8013A884(self, 11) == 1) {
-        fn_8012CDF4(self, 11, 0);
-        fn_8012CE9C(self, 8);
-        return;
-    }
-    if (rest == 1) {
-        if (fn_8013A884(self, 7) == 1) {
-            fn_8012CDF4(self, 7, self->field_0x799);
-        } else {
-            em_user_data_reenter(self);
-            em_finish_flag_set(self);
+        if (fn_8012CF04(self, 4) == 1 && fn_8013A884(self, 6) == 1) {
+            fn_8012CDF4(self, 6, 0);
+            em_alt_mode_set(self, 1);
+            return;
         }
-        fn_8012CE9C(self, 2);
+        if (fn_8012CF04(self, 8) == 1 && fn_8013A884(self, 11) == 1) {
+            fn_8012CDF4(self, 11, 0);
+            fn_8012CE9C(self, 8);
+            return;
+        }
+        if (rest == 1) {
+            if (fn_8013A884(self, 7) == 1) {
+                fn_8012CDF4(self, 7, self->field_0x799);
+            } else {
+                em_user_data_reenter(self);
+                em_finish_flag_set(self);
+            }
+            fn_8012CE9C(self, 2);
+        }
     }
 }
 
@@ -5288,7 +5316,7 @@ extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot)
             if (enemy->team != 4) {
                 return 0;
             }
-            if (plw->act_no == 42) {
+            if ((s32)plw->act_no == 42) {
                 return 1;
             }
             break;
@@ -5297,7 +5325,7 @@ extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot)
     case 1:
         switch (plw->field_0x00A) {
         case 7:
-            if ((u32)(plw->act_no - 5) <= 1 || plw->act_no == 0 || plw->act_no == 2) {
+            if ((u32)(plw->act_no - 5) <= 1 || plw->act_no == 0 || (s32)plw->act_no == 2) {
                 return 1;
             }
             break;
@@ -5305,7 +5333,7 @@ extern "C" u32 em_team_mate_state_ck(_ENEMY_WORK* enemy, u32 kind, u32 slot)
             if (enemy->team != 4) {
                 return 0;
             }
-            if (plw->act_no == 42) {
+            if ((s32)plw->act_no == 42) {
                 return 1;
             }
             break;
@@ -5878,7 +5906,7 @@ extern "C" void em_attack_start(_ENEMY_WORK* enemy)
     if (enemy->field_0x011 == 0) {
         enemy->field_0x011 = 1;
         if ((enemy->field_0x1C8 & 8) == 0) {
-            emc_kill_report(3);
+            ((void (*)(_ENEMY_WORK*, u32))emc_kill_report)(enemy, 3);
         }
     }
 }
@@ -7135,13 +7163,10 @@ extern "C" void em_stamina_reset(_ENEMY_WORK* self)
  * the tired motion mode 1, a gain leaves it. */
 extern "C" void em_stamina_add_capped(_ENEMY_WORK* self, s16 delta, u16 cap)
 {
-    if ((self->field_0x1C8 & 1) == 0) {
+    if ((self->field_0x1C8 & 1) == 0 || (self->field_0x1C8 & 0x80000)) {
         return;
     }
-    if (self->field_0x1C8 & 0x80000) {
-        return;
-    }
-    if (delta < 0 && em_mot_finished_ck(self) == 1) {
+    if (delta < 0 && (u32)em_mot_finished_ck(self) == 1) {
         delta = delta * 0.5f;
         if (delta == 0) {
             delta = -1;
@@ -7161,7 +7186,7 @@ extern "C" void em_stamina_add_capped(_ENEMY_WORK* self, s16 delta, u16 cap)
             self->field_0x8A2 = cap;
         }
         if (delta > 0) {
-            if (em_eft_active_ck(self) == 1) {
+            if ((u32)em_eft_active_ck(self) == 1) {
                 em_motion_mode_set(self, 3);
             } else if (self->field_0x89F == 1) {
                 em_motion_mode_set(self, 0);
@@ -7275,7 +7300,7 @@ extern "C" void em_bait_react(_ENEMY_WORK* self)
 extern "C" _ENEMY_WORK* em_ally_find(_ENEMY_WORK* self, u32 team, u32 near)
 {
     _ENEMY_WORK* work;
-    u16 max;
+    s32 max;
     s32 i;
 
     max = get_move_work_max(3);
@@ -9168,7 +9193,7 @@ extern "C" void em_turn_seq_start(_ENEMY_WORK* self, EmTurnMotions* table, u32 m
         diff = self->field_0x37C - self->field_0x1C0;
     }
     em_turn_motion_set(self, table, diff);
-    step = em_turn_step_get(self, table, diff, self->turn_flags_0x483);
+    step = em_turn_step_get_s16(self, table, diff, self->turn_flags_0x483);
     if (0.0f == table->lo) {
         if (self->turn_flags_0x483 & 0x20) {
             em_turn_apply(self, &self->field_0x1C4, diff, step);
@@ -9198,7 +9223,7 @@ extern "C" u32 em_turn_seq_step(_ENEMY_WORK* self, EmTurnMotions* table)
     } else {
         diff = self->field_0x37C - self->field_0x1C0;
     }
-    step = em_turn_step_get(self, table, diff, self->turn_flags_0x483);
+    step = em_turn_step_get_s16(self, table, diff, self->turn_flags_0x483);
     if (self->field_0x482 != 0 || (0.0f == table->lo && 0.0f == table->hi) ||
         em_frame_check(self, 3, table->lo, table->hi) == 1) {
         if (self->turn_flags_0x483 & 0x20) {
@@ -9220,7 +9245,7 @@ extern "C" u32 em_turn_seq_step(_ENEMY_WORK* self, EmTurnMotions* table)
             ended = 0;
         }
     } else {
-        ended = em_frame_check(self, 1, table->straight_end, 0.0f);
+        ended = ((u16 (*)(_ENEMY_WORK*, u16, f32, f32))em_frame_check)(self, 1, table->straight_end, 0.0f);
     }
     if (em_mot_end_ck(self) == 1 || ended != 0) {
         if (self->turn_flags_0x483 & 0x20) {
@@ -9329,12 +9354,11 @@ extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
     nw4r::math::VEC3 d0;
     nw4r::math::VEC3 d1;
     u16 turn;
-    s32 rate;
     u16 bank;
-    f32 lean;
     u16 roll;
-    u16 want;
     u16 motion;
+    s32 rate;
+    f32 lean;
 
     VEC3_ctor(&to_target);
     VEC3_ctor(&to_start);
@@ -9350,7 +9374,8 @@ extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
             self->fly_state_0x786++;
             turn = 0;
         } else {
-            turn = (u16)calcVecAng3(&to_target) - self->field_0x1C0;
+            turn = (u16)calcVecAng3(&to_target);
+            turn = turn - self->field_0x1C0;
         }
         break;
     case 1:
@@ -9371,9 +9396,10 @@ extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
         lean -= 0.1f;
         rate = 128.0f + 1664.0f * lean;
         self->offset_0x30C.vec_0x310.z -= 1.7f * lean;
-        bank = 0x3000;
         if ((u16)rate * 10 <= 0x3000) {
             bank = (u16)rate * 10;
+        } else {
+            bank = 0x3000;
         }
         if (self->frames_0x454[4] > 0.0f) {
             bank = bank * -1;
@@ -9395,16 +9421,16 @@ extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
         self->field_0x1C0 += (u16)rate;
     }
     roll = self->field_0x1C4 + 0x8000;
-    want = bank + 0x8000;
-    if (roll < want) {
+    bank += 0x8000;
+    if (roll < bank) {
         roll += 0x280;
-        if (roll > want) {
-            roll = want;
+        if (roll > bank) {
+            roll = bank;
         }
     } else {
         roll -= 0x280;
-        if (roll < want) {
-            roll = want;
+        if (roll < bank) {
+            roll = bank;
         }
     }
     self->field_0x1C4 = roll - 0x8000;
@@ -9491,7 +9517,7 @@ extern "C" void em_move_offset_rot_apply(_ENEMY_WORK* self, u32* rot)
 
     VEC3_ctor(&move);
     copyVec3(&move, &self->offset_0x30C.vec_0x310);
-    if ((u32)(self->field_0x1E2 - 1) <= 1 || self->field_0x1E2 == 4) {
+    if ((u32)(self->field_0x1E2 - 1) <= 1 || (s32)self->field_0x1E2 == 4) {
         rotVecZ(&move, rot[2]);
         rotVecX(&move, rot[0]);
     }
