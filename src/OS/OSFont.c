@@ -11,18 +11,17 @@
  *    them), `ParseStringNarrow` and `ParseStringWide` are GUESS names (the `s_parseString` targets), `OSGetFontTexel` is a GUESS
  *    (renders one glyph into a 4-bit texture), and `sjisSingleCode`, `sjisDoubleCode`, `s_ansiFont`, `s_sjisFont`,
  *    `s_sjisForAscii`, `s_parseString` and `s_fontEncode` are GUESS names.
- * RESIDUALS. `DecodeYay0`: the target keeps `codes`/`chunk` in r30/r29 and `outPos`/`linkOffset`/`bitsLeft`/`bits` in
- *    r8/r9/r11/r12, ours r7/r6/r9/r8/r10/r11 (declaration order permuted, no change). `ReadFont`: the first ROM-read expansion
- *    swaps the buffer/offset pair (r31/r26 in the target, r26/r31 here; the second expansion matches), and the glyph patch
- *    computes the cell row's `y` before the column and keeps one register fewer (r25..r31 saved, ours r24..r31).
- *    `OSGetFontTexel`: the target saves r17-r31, hoists `&font->c` into r23 and loads the destination byte before the table
- *    lookup, ours saves r19-r31 (a hoisted table local, the SDK step-by-step address, if/else stores and pragma probes all
- *    measured lower). The .sdata word `s_fontEncode` is 2 bytes here, the target object carries 8 (the alignment pad to the
- *    next unit).
+ * RESIDUALS. none in .text. The .sdata word `s_fontEncode` is 2 bytes here, the target object carries 8 (the alignment
+ *    pad to the next unit).
  * SHAPES. the ROM read is an inline helper expanded in both `ReadFont` arms; it subtracts the chunk from the length before
- *    the read and advances the offset, then the buffer, after it; the glyph patch walks rows 4..7 of the cell with the
- *    SDK's step-by-step sheet address (`sheet + rowWords * (y / 8)`, `+ (x / 8) * 16`, `+ (y % 8) * 2`, `+ (x % 8) / 4`)
- *    and the cell index reduced by subtraction; the Shift-JIS lead/trail tests are inline helpers.
+ *    the read and advances the offset, then the buffer, after it; the glyph patch (`ReadFont`) and the glyph walk
+ *    (`OSGetFontTexel`) are the SDK's step-by-step shapes: the cell index reduced by subtraction, `row`/`column` scaled
+ *    in place, the sheet address built `+=` by `+=` from `(row + y) / 8`, `(column + x) / 8`, `(row + y) % 8` and
+ *    `(column + x) % 8`, and in `OSGetFontTexel` the colour table hoisted as `colorIndex`, the sheet pointer declared
+ *    after it, the cell count written out twice (no `numChars` local) and the width index cast to `u32`; `DecodeYay0`
+ *    walks the flag words and the chunk as byte offsets from the header (not pointers), with every local at function
+ *    scope in the order srcBytes, size, link, i, from, outPos, linkOffset, count, bitsLeft, bits, chunkOffset, flagOffset;
+ *    the Shift-JIS lead/trail tests are inline helpers.
  */
 
 #include "types.h"
@@ -239,30 +238,42 @@ static u32 GetFontCode(u32 encode, u16 code) {
 
 /* 0x804D00C0 (0x1A8): expands a Yay0 image into `dst`. */
 static void DecodeYay0(Yay0Header* src, u8* dst) {
-    u8* srcBytes = (u8*)src;
-    u8* chunk = srcBytes + src->chunkOffset;
-    s32 size = src->expandedSize;
-    u32* codes = src->flagWords;
-    s32 outPos = 0;
-    s32 linkOffset = src->linkOffset;
-    s32 bitsLeft = 0;
+    u8* srcBytes;
+    s32 size;
+    s32 link;
+    s32 i;
+    s32 from;
+    s32 outPos;
+    s32 linkOffset;
+    s32 count;
+    s32 bitsLeft;
     u32 bits;
+    s32 chunkOffset;
+    s32 flagOffset;
+
+    srcBytes = (u8*)src;
+    chunkOffset = src->chunkOffset;
+    size = src->expandedSize;
+    flagOffset = sizeof(Yay0Header) - sizeof(u32);
+    outPos = 0;
+    linkOffset = src->linkOffset;
+    bitsLeft = 0;
 
     do {
         if (bitsLeft == 0) {
-            bits = *codes++;
+            bits = *(u32*)(srcBytes + flagOffset);
+            flagOffset += 4;
             bitsLeft = 32;
         }
         if (bits & 0x80000000) {
-            dst[outPos++] = *chunk++;
+            dst[outPos++] = srcBytes[chunkOffset++];
         } else {
-            s32 link = (srcBytes[linkOffset] << 8) | srcBytes[linkOffset + 1];
-            s32 count = link >> 12;
-            s32 from = outPos - (link & 0xFFF);
-            s32 i;
+            link = (srcBytes[linkOffset] << 8) | srcBytes[linkOffset + 1];
+            count = link >> 12;
+            from = outPos - (link & 0xFFF);
             linkOffset += 2;
             if (count == 0) {
-                count = *chunk++ + 18;
+                count = srcBytes[chunkOffset++] + 18;
             } else {
                 count += 2;
             }
@@ -300,11 +311,6 @@ static inline void ReadRom(u8* buf, s32 length, s32 offset) {
     }
 }
 
-/* Row address of the texel (x, y) in a 2-bit 8x8-tiled font sheet. */
-static inline u8* SheetRow(OSFontHeader* font, u8* sheet, s32 x, s32 y) {
-    return sheet + (y / 8) * (font->sheetWidth / 8 * 32 / 2) + (x / 8) * 16 + (y % 8) * 2 + (x % 8) / 4;
-}
-
 /* 0x804D02F0 (0x310): reads the ROM font of `encode` into `src`, expands it into `dst` and returns the expanded size. */
 static u32 ReadFont(u8* src, u16 encode, OSFontHeader* dst) {
     u32 size;
@@ -324,34 +330,35 @@ static u32 ReadFont(u8* src, u16 encode, OSFontHeader* dst) {
     }
     DecodeYay0((Yay0Header*)src, (u8*)dst);
     if (encode == 1) {
-        u16 rows[4] = {0x2ABE, 0x003D, 0x003D, 0x003D};
-        s32 index;
-        s32 sheetIndex;
+        OSFontHeader* font = dst;
+        s32 fontCode;
+        u8* imageSrc;
+        s32 sheet;
         s32 numChars;
-        s32 cellRow;
-        s32 cellCol;
+        s32 row;
+        s32 column;
         s32 x;
         s32 y;
-        s32 i;
-        u8* sheet;
-        u8* row;
+        u8* row16;
+        u16 imageT[4] = {0x2ABE, 0x003D, 0x003D, 0x003D};
 
-        index = GetFontCode(encode, 0x54);
-        numChars = dst->sheetColumn * dst->sheetRow;
-        sheetIndex = index / numChars;
-        index -= sheetIndex * numChars;
-        cellRow = index / dst->sheetColumn;
-        cellCol = index - cellRow * dst->sheetColumn;
-        x = cellCol * dst->cellWidth;
-        y = cellRow * dst->cellHeight;
-        sheet = (u8*)dst + dst->sheetImage;
-        sheet += sheetIndex * dst->sheetSize / 2;
-        for (i = 4; i < 8; i++) {
-            row = sheet + ((dst->sheetWidth / 8) * 32) / 2 * ((y + i) / 8);
-            row += (x / 8) * 16;
-            row += ((y + i) % 8) * 2;
-            row += (x % 8) / 4;
-            *(u16*)row = rows[i - 4];
+        fontCode = GetFontCode(encode, 0x54);
+        numChars = font->sheetColumn * font->sheetRow;
+        sheet = fontCode / numChars;
+        fontCode -= sheet * numChars;
+        row = fontCode / font->sheetColumn;
+        column = fontCode - row * font->sheetColumn;
+        row *= font->cellHeight;
+        column *= font->cellWidth;
+        imageSrc = (u8*)font + font->sheetImage;
+        imageSrc += sheet * font->sheetSize / 2;
+        for (y = 4; y < 8; y++) {
+            x = 0;
+            row16 = imageSrc + (((font->sheetWidth / 8) * 32) / 2) * ((row + y) / 8);
+            row16 += ((column + x) / 8) * 16;
+            row16 += ((row + y) % 8) * 2;
+            row16 += ((column + x) % 8) / 4;
+            *(u16*)row16 = imageT[y - 4];
         }
     }
     return size;
@@ -474,40 +481,51 @@ static u8* ParseStringWide(s32 encode, u8* str, OSFontHeader** font, s32* code) 
 /* 0x804D09E0 (0x288): renders the glyph of the first character of `string` into the 4-bit texture `image` at column `pos`. */
 char* OSGetFontTexel(const char* string, u8* image, s32 pos, s32 stride, s32* width) {
     OSFontHeader* font;
+    u8* dst;
+    s32 fontCode;
+    s32 sheet;
+    s32 row;
+    s32 column;
+    s32 x;
+    s32 y;
+    s32 offsetSrc;
+    s32 offsetDst;
+    u8* colorIndex;
+    u8* src;
+    u8* tmp;
     s32 code;
-    s32 sheetIndex;
-    s32 inSheet;
-    s32 cellRow;
-    s32 cellCol;
-    s32 srcX0;
-    s32 srcY0;
-    s32 cy;
-    s32 cx;
-    u8* sheet;
-    u32 encode = GetFontEncode();
 
-    u8* next = s_parseString(encode, (u8*)string, &font, &code);
-    sheetIndex = code / (font->sheetColumn * font->sheetRow);
-    inSheet = code % (font->sheetColumn * font->sheetRow);
-    cellRow = inSheet / font->sheetColumn;
-    cellCol = inSheet % font->sheetColumn;
-    srcY0 = cellRow * font->cellHeight;
-    srcX0 = cellCol * font->cellWidth;
-    sheet = (u8*)font + font->sheetImage + ((u32)(sheetIndex * font->sheetSize) >> 1);
-    for (cy = 0; cy < font->cellHeight; cy++) {
-        for (cx = 0; cx < font->cellWidth; cx++) {
-            s32 dx = pos + cx;
-            u8 texel = *SheetRow(font, sheet, srcX0 + cx, srcY0 + cy);
-            u8* out = image + (cy / 8) * ((stride * 4 / 8) << 5) + (dx / 8) * 32 + (cy % 8) * 4 + (dx % 8) / 2;
-            s32 mask = 0xF0;
-            if (dx % 2 != 0) {
-                mask = 0x0F;
-            }
-            *out |= (u8)(font->c[(texel >> (6 - (srcX0 + cx) % 4 * 2)) & 3] & mask);
+    string = (const char*)s_parseString(GetFontEncode(), (u8*)string, &font, &fontCode);
+    colorIndex = font->c;
+    sheet = fontCode / (font->sheetColumn * font->sheetRow);
+    code = fontCode - sheet * (font->sheetColumn * font->sheetRow);
+    row = code / font->sheetColumn;
+    column = code - row * font->sheetColumn;
+    row *= font->cellHeight;
+    column *= font->cellWidth;
+    src = (u8*)font + font->sheetImage;
+    src += sheet * font->sheetSize / 2;
+    for (y = 0; y < font->cellHeight; y++) {
+        for (x = 0; x < font->cellWidth; x++) {
+            tmp = src + (((font->sheetWidth / 8) * 32) / 2) * ((row + y) / 8);
+            tmp += ((column + x) / 8) * 16;
+            tmp += ((row + y) % 8) * 2;
+            tmp += ((column + x) % 8) / 4;
+
+            offsetSrc = (column + x) % 4;
+
+            dst = image + ((y / 8) * (((stride * 4) / 8) * 32));
+            dst += ((pos + x) / 8) * 32;
+            dst += (y % 8) * 4;
+            dst += ((pos + x) % 8) / 2;
+
+            offsetDst = (pos + x) % 2;
+
+            *dst |= colorIndex[(*tmp >> (6 - 2 * offsetSrc)) & 3] & (offsetDst ? 0x0F : 0xF0);
         }
     }
     if (width != NULL) {
-        *width = *((u8*)font + font->widthTable + code);
+        *width = ((u8*)font + font->widthTable)[(u32)fontCode];
     }
-    return (char*)next;
+    return (char*)string;
 }
