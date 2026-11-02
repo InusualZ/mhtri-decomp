@@ -10,24 +10,19 @@
  *   TU's) and its calls are the menu UI helpers.  No `__FILE__` string covers the range and the dump answers `zz_`, so the
  *   file name and all 22 symbol names are GUESSes from the bodies, in the `menu_*` family's scheme; so is what each page
  *   shows (0 the item's detail panel, 1 the row's damage/quality block, 2 the item card, 3 the option/season card).
- * RESIDUALS. 15 partial rows (the other 7 are byte-identical):
- *  - `item_page_draw`: the `case 1` arm's `else` body and the `page_ofs` test in another block order (three shapes);
- *  - `item_page_draw_page_arrow`: `pos` in r31 against r30 and the colour `or`'s operand order (four shapes);
- *  - `item_page_draw_detail0`/`1`/`2`, `item_page_draw_column3`: in-block reload/step order and colouring, the call
- *    sequences identical;
- *  - `item_page_draw_rows`/`item_page_draw_blank_rows`: the row draws' argument narrowing; `item_page_draw_rows` also
- *    narrows `first` with `extsb` where our `u8` gives `clrlwi`, and sets `row_id` after the first `sprite_frame_apply`;
- *  - `item_page_item_price`: retail masks the third argument into r5 at once, we copy to r0 and mask at the call;
- *  - `item_page_draw_wrapped_text`, `item_page_draw_column0`, `item_page_draw_closed_column`,
- *    `item_page_draw_option_frame`, `item_page_option_row_index`, `item_page_option_value_string`: the same in-block
- *    ordering/masking class.
- *   flipcheck: `.text` 0x50 long (0x233C against 0x22EC); extab 1 byte and extabindex 8 bytes differ;
- *   `font_print_ex__FsssPCce`, `get_userdata` (the map's `get_userdata__Fv`) and `spr_data_copy__FPsPv` are defined by no
- *   link input.
- * SHAPES. The `MenuRowData` record declares `kind` `s32`: retail's `switch (data->kind)` is a signed binary search; `u32`
+ * RESIDUALS. 2 partial rows (the other 20 are byte-identical):
+ *  - `item_page_draw_rows`/`item_page_draw_blank_rows`: `li r30,0` (the loop counter) is scheduled one slot later than
+ *    retail's, after the `row_id` copy of `get_menu_lsp_tbl`'s result (split init, `for`-init comma form, `while`,
+ *    `(s32)count` and every declaration order measured, none moves it);
+ *  - `item_page_draw` keeps a scoped `#pragma optimization_level 4` (the `case 1` arm's inner switch is retail's
+ *    `subi`+`cmplwi` range test only at level 4; file-wide level 4 costs `item_page_draw_detail0` 0.96 B).
+ *   flipcheck: `.text` 28 of 8940 bytes differ (the two rows above), every section size equal.
+ * SHAPES. A `u8` value passed to a `u16` parameter costs a `clrlwi` retail does not have: the detail draws keep the
+ *   frame index in a `u16` local. The `MenuRowData` record declares `kind` `s32`: retail's `switch (data->kind)` is a signed binary search; `u32`
  *   gives an unsigned linear chain.
- *  - `item_page_item_price`, `userdata_item_count_total`, `item_count_find`, `item_slots_count_sum` and `pl_item_page2_ck` are `u32` in this unit's
- *    view (retail masks none of those results), and the price is two statements (`base = Pl_item_timer_get(worker, id);
+ *  - `item_page_item_price`, `userdata_item_count_total`, `item_count_find` and `pl_item_page2_ck` are `u32` in this unit's
+ *    view (retail masks none of those results), `item_slots_count_sum` comes from its owner's leaf header (an `s32`
+ *    count, so the `u16` capacity is masked straight into r5), and the price is two statements (`base = Pl_item_timer_get(worker, id);
  *    base += item_slots_count_sum(...);`) so the worker call comes first.
  */
 
@@ -35,6 +30,10 @@
 #include "menu/menu_item.h"
 #include "menu/menu_item_page.h"
 #include "quest/quest_item_slot.h"   /* quest_record_a/b_count_get_wide (rule 2) */
+#include "quest/quest_types.h"       /* Q_UserData */
+#include "get_userdata.h"
+#include "lobby/spr_data_copy.h"
+#include "userdata_item/item_slots_count_sum.h"
 
 /* This unit's own view of the 0x24-byte sprite-data record `sprite_frame_apply` fills in and the `draw_*`
  * family takes by reference (`_SPR_DATA_` in the map's manglings): `hud/layout.h` owns the full
@@ -47,7 +46,11 @@ typedef struct SprWork {
     /* +0x06 */ s16 ofs_y;
     /* +0x08 */ s16 width;            /* the vertex rectangle `item_page_draw_wrapped_text` shifts by */
     /* +0x0A */ s16 height;
-    /* +0x0C */ u8 unused_0x0C[0x1C - 0x0C];
+    /* +0x0C */ u8 unused_0x0C[0x14 - 0x0C];
+    /* +0x14 */ s16 uv0_u;            /* the texture rectangle's corners (`_SPR_DATA_::uv0`/`uv1`) */
+    /* +0x16 */ s16 uv0_v;
+    /* +0x18 */ s16 uv1_u;
+    /* +0x1A */ s16 uv1_v;
     /* +0x1C */ u32 colour_0x1C;
     /* +0x20 */ u8 unused_0x20[0x24 - 0x20];
 } SprWork; /* size: 0x24 */
@@ -126,12 +129,14 @@ extern "C" void item_page_update_rows(MenuSlot* slot, u16 buttons)
 
 /* 0x80349FF0: one frame of the item page - the page's own sprite rows, the per-page detail draw, the
  * four arrow sprites with the selected one, and the page widget's number. */
+#pragma optimization_level 4
 extern "C" void item_page_draw(MenuSlot* slot)
 {
     SprWork back;
     SprWork panel;
     SprWork page;
     SprWork nums;
+    _mh_ivec2_ posFrame;
     _mh_ivec2_ posBack;
     _mh_ivec2_ posPanel;
     _mh_ivec2_ posPage;
@@ -151,18 +156,19 @@ extern "C" void item_page_draw(MenuSlot* slot)
         }
         break;
     case 1:
-        if ((u32)((s8)slot->page_index - 1) > 1) {
-            if ((s8)slot->page_index != 3) {
-                break;
-            }
+        switch ((s8)slot->page_index) {
+        case 1:
+        case 2:
+            arrow = 1;
+            break;
+        case 3:
             if (slot->field_0x002 == 0xA) {
                 item_page_draw_column3(slot);
                 draw = 0;
             } else {
                 arrow = 1;
             }
-        } else {
-            arrow = 1;
+            break;
         }
         break;
     }
@@ -187,18 +193,18 @@ extern "C" void item_page_draw(MenuSlot* slot)
     }
     draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x47), slot->field_0x23A, &posBack);
     draw_sprite_anim_idx(0x400, slot->field_0x23A, &posBack);
-    item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x4B), (u16)slot->field_0x23A, page_ofs - 3 == 0, &posPanel);
+    item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x4B), slot->field_0x23A, page_ofs - 3 == 0, &posPanel);
     draw_sprite_anim_idx(0x3FF, slot->field_0x23A, &posBack);
-    item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x4A), (u16)slot->field_0x23A, page_ofs - 2 == 0, &posPanel);
+    item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x4A), slot->field_0x23A, page_ofs - 2 == 0, &posPanel);
     draw_sprite_anim_idx(0x3FE, slot->field_0x23A, &posBack);
-    item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x49), (u16)slot->field_0x23A, page_ofs - 1 == 0, &posPanel);
+    item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x49), slot->field_0x23A, page_ofs - 1 == 0, &posPanel);
     draw_sprite_anim_idx(0x3FD, slot->field_0x23A, &posBack);
     item_page_draw_page_arrow((u16*)get_menu_lsp_tbl(0x48), slot->field_0x23A, page_ofs == 0, &posPanel);
     if (slot->field_0x23A > 0x1E) {
         sprite_frame_apply((_SPR_DATA_*)&page, 0x41F, slot->field_0x23A, &posPage);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x4C), slot->field_0x23A, &posPage);
         sprite_frame_apply((_SPR_DATA_*)&nums, 0x438, slot->field_0x23A, &posNums);
-        item_page_draw_page_widget((s8)slot->page_index, &posNums);
+        item_page_draw_page_widget(slot->page_index, &posNums);
         if (arrow != 0) {
             PutPageArrow((u16*)get_menu_lsp_tbl(0x4F), (s16)slot->scroll.col, (s16)slot->scroll.col_count,
                          slot->scroll.move_flags, &posNums, 1);
@@ -220,26 +226,28 @@ extern "C" void item_page_draw(MenuSlot* slot)
             break;
         }
     }
-    get_lsp_data(0x3F1, &posPage);
-    draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x45), slot->field_0x23A, &posPage);
+    get_lsp_data(0x3F1, &posFrame);
+    draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x45), slot->field_0x23A, &posFrame);
 }
+
+#pragma optimization_level reset
 
 /* 0x8034A398: draws one of the four page arrows - a plain row when `flag` is clear, else the frame
  * row shifted by the page's own animation phase plus the arrow glyph, tinted. */
-extern "C" void item_page_draw_page_arrow(u16* table, u32 id, s32 flag, _mh_ivec2_* pos)
+extern "C" void item_page_draw_page_arrow(u16* table, u16 id, s32 flag, _mh_ivec2_* pos)
 {
-    s32 part;
     SprWork spr;
 
     if (flag == 0) {
         draw_sprite_anim_ary(table, id, pos);
         return;
     }
-    part = id - 30;
-    draw_sprite_anim_idx(table[0], part, pos);
-    sprite_frame_apply((_SPR_DATA_*)&spr, table[1], part, NULL);
+    id -= 30;
+    draw_sprite_anim_idx(table[0], id, pos);
+    sprite_frame_apply((_SPR_DATA_*)&spr, table[1], id, NULL);
     cockpit_blink_get();
-    spr.colour_0x1C = (spr.colour_0x1C & 0xFF) | (color_lerp(spr.colour_0x1C, 0xFFD246FF) & 0xFFFFFF00);
+    u32 tint = color_lerp(spr.colour_0x1C, 0xFFD246FF) & 0xFFFFFF00;
+    spr.colour_0x1C = tint | (spr.colour_0x1C & 0xFF);
     draw_sprite(*(_SPR_DATA_*)&spr, pos);
 }
 
@@ -251,7 +259,7 @@ extern "C" void item_page_draw_page_widget(s8 page, _mh_ivec2_* pos)
     u16* row = (u16*)get_menu_lsp_tbl(0x4D);
 
     while (*row != 0xFFFF) {
-        spr_data_copy((s16*)&spr, get_lsp_data(*row, NULL));
+        spr_data_copy((_SPR_DATA_*)&spr, (const _SPR_DATA_*)get_lsp_data(*row, NULL));
         spr.colour_0x1C = item_page_colour_table[page];
         draw_sprite(*(_SPR_DATA_*)&spr, pos);
         row++;
@@ -262,16 +270,17 @@ extern "C" void item_page_draw_page_widget(s8 page, _mh_ivec2_* pos)
 
 /* 0x8034A4FC: draws one column of rows - each row's sprite, the selected row's highlight and its text,
  * walking the entry array, the sprite table and the row ids together. */
-extern "C" void item_page_draw_rows(MenuEntry* entries, u8 sel, u8 count, u8 id, u8 id2, u8 first, u8 blend)
+extern "C" void item_page_draw_rows(MenuEntry* entries, u8 sel, u8 count, u8 id, u8 id2, s8 first, u8 blend)
 {
     SprWork row;
     SprWork text;
     _mh_ivec2_ ofs;
-    u16* row_id = &((u16*)get_menu_lsp_tbl(0x52))[first];
+    u16* row_id;
     s32 i;
 
     sprite_frame_apply((_SPR_DATA_*)&row, 0x438, id, &ofs);
-    for (i = 0; i < count; i++) {
+    row_id = &((u16*)get_menu_lsp_tbl(0x52))[first];
+    for (i = 0; i < count;) {
         sprite_frame_apply((_SPR_DATA_*)&row, *row_id, id, NULL);
         row.pos.x += ofs.x;
         row.pos.y += ofs.y;
@@ -300,11 +309,12 @@ extern "C" void item_page_draw_blank_rows(MenuEntry* entries, u8 sel, u8 count, 
     SprWork row;
     SprWork text;
     _mh_ivec2_ ofs;
-    u16* row_id = (u16*)get_menu_lsp_tbl(0x52);
+    u16* row_id;
     s32 i;
 
     sprite_frame_apply((_SPR_DATA_*)&row, 0x438, id, &ofs);
-    for (i = 0; i < count; i++) {
+    row_id = (u16*)get_menu_lsp_tbl(0x52);
+    for (i = 0; i < count;) {
         if (i == 0 || entries->field_0x02 != 0) {
             sprite_frame_apply((_SPR_DATA_*)&row, *row_id, id, NULL);
             row.pos.x += ofs.x;
@@ -329,6 +339,7 @@ extern "C" void item_page_draw_blank_rows(MenuEntry* entries, u8 sel, u8 count, 
             }
         }
         row_id++;
+        i++;
         entries++;
     }
 }
@@ -356,10 +367,10 @@ extern "C" u32 item_page_item_price(MenuSlot* slot, u16 id)
 extern "C" void item_page_draw_detail0(MenuSlot* slot)
 {
     SprWork spr;
+    u16 id;
     MenuRowData* data;
     _mh_ivec2_ pos;
     s8 text[0x10];
-    u8 id;
 
     if (slot->field_0x002 != 0 || slot->field_0x23B != 0) {
         id = slot->field_0x23B;
@@ -379,7 +390,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
-            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->item_id));
+            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, (s8*)"%s", ItemExp(data->item_id));
             break;
         case 3:
             draw_font_anim_idx(0x4EA, id, (s8*)ItemName(data->equip_id), 4, &pos);
@@ -391,7 +402,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
-            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->equip_id));
+            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, (s8*)"%s", ItemExp(data->equip_id));
             break;
         case 4:
             draw_font_anim_idx(0x4EA, id, (s8*)ItemName(data->equip_id), 4, &pos);
@@ -403,7 +414,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
-            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->equip_id));
+            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, (s8*)"%s", ItemExp(data->equip_id));
             break;
         case 5:
             draw_font_anim_idx(0x4EA, id, (s8*)((u8**)get_str_tbl(0x44))[3], 4, &pos);
@@ -424,7 +435,11 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
-            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->field_0x0A));
+            font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, (s8*)"%s", ItemExp(data->field_0x0A));
+            break;
+        case 7:
+        case 8:
+        case 9:
             break;
         default:
             draw_font_anim_idx(0x4EA, id, (s8*)((u8**)get_str_tbl(0x44))[1], 4, &pos);
@@ -445,7 +460,7 @@ extern "C" void item_page_draw_column0(MenuSlot* slot)
     u8 blend = 0xFF;
 
     if (slot->page_index == 0 && slot->field_0x002 == 3) {
-        blend = slot->field_0x01D;
+        blend = slot->sub_cursor_0x01D;
     }
     item_page_draw_rows(slot->entries_b, slot->scroll.row, slot->scroll.row_limit, slot->field_0x23A, slot->field_0x23C,
                 0, blend);
@@ -454,7 +469,7 @@ extern "C" void item_page_draw_column0(MenuSlot* slot)
         ofs = (_mh_ivec2_*)get_lsp_data(0x4DA, NULL);
         pos.x += ofs->x;
         pos.y += ofs->y;
-        menu_select_window_draw(slot->field_0x01A, slot->entry_count_a, (s8*)get_menu_msg_tbl(12), &pos, 0);
+        menu_select_window_draw(slot->field_0x01A, slot->entry_count_a, (s8**)get_menu_msg_tbl(12), &pos, NULL);
     }
 }
 
@@ -469,9 +484,10 @@ extern "C" void item_page_draw_wrapped_text(u16 id, u16 part, s8* text, const _m
 {
     SprWork spr;
     s8 buffer[0x200];
-    s8* line = buffer;
+    s8* line;
 
     sprite_frame_apply((_SPR_DATA_*)&spr, id, part, NULL);
+    line = buffer;
     strcpy(buffer, text);
     for (;;) {
         s8* brk = (s8*)flfntStrChr((char*)line, 10);
@@ -492,18 +508,15 @@ extern "C" void item_page_draw_wrapped_text(u16 id, u16 part, s8* text, const _m
 extern "C" void item_page_draw_detail1(MenuSlot* slot)
 {
     SprWork spr;
-    SprWork bar;
+    u16 id;
     MenuEntry* entry;
     MenuRowRec* data;
     _mh_ivec2_ pos;
-    _mh_ivec2_ posBar;
     f32 value_a;
     f32 value_b;
     s8 text[0x10];
-    u8 id;
     u16 limit_a;
     u16 limit_b;
-    s32 i;
 
     if (slot->field_0x002 != 0 || slot->field_0x23B != 0) {
         id = slot->field_0x23B;
@@ -511,20 +524,20 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
         data = &((MenuRowRec*)menu_row_table_get())[entry->field_0x06];
         sprite_frame_apply((_SPR_DATA_*)&spr, 0x46C, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x54), id, &pos);
-        if (entry->selected != 0) {
+        if (entry->field_0x02 != 0) {
             draw_sprite_anim_ary((const u16*)((u32*)get_menu_lsp_tbl(0x55))[data->mode], id, &pos);
             limit_a = quest_record_a_count_get_wide(data->kind);
             limit_b = quest_record_b_count_get_wide(data->kind);
-            u16* user = (u16*)get_userdata();
-            u16 id_a = user[data->kind * 2 + 0x1DE1];
-            u16 id_b = user[data->kind * 2 + 0x1DE0];
+            Q_UserData* user = get_userdata();
+            u16 id_a = user->sizes_0x3BC0[data->kind].size_max;
+            u16 id_b = user->sizes_0x3BC0[data->kind].size_min;
             monster_size_value_get(data->kind, id_a, &value_a);
             monster_size_value_get(data->kind, id_b, &value_b);
             u8 res_a = monster_size_crown_get(data->kind, id_a);
             u8 res_b = monster_size_crown_get(data->kind, id_b);
             draw_font_anim_idx(0x493, id, (s8*)entry->field_0x08, 4, &pos);
             draw_font_anim_idx(0x4A9, id, str_tbl_34_get(data->field_0x02), 0, &pos);
-            draw_monstericon_anim_idx(0x48E, data->kind, id, &pos);
+            draw_monstericon_anim_idx(0x48E, id, data->kind, &pos);
             item_page_draw_wrapped_text(0x483, id, (s8*)get_menu_msg(0, entry->field_0x06), &pos);
             switch (data->mode) {
             case 1:
@@ -542,12 +555,12 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
                     sprintf(text, "%6.1f", value_a);
                     draw_font_anim_idx(0x4AE, id, text, 2, &pos);
                     if ((u8)(res_a + 0xFF) <= 1) {
-                        sprite_frame_apply((_SPR_DATA_*)&bar, 0x4A6, id, NULL);
+                        sprite_frame_apply((_SPR_DATA_*)&spr, 0x4A6, id, NULL);
                         if (res_a == 2) {
-                            bar.pos.x += 0x14;
-                            bar.pos.y += 0x14;
+                            spr.uv0_u += 0x14;
+                            spr.uv1_u += 0x14;
                         }
-                        draw_sprite(*(_SPR_DATA_*)&bar, &pos);
+                        draw_sprite(*(_SPR_DATA_*)&spr, &pos);
                     }
                 } else {
                     draw_font_anim_idx(0x4AE, id, (s8*)((u8**)get_str_tbl(0x44))[2], 2, &pos);
@@ -567,10 +580,9 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
                 sprintf(text, "%d", limit_a);
                 draw_font_anim_idx(0x4AA, id, text, 0, &pos);
                 if (data->field_0x03 != 0) {
-                    sprite_frame_apply((_SPR_DATA_*)&bar, 0x49F, id, NULL);
-                    for (i = 0; i < data->field_0x03; i++) {
-                        draw_sprite(*(_SPR_DATA_*)&bar, &pos);
-                        bar.pos.x += bar.ofs_x;
+                    sprite_frame_apply((_SPR_DATA_*)&spr, 0x49F, id, NULL);
+                    for (s32 i = 0; i < data->field_0x03; i++, spr.pos.x += spr.width) {
+                        draw_sprite(*(_SPR_DATA_*)&spr, &pos);
                     }
                 }
                 break;
@@ -603,17 +615,17 @@ extern "C" void item_page_draw_detail2(MenuSlot* slot)
     SprWork spr;
     MenuEntry* entry;
     _mh_ivec2_ pos;
-    s8 text[0x10];
-    u8 id;
+    s8 text[8];
+    u16 id;
     u16 item_a;
     u16 item_b;
     ItemRec* item;
 
     if (slot->field_0x002 != 0 || slot->field_0x23B != 0) {
         id = slot->field_0x23B;
-        entry = &slot->entries_b[slot->scroll.row];
         sprite_frame_apply((_SPR_DATA_*)&spr, 0x4B0, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x56), id, &pos);
+        entry = &slot->entries_b[slot->scroll.row];
         if (entry->field_0x02 != 0) {
             item = (ItemRec*)lb_page_row_pair_get(entry->field_0x06, &item_a, &item_b, 0);
             if (item != NULL) {
@@ -629,7 +641,7 @@ extern "C" void item_page_draw_detail2(MenuSlot* slot)
                 sprite_frame_apply((_SPR_DATA_*)&spr, 0x4D7, id, NULL);
                 font_set_size(spr.width, spr.height);
                 flfntSetColor(spr.colour_0x1C);
-                font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s",
+                font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, (s8*)"%s",
                               ItemExp(item->id));
             }
         } else {
@@ -657,7 +669,7 @@ extern "C" void item_page_draw_column3(MenuSlot* slot)
     SprWork glyph;
     _mh_ivec2_ pos;
     _mh_ivec2_ posGlyph;
-    s32 has_glyph;
+    s8 has_glyph;
     u8* str;
     u8 base;
     u8 kind;
@@ -675,13 +687,16 @@ extern "C" void item_page_draw_column3(MenuSlot* slot)
             base = slot->kind_row_base[(kind - 1) * 2];
             switch (kind) {
             case 1:
-                str = (u8*)get_str_tbl(0x45)[(u8)(base + slot->field_0x01D)];
+                base += slot->field_0x01D;
+                str = (u8*)get_str_tbl(0x45)[base];
                 break;
             case 2:
-                str = (u8*)get_str_tbl(0x46)[(u8)(base + slot->field_0x01E)];
+                base += slot->field_0x01E;
+                str = (u8*)get_str_tbl(0x46)[base];
                 break;
             case 3:
-                str = (u8*)get_str_tbl(0x47)[(u8)(base + slot->field_0x01F)];
+                base += slot->field_0x01F;
+                str = (u8*)get_str_tbl(0x47)[base];
                 break;
             default:
                 str = NULL;
@@ -696,8 +711,9 @@ extern "C" void item_page_draw_column3(MenuSlot* slot)
         return;
     }
     kind = slot->field_0x2F5;
+    base = slot->kind_row_base[kind * 2];
     item_page_draw_closed_column(kind, (u8)(slot->scroll.rows_per_page * slot->scroll.col +
-                          (slot->kind_row_base[kind * 2] + slot->scroll.row)),
+                          (base + slot->scroll.row)),
                 slot->scroll.light_colour, slot->scroll.dark_colour, slot->field_0x23A, slot->field_0x008, 2);
 }
 
@@ -708,19 +724,19 @@ extern "C" void item_page_draw_closed_column(u8 kind, u8 index, s8 light, s8 dar
     SprWork spr;
     _mh_ivec2_ pos;
     _mh_ivec2_ posText;
-    u8** values = NULL;
+    u8** values;
     s8* value;
     s8 selected;
-    u8 blend;
 
     selected = item_page_option_row_index(kind, index, light);
     sprite_frame_apply((_SPR_DATA_*)&spr, 0x438, id, &pos);
     if (selected >= 0 && get_option_cfg(7) == 0) {
-        blend = flags & 0xFE;
+        flags &= 0xFE;
     } else {
-        blend = flags | 1;
+        flags |= 1;
     }
-    item_page_draw_option_frame(light, dark, arg5, 5, blend, &posText);
+    item_page_draw_option_frame(light, dark, arg5, 5, flags, &posText);
+    values = NULL;
     switch (kind) {
     case 2:
         values = get_str_tbl(0x47);
@@ -750,8 +766,8 @@ extern "C" s8 item_page_option_row_index(u8 kind, u8 index, s8 light)
 
     switch (kind) {
     case 2:
-        if (index >= 0x0C && index < 0x1A) {
-            row = index - 0x0C;
+        if (index >= 0x0C && 0x1A > index) {
+            row -= 0x0C;
             table = menu_row_limit_get(4);
         }
         break;
@@ -769,99 +785,102 @@ extern "C" s8 item_page_option_row_index(u8 kind, u8 index, s8 light)
  * config selects and two "same as the player's" tests; the status code the card colours by goes to `out`. */
 extern "C" s8* item_page_option_value_string(u8 kind, u8 index, s8 light, s8* out)
 {
-    u8** head = get_str_tbl(0x49);
-    u8** table = NULL;
+    u8** head;
+    u8** table;
     u8** variant_a = NULL;
     u8** variant_b = NULL;
     u8** chosen;
     s8* value;
     u8 row = index;
-    u8 status;
-    u32 cfg;
+    s8 status;
 
+    head = get_str_tbl(0x49);
     if (head == NULL) {
         if (out != NULL) {
             *out = -1;
         }
         return NULL;
     }
-    if (kind > 1) {
-        switch (kind) {
-        case 2:
-            table = get_str_tbl(0x4A);
-            if (index >= 0x0C && index < 0x1A) {
-                row = index - 0x0C;
-                variant_a = get_str_tbl(0x4B);
-                variant_b = get_str_tbl(0x4C);
-            }
-            break;
-        case 3:
-            table = get_str_tbl(0x4D);
-            variant_a = get_str_tbl(0x4E);
-            variant_b = get_str_tbl(0x4F);
-            break;
-        default:
-            if (out != NULL) {
-                *out = -1;
-            }
-            return NULL;
+    switch (kind) {
+    case 0:
+    case 1:
+        if (out != NULL) {
+            *out = 4;
         }
-        cfg = get_option_cfg(7);
-        switch (cfg) {
-        case 0:
+        return NULL;
+    case 2:
+        table = get_str_tbl(0x4A);
+        if (index >= 0x0C && 0x1A > index) {
+            row -= 0x0C;
+            variant_a = get_str_tbl(0x4B);
+            variant_b = get_str_tbl(0x4C);
+        }
+        break;
+    case 3:
+        table = get_str_tbl(0x4D);
+        variant_a = get_str_tbl(0x4E);
+        variant_b = get_str_tbl(0x4F);
+        break;
+    default:
+        if (out != NULL) {
+            *out = -1;
+        }
+        return NULL;
+    }
+    switch (get_option_cfg(7)) {
+    case 0:
+        chosen = (u8**)table[index];
+        status = 1;
+        break;
+    case 2:
+        if (variant_a == NULL) {
             chosen = (u8**)table[index];
             status = 1;
-            break;
-        case 2:
-            if (variant_a == NULL) {
+        } else {
+            chosen = (u8**)variant_a[row];
+            value = (s8*)chosen[light];
+            if (strcmp(value, (const s8*)head[0]) == 0) {
                 chosen = (u8**)table[index];
                 status = 1;
+            } else if (strcmp(value, (const s8*)head[1]) == 0) {
+                chosen = NULL;
+                status = 0;
             } else {
-                chosen = (u8**)variant_a[row];
-                value = (s8*)chosen[light];
-                if (strcmp(value, (const s8*)head[0]) == 0) {
-                    chosen = (u8**)table[index];
-                    status = 1;
-                } else if (strcmp(value, (const s8*)head[1]) == 0) {
-                    chosen = NULL;
-                    status = 0;
-                } else {
-                    status = 2;
-                }
+                status = 2;
             }
-            break;
-        case 1:
-            if (variant_b == NULL) {
+        }
+        break;
+    case 1:
+        if (variant_b == NULL) {
+            chosen = (u8**)table[index];
+            status = 1;
+        } else {
+            chosen = (u8**)variant_b[row];
+            value = (s8*)chosen[light];
+            if (strcmp(value, (const s8*)head[0]) == 0) {
                 chosen = (u8**)table[index];
                 status = 1;
+            } else if (strcmp(value, (const s8*)head[1]) == 0) {
+                chosen = NULL;
+                status = 0;
             } else {
-                chosen = (u8**)variant_b[row];
-                value = (s8*)chosen[light];
-                if (strcmp(value, (const s8*)head[0]) == 0) {
-                    chosen = (u8**)table[index];
-                    status = 1;
-                } else if (strcmp(value, (const s8*)head[1]) == 0) {
-                    chosen = NULL;
-                    status = 0;
-                } else {
-                    status = 3;
-                }
+                status = 3;
             }
-            break;
-        default:
-            chosen = NULL;
-            status = 0xFF;
-            break;
         }
-        if (out != NULL) {
-            *out = status;
-        }
-        return (chosen != NULL) ? (s8*)chosen[light] : NULL;
+        break;
+    default:
+        chosen = NULL;
+        status = -1;
+        break;
     }
     if (out != NULL) {
-        *out = 4;
+        *out = status;
     }
-    return NULL;
+    value = NULL;
+    if (chosen != NULL) {
+        value = (s8*)chosen[light];
+    }
+    return value;
 }
 
 /* 0x8034BEF4: the "closed" season card - the frame row, the two arrow columns and the value glyph. */
@@ -869,17 +888,17 @@ extern "C" void item_page_draw_option_frame(s8 a, s8 b, u16 c, u16 d, u8 flags, 
 {
     SprWork spr;
     u32 glyph;
-    u8 arrow = 3;
+    s32 arrow = 3;
 
     sprite_frame_apply((_SPR_DATA_*)&spr, 0x4FE, d, pos);
     draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x5A), d, pos);
     if ((flags & 8) == 0) {
         if ((flags & 4) != 0) {
-            arrow = 3 | 0x80;
+            arrow |= 0x80;
         }
         PutPageArrow((u16*)get_menu_lsp_tbl(0x5B), a, b, c, pos, arrow);
     }
-    glyph = (flags & 1) ? 0x51E : 0x51B;
+    glyph = ((flags & 1) == 0) ? 0x51B : 0x51E;
     draw_sprite_anim_idx(glyph, d, pos);
 }
 

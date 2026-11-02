@@ -59,9 +59,9 @@ void menu_monster_list_build(MenuScroll* scroll, MenuEntry* rows);              
 void item_page_fill_rows(MenuSlot* slot);                                    /* 0x80349E30 */
 void item_page_update_rows(MenuSlot* slot, u16 buttons);                       /* 0x80349F8C */
 void item_page_draw(MenuSlot* slot);                                    /* 0x80349FF0 */
-void item_page_draw_page_arrow(u16* table, u32 id, s32 flag, _mh_ivec2_* pos); /* 0x8034A398 */
+void item_page_draw_page_arrow(u16* table, u16 id, s32 flag, _mh_ivec2_* pos); /* 0x8034A398 */
 void item_page_draw_page_widget(s8 page, _mh_ivec2_* pos);                          /* 0x8034A448 */
-void item_page_draw_rows(MenuEntry* entries, u8 sel, u8 count, u8 id, u8 id2, u8 first, u8 blend);
+void item_page_draw_rows(MenuEntry* entries, u8 sel, u8 count, u8 id, u8 id2, s8 first, u8 blend);
 void item_page_draw_blank_rows(MenuEntry* entries, u8 sel, u8 count, u8 id, u8 id2);
 u32 item_page_item_price(MenuSlot* slot, u16 id);                             /* 0x8034A814 */
 void item_page_draw_detail0(MenuSlot* slot);                                    /* 0x8034A914 */
@@ -88,17 +88,16 @@ extern "C" {
 #endif
 
 void sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out); /* 0x802E0AD4, hud/layout.cpp */
-void draw_monstericon_anim_idx(u16 id, u16 part, u16 arg2, const _mh_ivec2_* pos);
+u32 draw_monstericon_anim_idx(u16 id, u16 part, u8 tex_idx, const _mh_ivec2_* pos);
 void draw_font_anim_idx(u32 id, u32 part, s8* text, u8 flag, const _mh_ivec2_* pos);
 u32 color_lerp(u32 value, u32 mask);
-void menu_select_window_draw(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
+void menu_select_window_draw(u8 sel, u8 count, s8** texts, const _mh_ivec2_* pos, s16* flags); /* menu/menu_message.cpp */
 u8 GameMode_ck(void);
 u16 userdata_box_capacity(void* userdata);
 s32 userdata_pouch_size(u8 idx);
 void* userdata_pouch_get(void* userdata, u8 idx);
 u32 item_count_find(u16 id, void* a, s32 b);
 u32 userdata_item_count_total(u16 id, void* userdata);
-u32 item_slots_count_sum(u16 id, void* a, u16 b);
 u8 monster_size_crown_get(u8 a, u16 b);
 MenuRowData* userdata_item_rows_get(void);
 char* flfntStrChr(char* text, s32 c);   /* owner: `g3d/g3d_anmchr.cpp` */
@@ -113,18 +112,17 @@ s8* str_tbl_34_get(u8 idx);
 u16* lb_page_row_pair_get(u16 a, u16* b, u16* c, u16 d);
 s8 lb_combo_rate_get(void* a, u16 b);
 u32 lb_combo_rate_sprintf(void* a, void* b);
-void* get_userdata(void);
 
 /* The lobby item database `item_page_item_price` reads the price block out of: a 4-byte pointer at
  * `.sbss:0x80794880`, loaded through sda21.  Only the two offsets this unit names are fields.
- * size: 0x3F06 (approximate: the highest offset this unit touches + 2) */
+ * size: 0x3F08 (approximate: the highest offset this unit touches + 4) */
 typedef struct LbItemDb {
     /* +0x0000 */ u8 unused_0x0000[0x0018];
     /* +0x0018 */ s32 money_0x0018;    /* the money `score_add_clamped` adds a sale to */
     /* +0x001C */ u8 unused_0x001C[0x0180 - 0x001C];
     /* +0x0180 */ u8 field_0x0180;     /* the sub-block `item_slots_count_sum` is handed */
     /* +0x0181 */ u8 unused_0x0181[0x3F04 - 0x0181];
-    /* +0x3F04 */ u16 field_0x3F04;    /* the value the "%d" price line prints */
+    /* +0x3F04 */ s32 field_0x3F04;    /* the value the "%d" price line prints */
 } LbItemDb;
 extern LbItemDb* lobby_world_block;
 
@@ -155,7 +153,6 @@ void draw_sprite_ary(const u16* ids, const _mh_ivec2_* pos);
 void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos);
 void font_set_size(s16 w, s16 h);
 s32 chk_pointer(void);
-s32 spr_data_copy(s16* dst, void* src);
 u8 get_option_cfg(u8 index);
 
 /* `lobby/lb_pane_ui.cpp`'s page arrow and the menu band's own text helpers. */
@@ -164,7 +161,7 @@ u8** get_str_tbl(s32 idx);
 void set_blendmode(u8 a, u8 b, u8 c);
 void flfntSetColor(u32 colour);
 void font_flush(void);
-void font_print_ex(s16 x, s16 y, s16 flag, const char* fmt, ...);
+void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
 u32 GetEquipName(u8 kind, u16 id);
 
 
