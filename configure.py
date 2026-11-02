@@ -1331,7 +1331,7 @@ config.libs = [
             Object(Matching, "OS/OSError.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSExec.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSFatal.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSFont.c", cflags=cflags_base),
+            Object(Matching, "OS/OSFont.c", cflags=cflags_base),
             Object(Matching, "OS/OSInterrupt.c", cflags=cflags_base),
             Object(Matching, "OS/OSLink.c", cflags=cflags_base),
             Object(Matching, "OS/OSMessage.c", cflags=cflags_base),
@@ -1553,7 +1553,7 @@ config.libs = [
             Object(NonMatching, "USB/usb.cpp", cflags=cflags_base),
             Object(NonMatching, "VI/vi.cpp", cflags=cflags_base),
             Object(NonMatching, "VI/i2c.cpp", cflags=cflags_base),
-            Object(NonMatching, "VI/vi3in1.cpp", cflags=cflags_base),
+            Object(Matching, "VI/vi3in1.cpp", cflags=cflags_base),
             Object(NonMatching, "WENC/wenc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp", cflags=cflags_base),
             # -fp_contract off: fused-op evidence on the FLAGS line of src/WPAD/WPADHIDParser.cpp
