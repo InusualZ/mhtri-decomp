@@ -139,7 +139,7 @@ public:
     /* slot +0x09C */ virtual void confirm();
     /* slot +0x0A0 */ virtual void cancel();
     /* slot +0x0A4 */ virtual void switchLayoutMode(u32 mode);
-    /* slot +0x0A8 */ virtual u8 getKeyChangeMode() { return mKeyChangeMode; }
+    /* slot +0x0A8 */ virtual BOOL getKeyChangeMode() { return mKeyChangeMode; }
     /* slot +0x0AC */ virtual void setKeyChangeMode(u8 mode);
     /* slot +0x0B0 */ virtual nw4r::lyt::Pane* findUpNode();
     /* slot +0x0B4 */ virtual nw4r::lyt::Pane* findDownNode();

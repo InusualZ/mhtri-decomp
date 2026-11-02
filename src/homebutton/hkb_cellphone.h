@@ -19,6 +19,7 @@
 #include "homebutton/hkb_drawinfo.h"
 #include "homebutton/hkb_resource_accessor.h"
 #include "homebutton/tiHKBManager.h"
+#include "homebutton/hbm_kb_list.h"
 
 /* --------------------------------------------------------------------------------------------- */
 /* Records                                                                                         */
@@ -106,14 +107,6 @@ struct HkbSwitchArg {
 /* Views of layout objects this unit only calls                                                    */
 /* --------------------------------------------------------------------------------------------- */
 
-/* The keyboard's input switch (HkbKeyboardView::getInput). size: 0x4 (view) */
-class HkbKeyboardInput {
-public:
-    virtual void v_0x08();
-    virtual void v_0x0C();
-    virtual BOOL isActive();              /* +0x10 */
-};
-
 /* The keyboard's predictive-input state (HkbKeyboardView::getPredictor). size: 0x4 (view) */
 class HkbKeyboardPredictor {
 public:
@@ -135,52 +128,6 @@ public:
     virtual void v_0x44();
     virtual BOOL isOpen();                /* +0x48 */
     virtual void setOpen(u8 on);          /* +0x4C */
-};
-
-/* The keyboard's conversion state (HkbKeyboardView::getConverter). size: 0x4 (view) */
-class HkbKeyboardConverter {
-public:
-    virtual void v_0x08();
-    virtual void v_0x0C();
-    virtual void v_0x10();
-    virtual void v_0x14();
-    virtual void v_0x18();
-    virtual void v_0x1C();
-    virtual void v_0x20();
-    virtual void v_0x24();
-    virtual void v_0x28();
-    virtual void v_0x2C();
-    virtual void v_0x30();
-    virtual void v_0x34();
-    virtual void v_0x38();
-    virtual void v_0x3C();
-    virtual void v_0x40();
-    virtual void v_0x44();
-    virtual void v_0x48();
-    virtual void v_0x4C();
-    virtual void v_0x50();
-    virtual void v_0x54();
-    virtual void v_0x58();
-    virtual void v_0x5C();
-    virtual void v_0x60();
-    virtual void v_0x64();
-    virtual void v_0x68();
-    virtual void v_0x6C();
-    virtual void v_0x70();
-    virtual void v_0x74();
-    virtual void v_0x78();
-    virtual void v_0x7C();
-    virtual void v_0x80();
-    virtual void v_0x84();
-    virtual void v_0x88();
-    virtual void v_0x8C();
-    virtual void v_0x90();
-    virtual void v_0x94();
-    virtual void v_0x98();
-    virtual void v_0x9C();
-    virtual void v_0xA0();
-    virtual void setBusy(u8 on);          /* +0xA4 */
-    virtual BOOL isBusy();                /* +0xA8 */
 };
 
 /* The keyboard's composition state (HkbKeyboardView::getComposer). size: 0x4 (view) */
@@ -306,7 +253,7 @@ public:
     virtual void v_0x8C();
     virtual void v_0x90();
     virtual void v_0x94();
-    virtual HkbKeyboardInput* getInput();             /* +0x98 */
+    virtual HbmKbList* getInput();                    /* +0x98 */
 };
 
 /* --------------------------------------------------------------------------------------------- */
@@ -367,8 +314,8 @@ public:
 
 class HkbCellphoneKeypad;
 
-/* The pane controller whose events the pane listener receives; the slots it never calls are named by offset.
- * size: 0xA0 (view: only the pane at +0x9C is read) */
+/* The pane controller whose events the pane listener receives (tiHKBManager.cpp's HkbGuiPaneComponent); the slots
+ * it never calls are named by offset. size: 0xA0 (view: the per-channel state at +0x80 and the pane at +0x9C) */
 class HkbPaneController {
 public:
     virtual void v_0x08();
@@ -393,9 +340,13 @@ public:
     virtual void v_0x54();
     virtual void v_0x58();
     virtual void v_0x5C();
-    virtual void release(u32 channel, s32 flag);          /* +0x60 */
+    virtual void release(u32 channel, s32 state) {        /* +0x60 */
+        mChannelState[channel] = state;
+    }
 
-    u8 pad_0x04[0x98];                                    /* +0x04 */
+    u8 pad_0x04[0x7C];                                    /* +0x04 */
+    u16 mChannelState[8];                                 /* +0x80 */
+    u8 pad_0x90[0xC];                                     /* +0x90 */
     nw4r::lyt::Pane* mPane;                               /* +0x9C */
 };
 

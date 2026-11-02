@@ -32,14 +32,20 @@
  * SHAPES. The class declaration order (input, pane listener, key button, tag button, keypad) gives retail's vtable
  *   order in .data (keypad 0x8064E51C, tag button, key button, pane listener, input 0x8064E6C0), so the
  *   emission-order seam datagap reports at 0x8064E650 is the keypad/tag-button vtable pair inside this one TU.
- * RESIDUALS. onKeyRelease (0x805417D8, 0x350) unwritten: it walks homebutton/tiHKBManager.cpp's HkbKeyIter cursor
- *   (hkbKeyIterBeginWord1/3, hkbKeyIterSeek, hkbGetModifierState, hkbKeyIterGetUsage, hkbKeyIterGetChar,
- *   hkbKeyIterValid); its .data literal "W_CPkey_DELETE" (0x8064E4D0) is missing with it, so the
- *   .data from 0x8064E4D0 sits 0x10 B early and the thunk order differs (retail: dtor, sync, onKeys, open, close,
- *   reset).
- * RESIDUALS. Unwritten: 0x80541B28 (0x8, returns the byte +0xC0 of a class whose tables are
- *   homebutton/hbm_kb_list.cpp's and homebutton/hbm_value.cpp's) and 0x8054243C (0x10, stores a u16 at +0x80 +
- *   2*index of a class whose tables are homebutton/tiHKBManager.cpp's); neither class is reconstructed.
+ * SHAPES. The keyboard's +0x98 object is homebutton/hbm_kb_list.h's HbmKbList: onKeyRelease's call of its inline
+ *   getKeyChangeMode (a word return: retail tests it with `cmpwi`) makes MWCC emit the kept copy 0x80541B28 after
+ *   it (and updateSpaceKey's call of the inline getLayoutMode a weak copy retail's linker drops for
+ *   homebutton/hkb_keyboard.cpp's); the pane listener's call of the controller's inline release emits the kept copy
+ *   0x8054243C after onPaneEvent.
+ * NAMES. GUESS: HkbPaneController::release and mChannelState (0x8054243C stores the u16 argument at +0x80 + 2*channel;
+ *   the class is tiHKBManager.cpp's HkbGuiComponent, whose slot 0x60 it fills).
+ * RESIDUALS. Weak copies retail's object does not carry: HbmPaneHandler's and HbmEventHandler's inline destructors
+ *   and HbmKbListBase::getLayoutMode (the kept copies are earlier units'); .text is 136 B larger than retail's.
+ * RESIDUALS. The `subi 0x34` thunks come out in the reverse of HbmPaneManager's slot order (onKeyRelease,
+ *   updateComponents, drawComponents, calcComponents, init, dtor); retail's are dtor, updateComponents, onKeyRelease,
+ *   drawComponents, calcComponents, init; the override declaration order does not move them.
+ * RESIDUALS. .data 0x8064E748..0x8064E760 and .sdata2 0x8079D625..0x8079D628 are zero alignment fill the claim
+ *   covers and this object does not emit (24 B and 3 B).
  * RESIDUALS. HkbCellphoneInput::onPaneEvent (0x8053E968): the register allocator swaps name/backward (r27/r28 vs ours
  *   r28/r30) and the counter/base pairs of the inlined findKey loops; no declaration-order or helper-signature
  *   variant moved it.
@@ -495,7 +501,7 @@ void HkbCellphoneInput::setAltMode(BOOL on) {
 /* 0x8053F584 (0xD8): Posts whether the space key types a full-width space (the kana modes of the Japanese
  * layout). */
 void HkbCellphoneInput::updateSpaceKey() {
-    if (keyboard->getInput() == NULL || !keyboard->getInput()->isActive()) {
+    if (keyboard->getInput() == NULL || !keyboard->getInput()->getLayoutMode()) {
         switch (getLayoutType()) {
         case 0:
             HkbSwitchArg wide = {0};
@@ -982,6 +988,67 @@ void HkbCellphoneKeypad::latchCaps(u8 on) {
     if (getLayoutType() == 0) {
         caps = on;
     }
+}
+
+/* 0x805417D8 (0x350): Puts the released keys back to their first frame; while the keyboard converts, a released
+ * key commits the pending key and ends the conversion instead. */
+s32 HkbCellphoneKeypad::onKeyRelease(HkbManager* manager) {
+    if (keyboard->getInput()->getKeyChangeMode()) {
+        HkbKeyIter first = hkbKeyIterBeginWord1(manager);
+        if (hkbKeyIterValid(&first)) {
+            if (pending_key != NULL) {
+                HkbPaneEvent event = {pending_key->name};
+                onPaneEvent(1, (const char*)&event);
+            }
+            clearButtons();
+            keyboard->getInput()->switchLayoutMode(1);
+            if (!keyboard->getPredictor()->isOpen()) {
+                keyboard->getPredictor()->setOpen(1);
+            }
+        }
+    } else {
+        HkbKeyIter it = hkbKeyIterBeginWord1(manager);
+        while (hkbKeyIterValid(&it)) {
+            HbmKey* pAnim = NULL;
+            u8 usage = hkbKeyIterGetUsage(&it);
+            u16 c = hkbKeyIterGetChar(&it);
+            switch (usage) {
+            case 0x58:
+            case 0x28:
+                if (!(hkbGetModifierState(manager) & 4)) {
+                    pAnim = getPaneAnim("W_CPkey_LF");
+                }
+                break;
+            default:
+                pAnim = getKeyAnim(c);
+                break;
+            }
+            if (pAnim != NULL) {
+                pAnim->setAnim(0);
+            }
+            it = hkbKeyIterSeek(&it);
+        }
+        it = hkbKeyIterBeginWord3(manager);
+        while (hkbKeyIterValid(&it)) {
+            HbmKey* pAnim = NULL;
+            u8 usage = hkbKeyIterGetUsage(&it);
+            hkbKeyIterGetChar(&it);
+            switch (usage) {
+            case 0x2A:
+                if (hkbGetModifierState(manager) & 4) {
+                    break;
+                }
+            case 0x4C:
+                pAnim = getPaneAnim("W_CPkey_DELETE");
+                break;
+            }
+            if (pAnim != NULL) {
+                pAnim->setAnim(0);
+            }
+            it = hkbKeyIterSeek(&it);
+        }
+    }
+    return 0;
 }
 
 /* 0x80541B30 (0x1C): Enters a state and plays its animation (state 7 plays the focus-out one). */
