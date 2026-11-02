@@ -1590,7 +1590,7 @@ config.libs = [
             Object(NonMatching, "nw4r/db_assert.cpp"),
             Object(Matching, "nw4r/math_arithmetic.cpp"),
             Object(NonMatching, "nw4r/math_triangular.cpp"),
-            Object(NonMatching, "nw4r/math_types.cpp"),
+            Object(Matching, "nw4r/math_types.cpp"),
             Object(NonMatching, "nw4r/math_geometry.cpp"),
             Object(Matching, "nw4r/ut_list.cpp"),
             Object(Matching, "nw4r/ut_LinkList.cpp"),
