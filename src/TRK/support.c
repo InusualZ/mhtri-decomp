@@ -12,10 +12,11 @@
  *    `TRKSupportReply` and their fields are GUESS from the offsets the bodies fill and read.
  * EVIDENCE. `.data` 0x8060F710 (`bad reply size`, `failed in RequestSend`) is read only by `TRK_RequestSend`; the four
  *    request builders are called only from `TRKTargetSupportRequest`.
- * RESIDUALS. `TRKSuppAccessFile` keeps the error code in r20 and the reply's file status in r23 where the target has r23/r20
- *    (register allocation only; a hill-climb over the local declaration order and `u8`/`u16` reply locals did not swap them).
+ * RESIDUALS. none: every row and both sections are byte-identical to the target (the 7 B `.data` tail is alignment fill).
  * SHAPES. the local declaration order is the register order the target allocates (`TRK_RequestSend`, `TRKSuppCloseFile`,
- *    `TRKSuppAccessFile`); `TRK_RequestSend` leaves its status uninitialised, so the -1 the loop stores shares r31 with it.
+ *    `TRKSuppAccessFile`: `err` is declared first so it is coloured first and takes r23, and `reply_io` is a `u8` so the
+ *    narrowed host status is the named local the allocator gives r20, not a conversion temporary coloured ahead of `err`);
+ *    `TRK_RequestSend` leaves its status uninitialised, so the -1 the loop stores shares r31 with it.
  *    Every request fills a 0x40 B packet, appends it (and any payload) to a free buffer and sends it; a reply is
  *    a buffer whose command byte is 0x80 or more, anything below is a debugger command and is forwarded as input.
  */
@@ -85,10 +86,10 @@ s32 TRKStringLength(const char* text)
 
 s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, s32 need_reply, s32 is_read)
 {
+    s32 err;
     TRKBuffer* reply;
     u32 chunk;
-    s32 err;
-    u32 reply_io;
+    u8 reply_io;
     u32 reply_count;
     u32 offset;
     s32 done;
@@ -136,7 +137,7 @@ s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, s32 need
                     reply = TRKGetBuffer(reply_id);
                 }
                 reply_count = ((TRKSupportReply*)reply->data)->count;
-                reply_io = (u8)((TRKSupportReply*)reply->data)->io_result;
+                reply_io = ((TRKSupportReply*)reply->data)->io_result;
                 if (is_read && err == 0 && reply_count <= chunk) {
                     TRK_SetBufferPosition(reply, TRK_PACKET_SIZE);
                     err = TRKReadBuffer_ui8(reply, data + offset, reply_count);
