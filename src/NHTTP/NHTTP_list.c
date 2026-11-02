@@ -20,10 +20,10 @@
  *     and a `BOOL` local all give `cntlzw` or `or`/`srwi`/`subi`).
  *   - `NHTTPi_BufferFullCallback`/`NHTTPi_RecvCallback` declare the three words in field order and read them
  *     back to front, which gives retail's register colouring.
- * RESIDUALS.
- *   - `NHTTPi_PostSendCallback`: register colouring (`result`/`arg1` take each other's r29/r31; reading the
- *     two words back to front gains a little, no declaration order more).
- *   - flip blocker: `NHTTPi_PostSendCallback` (8 bytes); flipcheck does not list the map row `lbl_8076317A`.
+ *   - `NHTTPi_PostSendCallback` copies the two words the callback hands back into its own locals
+ *     (`postData`/`postLength`, declared first) instead of reassigning `arg1`/`arg2`: the parameters then keep
+ *     r31/r30 and `result` colours r29 (reassigning the parameters swaps `result` and `arg1`).
+ * RESIDUALS. none; the map row `lbl_8076317A` is a label inside `NHTTPi_systemInfo` no relocation names.
  */
 
 #include "NHTTP/d_nhttp.h"
@@ -208,6 +208,8 @@ s32 NHTTPi_GetConnectionListLength(void) {
  * words it may have updated back.  Answers the callback's own value, or -1 when there is nothing to
  * report. */
 s32 NHTTPi_PostSendCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection, u32 arg1, u32 arg2) {
+    u32 postData;
+    u32 postLength;
     NHTTPCallbackArgs args;
     NHTTPConnection* node;
     NHTTPResponse* response;
@@ -222,12 +224,12 @@ s32 NHTTPi_PostSendCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection, 
             args.field_0x08 = connection->postLength;
             args.field_0x0C = arg2;
             result = connection->callback(connection, 1, &args);
-            arg2 = args.field_0x08;
-            arg1 = args.field_0x04;
+            postLength = args.field_0x08;
+            postData = args.field_0x04;
             node = NHTTPi_ControlConnectionList(mutex, connection, NHTTPI_LIST_GET);
             if (node != NULL) {
-                node->postData = arg1;
-                node->postLength = arg2;
+                node->postData = postData;
+                node->postLength = postLength;
             }
         }
     }
