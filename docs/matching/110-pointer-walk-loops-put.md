@@ -24,7 +24,11 @@ delete, so a near-100 row (99.4-99.7 %) carries nothing else.
 
 **Result.** `menu/menu_result`: `q_result_items_left_ck` 99.71, `q_result_delivery_left_ck` 99.52,
 `q_result_sell_total_get` 99.39, `q_result_items_sell` 99.46, `q_result_equip_cells_fill` 99.49 -> all 100;
-`multi_box_phase_input` 98.79 -> 98.83 (the `for (...; i++, rec++)` form).
+`multi_box_phase_input` 98.79 -> 98.83 (the `for (...; i++, rec++)` form). `menu/menu_item_page`:
+`item_page_draw_rows` 99.63 -> 100 and `item_page_draw_blank_rows` 99.70 -> 100 with `for (i = 0; i < count; i++,
+entries++)` beside an indexed table (idea 111): the derived induction pointer's `addi` is emitted before the
+counter's, and the header's `entries++` after it (retail `addi r31,2; addi r30,1; addi r27,0x18`); a trailing
+`entries++` in the body comes out before both.
 
 **Example.**
 

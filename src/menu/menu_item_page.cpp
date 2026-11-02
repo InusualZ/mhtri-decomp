@@ -10,14 +10,14 @@
  *   TU's) and its calls are the menu UI helpers.  No `__FILE__` string covers the range and the dump answers `zz_`, so the
  *   file name and all 22 symbol names are GUESSes from the bodies, in the `menu_*` family's scheme; so is what each page
  *   shows (0 the item's detail panel, 1 the row's damage/quality block, 2 the item card, 3 the option/season card).
- * RESIDUALS. 2 partial rows (the other 20 are byte-identical):
- *  - `item_page_draw_rows`/`item_page_draw_blank_rows`: `li r30,0` (the loop counter) is scheduled one slot later than
- *    retail's, after the `row_id` copy of `get_menu_lsp_tbl`'s result (split init, `for`-init comma form, `while`,
- *    `(s32)count` and every declaration order measured, none moves it);
- *  - `item_page_draw` keeps a scoped `#pragma optimization_level 4` (the `case 1` arm's inner switch is retail's
- *    `subi`+`cmplwi` range test only at level 4; file-wide level 4 costs `item_page_draw_detail0` 0.96 B).
- *   flipcheck: `.text` 28 of 8940 bytes differ (the two rows above), every section size equal.
- * SHAPES. A `u8` value passed to a `u16` parameter costs a `clrlwi` retail does not have: the detail draws keep the
+ * RESIDUALS. none: every row is byte-identical and every section size equal.  `item_page_draw` keeps a scoped
+ *   `#pragma optimization_level 4` (the `case 1` arm's inner switch is retail's `subi`+`cmplwi` range test only at
+ *   level 4; file-wide level 4 costs `item_page_draw_detail0` 0.96 B).
+ * SHAPES. `item_page_draw_rows`/`item_page_draw_blank_rows` index the row-id table (`row_tbl[first + i]` / `row_tbl[i]`)
+ *   and step `entries` in the `for` header after `i` (ideas 111 and 110): the table pointer is then a strength-reduced
+ *   induction variable, so its `extsb`/`slwi`/`add r31` (or `mr r31,r3`) is emitted after the counter's `li r30,0`
+ *   and its `addi r31,r31,2` before `addi r30,r30,1`; a pointer the source steps itself puts both the other way.
+ *  - A `u8` value passed to a `u16` parameter costs a `clrlwi` retail does not have: the detail draws keep the
  *   frame index in a `u16` local. The `MenuRowData` record declares `kind` `s32`: retail's `switch (data->kind)` is a signed binary search; `u32`
  *   gives an unsigned linear chain.
  *  - `item_page_item_price`, `userdata_item_count_total`, `item_count_find` and `pl_item_page2_ck` are `u32` in this unit's
@@ -275,13 +275,13 @@ extern "C" void item_page_draw_rows(MenuEntry* entries, u8 sel, u8 count, u8 id,
     SprWork row;
     SprWork text;
     _mh_ivec2_ ofs;
-    u16* row_id;
+    u16* row_tbl;
     s32 i;
 
     sprite_frame_apply((_SPR_DATA_*)&row, 0x438, id, &ofs);
-    row_id = &((u16*)get_menu_lsp_tbl(0x52))[first];
-    for (i = 0; i < count;) {
-        sprite_frame_apply((_SPR_DATA_*)&row, *row_id, id, NULL);
+    row_tbl = (u16*)get_menu_lsp_tbl(0x52);
+    for (i = 0; i < count; i++, entries++) {
+        sprite_frame_apply((_SPR_DATA_*)&row, row_tbl[first + i], id, NULL);
         row.pos.x += ofs.x;
         row.pos.y += ofs.y;
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x50), id, &row.pos);
@@ -296,9 +296,6 @@ extern "C" void item_page_draw_rows(MenuEntry* entries, u8 sel, u8 count, u8 id,
             text.colour_0x1C = 0xBE5F1BFF;
         }
         draw_font(*(_SPR_DATA_*)&text, (s8*)entries->field_0x08, 0, &row.pos);
-        row_id++;
-        i++;
-        entries++;
     }
 }
 
@@ -309,14 +306,14 @@ extern "C" void item_page_draw_blank_rows(MenuEntry* entries, u8 sel, u8 count, 
     SprWork row;
     SprWork text;
     _mh_ivec2_ ofs;
-    u16* row_id;
+    u16* row_tbl;
     s32 i;
 
     sprite_frame_apply((_SPR_DATA_*)&row, 0x438, id, &ofs);
-    row_id = (u16*)get_menu_lsp_tbl(0x52);
-    for (i = 0; i < count;) {
+    row_tbl = (u16*)get_menu_lsp_tbl(0x52);
+    for (i = 0; i < count; i++, entries++) {
         if (i == 0 || entries->field_0x02 != 0) {
-            sprite_frame_apply((_SPR_DATA_*)&row, *row_id, id, NULL);
+            sprite_frame_apply((_SPR_DATA_*)&row, row_tbl[i], id, NULL);
             row.pos.x += ofs.x;
             row.pos.y += ofs.y;
             draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x50), id, &row.pos);
@@ -338,9 +335,6 @@ extern "C" void item_page_draw_blank_rows(MenuEntry* entries, u8 sel, u8 count, 
                 draw_font(*(_SPR_DATA_*)&text, (s8*)entries->field_0x08, 0, &row.pos);
             }
         }
-        row_id++;
-        i++;
-        entries++;
     }
 }
 

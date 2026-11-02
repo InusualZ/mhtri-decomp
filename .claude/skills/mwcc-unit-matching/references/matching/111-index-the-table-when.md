@@ -38,7 +38,14 @@ walked the pointer in the source; here it indexed.
 index form alone left a register rename that only the re-tried declaration order closed. `menu/menu_placeinfo`:
 `placeinfo_page12_draw` 98.19 -> 100 (`placeinfo_award_icons[i]`, `cells[offset + i]`), `lb_city_member_page_set`
 93.86 -> 100 (`&work->members[index]` per iteration), `placeinfo_world_draw` 99.10 -> 99.78 (`rows[i]`); the
-same rewrite measured *worse* on `lb_city_list_draw`/`_ex_draw` (96.7 -> 95.7), whose target walks the pointer.
+same rewrite measured *worse* on `lb_city_list_draw`/`_ex_draw` (96.7 -> 95.7), whose target walks the pointer. `menu/menu_item_page`: `item_page_draw_rows` 97.73 -> 99.63 and
+`item_page_draw_blank_rows` 98.18 -> 99.70 (-> 100 with idea 110 for the loop tail) - here the indexed base is a *call
+result* plus an `s8` offset, `row_tbl = get_menu_lsp_tbl(0x52); ... row_tbl[first + i]`, in place of
+`row_id = &tbl[first]; ... *row_id; row_id++`. The compiler debugger pins where the order is decided: in the first
+complete PCode dump (before any backend pass) the stepped pointer reads `mr row_id,r3; li i,0`, while the indexed form
+reads `mr row_tbl,r3; li i,0; mr iv,row_tbl` - the induction pointer is created by the front-end optimiser after the
+counter's init, and `loop-code-motion`/`loop-strength-reduction`/the scheduler never reorder it. A statement-order or
+declaration-order search around a stepped pointer therefore cannot reach retail's `li` slot.
 
 **Example.**
 
