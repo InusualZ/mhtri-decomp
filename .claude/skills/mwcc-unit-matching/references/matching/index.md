@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (255)
+## Ideas that work (257)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -264,6 +264,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 275 | [Two backward heads from one case: nest the 252 loops, break re-enters the outer head, and a case lands past a head's prefix with if (0) { case X: } else { prefix }](275-two-backward-heads-from.md) | works | source-shape | Retail's switch has two shared tails each sitting after a case's own code and each entered backwards from many later cases (some cases jump to one, some to the other, one case to both); idea 252's single loop re-enters... |
 | 276 | [Crossing backward branches: head the later target's loop, duplicate the earlier one once, and let a nested re-entry loop's exits fall to an inert test](276-crossing-backward-branches-head.md) | works | source-shape | Retail has two backward branches into two different blocks of one case (steps 3/4 back into step 1's check, step 6 back into step 2's success block) whose loop intervals cross; the goto-free source repeats both blocks... |
 | 277 | [A loop whose last test leaves: if (c) break; else continue; keeps retail's bne exit; b head](277-loop-whose-last-test.md) | works | source-shape | A for (;;) that ends with a conditional exit compiles to `beq head; b exit` where retail has `bne exit; b head` - one opcode and the back edge differ, and every row after shifts by nothing but still mismatches the... |
+| 278 | [opt_lifetimes off keeps a reassigned local on one node: a cast sum reads the loaded operand first and colours beside it](278-opt-lifetimes-off-keeps.md) | works | source-shape, allocator, pragma | A local summed with a fresh load is `add r3,r3,r0` (variable first) where retail has `add r3,r0,r3`, and every spelling that keeps the source's operand order moves the sum into r0 instead |
+| 279 | [A virtual-to-physical offset on a scaled index: subtract the constant outside the pointer sum so addis reuses the product's register](279-virtual-to-physical-offset.md) | works | source-shape, allocator | Retail's `mullw r4,r4,r0; addis r4,r4,0x8000; add r4,r6,r4` comes out as `addis r0,r4,0x8000; add r4,r6,r0` - the addis result takes r0 where retail reuses the product's r4 |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

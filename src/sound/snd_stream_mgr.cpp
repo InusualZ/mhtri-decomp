@@ -6,7 +6,10 @@
  * FLAGS. lib `sound` (`cflags_main`, Wii/1.3). `#pragma peephole off` and `#pragma fp_contract off` over the file;
  *   `#pragma optimization_level 4` around `cmd_start` (its channel switch is the level-4 `subi`/`cmplwi` range
  *   lowering, playbook 108); `#pragma no_static_dtors on` (`__sinit` registers no destructor); the manager's and the
- *   bank's constructors are `inline` and `never_inline` (idea 242), so they follow `__sinit`.
+ *   bank's constructors are `inline` and `never_inline` (idea 242), so they follow `__sinit`; `#pragma opt_lifetimes
+ *   off` around `stream_voice_setup` (the pan sum keeps `pan`'s own node, so it colours r3 beside the r0 load and the
+ *   add reads `track->pan` first - with lifetimes on the sum is a new web coloured r0, and the plain `pan = track->pan
+ *   + pan` is emitted destination-first whatever the source order).
  * NAMES. GUESS (from the bodies, the AX/DVD/MIX calls and the callers), every name in the unit: the manager streams
  *   ADPCM/PCM files from the disc into a buffer split in thirds (`DVDReadAsyncPrio`, `stream_read_*_cb`), plays them
  *   through one or two AX voices, and runs the commands of three stream banks (`StreamRelocSet`: format, group,
@@ -17,13 +20,8 @@
  *   evidence for the shape: retail's extab names the bank destructor for the manager's member array and for
  *   `cmd_start`'s by-value temporary, and the base destructor for the constructor; `stream_play` and
  *   `stream_play_cmd` copy a record and never destroy it (a copy into the destructor-less base).
- * RESIDUALS. `stream_voice_setup`: the pan add is `add r3,r3,r0` where retail has `add r3,r0,r3` - the front end
- *   already emits `pan = track->pan + pan` as `pan += track->pan` (the first PCode dump has the order), and every
- *   one-expression or single-use form reassociates to an add-then-`subi` (-9 B; an inline clamp, a separate offset
- *   or track local tried). `stream_voice_rewind`: the mono branch's `addis` result colours r0 where retail reuses r4
- *   (regalloc: the node is coloured first with r0 free; in-place, comma, cast and split-statement forms tried).
- * RESIDUALS. Data: `.sdata` is 2 of the claimed 8 bytes (the rest is link fill). flipcheck: `.text` bytes in the four
- *   rows above; `extab`/`extabindex` are byte-identical to the target's.
+ * RESIDUALS. Data: `.sdata` is 2 of the claimed 8 bytes (the rest is link fill); `extab`/`extabindex` are
+ *   byte-identical to the target's.
  * SHAPES. The DVD read callbacks test the result with three separate early returns (a `&&`/`||` chain, nested ifs or a
  *   switch fold to one `addi`/`cmplwi` range test). The bank table getters are separate functions right after their
  *   wrappers (retail's `addi`/`b`), every index widened to u32 at the call; the id key is
@@ -31,7 +29,11 @@
  *   arguments inline (evaluated right to left). `run_chain` reads the chained index through a `u16` inline getter
  *   (retail's `clrlwi` at the call); `stream_read_cb` rounds the read size in its own statement (retail reloads
  *   `file_pos` after the call); `stream_read_loop_cb` sums buffer, slot offset and result left to right; the pitch
- *   starts from the command's and adds the track's in one `+=`. `voice_limit` declares its counters before the key
+ *   starts from the command's and adds the track's in one `+=`; the pan sum is `(s32)(track->pan + pan)` (the cast
+ *   keeps the source's operand order). `stream_voice_rewind`'s mono address is `(u32)(buffer + next * chunk_size) -
+ *   0x80000000`: the backend pushes the constant onto the product, so the `addis` reuses the product's register
+ *   (the inner `- 0x80000000` spelling gives the `addis` a temporary of its own, coloured r0). `voice_limit`
+ *   declares its counters before the key
  *   (named locals colour in declaration order) and counts the excess in a block-local; `queue_read` reads `read_pos`
  *   into a local declared after `limit`.
  */
@@ -345,6 +347,7 @@ void stream_voice_drop_cb(AXVPB* vpb)
 }
 
 /* Initialises a voice's mix, envelope and streaming state from its command and track. */
+#pragma opt_lifetimes off
 void stream_voice_setup(StreamVoice* voice, StreamCmd* cmd, StreamTrack* track, u32 id)
 {
     u32 frames;
@@ -428,7 +431,7 @@ void stream_voice_setup(StreamVoice* voice, StreamCmd* cmd, StreamTrack* track, 
     voice->pitch = pitch;
 
     pan = cmd->pan - 64;
-    pan = track->pan + pan;
+    pan = (s32)(track->pan + pan);
     if (pan > 127) {
         pan = 127;
     } else if (pan < 0) {
@@ -491,6 +494,7 @@ void stream_voice_setup(StreamVoice* voice, StreamCmd* cmd, StreamTrack* track, 
     voice->loading = 1;
     voice->wraps = 0;
 }
+#pragma opt_lifetimes reset
 
 /* Programs a voice's loop, end and current addresses for the buffer it plays. */
 void stream_voice_loop_set(StreamVoice* voice, AXVPB* vpb, u8* buffer)
@@ -552,7 +556,7 @@ void stream_voice_rewind(StreamVoice* voice)
                 AXSetVoiceCurrentAddr(voice->vpb_r, right_addr);
             }
         } else {
-            addr = snd_format_bytes_to_addr(voice->format, (u32)(voice->buffer + (next * voice->chunk_size - 0x80000000)));
+            addr = snd_format_bytes_to_addr(voice->format, (u32)(voice->buffer + next * voice->chunk_size) - 0x80000000);
             if (voice->vpb_l != 0) {
                 AXSetVoiceCurrentAddr(voice->vpb_l, addr);
             }
