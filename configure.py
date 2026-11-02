@@ -759,13 +759,13 @@ config.libs = [
             Object(NonMatching, "sound/fn_800E3CBC.cpp"),
             Object(NonMatching, "sound/fn_800E46E8.cpp"),
             Object(NonMatching, "sound/sound_obj.cpp"),
-            Object(NonMatching, "sound/snd_stream_reloc.cpp"),
+            Object(Matching, "sound/snd_stream_reloc.cpp"),
             Object(Matching, "sound/snd_level_tbl.cpp"),
             # Registered (a 0x800E8E60 run discovery proposed).
             # The quest/challenge sound work system: 149 functions / 0x6978 bytes.  C++ from the range's
             # own mangled symbols; no `__FILE__` string survives, so the map's stem is the file name.
             Object(Matching, "sound/fn_800E8E60.cpp"),
-            Object(NonMatching, "sound/snd_stream_mgr.cpp"),
+            Object(Matching, "sound/snd_stream_mgr.cpp"),
             Object(NonMatching, "sound/snd_voice_pool.cpp"),
             Object(Matching, "sound/quest_snd.cpp"),
             Object(NonMatching, "sound/snd_bank_loader.cpp"),
