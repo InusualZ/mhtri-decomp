@@ -14,12 +14,16 @@
  *   `Assertion_Printf_` (fn_80500868), `ShowStack_` (fn_80500900), `VPanic` (fn_805009AC), `WarningAlarmFunc_`
  *   (fn_80500CE0), and the statics `sWarningAlarm`, `sWarningTime`, `sAssertionConsole`, `sDispWarningAuto`,
  *   `sAlarmInitialized`.
- * RESIDUALS. Warning: the scroll keeps the console in r30 and its view height in r31 where retail has r31/r30 (6 bytes);
- *   the other spellings tried swap the warning time and the alarm pointer instead (the time read through a local
- *   is the closer of the two).
  * RESIDUALS. The string pools are `@` symbols in ours where the map names them `lbl_8062F030`, `lbl_8062F090`,
  *   `lbl_8062F0A0` and `lbl_807941E4`.
  * RESIDUALS. The `.sdata`/`.sbss` claims end on alignment pad the object does not emit.
+ * SHAPES. Warning's scroll binds the console through a block-local reference (`ConsoleHandle& console =
+ *   sAssertionConsole;`): the reference's address temporary is numbered above the frontend's `@` temporaries, so the
+ *   console copy is coloured before the `if (sAssertionConsole)` load takes r30 and lands in r31 with the view height
+ *   in r30; passed as the global directly (VPanic's shape) the copy is the last `@` temporary and takes r30 (the two
+ *   registers swapped, 6 bytes).  Measured with the allocator dump (idea 243): the copy is a CSE temporary created
+ *   after the `if` load's, and no declaration order, helper inline, static (auto-inlined) helper, accessor argument,
+ *   hoisted store/argument or `opt_lifetimes off` moves it; the reference does.
  * SHAPES. ShowStack_ is kept out of line by a `#pragma dont_inline` scoped to its own definition (retail calls it);
  *   VPanic stays out of line by size and must sit outside that scope, or the console scroll is called, not inlined.
  *   `Assertion_ShowConsole` and `GetWarningAlarm_` are nw4r's helpers, `inline` so the object carries no unreferenced
@@ -181,7 +185,10 @@ void Warning(const char* file, int line, const char* fmt, ...) {
         Console_Printf(sAssertionConsole, "%s:%d Warning:", file, line);
         Console_VPrintf(sAssertionConsole, fmt, vlist);
         Console_Printf(sAssertionConsole, "\n");
-        Console_ShowLatestLine(sAssertionConsole);
+        {
+            ConsoleHandle& console = sAssertionConsole;
+            Console_ShowLatestLine(console);
+        }
         if (sDispWarningAuto) {
             u32 time = sWarningTime;
             Assertion_ShowConsole(time);
