@@ -7,15 +7,15 @@
  *   0x80602988) pins the start in 0x80417944..0x80417C44, and the base constructor 0x80417BC0 is the first function
  *   there that touches the class (`NetworkWiiMediator::applyEvent`, 0x80417B30, is the mediator's).
  * FLAGS. `-O3` (configure.py; measured in docs/network.md); file-scope `#pragma pool_data off` (`init`)
- *   and `#pragma peephole off` like the Wii half (the reload of the table word through r3 before each virtual call).
+ *   and `#pragma peephole off` like the Wii half (the reload of the table word through r3 before each virtual call);
+ *   `dateToTime` alone is `#pragma optimization_level 4` (the unrolled month loop computes `months - 8` before
+ *   `months - 1` only there; file-wide `-O4` costs `convertTime` its match).  `extab`: the constructor's record
+ *   starts at the virtual call because `getNetworkLogger` (`Network/NetworkStreamSink.h`) and `registerNetworkObject`
+ *   (here) are declared nothrow.
  * NAMES. The class and every method name are GUESSes from the bodies and strings (`Network/sNetworkLibrary.h`).
  *   `networkLog_destroyContext` (the release half of `acquireResolver`) and `networkSocketPool_acquire`/`_release`
  *   (members over the socket table) keep the C names and parameter types their callers use.
- * RESIDUALS. `dateToTime`: the unrolled month loop computes `months - 8` before `months - 1` in retail (two adjacent
- *   instructions swapped; loop/declaration/type variants and `-schedule off` measured).  `extab`: the constructor's
- *   record starts at the `registerNetworkObject` return (0x34) where retail's starts at the virtual call (0x60) -
- *   retail's `getNetworkLogger` is nothrow (`__attribute__((nothrow))` on its declaration in
- *   `Network/NetworkStreamSink.h` closes it; `registerNetworkObject` is declared nothrow here).
+ * RESIDUALS. none.
  * SHAPES. `convertTime`/`dateToTime` count days from 1 January of year 0; every unit constant is an unsigned 64-bit
  *   macro (retail divides through `__div2u`/`__mod2u`), the products `n * 366ULL` keep retail's dead sign extension,
  *   and `convertTime` adds each cycle as `(s16)(n * k)` (retail `extsh`es the product, not the sum).
@@ -278,6 +278,7 @@ void sNetworkLibrary::convertTime(s64 time, NetworkDateTime* out)
 }
 
 /* Normalises the month, then turns the calendar fields back into microseconds (minus the time zone). */
+#pragma optimization_level 4
 s64 sNetworkLibrary::dateToTime(NetworkDateTime* date)
 {
     s32 leap;
@@ -329,6 +330,7 @@ s64 sNetworkLibrary::dateToTime(NetworkDateTime* date)
     return time - (s64)timeZoneMinutes * NETWORK_USEC_PER_MINUTE;
 }
 
+#pragma optimization_level 3
 NetworkResolverWii* sNetworkLibrary::acquireResolver()
 {
     s32 i;
