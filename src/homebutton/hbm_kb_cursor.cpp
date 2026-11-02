@@ -9,12 +9,16 @@
  * NAMES.     GUESS function names hbmKbCursor* (read off the bodies and the slot each fills in the class table
  *            0x80657F10, named after the text panel's function in the same slot: CursorUp/Down, HandleMessage, Input,
  *            Reset, Calc, Update, HitTest, ...) and view classes HbmCursor*View (slots named by offset), records
- *            HbmCursorInput / HbmCursorAnchor / HbmCursorPaneHandler / HbmCursorPaneComponent / HbmCursorPaneTrigger /
- *            HbmCursorPointMsg / HbmCursorLineMsg / HbmCursorPoint(3); GUESS data hbmKbCursorPaneNames (the memo's pane
+ *            HbmCursorInput / HbmCursorAnchor / HbmCursorPointMsg / HbmCursorLineMsg / HbmCursorPoint(3); GUESS data hbmKbCursorPaneNames (the memo's pane
  *            names), hbmKbCursorResetFlag / hbmKbCursorResetLimit (the pair slot 0x10C stores), hbmKbCursorRestOffset.
  * NAMES.     GUESS registry name hbmNodeReset (0x8054F788, hbm_text_panel.cpp).
  * SHAPES.    The views are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch; no
  *            method is defined and nothing is constructed here, so no table is emitted (rule 10).
+ * SHAPES.    HbmKbCursorArrows (table 0x80657E50) and HbmKbCursorPaneHandler (table 0x80657EF0) define every slot of
+ *            their own here, so MWCC emits both tables; HbmKbCursorKeyGroup's first slot has no body, so its table
+ *            (0x80651830, hbm_value.cpp) is only referenced.
+ * SHAPES.    HbmKbCursorArrows::create passes `loop` as a bool local set by `if (kind == 5)` (retail's li/bne/li; the
+ *            direct `kind == 5` argument is cntlzw/srwi).
  * SHAPES.    fn_80568DD0 returns the anchor's Vec2f member by value (retail loads the two words straight into r3/r4).
  * SHAPES.    A pane is moved through hbmKbCursorPlacePane(pane, HbmCursorPoint(x, y)): retail builds the 2-float point
  *            and a 3-float translation on the stack and rounds the forwarded y (playbook 181); fn_80568004 negates the
@@ -25,10 +29,14 @@
  * SHAPES.    The text block at +0x10 has its vptr at its own +0x4C (HbmCursorTextView derives from a 0x4C-byte head).
  * SHAPES.    The empty override at 0x80568CA8 (slot 0x16C) is its own row, hbmKbCursorIgnorePositionChange.
  * SHAPES.    hbmKbCursorRestOffset is zero yet lives in .sdata: `#pragma explicit_zero_data` around its definition.
- * RESIDUALS. Unwritten, store class-table pointers of classes no unit models yet (rule 10): hbmKbCursorDestroy
- *            0x80566440 (0xB0, the keyboard's four tables), hbmKbCursorCreate 0x80566C94 (0x370, builds the text buffer of
- *            table 0x806515D0, the pane handler 0x80657EF0 and the key-slot block 0x80657E50), hbmKbCursorSlotsCreate
- *            0x8056725C (0x268, builds group holders of table 0x80651830 and HbmKbCursorKey objects of 0x2C bytes).
+ * RESIDUALS. Unwritten: hbmKbCursorDestroy 0x80566440 (0xB0), the keyboard's destructor: it stores the keyboard's four
+ *            tables (0x80657F10 +0x00/+0x20/+0xB8/+0x1AC) and calls the widget's destructor 0x8054CF38 with 0, which
+ *            needs homebutton/hbm_text_panel.cpp's file-local HbmKbTextWidget in a header and its destructor out of line.
+ * RESIDUALS. hbmKbCursorCreate: the pane handler's widget (+0x0C) is stored after its table pointer; retail stores it
+ *            before (the field belongs to hbm_text_panel.cpp's file-local HbmTextPaneListener base, playbook 272).
+ * RESIDUALS. HbmKbCursorArrows::create: retail's cursor key is 0x2C bytes and its constructor stores no +0x2C word;
+ *            homebutton/hbm_value.h's HbmKey is 0x30 with mState at +0x2C set by its constructor (one extra store, and
+ *            the allocation is 0x30). The key group's table is __vt__19HbmKbCursorKeyGroup (hbm_value.cpp's row).
  * RESIDUALS. hbmKbCursorCreateMemoKeys hoists the component list's address into a saved register; retail recomputes it
  *            at the append (and keeps `this`/the allocator in r25/r26).
  * RESIDUALS. hbmKbCursorUpdate: the text box button's half-height difference multiplies as `0.5 * d` against retail's
@@ -42,6 +50,10 @@
  *            word and a kind; members reset, setState, getType, getState).
  * NAMES.     GUESS hbmKbCursorCreateMemoKeys / hbmKbCursorNewLine and data hbmKbCursorMemoAnimDefs /
  *            hbmKbCursorMemoKeyDefs (the `my_Memo_a_*.brlan` animations of the N_Memo and Nigaoe keys).
+ * NAMES.     GUESS hbmKbCursorCreate (the keyboard's create: it runs hbmKbWidgetCreatePanel first), classes
+ *            HbmKbCursorArrows (create/draw/update/select; the nine `G_Arw*` groups), HbmKbCursorKeyGroup,
+ *            HbmKbCursorPaneHandler, view HbmCursorRootView, data hbmKbCursorArrowAnimDefs / hbmKbCursorArrowGroupDefs /
+ *            hbmKbCursorArrowGroupNames.
  */
 
 #include "types.h"
@@ -59,6 +71,7 @@
 #include "homebutton/hkb_textbox.h"
 #include "MEM/MEMAllocFromAllocator.h"
 #include "homebutton/hbmKbWidgetHandleMessage.h"
+#include "homebutton/hbmKbWidgetCreatePanel.h"
 #include "homebutton/hbmPanelAdvanceWord1A00.h"
 #include "MTX/mtxvec.h"
 #include "nw4r/ut_Rect.h"
@@ -127,10 +140,38 @@ const HbmKbCursorKeyDef hbmKbCursorMemoKeyDefs[2] = {
     {1, "Nigaoe", 2, {&hbmKbCursorMemoAnimDefs[4], &hbmKbCursorMemoAnimDefs[5]}},
 };
 
+/* The scroll arrows' key animations, indexed by kind (.rodata 0x8057C468). */
+const HkbAnimDef hbmKbCursorArrowAnimDefs[9] = {
+    {0, "my_Memo_a_Off.brlan"},
+    {1, "my_Memo_a_Appear.brlan"},
+    {2, "my_Memo_a_Lost.brlan"},
+    {3, "my_Memo_a_HDActionEnd.brlan"},
+    {4, "my_Memo_a_HDActionStart.brlan"},
+    {5, "my_Memo_a_Loop.brlan"},
+    {6, "my_Memo_a_Select.brlan"},
+    {7, "my_Memo_a_FocusOff.brlan"},
+    {8, "my_Memo_a_FocusOn.brlan"},
+};
+
+/* One arrow group: its index and the kinds of the (up to three) animations its keys play; kind 9 ends the list.
+ * size: 0x10 */
+struct HbmKbCursorArrowGroupDef {
+    /* +0x00 */ u32 index;
+    /* +0x04 */ u32 anims[3];
+}; /* size: 0x10 */
+
+/* The nine arrow groups' animations (.rodata 0x8057C6D0). */
+const HbmKbCursorArrowGroupDef hbmKbCursorArrowGroupDefs[9] = {
+    {0, {5, 9, 9}}, {1, {8, 7, 9}}, {2, {8, 7, 9}}, {3, {6, 9, 9}}, {4, {6, 9, 9}},
+    {5, {2, 1, 9}}, {6, {2, 1, 9}}, {7, {4, 3, 9}}, {8, {4, 3, 9}},
+};
+
 /* A cursor key: a band key whose reset and state setter are defined above as C functions (class table
  * 0x80657E2C).  size: 0x30 */
 class HbmKbCursorKey : public HbmKey {
 public:
+    HbmKbCursorKey(nw4r::lyt::Pane* pane) : HbmKey(pane) {}
+
     virtual void reset();
     virtual void setState(u32 state);
     virtual ~HbmKbCursorKey();
@@ -445,7 +486,7 @@ public:
     /* slot +0x2AC */ virtual f32 v_0x2AC();
     /* slot +0x2B0 */ virtual void v_0x2B0();
     /* slot +0x2B4 */ virtual void v_0x2B4();
-    /* slot +0x2B8 */ virtual void v_0x2B8();
+    /* slot +0x2B8 */ virtual void createMemoKeys(MEMAllocator* allocator);
     /* slot +0x2BC */ virtual void v_0x2BC();
     /* slot +0x2C0 */ virtual void v_0x2C0();
     /* slot +0x2C4 */ virtual void v_0x2C4();
@@ -505,17 +546,6 @@ public:
     /* slot +0x00C */ virtual void v_0x00C();
     /* slot +0x010 */ virtual void v_0x010();
     /* slot +0x014 */ virtual void v_0x014(s32 index, s32 mode);
-};
-
-/* A key slot of the cursor's nine-entry table at +0x10: slot 0x10 updates it, slot 0x18 selects it with a key.
- * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
-class HbmCursorSlotView {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010();
-    /* slot +0x014 */ virtual void v_0x014();
-    /* slot +0x018 */ virtual void v_0x018(u32 key);
 };
 
 /* The text field at +0x193C: slot 0x1C returns its length, slot 0x8C its selection.
@@ -622,20 +652,17 @@ struct HbmCursorLineMsg {
     /* +0x04 */ s32* line;
 }; /* size: 0x08 */
 
-/* The cursor's input block at the end of the keyboard object (KbTail +0x1A8..+0x1E8), as the arrow and key handlers
- * below read it, with the key-slot block at its start (+0x04 focus, +0x08 key, +0x10 slots, +0x34 shown flags, +0x3D/+0x3E
- * latches), the caret top (+0x1958), the scroll request (+0x1988), the scroll position (+0x1B04) and the row count
- * (+0x1B10).  size: 0x1BEC (approximation: the gaps are the rest of the keyboard) */
+/* The keyboard object as the handlers below read it: the text block (+0x10), the caret top (+0x1958), the scroll
+ * request (+0x1988), the pane manager base (+0x1A04), the scroll position (+0x1B04), the row count (+0x1B10), the
+ * text buffer (+0x1BD4) and the scroll arrows (+0x1BE0).  size: 0x1BEC (approximation: the gaps are the rest of the
+ * keyboard) */
+class HbmKbCursorPaneHandler;
+class HbmKbCursorArrows;
+
 struct HbmCursorInput {
-    /* +0x0000 */ u8 unused_0x0000[0x04];
-    /* +0x0004 */ s32 focus;
-    /* +0x0008 */ u32 key;
-    /* +0x000C */ u8 unused_0x000C[0x04];
-    /* +0x0010 */ HbmCursorSlotView* parts[9];
-    /* +0x0034 */ u8 shown[9];
-    /* +0x003D */ u8 leftLatch;
-    /* +0x003E */ u8 rightLatch;
-    /* +0x003F */ u8 unused_0x003F[0xC1];
+    /* +0x0000 */ u8 unused_0x0000[0x10];
+    /* +0x0010 */ u8 textBlock[0x30];       /* the text block (HbmCursorTextView) */
+    /* +0x0040 */ u8 unused_0x0040[0xC0];
     /* +0x0100 */ f32 textOffset;           /* the text writer's vertical offset (its +0xF0) */
     /* +0x0104 */ u8 unused_0x0104[0x14];
     /* +0x0118 */ u32 node_118;             /* the vptr of the HbmCursorNodeView at +0x118 */
@@ -668,7 +695,9 @@ struct HbmCursorInput {
     /* +0x1A70 */ u8 unused_0x1A70[0x44];
     /* +0x1AB4 */ u8 upArrowShown;
     /* +0x1AB5 */ u8 downArrowShown;
-    /* +0x1AB6 */ u8 unused_0x1AB6[0x3E];
+    /* +0x1AB6 */ u8 unused_0x1AB6[0x02];
+    /* +0x1AB8 */ HbmKbCursorPaneHandler* paneHandler;  /* the text panel's listener until create replaces it */
+    /* +0x1ABC */ u8 unused_0x1ABC[0x38];
     /* +0x1AF4 */ nw4r::lyt::Pane* memoPane;
     /* +0x1AF8 */ nw4r::lyt::Pane* memoRootPane;
     /* +0x1AFC */ nw4r::lyt::Pane* textBoxPane;
@@ -690,14 +719,14 @@ struct HbmCursorInput {
     /* +0x1BB0 */ u8 unused_0x1BB0[0x1C];
     /* +0x1BCC */ HbmCursorPopupView* popup;
     /* +0x1BD0 */ GXTexObj* texObj;         /* the texture object the material's first map takes */
-    /* +0x1BD4 */ u8 unused_0x1BD4[0x04];
+    /* +0x1BD4 */ HbmKbTextBuffer* textBuffer;
     /* +0x1BD8 */ u8 touchLetter;
     /* +0x1BD9 */ u8 dirty;
     /* +0x1BDA */ u8 leftPressed;
     /* +0x1BDB */ u8 rightPressed;
     /* +0x1BDC */ u8 shifted;
     /* +0x1BDD */ u8 unused_0x1BDD[0x03];
-    /* +0x1BE0 */ HbmCursorPartView* arrows;
+    /* +0x1BE0 */ HbmKbCursorArrows* arrows;
     /* +0x1BE4 */ u8 leftHeld;
     /* +0x1BE5 */ u8 rightHeld;
     /* +0x1BE6 */ u8 unused_0x1BE6[0x02];
@@ -734,27 +763,82 @@ static inline void hbmKbCursorPlacePane(nw4r::lyt::Pane* pane, const HbmCursorPo
     pane->mTranslate.z = translate.z;
 }
 
-/* The keyboard's pane handler (class table 0x80657EF0): the text panel's listener with the keyboard at +0x0C and
- * +0x10.  size: 0x14 */
-struct HbmCursorPaneHandler {
-    /* +0x00 */ u8 unused_0x00[0x0C];       /* the vptr and the listener's manager and sound */
+/* The keyboard's pane handler (class table 0x80657EF0): the text panel's listener (its widget at +0x0C) with the
+ * keyboard at +0x10.  size: 0x14 */
+class HbmKbCursorPaneHandler : public HbmPaneHandler {
+public:
+    HbmKbCursorPaneHandler(HbmCursorInput* pKeyboard) : widget(pKeyboard), keyboard(pKeyboard) {}
+
+    /* slot +0x008 */ virtual ~HbmKbCursorPaneHandler();
+    /* slot +0x018 */ virtual void onPaneEvent(HbmComponent* pComponent, u32 event, HbmPaneTrigger* pTrigger);
+
     /* +0x0C */ HbmCursorInput* widget;
     /* +0x10 */ HbmCursorInput* keyboard;
 }; /* size: 0x14 */
 
-/* A pane component the handler hears about: its pane at +0x9C.  size: 0xA0 (approximation: only +0x9C is read) */
-struct HbmCursorPaneComponent {
-    /* +0x00 */ u8 unused_0x00[0x9C];
-    /* +0x9C */ nw4r::lyt::Pane* pane;
-}; /* size: 0xA0 */
+/* The pane manager's component layout (+0x1A14) as the keyboard's create calls it: slot 0x40 takes the event
+ * handler, slot 0x4C finds a pane's component.
+ * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class HbmCursorRootView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void setEventHandler(HbmEventHandler* handler);
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual HbmComponent* findComponent(nw4r::lyt::Pane* pane);
+};
 
-/* The pointer state a pane event carries.  size: 0x10 (approximation: +0x10.. is not read) */
-struct HbmCursorPaneTrigger {
-    /* +0x00 */ u32 channel;
-    /* +0x04 */ f32 x;
-    /* +0x08 */ f32 y;
-    /* +0x0C */ u32 trigger;
-}; /* size: 0x10 */
+/* A group of arrow keys (class table 0x80651830, homebutton/hbm_value.cpp's .data): the layout group and the keys of
+ * its panes, linked at their +0x24; slot 0x10 updates the keys, 0x14 appends one, 0x18 hands them a key.  Its first
+ * slot has no body here, so its table is not emitted.  size: 0x14 */
+class HbmKbCursorKeyGroup {
+public:
+    HbmKbCursorKeyGroup(nw4r::lyt::Group* pGroup) : mpGroup(pGroup) { nw4r::ut::List_Init(&mKeys, 0x24); }
+
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void update();
+    /* slot +0x014 */ virtual void append(HbmKey* key);
+    /* slot +0x018 */ virtual void select(u32 key);
+
+    /* +0x04 */ nw4r::lyt::Group* mpGroup;
+    /* +0x08 */ nw4r::ut::List mKeys;
+}; /* size: 0x14 */
+
+/* The keyboard's scroll arrows (+0x1BE0; class table 0x80657E50): nine key groups of the layout's `G_Arw*` groups,
+ * the focused group and the last key handed to it.  size: 0x40 */
+class HbmKbCursorArrows {
+public:
+    HbmKbCursorArrows(nw4r::lyt::Layout* pLayout)
+        : focus(0), key(0), layout(pLayout), leftLatch(0), rightLatch(0) {}
+
+    /* slot +0x008 */ virtual void create(MEMAllocator* allocator, nw4r::lyt::ResourceAccessor* accessor);
+    /* slot +0x00C */ virtual void draw();
+    /* slot +0x010 */ virtual void update();
+    /* slot +0x014 */ virtual void select(s32 shifted, u32 key);
+
+    /* +0x04 */ s32 focus;
+    /* +0x08 */ u32 key;
+    /* +0x0C */ nw4r::lyt::Layout* layout;
+    /* +0x10 */ HbmKbCursorKeyGroup* groups[9];
+    /* +0x34 */ u8 shown[9];
+    /* +0x3D */ u8 leftLatch;
+    /* +0x3E */ u8 rightLatch;
+    /* +0x3F */ u8 pad_0x3F;
+}; /* size: 0x40 */
 
 /* The anchor object at KbTail +0x0F4: its position pair at +0x44 is returned by value.
  * size: 0x4C (approximation: only +0x44..+0x4C is touched) */
@@ -793,14 +877,14 @@ void hbmKbCursorUpdateArrows(HbmCursorInput* self, u8 left, u8 right, f32 delta)
 {
     ((HbmCursorSelfView*)self)->v_0x244(((KbObject*)self)->tail_0x1A04.float_0x100 + delta);
     if (left != 0 && self->leftHeld == 0) {
-        self->arrows->v_0x014(0, 4);
+        self->arrows->select(0, 4);
     } else if (right != 0 && self->rightHeld == 0) {
-        self->arrows->v_0x014(1, 4);
+        self->arrows->select(1, 4);
     }
     if (left == 0 && self->leftHeld != 0) {
-        self->arrows->v_0x014(0, 3);
+        self->arrows->select(0, 3);
     } else if (right == 0 && self->rightHeld != 0) {
-        self->arrows->v_0x014(1, 3);
+        self->arrows->select(1, 3);
     }
     self->leftHeld = left;
     self->rightHeld = right;
@@ -810,7 +894,7 @@ void hbmKbCursorUpdateArrows(HbmCursorInput* self, u8 left, u8 right, f32 delta)
  * the caret. */
 void hbmKbCursorCursorUp(HbmCursorInput* self)
 {
-    f32 y = 1.0f + (self->caretTop - ((HbmCursorTextView*)&self->parts)->v_0x028());
+    f32 y = 1.0f + (self->caretTop - ((HbmCursorTextView*)&self->textBlock)->v_0x028());
 
     if (y <= 0.0f) {
         u32 start;
@@ -838,10 +922,10 @@ void hbmKbCursorCursorDown(HbmCursorInput* self)
     f32 lines;
     f32 y;
 
-    y = 1.0f + (self->caretTop + ((HbmCursorTextView*)&self->parts)->v_0x028());
-    lines = (f32)((HbmCursorTextView*)&self->parts)->v_0x034();
+    y = 1.0f + (self->caretTop + ((HbmCursorTextView*)&self->textBlock)->v_0x028());
+    lines = (f32)((HbmCursorTextView*)&self->textBlock)->v_0x034();
 
-    if (y / ((HbmCursorTextView*)&self->parts)->v_0x028() >= lines) {
+    if (y / ((HbmCursorTextView*)&self->textBlock)->v_0x028() >= lines) {
         u32 start;
         u32 end;
 
@@ -892,11 +976,11 @@ void hbmKbCursorHandleScrollMessage(HbmCursorInput* self, s32 id, u32* arg)
             break;
         if (((HbmCursorPointMsg*)arg)->delta < 0.0f) {
             ((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x008(
-                0, 0, self->position, self->position + ((HbmCursorTextView*)&self->parts)->v_0x028(),
+                0, 0, self->position, self->position + ((HbmCursorTextView*)&self->textBlock)->v_0x028(),
                 hbmKbCursorScrollFrames);
         } else {
             ((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x008(
-                0, 0, self->position, self->position - ((HbmCursorTextView*)&self->parts)->v_0x028(),
+                0, 0, self->position, self->position - ((HbmCursorTextView*)&self->textBlock)->v_0x028(),
                 hbmKbCursorScrollFrames);
         }
         ((HbmCursorSelfView*)self)->v_0x17C(11);
@@ -921,15 +1005,15 @@ void hbmKbCursorHandleTouchMessage(HbmCursorInput* self, s32 id, u32* arg)
         s32 caretLine;
         s32 line;
 
-        line = (s32)((((HbmCursorPointMsg*)arg)->y - origin.y) / ((HbmCursorTextView*)&self->parts)->v_0x028());
+        line = (s32)((((HbmCursorPointMsg*)arg)->y - origin.y) / ((HbmCursorTextView*)&self->textBlock)->v_0x028());
 
-        if (line > ((HbmCursorTextView*)&self->parts)->v_0x034() - 1)
-            line = ((HbmCursorTextView*)&self->parts)->v_0x034() - 1;
-        if (((HbmCursorTextView*)&self->parts)->v_0x034() > 1
-            && line >= ((HbmCursorTextView*)&self->parts)->v_0x034() - 1)
-            line = ((HbmCursorTextView*)&self->parts)->v_0x034() - 2;
+        if (line > ((HbmCursorTextView*)&self->textBlock)->v_0x034() - 1)
+            line = ((HbmCursorTextView*)&self->textBlock)->v_0x034() - 1;
+        if (((HbmCursorTextView*)&self->textBlock)->v_0x034() > 1
+            && line >= ((HbmCursorTextView*)&self->textBlock)->v_0x034() - 1)
+            line = ((HbmCursorTextView*)&self->textBlock)->v_0x034() - 2;
         self->touchPosition = self->position;
-        self->touchLineTop = (f32)line * ((HbmCursorTextView*)&self->parts)->v_0x028();
+        self->touchLineTop = (f32)line * ((HbmCursorTextView*)&self->textBlock)->v_0x028();
         point.x = ((HbmCursorPointMsg*)arg)->x;
         point.y = ((HbmCursorPointMsg*)arg)->y - self->position;
         hbmKbWidgetHandleMessage((HbmPanelView*)self, 14, (u32*)&point);
@@ -951,6 +1035,59 @@ void hbmKbCursorHandleTouchMessage(HbmCursorInput* self, s32 id, u32* arg)
         hbmKbWidgetHandleMessage((HbmPanelView*)self, id, arg);
         break;
     }
+}
+
+/* 0x80566C94 (0x370): creates the keyboard widget, then the keyboard's text buffer, its pane handler, the portrait
+ * texture, the text box's and its button's metrics, the memo keys and the scroll arrows. */
+void hbmKbCursorCreate(HbmCursorInput* self, MEMAllocator* allocator, HbmTextBufferSet* buffers)
+{
+    hbmKbWidgetCreatePanel((HbmPanelView*)self, allocator, buffers);
+
+    HbmKbTextBuffer* buffer = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbTextBuffer))) HbmKbTextBuffer(0x200);
+    self->textBuffer = buffer;
+    buffer->create(allocator);
+
+    MEMFreeToAllocator(allocator, self->paneHandler);
+    self->paneHandler =
+        new (MEMAllocFromAllocator(allocator, sizeof(HbmKbCursorPaneHandler))) HbmKbCursorPaneHandler(self);
+    self->paneHandler->setSound(self->manager()->mpSound);
+    ((HbmCursorRootView*)self->manager()->mpRoot)->setEventHandler(self->paneHandler);
+
+    self->texObj = (GXTexObj*)MEMAllocFromAllocator(allocator, sizeof(GXTexObj));
+    const nw4r::lyt::Material* material = ((HbmCursorSelfView*)self)->v_0x2A0();
+    material->GetTexMapAry()->Get(self->texObj);
+
+    self->manager()->setPaneVisible("P_2l_TextBox", 1);
+    self->textBoxPane = self->manager()->mpLyt->mpRootPane->FindPaneByName("T_2l_TextBox", true);
+    self->textBoxTranslate.x = self->textBoxPane->mTranslate.x;
+    self->textBoxTranslate.y = self->textBoxPane->mTranslate.y;
+    self->textBoxTranslate.z = self->textBoxPane->mTranslate.z;
+    self->textBoxWidth = self->textBoxPane->mSize.width;
+    self->textBoxHeight = self->textBoxPane->mSize.height;
+
+    self->textBoxButtonPane = self->manager()->mpLyt->mpRootPane->FindPaneByName("B_2l_TextBox", true);
+    ((HbmCursorRootView*)self->manager()->mpRoot)->findComponent(self->textBoxButtonPane)->setTriggerTarget(0);
+    self->buttonRect = self->textBoxButtonPane->GetPaneRect(self->drawInfo);
+    self->buttonTranslate.x = self->textBoxButtonPane->mTranslate.x;
+    self->buttonTranslate.y = self->textBoxButtonPane->mTranslate.y;
+    self->buttonTranslate.z = self->textBoxButtonPane->mTranslate.z;
+    self->buttonWidth = self->textBoxButtonPane->mSize.width;
+    self->buttonHeight = self->textBoxButtonPane->mSize.height;
+
+    self->memoPane = self->manager()->mpLyt->mpRootPane->FindPaneByName(lbl_80794728, true);
+    self->memoRootPane = self->manager()->mpLyt->mpRootPane->FindPaneByName("N_MemoRoot", true);
+
+    ((HbmCursorSelfView*)self)->v_0x244(0.0f);
+    self->rows = 1;
+    self->touchPosition = 0.0f;
+    self->touchLineTop = 0.0f;
+    PSMTXIdentity(self->buttonMtx.m);
+    PSMTXIdentity(self->textBoxMtx.m);
+    ((HbmCursorSelfView*)self)->createMemoKeys(allocator);
+
+    self->arrows =
+        new (MEMAllocFromAllocator(allocator, sizeof(HbmKbCursorArrows))) HbmKbCursorArrows(self->manager()->mpLyt);
+    self->arrows->create(allocator, self->manager()->mpResAccessor);
 }
 
 /* 0x80567014 (0x1F0): Creates the memo's body and portrait keys with their animations and lists them in the pane
@@ -987,95 +1124,136 @@ void* fn_80567004(KbObject* self, void* value)
     return old;
 }
 
+/* The layout groups of the nine arrow groups (.data 0x80657D30). */
+const char* hbmKbCursorArrowGroupNames[9] = {
+    "G_ArwRoop", "G_ArwR_Focus", "G_ArwL_Focus", "G_ArwR_Ac", "G_ArwL_Ac",
+    "G_ArwL_End", "G_ArwR_End", "G_ArwL_HDAc", "G_ArwR_HDAc",
+};
+
+/* 0x8056725C (0x268): builds the nine arrow groups and a key with its animations for every pane of each group, then
+ * selects keys 5 and 2 on both sides and updates the groups ten times. */
+void HbmKbCursorArrows::create(MEMAllocator* allocator, nw4r::lyt::ResourceAccessor* accessor)
+{
+    for (s32 i = 0; i < 9; i++) {
+        shown[i] = 0;
+        nw4r::lyt::Group* group = layout->mpGroupContainer->FindGroupByName(hbmKbCursorArrowGroupNames[i]);
+        groups[i] = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbCursorKeyGroup))) HbmKbCursorKeyGroup(group);
+        nw4r::ut::LinkList<nw4r::lyt::PaneLink, 0>* paneList = group->GetPaneList();
+        for (nw4r::ut::LinkList<nw4r::lyt::PaneLink, 0>::Iterator it = paneList->GetBeginIter();
+             it != paneList->GetEndIter(); ++it) {
+            HbmKbCursorKey* key =
+                new (MEMAllocFromAllocator(allocator, sizeof(HbmKbCursorKey))) HbmKbCursorKey(it->mTarget);
+            for (u16 j = 0; j < 3; j++) {
+                s32 kind = hbmKbCursorArrowGroupDefs[i].anims[j];
+                if (kind != 9) {
+                    const void* res = accessor->GetResource(0, hbmKbCursorArrowAnimDefs[kind].name, NULL);
+                    nw4r::lyt::AnimTransform* anim = layout->CreateAnimTransform(res, accessor);
+                    bool loop = false;
+                    if (kind == 5)
+                        loop = true;
+                    key->addAnim(allocator, kind, anim, loop, false);
+                }
+            }
+            groups[i]->append(key);
+        }
+    }
+    select(1, 5);
+    select(0, 5);
+    select(1, 2);
+    select(0, 2);
+    for (s32 i = 0; i < 10; i++)
+        update();
+}
+
 /* 0x805674C4 (0x58): updates the nine parts at +0x10. */
-void hbmKbCursorUpdateParts(HbmCursorInput* self)
+void HbmKbCursorArrows::update()
 {
     s32 i;
 
     for (i = 0; i < 9; i++)
-        self->parts[i]->v_0x010();
+        groups[i]->update();
 }
 
 /* 0x8056751C (0x1A8): records the key and moves the focus to the slot the key selects (the shifted and unshifted
  * layouts differ; keys 3/4 toggle a latch), then marks that slot shown and selects it with the key. */
-void hbmKbCursorSelectKey(HbmCursorInput* self, s32 shifted, u32 key)
+void HbmKbCursorArrows::select(s32 shifted, u32 key)
 {
-    self->key = key;
+    this->key = key;
     if (shifted != 0) {
         switch (key) {
         case 0:
-            self->focus = 0;
+            focus = 0;
             break;
         case 1:
-            self->focus = 5;
+            focus = 5;
             break;
         case 2:
-            self->focus = 5;
+            focus = 5;
             break;
         case 3:
-            if (self->leftLatch == 0)
+            if (leftLatch == 0)
                 return;
-            self->focus = 8;
-            self->leftLatch = 0;
+            focus = 8;
+            leftLatch = 0;
             break;
         case 4:
-            if (self->leftLatch != 0)
+            if (leftLatch != 0)
                 return;
-            self->focus = 8;
-            self->leftLatch = 1;
+            focus = 8;
+            leftLatch = 1;
             break;
         case 5:
-            self->focus = 0;
+            focus = 0;
             break;
         case 6:
-            self->focus = 4;
+            focus = 4;
             break;
         case 7:
-            self->focus = 2;
+            focus = 2;
             break;
         case 8:
-            self->focus = 2;
+            focus = 2;
             break;
         }
     } else {
         switch (key) {
         case 0:
-            self->focus = 0;
+            focus = 0;
             break;
         case 1:
-            self->focus = 6;
+            focus = 6;
             break;
         case 2:
-            self->focus = 6;
+            focus = 6;
             break;
         case 3:
-            if (self->rightLatch == 0)
+            if (rightLatch == 0)
                 return;
-            self->focus = 7;
-            self->rightLatch = 0;
+            focus = 7;
+            rightLatch = 0;
             break;
         case 4:
-            if (self->rightLatch != 0)
+            if (rightLatch != 0)
                 return;
-            self->focus = 7;
-            self->rightLatch = 1;
+            focus = 7;
+            rightLatch = 1;
             break;
         case 5:
-            self->focus = 0;
+            focus = 0;
             break;
         case 6:
-            self->focus = 3;
+            focus = 3;
             break;
         case 7:
-            self->focus = 1;
+            focus = 1;
             break;
         case 8:
-            self->focus = 1;
+            focus = 1;
             break;
         }
     }
-    self->shown[self->focus] = 1;
-    self->parts[self->focus]->v_0x018(key);
+    shown[focus] = 1;
+    groups[focus]->select(key);
 }
 
 /* 0x805676C4 (0x68): in mode 1, holds the left arrow (state 8) and posts event 24. */
@@ -1083,7 +1261,7 @@ void hbmKbCursorHoldLeftArrow(HbmCursorInput* self)
 {
     if (self->mode != 1)
         return;
-    self->arrows->v_0x014(0, 8);
+    self->arrows->select(0, 8);
     ((HbmCursorSelfView*)self)->v_0x17C(24);
 }
 
@@ -1102,7 +1280,7 @@ void hbmKbCursorHoldRightArrow(HbmCursorInput* self)
 {
     if (self->mode != 1)
         return;
-    self->arrows->v_0x014(1, 8);
+    self->arrows->select(1, 8);
     ((HbmCursorSelfView*)self)->v_0x17C(24);
 }
 
@@ -1116,8 +1294,8 @@ void hbmKbCursorScrollUp(HbmCursorInput* self)
         return;
     if (((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x014() != 0)
         return;
-    self->arrows->v_0x014(0, 6);
-    target = self->position - hbmKbCursorScrollRows * ((HbmCursorTextView*)&self->parts)->v_0x028();
+    self->arrows->select(0, 6);
+    target = self->position - hbmKbCursorScrollRows * ((HbmCursorTextView*)&self->textBlock)->v_0x028();
     if (target <= ((HbmCursorSelfView*)self)->v_0x2A8())
         target = ((HbmCursorSelfView*)self)->v_0x2A8();
     ((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x008(0, 0, self->position, target, hbmKbCursorScrollFrames);
@@ -1134,8 +1312,8 @@ void hbmKbCursorScrollDown(HbmCursorInput* self)
         return;
     if (((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x014() != 0)
         return;
-    self->arrows->v_0x014(1, 6);
-    target = self->position + hbmKbCursorScrollRows * ((HbmCursorTextView*)&self->parts)->v_0x028();
+    self->arrows->select(1, 6);
+    target = self->position + hbmKbCursorScrollRows * ((HbmCursorTextView*)&self->textBlock)->v_0x028();
     if (target >= ((HbmCursorSelfView*)self)->v_0x2AC())
         target = ((HbmCursorSelfView*)self)->v_0x2AC();
     ((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x008(0, 0, self->position, target, hbmKbCursorScrollFrames);
@@ -1160,13 +1338,13 @@ void hbmKbCursorInput(HbmCursorInput* self, u32 channel, u32 trigger, u32 held, 
             return;
         }
         if (trigger & 1)
-            self->arrows->v_0x014(0, 4);
+            self->arrows->select(0, 4);
         if (release & 1)
-            self->arrows->v_0x014(0, 3);
+            self->arrows->select(0, 3);
         if (trigger & 0x4000)
-            self->arrows->v_0x014(1, 4);
+            self->arrows->select(1, 4);
         if (release & 0x4000)
-            self->arrows->v_0x014(1, 3);
+            self->arrows->select(1, 3);
         if (held & 1) {
             if (((HbmCursorSelfView*)self)->v_0x2A8() <= self->position) {
                 ((HbmCursorSelfView*)self)->v_0x244(self->position - 3.5f);
@@ -1176,9 +1354,9 @@ void hbmKbCursorInput(HbmCursorInput* self, u32 channel, u32 trigger, u32 held, 
                     ((HbmCursorSelfView*)self)->v_0x17C(26);
                 }
             }
-            self->arrows->v_0x014(0, 4);
+            self->arrows->select(0, 4);
         } else {
-            self->arrows->v_0x014(0, 3);
+            self->arrows->select(0, 3);
         }
         if (held & 0x4000) {
             if (((HbmCursorSelfView*)self)->v_0x2AC() >= self->position) {
@@ -1189,9 +1367,9 @@ void hbmKbCursorInput(HbmCursorInput* self, u32 channel, u32 trigger, u32 held, 
                     ((HbmCursorSelfView*)self)->v_0x17C(26);
                 }
             }
-            self->arrows->v_0x014(1, 4);
+            self->arrows->select(1, 4);
         } else {
-            self->arrows->v_0x014(1, 3);
+            self->arrows->select(1, 3);
         }
     }
     hbmKbWidgetInput_c1(self, channel, trigger, held, release, repeat, x, y);
@@ -1242,7 +1420,7 @@ void hbmKbCursorCalc(HbmCursorInput* self)
         self->manager()->findTextBox("N_TopBtn_00")->CalculateMtx(self->drawInfo);
         self->manager()->findTextBox("N_TopBtn_00")->Draw(self->drawInfo);
     }
-    self->rows = ((HbmCursorTextView*)&self->parts)->v_0x034();
+    self->rows = ((HbmCursorTextView*)&self->textBlock)->v_0x034();
     if (self->rows <= 4)
         self->rows = 4;
 }
@@ -1293,7 +1471,7 @@ void hbmKbCursorUpdate(HbmCursorInput* self)
                          HbmCursorPoint(0.0f, self->position));
 
     {
-        f32 height = (f32)self->rows * ((HbmCursorTextView*)&self->parts)->v_0x028();
+        f32 height = (f32)self->rows * ((HbmCursorTextView*)&self->textBlock)->v_0x028();
         f32 y = self->buttonTranslate.y - (height - self->buttonHeight) * 0.5f;
 
         self->textBoxButtonPane->mSize = nw4r::lyt::Size(self->textBoxButtonPane->mSize.width, height);
@@ -1316,10 +1494,10 @@ void hbmKbCursorUpdate(HbmCursorInput* self)
         self->buttonRect.top = origin.y + scale.y * (rect.top - rect.bottom);
     }
 
-    textHeight = (f32)self->rows * ((HbmCursorTextView*)&self->parts)->v_0x028();
+    textHeight = (f32)self->rows * ((HbmCursorTextView*)&self->textBlock)->v_0x028();
     textTop = self->textBoxTranslate.y - (textHeight - self->textBoxHeight) * 0.5f;
     if (self->mode == 2) {
-        textHeight = hbmKbCursorTwoRows * ((HbmCursorTextView*)&self->parts)->v_0x028();
+        textHeight = hbmKbCursorTwoRows * ((HbmCursorTextView*)&self->textBlock)->v_0x028();
         textTop = self->textBoxTranslate.y - (textHeight - self->textBoxHeight) * 0.5f - self->position;
     } else {
         self->textOffset = hbmKbCursorRestOffset;
@@ -1340,7 +1518,7 @@ void hbmKbCursorUpdate(HbmCursorInput* self)
         if (((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x014() == 0) {
             f32 textEnd;
 
-            if (self->position - ((HbmCursorTextView*)&self->parts)->v_0x028() * 0.5f > 0.0f) {
+            if (self->position - ((HbmCursorTextView*)&self->textBlock)->v_0x028() * 0.5f > 0.0f) {
                 if (self->upArrowShown == 0) {
                     self->manager()->getPaneAnim("P_txtScrll_UP")->setState(5);
                     self->manager()->mpRoot->findComponent(self->manager()->findTextBox("B_txtScrll_UP"))->v_0x010();
@@ -1351,9 +1529,9 @@ void hbmKbCursorUpdate(HbmCursorInput* self)
                     self->manager()->getPaneAnim("P_txtScrll_UP")->setState(6);
                 self->upArrowShown = 0;
             }
-            textEnd = ((HbmCursorTextView*)&self->parts)->v_0x028();
-            textEnd = (f32)((HbmCursorTextView*)&self->parts)->v_0x034() * textEnd;
-            if (self->position + textHeight + ((HbmCursorTextView*)&self->parts)->v_0x028() * 0.5f < textEnd) {
+            textEnd = ((HbmCursorTextView*)&self->textBlock)->v_0x028();
+            textEnd = (f32)((HbmCursorTextView*)&self->textBlock)->v_0x034() * textEnd;
+            if (self->position + textHeight + ((HbmCursorTextView*)&self->textBlock)->v_0x028() * 0.5f < textEnd) {
                 if (self->downArrowShown == 0) {
                     self->manager()->getPaneAnim("P_txtScrll_DOWN")->setState(5);
                     self->manager()->mpRoot->findComponent(self->manager()->findTextBox("B_txtScrll_DOWN"))->v_0x010();
@@ -1380,22 +1558,22 @@ void hbmKbCursorUpdate(HbmCursorInput* self)
         hbmKbCursorPlacePane(bar, HbmCursorPoint(bar->mTranslate.x, 0.0f));
     }
     if (self->mode == 1) {
-        self->arrows->v_0x010();
+        self->arrows->update();
         if (self->dirty == 0) {
             if (self->leftPressed != 0 && ((HbmCursorSelfView*)self)->v_0x2A8() >= self->position) {
                 self->leftPressed = 0;
-                self->arrows->v_0x014(0, 2);
+                self->arrows->select(0, 2);
             } else if (self->leftPressed == 0 && ((HbmCursorSelfView*)self)->v_0x2A8() < self->position) {
                 self->leftPressed = 1;
-                self->arrows->v_0x014(0, 1);
+                self->arrows->select(0, 1);
             }
             if (self->rightPressed != 0 && ((HbmCursorSelfView*)self)->v_0x2AC() <= self->position) {
                 self->rightPressed = 0;
-                self->arrows->v_0x014(1, 2);
+                self->arrows->select(1, 2);
             }
             if (self->rightPressed == 0 && ((HbmCursorSelfView*)self)->v_0x2AC() > self->position) {
                 self->rightPressed = 1;
-                self->arrows->v_0x014(1, 1);
+                self->arrows->select(1, 1);
             }
             if (self->popup != 0)
                 self->popup->v_0x014();
@@ -1415,20 +1593,20 @@ void hbmKbCursorScrollToCaret(HbmCursorInput* self)
     if ((u32)(self->scrollRequest - 1) > 1)
         return;
     if (self->mode == 2) {
-        bottom = self->caretTop + ((HbmCursorTextView*)&self->parts)->v_0x028() / 2.0f;
+        bottom = self->caretTop + ((HbmCursorTextView*)&self->textBlock)->v_0x028() / 2.0f;
         if (self->position > bottom) {
-            s32 lines = (s32)((self->position - self->caretTop) / ((HbmCursorTextView*)&self->parts)->v_0x028());
+            s32 lines = (s32)((self->position - self->caretTop) / ((HbmCursorTextView*)&self->textBlock)->v_0x028());
 
             ((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x008(0, 0, self->position,
-                self->position - (f32)lines * ((HbmCursorTextView*)&self->parts)->v_0x028(), hbmKbCursorScrollFrames);
+                self->position - (f32)lines * ((HbmCursorTextView*)&self->textBlock)->v_0x028(), hbmKbCursorScrollFrames);
             ((HbmCursorSelfView*)self)->v_0x17C(11);
         }
-        if (self->position + hbmKbCursorTwoRows * ((HbmCursorTextView*)&self->parts)->v_0x028() < bottom) {
-            s32 lines = (s32)((bottom - (self->position + hbmKbCursorTwoRows * ((HbmCursorTextView*)&self->parts)->v_0x028()))
-                              / ((HbmCursorTextView*)&self->parts)->v_0x028()) + 1;
+        if (self->position + hbmKbCursorTwoRows * ((HbmCursorTextView*)&self->textBlock)->v_0x028() < bottom) {
+            s32 lines = (s32)((bottom - (self->position + hbmKbCursorTwoRows * ((HbmCursorTextView*)&self->textBlock)->v_0x028()))
+                              / ((HbmCursorTextView*)&self->textBlock)->v_0x028()) + 1;
 
             ((HbmCursorScrollerView*)&self->scroll_1BAC)->v_0x008(0, 0, self->position,
-                self->position + (f32)lines * ((HbmCursorTextView*)&self->parts)->v_0x028(), hbmKbCursorScrollFrames);
+                self->position + (f32)lines * ((HbmCursorTextView*)&self->textBlock)->v_0x028(), hbmKbCursorScrollFrames);
             ((HbmCursorSelfView*)self)->v_0x17C(11);
         }
     }
@@ -1451,12 +1629,12 @@ void hbmKbCursorIgnorePositionChange(KbObject* self) { (void)self; }
  * last laid-out row (at most the line limit). */
 u32 hbmKbCursorHitTest(HbmCursorInput* self, f32 x, f32 y)
 {
-    u32 lines = ((HbmCursorTextView*)&self->parts)->v_0x034();
+    u32 lines = ((HbmCursorTextView*)&self->textBlock)->v_0x034();
 
     if (lines > self->maxLines)
         lines = self->maxLines;
-    if (y + self->position > (f32)lines * ((HbmCursorTextView*)&self->parts)->v_0x028())
-        return hbmPanelHitTest((HbmPanelView*)self, x, (f32)lines * ((HbmCursorTextView*)&self->parts)->v_0x028());
+    if (y + self->position > (f32)lines * ((HbmCursorTextView*)&self->textBlock)->v_0x028())
+        return hbmPanelHitTest((HbmPanelView*)self, x, (f32)lines * ((HbmCursorTextView*)&self->textBlock)->v_0x028());
     return hbmPanelHitTest((HbmPanelView*)self, x, y + self->position);
 }
 
@@ -1545,11 +1723,11 @@ void hbmKbCursorRefreshShift(HbmCursorInput* self)
     else
         ((HbmCursorTailView*)&((KbObject*)self)->tail_0x1A04)->v_0x05C(lbl_80794728)->v_0x014(3);
     if (self->leftPressed != 0) {
-        self->arrows->v_0x014(0, 2);
+        self->arrows->select(0, 2);
         self->leftPressed = 0;
     }
     if (self->rightPressed != 0) {
-        self->arrows->v_0x014(1, 2);
+        self->arrows->select(1, 2);
         self->rightPressed = 0;
     }
     self->dirty = 1;
@@ -1602,7 +1780,7 @@ f32 fn_805694C0(KbObject* self)
 /* 0x805694F4 (0x60): the text block's height: the row height times the row count. */
 f32 hbmKbCursorTextHeight(HbmCursorInput* self)
 {
-    return ((HbmCursorTextView*)&self->parts)->v_0x028() * (f32)self->rows;
+    return ((HbmCursorTextView*)&self->textBlock)->v_0x028() * (f32)self->rows;
 }
 
 /* 0x80569554 (0x70): in mode 1, posts event 25 while the popup is open. */
@@ -1698,39 +1876,38 @@ void fn_80569998(KbObject* self) { (void)self; }
 /* 0x8056999C (0x1FC): the keyboard's pane handler (slot 0x18): runs the text panel's listener, then on a press (4 with
  * trigger bit 0x10), a pointer entering (0) or leaving (1) the portrait button or an arrow button, calls the keyboard's
  * matching slot. */
-void hbmKbCursorOnPaneEvent(HbmCursorPaneHandler* self, HbmCursorPaneComponent* component, u32 event,
-                            HbmCursorPaneTrigger* trigger)
+void HbmKbCursorPaneHandler::onPaneEvent(HbmComponent* pComponent, u32 event, HbmPaneTrigger* pTrigger)
 {
     const char* name;
 
-    hbmTextPaneListenerOnEvent((HbmTextPaneListener*)self, (HbmPaneComponentView*)component, event,
-                               (HbmPointerInfo*)trigger);
-    name = component->pane->mName;
+    hbmTextPaneListenerOnEvent((HbmTextPaneListener*)this, (HbmPaneComponentView*)pComponent, event,
+                               (HbmPointerInfo*)pTrigger);
+    name = pComponent->mpPane->mName;
     if (name[0] != 'B')
         return;
-    if (event == 4 && (trigger->trigger & 0x10)) {
+    if (event == 4 && (pTrigger->trigger & 0x10)) {
         if (hbmNameMatches("B_Nigaoe", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x270();
+            ((HbmCursorSelfView*)keyboard)->v_0x270();
         if (hbmNameMatches("B_ArwR", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x290();
+            ((HbmCursorSelfView*)keyboard)->v_0x290();
         if (hbmNameMatches("B_ArwL", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x294();
+            ((HbmCursorSelfView*)keyboard)->v_0x294();
     }
     if (event == 0) {
         if (hbmNameMatches("B_Nigaoe", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x274();
+            ((HbmCursorSelfView*)keyboard)->v_0x274();
         if (hbmNameMatches("B_ArwR", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x280();
+            ((HbmCursorSelfView*)keyboard)->v_0x280();
         if (hbmNameMatches("B_ArwL", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x288();
+            ((HbmCursorSelfView*)keyboard)->v_0x288();
     }
     if (event == 1) {
         if (hbmNameMatches("B_Nigaoe", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x278();
+            ((HbmCursorSelfView*)keyboard)->v_0x278();
         if (hbmNameMatches("B_ArwR", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x284();
+            ((HbmCursorSelfView*)keyboard)->v_0x284();
         if (hbmNameMatches("B_ArwL", name))
-            ((HbmCursorSelfView*)self->keyboard)->v_0x28C();
+            ((HbmCursorSelfView*)keyboard)->v_0x28C();
     }
 }
 
@@ -1738,7 +1915,8 @@ void fn_80569B98(HbmKey* key, u32 state) { key->HbmKey::setState(state); }
 
 void fn_80569B9C(KbObject* self) { (void)self; }
 
-void fn_80569BA0(KbObject* self) { (void)self; }
+/* Draws nothing. */
+void HbmKbCursorArrows::draw() {}
 
 /* Returns the part's state. */
 u32 HbmKbCursorPart::getState() {
@@ -1787,13 +1965,8 @@ void  fn_80569C94(KbObject* self, void* value) { self->tail_0x1A04.field_0x1C8 =
 
 f32 fn_80569C9C(KbObject* self) { return self->tail_0x1A04.float_0x100; }
 
-/* 0x80569CA4 (0x40): deleting destructor of a part with an empty destructor. */
-HbmWidget* hbmKbCursorRecordDelete(HbmWidget* self, s32 flag)
-{
-    if (self != 0 && flag > 0)
-        operator delete(self);
-    return self;
-}
+/* Destroys the pane handler. */
+HbmKbCursorPaneHandler::~HbmKbCursorPaneHandler() {}
 
 /* Destroys the cursor key. */
 HbmKbCursorKey::~HbmKbCursorKey() {
