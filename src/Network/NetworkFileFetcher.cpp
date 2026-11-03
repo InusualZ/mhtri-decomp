@@ -10,8 +10,9 @@
  * NAMES. Every member name except `NetworkFileFetcher` and its constructor (the map's) is a GUESS from the bodies: the
  *   command numbers, the "unsupported" `write`/`remove` slots, the reply bits; `sendReqBinaryChecksum` (0x80400F28,
  *   request op 0x47) too.  `Network/NetworkFileFetcher.h` also declares the three neighbour units' classes.
- * RESIDUALS. `onReply`: the read reply's `transferred_20` copy sits in r4 and the available byte count in r7, retail the
- *   other way round (all 24 declaration orders of the locals measured).  The error code 0x800A0004 is relocated in the
+ * SHAPES. `onReply` reads `transferred_20` once into the named local `done` (retail keeps it in r7, the available
+ *   count in r4; re-reading the field swaps the two).
+ * RESIDUALS. The error code 0x800A0004 is relocated in the
  *   target (`ef_anim_curve_f32+0x7A8`); `config.yml`'s `block_relocations` entries remove those relocations.
  *   `extab` (6 B): retail records no cleanup around `getInstance_`, which is nothrow there; `__attribute__((nothrow))`
  *   on its declaration in `enemy/em020_ai.h` closes the section.
@@ -430,6 +431,7 @@ void NetworkFileFetcher::onReply(u32 code, s32 requestId, s32 b, s32 c, const u3
     u32 start;
     u32 available;
     u32 size;
+    u32 done;
 
     switch (code) {
     case 0x8000:
@@ -454,19 +456,20 @@ void NetworkFileFetcher::onReply(u32 code, s32 requestId, s32 b, s32 c, const u3
         replies_10 |= 0x80;
         break;
     case 0x800B:
-        position = offset_3C + transferred_20;
+        done = transferred_20;
+        position = offset_3C + done;
         start = message[1];
         if (start + message[2] <= position || position < start) {
             replies_10 |= 2;
             break;
         }
         available = start + message[2] - position;
-        size = bufferSize_38 - transferred_20;
+        size = bufferSize_38 - done;
         if (available < size) {
             size = available;
         }
         if (size != 0 && buffer_34 != NULL) {
-            memcpy(buffer_34 + transferred_20, (const u8*)message[3] + (position - start), size);
+            memcpy(buffer_34 + done, (const u8*)message[3] + (position - start), size);
         }
         transferred_20 += size;
         replies_10 |= 0x100;
