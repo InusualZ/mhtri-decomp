@@ -1,9 +1,9 @@
 /*
  * enemy/em015_prog.cpp - enemy 015's program: the `em015_prog_tbl` entry points (init, frame update, action run,
  *   motion/event hooks, TEV colour, state queries), the per-action dispatchers and their motion steps, the sound
- *   programs of actions 10 and 11, the demo steps, the per-motion event driver and the static initialiser.
+ *   programs of actions 10 and 11, the demo steps, the per-motion event driver; MWCC's `__sinit_\em015_prog_cpp` builds the `.bss` sound-offset object.
  * RANGE. .text 0x80176C30-0x80182C40 (112 functions); extab 0x8000E6D4-0x8000E9E4, extabindex
- *   0x80029928-0x80029DC0, .ctors 0x8056F338-0x8056F33C (`em015_static_init`), .rodata 0x8056FDD0-0x8056FF50 (the
+ *   0x80029928-0x80029DC0, .ctors 0x8056F338-0x8056F33C (`__sinit_\em015_prog_cpp`), .rodata 0x8056FDD0-0x8056FF50 (the
  *   six turn tables), .data 0x805A94A0-0x805AA930 (`em015_prog_tbl` first), .bss 0x806A79D0-0x806A7A00
  *   (`em015_se_shift`), .sdata2 0x80797B10-0x80797E88.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi`+`cmpwi` and `addi`+`stb`
@@ -21,11 +21,11 @@
  *   em015_back_step, em015_thunder_ball, em015_thunder_ball_aimed, em015_rolling_charge, em015_turn_slam,
  *   em015_thunder_burst, em015_thunder_burst_great, em015_reposition, em015_demo_dive_in, em015_demo_wake,
  *   em015_demo_arena, em015_mouth_sparks, em015_color_step, em015_step_toward, em015_part_flag_set,
- *   em015_ally_front_ck, em015_damage_level, em015_aim_set, em015_spawn_rec_set, `Em015UserData`,
- *   em015_static_init.
+ *   em015_ally_front_ck, em015_damage_level, em015_aim_set, em015_spawn_rec_set, `Em015UserData`.
  *   GUESS (data): em015_turn_seq_*, em015_area_follow_tbl, em015_area_point_tbl, em015_se_seq_<sub-state> and
  *   em015_se_alt_seq_<sub-state> (the sub-state that first plays each table) with their em015_se_rec/pos/ofs records,
- *   em015_demo_keys, em015_se_shift; the `Em015ProgTbl` slot names.
+ *   em015_demo_keys, em015_se_shift; the `Em015ProgTbl` slot names, `Em015SeShift`; `__sinit_\em015_prog_cpp` is the
+ *   compiler's.
  * RESIDUALS. `em015_rest`: retail colours `self` r31 and `kind`/`limit` r30, ours the other way round (the local's
  *   declaration place, an `if`/`else` select and a `u8`/`s32` parameter all leave it).
  *   `.sdata2` is 0x374 against the 0x378 claim: the last word is the alignment pad before the next unit's pool.
@@ -267,10 +267,33 @@ void em015_aim_reset(_ENEMY_WORK* self);
 u8 em015_damage_level(_ENEMY_WORK* self);
 void em015_aim_set(_ENEMY_WORK* self);
 void em015_spawn_rec_set(EmSpawnRec* out, u8 a, u16 b, u16 c);
-void em015_static_init(void);
 
-/* The four 0xC-byte vectors `em015_static_init` seeds. */
-extern nw4r::math::VEC3 em015_se_shift[4];
+/* The two sound-offset pairs (a point and its per-frame step each), built as one object by MWCC's `__sinit`
+ * (0x80182B94): each vector is set through `setVec3` into a temporary and copied with `assignVec3`; the sound
+ * records point at `pos_a` and `pos_b`.  size: 0x30 */
+struct Em015SeShift {
+    /* +0x00 */ nw4r::math::VEC3 pos_a;
+    /* +0x0C */ nw4r::math::VEC3 step_a;
+    /* +0x18 */ nw4r::math::VEC3 pos_b;
+    /* +0x24 */ nw4r::math::VEC3 step_b;
+
+    /* Builds (0, 0, 12.5), (0, 0, 0), (2, 0, 0) and (0, 0, 0). */
+    Em015SeShift()
+    {
+        nw4r::math::VEC3 d;
+        nw4r::math::VEC3 c;
+        nw4r::math::VEC3 b;
+        nw4r::math::VEC3 a;
+
+        assignVec3_c1(&pos_a, setVec3(&a, 0.0f, 0.0f, 12.5f));
+        assignVec3_c1(&step_a, setVec3(&b, 0.0f, 0.0f, 0.0f));
+        assignVec3_c1(&pos_b, setVec3(&c, 2.0f, 0.0f, 0.0f));
+        assignVec3_c1(&step_b, setVec3(&d, 0.0f, 0.0f, 0.0f));
+    }
+};
+
+/* The sound-offset object `__sinit` seeds (`.bss`, defined at the end). */
+extern Em015SeShift em015_se_shift;
 }
 
 #pragma peephole off
@@ -3501,11 +3524,11 @@ __declspec(section ".data") EmSeOffset em015_se_ofs_1C_a = {10.0f, 82.0f};
 
 __declspec(section ".data") EmSeOffset em015_se_ofs_1C_b = {64.0f, 114.0f};
 
-EmSeRecord em015_se_rec_1C_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift[0]};
+EmSeRecord em015_se_rec_1C_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_a};
 
 EmSeRecord em015_se_rec_1C_b = {126, 0, 0, 0, 0, {0, 4, 0, 0}, 0};
 
-EmSeRecord em015_se_rec_1C_c = {127, 0, 8, 0, 0, {0, 1, 0, 0}, (const EmSeOffset*)&em015_se_shift[2]};
+EmSeRecord em015_se_rec_1C_c = {127, 0, 8, 0, 0, {0, 1, 0, 0}, (const EmSeOffset*)&em015_se_shift.pos_b};
 
 EmSeEntry em015_se_seq_1C[9] = {
     {0x0A, {0, 0, 0}, (const EmSeRecord*)&em015_se_pos_1C_a},
@@ -3566,11 +3589,11 @@ EmSeEntry em015_se_seq_7E[6] = {
     {0xFE, {0, 0, 0}, 0},
 };
 
-EmSeRecord em015_se_rec_7F_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift[0]};
+EmSeRecord em015_se_rec_7F_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_a};
 
 EmSeRecord em015_se_rec_7F_b = {126, 0, 0, 0, 0, {1, 0, 0, 0}, 0};
 
-EmSeRecord em015_se_rec_7F_c = {127, 0, 8, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift[2]};
+EmSeRecord em015_se_rec_7F_c = {127, 0, 8, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_b};
 
 EmSeEntry em015_se_seq_7F[8] = {
     {0x0A, {0, 0, 0}, (const EmSeRecord*)&em015_se_pos_1C_a},
@@ -5787,21 +5810,6 @@ void em015_spawn_rec_set(EmSpawnRec* out, u8 a, u16 b, u16 c) {
 Em015UserData::~Em015UserData() {
 }
 
-/* 0x80182B94 (0xAC): the static initialiser: seeds the four sound-offset vectors. */
-void em015_static_init(void) {
-    VEC3 a;
-    VEC3 b;
-    VEC3 c;
-    VEC3 d;
-    assignVec3_c1(&em015_se_shift[0], setVec3(&a, 0.0f, 0.0f, 12.5f));
-    assignVec3_c1(&em015_se_shift[1], setVec3(&b, 0.0f, 0.0f, 0.0f));
-    assignVec3_c1(&em015_se_shift[2], setVec3(&c, 2.0f, 0.0f, 0.0f));
-    assignVec3_c1(&em015_se_shift[3], setVec3(&d, 0.0f, 0.0f, 0.0f));
-}
-
-/* The `.ctors` word (0x8056F338) the split assigns to this unit - it points at the static initialiser. */
-__declspec(section ".ctors") void* const em015_ctor = (void*)em015_static_init;
-
-/* The unit's `.bss`: the four-vector table `em015_static_init` fills (the map's second row at +0x18 is folded
- * in).  The name is a GUESS. */
-VEC3 em015_se_shift[4];  /* +0x806A79D0 */
+/* The unit's `.bss`: the sound-offset object MWCC's `__sinit` (0x80182B94) seeds (the map's second row at +0x18 is
+ * folded in); the `.ctors` word (0x8056F338) is the compiler's own anonymous entry for it.  The name is a GUESS. */
+Em015SeShift em015_se_shift;  /* +0x806A79D0 */

@@ -2,9 +2,9 @@
  * enemy/em012_prog.cpp - enemy 012's program: the `em012_prog_tbl` entry points (reset, init, frame update,
  *   action dispatch, event hook, motion events, tev colour, state query, area start, gauge, part gates, action
  *   selection), the per-action state steps the `state_sub` dispatchers select, the two sound programs, the demo
- *   (cut-scene) steps, the effect router and the static initializer.
+ *   (cut-scene) steps, the effect router; MWCC's `__sinit_\em012_prog_cpp` builds the two `.bss` vector pairs.
  * RANGE. .text 0x80170600-0x80176C30 (67 functions); extab 0x8000E52C-0x8000E6D4, extabindex
- *   0x800296AC-0x80029928, .ctors 0x8056F334-0x8056F338 (`em012_static_init`), .rodata 0x8056FD10-0x8056FDD0, .data
+ *   0x800296AC-0x80029928, .ctors 0x8056F334-0x8056F338 (`__sinit_\em012_prog_cpp`), .rodata 0x8056FD10-0x8056FDD0, .data
  *   0x805A8370-0x805A94A0 (`em012_prog_tbl` first), .bss 0x806A79A0-0x806A79D0, .sdata 0x80791A58-0x80791A60,
  *   .sdata2 0x80797910-0x80797B10.
  * FLAGS. `cflags_main`; `#pragma peephole off` file-wide except `em012_act1_12`..`em012_act1_dispatch` (on),
@@ -15,18 +15,18 @@
  *   em012_area_start_set, em012_gauge_update, em012_part_level_ck, em012_part_drop, em012_action_select.
  *   GUESS (dispatcher slot): em012_act<action>_<first sub-state> and em012_act<action>_dispatch,
  *   em012_act10_se_play, em012_act11_se_play; GUESS (from the bodies): em012_spawn_call, em012_alt_mode_effect,
- *   em012_effect_spawn, em012_area_move_armed_ck, em012_spawn_rec_set, em012_static_init.
+ *   em012_effect_spawn, em012_area_move_armed_ck, em012_spawn_rec_set.
  *   GUESS (data): em012_turn_seq_0..2, em012_pick_tbl, em012_demo_keys, em012_se_seq_<sub-state>,
  *   em012_se_seq_alt_<sub-state>, em012_se_rec_<seq>[_a..], em012_se_pos_0, em012_vec_pair_0/1, the
- *   `Em012ProgTbl` slot names; `EmAreaEntry::kind_0x08`/`entry_0x09`.
+ *   `Em012ProgTbl` slot names, `Em012VecPair`; `__sinit_\em012_prog_cpp` is the compiler's; `EmAreaEntry::kind_0x08`/`entry_0x09`.
  * RESIDUALS. 4 rows short of the target, every data section byte-identical:
  *   `em012_state_ck` - the pack count's `count <= 1U` gives `subfic`/`orc` with swapped operands where retail
  *   has `li r3,2; subi; orc` (`count < 2` forms are worse), and self/count take r31/r30 swapped.
  *   `em012_tev_color_update` - the rim/body constants are staged in r0/r3 where retail loads them straight into
  *   r6/r9.  `em012_act7_1` - `fmuls f0,f31,f0` operand order of the scale product.  `em012_action_select` -
  *   the first area selector lands in r0 where retail uses r4.
- *   flipcheck: the STOPGAP callee `em_mot_window_base_get` (request `enemy-em012#1`, the registry's proposal for
- *   0x8012EC74) is not a map name yet, so a flip links `undefined` until that rename lands.
+ *   flipcheck: the `em012_state_ck`, `em012_tev_color_update` and `em012_act7_1` registers.  `em_mot_window_base_get`
+ *   (0x8012EC74, `enemy/em_common.cpp`) is declared here under STOPGAP `enemy-em012#1` until its owner's header carries it.
  * SHAPES. A one-case test retail compares signed (`cmpwi`) is a `switch` (`em012_motion_events`,
  *   `em012_act2_27`).  A case-level `return` at the end of a state switch costs a `b`: the steps `break`.
  *   `em_mot_finished_ck`, `em_ground_ck`, `em_fall_start`, `assignVec3` and `em_act_arm_unless_down` are called
@@ -160,9 +160,26 @@ extern "C" const u32 em012_turn_seq_2[16] = {
 /* The pick record `em012_action_select` hands `em_pack_area_pick` (`.sdata`). */
 u8 em012_pick_tbl[8] = {0x00, 0x00, 0x00, 0x1E, 0xFF, 0xFF, 0x00, 0x00};
 
-/* The two vector pairs `em012_static_init` seeds (`.bss`, defined at the end); two sound records point at them. */
-extern VEC3 em012_vec_pair_0[2];
-extern VEC3 em012_vec_pair_1[2];
+/* A model-space point and its per-frame step, built by MWCC's `__sinit` (0x80176B7C): each vector is set through
+ * `setVec3` into a temporary and copied with `assignVec3`; two sound records point at the first vector.  size: 0x18 */
+struct Em012VecPair {
+    /* +0x00 */ VEC3 pos;
+    /* +0x0C */ VEC3 step;
+
+    /* Builds (0, y, z) and (0, dy, 0). */
+    Em012VecPair(f32 y, f32 z, f32 dy)
+    {
+        VEC3 b;
+        VEC3 a;
+
+        assignVec3_c1(&pos, setVec3(&a, 0.0f, y, z));
+        assignVec3_c1(&step, setVec3(&b, 0.0f, dy, 0.0f));
+    }
+};
+
+/* The two vector pairs `__sinit` seeds (`.bss`, defined at the end). */
+extern Em012VecPair em012_vec_pair_0;
+extern Em012VecPair em012_vec_pair_1;
 
 extern "C" {
 
@@ -232,8 +249,6 @@ void em012_part_drop(_ENEMY_WORK* self, u32 arg);
 s32 em012_action_select(_ENEMY_WORK *self, u16 arg);
 s32 em012_area_move_armed_ck(_ENEMY_WORK *self);
 void em012_spawn_rec_set(EmSpawnRec *rec, u8 arg1, u16 arg2, u16 arg3);
-
-void em012_static_init(void);
 
 Em012ProgTbl em012_prog_tbl = {
     em012_reset,
@@ -1561,7 +1576,7 @@ EmSeEntry em012_se_seq_18[2] = {
 
 EmSePos em012_se_pos_0 = {0.0f, 38.0f, 0, -32768, 0};
 
-EmSeRecord em012_se_rec_23_a = {0x66, 0, 0, 0, 0, {0, 2, 2, 0}, (const EmSeOffset*)&em012_vec_pair_0[0]};
+EmSeRecord em012_se_rec_23_a = {0x66, 0, 0, 0, 0, {0, 2, 2, 0}, (const EmSeOffset*)&em012_vec_pair_0.pos};
 
 EmSeRecord em012_se_rec_23_b = {0x67, 0, 0, 0, 0, {0, 1, 0, 0}, 0};
 
@@ -1654,7 +1669,7 @@ EmSeEntry em012_se_seq_B7[2] = {
     {0xFE, {0, 0, 0}, 0},
 };
 
-EmSeRecord em012_se_rec_B8_a = {0x4, 0, 4, 0, 0, {0, 2, 2, 0}, (const EmSeOffset*)&em012_vec_pair_1[0]};
+EmSeRecord em012_se_rec_B8_a = {0x4, 0, 4, 0, 0, {0, 2, 2, 0}, (const EmSeOffset*)&em012_vec_pair_1.pos};
 
 EmSeRecord em012_se_rec_B8_b = {0x23, 0, 0, 0, 0, {0, 1, 0, 0}, 0};
 
@@ -1699,7 +1714,7 @@ EmSeEntry em012_se_seq_BF[5] = {
     {0xFE, {0, 0, 0}, 0},
 };
 
-EmSeRecord em012_se_rec_alt_00_a = {0x66, 0, 0, 0, 0, {0, 2, 2, 0}, (const EmSeOffset*)&em012_vec_pair_0[0]};
+EmSeRecord em012_se_rec_alt_00_a = {0x66, 0, 0, 0, 0, {0, 2, 2, 0}, (const EmSeOffset*)&em012_vec_pair_0.pos};
 
 EmSeRecord em012_se_rec_alt_00_b = {0x67, 0, 0, 0, 0, {0, 1, 0, 0}, 0};
 
@@ -3318,23 +3333,7 @@ void em012_spawn_rec_set(EmSpawnRec *rec, u8 arg1, u16 arg2, u16 arg3) {
 
 }
 
-/* The unit's `.bss`: the two two-vector records `em012_static_init` seeds (each a pair of model-space points). */
-VEC3 em012_vec_pair_0[2]; /* 0x806A79A0 */
-VEC3 em012_vec_pair_1[2]; /* 0x806A79B8 */
-
-/* 0x80176B7C (0xB4): the static initializer: seeds the two vector pairs. */
-extern "C" void em012_static_init(void)
-{
-    VEC3 v3;
-    VEC3 v2;
-    VEC3 v1;
-    VEC3 v0;
-
-    assignVec3_c1(&em012_vec_pair_0[0], setVec3(&v3, 0.0f, 38.0f, -25.0f));
-    assignVec3_c1(&em012_vec_pair_0[1], setVec3(&v2, 0.0f, -5.0f, 0.0f));
-    assignVec3_c1(&em012_vec_pair_1[0], setVec3(&v1, 0.0f, 45.0f, 0.0f));
-    assignVec3_c1(&em012_vec_pair_1[1], setVec3(&v0, 0.0f, -5.0f, 0.0f));
-}
-
-/* The `.ctors` word (0x8056F334) - it points at the static initializer. */
-__declspec(section ".ctors") void* const em012_ctor = (void*)em012_static_init;
+/* The unit's `.bss`: the two vector pairs MWCC's `__sinit` (0x80176B7C) seeds; the `.ctors` word (0x8056F334) is
+ * the compiler's own anonymous entry for it. */
+Em012VecPair em012_vec_pair_0(38.0f, -25.0f, -5.0f); /* 0x806A79A0 */
+Em012VecPair em012_vec_pair_1(45.0f, 0.0f, -5.0f);   /* 0x806A79B8 */

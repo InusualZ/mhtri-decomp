@@ -2,9 +2,9 @@
  * enemy/em008_prog.cpp - enemy 008's program: the `em008_prog_tbl` entry points (init, frame update, action run,
  *   motion/event hooks, state queries, part breaks, the area-start check), the per-action dispatchers and their motion
  *   steps, the sound programs of actions 10 and 11, the arena demo, the per-motion event driver, the user-data record
- *   methods and the static initialiser.
+ *   methods; MWCC's `__sinit_\em008_prog_cpp` builds the two `.bss` vector pairs.
  * RANGE. .text 0x8015D860-0x801663E4 (88 functions); extab 0x8000DFA4-0x8000E1D4, extabindex
- *   0x80028E60-0x800291A8, .ctors 0x8056F328-0x8056F32C (`em008_static_init`), .rodata 0x8056FB50-0x8056FC10 (the
+ *   0x80028E60-0x800291A8, .ctors 0x8056F328-0x8056F32C (`__sinit_\em008_prog_cpp`), .rodata 0x8056FB50-0x8056FC10 (the
  *   three turn tables), .data 0x805A5D48-0x805A6D58 (`em008_prog_tbl` first), .bss 0x806A7868-0x806A7898
  *   (`em008_se_shift_a`/`_b`), .sdata2 0x80797330-0x807974F0.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs,
@@ -18,11 +18,11 @@
  *   GUESS (dispatcher slot): em008_act<action>_<first sub-state that runs it>, em008_act<N>_dispatch,
  *   em008_act2_approach, em008_act10_se_play, em008_act11_se_play; GUESS (from the bodies): em008_part_flags_seed,
  *   em008_part_flag_clear_ck, em008_part_pair_ck, em008_part_flags_count, em008_finish_act6/_act7 (the action they
- *   arm), em008_spawn_rec_set, em008_part_rec_update, em008_alt_mode_fx, em008_effect_spawn, em008_flag491_update,
- *   em008_static_init.
+ *   arm), em008_spawn_rec_set, em008_part_rec_update, em008_alt_mode_fx, em008_effect_spawn, em008_flag491_update.
  *   GUESS (data): em008_turn_seq_wait/_back/_side, em008_area_pick_tbl, em008_se_seq_<sub-state> and
  *   em008_se_alt_seq_<sub-state> (the sub-state that first plays each table) with their em008_se_rec/pos records,
- *   em008_se_shift_a/_b, em008_ctor; the `Em008ProgTbl` slot names; `Em008UserData`.
+ *   em008_se_shift_a/_b; the `Em008ProgTbl` slot names; `Em008VecPair`, `Em008UserData`.
+ *   `__sinit_\em008_prog_cpp` is the compiler's.
  *   `em_flag_0x8AD_ck` is called through the `_c1` view: its owner's header declares it `void`.
  * RESIDUALS. `em008_area_start_ck`: retail colours self/arg/seat/entry r28/r29/r30/r31, ours r31/r28/r29/r30 (the
  *   declaration order, an if/else or switch select, a u16 argument and dead call results all leave it).
@@ -221,7 +221,6 @@ s32 em008_alt_part_ck(_ENEMY_WORK* self, u8 arg1);
 s32 em008_part_break_ck(_ENEMY_WORK* self, u8 part);
 void em008_part_break_set(_ENEMY_WORK* self, u8 part);
 u32 em008_area_start_ck(_ENEMY_WORK* self, u32 arg1);
-void em008_static_init(void);
 }
 
 #pragma peephole off
@@ -307,9 +306,27 @@ extern "C" const u32 em008_turn_seq_side[16] = {
     0x00050000, 0x0000000A, 0x00000000, 0x00000000,
 };
 
-/* The two two-vector shift records `em008_static_init` seeds and the action-10 sound records point at (`.bss`). */
-extern "C" nw4r::math::VEC3 em008_se_shift_a[2];
-extern "C" nw4r::math::VEC3 em008_se_shift_b[2];
+/* A point and its per-frame step, built by MWCC's `__sinit` (0x80166330): each vector is set through `setVec3` into
+ * a temporary and copied with `assignVec3`; the action-10 sound records point at the first vector.  size: 0x18 */
+struct Em008VecPair {
+    /* +0x00 */ nw4r::math::VEC3 pos;
+    /* +0x0C */ nw4r::math::VEC3 step;
+
+    /* Builds (0, y, 0) and (0, dy, 0). */
+    Em008VecPair(f32 y, f32 dy)
+    {
+        VEC3 b;
+        VEC3 a;
+
+        assignVec3_view1(&pos, (VEC3*)setVec3(&a, 0.0f, y, 0.0f));
+        assignVec3_view1(&step, (VEC3*)setVec3(&b, 0.0f, dy, 0.0f));
+    }
+};
+
+/* The two two-vector shift records `__sinit` seeds and the action-10 sound records point at (`.bss`, defined at
+ * the end). */
+extern Em008VecPair em008_se_shift_a;
+extern Em008VecPair em008_se_shift_b;
 
 /* 0x8015D860 - seeds the action's flag byte: bit 2 for two damage levels on part 2, bit 0 and bit 5 for the
  * mask-2 and mask-1 probes. */
@@ -2473,9 +2490,9 @@ EmSeEntry em008_se_seq_B7[2] = {
     {0xFE, {0, 0, 0}, 0},
 };
 
-EmSeRecord em008_se_rec_B8_1 = {4, 0, 4, 0, 0, {0, 128, 3, 0}, (const EmSeOffset*)em008_se_shift_a};
+EmSeRecord em008_se_rec_B8_1 = {4, 0, 4, 0, 0, {0, 128, 3, 0}, (const EmSeOffset*)&em008_se_shift_a.pos};
 
-EmSeRecord em008_se_rec_B8_3 = {0, 0, 0, 0, 0, {0, 2, 3, 0}, (const EmSeOffset*)em008_se_shift_b};
+EmSeRecord em008_se_rec_B8_3 = {0, 0, 0, 0, 0, {0, 2, 3, 0}, (const EmSeOffset*)&em008_se_shift_b.pos};
 
 EmSeRecord em008_se_rec_B8_5 = {35, 0, 0, 0, 0, {0, 1, 0, 0}, 0};
 
@@ -4051,23 +4068,7 @@ void Em008UserData::CalcWorldEnd(nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl, 
 Em008UserData::~Em008UserData() {
 }
 
-/* 0x80166330 (0xB4): the static initialiser: seeds the two sound shift records. */
-void em008_static_init(void) {
-    VEC3 v0;
-    VEC3 v1;
-    VEC3 v2;
-    VEC3 v3;
-
-    /* `setVec3` returns its first argument, so the cast back to `VEC3*` costs no instruction. */
-    assignVec3_view1(&em008_se_shift_a[0], (VEC3*)setVec3(&v0, 0.0f, 100.0f, 0.0f));
-    assignVec3_view1(&em008_se_shift_a[1], (VEC3*)setVec3(&v1, 0.0f, -8.0f, 0.0f));
-    assignVec3_view1(&em008_se_shift_b[0], (VEC3*)setVec3(&v2, 0.0f, 0.0f, 0.0f));
-    assignVec3_view1(&em008_se_shift_b[1], (VEC3*)setVec3(&v3, 0.0f, -8.0f, 0.0f));
-}
-
-/* The `.ctors` word (0x8056F328) the split assigns to this unit - it points at the static initialiser. */
-__declspec(section ".ctors") void* const em008_ctor = (void*)em008_static_init;
-
-/* The unit's `.bss`: the two two-vector shift records `em008_static_init` seeds (GUESS names). */
-nw4r::math::VEC3 em008_se_shift_a[2];
-nw4r::math::VEC3 em008_se_shift_b[2];
+/* The unit's `.bss`: the two shift records MWCC's `__sinit` (0x80166330) seeds; the `.ctors` word (0x8056F328) is
+ * the compiler's own anonymous entry for it (GUESS names). */
+Em008VecPair em008_se_shift_a(100.0f, -8.0f);
+Em008VecPair em008_se_shift_b(0.0f, -8.0f);
