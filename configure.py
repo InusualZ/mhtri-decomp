@@ -627,7 +627,7 @@ config.libs = [
             Object(Matching, "menu/menu_effect_slot.cpp"),
             Object(Matching, "ef/eft045.cpp"),
             Object(Matching, "ef/eft046.cpp"),
-            Object(NonMatching, "menu/menu_quest.cpp"),
+            Object(Matching, "menu/menu_quest.cpp"),
             Object(NonMatching, "hud/lobby_hud.cpp"),
             Object(Matching, "menu/menu_item_page.cpp"),
             Object(Matching, "menu/menu_note.cpp"),
