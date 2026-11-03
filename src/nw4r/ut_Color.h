@@ -71,10 +71,15 @@ struct Color : public _GXColor {
         return ToU32ref();
     }
 
-    operator u32() const {
-        return ToU32ref();
-    }
+    operator u32() const;
 };
+
+/* Defined out of class: MWCC learns a callee is nothrow only from an out-of-class `inline` definition, and a
+ * caller that converts a Color temporary (g3d/g3d_resanm.cpp) then carries retail's 8-byte extab record instead
+ * of a cleanup range around the call (playbook idea 155). */
+inline Color::operator u32() const {
+    return ToU32ref();
+}
 
 }  // namespace ut
 }  // namespace nw4r

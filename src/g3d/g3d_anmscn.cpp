@@ -18,7 +18,7 @@
  *   res_anm_light_get_id, res_anm_fog_get_id, res_anm_camera_get_id.  The weak accessor copies keep their map stems
  *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
  * RESIDUALS. The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`,
- *   the map's fn_800651BC); fn_800651BC stays defined as the C stem `g3d/g3d_resanm.cpp` calls.
+ *   the map row at 0x800651BC: the copy the link keeps for every TU that converts a Color).
  *   light_setting_get_light_set: retail's ternary join branch.
  *   Data: the `.data` strings are not in `.text` order in retail (Construct's follow G3dProc's, GetLightSet's follow
  *   GetFog's); the `_ac.h` inline tail (0x8058C928-0x8058CC40, its "ref" copies in `.sdata`) is still extern; the
@@ -42,7 +42,11 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "nw4r/db_assert.h"      /* nw4r::db::Panic / Warning, owner nw4r/db_assert.cpp (rule 2) */
+/* ut::Color's members compile as out-of-line weak copies that call each other (retail's `operator u32` copy at
+ * 0x800651BC calls ToU32ref): a weak inline copy takes the pragma state of its definition. */
+#pragma dont_inline on
 #include "nw4r/ut_Color.h"       /* nw4r::ut::Color */
+#pragma dont_inline reset
 #include "unsplit/g3d.h"      /* the math types it reads through the band header */
 #include "g3d/g3d_light.h" /* LightObj / LightSet / LightSetting and their initialisers (rule 2) */
 #include "g3d/g3d_fog.h"   /* nw4r::g3d::Fog (rule 1) */
@@ -400,14 +404,6 @@ extern "C" LightObj *light_setting_get_light_obj_array(const LightSetting *p)
 {
     return p->mpLightObjArray;
 }
-
-#pragma dont_inline on
-/* Reads the colour word through ut::Color's const ToU32ref (0x80064754), the shape the two readers share. */
-extern "C" u32 fn_800651BC(void *self)
-{
-    return reinterpret_cast<const nw4r::ut::Color *>(self)->ToU32ref();
-}
-#pragma dont_inline reset
 
 extern "C" u32 light_setting_get_num_light_obj(const LightSetting *p)
 {

@@ -10,18 +10,22 @@
  *   0x80089ECC and returns `this`) and 0x80089ECC is Color::Set (each channel narrowed with `clrlwi` before its
  *   `stb`: `int` parameters); the constructor's `int` parameters are a GUESS (nw4r's spelling; its body only
  *   forwards them).
- * RESIDUALS. fn_80089C6C calls Color's `operator u32` under the map stem fn_800651BC (`g3d/g3d_anmscn.cpp` defines
- *   it as a C function), so that relocation name differs.  Our object also carries the weak Color copies earlier
- *   link inputs own (`__dt__Q34nw4r2ut5ColorFv`, `Color(u32)`, `operator=(u32)`, `operator u32`, `ToU32ref`).
- *   fn_80089C6C's extab record carries a cleanup range for the Color temporary (0x1F0, length 0x10: action 0x82 destroying sp+8) that retail's 8-byte
- *   record lacks; `throw()` on `operator u32` or on the destructor does not remove it.
+ * RESIDUALS. The weak Color copies this object emits (`Color(u32)`, `operator=(u32)`, `ToU32ref`, `~Color`,
+ *   `ToU32ref const`, `operator u32`) are retail's dead copies: the link folds each to the earlier input that owns
+ *   it, so the object's extra 0xE0 B of `.text` and their unwind entries never link.  fn_80089C6C's `operator u32`
+ *   call resolves to the copy the link keeps at 0x800651BC (`g3d/g3d_anmscn.cpp`'s range, map row
+ *   `__opUl__Q34nw4r2ut5ColorCFv`).
  * SHAPES. Retail has no record-form instruction and no fused multiply-add, and calls every inline member out of line.
  *   fn_80089F78 is the OS fast cast (`psq_st` through GQR5, then `lha`) in inline asm.  fn_800898B0 passes the
  *   estimate bounds to Panic as doubles, compares `pKey->frame == frame` and `frame >= pKey->frame`, and computes
  *   the two Hermite intervals before the call.  fn_80089F90 is modf's argument order (frame first: retail sets f1
  *   before r3), and fn_80089C6C's key index is an `int` (retail keeps the index and recomputes `(index + 1) * 4`; an
  *   `s32` is strength-reduced to one byte offset).  fn_80089C6C returns a Color temporary of the four-channel
- *   constructor, converted with `operator u32` and then destroyed (retail's `__dt__Q34nw4r2ut5ColorFv` call).
+ *   constructor, converted with `operator u32` and then destroyed (retail's `__dt__Q34nw4r2ut5ColorFv` call); its
+ *   extab is retail's 8-byte record only because `nw4r/ut_Color.h` defines `operator u32` out of class, which is
+ *   what makes MWCC know the call is nothrow (idea 155: an in-class body, `throw()`, `-inline off`, `exceptions off`
+ *   and a placing stub ahead of the caller all keep or drop the whole record).  The channel bytes are read through
+ *   Color's own `r`/`g`/`b`/`a` (the last argument is evaluated first: a, b, g, then r).
  */
 
 
@@ -59,14 +63,6 @@ typedef struct {
     f32 rate;            /* +0x04 */
     ResAnmChrKey keys[]; /* +0x08 */
 } ResAnmChrChannel; /* size: 0x8 */
-
-/* A 4-byte color. */
-typedef struct {
-    u8 b0; /* +0x00 */
-    u8 b1; /* +0x01 */
-    u8 b2; /* +0x02 */
-    u8 b3; /* +0x03 */
-} ResAnmClr; /* size: 0x4 */
 
 /* Forward declarations for the unit's own functions. */
 extern "C" {
@@ -173,10 +169,10 @@ u32 fn_80089C6C(u32 *arg0, f32 frame)
     nw4r::ut::Color spC(arg0[index + 1]);
     factor = fn_80089F14(32768.0f * value);
     return nw4r::ut::Color(
-        fn_80089EF0(((ResAnmClr *)&sp10)->b0, ((ResAnmClr *)&spC)->b0, factor),
-        fn_80089EF0(((ResAnmClr *)&sp10)->b1, ((ResAnmClr *)&spC)->b1, factor),
-        fn_80089EF0(((ResAnmClr *)&sp10)->b2, ((ResAnmClr *)&spC)->b2, factor),
-        fn_80089EF0(((ResAnmClr *)&sp10)->b3, ((ResAnmClr *)&spC)->b3, factor));
+        fn_80089EF0(sp10.r, spC.r, factor),
+        fn_80089EF0(sp10.g, spC.g, factor),
+        fn_80089EF0(sp10.b, spC.b, factor),
+        fn_80089EF0(sp10.a, spC.a, factor));
 }
 
 /* Linearly interpolates one byte between two values with a 15-bit factor. */
