@@ -604,7 +604,7 @@ ef/ef_drawbillboardstrategy.cpp:
 	extabindex  start:0x80023700 end:0x800237A8
 	.text       start:0x800B9A44 end:0x800BBDEC
 	.data       start:0x80593E88 end:0x80594070
-	.sdata      start:0x80791300 end:0x80791320
+	.sdata      start:0x80791300 end:0x80791320 align:32
 	.sdata2     start:0x80796150 end:0x80796170
 
 ef/ef_drawdirectionalstrategy.cpp:
