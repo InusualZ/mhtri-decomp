@@ -28,16 +28,24 @@
  *   em018_spin, em018_breach, em018_entrance, ...).
  *   The callee names this unit asked for (`enemy-em018#N`) are GUESS except where the owner's comment names the
  *   behaviour.
- * RESIDUALS. None in the object: every row and every claimed section is byte-identical (`.sdata2` is 0x2DC of the
- *   0x2E0 claim: the last word is the alignment fill before the next unit's pool); flipcheck READY.
+ * RESIDUALS. `em018_motion_events` (12348 B vs 12336 B, three extra instructions `lhz r0,0x74(r31)`; `cmplwi
+ *   r0,0x55`; `bne`): retail's jump table sends 0x55 and 0x56 to two heads and motion 0x55's head ends in a `b` (and
+ *   two `bne`) into the middle of motion 0x56's case, at its water tail (playbook 213; the goto-free shape is
+ *   rule 8's). The source merges the two cases and picks the head with a motion test, so the jump table's 0x56
+ *   word names the shared head: the mwcc-debugger dump 03 already holds that test as its own block (both table
+ *   entries reach it) and it survives to dump 25 (verify_pcode MATCH), so no pass threads it away. The repeated
+ *   tail measured 98.70 (+160 B), a nested `switch` on `em_get_mot_no` 99.84 (+20 B). Every other row is
+ *   byte-identical, and so is every claimed data section apart from that table word (`.sdata2` is 0x2DC of the
+ *   0x2E0 claim: the last word is the alignment fill before the next unit's pool).
  *   `fn_80192410` (the aim-bit 0x08 probe) keeps its generated name: `ef/eft026_fx.cpp`, `enemy/em025_prog.cpp` and
  *   the leaf header `enemy/fn_80192410.h` spell it, so the rename is filed (`dat-em018#1`, `em018_aim_flag8_ck`).
  * SHAPES. A motion id or probe chosen by a one-value test is a ternary of u16/u8 arms passed through a view of the
  *   callee with that width (`em_mot_set_c1`, `em_mot_set_blend_c1`, `em_pack_area_pick_c1`): the sum is masked in
  *   place (`em018_side_swipe`) and a branch-joined choice keeps retail's `clrlwi` at the call (`em018_mot9_height_step`,
  *   `em018_action_select`, whose `kind` is compared as `s32`).  `em018_glow_fade` tests the fade state 0, 1, 2 with
- *   the bodies laid out 1, 2, 0: `case 0:` is first and cases 1 and 2 sit in an `if (0)` block ahead of its body.  `em018_motion_events`: motion 0x55 shares motion 0x56's water tail, so `case 0x56:` sits inside an
- *   `if (0) { ... }` after case 0x55's head (playbook 241; the repeated tail measured 98.70).
+ *   the bodies laid out 1, 2, 0: the switch sits in a `do { } while (0)` whose tail is state 0's body, `case 0:`
+ *   breaks into it, cases 1 and 2 and the `default:` `continue` past it (playbook 183).  `em018_motion_events`:
+ *   motions 0x55 and 0x56 are one case whose head is chosen by `self->mot_no_0x074 == 0x55` (see RESIDUALS).
  *   `Em018UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
@@ -5035,24 +5043,25 @@ void em018_motion_events(struct _ENEMY_WORK* self) {
         }
         break;
     case 0x55:
-        if (em_after_frame_check(self, 0, 98.0f, 0.0f) == 1) {
-            em_camera_req(self, -1, 7);
-        }
-        if (em_water_check_c1(self) == 0) {
-            if (em_after_frame_check(self, 0, 120.0f, 0.0f) == 1) {
-                if ((self->field_0x228 & 6) != 0) {
-                    em018_effect_spawn(self, 0, 0x11, 3, 0, 1.2f);
-                } else {
-                    em018_effect_spawn(self, 1, 6, 3, 0, 2.0f);
+    case 0x56:
+        /* motions 0x55 and 0x56 differ only in their head and share the water tail */
+        if (self->mot_no_0x074 == 0x55) {
+            if (em_after_frame_check(self, 0, 98.0f, 0.0f) == 1) {
+                em_camera_req(self, -1, 7);
+            }
+            if (em_water_check_c1(self) == 0) {
+                if (em_after_frame_check(self, 0, 120.0f, 0.0f) == 1) {
+                    if ((self->field_0x228 & 6) != 0) {
+                        em018_effect_spawn(self, 0, 0x11, 3, 0, 1.2f);
+                    } else {
+                        em018_effect_spawn(self, 1, 6, 3, 0, 2.0f);
+                    }
+                }
+                if (em_after_frame_check(self, 0, 220.0f, 0.0f) == 1) {
+                    em018_effect_spawn(self, 0, 2, 8, 0, 1.0f);
                 }
             }
-            if (em_after_frame_check(self, 0, 220.0f, 0.0f) == 1) {
-                em018_effect_spawn(self, 0, 2, 8, 0, 1.0f);
-            }
-        }
-        /* motion 0x55 skips motion 0x56's head and shares its water tail */
-        if (0) {
-    case 0x56:
+        } else {
             if (em_after_frame_check(self, 0, 98.0f, 0.0f) == 1) {
                 em_camera_req(self, -1, 7);
             }
@@ -5915,9 +5924,10 @@ extern "C" {
 void em018_glow_fade(struct _ENEMY_WORK* self) {
     EmFadeRec* rec = &((EmActWork*)self)->fade_0x328;
 
-    switch (rec->state_0x30) {
-    case 0:
-        if (0) {
+    do {
+        switch (rec->state_0x30) {
+        case 0:
+            break;
         case 1:
             if ((rec->glow_0x00.x += 0.5f) > 2.0f) {
                 rec->glow_0x00.x = 2.0f;
@@ -5929,7 +5939,7 @@ void em018_glow_fade(struct _ENEMY_WORK* self) {
                 rec->glow_0x00.z = 1.0f;
             }
             rec->state_0x30++;
-            break;
+            continue;
         case 2:
             if ((rec->glow_0x00.x += 0.5f) > 2.0f) {
                 rec->glow_0x00.x = 2.0f;
@@ -5949,7 +5959,9 @@ void em018_glow_fade(struct _ENEMY_WORK* self) {
             if ((rec->glow_0x10.z += 0.59999996f) > 2.8f) {
                 rec->glow_0x10.z = 2.8f;
             }
-            break;
+            continue;
+        default:
+            continue;
         }
         if ((rec->glow_0x00.x -= 0.033333335f) < 1.0f) {
             rec->glow_0x00.x = 1.0f;
@@ -5969,8 +5981,7 @@ void em018_glow_fade(struct _ENEMY_WORK* self) {
         if ((rec->glow_0x10.z -= 0.06f) < 1.0f) {
             rec->glow_0x10.z = 1.0f;
         }
-        break;
-    }
+    } while (0);
     if (rec->dim_0x31 != 0) {
         if ((rec->fade_0x28 -= 0.075f) < 0.0001f) {
             rec->fade_0x28 = 0.0001f;
