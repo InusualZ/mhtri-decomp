@@ -84,8 +84,8 @@
  *   stb`) is a named local assigned on both arms, never `?:` or two stores; the call-free cases use `state` and `duration`
  *   apart from `next`, which lives across calls; the interrupt-guarded counts are read through u32-returning inlines
  *   (a u8 return is zero-extended again at each compare).  `wudCalcCrc` declares its two sums and assigns the high one first.
- *   The `if (0) { case 1: case 3: ... }` block in `WUDiSyncFiber` case 0x10 lets a simple-mode remote's else arm fall into
- *   `default`'s state, as the target's branch does (idea 241).
+ *   `WUDiSyncFiber` case 0x10 wraps its device-type switch in `do { } while (0)` (idea 183): the 0x11 paths `continue`
+ *   past the shared `state = 0xF`, which the simple-mode store and the other types reach by `break`, as the target does.
  */
 
 #include "types.h"
@@ -944,31 +944,30 @@ void WUDiSyncFiber(void)
     case 0x10:
         device = &wudStoredDeviceInfo;
         device->linkState = 1;
-        switch (device->type) {
-        case 0:
-        case 2:
-        case 4:
-        case 5:
-            if ((u8)wudCB.simple == 0) {
-                WUDiMoveDeviceToTail(device);
-                WUDiRemoveDevice(device->bdAddr);
-                state = 0x11;
+        do {
+            switch (device->type) {
+            case 0:
+            case 2:
+            case 4:
+            case 5:
+                if ((u8)wudCB.simple == 0) {
+                    WUDiMoveDeviceToTail(device);
+                    WUDiRemoveDevice(device->bdAddr);
+                    state = 0x11;
+                    continue;
+                }
+                /* A remote seen again in simple mode is re-registered as a guest: the balance boards skip this. */
+                device->type = 4;
                 break;
-            }
-            device->type = 4;
-            /* A remote seen again in simple mode is re-registered as a guest: the balance boards skip this. */
-            if (0) {
-        case 1:
-        case 3:
+            case 1:
+            case 3:
                 WUDiMoveWbcToTail(device);
                 WUDiRemoveDevice(wudCB.wbcTail->device->bdAddr);
                 state = 0x11;
-                break;
+                continue;
             }
-        default:
             state = 0xF;
-            break;
-        }
+        } while (0);
         cb->syncState = state;
         break;
     case 0x11:

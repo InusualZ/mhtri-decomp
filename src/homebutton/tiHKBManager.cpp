@@ -48,8 +48,9 @@
  *            reloads `start->manager` after the stores).
  * SHAPES.    hkbChannelUpdateModifiers tests the HID modifier usages in an if/else chain (a switch becomes a jump
  *            table, which also loses the CTR loop); the LED bits come from the inline hkbLedBits.
- * SHAPES.    hkbGuiManagerUpdate: cases 1 and 3 reach the shared contained block through case labels inside `if (0)`
- *            blocks (the block sits after case 5, as retail lays it out); `c` is declared before the other locals.
+ * SHAPES.    hkbGuiManagerUpdate: the switch sits in `do { } while (0)` (idea 183) - cases 1 and 3 `break` into the shared
+ *            contained block after case 5, as retail lays it out, the others `continue` past it; `c` is declared before
+ *            the other locals.
  * SHAPES.    hkbSetModifierState materialises the lock change as `((old - locks) | (locks - old)) >> 31` (retail's
  *            subf/subf/or/srwi.; both words are masked to 0x700, so it is `old != locks`).
  * SHAPES.    HkbManager::filterAllowed tests the allow-list pointer through the inline getAllowedChars: that keeps the
@@ -658,30 +659,31 @@ extern "C" u32 hkbGuiManagerUpdate(Manager* self, u32 idx, f32 x, f32 y, u32 tri
     for (Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0); n != NULL;
          n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n)) {
         c = (HkbGuiComponent*)n->mValue;
-        switch (c->v_0x04C(idx, x, y, trigger, hold, release)) {
-        case 1:
-            view->onEvent((Component*)c, 0, idx, data);
-            if (0) {
+        do {
+            switch (c->v_0x04C(idx, x, y, trigger, hold, release)) {
+            case 1:
+                view->onEvent((Component*)c, 0, idx, data);
+                break;
             case 2:
                 view->onEvent((Component*)c, 1, idx, data);
-                break;
+                continue;
             case 3:
                 view->onEvent((Component*)c, 2, idx, data);
-                if (0) {
-                case 4:
-                    view->onEvent((Component*)c, 4, idx, data);
-                    break;
-                case 5:
-                    view->onEvent((Component*)c, 5, idx, data);
-                    break;
-                }
+                break;
+            case 4:
+                view->onEvent((Component*)c, 4, idx, data);
+                continue;
+            case 5:
+                view->onEvent((Component*)c, 5, idx, data);
+                continue;
+            default:
+                continue;
             }
             bTouched = 1;
             if (c->v_0x050()) {
                 pLast = c;
             }
-            break;
-        }
+        } while (0);
         if (c->v_0x028(idx)) {
             view->onEvent((Component*)c, 3, idx, data);
         }
