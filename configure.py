@@ -1149,7 +1149,7 @@ config.libs = [
             Object(Matching, "Network/NetworkReflectService.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkSessionManager.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkSessionManager.cpp",
+            Object(Matching, "Network/NetworkSessionManager.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkPeerBase.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkPeerBase.cpp",
@@ -1494,7 +1494,7 @@ config.libs = [
             Object(Matching, "BTE/sdp_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_db.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/sdp_main.c", mw_version="GC/3.0a5", cflags=cflags_nw4r),
+            Object(Matching, "BTE/sdp_main.c", mw_version="GC/3.0a5", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_server.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
