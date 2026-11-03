@@ -6,7 +6,10 @@
  *   tables, the accessor strings), .sdata 0x80791110-0x80791124, .sbss 0x807948C8-0x807948D8,
  *   .sdata2 0x80795CA0-0x80795CF0.
  * FLAGS. `cflags_main`; `#pragma pool_data off` (each table address is its own `lis`/`addi`); `#pragma peephole off`
- *   around strap_task, save_msg_window_draw and the ResMatChan constructor (retail keeps `extsh`/`rlwinm` + `cmpwi`).
+ *   around save_msg_window_draw and the ResMatChan constructor (retail keeps `extsh`/`rlwinm` + `cmpwi`); strap_task
+ *   under `#pragma optimization_level 2` (push/pop): at -O3 its re-dispatch loop goes through the backend's loop code
+ *   motion (mwcc-debugger `backend-09-after-loop-code-motion` hoists 54 constants into the loop preheader, which
+ *   then colour r22-r31: 87.76 against 92.28 at level 2; peephole on measures 4.9 B better there).
  * NAMES. Class 4 (no `__FILE__` string; the runtime dump has only `zz_` placeholders).  GUESS: strap_task (the task
  *   body `pad_connect.cpp`'s registrar starts: strap fade in, wait for a button or 600 frames, fade out, then the save
  *   check/creation, the option load and the arena task), strap_screen_draw, save_msg_window_draw, save_msg_text_draw,
@@ -14,13 +17,17 @@
  *   save_sys_file_read, save_data_file_index, save_msg_blink_count, save_msg_blink_spare, save_msg_tex_rect,
  *   save_msg_size, save_msg_button_pos, save_msg_text_pos, save_error_enter, return_to_data_manager.
  *   The file keeps the map's stem; a unit-rename to `strap_task.cpp` is requested.
- * RESIDUALS. strap_task (0xD7C B against 0xD88 B; the `goto` spelling measures 100.00, rule 8 refuses it): sub-states
- *   1-7 sit in one `for (;;)` whose head is the shared save-error entry (case labels inside the loop, sub-state 1 in
- *   an `if (0)` before the head), so every failing step is `continue` and the entry runs into sub-state 2 as retail
- *   does (a `for (;;)` around the whole switch measured 83.38: MWCC hoists the loop's constants into r22-r31);
- *   sub-states 3-6 sit in an `if (0)` so sub-state 2's button exit falls into sub-state 7.  Two crossing jumps stay
- *   walls: sub-state 1's draw sits before the error entry (retail: after it, the entry jumping over it to sub-state
- *   2); sub-state 5 step 1's error arm is a separate `if` before the success arm (retail: after it, branching back
+ * RESIDUALS. strap_task (0xD94 B against 0xD88 B; the `goto` spelling measures 100.00, rule 8 refuses the case labels
+ *   inside a loop/`if (0)` that measured 95.99): retail's sub-state 1 failure arm holds the save-error entry
+ *   (0x80059A2C) before sub-state 1's draw and jumps over the draw into sub-state 2; the failing steps of sub-states
+ *   3-6 branch back to that entry (11 backward edges) and sub-state 2's button-0x10 exit jumps forward into
+ *   sub-state 7.  With every case label directly in the switch, the entry is the `for` loop's step and sub-state 2
+ *   is reached through the jump table again (the entry moves after sub-state 7, plus one branch back to the
+ *   dispatch) and sub-state 2's button exit repeats return_to_data_manager.  Level 2 keeps `extsh`/`clrlwi` on
+ *   constant arguments and on `u8` field compares and loads the 0.0 clamp late.  Measured goto-free alternatives:
+ *   the same loop at -O3 87.76; the entry and sub-state 2 after the switch in an inline helper 85.85; sub-state 2
+ *   repeated after the entry through an inline helper 90.07 (both need `always_inline` for their nested inlines).
+ *   Sub-state 5 step 1's error arm is a separate `if` before the success arm (retail: after it, branching back
  *   into it on -15/-4; the duplicated-arm `switch` measures 17 B worse).
  *   save_msg_text_draw: retail loads the int-to-float constant before `scr.x` and keeps `scr.x` in f3 and 0.5 in f2
  *   (this source: f2/f3, the constant after); `/ 2.0f`, declaration order and an unnamed 0.5 all measure worse.
@@ -36,7 +43,8 @@
  *   "%s" and "ref" are `.sdata` literals; each failing save step's result is a `switch` (`case 1` first, `-2`/`-1`
  *   after: the `addi`/`cmplwi 1` range test); `x / 2.0f` and `c *= -1.0f` keep retail's `fmuls` operand order
  *   (`* 0.5f` and `c * -1.0f` put the constant first); `16 <= id` keeps two signed compares where `id >= 16` fuses
- *   into a range test; the text's button `switch` puts `case 19: return;` between its two cases (retail's dead `b`).
+ *   into a range test; the text's button `switch` puts `case 19: return;` between its two cases (retail's dead `b`);
+ *   strap_task's button words are `u32` locals (a `u16` local keeps a `clrlwi` at level 2).
  */
 
 #include "types.h"
@@ -158,7 +166,8 @@ static inline void return_to_data_manager(void) {
 
 /* 0x800595E4 (0xD88): the boot task: fades the strap screen in and out, checks and creates the save data, then loads
  * the options and starts the arena task. */
-#pragma peephole off
+#pragma push
+#pragma optimization_level 2
 void strap_task(TaskSlot* task) {
     u32 args[2];
     s32 result;
@@ -207,8 +216,8 @@ void strap_task(TaskSlot* task) {
     case 3: {
         subTransSet((u32)strap_screen_draw, 1, args);
         if (task->wait_0x0C > 30) {
-            u16 trig = Psw[0].field_0xce & 0x3FF0;
-            u16 cl_trig = 0;
+            u32 trig = Psw[0].field_0xce & 0x3FF0;
+            u32 cl_trig = 0;
             if ((u8)get_ControlType(0) == 2) {
                 cl_trig = Psw[0].field_0xda & 0xFFFC;
             }
@@ -250,22 +259,20 @@ void strap_task(TaskSlot* task) {
         break;
     }
     case 5: {
-        u16 trig = Psw[0].button_0x2C0.pressed_0x04;
+        u32 trig = Psw[0].button_0x2C0.pressed_0x04;
         save_msg_blink_count = (save_msg_blink_count + 410) & 0x7FFF;
-        switch (task->sub_0x09) {
-        case 0:
-            system_w.field_0x865 = 1;
-            save_error_code = 0;
-            banner_file_check_init();
-            task->sub_0x09 = 1;
-            task->step_0x0A = 0;
-            task->page_0x0E = 0;
-            break;
-        /* Sub-states 1-7 share one loop: a failing save step `continue`s to the error entry at its head, which runs
-         * into sub-state 2; a `break` leaves the loop for the message draw after the switch. */
-        for (;;) {
-            /* sub-state 1 sits before the loop head: the loop entry skips it */
-            if (0) {
+        /* A failing save step `continue`s: the loop step is the error entry, and the re-dispatch runs
+         * sub-state 2; a `break` leaves the loop for the message draw after it. */
+        for (;; save_error_enter(task)) {
+            switch (task->sub_0x09) {
+            case 0:
+                system_w.field_0x865 = 1;
+                save_error_code = 0;
+                banner_file_check_init();
+                task->sub_0x09 = 1;
+                task->step_0x0A = 0;
+                task->page_0x0E = 0;
+                break;
             case 1:
                 save_error_code = 0;
                 save_msg_blink_count = 0;
@@ -292,9 +299,6 @@ void strap_task(TaskSlot* task) {
                 args[0] = -200;
                 subTransSet((u32)save_msg_text_draw, 1, args);
                 break;
-            }
-            save_error_enter(task);
-            /* the error entry runs on into sub-state 2 */
             case 2:
                 if (task->wait_0x0C > 0) {
                     task->wait_0x0C--;
@@ -316,12 +320,11 @@ void strap_task(TaskSlot* task) {
                     break;
                 }
                 args[1] = 0;
-                /* button 0x10 skips sub-states 3-6 into sub-state 7's return to the data manager */
                 if (trig & 0x10) {
-                } else {
-                    break;
+                    return_to_data_manager();
+                    return;
                 }
-                if (0) {
+                break;
             case 3:
                 switch (task->step_0x0A) {
                 case 0:
@@ -603,11 +606,11 @@ void strap_task(TaskSlot* task) {
                 }
                 args[1] = 0;
                 break;
-                }
             case 7:
                 return_to_data_manager();
                 return;
             }
+            break;
         }
         if ((task->sub_0x09 == 2 && save_error_code != 0) || task->sub_0x09 == 6) {
             save_msg_window_draw(args[0], args[1]);
@@ -632,7 +635,7 @@ void strap_task(TaskSlot* task) {
         break;
     }
 }
-#pragma peephole on
+#pragma pop
 
 /* The texel rectangles (s0, t0, s1, t1) of the message box's four sprites. */
 s16 save_msg_tex_rect[16] = {
