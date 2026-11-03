@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (275)
+## Ideas that work (276)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -284,6 +284,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 295 | [An inline accessor between an argument expression and an inlined callee numbers the value below the caller's locals](295-inline-accessor-between-an.md) | works | source-shape, allocator | An inlined callee's three loop values (a name argument, an offset table, the index) are the right instructions in the wrong callee-saved registers, the argument sitting highest where retail has it lowest, and no... |
 | 296 | [A named .ctors word is dead-stripped: emit the entry through a file-scope object's constructor](296-named-ctors-word-is.md) | works | sections, linker, source-shape | The unit's object is byte-identical (every row 100 %, `.ctors` 4 B on both sides) and the flipped link still fails the DOL hash; `flipcheck` names the unit's own `.ctors` word as dead-stripped |
 | 297 | [A local taken through a cast to another pointer type is kept as its own node and colours above the parameter](297-local-taken-through-a.md) | works | source-shape, allocator | Two pointer parameters both live across a call come out swapped (retail keeps the first parameter in r31, the second in r30; ours the reverse) in a function whose every other instruction matches, and no declaration... |
+| 298 | [A deferred helper whose assert strings stay in the main pool is a static inline; an extern inline's literals go to the .data tail](298-deferred-helper-whose-assert.md) | works | data, source-shape, sections | A group of helpers lands after their first caller in retail's `.text` (the deferred-inline order of idea 163), but the `.data` strings of some of them sit in the main first-use sequence while the header asserts' strings... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

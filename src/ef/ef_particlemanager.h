@@ -45,8 +45,8 @@ class Emitter;
 
 /* The particle manager as the emitter forms call it: a class whose vtable pointer follows a 0x1C-byte
  * non-polymorphic head (MWCC places it after the base's members), with `CreateParticle` in the table's +0x14 slot
- * (`ef_pm_create_particle`).  Declared only: the table is `ef/ef_particlemanager.cpp`'s, and nothing here makes a
- * unit emit one. */
+ * (`nw4r::ef::ParticleManager::CreateParticle`).  Declared only: the class and its table are
+ * `ef/ef_particlemanager.cpp`'s, and nothing here makes a unit emit one. */
 struct ParticleManagerHead {
     /* +0x00 */ u8 pad_0x00[0x1C];
 }; /* size: 0x1C */
@@ -59,8 +59,8 @@ struct ParticleManager : ParticleManagerHead {
     virtual s32 Initialize(nw4r::ef::Emitter* emitter, void* resource);
     virtual void CreateParticle(u16 life, VEC3 pos, VEC3 vel, const MTX34* space, f32 momentum, u8* inherit, u32 reference,
                                 u16 remain);
-    virtual void Calc();                              /* +0x18: `ef_pm_calc` */
-    virtual void Draw(const struct EfDrawInfo* info); /* +0x1C: `ef_pm_draw` */
+    virtual void Calc();                              /* +0x18: `ParticleManager::Calc` */
+    virtual void Draw(const struct EfDrawInfo* info); /* +0x1C: `ParticleManager::Draw` */
 }; /* size: 0x20 */
 #endif
 

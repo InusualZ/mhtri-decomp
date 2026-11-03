@@ -1,14 +1,22 @@
 /*
- * ef/ef_particlemanager.cpp - the nw4r::ef::ParticleManager bookkeeping object: its constructor `ef_particle_manager_ctor`
- *   (installs the table `lbl_805934E0`, slots 2-7 = fn_800AB730, fn_800AB73C, ef_pm_initialize, ef_pm_create_particle,
- *   fn_800AC2F8, fn_800ADED8), the object's lifecycle, and the static initializer `fn_800AEE14`, which constructs
- *   the file's two static matrices.
- * RANGE. .text 0x800AB658-0x800AEE48 (44 functions); extab 0x80009E6C-0x80009F74, extabindex 0x80023148-0x800232D4,
- *   .ctors 0x8056F2DC-0x8056F2E0, .data 0x80592F78-0x80593580 (the `__FILE__` string "ef_particlemanager.cpp"
- *   first), .bss 0x80694538-0x80694598, .sdata2 0x807960A0-0x807960E8.
+ * ef/ef_particlemanager.cpp - nw4r::ef::ParticleManager: its constructor and the two parameter sub-object
+ *   constructors, its six virtuals (`SendClosing`, `DestroyFunc`, `Initialize`, `CreateParticle`, `Calc`, `Draw`),
+ *   the retire paths, the field functions, the matrix accessors, the colour fade and the static initialiser of the
+ *   file's two static matrices.
+ * RANGE. .text 0x800AB664-0x800AEE48 (43 functions); extab 0x80009E6C-0x80009F74, extabindex 0x80023148-0x800232D4,
+ *   .ctors 0x8056F2DC-0x8056F2E0 (the static initialiser's entry), .data 0x80592F78-0x80593580 (the strings in
+ *   first-use order, `Calc`'s jump table, the class table at 0x805934E0, then the header asserts' weak strings),
+ *   .bss 0x80694538-0x80694598 (the two static matrices), .sdata2 0x807960A8-0x807960E8 (the literal pool).
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps `extsh` + `cmpwi`, `clrlwi` + `slwi`, the
- *   flag booleanisations and the `li r0,N; psq_lx` epilogues); `#pragma fp_contract off` around one body.
- * NAMES. The map has only `fn_` stems for the range.
+ *   flag booleanisations and the `li r0,N; psq_lx` epilogues) and `#pragma pool_data off` (each string its own
+ *   `lis`/`addi`); `#pragma fp_contract off` around two bodies; `#pragma dont_inline` around the constructor (the
+ *   base constructor stays a call).
+ * NAMES. The class and its virtuals are nw4r's `ParticleManager` slots, read from the table at 0x805934E0 and the
+ *   bodies; the map rows carry the compiler's manglings (GUESS: the parameter types of `Initialize`,
+ *   `CreateParticle` and `Draw`, from the bodies and the call sites), `__vt__Q34nw4r2ef15ParticleManager` and
+ *   `__sinit_\ef_particlemanager_cpp`.
+ *   GUESS (the static matrices): `ef_pm_mtx_work` (0x80694538, constructed and never read here) and
+ *   `ef_pm_mtx_local_to_emitter` (0x80694568, the manager's space relative to its emitter's; `ef_pm_particle_mtx`).
  *   GUESS (from the body and its callers): `ef_pm_handle`, `ef_pm_get_mtx`, `ef_pm_modulate_color`.
  *   GUESS (the out-of-line `ut::List_GetLast` and the emitter resource's particle tracks, from `ef/ef_resource.cpp`):
  *   GUESS: `ef_list_get_last`, `ef_emres_num_ptcl_track`, `ef_emres_get_ptcl_track_tbl`, `ef_emres_get_ptcl_track_at`.
@@ -20,36 +28,44 @@
  *   GUESS: `ef_field_gravity` (0x800AD9CC): a constant direction given as rotation angles, scaled by the power.
  *   GUESS: `ef_draw_info_copy` (0x800AE2A4): the draw info's (`EfDrawInfo`, 0xA0 bytes) field-by-field copy.
  *   GUESS: `ef_draw_info_set_depth_offset` (0x800AE298): sets the draw info's depth offset and origin.
- *   GUESS: `ef_pm_initialize` (0x800ABA6C): table slot 4, binds the manager to its emitter and resource.
- *   GUESS: `ef_pm_create_particle` (0x800AC1BC): table slot 5, allocates, initialises and lists a particle.
- *   GUESS: `ef_pm_calc` (0x800AC2F8): table slot 6, one frame of the particles' curve tracks, fields and steps.
  *   GUESS: `ef_emres_num_ptcl_track_init` (0x800ADE74): the track table's second count, where tracks past the
  *   creation frame start.
- *   GUESS: `ef_pm_draw` (0x800ADED8): table slot 7, draws the particles through the manager's draw strategy.
  *   GUESS: `ef_pm_calc_emitter_pos` (0x800ADA5C): a position relative to the emitter, from the three matrices.
  *   GUESS: `ef_pm_retire_particle` (0x800AB880, nw4r's `RetireParticle`): retires a created particle.
  *   GUESS: `ef_pm_particle_mtx` (0x800AE698): the static matrix the colour fade takes a particle's position with.
- *   GUESS: `ef_pm_err_pp`, `ef_pm_err_color_pri`, `ef_pm_err_color_sec`, `ef_pm_f32_epsilon`, `ef_pm_f32_256`
- *   (the colour fade's assert messages and constants, named from their text and value).
- * RESIDUALS. No row is unwritten.  The source order differs from retail's, so `.text`, extab and
- *   extabindex run in another order.
- *  - `ef_pm_calc`: the frame is 0x420 where retail's is 0x430 and the locals sit at other offsets; the field and
- *    post-field record addresses add their block sizes in another order (`lwz`/`add` scheduling).
- *  - `ef_pm_draw`: retail tests the emitter's hidden bit as `beq` + `b` where ours branches once (an early return,
- *    a `bool` local, one `&&` condition and an inline visibility helper give the same single branch), and keeps
- *    `self`/`info`/the descriptor in r29/r30/r31 where ours has r30/r31/r29.
- *   relocdiff: our `.ctors` word carries the symbol `lbl_8056F2DC`, retail's none.
- *   flipcheck: `.bss` and `.data` claimed, not emitted; `.sdata2` is our literals' partial pool - the claimed
- *   pool holds 256/2pi twice (0x807960A4 and 0x807960C0) and 2pi (0x807960A0, read by `ef/ef_particle.cpp`), so the
- *   range spans more than one TU's pool (flipcheck names a fold with `ef/ef_particle.cpp`; request #28 moves the
- *   seam).
- * SHAPES. `ef_field_random` names the cone tilt's and the push's unit randoms as locals (retail's operand order).
- *   The pool constants are literals (retail's `fmuls` operand order in `ef_field_random`).
+ *   GUESS: `ef_pm_f32_epsilon`, `ef_pm_f32_256` (the colour fade's constants, named from their value).
+ * RESIDUALS.
+ *  - `Calc`: the frame is 0x420 where retail's is 0x430 and the locals sit 8 bytes lower; retail keeps `this` in
+ *    r24 and the first particle in r16 where ours has r31/r24; the field and post-field record addresses add
+ *    their block sizes in another order (`lwz`/`add` scheduling).
+ *  - `Draw`: retail keeps `this`/`info`/the descriptor in r29/r30/r31 where ours has r30/r31/r29 (declaring the
+ *    descriptor first, or dropping the alias locals, does not move them; the `beq` + `b` exit is the `||` guard).
+ *  - `ef_particle_manager_delete` keeps its C name: the row is the pool's deleting destructor without a table
+ *    store (an MWCC destructor stores the table), as `ef/ef_emitter.cpp`'s 0x800A630C.
+ *  - Rule 7: the own rows `fn_800AB6BC`/`fn_800AB6FC` (the parameter sub-objects' constructors), `fn_800AB740`,
+ *    `fn_800AB9F4`, `fn_800AC0E4`, `fn_800AC100`, `fn_800AD0CC`, `fn_800AD514`, `fn_800ADA24`, `fn_800ADE98`,
+ *    `fn_800AE500`, `fn_800AE5B0`, `fn_800AE628`, `fn_800AE6A4` and the callees `fn_800A3FFC`, `fn_800A3800`,
+ *    `fn_800A45DC`, `fn_800A4A1C`, `fn_800A49B8`, `fn_800A6554` keep generated names.
+ * SHAPES. `ParticleManager` derives from `nw4r::ef::ReferencedObject` (`ef/ef_effect.h`): the constructor calls the
+ *   base's implicit constructor (its weak copy is dropped for `ef/ef_effect.cpp`'s) and stores this unit's table;
+ *   `SendClosing` is the key function.  `EfPmManager` is the class under the tag the C-linkage functions and their
+ *   consumers spell; the parameter sub-objects are constructed by their C-named functions from the body.
+ * SHAPES. The static matrices are `EfPmStaticMtx` objects (an `MTX34` whose constructor calls `MTX34_ctor`), so the
+ *   compiler emits `__sinit_\ef_particlemanager_cpp` and the anonymous `.ctors` word.
+ * SHAPES. The header accessors, the field functions and the small vector helpers are C-linkage `inline` functions
+ *   marked `never_inline`, declared ahead of the first definition in their headers' order (res_emitter.h, the ut
+ *   list, particle.h, then the file's own): their weak copies follow `Calc`, their first caller, in reverse order
+ *   of first use (a nested callee right after its user), and their assert strings are the `.data` tail in reverse
+ *   definition order.  `ef_pm_calc_emitter_pos` is `static inline` (an `extern "C"` block keeps its C name): it is
+ *   deferred the same way, but its strings and the single `__FILE__` copy stay in the main pool.
+ * SHAPES. The strings are literals and the pool constants literal floats (the NaN is `-(0.0f / 0.0f)`), in retail's
+ *   first-use order; `ef_field_random` names the cone tilt's and the push's unit randoms as locals (retail's
+ *   operand order).
  * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
  *   0x29E, 0x2D5, ...).
  * SHAPES. The memory manager and the particle are classes with declared virtual tables (the particle's after a
- *   0x1C-byte head): `ef_pm_create_particle` calls `AllocParticle` and `Initialize` as virtual members.
+ *   0x1C-byte head): `CreateParticle` calls `AllocParticle` and `Initialize` as virtual members.
  * SHAPES. A particle's link sits at `manager->list.linkOffset` (`next` at `node + linkOffset + 4`, retail's `lhz
  *   r0,0x42(self)` + `lwz rX,4(r3)`); the offset is a runtime value, so the walk keeps the byte offset.
  */
@@ -83,43 +99,9 @@
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 namespace nw4r { namespace math { f32 SinFIdx(f32); } }
 
-/* The assert strings, the class table and the pool constants of this unit's claimed data, declared, never defined. */
-extern "C" {
-extern const f32 ef_pm_f32_nan; /* NaN: no tail origin */
-extern const char lbl_80592F78[]; /* "ef_particlemanager.cpp" */
-extern const char lbl_80592F90[]; /* "NW4R:Pointer Error\ntarget(=%p) is not valid pointer." */
-extern const char lbl_80592FC8[]; /* "NW4R:Failed assertion target->mParticleManager == this" */
-extern const char ef_pm_result_pointer_error[];
-extern const char ef_pm_err_track_keyed[]; /* "NW4R:Failed assertion *ptr == 0xac" */
-extern const char ef_pm_err_track_rotate[]; /* "NW4R:Failed assertion kind == AC_TARGET_ROTATE" */
-extern const char ef_pm_err_post_field_name[]; /* "...postfieldResource->mChildOption.mNameIdx < ..." */
-extern const char ef_pm_err_parent[]; /* "NW4R:Pointer Error\nparent(=%p) is not valid pointer." */
-extern const char ef_pm_err_resource_arg[]; /* "NW4R:Pointer Error\nresource(=%p) is not valid pointer." */
-extern const char ef_pm_err_manager_em[]; /* "...\nmManagerEM(=%p) ..." */
-extern const char ef_pm_err_manager_ef[]; /* "...\nmManagerEM->mManagerEF(=%p) ..." */
-extern const char ef_pm_err_manager_es[]; /* "...\nmManagerEM->mManagerEF->mManagerES(=%p) ..." */
-extern const char ef_pm_err_draw_strategy_builder[]; /* "...\n...->mDrawStrategyBuilder(=%p) ..." */
-extern const char ef_pm_err_resource[]; /* "NW4R:Pointer Error\nmResource(=%p) is not valid pointer." */
-extern const char ef_pm_err_emitter_desc[]; /* "NW4R:Pointer Error\ned(=%p) is not valid pointer." */
-extern const char ef_pm_err_draw_strategy[]; /* "NW4R:Pointer Error\nmDrawStrategy(=%p) is not valid pointer." */
-extern const char ef_pm_err_mtx_local_to_emitter[]; /* "NW4R:Pointer Error\nmtxLocalToEmitter(=%p) is not valid pointer." */
-extern const char ef_pm_err_mtx_local_to_global[]; /* "NW4R:Pointer Error\nmtxLocalToGlobal(=%p) is not valid pointer." */
-extern const char ef_pm_err_pp[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer." */
-extern const char ef_pm_err_color_pri[]; /* "NW4R:Pointer Error\ncolorPri(=%p) is not valid pointer." */
-extern const char ef_pm_err_color_sec[]; /* "NW4R:Pointer Error\ncolorSec(=%p) is not valid pointer." */
-extern const char ef_pm_err_mtx_emitter_to_global[]; /* "NW4R:Pointer Error\nmtxEmitterToGlobal(=%p) is not valid pointer." */ /* "NW4R:Pointer Error\nresult(=%p) is not valid pointer." */
-extern const char lbl_80593500[]; /* "NW4R:Pointer Error\nadd(=%p) is not valid pointer." */
-extern const char lbl_80593534[]; /* "particle.h" */
-extern const char lbl_80593540[]; /* "NW4R:Failed assertion num < NumPtclTrack()" */
-extern const char lbl_8059356C[]; /* "res_emitter.h" */
-extern void* lbl_805934E0[];      /* ParticleManager vtable */
-extern nw4r::math::MTX34 lbl_80694538;
-extern nw4r::math::MTX34 lbl_80694568;
-}
 
 /* Callees outside this unit. */
 extern "C" {
-void fn_800A4080(void* self);
 void fn_800A3FFC(void* dst, s32 n);
 void fn_800A3800(void* p);
 void fn_800A45DC(void* list, void* node);
@@ -136,6 +118,7 @@ u8* ef_emres_get_ptcl_track();
 void operator delete(void* p) throw();
 
 #pragma peephole off
+#pragma pool_data off
 
 /* --------------------------------------------------------------------------------------------- */
 /* Types                                                                                          */
@@ -212,12 +195,28 @@ struct EfPmStateA {
     /* +0x14 */ EfPmStateB b;
 }; /* size: 0x30 */
 
-/* The manager. Only the fields this unit reads are named; the size is a lower bound. */
-struct EfPmManager {
-    /* +0x00 */ u8 pad_0x00[0x0C];
-    /* +0x0C */ s32 state;
-    /* +0x10 */ u8 pad_0x10[0x0C];
-    /* +0x1C */ void** vtable;
+namespace nw4r {
+namespace ef {
+
+class Emitter;
+class EmitterResource;
+class DrawInfo;
+
+/* The particle manager: the reference-counted base (its life status at +0x0C, its table at +0x1C), the emitter
+ * and resource it serves, its draw strategy, its particle list and parameters, and its matrix.  Its six virtuals
+ * are this unit's; `SendClosing` is the key function, so the table is emitted here. */
+class ParticleManager : public ReferencedObject {
+public:
+    ParticleManager();
+
+    virtual void SendClosing();
+    virtual void DestroyFunc();
+    virtual s32 Initialize(Emitter* parent, EmitterResource* resource);
+    virtual EfPmParticle* CreateParticle(u16 life, const nw4r::math::VEC3* pos, const nw4r::math::VEC3* vel,
+                                         s32 param0, f32 scale, s32 param1, s32 param2, u16 lifeAdd);
+    virtual void Calc();
+    virtual void Draw(const DrawInfo& info);
+
     /* +0x20 */ EfEmitterManager* managerEM;
     /* +0x24 */ EfResource* resource;
     /* +0x28 */ u32 flags;
@@ -231,6 +230,19 @@ struct EfPmManager {
     /* +0x8B */ u8 pad_0x8B;
     /* +0x8C */ nw4r::math::MTX34 mtx; /* the manager's matrix, inherited from its emitter's */
 }; /* size: 0xBC */
+
+} // namespace ef
+} // namespace nw4r
+
+/* The manager as the C-linkage functions take it (`ef/ef_particlemanager.h` declares the tag for the consumers):
+ * the class itself, under the name they spell. */
+struct EfPmManager : nw4r::ef::ParticleManager {
+}; /* size: 0xBC */
+
+/* A static matrix the static initialiser constructs through `MTX34_ctor`. */
+struct EfPmStaticMtx : nw4r::math::MTX34 {
+    EfPmStaticMtx() { MTX34_ctor(this); }
+}; /* size: 0x30 */
 
 /* A direction/rate parameter block (its rate at +0x04, its vector at +0x08). */
 struct EfPmDirParam {
@@ -460,167 +472,52 @@ struct EfPmFieldOwner {
 /* Functions, in address order                                                                    */
 /* --------------------------------------------------------------------------------------------- */
 
-/* Forward declarations of this unit's own constructors and accessors. */
+/* Forward declarations of this unit's functions (defined below in address order). */
 extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self);
 extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self);
-extern "C" u8* ef_emres_get_ptcl_track_tbl(void* self);
-extern "C" u16 ef_emres_num_ptcl_track(void* self);
-extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d);
-extern "C" void fn_800AEE14();
-extern "C" u16 ef_emres_num_ptcl_track_init(void* self);
+extern "C" s32 fn_800AB740(EfPmManager* self, EfPmParticle* target);
+extern "C" s32 ef_pm_retire_particle(EfPmManager* self, EfPmParticle* target);
+extern "C" s32 fn_800AB9F4(EfPmManager* self);
 extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p);
-extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src);
-extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin);
-
-/* ParticleManager constructor: base ctor, vtable, then the three sub-objects at +0x38/+0x58/+0x8C. */
-extern "C" EfPmManager* ef_particle_manager_ctor(EfPmManager* self) {
-    fn_800A4080(self);
-    self->vtable = lbl_805934E0;
-    fn_800A3FFC(&self->list, 0x14);
-    fn_800AB6BC(&self->stateA);
-    MTX34_ctor(&self->mtx);
-    return self;
-}
-
-/* Construct the scalar/vec block at manager +0x58. */
-extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self) {
-    VEC2_ctor(self);
-    VEC3_ctor(&self->aa.vec);
-    fn_800AB6FC(&self->b);
-    return self;
-}
-
-extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self) {
-    VEC3_ctor(&self->vec);
-    return self;
-}
-
-/* Virtual slot 2: forward the manager to the emitter manager. */
-extern "C" void fn_800AB730(EfPmManager* self) {
-    fn_800A6554(self->managerEM, self);
-}
-
-/* Virtual slot 3: the base's empty implementation (the destroy path lives elsewhere). */
-extern "C" void fn_800AB73C(EfPmManager* self) {
-    (void)self;
-}
-
-/* Put `target` on the manager's list and mark it retired. */
-extern "C" s32 fn_800AB740(EfPmManager* self, EfPmParticle* target) {
-#line 61
-    NW4R_POINTER_ASSERT(lbl_80592F78, target, lbl_80592F90);
-    fn_800A3800(target->manager);
-    fn_800A45DC(&self->list, target);
-    target->state = 3;
-    return 1;
-}
-
-/* Retire `target` from the manager's list if it is in the created state. */
-extern "C" s32 ef_pm_retire_particle(EfPmManager* self, EfPmParticle* target) {
-#line 72
-    NW4R_POINTER_ASSERT(lbl_80592F78, target, lbl_80592F90);
-#line 73
-    if (target->manager != self) nw4r::db::Panic(lbl_80592F78, __LINE__, lbl_80592FC8);
-    if (target->state != 1)
-        return 0;
-    fn_800A4A1C(&self->list, target);
-    fn_800A49B8(target);
-    return 1;
-}
-
-/* Walk the list, retiring every created particle. */
-extern "C" s32 fn_800AB9F4(EfPmManager* self) {
-    s32 total = 0;
-    EfPmParticle* node = self->list.head;
-    while (node != NULL) {
-        EfPmParticle* next = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
-        if (node->state == 1)
-            total += ef_pm_retire_particle(self, node);
-        node = next;
-    }
-    return total;
-}
-
-/* 0x800ABA6C (0x678): table slot 4: binds the manager to its emitter and resource, resets its state and picks
- * the draw strategy the resource's draw type asks for. */
-extern "C" s32 ef_pm_initialize(EfPmManager* self, EfEmitterManager* parent, EfResource* resource) {
-#line 109
-    NW4R_POINTER_ASSERT(lbl_80592F78, parent, ef_pm_err_parent);
-    NW4R_POINTER_ASSERT(lbl_80592F78, resource, ef_pm_err_resource_arg);
-    ef_ref_object_init(self);
-    ef_activity_list_clear(&self->list);
-    self->stateA.aa.a = 1.0f;
-    self->stateA.aa.b = 1.0f;
-    self->stateA.aa.vec.x = 0.0f;
-    self->stateA.aa.vec.y = 0.0f;
-    self->stateA.aa.vec.z = 0.0f;
-    self->managerEM = parent;
-    ef_ref_object_add_ref((EffectManager*)parent);
-    self->resource = resource;
-    self->flags = 0;
-    ef_pm_set_mtx_dirty(self);
-    EfPmEmitterDesc* desc = (EfPmEmitterDesc*)ef_res_emitter_desc(self->resource);
-#line 132
-    NW4R_POINTER_ASSERT(lbl_80592F78, self->managerEM, ef_pm_err_manager_em);
-    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect, ef_pm_err_manager_ef);
-    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect->system, ef_pm_err_manager_es);
-#line 135
-    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder, ef_pm_err_draw_strategy_builder);
-    EfPmDrawStrategyBuilder* builder = ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder;
-    self->drawStrategy = builder->GetDrawStrategy(desc->drawType);
-    self->list.activeCount = 0;
-    fn_800AC0E4(self, &desc->setter);
-    return 1;
-}
-
-/* Forward a parameter block to the manager's own setter. */
-extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p) {
-    fn_800AC100(self, p->mode, &p->colorPri, &p->colorSec, p->scale, &p->vec);
-}
-
 extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d);
+extern "C" void* ef_particle_manager_delete(void* p, s32 n);
+extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin);
+extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src);
+extern "C" MTX34* ef_pm_get_mtx(void* target, MTX34* out);
+extern "C" void fn_800AE500(EfPmManager* self, s32 arg1);
+extern "C" void fn_800AE5B0(EfPmManager* self);
+extern "C" void fn_800AE628(EfPmManager* self);
+extern "C" nw4r::math::MTX34* ef_pm_particle_mtx(EfPmManager* manager);
+extern "C" void fn_800AE6A4();
+extern "C" void ef_pm_modulate_color(EfPmManager* self, EfPmParticle* pp, u8* colorPri, u8* colorSec);
+extern "C" void ef_pm_handle(void* a, EfPmManager* m);
 
-/* 0x800AC1BC (0x13C): allocates a particle from the effect system's memory manager, initialises it with
- * copies of `pos` and `vel`, extends its life and puts it on the manager's list. */
-extern "C" EfPmParticle* ef_pm_create_particle(EfPmManager* self, u16 life, const nw4r::math::VEC3* pos,
-                                     const nw4r::math::VEC3* vel, s32 param0, f32 scale, s32 param1, s32 param2,
-                                     u16 lifeAdd) {
-    EfMemoryManager* mm = ef_system_memory_manager(((EfPmEmitterView*)self->managerEM)->effect->system);
-    EfPmParticle* p = mm->AllocParticle();
-    if (p == NULL) {
-        return NULL;
-    }
-    if (p->Initialize(life, *pos, *vel, self, param0, scale, param1, param2) == 0) {
-        return NULL;
-    }
-    p->life += lifeAdd;
-    ef_activity_list_add(&self->list, p);
-    p->state = 1;
-    p->field_0xE4 = 0;
-    p->field_0xE5 = ef_random_u16(&((EfPmEmitterView*)self->managerEM)->random);
-    return p;
-}
-
-/* The setter fn_800AC0E4 forwards to. */
-extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d) {
-    self->stateA.b.dirMode = a;
-    color_rgba_copy(self->stateA.b.colorPri, b);
-    color_rgba_copy(self->stateA.b.colorSec, c);
-    self->stateA.b.scale = f;
-    copyVec3(&self->stateA.b.vec, (const nw4r::math::VEC3*)d);
-}
-
-/* Delete-like helper: free only a live object. */
-extern "C" void* ef_particle_manager_delete(void* p, s32 n) {
-    if (p != NULL && (s16)n > 0)
-        operator delete(p);
-    return p;
-}
-
-/* Returns the list's last element (the previous of none), or null. */
-/* untyped: caller-owned payload - the list holds elements of any type */
-extern "C" void* ef_list_get_last(const nw4r::ut::List* list) {
-    return nw4r::ut::List_GetPrev(list, NULL);
+/* The header accessors, the field functions and the emitter-space helper: C-linkage `inline` functions marked
+ * `never_inline`, declared here in their headers' order so their weak copies and assert strings follow their
+ * first caller as retail's (`ef/ef_emitter.cpp` has the same shape). */
+extern "C" inline __attribute__((never_inline)) u16 ef_emres_num_ptcl_track(void* self);
+extern "C" inline __attribute__((never_inline)) u16 ef_emres_num_ptcl_track_init(void* self);
+extern "C" inline __attribute__((never_inline)) u8* ef_emres_get_ptcl_track_tbl(void* self);
+extern "C" inline __attribute__((never_inline)) u8* ef_emres_get_ptcl_track_at(void* self, u32 index);
+extern "C" inline __attribute__((never_inline)) EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self);
+extern "C" inline __attribute__((never_inline)) void* ef_list_get_last(const nw4r::ut::List* list);
+extern "C" inline __attribute__((never_inline)) nw4r::math::VEC3* fn_800AD0CC(EfPmParticle* self, nw4r::math::VEC3* add);
+extern "C" inline __attribute__((never_inline)) void fn_800AD514(void* a, void* b, f32 f);
+extern "C" inline __attribute__((never_inline)) void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f);
+extern "C" inline __attribute__((never_inline)) s32 fn_800ADA24(nw4r::math::VEC3* out, EfPmDirParam* p, const nw4r::math::VEC3* v);
+extern "C" inline __attribute__((never_inline)) s32 ef_field_vortex(nw4r::math::VEC3* out, EfPmFieldVortexParam* p, const nw4r::math::VEC3* pos);
+extern "C" inline __attribute__((never_inline)) s32 ef_field_newton(nw4r::math::VEC3* out, const EfPmFieldNewtonParam* p, const nw4r::math::VEC3* pos);
+extern "C" inline __attribute__((never_inline)) s32 ef_field_magnet(nw4r::math::VEC3* out, const EfPmFieldPoint* p, const nw4r::math::VEC3* pos);
+extern "C" inline __attribute__((never_inline)) s32 ef_field_spin(nw4r::math::VEC3* out, const EfPmFieldRotation* p, const nw4r::math::VEC3* pos);
+extern "C" inline __attribute__((never_inline)) s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, const EfPmFieldHeader* header,
+                           const EfPmFieldOwner* owner, const EfPmParticle* ptcl, u32 tick, u16 seed,
+                           const nw4r::math::VEC3* velocity, const nw4r::math::VEC3* prevVelocity,
+                           const nw4r::math::MTX34* mtx);
+extern "C" inline __attribute__((never_inline)) s32 ef_field_gravity(nw4r::math::VEC3* out, const EfPmFieldRotation* p);
+extern "C" {
+static inline __attribute__((never_inline)) void ef_pm_calc_emitter_pos(nw4r::math::VEC3* result, BOOL emitterSpace, const nw4r::math::MTX34* mtxLocalToEmitter,
+                            const nw4r::math::MTX34* mtxLocalToGlobal, const nw4r::math::MTX34* mtxEmitterToGlobal,
+                            const nw4r::math::VEC3* pos);
 }
 
 /* The resource-table accessors: the table's count, its first array base and its third u16. */
@@ -639,74 +536,13 @@ extern "C" u8* ef_emres_get_ptcl_track_tbl(void* self) {
     return ef_emres_get_ptcl_track() + 4;
 }
 
-/* 0x800ADA5C (0x370): the position `pos` relative to the emitter: through the local-to-emitter matrix, or through
- * the local-to-global one minus the emitter's global origin. */
-extern "C" void ef_pm_calc_emitter_pos(nw4r::math::VEC3* result, BOOL emitterSpace, const nw4r::math::MTX34* mtxLocalToEmitter,
-                            const nw4r::math::MTX34* mtxLocalToGlobal, const nw4r::math::MTX34* mtxEmitterToGlobal,
-                            const nw4r::math::VEC3* pos) {
-#line 194
-    NW4R_POINTER_ASSERT(lbl_80592F78, mtxLocalToEmitter, ef_pm_err_mtx_local_to_emitter);
-    NW4R_POINTER_ASSERT(lbl_80592F78, mtxLocalToGlobal, ef_pm_err_mtx_local_to_global);
-    NW4R_POINTER_ASSERT(lbl_80592F78, mtxEmitterToGlobal, ef_pm_err_mtx_emitter_to_global);
-    VEC3_ctor(result);
-    if (emitterSpace) {
-        mtx34_mult_vec3(result, mtxLocalToEmitter, pos);
-        return;
-    }
-    nw4r::math::VEC3 origin;
-    mtx34_mult_vec3(result, mtxLocalToGlobal, pos);
-    setVec3(&origin, 0.0f, 0.0f, 0.0f);
-    mtx34_mult_vec3(&origin, mtxEmitterToGlobal, &origin);
-    PSVECSubtract(&result->x, &result->x, &origin.x);
-}
-
-/* 0x800ADED8 (0x3C0): draws the manager's particles through its draw strategy, with the draw info's depth
- * offset measured from the emitter's origin when the draw setting asks for one. */
-extern "C" void ef_pm_draw(EfPmManager* self, const EfDrawInfo* info) {
-#line 698
-    NW4R_POINTER_ASSERT(lbl_80592F78, self->resource, ef_pm_err_resource);
-    EfPmEmitterDesc* ed = (EfPmEmitterDesc*)ef_res_emitter_desc(self->resource);
-#line 701
-    NW4R_POINTER_ASSERT(lbl_80592F78, ed, ef_pm_err_emitter_desc);
-    if ((ed->setter.flags & 0x400) == 0) {
-        if ((((EfPmEmitterView*)self->managerEM)->flags & 2) == 0) {
-            EfDrawInfo local;
-            ef_draw_info_copy(&local, info);
-            f32 offset = ((EfPmDrawSetting*)ef_resource_draw_setting(self->resource))->depthOffset;
-            if (0.0f != offset) {
-                nw4r::math::MTX34 m;
-                nw4r::math::VEC3 origin;
-                MTX34_ctor(&m);
-                ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &m);
-                setVec3(&origin, m.m[0][3], m.m[1][3], m.m[2][3]);
-                ef_draw_info_set_depth_offset(&local, offset, &origin);
-            }
-#line 719
-            NW4R_POINTER_ASSERT(lbl_80592F78, self->drawStrategy, ef_pm_err_draw_strategy);
-            self->drawStrategy->Draw(local, (EfDrawParticleManager*)self);
-        }
-    }
-}
-
 /* Bounds-checked resource lookup (index into the emitter resource table). */
 extern "C" u8* ef_emres_get_ptcl_track_at(void* self, u32 index) {
     u8* base = ef_emres_get_ptcl_track_tbl(self);
     if (!((u16)index < ef_emres_num_ptcl_track(self)))
-        nw4r::db::Panic(lbl_8059356C, 0x29E, lbl_80593540);
+        nw4r::db::Panic("res_emitter.h", 0x29E, "NW4R:Failed assertion num < NumPtclTrack()");
     return ((u8**)base)[(u16)index];
 }
-
-#pragma fp_contract off
-/* Adds a scaled direction into the particle's accumulated acceleration. */
-extern "C" nw4r::math::VEC3* fn_800AD0CC(EfPmParticle* self, nw4r::math::VEC3* add) {
-#line 281
-    NW4R_POINTER_ASSERT(lbl_80593534, add, lbl_80593500);
-    self->accel.x = self->accel.x + add->x * self->accelScale;
-    self->accel.y = self->accel.y + add->y * self->accelScale;
-    self->accel.z = self->accel.z + add->z * self->accelScale;
-    return &self->accel;
-}
-#pragma fp_contract reset
 
 /* Zero the three-vec block used by the particle transform paths. */
 extern "C" EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self) {
@@ -715,6 +551,24 @@ extern "C" EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self) {
     VEC3_ctor(&self->c);
     return self;
 }
+
+/* Returns the list's last element (the previous of none), or null. */
+/* untyped: caller-owned payload - the list holds elements of any type */
+extern "C" void* ef_list_get_last(const nw4r::ut::List* list) {
+    return nw4r::ut::List_GetPrev(list, NULL);
+}
+
+#pragma fp_contract off
+/* Adds a scaled direction into the particle's accumulated acceleration. */
+extern "C" nw4r::math::VEC3* fn_800AD0CC(EfPmParticle* self, nw4r::math::VEC3* add) {
+#line 281
+    NW4R_POINTER_ASSERT("particle.h", add, "NW4R:Pointer Error\nadd(=%p) is not valid pointer.");
+    self->accel.x = self->accel.x + add->x * self->accelScale;
+    self->accel.y = self->accel.y + add->y * self->accelScale;
+    self->accel.z = self->accel.z + add->z * self->accelScale;
+    return &self->accel;
+}
+#pragma fp_contract reset
 
 /* Scale a rate by the pool constant before handing it to the SDK vector routine. */
 extern "C" void fn_800AD514(void* a, void* b, f32 f) {
@@ -731,57 +585,6 @@ extern "C" s32 fn_800ADA24(nw4r::math::VEC3* out, EfPmDirParam* p, const nw4r::m
     vec3_scale_by(&out->x, &v->x, p->rate - 1.0f);
     return 1;
 }
-
-/* Sets the draw info's depth offset and the point it is measured from. */
-extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin) {
-    self->depth_offset = offset;
-    copyVec3(&self->depth_origin, origin);
-}
-
-/* Walk the list, aging every particle. */
-extern "C" void fn_800AE500(EfPmManager* self, s32 arg1) {
-    self->list.activeCount = 0;
-    EfPmParticle* node = self->list.head;
-    while (node != NULL) {
-        if (arg1 == 0 || node->life != 0) {
-            if (node->life != 0)
-                node->life--;
-            if (ef_get_life_status(node) == 1 && node->retireFlag == 1)
-                node->retireFlag = 0;
-        }
-        node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
-    }
-}
-
-/* Walk the list, promoting every retired particle. */
-extern "C" void fn_800AE5B0(EfPmManager* self) {
-    EfPmParticle* node = self->list.head;
-    while (node != NULL) {
-        if (ef_get_life_status(node) == 1 && node->retireFlag == 3)
-            node->retireFlag = 1;
-        node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
-    }
-}
-
-/* 0x800AE698 (0xC): returns the matrix a particle's position is taken to world space with. */
-extern "C" nw4r::math::MTX34* ef_pm_particle_mtx(EfPmManager* manager) {
-    return &lbl_80694568;
-}
-
-extern "C" void fn_800AE6A4() {
-}
-
-extern "C" void ef_pm_handle(void* a, EfPmManager* m) {
-    ef_store_word(a, (s32)m->resource);
-}
-
-/* The .ctors entry: construct the file's two static matrices. */
-extern "C" void fn_800AEE14() {
-    MTX34_ctor(&lbl_80694538);
-    MTX34_ctor(&lbl_80694568);
-}
-
-__declspec(section ".ctors") void* const lbl_8056F2DC = (void*)fn_800AEE14;
 
 /* 0x800AD254 (0x130): the vortex field: `out` turns `pos` about the field's axis, its power blended from the inner
  * to the outer one across the distance; 0 when `pos` sits on the axis. */
@@ -965,63 +768,184 @@ extern "C" s32 ef_field_gravity(nw4r::math::VEC3* out, const EfPmFieldRotation* 
     return 1;
 }
 
-/* 0x800AE2A4 (0xBC): copies the draw info field by field. */
-extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src) {
-    ef_mtx34_copy(&dst->view_mtx, &src->view_mtx);
-    ef_mtx34_copy(&dst->mtx_0x30, &src->mtx_0x30);
-    dst->light_enable = src->light_enable;
-    dst->light_mask = src->light_mask;
-    dst->light_mask1 = src->light_mask1;
-    dst->is_spot_light = src->is_spot_light;
-    dst->fog_type = src->fog_type;
-    dst->fog_start_z = src->fog_start_z;
-    dst->fog_end_z = src->fog_end_z;
-    dst->fog_near_z = src->fog_near_z;
-    dst->fog_far_z = src->fog_far_z;
-    *(u32*)&dst->fog_color = *(const u32*)&src->fog_color; /* the colour moves as one word (a ut::Color copy) */
-    dst->depth_offset = src->depth_offset;
-    assignVec3((Vec*)&dst->depth_origin, (Vec*)&src->depth_origin);
-    *(u32*)&dst->mat_color = *(const u32*)&src->mat_color; /* the colour moves as one word (a ut::Color copy) */
-    *(u32*)&dst->amb_color = *(const u32*)&src->amb_color; /* the colour moves as one word (a ut::Color copy) */
-    return dst;
-}
-
-/* 0x800AE628 (0x70): stores the particle manager's matrix relative to its emitter's in the file's second
- * static matrix. */
-extern "C" void fn_800AE628(EfPmManager* self) {
-    nw4r::math::MTX34 emitterMtx;
-    nw4r::math::MTX34 pmMtx;
-    MTX34_ctor(&emitterMtx);
-    MTX34_ctor(&pmMtx);
-    ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emitterMtx);
-    ef_pm_get_mtx(self, &pmMtx);
-    mtx34_inverse(&emitterMtx, &emitterMtx);
-    mtx34_concat(&lbl_80694568, &emitterMtx, &pmMtx);
-}
-
-/* 0x800AE360 (0x1A0): rebuilds the manager's matrix from its emitter's when it is dirty and copies it to
- * `out`. */
-extern "C" MTX34* ef_pm_get_mtx(void* target, MTX34* out) {
-    EfPmManager* self = (EfPmManager*)target;
-#line 725
-    NW4R_POINTER_ASSERT(lbl_80592F78, out, ef_pm_result_pointer_error);
-    if (self->mtxDirty != 0) {
-        nw4r::math::MTX34 emitterMtx;
-        MTX34_ctor(&emitterMtx);
-        ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emitterMtx);
-        u32 flags = self->flags;
-        ef_calc_inherit_mtx(&self->mtx, &emitterMtx, (flags & 1) != 0, (flags & 2) != 0, self->inheritTranslate,
-                            (flags & 4) != 0);
-        self->mtxDirty = 0;
+/* 0x800ADA5C (0x370): the position `pos` relative to the emitter: through the local-to-emitter matrix, or through
+ * the local-to-global one minus the emitter's global origin. */
+extern "C" {
+static void ef_pm_calc_emitter_pos(nw4r::math::VEC3* result, BOOL emitterSpace, const nw4r::math::MTX34* mtxLocalToEmitter,
+                            const nw4r::math::MTX34* mtxLocalToGlobal, const nw4r::math::MTX34* mtxEmitterToGlobal,
+                            const nw4r::math::VEC3* pos) {
+#line 194
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", mtxLocalToEmitter, "NW4R:Pointer Error\nmtxLocalToEmitter(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", mtxLocalToGlobal, "NW4R:Pointer Error\nmtxLocalToGlobal(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", mtxEmitterToGlobal, "NW4R:Pointer Error\nmtxEmitterToGlobal(=%p) is not valid pointer.");
+    VEC3_ctor(result);
+    if (emitterSpace) {
+        mtx34_mult_vec3(result, mtxLocalToEmitter, pos);
+        return;
     }
-    mtx34_copy(out, &self->mtx);
-    return out;
+    nw4r::math::VEC3 origin;
+    mtx34_mult_vec3(result, mtxLocalToGlobal, pos);
+    setVec3(&origin, 0.0f, 0.0f, 0.0f);
+    mtx34_mult_vec3(&origin, mtxEmitterToGlobal, &origin);
+    PSVECSubtract(&result->x, &result->x, &origin.x);
+}
+}
+
+/* The two static matrices (`.bss`), constructed by the static initialiser: a work matrix nothing here reads, and
+ * the matrix a particle's position is taken from the manager's space to its emitter's with. */
+EfPmStaticMtx ef_pm_mtx_work;
+EfPmStaticMtx ef_pm_mtx_local_to_emitter;
+
+#pragma dont_inline on
+/* 0x800AB664 (0x58): builds the manager: the base, its table, its particle list, its parameters and its matrix. */
+nw4r::ef::ParticleManager::ParticleManager() {
+    fn_800A3FFC(&list, 0x14);
+    fn_800AB6BC(&stateA);
+    MTX34_ctor(&mtx);
+}
+#pragma dont_inline reset
+
+/* Construct the scalar/vec block at manager +0x58. */
+extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self) {
+    VEC2_ctor(self);
+    VEC3_ctor(&self->aa.vec);
+    fn_800AB6FC(&self->b);
+    return self;
+}
+
+extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self) {
+    VEC3_ctor(&self->vec);
+    return self;
+}
+
+/* 0x800AB730 (0xC): hands the closing manager to its emitter. */
+void nw4r::ef::ParticleManager::SendClosing() {
+    fn_800A6554(managerEM, this);
+}
+
+/* 0x800AB73C (0x4): the base's empty destroy hook (the destroy path lives elsewhere). */
+void nw4r::ef::ParticleManager::DestroyFunc() {
+}
+
+/* Put `target` on the manager's list and mark it retired. */
+extern "C" s32 fn_800AB740(EfPmManager* self, EfPmParticle* target) {
+#line 61
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", target, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.");
+    fn_800A3800(target->manager);
+    fn_800A45DC(&self->list, target);
+    target->state = 3;
+    return 1;
+}
+
+/* Retire `target` from the manager's list if it is in the created state. */
+extern "C" s32 ef_pm_retire_particle(EfPmManager* self, EfPmParticle* target) {
+#line 72
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", target, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.");
+#line 73
+    if (target->manager != self) nw4r::db::Panic("ef_particlemanager.cpp", __LINE__, "NW4R:Failed assertion target->mParticleManager == this");
+    if (target->state != 1)
+        return 0;
+    fn_800A4A1C(&self->list, target);
+    fn_800A49B8(target);
+    return 1;
+}
+
+/* Walk the list, retiring every created particle. */
+extern "C" s32 fn_800AB9F4(EfPmManager* self) {
+    s32 total = 0;
+    EfPmParticle* node = self->list.head;
+    while (node != NULL) {
+        EfPmParticle* next = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
+        if (node->state == 1)
+            total += ef_pm_retire_particle(self, node);
+        node = next;
+    }
+    return total;
+}
+
+/* 0x800ABA6C (0x678): table slot 4: binds the manager to its emitter and resource, resets its state and picks
+ * the draw strategy the resource's draw type asks for. */
+s32 nw4r::ef::ParticleManager::Initialize(Emitter* aParent, EmitterResource* aResource) {
+    EfPmManager* self = (EfPmManager*)this;
+    EfEmitterManager* parent = (EfEmitterManager*)aParent;
+    EfResource* resource = (EfResource*)aResource;
+#line 109
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", parent, "NW4R:Pointer Error\nparent(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", resource, "NW4R:Pointer Error\nresource(=%p) is not valid pointer.");
+    ef_ref_object_init(self);
+    ef_activity_list_clear(&self->list);
+    self->stateA.aa.a = 1.0f;
+    self->stateA.aa.b = 1.0f;
+    self->stateA.aa.vec.x = 0.0f;
+    self->stateA.aa.vec.y = 0.0f;
+    self->stateA.aa.vec.z = 0.0f;
+    self->managerEM = parent;
+    ef_ref_object_add_ref((EffectManager*)parent);
+    self->resource = resource;
+    self->flags = 0;
+    ef_pm_set_mtx_dirty(self);
+    EfPmEmitterDesc* desc = (EfPmEmitterDesc*)ef_res_emitter_desc(self->resource);
+#line 132
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", self->managerEM, "NW4R:Pointer Error\nmManagerEM(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", ((EfPmEmitterView*)self->managerEM)->effect, "NW4R:Pointer Error\nmManagerEM->mManagerEF(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", ((EfPmEmitterView*)self->managerEM)->effect->system, "NW4R:Pointer Error\nmManagerEM->mManagerEF->mManagerES(=%p) is not valid pointer.");
+#line 135
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder, "NW4R:Pointer Error\nmManagerEM->mManagerEF->mManagerES->mDrawStrategyBuilder(=%p) is not valid pointer.");
+    EfPmDrawStrategyBuilder* builder = ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder;
+    self->drawStrategy = builder->GetDrawStrategy(desc->drawType);
+    self->list.activeCount = 0;
+    fn_800AC0E4(self, &desc->setter);
+    return 1;
+}
+
+/* Forward a parameter block to the manager's own setter. */
+extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p) {
+    fn_800AC100(self, p->mode, &p->colorPri, &p->colorSec, p->scale, &p->vec);
+}
+
+/* The setter fn_800AC0E4 forwards to. */
+extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d) {
+    self->stateA.b.dirMode = a;
+    color_rgba_copy(self->stateA.b.colorPri, b);
+    color_rgba_copy(self->stateA.b.colorSec, c);
+    self->stateA.b.scale = f;
+    copyVec3(&self->stateA.b.vec, (const nw4r::math::VEC3*)d);
+}
+
+/* Delete-like helper: free only a live object. */
+extern "C" void* ef_particle_manager_delete(void* p, s32 n) {
+    if (p != NULL && (s16)n > 0)
+        operator delete(p);
+    return p;
+}
+
+/* 0x800AC1BC (0x13C): allocates a particle from the effect system's memory manager, initialises it with
+ * copies of `pos` and `vel`, extends its life and puts it on the manager's list. */
+EfPmParticle* nw4r::ef::ParticleManager::CreateParticle(u16 life, const nw4r::math::VEC3* pos,
+                                                        const nw4r::math::VEC3* vel, s32 param0, f32 scale,
+                                                        s32 param1, s32 param2, u16 lifeAdd) {
+    EfPmManager* self = (EfPmManager*)this;
+    EfMemoryManager* mm = ef_system_memory_manager(((EfPmEmitterView*)self->managerEM)->effect->system);
+    EfPmParticle* p = mm->AllocParticle();
+    if (p == NULL) {
+        return NULL;
+    }
+    if (p->Initialize(life, *pos, *vel, self, param0, scale, param1, param2) == 0) {
+        return NULL;
+    }
+    p->life += lifeAdd;
+    ef_activity_list_add(&self->list, p);
+    p->state = 1;
+    p->field_0xE4 = 0;
+    p->field_0xE5 = ef_random_u16(&((EfPmEmitterView*)self->managerEM)->random);
+    return p;
 }
 
 /* 0x800AC2F8 (0xDCC): table slot 6, one frame of every particle not yet calculated: the effect's pre-calc hook,
  * the space matrices, then per particle its curve tracks (values, patterns, children, fields, post fields), the
  * velocity and position step, the post field and the wrap region; the post-calc hook last. */
-extern "C" void ef_pm_calc(EfPmManager* self) {
+void nw4r::ef::ParticleManager::Calc() {
+    EfPmManager* self = (EfPmManager*)this;
     EfPmParticle* first = (EfPmParticle*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list,
                                                                   (void*)self->list.activeCount);
     if (first == NULL) {
@@ -1029,8 +953,8 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
     }
     EfPmParticle* p = first;
 #line 225
-    NW4R_POINTER_ASSERT(lbl_80592F78, self->managerEM, ef_pm_err_manager_em);
-    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect, ef_pm_err_manager_ef);
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", self->managerEM, "NW4R:Pointer Error\nmManagerEM(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", ((EfPmEmitterView*)self->managerEM)->effect, "NW4R:Pointer Error\nmManagerEM->mManagerEF(=%p) is not valid pointer.");
     if (((EfPmEmitterView*)self->managerEM)->effect->preCalc != NULL) {
         ((EfPmEmitterView*)self->managerEM)->effect->preCalc(self, &self->list, first);
     }
@@ -1143,7 +1067,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                         EfAnimDivider divider;
                         u8* flags;
                         if (track->kind != 0xAC) {
-                            nw4r::db::Panic(lbl_80592F78, 0x181, ef_pm_err_track_keyed);
+                            nw4r::db::Panic("ef_particlemanager.cpp", 0x181, "NW4R:Failed assertion *ptr == 0xac");
                         }
                         ef_pm_handle(&handle, self);
                         flags = ef_emitter_tex_flags(&handle);
@@ -1161,16 +1085,16 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                     }
                     case 5:
                         if (track->kind != 0xAC) {
-                            nw4r::db::Panic(lbl_80592F78, 0x198, ef_pm_err_track_keyed);
+                            nw4r::db::Panic("ef_particlemanager.cpp", 0x198, "NW4R:Failed assertion *ptr == 0xac");
                         }
                         ef_anim_curve_child((const u8*)track, (EfAnimParticle*)p, tick, seed, mode);
                         break;
                     case 6:
                         if (target != 0x20) {
-                            nw4r::db::Panic(lbl_80592F78, 0x19D, ef_pm_err_track_rotate);
+                            nw4r::db::Panic("ef_particlemanager.cpp", 0x19D, "NW4R:Failed assertion kind == AC_TARGET_ROTATE");
                         }
                         if (track->kind != 0xAC) {
-                            nw4r::db::Panic(lbl_80592F78, 0x19E, ef_pm_err_track_keyed);
+                            nw4r::db::Panic("ef_particlemanager.cpp", 0x19E, "NW4R:Failed assertion *ptr == 0xac");
                         }
                         ef_anim_curve_rotate((const u8*)track, &p->rotate.x, tick, seed, mode);
                         break;
@@ -1223,7 +1147,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                             break;
                         case 8: {
                             EfPmEmitterView* em = (EfPmEmitterView*)self->managerEM;
-                            if (ef_pm_f32_nan != em->tailOrigin.x) {
+                            if (-(0.0f / 0.0f) != em->tailOrigin.x) {
                                 nw4r::math::MTX34 m;
                                 nw4r::math::VEC3 origin;
                                 MTX34_ctor(&m);
@@ -1265,7 +1189,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                             memcpy(&pfTransform, pf, sizeof(EfPmVecBlock));
                             if (track->nameTableBytes > 4) {
                                 if (!(pf->effectIndex < *(u16*)names)) {
-                                    nw4r::db::Panic(lbl_80592F78, 0x226, ef_pm_err_post_field_name);
+                                    nw4r::db::Panic("ef_particlemanager.cpp", 0x226, "NW4R:Failed assertion postfieldResource->mChildOption.mNameIdx < *reinterpret_cast<u16*>(nameTable)");
                                 }
                                 pfEffect = ((EffectHandle**)(names + 4))[pf->effectIndex];
                             }
@@ -1365,17 +1289,149 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
     }
 }
 
-/* --------------------------------------------------------------------------------------------- */
-/* Not yet reconstructed                                                                          */
-/* --------------------------------------------------------------------------------------------- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 0x800ADED8 (0x3C0): draws the manager's particles through its draw strategy, with the draw info's depth
+ * offset measured from the emitter's origin when the draw setting asks for one. */
+void nw4r::ef::ParticleManager::Draw(const DrawInfo& aInfo) {
+#line 698
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", this->resource, "NW4R:Pointer Error\nmResource(=%p) is not valid pointer.");
+    EfPmEmitterDesc* ed = (EfPmEmitterDesc*)ef_res_emitter_desc(this->resource);
+#line 701
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", ed, "NW4R:Pointer Error\ned(=%p) is not valid pointer.");
+    if ((ed->setter.flags & 0x400) != 0 || (((EfPmEmitterView*)this->managerEM)->flags & 2) != 0) {
+        return;
+    }
+    EfDrawInfo local;
+    ef_draw_info_copy(&local, (const EfDrawInfo*)&aInfo);
+    f32 offset = ((EfPmDrawSetting*)ef_resource_draw_setting(this->resource))->depthOffset;
+    if (0.0f != offset) {
+        nw4r::math::MTX34 m;
+        nw4r::math::VEC3 origin;
+        MTX34_ctor(&m);
+        ef_emitter_get_mtx((EfDrawEmitter*)this->managerEM, &m);
+        setVec3(&origin, m.m[0][3], m.m[1][3], m.m[2][3]);
+        ef_draw_info_set_depth_offset(&local, offset, &origin);
+    }
+#line 719
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", this->drawStrategy, "NW4R:Pointer Error\nmDrawStrategy(=%p) is not valid pointer.");
+    this->drawStrategy->Draw(local, (EfDrawParticleManager*)this);
+}
+
+/* Sets the draw info's depth offset and the point it is measured from. */
+extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin) {
+    self->depth_offset = offset;
+    copyVec3(&self->depth_origin, origin);
+}
+
+/* 0x800AE2A4 (0xBC): copies the draw info field by field. */
+extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src) {
+    ef_mtx34_copy(&dst->view_mtx, &src->view_mtx);
+    ef_mtx34_copy(&dst->mtx_0x30, &src->mtx_0x30);
+    dst->light_enable = src->light_enable;
+    dst->light_mask = src->light_mask;
+    dst->light_mask1 = src->light_mask1;
+    dst->is_spot_light = src->is_spot_light;
+    dst->fog_type = src->fog_type;
+    dst->fog_start_z = src->fog_start_z;
+    dst->fog_end_z = src->fog_end_z;
+    dst->fog_near_z = src->fog_near_z;
+    dst->fog_far_z = src->fog_far_z;
+    *(u32*)&dst->fog_color = *(const u32*)&src->fog_color; /* the colour moves as one word (a ut::Color copy) */
+    dst->depth_offset = src->depth_offset;
+    assignVec3((Vec*)&dst->depth_origin, (Vec*)&src->depth_origin);
+    *(u32*)&dst->mat_color = *(const u32*)&src->mat_color; /* the colour moves as one word (a ut::Color copy) */
+    *(u32*)&dst->amb_color = *(const u32*)&src->amb_color; /* the colour moves as one word (a ut::Color copy) */
+    return dst;
+}
+
+/* 0x800AE360 (0x1A0): rebuilds the manager's matrix from its emitter's when it is dirty and copies it to
+ * `out`. */
+extern "C" MTX34* ef_pm_get_mtx(void* target, MTX34* out) {
+    EfPmManager* self = (EfPmManager*)target;
+#line 725
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", out, "NW4R:Pointer Error\nresult(=%p) is not valid pointer.");
+    if (self->mtxDirty != 0) {
+        nw4r::math::MTX34 emitterMtx;
+        MTX34_ctor(&emitterMtx);
+        ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emitterMtx);
+        u32 flags = self->flags;
+        ef_calc_inherit_mtx(&self->mtx, &emitterMtx, (flags & 1) != 0, (flags & 2) != 0, self->inheritTranslate,
+                            (flags & 4) != 0);
+        self->mtxDirty = 0;
+    }
+    mtx34_copy(out, &self->mtx);
+    return out;
+}
+
+/* Walk the list, aging every particle. */
+extern "C" void fn_800AE500(EfPmManager* self, s32 arg1) {
+    self->list.activeCount = 0;
+    EfPmParticle* node = self->list.head;
+    while (node != NULL) {
+        if (arg1 == 0 || node->life != 0) {
+            if (node->life != 0)
+                node->life--;
+            if (ef_get_life_status(node) == 1 && node->retireFlag == 1)
+                node->retireFlag = 0;
+        }
+        node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
+    }
+}
+
+/* Walk the list, promoting every retired particle. */
+extern "C" void fn_800AE5B0(EfPmManager* self) {
+    EfPmParticle* node = self->list.head;
+    while (node != NULL) {
+        if (ef_get_life_status(node) == 1 && node->retireFlag == 3)
+            node->retireFlag = 1;
+        node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
+    }
+}
+
+/* 0x800AE628 (0x70): stores the particle manager's matrix relative to its emitter's in the file's second
+ * static matrix. */
+extern "C" void fn_800AE628(EfPmManager* self) {
+    nw4r::math::MTX34 emitterMtx;
+    nw4r::math::MTX34 pmMtx;
+    MTX34_ctor(&emitterMtx);
+    MTX34_ctor(&pmMtx);
+    ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emitterMtx);
+    ef_pm_get_mtx(self, &pmMtx);
+    mtx34_inverse(&emitterMtx, &emitterMtx);
+    mtx34_concat(&ef_pm_mtx_local_to_emitter, &emitterMtx, &pmMtx);
+}
+
+/* 0x800AE698 (0xC): returns the matrix a particle's position is taken to world space with. */
+extern "C" nw4r::math::MTX34* ef_pm_particle_mtx(EfPmManager* manager) {
+    return &ef_pm_mtx_local_to_emitter;
+}
+
+extern "C" void fn_800AE6A4() {
+}
 
 /* 0x800AE6A8 (0x764): multiplies a particle's two colours by the manager's colour, faded toward the
  * secondary colour with the distance to the manager's point in mode 2. */
 extern "C" void ef_pm_modulate_color(EfPmManager* self, EfPmParticle* pp, u8* colorPri, u8* colorSec) {
 #line 848
-    NW4R_POINTER_ASSERT(lbl_80592F78, pp, ef_pm_err_pp);
-    NW4R_POINTER_ASSERT(lbl_80592F78, colorPri, ef_pm_err_color_pri);
-    NW4R_POINTER_ASSERT(lbl_80592F78, colorSec, ef_pm_err_color_sec);
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", pp, "NW4R:Pointer Error\npp(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", colorPri, "NW4R:Pointer Error\ncolorPri(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT("ef_particlemanager.cpp", colorSec, "NW4R:Pointer Error\ncolorSec(=%p) is not valid pointer.");
     switch (self->stateA.b.dirMode) {
     case 1:
         colorPri[0] = (colorPri[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
@@ -1433,3 +1489,8 @@ extern "C" void ef_pm_modulate_color(EfPmManager* self, EfPmParticle* pp, u8* co
         break;
     }
 }
+
+extern "C" void ef_pm_handle(void* a, EfPmManager* m) {
+    ef_store_word(a, (s32)m->resource);
+}
+

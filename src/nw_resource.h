@@ -154,9 +154,11 @@ public:
     /* +0xDC */ u8 pad_0xDC[0x78];
 }; /* size: 0x154 */
 
-/* Constructed through `ef_particle_manager_ctor`/`ef_particle_manager_delete`, its owner's C-linkage pair. */
+/* Constructed through its owner's constructor; the pool frees it through `ef_particle_manager_delete`. */
 class ParticleManager : public PooledObject {
 public:
+    ParticleManager();
+
     /* +0x20 */ Emitter* mEmitter;
     /* +0x24 */ u8 pad_0x24[0x14];
     /* +0x38 */ EfSysActivityList mParticles;

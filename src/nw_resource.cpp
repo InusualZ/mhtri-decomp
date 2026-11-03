@@ -26,7 +26,7 @@
  *   `NwResPlLoadWork`, `nw_res_em_mdl_handle_set`/`_mot_` over the views `NwResKindWork`/`NwResKindSlots`;
  *   lane sound-mhchar's registry names `nw_scn_mdl_create`, `nw_anm_chr_blend_create`,
  *   `nw_anm_chr_res_create`; registry GUESS `ef_system_get_instance`, `ef_system_initialize`, `ef_system_retire_group`,
- *   `pl_res_buffer_get`, `pl_res_loaded_set`, `ef_particle_manager_ctor`, `ef_particle_manager_delete`,
+ *   `pl_res_buffer_get`, `pl_res_loaded_set`,
  *   `res_file_has_anm_tex_srt`, `res_file_get_res_anm_tex_srt_num`, `res_file_get_res_anm_tex_srt`,
  *   `res_anm_tex_srt_copy`, `res_anm_tex_srt_is_valid`; GUESS `nw_res_anm_work_num_has_tex_srt`/
  *   `nw_res_anm_create_has_tex_srt` (the two member-pointer records).
@@ -39,12 +39,10 @@
  * RESIDUALS. `.sdata2`: retail's 2.0f entry is 8 B (0x807963C0), ours 4 B.
  *   The pooled ef classes are views in `nw_resource.h` (`nw4r::ef::Effect`/`Emitter`/`ParticleManager`/
  *   `Particle`/`DrawInfo`); their full classes live in their own units, so the type is defined twice.
- *   The pool array constructors reach only symbols that exist: the Emitter and Particle views declare no destructor
- *   (retail passes the owners' C-linkage deleting destructors 0x800A630C/`ef_particle_delete`, ours 0: two
- *   `lis`/`addi` against one `li`), and the particle-manager array is spelled out with `__construct_new_array` over
- *   `ef_particle_manager_ctor`/`_delete`; its new-expression cleanup pad is written as a `catch (...)` that frees the
- *   block and rethrows, which adds the handler's `__end__catch` tail (6 instructions) retail's pad does not have, and
- *   the count is reloaded where retail keeps it in r30 (a cached local measured worse): 1404 B against 1384.
+ *   The pool array constructors reach only symbols that exist: the Emitter, ParticleManager and Particle views
+ *   declare no destructor (retail passes the owners' C-linkage deleting destructors 0x800A630C/
+ *   `ef_particle_manager_delete`/`ef_particle_delete`, ours 0: two `lis`/`addi` against one `li`), and the count is
+ *   reloaded where retail keeps it in r30 (a cached local measured worse).
  *   `nw_res_effect_init` copies the pool sizes field by field; retail materialises the struct's address first
  *   (`li r3,sizes@sda21` + four `lhz`/`sth`), ours folds the first load into `lhz r0,sizes@sda21` (a pointer local
  *   and a `dst`/`src` pair: no gain; the struct assignment becomes an `__as__` call under `dont_inline`, and
@@ -71,7 +69,6 @@
 #include "ef/ef_system_get_instance.h"
 #include "ef/ef_system_initialize.h"
 #include "ef/ef_system_retire_group.h"
-#include "ef/ef_particle_manager_ctor.h"
 #include "Runtime.PPCEABI.H/CPlusLibPPC.h"
 #include "g3d/g3d_scnobj.h" /* nw4r::g3d::ScnGroup::Clear, owner g3d/g3d_scnobj.cpp (rule 2) */
 #include "draw_shape/mtx34_copy.h"
@@ -823,23 +820,10 @@ public:
         mEmitterPool = new (AllocHeap(sizeof(NwResObjectPool<nw4r::ef::Emitter>)))
             NwResObjectPool<nw4r::ef::Emitter>(mNumEmitter, emitters);
 
-        /* the owner's constructor and destructor are C functions, so the new[] expression is spelled out */
         nw4r::ef::ParticleManager* managers = NULL;
         if (mNumParticleManager > 0) {
-            void* block = AllocHeap(mNumParticleManager * sizeof(nw4r::ef::ParticleManager) + 32);
-            managers = (nw4r::ef::ParticleManager*)operator new[](
-                mNumParticleManager * sizeof(nw4r::ef::ParticleManager) + 16, block);
-            if (managers != NULL) {
-                try {
-                    managers = (nw4r::ef::ParticleManager*)__construct_new_array(
-                        managers, (ConstructorDestructor)ef_particle_manager_ctor,
-                        (ConstructorDestructor)ef_particle_manager_delete, sizeof(nw4r::ef::ParticleManager),
-                        mNumParticleManager);
-                } catch (...) {
-                    operator delete[](managers, block);
-                    throw;
-                }
-            }
+            managers = new (AllocHeap(mNumParticleManager * sizeof(nw4r::ef::ParticleManager) + 32))
+                nw4r::ef::ParticleManager[mNumParticleManager];
         }
         mParticleManagerPool = new (AllocHeap(sizeof(NwResObjectPool<nw4r::ef::ParticleManager>)))
             NwResObjectPool<nw4r::ef::ParticleManager>(mNumParticleManager, managers);
