@@ -32,31 +32,21 @@
 /*
  * Monster Hunter Tri, RMHE08 -- Camellia (NTT 1.2.0, MPL 1.1; see the vendor header above).
  *
- * Nine of the ten functions are byte-identical to the retail object.  `camellia_setup256` is 6 rows
- * short of it (1215 instructions), and the residual is now known exactly:
- *
- *   * at `-O3` (the unit's real level) the instruction stream is byte-identical to retail except the
- *     r1 offsets: `subr(29)`'s split live range takes two stack slots (0x64 and 0xcc) where retail
- *     keeps one (0xc8), which pushes the locals from 0x180 to 0x184 and the frame from -0x1d0 to
- *     -0x1e0.  It is a greedy slot-colouring tie-break; dead-copy and duplicate-statement
- *     perturbations change the slot permutation but never the frame, and neither do 14
- *     operand/statement perturbations around the write and the reads.
- *   * `#pragma optimization_level 4` is the only way to reach the retail frame (-0x1d0).  It also
- *     reassociates the 5th `tl`/`tr` group (SubkeyL/R(23)): it emits `(subr(22) ^ subr(26)) ^
- *     RL1(dw)` where retail keeps `tr = subr(26) ^ RL1(dw)` in a register.  A dead duplicate of the
- *     group's `tl`/`dw` pair (optimised away, but it steers the allocator's web order so `tl` lands
- *     in retail's r26 and the final XOR in r27) takes the window from 9 differing rows to 6;
- *     ~120 operand-order/statement/temp/anchor forms over the group bottom out there.  The
- *     `w0 = dw ^ subr(22); SubkeyR = subr(26) ^ w0` spelling does give retail's association, but the
- *     level-4 pass then reassociates the *4th* group (SubkeyL/R(18)) the same way - a net 15 rows -
- *     and no anchor tried on either group suppresses that.
- *
- * The two are inseparable: every level-4 `-opt` combination that reaches the frame either is plain
- * level 4 or restores the level-3 frame, and `optimization_level`/`opt_*` pragmas are whole-function
- * (a mid-function switch is silently ignored).  Row -> source-line evidence and the full negative
- * list: .pi/notes/camellia-match-process.md and .pi/notes/camellia-67ed.md.
- *
- * Flags: `cflags_camellia` in configure.py.
+ * RANGE.     .text 0x8041DF10..0x80423E74 (camellia_setup128 .. Camellia_DecryptBlock), .rodata S-boxes,
+ *            extab/extabindex (unwind-only records from -Cpp_exceptions on).
+ * FLAGS.     `cflags_camellia` in configure.py (-O3 -inline noauto -use_lmw_stmw off -opt nopeephole
+ *            -pool off -Cpp_exceptions on); `camellia_setup256` alone is compiled at
+ *            `#pragma optimization_level 4`, the only level that gives its retail frame (-0x1d0).
+ * NAMES.     vendor names (NTT camellia.c 1.2.0).
+ * RESIDUALS. .text: none, all ten functions are byte-identical to the retail object.  .rodata: the
+ *            SP3033 word 0x80008080 at 0x8057177C is the vendor value; dtk relocates it against
+ *            @etb_80008080 until config.yml carries a block_relocations range for it (request
+ *            flip-camellia#1), and the target object reads 0 there until then.
+ * SHAPES.    level 4 forward-substitutes the last two single-use `tr` definitions of
+ *            `camellia_setup256` into their uses and reassociates the XOR chain.  Retail keeps the
+ *            SubkeyR(23) group's `tr` and flattens only SubkeyR(26)'s, so SubkeyR(27) is written
+ *            through one more single-use `tr` (`tr = subr(26) ^ subr(28)`), which takes the second
+ *            substitution and emits the same code.
  */
 
 
@@ -355,7 +345,7 @@ static const u32 camellia_sp3033[256] = {
     0x2F002F2F, 0xE200E2E2, 0x85008585, 0xD000D0D,
     0x53005353, 0xF000F0F0, 0x9C009C9C, 0x65006565,
     0xEA00EAEA, 0xA300A3A3, 0xAE00AEAE, 0x9E009E9E,
-    0xEC00ECEC, 0x00000000, 0x2D002D2D, 0x6B006B6B,
+    0xEC00ECEC, 0x80008080, 0x2D002D2D, 0x6B006B6B,
     0xA800A8A8, 0x2B002B2B, 0x36003636, 0xA600A6A6,
     0xC500C5C5, 0x86008686, 0x4D004D4D, 0x33003333,
     0xFD00FDFD, 0x66006666, 0x58005858, 0x96009696,
@@ -903,16 +893,8 @@ void camellia_setup256(const unsigned char *key, u32 *subkey)
     CamelliaSubkeyL(22) = subl(21) ^ subl(23);
     CamelliaSubkeyR(22) = subr(21) ^ subr(23);
     tl = subl(26) ^ (subr(26) & ~subr(24));
-    dw = tl & subl(24);
-    dw = CAMELLIA_RL1(dw);
-    /* Dead duplicate of the tl/dw pair.  It is optimised away, but it steers the allocator's web
-       order so that `tl` lands in retail's r26 and the final XOR in r27 (the window drops from 9
-       differing rows to 6).  See the file header. */
-    tl = subl(26) ^ (subr(26) & ~subr(24));
-    dw = tl & subl(24);
-    dw = CAMELLIA_RL1(dw);
-    tr = subr(26) ^ dw;
-    CamelliaSubkeyL(23) = tl ^ subl(22);
+    dw = tl & subl(24), tr = subr(26) ^ CAMELLIA_RL1(dw);
+    CamelliaSubkeyL(23) = subl(22) ^ tl;
     CamelliaSubkeyR(23) = subr(22) ^ tr;
     CamelliaSubkeyL(24) = subl(24);
     CamelliaSubkeyR(24) = subr(24);
@@ -923,7 +905,9 @@ void camellia_setup256(const unsigned char *key, u32 *subkey)
     CamelliaSubkeyL(26) = tl ^ subl(27);
     CamelliaSubkeyR(26) = tr ^ subr(27);
     CamelliaSubkeyL(27) = subl(26) ^ subl(28);
-    CamelliaSubkeyR(27) = subr(26) ^ subr(28);
+    /* single-use `tr`: absorbs level 4's second forward substitution (file header, SHAPES) */
+    tr = subr(26) ^ subr(28);
+    CamelliaSubkeyR(27) = tr;
     CamelliaSubkeyL(28) = subl(27) ^ subl(29);
     CamelliaSubkeyR(28) = subr(27) ^ subr(29);
     CamelliaSubkeyL(29) = subl(28) ^ subl(30);

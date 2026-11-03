@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (293)
+## Ideas that work (294)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -302,6 +302,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 314 | [An extab cleanup range that ends before an MSL call: declare the callee __attribute__((nothrow))](314-extab-cleanup-range-that.md) | works | source-shape, sections | .text is 100 % but an extab range's u16 length is longer than retail's - retail's cleanup range for a live local object stops before a call to an MSL C function (memmove) and ours covers it. |
 | 315 | [A byte stored into a window and compared afterwards is read back from the window](315-byte-stored-into-a.md) | works | source-shape, allocator | "`lbzx` of the byte and the `clrlwi` of the window index hold each other's volatile register (r3/r4 swapped) around a `stbx` into a small window array" |
 | 316 | [A frontend-hoisted product loads its operands in reverse: opt_common_subs off restores left-first loads](316-frontend-hoisted-product-loads.md) | works | pragma, source-shape | `lwz r3,x; lwz r0,y; mullw r3,r3,r0` in retail, while `x * y` gives the loads swapped and `y * x` gives `mullw r3,r0,r3`, for a product the function repeats (`x * y` and `x * y / 4`) |
+| 317 | [Level 4 forward-substitutes a variable's last single-use definitions - an extra one moves the window](317-level4-last-single-use-substitution.md) | works | source-shape, pragma | Under optimization_level 4 one XOR chain comes out reassociated, `(a ^ b) ^ c` where retail keeps `t = b ^ c; a ^ t`, and anchoring that group only moves the reassociation to another group. |
 
 ## Ruled out - tried and it did not work, do not re-run (14)
 
