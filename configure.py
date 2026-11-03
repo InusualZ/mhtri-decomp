@@ -1494,7 +1494,7 @@ config.libs = [
             Object(Matching, "BTE/sdp_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_db.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/sdp_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/sdp_main.c", mw_version="GC/3.0a5", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_server.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
