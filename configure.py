@@ -1184,7 +1184,7 @@ config.libs = [
             Object(Matching, "Network/NetworkConnection.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
             # Flags: unit header of src/Network/NetworkConnectionStable.cpp.
-            Object(NonMatching, "Network/NetworkConnectionStable.cpp",
+            Object(Matching, "Network/NetworkConnectionStable.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
             # Flags: unit header of src/Network/network_shared_data.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_shared_data.cpp"),
