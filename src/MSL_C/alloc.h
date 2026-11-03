@@ -23,7 +23,7 @@ char* strcpy(char* dst, const char* src);     /* 0x8045F554 */
 char* strncpy(char* dst, const char* src, u32 n); /* 0x8045F614 */
 char* strcat(char* dst, const char* src);     /* 0x8045F658 */
 int printf(const char* fmt, ...);             /* 0x8045EDBC */
-void* memmove(void* dst, const void* src, u32 n);        /* 0x8045B598; untyped: memcpy-shaped byte range */
+void* memmove(void* dst, const void* src, u32 n) __attribute__((nothrow));        /* 0x8045B598; untyped: memcpy-shaped byte range */
 int memcmp(const void* a, const void* b, u32 n);         /* 0x8045B6BC; untyped: byte range */
 int snprintf(char* dst, u32 size, const char* fmt, ...); /* 0x8045DDD8 - bounded formatter */
 /* 0x80463B58 - the wide-string copy; the elements this image's wide strings use are 2 bytes. */

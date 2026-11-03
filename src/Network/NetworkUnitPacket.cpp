@@ -18,13 +18,9 @@
  *   GUESS: networkPacket_getFlag04, networkPacket_isHandshake, networkStreamQueue_putNextPacket,
  *   GUESS: networkStreamQueue_acknowledge, networkStreamWriter_size (the queue's sequence number; the runtime dump's
  *   `J3DShapeMtxMulti::getUseMtxNum` there is a folded one-load body).
- * RESIDUALS. `networkPacket_beginMessage`: the 0x80/0x40 flag bits are computed into r3/r4 the other way round, and the value
- *   block's `stamp + offset` sum swaps its operands.  `networkPacket_takeByte`: the cursor is loaded before the block
- *   pointer (local and member spellings, `scheduling off` and level 2 tried).  `.data`: the emission-order seam
- *   `dataorder.py` reports at 0x805FCE10 is the writers' constructors (`Network/NetworkConnectionStable.cpp`) referring
- *   to the tables, not a TU edge: every slot of both tables is a function of this range.  `extab`:
- *   `networkStreamQueue_discard`'s cleanup range ends at the `hasMessage` call in retail (0x11 words) and at `memmove`
- *   in ours (0x1B) - a `throw()` on the declaration does not move it.  `.sdata`: 2 of 8 B (the frame version).
+ * RESIDUALS. None in `.text` or `extab`.  `.data`: the emission-order seam `dataorder.py` reports at 0x805FCE10 is the
+ *   writers' constructors (`Network/NetworkConnectionStable.cpp`) referring to the tables, not a TU edge: every slot of
+ *   both tables is a function of this range.  `.sdata`: 2 of 8 B (the frame version), the rest alignment fill.
  * SHAPES. A message is a big-endian u16 payload size, a flag byte (0x80 user data, 0x40 a timestamp follows, 0x3F the
  *   value count), the optional timestamp, the optional value block and the payload; a frame is a 22-byte header
  *   (version, payload length, two sequence numbers, two nonces, the flag byte at +0x11, the CRC at +0x12, the key
@@ -33,6 +29,12 @@
  *   has its constructor and destructor (0x803FA5F4/0x803FA63C) here, so this unit emits `__vt__18NetworkStreamQueue`
  *   (0x805FCD98); `NetworkStreamWriter`/`NetworkStreamWriterDefault` define their key function `onFlush` here, so it
  *   emits `__vt__19NetworkStreamWriter`/`__vt__26NetworkStreamWriterDefault` (0x805FCE10/0x805FCDD4) too.
+ *   `networkPacket_beginMessage` names the flag byte's first two terms (`header`) and types `stamp` u8:
+ *   the frontend evaluates the simpler operand of a commutative `|` first, so an unnamed `(flags | user) | stamp` emits
+ *   `or stamp, tmp` (backend-03 `or r57,r38,r56`); the value block's index is `7 + stamp4 + offset` for retail's
+ *   `add stamp4, offset`.  `networkPacket_takeByte` reads `*self->cursor_14++` (member spelling: data pointer loaded
+ *   first).  The two cleanup ranges that end before `memmove` (`networkStreamQueue_discard`, `_removeMessage`) need
+ *   memmove declared `__attribute__((nothrow))` (`MSL_C/alloc.h`), MSL's `_MSL_CANT_THROW`; `throw()` does not do it.
  */
 
 #include "Network/NetworkUnitPacket.h"
@@ -82,14 +84,16 @@ s32 networkPacket_beginMessage(NetworkStreamWriter* self, s32 userData, s32 time
     s32 offset;
     s32 i;
     s32 flags;
-    s32 stamp;
+    u8 stamp;
+    s32 header;
 
     if (self->capacity_08 - self->used_0C < 3) {
         return -1;
     }
     writeSize(self, 0);
     stamp = timestamp ? 0x40 : 0;
-    self->message_10[2] = (flags = count & 0x3F) | (userData ? 0x80 : 0) | stamp;
+    header = (flags = count & 0x3F) | (userData ? 0x80 : 0);
+    self->message_10[2] = header | stamp;
     if (self->capacity_08 - self->used_0C < networkPacket_getHeaderSize(self)) {
         return -1;
     }
@@ -99,7 +103,7 @@ s32 networkPacket_beginMessage(NetworkStreamWriter* self, s32 userData, s32 time
         memcpy(&self->message_10[(timestamp ? 4 : 0) + 3], &word, 4);
         for (i = 0, offset = 0; i < flags; i++, offset += 4) {
             word = getNetworkLogger()->encode_54(*values);
-            memcpy(&self->message_10[(timestamp ? 4 : 0) + offset + 7], &word, 4);
+            memcpy(&self->message_10[7 + (timestamp ? 4 : 0) + offset], &word, 4);
             values++;
         }
     }
@@ -354,14 +358,10 @@ s32 networkPacket_takeU16(NetworkStreamWriter* self, u16* out)
 /* Takes a byte into `out`; 1, or 0. */
 s32 networkPacket_takeByte(NetworkStreamWriter* self, u8* out)
 {
-    u8* data = self->data_04;
-    u8* cursor = self->cursor_14;
-
-    if (self->used_0C - (cursor - data) < 1) {
+    if (self->used_0C - (self->cursor_14 - self->data_04) < 1) {
         return 0;
     }
-    *out = *cursor;
-    self->cursor_14 = cursor + 1;
+    *out = *self->cursor_14++;
     return 1;
 }
 
