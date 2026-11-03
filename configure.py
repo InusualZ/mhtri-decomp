@@ -697,7 +697,7 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
-            Object(NonMatching, "enemy/em_eft_fx.cpp"),
+            Object(Matching, "enemy/em_eft_fx.cpp"),
             Object(NonMatching, "enemy/fn_8011D448.cpp"),
             Object(NonMatching, "enemy/em_common.cpp"),
             Object(Matching, "enemy/em_motion_update.cpp"),
@@ -1107,7 +1107,7 @@ config.libs = [
             Object(Matching, "Network/NetworkFetcherBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkFileFetcher.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkFileFetcher.cpp",
+            Object(Matching, "Network/NetworkFileFetcher.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkNullFetcher.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkNullFetcher.cpp",
