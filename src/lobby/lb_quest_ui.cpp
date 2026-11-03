@@ -41,7 +41,6 @@
  *    `lb_param_w` address;
  *  - `lb_kitchen_skill_text`: retail keeps the comparison limit in r3; ours (`limit = size`, the better of the two
  *    spellings) keeps it in r31;
- *  - `lb_kitchen_pick_draw`: retail adds the 8 into r5 directly, ours through r0;
  *  - `lb_kitchen_skill_apply`: retail truncates `skill` in place (r4), ours into r5;
  *  - `lb_kitchen_skill_text`, `lb_kitchen_pick_draw`, `lb_trade_cost_draw`: their format strings are literals, so
  *    their relocations name our anonymous string symbols where retail's name the map's labels
@@ -52,7 +51,8 @@
  *   flipcheck: `.data`/`.sdata` are emitted byte-identical (tables defined before their first users, strings as
  *   literals); the NPC talk program 0x8038EC44-0x8038F2BC is `lobby/lb_note_talk.cpp` (retail pools 1.0f once per
  *   unit: 0x8079C2A4 for the talk program, 0x8079C2AC for the scene effect); `.text`/extab/extabindex short of the claim.
- * SHAPES. The list draws index their layout tables (`lb_kitchen_row_lsp[i]`) instead of stepping a pointer, which
+ * SHAPES. A string id chosen by a sign test is a ternary of u16 arms passed to `lb_kitchen_skill_text`'s u16
+ *   parameter (the sum is masked in place, `lb_kitchen_pick_draw`).  The list draws index their layout tables (`lb_kitchen_row_lsp[i]`) instead of stepping a pointer, which
  *   orders retail's induction registers; locals that retail colours low (`active`, `str`, `filling`) are declared
  *   last. `lb_trade_cost_draw` reaches price `i` as notice word `i + 1` of the offer, the evaluation order retail's
  *   `add` shows (`&offer->costs[i]` measures lower). `lb_kitchen_skill_text`'s non-numeric kinds return from the
@@ -1455,11 +1455,11 @@ void lb_kitchen_pick_draw(LbKitchenWork* work) {
             if (skill->kind_a == 0) {
                 sprintf(text, "%s", LbStr(0, 89));
             } else {
-                lb_kitchen_skill_text(first, skill->kind_a, (skill->value_a < 0) + 8, skill->value_a);
+                lb_kitchen_skill_text(first, skill->kind_a, skill->value_a < 0 ? (u16)9 : (u16)8, skill->value_a);
                 if (skill->kind_b == 0) {
                     sprintf(text, "%s%s", LbStr(0, skill->kind_a + 89), first);
                 } else {
-                    lb_kitchen_skill_text(second, skill->kind_b, (skill->value_b < 0) + 8, skill->value_b);
+                    lb_kitchen_skill_text(second, skill->kind_b, skill->value_b < 0 ? (u16)9 : (u16)8, skill->value_b);
                     str = LbStr(0, skill->kind_b + 89);
                     sprintf(text, "%s%s %s%s", LbStr(0, skill->kind_a + 89), first, str, second);
                 }

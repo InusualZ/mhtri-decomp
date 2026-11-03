@@ -24,17 +24,15 @@
  *   em018_spin, em018_breach, em018_entrance, ...).
  *   The callee names this unit asked for (`enemy-em018#N`) are GUESS except where the owner's comment names the
  *   behaviour.
- * RESIDUALS. Partial rows:
- *  - `em018_mot9_height_step`, `em018_action_select`: retail keeps a `clrlwi` on a two-constant choice passed to a
- *    `u16`/`u8` parameter (`li r4,2; bne; li r4,9; clrlwi r4,r4,16`); MWCC drops it for every spelling tried
- *    (cast, local of each width, ternary, if);
- *  - `em018_side_swipe`: retail computes `(state == 1) + 0x52` in r4 (`addi r4,r4,0x52`), ours in r0 (casts,
- *    operand order and a local measured equal or worse);
- *  - `em018_glow_fade`: retail compares the fade state 0, 1, 2 with the bodies laid out 1, 2, 0 (selector casts
- *    to s32/u32/s8 measured equal or worse).
- *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` and `.sdata2` not emitted in retail
- *   order (the SE tables, demo keys, turn descriptors and pick records are `extern`).
- * SHAPES. `em018_motion_events`: motion 0x55 shares motion 0x56's water tail, so `case 0x56:` sits inside an
+ * RESIDUALS. Every row is at its original bytes.  flipcheck (not READY): `.text` is laid out in the source's definition
+ *   order, not address order (20380 B mislaid); `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` and
+ *   `.sdata2` not emitted in retail order (the SE tables, demo keys, turn descriptors and pick records are `extern`);
+ *   `em018_prog_tbl` is not defined here (`enemy_control` references it); one extab record differs (+0xE8: 0x18, retail 0x8).
+ * SHAPES. A motion id or probe chosen by a one-value test is a ternary of u16/u8 arms passed through a view of the
+ *   callee with that width (`em_mot_set_c1`, `em_mot_set_blend_c1`, `em_pack_area_pick_c1`): the sum is masked in
+ *   place (`em018_side_swipe`) and a branch-joined choice keeps retail's `clrlwi` at the call (`em018_mot9_height_step`,
+ *   `em018_action_select`, whose `kind` is compared as `s32`).  `em018_glow_fade` tests the fade state 0, 1, 2 with
+ *   the bodies laid out 1, 2, 0: `case 0:` is first and cases 1 and 2 sit in an `if (0)` block ahead of its body.  `em018_motion_events`: motion 0x55 shares motion 0x56's water tail, so `case 0x56:` sits inside an
  *   `if (0) { ... }` after case 0x55's head (playbook 241; the repeated tail measured 98.70).
  *   `Em018UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
@@ -122,6 +120,12 @@
 #define em_water_check_c1 ((u32 (*)(struct _ENEMY_WORK*))em_water_check)
 #define em_fall_height_get_c1 ((f32 (*)(struct _ENEMY_WORK*))em_fall_height_get)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
+/* The blend setter through a u16 motion (retail narrows the chosen motion with `clrlwi r4,r4,16` at the call): a
+ * ternary of u16 arms passed to it is masked in place after the join. */
+#define em_mot_set_blend_c1 ((void (*)(struct _ENEMY_WORK*, u16, u32, u32, u32))em_mot_set_blend)
+#define em_mot_set_c1 ((void (*)(struct _ENEMY_WORK*, u16, s32, s32))em_mot_set)
+/* the area pick with its probe as the u8 retail narrows at the call */
+#define em_pack_area_pick_c1 ((u32 (*)(struct _ENEMY_WORK*, u32, u8, u16, u8*, u8*))em_pack_area_pick)
 #define em_move_offset_step_update_c1 ((u32 (*)(struct _ENEMY_WORK*, u32*, f32))em_move_offset_step_update)
 #define em_roll_cooldown_ck_c1 ((s32 (*)(struct _ENEMY_WORK*, u16, u16, s16*))em_roll_cooldown_ck)
 #define anm_chr_result_scale_get_c1 ((void (*)(nw4r::g3d::ChrAnmResult*, VEC3*))anm_chr_result_scale_get)
@@ -931,10 +935,7 @@ void em018_mot9_height_step(struct _ENEMY_WORK* self, u32 a, u32 b) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        {
-            u16 motion = (u8)a == 1 ? 9 : 2;
-            em_mot_set(self, motion, 4, 0);
-        }
+        em_mot_set_c1(self, (u8)a == 1 ? (u16)9 : (u16)2, 4, 0);
         switch ((u8)b) {
         default:
             em_approach_start(self, -200.0f, 0);
@@ -2363,7 +2364,7 @@ void em018_side_swipe(struct _ENEMY_WORK* self) {
             self->state_0x006 = 1;
         }
         self->state_0x007 = (s32)turn >> 8;
-        em_mot_set_blend(self, (u16)((self->state_0x006 == 1) + 0x52), 0xA, 0, 1);
+        em_mot_set_blend_c1(self, self->state_0x006 == 1 ? (u16)0x53 : (u16)0x52, 0xA, 0, 1);
         em_hit_window_set_default(self, 0, 0x13);
         break;
     }
@@ -5372,15 +5373,7 @@ u32 em018_action_select(struct _ENEMY_WORK* self, u32 arg) {
                 }
             }
         } else {
-            switch (kind) {
-            case 3:
-                probe = 3;
-                break;
-            default:
-                probe = 0xFF;
-                break;
-            }
-            if (em_pack_area_pick(self, 0x17, (u8)probe, (u16)arg, em018_pick_a, em018_pick_b) == 1) {
+            if (em_pack_area_pick_c1(self, 0x17, (s32)kind == 3 ? (u8)3 : (u8)0xFF, (u16)arg, em018_pick_a, em018_pick_b) == 1) {
                 return 1;
             }
         }
@@ -5491,39 +5484,41 @@ void em018_glow_fade(struct _ENEMY_WORK* self) {
     EmFadeRec* rec = &((EmActWork*)self)->fade_0x328;
 
     switch (rec->state_0x30) {
-    case 1:
-        if ((rec->glow_0x00.x += 0.5f) > 2.0f) {
-            rec->glow_0x00.x = 2.0f;
-        }
-        if ((rec->glow_0x00.y += 8.0f) > 17.0f) {
-            rec->glow_0x00.y = 17.0f;
-        }
-        if (rec->glow_0x00.z > 1.0f) {
-            rec->glow_0x00.z = 1.0f;
-        }
-        rec->state_0x30++;
-        break;
-    case 2:
-        if ((rec->glow_0x00.x += 0.5f) > 2.0f) {
-            rec->glow_0x00.x = 2.0f;
-        }
-        if ((rec->glow_0x00.y += 8.0f) > 17.0f) {
-            rec->glow_0x00.y = 17.0f;
-        }
-        if (rec->glow_0x00.z > 1.0f) {
-            rec->glow_0x00.z = 1.0f;
-        }
-        if ((rec->glow_0x10.x += 0.4333333f) > 2.3f) {
-            rec->glow_0x10.x = 2.3f;
-        }
-        if ((rec->glow_0x10.y += 0.13333333f) > 1.4f) {
-            rec->glow_0x10.y = 1.4f;
-        }
-        if ((rec->glow_0x10.z += 0.59999996f) > 2.8f) {
-            rec->glow_0x10.z = 2.8f;
-        }
-        break;
     case 0:
+        if (0) {
+        case 1:
+            if ((rec->glow_0x00.x += 0.5f) > 2.0f) {
+                rec->glow_0x00.x = 2.0f;
+            }
+            if ((rec->glow_0x00.y += 8.0f) > 17.0f) {
+                rec->glow_0x00.y = 17.0f;
+            }
+            if (rec->glow_0x00.z > 1.0f) {
+                rec->glow_0x00.z = 1.0f;
+            }
+            rec->state_0x30++;
+            break;
+        case 2:
+            if ((rec->glow_0x00.x += 0.5f) > 2.0f) {
+                rec->glow_0x00.x = 2.0f;
+            }
+            if ((rec->glow_0x00.y += 8.0f) > 17.0f) {
+                rec->glow_0x00.y = 17.0f;
+            }
+            if (rec->glow_0x00.z > 1.0f) {
+                rec->glow_0x00.z = 1.0f;
+            }
+            if ((rec->glow_0x10.x += 0.4333333f) > 2.3f) {
+                rec->glow_0x10.x = 2.3f;
+            }
+            if ((rec->glow_0x10.y += 0.13333333f) > 1.4f) {
+                rec->glow_0x10.y = 1.4f;
+            }
+            if ((rec->glow_0x10.z += 0.59999996f) > 2.8f) {
+                rec->glow_0x10.z = 2.8f;
+            }
+            break;
+        }
         if ((rec->glow_0x00.x -= 0.033333335f) < 1.0f) {
             rec->glow_0x00.x = 1.0f;
         }

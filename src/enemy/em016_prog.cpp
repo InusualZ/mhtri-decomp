@@ -18,19 +18,18 @@
  *   em016_walk_*, em016_swim_*, em016_guard_*, em016_atk_*, em016_sound_*, em016_route_*, em016_demo_*); the SE
  *   programs are named `<species>_se_seq_<sub>`/`_se_alt_seq_<sub>` after the first `state_sub` that plays them,
  *   their records `<table>_rec<N>`; `em017_0x328`'s alert pair and `EmActWork` are this unit's views.
- * RESIDUALS. 13 rows short of 100:
+ * RESIDUALS. 5 rows short of 100:
  *  - `em016_frame_em017`: self sits in r31 where retail has r29 (the loop's found/rec/max/i take r31..r27);
  *  - `em016_frame_effect`: retail recomputes `(u16)(angle + 0x8000)` at each test, ours keeps it in a register;
  *  - `em016_action_select`: retail lowers the `act_id` 5/6/8 case group as a range test (`subi`+`cmplwi`);
  *  - `em016_strafe_point_get`: the selected offset lands in r4 where retail has r3 (`&v` computed late);
- *  - `em016_atk_spit`, `em016_walk_approach`, `em016_walk_approach_hit`, `em016_swim_short_turn`,
- *    `em016_swim_team_mot`: retail truncates a two-constant motion choice with `clrlwi r4,r4,16` at the call; every
- *    spelling tried (u16/u32 local, ternary, if, u16 parameter view, cast) folds it away;
- *  - `em016_atk_volley_charge`, `em016_atk_volley_run`: `(kind == 1) + 0xC9` computed into r0 where retail uses r4;
  *  - `em016_action_allow_ck`, `em016_swim_rest`: one scratch register coloured differently.
  *  `.ctors` is not emitted: `em016_static_init` is a plain function (a real `__sinit` needs the vector pair
  *  constructors). flipcheck also names `fn_805012E8` (no map row in this tree).
- * SHAPES. `Em016UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ * SHAPES. A motion id (or `em_approach_step` mask) chosen by a one-value test is a ternary of u16 arms passed through
+ *   a u16 view (`em_mot_set_u16`, `em_mot_set_blend_u16`, `em_approach_step_u16`): the sum is masked in place (the two
+ *   volley steps) and a branch-joined choice keeps retail's `clrlwi` at the call (the spit, approach, turn and team
+ *   motions).  `Em016UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
  *   A one-case test retail compares signed (`cmpwi`) is a `switch`; a trailing `default:` retail lays out
@@ -187,6 +186,8 @@ typedef void (*EmShellShotFn)(_ENEMY_WORK* self, EmSpawnRec* req, u32 mode);
 #define em_turn_seq_step_c ((u32 (*)(_ENEMY_WORK*, const u32*))em_turn_seq_step)
 #define em_die_ck_u32 ((u32 (*)(_ENEMY_WORK*))em_die_ck)
 #define em_mot_set_u16 ((void (*)(_ENEMY_WORK*, u16, s32, s32))em_mot_set)
+#define em_mot_set_blend_u16 ((void (*)(_ENEMY_WORK*, u16, u32, u32, u32))em_mot_set_blend)
+#define em_approach_step_u16 ((u32 (*)(_ENEMY_WORK*, s32, u16))em_approach_step)
 #define em_target_pos_set_view1 ((void (*)(_ENEMY_WORK*, VEC3*))em_target_pos_set)
 #define em_ground_ck_view1 ((u32 (*)(_ENEMY_WORK*, f32))em_ground_ck)
 
@@ -1481,8 +1482,7 @@ extern "C" void em016_walk_approach(_ENEMY_WORK* self, u32 arg1, u32 arg2) {
     case 0: {
         self->state++;
         em_move_mode_set(self, 0);
-        u32 motion = (u8)arg1 == 1 ? 9 : 2;
-        em_mot_set(self, (u16)motion, 0xA, 0);
+        em_mot_set_u16(self, (u8)arg1 == 1 ? (u16)9 : (u16)2, 0xA, 0);
         em_approach_start(self, 0.0f, 0);
         if ((u8)arg2 == 1 && self->value_0x378 > 700.0f) {
             self->value_0x378 = 700.0f;
@@ -1544,7 +1544,7 @@ extern "C" void em016_walk_approach_hit(_ENEMY_WORK* self, u32 arg1, u32 arg2) {
         break;
     }
     case 1:
-        if (em_approach_step(self, 0, (u16)((u8)arg1 == 1 ? 0xC0 : 0x40)) == 1) {
+        if (em_approach_step_u16(self, 0, (u8)arg1 == 1 ? (u16)0xC0 : (u16)0x40) == 1) {
             em_action_finish(self);
         }
         break;
@@ -2175,8 +2175,7 @@ extern "C" void em016_swim_short_turn(_ENEMY_WORK* self, u8 alt) {
     case 0: {
         self->state++;
         em_move_mode_set(self, 2);
-        u32 motion = alt == 1 ? 0x2C : 0x29;
-        em_mot_set_blend(self, (u16)motion, 0x18, 0, 1);
+        em_mot_set_blend_u16(self, alt == 1 ? (u16)0x2C : (u16)0x29, 0x18, 0, 1);
         break;
     }
     case 1:
@@ -2204,7 +2203,7 @@ extern "C" void em016_swim_team_mot(_ENEMY_WORK* self) {
     case 0: {
         self->state++;
         em_move_mode_set(self, 0);
-        em_mot_set(self, (u16)(self->team == 0x10 ? 0x3D : 0x3B), 0, 0);
+        em_mot_set_u16(self, self->team == 0x10 ? (u16)0x3D : (u16)0x3B, 0, 0);
         break;
     }
     case 1:
@@ -2745,8 +2744,7 @@ extern "C" void em016_atk_spit(_ENEMY_WORK* self, u8 kind) {
     case 0: {
         self->state++;
         em_move_mode_set(self, 0);
-        u32 motion = kind == 2 ? 0x5B : 0x57;
-        em_mot_set(self, (u16)motion, 0xA, 0);
+        em_mot_set_u16(self, kind == 2 ? (u16)0x5B : (u16)0x57, 0xA, 0);
         em_hit_window_set_default(self, 0, 0x21);
         em016_team16_motion_req(self, -0xF);
         break;
@@ -3375,7 +3373,7 @@ extern "C" void em016_atk_volley_charge(_ENEMY_WORK* self, u8 kind) {
             }
         } else if (em_mot_end_ck(self) == 1) {
             self->state++;
-            em_mot_set(self, (u16)(kind == 1 ? 0xCA : 0xC9), 0xA, 0);
+            em_mot_set_u16(self, kind == 1 ? (u16)0xCA : (u16)0xC9, 0xA, 0);
         }
         break;
     case 2:
@@ -3740,7 +3738,7 @@ extern "C" void em016_atk_volley_run(_ENEMY_WORK* self, u8 point, u8 kind) {
             }
         } else if (em_mot_end_ck(self) == 1) {
             self->state++;
-            em_mot_set(self, (u16)(kind == 1 ? 0xCA : 0xC9), 0xA, 0);
+            em_mot_set_u16(self, kind == 1 ? (u16)0xCA : (u16)0xC9, 0xA, 0);
         }
         break;
     case 6:

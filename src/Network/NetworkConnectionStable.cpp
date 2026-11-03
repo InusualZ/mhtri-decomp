@@ -22,11 +22,11 @@
  *   `sendChannel`: size, overhead and the send-queue pointer take r23/r22/r24 against retail's r22/r23/r22 (the local
  *   declaration order is the best of the permutations measured).
  *   `open`: `rand() + base` adds in the other operand
- *   order (`(s32)`/`(u16)` spellings tried).  `sendClose`: the 0x84/0x85
- *   select computes in r4 directly (a `u8` local tried).
+ *   order (`(s32)`/`(u16)` spellings tried).
  *   `.sdata2` (flip blocker): our object emits the `u32`->`f32` conversion double (8 B) that retail pools at
  *   0x8079C6B8 (`dispatchControl`'s pong time); the range is not this unit's to claim.
- * SHAPES. The destructor, the `NetworkSlotQueues` constructor and destructor and the four writer constructors and
+ * SHAPES. `sendClose`'s close byte is a ternary of u8 arms passed to `writeByte`'s u8 parameter (the sum is masked
+ *   in place).  The destructor, the `NetworkSlotQueues` constructor and destructor and the four writer constructors and
  *   destructors are complete with empty bodies (the compiler emits the member and base calls and the table stores);
  *   all of them match.  The writers' tables are `Network/NetworkUnitPacket.cpp`'s: each class declares its flush
  *   override first, so that override, not the destructor defined here, is the key function.
@@ -832,7 +832,7 @@ void NetworkConnectionStable::sendClose(s32 relay)
 
     packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
-    writeSize(&packet, writeByte(&packet, relay != 0 ? 0x84 : 0x85));
+    writeSize(&packet, writeByte(&packet, relay != 0 ? (u8)0x84 : (u8)0x85));
     putOnSendPool(&packet, 1);
 }
 

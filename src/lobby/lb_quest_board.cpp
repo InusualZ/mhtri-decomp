@@ -30,9 +30,10 @@
  *  - `lb_quest_board_step_screen`: retail cross-jumps the identical error tails (`step = 2; wait = 30`) into one copy
  *    (case 2: after the first error, case 3: after the second); the first error with its own tail and the others
  *    sharing one is the best spelling, duplicated tails stay separate and measure lower;
- *  - `draw_quest_board`: register colouring of the hoisted table bases (`lis` r31/r24/r23/r22 in retail);
- *  - `lb_quest_board_summary_draw`: retail adds 0x1678 to the session flag in r3 directly, ours through r0.
- * SHAPES. The row loops index their layout tables (`lb_quest_board_row_lsp[row]`, playbook 111); a two-way test on
+ *  - `draw_quest_board`: register colouring of the hoisted table bases (`lis` r31/r24/r23/r22 in retail).
+ * SHAPES. A sprite id chosen by a one-value test is a ternary of u16 arms passed to `draw_sprite_idx`'s u16 parameter
+ *   (the sum is masked in place, `lb_quest_board_summary_draw`; its locals are declared `entry, i, profile, labels`,
+ *   the order the allocator's colouring needs).  The row loops index their layout tables (`lb_quest_board_row_lsp[row]`, playbook 111); a two-way test on
  *   a `u8` kind that retail compares signed is a `switch`; `lb_cmd_repeat_get()` goes through a `u16` local before
  *   the cursor step (retail evaluates it first).
  */
@@ -669,13 +670,13 @@ u16 lb_quest_board_label_lsp[4] = {0x1695, 0x1696, 0x1697, 0x1697};
  * the wrapped comment and the four labels. */
 extern "C" void lb_quest_board_summary_draw(LbQuestBoardWork* work) {
     LbQuestBoardEntry* entry = (LbQuestBoardEntry*)getProfileQuestRecord(work->index_0x249);
+    s32 i;
     NetProfileRec* profile = &refreshAllProfiles()[work->index_0x249];
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
     char text[0x10];
     char comment[0x90];
     s32 count;
-    s32 i;
     NetProfileLabels* labels;
 
     get_lsp_data(0x1674, &anchor);
@@ -699,7 +700,7 @@ extern "C" void lb_quest_board_summary_draw(LbQuestBoardWork* work) {
     sprintf(text, "%d", entry->players);
     draw_font_idx(0x167C, (s8*)text, 0, &anchor);
     draw_font_idx(0x167D, (s8*)LbStr(1, 6), 0, &anchor);
-    draw_sprite_idx((profile->rank_0x08C == 1) + 0x1678, &anchor);
+    draw_sprite_idx(profile->rank_0x08C == 1 ? (u16)0x1679 : (u16)0x1678, &anchor);
     postQuestBoardRecord((u8*)entry->comment);
     quest_comment_wrap(entry->comment, comment);
     draw_font_idx(0x167E, (s8*)comment, 0, &anchor);

@@ -37,8 +37,7 @@
  *   `em007_model_eft_create` (two extra `clrlwi`: the res-id argument and the made-flag store; its extab record is
  *   0x18, retail 0x8 - the new-expression's landing pad), `em007_model_copy_bind_nodes` (the two node temporaries'
  *   stack slots swap), `em007_action_select` (retail keeps the first switch's answer in r28, ours r30),
- *   `em007_act2_14`/`em007_act7_6` (the motion-choice sum lands in r0, retail r4), `em007_act7_10` (the
- *   `fn_8012D3E0` answer is narrowed into r0, retail r6).
+ *   `em007_act7_10` (the `fn_8012D3E0` answer is narrowed into r0, retail r6).
  *   Data: `Em007UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table
  *   (0x805B75B8); it is built with placement `new` over `operator new` (a new-expression adds a landing pad).
  *   `.sdata2` stops at 0x28C: the trailing alignment word is the link's.
@@ -49,7 +48,8 @@
  *   with shared cases (`em007_tev_color_update`).  The hit-window id choices are `cond ? a : b` arguments, the step
  *   counters `self->state++`.  The shell-table slots +0x14/+0x2C/+0x54 are called without the table argument
  *   (`Em007ShellPosJobFn`, `Em007ShellSpawnFn`, `Em007ShellPointFn`).  `em_act_ck` is read unsigned through
- *   `em_act_ck_u`.  The pool's order follows the source text: `em007_act2_11`'s turn angle is one expression and
+ *   `em_act_ck_u`.  A motion id chosen by a one-value test is a ternary of u16 arms passed through the u16 view
+ *   `em_mot_set_c1` (the sum is masked in place).  The pool's order follows the source text: `em007_act2_11`'s turn angle is one expression and
  *   `em007_act7_8` computes the XZ distance before the angle.  A value retail computes before an argument list is a
  *   local assigned first (`em007_act7_8`'s hit mask, `em007_act7_3`'s speed, `em007_act9_1`'s gauge scale) and a
  *   product whose operands retail swaps takes its call result through a local (`em007_act2_10`/`7_1`/`7_11`).  The data is defined between the functions in retail
@@ -93,6 +93,9 @@
 #include "enemy/fn_80137604.h"
 #include "enemy/fn_8011D448.h"
 #include "enemy/em_common.h"
+/* The motion setter's own width (`em_mot_set` narrows its motion to u16 first, `enemy/em_common.h`): a ternary of
+ * u16 arms passed to it is masked in place after the join. */
+#define em_mot_set_c1 ((void (*)(struct _ENEMY_WORK*, u16, s32, s32))em_mot_set)
 #include "enemy/em_se_tbl_play.h"
 #include "enemy/em_se_tbl_play_alt.h"
 #include "enemy/em_se_record.h"
@@ -1050,7 +1053,7 @@ extern "C" void em007_act2_14(struct _ENEMY_WORK* self, u8 arg1) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        em_mot_set(self, (u16)((((s32)~((arg1 - 1) | (1 - arg1)) >> 0x1F) + 0x25)), 2, 0);
+        em_mot_set_c1(self, arg1 == 1 ? (u16)0x24 : (u16)0x25, 2, 0);
         break;
     case 1:
         if (em_frame_check(self, 3, 14.0f, 78.0f) == 1) {
@@ -1503,7 +1506,7 @@ extern "C" void em007_act7_6(struct _ENEMY_WORK* self, u8 arg1) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        em_mot_set(self, (u16)((arg1 == 1) + 0x2A), 6, 0);
+        em_mot_set_c1(self, arg1 == 1 ? (u16)0x2B : (u16)0x2A, 6, 0);
         em_stamina_add(self, (u32)-0x32);
         break;
     case 1:

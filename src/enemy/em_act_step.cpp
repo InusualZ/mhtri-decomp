@@ -20,19 +20,19 @@
  *   player's joint matrix) and are shaken off a player; the sound programs are named after the first `state_sub`
  *   that plays them (`em026_se_tbl_<sub>`, `em026_se_alt_tbl_<sub>`), their records `<table>_rec<entry>`.  The
  *   player helpers `pl_cling_req_set`/`pl_shake_off_ck`/`pl_guard_latch_ck` are registry names.
- * RESIDUALS. All 70 rows written; 3 short of 100.
+ * RESIDUALS. All 70 rows written; 2 short of 100.
  *  - `em_act_face_away`: self/player/grip pointer take r30/r31/r29 where retail has r29/r30/r31, and the three VEC3
  *    temporaries sit one slot apart (a declaration-order search over 400 orders and a grip-pointer-free spelling
  *    measured no better);
  *  - `em026_act3_lurk`: retail coalesces the companion pointer with the player pointer (r26) and the torch flag with
  *    the loop index (r28); ours keeps them apart (declaration orders and a direct `ainpc_w` spelling tried);
- *  - `em_act_arm_mot203_204`: `(action == 1) + 0xCB` lands in r0 where retail computes it in r4 (operand swap, a
- *    `u16` parameter view and a separate motion local tried; `enemy/em016_prog.cpp` records the same shape).
  *  - `em026_area_keep_set`'s source record is this unit's `Em026KeepSrc`, the same three words as
  *    `enemy/em040_ai.cpp`'s local `EmAreaKeepSrc` (one shared type once that unit's copy moves to a header).
  *  - flip: the three `Pl/pl_act.cpp` callees are registry names (`pl_cling_req_set`, `pl_shake_off_ck`,
  *    `pl_guard_latch_ck`) that are not map rows yet.
- * SHAPES. `#pragma peephole off`, `#pragma fp_contract off` and `#pragma pool_data off` (each table is addressed with
+ * SHAPES. A motion id chosen by a one-value test is a ternary of u16 arms passed through the u16 view `em_mot_set_c1`
+ *   (the sum is masked in place, `em_act_arm_mot203_204`).  `#pragma peephole off`, `#pragma fp_contract off` and
+ *   `#pragma pool_data off` (each table is addressed with
  *   its own `lis`/`addi`) over the bodies.  `EmActStepUserData` derives from `ResUserDataAc`, so MWCC emits its table;
  *   it is allocated with `operator new` and built with placement `new`.  The static initializer is MWCC's own `__sinit`
  *   for `em026_vec_pair` (a struct with an inline constructor).  Float arguments retail evaluates before the integers
@@ -118,6 +118,9 @@ s32 em_die_ck(struct _ENEMY_WORK* self);
 
 /* `em_fall_start` through the signature its body has: it reads a float in f1 (the shared declaration takes none). */
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
+/* The motion setter's own width (`em_mot_set` narrows its motion to u16 first, `enemy/em_common.h`): a ternary of
+ * u16 arms passed to it is masked in place after the join. */
+#define em_mot_set_c1 ((void (*)(struct _ENEMY_WORK*, u16, s32, s32))em_mot_set)
 /* `em_mot_speed_set` with its float argument listed first, so it is evaluated before `self` (retail order). */
 #define em_mot_speed_set_ff ((void (*)(f32, struct _ENEMY_WORK*))em_mot_speed_set)
 /* `em_gauge_period_step` and `em_turn_to_target` with their arguments in the order and widths retail evaluates them
@@ -863,7 +866,7 @@ extern "C" void em_act_arm_mot203_204(_ENEMY_WORK* self, u32 action)
         self->state += 1;
         em_fall_height_get(self);
         em_fall_start(self);
-        em_mot_set(self, (u16)(203 + ((action & 0xFF) == 1)), 0, 0);
+        em_mot_set_c1(self, (u8)action == 1 ? (u16)204 : (u16)203, 0, 0);
         em_ground_snap(self);
         break;
     case 1:

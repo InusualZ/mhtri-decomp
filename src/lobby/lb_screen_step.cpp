@@ -23,7 +23,7 @@
  *  - `lb_smith_kakou_preview_set`: the same argument order for `lb_scroll_materials_set`'s recipe address (8 bytes);
  *  - `lb_smith_make_preview_set`: the three gun-part records' stack slots (retail ascending, a 4-byte gap after the
  *    first);
- *  - `lb_smith_kakou_open`, `lb_smith_sort_labels_draw`, `lb_smith_deco_info_draw`: retail narrows the argument in its
+ *  - `lb_smith_kakou_open`, `lb_smith_deco_info_draw`: retail narrows the argument in its
  *    own register (`clrlwi r4,r4`/`extsb r4,r4`), ours through r0;
  *  - `lb_smith_pl_turn_step`: retail returns from the busy test through `bne`/`b` (4 bytes; nested, else-return and
  *    inline-helper shapes all give `beq`);
@@ -32,7 +32,8 @@
  *   Data: `.sbss` is 4 bytes short of the claimed 8 (only `deco_sei_tbl_ptr` is referenced; 0x80794BEC is not), and
  *   `.sdata` ends 4 zero bytes short of the target's 104 (alignment fill).
  *   flipcheck: 39 foreign callees carry registry names the map does not have yet.
- * SHAPES. A callee whose retail argument is wider or narrower than its owner's declaration is called through a `_c1`
+ * SHAPES. A string id chosen by a one-value test is a ternary of u16 arms passed to `LbStr`'s u16 parameter (the sum
+ *   is masked in place, `lb_smith_sort_labels_draw`).  A callee whose retail argument is wider or narrower than its owner's declaration is called through a `_c1`
  *   view (`lb_cmd_pressed_ck(...) == 1` is an unsigned compare in retail); a `bool` parameter passes a flag on to
  *   `GetMenu*Color` unnormalised.  A page-build loop keeps its `last` bound and an `s32` count; refusal bits start at 0
  *   and are ORed in.  The goods-window loops index the rows and the layout table by the loop counter.  A centred text
@@ -2590,7 +2591,7 @@ void lb_smith_sort_labels_draw(LbSmithWork* self, _mh_ivec2_* base)
         filter = self->sort_0x01C.pick_a_0x81 - 10;
     }
     draw_font_idx(0x192B, (s8*)LbStr(0, filter + 0xEA), 4, base);
-    draw_font_idx(0x192C, (s8*)LbStr(0, (self->sort_0x01C.pick_b_0x80 == 0) + 0xE8), 4, base);
+    draw_font_idx(0x192C, (s8*)LbStr(0, self->sort_0x01C.pick_b_0x80 == 0 ? (u16)0xE9 : (u16)0xE8), 4, base);
 }
 
 /* 0x80364790 (0x19C): draws the decoration recipes window. */
