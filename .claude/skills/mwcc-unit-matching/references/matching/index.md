@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (286)
+## Ideas that work (287)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -295,6 +295,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 306 | [Backend temporaries are numbered in statement order: move the statement, and read a global into a local to put its load on the named tier](306-backend-temporaries-are-numbered.md) | works | source-shape, allocator | A row matches every opcode but a block's volatile registers are permuted (a 64-bit difference in r12/r0 where retail has r8/r5, two pooled globals one register apart), the differing nodes are all backend temporaries,... |
 | 307 | [A fully unrolled clear loop's zero merges with its 0-valued counter: start the counter at 1](307-fully-unrolled-clear-loops.md) | works | source-shape, allocator | A constant-count `itd[i] = 0` loop beside a run of field copies has every opcode of retail, but the zero lands in a volatile register retail does not use (r4) and the copy temporaries take r0 where retail has r3 - a... |
 | 308 | [A temporary's cleanup record over an in-class inline member call: define the member out of class](308-temporarys-cleanup-record-over.md) | works | source-shape, sections | A function's `.text` is 100 % but its extab record is 0x18 B against retail's 8, with a cleanup range whose pc is the return address of an out-of-line call to an inline member (a `ut::Color` temporary converted through... |
+| 309 | [A loop bit mask colours before its strength-reduced walk: make the loop's mask the second web of a helper local](309-loop-bit-mask-colours.md) | works | source-shape, allocator | A bit-walking loop over an indexed array (`for (bits = ...; bits; i++, bits >>= 1) if (bits & 1) use(a[i])`) matches every opcode but the mask and the strength-reduced walk pointer are swapped (ours mask r7 / walk r8,... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

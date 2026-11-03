@@ -9,22 +9,19 @@
  *   the target, so no `fp_contract` evidence either way.
  * NAMES. SDK names throughout, including the SDK file-static helpers `__GXSetLightChan` and `__GXSetTexGen`. GUESS:
  *   `WriteGenMode` and `SendFlushPrim` are local inline copies of `__GXSetGenMode` and `__GXSendFlushPrim`.
- * RESIDUALS. `__GXSetDirtyState` only: the chan loop emits `addi r5,r31,0xB8` + `lwz 0(r5)` where the target has
- *   `mr r5,r31` + `lwz 0xB8(r5)` (the indexed `chanCtrl[i]` spelling gives that pair but scores lower); the texgen
- *   loop colours `bits`/the walk r7/r8 where the target has r8/r7. Register colouring; the indexed walk is numbered
- *   last in the front end. The SDK spelling with both loops written out in the body (one `dStateLocal`-style mask
- *   reused as the loop bits, an address counter and an index) gives every target instruction but colours the mask
- *   and the address counter r6/r7 where the target has r7/r6. Tried without a gain: helper parameter and local
- *   declaration orders, function-scope declaration orders, the loop counters as `int`, `__GXData` read directly,
- *   and scoped `optimization_level`, `global_optimizer`, `opt_strength_reduction`, `opt_propagation`,
- *   `opt_dead_assignments`, `opt_lifetimes`, `opt_loop_invariants`, `inline_bottom_up` and `peephole` pragmas.
+ * RESIDUALS. none.
  * SHAPES. The target inlines the genMode write into `__GXSetDirtyState` and the flush-primitive body into `GXBegin`
  *   though both are defined later; `-inline auto` only inlines an earlier definition, so the bodies are static inline
  *   helpers above their callers. `__GXSendFlushPrim` keeps its own copy of the body (a call to the helper inlines into
  *   a shorter function). `GXSetCullMode` builds the swapped front/back bits as `(mode << 1) & 2` then inserts
  *   `(mode >> 1) & 1`: the `__rlwimi` spelling of the same pair allocates its two registers the other way round. The
  *   numColorChans/numTexGens values are read into a local before the XF write, which lets the scheduler hoist the
- *   `genMode` load as the target does.
+ *   `genMode` load as the target does. In `__GXSetDirtyState` both XF loops index `gx->chanCtrl[i]` /
+ *   `gx->texGenCtrl[i]` (the strength-reduced walk starts at `gx`, `mr r5,r31` + `lwz 0xB8(r5)`), the address
+ *   counters and `ptaddr` are helper locals (numbered before the walk, so they colour r5/r6 first), and the loop's
+ *   bit mask is the *second* web of the helper local that first holds the channel/texgen count: a later def starts a
+ *   new web numbered after the strength-reduced walk, which is the only way the mask colours after the walk (r7/r8
+ *   and r5/r7 as retail; playbook idea 309, dumps read with tools/mwcc-debugger and `regsim`).
  */
 
 #include "RVLGX/GXGeometry.h"
@@ -57,32 +54,31 @@ static inline void SendFlushPrim(void)
     __GXData->xfWritePending = 1;
 }
 
-/* Sends the dirty channel count and channel controls to the XF. */
+/* Sends the dirty channel count and channel controls to the XF; `bits` holds the count, then the dirty bits. */
 static inline void __GXSetLightChan(GXData* gx, u32 dirty)
 {
+    u32 i;
     u32 bits;
     u32 addr = 0x100E;
     if (dirty & 0x01000000) {
-        u32 nChan = gx->genMode.f.numColorChans;
-        XF_WRITE(0x1009, nChan);
+        bits = gx->genMode.f.numColorChans;
+        XF_WRITE(0x1009, bits);
     }
-    {
-        GXChanCtrlReg* ctrl = gx->chanCtrl;
-        for (bits = (dirty >> 12) & 0xF; bits != 0; ctrl++, addr++, bits >>= 1) {
-            if (bits & 1) XF_WRITE(addr, ctrl->word);
-        }
+    bits = (dirty >> 12) & 0xF;
+    for (i = 0; bits != 0; i++, addr++, bits >>= 1) {
+        if (bits & 1) XF_WRITE(addr, gx->chanCtrl[i].word);
     }
 }
 
-/* Sends the dirty texgen count, texgen controls and post-texgen controls to the XF. */
+/* Sends the dirty texgen count, texgen controls and post-texgen controls to the XF; `bits` holds the count, then the dirty bits. */
 static inline void __GXSetTexGen(GXData* gx, u32 dirty)
 {
     u32 i;
     u32 bits;
     u32 taddr = 0x1040;
     if (dirty & 0x02000000) {
-        u32 nTex = gx->genMode.f.numTexGens;
-        XF_WRITE(0x103F, nTex);
+        bits = gx->genMode.f.numTexGens;
+        XF_WRITE(0x103F, bits);
     }
     bits = (dirty >> 16) & 0xFF;
     for (i = 0; bits != 0; taddr++, i++, bits >>= 1) {
