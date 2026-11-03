@@ -1,7 +1,7 @@
 ---
 id: 241
 title: A case that jumps forward into the middle of the next case: put the next case's label inside an if (0) block
-status: works
+status: ruled-out
 problem: Retail's switch case ends with a `b` into the middle of the following case (past that case's own test), so the shared tail exists once; the goto-free source repeats the tail in each case and the function grows by its size.
 tags: [source-shape]
 applies: [Wii/1.3]
@@ -10,6 +10,8 @@ related: [183, 213, 219]
 ---
 
 # 241. A case that jumps forward into the middle of the next case: put the next case's label inside an if (0) block
+
+**Ruled out by owner ruling 2026-11-03 (`docs/pipeline.md` 11): no case label inside another block.** The shape below matched retail's bytes, but no developer would write it, so it is not used. Write the case goto-free at its best score.
 
 **Problem.** Retail lays cases 0, 1, 2 out in order, and case 0 finishes with a `b` that lands *after* case 1's
 prefix (its "result arrived?" test), case 1 with a `b` past case 2's prefix: a chain of forward jumps into the
