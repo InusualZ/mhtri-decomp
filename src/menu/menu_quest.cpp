@@ -20,13 +20,11 @@
  *   `lb_quest_screen_close`, `quest_list_select_step`, `lb_quest_join_screen_draw`, the quest screen pages and draws,
  *   the table names; foreign (registry): `pl_se_pos_req`, `lb_talk_page_value_set`, `lobby_kujira_level_get`,
  *   `draw_tex_icon`.
- * RESIDUALS. Every row is written.  Register allocation residuals: `quest_group_bonus_pick` (two volatile backend
- *   temporaries of the shift loop swap r10/r11), `quest_comment_wrap` (a callee-saved permutation no declaration
- *   order reaches); `quest_group_id_ck` (retail tests 1000 and 9000 apart and branches to the final `return 0`; the
- *   nested, `&&`, `do { break; } while (0)` and empty-branch spellings fold into one `addis`/`subi`/`cmplwi` range
- *   test, the `else if (id < 1000) return 0; else if (id < 9000)` chain keeps the separate `li`/`b`, and a
- *   per-function `optimization_level 3` changes nothing; the file needs level 4 (115 B lower without it).
- *   flipcheck: `.text` 8 bytes over the claim (`quest_group_id_ck`) and the three rows above; data byte-identical.
+ * RESIDUALS. None: every row is written and byte-identical, the data sections match the claim (flipcheck READY).
+ * SHAPES. `quest_group_id_ck` writes its 9000 bound constant-first (`9000 > id`, idea 117) so the two compares stay
+ *   apart; `quest_group_bonus_pick` repeats `(u16)roll_b % n` instead of a named `pick`, so the CSE temporary is
+ *   coloured before the shift loop's count temporary (r10/r11); `quest_comment_wrap` walks a local copy `rest` of
+ *   `text`, which numbers it above `n` (r30/r29).
  */
 
 #include "menu/menu_quest.h"
@@ -143,7 +141,6 @@ extern "C" void quest_group_bonus_pick(s16 group, u16* ids, u16* out) {
     s32 roll_a;
     s32 roll_b;
     s32 roll_c;
-    s32 pick;
 
     for (i = 0; i < 10; i++) {
         list[i] = 0;
@@ -182,10 +179,9 @@ extern "C" void quest_group_bonus_pick(s16 group, u16* ids, u16* out) {
     roll_a = rand_lcg_step_c1((u16)lobby_w.field_0x036[seed]);
     roll_b = rand_lcg_step_c1((u16)roll_a);
     roll_c = rand_lcg_step_c1((u16)roll_b);
-    pick = (u16)roll_b % n;
-    out[0] = list[pick];
+    out[0] = list[(u16)roll_b % n];
     if ((u16)roll_a & 1) {
-        for (i = pick; i < n; i++) {
+        for (i = (u16)roll_b % n; i < n; i++) {
             list[i] = list[i + 1];
         }
         list[i] = 0;
@@ -1684,25 +1680,26 @@ u16 quest_join_value_spr[4] = {0x1601, 0x1602, 0x1603, 0xFFFF};
 /* 0x80323428 (0xC4): wraps `text` into `out`, 24 characters a line. */
 extern "C" void quest_comment_wrap(char* text, char* out) {
     char line[0x98];
-    s32 n = flKnjMsgNum(text);
+    char* rest = text;
+    s32 n = flKnjMsgNum(rest);
 
     *out = 0;
     for (;;) {
         char* cut;
 
         if (n <= 24) {
-            strcat(out, text);
+            strcat(out, rest);
             break;
         }
         line[0] = 0;
-        strcpy(line, text);
+        strcpy(line, rest);
         cut = flKnjMsgNumPtr(line, 24);
         if (cut != NULL) {
             *cut = 0;
         }
         strcat(out, line);
         strcat(out, "\n");
-        text = flKnjMsgNumPtr(text, 24);
+        rest = flKnjMsgNumPtr(rest, 24);
         n -= 24;
     }
 }
@@ -2003,10 +2000,7 @@ extern "C" u32 quest_group_id_ck(u16 id, u8 group) {
         if (id >= 10000 && (id < 60000 || group == 7)) {
             return 1;
         }
-    } else if (id >= 1000) {
-        if (id >= 9000) {
-            return 0;
-        }
+    } else if (id >= 1000 && 9000 > id) {
         switch (id) {
         case 1000:
             if (lb_unlock_cond_ck(6) == 0) {
