@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (276)
+## Ideas that work (278)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -285,6 +285,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 296 | [A named .ctors word is dead-stripped: emit the entry through a file-scope object's constructor](296-named-ctors-word-is.md) | works | sections, linker, source-shape | The unit's object is byte-identical (every row 100 %, `.ctors` 4 B on both sides) and the flipped link still fails the DOL hash; `flipcheck` names the unit's own `.ctors` word as dead-stripped |
 | 297 | [A local taken through a cast to another pointer type is kept as its own node and colours above the parameter](297-local-taken-through-a.md) | works | source-shape, allocator | Two pointer parameters both live across a call come out swapped (retail keeps the first parameter in r31, the second in r30; ours the reverse) in a function whose every other instruction matches, and no declaration... |
 | 298 | [A deferred helper whose assert strings stay in the main pool is a static inline; an extern inline's literals go to the .data tail](298-deferred-helper-whose-assert.md) | works | data, source-shape, sections | A group of helpers lands after their first caller in retail's `.text` (the deferred-inline order of idea 163), but the `.data` strings of some of them sit in the main first-use sequence while the header asserts' strings... |
+| 299 | [A for-else search: an inline helper returning the found pointer, the claim guarded and the pointer returned, puts the found path on the join](299-for-else-search-an.md) | works | source-shape | Retail's search loop jumps from its found path straight to the claim tail past the loop's `li r3,0; b end`; the `found` flag costs `li 0`/`li 1`/`cmpwi`/`bne` (+16 B) and an inline helper tested with `if (!p) return... |
+| 300 | [A loop with three exits: break on two of them and re-test the loaded byte after the loop, which CSE keeps, to move the tail after the loops](300-loop-with-three-exits.md) | works | source-shape | Retail's inner loop leaves three ways (restart the outer loop, a tail placed after both loops, a shared fail block) and the goto-free source puts the tail inline in the loop, so the `beq tail` forward branch, the tail's... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

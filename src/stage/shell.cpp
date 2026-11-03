@@ -20,17 +20,24 @@
  *   `shell_set_func_ptr` (`.sbss` 0x80794B60) is NOT defined here: no function of this TU touches `.sbss` but `pRoot`.
  * RESIDUALS.
  *   - `pull_shell_work`: retail's found path jumps from the search loop straight to the claim tail, past the loop's
- *     `return NULL` (a `goto`-shaped exit, idea 217/213 class: MWCC threads no flag).  A scratch `goto claimed`
- *     measures 100 % at 0x100 B; the best goto-free shape is the `found` flag (one register, one test, +16 B).
- *     Goto-free shapes measured: pointer result instead of the flag, `i >= max` re-test, a one-case `switch`,
- *     `#pragma peephole on` around the function, the claim tail inside the loop with `return shell` - all lower.
+ *     `return NULL` (a `goto`-shaped exit, idea 217/213 class).  A scratch `goto claimed` measures 100 % at 0x100 B.
+ *     The inlined `shell_work_find_free` is the best goto-free shape (+4 B): its found path branches straight to
+ *     the join, but the join still compares the helper's materialised NULL (`li r30,0; cmpwi r30,0; beq end`
+ *     against retail's `li r3,0; b end`).  `tools/mwcc-debugger` dump 03 (after-unreachable-block-deletion, the
+ *     first PCode) already holds that compare for every goto-free spelling (flag, pointer flag, `i >= max`
+ *     re-test, helper with `if (!shell) return NULL`, claim inside the loop, outer `for (;;)`, one-case
+ *     `switch`), and only the `goto` has the direct edge: the frontend's flow graph is the source's, and no later
+ *     pass threads it (idea 217).
  *   - `shell_block_alloc`: retail shares one `return NULL` block between the skip loop's and the run loop's bound
- *     exits and keeps the fill out of line after both loops (`beq fill`); both are jumps out of two loops
- *     (idea 213 class).  A scratch `goto fail`/`goto fill` copy measures 100 %; goto-free, the two `return NULL`
- *     statements stay separate blocks and the fill sits inline in the run loop.  The inline-helper fill measured
- *     lower.
- *   - The +16 B of `pull_shell_work` and the +4 B of `shell_block_alloc` shift every later symbol, so the object's
- *     `.text` is 0x1694 against the claimed 0x1680 and the extabindex size byte of `pull_shell_work` differs.  Every
+ *     exits (`bge fail` twice, the block after the fill) and keeps the fill out of line after both loops (`beq
+ *     fill`).  A scratch `goto fail`/`goto fill` copy measures 100 %.  Goto-free, `break` on both run-loop exits
+ *     with the CSE'd `*map` re-test after the loop puts the fill after the loops (+12 B: the re-test's
+ *     `cmpwi r0,0; bne`, and the two `return NULL` statements stay two `li r3,0; blr` blocks, so the bound branch
+ *     inverts to `blt` back).  Dump 03 shows two `li r3,0` blocks in every goto-free spelling (the inline search
+ *     helper with two `return -1` merges them through its return join, then re-tests the result, 336 B); the
+ *     single-loop, `i >= max` re-test and inline-fill spellings measure lower.
+ *   - The +4 B of `pull_shell_work` and the +12 B of `shell_block_alloc` shift every later symbol, so the object's
+ *     `.text` is 0x1690 against the claimed 0x1680 and the extabindex size byte of `pull_shell_work` differs.  Every
  *     other row, `.ctors`, extab, extabindex, `.bss` and `.sdata2` link byte-identical (a trial flip of the scratch
  *     goto copy builds main.dol OK).
  *   - `__declspec(export)` on `shell_block_clear_all`, `serial_st_change_by_key`, `niku_st_change_by_key`: nothing in
@@ -46,8 +53,9 @@
  *   - A guarded body is an early `if (a == NULL || b == NULL) return;` (`shell_attack_set`, `shell_set_prim`): the
  *     `||`'s last term keeps retail's `beq L; b end` pair (idea 218); the nested `if`s fold it to one `bne`.
  *   - `shell_block_free` computes `first` in two statements (`first = (u32)(a - b); first >>= 6;`) so the difference
- *     and the shift share a register; `shell_block_alloc` fills through the advancing `first_p` pointer and its
- *     declaration order (`n, run, i, first, pool, map, first_p`) is the colouring order retail shows.
+ *     and the shift share a register; `shell_block_alloc` fills through the advancing `first_p` pointer after both
+ *     loops (both run-loop exits `break`, then `if (*map == 0) break;` out of the outer loop reuses the loaded
+ *     byte) and its declaration order (`n, run, i, first, pool, map, first_p`) is the colouring order retail shows.
  *   - `(u32)stage_water_enabled_ck() == 1` keeps retail's `cmplwi` (the owner declares the function `s32`).
  *
  * Inventory and evidence: `python tools/units/ledger.py unit stage/shell.cpp`.
@@ -110,40 +118,44 @@ extern "C" void shell_work_init(void) {
     shell_pool.ready_0x00 = 1;
 }
 
+/* Takes the first inactive work record and counts it as used; NULL when every record is active. */
+static inline _SHELL_W* shell_work_find_free(ShellPool* pool) {
+    _SHELL_W* shell = pool->work_0x08;
+    s32 i;
+
+    for (i = 0; i < pool->work_max_0x04; i++, shell++) {
+        if (shell->active_0x00 == 0) {
+            pool->work_used_0x0C++;
+            return shell;
+        }
+    }
+    return NULL;
+}
+
 _SHELL_W* pull_shell_work(u32 work_size) {
     ShellPool* pool = &shell_pool;
     _SHELL_W* shell;
-    s32 i;
-    s32 found = 0;
 
     if (pool->work_used_0x0C >= pool->work_max_0x04) {
         return NULL;
     }
-    shell = pool->work_0x08;
-    for (i = 0; i < pool->work_max_0x04; i++, shell++) {
-        if (shell->active_0x00 == 0) {
-            pool->work_used_0x0C++;
-            found = 1;
-            break;
+    shell = shell_work_find_free(pool);
+    if (shell != NULL) {
+        shell->work_blocks_0x104 = shell_block_count(work_size);
+        shell->work_0x100 = shell_block_alloc(shell->work_blocks_0x104);
+        if (shell->work_blocks_0x104 > 0 && shell->work_0x100 == NULL) {
+            return NULL;
         }
+        shell->active_0x00 = 1;
+        shell->state_0x04 = 0;
+        shell->state_0x05 = 0;
+        shell->state_0x06 = 0;
+        shell->state_0x07 = 0;
+        hit_id_list_clear(shell->hit_ids_0xCE, &shell->hit_id_count_0xF6);
+        shell->hit_id_0x5A = 0xFFFF;
+        shell->serial_slot_0x0B = 0xFF;
+        shell->group_0x108 = 0;
     }
-    if (!found) {
-        return NULL;
-    }
-    shell->work_blocks_0x104 = shell_block_count(work_size);
-    shell->work_0x100 = shell_block_alloc(shell->work_blocks_0x104);
-    if (shell->work_blocks_0x104 > 0 && shell->work_0x100 == NULL) {
-        return NULL;
-    }
-    shell->active_0x00 = 1;
-    shell->state_0x04 = 0;
-    shell->state_0x05 = 0;
-    shell->state_0x06 = 0;
-    shell->state_0x07 = 0;
-    hit_id_list_clear(shell->hit_ids_0xCE, &shell->hit_id_count_0xF6);
-    shell->hit_id_0x5A = 0xFFFF;
-    shell->serial_slot_0x0B = 0xFF;
-    shell->group_0x108 = 0;
     return shell;
 }
 
@@ -259,11 +271,7 @@ extern "C" u8* shell_block_alloc(s32 count) {
                 break;
             }
             if (run == count) {
-                for (n = 0; n < run; n++) {
-                    *first_p = 1;
-                    first_p++;
-                }
-                return pool->blocks_0x20 + first * 64;
+                break;
             }
             map++;
             i++;
@@ -271,7 +279,15 @@ extern "C" u8* shell_block_alloc(s32 count) {
                 return NULL;
             }
         }
+        if (*map == 0) {
+            break;
+        }
     }
+    for (n = 0; n < run; n++) {
+        *first_p = 1;
+        first_p++;
+    }
+    return pool->blocks_0x20 + first * 64;
 }
 
 extern "C" void shell_block_free(u8* blocks, s32 count) {
