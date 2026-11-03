@@ -855,6 +855,7 @@ config.libs = [
             Object(Matching, "ef/eft029.cpp"),
             Object(NonMatching, "ef/eft029_fx.cpp"),
             Object(NonMatching, "ef/eft035.cpp"),
+            Object(NonMatching, "ef/eft034.cpp"),
             Object(NonMatching, "ef/eft050.cpp"),
             Object(Matching, "ef/eft051.cpp"),
             Object(Matching, "ef/eft050_set.cpp"),

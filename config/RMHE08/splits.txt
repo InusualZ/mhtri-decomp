@@ -1658,12 +1658,19 @@ hud/cockpit_quest.cpp:
 	.sdata2     start:0x8079A8E0 end:0x8079A9C8
 
 ef/eft035.cpp:
-	extab       start:0x8001547C end:0x80015514
-	extabindex  start:0x80033D20 end:0x80033E04
-	.text       start:0x802F2238 end:0x802F5138
-	.data       start:0x805D69A8 end:0x805D6D10
+	extab       start:0x8001547C end:0x800154D4
+	extabindex  start:0x80033D20 end:0x80033DA4
+	.text       start:0x802F2238 end:0x802F39DC
+	.data       start:0x805D69A8 end:0x805D6CE8
 	.sdata      start:0x80792860 end:0x80792880
-	.sdata2     start:0x8079A9C8 end:0x8079AA88
+	.sdata2     start:0x8079A9C8 end:0x8079A9F0
+
+ef/eft034.cpp:
+	extab       start:0x800154D4 end:0x80015514
+	extabindex  start:0x80033DA4 end:0x80033E04
+	.text       start:0x802F39DC end:0x802F5138
+	.data       start:0x805D6CE8 end:0x805D6D10
+	.sdata2     start:0x8079A9F0 end:0x8079AA88
 
 enemy/fn_802F5138.cpp:
 	extab       start:0x80015514 end:0x80015684
