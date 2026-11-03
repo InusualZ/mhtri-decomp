@@ -15,12 +15,12 @@
  *   write_pagescan_cfg 0x0C1C, write_inqscan_cfg 0x0C1E, write_encr_mode 0x0C22, write_link_super_tout 0x0C37,
  *   write_cur_iac_lap 0x0C3A, read_bd_addr 0x1009, get_link_quality 0x1403, write_inqscan_type 0x0C43,
  *   vendor_spec_cmd (OGF 0x3F).
- * RESIDUALS. btsnd_hcic_change_name allocates p_buf to r30 and p_name to r31 (retail: the reverse); four declaration
- *   orders, a char* name, a local copy of p_buf or of the name, `register` on either parameter, pp from the BT_HDR
- *   idiom, the length computed later, and a scoped scheduling/propagation/common-subs/global-optimizer/level 2-3
- *   pragma left it. Wii/1.3 schedules the builders differently. The .rodata channel map is emitted as a 10-byte
- *   @-pool object (retail label 0x80573860, 0x10 B with the pad).
+ * RESIDUALS. none in .text. The .rodata channel map is emitted as a 10-byte @-pool object (retail label 0x80573860,
+ *   0x10 B with the pad).
  * SHAPES. plain C; the builders that take a caller's buffer return nothing and tail-call btu_hcif_send_cmd.
+ *   btsnd_hcic_change_name keeps its header pointer in a local taken through a BT_BUF* view of the parameter: the
+ *   frontend keeps that local as its own node above the name parameter, so it is coloured first (r31) as retail
+ *   has it; a plain copy of the parameter is folded back into it and colours the name first.
  */
 
 #include "BTE/hcicmds.h"
@@ -955,9 +955,11 @@ u8 btsnd_hcic_delete_stored_key(u8* bd_addr, u8 delete_all_flag) {
     return TRUE;
 }
 
-/* 0x8048EE2C (0x140): Sets the host's device name to the NUL-terminated `p_name`, in `p`. */
-void btsnd_hcic_change_name(BT_HDR* p, u8* p_name) {
-    u8* pp = ((BT_BUF*)p)->data;
+/* 0x8048EE2C (0x140): Sets the host's device name to the NUL-terminated `p_name`, in `p_buf`. */
+void btsnd_hcic_change_name(BT_HDR* p_buf, u8* p_name) {
+    BT_BUF* buf = (BT_BUF*)p_buf;
+    BT_HDR* p = &buf->hdr;
+    u8* pp = buf->data;
     u16 len = (u16)(strlen((char*)p_name) + 1);
 
     p->len = HCIC_PREAMBLE_SIZE + HCIC_PARAM_SIZE_CHANGE_NAME;
