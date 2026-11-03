@@ -30,9 +30,21 @@ order and measure again: the pragma is usually no longer needed.
 with the non-const prototype (the latter also copies the three fields one by one; a struct assignment through the
 non-const pointer measured 74.71).
 
+**The same licence deletes a dead store.** Wii/1.0 (`Pl/pl_hit_sphere` `pl_capsule_box_set`, 97.96 -> 100): retail
+writes `box->reach = vec3_distance(...)` (`stfs f1,0x34(r31)`), forwards the reload as `frsp f1,f1`, loads
+`capsule->radius` and stores the sum. Through a `const PlCapsule* capsule` the first backend
+`common-subexpression-elimination` pass (mwcc-debugger dump 04, right after unreachable-block deletion) treats the
+radius load as unable to alias the store and deletes the first store as dead - the row is 4 bytes short and the
+`extabindex` size word reads 0xC0 against 0xC4. Through a plain `PlCapsule*` the same pass still forwards the reload
+(`frsp`) but keeps the store. No per-function pragma restores it (`opt_dead_assignments`, `opt_common_subs`,
+`opt_lifetimes`, `opt_propagation`, `opt_dead_code`, `global_optimizer`, `optimization_level 2` all measure the same),
+and giving both parameters one type or embedding the source record in the destination does not either: the `const`
+is the lever.
+
 **Example.**
 
 ```c
 void AXSetVoiceLpf(AXVPB* vpb, AXPBLpf* lpf);        /* not: const AXPBLpf* lpf */
 void __VISetGammaCoef(VIGammaEntry* entry);          /* not: const VIGammaEntry* */
+void pl_capsule_box_set(PlCapsule* capsule, PlCapsuleBox* box);   /* not: const PlCapsule*: the dead store stays */
 ```

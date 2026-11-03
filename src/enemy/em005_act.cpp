@@ -5611,7 +5611,7 @@ u32 em005_capsule_point_ck(u8 index, nw4r::math::VEC3* point) {
     }
     Em005Capsule* entry = &em005_capsule_tbl[index];
     capsule_box_from_points(&entry->start.pos, &entry->end.pos, entry->radius, &capsule);
-    pl_capsule_box_set((const PlCapsule*)&capsule, &box);
+    pl_capsule_box_set((PlCapsule*)&capsule, &box);
     return pl_capsule_point_ck(point, &box) == 1;
 }
 

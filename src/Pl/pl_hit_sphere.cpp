@@ -9,19 +9,25 @@
  *   Under `-fp_contract on` `hit_point_sphr` fuses retail's three `fmuls` and two `fadds` into two `fmadds`; under
  *   `off` it emits retail's sequence.
  * RESIDUALS.
- *  - `pl_capsule_box_set`: retail stores the `vec3_distance` result to `reach` (+0x34) before adding the radius
- *    (`stfs f1,0x34(r31)` then `frsp f1,f1`); ours drops that first store.  The mwcc-debugger dump names the
- *    backend `common-subexpression-elimination` pass (the first one, after unreachable-block deletion) as the one that
- *    forwards the reload as `frsp` and deletes the store; temporaries, compound/explicit adds, an inline helper,
- *    pointer/type-punned reaches and `-O2`..`-O4` all keep it deleted.  The dropped `stfs` is also two flipcheck
- *    blockers: `.text` is 0x21C of the claimed 0x220, and its `extabindex` size word reads 0xC0 against 0xC4.
- *  - the 0.5 is our own pool literal (`@238`) where retail names `lbl_8079A310`: relocdiff 22/24 by name.
- *  - flipcheck: the `.sdata2` pool (0.5 at 0x8079A310, then 0.001 at 0x8079A314 that no function here reads) shares a
- *    literal with `Pl/pl_coll.cpp`, whose `.text` follows: the two may be one TU (a fold candidate), so this object
- *    cannot reproduce the claimed pool alone (ours 0x4 of the claimed 0x8).
+ *  - the 0.5 is our own pool literal (`@280`) where retail names `lbl_8079A310`: relocdiff 22/24 by name, values equal.
+ *  - the unit is a fragment of `Pl/pl_coll.cpp`'s TU and cannot flip alone: the claimed `.sdata2` 0x8079A310-0x8079A318
+ *    holds 0.5 (read only by `pl_segment_box_set`/`pl_capsule_box_set`) then 0.001 at 0x8079A314 (read only by eight
+ *    `pl_coll` functions, first `pl_sphere_contact`).  MWCC gives every `.sdata2` pool alignment 8 (ours included), so
+ *    `pl_coll`'s pool - which also holds the `lfd` double at 0x8079A370 - cannot start at 0x8079A314; one pool
+ *    [0.5, 0.001, ...] from 0x8079A310 in first-use order is the only layout that places both words.  Ours emits 0x4 of
+ *    the claimed 0x8, and a trial flip ends in `undefined: 'lbl_8079A314'` from `pl_coll.o`.  The fold is filed as a
+ *    seam request; nothing here compensates for the missing word.
  * SHAPES. `pl_box_set` takes typed `PlBox*` parameters (`&b->vec_0x0C`), which MWCC emits as immediate offsets; a
  *   `void*`-plus-cast form CSEs the three reaches into a saved register.  `pl_segment_box_set` declares its locals
  *   `dir`, `center`, `sum` in that order: MWCC places them at 0x20, 0x14 and 0x8 as retail does.
+ *   `pl_capsule_box_set` takes a non-const `PlCapsule*` (playbook 132): retail stores the `vec3_distance` result to
+ *   `reach` (+0x34), forwards the reload as `frsp f1,f1`, loads `capsule->radius` and stores the sum.  Through a
+ *   `const PlCapsule*` the first backend `common-subexpression-elimination` pass (dump 04, after unreachable-block
+ *   deletion) treats the radius load as unable to alias the store and deletes the store as dead (0x21C of 0x220,
+ *   and the `extabindex` size word 0xC0 against 0xC4); through the plain pointer the same pass keeps it.  No
+ *   per-function pragma restores it (`opt_dead_assignments`, `opt_common_subs`, `opt_lifetimes`, `opt_propagation`,
+ *   `opt_dead_code`, `global_optimizer`, `optimization_level 2` all measure 97.96), nor does giving both parameters
+ *   one type or embedding `PlCapsule` in `PlCapsuleBox`.
  */
 
 #include "types.h"
@@ -61,7 +67,7 @@ void pl_segment_box_set(const PlSegment* seg, PlSegmentBox* box) {
 }
 
 /* 0x8028F558 (0xC4): fills `box` from the capsule. */
-void pl_capsule_box_set(const PlCapsule* capsule, PlCapsuleBox* box) {
+void pl_capsule_box_set(PlCapsule* capsule, PlCapsuleBox* box) {
     copyVec3(&box->start, &capsule->start);
     copyVec3(&box->end, &capsule->end);
     box->radius = capsule->radius;
