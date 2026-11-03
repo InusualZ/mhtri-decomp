@@ -2,11 +2,14 @@
  * Network/NetworkSessionManager.cpp - the request pool and state machine of `NetworkSessionManager` (21 request slots, a
  *   two-slot `NetworkRequest` pool at +0x7C) and the first `NetworkSessionManagerPat` methods (its request pair, the
  *   per-player records, the 32-entry circle list).
- * RANGE. .text 0x803D4904-0x803D70B8 (89 functions); .data 0x805FA788-0x805FAB48, .sbss 0x80794CA0-0x80794CA8, extab,
- *   extabindex.  The left edge is `NetworkSessionStable`'s `.data` seam: its op-code writers, rate governor,
- *   `moveOutOfBand` and `getUsableSlot` (0x803D3CE8..0x803D4904) have their strings before its tables. `datagap.py
- *   --unit` reads an emission-order seam inside: retail puts the base table between `deleteRequest`'s string and
- *   `getArgument`'s, so the original TU ends after the table (`.text` boundary in 0x803D6514..0x803D65F4) - not cut.
+ * RANGE. .text 0x803D4904-0x803D6F98 (88 functions); .data 0x805FA788-0x805FAB08, .sbss 0x80794CA0-0x80794CA8, extab
+ *   0x80019F3C-0x8001A340, extabindex 0x8003A5A8-0x8003A8A8.  The left edge is `NetworkSessionStable`'s `.data` seam:
+ *   its op-code writers, rate governor, `moveOutOfBand` and `getUsableSlot` (0x803D3CE8..0x803D4904) have their
+ *   strings before its tables.  The right edge is `NetworkSessionManagerPat::release` (0x803D6F98): its log string
+ *   is an 8-aligned object start at 0x805FAB08 (a weak `@STRING@` fragment is 4-aligned inside one object), so it
+ *   opens `Network/NetworkSessionManagerPat.cpp`; its extab record and extabindex row are the last of this range.
+ *   The base table at 0x805FA908 follows `deleteRequest`'s string at the table's own 8-alignment (one TU), and
+ *   `getArgument`'s string after it is the inline tail.
  * FLAGS. `-O3` (configure.py; measured in docs/network.md).  `#pragma dont_inline on` scopes keep the Pat
  *   methods' calls to the base's `clear`/`init`/`release` and the record destructors as `bl`s (else MWCC inlines 220 of
  *   `clear`'s 276 bytes); `#pragma peephole off` scopes (below).
@@ -20,21 +23,22 @@
  *   forwards to), the `slot_14C`..`slot_168` wrappers (their vtable slot).
  *   GUESS: NetworkRequestHead (the request fields ahead of the mutex both request records share).
  *   GUESS: clear, reset (`NetworkRequestPat`'s own record reset and its forwarder).
- * RESIDUALS. `.text` and `extabindex` are the target's bytes; every row pairs at 100.  Flip blockers, all data:
- *  - `extab`: the Pat constructor's record ends its first range at pc 0x7C where retail's runs to 0x90 - the
- *    `getInstance_` call (owned by `enemy/em020_prog.cpp`, declared in `enemy/em020_ai.h`) is may-throw here; with
- *    the declaration `__attribute__((nothrow))` (playbook 155) the record is byte-identical (request net-L5#1);
- *  - `.data` 0x3B8 against 0x3C0: retail emits the base table between `deleteRequest`'s string and `getArgument`'s,
- *    with 8-byte gaps before the table (0x805FA902) and before `NetworkSessionManagerPat::final`'s string
- *    (0x805FAB03) that MWCC's 4-byte string/table alignment does not produce inside one object - the range holds
- *    more than one TU (request net-L5#2 carries the seam evidence); ours emits the strings first and the table last;
- *    the log strings retail names (`NetworkSessionManager_deleteRequestMessage`,
- *    `NetworkRequest_getArgumentMessage`, `NetworkSessionManager_moveStandByMessage`,
- *    `NetworkSessionManagerPat_finalMessage`) are this object's anonymous literals;
- *  - `.sbss` emits the 4 B `NetworkRequest_idCounter` word of the 8 B claim (0x80794CA4 has no referrer).
+ * RESIDUALS. Every row pairs at 100; `.text`, `.data`, `extab` and `extabindex` are the target's bytes (flipcheck READY, the
+ *   trial flip links the retail DOL).  What differs from the target object and why:
+ *  - the log strings retail names (`NetworkSessionManager_deleteRequestMessage`, `NetworkRequest_getArgumentMessage`,
+ *    `NetworkSessionManager_moveStandByMessage`) are this object's anonymous literals (the first two `@NNNN`, the
+ *    third the weak `@STRING@getArgument__14NetworkRequestFUl`);
+ *  - `.data` is 0x37B of the 0x380 claim and `.sbss` the 4 B `NetworkRequest_idCounter` word of the 8 B claim: both
+ *    tails are the link's alignment fill (0x80794CA4 has no referrer);
+ *  - `.text` carries the 4 B `networkRequestArgument` the link strips (below).
  * SHAPES. `NetworkRequest::reset` and `NetworkRequestPat`'s `reset`/`clear` are inline and defined before the
  *   constructors and destructors that call them (under `dont_inline`): MWCC then records no pool or `NetworkMutex`
  *   cleanup around those calls (retail's empty `extab` records), and emits each copy after its first caller.
+ * SHAPES. `NetworkRequest::getArgument` is an `inline` kept out of line (`dont_inline`): its warning string is a weak
+ *   `@STRING@` object after the table (the inline tail; a plain definition puts it before the table), and nothing in
+ *   this TU calls it, so the one-call `networkRequestArgument` right after it is the referencer that places the copy
+ *   at 0x803D65F4 - the link strips that 4-byte `b` (nothing references it) and the copy lands where retail has it
+ *   (playbook 174).  An unreferenced `inline` is never emitted; a referencer whose call folds away does not count.
  * SHAPES. Both tables are compiler output (rule 10): the base table 0x805FA908..0x805FAAD0 (456 B) is emitted here;
  *   `NetworkSessionManagerPat` declares `move` FIRST so it is the key function (its body opens the next unit), so the
  *   Pat constructor stores `__vt__24NetworkSessionManagerPat` without a second table here.  `NetworkBuffer` (table
@@ -979,8 +983,11 @@ void NetworkRequest::setRecord(u32 a, u32 b, u32 c)
     UnlockMutex(&this->mutex_78);
 }
 
-/* The starter's word argument `idx`, 0 (and a warning) past the count it was given. */
-s32 NetworkRequest::getArgument(u32 idx)
+/* The starter's word argument `idx`, 0 (and a warning) past the count it was given.  An `inline` kept out of
+   line: its warning string is a weak `@STRING@` object of the inline tail, and its copy lands after the
+   referencer below. */
+#pragma dont_inline on
+inline s32 NetworkRequest::getArgument(u32 idx)
 {
     u32 count;
     NetworkLogger* log;
@@ -993,6 +1000,14 @@ s32 NetworkRequest::getArgument(u32 idx)
     }
     return (s32)this->args_2C[idx];
 }
+
+/* The one-call referencer that places `getArgument`'s copy (a 4-byte `b`, no unwind record); nothing calls it, so
+   the link strips it and the copy sits where retail has it. */
+s32 networkRequestArgument(NetworkRequest* req, u32 idx)
+{
+    return req->getArgument(idx);
+}
+#pragma dont_inline off
 
 /* ----------------------------------------------------------------------------------------- */
 /* NetworkRequest timers                                                                     */
@@ -1241,41 +1256,4 @@ void NetworkSessionManagerPat::clear()
     this->field_6E74 = 0;
 }
 #pragma peephole reset
-/* Tears the Pat session down: drains the game-spy thread, then runs the base class's teardown. */
-void NetworkSessionManagerPat::release()
-{
-    GameSpyInterfaceThread* thread;
-    PatInterface* pat;
-    void* context;
-
-    networkPatReleaseBuffer(this);
-    if (getInstance_() != 0) {
-        getInstance_()->clear();
-        if (getInstance_()->isReady() == 0) {
-            pat = (PatInterface*)getInstance_();
-            delete pat;
-        }
-    }
-    context = this->resolver_660;
-    if (context != 0) {
-        networkLog_destroyContext((NetworkSessionManagerLogger*)getNetworkLogger(), context);
-        this->resolver_660 = 0;
-    }
-    if (GameSpyInterfaceThread::getInstance() != 0) {
-        if (this->field_6E75 != 0) {
-            NetworkLogger* log = getNetworkLogger();
-            log->warn_10("NetworkSessionManagerPat::final: finalNetwork have not done.\n");
-            this->field_6E75 = 0;
-            thread = GameSpyInterfaceThread::getInstance();
-            thread->canClose();
-            thread = GameSpyInterfaceThread::getInstance();
-            thread->armCancel();
-        }
-        do {
-        } while (GameSpyInterfaceThread::getInstance()->requestClose());
-        thread = GameSpyInterfaceThread::getInstance();
-        delete thread;
-    }
-    this->NetworkSessionManager::release();
-}
 #pragma dont_inline off

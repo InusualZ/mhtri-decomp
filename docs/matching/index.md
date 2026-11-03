@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (281)
+## Ideas that work (282)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -290,6 +290,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 301 | [A ternary of u16 arms passed to a u16 parameter is masked in place: the sum coalesces with the argument register](301-ternary-of-u16-arms.md) | works | source-shape, allocator | A consecutive-constant ternary feeding a call ends `addi r4,r4,K ; clrlwi r4,r4,16` in retail and `addi r0,r4,K ; clrlwi r4,r0,16` in ours, whatever the cast on the ternary or the local it goes through |
 | 302 | [Keep a pointer sum's constant in place with += steps: the frontend folds one expression's constant to the chain's end](302-keep-a-pointer-sums.md) | works | source-shape, allocator | Retail adds a struct's size in the middle of a byte-offset sum (`add r4,r3,r0; addi r0,r4,0x20; lwz r4,0x10(r3); add ...`) where ours has the `addi` after the last field, with the loads reading the other register |
 | 303 | [GC/3.0a5.2 rematerialises a multiply-used zero per block where GC/3.0a3..3.0a5 hold it in a saved register across calls](303-gc-3-0a5-2.md) | works | flags, allocator | A plain init function stores a constant zero (a trace level, NULL callbacks) after two calls and retail keeps that zero in a callee-saved register materialised before the first call; our object is 8 B shorter with one... |
+| 304 | [An 8-aligned string after a 4-aligned inline tail is the next TU's first literal; an unreferenced inline is never emitted](304-8-aligned-string-after.md) | works | data, sections, source-shape, vtable | Every `.text` row is at 100 and `.data` still differs - retail has a string right after the vtable and another one 8-aligned after it, while ours emits every string before the vtable; making the owners `inline` moves... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

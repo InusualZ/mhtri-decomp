@@ -2218,17 +2218,17 @@ Network/NetworkSessionStable.cpp:
 	.data       start:0x805F9A40 end:0x805FA788
 
 Network/NetworkSessionManager.cpp:
-	extab       start:0x80019F3C end:0x8001A348
-	extabindex  start:0x8003A5A8 end:0x8003A8B4
-	.text       start:0x803D4904 end:0x803D70B8
-	.data       start:0x805FA788 end:0x805FAB48
+	extab       start:0x80019F3C end:0x8001A340
+	extabindex  start:0x8003A5A8 end:0x8003A8A8
+	.text       start:0x803D4904 end:0x803D6F98
+	.data       start:0x805FA788 end:0x805FAB08
 	.sbss       start:0x80794CA0 end:0x80794CA8
 
 Network/NetworkSessionManagerPat.cpp:
-	extab       start:0x8001A348 end:0x8001A6A8
-	extabindex  start:0x8003A8B4 end:0x8003AC38
-	.text       start:0x803D70B8 end:0x803DF2EC
-	.data       start:0x805FAB48 end:0x805FB2B8
+	extab       start:0x8001A340 end:0x8001A6A8
+	extabindex  start:0x8003A8A8 end:0x8003AC38
+	.text       start:0x803D6F98 end:0x803DF2EC
+	.data       start:0x805FAB08 end:0x805FB2B8
 	.sdata      start:0x80793930 end:0x80793940
 	.sdata2     start:0x8079C758 end:0x8079C778
 

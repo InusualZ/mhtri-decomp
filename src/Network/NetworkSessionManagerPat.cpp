@@ -2,9 +2,12 @@
  * Network/NetworkSessionManagerPat.cpp - `NetworkSessionManagerPat`: its key function `move` (so the class table is
  *   emitted here), the request handlers and callbacks, the circle list and player records, and
  *   `initNetworkSessionStable`, the NetworkSessionStable opener.
- * RANGE. .text 0x803D70B8-0x803DF2EC (106 functions); .data 0x805FAB48-0x805FB2B8 (the Pat strings, the jump tables and
- *   `__vt__24NetworkSessionManagerPat` 0x805FB0F0), .sdata 0x80793930-0x80793940 (the session's three timeouts), .sdata2
- *   0x8079C758-0x8079C778, extab, extabindex.  The right edge is the `.data` V->S seam at 0x805FB2B8.
+ * RANGE. .text 0x803D6F98-0x803DF2EC (107 functions); .data 0x805FAB08-0x805FB2B8 (`release`'s log string first, then
+ *   the Pat strings, the jump tables and `__vt__24NetworkSessionManagerPat` 0x805FB0F0), .sdata 0x80793930-0x80793940
+ *   (the session's three timeouts), .sdata2 0x8079C758-0x8079C778, extab 0x8001A340-0x8001A6A8, extabindex
+ *   0x8003A8A8-0x8003AC38.  The left edge is `release` (`NetworkSessionManagerPat::final` by its log string): its
+ *   string is an 8-aligned object start at 0x805FAB08, the first `.data` object of this TU, where the base unit's
+ *   inline tail ends 4-aligned at 0x805FAB03.  The right edge is the `.data` V->S seam at 0x805FB2B8.
  * FLAGS. The game-root `cflags_main` (configure.py; docs/network.md); file-scope `#pragma peephole off`
  *   from `move` on (retail keeps `lwz r12,0(r3)` after the `mr r3,r31` copy; it also closes `slot_1B8`), on again only
  *   around `getTimeSincePublish` and `updatePlayerRecord`.
@@ -25,6 +28,8 @@
  *    naming one would claim a symbol the original did not have, playbook 58);
  *  - `.sdata` 0xC against 0x10; `flipcheck` reads both small-data pools as a partial pool of a TU spanning several
  *    units (fold candidate with the session/transport units, low confidence).
+ * SHAPES. `release` is defined first, under `dont_inline` and the default peephole (as in the base unit it came from),
+ *   ahead of the file-scope `peephole off`; its string is the TU's first literal.
  * SHAPES. `Network/NetworkSessionManager.h` declares `move` first so it is the key function; the table is compiler
  *   output with one override per filled slot (`python tools/units/vtableaudit.py --at 0x805FB0F8 --json` regenerates
  *   the 112-row census; the `.data` offsets are the slot offsets).  The `+0x03C` slot is the empty `setFlag79` override
@@ -178,6 +183,46 @@ typedef struct PatEventTimer {
     /* +0x00 */ s32 enabled_00;
     /* +0x04 */ f32 time_04;
 } PatEventTimer;   /* size: 0x8 */
+
+#pragma dont_inline on
+/* Tears the Pat session down: drains the game-spy thread, then runs the base class's teardown. */
+void NetworkSessionManagerPat::release()
+{
+    GameSpyInterfaceThread* thread;
+    PatInterface* pat;
+    void* context;
+
+    networkPatReleaseBuffer(this);
+    if (getInstance_() != 0) {
+        getInstance_()->clear();
+        if (getInstance_()->isReady() == 0) {
+            pat = (PatInterface*)getInstance_();
+            delete pat;
+        }
+    }
+    context = this->resolver_660;
+    if (context != 0) {
+        networkLog_destroyContext((NetworkSessionManagerLogger*)getNetworkLogger(), context);
+        this->resolver_660 = 0;
+    }
+    if (GameSpyInterfaceThread::getInstance() != 0) {
+        if (this->field_6E75 != 0) {
+            NetworkLogger* log = getNetworkLogger();
+            log->warn_10("NetworkSessionManagerPat::final: finalNetwork have not done.\n");
+            this->field_6E75 = 0;
+            thread = GameSpyInterfaceThread::getInstance();
+            thread->canClose();
+            thread = GameSpyInterfaceThread::getInstance();
+            thread->armCancel();
+        }
+        do {
+        } while (GameSpyInterfaceThread::getInstance()->requestClose());
+        thread = GameSpyInterfaceThread::getInstance();
+        delete thread;
+    }
+    this->NetworkSessionManager::release();
+}
+#pragma dont_inline off
 
 #pragma peephole off
 typedef void (*PatErrorCallback)(u32, u32, u32, u32, NetworkErrorInfo*, u32);
