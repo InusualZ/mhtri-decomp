@@ -13,13 +13,12 @@
  * EVIDENCE. ten consecutive `gdev_cc_*` dump names; `.bss` 0x806F5020 (0x500 B) and 0x806F5520 (0x20 B, the
  *    receive circle buffer) and `.sbss` 0x80794E38 (the 8 B open-state object) are read only here. `DBInitComm` .. `DBInitInterrupts` and the two
  *    4-byte stubs `pre_continue`/`post_stop` call belong to `TRK/exi2_comm.c`.
- * RESIDUALS. link order: the compiler emits the 0x20 B circle buffer before the 0x500 B receive buffer in `.bss` (the target
- *    has the receive buffer first, 0x806F5020), which moves 6 code bytes of relocation words and the DOL hash, so the unit stays
- *    NonMatching although every row is at 100 %. Definition order, `static`, an earlier use of the circle buffer, a local
- *    alias, a `(void)` read, a `static inline` helper that reads the buffer, a function-local `static` buffer and one
- *    enclosing struct (which changes the code, 97 %) were all measured without moving the order. The order does follow
- *    the first PCode reference: a real earlier function reading `gdev_cc_buffer` puts it first, but it adds 0x10 B of text.
- * SHAPES. `read` and `peek` stage the DB bytes in a 0x500 B stack array, then queue them in the circle buffer.
+ * RESIDUALS. none: 10/10 rows byte-identical, relocations 28/28, `.bss` and `.sbss` layouts equal the target's, and the
+ *    trial flip links to the retail DOL hash.
+ * SHAPES. `read` and `peek` stage the DB bytes in a 0x500 B stack array, then queue them in the circle buffer. `.bss`:
+ *    `gdev_cc_buffer` carries a zero initialiser so it is a real definition emitted ahead of the tentative
+ *    `gdev_cc_circle_buffer` (playbook idea 158); a tentative object lands at its first code reference, which is the circle
+ *    buffer in `gdev_cc_initialize`, so definition order alone put the 0x20 B object first.
  */
 #include "TRK/CircleBuffer.h"
 #include "TRK/DBInitComm.h"
@@ -39,7 +38,7 @@ typedef struct GdevCcOpenState {
     /* +0x04 */ s32 unused_0x04;   /* never read or written */
 } GdevCcOpenState; /* size: 0x8 */
 
-u8 gdev_cc_buffer[GDEV_CC_BUFFER_SIZE];
+u8 gdev_cc_buffer[GDEV_CC_BUFFER_SIZE] = {0};
 CircleBuffer gdev_cc_circle_buffer;
 GdevCcOpenState gdev_cc_open_state;
 
