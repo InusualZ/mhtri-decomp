@@ -1123,7 +1123,7 @@ config.libs = [
             Object(Matching, "Network/NetworkUniqueId.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # Flags: unit header of src/Network/NetworkUnitPacket.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkUnitPacket.cpp",
+            Object(Matching, "Network/NetworkUnitPacket.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/PatConnection.cpp; measurements in docs/network.md.
             Object(Matching, "Network/PatConnection.cpp",
