@@ -5,7 +5,7 @@ status: works
 problem: A function written as `return helper(...)` over a static inline helper matches every opcode but a callee-saved register pair is swapped - the helper's parameter or local that holds a loaded value takes r31 where retail gives r31 to the result of a nested inline call
 tags: [source-shape, allocator]
 applies: [Wii/1.3]
-related: [243, 244, 278]
+related: [243, 244, 278, 292]
 demo: 
 ---
 
@@ -40,7 +40,7 @@ moved. Ruled out on the same row, all equal or worse: the six declaration orders
 renamings, `oldSize` as a parameter or a block-local, a dead `oldSize = 0`/`= size`/`= -size` before the load, a
 cast/`+ 0`/`* 1`/`| 0` on the load, an inline accessor for the size (loses the frontend CSE of `block - 1`, so the
 `subi` moves after the copy call), a direct body (named locals number below every temporary, and `header` is always
-a temporary), `DWC_Free` outside the null test, the free written through `header`, `#pragma opt_lifetimes off`.
+a temporary), `DWC_Free` outside the null test, the free written through `header`, `#pragma opt_lifetimes off`. The row's last 9 bytes closed with idea 292 (a direct body whose `header` keeps a named node).
 
 **Example.**
 
