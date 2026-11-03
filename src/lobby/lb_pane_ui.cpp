@@ -11,9 +11,11 @@
  *   differently; the colour band's `lb_chg` scope spells `lobby_world_block` as the pointer it is.  Uniting the views
  *   is open work.  `lb_box_menu_draw` and `lb_dye_pane_draw` sit in the colour band's address range but read the page
  *   band's types, so they are defined in a reopened `s_801F3294`.
- * FLAGS. `cflags_lobby`; `#pragma peephole off` throughout and `#pragma dont_inline on` over the panes band
- *   (0x801EC9F8-0x801F3294) only (retail keeps `fn_801ED3E8`/`fn_801ED464` out of line), lifted around the two saved-set
- *   copies so their record copies inline; measured in docs/lobby.md.  Per function (playbook 108/208, each measured
+ * FLAGS. `cflags_lobby`; `#pragma peephole off` throughout and `#pragma dont_inline on` from the panes band
+ *   (0x801EC9F8-0x801F3294) on (retail keeps `fn_801ED3E8`/`fn_801ED464` out of line; `dont_inline reset` after the
+ *   band restores `on`, so later bands inline nothing either), lifted around the two saved-set copies so their record
+ *   copies inline and around the three step helpers (`lb_color_pane_dispatch`, `lobby_enter_seq_dispatch`,
+ *   `lobby_scene_setup_dispatch`) and their callers; measured in docs/lobby.md.  Per function (playbook 108/208, each measured
  *   against the unit): `optimization_level 4` on `fn_801EEDC4`, `lb_equip_set_pane_init`,
  *   `lb_entry_pane_scroll_refresh`, `lb_color_pane_step`, `lb_dye_pane_step`; `opt_common_subs off` on `fn_801EDC4C`
  *   and `lb_pane_draw`.  The whole page band at `-O4` scores the same but for `lb_box_grid_draw` (-1.2 B).
@@ -23,13 +25,17 @@
  *   `lb_cursor_box_step`, `lb_progress_rewards_check`, `lobby_scene_setup_step`, `lb_digit_pane_value`,
  *   `lb_list_pane_init`, `lb_list_pane_pos_set`, `lb_page_walk_head`, `lb_pane_draw`) and every named `.data`/`.sdata`
  *   table.  Foreign callees named through the registry (lane lobby-pane-ui) are GUESS names too.
- * RESIDUALS. All 129 rows are written; 37 short of 100, by cause:
+ * RESIDUALS. All 129 rows are written; 38 short of 100, by cause:
  *  - `lobby_enter_seq_step`/`lobby_scene_setup_step`: retail keeps one "system file done" block (`field_0x865 = 0;
- *    state = 3`) inside case 2, entered from case 0, case 1 and backwards from `case 0x64`, and one
- *    `game_system_file_create_start` test inside case 1 that case 0 enters.  Ours reaches both forward through
- *    `case 1:`/`case 2:` inside `if (0)` blocks (playbook 241) and `case 0x64` jumps back through a `for (;;)`
- *    headed by the done block (playbook 252), but the save-wait tests stay if-chains: their -1/-2 arm sits inline
- *    where retail puts it after the shared code (an inner `switch` would capture the outer case labels: wall);
+ *    state = 3`) inside case 2, entered from case 0, from case 1's system-file start and backwards from `case 0x64`,
+ *    and one `game_system_file_create_start` test inside case 1 that case 0 enters - branches into the middle of
+ *    another case (playbook 213; retail's CFG: `beq 0xec74`/`beq 0xecb0` from case 0, `bne 0xecb0` back from 0x64).
+ *    No case label may sit inside a block, so ours keeps both blocks in place in case 1/case 2 and a second copy of
+ *    each after the switch (the start, then the done block) for case 0 and 0x64 to reach by `break`/`continue`;
+ *    the dump's first PCode (03) already has the copies, so they are the source's (+48 B, the copies and 0x64's `b`);
+ *    case 6's `return 0` becomes the helper's `return` (no `li r3,0`);
+ *  - `lb_color_pane_step`: retail's camera path returns 0 straight to the epilogue (`li r3,0; b`); inside the inline
+ *    helper it is a `return` to the shared `mr r3,r29` (one instruction, the only difference);
  *  - an `s16` index retail re-extends at every use where ours extends once at the definition (`lb_pane_draw`'s and
  *    `lb_box_grid_draw`'s grid walks), and register colouring / scheduling:
  *    `lb_box_grid_draw` (keeps `reason` on the stack), `lb_dye_inner_draw`, `lb_color_pane_draw`, `lb_dye_pane_draw`,
@@ -68,12 +74,16 @@
  *   (`game_save_wait`, `fn_801EDA9C`/`fn_801EDB34`, `menu_cursor_page_move`) where retail range-tests it; values a
  *   call consumes are computed before the call when retail does (`lb_pane_draw`'s and `lb_box_grid_draw`'s uv row,
  *   `lb_my_set_list_draw`'s mark mode, `lb_equip_set_pane_step`'s row count); a set's three ids are walked in a loop
- *   (`lb_equip_record_swap`); the sort masks' kind bits are set one statement each; `fn_801F3294`'s case 0 "done" path
- *   falls into case 2's tail (the rest of case 0 and case 1 sit in its `else`); `lb_color_pane_step` has one exit: its
- *   switch sits in a `do { } while (empty && (result = 1, 0))` whose condition is the "new colour" tail (`continue`),
- *   case 0's and case 1's "done" paths fall into case 2's "old colour" tail, and every other path `break`s;
- *   `lobby_enter_seq_step`/`lobby_scene_setup_step` run cases 3..0x64 inside a `for (;;)` headed by the "system file
- *   done" block (playbook 252), `done = 1` before the error-code call; the page band calls
+ *   (`lb_equip_record_swap`); the sort masks' kind bits are set one statement each; `fn_801F3294`'s switch sits in a
+ *   `do { } while (0)` with case 2's "record empty" test after it: case 0's "done" path and case 2 `break` into it,
+ *   every other path `continue`s past it (playbook 183); three steps keep three exits through a `static inline`
+ *   helper (playbook 219: its `return` is a jump to the end of the inlined body) holding `do { do { switch } A } while
+ *   (0); B` - `break` reaches A, `continue` B, `return` the caller's tail - with the caller's result passed by
+ *   reference: `lb_color_pane_dispatch` (A = case 2's "old colour" test, B = case 3's "new colour" test; the caller
+ *   declares `widths`, `pad`, `result`, `world`, `page` in that order and computes all but `widths`, which keeps
+ *   retail's colouring - regsim), `lobby_enter_seq_dispatch`/`lobby_scene_setup_dispatch` (A = the system-file start,
+ *   B = the "system file done" block; the save-wait tests are `(u32)(v + 2) > 1` with the -1/-2 arm after, `done = 1`
+ *   before the error-code call); the page band calls
  *   `lb_choice_draw`/`lb_help_num_put` through `_c1` views on the owner's signatures (`unsplit/lobby.h` declares other
  *   ones) and sees `lb_entry_pane_scroll_kind_get` returning a word (its definition returns `u8`); `Screen_w`'s size is
  *   converted signed (`(f32)(s16)`) where retail loads it with `lha`.
@@ -3976,18 +3986,21 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
     LbWorldBlock* world = lobby_world_block;
     LbPage* sub = self->page_0x010;
 
-    switch (req->state_0x000) {
-    case 0:
-        if (req->done_0x001 == 1) {
-            req->state_0x000 = 2;
-        } else {
+    /* one exit: `break` reaches case 2's "record empty" test after the switch, `continue` skips it */
+    do {
+        switch (req->state_0x000) {
+        case 0:
+            if (req->done_0x001 == 1) {
+                req->state_0x000 = 2;
+                break;
+            }
             if (lb_cmd_pressed_ck(0x80) == 1) {
                 lb_cam_manual_begin(self);
-                break;
+                continue;
             }
             if (lb_cmd_pressed_ck(0x10) == 1) {
                 if (lb_page_record_empty_ck(sub) != 1) {
-                    break;
+                    continue;
                 }
                 switch (req->mode_0x002) {
                 case 0:
@@ -4036,20 +4049,22 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                         menu_cursor_step(req->value_0x004, req->count_0x006, lb_cmd_repeat_get(), 1, 2);
                 }
             }
-            break;
-    case 1:
+            continue;
+        case 1:
             if (lb_page_record_empty_ck(sub) == 1 && lb_cmd_pressed_ck(0x30) == 1) {
                 req->state_0x000 = 0;
                 sysSE_req(0);
             }
+            continue;
+        case 2:
             break;
-        } /* the done test */
-    case 2:
+        default:
+            continue;
+        }
         if (lb_page_record_empty_ck(sub) == 1) {
             ret = 2;
         }
-        break;
-    }
+    } while (0);
     return ret;
 }
 
@@ -4215,117 +4230,75 @@ void fn_801F3998(LbPage* self, u32 rgb, u8 which)
     }
 }
 
-/* 0x801F39E8 (0x404): the colour pane's step: the grid picks a preset or the free cursor a colour, the button stores
- * it in the world block; returns 2 when left with the old colour, 1 with a new one. */
+/* Runs one step of the colour pane, storing 2 (old colour kept) or 1 (new colour) in `result` when the page's
+ * record is empty again. */
 #pragma push
 #pragma optimization_level 4
-u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
+#pragma dont_inline off
+static inline void lb_color_pane_dispatch(LbPageOwner* owner, LbColorPane* self, PlayerPad* pad, LbWorldBlock* world,
+                                          LbPage* page, u32& result, const s16*& widths)
 {
     const s16* cells;
-    PlayerPad* pad;
-    u32 result;
-    LbWorldBlock* world;
     u16 index;
-    LbPage* page;
     _SPR_DATA_* box;
-    const s16* widths;
 
-    result = 0;
-    pad = &Psw[0];
-    world = lobby_world_block;
-    page = (LbPage*)self->plw_0x24;
-    lb_anim_count_step(&self->anim_0x0C);
-    /* one exit: `break` reaches case 2's "old colour" test or the return, `continue` the loop condition's
-     * "new colour" test */
+    /* `break` reaches case 2's "old colour" test after the switch, `continue` case 3's "new colour" test after the
+     * loop, `return` ends the step */
     do {
         switch (self->phase_0x00) {
         case 0:
             if (self->done_0x01 == 1) {
                 self->phase_0x00 = 2;
                 self->done_0x01 = 0;
-            } else {
-                if (self->done_0x01 == 2) {
-                    self->phase_0x00 = 3;
-                    self->done_0x01 = 0;
-                    continue;
-                }
-                if (lb_cmd_pressed_ck(0x80) == 1) {
-                    lb_cam_manual_begin(owner);
-                    return 0;
-                }
-                widths = lb_color_grid_widths;
-                if (self->mode_0x02 == 0) {
-                    cells = lbl_805B87F4;
-                } else {
-                    cells = lbl_805B87D8;
-                }
-                if (lb_cmd_pressed_ck(0x10) == 1) {
-                    index = lb_color_grid_index(widths, self->column_0x04, self->row_0x06);
-                    switch (cells[index]) {
-                    default:
-                        fn_801F37C8(self, cells[index]);
-                        fn_801F3998(page, self->picked_0x18, self->mode_0x02);
-                        if (cells[index] >= 0) {
-                            self->cursor_x_0x0E = lbl_805B8674[cells[index]].cursor_x_0x06;
-                            self->cursor_y_0x10 = lbl_805B8674[cells[index]].cursor_y_0x08;
-                        }
-                        self->changed_0x03 = 1;
-                        sysSE_stop(4);
-                        break;
-                    case -2:
-                        switch (self->mode_0x02) {
-                        case 1:
-                            world->hair_color_0x0014 = self->picked_0x18;
-                            break;
-                        case 0:
-                            world->inner_color_0x39BC = self->picked_0x18;
-                            break;
-                        }
-                        userdata_pl_look_apply(page, world);
-                        lb_game_ready_param_set(owner);
-                        sysSE_req(0);
-                        self->done_0x01 = 2;
-                        break;
-                    case -3:
-                        break;
-                    }
-                } else if (lb_cmd_pressed_ck(0x20) == 1) {
-                    if (self->changed_0x03 == 0) {
-                        switch (self->mode_0x02) {
-                        case 1:
-                            world->hair_color_0x0014 = self->original_0x1C;
-                            break;
-                        case 0:
-                            world->inner_color_0x39BC = self->original_0x1C;
-                            break;
-                        }
-                        userdata_pl_look_apply(page, world);
-                        self->done_0x01 = 1;
-                    } else {
-                        self->phase_0x00++;
-                        self->stepper_0x20 = 0;
-                    }
-                    sysSE_req(1);
-                } else if (lb_color_grid_step(widths, &self->column_0x04, &self->row_0x06, self->rows_0x0A) == 0) {
-                    index = lb_color_grid_index(widths, self->column_0x04, self->row_0x06);
-                    if (cells[index] == -3) {
-                        box = (_SPR_DATA_*)get_lsp_data(0x1CA8, NULL);
-                        if (lb_cursor_box_step(&self->cursor_x_0x0E, &self->cursor_y_0x10, 1, box->width - 1, 1,
-                                               box->height - 1, pad->button_0x2C0.press_0x08) == 1U) {
-                            self->changed_0x03 = 1;
-                            fn_801F37C8(self, cells[index]);
-                            fn_801F3998(page, self->picked_0x18, self->mode_0x02);
-                        }
-                    }
-                }
                 break;
-        case 1:
-            if (self->done_0x01 == 1) {
-                self->phase_0x00++;
+            }
+            if (self->done_0x01 == 2) {
+                self->phase_0x00 = 3;
                 self->done_0x01 = 0;
+                continue;
+            }
+            if (lb_cmd_pressed_ck(0x80) == 1) {
+                lb_cam_manual_begin(owner);
+                return;
+            }
+            widths = lb_color_grid_widths;
+            if (self->mode_0x02 == 0) {
+                cells = lbl_805B87F4;
             } else {
-                switch (toggle_word_step(&self->stepper_0x20, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
-                case 1:
+                cells = lbl_805B87D8;
+            }
+            if (lb_cmd_pressed_ck(0x10) == 1) {
+                index = lb_color_grid_index(widths, self->column_0x04, self->row_0x06);
+                switch (cells[index]) {
+                default:
+                    fn_801F37C8(self, cells[index]);
+                    fn_801F3998(page, self->picked_0x18, self->mode_0x02);
+                    if (cells[index] >= 0) {
+                        self->cursor_x_0x0E = lbl_805B8674[cells[index]].cursor_x_0x06;
+                        self->cursor_y_0x10 = lbl_805B8674[cells[index]].cursor_y_0x08;
+                    }
+                    self->changed_0x03 = 1;
+                    sysSE_stop(4);
+                    break;
+                case -2:
+                    switch (self->mode_0x02) {
+                    case 1:
+                        world->hair_color_0x0014 = self->picked_0x18;
+                        break;
+                    case 0:
+                        world->inner_color_0x39BC = self->picked_0x18;
+                        break;
+                    }
+                    userdata_pl_look_apply(page, world);
+                    lb_game_ready_param_set(owner);
+                    sysSE_req(0);
+                    self->done_0x01 = 2;
+                    break;
+                case -3:
+                    break;
+                }
+            } else if (lb_cmd_pressed_ck(0x20) == 1) {
+                if (self->changed_0x03 == 0) {
                     switch (self->mode_0x02) {
                     case 1:
                         world->hair_color_0x0014 = self->original_0x1C;
@@ -4335,28 +4308,83 @@ u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
                         break;
                     }
                     userdata_pl_look_apply(page, world);
-                    sysSE_req(0);
                     self->done_0x01 = 1;
-                    break;
-                case 2:
-                    self->phase_0x00--;
-                    break;
+                } else {
+                    self->phase_0x00++;
+                    self->stepper_0x20 = 0;
                 }
+                sysSE_req(1);
+            } else if (lb_color_grid_step(widths, &self->column_0x04, &self->row_0x06, self->rows_0x0A) == 0) {
+                index = lb_color_grid_index(widths, self->column_0x04, self->row_0x06);
+                if (cells[index] == -3) {
+                    box = (_SPR_DATA_*)get_lsp_data(0x1CA8, NULL);
+                    if (lb_cursor_box_step(&self->cursor_x_0x0E, &self->cursor_y_0x10, 1, box->width - 1, 1,
+                                           box->height - 1, pad->button_0x2C0.press_0x08) == 1U) {
+                        self->changed_0x03 = 1;
+                        fn_801F37C8(self, cells[index]);
+                        fn_801F3998(page, self->picked_0x18, self->mode_0x02);
+                    }
+                }
+            }
+            return;
+        case 1:
+            if (self->done_0x01 == 1) {
+                self->phase_0x00++;
+                self->done_0x01 = 0;
                 break;
             }
-            } /* the case 0 else */
-        case 2:
-            if (lb_page_record_empty_ck(page) == 1) {
-                result = 2;
+            switch (toggle_word_step(&self->stepper_0x20, lobby_cmd_trig_get(), 4, 8, 0xFFFF)) {
+            case 1:
+                switch (self->mode_0x02) {
+                case 1:
+                    world->hair_color_0x0014 = self->original_0x1C;
+                    break;
+                case 0:
+                    world->inner_color_0x39BC = self->original_0x1C;
+                    break;
+                }
+                userdata_pl_look_apply(page, world);
+                sysSE_req(0);
+                self->done_0x01 = 1;
+                break;
+            case 2:
+                self->phase_0x00--;
+                break;
             }
+            return;
+        case 2:
             break;
         case 3:
             continue;
         default:
-            break;
+            return;
         }
-        break;
-    } while (lb_page_record_empty_ck(page) == 1 && (result = 1, 0));
+        if (lb_page_record_empty_ck(page) == 1) {
+            result = 2;
+        }
+        return;
+    } while (0);
+    if (lb_page_record_empty_ck(page) == 1) {
+        result = 1;
+    }
+}
+
+/* 0x801F39E8 (0x404): the colour pane's step: the grid picks a preset or the free cursor a colour, the button stores
+ * it in the world block; returns 2 when left with the old colour, 1 with a new one. */
+u32 lb_color_pane_step(LbPageOwner* owner, LbColorPane* self)
+{
+    const s16* widths;
+    PlayerPad* pad;
+    u32 result;
+    LbWorldBlock* world;
+    LbPage* page;
+
+    result = 0;
+    pad = &Psw[0];
+    world = lobby_world_block;
+    page = (LbPage*)self->plw_0x24;
+    lb_anim_count_step(&self->anim_0x0C);
+    lb_color_pane_dispatch(owner, self, pad, world, page, result, widths);
     return result;
 }
 #pragma pop
@@ -8418,118 +8446,246 @@ void fn_801FB478(void)
     }
 }
 
+#pragma push
+#pragma dont_inline off
+/* Runs one state of the editor's sequence: `return` ends the step, `break` out of the switch reaches the
+ * system-file start, `continue` the "system file done" block. */
+static inline void lobby_enter_seq_dispatch(LbChgSeqWork* self, u16 status, s32& done)
+{
+    Q_ResultWork* q;
+    s32 v;
+
+    do {
+        do {
+            switch (self->state_0x0B) {
+            case 0:
+                fn_801FBAE4();
+                fn_801FC810();
+                lobby_w.field_0x006 = 1;
+                lobby_w.field_0x001 = 0x16;
+                lobby_w.field_0x002 = 0;
+                create_move_work(2);
+                if (system_w.field_0x7ce == 2) {
+                    lobby_w.field_0x002 = 2;
+                }
+                lb_quest_return_apply();
+                fn_801FC874();
+                fn_801FC8C8();
+                lb_part_recs_reset();
+                q = get_qResult_work();
+                if (q != NULL && system_w.field_0x2d == 0 &&
+                    (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
+                    if (game_data_file_create_start() != 0) {
+                        self->state_0x0B = 1;
+                        system_w.field_0x865 = 1;
+                        return;
+                    }
+                    break;
+                }
+                continue;
+            case 1:
+                v = game_save_wait();
+                if ((u32)(v + 2) > 1) {
+                    if (v != 1) {
+                        return;
+                    }
+                    if (game_system_file_create_start() != 0) {
+                        self->state_0x0B = 2;
+                        return;
+                    }
+                    continue;
+                }
+                self->state_0x0B = 0x64;
+                return;
+            case 2:
+                v = game_system_file_create_wait();
+                if ((u32)(v + 2) > 1) {
+                    if (v != 1) {
+                        return;
+                    }
+                    system_w.field_0x865 = 0;
+                    self->state_0x0B = 3;
+                    return;
+                }
+                self->state_0x0B = 0x64;
+                return;
+            case 3:
+                fn_801FB2A8(0, lobby_w.field_0x001, lobby_w.field_0x002);
+                self->state_0x0B++;
+                setSoftresetFlag(0);
+                return;
+            case 4:
+                if (file_loading_ck(NULL, NULL) != 1U) {
+                    fn_801FB364(0);
+                    lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
+                    self->state_0x0B++;
+                }
+                return;
+            case 5:
+                fn_801FB438();
+                fn_801FB478();
+                self->state_0x0B++;
+                return;
+            case 6:
+                stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
+                demo_work_update();
+                lb_npc_map_setup();
+                camera_area_default_set();
+                self->step_0x0A++;
+                self->state_0x0B = 0;
+                setSoftresetFlag(1);
+                return;
+            case 0x64:
+                if ((status & 0x10) != 0) {
+                    continue;
+                } else {
+                    s32 code;
+
+                    done = 1;
+                    code = chg_nand_err2msgcode();
+                    subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
+                }
+                return;
+            default:
+                return;
+            }
+            /* the system-file start, reached from case 0 and case 1 */
+            if (game_system_file_create_start() != 0) {
+                self->state_0x0B = 2;
+                return;
+            }
+        } while (0);
+        /* the "system file done" block */
+        system_w.field_0x865 = 0;
+        self->state_0x0B = 3;
+    } while (0);
+}
+
 /* 0x801FB524 - the editor's sequence driver: one state step per frame, returning whether the sequence
  * has finished. */
 s32 lobby_enter_seq_step(LbChgSeqWork* self)
 {
     u16 status = Psw[0].button_0x2C0.pressed_0x04;
     s32 done = 0;
-    Q_ResultWork* q;
-    s32 v;
 
-    switch (self->state_0x0B) {
-    case 0:
-        fn_801FBAE4();
-        fn_801FC810();
-        lobby_w.field_0x006 = 1;
-        lobby_w.field_0x001 = 0x16;
-        lobby_w.field_0x002 = 0;
-        create_move_work(2);
-        if (system_w.field_0x7ce == 2) {
-            lobby_w.field_0x002 = 2;
-        }
-        lb_quest_return_apply();
-        fn_801FC874();
-        fn_801FC8C8();
-        lb_part_recs_reset();
-        q = get_qResult_work();
-        if (q != NULL && system_w.field_0x2d == 0 &&
-            (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
-            if (game_data_file_create_start() != 0) {
-                self->state_0x0B = 1;
-                system_w.field_0x865 = 1;
-                break;
-            }
-            /* no data file to create: on to case 1's system-file test */
-            if (0) {
-    case 1:
-                v = game_save_wait();
-                if ((u32)(v + 2) <= 1) {
-                    self->state_0x0B = 0x64;
-                    break;
-                }
-                if (v != 1) {
-                    break;
-                }
-            }
-            if (game_system_file_create_start() != 0) {
-                self->state_0x0B = 2;
-                break;
-            }
-        }
-        /* nothing to create: the system file is done */
-        if (0) {
-    case 2:
-            v = game_system_file_create_wait();
-            if ((u32)(v + 2) <= 1) {
-                self->state_0x0B = 0x64;
-                break;
-            }
-            if (v != 1) {
-                break;
-            }
-        }
-        /* the "system file done" block heads a loop: case 0x64 jumps back to it */
-        for (;;) {
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-            break;
-    case 3:
-            fn_801FB2A8(0, lobby_w.field_0x001, lobby_w.field_0x002);
-            self->state_0x0B++;
-            setSoftresetFlag(0);
-            break;
-    case 4:
-            if (file_loading_ck(NULL, NULL) != 1U) {
-                fn_801FB364(0);
-                lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
-                self->state_0x0B++;
-            }
-            break;
-    case 5:
-            fn_801FB438();
-            fn_801FB478();
-            self->state_0x0B++;
-            break;
-    case 6:
-            stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
-            demo_work_update();
-            lb_npc_map_setup();
-            camera_area_default_set();
-            self->step_0x0A++;
-            self->state_0x0B = 0;
-            setSoftresetFlag(1);
-            return 0;
-    case 0x64:
-            if ((status & 0x10) != 0) {
-                continue;
-            } else {
-                s32 code;
-
-                done = 1;
-                code = chg_nand_err2msgcode();
-                subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
-            }
-            break;
-        }
-        break;
-    default:
-        break;
-    }
+    lobby_enter_seq_dispatch(self, status, done);
     if (self->state_0x0B >= 3) {
         player_control_move();
     }
     return done;
+}
+#pragma pop
+
+#pragma push
+#pragma dont_inline off
+/* Runs one state of the lobby scene's setup: `return` ends the step, `break` out of the switch reaches the
+ * system-file start, `continue` the "system file done" block. */
+static inline void lobby_scene_setup_dispatch(LbChgSeqWork* self, u16 status, s32& done)
+{
+    Q_ResultWork* q;
+    s32 v;
+
+    do {
+        do {
+            switch (self->state_0x0B) {
+            case 0:
+                lobby_state_reset(self->mode_0x14);
+                enemy_net_work_reset();
+                NetCtrlWk::clearSessionFlag();
+                fn_801FBAE4();
+                fn_801FC810();
+                lobby_w.field_0x001 = 0x15;
+                if (self->mode_0x14 == 1) {
+                    lobby_w.field_0x002 = 2;
+                } else {
+                    lobby_w.field_0x002 = 0;
+                }
+                PlayMode_set(4);
+                create_move_work(1);
+                lb_quest_return_apply();
+                q = get_qResult_work();
+                if (q != NULL && system_w.field_0x2d == 0 && (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
+                    if (game_data_file_create_start() != 0) {
+                        self->state_0x0B = 1;
+                        system_w.field_0x865 = 1;
+                        return;
+                    }
+                    break;
+                }
+                continue;
+            case 1:
+                v = game_save_wait();
+                if ((u32)(v + 2) > 1) {
+                    if (v != 1) {
+                        return;
+                    }
+                    if (game_system_file_create_start() != 0) {
+                        self->state_0x0B = 2;
+                        return;
+                    }
+                    continue;
+                }
+                self->state_0x0B = 0x64;
+                return;
+            case 2:
+                v = game_system_file_create_wait();
+                if ((u32)(v + 2) > 1) {
+                    if (v != 1) {
+                        return;
+                    }
+                    system_w.field_0x865 = 0;
+                    self->state_0x0B = 3;
+                    return;
+                }
+                self->state_0x0B = 0x64;
+                return;
+            case 3:
+                fn_801FB2A8(1, lobby_w.field_0x001, lobby_w.field_0x002);
+                self->state_0x0B++;
+                return;
+            case 4:
+                if (file_loading_ck(NULL, NULL) != 1U) {
+                    fn_801FB364(1);
+                    lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
+                    self->state_0x0B++;
+                }
+                return;
+            case 5:
+                fn_801FB438();
+                self->state_0x0B++;
+                return;
+            case 6:
+                stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
+                lb_npc_map_setup();
+                camera_area_default_set();
+                self->step_0x0A++;
+                self->state_0x0B = 0;
+                NetCtrlWk::setFetchMode(1);
+                return;
+            case 0x64:
+                if ((status & 0x10) != 0) {
+                    continue;
+                } else {
+                    s32 code;
+
+                    done = 1;
+                    code = chg_nand_err2msgcode();
+                    subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
+                }
+                return;
+            default:
+                return;
+            }
+            /* the system-file start, reached from case 0 and case 1 */
+            if (game_system_file_create_start() != 0) {
+                self->state_0x0B = 2;
+                return;
+            }
+        } while (0);
+        /* the "system file done" block */
+        system_w.field_0x865 = 0;
+        self->state_0x0B = 3;
+    } while (0);
 }
 
 /* 0x801FB80C (0x2D8): the lobby scene's setup sequence: one state step per frame (the save, the area load and the
@@ -8538,110 +8694,14 @@ s32 lobby_scene_setup_step(LbChgSeqWork* self)
 {
     u16 status = Psw[0].button_0x2C0.pressed_0x04;
     s32 done = 0;
-    Q_ResultWork* q;
-    s32 v;
 
-    switch (self->state_0x0B) {
-    case 0:
-        lobby_state_reset(self->mode_0x14);
-        enemy_net_work_reset();
-        NetCtrlWk::clearSessionFlag();
-        fn_801FBAE4();
-        fn_801FC810();
-        lobby_w.field_0x001 = 0x15;
-        if (self->mode_0x14 == 1) {
-            lobby_w.field_0x002 = 2;
-        } else {
-            lobby_w.field_0x002 = 0;
-        }
-        PlayMode_set(4);
-        create_move_work(1);
-        lb_quest_return_apply();
-        q = get_qResult_work();
-        if (q != NULL && system_w.field_0x2d == 0 && (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
-            if (game_data_file_create_start() != 0) {
-                self->state_0x0B = 1;
-                system_w.field_0x865 = 1;
-                break;
-            }
-            /* no data file to create: on to case 1's system-file test */
-            if (0) {
-    case 1:
-                v = game_save_wait();
-                if ((u32)(v + 2) <= 1) {
-                    self->state_0x0B = 0x64;
-                    break;
-                }
-                if (v != 1) {
-                    break;
-                }
-            }
-            if (game_system_file_create_start() != 0) {
-                self->state_0x0B = 2;
-                break;
-            }
-        }
-        /* nothing to create: the system file is done */
-        if (0) {
-    case 2:
-            v = game_system_file_create_wait();
-            if ((u32)(v + 2) <= 1) {
-                self->state_0x0B = 0x64;
-                break;
-            }
-            if (v != 1) {
-                break;
-            }
-        }
-        /* the "system file done" block heads a loop: case 0x64 jumps back to it */
-        for (;;) {
-            system_w.field_0x865 = 0;
-            self->state_0x0B = 3;
-            break;
-    case 3:
-            fn_801FB2A8(1, lobby_w.field_0x001, lobby_w.field_0x002);
-            self->state_0x0B++;
-            break;
-    case 4:
-            if (file_loading_ck(NULL, NULL) != 1U) {
-                fn_801FB364(1);
-                lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
-                self->state_0x0B++;
-            }
-            break;
-    case 5:
-            fn_801FB438();
-            self->state_0x0B++;
-            break;
-    case 6:
-            stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
-            lb_npc_map_setup();
-            camera_area_default_set();
-            self->step_0x0A++;
-            self->state_0x0B = 0;
-            NetCtrlWk::setFetchMode(1);
-            return 0;
-    case 0x64:
-            if ((status & 0x10) != 0) {
-                continue;
-            } else {
-                s32 code;
-
-                done = 1;
-                code = chg_nand_err2msgcode();
-                subTransSet((u32)fn_801FC6A0, 1, (u32*)&code);
-            }
-            break;
-        }
-        break;
-    default:
-        break;
-    }
+    lobby_scene_setup_dispatch(self, status, done);
     if (self->state_0x0B >= 3) {
         player_control_move();
     }
     return done;
 }
+#pragma pop
 
 /* 0x801FBAE4 - hand the pending colour choice to the network side, then clear the option parameter
  * block back to its empty state. */
