@@ -15,16 +15,22 @@
  *    AAN scale factors read as doubles; `.sdata2` 0x8079D3A8..0x8079D3BC are the inverse-DCT constants of the
  *    paired-single routines; the decoder uses the locked cache (`LCStoreData`, `LCQueueWait`, `PPCMfhid2`).
  *    `.bss` 0x8075AFC0 .. 0x8075B110 and `.sbss` 0x807954A0..0x807955C8 are read here only.
- * RESIDUALS. `THPVideoDecode` 0x804E1120: the marker switch is compiled with signed compares where the target uses
- *    unsigned ones (a `u8`, `u32` or cast switch value changes nothing), the target tests 0xD9 explicitly, and its
- *    error exits are shared tails at the end of the function (`li r3,N; b exit` in the order 25, 27, 26, 11, 3, the
- *    parse status, 28, 29), the layout of jumps to labelled exits that the nested-`if` form without `goto` does not
- *    reach (an explicit `case 0xD9` scores lower); `THPParseHuffmanTable` 0x804E19F0: register numbering and the
- *    slot of the `THPHuffCounts` cursor load (declaration orders were hill-climbed); `THPParseQuantTable`
- *    0x804E1650: register numbering (declaration orders were hill-climbed).
- *    flipcheck: .text 0x347C vs 0x3490.
- * SHAPES. the marker switch lists its case bodies in the target's block order (0xC4, 0xC0, 0xDD, 0xDB, 0xDA, APPn/COM,
- *    0xD8); `THPDecodeFrame` declares `savedGqr6` before `savedGqr5` and builds the GQR values in the physical r3, which
+ * RESIDUALS. `THPVideoDecode` 0x804E1120: the marker switch's compare tree is `cmpwi` where the target has `cmplwi`
+ *    (already `cmpi` in the first PCode dump; Wii/1.3 and every GC/Wii MWCC build lower a switch of 8 or more case
+ *    labels to a signed tree whatever the selector type, while 7 or fewer keep `cmplwi`; a `u8`, `u32` or cast
+ *    selector, `U` labels and the switch/control-flow pragmas change nothing); the target's error exits are shared
+ *    tails after `return 0` in the order 25, 27, 26, 11, 3, the parse status, 28, 29 (a `goto`-label layout), while
+ *    the goto-free form emits 11, 3 and the status tail inside the loop (one extra `b` before the loop test, 716 B of
+ *    712) and the outer tails in nesting order 29, 28, 26, 27, 25 (early `if`-returns score 77.28);
+ *    `THPParseHuffmanTable` 0x804E19F0: register numbering and the slot of the `THPHuffCounts` cursor load
+ *    (declaration orders were hill-climbed); `THPParseQuantTable` 0x804E1650: register numbering and the operand
+ *    order of the scaled `fmul`/`fsubs` (declaration orders were hill-climbed).
+ *    flipcheck: .text bytes differ (the three rows above).
+ * SHAPES. `THPVideoDecode` returns the SDK's `s32` and keeps the parse status in a `u8`: every case `continue`s on
+ *    success and `break`s on a parse error to one `return result` after the switch (retail's shared `clrlwi r3,r3,24`);
+ *    `done = 0` follows the cursor store so the 0 for `rowY` stays its own `li` (which aligns the 0xFF-skip loop as
+ *    retail's `nop` does); the marker switch lists its case bodies in the target's block order (0xC4, 0xC0, 0xDD,
+ *    0xDB, 0xDA, APPn/COM, 0xD8); `THPDecodeFrame` declares `savedGqr6` before `savedGqr5` and builds the GQR values in the physical r3, which
  *    keeps r3 out of the function's other allocations as in the target.
  *    `THPDecodeFrame` advances its u16 row as `row = (row + 16) & 0xFFFF` (the mask keeps the `clrlwi` result in the
  *    row register; `row += 16` keeps the unextended sum); `THPDecodeFrame512x448` tests `--restartCounter == 0` on
@@ -99,7 +105,7 @@ void THPDecodeBlockY(THPDecoder* state, s16* block);
 void THPDecodeBlockU(THPDecoder* state, s16* block);
 void THPDecodeBlockV(THPDecoder* state, s16* block);
 
-u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
+s32 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
 {
     u8 result;
     u32 marker;
@@ -114,10 +120,10 @@ u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
                         THPState = (THPDecoder*)(((u32)work + 31) & ~31);
                         THPWorkEnd = (u8*)THPState + sizeof(THPDecoder);
                         DCZeroRange((u8*)THPState, sizeof(THPDecoder));
-                        done = 0;
                         THPState->bitPosition = 0x21;
                         THPState->rowY = 0;
                         THPState->cursor = data;
+                        done = 0;
                         do {
                             if (*THPState->cursor++ == 0xFF) {
                                 while (*THPState->cursor == 0xFF) {
@@ -127,14 +133,14 @@ u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
                                 switch (marker) {
                                 case 0xC4:
                                     result = THPParseHuffmanTable();
-                                    if (result != 0) {
-                                        return result;
+                                    if (result == 0) {
+                                        continue;
                                     }
                                     break;
                                 case 0xC0:
                                     result = THPParseFrameHeader();
-                                    if (result != 0) {
-                                        return result;
+                                    if (result == 0) {
+                                        continue;
                                     }
                                     break;
                                 case 0xDD:
@@ -143,19 +149,19 @@ u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
                                     THPState->restartInterval = THP_READ_U16(THPState->cursor);
                                     THPState->cursor += 2;
                                     THPState->restartCounter = THPState->restartInterval;
-                                    break;
+                                    continue;
                                 case 0xDB:
                                     result = THPParseQuantTable();
-                                    if (result != 0) {
-                                        return result;
+                                    if (result == 0) {
+                                        continue;
                                     }
                                     break;
                                 case 0xDA:
                                     result = THPParseScanHeader();
-                                    if (result != 0) {
-                                        return result;
+                                    if (result == 0) {
+                                        done = 1;
+                                        continue;
                                     }
-                                    done = 1;
                                     break;
                                 case 0xE0:
                                 case 0xE1:
@@ -175,15 +181,16 @@ u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
                                 case 0xEF:
                                 case 0xFE:
                                     THPState->cursor += THP_READ_U16(THPState->cursor);
-                                    break;
+                                    continue;
                                 case 0xD8:
-                                    break;
+                                    continue;
                                 default:
                                     return 0xB;
                                 }
                             } else {
                                 return 3;
                             }
+                            return result;
                         } while (done == 0);
                         base = (s16*)(((u32)THPWorkEnd + 31) & ~31);
                         THPBlocks[0] = base;

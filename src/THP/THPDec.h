@@ -56,7 +56,7 @@ typedef struct THPDecoder {
 
 /* 0x804E1120 - decodes one frame from `data` into the three output planes using `work` as scratch; returns 0 or an
  * error code. */
-u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work);
+s32 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work);
 
 /* 0x804E4510 - registers the library version, sets up the locked-cache plane addresses and the quantised load/store
  * registers; returns 1. */
