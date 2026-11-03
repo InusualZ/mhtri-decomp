@@ -147,7 +147,7 @@ void fn_8007A1B8(const nw4r::g3d::Fog* pFog, u32* pType, f32* pStartz, f32* pEnd
             *pFar = data.Far;
         }
         if (pColor != NULL) {
-            color_rgba_copy((u8*)pColor, (const u8*)&data.color);
+            *pColor = data.color;
         }
     }
 }

@@ -53,7 +53,7 @@
 #include "g3d/g3d_resanmfog.h"      /* res_anm_fog_get_anm_result (rule 2) */
 #include "g3d/g3d_anmscn.h"
 #include "g3d/light_obj_is_enable.h" /* this unit's light-object, light-setting and fog accessors */
-#include "g3d/g3d_anmclr.h"   /* color_to_u32_ref, color_ctor_white, owned by g3d/g3d_anmclr.cpp (rule 2) */
+#include "g3d/g3d_anmclr.h"   /* color_ctor_white, owned by g3d/g3d_anmclr.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h"   /* type_obj_set_name, fn_8005DC60, GetAnmPlayPolicy, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
@@ -401,11 +401,13 @@ extern "C" LightObj *light_setting_get_light_obj_array(const LightSetting *p)
     return p->mpLightObjArray;
 }
 
-/* Reads the +0x0 word through the identity helper (0x80064754), the shape the two readers share. */
+#pragma dont_inline on
+/* Reads the colour word through ut::Color's const ToU32ref (0x80064754), the shape the two readers share. */
 extern "C" u32 fn_800651BC(void *self)
 {
-    return *color_to_u32_ref((u32 *)self);
+    return reinterpret_cast<const nw4r::ut::Color *>(self)->ToU32ref();
 }
+#pragma dont_inline reset
 
 extern "C" u32 light_setting_get_num_light_obj(const LightSetting *p)
 {
@@ -1148,14 +1150,16 @@ void AnmScnRes::GetFog(Fog fog, u32 refNumber)
     fog_set_color(&fog, static_cast<const ut::Color&>(pResult->color));
 }
 
-/* 0x800679D4 (0x80): copies a colour into the fog record the handle names. */
+/* 0x800679D4 (0x80): copies a colour into the fog record the handle names (the GXColor assignment out of line). */
+#pragma dont_inline on
 extern "C" void fog_set_color(Fog *self, GXColor color)
 {
     if (fog_is_valid(self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CBF8, 0x63, (const char *)lbl_8058CBD8);
     if (fog_is_valid(self) != 0)
-        color_rgba_copy((u8 *)fog_ptr(self) + 20, (const u8 *)&color);
+        fog_ptr(self)->color = color;
 }
+#pragma dont_inline reset
 
 extern "C" FogData *fog_ptr(const Fog *p)
 {

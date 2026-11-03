@@ -1015,7 +1015,8 @@ void em040_motion_events(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801BB4C8 (0x14C): once, scales the material colour by the ratio of the stage cell colours of the work's cell
- * and its dry/underwater counterpart. */
+ * and its dry/underwater counterpart.  The GXColor copies are retail's out-of-line assignment. */
+#pragma dont_inline on
 void em040_tint_update(struct _ENEMY_WORK* self) {
     GXColor from;
     GXColor to;
@@ -1035,9 +1036,9 @@ void em040_tint_update(struct _ENEMY_WORK* self) {
         }
         if (cell_from != cell_to) {
             from_word = stage_cell_get(cell_from, 1);
-            color_rgba_copy((u8*)&from, (u8*)&from_word);
+            from = *reinterpret_cast<const GXColor*>(&from_word);
             to_word = stage_cell_get(cell_to, 1);
-            color_rgba_copy((u8*)&to, (u8*)&to_word);
+            to = *reinterpret_cast<const GXColor*>(&to_word);
             if (((MHchar*)&self->char_0x024)->getMatColor(0, GX_COLOR0A0, &mat) != 0) {
                 mat.r = (to.r * mat.r) / from.r;
                 mat.g = (to.g * mat.g) / from.g;
@@ -1047,6 +1048,7 @@ void em040_tint_update(struct _ENEMY_WORK* self) {
         }
     }
 }
+#pragma dont_inline reset
 
 /* 0x801BB614 (0x8): the state query; em040 reports nothing. */
 u32 em040_state_ck(void) {
