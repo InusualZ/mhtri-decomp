@@ -10,11 +10,11 @@
  *   neighbours, no `__FILE__` string covers it.  GUESS names, from the bodies: `menu_row_list_open`/`_step`/`_build`/
  *   `_scroll`, `menu_monster_list_open`/`_step`/`_build`, `menu_combo_list_build`/`_scroll`, `menu_note_list_open`/
  *   `_step`, `note_slot_pair_copy`; `MenuRowPair`.
- * RESIDUALS.
- *  - `menu_monster_list_build`: `first` and the table pointer swap registers (r23/r26, 9 bytes); no declaration order,
- *    `table[i]` indexing, for-init assignment or split assignment reaches it.
- *   flipcheck: `.text` 9 of 5008 bytes differ (that register pair); nothing else.
+ * RESIDUALS. None.
  * SHAPES. The tab handlers read the button word as `buttons_trig | (field_0x008 & 0xF)`.
+ *  - `menu_monster_list_build` declares the table pointer first and `first` last (`first` takes the lowest callee-saved
+ *    register, the pointer the one above the counters), with the zero initialisers written as assignments after
+ *    `first` so the `li`s follow the `mullw`.
  *  - `MenuSlot` declares +0x016/+0x01E/+0x01F `u8`, which retail reads and writes as `s8`: the `(s8&)` views give
  *    retail's direct `extsb`/`li -1`; an `(s8)` value cast adds a `clrlwi`.
  *  - `menu_row_list_scroll` spells its state test `(u32)state <= 1 || (s32)state == 3` (retail `cmplwi` then `cmpwi`).
@@ -646,11 +646,15 @@ extern "C" void menu_combo_list_scroll(MenuScroll* scroll, MenuEntry* rows, u16 
 /* 0x80349C9C (0x13C): fills the visible rows of the monster list with the marked monsters' names. */
 extern "C" void menu_monster_list_build(MenuScroll* scroll, MenuEntry* rows)
 {
-    s32 first = scroll->rows_per_page * scroll->col;
-    s32 marked = 0;
-    s32 shown = 0;
+    MenuRowRec* rec;
+    s32 marked;
+    s32 shown;
     s32 i;
-    MenuRowRec* rec = (MenuRowRec*)menu_row_table_get();
+    s32 first = scroll->rows_per_page * scroll->col;
+
+    marked = 0;
+    shown = 0;
+    rec = (MenuRowRec*)menu_row_table_get();
 
     for (i = 0; i < 35; i++, rec++) {
         if (monster_mark_ck(rec->kind) != 0) {
