@@ -3,7 +3,8 @@ Spec: docs/tools/spec/stylelint_rules.md. CLI: none (the stylelint package; `sty
 from __future__ import annotations
 
 from tools.units.stylelint_rules import (
-    r03_size, r04_offset, r05_field_name, r06_pointer_arith, r07_generated_name, r08_goto, r09_mangled, r15_comments,
+    r03_size, r04_offset, r05_field_name, r06_pointer_arith, r07_generated_name, r08_case_label, r08_goto, r09_mangled,
+    r15_comments,
 )
 from tools.units.stylelint_rules.common import (
     Source, all_header_files, all_lint_sources, all_sources, field_walk, header_files, is_header, is_unsplit_header, read_text,
@@ -57,6 +58,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
     out.extend(r07_generated_name.findings(src, fields))
     out.extend(r07_generated_name.path_findings(src))
     out.extend(r08_goto.findings(src))
+    out.extend(r08_case_label.findings(src))
     out.extend(r09_mangled.findings(src))
 
     if ownership is not None:

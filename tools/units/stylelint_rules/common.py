@@ -53,7 +53,7 @@ RULE_NAMES = {
     6: "no pointer arithmetic to reach a field",
     7: "no generated name survives (a `fn_`/`lbl_`/`loc_`/`dtor_`/`zz_` + 8-hex stem or a DOL address anywhere in an "
        "identifier or a file/directory name, bare `unkNN`)",
-    8: "goto is forbidden",
+    8: "goto is forbidden, and so is a case/default label inside another block of its switch",
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
     10: "a vtable we own is compiler output (vtableaudit's violations; `--budget` reads them, the lint has none)",
     11: "no `void *` parameter or return type (mark the declaration `/* untyped: <reason> */` if genuinely untyped)",

@@ -39,6 +39,9 @@ from tools.units.stylelint_rules.r07_generated_name import (  # noqa: F401
 from tools.units.stylelint_rules.r08_goto import (  # noqa: F401
     RULE8_RE,
 )
+from tools.units.stylelint_rules.r08_case_label import (  # noqa: F401
+    CHECK as RULE8_CASE_CHECK, sites as rule8_case_sites,
+)
 from tools.units.stylelint_rules.r09_mangled import (  # noqa: F401
     RULE9_MANGLED_RE, RULE9_CALL_RE, _DECL_HEAD_RE, _DECL_KEYWORDS, _statement_head, looks_like_declaration,
 )
