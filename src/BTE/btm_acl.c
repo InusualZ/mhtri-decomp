@@ -14,13 +14,14 @@
  * NAMES. the map's, which are the BTE source's; 0x804819F8 btm_get_acl_disc_reason_code is a GUESS (returns the btm_cb
  *   disconnect reason, between BTM_GetNumAclLinks and BTM_GetHCIConnHandle as in the BTE source). BTM_ReadLinkPolicy and
  *   BTM_SetQoS are dead-stripped from the retail link; their bodies here are GUESSes that keep their trace strings in
- *   the .data order.
- * RESIDUALS. btm_acl_created, btm_read_remote_features_complete: in the inlined BTM_SetLinkSuperTout the target puts
- *   the loop counter, the timeout and the entry in r29/r28/r30 (r30/r28/r29), this source in r30/r29/r28 (r29/r30/r28);
- *   every declaration order of btm_acl_created and both orders in btm_bda_to_acl measured the same or worse, as did a
- *   for-initialised entry pointer, a split declaration of the entry, and Broadcom's `if (bda)` guard (+0x80 B).
+ *   the .data order. The static btm_establish_continue (inlined, no map row) is a GUESS name taken from later Broadcom
+ *   stacks, where the link-up tail of btm_acl_created and btm_read_remote_features_complete lives in that helper.
+ * RESIDUALS. none.
  * SHAPES. plain C; the table is btm_cb.acl_db (BTE/btm_main.h), the entry type is BTE/btm_acl.h's. btm_bda_to_acl,
- *   btm_set_packet_types and BTM_SetLinkSuperTout are static here: every retail call inlines them and no copy survives.
+ *   btm_set_packet_types, BTM_SetLinkSuperTout and btm_establish_continue are static here: every retail call inlines
+ *   them and no copy survives. The shared link-up tail must go through btm_establish_continue: written out in both
+ *   callers, the inlined BTM_SetLinkSuperTout's loop counter, timeout and entry colour in the wrong order (r30/r29/r28
+ *   for retail's r29/r28/r30 in btm_acl_created, r29/r30/r28 for r30/r28/r29 in btm_read_remote_features_complete).
  */
 
 #include "BTE/btm_acl.h"
@@ -171,6 +172,21 @@ static u8 BTM_SetLinkSuperTout(u8* remote_bda, u16 timeout) {
     return BTM_UNKNOWN_ADDR;
 }
 
+/* Applies the default packet types, link policy and supervision timeout to the link `p` and reports it up. */
+static void btm_establish_continue(tACL_CONN* p) {
+    btm_set_packet_types(p, btm_cb.btm_acl_pkt_types_supported);
+
+    if (btm_cb.btm_def_link_policy) {
+        BTM_SetLinkPolicy(p->remote_addr, &btm_cb.btm_def_link_policy);
+    }
+
+    BTM_SetLinkSuperTout(p->remote_addr, btm_cb.btm_def_link_super_tout);
+
+    if (btm_cb.p_acl_changed_cb) {
+        (*btm_cb.p_acl_changed_cb)(p->remote_addr, p->remote_dc, p->remote_name, p->features, TRUE);
+    }
+}
+
 /* 0x80480A90 (0x1C): Sets the default supervision timeout and clears the disconnect reason. */
 void btm_acl_init(void) {
     btm_cb.btm_def_link_super_tout = BTM_DEFAULT_LINK_SUPER_TOUT;
@@ -236,18 +252,7 @@ void btm_acl_created(u8* bda, u8* dc, u8* bdn, u16 hci_handle, u8 link_role) {
                     if (p_dev_rec->features[yy]) {
                         memcpy(p->features, p_dev_rec->features, 8);
 
-                        btm_set_packet_types(p, btm_cb.btm_acl_pkt_types_supported);
-
-                        if (btm_cb.btm_def_link_policy) {
-                            BTM_SetLinkPolicy(p->remote_addr, &btm_cb.btm_def_link_policy);
-                        }
-
-                        BTM_SetLinkSuperTout(p->remote_addr, btm_cb.btm_def_link_super_tout);
-
-                        if (btm_cb.p_acl_changed_cb) {
-                            (*btm_cb.p_acl_changed_cb)(p->remote_addr, p->remote_dc, p->remote_name, p->features,
-                                                       TRUE);
-                        }
+                        btm_establish_continue(p);
                         return;
                     }
                 }
@@ -529,18 +534,7 @@ void btm_read_remote_features_complete(u8* p) {
                     memcpy(p_dev_rec->features, p_acl_cb->features, 8);
                 }
 
-                btm_set_packet_types(p_acl_cb, btm_cb.btm_acl_pkt_types_supported);
-
-                if (btm_cb.btm_def_link_policy) {
-                    BTM_SetLinkPolicy(p_acl_cb->remote_addr, &btm_cb.btm_def_link_policy);
-                }
-
-                BTM_SetLinkSuperTout(p_acl_cb->remote_addr, btm_cb.btm_def_link_super_tout);
-
-                if (btm_cb.p_acl_changed_cb) {
-                    (*btm_cb.p_acl_changed_cb)(p_acl_cb->remote_addr, p_acl_cb->remote_dc, p_acl_cb->remote_name,
-                                               p_acl_cb->features, TRUE);
-                }
+                btm_establish_continue(p_acl_cb);
                 break;
             }
         }
