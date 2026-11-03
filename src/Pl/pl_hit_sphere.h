@@ -1,11 +1,26 @@
-/* The player hit-sphere unit `Pl/pl_hit_sphere.cpp`: the segment and capsule box builders, their records, and the
- * point-in-sphere test.  The box builders' map names are plain, so they take C linkage; `hit_point_sphr` is mangled.
+/* The player shape-test unit `Pl/pl_hit_sphere.cpp`: the segment and capsule box builders, their records, the
+ * point-in-sphere test, and the sphere/capsule/segment/plane/triangle contact and push tests.  Every map name but
+ * `hit_point_sphr` is plain, so the functions take C linkage.
  */
 #ifndef MHTRI_PL_PL_HIT_SPHERE_H
 #define MHTRI_PL_PL_HIT_SPHERE_H
 
 #include "types.h"
 #include "nw4r/math.h"
+
+/* One 0x10-byte placed sphere: an `nw4r::math::VEC3` position plus the radius the overlap tests read at +0xC.  The
+ * body-shape lists (`Pl/pl_coll.cpp`'s `pl_coll_body_shape`) are runs of these ended by a radius of -1.  size: 0x10 */
+struct HitSphere {
+    /* +0x0 */ nw4r::math::VEC3 pos;
+    /* +0xC */ f32 radius;
+};
+
+/* A plane: the unit normal and the distance from the origin along it (`pl_plane_project` subtracts `dist` from the
+ * point's dot product with the normal). size: 0x10 */
+struct PlPlane {
+    /* +0x0 */ nw4r::math::VEC3 normal;
+    /* +0xC */ f32 dist;
+};
 
 #ifdef __cplusplus
 
@@ -54,6 +69,35 @@ void pl_capsule_box_set(PlCapsule* capsule, PlCapsuleBox* box);
 /* 0x8028F44C (0x68): builds the first 0x24 bytes of box `b` from the two vectors at the head of `a` and their
  * difference (`enemy/em_common.cpp`'s reach test hands it a segment). */
 void pl_box_set(struct PlBox* a, struct PlBox* b);
+
+/* 0x80290524 (0x74): projects `point` onto `plane` into `out`. */
+void pl_plane_project(nw4r::math::VEC3* point, PlPlane* plane, nw4r::math::VEC3* out);
+
+/* The body push tests `Pl/pl_body_push.cpp` calls: 1 when the two shapes overlap, with the push that separates them. */
+u32 pl_sphere_push(HitSphere* a, HitSphere* b, nw4r::math::VEC3* out);
+u32 pl_capsule_capsule_push(PlCapsuleBox* a, PlCapsuleBox* b, nw4r::math::VEC3* push_a, nw4r::math::VEC3* push_b);
+u32 pl_capsule_sphere_push(PlCapsuleBox* a, HitSphere* sphere, nw4r::math::VEC3* push_a,
+                           nw4r::math::VEC3* push_sphere);
+
+/* The hit contact tests `Pl/pl_hit.cpp` calls: 1 when the two shapes touch, with the contact point in `out`. */
+s32 pl_sphere_contact(HitSphere* a, HitSphere* b, nw4r::math::VEC3* out);
+s32 pl_capsule_capsule_contact(PlCapsuleBox* a, PlCapsuleBox* b, nw4r::math::VEC3* out);
+s32 pl_capsule_sphere_contact(PlCapsuleBox* a, HitSphere* sphere, nw4r::math::VEC3* out);
+s32 pl_sphere_capsule_contact(HitSphere* sphere, PlCapsuleBox* a, nw4r::math::VEC3* out);
+
+/* The segment and triangle tests `Pl/pl_coll.cpp`'s land queries call. */
+/* 0x8028F938 (0xE8): the point on segment `start`..`end` closest to `point`, into `out`; returns the squared distance. */
+f32 pl_segment_closest_point(nw4r::math::VEC3* start, nw4r::math::VEC3* end, nw4r::math::VEC3* point,
+                             nw4r::math::VEC3* out);
+/* 0x80290840 (0x3E8): segment box `seg` against capsule `capsule`: 0 for a miss, else 1 with the crossing points. */
+s32 pl_segment_capsule_hit(PlSegmentBox* seg, PlCapsuleBox* capsule, nw4r::math::VEC3* enter, nw4r::math::VEC3* exit);
+/* 0x80290C28 (0xE0): where segment `seg` crosses `plane`, into `out`; 0 when it does not. */
+u32 pl_segment_plane_hit(PlSegment* seg, PlPlane* plane, nw4r::math::VEC3* out);
+/* 0x80290D08 (0x3B8): the point of triangle `a`/`b`/`c` closest to `point`, into `out`; returns its region. */
+s32 pl_triangle_closest_point(nw4r::math::VEC3* point, nw4r::math::VEC3* a, nw4r::math::VEC3* b, nw4r::math::VEC3* c,
+                              nw4r::math::VEC3* out);
+/* 0x802910C0 (0x54): `out = in * scale`, constructing `out` first. */
+void vec3_scale_to(nw4r::math::VEC3* out, f32 scale, const nw4r::math::VEC3* in);
 
 }
 

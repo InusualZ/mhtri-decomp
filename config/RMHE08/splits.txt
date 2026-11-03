@@ -1519,21 +1519,21 @@ Pl/pl_motion.cpp:
 	.sdata2     start:0x8079A270 end:0x8079A310
 
 Pl/pl_hit_sphere.cpp:
-	extab       start:0x80013224 end:0x8001323C
-	extabindex  start:0x800309B4 end:0x800309D8
-	.text       start:0x8028F44C end:0x8028F66C
-	.sdata2     start:0x8079A310 end:0x8079A318
+	extab       start:0x80013224 end:0x800132DC
+	extabindex  start:0x800309B4 end:0x80030AC8
+	.text       start:0x8028F44C end:0x8029135C
+	.sdata2     start:0x8079A310 end:0x8079A330
 
 Pl/pl_coll.cpp:
-	extab       start:0x8001323C end:0x80013454
-	extabindex  start:0x800309D8 end:0x80030CFC
-	.text       start:0x8028F66C end:0x80297E34
+	extab       start:0x800132DC end:0x80013454
+	extabindex  start:0x80030AC8 end:0x80030CFC
+	.text       start:0x8029135C end:0x80297E34
 	.ctors      start:0x8056F370 end:0x8056F374
 	.data       start:0x805CDC48 end:0x805CDC88
 	.bss        start:0x806AB848 end:0x806AC8A8
 	.sdata      start:0x80792270 end:0x80792278
 	.sbss       start:0x80794B58 end:0x80794B60
-	.sdata2     start:0x8079A318 end:0x8079A380
+	.sdata2     start:0x8079A330 end:0x8079A380
 
 Pl/pl_body_push.cpp:
 	extab       start:0x80013454 end:0x80013524

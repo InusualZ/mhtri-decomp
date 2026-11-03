@@ -2,7 +2,8 @@
  * Pl/pl_coll.h - `Pl/pl_coll.cpp`'s `.bss` collision-work run 0x806AB848..0x806AC8A8 (0x1060 B, 12 arrays, declared,
  *   never defined) and the record types its readers share.  The readers are `Pl/pl_coll.cpp`, `Pl/pl_act_step.cpp`,
  *   `Pl/pl_act.cpp` and `menu/menu_item.cpp`; the static initialiser `pl_coll_static_init` builds the arrays with
- *   `__construct_array`, and each member's comment gives its element constructor and stride.
+ *   `__construct_array`, and each member's comment gives its element constructor and stride.  The shape tests and
+ *   their records (`HitSphere`, `PlPlane`, the push/contact tests) are `Pl/pl_hit_sphere.cpp`'s, included below.
  * `pl_move_work` is `[4][11]`, the shape the motion layer's addressing spells (`pl_move_work[chunk_ofs][i]`): a flat
  *   `[44]` indexed `chunk_ofs * 11 + i` makes MWCC emit a different multiply sequence.
  * GUESSes, named from the read sites beside each (no written body spells them): `pl_coll_slot_free`,
@@ -14,6 +15,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "Pl/pl_hit_sphere.h" /* `HitSphere`, `PlPlane` and the shape tests (rule 2) */
 
 /* One entry of the per-chunk move-work table (`.bss` `pl_move_work`, 0x420 B of 24-byte entries,
  * 264 B - 11 entries - per `_PLW::chunk_ofs` chunk).  Only the fields the readers name are spelled;
@@ -33,20 +35,6 @@ struct PlMoveEntry {
     };
     /* +0x14 */ u8 carve_0x14;   /* `pl_step_se_kind_get` returns the first live entry's byte here */
     /* +0x15 */ u8 pad_0x15[0x3];
-};
-
-/* One 0x10-byte placed sphere: an `nw4r::math::VEC3` position plus the radius the overlap tests read at +0xC.  The
- * body-shape lists (`pl_coll_body_shape`) are runs of these ended by a radius of -1.  size: 0x10 */
-struct HitSphere {
-    /* +0x0 */ nw4r::math::VEC3 pos;
-    /* +0xC */ f32 radius;
-};
-
-/* A plane: the unit normal and the distance from the origin along it (`pl_plane_project` subtracts `dist` from the
- * point's dot product with the normal). size: 0x10 */
-struct PlPlane {
-    /* +0x0 */ nw4r::math::VEC3 normal;
-    /* +0xC */ f32 dist;
 };
 
 /* One collision polygon of the stage's land file: the cells of a `PlLandGrid` list pointers to these, ended by
@@ -159,8 +147,11 @@ extern HitSphere pl_coll_body_shape_alt[2];     /* 0x805CDC68 */
 /* 0x80293A7C - scales `v` by the coll unit's constant over `len`.  GUESS name. */
 void vec3_scale_inv(VEC3* v, f32 len);
 
-/* 0x80290524 - projects `point` onto `plane` into `out`. */
-void pl_plane_project(nw4r::math::VEC3* point, PlPlane* plane, nw4r::math::VEC3* out);
+/* 0x80296AC4 - twice the signed area of the x/z triangle `a`/`b`/`c` (`pl_coll_tri_hit_ck` calls it). */
+f32 pl_tri2d_cross(VEC3* a, VEC3* b, VEC3* c);
+
+/* 0x80296B40 - 1 when `point` lies inside the x/z triangle whose doubled area is `cross`. */
+u8 pl_tri2d_point_ck(VEC3* a, VEC3* b, VEC3* c, VEC3* point, f32 cross);
 
 #ifdef __cplusplus
 }
@@ -180,20 +171,6 @@ extern "C" {
 #endif
 /* 0x8029708C - resets the player collision work (the system core's move-work reset). */
 void pl_coll_table_clear(void);
-
-/* The body push tests `Pl/pl_body_push.cpp` calls: 1 when the two shapes overlap, with the push that separates them. */
-struct PlCapsuleBox;
-u32 pl_sphere_push(HitSphere* a, HitSphere* b, nw4r::math::VEC3* out);
-u32 pl_capsule_capsule_push(struct PlCapsuleBox* a, struct PlCapsuleBox* b, nw4r::math::VEC3* push_a,
-                            nw4r::math::VEC3* push_b);
-u32 pl_capsule_sphere_push(struct PlCapsuleBox* a, HitSphere* sphere, nw4r::math::VEC3* push_a,
-                           nw4r::math::VEC3* push_sphere);
-
-/* The hit contact tests `Pl/pl_hit.cpp` calls: 1 when the two shapes touch, with the contact point in `out`. */
-s32 pl_sphere_contact(HitSphere* a, HitSphere* b, nw4r::math::VEC3* out);
-s32 pl_capsule_capsule_contact(struct PlCapsuleBox* a, struct PlCapsuleBox* b, nw4r::math::VEC3* out);
-s32 pl_capsule_sphere_contact(struct PlCapsuleBox* a, HitSphere* sphere, nw4r::math::VEC3* out);
-s32 pl_sphere_capsule_contact(HitSphere* sphere, struct PlCapsuleBox* a, nw4r::math::VEC3* out);
 #ifdef __cplusplus
 }
 #endif
