@@ -2,27 +2,27 @@
  * Pl/pl_yure.cpp - the equipment sway ("yure") band: short spring chains hung off a character's joints (hair, cloth,
  *   tails) that lag behind the body.  The records (`YureRec`, 0x90 B) live in the enemy work record (3 at +0x590) and
  *   the player work record (8 at +0x674); `yure_move` steps them all each frame through `yure_step`.
- * RANGE. .text 0x802ABD28-0x802AD9C0 (11 functions); .ctors 0x8056F378 (`yure_static_init`, which builds the gravity
- *   vector), .data 0x805CE638-0x805CED40 (the thirteen sway tables), .sdata 0x807922C0-0x807922E0 (the four `CL-0n`
- *   labels), .bss 0x806B8798-0x806B87C0 (`yure_world`), .sdata2 0x8079A410-0x8079A448, extab, extabindex.  The seam
- *   with `stage/shell.cpp` below: this TU has its own static initialiser and `.data` tables (read only by these
- *   functions) and no reference to the shell pool.
+ * RANGE. .text 0x802ABD28-0x802AD9C0 (11 functions); .ctors 0x8056F378 (MWCC's `__sinit_\pl_yure_cpp`, which builds the
+ *   gravity vector through `YureWorld`'s constructor), .data 0x805CE638-0x805CED40 (the thirteen sway tables),
+ *   .sdata 0x807922C0-0x807922E0 (the four `CL-0n` labels), .bss 0x806B8798-0x806B87C0 (`yure_world`),
+ *   .sdata2 0x8079A410-0x8079A448, extab, extabindex.  The seam with `stage/shell.cpp` below: this TU has its own
+ *   static initialiser and `.data` tables (read only by these functions) and no reference to the shell pool.
  * NAMES. The module and the file name are GUESSes from the behaviour (`yure` = sway; the map's `yure_move__Fv` is the
  *   exported entry point).  GUESS: `pl_parts_value_get` (0x80269508, registry name: it returns the part value
  *   `pl_parts_set` compares against); `YureEnemyWork::sway_mode_0x1E2` (2 picks the alternate spring constants).
- * RESIDUALS. Every row left differs only in register or stack-slot choice:
- *  - `yure_step`: `j` lands in r18-r21 where the target reuses `index`'s r16 for five of its loops; the chain loop's
- *    vel pointer and tip offset swap r24/r26; the `fsubs` of the pin push and the spring stretch is scheduled after
- *    the argument `addi`s instead of before them.
- *  - `yure_player_init_kind`: `src`/`label`/the inner-loop pointers take r20-r26 where the target uses r21-r27 (the
- *    best of the declaration orders measured); `yure_enemy_init` the same shift for `src` (r25 for r29).
- *  - `yure_move`: the enemy/player work pointers and counters take other non-volatile registers (r25-r30).
- *  - flipcheck: `.text` only; `pl_parts_value_get` (0x80269508) resolves once the registry name is in the map.
- *    `.sdata2` carries all thirteen pool values in the target's order (the target's fourteenth word is the link pad).
- * SHAPES. The four `CL-0n` labels are named `char` arrays in `.sdata` (a `const` array lands in `.sdata2`;
- *   `yure_label_3[8]` carries the pad of the target's 0x20-byte run), so the `.data` table's relocations name the
- *   map's rows.  `get_move_work_max` is declared `u32` in `ef/get_move_work_adrs.h`: the retail caller narrows the
- *   result with `clrlwi ...,16`.
+ * RESIDUALS. None: every row is byte-identical and the flipped link reproduces the DOL.  `.sdata2` carries the
+ *   thirteen pool values in the target's order; the target's fourteenth word is the link pad (inert in the link).
+ * SHAPES. The `.ctors` word is MWCC's own entry for `yure_world`, whose constructor calls `setVec3` (a named
+ *   `__declspec(section ".ctors")` word is dead-stripped by mwld).  The four `CL-0n` labels are named `char`
+ *   arrays in `.sdata` (a `const` array lands in `.sdata2`; `yure_label_3[8]` carries the pad of the target's
+ *   0x20-byte run), so the `.data` table's relocations name the map's rows.  `get_move_work_max` is declared `u32`
+ *   in `ef/get_move_work_adrs.h`: the retail caller narrows the result with `clrlwi ...,16`.  Register shapes
+ *   (regsim plans): `yure_move` has separate counters per loop (`k`/`l` for the player loop, `m` for its second
+ *   inner loop) and `count` at function scope between `enemy_max` and `enemy`; `yure_enemy_init` indexes
+ *   `yure_enemy_src[start + i]` (no walked pointer); `yure_player_init_kind` indexes `srcs[start + i]` and
+ *   `yure_label_tbl[label]` with a running counter bumped at the end of the inner body; `yure_step` names the
+ *   pin push and the spring stretch before their `vec3_scale` call, writes the chain loop's tip address in place,
+ *   and gives the state-1 pin loop its own `tip`/`n` pair declared at the top of the pin block.
  */
 
 #include "types.h"
@@ -115,7 +115,6 @@ extern u8 yure_pin_joint_tbl[20];
 extern "C" void yure_enemy_init(YureEnemyWork* enemy) {
     nw4r::math::VEC3 scratch_vec;
     nw4r::math::MTX34 scratch_mtx;
-    YureSrc* src;
     s32 i;
     u32 j;
     s32 count;
@@ -128,19 +127,19 @@ extern "C" void yure_enemy_init(YureEnemyWork* enemy) {
     rec = enemy->yure_0x590;
     start = yure_enemy_span[enemy->type_0x003].start_0x01;
     count = yure_enemy_span[enemy->type_0x003].count_0x00;
-    for (i = 0, src = &yure_enemy_src[start]; i < count; src++, i++, rec++) {
+    for (i = 0; i < count; i++, rec++) {
         rec->active_0x00 = 1;
         rec->state_0x03 = 0;
         rec->is_enemy_0x06 = 1;
         rec->slot_0x05 = start + i;
-        rec->shape_0x01 = src->shape_0x00;
-        rec->param_0x02 = src->param_0x01;
-        rec->count_0x08 = src->count_0x02;
-        rec->root_joint_0x0C = src->root_joint_0x04;
-        rec->pin_0x04 = src->pin_0x0C;
+        rec->shape_0x01 = yure_enemy_src[start + i].shape_0x00;
+        rec->param_0x02 = yure_enemy_src[start + i].param_0x01;
+        rec->count_0x08 = yure_enemy_src[start + i].count_0x02;
+        rec->root_joint_0x0C = yure_enemy_src[start + i].root_joint_0x04;
+        rec->pin_0x04 = yure_enemy_src[start + i].pin_0x0C;
         for (j = 0; j < rec->count_0x08; j++) {
-            rec->joint_0x10[j] = src->joint_0x05[j];
-            vec_to_mh_vec3(&rec->rest_0x54[j], &yure_rest_tbl[src->rest_0x08[j]]);
+            rec->joint_0x10[j] = yure_enemy_src[start + i].joint_0x05[j];
+            vec_to_mh_vec3(&rec->rest_0x54[j], &yure_rest_tbl[yure_enemy_src[start + i].rest_0x08[j]]);
             setVector3(&rec->vel_0x3C[j], 0.0f, 0.0f, 0.0f);
         }
         for (j = 0; j < rec->count_0x08 + 1; j++) {
@@ -159,11 +158,10 @@ extern "C" void yure_player_init(YurePlayerWork* plw) {
 extern "C" void yure_player_init_kind(YurePlayerWork* plw, u8 kind) {
     nw4r::math::VEC3 scratch_vec;
     nw4r::math::MTX34 scratch_mtx;
-    YureSrc* src;
-    u32 j;
-    const char** label;
-    YureSrc* srcs;
     s32 i;
+    u32 j;
+    s32 label;
+    YureSrc* srcs;
     s32 count;
     s32 start;
     YureRec* rec;
@@ -193,26 +191,27 @@ extern "C" void yure_player_init_kind(YurePlayerWork* plw, u8 kind) {
     default:
         return;
     }
-    for (i = 0, src = &srcs[start], label = yure_label_tbl; i < count; src++, i++, rec++) {
+    for (i = 0, label = 0; i < count; i++, rec++) {
         rec->active_0x00 = 1;
         rec->state_0x03 = 0;
         rec->is_enemy_0x06 = 0;
         rec->slot_0x05 = start + i;
-        rec->shape_0x01 = src->shape_0x00;
-        rec->count_0x08 = src->count_0x02;
-        rec->pin_0x04 = src->pin_0x0C;
-        rec->param_0x02 = src->param_0x01;
-        for (j = 0; j < rec->count_0x08; j++, label++) {
+        rec->shape_0x01 = srcs[start + i].shape_0x00;
+        rec->count_0x08 = srcs[start + i].count_0x02;
+        rec->pin_0x04 = srcs[start + i].pin_0x0C;
+        rec->param_0x02 = srcs[start + i].param_0x01;
+        for (j = 0; j < rec->count_0x08; j++) {
             nw4r::g3d::ResNode found =
-                ((nw4r::g3d::ResMdl*)&plw->rig_0x13C->models_0x004[kind].model.field_0x114)->GetResNode(*label);
+                ((nw4r::g3d::ResMdl*)&plw->rig_0x13C->models_0x004[kind].model.field_0x114)->GetResNode(yure_label_tbl[label]);
             res_node_assign((ResHandle*)&node, (const ResHandle*)&found);
             if (res_node_is_valid((const ResHandle*)&node) != 0) {
                 rec->joint_0x10[j] = res_node_get_id((const ResHandle*)&node);
             } else {
                 rec->joint_0x10[j] = 0;
             }
-            vec_to_mh_vec3(&rec->rest_0x54[j], &yure_rest_tbl[src->rest_0x08[j]]);
+            vec_to_mh_vec3(&rec->rest_0x54[j], &yure_rest_tbl[srcs[start + i].rest_0x08[j]]);
             setVector3(&rec->vel_0x3C[j], 0.0f, 0.0f, 0.0f);
+            label++;
         }
         for (j = 0; j < rec->count_0x08 + 1; j++) {
             setVector3(&rec->pos_0x18[j], 0.0f, 0.0f, 0.0f);
@@ -239,16 +238,20 @@ extern "C" void yure_player_clear_flags(YurePlayerWork* plw) {
 }
 
 void yure_move(void) {
-    s32 i;
     s32 j;
+    s32 k;
+    s32 i;
+    s32 m;
+    s32 l;
     u16 player_max;
-    YurePlayerWork* player;
     u16 enemy_max = get_move_work_max(3);
+    s32 count;
     YureEnemyWork* enemy = (YureEnemyWork*)get_move_work_adrs(3);
+    YurePlayerWork* player;
 
     for (i = 0; i < enemy_max; i++, enemy++) {
         if (enemy->active_0x000 != 0) {
-            s32 count = yure_enemy_span[enemy->type_0x003].count_0x00;
+            count = yure_enemy_span[enemy->type_0x003].count_0x00;
             for (j = 0; j < count; j++) {
                 if (enemy->yure_0x590[j].active_0x00 != 0) {
                     yure_step(enemy, 0, j, 0);
@@ -258,16 +261,16 @@ void yure_move(void) {
     }
     player_max = get_move_work_max(2);
     player = (YurePlayerWork*)get_move_work_adrs(2);
-    for (i = 0; i < player_max; i++, player++) {
+    for (k = 0; k < player_max; k++, player++) {
         if (player->active_0x000 != 0) {
-            for (j = 0; j < 4; j++) {
-                if (player->yure_0x674[j].active_0x00 != 0) {
-                    yure_step(player, 1, j, 5);
+            for (l = 0; l < 4; l++) {
+                if (player->yure_0x674[l].active_0x00 != 0) {
+                    yure_step(player, 1, l, 5);
                 }
             }
-            for (j = 4; j < 8; j++) {
-                if (player->yure_0x674[j].active_0x00 != 0) {
-                    yure_step(player, 1, j, 4);
+            for (m = 4; m < 8; m++) {
+                if (player->yure_0x674[m].active_0x00 != 0) {
+                    yure_step(player, 1, m, 4);
                 }
             }
         }
@@ -361,6 +364,8 @@ extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureE
     f32 seat_scale;
     f32 dist;
     f32 depth;
+    f32 stretch;
+    f32 push;
 
     VEC3_ctor(&dir);
     VEC3_ctor(&work);
@@ -524,7 +529,8 @@ extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureE
                 copyVec3(&work, &t_pin0_rel);
                 depth = vec3_dot(&plane.normal.x, &work.x);
                 if (depth < probe.radius) {
-                    vec3_scale(&t_pin0_push, &plane.normal, probe.radius - depth);
+                    push = probe.radius - depth;
+                    vec3_scale(&t_pin0_push, &plane.normal, push);
                     copyVec3(&work, &t_pin0_push);
                     addVec3To(tip, &work);
                 }
@@ -648,22 +654,21 @@ extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureE
             break;
         default:
             for (j = 0; j < rec->count_0x08; j++) {
-                nw4r::math::VEC3* tip = &rec->pos_0x18[j + 1];
-
-                addVec3To(tip, &rec->vel_0x3C[j]);
+                addVec3To(&rec->pos_0x18[j + 1], &rec->vel_0x3C[j]);
                 mtx34_rotate_vec3(&dir, &root_mtx, &rec->rest_0x54[j]);
                 vec3_scale(&t3_stiff, &dir, stiff);
                 copyVec3(&force[j], &t3_stiff);
                 vec3_scale(&t3_grav, &yure_world.gravity_0x00, gravity);
                 addVec3To(&force[j], &t3_grav);
-                vec3_clamp_distance(&rec->pos_0x18[j], tip, scale * (10.0f + length[j]));
-                subVec3(&t3_link, &rec->pos_0x18[j], tip);
+                vec3_clamp_distance(&rec->pos_0x18[j], &rec->pos_0x18[j + 1], scale * (10.0f + length[j]));
+                subVec3(&t3_link, &rec->pos_0x18[j], &rec->pos_0x18[j + 1]);
                 copyVec3(&work, &t3_link);
                 dist = vec3_len(&work.x);
                 if (dist > 0.001f) {
                     vec3_normalize_into(&work, &work);
                 }
-                vec3_scale(&t3_spring, &work, spring * (dist - scale * length[j]));
+                stretch = spring * (dist - scale * length[j]);
+                vec3_scale(&t3_spring, &work, stretch);
                 addVec3To(&force[j], &t3_spring);
                 vec3_scale(&t3_damp, &rec->vel_0x3C[j], 1.0f - damp);
                 addVec3(&t3_vel, &t3_damp, &force[j]);
@@ -672,7 +677,7 @@ extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureE
                     subVec3(&t3_follow, &root_pos, &rec->anchor_0x6C);
                     addVec3To(&rec->pos_0x18[j], &t3_follow);
                 }
-                subVec3(&t3_seg_d, tip, &rec->pos_0x18[j]);
+                subVec3(&t3_seg_d, &rec->pos_0x18[j + 1], &rec->pos_0x18[j]);
                 copyVec3(&work, &t3_seg_d);
                 if (vec3_len(&work.x) > 0.001f) {
                     vec3_normalize_into(&work, &work);
@@ -680,9 +685,12 @@ extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureE
                 vec3_scale(&t3_seg, &work, scale * length[j]);
                 copyVec3(&seg[j], &t3_seg);
                 addVec3(&t3_tip, &rec->pos_0x18[j], &seg[j]);
-                copyVec3(tip, &t3_tip);
+                copyVec3(&rec->pos_0x18[j + 1], &t3_tip);
             }
             if (rec->pin_0x04 != 0) {
+                nw4r::math::VEC3* tip;
+                u32 n;
+
                 if (is_player == 1) {
                     mhchar_joint_mtx_get(&plw->rig_0x13C->models_0x004[0].model, yure_pin_joint_tbl[rec->pin_0x04],
                                          &pin_mtx);
@@ -698,8 +706,8 @@ extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureE
                 mulVecMat(&pin_ofs, &pin_mtx);
                 addVec3To(&point, &pin_ofs);
                 plane.dist = vec3_dot(&point.x, &plane.normal.x);
-                for (j = 0; j < rec->count_0x08; j++) {
-                    nw4r::math::VEC3* tip = &rec->pos_0x18[j + 1];
+                for (n = 0; n < rec->count_0x08; n++) {
+                    tip = &rec->pos_0x18[n + 1];
 
                     copyVec3(&probe.pos, tip);
                     probe.radius = scale * params[rec->param_0x02].coeff_0x00[4];
@@ -708,7 +716,8 @@ extern "C" void yure_step(void* owner /* untyped: caller-owned payload - a YureE
                     copyVec3(&work, &t_pin1_rel);
                     depth = vec3_dot(&plane.normal.x, &work.x);
                     if (depth < probe.radius) {
-                        vec3_scale(&t_pin1_push, &plane.normal, probe.radius - depth);
+                        push = probe.radius - depth;
+                        vec3_scale(&t_pin1_push, &plane.normal, push);
                         copyVec3(&work, &t_pin1_push);
                         addVec3To(tip, &work);
                     }
@@ -779,13 +788,7 @@ extern "C" void yure_roll_calc(YureRec* rec, nw4r::math::MTX34* mtx, u32* out, u
     *out = vec3_angle_xy(&dir.x);
 }
 
-extern "C" void yure_static_init(void) {
-    setVec3(&yure_world.gravity_0x00, 0.0f, -1.0f, 0.0f);
-}
-
-/* The `.ctors` word (0x8056F378) the split assigns to this unit - it points at the static initialiser. */
-__declspec(section ".ctors") void* const yure_ctor = (void*)yure_static_init;
-
+/* The sway world; its constructor is MWCC's `__sinit_\pl_yure_cpp`, whose pointer is the unit's `.ctors` word. */
 YureWorld yure_world;
 
 /* The sway tables (`.data` 0x805CE638-0x805CED40).  Names are from each table's use in this unit;
