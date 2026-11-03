@@ -713,7 +713,7 @@ config.libs = [
             Object(NonMatching, "enemy/em015_prog.cpp"),
             Object(NonMatching, "enemy/em016_prog.cpp"),
             Object(NonMatching, "enemy/em012_prog.cpp"),
-            Object(NonMatching, "enemy/em018_prog.cpp"),
+            Object(Matching, "enemy/em018_prog.cpp"),
             Object(NonMatching, "enemy/em005_act.cpp"),
             Object(NonMatching, "enemy/em030_prog.cpp"),
             Object(NonMatching, "enemy/em034_prog.cpp"),
@@ -1187,7 +1187,7 @@ config.libs = [
             # Flags: unit header of src/Network/network_shared_data.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_shared_data.cpp"),
             # Flags: unit header of src/Network/GameSpyInterfaceThread.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/GameSpyInterfaceThread.cpp",
+            Object(Matching, "Network/GameSpyInterfaceThread.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
             # Flags: unit header of src/Network/NetworkPeerGameSpy.cpp (the interface unit's flags).
             Object(NonMatching, "Network/NetworkPeerGameSpy.cpp",
@@ -1399,7 +1399,7 @@ config.libs = [
             Object(Matching, "TRK/targcont.c"),
             Object(Matching, "TRK/msg.c"),
             Object(Matching, "TRK/msgbuf.c"),
-            Object(NonMatching, "TRK/msghndlr.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
+            Object(Matching, "TRK/msghndlr.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/mslsupp.c"),
             Object(NonMatching, "TRK/targimpl.c"),
             Object(Matching, "AI_SDK/ai.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
