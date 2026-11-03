@@ -1,6 +1,6 @@
 /* enemy/em_eft_fx.cpp - the enemy effect family: the pooled `_EFT` creators an `_ENEMY_WORK` owns (grouped and flat
  *   work blocks), with their release, dispatch, start, move, fade and free stages.
- * RANGE. .text 0x8011D448-0x8011E5EC (20 functions); .data 0x805A0C10-0x805A0CC8 (the effect tables), .sdata
+ * RANGE. .text 0x8011D448-0x8011E5EC (21 functions); .data 0x805A0C10-0x805A0CC8 (the effect tables), .sdata
  *   0x807919C8-0x807919D0, .sdata2 0x80796C08-0x80796C10 (its 0.0f and the alignment pad), extab 0x8000C63C-0x8000C6AC,
  *   extabindex 0x80026844-0x800268EC.
  * SEAM. `.sdata2` holds 0.0f three times: 0x80796BD0 (read only by `eft030_move`, `ef/eft029_fx.cpp`), 0x80796C08
@@ -10,14 +10,14 @@
  *   `enemy/fn_8011D448.cpp` above.
  * NAMES. Every name is a GUESS from its body and callers: `em_eft_fx_*` (the `eft029_*`
  *   create/release/dispatch/start/move/state_next/free scheme; the `em_eft_fx_family_tbl` tag picks the grouped or
- *   flat body), and the data names `em_eft_fx_*_tbl`/`_ids`.  The module/file stem is a GUESS from the row names.
+ *   flat body), the static `em_eft_fx_start` (map row `em_eft_fx_start__FP4_EFT`, scope local, the
+ *   tail-called stage-0 body after `em_eft_fx_dispatch`, as `eft029_start`), and the data names
+ *   `em_eft_fx_*_tbl`/`_ids`.  The module/file stem is a GUESS from the row names.
  * RESIDUALS.
- *  - `em_eft_fx_dispatch` (the unit's 4 B `.text` short): retail's stage-0 case is its own `b` to the inlined start
- *    body after the three tail calls; ours branches there directly.  An if-chain, `case 0` returning, the start
- *    switch inlined by hand or called with `break`s, a do/while(0) `continue`, an `if (0)` case label, a flag and
- *    `optimization_level` 1-3 all measure the same or lower.
  *  - data: the object's `.sdata2` is the 4-byte 0.0f; the claim's last 4 bytes are the alignment pad before the
  *    next unit's 8-byte-aligned double.
+ *  - names: the 0.0f pool word is `em_eft_fx_zero` in the map and the compiler's unnamed `@` pool symbol in ours
+ *    (6 relocations differ by name only, same bytes and offsets).
  * SHAPES. `#pragma peephole off`, `optimization_level 4`, `fp_contract off` and `pool_data off`, as
  *   `enemy/fn_8011D448.cpp` (the unit this range was cut from); the creators take `u32` type/timer arguments.
  */
@@ -329,8 +329,29 @@ extern "C" void em_eft_fx_release_flat(_EFT* self)
     work->count = 0;
 }
 
-/* The stage-0 body: creates the type's effects. */
-static inline void em_eft_fx_start(_EFT* self)
+static void em_eft_fx_start(_EFT* self);
+
+/* 0x8011D9B8 (0x3C): the family's `.dispatch` callback: `state_0x05` selects the stage. */
+extern "C" void em_eft_fx_dispatch(_EFT* self)
+{
+    switch (self->state_0x05) {
+    case 0:
+        em_eft_fx_start(self);
+        break;
+    case 1:
+        em_eft_fx_move(self);
+        break;
+    case 2:
+        em_eft_fx_fade(self);
+        break;
+    case 3:
+        em_eft_fx_free(self);
+        break;
+    }
+}
+
+/* 0x8011D9F4 (0x30): the stage-0 body: creates the type's effects by its family. */
+static void em_eft_fx_start(_EFT* self)
 {
     switch (em_eft_fx_family_tbl[self->type_0x02]) {
     case 0:
@@ -340,27 +361,6 @@ static inline void em_eft_fx_start(_EFT* self)
         em_eft_fx_start_flat(self);
         break;
     }
-}
-
-/* 0x8011D9B8 - the family's `.dispatch` callback: `state_0x05` selects the stage. */
-extern "C" void em_eft_fx_dispatch(_EFT* self)
-{
-    switch (self->state_0x05) {
-    case 0:
-        break;
-    case 1:
-        em_eft_fx_move(self);
-        return;
-    case 2:
-        em_eft_fx_fade(self);
-        return;
-    case 3:
-        em_eft_fx_free(self);
-        return;
-    default:
-        return;
-    }
-    em_eft_fx_start(self);
 }
 
 /* 0x8011DA24 - the grouped start: one effect per group at its joint, the owner's motion latched, then the first
