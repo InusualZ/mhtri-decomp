@@ -788,6 +788,12 @@ def comment_trim_candidates(obj_path: str, src_path: str,
 
 #: The section whose dead-stripped functions `deadstrip_model` takes out before the comparison.
 STRIPPED_CODE = ".text"
+#: A named constructor/destructor-table word the link dead-strips (`lib.objcompare.TABLE_SECTIONS`).
+TABLE_STRIP_LINE = ("%s: the link dead-strips the named table entry(ies) %s - nothing references them, and mwld "
+                    "keeps only anonymous .ctors/.dtors words (MWCC's own static-initialiser entry) and the runtime's "
+                    "*_reference names, so the linked table loses the word the claim holds and every later entry "
+                    "shifts; the word has to be the compiler's anonymous entry, not a named __declspec(section) "
+                    "variable")
 
 
 def deadstrip_roots(unit: str, target_rel: str, link_ctx: dict) -> set[str]:
@@ -910,7 +916,13 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
         rows = map_symbols() if map_rows is None else map_rows
         code = [s for s in dead if s.section == STRIPPED_CODE and s.name not in target_names and s.name not in rows
                 and s.name not in weak_names]
-        data = [s for s in dead if s.section != STRIPPED_CODE and s.section in claim and s.name not in weak_names]
+        # a named .ctors/.dtors word nothing references: the link drops it, and the target's table keeps its word
+        table = [s for s in dead if objcompare.table_section(s.section)]
+        if table:
+            problems.append(TABLE_STRIP_LINE % (
+                unit, ", ".join("%s (0x%X B of %s)" % (s.name, s.size, s.section) for s in table)))
+        data = [s for s in dead if s.section != STRIPPED_CODE and s.section in claim and s.name not in weak_names
+                and not objcompare.table_section(s.section)]
         # a weak copy (an implicit vtable, an inline's object) or a local (a string literal) that is dead and absent
         # from the target and the map is one retail stripped too: it leaves the layout like a stripped function;
         # anything else stays a refusal
@@ -1133,6 +1145,40 @@ def link_setup() -> tuple[dict | None, set[str] | None, set[str]]:
     return link_ctx, set(link_ctx["ref_count"]) | forced_active() | set(ENTRY_SYMBOLS), map_symbols()
 
 
+#: The first refusal line of a unit READY only while a NOT READY unit of its batch flips too (`settle_batch`).
+BATCH_DEPENDENCY_LINE = ("READY only as part of this batch: the verdict counts the NOT READY unit(s) %s as flipped, "
+                         "and with them left unflipped the link reads as follows")
+
+
+def settle_batch(wanted: dict, results: dict, refs, link_ctx, map_rows, verbose: bool = False) -> None:
+    """Re-check the READY units of a batch with its NOT READY units taken out of `BATCH`, until no verdict changes.
+
+    A batch member's object counts as linked for every other member (an earlier weak definition that drops our copy,
+    the references that root a function, a flipped successor that pads a short section), but a NOT READY member is
+    not flipped: a verdict that holds only through one is a false READY (`homebutton/hkb_window` READY beside
+    `homebutton/hkb_layout`, whose earlier weak `ut::Color` ctor drops ours, and +12 B of `.text` alone). Such a unit
+    becomes NOT READY, its first line naming the members it relied on, the rest its verdict without them."""
+    if not BATCH:
+        return
+    while True:
+        out = ({u for u, r in results.items() if not r["ready"]} | (BATCH - set(results))) & BATCH
+        if not out:
+            return
+        BATCH.difference_update(out)
+        changed = False
+        for unit, r in sorted(results.items()):
+            if not r["ready"]:
+                continue
+            problems, notes = check(unit, wanted[unit], refs, link_ctx, map_rows, verbose=verbose)
+            if problems:
+                names = sorted(out)
+                listed = ", ".join(names[:6]) + (" (+%d more)" % (len(names) - 6) if len(names) > 6 else "")
+                r.update(ready=False, notes=notes, problems=[BATCH_DEPENDENCY_LINE % listed] + problems)
+                changed = True
+        if not changed:
+            return
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Is a unit ready to flip to Object(Matching, ...)? Checks the object against the claim "
@@ -1181,6 +1227,9 @@ def main() -> int:
     for unit, claim in sorted(wanted.items()):
         problems, notes = check(unit, claim, refs, link_ctx, map_rows, verbose=args.verbose)
         results[unit] = {"ready": not problems, "problems": problems, "notes": notes}
+    settle_batch(wanted, results, refs, link_ctx, map_rows, args.verbose)
+    for unit, r in sorted(results.items()):
+        problems, notes = r["problems"], r["notes"]
         if args.json:
             bad += bool(problems)
             continue
@@ -1193,7 +1242,7 @@ def main() -> int:
                 if n.startswith(ADVISORY):
                     print("   . %s" % n)
         else:
-            print("READY      %s (%d section(s) match the claim)" % (unit, len(claim)))
+            print("READY      %s (%d section(s) match the claim)" % (unit, len(wanted[unit])))
             for n in notes:
                 print("   . %s" % n)
     if args.json:

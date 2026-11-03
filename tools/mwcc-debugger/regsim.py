@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Replay MWCC's GPR colouring from a mwcc-debugger dump and search the declaration order retail's registers need.
 Spec: docs/tools/spec/regsim.md. CLI: regsim.py verify DIR | want DIR -u UNIT | search DIR -u UNIT [--params N]
-[--want rV=rP,..] [--saved-only] [--no-edits] [--max-evals N] [--top N] [--tryvar [--keep]] [--json]."""
+[--want rV=rP,..] [--saved-only] [--no-edits] [--max-evals N] [--top N] [--require-exact] [--tryvar [--keep]] [--json]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -17,6 +17,10 @@ from tools.lib import objcompare, regsim, repo, units
 
 def fail(msg: str) -> "SystemExit":
     return SystemExit("regsim: " + msg)
+
+
+def reg(r: int | None) -> str:
+    return "none" if r is None or r < 0 else "r%d" % r
 
 
 def load_graph(args) -> regsim.Graph:
@@ -46,12 +50,16 @@ def cmd_verify(args) -> int:
         if not args.all and res.colour[p.vreg] < regsim.LOWEST_SAVED and not p.stalled:
             continue
         mark = "FORCED" if p.forced else ("stalled" if p.stalled else "")
-        dump = "r%d" % n.phys
-        print("  %-22s %-8s scan %d degree %2d  model r%-2d dump %-4s %s"
-              % (n.label(), n.tier, p.scan, p.degree, res.colour[p.vreg], dump,
+        print("  %-22s %-8s scan %d degree %2d cost %4d  model %-4s dump %-4s %s"
+              % (n.label(), n.tier, p.scan, p.degree, n.cost, reg(res.colour[p.vreg]), reg(n.phys),
                  "" if res.colour[p.vreg] == n.phys else "<- differs"), mark)
     if not args.all:
         print("  (volatile nodes coloured in order hidden; --all shows them)")
+    if res.spilled:
+        print("spilled (stack slots in this order): %s" % ", ".join(g.nodes[v].label() for v in res.spilled))
+    if g.cost_source == "computed" and any(p.forced for p in res.pushes):
+        print("note: the dump printed no spill costs; the stall picks used the costs computed from %s"
+              % regsim.cost_input(args.dir, args.pass_no).name)
     if div:
         for d in div:
             print("DIVERGES %s r%d: model %s, dump %s" % (d.kind, d.vreg, d.model, d.dump))
@@ -174,6 +182,10 @@ def cmd_search(args) -> int:
         want, notes = parse_want(args.want), []
     else:
         want, notes, _ = retail_want(args, g)
+    want, dropped = simulated_targets(g, want)
+    if dropped:
+        notes.append("not a coloured node of pass %d's graph, not used as a target: %s (a later pass's temp: "
+                     "--pass N searches that pass's graph)" % (args.pass_no, ", ".join("r%d" % v for v in dropped)))
     if args.saved_only:
         want = {v: r for v, r in want.items() if r >= regsim.LOWEST_SAVED}
     if not want:
@@ -205,15 +217,28 @@ def cmd_search(args) -> int:
                     print("    %2d. %s" % (k, describe(g, v, mapping)))
             missed = [v for v, r in want.items() if p.colour.get(p.layout.merged.get(v, v)) != r]
             if missed:
-                print("  still differs:", ", ".join("%s r%s (retail r%d)" % (g.nodes[v].label(), p.colour.get(v), want[v])
+                print("  still differs:", ", ".join("%s r%s (retail r%d)" % (g.nodes[v].label(),
+                                                                             p.colour.get(p.layout.merged.get(v, v)),
+                                                                             want[v])
                                                    for v in missed[:8]))
             if p.stalled:
                 print("  stalled:", ", ".join(g.nodes[v].label() for v in p.stalled))
         for note in notes:
             print("note:", note)
+        if plans and not plans[0].saved_exact:
+            print("\nno plan reproduces every callee-saved target")
     if args.tryvar and plans:
         return hand_to_tryvar(args, g, plans[0], s.base, mapping, path, text)
-    return 0 if plans and plans[0].saved_exact else 1
+    if args.require_exact:
+        return 0 if plans and plans[0].saved_exact else 1
+    return 0 if plans else 1
+
+
+def simulated_targets(g: regsim.Graph, want: dict[int, int]) -> tuple[dict[int, int], list[int]]:
+    """(the targets on nodes the replay colours, the vregs dropped): retail's registers are read from the last pass's
+    code, so a temp a later pass made (a spill reload) is not a node of an earlier pass's graph."""
+    coloured = set(g.virtual())
+    return {v: r for v, r in want.items() if v in coloured}, sorted(v for v in want if v not in coloured)
 
 
 def plan_json(g, p: regsim.Plan, mapping) -> dict:
@@ -317,6 +342,8 @@ def main(argv=None) -> int:
             p.add_argument("--max-evals", type=int, default=20000, help="simulations per order search")
             p.add_argument("--top", type=int, default=3, help="plans to print")
             p.add_argument("--seed", type=int, default=0)
+            p.add_argument("--require-exact", action="store_true",
+                           help="exit 1 unless the best plan reproduces every callee-saved target")
             p.add_argument("--tryvar", action="store_true", help="measure the best plan with tools/units/unittry.py")
             p.add_argument("--keep", action="store_true", help="with --tryvar: keep the rewrite when it scores better")
     args = ap.parse_args(argv)

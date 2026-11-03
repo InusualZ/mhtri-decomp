@@ -60,6 +60,8 @@ class Graph:
     assigned: list[int] = field(default_factory=list)
     function: str = ""
     defs: dict[int, str] = field(default_factory=dict)
+    #: "dump" when the costs are the dump's own, "computed" when the dump printed 0 and `spill_costs` filled them in
+    cost_source: str = "dump"
 
     def virtual(self) -> list[int]:
         """The simulated nodes: every virtual register that was not coalesced into another, ascending."""
@@ -67,7 +69,7 @@ class Graph:
 
     def copy(self) -> "Graph":
         return Graph({v: Node(n.vreg, n.phys, n.name, n.flags, n.cost, n.neighbors) for v, n in self.nodes.items()},
-                     list(self.assigned), self.function, dict(self.defs))
+                     list(self.assigned), self.function, dict(self.defs), self.cost_source)
 
     def coalesce(self, gone: int, into: int) -> "Graph":
         """A copy where node `gone` is folded into node `into` (union of their interference, `gone` removed)."""
@@ -78,6 +80,7 @@ class Graph:
         merged.discard(gone)
         merged.discard(into)
         g.nodes[into].neighbors = tuple(sorted(merged))
+        g.nodes[into].cost += g.nodes[gone].cost
         for v, n in g.nodes.items():
             if gone in n.neighbors and v != into:
                 nb = set(n.neighbors)
@@ -164,7 +167,91 @@ def load(directory: str | Path, pass_no: int = 1, cls: str = "gpr") -> Graph:
     pcode = regalloc_input(d)
     if pcode is not None:
         g.function, g.defs = parse_defs(pcode.read_text(encoding="utf-8", errors="replace"))
+    if cls == "gpr" and not any(g.nodes[v].cost for v in g.virtual()):
+        src = cost_input(d, pass_no)
+        if src is not None:
+            fill_costs(g, spill_costs(src.read_text(encoding="utf-8", errors="replace")))
     return g
+
+
+# --- the spill cost ---------------------------------------------------------------------------------------------
+
+#: mnemonics whose first GPR operand is read, not written (stores, compares, branches, special-register moves)
+_NO_DEF = re.compile(r"^(st|cmp|b|mt|tw|dcb|icb|fcmp|cr)")
+#: mnemonics whose first operand is read and written (an insert)
+_DEF_USE = frozenset({"rlwimi", "insrwi", "inslwi"})
+#: a load or store with update: the base register (second operand) is read and written
+_UPDATE = re.compile(r"^(l|st)[a-z]*ux?$")
+
+
+def instruction_refs(mnemonic: str, operands: tuple[str, ...]) -> list[tuple[int, bool, bool]]:
+    """[(register, defined, used)] of one PCode instruction's GPR operands."""
+    out = []
+    for i, tok in enumerate(operands):
+        r = _regno(tok)
+        if r is None:
+            continue
+        defined = i == 0 and not _NO_DEF.match(mnemonic)
+        used = not defined or mnemonic in _DEF_USE
+        if i == 1 and _UPDATE.match(mnemonic):
+            defined = used = True
+        out.append((r, defined, used))
+    return out
+
+
+def spill_costs(text: str) -> dict[int, int]:
+    """{vreg: spill cost} of a PCode dump, as MWCC computes it when simplify first stalls: every reference weighs its
+    instruction's loop weight (the dump's first column: 1, 8, 64), a def once and a use twice. A web whose single def
+    is a constant (`li`, `lis`) or a symbol address (`addi` with a fixup) is rematerialised instead of reloaded: its
+    cost is its use weights less its def weight."""
+    cost: dict[int, int] = {}
+    uses: dict[int, int] = {}
+    defs: dict[int, list[int]] = {}
+    remat: set[int] = set()
+    for line in text.splitlines():
+        if not line.startswith(" "):
+            continue
+        parts = line.split(None, 2)
+        if len(parts) < 2 or not parts[0].isdigit():
+            continue
+        weight, mnemonic = int(parts[0]), parts[1]
+        operands = tuple(t.strip() for t in parts[2].split(",")) if len(parts) > 2 else ()
+        for r, defined, used in instruction_refs(mnemonic, operands):
+            if r < FIRST_VIRTUAL:
+                continue
+            if defined:
+                cost[r] = cost.get(r, 0) + weight
+                defs.setdefault(r, []).append(weight)
+                if mnemonic in ("li", "lis") or (mnemonic == "addi" and any(o.startswith("fixup") for o in operands)):
+                    remat.add(r)
+            if used:
+                cost[r] = cost.get(r, 0) + 2 * weight
+                uses[r] = uses.get(r, 0) + weight
+    for r in remat:
+        if len(defs[r]) == 1:
+            cost[r] = uses.get(r, 0) - defs[r][0]
+    return cost
+
+
+def cost_input(directory: str | Path, pass_no: int = 1) -> Path | None:
+    """The PCode GPR pass `pass_no` built its graph from: the GPR passes are the last `after-interference-graph`
+    dumps (one dump precedes them, and the FPR pass's when the function has one)."""
+    d = Path(directory)
+    dumps = sorted(d.glob("backend-*-after-interference-graph.txt"))
+    passes = 0
+    while (d / ("regalloc-gpr-pass-%d-all.txt" % (passes + 1))).is_file():
+        passes += 1
+    i = len(dumps) - passes + pass_no - 1
+    return dumps[i] if 0 <= i < len(dumps) and pass_no <= passes else None
+
+
+def fill_costs(graph: Graph, costs: dict[int, int]) -> None:
+    """Give every virtual node its computed cost (the dump prints 0 when simplify never stalled: MWCC computes the
+    costs lazily, at the first stall)."""
+    for v, n in graph.nodes.items():
+        if v >= FIRST_VIRTUAL:
+            n.cost = costs.get(v, 0)
+    graph.cost_source = "computed"
 
 
 # --- the colouring ----------------------------------------------------------------------------------------------
@@ -189,6 +276,11 @@ class Colouring:
         """The select order (the compiler's `-assigned.txt` order)."""
         return [p.vreg for p in reversed(self.pushes)]
 
+    @property
+    def spilled(self) -> list[int]:
+        """The nodes left without a register, ascending: the order MWCC hands out their stack slots in."""
+        return sorted(v for v, r in self.colour.items() if r < 0)
+
     def push_of(self, vreg: int) -> Push | None:
         return next((p for p in self.pushes if p.vreg == vreg), None)
 
@@ -197,9 +289,10 @@ def simulate(graph: Graph, order: list[int] | None = None, k: int = K_GPR) -> Co
     """Replay MWCC's simplify/select on `graph`, scanning the nodes in `order` (default: ascending vreg).
 
     Simplify scans the order repeatedly and pushes every node whose current degree (physical neighbours included)
-    is below `k`; a scan with no progress pushes the first remaining node. Select pops in reverse: a node takes the
-    first free of r0, r3..r12, else the lowest callee-saved register handed out so far that no coloured neighbour
-    holds, else the next new one down from r31."""
+    is below `k`; a scan with no progress pushes the remaining node with the lowest cost / current degree, a tie
+    going to the latest in the scan (the highest vreg). Select pops in reverse: a node takes the first free of r0,
+    r3..r12, else the lowest callee-saved register handed out so far that no coloured neighbour holds, else the next
+    new one down from r31; below r14 there is none and the node is spilled (-1), which blocks no neighbour."""
     virt = set(graph.virtual())
     seq = [v for v in (order if order is not None else sorted(virt)) if v in virt]
     if len(seq) != len(virt):
@@ -221,7 +314,8 @@ def simulate(graph: Graph, order: list[int] | None = None, k: int = K_GPR) -> Co
             else:
                 rest.append(v)
         if len(rest) == len(remaining):
-            v = rest.pop(0)
+            v = stall_pick(rest, deg, graph)
+            rest.remove(v)
             pushes.append(Push(v, scan, deg[v], True, True))
             for m in vnb[v]:
                 deg[m] -= 1
@@ -231,14 +325,27 @@ def simulate(graph: Graph, order: list[int] | None = None, k: int = K_GPR) -> Co
     for p in reversed(pushes):
         n = graph.nodes[p.vreg]
         forbidden = {m for m in n.neighbors if m < FIRST_VIRTUAL}
-        forbidden.update(colour[m] for m in vnb[p.vreg] if m in colour)
+        forbidden.update(colour[m] for m in vnb[p.vreg] if colour.get(m, -1) >= 0)
         pick = next((r for r in VOLATILE if r not in forbidden), None)
         if pick is None:
             low = min(used) if used else FIRST_VIRTUAL
             pick = next((r for r in range(low, FIRST_VIRTUAL) if r not in forbidden), low - 1)
-            used.append(pick)
+            if pick < LOWEST_SAVED:
+                pick = -1
+            else:
+                used.append(pick)
         colour[p.vreg] = pick
     return Colouring(pushes, colour)
+
+
+def stall_pick(rest: list[int], deg: dict[int, int], graph: Graph) -> int:
+    """The node a stalled simplify pushes: the lowest cost / current degree, a tie to the latest in the scan."""
+    best_v, best_adj = rest[0], None
+    for v in rest:
+        adj = graph.nodes[v].cost / max(deg[v], 1)
+        if best_adj is None or adj <= best_adj:
+            best_v, best_adj = v, adj
+    return best_v
 
 
 @dataclass

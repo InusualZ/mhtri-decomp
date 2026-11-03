@@ -191,6 +191,26 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   `@etb_`/`@eti_` fragments stay `external_map_symbol_notes`' note). Measured: BTE/gki_buffer (its `.bss` label
   `lbl_8070DF3E`, read by `mh3_pad.o`; its trial flip failed with exactly that `undefined:`) goes READY -> NOT READY; the
   143 other units the row names were NOT READY already; READY 234 -> 233.
+* **A named `.ctors`/`.dtors` word the link dead-strips is refused (2026-11-02).** mwld keeps an anonymous table word
+  (MWCC's static-initialiser entry, only a section symbol over it) and the runtime's `*_reference` names
+  (`lib.objcompare.RESERVED_TABLE_SYMBOLS`, playbook idea 46), but a named entry nothing references - a
+  `__declspec(section ".ctors") void* const em008_ctor = em008_static_init;` - is dead-stripped like data, local or
+  `extern`, while its FORCEACTIVE target stays in `.text`; the linked `.ctors` loses the word and every later entry shifts.
+  `lib.objcompare.dead_symbols` now treats such a word as a candidate (`TABLE_SECTIONS`) and `deadstrip_model` refuses it:
+  `<unit>: the link dead-strips the named table entry(ies) <name> (0x4 B of .ctors) - ...` (`TABLE_STRIP_LINE`).
+  Measured: `enemy/em008_prog` was READY and its trial flip failed the DOL hash (`_rom_copy_info`'s `.ctors` size
+  0x170 -> 0x16C, 258 bytes of `.ctors` shifted; `mwlink_debugger.py trace` reads `.ctors NOT IN THE MAP`); now NOT READY
+  with that line. All 673 units at `5abb49bd`: READY 383 -> 382 (em008_prog only), no `Object(Matching)` unit lost READY,
+  5 NOT READY units gained the line (Pl/pl_yure, ef/ef_particlemanager, enemy/em012_prog, enemy/em015_prog, stage/shell).
+* **A READY that needs a NOT READY batch member is refused (2026-11-02).** A unit named on the command line counts every
+  other one as flipped (an earlier weak definition that drops our copy, references that root a function, a flipped
+  successor's padding), but a NOT READY member is not flipped. `settle_batch` re-checks the READY units with the NOT READY
+  ones out of `BATCH` until no verdict changes; a unit that falls reads `READY only as part of this batch: the verdict
+  counts the NOT READY unit(s) <units> as flipped, ...` (`BATCH_DEPENDENCY_LINE`, at most 6 names) and then its own lines
+  without them. Measured: `homebutton/hkb_window` read READY beside `homebutton/hkb_layout`, `hkb_textbox` or
+  `g3d/g3d_anmclr` (each NOT READY, each with an earlier weak `__ct__Q34nw4r2ut5ColorFv`) and in the 286-unit batch of
+  every NonMatching unit, the only READY there; its flip alone fails the DOL hash (`.text` +0x20). Now NOT READY in all of
+  them with the `.text` +12 line.
 * **`ninja diff` is not a flip signal.** `dtk dol diff` fails on main itself with `Expected to find symbol @eti_8001E558`:
   420 `@etb_`/`@eti_` symbols of the already-Matching units (objextab renames them global) are absent from the linked ELF's
   symbol table although their bytes are present and the DOL hash holds. No dead-strip is involved (`__nwa__FUl`,
@@ -299,6 +319,12 @@ The relocation places: `tools/tests/units/test_flipcheck_reloc.py` (11 checks, g
 other names ready; swapped copies refused with the verbatim line; the same place under another type refused; map
 aliases agree, another map address refused, an unmapped name compared by name; `strip_moves`/`apply_moves`, offsets
 mapped through the strip, the one-sided offset and the unresolved place not compared. Mutation: main's flipcheck fails 3.
+The table words and the batch fixpoint: `tools/tests/units/test_flipcheck_batch_ctors.py` (14 checks): an anonymous
+`.ctors` word READY, a named local or global one refused with the line, READY when another input references it; the
+library's candidates (the initialiser it alone kept dies with it, FORCEACTIVE keeps it, the reserved name and an
+anonymous word keep theirs, the `$NN` spellings); the fixpoint drops hkb_window beside a NOT READY hkb_layout, then what
+relied on it, keeps a unit that relies on nobody and leaves an all-READY batch alone. Against the previous flipcheck: 6 of
+10 checks fail.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

@@ -136,6 +136,74 @@ def test_select_order(c):
             -1)
 
 
+def clique(costs: dict[int, int]) -> regsim.Graph:
+    """19 call-crossing nodes that all interfere: one more than r14..r31, so simplify stalls and one node spills."""
+    vs = sorted(costs)
+    return regsim.Graph({v: regsim.Node(v, 0, "", (), costs[v], (0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+                                        + tuple(m for m in vs if m != v)) for v in vs})
+
+
+def test_stall_pick(c):
+    costs = {v: 100 for v in range(32, 51)}
+    costs[40] = 10
+    res = regsim.simulate(clique(costs))
+    c.check("a stall pushes the lowest cost / degree (r40), not the first remaining node (r32)",
+            [(p.vreg, p.forced) for p in res.pushes if p.forced], [(40, True)])
+    c.check("... so r40 is coloured last and spills; the others take r31..r14",
+            (res.spilled, sorted(res.colour[v] for v in costs if v != 40)), ([40], list(range(14, 32))))
+    costs[44] = 10
+    res = regsim.simulate(clique(costs))
+    c.check("a tie goes to the highest vreg", res.spilled, [44])
+    res = regsim.simulate(clique(costs), order=[44] + [v for v in sorted(costs) if v != 44])
+    c.check("... i.e. to the latest in the scan order", res.spilled, [40])
+    costs = {v: 100 for v in range(32, 52)}
+    costs.update({40: 10, 44: 20})
+    res = regsim.simulate(clique(costs))
+    c.check("a 20-clique stalls twice, cheapest first, and both spill (no r13, no r12)",
+            ([p.vreg for p in res.pushes if p.forced], res.spilled), ([40, 44], [40, 44]))
+
+
+#: a pass's PCode: loop weight, mnemonic, operands (`fixup[...]` is a relocated immediate)
+COST_PCODE = """; function f, dump 19 after-interference-graph
+B1: Successors = { B2 }  Predecessors = { }  Labels = { L1 }  line=1 pcode=5 offset=0x0
+     1  mr       r32,r3
+     1  li       r33,5
+     1  li       r34,0
+     1  lis      r35,fixup[0x0000]
+     1  addi     r36,r35,fixup[0x0000]
+B2: Successors = { B2 }  Predecessors = { B1 }  Labels = { L2 }  line=8 pcode=6 offset=0x0
+     8  add      r37,r32,r33
+     8  stw      r37,r32,0
+     8  li       r34,1
+     8  cmpli    cr0,r34,1
+     8  lbzx     r5,r36,r37
+     8  bt       cr0,2,B2
+"""
+
+
+def test_spill_costs(c):
+    costs = regsim.spill_costs(COST_PCODE)
+    c.check("a def weighs its loop weight once, a use twice; a store's and a compare's registers are uses",
+            (costs[32], costs[37]), (1 + 2 * 8 + 2 * 8, 8 + 2 * 8 + 2 * 8))
+    c.check("a single `li` def is rematerialised: its uses' weight less its def's", costs[33], 8 - 1)
+    c.check("... not a web with two defs", costs[34], 1 + 8 + 2 * 8)
+    c.check("... and a `lis`/`addi fixup` address is rematerialised too", (costs[35], costs[36]), (1 - 1, 8 - 1))
+    with testing.temp_dir() as tmp:
+        d = write_dump(Path(tmp) / "d")
+        for n, name in ((18, "interference-graph"), (19, "interference-graph"), (20, "regalloc")):
+            (d / ("backend-%d-after-%s.txt" % (n, name))).write_text(COST_PCODE.replace("r32", "r42"), encoding="utf-8")
+        c.check("pass 1 of a one-pass dump reads the last interference-graph dump",
+                regsim.cost_input(d, 1).name, "backend-19-after-interference-graph.txt")
+        g = regsim.load(d)
+        c.check("a dump that printed no cost gets the computed ones", (g.cost_source, g.nodes[42].cost),
+                ("computed", 1 + 2 * 8 + 2 * 8))
+        text = (d / "regalloc-gpr-pass-1-all.txt").read_text(encoding="utf-8")
+        (d / "regalloc-gpr-pass-1-all.txt").write_text(text.replace("cost: 0", "cost: 3", 1), encoding="utf-8")
+        g = regsim.load(d)
+        c.check("... a dump with costs keeps its own", (g.cost_source, g.nodes[32].cost, g.nodes[42].cost),
+                ("dump", 3, 0))
+
+
 BEFORE = """; function f, dump 20 after-interference-graph
 B1: Successors = { }  Predecessors = { }  Labels = { L1 }  line=1 pcode=3 offset=0x0
      1  mr       r40,r3
@@ -255,9 +323,17 @@ def test_cli(c):
         rc, out = testing.capture(cli.main, ["search", str(ok), "--params", "5", "--want", "r32=r30,r40=r31"])
         c.check("search exits 0 when a plan reproduces the targets", rc, 0)
         c.contains("... and names the edit", out, "declare r40(@4192) as a local")
+        rc, out = testing.capture(cli.main, ["search", str(ok), "--params", "5", "--want", "r32=r30,r40=r31",
+                                             "--no-edits"])
+        c.check("search exits 0 when it prints its plans, exact or not", rc, 0)
+        c.contains("... and says no plan is exact", out, "no plan reproduces every callee-saved target")
         rc, _ = testing.capture(cli.main, ["search", str(ok), "--params", "5", "--want", "r32=r30,r40=r31",
-                                           "--no-edits"])
-        c.check("search exits 1 when no declaration order does", rc, 1)
+                                           "--no-edits", "--require-exact"])
+        c.check("search --require-exact exits 1 when no declaration order does", rc, 1)
+        rc, out = testing.capture(cli.main, ["search", str(ok), "--params", "5", "--want", "r32=r30,r40=r31,r198=r29"])
+        c.check("a target that is no node of the pass's graph does not crash the search", rc, 0)
+        c.contains("... and is named in a note", out, "not used as a target: r198")
+        c.contains("... while the plan still reaches the rest", out, "EXACT")
         c.raises("search refuses without the parameter count", SystemExit, cli.main,
                  ["search", str(ok), "--want", "r32=r30"])
 

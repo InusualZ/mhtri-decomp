@@ -1515,6 +1515,19 @@ STRIPPABLE_SECTIONS = (".text", ".data", ".rodata", ".sdata", ".sdata2", ".bss",
 NON_ROOTING_SECTIONS = ("extabindex",)
 #: `.comment`'s force-active (export) flag: the linker keeps such a symbol whatever references it.
 FORCE_ACTIVE_FLAG = 0x08
+#: The constructor/destructor tables (`.ctors`, `.ctors$10`, ...): an anonymous entry (MWCC's `__sinit_*` word, only a
+#: section symbol over it) is kept whole, but a NAMED entry nothing references is dead-stripped like any data symbol -
+#: measured: `enemy/em008_prog`'s `__declspec(section ".ctors") void* const em008_ctor` (local, and as `extern`) drops
+#: out of the linked `.ctors` while its FORCEACTIVE target stays in `.text`.
+TABLE_SECTIONS = (".ctors", ".dtors")
+#: The runtime's own named table entries, which mwld recognises by name and keeps (playbook idea 46).
+RESERVED_TABLE_SYMBOLS = frozenset({"__init_cpp_exceptions_reference", "__destroy_global_chain_reference",
+                                    "__fini_cpp_exceptions_reference"})
+
+
+def table_section(name: str) -> bool:
+    """Whether `name` is a constructor/destructor table section (`.ctors`, `.dtors$15`, ...)."""
+    return name.split("$")[0] in TABLE_SECTIONS
 
 
 def dead_symbols(obj, roots: set[str], removed: set[int] | None = None, kept: set[int] | None = None) -> list | None:
@@ -1525,7 +1538,8 @@ def dead_symbols(obj, roots: set[str], removed: set[int] | None = None, kept: se
     every symbol a live byte range relocates (an `extabindex` entry roots nothing; bytes of a strippable section no
     candidate covers are a live range). A relocation naming a section
     symbol, a 0-size label or a symbol that is not itself a strip candidate keeps its whole section, because the
-    linker cannot tell which bytes behind it are used. Only a symbol of size > 0 in a strippable section can be dead.
+    linker cannot tell which bytes behind it are used. Only a symbol of size > 0 in a strippable section can be dead,
+    and a named entry of a `.ctors`/`.dtors` table (`TABLE_SECTIONS`; not the runtime's `RESERVED_TABLE_SYMBOLS`).
     `removed` are the symbol indices the link drops before the strip (a weak copy another input defines first): a
     reference to one resolves to that other definition, so it keeps nothing of this object alive, and its own bytes
     root nothing; they are not in the result. `kept` are symbol indices the caller holds live whatever references
@@ -1537,9 +1551,10 @@ def dead_symbols(obj, roots: set[str], removed: set[int] | None = None, kept: se
         return None
     syms = elf.symbols
     nsec = len(elf.sections)
-    strippable = {s.index for s in elf.sections if s.name in STRIPPABLE_SECTIONS}
+    strippable = {s.index for s in elf.sections if s.name in STRIPPABLE_SECTIONS or table_section(s.name)}
     cand = {s.index for s in syms
-            if s.name and s.size > 0 and 0 < s.shndx < nsec and s.shndx in strippable and s.type != STT_SECTION}
+            if s.name and s.size > 0 and 0 < s.shndx < nsec and s.shndx in strippable and s.type != STT_SECTION
+            and s.name not in RESERVED_TABLE_SYMBOLS}
     by_section: dict[int, list[int]] = {}
     for i in cand:
         by_section.setdefault(syms[i].shndx, []).append(i)

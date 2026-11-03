@@ -71,7 +71,9 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   byte range relocates - and bytes of a strippable section no candidate covers are live; an `extabindex` entry roots
   nothing; the indices in `removed` - weak copies the link drops for
   another input's definition - are never kept, root nothing and are not in the result; a relocation naming a section
-  symbol, a 0-size label or a non-candidate keeps its whole section; every doubt is live),
+  symbol, a 0-size label or a non-candidate keeps its whole section; a named `.ctors`/`.dtors` word is a candidate like
+  data (`TABLE_SECTIONS`, `table_section(name)`; the runtime's `RESERVED_TABLE_SYMBOLS` are not), an anonymous one stays
+  live; every doubt is live),
   `strip_section(obj, section, dead) -> bytes | None` (the section as the link lays it out without `dead`: each kept symbol
   at its `.comment` alignment, gaps zero; None unless the object already obeys that layout - no overlap, each symbol at the
   previous end rounded up to its alignment, zero gaps, the last ending at the section's end or short of it by zero fill up
@@ -88,7 +90,7 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   `fingerprints_equal(a, b)` (TOUCHED), `file_sha256(path)` (the raw half the gate pairs with `fingerprint`:
   `verifyunit.target_object_hashes` / `names_only_changes`, WP4).
 * Constants: `META_SECTIONS`, `DATA_SECTIONS`, `FLIP_DATA_SECTIONS`, `BOOKKEEPING_SECTIONS`, `EABI_LINKER_SYMBOLS`,
-  `ENTRY_SYMBOLS`, `LINKER_SYMBOLS`, `STRIPPABLE_SECTIONS`, `NON_ROOTING_SECTIONS`, `FORCE_ACTIVE_FLAG`, `LINK_INDEX_REL`, `RENAME_FREE_SECTIONS`, `UNSTABLE_SECTIONS`, `OBJDIFF_SIZE_GAP`.
+  `ENTRY_SYMBOLS`, `LINKER_SYMBOLS`, `STRIPPABLE_SECTIONS`, `TABLE_SECTIONS`, `RESERVED_TABLE_SYMBOLS`, `NON_ROOTING_SECTIONS`, `FORCE_ACTIVE_FLAG`, `LINK_INDEX_REL`, `RENAME_FREE_SECTIONS`, `UNSTABLE_SECTIONS`, `OBJDIFF_SIZE_GAP`.
 
 ## Invariants and rules
 
