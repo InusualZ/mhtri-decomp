@@ -2,6 +2,7 @@
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import json
 import os
+import struct
 
 from tools.lib import objcompare as oc
 from tools.lib import testing
@@ -282,6 +283,75 @@ def test_fingerprints(c):
         c.check("touch: a byte change is a change", oc.fingerprints_equal(a, oc.touch_fingerprint(p["bytes"], syms)),
                 False)
         c.check("touch: unreadable is None", oc.touch_fingerprint(p["raw"]), None)
+
+
+def _dtk_split(undefined, relocs, text=b"\0" * 12, func_at=0):
+    """A dtk-shaped split target object: one defined function `f` at `func_at`, the `undefined` names in order,
+    `relocs` `(offset, name, type)` on `.text`, a per-symbol `.comment` and a `.note.split` whose VIRT table carries
+    one u32 per symtab entry - the defined function's DOL address, 0 for every undefined symbol, as dtk writes it."""
+    b = ElfBuilder().section(".text", text).symbol("f", ".text", func_at, 4, type=FUNC)
+    for name in undefined:
+        b.symbol(name)
+    for off, name, kind in relocs:
+        b.reloc(".text", off, name, kind)
+    virt = [0] + [0x80010000 + func_at if s.name == "f" else 0 for s in b.ordered_symbols()]
+
+    def note(kind, desc):
+        return struct.pack(">III", 6, len(desc), kind) + b"Split\0\0\0" + desc + bytes(-len(desc) % 4)
+
+    blob = note(0x4D4F4449, bytes(4)) + note(0x56495254, struct.pack(">%dI" % len(virt), *virt))
+    return b.section(".note.split", blob, type=7, flags=0).comment().build()
+
+
+def test_fingerprint_alias(c):
+    from tools.lib.binary.elf import Elf
+    rest = ["_savegpr_21", "memset"]
+    calls = [(0, "VEC3_ctor", "R_PPC_REL24"), (4, "VEC3_ctor", "R_PPC_ADDR16_HA"), (8, "memset", "R_PPC_REL24")]
+    with testing.FixtureTree() as tree:
+        p = {k: str(tree.write(k + ".o", v)) for k, v in {
+            "before": _dtk_split(["VEC3_ctor"] + rest, calls),
+            # the pilot's map: the bl calls name the mangled row, the address load the alias label at its address
+            "alias": _dtk_split(["__ct__Q34nw4r4math4VEC3Fv", "VEC3_ctor"] + rest,
+                                [(0, "__ct__Q34nw4r4math4VEC3Fv", "R_PPC_REL24")] + calls[1:]),
+            "widened": _dtk_split(["VEC3_ctor"] + rest, calls, text=b"\0" * 16),
+            "shifted": _dtk_split(["VEC3_ctor"] + rest, calls, func_at=4),
+            "absorbed": _dtk_split(["VEC3_ctor"] + rest, calls[:2] + [(8, "f", "R_PPC_REL24")]),
+            "reslotted": _dtk_split(["VEC3_ctor"] + rest, calls[:2] + [(8, "memset", "R_PPC_ADDR32")]),
+        }.items()}
+        before, alias = Elf.read(p["before"]), Elf.read(p["alias"])
+        c.check("fixture: the alias adds an undefined symbol and renumbers .rela.text, .comment and .note.split",
+                (len(alias.symbols) - len(before.symbols),
+                 alias.section(".rela.text").raw == before.section(".rela.text").raw,
+                 len(alias.section(".comment").raw) - len(before.section(".comment").raw),
+                 len(alias.section(".note.split").raw) - len(before.section(".note.split").raw)),
+                (1, False, 8, 4))
+        c.check("fingerprint: an alias row that adds an undefined symbol at the same address is not drift",
+                oc.fingerprint(p["before"]) == oc.fingerprint(p["alias"]), True)
+        c.check("fingerprint: a widened range is drift", oc.fingerprint(p["before"]) == oc.fingerprint(p["widened"]),
+                False)
+        c.check("fingerprint: a defined symbol moved inside its section is drift",
+                oc.fingerprint(p["before"]) == oc.fingerprint(p["shifted"]), False)
+        c.check("fingerprint: a relocation retargeted from an external to a defined symbol is drift",
+                oc.fingerprint(p["before"]) == oc.fingerprint(p["absorbed"]), False)
+        c.check("fingerprint: a relocation of another kind at the same offset is drift",
+                oc.fingerprint(p["before"]) == oc.fingerprint(p["reslotted"]), False)
+
+
+def test_fingerprint_owner_alias(c):
+    def owner(*labels, size=4):
+        b = ElfBuilder().section(".text", b"\0" * 8).symbol("__ct__Q34nw4r4math4VEC3Fv", ".text", 0, size, type=FUNC)
+        for name, value in labels:
+            b.symbol(name, ".text", value)
+        return b.symbol("next", ".text", 4, 4, type=FUNC).build()
+
+    with testing.FixtureTree() as tree:
+        p = {k: str(tree.write(k + ".o", v)) for k, v in {
+            "before": owner(), "alias": owner(("VEC3_ctor", 0)), "aliases": owner(("VEC3_ctor", 0), ("ctor2", 0)),
+            "resized": owner(("VEC3_ctor", 0), size=8)}.items()}
+        c.check("fingerprint: an alias label where the owner's function starts is not drift",
+                [oc.fingerprint(p["before"]) == oc.fingerprint(p[k]) for k in ("alias", "aliases")], [True, True])
+        c.check("fingerprint: the owner's function resized beside its alias is drift",
+                oc.fingerprint(p["before"]) == oc.fingerprint(p["resized"]), False)
 
 
 def _dtk_bss(sym="s", data=b"\x01\x02\x03\x04"):

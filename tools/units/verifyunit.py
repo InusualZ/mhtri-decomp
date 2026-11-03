@@ -137,7 +137,7 @@ def registration_check(main: str, units: list[str]) -> tuple[bool, str]:
 # 2a. split target-object drift (the merger's strongest form)
 # --------------------------------------------------------------------------------------------------
 
-target_object_fingerprint = objcompare.fingerprint   # rename-insensitive: string tables skipped, names dropped
+target_object_fingerprint = objcompare.fingerprint   # rename-insensitive: per-symbol tables skipped, names dropped
 
 
 def target_object_snapshot(main: str) -> dict[str, str | None]:

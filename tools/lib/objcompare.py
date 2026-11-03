@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from tools.lib import cache as _cache
 from tools.lib import names as _names
 from tools.lib.binary.elf import (SHN_UNDEF, SHT_NULL, SHT_RELA, SHT_STRTAB, SHT_SYMTAB, STB_GLOBAL, STT_SECTION,
-                                  STB_LOCAL, STB_WEAK, STT_FILE, Elf, ElfError, reloc_name)
+                                  STB_LOCAL, STB_WEAK, STT_FILE, STT_NOTYPE, Elf, ElfError, reloc_name)
 
 #: Bookkeeping tables, not a unit's code or data: they move with the symbol table and the compiler version.
 META_SECTIONS = frozenset({".comment", ".note.split", ".shstrtab", ".strtab", ".symtab", ".dynsym", ".dynstr"})
@@ -36,8 +36,9 @@ LINK_INDEX_SCHEMA = 3  # 2: refs leave out local-symbol relocations; 3: those go
 #: The relocation kinds relocdiff/relocaudit-era views name; every other kind renders numerically there
 #: (Known gaps: the full `binary.elf` table would rename `R_PPC_11` -> `R_PPC_REL14` in their output).
 LEGACY_NAMED_RELOCS = frozenset({1, 4, 5, 6, 10, 109})
-#: The two string tables a symbol rename rewrites; the drift fingerprint skips them.
-RENAME_FREE_SECTIONS = (".symtab", ".strtab")
+#: The per-symbol tables a symbol rename or alias rewrites; the drift fingerprint skips them (`.comment` carries
+#: one entry per symbol, `.note.split`'s VIRT table one u32 address per symtab entry).
+RENAME_FREE_SECTIONS = (".symtab", ".strtab", ".comment", ".note.split")
 #: Sections the touch fingerprint ignores (they move with names and the compiler version, never with code).
 UNSTABLE_SECTIONS = (".symtab", ".strtab", ".shstrtab", ".comment")
 #: `.rela<target>`: how MWCC spells a relocation section.
@@ -1897,23 +1898,42 @@ def file_sha256(path: str) -> str:
 def fingerprint(path: str) -> str:
     """A rename-insensitive content fingerprint of a split target object (the drift check).
 
-    Every section but the two string tables (name, size, contents), plus the defined symbols' geometry
-    `(value, size, type, section index)` with the names dropped: a `splits.txt` re-range moves bytes or addresses,
-    a rename moves neither. A `SHT_NOBITS` section (`.bss`/`.sbss`) contributes no contents: dtk writes its
-    header offset as 0, so its file slice is the ELF header, whose section-table offset moves with `.strtab`'s
-    length. A file that is not an ELF object falls back to `raw:<sha256>`."""
+    Every section but the per-symbol tables (`RENAME_FREE_SECTIONS`) and the relocation sections (name, size,
+    contents), the distinct defined symbols' geometry `(value, size, type, section index)` with the names dropped (a
+    zero-size untyped label where a sized or typed symbol starts is an alias row and adds nothing), and every
+    relocation as `(section, offset, type, addend, target)`: the target is a defined symbol's `(section, value)`, or
+    just "undefined" - dtk's VIRT table leaves an undefined symbol's address 0, and the gate snapshots the old
+    objects under the batch's already-renamed map, so neither can resolve a renamed external. A `splits.txt`
+    re-range moves bytes, sizes or defined addresses; a rename or an alias row (which can add an undefined symbol
+    and so renumber every relocation's symbol index) moves none of them. A `SHT_NOBITS` section (`.bss`/`.sbss`)
+    contributes no contents: dtk writes its header offset as 0, so its file slice is the ELF header, whose
+    section-table offset moves with `.strtab`'s length. A file that is not an ELF object falls back to
+    `raw:<sha256>`."""
     try:
         elf = Elf.read(path)
     except Exception:                                            # noqa: BLE001 - not an ELF (or truncated)
         return "raw:" + file_sha256(path)
     h = hashlib.sha256()
     for sec in elf.sections:
-        if sec.name in RENAME_FREE_SECTIONS:
+        if sec.name in RENAME_FREE_SECTIONS or sec.type == SHT_RELA:
             continue
         h.update(("%s\0%08x\0" % (sec.name, sec.size)).encode())
         h.update(sec.data)
-    for geom in sorted((s.value, s.size, s.type, s.shndx) for s in elf.symbols if s.name and s.shndx):
+    geoms = {(s.value, s.size, s.type, s.shndx) for s in elf.symbols if s.name and s.shndx}
+    sized = {(value, shndx) for value, size, kind, shndx in geoms if size or kind != STT_NOTYPE}
+    for geom in sorted(g for g in geoms if g[1] or g[2] != STT_NOTYPE or (g[0], g[3]) not in sized):
         h.update(("|%08x/%08x/%d/%d" % geom).encode())
+    syms, nsec = elf.symbols, len(elf.sections)
+    rows = []
+    for r in elf.relocs():
+        sym = syms[r.symbol] if r.symbol < len(syms) else None
+        if sym is not None and sym.shndx != SHN_UNDEF:
+            where = "D:%s:%08x" % (elf.sections[sym.shndx].name if 0 < sym.shndx < nsec else sym.shndx, sym.value)
+        else:
+            where = "U"
+        rows.append("R|%s|%08x|%d|%d|%s" % (r.section, r.offset, r.type, r.addend, where))
+    for row in sorted(rows):
+        h.update(row.encode() + b"\n")
     return h.hexdigest()
 
 

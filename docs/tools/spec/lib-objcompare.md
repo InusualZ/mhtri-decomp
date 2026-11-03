@@ -108,7 +108,12 @@ object for drift and for "touched". Every function takes a path, the bytes of an
 * **`link_index`** caches per-input facts under `build/tmp/undefrefs/link-symbols.json` keyed by `[mtime_ns, size]`; only
   changed inputs are re-read and the file is written only when an input appeared, vanished or moved.
 * **Two fingerprints, two questions**: `fingerprint` is rename-insensitive (string tables skipped, symbol names dropped) so a
-  rename sweep is not drift; `touch_fingerprint` hashes everything but external targets and resolves those by address through
+  rename sweep is not drift. It also skips the per-symbol tables `.comment` and `.note.split` and reads each relocation as
+  `(section, offset, type, addend, target)` - a defined target by `(section, value)`, an undefined one name-free - and drops a
+  zero-size untyped alias label where a sized or typed symbol starts, so an alias row (one more undefined symbol, every
+  relocation's symbol index renumbered) is not drift either. dtk's VIRT table carries one u32 per symtab entry but leaves
+  every undefined entry 0, and the gate's before-snapshot reads the old objects under the batch's map, so neither resolves
+  an external by address. `touch_fingerprint` hashes everything but external targets and resolves those by address through
   the map, so a rename sweep is not a touch. Both hash a section's *contents* (`Section.data`), so a `SHT_NOBITS` section
   contributes only its name and size: dtk writes a `.bss`/`.sbss` header offset of 0, and its file slice is the ELF header,
   whose section-table offset moves with `.strtab`'s length - hashing that slice made a rename read as a re-range (2026-10-04,
