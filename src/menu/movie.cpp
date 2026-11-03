@@ -8,21 +8,23 @@
  *   is `menu/menu_friendlist.cpp` (the `.data` V->S seam at 0x806048B0, `.sdata`'s second "%s" at 0x80793AF0,
  *   `.sdata2`'s re-pooled 0.0f/1.0f at 0x8079C900, and the `extabindex` record of 0x8043F314 at 0x8003E85C).
  * FLAGS. `cflags_menu` (configure.py); file-scope `#pragma pool_data off` (MWCC otherwise addresses the strings and
- *   tables through one pooled base).
+ *   tables through one pooled base); `#pragma opt_common_subs off` around `THPSimpleCalcNeedMemory` and
+ *   `THPSimpleSetBuffer` (with it on, the CSE'd `xSize * ySize` loads `ySize` first and `mullw` reads r0, r3).
  * NAMES. Module `menu` and the file from the `__FILE__` string "movie.cpp".  The THPSimple/THPDraw functions carry the
  *   SDK sample's names (the panic strings "THPSimpleOpen fail"/"THPSimplePreLoad fail" and the map's
  *   `THPSimpleGetTotalFrame` name the copy); its record layout is the sample's minus the audio fields.
+ *   GUESS (the SDK sample): `THPSimpleGetFrameRate`, which the link strips (no row in the map); it is kept because its
+ *   0.0f is what makes 0.0f the first `.sdata2` entry, before `THPGXYuv2RgbSetup`'s TEV colours, as retail's is.
  *   GUESS (from each body and its callers): `movie_drive_wait`, `movie_change_request`, `movie_frame_draw`,
  *   `movie_playing_ck`, `movie_work`, `movie_table`, `dvd_error_*`, `dvd_error`, `system_shutdown_prepare`,
  *   `thp_gx_*`, the types `MovieWork`, `DvdError`, and every foreign name this file spells from the name registry.
  * RESIDUALS.
- *  - `NetworkFriendInfo`'s inline destructor is emitted here as a weak function (retail's table points at the copy
- *    `Network/NetworkCommunityPat.cpp` emits), so `.text` is 0x44 bytes longer than retail's.
- *  - `THPSimpleOpen`: the header's component offset takes r29 where retail splits it (r30, then r29 after `+= 0x14`).
- *  - `VideoDecode`: `THP/THPDec.h` returns `u8`, so the result gets a `clrlwi` retail lacks (request menu-movie#2).
- *  - `THPSimpleCalcNeedMemory`, `THPSimpleSetBuffer`: `mullw` takes the size operands in the other order; the SDK's
- *    `xSize * ySize` swaps the loads as well and scores lower than `ySize * xSize`.
- *  - `.sdata2`: retail pools 0.0f before the four TEV colours, ours after them.
+ *  - `NetworkFriendInfo`'s inline destructor and `THPSimpleGetFrameRate` are emitted here and dead-stripped by the
+ *    link (retail's table points at the destructor `Network/NetworkCommunityPat.cpp` emits), so the object's `.text`
+ *    is 0x68 bytes longer than the claim.
+ *  - `VideoDecode`: `THP/THPDec.h` returns `u8`, so the result gets a `clrlwi r0,r3,24` retail lacks (+4 bytes;
+ *    request menu-movie#2: retail's `THPVideoDecode` widens its result with `clrlwi r3,r3,24` at its shared exit, so
+ *    it returns `s32`). With that declaration the unit passes flipcheck and a trial `Matching` link hashes OK.
  */
 
 #include "types.h"
@@ -314,6 +316,7 @@ BOOL THPSimpleLoadStop(void);
 s32 THPSimpleDecode(void);
 s32 THPSimpleDrawCurrentFrame(GXRenderModeObj* rmode, u32 x, u32 y, u32 polygonW, u32 polygonH);
 BOOL THPSimpleGetVideoInfo(THPVideoInfo* videoInfo);
+f32 THPSimpleGetFrameRate(void);
 static void dvd_error_message_draw(void);
 }
 
@@ -437,6 +440,7 @@ void THPSimpleQuit(void) {
 
 /* 0x8043D910 (0x258): opens `fileName` and reads its header and component descriptions. */
 BOOL THPSimpleOpen(char* fileName) {
+    s32 compInfoOffset;
     s32 offset;
     u32 i;
 
@@ -463,13 +467,13 @@ BOOL THPSimpleOpen(char* fileName) {
         DVDClose(&movie_work.control.fileInfo);
         return FALSE;
     }
-    offset = movie_work.control.header.compInfoDataOffsets;
-    if (dvd_read_wait(&movie_work.control.fileInfo, movie_work.read_buffer, 32, offset) < 0) {
+    compInfoOffset = movie_work.control.header.compInfoDataOffsets;
+    if (dvd_read_wait(&movie_work.control.fileInfo, movie_work.read_buffer, 32, compInfoOffset) < 0) {
         DVDClose(&movie_work.control.fileInfo);
         return FALSE;
     }
     memcpy(&movie_work.control.compInfo, movie_work.read_buffer, sizeof(THPFrameCompInfo));
-    offset += sizeof(THPFrameCompInfo);
+    offset = compInfoOffset + sizeof(THPFrameCompInfo);
     for (i = 0; i < movie_work.control.compInfo.numComponents; i++) {
         switch (movie_work.control.compInfo.frameComp[i]) {
         case 0:
@@ -514,13 +518,15 @@ BOOL THPSimpleClose(void) {
     return FALSE;
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* 0x8043DBCC (0x60): the frame memory the open movie needs. */
 u32 THPSimpleCalcNeedMemory(void) {
     u32 size;
 
     if (movie_work.control.open) {
         size = OSRoundUp32B(movie_work.control.header.bufSize) * THP_READ_BUFFER_NUM;
-        size += OSRoundUp32B(movie_work.control.videoInfo.ySize * movie_work.control.videoInfo.xSize);
+        size += OSRoundUp32B(movie_work.control.videoInfo.xSize * movie_work.control.videoInfo.ySize);
         size += OSRoundUp32B(movie_work.control.videoInfo.xSize * movie_work.control.videoInfo.ySize / 4);
         size += OSRoundUp32B(movie_work.control.videoInfo.xSize * movie_work.control.videoInfo.ySize / 4);
         size += 0x1000;
@@ -537,7 +543,7 @@ BOOL THPSimpleSetBuffer(u8* buffer) {
     u32 uvsize;
 
     if (movie_work.control.open && !movie_work.control.preFetchState) {
-        ysize = OSRoundUp32B(movie_work.control.videoInfo.ySize * movie_work.control.videoInfo.xSize);
+        ysize = OSRoundUp32B(movie_work.control.videoInfo.xSize * movie_work.control.videoInfo.ySize);
         uvsize = OSRoundUp32B(movie_work.control.videoInfo.xSize * movie_work.control.videoInfo.ySize / 4);
         movie_work.control.textureSet.ytexture = buffer;
         DCInvalidateRange(buffer, ysize);
@@ -557,6 +563,7 @@ BOOL THPSimpleSetBuffer(u8* buffer) {
     }
     return TRUE;
 }
+#pragma pop
 
 static void ReadCallback(s32 result, DVDFileInfo* fileInfo);
 
@@ -750,6 +757,14 @@ BOOL THPSimpleGetVideoInfo(THPVideoInfo* videoInfo) {
         return TRUE;
     }
     return FALSE;
+}
+
+/* The open movie's frame rate; nothing calls it, so the link strips it. */
+f32 THPSimpleGetFrameRate(void) {
+    if (movie_work.control.open) {
+        return movie_work.control.header.frameRate;
+    }
+    return 0.0f;
 }
 
 /* 0x8043E484 (0x24): the open movie's frame count. */
