@@ -10,10 +10,11 @@
  * EVIDENCE. the source is the fdlibm 5.2 shape: `(x<0)**(non-int)` stores 33 (EDOM) into `errno` and returns `__float_nan`,
  *    the |y|-huge path computes `t = x - 1` and returns the folded `huge * huge` / `tiny * tiny` unsigned, and the sign
  *    `s` is set after the log2 split from `(hx >> 31) + 1`.
- * RESIDUALS. register allocation only: `v = s_l * t_h + t_l * ss` takes f7 where the target reuses f4, and `p_h = y1 * t1`
- *    f4 where the target reuses f3, which shifts the final exp2 block's temporaries (operand orders and declaration scope
- *    of the log2 block's locals measured, no effect).
- * SHAPES. the scalar constants are literals so the compiler pools them itself.
+ * RESIDUALS. none.
+ * SHAPES. the scalar constants are literals so the compiler pools them itself; the exp2 block's `v` is built from a
+ *    named `w = p_l - (t - p_h)` so the `lg2` product is emitted (and pooled) before the `t * lg2_l` one - as one
+ *    expression the frontend evaluates the simpler `t * lg2_l` term first, which inverts the two pool entries and
+ *    moves `v`/`p_h` of the log2 block to f7/f4 (target f4/f3).
  */
 #pragma fp_contract off
 #include "MSL/e_pow.h"
@@ -255,7 +256,8 @@ extern "C" f64 __ieee754_pow(f64 x, f64 y)
     t = p_l + p_h;
     F64_LO(t) = 0;
     u = t * 6.93147182464599609375e-01;
-    v = (p_l - (t - p_h)) * 6.93147180559945286227e-01 + t * -1.90465429995776804525e-09;
+    w = p_l - (t - p_h);
+    v = w * 6.93147180559945286227e-01 + t * -1.90465429995776804525e-09;
     z = u + v;
     w = v - (z - u);
     t = z * z;
