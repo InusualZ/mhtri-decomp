@@ -1,43 +1,54 @@
 /*
  * stage/shell.cpp - the shell pool: the 64 work records of thrown/fired objects (`_SHELL_W`), the 64-byte
- * work-block allocator and model-slot pool behind them, and the serial/niku sync tables.
- *
- * `.text` 0x802AA6A8-0x802ABD28 (58 functions, 5760 B), extab 0x80013984-0x80013AC4, extabindex
- * 0x800314C4-0x800316A4, `.ctors` 0x8056F374 (`shell_pool_static_init`), `.bss` 0x806AD698-0x806B8798 (the pool,
- * 0x3C0 + 64 x 0x10C + 64 x 0x168 + 0x1040 B) and `.sdata2` 0x8079A400-0x8079A410.  53 of 58 rows at 100 %;
- * still `NonMatching`.  Registered 2026-09-30 from the tail of `menu/menu_message.cpp`.
- *
- * Seams (evidence: `.ctors` words 0x8056F374 -> `shell_pool_static_init` and 0x8056F378 -> `yure_static_init`, one per TU;
- * `callers.py 0x802AA6A8` lists only `Pl/fn_80288CEC.cpp`, `enemy/em_pop.cpp` and one unsplit caller).  Left edge 0x802AA6A8, not the old 0x802AA764: the
- * preceding function `shell_work_init` memsets the pool and calls `serial_table_init`/`niku_table_init`, so it
- * is the shell TU's own initialiser (callers `Pl/fn_80288CEC.cpp`, `enemy/em_pop.cpp`).  Right edge 0x802ABD28
- * is the one `.ctors` word per TU: this TU's `__sinit` (`shell_pool_static_init`, 0x802ABC4C) is followed by its two
- * compiler-made element constructors, and everything after is `Pl/pl_yure.cpp` (own `__sinit` at 0x802AD9A8, own
- * `.data`/`.sdata`/`.sdata2`/`.bss`, no reference to this pool).  Module and file name are a GUESS (no `__FILE__`
- * string): the records are the projectile work `ef.h` calls `_SHELL_W`; the address neighbour is `stage/stg_w.cpp`.
- *
- * Names are GUESSES from behaviour: `serial_*` rows are the network-synced shell slots (`lb_sub0d_send`, the
- * `isServerSelectState` gate), `niku_*` a second 12-row table; `player_0x05`/`seq_0x06` are the owner's player number
- * and that player's running sequence number.  `shell_set_func_ptr` (`.sbss` 0x80794B60) is NOT defined here: no
- * function of this TU touches `.sbss` but `pRoot`.
- *
- * Flags: `cflags_main` plus `#pragma peephole off` (the stage band's deviation, see `stage/stg_w.cpp`; dropping it
- * costs 33 rows).  The pool objects are defined after their users, which is what keeps each symbol's own
- * `lis/addi` (defined first, the compiler folds them onto one section base).
- *
- * Residuals:
- *   * `shell_block_alloc` 77.86: retail returns NULL from every loop exit through one shared tail and never
- *     re-tests the bound after the skip loop (a `goto`-shaped exit); ours duplicates the tail (308 vs 308 B, 4 rows).
- *   * `pull_shell_work` 93.59, 0x110 B vs 0x100 in the target (+16 B, shifts every later symbol so the object's `.text` is
- *     0x1690 vs the claimed 0x1680): retail threads the found flag into a jump from the loop to the tail; ours keeps the flag
- *     (one register, one test).  A `goto claimed` exit measures 100 % and 0x100 B, so the shape is known but rule 8 forbids
- *     it.  Conformant shapes tried: a pointer result instead of the flag 93.28, `i >= max` test 91.70, a one-case `switch`
- *     93.59 (no change), `#pragma peephole on` around the function 91.88 (268 B).
- *   * `shell_set_prim` 98.23 and `shell_attack_set` 99.04: retail keeps `beq L; b end` where ours folds to `bne end`.
- *   * `shell_block_free` 98.79: register numbers only.
- *   * `.sdata2`: the target claim is 0x10 B, ours 0xC - the last word is alignment padding.
- *   * `__declspec(export)` on `shell_block_clear_all`, `serial_st_change_by_key`, `niku_st_change_by_key`: nothing in the
- *     link references them (their callers are in RSOs), and the target object force-activates them.
+ *   work-block allocator and model-slot pool behind them, and the serial/niku sync tables.
+ * RANGE. .text 0x802AA6A8-0x802ABD28 (58 functions); extab 0x80013984-0x80013AC4, extabindex
+ *   0x800314C4-0x800316A4, .ctors 0x8056F374-0x8056F378 (MWCC's own word for `__sinit_\shell_cpp`), .bss
+ *   0x806AD698-0x806B8798 (`shell_pool` 0x3C0, `shell_work_tbl` 64 x 0x10C, `shell_chara_heap_tbl` 64 x 0x168,
+ *   `shell_block_pool` 0x1040), .sdata2 0x8079A400-0x8079A410 (the claim's last word is the next TU's 8-byte
+ *   alignment pad; ours emits 12 B and the link pads it, trial flip OK).
+ *   Seams: one `.ctors` word per TU (0x8056F374 this TU's `__sinit`, 0x8056F378 `Pl/pl_yure.cpp`'s); the left edge
+ *   `shell_work_init` memsets the pool and calls `serial_table_init`/`niku_table_init` (callers `Pl/fn_80288CEC.cpp`,
+ *   `enemy/em_pop.cpp`); the right edge is `__sinit_\shell_cpp` plus its two element constructors, after which
+ *   `Pl/pl_yure.cpp` starts (own `__sinit`, own data).
+ * FLAGS. `cflags_main`; `#pragma peephole off` file-wide (the stage band's deviation, see `stage/stg_w.cpp`; dropping
+ *   it costs 33 rows).
+ * NAMES. Module and file name are a GUESS (no `__FILE__` string): the records are the projectile work `ef.h` calls
+ *   `_SHELL_W`; the address neighbour is `stage/stg_w.cpp`.  GUESS from behaviour: `serial_*` (the network-synced
+ *   shell slots: `lb_sub0d_send`, the `isServerSelectState` gate), `niku_*` (a second 12-row table),
+ *   `player_0x05`/`seq_0x06` (the owner's player number and that player's running sequence number),
+ *   `shell_block_*`, `ShellPool`, `ShellCharaHeap`, `ShellSerialEntry`, `ShellNikuEntry`, `ShellBlockPool`.
+ *   `shell_set_func_ptr` (`.sbss` 0x80794B60) is NOT defined here: no function of this TU touches `.sbss` but `pRoot`.
+ * RESIDUALS.
+ *   - `pull_shell_work`: retail's found path jumps from the search loop straight to the claim tail, past the loop's
+ *     `return NULL` (a `goto`-shaped exit, idea 217/213 class: MWCC threads no flag).  A scratch `goto claimed`
+ *     measures 100 % at 0x100 B; the best goto-free shape is the `found` flag (one register, one test, +16 B).
+ *     Goto-free shapes measured: pointer result instead of the flag, `i >= max` re-test, a one-case `switch`,
+ *     `#pragma peephole on` around the function, the claim tail inside the loop with `return shell` - all lower.
+ *   - `shell_block_alloc`: retail shares one `return NULL` block between the skip loop's and the run loop's bound
+ *     exits and keeps the fill out of line after both loops (`beq fill`); both are jumps out of two loops
+ *     (idea 213 class).  A scratch `goto fail`/`goto fill` copy measures 100 %; goto-free, the two `return NULL`
+ *     statements stay separate blocks and the fill sits inline in the run loop.  The inline-helper fill measured
+ *     lower.
+ *   - The +16 B of `pull_shell_work` and the +4 B of `shell_block_alloc` shift every later symbol, so the object's
+ *     `.text` is 0x1694 against the claimed 0x1680 and the extabindex size byte of `pull_shell_work` differs.  Every
+ *     other row, `.ctors`, extab, extabindex, `.bss` and `.sdata2` link byte-identical (a trial flip of the scratch
+ *     goto copy builds main.dol OK).
+ *   - `__declspec(export)` on `shell_block_clear_all`, `serial_st_change_by_key`, `niku_st_change_by_key`: nothing in
+ *     the link references them (their callers are in RSOs), and the target object force-activates them.
+ * SHAPES.
+ *   - `_SHELL_W` and `ShellCharaHeap` carry a declared constructor defined out of line after the pool objects
+ *     (`__declspec(noinline) inline`), so MWCC emits `__sinit_\shell_cpp` (two `__construct_array` calls, in the
+ *     objects' definition order), the anonymous `.ctors` word, and the two constructors after `__sinit` in retail's
+ *     order (the deferred list is last-in first-out; ideas 193, 242).  A named `__declspec(section ".ctors")` word
+ *     is dead-stripped by the link and shifts the merged table.
+ *   - The pool objects are defined after their users, which keeps each symbol's own `lis/addi` (defined first, the
+ *     compiler folds them onto one section base).
+ *   - A guarded body is an early `if (a == NULL || b == NULL) return;` (`shell_attack_set`, `shell_set_prim`): the
+ *     `||`'s last term keeps retail's `beq L; b end` pair (idea 218); the nested `if`s fold it to one `bne`.
+ *   - `shell_block_free` computes `first` in two statements (`first = (u32)(a - b); first >>= 6;`) so the difference
+ *     and the shift share a register; `shell_block_alloc` fills through the advancing `first_p` pointer and its
+ *     declaration order (`n, run, i, first, pool, map, first_p`) is the colouring order retail shows.
+ *   - `(u32)stage_water_enabled_ck() == 1` keeps retail's `cmplwi` (the owner declares the function `s32`).
  *
  * Inventory and evidence: `python tools/units/ledger.py unit stage/shell.cpp`.
  */
@@ -64,7 +75,6 @@
 #include "stage/shell.h"
 #include "stage/stg_w.h"
 #include "unsplit/g3d.h"
-#include "unsplit/Runtime.PPCEABI.H.h"
 
 #pragma peephole off
 
@@ -220,12 +230,12 @@ void push_shell_chara_heap_num(MHchar** charas, u32 count) {
 }
 
 extern "C" u8* shell_block_alloc(s32 count) {
+    s32 n;
+    s32 run;
+    s32 i;
+    s32 first;
     ShellPool* pool = &shell_pool;
     u8* map = pool->block_map_0x24;
-    s32 i;
-    s32 run;
-    s32 first;
-    s32 n;
     u8* first_p;
 
     if (count <= 0) {
@@ -250,7 +260,8 @@ extern "C" u8* shell_block_alloc(s32 count) {
             }
             if (run == count) {
                 for (n = 0; n < run; n++) {
-                    first_p[n] = 1;
+                    *first_p = 1;
+                    first_p++;
                 }
                 return pool->blocks_0x20 + first * 64;
             }
@@ -269,7 +280,8 @@ extern "C" void shell_block_free(u8* blocks, s32 count) {
     u8* map;
     ShellPool* pool = &shell_pool;
 
-    first = (u32)(blocks - pool->blocks_0x20) >> 6;
+    first = (u32)(blocks - pool->blocks_0x20);
+    first >>= 6;
     memset(pool->blocks_0x20 + first * 64, 0, count * 64);
     map = pool->block_map_0x24 + first;
     n = 0;
@@ -352,17 +364,16 @@ void shell_set_prim(_SHELL_W* shell, void* prim, u8 kind) {
         if (kind == 0) {
             g3d_root_model_bind(pRoot, model->field_0x118);
         }
-        if (shell->visible_0x01 != 0) {
-            if (shell->area_0x08 == get_now_areano()) {
-                switch (kind) {
-                case 0:
-                    sound_job_request(1, model->ready, model->field_0x118, 0, 0, 0, 0);
-                    return;
-                case 1:
-                    sound_job_request(1, 1, (s32)prim, 2, 0, 0, 0);
-                    break;
-                }
-            }
+        if (shell->visible_0x01 == 0 || shell->area_0x08 != get_now_areano()) {
+            return;
+        }
+        switch (kind) {
+        case 0:
+            sound_job_request(1, model->ready, model->field_0x118, 0, 0, 0, 0);
+            return;
+        case 1:
+            sound_job_request(1, 1, (s32)prim, 2, 0, 0, 0);
+            break;
         }
     }
 }
@@ -372,42 +383,43 @@ void shell_attack_set(_SHELL_W* shell, _HIT_DATA* hit_tbl, _HIT_SIZE_DATA** size
     _HIT_W* hit = SHELL_HIT(shell);
     _ENEMY_WORK* enemy;
 
-    if (hit_tbl != NULL && size_tbl != NULL) {
-        hit_flags_clear(hit);
-        hit_tbl += index;
-        hit->size_data_0x08 = size_tbl[hit_tbl->size_index_0x0F];
-        hit_source_set(hit, 2, shell);
-        hit->power_0x38 = hit_tbl->power_0x00;
-        hit->knock_0x3C = hit_tbl->knock_0x02;
-        hit_data_apply(hit, hit_tbl);
-        switch (shell->master_kind_0x09) {
-        case 0:
-            hit_owner_set(hit, 0, shell->master_0x0C);
-            break;
-        case 1:
-            enemy = (_ENEMY_WORK*)shell->master_0x0C;
-            if (hit->life_0x40 > 0) {
-                hit->life_0x40 = (s16)(hit->life_0x40 * enemy->shell_rate_0x7B4);
-                if (hit->life_0x40 <= 0) {
-                    hit->life_0x40 = 1;
-                }
-            }
-            if (em_get_rank(enemy) <= 1) {
-                attack_flags &= 0xEF;
-            }
-            hit_owner_set(hit, 1, shell->master_0x0C);
-            em_hit_buff_apply(enemy, hit);
-            break;
-        case 2:
-            hit_owner_set(hit, 3, shell->master_0x0C);
-            break;
-        case 3:
-            hit_owner_set(hit, 2, shell);
-            break;
-        }
-        hit->attack_flags_0x31 = attack_flags;
-        hit->attack_kind_0x32 = attack_kind;
+    if (hit_tbl == NULL || size_tbl == NULL) {
+        return;
     }
+    hit_flags_clear(hit);
+    hit_tbl += index;
+    hit->size_data_0x08 = size_tbl[hit_tbl->size_index_0x0F];
+    hit_source_set(hit, 2, shell);
+    hit->power_0x38 = hit_tbl->power_0x00;
+    hit->knock_0x3C = hit_tbl->knock_0x02;
+    hit_data_apply(hit, hit_tbl);
+    switch (shell->master_kind_0x09) {
+    case 0:
+        hit_owner_set(hit, 0, shell->master_0x0C);
+        break;
+    case 1:
+        enemy = (_ENEMY_WORK*)shell->master_0x0C;
+        if (hit->life_0x40 > 0) {
+            hit->life_0x40 = (s16)(hit->life_0x40 * enemy->shell_rate_0x7B4);
+            if (hit->life_0x40 <= 0) {
+                hit->life_0x40 = 1;
+            }
+        }
+        if (em_get_rank(enemy) <= 1) {
+            attack_flags &= 0xEF;
+        }
+        hit_owner_set(hit, 1, shell->master_0x0C);
+        em_hit_buff_apply(enemy, hit);
+        break;
+    case 2:
+        hit_owner_set(hit, 3, shell->master_0x0C);
+        break;
+    case 3:
+        hit_owner_set(hit, 2, shell);
+        break;
+    }
+    hit->attack_flags_0x31 = attack_flags;
+    hit->attack_kind_0x32 = attack_kind;
 }
 
 void shell_hit_cont(_SHELL_W* shell) {
@@ -472,7 +484,7 @@ s32 get_shell_in_water(_SHELL_W* shell) {
                 return 1;
             }
         } else if ((shell->scr_id_0x0A & 2) != 0) {
-            if (stage_water_enabled_ck() == 1) {
+            if ((u32)stage_water_enabled_ck() == 1) {
                 return 1;
             }
         }
@@ -762,31 +774,24 @@ void niku_erase(_SHELL_W* shell) {
     }
 }
 
-extern "C" void shell_pool_static_init(void) {
-    __construct_array(shell_work_tbl, (void*)shell_work_construct, 0, sizeof(_SHELL_W), SHELL_WORK_MAX);
-    __construct_array(shell_chara_heap_tbl, (void*)shell_chara_heap_construct, 0, sizeof(ShellCharaHeap),
-                      SHELL_WORK_MAX);
-}
-
-/* The `.ctors` word (0x8056F374) the split assigns to this unit - it points at the static initialiser. */
-__declspec(section ".ctors") void* const shell_pool_ctor = (void*)shell_pool_static_init;
-
-extern "C" ShellCharaHeap* shell_chara_heap_construct(ShellCharaHeap* self) {
-    mhchar_construct((MHchar*)self->chara_0x04);
-    return self;
-}
-
-extern "C" _SHELL_W* shell_work_construct(_SHELL_W* self) {
-    VEC3_ctor(&self->pos_0x18);
-    VEC3_ctor(&self->vec_0x30);
-    VEC3_ctor(&self->vel_0x3C);
-    VEC3_ctor(&self->vel_0x48);
-    return self;
-}
-
 /* The pool's storage, defined after every user (the compiler addresses a same-file object relative to
- * one section base; the retail code loads each symbol separately, i.e. it saw the definitions last). */
+ * one section base; the retail code loads each symbol separately, i.e. it saw the definitions last).
+ * The two constructed arrays make MWCC emit `__sinit_\shell_cpp` (two `__construct_array` calls, in definition
+ * order) and the unit's anonymous `.ctors` word. */
 ShellPool shell_pool;
 _SHELL_W shell_work_tbl[SHELL_WORK_MAX];
 ShellCharaHeap shell_chara_heap_tbl[SHELL_WORK_MAX];
 ShellBlockPool shell_block_pool;
+
+/* The element constructors, defined out of line after the objects so MWCC emits them after `__sinit` in
+ * retail's order (the deferred list is last-in first-out: the heap slot's, then the work record's). */
+__declspec(noinline) inline ShellCharaHeap::ShellCharaHeap() {
+    mhchar_construct((MHchar*)chara_0x04);
+}
+
+__declspec(noinline) inline _SHELL_W::_SHELL_W() {
+    VEC3_ctor(&pos_0x18);
+    VEC3_ctor(&vec_0x30);
+    VEC3_ctor(&vel_0x3C);
+    VEC3_ctor(&vel_0x48);
+}

@@ -91,6 +91,9 @@ struct _SHELL_W {
     /* +0x104 */ s32 work_blocks_0x104;    /* how many blocks the run holds */
     /* +0x108 */ u8 group_0x108;           /* the group `shell_area_release` matches against */
     /* +0x109 */ u8 pad_0x109[0x3];
+
+    /* Constructs the four vectors; MWCC's `__sinit` runs it over `shell_work_tbl` (defined in `stage/shell.cpp`). */
+    _SHELL_W();
 };
 
 /* One 0x168-byte slot of `shell_chara_heap_tbl`: a model object a shell borrows.  size: 0x168 */
@@ -98,6 +101,9 @@ struct ShellCharaHeap {
     /* +0x000 */ u8 used_0x00;
     /* +0x001 */ u8 pad_0x01[0x3];
     /* +0x004 */ u8 chara_0x04[0x164];     /* the `MHchar` the slot hands out */
+
+    /* Constructs the model object; MWCC's `__sinit` runs it over `shell_chara_heap_tbl` (defined in `stage/shell.cpp`). */
+    ShellCharaHeap();
 };
 
 /* One 0xC-byte row of the serial table: a shell registered for network sync.  size: 0xC */
@@ -163,9 +169,6 @@ extern "C" u8* shell_block_alloc(s32 count);
 extern "C" void shell_block_free(u8* blocks, s32 count);
 extern "C" void shell_block_clear_all(void);
 extern "C" s32 shell_block_count(u32 size);
-extern "C" void shell_pool_static_init(void);
-extern "C" ShellCharaHeap* shell_chara_heap_construct(ShellCharaHeap* self);
-extern "C" _SHELL_W* shell_work_construct(_SHELL_W* self);
 nw4r::ef::Effect* res_eft_create_shell(u32 group, u32 id);
 extern "C" void shell_area_release(u8 group);
 void res_shell_model_create(MHchar* model, u32 id, u32 arg);
