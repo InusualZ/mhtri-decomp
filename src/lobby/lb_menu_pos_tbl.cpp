@@ -6,7 +6,10 @@
  *   extabindex.  Between `lobby/lb_menu_scratch.cpp` and `lobby/lb_equip_page.cpp`; the three share
  *   `lobby/fn_8021E1EC.h`.
  * FLAGS. `cflags_lobby`; file-scope `#pragma peephole off` (retail keeps the narrowing `clrlwi`s; docs/lobby.md) and
- *   `#pragma pool_data off` (retail's `__sinit` addresses each `.bss` object with its own `lis`/`addi`, playbook 43).
+ *   `#pragma pool_data off` (retail's `__sinit` addresses each `.bss` object with its own `lis`/`addi`, playbook 43);
+ *   `lobby_local_main_step` alone under `opt_dead_assignments off`, which keeps case 2's `ready` pointer so its
+ *   `addi r30,r31,lb_param_w@l` precedes the `li r0,1` (with the pass on, the frontend folds it into the store and
+ *   the `li` comes first).
  * NAMES. `lobby_local_task` is the task `GameModeExec` starts for game mode 2 when `system_w` +0x7D3 is clear (beside
  *   `field_game_task`/`quest_game_task`); `__sinit_\lb_menu_pos_tbl_cpp` and `__ct__11LbLobbyWorkFv` are the
  *   compiler's names for the `.ctors` entry and the work's constructor.
@@ -14,9 +17,7 @@
  *   lb_item_list_select, lobby_local_init, lobby_local_task, lobby_local_opening_step, lobby_local_load_start,
  *   lobby_local_player_send, lobby_local_main_step, lobby_local_area_change_step, lobby_local_exit_set,
  *   lb_menu_pos_tbl, lb_menu_pos_extra, lb_menu_pos_radius, lb_page_state_0/1, lb_unused_zero.
- * RESIDUALS. `lobby_local_main_step` case 2's else arm: retail schedules `addi r30,r31,lb_param_w@l` before `li r0,1`,
- *   ours the reverse (a pointer local, `TRUE`, the swapped if/else and playbook 189's dead predecessor measured; none
- *   moves it) - 8 bytes, the one `.text` blocker of a flip.
+ * RESIDUALS. none in `.text`.
  *  - flipcheck: the calls to `field_game_task_start`/`lb_pl_act_idle_ck`/`lobby_enter_seq_step` resolve once the
  *    registry names reach the map; `.sdata2` is 0x5C against the 0x60 claim (the trailing alignment word).
  * SHAPES. `syncItemListClock` takes `count` as `u32`: retail converts it unsigned (no `xoris`).  The `frsp` before the
@@ -396,6 +397,8 @@ void lobby_local_player_send(void)
     }
 }
 
+#pragma push
+#pragma opt_dead_assignments off
 /* 0x8021F7DC (0x4F4): the lobby step: the entry sequence, the frame (and the walk into an exit), the exit into a
  * quest, an area change and the fade out. */
 void lobby_local_main_step(TaskSlot* self)
@@ -509,7 +512,8 @@ void lobby_local_main_step(TaskSlot* self)
             system_w.leave_state_0x7d8 = lb_param_w.field_0x00;
             lb_param_w.rank_sel_0x09 = getItemListSelection();
         } else {
-            lb_param_w.flag_0x0b = 1;
+            u8* ready = &lb_param_w.flag_0x0b;
+            *ready = 1;
             lb_param_w.rank_sel_0x09 = getItemListSelection();
             rank = lb_unlock_rank_get();
             if (rank == 0) {
@@ -542,6 +546,7 @@ void lobby_local_main_step(TaskSlot* self)
     }
 }
 
+#pragma pop
 /* 0x8021FCD0 (0x10): places the player at `pos` facing `angle` in area `mode`, with the default stage latch. */
 void lobby_player_place(u8 mode, nw4r::math::VEC3* pos, u16 angle)
 {
