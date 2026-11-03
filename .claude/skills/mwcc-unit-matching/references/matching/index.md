@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (271)
+## Ideas that work (272)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -280,6 +280,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 291 | [A self-reassignment after a load gives an inline helper's local a statement-time web that colours after the call result](291-self-reassignment-after-a.md) | works | source-shape, allocator | A function written as `return helper(...)` over a static inline helper matches every opcode but a callee-saved register pair is swapped - the helper's parameter or local that holds a loaded value takes r31 where retail... |
 | 292 | [Walk the tables through named pointers declared after the index when retail colours the index before the walks](292-walk-the-tables-through.md) | works | source-shape, allocator | A counted loop over two tables matches every opcode but the index and the two strength-reduced table pointers are rotated (ours r9/r7/r8, retail r7/r8/r9), and no declaration order, index type or pragma moves them |
 | 293 | [A single-use local assigned an address expression is substituted by its temporary; a second direct use keeps it a named node that colours last](293-single-use-local-assigned.md) | works | source-shape, allocator | Every opcode matches but a pointer local computed from a parameter (`header = block - 1`) takes a callee-saved register above the function's other locals, and no declaration order moves it - retail has it in the lowest... |
+| 294 | [A halved count folded forward takes the pipe base's register: cast the halving into the initialiser and or the word in one nested expression](294-halved-count-folded-forward.md) | works | source-shape, allocator | Every instruction of a register-write function is retail's but two volatile registers are swapped (retail `lis r6` for the pipe base and `r7` for a halved count, ours r7/r6) and the last `or` writes the word's web where... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

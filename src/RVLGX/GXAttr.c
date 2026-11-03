@@ -10,13 +10,7 @@
  *   operation, so there is no `-fp_contract` evidence either way.
  * NAMES. SDK names throughout, including the `static inline` helpers `__GXXfVtxSpecs` and `SetVAT` (the SDK's
  *   `SETVAT`); the VLim size tables `tbl1`/`tbl2`/`tbl3` keep the SDK's own (function-local in the SDK source) names.
- * RESIDUALS. `__GXSetVCD`: the instruction sequence is the target's, the register allocation is not - the target
- *   gives the second pipe base r6 and `nCols` r7 and composes `or r5,r5,r7` then `or r4,r5,r4`; ours swaps r6/r7 and
- *   keeps the word in r5 (`or r5,r6,r5`, `or r5,r5,r4`). The allocator assigns virtual registers from the highest
- *   number down, and ours numbers the `nCols / 2` shift after the pipe base. Tried without a gain: the other `reg`
- *   compositions and splits, local declaration orders, an inline XF writer, the word or-ed at the store, the `0x10`
- *   store at other points; `global_optimizer off`, `scheduling off` and `peephole off` are worse. flipcheck names
- *   that function's bytes as the `.text` blocker. Jump tables are emitted as compiler-local `@NNN` while the target object names them
+ * RESIDUALS. Jump tables are emitted as compiler-local `@NNN` while the target object names them
  *   `jumptable_8061A7D0`..`jumptable_8061A96C` (relocdiff reports only that naming). The map sizes `tbl3` 0x8 (a
  *   4-byte table plus 4 bytes of tail pad): the target `.sdata` is 0x10 while ours is 0xC; the `GXTexture` `.sdata`
  *   that follows is 8-aligned, so a flip that refuses on that size resizes `tbl3` to 0x4 in a separate map change.
@@ -32,10 +26,13 @@
  *   reads `__GXData` again, as the target reloads it. The two format setters share one `static inline` setter.
  *   `__GXCalculateVLim` and `GXSetVtxAttrFmtv` sit in a `#pragma global_optimizer off` scope: with it on, the VLim
  *   schedule loads `tbl3[position]` before `tbl3[normal]` and the format loop reuses the loop test's `list->attr`
- *   instead of reloading it (the whole file off loses five other functions). `__GXSetVCD` stores the XF command byte before
- *   it builds the word as `nCols | nTex << 4` then `|= nNrm << 2` (the earlier store numbers the pipe base before
- *   the word's shifts); `GXGetVtxAttrFmt` collects the normal fraction in a local so the three
- *   arms share one `stb`.
+ *   instead of reloading it (the whole file off loses five other functions). `__GXSetVCD`'s XF word: the `nCols`/`nTex`
+ *   halvings are `(u32)(33 - __cntlzw(...)) / 2` in the initialisers (an `int` operand makes the shift `srawi`, and a
+ *   separate `/= 2` statement is folded forward to the word's expression, where it is numbered after the pipe base
+ *   and takes its register); the word is one expression `(nTex << 4) | (nCols | (nNrm << 2))` - a two-statement
+ *   `reg = ..; reg |= ..` writes the web twice and the second `or` cannot take the normal term's register, while
+ *   a three-term flat chain or a single-use `reg` folded into the store is reassociated with the `nTex` term last.
+ *   `GXGetVtxAttrFmt` collects the normal fraction in a local so the three arms share one `stb`.
  */
 
 #pragma function_align 16
@@ -109,13 +106,10 @@ static inline void __GXXfVtxSpecs(void)
     u32 reg;
 
     nNrm = __GXData->hasBiNrms ? 2 : (__GXData->hasNrms != 0);
-    nCols = 33 - __cntlzw((__GXData->vcdLo.word >> 13) & 0xF);
-    nCols /= 2;
-    nTex = 33 - __cntlzw(__GXData->vcdHi.word & 0xFFFF);
-    nTex /= 2;
+    nCols = (u32)(33 - __cntlzw((__GXData->vcdLo.word >> 13) & 0xF)) / 2;
+    nTex = (u32)(33 - __cntlzw(__GXData->vcdHi.word & 0xFFFF)) / 2;
     GXWGFifo.u8 = 0x10;
-    reg = nCols | (nTex << 4);
-    reg |= nNrm << 2;
+    reg = (nTex << 4) | (nCols | (nNrm << 2));
     GXWGFifo.u32 = 0x1008;
     GXWGFifo.u32 = reg;
     __GXData->xfWritePending = 1;
