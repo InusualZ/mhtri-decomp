@@ -12,13 +12,15 @@
  *    (the 0x40 B header every message starts with: length, command, status or options, then command arguments).
  * EVIDENCE. jump tables `.data` 0x8060F7A8 / 0x8060F7C4 (error-code switches of the two memory handlers), the option strings
  *    0x8060F7E0 and `.sbss` 0x80794E70 / 0x80794E74 are read only by this run.
- * RESIDUALS. `TRKDoDisconnect`: the target loads the sequence number into r4 and the 0x40 length into r3 (ours r3/r4) and
- *    places `addi r3` for the UART write after the second `li r4,0x40`; measured without effect: an explicit reply body in
- *    the handler (24 field-order and declaration permutations), a block-scoped event, a status variable.
- *    `trk_option_strings` is `@stringBase0` in our object.
+ * RESIDUALS. none: 13/13 rows byte-identical, relocation differences are name-only (the compiler's local spellings
+ *    `@206`/`@244`/`@stringBase0` for the unit's own `jumptable_8060F7A8`, `jumptable_8060F7C4` and `trk_option_strings`),
+ *    and the trial flip links to the retail DOL hash.
  * SHAPES. every handler answers with a 0x40 B reply header built in its own stack slot (status code mapped from the
  *    internal error), then returns 0; the status reply stages the next sequence number in a local (the target's r5/r6
- *    order); `TRKDoWriteRegisters` wraps its error switch in `error != 0`, which folds the zero test into the compare tree; the register and memory handlers append the payload to the request buffer and send it
+ *    order) and reads `gTRKSequence` before it fills the header fields, so the load is a lower-numbered backend temporary
+ *    than the 0x40 length and the length is coloured first (r3, the load r4) in `TRKDoDisconnect`, the one handler whose
+ *    status zero is the callee-saved r31 shared with the `gTRKConnected` store (the mwcc-debugger regalloc dump names the
+ *    two nodes; `regsim verify` reproduces the colouring); `TRKDoWriteRegisters` wraps its error switch in `error != 0`, which folds the zero test into the compare tree; the register and memory handlers append the payload to the request buffer and send it
  *    with `TRK_MessageSend` instead.
  */
 #include "TRK/msghndlr.h"
@@ -82,10 +84,10 @@ static inline void trk_send_status(s32 status)
     u32 seq;
 
     TRK_memset(&reply, 0, sizeof(reply));
+    seq = gTRKSequence + 1;
     reply.command = TRK_COMMAND_REPLY;
     reply.length = TRK_HEADER_SIZE;
     reply.status = status;
-    seq = gTRKSequence + 1;
     reply.sequence = seq;
     gTRKSequence = seq + 1;
     TRK_WriteUARTN(&reply, TRK_HEADER_SIZE);
