@@ -10,14 +10,17 @@
  *   0x8041D750 (`NetworkPeerGameSpy::setContext`, extabindex 0x8003DB54).
  * FLAGS. `-O3 -inline noauto -pool off` (configure.py; measured in docs/network.md, playbook 43); file-scope
  *   `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsb` + `cmpwi` forms, so narrow stores are compound
- *   assignments and shift-and-mask bytes are `(v >> 16) & 0xFF`, playbook 95).
+ *   assignments and shift-and-mask bytes are `(v >> 16) & 0xFF`, playbook 95).  `publishRequest` alone is
+ *   `#pragma optimization_level 4` (playbook 108): under -O3 the frontend's common-subexpression temporaries for
+ *   `&slotIds_44[i]` and `i * 4` are numbered index-above-address and colour r7/r8 where retail has r8/r7; the
+ *   regalloc dump reproduces ours exactly (`regsim verify`), no declaration order reaches retail's, and
+ *   `opt_common_subs off`/`opt_lifetimes off`/every rewrite of the slot loop measured worse.
  * NAMES. The class from its methods (`__ct__22GameSpyInterfaceThreadFv`, `tGameSpyInterface`, `step`,
  *   `publishRequest`); the six `gt2*Callback` bodies and `DWC_GetLastErrorEx` from the pool strings.  GUESSes from call
  *   shape or opcode: the unsplit callees (the `gt2*` API, `DWC_*`, `DWCi_natProbe*`, `sendReq*`, `hasMultipleRefs60d4`,
  *   `errorRecordCode613c`, `getErrorInfo654c`, `getGameInfo2d1c`), `natNegProgressCallback`, `natNegCompletedCallback`,
  *   `copyGameSpyAddress` and `NetworkReflectService::notify`.
- * RESIDUALS. `publishRequest`: the slot-loop temporaries `i * 4` and `&slotIds_44[i]` take r8/r7, ours r7/r8.
- *   `.sdata`: bytes match, the map names `sRejectMessageNG`/`sEmptyString`/`sPortFormat` label anonymous literals.
+ * RESIDUALS. `.sdata`: bytes match, the map names `sRejectMessageNG`/`sEmptyString`/`sPortFormat` label anonymous literals.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
  *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
  *   sits where the first virtual is declared, playbook 98); as the key function it makes this unit emit `__vt__` and
@@ -430,6 +433,7 @@ void GameSpyInterfaceThread::setRequestResult(s32 error, s32 value)
 }
 
 /* Publishes a completed request: rewrites the slot tables and the negotiation result. */
+#pragma optimization_level 4
 void GameSpyInterfaceThread::publishRequest(s32 error, u8 index, u32 value)
 {
     u8 i;
@@ -468,6 +472,7 @@ void GameSpyInterfaceThread::publishRequest(s32 error, u8 index, u32 value)
     negotiationDone_446E = -1;
     negotiationResult_446D = 1;
 }
+#pragma optimization_level reset
 
 /* Opens the GameSpy socket and installs the callback set, then applies the pending requests. */
 void GameSpyInterfaceThread::ConnectToAnybody(s32 arg)
