@@ -7,16 +7,18 @@
  *   `g3d/g3d_resfile.cpp`'s `ResFile::ref` (0x80092444), whose asserts pass "g3d_resfile_ac.h".
  * NAMES. Map stems (the dump answers `zz_` placeholders).  res_anm_tex_srt_get_tex_result (0x80091B50,
  *   nw4r's per-texture `GetTexSrtAnmResult`) is a GUESS.
- * RESIDUALS. Code: none.
- *   flipcheck: the 0x4-byte tail of the `.data` claim is fill before `g3d/g3d_resfile.cpp`'s 32-aligned name
- *   records (that unit's `.data` split carries `align:32`, request g3d-res2#7).
+ * RESIDUALS. none; flipcheck READY.  The 0x5-byte tail of the `.data` claim is fill before `g3d/g3d_resfile.cpp`'s
+ *   32-aligned name records (that unit's `.data` split carries `align:32`).  Retail's "ofs != 0" message sits
+ *   8-aligned at 0x80590A28 (4 zero bytes after the last local string, no symbol, no referrer; the cause is a
+ *   GUESS - `g3d/g3d_resanmscn.cpp` has the same hole), so the message is an 8-aligned function-local static.
  * SHAPES. File-scope `#pragma peephole off`: retail's split `clrlwi` + `cmpwi`; fn_80092234 is compiled with
  *   `#pragma peephole on` (its base word stays in r0).  Definitions in address order.  `GetAnmResult` sits under
  *   a scoped `#pragma pool_data off` (each assert string its own `lis`/`addi`); the per-texture evaluator declares
  *   its cell index before the flags word; the two dictionary walkers read the node's bit index into an `int`
  *   local, and fn_80092020 passes the found name by value to fn_80091D78 (`ResName::operator==`), which copies the
  *   constructor's result.  fn_800922D0 (`g3d_rescommon_ac.h`'s offset resolver) is `inline` and
- *   `__declspec(noinline)`: its weak copy follows its first referencer and its strings are the `.data` tail.
+ *   `__declspec(noinline)`: its weak copy follows its first referencer and its strings are the `.data` tail
+ *   (the message as `static char msg[] __attribute__((aligned(8)))`; a literal packs it 4 bytes early).
  *   The byte readers and writers walk `p++`.
  */
 
@@ -329,7 +331,8 @@ void* nw4r::g3d::ResDic::operator[](const char* name) const {
 /* `ResDic`'s `g3d_rescommon_ac.h` offset resolver: the dictionary-relative address of a nonzero offset. */
 extern "C" __declspec(noinline) inline u32 fn_800922D0(u32* self, u32 ofs) {
     if (ofs == 0) {
-        nw4r::db::Panic("g3d_rescommon_ac.h", 123, "NW4R:Failed assertion ofs != 0");
+        static char msg[] __attribute__((aligned(8))) = "NW4R:Failed assertion ofs != 0";
+        nw4r::db::Panic("g3d_rescommon_ac.h", 123, msg);
     }
     return *self + ofs;
 }
