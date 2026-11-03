@@ -27,7 +27,11 @@
  *     first PCode) already holds that compare for every goto-free spelling (flag, pointer flag, `i >= max`
  *     re-test, helper with `if (!shell) return NULL`, claim inside the loop, outer `for (;;)`, one-case
  *     `switch`), and only the `goto` has the direct edge: the frontend's flow graph is the source's, and no later
- *     pass threads it (idea 217).
+ *     pass threads it (idea 217).  An inline does not supply the edge: dump 03 lowers every inlined `return X` to
+ *     `li rT,X; b <the inline's one exit block>`, laid out in source order, so the whole search+claim as an inline
+ *     (claim and `return` inside the loop, wrapper or guard outside) keeps the claim between the test and the
+ *     increment (252 B), a `return claim(...)` inline the same, and a BOOL/out-pointer inline or `?:` caller still
+ *     compares the materialised constant at the exit join (268-276 B).
  *   - `shell_block_alloc`: retail shares one `return NULL` block between the skip loop's and the run loop's bound
  *     exits (`bge fail` twice, the block after the fill) and keeps the fill out of line after both loops (`beq
  *     fill`).  A scratch `goto fail`/`goto fill` copy measures 100 %.  Goto-free, `break` on both run-loop exits
@@ -35,7 +39,11 @@
  *     `cmpwi r0,0; bne`, and the two `return NULL` statements stay two `li r3,0; blr` blocks, so the bound branch
  *     inverts to `blt` back).  Dump 03 shows two `li r3,0` blocks in every goto-free spelling (the inline search
  *     helper with two `return -1` merges them through its return join, then re-tests the result, 336 B); the
- *     single-loop, `i >= max` re-test and inline-fill spellings measure lower.
+ *     single-loop, `i >= max` re-test and inline-fill spellings measure lower.  Inlining gives the multi-level exit
+ *     (a find-run inline's found `return` branches from the run loop straight to its exit join, as retail's `beq
+ *     fill`) but one exit join for every `return`: each `return NULL` stays its own `li rT,0; b join` block in
+ *     dump 03, the fill behind the join re-tests the result (328 B), and the whole body as an inline adds a result
+ *     temporary (320 B, lower).
  *   - The +4 B of `pull_shell_work` and the +12 B of `shell_block_alloc` shift every later symbol, so the object's
  *     `.text` is 0x1690 against the claimed 0x1680 and the extabindex size byte of `pull_shell_work` differs.  Every
  *     other row, `.ctors`, extab, extabindex, `.bss` and `.sdata2` link byte-identical (a trial flip of the scratch
