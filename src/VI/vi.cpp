@@ -11,11 +11,7 @@
  *   interrupt-24 handler `VIInit` installs), `getTiming`, `__VIInit`, `setHorizontalRegs`, `VISetPreRetraceCallback`,
  *   `VISetPostRetraceCallback`, `VISetDimmingMode`, `VIGetScanMode`, `__VIResetDimmingControlA/B`, `viRenderModes`,
  *   `viShutdownFunctionInfo` and every `vi*` variable (named from what it holds and where it is read).
- * RESIDUALS. `__VIShutdown`: the target returns its `final` argument (0) for an unknown event and keeps the event 1..3
- *   retrace-count compare as two return blocks ahead of the gamma case; written with one shared `return FALSE`, the
- *   compare is inverted and the FALSE block sits after the gamma case (the explicit-return shape turns it branchless).
- *   `VIConfigure`: the clock-select word is a `u16` cleared with `& 0xFFFE` (same length as retail); retail clears
- *   bit 0 with `clrrwi` where ours masks to 16 bits (`rlwinm 16,30`), and the `u32`/`int` spellings allocate r0.
+ * RESIDUALS. none: every .text row, .data, .bss, .sdata and .sbss match the target object.
  * SHAPES. The SDK's inline helpers are written above their first caller; `VIGetTvFormat`, `VIGetScanMode` and
  *   `VIGetDTVStatus` are expanded through `getTvFormat`/`getScanMode`/`getDTVStatus`.  `VIInit` expands the copy
  *   `enableDimming`; `VIEnableDimming` keeps its own body (as a wrapper its two saved registers swap).
@@ -29,7 +25,10 @@
  *   differ only in their local declaration order, which decides the register allocation once inlined.
  *   `x = x + (2 * acv - 2)` (not `+=`) keeps the per-sum u16 truncation in `setVerticalRegs`; `(nonInter & 1) << 2` is
  *   what makes `__VIInit` insert the bit with rlwimi; `__VIShutdown` tests `final` last (its TRUE block closes the
- *   function).
+ *   function) and returns through one `result` local left unset for an unknown event, which is what keeps the
+ *   retrace compare as two return blocks and lets an unknown event return `final` unchanged.  `VIConfigure` reads
+ *   the clock-select word into `oldClksel` and writes `regClksel` (both `u32`: one local gives the wrong colouring,
+ *   a `u16` masks with `rlwinm 16,30` instead of `clrrwi`), and clears the 0x300 field in both arms of the TV test.
  */
 #include "VI/vi.h"
 #include "VI/vi3in1.h"
@@ -447,33 +446,40 @@ static inline void flushRegs(void)
 /* Flushes the video state on a shutdown event; returns TRUE once the display is ready for it. */
 static BOOL __VIShutdown(BOOL final, u32 event)
 {
-    if (!final) {
+    BOOL result;
+
+    if (final == FALSE) {
         switch (event) {
+        case 3:
         case 1:
         case 2:
-        case 3:
             if (viShutdownFlushPending) {
                 __VIRequestEncoderUpdate();
                 flushRegs();
                 viShutdownRetraceCount = viRetraceCount;
                 viShutdownFlushPending = FALSE;
-                return FALSE;
-            }
-            if (viShutdownRetraceCount != viRetraceCount) {
-                return TRUE;
+                result = FALSE;
+            } else {
+                if (viShutdownRetraceCount == viRetraceCount) {
+                    result = FALSE;
+                } else {
+                    result = TRUE;
+                }
             }
             break;
-        case 0:
         case 4:
-        case 5:
+        case 0:
         case 6:
+        case 5:
             __VISetLinearGamma();
-            return TRUE;
+            result = TRUE;
+            break;
         }
-        return FALSE;
     } else {
-        return TRUE;
+        result = TRUE;
     }
+
+    return result;
 }
 
 /* Handles the display interrupt: programs the flushed registers, runs the callbacks and drives the screen dimming. */
@@ -1207,7 +1213,8 @@ void VIConfigure(const GXRenderModeObj* rm)
 {
     VITimingInfo* tm;
     u32 regDspCfg;
-    u16 regClksel;
+    u32 regClksel;
+    u32 oldClksel;
     BOOL enabled;
     u32 newNonInter;
     u32 tvInBootrom;
@@ -1263,22 +1270,23 @@ void VIConfigure(const GXRenderModeObj* rm)
     adjustPosition(tm->acv);
     setInterruptRegs(tm);
     regDspCfg = viShdwRegs[1];
-    regClksel = viShdwRegs[54];
+    oldClksel = viShdwRegs[54];
     if (viHorVer.scanMode == 2 || viHorVer.scanMode == 3) {
         regDspCfg = (regDspCfg & ~4) | 4;
         if (viHorVer.tvFormat == 8) {
-            regClksel = regClksel & 0xFFFE;
+            regClksel = oldClksel & ~1;
         } else {
-            regClksel = (regClksel & 0xFFFE) | 1;
+            regClksel = (oldClksel & ~1) | 1;
         }
     } else {
         regDspCfg = (regDspCfg & ~4) | ((viHorVer.scanMode & 1) << 2);
-        regClksel = regClksel & 0xFFFE;
+        regClksel = oldClksel & ~1;
     }
     regDspCfg = (regDspCfg & ~8) | (viHorVer.threeD << 3);
-    regDspCfg = regDspCfg & ~0x300;
     if (viHorVer.tvFormat == 1 || viHorVer.tvFormat == 2 || viHorVer.tvFormat == 3) {
-        regDspCfg |= viHorVer.tvFormat << 8;
+        regDspCfg = (regDspCfg & ~0x300) | (viHorVer.tvFormat << 8);
+    } else {
+        regDspCfg = regDspCfg & ~0x300;
     }
     viShdwRegs[1] = regDspCfg;
     viChanged |= VI_BITMASK(1);
