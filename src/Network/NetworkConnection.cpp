@@ -3,7 +3,9 @@
  *   table 0x805F9190: it creates the slot's peer by kind and owns it at +0x0C), the member mutex class (table
  *   0x805F91E0) and the peer constructors the base calls (the 0x663C-byte peer, `NetworkPeerUdp`).
  * RANGE. .text 0x803CA1D4-0x803CA49C (9 functions), extab 0x80019584-0x80019618, extabindex 0x80039EAC-0x80039EF4
- *   (6 entries), .data 0x805F9190-0x805F91F0 (the two tables).  Left edge: the `.data` zigzag at 0x805F9190 (after
+ *   (6 entries), .data 0x805F9190-0x805F91F0 (the two tables), .sdata2 0x8079C690-0x8079C698 (`networkSessionDefaultDelay`,
+ *   4 B and the alignment fill; linked between `lobby/lb_server_sel_trans.cpp`'s pool and
+ *   `Network/NetworkConnectionStable.cpp`'s, read by `Network/NetworkSessionStable.cpp` and that unit).  Left edge: the `.data` zigzag at 0x805F9190 (after
  *   `__vt__17NetworkStreamSink`).  Right edge: the V->S seam at 0x805F91F0 (the `NetworkConnectionStable[%d]` strings
  *   start a new TU) and `NetworkConnectionStable`'s constructor 0x803CA49C (its extabindex record opens the next run);
  *   the three float setters 0x803CA484..0x803CA49C are the base table's slots +0x3C..+0x44, so they are this class's.
@@ -27,6 +29,9 @@
 #include "Network/network_shared_data.h"      /* the connection defaults */
 
 #pragma peephole off
+
+/* The slot's starting relay delay and round-trip guess, in seconds. */
+const f32 networkSessionDefaultDelay = 3.0f;
 
 /* Clears the callback, owner and peer, then creates the peer of `kind`: 1 a buffer peer, 2 a Udp peer, 4 and 5 an Mcs
  * peer (armed and not), 6 a GameSpy peer. */

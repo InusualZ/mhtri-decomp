@@ -3,7 +3,8 @@
  *   (its log strings: `NetworkConnectionStable[%d] ...`), the slot queues it embeds (`NetworkSlotQueues`), the send pool
  *   and the frame writer's entry points.
  * RANGE. .text 0x803CA49C-0x803CCDF8 (50 functions), extab 0x80019618-0x800198C8, extabindex 0x80039EF4-0x8003A0BC,
- *   .data 0x805F91F0-0x805F94E0 (the log strings and the class's table 0x805F9490).  Left edge: the V->S seam at
+ *   .data 0x805F91F0-0x805F94E0 (the log strings and the class's table 0x805F9490), .sdata2 0x8079C698-0x8079C6C8 (the
+ *   float pool and the `u32`->`f32` conversion double; every row is read only from here).  Left edge: the V->S seam at
  *   0x805F91F0 and the constructor's extabindex record (`Network/NetworkConnection.cpp`).  Right edge:
  *   `Network/NetworkPeerBase.cpp` at 0x803CCDF8.
  * FLAGS. the library's flags plus `#pragma peephole off` (kept `clrlwi`/`extsb` forms), `#pragma fp_contract off`
@@ -19,13 +20,11 @@
  *   0x803CC00C (`GoalOverlay::SceneCreated`, `J3DColorBlockLightOff::setColorChanNum`, `nw4hbm::ut::TextWriterBase`'s
  *   char-space accessors) are folded one-store bodies, not evidence.
  * RESIDUALS. The constructor calls `NetworkConnection(s32)`, which is unwritten in `Network/NetworkConnection.cpp`.
- *   `sendChannel`: size, overhead and the send-queue pointer take r23/r22/r24 against retail's r22/r23/r22 (the local
- *   declaration order is the best of the permutations measured).
- *   `open`: `rand() + base` adds in the other operand
- *   order (`(s32)`/`(u16)` spellings tried).
- *   `.sdata2` (flip blocker): our object emits the `u32`->`f32` conversion double (8 B) that retail pools at
- *   0x8079C6B8 (`dispatchControl`'s pong time); the range is not this unit's to claim.
- * SHAPES. `sendClose`'s close byte is a ternary of u8 arms passed to `writeByte`'s u8 parameter (the sum is masked
+ * SHAPES. The pool's floats are literals in the bodies; MWCC pools them in first-use order, which is retail's.
+ *   `open` spells each sequence as `rand() + (u32)(...)` with no local (a `base` local adds the operands the
+ *   other way).  `sendChannel` tests the stored `overhead` and logs `(u16)overhead() + size(0xFF)` as one expression:
+ *   the call results stay compiler temporaries coloured ahead of the send-queue pointer, which then takes r22.
+ *   `sendClose`'s close byte is a ternary of u8 arms passed to `writeByte`'s u8 parameter (the sum is masked
  *   in place).  The destructor, the `NetworkSlotQueues` constructor and destructor and the four writer constructors and
  *   destructors are complete with empty bodies (the compiler emits the member and base calls and the table stores);
  *   all of them match.  The writers' tables are `Network/NetworkUnitPacket.cpp`'s: each class declares its flush
@@ -33,9 +32,10 @@
  */
 
 #include "Network/NetworkConnectionStable.h"
+#include "Network/NetworkConnection.h"        /* networkSessionDefaultDelay */
 #include "Network/NetworkSessionStable.h"   /* NetworkConnectionStable, NetworkSlotQueues */
 #include "Network/NetworkUnitPacket.h"      /* the packet, writer, reader and queue entry points */
-#include "Network/network_shared_data.h"    /* the connection's pooled constants */
+#include "Network/network_shared_data.h"    /* the connection's default interval words */
 #include "MSL_C/alloc.h"                    /* rand */
 #include "unsplit/Network.h"                /* NetworkLogger */
 #include "Runtime.PPCEABI.H/memcpy.h"
@@ -80,18 +80,16 @@ NetworkConnectionStable::~NetworkConnectionStable()
 void NetworkConnectionStable::open(NetworkConnectionCallback callback, NetworkSessionStable* owner, s8 index,
                                    const NetworkConnectionOpenInfo* info)
 {
-    u32 base;
-
     (&queues_1024.send_00[0])->attach(sendBlocks_10A4[0], 0x400);
     (&queues_1024.send_00[1])->attach(sendBlocks_10A4[1], 0x400);
-    base = (u32)(networkConnectionMilliseconds * getNetworkLogger()->getTime_60());
-    networkStreamQueue_setSequence(&queues_1024.send_00[0], base + rand());
-    base = (u32)(networkConnectionMilliseconds * getNetworkLogger()->getTime_60());
-    networkStreamQueue_setSequence(&queues_1024.send_00[1], base + rand());
+    networkStreamQueue_setSequence(&queues_1024.send_00[0],
+                                   rand() + (u32)(1000.0f * getNetworkLogger()->getTime_60()));
+    networkStreamQueue_setSequence(&queues_1024.send_00[1],
+                                   rand() + (u32)(1000.0f * getNetworkLogger()->getTime_60()));
     (&queues_1024.receive_30[0])->attach(receiveBlocks_18A4[0], 0x400);
     (&queues_1024.receive_30[1])->attach(receiveBlocks_18A4[1], 0x400);
     queues_1024.receiveStarted_60 = 0;
-    queues_1024.expiry_64 = networkConnectionZero;
+    queues_1024.expiry_64 = 0.0f;
     index_20A4 = index;
     addressSize_2128 = (s32)info->size_04 < 0x80 ? (s32)info->size_04 : 0x80;
     memcpy(address_20A5, info->data_00, addressSize_2128);
@@ -101,11 +99,11 @@ void NetworkConnectionStable::open(NetworkConnectionCallback callback, NetworkSe
     connectTimeout_21C8 = networkConnectionDefaultTimeout;
     pingsLost_21F8 = 0;
     pingsAnswered_21FC = 0;
-    lastPing_2200 = networkConnectionZero;
-    lastStat_2204 = networkConnectionZero;
+    lastPing_2200 = 0.0f;
+    lastStat_2204 = 0.0f;
     totalBytesSent_222C = 0;
     totalBytesReceived_2230 = 0;
-    lastReceive_2234 = networkConnectionZero;
+    lastReceive_2234 = 0.0f;
     receiveTimeout_2238 = networkConnectionDefaultLimit;
     receivedThisFrame_223C = 0;
     callback_04 = callback;
@@ -138,15 +136,15 @@ void NetworkConnectionStable::clear()
     networkStreamQueue_clear(&queues_1024.receive_30[1]);
     queues_1024.resend_68 = 0;
     memset(queues_1024.lastSend_6C, 0, sizeof(queues_1024.lastSend_6C));
-    queues_1024.rate_74 = networkConnectionTwo * networkSessionDefaultDelay;
-    queues_1024.rateTarget_78 = networkConnectionZero;
+    queues_1024.rate_74 = 2.0f * networkSessionDefaultDelay;
+    queues_1024.rateTarget_78 = 0.0f;
     queues_1024.byteLimit_7C = 0x400;
     peerAddressSize_21AC = 0;
     memset(peerAddress_212C, 0, sizeof(peerAddress_212C));
     setState(0);
-    lastPoll_21BC = networkConnectionZero;
-    connectStart_21C4 = networkConnectionZero;
-    lastHello_21CC = networkConnectionZero;
+    lastPoll_21BC = 0.0f;
+    connectStart_21C4 = 0.0f;
+    lastHello_21CC = 0.0f;
     pingIndex_21D0 = 0;
     pingTimes_21D4[0] = networkSessionDefaultDelay;
     pingTimes_21D4[1] = networkSessionDefaultDelay;
@@ -213,7 +211,7 @@ void NetworkConnectionStable::update()
         if (result > 0) {
             setState(2);
             connectStart_21C4 = now_21B4;
-            lastHello_21CC = networkConnectionZero;
+            lastHello_21CC = 0.0f;
         }
         break;
     case 2:
@@ -238,7 +236,7 @@ void NetworkConnectionStable::update()
             setError(0x80030033, (s32)connectTimeout_21C8, 0x80000000);
             break;
         }
-        if (networkConnectionPingInterval + lastHello_21CC <= now_21B4) {
+        if (1.0f + lastHello_21CC <= now_21B4) {
             lastHello_21CC = now_21B4;
             sendHello(0);
         }
@@ -262,7 +260,7 @@ void NetworkConnectionStable::update()
             clear();
             break;
         }
-        if (networkConnectionPingInterval + lastPing_2200 <= now_21B4) {
+        if (1.0f + lastPing_2200 <= now_21B4) {
             lastPing_2200 = now_21B4;
             updateRoundTrip(pingIndex_21D0);
             sendPing(pingIndex_21D0);
@@ -278,7 +276,7 @@ void NetworkConnectionStable::update()
             minutePacketsSent_2228 += packetsSent_2220;
             packetsSent_2220 = 0;
         }
-        if (networkConnectionStatInterval + lastStat_2204 <= now_21B4) {
+        if (60.0f + lastStat_2204 <= now_21B4) {
             lastStat_2204 = now_21B4;
             getNetworkLogger()->signal_0C(1, "NetworkConnectionStable[%d] 1min send %d/%d recv %d\n", index_20A4,
                                           minuteBytesSent_2218, minutePacketsSent_2228, minuteBytesReceived_221C);
@@ -392,7 +390,7 @@ void NetworkConnectionStable::putOnSendPool(NetworkStreamWriter* packet, s32 cha
     s32 result;
 
     if (checkChannel(channel) == 0) {
-        networkPacket_setTimestamp(packet, networkConnectionZero);
+        networkPacket_setTimestamp(packet, 0.0f);
         result = networkStreamQueue_append(&queues_1024.send_00[channel], packet, 0xFF);
         if (result < 0) {
             getNetworkLogger()->log_14("NetworkConnectionStable[%d] put send pool over (0x%x)\n", index_20A4, result);
@@ -430,8 +428,8 @@ void NetworkConnectionStable::sendChannel(s32 channel)
     sent = 0;
     sequence = networkStreamWriter_size(&queues->send_00[channel]);
     while (networkPacket_hasMessage(&packet) != 0) {
-        if (networkPacket_getTimestamp(&packet) < networkConnectionZero
-            && now_21B4 < networkConnectionNoTimestamp * networkPacket_getTimestamp(&packet)) {
+        if (networkPacket_getTimestamp(&packet) < 0.0f
+            && now_21B4 < (-1.0f) * networkPacket_getTimestamp(&packet)) {
             break;
         }
         if (queues->rate_74 + networkPacket_getTimestamp(&packet) <= now_21B4) {
@@ -441,16 +439,16 @@ void NetworkConnectionStable::sendChannel(s32 channel)
         networkPacket_nextMessage(&packet);
     }
     while (networkPacket_hasMessage(&packet) != 0) {
-        if (networkPacket_getTimestamp(&packet) < networkConnectionZero
-            && now_21B4 < networkConnectionNoTimestamp * networkPacket_getTimestamp(&packet)) {
+        if (networkPacket_getTimestamp(&packet) < 0.0f
+            && now_21B4 < (-1.0f) * networkPacket_getTimestamp(&packet)) {
             break;
         }
         size = networkPacket_getMessageSize(&packet, 0x80);
-        if ((u16)networkPacket_getFrameOverhead() + size > 0x200) {
-            size = networkPacket_getMessageSize(&packet, 0xFF);
-            overhead = networkPacket_getFrameOverhead();
+        overhead = networkPacket_getFrameOverhead();
+        if (overhead + size > 0x200) {
             getNetworkLogger()->warn_10("NetworkConnectionStable:send:[%d] unit size over -> %d\n", index_20A4,
-                                        overhead + size);
+                                        (u16)networkPacket_getFrameOverhead()
+                                            + networkPacket_getMessageSize(&packet, 0xFF));
         }
         result = networkStreamWriter_putPacket(&frame, &packet, 0x80);
         if (result < 0) {
@@ -659,7 +657,7 @@ s32 NetworkConnectionStable::getCongestion()
     n = 7 - (s32)networkSessionDefaultDelay;
     count = 0;
     for (i = 0; i < n; i++) {
-        if (networkConnectionZero == pingTimes_21D4[(pingIndex_21D0 + i) % 8]) {
+        if (0.0f == pingTimes_21D4[(pingIndex_21D0 + i) % 8]) {
             count += 2;
         }
     }
@@ -798,8 +796,8 @@ void NetworkConnectionStable::sendPing(u8 index)
     u32 n;
 
     index = index % 8;
-    time = (u32)(networkConnectionMilliseconds * now_21B4);
-    pingTimes_21D4[index] = networkConnectionZero;
+    time = (u32)(1000.0f * now_21B4);
+    pingTimes_21D4[index] = 0.0f;
     packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
     n = (u16)writeByte(&packet, 0x91);
@@ -962,11 +960,11 @@ void NetworkConnectionStable::dispatchControl()
                 networkPacket_takeByte(&packet, &index);
                 networkPacket_takeU32(&packet, &time);
                 index = index % 8;
-                sent = time / networkConnectionMilliseconds;
+                sent = time / 1000.0f;
                 if (index < 8 && sent <= now_21B4) {
                     pingTimes_21D4[index] = now_21B4 - sent;
-                    if (networkConnectionZero == pingTimes_21D4[index]) {
-                        pingTimes_21D4[index] = networkConnectionMinRoundTrip;
+                    if (0.0f == pingTimes_21D4[index]) {
+                        pingTimes_21D4[index] = 0.0001f;
                     }
                 }
             }
@@ -1013,12 +1011,12 @@ void NetworkConnectionStable::updateRoundTrip(u8 index)
 
     ping = &pingTimes_21D4[(u8)(index % 8)];
     time = *ping;
-    if (time <= networkConnectionZero || networkSessionDefaultDelay < time) {
+    if (time <= 0.0f || networkSessionDefaultDelay < time) {
         time = networkSessionDefaultDelay;
     }
-    roundTrip_21F4 = networkConnectionRoundTripKeep * roundTrip_21F4 + networkConnectionRoundTripWeight * time;
+    roundTrip_21F4 = 0.9f * roundTrip_21F4 + 0.1f * time;
     updateRate();
-    if (networkConnectionZero == *ping) {
+    if (0.0f == *ping) {
         pingsLost_21F8++;
         return;
     }
@@ -1031,10 +1029,10 @@ void NetworkConnectionStable::updateRate()
     f32 a;
     f32 rate;
 
-    a = networkConnectionTwo * roundTrip_21F4;
-    rate = networkConnectionTwo * queues_1024.rateTarget_78;
+    a = 2.0f * roundTrip_21F4;
+    rate = 2.0f * queues_1024.rateTarget_78;
     rate = a < rate ? rate : a;
-    rate = networkConnectionRoundTripWeight < rate ? rate : networkConnectionRoundTripWeight;
-    rate = rate < networkConnectionPingInterval ? rate : networkConnectionPingInterval;
+    rate = 0.1f < rate ? rate : 0.1f;
+    rate = rate < 1.0f ? rate : 1.0f;
     queues_1024.rate_74 = rate;
 }

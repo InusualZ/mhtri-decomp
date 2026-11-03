@@ -60,4 +60,8 @@ public:
     /* +0x0C */ NetworkPeerBase* peer_0C;               /* the peer the constructor created */
 };   /* size: 0x10 */
 
+/* 0x8079C690: the relay delay a slot starts with before a route is known, and a connection's first round-trip guess
+   (GUESS name; read by `Network/NetworkSessionStable.cpp` and `Network/NetworkConnectionStable.cpp`). */
+extern const f32 networkSessionDefaultDelay;
+
 #endif /* MHTRI_NETWORK_NETWORKCONNECTION_H */

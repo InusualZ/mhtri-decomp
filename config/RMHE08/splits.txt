@@ -2156,10 +2156,6 @@ lobby/lb_server_sel_trans.cpp:
 	.sbss       start:0x80794C90 end:0x80794C98
 	.sdata2     start:0x8079C680 end:0x8079C690
 
-Network/network_shared_data.cpp:
-	.sdata      start:0x80793900 end:0x80793930
-	.sdata2     start:0x8079C690 end:0x8079C758
-
 Network/NetworkStreamSink.cpp:
 	extab       start:0x80019554 end:0x80019584
 	extabindex  start:0x80039E64 end:0x80039EAC
@@ -2172,12 +2168,18 @@ Network/NetworkConnection.cpp:
 	extabindex  start:0x80039EAC end:0x80039EF4
 	.text       start:0x803CA1D4 end:0x803CA49C
 	.data       start:0x805F9190 end:0x805F91F0
+	.sdata2     start:0x8079C690 end:0x8079C698
 
 Network/NetworkConnectionStable.cpp:
 	extab       start:0x80019618 end:0x800198C8
 	extabindex  start:0x80039EF4 end:0x8003A0BC
 	.text       start:0x803CA49C end:0x803CCDF8
 	.data       start:0x805F91F0 end:0x805F94E0
+	.sdata2     start:0x8079C698 end:0x8079C6C8
+
+Network/network_shared_data.cpp:
+	.sdata      start:0x80793900 end:0x80793930
+	.sdata2     start:0x8079C6C8 end:0x8079C758
 
 Network/NetworkPeerBase.cpp:
 	extab       start:0x800198C8 end:0x800198E0
