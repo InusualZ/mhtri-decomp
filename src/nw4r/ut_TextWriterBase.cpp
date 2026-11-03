@@ -14,14 +14,16 @@
  *   fn_80504B4C), PrintMutable (fn_80504C20), CalcLineRectImpl (fn_80504C28), CalcStringRectImpl (fn_805052B0),
  *   PrintImpl (fn_805053D0), AdjustCursor (fn_80505E5C), the static initialiser (fn_80506598) and the default tag
  *   processors mDefaultTagProcessor<c>/<w>.
- * RESIDUALS. TextWriterBase's constructor and destructor have empty bodies by design (member-list construction and
- *   nw4r's empty destructor).
- *   CalcLineRectImpl 99.65 %: retail keeps the unused prMaxRect copy as one stack Rect at 0x38, this
- *   compiler splits it into four slots and the frame grows 0x70; the copy as four field stores or through `*&`, no
- *   copy, and prMaxRect declared first, last or after `context` do not keep it whole.
- *   Font::GetCharStrmReader is a strong function here
- *   (retail links a weak copy at 0x80504AB8, after GetLineHeight<c>); the char instantiation's other functions are
- *   emitted and dropped by the link.
+ * RESIDUALS. none in .text or data. TextWriterBase's constructor and destructor have empty bodies by design
+ *   (member-list construction and nw4r's empty destructor). Font::GetCharStrmReader is a strong function here (retail's
+ *   copy at 0x80504AB8 may be weak; the DOL cannot tell); the char instantiation's other functions are emitted and
+ *   dropped by the link.
+ * SHAPES. The instantiations at the end of the file fix the emission order, which is the link order and the .sdata2
+ *   pool order: the char class first, then GetCharStrmReader, then the wchar_t members one by one. MWCC compiles a
+ *   template member with the pragma state at its instantiation point, so CalcLineRectImpl<w> alone is instantiated
+ *   under `#pragma opt_lifetimes off`: with lifetime splitting each dead store to prMaxRect gets its own stack slot
+ *   (seven slots, frame 0x1E0 for retail's 0x170); off for the whole file costs PrintImpl<w> (99.82). A `~Rect() {}`
+ *   in nw4r/ut_Rect.h also keeps prMaxRect whole, but changes ten homebutton/nw4r objects (two of them Matching).
  * SHAPES. GetCharStrmReader is defined under `#pragma auto_inline off` (retail calls it); PrintImpl declares useLimit,
  *   charSpace, prStrPos, prLineStrPos in that order (the saved-register order) and its width-limit test reads the
  *   local xOrigin.
@@ -368,6 +370,10 @@ template <typename T> f32 TextWriterBase<T>::AdjustCursor(f32* xOrigin, f32* yOr
     return textWidth;
 }
 
+/* The instantiations follow the retail link order: the char class (the link keeps only its GetLineHeight), the font's
+ * reader accessor, then the wchar_t members one by one so CalcLineRectImpl alone compiles without lifetime splitting. */
+template class TextWriterBase<char>;
+
 /* A reader set up for this font's encoding. */
 #pragma auto_inline off
 CharStrmReader Font::GetCharStrmReader() const {
@@ -375,7 +381,16 @@ CharStrmReader Font::GetCharStrmReader() const {
 }
 #pragma auto_inline reset
 
-template class TextWriterBase<char>;
+template TextWriterBase<wchar_t>::TextWriterBase();
+template TextWriterBase<wchar_t>::~TextWriterBase();
+template f32 TextWriterBase<wchar_t>::GetLineHeight() const;
+template f32 TextWriterBase<wchar_t>::PrintMutable(const wchar_t* str, int length);
+#pragma opt_lifetimes off
+template bool TextWriterBase<wchar_t>::CalcLineRectImpl(Rect* rect, const wchar_t** str, int length);
+#pragma opt_lifetimes reset
+template void TextWriterBase<wchar_t>::CalcStringRectImpl(Rect* rect, const wchar_t* str, int length);
+template f32 TextWriterBase<wchar_t>::PrintImpl(const wchar_t* str, int length, bool moveCursor);
+template f32 TextWriterBase<wchar_t>::AdjustCursor(f32* xOrigin, f32* yOrigin, const wchar_t* str, int length);
 template class TextWriterBase<wchar_t>;
 
 }  // namespace ut

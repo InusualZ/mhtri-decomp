@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (289)
+## Ideas that work (290)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -298,6 +298,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 309 | [A loop bit mask colours before its strength-reduced walk: make the loop's mask the second web of a helper local](309-loop-bit-mask-colours.md) | works | source-shape, allocator | A bit-walking loop over an indexed array (`for (bits = ...; bits; i++, bits >>= 1) if (bits & 1) use(a[i])`) matches every opcode but the mask and the strength-reduced walk pointer are swapped (ours mask r7 / walk r8,... |
 | 310 | [A link-up tail two callers share goes through one static helper: the extra inline level renumbers a nested inline's loop values](310-link-up-tail-two.md) | works | source-shape, allocator | Two functions end with the same call sequence; an inlined lookup inside it has the right instructions but its loop counter, argument and entry pointer in a permuted set of callee-saved registers, and no declaration... |
 | 311 | [A loop counter that is an inline helper's local colours before its strength-reduced pointer](311-loop-counter-that-is.md) | works | source-shape, allocator | A counted pointer-walk loop's counter and strength-reduced slot pointer swap two saved registers (retail r28 counter / r29 pointer, ours the reverse), nothing else differs |
+| 312 | [A template member compiles with the pragma state at its instantiation point: instantiate members one by one](312-template-member-compiles-with.md) | works | pragma, sections, source-shape | A pragma pair around a template member's definition changes nothing, the same pragma left on to the end of the file fixes that member and regresses its siblings, and the object's function order or .sdata2 pool order is... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
