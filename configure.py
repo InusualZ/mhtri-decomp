@@ -1576,7 +1576,7 @@ config.libs = [
             Object(NonMatching, "PMIC/pmic.c", cflags=cflags_base),
             Object(Matching, "KPR/kpr.c", cflags=cflags_base),
             Object(NonMatching, "HID/hid.c", cflags=cflags_base),
-            Object(NonMatching, "KBD/kbd.c", cflags=cflags_base),
+            Object(Matching, "KBD/kbd.c", cflags=cflags_base),
             # Wii/1.3 + cflags_base, not the homebutton band's GC/3.0a5.2: evidence on the FLAGS line of src/KBD/kbd_region_us.c.
             Object(Matching, "KBD/kbd_region_us.c", cflags=cflags_base),
         ],
@@ -1604,7 +1604,7 @@ config.libs = [
             Object(Matching, "nw4r/ut_ResFontBase.cpp"),
             Object(Matching, "nw4r/ut_ResFont.cpp"),
             Object(Matching, "nw4r/ut_CharWriter.cpp"),
-            Object(NonMatching, "nw4r/ut_TextWriterBase.cpp"),
+            Object(Matching, "nw4r/ut_TextWriterBase.cpp"),
             Object(Matching, "nw4r/fn_8050661C.cpp"),
         ],
     },
