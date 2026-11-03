@@ -62,6 +62,9 @@ fill_gaps: true
 # addresses and relocates them against extabindex labels; they are plain constants.
 # Measured (network pilot, L1): 21 functions up, 0 down, main.dol unchanged.
 block_relocations:
+# The Camellia SP3033 S-box word 0x80008080 (.rodata 0x8057177C, Camellia/camellia.c) is data, not a pointer.
+- source: .rodata:0x8057177C
+  end: .rodata:0x80571780
 # The weapon-3 act step tables (.data 0x805E9BE8..0x805EBBE0, Pl/pl_act_class3.cpp) are byte-coded records, not pointers.
 - source: .data:0x805E9BE8
   end: .data:0x805EBBE0
