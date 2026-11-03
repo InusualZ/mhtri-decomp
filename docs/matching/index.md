@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (278)
+## Ideas that work (279)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -287,6 +287,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 298 | [A deferred helper whose assert strings stay in the main pool is a static inline; an extern inline's literals go to the .data tail](298-deferred-helper-whose-assert.md) | works | data, source-shape, sections | A group of helpers lands after their first caller in retail's `.text` (the deferred-inline order of idea 163), but the `.data` strings of some of them sit in the main first-use sequence while the header asserts' strings... |
 | 299 | [A for-else search: an inline helper returning the found pointer, the claim guarded and the pointer returned, puts the found path on the join](299-for-else-search-an.md) | works | source-shape | Retail's search loop jumps from its found path straight to the claim tail past the loop's `li r3,0; b end`; the `found` flag costs `li 0`/`li 1`/`cmpwi`/`bne` (+16 B) and an inline helper tested with `if (!p) return... |
 | 300 | [A loop with three exits: break on two of them and re-test the loaded byte after the loop, which CSE keeps, to move the tail after the loops](300-loop-with-three-exits.md) | works | source-shape | Retail's inner loop leaves three ways (restart the outer loop, a tail placed after both loops, a shared fail block) and the goto-free source puts the tail inline in the loop, so the `beq tail` forward branch, the tail's... |
+| 301 | [A ternary of u16 arms passed to a u16 parameter is masked in place: the sum coalesces with the argument register](301-ternary-of-u16-arms.md) | works | source-shape, allocator | A consecutive-constant ternary feeding a call ends `addi r4,r4,K ; clrlwi r4,r4,16` in retail and `addi r0,r4,K ; clrlwi r4,r0,16` in ours, whatever the cast on the ternary or the local it goes through |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

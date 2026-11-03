@@ -19,11 +19,13 @@
  *   GUESS (data): em009_slide_curve, em009_pick_tbl, em009_route_points, em009_turn_seq_0/1,
  *   em009_demo_keys3/_a/_a_time/_b, em009_se_seq_<sub-state> (the sub-state that first plays each table) with their
  *   em009_se_rec/pos records, the `Em009ProgTbl` slot names.
- * RESIDUALS. `em009_act2_11`: retail computes the motion select into r4 (`addi r4,r4,0x1f;
- *   clrlwi r4,r4,16`), ours into r0 (a u16 callee view, a local, unsigned constants and the inverted test all leave
- *   it).  `.sdata2` is 0x29C against the claim's 0x2A0 (the trailing word is the section's 8-byte alignment pad).
- *   flipcheck: `em009_act2_11`.
- * SHAPES. `Em009UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ * RESIDUALS. None in `.text` (every row and its raw words agree with the target).  `.sdata2` is 0x29C against the
+ *   claim's 0x2A0 (the trailing word is the section's 8-byte alignment pad; the linked DOL hashes the same).
+ * SHAPES. `em009_act2_11`'s motion select is a ternary of u16 arms passed through a u16 view of `em_mot_set`
+ *   (`em_mot_set_c1`): the frontend's sum (`add tK,tM,tK`) is then masked in place and coalesced with r4, so
+ *   `addi r4,r4,0x1f; clrlwi r4,r4,16` - a `(u16)` cast of the whole ternary, int arms, or an s32 view each keep the
+ *   sum in r0 (playbook: the u16-arms-to-u16-parameter idea).
+ *   `Em009UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv` landing pad,
  *   0x10 of extab, retail does not have).  A case-level `return` that retail lays out as a `break` is written
  *   `break`; one-case signed compares are
@@ -76,6 +78,9 @@
 #define get_move_work_max_c1 ((u16 (*)(u8))get_move_work_max)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
 #define em_pl_target_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u8*))em_pl_target_ck)
+/* The motion setter's own width (`em_mot_set` narrows its motion to u16 first, `enemy/em_common.h`): a ternary of
+ * u16 arms passed to it is masked in place after the join. */
+#define em_mot_set_c1 ((void (*)(struct _ENEMY_WORK*, u16, s32, s32))em_mot_set)
 
 /* The shell-set slots this unit calls, typed as the call sites pass them (the table register is only the
  * slot base, not an argument). */
@@ -1030,7 +1035,7 @@ void em009_act2_11(_ENEMY_WORK* self, u8 a)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        em_mot_set(self, (u16)(a == 1 ? 0x1E : 0x1F), 2, 0);
+        em_mot_set_c1(self, a == 1 ? (u16)0x1E : (u16)0x1F, 2, 0);
         return;
     case 1:
         if (em_frame_check(self, 3, 14.0f, 78.0f) == 1) {
