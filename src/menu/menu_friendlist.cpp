@@ -18,9 +18,12 @@
  *   `option_cursor_draw`, `arena_value_step`, `terms_progress_draw`, the types `FriendPickWork`, `FriendCardView`,
  *   and every foreign name this file spells from the name registry.
  * RESIDUALS.
- *  - `friend_pick_step`: the friend-request step's sub-steps 0..2 run as one chain with `case 1:` and `case 2:` inside
- *    `if (0) { ... }` blocks (playbook 241), so retail's forward jumps into the next sub-step's tail are the source's;
- *    the size matches and the remainder is register colouring (declaration-order hill climb found nothing).
+ *  - `friend_pick_step`: in the friend-request step retail's sub-step 0 jumps forward into sub-step 1's tail and
+ *    sub-steps 0/1 into sub-step 2's tail, with five equality compares (0..4) dispatching.  Without a case label
+ *    inside another block (rule 8) sub-steps 0..2 share one `case 0: case 1: case 2:` body that tests the sub-step;
+ *    MWCC lowers the shared case to `cmplwi 2 ; ble` (already in the first backend dump, dump 03), so the dispatch is
+ *    one instruction shorter and re-tests the value; the bodies keep retail's layout.  The `if (0) { case N: }`
+ *    spelling 99.66; sub-steps 0/1 merged with sub-step 2's tail repeated 95.81; every tail repeated 92.28.
  *  - `movie_page04_draw`: retail reloads `row->page_kind` after each call in the value switch; MWCC keeps it in a
  *    saved register.
  *  - `page17_rows_build` matches only with `#pragma opt_strength_reduction off` (retail indexes the option tables with
@@ -379,29 +382,30 @@ s32 friend_pick_step(FriendPickWork* work) {
         lobby_hidden_flag = 1;
         switch (work->request_step_0x002) {
         case 0:
-            work->request_step_0x002 = 1;
-            if (menu_work.slot[0].field_0x31F != get_option_cfg(27)) {
-                requestFriendSync(&work->result_0x10AE);
-                break;
-            }
-            /* no sync needed: on to the profile resend */
-            if (0) {
         case 1:
-                if (work->result_0x10AE == 0) {
+        case 2:
+            /* sync the option, resend the profile, then send the request; each step runs on into the next */
+            if (work->request_step_0x002 != 2) {
+                if (work->request_step_0x002 == 0) {
+                    work->request_step_0x002 = 1;
+                    if (menu_work.slot[0].field_0x31F != get_option_cfg(27)) {
+                        requestFriendSync(&work->result_0x10AE);
+                        break;
+                    }
+                } else {
+                    if (work->result_0x10AE == 0) {
+                        break;
+                    }
+                    if (work->result_0x10AE != 1) {
+                        set_option_cfg(27, menu_work.slot[0].field_0x31F);
+                    }
+                }
+                work->request_step_0x002 = 2;
+                if (menu_work.slot[0].field_0x31E != 0) {
+                    resendProfileRecord(&work->result_0x10AE);
                     break;
                 }
-                if (work->result_0x10AE != 1) {
-                    set_option_cfg(27, menu_work.slot[0].field_0x31F);
-                }
-            }
-            work->request_step_0x002 = 2;
-            if (menu_work.slot[0].field_0x31E != 0) {
-                resendProfileRecord(&work->result_0x10AE);
-                break;
-            }
-            /* nothing to resend: on to the friend request */
-            if (0) {
-        case 2:
+            } else {
                 if (work->result_0x10AE == 0) {
                     break;
                 }

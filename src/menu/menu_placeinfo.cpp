@@ -6,7 +6,8 @@
  *   .ctors 0x8056F3C8, .data 0x80603E90-0x806047D0, .bss 0x806E1B38-0x806E26E0, .sdata 0x80793A10-0x80793A80, .sdata2
  *   0x8079C8A8-0x8079C8D0.  The right edge is where the `.ctors` closure ends, the left is `Network/net_session_close.cpp`'s
  *   end.  One TU: the `__FILE__` string "menu_placeinfo.cpp" (0x80604780) has one copy.
- * FLAGS. `cflags_menu` (configure.py); `#pragma dont_inline on` at the foot keeps `__sinit` calling the two constructors.
+ * FLAGS. `cflags_menu` (configure.py); `#pragma dont_inline on` at the foot keeps `__sinit` calling the two constructors;
+ *   `#pragma optimization_level 4` over `lb_city_select_draw` alone (see RESIDUALS).
  * NAMES. Module and file from the `__FILE__` string.  `draw_search_city_dialog`, `placeinfo_page12_*`/`placeinfo_page13_*`,
  *   `lb_city_select_open`, `lb_city_select_screen_step`, `lb_city_screen_open`, `lb_city_move_confirm_step`,
  *   `lb_city_area_ck`, `em003_call_se_*` are the map's names.
@@ -28,13 +29,21 @@
  *   `em003_call_se_ids`.
  * RESIDUALS.
  *  - `lb_community_select_step`: retail keeps its page-count tail (pages = total / 8, cursor clamp) in state 8 step 2
- *    and reaches it by backward jumps from step 3 and from six places in states 4 and 3.  Step 3's jump is the back
- *    edge of a `for (;;)` the tail heads (playbook 252); the other six sit in other cases of the OUTER switch, which
- *    no loop inside the step switch can contain, so they call the static helper `lb_community_page_count_set` (an
- *    extra function in our object, `mr r3,r30 ; bl` before each `b`).  A scratch `goto` spelling 99.24.
+ *    and reaches it by backward jumps from step 3 and from six places in states 4 and 3.  No loop can hold step 3
+ *    without a case label inside it (rule 8), so step 2 keeps the tail inline and the seven jump sites call the static
+ *    helper `lb_community_page_count_set` (an extra function in our object, `mr r3,r30 ; bl` before each `b`; the
+ *    first backend dump already holds the calls, so the shape is the source's).  A scratch `goto` spelling 99.24;
+ *    step 3 as the back edge of a `for (;;)` headed by the tail with `case 3:` inside the loop 98.51; the tail
+ *    repeated in step 3 96.46; step 2 calling the helper too 96.31.
  *  - `lb_city_select_screen_step`: state 5 step 3 repeats state 4 step 1's enter-city tail, which retail reaches by a
  *    backward jump from another case of the outer switch (rule 8; idea 252 cannot reach across the nesting; idea 213:
  *    MWCC has no pass that merges the identical copy).  The tail after the switch (idea 183) scores 96.30.
+ *  - `lb_city_select_draw`: retail's state 8 branches back to state 5's own entry (`bne` to the case-5 block, past the
+ *    compare chain).  Without a case label inside a loop (rule 8) the source re-dispatches (`state = 5; continue;`
+ *    around the switch): `li r3,5 ; b <dispatch>`, and the frontend hoists the `lobby_w.state` load into the loop's
+ *    preheader (dump 03, block B1), so the switch compares r3 and case 5 reads the hoisted r0; `#pragma
+ *    optimization_level 4` over the function and `state` declared before `work` keep `work` in r31.  The case-in-loop spelling 99.08; case 5's
+ *    body repeated in case 8 87.0; `case 5: case 8:` with a state test 70.2.
  *  - `lb_city_select_draw`: case 3's steps 3/4 range test is `subi`+`cmplwi` in retail, `cmpwi 3 ; blt ; cmpwi 4`
  *    in ours (one instruction); `case 4: case 3:`, a `default:` range test and `(u8)`/`(s32)`/`(u32)` switch
  *    operands do not move it.
@@ -1558,61 +1567,65 @@ void lb_city_timer_draw(LbCitySelectWork* work) {
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x80439EF8 (0x414): draws the city select's current state. */
 void lb_city_select_draw(void) {
+    u8 state;
     LbCitySelectWork* work = (LbCitySelectWork*)lobby_w.menu_0xAC;
 
-    switch (work->state_0x000) {
-    case 2:
-        put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x264), 0);
-        if (work->server_type_0x003 == 3) {
-            lb_city_list_ex_draw(work, 1);
-        } else {
-            lb_city_list_draw(work, 1);
-        }
-        break;
-    case 3:
-        put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
-        switch (work->step_0x001) {
-        case 0:
-            lb_city_member_list_draw(work, 1);
-            break;
-        case 1:
-            lb_city_member_list_draw(work, 1);
-            if (work->sub_0x002 == 1) {
-                put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
-            }
-            break;
+    state = work->state_0x000;
+
+    for (;;) {
+        switch (state) {
         case 2:
-            lb_city_member_list_draw(work, 1);
+            put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x264), 0);
+            if (work->server_type_0x003 == 3) {
+                lb_city_list_ex_draw(work, 1);
+            } else {
+                lb_city_list_draw(work, 1);
+            }
             break;
         case 3:
-        case 4:
-            menu_friend_list_draw((FriendCardView*)work->card_view_0x114C);
-            if (work->step_0x001 == 4 && work->sub_0x002 == 1) {
-                put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
-            }
-            break;
-        }
-        break;
-    case 4:
-        switch (work->step_0x001) {
-        case 0:
             put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
-            lb_city_member_list_draw(work, 0);
-            put_message_window((s8*)LbStr(0, 0x27F), (s8*)LbStr(1, 0x2D), (s8*)LbStr(1, 0x2E), work->yes_no_0x1340, 0,
-                               -1);
-            break;
-        case 1:
-            if (work->sub_0x002 == 1) {
-                put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
+            switch (work->step_0x001) {
+            case 0:
+                lb_city_member_list_draw(work, 1);
+                break;
+            case 1:
+                lb_city_member_list_draw(work, 1);
+                if (work->sub_0x002 == 1) {
+                    put_message((s8*)jump_err_msg_str->msg_0x08, 20, 0xC0C0C0FF);
+                }
+                break;
+            case 2:
+                lb_city_member_list_draw(work, 1);
+                break;
+            case 3:
+            case 4:
+                menu_friend_list_draw((FriendCardView*)work->card_view_0x114C);
+                if (work->step_0x001 == 4 && work->sub_0x002 == 1) {
+                    put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
+                }
+                break;
             }
             break;
-        }
-        break;
-    case 5:
-        /* The search dialog heads a loop: state 8's search steps branch back to it. */
-        for (;;) {
+        case 4:
+            switch (work->step_0x001) {
+            case 0:
+                put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x265), 0);
+                lb_city_member_list_draw(work, 0);
+                put_message_window((s8*)LbStr(0, 0x27F), (s8*)LbStr(1, 0x2D), (s8*)LbStr(1, 0x2E), work->yes_no_0x1340, 0,
+                                   -1);
+                break;
+            case 1:
+                if (work->sub_0x002 == 1) {
+                    put_message((s8*)lobby_net_jump_msg_get(work->result_0x004), 20, 0xC0C0C0FF);
+                }
+                break;
+            }
+            break;
+        case 5:
             if (lobby_w.state_0x000 == 33) {
                 put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
             } else {
@@ -1625,7 +1638,7 @@ void lb_city_select_draw(void) {
                 break;
             }
             break;
-    case 6:
+        case 6:
             if (lobby_w.state_0x000 == 33) {
                 put_frame_header(0, 0, 0, (s8*)LbStr(0, 0x267), 0);
             } else {
@@ -1635,7 +1648,7 @@ void lb_city_select_draw(void) {
             lb_city_filter_list_draw(work, 1);
             lb_city_timer_draw(work);
             break;
-    case 8:
+        case 8:
             if (work->step_0x001 == 0 || work->step_0x001 >= 3 || lobby_w.state_0x000 == 37) {
                 if (work->step_0x001 == 3) {
                     if (work->server_type_0x003 == 3) {
@@ -1649,13 +1662,18 @@ void lb_city_select_draw(void) {
                 }
                 break;
             }
+            /* the search steps redraw the search dialog: re-dispatch as state 5 */
+            state = 5;
+            continue;
+        case 13:
+            put_message((s8*)LbStr(3, 0x1F6), 18, -1);
+            break;
         }
-        break;
-    case 13:
-        put_message((s8*)LbStr(3, 0x1F6), 18, -1);
         break;
     }
 }
+#pragma pop
+
 /* 0x8043A30C (0x54): clears the lobby screen work and opens the city screen for player `self` */
 void lb_city_screen_open(struct _PLW* self) {
     memset(lobby_w.menu_0xAC, 0, sizeof(LbCitySelectWork));
@@ -1880,16 +1898,16 @@ void lb_community_select_step(LbCitySelectWork* work) {
                     work->page_0x00E = 0;
                     work->cursor_0x00A = 0;
                     sysSE_stop(0x20);
-                    /* The page count heads a loop: step 3's page turn (inside the loop) branches back to it. */
-                    for (;;) {
-                        work->pages_0x010 = work->total_0x012 / 8;
-                        if (work->total_0x012 - work->pages_0x010 * 8 > 0) {
-                            work->pages_0x010++;
-                        }
-                        if (work->cursor_0x00A >= work->count_0x00C) {
-                            work->cursor_0x00A = 0;
-                        }
-                        break;
+                    work->pages_0x010 = work->total_0x012 / 8;
+                    if (work->total_0x012 - work->pages_0x010 * 8 > 0) {
+                        work->pages_0x010++;
+                    }
+                    if (work->cursor_0x00A >= work->count_0x00C) {
+                        work->cursor_0x00A = 0;
+                    }
+                }
+            }
+            break;
         case 3:
             switch (work->sub_0x002) {
             case 0:
@@ -1929,7 +1947,7 @@ void lb_community_select_step(LbCitySelectWork* work) {
                                                         6, &work->arrow_moved_0x008);
                     work->count_0x00C = NetCtrlWk::copyCommunityViews(work->communities_0x1A4, work->page_0x00E * 8, 8,
                                                                       &work->total_0x012);
-                    continue;
+                    lb_community_page_count_set(work);
                 }
                 break;
             case 1:
@@ -1940,10 +1958,6 @@ void lb_community_select_step(LbCitySelectWork* work) {
                     work->sub_0x002 = 0;
                 }
                 break;
-            }
-            break;
-                    }
-                }
             }
             break;
         }
