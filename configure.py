@@ -1555,7 +1555,7 @@ config.libs = [
             # (WENC is 4-aligned, stays on cflags_os); evidence in the unit headers of src/WPAD/wpad.cpp and .pi/notes/sdk-compiler-survey.md.
             Object(Matching, "TPL/tpl.cpp", cflags=cflags_base),
             Object(NonMatching, "USB/usb.cpp", cflags=cflags_base),
-            Object(NonMatching, "VI/vi.cpp", cflags=cflags_base),
+            Object(Matching, "VI/vi.cpp", cflags=cflags_base),
             Object(NonMatching, "VI/i2c.cpp", cflags=cflags_base),
             Object(Matching, "VI/vi3in1.cpp", cflags=cflags_base),
             Object(NonMatching, "WENC/wenc.cpp"),
