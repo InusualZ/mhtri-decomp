@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (269)
+## Ideas that work (270)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -278,6 +278,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 289 | [A hoisted sum's loads come out in reverse operand order: name the sum and the shared load, sum declared first](289-hoisted-sums-loads-come.md) | works | source-shape, allocator | One `add rA,rA,r0` where ours has `add rA,r0,rA` after the same two loads; every operand order of the two field reads either swaps the loads or the add's operands, and a named local for the sum moves it one register up |
 | 290 | [One inlined by-value wrapper inside a dont_inline TU: open the window for that function, close it after a declaration, never_inline the record ctors](290-one-inlined-by-value.md) | works | pragma, source-shape | Two by-value argument copies sit in the wrong frame slots (ours interleaves each copy with the record it copies, retail puts both copies below both records) in a TU compiled under `#pragma dont_inline on` |
 | 291 | [A self-reassignment after a load gives an inline helper's local a statement-time web that colours after the call result](291-self-reassignment-after-a.md) | works | source-shape, allocator | A function written as `return helper(...)` over a static inline helper matches every opcode but a callee-saved register pair is swapped - the helper's parameter or local that holds a loaded value takes r31 where retail... |
+| 292 | [Walk the tables through named pointers declared after the index when retail colours the index before the walks](292-walk-the-tables-through.md) | works | source-shape, allocator | A counted loop over two tables matches every opcode but the index and the two strength-reduced table pointers are rotated (ours r9/r7/r8, retail r7/r8/r9), and no declaration order, index type or pragma moves them |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 

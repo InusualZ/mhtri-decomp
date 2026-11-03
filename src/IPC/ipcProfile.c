@@ -1,20 +1,20 @@
 /*
  * IPC/ipcProfile.c - the SDK IPC profiling counters (`IPCiProf*`).
  *
- * RANGE. `.text` 0x804BD5A0-0x804BD780 (4 functions / 0x1C8 B); `.bss` 0x80747440-0x80747540; `.sbss`
+ * RANGE. `.text` 0x804BD5A0-0x804BD780 (4 functions / 0x1DC B + 4 B pad); `.bss` 0x80747440-0x80747540; `.sbss`
  *   0x80795258-0x80795260.
  *   - `IpcFdArray` / `IpcReqPtrArray` (.bss 0x80747440..0x80747540) and `.sbss` 0x80795258..0x80795260 are read only
  *     here
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p, default alignment 16).
  * NAMES. `IPCiProfAck` is a GUESS and `IPCiProfInit` is a GUESS for the map's former placeholders (`IPCiProfAck` retires one un-issued request).
- * RESIDUALS. `IPCiProfQueueReq`: the index and the two walking pointers take r9/r7/r8 where the target has r7/r8/r9 (same
- *   instructions; declaration order, `u32` index, `i = 0` initialiser, statement order, nested `if`s, `while`, local
- *   array pointers and scoped `optimization_level 3` / `opt_loop_invariants off` / `opt_common_subs off` were
- *   measured; `break`, `!ptr`, constant-left compares, the counter update order and spelling and `u32` counters
- *   are neutral too).  `.bss`: the target has `IpcFdArray` at +0 and `IpcReqPtrArray` at +0x80, this object the reverse;
- *   the order follows the first emitted reference (`IPCiProfInit`'s first store), and the array definition order,
- *   global linkage and an unused inline reader do not move it.  flipcheck: `.text` is 4 B short of the claim (the pad
- *   before `KPAD/kpad.c`).
+ * RESIDUALS. none in `.text` (4/4 rows byte-identical, relocations 30/30, `.bss`/`.sbss` layouts identical); the
+ *   4 B between the last function and the claim's end is link padding before `KPAD/kpad.c` (align 16).
+ * SHAPES. `IPCiProfQueueReq`: the two tables are walked through named pointers declared after the index (an indexed
+ *   loop leaves the walks as frontend webs numbered above `i`, so `i` colours last and takes r9 where retail has r7;
+ *   as locals below `i` they colour after it and take r8/r9), and the `for` step bumps the pointers before the index
+ *   (retail's loop tail order).  `.bss`: `IpcFdArray` carries a zero initialiser so it is emitted ahead of the
+ *   tentative `IpcReqPtrArray` (playbook idea 158); the tentative objects follow their first code reference, which
+ *   put `IpcReqPtrArray` first.
  */
 
 #include "types.h"
@@ -22,11 +22,11 @@
 
 #define IPC_MAX_REQS 32
 
-/* `.bss` and `.sbss` are laid out in reverse definition order. */
+/* The tentative objects land in first-reference order; the zero-initialised table is emitted ahead of them. */
 static s32 IpcNumUnIssuedReqs;
 static s32 IpcNumPendingReqs;
 static IPCRequest* IpcReqPtrArray[IPC_MAX_REQS];
-static s32 IpcFdArray[IPC_MAX_REQS];
+static s32 IpcFdArray[IPC_MAX_REQS] = {0};
 
 /* Clears the request table and the counters. */
 void IPCiProfInit(void)
@@ -45,11 +45,15 @@ void IPCiProfInit(void)
 void IPCiProfQueueReq(IPCRequest* req, s32 fd)
 {
     s32 i;
+    IPCRequest** reqp;
+    s32* fdp;
 
     IpcNumPendingReqs++;
     IpcNumUnIssuedReqs++;
-    for (i = 0; i < IPC_MAX_REQS; i++) {
-        if (IpcReqPtrArray[i] == NULL && IpcFdArray[i] == -1) {
+    reqp = IpcReqPtrArray;
+    fdp = IpcFdArray;
+    for (i = 0; i < IPC_MAX_REQS; reqp++, fdp++, i++) {
+        if (*reqp == NULL && *fdp == -1) {
             IpcReqPtrArray[i] = req;
             IpcFdArray[i] = fd;
             return;
