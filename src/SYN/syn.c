@@ -18,12 +18,12 @@
  *    `0x4330000080000000` int-to-double constant, held again at 0x8079D378 (`SYN/synenv.c`) and 0x8079D380
  *    (`SYN/synvoice.c`): one TU pools a value once, so the three are separate TUs; the callers are
  *    `sound/snd_stream_reloc.cpp` (init and per frame) and the sequencer (`SYNMIDIInput`).
- * RESIDUALS. `SYNControlChange` 0x804DF200: in the three 128-key release loops the key counter and the strength-reduced
- *    slot pointer swap r28/r29 (r29/r27 beside the voice in the pedal-release loop); the counter's type leaves it.
- *    flipcheck: `SYNVolumeTable` is defined by `SYN/synvoice.c` (not flipped); .bss/.sbss shortfalls are link padding
- *    before the next unit.
- * SHAPES. the note-off, all-notes-off and bend-range steps are static inline helpers expanded in place (two copies each
- *    in the target); `SYNMIDIInput` and `SYNHandleMessage` take a non-const `u8*` (a const message lets the scheduler hoist
+ * RESIDUALS. none in `.text`.  flipcheck: .bss/.sbss shortfalls are link padding before the next unit.
+ * SHAPES. the note-off, all-notes-off, bend-range and sustain-pedal release steps are static inline helpers expanded in
+ *    place (two copies each of the first three in the target); the loop counters are the helpers' own locals: an
+ *    inline local is numbered above the strength-reduced slot pointer, so the allocator colours the counter first and
+ *    the pointer takes the next register (retail r28 counter / r29 pointer; a counter declared in `SYNControlChange`
+ *    itself colours last and swaps them); `SYNMIDIInput` and `SYNHandleMessage` take a non-const `u8*` (a const message lets the scheduler hoist
  *    the loads above the queue stores); the controller reset loops index `synth->controller[channel][i]` directly (a
  *    hoisted row pointer changes the unroll); the bend-range helper and the release loops also index
  *    `synth->controller[channel][n]` / `synth->noteVoice[channel][key]` directly (a row or slot pointer hoists an
@@ -62,6 +62,20 @@ static inline void SYNReleaseChannelNotes(SYNSynth* synth, u8 channel)
         if (synth->noteVoice[channel][key] != NULL) {
             SYNVoiceRelease(synth->noteVoice[channel][key], synth->releasePriority);
             synth->noteVoice[channel][key] = NULL;
+        }
+    }
+}
+
+/* Releases every note of a channel that was released while the sustain pedal was down. */
+static inline void SYNReleaseHeldNotes(SYNSynth* synth, u8 channel)
+{
+    s32 key;
+
+    for (key = 0; key < 128; key++) {
+        SYNVoice* voice = synth->noteVoice[channel][key];
+        if (voice != NULL && voice->releasePending != 0) {
+            SYNVoiceRelease(voice, synth->releasePriority);
+            voice->synth->noteVoice[voice->channel][voice->key] = NULL;
         }
     }
 }
@@ -155,15 +169,7 @@ void SYNControlChange(SYNSynth* synth, u8 channel, u8 controller, u8 value)
         break;
     case 64:
         if (value < 64) {
-            s32 key;
-
-            for (key = 0; key < 128; key++) {
-                SYNVoice* voice = synth->noteVoice[channel][key];
-                if (voice != NULL && voice->releasePending != 0) {
-                    SYNVoiceRelease(voice, synth->releasePriority);
-                    voice->synth->noteVoice[voice->channel][voice->key] = NULL;
-                }
-            }
+            SYNReleaseHeldNotes(synth, channel);
         }
         break;
     case 91:
