@@ -707,7 +707,7 @@ config.libs = [
             Object(NonMatching, "enemy/enemy_control.cpp"),
             Object(NonMatching, "enemy/em001_prog.cpp"),
             Object(NonMatching, "enemy/em003_prog.cpp"),
-            Object(NonMatching, "enemy/em008_prog.cpp"),
+            Object(Matching, "enemy/em008_prog.cpp"),
             Object(Matching, "enemy/em010_prog.cpp"),
             Object(Matching, "enemy/em011_prog.cpp"),
             Object(NonMatching, "enemy/em015_prog.cpp"),
@@ -1208,7 +1208,7 @@ config.libs = [
             # dwc_error / dwc_auth_interface / dwc_nasfunc: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
             Object(Matching, "DWCi/dwc_base64.c", cflags=cflags_base),  # src/DWCi/dwc_base64.c header
             Object(Matching, "DWCi/dwc_error.cpp", cflags=cflags_base),
-            Object(NonMatching, "DWCi/dwc_init.cpp", cflags=cflags_base),
+            Object(Matching, "DWCi/dwc_init.cpp", cflags=cflags_base),
             Object(Matching, "DWCi/dwc_report.cpp", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_nonport.c", cflags=cflags_base),  # src/DWCi/dwc_nonport.c header
             Object(Matching, "DWCi/dwc_auth_interface.c", cflags=cflags_base),
@@ -1534,7 +1534,7 @@ config.libs = [
             Object(Matching, "IPC/ipcMain.c", cflags=cflags_base),
             Object(NonMatching, "IPC/ipcclt.c", cflags=cflags_base),
             Object(Matching, "IPC/memory.c", cflags=cflags_base),
-            Object(NonMatching, "IPC/ipcProfile.c", cflags=cflags_base),
+            Object(Matching, "IPC/ipcProfile.c", cflags=cflags_base),
             # -fp_contract off: fused-op evidence on the FLAGS line of src/KPAD/kpad.c
             Object(NonMatching, "KPAD/kpad.c", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
             # The SC / SEQ / SI / SYN / THP band 0x804DB050..0x804E45B0 recut per library and source file (unit headers carry the
