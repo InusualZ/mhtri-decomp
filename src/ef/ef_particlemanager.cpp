@@ -35,11 +35,17 @@
  *   GUESS: `ef_pm_particle_mtx` (0x800AE698): the static matrix the colour fade takes a particle's position with.
  *   GUESS: `ef_pm_f32_epsilon`, `ef_pm_f32_256` (the colour fade's constants, named from their value).
  * RESIDUALS.
- *  - `Calc`: the frame is 0x420 where retail's is 0x430 and the locals sit 8 bytes lower; retail keeps `this` in
- *    r24 and the first particle in r16 where ours has r31/r24; the field and post-field record addresses add
- *    their block sizes in another order (`lwz`/`add` scheduling).
- *  - `Draw`: retail keeps `this`/`info`/the descriptor in r29/r30/r31 where ours has r30/r31/r29 (declaring the
- *    descriptor first, or dropping the alias locals, does not move them; the `beq` + `b` exit is the `||` guard).
+ *  - `Calc`: the post field's `names` sum keeps its `+ sizeof` in the middle as `+=` steps (the frontend folds the
+ *    constant of one expression to the chain's end before the first PCode: a typed `+ 1`, an integer round trip,
+ *    named copies and a redefinition all refold), so the three partial sums are one in-place web (r17) where
+ *    retail's are expression temporaries (r4/r0) with `names` defined by the last add: six register operands.
+ *  - `Draw`: retail keeps `this`/`info`/the descriptor in r29/r30/r31 where ours has r30/r31/r29. The dump: the
+ *    descriptor (r48, numbered between the first two assert blocks where it is declared) is scanned after the
+ *    second block's seven locals at degree 28 = K-1, so it simplifies and is coloured after the two stalled
+ *    parameters; retail's stalls. It needs one more neighbour numbered above it or a number below the block's
+ *    `ok1_`: declaring it first (r55), without an initialiser, through a copy (propagated away), a copy-first
+ *    assert (the copy becomes an early `mr r6`), an inline-function assert (972 B) and an `||` chain (648 B)
+ *    were measured; `regsim search` finds one EXACT plan, a number inside the macro's block, not a source shape.
  *  - `ef_particle_manager_delete` keeps its C name: the row is the pool's deleting destructor without a table
  *    store (an MWCC destructor stores the table), as `ef/ef_emitter.cpp`'s 0x800A630C.
  *  - Rule 7: the own rows `fn_800AB6BC`/`fn_800AB6FC` (the parameter sub-objects' constructors), `fn_800AB740`,
@@ -68,6 +74,12 @@
  *   0x1C-byte head): `CreateParticle` calls `AllocParticle` and `Initialize` as virtual members.
  * SHAPES. A particle's link sits at `manager->list.linkOffset` (`next` at `node + linkOffset + 4`, retail's `lhz
  *   r0,0x42(self)` + `lwz rX,4(r3)`); the offset is a runtime value, so the walk keeps the byte offset.
+ * SHAPES. `Calc`'s frame and colouring follow the declaration order (named locals first-declared-highest, then the
+ *   temporaries in textual order): case 4 has its own `handle`, the wrap block declares its emitter position before
+ *   `local`, case 7's emitter position is the by-value result of `ef_pm_calc_emitter_pos_byval` (the slot right
+ *   above the by-value `addPos` copy), `names` is a function-scope local under `first`, the else block declares
+ *   `i`, `hasPostField`, `pf`, `pfEffect` and the track loop `tick`, `mode`, `seed`, `target` ahead of `track`;
+ *   `i` is a word assigned from one `?:` (the `u32`-returning count helper keeps the join a `mr`).
  */
 
 #include "types.h"
@@ -496,7 +508,7 @@ extern "C" void ef_pm_handle(void* a, EfPmManager* m);
  * `never_inline`, declared here in their headers' order so their weak copies and assert strings follow their
  * first caller as retail's (`ef/ef_emitter.cpp` has the same shape). */
 extern "C" inline __attribute__((never_inline)) u16 ef_emres_num_ptcl_track(void* self);
-extern "C" inline __attribute__((never_inline)) u16 ef_emres_num_ptcl_track_init(void* self);
+extern "C" inline __attribute__((never_inline)) u32 ef_emres_num_ptcl_track_init(void* self);
 extern "C" inline __attribute__((never_inline)) u8* ef_emres_get_ptcl_track_tbl(void* self);
 extern "C" inline __attribute__((never_inline)) u8* ef_emres_get_ptcl_track_at(void* self, u32 index);
 extern "C" inline __attribute__((never_inline)) EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self);
@@ -519,6 +531,10 @@ static inline __attribute__((never_inline)) void ef_pm_calc_emitter_pos(nw4r::ma
                             const nw4r::math::MTX34* mtxLocalToGlobal, const nw4r::math::MTX34* mtxEmitterToGlobal,
                             const nw4r::math::VEC3* pos);
 }
+/* The emitter-position helper called by value: its result is a frame temporary below every named local. */
+#define ef_pm_calc_emitter_pos_byval                                                                            \
+    ((nw4r::math::VEC3(*)(BOOL, const nw4r::math::MTX34*, const nw4r::math::MTX34*, const nw4r::math::MTX34*, \
+                          const nw4r::math::VEC3*))ef_pm_calc_emitter_pos)
 
 /* The resource-table accessors: the table's count, its first array base and its third u16. */
 extern "C" u16 ef_emres_num_ptcl_track(void* self) {
@@ -526,7 +542,7 @@ extern "C" u16 ef_emres_num_ptcl_track(void* self) {
     return *(u16*)ef_emres_get_ptcl_track();
 }
 
-extern "C" u16 ef_emres_num_ptcl_track_init(void* self) {
+extern "C" u32 ef_emres_num_ptcl_track_init(void* self) {
     (void)self;
     return *(u16*)(ef_emres_get_ptcl_track() + 2);
 }
@@ -948,6 +964,7 @@ void nw4r::ef::ParticleManager::Calc() {
     EfPmManager* self = (EfPmManager*)this;
     EfPmParticle* first = (EfPmParticle*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list,
                                                                   (void*)self->list.activeCount);
+    u8* names;
     if (first == NULL) {
         return;
     }
@@ -1020,25 +1037,22 @@ void nw4r::ef::ParticleManager::Calc() {
                 nw4r::math::VEC3 addVel;
                 nw4r::math::VEC3 addPos;
                 EfPmVecBlock pfTransform;
+                s32 i;
+                BOOL hasPostField;
                 EfPmPostField* pf;
                 EffectHandle* pfEffect;
-                BOOL hasPostField;
-                u16 i;
                 setVec3(&addVel, 0.0f, 0.0f, 0.0f);
                 setVec3(&addPos, 0.0f, 0.0f, 0.0f);
                 hasPostField = FALSE;
                 fn_800ADE98(&pfTransform);
                 pfEffect = NULL;
-                if (p->age == 0) {
-                    i = 0;
-                } else {
-                    i = ef_emres_num_ptcl_track_init(self->resource);
-                }
+                i = (p->age == 0) ? 0 : ef_emres_num_ptcl_track_init(self->resource);
                 for (; (u16)i < ef_emres_num_ptcl_track(self->resource); i++) {
-                    EfPmTrack* track = (EfPmTrack*)ef_emres_get_ptcl_track_at(self->resource, (u16)i);
                     u32 tick;
                     u32 mode;
                     u32 seed;
+                    u8 target;
+                    EfPmTrack* track = (EfPmTrack*)ef_emres_get_ptcl_track_at(self->resource, (u16)i);
                     if ((track->flags & 8) != 0) {
                         continue;
                     }
@@ -1059,9 +1073,10 @@ void nw4r::ef::ParticleManager::Calc() {
                     if ((u8)(track->kind + 0x55) > 1) {
                         continue;
                     }
-                    u8 target = track->target;
+                    target = track->target;
                     switch (track->type) {
                     case 4: {
+                        EfDrawParticleManager* handle;
                         const u8* nameTable;
                         u32* channel;
                         EfAnimDivider divider;
@@ -1109,17 +1124,15 @@ void nw4r::ef::ParticleManager::Calc() {
                         nw4r::math::VEC3 rel;
                         nw4r::math::VEC3 out;
                         memcpy(&field,
-                               (u8*)track + track->keyBytes + track->randomBytes + track->randomTableBytes +
-                                   track->nameTableBytes + sizeof(EfPmTrack),
+                               (u8*)track + track->keyBytes + sizeof(EfPmTrack) + track->randomBytes +
+                                   track->randomTableBytes + track->nameTableBytes,
                                sizeof(EfPmFieldRecord));
                         if (track->keyBytes != 0) {
                             ef_anim_curve_f32((const u8*)track, &field.power, tick, seed, mode);
                         }
                         VEC3_ctor(&rel);
                         if (target == 6 || (u8)(target + 0xFE) <= 2) {
-                            nw4r::math::VEC3 emPos;
-                            ef_pm_calc_emitter_pos(&emPos, field.space == 1, &emToLocal, &pmMtx, &emMtx, &pos);
-                            copyVec3(&rel, &emPos);
+                            copyVec3(&rel, &ef_pm_calc_emitter_pos_byval(field.space == 1, &emToLocal, &pmMtx, &emMtx, &pos));
                         }
                         setVec3(&out, 0.0f, 0.0f, 0.0f);
                         switch (target) {
@@ -1183,8 +1196,9 @@ void nw4r::ef::ParticleManager::Calc() {
                     }
                     case 2:
                         if (track->dataBytes != 0) {
-                            u8* names = (u8*)track + track->keyBytes + sizeof(EfPmTrack) + track->randomBytes +
-                                        track->randomTableBytes;
+                            names = (u8*)track + track->keyBytes + sizeof(EfPmTrack);
+                            names += track->randomBytes;
+                            names += track->randomTableBytes;
                             pf = (EfPmPostField*)(names + track->nameTableBytes);
                             memcpy(&pfTransform, pf, sizeof(EfPmVecBlock));
                             if (track->nameTableBytes > 4) {
@@ -1225,6 +1239,7 @@ void nw4r::ef::ParticleManager::Calc() {
                         nw4r::math::MTX34 region;
                         nw4r::math::MTX34 rot;
                         nw4r::math::MTX34 regionInv;
+                        nw4r::math::VEC3 emPos;
                         nw4r::math::VEC3 local;
                         BOOL wrapped;
                         MTX34_ctor(&region);
@@ -1235,7 +1250,6 @@ void nw4r::ef::ParticleManager::Calc() {
                         mtx34_concat(&region, &rot, &region);
                         mtx34_trans_apply(&region, &pf->wrapTranslate, &region);
                         if ((pf->wrapFlags & 2) != 0) {
-                            nw4r::math::VEC3 emPos;
                             setVec3(&emPos, emMtx.m[0][3], emMtx.m[1][3], emMtx.m[2][3]);
                             mtx34_trans_apply(&region, &emPos, &region);
                         }
