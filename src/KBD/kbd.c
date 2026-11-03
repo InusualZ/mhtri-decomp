@@ -18,16 +18,19 @@
  *    0x80529820, followed by the key map tables (0x806493E8, 0x806497D0) and two jump tables; `.sbss`
  *    0x80795A08..0x80795A18 and `.bss` 0x8078FF40 (0x200 B), 0x80790140 (0x80 B) are read here only;
  *    `KBDSetLedsAsync` and `KBDSetChannelValue` are called by `homebutton/tiHKBManager.cpp`.
- * RESIDUALS. all 28 rows have a body; `kbd_client_attach` (0x80528890): the connect callback's byte sits at
- *    sp+0xC where ours packs it at sp+0x9, and the detach loop swaps r3/r5 (base vs walk pointer).
- *    `kbd_store_lock_state` expanded in `KBDSetChannelLeds` (0x80529B70) and `kbd_update_lock_state` (0x80528F80):
- *    retail writes the channel address into the offset register (r4) where ours reuses the state register (r5);
- *    pointer, index and cast spellings, operand order, a named high/low temporary and the channel pointer taken
- *    before `OSDisableInterrupts` were measured.  `kbd_lookup_key` (0x80529BF0): `entry` and `kind` swap r9/r11.
- *    flipcheck blockers: the rows above and .sdata/.sbss trailing padding the object does not emit (8 B / 4 B).
- * SHAPES. `kbd_store_lock_state` is a `static inline` expanded into `kbd_update_lock_state` and `KBDSetChannelLeds`
- *    (the value is copied before `|= 0x1000` so the 0x1000 test is not folded); member stores through
- *    `kbd_state->...` are not hoisted; `.sbss` objects are defined in reverse address order.
+ * RESIDUALS. none: all 28 rows match; the .text/.sdata tails the object does not emit are link and alignment fill.
+ * SHAPES. The lock-state merge in `KBDSetChannelLeds` and the tail of `kbd_update_lock_state` reads the old word
+ *    through `*(volatile u32*)&target->lockState`: the frontend does not forward-substitute a volatile load, so
+ *    `old` stays a local numbered below `target` and the address is coloured first (retail r4, the load r5); a
+ *    plain `old`, an inline helper and every operand order fold the load into a backend temporary that takes r4
+ *    (`#pragma opt_propagation off` keeps `old` too, but merges `kbd_update_lock_state`'s two `kbd_state` loads).
+ *    `kbd_update_lock_state` sets `step` in both arms of an if/else (the join leaves it in a backend temporary
+ *    numbered above `kbd_state`'s promoted read, so it takes r7)
+ *    and copies the value before `|= 0x1000` so the 0x1000 test is not folded; `kbd_lookup_key` keeps `entry` a
+ *    `u32` (a `u16` load is folded into a temporary) declared after `kind` and `mask`; `kbd_client_attach` indexes
+ *    `kbd_state->channels[channel]` in both loops (the walk pointer is the strength-reduced induction variable)
+ *    and hands the connect callback a `u8[1]` (an array local is 4-aligned: sp+0xC, a `u8` packs at sp+0x9).
+ *    Member stores through `kbd_state->...` are not hoisted; `.sbss` objects are defined in reverse address order.
  *    `kbd_initialize_led_module` is bracketed by `#pragma global_optimizer off` (retail walks the pool by base +
  *    offset); `KBDSetLedsAsync` returns through `result = 7; if (status == 0) result = 0;`; `kbd_client_attach`
  *    shares one `return 0` between both arms; `kbd_lookup_key` writes the modifier range test as
@@ -290,51 +293,36 @@ KBDLedRequest* kbd_alloc_led(void);
 void kbd_initialize_led_module(void);
 void kbd_init_keyboard(u32 channel, HIDDeviceInfo* info);
 
-/* Stores a lock-state word; bit 0x1000 asks for the whole word, otherwise only the high bits replace it. */
-static inline void kbd_store_lock_state(u8 channel, u32 value)
-{
-    if (value & 0x1000) {
-        kbd_state->channels[channel].lockState = value & ~0x1000;
-    } else {
-        BOOL enabled = OSDisableInterrupts();
-        KBDChannel* ch = &kbd_state->channels[channel];
-        ch->lockState = (ch->lockState & 0x3F) | (value & 0xFC0);
-        OSRestoreInterrupts(enabled);
-    }
-}
-
 /* HID attach callback: binds a boot-protocol keyboard to a free channel, or frees the channel of a removed one. */
 s32 kbd_client_attach(HIDClient* client, HIDDeviceInfo* info, s32 attached)
 {
     int channel;
-    KBDChannel* probe;
 
     if (attached) {
         if (info->vendorId == 0x46A) {
             return 0;
         }
         if (info->interfaceDescriptor[7] == 1) {
-            probe = kbd_state->channels;
-            for (channel = 0; channel < KBD_CHANNELS; probe++, channel++) {
-                if (probe->device == NULL) {
+            for (channel = 0; channel < KBD_CHANNELS; channel++) {
+                if (kbd_state->channels[channel].device == NULL) {
                     kbd_state->channels[channel].device = info;
                     kbd_state->channels[channel].state &= ~1;
                     KBDResetChannel(channel);
                     VIResetDimmingCount();
                     if (kbd_state->onConnect != NULL) {
-                        u8 connected = channel;
+                        u8 connected[1];
 
+                        connected[0] = channel;
                         kbd_init_keyboard(channel, info);
-                        kbd_state->onConnect(&connected, kbd_state);
+                        kbd_state->onConnect(connected, kbd_state);
                     }
                     return 1;
                 }
             }
         }
     } else {
-        probe = kbd_state->channels;
-        for (channel = 0; channel < KBD_CHANNELS; probe++, channel++) {
-            if (probe->device == info) {
+        for (channel = 0; channel < KBD_CHANNELS; channel++) {
+            if (kbd_state->channels[channel].device == info) {
                 kbd_state->channels[channel].device = NULL;
                 kbd_state->channels[channel].state |= 1;
                 if (kbd_state->onDisconnect != NULL) {
@@ -500,7 +488,7 @@ void kbdProcKey(u8 key, s32 type, u8 channel)
 void kbd_update_lock_state(u16 code, s32 type, u8 channel)
 {
     KBDChannel* ch = &kbd_state->channels[channel];
-    s32 step = -1;
+    s32 step;
     s32 down = type & 1;
     u32 locks;
     u32 value;
@@ -508,6 +496,8 @@ void kbd_update_lock_state(u16 code, s32 type, u8 channel)
 
     if (down) {
         step = 1;
+    } else {
+        step = -1;
     }
     mapFlags = kbd_state->maps[ch->mapIndex].lockMask;
     locks = kbd_state->channels[channel].lockState;
@@ -613,7 +603,15 @@ void kbd_update_lock_state(u16 code, s32 type, u8 channel)
     }
     value = locks;
     value |= 0x1000;
-    kbd_store_lock_state(channel, value);
+    if (value & 0x1000) {
+        kbd_state->channels[channel].lockState = value & ~0x1000;
+    } else {
+        BOOL enabled = OSDisableInterrupts();
+        KBDChannel* target = &kbd_state->channels[channel];
+        u32 old = *(volatile u32*)&target->lockState;
+        target->lockState = (old & 0x3F) | (value & 0xFC0);
+        OSRestoreInterrupts(enabled);
+    }
 }
 
 /* Appends an event to the channel's ring buffer and notifies the application; a full ring records an overflow marker. */
@@ -912,7 +910,15 @@ s32 KBDSetChannelValue(u8 channel, u32 value)
 /* Sets the lock-state word of a channel from the caller's side; returns 0. */
 s32 KBDSetChannelLeds(u8 channel, u32 value)
 {
-    kbd_store_lock_state(channel, value);
+    if (value & 0x1000) {
+        kbd_state->channels[channel].lockState = value & ~0x1000;
+    } else {
+        BOOL enabled = OSDisableInterrupts();
+        KBDChannel* target = &kbd_state->channels[channel];
+        u32 old = *(volatile u32*)&target->lockState;
+        target->lockState = (old & 0x3F) | (value & 0xFC0);
+        OSRestoreInterrupts(enabled);
+    }
     return 0;
 }
 
@@ -923,9 +929,9 @@ u16 kbd_lookup_key(u8 usage, s32 lockState, s32 mapIndex)
     const u16* table;
     u8 row;
     int base;
-    u16 entry;
-    u16 mask;
     int kind;
+    u16 mask;
+    u32 entry;
     int column;
     int shift;
     int variant;
