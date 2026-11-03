@@ -8,10 +8,10 @@
  *   `AtanFIdx` are a GUESS from the nw4r source, read off the bodies (octant reduction over a 32-step arc-tangent
  *   table, the second one scaled by 256 into a u16); `math_sincos_idx` keeps the map's C name for nw4r's
  *   `SinCosFIdx`, which its callers in `hud/` and `g3d/` declare so.  The tables are nw4r's `sSinCosTbl`/`sArcTanTbl`.
- * RESIDUALS. Every row matches.  `.sdata2`: retail pools 192.0f before 256.0f (ours 256 then 192) and the claim ends on a 4-byte pad.
- *   A dead `192.0f` initialiser inside Atan2Idx fixes the pool but swaps f3/f4 there (98.96 %); an unreferenced
- *   function between Atan2FIdx and Atan2Idx whose first new literal is 192.0f gives Atan2Idx 100 % and a
- *   byte-identical pool, so retail likely had one more link-dropped function there (its body is unknown).
+ * RESIDUALS. none.  The `.sdata2` claim ends on the 4-byte pad the link puts before the next pool (ours emits 0x24 bytes).
+ * SHAPES. Atan2Idx declares `a` with a dead `192.0f` initialiser (playbook 211): every octant overwrites it before it is read,
+ *   so the optimizer drops the store, while the literal takes its pool slot before 256.0f as retail orders it; the same
+ *   initialiser on `c` re-colours f3/f4 (98.96 %).
  * SHAPES. `math_sincos_idx` is C with one inline-asm block over `register` locals; `work` carries the circle size,
  *   the fraction and the swapped pair (retail's f2).  `AtanFIdx` is unreferenced: it puts 32.0f third in the pool,
  *   where retail has it, and the link drops it.  AtanFIdx_ calls the OS casts directly so its stack temporaries are
@@ -501,7 +501,7 @@ f32 Atan2FIdx(f32 y, f32 x) {
 
 /* 0x80501108 (0x1BC): the angle of (x, y) as a 16-bit index, 0..65535 per circle. */
 u16 Atan2Idx(f32 y, f32 x) {
-    f32 a;
+    f32 a = 192.0f;
     f32 b;
     f32 c;
     bool minus;
