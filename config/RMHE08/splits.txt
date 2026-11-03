@@ -3688,9 +3688,9 @@ THP/THPDec.c:
 	.text       start:0x804E1120 end:0x804E45B0 align:16
 	.rodata     start:0x80573BB0 end:0x80573C40
 	.data       start:0x8062AB20 end:0x8062AB68
-	.bss        start:0x8075AFC0 end:0x8075B110
+	.bss        start:0x8075AFC0 end:0x8075B110 align:32
 	.sdata      start:0x80794140 end:0x80794148
-	.sbss       start:0x807954A0 end:0x807955C8
+	.sbss       start:0x807954A0 end:0x807955C8 align:32
 	.sdata2     start:0x8079D3A0 end:0x8079D3C0
 
 TPL/tpl.cpp:

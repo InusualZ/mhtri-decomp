@@ -1448,7 +1448,7 @@ config.libs = [
             Object(Matching, "BTE/bta_hh_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE btm band 0x80480A90..0x8048AEE0 recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r for btm_acl/dev/devctl/discovery: evidence on the FLAGS line of src/BTE/btm_dev.c
-            Object(NonMatching, "BTE/btm_acl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_acl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_dev.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_devctl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
@@ -1541,11 +1541,11 @@ config.libs = [
             # evidence); its function starts are 16-aligned, so cflags_base.  The 4-packed head 0x804DAE40..0x804DB050 is RSO/runtime.c.
             Object(NonMatching, "SC/SCSystemConfig.c", cflags=cflags_base),
             Object(Matching, "SC/SCApi.c", cflags=cflags_base),
-            Object(NonMatching, "SC/SCProductInfo.c", cflags=cflags_base),
+            Object(Matching, "SC/SCProductInfo.c", cflags=cflags_base),
             Object(NonMatching, "SEQ/seq.c", cflags=cflags_base),
             Object(Matching, "SI/SIBios.c", cflags=cflags_base),
             Object(Matching, "SI/SISamplingRate.c", cflags=cflags_base),
-            Object(NonMatching, "SYN/syn.c", cflags=cflags_base),
+            Object(Matching, "SYN/syn.c", cflags=cflags_base),
             Object(NonMatching, "SYN/synenv.c", cflags=cflags_base),
             Object(NonMatching, "SYN/synvoice.c", cflags=cflags_base),
             Object(NonMatching, "THP/THPDec.c", cflags=cflags_base),
