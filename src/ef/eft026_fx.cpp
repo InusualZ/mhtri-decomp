@@ -1,30 +1,27 @@
 /* ef/eft026_fx.cpp - the eft026 enemy-fold family (`eft026_set` and two sibling setters, the allocator `fn_80117FF8`
- *   stamping tag 26, the release `fn_80118154` and its state machine) and the eft028 break/crumble family's setters
- *   (`eft028_set`, `eft028_set_koware`, `eft028_set_capsule`, `eft028_set_scaled`), which build their records through
- *   `ef/fn_80119C44.c`.
- * RANGE. .text 0x80117DA8-0x80119C44 (20 functions); extab 0x8000C4D4-0x8000C554, extabindex 0x80026628-0x800266E8,
- *   .data 0x805A0488-0x805A06F0, .sdata 0x80791940-0x80791970, .sdata2 0x80796AC0-0x80796B2C.
+ *   stamping tag 26, the release `fn_80118154` and its state machine).
+ * RANGE. .text 0x80117DA8-0x80119970 (16 functions); extab 0x8000C4D4-0x8000C534, extabindex 0x80026628-0x800266B8,
+ *   .data 0x805A0488-0x805A06F0, .sdata 0x80791940-0x80791970, .sdata2 0x80796AC0-0x80796B24.  The next TU,
+ *   `ef/eft028_set.cpp`, starts its own pool at 0x80796B24 (a second 0.0f).
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (with the pass on MWCC fuses the nested slot loop's
  *   `subi`/`cmpwi` into `subic.` and compresses the frame; playbook 39).
- * NAMES. `eft026_set` and `eft028_set_koware` are the runtime dump's own names; the map has only `fn_` stems for the
- *   rest, so plain definitions are `extern "C"`.
- *   GUESS (from its body and its caller): eft028_set_scaled; the data (map `lbl_805A0488`..`lbl_805A06B0`,
+ * NAMES. `eft026_set` is the runtime dump's own name; the map has only `fn_` stems for the rest, so plain definitions
+ *   are `extern "C"`.
+ *   GUESS: the data (map `lbl_805A0488`..`lbl_805A06B0`,
  *   `lbl_80791940`..`lbl_80791968`): `eft026_effect_ids`, `eft026_handler_kinds`, `eft026_durations`,
  *   `eft026_spin_rates`, `eft026_scale_keys_2`/`_9`/`_a`/`_b`, `eft026_alpha_keys_N`/`_kind2`,
  *   `eft026_alpha_key_tables`, `eft026_model_counts`; `EftUvModelHooks` (`update`, `set_scalar`).
  *   Also: `#pragma pool_data off` (each table its own `lis`/`addi`); `fn_80118B2C` and `fn_80118214` at
  *   `optimization_level 4` (their type switches' `subi`/`cmplwi` range test).
- * RESIDUALS. 2 partial rows:
- *  - `fn_8011870C`, `fn_80119450`: frames 0x10/0x20 larger (the stack slots of the material-access and colour
- *    temporaries are laid out differently), which also recolours `fn_8011870C`'s callee-saved registers.
- *   `.sdata2` is 0x68 of 0x6C: retail has a second, unreferenced 0.0f before 410.0f (0x80796B24) that one TU's
- *   pool cannot hold twice; `.data` 0x264 of 0x268 (identical prefix).
+ * RESIDUALS. none in bytes: `.data` is 0x264 of 0x268 (the tail is alignment fill).
  *   Relocation names that differ from retail: pool constants (`@NNN`), the switch table (`jumptable_805A06BC`).
- * SHAPES. `_EFT26_PHASE`'s colour is a `_GXColor` member (byte-aligned, so `slots` stays at +0x7C); the phase loops
+ * SHAPES. `fn_8011870C` declares `i`, `work`, `em` first (its callee-saved colouring) and the TEV-colour block's
+ *   `ignored` before `obj` (stack slots); `_EFT26_MATOBJ` is the 4-byte `ResMatTevColor` handle.
+ *   `_EFT26_PHASE`'s colour is a `_GXColor` member (byte-aligned, so `slots` stays at +0x7C); the phase loops
  *   index `work->phase[i]` (a `p` pointer adds an induction register) and count `done` in a `u8`.
  *   `eft026_set` is defined first (retail's `.text` and pool order).  The handlers load `work`/`source` after the
  *   constructors, extract colour bytes masked (`(col & 0xFF000000) >> 24`) and test loop floats against literals.
- *   `eft028_set_capsule` returns nothing; `fn_80117FF8`'s flag test re-reads the stored type; `_EFT26_WORK::slots` is
+ *   `fn_80117FF8`'s flag test re-reads the stored type; `_EFT26_WORK::slots` is
  *   `[2][2]`; `fn_80118FF0` runs `move2` before the scale copy.
  *   `fn_80118214`: the kind-1/2 vs 8/9 colours and the 1/8 vs 2/9 tail are `switch`es; the dead-enemy path stores
  *   state 3; the camera position is a `const VEC3&` bound after `fn_80119818`, with `cam` declared after it; the
@@ -34,8 +31,6 @@
 
 #include "ef/eft_res_spawn_gate_ck.h" /* eft_res_spawn_gate_ck (rule 2: the owner's header) */
 #include "enemy/fn_80192410.h" /* fn_80192410 (rule 2: the owner's header) */
-#include "ef/eft028_alpha_by_id.h" /* eft028_alpha_by_id (rule 2: the owner's header) */
-#include "ef/eft028_capsule_ends.h" /* eft028_capsule_ends (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
@@ -52,7 +47,6 @@
 #include "ef/effect.h"
 #include "ef/eft001.h"
 #include "ef/eft004.h"
-#include "ef/eft028_set_scaled.h"
 #include "fn_8004CAD8.h"
 #include "g3d/g3d_calcworld.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMatTevColor (rule 2) */
@@ -124,30 +118,6 @@ typedef struct _EFT26_EM {
     /* +0x1E1 */ u8 area_no_0x1E1; /* the area the allocator gates on */
 } _EFT26_EM; /* size: 0x1E2 (lower bound) */
 
-/* The eft028 work block `eft_res_slot_get(0x48)` attaches (the next unit, `ef/fn_80119C44.c`, owns the
- * record itself). size: 0x18 (lower bound). */
-typedef struct _EFT28_WORK {
-    /* +0x00 */ s32 mode;
-    /* +0x04 */ u8 pad_0x04[4];
-    /* +0x08 */ u8 col_r;      /* the tev colour fn_80119AA8/19970 arm */
-    /* +0x09 */ u8 col_g;
-    /* +0x0A */ u8 col_b;
-    /* +0x0B */ u8 col_a;
-    /* +0x0C */ u8 param_0x0C[0x10 - 0x0C]; /* pl_capsule_box_set's output */
-    /* +0x10 */ f32 field_0x10;             /* eft028_set_scaled's scale */
-    /* +0x14 */ u8 key_0x14;                /* eft028_set's colour keys */
-    /* +0x15 */ u8 key_0x15;
-    /* +0x16 */ u8 key_0x16;
-    /* +0x17 */ u8 key_0x17;
-} _EFT28_WORK;
-
-/* The 0x1C-byte parameter record `eft_capsule_ctor` builds and `pl_capsule_box_set` reads in eft028_set_capsule. */
-typedef struct _EFT28_PARAM {
-    /* +0x00 */ VEC3 a;
-    /* +0x0C */ VEC3 b;
-    /* +0x18 */ f32 c;
-} _EFT28_PARAM; /* size: 0x1C */
-
 /* The pooled effect object's vtable slots fn_8011870C/18B2C/18FF0/19450 reach by index. */
 typedef void (*EffectVfn0x24)(void* self);
 typedef void (*EffectVfn0x28)(void* self, f32 arg);
@@ -180,10 +150,10 @@ typedef struct _EFT26_EFFECT {
     /* +0x30 */ s32 field_0x30;   /* advanced by 0x100 per frame in fn_8011870C */
 } _EFT26_EFFECT; /* size: 0x34 (an approximation; only the two offsets above are read) */
 
-/* The 0x1C-byte record the g3d material accessor callback chain threads through. */
+/* The material's TEV colour handle (a `ResMatTevColor`: one data pointer), copied out of the accessor. */
 typedef struct _EFT26_MATOBJ {
-    /* +0x00 */ u8 pad_0x00[0x1C];
-} _EFT26_MATOBJ; /* size: 0x1C (an approximation - only ever passed by pointer) */
+    /* +0x00 */ void* data;
+} _EFT26_MATOBJ; /* size: 0x4 (the stack slot both handlers give it) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the runtime records (the shared headers)
@@ -214,14 +184,6 @@ void fn_80119804(_EFT* self);
 void fn_80119814(_EFT* self);
 void fn_80119818(MHchar* chr, u8 mode);
 void fn_801198F8(MHchar* chr, u8 index);
-void eft028_set(u8 kind, u8 variant, u8 id);
-void eft028_set_capsule(u8 area);
-
-/* the plain callees with no reconstructed owner yet (declared here, never `extern`-spelled, so the
- * symbol is the target's plain name; the landing pass moves the ones a registered unit owns) */
-_EFT* fn_80119C44(u8 kind, u8 variant, u32 arg);
-void fn_80119D10(_EFT* self);
-void fn_80119D9C(_EFT* self);
 /* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`ef.h`
  * spells `VEC3_ctor`/`setVec3` differently from `mh3_pad.h`, MWCC (10197)), so this
  * copy stays - normalised to the owner's body (`void*` return).  `vec3_normalize_into`/`addVec3` now
@@ -232,8 +194,6 @@ void mtx34_copy(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
  * `void*` copy collided with the owner's `u8*` definition once the header declared it. */
 
 void eft_em_spawn(struct _ENEMY_WORK* em, s32 a, s32 b, nw4r::math::VEC3* v, f32 c);
-void pl_capsule_box_set(_EFT28_PARAM* param, void* out);
-void eft_capsule_ctor(_EFT28_PARAM* param);
 u32 scn_mdl_mat_access_get_tev_color(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
 void res_mat_tev_color_copy_ctor(_EFT26_MATOBJ* out, void* in);
 void res_mat_tev_color_end_edit(_EFT26_MATOBJ* obj);
@@ -665,13 +625,13 @@ extern "C" void fn_801186C4(_EFT* self)
  * and seat the models from the enemy joint. */
 extern "C" void fn_8011870C(_EFT* self)
 {
-    _EFT26_EM* em;
+    s32 i;
     _EFT26_WORK* work;
+    _EFT26_EM* em;
     nw4r::math::VEC3 vA;
     nw4r::math::VEC3 vB;
     nw4r::math::MTX34 mtx;
     u8 done = 0;
-    s32 i;
 
     VEC3_ctor(&vA);
     VEC3_ctor(&vB);
@@ -712,9 +672,9 @@ extern "C" void fn_8011870C(_EFT* self)
             nw4r::g3d::ScnMdl::CopiedMatAccess access(
                 (nw4r::g3d::ScnMdl*)work->chara[0]->field_0x118, (u32)i);
             if (copied_mat_access_valid_ck(&access) != 0) {
+                u32 ignored;
                 _EFT26_MATOBJ obj;
                 u32 handle = scn_mdl_mat_access_get_tev_color(&access, 0);
-                u32 ignored;
                 res_mat_tev_color_copy_ctor(&obj, &handle);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXGetTevKColor(GX_KCOLOR3, (GXColor*)&ignored);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, work->phase[i].color);
@@ -1143,98 +1103,3 @@ extern "C" void fn_801198F8(MHchar* chr, u8 index)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * the eft028 (break/crumble) setters
- * ------------------------------------------------------------------------------------------------- */
-
-extern "C" void eft028_set(u8 kind, u8 variant, u8 id)
-{
-    u32 mode;
-    _EFT* rec;
-    _EFT28_WORK* work;
-
-    switch (variant) {
-    case 0:
-        mode = 3;
-        break;
-    case 1:
-        mode = 1;
-        break;
-    default:
-        return;
-    }
-    rec = fn_80119C44(kind, id, mode);
-    if (rec == 0) {
-        return;
-    }
-    work = (_EFT28_WORK*)rec->work_0x38;
-    work->key_0x14 = 0xff;
-    work->key_0x15 = 0xff;
-    work->key_0x16 = 0xff;
-    if (get_now_mapno() == 0) {
-        work->key_0x17 = eft028_alpha_by_id[id];
-    } else {
-        work->key_0x17 = 0xff;
-    }
-    rec->timer_0x0C = 0;
-}
-
-void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 variant, long timer)
-{
-    _EFT* rec = fn_80119C44(kind, variant, 1);
-
-    if (rec == 0) {
-        return;
-    }
-    copyVec3(&rec->pos_0x18, pos);
-    rec->timer_0x0C = timer;
-}
-
-extern "C" void eft028_set_capsule(u8 area)
-{
-    _EFT* rec;
-    _EFT28_WORK* work;
-    _EFT28_PARAM param;
-
-    eft_capsule_ctor(&param);
-    if (area != get_now_areano()) {
-        return;
-    }
-    rec = (_EFT*)(void*)eft_res_slot_get(0x48);
-    if (rec == 0) {
-        return;
-    }
-    rec->field_0x03 = 28;
-    rec->type_0x02 = 2;
-    rec->area_0x44 = area;
-    eft_state_flags_set(rec, 0, 0);
-    work = (_EFT28_WORK*)rec->work_0x38;
-    work->mode = 1;
-    copyVec3(&param.a, &eft028_capsule_ends[0]);
-    copyVec3(&param.b, &eft028_capsule_ends[1]);
-    param.c = 410.0f;
-    pl_capsule_box_set(&param, &work->param_0x0C[0]);
-    work->col_r = 0xff;
-    work->col_g = 0xff;
-    work->col_b = 0xff;
-    work->col_a = 0;
-    copyVec3(&rec->pos_0x18, &param.a);
-    rec->timer_0x0C = 0;
-    rec->release_0x40 = fn_80119D10;
-    rec->dispatch_0x34 = fn_80119D9C;
-}
-
-extern "C" void eft028_set_scaled(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 variant, long timer)
-{
-    _EFT* rec = fn_80119C44(kind, variant, 1);
-    _EFT28_WORK* work;
-
-    if (rec == 0) {
-        return;
-    }
-    work = (_EFT28_WORK*)rec->work_0x38;
-    work->field_0x10 = scale;
-    copyVec3(&rec->pos_0x18, pos);
-    eft_rot_vec_copy(&rec->rot_0x24, rot);
-    rec->timer_0x0C = timer;
-}

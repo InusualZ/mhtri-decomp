@@ -20,7 +20,7 @@
  *   GUESS (from each body and its callers): eft_pro_slot_assign (0x800F6B6C: files a table entry under a free proID
  *   slot), eft_area_effects_set (0x800F6DB4: `stage_area_enter`'s per-map/area effect starts); the callees named
  *   here are GUESSes filed with their owners: `pack_entry_count`/`pack_entry_data` (system_core), `em_kind_mem_alloc`
- *   (enemy_control), `eft028_set`/`eft028_set_capsule` (eft026_fx), `nw_res_anm_work_num`/`nw_res_anm_create`
+ *   (enemy_control), `eft028_set`/`eft028_set_capsule` (eft028_set), `nw_res_anm_work_num`/`nw_res_anm_create`
  *   (nw_resource), and draw_shape's common file descriptors `q_comn_efm_file`, `lobby_eft_mdl_file`,
  *   `lb_comn_eft_file`, `q_comn_eft_file`.
  *   GUESS (from each body and its callers): `eft_res_pool_reset`.
@@ -77,7 +77,7 @@
 #include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple::GetResMdl (rule 2) */
 #include "ef/system_core.h"   /* pack_entry_count, pack_entry_data */
 #include "enemy/enemy_control.h"   /* em_kind_mem_alloc */
-#include "ef/eft026_fx.h"   /* eft028_set, eft028_set_capsule */
+#include "ef/eft028_set.h"   /* eft028_set, eft028_set_capsule */
 #include "ef/RetireParticleAll.h"
 #include "ef/eft_res_file_load.h"
 

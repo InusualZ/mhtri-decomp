@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): a symbol `ef/eft026_fx.cpp` defines, for a consumer that cannot include
+/* Leaf header (docs/plan.md 6.5 rule 2): a symbol `ef/eft028_set.cpp` defines, for a consumer that cannot include
  * the owner's full header.  C++ linkage (the map row carries the mangling). */
 #ifndef MHTRI_EF_EFT028_SET_KOWARE_H
 #define MHTRI_EF_EFT028_SET_KOWARE_H

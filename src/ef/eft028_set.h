@@ -1,8 +1,8 @@
 /*
- * Declarations for the symbols `src/ef/eft026_fx.cpp` owns that other units use (docs/plan.md 6.5, rule 2).
+ * Declarations for the symbols `src/ef/eft028_set.cpp` owns that other units use (docs/plan.md 6.5, rule 2).
  */
-#ifndef MHTRI_EF_EFT026_FX_H
-#define MHTRI_EF_EFT026_FX_H
+#ifndef MHTRI_EF_EFT028_SET_H
+#define MHTRI_EF_EFT028_SET_H
 
 #include "types.h"
 
@@ -19,4 +19,4 @@ void eft028_set_capsule(u8 area);
 }
 #endif
 
-#endif /* MHTRI_EF_EFT026_FX_H */
+#endif /* MHTRI_EF_EFT028_SET_H */

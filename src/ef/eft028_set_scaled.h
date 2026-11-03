@@ -1,4 +1,4 @@
-/* ef/eft028_set_scaled.h - the declaration of `eft028_set_scaled`, which `ef/eft026_fx.cpp` owns (docs/plan.md 6.5
+/* ef/eft028_set_scaled.h - the declaration of `eft028_set_scaled`, which `ef/eft028_set.cpp` owns (docs/plan.md 6.5
  * rule 2); the signature is the definition's. */
 #ifndef MHTRI_EF_EFT028_SET_SCALED_H
 #define MHTRI_EF_EFT028_SET_SCALED_H
