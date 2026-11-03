@@ -1021,21 +1021,21 @@ ef/eft018.cpp:
 	.sdata2     start:0x80796848 end:0x807969D8
 
 ef/eft019.cpp:
-	extab       start:0x8000C32C end:0x8000C3D4
-	extabindex  start:0x800263AC end:0x800264A8
-	.text       start:0x801121DC end:0x80114E34
+	extab       start:0x8000C32C end:0x8000C3B4
+	extabindex  start:0x800263AC end:0x80026478
+	.text       start:0x801121DC end:0x80114C20
 	.data       start:0x8059F670 end:0x805A00B8
 	.sdata      start:0x80791840 end:0x80791930
-	.sdata2     start:0x807969D8 end:0x80796A28
+	.sdata2     start:0x807969D8 end:0x80796A20
 
 ef/fn_80114E34.cpp:
-	extab       start:0x8000C3D4 end:0x8000C3F4
-	extabindex  start:0x800264A8 end:0x800264D8
-	.text       start:0x80114E34 end:0x801153D0
+	extab       start:0x8000C3B4 end:0x8000C3F4
+	extabindex  start:0x80026478 end:0x800264D8
+	.text       start:0x80114C20 end:0x801153D0
 	.ctors      start:0x8056F310 end:0x8056F314
 	.data       start:0x805A00B8 end:0x805A0208
 	.bss        start:0x806A4538 end:0x806A4548
-	.sdata2     start:0x80796A28 end:0x80796A30
+	.sdata2     start:0x80796A20 end:0x80796A30
 
 ef/eft022_fx.cpp:
 	extab       start:0x8000C3F4 end:0x8000C464

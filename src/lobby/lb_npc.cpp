@@ -176,7 +176,7 @@ typedef struct LbNpcChar {
 #include "g3d/scn_root_get_current_camera.h"
 #include "npc_model_res_ids.h"
 #include "lobby/lobby_hunter_cards.h"
-#include "ef/eft019.h"   /* ef_inst_spawn */
+#include "ef/fn_80114E34.h"   /* ef_inst_spawn */
 #include "sound/fn_800D7F54.h"   /* sysSE_stop, sysSE_bank32_req */
 #include "ef/get_move_work_adrs.h"   /* get_move_work_max */
 #include "lobby/lb_spot_tbl.h"

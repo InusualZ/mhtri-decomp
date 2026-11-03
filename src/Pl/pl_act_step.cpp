@@ -212,7 +212,7 @@
 #include "ef/cp_vector.h" /* `_CP_VECTOR`, the rotation `em_roster_area_hit_find` writes out (the type's shared header) */
 #include "ai/ai_npc_player_in_reach_ck.h" /* the owner's leaf header: `ai/ai_npc.h` redefines `_AINPC_W` */
 #include "ai/ainpc_move.h" /* ai_npc_item_give (rule 2) */
-#include "ef/eft019.h" /* ef_inst_spawn (rule 2) */
+#include "ef/fn_80114E34.h" /* ef_inst_spawn (rule 2) */
 #include "stage/stage_zone_hit_ck.h"
 #include "hud/Pl_act_frame_dispatch.h"
 #include "ef/fn_8010D1A8.h"

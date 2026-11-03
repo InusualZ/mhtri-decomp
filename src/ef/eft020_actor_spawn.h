@@ -1,4 +1,4 @@
-/* ef/eft020_actor_spawn.h - leaf header: `eft020_actor_spawn` (0x80114D28), owned by `ef/eft019.cpp`. C linkage. */
+/* ef/eft020_actor_spawn.h - leaf header: `eft020_actor_spawn` (0x80114D28), owned by `ef/fn_80114E34.cpp`. C linkage. */
 #ifndef MHTRI_EF_EFT020_ACTOR_SPAWN_H
 #define MHTRI_EF_EFT020_ACTOR_SPAWN_H
 

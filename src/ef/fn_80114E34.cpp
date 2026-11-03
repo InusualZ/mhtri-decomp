@@ -1,9 +1,11 @@
-/* ef/fn_80114E34.cpp - the eft020 effect family: the creator `fn_80114E34` (a 0x20-byte `_EFT_WORK_A` block from
+/* ef/fn_80114E34.cpp - the eft020 effect family: the actor spawners (`ef_inst_spawn`, `ef_inst_spawn_joint`,
+ *   `fn_80114CC8`, `eft020_actor_spawn`), the creator `fn_80114E34` (a 0x20-byte `_EFT_WORK_A` block from
  *   `eft_res_slot_get`, `+0x03 = 20`, release `fn_80114F34` at +0x40, dispatch `fn_80114F70` at +0x34) and its
  *   per-frame bodies.
- * RANGE. .text 0x80114E34-0x801153D0 (8 functions); extab 0x8000C3D4-0x8000C3F4, extabindex 0x800264A8-0x800264D8,
+ * RANGE. .text 0x80114C20-0x801153D0 (12 functions); extab 0x8000C3B4-0x8000C3F4, extabindex 0x80026478-0x800264D8,
  *   .ctors 0x8056F310-0x8056F314, .data 0x805A00B8-0x805A0208, .bss 0x806A4538-0x806A4548, .sdata2
- *   0x80796A28-0x80796A30.  Families 21-22 from 0x801153D0 are `ef/eft022_fx.cpp`, 23-24 `ef/eft023_fx.cpp`.
+ *   0x80796A20-0x80796A30 (the spawners' 1.0f/0.5f, then the origin's 0.0f/-5.0f).  The spawners are this TU's:
+ *   they pool their own 1.0f/0.5f while `ef/eft019.cpp` pools the same values at 0x807969DC/0x80796A10.  Families 21-22 from 0x801153D0 are `ef/eft022_fx.cpp`, 23-24 `ef/eft023_fx.cpp`.
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps the `li r0` + `psq_l` epilogue and the
  *   raw `clrlwi` chains; playbook 39).
  * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.
@@ -18,6 +20,8 @@
  *   `i, dead, flags, work, plw, enemy` in that order.
  *   The origin vector is a file-scope `EftOriginVec3` whose constructor calls `setVec3`: MWCC emits `__sinit` (a tail
  *   call to `setVec3`), its `.ctors` word and the 0.0f/-5.0f pool.
+ *   The spawners sit above the static origin, so the pool reads 1.0f, 0.5f, 0.0f, -5.0f; `ef_inst_spawn_joint`
+ *   passes an uninitialised `f32` as the scale (retail reached the creator without a prototype).
  *   `fn_80114E34` takes `u8` parameters with explicit `(u8)` casts, and its float guard is `scale <= 0.0f`
  *   (`fcmpo` + `cror`), not `==` (`fcmpu`).
  *   `fn_80114FAC` declares `MTX34 mtx; s32 i; u16 id; s32 n; _EFT_WORK_A* work;` in that order.
@@ -77,6 +81,10 @@ extern "C" void fn_80114FAC(_EFT*);
 extern "C" void fn_80115100(_EFT*);
 extern "C" void fn_801153A4(_EFT*);
 extern "C" void fn_801153B4(_EFT*);
+extern "C" void ef_inst_spawn(void* actor, u8 key);
+extern "C" void ef_inst_spawn_joint(void* actor, u8 key, s32 joint);
+extern "C" void fn_80114CC8(void* actor, u8 key);
+extern "C" void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale);
 
 /* The library entry points, declared by their map spelling (a mangled callee is not evidence of a
  * C++ unit; only a mangled definition is). */
@@ -212,6 +220,135 @@ struct EftOriginVec3 : public nw4r::math::VEC3 {
         setVec3(this, x, y, z);
     }
 };
+
+/* The actor record the spawners hang an eft020 record off.  One record, several views: +0x016 is `pl.h`'s
+ * `_PLW::area_0x16`, +0x1E1 the area both the player and the enemy record carry, +0x1A4 `pl.h`'s
+ * `_PLW::effect_key_0x1A4`, +0x204 the enemy's joint id (`ef/eft001.cpp` `joint_0x204`) and +0x110 the word
+ * `eft020_actor_spawn` falls back to when it is -1. size: 0x208 - lower bound (the record continues past what
+ * this unit reads). */
+struct _EFT020_ACTOR {
+    /* +0x000 */ u8 pad_0x000[0x016];
+    /* +0x016 */ u8 area_0x16;
+    /* +0x017 */ u8 pad_0x017[0x110 - 0x017];
+    /* +0x110 */ u32 field_0x110;
+    /* +0x114 */ u8 pad_0x114[0x1A4 - 0x114];
+    /* +0x1A4 */ u8 effect_key_0x1A4;
+    /* +0x1A5 */ u8 pad_0x1A5[0x1E1 - 0x1A5];
+    /* +0x1E1 */ u8 area_no_0x1E1;
+    /* +0x1E2 */ u8 pad_0x1E2[0x204 - 0x1E2];
+    /* +0x204 */ u32 joint_0x204;
+};
+/* The per-enemy data record `get_enemy_data` returns.  `enemy.h`'s canonical `EnemyData` leaves +0x9C
+ * padding; `eft020_actor_spawn` dereferences it and reads the enemy's scale at +0x1C of what it points at. */
+struct _EFT020_EMY_SCALE {
+    /* +0x00 */ u8 pad_0x00[0x1C];
+    /* +0x1C */ f32 scale_0x1C;
+}; /* size: 0x20 - lower bound (only the scale this unit reads is named) */
+struct _EFT020_EMY_DATA {
+    /* +0x00 */ u8 pad_0x00[0x9C];
+    /* +0x9C */ _EFT020_EMY_SCALE* field_0x9C;
+}; /* size: 0xA0 */
+
+/* `get_enemy_data`'s map spelling is `get_enemy_data__FP11_ENEMY_WORK` (`enemy/em_common.cpp`'s); the tag is
+ * forward-declared so the declaration emits that exact mangling without `enemy.h`'s record view. */
+struct _ENEMY_WORK;
+void* get_enemy_data(struct _ENEMY_WORK* enemy);
+
+#pragma peephole off
+
+/* 0x80114C20 (0x4C): Spawns an eft020 record for a per-key effect on an actor. */
+
+extern "C" void ef_inst_spawn(void* actor, u8 key)
+{
+    _EFT* effect;
+
+    effect = fn_80114E34(key, ((_EFT020_ACTOR*)actor)->area_0x16, 1.0f);
+    if (effect != 0) {
+        effect->source_0x30 = actor;
+        effect->mode_0x08 = 0;
+    }
+}
+
+/* 0x80114C6C (0x5C): Spawns an eft020 record on an actor's joint in the actor's area. */
+
+extern "C" void ef_inst_spawn_joint(void* actor, u8 key, s32 joint)
+{
+    _EFT* effect;
+    /* retail passes the third argument as whatever the caller left in `f1` (the original translation
+     * unit reached this callee through a declaration with no prototype); an uninitialised local is
+     * what reproduces it, and the callee only reads it when it has to place a scaled model. */
+    f32 scale;
+
+    effect = fn_80114E34(key, ((_EFT020_ACTOR*)actor)->area_no_0x1E1, scale);
+    if (effect != 0) {
+        effect->source_0x30 = actor;
+        effect->mode_0x08 = 1;
+        ((_EFT_WORK_A*)effect->work_0x38)->joint = joint;
+    }
+}
+
+/* 0x80114CC8 (0x60): Spawns an eft020 record on an actor's joint 3 under its effect key. */
+
+extern "C" void fn_80114CC8(void* actor, u8 key)
+{
+    _EFT* effect;
+
+    effect = fn_80114E34(key, ((_EFT020_ACTOR*)actor)->effect_key_0x1A4, 0.5f);
+    if (effect != 0) {
+        effect->source_0x30 = actor;
+        effect->mode_0x08 = 2;
+        effect->field_0x07 = 1;
+        ((_EFT_WORK_A*)effect->work_0x38)->joint = 3;
+    }
+}
+
+/* 0x80114D28 (0x10C): Spawns an eft020 record on an actor, its area, scale and joint picked by the actor kind. */
+
+extern "C" void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale)
+{
+    _EFT020_ACTOR* a;
+    _EFT* effect;
+    _EFT_WORK_A* work;
+    u8 area;
+    f32 scaleIn;
+
+    a = (_EFT020_ACTOR*)actor;
+    scaleIn = scale;
+    switch (kind) {
+    case 0:
+        area = a->area_0x16;
+        break;
+    case 1:
+        area = a->area_no_0x1E1;
+        scaleIn = ((_EFT020_EMY_DATA*)get_enemy_data((_ENEMY_WORK*)actor))->field_0x9C->scale_0x1C;
+        break;
+    case 3:
+        area = a->effect_key_0x1A4;
+        break;
+    }
+    effect = fn_80114E34(type, area, scaleIn);
+    if (effect != 0) {
+        effect->source_0x30 = actor;
+        work = (_EFT_WORK_A*)effect->work_0x38;
+        switch (kind) {
+        case 0:
+            effect->mode_0x08 = 0;
+            break;
+        case 1:
+            effect->mode_0x08 = 1;
+            if (a->joint_0x204 != 0xFFFFFFFF) {
+                work->joint = a->joint_0x204;
+            } else {
+                work->joint = a->field_0x110;
+            }
+            break;
+        case 3:
+            effect->mode_0x08 = 2;
+            work->joint = 3;
+            break;
+        }
+    }
+}
 
 /* The effect origin, 5 units below the player's joint; MWCC's `__sinit` builds it. */
 static EftOriginVec3 eft020_origin(0.0f, -5.0f, 0.0f);

@@ -6098,7 +6098,7 @@ extern "C" void pl_guard_break_apply(struct _PLW* plw)
 #include "Pl/pl_coll.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "quest/quest_item_slot.h" /* quest_item_work_notify (rule 2: its owner) */
-#include "ef/eft019.h" /* ef_inst_spawn (rule 2: its owner) */
+#include "ef/fn_80114E34.h" /* ef_inst_spawn (rule 2: its owner) */
 
 /* The actors this unit calls into; the mangling of the source names reproduces the map's spellings. */
 u32 Pl_Skill_ck(_PLW*, u16);

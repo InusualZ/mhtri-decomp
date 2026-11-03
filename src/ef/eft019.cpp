@@ -1,25 +1,33 @@
 /* ef/eft019.cpp - the eft019 effect family: its spawn entry points, the family allocator and the record's state
  *   machine.
- * RANGE. .text 0x801121DC-0x80114E34 (24 functions); extab 0x8000C32C-0x8000C3D4, extabindex 0x800263AC-0x800264A8,
- *   .data 0x8059F670-0x805A00B8, .sdata 0x80791840-0x80791930, .sdata2 0x807969D8-0x80796A28.  `fn_80114A1C` is the
- *   allocator (`eft_res_slot_get(0x58)`, family tag `field_0x03 = 19`, capacity from `lbl_8059F670`, hooks
+ * RANGE. .text 0x801121DC-0x80114C20 (20 functions); extab 0x8000C32C-0x8000C3B4, extabindex 0x800263AC-0x80026478,
+ *   .data 0x8059F670-0x805A00B8, .sdata 0x80791840-0x80791930, .sdata2 0x807969D8-0x80796A20 (17 words, the
+ *   pad word 0x80796A1C is the link's 8-byte fill before `ef/fn_80114E34.cpp`'s pool).  `fn_80114A1C` is the
+ *   allocator (`eft_res_slot_get(0x58)`, family tag `field_0x03 = 19`, capacity from `eft019_effect_counts`, hooks
  *   `fn_80112D1C` as `dispatch_0x34` and `fn_80112CE0` as `release_0x40`); `fn_80112D1C` dispatches `state_0x05` to
  *   `fn_80112D58` (create), `fn_8011392C` (per-frame update), `fn_8011484C` (advance) and `fn_8011485C` (release).
  * FLAGS. `cflags_main`; `#pragma peephole off` from `eft019_set` to the end of the file (playbook 39: with the pass on,
- *   the `u8` argument `clrlwi`s fold away).
+ *   the `u8` argument `clrlwi`s fold away); `#pragma pool_data off` over the tables (playbook 194: with data pooling
+ *   on, `fn_80112D58`/`fn_8011392C` reach the tables through one `.data` anchor where retail names each table).
  * NAMES. The nine `eft019_set*` entries are the runtime dump's own names; the map has only `fn_` stems for the rest,
- *   so plain definitions are `extern "C"`.  `_EFT019_ACTOR` reads the actor's +0x1E1 byte as the area number (the
- *   canonical `enemy.h` calls it `act_id`; every ef consumer compares it as an area).
- * RESIDUALS. none in code.
- *   flipcheck: `.data` is 0x4C4 of the claim's 0xA48 and differs from the target's, `.sdata` and
- *   `.sdata2` are claimed, not emitted.  The tail 0x80114C20-0x80114E34 (`ef_inst_spawn` and three more) shares its
- *   pool with `ef/fn_80114E34.cpp`'s functions, so it is likely that unit's.
+ *   so plain definitions are `extern "C"`.
+ *   GUESS (the data, from the readers): `eft019_effect_counts`/`_groups`/`_ids` (the per-type `res_eft_create`
+ *   arguments), `eft019_pair_effect_ids` (subtypes 9..11's second effect), `eft019_rgb_keys_19_{a,b,c}N` and
+ *   `eft019_rgb_key_tables_19_{a,b,c}`/`eft019_rgb_key_table_set_19` (the per-slot colour strips type 0x13 picks by
+ *   subtype), `eft019_tint_rgb_32`/`_132` (the RGB triples of types 0x20/0x84), `eft019_rgb_keys_56`,
+ *   `eft019_rgb_keys_0_28`/`eft019_alpha_keys_0_28`, `eft019_rgb_keys_57`, `eft019_rgb_keys_102_*` and
+ *   `eft019_rgb_key_tables_102_{a,b,c}` (the strips of the state those types run).
+ * RESIDUALS. none.
  * SHAPES. The `_CP_VECTOR*` setters copy the rotation triple with word reads (`effect->rot_0x24 = *rot;`): through a
  *   `nw4r::math::VEC3*` it emits an `fctiwz` per component.
  *   `eft019_set` keeps one `VEC3` per camera case (nine).
  *   `fn_80114A1C` writes its two seeds with a chained assignment, so the constant is loaded once and 0x48 stored first.
+ *   `fn_801148E4` halves the screen size with `max[0] / 2.0f`: the strength-reduced multiply keeps the operand order
+ *   `fmuls f0, f5, f1` that a `* 0.5f` literal (canonicalised constant-first) does not.
+ *   The data is defined in one interleaved order so both `.sdata` (8-byte strips) and `.data` come out in retail's
+ *   order; `eft019_tint_rgb_32` is 15 bytes and `eft019_rgb_keys_57` 12, because MWCC 8-aligns a 16-byte array and
+ *   retail's next objects are 4-aligned.
  */
-
 #include "types.h"
 #include "nw4r/math.h"
 #include "pl.h"
@@ -27,7 +35,7 @@
 #include "ef/eft004.h"
 #include "camera/camera.h" /* get_camera_pos (rule 2) */
 #include "ef/effect.h"
-#include "ef/fn_80114E34.h"
+#include "ef/fn_80114E34.h" /* the eft020 creator the shot setter spawns through (rule 2) */
 #include "g3d/g3d_calcworld.h"
 #include "g3d/g3d_camera.h"
 #include "main.h"
@@ -65,10 +73,6 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area);                /* the weapon-s
 void fn_801148E4(_EFT* self);                                    /* the on-screen impact sound */
 _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type);       /* the family allocator */
 void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx);            /* place the record on its actor */
-void ef_inst_spawn(void* actor, u8 key);                           /* eft020 wrappers, per actor kind */
-void ef_inst_spawn_joint(void* actor, u8 key, s32 joint);
-void fn_80114CC8(void* actor, u8 key);
-void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale);
 
 /* Callees other units own, declared locally (a rule-2 residual): `vec3_normalize_into`/`vec3_scale_in_place` are
  * `fn_8004CAD8.cpp`'s, `fn_8005696C`/`fn_80056A20` `draw_shape_arm.cpp`'s, `eft_res_slot_get`/`eft_res_slot_release`
@@ -134,17 +138,12 @@ void rotVecY(nw4r::math::VEC3* v, u32 angle);
 /* The camera direction entry (`get_camera_direction__Fv`). */
 nw4r::math::VEC3 get_camera_direction(void); /* target references get_camera_direction__Fv (relocaudit) */
 
-/* `get_enemy_data`'s map spelling is `get_enemy_data__FP11_ENEMY_WORK`; the tag is forward-declared
- * here so the declaration emits that exact mangling without pulling in `enemy.h`'s record view. */
-struct _ENEMY_WORK;
-void* get_enemy_data(struct _ENEMY_WORK* enemy);
-
 /* ---------------------------------------------------------------------------------------------------
  * engine records
  * ------------------------------------------------------------------------------------------------- */
 
 /* The effect pool the eft019 record carries at `_EFT::work_0x38`.  The size is `eft_res_slot_get`'s
- * argument, 0x58.  `count` is how many effects the id asks for (`lbl_8059F670[type]`, whose maximum
+ * argument, 0x58.  `count` is how many effects the id asks for (`eft019_effect_counts[type]`, whose maximum
  * entry is 7), `live_0x3C` how many the creation path has built so far - `fn_80112D58` copies it into
  * `count` when it runs out, `fn_8011392C` reaps over it.  The per-variant state the setters leave
  * behind is `subtype_0x40` (the id `fn_80112D58` switches on to pick the colour table), the two scale
@@ -158,37 +157,19 @@ struct _EFT019_WORK {
     /* +0x41 */ u8 pad_0x41[0x3];
     /* +0x44 */ f32 scale_a_0x44;
     /* +0x48 */ f32 scale_b_0x48;
-    /* +0x4C */ _GXColor color_0x4C[3];  /* one tint per effect slot; `lbl_8059FB40` has 3 rows */
+    /* +0x4C */ _GXColor color_0x4C[3];  /* one tint per effect slot; `eft019_rgb_key_table_set_19` has 3 rows */
 };
 
-/* The eft020 sibling's work block.  `src/ef/fn_80114E34.cpp` owns the full view (its `_EFT_WORK_A`);
- * this unit only writes the joint id the sibling's `+0x18` carries. size: 0x20 */
-struct _EFT020_WORK_A_JOINT {
-    /* +0x00 */ u8 pad_0x00[0x18];
-    /* +0x18 */ s32 joint_0x18;
-    /* +0x1C */ u8 pad_0x1C[0x4];
-};
 
-/* The actor record a `fn_80114C*`/`eft020_actor_spawn` wrapper hangs its effect off, as this unit reads it.
- * One record, several views: +0x016 is `pl.h`'s `_PLW::area_0x16`, +0x1E1 the area both the player and
- * the enemy record carry, +0x1A4 `pl.h`'s `_PLW::effect_key_0x1A4`, +0x204 the enemy's joint id
- * (`ef/eft001.cpp` `joint_0x204`) and +0x110 the word `eft020_actor_spawn` falls back to when it is -1.
- * +0x009 is the kind byte the mazule path compares against 3 (`pl.h` still spells it `unk009`,
- * `enemy.h` names the same byte `state_0x009`). size: 0x208 - lower bound (the record continues past
- * what this unit reads). */
+/* The actor record `eft019_set_mazule` and `eft019_shot_set` read: +0x009 is the kind byte the mazule path compares
+ * against 3 (`pl.h` still spells it `unk009`, `enemy.h` names the same byte `state_0x009`) and +0x016 is `pl.h`'s
+ * `_PLW::area_0x16`. size: 0x208 - lower bound (the record continues past what this unit reads). */
 struct _EFT019_ACTOR {
     /* +0x000 */ u8 pad_0x000[0x009];
     /* +0x009 */ u8 kind_0x09;
     /* +0x00A */ u8 pad_0x00A[0x016 - 0x00A];
     /* +0x016 */ u8 area_0x16;
-    /* +0x017 */ u8 pad_0x017[0x110 - 0x017];
-    /* +0x110 */ u32 field_0x110;
-    /* +0x114 */ u8 pad_0x114[0x1A4 - 0x114];
-    /* +0x1A4 */ u8 effect_key_0x1A4;
-    /* +0x1A5 */ u8 pad_0x1A5[0x1E1 - 0x1A5];
-    /* +0x1E1 */ u8 area_no_0x1E1;
-    /* +0x1E2 */ u8 pad_0x1E2[0x204 - 0x1E2];
-    /* +0x204 */ u32 joint_0x204;
+    /* +0x017 */ u8 pad_0x017[0x208 - 0x017];
 };
 
 /* The physics sub-record the actor holds at +0x13C: its character model sits at +0x04.  `pl.h`
@@ -199,55 +180,288 @@ struct _EFT019_PHYSICS {
     /* +0x04 */ MHchar chr_0x04;
 };
 
-/* The per-enemy data record `get_enemy_data` returns.  `enemy.h`'s canonical `EnemyData` leaves +0x9C
- * padding; this unit dereferences it and reads a float at +0x1C of what it points at. */
-struct _EFT019_EMY_SCALE {
-    /* +0x00 */ u8 pad_0x00[0x1C];
-    /* +0x1C */ f32 scale_0x1C;
-}; /* size: 0x20 - lower bound (only the scale this unit reads is named) */
-struct _EFT019_EMY_DATA {
-    /* +0x00 */ u8 pad_0x00[0x9C];
-    /* +0x9C */ _EFT019_EMY_SCALE* field_0x9C;
-}; /* size: 0xA0 */
 
-/* --- the unit's own pool, declared, never defined (playbook 29) ---------------------------------- */
+#pragma pool_data off /* each table is reached by name, never through a shared .data anchor (playbook 194) */
 
-extern u8 lbl_8059F670[];  /* per-id effect count, indexed by `type_0x02` (.data 0x8059F670, 0x8C) */
-extern u16 lbl_8059F6FC[]; /* the effect id table `res_eft_create` is fed (.data 0x8059F6FC, 0x114) */
-extern u16 lbl_8059F810[]; /* its second field (.data 0x8059F810, 0x114) */
-extern u16 lbl_8059F924[]; /* the two-model ids (.data 0x8059F924) */
-extern s32 lbl_8059FB40[]; /* the three colour-table pointers the variant switch picks (.data) */
-extern u8 lbl_8059FB4C[];  /* one RGB triple per variant (.data 0x8059FB4C) */
-extern u8 lbl_8059FB5C[];  /* ditto */
-extern u8 lbl_8059FB68[];  /* ditto */
-extern u8 lbl_8059FB7C[];  /* ditto */
-extern u8 lbl_8059FB88[];  /* ditto */
-extern u8 lbl_8059FBB8[];  /* ditto */
-extern u8 lbl_8059FBC4[];  /* ditto */
-extern u8 lbl_8059FBD0[];  /* ditto */
-extern u8 lbl_8059FBDC[];  /* one RGB triple per 0x84 variant (.data 0x8059FBDC) */
-extern u8 eft019_alpha_keys_32[8]; /* the type-0x20 fade-out alpha keys (.sdata 0x807918E8) */
-extern u8 eft019_alpha_keys_57[8]; /* the type-0x39 alpha keys (.sdata 0x807918F0) */
+/* --- the unit's own data, in retail's emission order ---------------------------------------------
+ * The effect counts, `res_eft_create` groups and ids per type, the pair ids of subtypes 9..11, and the colour
+ * key strips (`{frame, r, g, b}` keys, `0xFF` ends; alpha strips are `{frame, a}` pairs) with the per-slot
+ * tables that pick a strip by subtype.  A strip of 8 bytes lands in `.sdata`, a longer one in `.data`,
+ * so the definition order below is the one both sections share.
+ * ------------------------------------------------------------------------------------------------- */
 
-extern f32 lbl_807969D8; /* .sdata2 0x807969D8 .. 0x80796A24, the scale/colour constants */
-extern f32 lbl_807969DC;
-extern f32 lbl_807969E0;
-extern f32 lbl_807969E4;
-extern f32 lbl_807969E8;
-extern f32 lbl_807969EC;
-extern f32 lbl_807969F0;
-extern f32 lbl_807969F4;
-extern f32 lbl_807969F8;
-extern f32 lbl_807969FC;
-extern f32 lbl_80796A00;
-extern f32 lbl_80796A04;
-extern f32 lbl_80796A08;
-extern f32 lbl_80796A0C;
-extern f32 lbl_80796A10;
-extern f32 lbl_80796A14;
-extern f32 lbl_80796A18;
-extern f32 lbl_80796A20;
-extern f32 lbl_80796A24;
+u8 eft019_effect_counts[140] = {
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x07, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x02, 0x02, 0x02, 0x01, 0x01, 0x03, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x03, 0x03, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00,
+};
+u16 eft019_effect_groups[138] = {
+    0x0030, 0x0031, 0x0032, 0x00E9, 0x00EA, 0x00EB, 0x0000, 0x0033, 0x0036, 0x00D5, 0x00D6, 0x00EC,
+    0x00F2, 0x0115, 0x0116, 0x0117, 0x0118, 0x013F, 0x0140, 0x0180, 0x01A1, 0x01A7, 0x01A8, 0x0032,
+    0x01E6, 0x01E7, 0x01F4, 0x01A1, 0x0030, 0x0116, 0x019B, 0x028A, 0x0298, 0x02B0, 0x02C1, 0x02B9,
+    0x02BD, 0x02BE, 0x02BF, 0x02F2, 0x0338, 0x0339, 0x0340, 0x0341, 0x0342, 0x0363, 0x0367, 0x0398,
+    0x0399, 0x0352, 0x0353, 0x0354, 0x0355, 0x0356, 0x02C0, 0x03FA, 0x0286, 0x0030, 0x00F2, 0x0033,
+    0x0413, 0x0414, 0x0425, 0x0426, 0x042B, 0x042B, 0x01A1, 0x0483, 0x035B, 0x035C, 0x035D, 0x035E,
+    0x04C4, 0x04C5, 0x04C8, 0x04C7, 0x04C6, 0x04CF, 0x042B, 0x00D5, 0x01F4, 0x04D5, 0x04D6, 0x0513,
+    0x013F, 0x02BE, 0x02BF, 0x05EE, 0x0612, 0x0615, 0x061C, 0x061D, 0x061E, 0x061F, 0x02BD, 0x02B9,
+    0x0363, 0x0625, 0x0625, 0x042B, 0x042B, 0x0695, 0x0636, 0x0636, 0x0696, 0x0697, 0x06AA, 0x06AA,
+    0x06B7, 0x072B, 0x072C, 0x014C, 0x0805, 0x088F, 0x0890, 0x0891, 0x0887, 0x0888, 0x0889, 0x088A,
+    0x08F8, 0x0996, 0x0995, 0x09F1, 0x09F2, 0x09F4, 0x019C, 0x0A13, 0x0A14, 0x0A1D, 0x0138, 0x01A3,
+    0x0A2A, 0x0A36, 0x052B, 0x0A4B, 0x00F2, 0x0000,
+};
+u16 eft019_effect_ids[138] = {
+    0x0008, 0x0008, 0x0008, 0x0003, 0x0003, 0x0003, 0x0000, 0x0008, 0x0008, 0x0015, 0x0015, 0x0003,
+    0x0008, 0x0014, 0x0014, 0x0014, 0x0014, 0x0026, 0x0026, 0x0015, 0x0020, 0x0026, 0x0026, 0x0008,
+    0x0033, 0x0033, 0x0015, 0x0020, 0x0008, 0x0014, 0x0015, 0x0032, 0x003F, 0x0041, 0x0032, 0x0043,
+    0x0043, 0x0043, 0x0043, 0x0015, 0x0026, 0x0026, 0x0014, 0x0014, 0x0014, 0x0043, 0x0025, 0x0014,
+    0x0006, 0x004C, 0x004C, 0x004C, 0x004C, 0x004C, 0x0033, 0x0032, 0x0025, 0x0008, 0x0008, 0x0008,
+    0x0003, 0x0003, 0x0007, 0x0003, 0x005A, 0x005A, 0x0020, 0x005A, 0x004C, 0x004C, 0x004C, 0x004C,
+    0x005E, 0x005E, 0x005E, 0x005E, 0x005E, 0x005A, 0x005A, 0x0015, 0x0015, 0x0026, 0x0026, 0x0026,
+    0x0026, 0x0043, 0x0043, 0x006F, 0x0071, 0x0071, 0x0072, 0x0072, 0x0072, 0x0072, 0x0043, 0x0043,
+    0x0043, 0x0043, 0x0043, 0x005A, 0x005A, 0x0075, 0x0015, 0x0015, 0x0075, 0x0075, 0x0043, 0x0043,
+    0x0025, 0x0015, 0x0015, 0x0022, 0x005A, 0x0062, 0x0062, 0x0062, 0x0062, 0x0062, 0x0062, 0x0062,
+    0x0062, 0x0062, 0x0062, 0x0062, 0x0062, 0x0062, 0x0015, 0x006F, 0x006F, 0x00A1, 0x0013, 0x0028,
+    0x003F, 0x004C, 0x0062, 0x0062, 0x0008, 0x0000,
+};
+u16 eft019_pair_effect_ids[6] = {
+    0x019C, 0x019D, 0x019E, 0x0182, 0x0182, 0x0182,
+};
+u8 eft019_rgb_keys_19_a1[8] = {
+    0x00, 0xBF, 0xFF, 0x7F, 0xFF, 0xBF, 0xFF, 0x7F,
+};
+u8 eft019_rgb_keys_19_a2[8] = {
+    0x00, 0xAF, 0x8F, 0xFF, 0xFF, 0xAF, 0x8F, 0xFF,
+};
+u8 eft019_rgb_keys_19_a3[8] = {
+    0x00, 0xFF, 0xDF, 0x7F, 0xFF, 0xFF, 0xDF, 0x7F,
+};
+u8 eft019_rgb_keys_19_a4[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_a5[8] = {
+    0x00, 0xFF, 0xAF, 0xAF, 0xFF, 0xFF, 0xAF, 0xAF,
+};
+u8 eft019_rgb_keys_19_a6[8] = {
+    0x00, 0xFF, 0xBF, 0x3F, 0xFF, 0xFF, 0xBF, 0x3F,
+};
+u8 eft019_rgb_keys_19_a7[8] = {
+    0x00, 0xFF, 0xBF, 0xBF, 0xFF, 0xFF, 0xBF, 0xBF,
+};
+u8 eft019_rgb_keys_19_a8[8] = {
+    0x00, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F,
+};
+u8 eft019_rgb_keys_19_a9[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_a10[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_a11[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_a12[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_a13[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_a14[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_a15[8] = {
+    0x00, 0xAF, 0xAF, 0xAF, 0xFF, 0xAF, 0xAF, 0xAF,
+};
+u8 eft019_rgb_keys_19_a16[8] = {
+    0x00, 0xAF, 0xAF, 0xAF, 0xFF, 0xAF, 0xAF, 0xAF,
+};
+u8 eft019_rgb_keys_19_a17[12] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x02, 0x7F, 0x8F, 0xFF, 0xFF, 0x7F, 0x8F, 0xFF,
+};
+u8 eft019_rgb_keys_19_a18[8] = {
+    0x00, 0xFF, 0x4F, 0x4F, 0xFF, 0xFF, 0x4F, 0x4F,
+};
+u8* eft019_rgb_key_tables_19_a[19] = {
+    eft019_rgb_keys_19_a11, eft019_rgb_keys_19_a1, eft019_rgb_keys_19_a2, eft019_rgb_keys_19_a3,
+    eft019_rgb_keys_19_a4, eft019_rgb_keys_19_a5, eft019_rgb_keys_19_a6, eft019_rgb_keys_19_a7,
+    eft019_rgb_keys_19_a8, eft019_rgb_keys_19_a9, eft019_rgb_keys_19_a10, eft019_rgb_keys_19_a11,
+    eft019_rgb_keys_19_a12, eft019_rgb_keys_19_a13, eft019_rgb_keys_19_a14, eft019_rgb_keys_19_a15,
+    eft019_rgb_keys_19_a16, eft019_rgb_keys_19_a17, eft019_rgb_keys_19_a18,
+};
+u8 eft019_rgb_keys_19_b1[12] = {
+    0x00, 0xFF, 0xFF, 0xBF, 0x02, 0xDF, 0xFF, 0xBF, 0xFF, 0xDF, 0xFF, 0xBF,
+};
+u8 eft019_rgb_keys_19_b2[12] = {
+    0x00, 0xDC, 0xD2, 0xFF, 0x02, 0x73, 0x50, 0xFF, 0xFF, 0x73, 0x50, 0xFF,
+};
+u8 eft019_rgb_keys_19_b3[12] = {
+    0x00, 0xFF, 0xFF, 0xDF, 0x02, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F,
+};
+u8 eft019_rgb_keys_19_b4[12] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x02, 0x8F, 0x8F, 0xFF, 0xFF, 0x8F, 0x8F, 0xFF,
+};
+u8 eft019_rgb_keys_19_b5[12] = {
+    0x00, 0xFF, 0xBF, 0xA4, 0x02, 0xFF, 0x7F, 0xA4, 0xFF, 0xFF, 0x7F, 0xA4,
+};
+u8 eft019_rgb_keys_19_b6[12] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x02, 0xFF, 0x7F, 0x40, 0xFF, 0xFF, 0x7F, 0x40,
+};
+u8 eft019_rgb_keys_19_b7[12] = {
+    0x00, 0xB6, 0xFF, 0xFF, 0x02, 0xFF, 0x35, 0x2C, 0xFF, 0xFF, 0x35, 0x2C,
+};
+u8 eft019_rgb_keys_19_b8[12] = {
+    0x00, 0xFF, 0xFF, 0xBF, 0x02, 0xFF, 0x9A, 0x00, 0xFF, 0xFF, 0x9A, 0x00,
+};
+u8 eft019_rgb_keys_19_b9[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_b10[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_b11[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_b12[12] = {
+    0x00, 0x94, 0x57, 0x28, 0x02, 0x46, 0x46, 0x46, 0xFF, 0x46, 0x46, 0x46,
+};
+u8 eft019_rgb_keys_19_b13[12] = {
+    0x00, 0x94, 0x57, 0x28, 0x02, 0x46, 0x46, 0x46, 0xFF, 0x46, 0x46, 0x46,
+};
+u8 eft019_rgb_keys_19_b14[12] = {
+    0x00, 0x94, 0x57, 0x28, 0x02, 0x46, 0x46, 0x46, 0xFF, 0x46, 0x46, 0x46,
+};
+u8 eft019_rgb_keys_19_b15[12] = {
+    0x00, 0xBF, 0xBF, 0xBF, 0x02, 0x91, 0xA6, 0xFF, 0xFF, 0x91, 0xA6, 0xFF,
+};
+u8 eft019_rgb_keys_19_b16[12] = {
+    0x00, 0xCF, 0xCF, 0xCF, 0x02, 0xB7, 0xBF, 0xBF, 0xFF, 0xB7, 0xBF, 0xBF,
+};
+u8 eft019_rgb_keys_19_b17[12] = {
+    0x00, 0xAF, 0xBF, 0xFF, 0x02, 0x5F, 0x7F, 0xFF, 0xFF, 0x5F, 0x7F, 0xFF,
+};
+u8 eft019_rgb_keys_19_b18[12] = {
+    0x00, 0xFF, 0xBF, 0xBF, 0x02, 0xFF, 0x2F, 0x2F, 0xFF, 0xFF, 0x2F, 0x2F,
+};
+u8* eft019_rgb_key_tables_19_b[19] = {
+    eft019_rgb_keys_19_b11, eft019_rgb_keys_19_b1, eft019_rgb_keys_19_b2, eft019_rgb_keys_19_b3,
+    eft019_rgb_keys_19_b4, eft019_rgb_keys_19_b5, eft019_rgb_keys_19_b6, eft019_rgb_keys_19_b7,
+    eft019_rgb_keys_19_b8, eft019_rgb_keys_19_b9, eft019_rgb_keys_19_b10, eft019_rgb_keys_19_b11,
+    eft019_rgb_keys_19_b12, eft019_rgb_keys_19_b13, eft019_rgb_keys_19_b14, eft019_rgb_keys_19_b15,
+    eft019_rgb_keys_19_b16, eft019_rgb_keys_19_b17, eft019_rgb_keys_19_b18,
+};
+u8 eft019_rgb_keys_19_c0[8] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_c1[12] = {
+    0x00, 0xBF, 0xFF, 0x8F, 0x0B, 0xBF, 0xFF, 0xAF, 0xFF, 0xBF, 0xFF, 0xAF,
+};
+u8 eft019_rgb_keys_19_c2[12] = {
+    0x00, 0xFF, 0x5F, 0xFF, 0x0B, 0xBF, 0x7F, 0xFF, 0xFF, 0xBF, 0x7F, 0xFF,
+};
+u8 eft019_rgb_keys_19_c3[12] = {
+    0x00, 0xFF, 0xFF, 0xAA, 0x0B, 0xFF, 0xFF, 0xA4, 0xFF, 0xFF, 0xFF, 0xA4,
+};
+u8 eft019_rgb_keys_19_c4[12] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x0B, 0xBF, 0xBF, 0xFF, 0xFF, 0xBF, 0xBF, 0xFF,
+};
+u8 eft019_rgb_keys_19_c5[12] = {
+    0x00, 0xFF, 0xDF, 0xAF, 0x0B, 0xFF, 0x9F, 0x8F, 0xFF, 0xFF, 0x9F, 0x8F,
+};
+u8 eft019_rgb_keys_19_c15[12] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x0B, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+u8 eft019_rgb_keys_19_c7[12] = {
+    0x00, 0xFF, 0xBF, 0xBF, 0x0B, 0xFF, 0x6F, 0x6F, 0xFF, 0xFF, 0x6F, 0x6F,
+};
+u8 eft019_rgb_keys_19_c8[12] = {
+    0x00, 0xFF, 0xDF, 0x8F, 0x0B, 0xFF, 0xFA, 0xA7, 0xFF, 0xFF, 0xFA, 0xA7,
+};
+u8 eft019_rgb_keys_19_c6[12] = {
+    0x00, 0x64, 0xBF, 0xFF, 0x0B, 0x64, 0xBF, 0xFF, 0xFF, 0x64, 0xBF, 0xFF,
+};
+u8* eft019_rgb_key_tables_19_c[19] = {
+    eft019_rgb_keys_19_c0, eft019_rgb_keys_19_c1, eft019_rgb_keys_19_c2, eft019_rgb_keys_19_c3,
+    eft019_rgb_keys_19_c4, eft019_rgb_keys_19_c5, eft019_rgb_keys_19_c6, eft019_rgb_keys_19_c7,
+    eft019_rgb_keys_19_c8, eft019_rgb_keys_19_c0, eft019_rgb_keys_19_c0, eft019_rgb_keys_19_c0,
+    eft019_rgb_keys_19_c0, eft019_rgb_keys_19_c0, eft019_rgb_keys_19_c0, eft019_rgb_keys_19_c15,
+    eft019_rgb_keys_19_c15, eft019_rgb_keys_19_c15, eft019_rgb_keys_19_c15,
+};
+u8** eft019_rgb_key_table_set_19[3] = {
+    eft019_rgb_key_tables_19_a, eft019_rgb_key_tables_19_b, eft019_rgb_key_tables_19_c,
+};
+u8 eft019_tint_rgb_32[15] = {
+    0xC8, 0xC8, 0xC8, 0x64, 0xC8, 0x64, 0x90, 0x80, 0x10, 0x71, 0x61, 0xA5,
+    0xC8, 0xF0, 0xFF,
+};
+u8 eft019_rgb_keys_56[12] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x22, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00,
+};
+u8 eft019_rgb_keys_0_28[20] = {
+    0x00, 0xBD, 0x56, 0x16, 0x06, 0xBD, 0x56, 0x16, 0x0A, 0xA6, 0x3C, 0x18,
+    0x0E, 0x1A, 0x1A, 0x1A, 0xFF, 0x1A, 0x1A, 0x1A,
+};
+u8 eft019_alpha_keys_0_28[12] = {
+    0x00, 0x40, 0x06, 0x40, 0x07, 0xFF, 0x12, 0xFF, 0x19, 0x00, 0xFF, 0x00,
+};
+u8 eft019_alpha_keys_32[8] = {
+    0x00, 0x00, 0x14, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
+};
+u8 eft019_alpha_keys_57[8] = {
+    0x00, 0x7F, 0x0A, 0xEF, 0x19, 0x00, 0xFF, 0x00,
+};
+u8 eft019_rgb_keys_57[12] = {
+    0x00, 0xF4, 0xBF, 0x9F, 0x14, 0xFF, 0x45, 0x58, 0xFF, 0xFF, 0x45, 0x58,
+};
+u8 eft019_rgb_keys_102_b0[16] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x05, 0xFF, 0xFF, 0xFF, 0x0C, 0xFF, 0x00, 0x00,
+    0xFF, 0xFF, 0x00, 0x00,
+};
+u8 eft019_rgb_keys_102_c0[16] = {
+    0x00, 0xFF, 0xFF, 0xFF, 0x05, 0xFF, 0xFF, 0xFF, 0x0C, 0xFF, 0x00, 0x00,
+    0xFF, 0xFF, 0x00, 0x00,
+};
+u8 eft019_rgb_keys_102_a0[8] = {
+    0x00, 0xFF, 0xC8, 0xC8, 0xFF, 0xFF, 0xC8, 0xC8,
+};
+u8 eft019_rgb_keys_102_a1[8] = {
+    0x00, 0xA1, 0xFF, 0xEE, 0xFF, 0xA1, 0xFF, 0xEE,
+};
+u8 eft019_rgb_keys_102_b1[8] = {
+    0x00, 0x64, 0xFF, 0xDE, 0xFF, 0x64, 0xFF, 0xDE,
+};
+u8 eft019_rgb_keys_102_c1[8] = {
+    0x00, 0xD2, 0xFF, 0xE4, 0xFF, 0xD2, 0xFF, 0xE4,
+};
+u8 eft019_rgb_keys_102_a2[8] = {
+    0x00, 0xFF, 0xFF, 0xDE, 0xFF, 0xFF, 0xFF, 0xDE,
+};
+u8 eft019_rgb_keys_102_b2[8] = {
+    0x00, 0xFF, 0xFF, 0x92, 0xFF, 0xFF, 0xFF, 0x92,
+};
+u8 eft019_rgb_keys_102_c2[8] = {
+    0x00, 0xF0, 0xFF, 0xBF, 0xFF, 0xF0, 0xFF, 0xBF,
+};
+u8* eft019_rgb_key_tables_102_a[3] = {
+    eft019_rgb_keys_102_a0, eft019_rgb_keys_102_a1, eft019_rgb_keys_102_a2,
+};
+u8* eft019_rgb_key_tables_102_b[3] = {
+    eft019_rgb_keys_102_b0, eft019_rgb_keys_102_b1, eft019_rgb_keys_102_b2,
+};
+u8* eft019_rgb_key_tables_102_c[3] = {
+    eft019_rgb_keys_102_c0, eft019_rgb_keys_102_c1, eft019_rgb_keys_102_c2,
+};
+u8 eft019_tint_rgb_132[20] = {
+    0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0x7F, 0xFF, 0x7F, 0x00, 0xFF, 0x1F, 0x00,
+    0x00, 0x7F, 0xFF, 0x71, 0x61, 0xA5, 0x00, 0x00,
+};
 
 /* The bodies keep retail's `u8` argument masks and unfused record-form compares (playbook 39). */
 #pragma peephole off
@@ -270,92 +484,92 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     case 0: {
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 12, lbl_807969DC, lbl_807969DC);
+        eft019_set_core(pos, area, 12, 1.0f, 1.0f);
         return;
     }
     case 1: {
         _EFT019_WORK* work;
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
+        eft019_set_core(pos, area, 12, 1.5f, 1.5f);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969DC;
+        work->scale_a_0x44 = work->scale_b_0x48 = 1.0f;
         return;
     }
     case 2: {
         _EFT019_WORK* work;
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
+        eft019_set_core(pos, area, 12, 1.9f, 1.9f);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
+        work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
         return;
     }
     case 14: {
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 13, lbl_807969DC, lbl_807969DC);
+        eft019_set_core(pos, area, 13, 1.0f, 1.0f);
         return;
     }
     case 15: {
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 13, lbl_807969E0, lbl_807969E0);
+        eft019_set_core(pos, area, 13, 1.5f, 1.5f);
         return;
     }
     case 16: {
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 13, lbl_807969EC, lbl_807969EC);
+        eft019_set_core(pos, area, 13, 2.25f, 2.25f);
         return;
     }
     case 23: {
         _EFT019_WORK* work;
-        eft019_set_core(pos, area, 12, lbl_807969F0, lbl_807969F0);
+        eft019_set_core(pos, area, 12, 4.0f, 4.0f);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969F4;
+        work->scale_a_0x44 = work->scale_b_0x48 = 2.0f;
         return;
     }
     case 28: {
         _EFT019_WORK* work;
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 12, lbl_807969E8, lbl_807969E8);
+        eft019_set_core(pos, area, 12, 0.7f, 0.7f);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
+        work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
         return;
     }
     case 29: {
         _EFT019_WORK* work;
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 13, lbl_807969E8, lbl_807969E8);
+        eft019_set_core(pos, area, 13, 0.7f, 0.7f);
         work = (_EFT019_WORK*)effect->work_0x38;
-        work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
+        work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
         return;
     }
     case 57: {
         copyVec3(&v, &get_camera_direction());
         vec3_normalize_into(&v, &v);
-        vec3_scale_in_place(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, -5.0f);
         addVec3To(pos, &v);
-        eft019_set_core(pos, area, 58, lbl_807969F8, lbl_807969F8);
+        eft019_set_core(pos, area, 58, 0.85f, 0.85f);
         break;
     }
     }
@@ -460,11 +674,11 @@ void eft019_set_mazule(u8 id, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot, _
         }
         break;
     case 17:
-        eft042_set_placed(plw, 11, pos, rot, plw->area_0x16, lbl_807969FC);
+        eft042_set_placed(plw, 11, pos, rot, plw->area_0x16, 0.68f);
         effect = fn_80114A1C(pos, area, 19);
         break;
     case 18:
-        eft042_set_placed(plw, 12, pos, rot, plw->area_0x16, lbl_80796A00);
+        eft042_set_placed(plw, 12, pos, rot, plw->area_0x16, 0.87f);
         effect = fn_80114A1C(pos, area, 19);
         break;
     case 19:
@@ -511,27 +725,27 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
         case 0: {
             copyVec3(&v, &get_camera_direction());
             vec3_normalize_into(&v, &v);
-            vec3_scale_in_place(&v, lbl_807969D8);
+            vec3_scale_in_place(&v, -5.0f);
             addVec3To(pos, &v);
-            eft019_set_core(pos, area, 12, lbl_807969DC, lbl_807969DC);
+            eft019_set_core(pos, area, 12, 1.0f, 1.0f);
             break;
         }
         case 1: {
             copyVec3(&v, &get_camera_direction());
             vec3_normalize_into(&v, &v);
-            vec3_scale_in_place(&v, lbl_807969D8);
+            vec3_scale_in_place(&v, -5.0f);
             addVec3To(pos, &v);
-            eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
-            work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969DC;
+            eft019_set_core(pos, area, 12, 1.5f, 1.5f);
+            work->scale_a_0x44 = work->scale_b_0x48 = 1.0f;
             break;
         }
         case 2: {
             copyVec3(&v, &get_camera_direction());
             vec3_normalize_into(&v, &v);
-            vec3_scale_in_place(&v, lbl_807969D8);
+            vec3_scale_in_place(&v, -5.0f);
             addVec3To(pos, &v);
-            eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
-            work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969E8;
+            eft019_set_core(pos, area, 12, 1.9f, 1.9f);
+            work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
             break;
         }
         default:
@@ -662,7 +876,7 @@ void fn_80112D58(_EFT* self)
     work = (_EFT019_WORK*)self->work_0x38;
     snd = eft_control.field_0x04;
     self->state_0x05++;
-    work->effects[0] = res_eft_create(lbl_8059F6FC[self->type_0x02], lbl_8059F810[self->type_0x02], 0);
+    work->effects[0] = res_eft_create(eft019_effect_groups[self->type_0x02], eft019_effect_ids[self->type_0x02], 0);
     if (work->effects[0] == 0) {
         fn_8011485C(self);
         return;
@@ -694,7 +908,7 @@ void fn_80112D58(_EFT* self)
     case 0xF:
     case 0x10:
         work->effects[1] =
-            res_eft_create((u16)(self->type_0x02 + 0x3FF), lbl_8059F810[self->type_0x02], 0);
+            res_eft_create((u16)(self->type_0x02 + 0x3FF), eft019_effect_ids[self->type_0x02], 0);
         if (work->effects[1] == 0) {
             fn_8011485C(self);
             return;
@@ -715,7 +929,7 @@ void fn_80112D58(_EFT* self)
         case 8:
             for (i = 1; i < work->count; i++) {
                 work->effects[i] = res_eft_create(
-                    (u16)(lbl_8059F6FC[self->type_0x02] + i), lbl_8059F810[self->type_0x02], 0);
+                    (u16)(eft019_effect_groups[self->type_0x02] + i), eft019_effect_ids[self->type_0x02], 0);
                 if (work->effects[i] == 0) {
                     fn_8011485C(self);
                     return;
@@ -724,13 +938,13 @@ void fn_80112D58(_EFT* self)
             break;
         case 6:
             work->effects[1] = res_eft_create(
-                (u16)(lbl_8059F6FC[self->type_0x02] + 1), lbl_8059F810[self->type_0x02], 0);
+                (u16)(eft019_effect_groups[self->type_0x02] + 1), eft019_effect_ids[self->type_0x02], 0);
             if (work->effects[1] == 0) {
                 fn_8011485C(self);
                 return;
             }
             work->effects[2] = res_eft_create(
-                (u16)(lbl_8059F6FC[self->type_0x02] + 3), lbl_8059F810[self->type_0x02], 0);
+                (u16)(eft019_effect_groups[self->type_0x02] + 3), eft019_effect_ids[self->type_0x02], 0);
             if (work->effects[2] == 0) {
                 fn_8011485C(self);
                 return;
@@ -740,7 +954,7 @@ void fn_80112D58(_EFT* self)
         case 10:
         case 11:
             work->count = 2;
-            work->effects[1] = res_eft_create(lbl_8059F924[work->subtype_0x40 - 9], 0x15, 0);
+            work->effects[1] = res_eft_create(eft019_pair_effect_ids[work->subtype_0x40 - 9], 0x15, 0);
             if (work->effects[1] == 0) {
                 fn_8011485C(self);
                 return;
@@ -750,7 +964,7 @@ void fn_80112D58(_EFT* self)
         case 13:
         case 14:
             work->count = 3;
-            work->effects[1] = res_eft_create(lbl_8059F924[work->subtype_0x40 - 9], 0x15, 0);
+            work->effects[1] = res_eft_create(eft019_pair_effect_ids[work->subtype_0x40 - 9], 0x15, 0);
             if (work->effects[1] == 0) {
                 fn_8011485C(self);
                 return;
@@ -763,12 +977,12 @@ void fn_80112D58(_EFT* self)
             break;
         case 15:
             work->effects[1] = res_eft_create(
-                (u16)(lbl_8059F6FC[self->type_0x02] + 1), lbl_8059F810[self->type_0x02], 0);
+                (u16)(eft019_effect_groups[self->type_0x02] + 1), eft019_effect_ids[self->type_0x02], 0);
             if (work->effects[1] == 0) {
                 fn_8011485C(self);
                 return;
             }
-            work->effects[2] = res_eft_create(0x626, lbl_8059F810[self->type_0x02], 0);
+            work->effects[2] = res_eft_create(0x626, eft019_effect_ids[self->type_0x02], 0);
             if (work->effects[2] == 0) {
                 fn_8011485C(self);
                 return;
@@ -776,12 +990,12 @@ void fn_80112D58(_EFT* self)
             break;
         case 16:
             work->effects[1] = res_eft_create(
-                (u16)(lbl_8059F6FC[self->type_0x02] + 1), lbl_8059F810[self->type_0x02], 0);
+                (u16)(eft019_effect_groups[self->type_0x02] + 1), eft019_effect_ids[self->type_0x02], 0);
             if (work->effects[1] == 0) {
                 fn_8011485C(self);
                 return;
             }
-            work->effects[2] = res_eft_create(0x627, lbl_8059F810[self->type_0x02], 0);
+            work->effects[2] = res_eft_create(0x627, eft019_effect_ids[self->type_0x02], 0);
             if (work->effects[2] == 0) {
                 fn_8011485C(self);
                 return;
@@ -790,7 +1004,7 @@ void fn_80112D58(_EFT* self)
         case 17:
         case 18:
             work->effects[1] = res_eft_create(
-                (u16)(lbl_8059F6FC[self->type_0x02] + 1), lbl_8059F810[self->type_0x02], 0);
+                (u16)(eft019_effect_groups[self->type_0x02] + 1), eft019_effect_ids[self->type_0x02], 0);
             if (work->effects[1] == 0) {
                 fn_8011485C(self);
                 return;
@@ -804,7 +1018,7 @@ void fn_80112D58(_EFT* self)
         for (i = 0; i < work->count; i++) {
             work->effects[i]->SetRootMtx(mtx);
             {
-                u8* tint = ((u8**)lbl_8059FB40[i])[work->subtype_0x40];
+                u8* tint = eft019_rgb_key_table_set_19[i][work->subtype_0x40];
                 work->color_0x4C[i].r = tint[1];
                 work->color_0x4C[i].g = tint[2];
                 work->color_0x4C[i].b = tint[3];
@@ -826,16 +1040,16 @@ void fn_80112D58(_EFT* self)
         work->color_0x4C[0].a = 0x90;
         break;
     case 0x1D:
-        work->effects[1] = res_eft_create(0x40D, lbl_8059F810[self->type_0x02], 0);
+        work->effects[1] = res_eft_create(0x40D, eft019_effect_ids[self->type_0x02], 0);
         if (work->effects[1] == 0) {
             fn_8011485C(self);
             return;
         }
         break;
     case 0x20:
-        work->color_0x4C[0].r = lbl_8059FB4C[work->subtype_0x40 * 3];
-        work->color_0x4C[0].g = lbl_8059FB4C[work->subtype_0x40 * 3 + 1];
-        work->color_0x4C[0].b = lbl_8059FB4C[work->subtype_0x40 * 3 + 2];
+        work->color_0x4C[0].r = eft019_tint_rgb_32[work->subtype_0x40 * 3];
+        work->color_0x4C[0].g = eft019_tint_rgb_32[work->subtype_0x40 * 3 + 1];
+        work->color_0x4C[0].b = eft019_tint_rgb_32[work->subtype_0x40 * 3 + 2];
         work->color_0x4C[0].a = 0xFF;
         break;
     case 0x21:
@@ -1017,9 +1231,9 @@ void fn_80112D58(_EFT* self)
         for (i = 0; i < work->count; i++) {
             work->effects[i]->SetRootMtx(mtx);
         }
-        work->color_0x4C[0].r = lbl_8059FBDC[work->subtype_0x40 * 3];
-        work->color_0x4C[0].g = lbl_8059FBDC[work->subtype_0x40 * 3 + 1];
-        work->color_0x4C[0].b = lbl_8059FBDC[work->subtype_0x40 * 3 + 2];
+        work->color_0x4C[0].r = eft019_tint_rgb_132[work->subtype_0x40 * 3];
+        work->color_0x4C[0].g = eft019_tint_rgb_132[work->subtype_0x40 * 3 + 1];
+        work->color_0x4C[0].b = eft019_tint_rgb_132[work->subtype_0x40 * 3 + 2];
         work->color_0x4C[0].a = 0xFF;
         break;
     case 0x88:
@@ -1040,7 +1254,7 @@ void fn_80112D58(_EFT* self)
     if ((u32)(self->type_0x02 - 0x66) <= 1) {
         copyVec3(&dir, &get_camera_direction());
         vec3_normalize_into(&dir, &dir);
-        vec3_scale_in_place(&dir, lbl_807969D8);
+        vec3_scale_in_place(&dir, -5.0f);
         for (i = 1; i < work->count; i++) {
             fn_800F975C(work->effects[i], &dir);
         }
@@ -1147,20 +1361,20 @@ void fn_8011392C(_EFT* self)
         switch (self->type_0x02) {
         case 0x00:
         case 0x1C:
-            eftGetKeyRGB(lbl_8059FB68, self->field_0x10, &work->color_0x4C[0].r, &work->color_0x4C[0].g,
+            eftGetKeyRGB(eft019_rgb_keys_0_28, self->field_0x10, &work->color_0x4C[0].r, &work->color_0x4C[0].g,
                          &work->color_0x4C[0].b);
-            work->color_0x4C[0].a = eftGetKeyAlpha(lbl_8059FB7C, self->field_0x10);
+            work->color_0x4C[0].a = eftGetKeyAlpha(eft019_alpha_keys_0_28, self->field_0x10);
             change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
             break;
         case 0x39:
-            eftGetKeyRGB(lbl_8059FB88, self->field_0x10, &work->color_0x4C[0].r, &work->color_0x4C[0].g,
+            eftGetKeyRGB(eft019_rgb_keys_57, self->field_0x10, &work->color_0x4C[0].r, &work->color_0x4C[0].g,
                          &work->color_0x4C[0].b);
             work->color_0x4C[0].a = eftGetKeyAlpha(eft019_alpha_keys_57, self->field_0x10);
             change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
             break;
         }
         copyVec3(&pos, &self->pos_0x18);
-        pos.y += lbl_80796A04 * work->scale_a_0x44;
+        pos.y += 50.0f * work->scale_a_0x44;
         eft_res_models_spawn(self, (void**)work->effects, 1, work->count, &pos);
         return;
     case 0x03:
@@ -1249,10 +1463,10 @@ void fn_8011392C(_EFT* self)
         copyVec3(&pos, &self->pos_0x18);
         switch (self->type_0x02) {
         case 0x0C:
-            pos.y += lbl_80796A04 * work->scale_a_0x44;
+            pos.y += 50.0f * work->scale_a_0x44;
             break;
         case 0x3A:
-            pos.y += lbl_80796A04 * work->scale_a_0x44;
+            pos.y += 50.0f * work->scale_a_0x44;
             change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
             break;
         }
@@ -1277,7 +1491,7 @@ void fn_8011392C(_EFT* self)
         {
             nw4r::math::VEC3 cam;
             EFT_CAMERA_POS(&cam);
-            if (cam.y < lbl_80796A08) {
+            if (cam.y < 0.0f) {
                 eft_res_models_spawn(self, (void**)&work->effects[1], 1, 1, NULL);
             }
         }
@@ -1313,12 +1527,12 @@ void fn_8011392C(_EFT* self)
             break;
         }
         if (self->field_0x06 != 0) {
-            keys = ((u8**)lbl_8059FB40[1])[work->subtype_0x40];
+            keys = eft019_rgb_key_table_set_19[1][work->subtype_0x40];
             if (self->field_0x10 > hold) {
                 eftGetKeyRGB(keys, self->field_0x10 - hold, &work->color_0x4C[1].r, &work->color_0x4C[1].g,
                              &work->color_0x4C[1].b);
             }
-            keys = ((u8**)lbl_8059FB40[2])[work->subtype_0x40];
+            keys = eft019_rgb_key_table_set_19[2][work->subtype_0x40];
             if (self->field_0x10 > 3) {
                 eftGetKeyRGB(keys, self->field_0x10 - hold, &work->color_0x4C[2].r, &work->color_0x4C[2].g,
                              &work->color_0x4C[2].b);
@@ -1461,7 +1675,7 @@ void fn_8011392C(_EFT* self)
         break;
     case 0x38:
         frame = ++self->field_0x10;
-        eftGetKeyRGB(lbl_8059FB5C, frame, &work->color_0x4C[0].r, &work->color_0x4C[0].g, &work->color_0x4C[0].b);
+        eftGetKeyRGB(eft019_rgb_keys_56, frame, &work->color_0x4C[0].r, &work->color_0x4C[0].g, &work->color_0x4C[0].b);
         if (effect_move(work->effects[0]) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05++;
@@ -1480,7 +1694,7 @@ void fn_8011392C(_EFT* self)
         {
             nw4r::math::VEC3 cam;
             EFT_CAMERA_POS(&cam);
-            if (cam.y < lbl_80796A08) {
+            if (cam.y < 0.0f) {
                 change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
                 eft_res_models_spawn(self, (void**)work->effects, 1, work->count, NULL);
             }
@@ -1490,7 +1704,7 @@ void fn_8011392C(_EFT* self)
         self->field_0x10++;
         change_paramscale_eff(work->effects[0], work->scale_a_0x44);
         change_paramscale_eff(work->effects[1], work->scale_a_0x44);
-        change_paramscale_eff(work->effects[2], lbl_80796A0C * work->scale_a_0x44);
+        change_paramscale_eff(work->effects[2], 1.6f * work->scale_a_0x44);
         for (i = 0; i < work->count; i++) {
             if (effect_move(work->effects[i]) == 0) {
                 done++;
@@ -1502,17 +1716,17 @@ void fn_8011392C(_EFT* self)
             return;
         }
         col.a = 0xFF;
-        eftGetKeyRGB(((u8**)lbl_8059FBB8)[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
+        eftGetKeyRGB(eft019_rgb_key_tables_102_a[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
         change_color_eff(work->effects[0], &self->pos_0x18, col);
-        eftGetKeyRGB(((u8**)lbl_8059FBC4)[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
+        eftGetKeyRGB(eft019_rgb_key_tables_102_b[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
         change_color_eff(work->effects[1], &self->pos_0x18, col);
-        eftGetKeyRGB(((u8**)lbl_8059FBD0)[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
+        eftGetKeyRGB(eft019_rgb_key_tables_102_c[work->subtype_0x40], self->field_0x10, &col.r, &col.g, &col.b);
         change_color_eff(work->effects[2], &self->pos_0x18, col);
         break;
     case 0x67:
         change_paramscale_eff(work->effects[0], work->scale_a_0x44);
         change_paramscale_eff(work->effects[1], work->scale_a_0x44);
-        change_paramscale_eff(work->effects[2], lbl_80796A0C * work->scale_a_0x44);
+        change_paramscale_eff(work->effects[2], 1.6f * work->scale_a_0x44);
         for (i = 0; i < work->count; i++) {
             if (effect_move(work->effects[i]) == 0) {
                 done++;
@@ -1551,7 +1765,7 @@ void fn_8011392C(_EFT* self)
             effect_retire(work->effects[0], 0);
         }
         copyVec3(&pos, &self->pos_0x18);
-        pos.y += lbl_80796A04 * work->scale_a_0x44;
+        pos.y += 50.0f * work->scale_a_0x44;
         eft_res_models_spawn(self, (void**)work->effects, 1, work->count, &pos);
         return;
     default:
@@ -1619,12 +1833,12 @@ void fn_801148E4(_EFT* self)
         screen_size_float_get((struct _MH_VEC2*)max);
         handle = scn_root_get_current_camera(pRoot);
         camera_world_to_screen((nw4r::g3d::Camera*)&handle, (u8*)v, &self->pos_0x18);
-        if (v[2] <= lbl_80796A08 || v[2] >= lbl_807969DC || v[0] < lbl_80796A08 ||
-            v[0] > max[0] || v[1] < lbl_80796A08 || v[1] > max[1]) {
+        if (v[2] <= 0.0f || v[2] >= 1.0f || v[0] < 0.0f ||
+            v[0] > max[0] || v[1] < 0.0f || v[1] > max[1]) {
             /* the projected point is off-screen: the impact makes no sound */
         } else {
-            rx = v[0] - max[0] * lbl_80796A10;
-            ry = v[1] - max[1] * lbl_80796A10;
+            rx = v[0] - max[0] / 2.0f;
+            ry = v[1] - max[1] / 2.0f;
             v[0] = rx / max[0];
             v[1] = ry / max[1];
             color.r = 0xFF;
@@ -1653,9 +1867,9 @@ _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type)
         return 0;
     }
     work = (_EFT019_WORK*)effect->work_0x38;
-    work->count = lbl_8059F670[type];
+    work->count = eft019_effect_counts[type];
     work->unused_0x38 = 0;
-    work->scale_a_0x44 = work->scale_b_0x48 = lbl_807969DC;
+    work->scale_a_0x44 = work->scale_b_0x48 = 1.0f;
     effect->field_0x03 = 19;
     effect->timer_0x0C = 0;
     effect->field_0x10 = 0;
@@ -1692,106 +1906,12 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     calcVecAngXY(&axis, &rot.x, &rot.y);
     rot.z = 0;
     self->rot_0x24.z = 0;
-    setVector3(&spin, lbl_80796A14, lbl_80796A14, lbl_80796A18);
+    setVector3(&spin, -10.0f, -10.0f, 87.0f);
     rotVecX(&spin, rot.x);
     rotVecY(&spin, rot.y);
     addVec3To(&pos, &spin);
     cpSetRotMatrix(&rot, mtx);
     mtx34_set_trans(mtx, &pos);
-}
-
-/* 0x80114C20 (0x4C): Spawns an eft020 record for a per-key effect on an actor. */
-
-void ef_inst_spawn(void* actor, u8 key)
-{
-    _EFT* effect;
-
-    effect = fn_80114E34(key, ((_EFT019_ACTOR*)actor)->area_0x16, lbl_80796A20);
-    if (effect != 0) {
-        effect->source_0x30 = actor;
-        effect->demo_flag_0x08 = 0;
-    }
-}
-
-/* 0x80114C6C (0x5C): Spawns an eft020 record on an actor's joint in the actor's area. */
-
-void ef_inst_spawn_joint(void* actor, u8 key, s32 joint)
-{
-    _EFT* effect;
-    /* retail passes the third argument as whatever the caller left in `f1` (the original translation
-     * unit reached this callee through a declaration with no prototype); an uninitialised local is
-     * what reproduces it, and the callee only reads it when it has to place a scaled model. */
-    f32 scale;
-
-    effect = fn_80114E34(key, ((_EFT019_ACTOR*)actor)->area_no_0x1E1, scale);
-    if (effect != 0) {
-        effect->source_0x30 = actor;
-        effect->demo_flag_0x08 = 1;
-        ((_EFT020_WORK_A_JOINT*)effect->work_0x38)->joint_0x18 = joint;
-    }
-}
-
-/* 0x80114CC8 (0x60): Spawns an eft020 record on an actor's joint 3 under its effect key. */
-
-void fn_80114CC8(void* actor, u8 key)
-{
-    _EFT* effect;
-
-    effect = fn_80114E34(key, ((_EFT019_ACTOR*)actor)->effect_key_0x1A4, lbl_80796A24);
-    if (effect != 0) {
-        effect->source_0x30 = actor;
-        effect->demo_flag_0x08 = 2;
-        effect->field_0x07 = 1;
-        ((_EFT020_WORK_A_JOINT*)effect->work_0x38)->joint_0x18 = 3;
-    }
-}
-
-/* 0x80114D28 (0x10C): Spawns an eft020 record on an actor, its area, scale and joint picked by the actor kind. */
-
-void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale)
-{
-    _EFT019_ACTOR* a;
-    _EFT* effect;
-    _EFT020_WORK_A_JOINT* work;
-    u8 area;
-    f32 scaleIn;
-
-    a = (_EFT019_ACTOR*)actor;
-    scaleIn = scale;
-    switch (kind) {
-    case 0:
-        area = a->area_0x16;
-        break;
-    case 1:
-        area = a->area_no_0x1E1;
-        scaleIn = ((_EFT019_EMY_DATA*)get_enemy_data((_ENEMY_WORK*)actor))->field_0x9C->scale_0x1C;
-        break;
-    case 3:
-        area = a->effect_key_0x1A4;
-        break;
-    }
-    effect = fn_80114E34(type, area, scaleIn);
-    if (effect != 0) {
-        effect->source_0x30 = actor;
-        work = (_EFT020_WORK_A_JOINT*)effect->work_0x38;
-        switch (kind) {
-        case 0:
-            effect->demo_flag_0x08 = 0;
-            break;
-        case 1:
-            effect->demo_flag_0x08 = 1;
-            if (a->joint_0x204 != 0xFFFFFFFF) {
-                work->joint_0x18 = a->joint_0x204;
-            } else {
-                work->joint_0x18 = a->field_0x110;
-            }
-            break;
-        case 3:
-            effect->demo_flag_0x08 = 2;
-            work->joint_0x18 = 3;
-            break;
-        }
-    }
 }
 
 #pragma peephole reset

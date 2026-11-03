@@ -1,4 +1,4 @@
-/* ef/ef_inst_spawn_joint.h - the declaration of `ef_inst_spawn_joint`, which `ef/eft019.cpp` owns (docs/plan.md 6.5
+/* ef/ef_inst_spawn_joint.h - the declaration of `ef_inst_spawn_joint`, which `ef/fn_80114E34.cpp` owns (docs/plan.md 6.5
  * rule 2), with the scale `enemy/em_common.cpp` passes in f1.  GUESS name (the owner's body). */
 #ifndef MHTRI_EF_EF_INST_SPAWN_JOINT_H
 #define MHTRI_EF_EF_INST_SPAWN_JOINT_H
