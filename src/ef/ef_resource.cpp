@@ -29,19 +29,18 @@
  *   GUESS (the list accessors): `ef_resource_texture_project_at`.
  *   GUESS: the record names `EfResourceManager`/`EfResProject`/`EfResTrack`/`EfPtclParam` and their field names are
  *   read from the code (the track's size words are GUESSes).
- * RESIDUALS. `ef_resource_bind_references` 0x800B44F4: register assignment only - retail keeps the record in r25 and the
- *   emitter in r26, ours swaps them (declaration order, a cast copy of the parameter, hoisting the locals, an `int`
- *   or `u16` emitter index and a member-function spelling do not move it).  Retail's member functions are spelled
- *   as C functions taking the record (see NAMES).
- *   flipcheck: `.sdata` is 0xD of the claimed 0x18: the rest is the link's fill up to the next unit's 16-aligned
- *   `.sdata`, which only lines up once `ef/ef_drawbillboardstrategy.cpp` is flipped too.
- *   Map rows to rename with the source: `ef_resource_construct` -> `__ct__17EfResourceManagerFv`,
- *   `ef_resource_static_init` -> `__sinit_\ef_resource_cpp` (the bytes are identical; until then both rows pair by
- *   name only).
+ * RESIDUALS. Every `.text` row is byte-identical.  Retail's member functions are spelled as C functions taking the
+ *   record (see NAMES).
+ *   flipcheck: `.sdata` is 0xD of the claimed 0x18: the rest is the link's fill up to `ef_billboard_texcoords`
+ *   (`ef/ef_drawbillboardstrategy.cpp`, `__attribute__((aligned(32)))`), which dtk's split object aligns to 8, so the
+ *   flipped link lands it at 0x807912F8; the successor's `.sdata` split line needs `align:32` (measured: the DOL
+ *   hashes with it) until that unit flips.
  * SHAPES. A table count read once into a local declared first (the by-name lookups); the big-endian offset read into
  *   a local before the entry pointer advances; `x + (n * 8 + 4)` for the track blocks and `&names->slot[n]` for the
  *   name list (both keep retail's temporary); the track binders count in a u32 that the caller narrows to u8, and
- *   the reference pass declares its track index in the `for`.
+ *   the reference pass declares its track index in the `for` and its texture slot pointer at function scope (the
+ *   slot numbered above `failed`/`emitter` puts `emitter` in the allocator's stall group, so `emitter` colours r26
+ *   before the `self` parameter takes r25; idea 244).
  * SHAPES. The data is the unit's own: the assert and warning strings are literals (`.data`, first-use order, each
  *   its own `lis`/`addi` under `#pragma pool_data off`), the "REFF"/"REFT" tags are defined arrays (`.sdata`), and the
  *   singleton is a defined `EfResourceManager` whose constructor (0x800B2884) the compiler's static initialiser
@@ -654,13 +653,13 @@ u32 ef_resource_bind_track_children(EfResourceManager* self, EfResTrack* track, 
 s32 ef_resource_bind_references(EfResourceManager* self) {
     u32 total = 0;
     u32 index;
+    void** slot;
 
     for (index = 0; index < ef_resource_num_emitters(self, 0); index++) {
         u8 failed = 0;
         EfEmitterRes* emitter = ef_resource_emitter_at(self, index, 0);
 
         if (emitter != 0) {
-            void** slot;
             u8* name;
             int i;
             EfEmitterDesc* desc;
