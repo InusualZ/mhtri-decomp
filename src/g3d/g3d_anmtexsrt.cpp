@@ -12,18 +12,27 @@
  * NAMES. apply_tex_srt_anm_result is a GUESS (nw4r's ApplyTexSrtAnmResult, by the ScnMdl material pass that hands it
  *   the copied handles and the animation's result).  The AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride and
  *   AnmObjTexSrtRes members are nw4r's (the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)` warnings
- *   and the four vtables); the stems are defined `extern "C"` (playbook 48).  The classes are declared in
- *   `g3d/g3d_anmtexsrt.h`, with the unit's C-linkage helpers.
- *   ResAnmTexSrt::GetNumMaterial, the AnmObjTexSrtOverride constructor/Construct and the AnmObjTexSrtRes members
- *   are nw4r's (the asserts, the vtables); their map rows are fn_ stems until rename request g3d-anmtex#5 lands.
+ *   and the four vtables).  The classes are declared in `g3d/g3d_anmtexsrt.h`, with the unit's C-linkage helpers.
+ *   fn_8006CDBC, res_anm_tex_srt_ptr, fn_8006CE28 and res_anm_tex_srt_is_valid are ResAnmTexSrt::ref/ptr/
+ *   GetClassName/IsValid (the `g3d_resanmtexsrt_ac.h` assert names the class); res_anm_tex_srt_copy, fn_8006D030,
+ *   fn_8006D060 and fn_8006D03C its copy constructor, ResCommon's copy, GetNumFrame and GetAnmPolicy; they keep the
+ *   map's C stems because `g3d/g3d_resfile.cpp`, `g3d/g3d_resanmtexsrt.cpp` and `nw_resource.cpp` call them by those.
  *   texsrt_add_offset_to_ptr (0x8006D970, ut::AddOffsetToPtr), apply_tex_srt_anm_result_tex (0x8006E160, the
- *   texture-SRT half of ApplyTexSrtAnmResult) and tex_srt_assign (0x8006E244, TexSrt's copy assignment) are
- *   GUESSES.  anmtexsrt_round_up (0x8006C650, the Construct functions' align-up: nw4r's ut::RoundUp shape) is a
- *   GUESS.  ResAnmTexSrt::GetAnmResult is `g3d/g3d_resanmtexsrt.cpp`'s fn_800916FC.
- * RESIDUALS. AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride, AnmObjTexSrtRes: the destructors' empty bodies are complete
- *   (the compiler emits the base calls and the deleting tail; `#pragma peephole off` keeps retail's `extsh`).
- *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata2` are claimed and not
- *   emitted.
+ *   texture-SRT half of ApplyTexSrtAnmResult), tex_srt_assign (0x8006E244, TexSrt's copy assignment) and
+ *   anmtexsrt_round_up (0x8006C650, the Construct functions' align-up: nw4r's ut::RoundUp shape) are GUESSES.
+ *   anm_typename_AnmObjTexSrt/Node/Override/Res are the `.rodata` records by their strings.
+ *   ResAnmTexSrt::GetAnmResult is `g3d/g3d_resanmtexsrt.cpp`'s.
+ * RESIDUALS. none: `.text`, extab, extabindex, `.rodata`, `.data`, `.sdata` and `.sdata2` are byte-identical to the
+ *   claim (`.data` and `.sdata2` end 6 and 4 bytes short: the link's 8-byte alignment fill before g3d_anmvis.cpp).
+ * SHAPES. The functions stand in address order.  The accessors are `__declspec(noinline) inline` weak copies: MWCC
+ *   emits a copy after the first function that references it (several in one function: reverse reference order, each
+ *   followed by its own callees) and its string literals after the vtables in reverse definition order (`static char`
+ *   member names forward in `.sdata`), so the string-bearing ones are defined first in the `.data` tail's order
+ *   (ResAnmTexSrt::ref, its GetClassName, the AnmObjTexSrtOverride constructor, ResTexSrt::ref, its GetClassName).
+ *   The type-name records are nw4r's ResNameDataT (the name padded with at least one NUL to a word), which is what
+ *   aligns each to 8.  AnmObjTexSrtNode's destructor tests its pointer through an inline function (locals declared
+ *   in reverse, initialised in order): the block-scoped assert's locals give the destructor seven base-cleanup states
+ *   (a 108 B extab record) where retail has one (28 B).
  * SHAPES. anmtexsrt_round_up takes `unsigned int align` (nw4r's ut::RoundUp signature): with a u32 alignment MWCC
  *   folds `~(align - 1)` into `andc` where retail keeps `nor` + `and`.
  * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
@@ -51,225 +60,6 @@
 
 #pragma pool_data off
 
-/* The `.rodata` animation name records the helper-backed readers pass by address (claimed, not emitted). */
-extern u8 lbl_8056F5C0[];
-extern u8 anm_typename_AnmObjTexSrtNode[];     /* "AnmObjTexSrtNode" (this unit's .rodata) */
-extern u8 anm_typename_AnmObjTexSrtOverride[]; /* "AnmObjTexSrtOverride" (this unit's .rodata) */
-extern u8 anm_typename_AnmObjTexSrtRes[];      /* "AnmObjTexSrtRes" (this unit's .rodata) */
-
-/* The `.data` type-name strings the plain returners hand back by address (claimed, not emitted). */
-extern u8 lbl_8058D678[]; /* "ResAnmTexSrt"  */
-extern u8 lbl_8058D5F8[]; /* "ResTexSrt"     */
-
-/* --------------------------------------------------------------------------------------------- *
- * The word accessors (0x80068698-0x8006E6B4): read / test / copy the body word at +0x0.
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 res_anm_tex_srt_ptr(void *p)
-{
-    return *(u32 *)p;
-}
-
-/* 0x8006E310 (0x8): returns the texture-SRT block. */
-nw4r::g3d::ResTexSrtData* nw4r::g3d::ResTexSrt::ptr()
-{
-    return static_cast<ResTexSrtData *>(mpData);
-}
-
-extern "C" u32 res_anm_tex_srt_is_valid(void *p)
-{
-    return *(u32 *)p != 0;
-}
-
-/* 0x8006E324 (0x14): tells whether the handle is set. */
-bool nw4r::g3d::ResTexSrt::IsValid() const
-{
-    return mpData != NULL;
-}
-
-/* 0x8006E6B4 (0x14): tells whether the handle is set. */
-bool nw4r::g3d::ResMatIndMtxAndScale::IsValid() const
-{
-    return mpData != NULL;
-}
-
-extern "C" void fn_8006D030(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The type-name returners (0x800686A0-0x8006E318): hand back the address of the `.data` name record.
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_8006CE28(void)
-{
-    return (u32)lbl_8058D678;
-}
-
-/* 0x8006E318 (0xC): returns the class name. */
-const char *nw4r::g3d::ResTexSrt::GetClassName()
-{
-    return (const char *)lbl_8058D5F8;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The two argument-less bodies (0x8006D9A0/0x8006E2A8): `blr`, no work.
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_8006D9A0(u32 p)
-{
-    return p;
-}
-
-extern "C" void fn_8006E2A8(nw4r::g3d::TexSrt* p)
-{
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The float helpers (0x8006E690/0x8006E6A4): a bit reinterpret and an `fmax`.
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_8006E690(f32 x)
-{
-    return *(u32 *)&x;
-}
-
-extern "C" f32 fn_8006E6A4(f32 x, f32 y)
-{
-    if (x < y)
-        return y;
-    return x;
-}
-
-/* Rounds `offset` up to the next multiple of `align`. */
-extern "C" u32 anmtexsrt_round_up(u32 offset, unsigned int align)
-{
-    return (align + offset - 1) & ~(align - 1);
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The store-then-return forwarders (0x800686C0-0x8006D000): write through the word copier beside each
- * one and hand the original `self` back in r3.
- * --------------------------------------------------------------------------------------------- */
-
-
-
-
-
-extern "C" void fn_8006D030(u32 *dst, const u32 *src);
-
-extern "C" void *res_anm_tex_srt_copy(void *self, void *src)
-{
-    fn_8006D030((u32 *)self, (const u32 *)src);
-    return self;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The helper-backed name readers (0x800693A0-0x8006E734): store the name record through one of the
- * unsplit store helpers and read the word back through the returned address.
- * --------------------------------------------------------------------------------------------- */
-
-
-/* --------------------------------------------------------------------------------------------- *
- * The list-insert chain steps (0x80069334-0x8006EA24): resolve a name record, compare the caller's key
- * against it through the `fn_800639D0` helper, and on a miss run the previous step's insertion with a
- * copy of the key word (the shape `g3d/g3d_anmchr.cpp`'s `fn_800638F8` uses beside them).
- * --------------------------------------------------------------------------------------------- */
-
-/* The three name readers this cluster's own insert steps chain into, defined in the helper section
- * beside their `fn_80063898`-family siblings. */
-
-
-/* --------------------------------------------------------------------------------------------- *
- * The teardown destructors and the checked word reader (0x8006AA4C-0x8006E9C8).
- * --------------------------------------------------------------------------------------------- */
-
-
-/* --------------------------------------------------------------------------------------------- *
- * The float-packed field reader (0x8006E668) and the indexed resource reader (0x8006D9FC).
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" s32 fn_8006E668(f32 x)
-{
-    return (s32)(((fn_8006E690(x) >> 23) & 0xFF) - 127);
-}
-
-extern "C" u32 fn_8006D9FC(void *self, u32 idx)
-{
-    u32 base = *(u32 *)self;
-
-    if (idx != 0)
-        return (u32)nw4r::g3d::ResDic((void *)(base + idx)).mpData;
-    return (u32)nw4r::g3d::ResDic((void *)0).mpData;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The seven checked getters (0x80068634-0x8006E2AC): resolve the object through the validity test,
- * panic through `nw4r::db::Panic` out of the owning `_ac.h` when it is not valid, then read the body
- * word through the resolver beside it.  The shape is nw4r's `NW4R_ASSERT` (file/line/message and the
- * `"ref"` reference-name argument).
- * --------------------------------------------------------------------------------------------- */
-namespace nw4r {
-namespace db {
-
-void Panic(const char *file, int line, const char *message, ...);
-
-} /* namespace db */
-} /* namespace nw4r */
-
-extern u8 lbl_8058D6A4[];
-extern u8 lbl_8058D688[];
-extern u8 lbl_8058D620[];
-extern u8 lbl_8058D604[];
-
-extern "C" u32 fn_8006CDBC(void *p)
-{
-    if (res_anm_tex_srt_is_valid(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058D6A4, 38, (const char *)lbl_8058D688,
-                        (const char *)fn_8006CE28(), "ref");
-    return res_anm_tex_srt_ptr(p);
-}
-
-/* 0x8006E2AC (0x64): returns the texture-SRT block, panicking on a NULL handle. */
-nw4r::g3d::ResTexSrtData& nw4r::g3d::ResTexSrt::ref()
-{
-    if (!IsValid())
-        nw4r::db::Panic((const char *)lbl_8058D620, 107, (const char *)lbl_8058D604, GetClassName(), "ref");
-    return *ptr();
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The three field readers of the resolved `ResAnmTexSrt` record (0x8006D03C/0x8006D060/0x8006D9A4).
- * --------------------------------------------------------------------------------------------- */
-extern "C" int fn_8006D060(void *p)
-{
-    return ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->numFrame;
-}
-
-extern "C" u32 fn_8006D03C(void *p)
-{
-    return ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->policy;
-}
-
-extern "C" u32 fn_8006D9A4(void *self, u32 idx)
-{
-    u32 tmp = fn_8006D9FC(self, ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(self))->toTexSrtDataDic);
-
-    return (u32)(*reinterpret_cast<nw4r::g3d::ResDic *>(&tmp))[(int)idx];
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The vtable-dispatch wrappers (0x8006A38C/0x8006A3F4/0x8006E794/0x8006E8F4): the body word 0 is its
- * vtable, the entry at +0x14 runs with the object and a word is read back through the `TypeObj::GetTypeName`
- * helper (the shape `g3d/g3d_anmscn.cpp` uses for its two wrappers).
- * --------------------------------------------------------------------------------------------- */
-
-
-/* ------------------------------------------------------------------------------------------------ */
-/* AnmObjTexSrt and its node, override and resource forms (the g3d_anmtexsrt.cpp part)              */
-/* ------------------------------------------------------------------------------------------------ */
-
 /* The nw4r resource pointer assert: `ptr` must fall in one of the seven mapped Wii memory ranges. */
 #define TEXSRT_POINTER_ASSERT(ptr, line, msg)                                                  \
     {                                                                                          \
@@ -293,9 +83,219 @@ extern "C" u32 fn_8006D9A4(void *self, u32 idx)
 
 #define TEXSRT_THIS_MSG "NW4R:Pointer Error\nthis(=%p) is not valid pointer."
 
-/* The unit's own helpers the class members below call before their definitions. */
-extern "C" u32 texsrt_add_offset_to_ptr(u32 base, s32 ofs);
-extern "C" nw4r::g3d::TexSrt* tex_srt_assign(nw4r::g3d::TexSrt* pDst, const nw4r::g3d::TexSrt* pSrc);
+/* The `.rodata` run-time type names of the four classes (0x8056F5C0, 0x8056F5D8, 0x8056F5F0, 0x8056F610): the
+ * name's size with its NUL, then the name, padded with at least one NUL to a word (nw4r's ResNameDataT). */
+#define TEXSRT_TYPENAME_LEN(s) (sizeof(s) + 4 - sizeof(s) % 4)
+extern "C" const nw4r::g3d::TypeNameData<TEXSRT_TYPENAME_LEN("AnmObjTexSrt")> anm_typename_AnmObjTexSrt = {
+    sizeof("AnmObjTexSrt"), "AnmObjTexSrt"};
+extern "C" const nw4r::g3d::TypeNameData<TEXSRT_TYPENAME_LEN("AnmObjTexSrtNode")> anm_typename_AnmObjTexSrtNode = {
+    sizeof("AnmObjTexSrtNode"), "AnmObjTexSrtNode"};
+extern "C" const nw4r::g3d::TypeNameData<TEXSRT_TYPENAME_LEN("AnmObjTexSrtOverride")> anm_typename_AnmObjTexSrtOverride = {
+    sizeof("AnmObjTexSrtOverride"), "AnmObjTexSrtOverride"};
+extern "C" const nw4r::g3d::TypeNameData<TEXSRT_TYPENAME_LEN("AnmObjTexSrtRes")> anm_typename_AnmObjTexSrtRes = {
+    sizeof("AnmObjTexSrtRes"), "AnmObjTexSrtRes"};
+
+/* -------------------------------------------------------------------------------------------------- */
+/* The accessor instances the target keeps as weak out-of-line copies.  Each copy comes out after the  */
+/* first function that references it (several in one function: reverse reference order, each followed */
+/* by its own callees); the string-bearing ones stand in the order the `.data` tail needs (their       */
+/* strings come out in reverse definition order after the vtables).                                    */
+/* -------------------------------------------------------------------------------------------------- */
+
+extern "C" {
+__declspec(noinline) inline u32 res_anm_tex_srt_ptr(void *p);
+__declspec(noinline) inline const char *fn_8006CE28(void);
+__declspec(noinline) inline u32 res_anm_tex_srt_is_valid(void *p);
+__declspec(noinline) inline u32 fn_8006D9FC(void *self, u32 idx);
+__declspec(noinline) inline u32 fn_8006D9A0(u32 p);
+__declspec(noinline) inline void fn_8006D030(u32 *dst, const u32 *src);
+__declspec(noinline) inline void fn_8006E2A8(nw4r::g3d::TexSrt *p);
+__declspec(noinline) inline u32 fn_8006E690(f32 x);
+}
+
+/* `ResAnmTexSrt::ref` with the `g3d_resanmtexsrt_ac.h` assert: the checked resolver the `g3d/g3d_resfile.cpp`
+ * getters and the `g3d/g3d_resanmtexsrt.cpp` field readers call. */
+extern "C" __declspec(noinline) inline u32 fn_8006CDBC(void *p)
+{
+    static char sMember[] = "ref";
+
+    if (res_anm_tex_srt_is_valid(p) == 0)
+        nw4r::db::Panic("g3d_resanmtexsrt_ac.h", 38, "%s::%s: Object not valid.", fn_8006CE28(), sMember);
+    return res_anm_tex_srt_ptr(p);
+}
+
+/* `ResAnmTexSrt::GetClassName`: the class name the assert above passes. */
+extern "C" __declspec(noinline) inline const char *fn_8006CE28(void)
+{
+    return "ResAnmTexSrt";
+}
+
+/* 0x8006C528 (0x128): constructs the override node over a binding buffer and a child array. */
+__declspec(noinline) inline nw4r::g3d::AnmObjTexSrtOverride::AnmObjTexSrtOverride(
+    MEMAllocator* pHeap, u16* pBindingBuf, int numBinding, AnmObjTexSrtRes** ppChildrenBuf, int numChildren)
+    : AnmObjTexSrtNode(pHeap, pBindingBuf, numBinding, ppChildrenBuf, numChildren)
+{
+    G3D_POINTER_ASSERT("g3d_anmtexsrt.h", this, 0xB0, TEXSRT_THIS_MSG);
+}
+
+/* 0x8006E2AC (0x64): returns the texture-SRT block, panicking on a NULL handle. */
+__declspec(noinline) inline nw4r::g3d::ResTexSrtData& nw4r::g3d::ResTexSrt::ref()
+{
+    static char sMember[] = "ref";
+
+    if (!IsValid())
+        nw4r::db::Panic("g3d_resmat_ac.h", 107, "%s::%s: Object not valid.", GetClassName(), sMember);
+    return *ptr();
+}
+
+/* 0x8006E318 (0xC): returns the class name. */
+__declspec(noinline) inline const char *nw4r::g3d::ResTexSrt::GetClassName()
+{
+    return "ResTexSrt";
+}
+
+/* The string-free copies. */
+
+/* `ResAnmTexSrt::ptr`: returns the block. */
+/* untyped: opaque handle - the `ResAnmTexSrt` handle, as the owner's definition spells it */
+extern "C" __declspec(noinline) inline u32 res_anm_tex_srt_ptr(void *p)
+{
+    return *(u32 *)p;
+}
+
+/* `ResAnmTexSrt::IsValid`: whether the handle is set. */
+extern "C" __declspec(noinline) inline u32 res_anm_tex_srt_is_valid(void *p)
+{
+    return *(u32 *)p != 0;
+}
+
+/* 0x8006E310 (0x8): returns the texture-SRT block. */
+__declspec(noinline) inline nw4r::g3d::ResTexSrtData* nw4r::g3d::ResTexSrt::ptr()
+{
+    return static_cast<ResTexSrtData *>(mpData);
+}
+
+/* 0x8006E324 (0x14): tells whether the handle is set. */
+__declspec(noinline) inline bool nw4r::g3d::ResTexSrt::IsValid() const
+{
+    return mpData != NULL;
+}
+
+/* 0x8006E6B4 (0x14): tells whether the handle is set. */
+__declspec(noinline) inline bool nw4r::g3d::ResMatIndMtxAndScale::IsValid() const
+{
+    return mpData != NULL;
+}
+
+/* The `ResCommon` copy: copies the handle word. */
+extern "C" __declspec(noinline) inline void fn_8006D030(u32 *dst, const u32 *src)
+{
+    *dst = *src;
+}
+
+/* Returns its argument (the `ut::AddOffsetToPtr` base conversion). */
+extern "C" __declspec(noinline) inline u32 fn_8006D9A0(u32 p)
+{
+    return p;
+}
+
+/* TexSrt's empty base assignment. */
+extern "C" __declspec(noinline) inline void fn_8006E2A8(nw4r::g3d::TexSrt* p)
+{
+}
+
+/* Reinterprets a float's bits. */
+extern "C" __declspec(noinline) inline u32 fn_8006E690(f32 x)
+{
+    return *(u32 *)&x;
+}
+
+/* Returns the larger of two floats. */
+extern "C" __declspec(noinline) inline f32 fn_8006E6A4(f32 x, f32 y)
+{
+    if (x < y)
+        return y;
+    return x;
+}
+
+/* 0x8006C650 (0x18): rounds `offset` up to the next multiple of `align`. */
+extern "C" __declspec(noinline) inline u32 anmtexsrt_round_up(u32 offset, unsigned int align)
+{
+    return (align + offset - 1) & ~(align - 1);
+}
+
+/* 0x8006D000 (0x30): copy-constructs a `ResAnmTexSrt` handle and returns the destination. */
+/* untyped: opaque handle - the `ResAnmTexSrt` handles, as the callers in `nw_resource.cpp` pass them */
+extern "C" __declspec(noinline) inline void *res_anm_tex_srt_copy(void *self, void *src)
+{
+    fn_8006D030((u32 *)self, (const u32 *)src);
+    return self;
+}
+
+/* The float's unbiased binary exponent. */
+extern "C" __declspec(noinline) inline s32 fn_8006E668(f32 x)
+{
+    return (s32)(((fn_8006E690(x) >> 23) & 0xFF) - 127);
+}
+
+/* The dictionary at offset `idx` from the resource block (none for offset 0). */
+extern "C" __declspec(noinline) inline u32 fn_8006D9FC(void *self, u32 idx)
+{
+    u32 base = *(u32 *)self;
+
+    if (idx != 0)
+        return (u32)nw4r::g3d::ResDic((void *)(base + idx)).mpData;
+    return (u32)nw4r::g3d::ResDic((void *)0).mpData;
+}
+
+/* The animation's frame count. */
+extern "C" __declspec(noinline) inline int fn_8006D060(void *p)
+{
+    return ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->numFrame;
+}
+
+/* The animation's play policy. */
+extern "C" __declspec(noinline) inline u32 fn_8006D03C(void *p)
+{
+    return ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->policy;
+}
+
+/* 0x8006D9A4 (0x58): material `idx`'s animation record, from the resource's material dictionary. */
+extern "C" __declspec(noinline) inline u32 fn_8006D9A4(void *self, u32 idx)
+{
+    u32 tmp = fn_8006D9FC(self, ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(self))->toTexSrtDataDic);
+
+    return (u32)(*reinterpret_cast<nw4r::g3d::ResDic *>(&tmp))[(int)idx];
+}
+
+/* 0x8006CD98 (0x24): the animated material count. */
+__declspec(noinline) inline u32 nw4r::g3d::ResAnmTexSrt::GetNumMaterial() const
+{
+    return ((const ResAnmTexSrtData*)fn_8006CDBC((void*)this))->numMaterial;
+}
+
+/* 0x8006D970 (0x30): the address `ofs` bytes past `base`. */
+extern "C" __declspec(noinline) inline u32 texsrt_add_offset_to_ptr(u32 base, s32 ofs)
+{
+    return ofs + fn_8006D9A0(base);
+}
+
+/* 0x8006E244 (0x64): copies the five SRT components of `pSrc` into `pDst` and returns `pDst`. */
+extern "C" __declspec(noinline) inline nw4r::g3d::TexSrt* tex_srt_assign(nw4r::g3d::TexSrt* pDst,
+                                                                         const nw4r::g3d::TexSrt* pSrc)
+{
+    fn_8006E2A8(pDst);
+    pDst->Su = pSrc->Su;
+    pDst->Sv = pSrc->Sv;
+    pDst->R = pSrc->R;
+    pDst->Tu = pSrc->Tu;
+    pDst->Tv = pSrc->Tv;
+    return pDst;
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* AnmObjTexSrt and its node, override and resource forms                                           */
+/* ------------------------------------------------------------------------------------------------ */
 
 /* 0x80069C80 (0x74): constructs the texture-SRT animation over a binding buffer of `numBinding` words, all
  * released. */
@@ -344,7 +344,7 @@ nw4r::g3d::AnmObjTexSrtRes* nw4r::g3d::AnmObjTexSrt::Attach(int idx, AnmObjTexSr
     TEXSRT_POINTER_ASSERT(pRes, 0x5A, "NW4R:Pointer Error\npObj(=%p) is not valid pointer.");
     nw4r::db::Warning("g3d_anmtexsrt.cpp", 0x60,
                       "AnmObjTexSrt::Attach(%d, %p(%s)) called with %s. Maybe uninteded call.", idx, pRes,
-                      reinterpret_cast<G3dObj*>(pRes)->GetTypeName(), GetTypeName());
+                      pRes->GetTypeName(), GetTypeName());
     return NULL;
 }
 
@@ -358,7 +358,7 @@ const char* nw4r::g3d::AnmObjTexSrt::GetTypeName() const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrt::GetTypeObj() const
 {
     const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F5C0));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrt)));
 }
 
 /* 0x8006A3F4 (0x38): returns the type's name. */
@@ -371,7 +371,7 @@ const char* nw4r::g3d::AnmObjTexSrtRes::GetTypeName() const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtRes::GetTypeObj() const
 {
     const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_res(&pName, anm_typename_AnmObjTexSrtRes));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_res(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrtRes)));
 }
 
 /* 0x8006A45C (0x15C): the base cannot detach: warns and returns NULL. */
@@ -419,10 +419,39 @@ nw4r::g3d::AnmObjTexSrt::~AnmObjTexSrt()
 {
 }
 
+/* Whether the node falls in one of the seven mapped Wii memory ranges (the pointer assert's test). */
+static inline BOOL texsrt_pointer_valid(const nw4r::g3d::AnmObjTexSrtNode* ptr)
+{
+    u32 top_;
+    BOOL ok6_, ok5_, ok4_, ok3_, ok2_, ok1_;
+
+    ok1_ = TRUE;
+    ok2_ = TRUE;
+    ok3_ = TRUE;
+    ok4_ = TRUE;
+    ok5_ = TRUE;
+    ok6_ = TRUE;
+    top_ = (u32)(ptr) & 0xFF000000u;
+    if (!(top_ == 0x80000000u) && !(((u32)(ptr) & 0xFF800000u) == 0x81000000u))
+        ok6_ = FALSE;
+    if (!ok6_ && !(((u32)(ptr) & 0xF8000000u) == 0x90000000u))
+        ok5_ = FALSE;
+    if (!ok5_ && !(top_ == 0xC0000000u))
+        ok4_ = FALSE;
+    if (!ok4_ && !(((u32)(ptr) & 0xFF800000u) == 0xC1000000u))
+        ok3_ = FALSE;
+    if (!ok3_ && !(((u32)(ptr) & 0xF8000000u) == 0xD0000000u))
+        ok2_ = FALSE;
+    if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))
+        ok1_ = FALSE;
+    return ok1_;
+}
+
 /* 0x8006AAA8 (0x16C): detaches every child and destroys the node. */
 nw4r::g3d::AnmObjTexSrtNode::~AnmObjTexSrtNode()
 {
-    TEXSRT_POINTER_ASSERT(this, 0x9D, TEXSRT_THIS_MSG);
+    if (!texsrt_pointer_valid(this))
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x9D, TEXSRT_THIS_MSG, this);
     DetachAll();
 }
 
@@ -530,6 +559,18 @@ void nw4r::g3d::AnmObjTexSrtNode::SetFrame(f32 frame)
     }
 }
 
+/* 0x8006B6D8 (0x168): returns the first child's frame, 0 without children. */
+f32 nw4r::g3d::AnmObjTexSrtNode::GetFrame() const
+{
+    TEXSRT_POINTER_ASSERT(this, 0x11E, TEXSRT_THIS_MSG);
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        if (mpChildrenArray[i] != NULL) {
+            return mpChildrenArray[i]->GetFrame();
+        }
+    }
+    return 0.0f;
+}
+
 /* 0x8006B840 (0x1C4): sets every child's update rate. */
 void nw4r::g3d::AnmObjTexSrtNode::SetUpdateRate(f32 rate)
 {
@@ -543,18 +584,6 @@ void nw4r::g3d::AnmObjTexSrtNode::SetUpdateRate(f32 rate)
             pChild->SetUpdateRate(rate);
         }
     }
-}
-
-/* 0x8006B6D8 (0x168): returns the first child's frame, 0 without children. */
-f32 nw4r::g3d::AnmObjTexSrtNode::GetFrame() const
-{
-    TEXSRT_POINTER_ASSERT(this, 0x11E, TEXSRT_THIS_MSG);
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        if (mpChildrenArray[i] != NULL) {
-            return mpChildrenArray[i]->GetFrame();
-        }
-    }
-    return 0.0f;
 }
 
 /* 0x8006BA04 (0x168): returns the first child's update rate, 1 without children. */
@@ -679,14 +708,6 @@ nw4r::g3d::AnmObjTexSrtOverride* nw4r::g3d::AnmObjTexSrtOverride::Construct(MEMA
                                            (AnmObjTexSrtRes**)(pBuf + childrenOffset), numChildren);
 }
 
-/* 0x8006C528 (0x128): constructs the override node over a binding buffer and a child array. */
-inline nw4r::g3d::AnmObjTexSrtOverride::AnmObjTexSrtOverride(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding,
-                                                             AnmObjTexSrtRes** ppChildrenBuf, int numChildren)
-    : AnmObjTexSrtNode(pHeap, pBindingBuf, numBinding, ppChildrenBuf, numChildren)
-{
-    G3D_POINTER_ASSERT("g3d_anmtexsrt.h", this, 0xB0, TEXSRT_THIS_MSG);
-}
-
 /* 0x8006C668 (0x2BC): material `idx`'s result from the last child that animates it, or nothing. */
 const nw4r::g3d::TexSrtAnmResult* nw4r::g3d::AnmObjTexSrtOverride::GetResult(TexSrtAnmResult* pResult, u32 idx)
 {
@@ -749,12 +770,6 @@ nw4r::g3d::AnmObjTexSrtRes* nw4r::g3d::AnmObjTexSrtRes::Construct(MEMAllocator* 
                         "NW4R:Alignment Error(0x%x)\npBindBuf must be aligned to 2 bytes boundary.", pBindingBuf);
     }
     return new (pBuf) AnmObjTexSrtRes(pHeap, res, pBindingBuf, numBinding, pCacheBuf);
-}
-
-/* 0x8006CD98 (0x24): the animated material count. */
-u32 nw4r::g3d::ResAnmTexSrt::GetNumMaterial() const
-{
-    return ((const ResAnmTexSrtData*)fn_8006CDBC((void*)this))->numMaterial;
 }
 
 /* 0x8006CE48 (0x1B8): builds a resource-played texture-SRT animation over `res`, with an optional result cache. */
@@ -854,12 +869,6 @@ bool nw4r::g3d::AnmObjTexSrtRes::Bind(ResMdl mdl)
     return bSuccess;
 }
 
-/* 0x8006D970 (0x30): the address `ofs` bytes past `base`. */
-extern "C" u32 texsrt_add_offset_to_ptr(u32 base, s32 ofs)
-{
-    return ofs + fn_8006D9A0(base);
-}
-
 /* 0x8006DA48 (0x2CC): material `idx`'s result: nothing for an unbound material, the cached result, or the
  * resource evaluated at the current frame into `pResult`. */
 const nw4r::g3d::TexSrtAnmResult* nw4r::g3d::AnmObjTexSrtRes::GetResult(TexSrtAnmResult* pResult, u32 idx)
@@ -948,18 +957,6 @@ extern "C" void apply_tex_srt_anm_result_tex(nw4r::g3d::ResTexSrt srt, const nw4
     }
 }
 
-/* 0x8006E244 (0x64): copies the five SRT components of `pSrc` into `pDst` and returns `pDst`. */
-extern "C" nw4r::g3d::TexSrt* tex_srt_assign(nw4r::g3d::TexSrt* pDst, const nw4r::g3d::TexSrt* pSrc)
-{
-    fn_8006E2A8(pDst);
-    pDst->Su = pSrc->Su;
-    pDst->Sv = pSrc->Sv;
-    pDst->R = pSrc->R;
-    pDst->Tu = pSrc->Tu;
-    pDst->Tv = pSrc->Tv;
-    return pDst;
-}
-
 
 /* 0x8006E338 (0x330): applies a texture-SRT result to a material's SRT block and, scaled into the hardware's
  * exponent range, to its indirect matrices. */
@@ -1027,14 +1024,14 @@ bool nw4r::g3d::AnmObjTexSrt::IsDerivedFrom(TypeObj type) const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrt::GetTypeObjStatic()
 {
     const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F5C0));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrt)));
 }
 
 /* 0x8006E764 (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtNode::GetTypeObj() const
 {
     const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_node(&pName, anm_typename_AnmObjTexSrtNode));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_node(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrtNode)));
 }
 
 /* 0x8006E794 (0x38): returns the type's name. */
@@ -1056,7 +1053,7 @@ bool nw4r::g3d::AnmObjTexSrtNode::IsDerivedFrom(TypeObj type) const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtNode::GetTypeObjStatic()
 {
     const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_node(&pName, anm_typename_AnmObjTexSrtNode));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_node(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrtNode)));
 }
 
 /* 0x8006E868 (0x5C): destroys the override node. */
@@ -1069,7 +1066,7 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtOverride::GetTypeObj() c
 {
     const u8* pName;
     return *reinterpret_cast<const TypeObj*>(
-        type_obj_set_name_texsrt_override(&pName, anm_typename_AnmObjTexSrtOverride));
+        type_obj_set_name_texsrt_override(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrtOverride)));
 }
 
 /* 0x8006E8F4 (0x38): returns the type's name. */
@@ -1092,7 +1089,7 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtOverride::GetTypeObjStat
 {
     const u8* pName;
     return *reinterpret_cast<const TypeObj*>(
-        type_obj_set_name_texsrt_override(&pName, anm_typename_AnmObjTexSrtOverride));
+        type_obj_set_name_texsrt_override(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrtOverride)));
 }
 
 /* 0x8006E9C8 (0x5C): destroys the resource animation. */
@@ -1113,5 +1110,5 @@ bool nw4r::g3d::AnmObjTexSrtRes::IsDerivedFrom(TypeObj type) const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtRes::GetTypeObjStatic()
 {
     const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_res(&pName, anm_typename_AnmObjTexSrtRes));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_texsrt_res(&pName, reinterpret_cast<const u8*>(&anm_typename_AnmObjTexSrtRes)));
 }
