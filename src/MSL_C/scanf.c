@@ -14,8 +14,9 @@
  * RESIDUALS. none: every row and the three data sections match the target.
  * SHAPES. the format record is built in a local and copied out; the `%s` set is filled through a pointer, which marks
  *    the record address-taken, so its later copy-outs stay load/store pairs as in the target. `%n` is a valid
- *    conversion. The base of `d`/`i` and `o`/`u`/`x` is set per case and shared through `if (0) { case ...: }`
- *    blocks; an empty `%[` scan with no destination ungets and goes on to the next directive. The formatter's
+ *    conversion. The base of `d`/`i` and `o`/`u`/`x` is set per case and shared through upstream MSL's
+ *    `goto signed_int` / `goto unsigned_int` labels (owner ruling, `docs/pipeline.md` 11: MSL_C keeps Metrowerks'
+ *    goto form where retail needs it); an empty `%[` scan with no destination ungets and goes on to the next directive. The formatter's
  *    declaration order (with `terminate` last and the zero stores in `terminate`-first order) and the uninitialised
  *    `c_buf_ok`/`buf_len` give retail's register order. The character class tests are the inline table reads of
  *    `MSL_C/ctype.h`.
@@ -302,10 +303,10 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
         switch (fmt.conversion_char) {
         case 'd':
             base = 10;
-            if (0) {
-            case 'i':
-                base = 0;
-            }
+            goto signed_int;
+        case 'i':
+            base = 0;
+        signed_int:
             if (terminate) {
                 ll_value = 0;
                 value = 0;
@@ -366,15 +367,14 @@ static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str
             continue;
         case 'o':
             base = 8;
-            if (0) {
-            case 'u':
-                base = 10;
-            }
-            if (0) {
-            case 'x':
-            case 'X':
-                base = 16;
-            }
+            goto unsigned_int;
+        case 'u':
+            base = 10;
+            goto unsigned_int;
+        case 'x':
+        case 'X':
+            base = 16;
+        unsigned_int:
             if (terminate) {
                 u_ll_value = 0;
                 u_value = 0;
