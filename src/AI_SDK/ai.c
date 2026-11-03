@@ -16,10 +16,12 @@
  *    `GetUseSerialIO`); `.data` 0x8060F820 is the build string `<< RVL_SDK - AI ...` read through `.sdata`
  *    0x80793D00 by `AIInit`; `.sbss` 0x80794E88..0x80794EC8 are read only by `AIInit`, `__AIDHandler`,
  *    `__AICallbackStackSwitch` and the first function.
- * RESIDUALS. `__AI_SRC_INIT` 99.0: the 64-bit window compares number their scratch registers differently (r12/r0 against
- *    r8/r5 around the `diff` temporaries); `.data` is 69 B against the target's 72 B range (its trailing pad is dtk's `gap`).
+ * RESIDUALS. none in `.text`; `.data` is 69 B against the target's 72 B range (its trailing pad is dtk's `gap`).
  * SHAPES. the DMA registers are 16-bit read-modify-writes at 0xCC005030..; the interrupt handler runs the user callback
- *    on a private stack through `__AICallbackStackSwitch`.
+ *    on a private stack through `__AICallbackStackSwitch`. `__AI_SRC_INIT` computes `diff` before the two register clears
+ *    and reads the two windows into locals after them (`margin` declared and assigned before `bound`): backend temporaries
+ *    are numbered in statement order and a local loaded from a global stays on the named tier, which is what puts `diff`
+ *    in r8/r5 under the first clear's r0 and the windows in r9..r12 (playbook idea 306).
  */
 #include "AI_SDK/ai.h"
 #include "OS/OS.h"
@@ -202,6 +204,8 @@ void __AI_SRC_INIT(void)
     s64 adjust = 0;
     s64 start;
     s64 diff;
+    s64 margin;
+    s64 bound;
 
     while (done == 0) {
         AI_REGS[0] = (AI_REGS[0] & ~0x20) | 0x20;
@@ -213,13 +217,15 @@ void __AI_SRC_INIT(void)
         AI_REGS[0] = (AI_REGS[0] & ~0x1) | 0x1;
         AI_WAIT_SAMPLE_EDGE();
         end = OSGetTime();
+        diff = end - start;
         AI_REGS[0] = AI_REGS[0] & ~0x2;
         AI_REGS[0] = AI_REGS[0] & ~0x1;
-        diff = end - start;
-        if (diff < gAIWindow31524 - gAIWindow3000) {
+        margin = gAIWindow3000;
+        bound = gAIWindow31524;
+        if (diff < bound - margin) {
             adjust = gAIWindow42000;
             done = 1;
-        } else if (diff >= gAIWindow31524 + gAIWindow3000 && diff < gAIWindow42024 - gAIWindow3000) {
+        } else if (diff >= bound + margin && diff < gAIWindow42024 - margin) {
             adjust = gAIWindow63000;
             done = 1;
         } else {
