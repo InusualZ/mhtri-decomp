@@ -26,12 +26,13 @@
  *   - `NHTTPi_sendUrlEncodedBody` adds a field's encoded token length and its `=` as two statements
  *     (`total += len; total += 1;`), which gives retail's `add r3,r0,r3` operand order.
  *   - `NHTTPi_sendRequest` and `NHTTPi_recvProxyConnectReply` declare their locals bare and assign them below
- *     in call order: the declaration order (`urlLength` after `hostOffset`; `response` before `request`) is
- *     what moves the register colouring towards retail's.
- * RESIDUALS.
- *   - `NHTTPi_sendPostField`, `NHTTPi_recvResponseBody`, `NHTTPi_recvProxyConnectReply`: register colouring (a
- *     hill-climb over each one's declaration order, initialisers moved below the declarations, found nothing
- *     closer for the first two).
+ *     in call order: the declaration order (`urlLength` after `hostOffset`; `discard`, `request`, `response`)
+ *     is what gives retail's register colouring; the reply scan assigns `i` before `blank`.
+ *   - `NHTTPi_sendPostField` indexes the url-encoded chunk as `data[i]` (the strength-reduced pointer is a
+ *     backend temporary that colours r31 first) and declares `connection` after the other locals.
+ *   - `NHTTPi_recvResponseBody` stores the chunk-size byte into its window and reads it back from there, and
+ *     `NHTTPi_skipLine` declares `count` before `skipped` and zeroes `skipped` before the window.
+ * RESIDUALS. none in `.text`.
  */
 
 #include "NHTTP/d_nhttp.h"
@@ -166,11 +167,11 @@ s32 NHTTPi_queryPostFieldSize(NHTTPMutexInfo* mutex, NHTTPRequest* request, cons
 s32 NHTTPi_sendPostField(NHTTPMutexInfo* mutex, NHTTPRequest* request, u8* buffer, const char* key, s32 fd,
                          s32* used, s32 mode) {
     s32 sent = 0;
-    NHTTPConnection* connection = NHTTPi_Request2Connection(mutex, (s32)request);
     u32 chunk;
     s32 result;
     u32 i;
     u8* data;
+    NHTTPConnection* connection = NHTTPi_Request2Connection(mutex, (s32)request);
     u8 encoded[3];
 
     if (connection == NULL) {
@@ -206,12 +207,10 @@ s32 NHTTPi_sendPostField(NHTTPMutexInfo* mutex, NHTTPRequest* request, u8* buffe
             }
             break;
         case 2: {
-            u8* p = data;
-
-            for (i = 0; i < chunk; i++, p++) {
+            for (i = 0; i < chunk; i++) {
                 NHTTPi_memclr(encoded, 3);
                 result = NHTTPi_SaveBuf(request, buffer, fd, used, encoded,
-                                        NHTTPi_encodeUrlChar(encoded, *p));
+                                        NHTTPi_encodeUrlChar(encoded, data[i]));
                 if (result < 0) {
                     return 1;
                 }
@@ -385,9 +384,9 @@ s32 NHTTPi_recvProxyConnectReply(NHTTPCommContext* context) {
     NHTTPThreadInfo* thread;
     NHTTPInfo* bgnend;
     NHTTPMutexInfo* mutex;
-    NHTTPResponse* response;
-    NHTTPRequest* request;
     u8* discard;
+    NHTTPRequest* request;
+    NHTTPResponse* response;
     s32 ok;
     s32 received;
     s32 count;
@@ -415,8 +414,9 @@ s32 NHTTPi_recvProxyConnectReply(NHTTPCommContext* context) {
         if (NHTTPi_strnicmp(reply, "HTTP/", 5) == 0 && reply[8] == ' ' && response->statusCode == 200) {
             ok = 1;
         }
+        i = 0;
         blank = 0;
-        for (i = 0; i < received; i++) {
+        for (; i < received; i++) {
             if (i > 1 && reply[i - 1] == '\r' && reply[i] == '\r') {
                 blank = 1;
             } else if (i > 1 && reply[i - 1] == '\n' && reply[i] == '\n') {
@@ -1304,13 +1304,13 @@ static inline s32 NHTTPi_recvIntoResponse(NHTTPMutexInfo* mutex, NHTTPRequest* r
  * receive's result. */
 static inline s32 NHTTPi_skipLine(NHTTPMutexInfo* mutex, NHTTPRequest* request, s32 fd) {
     s32 received;
-    s32 skipped;
     s32 count;
+    s32 skipped;
     char window[2];
 
+    skipped = 0;
     window[0] = 0;
     window[1] = 0;
-    skipped = 0;
     count = 0;
     while (window[count & 1] != '\r' || (s8)window[(count - 1) & 1] != '\n') {
         received = NHTTPi_SocRecv((s32)mutex, (NHTTPConnection*)request, fd, (u8*)&window[count & 1], 1, 0);
@@ -1397,8 +1397,8 @@ s32 NHTTPi_recvResponseBody(NHTTPCommContext* context) {
                         return 0;
                     }
                     index = context->recvCount;
-                    byte = buffer[index];
-                    sizeWindow[index & 1] = byte;
+                    sizeWindow[index & 1] = buffer[index];
+                    byte = sizeWindow[index & 1];
                     if ((s8)byte == ';' || ((s8)byte == '\n' && (s8)sizeWindow[(index - 1) & 1] == '\r')) {
                         if ((s8)byte == '\n') {
                             index -= 1;
