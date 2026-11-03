@@ -55,14 +55,23 @@
  *  - `updateMessagePool`: retail's control flow is irreducible (a layer entry's steps 3 and 4 jump back into step 1's
  *    `checkLayerEntry` dispatch, step 6 into step 2's success block; the two loops cross), so step 1's dispatch is a
  *    second copy of the `stepLayerEntryCheck` inline (42 instructions), and step 2's two failure paths that retail
- *    joins at the shared `freePoolEntry` free the record themselves (2 instructions each); the rest is colouring:
+ *    joins at the shared `freePoolEntry` free the record themselves (2 instructions each); step 6's re-entry is a
+ *    re-dispatch (`state = 7; continue;`: `li`, and `cmplwi 7`/`beq`/`b` in the dispatch where retail has `cmplwi 2`/
+ *    `bne`), and the loop it forms is reducible, so the backend `loop-code-motion` pass (dump 09) hoists
+ *    `addis r15,r18,1` to its preheader and shifts the pool loop's constant colours (retail's back edges make the region
+ *    irreducible, so retail has no preheader there); sharing one check copy with step 1 through a second re-dispatch
+ *    state measures lower (the dispatch grows and the check moves past commands 0x17/0x18); the rest is colouring:
  *    retail colours `i`/`work`/`entry`/`command` into r31..r28 before the ten loop-hoisted constants, ours colours
  *    the constants first (the mwcc-debugger dump: the eighteen callee-saved candidates form a clique at degree 29 = K,
  *    the allocator force-pushes the cheapest node (the constant 5, r14 in both) and colours the rest in descending
  *    virtual-register order, so retail's four locals were numbered above the loop-code-motion temporaries, which no
  *    declaration order of a named local reaches; `register` changes nothing).
- *  - `updateNetworkPatControl`: retail saves r24..r31 (ours r26..r31) and keeps constants and loop bases in the two
- *    extra registers, so most of the remaining rows are colouring.
+ *  - `updateNetworkPatControl`: retail's case 0x1F (after 0x3 and 0xD) branches back into the 0x19..0x1E body and step
+ *    0x64 of case 0x7 back into step 0; both are re-dispatches of the sub-state switch (a `for (;;)` over it on the
+ *    local `sub_state`), so the reducible loop lets the backend `loop-code-motion` pass (dump 09) hoist the jump table
+ *    base, a 0 and the 0x3C delay out of the dispatch (retail re-enters by `b` and has no loop); keeping the case
+ *    0x7 loop inside the case also hoists a 0 and `addis` there, and the 0x1F block placed before the body
+ *    (fallthrough) or the body copied after it (inline helper) measures lower; most of the rest is colouring.
  *  - `layerReflectCallback`: a joining peer's id address is shared between `formatNetId` and `importNetId`, and its
  *    name and slot offset are re-derived for `postChatLogLine`, where retail does the opposite (`opt_common_subs off`
  *    scores lower here).
@@ -111,9 +120,10 @@
  *    work on the `NetCommandPool` view; `findFreePeerEvent` scans `events_0x7996` by its kind byte;
  *  - redundant narrowing casts keep retail's explicit masks under `peephole off`: `postEntry*`'s `(u8)flags`,
  *    `layoutTextRuns`'s `(u16)width`; `get_server_type_name` writes its range test as `index < 0 || 4 <= index`;
- *  - a backward branch into another case's code is a `for (;;)` that the target code heads, with the jumping case's
- *    label inside the loop: `updateNetworkPatControl`'s 0x19..0x1E body heads a loop holding cases 0x3, 0xD and 0x1F
- *    (0x1F re-enters the body on the back edge), and case 0x7's step 0 heads the loop step 0x64 `continue`s into;
+ *  - a backward branch into another case's code is a re-dispatch: `updateNetworkPatControl`'s sub-state switch sits in a
+ *    `for (;;)` on the local `sub_state`; case 0x1F sets it to 0x19 and `continue`s, and step 0x64 of case 0x7
+ *    `continue`s with it unchanged (step 0 is stored first); case 0x1F advances its steps and its sub-state with `++`
+ *    (0->1->2, 0x1F->0x20: with `li` stores those constants are hoisted too and the colours shift);
  *  - `updateNetworkPatControl` is compiled under its scoped pragmas (FLAGS; retail re-derives addresses ours would
  *    share), its `dialog->timer_0x128` increments are plain `++` (a copy-and-add keeps an `extsh`), case 0xB computes
  *    the page start once for the count loop and `listServers`, and case 0xA1 dispatches its one step through a `switch`;
@@ -125,11 +135,10 @@
  *    `stepFileDownloads` adds `(group * 15 + 6)` to the fetch index as one term (retail loads the index first);
  *  - `can_enter_server` takes the hunter rank as `u16` (the caller narrows it at the call, after the type's copy);
  *    `updateNetworkPatControl`'s case 0xC walks the server list through a pointer formed at the case's entry;
- *  - `updateMessagePool`: step 2's success block heads a `for (;;)` inside a one-case `switch ((u32)state)` whose
- *    `default:` (the step 3..6 chain) sits inside the loop, step 6 re-entering with `if (sub_error != 0) break; else
- *    continue;` (retail's `bne exit; b head`: `if (c) break;` alone is inverted into `beq head; b exit`); inside it
- *    step 3's check heads a second `for (;;)` with step 4 as the `default:` of a one-case `switch ((u32)state)`,
- *    whose exits fall to the step 5 test (inert there: `state` is 3 or 4 and the record is then at step 2 or freed);
+ *  - `updateMessagePool`: steps 2..6 are a `for (;;)` over `switch ((u32)state)`: step 2's failures, then (falling
+ *    through) its success block as the re-entry state 7, then (falling through) the `default:` chain, where steps 3
+ *    and 4 share one check in a `do { } while (0)` whose exits fall to the step 5 and 6 tests (inert there: the record
+ *    is at step 2, 3 or 4 or freed) and step 6 re-enters with `state = 7; continue;`;
  *    the chat scan and send live in the inline `sendFirstChatEntry` (its `return` is retail's branch past the send
  *    loop; `command` is passed by reference so the dead `command = 0xF/0x12` stores stay, `command` being live into
  *    the pool loop through step 6's re-entry); the row copy of command 1 counts with the pool's own `i` and walks a
@@ -1467,39 +1476,41 @@ void updateMessagePool(void)
                     break;
                 }
             }
-            /* step 2's success block heads the loop step 6 re-enters; the other steps sit inside it */
-            switch ((u32)state) {
-            case 2:
-                command = 0x1B;
-                if (work->layer_results_0x6244[command] == 0) {
-                    break;
-                }
-                if (work->layer_results_0x6244[command] < 0) {
-                    s32 change = classifyLayerIdChange();
-
-                    if (change == 1) {
-                        work->sub_error_0xC259 = -1;
-                        *entry->result_0x04 = -1;
-                        freePoolEntry(entry);
-                        break;
-                    } else if ((u32)(change - 2) <= 1) {
-                        sendCheckRequest(3);
-                        work->sub_error_0xC259 = -1;
-                        entry->state_0x00 = 5;
-                        break;
-                    } else if (change == 4) {
-                        sendCheckRequest(3);
-                        work->sub_error_0xC259 = -1;
-                        entry->state_0x00 = 6;
-                        break;
-                    } else {
-                        work->error_0x058 = work->layer_results_0x6244[command];
-                        setErrorCode(5);
-                        freePoolEntry(entry);
+            /* Step 2 answers the jump; step 6 re-dispatches to its success block (re-entry state 7) with `continue`. */
+            for (;;) {
+                switch ((u32)state) {
+                case 2:
+                    command = 0x1B;
+                    if (work->layer_results_0x6244[command] == 0) {
                         break;
                     }
-                }
-                for (;;) {
+                    if (work->layer_results_0x6244[command] < 0) {
+                        s32 change = classifyLayerIdChange();
+
+                        if (change == 1) {
+                            work->sub_error_0xC259 = -1;
+                            *entry->result_0x04 = -1;
+                            freePoolEntry(entry);
+                            break;
+                        } else if ((u32)(change - 2) <= 1) {
+                            sendCheckRequest(3);
+                            work->sub_error_0xC259 = -1;
+                            entry->state_0x00 = 5;
+                            break;
+                        } else if (change == 4) {
+                            sendCheckRequest(3);
+                            work->sub_error_0xC259 = -1;
+                            entry->state_0x00 = 6;
+                            break;
+                        } else {
+                            work->error_0x058 = work->layer_results_0x6244[command];
+                            setErrorCode(5);
+                            freePoolEntry(entry);
+                            break;
+                        }
+                    }
+                    /* fallthrough */
+                case 7:
                     {
                         u32 server;
                         s32 depth;
@@ -1583,30 +1594,24 @@ void updateMessagePool(void)
                         clearRefreshTimeoutOnChange();
                         freePoolEntry(entry);
                     }
-            default:
-                    state = entry->state_0x00;
-                    switch ((u32)state) {
-                    case 3:
-                        if (work->profile_result_0xC3F1 == 0) {
-                            break;
-                        }
-                        if (work->profile_result_0xC3F1 < 0) {
-                            work->sub_error_0xC259 = -1;
-                            *entry->result_0x04 = -1;
-                            freePoolEntry(entry);
-                            break;
-                        }
-                        target = (const NetworkLayerId*)getCommunityStateBlock();
-                        profile = getCommunityUserProfile();
-                        /* step 3's check heads the loop step 4 re-enters with its own target; every exit of the
-                         * check falls to the step 5 test, which neither step passes */
-                        for (;;) {
-                            stepLayerEntryCheck(work, entry, target, profile, &command);
-                            break;
-                    default:
-                            if (state != 4) {
+                    /* fallthrough */
+                default:
+                    /* steps 3 and 4 share the layer entry check; its exits fall to the step 5 and 6 tests, which
+                     * neither step passes */
+                    do {
+                        if (entry->state_0x00 == 3) {
+                            if (work->profile_result_0xC3F1 == 0) {
                                 break;
                             }
+                            if (work->profile_result_0xC3F1 < 0) {
+                                work->sub_error_0xC259 = -1;
+                                *entry->result_0x04 = -1;
+                                freePoolEntry(entry);
+                                break;
+                            }
+                            target = (const NetworkLayerId*)getCommunityStateBlock();
+                            profile = getCommunityUserProfile();
+                        } else if (entry->state_0x00 == 4) {
                             command = 0x1C;
                             if (work->layer_results_0x6244[command] == 0) {
                                 break;
@@ -1619,38 +1624,37 @@ void updateMessagePool(void)
                             }
                             target = (const NetworkLayerId*)getCommunityRecord(entry->args_0x10[0]);
                             profile = NULL;
-                        }
-                        if (state == 5) {
-                            if (work->sub_error_0xC259 != 0) {
-                                break;
-                            }
-                            releaseRemotePlayerParts();
-                            resetPeerTable();
-                            work->flag_0x068 = 0;
-                            work->flag_0x069 = 0;
-                            work->flag_0x82C4 = 0;
-                            work->flag_0x82C5 = 0;
-                            work->flag_0x82C7 = 0;
-                            *entry->result_0x04 = 1;
-                            work->layer_depth_0x6240 = 1;
-                            work->layer_state_0x064 = 0;
-                            work->settings_0x6210[0] = -1;
-                            work->settings_0x6210[1] = -1;
-                            work->settings_0x6210[2] = -1;
-                            work->settings_0x6210[3] = -1;
-                            work->account_name_0xC0C4[0] = 0;
-                            work->nickname_0xC104[0] = 0;
-                            refreshRosterCache();
-                            freePoolEntry(entry);
-                        }
-                        if (entry->state_0x00 != 6) {
+                        } else {
                             break;
                         }
+                        stepLayerEntryCheck(work, entry, target, profile, &command);
+                    } while (0);
+                    if (entry->state_0x00 == 5) {
                         if (work->sub_error_0xC259 != 0) {
                             break;
-                        } else {
-                            continue;
                         }
+                        releaseRemotePlayerParts();
+                        resetPeerTable();
+                        work->flag_0x068 = 0;
+                        work->flag_0x069 = 0;
+                        work->flag_0x82C4 = 0;
+                        work->flag_0x82C5 = 0;
+                        work->flag_0x82C7 = 0;
+                        *entry->result_0x04 = 1;
+                        work->layer_depth_0x6240 = 1;
+                        work->layer_state_0x064 = 0;
+                        work->settings_0x6210[0] = -1;
+                        work->settings_0x6210[1] = -1;
+                        work->settings_0x6210[2] = -1;
+                        work->settings_0x6210[3] = -1;
+                        work->account_name_0xC0C4[0] = 0;
+                        work->nickname_0xC104[0] = 0;
+                        refreshRosterCache();
+                        freePoolEntry(entry);
+                    }
+                    if (entry->state_0x00 == 6 && work->sub_error_0xC259 == 0) {
+                        state = 7;
+                        continue;
                     }
                     break;
                 }
@@ -3573,6 +3577,7 @@ void updateNetworkPatControl(void)
     NetDialog* dialog = work->dialog_0xBF30;
     u16 pressed = Psw[0].button_0x2C0.pressed_0x04;
     u16 held = Psw[0].button_0x2C0.held_0x14 | pressed;
+    u8 sub_state;
 
     if (work->sub_state_0x017 != 0x21 && work->flag_0xC1BF != 1 && work->flag_0xC1BE != 1 &&
         work->sub_state_0x017 < 0x32 &&
@@ -3629,122 +3634,405 @@ void updateNetworkPatControl(void)
             work->flag_0xC49E = 0;
         }
     }
-    switch (work->sub_state_0x017) {
-    case 0x0:
-        switch (work->step_0x018) {
-        case 0:
-            startBootLoad();
-            work->step_0x018++;
-            /* fallthrough */
-        case 1: {
-            s32 result = pollBootLoad();
+    sub_state = work->sub_state_0x017;
+    /* `continue` re-dispatches: the roster steps (0x1F) run the city frame (0x19), step 0x64 drops back to step 0. */
+    for (;;) {
+        switch (sub_state) {
+        case 0x0:
+            switch (work->step_0x018) {
+            case 0:
+                startBootLoad();
+                work->step_0x018++;
+                /* fallthrough */
+            case 1: {
+                s32 result = pollBootLoad();
 
-            if (result != 0) {
-                if (result == 1) {
-                    work->sub_state_0x017 = 2;
-                } else {
-                    work->step_0x018++;
+                if (result != 0) {
+                    if (result == 1) {
+                        work->sub_state_0x017 = 2;
+                    } else {
+                        work->step_0x018++;
+                    }
                 }
-            }
-            return;
-        }
-        case 2:
-            work->sub_state_0x017 = 2;
-            return;
-        }
-        break;
-    case 0x2:
-        getNetworkLogger()->setLevel_18(3);
-        if (getInstance_() != NULL) {
-            if (isMessageRestricted(getInstance()) != 0) {
-                abortNetworkControl(work, 1);
                 return;
             }
-            resetMediatorState(getInstance());
-            updateOpeningState(getInstance(), 1, 0x9003C360, 0x4000);
-            updateOpeningState(getInstance(), 2, 0x90040360, 0x4000);
-            work->callback_0xC268();
-            setReflectPageRange(getInstance(), (u32)patReflectCallback, 0);
-            setReflectField30(getInstance(), 3);
-            {
-                s32 event;
-
-                getInstance();
-                event = dispatchReflectEvent();
-
-                setReflectField34(getInstance(), event);
-            }
-            work->group_0xC494 = language_group_table[system_w.field_0x09 * 2];
-            work->group_max_0xC490 = language_group_table[system_w.field_0x09 * 2 + 1];
-            setReflectField38(getInstance(), work->group_max_0xC490);
-            setReflectName3C(getInstance(), work->player_name_0xC1C8);
-            setReflectName5C(getInstance(), work->support_code_0xC1DE);
-            updateTermVersion(getInstance(), 0);
-            updatePatInterface180(getInstance(), (u32)pat_server_host, (u32)pat_ca_cert, pat_ca_cert_size);
-            resetFailureState(work);
-        }
-        work->status_0x174 = 0;
-        work->sub_state_0x017 = 0x96;
-        return;
-    case 0x96:
-        work->status_0x174 = 0;
-        resetMediatorFlags(getInstance());
-        work->sub_state_0x017 = 0x97;
-        return;
-    case 0x97:
-        if (work->status_0x174 != 0) {
-            if (work->status_0x174 < 0) {
-                abortNetworkControl(work, 2);
+            case 2:
+                work->sub_state_0x017 = 2;
                 return;
             }
-            work->sub_state_0x017 = 0xA0;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    case 0x98:
-        switch (work->step_0x018) {
-        case 0:
-            if ((pressed & 0x20) != 0) {
-                work->step_0x018 = 1;
-                dialog->mode_0x126 = 1;
-                dialog->value_0x127 = 0xE;
-                dialog->timer_0x128 = 0xF;
-                sysSE_req(1);
-                return;
-            }
-            if (dialog->flag_0x124 != 0) {
-                if ((pressed & 8) != 0 && dialog->flag_0x125 == 0) {
-                    sysSE_req(3);
-                    dialog->flag_0x125 = 1;
+            break;
+        case 0x2:
+            getNetworkLogger()->setLevel_18(3);
+            if (getInstance_() != NULL) {
+                if (isMessageRestricted(getInstance()) != 0) {
+                    abortNetworkControl(work, 1);
                     return;
                 }
-                if ((pressed & 4) != 0 && dialog->flag_0x125 == 1) {
-                    sysSE_req(3);
-                    dialog->flag_0x125 = 0;
+                resetMediatorState(getInstance());
+                updateOpeningState(getInstance(), 1, 0x9003C360, 0x4000);
+                updateOpeningState(getInstance(), 2, 0x90040360, 0x4000);
+                work->callback_0xC268();
+                setReflectPageRange(getInstance(), (u32)patReflectCallback, 0);
+                setReflectField30(getInstance(), 3);
+                {
+                    s32 event;
+
+                    getInstance();
+                    event = dispatchReflectEvent();
+
+                    setReflectField34(getInstance(), event);
+                }
+                work->group_0xC494 = language_group_table[system_w.field_0x09 * 2];
+                work->group_max_0xC490 = language_group_table[system_w.field_0x09 * 2 + 1];
+                setReflectField38(getInstance(), work->group_max_0xC490);
+                setReflectName3C(getInstance(), work->player_name_0xC1C8);
+                setReflectName5C(getInstance(), work->support_code_0xC1DE);
+                updateTermVersion(getInstance(), 0);
+                updatePatInterface180(getInstance(), (u32)pat_server_host, (u32)pat_ca_cert, pat_ca_cert_size);
+                resetFailureState(work);
+            }
+            work->status_0x174 = 0;
+            work->sub_state_0x017 = 0x96;
+            return;
+        case 0x96:
+            work->status_0x174 = 0;
+            resetMediatorFlags(getInstance());
+            work->sub_state_0x017 = 0x97;
+            return;
+        case 0x97:
+            if (work->status_0x174 != 0) {
+                if (work->status_0x174 < 0) {
+                    abortNetworkControl(work, 2);
                     return;
                 }
+                work->sub_state_0x017 = 0xA0;
+                work->step_0x018 = 0;
+                return;
             }
+            break;
+        case 0x98:
+            switch (work->step_0x018) {
+            case 0:
+                if ((pressed & 0x20) != 0) {
+                    work->step_0x018 = 1;
+                    dialog->mode_0x126 = 1;
+                    dialog->value_0x127 = 0xE;
+                    dialog->timer_0x128 = 0xF;
+                    sysSE_req(1);
+                    return;
+                }
+                if (dialog->flag_0x124 != 0) {
+                    if ((pressed & 8) != 0 && dialog->flag_0x125 == 0) {
+                        sysSE_req(3);
+                        dialog->flag_0x125 = 1;
+                        return;
+                    }
+                    if ((pressed & 4) != 0 && dialog->flag_0x125 == 1) {
+                        sysSE_req(3);
+                        dialog->flag_0x125 = 0;
+                        return;
+                    }
+                }
+                if (dialog->timer_0x128 > 0) {
+                    dialog->timer_0x128--;
+                    return;
+                }
+                if ((pressed & 0x10) != 0) {
+                    sysSE_req(0);
+                    if (dialog->flag_0x125 == 1) {
+                        work->terms_version_0xC200 = getInstance()->getOpeningTermsVersion();
+                        work->callback_0xC270();
+                        work->flag_0xC369 = 1;
+                        return;
+                    }
+                    work->step_0x018 = 1;
+                    dialog->mode_0x126 = 1;
+                    dialog->value_0x127 = 0xE;
+                    dialog->timer_0x128 = 0xF;
+                    return;
+                }
+                break;
+            case 1:
+                if (dialog->timer_0x128 > 0) {
+                    dialog->timer_0x128--;
+                    return;
+                }
+                if ((pressed & 0x10) != 0) {
+                    sysSE_req(0);
+                    work->sub_state_0x017 = 0x5A;
+                    work->step_0x018 = 0;
+                    return;
+                }
+                if ((pressed & 0x20) != 0) {
+                    work->step_0x018 = 0;
+                    dialog->mode_0x126 = 0;
+                    dialog->value_0x127 = 0;
+                    dialog->timer_0x128 = 0xF;
+                    sysSE_req(1);
+                    return;
+                }
+                break;
+            }
+            break;
+        case 0x99:
             if (dialog->timer_0x128 > 0) {
                 dialog->timer_0x128--;
                 return;
             }
             if ((pressed & 0x10) != 0) {
                 sysSE_req(0);
-                if (dialog->flag_0x125 == 1) {
-                    work->terms_version_0xC200 = getInstance()->getOpeningTermsVersion();
-                    work->callback_0xC270();
-                    work->flag_0xC369 = 1;
+                work->sub_state_0x017 = 0x5A;
+                work->step_0x018 = 0;
+                work->flag_0xC378 = 0;
+                return;
+            }
+            break;
+        case 0x9A:
+            switch (work->step_0x018) {
+            case 0:
+                if (dialog->mode_0x126 == 1) {
+                    if (dialog->timer_0x128 > 0) {
+                        dialog->timer_0x128--;
+                        return;
+                    }
+                    if ((pressed & 0x10) != 0) {
+                        sysSE_req(0);
+                        work->sub_state_0x017 = 0x5A;
+                        work->step_0x018 = 0;
+                        dialog->mode_0x126 = 0;
+                        dialog->value_0x127 = 0;
+                        return;
+                    }
+                    if ((pressed & 0x20) != 0) {
+                        dialog->mode_0x126 = 0;
+                        dialog->value_0x127 = 0;
+                        dialog->timer_0x128 = 0xF;
+                        sysSE_req(1);
+                        return;
+                    }
+                } else {
+                    if (dialog->timer_0x128 > 0) {
+                        dialog->timer_0x128--;
+                        return;
+                    }
+                    if ((pressed & 0x20) != 0) {
+                        dialog->mode_0x126 = 1;
+                        dialog->value_0x127 = 0xD;
+                        dialog->timer_0x128 = 0xF;
+                        sysSE_req(1);
+                        return;
+                    }
+                    if ((pressed & 0x10) != 0) {
+                        sysSE_req(0);
+                        work->step_0x018++;
+                        return;
+                    }
+                }
+                break;
+            case 1:
+                if (system_w.field_0x86A == 0) {
+                    work->sub_state_0x017 = 0xAC;
+                } else {
+                    work->sub_state_0x017 = 3;
+                }
+                work->step_0x018 = 0;
+                return;
+            }
+            break;
+        case 0xA0:
+            work->callback_0xC274();
+            return;
+        case 0xA1:
+            switch (work->step_0x018) {
+            case 1:
+                if (work->callback_0xC27C() != 0) {
+                    work->sub_state_0x017 = 7;
+                    work->step_0x018 = 0x64;
+                    work->substep_0x019 = 0;
+                    work->cursor_0x01C = 1;
+                    work->cursor_0x020 = 0;
+                    work->scroll_0x024 = 0;
+                    work->repeat_0x02C = 0;
+                    work->repeat_0x030 = 0;
+                    work->hold_0xC48C = 0xF;
                     return;
                 }
-                work->step_0x018 = 1;
-                dialog->mode_0x126 = 1;
-                dialog->value_0x127 = 0xE;
+                break;
+            }
+            break;
+        case 0xA8:
+            dialog->timer_0x128++;
+            work->sub_state_0x017 = 0xA9;
+            return;
+        case 0xA9:
+            dialog->timer_0x128++;
+            if (work->flag_0xC1BD == 1) {
+                abortNetworkControl(work, 0);
+                return;
+            }
+            work->sub_state_0x017 = 8;
+            work->step_0x018 = 1;
+            return;
+        case 0xAC:
+            work->status_0x174 = 0;
+            work->error_0x058 = 0;
+            work->error_code_0xC258 = 0;
+            getNetworkLayerPat(getPatsObject(), 0)->closeSession_1C();
+            work->flag_0x015 = 0;
+            work->sub_state_0x017 = 0xAA;
+            dialog->timer_0x128 = 0;
+            return;
+        case 0xAA:
+            dialog->timer_0x128++;
+            if (work->status_0x174 > 0 || work->error_0x058 != 0) {
+                if (work->status_0x174 < 0 || work->error_0x058 < 0) {
+                    if (work->net_error_0x134.code_0x0 + 0x7FFA0000 == 0x34U) {
+                        dialog->timer_0x128 = (getWarningUInt(getInstance()) + 1) * 0x1E;
+                        work->sub_state_0x017 = 0xAE;
+                        return;
+                    }
+                    if (work->net_error_0x134.detail_0x4 == 0x72) {
+                        work->sub_state_0x017 = 0xB3;
+                        return;
+                    }
+                    abortNetworkControl(work, 3);
+                    return;
+                }
+                getAccountName(getInstance(), work->support_code_0xC1DE, 0x20);
+                startAccountLoad();
+                work->sub_state_0x017 = 0xAB;
+                work->step_0x018 = 0;
+                return;
+            }
+            break;
+        case 0xAE:
+            if (dialog->timer_0x128 >= 0x1E) {
+                dialog->timer_0x128--;
+                return;
+            }
+            if ((pressed & 0x10) != 0) {
+                sysSE_req(0);
+                if (queryOpeningFlag278(getInstance()) != 0) {
+                    work->sub_state_0x017 = 0xAF;
+                    work->callback_0xC280();
+                    return;
+                }
+                work->sub_state_0x017 = 0x5A;
+                work->step_0x018 = 0;
+                return;
+            }
+            break;
+        case 0xAF: {
+            s32 result = work->callback_0xC284();
+
+            if (result < 0) {
+                abortNetworkControl(work, 3);
+                return;
+            }
+            if (result > 0) {
+                work->sub_state_0x017 = 0x5A;
+                work->step_0x018 = 0;
+                return;
+            }
+            break;
+        }
+        case 0xAB: {
+            if (pollAccountLoad(dialog->timer_0x128++) != 0) {
+                work->sub_state_0x017 = 0xB1;
+                work->step_0x018 = 0;
+                return;
+            }
+            break;
+        }
+        case 0xB1:
+            if (queryOpeningFlag2A8(getInstance()) == 0) {
+                work->sub_state_0x017 = 0xB3;
+                work->step_0x018 = 0;
+                return;
+            }
+            dialog->timer_0x128 = (getWarningUInt(getInstance()) + 1) * 0x1E;
+            work->sub_state_0x017 = 0xB2;
+            work->step_0x018 = 0;
+            return;
+        case 0xB2:
+            switch (work->step_0x018) {
+            case 0:
+                if (dialog->timer_0x128 >= 0x1E) {
+                    dialog->timer_0x128--;
+                    return;
+                }
+                work->step_0x018++;
+                dialog->mode_0x126 = 0;
+                return;
+            case 1:
+                if (dialog->mode_0x126 == 1) {
+                    if (dialog->timer_0x128 > 0) {
+                        dialog->timer_0x128--;
+                        return;
+                    }
+                    if ((pressed & 0x10) != 0) {
+                        sysSE_req(0);
+                        work->sub_state_0x017 = 0x5A;
+                        work->step_0x018 = 0;
+                        dialog->mode_0x126 = 0;
+                        dialog->value_0x127 = 0;
+                        return;
+                    }
+                    if ((pressed & 0x20) != 0) {
+                        dialog->mode_0x126 = 0;
+                        dialog->value_0x127 = 0;
+                        sysSE_req(1);
+                        return;
+                    }
+                } else {
+                    if ((pressed & 0x20) != 0) {
+                        dialog->mode_0x126 = 1;
+                        dialog->value_0x127 = 0xD;
+                        dialog->timer_0x128 = 0xF;
+                        sysSE_req(1);
+                        return;
+                    }
+                    if ((pressed & 0x10) != 0) {
+                        sysSE_req(0);
+                        work->sub_state_0x017 = 0xB3;
+                        work->step_0x018 = 0;
+                        return;
+                    }
+                }
+                break;
+            }
+            break;
+        case 0xB3:
+            if (queryOpeningFlag2C0(getInstance()) == 0) {
+                NetUserData* user;
+
+                work->flag_0x015 = 1;
+                work->sub_state_0x017 = 7;
+                work->step_0x018 = 0x64;
+                work->substep_0x019 = 1;
+                setupArenaVectors(work);
+                work->cursor_0x01C = 1;
+                work->cursor_0x020 = 0;
+                work->scroll_0x024 = 0;
+                work->repeat_0x02C = 0;
+                work->repeat_0x030 = 0;
+                work->hold_0xC48C = 0xF;
+                user = (NetUserData*)get_userdata();
+                work->name2_0x7372[0] = 0;
+                strcpy(work->name2_0x7372, user->name_0x03);
+                if (work->flag_0xC499 == 1 && work->flag_0xC49A == 0) {
+                    startTermsUpdate(getInstance());
+                    work->flag_0xC49E = 1;
+                    return;
+                }
+            } else {
+                work->sub_state_0x017 = 0xB4;
+                work->step_0x018 = 0;
                 dialog->timer_0x128 = 0xF;
                 return;
             }
             break;
-        case 1:
+        case 0xB4:
             if (dialog->timer_0x128 > 0) {
                 dialog->timer_0x128--;
                 return;
@@ -3755,292 +4043,11 @@ void updateNetworkPatControl(void)
                 work->step_0x018 = 0;
                 return;
             }
-            if ((pressed & 0x20) != 0) {
-                work->step_0x018 = 0;
-                dialog->mode_0x126 = 0;
-                dialog->value_0x127 = 0;
-                dialog->timer_0x128 = 0xF;
-                sysSE_req(1);
-                return;
-            }
             break;
-        }
-        break;
-    case 0x99:
-        if (dialog->timer_0x128 > 0) {
-            dialog->timer_0x128--;
-            return;
-        }
-        if ((pressed & 0x10) != 0) {
-            sysSE_req(0);
-            work->sub_state_0x017 = 0x5A;
-            work->step_0x018 = 0;
-            work->flag_0xC378 = 0;
-            return;
-        }
-        break;
-    case 0x9A:
-        switch (work->step_0x018) {
-        case 0:
-            if (dialog->mode_0x126 == 1) {
-                if (dialog->timer_0x128 > 0) {
-                    dialog->timer_0x128--;
-                    return;
-                }
-                if ((pressed & 0x10) != 0) {
-                    sysSE_req(0);
-                    work->sub_state_0x017 = 0x5A;
-                    work->step_0x018 = 0;
-                    dialog->mode_0x126 = 0;
-                    dialog->value_0x127 = 0;
-                    return;
-                }
-                if ((pressed & 0x20) != 0) {
-                    dialog->mode_0x126 = 0;
-                    dialog->value_0x127 = 0;
-                    dialog->timer_0x128 = 0xF;
-                    sysSE_req(1);
-                    return;
-                }
-            } else {
-                if (dialog->timer_0x128 > 0) {
-                    dialog->timer_0x128--;
-                    return;
-                }
-                if ((pressed & 0x20) != 0) {
-                    dialog->mode_0x126 = 1;
-                    dialog->value_0x127 = 0xD;
-                    dialog->timer_0x128 = 0xF;
-                    sysSE_req(1);
-                    return;
-                }
-                if ((pressed & 0x10) != 0) {
-                    sysSE_req(0);
-                    work->step_0x018++;
-                    return;
-                }
-            }
-            break;
-        case 1:
-            if (system_w.field_0x86A == 0) {
-                work->sub_state_0x017 = 0xAC;
-            } else {
-                work->sub_state_0x017 = 3;
-            }
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    case 0xA0:
-        work->callback_0xC274();
-        return;
-    case 0xA1:
-        switch (work->step_0x018) {
-        case 1:
-            if (work->callback_0xC27C() != 0) {
-                work->sub_state_0x017 = 7;
-                work->step_0x018 = 0x64;
-                work->substep_0x019 = 0;
-                work->cursor_0x01C = 1;
-                work->cursor_0x020 = 0;
-                work->scroll_0x024 = 0;
-                work->repeat_0x02C = 0;
-                work->repeat_0x030 = 0;
-                work->hold_0xC48C = 0xF;
-                return;
-            }
-            break;
-        }
-        break;
-    case 0xA8:
-        dialog->timer_0x128++;
-        work->sub_state_0x017 = 0xA9;
-        return;
-    case 0xA9:
-        dialog->timer_0x128++;
-        if (work->flag_0xC1BD == 1) {
-            abortNetworkControl(work, 0);
-            return;
-        }
-        work->sub_state_0x017 = 8;
-        work->step_0x018 = 1;
-        return;
-    case 0xAC:
-        work->status_0x174 = 0;
-        work->error_0x058 = 0;
-        work->error_code_0xC258 = 0;
-        getNetworkLayerPat(getPatsObject(), 0)->closeSession_1C();
-        work->flag_0x015 = 0;
-        work->sub_state_0x017 = 0xAA;
-        dialog->timer_0x128 = 0;
-        return;
-    case 0xAA:
-        dialog->timer_0x128++;
-        if (work->status_0x174 > 0 || work->error_0x058 != 0) {
-            if (work->status_0x174 < 0 || work->error_0x058 < 0) {
-                if (work->net_error_0x134.code_0x0 + 0x7FFA0000 == 0x34U) {
-                    dialog->timer_0x128 = (getWarningUInt(getInstance()) + 1) * 0x1E;
-                    work->sub_state_0x017 = 0xAE;
-                    return;
-                }
-                if (work->net_error_0x134.detail_0x4 == 0x72) {
-                    work->sub_state_0x017 = 0xB3;
-                    return;
-                }
-                abortNetworkControl(work, 3);
-                return;
-            }
-            getAccountName(getInstance(), work->support_code_0xC1DE, 0x20);
-            startAccountLoad();
-            work->sub_state_0x017 = 0xAB;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    case 0xAE:
-        if (dialog->timer_0x128 >= 0x1E) {
-            dialog->timer_0x128--;
-            return;
-        }
-        if ((pressed & 0x10) != 0) {
-            sysSE_req(0);
-            if (queryOpeningFlag278(getInstance()) != 0) {
-                work->sub_state_0x017 = 0xAF;
-                work->callback_0xC280();
-                return;
-            }
-            work->sub_state_0x017 = 0x5A;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    case 0xAF: {
-        s32 result = work->callback_0xC284();
-
-        if (result < 0) {
-            abortNetworkControl(work, 3);
-            return;
-        }
-        if (result > 0) {
-            work->sub_state_0x017 = 0x5A;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    }
-    case 0xAB: {
-        if (pollAccountLoad(dialog->timer_0x128++) != 0) {
-            work->sub_state_0x017 = 0xB1;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    }
-    case 0xB1:
-        if (queryOpeningFlag2A8(getInstance()) == 0) {
-            work->sub_state_0x017 = 0xB3;
-            work->step_0x018 = 0;
-            return;
-        }
-        dialog->timer_0x128 = (getWarningUInt(getInstance()) + 1) * 0x1E;
-        work->sub_state_0x017 = 0xB2;
-        work->step_0x018 = 0;
-        return;
-    case 0xB2:
-        switch (work->step_0x018) {
-        case 0:
-            if (dialog->timer_0x128 >= 0x1E) {
-                dialog->timer_0x128--;
-                return;
-            }
-            work->step_0x018++;
-            dialog->mode_0x126 = 0;
-            return;
-        case 1:
-            if (dialog->mode_0x126 == 1) {
-                if (dialog->timer_0x128 > 0) {
-                    dialog->timer_0x128--;
-                    return;
-                }
-                if ((pressed & 0x10) != 0) {
-                    sysSE_req(0);
-                    work->sub_state_0x017 = 0x5A;
-                    work->step_0x018 = 0;
-                    dialog->mode_0x126 = 0;
-                    dialog->value_0x127 = 0;
-                    return;
-                }
-                if ((pressed & 0x20) != 0) {
-                    dialog->mode_0x126 = 0;
-                    dialog->value_0x127 = 0;
-                    sysSE_req(1);
-                    return;
-                }
-            } else {
-                if ((pressed & 0x20) != 0) {
-                    dialog->mode_0x126 = 1;
-                    dialog->value_0x127 = 0xD;
-                    dialog->timer_0x128 = 0xF;
-                    sysSE_req(1);
-                    return;
-                }
-                if ((pressed & 0x10) != 0) {
-                    sysSE_req(0);
-                    work->sub_state_0x017 = 0xB3;
-                    work->step_0x018 = 0;
-                    return;
-                }
-            }
-            break;
-        }
-        break;
-    case 0xB3:
-        if (queryOpeningFlag2C0(getInstance()) == 0) {
-            NetUserData* user;
-
-            work->flag_0x015 = 1;
-            work->sub_state_0x017 = 7;
-            work->step_0x018 = 0x64;
-            work->substep_0x019 = 1;
-            setupArenaVectors(work);
-            work->cursor_0x01C = 1;
-            work->cursor_0x020 = 0;
-            work->scroll_0x024 = 0;
-            work->repeat_0x02C = 0;
-            work->repeat_0x030 = 0;
-            work->hold_0xC48C = 0xF;
-            user = (NetUserData*)get_userdata();
-            work->name2_0x7372[0] = 0;
-            strcpy(work->name2_0x7372, user->name_0x03);
-            if (work->flag_0xC499 == 1 && work->flag_0xC49A == 0) {
-                startTermsUpdate(getInstance());
-                work->flag_0xC49E = 1;
-                return;
-            }
-        } else {
-            work->sub_state_0x017 = 0xB4;
-            work->step_0x018 = 0;
-            dialog->timer_0x128 = 0xF;
-            return;
-        }
-        break;
-    case 0xB4:
-        if (dialog->timer_0x128 > 0) {
-            dialog->timer_0x128--;
-            return;
-        }
-        if ((pressed & 0x10) != 0) {
-            sysSE_req(0);
-            work->sub_state_0x017 = 0x5A;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    case 0x7:
-        switch (work->step_0x018) {
-        case 0x0:
-            /* Step 0 heads the loop: step 0x64 re-enters it with `continue`. */
-            for (;;) {
+        case 0x7:
+            /* Step 0x64 drops back to step 0 by re-dispatching sub-state 7 with `continue`. */
+            switch (work->step_0x018) {
+            case 0x0:
                 ai_npc_reaction_forward();
                 if (work->repeat_0x02C > 0) {
                     work->repeat_0x02C--;
@@ -4132,7 +4139,7 @@ void updateNetworkPatControl(void)
                     }
                 }
                 break;
-        case 0x1:
+            case 0x1:
                 if (dialog->timer_0x128 > 0) {
                     dialog->timer_0x128--;
                     return;
@@ -4149,7 +4156,7 @@ void updateNetworkPatControl(void)
                     return;
                 }
                 break;
-        case 0x64:
+            case 0x64:
                 if (get_option_cfg(0x1C) == 0) {
                     work->step_0x018 = 0;
                     continue;
@@ -4164,7 +4171,7 @@ void updateNetworkPatControl(void)
                 }
                 work->step_0x018 = 0x65;
                 /* fallthrough */
-        case 0x65:
+            case 0x65:
                 if ((pressed & 0x10) != 0) {
                     sysSE_req(0);
                     work->step_0x018 = 0;
@@ -4174,596 +4181,591 @@ void updateNetworkPatControl(void)
                 break;
             }
             break;
-        }
-        break;
-    case 0x8:
-        dialog->timer_0x128++;
-        switch (work->step_0x018) {
-        case 0:
-            if (work->layer_results_0x6244[1] != 0) {
-                if (work->layer_results_0x6244[1] < 0) {
-                    setErrorHappened(work);
+        case 0x8:
+            dialog->timer_0x128++;
+            switch (work->step_0x018) {
+            case 0:
+                if (work->layer_results_0x6244[1] != 0) {
+                    if (work->layer_results_0x6244[1] < 0) {
+                        setErrorHappened(work);
+                        return;
+                    }
+                    work->sub_state_0x017 = 0xA8;
                     return;
                 }
-                work->sub_state_0x017 = 0xA8;
+                break;
+            case 1:
+                work->mode_0x010 = 2;
+                getNetworkSessionManagerPat(getPatsObject(), 0)->request364();
+                work->sub_state_0x017 = 9;
+                work->step_0x018 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
                 return;
             }
             break;
-        case 1:
-            work->mode_0x010 = 2;
-            getNetworkSessionManagerPat(getPatsObject(), 0)->request364();
-            work->sub_state_0x017 = 9;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
-        }
-        break;
-    case 0x9:
-        dialog->timer_0x128++;
-        if (work->entered_0x014 == 1) {
-            work->sub_state_0x017 = 0xA;
-            getNetworkCommunityPat(getPatsObject(), 0)->openCommunity_1C();
-            return;
-        }
-        break;
-    case 0xA:
-        dialog->timer_0x128++;
-        if (work->flag_0x016 == 1) {
-            flushRosterSync();
-            work->sub_state_0x017 = 5;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
-        }
-        break;
-    case 0x5: {
-        s32 result;
-
-        dialog->timer_0x128++;
-        result = work->stepFetch(1);
-        if (result != 0) {
-            if (result < 0) {
-                setErrorCode(5);
-                setErrorHappened(work);
+        case 0x9:
+            dialog->timer_0x128++;
+            if (work->entered_0x014 == 1) {
+                work->sub_state_0x017 = 0xA;
+                getNetworkCommunityPat(getPatsObject(), 0)->openCommunity_1C();
                 return;
             }
-            {
-                s32 i;
-
-                for (i = 0; i < 8; i++) {
-                    work->fetch_timeouts_0xC37C[i] = get_server_big_data_timeout_element(i);
-                }
-            }
-            work->layer_results_0x6244[18] = 0;
-            getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
-            work->sub_state_0x017 = 0xB;
-            dialog->timer_0x128 = 0;
-            work->step_0x018 = 0;
-            work->cursor_0x01C = 0;
-            work->flag_0xC3F0 = 0;
-            return;
-        }
-        break;
-    }
-    case 0xB:
-        dialog->timer_0x128++;
-        if (work->layer_results_0x6244[18] != 0) {
-            NetSrvList* list;
-            u32 i;
-            s32 n;
-
-            if (work->layer_results_0x6244[18] < 0) {
-                setErrorHappened(work);
+            break;
+        case 0xA:
+            dialog->timer_0x128++;
+            if (work->flag_0x016 == 1) {
+                flushRosterSync();
+                work->sub_state_0x017 = 5;
+                work->step_0x018 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
                 return;
             }
-            work->sub_state_0x017 = 0xC;
-            work->step_0x018 = 0;
-            work->substep_0x019 = 0;
-            work->cursor_0x01C = 0;
-            work->type_ids_0xA100[0] = 0;
-            work->type_ids_0xA100[1] = 0;
-            work->type_ids_0xA100[2] = 0;
-            work->type_ids_0xA100[3] = 0;
-            work->field_0xA120[0] = 0;
-            work->field_0xA120[1] = 0;
-            work->field_0xA120[2] = 0;
-            work->field_0xA120[3] = 0;
-            work->group_count_0xA110 = 0;
-            work->selected_server_index_0xA114 = 0;
-            work->field_0xA118 = 0;
-            work->chosen_type_0xA11C = 0;
-            list = &work->server_list_0x660;
-            for (i = 0; i < list->count_0x000; i++) {
-                s32 type = list->entries_0x008[i].type_0x3C - 1;
+            break;
+        case 0x5: {
+            s32 result;
 
-                if (type >= 0) {
-                    work->type_ids_0xA100[type]++;
+            dialog->timer_0x128++;
+            result = work->stepFetch(1);
+            if (result != 0) {
+                if (result < 0) {
+                    setErrorCode(5);
+                    setErrorHappened(work);
+                    return;
                 }
-            }
-            for (n = 0; n < 4; n++) {
-                if (work->type_ids_0xA100[n] != 0) {
-                    strcpy(menu->rows_0x00C[work->group_count_0xA110].name_0x02, get_server_type_name(n));
-                    strcpy(menu->rows_0x00C[work->group_count_0xA110].description_0x12, get_server_type_desc(n));
-                    menu->rows_0x00C[work->group_count_0xA110].id_0x00 = work->type_ids_0xA100[n];
-                    work->group_count_0xA110++;
+                {
+                    s32 i;
+
+                    for (i = 0; i < 8; i++) {
+                        work->fetch_timeouts_0xC37C[i] = get_server_big_data_timeout_element(i);
+                    }
                 }
+                work->layer_results_0x6244[18] = 0;
+                getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
+                work->sub_state_0x017 = 0xB;
+                dialog->timer_0x128 = 0;
+                work->step_0x018 = 0;
+                work->cursor_0x01C = 0;
+                work->flag_0xC3F0 = 0;
+                return;
             }
-            menu->count_0x008 = work->group_count_0xA110;
-            menu->cursor_0x00A = 0;
-            menu->mode_0x000 = 2;
-            for (; n < 8; n++) {
-                menu->rows_0x00C[n].name_0x02[0] = 0;
-                menu->rows_0x00C[n].description_0x12[0] = 0;
-                menu->rows_0x00C[n].id_0x00 = 0;
-            }
-            work->screen_0xC150 = 1;
-            work->hold_0xC48C = 0xF;
-            return;
+            break;
         }
-        break;
-    case 0xC: {
-        NetSrvList* servers;
+        case 0xB:
+            dialog->timer_0x128++;
+            if (work->layer_results_0x6244[18] != 0) {
+                NetSrvList* list;
+                u32 i;
+                s32 n;
 
-        ai_npc_reaction_forward();
-        menu->field_0x006 = 0;
-        servers = &work->server_list_0x660;
-        switch (work->step_0x018) {
-        case 0:
-            switch (work->substep_0x019) {
+                if (work->layer_results_0x6244[18] < 0) {
+                    setErrorHappened(work);
+                    return;
+                }
+                work->sub_state_0x017 = 0xC;
+                work->step_0x018 = 0;
+                work->substep_0x019 = 0;
+                work->cursor_0x01C = 0;
+                work->type_ids_0xA100[0] = 0;
+                work->type_ids_0xA100[1] = 0;
+                work->type_ids_0xA100[2] = 0;
+                work->type_ids_0xA100[3] = 0;
+                work->field_0xA120[0] = 0;
+                work->field_0xA120[1] = 0;
+                work->field_0xA120[2] = 0;
+                work->field_0xA120[3] = 0;
+                work->group_count_0xA110 = 0;
+                work->selected_server_index_0xA114 = 0;
+                work->field_0xA118 = 0;
+                work->chosen_type_0xA11C = 0;
+                list = &work->server_list_0x660;
+                for (i = 0; i < list->count_0x000; i++) {
+                    s32 type = list->entries_0x008[i].type_0x3C - 1;
+
+                    if (type >= 0) {
+                        work->type_ids_0xA100[type]++;
+                    }
+                }
+                for (n = 0; n < 4; n++) {
+                    if (work->type_ids_0xA100[n] != 0) {
+                        strcpy(menu->rows_0x00C[work->group_count_0xA110].name_0x02, get_server_type_name(n));
+                        strcpy(menu->rows_0x00C[work->group_count_0xA110].description_0x12, get_server_type_desc(n));
+                        menu->rows_0x00C[work->group_count_0xA110].id_0x00 = work->type_ids_0xA100[n];
+                        work->group_count_0xA110++;
+                    }
+                }
+                menu->count_0x008 = work->group_count_0xA110;
+                menu->cursor_0x00A = 0;
+                menu->mode_0x000 = 2;
+                for (; n < 8; n++) {
+                    menu->rows_0x00C[n].name_0x02[0] = 0;
+                    menu->rows_0x00C[n].description_0x12[0] = 0;
+                    menu->rows_0x00C[n].id_0x00 = 0;
+                }
+                work->screen_0xC150 = 1;
+                work->hold_0xC48C = 0xF;
+                return;
+            }
+            break;
+        case 0xC: {
+            NetSrvList* servers;
+
+            ai_npc_reaction_forward();
+            menu->field_0x006 = 0;
+            servers = &work->server_list_0x660;
+            switch (work->step_0x018) {
             case 0:
-                if (work->hold_0xC48C > 0) {
-                    work->hold_0xC48C--;
-                } else if ((held & 3) != 0) {
-                    menu->cursor_0x00A = menu_cursor_step(menu->cursor_0x00A, work->group_count_0xA110, held, 1, 2);
-                    work->cursor_0x01C = menu->cursor_0x00A;
-                } else if ((held & 0x20) != 0) {
-                    sysSE_req(1);
-                    work->step_0x018 = 2;
-                    work->substep_0x019 = 0;
-                    dialog->timer_0x128 = 0xF;
-                } else if ((pressed & 0x10) != 0) {
-                    s32 seen = 0;
-                    s32 chosen;
+                switch (work->substep_0x019) {
+                case 0:
+                    if (work->hold_0xC48C > 0) {
+                        work->hold_0xC48C--;
+                    } else if ((held & 3) != 0) {
+                        menu->cursor_0x00A = menu_cursor_step(menu->cursor_0x00A, work->group_count_0xA110, held, 1, 2);
+                        work->cursor_0x01C = menu->cursor_0x00A;
+                    } else if ((held & 0x20) != 0) {
+                        sysSE_req(1);
+                        work->step_0x018 = 2;
+                        work->substep_0x019 = 0;
+                        dialog->timer_0x128 = 0xF;
+                    } else if ((pressed & 0x10) != 0) {
+                        s32 seen = 0;
+                        s32 chosen;
 
-                    for (chosen = 0; chosen < 4; chosen++) {
-                        if (work->type_ids_0xA100[chosen] != 0) {
-                            if (seen == work->cursor_0x01C) {
+                        for (chosen = 0; chosen < 4; chosen++) {
+                            if (work->type_ids_0xA100[chosen] != 0) {
+                                if (seen == work->cursor_0x01C) {
+                                    break;
+                                }
+                                seen++;
+                            }
+                        }
+                        if (chosen >= 4 || can_enter_server(chosen, get_hunter_rank_max((const u8*)lobby_world_block)) == 0) {
+                            work->substep_0x019 = 1;
+                            dialog->timer_0x128 = 0xF;
+                            sysSE_req(2);
+                        } else {
+                            s32 i;
+
+                            sysSE_req(0);
+                            work->chosen_type_0xA11C = chosen;
+                            work->step_0x018 = 1;
+                            work->substep_0x019 = 0;
+                            work->cursor_0x020 = 0;
+                            work->screen_0xC150 = 2;
+                            menu->cursor_0x49C = 0;
+                            menu->mode_0x000 = 2;
+                            menu->count_0x49E = 0;
+                            for (i = 0; i < work->type_ids_0xA100[work->chosen_type_0xA11C]; i++) {
+                                menu->count_0x49E++;
+                                if (menu->count_0x49E >= 8) {
+                                    break;
+                                }
+                            }
+                            NetCtrlWk::listServers(work->chosen_type_0xA11C + 1, menu->views_0x4A4, 0, 8);
+                        }
+                    }
+                    break;
+                case 1:
+                    if (dialog->timer_0x128 > 0) {
+                        dialog->timer_0x128--;
+                    } else if ((pressed & 0x10) != 0) {
+                        work->substep_0x019 = 0;
+                        sysSE_req(0);
+                    }
+                    break;
+                }
+                refreshServerScreen(work);
+                return;
+            case 1: {
+                s32 i;
+                s32 first;
+
+                menu->page_0x4A0 = work->cursor_0x020 / 8;
+                menu->pages_0x4A2 = work->type_ids_0xA100[work->chosen_type_0xA11C] / 8;
+                if (work->type_ids_0xA100[work->chosen_type_0xA11C] % 8 != 0) {
+                    menu->pages_0x4A2++;
+                }
+                first = menu->page_0x4A0 * 8;
+                menu->count_0x49E = 0;
+                for (i = first; i < work->type_ids_0xA100[work->chosen_type_0xA11C]; i++) {
+                    menu->count_0x49E++;
+                    if (menu->count_0x49E >= 8) {
+                        break;
+                    }
+                }
+                NetCtrlWk::listServers(work->chosen_type_0xA11C + 1, menu->views_0x4A4, first, 8);
+                if (menu->cursor_0x49C >= menu->count_0x49E) {
+                    menu->cursor_0x49C = menu->count_0x49E - 1;
+                }
+                if ((held & 3) != 0) {
+                    menu->cursor_0x49C = menu_cursor_step(menu->cursor_0x49C, menu->count_0x49E, held, 1, 2);
+                    work->cursor_0x020 = menu->cursor_0x49C + menu->page_0x4A0 * 8;
+                    return;
+                }
+                if ((held & 0xC) != 0) {
+                    menu->page_0x4A0 = menu_cursor_step_forward(menu->page_0x4A0, menu->pages_0x4A2, held, 4, 8, 6, (u16*)&menu->field_0x006);
+                    work->cursor_0x020 = menu->cursor_0x49C + menu->page_0x4A0 * 8;
+                    return;
+                }
+                if ((pressed & 0x20) != 0) {
+                    work->step_0x018 = 0;
+                    work->screen_0xC150 = 1;
+                    menu->mode_0x000 = 2;
+                    sysSE_req(1);
+                    work->hold_0xC48C = 0xF;
+                    return;
+                }
+                if ((pressed & 0x10) != 0) {
+                    NetSrvRec* server;
+                    s32 seen;
+                    u32 index;
+
+                    sysSE_req(0);
+                    seen = 0;
+                    for (index = 0; index < servers->count_0x000; index++) {
+                        s32 type;
+
+                        server = &servers->entries_0x008[index];
+                        type = server->type_0x3C - 1;
+
+                        if (type >= 0 && type == work->chosen_type_0xA11C) {
+                            if (seen == work->cursor_0x020) {
+                                work->selected_server_index_0xA114 = index;
                                 break;
                             }
                             seen++;
                         }
                     }
-                    if (chosen >= 4 || can_enter_server(chosen, get_hunter_rank_max((const u8*)lobby_world_block)) == 0) {
-                        work->substep_0x019 = 1;
-                        dialog->timer_0x128 = 0xF;
-                        sysSE_req(2);
-                    } else {
-                        s32 i;
-
-                        sysSE_req(0);
-                        work->chosen_type_0xA11C = chosen;
-                        work->step_0x018 = 1;
-                        work->substep_0x019 = 0;
-                        work->cursor_0x020 = 0;
-                        work->screen_0xC150 = 2;
-                        menu->cursor_0x49C = 0;
-                        menu->mode_0x000 = 2;
-                        menu->count_0x49E = 0;
-                        for (i = 0; i < work->type_ids_0xA100[work->chosen_type_0xA11C]; i++) {
-                            menu->count_0x49E++;
-                            if (menu->count_0x49E >= 8) {
-                                break;
-                            }
-                        }
-                        NetCtrlWk::listServers(work->chosen_type_0xA11C + 1, menu->views_0x4A4, 0, 8);
-                    }
+                    work->field_0xA120[0] = work->cursor_0x01C;
+                    work->field_0xA120[1] = work->cursor_0x020;
+                    work->layer_results_0x6244[19] = 0;
+                    getNetworkLayerPat(getPatsObject(), 0)->selectServer_28(server->id_0x00);
+                    work->sub_state_0x017 = 0xF;
+                    dialog->timer_0x128 = 0;
+                    work->step_0x018 = 0;
+                    work->substep_0x019 = 0;
+                    work->cursor_0x01C = 0;
+                    work->cursor_0x020 = 0;
+                    work->screen_0xC150 = 3;
+                    return;
                 }
-                break;
-            case 1:
+                refreshServerScreen(work);
+                return;
+            }
+            case 2:
                 if (dialog->timer_0x128 > 0) {
                     dialog->timer_0x128--;
-                } else if ((pressed & 0x10) != 0) {
-                    work->substep_0x019 = 0;
+                    return;
+                }
+                if ((pressed & 0x20) != 0) {
+                    sysSE_req(1);
+                    work->step_0x018 = 0;
+                    return;
+                }
+                if ((pressed & 0x10) != 0) {
                     sysSE_req(0);
+                    work->sub_state_0x017 = 0x5A;
+                    work->step_0x018 = 0;
+                    work->substep_0x019 = 0;
+                    work->screen_0xC150 = 0;
+                    return;
                 }
                 break;
             }
-            refreshServerScreen(work);
-            return;
-        case 1: {
-            s32 i;
-            s32 first;
-
-            menu->page_0x4A0 = work->cursor_0x020 / 8;
-            menu->pages_0x4A2 = work->type_ids_0xA100[work->chosen_type_0xA11C] / 8;
-            if (work->type_ids_0xA100[work->chosen_type_0xA11C] % 8 != 0) {
-                menu->pages_0x4A2++;
-            }
-            first = menu->page_0x4A0 * 8;
-            menu->count_0x49E = 0;
-            for (i = first; i < work->type_ids_0xA100[work->chosen_type_0xA11C]; i++) {
-                menu->count_0x49E++;
-                if (menu->count_0x49E >= 8) {
-                    break;
+            break;
+        }
+        case 0xF: {
+            dialog->timer_0x128++;
+            ai_npc_reaction_forward();
+            if (work->layer_results_0x6244[19] != 0) {
+                if (work->layer_results_0x6244[19] < 0) {
+                    failNetworkControl(work);
+                    return;
                 }
-            }
-            NetCtrlWk::listServers(work->chosen_type_0xA11C + 1, menu->views_0x4A4, first, 8);
-            if (menu->cursor_0x49C >= menu->count_0x49E) {
-                menu->cursor_0x49C = menu->count_0x49E - 1;
-            }
-            if ((held & 3) != 0) {
-                menu->cursor_0x49C = menu_cursor_step(menu->cursor_0x49C, menu->count_0x49E, held, 1, 2);
-                work->cursor_0x020 = menu->cursor_0x49C + menu->page_0x4A0 * 8;
-                return;
-            }
-            if ((held & 0xC) != 0) {
-                menu->page_0x4A0 = menu_cursor_step_forward(menu->page_0x4A0, menu->pages_0x4A2, held, 4, 8, 6, (u16*)&menu->field_0x006);
-                work->cursor_0x020 = menu->cursor_0x49C + menu->page_0x4A0 * 8;
-                return;
-            }
-            if ((pressed & 0x20) != 0) {
-                work->step_0x018 = 0;
-                work->screen_0xC150 = 1;
-                menu->mode_0x000 = 2;
-                sysSE_req(1);
-                work->hold_0xC48C = 0xF;
-                return;
-            }
-            if ((pressed & 0x10) != 0) {
-                NetSrvRec* server;
-                s32 seen;
-                u32 index;
+                {
+                    NetworkUniqueId id;
 
-                sysSE_req(0);
-                seen = 0;
-                for (index = 0; index < servers->count_0x000; index++) {
-                    s32 type;
-
-                    server = &servers->entries_0x008[index];
-                    type = server->type_0x3C - 1;
-
-                    if (type >= 0 && type == work->chosen_type_0xA11C) {
-                        if (seen == work->cursor_0x020) {
-                            work->selected_server_index_0xA114 = index;
-                            break;
-                        }
-                        seen++;
-                    }
+                    getNetworkLayerPat(getPatsObject(), 0)->readServerId_2C(&id);
+                    work->name_0x7368[0] = 0;
+                    formatNetId(work->name_0x7368, &id);
                 }
-                work->field_0xA120[0] = work->cursor_0x01C;
-                work->field_0xA120[1] = work->cursor_0x020;
-                work->layer_results_0x6244[19] = 0;
-                getNetworkLayerPat(getPatsObject(), 0)->selectServer_28(server->id_0x00);
-                work->sub_state_0x017 = 0xF;
+                flushRosterSync();
+                refreshRosterCache();
+                work->sub_state_0x017 = 0x10;
                 dialog->timer_0x128 = 0;
                 work->step_0x018 = 0;
-                work->substep_0x019 = 0;
-                work->cursor_0x01C = 0;
-                work->cursor_0x020 = 0;
-                work->screen_0xC150 = 3;
-                return;
-            }
-            refreshServerScreen(work);
-            return;
-        }
-        case 2:
-            if (dialog->timer_0x128 > 0) {
-                dialog->timer_0x128--;
-                return;
-            }
-            if ((pressed & 0x20) != 0) {
-                sysSE_req(1);
-                work->step_0x018 = 0;
-                return;
-            }
-            if ((pressed & 0x10) != 0) {
-                sysSE_req(0);
-                work->sub_state_0x017 = 0x5A;
-                work->step_0x018 = 0;
-                work->substep_0x019 = 0;
-                work->screen_0xC150 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
                 return;
             }
             break;
         }
-        break;
-    }
-    case 0xF: {
-        dialog->timer_0x128++;
-        ai_npc_reaction_forward();
-        if (work->layer_results_0x6244[19] != 0) {
-            if (work->layer_results_0x6244[19] < 0) {
-                failNetworkControl(work);
-                return;
-            }
-            {
-                NetworkUniqueId id;
+        case 0x10: {
+            s32 result;
 
-                getNetworkLayerPat(getPatsObject(), 0)->readServerId_2C(&id);
-                work->name_0x7368[0] = 0;
-                formatNetId(work->name_0x7368, &id);
+            dialog->timer_0x128++;
+            ai_npc_reaction_forward();
+            result = work->stepFetch(2);
+            if (result != 0) {
+                if (result < 0) {
+                    setErrorCode(5);
+                    setErrorHappened(work);
+                    return;
+                }
+                work->sub_state_0x017 = 0x11;
+                dialog->timer_0x128 = 0;
+                work->step_0x018 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
+                return;
             }
-            flushRosterSync();
-            refreshRosterCache();
-            work->sub_state_0x017 = 0x10;
-            dialog->timer_0x128 = 0;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
+            break;
         }
-        break;
-    }
-    case 0x10: {
-        s32 result;
+        case 0x11: {
+            s32 result;
 
-        dialog->timer_0x128++;
-        ai_npc_reaction_forward();
-        result = work->stepFetch(2);
-        if (result != 0) {
-            if (result < 0) {
-                setErrorCode(5);
-                setErrorHappened(work);
+            dialog->timer_0x128++;
+            ai_npc_reaction_forward();
+            result = work->stepFetch(3);
+            if (result != 0) {
+                work->timeout_0xC36C = get_server_big_data_timeout_element(0);
+                if (result < 0) {
+                    setErrorCode(5);
+                    setErrorHappened(work);
+                    return;
+                }
+                work->sub_state_0x017 = 0x12;
+                dialog->timer_0x128 = 0;
+                work->step_0x018 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
                 return;
             }
-            work->sub_state_0x017 = 0x11;
-            dialog->timer_0x128 = 0;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
+            break;
         }
-        break;
-    }
-    case 0x11: {
-        s32 result;
+        case 0x12: {
+            s32 result;
 
-        dialog->timer_0x128++;
-        ai_npc_reaction_forward();
-        result = work->stepFetch(3);
-        if (result != 0) {
-            work->timeout_0xC36C = get_server_big_data_timeout_element(0);
-            if (result < 0) {
-                setErrorCode(5);
-                setErrorHappened(work);
+            dialog->timer_0x128++;
+            ai_npc_reaction_forward();
+            result = work->stepFetch(4);
+            if (result != 0) {
+                if (result < 0) {
+                    setErrorCode(5);
+                    setErrorHappened(work);
+                    return;
+                }
+                work->community_results_0xA144[6] = 0;
+                getNetworkCommunityPat(getPatsObject(), 0)->requestNews_38();
+                work->sub_state_0x017 = 0x13;
+                dialog->timer_0x128 = 0;
+                work->step_0x018 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
                 return;
             }
-            work->sub_state_0x017 = 0x12;
-            dialog->timer_0x128 = 0;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
+            break;
         }
-        break;
-    }
-    case 0x12: {
-        s32 result;
-
-        dialog->timer_0x128++;
-        ai_npc_reaction_forward();
-        result = work->stepFetch(4);
-        if (result != 0) {
-            if (result < 0) {
-                setErrorCode(5);
-                setErrorHappened(work);
+        case 0x13: {
+            dialog->timer_0x128++;
+            ai_npc_reaction_forward();
+            if (work->community_results_0xA144[6] != 0) {
+                if (work->community_results_0xA144[6] < 0) {
+                    setErrorCode(5);
+                    setErrorHappened(work);
+                    return;
+                }
+                work->community_results_0xA144[24] = 0;
+                getNetworkCommunityPat(getPatsObject(), 0)->requestBlockList();
+                work->sub_state_0x017 = 0x14;
+                dialog->timer_0x128 = 0;
+                work->step_0x018 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
                 return;
             }
-            work->community_results_0xA144[6] = 0;
-            getNetworkCommunityPat(getPatsObject(), 0)->requestNews_38();
-            work->sub_state_0x017 = 0x13;
-            dialog->timer_0x128 = 0;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
+            break;
         }
-        break;
-    }
-    case 0x13: {
-        dialog->timer_0x128++;
-        ai_npc_reaction_forward();
-        if (work->community_results_0xA144[6] != 0) {
-            if (work->community_results_0xA144[6] < 0) {
-                setErrorCode(5);
-                setErrorHappened(work);
+        case 0x14: {
+            dialog->timer_0x128++;
+            ai_npc_reaction_forward();
+            if (work->community_results_0xA144[24] != 0) {
+                if (work->community_results_0xA144[24] < 0) {
+                    setErrorCode(5);
+                    setErrorHappened(work);
+                    return;
+                }
+                work->layer_state_0x064 = 0;
+                if (isOnlineFlagClear() == 0) {
+                    work->community_results_0xA144[18] = 0;
+                    buildRosterSync(&work->roster_sync_0x61CC);
+                    getNetworkCommunityPat(getPatsObject(), 0)->syncFriends(&work->roster_sync_0x61CC);
+                }
+                work->sub_state_0x017 = 0x15;
+                work->step_0x018 = 0;
+                work->fetch_step_0x82D0 = 0;
+                work->fetch_index_0x82D4 = 0;
                 return;
             }
-            work->community_results_0xA144[24] = 0;
-            getNetworkCommunityPat(getPatsObject(), 0)->requestBlockList();
-            work->sub_state_0x017 = 0x14;
-            dialog->timer_0x128 = 0;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
+            break;
         }
-        break;
-    }
-    case 0x14: {
-        dialog->timer_0x128++;
-        ai_npc_reaction_forward();
-        if (work->community_results_0xA144[24] != 0) {
-            if (work->community_results_0xA144[24] < 0) {
-                setErrorCode(5);
-                setErrorHappened(work);
-                return;
-            }
-            work->layer_state_0x064 = 0;
+        case 0x15: {
+            dialog->timer_0x128++;
+            ai_npc_reaction_forward();
             if (isOnlineFlagClear() == 0) {
-                work->community_results_0xA144[18] = 0;
-                buildRosterSync(&work->roster_sync_0x61CC);
-                getNetworkCommunityPat(getPatsObject(), 0)->syncFriends(&work->roster_sync_0x61CC);
-            }
-            work->sub_state_0x017 = 0x15;
-            work->step_0x018 = 0;
-            work->fetch_step_0x82D0 = 0;
-            work->fetch_index_0x82D4 = 0;
-            return;
-        }
-        break;
-    }
-    case 0x15: {
-        dialog->timer_0x128++;
-        ai_npc_reaction_forward();
-        if (isOnlineFlagClear() == 0) {
-            if (work->community_results_0xA144[18] == 0) {
-                break;
-            }
-            if (work->community_results_0xA144[18] < 0) {
-                setErrorCode(5);
-                setErrorHappened(work);
-                return;
-            }
-        }
-        work->layer_results_0x6244[9] = 0;
-        getNetworkLayerPat(getPatsObject(), 0)->requestCities_48(0x28);
-        work->sub_state_0x017 = 0x16;
-        work->step_0x018 = 0;
-        work->substep_0x019 = 0;
-        work->layer_state_0x064 = 0;
-        dialog->timer_0x128 = 0;
-        syncScheduleClock(work);
-        menu->count_0x49E = 0;
-        NetCtrlWk::copyCityListViews(menu->views2_0x60C, 0, 8);
-        return;
-    }
-    case 0x16:
-        ai_npc_reaction_forward();
-        menu->field_0x006 = 0;
-        switch (work->step_0x018) {
-        case 0:
-            if (work->substep_0x019 == 0) {
-                dialog->timer_0x128++;
-                if (work->layer_results_0x6244[9] == 0) {
+                if (work->community_results_0xA144[18] == 0) {
                     break;
                 }
-                if (work->layer_results_0x6244[9] < 0) {
-                    failNetworkControl(work);
+                if (work->community_results_0xA144[18] < 0) {
+                    setErrorCode(5);
+                    setErrorHappened(work);
                     return;
                 }
             }
-            work->total_0xA140 = getNetworkLayerPat(getPatsObject(), 0)->cities_540.count_0x000;
-            work->per_page_0xA13C = 8;
-            work->pages_0xA138 = work->total_0xA140 / work->per_page_0xA13C;
-            if (work->total_0xA140 % work->per_page_0xA13C != 0) {
-                work->pages_0xA138++;
-            }
-            work->step_0x018 = 1;
-            work->hold_0xC48C = 0xF;
-            work->cursor_0x01C = 0;
-            work->cursor_0x020 = 0;
-            menu->cursor2_0x604 = 0;
-            menu->pages2_0x60A = work->pages_0xA138;
-            menu->page2_0x608 = 0;
-            menu->mode_0x000 = 3;
+            work->layer_results_0x6244[9] = 0;
+            getNetworkLayerPat(getPatsObject(), 0)->requestCities_48(0x28);
+            work->sub_state_0x017 = 0x16;
+            work->step_0x018 = 0;
+            work->substep_0x019 = 0;
+            work->layer_state_0x064 = 0;
+            dialog->timer_0x128 = 0;
+            syncScheduleClock(work);
+            menu->count_0x49E = 0;
+            NetCtrlWk::copyCityListViews(menu->views2_0x60C, 0, 8);
             return;
-        case 1: {
-            s32 i;
-
-            i = menu->page2_0x608 * 8;
-            menu->count2_0x606 = 0;
-            for (; i < work->total_0xA140; i++) {
-                menu->count2_0x606++;
-                if (menu->count2_0x606 >= 8) {
-                    break;
+        }
+        case 0x16:
+            ai_npc_reaction_forward();
+            menu->field_0x006 = 0;
+            switch (work->step_0x018) {
+            case 0:
+                if (work->substep_0x019 == 0) {
+                    dialog->timer_0x128++;
+                    if (work->layer_results_0x6244[9] == 0) {
+                        break;
+                    }
+                    if (work->layer_results_0x6244[9] < 0) {
+                        failNetworkControl(work);
+                        return;
+                    }
                 }
-            }
-            NetCtrlWk::copyCityListViews(menu->views2_0x60C, menu->page2_0x608 * 8, 8);
-            if (work->hold_0xC48C > 0) {
-                work->hold_0xC48C--;
-                return;
-            }
-            if ((held & 3) != 0) {
-                menu->cursor2_0x604 = menu_cursor_step(menu->cursor2_0x604, menu->count2_0x606, held, 1, 2);
-                work->cursor_0x020 = menu->cursor2_0x604;
-                return;
-            }
-            if ((held & 0xC) != 0) {
-                menu->page2_0x608 = menu_cursor_step_forward(menu->page2_0x608, menu->pages2_0x60A, held, 4, 8, 6, (u16*)&menu->field_0x006);
-                work->cursor_0x01C = menu->page2_0x608;
-                return;
-            }
-            if ((pressed & 0x20) != 0) {
-                work->sub_state_0x017 = 0xC;
+                work->total_0xA140 = getNetworkLayerPat(getPatsObject(), 0)->cities_540.count_0x000;
+                work->per_page_0xA13C = 8;
+                work->pages_0xA138 = work->total_0xA140 / work->per_page_0xA13C;
+                if (work->total_0xA140 % work->per_page_0xA13C != 0) {
+                    work->pages_0xA138++;
+                }
                 work->step_0x018 = 1;
-                work->substep_0x019 = 0;
-                work->cursor_0x01C = work->field_0xA120[0];
-                work->cursor_0x020 = work->field_0xA120[1];
-                work->screen_0xC150 = 2;
-                menu->mode_0x000 = 2;
-                sysSE_req(1);
                 work->hold_0xC48C = 0xF;
-                return;
-            }
-            if ((pressed & 0x10) != 0) {
-                NetCityList* list;
-                NetCityRec* city;
-
-                sysSE_req(0);
-                list = &getNetworkLayerPat(getPatsObject(), 0)->cities_540;
-                work->chosen_city_0xA134 = work->cursor_0x020 + work->cursor_0x01C * work->per_page_0xA13C;
-                city = &list->entries_0x004[work->chosen_city_0xA134];
-                strcpy(work->account_name_0xC0C4, city->name_0x04);
-                work->layer_results_0x6244[5] = 0;
-                getNetworkLayerPat(getPatsObject(), 0)->selectCity_3C(city->id_0x00);
-                work->sub_state_0x017 = 0x17;
-                work->step_0x018 = 0;
-                work->substep_0x019 = 0;
                 work->cursor_0x01C = 0;
                 work->cursor_0x020 = 0;
-            }
-            refreshServerScreen(work);
-            return;
-        }
-        }
-        break;
-    case 0x17:
-        if (work->layer_results_0x6244[5] != 0) {
-            if (work->layer_results_0x6244[5] < 0) {
-                failNetworkControl(work);
-                work->account_name_0xC0C4[0] = 0;
+                menu->cursor2_0x604 = 0;
+                menu->pages2_0x60A = work->pages_0xA138;
+                menu->page2_0x608 = 0;
+                menu->mode_0x000 = 3;
+                return;
+            case 1: {
+                s32 i;
+
+                i = menu->page2_0x608 * 8;
+                menu->count2_0x606 = 0;
+                for (; i < work->total_0xA140; i++) {
+                    menu->count2_0x606++;
+                    if (menu->count2_0x606 >= 8) {
+                        break;
+                    }
+                }
+                NetCtrlWk::copyCityListViews(menu->views2_0x60C, menu->page2_0x608 * 8, 8);
+                if (work->hold_0xC48C > 0) {
+                    work->hold_0xC48C--;
+                    return;
+                }
+                if ((held & 3) != 0) {
+                    menu->cursor2_0x604 = menu_cursor_step(menu->cursor2_0x604, menu->count2_0x606, held, 1, 2);
+                    work->cursor_0x020 = menu->cursor2_0x604;
+                    return;
+                }
+                if ((held & 0xC) != 0) {
+                    menu->page2_0x608 = menu_cursor_step_forward(menu->page2_0x608, menu->pages2_0x60A, held, 4, 8, 6, (u16*)&menu->field_0x006);
+                    work->cursor_0x01C = menu->page2_0x608;
+                    return;
+                }
+                if ((pressed & 0x20) != 0) {
+                    work->sub_state_0x017 = 0xC;
+                    work->step_0x018 = 1;
+                    work->substep_0x019 = 0;
+                    work->cursor_0x01C = work->field_0xA120[0];
+                    work->cursor_0x020 = work->field_0xA120[1];
+                    work->screen_0xC150 = 2;
+                    menu->mode_0x000 = 2;
+                    sysSE_req(1);
+                    work->hold_0xC48C = 0xF;
+                    return;
+                }
+                if ((pressed & 0x10) != 0) {
+                    NetCityList* list;
+                    NetCityRec* city;
+
+                    sysSE_req(0);
+                    list = &getNetworkLayerPat(getPatsObject(), 0)->cities_540;
+                    work->chosen_city_0xA134 = work->cursor_0x020 + work->cursor_0x01C * work->per_page_0xA13C;
+                    city = &list->entries_0x004[work->chosen_city_0xA134];
+                    strcpy(work->account_name_0xC0C4, city->name_0x04);
+                    work->layer_results_0x6244[5] = 0;
+                    getNetworkLayerPat(getPatsObject(), 0)->selectCity_3C(city->id_0x00);
+                    work->sub_state_0x017 = 0x17;
+                    work->step_0x018 = 0;
+                    work->substep_0x019 = 0;
+                    work->cursor_0x01C = 0;
+                    work->cursor_0x020 = 0;
+                }
+                refreshServerScreen(work);
                 return;
             }
-            refreshRosterCache();
-            resetMessagePool();
-            work->sub_state_0x017 = 0x19;
-            work->mode_0x010 = 3;
-            work->flag_0x82C4 = 0;
-            work->flag_0x82C5 = 0;
-            work->flag_0x82C7 = 0;
-            work->flag_0x82C8 = 0;
-            work->screen_0xC150 = 4;
-            clearRefreshTimeout();
-            return;
-        }
-        break;
-    case 0x18:
-        if (work->layer_results_0x6244[5] != 0) {
-            if (work->layer_results_0x6244[5] < 0) {
-                setErrorHappened(work);
+            }
+            break;
+        case 0x17:
+            if (work->layer_results_0x6244[5] != 0) {
+                if (work->layer_results_0x6244[5] < 0) {
+                    failNetworkControl(work);
+                    work->account_name_0xC0C4[0] = 0;
+                    return;
+                }
+                refreshRosterCache();
+                resetMessagePool();
+                work->sub_state_0x017 = 0x19;
+                work->mode_0x010 = 3;
+                work->flag_0x82C4 = 0;
+                work->flag_0x82C5 = 0;
+                work->flag_0x82C7 = 0;
+                work->flag_0x82C8 = 0;
+                work->screen_0xC150 = 4;
+                clearRefreshTimeout();
                 return;
             }
-            resetMessagePool();
-            work->sub_state_0x017 = 0x19;
-            work->mode_0x010 = 3;
-            work->idle_hold_0xC360 = 0;
-            work->idle_press_0xC362 = 0;
-            work->idle_frames_0xC364 = 0;
-            return;
-        }
-        break;
-    case 0x19:
-    case 0x1A:
-    case 0x1B:
-    case 0x1C:
-    case 0x1D:
-    case 0x1E:
-        /* The shared body heads the loop: case 0x1F (after 0x3 and 0xD) steps its own sub-machine and re-enters
-         * the body on the back edge. */
-        for (;;) {
+            break;
+        case 0x18:
+            if (work->layer_results_0x6244[5] != 0) {
+                if (work->layer_results_0x6244[5] < 0) {
+                    setErrorHappened(work);
+                    return;
+                }
+                resetMessagePool();
+                work->sub_state_0x017 = 0x19;
+                work->mode_0x010 = 3;
+                work->idle_hold_0xC360 = 0;
+                work->idle_press_0xC362 = 0;
+                work->idle_frames_0xC364 = 0;
+                return;
+            }
+            break;
+        case 0x19:
+        case 0x1A:
+        case 0x1B:
+        case 0x1C:
+        case 0x1D:
+        case 0x1E:
             if (work->flag_0xC3F0 == 1) {
                 work->sub_state_0x017 = 0x26;
                 work->step_0x018 = 0;
@@ -4822,12 +4824,12 @@ void updateNetworkPatControl(void)
             updateFriendTransferModes();
             updateTransferMode();
             return;
-    case 0x3:
+        case 0x3:
             work->entered_0x014 = 0;
             getNetworkSessionManagerPat(getPatsObject(), 0)->request364();
             work->sub_state_0x017 = 0xD;
             return;
-    case 0xD:
+        case 0xD:
             if (work->status_0x174 != 0) {
                 if (work->status_0x174 < 0) {
                     setErrorHappened(work);
@@ -4841,7 +4843,8 @@ void updateNetworkPatControl(void)
                 return;
             }
             break;
-    case 0x1F:
+            break;
+        case 0x1F:
             switch (work->step_0x018) {
             case 0:
                 if (work->community_results_0xA144[18] != 0) {
@@ -4851,7 +4854,7 @@ void updateNetworkPatControl(void)
                     } else {
                         work->community_results_0xA144[12] = 0;
                         startRosterFetch(NULL);
-                        work->step_0x018 = 1;
+                        work->step_0x018++;
                     }
                 }
                 break;
@@ -4861,7 +4864,7 @@ void updateNetworkPatControl(void)
                         setErrorCode(5);
                         setErrorHappened(work);
                     } else {
-                        work->step_0x018 = 2;
+                        work->step_0x018++;
                         sysSE_stop(0x1F);
                         resumeSoundEngine();
                         work->delay_0xC488 = 0x3C;
@@ -4873,274 +4876,277 @@ void updateNetworkPatControl(void)
                     work->delay_0xC488--;
                 } else {
                     lb_entry_flags_clear();
-                    work->sub_state_0x017 = 0x20;
+                    work->sub_state_0x017++;
                     work->step_0x018 = 0;
                 }
                 break;
             }
-        }
-        break;
-    case 0x20:
-        if (work->flag_0x04C == 1) {
-            work->idle_hold_0xC360 = 0;
-            work->idle_press_0xC362 = 0;
-            work->idle_frames_0xC364 = 0;
-            work->sub_state_0x017 = 0x19;
-            work->mode_0x010 = 3;
-            work->flag_0x82C4 = 0;
-            work->flag_0x82C5 = 0;
-            work->flag_0x82C7 = 0;
-            work->flag_0x82C8 = 0;
-            lb_quest_board_reset(0, 0);
-            return;
-        }
-        work->state_0x011 = 7;
-        work->sub_state_0x017 = 0x21;
-        work->step_0x018 = 0;
-        return;
-    case 0x21: {
-        NetCtrlEntry* entry;
-        s32 i;
-
-        entry = work->entries_0x7CD8;
-        for (i = 0; i < 16; i++, entry++) {
-            if (entry->in_use_0x00 == 2) {
-                break;
+            /* the roster steps then run the city frame */
+            sub_state = 0x19;
+            continue;
+        case 0x20:
+            if (work->flag_0x04C == 1) {
+                work->idle_hold_0xC360 = 0;
+                work->idle_press_0xC362 = 0;
+                work->idle_frames_0xC364 = 0;
+                work->sub_state_0x017 = 0x19;
+                work->mode_0x010 = 3;
+                work->flag_0x82C4 = 0;
+                work->flag_0x82C5 = 0;
+                work->flag_0x82C7 = 0;
+                work->flag_0x82C8 = 0;
+                lb_quest_board_reset(0, 0);
+                return;
             }
-        }
-        if (i == 16) {
+            work->state_0x011 = 7;
+            work->sub_state_0x017 = 0x21;
+            work->step_0x018 = 0;
+            return;
+        case 0x21: {
+            NetCtrlEntry* entry;
+            s32 i;
+
             entry = work->entries_0x7CD8;
             for (i = 0; i < 16; i++, entry++) {
-                if (entry->in_use_0x00 == 1) {
-                    if (entry->kind_0x02 == 0 || entry->kind_0x02 == 1) {
-                        clearPhaseSlot(0x12);
-                        getNetworkSessionManagerPat(getPatsObject(), 0)->request412((u32)entry->name_0x04, entry->value_0x4C, -1);
-                    } else {
-                        s8 slot = lookupFriendSlot((u8*)entry->text_0x50);
-
-                        if (slot >= 0) {
-                            clearPhaseSlot(0x12);
-                            getNetworkSessionManagerPat(getPatsObject(), 0)->request412((u32)entry->name_0x04, entry->value_0x4C, slot);
-                        } else {
-                            work->layer_results_0x6244[15] = 0;
-                            getNetworkLayerPat(getPatsObject(), 0)->sendMessage_64(entry->name_0x04, entry->value_0x4C, 1, entry->flags_0x03);
-                        }
-                    }
-                    entry->in_use_0x00 = 2;
+                if (entry->in_use_0x00 == 2) {
                     break;
                 }
             }
-        }
-        updateFriendTransferModes();
-        updateTransferMode();
-        return;
-    }
-    case 0x22:
-        work->flag_0x82C4 = 0;
-        work->flag_0x82C5 = 0;
-        work->flag_0x82C7 = 0;
-        return;
-    case 0x24:
-        if (work->step_0x018 != 0) {
-            work->step_0x018--;
+            if (i == 16) {
+                entry = work->entries_0x7CD8;
+                for (i = 0; i < 16; i++, entry++) {
+                    if (entry->in_use_0x00 == 1) {
+                        if (entry->kind_0x02 == 0 || entry->kind_0x02 == 1) {
+                            clearPhaseSlot(0x12);
+                            getNetworkSessionManagerPat(getPatsObject(), 0)->request412((u32)entry->name_0x04, entry->value_0x4C, -1);
+                        } else {
+                            s8 slot = lookupFriendSlot((u8*)entry->text_0x50);
+
+                            if (slot >= 0) {
+                                clearPhaseSlot(0x12);
+                                getNetworkSessionManagerPat(getPatsObject(), 0)->request412((u32)entry->name_0x04, entry->value_0x4C, slot);
+                            } else {
+                                work->layer_results_0x6244[15] = 0;
+                                getNetworkLayerPat(getPatsObject(), 0)->sendMessage_64(entry->name_0x04, entry->value_0x4C, 1, entry->flags_0x03);
+                            }
+                        }
+                        entry->in_use_0x00 = 2;
+                        break;
+                    }
+                }
+            }
+            updateFriendTransferModes();
+            updateTransferMode();
             return;
         }
-        if ((pressed & 0x10) != 0) {
-            sysSE_req(0);
-            work->sub_error_0xC259 = 0;
+        case 0x22:
+            work->flag_0x82C4 = 0;
+            work->flag_0x82C5 = 0;
+            work->flag_0x82C7 = 0;
+            return;
+        case 0x24:
+            if (work->step_0x018 != 0) {
+                work->step_0x018--;
+                return;
+            }
+            if ((pressed & 0x10) != 0) {
+                sysSE_req(0);
+                work->sub_error_0xC259 = 0;
+                work->layer_results_0x6244[18] = 0;
+                getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
+                work->sub_state_0x017 = 0xB;
+                dialog->timer_0x128 = 0;
+                work->step_0x018 = 0;
+                work->substep_0x019 = 0;
+                work->cursor_0x01C = 0;
+                work->flag_0xC3F0 = 0;
+                return;
+            }
+            break;
+        case 0x25:
+            if (work->step_0x018 != 0) {
+                work->step_0x018--;
+                return;
+            }
+            if ((pressed & 0x10) != 0) {
+                sysSE_req(0);
+                work->sub_error_0xC259 = 0;
+                work->sub_state_0x017 = 0x16;
+                work->step_0x018 = 0;
+                work->substep_0x019 = 1;
+                work->layer_state_0x064 = 0;
+                syncScheduleClock(work);
+                work->screen_0xC150 = 3;
+                work->flag_0x82C4 = 0;
+                work->flag_0x82C5 = 0;
+                work->flag_0x82C7 = 0;
+                work->total_0xA140 = 0;
+                work->per_page_0xA13C = 0;
+                work->pages_0xA138 = 0;
+                work->cursor_0x01C = 0;
+                work->cursor_0x020 = 0;
+                menu->cursor2_0x604 = 0;
+                menu->pages2_0x60A = work->pages_0xA138;
+                menu->page2_0x608 = 0;
+                menu->mode_0x000 = 4;
+                NetCtrlWk::copyCityListViews(menu->views2_0x60C, menu->page2_0x608 * 8, 8);
+                return;
+            }
+            break;
+        case 0x26:
+            work->dialog_0xBF30 = work->create_dialog_0xC25C(work);
+            allocateDialogRecord();
+            work->mode_0x010 = 2;
             work->layer_results_0x6244[18] = 0;
             getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
             work->sub_state_0x017 = 0xB;
             dialog->timer_0x128 = 0;
             work->step_0x018 = 0;
-            work->substep_0x019 = 0;
             work->cursor_0x01C = 0;
             work->flag_0xC3F0 = 0;
+            work->flag_0xC3F2 = 1;
+            work->screen_0xC150 = 1;
             return;
-        }
-        break;
-    case 0x25:
-        if (work->step_0x018 != 0) {
-            work->step_0x018--;
-            return;
-        }
-        if ((pressed & 0x10) != 0) {
-            sysSE_req(0);
-            work->sub_error_0xC259 = 0;
-            work->sub_state_0x017 = 0x16;
-            work->step_0x018 = 0;
-            work->substep_0x019 = 1;
-            work->layer_state_0x064 = 0;
-            syncScheduleClock(work);
-            work->screen_0xC150 = 3;
-            work->flag_0x82C4 = 0;
-            work->flag_0x82C5 = 0;
-            work->flag_0x82C7 = 0;
-            work->total_0xA140 = 0;
-            work->per_page_0xA13C = 0;
-            work->pages_0xA138 = 0;
-            work->cursor_0x01C = 0;
-            work->cursor_0x020 = 0;
-            menu->cursor2_0x604 = 0;
-            menu->pages2_0x60A = work->pages_0xA138;
-            menu->page2_0x608 = 0;
-            menu->mode_0x000 = 4;
-            NetCtrlWk::copyCityListViews(menu->views2_0x60C, menu->page2_0x608 * 8, 8);
-            return;
-        }
-        break;
-    case 0x26:
-        work->dialog_0xBF30 = work->create_dialog_0xC25C(work);
-        allocateDialogRecord();
-        work->mode_0x010 = 2;
-        work->layer_results_0x6244[18] = 0;
-        getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
-        work->sub_state_0x017 = 0xB;
-        dialog->timer_0x128 = 0;
-        work->step_0x018 = 0;
-        work->cursor_0x01C = 0;
-        work->flag_0xC3F0 = 0;
-        work->flag_0xC3F2 = 1;
-        work->screen_0xC150 = 1;
-        return;
-    case 0x5A:
-        switch (work->step_0x018) {
-        case 0:
-            setTransferMode(0);
-            if ((u32)NetCtrlWk::isSessionManagerReady() == 1) {
-                work->results_0x078[8] = 0;
-                clearPhaseSlot(0x20);
-                getNetworkSessionManagerPat(getPatsObject(), 0)->request444();
+        case 0x5A:
+            switch (work->step_0x018) {
+            case 0:
+                setTransferMode(0);
+                if ((u32)NetCtrlWk::isSessionManagerReady() == 1) {
+                    work->results_0x078[8] = 0;
+                    clearPhaseSlot(0x20);
+                    getNetworkSessionManagerPat(getPatsObject(), 0)->request444();
+                    work->step_0x018++;
+                    return;
+                }
+                work->step_0x018 = 4;
+                return;
+            case 1:
+                if (isPhaseSlotDone(0x20) != 0) {
+                    clearPhaseSlot(0x10);
+                    getNetworkSessionManagerPat(getPatsObject(), 0)->request408();
+                    work->step_0x018++;
+                    return;
+                }
+                break;
+            case 2:
+                if (isPhaseSlotDone(0x10) != 0) {
+                    clearPhaseSlot(8);
+                    getNetworkSessionManagerPat(getPatsObject(), 0)->request392();
+                    work->step_0x018++;
+                    return;
+                }
+                break;
+            case 3:
+                if (isPhaseSlotDone(8) != 0) {
+                    work->step_0x018++;
+                    return;
+                }
+                break;
+            case 4:
+                if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
+                    work->community_results_0xA144[2] = 0;
+                    getNetworkCommunityPat(getPatsObject(), 0)->shutdown_20();
+                }
                 work->step_0x018++;
                 return;
-            }
-            work->step_0x018 = 4;
-            return;
-        case 1:
-            if (isPhaseSlotDone(0x20) != 0) {
-                clearPhaseSlot(0x10);
-                getNetworkSessionManagerPat(getPatsObject(), 0)->request408();
+            case 5:
+                if (getNetworkCommunityPat(getPatsObject(), 0) == NULL || work->community_results_0xA144[2] != 0) {
+                    if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                        clearPhaseSlot(2);
+                        getNetworkSessionManagerPat(getPatsObject(), 0)->request368();
+                    }
+                    work->step_0x018++;
+                    return;
+                }
+                break;
+            case 6:
+                if (getNetworkSessionManagerPat(getPatsObject(), 0) == NULL || isPhaseSlotDone(2) != 0) {
+                    if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+                        work->layer_results_0x6244[2] = 0;
+                        getNetworkLayerPat(getPatsObject(), 0)->shutdown_20();
+                    }
+                    work->step_0x018++;
+                    return;
+                }
+                break;
+            case 7:
+                if (getNetworkLayerPat(getPatsObject(), 0) == NULL || work->layer_results_0x6244[2] != 0) {
+                    work->step_0x018++;
+                    return;
+                }
+                break;
+            case 8:
                 work->step_0x018++;
+                return;
+            case 9:
+                work->status_0x174 = 0;
+                resetMediatorFlag1D(getInstance());
+                work->step_0x018++;
+                return;
+            case 10:
+                if (work->status_0x174 != 0) {
+                    work->step_0x018++;
+                    return;
+                }
+                break;
+            case 11:
+                work->step_0x018++;
+                return;
+            case 12:
+                pmic_disp_off();
+                work->flag_0xC499 = 0;
+                if (work->flag_0xBF2E != 0) {
+                    startTermsCheck(getInstance());
+                    work->sub_state_0x017 = 0x65;
+                    work->step_0x018 = 0;
+                    return;
+                }
+                if (work->flag_0xBF2D != 0) {
+                    startTermsCheck(getInstance());
+                    work->sub_state_0x017 = 0x64;
+                    work->step_0x018 = 0;
+                    work->flag_0xBF2D = 2;
+                    return;
+                }
+                work->sub_state_0x017 = 0x62;
+                work->step_0x018 = 0;
                 return;
             }
             break;
-        case 2:
-            if (isPhaseSlotDone(0x10) != 0) {
-                clearPhaseSlot(8);
-                getNetworkSessionManagerPat(getPatsObject(), 0)->request392();
-                work->step_0x018++;
-                return;
-            }
-            break;
-        case 3:
-            if (isPhaseSlotDone(8) != 0) {
-                work->step_0x018++;
-                return;
-            }
-            break;
-        case 4:
+        case 0x62:
             if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
-                work->community_results_0xA144[2] = 0;
-                getNetworkCommunityPat(getPatsObject(), 0)->shutdown_20();
+                deleteNetworkCommunityPat(getPatsObject(), 0);
             }
-            work->step_0x018++;
+            if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                deleteNetworkSessionManagerPat(getPatsObject(), 0);
+            }
+            if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+                deleteNetworkLayerPat(getPatsObject(), 0);
+            }
+            getInstance();
+            loadPatInterfaceBuffers();
+            clearNetworkPat(getPatsObject());
+            resetPatInterfaces();
+            work->pats_0x000 = NULL;
+            work->flag_0xBF2C = 2;
+            system_w.field_0x86b = 0;
+            resetSystemState(&system_w);
+            work->sub_state_0x017 = 0x63;
+            work->step_0x018 = 0;
             return;
-        case 5:
-            if (getNetworkCommunityPat(getPatsObject(), 0) == NULL || work->community_results_0xA144[2] != 0) {
-                if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
-                    clearPhaseSlot(2);
-                    getNetworkSessionManagerPat(getPatsObject(), 0)->request368();
-                }
-                work->step_0x018++;
-                return;
-            }
-            break;
-        case 6:
-            if (getNetworkSessionManagerPat(getPatsObject(), 0) == NULL || isPhaseSlotDone(2) != 0) {
-                if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
-                    work->layer_results_0x6244[2] = 0;
-                    getNetworkLayerPat(getPatsObject(), 0)->shutdown_20();
-                }
-                work->step_0x018++;
-                return;
-            }
-            break;
-        case 7:
-            if (getNetworkLayerPat(getPatsObject(), 0) == NULL || work->layer_results_0x6244[2] != 0) {
-                work->step_0x018++;
-                return;
-            }
-            break;
-        case 8:
-            work->step_0x018++;
-            return;
-        case 9:
-            work->status_0x174 = 0;
-            resetMediatorFlag1D(getInstance());
-            work->step_0x018++;
-            return;
-        case 10:
-            if (work->status_0x174 != 0) {
-                work->step_0x018++;
-                return;
-            }
-            break;
-        case 11:
-            work->step_0x018++;
-            return;
-        case 12:
-            pmic_disp_off();
-            work->flag_0xC499 = 0;
-            if (work->flag_0xBF2E != 0) {
-                startTermsCheck(getInstance());
-                work->sub_state_0x017 = 0x65;
+        case 0x64:
+            if (lobby_w.field_0x0B0 == 2 || lobby_w.field_0x0B0 == 4) {
+                work->sub_state_0x017 = 0x62;
                 work->step_0x018 = 0;
                 return;
             }
-            if (work->flag_0xBF2D != 0) {
-                startTermsCheck(getInstance());
-                work->sub_state_0x017 = 0x64;
+            break;
+        case 0x65:
+            if (work->flag_0xBF2E == 7) {
+                work->sub_state_0x017 = 0x62;
                 work->step_0x018 = 0;
-                work->flag_0xBF2D = 2;
-                return;
             }
-            work->sub_state_0x017 = 0x62;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    case 0x62:
-        if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
-            deleteNetworkCommunityPat(getPatsObject(), 0);
-        }
-        if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
-            deleteNetworkSessionManagerPat(getPatsObject(), 0);
-        }
-        if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
-            deleteNetworkLayerPat(getPatsObject(), 0);
-        }
-        getInstance();
-        loadPatInterfaceBuffers();
-        clearNetworkPat(getPatsObject());
-        resetPatInterfaces();
-        work->pats_0x000 = NULL;
-        work->flag_0xBF2C = 2;
-        system_w.field_0x86b = 0;
-        resetSystemState(&system_w);
-        work->sub_state_0x017 = 0x63;
-        work->step_0x018 = 0;
-        return;
-    case 0x64:
-        if (lobby_w.field_0x0B0 == 2 || lobby_w.field_0x0B0 == 4) {
-            work->sub_state_0x017 = 0x62;
-            work->step_0x018 = 0;
-            return;
-        }
-        break;
-    case 0x65:
-        if (work->flag_0xBF2E == 7) {
-            work->sub_state_0x017 = 0x62;
-            work->step_0x018 = 0;
+            break;
         }
         break;
     }
