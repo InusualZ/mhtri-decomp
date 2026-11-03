@@ -1402,7 +1402,7 @@ config.libs = [
             Object(NonMatching, "TRK/msghndlr.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/mslsupp.c"),
             Object(NonMatching, "TRK/targimpl.c"),
-            Object(NonMatching, "AI_SDK/ai.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
+            Object(Matching, "AI_SDK/ai.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             # The ARC archive and AX audio band 0x8046D9F0..0x80474CB0 recut per library and source file; each unit's header carries
             # its evidence.  Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
             Object(Matching, "ARC/arc.c", cflags=cflags_base),
