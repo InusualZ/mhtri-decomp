@@ -15,10 +15,16 @@
  * EVIDENCE. `.bss` 0x806FB6E0 (0x7800 B: 96 PBs), 0x80702EE0 (0x1800 B: 96 ITD buffers) and 0x807046E0 (0x8700 B: 96 voices)
  *    are reached through the `.sbss` pointers 0x80794FD8..0x80794FE0 that `__AXVPBInit` fills; `.sdata2`
  *    0x8079CF48..0x8079CF68 holds the float constants of `AXSetVoiceSrcRatio` and `AXGetLpfCoefs`.
- * RESIDUALS. __AXServiceVPB 0x804709C0: ITD copy temporaries take r3/r0 swapped.
- *    `.bss` opens with AXSPB's 8 B fill (claim align:32); flipcheck reads it as a layout difference, and it is link
- *    padding once the 32-aligned object links.
- * SHAPES. AXGetLpfCoefs folds `2.0f - cos(...)` into one expression and names the square root, which pools the
+ * RESIDUALS. none: 17/17 rows, the data sections byte-identical, the trial flip links the retail DOL.
+ *    `.bss` opens with AXSPB's 8 B fill (claim align:32) and `.sbss`/`.text` end in 4 B/8 B of link padding.
+ *    flipcheck's reverse-reference row names `@446`/`@486`..`@489` as referenced from NANDCore.o, OSReset.o and four
+ *    more: a by-name collision with those objects' own local `@N` pool entries, not a link reference.
+ * SHAPES. __AXServiceVPB clears the ITD buffer with a one-based index (`for (i = 1; i <= 16; i++) itd[i - 1] = 0`):
+ *    with a zero-based counter the fully unrolled stores' zero temporary and the dead counter both hold 0 and the
+ *    global-optimization pass merges them onto `i`'s named node, which colours after the seven ITD copy temporaries
+ *    (zero r4, copies r0); a counter that never holds 0 leaves the zero on a backend temporary numbered above the
+ *    copies, coloured first (r0), with the copies in r3 as retail has them.
+ *    AXGetLpfCoefs folds `2.0f - cos(...)` into one expression and names the square root, which pools the
  *    literals in the target's order (2.0f before 2pi, 1.0f before 32768.0f); `__AXPBData` is 32-byte aligned.
  *    __AXSyncPBs sums the cycle tables left to right in field order (MWCC reassociates them into the target's
  *    order), writes the start count as one sum, and walks the priority-0 stack with a block-scoped pointer.
@@ -152,8 +158,8 @@ void __AXServiceVPB(AXVPB* vpb)
         dst->itdTargetShift[0] = pb->itdTargetShift[0];
         dst->itdTargetShift[1] = pb->itdTargetShift[1];
         itd = vpb->itdBufferData;
-        for (i = 0; i < 16; i++) {
-            itd[i] = 0;
+        for (i = 1; i <= 16; i++) {
+            itd[i - 1] = 0;
         }
     }
     if (sync & AX_SYNC_DPOP) {

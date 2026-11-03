@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (284)
+## Ideas that work (285)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -293,6 +293,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 304 | [An 8-aligned string after a 4-aligned inline tail is the next TU's first literal; an unreferenced inline is never emitted](304-8-aligned-string-after.md) | works | data, sections, source-shape, vtable | Every `.text` row is at 100 and `.data` still differs - retail has a string right after the vtable and another one 8-aligned after it, while ours emits every string before the vtable; making the owners `inline` moves... |
 | 305 | [A commutative sum of two products emits the simpler product first: name the complex operand to keep the pool order](305-commutative-sum-of-two.md) | works | source-shape, data, allocator | Two adjacent .sdata2 pool entries are swapped against the target and a few FPR temporaries around their loads shift by one register, while every opcode of the row already matches; swapping the two terms in the source... |
 | 306 | [Backend temporaries are numbered in statement order: move the statement, and read a global into a local to put its load on the named tier](306-backend-temporaries-are-numbered.md) | works | source-shape, allocator | A row matches every opcode but a block's volatile registers are permuted (a 64-bit difference in r12/r0 where retail has r8/r5, two pooled globals one register apart), the differing nodes are all backend temporaries,... |
+| 307 | [A fully unrolled clear loop's zero merges with its 0-valued counter: start the counter at 1](307-fully-unrolled-clear-loops.md) | works | source-shape, allocator | A constant-count `itd[i] = 0` loop beside a run of field copies has every opcode of retail, but the zero lands in a volatile register retail does not use (r4) and the copy temporaries take r0 where retail has r3 - a... |
 
 ## Ruled out - tried and it did not work, do not re-run (13)
 
