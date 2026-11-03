@@ -32,7 +32,7 @@ LINKER_SYMBOLS = EABI_LINKER_SYMBOLS + ENTRY_SYMBOLS
 LINKER_ASSIGN_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.]*)\s*=")
 #: The link-symbol index cache (`build/` is gitignored, so it never dirties a tree).
 LINK_INDEX_REL = os.path.join("build", "tmp", "undefrefs", "link-symbols.json")
-LINK_INDEX_SCHEMA = 1
+LINK_INDEX_SCHEMA = 2  # 2: refs leave out relocations against the object's own local symbols
 #: The relocation kinds relocdiff/relocaudit-era views name; every other kind renders numerically there
 #: (Known gaps: the full `binary.elf` table would rename `R_PPC_11` -> `R_PPC_REL14` in their output).
 LEGACY_NAMED_RELOCS = frozenset({1, 4, 5, 6, 10, 109})
@@ -1478,7 +1478,9 @@ def reloc_facts(obj) -> dict | None:
 
     `relocs` are `{section, target, offset, type, type_name, symbol, addend}` dicts (`target` = the section the
     relocation applies to); `defined` is `{name: (section, st_info)}` for every symbol the object defines, locals
-    included; `refs` every name its non-bookkeeping relocations reference."""
+    included; `refs` every name its non-bookkeeping relocations reference through a symbol the linker resolves
+    across objects - a relocation against one of the object's own local symbols (an MWCC `@N` pool entry, a
+    section symbol) names nothing in another object, so it is not a reference to a same-spelled global."""
     try:
         elf = load(obj)
     except (OSError, ElfError, ValueError):
@@ -1497,7 +1499,8 @@ def reloc_facts(obj) -> dict | None:
         symbol = r.symbol_name if r.symbol < nsym else None
         rows.append({"section": r.rela, "target": target, "offset": r.offset, "type": r.type,
                      "type_name": legacy_reloc_name(r.type, "type-%d"), "symbol": symbol, "addend": r.addend})
-        if symbol and not (target or "").startswith(BOOKKEEPING_SECTIONS):
+        local = r.symbol < nsym and elf.symbols[r.symbol].info >> 4 == STB_LOCAL
+        if symbol and not local and not (target or "").startswith(BOOKKEEPING_SECTIONS):
             refs.add(symbol)
     return {"relocs": rows, "defined": defined, "refs": refs}
 
