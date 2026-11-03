@@ -584,7 +584,7 @@ def link_reference_context() -> dict | None:
     if not paths:
         return None
     index = objcompare.link_index(MAIN, paths)
-    return {"refs": index["refs"], "ref_count": index["ref_count"],
+    return {"refs": index["refs"], "ref_count": index["ref_count"], "live": index.get("live", set()),
             "providers": {name: set(rels) for name, rels in index["providers"].items()},
             "inputs": list(paths)}
 
@@ -1142,7 +1142,9 @@ def link_setup() -> tuple[dict | None, set[str] | None, set[str]]:
     link_ctx = link_reference_context()
     if link_ctx is None:
         return None, None, set()
-    return link_ctx, set(link_ctx["ref_count"]) | forced_active() | set(ENTRY_SYMBOLS), map_symbols()
+    # liveness counts local-symbol relocations too (an object's own `@N` pool entries); ref_count does not
+    return link_ctx, (set(link_ctx["ref_count"]) | set(link_ctx.get("live", ())) | forced_active()
+                      | set(ENTRY_SYMBOLS)), map_symbols()
 
 
 #: The first refusal line of a unit READY only while a NOT READY unit of its batch flips too (`settle_batch`).

@@ -32,7 +32,7 @@ LINKER_SYMBOLS = EABI_LINKER_SYMBOLS + ENTRY_SYMBOLS
 LINKER_ASSIGN_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.]*)\s*=")
 #: The link-symbol index cache (`build/` is gitignored, so it never dirties a tree).
 LINK_INDEX_REL = os.path.join("build", "tmp", "undefrefs", "link-symbols.json")
-LINK_INDEX_SCHEMA = 2  # 2: refs leave out relocations against the object's own local symbols
+LINK_INDEX_SCHEMA = 3  # 2: refs leave out local-symbol relocations; 3: those go to local_refs (liveness)
 #: The relocation kinds relocdiff/relocaudit-era views name; every other kind renders numerically there
 #: (Known gaps: the full `binary.elf` table would rename `R_PPC_11` -> `R_PPC_REL14` in their output).
 LEGACY_NAMED_RELOCS = frozenset({1, 4, 5, 6, 10, 109})
@@ -1474,13 +1474,14 @@ def value_brief(d: dict) -> str:
 # --- undefined names: what a flip would leave unresolved --------------------------------------------------------
 
 def reloc_facts(obj) -> dict | None:
-    """`{relocs, defined, refs}` for an object, or None when it cannot be read.
+    """`{relocs, defined, refs, local_refs}` for an object, or None when it cannot be read.
 
     `relocs` are `{section, target, offset, type, type_name, symbol, addend}` dicts (`target` = the section the
     relocation applies to); `defined` is `{name: (section, st_info)}` for every symbol the object defines, locals
     included; `refs` every name its non-bookkeeping relocations reference through a symbol the linker resolves
-    across objects - a relocation against one of the object's own local symbols (an MWCC `@N` pool entry, a
-    section symbol) names nothing in another object, so it is not a reference to a same-spelled global."""
+    across objects, `local_refs` the names referenced through the object's own local symbols (an MWCC `@N` pool
+    entry, a section symbol). A local reference names nothing in another object, so it never counts as a
+    reference to a same-spelled global - but it does keep its own symbol live (row 36's deadstrip test)."""
     try:
         elf = load(obj)
     except (OSError, ElfError, ValueError):
@@ -1494,15 +1495,16 @@ def reloc_facts(obj) -> dict | None:
     nsym = len(elf.symbols)
     rows = []
     refs = set()
+    local_refs = set()
     for r in elf.relocs():
         target = targets.get(r.rela_index)
         symbol = r.symbol_name if r.symbol < nsym else None
         rows.append({"section": r.rela, "target": target, "offset": r.offset, "type": r.type,
                      "type_name": legacy_reloc_name(r.type, "type-%d"), "symbol": symbol, "addend": r.addend})
-        local = r.symbol < nsym and elf.symbols[r.symbol].info >> 4 == STB_LOCAL
-        if symbol and not local and not (target or "").startswith(BOOKKEEPING_SECTIONS):
-            refs.add(symbol)
-    return {"relocs": rows, "defined": defined, "refs": refs}
+        if symbol and not (target or "").startswith(BOOKKEEPING_SECTIONS):
+            local = elf.symbols[r.symbol].info >> 4 == STB_LOCAL
+            (local_refs if local else refs).add(symbol)
+    return {"relocs": rows, "defined": defined, "refs": refs, "local_refs": local_refs}
 
 
 def provides_global(entry) -> bool:
@@ -1720,10 +1722,12 @@ def linker_assigned(ldscript: str) -> set[str]:
 
 def link_index(root: str, inputs: list[str] | None = None, cache_path: str | None = None,
                rebuild: bool = False) -> dict:
-    """`{providers: {name: [input]}, ref_count: {name: n}, inputs: [input], refs: {input: names}}` over the link inputs.
+    """`{providers, ref_count, inputs, refs, live}` over the link inputs.
 
-    `providers` is the global/weak definition map, `ref_count` how many inputs reference each name, `refs` what
-    each input references (empty for a missing or unreadable input). Per-input
+    `providers` is the global/weak definition map, `ref_count` how many inputs reference each name through a
+    global binding, `refs` what each input references that way (empty for a missing or unreadable input), and
+    `live` every name some input's relocation names, its own local symbols included (what keeps a symbol from
+    being deadstripped). Per-input
     facts are cached (`LINK_INDEX_REL` under `root` by default) keyed by size+mtime; only changed inputs are
     re-read, and the cache is written only when an input appeared, vanished or moved."""
     inputs = (link_inputs(os.path.join(root, "build.ninja")) or []) if inputs is None else inputs
@@ -1744,24 +1748,27 @@ def link_index(root: str, inputs: list[str] | None = None, cache_path: str | Non
         if sig is None:
             continue
         old = cached.get(rel)
-        if old and old.get("sig") == sig and "defined" in old and "refs" in old:
+        if old and old.get("sig") == sig and "defined" in old and "refs" in old and "local_refs" in old:
             fresh[rel] = old
             continue
         changed = True
         facts = reloc_facts(path)
         if facts is None:
-            fresh[rel] = {"sig": sig, "defined": [], "refs": []}
+            fresh[rel] = {"sig": sig, "defined": [], "refs": [], "local_refs": []}
             continue
         fresh[rel] = {"sig": sig, "defined": sorted(n for n, e in facts["defined"].items() if provides_global(e)),
-                      "refs": sorted(facts["refs"])}
+                      "refs": sorted(facts["refs"]), "local_refs": sorted(facts["local_refs"])}
     providers: dict[str, list[str]] = {}
     ref_count: dict[str, int] = {}
+    live: set[str] = set()
     refs = {rel: set(fresh[rel]["refs"]) if rel in fresh else set() for rel in inputs}
     for rel, entry in fresh.items():
         for name in entry["defined"]:
             providers.setdefault(name, []).append(rel)
         for name in entry["refs"]:
             ref_count[name] = ref_count.get(name, 0) + 1
+        live.update(entry["refs"])
+        live.update(entry.get("local_refs", ()))
     if changed:
         try:
             os.makedirs(os.path.dirname(cache_path), exist_ok=True)
@@ -1771,7 +1778,7 @@ def link_index(root: str, inputs: list[str] | None = None, cache_path: str | Non
             os.replace(tmp, cache_path)
         except OSError:
             pass
-    return {"providers": providers, "ref_count": ref_count, "inputs": inputs, "refs": refs}
+    return {"providers": providers, "ref_count": ref_count, "inputs": inputs, "refs": refs, "live": live}
 
 
 def external_candidates(ours: dict, known: set[str]) -> list[tuple[str, int, str]]:
