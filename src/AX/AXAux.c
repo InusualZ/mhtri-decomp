@@ -6,7 +6,11 @@
  *    0x80794ED8-0x80794F20.  Cut from the old ARC/AX block between `AX/AXAlloc.c` (0x8046EA90) and `AX/AXCL.c`
  *    (0x8046F310).
  * FLAGS. the `OS` lib's group with `cflags_base` (configure.py `cflags=`): every function start of the band is
- *    16-aligned (`-O4,p` default alignment), not the 4-byte packing `cflags_os` gives.
+ *    16-aligned (`-O4,p` default alignment), not the 4-byte packing `cflags_os` gives. `__AXProcessAux` is built
+ *    with `#pragma opt_common_subs off`: with the frontend's pass on, the frame-index loads and the two 0x600
+ *    products become frontend temporaries numbered below the aux A base, and the allocator then colours the base
+ *    r7 and the frame-out index r8 (retail r8/r7); with it off, the backend numbers them in code order and the
+ *    natural A/B/C in-then-out store order reproduces retail's registers.
  * NAMES. the `__AXGetAux*`, `__AXProcessAux` and `AXRegisterAuxACallback` names are the map's;
  *    `AXRegisterAuxBCallback` (0x8046F210), `AXRegisterAuxCCallback` (0x8046F280), `__AXAuxBufferA/B/C` (.bss 0x806F75E0)
  *    and the `__AXAux*` state words are GUESSes named from how the code uses them; the file name `AXAux.c` is a GUESS.
@@ -14,10 +18,7 @@
  *    C) are addressed from one base by `__AXProcessAux`; `.sbss` 0x80794ED8..0x80794F20 are the frame indices,
  *    buffer pointers, callbacks and clear flags, first written by `__AXAuxInit`. 0x80794F38 (the mode word) is defined
  *    in `AX/AXCL.c` and read here.
- * RESIDUALS. __AXProcessAux 0x8046EDF0: the aux A frame base and the frame-out index are coloured r7/r8 where the
- *    target has r8/r7 (operand-only differences in the head and the aux A frame adds); of the 720 orders of the six
- *    buffer-pointer stores the A-in, B-out, B-in, A-out, C-out, C-in order is the best, and locals for the indices or
- *    the buffer base and the address spelling do not move it.
+ * RESIDUALS. none: 21/21 rows, the data sections byte-identical, the trial flip links the retail DOL.
  * SHAPES. three frame arrays; each aux has a callback, a context word and three clear flags (one per frame).
  *    The aux C clear test re-reads `__AXAuxCCallback` through a `volatile` lvalue (a GUESS from the codegen): the
  *    target reloads it after the callback branch, a plain read is CSEd into one load, and a `volatile` declaration
@@ -198,15 +199,16 @@ void __AXGetAuxCOutput(u32* address)
     *address = (u32)__AXAuxBufferC[__AXAuxFrameOut];
 }
 
+#pragma opt_common_subs off
 /* 0x8046EDF0 (0x3AC): runs the aux callbacks on the current frame and advances the frame indices. */
 void __AXProcessAux(void)
 {
     __AXAuxAInput = __AXAuxBufferA[__AXAuxFrameIn][0];
-    __AXAuxBOutput = __AXAuxBufferB[__AXAuxFrameOut][0];
-    __AXAuxBInput = __AXAuxBufferB[__AXAuxFrameIn][0];
     __AXAuxAOutput = __AXAuxBufferA[__AXAuxFrameOut][0];
-    __AXAuxCOutput = __AXAuxBufferC[__AXAuxFrameOut][0];
+    __AXAuxBInput = __AXAuxBufferB[__AXAuxFrameIn][0];
+    __AXAuxBOutput = __AXAuxBufferB[__AXAuxFrameOut][0];
     __AXAuxCInput = __AXAuxBufferC[__AXAuxFrameIn][0];
+    __AXAuxCOutput = __AXAuxBufferC[__AXAuxFrameOut][0];
     if (__AXAuxACallback != NULL) {
         if (__AXOutputMode == 2) {
             s32* buffers[4];
@@ -283,6 +285,7 @@ void __AXProcessAux(void)
     __AXAuxFrameOut = (__AXAuxFrameOut + 1) % AX_AUX_FRAMES;
     __AXAuxFrameProc = (__AXAuxFrameProc + 1) % AX_AUX_FRAMES;
 }
+#pragma opt_common_subs reset
 
 /* 0x8046F1A0 (0x64): installs the aux A callback; clearing it marks all three aux A frames for a clear. */
 /* untyped: caller-owned context word handed back to the callback */
