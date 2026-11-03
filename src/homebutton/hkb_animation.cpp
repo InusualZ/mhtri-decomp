@@ -18,14 +18,17 @@
  *   'RLTP'/'RLIM' animation kinds, the Hermite constants); the three detail:: rows keep the map's manglings and the
  *   other rows take the compiler's.  Pane, Group and Layout come from homebutton/hkb_layout_decl.h, the two detail::
  *   callees from homebutton/hkb_keyboard.h.
- * RESIDUALS. AnimPaneTree::Set 0x80534830: the second inlined FindAnimContent holds name/index/offsets in
- *   r27/r26/r24 where retail has r24/r27/r26 (CONVERT_OFFS_TO_PTR inside FindAnimContent, a name, material or
- *   index local measured the same or lower).
- *   The object also emits a weak AnimTransform table (0x24 B .data) and ~AnimTransform (0x40 B) that no retail
- *   object carries: nothing references them, so the link dead-strips them.
+ * RESIDUALS. The object also emits a weak AnimTransform table (0x24 B .data) and ~AnimTransform (0x40 B) that no
+ *   retail object carries: nothing references them, so the link dead-strips them.
  * SHAPES. the two Bind overloads read the content-offset table through CONVERT_OFFS_TO_PTR
  *   (homebutton/hkb_material.h): the inline ConvertOffsToPtr call created the table's register first and swapped it
  *   with the running link.
+ * SHAPES. AnimPaneTree::Set colours the second inlined FindAnimContent's name/offsets/index as r24/r26/r27 only when
+ *   the material name arrives through an inline accessor (GetMaterialName: its parameter numbers the name below
+ *   pAnimBlock, a bare `->mName` is a temporary numbered above everything) and the offsets table is read through
+ *   CONVERT_OFFS_TO_PTR (the inline ConvertOffsToPtr's parameters number the table below pAnimBlock); either one
+ *   alone measures lower, and the declaration order inside FindAnimContent or of Set's expression-initialised
+ *   locals moves nothing (they take their initialiser's number).
  * SHAPES. `#pragma auto_inline on` is scoped to AnimResource::Init: retail inlines it into Set and nothing else
  *   (unit-wide it also inlines CalcAnimationNum(Pane*) into the Group overload).  TestFileVersion returns the
  *   comparison expression (a bool local spills it to a second register).  The texture SRT and pattern setters are
@@ -563,9 +566,14 @@ void AnimPaneTree::Init() {
     }
 }
 
+/* Returns a material's name. */
+inline const char* GetMaterialName(const Material* pMaterial) {
+    return pMaterial->mName;
+}
+
 /* Returns the index of the content of type `animContType` named `animContName`, or 0xFFFF. */
 inline u16 FindAnimContent(const res::AnimationBlock* pAnimBlock, const char* animContName, u8 animContType) {
-    const u32* animContOffsets = detail::ConvertOffsToPtr<u32>(pAnimBlock, pAnimBlock->animContOffsetsOffset);
+    const u32* animContOffsets = CONVERT_OFFS_TO_PTR(u32, pAnimBlock, pAnimBlock->animContOffsetsOffset);
     for (u16 i = 0; i < pAnimBlock->animContNum; ++i) {
         const res::AnimationContent* pAnimCont =
             detail::ConvertOffsToPtr<res::AnimationContent>(pAnimBlock, animContOffsets[i]);
@@ -589,7 +597,7 @@ void AnimPaneTree::Set(Pane* pTargetPane, const AnimResource& animRes) {
     const u8 animMatCnt = pTargetPane->GetMaterialNum();
     u16 animMatIdxs[MATERIAL_NUM_MAX];
     for (u8 i = 0; i < animMatCnt; ++i) {
-        animMatIdxs[i] = FindAnimContent(pAnimBlock, pTargetPane->GetMaterial(i)->mName, 1);
+        animMatIdxs[i] = FindAnimContent(pAnimBlock, GetMaterialName(pTargetPane->GetMaterial(i)), 1);
         if (animMatIdxs[i] != 0xFFFF) {
             ++linkNum;
         }
