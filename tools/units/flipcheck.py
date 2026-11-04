@@ -147,8 +147,10 @@ def padding_chain_break(stem: str, objsec: str) -> str | None:
         if nxt is None:
             return None
         standin = sections(os.path.join(MAIN, "build", "RMHE08", "obj", nxt[0] + ".o")).get(nxt[1])
-        if nxt[0] not in linked and standin and standin[1] >= 4:
-            return None  # an unflipped successor aligned to 16 by splits.txt places itself and fills its claim
+        if nxt[0] not in linked and standin:
+            align = 1 << standin[1]
+            if (span[0] + built[0] + align - 1) & -align == span[1]:
+                return None  # an unflipped successor's own alignment pads the short unit up to its claimed start
         if nxt[0] not in linked:
             return "%s (short by 0x%X) is followed by unflipped %s: flip from the tail of the run" % (
                 stem, span[1] - span[0] - built[0], nxt[0])
