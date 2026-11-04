@@ -682,7 +682,7 @@ config.libs = [
             # bytes and are listed with their blockers in the unit header and the outbox.
             Object(NonMatching, "quest/arenatask.cpp"),
             Object(NonMatching, "menu/menu_placeinfo.cpp"),
-            Object(NonMatching, "menu/movie.cpp"),
+            Object(Matching, "menu/movie.cpp"),
             Object(NonMatching, "menu/menu_friendlist.cpp"),
             Object(NonMatching, "menu/charmake.cpp"),
             Object(NonMatching, "menu/menu_plsearch.cpp"),
@@ -984,7 +984,7 @@ config.libs = [
             # Not a match yet: 9 of the 10 functions are byte-identical, camellia_setup256 still has
             # one extra 4-byte stack slot (see the file header comment in src/Camellia/camellia.c).
             # NonMatching keeps the original bytes in the link, so the DOL hash is unaffected by it.
-            Object(NonMatching, "Camellia/camellia.c"),
+            Object(Matching, "Camellia/camellia.c"),
         ],
     },
     {
