@@ -67,12 +67,10 @@ void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 reques
                             const u8* data);
 
 /* 0x80793930 / 0x80793934 - the two `.sdata` floats `initNetworkSessionStable` copies into a new
- * session through the vtable's +0x54/+0x58 slots; 0x8079C764 the `.sdata2` float it publishes
- * through +0x60. */
+ * session through the vtable's +0x54/+0x58 slots. */
 extern f32 networkSessionTimeoutSeconds;
 extern f32 networkSessionIntervalSeconds;
 extern f32 networkSessionLimitSeconds;   /* 0x80793938 (GUESS: the third timeout the circle block can set, 20..100 s) */
-extern f32 networkSessionPeriodSeconds;
 
 #ifdef __cplusplus
 }
