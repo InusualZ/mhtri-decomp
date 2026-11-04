@@ -4,24 +4,21 @@
  *   `GetResAnmFog`, `GetResAnmCamera`, each with its null-safe offset helper) and the `ResAnmTexPat` accessors,
  *   `Bind(ResFile)` (fn_800913A0) and `Release()` (fn_80091628).
  * RANGE. .text 0x8009001C-0x800916FC (50 functions); extab, extabindex, .data 0x80590660-0x80590928 (the five
- *   `ResName` records, the getters' strings from "g3d_resanmscn.cpp", then the `_ac.h` inline tail), .sdata
+ *   `ResName` records, the getters' strings from "g3d_resanmscn.cpp", then the `_ac.h` accessors' strings), .sdata
  *   0x80791268-0x80791270.  The left seam is the first function that reads this TU's data (fn_8009001C's callers
  *   read the 0x80590660 records; extabindex 0x80021D8C).
- * NAMES. Map stems (the dump answers `zz_` placeholders); the element types come from each out-of-line
+ * NAMES. The fourteen `resanmscn_*_ac_*` strings are GUESSES (named for their accessor and role).
+ *   Map stems (the dump answers `zz_` placeholders); the element types come from each out-of-line
  *   constructor's `*_ac.h` assert (fn_800900A4, fn_800901AC, fn_80090380, fn_80090554, fn_80090728).
  *   res_light_set_init, res_anm_amb_light_init, res_anm_light_init, res_anm_fog_init, res_anm_camera_init and
  *   res_anm_tex_pat_ref are GUESSES (dead-stripped referencers of the inline accessors; no symbols.txt row).
  *   res_name_light_set .. res_name_cameras are GUESSES for the map's lbl_80590660..lbl_805906E0.
- * RESIDUALS. fn_800913A0: register colouring only - the two `ResAnmTexPatInfoData` counts in r31/r30 (retail r30/r29), the
- *   texture-name array in r29 (retail r31), the palette counter on r24 (retail reuses r31), and the loop
- *   temporaries at 0x0C/0x1C/0x28/0x2C (retail 0x0C/0x14/0x1C/0x28).
- *   flipcheck: `.sdata` byte-identical; `.data` identical up to the texpat `ref()` format string, which retail
- *   places 4 bytes later (0x80590908 + 8-aligned, ours 4-aligned).  The six dead-stripped referencers are
- *   object-only.
+ * RESIDUALS. none; flipcheck byte-identical in .text/.data/.sdata/extab, trial flip keeps main.dol OK.  The 0x6-byte
+ *   tail of the `.data` claim is fill before `g3d/g3d_resanmtexsrt.cpp`'s 8-aligned `.data`.  The six
+ *   dead-stripped referencers are object-only.
  * SHAPES. The `_ac.h` accessors that carry strings (fn_800912F8, fn_80091280 and the five element constructors
- *   with their word stores) are `inline` and `__declspec(noinline)` under `#pragma dont_inline on`, defined in
- *   string-creation order (the
- *   inline tail is reversed); each weak copy follows its first referencer - retail's dead-stripped ones are
+ *   with their word stores) are `inline` and `__declspec(noinline)` under `#pragma dont_inline on`; each weak
+ *   copy follows its first referencer - retail's dead-stripped ones are
  *   frameless one-call wrappers here.  The lookups and constructors are compiled with `#pragma peephole off`
  *   (the kept `clrlwi` + `cmpwi`); the getters keep the default, which holds the eight offset helpers' base in r0.
  *   fn_80090218/3EC/5C0/794 build their element handles as `ResHandleTemp` class temporaries (g3d/g3d_rescommon.h)
@@ -31,6 +28,8 @@
  *   the lookups then hold the key copy's address in r31).
  *   The five getters declare the fallback temporary before the result (r1+0xC for the empty path, r1+0x8 for the
  *   element), and the `"ref"` assert argument stays a literal (an extern loads with `lis`/`addi`, not `@sda21`).
+ *   fn_800913A0 is compiled under `#pragma opt_lifetimes off` (one register for both loops' counter) and
+ *   `dont_inline off`, with the name word and the found handle as `ResHandleTemp` temporaries (retail's slots).
  */
 
 #include "types.h"
@@ -276,9 +275,25 @@ u32 fn_800699A8(void);
 
 #pragma peephole off
 
-/* The `*_ac.h` inline accessors this TU keeps, called out of line (`dont_inline`).  They are defined in
- * the order their strings are created: the inline tail is emitted in reverse, after every out-of-line
- * string. */
+/* The `*_ac.h` accessors' assert strings, defined after the last function so that they follow the getters'
+ * literals in `.data`.  Retail's `ResAnmTexPat` message is 8-aligned (4 zero bytes before it), which a weak
+ * literal cannot carry and a function-local static would place ahead of the getters' literals. */
+extern char resanmscn_camera_ac_align_msg[];
+extern char resanmscn_camera_ac_file[];
+extern char resanmscn_fog_ac_align_msg[];
+extern char resanmscn_fog_ac_file[];
+extern char resanmscn_light_set_ac_align_msg[];
+extern char resanmscn_light_set_ac_file[];
+extern char resanmscn_light_ac_align_msg[];
+extern char resanmscn_light_ac_file[];
+extern char resanmscn_amb_light_ac_align_msg[];
+extern char resanmscn_amb_light_ac_file[];
+extern char resanmscn_common_ac_null_msg[];
+extern char resanmscn_common_ac_file[];
+extern char resanmscn_tex_pat_ac_invalid_fmt[];
+extern char resanmscn_tex_pat_ac_file[];
+
+/* The `*_ac.h` inline accessors this TU keeps, called out of line (`dont_inline`). */
 #pragma dont_inline on
 
 /* `ResAnmTexPat::ref()`: the checked data pointer.  The message's class-name argument identifies the
@@ -286,7 +301,7 @@ u32 fn_800699A8(void);
 __declspec(noinline) inline u32 fn_800912F8(void *self)
 {
     if (fn_800699B4(self) == 0) {
-        nw4r::db::Panic("g3d_resanmtexpat_ac.h", 92, "%s::%s: Object not valid.", (const char *)fn_800699A8(), "ref");
+        nw4r::db::Panic(resanmscn_tex_pat_ac_file, 92, resanmscn_tex_pat_ac_invalid_fmt, (const char *)fn_800699A8(), "ref");
     }
     return fn_8009135C(self);
 }
@@ -295,7 +310,7 @@ __declspec(noinline) inline u32 fn_800912F8(void *self)
 __declspec(noinline) inline u32 *fn_80091280(void *self)
 {
     if (*(u32 **)self == NULL) {
-        nw4r::db::Panic("g3d_rescommon_ac.h", 143, "NW4R:Pointer must not be NULL (mpData)");
+        nw4r::db::Panic(resanmscn_common_ac_file, 143, resanmscn_common_ac_null_msg);
     }
     return *(u32 **)self;
 }
@@ -307,7 +322,7 @@ __declspec(noinline) inline void *fn_800901AC(void *self, const void *pData)
 
     fn_80090210((u32 *)self, value);
     if (value & 3) {
-        nw4r::db::Panic("g3d_resanmamblight_ac.h", 0x25, "NW4R:Failed assertion !((u32)p & 0x3)");
+        nw4r::db::Panic(resanmscn_amb_light_ac_file, 0x25, resanmscn_amb_light_ac_align_msg);
     }
     return self;
 }
@@ -325,7 +340,7 @@ __declspec(noinline) inline void *fn_80090380(void *self, const void *pData)
 
     fn_800903E4((u32 *)self, value);
     if (value & 3) {
-        nw4r::db::Panic("g3d_resanmlight_ac.h", 0x8F, "NW4R:Failed assertion !((u32)p & 0x3)");
+        nw4r::db::Panic(resanmscn_light_ac_file, 0x8F, resanmscn_light_ac_align_msg);
     }
     return self;
 }
@@ -343,7 +358,7 @@ __declspec(noinline) inline void *fn_800900A4(void *self, const void *pData)
 
     fn_80090108((u32 *)self, value);
     if (value & 3) {
-        nw4r::db::Panic("g3d_reslightset_ac.h", 0x27, "NW4R:Failed assertion !((u32)p & 0x3)");
+        nw4r::db::Panic(resanmscn_light_set_ac_file, 0x27, resanmscn_light_set_ac_align_msg);
     }
     return self;
 }
@@ -361,7 +376,7 @@ __declspec(noinline) inline void *fn_80090554(void *self, const void *pData)
 
     fn_800905B8((u32 *)self, value);
     if (value & 3) {
-        nw4r::db::Panic("g3d_resanmfog_ac.h", 0x3E, "NW4R:Failed assertion !((u32)p & 0x3)");
+        nw4r::db::Panic(resanmscn_fog_ac_file, 0x3E, resanmscn_fog_ac_align_msg);
     }
     return self;
 }
@@ -379,7 +394,7 @@ __declspec(noinline) inline void *fn_80090728(void *self, const void *pData)
 
     fn_8009078C((u32 *)self, value);
     if (value & 3) {
-        nw4r::db::Panic("g3d_resanmcamera_ac.h", 0x7D, "NW4R:Failed assertion !((u32)p & 0x3)");
+        nw4r::db::Panic(resanmscn_camera_ac_file, 0x7D, resanmscn_camera_ac_align_msg);
     }
     return self;
 }
@@ -872,6 +887,8 @@ void fn_80091394(void *dst, const void *src)
 
 /* `ResAnmTexPat::Bind(ResFile file)`: resolve every texture and palette name against `file` and store
  * the handles in the two arrays; returns whether every entry resolved. */
+#pragma dont_inline off
+#pragma opt_lifetimes off
 u32 fn_800913A0(void *self, void *file)
 {
     s32 numTex;
@@ -902,14 +919,11 @@ u32 fn_800913A0(void *self, void *file)
         if (reinterpret_cast<const nw4r::g3d::ResTex*>(pTexArray)->IsValid() != 0) {
             numBound++;
         } else {
-            u32 nameWord = fn_80091584(pTexNameArray, i);
             ResName name;
             ResTex tex;
-            u32 handle;
 
-            res_name_copy_ctor(&name, &nameWord);
-            handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResTex(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
-            res_tex_copy_ctor(&tex, &handle);
+            res_name_copy_ctor(&name, &ResHandleTemp().set(fn_80091584(pTexNameArray, i))->word);
+            res_tex_copy_ctor(&tex, &ResHandleTemp().set((u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResTex(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData)->word);
             if (reinterpret_cast<const nw4r::g3d::ResTex*>(&tex)->IsValid() != 0) {
                 res_tex_assign(pTexArray, &tex);
                 numBound++;
@@ -922,14 +936,11 @@ u32 fn_800913A0(void *self, void *file)
         if (reinterpret_cast<const nw4r::g3d::ResPltt*>(pPlttArray)->IsValid() != 0) {
             numBound++;
         } else {
-            u32 nameWord = fn_80091584(pPlttNameArray, i);
             ResName name;
             ResPltt pltt;
-            u32 handle;
 
-            res_name_copy_ctor(&name, &nameWord);
-            handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResPltt(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
-            res_pltt_copy_ctor(&pltt, &handle);
+            res_name_copy_ctor(&name, &ResHandleTemp().set(fn_80091584(pPlttNameArray, i))->word);
+            res_pltt_copy_ctor(&pltt, &ResHandleTemp().set((u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResPltt(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData)->word);
             if (reinterpret_cast<const nw4r::g3d::ResPltt*>(&pltt)->IsValid() != 0) {
                 res_pltt_assign(pPlttArray, &pltt);
                 numBound++;
@@ -940,6 +951,8 @@ u32 fn_800913A0(void *self, void *file)
 
     return numTex + numPltt - numBound == 0;
 }
+#pragma opt_lifetimes reset
+#pragma dont_inline on
 
 /* The name-array element at `idx`: the entry is an offset to a name record, whose four-byte head the
  * wrapper starts at. */
@@ -1029,5 +1042,21 @@ void fn_80091628(void *self)
         pPlttArray++;
     }
 }
+
+/* The `*_ac.h` accessors' assert strings, in the target's `.data` order. */
+char resanmscn_camera_ac_align_msg[] = "NW4R:Failed assertion !((u32)p & 0x3)";
+char resanmscn_camera_ac_file[] = "g3d_resanmcamera_ac.h";
+char resanmscn_fog_ac_align_msg[] = "NW4R:Failed assertion !((u32)p & 0x3)";
+char resanmscn_fog_ac_file[] = "g3d_resanmfog_ac.h";
+char resanmscn_light_set_ac_align_msg[] = "NW4R:Failed assertion !((u32)p & 0x3)";
+char resanmscn_light_set_ac_file[] = "g3d_reslightset_ac.h";
+char resanmscn_light_ac_align_msg[] = "NW4R:Failed assertion !((u32)p & 0x3)";
+char resanmscn_light_ac_file[] = "g3d_resanmlight_ac.h";
+char resanmscn_amb_light_ac_align_msg[] = "NW4R:Failed assertion !((u32)p & 0x3)";
+char resanmscn_amb_light_ac_file[] = "g3d_resanmamblight_ac.h";
+char resanmscn_common_ac_null_msg[] = "NW4R:Pointer must not be NULL (mpData)";
+char resanmscn_common_ac_file[] = "g3d_rescommon_ac.h";
+char resanmscn_tex_pat_ac_invalid_fmt[] __attribute__((aligned(8))) = "%s::%s: Object not valid.";
+char resanmscn_tex_pat_ac_file[] = "g3d_resanmtexpat_ac.h";
 
 } /* extern "C" */
